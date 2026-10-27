@@ -1,14 +1,6 @@
-# Office/WPS 插件的 Windows 安装器（.exe）在 Windows runner 上构建。
-#
-# 为什么要有这条：安装器的 NSIS 一键 UI 引擎（desktop/build/win/awd-oneclick-ui.nsh）
-# 与桌面端共用，引擎一改插件 exe 就得重出；而**维护者 Mac 上的 makensis 是坏的**
-# （Homebrew 3.12 与 electron-builder 缓存的 3.04 都一样，纯 ASCII 脚本走到写产物时
-# std::bad_alloc，2026-09-01 实测，见 .claude/agents/eng-infra.md 6.5.1），
-# 本机 `npm run build:installers` 出不了 Windows 那一半。没有这条工作流，
-# 插件端的安装器修复就只能烂在仓库里（dev-board#356 发版时实际撞上）。
-#
-# mac 那一半（.dmg，swiftc + 签名 + 公证）仍然只能在维护者 Mac 上跑：
-# `cd office-addin && npm run build:installers -- --skip-win`。
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Office/WPS 插件的 Windows 安装器（.exe）与 macOS 安装器（.dmg）在 CI runner 上构建。
 #
 # 版本号取 desktop/package.json（单一来源），产物两份：国内站与国际站各一份
 #（托管地址焙进包内 manifest，不是「与站点无关」的通用包）。
@@ -35,8 +27,6 @@ jobs:
             Add-Content $env:GITHUB_PATH 'C:\Program Files (x86)\NSIS'
           }
 
-      # 位图由 render-oneclick-art.mjs 现场渲染（Chrome + ImageMagick，runner 自带），
-      # 产物不入库；build-installers.mjs 内部会调它，这里不用单独跑。
       - name: Build Windows installers (both site variants)
         shell: pwsh
         run: |
@@ -49,12 +39,71 @@ jobs:
           Get-ChildItem -Recurse office-addin/installer/dist-cn, office-addin/installer/dist-intl |
             Select-Object FullName, Length | Format-Table -AutoSize
 
-      # 两份产物文件名相同（下载地址靠 host 区分），所以必须分目录上传，
-      # 否则合并到一个 artifact 里后构建的那份会静默覆盖前一份。
       - uses: actions/upload-artifact@v4
         with:
+          retention-days: 3
           name: addin-installer-exe
           path: |
             office-addin/installer/dist-cn/*.exe
             office-addin/installer/dist-intl/*.exe
+          if-no-files-found: error
+
+  mac:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Import signing certificate & build signed/notarized macOS installers (both site variants)
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_B64: ${{ secrets.APPLE_API_KEY_B64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          set -euo pipefail
+          KC="$RUNNER_TEMP/awd-sign.keychain-db"
+          KCPASS="awd-tmp-keychain"
+          echo "$CSC_LINK" | base64 --decode > "$RUNNER_TEMP/awd-cert.p12"
+          security create-keychain -p "$KCPASS" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KCPASS" "$KC"
+          security import "$RUNNER_TEMP/awd-cert.p12" -k "$KC" -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KCPASS" "$KC" > /dev/null
+          security list-keychains -d user -s "$KC" login.keychain-db
+          security find-identity -v -p codesigning "$KC"
+
+          printf '%s' "$APPLE_API_KEY_B64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          chmod 600 "$RUNNER_TEMP/AuthKey.p8"
+          export NOTARY_KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
+          export NOTARY_KEY_ID="$APPLE_API_KEY_ID"
+          export NOTARY_ISSUER_ID="$APPLE_API_ISSUER"
+
+          node office-addin/installer/build-installers.mjs --skip-win \
+            --url https://addin.aiworkdeck.com/office-addin --dist office-addin/installer/dist-cn
+          node office-addin/installer/build-installers.mjs --skip-win \
+            --url https://addin.workdeck.ai/office-addin --dist office-addin/installer/dist-intl
+
+          for dmg in office-addin/installer/dist-cn/*.dmg office-addin/installer/dist-intl/*.dmg; do
+            echo "=== Validating $dmg ==="
+            xcrun stapler validate "$dmg"
+            MOUNT_DIR=$(mktemp -d /tmp/addin-dmg.XXXXXX)
+            hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT_DIR" "$dmg"
+            codesign --verify --deep --strict --verbose=2 "$MOUNT_DIR/安装 AI WorkDeck Office 插件.app"
+            spctl --assess -v "$MOUNT_DIR/安装 AI WorkDeck Office 插件.app"
+            hdiutil detach "$MOUNT_DIR"
+          done
+          ls -lh office-addin/installer/dist-cn/*.dmg office-addin/installer/dist-intl/*.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          retention-days: 3
+          name: addin-installer-dmg
+          path: |
+            office-addin/installer/dist-cn/*.dmg
+            office-addin/installer/dist-intl/*.dmg
           if-no-files-found: error

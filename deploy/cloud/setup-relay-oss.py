@@ -100,7 +100,7 @@ def main():
     # 2. 生命周期：35 天兜底删除（代码 TTL 30 天是主机制）+ 7 天清失败分片
     lc = (
         "<LifecycleConfiguration>"
-        "<Rule><ID>expire-relay-35d</ID><Prefix></Prefix><Status>Enabled</Status>"
+        "<Rule><ID>expire-relay-35d</ID><Prefix>mobile-relay/</Prefix><Status>Enabled</Status>"
         "<Expiration><Days>35</Days></Expiration>"
         "<AbortMultipartUpload><Days>7</Days></AbortMultipartUpload>"
         "</Rule></LifecycleConfiguration>"
@@ -126,7 +126,7 @@ def main():
         "Statement": [
             {"Effect": "Allow",
              "Action": ["oss:GetObject", "oss:PutObject", "oss:DeleteObject",
-                         "oss:ListObjects", "oss:HeadObject", "oss:GetBucketStat"],
+                         "oss:ListObjects", "oss:HeadObject", "oss:GetBucketStat", "oss:GetBucketLifecycle"],
              "Resource": [f"acs:oss:*:*:{BUCKET}", f"acs:oss:*:*:{BUCKET}/*"]},
         ],
     })

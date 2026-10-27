@@ -22,6 +22,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -42,14 +43,32 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class MobileApiLanguageTest {
 
+    private Object previousLocalIdentity;
+    private Object previousUserService;
+    private Object previousUserSessionService;
+
+    private static Field authField(String name) throws Exception {
+        Field field = AuthController.class.getDeclaredField(name);
+        field.setAccessible(true);
+        return field;
+    }
+
     @BeforeEach
-    void registerLanguageService() {
+    void registerLanguageService() throws Exception {
+        // 未登录用例不能继承前序 local-mode 上下文；构造器写入的静态服务也须在用后还原。
+        previousLocalIdentity = authField("staticLocalIdentityService").get(null);
+        previousUserService = authField("staticUserService").get(null);
+        previousUserSessionService = authField("staticUserSessionService").get(null);
+        AuthController.registerLocalIdentityService(null);
         // 真实 AppLanguageService：全局设置为空 = 中文，只有请求级作用域能把它翻成英文
         LangText.register(new AppLanguageService(mock(SystemSettingService.class)));
     }
 
     @AfterEach
-    void resetLangText() {
+    void resetLangText() throws Exception {
+        authField("staticLocalIdentityService").set(null, previousLocalIdentity);
+        authField("staticUserService").set(null, previousUserService);
+        authField("staticUserSessionService").set(null, previousUserSessionService);
         LangText.reset();
     }
 

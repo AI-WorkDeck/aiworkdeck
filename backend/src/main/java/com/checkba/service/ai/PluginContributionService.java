@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 插件声明式贡献点的宿主落点（规范 v2.9 P4）：文书模板 / 样式画像 / 设置。
@@ -34,6 +35,9 @@ public class PluginContributionService {
 
     /** 全局默认画像的选择位：值形如 {@code <pluginId>:<profileId>}，空 = 未选 */
     public static final String STYLE_PROFILE_SELECTED_KEY = "ai.styleProfile.selected";
+
+    /** 全局外观皮肤的选择位：值形如 {@code <pluginId>:<themeId>}，空 = 默认内置皮肤（东方清雅） */
+    public static final String THEME_SELECTED_KEY = "ui.theme.selected";
 
     /** 模板文件上限：docx 模板正常几十 KB 到几 MB，20MB 与插件包受理线一致 */
     static final long MAX_TEMPLATE_BYTES = 20L * 1024 * 1024;
@@ -90,7 +94,7 @@ public class PluginContributionService {
         try {
             storageServiceFactory.getStorageService().save(file.getFilePath(), new ByteArrayInputStream(bytes));
         } catch (Exception e) {
-            throw new IllegalStateException("模板内容写入失败: " + e.getMessage(), e);
+            throw new IllegalStateException(com.checkba.service.LangText.of("模板内容写入失败: ", "Failed to write template content: ") + e.getMessage(), e);
         }
         log.info("plugin {} template {} -> project {} file {}", pluginId, templateId, projectId, file.getId());
         return file;
@@ -100,11 +104,11 @@ public class PluginContributionService {
         PluginService.PluginMetadata meta = pluginService.getPlugin(pluginId);
         if (meta == null || !pluginService.isEnabled(pluginId) || meta.getContributes() == null
                 || meta.getContributes().getTemplates() == null) {
-            throw new IllegalArgumentException("插件不存在或未启用: " + pluginId);
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("插件不存在或未启用: ", "Plugin does not exist or is not enabled: ") + pluginId);
         }
         return meta.getContributes().getTemplates().stream()
                 .filter(t -> t.getId().equals(templateId)).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("模板不存在: " + templateId));
+                .orElseThrow(() -> new IllegalArgumentException(com.checkba.service.LangText.of("模板不存在: ", "Template does not exist: ") + templateId));
     }
 
     // ==================== 样式画像 ====================
@@ -137,7 +141,7 @@ public class PluginContributionService {
         }
         String[] parts = ref.split(":", 2);
         if (parts.length != 2 || findStyleProfileDecl(parts[0], parts[1]) == null) {
-            throw new IllegalArgumentException("画像不存在或所属插件未启用: " + ref);
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("画像不存在或所属插件未启用: ", "Style profile does not exist or its plugin is not enabled: ") + ref);
         }
         // 选定前解析一遍：坏 JSON 的画像不允许被选中（否则每次导出都 WARN 一遍）
         StyleProfiles.parse(new String(readContributedFile(parts[0], findStyleProfileDecl(parts[0], parts[1]).getFile()),
@@ -185,10 +189,219 @@ public class PluginContributionService {
                 .filter(sp -> sp.getId().equals(profileId)).findFirst().orElse(null);
     }
 
+    // ==================== 外观皮肤主题 ====================
+
+    private static final java.util.regex.Pattern AWD_TOKEN_KEY =
+            java.util.regex.Pattern.compile("^--awd-[a-z0-9-]+$");
+    private static final java.util.regex.Pattern UNSAFE_CSS_VALUE =
+            java.util.regex.Pattern.compile("[;{}\\r\\n<>]|(?i)(url\\s*\\(|expression\\s*\\(|@import|javascript:)");
+
+    public record ContributedTheme(
+            String pluginId,
+            String id,
+            String name,
+            String description,
+            boolean selected,
+            Map<String, String> lightTokens,
+            Map<String, String> darkTokens,
+            Map<String, String> fonts,
+            Map<String, String> effects,
+            List<String> previewSwatches) {
+    }
+
+    /** 全部已启用插件贡献的外观皮肤主题清单（附带清洗后的双模式令牌与色卡预览） */
+    public List<ContributedTheme> listThemes() {
+        String selected = selectedThemeRef();
+        List<ContributedTheme> out = new ArrayList<>();
+        for (PluginService.PluginMetadata meta : pluginService.getPlugins()) {
+            if (!pluginService.isEnabled(meta.getId()) || meta.getContributes() == null
+                    || meta.getContributes().getThemes() == null) {
+                continue;
+            }
+            for (PluginService.ThemeDecl td : meta.getContributes().getThemes()) {
+                try {
+                    String raw = new String(readContributedFile(meta.getId(), td.getFile()),
+                            java.nio.charset.StandardCharsets.UTF_8);
+                    ParsedTheme parsed = parseThemeJson(raw);
+                    String ref = meta.getId() + ":" + td.getId();
+                    String name = td.getName() != null && !td.getName().isBlank()
+                            ? pluginService.localize(meta.getId(), td.getName())
+                            : td.getId();
+                    String desc = td.getDescription() != null && !td.getDescription().isBlank()
+                            ? pluginService.localize(meta.getId(), td.getDescription())
+                            : "";
+                    out.add(new ContributedTheme(
+                            meta.getId(),
+                            td.getId(),
+                            name,
+                            desc,
+                            ref.equals(selected),
+                            parsed.lightTokens(),
+                            parsed.darkTokens(),
+                            parsed.fonts(),
+                            parsed.effects(),
+                            parsed.previewSwatches()));
+                } catch (Exception e) {
+                    log.warn("插件 {} 皮肤 {} 解析失败，已跳过: {}", meta.getId(), td.getId(), e.getMessage());
+                }
+            }
+        }
+        return out;
+    }
+
+    /** 选定/清除全局外观皮肤；ref 形如 {@code <pluginId>:<themeId>}，null/空/"default" = 恢复默认 */
+    public void selectTheme(String ref) {
+        if (ref == null || ref.isBlank() || "default".equalsIgnoreCase(ref.trim())) {
+            systemSettingService.set(THEME_SELECTED_KEY, "");
+            return;
+        }
+        String trimmed = ref.trim();
+        String[] parts = trimmed.split(":", 2);
+        PluginService.ThemeDecl decl = parts.length == 2 ? findThemeDecl(parts[0], parts[1]) : null;
+        if (decl == null) {
+            throw new IllegalArgumentException("皮肤不存在或所属插件未启用: " + ref);
+        }
+        parseThemeJson(new String(readContributedFile(parts[0], decl.getFile()),
+                java.nio.charset.StandardCharsets.UTF_8));
+        systemSettingService.set(THEME_SELECTED_KEY, trimmed);
+    }
+
+    /** 当前生效的皮肤引用（{@code <pluginId>:<themeId>}）；未选、插件已禁用或文件损坏时退回空串（默认皮肤） */
+    public String selectedThemeRef() {
+        String ref = systemSettingService.get(THEME_SELECTED_KEY, "");
+        if (ref == null || ref.isBlank()) {
+            return "";
+        }
+        try {
+            String[] parts = ref.split(":", 2);
+            if (parts.length != 2 || !pluginService.isEnabled(parts[0])) {
+                return "";
+            }
+            PluginService.ThemeDecl decl = findThemeDecl(parts[0], parts[1]);
+            if (decl == null) {
+                return "";
+            }
+            parseThemeJson(new String(readContributedFile(parts[0], decl.getFile()),
+                    java.nio.charset.StandardCharsets.UTF_8));
+            return ref;
+        } catch (Exception e) {
+            log.warn("选中的皮肤 {} 不可用，退回默认皮肤: {}", ref, e.getMessage());
+            return "";
+        }
+    }
+
+    private PluginService.ThemeDecl findThemeDecl(String pluginId, String themeId) {
+        PluginService.PluginMetadata meta = pluginService.getPlugin(pluginId);
+        if (meta == null || !pluginService.isEnabled(pluginId) || meta.getContributes() == null
+                || meta.getContributes().getThemes() == null) {
+            return null;
+        }
+        return meta.getContributes().getThemes().stream()
+                .filter(t -> t.getId().equals(themeId)).findFirst().orElse(null);
+    }
+
+    private record ParsedTheme(
+            Map<String, String> lightTokens,
+            Map<String, String> darkTokens,
+            Map<String, String> fonts,
+            Map<String, String> effects,
+            List<String> previewSwatches) {
+    }
+
+    static ParsedTheme parseThemeJson(String raw) {
+        if (raw == null || !raw.trim().startsWith("{")) {
+            throw new IllegalArgumentException("皮肤定义必须是 JSON 对象");
+        }
+        cn.hutool.json.JSONObject obj = cn.hutool.json.JSONUtil.parseObj(raw);
+        cn.hutool.json.JSONObject tokensObj = obj.getJSONObject("tokens");
+        cn.hutool.json.JSONObject rolesObj = obj.getJSONObject("roles");
+        cn.hutool.json.JSONObject container = tokensObj != null ? tokensObj : (rolesObj != null ? rolesObj : obj);
+        cn.hutool.json.JSONObject lightRaw = container.getJSONObject("light");
+        cn.hutool.json.JSONObject darkRaw = container.getJSONObject("dark");
+        if (lightRaw == null || lightRaw.isEmpty() || darkRaw == null || darkRaw.isEmpty()) {
+            throw new IllegalArgumentException("皮肤定义必须包含非空的 light 与 dark 令牌表");
+        }
+        Map<String, String> light = sanitizeTokenMap(lightRaw);
+        Map<String, String> dark = sanitizeTokenMap(darkRaw);
+
+        Map<String, String> fonts = new LinkedHashMap<>();
+        cn.hutool.json.JSONObject fontsRaw = obj.getJSONObject("fonts");
+        if (fontsRaw != null) {
+            for (String k : fontsRaw.keySet()) {
+                String normKey = k.startsWith("--awd-font-") ? k : "--awd-font-" + k;
+                if (!Set.of("--awd-font-serif", "--awd-font-sans", "--awd-font-mono").contains(normKey)) {
+                    throw new IllegalArgumentException("非法的字体令牌键: " + k);
+                }
+                fonts.put(normKey, sanitizeCssValue(normKey, fontsRaw.getStr(k)));
+            }
+        }
+
+        Map<String, String> effects = new LinkedHashMap<>();
+        cn.hutool.json.JSONObject effectsRaw = obj.getJSONObject("effects");
+        if (effectsRaw != null) {
+            for (String k : effectsRaw.keySet()) {
+                if (!k.matches("^[a-zA-Z0-9_-]{1,40}$")) {
+                    throw new IllegalArgumentException("非法的动效配置键: " + k);
+                }
+                effects.put(k, sanitizeCssValue(k, effectsRaw.getStr(k)));
+            }
+        }
+
+        List<String> swatches = new ArrayList<>();
+        cn.hutool.json.JSONArray swatchArr = obj.getJSONArray("previewSwatches");
+        if (swatchArr != null) {
+            for (Object item : swatchArr) {
+                if (item != null && swatches.size() < 6) {
+                    swatches.add(sanitizeCssValue("swatch", String.valueOf(item)));
+                }
+            }
+        }
+        if (swatches.isEmpty()) {
+            for (String fallback : List.of(
+                    light.getOrDefault("--awd-bg", "#F6F4EE"),
+                    light.getOrDefault("--awd-accent", "#524D9A"),
+                    light.getOrDefault("--awd-mint", "#2E6F5E"),
+                    dark.getOrDefault("--awd-bg", "#13161B"))) {
+                swatches.add(fallback);
+            }
+        }
+        return new ParsedTheme(
+                java.util.Collections.unmodifiableMap(light),
+                java.util.Collections.unmodifiableMap(dark),
+                java.util.Collections.unmodifiableMap(fonts),
+                java.util.Collections.unmodifiableMap(effects),
+                java.util.Collections.unmodifiableList(swatches));
+    }
+
+    private static Map<String, String> sanitizeTokenMap(cn.hutool.json.JSONObject rawMap) {
+        Map<String, String> out = new LinkedHashMap<>();
+        for (String key : rawMap.keySet()) {
+            String normKey = key.startsWith("--awd-") ? key : "--awd-" + key;
+            if (!AWD_TOKEN_KEY.matcher(normKey).matches()) {
+                throw new IllegalArgumentException("非法的皮肤令牌键: " + key);
+            }
+            out.put(normKey, sanitizeCssValue(normKey, rawMap.getStr(key)));
+        }
+        return out;
+    }
+
+    private static String sanitizeCssValue(String key, String val) {
+        if (val == null || val.isBlank() || val.length() > 300 || val.indexOf('\\') >= 0
+                || val.contains("/*") || val.matches("(?is).*\\b(?:-webkit-)?image(?:-set)?\\s*\\(.*")
+                || UNSAFE_CSS_VALUE.matcher(val).find()) {
+            throw new IllegalArgumentException("非法的皮肤令牌值 (" + key + ")");
+        }
+        return val.trim();
+    }
+
     // ==================== 设置 ====================
 
     /** 设置声明 + 当前值（secret 只回显尾 4 位）；给广场详情页渲染表单 */
     public List<Map<String, Object>> settingsView(String pluginId) {
+        return settingsView(pluginId, null, null);
+    }
+
+    public List<Map<String, Object>> settingsView(String pluginId, Long userId, Long projectId) {
         PluginService.PluginMetadata meta = pluginService.getPlugin(pluginId);
         List<Map<String, Object>> out = new ArrayList<>();
         if (meta == null || meta.getSettings() == null) {
@@ -203,7 +416,10 @@ public class PluginContributionService {
             row.put("options", d.getOptions());
             boolean secret = Boolean.TRUE.equals(d.getSecret());
             row.put("secret", secret);
-            String value = currentValue(pluginId, d);
+            row.put("scope", settingScope(d));
+            if (("user".equals(settingScope(d)) && userId == null)
+                    || ("project".equals(settingScope(d)) && projectId == null)) continue;
+            String value = currentValue(pluginId, d, userId, projectId);
             row.put("value", secret ? mask(value) : value);
             out.add(row);
         }
@@ -212,18 +428,24 @@ public class PluginContributionService {
 
     /** 保存设置（按声明校验类型；未声明的键拒绝）。写入只走这条——配置权在用户手里 */
     public void saveSettings(String pluginId, Map<String, Object> values) {
+        saveSettings(pluginId, values, null, null);
+    }
+
+    public void saveSettings(String pluginId, Map<String, Object> values, Long userId, Long projectId) {
         PluginService.PluginMetadata meta = pluginService.getPlugin(pluginId);
         if (meta == null || meta.getSettings() == null) {
-            throw new IllegalArgumentException("插件没有可配置项: " + pluginId);
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("插件没有可配置项: ", "Plugin has no configurable settings: ") + pluginId);
         }
+        Map<String, String> writes = new LinkedHashMap<>();
         for (Map.Entry<String, Object> e : values.entrySet()) {
             PluginService.PluginSettingDecl d = meta.getSettings().stream()
                     .filter(x -> x.getKey().equals(e.getKey())).findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("未声明的设置项: " + e.getKey()));
+                    .orElseThrow(() -> new IllegalArgumentException(com.checkba.service.LangText.of("未声明的设置项: ", "Undeclared setting key: ") + e.getKey()));
             String v = e.getValue() == null ? "" : String.valueOf(e.getValue());
             validateValue(d, v);
-            systemSettingService.set("plugin." + pluginId + "." + d.getKey(), v);
+            writes.put(settingKey(pluginId, d, userId, projectId), v);
         }
+        writes.forEach(systemSettingService::set);
     }
 
     /**
@@ -245,34 +467,60 @@ public class PluginContributionService {
     }
 
     private String currentValue(String pluginId, PluginService.PluginSettingDecl d) {
+        return currentValue(pluginId, d, null, null);
+    }
+
+    private String currentValue(String pluginId, PluginService.PluginSettingDecl d, Long userId, Long projectId) {
         String def = d.getDefaultValue() == null ? null : String.valueOf(d.getDefaultValue());
-        return systemSettingService.get("plugin." + pluginId + "." + d.getKey(), def);
+        return systemSettingService.get(settingKey(pluginId, d, userId, projectId), def);
+    }
+
+    public static String settingScope(PluginService.PluginSettingDecl d) {
+        String scope = d.getScope() == null ? "installation" : d.getScope();
+        if (!List.of("installation", "user", "project").contains(scope)) throw new IllegalArgumentException("Unknown setting scope");
+        if (Boolean.TRUE.equals(d.getSecret()) && !"installation".equals(scope)) {
+            throw new IllegalArgumentException("Use a connection for per-user credentials");
+        }
+        return scope;
+    }
+
+    private static String settingKey(String pluginId, PluginService.PluginSettingDecl d, Long userId, Long projectId) {
+        String scope = settingScope(d);
+        String prefix = "plugin." + pluginId + ".";
+        if ("user".equals(scope)) {
+            if (userId == null) throw new IllegalArgumentException("A user is required for this setting");
+            prefix = "plugin-user." + userId + "." + pluginId + ".";
+        } else if ("project".equals(scope)) {
+            if (projectId == null) throw new IllegalArgumentException("A project is required for this setting");
+            prefix = "plugin-project." + projectId + "." + pluginId + ".";
+        }
+        return prefix + d.getKey();
     }
 
     private static void validateValue(PluginService.PluginSettingDecl d, String v) {
         switch (d.getType()) {
             case "boolean" -> {
                 if (!"true".equals(v) && !"false".equals(v) && !v.isEmpty()) {
-                    throw new IllegalArgumentException(d.getKey() + " 需要 true/false");
+                    throw new IllegalArgumentException(d.getKey() + com.checkba.service.LangText.of(" 需要 true/false", " requires true/false"));
                 }
             }
             case "number" -> {
                 if (!v.isEmpty()) {
                     try {
-                        Double.parseDouble(v);
+                        if (!Double.isFinite(Double.parseDouble(v))) throw new NumberFormatException();
                     } catch (NumberFormatException e) {
-                        throw new IllegalArgumentException(d.getKey() + " 需要数字");
+                        throw new IllegalArgumentException(d.getKey() + com.checkba.service.LangText.of(" 需要数字", " requires a number"));
                     }
                 }
             }
             case "select" -> {
                 if (!v.isEmpty() && (d.getOptions() == null || !d.getOptions().contains(v))) {
-                    throw new IllegalArgumentException(d.getKey() + " 必须是候选值之一");
+                    throw new IllegalArgumentException(d.getKey() + com.checkba.service.LangText.of(" 必须是候选值之一", " must be one of the allowed options"));
                 }
             }
             default -> {
                 if (v.length() > 4000) {
-                    throw new IllegalArgumentException(d.getKey() + " 超过 4000 字符上限");
+                    throw new IllegalArgumentException(d.getKey() + com.checkba.service.LangText.of(" 超过 4000 字符上限", " exceeds the 4,000-character limit"));
                 }
             }
         }
@@ -291,20 +539,20 @@ public class PluginContributionService {
     byte[] readContributedFile(String pluginId, String relFile) {
         File pluginDir = pluginService.getPluginDir(pluginId);
         if (pluginDir == null) {
-            throw new IllegalArgumentException("插件目录不存在: " + pluginId);
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("插件目录不存在: ", "Plugin directory does not exist: ") + pluginId);
         }
         try {
             File target = new File(pluginDir, relFile);
             String canonical = target.getCanonicalPath();
             if (!canonical.startsWith(pluginDir.getCanonicalPath() + File.separator)) {
-                throw new IllegalArgumentException("声明文件路径逃逸插件目录: " + relFile);
+                throw new IllegalArgumentException(com.checkba.service.LangText.of("声明文件路径逃逸插件目录: ", "Contributed file path escapes plugin directory: ") + relFile);
             }
             if (!target.isFile() || target.length() > MAX_TEMPLATE_BYTES) {
-                throw new IllegalArgumentException("声明文件不存在或超限: " + relFile);
+                throw new IllegalArgumentException(com.checkba.service.LangText.of("声明文件不存在或超限: ", "Contributed file does not exist or exceeds size limit: ") + relFile);
             }
             return Files.readAllBytes(target.toPath());
         } catch (java.io.IOException e) {
-            throw new IllegalStateException("声明文件读取失败: " + e.getMessage(), e);
+            throw new IllegalStateException(com.checkba.service.LangText.of("声明文件读取失败: ", "Failed to read contributed file: ") + e.getMessage(), e);
         }
     }
 

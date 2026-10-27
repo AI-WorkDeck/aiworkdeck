@@ -7,6 +7,11 @@
 set -uo pipefail
 ROOT=/root/lowa-build
 OUT=/root/out
+# Keep the r6 source/toolchain baseline while testing the r7 UI/input fixes.
+CORE_REV=dced3bc711d18407a2cc2400eb46e8261b663d95
+QT5_REV=3d440b7787f9b5ba15e5f8bcd7aef39b388f94fa
+EMSCRIPTEN_REV=949ee1d40467b80e90a9fdc67155d443426fef2d
+EMSDK_REV=d7b4130688bfa348392b921ab04015aa15c4f154
 export DEBIAN_FRONTEND=noninteractive
 mkdir -p "$ROOT" "$OUT"
 log(){ echo "=== $* $(date -u +%H:%M:%S) ==="; }
@@ -42,6 +47,13 @@ cd "$ROOT"
 ( [ -d core ] || git clone --depth 1 -b distro/allotropia/zeta-24-2 https://github.com/LibreOffice/core core ) &
 wait
 [ -d core ] && [ -d emscripten.fork ] && [ -d qt5 ] && [ -d emsdk ] || die clones
+for entry in "core:$CORE_REV" "qt5:$QT5_REV" "emscripten.fork:$EMSCRIPTEN_REV" "emsdk:$EMSDK_REV"; do
+  repo=${entry%%:*}; revision=${entry#*:}
+  if [ "$(git -C "$repo" rev-parse HEAD)" != "$revision" ]; then
+    git -C "$repo" fetch --depth 1 origin "$revision" && git -C "$repo" checkout --detach "$revision" || die "source-pin:$repo"
+  fi
+  [ "$(git -C "$repo" rev-parse HEAD)" = "$revision" ] || die "source-pin:$repo"
+done
 log "PHASE_2_DONE core=$(git -C core rev-parse --short HEAD)"
 
 # ---------- Phase 3: emsdk 3.1.65 + fork swap ----------------------------------
@@ -74,22 +86,31 @@ log "PHASE_3_DONE $(emcc --version 2>/dev/null | head -1)"
 # ---------- Phase 4: qt5 (background) + core prep (parallel) -------------------
 log "[4] qt5 build (bg) + core patches/translations"
 QT5DIR="$ROOT/qt5-wasm-install"
-(
-  set -e; source "$ROOT/env.sh"; cd "$ROOT/qt5"
-  ./init-repository --module-subset=qtbase >/root/qt5.log 2>&1
-  ./configure -opensource -confirm-license -xplatform wasm-emscripten \
-    -feature-thread -prefix "$QT5DIR" \
-    QMAKE_CFLAGS+=-sSUPPORT_LONGJMP=wasm QMAKE_CXXFLAGS+=-sSUPPORT_LONGJMP=wasm >>/root/qt5.log 2>&1
-  make -j"$(nproc)" module-qtbase >>/root/qt5.log 2>&1
-  make -j"$(nproc)" install >>/root/qt5.log 2>&1
-  echo QT5_OK >> /root/qt5.log
-) &
-QT5_PID=$!
+if [ ! -f "$QT5DIR/bin/qmake" ]; then
+  (
+    set -e; source "$ROOT/env.sh"; cd "$ROOT/qt5"
+    ./init-repository --module-subset=qtbase >/root/qt5.log 2>&1
+    python3 /root/apply-qt-patches.py "$ROOT/qt5/qtbase" >>/root/qt5.log 2>&1
+    ./configure -opensource -confirm-license -xplatform wasm-emscripten \
+      -feature-thread -prefix "$QT5DIR" \
+      QMAKE_CFLAGS+=-sSUPPORT_LONGJMP=wasm QMAKE_CXXFLAGS+=-sSUPPORT_LONGJMP=wasm >>/root/qt5.log 2>&1
+    make -j"$(nproc)" module-qtbase >>/root/qt5.log 2>&1
+    make -j"$(nproc)" install >>/root/qt5.log 2>&1
+    echo QT5_OK >> /root/qt5.log
+  ) &
+  QT5_PID=$!
+else
+  # A pre-existing Qt build may still have the old clock code. Do not silently
+  # link it into this candidate; use a fresh build root for the new toolchain.
+  die qt5-install-already-exists
+fi
 cd "$ROOT/core"
-git submodule update --init --depth 1 translations >/root/translations.log 2>&1 || die translations
+[ -d translations/source/zh-CN ] || git submodule update --init --depth 1 translations >/root/translations.log 2>&1 || die translations
 [ -d translations/source/zh-CN ] || die translations-zh
 python3 /root/apply-source-patches.py || die source-patches
-wait $QT5_PID; grep -q QT5_OK /root/qt5.log || die qt5-build
+if [ -n "$QT5_PID" ]; then
+  wait $QT5_PID; grep -q QT5_OK /root/qt5.log || die qt5-build
+fi
 [ -f "$QT5DIR/bin/qmake" ] || die qmake-missing
 log "PHASE_4_DONE"
 
@@ -114,10 +135,11 @@ log "PHASE_5_DONE"
 # ---------- Phase 6: bake zh-CN + repack ---------------------------------------
 log "[6] bake zh-CN into soffice.data"
 cp /root/ZZZ-aiworkdeck-locale-zh-CN.xcd instdir/share/registry/ || die zzz-cp
-python3 /root/fs-image-patch.py || die fs-image-patch
+python3 /root/fs-image-patch.py "$ROOT/core" --slim-dicts --slim-fonts || die fs-image-patch
 rm -f workdir/CustomTarget/static/emscripten_fs_image/soffice.data*
 rm -f "$ART/soffice.data" "$ART/soffice.data.js.metadata"
 make -j"$(nproc)" > /root/make6.log 2>&1 || { tail -30 /root/make6.log; die make6; }
+python3 /root/fs-image-patch.py "$ROOT/core" || die fs-image-repack
 grep -q "resource/zh_CN" "$ART/soffice.data.js.metadata" || die metadata-no-zh
 grep -q "ZZZ-aiworkdeck" "$ART/soffice.data.js.metadata" || die metadata-no-zzz
 log "PHASE_6_DONE"

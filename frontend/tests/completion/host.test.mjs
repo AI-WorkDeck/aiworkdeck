@@ -81,7 +81,8 @@ test('document candidates retain saved details for acceptance, completed-name hi
 })
 
 const editorScript = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8')
-  .match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
+  .match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import OfficeNavigation from .*$/m, 'const OfficeNavigation = {}')
+    .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
 const editorMethods = new Function('ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', editorScript)(null, null, null).methods
 
 test('engine remount disposes vocabulary before detaching its old transport', async () => {
@@ -100,26 +101,33 @@ test('engine remount disposes vocabulary before detaching its old transport', as
 test('in-place Writer reload destroys the old vocabulary before loading and rebuilds after success', async () => {
   const events = []
   const vm = { file: { id: 22 }, executor: {}, ready: true, saving: false, statusKey: 'ready', docLoadFailed: false,
+    backendFailedUpload: { fileId: 22, recoverySeq: 0 },
     _writingHost: { destroy: () => events.push('destroy') },
-    loadDocument: async () => { assert.equal(vm._writingHost, null); assert.equal(vm._reloading, true); events.push('load'); return true },
+    loadDocument: async () => { assert.equal(vm._writingHost, null); assert.equal(vm._reloading, true); assert.equal(vm.backendFailedUpload, null); events.push('load'); return true },
     initWritingAssistance: () => { assert.equal(vm._reloading, false); events.push('init') },
     appendLog() {}, scheduleAnchorCheck() {}, loadProvenance() {},
   }
+  vm.invalidateBackendSaveHint = editorMethods.invalidateBackendSaveHint.bind(vm)
   assert.equal(await editorMethods.reloadFromBackend.call(vm), true)
   assert.deepEqual(events, ['destroy', 'load', 'init'])
+  assert.equal(vm._backendSaveContext, 1, '重载开始即使旧文稿的恢复保存提示失效')
 })
 
 test('failed or in-flight reload cannot reactivate assistance against old document contents', async () => {
   const vm = { file: { id: 22 }, executor: {}, ready: true, saving: false, statusKey: 'ready', docLoadFailed: false,
+    backendFailedUpload: { fileId: 22, recoverySeq: 0 },
     docKind: 'writer', projectId: 11, _transportSend() {},
     _writingHost: { destroy() {} },
     loadDocument: async () => { editorMethods.initWritingAssistance.call(vm); assert.equal(vm._writingHost, null); throw new Error('download failed') },
     initWritingAssistance: () => editorMethods.initWritingAssistance.call(vm),
     appendLog() {}, scheduleAnchorCheck() {}, loadProvenance() {},
   }
+  vm.invalidateBackendSaveHint = editorMethods.invalidateBackendSaveHint.bind(vm)
   assert.equal(await editorMethods.reloadFromBackend.call(vm), false)
   assert.equal(vm.docLoadFailed, true)
   assert.equal(vm._writingHost, null)
+  assert.equal(vm.backendFailedUpload, null)
+  assert.equal(vm._backendSaveContext, 1, '加载失败也不能恢复旧文稿的保存提示')
 })
 
 test('user preference changes reach all open documents without replacing their current vocabulary', async (t) => {
@@ -359,4 +367,41 @@ test('editor login and recharge actions open in-place dialogs without repeating 
   for (const action of ['login', 'recharge']) await host.handle({ type: 'writing-request', session: host.session, id: 1, action })
   assert.deepEqual(opened, ['login', 'recharge'])
   host.destroy()
+})
+
+
+test('public autocomplete preference preserves an explicit off state, syncs hosts and rolls back failed persistence', async t => {
+  const saved = { enabled: false, learning: true, hints: true }
+  let fail = false
+  const create = fileId => {
+    const states = [], messages = []
+    const host = createWritingAssistanceHost({ projectId: 9001, fileId, userId: 'shared-toggle-test', writable: true,
+      execute: async () => ({ success: false }), send: m => messages.push(m), onState: s => states.push(s),
+      api: { list: async () => ({ items: [] }) },
+      storage: { get: () => saved, set: (key, next) => { if (fail) throw new Error('disk unavailable'); Object.assign(saved, next) } },
+    })
+    t.after(() => host.destroy())
+    return { host, states, messages }
+  }
+  const a = create(1), b = create(2)
+  await Promise.all([a.host.start(), b.host.start()])
+  assert.equal(a.states.at(-1).enabled, false)
+  assert.equal(b.states.at(-1).enabled, false)
+  assert.equal(a.host.setEnabled(true), true)
+  assert.equal(b.states.at(-1).enabled, true)
+  assert.equal(b.states.at(-1).session, b.host.session)
+  assert.equal(Object.hasOwn(b.messages.at(-1).config, 'items'), false)
+  fail = true
+  assert.equal(a.host.setEnabled(false), false)
+  assert.equal(a.states.at(-1).enabled, true)
+  assert.equal(a.states.at(-1).error, 'PREFERENCES_SAVE_FAILED')
+  assert.equal(a.messages.at(-1).config.enabled, true, 'guest tentative off must be corrected')
+  assert.equal(b.states.at(-1).enabled, true)
+  assert.equal(saved.enabled, true)
+  await a.host.handle({ type: 'writing-request', session: a.host.session, id: 9, action: 'preferences', data: { enabled: false } })
+  assert.equal(a.messages.at(-1).error, 'PREFERENCES_SAVE_FAILED')
+  fail = false
+  assert.equal(b.host.setEnabled(false), true)
+  assert.equal(a.states.at(-1).enabled, false)
+  assert.equal(a.states.at(-1).error, '')
 })

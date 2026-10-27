@@ -5,7 +5,41 @@ description: 侧边栏与工作台外壳领域。任务涉及左侧 rail/左栏�
 
 # 侧边栏与工作台外壳 领域地图
 
+## 资源管理器内的搜索（dev-board#1471）
+
+搜索入口在资源管理器标题栏、新建之前；`plugin-search` 仍是搜索态的面板 key，旧 `search` 别名和菜单调用继续走原路。`isExplorerPane` 将 files / plugin-search 统一为资源管理器标题与 rail 高亮，顶部按钮可返回文件目录。FileTree 继续用 v-show 保活，搜索期间不重建树；`syncFileTreeSelectionWithActiveTab` 在搜索态跳过隐藏树定位，打开结果不改变返回目录的位置。搜索本体仍为原 PluginPane + search 插件，启停、全文、标签、打开文件及取消请求契约不变；SearchPanel 挂载时聚焦输入框。
+
+独立搜索图标在 `panelDocking.applyPanelDocks` 最后过滤，不能从 dynamicPlugins 删除，也不能只滤 base 数组（停靠 extras 会补回来）。搜索按钮遵循插件可用性；禁用/卸载仍按动态插件加载链回落 files。
+
+回归：`frontend/tests/project-home/explorer-search.test.mjs`（真实模板/事件、菜单、停靠回补、旧 key、隐藏树定位），搜索业务与打包浏览器测试仍使用原入口。
+
 职责边界：工作台整体布局、左侧 rail 与左栏、面板切换状态机、页面路由。各面板内部逻辑归 utility-tools / plugin-system；右栏聊天内容归 ai-chat；编辑器归 doc-editor。
+
+## 账户浮层、左栏收起入口与 AI 首屏（dev-board#1417/#1418/#1419）
+
+`AccountEntry.vue` 的账户下拉通过每实例独立 holder 加入 `overlayState`；menuOpen 同步持有/释放，退出账户或卸载也释放。原生 BrowserView 无法被 DOM z-index 盖住，仍由工作台唯一 `desktopOverlayActive` watcher 隐藏/恢复，不能让组件直接操作主进程显隐。别的浮层未关闭时不恢复网页。
+
+左栏收起入口从 rail 底部移至展开左栏右缘靠顶部的 14×32px 窄左箭头卡；收起后卡片消失，rail 同项点击和顶栏开关继续收展。三条路径仍走 `toggleSidebar`，保留持久化及布局重算，不改变拖拽宽度。
+
+每次 `onLoad` 进入有项目的工作台，默认调用一次既有 `toggleAiPanel` 显示 AI；无项目欢迎态仍不挂 AI。本地免登项目同样可发现入口，不等待账户请求。当前代码没有 AI 关闭状态持久化读取；默认开启不在 `onShow`、账户刷新或焦点恢复中执行，用户本次手动关闭后保持关闭；重新打开/切换项目再默认开启。深链会话先标记不恢复旧会话，不能让首开恢复抢掉指定会话。懒挂载 + v-show 保活契约不变。
+
+回归：`ai-panel-default-open`、`sidebar-collapse`、`account-entry-account-changed`。`tests/project-home/shell-native-ui.mjs` 使用临时 profile、真实账户组件/浮层 watcher/BrowserView 注册表和合成原生网页验证遮挡、恢复与并存浮层，并保留 OS 窗口截图；不连接产品后端，也不等于正式客户端或 Windows 验收。`SHELL_UI_BASELINE=1` 从修复前基线 `9121174e1`（可用 `SHELL_UI_BASELINE_REF` 覆盖）读取旧账户组件作病灶对照。
+
+## 更新状态与项目打开入口（dev-board#1401/#1403）
+
+工作台顶栏右侧工具组左边挂 `components/DesktopUpdateIndicator.vue`，直接消费 `host.update` 的 `{type,state}` 事件，挂载先订阅后取快照，旧快照不得覆盖更新的事件。检查/下载/原生准备持续显示；下载百分比只取真实字节，`preparing` 不显示虚构进度，`ready` 才允许点击原有 `host.update.restart()` 保存退出链。失败保留详情和重试；退出取消后恢复可点击。详情浮层用独立 holder 接入 `overlayState`，避免被 BrowserView 盖住，卸载必须退订及释放。菜单检查完成、后台就绪、工作台重挂载都不自动弹重启框；旧 `appUpdate` 底栏与自动提示已移除。
+
+`ProjectListPane` 桌面顶部顺序为打开文件夹（主按钮）、打开文件（次按钮），然后团队案件库。用说明文字交代该面板查找/切换已有项目，具体文件在资源管理器；不再有独立新建目录弹窗，目录选择器既有 `createDirectory` 支持新建，浏览器仍保留托管项目创建。复用 `ideOpen` / `localOpenCoordinator`，切换前保存，取消不换项目，单文件走隐藏 loose-files 工作区。CLIENT 仍隐藏这些操作；协作入口不删。回归 `desktop-update-indicator.test.mjs`、`project-list-open-actions.test.mjs` 与导航契约。
+
+## 客户协作标签与账号边界（dev-board#1421）
+
+`ddClientTab.js` 打开全局单例 `tabType:'dd-client'`；静态 rail 的 `dd-client` 与欢迎页 `open-client-workspace` 事件共用这一入口，无项目态也可见。客户在标签内输入邀请码，只建立独立项目连接，不写主会话或改变 `currentUser.role`。两侧编辑区挂 `DdClientWorkspace`，快照仅保存标签元数据，不保存连接凭据；`fileKind` 排除其文档上下文。工作台每 15 秒查询已连接项目通知（非活跃页面实例不查询），卸载停止；客户 rail 显示未读数，律师云端尽调 rail/侧栏显示提交与申诉通知。`panelSwitching` 对当前云端/CLIENT 的 `dd-files` 保留原 key，只有已不适用的旧偏好才迁回 files。
+
+## 工作台视觉层次（dev-board#1365）
+
+`project-overview.scss` 的 `--awd-workbench-header-height` 统一资源管理器标题、中间标签栏和右侧 dock 页签的实际盒高（37px，含边线）；不要单独缩矮右侧 tab。`--awd-workbench-divider` 使用现有弱分隔令牌，rail 与左栏共用底色，内容区用 surface 区分。FileTree 的奇偶行底色必须保留以便逐行定位；悬停、选中与拖入提示仍独立。用户明确要求斑马纹不能因视觉简化而直接取消。
+
+Windows 顶栏（dev-board#1370）由 `App.vue` 平台样式分成菜单行与项目/工具行，不重复展示中央 Logo，保留原生窗口控件的右侧安全区。全局平台样式必须显式覆盖 `.page-project-overview.compact-mode`：项目 scoped 样式会增加属性选择器权重，单靠全局加载顺序不能覆盖窄屏的高度和 padding。非 Windows 布局中央保留绝对居中的 100px 品牌标志（`left: 50%` 相对 padding-box），`.header-left` 按 `calc(50% - (var(--awd-header-pad-start) - var(--awd-header-pad-end)) / 2 - 64px)` 限制最大宽度，使长协作状态 chip 与 `.project-meta` 在 1440px 等宽度下优先收缩省略、不压中央标志；`.header-left`、`.project-info`、`.project-title-row` 不得设 `overflow: hidden`，否则会截断 `.switcher-menu` 最近项目下拉。原生拖拽验收同时检查顶栏几何不重叠及真实鼠标菜单开关。
 
 ## 离开工作台前必须落盘（已踩）
 
@@ -21,6 +55,8 @@ beforeUnmount 兜底，Office 没有）。
 `pages/project-overview/flushDirtyEditors.js`，零依赖便于单测）再 `uni.reLaunch`。
 `handleLogout` 因为要在 `clearSession()` **之前**落盘（会话一清保存就是未授权），
 自己显式 flush 而不复用出口。
+
+2026-10-26（dev-board#1489）：这两条出口在保存后都调用 `confirmVersionBeforeLeaving`，使用最新项目状态提供“提交并退出 / 直接退出 / 取消”；提交成功并核验无新改动才继续导航/清除登录态。原生退出通过 `registerQuitSave` 第三个确认回调复用同一守卫，重启恢复内部导航除外。
 
 **新增任何离开工作台的路径都要走 `leaveWorkbench`**；`npm run check:nav` 已把这条钉住
 （goAllProjects 允许直接 reLaunch 或走 leaveWorkbench，走出口时会连带校验出口里有
@@ -44,6 +80,18 @@ flushDirtyEditors），单测见 `frontend/tests/project-home/flush-dirty-editor
 `LocalFileStorageService.createFromTemplate` 在配置模板不存在时使用 POI 生成有效的空白 DOCX，不能落成零字节文件，否则 Tika 全文读取与比对会失败；读取缺失文件仍抛错，不在读路径创建模板。回归 `BlankTemplateCompareRegressionTest` 覆盖有内容 A、空白 B 及真实缺失负例。
 
 `onCompareDialogConfirm` 先保存本次两份文档已打开且待保存的 Office 实例，最后重查 dirty/saving；失败保留对话框重试，不保存无关文档。等待期间取消、换比较对象或切项目，不打开过期比对。回归 `compare-flush-before-diff.test.mjs`。差异数等待 Monaco `onDidUpdateDiff` 更新，不能只在 `nextTick` 读取尚未完成的结果（dev-board#1104）；关闭标签释放监听。
+
+## 资源管理器新建菜单（dev-board#1444/#1445）
+
+顶部新建由 `FileTree.openCreateMenu` 打开 `ExplorerCreateMenu.vue`：Word / PPT / Excel / 录音。空白处右键的新建文件带 Office 子菜单，文件夹直接建 `Untitled Folder`（同目录重名从 `Untitled Folder 2` 递增），不弹命名框；Office 文档保留命名框与 Word 插件模板入口。工具栏使用选中项对应目录，空白右键使用当前浏览层级；打开菜单时捕获落点，回收站不提供新建。
+
+新建文件夹成功后通过 `revealFile` 定位到新条目（dev-board#1469）；标签视图切回文件夹视图。定位成功同步 `activeFolderId`，后续新建文档落在当前选中的新目录。定位时既展开父目录，也补足目标和父目录所在的每目录 100 项渲染窗口，然后在当前 FileTree 实例内滚动，不能只刷新列表后提示成功。`loadFiles` 保留最新请求的 Promise，创建定位等待当前请求与下一帧标签选中态同步；旧请求被通知/聚焦刷新作废时不能提前定位或提示成功。创建或刷新期间切换项目，不选择旧项目的新条目。回归 `file-tree-created-folder-visible.test.mjs`；`created-folder-visible-ui.mjs` 用真实 Uni 工作台、合成 API 验证 148 个同级文件夹后的根目录/子目录创建、选中与可见滚动、继续在新目录创建文档，不代表用户客户端或真实落盘已验。
+
+子菜单按实际尺寸贴近主项，靠右边缘时向左翻转、垂直限制在视口内；`utils/menuAim.js` 判断鼠标到子菜单近侧上下角的安全三角区，穿越其他行时暂不关闭，停留 350ms 或离开三角区后切换。这是 [safe polygon/menu aim](https://floating-ui.com/docs/useHover#safepolygon) 思路，没有固定“三角形比例”；按鼠标与实际菜单位置计算。支持键盘方向键、Enter、Escape 和焦点返回。浮层按每实例 holder 接入 `overlayState`，由工作台统一隐藏原生 BrowserView，关闭/卸载必须释放。
+
+录音由 `explorerRecording.js` 接收可信宿主点击，打开 voice 插件录音 tab、检查原有转写告知并调用全局 recorder。沿用 `recording-focus` 排队消息，不引用已经移出工作台的旧面板 ref；插件自行发起的录音仍走原有确认。插件未启用引导现有详情页；已有录音只定位，启动中离页通过 signal 取消，真正开始后切面板不断录。用户首次麦克风授权仍由系统处理。
+
+空白 PPTX/XLSX 在 `LocalFileStorageService.createFromTemplate` 按扩展名生成一张幻灯片／一个工作表，不能复用 Word 模板。`BlankOfficeTemplateTest` 实际重新解析文件。前端回归：`file-tree-new-file-naming`、`file-tree-create-target`、`menu-aim`、`meeting-recorder/explorer-recording`；`tests/project-home/explorer-create-ui.mjs` 用隔离浏览器和合成 HTTP 验实际工作台入口、三格式创建、目录编号、子菜单斜向路径和键盘操作，不代表正式客户端与真实麦克风权限已验。
 
 ## 文档标签与左栏独立（2026-09-10，dev-board#555/#556）
 
@@ -86,7 +134,7 @@ filelink 点击定位、多 target 弹窗、method 小条；契约见 ai-doc-bri
   **齿轮与头像都不在 rail 上了**（2026-08-19）；插件广场按钮也不在了，它升成了
   LEFT_SIDEBAR_PLUGINS 数组里的一项（key `market`）。
 - sidebar-left：sidebar-header（标题=leftPaneTitle）、sidebar-content 按 leftPaneKey 分支
-  （files→FileTree、dd-files→DdFilesPanel（现在只有 CLIENT 走得到）、
+  （files→FileTree、dd-files→DdFilesPanel（CLIENT 或云端轨道律师）、
   **home→ProjectHomePane compact**、**voice→内联 tab 宿主**（EasyVoicePane /
   MeetingRecordingPanel）、desensitize、search、version、market→MarketSidebarPanel、
   litigation-visual、动态插件→PluginPane）、拖拽手柄。
@@ -117,12 +165,23 @@ filelink 点击定位、多 target 弹窗、method 小条；契约见 ai-doc-bri
 - 生命周期：beforeUnmount:1781（多实例守卫，只清指向自身的活跃指针）、onLoad:1882、onShow:1932（返回时重新接管全局处理器）、mounted:1988（事件监听登记）。注意有个 beforeDestroy 误嵌在 methods 内（~:5344）。
 - :2261-6729 methods：**toggleLeftPane :2988**、goToSystemSettings:4498、toggleSidebar:4528、toggleAiPanel:4532、toggleToolsPanel:4544、triggerWorkbenchResize:4550、toggleSplitMode:4817、动态插件加载:6266。
 
+## 全局消息入口（dev-board#1490，2026-10-26）
+
+消息中心入口在顶栏右上角 `AccountEntry.vue`：已登录头像显示未读数字（超过 99 显示 `99+`），下拉首个动作是「消息中心」。消息来自现有 `messageCenterTab.js` 轮询；来源暂不可用时不能把未读归零，未知且部分失败显示 `·`，并保留不可用说明。余额/宽限提醒小点与消息角标共存。未连接统一账户时，登录按钮旁仍提供消息图标，因为受邀 DD 连接可独立于统一账户使用；旧 CLIENT 视角仍不开放消息入口。
+
+头像动作直接调用 `openMessageCenterTab`，沿用跨左右窗格的单例标签，不切换或展开左栏。`messages` 不再属于 rail / 无项目左栏白名单；旧有项目 `leftPaneKey=messages` 迁移成 `files`，无项目恢复默认 `projects`。`MessageCenterPane.vue` 保留对话、通知、待处理分类及原业务跳转；阅读不替代业务确认，项目切换仍走落盘出口，账号切换仍清除旧内容和迟到响应。
+
+验证：`node --test tests/messages/*.test.mjs tests/account/account-entry-account-changed.test.mjs`（`frontend/`），`npm run check:nav:full`。头像浏览器测试使用实际组件与单例方法、合成账户状态，隔离夹具把 uni `tap` 映射为 H5 点击；不代表正式 Electron 客户端、真实账户或跨设备已验。
+
 ## 面板切换状态机
 
 rail 点击 → toggleLeftPane(key)（:2988）：staging 单独分支 → 把当前 activeFile 存 lastActiveIdsByMode[oldKey]（:3005）→ 同 key 则收/展 sidebarCollapsed（:3011），异 key 则设 leftPaneKey 并展开（:3014）→ 动态插件通过 `openPluginTab(pluginId)` 打开/聚焦工作区单例（dev-board#1143/#1144，左栏仅 `PluginWorkspaceSummary`）→ 恢复该模式记忆的左右 tab（:3029）→ 持久化到 uni.storage（:3055）。
 顶栏三开关都在 $nextTick 调 triggerWorkbenchResize 派发 window resize 让编辑器/iframe 重排；toggleAiPanel 打开时刷新 AI 上下文 + fetchChatHistory。
 
 ## 左栏入口（frontend/src/config/leftSidebarPlugins.js）
+
+**侧栏溢出（dev-board#1546）**：普通工具放在 `.rail-tools`，保留既有排序，独立纵向滚动；`.rail-footer` 固定暂存区、版本控制、项目成员和反馈。两区内按钮禁止 flex 压缩；不要给整个 `.left-rail` 加 overflow 裁剪，否则成员浮层会被裁掉。隔离布局验证：`node frontend/tests/project-home/rail-overflow-ui.mjs`（需 Chrome）；覆盖30工具、480/640/900窗口高度、滚动后点击末项与成员浮层，非正式客户端验收。
+
 
 **rail 从上到下的顺序就是 `LEFT_SIDEBAR_PLUGINS` 数组的顺序，只有这一个出处。**
 2026-08-19 起「项目概览」与「插件中心」也收进了数组——它们走的都是普通的
@@ -134,8 +193,8 @@ desensitize(文件脱敏) → litigation-visual(门控) → calendar(日历)**�
 「暂存区」（都是围绕本机改动/存档的动作），不该跟文件树/搜索这类常驻浏览面板
 混排。定义照 `DD_FILES_PLUGIN` 的先例独立导出成 `VERSION_PLUGIN`，进
 `OFF_RAIL_PLUGINS`（`getLeftSidebarPlugin('version')` 与 `leftPaneTitle` 兜底照常能查到），
-rail 底部（spacer 之后由模板单独渲染）现在是**暂存区 → 版本记录 → 收起左栏 → 成员堆叠 → 反馈**
-（暂存区 / 版本 / 成员在无项目态不渲染，无项目态只剩收起 / 反馈；dev-board#1047 一度在末尾加过账户入口与设置齿轮，
+rail 底部（spacer 之后由模板单独渲染）现在是**暂存区 → 版本记录 → 成员堆叠 → 反馈**
+（暂存区 / 版本 / 成员在无项目态不渲染，无项目态只剩反馈；dev-board#1047 一度在末尾加过账户入口与设置齿轮，
 dev-board#1062 撤回、账户入口回到顶栏右上角），最初的三项是**暂存区 → 版本记录 → 成员堆叠**，
 版本记录夹在中间；`toggleLeftPane('version')` 语义、面板本身一行未动。
 
@@ -286,14 +345,13 @@ dev-board#97 的「中键关闭标签」就这么静默失效了一整轮：auxc
 （`npm run test:project-home`）。
 
 **落点定了之后只有一条路：import-local（dev-board#409 立，#513 收敛为唯一通道）**。
-`importExternalDrop(dt, targetParentId)` 取 `dataTransfer.files` 里的**顶层条目**
-（每条可能是文件，也可能是目录），逐个用 `resolveDroppedFilePath`（`host.fs.getPathForFile`，
+`importExternalDrop(dt, targetParentId)` 在 drop 同步阶段用 `captureDroppedFiles` 取 `dataTransfer.files`（为空则回退 `items.getAsFile()`）里的**顶层条目**
+（每条可能是文件，也可能是目录），逐个由共享 helper 用 `host.fs.getPathForFile`（
 Electron 的 webUtils）解析出本机绝对路径，交给
 **`POST /api/projects/{id}/files/import-local`**（`{sourcePath, parentId}`，
 `ProjectFileController.importLocal` → `ProjectFileService.importLocalFile`），
 让后端把它**复制**进项目目录；**目录由后端递归建行、递归复制**，前端不再用
-`webkitGetAsEntry` 展开目录。解析不出路径（不在桌面壳里跑）= 一条都导不了，
-只弹一句 `fileTree.importDesktopOnly`（「拖入导入仅桌面端支持」）——工作台的 H5 部署
+`webkitGetAsEntry` 展开目录。纯浏览器没有 `host.fs` 时提示 `fileTree.importDesktopOnly`（「拖入导入仅桌面端支持」）——工作台的 H5 部署
 已于 2026-08-19 下线，资源管理器是桌面端专属。逐条循环 + 一次 `loadFiles()` 收尾的
 `importDroppedLocalFiles(fileList, parentId)` 是**公开方法**，暂存区
 （`stagingArea.js#onStagingDropFiles`）直接调它，不另起一套。
@@ -309,6 +367,8 @@ xhr 只给一句 `Network Error`，后端看到 `ClientAbortException`），三�
 后置钩子（RAG 增量索引 + 自动打标签）与上传完成时同源。
 **这条路径不插乐观行**——没有传输阶段，返回时字节已经在目录里，`loadFiles()` 一刷即最终形态。
 后端测试 `ProjectFileServiceImportLocalTest` / `ProjectFileControllerImportLocalTest`。
+
+**无路径 File 的兼容（dev-board#1182）**：树、暂存区和 AI 对话共用 `captureDroppedFiles`，在原生 drop 回调返回前提取 files/items，并立刻开始读取无路径 File 的字节（暂存区创建文件夹可能先 await）。真实本机路径仍直接 import-local。仅有非空可读字节时，桌面 `fs:stageDroppedFile` 写入独立临时目录，返回当前窗口所属的随机 token；import-local 成功或失败后均 `releaseDroppedFile(token)`，窗口销毁也清理。只收字节与单段文件名，不收读写路径；100 MB/批字节预算不限制原生路径的大文件。无路径的空壳、目录、不可读 File、仅 file URL 文本或仅 promise 声明均不创建项目行，明确提示先保存到本机文件夹再拖入，不能误说“仅桌面端支持”。**file URL 文本不是本机文件读取授权**，不得解析后直接交 import-local。当前合成来源/隔离 Electron 已验证 items-only、字节无路径和 Finder 等价的磁盘 File；未采集微信原生 payload，不宣称覆盖全部微信来源，未增加 NSFilePromiseReceiver 原生桥。回归：`file-tree-external-drop.test.mjs`、`drop-byte-import.test.mjs`、`chat-external-drop.test.mjs`、`staging-drop-external-files.test.mjs`、`desktop/tests/dropped-files.test.js`。
 
 **拖进 AI 对话区是另一条路，别与文件树那条混用（dev-board#779 K6，2026-09-22）**：
 落点是整块 `.side-panel-ai`（`handleAiDrop`），但**高亮画在输入框卡片上**——
@@ -327,10 +387,10 @@ ChatInterface 的 `.input-card.is-drop-target`，由新 prop `:drag-active="drag
    会捡到上一个文件，用户拖了别的东西却看见「已添加: 上一个文件」（实测复现过）。
 5. **本机文件**（Finder / 资源管理器）：三种应用内格式都落空才轮到它，`dataTransfer` 走
    `utils/fileTreeExternalDrop.js` 的 `nativeDataTransfer(e)` 取（uni 重建 `<view>` 事件对象
-   的老地雷）。**走的是 HTTP 上传路而不是资源管理器那条 `import-local`**：对话区加材料的
+   的老地雷）。**桌面壳同样走 `import-local`，无路径 File 走上述受限字节暂存；纯浏览器才保留 HTTP 上传**：对话区加材料的
    落点是「项目里多一份文件 + 挂进本轮上下文」，复用 ChatInterface 暴露的
    `uploadLocalFilesAndAddContext(fileList)`（内部与上传对话框共用 `uploadFilesAndAttach`：
-   createFile + uploadFileContent + addFile）。**落点固定项目根目录**——工作台没有「当前
+   桌面 import-local + addFile；纯浏览器 createFile + uploadFileContent + addFile）。**落点固定项目根目录**——工作台没有「当前
    文件夹」这个概念（文件树的选中项跟着编辑器标签走，是一份文件不是一个目录），toast 里
    点名落点。目录条目在 `dataTransfer.files` 里是 0 字节空壳，照传会在项目里建出空文件，
    所以先用 `webkitGetAsEntry` 挡一道，请用户拖到左侧资源管理器（那条有整套递归导入）。
@@ -467,6 +527,13 @@ launch（**启动页**）/ unlock / identity / login / newproject / **project-li
 **隐藏系统文件夹的单一名单**：`frontend/src/utils/fileTreeBuild.js` 的 `HIDDEN_SYSTEM_FOLDER_NAMES`（`.stagezone` / `__staging_area__`）。文件树只要不展示那个文件夹就够了（`groupByParent` 跳过它，子树自然到不了），但**凡是扁平清单都必须连子树一起剔**——`aiContextFiles.excludeSystemFolders` 干这件事，Cmd+P 快速打开与 AI 的两个「挑一份文件」入口都过它。不这么做的话暂存区里的文件会一条条列出来（真机实测：「从项目选择」页签第一行就是 `__staging_area__`）。
 
 ## 窗口外壳与菜单栏（2026-08-16）
+
+**工作台主布局不得滚动（dev-board#1503）**：`.main-layout` 使用 `overflow:clip` +
+`min-height:0`，只裁切内容、允许 flex 收缩；不要改回 `overflow:hidden`，后者仍可被
+后代 `scrollIntoView` / 聚焦带着滚动。rail 内容超高时，定位文件会让整排左栏标题与
+文档标签上移到顶栏下方，之后滚回文件列表顶部也无法恢复。浏览器回归
+`npm run test:workbench-scroll` 使用真实 SCSS 与合成内容，覆盖三种窗口尺寸的文件定位、
+聚焦及滚轮往返，检查标题几何和底栏位置；可用 `CHROME_PATH` 指定 Chromium。
 
 **没有系统标题栏了。** `main.js` 的 `titleBarStyle:'hidden'`：mac 用
 `trafficLightPosition:{x:18,y:13}` 把三颗交通灯精确摆进 42px 的 `.project-header`
@@ -727,6 +794,7 @@ DdFilesPanel / ShareholderMeetingPanel。新面板照抄这套，不要再自定
 - **awd-\* 类名约定**（King IDE 品牌清零后的通用弹窗/按钮样式，PR#171）：awd-dialog/-mask/-header/-title/-body/-footer、awd-btn/-primary/-secondary/-danger、awd-field/awd-input。**没有集中定义**——在 project-overview.vue（~:10180-10300）、ChatInterface.vue（~:2869 起）、FileTree.vue 各自 scoped 重复定义；改样式要多处同步。
 - 外壳布局类：.header-tools:6904、.rail-btn:7009、.sidebar-left:7403/7905、.workbench:7455、.bottom-panel:7283/7510、.compact-mode:7478、.is-resizing:7927。
 - **面板拖拽的跟手守卫是三件一套，删一件拖拽就会退化**（2026-08-20）：① `.is-resizing` 禁 transition；② `.is-resizing :deep(iframe)/:deep(webview)` 关 pointer-events——光标滑进嵌入文档父窗口就收不到 mousemove，拖拽会冻住；③ 桌面端浏览器 BrowserView 是原生层 CSS 管不到，靠 `desktopOverlayActive` 里那条 `resizing.active` 在拖拽期间隐藏。另外 `startResize/stopResize`（tabDragSplit.js）会锁/还原 body 的 cursor 与 user-select。编辑器窗格 `.editor-pane`/`.pane-content` 已拉平成方角（圆角卡片残留会在标签栏下沿与分栏缝露出底色弧口），别再给它们加 border-radius。
+- **左栏收起把手（dev-board#1459）**：`.sidebar-collapse-anchor` 是 `.sidebar-left` 与 `.workbench` 之间的 14px 同级节点，与工作区同底色且不加分隔线；把手从分隔线向右凸出，不进入侧栏内容、滚动条或编辑器工具栏区域。拖拽与窗口回夹均扣除实测把手宽度，保留编辑区最小宽度。侧栏继续 `overflow:hidden`，宽度拖拽手柄仍在栏内 `right:0`，不要为显示收起按钮而放开整个侧栏的裁剪。
 - **面板拖拽的上限按「面板所在容器的实测宽」算，不按整窗宽算**（2026-09-05，dev-board#459）：
   原来两支都是 `Math.floor(window.innerWidth * 0.75)`，可 `.side-panel-ai` 的父容器
   `.workbench-main` 只拿到「整窗 − rail − 左栏」。`.side-panel{flex-shrink:0}` 让面板不肯
@@ -933,6 +1001,15 @@ DdFilesPanel / ShareholderMeetingPanel。新面板照抄这套，不要再自定
 通过了 `ContextAssemblerService` 只判 `isBlank()` 的守卫，被当成文档正文写进
 `<active_document>` CDATA。后端同批补了第二道（`isToolFailureText`，见 ai-chat.md）。
 
+## 欢迎页侧栏缺省与展开（dev-board#1374，2026-10-21）
+
+未保存 `awd_sidebar_collapsed` 的无项目窗口缺省收起左栏，已有项目缺省展开；显式布尔偏好优先。
+`loadSidebarCollapsed(uni, !hasNamedProject)` 统一处理缺值、坏值和读取失败。独立文件仍收起，
+`?pane=projects` / `?pane=files` 的明确打开意图继续覆盖默认值。点击不同 rail 面板从收起转为展开时，
+也走 `toggleSidebar`，确保持久化与编辑区 resize；切换不改变中间的欢迎/文档标签。
+插件广场的已安装、Marketplace 两组各占可用空间并独立滚动，组头与搜索保持可见；收起一组后另一组填满。
+验证：`sidebar-collapse.test.mjs`；隔离 Vite + 合成 API 的 `welcome-sidebar-ui.mjs`，不连接真实后端。
+
 ## 工作台无项目态与欢迎标签（dev-board#1047，2026-09-29）
 
 规格：`docs/superpowers/specs/2026-09-29-defer-login-welcome-tab-design.md` §3 §4 §6。启动落不带 `?id=` 的工作台外壳，
@@ -944,7 +1021,7 @@ DdFilesPanel / ShareholderMeetingPanel。新面板照抄这套，不要再自定
 | 区域 | 有项目 | 无项目 |
 |---|---|---|
 | rail 上半 | 现状 | 只剩全局面板：**项目**、插件中心、日程（+ 被停到左栏的剪贴板）；动态插件不上 rail |
-| rail 底部 | 暂存区 / 版本 / 收起 / 成员 / 反馈 | 收起 / 反馈（账户入口与设置齿轮 dev-board#1062 撤出 rail） |
+| rail 底部 | 暂存区 / 版本 / 成员 / 反馈 | 反馈（账户入口与设置齿轮 dev-board#1062 撤出 rail） |
 | 左栏面板 | 现状 | 只挂 `projects` / `calendar`（读全局事项）/ `market` / `clipboard`；`toggleLeftPane` 第一行就拦项目面板的 key（菜单、命令面板、存量 storage 都可能送进来），默认面板 `projects` |
 | 中央 | 标签 | 标签；「启动时显示欢迎页」开着就自动开欢迎标签，关着停在空态（一行提示 + 「打开欢迎页」链接） |
 | 右栏 AI | 现状 | **不渲染**（`v-if="aiPanelMounted && hasProject"`，`toggleAiPanel` / `resolveChatInterface` 直接返回并提示）——会话按项目隔离 |
@@ -1125,16 +1202,9 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 - `frontend/src/config/panelRegistry.js` — 可停靠面板注册表（**取代了原 `config/tools.js` 的 `WORKBENCH_TOOLS`，那个文件已删**，底栏三项现在是「停在 bottom 档的面板」）；`fileActions.js` — 文件树批量操作；`workbenchActions.js` — OCR/内链 scheme 常量。
 - `frontend/src/components/FileTree.vue`（5225 行）— 左栏文件树。
 - 各页面（行数实测）：login.vue(931)、newproject/index.vue(680)、wizard.vue(1007，重跑语义见 PR#134)、userprofile.vue（**已是薄壳页**，2026-08-20 起挂 `AdminPane initial-nav="work_log"`，个人中心的四栏内容在 `components/userprofile/Personal*Panel.vue`）、variable-library.vue(543)、admin.vue(**已是薄壳页 ~30 行**，实体在 `components/admin/AdminPane.vue`，含插件广场入口；原来的「记忆同步」面板 nav key `memory` 已随 dev-board#440 撤掉，见 version-control.md)、plugin-market.vue(22，**已是薄壳页**，实体在 `MarketPane`)。
-- **项目列表**（2026-09-29 起）：内容本体 `frontend/src/components/project-list/ProjectListPane.vue` + 同目录 `project-list-pane.scss`（根 `.project-list-pane`，开容器查询 `project-list-pane`，≤520px 收成单列卡 / 三列表）；`pages/project-list/project-list.vue` 是直链薄壳（根仍是 `.page-project-list`）。下面这段描述的内容、类名与门控全部跟着搬进了 Pane，只有三处不同：没有页面大标题（外壳 `.sidebar-header` 出「项目」）、页头的「日程 / 反馈 / 个人中心」按钮不搬（rail 上各有入口）、离开工作台的跳转（进项目 / 删当前项目 / 去日程 / 浏览器端新建）一律走注入的 `leaveWorkbench`。首次启动的「可选组件」面板搬到工作台 `onLoad`（只在无项目态触发），当日事项摘要 `todayDigest` 搬到工作台 `mounted`。
+- **项目列表**（2026-09-29 起）：内容本体 `frontend/src/components/project-list/ProjectListPane.vue` + 同目录 `project-list-pane.scss`（根 `.project-list-pane`，开容器查询 `project-list-pane`，≤520px 收成紧凑项目行）；`pages/project-list/project-list.vue` 是直链薄壳（根仍是 `.page-project-list`）。下面这段描述的内容、类名与门控全部跟着搬进了 Pane，只有三处不同：没有页面大标题（外壳 `.sidebar-header` 出「项目」）、页头的「日程 / 反馈 / 个人中心」按钮不搬（rail 上各有入口）、离开工作台的跳转（进项目 / 删当前项目 / 去日程 / 浏览器端新建）一律走注入的 `leaveWorkbench`。首次启动的「可选组件」面板搬到工作台 `onLoad`（只在无项目态触发），当日事项摘要 `todayDigest` 搬到工作台 `mounted`。
 - **项目列表页（2026-09-29 前的形态）** `frontend/src/pages/project-list/project-list.vue` + 同目录 `project-list.scss`（样式 `@import` 引入，照 project-overview.vue + .scss 的既有形制）。整块搬自 `userprofile.vue` 的 projects tab，卡片类名 `.project-item-card` 保持不变（e2e 锚点）；页面根 `.page-project-list`。**新建入口在列表下方**（`.create-section`，两张 `.create-card`：打开文件夹 / 新建项目文件夹，走 `utils/ideOpen.js` 的 `openFolderFlow`/`createFolderFlow`，命名弹窗同页）；「单独打开一个文件」已去掉——它造出的是没有归属的临时项目（`openFileFlow` 仍留给应用菜单与拖拽）。浏览器版没有系统文件夹对话框，降级为 navigateTo `newproject` 页填表建托管空白项目。承载 `InviteMemberDialog` 与 `CloudAcceptDialog`（**这两个必须一起搬**，`CloudAcceptDialog` 的两个入口是协作唯一入口，`CollabDialog.vue:271` 的邀请话术还指着它）。CLIENT 隐藏「+ 新建项目」「从团队案件库取一份案卷」与卡片上的删除/重命名/邀请。角色文案唯一来源是 `config/memberRoles.js`（搬迁时把原来硬编码的 `getRoleLabel` 映射表换掉）。**不要搬**「进行中/已完成」那两张统计卡——它们是写死的字面量 0，Project 实体根本没有状态字段。
-**双视图（2026-08-18）**：页头右侧 `.view-toggle` 两个按钮切 `viewMode`（`'grid'`/`'list'`），
-选择记在 `uni.storage` 的 `checkba_project_list_view`（本机习惯，不进后端）。默认仍是 grid，
-`.project-item-card` 因此一直在——**app-e2e 的 J2 就钉在这个类名上，改默认视图会让它红**。
-列表视图根 `.project-table`，行 `.ptable-row`，列 `.col-name/.col-client/.col-created/.col-updated/.col-members/.col-ops`。
-两个视图承载同一批字段（名称/客户/创建时间/最近修改/成员），没有哪个视图独占信息。
-卡片上**「空白项目」标签已不渲染**（`projectType === 'BLANK'` 时留 `.card-top-spacer` 占位，
-非 BLANK 的历史项目照旧显示类型），原来那句「通用项目工作区」占位与
-`projects.blankWorkspace` 文案一并删除。
+**统一列表（2026-10-11，dev-board#1205）**：用户明确窄侧栏只要言简意赅的高密度项目行。已删除 grid/list 切换、网格分支与旧 `checkba_project_list_view` 偏好读取；旧值不影响布局。列表根 `.project-table`、行 `.ptable-row`，E2E 使用 `.project-list-pane .ptable-row`。账户目录同样单行呈现名称和“本机 / 云端 / 可获取 / 待电脑开启”，完整位置放 title，“其他位置”独立按钮保留。
 **项目档案接进列表了（2026-08-18 二改）**：`ProjectCardDTO.profile` 是
 `fieldKey → 值` 的 map，**只含已填的**，键就是 `ProjectProfileService.FIELD_KEYS`
 （client / matterType / openedAt / nextStep / counterparty）。取数是
@@ -1146,13 +1216,12 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 - **客户是一等列，常显**；`clientText()` 先读 `profile.client`（律师手填、`source='user'`
   锁定、AI 抽取只写 pending 永不覆盖），**没填过才**回落到推断：① CLIENT 系角色成员
   ② listedCompanyName ③ targetCompanyName ④ `—`。列表视图给推断值加灰字 +「推断」小标，
-  免得律师以为那是自己填的（`clientIsInferred()`）；方块视图里手填值一定显示，
-  推断值才被「已单列上市公司」那条躲开（`showClientRow()`）。
+  免得律师以为那是自己填的（`clientIsInferred()`）。
 - **推断值绝不回写档案**：档案字段的语义是「谁说的算」，把猜的混进去会稀释掉那把手填锁。
 - 其余四项收在**页头的「详情」开关**后面（`.detail-toggle`，`checkba_project_list_detail`，
-  默认关，两个视图共用同一个开关）。列表视图渲染成主行下面的第二行（`.ptable-detail`，
+  默认关，统一列表沿用同一个开关）。列表视图渲染成主行下面的第二行（`.ptable-detail`，
   因此 `v-for` 挂在外层 `.ptable-item` 上、边框与悬停也上提到那一层，主行只剩高度）；
-  方块视图追加成卡片里的 info-row。**一项没填的案卷整条详情行不渲染**——空行只占地方。
+  **一项没填的案卷整条详情行不渲染**——空行只占地方。
   显示顺序是「事项类型 / 对方 / 立项时间 / 下一步」，不照搬 FIELD_KEYS（那是档案头的排版序）：
   先认这是哪一类活、跟谁打，`nextStep` 常常是一整句话，放末位才不会把前面几项挤没。
 - 想再加字段：后端不用动（map 是全量的），前端在 `detailFields()` 里加一行 + 补两条 locale。
@@ -1275,8 +1344,8 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
   它做三件事：`showAiPanel` 为 false 时先走既有的 `toggleAiPanel()`（顺带刷 AI 上下文 +
   拉历史，不能绕过去直接改标志位）→ 有界轮询 ~3s（30×100ms）等 `$refs.chatInterface`
   暴露 `sendExternalPrompt` → 真等不到才 toast。**别再各写各的
-  `if (!$refs.chatInterface) toast('AI 面板未就绪')`**：AI 面板默认收起，那条分支
-  在真实使用里几乎必中，而且它不告诉人该怎么办。现有三个调用方：
+  `if (!$refs.chatInterface) toast('AI 面板未就绪')`**：AI 面板首次挂载尚未完成时，那条分支
+  会误报未就绪，而且它不告诉人该怎么办。现有三个调用方：
   `handleShareholderMeetingStart` / `handleMeetingMinutesStart` / `handleLitigationStart`。
 - **rail 上加/改 key 之后自查 `panelSwitching.js`**：`toggleLeftPane` 与
   `lastActiveIdsByMode` 全按 key 工作（`data()` 里那两个字面量种子只写了
@@ -1366,4 +1435,170 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 
 ### 工作台底栏手机收件（dev-board#1171）
 
-`MobileReceiveStatus` 位于底栏 spacer 之前，桌面态常驻（含无项目态），点击展开本机收件详情；不依赖左栏面板或当前项目。设备完整 ID 与当前项目编号/本地路径用于和手机核对同名项目；列表为全设备最近 100 件本次运行记录。新收到且保存完成的当前项目资料抛 `received`，由工作台 `onVersionReloadFiles` 刷新文件树。后端定时取件、状态生命周期和验证边界见 mobile-sync.md 的 #1171 节。
+`MobileReceiveStatus` 位于底栏 spacer 之前，桌面态常驻（含无项目态），点击展开本机收件详情；不依赖左栏面板或当前项目。设备完整 ID 与当前项目编号/本地路径用于和手机核对同名项目；列表为全设备最近 100 件本次运行记录。新收到且保存完成的当前项目资料抛 `received`，工作台直接调用已挂载的 `fileTree.loadFiles()` 刷新目录（dev-board#1437）。不能接到 `onVersionReloadFiles([])`：它只重载指定的已打开文档，空编号数组会直接返回。树未挂载时跳过，重新挂载会拉取最新目录；不重载正在编辑的文档。后端定时取件、状态生命周期和验证边界见 mobile-sync.md 的 #1171 节。回归除 `tests/media/mobile-receive.test.mjs` 的事件绑定外，`tests/mobile-receive/ui.mjs` 必须验证保存后目录自动出现、展开日期文件夹能看到照片；只验证收件提示不代表资源管理器已刷新。
+
+## PDF 路由（2026-10-10，dev-board#1178）
+
+`isEditorOpenableFile` 必须在 `wpsFileId` 兼容兜底之前明确排除 PDF；FileTree 会为导入文件合成这个旧字段，不能据此把 PDF 送进 Writer。PDF 继续走 FilePreview 的 Chromium iframe，不改导出字节。回归 `project-home/pdf-editor-routing.test.mjs` 包括有/无旧ID及大写扩展名。
+
+## 账户统一项目目录（dev-board#1188，2026-10-11）
+
+桌面左栏 `ProjectListPane` 在本机项目视图旁挂 `AccountProjectCatalog`，通过本机代理读取账户云目录。
+同一个项目只有一个 projectUid，可从此处查看云附件与其他设备文件，包括已有本地副本的项目。
+目标本机项目必须明确选择；云文件直接取回，桌面文件先报价确认，再持久化 requestId 后 PULL；
+读取各来源失败保留已成功加载部分并说明原因。账户scope守卫、落盘/ACK顺序见 mobile-sync.md。
+
+## 账户项目入口与等待（dev-board#1195/#1199）
+
+`AccountProjectCatalog` 的 `localProjectId` 由本地后端按本设备 deviceId、项目 key 和项目所有者核对，只以此判断本机项目，禁止按名称合并。本机项目点击 emit `open-project`，`ProjectListPane.goToProject` 走注入的 `leaveWorkbench`（保留 flushDirtyEditors）并带 `pane=files`。当前项目点击只 emit `activate-current-project` 打开文件面板，不能重建工作台丢编辑器状态；客户角色仍走 dd-files。
+
+本机项目若存在其他文件来源，显示独立兄弟按钮“其他位置”，调用 openLocations 查看云附件及其他设备，不与主按钮嵌套。远程项目就地展开文件清单，不阻塞其他项目按钮。目录加载、LIST 等待和单文件导入各自有状态。项目选择/关闭递增 generation，LIST 每次 await 后及轮询前后核对；请求固定 accountScope，不再从可能已切换的 selected 动态取值。关闭仅停止 UI 等待，不冒称撤销已发往设备的服务端任务。云端快照文件可在其他设备 LIST 等待时按需获取，仍沿用目标本机项目、报价确认、幂等下载及 ACK 既有链路。
+
+律师可见状态改为“这台电脑·可直接打开 / 可获取·设备名 / 需打开电脑·设备名 / 云端文件”；长设备名省略，title 保留完整操作说明，不直接显示 deviceId。只有服务端确定的本机映射才能使用本机入口。
+
+## 项目页面密度（dev-board#1196）
+
+项目侧栏统一紧凑列表，移除双视图与旧偏好读取。圆角/主字号/间距消费全局 token；窄于 360px 隐藏固定宽日期列，保留搜索和日期排序。Catalog 为边界分隔的整行按钮，不再是大圆角卡片包小卡片；项目概览 Profile/Stats 保留容器查询，主信息使用 body13，减少块间留白而非缩字。
+
+验证：项目入口行为回归、脏编辑器保护、迟到响应与本机来源核验通过；主任务用QA账号真实H5工作台验证点击进入pane=files并显示测试文件，用独立真实组件合成夹具验证220/260px入口和其他位置。正式桌面发布不包含在本次源码修复交付中。
+
+## 顶部项目名称原位编辑（dev-board#1204）
+
+名称点击进入原位输入，Enter/confirm保存、Esc取消；小箭头独立打开项目切换菜单，不再放重命名菜单项。按ProjectController所有者规则显示入口，CLIENT不编辑。uni会把button编译为uni-button，必须显式role/tabindex与Enter/Space处理，不能仅靠HTML标签假定键盘可用。草稿从input/confirm实时值取，防IME、重复请求和confirm后blur；失败保留草稿，迟到结果不覆盖已切换的项目。主任务用独立QA项目实际验证修改、取消及恢复原名。
+
+
+## 独立文件工作区（dev-board#1212）
+
+系统打开方式与文件菜单共用 `utils/ideOpen.js` / `localOpenCoordinator.js`，单文件调用 `POST /api/projects/open-local-file {path}`；返回隐藏的每用户 `projectType=LOOSE_FILES` 工作区和 `file`。单文件不再切父目录项目；不同目录的文件进入同一工作区标签，重复打开聚焦已有标签。`hasProject` 保留编辑/AI上下文，`hasNamedProject` 控制项目管理入口；内部工作区不进最近项目/项目列表，不初始化暂存区、协作、版本和成员面板。
+
+工作台 mounted + restoreTabSnapshot 完成后注册打开接收器；只在 unload/销毁注销，不能在最小化的 onHide 注销。切工作区先等 `leaveWorkbench` 保存和导航回执，失败留原页；目标就绪超时从导航完成后计算，不把旧文档保存时间算进去。
+
+后端 `LocalProjectService.openLocalFile` 只登记明确选中的真实文件，`ProjectFile.externalPath` 不出 JSON。`ProjectStorageResolver` 按精确 key 映射外部文件，不授予父目录/兄弟文件访问；原文件保存先完整写同目录临时文件再替换，缺失或符号链接重绑失败，不重建原件。独立文件不启用 Git 项目版本，也不参与自动手机目录/备份；结构改动（删除/移动/改名）由 Finder/资源管理器处理。后端回归 `LooseFileWorkspaceTest`，前端 `loose-files-workspace.test.mjs`、`local-open-coordinator.test.mjs`。
+
+## 资源管理器右键转 PDF 与多选合并为 PDF（dev-board#1291，2026-10-15）
+
+- 前端 `FileTree.vue` 与 `utils/fileTreePdfActions.js`：单选可转 PDF 文件（`doc/docx/ppt/pptx/xls/xlsx` 及图片）右键菜单显示「转为 PDF」；多选（含已有 `pdf`）2 个及以上文件时右键菜单显示「合并为 PDF」。
+- 后端 `ProjectFileController`（`POST /api/projects/{projectId}/files/{fileId}/convert-pdf`、`POST /api/projects/{projectId}/files/batch/merge-pdf`）与 `ProjectFilePdfService`：Office 文档优先调本机 LibreOffice，不可用时走内置 POI + PDFBox 中文字体渲染兜底，在原目录生成同名（自动递增序号）PDF 并刷新文件树。回归：`ProjectFilePdfServiceTest`、`fileTreePdfActions.test.mjs`。
+
+## 资源管理器与暂存区文件向外拖拽（dev-board#1288）
+
+`FileTree` 与 `FileStagingArea` 支持将文件直接拖到软件窗口外部（如微信聊天、Finder/资源管理器）。微信等外部桌面应用只认 OS 级文件拖拽（macOS `NSFilenamesPboardType` / Windows `CF_HDROP`），不认 Chromium HTML5 `dataTransfer`。
+
+- 桌面主进程 `desktop/main/file-service.js` 注册 `fs:startDrag`（`ipcMain.on` + `ipcMain.handle`），校验路径为已存在的本地文件后调 `event.sender.startDrag({ files, icon })`（内置非空 32×32 PNG `nativeImage` 图标），preload 暴露 `host.fs.startDrag(path)`，用 `ipcRenderer.invoke` 返回实际启动结果（只表示已调用原生 API，不表示用户已经松手）。
+- 前端 `utils/fileLocalDrag.js` 在行悬停/按下时通过 `prefetchLocalFilePath(file)` 调 `/files/{id}/local-path` 预取并缓存本地绝对路径（`file.localPath` 已有时直接复用），`dragstart` 同步解析路径并在写入应用内 `dataTransfer` 后调 `startExternalFileDrag`。
+- `webContents.startDrag` 会向 `dataTransfer.types` 注入 `'Files'`、将 `effectAllowed` 锁为 `'copy'`，且拖到软件外松手时可能吞掉 DOM `dragend`：① `isExternalFileDrag(dt)` 在 `document.__checkbaDraggedFile` 存在时返回 `false`，避免应用内文件树把自己拖出的文件误判为外部上传；② 内部树移动/暂存区拖回/编辑器建链统一走 `compatibleDropEffect(dt, preferred)`，当 `effectAllowed === 'copy'` 时返回 `'copy'` 防止目标区拒绝落点；③ `installExternalDragCleanup` 监听窗口级 `mousemove (buttons === 0)` / `mousedown` / `dragend` / `drop`，兜底清理 `document.__checkbaDraggedFile` 与拖拽残留态。
+- 回归：`desktop/tests/file-drag.test.js`、`frontend/tests/project-home/file-tree-external-drop.test.mjs`。
+
+
+## 嵌套文件夹打开（dev-board#1305）
+
+`LocalProjectService.openLocalFolder` 在新项目与已有同账号项目有父子目录关系时，先抛 `NestedFolderConfirmationRequired`；`ProjectController` 返回 `code:0`、`data.requiresNestedConfirmation` 与 `overlappingProjectNames`，此时没有创建目录、项目或导入文件。共用入口 `ideOpen.launchProject` 展示「继续打开 / 取消」，确认后带 `allowNested:true` 重试同一路径，创建/打开所选目录的独立项目。已登记的相同目录照常复用，不重复提示；精确查询与列表查询之间并发登记的同一路径也须排除出嵌套判断，复用权限仍由锁内 `resolveProject` 校验（dev-board#1466，确定性 H2 时序回归覆盖所有者、授权协作者与无权限账号）；跨账号重叠仍拒绝且不泄漏项目名；案件库 clone 的非空与嵌套限制未放开。
+
+父子项目引用同一批真实文件，编辑、删除、退回版本彼此可见；数据库文件行和根 `.awd` 清单分别属于各项目。版本层排除子目录 `.awd` 并保护旧历史，详见 version-control.md。验证覆盖取消不落盘、两个方向、重开幂等、各项目独立索引与对账、前端系统打开/新建/菜单共用流程。
+
+## 资源管理器基本键盘操作与多选外拖（dev-board#1306/#1307/#1308）
+
+`FileTree.handleKeyDown` 只在当前树获得焦点且不在输入/对话框/菜单中处理按键。上下按 `displayFiles` 选择，不调用 `handleItemClick` 打开文件或改变复选框；左右展开/收起文件夹和进入子项/回到父项。超过每目录 100 项渲染窗口时先补 `revealCounts` 再滚动。Delete 与 Mac Backspace（含 Cmd+Delete）复用原删除确认和回收站逻辑；Enter 仅单选时重命名；重命名 Enter 提交原生输入值，Esc 取消，IME 组合期不提交。焦点用本实例 `$el`，不可全局找第一棵树；行 click 后补焦点以覆盖浏览器 mousedown 默认行为。uni-h5 Input 的 Enter keyup 会触发 confirm 并 blur，所以重命名显式 `confirm-hold`、忽略 keyup confirm，仅 keydown 提交，避免打开重命名的同一次 Enter 立即把输入框关闭。
+
+外拖以 `externalDragItems` 取当前有效选区：起拖项在选区则传整组，否则只传起拖项。`fileLocalDrag` 整组解析/去重，不允许漏掉缺路径的一项后部分拖出。preload `fs.startDrag` 接受字符串或字符串数组，主进程校验所有路径后以 `webContents.startDrag({files,icon})` 交给系统。文件夹混选或路径不可用提示失败；不自动发送微信消息。
+
+原生拖拽开始前登记清理，全部路径解析成功后，必须在同步 `dragstart` 内先对捕获的原生事件 `preventDefault()`，再调用 `fs.startDrag`；否则浏览器默认拖拽和系统拖拽同时启动，可能令宿主吞掉点击，清除 Vue 蒙层也不能修复（#1307 复测追修）。文件树与暂存区都传 `nativeEv`，保留全局文件身份供原生内部 drop 消费。非桌面、文件夹和路径解析失败不取消 HTML 拖拽；取消默认后原生启动失败则清理并提示，不能再宣称恢复了已经取消的 HTML 会话。两个组件均消费异步启动结果，成功回执不提前清理。
+
+除 DOM dragend/drop 外，宿主回焦、松开鼠标/pointer、Esc 也撤销拖拽状态并发 `file-drag-end`，解除编辑器 `evidenceDropArmed` 透明层。暂存区即使全局身份已被消费者清空也必须广播结束；新拖拽替换旧清理器时将旧闭包标为完成，防止旧 IPC 迟到失败清掉新会话。不要在 blur 时立即清理，鼠标可能仍按住跨窗拖动；焦点监听只处理窗口本身，不能把内部控件 focus 当拖拽结束。
+
+回归：`file-tree-keyboard.test.mjs`、`file-tree-external-drop.test.mjs`、`staging-drop-external-files.test.mjs`、桌面 `file-drag.test.js`。2026-10-19 隔离 Electron 30.5.1 原生鼠标对照：无取消默认时拖后宿主按钮不响应，取消默认后按钮响应；该最小窗口未完成真实文件接收，不能代表完整工作台/微信端到端通过。微信接收端与正式安装版本需要分别验收，不把原生 API 桩和浏览器合成环境称为真实微信投放。
+
+## 业务侧栏真实插件迁移（#1340，待发版）
+
+8个业务包为search/voice/desensitize/litigation-visual/calendar/favorites/clipboard/insight；tmeet由已有tencent-meeting包承接。布局从manifest contributes.views解析，动态PluginPane承载sidebar/workspace，global无项目可开，project受项目/CLIENT门控。源在frontend/plugin-app，构建npm run build:plugins；npm run build:h5先构建8包。业务服务桥分pluginBusinessServices/pluginCollectionServices/pluginVoiceServices/pluginInsightServices，账号与本机设备仍在宿主。日历深链转插件workspace视图，保留task/file/focus过滤。核心保留home/projects/files/dev/market/version/staging/members及受限CLIENT dd-files，详见PLUGIN_SPEC §17盘点。验证除了单元测试还需真实Uni+opaque sandbox：ES模块静态资产需要仅plugin-web路由ACAO:*；不增加allow-same-origin或unsafe-eval。
+
+
+## 插件与客户协作导航的层级（dev-board#1493/#1494）
+
+通用 `PluginWorkspaceSummary` 以一行工作区导航显示 `workspaceTabState`（当前显示/已打开/打开），简介默认折叠，业务阶段与 AI 动作保留为轻量行。客户协作使用相同导航方式，左栏和中栏名称一致；不再重复大介绍卡与“打开工作区”按钮。状态读取真实左右窗格，定位隐藏右分屏中的已有插件时恢复 splitMode；不创建重复实例，不令普通切标签自动切左栏。回归 `plugin-workspace-tabs` / `dd-client-i18n`。
+
+消息会话与项目沟通插件把上下文、过程状态、附件、输入和发送包在同一输入表面，内部不重复加框；保留云端处理范围与原有发送、附件和重试逻辑。项目沟通实测须使用真实 SDK/opaque iframe，见 `official-plugins/project-im/tests/agent-browser-sandbox.mjs`。全局消息页及入口重整由 #1490 / PR #1223 承接，勿回退它的布局。
+
+## 文件标签浏览（dev-board#1446）
+
+主资源管理器给 FileTree 传 `enable-tag-view`，显示下方标签分组；选择器等复用方默认关闭。
+标签视图跨折叠目录列出已标记文件，显示原父目录，多选标签 AND，不改文件实际位置和文件夹展开状态。
+资源管理器共用 `TagFilter.vue` 的 `sidebar` 形态（dev-board#1491）：取消顶部“文件夹／标签”切换，在文件列表下方显示可折叠的“标签”分组，圆点+名称；超过 8 项才出现名称过滤。点击标签进入跨目录筛选，清空/返回文件夹恢复目录，`showAllTaggedFiles` 单独处理“空 ids + 标签视图”的全部已标记文件。折叠保留所选条件，回收站和其他嵌入文件树不显示此入口；搜索沿用默认形态，契约见 utility-tools.md。
+过滤改变时清空选择；后台刷新移除命中项时清除隐藏选择，并关闭含失效目标的右键菜单。
+`fileOpenTabs.syncFileTreeSelectionWithActiveTab` 不能重新选中筛选外文件；批量操作取当前可见选择。
+标签列表按一个根窗口分页，键盘跨第 100 项必须同步扩展根窗口，不再按文件原父目录计数。
+右键加减标签同步 allFiles、当前列表与快照并发 `awd:files-changed`；项目标签管理关闭后重载文件及弹窗目标，
+后续加减标签以最新文件数据为准，防止已删除标签被旧弹窗重新带回。项目切换/卸载丢弃迟到的标签加载。
+回归 `file-tree-tag-filter` / `file-tab-focus`；`file-tag-filter-ui.mjs` 在真实 Uni H5 配合合成 API
+验证右键变更、鼠标/键盘、220/260/420px 与双主题，尚非正式 Electron 安装包验收。
+
+## Finder 式图片快览（dev-board#1359，2026-10-19）
+
+图片单击只选中；已有普通图片预览标签时单击/上下键安全替换当前图片，不增加标签、不覆盖编辑文档。
+空格打开 `QuickLookDialog`，上下键沿树的可见文件切换，空格/Esc关闭并恢复树焦点；双击打开正式标签。
+其他文档原单击打开习惯保留。FileTree 新事件 `file-navigate` / `quick-look` / `file-open` 接至
+`fileOpenTabs` 方法组；双击在真实DOM根委托，避免uni的事件包装。输入框、重命名、回收站和选择模式有守卫。
+弹窗复用 FilePreview、独立 overlay holder，`quick-look-open` 只以 visibility 隐藏后台 pane-content 原生画布；
+不能隐藏弹窗自己的预览。所有蒙层 no-drag；卸载按 holder 释放，不清其他弹窗的状态。
+回归 `file-tree-keyboard` / `file-tab-focus`；`finder-preview-ui.mjs` 使用真实工作台
+与合成API验证原生键鼠、首次单击不建标签、双击标签、上下联动、关闭焦点及overlay模块实际状态。
+
+## 桌面重开恢复入口（dev-board#1356）
+
+`restartRecovery.js` 只在桌面冷启动且没有外部打开意图时自动接续一个安全检查点；先导航原项目，等待项目资料/标签快照，再打开原会话和文件。Office 文件必须由相同 fileId 的 LOWA 实例与 executor 报 ready，预览或加载失败不算就绪。其余待恢复任务保留提示条供选择，不轮流切换用户编辑器。用户导航、指针/键盘操作、账户变化和外部打开取消迟到恢复。
+
+`App.vue` 的宿主退出回调先取消启动恢复，经 `desktopQuitGuard.js` 等后端安全暂停，再对所有已注册工作台执行 `flushDirtyEditors` 与标签快照。保存失败或退出取消恢复原任务；恢复条件已变时保留检查点并明确提示。成功 ACK 后保持输入遮罩直到主进程隐藏窗口，只有主进程确认取消才解除退出屏障。正常退出契约与安装边界见 ai-chat.md / eng-infra.md。回归为 desktop-quit(-app)、restart-recovery、restart-resume；合成行为测试不代替正式安装包与真实 LOWA 跨升级验收。
+
+
+## 多选移动与磁盘状态刷新（dev-board#1381/#1383）
+
+`FileTree.handleDragStart` 固定完整选区；内部节点/根目录落点的多选使用 `batchMoveFiles`，文件夹及其选中子孙折叠为最上层，禁止整组移入选中文件夹或后代，同父条目不重复搬动。原地判定按文件 id，不能比较可能已被后台刷新重排的行下标。旧移动请求不得清除新拖拽的选区/状态（`dragSequence`）。
+
+文件树刷新按请求序号只接收最新响应，刷新开始与完成均失效原生拖出路径缓存；`fileLocalDrag` 的预取回填/清理须核对 Promise 身份，避免旧路径在清除后被迟到响应重新写回。宿主 `not-found` 回执仅失效本次仍匹配的缓存路径。不能靠一分钟 TTL 等待恢复。
+
+桌面文件树挂载时经 `services/api.subscribeLocalProjectFileChanges` 订阅本机项目 `/api/projects/{id}/files/changes`。`ready` 补读，`files_changed` 在 watcher 对账返回后重读，心跳不拉树；切项目/卸载清理旧订阅，旧项目事件不刷新当前树。后端只在 local-mode、项目有 localRoot、具备读取权限且非客户端成员时开放；长连接排除 OSIV，发送前再次校验权限。具体流契约见 version-control.md。
+
+单文件同目录排序最终会走 `ProjectFileService.movePhysicalFile`，旧新路径相同时必须直接返回，保留排序元数据更新；否则“复制再删除”会删除自身。回归必须使用真实 `LocalFileStorageService` 与临时文件核对字节，存储 mock 无法发现该问题。
+
+验证：`npm --prefix frontend run test:project-home`、`ProjectFileMovePhysicalTest`、`LocalRootWatchNotificationTest`、`LocalProjectFileChangeControllerTest`、`LocalProjectFileChangeOsivTest`。浏览器组件夹具不等于正式 Electron/Finder 原生拖放验收。
+
+## macOS 权限引导与微信沙盒拖入（dev-board#1433，2026-10-22）
+
+- **微信拖入根因与双通道兜底**：macOS 微信（`WeChat.app`）聊天中的文件位于 App Sandbox 容器 `~/Library/Containers/com.tencent.xinWeChat/Data/...`（及 `Group Containers`），受 macOS TCC `kTCCServiceSystemPolicyAllFiles`（完全磁盘访问权限）保护，未授权时直接返回 `EPERM` 且系统不自动弹窗。`frontend/src/utils/fileTreeExternalDrop.js` 对命中 `/Library/(Group )?Containers/` 的路径在同步 `drop` 事件内预读 `File.arrayBuffer()` 字节流；当后端 `import-local` 因 TCC 失败时自动回退到 `stageDroppedFile` 上传字节；若字节流与直接路径均被 TCC 拒绝，抛出 `dropCode = 'importDropPermissionDenied'` 并触发全局事件 `awd:open-permission-onboarding`（`focus: 'fullDiskAccess', reason: 'wechat-drop'`）。后端 `ProjectFileService.throwIfSourceAccessDenied` 将 `AccessDeniedException` / `Operation not permitted` 转为明确提示开启「完全磁盘访问权限」的异常，同时对真实缺失文件保留原错误。
+- **Codex 式首启权限排查与拖拽授权浮窗**：桌面主进程 `desktop/main/permissions-service.js` 提供 `fullDiskAccess`（探测 `/Library/Preferences/com.apple.TimeMachine.plist` 与微信容器可读性）、`screenRecording`、`microphone`、`accessibility` 四项状态检测，打开对应 `x-apple.systempreferences:com.apple.preference.security?Privacy_*` 页，并通过 JXA `CGWindowListCopyWindowInfo` 追踪系统设置窗口位置，在旁侧贴靠置顶无边框拖拽引导浮窗（`showHelperWindow` + `desktop/preload/permission-helper-preload.js`），支持通过 `webContents.startDrag({ file: appBundlePath, icon })` 将 `AI WorkDeck.app` 直接拖入系统设置列表，后台 800ms 轮询授权成功后自动收起浮窗并广播 `checkba:permissions-updated`。
+- **前端全局引导与设置页入口**：`App.vue` 挂载独立根实例 `mountPermissionOnboarding()`（`PermissionOnboardingModal.vue` + `utils/permissionOnboarding.js`），macOS 桌面端首次启动存在未授权推荐项时自动弹出，并在 `AdminPane.vue`「系统 → 系统权限」提供常驻体检与一键开启入口。所有调起原生 `.app` 拖拽的 `dragstart` 必须先同步 `e.preventDefault()` 再调 `startAppDrag`。
+- **验证**：`desktop/tests/permissions-service.test.js`、`frontend/tests/project-home/drop-byte-import.test.mjs`、`frontend/tests/project-home/permission-onboarding.test.mjs`。
+
+## 项目标签恢复的加载范围（dev-board#1473）
+
+`tabSnapshot.snapshotFileIds` 收集左右窗格真实文件和比对两侧的去重 ID；`fetchTabSnapshotFileIndex(ids)` 经 `getProjectFilesByIds` 每批最多 200 个，调用现有 `GET /api/projects/{id}/files?tree=true&ids=…`。该分支仅查询当前项目未删除的指定文件，不读取整棵文件树或 tags；目录仍由宿主过滤。空快照不请求，任一批失败沿用原有保留标签的错误兜底，不能把部分返回当成完整存在性索引误删标签。文件树展示继续使用 tree/parent 路径，鉴权规则不变；切换仍须先 `flushDirtyEditors`。回归：`tab-snapshot.test.mjs`、`tab-file-lookup.test.mjs` 与后端 `ProjectFileControllerIdsTest`。
+
+宿主 `onLoad` 必须在恢复前以具名 `uni.getStorageSync/setStorageSync` 包装注入 `$tabStorage`。H5 构建按方法名改写 API 引用，裸 `uni` 及普通 JS 方法组读到的全局 `uni` 可能只有空壳；不能改成 `$tabStorage = uni`。回归同时覆盖无绑定、裸绑定负对照；实际编译产物和 Electron 项目切换验收见 `doc/verification/2026-10-24-startup-project-word-performance.md`。
+
+## 对话 / 工作台双模式与随手工作区（dev-board#1479，2026-10-26）
+
+- **单壳正交双模（`对话 | 工作台`）**：`project-overview.vue` 顶栏 `.header-center` 提供 `.mode-switch-capsule`（`viewMode: 'chat' | 'ide'`，在 `App.vue` 登记 `no-drag`），纯逻辑在 `pages/project-overview/chatMode.js`（`STARTUP_ENTRY_MODE_KEY = 'awd_startup_entry_mode'` 默认 `'welcome'`，`VIEW_MODE_STORAGE_KEY = 'awd_last_view_mode'`）。切换模式只在 `project-overview.vue` 内改布局状态，不调 `uni.reLaunch`，不卸载 `ChatInterface`（SSE 流不断）与 `LibreOfficeEditor`（LOWA `<webview>` 保活）。
+- **欢迎页快速入口（`WelcomePane.vue`）**：保留欢迎页为默认首屏，顶部新增 `.welcome-quick-chat` 输入框与快捷胶囊（`进入随手对话` / `新建空白文稿` / `新建 Markdown`），emit `start-chat` / `quick-create-doc` 交宿主切入 `chat` 模式。
+- **随手工作区（`Project.SCRATCH = "SCRATCH"`）**：无项目态切入 `chat` 模式时，宿主调 `ensureScratchProject()`（`POST /api/projects/scratch` → `ProjectService.getOrCreateScratchProject`）幂等获取每用户唯一的隐形托管项目（`versionOptOut = true`，在 `getUserProjects` / 律所目录 / 冲突检索中过滤隐藏），原地绑定 `projectId` 并拉取会话与文件。顶栏与侧栏提供「转为正式项目」（`POST /api/projects/{id}/promote` → `ProjectService.promoteScratchProject`），原地将 `SCRATCH` 转为 `BLANK` 并解除 `versionOptOut`，文件与对话历史零迁移保留。
+- **轻量侧栏与按需画布（`ChatModeSidebar.vue`）**：`chat` 模式下隐藏 `.left-rail` 与 `.sidebar-left`，左侧挂载可折叠 `ChatModeSidebar.vue`（近期对话、当前工作区文稿 `+ Word` / `+ MD`、跨项目调取树 `getMyProjects` + 按需展开 `getProjectFiles(id, null, true)`）。`.workbench-main` 通过 CSS flex `order` 将 `.side-panel-ai` 置左、`.content-area` 置右：无打开文档时 `.side-panel-ai` 居中流式（`max-width: 840px`），`.content-area` 零宽隐藏保活；打开/新建文稿或 AI 产物时 `chatCanvasOpen = true` 自动展开右侧画布（标签栏附「收起画布」按钮）。
+- **验证**：`frontend/tests/project-home/chat-mode.test.mjs`、`npm --prefix frontend run check:nav`、`npm --prefix frontend run check:emits`、`Backend ScratchProjectAndCrossProjectReadTest`。
+
+## 规则编辑与侧栏收展（2026-10-27，#1532/#1536）
+
+内置工作流规则从 ChatInterface 通过 provide/inject 的 `openWorkflowEditorTab` 打开单例 `builtin-workflow-settings` 标签；`BuiltinWorkflowEditor.vue` 与 `useBuiltinWorkflows.js` 复用既有版本 API，版本修改广播刷新聊天卡片。两侧标签池用 v-show 保留编辑草稿，切项目重选版本，虚拟标签不进入文件上下文。菜单 Teleport 到 body 并按视口限宽限高，不能再放进聊天栏的裁剪/定位上下文。回归 `builtin-workflow-tab.test.mjs` 与真实 Uni 编辑器测试。
+
+移除侧栏外缘收起按钮及14px占位；再次点当前 rail 入口复用 `toggleSidebar` 收起/展开，保留顶栏/快捷键。收起动态插件时不重新打开工作区；宽度回夹不再扣外缘占位。
+
+## 日程插件左右联动（dev-board#1538，2026-10-27）
+
+真实入口是 `frontend/plugin-app/calendar/Panel.vue`，由 `official-plugins/calendar` 打包；旧 `components/calendar/CalendarPane.vue` / `ProjectCalendarPane.vue` 不是当前插件入口。宿主 `PluginPane` 握手 `surface: sidebar|workspace` 明确视图用途，禁止按窗口宽度猜左栏：左栏 `Sidebar.vue` 只放项目快捷筛选、含今天的近 3/5 个自然日未完成事项和逾期入口；中央承载日/周/月/年/列表、编辑与文件关联。rail 选中日历时同时激活单例工作区标签，其余插件的面板规则不变。
+
+`calendarTabMethods.calendarWorkspace` 持有工作台本次生命周期的唯一展示状态；插件经 `calendar.workspace` 命名操作读/改，沿原 `sidebar.command` 发布 `calendar-state`。状态含项目/类型/完成项筛选、日期、视图、近期天数与文件筛选，递增 revision 防迟到响应回退；不写入用户项目、不扩大数据访问，所有任务/文件请求继续经原权限闸。任一侧修改局部字段不覆盖另一侧字段，初次挂载主动读取状态；左栏打开事项与新建请求只在工作区弹窗。年视图是 12 个月的实际日期网格，点击日期切入日视图，包含闰日。`calendar-focus` / `calendar-file` 旧入口继续接入，任务定位会清除冲突筛选并转到其项目和日期。
+
+宿主发给插件的状态必须复制为可 structured-clone 的普通值，尤其不能直接发送 Vue reactive 的 `projectIds` / `types` 数组；真实 H5 双面板已复现过 `DataCloneError`，状态单测覆盖此回归。
+
+验证：`tests/calendar/workspace-state.test.mjs`、`tests/plugins/collections-services.test.mjs`、`tests/project-home/plugin-workspace-tabs.test.mjs`；`node tests/plugins/calendar-workspace-browser.mjs` 使用两个真实沙箱插件 iframe 和合成 API，覆盖筛选双向联动、3/5 天、日/年切换、关联编辑、刷新失败重试及窄栏。完整 H5 另用 `CALENDAR_WORKBENCH_BASE=http://127.0.0.1:5197 node tests/plugins/calendar-workbench-browser.mjs`（先启动该端口 H5 dev server），实际挂载工作台、PluginPane 与 rail，拦截全部 API 为合成数据，核对两端 revision、关闭再开、单例标签及移除插件入口；截图默认在 `/tmp/calendar-workbench-ui`，可用 `CALENDAR_WORKBENCH_OUT` 改目录。该验证不等于正式客户端/市场安装/真实用户数据验收；包源码修改后需 `node scripts/build-business-plugins.mjs calendar` 同步构建且提高插件版本。
+
+### 插件入口按声明选择（dev-board#1531）
+
+`contributes.views: []` 不提供 rail、panel 或工作区。仅 workspace 的插件保留 rail，点击只打开/聚焦标签，不切换当前左栏；rail 高亮取真实工作区状态。仅 sidebar 不自动开标签，两者兼有可通过 SDK `ui.openWorkspace()` 打开自己的 workspace。缺省/null 沿用旧入口。新规则集中在 `utils/pluginViews.js` 与 `pluginWorkspaceTabs.js`，快照恢复及直达入口使用同一闸；每个视图按自己的 scope 检查项目上下文，不能借另一个 global 视图越过 project 限制。旧纯皮肤 gallery（无业务权限、工具及其他贡献）仅作预览，更新宿主即隐藏其入口并清理旧标签；非 gallery 的主题编辑器等业务视图仍按声明显示。

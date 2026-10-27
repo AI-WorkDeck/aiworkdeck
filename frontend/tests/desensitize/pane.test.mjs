@@ -83,11 +83,11 @@ test('generating waits for editor save, and a save failure never calls the redac
   assert.equal(calls, 0); assert.equal(state.error, 'save failed'); assert.equal(state.processing, false)
 })
 
-test('switching to restore selects the latest generated file and reuses its encrypted kit', async () => {
+test('explicit restore-result action selects the generated file and reuses its encrypted kit', async () => {
   const { state } = pane({ desensitizeFile: async () => ({ file: { id: 4, name: 'redacted.docx', filePath: 'redacted.docx' }, recoveryKit: 'AWD-RECOVERY-1:encrypted', counts: {} }) })
   state.fileId = 1; state.fileName = 'original.docx'; state.preview = {}; state.downloadKit = () => {}
   await state.handleGenerate()
-  state.chooseOperation('restore')
+  state.restoreLastResult()
   assert.equal(state.operation, 'restore'); assert.equal(state.fileId, 4)
   assert.equal(state.recoveryKit, 'AWD-RECOVERY-1:encrypted')
   assert.equal(state.password, '')
@@ -164,4 +164,72 @@ test('settings expansion retains selected rules and custom terms; processing exp
   assert.match(html, /retained term/)
   assert.match(html, /role="status"/)
   assert.doesNotMatch(html, /<view(?=[^>]*class="settings-content")(?=[^>]*style="display:none)[^>]*>/)
+})
+
+
+test('initial pane omits repeated instructions and keeps token guidance at the review step', async () => {
+  const initial = await renderPane()
+  assert.doesNotMatch(initial, /panels.deLocalNotice|panels.deStepSelect|panels.deStepReview|panels.deStepCreate/)
+  assert.doesNotMatch(initial, /class="help-text">panels.deTokenNotice/)
+  const reviewing = await renderPane({ fileId: 1, preview: { text: 'synthetic preview' } })
+  assert.match(reviewing, /class="help-text">panels.deTokenNotice/)
+  assert.match(reviewing, /panels.deReviewNotice/)
+})
+
+test('irreversible modes keep their limitations visible before preview', async () => {
+  const masking = await renderPane({ mode: 'MASK' })
+  assert.match(masking, /class="help-text">panels.deMaskNotice/)
+  const pdf = await renderPane({ fileName: 'synthetic.pdf' })
+  assert.match(pdf, /class="help-text">panels.dePdfNotice/)
+})
+
+test('choosing an operation keeps the file selected first, including after another generation', () => {
+  const { state } = pane()
+  state.lastRedaction = {
+    source: { id: 1, name: 'original.docx', filePath: 'original.docx' },
+    file: { id: 4, name: 'redacted.docx', filePath: 'redacted.docx' }, kit: 'old-map',
+  }
+  state.selectFile({ id: 8, name: 'selected.docx', filePath: 'selected.docx' })
+  state.preview = {}; state.password = 'previous-password'
+  state.chooseOperation('restore')
+  assert.equal(state.fileId, 8)
+  assert.equal(state.fileName, 'selected.docx')
+  assert.equal(state.recoveryKit, '')
+  assert.equal(state.preview, null)
+  assert.equal(state.password, '')
+  state.chooseOperation('redact')
+  assert.equal(state.fileId, 8)
+  assert.equal(state.filePath, 'selected.docx')
+})
+
+test('processing blocks operation changes and the explicit restore-result shortcut', () => {
+  const { state } = pane()
+  state.fileId = 8; state.processing = true
+  state.lastRedaction = { file: { id: 4, name: 'redacted.docx', filePath: 'redacted.docx' }, kit: 'old-map' }
+  state.chooseOperation('restore'); state.restoreLastResult()
+  assert.equal(state.operation, 'redact')
+  assert.equal(state.fileId, 8)
+  assert.equal(state.recoveryKit, '')
+})
+
+test('rendered redact workflow follows file, action, terms, types, replacement and preview order', async () => {
+  const html = await renderPane()
+  const keys = ['deSectionFileSelect', 'deOperationTitle', 'deRedactTab', 'deCustomWordsTitle',
+    'deStrategiesTitle', 'deModeTitle', 'dePreview']
+  let previous = -1
+  for (const key of keys) {
+    const position = html.indexOf('panels.' + key)
+    assert.ok(position > previous, `${key} must follow the preceding step`)
+    previous = position
+  }
+  assert.match(html, /aria-pressed="true"/)
+  assert.doesNotMatch(html, /panels.deStepReview/)
+})
+
+test('restore workflow keeps file and operation first, then shows recovery controls only', async () => {
+  const html = await renderPane({ operation: 'restore', fileId: 8, fileName: 'selected.docx' })
+  assert.ok(html.indexOf('panels.deSectionFileSelect') < html.indexOf('panels.deOperationTitle'))
+  assert.ok(html.indexOf('panels.deOperationTitle') < html.indexOf('panels.deImportKit'))
+  assert.doesNotMatch(html, /panels.deCustomWordsTitle|panels.deStrategiesTitle|panels.deModeTitle/)
+  assert.match(html, /<button[^>]*disabled[^>]*>panels.deRestoreGenerate<\/button>/)
 })

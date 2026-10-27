@@ -1,1034 +1,174 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * 极简中英双语字典（dev-board#150）。
+ * 极简 i18n（Office Add-in，20 语种 + 跟随系统 system，dev-board#150 / #1477）：
+ *   语言优先级：localStorage('checkba.lang') > Office.context.displayLanguage > navigator.language > 'en-US'。
+ *   支持 20 个规范 BCP-47 代码、'system'（跟随系统），并向下兼容旧版 'zh' / 'en'。
  *
- * 语言判定：用户手动选择（localStorage 覆盖，dev-board#177）优先，其次
- * Office.context.displayLanguage（Office 未就绪时 try/catch 吞掉），退回
- * navigator.language；'zh' 开头判中文，否则英文。
- * setLang() 可在运行时切换——字典查询走可变的 activeLang，界面由 App.vue 的
- * :key 重挂载让所有 t() 重新求值。
- *
- * **不许在模块顶层把 t() 的结果存进常量**（dev-board#713）：那等于把文案定死在加载那一刻，
- * 切语言后再也不变。officeExecutor 的命令 chip 名踩过这颗雷（同一条会话里 Word 的 chip
- * 是英文、Excel 的是中文），已改成存 i18n key、渲染时才查表。
- *
- * key 一律平铺，不分命名空间；带插值的串用 {name} 占位，t(key, {name: 'x'}) 替换。
+ * setLang() 可在运行时切换——字典查询走可变的 activeTag，界面由 App.vue 的
+ * langKey 响应式 ref 触发重绘。
  */
 
-export const LANG_STORAGE_KEY = 'awd_addin_lang'
+import { ZH } from '../locales/zh-CN.js'
+import { EN } from '../locales/en-US.js'
+import {
+  SYSTEM_LANGUAGE_MODE,
+  LOCALE_REGISTRY,
+  SUPPORTED_LOCALE_CODES,
+  LOCALE_MAP,
+  normalizeLocaleCode,
+  normalizeLanguageSetting,
+  matchSystemLocale,
+  getLocaleEntry,
+  getLocaleFallbackChain,
+} from '../locales/registry.js'
 
-function storedLang() {
-  try {
-    const v = localStorage.getItem(LANG_STORAGE_KEY)
-    if (v === 'zh' || v === 'en') return v
-  } catch (e) {
-    // 存储不可用：走自动判定
-  }
-  return ''
+export {
+  ZH,
+  EN,
+  SYSTEM_LANGUAGE_MODE,
+  LOCALE_REGISTRY,
+  SUPPORTED_LOCALE_CODES,
+  LOCALE_MAP,
+  normalizeLocaleCode,
+  normalizeLanguageSetting,
+  matchSystemLocale,
+  getLocaleEntry,
+  getLocaleFallbackChain,
 }
 
-function detectLang() {
-  const stored = storedLang()
-  if (stored) return stored
-  try {
-    if (typeof Office !== 'undefined' && Office.context && Office.context.displayLanguage) {
-      if (String(Office.context.displayLanguage).toLowerCase().startsWith('zh')) return 'zh'
-      return 'en'
+export const LANG_STORAGE_KEY = 'checkba.lang'
+
+export const LOCALE_DICTIONARIES = {
+  'zh-CN': ZH,
+  'en-US': EN,
+}
+
+try {
+  const extraModules = import.meta.glob('../locales/*.js', { eager: true })
+  for (const [p, mod] of Object.entries(extraModules || {})) {
+    const m = p.match(/\/locales\/([^/]+)\.js$/)
+    if (!m || m[1] === 'registry') continue
+    const code = normalizeLocaleCode(m[1])
+    if (code && mod && (mod.default || mod[code])) {
+      LOCALE_DICTIONARIES[code] = mod.default || mod[code]
     }
-  } catch (e) {
-    // Office 未就绪：退回 navigator.language
   }
+} catch {
+  // node --test 环境无 Vite import.meta.glob，按已静态导入的字典运行
+}
+
+export function registerLocaleDictionary(code, dict) {
+  const canonical = normalizeLocaleCode(code)
+  if (canonical && dict && typeof dict === 'object') {
+    LOCALE_DICTIONARIES[canonical] = dict
+  }
+}
+
+function detectHostOrBrowserLocale() {
+  let raw = ''
   try {
-    const nav = typeof navigator !== 'undefined' ? navigator.language : ''
-    if (nav && String(nav).toLowerCase().startsWith('zh')) return 'zh'
-  } catch (e) {
-    // navigator 也拿不到：默认英文
+    if (typeof Office !== 'undefined' && Office?.context?.displayLanguage) {
+      raw = Office.context.displayLanguage
+    }
+  } catch { /* Office 未就绪时读 context 可能抛 */ }
+  if (!raw && typeof navigator !== 'undefined' && navigator?.language) {
+    raw = navigator.language
   }
-  return 'en'
+  return matchSystemLocale(String(raw || ''))
 }
 
-export const ZH = {
-  // ---- App.vue ----
-  // ---- 语音听写（dev-board#153）----
-  dictate: '语音输入',
-  dictateRecording: '录音中，点击结束',
-  dictateTranscribing: '转写中…',
-  dictateDenied: '未获得麦克风权限：请在系统设置中允许 Word 使用麦克风，或使用 Word 自带「听写」',
-  dictateUnsupported: '当前环境不支持录音，可使用 Word 自带「听写」',
-  dictateEmpty: '没有听清，请靠近麦克风再试一次',
-  dictateFailed: '听写失败：{message}',
-  selectProject: '选择项目',
-  projectsLoadError: '项目列表加载失败，请检查网络后重试',
-  currentProjectTitle: '当前项目：{name}',
-  settings: '设置',
-  backToChat: '返回对话',
-  back: '返回',
-  login: '登录',
-  logout: '退出登录',
-  accountTitle: '账户',
-  languageLabel: '界面语言',
-  // WPS 宿主专属：停靠窗格期间 ribbon 被平台 bug 冻住，收起按钮是解锁通路（dev-board#244）
-  collapsePaneTitle: '收起面板（重开用功能区的「AI 助手」按钮）',
-  collapsePaneLabel: '收起面板',
-  langZh: '中文',
-  langEn: 'English',
-  connectionSettings: '连接与高级设置',
-  moreMenuTitle: '更多操作',
-  menuAttach: '附加项目文件',
-  menuUploadLocal: '添加本地文件',
-  menuSkills: '技能',
-  menuModel: '模型',
-  menuHistory: '历史对话',
-
-  // ---- App.vue：账户菜单（dev-board#194/#198）----
-  aiQuotaLabel: 'AI 额度',
-  quotaRemaining: '剩余 {remaining} / 共 {limit}',
-  quotaUsed: '已用 {used}',
-  recharge: '充值',
-  rechargeTitle: '在官网账户页充值（浏览器打开，与插件同一账户）',
-  quotaExhaustedNotice: '账户额度不足，本轮已中止。充值到账后重发这条消息即可继续。',
-
-  // ---- App.vue：新建项目（dev-board#196）----
-  // 后端懒建的临时项目名（lib/projectName.js 按当前语言换掉库里存着的那个名字）
-  addinDefaultProjectName: '插件临时项目',
-  newProjectOption: '+ 新建项目',
-  newProjectTitle: '新建项目',
-  newProjectPlaceholder: '项目名称，如「某某公司尽调」',
-  create: '创建',
-  creating: '创建中...',
-  createProjectFailed: '项目创建失败',
-
-  // ---- App.vue：远程设备（dev-board#250）----
-  remoteGroupOnline: '{name}（在线）',
-  remoteGroupOffline: '{name}（离线）',
-  unknownDevice: '未知设备',
-  remoteNoProjects: '（暂无项目）',
-  remoteProjectNotice: '该项目在远程设备上，仅可作为跨设备文件传输的来源或目标，AI 会话请选择本服务上的项目。',
-
-  // ---- App.vue / chatSession：归档绑定与文档镜像（dev-board#297/#298/#299）----
-  archiveBoundHint: '已绑定桌面项目「{name}」：这里的对话与文档副本将自动归档到该项目',
-  archiveBinding: '正在绑定桌面项目...',
-  archiveLinkUnsupported: '此服务器暂不支持归档绑定（需升级云后端）',
-  archiveCaptureUnsupported: '当前环境无法读取文档文件，文档副本不会归档（对话记录仍会同步）',
-
-  // ---- ChatView.vue：空态 ----
-  emptyHint: '与 AI 讨论当前文档或项目事务。',
-  connectionNotReady: '尚未登录：点击右上角「登录」连接账户。',
-  noProjectSelected: '尚未选择项目：在顶部下拉中选一个项目。',
-  welcomeTitle: '不离开 Office，用 AI 起草、修订、审阅',
-  welcomeBenefit1: '用日常语言说出要改什么，改动以修订形式写进文档，由你逐条接受或拒绝。',
-  welcomeBenefit2: '逐条处理文档批注，长文档按章节分段校对。',
-  welcomeBenefit3: '回答以你自己项目中的文件为依据，Word、Excel、PowerPoint 均可使用。',
-  createFreeAccount: '免费注册账户',
-  welcomeFootnote: '插件免费安装。AI 用量从你的 AI WorkDeck 账户扣除 Credits，与桌面版是同一个账户。',
-
-  // ---- ChatView.vue：快捷入口 ----
-  quickSummarizeLabel: '总结当前文档',
-  quickSummarizeText: '请阅读当前文档并给出要点总结。',
-  quickCommentsLabel: '逐条处理文档批注',
-  quickCommentsText:
-    '请逐条处理当前文档的所有批注：先用 get_comments 读取每条批注，'
-    + '按批注要求以修订模式修改其锚定的文字，改完用 reply_comment 回复说明改动；'
-    + '全部处理完给我一张处理清单。',
-  quickProofreadLabel: '校对错别字与病句',
-  quickProofreadText:
-    '请分段过卷校对全文的错别字与病句，以修订模式逐处修改，不改变原意；'
-    + '每处理完一段就落笔，处理完再继续下一段，直到全文过完。',
-
-  // ---- ChatView.vue：消息气泡 ----
-  thinkingProcess: '思考过程',
-  toolFailedSuffix: '（失败）',
-  // 标点也要跟着语言走：英文界面里冒出一个全角「：」同样是界面语言不一致（AppSource 1100.7）
-  colon: '：',
-  planLabel: '计划',
-  proceedWithPlan: '按此计划推进',
-  proposeChanges: '提出修改意见',
-  workingOnDocument: '正在操作文档…',
-  passProgress: '校对 {chunk}/{total} 段',
-  passProgressWithEdits: '校对 {chunk}/{total} 段 · 已改 {replaced} 处',
-  preparingDocumentContent: '正在准备文档内容…',
-  thinkingEllipsis: '正在思考…',
-  locateInDocumentTitle: '在文档中定位：{text}',
-  locateQuoteButton: '定位「{text}」',
-  done: '已完成',
-  doneWithDuration: '已完成 · {seconds} 秒',
-  answered: '已回答',
-  // ask_user 问题卡（dev-board#868），与桌面端 chat.askUser* 同文
-  askUserOther: '其他',
-  askUserOtherPlaceholder: '写下你的要求，回车发送',
-  askUserSubmit: '发送回答',
-  askUserOtherAnswer: '补充：{text}',
-
-  // ---- ChatView.vue：历史面板 ----
-  historyTitle: '历史对话',
-  loading: '加载中…',
-  noConversationsYet: '本项目还没有历史对话',
-  save: '保存',
-  cancel: '取消',
-  rename: '重命名',
-  deleteConversation: '删除会话',
-  confirmDeleteAgain: '再点一次确认删除',
-  delete: '删除',
-  confirmDelete: '确认删除',
-  untitledConversation: '（未命名对话）',
-  runningSuffix: ' · 进行中',
-
-  // ---- ChatView.vue：技能面板 ----
-  skillsTitle: '技能',
-  noSkillsAvailable: '服务器上还没有可用技能',
-
-  // ---- ChatView.vue：附件面板 ----
-  attachFilesTitle: '附加项目文件',
-  noProjectFiles: '项目里还没有文件',
-  uploadTooLarge: '超过 20MB 上限，无法添加',
-  uploadFailed: '添加失败',
-  uploadRetry: '重试',
-  uploadUnnamedFile: '未命名文件',
-
-  // ---- ChatView.vue：composer ----
-  docPillOnTitle: '每条消息附带当前文档正文（点击改为不附带）',
-  docPillOffTitle: '当前不附带文档正文，AI 仍可用工具按需读取（点击恢复附带）',
-  docPillOffPrefix: '不附带 ',
-  currentDocument: '当前文档',
-  // 未保存/取不到文件名时的文档通称（wordDoc.readDocumentMeta / wpsDoc.readWpsDocumentMeta）。
-  // 既是上下文 chip 上的字，也随 activeContext.name 上送后端，必须跟界面语言走（dev-board#768）
-  docNameWord: '当前 Word 文档',
-  docNameExcel: '当前 Excel 工作簿',
-  docNamePpt: '当前 PowerPoint 演示文稿',
-  docNameWpsWord: '当前 WPS 文档',
-  docNameWpsExcel: '当前 WPS 工作簿',
-  docNameWpsPpt: '当前 WPS 演示文稿',
-  attachButton: '+ 附件',
-  attachPillTitle: '附加项目里的其他文件作为上下文',
-  skillsPillTitle: '选择随对话生效的技能',
-  skillsButton: '技能',
-  defaultModelOption: '默认模型',
-  modelSelectTitle: '本轮使用的模型',
-  // 模型的视觉能力（后端 /api/ai/models 的 vision 字段）：只有明确 false 才提示，
-  // 字段缺失（旧后端）一律不提示
-  modelNoVisionTag: '不支持读图',
-  visionDowngradeTag: '将按文字识别处理',
-  visionModelPicked: '该模型不支持直接读图，图片将按文字识别处理。',
-  visionImagesDowngraded: '当前模型不支持直接读图，已附的图片将按文字识别处理。',
-  historyPillTitle: '查看本项目的历史对话',
-  historyButton: '历史',
-  newConversationTitle: '开始新对话',
-  newConversationButton: '新对话',
-  inputPlaceholder: '输入消息，Enter 发送，/ 选技能',
-  stop: '停止',
-  send: '发送',
-  reconnectingBanner: '连接中断，正在自动重连……',
-
-  // ---- ChatView.vue：script 里的提示/报错 ----
-  renameFailed: '重命名失败',
-  deleteFailed: '删除失败',
-  quoteNotFound: '原文中未找到该句（可能已被修改或另有措辞）',
-
-  // ---- SettingsView.vue ----
-  connectionTitle: '登录',
-  connectedTo: '已连接 {url}',
-  noAddressSet: '（未设置地址）',
-  loginHint: '登录后即可让 AI 阅读与修改当前文档、检索项目资料。与桌面版和官网是同一个账户。',
-  noAccountYet: '还没有账户？',
-  signUpFree: '免费注册',
-  signUpByEmailCode: '也可以直接填写邮箱和收到的验证码：首次登录即自动创建免费账户。',
-  signUpByPhoneCode: '也可以直接填写手机号和短信验证码：首次登录即自动创建免费账户。',
-  agreePrefix: '登录即表示你同意',
-  termsOfService: '《服务条款》',
-  agreeMiddle: '和',
-  privacyPolicy: '《隐私政策》',
-  agreeSuffix: '。',
-  tabPhone: '手机号',
-  tabEmail: '邮箱',
-  phoneLabel: '手机号',
-  phonePlaceholder: '11 位手机号',
-  smsCodeLabel: '验证码',
-  smsCodePlaceholder: '6 位验证码',
-  resendCountdown: '{seconds} 秒后重发',
-  sending: '发送中...',
-  getCode: '获取验证码',
-  emailLabel: '邮箱',
-  emailPlaceholder: '注册时使用的邮箱',
-  passwordLabel: '口令',
-  passwordPlaceholder: '账户口令',
-  connecting: '连接中...',
-  loginAndConnect: '登录并连接',
-  serverUrlEmptyHint: '连接未就绪：后端地址为空，可在「高级设置」中填写',
-  captchaIncomplete: '安全验证未完成，请重试',
-  codeSent: '验证码已发送，请查收短信',
-  codeSentEmail: '验证码已发送，请查收邮件',
-  codeSendFailed: '验证码发送失败',
-  fillPhoneAndCode: '请填写手机号与验证码',
-  fillEmailAndCode: '请填写邮箱与验证码',
-  fillEmailAndPassword: '请填写邮箱与口令',
-  usePasswordInstead: '改用口令登录',
-  useCodeInstead: '改用验证码登录',
-  connectSuccess: '连接成功',
-  accountConnectFailed: '账户连接失败',
-  advancedSettings: '高级设置',
-  advancedHint:
-    '私有部署与团队服务器场景：可填律所自建后端地址，或同机桌面版的 http://127.0.0.1:5269，'
-    + '再用官网 API Key 或手工粘贴的设备令牌连接。',
-  serverUrlLabel: '后端地址',
-  serverUrlPlaceholder: '例如 https://ai.yourfirm.com 或 http://127.0.0.1:5269',
-  awdkKeyLabel: '官网 API Key（awdk_ 开头）',
-  awdkKeyPlaceholder: '粘贴 awdk_ 开头的 API Key',
-  connectWithKeyButton: '用 Key 连接',
-  serverUrlEmptySimple: '连接未就绪：后端地址为空',
-  awdkKeyEmpty: '连接未就绪：请粘贴 awdk_ 开头的 API Key',
-  connectSuccessWithToken: '连接成功：已换取设备令牌',
-  directConnectFailed: '账户直连失败',
-  deviceTokenLabel: '设备令牌（awdt_ 开头）',
-  deviceTokenPlaceholder: '粘贴 awdt_ 设备令牌。可在 AI WorkDeck 桌面版个人中心的「账号安全」中生成。',
-  testConnectionButton: '测试连接',
-  testing: '测试中...',
-  serverAndTokenEmpty: '连接未就绪：请填写后端地址与设备令牌',
-  connectSuccessWithProjects: '连接成功：可访问 {count} 个项目',
-  connectFailed: '连接失败',
-
-  // ---- lib/chatSession.js ----
-  connectionNotReadySimple: '连接未就绪',
-  previousTaskInProgress: '上一次的任务仍在进行中，正在接收后续回复……',
-  awaitingAnswer: '等待你的回答，回答后 AI 继续',
-  awaitingConfirmation: 'AI 等你确认后继续：把意见发过去即可',
-  toolResultSendFailed: '工具结果回传失败，AI 会在等待超时后继续',
-  resultSendFailedPrefix: '结果回传失败：',
-  networkError: '网络错误',
-  stoppedPlaceholder: '（已停止）',
-  // dev-board#285/#287：连接层的三条用户可见状态
-  connectionUnstable: '连接反复中断。若你在另一个 WPS/Office 宿主里也开着本插件，请先收起其中一个窗格。',
-  conversationTakenOver: '这场对话已在另一个任务窗格里继续。本窗格已停止接收，点「新对话」可在这里另起一场。',
-  emptyAnswerRecovered: '（本轮回复在连接中断期间收到不全，已从服务器补回）',
-  emptyAnswerLost: '（本轮回复因连接中断没能收到。内容可能已经写进文档，请先看文档；需要的话让我重说一遍。）',
-  // 本轮没断过线、只是这一轮没产出任何文字（模型整轮都在调工具、一个 <final> 都没输出）。
-  // 与上一条刻意分开：把它也说成「连接中断」会让用户去查网络，而该看的是文档（dev-board#768）
-  emptyAnswerNone: '（这一轮没有产生文字回复。改动可能已经写进文档，请先看文档；需要的话让我再说一遍。）',
-  hostWord: '文字处理软件',
-  hostExcel: '表格软件',
-  hostPpt: '演示软件',
-  docPillTitle: '当前连着的是{host}里的《{name}》。其他窗口里打开的文件本插件看不到——要改它，请在对应软件里打开后从那边打开本插件。',
-  pausedMaxDepth: '（这一轮步数用尽提前停下，任务可能只做了一半。直接发一条「继续」即可接着做。）',
-  pausedMaxTokens: '（这一轮输出长度到上限被截断。直接发一条「继续」即可接着写。）',
-  runEndedUnknown: '（这一轮的结束状态没能确认，内容可能不完整。请先看文档，需要的话让我重做一遍。）',
-  sendFailed: '消息发送失败',
-  executionError: '执行出错',
-  noProjectBanner: '尚未选择项目：在顶部下拉中选一个项目',
-  docReadFailedBanner: '未能读取文档内容，本条消息不附带文档内容',
-
-  // ---- lib/api.js（客户端自造文案；服务端透传文案不进字典） ----
-  apiServerUrlEmpty: '连接未就绪：后端地址为空',
-  apiBackendUnreachable: '后端不可达：请检查地址、网络与 HTTPS/证书',
-  apiConnectFailedHttp: '连接失败（HTTP {status}）：令牌无效或后端拒绝了请求',
-  apiBadResponseFormat: '后端响应格式异常',
-  apiDeleteFailedHttp: '删除失败（HTTP {status}）',
-  apiRenameFailedHttp: '重命名失败（HTTP {status}）',
-  apiCreateFileFailedHttp: '创建文件失败（HTTP {status}）',
-  apiUploadFailedHttp: '添加失败（HTTP {status}）',
-  apiAccountVerifyFailed: '账户校验未通过，请重试',
-  apiAccountLoginUnsupported: '该服务器不支持账户直接连接，请在「高级设置」中改用 API Key 或设备令牌',
-  apiAccountConnectFailedHttp: '账户连接失败（HTTP {status}）',
-  apiAccountBridgeDisabled: '该服务器未开启账户直连，请在「高级设置」中改用 API Key 或设备令牌',
-  apiAccountConnectFailedRetry: '账户连接失败，请稍后重试',
-  apiAwdkBridgeDisabled: '该服务器未开启账户直连，请改用设备令牌',
-  apiAwdkConnectFailedHttp: '账户直连失败（HTTP {status}）',
-  apiAwdkVerifyFailed: '账户 Key 校验未通过：请确认 Key 正确且未过期，或改用设备令牌',
-  apiAiRefreshUnsupported: '该服务器不支持按账号的 AI 额度刷新',
-  apiAiRefreshFailedHttp: '额度刷新失败（HTTP {status}）',
-  apiAiRefreshVerifyFailed: '额度刷新未通过：请确认这枚 Key 属于本账号且未过期',
-  apiConversationIssueFailedHttp: '会话签发失败（HTTP {status}）',
-  apiChatUnreachable: '后端不可达：消息未送出',
-  apiChatFailedHttp: '对话请求失败（HTTP {status}）',
-  // 会话失效自愈（dev-board#715）：文案里不出现「登录/未授权/请先」三个子串（见 api.js 文件头）
-  conversationRenewedNotice: '原会话已失效，已自动新建一场会话并把这条消息重新发出。',
-  conversationExpiredRetryFailed: '会话已失效：自动新建会话后重发仍未成功。请点击底部的「新对话」重新开始；若仍然失败，请检查网络连接或稍后再试。',
-  conversationDenied: '当前会话无法继续：它可能属于另一台设备或另一个账户。请点击底部的「新对话」重新开始。',
-
-  // ---- lib/officeExecutor.js：工具活动 chip（COMMAND_DISPLAY_KEYS） ----
-  cmdGetText: '读取文档',
-  cmdGetSelection: '读取选区',
-  cmdSearch: '查找文本',
-  cmdReplaceText: '替换文本（修订）',
-  cmdReplaceBatch: '批量替换（修订）',
-  cmdPassStep: '分段过卷',
-  cmdInsertText: '插入文本（修订）',
-  cmdAddComment: '插入批注',
-  cmdFormatText: '设置文字格式',
-  cmdSetParagraphFormat: '设置段落格式',
-  cmdGetFormatting: '读取格式',
-  cmdSetNumbering: '设置自动编号',
-  cmdFormatTable: '设置表格格式',
-  cmdApplyStandardFormat: '套用标准格式',
-  cmdInsertTable: '插入表格',
-  cmdTableRead: '读取表格',
-  cmdTableSetCell: '修改单元格',
-  cmdTableAddRow: '插入表格行',
-  cmdTableDeleteRow: '删除表格行',
-  cmdTableAddCol: '插入表格列',
-  cmdTableDeleteCol: '删除表格列',
-  cmdInsertBreak: '插入分页符',
-  cmdSetHyperlink: '设置超链接',
-  cmdEditHeaderFooter: '编辑页眉页脚',
-  cmdGetComments: '读取批注',
-  cmdReplyComment: '回复批注',
-  cmdResolveComment: '解决批注',
-  cmdDeleteComment: '删除批注',
-  cmdInsertToc: '插入目录',
-  cmdSetPageSetup: '页面设置',
-  cmdGetRevisions: '读取修订',
-  cmdAcceptRevision: '接受修订',
-  cmdRejectRevision: '拒绝修订',
-  cmdInsertFootnote: '插入脚注',
-  cmdInsertEndnote: '插入尾注',
-  cmdInsertImage: '插入图片',
-  cmdApplyStyle: '应用样式',
-  cmdManageContentControl: '管理内容控件',
-  cmdSetDocumentProperties: '设置文档属性',
-  cmdExcelGetRange: '读取区域',
-  cmdExcelSetValues: '写入区域',
-  cmdExcelSearch: '查找单元格',
-  cmdExcelReplace: '替换单元格文本',
-  cmdExcelFormatCells: '设置单元格格式',
-  cmdExcelSetBorders: '设置边框',
-  cmdExcelEditRowsCols: '编辑行列',
-  cmdExcelMergeCells: '合并单元格',
-  cmdExcelSortRange: '排序',
-  cmdExcelManageSheets: '管理工作表',
-  cmdExcelFreezePanes: '冻结窗格',
-  cmdExcelSetFormulas: '写入公式',
-  cmdExcelGetOverview: '读取总览',
-  cmdExcelSelectRange: '选中区域',
-  cmdExcelSetAutofilter: '设置自动筛选',
-  cmdExcelConditionalFormat: '设置条件格式',
-  cmdExcelAddComment: '添加批注',
-  cmdExcelGetComments: '读取批注',
-  cmdExcelReplyComment: '回复批注',
-  cmdExcelResolveComment: '解决批注',
-  cmdExcelDeleteComment: '删除批注',
-  cmdExcelSetDataValidation: '设置数据验证',
-  cmdExcelAddChart: '插入图表',
-  cmdExcelDefineName: '管理命名区域',
-  cmdExcelProtectSheet: '保护工作表',
-  cmdExcelGroupRowsCols: '分组行列',
-  cmdExcelAddPivotTable: '创建透视表',
-  cmdPptGetSlides: '读取幻灯片',
-  cmdPptReplaceText: '替换幻灯片文本',
-  cmdPptFormatText: '设置幻灯片文字格式',
-  cmdPptAddSlide: '新增幻灯片',
-  cmdPptDeleteSlide: '删除幻灯片',
-  cmdPptAddTextBox: '插入文本框',
-  cmdPptMoveSlide: '移动幻灯片',
-  cmdPptAddShape: '插入形状',
-  cmdPptGetSlideDetails: '读取幻灯片明细',
-  cmdPptDeleteShape: '删除形状',
-  cmdPptAddTable: '插入表格',
-  cmdPptTableRead: '读取表格',
-  cmdPptTableSetCell: '修改表格单元格',
-  cmdPptSetHyperlink: '设置超链接',
-  cmdReadForReference: '供其他文档读取',
-  cmdFallback: '文档操作（{command}）',
-
-  // ---- lib/crossDocWrite.js：修订记录条目摘要（dev-board#717）----
-  revSumReplace: '将“{from}”改为“{to}”',
-  revSumReplaceBatch: '批量改写 {count} 处',
-  revSumInsert: '插入“{text}”',
-  revSumExcelWrite: '写入 {range}',
-  revSumExcelSort: '排序 {range}',
-  revSumPptCell: '第 {slide} 页表格第 {row} 行第 {col} 列改为“{text}”',
-
-  // ---- RevisionLogPanel.vue / App.vue：修订记录面板与跨文档横幅（dev-board#717）----
-  revLogTitle: '修订记录',
-  revLogEmpty: '还没有来自其他文档的修改',
-  revLogFrom: '来自《{name}》',
-  revLogUnknownDoc: '其他文档',
-  revLogLocate: '定位',
-  revLogLocateMiss: '在本文档里没找到这处修改，可能已被再次改动',
-  revLogUndo: '撤销',
-  revLogUndone: '已撤销',
-  revLogConflict: '这里已被再次修改，未覆盖',
-  revLogUndoFailed: '撤销失败：{message}',
-  // 宿主中立：Office 与 WPS 文字都走这条（痕迹是文档自己的修订，不是本面板能撤的）
-  revLogNotUndoable: '已标为修订，撤销请在文档里拒绝该修订',
-  revLogNoBefore: '无法记录改前值，不能撤销',
-  revLogClear: '清空',
-  // 「修订已标记」只对文字宿主成立，表格/演示没有修订机制，统一说「已记入修订记录」
-  crossDocBanner: '来自《{name}》会话的 AI 刚修改了本文档 {count} 处，已记入修订记录',
-  crossDocBannerOpen: '查看',
-
-  // ---- GitLinkPanel.vue / lib/gitLink.js：关联 git 仓库（dev-board#720）----
-  menuGitLink: '关联 git 仓库',
-  gitLinkTitle: '关联 git 仓库',
-  gitLinkUrl: '仓库地址',
-  gitLinkUrlPlaceholder: 'https://github.com/用户名/仓库名',
-  gitLinkBranch: '分支（留空为默认）',
-  gitLinkToken: '访问令牌（只读权限即可）',
-  gitLinkSave: '验证并保存',
-  gitLinkVerifying: '正在验证…',
-  gitLinkRemove: '解除关联',
-  gitLinkOnlyHosts: '只支持 GitHub 与 Gitee',
-  gitLinkBadUrl: '仓库地址格式不对，例如 https://github.com/用户名/仓库名',
-  gitLinkHint: 'AI 只会读取这个仓库里的文件，不会提交或推送；令牌加密保存，可随时解除。',
-  gitLinkNoProject: '请先在顶部选择项目',
-  gitLinkEmpty: '还没有关联仓库',
-
-  // ---- lib/transfer.js（dev-board#251）----
-  transferHttpFailed: '连接失败（HTTP {status}）',
-  transferBadResponse: '服务器返回的数据无法识别',
-  transferBackendUnreachable: '连接不到后端服务器，请检查网络',
-  transferPollTimeout: '等待超时，请稍后重试',
-
-  // ---- TransferPanel.vue（dev-board#251）----
-  menuTransfer: '跨设备文件',
-  transferPanelTitle: '跨设备文件传输',
-  transferTabPull: '拉取',
-  transferTabPush: '投送',
-  transferDeviceLabel: '设备',
-  transferProjectLabel: '项目',
-  transferChooseDevicePlaceholder: '选择设备',
-  transferChooseProjectPlaceholder: '选择项目',
-  transferDeviceOfflineReason: '设备离线，待其上线后再试',
-  transferFetchListBtn: '获取文件清单',
-  transferListWaitingHint: '对方设备约每分钟检查一次请求，首次响应通常需要 1-3 分钟。',
-  transferListLoading: '正在获取文件清单…',
-  transferNoFilesFound: '该项目下没有可传输的文件',
-  transferFileSizeTooLarge: '超过 200MB 上限，暂不支持传输',
-  transferQuoteLoading: '正在计算费用…',
-  transferQuoteLine: '预计扣除 {credits} Credits（按文件大小计）· 经官网服务器中转，费用从账户余额扣除',
-  transferConfirmPull: '确认拉取',
-  transferConfirmPush: '确认投送',
-  transferWaitingUpload: '正在等待对方设备上传，请保持面板打开…',
-  transferSavingToProject: '正在存入项目…',
-  transferPullDone: '已存入项目：{name}',
-  transferAttachToChat: '附加到对话',
-  transferAttachedDone: '已附加到对话',
-  transferCancelBtn: '取消传输',
-  transferCancelling: '正在取消…',
-  transferPushLocalFilesTitle: '当前项目文件',
-  transferTargetDeviceLabel: '目标设备',
-  transferTargetProjectLabel: '目标项目',
-  transferPushOfflineNotice: '对方设备当前离线，上线后会自动收取该文件',
-  transferPushSubmitted: '已提交投送：费用已扣除，若长期未送达将自动退回',
-  transferLoadingFiles: '正在加载文件…',
-  transferSelectAFile: '请先选择一个文件'
+function detectInitialLangState() {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem(LANG_STORAGE_KEY)
+      const normalized = normalizeLanguageSetting(saved)
+      if (normalized === SYSTEM_LANGUAGE_MODE) {
+        return { pref: SYSTEM_LANGUAGE_MODE, tag: detectHostOrBrowserLocale() }
+      }
+      if (normalized) {
+        return { pref: normalized, tag: normalized }
+      }
+    }
+  } catch { /* WebView 禁 storage 时降级自动探测 */ }
+  return { pref: SYSTEM_LANGUAGE_MODE, tag: detectHostOrBrowserLocale() }
 }
 
-export const EN = {
-  // ---- App.vue ----
-  // ---- 语音听写（dev-board#153）----
-  dictate: 'Voice input',
-  dictateRecording: 'Recording, click to finish',
-  dictateTranscribing: 'Transcribing...',
-  dictateDenied: 'Microphone permission denied: allow Word to use the microphone in system settings, or use Word built-in Dictate',
-  dictateUnsupported: 'Recording is not supported here; use Word built-in Dictate instead',
-  dictateEmpty: 'Could not hear that; move closer to the microphone and retry',
-  dictateFailed: 'Dictation failed: {message}',
-  selectProject: 'Select a project',
-  projectsLoadError: 'Failed to load projects. Check your network and retry.',
-  currentProjectTitle: 'Current project: {name}',
-  settings: 'Settings',
-  backToChat: 'Back to chat',
-  back: 'Back',
-  login: 'Sign in',
-  logout: 'Sign out',
-  accountTitle: 'Account',
-  languageLabel: 'Language',
-  collapsePaneTitle: 'Hide panel (reopen via the AI Assistant ribbon button)',
-  collapsePaneLabel: 'Hide panel',
-  langZh: '中文',
-  langEn: 'English',
-  connectionSettings: 'Connection & advanced settings',
-  moreMenuTitle: 'More actions',
-  menuAttach: 'Attach project files',
-  menuUploadLocal: 'Add local files',
-  menuSkills: 'Skills',
-  menuModel: 'Model',
-  menuHistory: 'Conversation history',
+const initialState = detectInitialLangState()
+let activePref = initialState.pref
+let activeTag = initialState.tag
 
-  // ---- App.vue：账户菜单（dev-board#194/#198）----
-  aiQuotaLabel: 'AI quota',
-  quotaRemaining: '{remaining} left of {limit}',
-  quotaUsed: '{used} used',
-  recharge: 'Top up',
-  rechargeTitle: 'Top up on the website account page (opens in browser, same account as this add-in)',
-  quotaExhaustedNotice: 'Your account is out of credit; this turn was stopped. Top up and resend this message to continue.',
+export const currentLangTag = activeTag
+export const currentLang = activeTag.startsWith('zh') ? 'zh' : 'en'
 
-  // ---- App.vue：新建项目（dev-board#196）----
-  addinDefaultProjectName: 'Plugin Temporary Project',
-  newProjectOption: '+ New project',
-  newProjectTitle: 'New project',
-  newProjectPlaceholder: 'Project name, e.g. "Acme due diligence"',
-  create: 'Create',
-  creating: 'Creating...',
-  createProjectFailed: 'Failed to create project',
-
-  // ---- App.vue：远程设备（dev-board#250）----
-  remoteGroupOnline: '{name} (online)',
-  remoteGroupOffline: '{name} (offline)',
-  unknownDevice: 'Unknown device',
-  remoteNoProjects: '(no projects yet)',
-  remoteProjectNotice: 'This project lives on a remote device. It can only be used as a source or target for cross-device file transfer; for AI conversations, please select a project on this server.',
-
-  // ---- App.vue / chatSession：归档绑定与文档镜像（dev-board#297/#298/#299）----
-  archiveBoundHint: 'Bound to desktop project "{name}": conversations and document copies here will be archived to it automatically',
-  archiveBinding: 'Binding desktop project...',
-  archiveLinkUnsupported: 'This server does not support archive binding yet (cloud backend upgrade required)',
-  archiveCaptureUnsupported: 'This environment cannot read the document file, so document copies will not be archived (conversation history still syncs)',
-
-  // ---- ChatView.vue：空态 ----
-  emptyHint: 'Ask AI about the current document or project.',
-  connectionNotReady: 'Not signed in: click "Sign in" in the top right to connect your account.',
-  noProjectSelected: 'No project selected: pick one from the dropdown at the top.',
-  welcomeTitle: 'Draft, redline and review with AI, without leaving Office',
-  welcomeBenefit1: 'Ask for a change in plain language. Edits land in your document as tracked changes you accept or reject.',
-  welcomeBenefit2: 'Work through every comment, and proofread long documents section by section.',
-  welcomeBenefit3: 'Answers grounded in the files of your own matter, in Word, Excel and PowerPoint.',
-  createFreeAccount: 'Create a free account',
-  welcomeFootnote: 'Free to install. AI usage draws Credits from your AI WorkDeck account, the same account as the desktop app.',
-
-  // ---- ChatView.vue：快捷入口 ----
-  quickSummarizeLabel: 'Summarize this document',
-  quickSummarizeText: 'Please read the current document and summarize the key points.',
-  quickCommentsLabel: 'Resolve all comments',
-  quickCommentsText:
-    'Please go through every comment in the current document: read each one with get_comments, '
-    + 'edit the anchored text in track-changes mode as the comment requests, reply with reply_comment '
-    + 'to explain the change, and give me a checklist once you\'re done with all of them.',
-  quickProofreadLabel: 'Proofread for typos and grammar',
-  quickProofreadText:
-    'Please proofread the whole document for typos and awkward phrasing section by section, '
-    + 'making edits in track-changes mode without changing the meaning; apply the edits for each '
-    + 'section before moving on to the next, until the whole document is covered.',
-
-  // ---- ChatView.vue：消息气泡 ----
-  thinkingProcess: 'Thinking',
-  toolFailedSuffix: ' (failed)',
-  colon: ': ',
-  planLabel: 'Plan',
-  proceedWithPlan: 'Proceed with this plan',
-  proposeChanges: 'Suggest changes',
-  workingOnDocument: 'Working on the document…',
-  passProgress: 'Reviewing section {chunk} of {total}',
-  passProgressWithEdits: 'Reviewing section {chunk} of {total} · {replaced} edits applied',
-  preparingDocumentContent: 'Preparing document content…',
-  thinkingEllipsis: 'Thinking…',
-  locateInDocumentTitle: 'Locate in document: {text}',
-  locateQuoteButton: 'Locate "{text}"',
-  done: 'Done',
-  doneWithDuration: 'Done in {seconds}s',
-  answered: 'Answered',
-  askUserOther: 'Other',
-  askUserOtherPlaceholder: 'Describe what you want, press Enter to send',
-  askUserSubmit: 'Send answer',
-  askUserOtherAnswer: 'Note: {text}',
-
-  // ---- ChatView.vue：历史面板 ----
-  historyTitle: 'History',
-  loading: 'Loading…',
-  noConversationsYet: 'No conversations yet in this project',
-  save: 'Save',
-  cancel: 'Cancel',
-  rename: 'Rename',
-  deleteConversation: 'Delete conversation',
-  confirmDeleteAgain: 'Click again to confirm delete',
-  delete: 'Delete',
-  confirmDelete: 'Confirm delete',
-  untitledConversation: '(Untitled conversation)',
-  runningSuffix: ' · Running',
-
-  // ---- ChatView.vue：技能面板 ----
-  skillsTitle: 'Skills',
-  noSkillsAvailable: 'No skills available on the server yet',
-
-  // ---- ChatView.vue：附件面板 ----
-  attachFilesTitle: 'Attach project files',
-  noProjectFiles: 'No files in this project yet',
-  uploadTooLarge: 'Exceeds the 20MB limit and cannot be added',
-  uploadFailed: 'Failed to add file',
-  uploadRetry: 'Retry',
-  uploadUnnamedFile: 'Unnamed file',
-
-  // ---- ChatView.vue：composer ----
-  docPillOnTitle: 'The current document is included with every message (click to exclude)',
-  docPillOffTitle: 'The current document is not included; AI can still read it via tools on demand (click to include)',
-  docPillOffPrefix: 'Not attached: ',
-  currentDocument: 'Current document',
-  docNameWord: 'Current Word document',
-  docNameExcel: 'Current Excel workbook',
-  docNamePpt: 'Current PowerPoint presentation',
-  docNameWpsWord: 'Current WPS document',
-  docNameWpsExcel: 'Current WPS workbook',
-  docNameWpsPpt: 'Current WPS presentation',
-  attachButton: '+ Attach',
-  attachPillTitle: 'Attach other project files as context',
-  skillsPillTitle: 'Choose skills for this conversation',
-  skillsButton: 'Skills',
-  defaultModelOption: 'Default model',
-  modelSelectTitle: 'Model for this turn',
-  modelNoVisionTag: 'No image reading',
-  visionDowngradeTag: 'will be read as text',
-  visionModelPicked: 'This model cannot read images directly; images will be processed as recognized text.',
-  visionImagesDowngraded: 'The current model cannot read images directly; attached images will be processed as recognized text.',
-  historyPillTitle: 'View conversation history for this project',
-  historyButton: 'History',
-  newConversationTitle: 'Start a new conversation',
-  newConversationButton: 'New chat',
-  inputPlaceholder: 'Type a message, Enter to send, / for skills',
-  stop: 'Stop',
-  send: 'Send',
-  reconnectingBanner: 'Connection lost, reconnecting automatically…',
-
-  // ---- ChatView.vue：script 里的提示/报错 ----
-  renameFailed: 'Rename failed',
-  deleteFailed: 'Delete failed',
-  quoteNotFound: 'Could not find this text in the document (it may have been edited or reworded)',
-
-  // ---- SettingsView.vue ----
-  connectionTitle: 'Sign in',
-  connectedTo: 'Connected to {url}',
-  noAddressSet: '(no address set)',
-  loginHint: 'Sign in to let AI read and edit this document and search your project files. Same account as the desktop app and the website.',
-  noAccountYet: 'No account yet? ',
-  signUpFree: 'Sign up for free',
-  signUpByEmailCode: 'Or just enter your email and the code we send you: a free account is created the first time you sign in.',
-  signUpByPhoneCode: 'Or just enter your mobile number and the SMS code: a free account is created the first time you sign in.',
-  agreePrefix: 'By signing in you agree to the ',
-  termsOfService: 'Terms of Service',
-  agreeMiddle: ' and ',
-  privacyPolicy: 'Privacy Policy',
-  agreeSuffix: '.',
-  tabPhone: 'Phone',
-  tabEmail: 'Email',
-  phoneLabel: 'Phone number',
-  phonePlaceholder: '11-digit phone number',
-  smsCodeLabel: 'Verification code',
-  smsCodePlaceholder: '6-digit code',
-  resendCountdown: 'Resend in {seconds}s',
-  sending: 'Sending...',
-  getCode: 'Get code',
-  emailLabel: 'Email',
-  emailPlaceholder: 'The email you registered with',
-  passwordLabel: 'Password',
-  passwordPlaceholder: 'Account password',
-  connecting: 'Connecting...',
-  loginAndConnect: 'Sign in and connect',
-  serverUrlEmptyHint: 'Not connected: server address is empty, fill it in under "Advanced settings"',
-  captchaIncomplete: 'Security verification incomplete, please try again',
-  codeSent: 'Verification code sent, please check your messages',
-  codeSentEmail: 'Verification code sent, please check your email',
-  codeSendFailed: 'Failed to send verification code',
-  fillPhoneAndCode: 'Please enter your phone number and verification code',
-  fillEmailAndCode: 'Please enter your email and verification code',
-  fillEmailAndPassword: 'Please enter your email and password',
-  usePasswordInstead: 'Use password instead',
-  useCodeInstead: 'Use a verification code instead',
-  connectSuccess: 'Connected',
-  accountConnectFailed: 'Account connection failed',
-  advancedSettings: 'Advanced settings',
-  advancedHint:
-    'For private deployments and team servers: enter your firm\'s self-hosted backend address, '
-    + 'or the desktop app on this machine at http://127.0.0.1:5269, then connect with an API key '
-    + 'or a manually pasted device token.',
-  serverUrlLabel: 'Server address',
-  serverUrlPlaceholder: 'e.g. https://ai.yourfirm.com or http://127.0.0.1:5269',
-  awdkKeyLabel: 'API key (starts with awdk_)',
-  awdkKeyPlaceholder: 'Paste an API key starting with awdk_',
-  connectWithKeyButton: 'Connect with key',
-  serverUrlEmptySimple: 'Not connected: server address is empty',
-  awdkKeyEmpty: 'Not connected: please paste an API key starting with awdk_',
-  connectSuccessWithToken: 'Connected: device token issued',
-  directConnectFailed: 'Direct account connection failed',
-  deviceTokenLabel: 'Device token (starts with awdt_)',
-  deviceTokenPlaceholder: 'Paste an awdt_ device token. You can generate one under Account Security in the AI WorkDeck desktop app.',
-  testConnectionButton: 'Test connection',
-  testing: 'Testing...',
-  serverAndTokenEmpty: 'Not connected: please fill in the server address and device token',
-  connectSuccessWithProjects: 'Connected: {count} project(s) accessible',
-  connectFailed: 'Connection failed',
-
-  // ---- lib/chatSession.js ----
-  connectionNotReadySimple: 'Not connected',
-  previousTaskInProgress: 'The previous task is still running, receiving the rest of the reply…',
-  awaitingAnswer: 'Waiting for your answer, AI will continue once you reply',
-  awaitingConfirmation: 'AI is waiting for your confirmation: send your feedback to continue',
-  toolResultSendFailed: 'Failed to send tool result back; AI will continue after the wait times out',
-  resultSendFailedPrefix: 'Failed to send result: ',
-  networkError: 'network error',
-  stoppedPlaceholder: '(Stopped)',
-  connectionUnstable: 'The connection keeps dropping. If this add-in is also open in another WPS/Office host, collapse one of the panes first.',
-  conversationTakenOver: 'This conversation continued in another task pane. This pane has stopped receiving; choose "New chat" to start a separate one here.',
-  emptyAnswerRecovered: '(This reply arrived incomplete while the connection was down; it was restored from the server.)',
-  emptyAnswerLost: '(This reply was lost while the connection was down. The content may already be in your document - check there, or ask me to say it again.)',
-  emptyAnswerNone: '(This turn produced no text reply. Any changes may already be in your document - check there, or ask me to say it again.)',
-  hostWord: 'word processor',
-  hostExcel: 'spreadsheet app',
-  hostPpt: 'presentation app',
-  docPillTitle: 'Attached to "{name}" in your {host}. Files open in other windows are invisible to this add-in - to edit one, open it in the matching app and open the add-in there.',
-  pausedMaxDepth: '(This turn ran out of steps and stopped early; the task may be half-done. Send "continue" to pick it up.)',
-  pausedMaxTokens: '(This turn hit the output length limit and was cut off. Send "continue" to carry on.)',
-  runEndedUnknown: '(The end state of this turn could not be confirmed, so it may be incomplete. Check the document, or ask me to redo it.)',
-  sendFailed: 'Failed to send message',
-  executionError: 'Execution failed',
-  noProjectBanner: 'No project selected: pick one from the dropdown at the top',
-  docReadFailedBanner: 'Could not read the document content; this message will not include it',
-
-  // ---- lib/api.js（客户端自造文案；服务端透传文案不进字典） ----
-  apiServerUrlEmpty: 'Not connected: server address is empty',
-  apiBackendUnreachable: 'Backend unreachable: check the address, network, and HTTPS/certificate',
-  apiConnectFailedHttp: 'Connection failed (HTTP {status}): invalid token or the backend rejected the request',
-  apiBadResponseFormat: 'Unexpected response format from backend',
-  apiDeleteFailedHttp: 'Delete failed (HTTP {status})',
-  apiRenameFailedHttp: 'Rename failed (HTTP {status})',
-  apiCreateFileFailedHttp: 'Failed to create the file record (HTTP {status})',
-  apiUploadFailedHttp: 'Failed to add file (HTTP {status})',
-  apiAccountVerifyFailed: 'Account verification failed, please try again',
-  apiAccountLoginUnsupported: 'This server does not support direct account connection; use an API key or device token under "Advanced settings"',
-  apiAccountConnectFailedHttp: 'Account connection failed (HTTP {status})',
-  apiAccountBridgeDisabled: 'This server has not enabled direct account connection; use an API key or device token under "Advanced settings"',
-  apiAccountConnectFailedRetry: 'Account connection failed, please try again later',
-  apiAwdkBridgeDisabled: 'This server has not enabled direct account connection; use a device token instead',
-  apiAwdkConnectFailedHttp: 'Direct account connection failed (HTTP {status})',
-  apiAwdkVerifyFailed: 'Account key verification failed: confirm the key is correct and not expired, or use a device token instead',
-  apiAiRefreshUnsupported: 'This server does not support refreshing AI quota by account',
-  apiAiRefreshFailedHttp: 'Quota refresh failed (HTTP {status})',
-  apiAiRefreshVerifyFailed: 'Quota refresh failed verification: confirm this key belongs to this account and is not expired',
-  apiConversationIssueFailedHttp: 'Failed to issue conversation (HTTP {status})',
-  apiChatUnreachable: 'Backend unreachable: message not sent',
-  apiChatFailedHttp: 'Chat request failed (HTTP {status})',
-  conversationRenewedNotice: 'The previous conversation was no longer valid. A new one was started and this message was sent again.',
-  conversationExpiredRetryFailed: 'This conversation is no longer valid, and resending it in a new conversation also failed. Tap "New chat" at the bottom to start over; if it keeps failing, check your network connection or try again later.',
-  conversationDenied: 'This conversation cannot be continued: it may belong to another device or another account. Tap "New chat" at the bottom to start over.',
-
-  // ---- lib/officeExecutor.js：工具活动 chip（COMMAND_DISPLAY_KEYS） ----
-  cmdGetText: 'Read document',
-  cmdGetSelection: 'Read selection',
-  cmdSearch: 'Search text',
-  cmdReplaceText: 'Replace text (tracked)',
-  cmdReplaceBatch: 'Batch replace (tracked)',
-  cmdPassStep: 'Section-by-section pass',
-  cmdInsertText: 'Insert text (tracked)',
-  cmdAddComment: 'Add comment',
-  cmdFormatText: 'Set text formatting',
-  cmdSetParagraphFormat: 'Set paragraph formatting',
-  cmdGetFormatting: 'Read formatting',
-  cmdSetNumbering: 'Set numbering',
-  cmdFormatTable: 'Set table formatting',
-  cmdApplyStandardFormat: 'Apply house style',
-  cmdInsertTable: 'Insert table',
-  cmdTableRead: 'Read table',
-  cmdTableSetCell: 'Edit table cell',
-  cmdTableAddRow: 'Insert table row',
-  cmdTableDeleteRow: 'Delete table row',
-  cmdTableAddCol: 'Insert table column',
-  cmdTableDeleteCol: 'Delete table column',
-  cmdInsertBreak: 'Insert page break',
-  cmdSetHyperlink: 'Set hyperlink',
-  cmdEditHeaderFooter: 'Edit header/footer',
-  cmdGetComments: 'Read comments',
-  cmdReplyComment: 'Reply to comment',
-  cmdResolveComment: 'Resolve comment',
-  cmdDeleteComment: 'Delete comment',
-  cmdInsertToc: 'Insert table of contents',
-  cmdSetPageSetup: 'Page setup',
-  cmdGetRevisions: 'Read revisions',
-  cmdAcceptRevision: 'Accept revision',
-  cmdRejectRevision: 'Reject revision',
-  cmdInsertFootnote: 'Insert footnote',
-  cmdInsertEndnote: 'Insert endnote',
-  cmdInsertImage: 'Insert image',
-  cmdApplyStyle: 'Apply style',
-  cmdManageContentControl: 'Manage content control',
-  cmdSetDocumentProperties: 'Set document properties',
-  cmdExcelGetRange: 'Read range',
-  cmdExcelSetValues: 'Write range',
-  cmdExcelSearch: 'Search cells',
-  cmdExcelReplace: 'Replace in cells',
-  cmdExcelFormatCells: 'Format cells',
-  cmdExcelSetBorders: 'Set borders',
-  cmdExcelEditRowsCols: 'Edit rows/columns',
-  cmdExcelMergeCells: 'Merge cells',
-  cmdExcelSortRange: 'Sort',
-  cmdExcelManageSheets: 'Manage sheets',
-  cmdExcelFreezePanes: 'Freeze panes',
-  cmdExcelSetFormulas: 'Write formulas',
-  cmdExcelGetOverview: 'Read overview',
-  cmdExcelSelectRange: 'Select range',
-  cmdExcelSetAutofilter: 'Set autofilter',
-  cmdExcelConditionalFormat: 'Set conditional format',
-  cmdExcelAddComment: 'Add comment',
-  cmdExcelGetComments: 'Read comments',
-  cmdExcelReplyComment: 'Reply to comment',
-  cmdExcelResolveComment: 'Resolve comment',
-  cmdExcelDeleteComment: 'Delete comment',
-  cmdExcelSetDataValidation: 'Set data validation',
-  cmdExcelAddChart: 'Insert chart',
-  cmdExcelDefineName: 'Manage named ranges',
-  cmdExcelProtectSheet: 'Protect sheet',
-  cmdExcelGroupRowsCols: 'Group rows/columns',
-  cmdExcelAddPivotTable: 'Create pivot table',
-  cmdPptGetSlides: 'Read slides',
-  cmdPptReplaceText: 'Replace slide text',
-  cmdPptFormatText: 'Set slide text formatting',
-  cmdPptAddSlide: 'Add slide',
-  cmdPptDeleteSlide: 'Delete slide',
-  cmdPptAddTextBox: 'Insert text box',
-  cmdPptMoveSlide: 'Move slide',
-  cmdPptAddShape: 'Insert shape',
-  cmdPptGetSlideDetails: 'Read slide details',
-  cmdPptDeleteShape: 'Delete shape',
-  cmdPptAddTable: 'Insert table',
-  cmdPptTableRead: 'Read table',
-  cmdPptTableSetCell: 'Edit table cell',
-  cmdPptSetHyperlink: 'Set hyperlink',
-  cmdReadForReference: 'Read for another document',
-  cmdFallback: 'Document action ({command})',
-
-  // ---- lib/crossDocWrite.js：修订记录条目摘要（dev-board#717）----
-  revSumReplace: 'Changed "{from}" to "{to}"',
-  revSumReplaceBatch: 'Batch edit of {count} place(s)',
-  revSumInsert: 'Inserted "{text}"',
-  revSumExcelWrite: 'Wrote {range}',
-  revSumExcelSort: 'Sorted {range}',
-  revSumPptCell: 'Slide {slide}, table row {row} column {col} set to "{text}"',
-
-  // ---- RevisionLogPanel.vue / App.vue：修订记录面板与跨文档横幅（dev-board#717）----
-  revLogTitle: 'Change log',
-  revLogEmpty: 'No changes from other documents yet',
-  revLogFrom: 'From "{name}"',
-  revLogUnknownDoc: 'another document',
-  revLogLocate: 'Locate',
-  revLogLocateMiss: 'Could not find this change here; it may have been changed again',
-  revLogUndo: 'Undo',
-  revLogUndone: 'Undone',
-  revLogConflict: 'Changed again since, not overwritten',
-  revLogUndoFailed: 'Undo failed: {message}',
-  revLogNotUndoable: 'Marked as a tracked change; reject that revision in the document to undo it',
-  revLogNoBefore: 'Previous value not recorded, cannot undo',
-  revLogClear: 'Clear',
-  crossDocBanner: 'The AI in "{name}" just changed {count} place(s) in this document; recorded in the change log',
-  crossDocBannerOpen: 'View',
-
-  // ---- GitLinkPanel.vue / lib/gitLink.js：关联 git 仓库（dev-board#720）----
-  menuGitLink: 'Linked git repositories',
-  gitLinkTitle: 'Linked git repositories',
-  gitLinkUrl: 'Repository URL',
-  gitLinkUrlPlaceholder: 'https://github.com/owner/repo',
-  gitLinkBranch: 'Branch (blank = default)',
-  gitLinkToken: 'Access token (read-only is enough)',
-  gitLinkSave: 'Verify and save',
-  gitLinkVerifying: 'Verifying…',
-  gitLinkRemove: 'Unlink',
-  gitLinkOnlyHosts: 'Only GitHub and Gitee are supported',
-  gitLinkBadUrl: 'That does not look like a repository URL, e.g. https://github.com/owner/repo',
-  gitLinkHint: 'The AI only reads files in this repository and never commits or pushes. The token is stored encrypted and can be removed at any time.',
-  gitLinkNoProject: 'Choose a project at the top first',
-  gitLinkEmpty: 'No linked repositories yet',
-
-  // ---- lib/transfer.js（dev-board#251）----
-  transferHttpFailed: 'Connection failed (HTTP {status})',
-  transferBadResponse: 'Could not parse the server response',
-  transferBackendUnreachable: 'Could not reach the backend server; check your network',
-  transferPollTimeout: 'Timed out waiting; please try again later',
-
-  // ---- TransferPanel.vue（dev-board#251）----
-  menuTransfer: 'Cross-device file',
-  transferPanelTitle: 'Cross-device file transfer',
-  transferTabPull: 'Pull',
-  transferTabPush: 'Push',
-  transferDeviceLabel: 'Device',
-  transferProjectLabel: 'Project',
-  transferChooseDevicePlaceholder: 'Choose a device',
-  transferChooseProjectPlaceholder: 'Choose a project',
-  transferDeviceOfflineReason: 'This device is offline; try again once it is online',
-  transferFetchListBtn: 'Get file list',
-  transferListWaitingHint: 'The other device checks for requests roughly once a minute; the first response usually takes 1-3 minutes.',
-  transferListLoading: 'Fetching file list…',
-  transferNoFilesFound: 'No transferable files in this project',
-  transferFileSizeTooLarge: 'Exceeds the 200MB limit; not supported yet',
-  transferQuoteLoading: 'Calculating cost…',
-  transferQuoteLine: 'Estimated cost: {credits} Credits (based on file size) · Relayed through the website server; charged from your account balance',
-  transferConfirmPull: 'Confirm pull',
-  transferConfirmPush: 'Confirm push',
-  transferWaitingUpload: 'Waiting for the other device to upload, keep this panel open…',
-  transferSavingToProject: 'Saving to project…',
-  transferPullDone: 'Saved to project: {name}',
-  transferAttachToChat: 'Attach to chat',
-  transferAttachedDone: 'Attached to chat',
-  transferCancelBtn: 'Cancel transfer',
-  transferCancelling: 'Cancelling…',
-  transferPushLocalFilesTitle: 'Files in this project',
-  transferTargetDeviceLabel: 'Target device',
-  transferTargetProjectLabel: 'Target project',
-  transferPushOfflineNotice: 'The target device is offline; it will pick up the file automatically once online',
-  transferPushSubmitted: 'Push submitted: charged now, auto-refunded if never delivered',
-  transferLoadingFiles: 'Loading files…',
-  transferSelectAFile: 'Select a file first'
-}
-
-export const currentLang = detectLang()
-
-// 运行时可变的当前语言（初值 = currentLang）。t() 每次查它，setLang 改它。
-let activeLang = currentLang
-
+/**
+ * 返回简写语言桶（'zh' | 'en'）：供既有二元逻辑（分号、项目名回退等）判断中文 vs 非中文。
+ */
 export function getLang() {
-  return activeLang
+  return activeTag.startsWith('zh') ? 'zh' : 'en'
 }
 
 /**
- * 把生效语言写到 {@code <html lang>}（dev-board#765）。
- *
- * 窗格底部的许可告示是静态 HTML，刻意在 Vue 树外（JS 挂不上时它也得在），
- * 拿不到 t()；它的中英两份写死在页里，靠这个属性 + 纯 CSS 二选一。
- * 顺带让宿主 WebView 的拼写检查与字体启发式按真实语言走。
- *
- * document 拿不到（node 跑单测）时静默跳过——这是展示层的事，不该把字典模块弄挂。
+ * 返回当前生效的规范 BCP-47 语言标签（20 个规范代码之一，如 'zh-CN' / 'en-US' / 'ja-JP'）。
+ * 供请求头 X-App-Language 与 chat 请求体 appLanguage 使用。
+ */
+export function getLangTag() {
+  return activeTag
+}
+
+/**
+ * 返回用户当前选择的语言偏好：'system' 或 20 个规范 BCP-47 代码之一。
+ */
+export function getLangPreference() {
+  return activePref
+}
+
+export function getLocaleMeta(code = activeTag) {
+  return getLocaleEntry(code)
+}
+
+/**
+ * 把当前语言同步到 `<html lang>` 与 `<html dir>`。
+ * index.html / wps.html 的开源告示页脚挂在 `#app` 之外，靠 CSS 选择器切换中英文，
+ * 同时 `ar-SA` 靠 `dir="rtl"` 驱动右起排版。
  */
 function syncDocumentLang() {
   try {
     if (typeof document !== 'undefined' && document.documentElement) {
-      document.documentElement.lang = activeLang === 'zh' ? 'zh-CN' : 'en-US'
+      const entry = getLocaleEntry(activeTag)
+      document.documentElement.lang = entry.bcp47 || activeTag
+      document.documentElement.dir = entry.dir || 'ltr'
     }
-  } catch (e) {
-    // 宿主不给 document：忽略
-  }
+  } catch { /* node --test 里没有 document */ }
 }
-
 syncDocumentLang()
 
-/**
- * 当前界面语言的 BCP-47 标签（zh-CN / en-US），随请求上送后端（X-App-Language 头 +
- * chat 请求体的 appLanguage 字段）。后端 AppLanguageScope 据它选中英文 system prompt，
- * 于是「界面英文 → 回答英文」（AppSource 政策 1100.7 的界面语言一致要求）。
- *
- * 值域刻意与后端 AppLanguageService 的 SUPPORTED 逐字对齐——两边各写一套形态
- * （这边发 'en'、那边只认 'en-US'）会静默回落中文，不报错。
- */
-export function getLangTag() {
-  return activeLang === 'zh' ? 'zh-CN' : 'en-US'
-}
-
-/**
- * 手动切换语言并持久化（写不进存储时静默降级，本次会话内仍生效）。
- * 界面刷新由调用方负责（App.vue 用 :key 重挂载）。
- */
 export function setLang(lang) {
-  if (lang !== 'zh' && lang !== 'en') return
-  activeLang = lang
-  // 页脚的许可告示不在 Vue 树里，:key 重挂载带不动它，只能靠这一句跟着换语言
-  syncDocumentLang()
+  const normalized = normalizeLanguageSetting(lang)
+  if (!normalized) return activeTag
+  activePref = normalized
+  activeTag = normalized === SYSTEM_LANGUAGE_MODE ? detectHostOrBrowserLocale() : normalized
   try {
-    localStorage.setItem(LANG_STORAGE_KEY, lang)
-  } catch (e) {
-    // 存储不可用：本次会话内生效即可
-  }
+    if (typeof localStorage !== 'undefined') localStorage.setItem(LANG_STORAGE_KEY, normalized)
+  } catch { /* ignore */ }
+  syncDocumentLang()
+  return activeTag
 }
 
-/**
- * t('key', {name: 'x'})：查字典，未知 key 回退 key 本身；{name} 占位做简单替换。
- */
+function resolveTemplate(key) {
+  const chain = getLocaleFallbackChain(activeTag)
+  for (const code of chain) {
+    const dict = LOCALE_DICTIONARIES[code]
+    if (dict && dict[key] !== undefined) {
+      return dict[key]
+    }
+  }
+  return undefined
+}
+
 export function t(key, params) {
-  const dict = activeLang === 'zh' ? ZH : EN
-  const raw = Object.prototype.hasOwnProperty.call(dict, key) ? dict[key] : key
-  if (!params) return raw
-  return raw.replace(/\{(\w+)\}/g, (match, name) =>
-    Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : match)
+  const tpl = resolveTemplate(key)
+  if (tpl === undefined) return key
+  if (!params) return tpl
+  return tpl.replace(/\{(\w+)\}/g, (_, k) => (params[k] !== undefined ? String(params[k]) : `{${k}}`))
 }

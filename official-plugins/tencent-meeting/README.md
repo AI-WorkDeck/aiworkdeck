@@ -12,7 +12,15 @@
 4. 设置回溯天数（1–90 天）及排除关键词，点「同步」。同步仅拉取列表；打开一场会议时才读取其逐字稿和智能纪要。搜索只筛选已同步的本地列表。
 5. 可归档到当前项目，或选择生成纪要、提取待办；这两项会先归档，再以文件引用交给 AI。读取不完整时明确提示，并阻止将其作为完整材料归档。
 
+Mac 与 Windows 的「检查连接」每次都会重新查找 CLI，安装完成后可直接再次检查。Windows 的 npm `.cmd` 入口通过同包 `package.json` 的 `bin` 定位脚本，再由 Node.js 运行，不启动命令解释器；支持 PATH 自定义 npm 前缀和默认 AppData npm 目录。Mac 支持 PATH、常见 Homebrew 与 `~/.local/bin` 的 npm 链接。自定义位置可用 `TMEET_PATH` 和 `TMEET_NODE_PATH`，修改应用进程环境后需重新启动应用。缺少 Node.js、包入口损坏和请求超时会分别提示；不会自动安装或登录。
+
+准备面板里的宿主 CLI 检测不代替本插件的「检查连接」：本插件通过公开 SPI 独立运行，插件实际状态以自身检查为准。此改动是源码修复，需后续重建、签名和发布插件包才会到达已安装客户端；本轮未发布。验证包含 Mac 合成进程与 Windows 路径/文件系统模拟，尚未在 Windows 实机运行或连接真实会议账号。
+
 依赖账号对腾讯会议云录制与转写的权限，插件不会绕过权限、替会议生成云端转写，或把尚未结束转码的录制视为已完成。真实账号授权和会议数据需由使用者验收。
+
+授权等待期间，插件只检查已有登录进程是否结束，不并发启动其他 CLI 命令，避免与 CLI 的凭据锁冲突。登录进程结束后再读取连接状态；临时检查失败会继续重试，返回窗口时也会重新检查。复制授权链接在隔离插件框架内同步执行，只有实际复制成功才显示成功；复制失败时保留已选链接供手动复制。此修复尚需发布插件包后才能更新已安装版本。
+
+同一宿主进程内的插件重扫也会识别旧授权进程；跨实例只共享 PID 与启动时间，不共享或持久化授权链接。重新打开页面或切换项目后可检查连接并继续原授权；若插件已重载，须在原浏览器页完成授权，或等待此次授权结束后重新发起。此保护不覆盖其他应用或终端自行启动的 CLI 命令。
 
 登录账号属于本机操作系统用户的 CLI，共享该 CLI 的程序使用同一授权。退出需确认，并会影响其他程序。插件缓存按 AI WorkDeck 用户和项目区分；这不是独立的腾讯会议租户账号。用户仍应只同步当前项目相关材料。
 
@@ -29,9 +37,11 @@
 ```sh
 ./official-plugins/tencent-meeting/build.sh
 NODE_PATH="$PWD/frontend/node_modules" node --test official-plugins/tencent-meeting/tests/web-*.mjs
+# 本机装有 Chrome 时，实跑 opaque iframe 与隔离浏览器剪贴板读回：
+node official-plugins/tencent-meeting/tests/auth-copy-browser.mjs
 ```
 
-输出 `dist/tencent-meeting-1.0.0.zip`，包含真实 JAR、Web 资源和独立技能。JAR 仅使用公开 PluginHost API，宿主依赖不打包进插件。发布使用官网现有 `publish-plugin.mts` 的受理、扫描、审核、签名流程；本构建脚本不会发布。
+输出 `dist/tencent-meeting-1.0.1.zip`，包含真实 JAR、Web 资源和独立技能。JAR 仅使用公开 PluginHost API，宿主依赖不打包进插件。发布使用官网现有 `publish-plugin.mts` 的受理、扫描、审核、签名流程；本构建脚本不会发布。
 
 ## English
 

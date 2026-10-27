@@ -12,4 +12,7 @@ import java.util.List;
 @Repository
 public interface DdRequestRepository extends JpaRepository<DdRequest, Long> {
     List<DdRequest> findByProjectIdOrderByCreatedAtDesc(Long projectId);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select e from DdRequest e where e.id = :id")
+    java.util.Optional<DdRequest> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
 }

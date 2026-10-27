@@ -9,14 +9,28 @@ const { createModelManager } = require('../main/services/model-manager')
 
 // 假下载进程：向组件目录落盘字节（整体进度=已落盘字节/estBytes，不再解析
 // stdout 百分比——那是单文件 tqdm，多文件会反复 0→100%），随后正常退出
-const FAKE_DOWNLOAD_OK = `
-  const fs = require('fs'), path = require('path')
-  const dir = path.join(process.cwd(), 'models', 'mineru')
-  fs.mkdirSync(dir, { recursive: true })
-  fs.writeFileSync(path.join(dir, 'model.bin'), Buffer.alloc(550)) // 550/1000 -> 55%
-  console.log('fetching model.bin 100%')
-  setTimeout(() => process.exit(0), 300)
-`
+const { MINERU_REQUIRED, saveInventory } = require('../main/services/model-inventory')
+function fixtureCode(id) {
+  return `
+    const fs = require('fs'), path = require('path');
+    const dir = path.join(process.cwd(), 'models', ${JSON.stringify(id.replace('-models', ''))});
+    const put = (name, value) => { const file = path.join(dir, name); fs.mkdirSync(path.dirname(file), {recursive:true}); fs.writeFileSync(file, value); };
+    if (${JSON.stringify(id)} === 'mineru-models') {
+      const root = path.join(dir, 'pipeline');
+      for (const name of ${JSON.stringify(MINERU_REQUIRED)}) put('pipeline/' + name + (name.endsWith('.onnx') ? '' : '/weights.bin'), Buffer.alloc(550));
+      put('mineru.json', JSON.stringify({'models-dir':{pipeline:root}}));
+    } else {
+      const asr = ${JSON.stringify(id)} === 'asr-models';
+      const repo = asr ? 'Systran--faster-whisper-medium' : 'hexgrad--Kokoro-82M-v1.1-zh';
+      const prefix = 'hub/models--' + repo + '/';
+      put(prefix + 'refs/main', 'a'.repeat(40));
+      const files = asr ? ['config.json','tokenizer.json','vocabulary.json','model.bin']
+        : ['config.json','kokoro-v1_1-zh.pth','voices/zf_001.pt','voices/zm_010.pt','voices/af_maple.pt','voices/bf_vale.pt'];
+      for (const file of files) put(prefix + 'snapshots/' + 'a'.repeat(40) + '/' + file, file === 'vocabulary.json' ? '["!","<|endoftext|>"]' : file.endsWith('.json') ? '{}' : Buffer.alloc(550));
+    }
+  `
+}
+const FAKE_DOWNLOAD_OK = fixtureCode('mineru-models') + `setTimeout(() => process.exit(0), 300)`
 // 假下载进程：挂住直到被杀
 const FAKE_DOWNLOAD_HANG = `console.log('starting 1%'); setInterval(() => {}, 1000)`
 // 假下载进程：直接失败
@@ -76,7 +90,7 @@ test('status: absent initially, installed after successful download with marker'
   await waitFor(() => mm.isInstalled('mineru-models'))
   assert.strictEqual(mm.status().find((c) => c.id === 'mineru-models').state, 'installed')
   // 进度事件：至少一次字节级整体百分比（55%，且未到 done 前封顶 99）+ 一次 done
-  assert.ok(events.some((e) => e.id === 'mineru-models' && e.percent === 55))
+  assert.ok(events.some((e) => e.id === 'mineru-models' && e.percent > 0 && e.percent <= 99))
   assert.ok(events.every((e) => e.phase !== 'progress' || e.percent === undefined || e.percent <= 99))
   assert.ok(events.some((e) => e.phase === 'done'))
 })
@@ -140,7 +154,7 @@ function makeSourcedManager(dataDir, behavior, events) {
         ? 'error[disk]: OSError: [Errno 28] No space left on device'
         : (source === 'hf' ? HF_FAIL_LINE : MS_FAIL_LINE)
       const body = mode === 'ok'
-        ? `console.log('done'); process.exit(0)`
+        ? fixtureCode(component.id) + `console.log('done'); process.exit(0)`
         : mode === 'hang'
           ? `console.log('starting'); setInterval(() => {}, 1000)`
           : `console.log(${JSON.stringify(failLine)}); process.exit(1)`
@@ -258,4 +272,190 @@ test('runtime pack 未装时，模型下载当场失败并说清要先装哪个�
     onProgress: () => {}
   })
   await assert.rejects(() => mgr.download('kokoro-models'), /kokoro-runtime/)
+})
+
+test('completion marker without model files is repairable, not installed', async (t) => {
+  const root = tmpDataDir()
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const mm = makeManager(root, FAKE_DOWNLOAD_FAIL, [])
+  fs.mkdirSync(mm.dirOf('asr-models'), { recursive: true })
+  fs.writeFileSync(path.join(mm.dirOf('asr-models'), '.aiworkdeck-complete'), 'old timestamp')
+  assert.equal(mm.isInstalled('asr-models'), false)
+  assert.equal(mm.stateOf('asr-models'), 'error')
+  await mm.download('asr-models')
+  await mm.cancel('asr-models')
+})
+
+test('successful exit with no model files emits error instead of done', async (t) => {
+  const root = tmpDataDir(); t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const events = []; const mm = makeManager(root, 'process.exit(0)', events)
+  await mm.download('mineru-models')
+  await waitFor(() => events.some((e) => e.phase === 'error'))
+  assert.equal(mm.isInstalled('mineru-models'), false)
+  assert.ok(!events.some((e) => e.phase === 'done'))
+})
+
+test('saved inventory detects a missing/truncated model and repairs it without manual deletion', async (t) => {
+  const root = tmpDataDir(); t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const mm = makeManager(root, fixtureCode('asr-models'), [])
+  await mm.download('asr-models'); await waitFor(() => mm.isInstalled('asr-models'))
+  const model = path.join(mm.dirOf('asr-models'), 'hub/models--Systran--faster-whisper-medium/snapshots', 'a'.repeat(40), 'model.bin')
+  fs.writeFileSync(model, 'truncated')
+  assert.equal(mm.isInstalled('asr-models'), false)
+  assert.equal(mm.status().find((c) => c.id === 'asr-models').repairRequired, true)
+  await mm.download('asr-models'); await waitFor(() => mm.isInstalled('asr-models'))
+  assert.equal(fs.statSync(model).size, 550)
+})
+
+test('stalled byte progress times out even if downloader keeps printing', async (t) => {
+  const root = tmpDataDir(); t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const events = []; const mm = makeManager(root, "setInterval(() => console.log('still alive'), 5)", events)
+  mm.stallMs = 100
+  await mm.download('mineru-models')
+  await waitFor(() => events.some((e) => e.phase === 'error'))
+  assert.equal(mm.active.size, 0)
+  assert.match(events.find((e) => e.phase === 'error').message, /超时|timed out/)
+  assert.equal(events.filter((e) => e.phase === 'error').length, 1)
+})
+
+test('total deadline stops an endlessly growing download', async (t) => {
+  const root = tmpDataDir(); t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const events = []; const mm = makeManager(root,
+    "const fs=require('fs'); setInterval(() => fs.appendFileSync('models/mineru/growing.incomplete', 'x'), 5)", events)
+  mm.stallMs = 1000; mm.totalMs = 120
+  await mm.download('mineru-models')
+  await waitFor(() => events.some((e) => e.phase === 'error'))
+  assert.equal(mm.active.size, 0)
+  assert.equal(mm.isInstalled('mineru-models'), false)
+})
+
+test('spawn error and subsequent close produce one terminal event', async (t) => {
+  const root = tmpDataDir(); t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const events = []; const mm = makeManager(root, '', events)
+  mm.spawnSpecOverride = () => ({ cmd: path.join(root, 'does-not-exist'), args: [], cwd: root, env: process.env })
+  await mm.download('mineru-models')
+  await waitFor(() => events.some((e) => e.phase === 'error'))
+  await new Promise((r) => setTimeout(r, 70))
+  assert.equal(events.filter((e) => e.phase === 'error').length, 1)
+  assert.equal(mm.active.size, 0)
+})
+
+test('cancel completes once before a new download can replace the job', async (t) => {
+  const root = tmpDataDir(); t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const events = []; const mm = makeManager(root, FAKE_DOWNLOAD_HANG, events)
+  await mm.download('mineru-models')
+  await Promise.all([mm.cancel('mineru-models'), mm.cancel('mineru-models')])
+  assert.equal(events.filter((e) => e.phase === 'cancelled').length, 1)
+  mm.spawnSpecOverride = () => ({ cmd: process.execPath, args: ['-e', FAKE_DOWNLOAD_OK], cwd: root, env: process.env })
+  await mm.download('mineru-models'); await waitFor(() => mm.isInstalled('mineru-models'))
+  assert.equal(events.filter((e) => e.phase === 'done').length, 1)
+})
+
+test('ModelScope explicit repair validates cached hashes and safe paths with synthetic files', () => {
+  const { execFileSync } = require('child_process')
+  execFileSync(process.platform === 'win32' ? 'python' : 'python3', [path.join(__dirname, 'model-fetch.test.py')], { stdio: 'pipe' })
+})
+
+test('explicit repair can revalidate an installed model while ordinary downloads stay deduplicated', async (t) => {
+  const root = tmpDataDir(); t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const events = []; const mm = makeManager(root, fixtureCode('asr-models'), events)
+  await mm.download('asr-models'); await waitFor(() => mm.isInstalled('asr-models'))
+  await assert.rejects(() => mm.download('asr-models'), /already installed/)
+  await mm.download('asr-models', { repair: true }); await waitFor(() => mm.isInstalled('asr-models'))
+  assert.equal(events.filter((e) => e.phase === 'done').length, 2)
+})
+
+
+test('complete legacy layouts migrate locally without spawning a downloader', () => {
+  const { execFileSync } = require('child_process')
+  for (const id of ['asr-models', 'kokoro-models', 'mineru-models']) {
+    const root = tmpDataDir()
+    execFileSync(process.execPath, ['-e', fixtureCode(id)], { cwd: root })
+    const mm = makeManager(root, FAKE_DOWNLOAD_FAIL, [])
+    const marker = path.join(mm.dirOf(id), '.aiworkdeck-complete')
+    fs.writeFileSync(marker, '2026-10-21T01:02:03.000Z')
+    assert.strictEqual(mm.isInstalled(id), true)
+    assert.strictEqual(JSON.parse(fs.readFileSync(marker, 'utf8')).schema, 1)
+    assert.strictEqual(mm.active.size, 0)
+  }
+})
+
+test('legacy model directory symlink loop is rejected without recursive traversal', () => {
+  const { execFileSync } = require('child_process')
+  const root = tmpDataDir()
+  execFileSync(process.execPath, ['-e', fixtureCode('mineru-models')], { cwd: root })
+  const mm = makeManager(root, FAKE_DOWNLOAD_FAIL, [])
+  const dir = mm.dirOf('mineru-models')
+  fs.symlinkSync(path.join(dir, 'pipeline/models/Layout/PP-DocLayoutV2'), path.join(dir, 'pipeline/models/Layout/PP-DocLayoutV2/loop'), 'dir')
+  fs.writeFileSync(path.join(dir, '.aiworkdeck-complete'), '2026-10-21T01:02:03.000Z')
+  assert.strictEqual(mm.isInstalled('mineru-models'), false)
+})
+
+test('cancelling while the running service stops prevents a later downloader launch', async (t) => {
+  const root = tmpDataDir(); t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const events = []; const mm = makeManager(root, FAKE_DOWNLOAD_HANG, events)
+  let release
+  const stopped = new Promise(resolve => { release = resolve })
+  const pending = mm.download('asr-models', { beforeStart: () => stopped })
+  await mm.cancel('asr-models')
+  release()
+  const result = await pending
+  assert.equal(result.ok, false)
+  assert.equal(events.filter(e => e.phase === 'cancelled').length, 1)
+  assert.equal(mm.active.size, 0)
+})
+
+test('real IPC handlers retain cancellation ownership while services.stop is pending', async (t) => {
+  const vm = require('node:vm')
+  const root = tmpDataDir(); t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const events = []; const mm = makeManager(root, FAKE_DOWNLOAD_HANG, events)
+  const source = fs.readFileSync(path.join(__dirname, '../main/main.js'), 'utf8')
+  const start = source.indexOf("ipcMain.handle('checkba:model-download'")
+  const end = source.indexOf("ipcMain.handle('checkba:model-remove'", start)
+  const handlers = {}; let release
+  const stopped = new Promise(resolve => { release = resolve })
+  vm.runInNewContext(source.slice(start, end), {
+    ipcMain: { handle: (name, fn) => { handlers[name] = fn } },
+    modelManager: mm,
+    COMPONENT_SERVICE: { 'asr-models': 'asr-service' },
+    services: { stop: () => stopped },
+  })
+  const pending = handlers['checkba:model-download'](null, { id: 'asr-models', repair: true })
+  assert.equal(mm.active.has('asr-models'), true)
+  await handlers['checkba:model-cancel'](null, { id: 'asr-models' })
+  release()
+  assert.equal((await pending).cancelled, true)
+  assert.equal(mm.active.size, 0)
+  assert.equal(fs.existsSync(mm.dirOf('asr-models')), false, 'cancelled preparation leaves model cache untouched')
+  assert.equal(events.filter(e => e.phase === 'cancelled').length, 1)
+})
+
+test('service-stop failure settles download ownership and remains retryable', async (t) => {
+  const root = tmpDataDir(); t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const events = []; const mm = makeManager(root, FAKE_DOWNLOAD_HANG, events)
+  const result = await mm.download('asr-models', { beforeStart: async () => { throw new Error('service busy') } })
+  assert.equal(result.ok, false)
+  assert.match(result.message, /service busy/)
+  assert.equal(mm.active.size, 0)
+  assert.equal(events.filter(e => e.phase === 'error').length, 1)
+})
+
+test('ASR accepts upstream text vocabulary and records the selected format; missing or malformed vocab stays unavailable', async (t) => {
+  const root = tmpDataDir(); t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const mm = makeManager(root, fixtureCode('asr-models'), [])
+  await mm.download('asr-models'); await waitFor(() => mm.isInstalled('asr-models'))
+  const snapshot = path.join(mm.dirOf('asr-models'), 'hub/models--Systran--faster-whisper-medium/snapshots', 'a'.repeat(40))
+  fs.unlinkSync(path.join(snapshot, 'vocabulary.json'))
+  fs.writeFileSync(path.join(snapshot, 'vocabulary.txt'), '!\n<|endoftext|>\n<|startoftranscript|>\n')
+  saveInventory('asr-models', mm.dirOf('asr-models'))
+  assert.equal(mm.isInstalled('asr-models'), true)
+  const marker = JSON.parse(fs.readFileSync(path.join(mm.dirOf('asr-models'), '.aiworkdeck-complete'), 'utf8'))
+  assert.ok(marker.files.some(f => f.path.endsWith('/vocabulary.txt')))
+  fs.writeFileSync(path.join(snapshot, 'vocabulary.json'), '{}')
+  assert.equal(mm.isInstalled('asr-models'), false, 'malformed preferred JSON must not fall back silently')
+  fs.writeFileSync(path.join(snapshot, 'vocabulary.json'), '["!"] trailing')
+  assert.equal(mm.isInstalled('asr-models'), false, 'trailing content in preferred JSON must be rejected')
+  fs.unlinkSync(path.join(snapshot, 'vocabulary.json'))
+  fs.unlinkSync(path.join(snapshot, 'vocabulary.txt'))
+  assert.equal(mm.isInstalled('asr-models'), false)
 })

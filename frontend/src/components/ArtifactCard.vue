@@ -267,7 +267,7 @@ export default {
         revised: true,
         content: edited,
         changeCount: stats.hunks,
-        diffSummary: `+${stats.added} 行 / -${stats.removed} 行`
+        diffSummary: this.$t('chat.diffSummaryLines', { added: stats.added, removed: stats.removed })
       })
     }
   }

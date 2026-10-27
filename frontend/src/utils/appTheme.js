@@ -16,6 +16,7 @@
 // 启动最早期就要用，不能卷进循环引用。
 
 export const APP_THEME_KEY = 'awd_theme'
+export const APP_SKIN_KEY = 'awd_skin_cache'
 export const APP_THEME_EVENT = 'awd-theme-changed'
 export const THEME_MODES = ['light', 'dark', 'system']
 
@@ -24,7 +25,7 @@ export const THEME_MODES = ['light', 'dark', 'system']
 // webview 注入 --vscode-* 变量的机制）。App.vue 新增令牌时这里要同步补名——
 // 漏了不报错，只是插件侧 var() 落空走 fallback。
 export const THEME_TOKEN_NAMES = [
-  'bg', 'surface', 'surface-2', 'surface-3',
+  'bg', 'surface', 'surface-2', 'surface-3', 'surface-elevated',
   'text', 'text-2', 'text-3', 'text-on-accent', 'text-on-mint',
   'border-subtle', 'border', 'border-strong',
   'accent', 'accent-hover', 'accent-text', 'accent-soft', 'accent-wash',
@@ -36,8 +37,23 @@ export const THEME_TOKEN_NAMES = [
   'warning', 'warning-text', 'warning-soft',
   'info', 'info-text', 'info-soft',
   'file-word', 'file-ppt', 'file-excel', 'file-pdf', 'file-md', 'file-image',
-  'shadow-sm', 'shadow-md', 'shadow-lg', 'overlay',
-  'halo-1', 'halo-2', 'halo-page', 'glass', 'glass-border', 'canvas'
+  'shadow-sm', 'shadow-md', 'shadow-lg', 'shadow-island', 'shadow-card', 'shadow-btn',
+  'specular', 'overlay',
+  'halo-1', 'halo-2', 'halo-page', 'glass', 'glass-border', 'canvas',
+  // iframe 与宿主共用字体、密度和交互尺寸，新增公共令牌须同时进入此表。
+  'font-serif', 'font-sans', 'font-mono',
+  'space-1', 'space-2', 'space-3', 'space-4', 'space-5', 'space-6', 'space-7', 'space-8',
+  'control-xs', 'control-sm', 'control-md',
+  'control-height', 'control-height-touch',
+  'radius-sm', 'radius-md', 'radius-dialog', 'radius-lg',
+  'island-radius', 'island-gap',
+  'font-size-body', 'font-size-reading', 'font-size-title', 'line-height-ui',
+  'focus-width', 'focus-offset', 'motion-fast', 'motion-base',
+  'switch-width', 'switch-track-height', 'switch-knob-size',
+  'panel-pad-x', 'panel-gap', 'panel-gap-lg', 'panel-sec-h', 'panel-row-h', 'panel-radius',
+  'panel-fs-sec', 'panel-fs', 'panel-fs-meta', 'panel-border', 'panel-hover',
+  'panel-text', 'panel-text-2', 'panel-text-3', 'panel-text-4',
+  'panel-accent', 'panel-accent-2', 'panel-accent-wash'
 ]
 
 // 计划审阅（dev-board#1022）的四个令牌：改动行底色 / 改动行左侧标记条 / 删除段小标记文字 /
@@ -79,6 +95,9 @@ export function collectThemeTokens() {
 const DEFAULT_MODE = 'light'
 
 let cachedMode = ''
+let cachedSkin = null
+let skinLoadedFromStorage = false
+let appliedSkinKeys = []
 let systemDark = false
 let mediaQuery = null
 
@@ -89,6 +108,76 @@ function readStorage(key) {
   } catch (e) {
     return ''
   }
+}
+
+function loadCachedSkin() {
+  if (skinLoadedFromStorage) return cachedSkin
+  skinLoadedFromStorage = true
+  try {
+    const raw = uni.getStorageSync(APP_SKIN_KEY)
+    const obj = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (obj && typeof obj === 'object' && obj.ref && obj.lightTokens && obj.darkTokens) {
+      cachedSkin = obj
+    }
+  } catch (e) {
+    cachedSkin = null
+  }
+  return cachedSkin
+}
+
+/** 当前生效的皮肤引用（如 'theme-inkwash-zen:inkwash-zen'，默认皮肤为 ''） */
+export function getActiveSkinRef() {
+  const s = loadCachedSkin()
+  return (s && s.ref) ? String(s.ref) : ''
+}
+
+/** 当前生效的皮肤对象（默认皮肤为 null） */
+export function getActiveSkin() {
+  return loadCachedSkin()
+}
+
+function applySkinVariables(resolved) {
+  try {
+    if (typeof document === 'undefined' || !document.documentElement) return
+    const el = document.documentElement
+    if (appliedSkinKeys.length && el.style && el.style.removeProperty) {
+      for (const k of appliedSkinKeys) el.style.removeProperty(k)
+    }
+    appliedSkinKeys = []
+    const skin = loadCachedSkin()
+    if (!skin || !skin.ref || !el.style || !el.style.setProperty) {
+      if (el.removeAttribute) {
+        el.removeAttribute('data-skin')
+        el.removeAttribute('data-skin-pulse')
+        el.removeAttribute('data-skin-texture')
+      }
+      return
+    }
+    if (el.setAttribute) {
+      el.setAttribute('data-skin', String(skin.ref))
+      if (skin.effects && skin.effects.aiPulseStyle) el.setAttribute('data-skin-pulse', String(skin.effects.aiPulseStyle))
+      else if (el.removeAttribute) el.removeAttribute('data-skin-pulse')
+      if (skin.effects && skin.effects.surfaceTexture) el.setAttribute('data-skin-texture', String(skin.effects.surfaceTexture))
+      else if (el.removeAttribute) el.removeAttribute('data-skin-texture')
+    }
+    const tokens = (resolved === 'dark' ? skin.darkTokens : skin.lightTokens) || {}
+    for (const [k, v] of Object.entries(tokens)) {
+      const prop = k.startsWith('--awd-') ? k : '--awd-' + k
+      if (/^--awd-[a-z0-9-]+$/.test(prop) && typeof v === 'string' && v) {
+        el.style.setProperty(prop, v)
+        appliedSkinKeys.push(prop)
+      }
+    }
+    if (skin.fonts && typeof skin.fonts === 'object') {
+      for (const [fk, fv] of Object.entries(skin.fonts)) {
+        const prop = fk.startsWith('--awd-font-') ? fk : '--awd-font-' + fk
+        if (/^--awd-font-(?:serif|sans|mono)$/.test(prop) && typeof fv === 'string' && fv) {
+          el.style.setProperty(prop, fv)
+          appliedSkinKeys.push(prop)
+        }
+      }
+    }
+  } catch (e) { /* 非浏览器环境静默 */ }
 }
 
 /** 当前 mode（'light' | 'dark' | 'system'） */
@@ -111,6 +200,7 @@ function paint() {
   try {
     document.documentElement.setAttribute('data-theme', resolved)
   } catch (e) { /* 非浏览器环境（小程序端）静默 */ }
+  applySkinVariables(resolved)
   return resolved
 }
 
@@ -172,4 +262,34 @@ export function setThemeMode(mode) {
     try { uni.$emit(APP_THEME_EVENT, resolved) } catch (e) { /* ignore */ }
   }
   return cachedMode
+}
+
+/**
+ * 切换或清除外观皮肤并广播 APP_THEME_EVENT（自动同步主工作台、Web 插件 iframe 与编辑器）。
+ * @param {object|null} skin 形如 { ref, pluginId, id, name, lightTokens, darkTokens, fonts, effects }；传 null/空恢复默认皮肤
+ */
+export function setActiveSkin(skin) {
+  const prevRef = getActiveSkinRef()
+  if (!skin || typeof skin !== 'object' || (!skin.ref && !(skin.pluginId && skin.id))) {
+    cachedSkin = null
+    skinLoadedFromStorage = true
+    try { uni.removeStorageSync(APP_SKIN_KEY) } catch (e) { /* ignore */ }
+  } else {
+    const ref = skin.ref || `${skin.pluginId}:${skin.id}`
+    cachedSkin = {
+      ref,
+      name: skin.name || ref,
+      lightTokens: skin.lightTokens || {},
+      darkTokens: skin.darkTokens || {},
+      fonts: skin.fonts || {},
+      effects: skin.effects || {},
+    }
+    skinLoadedFromStorage = true
+    try { uni.setStorageSync(APP_SKIN_KEY, JSON.stringify(cachedSkin)) } catch (e) { /* ignore */ }
+  }
+  const resolved = paint()
+  if (prevRef !== getActiveSkinRef() || cachedSkin) {
+    try { uni.$emit(APP_THEME_EVENT, resolved) } catch (e) { /* ignore */ }
+  }
+  return getActiveSkinRef()
 }

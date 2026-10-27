@@ -15,19 +15,18 @@ import { createLegacyAskUserMarkup } from './legacyAskUserMarkup.mjs'
 import { isUserQuestionAwaiting } from './awaitingInput.mjs'
 import { applyInboxReceipt, applyInboxSnapshot, applyInputApplied, createInboxState, markInboxEvent, removeInboxItem, replaceInboxItem } from './agentInboxState.mjs'
 
-// 网络恢复/页面回前台时触发重连的激活实例指针（模块级单例）。
-// 页面栈会多次实例化本 composable（PR#148 重复订阅地雷），window 监听只挂一次，
-// 回调经该指针分发到最近建连的实例。
-let activeNetworkRecoveryHook = null
+// window 监听只挂一次，各活跃会话分别登记恢复回调。工作台的后台出图与
+// 右侧聊天可以同时连接，不能让最后建连的实例夺走其他会话的恢复入口。
+const activeNetworkRecoveryHooks = new Set()
 if (typeof window !== 'undefined' && !window.__awdSseNetworkHooks) {
     window.__awdSseNetworkHooks = true
     window.addEventListener('online', () => {
-        if (activeNetworkRecoveryHook) activeNetworkRecoveryHook('network-online')
+        for (const hook of activeNetworkRecoveryHooks) hook('network-online')
     })
     if (typeof document !== 'undefined') {
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible' && activeNetworkRecoveryHook) {
-                activeNetworkRecoveryHook('page-visible')
+            if (document.visibilityState === 'visible') {
+                for (const hook of activeNetworkRecoveryHooks) hook('page-visible')
             }
         })
     }
@@ -148,6 +147,10 @@ export function useAgentStream() {
         if (skillFlashTimer) { clearTimeout(skillFlashTimer); skillFlashTimer = null }
     }
 
+    // STATE: 智能模式（auto）下后端本轮确定性路由出的目标模型（model_routed 事件更新）
+    // null | { requestedModel, effectiveModel, effectiveModelName, tier, routed }
+    const routedModelInfo = ref(null)
+
     // STATE: 任务待续跑——步数超限暂停（bubble_end status=paused）或上次进程被杀
     // （run_state status=INTERRUPTED）。前端据此渲染一键「继续」按钮
     const agentPaused = ref(null) // null | { reason: 'max_depth' | 'process_interrupted' | ... }
@@ -169,8 +172,7 @@ export function useAgentStream() {
     // Abort Controllers
     let sseAbortController = null
     let messageAbortController = null
-    // 本实例最近一次挂上模块级单例的网络恢复回调（卸载时据此判断单例是不是自己的，
-    // 无条件置空会踩掉后挂载实例的重连入口）
+    // 本实例的网络恢复回调；切会话/卸载只移除自身，不影响并行会话。
     let myNetworkRecoveryHook = null
 
     // --- 断线自动重连状态（F-05）---
@@ -282,6 +284,7 @@ export function useAgentStream() {
         // TodoListService 约定跨轮保留直到下一次 todo_write，不能在“继续”时清空。
         planTodos: [...planTodos.value],
         artifacts: [],
+        fileChanges: [],
         walkthrough: '',
         content: '', // Main Answer (from <final> tag)
         // 模型反问（<question> 标签）解析结果，供问题卡渲染：
@@ -297,11 +300,25 @@ export function useAgentStream() {
         status: '',
         rawLog: '',
         isStreaming: false,
+        isEditorStreaming: false,
         // 用户点停止后的提示条文案。刻意不并进 content：content 是「模型正文」，
         // 会触发 isReady/hasContent/「用到文档」操作 chip 的判定，系统提示写进去
         // 会让一个空产出的回合长出可插入文档的操作项（dev-board#212）。
-        stopNotice: ''
+        stopNotice: '',
+        // Harness 运行期自愈 / 收尾核验 / 自进化（dev-board#1481）：分别由 harness_adaptation、
+        // verification_report、harness_evolution 三条 SSE 事件填充，供过程卡与根气泡卡片展示。
+        harnessAdaptations: [],
+        verificationReport: null,
+        harnessEvolution: null
     })
+
+    const clearDocStreamingPlaceholder = (bubble) => {
+        if (bubble && bubble.content === t('agentStream.docStreamingPlaceholder')) {
+            bubble.content = ''
+            // 占位符也可能已被时间线记录；清正文时同步撤掉那段文本索引。
+            captureChatTimeline(bubble)
+        }
+    }
 
     // displayContent = 「显示内容 ≠ 发送内容」通道（契约 D）：content 永远是模型看到的原文，
     // displayContent 为空则回退 content。渲染侧一律 displayContent || content，
@@ -376,6 +393,8 @@ export function useAgentStream() {
         console.log('[AgentStream] Resetting SSE state')
         if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
         stopHeartbeatMonitor()
+        if (myNetworkRecoveryHook) activeNetworkRecoveryHooks.delete(myNetworkRecoveryHook)
+        myNetworkRecoveryHook = null
         // Abort any existing connections
         if (sseAbortController) {
             try { sseAbortController.abort() } catch (e) { }
@@ -412,6 +431,7 @@ export function useAgentStream() {
         clearSkillFlash()
         activeSkills.value = []
         skillNotice.value = null
+        routedModelInfo.value = null
         agentPaused.value = null
         agentRunStatus.value = null
         agentAwaitingInput.value = false
@@ -439,6 +459,7 @@ export function useAgentStream() {
         if (currentConversationId.value !== id) {
             console.log('[AgentStream] Conversation changing:', currentConversationId.value, '->', id)
             resetSSE()
+            fileChanges.value = []
         }
         currentConversationId.value = id
     }
@@ -627,6 +648,9 @@ export function useAgentStream() {
 
                 clearTimeout(connectTimer) // 仅限制响应头等待，不限制长时间流式任务
                 if (!response.ok) throw new Error(`SSE Connection Failed: ${response.status}`)
+                if (sseAbortController !== myController || myController.signal.aborted) {
+                    throw new DOMException('Aborted', 'AbortError')
+                }
 
                 isConnected.value = true
                 streamOpened = true
@@ -637,11 +661,13 @@ export function useAgentStream() {
                 linkStatus.value = { state: 'live', attempt: 0 }
                 lastSseActivityAt = Date.now()
                 startHeartbeatMonitor()
-                // 网络恢复/回前台时经模块级单例回调触发本实例重连
-                myNetworkRecoveryHook = (reason) => {
-                    if (!isConnected.value && currentConversationId.value) scheduleReconnect(reason)
+                // 重连复用同一回调，避免每次连接都留下一个过期闭包。
+                if (!myNetworkRecoveryHook) {
+                    myNetworkRecoveryHook = (reason) => {
+                        if (!isConnected.value && currentConversationId.value) scheduleReconnect(reason)
+                    }
+                    activeNetworkRecoveryHooks.add(myNetworkRecoveryHook)
                 }
-                activeNetworkRecoveryHook = myNetworkRecoveryHook
                 resolve()
 
                 // 建连即补拉一次在跑的后台任务：background_task_start 只在任务起跑那一刻发一次，
@@ -774,6 +800,9 @@ export function useAgentStream() {
             || (bubble.thinking && bubble.thinking.content)
             || (Array.isArray(bubble.processes) && bubble.processes.length)
             || (Array.isArray(bubble.artifacts) && bubble.artifacts.length)
+            || bubble.verificationReport
+            || bubble.harnessEvolution
+            || (Array.isArray(bubble.harnessAdaptations) && bubble.harnessAdaptations.length)
         )
     )
 
@@ -800,6 +829,7 @@ export function useAgentStream() {
         }
         resetParser()
         const next = createAssistantBubble()
+        next.originClientRequestId = entry.clientRequestId || null
         next.isStreaming = true
         next.thinking.status = 'thinking'
         next.thinking.startTime = Date.now()
@@ -837,7 +867,10 @@ export function useAgentStream() {
             // 磁盘上那份正文已经不是用户眼前看到的那份，让后端只带壳、
             // 由模型走编辑器桥读实时正文，别拿旧版本给结论。
             // 重新生成保留身份，由调用侧重新标明正文状态。
-            staleBody: activeContext.staleBody === true
+            staleBody: activeContext.staleBody === true,
+            ...(typeof activeContext.selectionText === 'string' && activeContext.selectionText.trim()
+                ? { selectionText: activeContext.selectionText.trim() }
+                : {})
         } : null
 
         if (!continuingRun) {
@@ -863,6 +896,7 @@ export function useAgentStream() {
             }
 
             const newBubble = createAssistantBubble()
+            newBubble.originClientRequestId = requestId
             newBubble.isStreaming = true
             newBubble.thinking.status = 'thinking'
             newBubble.thinking.startTime = Date.now()
@@ -920,7 +954,10 @@ export function useAgentStream() {
                     id: String(f.id),
                     name: f.fileName || f.name || 'Unknown',
                     isDir: f.isDir === true,
-                    fileType: f.fileType || ''
+                    fileType: f.fileType || '',
+                    projectId: f.projectId || undefined,
+                    projectName: f.projectName || undefined,
+                    readOnly: f.readOnly || undefined
                 })),
                 fileIds: fileList.map(f => f.id), // Legacy compatibility
                 // NEW: Active context (auto-detected current tab) — 与用户气泡上的快照同源（dev-board#1118）
@@ -957,7 +994,6 @@ export function useAgentStream() {
             // POST 已经受理，现在才等建连——多半早就连上了（两件事是并行跑的）。
             // 仍然要等：建连失败必须照旧抛出去走同一条错误处置，
             // 否则用户会看到「消息发出去了，但界面永远停在等待」。
-            await connectPromise
             const receipt = responseBody && responseBody.data ? responseBody.data : responseBody
             if (!receipt || receipt.status !== 'accepted' || !receipt.messageId) {
                 throw new Error(t('agentStream.chatRequestFailed', { status: chatResp.status }))
@@ -966,6 +1002,8 @@ export function useAgentStream() {
             // The request still belongs to the captured conversation even if the user opened
             // another chat while HTTP was in flight. Return its receipt to the sender, but do
             // not let that late completion repopulate the newly selected conversation.
+            if (currentConversationId.value !== conversationId) return receipt
+            await connectPromise
             if (currentConversationId.value !== conversationId) return receipt
 
             const entry = applyInboxReceipt(inboxState, receipt, {
@@ -1219,10 +1257,25 @@ export function useAgentStream() {
                     id: s.id,
                     name: s.name || s.id,
                     source: s.source === 'manual' ? 'manual' : 'auto',
+                    builtinWorkflow: !!s.builtinWorkflow,
+                    versionId: s.versionId || 'default',
+                    versionName: s.versionName || '',
+                    customVersion: !!s.customVersion,
                     justActivated: freshAuto.some(f => f.id === s.id)
                 }))
                 if (freshAuto.length) {
-                    skillNotice.value = { id: freshAuto[0].id, name: freshAuto[0].name || freshAuto[0].id, at: Date.now() }
+                    const first = freshAuto[0]
+                    const display = first.customVersion && first.versionName
+                        ? `${first.name || first.id} · ${first.versionName}`
+                        : (first.name || first.id)
+                    skillNotice.value = {
+                        id: first.id,
+                        name: display,
+                        builtinWorkflow: !!first.builtinWorkflow,
+                        versionName: first.versionName || '',
+                        customVersion: !!first.customVersion,
+                        at: Date.now()
+                    }
                     clearSkillFlash()
                     // 高亮只持续几秒：chip 本身留着（它这轮确实生效着），闪的只是"刚加载"这件事
                     skillFlashTimer = setTimeout(() => {
@@ -1233,6 +1286,74 @@ export function useAgentStream() {
                 }
             } catch (e) {
                 console.error('Failed to parse skill_update', e)
+            }
+            return
+        }
+
+        // 智能模式路由结果（dev-board#1434）：与 skill_update 同理在起跑时即发出，放在气泡守卫之前。
+        if (evt === 'model_routed') {
+            try {
+                const d = JSON.parse(dataStr)
+                if (d && d.effectiveModel) {
+                    routedModelInfo.value = {
+                        requestedModel: d.requestedModel || 'auto',
+                        effectiveModel: d.effectiveModel,
+                        effectiveModelName: d.effectiveModelName || d.effectiveModel,
+                        tier: d.tier || null,
+                        routed: !!d.routed,
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to parse model_routed', e)
+            }
+            return
+        }
+
+        // Harness² 对齐（dev-board#1481）：运行期自愈、收尾核验报告与自进化提案。
+        // 与 ask_user 同理放在气泡守卫之前，指针为空时挂到最后一个助手气泡上。
+        if (evt === 'harness_adaptation' || evt === 'verification_report' || evt === 'harness_evolution') {
+            try {
+                const payload = JSON.parse(dataStr)
+                if (!payload || typeof payload !== 'object') return
+                let target = currentAssistantBubble.value
+                if (!target) {
+                    const last = bubbles.value[bubbles.value.length - 1]
+                    if (last && last.role === 'ASSISTANT') target = last
+                }
+                if (!target) return
+                if (evt === 'harness_adaptation') {
+                    if (!Array.isArray(target.harnessAdaptations)) target.harnessAdaptations = []
+                    if (!target.harnessAdaptations.some(a => a.id && a.id === payload.id)) {
+                        target.harnessAdaptations.push(payload)
+                    }
+                    // 挂到对应工具的最近一条过程上，过程卡内联展示「诊断 → 处方」
+                    const procs = Array.isArray(target.processes) ? target.processes : []
+                    for (let i = procs.length - 1; i >= 0; i--) {
+                        const p = procs[i]
+                        const code = String(p?.toolCode || p?.code || p?.name || '')
+                        if (!payload.toolName || code.includes(payload.toolName) || i === procs.length - 1) {
+                            if (!Array.isArray(p.harnessAdaptations)) p.harnessAdaptations = []
+                            if (!p.harnessAdaptations.some(a => a.id && a.id === payload.id)) {
+                                p.harnessAdaptations.push(payload)
+                            }
+                            if (Array.isArray(target.timeline)) {
+                                for (let ti = target.timeline.length - 1; ti >= 0; ti--) {
+                                    const tEntry = target.timeline[ti]
+                                    if (tEntry?.type === 'process' && (tEntry.source === p || tEntry.data?.id === p.id)) {
+                                        tEntry.data.harnessAdaptations = p.harnessAdaptations
+                                    }
+                                }
+                            }
+                            break
+                        }
+                    }
+                } else if (evt === 'verification_report') {
+                    target.verificationReport = payload
+                } else {
+                    target.harnessEvolution = payload
+                }
+            } catch (e) {
+                console.error(`Failed to parse ${evt}`, e)
             }
             return
         }
@@ -1460,6 +1581,36 @@ export function useAgentStream() {
             return
         }
 
+        // Handle File Changes (Added/Modified)
+        if (evt === 'file_change') {
+            try {
+                const d = JSON.parse(dataStr)
+                // d: { fileName: "...", changeType: "ADDED" | "MODIFIED", fileId: 42 | null }
+                // fileId（dev-board#852）：后端知道是哪份文件时带上，卡片按 id 打开；旧后端没有这个字段。
+                if (!['ADDED', 'MODIFIED'].includes(d.changeType) || !d.fileName || d.success === false || d.status === 'error') return
+                const change = { fileName: d.fileName, changeType: d.changeType, fileId: d.fileId ?? null, projectId: d.projectId ?? null }
+                if (d.conversationId && d.conversationId !== currentConversationId.value) return
+                const bubble = d.clientRequestId
+                    ? (bubbles.value.find(b => b.role === 'ASSISTANT' && b.originClientRequestId === d.clientRequestId)
+                        || (d.assistantMessageId && bubbles.value.find(b => b.role === 'ASSISTANT' && String(b.id) === String(d.assistantMessageId))))
+                    : d.assistantMessageId ? bubbles.value.find(b => String(b.id) === String(d.assistantMessageId))
+                        : currentAssistantBubble.value // Older backends have no correlation fields.
+                if (!bubble) return // Never attach a known but unmatched old turn to the current one.
+                if (bubble) {
+                    bubble.fileChanges ||= []
+                    if (!bubble.fileChanges.some(f => isSameFileChange(f, change))) bubble.fileChanges.push(change)
+                }
+                const exists = fileChanges.value.some(f => f.assistantBubbleId === bubble.id && isSameFileChange(f, change))
+                if (!exists) {
+                    fileChanges.value.push({ ...change, assistantBubbleId: bubble?.id })
+                }
+                console.log('[AgentStream] File Change:', d)
+            } catch (e) {
+                console.error('Failed to parse file_change', e)
+            }
+            return
+        }
+
         if (!currentAssistantBubble.value) {
             // 终态事件不能因气泡指针缺失而丢弃：重连落在"RUNNING 但快照未建"窗口时
             // 若把 bubble_end/error/cancelled 一并吞掉，isStreaming 永久锁死、输入框
@@ -1600,13 +1751,17 @@ export function useAgentStream() {
             let streamEndPayload = {}
             try { streamEndPayload = JSON.parse(dataStr) || {} } catch (e) { streamEndPayload = {} }
             const streamBubble = currentAssistantBubble.value
+            // 先冲掉正文尾部缓冲（仍处于抑制态），再开放后续总结；结束信号不代表编辑器写入成功。
+            flushRemainingBuffer()
+            streamBubble.isEditorStreaming = false
+            clearDocStreamingPlaceholder(streamBubble)
             let docStreamFailureShown = false
             const surfaceDocStreamFailure = (reason) => {
                 if (!reason || !streamBubble || docStreamFailureShown) return
                 docStreamFailureShown = true
                 const notice = t('agentStream.docStreamFailedNotice', { reason: String(reason) })
                 // 占位符是"正在写入"的谎言，直接换掉；其余情况追加一行
-                if (streamBubble.content === t('agentStream.docStreamingPlaceholder')) {
+                if (!streamBubble.content || streamBubble.content === t('agentStream.docStreamingPlaceholder')) {
                     streamBubble.content = notice
                 } else {
                     streamBubble.content = (streamBubble.content || '') + '\n\n' + notice
@@ -1625,15 +1780,21 @@ export function useAgentStream() {
                         console.error('[SSE] doc_stream_end handler failed', e)
                         surfaceDocStreamFailure((e && e.message) || String(e))
                     })
-                } else if (streamEndPayload.wrote === false) {
-                    // 消费端根本没接这条（旧实现）时，后端这一路仍然能报出"没写进去"
-                    surfaceDocStreamFailure(t('agentStream.docStreamReasonNoBody'))
                 }
+            }
+            // 即使没有编辑器消费者，后端确认的空正文也必须报告。
+            if (streamEndPayload.wrote === false) {
+                surfaceDocStreamFailure(t('agentStream.docStreamReasonNoBody'))
             }
         } else if (evt === 'cancelled') {
             // 处理取消事件
+            agentRunStatus.value = 'CANCELLED'
+            agentAwaitingInput.value = false
+            agentPaused.value = null
             console.log('[SSE] Received cancelled event')
             flushRemainingBuffer()
+            clearDocStreamingPlaceholder(currentAssistantBubble.value)
+            currentAssistantBubble.value.isEditorStreaming = false
             currentAssistantBubble.value.isStreaming = false
             const thinking = currentAssistantBubble.value.thinking
             if (thinking.status === 'thinking') {
@@ -1650,6 +1811,8 @@ export function useAgentStream() {
         } else if (evt === 'bubble_end' || evt === 'error') {
             // Flush any remaining content in parserBuffer before ending
             flushRemainingBuffer()
+            clearDocStreamingPlaceholder(currentAssistantBubble.value)
+            currentAssistantBubble.value.isEditorStreaming = false
             currentAssistantBubble.value.isStreaming = false
             const thinking = currentAssistantBubble.value.thinking
             if (thinking.status === 'thinking') {
@@ -1741,26 +1904,13 @@ export function useAgentStream() {
         if (evt === 'bubble_end' || evt === 'error' || evt === 'cancelled') {
             isStreaming.value = false
             roundSettled = true
+            // Live terminal event only: history/recovery must not trigger paid suggestion generation.
+            if (evt === 'bubble_end' && agentRunStatus.value === 'FINISHED' && JSON.parse(dataStr).status === 'finished') turnFinishedHandler.value?.()
         }
 
         // heartbeat 与三个后台任务事件已在气泡守卫之前处理（见上）
 
-        // Handle File Changes (Added/Modified)
-        if (evt === 'file_change') {
-            try {
-                const d = JSON.parse(dataStr)
-                // d: { fileName: "...", changeType: "ADDED" | "MODIFIED", fileId: 42 | null }
-                // fileId（dev-board#852）：后端知道是哪份文件时带上，卡片按 id 打开；旧后端没有这个字段。
-                const change = { fileName: d.fileName, changeType: d.changeType, fileId: d.fileId ?? null }
-                const exists = fileChanges.value.some(f => isSameFileChange(f, change))
-                if (!exists) {
-                    fileChanges.value.push(change)
-                }
-                console.log('[AgentStream] File Change:', d)
-            } catch (e) {
-                console.error('Failed to parse file_change', e)
-            }
-        }
+
     }
 
     // 状态恢复（重连续流）：后端把本轮已生成的全量文本快照重放给前端。
@@ -2251,6 +2401,7 @@ export function useAgentStream() {
                     title: processTitle,
                     isExpanded: true,
                     items: [], // CHANGED: from steps -> items
+                    harnessAdaptations: [],
                     content: '',
                     stepIndex: stepIdx,
                     stepTitle: stepIdx >= 0 ? (planTodos.value[stepIdx].content || '') : ''
@@ -2365,6 +2516,7 @@ export function useAgentStream() {
         } else if (tagName === 'final') {
             if (isClose) activeTag = null
             else {
+                clearDocStreamingPlaceholder(bubble)
                 settleRootThinking(bubble)
                 if (bubble.content && !bubble.content.endsWith('\n\n')) bubble.content += '\n\n'
                 activeTag = 'final'
@@ -2664,6 +2816,7 @@ export function useAgentStream() {
 
     const clientActionHandler = ref(null)
     const titleUpdateHandler = ref(null)
+    const turnFinishedHandler = ref(null)
 
     /**
      * 回退到指定消息（edit-and-resend）
@@ -2693,16 +2846,14 @@ export function useAgentStream() {
     // 组件卸载时收尾：SSE reader 循环、心跳 interval、待触发的重连定时器都活在闭包里，
     // 页面被销毁（工作台的跳转一律 reLaunch，整个页面栈都拆掉）后它们不会自己停。
     // 后果不只是白耗流量：僵尸实例还会 scheduleReconnect，与新挂载的实例轮流把对方
-    // 从同一会话的 SSE 上挤下去。activeNetworkRecoveryHook 是模块级单例，
-    // 只有它当前指向本实例时才置空，否则会踩掉后挂载实例的重连入口。
+    // 从同一会话的 SSE 上挤下去。resetSSE 同时移除本实例的网络恢复回调，
+    // 保留其他活跃会话的恢复入口。
     if (getCurrentInstance()) {
         onUnmounted(() => {
             if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
             // 先清会话 id：scheduleReconnect 与重连回调都以它为准，置空即断掉续命链
             currentConversationId.value = null
             stopHeartbeatMonitor()
-            if (activeNetworkRecoveryHook === myNetworkRecoveryHook) activeNetworkRecoveryHook = null
-            myNetworkRecoveryHook = null
             resetSSE()
         })
     }
@@ -2765,6 +2916,7 @@ export function useAgentStream() {
         // Background task tracking
         onClientAction: (cb) => { clientActionHandler.value = cb },
         onTitleUpdate: (cb) => { titleUpdateHandler.value = cb },
+        onTurnFinished: (cb) => { turnFinishedHandler.value = cb },
         tokenUsage,
         fileChanges,
         backgroundTasks,
@@ -2778,6 +2930,7 @@ export function useAgentStream() {
         // 本轮生效的 Skill 与「刚自动加载了一个技能」的轻提示
         activeSkills,
         skillNotice,
+        routedModelInfo,
         // 已结束的后台任务不再自动销毁（完成态要保留可查），供任务面板做「关闭」按钮
         dismissBackgroundTask: (taskId) => {
             if (taskId && backgroundTasks.value[taskId]) delete backgroundTasks.value[taskId]
@@ -2786,14 +2939,16 @@ export function useAgentStream() {
         upsertPluginJob,
         // 切回会话时重连 SSE：后端 connect 会推 run_state（运行中还会推 state_recovery 续流）。
         reattachSSE: async (conversationId) => {
-            if (!conversationId) return
-            try { await connectSSE(conversationId) } catch (e) { console.warn('[AgentStream] reattach failed', e) }
+            if (!conversationId) return false
+            try { await connectSSE(conversationId); return isConnected.value }
+            catch (e) { console.warn('[AgentStream] reattach failed', e); return false }
         },
         // Load metadata for historical conversations
         loadConversationMetadata: async (conversationId) => {
             if (!conversationId) return
             try {
                 const resp = await getConversationMetadata(conversationId)
+                if (currentConversationId.value !== conversationId) return
                 // resp: { fileChanges: [...], tokenUsage: { promptTokens, completionTokens, totalTokens } }
                 if (resp.fileChanges) {
                     fileChanges.value = resp.fileChanges

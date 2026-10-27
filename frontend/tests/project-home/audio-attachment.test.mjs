@@ -60,6 +60,16 @@ test('视频附件同样要提示先转写（AI 读不到视频，只能读转�
   assert.deepEqual(audioNeedingTranscription(files, done).map((f) => f.id), [1])
 })
 
+test('QTA 显示转写入口与附件提示，已转写后提示消失', () => {
+  const recording = { id: 41, name: '空间录音.QTA' }
+  assert.equal(isAudioFile(recording), true)
+  assert.equal(isTranscribableMedia(recording), true)
+  assert.equal(isTranscribableMedia({ name: '空间录音.QTA', isFolder: true }), false)
+  assert.deepEqual(audioNeedingTranscription([recording], new Set()), [recording])
+  assert.deepEqual(audioNeedingTranscription([recording],
+    transcribedAudioFileIds([{ audioFileId: 41, status: 'TRANSCRIBED' }])), [])
+})
+
 test('判据认扩展名，文件夹与非音频一律为假', () => {
   assert.equal(isAudioFile({ name: '开庭录音.mp3' }), true)
   assert.equal(isAudioFile({ name: '会见录音.M4A' }), true, '扩展名大小写不敏感')

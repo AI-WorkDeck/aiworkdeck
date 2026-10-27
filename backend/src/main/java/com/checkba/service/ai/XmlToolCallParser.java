@@ -324,9 +324,11 @@ public class XmlToolCallParser {
         Optional<ToolRegistry.RegisteredTool> tool = toolRegistry.resolve(
                 ToolRegistry.TOOL_NAME_ALIASES.getOrDefault(toolName, toolName));
         if (tool.isPresent()) {
-            java.lang.reflect.Parameter[] params = tool.get().method().getParameters();
-            for (java.lang.reflect.Parameter p : params) {
-                String paramName = p.getName();
+            // Manifest tools have a schema instead of a Java method signature.
+            List<String> params = tool.get().method() == null
+                    ? new ArrayList<>(tool.get().spec().parameters().properties().keySet())
+                    : java.util.Arrays.stream(tool.get().method().getParameters()).map(java.lang.reflect.Parameter::getName).toList();
+            for (String paramName : params) {
                 String value = extractNullableStringArg(code, paramName);
                 if (value == null) {
                     for (String alias : ToolRegistry.aliasesFor(paramName)) {
@@ -337,28 +339,39 @@ public class XmlToolCallParser {
                     }
                 }
                 if (value != null) {
-                    args.set(paramName, value);
+                    args.set(paramName, schemaArgument(tool.get(), paramName, value));
                 }
             }
             // 5. 位置参数兜底：doc_find_replace("合同", "协议", true) 这类无 key= 写法，
             //    按签名声明顺序映射到尚未命中的参数（跳过服务端注入参数，避免错位）
             List<String> positional = extractPositionalArgs(code, toolName);
             int posIdx = 0;
-            for (java.lang.reflect.Parameter p : params) {
+            for (String paramName : params) {
                 if (posIdx >= positional.size()) {
                     break;
                 }
-                String paramName = p.getName();
-                if (ToolRegistry.isServerContextParam(paramName) || args.containsKey(paramName)) {
+                if ((tool.get().method() != null && ToolRegistry.isServerContextParam(paramName)) || args.containsKey(paramName)) {
                     continue;
                 }
-                args.set(paramName, positional.get(posIdx++));
+                args.set(paramName, schemaArgument(tool.get(), paramName, positional.get(posIdx++)));
             }
         } else {
             // 未注册工具（可能是插件或幻觉调用）：通用 key=value 提取，交由分发层判定
             args = cn.hutool.json.JSONUtil.parseObj(extractArgsAsJson(code));
         }
         return new ParsedCall(toolName, args.toString(), code);
+    }
+
+    private Object schemaArgument(ToolRegistry.RegisteredTool tool, String name, String value) {
+        if (tool.method() == null) {
+            var schema = tool.spec().parameters().properties().get(name);
+            if (!(schema instanceof dev.langchain4j.model.chat.request.json.JsonStringSchema)
+                    && !(schema instanceof dev.langchain4j.model.chat.request.json.JsonEnumSchema)) {
+                try { return JSON.readValue(value, Object.class); }
+                catch (java.io.IOException ignored) { /* the schema validator rejects an invalid typed value */ }
+            }
+        }
+        return value;
     }
 
     /**

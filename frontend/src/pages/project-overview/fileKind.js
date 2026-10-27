@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // 标签页的文件类型色（dev-board#504）：fileType → kind key 的唯一出处。
 //
 // 零依赖纯函数（不 import Vue / uni / '@/' 别名），node --test 可直接导入；
@@ -16,7 +18,7 @@
 // 就是正文，保存/关闭的心智全错。
 // 'welcome'（欢迎标签，dev-board#1047）：单例 id 'welcome'，不是文档，不当活跃文档、不能拖进 AI 上下文。
 // 'tmeet-transcript'：腾讯会议逐字稿标签（中栏工作台），查看会议转写时间轴与智能纪要。
-export const NON_FILE_TAB_TYPES = ['web', 'browser', 'market-detail', 'admin-settings', 'insight-entity', 'commit-history', 'merge-review', 'welcome', 'calendar', 'tmeet-transcript', 'plugin']
+export const NON_FILE_TAB_TYPES = ['web', 'browser', 'market-detail', 'admin-settings', 'builtin-workflow-settings', 'insight-entity', 'commit-history', 'merge-review', 'welcome', 'calendar', 'tmeet-transcript', 'plugin', 'dd-client', 'dd-request', 'message-center', 'cross-project-preview']
 
 // 分组口径与 config/icons.js 的 fileGlyph 保持一致（csv 跟着 Excel 走）。
 const KIND_BY_EXT = {

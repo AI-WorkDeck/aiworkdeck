@@ -25,15 +25,24 @@ public class ConversationFileChangeService {
      * Save a file change record for a conversation.
      */
     public void saveFileChange(String conversationId, String fileName, String changeType) {
-        // Avoid duplicates within same conversation
+        saveFileChange(conversationId, fileName, changeType, null, null, null);
+    }
+
+    public void saveFileChange(String conversationId, String fileName, String changeType,
+                               Long fileId, Long projectId, Long assistantMessageId) {
         List<ConversationFileChange> existing = repository.findByConversationId(conversationId);
-        boolean duplicate = existing.stream()
-                .anyMatch(c -> c.getFileName().equals(fileName) && c.getChangeType().equals(changeType));
-        
+        boolean duplicate = existing.stream().anyMatch(c ->
+                java.util.Objects.equals(c.getAssistantMessageId(), assistantMessageId)
+                && java.util.Objects.equals(c.getProjectId(), projectId)
+                && (fileId != null ? fileId.equals(c.getFileId())
+                    : c.getFileId() == null && java.util.Objects.equals(c.getFileName(), fileName))
+                && java.util.Objects.equals(c.getChangeType(), changeType));
         if (!duplicate) {
             ConversationFileChange change = new ConversationFileChange(conversationId, fileName, changeType);
+            change.setFileId(fileId);
+            change.setProjectId(projectId);
+            change.setAssistantMessageId(assistantMessageId);
             repository.save(change);
-            log.debug("Saved file change: conv={}, file={}, type={}", conversationId, fileName, changeType);
         }
     }
 

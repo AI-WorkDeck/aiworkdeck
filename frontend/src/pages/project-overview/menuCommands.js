@@ -38,7 +38,7 @@ export const menuCommandsMethods = {
     const chat = this.$refs.chatInterface
     const chatState = chat && chat.menuState ? chat.menuState() : {}
     return {
-      hasProject: !!(this.project && this.project.id),
+      hasProject: !!(this.project && this.project.id) && !this.isLooseWorkspace,
       hasTab: !!(this.activeFileIdLeft || (this.splitMode && this.activeFileIdRight)),
       // 「是不是 Writer 文档」既看文件名也看引擎实例：备胎/未就绪时不该点亮
       // 修订类命令，否则点了没反应。
@@ -47,8 +47,8 @@ export const menuCommandsMethods = {
       sidebarOpen: !this.sidebarCollapsed,
       toolsPanelOpen: !!this.showToolsPanel,
       aiPanelOpen: !!this.showAiPanel,
-      toolFavorites: !!this.showToolsPanel && this.activeToolKey === 'favorites',
-      toolClipboard: !!this.showToolsPanel && this.activeToolKey === 'clipboard',
+      toolFavorites: this.isPanelOpenIn('plugin-favorites', 'left') || this.isPanelOpenIn('plugin-favorites', 'right') || this.isPanelOpenIn('plugin-favorites', 'bottom'),
+      toolClipboard: this.isPanelOpenIn('plugin-clipboard', 'left') || this.isPanelOpenIn('plugin-clipboard', 'right') || this.isPanelOpenIn('plugin-clipboard', 'bottom'),
       recording: !!this.isRecording,
       trackChanges: !!edState.trackChanges,
       reviewOpen: !!edState.reviewOpen,
@@ -74,7 +74,8 @@ export const menuCommandsMethods = {
       // 要手动把它补回来，否则版本记录会从这份清单里消失。
       views: (this.LEFT_SIDEBAR_PLUGINS || [])
         .map((p) => ({ key: p.key, label: p.label }))
-        .concat(this.VERSION_PLUGIN ? [{ key: this.VERSION_PLUGIN.key, label: this.VERSION_PLUGIN.label }] : []),
+        .concat(this.hasNamedProject && !this.isClientView && this.explorerSearchPlugin ? [{ key: this.explorerSearchPlugin.key, label: this.explorerSearchPlugin.label }] : [])
+        .concat(this.VERSION_PLUGIN && !this.isLooseWorkspace ? [{ key: this.VERSION_PLUGIN.key, label: this.VERSION_PLUGIN.label }] : []),
       flags: this.buildMenuFlags(),
     })
     // Windows 自绘菜单栏读的是同一份快照，状态推完让它重建一次。
@@ -148,6 +149,12 @@ export const menuCommandsMethods = {
     const verb = payload && payload.verb
     const arg = payload && payload.arg
     if (!verb) return
+    // 独立文件保留编辑、AI 与全局导航；不能从菜单绕回内部项目的资源管理器或版本。
+    if (this.isLooseWorkspace) {
+      if (['importFiles', 'openVersionPanel', 'goProjectHome', 'toggleRecording', 'revealInFinder'].includes(verb)) return
+      if (verb === 'openView' && !(this.LEFT_SIDEBAR_PLUGINS || []).some(p => p.key === arg)) return
+      if (verb === 'openTool' && arg !== 'clipboard') return
+    }
     switch (verb) {
       // —— 视图 / 面板
       case 'toggleSidebar': this.toggleSidebar(); break
@@ -175,7 +182,7 @@ export const menuCommandsMethods = {
       case 'shareFile': await this.menuShareFile(); break
 
       // —— 导航
-      case 'quickOpen': this.quickOpenVisible = true; break
+      case 'quickOpen': if (this.isLooseWorkspace) this.openProjectsPane(); else this.quickOpenVisible = true; break
       case 'commandPalette': this.commandPaletteVisible = true; break
       case 'goProjectHome': this.goProjectHome(); break
       case 'goAllProjects': this.goAllProjects(); break

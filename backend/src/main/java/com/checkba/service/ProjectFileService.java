@@ -27,7 +27,13 @@ import java.util.UUID;
 @Service
 public class ProjectFileService {
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private DdOriginalGuard ddOriginalGuard;
+
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProjectFileService.class);
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.service.mobile.CloudStorageQuotaService cloudStorageQuota;
 
     private final ProjectFileRepository projectFileRepository;
     private final ProjectRagService projectRagService;
@@ -98,6 +104,15 @@ public class ProjectFileService {
             throw new IllegalArgumentException(LangText.of("项目 ID 不能为空", "Project ID must not be empty"));
         }
         return projectFileRepository.findByProjectIdOrderBySortOrderAsc(projectId);
+    }
+
+    /** 按需读取标签快照中的文件，范围约束由数据库执行，不扫描完整文件树。 */
+    public List<ProjectFile> getFilesByIds(Long projectId, List<Long> fileIds) {
+        if (projectId == null) {
+            throw new IllegalArgumentException(LangText.of("项目 ID 不能为空", "Project ID must not be empty"));
+        }
+        if (fileIds.isEmpty()) return List.of();
+        return projectFileRepository.findByProjectIdAndIdInAndIsDeletedFalse(projectId, fileIds);
     }
 
     /**
@@ -249,6 +264,15 @@ public class ProjectFileService {
         Optional<ProjectFile> existing = projectFileRepository.findByProjectIdAndParentIdAndNameAndIsDeletedFalse(projectId, parentId, name);
         if (existing.isPresent()) {
             ProjectFile f = existing.get();
+            requireManagedFile(f);
+            if (cloudStorageQuota != null && cloudStorageQuota.isEnabled()) {
+                cloudStorageQuota.lockFileForWrite(f);
+                // Metadata updates cannot hide physical bytes or orphan the previous storage key.
+                if (StringUtils.hasText(filePath) && !Objects.equals(f.getFilePath(), requireProjectScopedPath(projectId, filePath))) {
+                    throw new IllegalArgumentException("Use the file move operation to change a cloud storage path");
+                }
+                fileSize = cloudStorageQuota.measuredBytes(f);
+            }
             f.setFileSize(fileSize);
             f.setUpdatedAt(LocalDateTime.now());
             // If wpsFileId is provided, update it (or keep existing if new is null?? usually overwrite)
@@ -309,6 +333,8 @@ public class ProjectFileService {
             throw new IllegalArgumentException(LangText.of("该文件夹下已存在同名文件: ", "A file with this name already exists: ") + finalName);
         }
 
+        if (cloudStorageQuota != null) cloudStorageQuota.requireProjectCapacity(projectId, fileSize == null ? 0 : fileSize);
+
         // 获取当前父文件夹下的最大排序序号（单条聚合查询，见 ProjectFileRepository.maxSortOrder）
         Integer maxSortOrder = projectFileRepository.maxSortOrder(projectId, parentId);
 
@@ -337,10 +363,20 @@ public class ProjectFileService {
         // 从模板物化物理文件。此前这里调的是 load()——靠「读不到就造一个」的副作用来建文件，
         // 于是读路径也被迫保留那个副作用，任何一份正文丢失的文档都会被静默读成空白模板。
         // 建与读拆开后，这里明确表达「创建」，load() 得以回归纯读（文件不存在就报错）。
+        boolean officialCloud = cloudStorageQuota != null && cloudStorageQuota.isEnabled();
+        boolean existedBeforeTemplate = officialCloud && storageServiceFactory.getStorageService().exists(filePath);
+        if (officialCloud && !existedBeforeTemplate) removeNewCloudFileOnRollback(projectId, filePath);
         try {
             storageServiceFactory.getStorageService().createFromTemplate(filePath);
+            if (officialCloud) cloudStorageQuota.requireCurrentProjectUsage(projectId);
             log.info("物理文件创建成功: {}", filePath);
         } catch (Exception e) {
+            if (officialCloud) {
+                if (!existedBeforeTemplate && storageServiceFactory.getStorageService().exists(filePath)) {
+                    storageServiceFactory.getStorageService().delete(filePath);
+                }
+                throw e;
+            }
             log.warn("物理文件创建失败（首次保存时会重新写入）: {}", filePath, e);
         }
 
@@ -376,6 +412,7 @@ public class ProjectFileService {
             throw new IllegalArgumentException(LangText.of("比对稿不是有效的 DOCX 文档", "The comparison is not a valid DOCX document"), e);
         }
         requireWithinProjectSizeLimit(projectId, bytes.length);
+        if (cloudStorageQuota != null) cloudStorageQuota.requireProjectCapacity(projectId, bytes.length);
         String name = resolveConflictingName(projectId, parentId, comparisonStem(base.getName())
                 + LangText.of("与", " vs ") + comparisonStem(revised.getName()) + LangText.of("（比对稿）.docx", " (comparison).docx"));
         validateNodeName(name);
@@ -502,6 +539,7 @@ public class ProjectFileService {
     public ProjectFile importLocalFile(Long projectId, Long parentId, String sourcePath, Long userId) {
         java.nio.file.Path source = resolveImportSource(projectId, userId, sourcePath);
         if (!java.nio.file.Files.isRegularFile(source, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+            throwIfSourceAccessDenied(source, sourcePath);
             // 目录与不存在的路径都落在这里：这个入口一次只收一个普通文件（目录走 importLocalPath）
             throw new IllegalArgumentException(LangText.of("源文件不存在或不是普通文件: ", "Source file does not exist or is not a regular file: ") + sourcePath);
         }
@@ -627,7 +665,32 @@ public class ProjectFileService {
         if (java.nio.file.Files.isDirectory(source, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
             return importLocalDirectory(projectId, parentId, source, userId);
         }
+        throwIfSourceAccessDenied(source, sourcePath);
         throw new IllegalArgumentException(LangText.of("源文件不存在或不是普通文件: ", "Source file does not exist or is not a regular file: ") + sourcePath);
+    }
+
+    private static void throwIfSourceAccessDenied(java.nio.file.Path source, String sourcePath) {
+        try {
+            java.nio.file.Files.readAttributes(
+                    source,
+                    java.nio.file.attribute.BasicFileAttributes.class,
+                    java.nio.file.LinkOption.NOFOLLOW_LINKS);
+        } catch (java.nio.file.AccessDeniedException e) {
+            throw new IllegalArgumentException(LangText.of(
+                    "无权读取源文件（请在 macOS「系统设置 → 隐私与安全性 → 完全磁盘访问权限」中开启 AI WorkDeck）: ",
+                    "Permission denied reading source file (grant Full Disk Access to AI WorkDeck in macOS System Settings): ")
+                    + sourcePath);
+        } catch (java.nio.file.FileSystemException e) {
+            String reason = e.getReason() != null ? e.getReason() : e.getMessage();
+            if (reason != null && (reason.contains("Operation not permitted") || reason.contains("Permission denied"))) {
+                throw new IllegalArgumentException(LangText.of(
+                        "无权读取源文件（请在 macOS「系统设置 → 隐私与安全性 → 完全磁盘访问权限」中开启 AI WorkDeck）: ",
+                        "Permission denied reading source file (grant Full Disk Access to AI WorkDeck in macOS System Settings): ")
+                        + sourcePath);
+            }
+        } catch (Exception ignored) {
+            // NoSuchFileException 等按原有的「源文件不存在或不是普通文件」处理
+        }
     }
 
     /**
@@ -782,6 +845,10 @@ public class ProjectFileService {
         ProjectFile file = projectFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException(LangText.of("文件不存在: ", "File not found: ") + fileId));
 
+        requireManagedFile(file);
+
+        if (cloudStorageQuota != null) cloudStorageQuota.lockFileForWrite(file);
+
         // 权限检查已移至 Controller 层，这里不再检查创建者身份
 
         String oldName = file.getName();
@@ -859,6 +926,7 @@ public class ProjectFileService {
     public ProjectFile relinkExternallyMoved(Long fileId, Long newParentId, String newName, String logicalPath, Long userId) {
         ProjectFile file = projectFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException(LangText.of("文件不存在: ", "File not found: ") + fileId));
+        requireManagedFile(file);
         file.setParentId(newParentId);
         file.setName(newName);
         file.setFilePath(requireProjectScopedPath(file.getProjectId(), logicalPath));
@@ -889,6 +957,7 @@ public class ProjectFileService {
     }
 
     private void softDeleteRecursive(ProjectFile file) {
+        requireManagedFile(file);
         // 如果是文件夹，递归软删除子文件
         if (Boolean.TRUE.equals(file.getIsFolder())) {
             List<ProjectFile> children = projectFileRepository.findByProjectIdAndParentIdAndIsDeletedFalseOrderBySortOrderAsc(
@@ -923,6 +992,7 @@ public class ProjectFileService {
         }
 
         // 权限检查已移至 Controller 层，这里不再检查创建者身份
+        if (cloudStorageQuota != null) cloudStorageQuota.lockFileForWrite(file);
         purgeRecursive(file, true);
     }
 
@@ -933,7 +1003,8 @@ public class ProjectFileService {
      */
     @Transactional
     public void permDelete(Long fileId, Long userId, boolean diskHandled) {
-        if (!diskHandled) {
+        if (!diskHandled || (cloudStorageQuota != null && cloudStorageQuota.isEnabled())) {
+            // A client cannot attest that bytes on the official cloud disk have been deleted.
             permDelete(fileId, userId);
             return;
         }
@@ -959,6 +1030,7 @@ public class ProjectFileService {
         if (file == null || storageResolver == null) {
             return List.of();
         }
+        requireManagedFile(file);
         List<java.nio.file.Path> resolved = new ArrayList<>();
         for (String key : collectPhysicalTargets(file)) {
             resolved.add(storageResolver.resolve(key));
@@ -993,10 +1065,18 @@ public class ProjectFileService {
 
     /** 递归移除行（子孙含已软删除的，否则删不干净）；deletePhysical=false 时一个字节都不碰磁盘。 */
     private void purgeRecursive(ProjectFile file, boolean deletePhysical) {
+        requireManagedFile(file);
         if (deletePhysical) {
             deletePhysicalTargets(collectPhysicalTargets(file));
         }
         purgeRows(file);
+    }
+
+    private void requireManagedFile(ProjectFile file) {
+        if (ddOriginalGuard != null) ddOriginalGuard.requireMutableTree(file);
+        if (StringUtils.hasText(file.getExternalPath())) throw new IllegalArgumentException(LangText.of(
+                "独立文件请在 Finder 或资源管理器中移动、改名或删除",
+                "Move, rename or delete standalone files in Finder or File Explorer"));
     }
 
     /** 这一行在磁盘上对应的逻辑路径：文件取 filePath，文件夹按祖先链现拼。 */
@@ -1039,6 +1119,9 @@ public class ProjectFileService {
                 storageServiceFactory.getStorageService().delete(path);
                 log.info("物理文件/文件夹彻底删除成功: path={}", path);
             } catch (Exception e) {
+                if (cloudStorageQuota != null && cloudStorageQuota.isEnabled()) {
+                    throw new IllegalStateException("Cloud file deletion failed; retaining its storage record", e);
+                }
                 log.warn("物理文件/文件夹彻底删除失败，继续删除数据库记录: path={}", path, e);
             }
         }
@@ -1165,6 +1248,10 @@ public class ProjectFileService {
 
         ProjectFile file = projectFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException(LangText.of("文件不存在: ", "File not found: ") + fileId));
+
+        requireManagedFile(file);
+
+        if (cloudStorageQuota != null) cloudStorageQuota.lockFileForWrite(file);
 
         // 权限检查已移至 Controller 层，这里不再检查创建者身份
 
@@ -1389,6 +1476,10 @@ public class ProjectFileService {
         }
 
         // file
+        if (cloudStorageQuota != null && cloudStorageQuota.isEnabled()) {
+            cloudStorageQuota.lockFileForWrite(source);
+            cloudStorageQuota.requireProjectCapacity(projectId, cloudStorageQuota.measuredBytes(source));
+        }
         String desiredName = source.getName();
         if (Objects.equals(source.getParentId(), targetParentId)) {
             desiredName = LangText.of("【副本】", "Copy of ") + desiredName;
@@ -1412,13 +1503,28 @@ public class ProjectFileService {
 
         // copy physical
         if (StringUtils.hasText(source.getFilePath())) {
+            boolean officialCloud = cloudStorageQuota != null && cloudStorageQuota.isEnabled();
+            if (officialCloud) removeNewCloudFileOnRollback(projectId, newPath);
             try {
                 copyPhysicalFile(source.getFilePath(), newPath);
             } catch (Exception e) {
+                if (officialCloud) throw new IllegalStateException("Cloud file copy failed", e);
                 log.warn("复制物理文件失败: sourcePath={}, targetPath={}", source.getFilePath(), newPath, e);
             }
         }
         return saved;
+    }
+
+    private void removeNewCloudFileOnRollback(Long projectId, String path) {
+        if (!org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) return;
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override public void afterCompletion(int status) {
+                        if (status == STATUS_COMMITTED) return;
+                        try { cloudStorageQuota.removeRolledBackFile(projectId, path); }
+                        catch (Exception e) { log.error("Cloud rollback could not remove new file: {}", path, e); }
+                    }
+                });
     }
 
     private String resolveUniqueName(Long projectId, Long parentId, String desiredName) {
@@ -1461,6 +1567,8 @@ public class ProjectFileService {
      * 通过读取旧文件、写入新位置、删除旧文件来实现
      */
     private void movePhysicalFile(String oldPath, String newPath) throws Exception {
+        // 同目录排序没有路径变化，不能把原文件复制到自身后再删除。
+        if (Objects.equals(oldPath, newPath)) return;
         try {
             // 读取旧文件
             var resource = storageServiceFactory.getStorageService().load(oldPath);
@@ -1646,6 +1754,10 @@ public class ProjectFileService {
             throw new IllegalStateException("文件没有存储路径: " + fileId);
         }
         byte[] bytes = (text == null ? "" : text).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        if (cloudStorageQuota != null) {
+            cloudStorageQuota.requireFileCapacity(file, bytes.length, false);
+            key = StringUtils.hasText(file.getFilePath()) ? file.getFilePath() : file.getWpsFileId();
+        }
         storageServiceFactory.getStorageService().save(key, new java.io.ByteArrayInputStream(bytes));
         file.setFileSize((long) bytes.length);
         file.setUpdatedAt(LocalDateTime.now());
@@ -1809,6 +1921,8 @@ public class ProjectFileService {
         if (existing.isPresent()) {
             // 更新内容
             ProjectFile file = existing.get();
+            if (cloudStorageQuota != null) cloudStorageQuota.requireFileCapacity(file,
+                    content.getBytes(java.nio.charset.StandardCharsets.UTF_8).length, false);
             try {
                 // 更新物理文件
                 storageServiceFactory.getStorageService().save(file.getFilePath(), new java.io.ByteArrayInputStream(content.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
@@ -1821,6 +1935,8 @@ public class ProjectFileService {
             }
         } else {
             // 创建新文件
+            if (cloudStorageQuota != null) cloudStorageQuota.requireProjectCapacity(projectId,
+                    content.getBytes(java.nio.charset.StandardCharsets.UTF_8).length);
             String logicalPath = "AI Assistant Files/" + convFolder.getName() + "/" + finalName;
             String physicalPath = buildPhysicalPath(projectId, convFolder.getId(), finalName);
             
@@ -1963,6 +2079,168 @@ public class ProjectFileService {
     private static final long MAX_ARCHIVE_BYTES = 1024L * 1024 * 1024;      // 整包载入内存，1GB 上限
     private static final long MAX_EXTRACT_TOTAL = 8L * 1024 * 1024 * 1024;  // 解压后总量上限（防 zip bomb）
     private static final int MAX_ARCHIVE_ENTRIES = 5000;
+    private static final int MAX_ARCHIVE_ENTRY_BYTES = 128 * 1024 * 1024;
+
+    public record ArchiveEntryContent(String name, byte[] bytes) { }
+
+    /** Read one entry without importing it into the project. Never trust the declared size alone. */
+    public ArchiveEntryContent readArchiveEntry(Long fileId, String path) {
+        String requested = normalizeEntryPath(path);
+        if (requested == null) throw new IllegalArgumentException(LangText.of("请选择压缩包内的文件", "Select a file in the archive"));
+        ProjectFile archive = getFile(fileId);
+        if (Boolean.TRUE.equals(archive.getIsDeleted())) {
+            throw new IllegalArgumentException(LangText.of("压缩包已被删除", "The archive has been deleted"));
+        }
+        ArchiveEntryContent[] result = { null };
+        int[] count = { 0 };
+        try {
+            walkArchiveEntry(archive, (raw, dir, size, content) -> {
+                if (++count[0] > MAX_ARCHIVE_ENTRIES) {
+                    throw new IllegalArgumentException(LangText.of("压缩包条目过多", "Too many entries in the archive"));
+                }
+                String normalized = normalizeEntryPath(raw);
+                if (!requested.equals(normalized)) return;
+                if (result[0] != null) {
+                    throw new IllegalArgumentException(LangText.of("压缩包内存在重复路径，无法确定文件", "The archive contains an ambiguous duplicate path"));
+                }
+                if (dir || content == null) {
+                    throw new IllegalArgumentException(LangText.of("请先解压文件夹，再预览或拖拽其中的文件", "Extract the folder before previewing or dragging its files"));
+                }
+                if (size > MAX_ARCHIVE_ENTRY_BYTES) throw archiveEntryTooLarge();
+                try (java.io.InputStream in = content.call()) {
+                    result[0] = new ArchiveEntryContent(normalized.substring(normalized.lastIndexOf('/') + 1),
+                            readArchiveEntryBytes(in));
+                }
+            });
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException(archiveErrorMessage(e), e);
+        }
+        if (result[0] == null) throw new IllegalArgumentException(LangText.of("压缩包中找不到该文件", "File not found in the archive"));
+        return result[0];
+    }
+
+    /** Local ZIPs are seekable: previewing a photo must not load the entire archive into memory. */
+    private void walkArchiveEntry(ProjectFile archive, ArchiveVisitor visitor) throws Exception {
+        if ("zip".equals(archiveType(archive))) {
+            var resource = storageServiceFactory.getStorageService().load(archive.getFilePath());
+            if (resource.isFile()) {
+                java.nio.file.Path archivePath = resource.getFile().toPath();
+                if (java.nio.file.Files.size(archivePath) > MAX_ARCHIVE_BYTES) {
+                    throw new IllegalArgumentException(LangText.of("压缩包过大（上限 1GB）", "Archive too large (limit 1GB)"));
+                }
+                try (var zip = org.apache.commons.compress.archivers.zip.ZipFile.builder()
+                        .setPath(archivePath).setCharset(java.nio.charset.StandardCharsets.UTF_8).get()) {
+                    var entries = zip.getEntries();
+                    while (entries.hasMoreElements()) {
+                        var entry = entries.nextElement();
+                        visitor.visit(zipEntryName(entry), entry.isDirectory(), entry.getSize(), () -> zip.getInputStream(entry));
+                    }
+                }
+                return;
+            }
+        }
+        walkArchive(archiveType(archive), loadArchiveBytes(archive), visitor);
+    }
+
+    private byte[] readArchiveEntryBytes(java.io.InputStream in) throws java.io.IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int read;
+        while ((read = in.read(buffer)) != -1) {
+            if ((long) out.size() + read > MAX_ARCHIVE_ENTRY_BYTES) throw archiveEntryTooLarge();
+            out.write(buffer, 0, read);
+        }
+        return out.toByteArray();
+    }
+
+    private IllegalArgumentException archiveEntryTooLarge() {
+        return new IllegalArgumentException(LangText.of(
+                "单个文件超过 128MB，请先解压后操作", "This file exceeds 128MB; extract the archive first"));
+    }
+
+    /** Publish a complete new file without overwriting an unindexed file already on disk. */
+    @Transactional
+    public ProjectFile importArchiveEntry(Long projectId, Long fileId, String path, Long parentId, Long userId) {
+        if (projectId == null || userId == null) throw new IllegalArgumentException("Project and user are required");
+        ProjectFile archive = getFile(fileId);
+        if (!projectId.equals(archive.getProjectId())) throw new IllegalArgumentException(LangText.of("文件不属于该项目", "This file does not belong to this project"));
+        parentId = resolveParentId(projectId, parentId);
+        ArchiveEntryContent entry = readArchiveEntry(fileId, path);
+        String name = entry.name().trim();
+        validateNodeName(name);
+        if (projectFileRepository.existsByProjectIdAndParentIdAndNameAndIdNot(projectId, parentId, name, -1L)) {
+            throw new IllegalArgumentException(LangText.of("该文件夹下已存在同名文件: ", "A file with this name already exists: ") + name);
+        }
+        requireWithinProjectSizeLimit(projectId, entry.bytes().length);
+        if (cloudStorageQuota != null) cloudStorageQuota.requireProjectCapacity(projectId, entry.bytes().length);
+        int dot = name.lastIndexOf('.');
+        String ext = dot > 0 ? name.substring(dot + 1).toLowerCase(java.util.Locale.ROOT) : "";
+        if (ext.length() > 32) ext = ext.substring(0, 32);
+        String target = requireProjectScopedPath(projectId, buildPhysicalPath(projectId, parentId, name));
+        String staging = "projects/" + projectId + "/.awd/archive-" + UUID.randomUUID() + ".tmp";
+        var storage = storageServiceFactory.getStorageService();
+        boolean[] published = {false};
+        boolean transactional = org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive();
+        if (transactional) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override public void afterCommit() {
+                            try {
+                                if (transactionManager == null) { signalChange(projectId, userId); return; }
+                                var tx = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+                                tx.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                                tx.executeWithoutResult(status -> signalChange(projectId, userId));
+                            } catch (RuntimeException e) {
+                                log.warn("归档文件已导入，版本变更信号失败", e);
+                            }
+                        }
+                        @Override public void afterCompletion(int status) {
+                            if (status != STATUS_COMMITTED && published[0]) cleanupArchiveImport(target);
+                            cleanupArchiveImport(staging);
+                        }
+                    });
+        }
+        try {
+            storage.save(staging, new java.io.ByteArrayInputStream(entry.bytes()));
+            // moveNew is the no-overwrite boundary, including files Finder has created since the last scan.
+            storage.moveNew(staging, target);
+            published[0] = true;
+            ProjectFile created = new ProjectFile();
+            created.setProjectId(projectId);
+            created.setParentId(parentId);
+            created.setIsFolder(false);
+            created.setName(name);
+            created.setFileType(ext);
+            created.setFileSize((long) entry.bytes().length);
+            created.setFilePath(target);
+            created.setWpsFileId(generateWpsFileId(projectId));
+            Integer order = projectFileRepository.maxSortOrder(projectId, parentId);
+            created.setSortOrder((order == null ? -1 : order) + 1);
+            created.setUserId(userId);
+            created.setCreatedAt(LocalDateTime.now());
+            created.setUpdatedAt(LocalDateTime.now());
+            ProjectFile saved = projectFileRepository.saveAndFlush(created);
+            if (!transactional) signalChange(projectId, userId);
+            return saved;
+        } catch (RuntimeException e) {
+            if (published[0]) { cleanupArchiveImport(target); published[0] = false; }
+            cleanupArchiveImport(staging);
+            if (e instanceof com.checkba.storage.StorageException) {
+                if (e.getCause() instanceof java.nio.file.FileAlreadyExistsException) {
+                    throw new IllegalArgumentException(LangText.of("目标目录已有同名文件，未覆盖: ", "The destination already contains this file; it was not overwritten: ") + name, e);
+                }
+                throw new IllegalArgumentException(LangText.of("保存解压文件失败，请重试", "Failed to save the extracted file; please retry"), e);
+            }
+            throw e;
+        }
+    }
+
+    private void cleanupArchiveImport(String path) {
+        try { storageServiceFactory.getStorageService().delete(path); }
+        catch (RuntimeException e) { log.warn("清理未完成的归档导入文件失败", e); }
+    }
 
     /** 条目访问器：list 与 extract 共用同一套格式遍历逻辑。content 仅文件条目非 null。 */
     private interface ArchiveVisitor {
@@ -2089,6 +2367,9 @@ public class ProjectFileService {
     private String normalizeEntryPath(String raw) {
         if (raw == null) return null;
         String p = raw.replace('\\', '/');
+        if (p.startsWith("/") || p.matches("^[A-Za-z]:.*") || p.chars().anyMatch(c -> c < 32 || c == 127)) {
+            throw new IllegalArgumentException(LangText.of("压缩包含非法路径: ", "Archive contains an invalid path: ") + raw);
+        }
         List<String> segs = new ArrayList<>();
         for (String s : p.split("/")) {
             String seg = s.trim();
@@ -2236,4 +2517,3 @@ public class ProjectFileService {
         }
     }
 }
-

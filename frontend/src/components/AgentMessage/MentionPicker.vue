@@ -29,7 +29,7 @@
           <text v-if="item.roleLabel || item.role" class="mp-path">{{ item.roleLabel || item.role }}</text>
         </template>
         <template v-else>
-          <image class="mp-icon" :src="item.isDir ? '/static/folder-closed.png' : '/static/document.png'" mode="aspectFit" />
+          <image class="mp-icon" :src="item.isDir ? folderIcon : documentIcon" mode="aspectFit" />
           <text class="mp-name">{{ item.name }}</text>
           <text v-if="item.dirLabel" class="mp-path">{{ item.dirLabel }}</text>
         </template>
@@ -57,6 +57,8 @@
 // 缺省为空数组，chat 的两处调用不传，行为不变。title/hint/emptyText/placement 同理可选。
 import { matchProjectFiles } from '@/utils/aiContextFiles.js'
 import { matchMembers, memberName } from '@/components/calendar/mentionText.js'
+import folderIcon from '@/static/folder-closed.png'
+import documentIcon from '@/static/document.png'
 
 export default {
   name: 'MentionPicker',
@@ -74,7 +76,7 @@ export default {
   },
   emits: ['select'],
   data() {
-    return { activeIndex: 0 }
+    return { activeIndex: 0, folderIcon, documentIcon }
   },
   computed: {
     matches() {
@@ -118,8 +120,8 @@ export default {
   z-index: 60;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
-  box-shadow: 0 8px 28px rgba(18, 52, 77, 0.14);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-lg);
   overflow: hidden;
 }
 
@@ -137,7 +139,7 @@ export default {
   line-height: 18px;
   border-radius: 50%;
   text-align: center;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-accent-text);
   background: var(--awd-accent-soft);
@@ -153,13 +155,13 @@ export default {
 }
 
 .mp-title {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 500;
   color: var(--awd-text-2);
 }
 
 .mp-hint {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   white-space: nowrap;
   overflow: hidden;
@@ -189,7 +191,7 @@ export default {
 }
 
 .mp-name {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   white-space: nowrap;
   overflow: hidden;
@@ -197,7 +199,7 @@ export default {
 }
 
 .mp-path {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   white-space: nowrap;
   overflow: hidden;
@@ -208,7 +210,7 @@ export default {
 
 .mp-empty {
   padding: 14px 12px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   text-align: center;
 }

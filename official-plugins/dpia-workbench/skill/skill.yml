@@ -1,0 +1,15 @@
+id: dpia-assessment
+name: DPIA 评估工作台
+name_en: DPIA Assessment Workbench
+description: 在 DPIA 工作台发起的专用会话中，沿用冻结材料、来源与版本，执行 GDPR 数据保护影响评估和报告。
+description_en: Execute GDPR Data Protection Impact Assessments and generate reports in dedicated sessions launched from the DPIA Workbench using frozen materials, sources, and versions.
+version: 1.0.0
+enabled_by_default: false
+languages: [zh-CN]
+triggers: [DPIA工作台, DPIA 工作台]
+tool_policy: restrict
+allowed_tools:
+  - dpia_workbench_task
+  - search_web
+  - browse_url
+prompt: prompt.md

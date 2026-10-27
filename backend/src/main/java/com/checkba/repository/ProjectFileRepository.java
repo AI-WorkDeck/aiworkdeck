@@ -12,6 +12,21 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ProjectFileRepository extends JpaRepository<ProjectFile, Long> {
+    /** Content publication must not merge a stale path/deletion state back over a concurrent move. */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE ProjectFile p SET p.fileSize = COALESCE(:size, p.fileSize), p.updatedAt = COALESCE(:modifiedAt, p.updatedAt) "
+            + "WHERE p.id = :id AND p.projectId = :projectId AND p.filePath = :path AND p.isDeleted = false")
+    int updateContentMetadataIfCurrent(Long id, Long projectId, String path, Long size, java.time.LocalDateTime modifiedAt);
+
+    Optional<ProjectFile> findFirstByProjectIdAndExternalPathAndIsDeletedFalse(Long projectId, String externalPath);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("UPDATE ProjectFile p SET p.uid = :uid WHERE p.id = :id AND ((:previous IS NULL AND p.uid IS NULL) OR p.uid = :previous)")
+    int assignCatalogUidIfUnchanged(Long id, String previous, String uid);
+
+    @org.springframework.data.jpa.repository.Query("SELECT p.uid FROM ProjectFile p WHERE p.id = :id")
+    String readCatalogUid(Long id);
+
     /**
      * 根据项目 ID 查询所有文件（包含已删除），用于文件树清单采集
      */
@@ -48,6 +63,9 @@ public interface ProjectFileRepository extends JpaRepository<ProjectFile, Long> 
      * 根据项目 ID 查询所有文件（排除已删除）
      */
     List<ProjectFile> findByProjectIdAndIsDeletedFalseOrderBySortOrderAsc(Long projectId);
+
+    /** 少量标签恢复只读取给定 ID，不加载完整项目文件清单。 */
+    List<ProjectFile> findByProjectIdAndIdInAndIsDeletedFalse(Long projectId, List<Long> fileIds);
     
     @org.springframework.data.jpa.repository.Query("SELECT pf FROM ProjectFile pf WHERE pf.projectId = :projectId AND pf.isDeleted = false ORDER BY pf.sortOrder ASC")
     List<ProjectFile> findByProjectIdOrderBySortOrderAsc(Long projectId);
@@ -131,6 +149,10 @@ public interface ProjectFileRepository extends JpaRepository<ProjectFile, Long> 
      */
     @org.springframework.data.jpa.repository.Query("SELECT SUM(pf.fileSize) FROM ProjectFile pf WHERE pf.projectId = :projectId AND pf.isDeleted = false")
     Long sumSizeByProjectId(Long projectId);
+
+    // Include soft-deleted rows: trash still occupies physical storage until bytes are deleted.
+    @org.springframework.data.jpa.repository.Query("SELECT pf FROM ProjectFile pf WHERE pf.isFolder = false AND pf.projectId IN (SELECT p.id FROM Project p WHERE p.userId = :userId)")
+    List<ProjectFile> findCloudFilesByOwner(Long userId);
 
     /**
      * 根据物理文件路径查询

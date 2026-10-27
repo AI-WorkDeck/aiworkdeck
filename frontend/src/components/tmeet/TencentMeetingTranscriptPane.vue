@@ -16,7 +16,7 @@
             <text>{{ $t('tmeet.aiTodos') }}</text>
           </button>
           <button class="tmeet-pane-btn" :disabled="exporting" @tap="onExportDoc">
-            <text>{{ exporting ? '导出中…' : $t('tmeet.exportDoc') }}</text>
+            <text>{{ exporting ? $t('tmeet.exportingDoc') : $t('tmeet.exportDoc') }}</text>
           </button>
           <button class="tmeet-pane-btn" @tap="onCopyTranscript">
             <text>{{ copied ? $t('tmeet.copied') : $t('tmeet.copyTranscript') }}</text>
@@ -71,12 +71,13 @@
             class="tmeet-timeline-search"
             v-model="searchQuery"
             :placeholder="$t('tmeet.tabSearchPlaceholder')"
+            :aria-label="$t('tmeet.tabSearchPlaceholder')"
           />
         </view>
 
         <scroll-view class="tmeet-timeline-scroll" scroll-y>
           <view v-if="filteredParagraphs.length === 0" class="tmeet-pane-empty">
-            <text>{{ searchQuery ? '未找到匹配的发言内容' : $t('tmeet.noTranscript') }}</text>
+            <text>{{ searchQuery ? $t('tmeet.noMatchedSpeech') : $t('tmeet.noTranscript') }}</text>
           </view>
 
           <view class="tmeet-timeline">
@@ -97,7 +98,7 @@
                 </view>
               </view>
               <view class="tmeet-content-col">
-                <view class="tmeet-speaker-name">{{ p.speakerName || '发言人' }}</view>
+                <view class="tmeet-speaker-name">{{ p.speakerName || $t('tmeet.defaultSpeaker') }}</view>
                 <view class="tmeet-bubble">
                   <text class="tmeet-text">{{ p.text }}</text>
                 </view>
@@ -152,8 +153,7 @@ export default {
       exporting: false,
       copied: false,
       colorPalette: [
-        '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6',
-        '#ec4899', '#06b6d4', '#14b8a6', '#f97316'
+        'var(--awd-accent)', 'var(--awd-info-text)', 'var(--awd-warning-text)', 'var(--awd-text-2)'
       ]
     }
   },
@@ -217,11 +217,10 @@ export default {
       const rec = this.record || this.meeting
       try {
         const res = await getTmeetMinutesPrompt(rec.id)
-        const prompt = res && res.data ? res.data : `腾讯会议纪要：请根据腾讯会议「${rec.subject}」（recordId=${rec.id}）生成专业会议纪要。`
-        this.$emit('generate-minutes', { prompt, meeting: rec })
+        if (typeof res?.data?.prompt !== 'string' || !res.data.prompt.trim()) throw new Error('missing prompt')
+        this.$emit('generate-minutes', { prompt: res.data.prompt, meeting: rec })
       } catch (e) {
-        const prompt = `腾讯会议纪要：请根据腾讯会议「${rec.subject}」（recordId=${rec.id}）生成专业会议纪要。`
-        this.$emit('generate-minutes', { prompt, meeting: rec })
+        uni.showToast({ title: this.$t('tmeet.prepareFailed'), icon: 'none' })
       }
     },
 
@@ -229,18 +228,17 @@ export default {
       const rec = this.record || this.meeting
       try {
         const res = await getTmeetTodosPrompt(rec.id)
-        const prompt = res && res.data ? res.data : `腾讯会议待办：请提取腾讯会议「${rec.subject}」（recordId=${rec.id}）中的所有行动项（Action Items / ToDo List）。`
-        this.$emit('generate-todos', { prompt, meeting: rec })
+        if (typeof res?.data?.prompt !== 'string' || !res.data.prompt.trim()) throw new Error('missing prompt')
+        this.$emit('generate-todos', { prompt: res.data.prompt, meeting: rec })
       } catch (e) {
-        const prompt = `腾讯会议待办：请提取腾讯会议「${rec.subject}」（recordId=${rec.id}）中的所有行动项（Action Items / ToDo List）。`
-        this.$emit('generate-todos', { prompt, meeting: rec })
+        uni.showToast({ title: this.$t('tmeet.prepareFailed'), icon: 'none' })
       }
     },
 
     async onExportDoc() {
       const rec = this.record || this.meeting
       if (!this.projectId) {
-        uni.showToast({ title: '请先打开一个项目后再导出', icon: 'none' })
+        uni.showToast({ title: this.$t('tmeet.openProjectBeforeExport'), icon: 'none' })
         return
       }
       this.exporting = true
@@ -303,16 +301,16 @@ export default {
   flex-direction: column;
   height: 100%;
   width: 100%;
-  background: var(--color-bg-base, #ffffff);
-  color: var(--color-text-main, #0f172a);
+  background: var(--awd-surface);
+  color: var(--awd-text);
   box-sizing: border-box;
   overflow: hidden;
 }
 
 .tmeet-pane-header {
-  padding: 16px 20px 0;
-  border-bottom: 1px solid var(--color-border-card, #e2e8f0);
-  background: var(--color-bg-card, #ffffff);
+  padding: var(--awd-space-4) var(--awd-space-5) 0;
+  border-bottom: 1px solid var(--awd-border);
+  background: var(--awd-surface);
   flex-shrink: 0;
 }
 
@@ -320,89 +318,90 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: var(--awd-panel-pad-x);
 }
 
 .tmeet-pane-title {
-  font-size: 17px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
-  color: var(--color-text-main, #0f172a);
+  color: var(--awd-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
-  margin-right: 16px;
+  margin-right: var(--awd-space-4);
 }
 
 .tmeet-pane-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--awd-space-2);
   flex-shrink: 0;
 }
 
 .tmeet-pane-btn {
-  font-size: 12px;
-  padding: 5px 12px;
-  border-radius: 6px;
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #334155;
+  min-height: var(--awd-control-height);
+  font-size: var(--awd-panel-fs);
+  padding: 5px var(--awd-space-3);
+  border-radius: var(--awd-radius-md);
+  border: 1px solid var(--awd-border);
+  background: var(--awd-surface);
+  color: var(--awd-text);
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 4px;
-  transition: all 0.15s;
+  gap: var(--awd-space-1);
+  transition: background var(--awd-motion-fast), color var(--awd-motion-fast);
 }
 
 .tmeet-pane-btn:hover {
-  background: #f8fafc;
-  border-color: #94a3b8;
+  background: var(--awd-surface);
+  border-color: var(--awd-text-2);
 }
 
 .tmeet-pane-btn.primary {
-  background: #10b981;
-  border-color: #10b981;
-  color: #ffffff;
+  background: var(--awd-accent);
+  border-color: var(--awd-accent);
+  color: var(--awd-text-on-accent);
 }
 
 .tmeet-pane-btn.primary:hover {
-  background: #059669;
+  background: var(--awd-accent-hover);
 }
 
 .tmeet-pane-btn.accent {
-  background: #0ea5e9;
-  border-color: #0ea5e9;
-  color: #ffffff;
+  background: var(--awd-accent);
+  border-color: var(--awd-accent);
+  color: var(--awd-text-on-accent);
 }
 
 .tmeet-pane-btn.accent:hover {
-  background: #0284c7;
+  background: var(--awd-accent-hover);
 }
 
 .btn-icon {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
 }
 
 .tmeet-pane-meta-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: var(--awd-panel-pad-x);
+  margin-bottom: var(--awd-panel-gap-lg);
 }
 
 .tmeet-meta-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  background: #f1f5f9;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  color: #475569;
+  gap: var(--awd-space-1);
+  background: var(--awd-surface-2);
+  padding: 2px var(--awd-space-2);
+  border-radius: var(--awd-radius-sm);
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
 }
 
 .chip-label {
-  color: #94a3b8;
+  color: var(--awd-text-2);
 }
 
 .chip-val {
@@ -411,44 +410,44 @@ export default {
 
 .tmeet-section-tabs {
   display: flex;
-  gap: 20px;
+  gap: var(--awd-space-5);
 }
 
 .tmeet-tab-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 4px;
-  font-size: 13px;
+  gap: calc(var(--awd-space-3) / 2);
+  padding: var(--awd-space-2) var(--awd-space-1);
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
-  color: #64748b;
+  color: var(--awd-text-2);
   cursor: pointer;
   border-bottom: 2px solid transparent;
-  transition: all 0.2s;
+  transition: background var(--awd-motion-fast), color var(--awd-motion-fast);
 }
 
 .tmeet-tab-item:hover {
-  color: #1e293b;
+  color: var(--awd-text);
 }
 
 .tmeet-tab-item.active {
-  color: #10b981;
-  border-bottom-color: #10b981;
+  color: var(--awd-accent);
+  border-bottom-color: var(--awd-accent);
 }
 
 .tmeet-count-pill {
-  font-size: 10px;
-  background: #e2e8f0;
-  color: #475569;
-  padding: 1px 6px;
-  border-radius: 10px;
+  font-size: var(--awd-panel-fs-meta);
+  background: var(--awd-border);
+  color: var(--awd-text-2);
+  padding: 1px calc(var(--awd-space-3) / 2);
+  border-radius: var(--awd-radius-md);
 }
 
 .tmeet-dot-pill {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #10b981;
+  background: var(--awd-accent);
 }
 
 .tmeet-pane-body {
@@ -456,7 +455,7 @@ export default {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--color-bg-base, #ffffff);
+  background: var(--awd-surface);
 }
 
 .tmeet-timeline-container {
@@ -466,59 +465,62 @@ export default {
 }
 
 .tmeet-search-bar {
-  padding: 12px 20px;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
+  padding: var(--awd-space-3) var(--awd-space-5);
+  background: var(--awd-surface);
+  border-bottom: 1px solid var(--awd-border);
 }
 
 .tmeet-timeline-search {
+  height: var(--awd-control-height);
+  min-height: var(--awd-control-height);
+  box-sizing: border-box;
   width: 100%;
   max-width: 480px;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 12px;
+  background: var(--awd-surface);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-md);
+  padding: calc(var(--awd-space-3) / 2) var(--awd-space-3);
+  font-size: var(--awd-panel-fs);
   box-sizing: border-box;
 }
 
 .tmeet-timeline-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 20px;
+  padding: var(--awd-space-4) var(--awd-space-5);
   box-sizing: border-box;
 }
 
 .tmeet-pane-empty {
   text-align: center;
-  padding: 60px 20px;
-  color: #94a3b8;
-  font-size: 13px;
+  padding: 60px var(--awd-space-5);
+  color: var(--awd-text-2);
+  font-size: var(--awd-font-size-body);
 }
 
 .tmeet-timeline {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--awd-space-4);
   max-width: 900px;
   margin: 0 auto;
 }
 
 .tmeet-timeline-item {
   display: flex;
-  gap: 12px;
+  gap: var(--awd-space-3);
   align-items: flex-start;
 }
 
 .tmeet-time-col {
   width: 52px;
   flex-shrink: 0;
-  padding-top: 4px;
+  padding-top: var(--awd-space-1);
 }
 
 .tmeet-time-pill {
-  font-size: 11px;
-  color: #94a3b8;
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
   font-family: monospace;
 }
 
@@ -530,11 +532,11 @@ export default {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  color: #ffffff;
+  color: var(--awd-text-on-accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
 }
 
@@ -543,48 +545,48 @@ export default {
 }
 
 .tmeet-speaker-name {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
-  color: #475569;
-  margin-bottom: 4px;
+  color: var(--awd-text-2);
+  margin-bottom: var(--awd-space-1);
 }
 
 .tmeet-bubble {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 10px 14px;
+  background: var(--awd-surface);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-md);
+  padding: var(--awd-panel-pad-x) var(--awd-panel-gap-lg);
   display: inline-block;
   max-width: 100%;
 }
 
 .tmeet-text {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.6;
-  color: #1e293b;
+  color: var(--awd-text);
   word-break: break-word;
 }
 
 .tmeet-smart-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  padding: var(--awd-space-6);
   box-sizing: border-box;
 }
 
 .tmeet-smart-content {
   max-width: 800px;
   margin: 0 auto;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 24px;
+  background: var(--awd-surface);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-md);
+  padding: var(--awd-space-6);
 }
 
 .tmeet-markdown-block {
   line-height: 1.8;
-  font-size: 14px;
-  color: #334155;
+  font-size: var(--awd-font-size-body);
+  color: var(--awd-text);
   white-space: pre-wrap;
 }
 </style>

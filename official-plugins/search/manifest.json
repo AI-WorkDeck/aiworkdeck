@@ -1,0 +1,12 @@
+{
+  "id": "search",
+  "name": "项目搜索",
+  "version": "1.0.3",
+  "description": "按正文、标签搜索项目文件，并定位到文档。",
+  "author": "AI WorkDeck",
+  "permissions": ["file_read"],
+  "frontendEntry": "web/index.html",
+  "contributes": {
+    "views": [{ "id": "main", "name": "项目搜索", "entry": "web/index.html", "placement": "sidebar", "scope": "project", "defaultDock": "left", "allowedDocks": ["left"] }]
+  }
+}

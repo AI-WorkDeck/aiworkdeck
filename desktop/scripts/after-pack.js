@@ -86,13 +86,35 @@ function pruneFrameworkLocales(resourcesDir, keep = KEEP_LPROJ) {
     return { removed, keptCount, bytes };
 }
 
+// jlink emits some legal notices as 0444. Squirrel.Mac removes quarantine
+// before taking ownership; removexattr returns EACCES for these read-only files
+// even when they belong to the installing user (dev-board#1368).
+// Normalize only regular legal files before the enclosing app is signed.
+function makeJreLegalFilesOwnerWritable(dir) {
+    let changed = 0;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) changed += makeJreLegalFilesOwnerWritable(full);
+        else if (entry.isFile()) {
+            const mode = fs.statSync(full).mode & 0o7777;
+            if (!(mode & 0o200)) {
+                fs.chmodSync(full, mode | 0o200);
+                changed++;
+            }
+        }
+    }
+    return changed;
+}
+
 /** electron-builder afterPack 钩子。 */
 module.exports = async (context) => {
     if (context.electronPlatformName !== 'darwin') return;
 
+    const appDir = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
+    const writable = makeJreLegalFilesOwnerWritable(path.join(appDir, 'Contents/Resources/jre/legal'));
+    console.log(`  • prepare JRE legal permissions  ownerWritable=${writable}`);
     const resourcesDir = path.join(
-        context.appOutDir,
-        `${context.packager.appInfo.productFilename}.app`,
+        appDir,
         FRAMEWORK_RESOURCES,
     );
     const { removed, keptCount, bytes } = pruneFrameworkLocales(resourcesDir, KEEP_LPROJ);

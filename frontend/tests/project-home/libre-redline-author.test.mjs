@@ -22,6 +22,7 @@ import { createAuthorNameResolver } from '../../src/utils/editorAuthor.js'
 
 const SRC = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8')
 const BODY = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
   .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
 
 // 组件里 `import { getCurrentUser } from '@/utils/auth.js'`（本地缓存，同步）与
@@ -102,8 +103,8 @@ test('新建文档（后端 0 字节）：空白分支也要把署名下发给�
   const { vm, sent } = blankDocVm({ cached: { displayName: '韩泽伟' } })
   const loaded = await vm.loadDocument()
   assert.equal(loaded, false, '0 字节仍按新建空白文档处理，不换文档')
-  assert.deepEqual(sent, [['load_document', { authorName: '韩泽伟' }]],
-    '只补署名、不带 bytes——否则引擎一直端着 boot 时的空作者')
+  assert.deepEqual(sent, [['load_document', { bytes: new Uint8Array(0), name: 'newdocument.docx', authorName: '韩泽伟' }]],
+    '显式空字节可初始化空白文档，已有空白模型保持不变且署名更新')
   assert.equal(vm.selfAuthor, '韩泽伟', '引擎署名与审阅面板「我」这一桶必须同串')
 })
 
@@ -113,17 +114,25 @@ test('新建文档且名字要问后端：mounted 的解析先完成时，空白
   assert.deepEqual(sent, [])
   vm._endpointUp = true
   await vm.loadDocument()
-  assert.deepEqual(sent, [['load_document', { authorName: '本机用户' }]])
+  assert.deepEqual(sent, [['load_document', { bytes: new Uint8Array(0), name: 'newdocument.docx', authorName: '本机用户' }]])
 })
 
-test('新建文档、拿不到名字：不发空名字（保持引擎兜底），也不算装载失败', async () => {
+test('新建文档、拿不到名字：仍明确初始化空白文档，署名使用引擎兜底', async () => {
   const { vm, sent } = blankDocVm({ cached: null, fail: true })
   assert.equal(await vm.loadDocument(), false)
-  assert.deepEqual(sent, [])
+  assert.deepEqual(sent, [['load_document', { bytes: new Uint8Array(0), name: 'newdocument.docx', authorName: '' }]])
 })
 
 test('新建文档、署名下发失败：不把空白文档判成装载失败', async () => {
   const { vm } = blankDocVm({ cached: { displayName: '韩泽伟' } })
   vm.executor = { executeCommand: async () => { throw new Error('relay timeout') } }
   assert.equal(await vm.loadDocument(), false)
+})
+
+
+test('冷实例尚无模型：空文档初始化失败必须保留装载失败保护', async () => {
+  const { vm } = blankDocVm({ cached: null })
+  vm._initialDocument = true
+  vm.executor = { executeCommand: async () => ({ success: false, message: 'native load failed' }) }
+  await assert.rejects(vm.loadDocument(), /native load failed/)
 })

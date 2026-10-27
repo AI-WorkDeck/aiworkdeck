@@ -111,3 +111,18 @@ test('过短 / 静音本来就不自动提交，不必再问', async () => {
   await recordAndStop('silent-noask', { amplitude: 0, seconds: 7 })
   assert.equal(stubs.paidConfirmArgs().length, before)
 })
+
+test('plugin disposal while microphone permission is pending stops the late stream before recording', async () => {
+  installGlobals(0)
+  let resolveMic, stopped = 0
+  navigator.mediaDevices.getUserMedia = () => new Promise(resolve => { resolveMic = resolve })
+  const rec = await import(buildModuleUrl('cancel-start'))
+  const controller = new AbortController()
+  const pending = rec.startRecording('p1', undefined, { signal: controller.signal })
+  controller.abort()
+  resolveMic({ getTracks: () => [{ stop() { stopped++ } }] })
+  await assert.rejects(pending, { code: 'cancelled' })
+  assert.equal(stopped, 1)
+  assert.equal(rec.recorderState.status, 'idle')
+  assert.equal(rec.recorderState.meetingId, null)
+})

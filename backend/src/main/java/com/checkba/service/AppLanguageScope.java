@@ -3,7 +3,7 @@
 
 package com.checkba.service;
 
-import java.util.Locale;
+import com.checkba.util.AppLocale;
 
 /**
  * 「这一次请求 / 这一轮对话该说哪种语言」——应用语言的请求级作用域。
@@ -28,30 +28,14 @@ public final class AppLanguageScope {
     private AppLanguageScope() {
     }
 
-    /** 当前线程声明的语言（已归一为 zh-CN / en-US）；未声明返回 null。 */
+    /** 当前线程声明的语言（已归一为 20 个标准码之一）；未声明返回 null。 */
     public static String current() {
         return CURRENT.get();
     }
 
-    /**
-     * 归一化调用方给的语言串：{@code zh-CN} / {@code en-US} 原样，另外容忍
-     * {@code zh} / {@code en} / {@code zh_CN} / {@code en-GB} 这些客户端常见写法。
-     * 无法识别（含 null / 空白 / {@code ja-JP}）返回 null = 不覆盖，回落全局设置。
-     *
-     * <p>刻意只按前两位语言码判定而不是整串匹配：插件端的界面语言只有 zh / en 两档，
-     * 而 Office / 浏览器给出的 locale 形态五花八门（{@code en-GB}、{@code zh-Hant-TW}），
-     * 整串匹配会把它们全判成「不认识」，于是英文界面静默拿到中文回答。
-     */
+    /** 归一化为受支持的标准语种；无法识别时返回 null = 不覆盖，回落全局设置。 */
     public static String normalize(String raw) {
-        if (raw == null) return null;
-        String trimmed = raw.trim();
-        if (trimmed.isEmpty()) return null;
-        String primary = trimmed.replace('_', '-').toLowerCase(Locale.ROOT);
-        int dash = primary.indexOf('-');
-        if (dash > 0) primary = primary.substring(0, dash);
-        if ("zh".equals(primary)) return AppLanguageService.ZH_CN;
-        if ("en".equals(primary)) return AppLanguageService.EN_US;
-        return null;
+        return AppLocale.normalize(raw);
     }
 
     /**

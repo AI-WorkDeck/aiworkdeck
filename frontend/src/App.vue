@@ -6,14 +6,18 @@ import { openLocalRootPath, openLocalFilePath } from '@/utils/ideOpen.js'
 import { track } from '@/utils/telemetryClient.js'
 import { host, isDesktopHost } from '@/services/host.js'
 import { mountFeedbackWidget } from '@/utils/feedbackWidget.js'
+import { mountPermissionOnboarding } from '@/utils/permissionOnboarding.js'
 import { mountRecordingIndicator } from '@/utils/recordingIndicator.js'
 import { initWindowChrome, refreshDragStrip } from '@/utils/windowChrome.js'
 import { mountGlobalBack, refreshGlobalBack } from '@/utils/globalBack.js'
 import { initAppMenuBridge } from '@/utils/appMenuBridge.js'
-import { getAppLanguage, APP_LANGUAGE_EVENT } from '@/utils/appLanguage.js'
+import { getAppLanguage, setAppLanguage, isLanguageManuallyChosen, normalizeLocaleCode, APP_LANGUAGE_EVENT } from '@/utils/appLanguage.js'
+import { applyI18nLocale } from '@/i18n/index.js'
 import { initAppTheme } from '@/utils/appTheme.js'
 import { installModalFocusGuard } from '@/utils/modalFocusGuard.js'
-import { saveAppLanguageRemote } from '@/services/api.js'
+import { getAppLanguageRemote, saveAppLanguageRemote, prepareAgentRestart, abortAgentRestart } from '@/services/api.js'
+import { createDesktopQuitGuard, flushQuitWorkbenches, confirmQuitWorkbenches } from '@/utils/desktopQuitGuard.js'
+import { setGlobalOverlay } from '@/utils/overlayState.js'
 
 export default {
   onLaunch: function () {
@@ -27,18 +31,40 @@ export default {
     // 桌面主进程（菜单等原生文案）与后端 system_setting（prompt/文案语言）。
     // 之后语言切换（设置页 setAppLanguage）经 APP_LANGUAGE_EVENT 走同一条同步链。
     const syncLanguageMirrors = (lang) => {
-      try { if (host.appLanguage && host.appLanguage.set) host.appLanguage.set(lang) } catch (e) { /* ignore */ }
+      const canonical = normalizeLocaleCode(lang) || getAppLanguage()
+      try { if (host.appLanguage && host.appLanguage.set) host.appLanguage.set(canonical) } catch (e) { /* ignore */ }
       // fire-and-forget：后端没起来也不能拦启动，下次切换/启动会再补。
       // 浏览器态未登录时不发——POST 会回「未登录」，request 包装器据此清会话
       // 并 reLaunch 登录页，启动链会被这条后台同步搅乱；桌面 local-mode 恒可发。
       if (isDesktopHost() || getSessionId()) {
-        try { saveAppLanguageRemote(lang).catch(() => {}) } catch (e) { /* ignore */ }
+        try { saveAppLanguageRemote(canonical).catch(() => {}) } catch (e) { /* ignore */ }
       }
     }
-    syncLanguageMirrors(getAppLanguage())
+    const initialLang = getAppLanguage()
+    applyI18nLocale(initialLang)
+    syncLanguageMirrors(initialLang)
+    if ((isDesktopHost() || getSessionId()) && !isLanguageManuallyChosen()) {
+      try {
+        getAppLanguageRemote()
+          .then((res) => {
+            if (isLanguageManuallyChosen()) return
+            const payload = (res && res.data) || res || {}
+            const remoteLang = normalizeLocaleCode(
+              res && (res.language || res.appLanguage || payload.language || payload.geoLocale || res.geoLocale)
+            )
+            if (remoteLang && remoteLang !== getAppLanguage()) {
+              const resolved = setAppLanguage(remoteLang, { auto: true })
+              applyI18nLocale(resolved)
+            }
+          })
+          .catch(() => {})
+      } catch (e) { /* ignore */ }
+    }
     try { uni.$on(APP_LANGUAGE_EVENT, syncLanguageMirrors) } catch (e) { /* ignore */ }
     // 常驻反馈浮窗：挂在页面树之外，全应用一个实例（见 utils/feedbackWidget.js）
     mountFeedbackWidget()
+    // macOS 系统权限引导：首启自动排查关键权限，支持一键打开系统设置并弹出拖拽授权浮窗（dev-board#1433）
+    mountPermissionOnboarding()
     // 弹窗开着时键盘不许溜进被遮住的编辑器（dev-board#883）：自绘弹窗只有遮罩没有
     // 焦点圈，Tab 会把焦点送进编辑器 webview，字写进背景文档（见 utils/modalFocusGuard.js）
     installModalFocusGuard()
@@ -71,20 +97,88 @@ export default {
     // 应用菜单：命令表 → 菜单树的下发与动作派发全部收在 appMenuBridge 里。
     // App 级注册一次，天然避开 project-overview 的页面栈多实例问题。
     initAppMenuBridge()
+    let systemOpenPending = Promise.resolve()
+    let quitPreparationPending = Promise.resolve()
+    if (host.lifecycle?.onPrepareQuit) {
+      let reportQuitStage = () => {}
+      let awaitingChoice = false
+      const quitGuard = createDesktopQuitGuard({
+        prepare: prepareAgentRestart,
+        abort: abortAgentRestart,
+        flush: flushQuitWorkbenches,
+        confirm: confirmQuitWorkbenches,
+        progress: stage => {
+          awaitingChoice = stage === 'confirming'
+          if (awaitingChoice) uni.hideLoading()
+          else uni.showLoading({ title: this.$t('admin.quit' + (stage === 'pausing' ? 'Pausing' : 'Saving')), mask: true })
+          setGlobalOverlay(!awaitingChoice, 'desktop-quit')
+          return reportQuitStage(stage)
+        },
+        errorText: key => this.$t('admin.quitErrors.' + key),
+      })
+      let preparing = false
+      const releaseQuitOverlay = () => {
+        preparing = false
+        awaitingChoice = false
+        uni.hideLoading()
+        setGlobalOverlay(false, 'desktop-quit')
+      }
+      const cancel = async ({ windowHidden = false } = {}) => {
+        if (!preparing) return
+        let recoveryPending = false
+        try { recoveryPending = (await quitGuard.cancel())?.paused > 0 } catch (_) { recoveryPending = true }
+        releaseQuitOverlay()
+        // A completed window hide has no failing prepare call left to report recovery.
+        if (windowHidden && recoveryPending) {
+          uni.showModal({ title: this.$t('admin.quitStopped'), content: this.$t('admin.quitErrors.recoveryPending'), showCancel: false })
+        }
+      }
+      // Escape cancels a slow shutdown; ordinary input cannot dirty a saved editor.
+      window.addEventListener('keydown', event => {
+        if (!preparing || awaitingChoice) return
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        if (event.key === 'Escape') host.lifecycle.cancelQuit?.()
+      }, true)
+      host.lifecycle.onQuitCancelled?.(cancel)
+      host.lifecycle.onPrepareQuit(({ reportStage } = {}) => {
+        reportQuitStage = reportStage || (() => {})
+        uni.$emit('awd:cancel-restart-recovery')
+        preparing = true
+        setGlobalOverlay(true, 'desktop-quit')
+        const alreadyOpening = systemOpenPending
+        quitPreparationPending = (async () => {
+          await alreadyOpening
+          if (!preparing) return { ok: false, error: this.$t('admin.quitErrors.cancelled') }
+          const result = await quitGuard.prepare()
+          // Keep input blocked after ACK until the main process hides the window.
+          if (!result.ok) {
+            releaseQuitOverlay()
+            if (!result.cancelled) uni.showModal({ title: this.$t('admin.quitStopped'), content: result.error, showCancel: false })
+          }
+          return result
+        })()
+        return quitPreparationPending
+      })
+    }
     // Dock/访达「打开方式」进来的路径不是菜单命令，主进程直发，单独接。
     if (host.menu && host.menu.onAction) {
       host.menu.onAction(async (data) => {
         if (!data || data.action !== 'open-path' || !data.path) return
-        if (!getSessionId()) {
-          uni.showToast({ title: this.$t('shell.pleaseLoginFirst'), icon: 'none' })
-          return
-        }
-        try {
-          if (data.isDirectory) await openLocalRootPath(data.path)
-          else await openLocalFilePath(data.path)
-        } catch (e) {
-          uni.showToast({ title: (e && e.message) || this.$t('shell.menuActionFailed'), icon: 'none' })
-        }
+        const beforeOpen = Promise.all([systemOpenPending, quitPreparationPending])
+        systemOpenPending = (async () => {
+          await beforeOpen
+          uni.$emit('awd:cancel-restart-recovery')
+          try {
+            if (data.isDirectory) await openLocalRootPath(data.path)
+            else await openLocalFilePath(data.path)
+          } catch (e) {
+            uni.showToast({ title: (e && e.message) || this.$t('shell.menuActionFailed'), icon: 'none' })
+          } finally {
+            if (data.requestId) host.menu?.ackOpenPath?.(data.requestId)
+          }
+        })()
+        return systemOpenPending
       })
     }
     // IDE 化：拖一个文件夹到窗口任意位置 = 打开为项目（capture 段拦截，
@@ -105,7 +199,7 @@ export default {
           e.stopPropagation()
           const path = host.fs.getPathForFile(e.dataTransfer.files[0])
           if (!path) return
-          if (!getSessionId()) {
+          if (!isDesktopHost() && !getSessionId()) {
             uni.showToast({ title: this.$t('shell.pleaseLoginFirst'), icon: 'none' })
             return
           }
@@ -115,6 +209,7 @@ export default {
             confirmText: this.$t('shell.open'),
             success: (r) => {
               if (r.confirm) {
+                uni.$emit('awd:cancel-restart-recovery')
                 openLocalRootPath(path).catch((err) => {
                   uni.showToast({ title: (err && err.message) || this.$t('shell.openFolderFailed'), icon: 'none' })
                 })
@@ -139,7 +234,8 @@ export default {
 <style>
 /* AI WorkDeck Global Overrides */
 
-/* ============ 全局字体（dev-board#849） ============
+/* ============ 全局字体（dev-board#849） =====}
+
    此前全仓没有 html/body 字体规则：页面里的组件各自带字体没露馅，挂在 document.body
    上的 uni 弹层（<uni-toast>，以及接管前的 <uni-modal>）却直接掉到浏览器默认衬线字。
    字栈与 uni.scss 的 $awd-font-serif / $awd-font-sans / $awd-font-mono 逐字一致
@@ -157,7 +253,8 @@ uni-toast {
     font-family: var(--awd-font-sans);
 }
 
-/* ============ 颜色语义令牌（浅色/深色两套取值） ============
+/* ============ 颜色语义令牌（浅色/深色两套取值） =====}
+
    改造前全前端有 3950 处硬编码颜色、435 种色值，文字/背景/边框各自混着四套
    并行灰阶（Bootstrap 的 #6C757D/#ADB5BD、Tailwind slate 的 #64748B/#94A3B8、
    Tailwind gray 的 #6B7280/#D1D5DB，外加 #333/#666/#999 遗留）。收敛成下面这
@@ -247,6 +344,12 @@ html[data-theme='light'] {
     --awd-file-pdf: #D93025;
     --awd-file-md: #6B7280;
     --awd-file-image: #7C3AED;
+    /* 宋韵精工（Neo-Oriental Editorial）建筑层次与高光令牌 */
+    --awd-surface-elevated: #FFFFFF;
+    --awd-specular: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    --awd-shadow-island: 0 2px 10px rgba(42, 38, 30, 0.05), 0 0 0 1px rgba(46, 42, 34, 0.09);
+    --awd-shadow-card: 0 1px 3px rgba(42, 38, 30, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    --awd-shadow-btn: 0 1px 2px rgba(42, 38, 30, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.85);
     color-scheme: light;
 }
 
@@ -331,6 +434,12 @@ html[data-theme='dark'] {
     --awd-file-pdf: #FF8A80;
     --awd-file-md: #A6ADB4;
     --awd-file-image: #A78BFA;
+    /* 宋韵精工·徽墨夜览（Neo-Oriental Editorial Dark）建筑层次与高光令牌 */
+    --awd-surface-elevated: #2A2620;
+    --awd-specular: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    --awd-shadow-island: 0 4px 18px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.07);
+    --awd-shadow-card: 0 2px 6px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --awd-shadow-btn: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     color-scheme: dark;
 }
 
@@ -343,7 +452,8 @@ html[data-theme='dark'] .awd-brand-logo > img {
     filter: invert(1) hue-rotate(180deg) saturate(1.35) brightness(1.1);
 }
 
-/* ============ 无边框窗口：给系统窗口控件让位 ============
+/* ============ 无边框窗口：给系统窗口控件让位 =====}
+
    桌面壳去掉了系统标题栏（main.js titleBarStyle: 'hidden'），窗口控件浮在
    网页内容上。类名由 utils/windowChrome.js 挂在 documentElement 上。
    设计见 docs/superpowers/specs/2026-08-16-desktop-chrome-and-command-menu.md */
@@ -365,6 +475,40 @@ html[data-theme='dark'] .awd-brand-logo > img {
 html {
     --awd-titlebar-safe-inline-start: 0px;
     --awd-titlebar-safe-inline-end: 0px;
+}
+
+/* ---- 跨页面尺寸与交互令牌（颜色仍由 palette 生成） ---- */
+html {
+    --awd-space-1: 4px;
+    --awd-space-2: 8px;
+    --awd-space-3: 12px;
+    --awd-space-4: 16px;
+    --awd-space-5: 20px;
+    --awd-space-6: 24px;
+    --awd-space-7: 28px;
+    --awd-space-8: 32px;
+    --awd-control-xs: 24px;
+    --awd-control-sm: 28px;
+    --awd-control-md: 32px;
+    --awd-control-height: 32px;
+    --awd-control-height-touch: 48px;
+    --awd-radius-sm: 4px;
+    --awd-radius-md: 6px;
+    --awd-radius-dialog: 8px;
+    --awd-radius-lg: 10px;
+    --awd-island-radius: 10px;
+    --awd-island-gap: 6px;
+    --awd-font-size-body: 13px;
+    --awd-font-size-reading: 15px;
+    --awd-font-size-title: 16px;
+    --awd-line-height-ui: 1.5;
+    --awd-focus-width: 2px;
+    --awd-focus-offset: 2px;
+    --awd-motion-fast: 140ms;
+    --awd-motion-base: 220ms;
+    --awd-switch-width: 38px;
+    --awd-switch-track-height: 22px;
+    --awd-switch-knob-size: 18px;
 }
 
 /* ---- 左栏面板密度令牌 ----
@@ -455,6 +599,30 @@ html.is-mac.is-fullscreen {
 html.is-win {
     --awd-titlebar-safe-inline-end: 148px;
 }
+/* Windows 没有系统全局菜单栏：菜单独占一行，避免和项目名、工具挤在一起。 */
+html.is-win .page-project-overview .project-header,
+html.is-win .page-project-overview.compact-mode .project-header {
+    height: 72px;
+    padding-top: 28px;
+    box-sizing: border-box;
+    gap: 16px;
+}
+html.is-win .project-header .amb {
+    position: absolute;
+    top: 4px;
+    left: 18px;
+    height: 24px;
+}
+html.is-win .project-header .header-center { display: none; }
+html.is-win .project-header .header-left,
+html.is-win .project-header .project-info { flex: 1; min-width: 0; max-width: none; }
+html.is-win .project-header .project-title-row { min-width: 0; }
+html.is-win .project-header .header-right { flex-shrink: 0; }
+html.is-win .project-header .project-meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 /* win：非最大化时应用边界与浅色资源管理器（#F8F9FA 页面、#FFFFFF 顶栏）几乎同色
    （dev-board#722），描 1px 内框区分开；最大化/全屏时系统本身就有窗口边界，不描。
    用 outline + 负 outline-offset，不用 inset box-shadow：body/页面根节点（100vh、
@@ -490,6 +658,10 @@ html.is-desktop .project-header .switcher-menu,
 html.is-desktop .project-header .project-status-badge,
 html.is-desktop .project-header .work-status-chip,
 html.is-desktop .project-header .collab-chip,
+html.is-desktop .project-header .mode-switch-capsule,
+html.is-desktop .project-header .mode-switch-item,
+html.is-desktop .project-header .scratch-promote-btn,
+html.is-desktop .project-header .scratch-badge,
 html.is-desktop .project-header .header-center,
 html.is-desktop .project-header .header-tools,
 html.is-desktop .project-header .top-bar-btn,
@@ -524,10 +696,13 @@ html.is-desktop .amb-mask,
 html.is-desktop .awd-dialog-mask,
 html.is-desktop .awd-dlg-mask,
 html.is-desktop .awd-mask,
+html.is-desktop .awd-perm-mask,
 html.is-desktop .awd-select-mask,
 html.is-desktop .awd-toast-mask,
 html.is-desktop .awdfb-mask,
+html.is-desktop .backup-overlay,
 html.is-desktop .batch-menu-mask,
+html.is-desktop .bw-context-mask,
 html.is-desktop .cal-filter-mask,
 html.is-desktop .ch-mask,
 html.is-desktop .compare-dialog-mask,
@@ -539,6 +714,7 @@ html.is-desktop .dlp-mask,
 html.is-desktop .dock-menu-mask,
 html.is-desktop .dropdown-fixed-mask,
 html.is-desktop .dropdown-mask,
+html.is-desktop .explorer-create-layer,
 html.is-desktop .file-picker-mask,
 html.is-desktop .filelink-mask,
 html.is-desktop .form-dialog-mask,
@@ -554,6 +730,7 @@ html.is-desktop .ocd-mask,
 html.is-desktop .ocr-overlay,
 html.is-desktop .popup-mask-transparent,
 html.is-desktop .qo-mask,
+html.is-desktop .quick-look-mask,
 html.is-desktop .sfp-mask,
 html.is-desktop .sm-dialog-mask,
 html.is-desktop .task-dialog-mask,
@@ -665,5 +842,67 @@ html.is-desktop .page-variable-library .header-card {
 /* plugin-market：hero 的分类标签在最上一行 */
 html.is-desktop .page-plugin-market .hero {
     padding-top: 38px;
+}
+
+/* ============ 声明式皮肤插件特征质感（dev-board#1480） =====}
+
+   当用户启用了带 surfaceTexture / aiPulseStyle 的皮肤插件时，appTheme.js 在
+   documentElement 上挂载 data-skin-texture 与 data-skin-pulse。通过极轻量的
+   全局特征样式增强三套皮肤的视觉辨识度，同时严格复用 var(--awd-*) 语义令牌。 */
+html[data-skin-texture='xuan-paper'] .page-project-overview,
+html[data-skin-texture='xuan-paper'] .pane-empty {
+    background-image:
+        radial-gradient(ellipse 85% 65% at 50% 35%, var(--awd-halo-1) 0%, transparent 72%),
+        repeating-linear-gradient(0deg, transparent 0px, transparent 3px, var(--awd-accent-wash) 3px, var(--awd-accent-wash) 4px);
+}
+html[data-skin-texture='xuan-paper'] .project-title-text,
+html[data-skin-texture='xuan-paper'] .sidebar-title-text {
+    font-family: var(--awd-font-serif);
+    letter-spacing: 0.03em;
+}
+html[data-skin-texture='cel-glass'] .pane-empty,
+html[data-skin-texture='cel-glass'] .project-header {
+    background-image: linear-gradient(125deg, var(--awd-halo-1) 0%, transparent 48%, var(--awd-halo-2) 100%);
+}
+html[data-skin-texture='frosted-glass'] .pane-empty,
+html[data-skin-texture='frosted-glass'] .project-header {
+    background-image: radial-gradient(circle at 80% 15%, var(--awd-halo-1) 0%, var(--awd-halo-2) 45%, transparent 78%);
+}
+
+/* ---- RTL 基础排版与布局适配（ar-SA，dev-board#1477） ---- */
+html[dir="rtl"] body {
+    direction: rtl;
+    text-align: right;
+}
+
+html[dir="rtl"] .awd-global-back {
+    left: auto;
+    right: max(12px, var(--awd-titlebar-safe-inline-start));
+    padding: 0 8px 0 11px;
+}
+
+html[dir="rtl"] .project-header,
+html[dir="rtl"] .home-topbar,
+html[dir="rtl"] .top-nav,
+html[dir="rtl"] .awd-set-row,
+html[dir="rtl"] .settings-row {
+    direction: rtl;
+}
+
+html[dir="rtl"] input[type="tel"],
+html[dir="rtl"] input[type="email"],
+html[dir="rtl"] input[type="url"],
+html[dir="rtl"] code,
+html[dir="rtl"] pre,
+html[dir="rtl"] .mono,
+html[dir="rtl"] .file-path,
+html[dir="rtl"] .shortcut-key,
+html[dir="rtl"] .ltr-inline {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+html[dir="rtl"] .rtl-flip {
+    transform: scaleX(-1);
 }
 </style>

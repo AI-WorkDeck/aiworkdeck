@@ -141,6 +141,108 @@ class WorkSessionServiceTest {
                 sessions.values().iterator().next().getStatus());
     }
 
+    @Test
+    void endSessionCapturesPendingFilesWithoutAChangeSignal() throws Exception {
+        Files.writeString(root.resolve("projects/7/合同.txt"), "插件修改的正文");
+        Files.writeString(root.resolve("projects/7/新报告.txt"), "AI 生成的报告");
+        assertTrue(svc.activeSession(7L).isEmpty());
+        assertEquals(2, repoSvc.pendingChanges(7L).size(), "前置：文件已落盘但未触发工作段信号");
+        ProjectRepoService observedRepo = spy(repoSvc);
+        svc = new WorkSessionService(observedRepo, manifestSvc, sessionRepo, scheduler, fileRepo, event -> {});
+        doAnswer(call -> {
+            assertTrue(svc.repoLock(7L).isHeldByCurrentThread(), "检查和提交必须在同一仓库锁内");
+            return call.callRealMethod();
+        }).when(observedRepo).pendingChanges(7L);
+
+        var result = svc.endSession(7L, 1L, "韩泽伟", "提交插件与 AI 修改");
+
+        assertNotNull(result.sha());
+        assertNull(result.notice());
+        assertNull(result.conflict());
+        assertEquals("提交插件与 AI 修改", repoSvc.log(7L, "HEAD", 1).get(0).message());
+        assertEquals("插件修改的正文", new String(repoSvc.readBlobAtCommit(7L, result.sha(), "合同.txt")));
+        assertEquals("AI 生成的报告", new String(repoSvc.readBlobAtCommit(7L, result.sha(), "新报告.txt")));
+        assertEquals("插件修改的正文", Files.readString(root.resolve("projects/7/合同.txt")));
+        assertEquals("AI 生成的报告", Files.readString(root.resolve("projects/7/新报告.txt")));
+        assertEquals(List.of(repoSvc.mainBranch()), repoSvc.listBranches(7L));
+        assertTrue(repoSvc.pendingChanges(7L).isEmpty());
+        assertTrue(svc.activeSession(7L).isEmpty());
+        assertEquals(1, sessions.size());
+        assertEquals(WorkSession.Status.MERGED, sessions.values().iterator().next().getStatus());
+        assertFalse(idleTimerArmed(svc, 7L), "隐式开段后立即收尾，不遗留空闲定时器");
+    }
+
+    @Test
+    void endSessionWithoutChangesDoesNotCreateAWorkSession() throws Exception {
+        String before = repoSvc.resolveRef(7L, "HEAD");
+        assertTrue(repoSvc.pendingChanges(7L).isEmpty());
+
+        VersionException error = assertThrows(VersionException.class,
+                () -> svc.endSession(7L, 1L, "韩泽伟", "不应生成版本"));
+
+        assertTrue(error.isUserFacing());
+        assertEquals("当前没有进行中的工作", error.getMessage());
+        assertEquals(before, repoSvc.resolveRef(7L, "HEAD"));
+        assertTrue(sessions.isEmpty());
+        assertEquals(List.of(repoSvc.mainBranch()), repoSvc.listBranches(7L));
+        assertFalse(idleTimerArmed(svc, 7L));
+    }
+
+    private String addLegacyNestedMetadata() throws Exception {
+        Path childMetadata = root.resolve("projects/7/child/.awd/tree.json");
+        Files.createDirectories(childMetadata.getParent());
+        Files.writeString(childMetadata, "legacy child manifest");
+        try (var repo = repoSvc.open(7L); var git = new org.eclipse.jgit.api.Git(repo)) {
+            Files.writeString(repoSvc.gitDir(7L).resolve("info/exclude"), "");
+            git.add().addFilepattern(".").call();
+            return git.commit().setMessage("old parent snapshot")
+                    .setAuthor("author", "a@example.com").call().name();
+        }
+    }
+
+    @Test
+    void legacyMasterCanStartAutosaveAndEndWorkWithoutTouchingChildMetadata() throws Exception {
+        String legacy = addLegacyNestedMetadata();
+        Path childMetadata = root.resolve("projects/7/child/.awd/tree.json");
+        Files.writeString(childMetadata, "current child manifest");
+        Files.writeString(root.resolve("projects/7/合同.txt"), "修改正文");
+
+        assertNotNull(svc.commitNow(7L, 1L, "韩泽伟", "自动存档"));
+        assertEquals(1, sessions.size(), "Migration must not leave orphan work sessions");
+        assertNotNull(svc.endSession(7L, 1L, "韩泽伟", "完成修改").sha());
+        assertTrue(svc.activeSession(7L).isEmpty());
+        assertEquals(List.of(repoSvc.mainBranch()), repoSvc.listBranches(7L));
+        assertEquals("修改正文", Files.readString(root.resolve("projects/7/合同.txt")));
+        assertEquals("current child manifest", Files.readString(childMetadata));
+        assertTrue(repoSvc.isAncestor(7L, legacy, "HEAD"));
+        assertFalse(repoSvc.listPaths(7L, "HEAD").contains("child/.awd/tree.json"));
+    }
+
+    @Test
+    void existingLegacyActiveSessionCanReturnToOldMasterAndEnd() throws Exception {
+        svc.onChangeSignal(7L, 1L, "韩泽伟");
+        String legacy = addLegacyNestedMetadata();
+        // Both branches were already present in the old application; only the session branch
+        // will lose nested metadata in commitNow, leaving an old master to return to.
+        try (var repo = repoSvc.open(7L)) {
+            var update = repo.updateRef("refs/heads/" + repoSvc.mainBranch());
+            update.setNewObjectId(org.eclipse.jgit.lib.ObjectId.fromString(legacy));
+            assertEquals(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD, update.update());
+        }
+        Path childMetadata = root.resolve("projects/7/child/.awd/tree.json");
+        Files.writeString(childMetadata, "current child manifest");
+        Files.writeString(root.resolve("projects/7/合同.txt"), "旧工作段的新修改");
+
+        assertNotNull(svc.commitNow(7L, 1L, "韩泽伟", "自动存档"));
+        var ended = svc.endSession(7L, 1L, "韩泽伟", "结束旧工作段");
+        assertNotNull(ended.sha());
+        assertTrue(svc.activeSession(7L).isEmpty());
+        assertEquals(List.of(repoSvc.mainBranch()), repoSvc.listBranches(7L));
+        assertEquals("旧工作段的新修改", Files.readString(root.resolve("projects/7/合同.txt")));
+        assertEquals("current child manifest", Files.readString(childMetadata));
+        assertFalse(repoSvc.listPaths(7L, "HEAD").contains("child/.awd/tree.json"));
+    }
+
     /**
      * 结束工作必须把已经并进主线的工作分支删掉。
      *
@@ -911,4 +1013,74 @@ class WorkSessionServiceTest {
 
         assertEquals(0, autosaveFailureStreak(svc, 7L), "成功一轮之后连续失败计数必须清零");
     }
+    @Test
+    void mediaRevertAndDiscardRestoreCompleteObjectVersions() throws Exception {
+        Path media = root.resolve("projects/7/recording.mp4");
+        Files.writeString(media, "first recording");
+        svc.commitNow(7L, 1L, "Tester", "first");
+        svc.endSession(7L, 1L, "Tester", "first recording");
+        String first = repoSvc.resolveRef(7L, "HEAD");
+        Files.writeString(media, "second recording");
+        svc.commitNow(7L, 1L, "Tester", "second");
+        svc.endSession(7L, 1L, "Tester", "second recording");
+        String second = repoSvc.resolveRef(7L, "HEAD");
+        svc.revertTo(7L, first, 1L, "Tester");
+        assertEquals("first recording", Files.readString(media));
+        svc.revertTo(7L, second, 1L, "Tester");
+        assertEquals("second recording", Files.readString(media));
+        svc.endSession(7L, 1L, "Tester", "restored");
+        Files.writeString(media, "unsaved edit");
+        svc.commitNow(7L, 1L, "Tester", "editing");
+        svc.discardSession(7L, 1L);
+        assertEquals("second recording", Files.readString(media));
+        assertTrue(repoSvc.pendingChanges(7L).isEmpty());
+    }
+
+    @Test
+    void deletionWaitsForPublicationAndRejectsLateVersionWriters() throws Exception {
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        try {
+            var publication = executor.submit(() -> svc.runLocked(7, () -> {
+                entered.countDown();
+                try {
+                    assertTrue(release.await(5, TimeUnit.SECONDS));
+                    repoSvc.objects().put(7, new java.io.ByteArrayInputStream("recording".getBytes()));
+                } catch (Exception e) { throw new RuntimeException(e); }
+            }));
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            var deletion = executor.submit(() -> svc.runProjectDeletion(7, () -> repoSvc.deleteRepository(7)));
+            assertThrows(java.util.concurrent.TimeoutException.class, () -> deletion.get(100, TimeUnit.MILLISECONDS));
+            release.countDown();
+            publication.get(5, TimeUnit.SECONDS);
+            deletion.get(5, TimeUnit.SECONDS);
+            assertNull(svc.commitNow(7, 1L, "Tester", null));
+            assertNull(svc.commitAiRound(7, 1L, true));
+            svc.onChangeSignal(7, 1L, "Tester");
+            svc.enableVersionRecording(7, "Tester", "test@example.test");
+            assertThrows(VersionException.class, () -> svc.runLocked(7, () -> fail("late import ran")));
+            assertFalse(repoSvc.isInitialized(7));
+            assertFalse(Files.exists(repoSvc.objects().projectRoot(7)));
+        } finally { release.countDown(); executor.shutdownNow(); }
+    }
+
+    @Test
+    void deletionHoldsRepositoryLockUntilTransactionCompletionAndRollbackAllowsRetry() throws Exception {
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            svc.runProjectDeletion(7, () -> {});
+            assertTrue(svc.repoLock(7).isHeldByCurrentThread());
+            var synchronizations = org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations();
+            assertEquals(1, synchronizations.size());
+            synchronizations.get(0).afterCompletion(org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK);
+            assertFalse(svc.repoLock(7).isHeldByCurrentThread());
+            svc.runLocked(7, () -> {});
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+            org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
+    }
+
 }

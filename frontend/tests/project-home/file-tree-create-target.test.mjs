@@ -19,11 +19,11 @@ const IMPORT_NAMES = [
   'batchCopyFiles', 'getApiBaseUrl', 'getContributedTemplates', 'createFileFromContributedTemplate',
   'getSessionId', 'host', 'findTopmostDeletedAncestor', 'summarizeDeleteResults',
   'groupByParent', 'buildTreeFromGroups', 'evidenceRefCounts', 'createRefCountsFetcher',
-  'warmDragImage', 'applyDragImage', 'FileTypeIcon', 'TagChip', 'TagSelector',
+  'warmDragImage', 'applyDragImage', 'FileTypeIcon', 'TagChip', 'TagFilter', 'TagSelector',
   'TagManager', 'AwdDatePicker', 'ICONS', 'getProjectTags', 'addTagToFile', 'removeTagFromFile',
   'createTag', 'createTask', 'importLocalFile',
   'nativeDataTransfer', 'isExternalFileDrag', 'claimExternalDrop', 'isTranscribableMediaItem',
-  'showDialog',
+  'showDialog', 'ExplorerCreateMenu',
 ]
 
 function makeVm() {
@@ -46,6 +46,7 @@ function makeVm() {
   vm.displayFiles = []
   vm.$t = (k) => k
   vm.$emit = () => {}
+  vm.$nextTick = callback => callback?.()
   vm.loadFiles = async () => {}
   vm.showErrorModal = (msg) => { throw new Error('unexpected error modal: ' + msg) }
   vm.calls = calls
@@ -83,7 +84,6 @@ test('新建文档与新建文件夹用同一个落点', async () => {
   const vm = makeVm()
   vm.allFiles = [folder, doc]
   vm.handleItemClick(folder, {})
-  vm.newFolderName = '子目录'
   await vm.handleCreateFolder()
   await vm.createBlankWord()
   assert.equal(vm.calls.createFolder[0][1], vm.calls.createFile[0][1])
@@ -94,7 +94,6 @@ test('选中的文件夹已进回收站时退回当前浏览层级', async () =>
   vm.allFiles = [folder, doc]
   vm.handleItemClick(folder, {})
   vm.recycleBin = [folder]
-  vm.newFolderName = '子目录'
   await vm.handleCreateFolder()
   await vm.createBlankWord()
   assert.equal(vm.calls.createFile[0][1], null)

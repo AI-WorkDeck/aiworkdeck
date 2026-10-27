@@ -1,0 +1,17 @@
+{
+  "plugin.name": "Tencent Meeting",
+  "plugin.description": "Подключите Tencent Meeting, чтобы синхронизировать встречи и записи по запросу, просматривать транскрипты и умные протоколы, архивировать в проекты, а также создавать протоколы встреч и пункты действий. Требуется официальный CLI tmeet и авторизация аккаунта.",
+  "tool.tencent_meeting_action.description": "Плагин Tencent Meeting: проверка подключения, авторизация входа, синхронизация по запросу, просмотр встреч и транскриптов, архивирование файлов проекта.",
+  "panel.refreshList": "Обновить",
+  "panel.selectMeeting": "Выберите встречу",
+  "panel.backToList": "Назад к встречам",
+  "panel.meetingCount": "встреч",
+  "panel.connectInSidebar": "Подключите Tencent Meeting на боковой панели",
+  "panel.loadingList": "Загрузка встреч…",
+  "panel.loadingDetail": "Загрузка материалов встречи…",
+  "panel.syncing": "Синхронизация встреч…",
+  "panel.exporting": "Сохранение материалов встречи…",
+  "panel.preparingAi": "Подготовка материалов встречи для ИИ…",
+  "view.account.name": "Tencent Meeting",
+  "view.meetings.name": "Tencent Meeting"
+}

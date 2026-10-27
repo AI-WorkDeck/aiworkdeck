@@ -10,6 +10,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/desktop-build.yml'
+      - '.github/workflows/dependency-clean-windows.yml'
       - 'desktop/**'
       - 'backend/**'
       # Installers bundle the built frontend (frontend/dist), so frontend-only
@@ -21,6 +22,10 @@ on:
       # requirements.lock 决定它的依赖闭包——改这里不跑桌面打包冒烟，
       # re-vendor 之类的整包替换就没有任何 CI 覆盖。
       - 'pptx-service/**'
+      - 'asr-service/**'
+      - 'kokoro-service/**'
+      - 'official-plugins/dpia-workbench/runtime/**'
+      - 'official-plugins/dpia-workbench/backend/**'
 
 # The "Attach to GitHub Release" step (softprops/action-gh-release) creates the
 # release for a v* tag, which needs write access to repository contents. The
@@ -47,9 +52,35 @@ jobs:
       - name: Enforce minor-release boundaries
         run: bash desktop/scripts/patch-gate.sh "$GITHUB_REF_NAME"
 
+  dependency-scope:
+    name: Detect dependency acceptance changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      required: ${{ steps.scope.outputs.required }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: scope
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > /tmp/dependency-paths
+          if grep -Eq '^(desktop/scripts/dependency-clean-windows/|[.]github/workflows/dependency-clean-windows.yml|backend/src/main/java/com/checkba/(service/(LibreOfficePdfConverter|tmeet/|pack/|ocr/|ai/tools/PythonTools)|controller/ExternalDependenciesController)|desktop/main/services/(model-manager|model-inventory|model-fetch|pysvc-runtime)|asr-service/|kokoro-service/|official-plugins/dpia-workbench/(runtime|backend)/)' /tmp/dependency-paths; then
+            echo 'required=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'required=false' >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     name: Build (${{ matrix.os }})
-    needs: [patch-gate]
+    needs: [patch-gate, dependency-scope]
     # patch-gate 只在 tag 上运行；非 tag（PR / 手动触发）时它被 skip，
     # build 必须照常跑，所以放行 success 与 skipped 两种结果
     if: always() && (needs.patch-gate.result == 'success' || needs.patch-gate.result == 'skipped')
@@ -82,9 +113,12 @@ jobs:
           cache: maven
       - name: Build frontend
         working-directory: frontend
+        # PowerShell can hide a failed npm build when the next npm command succeeds.
+        shell: bash
         run: |
           npm ci || npm install
           npm run build:h5
+          test -s dist/build/h5/index.html
           # Epic #43: build the embedded LibreOffice editor bundle (dist/zetaoffice),
           # shipped via extraResources for the experimental "LibreOffice 验证" window.
           npm run build:zetaoffice
@@ -95,7 +129,7 @@ jobs:
           # tooltips + FS/callMain exports. Hosted on the project site (versioned,
           # immutable; wasm/data served brotli so the installer stays small).
           # Unset -> upstream CDN (English UI). Build recipe: desktop/lowa-build/.
-          LOWA_BASE_URL: https://www.aiworkdeck.com/lowa-engine/24.2.8-zhcn-r5/
+          LOWA_BASE_URL: https://www.aiworkdeck.com/lowa-engine/24.2.8-zhcn-r7/
         run: |
           # Track A (Epic #43): download the LibreOffice WASM runtime (soffice.*)
           # into dist/zetaoffice/lowa and an OFL-licensed CJK font (Noto Sans SC)
@@ -177,10 +211,10 @@ jobs:
           # 插件宿主 SPI 是本仓独立工程，不在远端仓库：先 install 再打 backend
           mvn -B -q -f backend/plugin-api/pom.xml install
           # Apple Silicon only（2026-07-03 决策放弃 Intel Mac）：单 arm64 jar + arm64 JRE
-          mvn -B -q -DskipTests -Djavacpp.platform=macosx-arm64 -f backend/pom.xml package
+          mvn -B -q -Dtest=MeetingAudioTranscoderVideoTest,MeetingAudioTranscoderQtaTest -Djavacpp.platform=macosx-arm64 -f backend/pom.xml package
           node desktop/scripts/prepare-backend.js \
             --jar backend/target/backend-0.0.1-SNAPSHOT.jar \
-            --out desktop/bundled/mac-arm64
+            --out desktop/bundled/mac-arm64 --native-platform macosx-arm64
       # ──────────────────────────────────────────────────────────────
       # Python 运行时 / graphviz 的缓存。
       #
@@ -219,10 +253,10 @@ jobs:
           JAVA_HOME: ${{ steps.jdk.outputs.path }}
         run: |
           mvn -B -q -f backend/plugin-api/pom.xml install
-          mvn -B -q -DskipTests -Djavacpp.platform=windows-x86_64 -f backend/pom.xml package
+          mvn -B -q -Dtest=MeetingAudioTranscoderVideoTest,MeetingAudioTranscoderQtaTest -Djavacpp.platform=windows-x86_64 -f backend/pom.xml package
           node desktop/scripts/prepare-backend.js \
             --jar backend/target/backend-0.0.1-SNAPSHOT.jar \
-            --out desktop/bundled/win-x64
+            --out desktop/bundled/win-x64 --native-platform windows-x86_64
       # ──────────────────────────────────────────────────────────────
       # Python 运行时 / graphviz 的缓存。
       #
@@ -363,6 +397,10 @@ jobs:
           ulimit -n 524288 || ulimit -n "$(ulimit -Hn)" || true
           echo "fd soft=$(ulimit -n) hard=$(ulimit -Hn)"
           npx electron-builder --publish never
+      - name: Compress macOS disk image
+        if: runner.os == 'macOS'
+        working-directory: desktop
+        run: bash scripts/compress-mac-dmg.sh release/*.dmg
       - name: Notarization failure log (macOS)
         if: failure() && runner.os == 'macOS'
         env:
@@ -509,6 +547,27 @@ jobs:
           # 未设 AZURE_SIGNING_*（普通 PR / fork PR）时钩子跳过，产物未签名。
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npx electron-builder --publish never
+      - name: Regress NSIS known-folder path copy
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./desktop/scripts/test-nsis-known-folder.ps1
+      - name: Smoke test installed Windows file associations
+        id: file-associations
+        if: runner.os == 'Windows'
+        timeout-minutes: 16
+        shell: pwsh
+        run: |
+          $installers = @(Get-ChildItem 'desktop/release/*.exe')
+          if ($installers.Count -ne 1) { throw "Expected one NSIS installer, found $($installers.Count)" }
+          & ./desktop/scripts/test-file-associations.ps1 -InstallerPath $installers[0].FullName
+      - name: Preserve failed Windows installer for diagnosis
+        if: failure() && runner.os == 'Windows' && steps.file-associations.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-windows-installer-${{ github.run_attempt }}
+          path: desktop/release/*.exe
+          retention-days: 1
+          if-no-files-found: error
       - name: Verify Windows signatures
         # 对安装器、解包后的 x64 应用 exe、ARM64 壳 exe 做 signtool verify /pa；
         # 还要求带时间戳，否则证书到期（Artifact Signing 证书只有几天有效期）后签名即失效。
@@ -553,7 +612,9 @@ jobs:
             --out desktop/release/patch
           ls -la desktop/release/patch
       - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
         with:
+          retention-days: 3
           name: aiworkdeck-${{ matrix.os }}
           path: |
             desktop/release/*.dmg
@@ -561,13 +622,32 @@ jobs:
             desktop/release/patch/*
           if-no-files-found: error
 
+      - name: Preserve unsigned PR installer for isolated dependency acceptance
+        if: github.event_name == 'pull_request' && runner.os == 'Windows' && needs.dependency-scope.outputs.required == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-pr-dependency-installer
+          path: desktop/release/*.exe
+          retention-days: 3
+          if-no-files-found: error
+
+  clean-windows-dependencies:
+    name: Fresh Windows dependency acceptance
+    needs: [build, dependency-scope]
+    # The tag-only patch gate is skipped on PRs. Explicit status evaluation keeps
+    # that transitive skip from suppressing acceptance after a successful build.
+    if: always() && !cancelled() && needs.build.result == 'success' && needs.dependency-scope.result == 'success' && github.event_name == 'pull_request' && needs.dependency-scope.outputs.required == 'true'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/dependency-clean-windows.yml
+
   # 发布收口：GitHub Release 在这一个单点 job 里创建，不放在上面的 matrix job
   # 里（dev-board#74 稳定性审计）。build 用 fail-fast:false，mac 腿在公证抖动
   # 处失败时 windows 腿仍会跑完；发布步骤若留在 matrix 里，windows 腿会独自把
   # release 发出去——用户看到的是只有 .exe、缺 .dmg 的半成品版本。
-  # needs:[build] 不加 if:always()，默认语义就是「build 的所有矩阵腿都成功才
-  # 跑」，天然挡住这种半成品发布；同构于 pack-release.yml 的 release job
-  # （needs:[mac,win] 单点发布）。
+  # tag 上 PR 专属的 dependency-scope 会跳过；always() 避免祖先跳过传播，
+  # 再显式要求 build 所有矩阵腿成功且运行未取消，仍挡住半成品发布（#1399）。
   # patch/* 现在随 aiworkdeck-windows-latest 这个 artifact 一起上传（见上面
   # upload-artifact 的 path，仅 windows 腿会真的产出这些文件，mac 腿这条 glob
   # 落空不影响该 step——if-no-files-found 看的是全部 path 的汇总匹配）。
@@ -575,14 +655,22 @@ jobs:
   release:
     name: Create GitHub Release
     needs: [build]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: always() && !cancelled() && needs.build.result == 'success' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           pattern: aiworkdeck-*
           merge-multiple: true
+      - name: Bind full installers to signed update manifest
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: node desktop/scripts/finalize-update-manifest.js artifacts "${GITHUB_REF_NAME#v}"
       - name: Attach to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -630,7 +718,7 @@ jobs:
   sync-mirror:
     name: Sync installers to mirror
     needs: [release]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: always() && !cancelled() && needs.release.result == 'success' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - name: Download built installers

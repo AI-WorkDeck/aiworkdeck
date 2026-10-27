@@ -2,6 +2,10 @@
 
 2026-09-15 · dev-board #648 · 以资源管理器和插件广场为基准。
 
+2026-10-11增补（#1198）：全面规范见 [多端设计规范与迁移清单](../docs/design/2026-10-11-cross-platform-design-system.md)。共享尺寸在App.vue，颜色仍由palette生成。现有28px紧凑行保留；搜索/输入/主要按钮使用 `--awd-control-height`（32px），触屏命中区使用 `--awd-control-height-touch`（48px）。正文主信息用 `--awd-font-size-body`（13px），12px仍供紧凑辅助界面，不把全部阅读文字压小。
+
+公共间距 `--awd-space-1…8`、圆角/字体/焦点/动效及既有panel令牌已接入iframe主题消息。侧栏标题仍由外壳负责，输入和字段应以真实容器宽适配。增量守卫运行 `node scripts/check-design-system.mjs`，已迁移文件白名单以脚本为准；审计清单不等于全站已修。
+
 ## 统一规则
 
 - **外壳负责标题。** 内部不重复画页面标题；白色/深色表面随主题切换，不用灰底叠白卡片。

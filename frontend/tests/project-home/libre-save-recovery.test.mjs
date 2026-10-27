@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import * as barriers from '../../src/utils/checkpointSaveBarrier.js'
+import { observeLocalContentBackend } from '../../src/utils/localContentProtocol.js'
 // A6/C10：运行真实组件保存方法，控制导出/上传的在途顺序。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -8,14 +9,15 @@ import { readFileSync } from 'node:fs'
 
 const source = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8')
 const body = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
   .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
-function makeVm(extra = {}) {
+function makeVm(extra = {}, events = [], wait = setTimeout) {
   // stampApplication / documentStampApplication 是 B4 的打标链路，这里喂成「开关关着」，
   // 保存行为与打标前完全一致；打标本身另有 libre-save-generator-stamp.test.mjs。
   const options = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'getFileWriteUrl',
-    'stampApplication', 'documentStampApplication', body)(...Object.values(barriers),
+    'stampApplication', 'documentStampApplication', 'observeLocalContentBackend', 'uni', 'setTimeout', body)(...Object.values(barriers),
     null, null, null, id => '/upload/' + id,
-    async (bytes) => bytes, async () => null)
+    async (bytes) => bytes, async () => null, observeLocalContentBackend, { $emit: (...args) => events.push(args) }, wait)
   const vm = {
     ready: true, file: { id: 7, name: '证据清单.docx' }, statusKey: 'ready',
     dirty: true, saving: false, _dirtySince: Date.now(),
@@ -95,6 +97,98 @@ test('关闭保存失败不得清掉 dirty，重试时保存当前完整内容',
   assert.equal(vm.dirty, false)
 })
 
+// The worker takes its snapshot after queued IME commits, not when the host enqueues export.
+for (const laterEdit of [false, true]) {
+  test(`导出前排队的输入算入本次保存，导出后的新输入仍留脏：${laterEdit}`, async () => {
+    const gate = deferred()
+    let event, token
+    const vm = makeVm({
+      executor: { executeCommand: async (action, params) => {
+        token = params.saveSnapshotId
+        vm.onDocModified() // queued IME commit completes after flush starts
+        event({ __lo: 'lo-relay', type: 'save-snapshot', saveSnapshotId: token })
+        assert.equal(vm.dirty, false, 'worker snapshot includes the earlier input')
+        if (laterEdit) vm.onDocModified()
+        // A duplicate acknowledgement must not erase input after the snapshot.
+        event({ __lo: 'lo-relay', type: 'save-snapshot', saveSnapshotId: token })
+        return { success: true, bytes: [1, 2, 3] }
+      } },
+      uploadBytes: async () => gate.promise,
+    })
+    vm.subscribeHostEvents({ subscribe(fn) { event = fn; return () => {} } })
+    const pending = vm.flushSave()
+    await tick()
+    assert.ok(Number.isSafeInteger(token) && token > 0)
+    gate.resolve()
+    assert.equal(await pending, !laterEdit)
+    assert.equal(vm.dirty, laterEdit)
+    clearTimeout(vm._saveTimer)
+  })
+}
+
+test('外部导出、错误保存编号和已结束的保存回调不得清掉输入', async () => {
+  const gate = deferred()
+  let event, token
+  const vm = makeVm({ executor: { executeCommand: async (action, params) => {
+    token = params.saveSnapshotId
+    vm.onDocModified()
+    event({ __lo: 'lo-relay', type: 'save-snapshot', saveSnapshotId: token + 1 })
+    assert.equal(vm.dirty, true)
+    await gate.promise
+    return { success: false, message: 'export failed' }
+  } } })
+  vm.subscribeHostEvents({ subscribe(fn) { event = fn; return () => {} } })
+  const pending = vm.flushSave()
+  await tick(); gate.resolve()
+  assert.equal(await pending, false)
+  event({ __lo: 'lo-relay', type: 'save-snapshot', saveSnapshotId: token })
+  assert.equal(vm.dirty, true)
+  clearTimeout(vm._saveTimer)
+})
+
+for (const changed of ['file', 'project', 'context', 'checkpoint', 'reload', 'discard']) {
+  test(`导出快照回调不影响已变化的保存上下文：${changed}`, async () => {
+    const gate = deferred()
+    let event, token
+    const vm = makeVm({ projectId: 900,
+      executor: { executeCommand: async (action, params) => {
+        token = params.saveSnapshotId
+        await gate.promise
+        return { success: false }
+      } },
+    })
+    vm.subscribeHostEvents({ subscribe(fn) { event = fn; return () => {} } })
+    const pending = vm.flushSave()
+    await tick()
+    vm.onDocModified()
+    if (changed === 'file') vm.file = { id: 8 }
+    if (changed === 'project') vm.projectId = 901
+    if (changed === 'context') vm._backendSaveContext = 1
+    if (changed === 'checkpoint') vm._checkpointInvalidated = true
+    if (changed === 'reload') vm._reloading = true
+    if (changed === 'discard') vm._saveDiscarded = true
+    event({ __lo: 'lo-relay', type: 'save-snapshot', saveSnapshotId: token })
+    assert.equal(vm.dirty, true)
+    gate.resolve(); assert.equal(await pending, false)
+    clearTimeout(vm._saveTimer)
+  })
+}
+
+test('导出快照已确认但上传失败仍保留输入待重试', async () => {
+  let event
+  const vm = makeVm({
+    executor: { executeCommand: async (action, params) => {
+      event({ __lo: 'lo-relay', type: 'save-snapshot', saveSnapshotId: params.saveSnapshotId })
+      return { success: true, bytes: [1] }
+    } },
+    uploadBytes: async () => { throw new Error('offline') },
+  })
+  vm.subscribeHostEvents({ subscribe(fn) { event = fn; return () => {} } })
+  assert.equal(await vm.flushSave(), false)
+  assert.equal(vm.dirty, true)
+  assert.equal(vm._savePaused, true)
+})
+
 test('上传请求具备超时和中止终态，不会永远保持 saving', async () => {
   let xhr
   class Xhr {
@@ -126,10 +220,12 @@ function makeCloseVm(confirm) {
     discardPendingSave: () => { discarded++ },
   }
   const vm = { leftFiles: [{ id: 7 }], rightFiles: [], activeFileIdLeft: 7,
+    pdfKeepAliveKeys: [],
     _libreRefs: { 'left:7': inst }, useLibreEditor: () => true,
     isBrowserTab: () => false, $t: k => k, lastActiveIdsByMode: { left: {} },
     saveActiveIdsByMode() {},
   }
+  vm.evictPdfKeepAlive = methods.evictPdfKeepAlive.bind(vm)
   return { vm, close: methods.closeFile.bind(vm), modals, toasts,
     counts: () => ({ flushed, discarded }) }
 }
@@ -162,6 +258,7 @@ test('关闭等待期间继续输入：保留标签后新改动必须重新进�
   assert.equal(await pending, false, '关标签者必须知道仍有后来输入没保存')
   assert.ok(vm._saveTimer, '解除 flush 闸后必须给后来输入补排保存，不能一直 dirty + ready')
   clearTimeout(vm._saveTimer)
+  vm._lastInteractionAt = Date.now() - 1501 // Exercise the scheduled idle retry after the later edit.
   await vm.autoSave()
   assert.equal(uploads, 2)
   assert.equal(vm.dirty, false)
@@ -252,6 +349,7 @@ for (const state of ['dirty', 'saving']) {
 test('保存状态固定展示待保存、保存中、已保存及失败；不再使用保存浮动胶囊', () => {
   const options = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', body)(...Object.values(barriers), null, null, null)
   const vm = { ready: true, file: { id: 7, fileSize: 100 }, statusKey: 'ready', dirty: true, saving: false, $t: k => k }
+  vm.backendSaveRetryReady = options.methods.backendSaveRetryReady.bind(vm)
   const state = () => options.computed.saveStateText.call(vm)
   assert.equal(state(), 'editor.status.pendingSave')
   vm.saving = true
@@ -262,6 +360,11 @@ test('保存状态固定展示待保存、保存中、已保存及失败；不�
   vm.statusKey = 'saveFailed'
   vm.dirty = true
   assert.equal(state(), 'editor.status.saveFailed')
+  vm.backendHealthState = { state: 'healthy', ok: true }
+  vm.backendHealthRecoverySeq = 1
+  vm.backendFailedUpload = { fileId: 7, projectId: undefined, recoverySeq: 0 }
+  assert.equal(state(), 'workbench.backendHealth.saveRetryReady', '服务恢复也必须明确文稿尚未保存')
+  vm.backendFailedUpload = null
   vm.saving = true
   assert.equal(state(), 'editor.status.saving', '重试期间不能继续说保存失败')
   vm.saving = false
@@ -274,8 +377,229 @@ test('保存状态固定展示待保存、保存中、已保存及失败；不�
   vm.docLoadFailed = true
   assert.equal(state(), '', '装载失败不显示已保存')
   assert.match(source, /class="libre-save-state"/)
-  assert.match(source, /v-if="saveStateText \|\| provenanceBarVisible"/)
+  assert.match(source, /v-if="saveStateText" class="libre-save-bar"/)
   for (const statusKey of ['saving', 'saveFailed', 'movedSaveFailed']) {
     assert.equal(options.computed.displayStatus.call({ statusKey, saveStateText: 'status', $t: k => k }), '')
   }
 })
+
+for (const recoveryFirst of [false, true]) {
+  test(`本地服务恢复${recoveryFirst ? '先于' : '晚于'}上传失败：只提示手动重试，绝不自动补写`, async () => {
+    const gate = deferred(); let uploads = 0
+    const vm = makeVm({ backendHealthRecoverySeq: 0, backendHealthState: null, backendFailedUpload: null,
+      uploadBytes: () => { uploads++; return gate.promise } })
+    vm.onBackendHealth( { state: 'degraded', ok: false, updatedAt: 1 })
+    const pending = vm.autoSave()
+    await tick()
+    if (recoveryFirst) vm.onBackendHealth({ state: 'healthy', ok: true, updatedAt: 2 })
+    gate.reject(Object.assign(new Error('network'), { backendUnavailable: true }))
+    await pending
+    if (!recoveryFirst) vm.onBackendHealth({ state: 'healthy', ok: true, updatedAt: 2 })
+    assert.equal(vm.backendSaveRetryReady(), true)
+    assert.equal(vm.dirty, true)
+    assert.equal(vm._savePaused, true)
+    assert.equal(uploads, 1, '健康恢复只给恢复保存入口，不写入文稿')
+    vm.discardPendingSave()
+    assert.equal(vm.backendSaveRetryReady(), false)
+  })
+}
+
+test('服务恢复不替引擎错误或404/409/权限错误声称可恢复；旧文件/重载/销毁不留恢复提示', async () => {
+  for (const error of [new Error('export timeout'), Object.assign(new Error('HTTP 404'), { status: 404 }), Object.assign(new Error('HTTP 409'), { status: 409 }), Object.assign(new Error('HTTP 403'), { status: 403 })]) {
+    const vm = makeVm({ backendHealthRecoverySeq: 0, backendHealthState: null, backendFailedUpload: null, uploadBytes: async () => { throw error } })
+    vm.onBackendHealth({ state: 'degraded', ok: false, updatedAt: 1 })
+    await vm.autoSave()
+    vm.onBackendHealth({ state: 'healthy', ok: true, updatedAt: 2 })
+    assert.equal(vm.backendSaveRetryReady(), false)
+  }
+  const vm = makeVm({ backendHealthRecoverySeq: 1, backendHealthState: { state: 'healthy', ok: true }, backendFailedUpload: { fileId: 7, projectId: undefined, recoverySeq: 0 } })
+  assert.equal(vm.backendSaveRetryReady(), true)
+  vm.file = { id: 8 }
+  assert.equal(vm.backendSaveRetryReady(), false)
+  vm.file = { id: 7 }; vm._reloading = true
+  assert.equal(vm.backendSaveRetryReady(), false)
+  vm._reloading = false; vm._backendHealthDisposed = true
+  assert.equal(vm.backendSaveRetryReady(), false)
+})
+
+test('仅上传网络/超时/5xx有恢复资格，取消及4xx没有', async () => {
+  for (const outcome of ['error', 'timeout', 'abort', 500, 503, 404, 409, 403]) {
+    let xhr
+    class Xhr { constructor() { xhr = this } open() {} setRequestHeader() {} send() {} }
+    const opts = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'getAuthHeaders', 'XMLHttpRequest', body)(...Object.values(barriers), null, null, null, () => ({}), Xhr)
+    const pending = opts.methods.uploadBytes.call({ $t: k => k }, '/upload/7', new Uint8Array([1]), 'a.docx')
+    if (typeof outcome === 'number') { xhr.status = outcome; xhr.onload() } else xhr['on' + outcome]()
+    await assert.rejects(pending, e => Boolean(e.backendUnavailable) === (outcome === 'error' || outcome === 'timeout' || outcome >= 500))
+  }
+})
+
+test('编辑器健康监听忽略迟到初始响应，卸载清理订阅且迟到事件不能触发保存', async () => {
+  const gate = deferred(); let handler, unsubscribed = 0
+  const backend = { getHealth: () => gate.promise, onHealthChanged: fn => { handler = fn; return () => unsubscribed++ } }
+  const opts = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'host', 'uni', body)(...Object.values(barriers), null, null, null, { backend }, { $off() {} })
+  const vm = makeVm({ backendHealthRecoverySeq: 0, backendHealthState: null, backendFailedUpload: null })
+  const watching = opts.methods.watchBackendHealth.call(vm)
+  handler({ state: 'failed', ok: false, updatedAt: 2 })
+  gate.resolve({ state: 'healthy', ok: true, updatedAt: 1 }); await watching
+  assert.equal(vm.backendHealthState.state, 'failed')
+  opts.beforeUnmount.call(vm)
+  handler({ state: 'healthy', ok: true, updatedAt: 3 })
+  assert.equal(vm.backendHealthState.state, 'failed')
+  assert.equal(unsubscribed, 1)
+  assert.equal(vm.backendFailedUpload, null)
+})
+
+test('重载或身份换代后迟到的上传失败不能重新挂恢复提示，引擎错误也不冒充上传错误', async () => {
+  const gate = deferred()
+  const vm = makeVm({ backendHealthRecoverySeq: 0, backendHealthState: null, backendFailedUpload: null, uploadBytes: () => gate.promise })
+  vm.onBackendHealth({ state: 'failed', ok: false, updatedAt: 1 })
+  const pending = vm.autoSave(); await tick()
+  vm.invalidateBackendSaveHint()
+  vm.onBackendHealth({ state: 'healthy', ok: true, updatedAt: 2 })
+  gate.reject(Object.assign(new Error('network'), { backendUnavailable: true })); await pending
+  assert.equal(vm.backendFailedUpload, null)
+  const engine = makeVm({ backendHealthRecoverySeq: 0, backendHealthState: null, backendFailedUpload: null,
+    executor: { executeCommand: async () => { throw Object.assign(new Error('engine'), { backendUnavailable: true }) } } })
+  await engine.autoSave()
+  assert.equal(engine.backendFailedUpload, null)
+})
+
+test('版本忙碌只信任明确的未开始写入回执，其他HTTP错误保持未知结果', async () => {
+  const confirmed = { code: -1, reason: 'VERSION_BUSY', writeState: 'not_started' }
+  for (const [status, response, expected] of [
+    [423, confirmed, true], [423, { code: -1, reason: 'VERSION_BUSY' }, false],
+    [423, { ...confirmed, code: 0 }, false], [423, { ...confirmed, reason: 'OTHER' }, false],
+    [500, confirmed, false], [404, confirmed, false], [423, 'invalid json', false],
+  ]) {
+    let xhr
+    class Xhr { constructor() { xhr = this } open() {} setRequestHeader() {} send() {} }
+    const opts = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'getAuthHeaders', 'XMLHttpRequest', body)(...Object.values(barriers), null, null, null, () => ({}), Xhr)
+    const pending = opts.methods.uploadBytes.call({ $t: k => k }, '/upload/7', new Uint8Array([1]), 'a.docx')
+    xhr.status = status
+    xhr.response = typeof response === 'string' ? response : JSON.stringify(response)
+    xhr.onload()
+    await assert.rejects(pending, error => error.saveNotPublished === expected)
+  }
+})
+
+test('持续版本忙碌只重试同一份导出三次，仍失败则留脏并允许手动重试', async () => {
+  let uploads = 0, exports = 0, busy = true
+  const payloads = []
+  const vm = makeVm({ projectId: 'known-version-busy',
+    executor: { executeCommand: async () => { exports++; return { success: true, bytes: [1, 2, 3] } } },
+    uploadBytes: async (url, bytes) => {
+      uploads++; payloads.push(bytes)
+      if (busy) throw Object.assign(new Error('HTTP 423'), { saveNotPublished: true })
+    },
+  }, [], (fn, ms) => ms === 1000 ? setTimeout(fn, 0) : setTimeout(fn, ms))
+  await vm.autoSave()
+  assert.equal(uploads, 4)
+  assert.equal(exports, 1)
+  assert.ok(payloads.every(bytes => bytes === payloads[0]))
+  assert.equal(vm.dirty, true)
+  assert.equal(vm._savePaused, true)
+  assert.equal(vm.statusKey, 'saveFailed')
+  assert.equal(vm.versionSaveBusy, true)
+  busy = false
+  assert.equal(await vm.retrySave(), true)
+  assert.equal(vm.dirty, false)
+  assert.equal(vm.versionSaveBusy, false)
+  const barrier = barriers.beginCheckpointSaveBarrier(vm.projectId, vm.file.id, 'after-busy-retry')
+  assert.equal(await barrier.drained, true, 'known unpublished saves must not leave an uncertain writer')
+  barriers.endCheckpointSaveBarrier(vm.projectId, vm.file.id, 'after-busy-retry')
+})
+
+test('暂时版本忙碌恢复后自动保存，等待期间新输入留脏并在下一次保存处理', async () => {
+  let exports = 0, uploads = 0, resume
+  const bytes = []
+  const vm = makeVm({ projectId: 'transient-version-busy',
+    executor: { executeCommand: async () => { exports++; return { success: true, bytes: [exports] } } },
+    uploadBytes: async (url, data) => {
+      uploads++; bytes.push([...data])
+      if (uploads === 1) throw Object.assign(new Error('HTTP 423'), { saveNotPublished: true })
+    },
+    scheduleAutoSave() {},
+  }, [], (fn, ms) => ms === 1000 ? (resume = fn) : setTimeout(fn, ms))
+  const saving = vm.autoSave(); await tick()
+  assert.equal(vm.saving, true)
+  assert.notEqual(vm.statusKey, 'saveFailed')
+  vm.dirty = true
+  resume(); await saving
+  assert.deepEqual(bytes, [[1], [1]])
+  assert.equal(exports, 1)
+  assert.equal(vm.dirty, true)
+  assert.equal(vm._savePaused, false)
+  await vm.autoSave()
+  assert.deepEqual(bytes, [[1], [1], [2]])
+})
+
+for (const change of ['file', 'project', 'context', 'reload', 'discard', 'checkpoint', 'generation']) {
+  test(`版本忙碌重试前重新核对保存身份和屏障：${change}`, async () => {
+    let uploads = 0, resume, barrier
+    const projectId = 'busy-abort-' + change
+    const vm = makeVm({ projectId,
+      uploadBytes: async () => { uploads++; throw Object.assign(new Error('HTTP 423'), { saveNotPublished: true }) },
+    }, [], (fn, ms) => ms === 1000 ? (resume = fn) : setTimeout(fn, ms))
+    const saving = vm.saveDocument(); await tick()
+    if (change === 'file') vm.file = { id: 8 }
+    if (change === 'project') vm.projectId = 'another'
+    if (change === 'context') vm._backendSaveContext = 1
+    if (change === 'reload') vm._reloading = true
+    if (change === 'discard') vm._saveDiscarded = true
+    if (change === 'checkpoint' || change === 'generation') {
+      barrier = barriers.beginCheckpointSaveBarrier(projectId, 7, 'test-restore')
+      if (change === 'generation') barriers.endCheckpointSaveBarrier(projectId, 7, 'test-restore')
+    }
+    resume(); assert.equal(await saving, false)
+    assert.equal(uploads, 1)
+    if (barrier) {
+      assert.equal(await barrier.drained, true)
+      barriers.endCheckpointSaveBarrier(projectId, 7, 'test-restore')
+    }
+  })
+}
+
+test('版本忙碌后第二次上传失去响应仍保留未知写入屏障，不能继续重试', async () => {
+  let uploads = 0
+  const vm = makeVm({ projectId: 'busy-then-unknown', uploadBytes: async () => {
+    uploads++
+    if (uploads === 1) throw Object.assign(new Error('HTTP 423'), { saveNotPublished: true })
+    throw new Error('connection lost after upload')
+  } }, [], (fn, ms) => ms === 1000 ? setTimeout(fn, 0) : setTimeout(fn, ms))
+  await vm.autoSave()
+  assert.equal(uploads, 2)
+  assert.equal(vm._savePaused, true)
+  assert.equal(vm.versionSaveBusy, false)
+  const barrier = barriers.beginCheckpointSaveBarrier(vm.projectId, 7, 'keep-second-unknown')
+  assert.equal(await barrier.drained, false)
+  barriers.endCheckpointSaveBarrier(vm.projectId, 7, 'keep-second-unknown')
+})
+
+test('版本忙碌的安全回执不能抹掉更早一次网络上传的未知结果', async () => {
+  const vm = makeVm({ projectId: 'prior-uncertain-before-busy', uploadBytes: async () => { throw new Error('offline') } }, [], (fn, ms) => ms === 1000 ? setTimeout(fn, 0) : setTimeout(fn, ms))
+  await vm.autoSave()
+  vm.uploadBytes = async () => { throw Object.assign(new Error('HTTP 423'), { saveNotPublished: true }) }
+  assert.equal(await vm.retrySave(), false)
+  const barrier = barriers.beginCheckpointSaveBarrier(vm.projectId, vm.file.id, 'keep-uncertain')
+  assert.equal(await barrier.drained, false)
+  barriers.endCheckpointSaveBarrier(vm.projectId, vm.file.id, 'keep-uncertain')
+})
+
+for (const outcome of ['saved', 'failed', 'discarded', 'reloading', 'project-changed', 'file-changed', 'context-changed']) {
+  test(`文件保存事件等待上传确认，${outcome} 只通知有效的当前文件`, async () => {
+    const gate = deferred(), events = []
+    const vm = makeVm({ projectId: 1487, scheduleProvenanceReload() {}, uploadBytes: () => gate.promise }, events)
+    const saved = vm.saveDocument()
+    await tick()
+    assert.deepEqual(events, [], '不能在上传确认前刷新为已保存')
+    if (outcome === 'discarded') vm._saveDiscarded = true
+    if (outcome === 'reloading') vm._reloading = true
+    if (outcome === 'project-changed') vm.projectId = 1488
+    if (outcome === 'file-changed') vm.file = { id: 8 }
+    if (outcome === 'context-changed') vm._backendSaveContext = 1
+    if (outcome === 'failed') gate.reject(new Error('offline'))
+    else gate.resolve()
+    await saved
+    assert.deepEqual(events, outcome === 'saved' ? [['awd:file-saved', { projectId: 1487, fileId: 7 }]] : [])
+  })
+}

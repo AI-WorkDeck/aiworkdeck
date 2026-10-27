@@ -65,7 +65,7 @@ public class StreamableHttpMcpProvider implements McpProvider {
             requestBody.set("id", UUID.randomUUID().toString());
 
             String jsonPayload = requestBody.toString();
-            log.debug("MCP Payload: {}", jsonPayload);
+
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(server.getUrl()))
@@ -76,22 +76,37 @@ public class StreamableHttpMcpProvider implements McpProvider {
                     .timeout(Duration.ofSeconds(server.getTimeoutSeconds()))
                     .build();
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            String responseBody = response.body();
-
-            // Log RAW response for debugging - Critical for diagnosing format mismatches
-            if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                log.info("MCP Raw Response (Success): {}", responseBody);
+            String responseBody;
+            int status;
+            if (server.isPluginEndpoint()) {
+                // Use the same DNS-pinned policy as the general plugin MCP transport.
+                PluginMcpEndpointPolicy.validateUrl(server.getUrl());
+                okhttp3.OkHttpClient guarded = new okhttp3.OkHttpClient.Builder()
+                        .dns(new PluginMcpEndpointPolicy()).proxy(java.net.Proxy.NO_PROXY)
+                        .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false)
+                        .callTimeout(Duration.ofSeconds(Math.min(60, Math.max(1, server.getTimeoutSeconds())))).build();
+                okhttp3.Request guardedRequest = new okhttp3.Request.Builder().url(server.getUrl())
+                        .header("Authorization", "Bearer " + token).header("Accept", "application/json, text/event-stream")
+                        .post(okhttp3.RequestBody.create(jsonPayload, okhttp3.MediaType.get("application/json"))).build();
+                try (okhttp3.Response response = guarded.newCall(guardedRequest).execute()) {
+                    status = response.code();
+                    if (response.body() == null) return "Error: empty MCP response.";
+                    var source = response.body().source();
+                    if (source.request(PluginMcpHttpClient.MAX_BYTES + 1L)) return "Error: MCP response exceeds size limit.";
+                    responseBody = source.readUtf8();
+                }
             } else {
-                log.error("MCP Raw Response (Error {}): {}", response.statusCode(), responseBody);
-                return "Error calling MCP server (" + response.statusCode() + "): " + responseBody;
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                status = response.statusCode();
+                responseBody = response.body();
             }
+            if (status < 200 || status >= 300) return "Error calling MCP server (HTTP " + status + ").";
 
             return McpResponseParser.parse(responseBody);
 
         } catch (Exception e) {
-            log.error("MCP tool call failed: server={}, tool={}, error={}", server.getName(), toolName, e.getMessage(), e);
-            return "Error calling MCP tool: " + e.getMessage();
+            log.warn("MCP tool call failed: server={}, tool={}, type={}", server.getName(), toolName, e.getClass().getSimpleName());
+            return "Error calling MCP tool: connection or response failed.";
         }
     }
 }

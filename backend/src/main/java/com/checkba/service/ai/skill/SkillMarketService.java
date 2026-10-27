@@ -64,7 +64,9 @@ public class SkillMarketService {
     public static class MarketSkillView {
         private String id;
         private String name;
+        private String nameEn;
         private String description;
+        private String descriptionEn;
         private String icon;
         private String version;
         private String author;
@@ -101,12 +103,34 @@ public class SkillMarketService {
         } catch (Exception e) {
             throw new IllegalStateException(LangText.of("注册表返回内容无法解析: ", "Failed to parse registry response: ") + e.getMessage());
         }
+        // 工程内置高频工作流（builtin_workflow: true，如 contract-review）已随核心系统直接内置，
+        // 不再作为在线 Skill 广场的可安装/可更新项重复展示，降低用户的选择负担（懒人模式，dev-board#1431）。
+        list.removeIf(view -> view.getId() != null
+                && skillRegistry.getSkill(view.getId()).map(SkillDefinition::isBuiltinWorkflow).orElse(false));
         for (MarketSkillView view : list) {
             view.setPriceCents(MarketPurchaseGate.normalizePrice(view.getPriceCents()));
             if (view.getPricingModel() == null || view.getPricingModel().isBlank()) {
                 view.setPricingModel("once");
             }
             view.setInstalled(view.getId() != null && skillRegistry.getSkill(view.getId()).isPresent());
+            if (view.getId() != null) {
+                skillRegistry.getSkill(view.getId()).ifPresent(local -> {
+                    if (view.getNameEn() == null || view.getNameEn().isBlank()) {
+                        view.setNameEn(local.getNameEn());
+                    }
+                    if (view.getDescriptionEn() == null || view.getDescriptionEn().isBlank()) {
+                        view.setDescriptionEn(local.getDescriptionEn());
+                    }
+                });
+            }
+            if (LangText.isEnglish()) {
+                if (view.getNameEn() != null && !view.getNameEn().isBlank()) {
+                    view.setName(view.getNameEn());
+                }
+                if (view.getDescriptionEn() != null && !view.getDescriptionEn().isBlank()) {
+                    view.setDescription(view.getDescriptionEn());
+                }
+            }
             view.setPurchased(view.getPriceCents() > 0 && view.getId() != null
                     && purchaseGate.purchased(MarketPurchaseGate.skillFeature(view.getId())));
         }
@@ -182,6 +206,11 @@ public class SkillMarketService {
     public synchronized void uninstall(String id) {
         requireValidId(id);
         SkillDefinition existing = skillRegistry.getSkill(id).orElse(null);
+        if (existing != null && existing.isBuiltinWorkflow()) {
+            throw new IllegalStateException(LangText.of(
+                    "该能力属于系统内置高频工作流，默认自动生效，无需安装或卸载",
+                    "This capability is a built-in core workflow and cannot be uninstalled"));
+        }
         if (existing != null && existing.getSourcePluginId() != null) {
             throw new IllegalStateException(LangText.of(
                     "该 Skill 来自插件 " + existing.getSourcePluginId() + "，请通过插件管理卸载",

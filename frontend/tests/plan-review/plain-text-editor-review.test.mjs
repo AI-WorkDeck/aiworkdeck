@@ -4,6 +4,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { beginDocumentSave } from '../../src/utils/checkpointSaveBarrier.js'
 
 const SRC = readFileSync(new URL('../../src/components/PlainTextEditor.vue', import.meta.url), 'utf8')
 const SVC = readFileSync(new URL('../../src/services/fileReview.js', import.meta.url), 'utf8')
@@ -95,7 +96,7 @@ function loadOptions() {
   const script = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
   const body = script.replace(/^import .*$/gm, '').replace('export default', 'return')
   // eslint-disable-next-line no-new-func
-  return new Function('setTimeout', 'clearTimeout', body)(() => 1, () => {})
+  return new Function('setTimeout', 'clearTimeout', 'beginDocumentSave', body)(() => 1, () => {}, beginDocumentSave)
 }
 
 function unmountWith(discarding) {

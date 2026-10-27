@@ -106,6 +106,18 @@ public class AgentRunStateService {
         persist(conversationId, status, projectId, userId);
     }
 
+    /** Shutdown acknowledgement requires durable state; unlike ordinary UI state this must fail closed. */
+    public void suspendForRestart(String conversationId, Long projectId, Long userId) {
+        AgentRunRecord record = recordRepository.findByConversationId(conversationId).orElseGet(AgentRunRecord::new);
+        record.setConversationId(conversationId);
+        record.setProjectId(projectId);
+        record.setUserId(userId);
+        record.setStatus(RunStatus.INTERRUPTED.name());
+        record.setUpdatedAt(LocalDateTime.now());
+        recordRepository.saveAndFlush(record);
+        restore(conversationId, RunStatus.INTERRUPTED);
+    }
+
     /**
      * 清理超过 {@link #STALE_STATE_MILLIS} 未再更新的会话状态（见 {@link #states} 字段注释）。
      * 与 {@code TodoListService.purgeStaleLists} / {@code SkillRouter.purgeStaleActivations}

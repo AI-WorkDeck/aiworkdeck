@@ -7,6 +7,7 @@
 import { getProjectFiles, fetchProjectFileBytes, createComparisonFile } from '@/services/api.js'
 import { activityTracker } from '@/utils/activityTracker.js'
 import { ICONS as GLYPHS, fileGlyph } from '@/config/icons.js'
+import { getPluginAvatarUrl, getPluginGlyphPaths } from '@/config/pluginIcons.js'
 import { fileKindClass } from './fileKind.js'
 import { findChatFile, isCurrentDocSentinel, matchesActiveTab } from '@/utils/chatFileChange.js'
 import { isDocxDoc, runDocxComparison } from '@/utils/docxComparison.js'
@@ -15,6 +16,12 @@ import { isDocxDoc, runDocxComparison } from '@/utils/docxComparison.js'
 // dev-board#61 插件开发形态起收纳代码文件（js/json/html/css 等），供律师直改插件源码。
 // 必须与后端 TextFileEditTools.PLAIN_TEXT_TYPES 完全一致，改这里要同步改那边。
 const PLAIN_TEXT_TYPES = ['txt', 'md', 'markdown', 'json', 'js', 'mjs', 'css', 'html', 'htm', 'yml', 'yaml']
+
+function isImagePreview(item) {
+  return item && !item.isFolder && !item.tabType
+    && /^(png|jpe?g|gif|webp|bmp|svg|ico|avif)$/i.test(item.fileType || item.name?.split('.').pop() || '')
+}
+
 
 // 取鼠标事件的键位。uni-app H5 会把 <view> 上的原生事件重新包装成普通对象
 // （uni-h5 的 createNativeEvent），只给 click / mouse 系 / touch / keyboard 几类补字段，
@@ -38,7 +45,52 @@ function tabDomId(pane, fileId) {
 export const fileOpenTabsMethods = {
     handleFileTreeSelect(file) {
       if (!file || file.isFolder) return
+      if (this.quickLookFile) { this.quickLookFile = file; return }
+      if (isImagePreview(file)) { this.handleFileTreeNavigate(file); return }
       this.openFile(file)
+    },
+
+    handleFileTreeOpen(file) {
+      if (!file || file.isFolder) return
+      this.closeQuickLook()
+      this.openFile(file)
+    },
+    toggleQuickLook(file) {
+      if (this.quickLookFile) this.closeQuickLook()
+      else if (file && !file.isFolder) this.quickLookFile = file
+    },
+    closeQuickLook() {
+      this.quickLookFile = null
+      this.$nextTick(() => this.$refs.fileTree?.focusTree())
+    },
+    navigateQuickLook(direction) {
+      const tree = this.$refs.fileTree
+      const files = (tree?.displayFiles || []).filter(file => !file.isFolder)
+      const index = files.findIndex(file => String(file.id) === String(this.quickLookFile?.id))
+      if (!files.length) return
+      const next = Math.max(0, Math.min(files.length - 1, index + direction))
+      tree.selectKeyboardItem(files[next])
+    },
+    handleFileTreeNavigate(file) {
+      if (this.quickLookFile) {
+        if (file?.isFolder) this.closeQuickLook()
+        else this.quickLookFile = file
+        return
+      }
+      // Only an ordinary image preview may follow selection. Never replace an editor,
+      // special tab, or another pane; arrow navigation does not create a tab trail.
+      const pane = this.splitMode ? this.focusedPane : 'left'
+      const list = pane === 'right' ? this.rightFiles : this.leftFiles
+      const idProp = pane === 'right' ? 'activeFileIdRight' : 'activeFileIdLeft'
+      const index = list.findIndex(tab => String(tab.id) === String(this[idProp]))
+      const current = list[index]
+      if (!isImagePreview(file) || !isImagePreview(current) || current.dirty || current.isDirty || current.saving) return
+      const existing = list.find(tab => !tab.tabType && String(tab.id) === String(file.id))
+      if (existing) this[idProp] = existing.id
+      else { list.splice(index, 1, { ...file }); this[idProp] = file.id }
+      const mode = this.leftPaneKey || 'files'
+      this.lastActiveIdsByMode[pane][mode] = this[idProp]
+      this.saveActiveIdsByMode()
     },
 
     // Handle file open from SearchPanel
@@ -177,6 +229,7 @@ export const fileOpenTabsMethods = {
       // 保留已有 id 的类型，避免数字/字符串来源差异重建编辑器实例。
       const sameFile = tab => tab.id != null && file.id != null
         && String(tab.id) === String(file.id) && (tab.tabType || '') === (file.tabType || '')
+        && (file.tabType !== 'cross-project-preview' || String(tab.projectId) === String(file.projectId))
       const preferredPane = this.splitMode ? this.focusedPane : 'left'
       const otherPane = preferredPane === 'left' ? 'right' : 'left'
       const preferredList = preferredPane === 'left' ? this.leftFiles : this.rightFiles
@@ -203,8 +256,60 @@ export const fileOpenTabsMethods = {
       this.lastActiveIdsByMode[targetPane][mode] = tabId
       this.saveActiveIdsByMode()
 
+      this.syncFileTreeSelectionWithActiveTab?.(file)
+
       // 打开/激活后，给 WPS 一个机会刷新（避免容器尺寸/激活状态不对）
       this.$nextTick(() => this.triggerWorkbenchResize())
+    },
+
+    /**
+     * 强制把当前活动标签与左侧资源管理器（FileTree）的高亮选中状态绑定同步。
+     * 无论是 openFile、activateTab、closeFile、分屏切换、新建/复制标签还是打开特殊标签，
+     * 只要当前聚焦窗格的活动标签变化，左侧 FileTree 的高亮就必须指向同一个文件（或对非文件标签清空高亮），
+     * 避免出现「打开了新标签页，左侧却还高亮着另一个文件」的错位。
+     */
+    syncFileTreeSelectionWithActiveTab(fallbackFile = null) {
+      // 搜索结果可打开文档，但不展开/滚动隐藏的目录，返回时保留原来的浏览位置。
+      if (this.leftPaneKey === 'plugin-search') return
+      const pane = (this.splitMode && this.focusedPane === 'right') ? 'right' : 'left'
+      const activeId = pane === 'right' ? this.activeFileIdRight : this.activeFileIdLeft
+      const list = pane === 'right' ? this.rightFiles : this.leftFiles
+      let active = pane === 'right' ? this.activeFileRight : this.activeFileLeft
+      if (!active && activeId != null && Array.isArray(list)) {
+        active = list.find(f => f && String(f.id) === String(activeId)) || null
+      }
+      if (!active && fallbackFile && activeId != null && String(fallbackFile.id) === String(activeId)) {
+        active = fallbackFile
+      }
+      const applySync = () => {
+        const tree = this.$refs && this.$refs.fileTree
+        if (!tree) return
+        if (active && !this.isBrowserTab(active) && active.id != null && !active.tabType) {
+          // Activating a document outside the tag filter must not silently select a hidden file.
+          if (tree.isTagView && !tree.displayFiles.some(file => String(file.id) === String(active.id))) {
+            tree.selectedFileId = null
+            tree.multiSelectedIds = []
+            return
+          }
+          if (typeof tree.revealFile === 'function') {
+            const revealed = tree.revealFile(active.id)
+            if (!revealed) {
+              tree.selectedFileId = active.id
+              tree.multiSelectedIds = [active.id]
+            }
+          } else {
+            tree.selectedFileId = active.id
+            tree.multiSelectedIds = [active.id]
+          }
+        } else {
+          tree.selectedFileId = null
+          tree.multiSelectedIds = []
+        }
+      }
+      applySync()
+      if (typeof this.$nextTick === 'function') {
+        this.$nextTick(applySync)
+      }
     },
 
     /** 模板里给每个 .tab-item 打 id 用（scroll-into-view 的锚点） */
@@ -261,29 +366,7 @@ export const fileOpenTabsMethods = {
       this.saveActiveIdsByMode()
 
       // 同步更新 FileTree 的选中状态
-      // 如果是文件类型（非浏览器标签、非特殊标签类型），需要更新资源管理器的选中状态
-      if (!this.isBrowserTab(file) && file.id && !file.tabType) {
-        // 只同步当前已挂载的文件树；文档标签不改变左侧功能区或折叠状态。
-        this.$nextTick(() => {
-          if (this.$refs.fileTree) {
-            // 使用 revealFile 方法来定位并选中文件（会展开父目录并滚动到文件）
-            if (this.$refs.fileTree.revealFile) {
-              this.$refs.fileTree.revealFile(file.id)
-            } else {
-              // 如果没有 revealFile 方法，直接设置 selectedFileId
-              this.$refs.fileTree.selectedFileId = file.id
-            }
-          }
-        })
-      } else {
-        // 如果是浏览器标签或其他特殊类型，清空 FileTree 的选中状态
-        this.$nextTick(() => {
-          if (this.$refs.fileTree) {
-            this.$refs.fileTree.selectedFileId = null
-            this.$refs.fileTree.multiSelectedIds = []
-          }
-        })
-      }
+      this.syncFileTreeSelectionWithActiveTab?.(file)
 
       // Track switch
       const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
@@ -415,6 +498,7 @@ export const fileOpenTabsMethods = {
       // activityTracker.logAction('CLOSE_FILE', file.id, file.name, 0, meta)
 
       list.splice(idx, 1)
+      this.evictPdfKeepAlive(pane, fileId)
 
       // 如果关闭的是当前激活的文件，尝试切换到临近的文件
       if (activeId === fileId) {
@@ -428,17 +512,33 @@ export const fileOpenTabsMethods = {
         this.lastActiveIdsByMode[pane][mode] = newActiveId
         this.saveActiveIdsByMode()
       }
+      this.syncFileTreeSelectionWithActiveTab?.()
+    },
+
+    /** 插件/广场详情标签若有品牌形象头像（如包晴天），优先渲染头像而非线性 SVG */
+    getTabAvatarUrl(file) {
+      if (!file) return null
+      const pid = file.pluginId || (file.marketSpec && file.marketSpec.kind === 'plugin' ? file.marketSpec.id : null)
+      if (!pid) return null
+      return typeof getPluginAvatarUrl === 'function' ? getPluginAvatarUrl(pid) : null
     },
 
     /** 标签页图标的 SVG path 集合（界面禁用 emoji，图标一律 stroke 线性 SVG） */
-    getFileIconPaths(type, tabType) {
+    getFileIconPaths(type, tabType, pluginId) {
       if (tabType === 'web') return GLYPHS.web
-      if (tabType === 'market-detail' || tabType === 'plugin') return GLYPHS.blocks
+      if (tabType === 'plugin') {
+        return typeof getPluginGlyphPaths === 'function' ? getPluginGlyphPaths(pluginId) : GLYPHS.blocks
+      }
+      if (tabType === 'market-detail') {
+        if (pluginId && typeof getPluginGlyphPaths === 'function') return getPluginGlyphPaths(pluginId)
+        return GLYPHS.blocks
+      }
       // 项目概览 2026-08-19 起在左栏展示，不再有 project-home 标签
       // 个人中心 2026-08-20 并进了「设置」标签，不再有 user-profile 标签
-      if (tabType === 'admin-settings') return GLYPHS.settings
+      if (tabType === 'admin-settings' || tabType === 'builtin-workflow-settings') return GLYPHS.settings
       if (tabType === 'commit-history') return GLYPHS.history
       if (tabType === 'welcome') return GLYPHS.welcome
+      if (tabType === 'message-center' || tabType === 'dd-client' || tabType === 'dd-request') return GLYPHS.docText
       if (tabType === 'calendar') return GLYPHS.calendar
       if (tabType === 'tmeet-transcript') return GLYPHS.tmeet
       return fileGlyph(type)
@@ -463,7 +563,7 @@ export const fileOpenTabsMethods = {
         // 视频
         'mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi',
         // 音频
-        'mp3', 'wav', 'm4a', 'flac', 'aac',
+        'mp3', 'wav', 'm4a', 'flac', 'aac', 'qta',
         // 文本文件
         'txt', 'md', 'markdown', 'json', 'xml', 'html', 'css', 'js', 'java', 'py', 'sh', 'sql', 'log',
         // 压缩包（FilePreview 条目预览 + 解压）
@@ -478,9 +578,13 @@ export const fileOpenTabsMethods = {
     },
     isEditorOpenableFile(file) {
       // 判断是否为「文档编辑器可打开」的 Office 类文件
-      if (!file || file.tabType === 'web' || file.tabType === 'markdown' || !file.fileType) return false
+      if (!file || file.tabType === 'web' || file.tabType === 'markdown' || file.tabType === 'cross-project-preview' || !file.fileType) return false
 
       const type = file.fileType.toLowerCase()
+
+      // PDF must reach FilePreview even when FileTree supplies a legacy wpsFileId.
+      // Writer otherwise imports its binary bytes as text (dev-board#1178).
+      if (type === 'pdf' || ['zip', 'rar', '7z'].includes(type)) return false
 
       // 1. Force native preview for media types (Images, Video, Audio)
       const mediaTypes = [
@@ -489,7 +593,7 @@ export const fileOpenTabsMethods = {
           // Video
           'mp4','webm','ogg','mov','mkv','avi',
           // Audio
-          'mp3','wav','m4a','flac','aac'
+          'mp3','wav','m4a','flac','aac','qta'
       ]
       if (mediaTypes.includes(type)) return false
 
@@ -569,6 +673,58 @@ export const fileOpenTabsMethods = {
             console.warn('[ProjectOverview] plain text reload failed:', e)
             ok = false
           }
+        }
+      }
+      return ok
+    },
+
+    isPdfPreviewFile(file) {
+      return !!(file && !file.tabType && !file.isFolder && String(file.fileType || '').toLowerCase() === 'pdf')
+    },
+    touchPdfKeepAlive(pane, file) {
+      if (!this.isPdfPreviewFile(file)) return
+      const prefix = pane + ':'
+      const key = prefix + file.id
+      const keys = this.pdfKeepAliveKeys || []
+      const own = [key, ...keys.filter(item => item.startsWith(prefix) && item !== key)].slice(0, 2)
+      this.pdfKeepAliveKeys = [...own, ...keys.filter(item => !item.startsWith(prefix))]
+    },
+    evictPdfKeepAlive(pane, fileId, { includeActive = true } = {}) {
+      const activeId = pane === 'left' ? this.activeFileIdLeft : this.activeFileIdRight
+      if (!includeActive && String(activeId) === String(fileId)) return
+      const key = pane + ':' + fileId
+      this.pdfKeepAliveKeys = (this.pdfKeepAliveKeys || []).filter(item => item !== key)
+    },
+    prunePdfKeepAlive() {
+      this.pdfKeepAliveKeys = (this.pdfKeepAliveKeys || []).filter(key => {
+        const pane = key.startsWith('right:') ? 'right' : 'left'
+        const files = pane === 'left' ? this.leftFiles : this.rightFiles
+        const id = key.slice(key.indexOf(':') + 1)
+        return files.some(file => this.isPdfPreviewFile(file) && String(file.id) === id)
+      })
+    },
+    resetPdfPreviewPool() {
+      this.pdfKeepAliveKeys = []
+      this.pdfPreviewEpoch = (this.pdfPreviewEpoch || 0) + 1
+      // 权限初始化也会重建查看器；把当前文件重新记入池，切走时才不会立即销毁。
+      this.touchPdfKeepAlive('left', this.activeFileLeft)
+      this.touchPdfKeepAlive('right', this.activeFileRight)
+    },
+    setPdfPreviewRef(pane, fileId, el) {
+      if (!this._pdfPreviewRefs) this._pdfPreviewRefs = {}
+      const key = pane + ':' + fileId
+      if (el) this._pdfPreviewRefs[key] = el
+      else delete this._pdfPreviewRefs[key]
+    },
+    async reloadPdfInstances(fileId, force = true) {
+      let ok = true
+      for (const [key, inst] of Object.entries(this._pdfPreviewRefs || {})) {
+        if (!inst || String(inst.file?.id) !== String(fileId)) continue
+        try {
+          if (await inst.reloadFromBackend(force) !== true) ok = false
+        } catch (e) {
+          console.warn('[ProjectOverview] PDF reload failed:', key, e)
+          ok = false
         }
       }
       return ok
@@ -981,7 +1137,15 @@ export const fileOpenTabsMethods = {
     // 顶掉，律师只看得见最后一条、还以为只更新了一份。多文件时改为静音逐份重载、
     // 最后聚合成一句。单文件语义一个字不改（仍是原来的逐文件 toast）。
     async onVersionReloadFiles(affectedFileIds) {
-      if (!Array.isArray(affectedFileIds) || !affectedFileIds.length) return
+      if (this._projectVersionReload) {
+        const restored = await this._projectVersionReload()
+        const ids = Array.isArray(affectedFileIds) ? affectedFileIds : [...new Set(Object.values(this._pdfPreviewRefs || {}).map(inst => inst.file?.id).filter(id => id != null))]
+        const pdfResults = await Promise.all(ids.map(id => this.reloadPdfInstances(id)))
+        return restored && pdfResults.every(ok => ok !== false)
+      }
+      // 文件树切栏后仍保留挂载，版本操作须主动刷新清单；不等待请求，避免延迟编辑器换入新内容。
+      this.$refs?.fileTree?.loadFiles()
+      if (!Array.isArray(affectedFileIds) || !affectedFileIds.length) return true
       const idSet = new Set(affectedFileIds)
       const openIds = new Set()
       for (const f of this.leftFiles) {
@@ -992,6 +1156,8 @@ export const fileOpenTabsMethods = {
       }
       const many = openIds.size > 1
       let ok = 0
+      let textOk = true
+      let pdfOk = true
       for (const fileId of openIds) {
         // forceActive：这条链上的每一种动作（退回/开稿/切线/采纳/放弃/丢弃）都是律师
         // 亲手点出来的，正在显示的那个实例也必须就地换文档——不然下一次 autosave 会把
@@ -1011,7 +1177,9 @@ export const fileOpenTabsMethods = {
       // 标签没有实例（v-if 单实例），下次激活挂载即拉新内容。失败时组件自己转入
       // 错误相位并封死保存，这里不再叠加提示。
       for (const fileId of idSet) {
-        await this.reloadPlainTextInstances(fileId)
+        if (await this.reloadPlainTextInstances(fileId) === false) textOk = false
+        if (await this.reloadPdfInstances?.(fileId) === false) pdfOk = false
       }
+      return ok === openIds.size && textOk && pdfOk
     },
 }

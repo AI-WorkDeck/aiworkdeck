@@ -50,7 +50,7 @@
 //  - 切语言必须整页 reload：i18n 单例的 locale 与 utils/appLanguage.js 的模块级
 //    cached 都在模块加载时定死，uni 的 hash 跳转不产生新 document，改了存储也
 //    不生效（admin 页面栈缓存同理，J11 连接步骤的注释有实证）。语言键
-//    awd_app_language 直写 localStorage 裸字符串即可（uni h5 getStorageSync 兼容）
+//    app_language 直写 localStorage 裸字符串即可（uni h5 getStorageSync 兼容）
 //
 // Env: APP_E2E_BASE / APP_E2E_BACKEND / PUPPETEER_EXECUTABLE_PATH
 
@@ -229,6 +229,15 @@ try {
     if (!box) throw new Error('找不到选择器: ' + sel)
     await page.mouse.click(box.x, box.y)
     await sleep(700)
+  }
+  // 独立 Web 插件内容位于 opaque-origin iframe；只在可见且已挂载的真实面板内断言。
+  const pluginFrame = async (id, selector) => {
+    const iframe = await page.waitForSelector(`iframe.plugin-iframe[src*="/api/plugin-web/${id}/"]`,
+      { visible: true, timeout: 15000 })
+    const frame = await iframe.contentFrame()
+    if (!frame) throw new Error('插件 iframe 尚未挂载: ' + id)
+    await frame.waitForSelector(selector, { visible: true, timeout: 15000 })
+    return frame
   }
   // 协作抽屉（PR-E）：交稿/取回/放进团队案件库三个动作全在这个页面级弹窗里，做完
   // 必须显式关掉——它是全屏遮罩，不关的话后续点版本面板/rail 的坐标全落在遮罩上，
@@ -480,8 +489,8 @@ try {
   // 同时视为用户亲手选过中文：登录卡选国际站时「从没选过语言就顺带切英文」（设计 2026-09-23 §2.4）
   // 会整页 reload 成英文；并钉住「首装按语言预选站点」已做过，套件全程不让页面替用户切站。
   const PIN_ZH_CN = `
-    try { localStorage.setItem('awd_app_language', 'zh-CN') } catch (e) {}
-    try { localStorage.setItem('awd_app_language_manual', '1') } catch (e) {}
+    try { localStorage.setItem('app_language', 'zh-CN') } catch (e) {}
+    try { localStorage.setItem('app_language_manual', '1') } catch (e) {}
     try { localStorage.setItem('awd_site_preselected', '1') } catch (e) {}
   `
   await page.evaluateOnNewDocument((apiBase) => {
@@ -613,8 +622,8 @@ try {
     })
 
     await step('顶栏右上角账户入口：未连账户显示「登录」态，rail 底部无账户入口与设置齿轮', async () => {
-      await j1Page.waitForSelector('.project-header .header-account .account-entry-btn', { timeout: 15000 })
-      const st = await j1Page.$eval('.project-header .header-account .account-entry-btn', (e) => ({
+      await j1Page.waitForSelector('.project-header .header-account .account-entry-btn:not(.signed-out-messages)', { timeout: 15000 })
+      const st = await j1Page.$eval('.project-header .header-account .account-entry-btn:not(.signed-out-messages)', (e) => ({
         signedOut: e.classList.contains('is-signed-out'),
         label: ((e.querySelector('.account-entry-label') || {}).textContent || '').trim(),
         avatar: !!e.querySelector('.account-avatar'),
@@ -633,7 +642,8 @@ try {
 
     await step('无项目态：AI 栏不渲染、项目专属 rail 项不挂、有「项目」入口', async () => {
       if (await j1Page.$('.chat-input-rich')) throw new Error('无项目态不该渲染 AI 输入框')
-      for (const title of ['资源管理器', '版本记录', '文件暂存区']) {
+      if (await j1Page.$('.left-rail .version-entry')) throw new Error('无项目态 rail 不该有版本入口')
+      for (const title of ['资源管理器', '文件暂存区']) {
         if (await j1Page.$('.left-rail [title="' + title + '"]')) throw new Error('无项目态 rail 不该有「' + title + '」')
       }
       if (!(await j1Page.$('.left-rail [title="项目"]'))) throw new Error('无项目态 rail 缺「项目」入口')
@@ -656,7 +666,7 @@ try {
   }
 
   // ============ J2 左栏「项目」面板 + 统一设置页的「个人」组 ============
-  //  ① 项目列表直链落到工作台外壳的「项目」面板，能加载出卡片（J3 的起点，必须先立住）。
+  //  ① 项目列表直链落到工作台外壳的「项目」面板，能加载出项目行（J3 的起点，必须先立住）。
   //     dev-board#1047 起 pages/project-list 是直链薄壳：redirectTo 外壳 ?pane=projects，
   //     内容本体是 components/project-list/ProjectListPane.vue（.project-list-pane）。
   //  ② 个人内容仍然到得了、四个栏目都不是空白页
@@ -679,10 +689,10 @@ try {
         () => location.hash.includes('pages/project-overview/project-overview') && location.hash.includes('pane=projects'),
         { timeout: 20000 })
     }
-    await page.waitForSelector('.project-list-pane .project-item-card', { timeout: 20000 })
+    await page.waitForSelector('.project-list-pane .ptable-row', { timeout: 20000 })
   }
 
-  await step('项目列表直链 → 外壳「项目」面板加载出项目卡片', async () => {
+  await step('项目列表直链 → 外壳「项目」面板加载出项目行', async () => {
     // 这一步刻意走直链（新文档，不在工作台里），验薄壳页的 redirectTo
     if (await page.$('.page-project-overview')) throw new Error('直链断言要从工作台之外出发')
     await gotoProjectsPane()
@@ -758,11 +768,11 @@ try {
   // 所以后面回工作台必须先点回「资源管理器」（见「回到工作台继续后续旅程」）。
   console.log('== J3 两级导航 ==')
 
-  await step('「项目」面板点卡片 → 直达工作台', async () => {
+  await step('「项目」面板点项目行 → 直达工作台', async () => {
     await gotoProjectsPane()
     await waitText(QA.project.slice(0, 8))
-    // 卡片标题绑定 @tap.stop=startRename（点名字=重命名），进入要点卡片主体
-    await mouseClickSel('.project-item-card')
+    // 项目行主体（包括名称）进入项目；重命名使用独立操作按钮。
+    await mouseClickSel('.project-list-pane .ptable-row')
     await page.waitForFunction(
       () => location.hash.includes('pages/project-overview/project-overview'), { timeout: 20000 })
     await waitText('资源管理器', 30000)
@@ -787,7 +797,7 @@ try {
     if (cards !== 1) throw new Error('浏览器降级下新建卡应当恰好 1 张，实际 ' + cards)
     if (!t.includes('新建项目')) throw new Error('列表下方缺新建入口')
     if (t.includes('打开文件…')) throw new Error('「单独打开文件」应当已从新建入口去掉')
-    await mouseClickSel('.project-item-card')
+    await mouseClickSel('.project-list-pane .ptable-row')
     await page.waitForFunction(
       () => location.hash.includes('pages/project-overview/project-overview'), { timeout: 20000 })
     await waitText('资源管理器', 30000)
@@ -858,7 +868,7 @@ try {
     await page.waitForFunction(
       () => location.hash.includes('pages/project-overview/project-overview') && location.hash.includes('pane=projects'),
       { timeout: 15000 })
-    await page.waitForSelector('.project-list-pane .project-item-card', { timeout: 15000 })
+    await page.waitForSelector('.project-list-pane .ptable-row', { timeout: 15000 })
     // uni h5 的页面栈在 DOM 里是并存的（navigateTo 压栈时旧页留在文档里只是隐藏），
     // 所以根节点计数就是页面栈实例数的直接证据。
     const n = await page.evaluate(() => ({
@@ -870,7 +880,7 @@ try {
   })
 
   await step('回到工作台继续后续旅程', async () => {
-    await mouseClickSel('.project-item-card')
+    await mouseClickSel('.project-list-pane .ptable-row')
     await page.waitForFunction(
       () => location.hash.includes('pages/project-overview/project-overview'), { timeout: 20000 })
     // **这里不能用 waitText('资源管理器')**：上一步点过「项目概览」，leftPaneKey 已经
@@ -903,6 +913,12 @@ try {
   /** 等登录弹层出现并断言形态；siteInfo 为 null 时跳过站点分段断言。返回弹层里的文本。 */
   const assertLoginDialog = async (pg, { reasonIncludes = '', siteInfo = site0, cancelText = LOGIN_CANCEL_TEXT, noCjk = false } = {}) => {
     await pg.waitForSelector('.awd-login-mask .unlock-card.is-dialog', { visible: true, timeout: 15000 })
+    // Site status arrives asynchronously after the dialog shell mounts.
+    if (siteInfo && siteInfo.multiSite) {
+      await pg.waitForFunction(() => document.querySelectorAll(
+        '.awd-login-mask .unlock-site-seg .unlock-site-seg-item').length === 2,
+      { timeout: 15000 })
+    }
     const st = await pg.evaluate(() => {
       const mask = document.querySelector('.awd-login-mask')
       const q = (s) => mask && mask.querySelector(s)
@@ -1100,45 +1116,48 @@ try {
 
   // ============ J6 左栏功能区（title 定位图标） ============
   console.log('== J6 左栏功能区 ==')
-  // 标题取自 config/leftSidebarPlugins.js 的 label（i18n 键 config.sidebar.*）——
-  // 改名会让这一步整条失配。「EasyVoice」在 #389 已改成「语音合成」；2026-08-19
-  // 语音合成与会议录音合并成一个 rail 入口「语音」（合成成了面板内的一个 tab），
-  // rail 标题跟着改。以后再改名，先看这一行。
-  // 「文件脱敏」自 2026-08-19 起是门控面板（skill desensitize 默认不装），
-  // 不再常显，单独走下面的安装/卸载全周期断言。
-  for (const title of ['搜索', '语音', '文件暂存区', '资源管理器']) {
+  // #1151 后业务面板由独立插件贡献；入口名称与内容分别在宿主 rail / 插件 iframe。
+  await step('左栏项目搜索打开独立插件内容', async () => {
+    await mouseClickSel('[title="搜索"]')
+    await pluginFrame('search', '.search-panel input')
+  })
+  for (const title of ['语音', '文件暂存区', '资源管理器']) {
     await step('左栏 ' + title, () => mouseClickSel('[title="' + title + '"]'))
   }
-  await step('脱敏默认不装：rail 无入口', async () => {
-    if (await page.$('[title="文件脱敏"]')) {
-      throw new Error('desensitize 未启用时 rail 不该出现「文件脱敏」入口')
-    }
-  })
-  await step('广场安装（启用）脱敏后入口出现，卸载后消失', async () => {
-    // 与广场「安装」同一条后端路径；enabledSkillIds 是挂载时拉取的，翻转后整页刷新再断言
-    await api('/api/skills/desensitize/enable', { method: 'POST' })
+  await step('插件中心启停脱敏：当前工作台即时更新入口并打开实际面板', async () => {
+    const original = (await api('/api/plugins/list')).find(p => p.id === 'desensitize')
+    if (!original) throw new Error('缺少随应用分发的脱敏插件')
     try {
-      await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 })
-      await page.waitForSelector('[title="文件脱敏"]', { timeout: 15000 })
-      await mouseClickSel('[title="文件脱敏"]')
+      await mouseClickSel('[title="插件中心"]')
+      const row = await page.waitForFunction(() => [...document.querySelectorAll('.msb .msb-row-name')]
+        .find(el => el.innerText.trim() === '脱敏'), { timeout: 15000 })
+      await row.asElement().click()
+      await page.waitForSelector('.mdp .awd-switch', { visible: true, timeout: 15000 })
+      if (!original.enabled) {
+        await mouseClickSel('.mdp .awd-switch')
+        await page.waitForSelector('.left-rail [title="文件脱敏"]', { visible: true, timeout: 15000 })
+      }
+      await mouseClickSel('.mdp .awd-switch')
+      await page.waitForFunction(() => !document.querySelector('.left-rail [title="文件脱敏"]'), { timeout: 15000 })
+      await page.waitForSelector('.mdp .awd-switch[aria-checked="false"]', { timeout: 15000 })
+      await mouseClickSel('.mdp .awd-switch')
+      await page.waitForSelector('.left-rail [title="文件脱敏"]', { visible: true, timeout: 15000 })
+      await page.waitForSelector('.mdp .awd-switch[aria-checked="true"]', { timeout: 15000 })
+      await mouseClickSel('.left-rail [title="文件脱敏"]')
+      await pluginFrame('desensitize', '.desensitize-pane .operation-tabs')
     } finally {
-      // 还原到默认态（长驻后端不能被 e2e 改状态）
-      await api('/api/skills/desensitize/disable', { method: 'POST' })
+      // 这里只恢复测试前的后端状态；上述 UI 通知链断言不借助 API 写入、reload 或手动刷新。
+      await api('/api/plugins/desensitize/' + (original.enabled ? 'enable' : 'disable'), { method: 'POST' })
     }
-    await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 })
-    await page.waitForFunction(
-      () => !document.querySelector('[title="文件脱敏"]'),
-      { timeout: 15000 },
-    )
   })
-  await step('「语音」面板里是两个 tab 而不是两个 rail 入口', async () => {
+  await step('「语音」独立插件里显示语音合成与会议录音两个 tab', async () => {
     await mouseClickSel('[title="语音"]')
-    await page.waitForSelector('.voice-tabs', { timeout: 10000 })
-    const t = await textOf()
-    if (!t.includes('语音合成')) throw new Error('语音面板里没有「语音合成」tab')
-    // dev-board#66 起语音合成与会议录音是**一个**合并插件（启停一体，后端
-    // SkillRegistry 收敛保证两个成员状态一致）：语音入口在，两个 tab 就都在。
-    if (!t.includes('会议录音')) throw new Error('语音面板里没有「会议录音」tab（合并插件启停一体后应恒在）')
+    const frame = await pluginFrame('voice', '.voice-tabs')
+    const tabs = await frame.$$eval('.voice-tab', els => els.map(el => el.innerText.trim()))
+    if (JSON.stringify(tabs) !== JSON.stringify(['语音合成', '会议录音'])) {
+      throw new Error('语音插件 tab 不匹配: ' + JSON.stringify(tabs))
+    }
+    await frame.waitForSelector('.easy-voice-pane', { visible: true, timeout: 10000 })
     await mouseClickSel('[title="资源管理器"]')
   })
   await shot('j6-rails')
@@ -1156,7 +1175,7 @@ try {
   console.log('== J6.3 账户入口与设置标签 ==')
   if (accountConnected0) {
     await step('点顶栏头像开三项下拉，点「设置」开中栏标签、不跳页', async () => {
-      await mouseClickSel('.project-header .header-account .account-entry-btn')
+      await mouseClickSel('.project-header .header-account .account-entry-btn:not(.signed-out-messages)')
       await page.waitForSelector('.account-entry-menu', { timeout: 8000 })
       const items = await page.$$eval('.account-entry-menu .avatar-menu-item', (els) => els.map((e) => e.textContent.trim()))
       if (items.length !== 3) throw new Error('账户下拉应当恰好三项（我的日程/设置/退出登录），实际: ' + JSON.stringify(items))
@@ -1232,12 +1251,12 @@ try {
     await page.waitForSelector('.sidebar-left', { timeout: 10000 })
     const widthBefore = await page.$eval('.sidebar-left', (el) => el.getBoundingClientRect().width)
     if (widthBefore <= 0) throw new Error('测试起点应为左栏展开状态，实际宽度: ' + widthBefore)
-    await mouseClickSel('.left-rail [title="收起左侧栏"]')
+    await mouseClickSel('.sidebar-collapse-tab[title="收起左侧栏"]')
     await page.waitForFunction(
       () => document.querySelector('.sidebar-left')?.getBoundingClientRect().width === 0,
       { timeout: 8000 },
     )
-    await mouseClickSel('.left-rail [title="展开左侧栏"]')
+    await mouseClickSel('.top-bar-btn[title="展开左侧栏"]')
     await page.waitForFunction(
       () => (document.querySelector('.sidebar-left')?.getBoundingClientRect().width || 0) > 0,
       { timeout: 8000 },
@@ -1260,8 +1279,8 @@ try {
     if (!(await page.$('.bottom-panel'))) await mouseClickSel('[title="常用工具"]')
     await page.waitForSelector('.bottom-panel', { timeout: 10000 })
     await mouseClickText('剪贴板')
-    // 断言 ClipboardPanel 组件真的挂载了（.tab-indicator 只说明有 tab 激活，面板挂载失败也存在）
-    await page.waitForSelector('.clip-panel', { timeout: 10000 })
+    // 真正进入插件 iframe，不能只验宿主 tab 激活。
+    await pluginFrame('clipboard', '.clip-panel .collection-search')
   })
   await shot('j6.6-clipboard')
 
@@ -1586,7 +1605,7 @@ try {
   // → 手动再开」这条新增的拒绝链补成三步——手动开启这一步同时把旅程接回旧基线的
   // 起点（已开启的空仓），后面 runWorkSession 那一串一个字都不用改。
   await step('打开版本面板即已是开启态（默认开启，无需手动点开启）', async () => {
-    await mouseClickSel('[title="版本"]')
+    await mouseClickSel('.version-entry')
     // 认已开启态的**结构**，不认「空闲/工作中」哪一种：VersionPanel 的 v-else 分支
     // （WorkSessionBar + footer）只在 enabled 为真时渲染。这里刻意不断言 .session-idle
     // ——默认开启之后，J4 那两次上传本身就是变更信号，会在这个项目上隐式开一段工作，
@@ -1662,26 +1681,32 @@ try {
       throw new Error('改动信号把已 opt-out 的项目又开回来了: ' + JSON.stringify(st).slice(0, 200))
     }
     // 面板只在挂载时读一次 /status，靠切出/切回侧栏挂载点强制重新挂载（既有手法）。
-    await mouseClickSel('[title="版本"]')
+    await mouseClickSel('.version-entry')
     await waitText('这个项目没有开启版本记录', 15000)
   })
 
   await step('手动开启清掉 opt-out 后回到已开启空闲态', async () => {
     await mouseClickText('开启版本记录')
     await page.waitForSelector('.session-bar .session-idle', { timeout: 15000 })
-    // 旧基线的文案断言原样保留（空闲态文案是「当前没有进行中的工作」）。
-    await waitText('当前没有进行中的工作')
+    // 空闲态应明确没有待提交的改动。
+    await waitText('当前没有待提交的改动')
   })
+
+  // 工作段空闲先于子时间线异步加载完成；点击前等本次命名节点真正可见。
+  const waitVersionTitle = (title) => page.waitForFunction((expected) =>
+    [...document.querySelectorAll('.timeline-node .node-title')].some((node) =>
+      node.innerText.trim() === expected && node.getClientRects().length > 0),
+    { timeout: 15000 }, title)
 
   // 一段完整工作：上传一个文件、进入工作中、结束并命名、回到空闲态。
   const runWorkSession = async (file, uploadLabel, title) => {
     await mouseClickSel('[title="资源管理器"]')
     await uploadOne(file, uploadLabel)
     await waitText(uploadLabel, 20000)
-    await mouseClickSel('[title="版本"]')
-    await waitText('工作中')
+    await mouseClickSel('.version-entry')
+    await page.waitForSelector('.session-bar .session-dot:not(.draft-dot)', { timeout: 10000 })
 
-    await mouseClickText('结束本次工作')
+    await mouseClickText('提交本次改动…')
     // 注意：brief 原写法选 .awd-input（模板里 <input> 标签自带的 class），
     // 但那是 uni-app <input> 组件编译到 H5 后的外层包装元素的 class，
     // 真正可编辑的原生 <input> 在其内部另有 .uni-input-input（顶部注释
@@ -1696,10 +1721,10 @@ try {
     // Vue 数据层的 title 仍是去抖前的值，提交的标题会丢最后一个字。
     // 实测过 300ms 足够让同步落定（真实网络请求里标题不再缺字）。
     await sleep(300)
-    await mouseClickText('完成')
-    // brief 原断言是 waitText('主线')；实际空闲态文案是"当前没有进行中的工作"
-    // （见上一步同样的改动理由），以实际组件模板为准。
-    await waitText('当前没有进行中的工作')
+    await mouseClickSel('.session-bar .awd-dialog .awd-btn-primary')
+    // 提交后回到无待提交改动态，并在下方核验命名版本节点。
+    await waitText('当前没有待提交的改动')
+    await waitVersionTitle(title)
   }
 
   await step('第一段工作：落一个文件并命名结束', () =>
@@ -1799,18 +1824,19 @@ try {
     // 裸 REST 调用不会推送给前端；版本面板只在挂载时读一次状态，靠切出/切回
     // 侧栏挂载点强制重新挂载、重新拉取状态（与 runWorkSession 里同样的手法）。
     await mouseClickSel('[title="资源管理器"]')
-    await mouseClickSel('[title="版本"]')
-    await waitText('工作中')
+    await mouseClickSel('.version-entry')
+    await page.waitForSelector('.session-bar .session-dot:not(.draft-dot)', { timeout: 10000 })
   })
 
   await step('结束追加工作并命名（产生 MODIFY 提交）', async () => {
-    await mouseClickText('结束本次工作')
+    await mouseClickText('提交本次改动…')
     await page.waitForSelector('.awd-dialog .uni-input-input', { timeout: 10000 })
     const input = await page.$('.awd-dialog .uni-input-input')
     await input.click(); await input.type('端到端测试稿四', { delay: 15 })
     await sleep(300)
-    await mouseClickText('完成')
-    await waitText('当前没有进行中的工作')
+    await mouseClickSel('.session-bar .awd-dialog .awd-btn-primary')
+    await waitText('当前没有待提交的改动')
+    await waitVersionTitle('端到端测试稿四')
   })
 
   // ============ J9 追加 2/3：对比入口 ============
@@ -1960,7 +1986,7 @@ try {
   })
 
   await step('回到主线工作后稿态消失', async () => {
-    await mouseClickSel('[title="版本"]')
+    await mouseClickSel('.version-entry')
     await mouseClickText('回到主稿工作')
     await page.waitForFunction(
       () => !!document.querySelector('.session-bar .session-idle'),
@@ -1978,7 +2004,7 @@ try {
 
   // ---- 4. 「切到这一稿」→ 断言文件回来（两线内容隔离的正反双证） ----
   await step('切到这一稿', async () => {
-    await mouseClickSel('[title="版本"]')
+    await mouseClickSel('.version-entry')
     await waitText('进行中的稿')
     await mouseClickText('切到这一稿')
     await page.waitForFunction(
@@ -1998,7 +2024,7 @@ try {
   // ---- 5. 回主线 → 主线上裸 REST 改文件 → 稿上也裸 REST 改同一文件 → 「采纳这一稿」
   //         → 断言三选一弹窗出现且列出该文件（认 AdoptConflictDialog 选择器） ----
   await step('回到主线工作', async () => {
-    await mouseClickSel('[title="版本"]')
+    await mouseClickSel('.version-entry')
     await mouseClickText('回到主稿工作')
     await page.waitForFunction(
       () => !!document.querySelector('.session-bar .session-idle'),
@@ -2013,14 +2039,14 @@ try {
     // REST 直传会隐式在主线上开一段工作段（onChangeSignal 对非稿分支的口径），
     // adoptDraft 要求"没有进行中的工作"，必须先收尾，理由见领域文档核心契约。
     await mouseClickSel('[title="资源管理器"]')
-    await mouseClickSel('[title="版本"]')
-    await waitText('工作中')
-    await mouseClickText('结束本次工作')
+    await mouseClickSel('.version-entry')
+    await page.waitForSelector('.session-bar .session-dot:not(.draft-dot)', { timeout: 10000 })
+    await mouseClickText('提交本次改动…')
     await page.waitForSelector('.awd-dialog .uni-input-input', { timeout: 10000 })
     const input = await page.$('.awd-dialog .uni-input-input')
     await input.click(); await input.type('J10 主线追加修改', { delay: 15 })
     await sleep(300)
-    await mouseClickText('完成')
+    await mouseClickSel('.session-bar .awd-dialog .awd-btn-primary')
     await page.waitForFunction(
       () => !!document.querySelector('.session-bar .session-idle'),
       { timeout: 10000 },
@@ -2089,7 +2115,7 @@ try {
   })
 
   await step('时间线出现「采纳：试验稿」节点', async () => {
-    await mouseClickSel('[title="版本"]')
+    await mouseClickSel('.version-entry')
     await page.waitForFunction(() => {
       const titles = [...document.querySelectorAll('.timeline-node .node-title')].map((e) => e.innerText || '')
       return titles.some((t) => t.includes('采纳：试验稿'))
@@ -2180,6 +2206,14 @@ try {
     if (!j || j.code !== 0) throw new Error('REST 直传失败: ' + JSON.stringify(j))
   }
   const endSessionAt = async (apiFn, projectId, title) => {
+    // Upload completion precedes asynchronous version bookkeeping. Match the UI's
+    // working-state prerequisite before sending the one-shot end request.
+    let status
+    const ready = await pollUntil(async () => {
+      status = await apiFn('/api/projects/' + projectId + '/version/status')
+      return status?.code === 0 && status.data?.enabled === true && status.data?.working === true
+    }, 15000, 200)
+    if (!ready) throw new Error('结束工作前未进入工作中: ' + JSON.stringify(status).slice(0, 300))
     const r = await apiFn('/api/projects/' + projectId + '/version/session/end', { method: 'POST', body: { title } })
     if (!r || r.code !== 0) throw new Error('结束工作失败: ' + JSON.stringify(r).slice(0, 200))
     return r.data
@@ -2267,7 +2301,7 @@ try {
       // 靠切出/切回侧栏挂载点强制重新挂载」是同一条既有纪律（J9/J10 到处这么用），
       // 这里只是补上「整页 goto 之后第一次开面板」这一种也需要它的场景。
       await mouseClickSel('[title="资源管理器"]')
-      await mouseClickSel('[title="版本"]')
+      await mouseClickSel('.version-entry')
       // CloudSyncBar 的内容要等 VersionPanel.refresh()→fetchCloudState() 两次串行网络
       // 请求都落地才出现；这个项目此时已经带着 J9/J10 攒下的一整段真实历史，读取比
       // 早期空项目慢，mouseClickSel 自带的 700ms 不够稳（现场调试实证：直接点文案
@@ -2312,9 +2346,9 @@ try {
     // 两条主分支由后端单测 ProjectMemberLookupTest / ProjectMemberAddByContactTest 覆盖。
     await step('A：协作抽屉里查出 lawyer_b 的人卡并确认加进案卷（UI 两步加人）', async () => {
       await mouseClickSel('[title="资源管理器"]')
-      await mouseClickSel('[title="版本"]')
+      await mouseClickSel('.version-entry')
       await page.waitForSelector('.cloud-dot', { timeout: 15000 })
-      await mouseClickText('打开协作')
+      await mouseClickText('管理云端同步')
       await page.waitForSelector('.collab-dialog', { timeout: 10000 })
       await mouseClickText('案件参与人')
       await page.waitForSelector('.collab-add-row .uni-input-input', { timeout: 10000 })
@@ -2419,11 +2453,11 @@ try {
 
     await step('A：点「取回最新稿」', async () => {
       await mouseClickSel('[title="资源管理器"]')
-      await mouseClickSel('[title="版本"]')
+      await mouseClickSel('.version-entry')
       // 同上一步的教训：等 .cloud-dot 出现（已放进案件库才有的选择器）比等 700ms 定式稳，
       // 面板这时候要重新拉 /status+/drafts+/cloud/status 三串请求才会渲染出这行状态。
       await page.waitForSelector('.cloud-dot', { timeout: 15000 })
-      await mouseClickText('打开协作')
+      await mouseClickText('管理云端同步')
       await page.waitForSelector('.collab-dialog', { timeout: 10000 })
       await mouseClickText('取回最新稿')
       await sleep(2000)
@@ -2445,7 +2479,7 @@ try {
 
     await step('A：版本时间线出现 B 的工作段节点', async () => {
       await mouseClickSel('[title="资源管理器"]')
-      await mouseClickSel('[title="版本"]')
+      await mouseClickSel('.version-entry')
       await page.waitForFunction(() => {
         const titles = [...document.querySelectorAll('.timeline-node .node-title')].map((e) => e.innerText || '')
         return titles.some((t) => t.includes('B 第一次修改'))
@@ -2471,15 +2505,15 @@ try {
 
     await step('A：结束这段隐式打开的工作（标题「甲的撞车工作」）', async () => {
       await mouseClickSel('[title="资源管理器"]')
-      await mouseClickSel('[title="版本"]')
-      await waitText('工作中')
-      await mouseClickText('结束本次工作')
+      await mouseClickSel('.version-entry')
+      await page.waitForSelector('.session-bar .session-dot:not(.draft-dot)', { timeout: 10000 })
+      await mouseClickText('提交本次改动…')
       await page.waitForSelector('.awd-dialog .uni-input-input', { timeout: 10000 })
       const input = await page.$('.awd-dialog .uni-input-input')
       await input.click(); await input.type('甲的撞车工作', { delay: 15 })
       await sleep(300)
-      await mouseClickText('完成')
-      await waitText('当前没有进行中的工作')
+      await mouseClickSel('.session-bar .awd-dialog .awd-btn-primary')
+      await waitText('当前没有待提交的改动')
     })
 
     await step('A：结束工作后台上传被拒只置待交稿标记（不自动整合）', async () => {
@@ -2495,7 +2529,7 @@ try {
       }, 40000, 2000)
       if (!ok) throw new Error('等待超时：结束工作后 pendingUpload 没有被置上')
       await mouseClickSel('[title="资源管理器"]')
-      await mouseClickSel('[title="版本"]')
+      await mouseClickSel('.version-entry')
       // dev-board#623 之后这句话不再是写死的「同事交了新稿」：后端算得出作者与版数时
       // 会说成「{谁}交了新稿 · N 版」（utils/collabWording.js 的三态），算不出来才落回老
       // 那句。这里只断「说了有新稿」这件事本身——具体是哪一支由下面 J11-历史 那几步
@@ -2515,11 +2549,18 @@ try {
       if (dialogOpen) throw new Error('后台上传不该自动整合出冲突弹窗（I2 新语义被破坏）')
     })
 
-    await step('A：点「交稿」前台整合撞上冲突弹窗且标签正确', async () => {
-      await mouseClickText('打开协作')
+    await step('A：点「交稿」按引导取回新稿后冲突弹窗标签正确', async () => {
+      await mouseClickText('管理云端同步')
       await page.waitForSelector('.collab-dialog', { timeout: 10000 })
       await mouseClickText('交稿')
-      // 撞冲突时协作抽屉自己关掉、页面把人送到裁决现场（版本面板），不用再手工关
+      // 已知案件库领先时，交稿先进入 #645 三步引导，按当前可操作步骤取回新稿。
+      await page.waitForFunction(() =>
+        document.querySelector('.submit-guide .sg-step-end-session.sg-done')
+        && document.querySelector('.submit-guide .sg-step-pull-latest.sg-active')
+        && document.querySelector('.submit-guide .sg-step-submit.sg-todo'),
+      { timeout: 15000 })
+      await mouseClickSel('.submit-guide .sg-step-pull-latest.sg-active .sg-step-btn')
+      // 取回撞冲突时引导自己关掉、页面把人送到裁决现场（版本面板），不用再手工关
       await page.waitForFunction(() => {
         const dlg = document.querySelector('.adopt-dialog')
         if (!dlg || dlg.getClientRects().length === 0) return false
@@ -2571,7 +2612,7 @@ try {
     })
 
     await step('时间线出现「取回最新稿」节点', async () => {
-      await mouseClickSel('[title="版本"]')
+      await mouseClickSel('.version-entry')
       await page.waitForFunction(() => {
         const titles = [...document.querySelectorAll('.timeline-node .node-title')].map((e) => e.innerText || '')
         return titles.some((t) => t.includes('取回最新稿'))
@@ -2826,10 +2867,14 @@ try {
     // 文件字节一并复原。
     await step('J11-引导：手头有活 + 案件库领先时点「交稿」，先摆一张三步清单', async () => {
       await restOverwrite('qa-J11协作文件.txt', 'QA J11 交稿引导：改了但没结束工作\n')
-      const before = await api('/api/projects/' + QA.projectId + '/version/status')
-      if (!(before && before.data && before.data.working)) {
+      let before
+      const working = await pollUntil(async () => {
+        before = await api('/api/projects/' + QA.projectId + '/version/status')
+        return before?.code === 0 && before.data?.enabled === true && before.data?.working === true
+      }, 15000, 200)
+      if (!working) {
         throw new Error('裸 REST 改文件之后 A 没有进入「工作中」，引导的前提不成立: '
-          + JSON.stringify(before && before.data).slice(0, 300))
+          + JSON.stringify(before).slice(0, 300))
       }
 
       await clickHistoryBtn('交稿')
@@ -3059,9 +3104,9 @@ try {
 
   await step('J12 切 en-US 并整页 reload 生效', async () => {
     await page.evaluateOnNewDocument(() => {
-      try { localStorage.setItem('awd_app_language', 'en-US') } catch (e) { /* ignore */ }
+      try { localStorage.setItem('app_language', 'en-US') } catch (e) { /* ignore */ }
     })
-    await page.evaluate(() => localStorage.setItem('awd_app_language', 'en-US'))
+    await page.evaluate(() => localStorage.setItem('app_language', 'en-US'))
     await page.goto(BASE + '/#/pages/project-overview/project-overview?id=' + QA.projectId,
       { waitUntil: 'networkidle2', timeout: 30000 })
     await page.reload({ waitUntil: 'networkidle2', timeout: 30000 })
@@ -3069,19 +3114,33 @@ try {
   })
 
   await step('J12 工作台四列英文锚点（rail title 属性）', async () => {
-    for (const title of ['Explorer', 'Version History', 'AI Assistant', 'Staging Area']) {
+    for (const title of ['Explorer', 'AI Assistant', 'Staging Area']) {
       await page.waitForSelector('[title="' + title + '"]', { timeout: 15000 })
+    }
+    // 版本入口会附带待提交/同步状态，仍核验英文可访问标题而非只检查按钮存在。
+    const versionTitle = await page.$eval('.version-entry', (e) => e.getAttribute('title') || '')
+    if (!versionTitle.startsWith('Source Control · ') ||
+        !versionTitle.endsWith('View project changes and sync') || /[一-鿿]/.test(versionTitle)) {
+      throw new Error('en-US 下版本入口标题不正确: ' + versionTitle)
     }
   })
 
   await step('J12 左栏面板标题是 Explorer（.sidebar-title 文本）', async () => {
-    // 左栏面板 key 跨 reload 持久（J11/J10 收尾停在版本面板），先点 rail 切回
-    // 资源管理器——顺带就是对 [title="Explorer"] 这个英文锚点的真实点击验证。
+    // 面板 key 和收起状态都跨 reload 持久。同一 rail 按钮会切换展开/收起，
+    // 已展开 Explorer 时先验证收起，再真实点击打开，避免盲点一次反而把它关掉。
+    const explorerOpen = await page.evaluate(() => {
+      const el = document.querySelector('.sidebar-left:not(.collapsed) .sidebar-title')
+      return !!el && el.innerText.trim().toLowerCase() === 'explorer'
+    })
+    if (explorerOpen) {
+      await mouseClickSel('[title="Explorer"]')
+      await page.waitForSelector('.sidebar-left.collapsed', { timeout: 15000 })
+    }
     await mouseClickSel('[title="Explorer"]')
     // 大小写不敏感：.sidebar-title 带 text-transform:uppercase，而 innerText 返回的是
     // 变换后的文本（"EXPLORER"）——按原文大小写断言会永远失败。
     await page.waitForFunction(() => {
-      const el = document.querySelector('.sidebar-title')
+      const el = document.querySelector('.sidebar-left:not(.collapsed) .sidebar-title')
       return !!el && el.innerText.trim().toLowerCase() === 'explorer'
     }, { timeout: 15000 })
   })
@@ -3222,16 +3281,16 @@ try {
 
   await step('J12 还原 zh-CN 并整页 reload', async () => {
     await page.evaluateOnNewDocument(() => {
-      try { localStorage.setItem('awd_app_language', 'zh-CN') } catch (e) { /* ignore */ }
+      try { localStorage.setItem('app_language', 'zh-CN') } catch (e) { /* ignore */ }
     })
-    await page.evaluate(() => localStorage.setItem('awd_app_language', 'zh-CN'))
+    await page.evaluate(() => localStorage.setItem('app_language', 'zh-CN'))
     await page.reload({ waitUntil: 'networkidle2', timeout: 30000 })
     await page.waitForSelector('[title="资源管理器"]', { timeout: 20000 })
   })
 
-  // ============ J13 广场安装带资源包的插件（诉讼可视化 + 桩 pack 源） ============
+  // ============ J13 独立插件与广场安装资源包（诉讼可视化 + 桩 pack 源） ============
   // 规范 docs/NATIVE_PACK_DISTRIBUTION.md §4/§7.1，契约在 NativePackService/PackController；
-  // UI 状态机在 MarketDetailPane.vue（packId/packReady/packDownloading 三态)。
+  // UI 状态机在独立插件 LitigationVisualPanel.vue 与 MarketDetailPane.vue。
   //
   // 为什么不能复用本文件全程驱动的主后端（BACKEND，默认 9696/9797）：
   // 广场装 pack 要后端把 ai.packs.base-urls 指向一个真会应答签了名 manifest 的源、
@@ -3262,7 +3321,14 @@ try {
     const j13SkillsDir = path.join(j13Home, 'skills-copy')
     fs.cpSync(path.join(repoRoot, 'backend/skills'), j13SkillsDir, { recursive: true })
 
-    const j13Stub = await startPackStub(path.join(j13Home, 'pack-src'), { id: 'litigation-visual', version: '9.9.9' })
+    const j13Stub = await startPackStub(path.join(j13Home, 'pack-src'), { id: 'litigation-visual', version: '9.9.9', failDownloads: true })
+    // 装入真正的独立插件分发内容，测试从其 iframe 发起依赖包安装。
+    const pluginSource = path.join(repoRoot, 'official-plugins/litigation-visual')
+    const pluginTarget = path.join(j13Cwd, 'plugins/litigation-visual')
+    fs.mkdirSync(pluginTarget, { recursive: true })
+    for (const item of ['manifest.json', 'web', 'l10n']) {
+      if (fs.existsSync(path.join(pluginSource, item))) fs.cpSync(path.join(pluginSource, item), path.join(pluginTarget, item), { recursive: true })
+    }
     const j13Port = 9703 // J11 占了 9701(S)/9702(B)，这里另取一个
     const j13Backend = 'http://127.0.0.1:' + j13Port
     const j13Args = [
@@ -3272,6 +3338,8 @@ try {
       '--spring.datasource.url=jdbc:h2:file:' + path.join(j13Home, 'db') + ';MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=VALUE',
       '--ai.skills.dir=' + j13SkillsDir,
       '--ai.packs.base-urls[0]=' + j13Stub.url,
+      '--ai.skills.registry-url=' + j13Stub.registryUrl + '/skills',
+      '--ai.plugins.registry-url=' + j13Stub.registryUrl + '/plugins',
       '--ai.plugins.registry-public-key=' + j13Stub.publicKeyPem,
     ]
     const j13Child = spawn(process.env.JAVA_HOME + '/bin/java', j13Args, { cwd: j13Cwd, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -3303,7 +3371,7 @@ try {
         // 端口就是这么注入的，同一套机制）。
         await j13Page.evaluateOnNewDocument((apiBase) => {
           window.checkbaDesktop = { apiBaseUrl: apiBase, shell: { openExternal: () => Promise.resolve() } }
-          try { localStorage.setItem('awd_app_language', 'zh-CN') } catch (e) { /* 全新页面没有「已有痕迹」，不设置会按 navigator.language 猜成 en-US */ }
+          try { localStorage.setItem('app_language', 'zh-CN') } catch (e) { /* 全新页面没有「已有痕迹」，不设置会按 navigator.language 猜成 en-US */ }
         }, j13Backend)
 
         const j13WaitText = async (t, ms = 15000) => j13Page.waitForFunction((x) => document.body.innerText.includes(x), { timeout: ms }, t)
@@ -3339,10 +3407,17 @@ try {
             const el = [...container.querySelectorAll('*')].find((e) =>
               e.children.length === 0 && e.offsetParent !== null && e.innerText && e.innerText.trim() === lbl)
             if (!el) return null
+            // 已安装/Marketplace 各自滚动；offsetParent 非空不代表列表项在视口内。
+            // 先滚到真实可点击处，再命中测试，避免点击落到另一分组或编辑区。
+            el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' })
             const r = el.getBoundingClientRect()
-            return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
+            const x = r.x + r.width / 2
+            const y = r.y + r.height / 2
+            const hit = document.elementFromPoint(x, y)
+            return { x, y, hit: hit === el || el.contains(hit) }
           }, containerSel, label)
           if (!box) throw new Error(`找不到文本(${containerSel} 内): ` + label)
+          if (!box.hit) throw new Error(`文本被遮挡(${containerSel} 内): ` + label)
           await j13Page.mouse.click(box.x, box.y)
           await sleep(500)
         }
@@ -3363,69 +3438,66 @@ try {
           await j13WaitText('资源管理器', 30000)
         })
 
-        await step13('J13 rail 点开插件中心，诉讼可视化显示待安装', async () => {
-          await j13ClickSel('[title="插件中心"]')
-          await j13WaitText('诉讼可视化', 15000)
-        })
-
-        await step13('J13 详情面板显示需下载资源包的安装按钮', async () => {
-          await j13ClickTextIn('.msb', '诉讼可视化')
-          await j13WaitText('需下载资源包', 15000)
-        })
-
-        await step13('J13 点安装后出现下载进度（bytesTotal>0）', async () => {
-          await j13ClickSel('.mdp .mdp-btn.primary')
-          let sawBytesTotal = false
-          for (let i = 0; i < 30; i++) {
+        const j13PackFrame = async () => {
+          const el = await j13Page.waitForSelector('iframe.plugin-iframe[src*="/api/plugin-web/litigation-visual/"]', { visible: true, timeout: 15000 })
+          const frame = await el.contentFrame()
+          if (!frame) throw new Error('诉讼可视化插件 iframe 未加载')
+          return frame
+        }
+        const j13WaitState = async (state) => {
+          for (let i = 0; i < 60; i++) {
             const st = await j13Api('/api/packs/litigation-visual/status')
-            if (st && st.status && st.status.bytesTotal > 0) { sawBytesTotal = true; break }
-            if (st && st.status && st.status.state === 'ready') { sawBytesTotal = st.status.bytesTotal > 0; break }
-            await sleep(200)
-          }
-          if (!sawBytesTotal) throw new Error('未观察到 bytesTotal>0 的下载进度')
-        })
-
-        await step13('J13 轮询到 ready 且 skill 自动启用', async () => {
-          // 直接轮询后端状态（权威数据源），不靠 DOM 文本猜——UI 那句「已启用」见下面
-          // j13WaitTextIn 的注释，整页文本判定会被别的 skill 的同名标签撞上。
-          let st = null
-          for (let i = 0; i < 40; i++) {
-            st = await j13Api('/api/packs/litigation-visual/status')
-            if (st && st.status && (st.status.state === 'ready' || st.status.state === 'failed')) break
+            if (st?.status?.state === state) return st.status
             await sleep(500)
           }
-          if (!st || !st.status || st.status.state !== 'ready') throw new Error('后端状态未到 ready: ' + JSON.stringify(st))
-          await j13WaitTextIn('.mdp', '已启用', 20000)
+          throw new Error('资源包未进入状态: ' + state)
+        }
+        await step13('J13 独立插件未安装依赖时如实提示并提供安装按钮', async () => {
+          await j13ClickSel('[title="诉讼可视化"]')
+          const frame = await j13PackFrame()
+          await frame.waitForSelector('.lv-pack-retry', { visible: true, timeout: 15000 })
+          const text = await frame.$eval('.lv-pack-bar', el => el.innerText)
+          if (!text.includes('需安装') || text.includes('正在下载')) throw new Error('未安装状态文案失真: ' + text)
         })
-
-        await step13('J13 左栏 rail 出现诉讼可视化入口', async () => {
-          await j13Page.waitForSelector('[title="诉讼可视化"]', { timeout: 15000 })
+        await step13('J13 点击插件安装：真实下载失败显示重试按钮', async () => {
+          const frame = await j13PackFrame()
+          await frame.click('.lv-pack-retry')
+          await j13WaitState('failed')
+          await frame.waitForSelector('.lv-pack-bar.failed .lv-pack-retry', { visible: true, timeout: 15000 })
         })
-
-        await step13('J13 卸载：确认框 + rail 入口消失', async () => {
+        await step13('J13 插件内重试：真实下载进度、验签解包后 ready', async () => {
+          await j13Stub.allowDownloads()
+          const frame = await j13PackFrame()
+          await frame.click('.lv-pack-retry')
+          await frame.waitForFunction(() => document.querySelector('.lv-pack-text')?.innerText.includes(' / '), { timeout: 15000 })
+          const status = await j13WaitState('ready')
+          if (!(status.bytesTotal > 0)) throw new Error('没有真实资源包下载字节')
+          await frame.waitForSelector('.lv-pack-bar', { hidden: true, timeout: 15000 })
+        })
+        await step13('J13 Skill 详情仍提供资源包管理入口', async () => {
+          await j13ClickSel('[title="插件中心"]')
+          await j13ClickTextIn('.msb .msb-tabs', 'Skill')
           await j13ClickTextIn('.msb', '诉讼可视化')
           await j13WaitTextIn('.mdp', '已启用', 15000)
-          await j13ClickSel('.mdp .mdp-btn.danger')
-          // uni.showModal 已转发给应用内对话框 AwdDialog（dev-board#849），确认按钮是
-          // .awd-dlg-mask .awd-dlg__confirm（不是文案「卸载」本身——那个词在卸载按钮与
-          // 确认按钮上各出现一次，覆盖态下用文本点击会点到底下被遮住的原按钮，实测踩过）。
-          await j13ClickSel('.awd-dlg-mask .awd-dlg__confirm')
-          let railGone = false
-          for (let i = 0; i < 15; i++) {
-            if (!(await j13Page.$('[title="诉讼可视化"]'))) { railGone = true; break }
-            await sleep(300)
-          }
-          if (!railGone) throw new Error('卸载后 rail 入口未消失')
         })
-
-        await step13('J13 卸载后端状态回到 not_installed', async () => {
-          let st = null
-          for (let i = 0; i < 15; i++) {
-            st = await j13Api('/api/packs/litigation-visual/status')
-            if (st && st.status && st.status.state === 'not_installed') break
-            await sleep(300)
-          }
-          if (!st || !st.status || st.status.state !== 'not_installed') throw new Error('卸载后状态未回到 not_installed: ' + JSON.stringify(st))
+        await step13('J13 卸载资源包：确认后回到 not_installed，独立插件保留安装入口', async () => {
+          await j13ClickSel('.mdp .mdp-btn.danger')
+          await j13ClickSel('.awd-dlg-mask .awd-dlg__confirm')
+          await j13WaitState('not_installed')
+          await j13ClickSel('[title="诉讼可视化"]')
+          const frame = await j13PackFrame()
+          await frame.waitForSelector('.lv-pack-retry', { visible: true, timeout: 15000 })
+        })
+        await step13('J13 广场手动安装仍可用且完成后自动启用 Skill', async () => {
+          await j13ClickSel('[title="插件中心"]')
+          await j13ClickTextIn('.msb .msb-tabs', 'Skill')
+          await j13ClickTextIn('.msb', '诉讼可视化')
+          await j13WaitTextIn('.mdp', '需下载资源包', 15000)
+          await j13ClickSel('.mdp .mdp-btn.primary')
+          await j13WaitState('ready')
+          await j13WaitTextIn('.mdp', '已启用', 15000)
+          const skills = await j13Api('/api/skills/list')
+          if (!skills.find(s => s.id === 'litigation-visual')?.enabled) throw new Error('资源包就绪后 Skill 未启用')
         })
       }
     } finally {
@@ -3705,12 +3777,12 @@ try {
     // （自动合并编排器挂在它上面，见 project-overview.vue 的 @status-changed）。
     const remountVersionPanel = async () => {
       await mouseClickSel('[title="资源管理器"]')
-      await mouseClickSel('[title="版本"]')
+      await mouseClickSel('.version-entry')
       await page.waitForSelector('.cloud-dot', { timeout: 20000 })
     }
     const pullViaUi = async () => {
       // 进这一步时仓库必须是干净的。上一轮没收尾的话裁决弹窗还挂着，而它是全屏遮罩
-      // （.awd-mask）：下面点「打开协作」会点在遮罩上，症状是 .collab-dialog 十秒超时，
+      // （.awd-mask）：下面点「管理云端同步」会点在遮罩上，症状是 .collab-dialog 十秒超时，
       // 完全看不出真因。把前提写成一条明确的失败信息，别让它伪装成 UI 回归。
       const stale = await conflictA()
       if (stale) {
@@ -3718,7 +3790,7 @@ try {
           + String(JSON.stringify(stale)).slice(0, 200))
       }
       await remountVersionPanel()
-      await mouseClickText('打开协作')
+      await mouseClickText('管理云端同步')
       await page.waitForSelector('.collab-dialog', { timeout: 10000 })
       await mouseClickText('取回最新稿')
       await sleep(2500)
@@ -4194,7 +4266,7 @@ try {
       const ok = await pollUntil(async () => {
         const notes = await visibleTexts('.adopt-dialog .adopt-row-note')
         return notes.includes('同一段两边都改了 · 1 处')
-          && notes.includes('PDF 与图片没有可比对的段落，只能整份选择')
+          && notes.includes('这份文件暂不支持逐处合并，请选择要保留的整份版本')
       }, 30000, 1000)
       if (!ok) {
         throw new Error('总览没有同时给出这两句，实际可见文案: '

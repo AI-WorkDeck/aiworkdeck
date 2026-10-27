@@ -16,6 +16,8 @@
 //      同值再次打开要先清空、下一拍写回，否则 watch 不触发（同 openSettingsTab 的 adminNav）。
 //      深链不进标签快照（tabSnapshot.js）：重启时再弹一次事项编辑框是打扰。
 
+import { createCalendarWorkspaceState, patchCalendarWorkspaceState } from '../../components/calendar/workspaceState.js'
+
 export const CALENDAR_TAB_ID = 'calendar'
 export const CALENDAR_TAB_TYPE = 'calendar'
 
@@ -30,51 +32,35 @@ function normGroup(v) {
 }
 
 export const calendarTabMethods = {
+  calendarWorkspace(params = {}) {
+    const previous = this.calendarWorkspaceState || createCalendarWorkspaceState()
+    const state = patchCalendarWorkspaceState(previous, params.patch)
+    this.calendarWorkspaceState = state
+    if (params.open === true || params.focus || params.create === true) this.openPluginTab('calendar')
+    // The workbench makes stored arrays reactive; sandbox postMessage needs plain arrays.
+    const result = { ...state, projectIds: [...state.projectIds], types: [...state.types], currentProjectId: this.hasProject ? String(this.projectId) : '' }
+    if (state.revision !== previous.revision || params.focus || params.create === true) {
+      this.$nextTick(() => uni.$emit('awd:plugin-sidebar-command', {
+        pluginId: 'calendar', command: 'calendar-state', state: result,
+        focus: normFocus(params.focus), create: params.create === true,
+      }))
+    }
+    return result
+  },
   /** 打开（或激活）日程标签。opts.focus / opts.group 是一次性深链。 */
   openCalendarTab(opts) {
-    const focus = normFocus(opts && opts.focus)
-    const group = normGroup(opts && opts.group)
-    for (const pane of ['left', 'right']) {
-      const list = pane === 'left' ? this.leftFiles : this.rightFiles
-      const existing = list.find((f) => f.id === CALENDAR_TAB_ID)
-      if (existing) {
-        const sameValue = (focus && existing.calendarFocus === focus) || (group && existing.calendarGroup === group)
-        if (sameValue) {
-          existing.calendarFocus = ''
-          existing.calendarGroup = ''
-          this.$nextTick(() => {
-            existing.calendarFocus = focus
-            existing.calendarGroup = group
-          })
-        } else {
-          existing.calendarFocus = focus
-          existing.calendarGroup = group
-        }
-        this[pane === 'left' ? 'activeFileIdLeft' : 'activeFileIdRight'] = existing.id
-        this.focusedPane = pane
-        this.$nextTick(() => this.triggerWorkbenchResize())
-        return
-      }
-    }
-    const targetPane = this.splitMode ? this.focusedPane : 'left'
-    const list = targetPane === 'left' ? this.leftFiles : this.rightFiles
-    list.push({
-      id: CALENDAR_TAB_ID,
-      tabType: CALENDAR_TAB_TYPE,
-      name: this.$t('calendar.tabName'),
-      calendarFocus: focus,
-      calendarGroup: group,
-    })
-    this[targetPane === 'left' ? 'activeFileIdLeft' : 'activeFileIdRight'] = CALENDAR_TAB_ID
-    this.focusedPane = targetPane
-    this.$nextTick(() => this.triggerWorkbenchResize())
+    if (!this.dynamicPluginsLoaded) { this.pendingCalendarOpen = opts || {}; return }
+    this.openPluginTab('calendar')
+    const payload = { pluginId: 'calendar', command: 'calendar-focus', focus: normFocus(opts?.focus), group: normGroup(opts?.group) }
+    this.$nextTick(() => uni.$emit('awd:plugin-sidebar-command', payload))
   },
 
   /** 标签里的「关闭」（页头返回在标签形态下隐藏，保留给键盘 / 程序调用） */
   closeCalendarTab() {
     for (const pane of ['left', 'right']) {
       const list = pane === 'left' ? this.leftFiles : this.rightFiles
-      if (list.some((f) => f.id === CALENDAR_TAB_ID)) this.closeFile(CALENDAR_TAB_ID, pane)
+      const tab = list.find(f => f.id === CALENDAR_TAB_ID || (f.tabType === 'plugin' && f.pluginId === 'calendar'))
+      if (tab) this.closeFile(tab.id, pane)
     }
   },
 

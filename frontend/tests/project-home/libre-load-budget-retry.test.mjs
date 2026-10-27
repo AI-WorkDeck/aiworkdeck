@@ -25,6 +25,7 @@ const SRC = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', i
 
 function loadOptions() {
   const body = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+    .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
     .replace(/^import .*$/gm, '')
     .replace(/export default \{/, 'return {')
   const factory = new Function(...Object.keys(barriers),
@@ -59,10 +60,14 @@ function makeVm(exec, fileSize = 4096) {
     emitted: [], calls: [], remounts: 0,
     $emit(ev, arg) { this.emitted.push([ev, arg]) },
     appendLog() {}, startBootTrickle() {}, logLoadFailure() {}, initEvidence() {},
-    fetchArrayBuffer: async () => new ArrayBuffer(fileSize),
-    executor: { executeCommand: (action, params, opts) => { vm.calls.push({ action, params, opts }); return exec(action, params, opts) } },
+    fetchDocumentBytes: async () => new ArrayBuffer(fileSize),
+    executor: { executeCommand: (action, params, opts) => {
+      vm.calls.push({ action, params, opts })
+      if (action === 'set_chrome') return Promise.resolve({ success: true, applied: { menubar: false, statusbar: false, toolbars: { standardbar: false } } })
+      return exec(action, params, opts)
+    } },
   }
-  for (const name of ['finishDocLoad', 'loadDocument', 'retryLoad', 'bootMilestone', 'initWritingAssistance', 'loadWaitBudgetMs']) if (METHODS[name]) vm[name] = METHODS[name].bind(vm)
+  for (const name of ['finishDocLoad', 'prepareInitialChrome', 'loadDocument', 'retryLoad', 'bootMilestone', 'initWritingAssistance', 'loadWaitBudgetMs']) if (METHODS[name]) vm[name] = METHODS[name].bind(vm)
   // remountEditor 用真实现（它负责让在途链路作废），只把建元素那一步桩掉。
   // 新引擎的 executor 由 mountEditor 接线；这里复用同一个桩（各用例可改它的 executeCommand）。
   const execStub = vm.executor

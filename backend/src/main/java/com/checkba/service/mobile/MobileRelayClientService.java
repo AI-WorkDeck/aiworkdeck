@@ -41,6 +41,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.Objects;
 import java.util.Map;
@@ -81,6 +82,492 @@ public class MobileRelayClientService {
     private final boolean enabled;
     private final boolean localMode;
     private final String baseUrl;
+    @Autowired(required = false) private ProjectCatalogService projectCatalog;
+    @Autowired(required = false) private com.checkba.repository.ProjectRemoteRepository projectRemotes;
+    @Autowired(required = false) private com.checkba.repository.CloudConnectionRepository cloudConnections;
+    @Autowired(required = false) private com.checkba.service.task.ProjectTaskService mobileTasks;
+    @Autowired(required = false) private com.checkba.service.ProjectProfileService mobileProfiles;
+    private final AtomicBoolean calendarSyncRunning = new AtomicBoolean();
+    private final AtomicBoolean assistantSyncRunning = new AtomicBoolean();
+
+    @Autowired(required=false) private com.checkba.version.objects.LocalVersionObjectStore versionObjectStore;
+    private final AtomicBoolean versionBackupRunning = new AtomicBoolean();
+    private final java.util.concurrent.atomic.AtomicLong versionBackupGeneration = new java.util.concurrent.atomic.AtomicLong();
+    private volatile String versionBackupScope;
+    private volatile Map<String,Object> versionBackupStatus = Map.of("state","idle","pendingObjects",0,"lastError","");
+
+    /** Local authenticated proxy; cloud device tokens never enter the renderer. */
+    public List<Map<String, Object>> catalog() {
+        if (!active()) return List.of();
+        String scope = catalogAccountScope();
+        pushDirectory();
+        CatalogSession session = beginCatalogSession(scope);
+        try {
+            HttpResponse<String> response = catalogExchange(session, "GET", "/api/mobile/catalog", null);
+            if (response == null || response.statusCode() == 404) return List.of();
+            if (response.statusCode() != 200) throw new IOException("Cloud catalogue unavailable");
+            JsonNode data = mapper.readTree(response.body());
+            if (!data.isArray()) throw new IOException("Cloud catalogue unavailable");
+            List<Map<String, Object>> result = mapper.convertValue(data, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+            for (Map<String, Object> item : result) {
+                item.put("accountScope", scope);
+                JsonNode locations = mapper.valueToTree(item.get("locations"));
+                for (JsonNode location : locations) {
+                    if ("desktop".equals(location.path("kind").asText()) && deviceId().equals(location.path("deviceId").asText())) {
+                        Long id = parseLongOrNull(location.path("key").asText());
+                        if (id != null && projectRepository.findById(id).filter(p -> localIdentityService.localUserId().equals(p.getUserId())).isPresent()) {
+                            item.put("localProjectId", id);
+                        }
+                    }
+                }
+            }
+            requireCatalogAccountScope(scope);
+            return result;
+        } catch (IOException e) { throw new IllegalStateException(LangText.of("云端项目目录暂不可用", "Cloud project catalogue is unavailable"), e); }
+    }
+
+    public String catalogAccountScope() {
+        String fingerprint = accountService.accountFingerprintOrNull();
+        return fingerprint == null ? "" : sha256("catalog:" + fingerprint);
+    }
+    public void requireCatalogAccountScope(String scope) {
+        if (scope == null || scope.isBlank() || !scope.equals(catalogAccountScope())) throw new IllegalArgumentException(
+                LangText.of("账户已变化，请刷新项目目录", "Account changed; refresh the project catalogue"));
+    }
+
+    private record CatalogSession(String scope, String token) {}
+    private CatalogSession beginCatalogSession(String scope) {
+        requireCatalogAccountScope(scope);
+        String token = currentToken();
+        requireCatalogAccountScope(scope);
+        if (token == null) throw new IllegalArgumentException(LangText.of("请先连接账户", "Connect your account first"));
+        return new CatalogSession(scope, token);
+    }
+    /** A catalogue operation never rebinds credentials halfway through an account switch. */
+    private HttpResponse<String> catalogExchange(CatalogSession session, String method, String path, String body) {
+        requireCatalogAccountScope(session.scope());
+        HttpRequest.Builder builder = request(path).header("X-Session-Id", session.token()).header("Content-Type", "application/json");
+        builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
+        try {
+            HttpResponse<String> response = http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            requireCatalogAccountScope(session.scope());
+            return response;
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            throw new IllegalStateException(LangText.of("云端请求失败", "Cloud request failed"), e);
+        }
+    }
+    private void acknowledgeCatalogTransfer(CatalogSession session, Long transferId) {
+        if (transferId == null) { requireCatalogAccountScope(session.scope()); return; }
+        if (!okEnvelope(catalogExchange(session, "POST", "/api/mobile/transfer/" + transferId + "/ack", "{}"))) {
+            throw new IllegalStateException(LangText.of("文件已保存，收件确认待重试", "File saved; retry to confirm delivery"));
+        }
+    }
+    public JsonNode catalogRequest(String method, String path, JsonNode body, String scope) {
+        return readCatalogJson(beginCatalogSession(scope), method, path, body);
+    }
+
+    private JsonNode readCatalogJson(CatalogSession session, String method, String path, JsonNode body) {
+        boolean allowed = "GET".equals(method) && (path.matches("/api/mobile/catalog/[0-9a-f-]{36}/files")
+                || path.matches("/api/mobile/transfer/[0-9]+") || path.matches("/api/mobile/transfer/quote\\?bytes=[0-9]+"))
+                || "POST".equals(method) && (path.equals("/api/mobile/transfer/list") || path.equals("/api/mobile/transfer/pull"));
+        if (!allowed || !active()) throw new IllegalArgumentException("Invalid catalogue operation");
+        try {
+            HttpResponse<String> response = catalogExchange(session, method, path, body == null ? null : mapper.writeValueAsString(body));
+            if (response == null || response.statusCode() != 200) throw new IOException("Cloud unavailable");
+            JsonNode result = mapper.readTree(response.body());
+            if (result.has("code") && result.path("code").asInt() != 0) throw new IllegalArgumentException(result.path("message").asText("Cloud request failed"));
+            requireCatalogAccountScope(session.scope());
+            return result;
+        } catch (IOException e) { throw new IllegalStateException(LangText.of("云端请求失败", "Cloud request failed"), e); }
+    }
+
+    /** Download to a local project before acknowledging a disposable transfer. */
+    public synchronized Map<String, Object> importCatalogFile(Long targetProjectId, String projectUid, String fileUid, Long transferId, String scope) {
+        if (!active()) throw new IllegalArgumentException(LangText.of("请先连接账户", "Connect your account first"));
+        CatalogSession session = beginCatalogSession(scope);
+        Long userId = localIdentityService.localUserId();
+        projectRepository.findById(targetProjectId).filter(p -> userId.equals(p.getUserId()))
+                .orElseThrow(() -> new IllegalArgumentException("Project not found"));
+        String name, marker, path;
+        long size;
+        boolean alreadyDelivered = false;
+        if (transferId != null) {
+            JsonNode transfer = readCatalogJson(session, "GET", "/api/mobile/transfer/" + transferId, null).path("transfer");
+            alreadyDelivered = "DELIVERED".equals(transfer.path("status").asText());
+            if (!alreadyDelivered && !"STAGED".equals(transfer.path("status").asText())) throw new IllegalArgumentException("Transfer is not ready");
+            name = transfer.path("fileName").asText(); size = transfer.path("fileSize").asLong();
+            marker = "transfer-" + transferId; path = "/api/mobile/transfer/" + transferId + "/content";
+        } else {
+            if (ProjectCatalogService.validUid(projectUid) == null || ProjectCatalogService.validUid(fileUid) == null) throw new IllegalArgumentException("Invalid file identity");
+            JsonNode list = readCatalogJson(session, "GET", "/api/mobile/catalog/" + projectUid + "/files", null);
+            JsonNode found = null;
+            for (JsonNode file : list.path("files")) if (fileUid.equals(file.path("uid").asText())
+                    && !file.path("isFolder").asBoolean()
+                    && Set.of("cloud", "backup").contains(file.path("source").asText())) found = file;
+            if (found == null) throw new IllegalArgumentException("File not found");
+            name = found.path("name").asText(); size = found.path("size").asLong(); marker = fileUid;
+            path = ("backup".equals(found.path("source").asText()) ? "/api/mobile/preview/catalog/" : "/api/mobile/catalog/")
+                    + projectUid + "/files/" + fileUid + "/content";
+        }
+        String clean = name.replace('\\', '/'); clean = clean.substring(clean.lastIndexOf('/') + 1);
+        int dot = clean.lastIndexOf('.');
+        String stem = dot > 0 ? clean.substring(0, dot) : clean;
+        String ext = dot > 0 ? clean.substring(dot) : "";
+        if (stem.length() > 100) stem = stem.substring(0,100);
+        String landed = stem + "-" + marker + ext;
+        ProjectFile folder = projectFileService.getFilesByParent(targetProjectId, null).stream()
+                .filter(f -> Boolean.TRUE.equals(f.getIsFolder()) && "云端文件".equals(f.getName())).findFirst()
+                .orElseGet(() -> projectFileService.createFolder(targetProjectId, null, "云端文件", userId));
+        ProjectFile existing = projectFileService.getFilesByParent(targetProjectId, folder.getId()).stream()
+                .filter(f -> !Boolean.TRUE.equals(f.getIsFolder()) && landed.equals(f.getName())).findFirst().orElse(null);
+        if (existing != null) {
+            requireCatalogAccountScope(scope);
+            if (projectCatalog != null) projectCatalog.preserveImportedFileUid(existing, fileUid);
+            acknowledgeCatalogTransfer(session, transferId);
+            return Map.of("fileId", existing.getId(), "projectId", targetProjectId);
+        }
+        if (alreadyDelivered) throw new IllegalArgumentException(LangText.of("文件已取回，请在原目标项目查找", "File was already downloaded; check the original destination project"));
+        String storagePath = "projects/" + targetProjectId + "/云端文件/" + landed;
+        String temp = "projects/" + targetProjectId + "/.catalog-" + UUID.randomUUID() + ".tmp";
+        var store = storageServiceFactory.getStorageService();
+        boolean moved = false;
+        ProjectFile landedFile;
+        try {
+            requireCatalogAccountScope(scope);
+            HttpRequest request = request(path, Duration.ofMinutes(10)).header("X-Session-Id", session.token()).GET().build();
+            HttpResponse<InputStream> response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            try (InputStream content = response.body()) {
+                if (response.statusCode() != 200 || !response.headers().firstValue("Content-Type").orElse("").startsWith("application/octet-stream")) throw new IOException("Invalid file response");
+                store.save(temp, content);
+                if (store.load(temp).contentLength() != size) throw new IOException("File length mismatch");
+            }
+            requireCatalogAccountScope(scope);
+            store.move(temp, storagePath); moved = true;
+            requireCatalogAccountScope(scope);
+            landedFile = projectFileService.createFile(targetProjectId, folder.getId(), landed,
+                    fileTypeOf(landed, "bin"), size, storagePath, null, userId);
+        } catch (IOException | InterruptedException | RuntimeException e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            try { store.delete(moved ? storagePath : temp); } catch (Exception ignored) {}
+            throw new IllegalStateException(LangText.of("取回失败，请重试", "Download failed; please retry"), e);
+        }
+        requireCatalogAccountScope(scope);
+        if (projectCatalog != null) projectCatalog.preserveImportedFileUid(landedFile, fileUid);
+        acknowledgeCatalogTransfer(session, transferId);
+        return Map.of("fileId", landedFile.getId(), "projectId", targetProjectId);
+    }
+
+    /** Consent belongs to the connected account, never to this installation. */
+    public JsonNode backupConsent() {
+        if (!active()) return mapper.createObjectNode().put("available", false);
+        String scope = catalogAccountScope();
+        JsonNode result = backupJson(beginCatalogSession(scope), "GET", "/api/mobile/backup-consent", null);
+        ObjectNode out = (ObjectNode) result.deepCopy();
+        out.put("accountScope", scope);
+        out.put("available", true);
+        out.set("objectBackup",mapper.valueToTree(scope.equals(versionBackupScope) ? versionBackupStatus
+                : Map.of("state","idle","pendingObjects",0,"lastError","")));
+        return out;
+    }
+
+    public JsonNode setBackupConsent(boolean enabled, String version, String scope) {
+        if (!enabled) versionBackupGeneration.incrementAndGet();
+        CatalogSession session = beginCatalogSession(scope);
+        ObjectNode body = mapper.createObjectNode().put("enabled", enabled).put("consentVersion", version);
+        JsonNode result = backupJson(session, "PUT", "/api/mobile/backup-consent", body);
+        if (enabled) {
+            dispatchNudge("backup", this::syncFileBackups);
+            dispatchNudge("version-backup", this::syncVersionObjectBackups);
+        }
+        return result;
+    }
+
+    private JsonNode backupJson(CatalogSession session, String method, String path, JsonNode body) {
+        try {
+            HttpResponse<String> response = catalogExchange(session, method, path,
+                    body == null ? null : mapper.writeValueAsString(body));
+            if (response.statusCode() != 200) throw new IOException("Backup request failed");
+            JsonNode data = mapper.readTree(response.body());
+            if (!data.isObject() || data.path("code").asInt(0) != 0)
+                throw new IOException("Backup request failed");
+            return data;
+        } catch (IOException e) {
+            throw new IllegalStateException(LangText.of("云备份暂不可用，请重试", "Cloud backup is unavailable; please retry"), e);
+        }
+    }
+
+    @Scheduled(initialDelay = 75_000, fixedDelay = 60_000)
+    public void scheduleFileBackups() {
+        if (active()) {
+            dispatchNudge("backup", this::syncFileBackups);
+            dispatchNudge("version-backup", this::syncVersionObjectBackups);
+        }
+    }
+
+    /** A sharing request may never silently override the account's file backup decision. */
+    public void requireVersionObjectCloudConsent() {
+        try {
+            JsonNode consent=backupConsent();
+            if(!consent.path("enabled").asBoolean() || !consent.path("subscriptionActive").asBoolean())
+                throw new IllegalStateException("consent");
+        } catch(RuntimeException e) {
+            throw com.checkba.version.VersionException.userFacing(LangText.of(
+                    "大文件已保存在本地；请先开启文件云端备份并确认订阅有效，再同步到案件库",
+                    "Large files are saved locally. Enable cloud file backup with an active subscription before sharing"));
+        }
+    }
+
+    private static String versionBackupError(JsonNode response) {
+        String message=response.path("message").asText("");
+        if(message.contains("空间") || message.toLowerCase(java.util.Locale.ROOT).contains("storage is full"))
+            return LangText.of("云端空间不足，本地版本已保留；释放空间后会自动重试",
+                    "Cloud storage is full. Local versions are safe; synchronization will retry after space is available");
+        return LangText.of("大文件版本备份未完成，本地版本已保留，将自动重试",
+                "Large-file backup is incomplete. Local versions are safe; synchronization will retry");
+    }
+
+    private JsonNode versionObjectResponse(HttpResponse<String> response) throws IOException {
+        if(response.statusCode()==404) throw new IOException(LangText.of(
+                "云端暂不支持大文件版本备份，本地版本已保留", "The server does not yet support large-file version backup. Local versions are safe"));
+        if(response.statusCode()!=200) throw new IOException(LangText.of(
+                "云端连接暂不可用，本地版本已保留，将自动重试", "Cloud connection is unavailable. Local versions are safe; synchronization will retry"));
+        JsonNode result=mapper.readTree(response.body());
+        if(!result.isObject() || result.path("code").asInt(0)!=0) throw new IOException(versionBackupError(result));
+        return result;
+    }
+
+    private JsonNode versionObjectJson(CatalogSession session,String method,String path) throws IOException {
+        return versionObjectResponse(catalogExchange(session,method,path,null));
+    }
+
+    private void requireVersionBackupActive(CatalogSession session,long generation) {
+        requireCatalogAccountScope(session.scope());
+        if(generation!=versionBackupGeneration.get()) throw new java.util.concurrent.CancellationException();
+        JsonNode consent=backupJson(session,"GET","/api/mobile/backup-consent",null);
+        if(!consent.path("enabled").asBoolean() || !consent.path("subscriptionActive").asBoolean()
+                || generation!=versionBackupGeneration.get()) throw new java.util.concurrent.CancellationException();
+    }
+
+    /** Explicit recovery only: no downloads from save/status paths; import publishes after whole-object verification. */
+    public void restoreVersionObject(long projectId,com.checkba.version.objects.LocalVersionObjectStore.ObjectRef ref) throws IOException {
+        if(!active() || versionObjectStore==null) throw new IOException(LangText.of("云备份暂不可用","Cloud backup unavailable"));
+        Project project=projectRepository.findById(projectId).orElseThrow(()->new IllegalArgumentException("Project not found"));
+        if(!Objects.equals(project.getUserId(),localIdentityService.localUserId())) throw new IllegalArgumentException("Project not found");
+        CatalogSession session=beginCatalogSession(catalogAccountScope());
+        String query="?deviceId="+queryValue(deviceId())+"&projectKey="+projectId;
+        String base="/api/mobile/backup/version-objects/"+ref.sha256();
+        JsonNode status=versionObjectJson(session,"GET",base+query+"&size="+ref.size());
+        if(!status.path("complete").asBoolean() || !ref.sha256().equals(status.path("sha256").asText())
+                || status.path("size").asLong(-1)!=ref.size()) throw new IOException("Version object backup is incomplete");
+        Path temporary=Files.createTempFile("awd-version-restore-",".part");
+        try {
+            try(OutputStream output=Files.newOutputStream(temporary)) {
+                byte[] buffer=new byte[65536];
+                for(int index=0;index<MobileVersionObjectService.partCount(ref.size());index++) {
+                    requireCatalogAccountScope(session.scope());
+                    HttpRequest request=request(base+"/parts/"+index+query,Duration.ofMinutes(10))
+                            .header("X-Session-Id",session.token()).GET().build();
+                    HttpResponse<InputStream> response;
+                    try {response=http.send(request,HttpResponse.BodyHandlers.ofInputStream());}
+                    catch(InterruptedException e){Thread.currentThread().interrupt();throw new IOException(e);}
+                    long expected=Math.min(MobileVersionObjectService.PART_BYTES,ref.size()-index*MobileVersionObjectService.PART_BYTES);
+                    try(InputStream input=new com.checkba.util.DeadlineInputStream(response.body(), Duration.ofSeconds(90))) {
+                        requireCatalogAccountScope(session.scope());
+                        if(response.statusCode()!=200 || !response.headers().firstValue("Content-Type").orElse("").startsWith("application/octet-stream")
+                                || response.headers().firstValueAsLong("Content-Length").orElse(-1)!=expected)
+                            throw new IOException("Version object download rejected");
+                        long count=0;int n;
+                        while((n=input.read(buffer))!=-1) {
+                            requireCatalogAccountScope(session.scope());
+                            count+=n;if(count>expected) throw new IOException("Version object download length mismatch");
+                            output.write(buffer,0,n);
+                        }
+                        if(count!=expected) throw new IOException("Version object download truncated");
+                    }
+                }
+            }
+            requireCatalogAccountScope(session.scope());
+            try(InputStream input=Files.newInputStream(temporary)){versionObjectStore.importObject(projectId,ref,input);}
+        } finally {Files.deleteIfExists(temporary);}
+    }
+
+    /** Independent worker: immutable bytes are uploaded only after affirmative remote consent. */
+    void syncVersionObjectBackups() {
+        if(!active() || versionObjectStore==null || !versionBackupRunning.compareAndSet(false,true)) return;
+        int pending=0;
+        long generation=versionBackupGeneration.get();
+        try {
+            CatalogSession session=beginCatalogSession(catalogAccountScope());
+            versionBackupScope=session.scope();
+            JsonNode consent=backupJson(session,"GET","/api/mobile/backup-consent",null);
+            if(!consent.path("enabled").asBoolean() || !consent.path("subscriptionActive").asBoolean()) {
+                versionBackupStatus=Map.of("state","disabled","pendingObjects",0,"lastError","");return;
+            }
+            pushDirectory();requireCatalogAccountScope(session.scope());
+            record LocalObject(long projectId,com.checkba.version.objects.LocalVersionObjectStore.ObjectRef ref) {}
+            List<LocalObject> local=new ArrayList<>();
+            for(Project project:projectRepository.findByUserIdOrderByCreatedAtDesc(localIdentityService.localUserId())) {
+                if(project.isLooseFileWorkspace()) continue;
+                for(var ref:versionObjectStore.list(project.getId())) local.add(new LocalObject(project.getId(),ref));
+            }
+            pending=local.size();
+            versionBackupStatus=Map.of("state","syncing","pendingObjects",pending,"lastError","");
+            for(var object:local) {
+                requireCatalogAccountScope(session.scope());
+                var ref=object.ref();
+                String query="?deviceId="+queryValue(deviceId())+"&projectKey="+object.projectId()+"&size="+ref.size();
+                String base="/api/mobile/backup/version-objects/"+ref.sha256();
+                JsonNode remote=versionObjectJson(session,"GET",base+query);
+                if(!remote.path("complete").asBoolean()) {
+                    Set<Integer> uploaded=new java.util.HashSet<>();
+                    for(JsonNode part:remote.path("parts")) uploaded.add(part.asInt());
+                    requireVersionBackupActive(session,generation);
+                    try(InputStream input=versionObjectStore.open(object.projectId(),ref.sha256())) {
+                        for(int index=0;index<MobileVersionObjectService.partCount(ref.size());index++) {
+                            requireVersionBackupActive(session,generation);
+                            int length=(int)Math.min(MobileVersionObjectService.PART_BYTES,
+                                    ref.size()-index*MobileVersionObjectService.PART_BYTES);
+                            if(uploaded.contains(index)) {input.skipNBytes(length);continue;}
+                            byte[] bytes=input.readNBytes(length);
+                            if(bytes.length!=length) throw new IOException("Local version object is incomplete");
+                            String hash=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+                            requireCatalogAccountScope(session.scope());
+                            if(generation!=versionBackupGeneration.get()) throw new java.util.concurrent.CancellationException();
+                            HttpRequest request=request(base+"/parts/"+index+query+"&partSha="+hash,Duration.ofMinutes(10))
+                                    .header("X-Session-Id",session.token()).header("Content-Type","application/octet-stream")
+                                    .PUT(HttpRequest.BodyPublishers.ofByteArray(bytes)).build();
+                            JsonNode result=versionObjectResponse(http.send(request,HttpResponse.BodyHandlers.ofString()));
+                            requireCatalogAccountScope(session.scope());
+                            if(!hash.equals(result.path("sha256").asText()) || result.path("size").asLong(-1)!=length)
+                                throw new IOException("Version object upload verification failed");
+                        }
+                    }
+                    requireVersionBackupActive(session,generation);
+                    HttpRequest finish=request(base+"/complete"+query,Duration.ofMinutes(10))
+                            .header("X-Session-Id",session.token()).POST(HttpRequest.BodyPublishers.noBody()).build();
+                    JsonNode completed=versionObjectResponse(http.send(finish,HttpResponse.BodyHandlers.ofString()));
+                    requireCatalogAccountScope(session.scope());
+                    if(!completed.path("complete").asBoolean() || !ref.sha256().equals(completed.path("sha256").asText()))
+                        throw new IOException("Version object completion was not confirmed");
+                }
+                versionBackupStatus=Map.of("state","syncing","pendingObjects",--pending,"lastError","");
+            }
+            versionBackupStatus=Map.of("state","synced","pendingObjects",0,"lastError","");
+        } catch(Exception e) {
+            if(e instanceof java.util.concurrent.CancellationException) {
+                versionBackupStatus=Map.of("state","disabled","pendingObjects",Math.max(0,pending),"lastError","");return;
+            }
+            if(e instanceof InterruptedException) Thread.currentThread().interrupt();
+            String message=e instanceof IOException && e.getMessage()!=null
+                    && (e.getMessage().contains("本地版本") || e.getMessage().contains("Local versions")) ? e.getMessage()
+                    : LangText.of("大文件版本同步暂不可用，本地版本已保留，将自动重试",
+                            "Large-file synchronization is unavailable. Local versions are safe; synchronization will retry");
+            versionBackupStatus=Map.of("state","pending","pendingObjects",Math.max(1,pending),"lastError",message);
+            log.warn("Version object backup incomplete; local objects retained ({})",e.getClass().getSimpleName());
+        } finally {versionBackupRunning.set(false);}
+    }
+
+    /** Separate worker: large backups cannot block the camera inbox or desktop heartbeat. */
+    private final AtomicBoolean backupRunning = new AtomicBoolean();
+
+    void syncFileBackups() {
+        if (!active() || !backupRunning.compareAndSet(false, true)) return;
+        try {
+            CatalogSession session = beginCatalogSession(catalogAccountScope());
+            JsonNode consent = backupJson(session, "GET", "/api/mobile/backup-consent", null);
+            if (!consent.path("enabled").asBoolean() || !consent.path("subscriptionActive").asBoolean()) return;
+            pushDirectory();
+            requireCatalogAccountScope(session.scope());
+            String device = deviceId();
+            JsonNode remote = backupJson(session, "GET", "/api/mobile/backup/files?deviceId=" + queryValue(device), null);
+            Map<String, JsonNode> previous = new LinkedHashMap<>();
+            for (JsonNode file : remote.path("files")) previous.put(file.path("projectKey").asText() + ":" + file.path("id").asText(), file);
+            for (Project project : projectRepository.findByUserIdOrderByCreatedAtDesc(localIdentityService.localUserId())) {
+                if (project.isLooseFileWorkspace()) continue;
+                requireCatalogAccountScope(session.scope());
+                String projectKey = project.getId().toString();
+                List<ProjectFile> tree = projectFileService.getFileTree(project.getId());
+                Map<Long, ProjectFile> byId = new HashMap<>();
+                for (ProjectFile file : tree) if (file.getId() != null) byId.put(file.getId(), file);
+                ObjectNode manifest = mapper.createObjectNode().put("deviceId", device).put("projectKey", projectKey);
+                ArrayNode entries = manifest.putArray("files");
+                for (ProjectFile file : tree) {
+                    boolean folder = Boolean.TRUE.equals(file.getIsFolder());
+                    // Metadata may include unsupported files; bytes never leave this machine.
+                    ObjectNode entry = entries.addObject();
+                    entry.put("id", file.getId().toString());
+                    String uid = projectCatalog != null ? projectCatalog.ensureFileUid(file) : file.getUid();
+                    entry.put("uid", uid); entry.put("name", file.getName());
+                    entry.put("path", listEntryPath(file, byId)); entry.put("isFolder", folder);
+                    entry.put("parentId", file.getParentId() == null ? null : file.getParentId().toString());
+                    entry.put("size", file.getFileSize() == null ? 0L : file.getFileSize());
+                }
+                manifest.put("totalCount", entries.size());
+                backupJson(session, "PUT", "/api/mobile/backup/manifest", manifest);
+                for (ProjectFile file : tree) {
+                    if (Boolean.TRUE.equals(file.getIsFolder()) || !MobilePreviewPolicy.supports(file.getName())) continue;
+                    if (file.getFilePath() == null) continue;
+                    String identity = projectKey + ":" + file.getId();
+                    var resource = storageServiceFactory.getStorageService().load(file.getFilePath());
+                    long size = resource.contentLength();
+                    if (size > MobileTransferService.MAX_TRANSFER_BYTES) continue;
+                    JsonNode old = previous.remove(identity);
+                    MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                    try (InputStream input = resource.getInputStream()) {
+                        byte[] buffer = new byte[65536]; int count;
+                        while ((count = input.read(buffer)) != -1) digest.update(buffer, 0, count);
+                    }
+                    String hash = HexFormat.of().formatHex(digest.digest());
+                    String path = listEntryPath(file, byId);
+                    if (old != null && hash.equals(old.path("sha256").asText())
+                            && path.equals(old.path("path").asText()) && file.getName().equals(old.path("name").asText())) continue;
+                    String uid = projectCatalog != null ? projectCatalog.ensureFileUid(file) : file.getUid();
+                    if (ProjectCatalogService.validUid(uid) == null) continue;
+                    String query = "?deviceId=" + queryValue(device) + "&projectKey=" + queryValue(projectKey)
+                            + "&fileId=" + file.getId() + "&uid=" + queryValue(uid)
+                            + "&name=" + queryValue(file.getName()) + "&path=" + queryValue(path) + "&sha256=" + hash;
+                    if (file.getParentId() != null) query += "&parentId=" + file.getParentId();
+                    requireCatalogAccountScope(session.scope());
+                    String boundary = MultipartBody.newBoundary();
+                    try (InputStream input = resource.getInputStream()) {
+                        HttpRequest req = request("/api/mobile/backup/files" + query, Duration.ofMinutes(10))
+                                .header("X-Session-Id", session.token())
+                                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                                .PUT(MultipartBody.filePublisher(boundary, "file", file.getName(), input)).build();
+                        HttpResponse<String> response = http.send(req, HttpResponse.BodyHandlers.ofString());
+                        requireCatalogAccountScope(session.scope());
+                        if (response.statusCode() != 200) throw new IOException("Backup upload rejected");
+                        JsonNode result = mapper.readTree(response.body());
+                        if (result.path("code").asInt(0) != 0 || !hash.equals(result.path("sha256").asText()))
+                            throw new IOException("Backup upload rejected");
+                    }
+                }
+            }
+            // Only reconcile after every local project was read successfully; transient IO cannot erase backups.
+            for (JsonNode old : previous.values()) {
+                backupJson(session, "DELETE", "/api/mobile/backup/files?deviceId=" + queryValue(device)
+                        + "&projectKey=" + queryValue(old.path("projectKey").asText())
+                        + "&fileId=" + queryValue(old.path("id").asText()), null);
+            }
+        } catch (Exception e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            log.warn("Cloud file backup incomplete; will retry on next scheduled check ({})", e.getClass().getSimpleName());
+        } finally { backupRunning.set(false); }
+    }
+
+    private static String queryValue(String value) {
+        return java.net.URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private Long cloudProjectId(Project project) {
+        if (projectRemotes == null || cloudConnections == null) return null;
+        return projectRemotes.findByProjectId(project.getId()).flatMap(remote ->
+                cloudConnections.findById(remote.getConnectionId()).filter(connection ->
+                        project.getUserId().equals(connection.getUserId()) &&
+                        baseUrl.replaceAll("/+$", "").equals(connection.getServerUrl().replaceAll("/+$", "")))
+                        .map(connection -> parseLongOrNull(remote.getRemoteProjectId()))).orElse(null);
+    }
     private final AccountService accountService;
     private final LocalIdentityService localIdentityService;
     private final ProjectRepository projectRepository;
@@ -262,6 +749,141 @@ public class MobileRelayClientService {
 
     // ==================== 周期任务 ====================
 
+    @Scheduled(initialDelay = 70_000, fixedDelay = 60_000)
+    public void scheduleMobileCalendar() {
+        if (active()) dispatchNudge("calendar-sync", this::syncMobileCalendar);
+    }
+
+    @Scheduled(initialDelay = 90_000, fixedDelay = 600_000)
+    public void scheduleMobileAssistant() {
+        if (active()) dispatchNudge("assistant-sync", this::syncMobileAssistant);
+    }
+
+    /** No task content leaves the desktop before the account's explicit calendar consent. */
+    public void syncMobileCalendar() {
+        if (!active() || mobileTasks == null || !calendarSyncRunning.compareAndSet(false, true)) return;
+        try {
+            CatalogSession session = beginCatalogSession(catalogAccountScope());
+            JsonNode settings = workspaceJson(session, "GET", "/api/mobile/calendar/settings", null);
+            if (!settings.path("enabled").asBoolean() || !settings.path("subscriptionActive").asBoolean()) return;
+            List<Project> projects = mobileWorkspaceProjects();
+            if (projects.isEmpty()) return;
+            projects = pushWorkspaceDirectory(session, projects);
+            requireCatalogAccountScope(session.scope());
+            ObjectNode body = mapper.createObjectNode().put("deviceId", deviceId())
+                    .put("timeZone", java.time.ZoneId.systemDefault().getId())
+                    .put("sourceUpdatedAt", java.time.Instant.now().toString());
+            ArrayNode events = body.putArray("events");
+            for (Project project : projects) {
+                for (Map<String, Object> task : mobileTasks.listByProject(project.getId(), null, null)) {
+                    ObjectNode event = events.addObject().put("projectKey", project.getId().toString())
+                            .put("taskId", String.valueOf(task.get("id"))).put("title", String.valueOf(task.get("title")))
+                            .put("dueDate", String.valueOf(task.get("dueDate"))).put("status", String.valueOf(task.get("status")));
+                    if (task.get("dueTime") != null) event.put("dueTime", task.get("dueTime").toString());
+                    if (task.get("remindBefore") instanceof Number n) event.put("remindBefore", n.intValue());
+                    ArrayNode files = event.putArray("files");
+                    if (task.get("files") instanceof List<?> linked) for (Object raw : linked) {
+                        if (raw instanceof Map<?, ?> file && file.get("fileId") != null)
+                            files.addObject().put("fileId", file.get("fileId").toString())
+                                    .put("fileName", Objects.toString(file.get("fileName"), ""));
+                    }
+                }
+            }
+            // Publish only a complete read. A failed project read must not erase the previous snapshot.
+            workspaceJson(session, "PUT", "/api/mobile/calendar/snapshots", body);
+        } catch (Exception e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            log.warn("Mobile calendar sync pending retry ({})", e.getClass().getSimpleName());
+        } finally { calendarSyncRunning.set(false); }
+    }
+
+    /** Cloud extracts document evidence from already consented backups; this sends only project facts and tasks. */
+    public void syncMobileAssistant() {
+        if (!active() || mobileTasks == null || mobileProfiles == null || !assistantSyncRunning.compareAndSet(false, true)) return;
+        try {
+            CatalogSession session = beginCatalogSession(catalogAccountScope());
+            JsonNode status = workspaceJson(session, "GET", "/api/mobile/assistant/status", null);
+            if (!status.path("enabled").asBoolean() || !status.path("subscriptionActive").asBoolean()
+                    || !status.path("backupEnabled").asBoolean()) return;
+            List<Project> projects = mobileWorkspaceProjects();
+            if (projects.isEmpty()) return;
+            projects = pushWorkspaceDirectory(session, projects);
+            requireCatalogAccountScope(session.scope());
+            Set<String> keys = projects.stream().map(p -> p.getId().toString()).collect(java.util.stream.Collectors.toSet());
+            for (Project project : projects) {
+                requireCatalogAccountScope(session.scope());
+                try {
+                    StringBuilder context = new StringBuilder("Project: ").append(project.getName()).append('\n');
+                    context.append("Profile: ").append(mobileProfiles.getProfile(project.getId())).append('\n');
+                    context.append("Tasks: ").append(mobileTasks.listByProject(project.getId(), null, null));
+                    if (context.length() > 23_900) context.setLength(23_900);
+                    if (context.length() == 23_900) context.append("\n[Context truncated; consult source files for detail.]");
+                    ObjectNode body = mapper.createObjectNode().put("deviceId", deviceId())
+                            .put("projectKey", project.getId().toString()).put("projectName", project.getName())
+                            .put("sourceUpdatedAt", java.time.Instant.now().toString()).put("context", context.toString());
+                    workspaceJson(session, "PUT", "/api/mobile/assistant/snapshots", body);
+                } catch (Exception e) {
+                    requireCatalogAccountScope(session.scope());
+                    if (e instanceof InterruptedException) { Thread.currentThread().interrupt(); throw e; }
+                    log.warn("One mobile project summary pending retry ({})", e.getClass().getSimpleName());
+                }
+            }
+            JsonNode summaries = workspaceJson(session, "GET", "/api/mobile/assistant/summaries", null);
+            JsonNode list = summaries.isArray() ? summaries : summaries.path("summaries");
+            for (JsonNode summary : list) if (deviceId().equals(summary.path("deviceId").asText())
+                    && !keys.contains(summary.path("projectKey").asText()))
+                workspaceJson(session, "DELETE", "/api/mobile/assistant/snapshots?deviceId=" + queryValue(deviceId())
+                        + "&projectKey=" + queryValue(summary.path("projectKey").asText()), null);
+        } catch (Exception e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            log.warn("Mobile assistant summary sync pending retry ({})", e.getClass().getSimpleName());
+        } finally { assistantSyncRunning.set(false); }
+    }
+
+    private List<Project> mobileWorkspaceProjects() {
+        return projectRepository.findByUserIdOrderByCreatedAtDesc(localIdentityService.localUserId()).stream()
+                .filter(p -> p.getId() != null && p.getName() != null && !p.isLooseFileWorkspace()).toList();
+    }
+
+    private List<Project> pushWorkspaceDirectory(CatalogSession session, List<Project> projects) throws IOException {
+        requireCatalogAccountScope(session.scope());
+        ObjectNode body = mapper.createObjectNode().put("deviceId", deviceId()).put("deviceName", deviceName());
+        ArrayNode entries = body.putArray("projects");
+        for (Project p : projects) {
+            ObjectNode entry = entries.addObject().put("key", p.getId().toString()).put("name", p.getName());
+            if (projectCatalog != null) entry.put("projectUid", projectCatalog.ensureProjectUid(p));
+            Long cloudId = cloudProjectId(p);
+            if (cloudId != null) entry.put("cloudProjectId", cloudId);
+        }
+        // Never rebind the credential mid-operation, including the directory prerequisite.
+        HttpResponse<String> response = catalogExchange(session, "PUT", "/api/mobile/projects", mapper.writeValueAsString(body));
+        if (!okEnvelope(response)) throw new IOException("Project directory sync unavailable");
+        JsonNode result = mapper.readTree(response.body());
+        if (result.path("truncated").asBoolean(false)) {
+            int stored = result.path("count").asInt(-1);
+            if (stored < 0 || stored > projects.size()) throw new IOException("Invalid directory sync count");
+            log.warn("Mobile workspace directory limited to {} of {} projects", stored, projects.size());
+            return projects.subList(0, stored);
+        }
+        return projects;
+    }
+
+    private JsonNode workspaceJson(CatalogSession session, String method, String path, JsonNode body)
+            throws IOException, InterruptedException {
+        requireCatalogAccountScope(session.scope());
+        HttpRequest.Builder builder = request(path, Duration.ofMinutes(3))
+                .header("X-Session-Id", session.token()).header("Content-Type", "application/json");
+        builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody()
+                : HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)));
+        HttpResponse<String> response = http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+        requireCatalogAccountScope(session.scope());
+        if (response.statusCode() != 200) throw new IOException("Workspace sync unavailable");
+        JsonNode envelope = mapper.readTree(response.body());
+        if (!envelope.has("code") || envelope.path("code").asInt(-1) != 0 || !envelope.has("data"))
+            throw new IOException("Workspace sync failed");
+        return envelope.path("data");
+    }
+
     /** 项目目录推送：启动后 45 秒首推，此后每 10 分钟（清单无变化则跳过出站）。 */
     @Scheduled(initialDelay = 45_000, fixedDelay = 600_000)
     public void pushDirectory() {
@@ -274,10 +896,13 @@ public class MobileRelayClientService {
             body.put("deviceName", deviceName());
             ArrayNode arr = body.putArray("projects");
             for (Project p : projects) {
-                if (p.getId() == null || p.getName() == null) continue;
+                if (p.getId() == null || p.getName() == null || p.isLooseFileWorkspace()) continue;
                 ObjectNode e = arr.addObject();
                 e.put("key", String.valueOf(p.getId()));
                 e.put("name", p.getName());
+                if (projectCatalog != null) e.put("projectUid", projectCatalog.ensureProjectUid(p));
+                Long cloudId = cloudProjectId(p);
+                if (cloudId != null) e.put("cloudProjectId", cloudId);
             }
             // 空清单不推送：同一台机器上 e2e/dev/优化者等多个后端实例共享同一份
             // ~/.aiworkdeck/mobile-relay.json 的 relay 身份，测试实例本地库是空的，
@@ -746,7 +1371,7 @@ public class MobileRelayClientService {
         }
     }
 
-    /** LIST：组本机项目的文件清单（不含文件夹）上报；项目不存在/不属本机用户则 /fail。 */
+    /** LIST：组本机项目的文件清单（含文件夹）上报；项目不存在/不属本机用户则 /fail。 */
     private void handleListCommand(long id, JsonNode cmd) {
         Long userId = localIdentityService.localUserId();
         Long projectId = parseLongOrNull(cmd.path("projectKey").asText());
@@ -764,13 +1389,17 @@ public class MobileRelayClientService {
         ArrayNode files = body.putArray("files");
         int totalCount = 0;
         for (ProjectFile f : tree) {
-            if (Boolean.TRUE.equals(f.getIsFolder())) continue;
             totalCount++;
             if (files.size() >= 2000) continue; // 只上报前 2000 条，仍统计完整数量
             ObjectNode e = files.addObject();
             e.put("id", String.valueOf(f.getId()));
+            if (projectCatalog != null) e.put("uid", projectCatalog.ensureFileUid(f));
+            else if (f.getUid() != null) e.put("uid", f.getUid());
             e.put("name", f.getName());
             e.put("path", listEntryPath(f, byId));
+            e.put("isFolder", Boolean.TRUE.equals(f.getIsFolder()));
+            if (f.getParentId() == null) e.putNull("parentId");
+            else e.put("parentId", f.getParentId().toString());
             e.put("size", f.getFileSize() == null ? 0L : f.getFileSize());
         }
         body.put("totalCount", totalCount);
@@ -826,7 +1455,11 @@ public class MobileRelayClientService {
             failTransfer(id, LangText.of("文件不存在或已移动", "The file does not exist or has been moved"));
             return;
         }
-        String fileName = cmd.path("fileName").asText(file.getName());
+        if (cmd.path("previewOnly").asBoolean() && !MobilePreviewPolicy.supports(file.getName())) {
+            failTransfer(id, MobilePreviewPolicy.unsupported());
+            return;
+        }
+        String fileName = file.getName();
         try {
             var resource = storageServiceFactory.getStorageService().load(file.getFilePath());
             try (InputStream in = resource.getInputStream()) {

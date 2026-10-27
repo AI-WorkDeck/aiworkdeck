@@ -8,6 +8,7 @@
 //                         dir instead of dist/zetaoffice/lowa — survives
 //                         `npm run build:zetaoffice`, which EMPTIES dist and
 //                         deletes the fetched engine.
+//       LOWA_DIST_DIR     use an isolated editor build (for example under /tmp).
 //       PUPPETEER_EXECUTABLE_PATH  Chrome binary (default: mac Google Chrome).
 //       LOWA_E2E_PORT     server port (default 8901).
 
@@ -17,7 +18,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const here = path.dirname(fileURLToPath(import.meta.url))
-export const distDir = path.resolve(here, '../../dist/zetaoffice')
+export const distDir = process.env.LOWA_DIST_DIR || path.resolve(here, '../../dist/zetaoffice')
 export const engineDir = process.env.LOWA_ENGINE_DIR || path.join(distDir, 'lowa')
 export const PORT = Number(process.env.LOWA_E2E_PORT || 8901)
 export const ORIGIN = 'http://127.0.0.1:' + PORT

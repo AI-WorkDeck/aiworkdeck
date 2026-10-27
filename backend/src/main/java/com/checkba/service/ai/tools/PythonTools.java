@@ -51,90 +51,98 @@ public class PythonTools implements AgentToolComponent {
 
     private static final String DOCKER_IMAGE = "python:3.9-slim";
 
-    /** Docker 探测的等待上限。跑在 ToolRegistry 的 @PostConstruct 上，不能让后端启动卡在这里。 */
     private static final long DOCKER_PROBE_TIMEOUT_SECONDS = 3;
+    private static final long DOCKER_STATUS_TTL_MILLIS = 30_000;
+    private volatile Boolean dockerAvailable; // test override; production always probes
+    private volatile DockerProbe dockerProbe;
+    private record DockerProbe(String status, String executable, long checkedAt) {}
 
-    /** 测试注入的探测结果，非 null 时优先于真实探测。 */
-    private volatile Boolean dockerAvailable;
-
-    /**
-     * 本机 Docker 是否可用。null = 还没探测过。
-     *
-     * <p>缓存到进程结束、且是<b>进程级</b>而不是每个实例一份：Docker 装没装是机器的属性，
-     * 而 fork 一个 docker 子进程有实打实的代价（Docker Desktop 装了没开的机器上
-     * {@code docker version} 要等上一两秒）。用户中途装上 Docker 的话重启后端即可。
-     */
-    private static volatile Boolean dockerProbeResult;
-
-    /**
-     * 没有 Docker 就不要把 run_python 摆到模型面前。
-     *
-     * <p>病灶（dev-board#396）：用户让 AI 读项目里的一张 jpg，模型抽不到文字后把 run_python
-     * 当成"另找一条 OCR 路子"，拿到的是 "Cannot run program docker"，于是它自己下结论
-     * 「OCR 环境（docker）不可用」并这样告诉用户——而图片其实一直能读（read_file /
-     * extract_file_text 自动走云端 OCR）。模型看不见这个工具，就不会走上这条死路。
-     */
     @Override
     public boolean isAvailable() {
         return dockerReady();
     }
 
-    /** 探测结果（带缓存）。绝不抛异常：调用方在启动路径上。 */
     boolean dockerReady() {
-        Boolean override = dockerAvailable;
-        if (override != null) {
-            return override;
-        }
-        Boolean cached = dockerProbeResult;
-        if (cached != null) {
-            return cached;
-        }
-        synchronized (PythonTools.class) {
-            if (dockerProbeResult == null) {
-                dockerProbeResult = probeDocker();
-                log.info("Docker probe: {}",
-                        dockerProbeResult ? "available" : "unavailable (run_python is hidden)");
-            }
-            return dockerProbeResult;
-        }
+        if (dockerAvailable != null) return dockerAvailable;
+        return "AVAILABLE".equals(dockerStatus());
     }
 
-    /** 供测试直接注入探测结果，生产路径不调用（真实探测在 probeDocker）。 */
+    /** Cached local readiness; expiry allows install/start/stop to recover in the same process. */
+    public synchronized String dockerStatus() {
+        if (dockerProbe == null || probeClockMillis() - dockerProbe.checkedAt() >= DOCKER_STATUS_TTL_MILLIS) {
+            dockerProbe = probeDocker();
+        }
+        return dockerProbe.status();
+    }
+
+    /** Explicit settings-panel retry, bypassing the short local cache. Never starts Docker itself. */
+    public synchronized String refreshDockerStatus() {
+        dockerProbe = probeDocker();
+        return dockerProbe.status();
+    }
+
     void overrideDockerAvailable(boolean available) {
         this.dockerAvailable = available;
     }
 
-    /**
-     * 判据是「docker 可执行文件在 且 docker version 成功」——只判可执行文件存在不够：
-     * Docker Desktop 装了没开的机器上 CLI 在、守护进程不在，run 一样起不来。
-     *
-     * <p>输出直接丢弃（不接管道）：接了管道又不读，输出撑满 OS 缓冲区时子进程会阻塞在 write 上，
-     * 探测就永远等不到退出。
-     */
-    private static boolean probeDocker() {
-        Process process = null;
-        try {
-            process = new ProcessBuilder("docker", "version")
-                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
-                    .start();
-            if (!process.waitFor(DOCKER_PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                return false;
-            }
-            return process.exitValue() == 0;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return false;
-        } catch (Exception e) {
-            // 找不到 docker 可执行文件时 start() 抛 IOException，这就是绝大多数用户机器的情形
-            return false;
-        } finally {
-            if (process != null && process.isAlive()) {
-                process.destroyForcibly();
+    long probeClockMillis() { return System.currentTimeMillis(); }
+
+    List<String> dockerCandidates() {
+        var candidates = new java.util.LinkedHashSet<String>();
+        candidates.add("docker");
+        String home = System.getProperty("user.home", "");
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        if (os.startsWith("windows")) {
+            String programFiles = System.getenv("ProgramFiles");
+            if (programFiles == null || programFiles.isBlank()) programFiles = "C:\\Program Files";
+            candidates.add(Path.of(programFiles, "Docker", "Docker", "resources", "bin", "docker.exe").toString());
+            String local = System.getenv("LOCALAPPDATA");
+            if (local != null && !local.isBlank()) candidates.add(Path.of(local, "Programs", "DockerDesktop", "resources", "bin", "docker.exe").toString());
+        } else {
+            candidates.add("/Applications/Docker.app/Contents/Resources/bin/docker");
+            candidates.add("/usr/local/bin/docker");
+            candidates.add("/opt/homebrew/bin/docker");
+            if (!home.isBlank()) candidates.add(Path.of(home, ".docker", "bin", "docker").toString());
+        }
+        return List.copyOf(candidates);
+    }
+
+    Process startDockerProbe(String executable) throws java.io.IOException {
+        return new ProcessBuilder(executable, "version")
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(ProcessBuilder.Redirect.DISCARD).start();
+    }
+
+    /** CLI presence alone is insufficient: version must also reach the daemon, within 3 seconds. */
+    private DockerProbe probeDocker() {
+        for (String executable : dockerCandidates()) {
+            Process process = null;
+            try {
+                process = startDockerProbe(executable);
+                if (!process.waitFor(DOCKER_PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    return new DockerProbe("TIMED_OUT", executable, probeClockMillis());
+                }
+                return new DockerProbe(process.exitValue() == 0 ? "AVAILABLE" : "DAEMON_UNAVAILABLE", executable, probeClockMillis());
+            } catch (java.io.IOException e) {
+                // PATH may omit Docker Desktop in packaged GUI launches; try its standard locations.
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return new DockerProbe("TIMED_OUT", executable, probeClockMillis());
+            } catch (RuntimeException e) {
+                return new DockerProbe("DAEMON_UNAVAILABLE", executable, probeClockMillis());
+            } finally {
+                if (process != null && process.isAlive()) process.destroyForcibly();
             }
         }
+        return new DockerProbe("MISSING", null, probeClockMillis());
     }
+
+    String dockerExecutable() {
+        DockerProbe current = dockerProbe;
+        return current != null && current.executable() != null ? current.executable() : "docker";
+    }
+
+    Process startSandbox(ProcessBuilder builder) throws java.io.IOException { return builder.start(); }
 
     /**
      * stdout/stderr 排空缓冲区的字符数上限。本类自己定的默认值（非产品要求）：
@@ -289,7 +297,7 @@ default_api = _ToolAPI()
 
             // 2. Build Docker Command
             List<String> command = new ArrayList<>();
-            command.add("docker");
+            command.add(dockerExecutable());
             command.add("run");
             command.add("--rm");
             // Volume Mount
@@ -314,7 +322,7 @@ default_api = _ToolAPI()
             pb.redirectErrorStream(false);
             log.info("Executing Docker command: {}", String.join(" ", command));
             
-            process = pb.start();
+            process = startSandbox(pb);
 
             // 并发排空 stdout/stderr：子进程输出超过 OS 管道缓冲区(~64KB)时会阻塞在 write，
             // 若主线程等进程退出后才读，进程将永不退出 → 假超时。必须边跑边读。

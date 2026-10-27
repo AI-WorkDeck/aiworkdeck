@@ -60,7 +60,7 @@ test('saveSidebarCollapsed 把非布尔值归一成布尔再写入', () => {
 })
 
 // ======================================================================
-// 接线核实：toggleSidebar 是三条入口（顶栏图标、rail 新按钮、Alt+Ctrl+B、
+// 接线核实：toggleSidebar 是三条入口（顶栏图标、左栏窄卡、Alt+Ctrl+B、
 // 再点同一个 rail 面板图标）唯一共用的出口，必须同时落盘与触发工作台 resize，
 // 否则收起状态在刷新/重开项目后又弹回来，或编辑器/iframe 不跟着重排。
 // ======================================================================
@@ -89,7 +89,7 @@ test('onLoad 用 loadSidebarCollapsed 恢复本机收起习惯', () => {
   assert.ok(onLoadStart > 0, '找不到 onLoad')
   const onLoadEnd = src.indexOf('\n  onShow(', onLoadStart)
   const body = src.slice(onLoadStart, onLoadEnd > 0 ? onLoadEnd : onLoadStart + 6000)
-  assert.match(body, /this\.sidebarCollapsed\s*=\s*loadSidebarCollapsed\(uni\)/,
+  assert.match(body, /this\.sidebarCollapsed\s*=\s*loadSidebarCollapsed\(uni,\s*!this\.hasNamedProject\)/,
     'onLoad 必须用 loadSidebarCollapsed 恢复状态，否则每次进项目左栏收起都会弹回来')
 })
 
@@ -104,15 +104,21 @@ test('panelSwitching.js 的同 key 收展分支复用 toggleSidebar，不再各�
     '不应该在这里再自己翻转一次，出口只有一个')
 })
 
-test('rail 底部渲染了收起/展开按钮，@tap 绑的是 toggleSidebar', () => {
+test('侧栏外缘不再占位，保留顶栏与同入口收起', () => {
   const src = read('pages/project-overview/project-overview.vue')
-  const versionIdx = src.indexOf("@tap=\"toggleLeftPane('version')\"")
-  const membersIdx = src.indexOf('Project Members Stack')
-  assert.ok(versionIdx > 0 && membersIdx > versionIdx, '定位版本记录按钮与成员堆叠区块失败')
-  const between = src.slice(versionIdx, membersIdx)
-  assert.match(between, /@tap="toggleSidebar"/, '版本记录按钮与成员堆叠之间必须有一个走 toggleSidebar 的 rail-btn')
-  assert.match(between, /class="rail-btn"/, '新按钮必须复用现有 .rail-btn 样式，不新起一套')
-  assert.match(between, /GLYPHS\.panelLeft/, '图标复用顶栏同功能按钮的 GLYPHS.panelLeft')
+  assert.doesNotMatch(src, /sidebar-collapse-(anchor|tab)/)
+  assert.match(src, /@tap="toggleSidebar"/)
+})
+
+test('欢迎首屏缺省收起，显式收展选择优先，存储故障也保持缺省', () => {
+  for (const value of ['', null, undefined, 'true', 1, {}]) {
+    assert.equal(loadSidebarCollapsed(fakeStorage({ awd_sidebar_collapsed: value }), true), true)
+  }
+  for (const saved of [true, false]) {
+    assert.equal(loadSidebarCollapsed(fakeStorage({ awd_sidebar_collapsed: saved }), true), saved)
+  }
+  assert.equal(loadSidebarCollapsed({ getStorageSync() { throw new Error('unavailable') } }, true), true)
+  assert.equal(loadSidebarCollapsed(fakeStorage(), false), false, '项目文件树保持默认展开')
 })
 
 test('FileTree 切回工作台或切左栏面板时不闪现「加载中…」且 getItemPadding 走 O(1) Map 查找（dev-board#1427）', () => {

@@ -65,6 +65,15 @@ class AccountControllerLoginSyncTest {
     }
 
     @Test
+    void setupChallengeDoesNotFinalizeLogin() {
+        Map<String, Object> challenge = Map.of("passwordSetupRequired", true, "setupToken", "restricted-ticket");
+        when(accountService.loginWithPhone("13800000000", "123456"))
+                .thenThrow(new com.checkba.service.account.PasswordSetupRequired(challenge));
+        assertEquals(challenge, data(controller.login(Map.of("phone", "13800000000", "code", "123456"), null)));
+        verifyNoInteractions(cleanup, identitySync);
+    }
+
+    @Test
     @DisplayName("/login 成功：立即做一次身份同步，而且在作废旧账户缓存之后")
     void loginSyncsIdentityRightAway() {
         when(accountService.loginWithPhone("13800000000", "123456")).thenReturn(connected());

@@ -64,6 +64,17 @@ public class DdRequest {
     @Column
     private Long cloudRequestId;
 
+    private LocalDateTime publishedAt;
+    private Long publishedBy;
+    private Boolean aiReviewEnabled = false;
+
+    public LocalDateTime getPublishedAt() { return publishedAt; }
+    public void setPublishedAt(LocalDateTime value) { publishedAt = value; }
+    public Long getPublishedBy() { return publishedBy; }
+    public void setPublishedBy(Long value) { publishedBy = value; }
+    public Boolean getAiReviewEnabled() { return Boolean.TRUE.equals(aiReviewEnabled); }
+    public void setAiReviewEnabled(Boolean value) { aiReviewEnabled = Boolean.TRUE.equals(value); }
+
     public Long getCloudRequestId() {
         return cloudRequestId;
     }

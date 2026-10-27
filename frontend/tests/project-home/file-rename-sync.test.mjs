@@ -63,7 +63,17 @@ function workspace() {
     rightFiles: [],
     $refs: {},
     _titleUpdates: 0,
+    _selectionSyncs: 0,
+    syncFileTreeSelectionWithActiveTab() { this._selectionSyncs++ },
     updateWindowTitle() { this._titleUpdates++ },
+    // fileOpenTabs.js 里 PDF keepalive 的最小等价桩（本用例的标签都是 docx，不会触发驱逐）
+    pdfKeepAliveKeys: [],
+    isPdfPreviewFile(file) {
+      return !!(file && !file.tabType && !file.isFolder && String(file.fileType || '').toLowerCase() === 'pdf')
+    },
+    evictPdfKeepAlive(pane, fileId) {
+      this.pdfKeepAliveKeys = (this.pdfKeepAliveKeys || []).filter(item => item !== pane + ':' + fileId)
+    },
   }
   for (const [name, method] of Object.entries(syncMethods)) vm[name] = method.bind(vm)
   return vm
@@ -78,6 +88,7 @@ test('handleFileRenamed：按 id 把新名同步进左右两侧标签，且左�
   vm.handleFileRenamed({ id: 42, name: 'new.docx' })
   assert.equal(leftTab.name, 'new.docx')
   assert.equal(rightTab.name, 'new.docx')
+  assert.equal(vm._selectionSyncs, 1, '重命名后同步文件树选中态')
   assert.equal(vm._titleUpdates, 1, '改了名要重算一次窗口标题（activeFileIdLeft 没变，watch 不会自己触发)')
 })
 
@@ -122,6 +133,7 @@ test('syncOpenTabsFromFileTree：拿文件树的最新清单，把已开标签�
   assert.equal(leftTab.name, 'AI 改过的名字.docx')
   assert.equal(vm.rightFiles[0].name, 'untouched.docx', '名字没变的不应该被当成"有变化"去刷标题')
   assert.equal(vm._titleUpdates, 1)
+  assert.equal(vm._selectionSyncs, 1, '批量对齐后同步文件树选中态')
 })
 
 test('syncOpenTabsFromFileTree：文件树 ref 还没挂上或没数据时安全跳过，不抛错', () => {
@@ -202,7 +214,7 @@ test('refresh_files：文件树还没挂上 ref 时不报错、也不调用同�
 
 test('FileTree.commitRename（右键重命名，唯一可达的入口）成功后广播 file-renamed', () => {
   const src = stripComments(read('components/FileTree.vue'))
-  const body = extractBlock(src, 'async commitRename()')
+  const body = extractBlock(src, 'async commitRename(e)')
   assert.match(body, /await this\.loadFiles\(\)/, '必须先落库刷新完树')
   assert.match(body, /\$emit\(\s*'file-renamed'\s*,\s*\{\s*id:\s*fileId\s*,\s*name:\s*finalName\s*\}\s*\)/,
     '重命名成功后要把新名连同 fileId 广播出去，工作台才能同步标签/标题/AI 上下文')

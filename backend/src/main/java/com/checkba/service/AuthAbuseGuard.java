@@ -71,6 +71,7 @@ public class AuthAbuseGuard {
 
     private final Map<String, FailureState> loginFailures = new ConcurrentHashMap<>();
     private final Map<String, WindowCounter> registrations = new ConcurrentHashMap<>();
+    private final Map<String, WindowCounter> captchaChallenges = new ConcurrentHashMap<>();
     private final Map<String, WindowCounter> codeSends = new ConcurrentHashMap<>();
     private final Map<String, WindowCounter> memberLookups = new ConcurrentHashMap<>();
 
@@ -165,6 +166,23 @@ public class AuthAbuseGuard {
 
     // ==================== 验证码发送限频（按 IP，短信与邮件共用；手机号/邮箱维度在 VerificationCodeStore） ====================
 
+    /** Image refreshes use a separate, atomic quota and never consume paid-delivery attempts. */
+    public void recordCaptchaChallenge(String ip) {
+        if (localMode) return;
+        purgeIfOversized();
+        long now = nowMillis.getAsLong();
+        captchaChallenges.compute(ip, (key, counter) -> {
+            if (counter == null || now - counter.windowStart > Duration.ofMinutes(10).toMillis()) {
+                counter = new WindowCounter();
+                counter.windowStart = now;
+            }
+            if (counter.count >= 60) throw new IllegalArgumentException(LangText.of(
+                    "安全验证图片请求过于频繁，请稍后再试", "Too many security image requests, please retry later"));
+            counter.count++;
+            return counter;
+        });
+    }
+
     public void checkCodeSendRate(String ip) {
         if (localMode) return;
         WindowCounter counter = codeSends.get(ip);
@@ -249,6 +267,9 @@ public class AuthAbuseGuard {
         if (registrations.size() > PURGE_THRESHOLD) {
             registrations.entrySet().removeIf(e ->
                     now - e.getValue().windowStart > REGISTRATION_WINDOW.toMillis());
+        }
+        if (captchaChallenges.size() > PURGE_THRESHOLD) {
+            captchaChallenges.entrySet().removeIf(e -> now - e.getValue().windowStart > Duration.ofMinutes(10).toMillis());
         }
         if (codeSends.size() > PURGE_THRESHOLD) {
             codeSends.entrySet().removeIf(e ->

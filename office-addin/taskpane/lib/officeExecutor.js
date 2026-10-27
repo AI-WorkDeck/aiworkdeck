@@ -169,9 +169,6 @@ function truncate(text) {
     : { text: s, truncated: false, totalChars: s.length }
 }
 
-/** 跨文档写入标不了修订时的回错（模型可见，保持中文） */
-const CROSS_DOC_NO_TRACKING = '本机 Word 版本无法标记修订，已拒绝跨文档修改'
-
 /**
  * 跨文档写入的强制修订（dev-board#717）：executeOfficeCommand 见到 args.__forceTracking
  * 就在执行期间把这里加一。强制期间 withTracking **不许**降级直改——别的窗格的 AI 改本文档，
@@ -186,7 +183,7 @@ let forcedTrackingDepth = 0
  */
 async function withTracking(context, fn) {
   if (!trackingSupported()) {
-    if (forcedTrackingDepth > 0) throw new Error(CROSS_DOC_NO_TRACKING)
+    if (forcedTrackingDepth > 0) throw new Error(t('officeCrossDocNoTracking'))
     const data = await fn()
     return { ...data, tracked: false }
   }
@@ -739,10 +736,10 @@ export function houseFromProfile(p) {
 const HOUSE = houseFromProfile(houseProfile)
 
 /**
- * 小标题启发式：第X条/章/节/款/项、「一、」「（一）」「1.」这类序号开头且不长的段落。
+ * 小标题启发式：第X编/章/节/条/款/项、「一、」「（一）」「1.」这类序号开头且不长的段落。
  * 与 LOWA 的规范一致——小标题与正文同款字号，只是加粗且不首行缩进。
  */
-const HEADING_RE = /^(第[一二三四五六七八九十百千零〇\d]+[条章节款项]|[一二三四五六七八九十]+[、.．]|[（(][一二三四五六七八九十\d]+[)）]|\d+[、.．])/
+const HEADING_RE = /^(第[一二三四五六七八九十百千零〇\d]+[编章节条款项]|[一二三四五六七八九十]+[、.．]|[（(][一二三四五六七八九十\d]+[)）]|\d+[、.．])/
 
 /** 主标题（文档首个非空段）的长度上限，超了当正文处理 */
 const HOUSE_TITLE_MAX_CHARS = 50
@@ -767,7 +764,7 @@ function applyHouseParagraph(paragraph, kind, fontSplit) {
   paragraph.lineSpacing = HOUSE.lineSpacingPt
   paragraph.spaceBefore = 0
   paragraph.spaceAfter = HOUSE.spaceAfterPt
-  paragraph.firstLineIndent = kind === 'body' ? HOUSE.firstLineIndentPt : 0
+  paragraph.firstLineIndent = (kind === 'body' && !paragraph.isListItem) ? HOUSE.firstLineIndentPt : 0
 }
 
 /** 小写短名 → Office.js 枚举值；非法值报错并列出合法值（后端已拦一道，这里是防线） */
@@ -795,7 +792,16 @@ function applyProps(target, patch) {
 /** 从 args 里挑出字符格式字段（空对象 = 调用方没给任何格式参数） */
 function buildFontPatch(args) {
   const patch = {}
+  const fontSplit = farEastFontSupported()
   if (args.fontName) patch.name = String(args.fontName)
+  if (args.fontNameAsian) {
+    patch.name = String(args.fontNameAsian)
+    if (fontSplit) patch.nameFarEast = String(args.fontNameAsian)
+  }
+  if (args.fontNameWestern) {
+    if (fontSplit) patch.nameAscii = String(args.fontNameWestern)
+    if (!patch.name) patch.name = String(args.fontNameWestern)
+  }
   if (args.fontSize != null) patch.size = Number(args.fontSize)
   if (args.bold != null) patch.bold = !!args.bold
   if (args.italic != null) patch.italic = !!args.italic
@@ -812,6 +818,12 @@ function buildParagraphPatch(args) {
   if (args.alignment != null) patch.alignment = toEnumValue(ALIGNMENTS, args.alignment, 'alignment')
   for (const field of PARAGRAPH_POINT_FIELDS) {
     if (args[field] != null) patch[field] = Number(args[field])
+  }
+  if (patch.firstLineIndent == null && args.firstLineIndentChars != null && isFinite(Number(args.firstLineIndentChars))) {
+    patch.firstLineIndent = Number(args.firstLineIndentChars) * 12
+  }
+  if (patch.lineSpacing != null && patch.lineSpacing > 0 && patch.lineSpacing <= 5) {
+    patch.lineSpacing = patch.lineSpacing * 12
   }
   return patch
 }
@@ -1130,10 +1142,26 @@ const HANDLERS = {
     if (!anchorText) throw new Error('目标文本不能为空')
     const font = buildFontPatch(args)
     if (!Object.keys(font).length) {
-      throw new Error('未给出任何格式参数（fontName/fontSize/bold/italic/underline/strikeThrough/doubleStrikeThrough/color 至少给一个）')
+      throw new Error('未给出任何格式参数（fontName/fontNameAsian/fontNameWestern/fontSize/bold/italic/underline/strikeThrough/doubleStrikeThrough/color 至少给一个）')
     }
+    const paragraphCount = args.paragraphCount != null && Number(args.paragraphCount) >= 1
+      ? Math.min(Math.floor(Number(args.paragraphCount)), MAX_NUMBERING_PARAGRAPHS)
+      : 0
     return Word.run(async (context) => {
       return withTracking(context, async () => {
+        if (paragraphCount >= 1) {
+          const paragraphs = context.document.body.paragraphs
+          paragraphs.load('text')
+          await context.sync()
+          const all = paragraphs.items
+          const start = all.findIndex((p) => String(p.text || '').includes(anchorText))
+          if (start >= 0) {
+            const targets = all.slice(start, start + paragraphCount)
+            for (const p of targets) applyProps(p.font, font)
+            await context.sync()
+            return { formatted: targets.length, totalMatches: 1, paragraphCount: targets.length, applied: font }
+          }
+        }
         const items = await searchRanges(context, anchorText, true)
         if (!items.length) {
           throw await anchorNotFound(context, '定位锚点', anchorText)
@@ -1154,19 +1182,38 @@ const HANDLERS = {
       ? null
       : toEnumValue(PARAGRAPH_STYLES, args.styleBuiltIn, 'styleBuiltIn')
     if (!styleBuiltIn && !Object.keys(patch).length) {
-      throw new Error('未给出任何格式参数（alignment/lineSpacing/spaceBefore/spaceAfter/firstLineIndent/leftIndent/rightIndent/styleBuiltIn 至少给一个）')
+      throw new Error('未给出任何格式参数（alignment/lineSpacing/spaceBefore/spaceAfter/firstLineIndent/firstLineIndentChars/leftIndent/rightIndent/styleBuiltIn 至少给一个）')
     }
     if (styleBuiltIn && !builtInStyleSupported()) {
       throw new Error('当前 Word 版本不支持设置标题级别（需要 WordApi 1.3），可改用字号与加粗参数')
     }
+    const paragraphCount = args.paragraphCount != null && Number(args.paragraphCount) > 1
+      ? Math.min(Math.floor(Number(args.paragraphCount)), MAX_NUMBERING_PARAGRAPHS)
+      : 1
     return Word.run(async (context) => {
       return withTracking(context, async () => {
-        const items = await searchRanges(context, anchorText, true)
-        if (!items.length) {
-          throw await anchorNotFound(context, '定位锚点', anchorText)
+        let paragraphs = []
+        let totalMatches = 0
+        if (paragraphCount > 1 && !args.applyToAll) {
+          const allParas = context.document.body.paragraphs
+          allParas.load('text')
+          await context.sync()
+          const all = allParas.items
+          const start = all.findIndex((p) => String(p.text || '').includes(anchorText))
+          if (start >= 0) {
+            paragraphs = all.slice(start, start + paragraphCount)
+            totalMatches = 1
+          }
         }
-        const targets = args.applyToAll ? items : [items[0]]
-        const paragraphs = targets.map((range) => range.paragraphs.getFirst())
+        if (!paragraphs.length) {
+          const items = await searchRanges(context, anchorText, true)
+          if (!items.length) {
+            throw await anchorNotFound(context, '定位锚点', anchorText)
+          }
+          totalMatches = items.length
+          const targets = args.applyToAll ? items : [items[0]]
+          paragraphs = targets.map((range) => range.paragraphs.getFirst())
+        }
         // 套内置样式会把段落格式重置成样式自带的那套，必须先落样式再落其余参数
         if (styleBuiltIn) {
           for (const paragraph of paragraphs) paragraph.styleBuiltIn = styleBuiltIn
@@ -1177,7 +1224,7 @@ const HANDLERS = {
           await context.sync()
         }
         const applied = styleBuiltIn ? { ...patch, styleBuiltIn: args.styleBuiltIn } : patch
-        return { formatted: paragraphs.length, totalMatches: items.length, applied }
+        return { formatted: paragraphs.length, totalMatches, applied }
       })
     })
   },
@@ -1198,37 +1245,51 @@ const HANDLERS = {
       }
       const paragraph = range.paragraphs.getFirst()
       range.load('text')
-      range.font.load('name,size,bold,italic,underline,strikeThrough,color')
-      // styleBuiltIn 属 WordApi 1.3：旧宿主上既不能 load 也不能读（未 load 的属性直接抛）
+      const fontSplit = farEastFontSupported()
+      const fontFields = ['name', 'size', 'bold', 'italic', 'underline', 'strikeThrough', 'color']
+      if (fontSplit) fontFields.push('nameFarEast', 'nameAscii')
+      range.font.load(fontFields.join(','))
+      // styleBuiltIn / isListItem 属 WordApi 1.3：旧宿主上既不能 load 也不能读（未 load 的属性直接抛）
       const withBuiltIn = builtInStyleSupported()
+      const listApi = wordApi13Supported()
       const paragraphFields = PARAGRAPH_POINT_FIELDS.concat(['alignment', 'style'])
       if (withBuiltIn) paragraphFields.push('styleBuiltIn')
+      if (listApi) paragraphFields.push('isListItem')
       paragraph.load(paragraphFields.join(','))
       await context.sync()
       const font = range.font
+      const fontOut = {
+        name: font.name,
+        size: font.size,
+        bold: font.bold,
+        italic: font.italic,
+        underline: fromEnumValue(UNDERLINE_TYPES, font.underline),
+        strikeThrough: font.strikeThrough,
+        color: font.color
+      }
+      if (fontSplit) {
+        fontOut.nameFarEast = font.nameFarEast
+        fontOut.nameAscii = font.nameAscii
+      }
+      const paraOut = {
+        alignment: fromEnumValue(ALIGNMENTS, paragraph.alignment),
+        lineSpacing: paragraph.lineSpacing,
+        spaceBefore: paragraph.spaceBefore,
+        spaceAfter: paragraph.spaceAfter,
+        firstLineIndent: paragraph.firstLineIndent,
+        leftIndent: paragraph.leftIndent,
+        rightIndent: paragraph.rightIndent,
+        style: paragraph.style,
+        styleBuiltIn: withBuiltIn ? fromEnumValue(PARAGRAPH_STYLES, paragraph.styleBuiltIn) : undefined
+      }
+      if (listApi && paragraph.isListItem !== undefined) {
+        paraOut.isListItem = !!paragraph.isListItem
+      }
       return {
         source: anchorText ? 'anchor' : 'selection',
         text: (range.text || '').slice(0, 200),
-        font: {
-          name: font.name,
-          size: font.size,
-          bold: font.bold,
-          italic: font.italic,
-          underline: fromEnumValue(UNDERLINE_TYPES, font.underline),
-          strikeThrough: font.strikeThrough,
-          color: font.color
-        },
-        paragraph: {
-          alignment: fromEnumValue(ALIGNMENTS, paragraph.alignment),
-          lineSpacing: paragraph.lineSpacing,
-          spaceBefore: paragraph.spaceBefore,
-          spaceAfter: paragraph.spaceAfter,
-          firstLineIndent: paragraph.firstLineIndent,
-          leftIndent: paragraph.leftIndent,
-          rightIndent: paragraph.rightIndent,
-          style: paragraph.style,
-          styleBuiltIn: withBuiltIn ? fromEnumValue(PARAGRAPH_STYLES, paragraph.styleBuiltIn) : undefined
-        }
+        font: fontOut,
+        paragraph: paraOut
       }
     })
   },
@@ -1368,11 +1429,12 @@ const HANDLERS = {
   async apply_standard_format(args) {
     const scope = String(args.scope || 'document').trim().toLowerCase() === 'selection' ? 'selection' : 'document'
     const fontSplit = farEastFontSupported()
+    const listApi = wordApi13Supported()
     return Word.run(async (context) => {
       return withTracking(context, async () => {
         const root = scope === 'selection' ? context.document.getSelection() : context.document.body
         const paragraphs = root.paragraphs
-        paragraphs.load('text')
+        paragraphs.load(listApi ? 'text,isListItem' : 'text')
         await context.sync()
         const all = paragraphs.items
         const truncated = all.length > MAX_STANDARD_FORMAT_PARAGRAPHS
@@ -4258,7 +4320,7 @@ export function commandDisplayName(command) {
  */
 export async function executeOfficeCommand(command, args) {
   if (!officeAvailable()) {
-    return { ok: false, error: 'Office 环境不可用：请在 Office 任务窗格中使用本插件' }
+    return { ok: false, error: t('officeEnvUnavailable') }
   }
   const handler = HANDLERS[command]
   if (!handler) {
@@ -4269,7 +4331,10 @@ export async function executeOfficeCommand(command, args) {
   if (requiredHost && host !== requiredHost) {
     return {
       ok: false,
-      error: `unsupported host: 该命令只在 ${HOST_LABELS[requiredHost]} 中可用（当前宿主：${HOST_LABELS[host] || '未知'}）`
+      error: t('officeUnsupportedHost', {
+        required: HOST_LABELS[requiredHost],
+        current: HOST_LABELS[host] || t('officeUnknownHost')
+      })
     }
   }
   // __forceTracking 是跨文档写入的内部标记（crossDocWrite 加的），不许漏进 handler 的参数
@@ -4304,8 +4369,10 @@ async function describeExecutionError(e, command, args) {
   if (code === 'ItemNotFound' && command.startsWith('excel_') && args.sheetName) {
     const names = await listWorksheetNames()
     if (names.length) {
-      return `未找到名为「${args.sheetName}」的工作表。本工作簿现有工作表：${names.join('、')}。`
-        + '请用其中之一重试（名称区分空格与全角半角），或留空 sheetName 表示活动工作表。'
+      return t('officeWorksheetNotFound', {
+        sheetName: args.sheetName,
+        names: names.join('、')
+      })
     }
   }
   if (code) message += `（宿主错误码 ${code}${where ? '，出错位置 ' + where : ''}）`
@@ -4511,7 +4578,7 @@ export async function writeOfficeState(state) {
       const cell = table.getCellOrNullObject(s.row, s.col)
       cell.load('isNullObject')
       await context.sync()
-      if (cell.isNullObject) throw new Error('目标单元格已不存在')
+      if (cell.isNullObject) throw new Error(t('officeTargetCellMissing'))
       cell.text = s.text
       await context.sync()
     })
@@ -4521,7 +4588,7 @@ export async function writeOfficeState(state) {
       const frames = await loadPptTextFrames(context)
       for (const f of s.frames || []) {
         const tf = frames[f.slide - 1] && frames[f.slide - 1][f.frame]
-        if (!tf || tf.isNullObject) throw new Error('目标文本框已不存在')
+        if (!tf || tf.isNullObject) throw new Error(t('officeTargetTextFrameMissing'))
         const current = tf.hasText ? (tf.textRange.text || '') : ''
         if (current === f.text) continue
         if (!current.length) {
@@ -4538,7 +4605,7 @@ export async function writeOfficeState(state) {
       await context.sync()
     })
   }
-  throw new Error('无法识别的修订快照，撤销未执行')
+  throw new Error(t('officeUnrecognizedSnapshot'))
 }
 
 /* ==================== 修订记录的「定位」（dev-board#717） ==================== */

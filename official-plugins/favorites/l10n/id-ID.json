@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Favorit",
+  "plugin.description": "Telusuri favorit proyek, salin, sisipkan, atau buka sumbernya.",
+  "view.main.name": "Favorit"
+}

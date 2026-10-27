@@ -12,6 +12,8 @@ const winEmulated = process.argv.includes('--checkba-win-emulated=1')
 // sandbox preload 不能直接读 os；由主进程注入物理内存，供编辑器选择预热策略。
 const systemMemoryArg = process.argv.find((a) => a.startsWith('--checkba-system-memory='))
 const systemMemoryBytes = systemMemoryArg ? Number(systemMemoryArg.slice('--checkba-system-memory='.length)) : NaN
+const nativeDocxArg = process.argv.find((a) => a.startsWith('--checkba-native-docx-max-bytes='))
+const nativeDocxMaxBytes = nativeDocxArg ? Number(nativeDocxArg.slice('--checkba-native-docx-max-bytes='.length)) : NaN
 
 contextBridge.exposeInMainWorld('checkbaDesktop', {
   apiBaseUrl,
@@ -137,6 +139,12 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
     }
   },
   backend: {
+    getHealth: () => ipcRenderer.invoke('checkba:backend-health'),
+    onHealthChanged: (handler) => {
+      const listener = (_event, health) => handler(health)
+      ipcRenderer.on('checkba:backend-health-changed', listener)
+      return () => ipcRenderer.removeListener('checkba:backend-health-changed', listener)
+    },
     restart: () => ipcRenderer.invoke('checkba:backend-restart'),
     onStatus: (handler) => {
       const listener = (_evt, data) => handler && handler(data)
@@ -147,7 +155,7 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
   // 组件管理（本地模型下载/状态，Phase 2）：状态查询 + 下载/取消/删除 + 进度订阅
   model: {
     status: () => ipcRenderer.invoke('checkba:model-status'),
-    download: (id) => ipcRenderer.invoke('checkba:model-download', { id }),
+    download: (id, options) => ipcRenderer.invoke('checkba:model-download', { id, repair: options?.repair === true }),
     cancel: (id) => ipcRenderer.invoke('checkba:model-cancel', { id }),
     remove: (id) => ipcRenderer.invoke('checkba:model-remove', { id }),
     onProgress: (handler) => {
@@ -165,8 +173,28 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
     set: (key, value) => ipcRenderer.invoke('checkba:prefs-set', { key, value })
   },
   // 应用内增量更新（docs/INCREMENTAL_UPDATE_DESIGN.md）：小版本补丁自动下载、
-  // 重启生效；大版本引导官网下载全量包。onEvent 返回退订函数——页面栈多实例
+  // 重启生效；完整版本验签准备后退出安装。onEvent 返回退订函数——页面栈多实例
   // 场景务必用活跃实例指针消费（见剪贴板去重地雷，PR#151）。
+  lifecycle: {
+    onPrepareQuit: (handler) => {
+      const listener = async (_event, { requestId }) => {
+        let result
+        try {
+          result = await handler({ reportStage: (stage) => ipcRenderer.invoke('checkba:quit-stage', { requestId, stage }) })
+        } catch (e) { result = { ok: false, error: String(e?.message || e) } }
+        return ipcRenderer.invoke('checkba:quit-prepared', { requestId, ...result })
+      }
+      ipcRenderer.on('checkba:prepare-quit', listener)
+      ipcRenderer.send('checkba:quit-handler-ready')
+      return () => ipcRenderer.removeListener('checkba:prepare-quit', listener)
+    },
+    onQuitCancelled: (handler) => {
+      const listener = (_event, data) => handler && handler(data)
+      ipcRenderer.on('checkba:quit-cancelled', listener)
+      return () => ipcRenderer.removeListener('checkba:quit-cancelled', listener)
+    },
+    cancelQuit: () => ipcRenderer.invoke('checkba:cancel-quit')
+  },
   update: {
     status: () => ipcRenderer.invoke('checkba:update-status'),
     check: () => ipcRenderer.invoke('checkba:update-check'),
@@ -198,6 +226,13 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
     // 「发送…」：macOS 唤起系统分享面板（微信/邮件/隔空投送），Windows 退化为剪贴板粘贴
     // （dev-board#382）。返回 { ok, mode: 'share-sheet' | 'clipboard', reason? }。
     shareFile: (path) => ipcRenderer.invoke('fs:shareFile', { path }),
+    // 原生文件拖出（dev-board#1288）：在 dragstart 中把本机物理路径交给 webContents.startDrag，
+    // 拖到微信聊天窗口 / Finder / 资源管理器可直接发出或落盘。
+    startDrag: (path) => {
+      const paths = Array.isArray(path) ? path : [path]
+      if (!paths.length || paths.some(p => typeof p !== 'string' || !p)) return { ok: false, reason: 'bad-path' }
+      return ipcRenderer.invoke('fs:startDrag', { paths })
+    },
     // 回收站「彻底删除」把后端报回的物理路径送进系统废纸篓（dev-board#1051）。
     // 返回 { ok, results: [{ path, ok, missing?, reason? }] }；ok 为假时渲染层不清行。
     trashItems: (paths) => ipcRenderer.invoke('fs:trashItems', { paths }),
@@ -211,6 +246,10 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
       ipcRenderer.on('checkba:download-done', listener)
       return () => ipcRenderer.removeListener('checkba:download-done', listener)
     },
+    stageDroppedFile: (file) => ipcRenderer.invoke('fs:stageDroppedFile', file),
+    // Cache archive-entry bytes for native file export; callers cannot choose a disk path.
+    cacheArchiveEntry: (file) => ipcRenderer.invoke('fs:cacheArchiveEntry', file),
+    releaseDroppedFile: (token) => ipcRenderer.invoke('fs:releaseDroppedFile', token),
     // 拖放的 File 对象 → 绝对路径（Electron 32 起 File.path 移除，webUtils 是正途）
     getPathForFile: (file) => {
       try {
@@ -230,6 +269,9 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
       ipcRenderer.on('checkba:menu-action', listener)
       return () => ipcRenderer.removeListener('checkba:menu-action', listener)
     },
+    // 工作台挂载并可接文件后 ready；每条成功或已展示错误后 ack，不能提前确认。
+    openPathsReady: () => ipcRenderer.send('checkba:open-paths-ready'),
+    ackOpenPath: (requestId) => ipcRenderer.send('checkba:open-path-ack', requestId),
     setState: (payload) => ipcRenderer.send('checkba:menu-state', payload)
   },
   // 应用语言（zh-CN/en-US）：渲染层是权威源，启动与切换时推给主进程
@@ -247,7 +289,15 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
   // { url, preload, partition } for the host to mount the webview.
   // （onOpenEmbed / ⌘⇧O 覆盖层已移除：内联编辑器就是产品默认。）
   zetaoffice: {
-    getEditor: () => ipcRenderer.invoke('checkba:zetaoffice-editor')
+    nativeDocxMaxBytes: Number.isSafeInteger(nativeDocxMaxBytes) && nativeDocxMaxBytes > 0 ? nativeDocxMaxBytes : null,
+    getEditor: (options) => ipcRenderer.invoke('checkba:zetaoffice-editor', options),
+    nativeRequest: (sessionId, action, params) => ipcRenderer.invoke('checkba:native-editor-request', sessionId, action, params),
+    nativeClose: (sessionId) => ipcRenderer.invoke('checkba:native-editor-close', sessionId),
+    onNativeEvent: (sessionId, callback) => {
+      const listener = (_event, message) => { if (message?.sessionId === sessionId) callback(message.event) }
+      ipcRenderer.on('checkba:native-editor-event', listener)
+      return () => ipcRenderer.removeListener('checkba:native-editor-event', listener)
+    }
   },
   // 编辑器本机字体（仅桌面）：list({refresh}) → { platform, fonts, enabledBytes,
   // maxRecommendedBytes }；setEnabled(ids) → { ok, enabledBytes, count }。
@@ -265,6 +315,21 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
   // 国际站人机验证托管页挂 <webview> 用（dev-board#863）：getConfig() 返回 { preload }。
   captchaEmbed: {
     getConfig: () => ipcRenderer.invoke('checkba:captcha-embed')
+  },
+  // macOS 系统权限引导与拖拽授权浮窗（dev-board#1433）：
+  // 排查完全磁盘访问（微信沙盒容器拖入必需）、屏幕录制、麦克风、辅助功能，
+  // 打开对应系统设置页并弹出可原生拖出 AI WorkDeck.app 的悬浮小窗。
+  permissions: {
+    getStatus: () => ipcRenderer.invoke('checkba:permissions-status'),
+    request: (id, opts) => ipcRenderer.invoke('checkba:permissions-request', { id, ...(opts && typeof opts === 'object' ? opts : {}) }),
+    openSettings: (id, opts) => ipcRenderer.invoke('checkba:permissions-open-settings', { id, ...(opts && typeof opts === 'object' ? opts : {}) }),
+    startAppDrag: () => ipcRenderer.invoke('checkba:permissions-start-app-drag'),
+    closeHelper: () => ipcRenderer.invoke('checkba:permissions-close-helper'),
+    onUpdated: (handler) => {
+      const listener = (_evt, data) => handler && handler(data)
+      ipcRenderer.on('checkba:permissions-updated', listener)
+      return () => ipcRenderer.removeListener('checkba:permissions-updated', listener)
+    }
   }
 })
 

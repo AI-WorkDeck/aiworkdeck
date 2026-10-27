@@ -46,6 +46,36 @@ class ProjectControllerOpenLocalGateTest {
     private ProjectController controller;
 
     @Test
+    void singleFileOpeningRequiresDesktopModeAndAnAuthenticatedSession() {
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(1L);
+            auth.when(() -> AuthController.getUserIdFromSession(null)).thenReturn(null);
+            assertThrows(IllegalArgumentException.class,
+                    () -> controller.openLocalFile(Map.of("path", "/tmp/file.pdf"), "sess"));
+            ReflectionTestUtils.setField(controller, "localFolderProjectsEnabled", true);
+            assertThrows(IllegalArgumentException.class,
+                    () -> controller.openLocalFile(Map.of("path", "/tmp/file.pdf"), null));
+            verify(localProjectService, never()).openLocalFile(any(), any());
+        }
+    }
+
+    @Test
+    void desktopSingleFileResponseContainsTheFileAndWorkspaceType() {
+        ReflectionTestUtils.setField(controller, "localFolderProjectsEnabled", true);
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(1L);
+            Project p = new Project(); p.setId(7L); p.setProjectType(Project.LOOSE_FILES);
+            var file = new com.checkba.model.entity.ProjectFile(); file.setId(8L);
+            when(localProjectService.openLocalFile("/tmp/file.pdf", 1L))
+                    .thenReturn(new LocalProjectService.OpenLocalFileResult(p, file, false));
+            Map<?, ?> data = (Map<?, ?>) controller.openLocalFile(Map.of("path", "/tmp/file.pdf"), "sess").get("data");
+            assertEquals(7L, data.get("projectId"));
+            assertEquals(Project.LOOSE_FILES, data.get("projectType"));
+            assertEquals(file, data.get("file"));
+        }
+    }
+
+    @Test
     void cloudDefaultRejectsArbitraryLocalRoot() {
         try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(1L);
@@ -53,7 +83,7 @@ class ProjectControllerOpenLocalGateTest {
             assertThrows(IllegalArgumentException.class,
                     () -> controller.openLocalFolder(Map.of("localRoot", "/etc"), "sess"));
             verify(localProjectService, never())
-                    .openLocalFolder(anyString(), anyBoolean(), any(), any(), anyLong());
+                    .openLocalFolder(anyString(), anyBoolean(), any(), any(), anyLong(), anyBoolean());
         }
     }
 
@@ -65,7 +95,7 @@ class ProjectControllerOpenLocalGateTest {
             Project p = new Project();
             p.setId(7L);
             p.setName("案卷");
-            when(localProjectService.openLocalFolder("/Users/me/案卷", false, null, null, 1L))
+            when(localProjectService.openLocalFolder("/Users/me/案卷", false, null, null, 1L, false))
                     .thenReturn(new LocalProjectService.OpenLocalResult(p, false, null, 3, false, 0, false));
 
             Map<String, Object> result = controller.openLocalFolder(
@@ -89,7 +119,7 @@ class ProjectControllerOpenLocalGateTest {
             Project p = new Project();
             p.setId(9L);
             p.setName("大项目");
-            when(localProjectService.openLocalFolder("/Users/me/大项目", false, null, null, 1L))
+            when(localProjectService.openLocalFolder("/Users/me/大项目", false, null, null, 1L, false))
                     .thenReturn(new LocalProjectService.OpenLocalResult(p, false, null, 50, true, 7, false));
 
             Map<String, Object> result = controller.openLocalFolder(
@@ -101,4 +131,23 @@ class ProjectControllerOpenLocalGateTest {
             assertEquals(7, data.get("truncatedCount"));
         }
     }
+    @Test
+    void nestedFolderDecisionIsReturnedAndExplicitConfirmationIsPassedThrough() {
+        ReflectionTestUtils.setField(controller, "localFolderProjectsEnabled", true);
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(1L);
+            when(localProjectService.openLocalFolder("/tmp/parent/child", false, null, null, 1L, false))
+                    .thenThrow(new LocalProjectService.NestedFolderConfirmationRequired(java.util.List.of("父项目")));
+            var response = controller.openLocalFolder(Map.of("localRoot", "/tmp/parent/child"), "sess");
+            assertEquals(0, response.get("code"));
+            assertEquals(Map.of("requiresNestedConfirmation", true,
+                    "overlappingProjectNames", java.util.List.of("父项目")), response.get("data"));
+            Project p = new Project(); p.setId(8L); p.setName("child");
+            when(localProjectService.openLocalFolder("/tmp/parent/child", false, null, null, 1L, true))
+                    .thenReturn(new LocalProjectService.OpenLocalResult(p, false, null, 0, false, 0, false));
+            var opened = controller.openLocalFolder(Map.of("localRoot", "/tmp/parent/child", "allowNested", true), "sess");
+            assertEquals(8L, ((Map<?, ?>) opened.get("data")).get("projectId"));
+        }
+    }
+
 }

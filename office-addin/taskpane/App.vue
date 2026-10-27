@@ -67,12 +67,14 @@
         </svg>
         <span v-if="revisionUnread" class="revlog-badge">{{ revisionUnread > 99 ? '99+' : revisionUnread }}</span>
       </button>
-      <!-- 语言切换（dev-board#177/#193）：未登录也要能切，所以放头部而不是账户菜单里；
-           地球图标 + 目标语言缩写，让它一眼可读为「切换语言」而不是一个谜之汉字按钮 -->
+      <!-- 语言切换（dev-board#177/#193/#1477）：未登录也要能切，所以放头部而不是账户菜单里；
+           地球图标 + 当前语言角标，点击展开 20 语种 + 跟随系统搜索下拉 -->
       <button
         class="icon-btn lang-btn"
-        :title="t('languageLabel')"
-        @click="toggleLang"
+        :title="t('languagePickerLabel')"
+        :aria-label="t('languagePickerLabel')"
+        :aria-expanded="langMenuOpen ? 'true' : 'false'"
+        @click="openLangMenu"
       >
         <svg class="lang-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
           <circle cx="12" cy="12" r="9"/>
@@ -136,6 +138,46 @@
         <!-- 关联 git 仓库（dev-board#720）：给不装桌面端的用户一个权威参考源 -->
         <button class="menu-item" @click="showGitLink">{{ t('menuGitLink') }}</button>
         <button class="menu-item danger" @click="logout">{{ t('logout') }}</button>
+      </div>
+    </div>
+
+    <!-- 语言选择弹层（20 语种 + 跟随系统，dev-board#1477） -->
+    <div v-if="langMenuOpen" class="account-overlay" @click.self="langMenuOpen = false">
+      <div ref="langMenuEl" class="account-menu glass lang-menu" role="listbox" :aria-label="t('languagePickerLabel')">
+        <div class="lang-search-wrap">
+          <input
+            ref="langSearchInputEl"
+            v-model="langSearchQuery"
+            type="text"
+            class="np-input lang-search-input"
+            :placeholder="t('languageSearchPlaceholder')"
+            @keydown.esc="langMenuOpen = false"
+          />
+        </div>
+        <div class="lang-list">
+          <button
+            v-for="opt in filteredLangOptions"
+            :key="opt.value"
+            type="button"
+            role="option"
+            class="menu-item lang-option"
+            :class="{ 'is-selected': isLangOptionSelected(opt), 'is-system': opt.isSystem }"
+            :dir="opt.dir || 'ltr'"
+            @click="selectLanguage(opt.value)"
+          >
+            <span class="lang-opt-main">
+              <span class="lang-opt-native">{{ opt.label }}</span>
+              <span v-if="opt.sublabel" class="lang-opt-sub">{{ opt.sublabel }}</span>
+            </span>
+            <span class="lang-opt-right">
+              <span class="lang-opt-badge">{{ opt.badge }}</span>
+              <span class="lang-opt-check">{{ isLangOptionSelected(opt) ? '✓' : '' }}</span>
+            </span>
+          </button>
+          <div v-if="!filteredLangOptions.length" class="lang-empty">
+            {{ t('languageNoMatch') }}
+          </div>
+        </div>
       </div>
     </div>
 
@@ -227,11 +269,20 @@ import {
   loadArchiveLinks, saveArchiveLink, mergeArchiveLinks
 } from './lib/settings.js'
 import {
-  fetchMyProjects, ensureAddinDefaultProject, fetchMe, postLogout,
+  fetchMyProjects, fetchProjectCatalog, ensureAddinDefaultProject, fetchMe, postLogout,
   createProject, fetchPlatformAiStatus, fetchMobileDevices,
   ensureAddinLink, fetchAddinLinks, postPaneHeartbeat, sendPaneBye
 } from './lib/api.js'
-import { t, getLang, setLang } from './lib/i18n.js'
+import {
+  t,
+  getLang,
+  getLangTag,
+  getLangPreference,
+  getLocaleMeta,
+  setLang,
+  LOCALE_REGISTRY,
+  SYSTEM_LANGUAGE_MODE,
+} from './lib/i18n.js'
 import { displayProjectName } from './lib/projectName.js'
 import { rechargeUrl, openExternal } from './lib/site.js'
 import { hostFamily, hidePanel, detectHost, readDocumentMeta, documentKey } from './lib/hostBridge.js'
@@ -261,7 +312,12 @@ const archiveLinks = ref(loadArchiveLinks())
 const archiveHint = ref('')
 const archiveHintError = ref(false)
 let archiveHintTimer = null
-const langKey = ref(getLang())
+const langKey = ref(getLangTag())
+const langPref = ref(getLangPreference())
+const langMenuOpen = ref(false)
+const langSearchQuery = ref('')
+const langMenuEl = ref(null)
+const langSearchInputEl = ref(null)
 const me = ref(null)
 const accountOpen = ref(false)
 const accountMenuEl = ref(null)
@@ -352,9 +408,69 @@ async function bindRemoteProject(deviceId, projectKey) {
   }
 }
 
-// 按钮显示「切过去」的语言名（在中文界面显示 EN，反之显示中）；
-// 字面量放 script 里——i18n 静态扫描只盯模板段的裸中文
-const langBtnLabel = computed(() => (langKey.value === 'zh' ? 'EN' : '中'))
+// 按钮显示当前生效语言的短角标（如 简 / 繁 / EN / JA / AR）
+const langBtnLabel = computed(() => getLocaleMeta(langKey.value).shortBadge)
+
+const allLangOptions = computed(() => {
+  // 引用 langKey.value 让切换语言后跟随系统文案自动重算
+  const currentTag = langKey.value
+  const sysEntry = getLocaleMeta(currentTag)
+  const followLabel = t('languageFollowSystem')
+  const sysOpt = {
+    value: SYSTEM_LANGUAGE_MODE,
+    label: followLabel,
+    sublabel: sysEntry.nativeName,
+    badge: sysEntry.shortBadge,
+    dir: 'ltr',
+    isSystem: true,
+    searchTerms: `${followLabel} system auto ${sysEntry.nativeName} ${sysEntry.englishName}`.toLowerCase(),
+  }
+  const localeOpts = LOCALE_REGISTRY.map((entry) => ({
+    value: entry.code,
+    label: entry.nativeName,
+    sublabel: entry.englishName !== entry.nativeName ? entry.englishName : '',
+    badge: entry.shortBadge,
+    dir: entry.dir,
+    isSystem: false,
+    searchTerms: `${entry.nativeName} ${entry.englishName} ${entry.code} ${entry.slug} ${entry.shortBadge}`.toLowerCase(),
+  }))
+  return [sysOpt, ...localeOpts]
+})
+
+const filteredLangOptions = computed(() => {
+  const q = String(langSearchQuery.value || '').trim().toLowerCase()
+  if (!q) return allLangOptions.value
+  return allLangOptions.value.filter((opt) => opt.searchTerms.includes(q))
+})
+
+function isLangOptionSelected(opt) {
+  if (langPref.value === SYSTEM_LANGUAGE_MODE) {
+    return opt.value === SYSTEM_LANGUAGE_MODE
+  }
+  return opt.value === langKey.value
+}
+
+function openLangMenu() {
+  accountOpen.value = false
+  langSearchQuery.value = ''
+  langMenuOpen.value = !langMenuOpen.value
+  if (langMenuOpen.value) {
+    nextTick(() => {
+      popIn(langMenuEl.value)
+      if (langSearchInputEl.value) langSearchInputEl.value.focus()
+    })
+  }
+}
+
+function selectLanguage(choice) {
+  const resolved = setLang(choice)
+  const pref = getLangPreference()
+  mirrorLang(pref)
+  langPref.value = pref
+  langKey.value = resolved
+  langMenuOpen.value = false
+  accountOpen.value = false
+}
 
 const avatarInitial = computed(() => {
   const name = me.value && (me.value.displayName || me.value.username)
@@ -399,11 +515,12 @@ const quotaText = computed(() => {
  * - 一个都没有：让后端懒建「插件临时项目」并静默选中，用户无感。
  *   旧后端没有该端点时降级为现状（空态提示去选项目），不报错。
  */
+import { catalogOptions } from './lib/projectCatalog.js'
+
 async function refreshProjects() {
   if (!configured.value) return
   // 远程设备目录（dev-board#250）：与本项目列表并行拉，null 容忍——拿不到就没有
   // 这组下拉项，不影响本服务项目的正常选择
-  fetchMobileDevices(settings).then((devices) => { remoteDevices.value = devices || [] })
   projectsError.value = false
   try {
     // 归档绑定权威清单先到位（dev-board#297）：webview 清过缓存时靠它重建本地映射，
@@ -412,7 +529,15 @@ async function refreshProjects() {
     if (serverLinks.length) archiveLinks.value = mergeArchiveLinks(serverLinks)
 
     const list = await fetchMyProjects(settings)
-    projects.value = list
+    const catalog = await fetchProjectCatalog(settings)
+    if (catalog) {
+      const options = catalogOptions(catalog, list)
+      projects.value = options.projects
+      remoteDevices.value = options.devices
+    } else {
+      projects.value = list
+      remoteDevices.value = await fetchMobileDevices(settings) || []
+    }
     // 记住的项目已不存在时清空选择——绑定的影子项目刻意不在列表里，豁免
     if (projectId.value && !list.some(p => String(p.id) === projectId.value)
         && !archiveLinks.value[projectId.value]) {
@@ -501,11 +626,8 @@ async function confirmCreateProject() {
 }
 
 function toggleLang() {
-  const next = langKey.value === 'zh' ? 'en' : 'zh'
-  setLang(next)
-  mirrorLang(next)
-  langKey.value = next
-  accountOpen.value = false
+  const next = getLang() === 'zh' ? 'en-US' : 'zh-CN'
+  selectLanguage(next)
 }
 
 async function logout() {
@@ -571,9 +693,10 @@ onMounted(async () => {
       settings.token = restored.token
       settings.projectId = restored.projectId
       if (restored.projectId) projectId.value = restored.projectId
-      if (restored.lang && restored.lang !== getLang()) {
-        setLang(restored.lang)
-        langKey.value = restored.lang
+      if (restored.lang && restored.lang !== getLangPreference()) {
+        const resolved = setLang(restored.lang)
+        langPref.value = getLangPreference()
+        langKey.value = resolved
       }
       if (configured.value && view.value === 'settings') view.value = 'chat'
     }
@@ -875,7 +998,7 @@ function startPaneHeartbeat() {
 .account-menu {
   position: absolute;
   top: 44px;
-  right: 8px;
+  inset-inline-end: 8px;
   width: 210px;
   border: 1px solid rgba(46, 90, 80, 0.12);
   border-radius: var(--awd-radius-md);
@@ -1012,7 +1135,7 @@ function startPaneHeartbeat() {
 .menu-item {
   display: block;
   width: 100%;
-  text-align: left;
+  text-align: start;
   padding: 7px 8px;
   border: none;
   border-radius: var(--awd-radius-sm);
@@ -1066,5 +1189,96 @@ function startPaneHeartbeat() {
   width: 12px;
   height: 12px;
   flex-shrink: 0;
+}
+
+/* 语言选择下拉（dev-board#1477） */
+.lang-menu {
+  width: 240px;
+  max-width: calc(100vw - 16px);
+  padding: 8px;
+}
+
+.lang-search-wrap {
+  margin-bottom: 6px;
+}
+
+.lang-search-input {
+  font-size: 12px;
+  padding: 5px 8px;
+}
+
+.lang-list {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.lang-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: start;
+}
+
+.lang-option.is-system {
+  border-bottom: 1px solid var(--awd-border);
+  margin-bottom: 3px;
+  border-radius: var(--awd-radius-sm) var(--awd-radius-sm) 0 0;
+}
+
+.lang-option.is-selected {
+  font-weight: 600;
+  color: var(--awd-primary);
+  background: var(--awd-mint-pale);
+}
+
+.lang-opt-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lang-opt-native {
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lang-opt-sub {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--awd-text-secondary);
+  line-height: 1.2;
+}
+
+.lang-opt-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.lang-opt-badge {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(46, 90, 80, 0.08);
+  color: var(--awd-text-secondary);
+}
+
+.lang-opt-check {
+  width: 12px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--awd-primary);
+}
+
+.lang-empty {
+  padding: 12px 8px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--awd-text-secondary);
 }
 </style>

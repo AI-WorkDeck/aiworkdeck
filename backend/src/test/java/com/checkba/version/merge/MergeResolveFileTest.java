@@ -78,7 +78,8 @@ class MergeResolveFileTest {
 
             Map<String, Object> data = dataOf(s.controller.mergeResolveFile(
                     MergeScene.PROJECT_ID, DOC, "manual", DECISIONS_JSON, "adopt",
-                    upload(merged), MergeScene.SESSION));
+                    s.repoSvc.resolveRef(MergeScene.PROJECT_ID, "HEAD"),
+                    s.repoSvc.mergeHeadRef(MergeScene.PROJECT_ID), upload(merged), MergeScene.SESSION));
 
             assertEquals(DOC, data.get("path"));
             assertEquals("MERGED", data.get("state"));
@@ -97,7 +98,7 @@ class MergeResolveFileTest {
             s.stageAdoptConflict(DOC);
 
             s.controller.mergeResolveFile(MergeScene.PROJECT_ID, DOC, "auto", "[]", null,
-                    upload(mergedBytes()), MergeScene.SESSION);
+                    null, null, upload(mergedBytes()), MergeScene.SESSION);
 
             MergeRecord rec = s.pendingStore.get(MergeScene.PROJECT_ID, DOC).orElseThrow();
             assertEquals("auto", rec.mode());
@@ -120,7 +121,7 @@ class MergeResolveFileTest {
             s.stageAdoptConflict(DOC);
 
             s.controller.mergeResolveFile(MergeScene.PROJECT_ID, DOC, "manual", DECISIONS_JSON,
-                    "adopt", upload(mergedBytes()), MergeScene.SESSION);
+                    "adopt", null, null, upload(mergedBytes()), MergeScene.SESSION);
 
             Map<String, Object> row = s.analysisSvc.documentMerges(MergeScene.PROJECT_ID).stream()
                     .filter(r -> DOC.equals(r.get("path"))).findFirst().orElseThrow();
@@ -140,7 +141,7 @@ class MergeResolveFileTest {
             s.stageAdoptConflict(DOC);
 
             s.controller.mergeResolveFile(MergeScene.PROJECT_ID, DOC, "auto", "[]", null,
-                    upload(mergedBytes()), MergeScene.SESSION);
+                    null, null, upload(mergedBytes()), MergeScene.SESSION);
 
             Map<String, Object> row = s.analysisSvc.documentMerges(MergeScene.PROJECT_ID).stream()
                     .filter(r -> DOC.equals(r.get("path"))).findFirst().orElseThrow();
@@ -157,7 +158,7 @@ class MergeResolveFileTest {
 
             VersionException e = assertThrows(VersionException.class, () ->
                     s.controller.mergeResolveFile(MergeScene.PROJECT_ID, "别的文件.docx", "manual",
-                            "[]", null, upload(mergedBytes()), MergeScene.SESSION));
+                            "[]", null, null, null, upload(mergedBytes()), MergeScene.SESSION));
             assertTrue(e.isUserFacing());
             assertFalse(java.nio.file.Files.exists(
                             s.root.resolve("projects/" + MergeScene.PROJECT_ID + "/别的文件.docx")),
@@ -173,8 +174,85 @@ class MergeResolveFileTest {
 
             VersionException e = assertThrows(VersionException.class, () ->
                     s.controller.mergeResolveFile(MergeScene.PROJECT_ID, DOC, "manual",
-                            "[]", "cloud", upload(mergedBytes()), MergeScene.SESSION));
+                            "[]", "cloud", null, null, upload(mergedBytes()), MergeScene.SESSION));
             assertTrue(e.isUserFacing());
+        }
+    }
+
+    @Test
+    void staleRevisionsDoNotOverwriteConflict(@TempDir Path tmp) throws Exception {
+        try (MergeScene s = new MergeScene(tmp)) {
+            s.stageAdoptConflict(DOC);
+            byte[] before = s.read(DOC);
+            assertThrows(VersionException.class, () -> s.controller.mergeResolveFile(
+                    MergeScene.PROJECT_ID, DOC, "auto", "[]", "adopt",
+                    "outdated-main", s.repoSvc.mergeHeadRef(MergeScene.PROJECT_ID),
+                    upload(mergedBytes()), MergeScene.SESSION));
+            assertThrows(VersionException.class, () -> s.controller.mergeResolveStructured(
+                    MergeScene.PROJECT_ID, Map.of("path", DOC, "ctx", "adopt",
+                            "mainRef", s.repoSvc.resolveRef(MergeScene.PROJECT_ID, "HEAD"),
+                            "otherRef", "outdated-other"), MergeScene.SESSION));
+            assertArrayEquals(before, s.read(DOC));
+            assertTrue(s.pendingStore.all(MergeScene.PROJECT_ID).isEmpty());
+        }
+    }
+
+    @Test
+    void queuedMergeChecksConflictAfterRepositoryLock(@TempDir Path tmp) throws Exception {
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try (MergeScene s = new MergeScene(tmp)) {
+            s.stageAdoptConflict(DOC);
+            var entered = new java.util.concurrent.CountDownLatch(1);
+            var future = new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Future<?>>();
+            s.sessionSvc.runLocked(MergeScene.PROJECT_ID, () -> {
+                future.set(executor.submit(() -> {
+                    try (var auth = org.mockito.Mockito.mockStatic(com.checkba.controller.AuthController.class)) {
+                        auth.when(() -> com.checkba.controller.AuthController.getUserIdFromSession(MergeScene.SESSION))
+                                .thenReturn(MergeScene.USER_ID);
+                        entered.countDown();
+                        return s.controller.mergeResolveFile(MergeScene.PROJECT_ID, DOC, "manual", "[]",
+                                "adopt", null, null, upload(mergedBytes()), MergeScene.SESSION);
+                    }
+                }));
+                try {
+                    assertTrue(entered.await(2, java.util.concurrent.TimeUnit.SECONDS));
+                    assertThrows(java.util.concurrent.TimeoutException.class,
+                            () -> future.get().get(150, java.util.concurrent.TimeUnit.MILLISECONDS),
+                            "Merge publication must wait for the existing repository lock");
+                    assertTrue(s.pendingStore.all(MergeScene.PROJECT_ID).isEmpty());
+                    s.sessionSvc.abortAdopt(MergeScene.PROJECT_ID);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new AssertionError(e);
+                }
+            });
+            byte[] abortedBytes = s.read(DOC);
+            var failure = assertThrows(java.util.concurrent.ExecutionException.class,
+                    () -> future.get().get(5, java.util.concurrent.TimeUnit.SECONDS));
+            assertInstanceOf(VersionException.class, failure.getCause());
+            assertArrayEquals(abortedBytes, s.read(DOC), "A queued stale merge cannot undo the abort");
+            assertTrue(s.pendingStore.all(MergeScene.PROJECT_ID).isEmpty());
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void structuredMergeUsesTheVerifiedTwoRevisions(@TempDir Path tmp) throws Exception {
+        try (MergeScene s = new MergeScene(tmp)) {
+            String path = "清单.xlsx";
+            s.stageAdoptConflictOn(path,
+                    MergeFixtures.xlsx("Sheet1", Map.of("A1", "甲方", "B1", "100")),
+                    MergeFixtures.xlsx("Sheet1", Map.of("A1", "甲方修改", "B1", "100")),
+                    MergeFixtures.xlsx("Sheet1", Map.of("A1", "甲方", "B1", "200")));
+            Map<String, Object> result = dataOf(s.controller.mergeResolveStructured(MergeScene.PROJECT_ID,
+                    Map.of("path", path, "ctx", "adopt", "mainRef", s.repoSvc.resolveRef(MergeScene.PROJECT_ID, "HEAD"),
+                            "otherRef", s.repoSvc.mergeHeadRef(MergeScene.PROJECT_ID)), MergeScene.SESSION));
+            assertEquals("MERGED", result.get("state"));
+            Map<String, String> cells = XlsxCellReader.read(s.read(path));
+            assertEquals("甲方修改", cells.get("Sheet1!A1"));
+            assertEquals("200", cells.get("Sheet1!B1"));
+            assertTrue(s.pendingStore.get(MergeScene.PROJECT_ID, path).isPresent());
         }
     }
 
@@ -203,7 +281,7 @@ class MergeResolveFileTest {
             long draftId = s.stageAdoptConflict(DOC);
             byte[] merged = mergedBytes();
             s.controller.mergeResolveFile(MergeScene.PROJECT_ID, DOC, "manual", DECISIONS_JSON,
-                    "adopt", upload(merged), MergeScene.SESSION);
+                    "adopt", null, null, upload(merged), MergeScene.SESSION);
 
             WorkSessionService.AdoptOutcome r = s.sessionSvc.resolveAdopt(MergeScene.PROJECT_ID, draftId,
                     Map.of(DOC, WorkSessionService.Resolution.MERGED), MergeScene.USER_ID, "韩泽伟");
@@ -226,7 +304,7 @@ class MergeResolveFileTest {
             long sessionId = s.stageSessionEndConflict(DOC);
             byte[] merged = mergedBytes();
             s.controller.mergeResolveFile(MergeScene.PROJECT_ID, DOC, "manual", DECISIONS_JSON,
-                    "session-end", upload(merged), MergeScene.SESSION);
+                    "session-end", null, null, upload(merged), MergeScene.SESSION);
 
             s.sessionSvc.resolveSessionEnd(MergeScene.PROJECT_ID, sessionId,
                     Map.of(DOC, WorkSessionService.Resolution.MERGED), MergeScene.USER_ID, "韩泽伟");
@@ -246,7 +324,7 @@ class MergeResolveFileTest {
         try (MergeScene s = new MergeScene(tmp)) {
             s.stageAdoptConflict(DOC);
             s.controller.mergeResolveFile(MergeScene.PROJECT_ID, DOC, "manual", DECISIONS_JSON,
-                    "adopt", upload(mergedBytes()), MergeScene.SESSION);
+                    "adopt", null, null, upload(mergedBytes()), MergeScene.SESSION);
             assertFalse(s.pendingStore.all(MergeScene.PROJECT_ID).isEmpty(), "前置：记录确实写下了");
 
             s.sessionSvc.abortAdopt(MergeScene.PROJECT_ID);
@@ -265,7 +343,7 @@ class MergeResolveFileTest {
         try (MergeScene s = new MergeScene(tmp)) {
             s.stageAdoptConflict(DOC);
             s.controller.mergeResolveFile(MergeScene.PROJECT_ID, DOC, "manual", DECISIONS_JSON,
-                    "adopt", upload(mergedBytes()), MergeScene.SESSION);
+                    "adopt", null, null, upload(mergedBytes()), MergeScene.SESSION);
 
             // 「重启」：换一套全新的服务实例读同一个 gitdir，内存缓存一点都不继承
             PendingMergeStore freshStore = new PendingMergeStore(s.repoSvc);

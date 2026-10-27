@@ -34,11 +34,11 @@ public class OfficeResultController {
         String conversationId = officeBridgeService.getPendingConversationId(payload.getRequestId());
         if (conversationId == null) {
             log.warn("Rejected office result: unknown or expired requestId={}", payload.getRequestId());
-            return new OfficeResultResponse(false, "请求不存在或已超时");
+            return new OfficeResultResponse(false, com.checkba.service.LangText.of("请求不存在或已超时", "Request does not exist or has timed out"));
         }
         if (!messageService.canUseConversation(conversationId, userId)) {
             log.warn("Rejected office result: requestId={}, conversationId={}", payload.getRequestId(), conversationId);
-            return new OfficeResultResponse(false, "无权回传该会话的结果");
+            return new OfficeResultResponse(false, com.checkba.service.LangText.of("无权回传该会话的结果", "You do not have permission to submit results for this conversation"));
         }
 
         log.info("Received office result: requestId={}, ok={}", payload.getRequestId(), payload.isOk());

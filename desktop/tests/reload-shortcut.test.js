@@ -252,6 +252,6 @@ test('主窗口建出来就挂上兜底拦截，且按 app.isPackaged 判档', (
 
 test('main.js 的 initAppMenu 接线里真的注入了 BrowserView 销毁钩子（dev-board BUG-01）', () => {
   const SRC = fs.readFileSync(path.join(__dirname, '../main/main.js'), 'utf8')
-  assert.match(SRC, /initAppMenu\(\s*\(\)\s*=>\s*mainWindow\s*,\s*\{\s*destroyAllBrowserViews:\s*\(\)\s*=>\s*views\.destroyAll\(\)\s*\}\s*\)/,
+  assert.match(SRC, /initAppMenu\(\s*\(\)\s*=>\s*quitInProgress\s*\?\s*null\s*:\s*mainWindow\s*,\s*\{\s*destroyAllBrowserViews:\s*\(\)\s*=>\s*views\.destroyAll\(\)\s*\}\s*\)/,
     'confirmAndReload 之前若不清空 views 注册表，重载后网页面板会一直浮在新页面上方')
 })

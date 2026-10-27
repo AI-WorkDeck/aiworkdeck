@@ -1,0 +1,20 @@
+{
+  "id": "theme-anime-twilight",
+  "name": "%plugin.name%",
+  "version": "1.0.3",
+  "description": "%plugin.desc%",
+  "author": "AI WorkDeck",
+  "frontendEntry": "web/index.html",
+  "contributes": {
+    "themes": [
+      {
+        "id": "anime-twilight",
+        "name": "%theme.name%",
+        "description": "%theme.desc%",
+        "file": "themes/anime-twilight.json"
+      }
+    ],
+    "views": []
+  },
+  "minHostVersion": "0.72.0"
+}

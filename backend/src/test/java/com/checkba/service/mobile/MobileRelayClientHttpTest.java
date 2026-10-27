@@ -282,6 +282,89 @@ class MobileRelayClientHttpTest {
         ex.close();
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"cloud", "backup"})
+    void catalogImportDownloadsOriginalBeforeMetadataAndNeverAcknowledgesCloudCopies(String source) throws Exception {
+        String uid = "11111111-1111-4111-8111-111111111111";
+        String fileUid = "22222222-2222-4222-8222-222222222222";
+        server.createContext("/api/mobile/catalog/" + uid + "/files", exchange -> {
+            if (exchange.getRequestURI().getPath().endsWith("/content")) {
+                exchange.getResponseHeaders().add("Content-Type", "application/octet-stream");
+                respond(exchange, 200, "ORIGINAL");
+            } else respond(exchange, 200, "{\"files\":[{\"uid\":\"" + fileUid + "\",\"source\":\"" + source + "\",\"name\":\"a.docx\",\"size\":8}]}");
+        });
+        server.createContext("/api/mobile/preview/catalog/" + uid + "/files/" + fileUid + "/content", exchange -> {
+            exchange.getResponseHeaders().add("Content-Type", "application/octet-stream");
+            respond(exchange, 200, "ORIGINAL");
+        });
+        when(storageService.load(anyString())).thenAnswer(inv -> new ByteArrayResource(savedBytes.get(savedBytes.size()-1)));
+        MobileRelayClientService svc = service();
+        ProjectCatalogService identities = mock(ProjectCatalogService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(svc, "projectCatalog", identities);
+        var result = svc.importCatalogFile(42L, uid, fileUid, null, svc.catalogAccountScope());
+        verify(identities).preserveImportedFileUid(any(ProjectFile.class), eq(fileUid));
+        assertNotNull(result.get("fileId")); assertArrayEquals("ORIGINAL".getBytes(StandardCharsets.UTF_8), savedBytes.get(0));
+        assertTrue(callOrder.get(0).startsWith("save:")); assertTrue(callOrder.get(1).startsWith("move:"));
+        assertTrue(callOrder.get(2).startsWith("createFile:")); assertTrue(transferAcked.isEmpty());
+        svc.importCatalogFile(42L, uid, fileUid, null, svc.catalogAccountScope());
+        assertEquals(1, savedBytes.size(), "Retry reuses the successful local copy");
+    }
+
+    @Test
+    void catalogImportRejectsTruncatedBytesWithoutCreatingMetadataOrAck() throws Exception {
+        server.createContext("/api/mobile/transfer/900", exchange -> {
+            if (exchange.getRequestURI().getPath().endsWith("/content")) {
+                exchange.getResponseHeaders().add("Content-Type", "application/octet-stream"); respond(exchange,200,"short");
+            } else respond(exchange,200,"{\"code\":0,\"transfer\":{\"status\":\"STAGED\",\"fileName\":\"a.docx\",\"fileSize\":100}}");
+        });
+        when(storageService.load(anyString())).thenAnswer(inv -> new ByteArrayResource(savedBytes.get(savedBytes.size()-1)));
+        MobileRelayClientService svc = service();
+        assertThrows(IllegalStateException.class, () -> svc.importCatalogFile(42L,"","",900L,svc.catalogAccountScope()));
+        verify(projectFileService,never()).createFile(anyLong(),any(),anyString(),anyString(),anyLong(),any(),any(),anyLong());
+        assertTrue(transferAcked.isEmpty()); verify(storageService).delete(contains(".catalog-"));
+    }
+
+    @Test
+    void accountSwitchDuringDownloadCannotLandFileOrAckUsingAnotherAccount() throws Exception {
+        List<String> tokens = new CopyOnWriteArrayList<>();
+        server.createContext("/api/mobile/transfer/901", exchange -> {
+            tokens.add(exchange.getRequestHeaders().getFirst("X-Session-Id"));
+            if (exchange.getRequestURI().getPath().endsWith("/content")) {
+                when(accountService.accountFingerprintOrNull()).thenReturn("switched-account");
+                exchange.getResponseHeaders().add("Content-Type", "application/octet-stream"); respond(exchange,200,"ORIGINAL");
+            } else if(exchange.getRequestURI().getPath().endsWith("/ack")) {
+                transferAcked.add("wrong-ack");respond(exchange,200,"{\"code\":0}");
+            } else respond(exchange,200,"{\"code\":0,\"transfer\":{\"status\":\"STAGED\",\"fileName\":\"a.docx\",\"fileSize\":8}}");
+        });
+        when(storageService.load(anyString())).thenAnswer(inv -> new ByteArrayResource(savedBytes.get(savedBytes.size()-1)));
+        MobileRelayClientService svc=service();String scope=svc.catalogAccountScope();
+        assertThrows(IllegalStateException.class,()->svc.importCatalogFile(42L,"","",901L,scope));
+        assertEquals(List.of("awdt_test_token","awdt_test_token"),tokens);
+        verify(projectFileService,never()).createFile(anyLong(),any(),anyString(),anyString(),anyLong(),any(),any(),anyLong());
+        assertTrue(transferAcked.isEmpty());assertEquals(1,bridgeBodies.size(),"No new-account rebind during download");
+        verify(storageService).delete(contains(".catalog-"));
+    }
+
+    @Test
+    void accountSwitchWhileCatalogueLoadsCannotRelabelOldRowsWithNewScope() {
+        server.createContext("/api/mobile/catalog",exchange->{
+            when(accountService.accountFingerprintOrNull()).thenReturn("switched-account");
+            respond(exchange,200,"[{\"projectUid\":\"old-account\",\"name\":\"A\",\"locations\":[]}]");
+        });
+        assertThrows(IllegalArgumentException.class,()->service().catalog());
+        assertEquals(1,bridgeBodies.size());
+    }
+
+    @Test
+    void catalogAccountScopeRejectsOldRendererAfterAccountSwitch() {
+        MobileRelayClientService svc=service(); String scope=svc.catalogAccountScope();
+        svc.requireCatalogAccountScope(scope);
+        when(accountService.accountFingerprintOrNull()).thenReturn("another-account");
+        assertThrows(IllegalArgumentException.class,()->svc.requireCatalogAccountScope(scope));
+        assertThrows(IllegalArgumentException.class,()->svc.requireCatalogAccountScope(""));
+        assertTrue(bridgeBodies.isEmpty(),"No out-of-account transfer may be sent");
+    }
+
     @Test
     @DisplayName("目录推送：首次出站先桥接，请求带 deviceId 与项目清单；同清单第二轮不重复出站")
     void pushDirectoryBridgesAndDedupes() {
@@ -709,7 +792,7 @@ class MobileRelayClientHttpTest {
     // ==================== 跨设备文件传输（dev-board#251 B 侧） ====================
 
     @Test
-    @DisplayName("传输命令 LIST：清单按 parentId 逐级拼路径上报，文件夹本身不进清单")
+    @DisplayName("传输命令 LIST：清单按 parentId 逐级拼路径上报，保留文件夹和父子关系")
     void transferListCommandReportsFileTreeWithPaths() {
         ProjectFile folder = addNode(null, "合同", true);
         ProjectFile f1 = addNode(folder.getId(), "结算书.docx", false);
@@ -726,7 +809,9 @@ class MobileRelayClientHttpTest {
         assertTrue(body.contains("\"size\":2048"), body);
         assertTrue(body.contains("\"path\":\"备忘录.txt\""), body);
         assertTrue(body.contains("\"size\":100"), body);
-        assertFalse(body.contains("\"name\":\"合同\""), "文件夹本身不该进清单: " + body);
+        assertTrue(body.contains("\"name\":\"合同\""), "文件夹必须进入清单: " + body);
+        assertTrue(body.contains("\"isFolder\":true"), body);
+        assertTrue(body.contains("\"parentId\":\"" + folder.getId() + "\""), body);
     }
 
     @Test
@@ -738,7 +823,7 @@ class MobileRelayClientHttpTest {
         assertEquals(1, transferFilesBodies.size());
         var body = new com.fasterxml.jackson.databind.ObjectMapper().readTree(transferFilesBodies.get(0));
         assertEquals(2000, body.path("files").size());
-        assertEquals(2001, body.path("totalCount").asInt());
+        assertEquals(2002, body.path("totalCount").asInt());
         verify(storageService, never()).load(anyString());
     }
 
@@ -920,5 +1005,248 @@ class MobileRelayClientHttpTest {
         svc.pollInbox();
         svc.pollInbox();
         assertEquals(1, convSyncRequests.get(), "404 后不该再打这个端点");
+    }
+    @Test
+    void backupDoesNotReadAnyFileWithoutBothConsentAndSubscription() {
+        var decision = new java.util.concurrent.atomic.AtomicReference<>("{\"enabled\":false,\"subscriptionActive\":true}");
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex, 200, decision.get()));
+        MobileRelayClientService client = service();
+        client.syncFileBackups();
+        decision.set("{\"enabled\":true,\"subscriptionActive\":false}");
+        client.syncFileBackups();
+        verify(projectFileService, never()).getFileTree(anyLong());
+        verifyNoInteractions(storageService);
+        assertTrue(dirBodies.isEmpty());
+    }
+
+    @Test
+    void standaloneWorkspaceIsNotPublishedOrBackedUpEvenWithConsent() {
+        Project loose = new Project(); loose.setId(43L); loose.setName("Standalone files");
+        loose.setProjectType(Project.LOOSE_FILES); loose.setUserId(7L);
+        when(projectRepository.findByUserIdOrderByCreatedAtDesc(7L)).thenReturn(List.of(loose));
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex, 200, "{\"enabled\":true,\"subscriptionActive\":true}"));
+        server.createContext("/api/mobile/backup/files", ex -> respond(ex, 200, "{\"files\":[]}"));
+        var client = service();
+        client.pushDirectory();
+        client.syncFileBackups();
+        assertTrue(dirBodies.isEmpty());
+        verify(projectFileService, never()).getFileTree(anyLong());
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void backupUploadsSupportedBytesOnceAndIncludesEmptyFolders() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex, 200, "{\"enabled\":true,\"subscriptionActive\":true}"));
+        byte[] bytes = "synthetic-backup-pdf".getBytes(StandardCharsets.UTF_8);
+        String hash = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        var folder = addNode(null, "空目录", true);
+        var file = addNode(null, "资料.pdf", false);
+        file.setUid("79db0af1-8912-4b62-b659-58b7baabca17"); file.setFilePath("synthetic/doc.pdf");
+        addNode(null, "script.exe", false).setFilePath("synthetic/script.exe");
+        when(storageService.load("synthetic/doc.pdf")).thenReturn(new ByteArrayResource(bytes));
+        List<String> manifests = new CopyOnWriteArrayList<>();
+        List<byte[]> uploads = new CopyOnWriteArrayList<>();
+        server.createContext("/api/mobile/backup/manifest", ex -> { manifests.add(readBody(ex.getRequestBody())); respond(ex, 200, "{\"code\":0}"); });
+        server.createContext("/api/mobile/backup/files", ex -> {
+            if (ex.getRequestMethod().equals("PUT")) {
+                assertTrue(ex.getRequestURI().getRawQuery().contains("sha256=" + hash));
+                uploads.add(ex.getRequestBody().readAllBytes()); respond(ex, 200, "{\"sha256\":\"" + hash + "\"}");
+            } else respond(ex, 200, uploads.isEmpty() ? "{\"files\":[]}" : "{\"files\":[{\"projectKey\":\"42\",\"id\":\"" + file.getId() + "\",\"sha256\":\"" + hash + "\",\"name\":\"资料.pdf\",\"path\":\"资料.pdf\"}]}");
+        });
+        var client = service(); client.syncFileBackups(); client.syncFileBackups();
+        assertEquals(1, uploads.size());
+        assertTrue(new String(uploads.get(0), StandardCharsets.UTF_8).contains("synthetic-backup-pdf"));
+        var data = new com.fasterxml.jackson.databind.ObjectMapper().readTree(manifests.get(0));
+        assertEquals(3, data.path("files").size());
+        assertTrue(data.path("files").get(0).path("isFolder").asBoolean());
+        assertEquals(folder.getId().toString(), data.path("files").get(0).path("id").asText());
+        verify(storageService, never()).load("synthetic/script.exe");
+    }
+
+    @Test
+    void backupRemovesDeletedProjectsOnlyAfterSuccessfulLocalScan() {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex, 200, "{\"enabled\":true,\"subscriptionActive\":true}"));
+        AtomicInteger deletes = new AtomicInteger();
+        server.createContext("/api/mobile/backup/manifest", ex -> respond(ex, 200, "{\"code\":0}"));
+        server.createContext("/api/mobile/backup/files", ex -> {
+            if (ex.getRequestMethod().equals("DELETE")) { deletes.incrementAndGet(); respond(ex, 200, "{\"code\":0}"); }
+            else respond(ex, 200, "{\"files\":[{\"id\":\"10\",\"projectKey\":\"99\"}]}");
+        });
+        var client = service();
+        when(projectFileService.getFileTree(42L)).thenThrow(new IllegalStateException("unavailable"));
+        client.syncFileBackups(); assertEquals(0, deletes.get());
+        doReturn(List.of()).when(projectFileService).getFileTree(42L);
+        client.syncFileBackups(); assertEquals(1, deletes.get());
+    }
+
+    @Test
+    void backupDeletesObsoleteCopyWhenFileExceedsTransferLimit() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex, 200, "{\"enabled\":true,\"subscriptionActive\":true}"));
+        var file = addNode(null, "large.pdf", false);
+        file.setFilePath("synthetic/large.pdf");
+        var resource = mock(org.springframework.core.io.Resource.class);
+        when(resource.contentLength()).thenReturn(MobileTransferService.MAX_TRANSFER_BYTES + 1);
+        when(storageService.load("synthetic/large.pdf")).thenReturn(resource);
+        AtomicInteger deletes = new AtomicInteger();
+        server.createContext("/api/mobile/backup/manifest", ex -> respond(ex, 200, "{\"code\":0}"));
+        server.createContext("/api/mobile/backup/files", ex -> {
+            if (ex.getRequestMethod().equals("DELETE")) { deletes.incrementAndGet(); respond(ex, 200, "{\"code\":0}"); }
+            else respond(ex, 200, "{\"files\":[{\"id\":\"" + file.getId() + "\",\"projectKey\":\"42\"}]}");
+        });
+        service().syncFileBackups();
+        assertEquals(1, deletes.get());
+        verify(resource, never()).getInputStream();
+    }
+
+    @Test
+    void backupAccountSwitchStopsBeforeUploadingFileBytes() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex, 200, "{\"enabled\":true,\"subscriptionActive\":true}"));
+        AtomicInteger uploads = new AtomicInteger();
+        server.createContext("/api/mobile/backup/files", ex -> {
+            if (ex.getRequestMethod().equals("PUT")) uploads.incrementAndGet();
+            respond(ex, 200, "{\"files\":[]}");
+        });
+        server.createContext("/api/mobile/backup/manifest", ex -> {
+            when(accountService.accountFingerprintOrNull()).thenReturn("other-account");
+            respond(ex, 200, "{\"code\":0}");
+        });
+        var file = addNode(null, "fixture.pdf", false);
+        file.setUid("79db0af1-8912-4b62-b659-58b7baabca17"); file.setFilePath("synthetic/doc.pdf");
+        when(storageService.load(anyString())).thenReturn(new ByteArrayResource(new byte[]{1,2,3}));
+        service().syncFileBackups();
+        assertEquals(0, uploads.get());
+        verify(storageService, never()).load(anyString());
+    }
+
+
+    @Test
+    void versionObjectWorkerDoesNotReadLocalBytesWithoutCloudConsent() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex,200,"{\"enabled\":false,\"subscriptionActive\":true}"));
+        var objects=mock(com.checkba.version.objects.LocalVersionObjectStore.class);
+        var client=service();org.springframework.test.util.ReflectionTestUtils.setField(client,"versionObjectStore",objects);
+        client.syncVersionObjectBackups();verifyNoInteractions(objects);
+        assertEquals("disabled",client.backupConsent().path("objectBackup").path("state").asText());
+        assertThrows(com.checkba.version.VersionException.class,client::requireVersionObjectCloudConsent);
+    }
+
+    @Test
+    void versionObjectWorkerResumesPartsAndReportsVerifiedCompletion() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex,200,"{\"enabled\":true,\"subscriptionActive\":true}"));
+        byte[] bytes=new byte[(int)MobileVersionObjectService.PART_BYTES+3];new java.util.Random(8).nextBytes(bytes);
+        String hash=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        var objects=mock(com.checkba.version.objects.LocalVersionObjectStore.class);
+        when(objects.list(42L)).thenReturn(List.of(new com.checkba.version.objects.LocalVersionObjectStore.ObjectRef(hash,bytes.length)));
+        when(objects.open(42L,hash)).thenAnswer(inv->new java.io.ByteArrayInputStream(bytes));
+        AtomicInteger attempts=new AtomicInteger();List<Integer> uploaded=new ArrayList<>();AtomicInteger complete=new AtomicInteger();
+        server.createContext("/api/mobile/backup/version-objects/", ex->{
+            String path=ex.getRequestURI().getPath();
+            if(ex.getRequestMethod().equals("GET")) respond(ex,200,"{\"parts\":[0],\"complete\":false}");
+            else if(path.endsWith("/complete")){complete.incrementAndGet();respond(ex,200,"{\"complete\":true,\"sha256\":\""+hash+"\"}");}
+            else {
+                assertTrue(path.endsWith("/parts/1"));byte[] part=ex.getRequestBody().readAllBytes();
+                assertArrayEquals(java.util.Arrays.copyOfRange(bytes,bytes.length-3,bytes.length),part);
+                uploaded.add(1);
+                if(attempts.getAndIncrement()==0) respond(ex,503,"offline");
+                else {
+                    String partHash=java.util.HexFormat.of().formatHex(digest(part));
+                    respond(ex,200,"{\"sha256\":\""+partHash+"\",\"size\":3}");
+                }
+            }
+        });
+        var client=service();org.springframework.test.util.ReflectionTestUtils.setField(client,"versionObjectStore",objects);
+        client.syncVersionObjectBackups();assertEquals(0,complete.get());
+        assertEquals("pending",client.backupConsent().path("objectBackup").path("state").asText());
+        client.syncVersionObjectBackups();assertEquals(List.of(1,1),uploaded);assertEquals(1,complete.get());
+        assertEquals("synced",client.backupConsent().path("objectBackup").path("state").asText());
+        verify(objects,never()).importObject(anyLong(),any(),any());
+    }
+
+    private static byte[] digest(byte[] bytes) {
+        try{return java.security.MessageDigest.getInstance("SHA-256").digest(bytes);}
+        catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}
+    }
+
+    @Test
+    void versionObjectWorkerKeepsLocalObjectsAndExplainsQuotaOrOldServer() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex,200,"{\"enabled\":true,\"subscriptionActive\":true}"));
+        byte[] bytes={1,2};String hash=java.util.HexFormat.of().formatHex(digest(bytes));
+        var objects=mock(com.checkba.version.objects.LocalVersionObjectStore.class);
+        when(objects.list(42L)).thenReturn(List.of(new com.checkba.version.objects.LocalVersionObjectStore.ObjectRef(hash,2)));
+        when(objects.open(42L,hash)).thenAnswer(inv->new java.io.ByteArrayInputStream(bytes));
+        AtomicInteger mode=new AtomicInteger();
+        server.createContext("/api/mobile/backup/version-objects/", ex->{
+            if(mode.get()==1) respond(ex,404,"not found");
+            else if(ex.getRequestMethod().equals("GET")) respond(ex,200,"{\"parts\":[],\"complete\":false}");
+            else respond(ex,200,"{\"code\":1,\"message\":\"持久云空间不足\"}");
+        });
+        var client=service();org.springframework.test.util.ReflectionTestUtils.setField(client,"versionObjectStore",objects);
+        client.syncVersionObjectBackups();var status=client.backupConsent().path("objectBackup");
+        assertEquals("pending",status.path("state").asText());assertTrue(status.path("lastError").asText().contains("空间不足"));
+        mode.set(1);client.syncVersionObjectBackups();assertTrue(client.backupConsent().path("objectBackup").path("lastError").asText().contains("暂不支持"));
+        verify(objects,never()).importObject(anyLong(),any(),any());
+    }
+
+    @Test
+    void versionObjectAccountChangeBeforeContentRequestStopsUpload() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex,200,"{\"enabled\":true,\"subscriptionActive\":true}"));
+        var objects=mock(com.checkba.version.objects.LocalVersionObjectStore.class);
+        when(objects.list(42L)).thenReturn(List.of(new com.checkba.version.objects.LocalVersionObjectStore.ObjectRef("a".repeat(64),2)));
+        AtomicInteger uploads=new AtomicInteger();
+        server.createContext("/api/mobile/backup/version-objects/", ex->{
+            if(ex.getRequestMethod().equals("GET")) {when(accountService.accountFingerprintOrNull()).thenReturn("changed");respond(ex,200,"{\"parts\":[]}");}
+            else {uploads.incrementAndGet();respond(ex,200,"{}");}
+        });
+        var client=service();org.springframework.test.util.ReflectionTestUtils.setField(client,"versionObjectStore",objects);
+        client.syncVersionObjectBackups();assertEquals(0,uploads.get());verify(objects,never()).open(anyLong(),anyString());
+    }
+
+    @Test
+    void versionObjectRevokedAfterStatusDoesNotOpenOrUploadSnapshot() throws Exception {
+        java.util.concurrent.atomic.AtomicBoolean enabled=new java.util.concurrent.atomic.AtomicBoolean(true);
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex,200,"{\"enabled\":"+enabled.get()+",\"subscriptionActive\":true}"));
+        var objects=mock(com.checkba.version.objects.LocalVersionObjectStore.class);
+        when(objects.list(42L)).thenReturn(List.of(new com.checkba.version.objects.LocalVersionObjectStore.ObjectRef("a".repeat(64),2)));
+        AtomicInteger uploads=new AtomicInteger();
+        server.createContext("/api/mobile/backup/version-objects/", ex->{
+            if(ex.getRequestMethod().equals("GET")){enabled.set(false);respond(ex,200,"{\"parts\":[]}");}
+            else {uploads.incrementAndGet();respond(ex,200,"{}");}
+        });
+        var client=service();org.springframework.test.util.ReflectionTestUtils.setField(client,"versionObjectStore",objects);
+        client.syncVersionObjectBackups();assertEquals(0,uploads.get());verify(objects,never()).open(anyLong(),anyString());
+        assertEquals("disabled",client.backupConsent().path("objectBackup").path("state").asText());
+    }
+
+    @Test
+    void versionObjectBackupRoundTripRestoresVerifiedBytesAndRejectsCorruption() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex,200,"{\"enabled\":true,\"subscriptionActive\":true}"));
+        var resolver=mock(com.checkba.storage.ProjectStorageResolver.class);
+        when(resolver.globalRoot()).thenReturn(stateDir.resolve("version-storage"));
+        var store=new com.checkba.version.objects.LocalVersionObjectStore(resolver);
+        byte[] original="immutable synthetic audio snapshot".getBytes(StandardCharsets.UTF_8);
+        var ref=store.put(42L,new java.io.ByteArrayInputStream(original));
+        java.util.concurrent.atomic.AtomicReference<byte[]> remote=new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicBoolean complete=new java.util.concurrent.atomic.AtomicBoolean();
+        java.util.concurrent.atomic.AtomicBoolean corrupt=new java.util.concurrent.atomic.AtomicBoolean();
+        server.createContext("/api/mobile/backup/version-objects/", ex->{
+            String path=ex.getRequestURI().getPath();
+            if(path.endsWith("/parts/0") && ex.getRequestMethod().equals("PUT")) {
+                byte[] bytes=ex.getRequestBody().readAllBytes();remote.set(bytes);
+                respond(ex,200,"{\"sha256\":\""+java.util.HexFormat.of().formatHex(digest(bytes))+"\",\"size\":"+bytes.length+"}");
+            } else if(path.endsWith("/complete")) {
+                complete.set(true);respond(ex,200,"{\"complete\":true,\"sha256\":\""+ref.sha256()+"\"}");
+            } else if(path.endsWith("/parts/0")) {
+                byte[] bytes=remote.get().clone();if(corrupt.get())bytes[0]^=1;
+                ex.getResponseHeaders().add("Content-Type","application/octet-stream");
+                ex.sendResponseHeaders(200,bytes.length);try(var output=ex.getResponseBody()){output.write(bytes);}ex.close();
+            } else respond(ex,200,"{\"parts\":[],\"complete\":"+complete.get()+",\"sha256\":\""+ref.sha256()+"\",\"size\":"+ref.size()+"}");
+        });
+        var client=service();org.springframework.test.util.ReflectionTestUtils.setField(client,"versionObjectStore",store);
+        client.syncVersionObjectBackups();assertArrayEquals(original,remote.get());assertTrue(complete.get());
+        java.nio.file.Files.delete(store.path(42L,ref.sha256()));corrupt.set(true);
+        assertThrows(IOException.class,()->client.restoreVersionObject(42L,ref));
+        assertFalse(java.nio.file.Files.exists(store.path(42L,ref.sha256())));
+        corrupt.set(false);client.restoreVersionObject(42L,ref);
+        try(var input=store.open(42L,ref.sha256())){assertArrayEquals(original,input.readAllBytes());}
+        assertThrows(IllegalArgumentException.class,()->client.restoreVersionObject(999L,ref));
     }
 }

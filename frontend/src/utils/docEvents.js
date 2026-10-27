@@ -22,6 +22,7 @@ export const DOC_MUTATED_DEBOUNCE_MS = 300
 // 改 EDITOR_ACTIONS + worker 实现，不会有人记得回来改这里）自动被算作写入——
 // 漏判一条写入 = 计数又不刷新（本卡的病灶本身），漏判一条只读 = 多打一轮读命令。
 export const DOC_READONLY_ACTIONS = new Set([
+  'office_get_navigation', 'office_activate_item', 'slide_get_thumbnail',
   // 读正文 / 读状态
   'get_selection', 'get_paragraph', 'get_outline', 'get_document_text', 'get_cursor_context',
   'get_clauses', 'get_cursor_rect', 'get_ui_state', 'get_ui_lang', 'get_selection_hyperlink',
@@ -31,6 +32,7 @@ export const DOC_READONLY_ACTIONS = new Set([
   // 只动视图光标 / 只动锚点书签，不改正文，也不产生修订与批注
   'find_text_locations', 'find_navigate', 'goto', 'goto_revision', 'goto_comment', 'goto_bookmark',
   'select_paragraph', 'set_selection', 'collapse_selection', 'move_cursor', 'clear_anchors',
+  'stash_selection_for_drag',
   // 显示 / 外观 / 宿主自发的存取，都不改内容
   'export_document', 'load_document', 'set_zoom', 'set_app_theme', 'set_chrome',
   'set_track_changes', 'set_revision_view', 'set_view_options',

@@ -171,3 +171,25 @@ test('获取策略后默认勾选中文姓名，用户不填补充词也能使�
   assert.ok(state.selectedStrategies.includes('CHINESE_NAME'))
   assert.equal(state.customTerms, '')
 })
+
+
+test('地址默认勾选并通过预览和生成共用请求传给后端', async () => {
+  const fetchScript = componentScript.replace('await getSensitiveOptions()', "[{value:'ADDRESS'}, {value:'PHONE'}]")
+  const subject = new Function(fetchScript)()
+  const state = { ...subject.data(), $t: key => key }
+  await subject.methods.fetchOptions.call(state)
+  assert.ok(state.selectedStrategies.includes('ADDRESS'))
+  assert.ok(subject.methods.payload.call(state).strategies.includes('ADDRESS'))
+})
+
+
+test('两种替换方式均说明地址只保留层级，编号须完整保留用于复敏', async () => {
+  for (const [lang, expected] of [
+    ['zh-CN', /XX省XX市XX区XXXX/],
+    ['en-US', /XX Province, XX City, XX District, XXXX/],
+  ]) {
+    const panels = await loadPanels(lang)
+    assert.match(panels.deTokenNotice, expected)
+    assert.match(panels.deMaskNotice, expected)
+  }
+})

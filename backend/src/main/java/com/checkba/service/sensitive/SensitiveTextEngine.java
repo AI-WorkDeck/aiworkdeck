@@ -49,15 +49,22 @@ public final class SensitiveTextEngine {
      */
     private List<Hit> detect(String text, List<Hit> failedVerification) {
         List<Hit> hits = new ArrayList<>();
+        String recognized = normalizeRadicals(text);
         if (strategies.contains("CHINESE_NAME")) {
-            for (var span : ChineseNameRecognizer.find(text, ChineseNameRecognizer.protectedRanges(text))) {
+            for (var span : ChineseNameRecognizer.find(recognized, ChineseNameRecognizer.protectedRanges(recognized))) {
                 String value = text.substring(span.start(), span.end());
                 if (!excluded.contains(value)) hits.add(new Hit(span.start(), span.end(), "CHINESE_NAME", value));
             }
         }
+        if (strategies.contains("ADDRESS")) {
+            for (var span : ChineseAddressRecognizer.find(recognized)) {
+                String value = text.substring(span.start(), span.end());
+                if (!excluded.contains(value)) hits.add(new Hit(span.start(), span.end(), "ADDRESS", value));
+            }
+        }
         for (SensitiveType type : SensitiveType.values()) {
             if (!type.isAutoDetect() || !strategies.contains(type.getCode())) continue;
-            if (type == SensitiveType.CHINESE_NAME) continue; // Context rules return just the name span.
+            if (type == SensitiveType.CHINESE_NAME || type == SensitiveType.ADDRESS) continue; // Context rules return just the name span.
             Matcher matcher = type.getPattern().matcher(text);
             while (matcher.find()) {
                 int start = matcher.start(), end = matcher.end();
@@ -92,15 +99,39 @@ public final class SensitiveTextEngine {
         return hits;
     }
 
+    // Some PDF fonts extract ordinary-looking Han characters as compatibility
+    // radicals. Normalize only one-character equivalents so original offsets,
+    // exclusions, custom terms and recovery values remain untouched.
+    private static String normalizeRadicals(String text) {
+        StringBuilder result = new StringBuilder(text);
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c < '\u2e80' || c > '\u2fdf') continue;
+            String normalized = java.text.Normalizer.normalize(String.valueOf(c), java.text.Normalizer.Form.NFKC);
+            if (normalized.length() == 1) result.setCharAt(i, normalized.charAt(0));
+        }
+        return result.toString();
+    }
+
     public List<Edit> edits(String text) {
         List<Hit> suspectHits = new ArrayList<>();
         List<Hit> hits = detect(text, suspectHits);
-        BitSet protectedNames = strategies.contains("CHINESE_NAME") ? ChineseNameRecognizer.protectedRanges(text) : new BitSet();
+        String recognized = normalizeRadicals(text);
+        BitSet protectedNames = strategies.contains("CHINESE_NAME") ? ChineseNameRecognizer.protectedRanges(recognized) : new BitSet();
+        // A learned short name must not replace part of a longer preserved name.
+        for (String value : excluded) {
+            if (value.isEmpty()) continue;
+            int from = 0, at;
+            while ((at = text.indexOf(value, from)) >= 0) {
+                protectedNames.set(at, at + value.length());
+                from = at + value.length();
+            }
+        }
         known.forEach((value, code) -> {
             int from = 0, at;
             while ((at = text.indexOf(value, from)) >= 0) {
                 if (!excluded.contains(value) && (!code.equals("CHINESE_NAME")
-                        || ChineseNameRecognizer.allowsOccurrence(text, at, at + value.length(), protectedNames))) {
+                        || ChineseNameRecognizer.allowsOccurrence(recognized, at, at + value.length(), protectedNames))) {
                     hits.add(new Hit(at, at + value.length(), code, value));
                 }
                 from = at + value.length();
@@ -133,7 +164,7 @@ public final class SensitiveTextEngine {
         List<Edit> edits = new ArrayList<>();
         for (Hit hit : accepted) {
             SensitiveType type = SensitiveType.fromCode(hit.code);
-            String label = type == null ? "自定义" : type.getLabel();
+            String label = type == null ? "自定义" : type == SensitiveType.ADDRESS ? type.mask(hit.value) : type.getLabel();
             String replacement;
             if (reversible) {
                 replacement = valueTokens.computeIfAbsent(hit.value, value -> {
@@ -149,6 +180,8 @@ public final class SensitiveTextEngine {
         }
         return edits;
     }
+
+    public boolean accepts(String code, String value) { return strategies.contains(code) && !excluded.contains(value); }
 
     public String apply(String text) { return apply(text, edits(text)); }
     public Map<String, String> recovery() { return Map.copyOf(recovery); }

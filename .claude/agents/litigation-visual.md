@@ -50,7 +50,7 @@ JSON 对不对，不取决于模型对像素多聪明——这是上游的核心
   一律经 modelFilesJson 参数提交，由 Java 写进 workdir；材料由 Java 用 Tika 预转成
   UTF-8 文本再进管线（上游 read_source 只认 UTF-8 文本与 python-docx，后者打包
   运行时没有）；溯源索引由服务端按管线落的 `-trace.json` 用 POI 出 Word 三线表
-  （上游的 node 路线桌面端不可用）。守卫：`LitigationTimelineFlowTest`。
+  （管线自身的索引现由标准库 `trace_index.py` 生成，无需 Node/npm；Java POI 发布路径保留）。守卫：`LitigationTimelineFlowTest`、`litviz/tests/test_timeline_trace_index.py`。
 - `service/ai/LitigationPngService.java` — SVG→PNG（Batik，纯 Java）。位图是插进文书
   的那一环，见「已知地雷」里 PNG 那条。
 - `service/LitigationVisualPanelService.java` — 面板后端：图廊、换风格、拼 kickoff prompt。
@@ -78,8 +78,22 @@ JSON 对不对，不取决于模型对像素多聪明——这是上游的核心
   260px 宽的左栏里五个等权按钮必然换行，会把「打开/编辑」这两个主动作挤到第二行。
   密度用 `App.vue` 的 `--awd-panel-*` 令牌，见 sidebar-shell.md。
 - `config/leftSidebarPlugins.js` — key `litigation-visual`。
-- `pages/project-overview/project-overview.vue` — 面板分支 + 三个 handler
-  （`handleLitigationStart` / `handleLitigationOpenFile` / `handleLitigationScopeSelect`）。
+- `plugin-app/pages/panel.vue` / `official-plugins/litigation-visual/` — 隔离插件入口。
+  通过 `awd.services.request('litigation', operation, params)` 访问业务桥；出图不再调用
+  `awd.chat.send`，不打开或替换右侧聊天。
+- `composables/useLitigationGeneration.js` / `utils/litigationGeneration.mjs` — 工作台持有独立
+  `useAgentStream`，复用原生会话签发、inbox 与 SSE。操作为 generate / generation /
+  answer / stop / continue；权限要求 file_read、file_write、ai，技能每轮显式激活。
+  左栏显示持续状态、原始确认问题与选项；用户明确提交答案后才继续。任务按本地账户、
+  云账户、API 与项目隔离保存；发前持久化 clientRequestId，回执丢失先查 inbox/history
+  再决定恢复或使用原 ID 重试，不能把幂等旧回执误当作新的执行。
+- `pages/project-overview/project-overview.vue` — businessActions 接入独立任务、材料选择与
+  图表打开。完成态须由本任务文件 ID（或新目录+会话元数据中的准确图名）与图廊核对；
+  优先打开 draw.io。异步详情返回后再次核对项目/账户/页面，避免旧项目文件打开到新项目。
+- `tests/litigation-visual/*.test.mjs` — 真实 native stream/controller 的合成网络回归及面板状态。
+  `tests/plugins/sensitive-litigation-browser.mjs` — 打包 iframe/SDK/业务桥的鼠标键盘验收；
+  runner、后端和选择器是替身，不能据此宣称真实模型或正式客户端端到端已验证。
+  插件 1.0.3 要求宿主 >=0.72.2；宿主与插件需一起发布，合并本身不等于发版。
 
 **打包与分发（2026-08 起转原生资源包，规范 docs/NATIVE_PACK_DISTRIBUTION.md）**
 - litviz / graphviz / drawio 三类重资源改走 native pack 运行时下载

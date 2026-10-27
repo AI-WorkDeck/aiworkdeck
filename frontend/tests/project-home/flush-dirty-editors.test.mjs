@@ -77,7 +77,7 @@ test('工作台离开路径只有一个出口：除 leaveWorkbench / handleLogou
   assert.ok(bare.length <= 2,
     `工作台的离开路径必须先落盘。裸 uni.reLaunch 出现 ${bare.length} 处，` +
     '新增离开路径请走 leaveWorkbench()（或像 handleLogout 那样自己先 flush 再清会话）')
-  assert.ok(code.includes('async leaveWorkbench(url)'), 'leaveWorkbench 出口必须还在')
+  assert.match(code, /async leaveWorkbench\(url(?:, options)?\)/, 'leaveWorkbench 出口必须还在')
   assert.ok(code.includes('flushDirtyEditors'), '离开前必须调用 flushDirtyEditors')
 })
 
@@ -103,7 +103,7 @@ test('保存失败态仍要尝试；返回 false 或仍然 dirty 都属于未保
 })
 
 for (const name of ['leaveWorkbench', 'handleLogout']) {
-  for (const outcome of ['failed', 'throws', 'saved']) {
+  for (const outcome of ['failed', 'throws', 'saved', 'cancelled']) {
     test(`${name} ${outcome}：只有全部保存成功才能导航或清会话`, async () => {
       const from = PAGE.indexOf(`    async ${name}(`)
       const end = PAGE.indexOf(name === 'leaveWorkbench' ? '    goAllProjects()' : '    onFileTreeQuickAction(', from)
@@ -111,10 +111,11 @@ for (const name of ['leaveWorkbench', 'handleLogout']) {
       const methods = new Function('flushDirtyEditors', 'uni', 'clearSession',
         'return {' + PAGE.slice(from, end) + '}')(
         async () => { if (outcome === 'throws') throw new Error('offline'); return { failed: outcome === 'failed' ? 1 : 0 } },
-        { showToast: () => calls.push('toast'), reLaunch: () => calls.push('navigate') },
+        { showToast: () => calls.push('toast'), reLaunch: ({ success }) => { calls.push('navigate'); success?.() } },
         () => calls.push('clear'))
-      await methods[name].call({ $t: k => k }, '/target')
+      await methods[name].call({ $t: k => k, confirmVersionBeforeLeaving: async () => outcome !== 'cancelled' }, '/target')
       if (outcome === 'saved') assert.deepEqual(calls, name === 'handleLogout' ? ['clear', 'navigate'] : ['navigate'])
+      else if (outcome === 'cancelled') assert.deepEqual(calls, [], '取消后不导航也不清除会话')
       else assert.deepEqual(calls, ['toast'], '失败必须留在工作台并保留会话')
     })
   }
@@ -148,7 +149,7 @@ for (const name of ['leaveWorkbench', 'handleLogout']) {
     const methods = new Function('flushDirtyEditors', 'uni', 'clearSession',
       'return {' + PAGE.slice(from, end) + '}')(
       flushDirtyEditors,
-      { showToast: () => calls.push('toast'), reLaunch: () => calls.push('navigate') },
+      { showToast: () => calls.push('toast'), reLaunch: ({ success }) => { calls.push('navigate'); success?.() } },
       () => calls.push('clear'))
     const text = libre({ dirty: true })
     const vm = { $t: k => k, _plainTextRefs: { left: text } }

@@ -3,15 +3,24 @@
 # （或环境变量 SPRING_PROFILES_ACTIVE=desktop）
 #
 # 设计目标：零外部依赖启动——不需要 PostgreSQL，数据落在用户主目录的 H2 文件库。
-# 向量检索由 PgVectorConfig 自动降级为内存存储（PG 不可达时的既有回退路径）。
+# 向量检索由 PgVectorConfig 直接使用内存存储，不在启动时探测 PG 或向量模型。
 
 # 单机模式只服务本机 Electron 壳（渲染层固定连 localhost:9696）。
 # 这里显式钉死回环：本 profile 同时开了 allow-all-users，一旦监听到 0.0.0.0，
 # 同一网段（办公 wifi、酒店、客户现场）的任何人都能注册账号并直接拿到管理员权限。
 server:
   address: 127.0.0.1
+  shutdown: graceful
 
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  data:
+    jpa:
+      repositories:
+        # 与异步 EntityManagerFactory 初始化配合；上下文刷新时仍校验全部仓库，
+        # 不把查询解析推迟到用户首次操作。健康接口须等应用完整就绪再放行。
+        bootstrap-mode: deferred
   datasource:
     driver-class-name: org.h2.Driver
     # H2 文件库：~/.aiworkdeck/local.mv.db
@@ -21,6 +30,10 @@ spring:
     url: jdbc:h2:file:${user.home}/.aiworkdeck/local;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=VALUE;AUTO_SERVER=TRUE
     username: sa
     password:
+    hikari:
+      # Fail promptly when the pool is exhausted; the desktop supervisor probes the same pool.
+      connection-timeout: 2000
+      validation-timeout: 1000
   jpa:
     hibernate:
       ddl-auto: update

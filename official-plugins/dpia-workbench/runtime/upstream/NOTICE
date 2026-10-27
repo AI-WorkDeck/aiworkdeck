@@ -1,0 +1,26 @@
+DSH DPIA Workbench
+
+Original plugin code and project-authored documentation on the current main
+branch are licensed under GNU AGPL v3.0 only (AGPL-3.0-only), as stated in
+LICENSE. The published v0.3.11-beta.5 tag and release archive remain under
+Apache-2.0. The EDPB template files listed below are third-party materials
+and are not relicensed under AGPL-3.0-only:
+
+- skill/assets/official/edpb-2026-v1-en.docx — European Data Protection Board,
+  "Template for Data Protection Impact Assessment", consultation version.
+  Source: https://www.edpb.europa.eu/public-consultations/template-for-data-protection-impact-assessment_en
+- skill/assets/official/edpb-2026-v1-zh-user-translation.docx — unofficial
+  Chinese working translation of the EDPB template. The project owner confirmed
+  redistribution rights on 2026-10-14. This is not an EDPB-issued translation.
+
+EDPB source and reuse conditions:
+https://www.edpb.europa.eu/copyright_en
+The EDPB permits commercial and non-commercial reuse on conditions including
+source acknowledgement and preservation of the original meaning. Existing
+author/source indications must not be removed. The EDPB does not accept
+liability for consequences of reuse. Check the linked terms for full details.
+The English template remained labelled a consultation version on 2026-10-15;
+the Chinese working translation remains unofficial.
+
+DeepSeek Harness is a separate project. This plugin is not endorsed by DeepSeek
+or the European Data Protection Board.

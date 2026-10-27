@@ -83,7 +83,7 @@ const handleOpen = () => {
   align-items: center;
   gap: 6px;
   margin-bottom: 6px;
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-text-2);
   text-transform: uppercase;
@@ -91,11 +91,11 @@ const handleOpen = () => {
 }
 
 .card-header .icon {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
 }
 
 .card-body {
-  font-size: 12px; /* 减小字体 */
+  font-size: var(--awd-panel-fs); /* 减小字体 */
   line-height: 1.45; /* 紧凑行距 */
   color: var(--awd-text);
 }
@@ -120,11 +120,11 @@ const handleOpen = () => {
 .expand-btn {
   background: var(--awd-surface-2);
   padding: 3px 10px;
-  border-radius: 10px;
-  font-size: 11px;
+  border-radius: var(--awd-radius-dialog);
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  box-shadow: var(--awd-shadow-sm);
   transition: background 0.15s;
 }
 .expand-btn:hover {
@@ -142,7 +142,7 @@ const handleOpen = () => {
 }
 
 .walkthrough-card :deep(.markdown-body) {
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     line-height: 1.4;
     margin: 0;
     padding: 0;
@@ -173,7 +173,7 @@ const handleOpen = () => {
 .walkthrough-card :deep(.markdown-body h3) {
     margin-top: 4px !important;
     margin-bottom: 2px !important;
-    font-size: 13px !important;
+    font-size: var(--awd-font-size-body) !important;
 }
 
 .walkthrough-card :deep(.markdown-body pre) {

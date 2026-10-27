@@ -5,8 +5,9 @@
     <view class="mdp-inner">
       <!-- 头部：图标 + 名称 + 元信息 + 动作（VS Code 扩展详情页结构） -->
       <view class="mdp-head">
-        <view class="mdp-glyph" :class="{ 'is-plugin': spec.kind === 'plugin' }">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <view class="mdp-glyph" :class="{ 'is-plugin': spec.kind === 'plugin', 'has-avatar': !!headAvatarUrl }">
+          <image v-if="headAvatarUrl" :src="headAvatarUrl" class="mdp-avatar" mode="aspectFill" />
+          <svg v-else viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path v-for="(d, gi) in headGlyph" :key="gi" :d="d" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
         </view>
@@ -19,7 +20,8 @@
           </view>
           <view class="mdp-byline">
             <text v-if="display.author" class="mdp-byline-item mdp-author">{{ display.author }}</text>
-            <text v-if="display.version" class="mdp-byline-item">v{{ display.version }}</text>
+            <text v-if="display.version" class="mdp-byline-item">{{ installedInfo ? $t('market.installedVersion') + ' ' : '' }}v{{ display.version }}</text>
+            <text v-if="pluginUpdateAvailable" class="mdp-byline-item mdp-update-note">{{ $t('market.updateToVersion', { version: marketInfo.version }) }}</text>
             <text v-if="display.downloads" class="mdp-byline-item">{{ $t('market.downloadsCount', { count: display.downloads }) }}</text>
             <text v-if="display.categoryLabel" class="mdp-byline-item">{{ display.categoryLabel }}</text>
           </view>
@@ -30,7 +32,7 @@
           <!-- 动作区 -->
           <view class="mdp-actions">
             <!-- 付费未购（Skill 与插件同款）：先去官网买，本机不给安装按钮——点了也只会拿到 402 -->
-            <template v-if="marketInfo && !installedInfo && needsPurchase">
+            <template v-if="marketInfo && (!installedInfo || pluginUpdateAvailable) && needsPurchase">
               <view class="mdp-btn primary" @tap="openPurchase">
                 <text>{{ $t('market.buyWithPrice', { price: priceText }) }}</text>
               </view>
@@ -71,7 +73,7 @@
                    会让面板里的 kick-off 按钮点了没反应。判据见 leftSidebarPlugins.js。
                    挂着原生资源包（packId 非空）的再加一层：包没就绪前不给开关，
                    见 docs/NATIVE_PACK_DISTRIBUTION.md §4.3/§7.1。 -->
-              <template v-if="installedInfo && !installedInfo.sourcePluginId && isPanel">
+              <template v-if="installedInfo && !installedInfo.sourcePluginId && (isPanel || packId)">
                 <text v-if="packRevokedState" class="mdp-pack-revoked">{{ $t('market.packRevokedNotice') }}</text>
                 <view v-else-if="packId && packDownloading" class="mdp-pack-progress">
                   <text>{{ packProgressText }}</text>
@@ -139,9 +141,20 @@
               >
                 <text>{{ busy ? $t('market.installingEllipsis') : $t('market.install') }}</text>
               </view>
+              <component
+                :is="'button'"
+                v-else-if="pluginUpdateAvailable && !needsPurchase"
+                type="button"
+                class="mdp-btn primary"
+                :class="{ busy }"
+                :disabled="busy"
+                @click="doInstallPlugin"
+              >
+                <text>{{ busy ? $t('market.updatingEllipsis') : $t('market.updateToVersion', { version: marketInfo.version }) }}</text>
+              </component>
               <view v-if="installedInfo" class="mdp-switch-row">
                 <text class="mdp-switch-label">{{ installedInfo.enabled ? $t('market.enabledTag') : $t('market.disabledTag') }}</text>
-                <AwdSwitch :checked="!!installedInfo.enabled" @change="onPluginToggle" />
+                <AwdSwitch :checked="!!installedInfo.enabled" :disabled="busy || !!installedInfo.revokedReason || !!installedInfo.incompatibleReason" @change="onPluginToggle" />
               </view>
               <view
                 v-if="installedInfo && marketInfo"
@@ -154,6 +167,9 @@
             </template>
           </view>
 
+          <text v-if="pluginActionError" class="mdp-purchase-hint" role="alert">{{ pluginActionError }}</text>
+          <text v-if="pluginActionHint" class="mdp-purchase-hint" role="status">{{ pluginActionHint }}</text>
+          <text v-if="spec.kind === 'plugin' && installedInfo && (installedInfo.revokedReason || installedInfo.incompatibleReason)" class="mdp-purchase-hint">{{ installedInfo.revokedReason || installedInfo.incompatibleReason }}</text>
           <text v-if="purchaseHint" class="mdp-purchase-hint">{{ purchaseHint }}</text>
         </view>
       </view>
@@ -220,6 +236,9 @@
           </view>
         </view>
 
+        <PluginConnectionSettings v-if="spec.kind === 'plugin' && installedInfo && installedInfo.enabled && (installedInfo.permissions || []).includes('network')"
+          :key="spec.id" :plugin-id="spec.id" />
+
         <!-- 样式画像（规范 v2.9 P4）：插件贡献的画像可设为全局默认（写端导出走它） -->
         <view v-if="spec.kind === 'plugin' && installedInfo && ownStyleProfiles.length" class="mdp-section">
           <text class="mdp-sec-title">{{ $t('market.styleProfilesTitle') }}</text>
@@ -230,6 +249,39 @@
             </text>
           </view>
           <text class="mdp-sec-note">{{ $t('market.styleProfileNote') }}</text>
+        </view>
+
+        <!-- 外观皮肤（contributes.themes）：插件贡献的双模式色彩令牌，一键切换工作台皮肤 -->
+        <view v-if="spec.kind === 'plugin' && installedInfo && ownThemes.length" class="mdp-section">
+          <text class="mdp-sec-title">{{ $t('market.themesTitle') }}</text>
+          <view v-for="th in ownThemes" :key="th.id" class="mdp-theme-row">
+            <view class="mdp-theme-main">
+              <view class="mdp-theme-head">
+                <text class="mdp-theme-name">{{ th.name || th.id }}</text>
+                <view v-if="th.previewSwatches && th.previewSwatches.length" class="mdp-theme-swatches">
+                  <view
+                    v-for="(sw, si) in th.previewSwatches"
+                    :key="si"
+                    class="mdp-theme-dot"
+                    :style="{ background: sw }"
+                  ></view>
+                </view>
+              </view>
+              <text v-if="th.description" class="mdp-sec-note">{{ th.description }}</text>
+            </view>
+            <text class="mdp-v mdp-link" @tap="toggleTheme(th)">
+              {{ th.selected ? $t('market.themeSelected') : $t('market.themeSelect') }}
+            </text>
+          </view>
+          <text class="mdp-sec-note">{{ $t('market.themeNote') }}</text>
+          <iframe
+            v-if="themePreviewUrl"
+            ref="themePreview"
+            :src="themePreviewUrl"
+            @load="pushThemePreview"
+            class="mdp-theme-preview-frame"
+            sandbox="allow-scripts"
+          ></iframe>
         </view>
 
         <!-- 详细信息：工具权限压缩为一行人话摘要，不再枚举内部工具名 -->
@@ -243,7 +295,8 @@
               <text class="mdp-k">{{ $t('market.kvPrice') }}</text><text class="mdp-v">{{ priceDetailText }}</text>
             </view>
             <view class="mdp-kv-row"><text class="mdp-k">{{ $t('market.kvId') }}</text><text class="mdp-v mono">{{ spec.id }}</text></view>
-            <view v-if="display.version" class="mdp-kv-row"><text class="mdp-k">{{ $t('market.kvVersion') }}</text><text class="mdp-v">v{{ display.version }}</text></view>
+            <view v-if="display.version" class="mdp-kv-row"><text class="mdp-k">{{ installedInfo ? $t('market.installedVersion') : $t('market.kvVersion') }}</text><text class="mdp-v">v{{ display.version }}</text></view>
+            <view v-if="installedInfo && marketInfo && marketInfo.version && !marketInfo.bundled && !isBuiltinRedaction" class="mdp-kv-row"><text class="mdp-k">{{ $t('market.latestVersion') }}</text><text class="mdp-v">v{{ marketInfo.version }}</text></view>
             <view v-if="display.author" class="mdp-kv-row"><text class="mdp-k">{{ $t('market.kvAuthor') }}</text><text class="mdp-v">{{ display.author }}</text></view>
             <view v-if="display.license" class="mdp-kv-row"><text class="mdp-k">{{ $t('market.kvLicense') }}</text><text class="mdp-v">{{ display.license }}</text></view>
             <view v-if="display.updatedAt" class="mdp-kv-row"><text class="mdp-k">{{ $t('market.kvUpdatedAt') }}</text><text class="mdp-v">{{ display.updatedAt }}</text></view>
@@ -267,10 +320,15 @@
 // 插件广场详情 tab（VS Code 扩展详情页形态）。spec = { kind: 'skill'|'plugin', id, name }
 // 由左栏 MarketSidebarPanel 点行打开。自行拉取市场与已安装两份数据合成视图，
 // 装/卸/启停后通过 uni.$emit('awd:market-changed') 通知左栏刷新。
-import { getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, uninstallMarketSkill, installMarketPlugin, uninstallMarketPlugin, setPluginEnabled, setSkillActivation, packStatus, packInfo, packInstall, packUpgrade, packUninstall, getPluginSettings, savePluginSettings, getContributedStyleProfiles, selectContributedStyleProfile } from '@/services/api.js'
+import { getBundledPlugins, installBundledPlugin, getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, uninstallMarketSkill, installMarketPlugin, uninstallMarketPlugin, setPluginEnabled, setSkillActivation, packStatus, packInfo, packInstall, packUpgrade, packUninstall, getPluginSettings, savePluginSettings, getContributedStyleProfiles, selectContributedStyleProfile, getContributedThemes, selectContributedTheme, resolvePluginEntryUrl } from '@/services/api.js'
+import { APP_LANGUAGE_EVENT, getAppLanguage } from '@/utils/appLanguage.js'
+import { setActiveSkin, getResolvedTheme, collectThemeTokens, APP_THEME_EVENT } from '@/utils/appTheme.js'
 import { ICONS } from '@/config/icons.js'
+import { getPluginAvatarUrl, getPluginGlyphPaths } from '@/config/pluginIcons.js'
 import { isPanelSkill, buildVoiceGroupSkill } from '@/config/leftSidebarPlugins.js'
 import { formatPrice, isPaid, paidState, priceCentsOf, priceLabel, purchaseUrl } from '@/utils/marketPricing.js'
+import { mergePluginCatalog, isPluginUpdateAvailable } from '@/utils/marketUpdates.js'
+import PluginConnectionSettings from '@/components/PluginConnectionSettings.vue'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { refreshEntitlements } from '@/composables/useEntitlement.js'
 import { requireAccount, isAccountLoginRetry } from '@/utils/requireAccount.js'
@@ -302,7 +360,14 @@ const PERMISSION_LABELS = {
   file_read: t('market.permFileRead'),
   file_write: t('market.permFileWrite'),
   network: t('market.permNetwork'),
+  im: t('market.permIm'),
+  notifications: t('market.permNotifications'),
   editor: t('market.permEditor'),
+  ai: t('market.permAi'),
+  speech: t('market.permSpeech'),
+  tasks: t('market.permTasks'),
+  clipboard: t('market.permClipboard'),
+  lawfirm: t('market.permLawfirm'),
 }
 
 /**
@@ -326,7 +391,7 @@ const ACTIVATION_LABELS = [t('market.activationAuto'), t('market.activationManua
 
 export default {
   name: 'MarketDetailPane',
-  components: { AwdSelect, AwdSwitch },
+  components: { AwdSelect, AwdSwitch, PluginConnectionSettings },
   props: {
     spec: {
       type: Object,
@@ -339,10 +404,13 @@ export default {
   data() {
     return {
       loading: true,
+      reloadGeneration: 0,
       loadError: '',
       marketInfo: null,
       installedInfo: null,
       busy: false,
+      pluginActionError: '',
+      pluginActionHint: '',
       // 是否已连接官网账户；随广场列表响应下发（付费未购项据此在「购买」与「需连接账户」之间选）
       accountConnected: false,
       // 原生资源包（native pack）状态，见 docs/NATIVE_PACK_DISTRIBUTION.md §4.3
@@ -354,7 +422,9 @@ export default {
       pluginSettings: [],   // manifest.settings 声明 + 当前值（secret 已掩码）
       settingsDraft: {},    // 表单草稿；secret 项只保存被用户改过的（掩码值原样 = 未改）
       settingsBusy: false,
+      contributionGeneration: 0,
       ownStyleProfiles: [], // 本插件贡献的样式画像 + 是否被选为全局默认
+      ownThemes: [],        // 本插件贡献的外观皮肤 + 是否当前启用
     }
   },
   computed: {
@@ -391,14 +461,23 @@ export default {
       }
       return this.$t('market.buyHint')
     },
+    headAvatarUrl() {
+      if (this.spec.kind !== 'plugin') return null
+      return typeof getPluginAvatarUrl === 'function' ? getPluginAvatarUrl(this.spec.id) : null
+    },
     headGlyph() {
-      if (this.spec.kind === 'plugin') return ICONS.blocks
+      if (this.spec.kind === 'plugin') {
+        return typeof getPluginGlyphPaths === 'function' ? getPluginGlyphPaths(this.spec.id) : ICONS.blocks
+      }
       const cat = (this.marketInfo?.category || this.installedInfo?.category) || 'other'
       return CATEGORY_GLYPHS[cat] || CATEGORY_GLYPHS.other
     },
     isBuiltinRedaction() {
       return this.spec.kind === 'skill' && this.spec.id === 'desensitize'
         && !!this.installedInfo && !this.installedInfo.sourcePluginId
+    },
+    pluginUpdateAvailable() {
+      return this.spec.kind === 'plugin' && isPluginUpdateAvailable(this.marketInfo, this.installedInfo)
     },
     display() {
       const m = this.marketInfo || {}
@@ -409,7 +488,7 @@ export default {
         name: m.name || i.name || this.spec.name || this.spec.id,
         description: (this.isBuiltinRedaction ? i.description : m.description) || i.description || '',
         author: m.authorDisplayName || m.author || i.author || '',
-        version: (this.isBuiltinRedaction ? i.version : m.version) || i.version || '',
+        version: this.installedInfo ? (i.version || '') : (m.version || ''),
         license: m.license || i.license || '',
         // credits（第三方引擎署名）目前只有本机 skill 会带；官网 registry 契约暂未收录该字段
         credits: i.credits || m.credits || [],
@@ -450,7 +529,7 @@ export default {
       return this.$t('market.toolSummaryText', { domains: head, count: tools.length })
     },
     pluginPermissionText() {
-      const item = this.marketInfo || this.installedInfo || {}
+      const item = this.installedInfo || this.marketInfo || {}
       const parts = []
       const toolCount = item.toolCount != null ? item.toolCount : (item.tools || []).length
       if (toolCount) parts.push(this.$t('market.providesTools', { count: toolCount }))
@@ -533,21 +612,50 @@ export default {
     },
     sourceText() {
       if (this.installedInfo?.sourcePluginId) return this.$t('market.sourceBuiltinPlugin', { id: this.installedInfo.sourcePluginId })
+      if (this.marketInfo?.bundled) return this.$t('pluginPlatform.bundled')
       if (this.marketInfo) return this.$t('market.sourceOfficialMarket')
       return this.$t('market.sourceLocal')
     },
+    themePreviewUrl() {
+      if (this.spec.kind !== 'plugin' || !this.installedInfo || !this.installedInfo.enabled || !this.ownThemes.length) return ''
+      const entry = this.installedInfo.frontendEntry || this.marketInfo?.frontendEntry || ''
+      return entry ? resolvePluginEntryUrl(this.spec.id, entry) : ''
+    },
+  },
+  watch: {
+    'spec.projectId'() { this.loadContribution() },
   },
   mounted() {
+    uni.$on(APP_THEME_EVENT, this.pushThemePreview)
+    uni.$on(APP_LANGUAGE_EVENT, this.pushThemePreview)
+    uni.$on('awd:account-changed', this.loadContribution)
     this.reload()
     uni.$on('awd:market-changed-from-sidebar', this.reload)
+    uni.$on('awd:market-update-checked', this.onUpdatesChecked)
   },
   beforeUnmount() {
+    this.reloadGeneration++
+    this.contributionGeneration++
+    uni.$off(APP_THEME_EVENT, this.pushThemePreview)
+    uni.$off(APP_LANGUAGE_EVENT, this.pushThemePreview)
+    uni.$off('awd:account-changed', this.loadContribution)
     uni.$off('awd:market-changed-from-sidebar', this.reload)
+    uni.$off('awd:market-update-checked', this.onUpdatesChecked)
     this.stopPackPoll()
   },
   methods: {
-    async reload() {
-      this.loading = true
+    pushThemePreview() {
+      this.$refs.themePreview?.contentWindow?.postMessage({
+        awd: 1, type: 'theme', theme: getResolvedTheme(), tokens: collectThemeTokens(), language: getAppLanguage(),
+      }, '*')
+    },
+    onUpdatesChecked() {
+      if (this.loading || this.busy) return
+      return this.reload(false)
+    },
+    async reload(refreshContributions = true) {
+      const generation = ++this.reloadGeneration
+      if (refreshContributions) this.loading = true
       this.loadError = ''
       // 广场不可达要如实说：本页没有市场数据时按钮区是空的，若再不给原因，
       // 用户看到的就是「有标题、没价格、没按钮」的哑页面——尤其付费项本来也没有安装按钮
@@ -559,6 +667,7 @@ export default {
           // 'voice' 不是 registry 条目，不去在线广场查——marketInfo 恒空，
           // 动作区因此只剩启停开关（没有安装/卸载，内置插件本就不可卸载）。
           const iRes = await getSkills().catch(() => null)
+          if (generation !== this.reloadGeneration) return
           const installedList = Array.isArray(iRes) ? iRes : (iRes?.data || [])
           this.marketInfo = null
           this.installedInfo = buildVoiceGroupSkill(installedList)
@@ -567,21 +676,24 @@ export default {
             getSkillMarket().catch(keepMarketError),
             getSkills().catch(() => null),
           ])
+          if (generation !== this.reloadGeneration) return
           const marketList = mRes?.skills || []
           const installedList = Array.isArray(iRes) ? iRes : (iRes?.data || [])
           if (typeof mRes?.accountConnected === 'boolean') this.accountConnected = mRes.accountConnected
           this.marketInfo = marketList.find(s => s.id === this.spec.id) || null
           this.installedInfo = installedList.find(s => s.id === this.spec.id) || null
         } else {
-          const [mRes, iRes] = await Promise.all([
+          const [mRes, iRes, bundledRes] = await Promise.all([
             getPluginMarket().catch(keepMarketError),
             getPlugins().catch(() => null),
+            getBundledPlugins().catch(() => null),
           ])
-          const marketList = mRes?.plugins || []
-          const installedList = Array.isArray(iRes) ? iRes : (iRes?.data || [])
+          if (generation !== this.reloadGeneration) return
+          const marketList = mergePluginCatalog(mRes?.plugins || [], bundledRes?.plugins || [])
+          const installedList = Array.isArray(iRes) ? iRes : iRes?.data
           if (typeof mRes?.accountConnected === 'boolean') this.accountConnected = mRes.accountConnected
           this.marketInfo = marketList.find(p => p.id === this.spec.id) || null
-          this.installedInfo = installedList.find(p => p.id === this.spec.id) || null
+          if (Array.isArray(installedList)) this.installedInfo = installedList.find(p => p.id === this.spec.id) || null
         }
         // 本机已装的项即使广场挂了也照常展示（信息来自本地），不必报错打扰
         if (!this.marketInfo && !this.installedInfo && marketError) {
@@ -591,10 +703,11 @@ export default {
         console.error('加载详情失败:', e)
         this.loadError = e?.message || this.$t('market.networkUnavailable')
       } finally {
-        this.loading = false
+        if (generation === this.reloadGeneration) this.loading = false
       }
+      if (generation !== this.reloadGeneration) return
       // 声明式贡献点（规范 v2.9）：设置表单与画像清单随详情一起拉
-      await this.loadContribution()
+      if (refreshContributions) await this.loadContribution()
       // 挂着资源包的面板型 skill：拉一次现状——可能是用户上次没装完，也可能是
       // 老版本升级后端自动补下载中，两种都要接着轮询而不是回到「安装」按钮
       if (this.packId) {
@@ -618,28 +731,46 @@ export default {
     // ---- 声明式贡献点（规范 v2.9 P4）：设置表单 + 样式画像 ----
 
     async loadContribution() {
+      const generation = ++this.contributionGeneration
+      const { id, projectId } = this.spec
+      this.pluginSettings = []; this.settingsDraft = {}; this.ownStyleProfiles = []; this.ownThemes = []
       if (this.spec.kind !== 'plugin' || !this.installedInfo) {
         this.pluginSettings = []
         this.ownStyleProfiles = []
+        this.ownThemes = []
         return
       }
       try {
-        const res = await getPluginSettings(this.spec.id)
+        const res = await getPluginSettings(id, projectId)
+        if (generation !== this.contributionGeneration) return
         const body = res && res.settings !== undefined ? res : (res && res.data) || {}
         this.pluginSettings = Array.isArray(body.settings) ? body.settings : []
         const draft = {}
         this.pluginSettings.forEach(s => { draft[s.key] = s.value == null ? '' : String(s.value) })
         this.settingsDraft = draft
       } catch (e) {
+        if (generation !== this.contributionGeneration) return
         this.pluginSettings = []
       }
       try {
         const res = await getContributedStyleProfiles()
+        if (generation !== this.contributionGeneration) return
         const body = res && res.profiles !== undefined ? res : (res && res.data) || {}
         const all = Array.isArray(body.profiles) ? body.profiles : []
-        this.ownStyleProfiles = all.filter(p => p.pluginId === this.spec.id)
+        this.ownStyleProfiles = all.filter(p => p.pluginId === id)
       } catch (e) {
+        if (generation !== this.contributionGeneration) return
         this.ownStyleProfiles = []
+      }
+      try {
+        const res = await getContributedThemes()
+        if (generation !== this.contributionGeneration) return
+        const body = res && res.themes !== undefined ? res : (res && res.data) || {}
+        const all = Array.isArray(body.themes) ? body.themes : []
+        this.ownThemes = all.filter(t => t.pluginId === id)
+      } catch (e) {
+        if (generation !== this.contributionGeneration) return
+        this.ownThemes = []
       }
     },
 
@@ -651,10 +782,10 @@ export default {
         this.pluginSettings.forEach(s => {
           const v = this.settingsDraft[s.key]
           // secret 项的掩码回显（****xxxx）原样未动 = 用户没改，不回写
-          if (s.secret && v === s.value) return
+          if (String(v == null ? '' : v) === String(s.value == null ? '' : s.value)) return
           values[s.key] = v == null ? '' : String(v)
         })
-        const res = await savePluginSettings(this.spec.id, values)
+        const res = await savePluginSettings(this.spec.id, values, this.spec.projectId)
         const body = res && res.code !== undefined ? res : (res && res.data) || {}
         if (body.code !== 0) throw new Error(body.message || this.$t('market.saveFailed'))
         uni.showToast({ title: this.$t('market.settingsSaved'), icon: 'none' })
@@ -674,6 +805,20 @@ export default {
         const res = await selectContributedStyleProfile(ref)
         const body = res && res.code !== undefined ? res : (res && res.data) || {}
         if (body.code !== 0) throw new Error(body.message || this.$t('market.saveFailed'))
+        await this.loadContribution()
+      } catch (e) {
+        uni.showToast({ title: (e && e.message) || this.$t('market.saveFailed'), icon: 'none' })
+      }
+    },
+
+    async toggleTheme(th) {
+      try {
+        const ref = th.selected ? '' : (th.pluginId + ':' + th.id)
+        const res = await selectContributedTheme(ref)
+        const body = res && res.code !== undefined ? res : (res && res.data) || {}
+        if (body.code !== 0) throw new Error(body.message || this.$t('market.saveFailed'))
+        setActiveSkin(ref ? { ...th, ref } : null)
+        try { uni.$emit('awd:skin-changed') } catch (e) { /* ignore */ }
         await this.loadContribution()
       } catch (e) {
         uni.showToast({ title: (e && e.message) || this.$t('market.saveFailed'), icon: 'none' })
@@ -825,7 +970,7 @@ export default {
         uni.showToast({ title: this.$t('market.purchaseNotFoundHint'), icon: 'none' })
         return
       }
-      if (this.installedInfo) return
+      if (this.installedInfo && !this.pluginUpdateAvailable) return
       if (this.spec.kind === 'skill') await this.doInstallSkill()
       else await this.doInstallPlugin()
     },
@@ -862,35 +1007,69 @@ export default {
       }
     },
     async doInstallPlugin() {
-      if (this.busy) return
+      if (this.busy || this.needsPurchase) return
       const m = this.marketInfo || {}
+      const isUpdate = !!this.installedInfo
+      if (isUpdate && !this.pluginUpdateAvailable) return
+      const wasEnabled = this.installedInfo?.enabled === true
+      const confirmedVersion = m.version
+      const confirmedPermissions = [...new Set(m.permissions || [])].sort().join('\n')
+      this.busy = true
       const perms = (m.permissions || []).map(p => PERMISSION_LABELS[p] || p).join(this.$t('market.listSeparator')) || this.$t('market.noSensitiveCapability')
       const ok = await new Promise(resolve => {
         uni.showModal({
-          title: this.$t('market.confirmInstallPluginTitle'),
-          content: this.$t('market.confirmInstallPluginContent', {
+          title: this.$t(isUpdate ? 'market.confirmUpdatePluginTitle' : 'market.confirmInstallPluginTitle'),
+          content: this.$t(isUpdate ? 'market.confirmUpdatePluginContent' : 'market.confirmInstallPluginContent', {
             name: m.name || this.spec.id,
             version: m.version,
             author: m.authorDisplayName || m.author || this.$t('market.unknownAuthor'),
             perms,
           }),
-          confirmText: this.$t('market.install'),
+          confirmText: this.$t(isUpdate ? 'market.update' : 'market.install'),
           cancelText: this.$t('market.cancelBtn'),
           success: r => resolve(r.confirm),
           fail: () => resolve(false),
         })
       })
-      if (!ok) return
-      this.busy = true
+      if (!ok) { this.busy = false; return }
+      this.pluginActionError = ''
+      this.pluginActionHint = ''
       try {
-        await installMarketPlugin(this.spec.id)
-        uni.showToast({ title: this.$t('market.installedUsableHint'), icon: 'none' })
+        await (m.bundled ? installBundledPlugin(this.spec.id) : installMarketPlugin(this.spec.id))
+        if (isUpdate) this.installedInfo = { ...this.installedInfo, enabled: false, version: '' }
+        // 验签安装始终先禁用；确认新版能力后，只恢复更新前已经启用的插件。
+        if (isUpdate && wasEnabled) {
+          try {
+            const installedRes = await getPlugins()
+            const installedList = Array.isArray(installedRes) ? installedRes : installedRes?.data
+            const actual = Array.isArray(installedList) ? installedList.find(p => p.id === this.spec.id) : null
+            if (actual) this.installedInfo = actual
+            if (!actual || actual.version !== confirmedVersion
+              || [...new Set(actual.permissions || [])].sort().join('\n') !== confirmedPermissions) {
+              this.pluginActionHint = this.$t('market.updateConfirmationChangedHint')
+            }
+          } catch (e) {
+            this.pluginActionHint = this.$t('market.updateVerificationFailedHint') + (e?.message ? ' ' + e.message : '')
+          }
+          if (!this.pluginActionHint) {
+            try {
+              await setPluginEnabled(this.spec.id, true)
+              this.installedInfo.enabled = true
+            } catch (e) {
+              this.pluginActionHint = this.$t('market.updatedDisabledHint') + (e?.message ? ' ' + e.message : '')
+            }
+          }
+        }
         await this.reload()
         this.notifyChanged()
+        uni.showToast({ title: this.pluginActionHint || this.$t(isUpdate ? 'market.updatedToast' : 'market.installedUsableHint'), icon: 'none' })
       } catch (e) {
         console.error('安装插件失败:', e)
         if (isAccountLoginRetry(e)) await this.reload()
-        uni.showToast({ title: e?.message || this.$t('market.installFailedNeedAdmin'), icon: 'none' })
+        this.pluginActionError = isUpdate
+          ? this.$t('market.updateFailed') + (e?.message ? ' ' + e.message : '')
+          : (e?.message || this.$t('market.installFailedNeedAdmin'))
+        uni.showToast({ title: this.pluginActionError, icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -912,9 +1091,11 @@ export default {
     },
     // AwdSwitch 直接抛布尔值
     async onPluginToggle(enabled) {
+      if (this.busy || this.installedInfo?.revokedReason || this.installedInfo?.incompatibleReason) return
       try {
         await setPluginEnabled(this.spec.id, enabled)
         if (this.installedInfo) this.installedInfo.enabled = enabled
+        this.pluginActionHint = ''
         uni.showToast({ title: enabled ? this.$t('market.enabledToast') : this.$t('market.disabledToggleToast'), icon: 'none' })
         this.notifyChanged()
       } catch (e) {
@@ -966,6 +1147,9 @@ export default {
 <style lang="scss" scoped>
 /* VS Code 扩展详情页结构 + 产品浅色编辑排版（衬线标题按官网 DESIGN.md 只用于展示位） */
 .mdp {
+  --awd-glyph-radius: 14px;
+  --awd-font-size-kpi: 22px;
+  --awd-font-size-badge: 10px;
   width: 100%;
   height: 100%;
   background: var(--awd-surface);
@@ -986,12 +1170,13 @@ export default {
   width: 72px;
   height: 72px;
   flex-shrink: 0;
-  border-radius: 14px;
+  border-radius: var(--awd-glyph-radius);
   background: var(--awd-accent-soft);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--awd-accent-text);
+  overflow: hidden;
 
   svg {
     width: 34px;
@@ -1003,6 +1188,20 @@ export default {
     background: var(--awd-accent-hover);
     color: var(--awd-text-on-accent);
   }
+
+  &.has-avatar {
+    background: var(--awd-surface);
+    border: 1.5px solid var(--awd-border);
+    border-radius: 50%;
+    box-shadow: var(--awd-shadow-md);
+  }
+}
+
+.mdp-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: block;
 }
 
 .mdp-head-main {
@@ -1019,37 +1218,37 @@ export default {
 
 .mdp-title {
   font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
-  font-size: 22px;
+  font-size: var(--awd-font-size-kpi);
   font-weight: 700;
   color: var(--awd-text);
   line-height: 1.25;
 }
 
 .mdp-kind-badge {
-  font-size: 10px;
+  font-size: var(--awd-font-size-badge);
   font-weight: 600;
   color: var(--awd-accent-text);
   background: var(--awd-accent-soft);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   padding: 1px 6px;
 }
 
 .mdp-installed-badge {
-  font-size: 10px;
+  font-size: var(--awd-font-size-badge);
   font-weight: 600;
   color: var(--awd-text-on-accent);
   background: var(--awd-accent);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   padding: 1px 6px;
 }
 
 /* 价格徽章：免费用中性灰，付费用暖色（与「试用版」chip 同族），不做成促销红 */
 .mdp-price-badge {
-  font-size: 10px;
+  font-size: var(--awd-font-size-badge);
   font-weight: 600;
   color: var(--awd-text-2);
   background: var(--awd-surface-2);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   padding: 1px 6px;
 
   &.paid {
@@ -1061,9 +1260,14 @@ export default {
 .mdp-purchase-hint {
   display: block;
   margin-top: 8px;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   line-height: 17px;
   color: var(--awd-warning-text);
+}
+
+.mdp-update-note {
+  color: var(--awd-accent);
+  font-weight: 600;
 }
 
 .mdp-byline {
@@ -1075,7 +1279,7 @@ export default {
 }
 
 .mdp-byline-item {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 
   & + .mdp-byline-item::before {
@@ -1093,7 +1297,7 @@ export default {
 .mdp-kind-note {
   display: block;
   margin-top: 6px;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   line-height: 16px;
   color: var(--awd-text-2);
 }
@@ -1101,7 +1305,7 @@ export default {
 .mdp-summary {
   display: block;
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 20px;
   color: var(--awd-text);
 }
@@ -1112,7 +1316,7 @@ export default {
 
 .mdp-scenario-lead {
   display: block;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   margin-bottom: 6px;
 }
@@ -1126,16 +1330,23 @@ export default {
 }
 
 .mdp-btn {
+  margin: 0;
+  font-family: inherit;
   height: 28px;
   line-height: 26px;
   padding: 0 14px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   border: 1px solid var(--awd-border-strong);
   background: var(--awd-surface);
   cursor: pointer;
 
+  &:focus-visible {
+    outline: 2px solid var(--awd-accent);
+    outline-offset: 2px;
+  }
+
   text {
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     font-weight: 600;
     color: var(--awd-text);
   }
@@ -1186,18 +1397,18 @@ export default {
 }
 
 .mdp-switch-label {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
 .mdp-action-hint {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   color: var(--awd-text-3);
 }
 
 /* 原生资源包状态：下架标红、下载中用中性进度条、失败态错误文案 + 重试按钮 */
 .mdp-pack-revoked {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-danger-text);
 }
@@ -1206,19 +1417,19 @@ export default {
   height: 28px;
   line-height: 28px;
   padding: 0 12px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-surface-2);
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
 .mdp-pack-error {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-danger-text);
 }
 
 .mdp-pack-update {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
@@ -1230,7 +1441,7 @@ export default {
 
 .mdp-loading {
   padding: 24px 0;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
 }
 
@@ -1240,7 +1451,7 @@ export default {
 
 .mdp-sec-title {
   display: block;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 700;
   color: var(--awd-text);
   margin-bottom: 8px;
@@ -1248,7 +1459,7 @@ export default {
 
 .mdp-sec-body {
   display: block;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 20px;
   color: var(--awd-text);
 }
@@ -1268,15 +1479,15 @@ export default {
   justify-content: space-between;
 }
 .mdp-set-label {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
 }
 .mdp-set-input {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   padding: 6px 10px;
   border: 1px solid var(--awd-border-strong);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-surface);
   color: var(--awd-text);
 }
@@ -1286,7 +1497,7 @@ export default {
   gap: 6px;
 }
 .mdp-set-opt {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   padding: 4px 12px;
   border: 1px solid var(--awd-border-strong);
   border-radius: 999px;
@@ -1306,7 +1517,7 @@ export default {
 .mdp-sec-note {
   display: block;
   margin-top: 6px;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   line-height: 17px;
   color: var(--awd-text-3);
 }
@@ -1318,7 +1529,7 @@ export default {
 }
 
 .mdp-trigger {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-accent-text);
 }
 
@@ -1334,14 +1545,15 @@ export default {
 }
 
 .mdp-k {
-  width: 56px;
+  width: 96px;
   flex-shrink: 0;
-  font-size: 12px;
+  word-break: keep-all;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
 .mdp-v {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   word-break: break-all;
 
@@ -1354,5 +1566,61 @@ export default {
   color: var(--awd-accent-text);
   text-decoration: underline;
   cursor: pointer;
+}
+
+.mdp-theme-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--awd-border-subtle);
+}
+
+.mdp-theme-row:last-of-type {
+  border-bottom: 0;
+}
+
+.mdp-theme-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.mdp-theme-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mdp-theme-name {
+  font-size: var(--awd-font-size-body);
+  font-weight: 600;
+  color: var(--awd-text);
+}
+
+.mdp-theme-swatches {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mdp-theme-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid var(--awd-border);
+}
+
+.mdp-theme-preview-frame {
+  width: 100%;
+  height: 184px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: var(--awd-radius-md);
+  background: transparent;
+  display: block;
 }
 </style>

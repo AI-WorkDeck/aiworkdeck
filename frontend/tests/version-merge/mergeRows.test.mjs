@@ -11,6 +11,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mergeRowState, mergeRowText } from '../../src/utils/mergeRows.js'
+import zhVersion from '../../src/locales/zh-CN/version.js'
+import enVersion from '../../src/locales/en-US/version.js'
 
 // 假 $t：把键与参数原样拼出来，断言的是「挑了哪个键、喂了什么参数」
 const t = (key, params) => (params === undefined ? key : `${key}(${JSON.stringify(params)})`)
@@ -165,3 +167,24 @@ test('文案：自动合并失败要带得出原因，对齐核对失败与引�
     'version.mergeRowAutoFailed({"reason":"version.mergeFailReasonGeneric"})'
   )
 })
+
+
+// Two-device 0.60 QA: a same-line TXT conflict is WHOLE/BINARY too. This
+// reason describes the merge capability; it does not identify PDF/image bytes.
+for (const [language, messages] of [['zh-CN', zhVersion], ['en-US', enVersion]]) {
+  test(`${language}: text and other whole-file conflicts explain the available choice without inventing a format`, () => {
+    const translate = key => messages[key.replace(/^version\./, '')]
+    for (const path of ['QA-conflict.txt', 'notes.md', '证据.pdf', 'photo.png', 'payload.unknown']) {
+      const row = { path, kind: 'WHOLE', decision: 'WHOLE', reason: 'BINARY', state: 'PENDING' }
+      assert.equal(mergeRowState(row), 'whole', path)
+      const text = mergeRowText(translate, row)
+      assert.ok(typeof text === 'string' && text.length > 0, path)
+      assert.doesNotMatch(text, /PDF|images?|图片|没有.*段落|no paragraphs/i, path)
+      assert.match(text, language === 'zh-CN' ? /暂不支持逐处合并/ : /does not yet support.*merg/i, path)
+      assert.match(text, language === 'zh-CN' ? /选择.*整份版本/ : /choose.*whole version/i, path)
+    }
+    const noBase = { path: 'QA-conflict.txt', kind: 'WHOLE', decision: 'WHOLE', reason: 'NO_BASE' }
+    assert.equal(mergeRowText(translate, noBase), messages.mergeRowWholeNoBase)
+    assert.notEqual(mergeRowText(translate, noBase), messages.mergeRowWholeBinary)
+  })
+}

@@ -1,0 +1,57 @@
+--- a/sw/source/uibase/uno/loktxdoc.cxx	2026-10-04 10:51:12
++++ b/sw/source/uibase/uno/loktxdoc.cxx	2026-10-04 10:51:12
+@@ -37,6 +37,7 @@
+ #include <IDocumentRedlineAccess.hxx>
+ #include <doc.hxx>
+ #include <docsh.hxx>
++#include <docstat.hxx>
+ #include <fmtrfmrk.hxx>
+ #include <wrtsh.hxx>
+ #include <txtrfmrk.hxx>
+@@ -1110,6 +1111,26 @@
+     rJsonWriter.put("formula", xSet->getPropertyValue(u"Formula"_ustr).get<OUString>());
+ }
+ 
++/// Implements getCommandValues(".uno:WordCount").
++void GetWordCount(tools::JsonWriter& rJsonWriter, SwDocShell* pDocShell)
++{
++    SwWrtShell* pWrtShell = pDocShell->GetWrtShell();
++    if (!pWrtShell)
++        return;
++    SwDocStat aSelection;
++    pWrtShell->CountWords(aSelection);
++    const SwDocStat aDocument = pWrtShell->GetUpdatedDocStat();
++    for (const auto& [pName, rStat] :
++         { std::pair<const char*, const SwDocStat&>("document", aDocument),
++           std::pair<const char*, const SwDocStat&>("selection", aSelection) })
++    {
++        auto aNode = rJsonWriter.startNode(pName);
++        rJsonWriter.put("words", static_cast<sal_Int64>(rStat.nWord));
++        rJsonWriter.put("characters", static_cast<sal_Int64>(rStat.nChar));
++        rJsonWriter.put("charactersNoSpaces", static_cast<sal_Int64>(rStat.nCharExcludingSpaces));
++    }
++}
++
+ /// Implements getCommandValues(".uno:Sections").
+ ///
+ /// Parameters:
+@@ -1148,7 +1169,7 @@
+         = { u"TextFormFields", u"TextFormField", u"SetDocumentProperties",
+             u"Bookmarks",      u"Fields",        u"Sections",
+             u"Bookmark",       u"Field",         u"Layout",
+-            u"Formula" };
++            u"Formula",        u"WordCount" };
+ 
+     return std::find(vForward.begin(), vForward.end(), rCommand) != vForward.end();
+ }
+@@ -1235,6 +1256,10 @@
+     {
+         GetDocStructure(rJsonWriter, m_pDocShell, aMap);
+     }
++    else if (o3tl::starts_with(rCommand, ".uno:WordCount"sv))
++    {
++        GetWordCount(rJsonWriter, m_pDocShell);
++    }
+     else if (o3tl::starts_with(rCommand, ".uno:Formula"sv))
+     {
+         GetFormula(rJsonWriter, m_pDocShell);

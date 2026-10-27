@@ -15,7 +15,8 @@ function setup(fetch, { lastEventId = '', cursorConversation = 'conv', onReconne
   const bubble = { value: { content: '', isStreaming: true } }
   const build = new Function('fetch', 'setTimeout', 'clearTimeout', 'isConnected', 'isStreaming', 'currentAssistantBubble', 'lastSseEventId', 'lastSseEventConversationId', 'scheduleReconnect', `
     let sseAbortController, reconnectAttempts, lastSseActivityAt, myNetworkRecoveryHook,
-      activeNetworkRecoveryHook, disconnectedBubble, supersededByOtherClient;
+      disconnectedBubble, supersededByOtherClient;
+    const activeNetworkRecoveryHooks = new Set();
     const linkStatus = { value: {} };
     const currentConversationId = { value: 'conv' };
     const getApiBaseUrl = () => '', getSessionId = () => 'sess', t = key => key;

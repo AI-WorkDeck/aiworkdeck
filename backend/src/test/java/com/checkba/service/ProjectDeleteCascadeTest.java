@@ -3,6 +3,7 @@
 
 package com.checkba.service;
 
+import com.checkba.model.entity.ChatSuggestion;
 import com.checkba.model.entity.EvidenceLink;
 import com.checkba.model.entity.EvidenceLinkTarget;
 import com.checkba.model.entity.Project;
@@ -16,6 +17,7 @@ import com.checkba.model.entity.ProjectRemote;
 import com.checkba.model.entity.ProjectTask;
 import com.checkba.model.entity.ProjectTaskFile;
 import com.checkba.model.entity.ProjectVariable;
+import com.checkba.repository.ChatSuggestionRepository;
 import com.checkba.repository.EvidenceLinkRepository;
 import com.checkba.repository.EvidenceLinkTargetRepository;
 import com.checkba.repository.ProjectAiMessageRepository;
@@ -80,6 +82,7 @@ class ProjectDeleteCascadeTest {
     @Autowired private ProjectTaskRepository taskRepository;
     @Autowired private ProjectTaskFileRepository taskFileRepository;
     @Autowired private ProjectAiMessageRepository aiMessageRepository;
+    @Autowired private ChatSuggestionRepository chatSuggestionRepository;
     @Autowired private EvidenceLinkRepository evidenceLinkRepository;
     @Autowired private EvidenceLinkTargetRepository evidenceLinkTargetRepository;
     @Autowired private ProjectStorageResolver storageResolver;
@@ -88,6 +91,31 @@ class ProjectDeleteCascadeTest {
     @Autowired private MemoryRemoteRepository memoryRemoteRepository;
     @Autowired private MemoryRepoService memoryRepoService;
     @Autowired private CompletionEntryRepository completionEntryRepository;
+    @Autowired private com.checkba.repository.ContractReviewStandardRepository reviewStandards;
+    @Autowired private com.checkba.repository.ContractReviewRunRepository reviewRuns;
+
+    @Test
+    void deleteProject_removesReviewRulesAndQuotedContractSnapshots() throws IOException {
+        Long projectId = seedProject();
+        var standard = new com.checkba.model.entity.ContractReviewStandard();
+        standard.setProjectId(projectId);
+        standard.setName("Synthetic review policy");
+        standard.setRulesJson("[]");
+        reviewStandards.saveAndFlush(standard);
+        var run = new com.checkba.model.entity.ContractReviewRun();
+        run.setProjectId(projectId);
+        run.setDocFileId(seededDocFileId);
+        run.setStandardJson("{}");
+        run.setResultsJson("[{\"quote\":\"synthetic confidential clause\"}]");
+        run.setStatus("PARTIAL");
+        run.setDocumentHash("a".repeat(64));
+        reviewRuns.saveAndFlush(run);
+
+        projectService.deleteProject(projectId);
+
+        assertFalse(reviewStandards.existsById(standard.getId()));
+        assertFalse(reviewRuns.existsById(run.getId()));
+    }
 
     @Test
     void deleteProject_clearsEveryProjectScopedTableAndOnDiskDirectory() throws IOException {
@@ -98,8 +126,10 @@ class ProjectDeleteCascadeTest {
         Files.createDirectories(projectDir.resolve("客户上传"));
         Files.writeString(projectDir.resolve("客户上传").resolve("尽调材料.txt"), "机密");
         Files.createDirectories(gitDir.resolve("objects"));
+        projectRepoService.objects().put(projectId, new java.io.ByteArrayInputStream("synthetic media".getBytes()));
 
         projectService.deleteProject(projectId);
+        assertFalse(Files.exists(projectRepoService.objects().projectRoot(projectId)));
 
         assertFalse(projectRepository.existsById(projectId), "project 行应被删除");
         assertTrue(memberRepository.findByProjectId(projectId).isEmpty(), "project_member 残留孤儿行");
@@ -192,6 +222,30 @@ class ProjectDeleteCascadeTest {
     }
 
     @Test
+    void objectDeletionFailureKeepsProjectRowAndNeverFollowsExternalLink() throws IOException {
+        Long projectId = seedProject();
+        Path objectRoot = projectRepoService.objects().projectRoot(projectId);
+        Path outside = Files.createTempDirectory("awd-delete-protected-");
+        Files.writeString(outside.resolve("keep.txt"), "do not delete");
+        Files.createDirectories(objectRoot.getParent());
+        try {
+            try { Files.createSymbolicLink(objectRoot, outside); }
+            catch (UnsupportedOperationException | IOException e) {
+                org.junit.jupiter.api.Assumptions.assumeTrue(false, "Symbolic links unavailable");
+            }
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                    () -> projectService.deleteProject(projectId));
+            assertTrue(projectRepository.existsById(projectId));
+            org.junit.jupiter.api.Assertions.assertEquals("do not delete", Files.readString(outside.resolve("keep.txt")));
+        } finally {
+            Files.deleteIfExists(objectRoot);
+            Files.deleteIfExists(outside.resolve("keep.txt"));
+            Files.deleteIfExists(outside);
+            projectService.deleteProject(projectId);
+        }
+    }
+
+    @Test
     void deleteProject_clearsOnlyItsCompletionScope() {
         Long projectId = seedProject();
         Long otherProjectId = seedProject();
@@ -204,6 +258,37 @@ class ProjectDeleteCascadeTest {
         assertTrue(completionEntryRepository.findByScopeKeyOrderByLastUsedAtDescIdDesc("p:" + projectId).isEmpty());
         assertFalse(completionEntryRepository.findByScopeKeyOrderByLastUsedAtDescIdDesc("p:" + otherProjectId).isEmpty());
         assertFalse(completionEntryRepository.findByScopeKeyOrderByLastUsedAtDescIdDesc("u:9000").isEmpty());
+    }
+
+    @Test
+    void deleteProject_clearsItsChatSuggestionsAndPreservesOtherProjects() {
+        Long projectId = seedProject();
+        Long otherProjectId = seedProject();
+        String suggestionId = saveSuggestion(projectId);
+        String otherSuggestionId = saveSuggestion(otherProjectId);
+
+        projectService.deleteProject(projectId);
+
+        assertFalse(chatSuggestionRepository.existsById(suggestionId), "已删项目的建议与修改反馈不应残留");
+        assertTrue(aiMessageRepository.findByProjectIdOrderByCreatedAtAsc(projectId).isEmpty());
+        assertTrue(chatSuggestionRepository.existsById(otherSuggestionId), "其他项目的建议不应被删除");
+        assertFalse(aiMessageRepository.findByProjectIdOrderByCreatedAtAsc(otherProjectId).isEmpty());
+    }
+
+    private String saveSuggestion(Long projectId) {
+        ProjectAiMessage message = aiMessageRepository.findByProjectIdOrderByCreatedAtAsc(projectId).get(0);
+        message.setConversationId("delete-cascade-" + projectId);
+        aiMessageRepository.save(message);
+        ChatSuggestion suggestion = new ChatSuggestion();
+        suggestion.setId(UUID.randomUUID().toString());
+        suggestion.setUserId(message.getUserId());
+        suggestion.setConversationId(message.getConversationId());
+        suggestion.setSourceMessageId(message.getId());
+        suggestion.setText("继续整理本项目材料");
+        suggestion.setOutcome("edited");
+        suggestion.setCorrection("先整理本项目合同材料");
+        suggestion.setCreatedAt(LocalDateTime.now());
+        return chatSuggestionRepository.save(suggestion).getId();
     }
 
     private void saveCompletion(String scopeKey, String text) {

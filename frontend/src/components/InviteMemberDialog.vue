@@ -8,8 +8,8 @@
         <view class="modal-close" @tap="close">×</view>
       </view>
 
-      <!-- Tabs -->
-      <view class="dialog-tabs">
+      <!-- 只有同事和客户两种邀请方式都可用时才显示切换栏。 -->
+      <view v-if="showClientTab" class="dialog-tabs">
         <view
           class="dialog-tab"
           :class="{ active: activeTab === 'MEMBER' }"
@@ -665,8 +665,8 @@ export default {
 .workdeck-dialog {
   width: 618px; /* Golden Ratio */
   background: var(--awd-surface);
-  border-radius: 12px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -682,13 +682,13 @@ export default {
 }
 
 .workdeck-dialog-title {
-  font-size: 20px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .modal-close {
-  font-size: 24px;
+  font-size: var(--awd-font-size-title);
   color: var(--awd-text-3);
   cursor: pointer;
   line-height: 1;
@@ -711,7 +711,7 @@ export default {
   flex: 1;
   text-align: center;
   padding: 12px 0;
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text-2);
   cursor: pointer;
   font-weight: 500;
@@ -748,7 +748,7 @@ export default {
 
 .form-label {
   display: block;
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
   color: var(--awd-text);
   margin-bottom: 8px;
@@ -756,11 +756,11 @@ export default {
 
 .workdeck-input {
   width: 100%;
-  height: 44px;
+  height: var(--awd-control-height);
   padding: 0 12px;
   border: 1px solid var(--awd-border-strong);
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   transition: all 0.2s;
   box-sizing: border-box;
@@ -769,7 +769,7 @@ export default {
 .workdeck-input:focus {
   border-color: var(--awd-accent);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(46, 90, 80, 0.1);
+  box-shadow: 0 0 0 var(--awd-focus-width) var(--awd-accent-wash);
 }
 
 /* ---- 查人结果区 ---- */
@@ -780,14 +780,14 @@ export default {
 
 .lookup-hint {
   display: block;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   line-height: 1.6;
 }
 
 .member-candidate {
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   padding: 12px;
   background: var(--awd-bg);
 }
@@ -811,7 +811,7 @@ export default {
   justify-content: center;
   background: var(--awd-accent-soft);
   color: var(--awd-accent-text);
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 600;
 }
 
@@ -822,19 +822,19 @@ export default {
 }
 
 .member-candidate-name {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .member-candidate-contact {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
 .lookup-notfound {
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   padding: 12px;
   background: var(--awd-bg);
   display: flex;
@@ -843,7 +843,7 @@ export default {
 }
 
 .lookup-notfound-title {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
 }
@@ -865,11 +865,11 @@ export default {
 
 .invite-link-text {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   background: var(--awd-surface-2);
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   word-break: break-all;
   user-select: text;
 }
@@ -880,20 +880,20 @@ export default {
 
 .copied-inline {
   display: block;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-accent-text);
 }
 
 .added-inline {
   display: block;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-accent-text);
   margin-top: 8px;
 }
 
 .form-error {
   display: block;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-danger-text);
   margin-top: 8px;
   line-height: 1.6;
@@ -902,7 +902,7 @@ export default {
 /* ---- 待放进案件库 ---- */
 .needs-library-lead {
   display: block;
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   line-height: 1.7;
   margin-bottom: 12px;
@@ -931,9 +931,9 @@ export default {
   gap: 6px;
   cursor: pointer;
   padding: 6px 12px;
-  border-radius: 20px;
+  border-radius: 999px;
   border: 1px solid var(--awd-border);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   transition: all 0.2s;
 }
@@ -975,12 +975,12 @@ export default {
 .invite-desc-box {
   background: var(--awd-bg);
   padding: 12px;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   margin-bottom: 20px;
 }
 
 .invite-desc {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   line-height: 1.6;
   white-space: pre-wrap;
@@ -988,7 +988,7 @@ export default {
 
 .role-hint {
   display: block;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   margin-top: 8px;
   line-height: 1.6;
@@ -996,7 +996,7 @@ export default {
 
 .code-tip {
   display: block;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   line-height: 1.6;
   margin-top: 12px;
@@ -1008,7 +1008,7 @@ export default {
 }
 
 .code-label {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   margin-bottom: 8px;
   display: block;
@@ -1023,17 +1023,17 @@ export default {
 
 .code-text {
   font-family: monospace;
-  font-size: 24px;
+  font-size: 1.5em;
   color: var(--awd-text);
   letter-spacing: 2px;
   background: var(--awd-surface-2);
   padding: 4px 12px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
 }
 
 .copy-link {
   color: var(--awd-accent-text);
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   cursor: pointer;
   text-decoration: underline;
   align-self: flex-start;
@@ -1049,10 +1049,10 @@ export default {
 }
 
 .workdeck-btn {
-  height: 40px;
+  height: var(--awd-control-height);
   padding: 0 24px;
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
   cursor: pointer;
   display: flex;

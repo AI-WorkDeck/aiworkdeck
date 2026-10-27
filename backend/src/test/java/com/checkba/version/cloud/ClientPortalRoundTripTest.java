@@ -80,9 +80,9 @@ import static org.mockito.Mockito.when;
  * 桌面端后端，HTTP seam 不打桩。
  *
  * <p>律师放进案件库 → 本机旧清单首读时迁上去（含附件，走 multipart 原字节转发）→ 代理签码 →
- * 客户在案件库凭码登录 → 只看得到这一份 → 代理再建一条清单 → 客户读得到、上传、留言 →
+ * 客户在案件库凭码登录 → 草稿不可见 → 律师发布并通知 → 客户上传、留言、申请复核 →
  * 客户删清单 403 → 律师经代理取到客户传的文件 → 律师审核（驳回带理由 / 客户重传回待审核 / 通过 / 撤回）
- * → 撤销后码失效、会话看不到案卷。
+ * → 补传保留每版底稿、过期审核被拒 → 撤销后码失效、会话看不到案卷。
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {"security.local-mode=false"})
@@ -287,13 +287,33 @@ class ClientPortalRoundTripTest {
     }
 
     /** 律师在桌面端点「通过 / 驳回 / 撤回」：PUT /api/dd/items/{id}/status?projectId=7 经代理到案件库。 */
-    private MockHttpServletResponse review(DdCloudProxyFilter filter, long itemId, String status, String reason)
+    private MockHttpServletResponse review(DdCloudProxyFilter filter, long requestId, long itemId, String status, String reason)
+            throws Exception {
+        JSONObject detail = JSONUtil.parseObj(viaDesktop(filter, "GET", "/api/dd/requests/" + requestId,
+                "projectId=7", null, null).getContentAsString(StandardCharsets.UTF_8));
+        return reviewSnapshot(filter, findItem(detail, itemId), status, reason);
+    }
+
+    private MockHttpServletResponse reviewSnapshot(DdCloudProxyFilter filter, JSONObject item, String status, String reason)
             throws Exception {
         Map<String, Object> body = new HashMap<>();
         body.put("status", status);
+        body.put("submissionId", item.getLong("currentSubmissionId"));
+        body.put("revision", item.getLong("revision"));
         if (reason != null) body.put("reason", reason);
-        return viaDesktop(filter, "PUT", "/api/dd/items/" + itemId + "/status", "projectId=7",
+        return viaDesktop(filter, "PUT", "/api/dd/items/" + item.getLong("id") + "/status", "projectId=7",
                 JSONUtil.toJsonStr(body).getBytes(StandardCharsets.UTF_8), "application/json");
+    }
+
+    private JSONObject findItem(JSONObject detail, long itemId) {
+        return detail.getJSONArray("items").stream().map(o -> (JSONObject) o)
+                .filter(item -> item.getLong("id") == itemId).findFirst().orElseThrow();
+    }
+
+    private HttpResponse submit(long itemId, String session, Path file, String key) {
+        return HttpRequest.post(serverUrl() + "/api/dd/items/" + itemId + "/submissions")
+                .header("X-Session-Id", session).form("files", file.toFile())
+                .form("idempotencyKey", key).form("aiConsent", "false").execute();
     }
 
     // ---- 案件库侧（客户直连） -------------------------------------------------
@@ -380,7 +400,7 @@ class ClientPortalRoundTripTest {
             assertEquals(1, myProjects.size());
             assertEquals(rid, myProjects.getJSONObject(0).getLong("id"));
 
-            // ④ 律师经代理再建一条清单（带条目），客户读得到
+            // ④ 新建与迁入的清单均为草稿，律师确认发布前客户不可见
             byte[] createBody = JSONUtil.toJsonStr(Map.of("name", "第一轮尽调清单", "content", "公司章程\n股东名册"))
                     .getBytes(StandardCharsets.UTF_8);
             MockHttpServletResponse created = viaDesktop(filter, "POST", "/api/dd/projects/7", null, createBody,
@@ -388,19 +408,62 @@ class ClientPortalRoundTripTest {
             long requestId = JSONUtil.parseObj(created.getContentAsString(StandardCharsets.UTF_8)).getLong("id");
             JSONArray clientLists = JSONUtil.parseArray(clientCall(cn.hutool.http.Method.GET,
                     "/api/dd/projects/" + rid, clientSession, null).body());
+            assertEquals(0, clientLists.size(), "草稿不能出现在客户清单中");
+            assertEquals(403, clientCall(cn.hutool.http.Method.GET, "/api/dd/requests/" + requestId,
+                    clientSession, null).getStatus());
+            assertEquals(403, clientCall(cn.hutool.http.Method.GET, "/api/dd/requests/" + migratedId,
+                    clientSession, null).getStatus());
+            byte[] publishBody = "{\"aiReviewEnabled\":false}".getBytes(StandardCharsets.UTF_8);
+            for (long id : List.of(migratedId, requestId, requestId)) {
+                MockHttpServletResponse published = viaDesktop(filter, "POST", "/api/dd/requests/" + id + "/publish",
+                        "projectId=7", publishBody, "application/json");
+                assertEquals(200, published.getStatus(), published.getContentAsString(StandardCharsets.UTF_8));
+                assertEquals("PUBLISHED", JSONUtil.parseObj(published.getContentAsString(StandardCharsets.UTF_8)).getStr("status"));
+            }
+            clientLists = JSONUtil.parseArray(clientCall(cn.hutool.http.Method.GET,
+                    "/api/dd/projects/" + rid, clientSession, null).body());
             assertEquals(2, clientLists.size());
+            JSONArray publishedNotifications = JSONUtil.parseArray(clientCall(cn.hutool.http.Method.GET,
+                    "/api/dd/notifications?projectId=" + rid, clientSession, null).body());
+            assertEquals(2, publishedNotifications.size(), "重复发布不应重复通知客户");
+            assertTrue(publishedNotifications.stream().allMatch(o -> "PUBLISHED".equals(((JSONObject) o).getStr("kind"))));
+            long publicationNoticeId = publishedNotifications.getJSONObject(0).getLong("id");
+            JSONObject readNotice = JSONUtil.parseObj(clientCall(cn.hutool.http.Method.POST,
+                    "/api/dd/notifications/" + publicationNoticeId + "/read", clientSession, "{}").body());
+            assertNotNull(readNotice.getStr("readAt"));
+
+            JSONArray legacyHistory = JSONUtil.parseArray(clientCall(cn.hutool.http.Method.GET,
+                    "/api/dd/items/" + license.getLong("id") + "/submissions", clientSession, null).body());
+            assertEquals(1, legacyHistory.size());
+            JSONObject legacyVersion = legacyHistory.getJSONObject(0);
+            assertEquals("APPROVED", legacyVersion.getStr("reviewStatus"));
+            assertEquals("MANUAL_REQUIRED", legacyVersion.getStr("aiStatus"));
+            long legacyFileId = legacyVersion.getJSONArray("files").getJSONObject(0).getLong("fileId");
+            assertArrayEquals(oldAttachment, clientCall(cn.hutool.http.Method.GET,
+                    "/api/dd/items/" + license.getLong("id") + "/submissions/" + legacyVersion.getLong("id") + "/files/" + legacyFileId,
+                    clientSession, null).bodyBytes(), "发布迁入清单后仍可读取原始底稿");
+
             JSONObject detail = JSONUtil.parseObj(clientCall(cn.hutool.http.Method.GET,
                     "/api/dd/requests/" + requestId, clientSession, null).body());
             long itemId = detail.getJSONArray("items").getJSONObject(0).getLong("id");
 
-            // ⑤ 客户能传文件、能留言
+            // ⑤ 客户能传文件、能留言；相同幂等标识重试不会再生成材料版本或通知
             byte[] clientFile = "客户上传的章程".getBytes(StandardCharsets.UTF_8);
             Path tmp = Files.createTempFile(desktopRoot, "charter", ".txt");
             Files.write(tmp, clientFile);
-            HttpResponse up = HttpRequest.post(serverUrl() + "/api/dd/items/" + itemId + "/upload")
-                    .header("X-Session-Id", clientSession).form("file", tmp.toFile()).execute();
-            assertEquals(200, up.getStatus());
-            assertEquals("UPLOADED", JSONUtil.parseObj(up.body()).getStr("status"), up.body());
+            HttpResponse up = submit(itemId, clientSession, tmp, "charter-v1");
+            assertEquals(200, up.getStatus(), up.body());
+            JSONObject firstSubmission = JSONUtil.parseObj(up.body());
+            long firstSubmissionId = firstSubmission.getLong("id");
+            assertEquals("UPLOADED", firstSubmission.getStr("reviewStatus"), up.body());
+            assertEquals("MANUAL_REQUIRED", firstSubmission.getStr("aiStatus"));
+            assertEquals(1, firstSubmission.getInt("version"));
+            HttpResponse retried = submit(itemId, clientSession, tmp, "charter-v1");
+            assertEquals(200, retried.getStatus(), retried.body());
+            assertEquals(firstSubmissionId, JSONUtil.parseObj(retried.body()).getLong("id"));
+            JSONArray lawyerNotifications = JSONUtil.parseArray(viaDesktop(filter, "GET", "/api/dd/notifications",
+                    "projectId=7", null, null).getContentAsString(StandardCharsets.UTF_8));
+            assertEquals(1, lawyerNotifications.stream().filter(o -> "SUBMISSION".equals(((JSONObject) o).getStr("kind"))).count());
             HttpResponse comment = clientCall(cn.hutool.http.Method.POST, "/api/dd/items/" + itemId + "/comments",
                     clientSession, JSONUtil.toJsonStr(Map.of("content", "已上传")));
             assertEquals(200, comment.getStatus());
@@ -425,10 +488,10 @@ class ClientPortalRoundTripTest {
             // ⑦½ 律师审核（dev-board#1057）：经代理驳回（带理由）→ 客户读到状态与理由 → 客户改状态 403
             //     → 客户重传回到待审核 → 律师通过 → 客户不能再传 → 律师撤回通过；没上传的条目不能通过（400）
             long untouchedItem = detail.getJSONArray("items").getJSONObject(1).getLong("id");
-            MockHttpServletResponse early = review(filter, untouchedItem, "APPROVED", null);
+            MockHttpServletResponse early = review(filter, requestId, untouchedItem, "APPROVED", null);
             assertEquals(400, early.getStatus(), early.getContentAsString(StandardCharsets.UTF_8));
-            assertEquals(400, review(filter, itemId, "REJECTED", "  ").getStatus(), "驳回必须带理由");
-            MockHttpServletResponse rejected = review(filter, itemId, "REJECTED", "章程缺最后一页");
+            assertEquals(400, review(filter, requestId, itemId, "REJECTED", "  ").getStatus(), "驳回必须带理由");
+            MockHttpServletResponse rejected = review(filter, requestId, itemId, "REJECTED", "章程缺最后一页");
             assertEquals(200, rejected.getStatus(), rejected.getContentAsString(StandardCharsets.UTF_8));
             assertEquals("REJECTED", JSONUtil.parseObj(rejected.getContentAsString(StandardCharsets.UTF_8)).getStr("status"));
 
@@ -447,16 +510,66 @@ class ClientPortalRoundTripTest {
             assertEquals(403, clientCall(cn.hutool.http.Method.PUT, "/api/dd/items/" + itemId + "/status",
                     clientSession, JSONUtil.toJsonStr(Map.of("status", "UPLOADED"))).getStatus());
 
-            HttpResponse reUp = HttpRequest.post(serverUrl() + "/api/dd/items/" + itemId + "/upload")
-                    .header("X-Session-Id", clientSession).form("file", tmp.toFile()).execute();
-            assertEquals(200, reUp.getStatus(), reUp.body());
-            assertEquals("UPLOADED", JSONUtil.parseObj(reUp.body()).getStr("status"), "驳回后重传回到待审核");
+            HttpResponse appealed = clientCall(cn.hutool.http.Method.POST, "/api/dd/items/" + itemId + "/appeal",
+                    clientSession, JSONUtil.toJsonStr(Map.of("submissionId", firstSubmissionId, "reason", "请律师再核对最后一页")));
+            assertEquals(200, appealed.getStatus(), appealed.body());
+            assertEquals("UPLOADED", JSONUtil.parseObj(appealed.body()).getStr("reviewStatus"));
+            assertNotNull(JSONUtil.parseObj(appealed.body()).getStr("appealedAt"));
+            lawyerNotifications = JSONUtil.parseArray(viaDesktop(filter, "GET", "/api/dd/notifications",
+                    "projectId=7", null, null).getContentAsString(StandardCharsets.UTF_8));
+            JSONObject appealNotice = lawyerNotifications.stream().map(o -> (JSONObject) o)
+                    .filter(o -> "APPEAL".equals(o.getStr("kind"))).findFirst().orElseThrow();
+            assertEquals(firstSubmissionId, appealNotice.getLong("submissionId"));
+            MockHttpServletResponse marked = viaDesktop(filter, "POST", "/api/dd/notifications/" + appealNotice.getLong("id") + "/read",
+                    "projectId=7", "{}".getBytes(StandardCharsets.UTF_8), "application/json");
+            assertEquals(200, marked.getStatus(), marked.getContentAsString(StandardCharsets.UTF_8));
+            assertNotNull(JSONUtil.parseObj(marked.getContentAsString(StandardCharsets.UTF_8)).getStr("readAt"));
+            assertEquals(404, clientCall(cn.hutool.http.Method.POST,
+                    "/api/dd/notifications/" + appealNotice.getLong("id") + "/read", clientSession, "{}").getStatus(),
+                    "客户不能读取或标记只发给律师的申诉通知");
+            assertEquals(200, review(filter, requestId, itemId, "REJECTED", "复核后仍缺最后一页，请补传").getStatus());
+            JSONObject beforeResubmit = JSONUtil.parseObj(clientCall(cn.hutool.http.Method.GET,
+                    "/api/dd/requests/" + requestId, clientSession, null).body());
+            JSONObject supersededSnapshot = findItem(beforeResubmit, itemId);
+            JSONObject reviewedAppeal = beforeResubmit.getJSONObject("submissionsByItem").getJSONObject(String.valueOf(itemId));
+            assertEquals("REJECTED", reviewedAppeal.getStr("reviewStatus"));
+            assertNotNull(reviewedAppeal.getStr("reviewedAt"));
 
-            assertEquals(200, review(filter, itemId, "APPROVED", null).getStatus());
-            HttpResponse afterApprove = HttpRequest.post(serverUrl() + "/api/dd/items/" + itemId + "/upload")
-                    .header("X-Session-Id", clientSession).form("file", tmp.toFile()).execute();
-            assertEquals(400, afterApprove.getStatus(), "已通过的条目不再收材料: " + afterApprove.body());
-            MockHttpServletResponse withdrawn = review(filter, itemId, "UPLOADED", null);
+            byte[] correctedFile = "客户补传的完整章程，含最后一页".getBytes(StandardCharsets.UTF_8);
+            Files.write(tmp, correctedFile);
+            HttpResponse reUp = submit(itemId, clientSession, tmp, "charter-v2");
+            assertEquals(200, reUp.getStatus(), reUp.body());
+            JSONObject secondSubmission = JSONUtil.parseObj(reUp.body());
+            assertEquals("UPLOADED", secondSubmission.getStr("reviewStatus"), "驳回后重传回到待审核");
+            assertEquals(2, secondSubmission.getInt("version"));
+            assertFalse(firstSubmissionId == secondSubmission.getLong("id"));
+            assertEquals(409, reviewSnapshot(filter, supersededSnapshot, "APPROVED", null).getStatus(), "旧页面不能误确认补传的新版本");
+            JSONArray history = JSONUtil.parseArray(clientCall(cn.hutool.http.Method.GET,
+                    "/api/dd/items/" + itemId + "/submissions", clientSession, null).body());
+            assertEquals(2, history.size());
+            assertEquals(2, history.getJSONObject(0).getInt("version"));
+            assertEquals(1, history.getJSONObject(1).getInt("version"));
+            for (int i = 0; i < history.size(); i++) {
+                JSONObject version = history.getJSONObject(i);
+                JSONObject metadata = version.getJSONArray("files").getJSONObject(0);
+                assertNotNull(metadata.getStr("name"));
+                assertTrue(metadata.getLong("fileSize") > 0);
+                MockHttpServletResponse original = viaDesktop(filter, "GET", "/api/dd/items/" + itemId + "/submissions/"
+                        + version.getLong("id") + "/files/" + metadata.getLong("fileId"), "projectId=7", null, null);
+                assertEquals(200, original.getStatus());
+                assertArrayEquals(i == 0 ? correctedFile : clientFile, original.getContentAsByteArray(), "每版原件必须保留");
+            }
+
+            assertEquals(200, review(filter, requestId, itemId, "APPROVED", null).getStatus());
+            JSONArray reviewNotifications = JSONUtil.parseArray(clientCall(cn.hutool.http.Method.GET,
+                    "/api/dd/notifications?projectId=" + rid, clientSession, null).body());
+            assertTrue(reviewNotifications.stream().map(o -> (JSONObject) o)
+                    .anyMatch(o -> "REVIEW".equals(o.getStr("kind"))
+                            && secondSubmission.getLong("id").equals(o.getLong("submissionId"))),
+                    "律师确认材料后应通知本版提交者");
+            HttpResponse afterApprove = submit(itemId, clientSession, tmp, "charter-v3");
+            assertEquals(409, afterApprove.getStatus(), "已通过的条目不再收材料: " + afterApprove.body());
+            MockHttpServletResponse withdrawn = review(filter, requestId, itemId, "UPLOADED", null);
             assertEquals(200, withdrawn.getStatus());
             assertEquals("UPLOADED", JSONUtil.parseObj(withdrawn.getContentAsString(StandardCharsets.UTF_8)).getStr("status"));
 
@@ -470,6 +583,9 @@ class ClientPortalRoundTripTest {
             JSONArray afterRevoke = JSONUtil.parseArray(clientCall(cn.hutool.http.Method.GET, "/api/projects/my",
                     clientSession, null).body());
             assertEquals(0, afterRevoke.size());
+            JSONObject revokedRead = JSONUtil.parseObj(clientCall(cn.hutool.http.Method.GET,
+                    "/api/dd/requests/" + requestId, clientSession, null).body());
+            assertEquals(1, revokedRead.getInt("code"), "旧会话不能继续读取已撤销项目的清单");
         }
     }
 }

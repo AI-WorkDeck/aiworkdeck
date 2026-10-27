@@ -24,11 +24,11 @@ const IMPORT_NAMES = [
   'batchCopyFiles', 'getApiBaseUrl', 'getContributedTemplates', 'createFileFromContributedTemplate',
   'getSessionId', 'host', 'findTopmostDeletedAncestor', 'summarizeDeleteResults',
   'groupByParent', 'buildTreeFromGroups', 'evidenceRefCounts', 'createRefCountsFetcher',
-  'warmDragImage', 'applyDragImage', 'FileTypeIcon', 'TagChip', 'TagSelector',
+  'warmDragImage', 'applyDragImage', 'FileTypeIcon', 'TagChip', 'TagFilter', 'TagSelector',
   'TagManager', 'AwdDatePicker', 'ICONS', 'getProjectTags', 'addTagToFile', 'removeTagFromFile',
   'createTag', 'createTask', 'importLocalFile',
   'nativeDataTransfer', 'isExternalFileDrag', 'claimExternalDrop', 'isTranscribableMediaItem',
-  'showDialog',
+  'showDialog', 'ExplorerCreateMenu',
 ]
 
 // replies：依次回给每一次 showDialog 的结果；opened 记下每次弹框的参数
@@ -59,6 +59,7 @@ function makeVm({ templates = [], replies = [] } = {}) {
   vm.allFiles = []
   vm.$t = (k) => k
   vm.$emit = () => {}
+  vm.$nextTick = callback => callback?.()
   vm.loadFiles = async () => {}
   vm.showErrorModal = (msg) => { throw new Error('unexpected error modal: ' + msg) }
   vm.calls = calls
@@ -126,28 +127,27 @@ test('有贡献模板时，actionsheet 第一项「空白文档」同样先弹�
   assert.equal(vm.calls.createFile.length, 0)
 })
 
-test('新建文件夹同样走 AwdDialog：确认才建，取消不建', async () => {
-  const vm = makeVm({ replies: [{ confirm: true, cancel: false, content: '证据' }] })
-  await vm.showCreateFolderDialog()
-  assert.equal(vm.calls.dialogs[0].editable, true)
-  assert.equal(vm.calls.dialogs[0].title, 'fileTree.newFolder')
-  assert.equal(vm.calls.createFolder.length, 1)
-  assert.equal(vm.calls.createFolder[0][2], '证据')
-
-  const vm2 = makeVm()
-  await vm2.showCreateFolderDialog()
-  assert.equal(vm2.calls.createFolder.length, 0)
+test('新建文件夹直接建 Untitled Folder，不弹命名框，并避开同目录重名', async () => {
+  const vm = makeVm()
+  vm.allFiles = [
+    { id: 1, parentId: null, name: 'Untitled Folder', isFolder: true },
+    { id: 2, parentId: null, name: 'Untitled Folder 2', isFolder: true },
+    { id: 3, parentId: 7, name: 'Untitled Folder 3', isFolder: true },
+  ]
+  await vm.handleCreateFolder()
+  assert.equal(vm.calls.dialogs.length, 0)
+  assert.equal(vm.calls.createFolder[0][2], 'Untitled Folder 3')
 })
 
-test('新建文件夹用了保留名：提示后带着原输入重开，不建', async () => {
-  toasts = []
-  const vm = makeVm({ replies: [{ confirm: true, cancel: false, content: '.stagezone' }] })
-  await vm.showCreateFolderDialog()
-  assert.equal(vm.calls.createFolder.length, 0)
-  assert.deepEqual(toasts, ['fileTree.reservedNameNotAllowed'])
-  assert.equal(vm.calls.dialogs.length, 2)
-  assert.equal(vm.calls.dialogs[1].content, '.stagezone')
-})
+for (const type of ['pptx', 'xlsx']) {
+  test(`新建 ${type} 保留类型、命名与指定目录`, async () => {
+    const vm = makeVm({ replies: [{ confirm: true, content: `材料.${type}` }] })
+    await vm.openCreateFileDialog(undefined, type, 7)
+    assert.equal(vm.calls.createFile[0][1], 7)
+    assert.equal(vm.calls.createFile[0][2], `材料.${type}`)
+    assert.equal(vm.calls.createFile[0][3], type)
+  })
+}
 
 test('默认名中英文案：中文「新建文档」、英文 "New document"', async () => {
   const zh = (await import('../../src/locales/zh-CN/fileTree.js')).default

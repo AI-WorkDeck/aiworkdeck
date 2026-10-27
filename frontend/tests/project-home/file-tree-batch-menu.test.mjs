@@ -31,8 +31,8 @@ const IMPORT_NAMES = [
   'batchCopyFiles', 'getApiBaseUrl', 'getContributedTemplates', 'createFileFromContributedTemplate',
   'getSessionId', 'host', 'findTopmostDeletedAncestor', 'summarizeDeleteResults', 'collapseToTopmostSelected',
   'groupByParent', 'buildTreeFromGroups', 'evidenceRefCounts', 'createRefCountsFetcher',
-  'warmDragImage', 'applyDragImage', 'FileTypeIcon', 'TagChip', 'TagSelector',
-  'TagManager', 'AwdDatePicker', 'ICONS', 'getProjectTags', 'addTagToFile', 'removeTagFromFile',
+  'warmDragImage', 'applyDragImage', 'FileTypeIcon', 'TagChip', 'TagFilter', 'TagSelector',
+  'TagManager', 'ExplorerCreateMenu', 'AwdDatePicker', 'ICONS', 'getProjectTags', 'addTagToFile', 'removeTagFromFile',
   'createTag', 'createTask', 'importLocalFile',
   'nativeDataTransfer', 'isExternalFileDrag', 'claimExternalDrop', 'isTranscribableMediaItem',
   'showDialog',
@@ -77,6 +77,8 @@ function makeVm({ replies = [] } = {}) {
   vm.files = FILES
   vm.expandedFolders = new Set([1])
   vm.recycleBin = []
+  Object.defineProperty(vm, 'displayFiles', { get: () => vm.files })
+  vm.$nextTick = fn => fn()
   Object.defineProperty(vm, 'checkedIds', {
     get() { return Object.keys(vm.checkedMap).filter(k => vm.checkedMap[k]).map(Number) },
   })
@@ -127,7 +129,7 @@ test('BUG-73 复核：按住 ⌘ 按 ArrowDown 仍是单选移动，不加选（
   }
   assert.deepEqual(vm.multiSelectedIds, [12], '键盘移动是单选')
   const opens = vm.calls.emits.filter(e => e[0] === 'file-select').map(e => e[1].id)
-  assert.deepEqual(opens, [11, 12], '方向键移动照常 file-select')
+  assert.deepEqual(opens, [11], '方向键只移动选择，不能像鼠标点击一样打开文件（#1308）')
 })
 
 test('BUG-73 批量选择态勾两份 docx 后右键：菜单进入多选态（已选 2 项），对比文档可用', () => {

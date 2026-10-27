@@ -62,7 +62,7 @@ public class PluginDevService {
     /** 开发安装的来源标记文件名（JSON：projectId / folderId / installedAt） */
     public static final String DEV_MARKER = ".awd-dev";
 
-    private static final Set<String> ALLOWED_PERMISSIONS = Set.of("file_read", "file_write", "network", "editor", "ai");
+    private static final Set<String> ALLOWED_PERMISSIONS = Set.of("file_read", "file_write", "network", "editor", "ai", "im", "lawfirm", "tasks", "clipboard", "speech");
     private static final int MAX_FILES = 200;
     private static final long MAX_FILE_BYTES = 5L * 1024 * 1024;
     private static final long MAX_TOTAL_BYTES = 20L * 1024 * 1024;
@@ -135,6 +135,10 @@ public class PluginDevService {
                 indexHtml.getBytes(StandardCharsets.UTF_8));
         writeProjectFile(projectId, web.getId(), "awd-plugin-sdk.js", "js", userId,
                 readTemplate("plugin-dev/awd-plugin-sdk.js").getBytes(StandardCharsets.UTF_8));
+        writeProjectFile(projectId, web.getId(), "awd-plugin-sdk.d.ts", "ts", userId,
+                readTemplate("plugin-dev/awd-plugin-sdk.d.ts").getBytes(StandardCharsets.UTF_8));
+        writeProjectFile(projectId, folder.getId(), "manifest.schema.json", "json", userId,
+                readTemplate("plugin-dev/manifest.schema.json").getBytes(StandardCharsets.UTF_8));
 
         log.info("Plugin dev scaffold created: project={} id={} folderId={}", projectId, id, folder.getId());
         return folder.getId();
@@ -263,6 +267,7 @@ public class PluginDevService {
      */
     private void installFiles(String id, LinkedHashMap<String, byte[]> files, JSONObject marker,
                               InstallPolicy policy, List<String> errors) {
+        files.keySet().removeIf(path -> java.util.Arrays.stream(path.split("/")).anyMatch(name -> name.matches("\\.awd-(dev|bundled|service-trust)(-.*)?")));
         if (files.size() > MAX_FILES) {
             errors.add(LangText.of("文件数超限（最多 " + MAX_FILES + " 个）", "Too many files (max " + MAX_FILES + ")"));
         }
@@ -308,6 +313,10 @@ public class PluginDevService {
                 FileUtil.mkdir(out.getParentFile());
                 Files.write(out.toPath(), bytes);
             }
+            var metadata = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readValue(Files.readString(new File(tmp, "manifest.json").toPath()), PluginService.PluginMetadata.class);
+            PluginManifestContractValidator.validateViews(metadata, tmp);
+            PluginManifestContractValidator.validateServices(metadata);
             marker.set("installedAt", LocalDateTime.now().toString());
             Files.write(new File(tmp, DEV_MARKER).toPath(), marker.toString().getBytes(StandardCharsets.UTF_8));
 
@@ -345,7 +354,7 @@ public class PluginDevService {
         }
         java.util.Arrays.sort(children, java.util.Comparator.comparing(File::getName));
         for (File child : children) {
-            if (DEV_MARKER.equals(child.getName())) {
+            if (child.getName().matches("\\.awd-(dev|bundled|service-trust)(-.*)?")) {
                 continue;
             }
             if (child.isDirectory()) {
@@ -433,8 +442,8 @@ public class PluginDevService {
             for (Object p : permissions) {
                 if (!ALLOWED_PERMISSIONS.contains(String.valueOf(p))) {
                     errors.add(LangText.of("未知权限: ", "Unknown permission: ") + p
-                            + LangText.of("（可用: file_read / file_write / network / editor / ai）",
-                                          " (allowed: file_read / file_write / network / editor / ai)"));
+                            + LangText.of("（可用: file_read / file_write / network / editor / ai / im / lawfirm / tasks / clipboard / speech）",
+                                          " (allowed: file_read / file_write / network / editor / ai / im / lawfirm / tasks / clipboard / speech)"));
                 }
             }
         }
@@ -482,7 +491,7 @@ public class PluginDevService {
         if (contributes == null) {
             return false;
         }
-        for (String key : List.of("templates", "styleProfiles", "capabilities")) {
+        for (String key : List.of("templates", "styleProfiles", "themes", "capabilities")) {
             JSONArray arr = contributes.getJSONArray(key);
             if (arr != null && !arr.isEmpty()) {
                 return true;

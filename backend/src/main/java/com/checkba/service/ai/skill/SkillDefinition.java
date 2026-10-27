@@ -108,6 +108,18 @@ public class SkillDefinition {
      */
     private boolean enabledByDefault = true;
 
+    /**
+     * 是否为工程内置的高频核心工作流（懒人模式，dev-board#1431；skill.yml: builtin_workflow）。
+     *
+     * <p>为 true 的高频默认能力（合同审查、证据整理与闭环报告、法律意见书核查）已固化为工程内置工作流：
+     * <ul>
+     *   <li>永远处于启用 + 自动匹配状态（不受 disabled / manual 名单覆写，无需用户管理或钉选）；</li>
+     *   <li>不在对话输入框的手动 Skill 选择器、已安装 Skill 启停列表或在线 Skill 广场中作为可选项暴露，降低用户选择负担；</li>
+     *   <li>命中时随 {@code skill_update} 携带 {@code builtinWorkflow: true}，供前端提示「内置工作流已自动接管」。</li>
+     * </ul>
+     */
+    private boolean builtinWorkflow = false;
+
     /** 展示用作者名（skill.yml: author），如 "AI WorkDeck" */
     private String author;
 
@@ -139,6 +151,9 @@ public class SkillDefinition {
     /** 英文展示名（skill.yml: name_en，可选）；英文模式下注入块用它，缺省回退 name */
     private String nameEn;
 
+    /** 英文简介（skill.yml: description_en，可选）；英文界面下优先展示，缺省回退 description */
+    private String descriptionEn;
+
     /** 英文触发词（skill.yml: triggers_en，可选）；仅英文模式参与匹配（连同 triggers 一起） */
     private List<String> triggersEn = new ArrayList<>();
 
@@ -147,6 +162,36 @@ public class SkillDefinition {
 
     /** 英文 prompt 模板（目录下存在 prompt.en.md 时加载）；英文模式下注入用它，缺省回退 promptTemplate */
     private String promptTemplateEn;
+
+    /**
+     * 收尾独立核验策略（VeriHarness 对齐，dev-board#1481；skill.yml: {@code verification_policy}）。
+     *
+     * <p>缺省为 {@link VerificationPolicy#NONE}；声明为 {@link VerificationPolicy#SLOT_EVIDENCE_CHALLENGER}
+     * 的 skill（如 {@code legal-opinion-review} 及用户从自进化卡片晋升的高敏核查技能）在实质审查/修订轮次
+     * 正常收尾前，由编排器自动派发一次独立只读 Challenger 子任务执行逐槽证据核验，并将结构化核验报告
+     * 通过 SSE {@code verification_report} 呈现给用户。
+     */
+    private VerificationPolicy verificationPolicy = VerificationPolicy.NONE;
+
+    /** {@link #verificationPolicy} 的取值。 */
+    public enum VerificationPolicy {
+        /** 不额外派发收尾只读核验子任务（缺省）。 */
+        NONE,
+        /** 独立只读 Challenger 逐槽证据核验（主体角色、法律关系、标的、条件、事实时点）。 */
+        SLOT_EVIDENCE_CHALLENGER;
+
+        public static java.util.Optional<VerificationPolicy> parse(String raw) {
+            if (raw == null || raw.isBlank()) {
+                return java.util.Optional.empty();
+            }
+            String normalized = raw.trim().toUpperCase(java.util.Locale.ROOT).replace('-', '_');
+            try {
+                return java.util.Optional.of(VerificationPolicy.valueOf(normalized));
+            } catch (IllegalArgumentException e) {
+                return java.util.Optional.empty();
+            }
+        }
+    }
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -178,6 +223,8 @@ public class SkillDefinition {
     public void setCategory(String category) { this.category = category; }
     public boolean isEnabledByDefault() { return enabledByDefault; }
     public void setEnabledByDefault(boolean enabledByDefault) { this.enabledByDefault = enabledByDefault; }
+    public boolean isBuiltinWorkflow() { return builtinWorkflow; }
+    public void setBuiltinWorkflow(boolean builtinWorkflow) { this.builtinWorkflow = builtinWorkflow; }
     public String getAuthor() { return author; }
     public void setAuthor(String author) { this.author = author; }
     public String getAuthorUrl() { return authorUrl; }
@@ -192,10 +239,16 @@ public class SkillDefinition {
     public void setLanguages(List<String> languages) { this.languages = languages; }
     public String getNameEn() { return nameEn; }
     public void setNameEn(String nameEn) { this.nameEn = nameEn; }
+    public String getDescriptionEn() { return descriptionEn; }
+    public void setDescriptionEn(String descriptionEn) { this.descriptionEn = descriptionEn; }
     public List<String> getTriggersEn() { return triggersEn; }
     public void setTriggersEn(List<String> triggersEn) { this.triggersEn = triggersEn; }
     public String getOutputEn() { return outputEn; }
     public void setOutputEn(String outputEn) { this.outputEn = outputEn; }
     public String getPromptTemplateEn() { return promptTemplateEn; }
     public void setPromptTemplateEn(String promptTemplateEn) { this.promptTemplateEn = promptTemplateEn; }
+    public VerificationPolicy getVerificationPolicy() { return verificationPolicy; }
+    public void setVerificationPolicy(VerificationPolicy verificationPolicy) {
+        this.verificationPolicy = verificationPolicy == null ? VerificationPolicy.NONE : verificationPolicy;
+    }
 }

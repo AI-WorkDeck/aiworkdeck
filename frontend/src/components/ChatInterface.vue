@@ -272,17 +272,21 @@
        <view class="header-actions">
           <view class="memory-header-btn" @tap="showMemoryBrowser = true">{{ $t('chat.memoryButton') }}</view>
           <view class="icon-btn" @tap="$emit('toggle-history')" title="History">
-             <image class="btn-icon default" src="/static/history.png" />
-             <image class="btn-icon hover" src="/static/history_hover.png" />
+             <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+               <circle cx="12" cy="12" r="9" />
+               <path d="M12 7v5l3 2" />
+             </svg>
              <view v-if="historyBadge" class="conv-dot header-dot" :class="historyBadge"></view>
           </view>
           <view class="icon-btn" @tap="startNewChat" title="New Chat">
-             <image class="btn-icon default" src="/static/plus.png" />
-             <image class="btn-icon hover" src="/static/plus_hover.png" />
+             <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+               <path d="M12 5v14M5 12h14" />
+             </svg>
           </view>
           <view class="icon-btn" @tap="$emit('close')" title="Close">
-             <image class="btn-icon default" src="/static/close.png" />
-             <image class="btn-icon hover" src="/static/close_hover.png" />
+             <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+               <path d="M18 6L6 18M6 6l12 12" />
+             </svg>
           </view>
        </view>
     </view>
@@ -403,6 +407,8 @@
                :bubble="msg"
                :is-latest="index === bubbles.length - 1"
                :review-states="reviewStates"
+               :file-changes="filesForBubble(msg)"
+               @open-file="handleOpenFile"
                @open-artifact-tab="handleArtifactOpenTab"
                @approve="handleArtifactApprove"
                @open-review="handleArtifactOpenReview"
@@ -454,6 +460,13 @@
                   <text class="active-doc-name">{{ activeDocChip.name }}</text>
                   <text class="active-doc-remove" @tap.stop="dismissActiveDoc">×</text>
                </view>
+               <!-- 当前文档选区 chip（dev-board#1430）：选中正文后自动浮出，可直接对选区提修订意见 -->
+               <view v-if="activeSelectionChip" class="active-doc-chip active-selection-chip" :title="$t('chat.activeSelectionChipTitle')">
+                  <text class="active-doc-label">{{ $t('chat.activeSelectionChipLabel') }}</text>
+                  <text class="active-doc-name">{{ $t('chat.activeSelectionChipPreview', { text: activeSelectionChip.preview }) }}</text>
+                  <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { count: activeSelectionChip.charCount }) }}</text>
+                  <text class="active-doc-remove" @tap.stop="dismissActiveSelection">×</text>
+               </view>
                <!-- 「模型看不了图」常驻提示（K21 ⑨）：粘的、拖的图片都覆盖；能力未知一律不提示 -->
                <text v-if="visionNotice" class="input-images-note">{{ $t(visionNotice) }}</text>
                <!-- 上一轮带过的附件（虚线标签）会继续带上：常驻一句说清楚，不靠用户自己去悬停（BUG-19） -->
@@ -476,13 +489,13 @@
               <view v-if="skillChips.length" class="skill-chip-row">
                  <view v-for="chip in skillChips" :key="chip.id"
                        class="skill-chip"
-                       :class="{ auto: chip.source === 'auto', flash: chip.justActivated }">
-                    <text class="skill-chip-name">{{ chip.name }}</text>
+                       :class="{ auto: chip.source === 'auto', 'is-builtin': chip.builtinWorkflow, flash: chip.justActivated }">
+                    <text class="skill-chip-name">{{ chip.builtinWorkflow ? $t('chat.builtinWorkflowChipPrefix', { name: chip.customVersion && chip.versionName ? `${chip.name} · ${chip.versionName}` : chip.name }) : chip.name }}</text>
                     <text v-if="chip.source === 'manual'" class="skill-chip-remove"
                           @tap.stop="removeSelectedSkill(chip.id)">×</text>
                  </view>
               </view>
-              <view class="input-footer">
+              <view class="input-footer" :class="{ 'is-streaming': isStreaming }">
                  <view class="action-bar-left">
                     <view class="icon-btn mini file-add-btn" @tap="triggerFileSelect" title="Add File">
                    <svg class="plus-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -525,6 +538,28 @@
                        </svg>
                        <text v-if="selectedSkillIds.length && !skillDisabledByMode" class="skill-count">{{ selectedSkillIds.length }}</text>
                        <view v-if="showSkillDropdown" class="skill-dropdown down" role="listbox">
+                          <view class="skill-builtin-section">
+                             <view class="skill-builtin-head">
+                                <text class="skill-builtin-title">{{ $t('chat.builtinWorkflowsHeader') }}</text>
+                                <view class="skill-builtin-head-actions">
+                                   <text class="skill-builtin-badge">{{ $t('chat.builtinWorkflowBadge') }}</text>
+                                   <text class="skill-builtin-adv-link" @tap.stop="openBuiltinWorkflowEditor(builtinQuickWorkflows[0], builtinQuickWorkflows[0]?.activeVersionId)">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</text>
+                                </view>
+                             </view>
+                             <text class="skill-builtin-sub">{{ $t('chat.builtinWorkflowsSub') }}</text>
+                             <view class="skill-builtin-pills">
+                                <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
+                                      class="skill-builtin-pill"
+                                      :class="{ 'is-custom': !bw.activeIsSystemDefault }"
+                                      :title="$t('chat.builtinWorkflowRightClickHint')"
+                                      @tap.stop="applyBuiltinWorkflow(bw)"
+                                      @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                                   <text class="skill-builtin-pill-label">{{ bw.activeIsSystemDefault ? bw.title : `${bw.title} · ${bw.activeVersionName}` }}</text>
+                                   <text class="skill-builtin-pill-more" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
+                                </view>
+                             </view>
+                          </view>
+                          <view class="skill-divider"></view>
                           <view class="skill-dropdown-head">
                              <text class="skill-dropdown-title">{{ $t('chat.skillPickerTitle') }}</text>
                              <text class="skill-dropdown-hint">{{ skillDisabledByMode ? $t('chat.skillAskDisabled') : $t('chat.skillPickerHint') }}</text>
@@ -563,7 +598,53 @@
                  </view>
               </view>
           </view>
+          <ChatSuggestionControl v-if="chatSuggestions.available && visibleSuggestion" :suggestion="visibleSuggestion" :show-settings="false"
+            @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
+          <details class="composer-advanced-settings">
+          <summary class="composer-advanced-summary">{{ $t('chat.composerAdvancedSettings') }}</summary>
+          <view class="composer-preferences">
+          <details class="builtin-workflows-fold" :class="{ customized: builtinCustomActiveCount > 0 }">
+             <summary class="builtin-workflows-summary">
+                <span class="builtin-workflows-entry">
+                   <span class="builtin-workflows-heading">
+                      <span class="builtin-workflows-title">{{ $t('chat.builtinWorkflowsFoldEntry') }}</span>
+                      <span class="builtin-workflows-summary-state" :class="{ custom: builtinCustomActiveCount > 0 }">
+                         {{ builtinCustomActiveCount > 0 ? $t('chat.builtinWorkflowsCustomCount', { count: builtinCustomActiveCount }) : $t('chat.builtinWorkflowBadge') }}
+                      </span>
+                   </span>
+                   <span class="builtin-workflows-scope">{{ $t('chat.builtinWorkflowsScope') }}</span>
+                </span>
+                <span class="builtin-workflows-summary-right">
+                   <button type="button" class="builtin-workflows-adv-btn"
+                           @click.stop.prevent="openBuiltinWorkflowEditor(builtinQuickWorkflows[0], builtinQuickWorkflows[0]?.activeVersionId)">
+                      {{ $t('chat.builtinWorkflowsAdvancedBtn') }}
+                   </button>
+                </span>
+             </summary>
+             <view class="builtin-workflows-body">
+                <view class="builtin-workflows-grid">
+                   <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
+                         class="builtin-workflow-card"
+                         :class="{ 'is-custom-version': !bw.activeIsSystemDefault }"
+                         :title="$t('chat.builtinWorkflowRightClickHint')"
+                         @tap="applyBuiltinWorkflow(bw)"
+                         @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                      <view class="builtin-workflow-card-top">
+                         <text class="builtin-workflow-name">{{ bw.title }}</text>
+                         <view class="builtin-workflow-card-actions" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                            <text class="builtin-workflow-ver-tag" :class="{ custom: !bw.activeIsSystemDefault }">{{ bw.activeVersionName }}</text>
+                            <text class="builtin-workflow-more-btn">⋯</text>
+                         </view>
+                      </view>
+                      <text class="builtin-workflow-desc">{{ bw.desc }}</text>
+                   </view>
+                </view>
+             </view>
+          </details>
+          <ChatSuggestionControl v-if="chatSuggestions.available" :enabled="suggestionEnabled" @toggle="chatSuggestions.toggle" />
           <DecisionAssistControl :enabled="decisionAssistEnabled" :local-only="isLocalOnlyProvider" @toggle="toggleDecisionAssist" />
+          </view>
+          </details>
           <view v-if="showModelDropdown || showModeDropdown || showSkillDropdown" class="dropdown-mask model-mask" @tap="showModelDropdown = false; showModeDropdown = false; showSkillDropdown = false"></view>
        </view>
 
@@ -648,12 +729,22 @@
                        <text class="status-btn-label">{{ $t('chat.createdCount', { count: createdFiles.length }) }}</text>
                    </view>
                    <view v-if="showNewPopup && createdFiles.length > 0" class="status-popup up">
-                       <view v-for="(f, i) in createdFiles" :key="i" class="status-popup-item" @tap.stop="handleOpenFile(f)">
+                       <view v-for="(f, i) in createdFiles" :key="i" class="status-popup-item"
+                             :draggable="canDragCreatedFile(f, projectId)"
+                             @dragstart="handleCreatedFileDragStart($event, f)" @dragend="handleCreatedFileDragEnd"
+                             @tap.stop="handleOpenFile(f)">
                            <image src="/static/document.png" class="file-icon-mini"/>
                            <text class="file-name-text">{{ fileChangeLabel(f) }}</text>
                        </view>
                    </view>
-                   <view v-if="showNewPopup && createdFiles.length > 0" class="popup-mask-transparent" @tap.stop="showNewPopup = false"></view>
+                   <view v-if="showNewPopup && createdFiles.length > 0" class="popup-mask-transparent"
+                         :style="{ pointerEvents: draggingCreatedFile ? 'none' : '' }" @tap.stop="showNewPopup = false"></view>
+               </view>
+               <view v-if="legacyFileChanges.length" class="status-btn-wrapper">
+                 <button type="button" class="status-btn" @click="showLegacyFilesPopup = !showLegacyFilesPopup">{{ $t('chat.earlierFiles') }}</button>
+                 <view v-if="showLegacyFilesPopup" class="status-popup up">
+                   <button v-for="(file, i) in legacyFileChanges" :key="i" type="button" class="status-popup-item" @click="handleOpenFile(file); showLegacyFilesPopup = false">{{ fileChangeLabel(file) }}</button>
+                 </view>
                </view>
            </view>
 
@@ -699,6 +790,13 @@
               <text class="active-doc-name">{{ activeDocChip.name }}</text>
               <text class="active-doc-remove" @tap.stop="dismissActiveDoc">×</text>
            </view>
+           <!-- 当前文档选区 chip（dev-board#1430）：选中正文后自动浮出，可直接对选区提修订意见 -->
+           <view v-if="activeSelectionChip" class="active-doc-chip active-selection-chip" :title="$t('chat.activeSelectionChipTitle')">
+              <text class="active-doc-label">{{ $t('chat.activeSelectionChipLabel') }}</text>
+              <text class="active-doc-name">{{ $t('chat.activeSelectionChipPreview', { text: activeSelectionChip.preview }) }}</text>
+              <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { count: activeSelectionChip.charCount }) }}</text>
+              <text class="active-doc-remove" @tap.stop="dismissActiveSelection">×</text>
+           </view>
            <!-- 「模型看不了图」常驻提示（K21 ⑨）：粘的、拖的图片都覆盖；能力未知一律不提示 -->
            <text v-if="visionNotice" class="input-images-note">{{ $t(visionNotice) }}</text>
            <!-- 上一轮带过的附件（虚线标签）会继续带上：常驻一句说清楚，不靠用户自己去悬停（BUG-19） -->
@@ -721,13 +819,13 @@
           <view v-if="skillChips.length" class="skill-chip-row">
              <view v-for="chip in skillChips" :key="chip.id"
                    class="skill-chip"
-                   :class="{ auto: chip.source === 'auto', flash: chip.justActivated }">
-                <text class="skill-chip-name">{{ chip.name }}</text>
+                   :class="{ auto: chip.source === 'auto', 'is-builtin': chip.builtinWorkflow, flash: chip.justActivated }">
+                <text class="skill-chip-name">{{ chip.builtinWorkflow ? $t('chat.builtinWorkflowChipPrefix', { name: chip.customVersion && chip.versionName ? `${chip.name} · ${chip.versionName}` : chip.name }) : chip.name }}</text>
                 <text v-if="chip.source === 'manual'" class="skill-chip-remove"
                       @tap.stop="removeSelectedSkill(chip.id)">×</text>
              </view>
           </view>
-          <view class="input-footer">
+          <view class="input-footer" :class="{ 'is-streaming': isStreaming }">
              <view class="action-bar-left">
                 <view class="icon-btn mini" @tap="triggerFileSelect" title="Add File">
                    <svg class="plus-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -770,6 +868,28 @@
                    </svg>
                    <text v-if="selectedSkillIds.length && !skillDisabledByMode" class="skill-count">{{ selectedSkillIds.length }}</text>
                    <view v-if="showSkillDropdown" class="skill-dropdown up" role="listbox">
+                      <view class="skill-builtin-section">
+                         <view class="skill-builtin-head">
+                            <text class="skill-builtin-title">{{ $t('chat.builtinWorkflowsHeader') }}</text>
+                            <view class="skill-builtin-head-actions">
+                               <text class="skill-builtin-badge">{{ $t('chat.builtinWorkflowBadge') }}</text>
+                               <text class="skill-builtin-adv-link" @tap.stop="openBuiltinWorkflowEditor(builtinQuickWorkflows[0], builtinQuickWorkflows[0]?.activeVersionId)">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</text>
+                            </view>
+                         </view>
+                         <text class="skill-builtin-sub">{{ $t('chat.builtinWorkflowsSub') }}</text>
+                         <view class="skill-builtin-pills">
+                            <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
+                                  class="skill-builtin-pill"
+                                  :class="{ 'is-custom': !bw.activeIsSystemDefault }"
+                                  :title="$t('chat.builtinWorkflowRightClickHint')"
+                                  @tap.stop="applyBuiltinWorkflow(bw)"
+                                  @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                               <text class="skill-builtin-pill-label">{{ bw.activeIsSystemDefault ? bw.title : `${bw.title} · ${bw.activeVersionName}` }}</text>
+                               <text class="skill-builtin-pill-more" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
+                            </view>
+                         </view>
+                      </view>
+                      <view class="skill-divider"></view>
                       <view class="skill-dropdown-head">
                          <text class="skill-dropdown-title">{{ $t('chat.skillPickerTitle') }}</text>
                          <text class="skill-dropdown-hint">{{ skillDisabledByMode ? $t('chat.skillAskDisabled') : $t('chat.skillPickerHint') }}</text>
@@ -809,7 +929,53 @@
           </view>
           <view v-if="showModelDropdown || showModeDropdown || showSkillDropdown" class="dropdown-mask" @tap="showModelDropdown = false; showModeDropdown = false; showSkillDropdown = false"></view>
        </view>
+          <ChatSuggestionControl v-if="chatSuggestions.available && visibleSuggestion" :suggestion="visibleSuggestion" :show-settings="false"
+            @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
+          <details class="composer-advanced-settings">
+          <summary class="composer-advanced-summary">{{ $t('chat.composerAdvancedSettings') }}</summary>
+          <view class="composer-preferences">
+          <details class="builtin-workflows-fold builtin-workflows-fold-bottom" :class="{ customized: builtinCustomActiveCount > 0 }">
+             <summary class="builtin-workflows-summary">
+                <span class="builtin-workflows-entry">
+                   <span class="builtin-workflows-heading">
+                      <span class="builtin-workflows-title">{{ $t('chat.builtinWorkflowsFoldEntry') }}</span>
+                      <span class="builtin-workflows-summary-state" :class="{ custom: builtinCustomActiveCount > 0 }">
+                         {{ builtinCustomActiveCount > 0 ? $t('chat.builtinWorkflowsCustomCount', { count: builtinCustomActiveCount }) : $t('chat.builtinWorkflowBadge') }}
+                      </span>
+                   </span>
+                   <span class="builtin-workflows-scope">{{ $t('chat.builtinWorkflowsScope') }}</span>
+                </span>
+                <span class="builtin-workflows-summary-right">
+                   <button type="button" class="builtin-workflows-adv-btn"
+                           @click.stop.prevent="openBuiltinWorkflowEditor(builtinQuickWorkflows[0], builtinQuickWorkflows[0]?.activeVersionId)">
+                      {{ $t('chat.builtinWorkflowsAdvancedBtn') }}
+                   </button>
+                </span>
+             </summary>
+             <view class="builtin-workflows-body">
+                <view class="builtin-workflows-grid">
+                   <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
+                         class="builtin-workflow-card"
+                         :class="{ 'is-custom-version': !bw.activeIsSystemDefault }"
+                         :title="$t('chat.builtinWorkflowRightClickHint')"
+                         @tap="applyBuiltinWorkflow(bw)"
+                         @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                      <view class="builtin-workflow-card-top">
+                         <text class="builtin-workflow-name">{{ bw.title }}</text>
+                         <view class="builtin-workflow-card-actions" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                            <text class="builtin-workflow-ver-tag" :class="{ custom: !bw.activeIsSystemDefault }">{{ bw.activeVersionName }}</text>
+                            <text class="builtin-workflow-more-btn">⋯</text>
+                         </view>
+                      </view>
+                      <text class="builtin-workflow-desc">{{ bw.desc }}</text>
+                   </view>
+                </view>
+             </view>
+          </details>
+          <ChatSuggestionControl v-if="chatSuggestions.available" :enabled="suggestionEnabled" @toggle="chatSuggestions.toggle" />
           <DecisionAssistControl :enabled="decisionAssistEnabled" :local-only="isLocalOnlyProvider" @toggle="toggleDecisionAssist" />
+          </view>
+          </details>
        </template>
     </view>
 
@@ -823,6 +989,7 @@
     <!-- 可选组件缺失（设计 §4.2）：确认前把体积、解锁什么、不装则什么不可用都说全，
          确认后卡片就地跳进度，装完自动重发原消息。下载中可「后台下载」收起卡片继续用对话
          （dev-board#581），装完是否重发见 useComponentRequired.shouldAutoResend。 -->
+    <OcrRoutingCard v-if="ocrRouteState" :key="ocrRouteState.decisionId" :state="ocrRouteState" @choose="chooseOcrRoute" @cancel="cancelOcrRoute" />
     <view v-if="componentReadyContinue" class="chat-component-ready">
       <text class="ccr-text">{{ $t('components.chatReadyContinue') }}</text>
       <view class="cg-btn primary" :class="{ disabled: isStreaming }" @tap="continueComponentPending">{{ $t('components.chatReadyContinueBtn') }}</view>
@@ -844,10 +1011,52 @@
       </view>
     </view>
 
+    <!-- 内置常驻工作流右键菜单：快速切换当前项目版本 / 打开规则与版本编辑器（dev-board#1438） -->
+    <Teleport to="body">
+    <view v-if="builtinWorkflowMenu.visible && activeMenuWorkflow"
+          class="bw-context-mask"
+          @tap="closeBuiltinWorkflowContextMenu"
+          @contextmenu.prevent="closeBuiltinWorkflowContextMenu">
+      <view class="bw-context-menu"
+            :style="{ left: `${builtinWorkflowMenu.x}px`, top: `${builtinWorkflowMenu.y}px`, maxHeight: `calc(100vh - ${builtinWorkflowMenu.y + 12}px)` }"
+            @tap.stop>
+        <view class="bw-menu-head">
+          <text class="bw-menu-title">{{ activeMenuWorkflow.title }}</text>
+          <text class="bw-menu-sub">{{ projectId ? $t('chat.builtinWorkflowMenuSwitchTitle') : $t('chat.builtinWorkflowMenuGlobalTitle') }}</text>
+        </view>
+        <view class="bw-menu-versions">
+          <view v-for="ver in activeMenuWorkflow.versions" :key="ver.id"
+                class="bw-menu-version-item"
+                :class="{ active: activeMenuWorkflow.activeVersionId === ver.id }"
+                @tap.stop="switchBuiltinWorkflowVersion(activeMenuWorkflow, ver.id)">
+            <text class="bw-menu-check">{{ activeMenuWorkflow.activeVersionId === ver.id ? '✓' : '' }}</text>
+            <view class="bw-menu-version-main">
+              <text class="bw-menu-version-name">{{ ver.name }}</text>
+              <text v-if="ver.systemDefault" class="bw-menu-version-tag">{{ $t('chat.builtinWorkflowReadOnlyTag') }}</text>
+            </view>
+            <text class="bw-menu-version-edit"
+                  @tap.stop="openBuiltinWorkflowEditor(activeMenuWorkflow, ver.id)">{{ ver.systemDefault ? '查看' : '编辑' }}</text>
+          </view>
+        </view>
+        <view class="skill-divider"></view>
+        <view class="bw-menu-action" @tap.stop="openBuiltinWorkflowEditor(activeMenuWorkflow, activeMenuWorkflow.activeVersionId)">
+          <text>{{ $t('chat.builtinWorkflowMenuEditCurrent') }}</text>
+        </view>
+        <view class="bw-menu-action accent" @tap.stop="openBuiltinWorkflowEditor(activeMenuWorkflow, '__new__')">
+          <text>{{ $t('chat.builtinWorkflowMenuCreateNew') }}</text>
+        </view>
+      </view>
+    </view>
+    </Teleport>
+
+
+
   </view>
 </template>
 
 <script>
+import { getPendingAgentRestarts, resumeAgentRestart, getCloudAccountGeneration } from '@/services/api.js'
+import { fileChangesForBubble, summarizeFileChanges } from '@/utils/chatFileChange.js'
 import RootBubble from './AgentMessage/RootBubble.vue'
 import ChatTurnRail from './AgentMessage/ChatTurnRail.vue'
 import MentionPicker from './AgentMessage/MentionPicker.vue'
@@ -857,27 +1066,41 @@ import BackgroundTaskIndicator from './BackgroundTaskIndicator.vue'
 import AgentInbox from './AgentInbox.vue'
 import MemoryBrowser from './MemoryBrowser.vue'
 import { useAgentStream } from '@/composables/useAgentStream.js'
-import { ref, watch, onMounted, onBeforeUnmount, nextTick, getCurrentInstance, computed } from 'vue'
-import { createFile, importLocalFile, getProjectFiles, getApiBaseUrl, getAiHistory, rollbackConversation, performPptGeneration, getSkills, getCurrentUser as getCurrentUserApi, fetchAiModels, getAiConfig, cancelBackgroundTask, listPluginJobs, cancelPluginJob, getMeetingRecordings, resolveProjectFileByPath } from '@/services/api.js'
+import { setGlobalOverlay } from '@/utils/overlayState.js'
+import { useBuiltinWorkflows, notifyBuiltinWorkflowsChanged } from '@/composables/useBuiltinWorkflows.js'
+import { ref, watch, onMounted, onBeforeUnmount, nextTick, getCurrentInstance, computed, inject } from 'vue'
+import { createFile, importLocalFile, getProjectFiles, getApiBaseUrl, getAiHistory, rollbackConversation, performPptGeneration, getSkills, selectBuiltinWorkflowVersion, getCurrentUser as getCurrentUserApi, fetchAiModels, getAiConfig, cancelBackgroundTask, listPluginJobs, cancelPluginJob, getMeetingRecordings, resolveProjectFileByPath } from '@/services/api.js'
 import { audioNeedingTranscription, isTranscribableMedia, transcribedAudioFileIds } from '@/utils/audioAttachment.js'
-import { getAuthHeaders, getCurrentUser } from '@/utils/auth.js'
+import { getAuthHeaders, getCurrentUser, getSessionId } from '@/utils/auth.js'
 import { host } from '@/services/host.js'
+import { captureDroppedFiles, importDroppedFile } from '@/utils/fileTreeExternalDrop.js'
 import DecisionAssistControl from './DecisionAssistControl.vue'
+import ChatSuggestionControl from './ChatSuggestionControl.vue'
+import { useChatSuggestions } from '@/composables/useChatSuggestions.js'
 import ModelSelectorDropdown from './ModelSelectorDropdown.vue'
 import { createDecisionAssistState, decisionAssistPreferenceKey, decisionAssistUser } from '@/utils/decisionAssistPreference.js'
 import { getAppLanguage } from '@/utils/appLanguage.js'
 import { t } from '@/i18n'
 import { ICONS } from '@/config/icons.js'
+import OcrRoutingCard from '@/components/OcrRoutingCard.vue'
+import { createOcrRoutingHandler } from '@/composables/useOcrRouting.js'
+import { chooseOcrRouting, cancelOcrRouting } from '@/services/api.js'
+import { getHarnessEvolutions } from '@/services/api.js'
+import { attachEvolutionsToBubbles } from '@/utils/harnessEvolutionHistory.mjs'
 import OptionalComponentCard from '@/components/OptionalComponentCard.vue'
 import { componentDownloads } from '@/services/componentDownloads.js'
 import { createComponentRequiredHandler, shouldAutoResend } from '@/composables/useComponentRequired.js'
 import { pendingInboxItems } from '@/composables/agentInboxState.mjs'
 import { saveLastConversation } from '@/utils/lastConversation.js'
 import { isContextEligibleTab } from '@/pages/project-overview/activeTabContext.js'
+import { buildActiveSelectionChip } from '@/pages/project-overview/activeSelectionContext.js'
 import { isCurrentDocSentinel } from '@/utils/chatFileChange.js'
+import { canDragCreatedFile, startCreatedFileDrag, endCreatedFileDrag } from '@/utils/generatedFileDrag.js'
+import { warmDragImage } from '@/utils/dragImage.js'
 import {
   DEFAULT_CONTEXT_LIMITS,
   normalizeContextLimits,
+  normalizeContextItem,
   visionNoticeKey,
   admitFileToContext,
   admitPastedImage,
@@ -905,8 +1128,9 @@ import {
 
 export default {
   name: 'ChatInterface',
-  components: { DecisionAssistControl, ModelSelectorDropdown, RootBubble, ChatTurnRail, MentionPicker, BackgroundTaskIndicator, AgentInbox, MemoryBrowser, OptionalComponentCard },
+  components: { OcrRoutingCard, ChatSuggestionControl, DecisionAssistControl, ModelSelectorDropdown, RootBubble, ChatTurnRail, MentionPicker, BackgroundTaskIndicator, AgentInbox, MemoryBrowser, OptionalComponentCard },
   props: {
+    visible: { type: Boolean, default: true },
     projectId: String,
     projectName: String,
     recentHistory: {
@@ -926,6 +1150,10 @@ export default {
     activeTabPane: {
       type: String,
       default: null // 'left' | 'right' | null
+    },
+    activeSelection: {
+      type: [Object, String],
+      default: null
     },
     // 插件镜像会话只读态（dev-board#298）：非空 = 当前会话是插件同步过来的镜像，
     // 值是来源文案（如「Word 插件」，由宿主用 utils/conversationSource.js 算好传入）。
@@ -964,6 +1192,7 @@ export default {
       parseAssistantHistory,
       onClientAction,
       onTitleUpdate,
+      onTurnFinished,
       backgroundTasks,
       dismissBackgroundTask,
       upsertPluginJob,
@@ -975,6 +1204,7 @@ export default {
       linkStatus,
       activeSkills,
       skillNotice,
+      routedModelInfo,
       reattachSSE,
       rollbackToMessage,
       currentConversationId,
@@ -989,6 +1219,7 @@ export default {
     const componentGateItem = ref(null)
     const componentReadyContinue = ref(null) // 装完但没自动重发时挂着的「待继续」原消息
     const dropComponentPending = () => {
+      ocrRouteHandler.cancel()
       if (typeof componentRequiredHandler !== 'undefined') componentRequiredHandler.dismissPending()
       componentReadyContinue.value = null
     }
@@ -1096,6 +1327,32 @@ export default {
       if (resolve) resolve(ok)
     }
 
+    const ocrRouteState = ref(null)
+    const ocrRouteHandler = createOcrRoutingHandler({
+      t,
+      conversation: () => currentConversationId.value,
+      identity: () => JSON.stringify([getApiBaseUrl(), getSessionId(), getCloudAccountGeneration()]),
+      userCount: userMessageCount,
+      streaming: () => isStreaming.value,
+      onState: (state) => { ocrRouteState.value = state },
+      lastUserMessage: () => [...bubbles.value].reverse().find(b => String(b?.role).toUpperCase() === 'USER')?.content || '',
+      choose: chooseOcrRouting,
+      captureCancel: () => {
+        const scope = { baseUrl: getApiBaseUrl(), headers: { ...getAuthHeaders(), 'X-Session-Id': getSessionId() || '' } }
+        return body => cancelOcrRouting(body, scope)
+      },
+      resend: async (prompt) => {
+        await sendMessage({ prompt, projectId: props.projectId, modelId: currentModelId.value,
+          mode: currentModeId.value, skillIds: currentSkillIds() })
+        scrollToBottom()
+      },
+    })
+    const chooseOcrRoute = (choice, remember) => ocrRouteHandler.choose(choice, remember)
+    const cancelOcrRoute = () => ocrRouteHandler.cancel()
+    watch(isStreaming, (streaming) => { if (!streaming) ocrRouteHandler.continueReady() })
+    watch(currentConversationId, () => ocrRouteHandler.cancel())
+    onBeforeUnmount(() => ocrRouteHandler.cancel())
+
     // Bridge Stream Events to Component Events
     onClientAction((action) => {
         if (action.action === 'ppt_config_required') {
@@ -1103,6 +1360,8 @@ export default {
            pptConfigData.value = action
            pptExportEditable.value = false // Default to safe option
            showPptConfigDialog.value = true
+        } else if (action.action === 'ocr_route_required') {
+           ocrRouteHandler.onAction(action)
         } else if (action.action === 'component_required') {
            // 可选组件缺失（设计 §4.2）：就地弹窗 → 装 → 自动重发原消息。
            // 刻意不往下 emit：它不是编辑器命令，执行器只会回 Unknown action。
@@ -1145,7 +1404,7 @@ export default {
     }
     const resolveDecisionAssistUser = async () => {
       // 浏览器登录态已有缓存身份时不必再问服务端
-      if (decisionAssistUser(getCurrentUser(), null)) return syncDecisionAssistPreference()
+      if (decisionAssistUser(getCurrentUser(), null)) { chatSuggestions.sync(); return syncDecisionAssistPreference() }
       try {
         const res = await getCurrentUserApi()
         decisionAssistResolvedUser = res && res.code === 0 && res.data ? res.data : null
@@ -1153,6 +1412,7 @@ export default {
         decisionAssistResolvedUser = null
       }
       syncDecisionAssistPreference()
+      chatSuggestions.sync()
     }
     const sendMessage = (options) => sendAgentMessage({
       ...options,
@@ -1160,7 +1420,7 @@ export default {
         ? options.decisionAssistEnabled === true && decisionAssistState.ownerStillCurrent(options.decisionAssistOwner)
         : syncDecisionAssistPreference(),
     })
-    const refreshDecisionAssistPreference = () => syncDecisionAssistPreference(true)
+    const refreshDecisionAssistPreference = () => { syncDecisionAssistPreference(true); chatSuggestions.sync() }
     onMounted(() => {
       window.addEventListener('focus', refreshDecisionAssistPreference)
       window.addEventListener('storage', refreshDecisionAssistPreference)
@@ -1338,6 +1598,22 @@ export default {
 
     const dismissActiveDoc = () => { activeDocDismissed.value = true }
 
+    // 当前文档选区 chip（dev-board#1430）：选中正文时自动浮出，点 × 仅本轮不带，重选或换标签即复位。
+    const activeSelectionDismissed = ref(false)
+    watch(
+      [
+        () => (typeof props.activeSelection === 'string' ? props.activeSelection : props.activeSelection?.text),
+        () => (props.activeSelection && typeof props.activeSelection === 'object' ? props.activeSelection.fileId : null),
+        () => props.activeTab && props.activeTab.id,
+      ],
+      () => { activeSelectionDismissed.value = false }
+    )
+    const activeSelectionChip = computed(() => {
+      if (activeSelectionDismissed.value) return null
+      return buildActiveSelectionChip(props.activeSelection, activeDocChip.value)
+    })
+    const dismissActiveSelection = () => { activeSelectionDismissed.value = true }
+
     /**
      * 一条 context_notice 的人话（dev-board#801 K21 ⑦）。
      *
@@ -1425,16 +1701,36 @@ export default {
     })
 
     const applyModelSelection = (id) => {
+      if (id === 'auto') {
+        currentModelId.value = 'auto'
+        const routedName = routedModelInfo.value?.effectiveModelName
+        currentModelName.value = routedName
+          ? t('chat.autoModelRoutedLabel', { name: routedName })
+          : t('chat.autoModelName')
+        return
+      }
       const hit = availableModels.value.find(m => m.id === id)
       currentModelId.value = hit ? hit.id : (id || '')
       currentModelName.value = hit ? hit.name : (id || t('chat.selectModel'))
     }
+
+    watch(routedModelInfo, (info) => {
+      if (currentModelId.value === 'auto') {
+        currentModelName.value = info?.effectiveModelName
+          ? t('chat.autoModelRoutedLabel', { name: info.effectiveModelName })
+          : t('chat.autoModelName')
+      }
+    })
 
     // 当前模型能不能直接读图。**三态**：true 支持 / false 不支持 / null 未知。
     // 「未知」不许并到 false：拉不到模型目录时 availableModels 是空数组而 currentModelId
     // 还留着上次的值，applyModelSelection 也允许选中清单外的旧 id——把 undefined 当不支持，
     // 就会在这两种情况下对所有模型误报「不支持读图」。未知一律不提示。
     const currentModelVision = computed(() => {
+      if (currentModelId.value === 'auto') {
+        if (!availableModels.value.length) return null
+        return availableModels.value.some(m => m.vision === true)
+      }
       const hit = availableModels.value.find(m => m.id === currentModelId.value)
       if (!hit || typeof hit.vision !== 'boolean') return null
       return hit.vision
@@ -1499,8 +1795,15 @@ export default {
           : list[0].id
 
         const saved = readPersistedModelId()
-        if (saved && list.some(m => m.id === saved)) {
+        if (saved === 'auto' || (saved && list.some(m => m.id === saved))) {
           applyModelSelection(saved)
+          return
+        }
+
+        if (!saved) {
+          // 首次使用（未持久化过具体模型）时默认开启智能模式（auto），免除选模负担
+          applyModelSelection('auto')
+          persistModelId('auto')
           return
         }
 
@@ -1634,12 +1937,14 @@ export default {
 
     // 已安装 Skill 为 0 时不显示选择器，避免输入区堆无用控件。
     // available=false 的一律不列：那些在当前应用语言下永远不会生效，能勾但不生效比看不见更糟。
+    // builtinWorkflow=true 的高频内置工作流（合同审查、证据整理、法律意见书核查等）走懒人模式自动接管，
+    // 不出现在手动勾选清单里，降低用户选择负担。
     const loadAvailableSkills = async () => {
       try {
         const res = await getSkills()
         const list = Array.isArray(res) ? res : (res?.data || [])
         availableSkills.value = list.filter(
-          s => s.activationMode !== 'disabled' && s.enabled !== false && s.available !== false
+          s => !s.builtinWorkflow && s.activationMode !== 'disabled' && s.enabled !== false && s.available !== false
         )
         // 列表变了（管理员停用/卸载）就把选不中的清掉，别留一个永远不生效的 chip
         selectedSkillIds.value = selectedSkillIds.value.filter(
@@ -1649,6 +1954,121 @@ export default {
         // Skill 列表拉取失败不该影响对话，静默降级为"无可选 Skill"
         console.warn('[ChatInterface] 加载 Skill 列表失败:', e)
         availableSkills.value = []
+      }
+    }
+
+    // ---- 内置常驻工作流（懒人模式，dev-board#1438）：多版本与按项目切换偏好 ----
+    const { builtinWorkflowStates, builtinQuickWorkflows, loadBuiltinWorkflowStates } = useBuiltinWorkflows(props)
+    const builtinWorkflowMenu = ref({ visible: false, x: 0, y: 0, workflowId: '' })
+    const openWorkflowEditorTab = inject('openWorkflowEditorTab', null)
+
+    const builtinCustomActiveCount = computed(() =>
+      builtinQuickWorkflows.value.filter(w => !w.activeIsSystemDefault).length
+    )
+
+    const activeMenuWorkflow = computed(() =>
+      builtinQuickWorkflows.value.find(w => w.id === builtinWorkflowMenu.value.workflowId) || null
+    )
+    const openBuiltinWorkflowContextMenu = (event, bw) => {
+      if (!bw) return
+      let x = 220
+      let y = 260
+      if (event && typeof event.clientX === 'number' && event.clientX > 0) {
+        x = event.clientX
+        y = event.clientY
+      } else if (event?.currentTarget?.getBoundingClientRect) {
+        const rect = event.currentTarget.getBoundingClientRect()
+        x = rect.left + Math.min(rect.width - 20, 80)
+        y = rect.bottom + 4
+      }
+      if (typeof window !== 'undefined') {
+        const maxW = window.innerWidth || 1024
+        const maxH = window.innerHeight || 768
+        x = Math.max(12, Math.min(x, maxW - 272))
+        y = Math.max(12, Math.min(y, maxH - 280))
+      }
+      builtinWorkflowMenu.value = {
+        visible: true,
+        x,
+        y,
+        workflowId: bw.id
+      }
+      loadBuiltinWorkflowStates()
+    }
+
+    const closeBuiltinWorkflowContextMenu = () => {
+      builtinWorkflowMenu.value = { ...builtinWorkflowMenu.value, visible: false }
+    }
+
+    const workflowMenuHolder = `builtin-workflow-menu-${getCurrentInstance().uid}`
+    const dismissWorkflowMenu = (event) => {
+      if (event.key !== 'Escape' || !builtinWorkflowMenu.value.visible) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      closeBuiltinWorkflowContextMenu()
+    }
+    watch(() => builtinWorkflowMenu.value.visible, open => setGlobalOverlay(open, workflowMenuHolder), { flush: 'sync' })
+    watch([() => props.visible, () => props.projectId], closeBuiltinWorkflowContextMenu)
+    onMounted(() => window.addEventListener('keydown', dismissWorkflowMenu, true))
+    onBeforeUnmount(() => {
+      window.removeEventListener('keydown', dismissWorkflowMenu, true)
+      setGlobalOverlay(false, workflowMenuHolder)
+    })
+
+    const switchBuiltinWorkflowVersion = async (bw, versionId, scopeOverride) => {
+      if (!bw || !versionId) return
+      closeBuiltinWorkflowContextMenu()
+      const projectId = props.projectId
+      try {
+        const scope = scopeOverride || (props.projectId ? 'project' : 'global')
+        const res = await selectBuiltinWorkflowVersion(bw.id, {
+          versionId,
+          scope,
+          projectId: props.projectId || ''
+        })
+        if (projectId !== props.projectId) { notifyBuiltinWorkflowsChanged(); return }
+        const workflows = res?.workflows || res?.data?.workflows
+        if (Array.isArray(workflows) && workflows.length) {
+          builtinWorkflowStates.value = workflows
+        } else {
+          await loadBuiltinWorkflowStates()
+        }
+        notifyBuiltinWorkflowsChanged()
+        const updatedWf = builtinQuickWorkflows.value.find(w => w.id === bw.id)
+        const verName = updatedWf?.activeVersionName || versionId
+        if (typeof uni !== 'undefined' && uni.showToast) {
+          uni.showToast({
+            title: t('chat.builtinWorkflowSwitchedToast', { workflow: bw.title, version: verName }),
+            icon: 'none',
+            duration: 2200
+          })
+        }
+      } catch (e) {
+        console.error('[ChatInterface] 切换内置工作流版本失败:', e)
+      }
+    }
+
+    const openBuiltinWorkflowEditor = (bw, targetVersionId) => {
+      if (!bw || !openWorkflowEditorTab) return
+      closeBuiltinWorkflowContextMenu()
+      showSkillDropdown.value = false
+      openWorkflowEditorTab({ workflowId: bw.id, versionId: targetVersionId || bw.activeVersionId || 'default' })
+    }
+
+    const applyBuiltinWorkflow = (bw) => {
+      if (!bw || !bw.prompt) return
+      showSkillDropdown.value = false
+      if (currentModeId.value === 'ASK' && !isLocalOnlyProvider.value) {
+        const agentMode = availableModes.value.find(m => m.id === 'AGENT')
+        if (agentMode) selectMode(agentMode)
+      }
+      inputPrompt.value = bw.prompt
+      if (richInput.value) {
+        const existingTags = Array.from(richInput.value.querySelectorAll('[data-file-id]'))
+          .map(el => el.outerHTML)
+          .join(' ')
+        richInput.value.innerHTML = (existingTags ? existingTags + ' ' : '') + escapeHtml(bw.prompt)
+        richInput.value.focus()
       }
     }
 
@@ -1683,7 +2103,8 @@ export default {
       if (!n) return
       try {
         if (typeof uni !== 'undefined' && uni.showToast) {
-          uni.showToast({ title: t('chat.skillAutoLoadedToast', { name: n.name }), icon: 'none', duration: 2500 })
+          const toastKey = n.builtinWorkflow ? 'chat.builtinWorkflowAutoToast' : 'chat.skillAutoLoadedToast'
+          uni.showToast({ title: t(toastKey, { name: n.name }), icon: 'none', duration: 2500 })
         }
       } catch (e) { /* toast 失败不影响对话 */ }
     })
@@ -1782,16 +2203,35 @@ export default {
       return folder ? folder.name : t('chat.rootFolder')
     })
 
+    warmDragImage()
     // --- File Changes Logic ---
     const showModifiedPopup = ref(false)
     const showNewPopup = ref(false)
+    const draggingCreatedFile = ref(false)
+    const handleCreatedFileDragStart = (event, file) => {
+        draggingCreatedFile.value = startCreatedFileDrag(event, file, props.projectId)
+        if (draggingCreatedFile.value) uni.$emit('file-drag-start')
+    }
+    const handleCreatedFileDragEnd = () => {
+        if (draggingCreatedFile.value) uni.$emit('file-drag-end')
+        draggingCreatedFile.value = false
+        endCreatedFileDrag()
+    }
 
+    const filesForBubble = (bubble) => fileChangesForBubble(bubble, fileChanges.value || [])
+    const latestFileChanges = computed(() => {
+        const latest = [...bubbles.value].reverse().find(b => b.role === 'ASSISTANT')
+        return latest ? filesForBubble(latest) : []
+    })
+    const legacyFileChanges = computed(() => summarizeFileChanges((fileChanges.value || [])
+        .filter(f => !f.assistantMessageId && !f.assistantBubbleId)))
+    const showLegacyFilesPopup = ref(false)
     const createdFiles = computed(() => {
-        return (fileChanges.value || []).filter(f => f.changeType === 'ADDED')
+        return latestFileChanges.value.filter(f => f.changeType === 'ADDED')
     })
 
     const modifiedFiles = computed(() => {
-        return (fileChanges.value || []).filter(f => f.changeType === 'MODIFIED')
+        return latestFileChanges.value.filter(f => f.changeType === 'MODIFIED')
     })
 
     const toggleModifiedPopup = () => {
@@ -2054,6 +2494,7 @@ export default {
         }
 
         // 2. 在前端删除bubbles（目标一起删——与后端同语义，用户接着在输入框里改了重发）
+        chatSuggestions.clear()
         const rolledBackContent = rollbackToMessage(targetIndex)
 
         // 3. 回退：把原文连同那一轮带过的附件标签放回输入框等用户改；
@@ -2227,6 +2668,7 @@ export default {
       // 取消就停在原地，草稿与附件一个都不动；已连接时 requireAccount 走缓存，不多一次请求。
       if (!(await ensureAiAccount())) return
 
+      const suggestionSnapshot = chatSuggestions.capture()
       const prompt = text
       const submissionMode = isStreaming.value && requestedMode === 'queue' ? 'queue' : 'steer'
       const editorHtml = richInput.value ? richInput.value.innerHTML : ''
@@ -2269,6 +2711,7 @@ export default {
       //
       // chip 被用户摘掉时 activeDocChip 为 null，本轮就真的不带——
       // 「帮我查一下最新的司法解释」这类与文档无关的提问不该每轮都拖着几万字的合同。
+      const selectionChip = activeSelectionChip.value
       const activeContext = chipTab ? {
         id: chipTab.id,
         name: chipTab.name,
@@ -2276,7 +2719,8 @@ export default {
         wpsFileId: props.activeTab.wpsFileId,
         pane: props.activeTabPane,
         // 没能落盘：告诉后端别用磁盘上那份旧正文，改走 readHint 分支
-        staleBody: !activeDocFlushed
+        staleBody: !activeDocFlushed,
+        ...(selectionChip ? { selectionText: selectionChip.text } : {})
       } : null
       const attempt = beginChatSubmission(submissionTracker, {
         prompt,
@@ -2327,7 +2771,10 @@ export default {
         fileName: f.name,
         fileType: f.fileType,
         wpsFileId: f.wpsFileId,
-        isDir: f.isDir
+        isDir: f.isDir,
+        projectId: f.projectId,
+        projectName: f.projectName,
+        readOnly: f.readOnly
       })).concat(pastedFileList.map(f => ({
         id: f.id,
         fileName: f.name,
@@ -2371,6 +2818,8 @@ export default {
         uni.showToast({ title: t('chat.sendFailedDraftKept'), icon: 'none' })
         return
       }
+
+      chatSuggestions.received(suggestionSnapshot, attempt.clientRequestId)
 
       // Receipt is the durability boundary. Only clear the exact draft and attachments that
       // produced it; text/images added while the request was in flight stay for the next send.
@@ -2593,6 +3042,7 @@ export default {
           } else {
               const bubble = parseAssistantHistory(msg.content || '', msg.reasoning)
               bubble.id = msg.id
+              bubble.originClientRequestId = [...built].reverse().find(b => b.role === 'USER')?.clientRequestId || null
               bubble.timestamp = formatTime(msg.createdAt)
               const recoveredTodos = recoverPlanTodos(bubble.processes)
               if (recoveredTodos !== null) {
@@ -2631,6 +3081,20 @@ export default {
        }
     }
 
+    // Harness 自进化卡片的历史回放（dev-board#1481）：卡片原本只随当轮 SSE 出现，刷新后要按
+    // assistantMessageId 从持久化记录挂回原气泡，否则「撤销这次学习」的入口随刷新消失而规则仍在生效。
+    // 失败静默：这是附加信息，拿不到也不该影响历史本身的展示。
+    const restoreHarnessEvolutions = async (conversationId) => {
+       if (!conversationId) return
+       try {
+          const records = await getHarnessEvolutions({ conversationId })
+          if (currentConversationId.value !== conversationId) return
+          attachEvolutionsToBubbles(bubbles.value, Array.isArray(records) ? records : (records?.data || []))
+       } catch (e) {
+          console.warn('[ChatInterface] restore harness evolutions failed', e)
+       }
+    }
+
     // 历史分页（dev-board#811 K31，审查 C-12）。首屏只取最近一页，向上滚再补更早的。
     // hasMore 为假时这三个状态恒定，翻页那条链整条不参与——旧后端（不认 limit，回裸数组）
     // 与夹具直接传数组的调用一样落在这一档。
@@ -2646,6 +3110,7 @@ export default {
      *   `{ messages, hasMore, nextBefore }` 信封（带 limit 请求时后端回的形状）
      */
     const loadMessages = (conversationId, loaded) => {
+       chatSuggestions.clear()
        dropComponentPending()
        const page = Array.isArray(loaded) ? { messages: loaded, hasMore: false, nextBefore: null } : (loaded || {})
        const loadedMsgs = page.messages || []
@@ -2660,6 +3125,7 @@ export default {
 
        bubbles.value.push(...historyBubbles(loadedMsgs))
        markAnsweredQuestions()
+       restoreHarnessEvolutions(conversationId)
 
        // 后台续跑关键一步：切回会话时重连 SSE。后端 connect 会推 run_state
        // （运行中还会推 state_recovery 全量续流 + plan_update 恢复任务清单），
@@ -2700,6 +3166,7 @@ export default {
           if (older.length) {
              bubbles.value.unshift(...historyBubbles(older))
              markAnsweredQuestions()
+             restoreHarnessEvolutions(conversationId)
           }
           historyHasMore.value = !!(page && page.hasMore)
           historyBefore.value = (page && page.nextBefore) ?? historyBefore.value
@@ -2778,6 +3245,7 @@ export default {
     }
 
     const handleRichInput = (e) => {
+      chatSuggestions.inputChanged()
         inputPrompt.value = e.target.innerText
 
         // Sync inline tags with contextFiles ref
@@ -2904,6 +3372,15 @@ export default {
         document.execCommand('insertText', false, text)
       }
     }
+
+    const chatSuggestions = useChatSuggestions({
+      conversationId: currentConversationId, modelId: currentModelId,
+      projectId: () => props.projectId, activeFileId: () => props.activeTab?.id,
+      input: richInput, inputPrompt, streaming: isStreaming, readOnly: () => props.externalReadOnly,
+      identity: decisionAssistIdentity, onFinished: onTurnFinished,
+    })
+    const suggestionEnabled = chatSuggestions.enabled
+    const visibleSuggestion = computed(() => chatSuggestions.show.value ? chatSuggestions.suggestion.value : null)
 
     // --- Handle Enter Key ---
     const handleEnterKey = (e) => {
@@ -3167,6 +3644,10 @@ export default {
         handleEnterKey(e)
         return
       }
+      if (key === 'Tab' && !mentionOpen.value) {
+        chatSuggestions.tab(e, () => handleSubmit(followUpMode.value), mentionOpen.value)
+        return
+      }
       if (key === 'Tab' && pickerItem) {
         e.preventDefault()
         chooseMentionFile(pickerItem)
@@ -3234,13 +3715,7 @@ export default {
         // duplicate 静默：同一份拖两遍是常见误操作，弹提示只是噪音
         return
       }
-      const fileData = {
-        id: file.id,
-        name: file.name,
-        fileType: file.fileType,
-        wpsFileId: file.wpsFileId,
-        isDir: file.isDir || file.fileType === 'folder'
-      }
+      const fileData = normalizeContextItem(file)
       contextFiles.value.push(fileData)
       // 只有真挂了音视频才去问「它转写过没有」（dev-board#814 K34；视频见 #1024）
       if (isTranscribableMedia(fileData)) refreshTranscribedAudio()
@@ -3261,6 +3736,9 @@ export default {
       const displayName = truncateName(file.name)
       // 文件名由项目成员自由命名（后端只挡路径分隔符），这段字符串会直接进 DOM，必须转义
       const safeDisplayName = escapeHtml(displayName)
+      const projectBadge = file.projectName
+        ? `<span class="ctx-project-badge">${escapeHtml(file.projectName)} /</span>`
+        : ''
       // 淡态 = 上一轮带过的，仍然会继续带上（这才是 E-2 要的跨轮保留）；
       // title 里明说这件事，否则用户会以为淡态是「已失效」
       const carriedClass = carried ? ' is-carried' : ''
@@ -3270,6 +3748,7 @@ export default {
         <span class="context-tag-inline${carriedClass}" contenteditable="false" data-file-id="${file.id}" data-is-dir="${file.isDir ? 'true' : 'false'}" title="${tagTitle}">
           <img src="${icon}" class="tag-icon"/>
           <span class="tag-at">@</span>
+          ${projectBadge}
           <span class="tag-name">${safeDisplayName}</span>
           <span class="tag-close">×</span>
         </span>&nbsp;`.replace(/\s+/g, ' ').trim()
@@ -3346,7 +3825,7 @@ export default {
       if (!Array.isArray(fileList) || !fileList.length) return
       carriedFileIds.value = []
       for (const f of fileList) {
-        addFile({ id: f.id, name: f.fileName, fileType: f.fileType, wpsFileId: f.wpsFileId, isDir: f.isDir })
+        addFile({ id: f.id, name: f.fileName, fileType: f.fileType, wpsFileId: f.wpsFileId, isDir: f.isDir, projectId: f.projectId, projectName: f.projectName, readOnly: f.readOnly })
       }
       if (richInput.value) inputPrompt.value = richInput.value.innerText
     }
@@ -3654,16 +4133,17 @@ export default {
       // 字节上传失败的文件名：这些不并入附件，收尾时要点名告诉用户
       const failedUploads = []
       const failedImports = []
+      let dropFailureCode = ''
       let addedCount = 0
 
+      captureDroppedFiles({ files: filesToUpload.map(file => file.fileObject).filter(Boolean) }, host.fs)
       try {
         for (const file of filesToUpload) {
           // 桌面壳：本机文件交给 import-local，由后端从磁盘复制进项目，一步到位（dev-board#1034）。
           // 老路「createFile 建空行再传字节」会在字节失效时留下空白文件（dev-board#409）。
-          const localPath = localPathOf(file.fileObject)
-          if (localPath) {
+          if (host.fs) {
             try {
-              const res = await importLocalFile(projectId, localPath, parentId)
+              const res = await importDroppedFile(file.fileObject, host.fs, path => importLocalFile(projectId, path, parentId))
               const imported = res && res.data
               if (!imported || !imported.id) throw new Error('import-local returned no file')
               addFile({
@@ -3675,8 +4155,8 @@ export default {
               })
               addedCount++
             } catch (importErr) {
-              console.warn('[ChatInterface] import-local failed, not attaching:', importErr)
               failedImports.push(file.name)
+              if (importErr?.dropCode) dropFailureCode = importErr.dropCode
             }
             continue
           }
@@ -3727,7 +4207,7 @@ export default {
 
         if (failedImports.length) {
           uni.showToast({
-            title: t('chat.importContentFailed', { names: failedImports.join('、') }),
+            title: dropFailureCode ? t('fileTree.' + dropFailureCode) : t('chat.importContentFailed', { names: failedImports.join('、') }),
             icon: 'none',
             duration: 3000
           })
@@ -3764,21 +4244,6 @@ export default {
         .map(f => ({ name: f.name, size: f.size, fileObject: f }))
       if (!files.length) return
       await uploadFilesAndAttach(files, null)
-    }
-
-    // File → 本机绝对路径（桌面壳 webUtils，同 FileTree.resolveDroppedFilePath）。
-    // 「+」对话框的 uni.chooseFile 在 H5 下返回的就是 <input type=file> 的原生 File，
-    // 拖入的是 dataTransfer 的 File，两者都拿得到。粘贴的 blob、纯浏览器恒为空串。
-    // preload 在 webUtils 缺席时回落 file.path，而 uni.chooseFile 把 path 定义成 blob: URL，
-    // 所以只认绝对路径。
-    const localPathOf = (fileObject) => {
-      try {
-        if (!fileObject || !host.fs || typeof host.fs.getPathForFile !== 'function') return ''
-        const p = host.fs.getPathForFile(fileObject) || ''
-        return /^(\/|[A-Za-z]:[\\/]|\\\\)/.test(p) ? p : ''
-      } catch (e) {
-        return ''
-      }
     }
 
     // Upload file content to storage（纯浏览器与粘贴图片用；URL 一律用数字主键）
@@ -3869,21 +4334,60 @@ export default {
       return { files, failed }
     }
 
+    const attachCrossProjectFile = (contextItem) => {
+      if (!contextItem) return
+      addFile(contextItem)
+      uni.showToast({ title: t('chat.crossProjectAttached', { name: contextItem.name }), icon: 'none' })
+    }
+
+    const sendQuickPrompt = (promptText) => {
+      const prompt = String(promptText || '').trim()
+      if (!prompt) return
+      inputPrompt.value = prompt
+      if (richInput.value) richInput.value.textContent = prompt
+      nextTick(() => handleSubmit())
+    }
+
     // 外部面板（如股东大会核查）注入预设 prompt：强制 AGENT 模式发送
     // （skill 注入依赖 prompt 文本内的触发词；ASK 模式会跳过注入）。
     // 返回本次会话 ID，供调用方把业务对象绑定到该会话。
-    const sendExternalPrompt = async (prompt) => {
+    const sendExternalPrompt = async (prompt, options = {}) => {
       if (!prompt) return null
       if (isStreaming.value) {
         uni.showToast({ title: t('chat.busyToast'), icon: 'none' })
         return null
+      }
+      let activeContext = null
+      const selectionText = options && typeof options.selectionText === 'string' ? options.selectionText.trim() : ''
+      const chipTab = activeDocChip.value || (props.activeTab && isContextEligibleTab(props.activeTab)
+        ? { id: String(props.activeTab.id), name: props.activeTab.name || '' }
+        : null)
+      if (chipTab && (selectionText || (options && options.fileId != null))) {
+        let activeDocFlushed = true
+        if (typeof props.flushActiveDocument === 'function') {
+          try {
+            activeDocFlushed = await props.flushActiveDocument(chipTab.id, { timeoutMs: 1500 }) !== false
+          } catch (e) {
+            activeDocFlushed = false
+          }
+        }
+        activeContext = {
+          id: chipTab.id,
+          name: chipTab.name,
+          fileType: props.activeTab ? props.activeTab.fileType : '',
+          wpsFileId: props.activeTab ? props.activeTab.wpsFileId : null,
+          pane: props.activeTabPane,
+          staleBody: !activeDocFlushed,
+          ...(selectionText ? { selectionText } : {})
+        }
       }
       await sendMessage({
         prompt,
         projectId: props.projectId,
         modelId: currentModelId.value,
         mode: 'AGENT',
-        skillIds: currentSkillIds()
+        skillIds: currentSkillIds(),
+        ...(activeContext ? { activeContext } : {})
       })
       scrollToBottom()
       return currentConversationId.value
@@ -4007,9 +4511,34 @@ export default {
       reviewStates.value = { ...reviewStates.value, [st.fileId]: withOpenerArtifactId(st) }
     }
 
+    let restartResuming = false
+    // Called by the workbench only after the original editor reports ready.
+    const resumeAfterRestart = async (activeFileId = null, canResume = () => true) => {
+      if (restartResuming || !currentConversationId.value) return false
+      const conversationId = currentConversationId.value
+      const projectId = Number(props.projectId)
+      const accountGeneration = getCloudAccountGeneration()
+      const stillCurrent = () => canResume() && currentConversationId.value === conversationId
+        && Number(props.projectId) === projectId && getCloudAccountGeneration() === accountGeneration
+        && (activeFileId == null || String(activeDocChip.value?.id ?? '') === String(activeFileId))
+      if (!stillCurrent()) return false
+      restartResuming = true
+      try {
+        const pending = await getPendingAgentRestarts()
+        if (!stillCurrent()) return false
+        const target = pending.find(item => item.conversationId === conversationId && Number(item.projectId) === projectId)
+        if (!target || String(target.activeFileId ?? '') !== String(activeFileId ?? '')) return false
+        const connected = await reattachSSE(conversationId)
+        if (!connected || !stillCurrent()) return false
+        const result = await resumeAgentRestart({ conversationId, projectId, activeFileId })
+        return result.resumed === true
+      } finally { restartResuming = false }
+    }
+
     // Expose methods for parent ref access
     expose({
-      addFile, loadMessages, loadConversationMetadata, sendExternalPrompt,
+      addFile, loadMessages, loadConversationMetadata, sendExternalPrompt, resumeAfterRestart,
+      attachCrossProjectFile, sendQuickPrompt,
       startNewChat, menuSetMode, menuStop, menuState,
       uploadLocalFilesAndAddContext,
       handleReviewSubmit, handleReviewState,
@@ -4018,6 +4547,7 @@ export default {
     })
 
     return {
+       ocrRouteState, chooseOcrRoute, cancelOcrRoute,
        bubbles,
        currentConversationId,
        reviewStates,
@@ -4033,6 +4563,7 @@ export default {
        richInput,
        showMemoryBrowser,
        decisionAssistEnabled, toggleDecisionAssist, isLocalOnlyProvider,
+       chatSuggestions, suggestionEnabled, visibleSuggestion,
        followUpMode,
        toggleFollowUpMode,
        pendingInbox,
@@ -4057,6 +4588,8 @@ export default {
        fileListFromBubble,
        activeDocChip,
        dismissActiveDoc,
+       activeSelectionChip,
+       dismissActiveSelection,
        visionNotice,
        contextNoticeText,
        isUploadingPasted,
@@ -4132,14 +4665,23 @@ export default {
        toggleSkillSelection,
        removeSelectedSkill,
        goToSkillManagement,
+       builtinQuickWorkflows,
+       builtinCustomActiveCount,
+       applyBuiltinWorkflow,
+       builtinWorkflowMenu,
+       activeMenuWorkflow,
+       openBuiltinWorkflowContextMenu,
+       closeBuiltinWorkflowContextMenu,
+       switchBuiltinWorkflowVersion,
+       openBuiltinWorkflowEditor,
        // Artifact
        handleArtifactOpenTab: (art) => emit('artifact-open-tab', art),
        handleArtifactApprove: async (art) => {
           console.log('[ChatInterface] Artifact Approved:', art.id, art.revised ? `(revised x${art.changeCount})` : '')
           // 计划卡一键推进：普通批准发确认语；修订版把改动数与修订后全文一并回喂模型
           const prompt = art.revised
-             ? `我已修订计划（共 ${art.changeCount} 处改动，${art.diffSummary}）。请以下方修订版计划为准执行，注意修订处的差异：\n\n${art.content}`
-             : `已确认${art.type === 'implementation_plan' ? '实施计划' : '计划'}，请按此推进。`
+             ? t('chat.approvePromptRevised', { changeCount: art.changeCount, diffSummary: art.diffSummary, content: art.content })
+             : (art.type === 'implementation_plan' ? t('chat.approvePromptImplPlan') : t('chat.approvePromptPlan'))
           // 契约 D 要解决的原始病灶就在这里：上面那段是模型需要的细节（尤其修订版全文），
           // 但它此前直接当成用户消息显示，于是用户在自己的气泡里读到一句自己没说过的机器口吻话。
           // 现在细节仍走 message，气泡里只显示 displayText 这句人话。
@@ -4256,13 +4798,16 @@ export default {
        stoppingTasks,
        handleCancelTask,
        modifiedFiles,
+       filesForBubble,
+       legacyFileChanges,
+       showLegacyFilesPopup,
        fileChangeLabel,
        createdFiles,
        showModifiedPopup,
        showNewPopup,
        toggleModifiedPopup,
        toggleNewPopup,
-       handleOpenFile
+       handleOpenFile, canDragCreatedFile, draggingCreatedFile, handleCreatedFileDragStart, handleCreatedFileDragEnd
     }
   }
 }
@@ -4275,20 +4820,21 @@ export default {
   height: 100%;
   width: 100%;
   max-width: 100%;
-  background: var(--awd-bg);
+  background: var(--awd-surface);
   position: relative;
   overflow: hidden; /* Prevent children from overflowing */
+  container: chat-panel / inline-size;
   box-sizing: border-box;
 }
 
 .chat-header {
   height: 36px;
-  border-bottom: 1px solid var(--awd-border);
+  border-bottom: 1px solid var(--awd-border-subtle);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 16px;
-  background: var(--awd-bg);
+  padding: 0 12px;
+  background: var(--awd-surface-2);
   flex-shrink: 0;
 }
 
@@ -4317,9 +4863,9 @@ export default {
   align-self: center;
   white-space: nowrap;
   padding: 4px 7px;
-  border-radius: 5px;
+  border-radius: var(--awd-radius-sm);
   color: var(--awd-text-2);
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   cursor: pointer;
 }
 .memory-header-btn:hover { background: var(--awd-surface); color: var(--awd-accent-text); }
@@ -4334,7 +4880,7 @@ export default {
 .icon-btn {
   cursor: pointer;
   padding: 6px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   color: var(--awd-text-2);
   display: flex;
   align-items: center;
@@ -4363,7 +4909,7 @@ export default {
 /* Prevent layout shift when active */
 .icon-btn.active {
   background: var(--awd-accent-soft);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
 }
 .icon-btn.active .btn-icon.default {
   display: none;
@@ -4378,7 +4924,8 @@ export default {
   width: 14px;
   height: 14px;
 }
-/* 加号用内联 SVG（描边风格与发送键一致），hover 走 currentColor 变绿，不再双位图切换 */
+/* 顶栏与输入栏内联 SVG 按钮：描边风格与发送键一致，hover 走 currentColor 变绿 */
+.icon-btn .btn-svg,
 .icon-btn .plus-svg {
   width: 15px;
   height: 15px;
@@ -4386,17 +4933,19 @@ export default {
   color: var(--awd-text-2);
   transition: color 0.15s ease;
 }
+.icon-btn.mini .btn-svg,
 .icon-btn.mini .plus-svg {
   width: 14px;
   height: 14px;
 }
+.icon-btn:hover .btn-svg,
 .icon-btn:hover .plus-svg {
   color: var(--awd-accent-text);
 }
 /* File add button with border */
 .icon-btn.file-add-btn {
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 3px;
 }
 .icon-btn.file-add-btn:hover {
@@ -4455,12 +5004,12 @@ export default {
   margin: 0;
   min-width: 0;
   border: 1px solid var(--awd-border);
-  border-radius: 20px;
+  border-radius: var(--awd-radius-dialog);
   padding: 5px 14px;
   color: var(--awd-accent-text);
   background: var(--awd-surface);
   box-shadow: var(--awd-shadow-sm);
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.6;
   white-space: nowrap;
   overflow: hidden;
@@ -4491,10 +5040,10 @@ export default {
 .user-bubble {
   background: var(--awd-accent-soft); /* AI WorkDeck品牌色 Lightest */
   padding: 8px 12px;
-  border-radius: 6px 6px 0 6px;
+  border-radius: var(--awd-radius-md) var(--awd-radius-md) 0 var(--awd-radius-md);
   max-width: 80%;
   color: var(--awd-text); /* Gray-Dark for text */
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.5;
   box-shadow: none;
   border: 1px solid var(--awd-border);
@@ -4517,7 +5066,7 @@ export default {
 }
 
 .bubble-timestamp {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   /* margin-top: 4px; */
 }
@@ -4531,7 +5080,7 @@ export default {
 }
 .bubble-receipt {
   margin-right: 8px;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   white-space: nowrap;
 }
@@ -4557,17 +5106,16 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0 24px 24px;
+  padding: 0 16px 20px;
   overflow-y: auto;
   min-width: 0;
   box-sizing: border-box;
 }
 
 .empty-top-section {
-  /* 黄金分割位：38.2% from top，进一步上移 */
-  margin-top: calc(30vh - 80px);
+  margin-top: clamp(28px, 16vh, 160px);
   flex-shrink: 0;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
   text-align: center;
 }
 
@@ -4582,13 +5130,15 @@ export default {
   width: 100%;
   max-width: 600px;
   flex-shrink: 0;
-  margin-top: auto; /* Push to bottom */
-  padding-top: 24px;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--awd-border-subtle);
   box-sizing: border-box;
 }
 
 .welcome-text {
-  font-size: 24px;
+  font-family: var(--awd-font-serif);
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-text);
   margin-bottom: 8px;
@@ -4596,7 +5146,8 @@ export default {
 }
 
 .welcome-subtitle {
-  font-size: 15px;
+  font-size: var(--awd-font-size-body);
+  line-height: 1.6;
   font-weight: 400;
   color: var(--awd-text-2);
   display: block;
@@ -4605,11 +5156,11 @@ export default {
 .input-card {
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: var(--awd-radius-dialog);
+  padding: 12px;
   width: 100%;
   box-sizing: border-box;
-  box-shadow: 0 1px 2px rgba(18, 52, 77, 0.04), 0 4px 16px rgba(18, 52, 77, 0.06);
+  box-shadow: var(--awd-shadow-card);
   position: relative;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -4623,27 +5174,25 @@ export default {
 /* 输入区获得焦点时整卡亮起：品牌绿描边 + mint 光晕（浅色，不做深色 chrome） */
 .input-card:focus-within {
   border-color: var(--awd-accent);
-  box-shadow: 0 0 0 3px rgba(137, 168, 160, 0.16), 0 1px 2px rgba(18, 52, 77, 0.04), 0 4px 16px rgba(18, 52, 77, 0.06);
+  box-shadow: 0 0 0 2px var(--awd-accent-soft);
 }
 
 /* Recent History Section - 紧凑专业样式 */
 .recent-history-header {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 500;
   color: var(--awd-text-3);
   margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.02em;
 }
 
 .recent-history {
   display: flex;
   flex-direction: column;
-  gap: 0; /* 无间距 */
-  border: 1px solid var(--awd-border);
-  border-radius: 4px; /* 减小圆角 */
+  gap: var(--awd-space-1);
+  border: none;
   overflow: hidden;
-  background: var(--awd-surface);
+  background: transparent;
 }
 
 /* 会话后台任务状态点（与宿主抽屉同一套视觉）：
@@ -4677,10 +5226,10 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 14px;
-  background: var(--awd-surface);
-  border-bottom: 1px solid var(--awd-border-subtle);
-  border-radius: 0; /* 无圆角 */
+  padding: 10px 8px;
+  background: transparent;
+  border-bottom: none;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
   transition: background 0.15s ease;
   box-shadow: none;
@@ -4695,7 +5244,7 @@ export default {
 }
 
 .history-title {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   flex: 1;
   overflow: hidden;
@@ -4706,7 +5255,7 @@ export default {
 }
 
 .history-time {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   margin-left: 12px;
   flex-shrink: 0;
@@ -4715,19 +5264,20 @@ export default {
 }
 
 .history-empty-placeholder {
-  font-size: 13px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   text-align: center;
-  padding: 24px 0;
+  padding: 12px 0;
 }
 
 .history-disclaimer {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs-meta);
+  line-height: 1.6;
   color: var(--awd-text-3);
   text-align: center;
   padding: 16px 0 0;
   margin-top: 12px;
-  border-top: 1px solid var(--awd-border-subtle);
+  border-top: none;
 }
 
 .chat-input-rich {
@@ -4735,8 +5285,8 @@ export default {
   max-height: 200px;
   overflow-y: auto;
   outline: none;
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: var(--awd-font-size-body);
+  line-height: 1.6;
   color: var(--awd-text);
 }
 
@@ -4746,29 +5296,43 @@ export default {
 }
 
 .input-footer {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  flex-wrap: wrap;
-  column-gap: 8px;
-  row-gap: 6px;
+  gap: 8px;
   margin-top: 12px;
-  padding-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid var(--awd-border-subtle);
 }
 
 .action-bar-left {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px;
   align-items: center;
-  flex: 1 1 240px;
-  /* 窄面板按控件换行，保留模型名的可读宽度；发送按钮可另起一行。 */
   min-width: 0;
 }
 
+.input-footer .icon-btn.mini,
+.input-footer .skill-selector {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+.input-footer .icon-btn.mini { border: 0; }
+.input-footer.is-streaming { grid-template-columns: minmax(0, 1fr); }
+.input-footer.is-streaming .composer-actions { flex-wrap: wrap; justify-content: flex-end; }
+
+@container chat-panel (max-width: 340px) {
+  .action-bar-left { display: grid; grid-template-columns: 28px minmax(0, 1fr) 28px; }
+  .model-selector { grid-column: 1 / -1; grid-row: 2; }
+  .skill-selector { grid-column: 3; grid-row: 1; }
+  .input-footer { align-items: end; }
+}
+
 .model-selector {
-  font-size: 13px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   cursor: pointer;
   /* 定位基准挪给 .input-card（见 .model-dropdown 注释）——AI 面板最窄 240px，
@@ -4778,15 +5342,15 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 24px;
+  height: 28px;
   box-sizing: border-box;
   padding: 0 6px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   transition: background 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
-  flex: 1 1 100px;
-  min-width: 100px;
+  flex: 1 1 0;
+  min-width: 0;
   max-width: 100%;
 }
 /* uni 的 <text> 不继承父级的 nowrap 效果，窄栏下「Kimi K3」会折成两行（BUG-41） */
@@ -4803,7 +5367,7 @@ export default {
 
 .dropdown-arrow {
   flex-shrink: 0;
-  font-size: 8px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   transition: color 0.15s ease;
 }
@@ -4815,7 +5379,8 @@ export default {
 
 /* ============= Mode Selector (Agent/Ask/Plan) ============= */
 .mode-selector {
-  font-size: 13px;
+  font-size: var(--awd-panel-fs);
+  flex-shrink: 0;
   color: var(--awd-text-2);
   cursor: pointer;
   /* 同 .model-selector：定位基准挪给 .input-card。实测在 240px 最窄面板下，
@@ -4826,10 +5391,10 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 24px;
+  height: 28px;
   box-sizing: border-box;
   padding: 0 8px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-accent-wash);
   border: 1px solid var(--awd-accent-soft);
   transition: all 0.15s ease;
@@ -4843,7 +5408,7 @@ export default {
 }
 
 .mode-icon {
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
 }
 
 .mode-name {
@@ -4859,8 +5424,8 @@ export default {
   right: 0;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-lg);
   z-index: 1001;
   min-width: 0;
   padding: 6px 0;
@@ -4894,7 +5459,7 @@ export default {
 }
 
 .mode-option-icon {
-  font-size: 18px;
+  font-size: var(--awd-font-size-title);
 }
 
 .mode-option-text {
@@ -4904,13 +5469,13 @@ export default {
 }
 
 .mode-option-name {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
   color: var(--awd-text);
 }
 
 .mode-option-desc {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
 }
 
@@ -4919,7 +5484,7 @@ export default {
   border-top: 1px solid var(--awd-border-subtle);
   margin-top: 4px;
   padding: 6px 14px 2px;
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   line-height: 1.5;
   max-width: 200px;
@@ -4931,8 +5496,8 @@ export default {
   right: 0;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-lg);
   z-index: 1000;
   min-width: 240px;
   padding: 8px 0;
@@ -4952,7 +5517,7 @@ export default {
 
 .menu-label {
   padding: 6px 12px;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-text-2);
   background: var(--awd-bg);
@@ -4965,7 +5530,7 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   transition: all 0.15s ease;
   border-bottom: 1px solid var(--awd-border-subtle);
@@ -5028,10 +5593,10 @@ export default {
   flex-shrink: 0;
 }
 .composer-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; max-width: 100%; }
-.follow-mode,.alternate-send { padding: 4px 6px; border-radius: 5px; color: var(--awd-text-2); font-size: 10px; cursor: pointer; }
+.follow-mode,.alternate-send { padding: 4px 6px; border-radius: var(--awd-radius-sm); color: var(--awd-text-2); font-size: var(--awd-panel-fs-meta); cursor: pointer; }
 .follow-mode { background: var(--awd-accent-soft); color: var(--awd-accent-text); }
 .alternate-send:hover { background: var(--awd-surface-2); }
-.stop-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--awd-danger); color: white; font-size: 11px; cursor: pointer; }
+.stop-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--awd-danger); color: var(--awd-text-on-accent); font-size: var(--awd-panel-fs-meta); cursor: pointer; }
 .send-btn:hover {
   background: var(--awd-accent-hover);
 }
@@ -5050,7 +5615,7 @@ export default {
   background: var(--awd-danger);
 }
 .send-icon {
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
   font-weight: bold;
   display: inline-block;
 }
@@ -5075,22 +5640,22 @@ export default {
   padding: 10px 12px;
   background: var(--awd-accent-wash);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
 }
 .readonly-text {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 18px;
   color: var(--awd-text-2);
 }
 .readonly-fork-btn {
   flex-shrink: 0;
   padding: 5px 12px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-on-accent);
   background: var(--awd-accent);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
 }
 .readonly-fork-btn:hover {
@@ -5113,14 +5678,14 @@ export default {
   gap: 4px;
   background: var(--awd-bg);
   border: 1px solid var(--awd-info);
-  border-radius: 14px;
+  border-radius: var(--awd-radius-dialog);
   padding: 4px 8px 4px 6px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-info-text);
 }
 
 .context-file-icon {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
 }
 
 .context-file-name {
@@ -5134,7 +5699,7 @@ export default {
   margin-left: 4px;
   color: var(--awd-text-3);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   line-height: 1;
 }
 
@@ -5158,13 +5723,13 @@ export default {
 .carried-attachment-hint {
   display: block;
   padding: 2px 2px 0;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.5;
   color: var(--awd-text-3);
 }
 .input-images-note {
   flex-basis: 100%;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.5;
   color: var(--awd-text-3);
   /* 从缩略图块里挪到输入卡片底部常驻（K21 ⑨）：拖进来的项目图片也要覆盖，
@@ -5180,12 +5745,13 @@ export default {
   align-items: center;
   gap: 4px;
   max-width: 100%;
-  margin: 0 0 4px;
-  padding: 2px 6px 2px 8px;
-  border-radius: 4px;
-  border: 1px dashed var(--awd-border);
-  background: var(--awd-bg-2);
-  font-size: 11px;
+  margin: 0 0 8px;
+  padding: 3px 6px 3px 8px;
+  box-sizing: border-box;
+  border-radius: var(--awd-radius-sm);
+  border: 1px solid var(--awd-border-subtle);
+  background: var(--awd-surface-2);
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.6;
   color: var(--awd-text-2);
 }
@@ -5197,17 +5763,26 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--awd-text-1);
+  color: var(--awd-text);
 }
 .active-doc-remove {
   flex-shrink: 0;
   padding: 0 2px;
   color: var(--awd-text-3);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1;
 }
-.active-doc-remove:hover { color: var(--awd-text-1); }
+.active-doc-remove:hover { color: var(--awd-text); }
+.active-selection-chip {
+  border-style: solid;
+  border-color: var(--awd-accent-soft);
+  background: var(--awd-accent-wash);
+}
+.active-selection-count {
+  flex-shrink: 0;
+  color: var(--awd-text-3);
+}
 
 /* 历史里那一轮带过的附件（K14 ④）：只在历史气泡上出现——
    手打输入那条路的附件是正文里的内联标签，再挂一排就是显示两遍。 */
@@ -5218,10 +5793,10 @@ export default {
   margin-top: 6px;
 }
 .bubble-attachment {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.6;
   padding: 0 6px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   border: 1px solid var(--awd-border);
   color: var(--awd-text-2);
   max-width: 100%;
@@ -5239,7 +5814,7 @@ export default {
   margin-top: 4px;
 }
 .context-notice {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.5;
   color: var(--awd-text-3);
   text-align: left;
@@ -5249,9 +5824,9 @@ export default {
   position: relative;
   width: 48px;
   height: 48px;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   overflow: hidden;
-  box-shadow: 0 2px 6px rgba(46, 90, 80, 0.15);
+  box-shadow: var(--awd-shadow-sm);
 }
 
 .preview-thumb {
@@ -5269,11 +5844,11 @@ export default {
   background: linear-gradient(135deg, var(--awd-accent) 0%, var(--awd-accent-hover) 100%);
   color: var(--awd-text-on-accent);
   border-radius: 50%;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   text-align: center;
   line-height: 18px;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(46, 90, 80, 0.3);
+  box-shadow: var(--awd-shadow-sm);
   transition: all 0.15s ease;
 }
 
@@ -5293,9 +5868,9 @@ export default {
    background: transparent;
    color: var(--awd-accent-text);
    padding: 3px 22px 3px 8px; /* 右侧给常显的 × 留位 */
-   border-radius: 4px;
+   border-radius: var(--awd-radius-sm);
    margin: 0 4px 2px 0;
-   font-size: 12px;
+   font-size: var(--awd-panel-fs);
    font-weight: 500;
    vertical-align: middle;
    user-select: none;
@@ -5331,13 +5906,22 @@ export default {
    width: 14px;
    height: 14px;
    flex-shrink: 0;
-   border-radius: 2px;
+   border-radius: var(--awd-radius-sm);
    filter: brightness(0.3);
  }
 
  :deep(.tag-at) {
    color: var(--awd-accent-text);
    font-weight: 600;
+ }
+
+ :deep(.ctx-project-badge) {
+   max-width: 88px;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   white-space: nowrap;
+   color: var(--awd-text-3);
+   font-size: var(--awd-panel-fs-meta);
  }
 
  :deep(.tag-name) {
@@ -5362,7 +5946,7 @@ export default {
    border-radius: 50%;
    align-items: center;
    justify-content: center;
-   font-size: 10px;
+   font-size: var(--awd-panel-fs-meta);
    cursor: pointer;
    transition: all 0.1s ease;
  }
@@ -5383,9 +5967,9 @@ export default {
   background: transparent;
   color: var(--awd-accent-text);
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   margin: 0 4px 2px 0;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 500;
   vertical-align: middle;
   user-select: none;
@@ -5398,7 +5982,7 @@ export default {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
-  border-radius: 2px;
+  border-radius: var(--awd-radius-sm);
   /* Ensure icon is visible on light background */
   filter: brightness(0.2);
 }
@@ -5438,9 +6022,9 @@ export default {
 .bubble-image-thumb {
   width: 80px;
   height: 80px;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   object-fit: cover;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--awd-shadow-sm);
 }
 
 /* Improve user bubble content display for inline tags */
@@ -5448,7 +6032,7 @@ export default {
   line-height: 1.5;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   white-space: pre-wrap; /* Preserve newlines and spaces */
 }
 
@@ -5478,7 +6062,7 @@ export default {
   flex-shrink: 0;
   height: 20px;
   padding: 0 7px;
-  border-radius: 10px;
+  border-radius: var(--awd-radius-dialog);
   background: var(--awd-accent-soft);
   border: 1px solid var(--awd-accent-soft);
 }
@@ -5490,14 +6074,14 @@ export default {
 }
 
 .skill-chip-name {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
   line-height: 1;
   white-space: nowrap;
 }
 
 .skill-chip-remove {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1;
   color: var(--awd-accent-text);
   cursor: pointer;
@@ -5519,7 +6103,7 @@ export default {
   50% {
     background: var(--awd-accent-soft);
     border-color: var(--awd-mint);
-    box-shadow: 0 0 0 2px rgba(137, 168, 160, 0.18);
+    box-shadow: 0 0 0 2px var(--awd-accent-soft);
   }
 }
 
@@ -5527,7 +6111,7 @@ export default {
    已选数量用角标表达，生效清单在上方 chip 行，不占横向空间 */
 .skill-selector {
   cursor: pointer;
-  position: relative;
+  position: static;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5535,7 +6119,7 @@ export default {
   min-width: 24px;
   height: 24px;
   padding: 0 3px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   transition: background 0.15s ease;
   flex-shrink: 0;
 }
@@ -5556,7 +6140,7 @@ export default {
 }
 
 .skill-count {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1;
   color: var(--awd-accent-text);
   font-weight: 600;
@@ -5574,14 +6158,15 @@ export default {
 
 .skill-dropdown {
   position: absolute;
-  /* 选择器位于工具条最右，向右展开会溢出 AI 面板，故右对齐 */
+  /* 与模式、模型菜单一样锚定输入卡，窄栏下仍完整可见。 */
+  left: 0;
   right: 0;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-md);
   z-index: 1001;
-  min-width: 230px;
+  min-width: 0;
   max-height: 280px;
   overflow-y: auto;
   padding: 4px 0;
@@ -5600,12 +6185,12 @@ export default {
   row-gap: 2px;
 }
 .skill-dropdown-title {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   font-weight: 500;
 }
 .skill-dropdown-hint {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   white-space: normal;
 }
@@ -5633,14 +6218,14 @@ export default {
 .skill-check {
   width: 12px;
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 18px;
   color: var(--awd-accent-text);
 }
 
 .skill-empty {
   padding: 7px 12px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
 }
 
@@ -5652,7 +6237,7 @@ export default {
 }
 
 .skill-option-name {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
 }
 .skill-option.active .skill-option-name {
@@ -5661,7 +6246,7 @@ export default {
 }
 
 .skill-option-desc {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5677,7 +6262,7 @@ export default {
 
 .skill-manage {
   padding: 7px 12px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   cursor: pointer;
   transition: background 0.15s ease;
@@ -5685,6 +6270,381 @@ export default {
 .skill-manage:hover {
   background: var(--awd-surface-2);
   color: var(--awd-accent-text);
+}
+
+/* 懒人模式：内置高频能力（免选即用） */
+.skill-chip.is-builtin {
+  background: var(--awd-accent-soft);
+  border-style: solid;
+  border-color: var(--awd-accent);
+}
+
+.skill-builtin-section {
+  padding: 8px 12px 6px;
+  display: flex;
+  flex-direction: column;
+  row-gap: 4px;
+  background: var(--awd-accent-wash);
+}
+.skill-builtin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: 6px;
+}
+.skill-builtin-head-actions {
+  display: flex;
+  align-items: center;
+  column-gap: 6px;
+}
+.skill-builtin-adv-link {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-accent-text);
+  cursor: pointer;
+}
+.skill-builtin-adv-link:hover {
+  text-decoration: underline;
+}
+.skill-builtin-title {
+  font-size: var(--awd-panel-fs);
+  font-weight: 600;
+  color: var(--awd-accent-text);
+}
+.skill-builtin-badge {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-accent-text);
+  background: var(--awd-accent-soft);
+  padding: 1px 6px;
+  border-radius: var(--awd-radius-sm);
+  flex-shrink: 0;
+}
+.skill-builtin-sub {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
+  line-height: 1.4;
+  white-space: normal;
+}
+.skill-builtin-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+.skill-builtin-pill {
+  display: inline-flex;
+  align-items: center;
+  column-gap: 4px;
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-accent-text);
+  background: var(--awd-surface);
+  border: 1px solid var(--awd-border);
+  padding: 2px 7px;
+  border-radius: var(--awd-radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.skill-builtin-pill:hover {
+  border-color: var(--awd-accent);
+  background: var(--awd-accent-soft);
+}
+.skill-builtin-pill.is-custom {
+  border-color: var(--awd-accent);
+  background: var(--awd-accent-soft);
+  font-weight: 600;
+}
+.skill-builtin-pill-more {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-3);
+  padding: 0 2px;
+}
+.skill-builtin-pill:hover .skill-builtin-pill-more {
+  color: var(--awd-accent-text);
+}
+
+/* 辅助设置默认折叠；实际生成的下一句建议独立显示在外侧。 */
+.composer-advanced-settings { margin-top: 8px; min-width: 0; }
+.composer-advanced-summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  padding: 4px 6px;
+  border-radius: var(--awd-radius-sm);
+  color: var(--awd-text-2);
+  font-size: var(--awd-panel-fs-meta);
+  line-height: 1.5;
+  list-style: none;
+  cursor: pointer;
+}
+.composer-advanced-summary::-webkit-details-marker { display: none; }
+.composer-advanced-summary::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(-45deg);
+}
+.composer-advanced-settings[open] > .composer-advanced-summary::before { transform: rotate(45deg); }
+.composer-advanced-summary:hover { color: var(--awd-accent-text); background: var(--awd-accent-wash); }
+.composer-advanced-summary:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 2px; }
+.composer-preferences {
+  margin-top: 4px;
+  padding: 0 2px;
+  min-width: 0;
+}
+.composer-preferences > :deep(:not(:first-child)) {
+  border-top: 1px solid var(--awd-border-subtle);
+}
+.builtin-workflows-fold { width: 100%; color: var(--awd-text-2); box-sizing: border-box; }
+.builtin-workflows-summary {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 6px;
+  border-radius: var(--awd-radius-md);
+  list-style: none;
+  font-size: var(--awd-panel-fs);
+  line-height: 1.5;
+  cursor: pointer;
+}
+.builtin-workflows-summary::-webkit-details-marker { display: none; }
+.builtin-workflows-summary::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(-45deg);
+}
+.builtin-workflows-fold[open] > .builtin-workflows-summary::before { transform: rotate(45deg); }
+.builtin-workflows-summary:hover { color: var(--awd-accent-text); background: var(--awd-accent-wash); }
+.builtin-workflows-summary:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 2px; }
+.builtin-workflows-entry { min-width: 0; overflow-wrap: anywhere; }
+.builtin-workflows-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.builtin-workflows-title { color: var(--awd-text); font-weight: 500; }
+.builtin-workflows-scope { display: block; margin-top: 2px; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); }
+.builtin-workflows-summary-right { display: flex; align-items: center; max-width: 100px; }
+.builtin-workflows-summary-state { font-size: var(--awd-panel-fs-meta); font-weight: 400; line-height: 1.4; color: var(--awd-accent-text); background: var(--awd-accent-wash); border-radius: var(--awd-radius-sm); padding: 1px 5px; }
+.builtin-workflows-summary-state.custom { color: var(--awd-accent-text); font-weight: 600; }
+.builtin-workflows-adv-btn {
+  font: inherit;
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-accent-text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--awd-radius-sm);
+  padding: 4px 0 4px 6px;
+  margin: 0;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.builtin-workflows-adv-btn::after { border: 0; }
+.builtin-workflows-adv-btn:hover { text-decoration: underline; }
+.builtin-workflows-adv-btn:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 2px; }
+.builtin-workflows-body { padding: 4px 6px 12px 22px; display: flex; flex-direction: column; row-gap: 6px; }
+.builtin-workflows-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 6px;
+}
+.builtin-workflow-card {
+  display: flex;
+  flex-direction: column;
+  row-gap: 3px;
+  padding: 7px 10px;
+  border-radius: var(--awd-radius-md);
+  background: var(--awd-surface);
+  border: 1px solid var(--awd-border-subtle);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.builtin-workflow-card.is-custom-version {
+  border-color: var(--awd-accent);
+}
+.builtin-workflow-card:hover {
+  border-color: var(--awd-accent);
+  background: var(--awd-accent-wash);
+}
+.builtin-workflow-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: 6px;
+}
+.builtin-workflow-name {
+  font-size: var(--awd-panel-fs);
+  font-weight: 600;
+  color: var(--awd-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.builtin-workflow-card-actions {
+  display: flex;
+  align-items: center;
+  column-gap: 4px;
+  flex-shrink: 0;
+}
+.builtin-workflow-ver-tag {
+  font-size: var(--awd-panel-fs-meta);
+  line-height: 1.3;
+  padding: 1px 6px;
+  border-radius: var(--awd-radius-sm);
+  color: var(--awd-text-3);
+  background: var(--awd-bg);
+  border: 1px solid var(--awd-border-subtle);
+  max-width: 110px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.builtin-workflow-ver-tag.custom {
+  color: var(--awd-accent-text);
+  background: var(--awd-accent-soft);
+  border-color: var(--awd-accent);
+  font-weight: 500;
+}
+.builtin-workflow-more-btn {
+  font-size: var(--awd-panel-fs);
+  line-height: 1;
+  color: var(--awd-text-2);
+  padding: 1px 4px;
+  border-radius: var(--awd-radius-sm);
+  background: var(--awd-bg);
+  border: 1px solid var(--awd-border-subtle);
+}
+.builtin-workflow-card-actions:hover .builtin-workflow-more-btn {
+  color: var(--awd-accent-text);
+  border-color: var(--awd-accent);
+}
+.builtin-workflow-desc {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 内置常驻工作流右键菜单与版本规则配置弹窗（dev-board#1438） */
+.bw-context-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2400;
+  background: transparent;
+}
+.bw-context-menu {
+  position: fixed;
+  width: min(248px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  background: var(--awd-surface);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-md);
+  box-shadow: var(--awd-shadow-lg);
+  padding: 6px;
+  z-index: 2401;
+  display: flex;
+  flex-direction: column;
+  row-gap: 2px;
+}
+.bw-menu-head {
+  padding: 5px 8px 6px;
+  border-bottom: 1px solid var(--awd-border-subtle);
+  margin-bottom: 2px;
+  display: flex;
+  flex-direction: column;
+  row-gap: 2px;
+}
+.bw-menu-title {
+  font-size: var(--awd-panel-fs);
+  font-weight: 600;
+  color: var(--awd-text);
+}
+.bw-menu-sub {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-3);
+}
+.bw-menu-versions {
+  display: flex;
+  flex-direction: column;
+  row-gap: 2px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.bw-menu-version-item {
+  display: flex;
+  align-items: center;
+  column-gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--awd-radius-sm);
+  cursor: pointer;
+}
+.bw-menu-version-item:hover {
+  background: var(--awd-accent-wash);
+}
+.bw-menu-version-item.active {
+  background: var(--awd-accent-soft);
+}
+.bw-menu-check {
+  width: 14px;
+  font-size: var(--awd-panel-fs);
+  font-weight: 600;
+  color: var(--awd-accent-text);
+  flex-shrink: 0;
+}
+.bw-menu-version-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  column-gap: 6px;
+}
+.bw-menu-version-name {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bw-menu-version-tag {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-3);
+  background: var(--awd-bg);
+  border: 1px solid var(--awd-border-subtle);
+  padding: 0 4px;
+  border-radius: var(--awd-radius-sm);
+  flex-shrink: 0;
+}
+.bw-menu-version-edit {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-accent-text);
+  padding: 2px 6px;
+  border-radius: var(--awd-radius-sm);
+  flex-shrink: 0;
+}
+.bw-menu-version-edit:hover {
+  background: var(--awd-surface);
+}
+.bw-menu-action {
+  padding: 6px 10px;
+  border-radius: var(--awd-radius-sm);
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
+  cursor: pointer;
+}
+.bw-menu-action:hover {
+  background: var(--awd-accent-wash);
+  color: var(--awd-text);
+}
+.bw-menu-action.accent {
+  color: var(--awd-accent-text);
+  font-weight: 500;
 }
 
 /* Model dropdown mask overlay */
@@ -5719,8 +6679,8 @@ export default {
   width: 618px; /* Golden Ratio-ish Width */
   max-width: 90vw;
   background-color: var(--awd-surface);
-  border-radius: 12px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-lg);
   overflow: hidden;
   animation: awd-dialog-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   display: flex;
@@ -5770,11 +6730,11 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-accent-text);
   cursor: pointer;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   transition: background 0.15s ease;
 }
 
@@ -5783,13 +6743,13 @@ export default {
 }
 
 .new-folder-btn .btn-plus {
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
   font-weight: bold;
   line-height: 1;
 }
 
 .awd-dialog-title {
-  font-size: 20px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-accent-text); /* Forest Green */
   line-height: 1.4;
@@ -5798,7 +6758,7 @@ export default {
 
 .awd-dialog-subtitle {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   line-height: 1.5;
   display: block;
@@ -5835,9 +6795,9 @@ export default {
   justify-content: center;
   height: 44px;
   padding: 0 32px;
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 500;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   cursor: pointer;
   transition: all 0.2s;
   min-width: 100px;
@@ -5887,8 +6847,8 @@ export default {
 }
 .pick-tab {
   padding: 5px 12px;
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   cursor: pointer;
 }
@@ -5903,9 +6863,9 @@ export default {
   height: 34px;
   padding: 0 10px;
   box-sizing: border-box;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   color: var(--awd-text);
 }
 .pick-list {
@@ -5917,21 +6877,21 @@ export default {
   align-items: center;
   gap: 8px;
   padding: 7px 8px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
 }
 .pick-row:hover { background: var(--awd-surface-2); }
 .pick-row.picked { cursor: default; opacity: 0.65; }
 .pick-icon { width: 14px; height: 14px; flex-shrink: 0; }
 .pick-name {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .pick-path {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   white-space: nowrap;
   overflow: hidden;
@@ -5940,20 +6900,20 @@ export default {
 }
 .pick-done {
   margin-left: auto;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
   white-space: nowrap;
 }
 .pick-empty {
   padding: 22px 8px;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-3);
 }
 
 .form-label {
   display: block;
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 500;
   color: var(--awd-text);
   margin-bottom: 8px;
@@ -5962,7 +6922,7 @@ export default {
 .awd-field {
   background-color: var(--awd-bg);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   padding: 12px 16px;
   display: flex;
   align-items: center;
@@ -5987,12 +6947,12 @@ export default {
 }
 
 .awd-field .field-value {
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text);
 }
 
 .awd-field .field-placeholder {
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text-3);
 }
 
@@ -6003,10 +6963,10 @@ export default {
 }
 
 .selected-file-tag {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   background: var(--awd-surface);
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   border: 1px solid var(--awd-border);
   color: var(--awd-text);
   max-width: 150px;
@@ -6021,7 +6981,7 @@ export default {
   align-items: center;
   padding: 10px 12px;
   margin-bottom: 2px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -6065,14 +7025,14 @@ export default {
 
 .folder-name {
   margin-left: 8px;
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text);
 }
 
 .empty-tip {
   text-align: center;
   color: var(--awd-text-3);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   padding: 20px 0;
 }
 /* Token Usage Bar */
@@ -6084,7 +7044,7 @@ export default {
   padding: 4px 12px;
   margin-bottom: 8px; /* Maintain margin */
   background: linear-gradient(135deg, var(--awd-accent-wash) 0%, var(--awd-accent-wash) 100%);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   border: 1px solid var(--awd-accent-soft);
   width: 100%; /* Fix: Full width */
   box-sizing: border-box; /* Fix: Include padding in width */
@@ -6092,7 +7052,7 @@ export default {
 }
 
 .token-usage-bar .token-label {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-accent-text);
   text-transform: uppercase;
@@ -6100,7 +7060,7 @@ export default {
 }
 
 .token-usage-bar .token-value {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-mint);
   flex: 1; /* Allow value to take space if needed */
@@ -6108,7 +7068,7 @@ export default {
 }
 
 .token-usage-bar .token-detail {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
 }
 
@@ -6123,21 +7083,21 @@ export default {
   padding: 6px 12px;
   background: var(--awd-bg);
   border: 1px solid var(--awd-warning);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
 }
 
 .continue-hint {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-warning-text);
 }
 
 .continue-btn {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-text-on-accent);
   background: var(--awd-accent);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 4px 14px;
   cursor: pointer;
   transition: background 0.2s;
@@ -6155,11 +7115,11 @@ export default {
   padding: 6px 12px;
   background: var(--awd-bg);
   border: 1px solid var(--awd-warning);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
 }
 
 .link-hint {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-warning-text);
 }
 
@@ -6173,12 +7133,12 @@ export default {
   padding: 6px 12px;
   background: var(--awd-bg);
   border: 1px solid var(--awd-warning);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
 }
 
 .audio-transcribe-hint {
   flex: 1;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-warning-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6187,11 +7147,11 @@ export default {
 
 .audio-transcribe-btn {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 3px 12px;
   cursor: pointer;
   transition: all 0.15s;
@@ -6219,11 +7179,11 @@ export default {
   padding: 5px 12px;
   background: var(--awd-bg);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
 }
 
 .task-control-name {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-text);
   flex-shrink: 0;
@@ -6231,7 +7191,7 @@ export default {
 
 .task-control-msg {
   flex: 1;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6240,11 +7200,11 @@ export default {
 
 .task-control-btn {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 3px 12px;
   cursor: pointer;
   transition: all 0.15s;
@@ -6275,7 +7235,7 @@ export default {
   /* 与下方输入卡对齐（卡自带描边），行距走 8 栅格 */
   padding: 0 2px 8px;
   background-color: transparent;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   z-index: 10;
   width: 100%;
   box-sizing: border-box;
@@ -6295,7 +7255,7 @@ export default {
   align-items: center;
   gap: 4px;
   opacity: 0.6;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
 }
 
 /* 本轮用量是一句说明，不是要盯着看的数字面板：去掉等宽加粗，与左侧改动/新增同重 */
@@ -6319,10 +7279,10 @@ export default {
   display: flex;
   align-items: center;
   padding: 4px 12px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background-color: var(--awd-surface);
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-text-2); /* Gray-Medium */
   border: 1px solid var(--awd-border); /* Gray-Light */
@@ -6372,8 +7332,8 @@ export default {
   margin-bottom: 8px; /* Gap */
   width: 200px;
   background: var(--awd-surface);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-md);
   padding: 4px 0;
   z-index: 100;
   border: 1px solid var(--awd-border);
@@ -6401,7 +7361,7 @@ export default {
 }
 
 .file-name-text {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6428,7 +7388,7 @@ export default {
   font-weight: 600;
 }
 .token-detail {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
 }
 
@@ -6510,11 +7470,11 @@ export default {
 
 /* .rollback-btn:hover .rollback-icon-svg,
 .rollback-btn:hover .rollback-text {
-  color: white;
+  color: var(--awd-text-on-accent);
 } */
 
 .rollback-text {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
   font-weight: 600;
 }
@@ -6533,7 +7493,7 @@ export default {
 }
 
 .warning-text {
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text);
   margin-bottom: 12px;
   display: block;
@@ -6542,7 +7502,7 @@ export default {
 .doc-tip-box {
   background-color: var(--awd-surface);
   border: 1px solid var(--awd-info);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 10px;
   display: flex;
   flex-direction: row;
@@ -6558,7 +7518,7 @@ export default {
 }
 
 .doc-tip-text {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-info-text);
   display: flex;
   flex-direction: column;
@@ -6572,18 +7532,18 @@ export default {
 .rollback-preview {
   background-color: var(--awd-surface-2);
   padding: 8px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   border-left: 3px solid var(--awd-border-strong);
 }
 
 .preview-label {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   margin-right: 4px;
 }
 
 .preview-content {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   font-style: italic;
 }
@@ -6603,7 +7563,7 @@ export default {
 }
 
 .section-title {
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text-2);
   margin-bottom: 12px;
   display: block;
@@ -6611,7 +7571,7 @@ export default {
 
 .ppt-option-card {
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   padding: 16px;
   margin-bottom: 12px;
   cursor: pointer;
@@ -6627,7 +7587,7 @@ export default {
 .ppt-option-card.active {
   border-color: var(--awd-info);
   background-color: var(--awd-info-soft);
-  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.15);
+  box-shadow: var(--awd-shadow-sm);
 }
 
 .option-header {
@@ -6645,7 +7605,7 @@ export default {
 }
 
 .option-name {
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-text);
   flex: 1;
@@ -6654,11 +7614,11 @@ export default {
 .check-mark {
   color: var(--awd-info-text);
   font-weight: bold;
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
 }
 
 .option-desc {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   line-height: 1.5;
   padding-left: 32px; /* align with text start */
@@ -6675,7 +7635,7 @@ export default {
 .rollback-archive-note {
   color: var(--awd-text-2);
   font-weight: 400;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
 }
 
 .highlight-text {
@@ -6704,11 +7664,11 @@ export default {
     padding: 8px 12px;
     background: var(--awd-surface);
     border: 1px solid var(--awd-border);
-    border-radius: 10px;
+    border-radius: var(--awd-radius-dialog);
 }
 
 .ccr-text {
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     color: var(--awd-text);
 }
 
@@ -6733,21 +7693,21 @@ export default {
     max-width: 88%;
     background: var(--awd-surface);
     border: 1px solid var(--awd-border);
-    border-radius: 12px;
+    border-radius: var(--awd-radius-dialog);
     box-shadow: var(--awd-shadow-lg);
     padding: 18px;
 }
 
 .cg-title {
     display: block;
-    font-size: 15px;
+    font-size: var(--awd-font-size-reading);
     font-weight: 600;
     color: var(--awd-text);
     margin-bottom: 10px;
 }
 
 .cg-installing-text {
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     color: var(--awd-text-2);
 }
 
@@ -6760,8 +7720,8 @@ export default {
 .cg-btn {
     padding: 7px 14px;
     border: 1px solid var(--awd-border-strong);
-    border-radius: 8px;
-    font-size: 13px;
+    border-radius: var(--awd-radius-dialog);
+    font-size: var(--awd-font-size-body);
     color: var(--awd-text);
     cursor: pointer;
 }

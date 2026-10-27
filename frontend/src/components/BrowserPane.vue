@@ -3,47 +3,63 @@
 <template>
   <view class="browser-pane">
     <view class="browser-toolbar">
-      <view class="browser-btn" @tap="goBack" :class="{ disabled: !canGoBack }" :title="$t('panels.bpBack')">
-        <text class="btn-icon">←</text>
-      </view>
-      <view class="browser-btn" @tap="goForward" :class="{ disabled: !canGoForward }" :title="$t('panels.bpForward')">
-        <text class="btn-icon">→</text>
-      </view>
-      <view class="browser-btn" @tap="reload" :title="$t('panels.bpRefresh')">
-        <text class="btn-icon">↻</text>
-      </view>
-
-      <input
-        v-model="inputUrl"
-        class="url-input"
-        :placeholder="$t('panels.bpUrlPlaceholder')"
-        @confirm="navigate(inputUrl)"
-      />
-      <view class="browser-btn primary" @tap="navigate(inputUrl)" :title="$t('panels.bpOpen')">
-        <text class="btn-icon">↵</text>
+      <view class="browser-nav">
+        <view class="browser-btn" role="button" :tabindex="!canGoBack ? -1 : 0" :aria-disabled="!canGoBack" :class="{ disabled: !canGoBack }"
+          @tap="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"
+          :title="$t('panels.bpBack')" :aria-label="$t('panels.bpBack')">
+          <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path v-for="(d, gi) in ICONS.arrowLeft" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </view>
+        <view class="browser-btn" role="button" :tabindex="!canGoForward ? -1 : 0" :aria-disabled="!canGoForward" :class="{ disabled: !canGoForward }"
+          @tap="goForward" @keydown.enter.prevent="goForward" @keydown.space.prevent="goForward"
+          :title="$t('panels.bpForward')" :aria-label="$t('panels.bpForward')">
+          <svg class="btn-icon-svg icon-forward" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path v-for="(d, gi) in ICONS.arrowLeft" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </view>
+        <view class="browser-btn" role="button" tabindex="0"
+          @tap="reload" @keydown.enter.prevent="reload" @keydown.space.prevent="reload"
+          :title="$t('panels.bpRefresh')" :aria-label="$t('panels.bpRefresh')">
+          <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path v-for="(d, gi) in ICONS.refresh" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </view>
       </view>
 
-      <!-- 收藏本页：已收藏时星形实心（再点只提示，不重复入库；删除仍去收藏面板坞位） -->
-      <view
-        class="browser-btn"
-        :class="{ on: isCurrentFavorited, disabled: !canFavorite }"
-        @tap="favoriteCurrentPage"
-        :title="isCurrentFavorited ? $t('panels.bpFavorited') : $t('panels.bpAddFavorite')"
-      >
-        <svg class="btn-icon-svg" viewBox="0 0 24 24" :fill="isCurrentFavorited ? 'currentColor' : 'none'" xmlns="http://www.w3.org/2000/svg"><path v-for="(d, gi) in ICONS.star" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      <view class="browser-address">
+        <!-- uni 的 v-model 更新有节流；确认/失焦使用事件的完整值，避免快速输入后打开截断地址。 -->
+        <input
+          v-model="inputUrl"
+          class="url-input"
+          :aria-label="$t('panels.bpUrlPlaceholder')"
+          :placeholder="$t('panels.bpUrlPlaceholder')"
+          placeholder-class="url-placeholder"
+          @blur="inputUrl = $event.detail.value"
+          @confirm="navigate($event.detail.value)"
+        />
+        <view class="browser-btn" role="button" tabindex="0"
+          @tap="navigate(inputUrl)" @keydown.enter.prevent="navigate(inputUrl)" @keydown.space.prevent="navigate(inputUrl)"
+          :title="$t('panels.bpOpen')" :aria-label="$t('panels.bpOpen')">
+          <svg class="btn-icon-svg icon-forward" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path v-for="(d, gi) in ICONS.arrowLeft" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </view>
       </view>
 
-      <!-- 收藏夹/快捷方式抽屉开关 -->
-      <view class="browser-btn" :class="{ on: shelfOpen }" @tap="toggleShelf" :title="$t('panels.bpShelf')">
-        <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path v-for="(d, gi) in ICONS.bookmark" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
-      </view>
-
-      <view class="browser-btn" @tap="openInAppNewTab" :title="$t('panels.bpNewTab')">
-        <text class="btn-icon">⧉</text>
-      </view>
-
-      <view class="browser-btn" :class="{ primary: isMobileMode }" @tap="toggleMobileMode" :title="isMobileMode ? $t('panels.bpSwitchToDesktop') : $t('panels.bpSwitchToMobile')">
-        <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path v-for="(d, gi) in (isMobileMode ? ICONS.phone : ICONS.desktop)" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      <view class="browser-actions">
+        <view class="browser-btn" role="button" :tabindex="!canFavorite ? -1 : 0" :aria-disabled="!canFavorite" :class="{ on: isCurrentFavorited, disabled: !canFavorite }" :aria-pressed="isCurrentFavorited"
+          @tap="favoriteCurrentPage" @keydown.enter.prevent="favoriteCurrentPage" @keydown.space.prevent="favoriteCurrentPage"
+          :title="isCurrentFavorited ? $t('panels.bpFavorited') : $t('panels.bpAddFavorite')" :aria-label="isCurrentFavorited ? $t('panels.bpFavorited') : $t('panels.bpAddFavorite')">
+          <svg class="btn-icon-svg" viewBox="0 0 24 24" :fill="isCurrentFavorited ? 'currentColor' : 'none'" aria-hidden="true"><path v-for="(d, gi) in ICONS.star" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </view>
+        <view class="browser-btn" role="button" tabindex="0" :class="{ on: shelfOpen }" :aria-expanded="shelfOpen"
+          @tap="toggleShelf" @keydown.enter.prevent="toggleShelf" @keydown.space.prevent="toggleShelf"
+          :title="$t('panels.bpShelf')" :aria-label="$t('panels.bpShelf')">
+          <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path v-for="(d, gi) in ICONS.bookmark" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </view>
+        <view class="browser-btn" role="button" tabindex="0"
+          @tap="openInAppNewTab" @keydown.enter.prevent="openInAppNewTab" @keydown.space.prevent="openInAppNewTab"
+          :title="$t('panels.bpNewTab')" :aria-label="$t('panels.bpNewTab')">
+          <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path v-for="(d, gi) in ICONS.copyDoc" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </view>
+        <view class="browser-btn" role="button" tabindex="0" :class="{ on: isMobileMode }" :aria-pressed="isMobileMode"
+          @tap="toggleMobileMode" @keydown.enter.prevent="toggleMobileMode" @keydown.space.prevent="toggleMobileMode"
+          :title="isMobileMode ? $t('panels.bpSwitchToDesktop') : $t('panels.bpSwitchToMobile')" :aria-label="isMobileMode ? $t('panels.bpSwitchToDesktop') : $t('panels.bpSwitchToMobile')">
+          <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path v-for="(d, gi) in (isMobileMode ? ICONS.phone : ICONS.desktop)" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </view>
       </view>
 
       <!-- 加载中提示：必须钉在工具栏而不是内容区——BrowserView 是原生层，恒盖住
@@ -879,18 +895,46 @@ export default {
   height: 100%;
   min-height: 0;
   background: var(--awd-surface);
+  container-type: inline-size;
 }
 
+/* 与工作台共用暖中性表面、32px 控件及轻量图标动作。 */
 .browser-toolbar {
   position: relative;
-  height: 40px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 10px;
-  border-bottom: 1px solid var(--awd-border);
+  gap: var(--awd-space-2);
+  padding: var(--awd-space-1) var(--awd-space-2);
+  border-bottom: 1px solid var(--awd-border-subtle);
+  background: var(--awd-bg);
+}
+
+.browser-nav,
+.browser-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--awd-space-1);
+  flex: none;
+}
+
+.browser-address {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  height: var(--awd-control-height);
+  box-sizing: border-box;
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-md);
   background: var(--awd-surface);
+  transition: border-color var(--awd-motion-fast) ease;
+}
+
+.browser-address:focus-within {
+  border-color: var(--awd-accent);
+  outline: var(--awd-focus-width) solid var(--awd-accent-text);
+  outline-offset: var(--awd-focus-offset);
 }
 
 /* 钉在工具栏底边（覆盖 border-bottom 那一线），不落进 .browser-body——那里恒被
@@ -905,22 +949,33 @@ export default {
 }
 
 .browser-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: var(--awd-control-height);
+  height: var(--awd-control-height);
+  flex: none;
+  border-radius: var(--awd-radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: var(--awd-surface);
-  color: var(--awd-text);
+  background: transparent;
+  color: var(--awd-text-2);
   cursor: pointer;
+  transition: background var(--awd-motion-fast) ease, color var(--awd-motion-fast) ease;
 }
 
-.browser-btn.primary {
-  background: var(--awd-info);
-  color: var(--awd-text-on-accent);
-  border-color: transparent;
+.browser-btn:hover {
+  background: var(--awd-surface-2);
+  color: var(--awd-text);
+}
+
+.browser-btn:active,
+.browser-btn.on {
+  color: var(--awd-accent-text);
+  background: var(--awd-accent-soft);
+}
+
+.browser-btn:focus-visible {
+  outline: var(--awd-focus-width) solid var(--awd-accent-text);
+  outline-offset: var(--awd-focus-offset);
 }
 
 .browser-btn.disabled {
@@ -928,26 +983,60 @@ export default {
   pointer-events: none;
 }
 
-/* 星形已收藏 / 抽屉展开：森林绿点缀，保持克制 */
-.browser-btn.on {
-  color: var(--awd-accent-text);
-  border-color: var(--awd-accent);
-  background: var(--awd-accent-soft);
+.browser-address .browser-btn {
+  width: var(--awd-panel-row-h);
+  height: var(--awd-panel-row-h);
+  margin-right: 1px;
 }
 
-.btn-icon {
-  font-size: 14px;
-  font-weight: 700;
-}
+.icon-forward { transform: rotate(180deg); }
 
 .url-input {
   flex: 1;
-  height: 32px;
-  border-radius: 8px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  padding: 0 10px;
-  font-size: 13px;
-  background: var(--awd-surface);
+  min-width: 0;
+  height: 100%;
+  padding: 0 var(--awd-space-3);
+  font-family: var(--awd-font-sans);
+  font-size: var(--awd-font-size-body);
+  color: var(--awd-text);
+  background: transparent;
+}
+
+:deep(.url-placeholder) { color: var(--awd-text-2); }
+
+/* 分栏宽度由 pane 决定，不能按整个窗口判断。窄栏保留全部动作，不挤扁地址。 */
+@container (max-width: 480px) {
+  .browser-toolbar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--awd-space-1) var(--awd-space-2);
+  }
+  .browser-actions {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+}
+
+@container (max-width: 360px) {
+  .browser-toolbar { grid-template-columns: minmax(0, 1fr); }
+  .browser-actions {
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
+
+@media (pointer: coarse) {
+  .browser-btn,
+  .browser-address .browser-btn {
+    width: var(--awd-control-height-touch);
+    height: var(--awd-control-height-touch);
+  }
+  .browser-address { height: calc(var(--awd-control-height-touch) + 2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .browser-btn, .browser-address { transition: none; }
 }
 
 /* 收藏夹/快捷方式抽屉：普通文档流元素（flex 列的一段），展开即挤压下方
@@ -965,7 +1054,7 @@ export default {
 .shelf-section + .shelf-section {
   margin-top: 12px;
   padding-top: 10px;
-  border-top: 1px solid rgba(148, 163, 184, 0.25);
+  border-top: 1px solid var(--awd-border-subtle);
 }
 
 .shelf-head {
@@ -976,7 +1065,7 @@ export default {
 }
 
 .shelf-title {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-text-2);
   letter-spacing: 0.02em;
@@ -990,7 +1079,7 @@ export default {
   border: 1px solid var(--awd-accent);
   border-radius: 999px;
   color: var(--awd-accent-text);
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   cursor: pointer;
   background: var(--awd-surface);
 }
@@ -1012,7 +1101,7 @@ export default {
 }
 
 .shelf-empty {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   padding: 6px 2px;
 }
@@ -1029,16 +1118,16 @@ export default {
   gap: 6px;
   width: 190px;
   padding: 7px 9px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: 8px;
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-dialog);
   background: var(--awd-surface);
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--awd-shadow-sm);
 }
 
 .shelf-card:hover {
   border-color: var(--awd-accent);
-  box-shadow: 0 1px 4px rgba(46, 90, 80, 0.12);
+  box-shadow: var(--awd-shadow-md);
 }
 
 .shelf-card-main {
@@ -1050,7 +1139,7 @@ export default {
 }
 
 .shelf-card-title {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   white-space: nowrap;
   overflow: hidden;
@@ -1058,7 +1147,7 @@ export default {
 }
 
 .shelf-card-host {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   white-space: nowrap;
   overflow: hidden;
@@ -1069,12 +1158,12 @@ export default {
   flex-shrink: 0;
   width: 18px;
   height: 18px;
-  border-radius: 5px;
+  border-radius: var(--awd-radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--awd-text-3);
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   visibility: hidden;
 }
 
@@ -1083,7 +1172,7 @@ export default {
 }
 
 .shelf-card-x:hover {
-  background: rgba(148, 163, 184, 0.18);
+  background: var(--awd-surface-2);
   color: var(--awd-text-2);
 }
 
@@ -1128,12 +1217,12 @@ export default {
 }
 
 .bce-text {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
 }
 
 .bce-detail {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   word-break: break-all;
   max-width: 420px;
@@ -1143,10 +1232,10 @@ export default {
   margin-top: 4px;
   padding: 7px 18px;
   border: 1px solid var(--awd-border-strong);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   background: var(--awd-surface);
   color: var(--awd-accent-text);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   cursor: pointer;
 }
 
@@ -1169,19 +1258,19 @@ export default {
 }
 
 .ble-title {
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .ble-reason {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   max-width: 420px;
 }
 
 .ble-detail {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   word-break: break-all;
   max-width: 420px;
@@ -1191,10 +1280,10 @@ export default {
   margin-top: 4px;
   padding: 7px 18px;
   border: 1px solid var(--awd-border-strong);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   background: var(--awd-surface);
   color: var(--awd-accent-text);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   cursor: pointer;
 }
 

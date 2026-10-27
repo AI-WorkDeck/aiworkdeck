@@ -91,7 +91,7 @@ test('invalid login credentials reject in the current form without recursively o
   const h = harness({ code: 1, kind: 'UNAUTHORIZED', message: 'Invalid verification code' })
   for (const name of ['loginAccount', 'connectAccount', 'sendAccountLoginCode']) {
     const functionSource = api.slice(api.indexOf('export function ' + name + '(')).split('\n}')[0] + '\n}'
-    const method = new Function('request', 'unwrapEnvelope', functionSource.replace('export function', 'function') + '\nreturn ' + name)(h.request, value => value)
+    const method = new Function('request', 'unwrapEnvelope', 'cloudAccountChanged', functionSource.replace('export function', 'function') + '\nreturn ' + name)(h.request, value => value, () => { throw new Error('Failed login must not invalidate the account scope') })
     await assert.rejects(method('synthetic'), e => e.kind === 'UNAUTHORIZED' && e.message === 'Invalid verification code' && !e.accountRequired)
   }
   assert.deepEqual(h.prompts, [])

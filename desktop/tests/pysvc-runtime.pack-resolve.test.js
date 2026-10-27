@@ -96,3 +96,46 @@ test('未知服务名不猜路径，直接 null', (t) => {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
   assert.strictEqual(resolveServiceRoot(makeCtx(root), 'litviz-service'), null)
 })
+
+test('HTTP service check rejects a listening foreign server and accepts only expected health', async (t) => {
+  const http = require('http')
+  const { checkServiceHealth } = require('../main/services/pysvc-runtime')
+  let response = { status: 'ok', service: 'other-service' }
+  const server = http.createServer((_req, res) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(response)) })
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise((resolve) => server.close(resolve)))
+  const port = server.address().port
+  assert.equal(await checkServiceHealth('kokoro-service', port), false)
+  response = { status: 'ok', service: 'kokoro-service' }
+  assert.equal(await checkServiceHealth('kokoro-service', port), true)
+  response = { status: 'healthy', version: '3.4.3' }
+  assert.equal(await checkServiceHealth('mineru-service', port), true)
+  assert.equal(await checkServiceHealth('asr-service', port), false)
+})
+
+test('HTTP service check bounds a socket that never returns a response', async (t) => {
+  const net = require('net')
+  const { checkServiceHealth } = require('../main/services/pysvc-runtime')
+  const sockets = new Set()
+  const server = net.createServer((socket) => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)) })
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => { for (const socket of sockets) socket.destroy(); server.close() })
+  assert.equal(await checkServiceHealth('asr-service', server.address().port, 30), false)
+})
+
+
+test('startup health retries transient HTTP failure within a fixed deadline', async (t) => {
+  const { waitForServiceHealth } = require('../main/services/pysvc-runtime')
+  let attempts = 0
+  const server = require('http').createServer((req, res) => {
+    if (++attempts < 2) { res.writeHead(503); res.end(); return }
+    res.end(JSON.stringify({ status: 'ok', service: 'asr-service' }))
+  })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => server.close())
+  assert.equal(await waitForServiceHealth('asr-service', server.address().port, 500, 10), true)
+  assert.equal(attempts, 2)
+  const start = Date.now()
+  assert.equal(await waitForServiceHealth('kokoro-service', server.address().port, 50, 5), false)
+  assert.ok(Date.now() - start < 500)
+})

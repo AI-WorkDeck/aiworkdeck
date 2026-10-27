@@ -148,6 +148,52 @@ class PluginHostImpl implements PluginHost {
     @Override public Settings settings() { return settings; }
     @Override public Llm llm() { return llm; }
 
+    @Override public com.checkba.plugin.api.Notifications notifications() {
+        return new com.checkba.plugin.api.Notifications() {
+            private PluginNotificationService service() {
+                if (f.notifications == null) throw new UnsupportedOperationException("Message center unavailable");
+                return f.notifications.getObject();
+            }
+            public Map<String,Object> publish(Map<String,Object> notification) { return service().publish(pluginId, enter(), notification); }
+            public Map<String,Object> resolve(String eventKey, String state) { return service().resolve(pluginId, enter(), eventKey, state); }
+            public List<Map<String,Object>> publishProject(long projectId, List<Long> recipients, Map<String,Object> notification) {
+                return service().publishProject(pluginId, enter(), projectId, recipients, notification);
+            }
+            public void resolveProject(long projectId, List<Long> recipients, String eventKey, String state) {
+                service().resolveProject(pluginId, enter(), projectId, recipients, eventKey, state);
+            }
+        };
+    }
+
+    @Override public com.checkba.plugin.api.PluginSessions sessions() {
+        return new com.checkba.plugin.api.PluginSessions() {
+            private PluginAgentSessionService service() {
+                if (f.agentSessions == null) throw new UnsupportedOperationException("Native Agent sessions are unavailable");
+                return f.agentSessions.getObject();
+            }
+            @Override public void authorize() {
+                ToolCall c = enter();
+                service().authorize(pluginId, c);
+            }
+            @Override public com.checkba.plugin.api.PluginSession ensure(String key, String title) {
+                ToolCall c = enter();
+                return service().ensure(pluginId, c, key, title);
+            }
+            @Override public com.checkba.plugin.api.PluginSession status(String key) {
+                ToolCall c = enter();
+                return service().status(pluginId, c, key);
+            }
+            @Override public boolean submit(String key, String requestId, String prompt, List<String> skillIds) {
+                ToolCall c = enter();
+                return service().submit(pluginId, c, key, requestId, prompt, skillIds);
+            }
+            @Override public boolean cancel(String key) {
+                ToolCall c = enter();
+                return service().cancel(pluginId, c, key);
+            }
+        };
+    }
+
     // ------------------------------------------------------------------ guards
 
     /** 配额 + 必须有调用上下文。 */

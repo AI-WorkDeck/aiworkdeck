@@ -1,0 +1,15 @@
+{
+  "plugin.name": "Banco di lavoro DPIA",
+  "plugin.description": "Valutazione d'impatto sulla protezione dei dati: tracciamento delle fonti, conferma dei fatti, follow-up di domande e risposte, rischi e rimedi, rivalutazione continua e report versionati. Adattato dal banco di lavoro DPIA DSH di Zhu Lingfeng; richiede Node.js, Python e LibreOffice.",
+  "plugin.author": "AI WorkDeck (Origine: Zhu Lingfeng / The-Data-Galaxy)",
+  "setting.nodePath.label": "Eseguibile Node.js",
+  "setting.nodePath.description": "Lasciare vuoto per usare il node dal PATH di sistema; richiede Node.js 20 o successivo.",
+  "setting.pythonPath.label": "Eseguibile Python",
+  "setting.pythonPath.description": "Richiede le dipendenze dei documenti da runtime/requirements.txt; è possibile specificare un percorso Python da un ambiente virtuale.",
+  "setting.pdfFontPath.label": "File di font CJK per PDF",
+  "setting.pdfFontPath.description": "L'inserimento di testo CJK nei modelli PDF nativi richiede un font TrueType incorporabile (TTF/TTC); lasciare vuoto per usare la ricerca dei font di sistema.",
+  "setting.sofficePath.label": "Eseguibile LibreOffice",
+  "setting.sofficePath.description": "Necessario solo per l'esportazione dei report in PDF e l'anteprima delle pagine; lasciare vuoto per provare le posizioni predefinite di sistema.",
+  "tool.dpia_workbench_action.description": "Caso DPIA, materiali, conferma dei fatti, domande e risposte, stato di esecuzione e operazioni dei report. Solo per l'interfaccia del workbench; l'AI non deve invocare le voci di conferma/approvazione manuali.",
+  "tool.dpia_workbench_task.description": "Eseguire le attività DPIA attualmente bloccate: context/read/write/script/commit/report; rigorosamente limitato al progetto utente corrente e alla directory di output del caso."
+}

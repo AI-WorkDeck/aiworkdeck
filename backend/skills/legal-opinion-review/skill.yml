@@ -4,12 +4,15 @@
 id: legal-opinion-review
 name: 法律意见书审查
 name_en: Legal Opinion Review
+builtin_workflow: true
 description: 根据相关材料核对法律意见书中的事实、事实时点和结论，保留证据缺口并以修订和批注落实；尊重用户指定的段落范围，不自动扩成合同条款审查。
+description_en: Cross-check facts, factual cut-off dates, and conclusions in a legal opinion against supporting materials, record evidence gaps, and apply tracked changes and comments within the user-specified scope.
 languages: [zh-CN, en-US]
 triggers: [法律意见书, 法律意見書]
 triggers_en: [legal opinion]
 prompt: prompt.md
 tool_policy: restrict
+verification_policy: slot_evidence_challenger
 allowed_tools:
   - doc_get_document_text
   - doc_get_paragraph

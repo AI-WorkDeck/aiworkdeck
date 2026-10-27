@@ -33,6 +33,7 @@ languages:
   - en-US
 
 name_en: Meeting Recording
+description_en: One-click meeting audio recording with automatic speaker-diarized transcription and AI-generated structured meeting minutes (agenda, key points, decisions, action items, risk notes) saved directly to project files.
 
 # 触发条件：用户输入包含任一关键词即命中（面板 kick-off prompt 以「会议纪要」开头）。
 # 匹配口径见 SkillRouter.containsTrigger：中文是子串匹配，拉丁串两端要求整词。

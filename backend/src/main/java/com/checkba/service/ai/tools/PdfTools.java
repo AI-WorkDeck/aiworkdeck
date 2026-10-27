@@ -11,6 +11,7 @@ import com.checkba.service.ai.AiDocxExportService;
 import com.checkba.service.ai.EditorBridgeService;
 import com.checkba.service.ai.PdfEditService;
 import com.checkba.service.pack.NativePackService;
+import com.checkba.service.pack.ModelPresence;
 import com.checkba.service.pack.OptionalComponents;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
@@ -51,6 +52,9 @@ public class PdfTools implements AgentToolComponent {
     private final com.checkba.storage.ProjectStorageResolver storageResolver;
     // mineru-service / pptx-service 从 0.38.0 起是按需下载的可选组件（设计 §3.2）
     private final NativePackService packService;
+    private final ModelPresence modelPresence;
+    private final com.checkba.service.ocr.OcrRoutingService ocrRouting;
+    private final com.checkba.service.ocr.PdfCloudOcrService cloudOcr;
 
     private static final Long AGENT_USER_ID = 10001L;
     private static final int INSPECT_MAX_CHARS_PER_PAGE = 3000;
@@ -335,6 +339,7 @@ public class PdfTools implements AgentToolComponent {
 
             String base = baseName(file.getName());
             StringBuilder report = new StringBuilder();
+            java.util.List<Object> producedFiles = new java.util.ArrayList<>();
             int done = 0;
             // 逐段分别登记：某一段失败不回滚已经产出的那几份（文件已经在文件树里了，
             // 说成失败会让用户去找一个其实存在的文件），如实逐条报告成功与失败。
@@ -344,13 +349,20 @@ public class PdfTools implements AgentToolComponent {
                     int pages = pdfEditService.extractPages(localPath, target, seg.pages());
                     return String.format("%s（%d 页）", pageLabel(seg.pages()), pages);
                 });
-                if (!line.startsWith("Error:")) done++;
-                report.append(line).append('\n');
+                if (GeneratedFileLocation.createdId(line) != null) {
+                    done++;
+                    producedFiles.add(new com.fasterxml.jackson.databind.ObjectMapper().readTree(line));
+                } else {
+                    report.append(line).append('\n');
+                }
             }
             String failures = done == segments.size() ? ""
                     : String.format("（%d 段失败，只重试失败的那几段，不要整份重拆）", segments.size() - done);
-            return String.format("已把『%s』（共 %d 页）拆分为 %d / %d 份%s，原件保持不变：\n%s",
+            String message = String.format("已把『%s』（共 %d 页）拆分为 %d / %d 份%s，原件保持不变：\n%s",
                     file.getName(), total, done, segments.size(), failures, report.toString().strip());
+            if (done == 0) return "Error: " + message;
+            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(java.util.Map.of(
+                    "status", "success", "files", producedFiles, "message", message));
         } catch (Exception e) {
             return errorOf("拆分 PDF 失败", e);
         }
@@ -490,13 +502,13 @@ public class PdfTools implements AgentToolComponent {
           "本机转换组件没装或正在下载时，本工具会请用户下载、本轮到此结束，装好后自动重新执行——" +
           "不要改用文字提取或其它方式自行生成文档。组件装好了但转换仍失败时返回失败原因：" +
           "只保留文字的结构级转换会丢掉表格与版式，必须先征得用户同意，再带 allowStructuralFallback=true 调用；" +
-          "2) 扫描件（无文本层）自动走本地 MinerU OCR 识别出内容再转（内容级，文档不出本机）。" +
+          "2) 扫描件优先本地 OCR；本地不可用时，按用户保存的选择或界面确认使用云端识别，或下载本地引擎后继续（内容级，不保留原版布局）。" +
           "这是对 PDF 做大范围修改的正确路径：转出 docx 后用 doc_* 工具编辑（带修订痕迹）。" +
           "转换是机械流程，不消耗模型步数重新生成内容；完成后新 docx 自动在编辑器中打开（加载需要时间），" +
           "返回信息会注明实际使用的转换路径，向用户如实转述。同一轮里对同一份 PDF 再调一次会直接复用已转出的那份。")
     public String pdf_to_word(
             @P("PDF 文件 ID") Long fileId,
-            @P("目标文件夹 ID（可选，传 null 放项目根目录）") Long parentId,
+            @P("目标文件夹 ID（可选，省略跟随源 PDF 所在目录；传 0 明确放项目根目录）") Long parentId,
             @P(value = "版式级转换失败时是否允许退回只保留文字的结构级转换（表格与版式会丢失）。"
                     + "默认 false；只有用户明确同意后才传 true", required = false) Boolean allowStructuralFallback
     ) {
@@ -504,6 +516,8 @@ public class PdfTools implements AgentToolComponent {
                 fileId, parentId, allowStructuralFallback);
         try {
             ProjectFile file = getPdfFile(fileId);
+            parentId = GeneratedFileLocation.resolve(projectFileService, file.getProjectId(), parentId,
+                    GeneratedFileLocation.initialParent(projectFileService, file.getProjectId(), fileId));
             // 同一轮对同一份 PDF 再转一次：直接复用（dev-board#1017，RENAME 会再多一份同名 docx）
             String runKey = EditorBridgeService.pdfToWordKey(file.getId(), parentId);
             String reused = reuseGenerated(runKey);
@@ -515,46 +529,72 @@ public class PdfTools implements AgentToolComponent {
             String markdown = extracted.markdown();
 
             if (extracted.looksScanned()) {
-                // 扫描件：本地 MinerU OCR（pptx-service 路由本地优先/云端兜底）
-                String ocrMarkdown;
-                try {
-                    ocrMarkdown = pptxServiceClient.ocrPdfToMarkdown(localPath.toString());
-                } catch (Exception e) {
-                    log.warn("MinerU OCR failed for scanned PDF", e);
-                    if (markdown != null && !markdown.isBlank()) {
-                        // 手里还有已经提取到的文本层（页眉页码那种稀薄内容，也可能是一份
-                        // 本来就很短的文本件）。OCR 失败就回退用它，别把一份能转的文档
-                        // 变成一句「请去装 MinerU」——判据偏向 OCR 的前提就是有这条兜底。
-                        log.warn("OCR 不可用，回退到已提取的稀薄文本层: {}", file.getName());
-                    } else {
-                        OptionalComponents.Entry me = OptionalComponents.byService("mineru-service");
-                        if (!packService.isReady(me.packId())) {
-                            long sizeMb = packService.knownSizes(me.packId()).downloadBytes() / (1024 * 1024);
-                            editorBridgeService.sendComponentRequiredAction(
-                                    me.packId(), me.service(), me.modelId(), sizeMb, me.featureKeys(), "pdf_to_word");
-                            // 同 PptxTools：文案里不出现「稍后重试」，模型会原样转述
-                            return "该 PDF 是扫描件（无文本层），本机的「扫描件 OCR 引擎」组件还没安装，"
-                                    + "已请用户确认下载（界面上已经弹出提示，含 3GB 模型）。"
-                                    + "用户确认后会自动装好并重新执行这一步，不要让用户等一会儿再试一次。";
-                        }
-                        return "Error: 该 PDF 是扫描件（无文本层），已尝试本地 MinerU OCR 但失败：" + e.getMessage() +
-                                "\n请确认桌面端 MinerU 组件已下载并启动（设置-组件管理），或稍后重试。";
-                    }
-                    ocrMarkdown = null;
+                var route = ocrRouting.route(file, localPath);
+                if (route == com.checkba.service.ocr.OcrRoutingService.Route.CANCELLED) return "任务已取消，未继续识别或生成 Word。";
+                boolean localReady = packService.isReady("pptx-runtime") && packService.isReady("mineru-runtime")
+                        && modelPresence.installed("mineru-models");
+                String ocrMarkdown = null;
+                String reason = "本地扫描件识别组件尚未准备好。";
+                boolean localAvailable = true;
+                boolean usedCloud = false;
+                if (!localReady && route == com.checkba.service.ocr.OcrRoutingService.Route.LOCAL) {
+                    String waiting = promptPptxComponentIfMissing("pdf_to_word");
+                    if (waiting != null) return waiting;
+                    waiting = promptOcrComponentIfMissing();
+                    if (waiting != null) return waiting;
                 }
-                if (ocrMarkdown == null) {
-                    // 走下面的文本型分支，用已提取的文本层继续
-                } else {
+                if (localReady && !ocrRouting.cloudChosenForTask(file, localPath)) {
+                    try {
+                        if (!pptxServiceClient.isHealthy()) throw new IllegalStateException("本机 PDF 转换入口服务未启动或不可达");
+                        ocrMarkdown = pptxServiceClient.ocrPdfToMarkdown(localPath.toString());
+                        if (ocrMarkdown == null || ocrMarkdown.isBlank()) throw new IllegalStateException("本地 OCR 未返回解析内容");
+                    } catch (com.checkba.service.ai.PptxServiceClient.LocalOcrUnsupportedException error) {
+                        reason = error.getMessage(); localAvailable = false;
+                    } catch (Exception error) {
+                        reason = "本地 OCR 未完成：" + error.getMessage();
+                    }
+                }
+                if (ocrMarkdown == null || ocrMarkdown.isBlank()) {
+                    route = ocrRouting.route(file, localPath); // Recheck consent after a potentially long local attempt.
+                    if (route == com.checkba.service.ocr.OcrRoutingService.Route.CANCELLED) return "任务已取消，未继续识别或生成 Word。";
+                    if (route == com.checkba.service.ocr.OcrRoutingService.Route.CLOUD) {
+                        try {
+                            ToolContext originalContext = ToolContextHolder.get();
+                            ocrMarkdown = cloudOcr.recognize(localPath, () -> {
+                                if (Thread.currentThread().isInterrupted() || (originalContext != null && originalContext.isCancelled()))
+                                    throw new java.util.concurrent.CancellationException("任务已取消，后续页面未上传");
+                                ocrRouting.requireCloudPermission(file, localPath);
+                            });
+                            usedCloud = true;
+                        } catch (Exception error) {
+                            if (Thread.currentThread().isInterrupted() || (ToolContextHolder.get() != null && ToolContextHolder.get().isCancelled()))
+                                return "任务已取消，后续页面未上传，未生成 Word。";
+                            if (ocrRouting.route(file, localPath) == com.checkba.service.ocr.OcrRoutingService.Route.CANCELLED)
+                                return "任务已取消，后续页面未上传，未生成 Word。";
+                            reason = "云端识别未完成：" + error.getMessage();
+                            ocrRouting.offer(file, localPath, reason, localAvailable);
+                            return reason + " 已显示重试云端或改用本地的选择，未生成 Word。等待用户选择，本轮到此为止。";
+                        }
+                    } else {
+                        ocrRouting.offer(file, localPath, reason, localAvailable);
+                        return reason + " 已请用户选择云端识别或准备本地引擎，选择后会继续任务；不要自行改用其它方式生成文档，本轮到此为止。";
+                    }
+                }
+                ToolContext finishingContext = ToolContextHolder.get();
+                if (Thread.currentThread().isInterrupted() || (finishingContext != null && finishingContext.isCancelled())
+                        || ocrRouting.route(file, localPath) == com.checkba.service.ocr.OcrRoutingService.Route.CANCELLED)
+                    return "任务已取消，未生成 Word。";
+                if (usedCloud) ocrRouting.requireCloudPermission(file, localPath);
                 ProjectFile docx = aiDocxExportService.exportMarkdownToDocx(
                         file.getProjectId(), parentId, AGENT_USER_ID, docxName, ocrMarkdown);
+                ocrRouting.complete(file, localPath);
                 editorBridgeService.noteGenerated(runKey, docx.getId());
                 editorBridgeService.sendRefreshFilesAction();
                 editorBridgeService.sendOpenFileAction(docx);
-                return String.format("已将扫描件『%s』经本地 MinerU OCR 识别并转换为 Word 文档『%s』（文件 ID: %d），已在编辑器中打开（加载需要时间；随后的 doc_* 调用若返回 EDITOR_BOOTING，就等一等再重试同一步）。\n" +
-                        "说明：这是 OCR 内容级转换（识别文字并保留段落结构，不保留原版式；识别结果建议人工核对）。\n" +
+                return GeneratedFileLocation.createdResult(docx, String.format("已将扫描件『%s』经" + (usedCloud ? "云端" : "本地 MinerU") + " OCR 识别并转换为 Word 文档『%s』（文件 ID: %d），已在编辑器中打开（加载需要时间；随后的 doc_* 调用若返回 EDITOR_BOOTING，就等一等再重试同一步）。\n" +
+                        "说明：这是" + (usedCloud ? "云端" : "本地") + " OCR 内容级转换（识别文字并保留段落结构，不保留原版式；识别结果建议人工核对）。\n" +
                         "接下来可用 doc_* 编辑工具修改该 docx（修改带修订痕迹）。",
-                        file.getName(), docx.getName(), docx.getId());
-                }
+                        file.getName(), docx.getName(), docx.getId()));
             }
 
             // 文本型：版式级优先（pdf2docx），失败回退结构级
@@ -579,10 +619,10 @@ public class PdfTools implements AgentToolComponent {
 
                     editorBridgeService.sendRefreshFilesAction();
                     editorBridgeService.sendOpenFileAction(docx);
-                    return String.format("已将『%s』版式级转换为 Word 文档『%s』（文件 ID: %d），已在编辑器中打开（加载需要时间；随后的 doc_* 调用若返回 EDITOR_BOOTING，就等一等再重试同一步）。\n" +
+                    return GeneratedFileLocation.createdResult(docx, String.format("已将『%s』版式级转换为 Word 文档『%s』（文件 ID: %d），已在编辑器中打开（加载需要时间；随后的 doc_* 调用若返回 EDITOR_BOOTING，就等一等再重试同一步）。\n" +
                             "说明：版式级转换（pdf2docx），段落/表格/图片/分栏尽量保留原排版。\n" +
                             "接下来可用 doc_* 编辑工具修改该 docx（修改带修订痕迹，用户可逐条接受/拒绝）。",
-                            file.getName(), docx.getName(), docx.getId());
+                            file.getName(), docx.getName(), docx.getId()));
                 } finally {
                     Files.deleteIfExists(tempOut);
                 }
@@ -604,7 +644,7 @@ public class PdfTools implements AgentToolComponent {
             editorBridgeService.noteGenerated(runKey, docx.getId());
             editorBridgeService.sendRefreshFilesAction();
             editorBridgeService.sendOpenFileAction(docx);
-            return LangText.of(
+            return GeneratedFileLocation.createdResult(docx, LangText.of(
                     String.format("已将『%s』按用户同意做了结构级转换，得到 Word 文档『%s』（文件 ID: %d），已在编辑器中打开（加载需要时间）。\n" +
                             "说明：结构级转换只保留文字与段落，原文的表格与版式已丢失。向用户如实说明这一点。\n" +
                             "接下来可用 doc_* 编辑工具修改该 docx（修改带修订痕迹）。",
@@ -614,7 +654,7 @@ public class PdfTools implements AgentToolComponent {
                             + "Note: a structural conversion keeps only the text and paragraphs; the original tables and "
                             + "layout have been lost. Tell the user this plainly.\n"
                             + "You can now edit the docx with the doc_* tools (edits are tracked).",
-                            file.getName(), docx.getName(), docx.getId()));
+                            file.getName(), docx.getName(), docx.getId())));
         } catch (Exception e) {
             return errorOf("PDF 转 Word 失败", e);
         }
@@ -644,15 +684,34 @@ public class PdfTools implements AgentToolComponent {
             log.warn("Could not determine pptx-runtime readiness", e);
         }
         return LangText.of(
-                "版式级转换需要本机组件「PPT 生成与 PDF 转 Word」，它还没有装好（可能正在下载），"
+                "PDF 转 Word 需要本机组件「PPT 生成与 PDF 转 Word」，它还没有装好（可能正在下载），"
                         + "已请用户确认下载（界面上已经弹出提示）。装好后会自动重新执行这一步。"
                         + "你现在不需要重复调用本工具，也不要改用文字提取或其它方式自行生成文档"
                         + "（那样会丢掉表格与版式）；本轮到此为止。",
-                "Layout-level conversion needs the local component \"PPT generation and PDF to Word\", which is not "
+                "PDF to Word conversion needs the local component \"PPT generation and PDF to Word\", which is not "
                         + "installed yet (it may still be downloading). The user has been asked to confirm the download "
                         + "(a prompt is already on screen). This step will run again automatically once it is installed. "
                         + "Do not call this tool again now, and do not switch to text extraction or any other way of "
                         + "producing the document yourself (that would lose the tables and layout); this turn ends here.");
+    }
+
+    /** runtime 与模型沿用同一张准备卡；装好后重发原消息，继续尚未完成的 OCR。 */
+    private String promptOcrComponentIfMissing() {
+        OptionalComponents.Entry e = OptionalComponents.byService("mineru-service");
+        boolean runtimeReady = packService.isReady(e.packId());
+        boolean modelReady = modelPresence.installed(e.modelId());
+        if (runtimeReady && modelReady) return null;
+        long sizeMb = packService.knownSizes(e.packId()).downloadBytes() / (1024 * 1024);
+        editorBridgeService.sendComponentRequiredAction(
+                e.packId(), e.service(), e.modelId(), sizeMb, e.featureKeys(), "pdf_to_word");
+        return LangText.of(
+                "本地扫描件 OCR 的" + (runtimeReady ? "识别模型" : "运行组件和模型")
+                        + "尚未准备好，已请用户确认下载（界面上已经弹出提示）。"
+                        + "装好后会自动重新执行这一步；不要重复调用或改用不完整文本层生成文档，本轮到此为止。",
+                "The local scanned-PDF OCR " + (runtimeReady ? "models are" : "runtime and models are")
+                        + " not ready. The user has been asked to confirm the download. This step will run again "
+                        + "once preparation finishes. Do not repeat the tool or convert the incomplete text layer; "
+                        + "this turn ends here.");
     }
 
     /** 组件已就绪但版式级转换失败：说清原因，结构级回退要用户点头。 */
@@ -771,8 +830,8 @@ public class PdfTools implements AgentToolComponent {
             created.setFileSize(Files.size(target));
             projectFileRepository.save(created);
 
-            return String.format("%s 新文件『%s』（文件 ID: %d）已保存在原件所在目录。",
-                    summary, created.getName(), created.getId());
+            return GeneratedFileLocation.createdResult(created, String.format("%s 新文件『%s』（文件 ID: %d）已保存在原件所在目录。",
+                    summary, created.getName(), created.getId()));
         } catch (PdfEditService.PdfEditException e) {
             return "Error: " + e.getMessage();
         } catch (Exception e) {

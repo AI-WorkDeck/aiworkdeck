@@ -13,9 +13,7 @@
     - 新建 / 打开文件夹：emit 给宿主，宿主先把编辑器落盘，再跑与菜单「文件」同一条命令（config/commands/file.js）；
     - 取案卷：与项目列表同一个 CloudAcceptDialog；
     - 连接团队服务器：设置标签的「团队」一栏（注入的 openSettingsTab）；
-    - 凭访问码进入案卷：与登录页「客户」tab 同一个 ClientAccessCodeForm。桌面端用 mode="portal"
-      （dev-board#1050：系统浏览器打开案件库客户门户 {cloud.collab.base-url}/client/#code=<码>，不登录本应用）；
-      浏览器端（团队服务器网页）用 mode="login"，打页面所在服务器的 clientLogin；
+    - 凭访问码进入案卷：打开完整工作台的客户协作标签，连接受邀项目而不替换主账号。
     - 进项目：注入的 leaveWorkbench（先落盘再 reLaunch 进带 id 的工作台）。
   客户视图（CLIENT）只看得到 Recent，建项目 / 取案卷 / 连服务器三项对他收起。
 -->
@@ -26,6 +24,36 @@
         <text class="welcome-brand">{{ $t('onboarding.unlock.brand.brand') }}</text>
         <text class="welcome-tagline">{{ $t('onboarding.unlock.brand.tagline') }}</text>
         <text class="welcome-lead">{{ $t('onboarding.unlock.brand.lead') }}</text>
+      </view>
+
+      <view class="welcome-quick-chat">
+        <textarea
+          v-model="quickPrompt"
+          class="welcome-quick-chat-input"
+          :placeholder="$t('workbench.welcome.quickChatPlaceholder')"
+          :maxlength="-1"
+          :auto-height="true"
+          @keydown.enter.exact.prevent="submitQuickChat"
+        />
+        <view class="welcome-quick-chat-actions">
+          <view class="welcome-quick-chat-tools">
+            <view class="welcome-quick-tool" data-quick="new-docx" @tap="$emit('quick-create-doc', 'docx')">
+              <svg class="welcome-quick-tool-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path v-for="(d, gi) in ICONS.filePlus" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <text>{{ $t('workbench.welcome.quickNewDocx') }}</text>
+            </view>
+            <view class="welcome-quick-tool" data-quick="new-md" @tap="$emit('quick-create-doc', 'md')">
+              <svg class="welcome-quick-tool-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path v-for="(d, gi) in ICONS.docText" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <text>{{ $t('workbench.welcome.quickNewMd') }}</text>
+            </view>
+          </view>
+          <view class="welcome-quick-send" data-quick="send" @tap="submitQuickChat">
+            <text>{{ quickPrompt.trim() ? $t('workbench.welcome.quickChatSend') : $t('workbench.welcome.enterChatMode') }}</text>
+          </view>
+        </view>
       </view>
 
       <view class="welcome-columns">
@@ -65,7 +93,7 @@
                 <text class="welcome-action-text">{{ $t('welcome.connectTeamServer') }}</text>
               </view>
             </template>
-            <view v-if="showAccessCodeEntry" class="welcome-action" data-action="access-code" @tap="openAccessCode">
+            <view class="welcome-action" data-action="access-code" @tap="$emit('open-client-workspace')">
               <svg class="welcome-action-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path v-for="(d, gi) in ICONS.logIn" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
@@ -127,28 +155,6 @@
       </view>
     </view>
 
-    <!-- 凭访问码进入案卷：与登录页「客户」tab 同一个表单组件 -->
-    <view v-if="showAccessCode" class="welcome-dialog-mask" @tap.self="showAccessCode = false">
-      <view class="welcome-dialog">
-        <view class="welcome-dialog-head">
-          <text class="welcome-dialog-title">{{ $t('welcome.accessCodeDialogTitle') }}</text>
-          <text class="welcome-dialog-close" @tap="showAccessCode = false">×</text>
-        </view>
-        <text class="welcome-dialog-hint">{{ $t('welcome.accessCodeDialogHint') }}</text>
-        <!-- 桌面端：案卷在案件库的客户门户里（浏览器打开，不登录本应用，dev-board#1050）；
-             浏览器端（团队服务器上的网页）：页面所在那台服务器的 clientLogin，进本服务器的工作台。 -->
-        <ClientAccessCodeForm
-          v-if="isDesktop"
-          mode="portal"
-          compact
-          autofocus
-          :portal-base="caseServerUrl"
-          @portal-opened="showAccessCode = false"
-        />
-        <ClientAccessCodeForm v-else compact autofocus />
-      </view>
-    </view>
-
     <CloudAcceptDialog
       v-model:visible="showCloudAccept"
       @accepted="onCloudAccepted"
@@ -157,7 +163,7 @@
 </template>
 
 <script>
-import { getMyProjects, getTelemetrySettings, getOfficialCloud } from '@/services/api.js'
+import { getMyProjects, getTelemetrySettings } from '@/services/api.js'
 import { getRecentProjectIds } from '@/utils/recentProjects.js'
 import { getCurrentUser } from '@/utils/auth.js'
 import { isDesktopHost, host } from '@/services/host.js'
@@ -166,14 +172,13 @@ import { setGlobalOverlay } from '@/utils/overlayState.js'
 import { ICONS } from '@/config/icons.js'
 import { buildRecentProjects } from './welcomeRecent.js'
 import { loadTelemetryNoticeDismissed, saveTelemetryNoticeDismissed } from '@/pages/project-overview/welcomeTab.js'
-import ClientAccessCodeForm from '@/components/account/ClientAccessCodeForm.vue'
 import CloudAcceptDialog from '@/components/CloudAcceptDialog.vue'
 
 let overlaySeq = 0
 
 export default {
   name: 'WelcomePane',
-  components: { ClientAccessCodeForm, CloudAcceptDialog },
+  components: { CloudAcceptDialog },
   inject: {
     leaveWorkbench: { default: null },
     openSettingsTab: { default: null },
@@ -184,19 +189,15 @@ export default {
     /** 「启动时显示欢迎页」当前值（本机记忆由宿主持有） */
     showOnStartup: { type: Boolean, default: true },
   },
-  emits: ['new-project', 'open-folder', 'open-file', 'open-url', 'open-projects-pane', 'update:show-on-startup'],
+  emits: ['new-project', 'open-folder', 'open-file', 'open-url', 'open-projects-pane', 'open-client-workspace', 'update:show-on-startup', 'create-project', 'open-local-folder', 'open-loose-files', 'open-project', 'start-chat', 'quick-create-doc'],
   data() {
     return {
+      quickPrompt: '',
       recentProjects: [],
       recentState: 'loading', // loading | ready | error
-      showAccessCode: false,
       showCloudAccept: false,
       telemetryEnabled: false,
       telemetryDismissed: false,
-      // 官方案件库地址（后端 cloud.collab.base-url，经 /api/cloud/official）；客户门户的根地址，不在界面上显示
-      caseServerUrl: '',
-      // 国际站没有官方案件库（/api/cloud/official 回 available:false），桌面态客户入口整个不显示
-      portalUnavailable: false,
     }
   },
   computed: {
@@ -208,12 +209,6 @@ export default {
       return !!u && u.role === 'CLIENT'
     },
     // 判据同项目列表：有系统文件夹对话框才给「打开已有文件夹」（浏览器端降级为托管空白项目）
-    isDesktop() {
-      return isDesktopHost()
-    },
-    showAccessCodeEntry() {
-      return !this.isDesktop || !this.portalUnavailable
-    },
     isDesktopFs() {
       return isDesktopHost() && !!(host.fs && host.fs.showOpenDialog)
     },
@@ -229,7 +224,7 @@ export default {
       return this.telemetryEnabled && !this.telemetryDismissed
     },
     anyDialogOpen() {
-      return this.showAccessCode || this.showCloudAccept
+      return this.showCloudAccept
     },
   },
   watch: {
@@ -246,12 +241,16 @@ export default {
   mounted() {
     this.loadRecent()
     this.loadTelemetryState()
-    this.loadPortalBase()
   },
   beforeUnmount() {
     setGlobalOverlay(false, this._overlayHolder)
   },
   methods: {
+    submitQuickChat() {
+      const prompt = (this.quickPrompt || '').trim()
+      this.$emit('start-chat', { prompt })
+      this.quickPrompt = ''
+    },
     async loadRecent() {
       this.recentState = 'loading'
       try {
@@ -300,23 +299,6 @@ export default {
       if (localProjectId) this.openProject({ id: localProjectId })
       else this.loadRecent()
     },
-    // 凭访问码进入案卷：桌面端先取官方案件库地址（客户门户在它下面）；取不到时表单提交会如实提示
-    async openAccessCode() {
-      this.showAccessCode = true
-      await this.loadPortalBase()
-    },
-    // 桌面态挂载时就查一次：明确 available:false（国际站）就把入口藏掉；网络失败不藏，提交时如实提示
-    async loadPortalBase() {
-      if (!isDesktopHost() || this.caseServerUrl || this.portalUnavailable) return
-      try {
-        const res = await getOfficialCloud()
-        const d = (res && res.data) || {}
-        if (d.available && d.serverUrl) this.caseServerUrl = String(d.serverUrl)
-        else if (d.available === false) this.portalUnavailable = true
-      } catch (e) {
-        // 取不到不拦路：弹窗照开，提交时表单说「暂时取不到案件库地址」
-      }
-    },
     onConnectTeam() {
       if (this.openSettingsTab) this.openSettingsTab({ nav: 'team' })
     },
@@ -355,22 +337,130 @@ export default {
 }
 
 .welcome-brand {
-  font-size: 30px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   letter-spacing: 0.2px;
   color: var(--awd-text);
 }
 
 .welcome-tagline {
-  font-size: 18px;
+  font-size: var(--awd-font-size-title);
   color: var(--awd-accent-text);
 }
 
 .welcome-lead {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   line-height: 1.6;
   max-width: 560px;
+}
+
+.welcome-quick-chat {
+  margin: -8px 0 36px;
+  padding: 12px 14px 10px;
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-dialog);
+  background: var(--awd-surface);
+  box-shadow: var(--awd-shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.welcome-quick-chat:focus-within {
+  border-color: var(--awd-accent);
+  box-shadow: 0 0 0 2px var(--awd-accent-soft);
+}
+
+.welcome-quick-chat-input {
+  width: 100%;
+  min-height: 44px;
+  max-height: 140px;
+  padding: 2px 0;
+  box-sizing: border-box;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  color: var(--awd-text);
+  font-size: var(--awd-font-size-body);
+  line-height: 1.6;
+}
+
+.welcome-quick-chat :deep(.uni-textarea-wrapper),
+.welcome-quick-chat :deep(.uni-textarea-textarea),
+.welcome-quick-chat :deep(.uni-textarea-placeholder),
+.welcome-quick-chat :deep(textarea) {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  color: var(--awd-text);
+  font-size: var(--awd-font-size-body);
+  line-height: 1.6;
+}
+
+.welcome-quick-chat :deep(.uni-textarea-placeholder) {
+  color: var(--awd-text-3);
+}
+
+.welcome-quick-chat-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--awd-border-subtle);
+}
+
+.welcome-quick-chat-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.welcome-quick-tool {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--awd-radius-sm);
+  color: var(--awd-text-2);
+  font-size: var(--awd-panel-fs);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.welcome-quick-tool:hover {
+  background: var(--awd-surface-2);
+  color: var(--awd-text);
+}
+
+.welcome-quick-tool-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.welcome-quick-send {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: var(--awd-radius-sm);
+  background: var(--awd-accent);
+  color: var(--awd-text-on-accent);
+  font-size: var(--awd-panel-fs);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.welcome-quick-send:hover {
+  background: var(--awd-accent-hover);
 }
 
 .welcome-columns {
@@ -395,7 +485,7 @@ export default {
 }
 
 .welcome-section-title {
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 600;
   color: var(--awd-text);
   margin-bottom: 10px;
@@ -422,11 +512,11 @@ export default {
 }
 
 .welcome-action-text {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
 }
 
 .welcome-muted {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-3);
   line-height: 1.6;
 }
@@ -464,7 +554,7 @@ export default {
 }
 
 .welcome-recent-name {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-accent-text);
   white-space: nowrap;
   overflow: hidden;
@@ -473,7 +563,7 @@ export default {
 }
 
 .welcome-recent-meta {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   white-space: nowrap;
   flex-shrink: 0;
@@ -481,14 +571,14 @@ export default {
 
 .welcome-more {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
 }
 
 .welcome-guide-card {
   padding: 12px 14px;
   margin-bottom: 10px;
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   background: var(--awd-bg);
   cursor: pointer;
   display: flex;
@@ -502,13 +592,13 @@ export default {
 }
 
 .welcome-guide-title {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .welcome-guide-desc {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   line-height: 1.5;
 }
@@ -536,7 +626,7 @@ export default {
   width: 14px;
   height: 14px;
   border: 1px solid var(--awd-border-strong);
-  border-radius: 3px;
+  border-radius: var(--awd-radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -555,7 +645,7 @@ export default {
 }
 
 .welcome-startup-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
@@ -568,11 +658,11 @@ export default {
 }
 
 .welcome-telemetry-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
 }
 
 .welcome-telemetry-close {
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   line-height: 14px;
   color: var(--awd-text-3);
   cursor: pointer;
@@ -580,56 +670,6 @@ export default {
   &:hover {
     color: var(--awd-text);
   }
-}
-
-/* 访问码弹窗：铺满视口的 fixed 浮层，App.vue 的 no-drag 名单里有它 */
-.welcome-dialog-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 3000;
-  background: rgba(18, 52, 77, 0.28);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.welcome-dialog {
-  width: 360px;
-  max-width: calc(100vw - 32px);
-  background: var(--awd-surface);
-  border: 1px solid var(--awd-border);
-  border-radius: 10px;
-  box-shadow: var(--awd-shadow-lg);
-  padding: 18px 20px 20px;
-  box-sizing: border-box;
-}
-
-.welcome-dialog-head {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-
-.welcome-dialog-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--awd-text);
-}
-
-.welcome-dialog-close {
-  font-size: 18px;
-  color: var(--awd-text-3);
-  cursor: pointer;
-}
-
-.welcome-dialog-hint {
-  display: block;
-  font-size: 12px;
-  color: var(--awd-text-2);
-  line-height: 1.6;
-  margin-bottom: 14px;
 }
 
 /* 窄中栏（分屏 / 左右栏拖宽）：按中栏实际宽度把两栏叠成一栏 */

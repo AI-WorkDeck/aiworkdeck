@@ -10,13 +10,15 @@
 # 触发词刻意不用单字「报告」「核查」：它们与合同审查 / 法律意见书审查等 restrict skill 同句出现时，
 # passthrough 会让整轮放弃裁剪（SKILL_SPEC：收窄必须全体同意）。
 id: evidence-linked-report
-name: 证据闭环报告
-name_en: Evidence-Linked Report
-description: 依据项目材料撰写报告或备忘录时，逐条把有依据的结论链接回原文出处（可一键跳转高亮）；找不到证据的结论在正文中写明缺少什么材料，不挂链接、不写成定论。
+name: 证据整理与闭环报告
+name_en: Evidence Organization & Linked Report
+builtin_workflow: true
+description: 梳理项目材料生成结构化证据目录/证据清单，或在撰写尽调报告、备忘录时逐条把有依据的结论链接回原文出处（可一键跳转高亮）；缺证据的事项在正文中写明缺少什么材料，不挂链接、不写成定论。
+description_en: Organize project materials into a structured evidence catalog or checklist, and link each substantiated conclusion in due diligence reports or legal memoranda back to its source passage with one-click highlight navigation while explicitly flagging any evidence gaps.
 
 author: AI Workdeck
 author_url: https://www.aiworkdeck.com
-version: 1.0.0
+version: 1.1.0
 license: AGPL-3.0-or-later
 
 category: 尽职调查
@@ -26,6 +28,11 @@ languages:
   - en-US
 
 triggers:
+  - 证据整理
+  - 整理证据
+  - 梳理证据
+  - 证据目录
+  - 证据清单
   - 证据闭环
   - 尽调报告
   - 尽职调查报告
@@ -37,6 +44,10 @@ triggers:
   - 证据链接
 
 triggers_en:
+  - evidence organization
+  - organize evidence
+  - evidence list
+  - evidence index
   - due diligence report
   - legal memo
   - memorandum

@@ -512,12 +512,24 @@ export async function postAccountLoginSendEmailCode({ serverUrl }, email, captch
  * credentials 整体透传给后端，与官网 /api/auth/exchange-key 的三种凭据形状一一对应。
  *
  * @param credentials {phone, code} / {email, code} / {account, password}
- * @returns awdt_ 令牌字符串
+ * @returns awdt_ 令牌字符串，或首次验证的 passwordSetupRequired 受限挑战（不可保存为登录态）
  */
 export async function postAccountLogin({ serverUrl }, credentials) {
   const data = await postAnonymous(serverUrl, '/api/auth/account-login', credentials || {})
+  if (data?.data?.passwordSetupRequired) return data.data
   if (data && data.data && data.data.token) return data.data.token
   throw new Error(t('apiAccountVerifyFailed'))
+}
+
+export async function postAccountPasswordOperation({ serverUrl }, operation, payload) {
+  if (!['setup', 'reset/send-code', 'reset'].includes(operation)) throw new Error('Unknown password operation')
+  const response = await postAnonymous(serverUrl, `/api/auth/account-login/password/${operation}`, payload)
+  return response.data
+}
+
+export async function postAccountLoginChallenge({ serverUrl }, payload) {
+  const response = await postAnonymous(serverUrl, '/api/auth/account-login/captcha-challenge', payload)
+  return response.data
 }
 
 /**
@@ -708,6 +720,12 @@ export async function postChat({ serverUrl, token }, payload) {
   if (!resp.ok) {
     const err = new Error(t('apiChatFailedHttp', { status: resp.status }))
     err.status = resp.status
+    let detail = null
+    try { detail = await resp.json() } catch (_) { /* Non-JSON failures keep the HTTP fallback. */ }
+    if (detail && detail.code === 'INLINE_CONTENT_CACHE_MISS') {
+      err.code = detail.code
+      err.retryWithInlineContent = detail.retryWithInlineContent === true
+    }
     throw err
   }
 }
@@ -856,4 +874,15 @@ export async function postCancel({ serverUrl, token }, conversationId) {
   } catch (e) {
     // 停止是尽力而为：连接断了也要允许前端解锁
   }
+}
+
+/** The catalogue is authoritative when available; only an old server (404) falls back. */
+export async function fetchProjectCatalog({ serverUrl, token }) {
+  const base = normalizeBaseUrl(serverUrl)
+  const response = await fetch(`${base}/api/mobile/catalog`, { headers: headers(token) })
+  if (response.status === 404) return null
+  if (!response.ok) throw new Error(t('apiConnectFailedHttp', { status: response.status }))
+  const rows = await response.json()
+  if (!Array.isArray(rows)) throw new Error(t('apiBadResponseFormat'))
+  return rows
 }

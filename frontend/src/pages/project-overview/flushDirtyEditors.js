@@ -25,13 +25,13 @@
  * @param {object} plainTextRefs  形如 { left: inst, right: inst }，来自 _plainTextRefs
  * @returns {Promise<{flushed: number, failed: number}>}
  */
-export async function flushDirtyEditors(libreRefs, plainTextRefs) {
+export async function flushDirtyEditors(libreRefs, plainTextRefs, { timeoutMs = 10000 } = {}) {
   let flushed = 0
   const failed = new Set()
 
   const attempt = async (inst) => {
     try {
-      const saved = await inst.flushSave({ timeoutMs: 10000 })
+      const saved = await inst.flushSave({ timeoutMs })
       if (saved === false || inst.dirty || inst.saving) failed.add(inst)
       else flushed++
     } catch (e) {

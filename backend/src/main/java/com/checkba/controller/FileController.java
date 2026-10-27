@@ -46,6 +46,9 @@ public class FileController {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(FileController.class);
 
     @Autowired
+    private com.checkba.service.ProjectFileContentService contentService;
+
+    @Autowired
     private StorageServiceFactory storageServiceFactory;
 
     @Autowired
@@ -69,6 +72,31 @@ public class FileController {
     @Autowired
     private com.checkba.service.DocumentTextService documentTextService;
 
+    @Autowired
+    private com.checkba.service.ProjectFileAccessService fileAccess;
+
+    @Autowired
+    private com.checkba.service.meeting.MeetingAudioTranscoder audioTranscoder;
+
+    @Autowired(required = false)
+    @org.springframework.beans.factory.annotation.Qualifier("taskExecutor")
+    private java.util.concurrent.Executor taskExecutor;
+
+    private static final java.util.concurrent.ExecutorService FALLBACK_UPLOAD_EXECUTOR =
+            new java.util.concurrent.ThreadPoolExecutor(
+                    2, 8, 60L, java.util.concurrent.TimeUnit.SECONDS,
+                    new java.util.concurrent.LinkedBlockingQueue<>(256),
+                    r -> {
+                        Thread t = new Thread(r, "file-upload-postproc");
+                        t.setDaemon(true);
+                        return t;
+                    },
+                    new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
+
+    private java.util.concurrent.Executor asyncExecutor() {
+        return taskExecutor != null ? taskExecutor : FALLBACK_UPLOAD_EXECUTOR;
+    }
+
     /**
      * 文件的物理磁盘路径（「在 Finder 中显示」用）。
      */
@@ -81,8 +109,8 @@ public class FileController {
             return ResponseEntity.ok(Map.of("code", 1, "message", com.checkba.service.LangText.of("文件不存在", "File not found")));
         }
         ProjectFile pf = pfOpt.get();
-        if (!isAuthorizedForProject(null, sessionHeader, pf.getProjectId())) {
-            return ResponseEntity.status(403).body(Map.of("code", 1, "message", com.checkba.service.LangText.of("无权访问该文件", "You do not have access to this file")));
+        if (!isAuthorizedForFile(null, sessionHeader, pf)) {
+            return ResponseEntity.status(403).body(Map.of("code", 1, "message", com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE));
         }
         if (!org.springframework.util.StringUtils.hasText(pf.getFilePath())) {
             return ResponseEntity.ok(Map.of("code", 1, "message", com.checkba.service.LangText.of("该文件没有物理路径", "This file has no physical path")));
@@ -102,18 +130,18 @@ public class FileController {
      * 浏览器 &lt;a&gt; 下载无法设请求头，只能用 ?token=&lt;sessionId&gt;；fetch/XHR 走 X-Session-Id 头。
      * 两者取其一解析出 userId 后校验项目成员资格。此前这些接口完全无鉴权，可按数字 id 遍历下载他人文件。
      */
-    private boolean isAuthorizedForProject(String token, String sessionHeader, Long projectId) {
-        if (projectId == null) {
+    private boolean isAuthorizedForFile(String token, String sessionHeader, ProjectFile file) {
+        if (file == null) {
             return false;
         }
         String sid = StringUtils.hasText(sessionHeader) ? sessionHeader : token;
         Long userId = AuthController.getUserIdFromSession(sid);
-        return userId != null && projectMemberService.hasReadPermission(projectId, userId);
+        return fileAccess.canRead(file, userId);
     }
 
     /**
      * 写权限校验：只有 owner/ADMIN/PARTICIPANT 可改写项目文件字节，
-     * READ_ONLY 成员与客户虽然读得到（isAuthorizedForProject 为真）但不得覆盖。
+     * READ_ONLY 成员与客户虽然读得到（文件可见）但不得覆盖。
      */
     private boolean isAuthorizedForWrite(String token, String sessionHeader, Long projectId) {
         if (projectId == null) {
@@ -121,7 +149,8 @@ public class FileController {
         }
         String sid = StringUtils.hasText(sessionHeader) ? sessionHeader : token;
         Long userId = AuthController.getUserIdFromSession(sid);
-        return userId != null && projectMemberService.hasWritePermission(projectId, userId);
+        return userId != null && projectMemberService.hasWritePermission(projectId, userId)
+                && !fileAccess.isClient(projectId, userId);
     }
 
     /**
@@ -137,6 +166,107 @@ public class FileController {
         }
     }
 
+    private static final long AUDIO_PREVIEW_MAX_BYTES = 512L * 1024 * 1024;
+
+    /** QTA 只在本机转换为浏览器可播放的副本；原文件下载接口仍返回原件。 */
+    @GetMapping("/{fileId}/audio-preview")
+    public ResponseEntity<Resource> audioPreview(
+            @PathVariable("fileId") Long fileId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionHeader) {
+        ProjectFile file = projectFileRepository.findById(fileId).orElse(null);
+        if (file == null) return ResponseEntity.notFound().build();
+        if (!isAuthorizedForFile(null, sessionHeader, file)) {
+            return previewError(403, com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE);
+        }
+        if (!"qta".equalsIgnoreCase(file.getFileType())) {
+            return previewError(400, com.checkba.service.LangText.of(
+                    "此预览转换仅用于 QTA 音频", "This preview conversion only supports QTA audio"));
+        }
+        java.nio.file.Path workDir = null;
+        try {
+            workDir = java.nio.file.Files.createTempDirectory("awd-qta-preview-");
+            var input = workDir.resolve("source.qta");
+            Resource sourceResource = getStorageService().load(file.getFilePath());
+            if (sourceResource.isFile() && sourceResource.contentLength() > AUDIO_PREVIEW_MAX_BYTES) {
+                cleanupAudioPreview(workDir);
+                return audioPreviewTooLarge();
+            }
+            long copied;
+            try (var source = sourceResource.getInputStream(); var destination = java.nio.file.Files.newOutputStream(input)) {
+                // 长度未知或元数据过期也不能无限复制；含 end 的范围最多读上限加一字节。
+                copied = org.springframework.util.StreamUtils.copyRange(source, destination, 0, AUDIO_PREVIEW_MAX_BYTES);
+            }
+            if (copied > AUDIO_PREVIEW_MAX_BYTES) {
+                cleanupAudioPreview(workDir);
+                return audioPreviewTooLarge();
+            }
+            var output = audioTranscoder.toPreviewMp3(input.toFile(), workDir);
+            var cleanupDir = workDir;
+            var stream = new java.io.FilterInputStream(java.nio.file.Files.newInputStream(output.toPath())) {
+                @Override public void close() throws IOException {
+                    try { super.close(); } finally { cleanupAudioPreview(cleanupDir); }
+                }
+            };
+            // XHR 先完整获取 MP3 再播放，InputStreamResource 不做 Range，流关闭时删除临时副本。
+            return ResponseEntity.ok().contentType(MediaType.parseMediaType("audio/mpeg"))
+                    .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                    .contentLength(output.length()).body(new InputStreamResource(stream));
+        } catch (java.util.concurrent.TimeoutException e) {
+            cleanupAudioPreview(workDir);
+            return previewError(504, com.checkba.service.LangText.of(
+                    "准备 QTA 音频预览超时。请将录音导出为 M4A 后打开；原文件未修改。",
+                    "QTA audio preview preparation timed out. Export the recording as M4A and open it again. The original file is unchanged."));
+        } catch (Exception | LinkageError e) {
+            cleanupAudioPreview(workDir);
+            // JavaCV tryLoad 把 Loader 的 LinkageError 包在 IOException 内；不能按外层类型误报磁盘。
+            if (hasNativeLinkageFailure(e)) {
+                return previewError(503, com.checkba.service.LangText.of(
+                        "内置音频组件未能加载。请重新安装 AI WorkDeck 后重试；也可先将录音导出为 M4A。",
+                        "The built-in audio component could not load. Reinstall AI WorkDeck and try again, or export the recording as M4A."));
+            }
+            boolean codecFailure = e instanceof org.bytedeco.javacv.FrameGrabber.Exception
+                    || e instanceof org.bytedeco.javacv.FrameRecorder.Exception;
+            if (!codecFailure && (e instanceof IOException || e instanceof StorageException)) {
+                return previewError(500, com.checkba.service.LangText.of(
+                        "无法读取录音或写入临时预览文件。请检查文件是否仍存在、磁盘空间和文件访问权限，再重新打开。",
+                        "Could not read the recording or write its temporary preview. Check that the file still exists, disk space and file permissions, then open it again."));
+            }
+            log.warn("QTA preview failed for file {}: {}", fileId, e.toString());
+            return previewError(422, com.checkba.service.LangText.of(
+                    "无法预览这份 QTA 录音。文件可能损坏或包含无法安全选择的多层音轨。请在语音备忘录中分离录音层，分别导出为 M4A 后打开；原文件未修改。",
+                    "This QTA recording could not be previewed. It may be damaged or contain layered tracks that cannot be selected safely. Separate the recording layers in Voice Memos and export each as M4A. The original file is unchanged."));
+        }
+    }
+
+    private static boolean hasNativeLinkageFailure(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof LinkageError) return true;
+        }
+        return false;
+    }
+
+    private ResponseEntity<Resource> audioPreviewTooLarge() {
+        return previewError(413, com.checkba.service.LangText.of(
+                "QTA 预览暂时支持不超过 512 MB 的录音。请先分段或导出为 M4A 后打开；原文件未修改。",
+                "QTA preview currently supports recordings up to 512 MB. Split the recording or export it as M4A. The original file is unchanged."));
+    }
+
+    private ResponseEntity<Resource> previewError(int status, String message) {
+        return ResponseEntity.status(status).contentType(new MediaType("text", "plain", StandardCharsets.UTF_8))
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(new org.springframework.core.io.ByteArrayResource(message.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private void cleanupAudioPreview(java.nio.file.Path dir) {
+        if (dir == null) return;
+        for (String name : List.of("source.qta", "meeting-audio.mp3")) {
+            try { java.nio.file.Files.deleteIfExists(dir.resolve(name)); }
+            catch (IOException e) { log.warn("Could not remove temporary audio preview: {}", e.toString()); }
+        }
+        try { java.nio.file.Files.deleteIfExists(dir); }
+        catch (IOException e) { log.warn("Could not remove temporary audio preview directory: {}", e.toString()); }
+    }
+
     /**
      * 实际下载接口
      */
@@ -144,7 +274,8 @@ public class FileController {
     public ResponseEntity<Resource> downloadFile(
             @PathVariable("fileId") String fileId,
             @RequestParam(value = "token", required = false) String token,
-            @RequestHeader(value = "X-Session-Id", required = false) String sessionHeader) {
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionHeader,
+            @RequestParam(value = "inline", defaultValue = "false") boolean inline) {
         log.info("[FileDownload] ===== 开始处理下载请求 =====");
         log.info("[FileDownload] 收到下载请求: fileId={}", fileId);
         
@@ -160,9 +291,13 @@ public class FileController {
             if (projectFileOpt.isPresent()) {
                 ProjectFile pf = projectFileOpt.get();
                 // 鉴权：只有该文件所属项目的成员可下载（浏览器下载用 ?token=，其它用 X-Session-Id 头）
-                if (!isAuthorizedForProject(token, sessionHeader, pf.getProjectId())) {
+                if (!isAuthorizedForFile(token, sessionHeader, pf)) {
                     log.warn("[FileDownload] 拒绝越权下载: fileId={}, projectId={}", fileId, pf.getProjectId());
-                    return ResponseEntity.status(403).build();
+                    return ResponseEntity.status(403)
+                            .contentType(new MediaType("text", "plain", java.nio.charset.StandardCharsets.UTF_8))
+                            .body(new org.springframework.core.io.ByteArrayResource(
+                                    com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE
+                                            .getBytes(java.nio.charset.StandardCharsets.UTF_8)));
                 }
                 log.info("[FileDownload] 找到文件记录: id={}, name={}, filePath={}, wpsFileId={}",
                     pf.getId(), pf.getName(), pf.getFilePath(), pf.getWpsFileId());
@@ -220,7 +355,7 @@ public class FileController {
             }
 
             String filename = URLEncoder.encode(downloadFilename, StandardCharsets.UTF_8).replace("+", "%20");
-            String contentDisposition = "attachment; filename=\"" + filename + "\"";
+            String contentDisposition = (inline && MediaType.APPLICATION_PDF.equals(mediaType) ? "inline" : "attachment") + "; filename=\"" + filename + "\"";
 
             // Range（dev-board#1025）：返回 200 + Resource 时，Spring MVC（AbstractMessageConverterMethodProcessor）
             // 会按请求的 Range 头自行切成 ResourceRegion 回 206 / 越界回 416 + "bytes */total"，
@@ -231,6 +366,7 @@ public class FileController {
                 return ResponseEntity.ok()
                         .contentType(mediaType)
                         .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                    .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
                         .body(new InputStreamResource(resource.getInputStream()));
             }
 
@@ -238,6 +374,7 @@ public class FileController {
                     .contentType(mediaType)
                     .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                     .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                    .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
                     .body(resource);
         } catch (StorageException e) {
             log.error("[FileDownload] 存储异常: fileId={}, message={}", fileId, e.getMessage());
@@ -283,38 +420,6 @@ public class FileController {
     }
 
     /**
-     * 递归构建文件的逻辑路径（相对于项目根目录）
-     */
-    private String buildLogicalPath(ProjectFile file) {
-        if (file.getParentId() == null) {
-            return "";
-        }
-        
-        StringBuilder pathBuilder = new StringBuilder();
-        ProjectFile current = file;
-        
-        // 向上查找父文件夹，直到根目录
-        // 为防止死循环，设置最大深度
-        int depth = 0;
-        while (current.getParentId() != null && depth < 20) {
-            Optional<ProjectFile> parentOpt = projectFileRepository.findById(current.getParentId());
-            if (parentOpt.isPresent()) {
-                current = parentOpt.get();
-                // 在路径前插入父文件夹名
-                if (pathBuilder.length() > 0) {
-                    pathBuilder.insert(0, "/");
-                }
-                pathBuilder.insert(0, current.getName());
-            } else {
-                break;
-            }
-            depth++;
-        }
-        
-        return pathBuilder.toString();
-    }
-
-    /**
      * 下载 / 上传的目标文件定位：只认数据库数字 id（dev-board#1035）。
      *
      * <p>曾经查不到还会按 wpsFileId 回退，但 wpsFileId 不唯一（清单同步建的行为 null，
@@ -329,39 +434,7 @@ public class FileController {
         }
     }
 
-    /**
-     * 解析上传目标的存储路径：优先用 DB 记录的 filePath；没有则按项目逻辑路径
-     * 生成并回写 DB。首块(save)、追加块(append)、断点查询(getSize) 三处必须用
-     * 同一路径，否则分片会写散。
-     */
-    private String resolveUploadStoragePath(String fileId, Optional<ProjectFile> projectFileOpt) {
-        String storagePath = fileId;
-        if (projectFileOpt.isPresent()) {
-            ProjectFile pf = projectFileOpt.get();
-            if (StringUtils.hasText(pf.getFilePath())) {
-                storagePath = pf.getFilePath();
-            } else {
-                String safeName = StringUtils.hasText(pf.getName()) ? pf.getName() : fileId;
-                if (pf.getFileType() != null && !safeName.endsWith("." + pf.getFileType())) {
-                    safeName += "." + pf.getFileType();
-                }
-                String logicalPath = buildLogicalPath(pf);
-                String basePath = String.format("projects/%d", pf.getProjectId());
-                storagePath = StringUtils.hasText(logicalPath) ?
-                    String.format("%s/%s/%s", basePath, logicalPath, safeName) :
-                    String.format("%s/%s", basePath, safeName);
-
-                pf.setFilePath(storagePath);
-                projectFileRepository.save(pf);
-            }
-        }
-        return storagePath;
-    }
-
-    /**
-     * 上传接口
-     * ...
-     */
+    /** Upload reception stays outside transactions and the version lock; publication uses the content service. */
     @PostMapping("/{fileId}/upload")
     public ResponseEntity<Map<String, Object>> uploadFile(
             @PathVariable("fileId") String fileId,
@@ -450,111 +523,51 @@ public class FileController {
                 inputStream = request.getInputStream();
             }
 
-            // 1. 确定存储路径
-            // ... (Existing path logic, keep simplified for brevity in this replace block if possible, but I need to be careful not to delete logic)
-            // Wait, replace_file_content replaces a block. I should probably use multi_replace to be precise or rewrite the whole method carefully.
-            // I will rewrite the logic to use `append` if offset > 0.
+            String sid = StringUtils.hasText(sessionHeader) ? sessionHeader : token;
+            Long actor = AuthController.getUserIdFromSession(sid);
+            long incoming = multipartFile != null ? multipartFile.getSize() : request.getContentLengthLong();
+            var published = contentService.upload(projectFileOpt.get().getId(), projectFileOpt.get().getProjectId(),
+                    actor, inputStream, incoming, offset, "1".equals(request.getParameter("mustExist")),
+                    request.getHeader("X-File-Total-Size"));
 
-            // 1. 确定存储路径（首块与追加块必须解析到同一路径：此前追加块直接用
-            // 裸 wpsFileId 作路径，>5MB 文件的第 2+ 块被追加到存储根的孤儿文件里，
-            // 正式路径上只剩首块 5MB —— 下载得到截断的 zip，文档加载失败）
-            String storagePath = resolveUploadStoragePath(fileId, projectFileOpt);
-
-            String savedPath;
-            if (offset != null && offset > 0) {
-                 // 追加模式
-                 savedPath = getStorageService().append(storagePath, inputStream);
-            } else {
-                 // 覆盖/新传模式
-                 savedPath = getStorageService().save(storagePath, inputStream);
-            }
-
-            // 检查是否完成上传并触发RAG (Async)
-            // uploadComplete 同时复用为版本变更信号的完成判定：分片上传时，"上传成功"
-            // 指整个文件传完，而不是某一片落盘，避免几百个分片各发一次信号。
-            // 无 X-File-Total-Size 头的普通（非分片）上传路径不受影响，视为一次性完成。
-            boolean uploadComplete = true;
-            String totalSizeStr = request.getHeader("X-File-Total-Size");
-            if (StringUtils.hasText(totalSizeStr)) {
-                uploadComplete = false;
+            // The executor may use CallerRunsPolicy. All indexing, notifications and version signals
+            // are intentionally submitted only after publication has released the canonical lock.
+            if (published.postProcess()) {
                 try {
-                    long totalSize = Long.parseLong(totalSizeStr);
-                    long currentSize = getStorageService().getSize(savedPath); // Need to ensure savedPath works for getSize, usually it takes key?
-                    // LocalFileStorageService.getSize implementation takes key (filePath).
-                    // Wait, getStorageService().save returns the key (path). so savedPath is the key.
-
-                    uploadComplete = currentSize >= totalSize;
-                    if (uploadComplete) {
-                         if (projectFileOpt.isPresent()) {
-                             Long pid = projectFileOpt.get().getProjectId();
-                             // Async execution to prevent blocking 408 Timeout
-                             java.util.concurrent.CompletableFuture.runAsync(() -> {
-                                 try {
-                                     log.info("触发异步RAG索引: projectId={}, file={}", pid, savedPath);
-                                     projectRagService.refreshProjectKnowledgeIncremental(String.valueOf(pid), savedPath);
-                                     
-                                     // 触发自动打标签
-                                     try {
-                                         autoTaggingService.autoTagFile(pid, projectFileOpt.get().getId(), savedPath, projectFileOpt.get().getUserId());
-                                     } catch (Exception e) {
-                                         log.error("AutoTag failed", e);
-                                     }
-                                 } catch (Exception e) {
-                                     log.error("Async RAG indexing failed for file: " + savedPath, e);
-                                 }
-                             });
-                         }
-                    }
-                } catch (Exception e) {
-                    log.warn("Failed to check completion for RAG trigger", e);
-                }
-            } else {
-                // Compatibility: If no header, trigger for first chunk (Legacy behavior, but Async now)
-                if ((offset == null || offset == 0) && projectFileOpt.isPresent()) {
-                     Long pid = projectFileOpt.get().getProjectId();
-                     java.util.concurrent.CompletableFuture.runAsync(() -> {
-                         try {
-                              projectRagService.refreshProjectKnowledgeIncremental(String.valueOf(pid), savedPath);
-                              
-                              // 触发自动打标签 (Legacy)
-                              try {
-                                  autoTaggingService.autoTagFile(pid, projectFileOpt.get().getId(), savedPath, projectFileOpt.get().getUserId());
-                              } catch (Exception e) {
-                                  log.error("AutoTag (Legacy) failed", e);
-                              }
-                         } catch (Exception e) {
-                              log.error("Async RAG (Legacy) failed", e);
-                         }
-                     });
+                    java.util.concurrent.CompletableFuture.runAsync(() -> {
+                        try {
+                            projectRagService.refreshProjectKnowledgeIncremental(String.valueOf(published.file().getProjectId()), published.path());
+                            try {
+                                autoTaggingService.autoTagFile(published.file().getProjectId(), published.file().getId(),
+                                        published.path(), published.file().getUserId());
+                            } catch (Exception e) { log.error("AutoTag failed", e); }
+                        } catch (Exception e) { log.error("Async RAG indexing failed for file: " + published.path(), e); }
+                    }, asyncExecutor());
+                } catch (RuntimeException e) {
+                    log.warn("文件内容已保存，未能提交索引/标签任务: fileId={}", published.file().getId(), e);
                 }
             }
-
-            if (uploadComplete && projectFileOpt.isPresent()) {
-                String sid = StringUtils.hasText(sessionHeader) ? sessionHeader : token;
-                signalChange(projectFileOpt.get().getProjectId(), AuthController.getUserIdFromSession(sid), AuthController.getUsernameFromSession(sid));
-                // 覆盖保存也是修改：此前这条路径只写字节、不动文件行，于是编辑器自动保存
-                // 一整天，ProjectFile.updatedAt 仍停在建文件那一刻——项目列表的「最近修改」
-                // 因此永远等于创建日期。挂在 uploadComplete 上而不是每一片，分片上传只写一次。
-                try {
-                    ProjectFile touched = projectFileOpt.get();
-                    touched.setUpdatedAt(java.time.LocalDateTime.now());
-                    try {
-                        long size = getStorageService().getSize(savedPath);
-                        if (size > 0) touched.setFileSize(size);
-                    } catch (Exception ignored) {
-                        // 取不到大小不影响「改过了」这件事，时间照写
-                    }
-                    projectFileRepository.save(touched);
-                } catch (Exception e) {
-                    // 字节已经落盘，元数据没记上不该让整个上传报失败
-                    log.warn("上传完成后回写文件修改时间失败: fileId={}", fileId, e);
-                }
+            if (published.complete()) {
+                signalChange(published.file().getProjectId(), actor, AuthController.getUsernameFromSession(sid));
             }
 
             Map<String, Object> result = new HashMap<>();
             result.put("code", 0);
             return ResponseEntity.ok(result);
 
+        } catch (com.checkba.service.ProjectFileContentService.ContentWriteException e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("code", -1); error.put("message", e.getMessage());
+            if (e.reason() != null) error.put("reason", e.reason());
+            if (e.status() == 423 && "VERSION_BUSY".equals(e.reason())) error.put("writeState", "not_started");
+            return ResponseEntity.status(e.status()).body(error);
+        } catch (com.checkba.version.VersionException e) {
+            // Pre-publication lock rejection was translated by the content service. A version
+            // exception from inside publication may follow a disk write and has an unknown outcome.
+            log.warn("Content publication failed in version coordination", e);
+            return ResponseEntity.status(500)
+                    .body(Map.of("code", -1, "message", e.isUserFacing() ? e.getMessage()
+                            : com.checkba.service.LangText.of("保存失败，请重试", "Save failed; please retry")));
         } catch (Exception e) {
             log.error("上传失败", e);
             // e.getMessage() 可能为 null（如 JVM fast-throw 优化后的 NPE），
@@ -583,8 +596,8 @@ public class FileController {
             if (fileOpt.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("code", -1, "message", com.checkba.service.LangText.of("文件不存在", "File not found")));
             }
-            if (!isAuthorizedForProject(token, sessionHeader, fileOpt.get().getProjectId())) {
-                return ResponseEntity.status(403).body(Map.of("code", -1, "message", com.checkba.service.LangText.of("无权访问该文件", "You do not have access to this file")));
+            if (!isAuthorizedForFile(token, sessionHeader, fileOpt.get())) {
+                return ResponseEntity.status(403).body(Map.of("code", -1, "message", com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE));
             }
 
             String text = extractDocumentText(fileOpt.get());
@@ -634,9 +647,9 @@ public class FileController {
             ProjectFile targetFile = targetOpt.get();
 
             // 鉴权：两个文档所属项目都需当前用户有权访问
-            if (!isAuthorizedForProject(token, sessionHeader, sourceFile.getProjectId())
-                    || !isAuthorizedForProject(token, sessionHeader, targetFile.getProjectId())) {
-                return ResponseEntity.status(403).body(Map.of("code", -1, "message", com.checkba.service.LangText.of("无权访问该文件", "You do not have access to this file")));
+            if (!isAuthorizedForFile(token, sessionHeader, sourceFile)
+                    || !isAuthorizedForFile(token, sessionHeader, targetFile)) {
+                return ResponseEntity.status(403).body(Map.of("code", -1, "message", com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE));
             }
 
             // 3. 检查文件类型（只支持 doc/docx）

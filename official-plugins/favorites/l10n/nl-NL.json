@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Favorieten",
+  "plugin.description": "Zoek in projectfavorieten, kopieer, voeg in of open bronnen.",
+  "view.main.name": "Favorieten"
+}

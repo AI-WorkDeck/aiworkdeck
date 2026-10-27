@@ -3,7 +3,9 @@
 
 # Plugin guide
 
-> Originally contributed by @AzazelSensei in #730; refreshed 2026-09-29.
+> Originally contributed by @AzazelSensei in #730; developer onboarding refreshed 2026-10-18.
+
+Start with the [external developer walkthrough](plugin-developer-journey.md) for Agent instructions, installation, debugging, developer registration and scoped submission tokens. SDK 1.6 and the new developer portal require the corresponding host release / website deployment; a merged change is not an available release.
 
 Plugins extend AI WorkDeck with extra tools, sidebar panes, and declarative content. JAR plugins run **in-process** with the host; web plugins run in a sandboxed iframe. There is no JVM sandbox, so treat write access to a plugin directory as equivalent to running code as the user.
 
@@ -75,7 +77,7 @@ Each plugin is a directory with `manifest.json`:
 
 `id` is required and stable (kebab-case); enable/disable state is keyed on it. Duplicate ids: first scan wins. Permissions are the author's declaration, not a runtime grant; the host still enforces them on tool dispatch and on the bridge.
 
-If your plugin uses newer host features, declare `minHostVersion` (semver). An older host still lists the plugin but does not load it, and shows an "upgrade the client" hint instead. Unknown manifest fields are ignored, so newer manifests stay loadable on older hosts.
+If your plugin uses newer host features, declare `minHostVersion` (semver). An older host still lists the plugin but does not load it, and shows an "upgrade the client" hint instead. Use the published manifest schema. Unknown fields may be rejected by the host; do not rely on an older client accepting new declarations. `$schema` is schema metadata, not a remote fetch instruction.
 
 ## Web SDK
 

@@ -1,0 +1,31 @@
+{
+  "id": "favorites",
+  "name": "收藏夹",
+  "version": "1.0.1",
+  "description": "查找项目收藏，复制、插入或打开来源。",
+  "author": "AI WorkDeck",
+  "permissions": [
+    "file_read",
+    "file_write",
+    "editor",
+    "clipboard"
+  ],
+  "frontendEntry": "web/index.html",
+  "contributes": {
+    "views": [
+      {
+        "id": "main",
+        "name": "收藏夹",
+        "entry": "web/index.html",
+        "placement": "sidebar",
+        "scope": "project",
+        "defaultDock": "bottom",
+        "allowedDocks": [
+          "left",
+          "right",
+          "bottom"
+        ]
+      }
+    ]
+  }
+}

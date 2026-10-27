@@ -1,0 +1,4 @@
+{
+  "plugin.name": "Gestion de cabinet d'avocats",
+  "plugin.description": "Intake et validation des dossiers, vérifications des conflits d'intérêts de niveau réglementaire avec déblocage collaboratif, facturation et registre des factures (rapprochement manuel et intégration Kingdee/Yonyou), ainsi que charge de travail des avocats et tableau de bord de direction."
+}

@@ -292,7 +292,8 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("会话ID（系统自动注入）") String conversationId,
             @P("要查找的原文（须与文档精确一致）") String searchText,
             @P("替换后的新文本") String replaceText,
-            @P("是否替换所有匹配（false=仅第一处）") Boolean replaceAll
+            @P("是否替换所有匹配（false=仅第一处）") Boolean replaceAll,
+            @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
     ) {
         log.info("Tool: office_replace_text called, search={}, replaceAll={}", searchText, replaceAll);
         if (searchText == null || searchText.isBlank()) {
@@ -308,6 +309,7 @@ public class OfficeEditTools implements AgentToolComponent {
         args.put("searchText", searchText);
         args.put("replaceText", replaceText);
         args.put("replaceAll", replaceAll != null && replaceAll);
+        if (reason != null && !reason.isBlank()) args.put("reason", reason.trim());
         return officeBridgeService.executeOfficeCommand(conversationId, "replace_text", args);
     }
 
@@ -315,7 +317,7 @@ public class OfficeEditTools implements AgentToolComponent {
     private static final int MAX_BATCH_EDITS = 50;
 
     @Tool("在当前 Word 文档中一次完成多处查找替换，全部以 Word 原生修订（Track Changes）形式呈现。" +
-          "editsJson 是 JSON 数组，每个元素形如 {\"searchText\":\"原文\",\"replaceText\":\"新文\"}，一批最多 " + MAX_BATCH_EDITS + " 处。" +
+          "editsJson 是 JSON 数组，每个元素形如 {\"searchText\":\"原文\",\"replaceText\":\"新文\",\"reason\":\"修改理由（可选）\"}，一批最多 " + MAX_BATCH_EDITS + " 处。" +
           "【整篇校对、整篇润色、批量改称谓这类要改很多处的任务，必须用本工具成批提交，不要逐处调用 office_replace_text】" +
           "——逐处调用每处都要占一整个执行步（单轮上限 30 步），一份合同改不完就会中途暂停。" +
           "每条的 searchText 须与文档精确一致、不得跨段落、不超 255 字；各条之间不得重复、也不得互相包含（会把同一段文字改两遍）；" +
@@ -324,7 +326,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "批量替换（修订）", category = "office", fileEffect = "MODIFIED")
     public String office_replace_batch(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("修改清单，JSON 数组：[{\"searchText\":\"原文\",\"replaceText\":\"新文\"}, ...]") String editsJson
+            @P("修改清单，JSON 数组：[{\"searchText\":\"原文\",\"replaceText\":\"新文\",\"reason\":\"修改理由（可选）\"}, ...]") String editsJson
     ) {
         log.info("Tool: office_replace_batch called");
         BatchEdits parsed = parseBatchEdits(editsJson, false);
@@ -402,6 +404,11 @@ public class OfficeEditTools implements AgentToolComponent {
             java.util.Map<String, Object> normalized = new HashMap<>();
             normalized.put("searchText", searchText);
             normalized.put("replaceText", String.valueOf(replace));
+            Object reason = item.get("reason");
+            if (reason != null && !(reason instanceof String)) {
+                return BatchEdits.fail("Error: 第 " + index + " 条的 reason 须为字符串");
+            }
+            if (reason instanceof String text && !text.isBlank()) normalized.put("reason", text.trim());
             items.add(normalized);
         }
         // 一条 searchText 是另一条的子串时两处命中必然重叠，各自落笔＝同一段文字被改两遍
@@ -428,7 +435,7 @@ public class OfficeEditTools implements AgentToolComponent {
           "不要试图一轮列全整篇的修改。】单处、几处或选区内的修改仍用 office_replace_text / office_replace_batch。" +
           "用法：首次调用 editsJson 传 [] 拿第一块；看完这一块后把该块的修改清单传给下一次调用，同时拿到下一块；" +
           "本块不需要改就传 []；想提前结束传 stop=true。" +
-          "editsJson 的格式与校验口径与 office_replace_batch 完全一致（每条 {\"searchText\":\"原文\",\"replaceText\":\"新文\"}，" +
+          "editsJson 的格式与校验口径与 office_replace_batch 完全一致（每条 {\"searchText\":\"原文\",\"replaceText\":\"新文\",\"reason\":\"修改理由（可选）\"}，" +
           "一批最多 " + MAX_BATCH_EDITS + " 处，searchText 须与文档精确一致、不跨段落、不超 255 字，各条之间不得重复或互相包含）。" +
           "清单按【全文查找】落笔而不限于当前块——处理某一块时发现别处需要连带修改，可以一并写进同一份清单。" +
           "返回值里 pass 是进度（chunk/total/done），applied 是上一份清单的落笔结果，paragraphs 是本块正文（带段落号）。" +
@@ -436,7 +443,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "分段过卷", category = "office", fileEffect = "MODIFIED")
     public String office_pass_step(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("对上一块（或任意位置）的修改清单，JSON 数组：[{\"searchText\":\"原文\",\"replaceText\":\"新文\"}, ...]；"
+            @P("对上一块（或任意位置）的修改清单，JSON 数组：[{\"searchText\":\"原文\",\"replaceText\":\"新文\",\"reason\":\"修改理由（可选）\"}, ...]；"
                     + "首次调用与本块无需修改时传 []") String editsJson,
             @P("提前结束过卷（true=落笔后返回汇总并结束；缺省 false）") Boolean stop
     ) {
@@ -480,6 +487,9 @@ public class OfficeEditTools implements AgentToolComponent {
             applied.put("replaced", replaced);
             applied.put("requested", node.path("requested").asInt(parsed.items().size()));
             applied.put("failed", failed);
+            if (node.has("requestedEditReasons")) {
+                applied.put("requestedEditReasons", node.get("requestedEditReasons"));
+            }
         }
 
         boolean stopping = Boolean.TRUE.equals(stop);
@@ -626,7 +636,8 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("会话ID（系统自动注入）") String conversationId,
             @P("要插入的文本") String text,
             @P("定位锚点文本（可选；为空则在当前光标/选区处插入）") String anchorText,
-            @P("相对锚点的位置：before 或 after（默认 after，仅提供锚点时有效）") String position
+            @P("相对锚点的位置：before 或 after（默认 after，仅提供锚点时有效）") String position,
+            @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
     ) {
         log.info("Tool: office_insert_text called, anchor={}, position={}", anchorText, position);
         if (text == null || text.isEmpty()) {
@@ -643,6 +654,7 @@ public class OfficeEditTools implements AgentToolComponent {
         args.put("text", text);
         args.put("anchorText", anchorText == null ? "" : anchorText);
         args.put("position", pos);
+        if (reason != null && !reason.isBlank()) args.put("reason", reason.trim());
         return officeBridgeService.executeOfficeCommand(conversationId, "insert_text", args);
     }
 
@@ -671,9 +683,11 @@ public class OfficeEditTools implements AgentToolComponent {
 
     // ==================== 格式（Word 原生修订） ====================
 
-    @Tool("在当前 Word 文档中设置指定文本的字符格式：字体、字号、加粗、斜体、下划线、删除线、颜色。" +
-          "anchorText 须与文档中的文本精确一致，默认只对第一处匹配生效，applyToAll=true 对所有匹配生效。" +
-          "格式参数至少要给一个，没传的保持原样。fontName 中西文字体名都可（如 宋体 / 楷体_GB2312 / Times New Roman）。" +
+    @Tool("在当前 Word 文档中设置指定文本或连续段落的字符格式：字体（含中/西文分设）、字号、加粗、斜体、下划线、删除线、颜色。" +
+          "anchorText 须与文档中的文本精确一致，默认只对第一处匹配生效，applyToAll=true 对所有匹配生效；" +
+          "若传 paragraphCount（>=1），则以 anchorText 命中的段落为起点连续对 paragraphCount 个段落整体设置字符格式。" +
+          "格式参数至少要给一个，没传的保持原样。fontName 中西文字体名都可（如 宋体 / 楷体_GB2312 / Times New Roman），" +
+          "也可分别传 fontNameAsian（中文字体）和 fontNameWestern（西文字体）。" +
           "修改以 Word 原生修订（Track Changes）形式呈现。")
     @ToolMeta(displayName = "设置文字格式", category = "office", fileEffect = "MODIFIED")
     public String office_format_text(
@@ -681,15 +695,18 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("要设置格式的目标文本（须与文档精确一致）") String anchorText,
             @P("是否对所有匹配生效（false=仅第一处）") Boolean applyToAll,
             @P("字体名，如 宋体 / 楷体_GB2312 / Times New Roman（不改则不传）") String fontName,
-            @P("字号（磅），如 12（不改则不传）") Double fontSize,
+            @P("字号（磅），如 小四=12、四号=14、三号=16（不改则不传）") Double fontSize,
             @P("加粗 true/false（不改则不传）") Boolean bold,
             @P("斜体 true/false（不改则不传）") Boolean italic,
             @P("下划线线型：none/single/double/dotted/wave（wave=波浪线；不改则不传）") String underline,
             @P("删除线 true/false（不改则不传）") Boolean strikeThrough,
             @P("双删除线 true/false（不改则不传）") Boolean doubleStrikeThrough,
-            @P("文字颜色 #RRGGBB，如 #C00000（不改则不传）") String color
+            @P("文字颜色 #RRGGBB，如 #C00000（不改则不传）") String color,
+            @P(value = "中文字体名（如 宋体 / 仿宋_GB2312 / 楷体_GB2312，不改则不传）", required = false) String fontNameAsian,
+            @P(value = "西文字体名（如 Times New Roman / Arial，不改则不传）", required = false) String fontNameWestern,
+            @P(value = "从锚点所在段落起连续套用整段字符格式的段数（可选，1~200；不传则仅对锚点文本本身生效）", required = false) Integer paragraphCount
     ) {
-        log.info("Tool: office_format_text called, anchor={}, applyToAll={}", anchorText, applyToAll);
+        log.info("Tool: office_format_text called, anchor={}, applyToAll={}, paragraphCount={}", anchorText, applyToAll, paragraphCount);
         if (anchorText == null || anchorText.isBlank()) {
             return "Error: 目标文本不能为空";
         }
@@ -702,6 +719,9 @@ public class OfficeEditTools implements AgentToolComponent {
         if (color != null && !color.isBlank() && !HEX_COLOR.matcher(color.trim()).matches()) {
             return "Error: color 须为 #RRGGBB 格式，如 #C00000";
         }
+        if (paragraphCount != null && (paragraphCount < 1 || paragraphCount > MAX_NUMBERING_PARAGRAPHS)) {
+            return "Error: paragraphCount 须为 1~" + MAX_NUMBERING_PARAGRAPHS + " 的整数";
+        }
         String underlineValue;
         try {
             underlineValue = normalizeEnum(underline, UNDERLINE_VALUES, "underline");
@@ -711,6 +731,8 @@ public class OfficeEditTools implements AgentToolComponent {
 
         Map<String, Object> args = new HashMap<>();
         if (fontName != null && !fontName.isBlank()) args.put("fontName", fontName.trim());
+        if (fontNameAsian != null && !fontNameAsian.isBlank()) args.put("fontNameAsian", fontNameAsian.trim());
+        if (fontNameWestern != null && !fontNameWestern.isBlank()) args.put("fontNameWestern", fontNameWestern.trim());
         if (fontSize != null) args.put("fontSize", fontSize);
         if (bold != null) args.put("bold", bold);
         if (italic != null) args.put("italic", italic);
@@ -719,21 +741,23 @@ public class OfficeEditTools implements AgentToolComponent {
         if (doubleStrikeThrough != null) args.put("doubleStrikeThrough", doubleStrikeThrough);
         if (color != null && !color.isBlank()) args.put("color", color.trim());
         if (args.isEmpty()) {
-            return "Error: 未给出任何格式参数（fontName/fontSize/bold/italic/underline/strikeThrough/"
+            return "Error: 未给出任何格式参数（fontName/fontNameAsian/fontNameWestern/fontSize/bold/italic/underline/strikeThrough/"
                     + "doubleStrikeThrough/color 至少给一个）";
         }
         args.put("anchorText", anchorText);
         args.put("applyToAll", applyToAll != null && applyToAll);
+        if (paragraphCount != null) args.put("paragraphCount", paragraphCount);
         return officeBridgeService.executeOfficeCommand(conversationId, "format_text", args);
     }
 
     @Tool("在当前 Word 文档中设置段落格式：对齐、行距、段前段后间距、缩进、标题级别。" +
           "anchorText 须与文档中的文本精确一致，命中处所在的整个段落即目标段落；" +
-          "默认只对第一处匹配所在段落生效，applyToAll=true 对所有匹配所在段落生效。" +
+          "默认只对第一处匹配所在段落生效，applyToAll=true 对所有匹配所在段落生效；" +
+          "若传 paragraphCount（1~200），则从命中段落起连续对 paragraphCount 个段落批量生效。" +
           "格式参数至少要给一个，没传的保持原样。" +
           "lineSpacing/spaceBefore/spaceAfter/firstLineIndent/leftIndent/rightIndent 单位都是磅：" +
-          "行距按字号换算（12 磅字的 1.5 倍行距填 18，2 倍填 24）；" +
-          "首行缩进按中文惯例 2 字符换算（12 磅字填 24）。" +
+          "行距按字号换算（12 磅字的 1.5 倍行距填 18，2 倍填 24；若直接传倍数如 1.5 或 2，会自动按 12 磅折算为 18 或 24）；" +
+          "首行缩进可传 firstLineIndentChars（字符数，如 2；传 0 取消缩进顶格）或 firstLineIndent（磅值，12 磅字缩进 2 字符填 24）。" +
           "styleBuiltIn 用于标题级别（heading1~heading4，normal 恢复正文）。" +
           "修改以 Word 原生修订（Track Changes）形式呈现。")
     @ToolMeta(displayName = "设置段落格式", category = "office", fileEffect = "MODIFIED")
@@ -742,16 +766,18 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("目标段落中的一段文本（须与文档精确一致）") String anchorText,
             @P("是否对所有匹配所在段落生效（false=仅第一处）") Boolean applyToAll,
             @P("对齐方式：left/center/right/justify（不改则不传）") String alignment,
-            @P("行距（磅），如 12 磅字的 1.5 倍行距填 18（不改则不传）") Double lineSpacing,
+            @P("行距（磅，如 12 磅字的 1.5 倍行距填 18；传 <=5 的倍数如 1.5 会自动折算为 18 磅）（不改则不传）") Double lineSpacing,
             @P("段前间距（磅）（不改则不传）") Double spaceBefore,
             @P("段后间距（磅）（不改则不传）") Double spaceAfter,
-            @P("首行缩进（磅），正值缩进；12 磅字缩进 2 字符填 24（不改则不传）") Double firstLineIndent,
+            @P("首行缩进（磅），正值缩进；12 磅字缩进 2 字符填 24，传 0 取消缩进（不改则不传）") Double firstLineIndent,
             @P("左缩进（磅）（不改则不传）") Double leftIndent,
             @P("右缩进（磅）（不改则不传）") Double rightIndent,
-            @P("段落样式（标题级别）：normal/heading1/heading2/heading3/heading4（不改则不传）") String styleBuiltIn
+            @P("段落样式（标题级别）：normal/heading1/heading2/heading3/heading4（不改则不传）") String styleBuiltIn,
+            @P(value = "首行缩进（字符数，如 2；传 0 取消缩进顶格；按 12 磅字折算，与 firstLineIndent 二选一）", required = false) Double firstLineIndentChars,
+            @P(value = "从命中段落起连续套用段落格式的段数（可选，1~200，缺省 1）", required = false) Integer paragraphCount
     ) {
-        log.info("Tool: office_set_paragraph_format called, anchor={}, alignment={}, styleBuiltIn={}",
-                anchorText, alignment, styleBuiltIn);
+        log.info("Tool: office_set_paragraph_format called, anchor={}, alignment={}, styleBuiltIn={}, paragraphCount={}",
+                anchorText, alignment, styleBuiltIn, paragraphCount);
         if (anchorText == null || anchorText.isBlank()) {
             return "Error: 目标文本不能为空";
         }
@@ -760,6 +786,9 @@ public class OfficeEditTools implements AgentToolComponent {
         }
         if (lineSpacing != null && lineSpacing <= 0) {
             return "Error: lineSpacing 须为大于 0 的磅值（12 磅字的 1.5 倍行距填 18）";
+        }
+        if (paragraphCount != null && (paragraphCount < 1 || paragraphCount > MAX_NUMBERING_PARAGRAPHS)) {
+            return "Error: paragraphCount 须为 1~" + MAX_NUMBERING_PARAGRAPHS + " 的整数";
         }
         String alignmentValue;
         String styleValue;
@@ -772,19 +801,28 @@ public class OfficeEditTools implements AgentToolComponent {
 
         Map<String, Object> args = new HashMap<>();
         if (alignmentValue != null) args.put("alignment", alignmentValue);
-        if (lineSpacing != null) args.put("lineSpacing", lineSpacing);
+        if (lineSpacing != null) {
+            double effectiveLineSpacing = lineSpacing <= 5.0 ? lineSpacing * 12.0 : lineSpacing;
+            args.put("lineSpacing", effectiveLineSpacing);
+        }
         if (spaceBefore != null) args.put("spaceBefore", spaceBefore);
         if (spaceAfter != null) args.put("spaceAfter", spaceAfter);
-        if (firstLineIndent != null) args.put("firstLineIndent", firstLineIndent);
+        if (firstLineIndent != null) {
+            args.put("firstLineIndent", firstLineIndent);
+        } else if (firstLineIndentChars != null) {
+            args.put("firstLineIndent", firstLineIndentChars * 12.0);
+            args.put("firstLineIndentChars", firstLineIndentChars);
+        }
         if (leftIndent != null) args.put("leftIndent", leftIndent);
         if (rightIndent != null) args.put("rightIndent", rightIndent);
         if (styleValue != null) args.put("styleBuiltIn", styleValue);
         if (args.isEmpty()) {
             return "Error: 未给出任何格式参数（alignment/lineSpacing/spaceBefore/spaceAfter/"
-                    + "firstLineIndent/leftIndent/rightIndent/styleBuiltIn 至少给一个）";
+                    + "firstLineIndent/firstLineIndentChars/leftIndent/rightIndent/styleBuiltIn 至少给一个）";
         }
         args.put("anchorText", anchorText);
         args.put("applyToAll", applyToAll != null && applyToAll);
+        if (paragraphCount != null) args.put("paragraphCount", paragraphCount);
         return officeBridgeService.executeOfficeCommand(conversationId, "set_paragraph_format", args);
     }
 
@@ -1018,7 +1056,8 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("会话ID（系统自动注入）") String conversationId,
             @P("表格序号（0 开始，缺省 0）") Integer tableIndex,
             @P("单元格坐标，如 B2（列字母 + 行号，行号 1 开始）") String cell,
-            @P("该单元格的新文本") String text
+            @P("该单元格的新文本") String text,
+            @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
     ) {
         log.info("Tool: office_table_set_cell called, index={}, cell={}", tableIndex, cell);
         int index = tableIndex == null ? 0 : tableIndex;
@@ -1032,6 +1071,7 @@ public class OfficeEditTools implements AgentToolComponent {
         args.put("tableIndex", index);
         args.put("cell", cell.trim());
         args.put("text", text == null ? "" : text);
+        if (reason != null && !reason.isBlank()) args.put("reason", reason.trim());
         return officeBridgeService.executeOfficeCommand(conversationId, "table_set_cell", args);
     }
 
@@ -1199,7 +1239,8 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("会话ID（系统自动注入）") String conversationId,
             @P("header（页眉）或 footer（页脚）") String part,
             @P("要写入的文本，覆盖原有内容（空字符串等于清空）") String text,
-            @P("对齐方式：left/center/right/justify（不改则不传）") String alignment
+            @P("对齐方式：left/center/right/justify（不改则不传）") String alignment,
+            @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
     ) {
         log.info("Tool: office_edit_header_footer called, part={}", part);
         String partValue;
@@ -1217,6 +1258,7 @@ public class OfficeEditTools implements AgentToolComponent {
         args.put("part", partValue);
         args.put("text", text == null ? "" : text);
         if (alignmentValue != null) args.put("alignment", alignmentValue);
+        if (reason != null && !reason.isBlank()) args.put("reason", reason.trim());
         return officeBridgeService.executeOfficeCommand(conversationId, "edit_header_footer", args);
     }
 
@@ -2737,7 +2779,8 @@ public class OfficeEditTools implements AgentToolComponent {
     public String office_insert_footnote(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("插入脚注标记的目标文本（须与文档精确一致）") String anchorText,
-            @P("脚注正文内容") String text
+            @P("脚注正文内容") String text,
+            @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
     ) {
         log.info("Tool: office_insert_footnote called, anchor={}", anchorText);
         if (anchorText == null || anchorText.isBlank()) {
@@ -2752,6 +2795,7 @@ public class OfficeEditTools implements AgentToolComponent {
         Map<String, Object> args = new HashMap<>();
         args.put("anchorText", anchorText);
         args.put("text", text);
+        if (reason != null && !reason.isBlank()) args.put("reason", reason.trim());
         return officeBridgeService.executeOfficeCommand(conversationId, "insert_footnote", args);
     }
 
@@ -2761,7 +2805,8 @@ public class OfficeEditTools implements AgentToolComponent {
     public String office_insert_endnote(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("插入尾注标记的目标文本（须与文档精确一致）") String anchorText,
-            @P("尾注正文内容") String text
+            @P("尾注正文内容") String text,
+            @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
     ) {
         log.info("Tool: office_insert_endnote called, anchor={}", anchorText);
         if (anchorText == null || anchorText.isBlank()) {
@@ -2776,6 +2821,7 @@ public class OfficeEditTools implements AgentToolComponent {
         Map<String, Object> args = new HashMap<>();
         args.put("anchorText", anchorText);
         args.put("text", text);
+        if (reason != null && !reason.isBlank()) args.put("reason", reason.trim());
         return officeBridgeService.executeOfficeCommand(conversationId, "insert_endnote", args);
     }
 

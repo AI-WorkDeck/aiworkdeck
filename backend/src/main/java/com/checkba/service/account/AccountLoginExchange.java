@@ -80,10 +80,12 @@ final class AccountLoginExchange {
         // 而这两件对一个凭据本来就正确的用户都是错的。
         AccountException.Kind kind =
                 ("phone_binding_required".equals(code) || "captcha_failed".equals(code)
-                        || "too_many_requests".equals(code))
+                        || "sms_send_failed".equals(code) || "mail_send_failed".equals(code) || "code_send_failed".equals(code)
+                        || "too_many_requests".equals(code) || "password_login_required".equals(code)
+                        || "password_setup_required".equals(code) || "invalid_password".equals(code))
                         ? AccountException.Kind.CONFLICT
                         : AccountException.Kind.UNAUTHORIZED;
-        throw new AccountException(kind, message);
+        throw new AccountException(kind, message, code);
     }
 
     /** 官网没给 message 时的兜底文案（按 error code 分，别一律「操作失败」）。 */
@@ -96,6 +98,10 @@ final class AccountLoginExchange {
             return LangText.of("登录失败，请稍后重试", "Sign-in failed, please retry shortly");
         }
         return switch (code) {
+            case "password_login_required" -> LangText.of("此账户已设置密码，请使用密码登录；忘记密码可重置", "This account has a password. Sign in with it or reset a forgotten password");
+            case "password_setup_required" -> LangText.of("请先验证手机号或邮箱并创建密码", "Verify your phone number or email and create a password first");
+            case "invalid_password" -> LangText.of("密码需为8–72个字符", "Use a password with 8–72 characters");
+            case "invalid_setup_token" -> LangText.of("验证已过期，请重新验证手机号或邮箱", "Verification expired. Verify your phone number or email again");
             case "invalid_code" -> LangText.of("验证码错误或已过期", "Incorrect or expired verification code");
             case "invalid_credentials" -> LangText.of("账号或密码不正确", "Incorrect account or password");
             case "sms_not_supported_on_site" -> LangText.of("当前站点不支持手机号方式，请改用邮箱",
@@ -112,10 +118,15 @@ final class AccountLoginExchange {
             case "phone_binding_required" -> LangText.of(
                     "该账户尚未绑定手机号，且已超过绑定期限。请邮件联系 hi@aiworkdeck.com 处理",
                     "This account has no linked mobile number and the deadline has passed. Please email hi@aiworkdeck.com");
-            case "captcha_failed" -> LangText.of("请先完成安全验证后再试",
-                    "Please complete the security check and try again");
+            case "sms_send_failed" -> LangText.of("短信未能发送，请稍后重试", "SMS delivery failed. Please retry shortly");
+            case "mail_send_failed" -> LangText.of("邮件未能发送，请稍后重试", "Email delivery failed. Please retry shortly");
+            case "code_send_failed" -> LangText.of("验证码未能发送，请稍后重试", "Verification code delivery failed. Please retry shortly");
+            case "captcha_failed" -> LangText.of("安全验证未通过或已过期，请换一张图片或重新验证",
+                    "Security verification failed or expired. Load a new image or retry the security check");
             case "too_many_requests" -> LangText.of("验证码请求过于频繁，请稍后再试",
                     "Too many verification code requests, please try again later");
+            case "invalid_phone" -> LangText.of("请输入正确的手机号", "Enter a valid phone number");
+            case "invalid_email" -> LangText.of("请输入正确的邮箱地址", "Enter a valid email address");
             case "missing_fields" -> LangText.of("请填写完整", "Please fill in all fields");
             default -> LangText.of("登录失败，请稍后重试", "Sign-in failed, please retry shortly");
         };

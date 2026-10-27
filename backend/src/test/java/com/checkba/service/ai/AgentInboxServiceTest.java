@@ -57,6 +57,84 @@ class AgentInboxServiceTest {
     }
 
     @Test
+    void inlineBodiesStayOutOfDurableJsonAndQueuedVersionsRemainIndependent() throws Exception {
+        var first = request("review", "body-1", "queue");
+        var body = new AiAgentController.ContextItem();
+        body.setId("doc"); body.setInlineContent("synthetic first document");
+        body.setInlineContentHash("untrusted-client-hash");
+        first.setActiveContext(body);
+        var attached = new AiAgentController.ContextItem();
+        attached.setInlineContent("synthetic attachment");
+        first.setContextItems(List.of(attached));
+        var row = service.submit(first, 7L);
+        var json = new ObjectMapper().readTree(row.getRequestJson());
+        assertFalse(row.getRequestJson().contains("synthetic first document"));
+        assertFalse(row.getRequestJson().contains("synthetic attachment"));
+        assertFalse(json.path("activeContext").has("inlineContent"));
+        assertEquals(InlineContentCache.sha256Hex(body.getInlineContent()), json.path("activeContext").path("inlineContentHash").asText());
+        assertEquals("synthetic first document", first.getActiveContext().getInlineContent(), "serialization must not mutate caller");
+
+        body.setInlineContent("synthetic next version");
+        first.setClientRequestId("body-2");
+        var next = service.submit(first, 7L);
+        assertEquals("synthetic first document", service.requestOf(row).getActiveContext().getInlineContent());
+        assertEquals("synthetic attachment", service.requestOf(row).getContextItems().get(0).getInlineContent());
+        assertEquals("synthetic next version", service.requestOf(next).getActiveContext().getInlineContent());
+        service.edit("conv-1", row.getId(), "edited review", null, null, row.getRevision());
+        assertFalse(row.getRequestJson().contains("synthetic first document"));
+        assertEquals("synthetic first document", service.requestOf(row).getActiveContext().getInlineContent());
+    }
+
+    @Test
+    void restartFailsExplicitlyInsteadOfReplayingWithoutRequiredDocument() {
+        var request = request("review", "body", "queue");
+        var body = new AiAgentController.ContextItem(); body.setInlineContent("synthetic body");
+        request.setActiveContext(body);
+        var row = service.submit(request, 7L);
+        var restarted = new AgentInboxService(repository, sse, mock(AgentRunStateService.class));
+        assertThrows(AgentInboxService.InlineContentUnavailable.class, () -> restarted.requestOf(row));
+        var same = restarted.submit(request, 7L);
+        assertEquals(row.getId(), same.getId());
+        assertEquals("synthetic body", restarted.requestOf(same).getActiveContext().getInlineContent());
+    }
+
+    @Test
+    void deletedInputErasesPayloadButRetainsIdempotencyTombstone() {
+        var request = request("private question", "private-key", "queue");
+        request.setDisplayText("private display");
+        var body = new AiAgentController.ContextItem(); body.setInlineContent("synthetic private body");
+        request.setActiveContext(body);
+        var row = service.submit(request, 7L);
+        String previousJson = row.getRequestJson();
+        service.delete("conv-1", row.getId(), row.getRevision());
+        assertEquals("", row.getMessage());
+        assertNull(row.getDisplayText());
+        assertEquals("{}", row.getRequestJson());
+        assertEquals(row.getId(), service.submit(request, 7L).getId());
+        row.setRequestJson(previousJson); // Probe only the transient store, using synthetic metadata.
+        assertThrows(AgentInboxService.InlineContentUnavailable.class, () -> service.requestOf(row));
+    }
+
+    @Test
+    void startupScrubsHistoricalBodiesAndDerivedOfficeSummaryIdempotently() throws Exception {
+        var row = service.submit(request("question", "legacy", "queue"), 7L);
+        row.setRequestJson("{\"message\":\"question\",\"clientCapability\":\"office\",\"activeContext\":{\"inlineContent\":\"legacy synthetic body\"}}");
+        var summaries = mock(com.checkba.repository.ConversationSummaryRepository.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "conversationSummaries", summaries);
+        when(repository.findIdsAfter(eq(""), any())).thenReturn(List.of(row.getId()));
+        when(repository.findIdsAfter(eq(row.getId()), any())).thenReturn(List.of());
+        service.run(null);
+        String cleaned = row.getRequestJson();
+        assertFalse(cleaned.contains("legacy synthetic body"));
+        assertEquals(InlineContentCache.sha256Hex("legacy synthetic body"), new ObjectMapper().readTree(cleaned).path("activeContext").path("inlineContentHash").asText());
+        assertThrows(AgentInboxService.InlineContentUnavailable.class, () -> service.requestOf(row));
+        verify(summaries).deleteByConversationId("conv-1");
+        verify(summaries).deleteOrphanedSummaries();
+        service.run(null);
+        assertEquals(cleaned, row.getRequestJson());
+    }
+
+    @Test
     void persistsBeforeReceiptAndDeduplicatesClientRequestId() {
         AiAgentController.AgentChatRequest request = request("first", "same-key", "queue");
         AiAgentController.ContextItem attachment = new AiAgentController.ContextItem();

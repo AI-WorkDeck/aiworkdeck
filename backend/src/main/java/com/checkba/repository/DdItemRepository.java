@@ -12,4 +12,9 @@ import java.util.List;
 @Repository
 public interface DdItemRepository extends JpaRepository<DdItem, Long> {
     List<DdItem> findByDdRequestIdOrderBySortOrderAsc(Long ddRequestId);
+    @org.springframework.data.jpa.repository.Query("select e.ddRequestId from DdItem e where e.id = :id")
+    java.util.Optional<Long> findRequestIdById(@org.springframework.data.repository.query.Param("id") Long id);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select e from DdItem e where e.id = :id")
+    java.util.Optional<DdItem> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
 }

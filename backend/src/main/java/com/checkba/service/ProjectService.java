@@ -53,6 +53,14 @@ public class ProjectService {
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.service.mobile.CloudStorageQuotaService cloudStorageQuota;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.storage.StorageServiceFactory storageServiceFactory;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.version.WorkSessionService workSessions;
+
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProjectService.class);
 
     /**
@@ -66,7 +74,8 @@ public class ProjectService {
     private static final List<String> PROJECT_SCOPED_ENTITIES = List.of(
             "ProjectMember", "ProjectFile", "ProjectVariable", "ProjectProfileField",
             "ProjectMemory", "ProjectInvitation", "ProjectRemote", "ProjectTask",
-            "ProjectAiMessage", "EvidenceLink", "WorkSession");
+            "ProjectAiMessage", "EvidenceLink", "WorkSession",
+            "ContractReviewRun", "ContractReviewStandard", "DdSubmission", "DdNotification", "DdAiJob", "DdMaterialMirror", "DdRequest");
 
     /**
      * 项目建好了（dev-board#438）。{@code VersionLifecycleService} 监听它自动开启版本记录——
@@ -74,8 +83,14 @@ public class ProjectService {
      */
     public record ProjectCreatedEvent(long projectId, Long userId) {}
 
+    /** 删除事务已提交，本地监听不得再为这个 ID 注册或响应迟到的打开事件。 */
+    public record ProjectDeletedEvent(long projectId) {}
+
     @Transactional
     public Project createProject(ProjectCreateRequest request, Long userId) {
+        if (Project.LOOSE_FILES.equals(request.getProjectType()) || Project.SCRATCH.equals(request.getProjectType())) {
+            throw new IllegalArgumentException(LangText.of("不支持的项目类型", "Unsupported project type"));
+        }
         if (!StringUtils.hasText(request.getProjectType())) {
             throw new IllegalArgumentException(LangText.of("项目类型不能为空", "Project type must not be empty"));
         }
@@ -193,6 +208,7 @@ public class ProjectService {
         allProjects.addAll(memberProjects);
 
         return allProjects.stream()
+                .filter(p -> !p.isLooseFileWorkspace() && !p.isScratchWorkspace())
                 .sorted((p1, p2) -> {
                      if (p1.getCreatedAt() == null || p2.getCreatedAt() == null) return 0;
                      return p2.getCreatedAt().compareTo(p1.getCreatedAt());
@@ -270,6 +286,71 @@ public class ProjectService {
     }
 
     /**
+     * 随手工作区（dev-board#1479，Chat/Scratch Mode）：每用户至多一个的隐藏 SCRATCH 项目。
+     * 幂等：已存在即复用，不存在才建。versionOptOut=true——聊天草稿不该被版本记录搅扰。
+     */
+    @Transactional
+    public Project getOrCreateScratchProject(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException(LangText.of("请先登录", "Please sign in first"));
+        }
+        return projectRepository.findFirstByUserIdAndProjectTypeOrderByIdAsc(userId, Project.SCRATCH)
+                .orElseGet(() -> {
+                    Project p = new Project();
+                    p.setName(LangText.of("随手工作区", "Scratch Workspace"));
+                    p.setProjectType(Project.SCRATCH);
+                    p.setListedCompanyName("");
+                    p.setTargetCompanyName("");
+                    p.setUserId(userId);
+                    p.setVersionOptOut(true);
+                    p.setCreatedAt(LocalDateTime.now());
+                    p.setUpdatedAt(p.getCreatedAt());
+                    Project saved = projectRepository.save(p);
+                    ProjectMember member = new ProjectMember();
+                    member.setProjectId(saved.getId());
+                    member.setUserId(userId);
+                    member.setRole("ADMIN");
+                    projectMemberRepository.save(member);
+                    return saved;
+                });
+    }
+
+    /**
+     * 随手工作区就地转正（dev-board#1479）：SCRATCH → 正式项目（默认 BLANK），
+     * 转正后开始计入「我的项目」并允许版本记录；下一次 getOrCreateScratchProject 会另建新的。
+     */
+    @Transactional
+    public Project promoteScratchProject(Long projectId, String name, String targetProjectType, Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException(LangText.of("请先登录", "Please sign in first"));
+        }
+        Project p = getProject(projectId);
+        if (!userId.equals(p.getUserId())) {
+            throw new IllegalArgumentException(LangText.of("无权操作此项目", "Permission denied"));
+        }
+        if (!p.isScratchWorkspace()) {
+            throw new IllegalArgumentException(LangText.of("该项目不是随手工作区", "Project is not a scratch workspace"));
+        }
+        String resolvedName = (name != null && !name.trim().isEmpty())
+                ? name.trim()
+                : LangText.of("未命名项目", "Untitled Project");
+        String resolvedType = (targetProjectType != null && !targetProjectType.trim().isEmpty()
+                && !Project.SCRATCH.equals(targetProjectType.trim())
+                && !Project.LOOSE_FILES.equals(targetProjectType.trim()))
+                ? targetProjectType.trim()
+                : "BLANK";
+        p.setName(resolvedName);
+        p.setProjectType(resolvedType);
+        p.setVersionOptOut(false);
+        p.setUpdatedAt(LocalDateTime.now());
+        Project saved = projectRepository.save(p);
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new ProjectCreatedEvent(saved.getId(), userId));
+        }
+        return saved;
+    }
+
+    /**
      * 删除项目：连带清掉项目级的库行与磁盘目录。
      *
      * 「删除项目」对律师意味着这个项目的材料不再留存，所以文档目录、版本记录仓库、
@@ -277,6 +358,12 @@ public class ProjectService {
      */
     @Transactional
     public void deleteProject(Long id) {
+        workSessions.runProjectDeletion(id, () -> deleteProjectLocked(id));
+    }
+
+    private void deleteProjectLocked(Long id) {
+        boolean officialCloud = cloudStorageQuota != null && cloudStorageQuota.isEnabled();
+        if (officialCloud) cloudStorageQuota.lockProjectForWrite(id);
         Project project = entityManager.find(Project.class, id, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
         if (project == null) {
             throw new IllegalArgumentException(LangText.of("项目不存在: ", "Project not found: ") + id);
@@ -292,6 +379,35 @@ public class ProjectService {
         Path memoryGitDir = memoryRepoService.gitDir(memoryRepoKey);
         Path memoryWorkTree = memoryRepoService.workTree(memoryRepoKey);
 
+        // Whole-project deletion is authorized by its existing controller. Remove evidence references
+        // in this transaction before storage deletion; any failure rolls the references back too.
+        entityManager.createQuery("delete from DdSubmission s where s.projectId = :pid")
+                .setParameter("pid", id).executeUpdate();
+
+        // Cloud bytes must disappear before their accounting records. A failed deletion remains retryable.
+        if (officialCloud) {
+            Set<String> keys = new HashSet<>();
+            for (var file : projectFileRepository.findByProjectId(id)) {
+                if (Boolean.TRUE.equals(file.getIsFolder())) continue;
+                String key = StringUtils.hasText(file.getFilePath()) ? file.getFilePath() : file.getWpsFileId();
+                if (StringUtils.hasText(key)) keys.add(key);
+            }
+            for (String key : keys) storageServiceFactory.getStorageService().delete(key);
+            deleteDirectoryStrictly(projectDir);
+        }
+
+        try {
+            projectRepoService.objects().deleteProject(id);
+        } catch (IOException e) {
+            throw new IllegalStateException(LangText.of("版本文件未能完整删除，请重试", "Version files could not be fully deleted; please retry"), e);
+        }
+
+        entityManager.createQuery("delete from DdComment c where c.ddItemId in "
+                        + "(select i.id from DdItem i where i.ddRequestId in (select r.id from DdRequest r where r.projectId = :pid))")
+                .setParameter("pid", id).executeUpdate();
+        entityManager.createQuery("delete from DdItem i where i.ddRequestId in (select r.id from DdRequest r where r.projectId = :pid)")
+                .setParameter("pid", id).executeUpdate();
+
         // evidence_link_target 没有 project_id 列，只能先按 link id 级联，再删 evidence_link 本身。
         entityManager.createQuery(
                         "delete from EvidenceLinkTarget t where t.linkId in (select l.id from EvidenceLink l where l.projectId = :pid)")
@@ -300,6 +416,11 @@ public class ProjectService {
         // project_task_file（dev-board#895）同理：没有 project_id 列，按所属事项子查询删，必须在删 project_task 之前。
         entityManager.createQuery(
                         "delete from ProjectTaskFile f where f.taskId in (select t.id from ProjectTask t where t.projectId = :pid)")
+                .setParameter("pid", id)
+                .executeUpdate();
+        // Suggestion feedback has no project_id; remove it while the conversation messages still exist.
+        entityManager.createQuery(
+                        "delete from ChatSuggestion s where s.conversationId in (select m.conversationId from ProjectAiMessage m where m.projectId = :pid)")
                 .setParameter("pid", id)
                 .executeUpdate();
         for (String entity : PROJECT_SCOPED_ENTITIES) {
@@ -316,10 +437,38 @@ public class ProjectService {
 
         // 磁盘清理失败不回滚：库里已经删干净了，剩下的目录是可再清的垃圾，
         // 为它报错反而会让用户以为项目没删掉。
-        deleteDirectoryQuietly(projectDir);
-        deleteDirectoryQuietly(gitDir);
-        deleteDirectoryQuietly(memoryGitDir);
-        deleteDirectoryQuietly(memoryWorkTree);
+        // 若当前在事务同步上下文中，放到 afterCommit 同步回调里执行，先把 Project/User 的悲观锁与数据库连接释放掉。
+        Runnable cleanupDirs = () -> {
+            try {
+                eventPublisher.publishEvent(new ProjectDeletedEvent(id));
+            } catch (RuntimeException e) {
+                log.warn("项目已删除，通知本地监听失败: project={} ({})", id, e.toString());
+            }
+            if (!officialCloud) deleteDirectoryQuietly(projectDir);
+            deleteDirectoryQuietly(gitDir);
+            deleteDirectoryQuietly(memoryGitDir);
+            deleteDirectoryQuietly(memoryWorkTree);
+        };
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            cleanupDirs.run();
+                        }
+                    });
+        } else {
+            cleanupDirs.run();
+        }
+    }
+
+    private void deleteDirectoryStrictly(Path dir) {
+        if (dir == null || !Files.exists(dir)) return;
+        try (var walk = Files.walk(dir)) {
+            for (Path path : walk.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
+        } catch (IOException e) {
+            throw new IllegalStateException("Cloud project deletion failed; retaining its storage records", e);
+        }
     }
 
     /** 递归删目录，失败只记日志。 */

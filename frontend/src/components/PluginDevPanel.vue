@@ -283,7 +283,7 @@ export default {
 }
 
 .pdp-sec-count {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-panel-text-3);
   background: var(--awd-panel-hover);
   border-radius: 999px;
@@ -302,7 +302,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   color: var(--awd-panel-text-3);
   cursor: pointer;
 
@@ -338,12 +338,12 @@ export default {
   outline: none;
 
   &::placeholder {
-    color: var(--awd-panel-text-4);
+    color: var(--awd-panel-text-2);
   }
 
   &:focus {
-    border-color: var(--awd-panel-accent-2);
-    box-shadow: 0 0 0 2px rgba(137, 168, 160, 0.15);
+    border-color: var(--awd-accent-text);
+    box-shadow: 0 0 0 var(--awd-focus-width) var(--awd-accent-text);
   }
 }
 
@@ -362,13 +362,13 @@ export default {
   height: 24px;
   line-height: 22px;
   padding: 0 10px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   border: 1px solid var(--awd-panel-border);
   background: var(--awd-surface);
   cursor: pointer;
 
   text {
-    font-size: 11px;
+    font-size: var(--awd-panel-fs-meta);
     font-weight: 600;
     color: var(--awd-panel-text-2);
   }
@@ -403,8 +403,8 @@ export default {
 
 .pdp-empty {
   padding: 8px 12px 10px;
-  font-size: 11px;
-  color: var(--awd-panel-text-4);
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-panel-text-2);
 }
 
 .pdp-row {
@@ -427,7 +427,7 @@ export default {
   height: 24px;
   flex-shrink: 0;
   margin-top: 1px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-accent-hover);
   color: var(--awd-text-on-accent);
   display: flex;
@@ -463,7 +463,7 @@ export default {
 }
 
 .pdp-row-hint {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-warning-text);
 }
 
@@ -479,13 +479,13 @@ export default {
   height: 20px;
   line-height: 18px;
   padding: 0 8px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-surface);
   border: 1px solid var(--awd-panel-border);
   cursor: pointer;
 
   text {
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     font-weight: 600;
     color: var(--awd-panel-text-2);
   }
@@ -525,7 +525,7 @@ export default {
   }
 
   &.pdp-action-ai {
-    border-color: var(--awd-panel-accent-2);
+    border-color: var(--awd-accent-text);
 
     text {
       color: var(--awd-panel-accent);
@@ -543,7 +543,7 @@ export default {
 }
 
 .pdp-row-error-toggle {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-danger-text);
   cursor: pointer;
 
@@ -556,11 +556,11 @@ export default {
   display: block;
   margin-top: 4px;
   padding: 6px 8px;
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.5;
   color: var(--awd-danger-text);
   background: var(--awd-bg);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   white-space: pre-wrap;
   word-break: break-word;
 }

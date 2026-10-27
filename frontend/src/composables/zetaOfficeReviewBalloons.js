@@ -45,25 +45,40 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
     .awd-rb-actions { display:flex;gap:6px;flex-wrap:wrap; }.awd-rb-actions button:disabled { opacity:.45;cursor:wait; }
     .awd-rb-lines { position:absolute;inset:0;width:100%;height:100%;overflow:hidden;pointer-events:none; }
     .awd-rb-lines path { fill:none;stroke:var(--awd-bamboo);stroke-width:1;stroke-dasharray:4 4;opacity:.65; }
-    .awd-rb-notice { position:absolute;bottom:8px;right:8px;max-width:260px;padding:5px 10px;background:var(--awd-warning-soft);color:var(--awd-warning-text);z-index:3; }
+    .awd-rb-notice { position:absolute;bottom:8px;right:8px;max-width:260px;padding:5px 10px;background:var(--awd-warning-soft);color:var(--awd-warning-text);z-index:3;pointer-events:auto; }
+    .awd-rb-notice button { margin-left:8px;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-decoration:underline;cursor:pointer; }
   `
   const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.classList.add('awd-rb-lines')
   const list = doc.createElement('aside'); list.className = 'awd-rb-list'; list.setAttribute('aria-label', labels.title)
   const notice = doc.createElement('div'); notice.className = 'awd-rb-notice'; notice.hidden = true
+  notice.setAttribute('role', 'status')
+  const noticeText = doc.createElement('span'); noticeText.className = 'awd-rb-notice-text'
+  const retry = doc.createElement('button'); retry.textContent = en ? 'Refresh review' : '刷新审阅'
+  retry.onclick = () => { actionFailure = ''; showNotice(''); refreshNow() }
+  notice.append(noticeText, retry)
   root.append(svg, list, notice); doc.head.append(style); doc.body.append(root)
   let suspended = 0, generation = 0
   let disposed = false, timer = null, inFlight = false, again = false, snapshot = null
-  let viewportTimer = null
+  let viewportTimer = null, actionFailure = ''
   // Typing must never wait for review metadata (several UNO round trips per
   // item on the office thread). Edits refresh positions from cached metadata;
   // metadata is re-read once the document has been quiet for FRESH_DELAY.
   const EDIT_DELAY = 250, FRESH_DELAY = 900
-  let wantFresh = true, freshTimer = null, lastAction = '', pendingPolls = 0
+  let wantFresh = true, freshTimer = null, refreshAfterSuspend = false, pendingPolls = 0
   let enabled = false, cards = [], focusKey = '', busy = false, editingKey = '', pointerDown = false
   // Last read's gutter conclusion; the width only moves once two reads agree.
   let lastWantGutter = false
   const pageLayers = new Map()
-  function showNotice(text) { notice.textContent = text; notice.hidden = !text }
+  function showNotice(text) { noticeText.textContent = text; notice.hidden = !text }
+  function showActionFailure(result) {
+    const failed = result?.results?.find(x => !x.success)
+    const reason = [failed?.error, failed?.message, result?.error, result?.message]
+      .find(value => typeof value === 'string' && value.trim())
+    // Only display a bounded message line, never serialize objects or a stack.
+    const message = reason?.trim().split(/[\r\n]/, 1)[0].trim()
+    actionFailure = message && message.length <= 300 && !/^(at\s|wasm-function\[)/.test(message) ? message : labels.failed
+    showNotice(actionFailure)
+  }
   function makeCard(item) {
     const node = doc.createElement('article'); node.className = 'awd-rb-card'
     node.dataset.key = item.key; node.tabIndex = 0
@@ -93,6 +108,7 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
       b.onclick = async e => {
         const r = item.data
         e.stopPropagation(); if (busy) return
+        actionFailure = ''; showNotice('')
         if (action === 'edit') {
           if (node.querySelector('textarea')) return
           const input = doc.createElement('textarea'); input.className = 'awd-rb-editor'; input.value = r.content || ''; input.setAttribute('aria-label', labels.edit)
@@ -123,9 +139,9 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
           const result = await execute(item.kind === 'comment' ? (action === 'remove' ? 'delete_comment' : 'set_comment_resolved') : 'resolve_revisions', item.kind === 'comment'
             ? { id: r.id, index: r.index, resolved: action === 'resolve', revision: item.revision, documentSeq: item.documentSeq, expectedComment: r }
             : { indices: r.items.map(x => x.index).sort((a, b) => b - a), action, revision: item.revision, documentSeq: item.documentSeq, expectedRevisions: r.items })
-          if (!result?.success || result.results?.some(x => !x.success)) throw new Error()
+          if (!result?.success || result.results?.some(x => !x.success)) { showActionFailure(result); return }
           transport.send({ __lo: 'lo-relay', type: 'modified' })
-        } catch { showNotice(labels.failed) }
+        } catch { showActionFailure(null) }
         finally { busy = false; root.querySelectorAll('.awd-rb-actions button').forEach(b => { b.disabled = false }); refreshNow() }
       }
       actions.append(b)
@@ -170,7 +186,7 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
       if (card.key === editingKey) { editingKey = ''; busy = false }
       card.node.remove()
     })
-    showNotice(data.truncated ? labels.more : '')
+    showNotice(actionFailure || (data.truncated ? labels.more : ''))
   }
   function pageLayer(page) {
     let layer = pageLayers.get(page.number)
@@ -327,7 +343,7 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
       reconcile(data, items)
       root.hidden = !enabled
       if (enabled) place(data)
-    } catch { if (!disposed) showNotice(labels.failed) }
+    } catch { if (!disposed && !suspended && capturedGeneration === generation) showNotice(labels.failed) }
     finally { inFlight = false; if (again && !suspended && !pointerDown && (!busy || editingKey)) { again = false; schedule(0) } }
   }
   function schedule(delay = 80) { if (disposed) return; clearTimeout(timer); timer = setTimeout(refresh, delay) }
@@ -362,9 +378,13 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
   schedule(0)
   return {
     suspend(action) {
-      suspended++; generation++; clearTimeout(timer); lastAction = action
-      if (action === 'load_document') {
-        busy = false; editingKey = ''; pointerDown = false; snapshot = null; cards = []; focusKey = ''; enabled = false; lastWantGutter = false
+      suspended++; generation++; clearTimeout(timer)
+      // Comparisons build a different review snapshot just like document import.
+      // Do not leave cards or partial-list notices from the previous snapshot
+      // over the host's loading screen while the engine is still generating it.
+      if (['load_document', 'compare_document', 'build_comparison_document', 'build_merge_draft'].includes(action)) {
+        refreshAfterSuspend = true
+        actionFailure = ''; busy = false; editingKey = ''; pointerDown = false; snapshot = null; cards = []; focusKey = ''; enabled = false; lastWantGutter = false
         list.replaceChildren(); pageLayers.clear(); svg.replaceChildren(); root.hidden = true
       }
     },
@@ -372,7 +392,7 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
       suspended = Math.max(0, suspended - 1)
       if (suspended) return
       // Content edits also arrive as documentChanged; a command alone only moves things.
-      if (lastAction === 'load_document') refreshNow(); else schedule(EDIT_DELAY)
+      if (refreshAfterSuspend) { refreshAfterSuspend = false; refreshNow() } else schedule(EDIT_DELAY)
     },
     documentChanged: edited,
     cursorMoved() { if (enabled) schedule(200) },

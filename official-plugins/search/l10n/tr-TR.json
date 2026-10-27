@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Proje Arama",
+  "plugin.description": "Proje dosyalarını tam metin veya etiketlerle arayın ve doğrudan belgelere atlayın.",
+  "view.main.name": "Proje Arama"
+}

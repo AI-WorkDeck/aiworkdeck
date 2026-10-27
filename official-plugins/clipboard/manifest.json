@@ -1,0 +1,29 @@
+{
+  "id": "clipboard",
+  "name": "剪贴板",
+  "version": "1.0.1",
+  "description": "查找剪贴记录、复制和插入内容。",
+  "author": "AI WorkDeck",
+  "permissions": [
+    "clipboard",
+    "editor"
+  ],
+  "frontendEntry": "web/index.html",
+  "contributes": {
+    "views": [
+      {
+        "id": "main",
+        "name": "剪贴板",
+        "entry": "web/index.html",
+        "placement": "sidebar",
+        "scope": "global",
+        "defaultDock": "bottom",
+        "allowedDocks": [
+          "left",
+          "right",
+          "bottom"
+        ]
+      }
+    ]
+  }
+}

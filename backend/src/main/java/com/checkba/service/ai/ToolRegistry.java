@@ -132,6 +132,325 @@ public class ToolRegistry {
     }
 
     /**
+     * 英文工具展示名映射（与 frontend/src/utils/toolDisplayNames.js 的 en 列逐项对齐）。
+     * 当 LangText.isEnglish() 为 true 时，RegisteredTool.displayName() 返回对应的英文展示名。
+     */
+    private static final Map<String, String> ENGLISH_TOOL_DISPLAY_NAMES = Map.ofEntries(
+            Map.entry("todo_write", "Update plan"),
+            Map.entry("ask_user", "Ask the user"),
+            Map.entry("get_project_context", "Get project context"),
+            Map.entry("update_project_info", "Update project info"),
+            Map.entry("get_conversation_summary", "Recall conversation"),
+            Map.entry("list_project_folders", "List folders"),
+            Map.entry("task_create", "Create task"),
+            Map.entry("task_list", "List tasks"),
+            Map.entry("task_update", "Update task"),
+            Map.entry("search_web", "Web search"),
+            Map.entry("browse_url", "Browse page"),
+            Map.entry("deep_search", "Deep search"),
+            Map.entry("search_knowledge_base", "Search knowledge base"),
+            Map.entry("qichacha_query", "Company registry lookup"),
+            Map.entry("qichacha_ipr", "Company IP lookup"),
+            Map.entry("tushare_query", "Financial data lookup"),
+            Map.entry("law_search", "Search regulations"),
+            Map.entry("law_search_keyword", "Keyword law search"),
+            Map.entry("law_recognition", "Identify citations"),
+            Map.entry("get_law_article", "Look up article"),
+            Map.entry("read_document", "Read document"),
+            Map.entry("search_project_files", "Search files"),
+            Map.entry("search_project_content", "Search file contents"),
+            Map.entry("read_file", "Read file"),
+            Map.entry("extract_file_text", "Extract document text"),
+            Map.entry("list_files", "List files"),
+            Map.entry("list_contributed_templates", "List contributed templates"),
+            Map.entry("create_file_from_template", "Create file from template"),
+            Map.entry("write_file", "Write file"),
+            Map.entry("write_docx", "Create Word doc"),
+            Map.entry("docx_inspect_template", "Learn template style"),
+            Map.entry("text_write_file", "Write text file"),
+            Map.entry("text_find_replace", "Text find and replace"),
+            Map.entry("capability_list", "List capabilities"),
+            Map.entry("capability_install", "Prepare capability upgrade"),
+            Map.entry("capability_apply", "Apply capability upgrade"),
+            Map.entry("capability_select", "Switch capability"),
+            Map.entry("plugin_dev_scaffold", "Scaffold plugin"),
+            Map.entry("plugin_dev_install", "Install plugin locally"),
+            Map.entry("scan_files", "Scan files"),
+            Map.entry("delete_file", "Delete file"),
+            Map.entry("move_file", "Move file"),
+            Map.entry("create_folder", "Create folder"),
+            Map.entry("rename_project_file", "Rename file"),
+            Map.entry("move_project_file", "Move file"),
+            Map.entry("move_files_batch", "Move files (batch)"),
+            Map.entry("move_to_trash", "Move to recycle bin"),
+            Map.entry("copy_files", "Copy files"),
+            Map.entry("tag_list", "List tags"),
+            Map.entry("tag_file", "Tag file"),
+            Map.entry("tag_remove_from_file", "Untag file"),
+            Map.entry("memory_list", "List memories"),
+            Map.entry("memory_read", "Read memory"),
+            Map.entry("memory_search", "Search memory"),
+            Map.entry("memory_write", "Write memory"),
+            Map.entry("memory_edit", "Edit memory"),
+            Map.entry("memory_delete", "Delete memory"),
+            Map.entry("save_memory", "Save memory"),
+            Map.entry("query_memory", "Query memory"),
+            Map.entry("retrieve_evidence", "Retrieve evidence"),
+            Map.entry("get_user_profile", "Get user profile"),
+            Map.entry("dispatch_subtask", "Delegate subtask"),
+            Map.entry("list_tools", "Browse tool catalog"),
+            Map.entry("use_skill", "Use a skill"),
+            Map.entry("run_python", "Run Python"),
+            Map.entry("doc_list_project_files", "List project files"),
+            Map.entry("doc_open_file", "Open document"),
+            Map.entry("doc_start_stream", "Stream to document"),
+            Map.entry("doc_get_document_text", "Read document text"),
+            Map.entry("doc_get_clauses", "Map contract clauses"),
+            Map.entry("doc_audit_structure", "Audit contract structure"),
+            Map.entry("doc_get_outline", "Get outline"),
+            Map.entry("doc_get_selection", "Read selection"),
+            Map.entry("doc_get_cursor_context", "Inspect cursor"),
+            Map.entry("doc_get_paragraph", "Read paragraph"),
+            Map.entry("doc_goto", "Move cursor"),
+            Map.entry("doc_set_selection", "Set selection"),
+            Map.entry("doc_find_text", "Find in document"),
+            Map.entry("doc_find_replace", "Find & replace"),
+            Map.entry("doc_replace_nth_match", "Replace match"),
+            Map.entry("doc_delete_match", "Delete match"),
+            Map.entry("doc_delete_text", "Delete text"),
+            Map.entry("doc_replace_selection", "Replace selection"),
+            Map.entry("doc_insert_at_cursor", "Insert text"),
+            Map.entry("doc_modify_paragraph", "Edit paragraph"),
+            Map.entry("doc_insert_under_heading", "Insert under heading"),
+            Map.entry("doc_export_pdf", "Export to PDF"),
+            Map.entry("doc_search_related_docs", "Find related docs"),
+            Map.entry("doc_select_anchor", "Select anchor"),
+            Map.entry("doc_select_paragraph", "Select paragraph"),
+            Map.entry("doc_collapse_cursor", "Collapse cursor"),
+            Map.entry("doc_replace_at_anchor", "Replace at anchor"),
+            Map.entry("doc_delete_selection", "Delete selection"),
+            Map.entry("doc_format_selection", "Format text"),
+            Map.entry("doc_set_paragraph_format", "Format paragraph"),
+            Map.entry("doc_set_numbering", "Set numbering"),
+            Map.entry("doc_format_table", "Format table"),
+            Map.entry("doc_insert_table", "Insert table"),
+            Map.entry("doc_table_read", "Read table"),
+            Map.entry("doc_table_set_cell", "Edit table cell"),
+            Map.entry("doc_table_add_row", "Add table row"),
+            Map.entry("doc_table_delete_row", "Delete table row"),
+            Map.entry("doc_table_add_col", "Add table column"),
+            Map.entry("doc_table_delete_col", "Delete table column"),
+            Map.entry("doc_get_formatting", "Read formatting"),
+            Map.entry("doc_apply_standard_format", "Apply standard format"),
+            Map.entry("doc_apply_style_profile", "Apply style profile"),
+            Map.entry("doc_insert_toc", "Insert table of contents"),
+            Map.entry("doc_set_page_setup", "Page setup"),
+            Map.entry("doc_undo", "Undo"),
+            Map.entry("doc_redo", "Redo"),
+            Map.entry("doc_add_comment", "Add comment"),
+            Map.entry("doc_debug_revisions", "Inspect revisions"),
+            Map.entry("doc_restore_checkpoint", "Restore snapshot"),
+            Map.entry("version_status", "Check version status"),
+            Map.entry("version_history", "View version history"),
+            Map.entry("version_changes", "Inspect version changes"),
+            Map.entry("version_commit", "Commit project changes"),
+            Map.entry("version_pull", "Pull latest cloud version"),
+            Map.entry("version_restore", "Restore historical version"),
+            Map.entry("doc_get_comments", "View comments"),
+            Map.entry("doc_reply_comment", "Reply to comment"),
+            Map.entry("doc_resolve_comment", "Resolve comment"),
+            Map.entry("doc_delete_comment", "Delete comment"),
+            Map.entry("doc_list_revisions", "List revisions"),
+            Map.entry("doc_accept_revision", "Accept revision"),
+            Map.entry("doc_reject_revision", "Reject revision"),
+            Map.entry("doc_accept_all_revisions", "Accept all revisions"),
+            Map.entry("doc_reject_all_revisions", "Reject all revisions"),
+            Map.entry("doc_edit_header_footer", "Edit header/footer"),
+            Map.entry("doc_insert_break", "Insert break"),
+            Map.entry("doc_insert_footnote", "Insert footnote"),
+            Map.entry("doc_insert_endnote", "Insert endnote"),
+            Map.entry("doc_set_hyperlink", "Set hyperlink"),
+            Map.entry("doc_link_evidence", "Link evidence"),
+            Map.entry("doc_list_evidence", "List evidence links"),
+            Map.entry("dd_export", "Export due-diligence deliverable"),
+            Map.entry("web_verify_import", "Import web-verification archive"),
+            Map.entry("evidence_verify", "Verify evidence"),
+            Map.entry("doc_insert_image", "Insert image"),
+            Map.entry("doc_set_style", "Apply style"),
+            Map.entry("sheet_get_overview", "Sheet overview"),
+            Map.entry("sheet_read_range", "Read cells"),
+            Map.entry("sheet_write_cells", "Write cells"),
+            Map.entry("sheet_select_range", "Select cells"),
+            Map.entry("sheet_format_cells", "Format cells"),
+            Map.entry("sheet_set_borders", "Set cell borders"),
+            Map.entry("sheet_set_row_col", "Set row/column size"),
+            Map.entry("sheet_create_file", "Create spreadsheet"),
+            Map.entry("sheet_manage_sheets", "Manage sheets"),
+            Map.entry("sheet_edit_rows_cols", "Edit rows/columns"),
+            Map.entry("sheet_merge_cells", "Merge cells"),
+            Map.entry("sheet_sort_range", "Sort range"),
+            Map.entry("sheet_set_autofilter", "Set autofilter"),
+            Map.entry("sheet_freeze_panes", "Freeze panes"),
+            Map.entry("sheet_conditional_format", "Conditional format"),
+            Map.entry("sheet_add_comment", "Add cell comment"),
+            Map.entry("sheet_get_comments", "Get cell comments"),
+            Map.entry("sheet_delete_comment", "Delete cell comment"),
+            Map.entry("sheet_set_data_validation", "Set data validation"),
+            Map.entry("sheet_add_chart", "Add chart"),
+            Map.entry("sheet_search", "Search sheet"),
+            Map.entry("sheet_find_replace", "Replace in sheet"),
+            Map.entry("sheet_define_name", "Define named range"),
+            Map.entry("sheet_protect_sheet", "Protect sheet"),
+            Map.entry("sheet_group_rows_cols", "Group rows/columns"),
+            Map.entry("sheet_add_pivot_table", "Add pivot table"),
+            Map.entry("slide_get_overview", "Slide overview"),
+            Map.entry("slide_get_page", "Read slide details"),
+            Map.entry("slide_read_notes", "Read notes"),
+            Map.entry("slide_write_notes", "Write notes"),
+            Map.entry("slide_goto", "Go to slide"),
+            Map.entry("slide_set_shape_text", "Set shape text"),
+            Map.entry("slide_replace_text", "Replace slide text"),
+            Map.entry("slide_add_page", "Add slide"),
+            Map.entry("slide_delete_page", "Delete slide"),
+            Map.entry("slide_move_page", "Move slide"),
+            Map.entry("slide_set_layout", "Set layout"),
+            Map.entry("slide_add_text_box", "Add text box"),
+            Map.entry("slide_add_shape", "Add shape"),
+            Map.entry("slide_delete_shape", "Delete shape"),
+            Map.entry("slide_set_shape_geometry", "Resize/move shape"),
+            Map.entry("slide_format_text", "Format slide text"),
+            Map.entry("slide_format_shape", "Format shape"),
+            Map.entry("slide_add_table", "Add table"),
+            Map.entry("slide_table_read", "Read table"),
+            Map.entry("slide_table_set_cell", "Set table cell"),
+            Map.entry("slide_table_set_style", "Set table style"),
+            Map.entry("slide_set_hyperlink", "Set hyperlink"),
+            Map.entry("ref_list", "Find reference files"),
+            Map.entry("ref_read", "Read reference file"),
+            Map.entry("ref_edit", "Edit another document"),
+            Map.entry("ref_open", "Open project file"),
+            Map.entry("office_get_text", "Read document"),
+            Map.entry("office_get_selection", "Read selection"),
+            Map.entry("office_search", "Find in document"),
+            Map.entry("office_replace_text", "Replace text (tracked)"),
+            Map.entry("office_replace_batch", "Batch replace (tracked)"),
+            Map.entry("office_pass_step", "Section-by-section pass"),
+            Map.entry("office_insert_text", "Insert text (tracked)"),
+            Map.entry("office_add_comment", "Add comment"),
+            Map.entry("office_format_text", "Format text"),
+            Map.entry("office_set_paragraph_format", "Set paragraph format"),
+            Map.entry("office_get_formatting", "Read formatting"),
+            Map.entry("office_set_numbering", "Set list numbering"),
+            Map.entry("office_format_table", "Format table"),
+            Map.entry("office_apply_standard_format", "Apply standard format"),
+            Map.entry("office_excel_get_range", "Read range"),
+            Map.entry("office_excel_set_values", "Write range"),
+            Map.entry("office_excel_search", "Find cells"),
+            Map.entry("office_excel_replace", "Replace in cells"),
+            Map.entry("office_excel_format_cells", "Format cells"),
+            Map.entry("office_excel_set_borders", "Set borders"),
+            Map.entry("office_excel_edit_rows_cols", "Edit rows/columns"),
+            Map.entry("office_excel_merge_cells", "Merge cells"),
+            Map.entry("office_excel_sort_range", "Sort range"),
+            Map.entry("office_excel_manage_sheets", "Manage sheets"),
+            Map.entry("office_excel_freeze_panes", "Freeze panes"),
+            Map.entry("office_excel_set_formulas", "Set formulas"),
+            Map.entry("office_excel_get_overview", "Read overview"),
+            Map.entry("office_excel_select_range", "Select range"),
+            Map.entry("office_excel_set_autofilter", "Set autofilter"),
+            Map.entry("office_excel_conditional_format", "Conditional format"),
+            Map.entry("office_ppt_get_slides", "Read slides"),
+            Map.entry("office_ppt_replace_text", "Replace slide text"),
+            Map.entry("office_ppt_format_text", "Format slide text"),
+            Map.entry("office_ppt_add_slide", "Add slide"),
+            Map.entry("office_ppt_delete_slide", "Delete slide"),
+            Map.entry("office_ppt_add_text_box", "Insert text box"),
+            Map.entry("office_ppt_move_slide", "Move slide"),
+            Map.entry("office_ppt_add_shape", "Insert shape"),
+            Map.entry("office_ppt_get_slide_details", "Read slide details"),
+            Map.entry("office_ppt_delete_shape", "Delete shape"),
+            Map.entry("office_insert_table", "Insert table"),
+            Map.entry("office_table_read", "Read table"),
+            Map.entry("office_table_set_cell", "Edit table cell"),
+            Map.entry("office_table_add_row", "Add table row"),
+            Map.entry("office_table_delete_row", "Delete table row"),
+            Map.entry("office_table_add_col", "Add table column"),
+            Map.entry("office_table_delete_col", "Delete table column"),
+            Map.entry("office_insert_break", "Insert break"),
+            Map.entry("office_set_hyperlink", "Set hyperlink"),
+            Map.entry("office_edit_header_footer", "Edit header/footer"),
+            Map.entry("office_get_comments", "Read comments"),
+            Map.entry("office_reply_comment", "Reply to comment"),
+            Map.entry("office_resolve_comment", "Resolve comment"),
+            Map.entry("office_delete_comment", "Delete comment"),
+            Map.entry("office_insert_toc", "Insert table of contents"),
+            Map.entry("office_set_page_setup", "Page setup"),
+            Map.entry("office_get_revisions", "Read revisions"),
+            Map.entry("office_accept_revision", "Accept revision"),
+            Map.entry("office_reject_revision", "Reject revision"),
+            Map.entry("office_insert_footnote", "Insert footnote"),
+            Map.entry("office_insert_endnote", "Insert endnote"),
+            Map.entry("office_insert_image", "Insert image"),
+            Map.entry("office_apply_style", "Apply style"),
+            Map.entry("office_manage_content_control", "Manage content control"),
+            Map.entry("office_set_document_properties", "Set document properties"),
+            Map.entry("office_excel_add_comment", "Add comment"),
+            Map.entry("office_excel_get_comments", "Read comments"),
+            Map.entry("office_excel_reply_comment", "Reply to comment"),
+            Map.entry("office_excel_resolve_comment", "Resolve comment"),
+            Map.entry("office_excel_delete_comment", "Delete comment"),
+            Map.entry("office_excel_set_data_validation", "Set data validation"),
+            Map.entry("office_excel_add_chart", "Add chart"),
+            Map.entry("office_excel_define_name", "Manage named range"),
+            Map.entry("office_excel_protect_sheet", "Protect sheet"),
+            Map.entry("office_excel_group_rows_cols", "Group rows/columns"),
+            Map.entry("office_excel_add_pivot_table", "Add pivot table"),
+            Map.entry("office_ppt_add_table", "Add table"),
+            Map.entry("office_ppt_table_read", "Read table"),
+            Map.entry("office_ppt_table_set_cell", "Edit table cell"),
+            Map.entry("office_ppt_set_hyperlink", "Set hyperlink"),
+            Map.entry("pptx_check_service", "Check PPT service"),
+            Map.entry("pptx_generate", "Generate slides"),
+            Map.entry("pptx_generate_outline", "Outline slides"),
+            Map.entry("pptx_refine_outline", "Refine outline"),
+            Map.entry("pptx_open_file", "Open slides"),
+            Map.entry("pptx_list_files", "List slide files"),
+            Map.entry("pptx_search_files", "Search slide files"),
+            Map.entry("pptx_get_project_pages", "Get slide pages"),
+            Map.entry("pptx_edit_page", "Edit slide"),
+            Map.entry("pptx_export_editable", "Export editable slides"),
+            Map.entry("pptx_inspect_format", "Inspect slide formatting"),
+            Map.entry("pptx_apply_format", "Format slides"),
+            Map.entry("pdf_list_files", "List PDF files"),
+            Map.entry("pdf_inspect", "Inspect PDF"),
+            Map.entry("pdf_highlight", "Highlight PDF text"),
+            Map.entry("pdf_annotate", "Annotate PDF"),
+            Map.entry("pdf_redact", "Redact PDF"),
+            Map.entry("pdf_replace_text", "Replace PDF text"),
+            Map.entry("pdf_to_word", "Convert PDF to Word"),
+            Map.entry("pdf_merge", "Merge PDFs"),
+            Map.entry("pdf_split", "Split PDF"),
+            Map.entry("pdf_extract_pages", "Extract PDF pages"),
+            Map.entry("pdf_delete_pages", "Delete PDF pages"),
+            Map.entry("pdf_rotate_pages", "Rotate PDF pages"),
+            Map.entry("pdf_add_page_numbers", "Add page numbers"),
+            Map.entry("litigation_reference", "Read diagram standard"),
+            Map.entry("litigation_checkpoint", "Confirm before drawing"),
+            Map.entry("litigation_render", "Draw litigation diagram"),
+            Map.entry("litigation_timeline_start", "Read timeline materials"),
+            Map.entry("litigation_timeline_step", "Advance timeline pipeline"),
+            Map.entry("litigation_timeline_render", "Draw case timeline"),
+            Map.entry("meeting_list_recordings", "List meeting recordings"),
+            Map.entry("meeting_get_transcript", "Read meeting transcript"),
+            Map.entry("tmeet_list_meetings", "List Tencent meetings"),
+            Map.entry("tmeet_get_transcript", "Read Tencent meeting transcript"),
+            Map.entry("baoqingtian_action", "Baoqingtian workspace"),
+            Map.entry("dpia_workbench_action", "DPIA workbench action"),
+            Map.entry("dpia_workbench_task", "DPIA workbench task"),
+            Map.entry("tencent_meeting_action", "Tencent Meeting action")
+    );
+
+    /**
      * 一个已注册工具：宿主 Bean + 方法 + LLM 规格 + 产品元数据。
      */
     public record RegisteredTool(Object bean, Method method, ToolSpecification spec, ToolMeta meta, boolean fromPlugin) {
@@ -147,6 +466,19 @@ public class ToolRegistry {
          * 英文会话里唯一冒中文的那一处。
          */
         public String displayName() {
+            if (LangText.isEnglish()) {
+                String toolName = spec != null ? spec.name() : (method != null ? method.getName() : null);
+                if (toolName != null && !toolName.isBlank()) {
+                    String en = ENGLISH_TOOL_DISPLAY_NAMES.get(toolName);
+                    if (en != null && !en.isBlank()) {
+                        return en;
+                    }
+                    if (meta != null && !meta.displayName().isEmpty()) {
+                        return toolName.replace('_', ' ');
+                    }
+                }
+                return "Tool execution";
+            }
             if (meta != null && !meta.displayName().isEmpty()) {
                 return meta.displayName();
             }
@@ -195,9 +527,17 @@ public class ToolRegistry {
         }
     }
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ai.mcp.PluginMcpService pluginMcpService;
+
+    public void setPluginMcpService(com.checkba.service.ai.mcp.PluginMcpService service) { this.pluginMcpService = service; }
+
     private final List<AgentToolComponent> toolComponents;
     private final PluginService pluginService;
     private final ClientCapabilityService clientCapabilityService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.service.ProjectFileService projectFileService;
 
     private final Map<String, RegisteredTool> builtinTools = new ConcurrentHashMap<>();
     private final Map<String, RegisteredTool> pluginToolCache = new ConcurrentHashMap<>();
@@ -237,13 +577,7 @@ public class ToolRegistry {
     @PostConstruct
     public void init() {
         for (AgentToolComponent bean : toolComponents) {
-            boolean available = componentAvailable(bean);
-            if (!available) {
-                log.info("Tool component {} reports itself unavailable on this machine — "
-                        + "its tools stay registered but are not offered to the model",
-                        bean.getClass().getSimpleName());
-            }
-            registerBean(bean, available);
+            registerBean(bean);
         }
         if (disclosurePolicy != null) {
             disclosurePolicy.setPluginToolNames(this::pluginToolNames);
@@ -257,10 +591,12 @@ public class ToolRegistry {
      * 不按启停过滤——禁用插件的工具本来就不进候选集，目录里也就不会出现。
      */
     public Set<String> pluginToolNames() {
-        return java.util.Collections.unmodifiableSet(pluginService.getPluginTools().keySet());
+        Set<String> names = new java.util.HashSet<>(pluginService.getPluginTools().keySet());
+        if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> names.add(b.specification().name()));
+        return java.util.Collections.unmodifiableSet(names);
     }
 
-    /** 组件自报可用性绝不能掀翻启动：探测里抛出来的一律当"可用"，最坏只是多下发一个工具。 */
+    /** 组件自报可用性绝不能掀翻工具清单读取：探测里抛出来的一律当"可用"，最坏只是多下发一个工具。 */
     private boolean componentAvailable(AgentToolComponent bean) {
         try {
             return bean.isAvailable();
@@ -271,14 +607,8 @@ public class ToolRegistry {
         }
     }
 
-    /**
-     * @param componentOffersToModel 组件级开关（{@code AgentToolComponent.isAvailable()}）：
-     *                     false 时本组件的工具只登记不下发。单个工具还能再用
-     *                     {@code @ToolMeta.offerToModel = false} 单独退出下发（dev-board#799）。
-     *                     两者都是「只登记不下发」：工具仍可被 resolve/execute 调到，
-     *                     拿到的是它自己那句可行动的错误，好过一句 "Tool not found"。
-     */
-    private void registerBean(Object bean, boolean componentOffersToModel) {
+    /** Keep eligible specs registered; component readiness is checked when a new turn requests them. */
+    private void registerBean(Object bean) {
         for (Method method : bean.getClass().getDeclaredMethods()) {
             if (!method.isAnnotationPresent(Tool.class)) {
                 continue;
@@ -297,7 +627,7 @@ public class ToolRegistry {
                     log.warn("Duplicate tool name '{}' — {} overrides {}",
                             spec.name(), bean.getClass().getSimpleName(),
                             previous.bean().getClass().getSimpleName());
-                } else if (componentOffersToModel && (meta == null || meta.offerToModel())) {
+                } else if (meta == null || meta.offerToModel()) {
                     builtinSpecifications.add(spec);
                 }
             } catch (Exception e) {
@@ -415,7 +745,14 @@ public class ToolRegistry {
      * 禁用插件的工具规格不下发——LLM 看不到即不会调用。
      */
     public List<ToolSpecification> getAllSpecifications() {
-        List<ToolSpecification> all = new ArrayList<>(builtinSpecifications);
+        List<ToolSpecification> all = new ArrayList<>();
+        Map<AgentToolComponent, Boolean> availability = new java.util.IdentityHashMap<>();
+        for (ToolSpecification spec : builtinSpecifications) {
+            Object owner = builtinTools.get(spec.name()).bean();
+            if (!(owner instanceof AgentToolComponent component)
+                    || availability.computeIfAbsent(component, this::componentAvailable)) all.add(spec);
+        }
+        if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> all.add(b.specification()));
         for (ToolSpecification spec : pluginService.getToolSpecifications()) {
             if (pluginToolEnabled(spec.name())) {
                 all.add(offerable(spec));
@@ -519,6 +856,7 @@ public class ToolRegistry {
                 names.add(name);
             }
         }
+        if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> names.add(b.specification().name()));
         names.sort(Comparator.comparingInt(String::length).reversed());
         return names;
     }
@@ -541,6 +879,10 @@ public class ToolRegistry {
         RegisteredTool tool = builtinTools.get(name);
         if (tool != null) {
             return Optional.of(tool);
+        }
+        if (pluginMcpService != null) {
+            var binding = pluginMcpService.find(name);
+            if (binding != null) return Optional.of(new RegisteredTool(pluginMcpService, null, binding.specification(), null, true));
         }
         // 插件工具：先过启停过滤（禁用插件的工具视同不存在，重新启用即恢复）
         if (!pluginToolEnabled(name)) {
@@ -585,6 +927,15 @@ public class ToolRegistry {
             return new ToolResult(unknownToolMessage(resolvedName), null, false);
         }
         RegisteredTool tool = toolOpt.get();
+        if (tool.bean() instanceof com.checkba.service.ai.mcp.PluginMcpService mcp) {
+            try {
+                return new ToolResult(mcp.callAgent(resolvedName, new java.util.LinkedHashMap<>(parseArgs(argsJson)), ctx), tool, true);
+            } catch (com.checkba.service.ai.mcp.PluginMcpException e) {
+                return new ToolResult("Error: " + e.code() + ": " + e.getMessage(), tool, true);
+            } catch (IllegalArgumentException e) {
+                return new ToolResult("Error: invalid MCP arguments.", tool, true);
+            }
+        }
 
         // 插件工具权限校验（规范 v2）：所需权限未在 manifest permissions 中声明即拒绝
         if (tool.fromPlugin()) {
@@ -649,6 +1000,15 @@ public class ToolRegistry {
                         + "Please re-emit the call to '" + resolvedName
                         + "' with a well-formed JSON object of named arguments. Parse error: "
                         + badArgs.getMessage(), tool, true);
+            }
+            String parentParameter = com.checkba.service.ai.tools.GeneratedFileLocation.parentParameter(
+                    resolvedName, rawArg(args, "fileId"));
+            if (parentParameter != null && projectFileService != null) {
+                Long requested = (Long) convert(rawArg(args, parentParameter), Long.class);
+                for (String alias : ARG_ALIASES.getOrDefault(parentParameter, List.of())) args.remove(alias);
+                args.set(parentParameter, com.checkba.service.ai.tools.GeneratedFileLocation.resolve(
+                        projectFileService, ctx == null ? null : ctx.projectId(), requested,
+                        ctx == null ? null : ctx.defaultOutputFolderId()));
             }
             Object[] boundArgs = bindArguments(resolvedName, tool.method(), args, ctx);
             Object result = tool.method().invoke(tool.bean(), boundArgs);

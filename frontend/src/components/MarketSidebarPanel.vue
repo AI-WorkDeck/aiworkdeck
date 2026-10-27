@@ -11,7 +11,8 @@
       <view v-if="searchText" class="msb-search-clear" @tap="searchText = ''">×</view>
     </view>
 
-    <scroll-view scroll-y class="msb-body">
+    <view class="msb-body">
+      <view class="msb-section" :class="{ expanded: sections.installed }">
       <!-- ===== 已安装 ===== -->
       <view class="msb-sec-head" @tap="toggleSection('installed')">
         <text class="msb-sec-chevron" :class="{ open: sections.installed }">›</text>
@@ -24,7 +25,7 @@
           </svg>
         </view>
       </view>
-      <view v-if="sections.installed">
+      <view v-if="sections.installed" class="msb-section-content">
         <!-- 「已安装」的插件/Skill 两类改为**横向标签并排**（dev-board#67）：
              竖着叠两个子分组时后一组常被推出视口，"看不全"。标签标题即类型，
              行内不再重复"面板插件/Skill"小字标签。顺序插件在前，与整页版一致。 -->
@@ -40,6 +41,10 @@
             <text class="msb-tab-count">{{ group.rows.length }}</text>
           </view>
         </view>
+        <scroll-view scroll-y class="msb-list">
+        <view v-if="installedTab === 'skill'" class="msb-builtin-note">
+          <text>{{ $t('market.builtinWorkflowsMarketNotice') }}</text>
+        </view>
         <view v-if="!activeInstalledRows.length" class="msb-empty">
           <text>{{ searchText ? activeInstalledEmptyText : $t('market.noInstalledYet') }}</text>
         </view>
@@ -49,8 +54,9 @@
           class="msb-row"
           @tap="openDetail(row)"
         >
-          <view class="msb-row-glyph" :class="{ 'is-plugin': row.kind === 'plugin' || row.panel }">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <view class="msb-row-glyph" :class="{ 'is-plugin': row.kind === 'plugin' || row.panel, 'has-avatar': !!row.avatarUrl }">
+            <image v-if="row.avatarUrl" :src="row.avatarUrl" class="msb-row-avatar" mode="aspectFill" />
+            <svg v-else viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, gi) in row.glyph" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </view>
@@ -63,16 +69,29 @@
             <text>{{ row.stateLabel }}</text>
           </view>
         </view>
+        </scroll-view>
+      </view>
       </view>
 
       <!-- ===== Marketplace：在线 Skill 与插件收进同一个分组，组内横向双标签
            （左 Skill 右插件，dev-board#67）===== -->
+      <view class="msb-section" :class="{ expanded: sections.market }">
       <view class="msb-sec-head" @tap="toggleSection('market')">
         <text class="msb-sec-chevron" :class="{ open: sections.market }">›</text>
         <text class="msb-sec-title">{{ $t('market.tabMarketplace') }}</text>
         <text class="msb-sec-count">{{ skillRows.length + pluginRows.length }}</text>
+        <text v-if="pluginUpdateState.count" class="msb-update-count" :title="$t('market.updateAvailableCount', { count: pluginUpdateState.count })">{{ pluginUpdateState.count }}</text>
+        <view class="msb-sec-spacer"></view>
+        <component :is="'button'" type="button" class="msb-sec-action msb-check-updates" :title="$t('market.checkForUpdates')" :aria-label="$t('market.checkForUpdates')" :disabled="marketPluginLoading" @click.stop="checkForUpdates">
+          <svg class="msb-sec-action-icon" :class="{ spinning: marketPluginLoading }" viewBox="0 0 24 24" fill="none">
+            <path v-for="(d, gi) in ICONS.refresh" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </component>
       </view>
-      <view v-if="sections.market">
+      <view v-if="sections.market" class="msb-section-content">
+        <view v-if="marketPluginLoading || marketPluginError" class="msb-update-status" :class="{ 'msb-error': marketPluginError }" role="status">
+          <text>{{ marketPluginLoading ? $t('market.checkingUpdates') : $t('market.checkingUpdatesFailed') + ' ' + marketPluginError }}</text>
+        </view>
         <view class="msb-tabs">
           <view class="msb-tab" :class="{ active: marketTab === 'skill' }" @tap="marketTab = 'skill'">
             <text>{{ $t('market.sectionSkillTitle') }}</text>
@@ -84,7 +103,11 @@
           </view>
         </view>
 
+        <scroll-view scroll-y class="msb-list">
         <template v-if="marketTab === 'skill'">
+          <view class="msb-builtin-note">
+            <text>{{ $t('market.builtinWorkflowsMarketNotice') }}</text>
+          </view>
           <view v-if="marketLoading" class="msb-empty"><text>{{ $t('market.loadingEllipsis') }}</text></view>
           <view v-else-if="marketError" class="msb-empty msb-error">
             <text>{{ $t('market.marketUnavailablePrefixed', { error: marketError }) }}</text>
@@ -140,8 +163,9 @@
             class="msb-row"
             @tap="openDetail(row)"
           >
-            <view class="msb-row-glyph is-plugin">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <view class="msb-row-glyph is-plugin" :class="{ 'has-avatar': !!row.avatarUrl }">
+              <image v-if="row.avatarUrl" :src="row.avatarUrl" class="msb-row-avatar" mode="aspectFill" />
+              <svg v-else viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path v-for="(d, gi) in row.glyph" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
             </view>
@@ -150,7 +174,8 @@
               <text v-if="row.desc" class="msb-row-desc">{{ row.desc }}</text>
               <text class="msb-row-meta">{{ row.meta }}</text>
             </view>
-            <view v-if="row.installed" class="msb-row-state ok"><text>{{ $t('market.installedShort') }}</text></view>
+            <component :is="'button'" type="button" v-if="row.updatable" class="msb-row-install msb-row-update" :title="$t('market.updateToVersion', { version: row.raw.version })" @click.stop="openDetail(row)"><text>{{ $t('market.update') }}</text></component>
+            <view v-else-if="row.installed" class="msb-row-state ok"><text>{{ $t('market.installedShort') }}</text></view>
             <view
               v-else-if="row.canInstall"
               class="msb-row-install"
@@ -167,18 +192,23 @@
             </view>
           </view>
         </template>
+        </scroll-view>
       </view>
-    </scroll-view>
+      </view>
+    </view>
   </view>
 </template>
 
 <script>
 // 插件广场左栏面板（VS Code 扩展栏形态）：搜索 + 已安装/Skill 广场/插件广场
-// 三个折叠分组的紧凑列表；点行在中栏开详情 tab（emit open-detail），行内快捷安装。
+// 两个独立滚动分组的紧凑列表；点行在中栏开详情 tab（emit open-detail），行内快捷安装。
 // 数据与安装链路复用 MarketPane 同一组 services/api.js 封装。
-import { getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, installMarketPlugin, rescanPlugins, rescanSkills } from '@/services/api.js'
+import { installBundledPlugin, getPlugins, getSkills, getSkillMarket, installMarketSkill, installMarketPlugin, rescanPlugins, rescanSkills } from '@/services/api.js'
+import { pluginUpdates, refreshPluginUpdates } from '@/composables/usePluginUpdates.js'
+import { isPluginUpdateAvailable } from '@/utils/marketUpdates.js'
 import { ICONS } from '@/config/icons.js'
-import { isPanelSkill, isVoiceGroupMember, buildVoiceGroupSkill } from '@/config/leftSidebarPlugins.js'
+import { getPluginAvatarUrl, getPluginGlyphPaths } from '@/config/pluginIcons.js'
+import { isPanelSkill, isVoiceGroupMember } from '@/config/leftSidebarPlugins.js'
 import { canInstall, paidState, priceLabel, purchaseUrl } from '@/utils/marketPricing.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { requireAccount, isAccountLoginRetry } from '@/utils/requireAccount.js'
@@ -231,11 +261,9 @@ export default {
       plugins: [],
       skills: [],
       marketSkills: [],
-      marketPlugins: [],
+      pluginUpdateState: pluginUpdates,
       marketLoading: false,
       marketError: '',
-      marketPluginLoading: false,
-      marketPluginError: '',
       marketBusyId: '',
       pluginBusyId: '',
       rescanning: false,
@@ -244,44 +272,22 @@ export default {
     }
   },
   computed: {
+    marketPlugins() { return this.pluginUpdateState.catalog },
+    marketPluginLoading() { return this.pluginUpdateState.checking },
+    marketPluginError() { return this.pluginUpdateState.error },
     ICONS() {
       return ICONS
     },
     installedRows() {
       const kw = this.searchText.trim().toLowerCase()
       const rows = []
-      // 「语音」合并插件（dev-board#66）：左栏一个图标 = 一个插件。语音合成与
-      // 会议录音两个成员 skill 不单列，在首个成员的位置合成一行；启停在详情页
-      // 一次作用于全部成员。
-      const voiceGroup = buildVoiceGroupSkill(this.skills)
-      let voiceEmitted = false
+      // Voice UI is an installed plugin. Its legacy AI skills stay in the Skill tab.
       for (const s of this.skills) {
-        if (voiceGroup && isVoiceGroupMember(s.id) && !s.sourcePluginId) {
-          if (!voiceEmitted) {
-            voiceEmitted = true
-            const metaParts = []
-            if (voiceGroup.version) metaParts.push('v' + voiceGroup.version)
-            if (voiceGroup.author) metaParts.push(voiceGroup.author)
-            rows.push({
-              kind: 'skill',
-              id: voiceGroup.id,
-              group: true,
-              name: voiceGroup.name,
-              desc: voiceGroup.description,
-              glyph: ICONS.panelLeft,
-              meta: metaParts.join(' · '),
-              panel: true,
-              stateLabel: voiceGroup.enabled ? this.$t('market.enabledTag') : this.$t('market.disabledTag'),
-              stateClass: voiceGroup.enabled ? 'ok' : 'off',
-              raw: voiceGroup,
-            })
-          }
-          continue
-        }
+        if (s.builtinWorkflow) continue
         const mode = s.activationMode || (s.enabled ? 'auto' : 'disabled')
         // 面板型（背后挂着左栏面板）在列表里也按插件标注：用户看到的是一个面板，
         // 说它是「Skill · 自动触发」只会让人对不上号。判据见 leftSidebarPlugins.js。
-        const panel = isPanelSkill(s.id) && !s.sourcePluginId
+        const panel = isPanelSkill(s.id) && !isVoiceGroupMember(s.id) && !s.sourcePluginId
         // 「面板插件/Skill」标签不再在行内重复——子分组标题（installedGroups）已经
         // 表明了这一行属于哪一类，见下方 installedSkillRows/installedPluginRows。
         const metaParts = []
@@ -312,15 +318,18 @@ export default {
         })
       }
       for (const p of this.plugins) {
+        const latest = (this.marketPlugins || []).find(item => item.id === p.id)
+        const updatable = isPluginUpdateAvailable(latest, p)
         rows.push({
           kind: 'plugin',
           id: p.id,
           name: p.name || p.id,
           desc: p.description || '',
-          glyph: ICONS.blocks,
+          avatarUrl: typeof getPluginAvatarUrl === 'function' ? getPluginAvatarUrl(p.id) : null,
+          glyph: typeof getPluginGlyphPaths === 'function' ? getPluginGlyphPaths(p.id) : ICONS.blocks,
           meta: p.version ? ('v' + p.version) : '',
-          stateLabel: p.enabled ? this.$t('market.enabledTag') : this.$t('market.disabledTag'),
-          stateClass: p.enabled ? 'ok' : 'off',
+          stateLabel: updatable ? this.$t('market.updateAvailable') : (p.enabled ? this.$t('market.enabledTag') : this.$t('market.disabledTag')),
+          stateClass: updatable ? 'update' : (p.enabled ? 'ok' : 'off'),
           raw: p,
         })
       }
@@ -356,6 +365,7 @@ export default {
         const cat = m.category || 'other'
         const metaParts = []
         if (m.version) metaParts.push('v' + m.version)
+        if (m.bundled) metaParts.push(this.$t('pluginPlatform.bundled'))
         const dl = fmtDownloads(m.downloads)
         if (dl) metaParts.push(dl + this.$t('market.downloadsSuffix'))
         metaParts.push(CATEGORY_LABELS[cat] || this.$t('market.catOther'))
@@ -387,6 +397,7 @@ export default {
       const rows = this.marketPlugins.map(m => {
         const metaParts = []
         if (m.version) metaParts.push('v' + m.version)
+        if (m.bundled) metaParts.push(this.$t('pluginPlatform.bundled'))
         const author = m.authorDisplayName || m.author
         if (author) metaParts.push(author)
         metaParts.push(priceLabel(m))
@@ -396,9 +407,11 @@ export default {
           id: m.id,
           name: m.name || m.id,
           desc: m.description || '',
-          glyph: ICONS.blocks,
+          avatarUrl: typeof getPluginAvatarUrl === 'function' ? getPluginAvatarUrl(m.id) : null,
+          glyph: typeof getPluginGlyphPaths === 'function' ? getPluginGlyphPaths(m.id) : ICONS.blocks,
           meta: metaParts.join(' · ') || this.$t('market.pluginLabel'),
           installed: installedIds.has(m.id) || !!m.installed,
+          updatable: isPluginUpdateAvailable(m, this.plugins.find(p => p.id === m.id)),
           paidState: state,
           canInstall: canInstall(state),
           raw: m,
@@ -446,9 +459,7 @@ export default {
       else await this.installPluginRow(fresh)
     },
     async reloadAll() {
-      this.loadInstalled()
-      this.loadMarketSkills()
-      this.loadMarketPlugins()
+      await Promise.all([this.loadInstalled(), this.loadMarketSkills(), this.loadMarketPlugins()])
     },
     async loadInstalled() {
       try {
@@ -475,19 +486,15 @@ export default {
       }
     },
     async loadMarketPlugins() {
-      this.marketPluginLoading = true
-      this.marketPluginError = ''
-      try {
-        const res = await getPluginMarket()
-        this.marketPlugins = res?.plugins || []
-        if (typeof res?.accountConnected === 'boolean') this.accountConnected = res.accountConnected
-      } catch (e) {
-        console.warn('在线插件广场不可用:', e)
-        this.marketPluginError = e?.message || this.$t('market.networkUnavailable')
-        this.marketPlugins = []
-      } finally {
-        this.marketPluginLoading = false
-      }
+      const state = await refreshPluginUpdates(true)
+      this.accountConnected = state.accountConnected
+    },
+    async checkForUpdates() {
+      if (this.marketPluginLoading) return
+      this.marketTab = 'plugin'
+      this.sections.market = true
+      await Promise.all([this.loadInstalled(), this.loadMarketPlugins()])
+      if (!this.marketPluginError) uni.showToast({ title: this.$t('market.updatesChecked'), icon: 'none' })
     },
     async installSkillRow(row) {
       if (this.marketBusyId) return
@@ -509,7 +516,8 @@ export default {
     async installPluginRow(row) {
       if (this.pluginBusyId) return
       const m = row.raw
-      const perms = (m.permissions || []).join(this.$t('market.listSeparator')) || this.$t('market.noSensitiveCapability')
+      const labels = { file_read: 'permFileRead', file_write: 'permFileWrite', network: 'permNetwork', im: 'permIm', notifications: 'permNotifications', editor: 'permEditor', ai: 'permAi', speech: 'permSpeech', tasks: 'permTasks', clipboard: 'permClipboard', lawfirm: 'permLawfirm' }
+      const perms = (m.permissions || []).map(p => labels[p] ? this.$t(`market.${labels[p]}`) : p).join(this.$t('market.listSeparator')) || this.$t('market.noSensitiveCapability')
       const ok = await new Promise(resolve => {
         uni.showModal({
           title: this.$t('market.confirmInstallPluginTitle'),
@@ -528,7 +536,7 @@ export default {
       if (!ok) return
       this.pluginBusyId = row.id
       try {
-        await installMarketPlugin(row.id)
+        await (m.bundled ? installBundledPlugin(row.id) : installMarketPlugin(row.id))
         uni.showToast({ title: this.$t('market.installedNoExecuteHint'), icon: 'none' })
         await this.reloadAll()
         uni.$emit('awd:market-changed-from-sidebar')
@@ -569,6 +577,8 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
   background: transparent;
 }
 
@@ -576,30 +586,31 @@ export default {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 8px 10px 6px;
+  margin: 8px var(--awd-panel-pad-x) 6px;
+  flex-shrink: 0;
   height: 28px;
   padding: 0 8px;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-sm);
 
   &:focus-within {
-    border-color: var(--awd-mint);
-    box-shadow: 0 0 0 2px rgba(137, 168, 160, 0.15);
+    border-color: var(--awd-accent-text);
+    box-shadow: 0 0 0 var(--awd-focus-width) var(--awd-accent-text);
   }
 }
 
 .msb-search-icon {
   width: 13px;
   height: 13px;
-  color: var(--awd-text-3);
+  color: var(--awd-text-2);
   flex-shrink: 0;
 }
 
 .msb-search-input {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   background: transparent;
   border: none;
@@ -613,9 +624,9 @@ export default {
   height: 16px;
   line-height: 15px;
   text-align: center;
-  border-radius: 4px;
-  color: var(--awd-text-3);
-  font-size: 13px;
+  border-radius: var(--awd-radius-sm);
+  color: var(--awd-text-2);
+  font-size: var(--awd-font-size-body);
   cursor: pointer;
 
   &:hover {
@@ -627,6 +638,33 @@ export default {
 .msb-body {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.msb-section {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+
+  &.expanded { flex: 1 1 0; }
+  & + & { border-top: 1px solid var(--awd-border); }
+}
+
+.msb-section-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.msb-list {
+  flex: 1;
+  height: 0;
+  min-height: 0;
 }
 
 /* 分组头：VS Code 式全大写小字 + 计数 */
@@ -634,8 +672,9 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 26px;
-  padding: 0 10px 0 6px;
+  height: var(--awd-panel-sec-h);
+  flex-shrink: 0;
+  padding: 0 var(--awd-panel-pad-x) 0 6px;
   cursor: pointer;
   user-select: none;
 
@@ -646,7 +685,7 @@ export default {
 
 .msb-sec-chevron {
   width: 12px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   transition: transform 0.12s ease;
   transform-origin: center;
@@ -657,14 +696,13 @@ export default {
 }
 
 .msb-sec-title {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 700;
-  letter-spacing: 0.04em;
   color: var(--awd-text-2);
 }
 
 .msb-sec-count {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
   background: var(--awd-surface-2);
   border-radius: 999px;
@@ -677,13 +715,52 @@ export default {
   flex: 1;
 }
 
+.msb-update-count {
+  min-width: 14px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--awd-accent);
+  color: var(--awd-text-on-accent);
+  font-size: var(--awd-panel-fs-meta);
+  text-align: center;
+}
+
+.msb-update-status {
+  padding: 4px var(--awd-panel-pad-x);
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
+  overflow-wrap: anywhere;
+}
+
+.msb-check-updates {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  &::after { border: 0; }
+  &:focus-visible { outline: 2px solid var(--awd-accent); }
+}
+
+.msb-row-update {
+  margin: 0;
+  line-height: 18px;
+  &::after { border: 0; }
+  &:focus-visible { outline: 2px solid var(--awd-accent-text); outline-offset: 2px; }
+}
+
+.msb-row-state.update {
+  color: var(--awd-accent-text);
+  background: var(--awd-accent-soft);
+  font-weight: 600;
+}
+
 .msb-sec-action {
   width: 20px;
   height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   color: var(--awd-text-2);
   cursor: pointer;
 
@@ -706,13 +783,14 @@ export default {
   to { transform: rotate(360deg); }
 }
 
-/* 组内横向标签（已安装的插件/Skill、Marketplace 的 Skill/插件）：并排小胶囊，
+/* 组内横向标签（已安装的插件/Skill、Marketplace 的 Skill/插件）：紧凑下划线，
    竖着叠分组会把后一组推出视口（dev-board#67）。 */
 .msb-tabs {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px 4px 22px;
+  padding: 0 var(--awd-panel-pad-x) 4px 22px;
+  flex-shrink: 0;
 }
 
 .msb-tab {
@@ -721,12 +799,13 @@ export default {
   gap: 4px;
   height: 20px;
   padding: 0 8px;
-  border-radius: 999px;
+  border-radius: 0;
+  border-bottom: 1px solid transparent;
   cursor: pointer;
   background: transparent;
 
   text {
-    font-size: 10.5px;
+    font-size: var(--awd-panel-fs-meta);
     font-weight: 600;
     letter-spacing: 0.03em;
     color: var(--awd-text-2);
@@ -737,7 +816,7 @@ export default {
   }
 
   &.active {
-    background: var(--awd-accent-soft);
+    border-bottom-color: var(--awd-accent-text);
 
     text {
       color: var(--awd-accent-text);
@@ -746,8 +825,8 @@ export default {
 }
 
 .msb-tab-count {
-  font-size: 9.5px;
-  color: var(--awd-text-3);
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
 }
 
 .msb-tab.active .msb-tab-count {
@@ -757,20 +836,21 @@ export default {
 
 .msb-empty {
   padding: 8px 12px 10px 22px;
-  font-size: 11px;
-  color: var(--awd-text-3);
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
 
   &.msb-error {
     color: var(--awd-danger-text);
   }
 }
 
-/* 列表行：紧凑三行（名称/描述/元信息），hover 出安装钮 */
+/* 三行扩展列表：名称和描述使用全宽，操作与版本信息同排。 */
 .msb-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 6px 10px 6px 12px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  column-gap: 10px;
+  row-gap: 1px;
+  padding: 8px var(--awd-panel-pad-x);
   cursor: pointer;
 
   &:hover {
@@ -779,20 +859,22 @@ export default {
 }
 
 .msb-row-glyph {
-  width: 26px;
-  height: 26px;
-  flex-shrink: 0;
-  margin-top: 1px;
-  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  grid-column: 1;
+  grid-row: 1 / 4;
+  align-self: center;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-accent-soft);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--awd-accent-text);
+  overflow: hidden;
 
   svg {
-    width: 14px;
-    height: 14px;
+    width: 22px;
+    height: 22px;
   }
 
   /* 插件 = 可执行扩展：深底图标与 Skill（浅底）一眼区分 */
@@ -800,18 +882,32 @@ export default {
     background: var(--awd-accent-hover);
     color: var(--awd-text-on-accent);
   }
+
+  &.has-avatar {
+    background: var(--awd-surface);
+    border: 1px solid var(--awd-border);
+    border-radius: 50%;
+    padding: 0;
+  }
+}
+
+.msb-row-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: block;
 }
 
 .msb-row-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+  display: contents;
 }
 
 .msb-row-name {
-  font-size: 12.5px;
+  min-width: 0;
+  grid-column: 2 / 4;
+  grid-row: 1;
+  line-height: 18px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
   white-space: nowrap;
@@ -820,8 +916,11 @@ export default {
 }
 
 .msb-row-desc {
-  font-size: 11px;
-  line-height: 15px;
+  min-width: 0;
+  grid-column: 2 / 4;
+  grid-row: 2;
+  line-height: 18px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   white-space: nowrap;
   overflow: hidden;
@@ -829,26 +928,33 @@ export default {
 }
 
 .msb-row-meta {
-  font-size: 10px;
-  color: var(--awd-text-3);
+  min-width: 0;
+  grid-column: 2;
+  grid-row: 3;
+  line-height: 18px;
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .msb-row-install {
+  grid-column: 3;
+  grid-row: 3;
+  max-width: 100%;
   flex-shrink: 0;
   align-self: center;
   height: 20px;
   line-height: 18px;
   padding: 0 8px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-accent);
   border: 1px solid var(--awd-accent);
   cursor: pointer;
 
   text {
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     font-weight: 600;
     color: var(--awd-text-on-accent);
   }
@@ -878,9 +984,12 @@ export default {
 }
 
 .msb-row-state {
+  grid-column: 3;
+  grid-row: 3;
+  max-width: 100%;
   flex-shrink: 0;
   align-self: center;
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   padding: 1px 6px;
   border-radius: 999px;
 
@@ -889,7 +998,7 @@ export default {
 
     text {
       color: var(--awd-accent-text);
-      font-size: 10px;
+      font-size: var(--awd-panel-fs-meta);
     }
   }
 
@@ -898,7 +1007,7 @@ export default {
 
     text {
       color: var(--awd-text-2);
-      font-size: 10px;
+      font-size: var(--awd-panel-fs-meta);
     }
   }
 
@@ -909,7 +1018,7 @@ export default {
 
     text {
       color: var(--awd-warning-text);
-      font-size: 10px;
+      font-size: var(--awd-panel-fs-meta);
     }
 
     &:hover {
@@ -923,8 +1032,22 @@ export default {
 
     text {
       color: var(--awd-warning-text);
-      font-size: 10px;
+      font-size: var(--awd-panel-fs-meta);
     }
+  }
+}
+
+.msb-builtin-note {
+  margin: 6px var(--awd-panel-pad-x) 4px;
+  padding: 7px 9px;
+  border-radius: var(--awd-radius-sm);
+  background: var(--awd-accent-wash);
+  border: 1px solid var(--awd-accent-soft);
+
+  text {
+    font-size: var(--awd-panel-fs-meta);
+    color: var(--awd-text-2);
+    line-height: 1.45;
   }
 }
 </style>

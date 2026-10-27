@@ -56,7 +56,7 @@ class OfficeEditToolsTest {
         when(bridge.executeOfficeCommand(eq("conv-1"), eq("replace_text"), anyMap()))
                 .thenReturn("{\"replaced\":1,\"tracked\":true}");
 
-        String result = tools.office_replace_text("conv-1", "甲方", "买受人", false);
+        String result = tools.office_replace_text("conv-1", "甲方", "买受人", false, null);
 
         assertEquals("{\"replaced\":1,\"tracked\":true}", result);
         @SuppressWarnings("unchecked")
@@ -127,10 +127,10 @@ class OfficeEditToolsTest {
     void validationFailuresDoNotTouchBridge() {
         assertTrue(tools.office_search("conv-1", " ").startsWith("Error"));
         assertTrue(tools.office_search("conv-1", "长".repeat(256)).startsWith("Error"));
-        assertTrue(tools.office_replace_text("conv-1", "", "x", true).startsWith("Error"));
-        assertTrue(tools.office_replace_text("conv-1", "找我", null, true).startsWith("Error"));
-        assertTrue(tools.office_insert_text("conv-1", "", null, null).startsWith("Error"));
-        assertTrue(tools.office_insert_text("conv-1", "文本", "锚点", "middle").startsWith("Error"));
+        assertTrue(tools.office_replace_text("conv-1", "", "x", true, null).startsWith("Error"));
+        assertTrue(tools.office_replace_text("conv-1", "找我", null, true, null).startsWith("Error"));
+        assertTrue(tools.office_insert_text("conv-1", "", null, null, null).startsWith("Error"));
+        assertTrue(tools.office_insert_text("conv-1", "文本", "锚点", "middle", null).startsWith("Error"));
         assertTrue(tools.office_add_comment("conv-1", "", "批注").startsWith("Error"));
         assertTrue(tools.office_add_comment("conv-1", "目标", " ").startsWith("Error"));
         verifyNoInteractions(bridge);
@@ -141,7 +141,7 @@ class OfficeEditToolsTest {
     void insertTextDefaults() {
         when(bridge.executeOfficeCommand(any(), eq("insert_text"), anyMap())).thenReturn("{}");
 
-        tools.office_insert_text("conv-1", "新增条款", null, null);
+        tools.office_insert_text("conv-1", "新增条款", null, null, null);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> args = ArgumentCaptor.forClass(Map.class);
@@ -159,7 +159,7 @@ class OfficeEditToolsTest {
                 .thenReturn("{\"formatted\":1,\"tracked\":true}");
 
         String result = tools.office_format_text("conv-1", "第一条", true, "楷体_GB2312", 12.0,
-                true, null, "Wave", null, null, "#C00000");
+                true, null, "Wave", null, null, "#C00000", "宋体", "Times New Roman", 3);
 
         assertEquals("{\"formatted\":1,\"tracked\":true}", result);
         @SuppressWarnings("unchecked")
@@ -169,6 +169,9 @@ class OfficeEditToolsTest {
         assertEquals("第一条", sent.get("anchorText"));
         assertEquals(true, sent.get("applyToAll"));
         assertEquals("楷体_GB2312", sent.get("fontName"));
+        assertEquals("宋体", sent.get("fontNameAsian"));
+        assertEquals("Times New Roman", sent.get("fontNameWestern"));
+        assertEquals(3, sent.get("paragraphCount"));
         assertEquals(12.0, sent.get("fontSize"));
         assertEquals(true, sent.get("bold"));
         assertEquals("wave", sent.get("underline"));
@@ -178,12 +181,12 @@ class OfficeEditToolsTest {
     }
 
     @Test
-    @DisplayName("office_set_paragraph_format：磅值与枚举透传，未给字段不下发")
+    @DisplayName("office_set_paragraph_format：磅值与枚举透传，行距倍数与字符数缩进自动折算")
     void setParagraphFormatDispatches() {
         when(bridge.executeOfficeCommand(any(), eq("set_paragraph_format"), anyMap())).thenReturn("{}");
 
-        tools.office_set_paragraph_format("conv-1", "第一条", null, "Justify", 18.0,
-                null, 18.0, 24.0, null, null, "heading2");
+        tools.office_set_paragraph_format("conv-1", "第一条", null, "Justify", 1.5,
+                null, 18.0, null, null, null, "heading2", 2.0, 4);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> args = ArgumentCaptor.forClass(Map.class);
@@ -195,6 +198,8 @@ class OfficeEditToolsTest {
         assertEquals(18.0, sent.get("lineSpacing"));
         assertEquals(18.0, sent.get("spaceAfter"));
         assertEquals(24.0, sent.get("firstLineIndent"));
+        assertEquals(2.0, sent.get("firstLineIndentChars"));
+        assertEquals(4, sent.get("paragraphCount"));
         assertEquals("heading2", sent.get("styleBuiltIn"));
         assertFalse(sent.containsKey("spaceBefore"));
         assertFalse(sent.containsKey("leftIndent"));
@@ -218,30 +223,30 @@ class OfficeEditToolsTest {
     void formatValidationFailuresDoNotTouchBridge() {
         // 空锚点 / 锚点超 255
         assertTrue(tools.office_format_text("conv-1", " ", null, "宋体", null,
-                null, null, null, null, null, null).startsWith("Error"));
+                null, null, null, null, null, null, null, null, null).startsWith("Error"));
         assertTrue(tools.office_format_text("conv-1", "长".repeat(256), null, "宋体", null,
-                null, null, null, null, null, null).startsWith("Error"));
+                null, null, null, null, null, null, null, null, null).startsWith("Error"));
         // 一个格式参数都没给
         assertTrue(tools.office_format_text("conv-1", "第一条", null, null, null,
-                null, null, null, null, null, null).startsWith("Error"));
+                null, null, null, null, null, null, null, null, null).startsWith("Error"));
         // 非法枚举 / 非法颜色 / 非法字号
         assertTrue(tools.office_format_text("conv-1", "第一条", null, null, null,
-                null, null, "squiggly", null, null, null).startsWith("Error"));
+                null, null, "squiggly", null, null, null, null, null, null).startsWith("Error"));
         assertTrue(tools.office_format_text("conv-1", "第一条", null, null, null,
-                null, null, null, null, null, "红色").startsWith("Error"));
+                null, null, null, null, null, "红色", null, null, null).startsWith("Error"));
         assertTrue(tools.office_format_text("conv-1", "第一条", null, null, 0.0,
-                null, null, null, null, null, null).startsWith("Error"));
+                null, null, null, null, null, null, null, null, null).startsWith("Error"));
         // 段落面
         assertTrue(tools.office_set_paragraph_format("conv-1", "", null, "left", null,
-                null, null, null, null, null, null).startsWith("Error"));
+                null, null, null, null, null, null, null, null).startsWith("Error"));
         assertTrue(tools.office_set_paragraph_format("conv-1", "第一条", null, null, null,
-                null, null, null, null, null, null).startsWith("Error"));
+                null, null, null, null, null, null, null, null).startsWith("Error"));
         assertTrue(tools.office_set_paragraph_format("conv-1", "第一条", null, "middle", null,
-                null, null, null, null, null, null).startsWith("Error"));
+                null, null, null, null, null, null, null, null).startsWith("Error"));
         assertTrue(tools.office_set_paragraph_format("conv-1", "第一条", null, null, null,
-                null, null, null, null, null, "heading9").startsWith("Error"));
+                null, null, null, null, null, "heading9", null, null).startsWith("Error"));
         assertTrue(tools.office_set_paragraph_format("conv-1", "第一条", null, null, -1.0,
-                null, null, null, null, null, null).startsWith("Error"));
+                null, null, null, null, null, null, null, null).startsWith("Error"));
         // 读取面
         assertTrue(tools.office_get_formatting("conv-1", "长".repeat(256)).startsWith("Error"));
         verifyNoInteractions(bridge);
@@ -387,7 +392,7 @@ class OfficeEditToolsTest {
     void tableSetCellDispatches() {
         when(bridge.executeOfficeCommand(any(), eq("table_set_cell"), anyMap())).thenReturn("{}");
 
-        tools.office_table_set_cell("conv-1", null, "B2", "新内容");
+        tools.office_table_set_cell("conv-1", null, "B2", "新内容", null);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> args = ArgumentCaptor.forClass(Map.class);
@@ -450,9 +455,9 @@ class OfficeEditToolsTest {
         assertTrue(tools.office_insert_table("conv-1", "[[\"a\",\"b\"],[\"c\"]]", null, null, null).startsWith("Error"));
         assertTrue(tools.office_insert_table("conv-1", "[[\"a\"]]", null, null, "middle").startsWith("Error"));
         assertTrue(tools.office_table_read("conv-1", -1).startsWith("Error"));
-        assertTrue(tools.office_table_set_cell("conv-1", -1, "B2", "x").startsWith("Error"));
-        assertTrue(tools.office_table_set_cell("conv-1", 0, "", "x").startsWith("Error"));
-        assertTrue(tools.office_table_set_cell("conv-1", 0, "2B", "x").startsWith("Error"));
+        assertTrue(tools.office_table_set_cell("conv-1", -1, "B2", "x", null).startsWith("Error"));
+        assertTrue(tools.office_table_set_cell("conv-1", 0, "", "x", null).startsWith("Error"));
+        assertTrue(tools.office_table_set_cell("conv-1", 0, "2B", "x", null).startsWith("Error"));
         assertTrue(tools.office_table_add_row("conv-1", -1, null, null).startsWith("Error"));
         assertTrue(tools.office_table_add_row("conv-1", 0, null, 0).startsWith("Error"));
         assertTrue(tools.office_table_add_row("conv-1", 0, null, 51).startsWith("Error"));
@@ -496,7 +501,7 @@ class OfficeEditToolsTest {
     void editHeaderFooterValidatesPart() {
         when(bridge.executeOfficeCommand(any(), eq("edit_header_footer"), anyMap())).thenReturn("{}");
 
-        tools.office_edit_header_footer("conv-1", "footer", null, "center");
+        tools.office_edit_header_footer("conv-1", "footer", null, "center", null);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> args = ArgumentCaptor.forClass(Map.class);
         verify(bridge).executeOfficeCommand(eq("conv-1"), eq("edit_header_footer"), args.capture());
@@ -504,7 +509,7 @@ class OfficeEditToolsTest {
         assertEquals("", args.getValue().get("text"));
         assertEquals("center", args.getValue().get("alignment"));
 
-        assertTrue(tools.office_edit_header_footer("conv-1", "sidebar", "text", null).startsWith("Error"));
+        assertTrue(tools.office_edit_header_footer("conv-1", "sidebar", "text", null, null).startsWith("Error"));
     }
 
     @Test
@@ -1304,8 +1309,8 @@ class OfficeEditToolsTest {
         when(bridge.executeOfficeCommand(any(), eq("manage_content_control"), anyMap())).thenReturn("{}");
         when(bridge.executeOfficeCommand(any(), eq("set_document_properties"), anyMap())).thenReturn("{}");
 
-        assertEquals("{}", tools.office_insert_footnote("conv-1", "第一条", "参见附件一"));
-        assertEquals("{}", tools.office_insert_endnote("conv-1", "第一条", "参见附件一"));
+        assertEquals("{}", tools.office_insert_footnote("conv-1", "第一条", "参见附件一", null));
+        assertEquals("{}", tools.office_insert_endnote("conv-1", "第一条", "参见附件一", null));
         assertEquals("{}", tools.office_apply_style("conv-1", "标题", true, "标题 1"));
         assertEquals("{}", tools.office_manage_content_control("conv-1", "insert", "填空处", "field-1", "客户名称", null, null));
         assertEquals("{}", tools.office_set_document_properties("conv-1", "尽调报告", null, "AI WorkDeck", null, null, null));
@@ -1327,8 +1332,8 @@ class OfficeEditToolsTest {
     @Test
     @DisplayName("批次9 Word 杂项工具参数校验失败：拦下不触碰桥")
     void wordMiscBatch9ValidationFailuresDoNotTouchBridge() {
-        assertTrue(tools.office_insert_footnote("conv-1", "", "内容").startsWith("Error"));
-        assertTrue(tools.office_insert_endnote("conv-1", "锚点", "").startsWith("Error"));
+        assertTrue(tools.office_insert_footnote("conv-1", "", "内容", null).startsWith("Error"));
+        assertTrue(tools.office_insert_endnote("conv-1", "锚点", "", null).startsWith("Error"));
         assertTrue(tools.office_apply_style("conv-1", "", true, "标题 1").startsWith("Error"));
         assertTrue(tools.office_apply_style("conv-1", "标题", true, "").startsWith("Error"));
         assertTrue(tools.office_manage_content_control("conv-1", "insert", "", "tag1", null, null, null).startsWith("Error"));
@@ -1435,10 +1440,10 @@ class OfficeEditToolsTest {
     void passStepAppliesEditsThenAdvances() {
         inlineContentCache.put("conv-1", passDoc());
         when(bridge.executeOfficeCommand(eq("conv-1"), eq("replace_batch"), anyMap()))
-                .thenReturn("{\"replaced\":2,\"requested\":2,\"failed\":[]}");
+                .thenReturn("{\"replaced\":2,\"requested\":2,\"failed\":[],\"requestedEditReasons\":[{\"index\":1,\"reason\":\"规范编号\"}]}");
 
         tools.office_pass_step("conv-1", "[]", null); // 第 1 块
-        String json = "[{\"searchText\":\"第1条\",\"replaceText\":\"第一条\"},"
+        String json = "[{\"searchText\":\"第1条\",\"replaceText\":\"第一条\",\"reason\":\"规范编号\"},"
                 + "{\"searchText\":\"第2条\",\"replaceText\":\"第二条\"}]";
         com.fasterxml.jackson.databind.JsonNode r = parse(tools.office_pass_step("conv-1", json, null));
 
@@ -1450,6 +1455,8 @@ class OfficeEditToolsTest {
                 (java.util.List<Map<String, Object>>) args.getValue().get("items");
         assertEquals(2, items.size(), "清单原样过桥，不做任何改写");
         assertEquals("第1条", items.get(0).get("searchText"));
+        assertEquals("规范编号", items.get(0).get("reason"));
+        assertEquals("规范编号", r.path("applied").path("requestedEditReasons").get(0).path("reason").asText());
 
         assertEquals(2, r.path("pass").path("chunk").asInt(), "落笔后游标前进到第 2 块");
         assertEquals(2, r.path("applied").path("replaced").asInt());

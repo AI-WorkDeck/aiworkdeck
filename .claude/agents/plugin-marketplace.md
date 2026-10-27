@@ -10,7 +10,7 @@ description: 插件市场领域。任务涉及插件广场页、在线 Skill 广
 ## 关键文件
 
 **前端（2026-08 二改：VS Code 扩展栏形态，主入口）**
-- `frontend/src/components/MarketSidebarPanel.vue` — **左栏列表面板**（rail 广场按钮 → `toggleLeftPane('market')` 打开）：顶部搜索（过滤全部分组）+ 两个折叠分组「已安装（含重扫按钮）/ Marketplace」（dev-board#67 起在线 Skill 广场与插件广场收进同一个「Marketplace」组）。**每个分组内部是横向标签**（`.msb-tabs` 胶囊）：已安装 = [插件 | Skill]（`installedTab`，插件在前 = 面板型 skill ∪ JAR/Web 插件，Skill = 纯对话型，判据仍是 `isPanelSkill`）；Marketplace = [Skill | 插件]（`marketTab`）。竖着叠分组会把后一组推出视口，是当初被用户打回的形态，别改回去。行内布局：分类图标+名称+一行描述+版本·下载·分类，行内快捷安装钮，点行 emit `open-detail`；面板型深底图标（`.msb-row-glyph.is-plugin`）。标签标题复用 `sectionPluginTitle`/`sectionSkillTitle` 词条，与 `MarketPane.vue` 整页版「已安装」tab 的分区一致。
+- `frontend/src/components/MarketSidebarPanel.vue` — **左栏列表面板**（rail 广场按钮 → `toggleLeftPane('market')` 打开）：顶部搜索（过滤全部分组）+ 两个折叠分组「已安装（含重扫按钮）/ Marketplace」（dev-board#67 起在线 Skill 广场与插件广场收进同一个「Marketplace」组）。**每个分组内部是横向标签**（`.msb-tabs` 下划线）：已安装 = [插件 | Skill]（`installedTab`，插件在前 = 面板型 skill ∪ JAR/Web 插件，Skill = 纯对话型，判据仍是 `isPanelSkill`）；Marketplace = [Skill | 插件]（`marketTab`）。两个主分组现各自滚动、平均分配可用高度；搜索、组头与标签不随列表滚走，折叠任一组会把空间交给另一组（dev-board#1374）。不要改回整栏共用一个滚动区，否则已安装项会把 Marketplace 推出视口。行内布局：分类图标+名称+一行描述+版本·下载·分类，行内快捷安装钮，点行 emit `open-detail`；面板型深底图标（`.msb-row-glyph.is-plugin`）。标签标题复用 `sectionPluginTitle`/`sectionSkillTitle` 词条，与 `MarketPane.vue` 整页版「已安装」tab 的分区一致。
 - **「语音」合并插件（dev-board#66）**：概念模型是**左栏一个图标 = 一个插件，skill 只在 AI 对话生效**。语音合成（text-to-speech）与会议录音（meeting-recorder）共占 rail 'voice' 一个面板位，广场三处（左栏列表 / 整页已安装 / 详情页）都必须显示**一个**「语音」条目——分组定义 `VOICE_PLUGIN_GROUP` 与合成视图 `buildVoiceGroupSkill()` 在 `leftSidebarPlugins.js`，detail 的 spec 带 `group:true`（'voice' 不是 registry 条目，详情页不去在线广场查它）。启停一体：开关一次翻全部成员，后端 `SkillRegistry` 每次扫描后还做状态收敛（任一启用 → 全部启用），防「tab 可见但 kick-off 命不中 skill」的静默断裂。新增面板内多 tab 的合并插件时照这套（分组定义 + 三处 UI + 后端收敛名单）。
 - `frontend/src/components/MarketDetailPane.vue` — **中栏详情 tab**（overview `openMarketDetail(spec)` 打开，`tabType:'market-detail'`、id=`market-detail_{kind}_{id}`、单例、isTabVisible 常显）：头部图标+衬线标题+作者/版本/下载+动作区（Skill：安装/更新/卸载/生效方式三档；插件：安装带权限确认/启停 switch/卸载），正文触发词「」排版、能力、详细信息（标识/来源/主页，主页 emit open-url 走浏览器 tab）。
 - 两件通过 `uni.$emit('awd:market-changed')`（详情→列表）与 `'awd:market-changed-from-sidebar'`（列表→详情）互相刷新；组件卸载时 $off，不涉页面栈多实例地雷。
@@ -140,6 +140,16 @@ description: 插件市场领域。任务涉及插件广场页、在线 Skill 广
 
 ## 安装/卸载链路
 
+### 插件更新提示（dev-board#1442）
+
+- `utils/marketUpdates.js` 区分已安装版本与市场版本、严格比较 SemVer，并合并远端与随应用提供的目录。在线同 ID 以远端为准，不能让旧 bundled 条目遮住新版本；确定未安装且随包更新时可选随包，已有独立安装不走 bundled 覆盖。离线时保留已知更新，未安装项可退回随包安装源。
+- `composables/usePluginUpdates.js` 是插件更新计数的共享状态：工作台挂载即检查，之后每 30 分钟及窗口恢复焦点时检查（焦点检查间隔至少 5 分钟），不依赖市场面板挂载。检查只读取目录；更新仍由用户点击。入口和 Marketplace 分组显示数字角标，手动检查失败持续提示，不把离线当成全部最新。
+- 后台/手动检查完成广播 `awd:market-update-checked`，仅刷新已打开详情的版本元数据，不卸载正文或覆盖未保存设置；初次加载/更新期间不打断当前操作。安装、卸载、启停沿用原有两个 market-changed 事件刷新本地版本、角标与工作台入口。在途检查遇到安装变更会补一次读取，避免旧结果复活角标。工作台 PluginPane 的 key 包含版本，升级后已打开插件重新装载。
+- `MarketPluginView.installedVersion/installed/updatable` 只由本机扫描判定，不采信 registry 中的同名状态字段。详情显示“已安装版本 / 最新版本”，不再把云端版本显示成本地版本。
+- 更新确认新版声明能力，仍走原验签安装；后端成功后默认禁用。仅原来启用的插件，在读回实际版本及权限与确认快照相同后恢复启用；版本或权限变化、回读失败、恢复失败都保持禁用并提示核对，原停用项不自动启用。
+- 安装先在插件根内隐藏暂存目录下载、验签及逐文件校验，再验证 manifest 的 ID/版本与签名清单相符；替换保留旧目录直到新版本扫描成功。替换/扫描失败恢复旧文件及原启用态，不先删除唯一旧副本。
+- 验证：`node --test frontend/tests/plugins/market-updates.test.mjs frontend/tests/plugin-sdk/market-update-detail.test.mjs frontend/tests/project-home/market-*.test.mjs`；JDK 21 下 `PluginMarketServiceTest` 覆盖版本判定、签名及失败回滚。
+
 - 安装：前端 POST /api/skills/market/install {id} → admin 校验 → `requireValidId`（正则 `^[a-z0-9][a-z0-9-]{1,49}$`，兼防路径穿越）→ 下载 bundle → 写 `{ai.skills.dir}/{id}/` 两文件 → `rescan()`。**重装即覆盖更新**。
 - 卸载：来自插件的 skill 拒绝卸载（走插件管理）；canonical 路径校验防符号链接逃逸，只删 skills 正下方子目录。
 - **安装目标目录 == 内置 skill 扫描目录**（默认 `backend/skills/`），在线安装的与内置的（listing-pathway）并列共存、同一套扫描/启停。
@@ -181,3 +191,15 @@ description: 插件市场领域。任务涉及插件广场页、在线 Skill 广
 源码在 `official-plugins/tencent-meeting/`：公开 PluginHost JAR + sandbox Web 面板 + `tencent-meeting-market` 技能。`build.sh` 输出真实 ZIP；由官网 `publish-plugin.mts` 受理、扫描、审核、签名上架，再同步北京已签名文件与目录至新加坡。目录更新无需客户端发版或网站部署。不要把旧内置 `tencent-meeting` 技能上架当作独立插件：旧客户端没有它依赖的宿主实现。
 
 新插件依赖本机官方 `tmeet` CLI；同步由用户主动触发，先取元数据，打开会议再读正文。长操作使用公开 Jobs SPI，Web 每 3 秒轮询；不可降至 1 秒（插件 SPI 配额）。AI 入口先归档到项目，再以短文件引用触发独立技能；不向聊天塞入整份逐字稿。登录账号由操作系统用户共享，缓存按 WorkDeck 用户/项目区分，二者不是同一种隔离。
+
+## 包晴天独立插件（dev-board#1249）
+
+源码在 `official-plugins/baoqingtian/`，Java 公开 SPI + sandbox Web 工作区，最低宿主 0.60.0。复用动态 rail 与 `plugin` 标签，不新增静态入口。连接包晴天官方 PC 认证和律师业务 API；上游仓只读，不复制其实现。用户确认笔记指平台律师图文笔记，非本地私人笔记。会话按宿主用户保留于后端内存；不使用插件 localStorage 储存认证信息。
+
+接口地雷：新增 `/note/add` 与更新 `/note/edit` 分开；编辑用 `noteId`。本人列表用 `/note/lawyer/page`；每次写入前再次校验笔记归属。`status:DRAFT` 才是草稿，`isNoteDraft:Y` 是媒体上传中标识，不能混淆。图文 `content` 是媒体引用、`description` 才是正文，编辑时必须保留媒体、类型及关联字段。构建/单测入口见插件 README；上架仍须按本页真实受理、签名、双站同步与实际工作台安装路径验收，不能把存在目录当成已交付。
+
+**媒体上传补齐（#1249，2026-10-14）**：新建遵循当前APP的暂存→COS上传→`updateAfterUploadSuccess`链路，不能仅依赖DTO有TEXT枚举就开放纯文字新增。`description`是正文，图片`content`用分号连接，视频必须独立封面。客户端分片通过工具桥传到插件后端，不把平台签名交给页面。保存结果未知不得重新add；续传必须绑定原记录和原账号。只有回填响应与读回验证完成才显示保存成功。实际账户及Marketplace实测结果以台账为准。
+
+## 可安装业务面板与服务设置（#1340/#1341，待发版）
+
+搜索/语音/脱敏/诉讼可视化/日历/收藏/剪贴板/洞察改为official-plugins中的真实Web包；MarketSidebarPanel/MarketDetailPane将/api/plugins/bundled的随应用目录与在线广场合并，断网仍可装随包项。PluginBundledInstaller首次复制、保留禁用和卸载意愿，不覆盖独立同名包；desktop extraResources提供只读来源。旧voice skill合成项仅用于旧实现兼容，实际新入口按voice插件启停。PluginConnectionSettings为可信宿主设置面板，负责开发服务授权、令牌输入、OAuth与连接状态；iframe没有授权写接口。主产品插件权益与开发者SaaS付费是两条通道。

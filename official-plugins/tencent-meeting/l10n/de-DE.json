@@ -1,0 +1,17 @@
+{
+  "plugin.name": "Tencent Meeting",
+  "plugin.description": "Verbinden Sie Tencent Meeting, um Meetings und Aufnahmen bei Bedarf zu synchronisieren, Transkripte und intelligente Protokolle anzusehen, in Projekte zu archivieren und Meeting-Protokolle sowie Aufgaben zu erstellen. Erfordert die offizielle tmeet-CLI und eine Kontoautorisierung.",
+  "tool.tencent_meeting_action.description": "Tencent-Meeting-Plugin: Verbindung prüfen, Anmeldung autorisieren, bei Bedarf synchronisieren, Meetings und Transkripte ansehen und Projektdateien archivieren.",
+  "panel.refreshList": "Aktualisieren",
+  "panel.selectMeeting": "Besprechung auswählen",
+  "panel.backToList": "Zurück zu den Besprechungen",
+  "panel.meetingCount": "Besprechungen",
+  "panel.connectInSidebar": "Tencent Meeting in der Seitenleiste verbinden",
+  "panel.loadingList": "Besprechungen werden geladen…",
+  "panel.loadingDetail": "Besprechungsinhalte werden geladen…",
+  "panel.syncing": "Besprechungen werden synchronisiert…",
+  "panel.exporting": "Besprechungsmaterial wird gespeichert…",
+  "panel.preparingAi": "Besprechungsmaterial für KI wird vorbereitet…",
+  "view.account.name": "Tencent Meeting",
+  "view.meetings.name": "Tencent Meeting"
+}

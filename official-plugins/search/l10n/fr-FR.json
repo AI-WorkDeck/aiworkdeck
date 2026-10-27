@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Recherche de projet",
+  "plugin.description": "Recherchez dans les fichiers du projet par texte intégral ou par tags et accédez directement aux documents.",
+  "view.main.name": "Recherche de projet"
+}

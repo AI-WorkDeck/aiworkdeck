@@ -29,6 +29,9 @@ class DdControllerAuthTest {
     @Mock
     private ProjectMemberService projectMemberService;
 
+    @Mock private com.checkba.service.ProjectFileAccessService fileAccess;
+    @Mock private com.checkba.service.DdWorkflowService workflow;
+
     @InjectMocks
     private DdController controller;
 
@@ -56,7 +59,7 @@ class DdControllerAuthTest {
         try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(7L);
             when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(true);
-            when(ddService.getRequests(42L)).thenReturn(List.of());
+            when(workflow.visibleRequests(42L, 7L)).thenReturn(List.of());
             assertNotNull(controller.getRequests(42L, "sess"));
         }
     }

@@ -5,6 +5,45 @@ description: 授权与计费领域。任务涉及解锁门（试用码/账户 Ke
 
 # 授权与计费 领域地图
 
+## 设置账户状态（dev-board#1415，2026-10-21）
+
+`AdminPane` 的账户状态区分 loading / ready / error：只有成功取得明确的 `connected:false` 才显示登录入口；请求失败保留已确认身份并给重试，不当作退出登录。并发状态请求按代次接收，旧未连接回包不能盖过登录后的新状态。账户/钱包块必须显式按 connected 显示，不能用紧跟手机同步 `v-if=isDesktop` 的 `v-else`（这会在桌面隐藏整个账户块）。
+验证：`tests/account/admin-account-state.test.mjs` 真模板 SSR 与加载方法；`admin-account-ui.mjs` 实际设置路由、合成 API 的初始等待/连接/账户事件失败/重试/退出。用户截图发生时的请求失败原因无法仅凭截图还原；模板错误与失败误判路径各自有回归，不混为一个根因。
+
+## 受限网络兼容验证（dev-board#1330，2026-10-17）
+
+国内阿里云/国际 Turnstile 浏览器控件被网络拦截时，桌面登录卡与官网注册/重置表单可手动选「使用兼容验证」。短信本来就由官网服务器发送；兼容入口替换的是人机验证，不是短信供应商。官网 `POST /api/auth/captcha-challenge` 接收 `{phone|email,purpose:login|reset}`，返回 `{id,image,expiresAt}`；图片为服务端栅格化的 PNG data URL，无答案明文。桌面 `/api/account/captcha-challenge` 经机器账户闸代理；插件匿名桥 `/api/auth/account-login/captcha-challenge` 受桥接开关与独立图片签发限频，不能扣短信发送桶，也不信任客户端提供的 IP 字段。
+
+发送仍用既有 `captchaToken`，兼容格式 `local:<id>:<answer>`。官网 SQLite `captcha_challenge` 存哈希、规范联系方式、用途、来源 IP 与有效期；3 分钟失效，BEGIN IMMEDIATE 原子核销，每次尝试（含错误/绑定不符）作废。挑战签发独立限制账号/IP/全局频率，发送沿用短信/邮件冷却、日配额与全局熔断。兼容验证不能借缺 token、SDK失败、主供应商未配置直接放行；不是第三方行为风控的等价替代。Java 图片签发与发送走相同出站路径，官网来源 IP 仍沿用既有可信反代边界，未添加任意 XFF 转发。
+
+错误分层：组件加载失败、`captcha_failed`、账户服务网络失败、短信/邮件发送失败；后者保留上游已脱敏的冷却/日配额具体提示。错误联系方式是 `invalid_phone` / `invalid_email`，不得显示为验证码错误。错误/过期图需换一张；切联系方式、用途或站点清掉旧图。
+
+验证：官网隔离空目录 `scripts/verify-captcha-challenge.mts`（cn/intl，所有外发拦截）；主仓 `frontend/tests/account/compatible-{desktop,website,addin}-ui.mjs`（合成 API + 主动阻断第三方 + 实际 PNG）；`AccountServiceTest`、`AwdkLoginServiceTest`、`AuthControllerHardeningTest`。不代表生产短信、律所网络、正式安装包或真实反代 IP 配置已实测。
+
+## 统一密码登录（dev-board#1299，2026-10-15）
+
+此节取代下文历史条目的「验证码即登录」「桌面无密码入口」。官网是唯一密码权威；桌面
+`AccountLoginDialog.vue` 默认手机号（cn）/邮箱（intl）+ 密码，首次使用/存量无密码用户走
+验证码→创建并确认密码→密码登录。忘记密码走独立 reset 场景；密码保留首尾空白，8–72 字符。
+未设置密码时官网 exchange-key 只返回 `{passwordSetupRequired:true,setupToken,expiresAt,account}`，
+Java `PasswordSetupRequired` 将它作为 code=0/data 受限挑战返回，不执行 connect、账户缓存清理、
+identitySync、平台Key申请或令牌签发。完成 setup 后再单独 exchange-key/password 登录。
+
+桌面端点：`POST /api/account/password/{setup,reset/send-code,reset}`，受既有机器账户权限闸；
+插件/移动匿名桥：`POST /api/auth/account-login/password/{setup,reset/send-code,reset}`，沿用桥接
+开关与 IP 限速。它们仅代理官网同名 `/api/auth/password/*`；不在 Java 库保存官网密码。
+`AccountLoginExchange` 将 password_login_required/password_setup_required 等业务态保留 reason；
+不将它们计为错误密码导致锁定。setup/reset 本身只返回 ok，不能当作登录成功。
+
+桌面与插件切模式/站点清空密码、确认密码、验证码及 setupToken；验证码控件节点保持挂载，
+仅首次验证/重置表单显示。两份密码输入都不得 trim。已有 TOTP 与自建服务器 `/api/auth/login`
+二次验证链不变。官网重置失效范围不能冒充已撤销所有 Java awdt_；旧设备令牌撤销仍属独立机制。
+
+验证：`AccountServiceTest`、`AccountControllerLoginSyncTest`、`AuthControllerHardeningTest`、
+`MobileApiContractTest`；前端 `tests/account/password-{login,desktop}-ui.mjs` 用实际路由及合成API，
+截图在显式配置的临时目录。浏览器 UI 不等于正式 Electron、Word/WPS 或生产短信实测。
+
+
 职责边界：**谁被允许用、用多少、钱怎么记**。包括桌面解锁门、账户连接、entitlement 框架、
 本地 SKU 的免费额度执行、平台 AI 通道的取 key 与对账、广场付费项闸门、单机免登的身份解析与准入闸。
 不含：广场的页面形态与安装链路本身（plugin-marketplace）、AI 编排与供应商路由的其余部分（ai-chat）、
@@ -16,6 +55,16 @@ description: 授权与计费领域。任务涉及解锁门（试用码/账户 Ke
 #250（身份解析修正）、PR-D #251（广场付费项）、PR-E #252（协作 UX，本领域只涉术语）。
 总 Spec 见 `docs/superpowers/specs/2026-08-05-commercialization-redesign.md`，
 **Spec 与实现有偏差时以代码为准**，偏差逐条记在该文件末尾「实现与 Spec 的偏差记录」一节。
+
+## Pro 订阅与充值分账（dev-board#1187，2026-10-11）
+
+官网仍是余额与权益权威源，149 元购买一次 30 天，不自动续费。订阅服务额度和充值 Credits 分账；2026-10-11 用户追加要求按 ¥149 对应 745 Credits 同步更新周/月限额，当前采用 745 Credits / 30 天、200 Credits / 7 天（周 200 沿用此前对应方案；尚未部署）。周/月窗口从订阅周期开始时刻计算。官网 `subscription` 快照由账户余额和平台用量接口透传，桌面 AdminPane 展示两层额度、重置时间及充值余额续用开关状态；开关在官网账户页修改。
+
+`EntitlementService` 缓存逐项到期时间与账户指纹，离线宽限不能延长订阅权益，单独购买的永久权益仍保留。Pro 派生 `plan.pro`、`clipboard.unlimited`、`stage.unlimited`、`cloud.storage.3gb`；旧缓存的 Pro 无到期时间时须刷新。
+
+`CloudStorageQuotaService` 通过当前云用户的 MobileBilling 绑定查询权益，不能借机器管理员账户。官方 cloud profile 开启普通项目写入配额校验；desktop/self-host 默认关闭。Pro 为 3GiB 持久空间，免费账户无持久空间；到期已有文件仍能读、删。云写入以所属用户行锁串行计量，复制、编辑、AI 产物和模板都计入；优先核算实际磁盘字节，回收站中仍在磁盘上的文件继续占用。所有账户临时中转池为 200MiB，同时包含手机上传及桌面取件暂存，ACK 后释放，不是每月流量。
+
+验证入口：`EntitlementServiceTest`、`HttpMobileBillingClientTest`、`CloudStorageQuotaServiceTest`、`ProjectFileServiceCloudQuotaTest`、`MobileRelayStoreServiceTest`、`MobileTransferServiceTest`；官网独立空目录脚本 `verify-subscription-allowance.mts`。跨仓细节及经营测算见 `docs/handoffs/2026-10-11-subscription-project-unification.md`。合并不等于部署。
 
 ## 试用缓存与回合归属（dev-board#1166，2026-10-10）
 
@@ -80,6 +129,7 @@ description: 授权与计费领域。任务涉及解锁门（试用码/账户 Ke
   给个默认返回值会让「桩根本没接这条路」在测试里表现成一次成功的上传。
 - `service/account/AccountEndpoint.java` — 授权服务器地址的协议校验（https，回环 http 例外），`LicenseService` 与 `AccountService` 共用。
 - `service/account/AccountException.java` — `Kind`：NETWORK / UNAUTHORIZED / CONFLICT / NOT_CONNECTED / MALFORMED。
+- 团队端点（精确 `/api/account/team` 或其子路径）的 HTTP 403 + `forbidden` 是角色权限拒绝，归 REJECTED，保留有效会话；401、invalid_key、key_revoked 与其他账户端点的 forbidden 仍走原凭据失败分类。护栏 `AccountTeamPermissionTest`（dev-board#1252/#1296），不能全局放宽 403。
 - `backend/src/main/java/com/checkba/controller/AccountController.java` — `/api/account/{status,connect,disconnect,usage}`
   以及个人档案 `/api/account/profile`（GET/PUT）与 `/api/account/avatar`（POST multipart/DELETE）。
 - `service/account/AccountSwitchCleanup.java` — **换账户后作废动作的唯一出口**（`afterConnect` / `afterDisconnect`）：

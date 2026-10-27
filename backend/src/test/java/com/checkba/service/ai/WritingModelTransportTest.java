@@ -77,9 +77,16 @@ class WritingModelTransportTest {
         assertEquals(baseline, body.get());
         assertTrue(new ObjectMapper().readTree(body.get()).path("tools").isArray());
     }
+    @Test void structuredReviewBudgetReachesTheRealHttpTransport() throws Exception {
+        serve(); Collector c=new Collector();
+        model("deepseek/deepseek-v4-flash",Duration.ofSeconds(3)).generateCancellable(
+                List.of(UserMessage.from("synthetic structured review")),8192,c);
+        c.await(); assertNull(c.error.get()); assertEquals(1,requests.get());
+        assertEquals(8192,new ObjectMapper().readTree(body.get()).path("max_tokens").asInt());
+    }
     @Test void invalidCapIsRejectedBeforeAnyHttp() {
         serve(); var m = model("openai/gpt-4o", Duration.ofSeconds(3));
-        for (int cap : new int[]{-1, 0, 255, 4097}) assertThrows(IllegalArgumentException.class,
+        for (int cap : new int[]{-1, 0, 255, 8193}) assertThrows(IllegalArgumentException.class,
                 () -> m.generateCancellable(List.of(UserMessage.from("synthetic")), cap, new Collector()));
         assertEquals(0, requests.get());
     }
@@ -151,12 +158,20 @@ class WritingModelTransportTest {
         var platform = mock(PlatformAiChannel.class);
         var f = factory("OLLAMA", new AiModelProperties(), platform);
         assertThrows(com.checkba.exception.FeatureNotConfiguredException.class, () -> f.getWritingModel(Duration.ofSeconds(2)));
+        assertThrows(com.checkba.exception.FeatureNotConfiguredException.class, () -> f.getAutomaticWritingModel(Duration.ofSeconds(2)));
+        for (int reviewer : new int[]{0, 1}) assertThrows(com.checkba.exception.FeatureNotConfiguredException.class,
+                () -> f.getAutomaticWritingReviewModel(Duration.ofSeconds(2),reviewer));
         verify(platform, never()).apiKey();
     }
     @Test void expiredBudgetRejected() {
         var f = factory("OPENROUTER", new AiModelProperties(), mock(PlatformAiChannel.class));
         for (Duration d : new Duration[]{Duration.ZERO, Duration.ofMillis(-1)}) assertThrows(IllegalArgumentException.class, () -> f.getWritingModel(d));
         assertThrows(IllegalArgumentException.class, () -> f.getWritingModel(null));
+        for (Duration d : new Duration[]{null, Duration.ZERO, Duration.ofMillis(-1)}) {
+            assertThrows(IllegalArgumentException.class, () -> f.getAutomaticWritingModel(d));
+            for (int reviewer : new int[]{0, 1}) assertThrows(IllegalArgumentException.class,
+                    () -> f.getAutomaticWritingReviewModel(d,reviewer));
+        }
     }
     @Test void emptyOrReasoningOnlyStreamsAlwaysReachOneErrorTerminal() throws Exception {
         AtomicReference<String> response=new AtomicReference<>();
@@ -188,6 +203,87 @@ class WritingModelTransportTest {
             assertFalse(new ObjectMapper().readTree(body.get()).has("reasoning"));
         }
     }
+    @Test void boundedFlashReviewCanDisableReasoningWithoutAnUnsupportedEffort() throws Exception {
+        serve();
+        var review = new OpenRouterStreamingChatModel("synthetic-key", url(), "deepseek/deepseek-v4-flash",
+                Duration.ofSeconds(2), 5, "none");
+        Collector c = new Collector();
+        review.generateCancellable(List.of(UserMessage.from("synthetic review")),8192,c); c.await();
+        assertNull(c.error.get());
+        var request = new ObjectMapper().readTree(body.get());
+        assertEquals(8192,request.path("max_tokens").asInt());
+        assertFalse(request.path("reasoning").path("enabled").asBoolean(true));
+        assertFalse(request.path("reasoning").has("effort"));
+    }
+    @Test void deepSeekFlashReasoningDisableDoesNotExpandToHighDefaultOrUnboundedCalls() throws Exception {
+        serve(); ObjectMapper json = new ObjectMapper();
+        List<ChatMessage> messages = List.of(UserMessage.from("synthetic reasoning boundary"));
+        var high = new OpenRouterStreamingChatModel("synthetic-key", url(), "deepseek/deepseek-v4-flash",
+                Duration.ofSeconds(2), 5, "high");
+        Collector review = new Collector(); high.generateCancellable(messages,8192,review); review.await();
+        assertNull(review.error.get());
+        var request = json.readTree(body.get());
+        assertEquals(8192,request.path("max_tokens").asInt());
+        assertEquals(json.readTree("{\"effort\":\"high\"}"),request.path("reasoning"));
+
+        var defaults = new OpenRouterStreamingChatModel("synthetic-key", url(), "deepseek/deepseek-v4-flash",
+                Duration.ofSeconds(2), 5, null);
+        Collector generation = new Collector(); defaults.generateCancellable(messages,4096,generation); generation.await();
+        assertNull(generation.error.get());
+        request = json.readTree(body.get());
+        assertEquals(4096,request.path("max_tokens").asInt());
+        assertFalse(request.has("reasoning"),"Bounded generation must retain provider defaults when effort is absent");
+
+        var none = new OpenRouterStreamingChatModel("synthetic-key", url(), "deepseek/deepseek-v4-flash",
+                Duration.ofSeconds(2), 5, "none");
+        Collector ordinary = new Collector(); none.generate(messages,ordinary); ordinary.await();
+        assertNull(ordinary.error.get());
+        request = json.readTree(body.get());
+        assertFalse(request.has("max_tokens"));
+        assertEquals(json.readTree("{\"effort\":\"none\"}"),request.path("reasoning"),
+                "Unbounded chat retains its existing effort serialization");
+        assertEquals(3,requests.get());
+    }
+    @Test void boundedReviewPreservesExplicitLowReasoningForFlash() throws Exception {
+        serve();
+        var review = new OpenRouterStreamingChatModel("synthetic-key", url(), "qwen/qwen3.7-flash",
+                Duration.ofSeconds(2), 5, "low");
+        Collector c = new Collector();
+        review.generateCancellable(List.of(UserMessage.from("synthetic review")), 4096, c); c.await();
+        assertNull(c.error.get());
+        var request = new ObjectMapper().readTree(body.get());
+        assertEquals(4096, request.path("max_tokens").asInt());
+        assertEquals("low", request.path("reasoning").path("effort").asText());
+        assertFalse(request.path("reasoning").has("enabled"));
+    }
+    @Test void automaticFactoryUsesMainGenerationAndTwoLowReviewersOnByokAndPlatform() throws Exception {
+        serve();
+        AiModelProperties props = new AiModelProperties();
+        props.getOpenRouter().setBaseUrl(url()); props.getOpenRouter().setApiKey("synthetic-byok");
+        props.getOpenRouter().setDefaultModel("deepseek/deepseek-v4-flash");
+        var platform = mock(PlatformAiChannel.class); when(platform.apiKey()).thenReturn("synthetic-platform");
+        for (String provider : List.of("OPENROUTER", "AWD_CLOUD")) {
+            var factory = factory(provider, props, platform, provider.equals("OPENROUTER") ? url() : "http://127.0.0.1:1/untrusted");
+            var reasoning = new com.checkba.config.AiReasoningProperties();
+            reasoning.setModels(List.of("deepseek/deepseek-v4-flash", "moonshotai/kimi-k3", "qwen/qwen3.8-max"));
+            reasoning.setEffortDefault("high"); factory.setReasoningPropertiesForTest(reasoning);
+            for (int stage : new int[]{-1, 0, 1}) {
+                var model = stage < 0 ? factory.getAutomaticWritingModel(Duration.ofSeconds(2))
+                        : factory.getAutomaticWritingReviewModel(Duration.ofSeconds(2), stage);
+                Collector c = new Collector();
+                model.generateCancellable(List.of(UserMessage.from("synthetic writing")),4096,c); c.await();
+                assertNull(c.error.get());
+                assertEquals(provider.equals("OPENROUTER") ? "Bearer synthetic-byok" : "Bearer synthetic-platform",auth.get());
+                var request = new ObjectMapper().readTree(body.get());
+                assertEquals(stage < 0 ? "deepseek/deepseek-v4-flash" : stage == 0 ? AllowedModels.KIMI_K3.getModelId()
+                        : AllowedModels.QWEN_3_8_MAX.getModelId(),request.path("model").asText());
+                assertEquals(4096,request.path("max_tokens").asInt());
+                assertEquals(stage <= 0 ? "high" : "low",request.path("reasoning").path("effort").asText());
+                assertFalse(request.path("reasoning").has("enabled"));
+            }
+        }
+        assertEquals(6,requests.get());
+    }
     @Test void boundedWritingNeverLogsMalformedProviderContent() throws Exception {
         String secret = "SYNTHETIC_PRIVATE_MATERIAL_042";
         server.createContext("/chat/completions", ex -> {
@@ -212,6 +308,67 @@ class WritingModelTransportTest {
             assertNull(normal.error.get());
             assertTrue(logs.list.stream().anyMatch(event -> event.getFormattedMessage().contains(secret)), "Existing normal chat diagnostics remain unchanged");
         } finally { logger.detachAppender(logs); logs.stop(); }
+    }
+
+    @Test void automaticWritingSendsConfiguredRoutingForGenerationAndReview() throws Exception {
+        serve();
+        AiModelProperties props = new AiModelProperties();
+        props.getOpenRouter().setBaseUrl(url()); props.getOpenRouter().setApiKey("synthetic-byok");
+        props.getOpenRouter().setDefaultModel("moonshotai/kimi-k3");
+        var platform = mock(PlatformAiChannel.class); when(platform.apiKey()).thenReturn("synthetic-platform");
+        for (String channel : List.of("OPENROUTER", "AWD_CLOUD")) {
+            var factory = factory(channel, props, platform);
+            var reasoning = new com.checkba.config.AiReasoningProperties();
+            reasoning.setModels(List.of("moonshotai/kimi-k3"));
+            factory.setReasoningPropertiesForTest(reasoning);
+            var routing = new com.checkba.config.AiProviderRoutingProperties();
+            routing.setEnabled(true); routing.setSort("throughput");
+            routing.setQuantizations(List.of("fp8")); routing.setAllowFallbacks(false);
+            factory.setProviderRoutingForTest(routing, 1);
+            for (boolean review : new boolean[]{false, true}) {
+                Collector c = new Collector();
+                var model = review ? factory.getAutomaticWritingReviewModel(Duration.ofSeconds(2), 0)
+                        : factory.getAutomaticWritingModel(Duration.ofSeconds(2));
+                model.generateCancellable(List.of(UserMessage.from("synthetic")), 4096, c); c.await();
+                assertNull(c.error.get());
+                var request = new ObjectMapper().readTree(body.get());
+                assertEquals("throughput", request.path("provider").path("sort").asText());
+                assertEquals(List.of("fp8"), new ObjectMapper().convertValue(request.path("provider").path("quantizations"), List.class));
+                assertFalse(request.path("provider").path("allow_fallbacks").asBoolean(true));
+                assertEquals("moonshotai/kimi-k3", request.path("model").asText());
+                assertEquals(review ? "high" : "medium", request.path("reasoning").path("effort").asText());
+                assertEquals(4096, request.path("max_tokens").asInt());
+                assertTrue(request.path("stream_options").path("include_usage").asBoolean());
+                assertEquals(channel.equals("OPENROUTER") ? "Bearer synthetic-byok" : "Bearer synthetic-platform", auth.get());
+            }
+        }
+        assertEquals(4, requests.get());
+    }
+
+    @Test void boundedRoutingDoesNotEnableLocalProviderRequeueOrRetryOnFailure() throws Exception {
+        AtomicBoolean closeBeforeHeaders = new AtomicBoolean();
+        server.createContext("/chat/completions", ex -> {
+            requests.incrementAndGet(); body.set(new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            if (!closeBeforeHeaders.get()) ex.sendResponseHeaders(503, -1);
+            ex.close();
+        });
+        class RoutedCollector extends Collector implements ReasoningStreamingHandler {
+            @Override public void bindProviderRequeue(int afterSeconds, java.util.function.BooleanSupplier requeue) {
+                fail("Bounded writing must not bind local provider requeue");
+            }
+        }
+        var route = new OpenRouterStreamingChatModel.ProviderRouting("latency", List.of(), true, 1);
+        var model = new OpenRouterStreamingChatModel("synthetic-key", url(), "moonshotai/kimi-k3",
+                Duration.ofSeconds(2), 5, "medium", route);
+        for (boolean disconnect : new boolean[]{false, true}) {
+            closeBeforeHeaders.set(disconnect); requests.set(0);
+            var c = new RoutedCollector();
+            model.generateCancellable(List.of(UserMessage.from("synthetic")), 512, c); c.await();
+            assertNotNull(c.error.get()); assertEquals(1, c.terminal.get()); assertEquals(1, requests.get());
+            var request = new ObjectMapper().readTree(body.get());
+            assertEquals("latency", request.path("provider").path("sort").asText());
+            assertFalse(request.path("provider").has("ignore"));
+        }
     }
 
 }

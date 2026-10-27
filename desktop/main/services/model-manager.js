@@ -14,7 +14,9 @@ const { spawn } = require('child_process')
  *   - spawnSpecOverride(component, ctx) → {cmd,args,env,cwd}：测试注入用
  */
 
-const MARKER = '.aiworkdeck-complete'
+const { MARKER, checkInventory, saveInventory } = require('./model-inventory')
+const DOWNLOAD_STALL_MS = 3 * 60 * 1000
+const DOWNLOAD_TOTAL_MS = 2 * 60 * 60 * 1000
 const PROGRESS_POLL_MS = 1000
 
 // 目标目录累计字节数（含子目录）：整体进度 = 已落盘字节 / estBytes。
@@ -63,7 +65,7 @@ function stagedFetchScript(ctx) {
 
 // kokoro / asr 的模型下载源（dev-board#583），按顺序尝试：
 //   modelscope —— model-fetch.py 从 ModelScope 同名仓直下，落成标准 HF 缓存布局；
-//   hf         —— huggingface_hub.snapshot_download 走 hf-mirror.com。
+//   hf         —— model-fetch.py 校验 HF 元数据，huggingface_hub 逐文件下载走 hf-mirror.com。
 // 为什么 ModelScope 在前：hf-mirror 只代理元数据，大文件 302 到 HF 官方 CDN
 // （cas-bridge.xethub.hf.co），国内无代理网络连不上，报 LocalEntryNotFoundError。
 // hf 留作回落给海外用户（ModelScope 在海外可能慢或不通）。
@@ -87,7 +89,7 @@ function hfRepoSpec(ctx, service, repo, source) {
   }
   return {
     cmd: pyBin(ctx.resourcesPath),
-    args: ['-c', `from huggingface_hub import snapshot_download; snapshot_download('${repo}')`],
+    args: [stagedFetchScript(ctx), '--source', 'hf', '--repo', repo, '--hf-home', dir],
     env: {
       ...base,
       HF_ENDPOINT: process.env.CHECKBA_HF_ENDPOINT || 'https://hf-mirror.com',
@@ -105,7 +107,16 @@ function hfRepoSpec(ctx, service, repo, source) {
 function humanDownloadError(attempts) {
   const disk = attempts.some((a) => /error\[disk\]|No space left|Errno 28|ENOSPC/i.test(a.detail))
   const labels = attempts.map((a) => t(SOURCE_LABELS[a.source])).join(' / ')
-  const head = disk
+  const runtime = attempts.some((a) => /ModuleNotFoundError|ImportError|DLL load failed|WinError 193/i.test(a.detail))
+  const checksum = attempts.some((a) => /error\[checksum\]|ChecksumError/i.test(a.detail))
+  const permission = attempts.some((a) => /PermissionError|EACCES|Errno 13/i.test(a.detail))
+  const head = runtime
+    ? t({ zh: '模型下载组件无法加载，请修复对应的运行时组件后重试。', en: 'The model downloader could not load. Repair its runtime component and retry.' })
+    : checksum
+      ? t({ zh: '模型下载内容校验失败，请重新下载。', en: 'Model download integrity verification failed. Please retry.' })
+      : permission
+        ? t({ zh: '无法写入模型目录，请检查文件访问权限后重试。', en: 'Cannot write to the model directory. Check file permissions and retry.' })
+        : disk
     ? t({ zh: '磁盘空间不足，请清理出空间后重试。', en: 'Not enough disk space. Free up some space and try again.' })
     : t({
       zh: `无法连接模型下载源（${labels}），请检查网络后重试。`,
@@ -200,7 +211,9 @@ class ModelManager {
     this.onProgress = opts.onProgress || (() => {})
     this.spawnSpecOverride = opts.spawnSpecOverride || null
     this.progressPollMs = opts.progressPollMs || PROGRESS_POLL_MS
-    this.active = new Map() // id -> child process
+    this.stallMs = opts.stallMs ?? DOWNLOAD_STALL_MS
+    this.totalMs = opts.totalMs ?? DOWNLOAD_TOTAL_MS
+    this.active = new Map() // id -> download job (including cancellation/termination)
     this.errors = new Map() // id -> last error message
   }
 
@@ -215,13 +228,13 @@ class ModelManager {
   }
 
   isInstalled(id) {
-    return fs.existsSync(path.join(this.dirOf(id), MARKER))
+    return checkInventory(id, this.dirOf(id)).installed
   }
 
   stateOf(id) {
     if (this.active.has(id)) return 'downloading'
     if (this.isInstalled(id)) return 'installed'
-    if (this.errors.has(id)) return 'error'
+    if (this.errors.has(id) || checkInventory(id, this.dirOf(id)).invalid) return 'error'
     return 'absent'
   }
 
@@ -232,11 +245,14 @@ class ModelManager {
       name: t(c.name),
       sizeHint: c.sizeHint,
       state: this.stateOf(c.id),
-      message: this.errors.get(c.id) || null
+      repairRequired: checkInventory(c.id, this.dirOf(c.id)).invalid,
+      validation: 'structure-and-size',
+      message: this.errors.get(c.id) || (checkInventory(c.id, this.dirOf(c.id)).invalid
+        ? t({ zh: '模型需要校验，请选择校验并修复；可复用的下载文件会保留。', en: 'Model verification is needed. Verify and repair to reuse valid cached downloads.' }) : null)
     }))
   }
 
-  async download(id) {
+  async download(id, { repair = false, beforeStart } = {}) {
     const c = this.component(id)
     // 模型下载器本身就跑在这个服务的 venv 里（modelscope / huggingface_hub 都在 lib/ 下）：
     // 运行时 pack 没装的话，spawn 出去只会 ModuleNotFoundError，用户看到的是一句看不懂的
@@ -245,138 +261,148 @@ class ModelManager {
       throw new Error(`${PACK_ID_BY_SERVICE[c.runtimeService]} 未安装：模型下载要用该组件的 Python 运行时`)
     }
     if (this.active.has(id)) throw new Error(`${id} already downloading`)
-    if (this.isInstalled(id)) throw new Error(`${id} already installed`)
+    if (!repair && this.isInstalled(id)) throw new Error(`${id} already installed`)
     this.errors.delete(id)
 
     const dir = this.dirOf(id)
-    fs.mkdirSync(dir, { recursive: true })
     const sources = sourcesFor(c)
     const attempts = [] // 失败过的来源：{ source, detail, raw }
 
-    // stdout/stderr 只取"最近一行"当状态文案；百分比不再取自下载器输出——
-    // 那是单个文件的 tqdm，十几个模型文件会反复 0→100%（真机反馈"下载完又
-    // 从 0 开始"）。整体进度 = 已落盘字节 / estBytes，按固定间隔轮询目录。
+    // A job owns all attempts and timers. Old child events cannot finish a newer retry.
+    const job = { child: null, stopped: false, finish: null, stop: null }
+    this.active.set(id, job)
     let lastLine = ''
-    const estBytes = c.estBytes || 0
+    let lastSize = dirSize(dir)
+    let lastChange = Date.now()
+    const started = Date.now()
+    const finish = (phase, message) => {
+      if (job.stopped) return
+      job.stopped = true
+      clearInterval(poller)
+      if (this.active.get(id) === job) this.active.delete(id)
+      if (phase === 'error') this.errors.set(id, message)
+      this.onProgress({ id, phase, message })
+    }
+    job.finish = finish
+    // Wait for close before releasing the job: no new writer may race the old downloader.
+    job.stop = (phase, message) => {
+      if (job.stopPromise) return job.stopPromise
+      job.stopPromise = new Promise((resolve) => {
+        const child = job.child
+        let killTimer
+        const closed = () => {
+          clearTimeout(killTimer)
+          finish(phase, message)
+          resolve({ ok: true })
+        }
+        if (!child || child.exitCode !== null || child.signalCode !== null) return closed()
+        child.once('close', closed)
+        child.kill('SIGTERM')
+        killTimer = setTimeout(() => { if (!job.stopped) child.kill('SIGKILL') }, 3000)
+      })
+      return job.stopPromise
+    }
     const poller = setInterval(() => {
-      const percent = estBytes > 0
-        ? Math.min(99, Math.round(dirSize(dir) / estBytes * 100)) // 封顶 99，成功退出才是 done
-        : undefined
-      this.onProgress({ id, phase: 'progress', percent, message: lastLine.slice(0, 200) })
+      if (job.stopped || job.stopPromise) return
+      const size = dirSize(dir)
+      if (size !== lastSize) { lastSize = size; lastChange = Date.now() }
+      if (Date.now() - started >= this.totalMs || Date.now() - lastChange >= this.stallMs) {
+        job.stop('error', t({ zh: '模型下载超时或长时间没有新数据，已停止下载。请检查网络后重试。',
+          en: 'Model download timed out or stopped receiving data. Download stopped; check your network and retry.' }))
+        return
+      }
+      const percent = c.estBytes > 0 ? Math.min(99, Math.round(size / c.estBytes * 100)) : undefined
+      this.onProgress({ id, phase: 'progress', percent, bytesDownloaded: size, message: lastLine.slice(0, 200) })
     }, this.progressPollMs)
 
-    const finishError = (msg) => {
-      clearInterval(poller)
-      this.active.delete(id)
-      this.errors.set(id, msg)
-      this.onProgress({ id, phase: 'error', message: msg })
-    }
-
-    const runAttempt = (idx) => {
-      const source = sources[idx]
-      let spec
-      try {
-        spec = this.spawnSpecOverride ? this.spawnSpecOverride(c, this.ctx, source) : c.spawnSpec(this.ctx, source)
-      } catch (e) {
-        return settleFailure(idx, String(e && e.message ? e.message : e))
-      }
-      lastLine = ''
-      // Python 异常的说明可能跨多行，最后一行未必带异常类名与根因（hf 的
-      // LocalEntryNotFoundError 就是这样）；另记最后一条「异常头」行，报错时优先用它
-      let errLine = ''
-      const child = spawn(spec.cmd, spec.args, { cwd: spec.cwd, env: spec.env, stdio: ['ignore', 'pipe', 'pipe'] })
-      this.active.set(id, child)
-      const hook = (stream) => {
-        let buf = ''
-        stream.on('data', (d) => {
-          buf += d.toString()
-          // tqdm 用 \r 刷新进度，按 \r 和 \n 一起切行
-          const parts = buf.split(/[\r\n]+/)
-          buf = parts.pop()
-          // 回落之后上一个来源的残余输出不能盖掉当前来源的状态行
-          for (const p of parts) {
-            const line = p.trim()
-            if (!line || this.active.get(id) !== child) continue
-            lastLine = line
-            if (/^(error\[\w+\]:|[\w.]+(Error|Exception)\b)/.test(line)) errLine = line
-          }
-        })
-      }
-      hook(child.stdout)
-      hook(child.stderr)
-
-      let settled = false
-      const settle = (ok, raw) => {
-        if (settled) return
-        settled = true
-        if (child._awdCancelled) {
-          // 取消 = 用户的决定，不再回落到下一个来源
-          clearInterval(poller)
-          if (this.active.get(id) === child) this.active.delete(id)
-          this.onProgress({ id, phase: 'progress', percent: 0, message: 'cancelled' })
-          return
-        }
-        if (ok) {
-          clearInterval(poller)
-          this.active.delete(id)
-          fs.writeFileSync(path.join(dir, MARKER), new Date().toISOString())
-          this.onProgress({ id, phase: 'done' })
-          return
-        }
-        settleFailure(idx, raw, errLine || lastLine)
-      }
-      // 用 close 不用 exit：close 在 stdio 读完之后才发，最后一行（错误原因）不会丢
-      child.on('close', (code, signal) => settle(code === 0, `download exited ${code ?? signal}: ${lastLine}`))
-      child.on('error', (e) => settle(false, String(e && e.message ? e.message : e)))
-    }
-
     const settleFailure = (idx, raw, line) => {
+      if (job.stopped || job.stopPromise) return
       const source = sources[idx]
       attempts.push({ source, raw, detail: line || raw })
       if (idx + 1 < sources.length) {
-        const next = sources[idx + 1]
-        lastLine = t({
-          zh: `${t(SOURCE_LABELS[source])} 下载失败，改用 ${t(SOURCE_LABELS[next])}…`,
-          en: `${t(SOURCE_LABELS[source])} failed, trying ${t(SOURCE_LABELS[next])}...`
-        })
+        lastChange = Date.now()
         return runAttempt(idx + 1)
       }
-      // mineru 没有多来源：保持原来的报错口径
-      finishError(source === null ? raw.slice(0, 500) : humanDownloadError(attempts))
+      finish('error', source === null ? raw.slice(0, 500) : humanDownloadError(attempts))
     }
-
-    runAttempt(0)
-    return { ok: true }
+    const runAttempt = (idx) => {
+      let child
+      try {
+        const spec = this.spawnSpecOverride ? this.spawnSpecOverride(c, this.ctx, sources[idx]) : c.spawnSpec(this.ctx, sources[idx])
+        child = spawn(spec.cmd, spec.args, { cwd: spec.cwd, env: spec.env, stdio: ['ignore', 'pipe', 'pipe'] })
+      } catch (e) { settleFailure(idx, String(e.message || e)); return }
+      job.child = child
+      let error = ''
+      let errLine = ''
+      lastLine = ''
+      const hook = (stream) => {
+        let buf = ''
+        const line = (value) => {
+          if (!value.trim() || job.child !== child || job.stopped) return
+          lastLine = value.trim()
+          if (/^(error\[\w+\]:|[\w.]+(Error|Exception)\b)/.test(lastLine)) errLine = lastLine
+        }
+        stream.on('data', (d) => {
+          const parts = (buf + d.toString()).split(/[\r\n]+/)
+          buf = parts.pop().slice(-2000)
+          parts.forEach(line)
+        })
+        stream.on('end', () => line(buf))
+      }
+      hook(child.stdout)
+      hook(child.stderr)
+      child.once('error', (e) => { error = String(e.message || e) })
+      child.once('close', (code, signal) => {
+        if (job.stopped || job.stopPromise || job.child !== child) return
+        if (code === 0 && !error) {
+          try { saveInventory(id, dir) } catch (e) {
+            finish('error', t({ zh: '下载进程已结束，但模型文件不完整。请重新下载以修复。',
+              en: 'Download finished but model files are incomplete. Download again to repair.' }))
+            return
+          }
+          finish('done')
+        } else settleFailure(idx, error || `download exited ${code ?? signal}: ${lastLine}`, errLine || lastLine)
+      })
+    }
+    try {
+      if (beforeStart) await beforeStart()
+      if (job.stopped) return { ok: false, cancelled: true, message: t({ zh: '已取消下载', en: 'Download cancelled' }) }
+      fs.mkdirSync(dir, { recursive: true })
+      fs.rmSync(path.join(dir, MARKER), { force: true })
+      if (id === 'mineru-models') {
+        // MinerU skips whole configured directories even when a child weight was removed.
+        // Explicit repair must let its downloader inspect the cache again, retaining other settings.
+        const configPath = path.join(dir, 'mineru.json')
+        try {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+          if (config['models-dir']) delete config['models-dir'].pipeline
+          fs.writeFileSync(configPath, JSON.stringify(config))
+        } catch (e) {
+          if (e.code !== 'ENOENT') {
+            // Keep an unreadable/invalid configuration for diagnosis; the downloader creates a fresh one.
+            fs.renameSync(configPath, configPath + '.repair-backup')
+          }
+        }
+      }
+      runAttempt(0)
+      return { ok: true }
+    } catch (e) {
+      const message = String(e.message || e)
+      finish('error', message)
+      return { ok: false, message }
+    }
   }
 
   async cancel(id) {
-    const child = this.active.get(id)
-    if (!child) return { ok: true }
-    child._awdCancelled = true
-    return new Promise((resolve) => {
-      let done = false
-      const finish = () => {
-        if (done) return
-        done = true
-        this.active.delete(id)
-        this.errors.delete(id)
-        resolve({ ok: true })
-      }
-      child.once('exit', finish)
-      try { child.kill('SIGTERM') } catch (e) { finish(); return }
-      setTimeout(() => {
-        try { child.kill('SIGKILL') } catch (e) { /* ignore */ }
-        finish()
-      }, 3000)
-    })
+    const job = this.active.get(id)
+    if (!job) return { ok: true }
+    this.errors.delete(id)
+    return job.stop('cancelled', t({ zh: '已取消下载', en: 'Download cancelled' }))
   }
 
-  /** 退出时批量终止所有进行中的下载子进程，防止孤儿 Python 进程继续占用 CPU/带宽/磁盘。 */
+  /** Stop all writers on exit; keep ownership until their streams close. */
   killAllActive() {
-    for (const [, child] of this.active) {
-      try { child._awdCancelled = true; child.kill('SIGTERM') } catch (e) { /* ignore */ }
-    }
-    this.active.clear()
+    for (const [id] of this.active) this.cancel(id).catch(() => {})
   }
 
   async remove(id) {

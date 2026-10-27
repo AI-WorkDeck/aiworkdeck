@@ -55,6 +55,25 @@ public class CloudSyncService {
     private final ProjectRemoteRepository remoteRepository;
     private final ProjectRepository projectRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.version.cloud.ProjectObjectSyncService objectSync;
+
+    private void uploadObjects(long projectId, CloudConnection connection, String remoteId) {
+        if (objectSync != null) objectSync.upload(projectId,
+                connection.getServerUrl() + "/git/" + remoteId + ".git",
+                connection.getUsername(), connection.getDeviceToken());
+        else if (!repoService.objectPointersAt(projectId, repoService.mainBranch(), true).isEmpty())
+            throw VersionException.userFacing(LangText.of("大文件同步暂不可用，版本仍保存在本机", "Large-file sync is unavailable; your versions remain saved locally."));
+    }
+
+    private void downloadObjects(long projectId, CloudConnection connection, String remoteId, String ref) {
+        if (objectSync != null) objectSync.download(projectId,
+                connection.getServerUrl() + "/git/" + remoteId + ".git",
+                connection.getUsername(), connection.getDeviceToken(), ref);
+        else if (!repoService.objectPointersAt(projectId, ref, true).isEmpty())
+            throw VersionException.userFacing(LangText.of("大文件同步暂不可用，尚未替换本地文件", "Large-file sync is unavailable; local files have not been replaced."));
+    }
+
     /**
      * 提交署名解析（spec 2026-09-14 §2.1）。**字段注入不是构造器参数**：本类的构造器被
      * 五个单测手工 new，加参数是纯 churn。required=false，authorEmail 自带回落。
@@ -294,6 +313,7 @@ public class CloudSyncService {
                 }
 
                 repoService.setRemoteOrigin(projectId, conn.getServerUrl() + "/git/" + remoteProjectId + ".git");
+                uploadObjects(projectId, conn, String.valueOf(remoteProjectId));
                 ProjectRepoService.PushOutcome out = repoService.pushMainlineToOrigin(
                         projectId, conn.getUsername(), conn.getDeviceToken());
                 if (!out.pushed()) {
@@ -336,7 +356,7 @@ public class CloudSyncService {
     }
 
     /**
-     * 从云端接入一个项目：prepare-remote（若云端还是 v1 清单，服务端顺带落一笔升级提交）→
+     * 从云端接入一个项目：有编辑权限时 prepare-remote（升级旧清单），只读参与人跳过远端写操作 →
      * 本地建一个新项目行 → 整仓克隆 → 读 HEAD 清单落库。清单必须是 v2——v1 清单里的节点
      * 没有跨机器一致的 uid，v2 是本机制的立身之本，旧格式一律拒绝、指引律师先在云端更新一次。
      */
@@ -366,23 +386,27 @@ public class CloudSyncService {
             return existing;
         }
 
-        JSONObject prep = JSONUtil.parseObj(httpPost(
-                conn.getServerUrl() + "/api/projects/" + remoteProjectId + "/version/prepare-remote",
-                "{}", conn.getDeviceToken()));
-        if (prep.getInt("code", 1) != 0) {
-            throw VersionException.userFacing(LangText.of(
-                    "没能取到本机：" + prep.getStr("message", "请重试"),
-                    "Couldn't pull this to your machine: " + prep.getStr("message", "please try again")));
-        }
-
-        String remoteName = listRemoteProjects(connectionId, localUserId).stream()
+        Map<String, Object> remoteProject = listRemoteProjects(connectionId, localUserId).stream()
                 .filter(m -> m.get("id") != null)
                 .filter(m -> remoteProjectId == ((Number) m.get("id")).longValue())
-                .map(m -> (String) m.get("name"))
-                .findFirst()
-                .orElse(LangText.of("案件库里的案卷", "A case file in the library"));
+                .findFirst().orElse(Map.of());
+        // prepare-remote 可建仓、重置空仓或提交旧清单升级，只能由明确的写角色尝试。
+        // 列表只是快照；服务端仍校验当前写权限。未知角色不尝试写操作，Git 读取仍独立鉴权。
+        Object role = remoteProject.get("myRole");
+        if ("OWNER".equals(role) || "ADMIN".equals(role) || "PARTICIPANT".equals(role)) {
+            JSONObject prep = JSONUtil.parseObj(httpPost(
+                    conn.getServerUrl() + "/api/projects/" + remoteProjectId + "/version/prepare-remote",
+                    "{}", conn.getDeviceToken()));
+            if (prep.getInt("code", 1) != 0) {
+                throw VersionException.userFacing(LangText.of(
+                        "没能取到本机：" + prep.getStr("message", "请重试"),
+                        "Couldn't pull this to your machine: " + prep.getStr("message", "please try again")));
+            }
+        }
+        String remoteName = (String) remoteProject.get("name");
+        if (remoteName == null) remoteName = LangText.of("案件库里的案卷", "A case file in the library");
 
-        // 目标文件夹放在 prepare-remote 之后才落盘：前面任何一步失败都不该在用户磁盘上留下空目录
+        // 列表读取与可选 prepare-remote 完成后才创建目标文件夹；后续失败统一补偿清理。
         com.checkba.service.LocalProjectService.CloneTarget target = null;
         if (localRoot != null && !localRoot.isBlank()) {
             var lps = localProjectService();
@@ -416,7 +440,8 @@ public class CloudSyncService {
             try {
                 repoService.cloneFromRemote(localProjectId,
                         conn.getServerUrl() + "/git/" + remoteProjectId + ".git",
-                        conn.getUsername(), conn.getDeviceToken());
+                        conn.getUsername(), conn.getDeviceToken(),
+                        () -> downloadObjects(localProjectId, conn, String.valueOf(remoteProjectId), "HEAD"));
                 if (target != null) {
                     // JGit 带独立 gitDir 克隆时会在工作区写一个 ".git" 指路文件（gitdir: ...）。
                     // 本仓一切读写都显式传 gitDir/workTree，用不到它；留在用户自己的文件夹里
@@ -468,6 +493,8 @@ public class CloudSyncService {
         Path gitDir = repoService.gitDir(localProjectId);
         Path workTree = target != null ? target.root() : repoService.workTree(localProjectId);
         try {
+            // Preserve the project row if object cleanup fails, so the remaining bytes stay attributable.
+            repoService.objects().deleteProject(localProjectId);
             projectRepository.delete(project);
         } catch (Exception e) {
             log.warn("接入失败清理本地项目行失败: project={}", localProjectId, e);
@@ -543,7 +570,7 @@ public class CloudSyncService {
      * 维持旧行为：只置 pendingUpload，等律师自己处理完再手动上传或从云端更新。
      *
      * **后台路径（background=true，含结束工作的 onMainlineMerged 自动上传）被拒时一律
-     * 不自动整合**，只置 pendingUpload（remoteAhead 灯自然亮起，等律师前台点「立即上传」）。
+     * 不自动整合**，只刷新远端引用并置 pendingUpload，让状态区显示新稿，等律师前台处理。
      * 两条理由（v2 终审 I2）：① 后台整合会改写磁盘，却没有任何通道通知打开中的编辑器
      * 重载（v1 地雷 #11 的 autosave 覆盖形态——编辑器把整合前的旧字节写回，整合结果被
      * 静默冲掉）；② 后台整合撞上冲突会开出一个律师不知情的 MERGING 裁决窗口。
@@ -580,6 +607,7 @@ public class CloudSyncService {
                 String mainSha = repoService.resolveRef(projectId, repoService.mainBranch());
                 boolean deliversNothing = mainSha != null
                         && mainSha.equals(repoService.originMasterSha(projectId));
+                uploadObjects(projectId, conn, remote.getRemoteProjectId());
                 ProjectRepoService.PushOutcome out = repoService.pushMainlineToOrigin(
                         projectId, conn.getUsername(), conn.getDeviceToken());
                 if (out.pushed()) {
@@ -629,6 +657,11 @@ public class CloudSyncService {
                     // 走到这里只剩 OFFLINE（fetch 联不上）：整合本身没能进行，落回
                     // 旧行为。integrateFromCloud 直接复用这里已经解析好的 conn、
                     // 不会再走一次 remoteOpt 查找，NOT_LINKED 不会从这条路径出现。
+                }
+                if (background) {
+                    // 被拒的 push 不会更新 origin/master；只 fetch 引用，让下一次状态快照
+                    // 看见新稿，不整合、切换分支或改写打开中的文件。失败沿用离线待交稿状态。
+                    repoService.fetchFromOrigin(projectId, conn.getUsername(), conn.getDeviceToken());
                 }
                 remote.setPendingUpload(true);
                 remoteRepository.save(remote);
@@ -1154,6 +1187,14 @@ public class CloudSyncService {
             }
             path = "/projects/" + remote.getRemoteProjectId() + (m.group(2) == null ? "" : m.group(2));
         }
+        if (!m.matches()) {
+            // Bind resource ids to this project even when the device token can access other cases.
+            String remaining = query == null ? "" : java.util.Arrays.stream(query.split("&"))
+                    .filter(part -> !part.isBlank() && !"projectId".equals(java.net.URLDecoder.decode(
+                            part.split("=", 2)[0], java.nio.charset.StandardCharsets.UTF_8)))
+                    .collect(java.util.stream.Collectors.joining("&"));
+            query = "projectId=" + remote.getRemoteProjectId() + (remaining.isBlank() ? "" : "&" + remaining);
+        }
         String url = conn.getServerUrl() + "/api/dd" + path
                 + (query == null || query.isBlank() ? "" : "?" + query);
         return httpRaw(method, url, body, contentType, conn.getDeviceToken());
@@ -1212,6 +1253,8 @@ public class CloudSyncService {
         String remoteSha;
         try {
             remoteSha = repoService.fetchFromOrigin(projectId, conn.getUsername(), conn.getDeviceToken());
+            ProjectRemote binding = remoteRepository.findByProjectId(projectId).orElseThrow();
+            downloadObjects(projectId, conn, binding.getRemoteProjectId(), ORIGIN_MASTER);
         } catch (VersionException e) {
             return new UpdateResult(UpdateStatus.OFFLINE, List.of(), null);
         }
@@ -1335,6 +1378,8 @@ public class CloudSyncService {
         if (pendingMergeStore != null) pendingMergeStore.clear(projectId);
         boolean landed = false;
         try {
+            ProjectRemote binding = remoteRepository.findByProjectId(projectId).orElseThrow();
+            uploadObjects(projectId, conn, binding.getRemoteProjectId());
             // 重推被拒是返回值不是异常（裁决窗口期间远端又被同事推进了一版）：不接住的话
             // 会绿灯假同步——pendingUpload=false + lastSyncSha=本地 sha，界面显示「已与云端
             // 同步」而云端根本没有这份裁决结果（v2 终审 I1）。

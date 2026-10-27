@@ -19,8 +19,8 @@ try {
 // 一条腿失败完全不妨碍另一条腿继续跑完，会独立调用 softprops/action-gh-release
 // 把 release 发出去——mac 腿在公证抖动处失败时，windows 腿会把只有 .exe、
 // 缺 .dmg 的半成品版本发布给用户。修复把发布步骤挪到一个 needs:[build] 的
-// 独立 job（不加 if:always()，天然要求 build 的所有矩阵腿都成功才跑），
-// 同构于 pack-release.yml 里 needs:[mac,win] 的 release job。
+// 独立 job，并显式要求 build 的所有矩阵腿成功；always() 只用于绕过
+// PR 专属祖先 job 在 tag 上的正常跳过（dev-board#1399）。
 //
 // 这里是纯静态检查：解析仓库里全部 workflow YAML，断言任何带 strategy.matrix
 // 的 job 都不能再直接包含 action-gh-release 步骤——防止以后哪次改动又把发布
@@ -41,6 +41,33 @@ function loadWorkflow(file) {
 function stepsUseGhRelease(steps) {
   return (steps || []).some((s) => typeof s.uses === 'string' && s.uses.startsWith('softprops/action-gh-release'))
 }
+
+test('desktop frontend failure stops before editor build on both runner platforms', () => {
+  const step = loadWorkflow('desktop-build.yml').jobs.build.steps.find(s => s.name === 'Build frontend')
+  assert.equal(step.shell, 'bash', 'Use the same fail-fast shell on Windows and macOS')
+  const result = require('child_process').spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', `
+    npm() {
+      printf '%s\\n' "$*"
+      if [ "$*" = 'run build:h5' ]; then return 42; fi
+    }
+    ${step.run}
+  `], { encoding: 'utf8' })
+  assert.equal(result.status, 42, result.stderr)
+  assert.match(result.stdout, /run build:h5/)
+  assert.doesNotMatch(result.stdout, /run build:zetaoffice/)
+})
+
+test('desktop frontend step rejects a successful compiler with missing output', (t) => {
+  const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'awd-frontend-gate-'))
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
+  const step = loadWorkflow('desktop-build.yml').jobs.build.steps.find(s => s.name === 'Build frontend')
+  const result = require('child_process').spawnSync('bash', ['-e', '-o', 'pipefail', '-c', `
+    npm() { printf '%s\\n' "$*"; }
+    ${step.run}
+  `], { cwd: dir, encoding: 'utf8' })
+  assert.notEqual(result.status, 0)
+  assert.doesNotMatch(result.stdout, /run build:zetaoffice/)
+})
 
 test('前提：workflows 目录真的存在且非空（防止路径写错导致下面的用例全部空跑通过）', () => {
   const files = workflowFiles()
@@ -75,13 +102,28 @@ test('desktop-build.yml：发布已收口到独立 release job，且被 needs �
   assert.ok(stepsUseGhRelease(releaseJob.steps), 'release job 应该包含 action-gh-release 步骤')
 
   const needs = Array.isArray(releaseJob.needs) ? releaseJob.needs : [releaseJob.needs]
-  assert.ok(needs.includes('build'), 'release job 必须 needs: build——默认语义下 build 任一矩阵腿失败它就不会跑')
-
-  // 不能用 if: always() 之类的条件放行失败腿——否则又把「必须全部成功」这道
-  // 门禁架空，等于走了一遍手续但没有实际效果。
-  const ifCond = String(releaseJob.if || '')
-  assert.ok(!/always\s*\(\s*\)/.test(ifCond), 'release job 的 if 条件不应该用 always() 绕开 needs 的全部成功前提')
+  assert.ok(needs.includes('build'), 'release job 必须等待 build 的所有矩阵腿完成')
 })
+
+// Evaluate only the boolean expression subset used by these two gates. This is
+// a local guard regression, not a reproduction of GitHub's scheduler.
+for (const [jobId, dependency] of [['release', 'build'], ['sync-mirror', 'release']]) {
+  test(`desktop-build.yml: ${jobId} survives skipped ancestors but requires its direct dependency to succeed`, () => {
+    const condition = String(loadWorkflow('desktop-build.yml').jobs[jobId].if || '')
+    assert.match(condition, /always\s*\(\s*\)/, 'A skipped PR-only ancestor must not implicitly skip tag delivery')
+    const evaluate = new Function('always', 'cancelled', 'needs', 'github', 'startsWith', `return (${condition})`)
+    for (const result of ['success', 'failure', 'cancelled', 'skipped']) {
+      for (const isCancelled of [false, true]) {
+        for (const ref of ['refs/tags/v0.68.0', 'refs/heads/master', 'refs/pull/1176/merge']) {
+          const actual = evaluate(() => true, () => isCancelled,
+            { [dependency]: { result } }, { ref }, (value, prefix) => value.startsWith(prefix))
+          assert.equal(actual, result === 'success' && !isCancelled && ref.startsWith('refs/tags/v'),
+            `${jobId}: ${dependency}=${result}, cancelled=${isCancelled}, ref=${ref}`)
+        }
+      }
+    }
+  })
+}
 
 test('desktop-build.yml：镜像同步必须排在 release 之后（它是从 GitHub Release 拉资产的）', () => {
   const doc = loadWorkflow('desktop-build.yml')
@@ -98,8 +140,10 @@ test('desktop-build.yml：镜像同步必须排在 release 之后（它是从 Gi
 // 0.38.0 起四个 Python 服务改走 native pack（设计 §3）：安装包链路里不再装 pip
 // 依赖、不再打 pysvc.tar.gz。dev-board#74 那条「缓存 key 必须覆盖各服务源码」的
 // 门禁随之作废——被它守着的步骤已经整体不在这条 workflow 里了。
-test('desktop-build.yml：安装包链路里不再有任何 pysvc 痕迹（四个服务改走 native pack）', () => {
-  const yml = fs.readFileSync(path.join(workflowsDir, 'desktop-build.yml'), 'utf8')
+test('desktop-build.yml：安装包构建步骤不再打包 pysvc（四个服务改走 native pack）', () => {
+  // Change detection may legitimately name pysvc-runtime.js; only packaging steps
+  // must stay free of the obsolete bundled service archive.
+  const yml = JSON.stringify(loadWorkflow('desktop-build.yml').jobs.build.steps)
   for (const sym of ['pysvc', 'pack-pysvc.js']) {
     assert.ok(!yml.includes(sym), `desktop-build.yml 仍引用 ${sym}`)
   }
@@ -313,4 +357,70 @@ test('master 暖缓存与安装包实际消费的缓存路径、key 和运行时
   }
   assert.deepEqual(warm.on.push.branches, ['master'])
   assert.ok(!warm.on.push.tags)
+})
+
+test('upgrade provenance accepts pinned official tag runs and rejects branch, foreign, failed or mismatched builds', async () => {
+  const { validateBuild } = await import('../scripts/download-upgrade-build.mjs')
+  const sha = 'a'.repeat(40)
+  const build = { repository: { full_name: 'AI-WorkDeck/aiworkdeck' }, path: '.github/workflows/desktop-build.yml', conclusion: 'success', head_sha: sha, event: 'push', head_branch: 'v0.71.0' }
+  const expected = { sha, version: '0.71.0', tagSha: sha, sourceVersion: '0.71.0' }
+  assert.doesNotThrow(() => validateBuild(build, expected))
+  assert.doesNotThrow(() => validateBuild({ ...build, event: 'workflow_dispatch', head_branch: 'candidate' }, expected))
+  for (const patch of [
+    { event: 'pull_request' }, { head_branch: 'master' }, { head_branch: 'v0.72.0' },
+    { head_sha: 'b'.repeat(40) }, { conclusion: 'failure' },
+    { repository: { full_name: 'someone/aiworkdeck' } }, { path: '.github/workflows/ci.yml' }
+  ]) assert.throws(() => validateBuild({ ...build, ...patch }, expected))
+  assert.throws(() => validateBuild(build, { ...expected, tagSha: 'b'.repeat(40) }))
+  assert.throws(() => validateBuild(build, { ...expected, sourceVersion: '0.70.0' }))
+})
+
+test('upgrade release gate verifies manifest signature, exact version, official URL and real bytes', async () => {
+  const { signedInstaller, verifyInstaller } = await import('../scripts/download-upgrade-build.mjs')
+  const crypto = require('crypto'), os = require('os')
+  const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519')
+  const payload = Buffer.from('synthetic signed installer')
+  const info = { version: '0.71.0', size: payload.length, sha256: crypto.createHash('sha256').update(payload).digest('hex'), urls: ['https://github.com/AI-WorkDeck/aiworkdeck/releases/download/v0.71.0/AI.WorkDeck.Setup.0.71.0.exe'] }
+  const bytes = Buffer.from(JSON.stringify({ channels: { '0.71': { latest: '0.71.0', installers: { win32: info } } } }))
+  const signature = crypto.sign(null, bytes, privateKey).toString('base64')
+  const expected = signedInstaller(bytes, signature, publicKey, '0.71.0', 'win32')
+  assert.equal(expected.name, 'AI.WorkDeck.Setup.0.71.0.exe')
+  assert.throws(() => signedInstaller(Buffer.concat([bytes, Buffer.from(' ')]), signature, publicKey, '0.71.0', 'win32'))
+  assert.throws(() => signedInstaller(bytes, signature, crypto.generateKeyPairSync('ed25519').publicKey, '0.71.0', 'win32'))
+  assert.throws(() => signedInstaller(bytes, signature, publicKey, '0.72.0', 'win32'))
+  assert.throws(() => signedInstaller(bytes, signature, publicKey, '0.71.0', 'darwin-arm64'))
+  const wrongUrl = Buffer.from(bytes.toString().replace('AI-WorkDeck/aiworkdeck/releases', 'someone/aiworkdeck/releases'))
+  assert.throws(() => signedInstaller(wrongUrl, crypto.sign(null, wrongUrl, privateKey).toString('base64'), publicKey, '0.71.0', 'win32'))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'upgrade-byte-gate-'))
+  try {
+    const file = path.join(dir, 'fixture.exe'); fs.writeFileSync(file, payload)
+    assert.equal(await verifyInstaller(file, expected), info.sha256)
+    await assert.rejects(verifyInstaller(file, { ...expected, size: info.size + 1 }))
+    fs.writeFileSync(file, Buffer.alloc(payload.length))
+    await assert.rejects(verifyInstaller(file, expected))
+  } finally { fs.rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('Mac upgrade fixture uses explicit 0.71 to 0.72 inputs and rejects absent/equal/older versions', async () => {
+  const { validateVersions, signedManifest } = await import('../scripts/test-full-upgrade-mac-feed.mjs')
+  const crypto = require('crypto')
+  for (const [baseline, candidate] of [[undefined, '0.72.0'], ['0.71.0', undefined], ['0.71.0', '0.71.0'], ['0.71.0', '0.70.9'], ['0.71.0', 'latest']]) {
+    assert.throws(() => validateVersions(baseline, candidate))
+  }
+  const installer = { version: '0.72.0', size: 1, sha256: 'a'.repeat(64), urls: ['http://127.0.0.1/candidate.dmg'] }
+  const fixture = signedManifest(installer, '0.71.0')
+  const manifest = JSON.parse(fixture.bytes)
+  assert.equal(manifest.latestMajor, '0.72')
+  assert.equal(manifest.channels['0.71'].latest, '0.71.0')
+  assert.deepEqual(manifest.channels['0.72'].installers['darwin-arm64'], installer)
+  assert(crypto.verify(null, fixture.bytes, fixture.publicKey, Buffer.from(fixture.signature.toString().trim(), 'base64')))
+  const workflow = loadWorkflow('full-upgrade-mac-smoke.yml')
+  const env = workflow.jobs['native-upgrade'].steps.find(s => s.run?.includes('test-full-upgrade-mac.mjs')).env
+  assert.equal(env.BASELINE_VERSION, '${{ inputs.baseline_version }}')
+  assert.equal(env.CANDIDATE_VERSION, '${{ inputs.candidate_version }}')
+  for (const kind of ['baseline', 'candidate']) {
+    const win = loadWorkflow('full-upgrade-smoke.yml').jobs.windows.steps.find(s => s.name === 'Download and identify signed installer builds')
+    assert.equal(win.env[kind.toUpperCase() + '_SHA'], '${{ inputs.' + kind + '_sha }}')
+    assert(win.run.includes(`download-upgrade-build.mjs ${kind} win32`))
+  }
 })

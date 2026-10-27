@@ -7,6 +7,7 @@
 # 注入本轮，并把审查需要的感知/编辑/检索工具全部放进可见集。
 id: contract-review
 name: 合同审查
+builtin_workflow: true
 description: 站在指定一方立场对合同/协议做全文逐条审查：先定立场与适用法域，通读全文并做机械结构审计（编号、交叉引用、空白、金额算术、繁简字形、前一轮修订），再按「法律用语与法源 / 立场保护 / 遗留硬伤 / 数字与空白 / 商业条款不越权」多遍过，成批以修订+批注落到文档里，最后分类交付清单。
 
 # 法律事项类别（匿名统计用，枚举见 MatterCategory）
@@ -19,6 +20,7 @@ languages:
   - en-US
 
 name_en: Contract Review
+description_en: Review a contract or agreement clause by clause from the specified party's perspective—establishing party stance and governing law, auditing structure (numbering, cross-references, blanks, arithmetic, prior revisions), running multi-pass legal and commercial checks, applying tracked changes and comments in batch, and delivering a categorized findings schedule.
 
 # 触发条件：用户输入包含任一关键词即命中（不区分大小写）。
 # 刻意不用单字「审查」「审阅」——它们会命中「尽调审查」「审阅笔录」这类别的任务，

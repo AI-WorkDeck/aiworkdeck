@@ -5,6 +5,7 @@ const assert = require('node:assert')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
+const { spawnSync } = require('node:child_process')
 const afterPack = require('../scripts/after-pack')
 const { pruneFrameworkLocales } = afterPack
 
@@ -31,6 +32,7 @@ function makeApp(root, productFilename = 'AI WorkDeck') {
   fs.writeFileSync(path.join(resourcesDir, 'Info.plist'), 'plist')
   fs.mkdirSync(path.join(resourcesDir, 'MainMenu.nib'))
   fs.writeFileSync(path.join(resourcesDir, 'MainMenu.nib', 'keyedobjects.nib'), 'nib')
+  fs.mkdirSync(path.join(root, `${productFilename}.app`, 'Contents/Resources/jre/legal'), { recursive: true })
   return { resourcesDir, sizes }
 }
 
@@ -120,4 +122,44 @@ test('afterPack 钩子在非 darwin 上一个文件都不动', async () => {
   } finally {
     fs.rmSync(root, { recursive: true, force: true })
   }
+})
+
+test('Mac afterPack makes JRE legal files owner-writable without changing bytes, executable bits or external symlinks', { skip: process.platform === 'win32' }, async () => {
+  const root = mkTmp()
+  try {
+    makeApp(root)
+    const legal = path.join(root, 'AI WorkDeck.app/Contents/Resources/jre/legal/java.xml')
+    fs.mkdirSync(legal)
+    const notice = path.join(legal, 'bcel.md')
+    const executable = path.join(legal, 'executable-notice')
+    const outside = path.join(root, 'unrelated-readonly')
+    for (const file of [notice, outside]) { fs.writeFileSync(file, 'original legal notice'); fs.chmodSync(file, 0o444) }
+    fs.writeFileSync(executable, 'preserve executable bits'); fs.chmodSync(executable, 0o555)
+    fs.symlinkSync(outside, path.join(legal, 'linked-notice'))
+    const context = { appOutDir: root, electronPlatformName: 'darwin', packager: { appInfo: { productFilename: 'AI WorkDeck' } } }
+    await afterPack(context)
+    assert.strictEqual(fs.statSync(notice).mode & 0o777, 0o644)
+    assert.strictEqual(fs.statSync(executable).mode & 0o777, 0o755)
+    assert.strictEqual(fs.statSync(outside).mode & 0o777, 0o444)
+    assert.strictEqual(fs.readFileSync(notice, 'utf8'), 'original legal notice')
+    assert.ok(fs.lstatSync(path.join(legal, 'linked-notice')).isSymbolicLink())
+  } finally { fs.rmSync(root, { recursive: true, force: true }) }
+})
+
+test('Mac JRE legal notice permits the real quarantine removal required by ShipIt', { skip: process.platform !== 'darwin' }, async () => {
+  const root = mkTmp()
+  try {
+    makeApp(root)
+    const notice = path.join(root, 'AI WorkDeck.app/Contents/Resources/jre/legal/bcel.md')
+    fs.writeFileSync(notice, 'synthetic legal notice')
+    const added = spawnSync('/usr/bin/xattr', ['-w', 'com.apple.quarantine', '0081;00000000;QA;', notice], { encoding: 'utf8' })
+    assert.strictEqual(added.status, 0, added.stderr)
+    fs.chmodSync(notice, 0o444)
+    const blocked = spawnSync('/usr/bin/xattr', ['-d', 'com.apple.quarantine', notice], { encoding: 'utf8' })
+    assert.notStrictEqual(blocked.status, 0)
+    assert.match(blocked.stderr, /Permission denied/)
+    await afterPack({ appOutDir: root, electronPlatformName: 'darwin', packager: { appInfo: { productFilename: 'AI WorkDeck' } } })
+    const removed = spawnSync('/usr/bin/xattr', ['-d', 'com.apple.quarantine', notice], { encoding: 'utf8' })
+    assert.strictEqual(removed.status, 0, removed.stderr)
+  } finally { fs.rmSync(root, { recursive: true, force: true }) }
 })

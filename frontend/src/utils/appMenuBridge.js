@@ -17,8 +17,8 @@
 
 import { host, isDesktopHost } from '@/services/host.js'
 import { COMMAND_BY_ID, COMMANDS, buildMenuPayload, isEnabled, labelOf } from '@/config/commands/index.js'
-import { getAppLanguage, setAppLanguage, APP_LANGUAGE_EVENT } from '@/utils/appLanguage.js'
-import { t } from '@/i18n'
+import { getAppLanguage, getAppLanguagePreference, setAppLanguage, APP_LANGUAGE_EVENT } from '@/utils/appLanguage.js'
+import { t, applyI18nLocale } from '@/i18n'
 import { runMenuUndoRedo } from '@/utils/undoRouting.js'
 
 /** 工作台命令的事件名。project-overview 侧监听，自带活跃实例守卫。 */
@@ -52,6 +52,7 @@ function schedulePush() {
   pushTimer = setTimeout(() => {
     pushTimer = null
     try {
+      state.langPref = getAppLanguagePreference()
       const payload = buildMenuPayload(state, currentLang())
       const s = JSON.stringify(payload)
       if (s === lastSerialized) return
@@ -146,16 +147,50 @@ async function runAppCommand(verb, arg) {
     }
     case 'checkUpdate': {
       if (!(host.update && host.update.check)) return
-      toast(t('shell.menuCheckingUpdate'))
+      if (state.page !== 'workbench') toast(t('shell.menuCheckingUpdate'))
       const r = await host.update.check()
       const phase = r && r.phase
-      if (phase === 'error') toast((r && r.error) || t('shell.menuUpdateFailed'))
-      else if (phase === 'idle' || phase === 'up-to-date') toast(t('shell.menuUpToDate'))
-      // 其余阶段（下载中/待重启）由更新器自己的 UI 接管，别在这里抢话
+      if (phase === 'error') {
+        toast((r && r.error) || t('shell.menuUpdateFailed'))
+      } else if (phase === 'ready' && r && r.available && state.page !== 'workbench') {
+        uni.showModal({
+          title: t('admin.restartAppTitle'),
+          content: t('admin.restartAppContent', {
+            version: r.available.version || t('admin.newVersionFallback'),
+          }),
+          confirmText: t('admin.restartNowButton'),
+          cancelText: t('common.close'),
+          success: (res) => {
+            if (res && res.confirm && host.update && host.update.restart) {
+              host.update.restart()
+            }
+          },
+        })
+      } else if (phase === 'downloading') {
+        toast(t('admin.downloadingPatch'))
+      } else if (r && r.majorAvailable && state.page !== 'workbench') {
+        uni.showModal({
+          title: t('admin.majorReleased', { version: r.majorAvailable.major }),
+          content: t('admin.majorNote'),
+          confirmText: t('admin.goDownloadButton'),
+          cancelText: t('common.close'),
+          success: (res) => {
+            if (res && res.confirm && host.shell && host.shell.openExternal) {
+              host.shell.openExternal(r.majorAvailable.page || 'https://www.aiworkdeck.com')
+            }
+          },
+        })
+      } else if (phase === 'idle' || phase === 'up-to-date') {
+        toast(t('shell.menuUpToDate'))
+      }
       return
     }
     case 'setLang':
-      if (arg) setAppLanguage(arg)
+      if (arg) {
+        const resolved = setAppLanguage(arg)
+        applyI18nLocale(resolved)
+        schedulePush()
+      }
       return
     case 'openFeedback':
       uni.$emit('awd:open-feedback')
@@ -270,5 +305,5 @@ export function initAppMenuBridge() {
 
 /** 测试与调试用：读当前快照（只读副本）。 */
 export function getMenuState() {
-  return JSON.parse(JSON.stringify(state))
+  return JSON.parse(JSON.stringify({ ...state, langPref: getAppLanguagePreference() }))
 }

@@ -1,0 +1,5 @@
+{
+  "plugin.name": "语音",
+  "plugin.description": "即时朗读、实时调速、字幕高亮与会议录音。",
+  "view.main.name": "语音"
+}

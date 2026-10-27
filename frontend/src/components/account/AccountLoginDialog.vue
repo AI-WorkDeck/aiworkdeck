@@ -56,7 +56,7 @@
            人机验证控件挂在这块里，切到 Key 模式再切回来时 DOM 不能被销毁重建 -->
       <div v-show="mode !== 'code'" class="unlock-main">
         <div class="unlock-title">{{ $t('onboarding.unlock.title') }}</div>
-        <div class="unlock-desc">{{ isPhoneSite ? $t('onboarding.unlock.descPhone') : $t('onboarding.unlock.descEmail') }}</div>
+        <div class="unlock-desc">{{ $t(authFlow === 'setup' ? 'accountPassword.setupHint' : authFlow === 'reset' ? 'accountPassword.resetHint' : 'accountPassword.intro') }}</div>
         <div v-if="promoActive" class="unlock-promo">{{ $t('onboarding.unlock.promoLine', { amount: promoAmount }) }}</div>
 
         <div class="unlock-form">
@@ -69,6 +69,7 @@
               type="tel"
               inputmode="numeric"
               autocomplete="tel"
+              :disabled="authFlow === 'setup' || submitBusy || sendingCode"
               :value="phone"
               :placeholder="$t('onboarding.unlock.phonePlaceholder')"
               @input="phone = $event.target.value"
@@ -81,13 +82,14 @@
               class="unlock-field"
               type="email"
               autocomplete="email"
+              :disabled="authFlow === 'setup' || submitBusy || sendingCode"
               :value="email"
               :placeholder="$t('onboarding.unlock.emailPlaceholder')"
               @input="email = $event.target.value"
               @keydown.enter="handlePrimary"
             />
           </div>
-          <div class="unlock-code-row">
+          <div v-if="authFlow === 'register' || authFlow === 'reset'" class="unlock-code-row">
             <div class="unlock-field-box unlock-field-inline">
               <component
                 :is="'input'"
@@ -105,14 +107,38 @@
               :is="'button'"
               type="button"
               class="unlock-code-btn"
-              :disabled="sendingCode || cooldown > 0 || !codeIdentifier"
+              :disabled="sendingCode || compatLoading || cooldown > 0 || !codeIdentifier"
               @click="handleSendCode"
             >{{ codeBtnLabel }}</component>
+          </div>
+          <div v-if="authFlow !== 'register'" class="unlock-field-box">
+            <component :is="'input'" class="unlock-field" type="password"
+              :autocomplete="authFlow === 'password' ? 'current-password' : 'new-password'"
+              :value="password" :placeholder="$t('accountPassword.password')"
+              @input="password = $event.target.value" @keydown.enter="handlePrimary" />
+          </div>
+          <div v-if="authFlow === 'setup' || authFlow === 'reset'" class="unlock-field-box">
+            <component :is="'input'" class="unlock-field" type="password" autocomplete="new-password"
+              :value="confirmPassword" :placeholder="$t('accountPassword.confirm')"
+              @input="confirmPassword = $event.target.value" @keydown.enter="handlePrimary" />
+          </div>
+          <div v-if="authFlow === 'setup' || authFlow === 'reset'" class="unlock-desc">{{ $t('accountPassword.passwordHint') }}</div>
+          <div class="unlock-code-links">
+            <component :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="switchAuthFlow(authFlow === 'password' ? 'register' : 'password')">{{ $t(authFlow === 'password' ? 'accountPassword.register' : 'accountPassword.back') }}</component>
+            <component v-if="authFlow === 'password'" :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="switchAuthFlow('reset')">{{ $t('accountPassword.reset') }}</component>
+          </div>
+          <div v-if="authFlow === 'register' || authFlow === 'reset'" class="unlock-compat-verification">
+            <component :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="loadCompatChallenge">{{ $t(compatLoading ? 'onboarding.unlock.compatLoading' : compatVerification ? 'onboarding.unlock.compatRefresh' : 'onboarding.unlock.compatUse') }}</component>
+            <div v-if="compatVerification" class="unlock-desc">{{ $t('onboarding.unlock.compatHint') }}</div>
+            <template v-if="compatChallenge">
+              <img :src="compatChallenge.image" width="210" height="70" :alt="$t('onboarding.unlock.compatImage')" />
+              <div class="unlock-field-box"><component :is="'input'" class="unlock-field" type="text" maxlength="6" autocomplete="off" :value="compatAnswer" :placeholder="$t('onboarding.unlock.compatAnswer')" :aria-label="$t('onboarding.unlock.compatAnswer')" :disabled="sendingCode" @input="compatAnswer = $event.target.value" /></div>
+            </template>
           </div>
           <!-- 人机验证控件挂点。阿里云（大陆站）点了才弹拼图，平时不占版面；
                Turnstile（国际站）走官网托管页，is-embed 给它留位置。未启用时整块不渲染。 -->
           <div
-            v-show="captcha"
+            v-show="!compatVerification && captcha && (authFlow === 'register' || authFlow === 'reset')"
             class="unlock-captcha-holder"
             :class="{ 'is-embed': captcha && captcha.provider === 'turnstile' }"
           >
@@ -176,9 +202,11 @@
       <!-- 底部一行：左边语言切换（语言名用各自的语言写，不翻译），右边 Key 入口 / 返回 / 暂不登录 -->
       <div class="unlock-card-foot">
         <div class="unlock-lang">
-          <span class="unlock-lang-item" :class="{ 'is-active': !isEn }" role="button" @click="pickLanguage('zh-CN')">中文</span>
-          <span class="unlock-lang-sep">·</span>
-          <span class="unlock-lang-item" :class="{ 'is-active': isEn }" role="button" @click="pickLanguage('en-US')">English</span>
+          <LanguagePicker
+            compact
+            placement="top"
+            @change="({ resolved }) => pickLanguage(resolved)"
+          />
         </div>
         <div class="unlock-foot-right">
           <span v-if="mode === 'code'" class="unlock-foot-link" role="button" @click="switchMode('login')">{{ $t('onboarding.unlock.back') }}</span>
@@ -191,16 +219,17 @@
 </template>
 
 <script>
-import { activateLicense, getLicenseStatus, getSiteStatus, selectSite, sendAccountLoginCode, loginAccount, getAccountCaptchaConfig } from '@/services/api.js'
+import { activateLicense, getLicenseStatus, getSiteStatus, selectSite, sendAccountLoginCode, loginAccount, getAccountCaptchaConfig, getAccountCaptchaChallenge, accountPasswordOperation, getAppLanguageRemote, saveAppLanguageRemote } from '@/services/api.js'
 import { setupCaptcha, teardownCaptcha } from '@/utils/captcha.js'
 import { captchaFailureNotice, toCaptchaFailure } from '@/utils/captchaFailure.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { loadSiteLinks, siteBaseUrl, resetSiteLinks } from '@/utils/siteLinks.js'
-import { getAppLanguage, setAppLanguage, isLanguageManuallyChosen } from '@/utils/appLanguage.js'
+import { getAppLanguage, setAppLanguage, isLanguageManuallyChosen, normalizeLocaleCode } from '@/utils/appLanguage.js'
 import { siteLanguageToApply } from '@/utils/siteLanguage.js'
 import { applyI18nLocale } from '@/i18n/index.js'
 import { recordAccountConsents } from '@/utils/accountConsent.js'
 import { showDialog } from '@/utils/dialog.js'
+import LanguagePicker from '@/components/LanguagePicker.vue'
 
 // 与站点无关（GitHub README），不走 siteBaseUrl()
 const TRIAL_CODE_URL = 'https://github.com/AI-WorkDeck/aiworkdeck#readme'
@@ -213,6 +242,7 @@ const SITE_PRESELECT_KEY = 'awd_site_preselected'
 
 export default {
   name: 'AccountLoginDialog',
+  components: { LanguagePicker },
   props: {
     // 'dialog'：就地登录弹层；'page'：解锁页薄壳里的卡片
     variant: { type: String, default: 'dialog' },
@@ -237,6 +267,11 @@ export default {
       licenseMode: '',
       licenseAccountConnected: false,
       mode: 'login',
+      authFlow: 'password',
+      password: '',
+      confirmPassword: '',
+      setupToken: '',
+      setupAccount: '',
       phone: '',
       email: '',
       smsCode: '',
@@ -246,6 +281,10 @@ export default {
       cooldownTimer: null,
       // 人机验证控件。null 且 captchaFailure 为空 = 本站未启用，此时照常发码（官网那边也不会校验）
       captcha: null,
+      compatVerification: false,
+      compatChallenge: null,
+      compatAnswer: '',
+      compatLoading: false,
       // 官网说启用了、控件却装不出来：{ provider, reason }。此时绝不盲发码（必 403），
       // 点「获取验证码」先重试一次装配，仍失败就说清楚要放行哪些地址（dev-board#1056）
       captchaFailure: null,
@@ -308,11 +347,16 @@ export default {
       if (this.mode === 'code') {
         return this.unlocking ? this.$t('onboarding.unlock.unlocking') : this.$t('onboarding.unlock.unlock')
       }
-      return this.loggingIn ? this.$t('onboarding.unlock.loggingIn') : this.$t('onboarding.unlock.continue')
+      return this.loggingIn ? this.$t('onboarding.unlock.loggingIn') : this.$t({password:'accountPassword.signIn', register:'accountPassword.verify', setup:'accountPassword.setup', reset:'accountPassword.resetTitle'}[this.authFlow])
     },
     submitBusy() {
-      return this.loggingIn || this.unlocking
+      return this.loggingIn || this.unlocking || this.compatLoading
     },
+  },
+  watch: {
+    codeIdentifier() { this.clearCompatChallenge() },
+    authFlow() { this.clearCompatChallenge() },
+    'siteStatus.current'() { this.clearCompatChallenge() },
   },
   mounted() {
     loadSiteLinks()
@@ -326,6 +370,8 @@ export default {
     }
   },
   beforeUnmount() {
+    this.done = true
+    this.clearLoginSecrets()
     if (this.cooldownTimer) clearInterval(this.cooldownTimer)
     // 托管页 iframe 的 message 监听挂在 window 上，走了也要摘
     teardownCaptcha()
@@ -334,9 +380,39 @@ export default {
     onEsc() {
       if (this.variant === 'dialog') this.cancel()
     },
+    clearCompatChallenge() {
+      this.compatChallenge = null
+      this.compatAnswer = ''
+    },
+    async loadCompatChallenge() {
+      if (this.submitBusy || this.sendingCode) return
+      if (!this.codeIdentifier) { this.errorMsg = this.$t('onboarding.unlock.compatContactFirst'); return }
+      this.compatVerification = true
+      this.clearCompatChallenge()
+      this.errorMsg = ''
+      this.compatLoading = true
+      const identifier = this.codeIdentifier
+      const purpose = this.authFlow === 'reset' ? 'reset' : 'login'
+      const site = this.siteStatus.current
+      try {
+        const challenge = await getAccountCaptchaChallenge({ [this.isPhoneSite ? 'phone' : 'email']: identifier, purpose })
+        if (!this.done && identifier === this.codeIdentifier && site === this.siteStatus.current && purpose === (this.authFlow === 'reset' ? 'reset' : 'login')) this.compatChallenge = challenge
+      } catch (e) {
+        this.errorMsg = (e && e.message) || this.$t('onboarding.unlock.accountNetworkFailed')
+      } finally { this.compatLoading = false }
+    },
+    clearLoginSecrets() {
+      this.clearCompatChallenge()
+      this.password = ''
+      this.confirmPassword = ''
+      this.smsCode = ''
+      this.setupToken = ''
+      this.setupAccount = ''
+    },
     cancel() {
-      if (this.done) return
+      if (this.done || this.submitBusy) return
       this.done = true
+      this.clearLoginSecrets()
       this.$emit('cancel')
     },
     async bootstrapSite() {
@@ -453,13 +529,24 @@ export default {
         // 拿不到就当单站，站点入口不渲染
       }
     },
+    switchAuthFlow(next) {
+      if (this.submitBusy || this.sendingCode) return
+      this.authFlow = next
+      this.password = ''
+      this.confirmPassword = ''
+      this.smsCode = ''
+      this.setupToken = ''
+      this.setupAccount = ''
+      this.errorMsg = ''
+    },
     switchMode(next) {
       if (this.mode === next) return
+      this.switchAuthFlow('password')
       this.mode = next
       this.errorMsg = ''
     },
     async handleSendCode() {
-      if (this.sendingCode || this.cooldown > 0) return
+      if (this.sendingCode || this.compatLoading || this.cooldown > 0) return
       const identifier = this.codeIdentifier
       if (!identifier) {
         this.errorMsg = this.isPhoneSite
@@ -471,7 +558,13 @@ export default {
       this.sendingCode = true
       try {
         // 先取人机验证 token 再发。拿不到就别发——发了必被官网 403，白让用户等一轮。
-        const got = await this.acquireCaptchaToken()
+        if (this.compatVerification && (!this.compatChallenge || !/^[a-z0-9]{6}$/i.test(this.compatAnswer.trim()))) {
+          this.errorMsg = this.$t('onboarding.unlock.compatAnswerFirst')
+          return
+        }
+        const got = this.compatVerification
+          ? { token: `local:${this.compatChallenge.id}:${this.compatAnswer.trim()}` }
+          : await this.acquireCaptchaToken()
         if (got.failure) {
           this.errorMsg = this.captchaFailureMessage(got.failure)
           this.sendingCode = false
@@ -483,11 +576,16 @@ export default {
           return
         }
         const captchaToken = got.token
-        await sendAccountLoginCode(identifier, captchaToken, this.isPhoneSite)
+        if (this.compatVerification) this.clearCompatChallenge()
+        if (this.authFlow === 'reset') {
+          await accountPasswordOperation('reset/send-code', { [this.isPhoneSite ? 'phone' : 'email']: identifier, captchaToken })
+        } else {
+          await sendAccountLoginCode(identifier, captchaToken, this.isPhoneSite)
+        }
         uni.showToast({ title: this.$t('onboarding.unlock.codeSent'), icon: 'none', duration: 1600 })
         this.startCooldown(60)
       } catch (e) {
-        this.errorMsg = (e && e.message) || this.$t('onboarding.unlock.loginFailed')
+        this.errorMsg = (e && e.message) || this.$t('onboarding.unlock.accountNetworkFailed')
       } finally {
         this.sendingCode = false
       }
@@ -549,28 +647,65 @@ export default {
           : this.$t('onboarding.unlock.emailFirst')
         return
       }
-      if (!smsCode) {
-        this.errorMsg = this.isPhoneSite
-          ? this.$t('onboarding.unlock.smsCodeFirst')
-          : this.$t('onboarding.unlock.emailCodeFirst')
+      if ((this.authFlow === 'register' || this.authFlow === 'reset') && !smsCode) {
+        this.errorMsg = this.$t('onboarding.unlock.smsCodeFirst')
         return
       }
-      const payload = this.isPhoneSite
-        ? { phone: identifier, code: smsCode }
-        : { email: identifier, code: smsCode }
+      if (this.authFlow !== 'register' && !this.password) {
+        this.errorMsg = this.$t('accountPassword.required')
+        return
+      }
+      if (this.authFlow === 'setup' || this.authFlow === 'reset') {
+        if (this.password.length < 8 || this.password.length > 72) {
+          this.errorMsg = this.$t('accountPassword.invalid'); return
+        }
+        if (this.password !== this.confirmPassword) {
+          this.errorMsg = this.$t('accountPassword.mismatch'); return
+        }
+      }
+      const payload = this.authFlow === 'password'
+        ? { account: identifier, password: this.password }
+        : { [this.isPhoneSite ? 'phone' : 'email']: identifier, code: smsCode }
       this.errorMsg = ''
       this.loggingIn = true
       try {
         // 同意落在连接之前：连上账户就是内容开始能出境的时点（accountConsent.js 文件头）
         await recordAccountConsents()
-        const res = await loginAccount(payload)
+        if (this.done) return
+        if (this.authFlow === 'reset') {
+          await accountPasswordOperation('reset', { ...payload, password: this.password })
+          this.loggingIn = false
+          this.switchAuthFlow('password')
+          this.errorMsg = this.$t('accountPassword.resetDone')
+          return
+        }
+        let res
+        if (this.authFlow === 'setup') {
+          await accountPasswordOperation('setup', { setupToken: this.setupToken, password: this.password })
+          if (this.done) return
+          // The setup ticket is consumed. If sign-in fails, retry using the saved password form.
+          this.setupToken = ''
+          this.authFlow = 'password'
+          res = await loginAccount({ account: this.setupAccount || identifier, password: this.password })
+        } else res = await loginAccount(payload)
+        if (res && res.passwordSetupRequired) {
+          this.authFlow = 'setup'
+          this.setupToken = res.setupToken
+          this.setupAccount = res.account || identifier
+          this.smsCode = ''
+          this.password = ''
+          this.confirmPassword = ''
+          return
+        }
+        this.password = ''
+        this.confirmPassword = ''
         await this.finishLogin(res, {
           title: res && res.isNewUser
             ? this.$t('onboarding.unlock.registered')
             : this.$t('onboarding.unlock.loggedIn'),
         })
       } catch (e) {
-        this.errorMsg = (e && e.message) || this.$t('onboarding.unlock.loginFailed')
+        this.errorMsg = (e && e.message) || this.$t('onboarding.unlock.accountNetworkFailed')
       } finally {
         this.loggingIn = false
       }
@@ -620,6 +755,20 @@ export default {
      */
     async finishLogin(res, toast) {
       if (toast) uni.showToast({ title: toast.title, icon: 'success', duration: 1600 })
+      try {
+        if (isLanguageManuallyChosen()) {
+          saveAppLanguageRemote(getAppLanguage()).catch(() => {})
+        } else {
+          getAppLanguageRemote()
+            .then((r) => {
+              const remoteLang = normalizeLocaleCode(r && (r.language || r.appLanguage || (r.data && r.data.language)))
+              if (remoteLang && remoteLang !== getAppLanguage()) {
+                this.applyLanguage(remoteLang, { auto: true })
+              }
+            })
+            .catch(() => {})
+        }
+      } catch (e) { /* ignore */ }
       // 换了一个账户（后端 previousAccountDiffers，一次性）：维护者拍板「本机项目属于这台电脑」
       if (res && res.previousAccountDiffers) {
         await showDialog({
@@ -650,7 +799,7 @@ export default {
     },
     onSiteSegTap(site) {
       if (!site || site.id === this.siteStatus.current) return
-      if (this.siteStatus.pinned || this.siteBusy || this.rescueBusy) return
+      if (this.siteStatus.pinned || this.siteBusy || this.rescueBusy || this.submitBusy || this.sendingCode) return
       if (this.needsSwitchConfirm) this.confirmSwitchSite(site)
       else this.switchSite(site)
     },
@@ -680,6 +829,7 @@ export default {
         this.siteBusy = false
       }
       // 验证码只对发给的那个手机号/邮箱有效，换了站就是换了收件目标
+      this.switchAuthFlow('password')
       this.smsCode = ''
       this.stopCooldown()
       // 先切语言再装配：国际站托管页的语言随 URL 参数定
@@ -745,6 +895,20 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.unlock-auth-link {
+  appearance: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 2px 0;
+  font: inherit;
+  font-size: var(--awd-panel-fs);
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+.unlock-auth-link:disabled { opacity: .55; cursor: default; }
+
 /* ---------- 弹层形态：遮罩 + 居中卡片 ----------
    z-index 9990：低于 AwdDialog 宿主（10000）——卡片里弹的「跨境说明」「换了账户」要盖在它上面；
    高于工作台自家的 .awd-mask（9999 以下的业务浮层），并且 requireAccount.js 持有全局浮层让
@@ -759,7 +923,7 @@ export default {
   padding: 24px 16px;
   box-sizing: border-box;
   overflow-y: auto;
-  background: var(--awd-overlay, rgba(35, 32, 26, 0.38));
+  background: var(--awd-overlay);
   backdrop-filter: blur(3px);
   font-family: var(--awd-font-sans, inherit);
 }
@@ -771,7 +935,7 @@ export default {
 .unlock-card.is-dialog {
   position: relative;
   margin: auto;
-  box-shadow: 0 24px 64px rgba(35, 32, 26, 0.28);
+  box-shadow: var(--awd-shadow-lg);
   animation: awd-login-in 160ms ease-out;
 }
 
@@ -796,8 +960,8 @@ export default {
   height: 28px;
   line-height: 28px;
   text-align: center;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--awd-radius-dialog);
+  font-size: var(--awd-login-close-fs);
   color: var(--awd-text-3);
   cursor: pointer;
 
@@ -810,10 +974,10 @@ export default {
 .awd-login-reason {
   margin-top: 18px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--awd-login-item-radius);
   background: var(--awd-accent-soft);
   color: var(--awd-text);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.6;
 }
 
@@ -836,12 +1000,17 @@ export default {
 }
 
 .unlock-card {
+  --awd-login-card-radius: 18px;
+  --awd-login-item-radius: 10px;
+  --awd-login-btn-radius: 11px;
+  --awd-login-title-fs: 20px;
+  --awd-login-close-fs: 14px;
   width: 400px;
   max-width: calc(100vw - 48px);
   box-sizing: border-box;
   background: var(--awd-surface);
   border: 1px solid var(--awd-glass-border);
-  border-radius: 18px;
+  border-radius: var(--awd-login-card-radius);
   box-shadow: var(--awd-shadow-sm), var(--awd-shadow-lg);
   padding: 36px 40px 28px;
   display: flex;
@@ -860,7 +1029,7 @@ export default {
   padding: 3px;
   margin: 26px 0 22px;
   background: var(--awd-surface-2);
-  border-radius: 10px;
+  border-radius: var(--awd-login-item-radius);
 
   &.is-disabled .unlock-site-seg-item {
     cursor: default;
@@ -879,12 +1048,12 @@ export default {
   flex: 1;
   text-align: center;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
   line-height: 30px;
   color: var(--awd-text-2);
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 
@@ -908,7 +1077,7 @@ export default {
 }
 
 .unlock-title {
-  font-size: 20px;
+  font-size: var(--awd-login-title-fs);
   line-height: 1.3;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -917,7 +1086,7 @@ export default {
 }
 
 .unlock-desc {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.6;
   color: var(--awd-text-2);
   margin-bottom: 22px;
@@ -925,7 +1094,7 @@ export default {
 
 .unlock-promo {
   margin: -12px 0 18px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.6;
   color: var(--awd-gold-text);
 }
@@ -944,7 +1113,7 @@ export default {
   align-items: center;
   gap: 10px;
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
+  border-radius: var(--awd-login-item-radius);
   background: var(--awd-surface);
   transition: border-color 0.15s, box-shadow 0.15s;
 
@@ -958,7 +1127,7 @@ export default {
   flex-shrink: 0;
   padding-right: 10px;
   border-right: 1px solid var(--awd-border);
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 500;
   color: var(--awd-text-2);
 }
@@ -970,7 +1139,7 @@ export default {
   padding: 0;
   border: 0;
   outline: none;
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-family: inherit;
   color: var(--awd-text);
   background: transparent;
@@ -1000,8 +1169,8 @@ export default {
   background: var(--awd-surface);
   color: var(--awd-accent-text);
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
-  font-size: 13px;
+  border-radius: var(--awd-login-item-radius);
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
@@ -1024,10 +1193,10 @@ export default {
   box-sizing: border-box;
   padding: 12px 14px;
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
+  border-radius: var(--awd-login-item-radius);
   outline: none;
   resize: none;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.6;
   color: var(--awd-text);
   background: var(--awd-surface);
@@ -1052,7 +1221,7 @@ export default {
 
 .unlock-error {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.6;
   color: var(--awd-danger-text);
 }
@@ -1066,8 +1235,8 @@ export default {
   background: var(--awd-accent);
   color: var(--awd-text-on-accent);
   border: none;
-  border-radius: 11px;
-  font-size: 15px;
+  border-radius: var(--awd-login-btn-radius);
+  font-size: var(--awd-font-size-reading);
   font-weight: 600;
   font-family: inherit;
   letter-spacing: 0.02em;
@@ -1104,7 +1273,7 @@ export default {
   margin-top: 2px;
   box-sizing: border-box;
   border: 1.5px solid var(--awd-border-strong);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-surface);
   transition: background 0.15s, border-color 0.15s;
 
@@ -1115,13 +1284,13 @@ export default {
 }
 
 .consent-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.55;
   color: var(--awd-text-2);
 }
 
 .unlock-link {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-accent-text);
   cursor: pointer;
 
@@ -1137,7 +1306,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1;
   color: var(--awd-text-3);
 }

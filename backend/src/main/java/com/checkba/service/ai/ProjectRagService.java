@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -54,8 +55,30 @@ public class ProjectRagService {
                 }
             });
 
+    // 按项目条带化的构建锁：buildRetriever 含磁盘扫描 + Tika + HTTP embedding 的重 I/O，
+    // 不能在 retrieverCache 的全局同步锁内执行（会把所有项目的 RAG 查询和 remove 一起卡住）
+    private final Object[] projectLocks = createProjectLocks();
+
+    private static Object[] createProjectLocks() {
+        Object[] locks = new Object[64];
+        for (int i = 0; i < locks.length; i++) locks[i] = new Object();
+        return locks;
+    }
+
+    private Object projectLock(String projectId) {
+        return projectLocks[Math.floorMod(Objects.hashCode(projectId), projectLocks.length)];
+    }
+
     public ContentRetriever getRetrieverForProject(String projectId) {
-        return retrieverCache.computeIfAbsent(projectId, this::buildRetriever);
+        ContentRetriever cached = retrieverCache.get(projectId);
+        if (cached != null) return cached;
+        synchronized (projectLock(projectId)) {
+            cached = retrieverCache.get(projectId);
+            if (cached != null) return cached;
+            ContentRetriever built = buildRetriever(projectId);
+            retrieverCache.put(projectId, built);
+            return built;
+        }
     }
 
     /**

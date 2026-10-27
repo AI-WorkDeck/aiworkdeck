@@ -208,4 +208,15 @@ export default {
   railScheduleTitle: 'Schedule ({overdue} overdue · {today} today)',
   // Workbench center "Schedule" tab (dev-board#1048)
   tabName: 'Schedule',
+  "workspaceAll": "All projects",
+  "workspaceCurrent": "Current project",
+  "workspaceUpcoming": "Coming up",
+  "workspaceDays": "Next {count} days",
+  "workspaceRetry": "Reload",
+  "workspaceOverdue": "{count} overdue",
+  "workspaceNoUpcoming": "Nothing due in the next {count} days",
+  "workspaceLinked": "Filters sync with the calendar. Select an item to see details.",
+  "workspaceDay": "Day",
+  "workspaceYear": "Year",
+  "workspaceEventCount": "{count} items",
 }

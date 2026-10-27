@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -51,11 +50,16 @@ public class MergeAnalysisService {
      * 对纯 CPU 的解析不起作用）。所以用一个守护线程池：跑飞的任务自己结束、
      * 不拦着 JVM 退出，也不占用调用方（HTTP 工作线程）。
      */
-    private static final ExecutorService ANALYZER = Executors.newCachedThreadPool(r -> {
-        Thread t = new Thread(r, "merge-analyzer");
-        t.setDaemon(true);
-        return t;
-    });
+    // 有界线程池：core=2, max=8, 队列 128，打满时由调用线程兜底执行，避免无界 cached pool
+    private static final ExecutorService ANALYZER = new java.util.concurrent.ThreadPoolExecutor(
+            2, 8, 60L, java.util.concurrent.TimeUnit.SECONDS,
+            new java.util.concurrent.LinkedBlockingQueue<>(128),
+            r -> {
+                Thread t = new Thread(r, "merge-analyzer");
+                t.setDaemon(true);
+                return t;
+            },
+            new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
 
     private final ProjectRepoService repoService;
     private final PendingMergeStore pendingStore;

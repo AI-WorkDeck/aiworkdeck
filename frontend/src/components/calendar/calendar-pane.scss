@@ -64,8 +64,8 @@
   height: 28px;
   padding: 0 8px 0 4px;
   margin-left: -4px;
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
@@ -79,7 +79,7 @@
 }
 
 .header-title {
-  font-size: 20px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-text);
   flex: 0 0 auto;
@@ -106,7 +106,7 @@
   height: 30px;
   box-sizing: border-box;
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-surface);
   color: var(--awd-text-2);
   cursor: pointer;
@@ -126,12 +126,12 @@
 
 .cal-today-btn {
   padding: 0 12px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
 }
 
 .cal-period {
   min-width: 112px;
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-text);
   white-space: nowrap;
@@ -154,15 +154,15 @@
   padding: 2px;
   background: var(--awd-bg);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
 }
 
 .cal-seg-btn {
   height: 26px;
   line-height: 26px;
   padding: 0 12px;
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   cursor: pointer;
   white-space: nowrap;
@@ -190,9 +190,9 @@
   box-sizing: border-box;
   padding: 0 12px;
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-surface);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   cursor: pointer;
   white-space: nowrap;
@@ -218,10 +218,10 @@
   line-height: 16px;
   padding: 0 4px;
   box-sizing: border-box;
-  border-radius: 8px;
+  border-radius: 999px;
   background: var(--awd-accent);
   color: var(--awd-text-on-accent);
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   text-align: center;
 }
@@ -242,7 +242,7 @@
   padding: 14px;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
+  border-radius: var(--awd-radius-dialog);
   box-shadow: var(--awd-shadow-lg);
   display: flex;
   flex-direction: column;
@@ -256,7 +256,7 @@
 }
 
 .fp-label {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-text-2);
 }
@@ -272,7 +272,7 @@
   align-items: center;
   gap: 8px;
   padding: 5px 6px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
 
   &:hover { background: var(--awd-bg); }
@@ -290,7 +290,7 @@
   height: 14px;
   box-sizing: border-box;
   border: 1.5px solid var(--awd-border-strong);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   color: transparent;
   display: flex;
   align-items: center;
@@ -302,7 +302,7 @@
 .fp-option-text {
   flex: 1;
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -323,8 +323,8 @@
   padding: 0 10px;
   box-sizing: border-box;
   border: 1px solid var(--awd-border);
-  border-radius: 13px;
-  font-size: 12px;
+  border-radius: 999px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   cursor: pointer;
 
@@ -346,7 +346,7 @@
 }
 
 .fp-row-label {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
 }
 
@@ -358,7 +358,7 @@
 }
 
 .fp-reset {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-accent-text);
   cursor: pointer;
 
@@ -375,10 +375,10 @@
   height: 32px;
   box-sizing: border-box;
   padding: 0 14px 0 11px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-accent);
   color: var(--awd-text-on-accent);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
@@ -417,7 +417,7 @@
   padding: 12px;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
+  border-radius: var(--awd-radius-dialog);
   display: flex;
   flex-direction: column;
 }
@@ -485,7 +485,7 @@
 
   :deep(.fc-scrollgrid) {
     border-color: var(--awd-border);
-    border-radius: 8px;
+    border-radius: var(--awd-radius-dialog);
     overflow: hidden;
   }
 
@@ -498,7 +498,7 @@
   :deep(.fc-col-header-cell) {
     background: var(--awd-bg);
     padding: 6px 0;
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     font-weight: 500;
     color: var(--awd-text-2);
   }
@@ -533,7 +533,7 @@
   }
 
   :deep(.fc-daynum) {
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     color: var(--awd-text-2);
     font-variant-numeric: tabular-nums;
   }
@@ -549,7 +549,7 @@
     line-height: 20px;
     padding: 0 4px;
     box-sizing: border-box;
-    border-radius: 10px;
+    border-radius: 999px;
     background: var(--awd-accent);
     color: var(--awd-text-on-accent);
     font-weight: 600;
@@ -559,9 +559,9 @@
   :deep(.fc-holiday-badge) {
     display: inline-block;
     padding: 0 4px;
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     line-height: 15px;
-    border-radius: 3px;
+    border-radius: var(--awd-radius-sm);
     vertical-align: middle;
   }
 
@@ -583,7 +583,7 @@
   :deep(.fc-daygrid-event),
   :deep(.fc-timegrid-event) {
     border: none;
-    border-radius: 4px;
+    border-radius: var(--awd-radius-sm);
     cursor: pointer;
     box-shadow: none;
   }
@@ -609,7 +609,7 @@
     min-height: 18px;
     padding-right: 4px;
     overflow: hidden;
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     line-height: 18px;
   }
 
@@ -629,7 +629,7 @@
     left: 0;
     top: 0;
     bottom: 0;
-    border-radius: 3px 0 0 3px;
+    border-radius: var(--awd-radius-sm) 0 0 var(--awd-radius-sm);
   }
 
   :deep(.fc-timegrid-event .fc-awd-ev-title) {
@@ -642,14 +642,14 @@
     flex: none;
     align-self: stretch;
     width: 3px;
-    border-radius: 3px 0 0 3px;
+    border-radius: var(--awd-radius-sm) 0 0 var(--awd-radius-sm);
     margin-right: 2px;
   }
 
   :deep(.fc-awd-ev-time) {
     flex: none;
     color: var(--awd-text-2);
-    font-size: 11px;
+    font-size: var(--awd-panel-fs-meta);
     font-variant-numeric: tabular-nums;
   }
 
@@ -679,7 +679,7 @@
   }
 
   :deep(.fc-awd-ev.is-list) {
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     gap: 8px;
   }
 
@@ -689,13 +689,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     color: var(--awd-text-3);
   }
 
   :deep(.fc-daygrid-more-link) {
     margin: 1px 4px 0;
-    font-size: 11px;
+    font-size: var(--awd-panel-fs-meta);
     color: var(--awd-text-2);
 
     &:hover {
@@ -707,14 +707,14 @@
   :deep(.fc-popover) {
     background: var(--awd-surface);
     border: 1px solid var(--awd-border);
-    border-radius: 8px;
+    border-radius: var(--awd-radius-dialog);
     box-shadow: var(--awd-shadow-lg);
     overflow: hidden;
   }
 
   :deep(.fc-popover-header) {
     background: var(--awd-bg);
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     color: var(--awd-text-2);
   }
 
@@ -725,7 +725,7 @@
 
   :deep(.fc-timegrid-slot-label),
   :deep(.fc-timegrid-axis) {
-    font-size: 11px;
+    font-size: var(--awd-panel-fs-meta);
     color: var(--awd-text-3);
   }
 
@@ -736,13 +736,13 @@
   /* ---- 列表视图 ---- */
   :deep(.fc-list) {
     border-color: var(--awd-border);
-    border-radius: 8px;
+    border-radius: var(--awd-radius-dialog);
     overflow: hidden;
   }
 
   :deep(.fc-list-day-cushion) {
     background: var(--awd-bg);
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     font-weight: 600;
     color: var(--awd-text-2);
   }
@@ -761,13 +761,13 @@
 
   /* 周视图表头：星期 + 日 */
   :deep(.fc-dh-weekday) {
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     color: var(--awd-text-2);
   }
 
   :deep(.fc-dh-day) {
     margin-left: 4px;
-    font-size: 14px;
+    font-size: var(--awd-font-size-body);
     font-weight: 600;
     color: var(--awd-text);
     font-variant-numeric: tabular-nums;
@@ -778,7 +778,7 @@
   }
 
   :deep(.fc-list-event td) {
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
   }
 
   :deep(.fc-list-event-time) {
@@ -787,13 +787,13 @@
   }
 
   :deep(.fc-list-event-dot) {
-    border-radius: 2px;
+    border-radius: var(--awd-radius-sm);
     border-width: 4px;
   }
 
   :deep(.fc-list-empty) {
     background: var(--awd-surface);
     color: var(--awd-text-3);
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
   }
 }

@@ -7,6 +7,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
+import { pluginWorkspaceTabMethods } from '../../src/pages/project-overview/pluginWorkspaceTabs.js'
 import { CALENDAR_TAB_ID, CALENDAR_TAB_TYPE, calendarTabMethods } from '../../src/pages/project-overview/calendarTab.js'
 import { isContextEligibleTab, pickActiveContextTab } from '../../src/pages/project-overview/activeTabContext.js'
 import { NON_FILE_TAB_TYPES, fileKindKey } from '../../src/pages/project-overview/fileKind.js'
@@ -17,6 +18,8 @@ function fakeWorkbench(overrides = {}) {
   const ticks = []
   const vm = {
     projectId: null,
+    dynamicPluginsLoaded: true,
+    dynamicPlugins: [{ pluginId: 'calendar', label: '日程', hasDeclaredViews: true, workspaceView: { placement: 'workspace', scope: 'global' }, views: [{ placement: 'workspace', scope: 'global' }] }],
     hasProject: false,
     leftFiles: [],
     rightFiles: [],
@@ -42,52 +45,44 @@ function fakeWorkbench(overrides = {}) {
     },
     ...overrides,
   }
-  for (const [k, fn] of Object.entries(calendarTabMethods)) vm[k] = fn.bind(vm)
+  for (const [k, fn] of Object.entries({ ...pluginWorkspaceTabMethods, ...calendarTabMethods })) vm[k] = fn.bind(vm)
   return vm
 }
 
-test('openCalendarTab：未分屏落左侧并激活，id / tabType 恒为 calendar，深链挂在标签对象上', () => {
+const calendarEvents = []
+globalThis.uni = { $emit: (...args) => calendarEvents.push(args) }
+test('calendar shortcut opens the installed global plugin workspace and forwards normalized deep links', () => {
+  calendarEvents.length = 0
   const vm = fakeWorkbench()
   vm.openCalendarTab({ focus: 12, group: 'today' })
+  vm.flushTicks()
+  assert.deepEqual(vm.leftFiles[0], { id: 'plugin-calendar', tabType: 'plugin', pluginId: 'calendar', name: '日程' })
+  assert.equal(vm.activeFileIdLeft, 'plugin-calendar')
+  assert.deepEqual(calendarEvents.at(-1)[1], { pluginId: 'calendar', command: 'calendar-focus', focus: '12', group: 'today' })
+})
+test('invalid calendar group is removed and duplicate deep links remain separate events', () => {
+  calendarEvents.length = 0
+  const vm = fakeWorkbench()
+  vm.openCalendarTab({ focus: 7, group: 'yesterday' }); vm.flushTicks()
+  vm.openCalendarTab({ focus: 7 }); vm.flushTicks()
+  assert.equal(calendarEvents.length, 2)
+  assert.equal(calendarEvents[0][1].group, '')
   assert.equal(vm.leftFiles.length, 1)
-  assert.deepEqual(vm.leftFiles[0], {
-    id: CALENDAR_TAB_ID, tabType: CALENDAR_TAB_TYPE, name: 'calendar.tabName', calendarFocus: '12', calendarGroup: 'today',
-  })
-  assert.equal(vm.activeFileIdLeft, 'calendar')
 })
-
-test('openCalendarTab：非法 group 丢掉、缺省参数不报错', () => {
-  const vm = fakeWorkbench()
-  vm.openCalendarTab({ group: 'yesterday' })
-  assert.equal(vm.leftFiles[0].calendarGroup, '')
-  const vm2 = fakeWorkbench()
-  vm2.openCalendarTab()
-  assert.equal(vm2.leftFiles[0].calendarFocus, '')
+test('calendar plugin stays singleton across panes and cannot open after removal', () => {
+  const vm = fakeWorkbench({ splitMode: true })
+  vm.rightFiles.push({ id: 'plugin-calendar', tabType: 'plugin', pluginId: 'calendar', name: '日程' })
+  vm.leftFiles.push({ id: 12, name: '合同.docx' }); vm.activeFileIdLeft = 12
+  vm.openCalendarTab(); vm.flushTicks()
+  assert.equal(vm.rightFiles.length, 1); assert.equal(vm.leftFiles.length, 1)
+  assert.equal(vm.activeFileIdRight, 'plugin-calendar'); assert.equal(vm.activeFileIdLeft, 12)
+  const removed = fakeWorkbench({ dynamicPlugins: [] }); removed.openCalendarTab(); removed.flushTicks()
+  assert.equal(removed.leftFiles.length, 0)
 })
-
-test('openCalendarTab：单例——任一侧已开着只激活并更新深链，不开第二个', () => {
-  const vm = fakeWorkbench({ splitMode: true, focusedPane: 'left' })
-  vm.rightFiles.push({ id: 'calendar', tabType: 'calendar', name: '日程', calendarFocus: '', calendarGroup: '' })
-  vm.leftFiles.push({ id: 12, name: '合同.docx', fileType: 'docx' })
-  vm.activeFileIdLeft = 12
-  vm.openCalendarTab({ group: 'overdue' })
-  vm.openCalendarTab()
-  vm.flushTicks()
-  assert.equal(vm.leftFiles.length, 1, '左侧没有多出第二个日程标签')
-  assert.equal(vm.rightFiles.length, 1)
-  assert.equal(vm.activeFileIdRight, 'calendar')
-  assert.equal(vm.focusedPane, 'right')
-  assert.equal(vm.activeFileIdLeft, 12, '另一侧正在看的文档不被顶掉')
-})
-
-test('openCalendarTab：同一深链再点一次要能重新生效（先清空、下一拍写回，watch 才会触发）', () => {
-  const vm = fakeWorkbench()
-  vm.openCalendarTab({ focus: 7 })
-  const tab = vm.leftFiles[0]
-  vm.openCalendarTab({ focus: 7 })
-  assert.equal(tab.calendarFocus, '', '同值先清空')
-  vm.flushTicks()
-  assert.equal(tab.calendarFocus, '7', '下一拍写回')
+test('calendar deep link waits for installed plugin discovery', () => {
+  const vm = fakeWorkbench({ dynamicPluginsLoaded: false })
+  vm.openCalendarTab({ focus: 7 }); assert.equal(vm.leftFiles.length, 0)
+  assert.deepEqual(vm.pendingCalendarOpen, { focus: 7 })
 })
 
 test('日程标签不能当活跃文档、不能拖进 AI 上下文，也不按扩展名上色', () => {

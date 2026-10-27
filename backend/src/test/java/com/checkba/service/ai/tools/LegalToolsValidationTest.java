@@ -13,9 +13,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * 审计条目：「get_law_article/law_search/law_recognition dereference LLM-supplied args
@@ -81,6 +86,27 @@ class LegalToolsValidationTest {
     @DisplayName("修复：law_recognition 漏传 text 时返回可行动的错误，不是裸 NPE（此前连 log 都到不了）")
     void lawRecognitionMissingTextReturnsActionableError() {
         String result = tools.law_recognition(null);
+
+        assertTrue(result.startsWith("Error"), result);
+        verifyNoInteractions(mcpClientService);
+    }
+
+    @Test
+    @DisplayName("修复：law_search 调用 pkulaw-semantic search_article 时传 text 参数而非 query（避免 FastMCP Pydantic missing_argument）")
+    void lawSearchPassesTextArgumentToPkulawSearchArticle() {
+        when(mcpClientService.callTool("pkulaw-semantic", "search_article", Map.of("text", "中华人民共和国公证法 全文 条文")))
+                .thenReturn("[{\"title\":\"中华人民共和国公证法\",\"article\":\"第一条\"}]");
+
+        String result = tools.law_search("  中华人民共和国公证法 全文 条文  ");
+
+        assertEquals("[{\"title\":\"中华人民共和国公证法\",\"article\":\"第一条\"}]", result);
+        verify(mcpClientService).callTool("pkulaw-semantic", "search_article", Map.of("text", "中华人民共和国公证法 全文 条文"));
+    }
+
+    @Test
+    @DisplayName("修复：law_search_keyword 在 title 与 fulltext 均为空时返回可行动的错误")
+    void lawSearchKeywordMissingBothArgsReturnsActionableError() {
+        String result = tools.law_search_keyword(" ", null);
 
         assertTrue(result.startsWith("Error"), result);
         verifyNoInteractions(mcpClientService);

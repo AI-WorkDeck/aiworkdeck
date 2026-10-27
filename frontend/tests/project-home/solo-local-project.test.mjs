@@ -30,5 +30,5 @@ test('工作台顶栏与项目列表两处都接了这条判定', () => {
   // 项目列表内容体已抽成左栏「项目」面板（dev-board#1047），皇冠门控随之搬家
   const pl = readFileSync(new URL('../../src/components/project-list/ProjectListPane.vue', import.meta.url), 'utf8')
   const crowns = pl.match(/class="manager-avatar-wrapper" v-if="project\.managerId && !isSoloLocal\(project\)"/g) || []
-  assert.equal(crowns.length, 2, '卡片视图与表格视图两处皇冠都要按单人本机项目隐藏')
+  assert.equal(crowns.length, 1, '统一列表的皇冠仍须按单人本机项目隐藏')
 })

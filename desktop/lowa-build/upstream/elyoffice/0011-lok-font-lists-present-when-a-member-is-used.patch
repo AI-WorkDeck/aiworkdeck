@@ -1,0 +1,27 @@
+--- a/desktop/source/lib/init.cxx	2026-10-04 13:38:07
++++ b/desktop/source/lib/init.cxx	2026-10-04 13:38:07
+@@ -3055,11 +3055,20 @@
+                                 // vcl::Font::GetItalic() returns and boldness by what
+                                 // vcl::Font::GetWeight() returns.)
+ 
++                                // A ';' list is present if any member is used.
+                                 if (x.mOriginalFont.indexOf('/') == -1)
+-                                    for (const auto &j : x.mUsedFonts)
+-                                        if (j == x.mOriginalFont ||
+-                                            j.startsWith(Concat2View(x.mOriginalFont + "/")))
+-                                            return true;
++                                {
++                                    sal_Int32 nIndex = 0;
++                                    do
++                                    {
++                                        const OUString aFamily
++                                            = x.mOriginalFont.getToken(0, ';', nIndex);
++                                        for (const auto &j : x.mUsedFonts)
++                                            if (j == aFamily
++                                                || j.startsWith(Concat2View(aFamily + "/")))
++                                                return true;
++                                    } while (nIndex >= 0);
++                                }
+ 
+                                 return false;
+                             });

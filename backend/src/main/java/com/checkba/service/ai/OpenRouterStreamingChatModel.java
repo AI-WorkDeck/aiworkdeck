@@ -131,6 +131,25 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
      */
     static final int DEFAULT_MAX_REQUESTS_PER_HOST = 32;
 
+    /**
+     * 进程级共享的底层 HTTP 连接池与调度器（dev-board#1270 [S-3]）。
+     *
+     * <p>{@code ChatModelFactory.createWritingModel} 每次写作/续写请求都会新建非缓存的
+     * {@link OpenRouterStreamingChatModel}，多租户下 {@code streamingModelCache} 也会按 LRU 淘汰；
+     * 若每个实例各自 {@code new OkHttpClient.Builder()}，每次都会残留独立的
+     * {@code ConnectionPool} 与 {@code Dispatcher} 线程池。通过 {@code SHARED_CLIENT.newBuilder()}
+     * 派生实例，既共享底层连接池与调度器，又允许每个实例独立设置超时。
+     */
+    private static final OkHttpClient SHARED_CLIENT = createSharedClient();
+
+    private static OkHttpClient createSharedClient() {
+        okhttp3.Dispatcher dispatcher = new okhttp3.Dispatcher();
+        dispatcher.setMaxRequestsPerHost(DEFAULT_MAX_REQUESTS_PER_HOST);
+        return new OkHttpClient.Builder()
+                .dispatcher(dispatcher)
+                .build();
+    }
+
     public OpenRouterStreamingChatModel(String apiKey, String baseUrl, String modelName, Duration timeout) {
         this(apiKey, baseUrl, modelName, timeout, DEFAULT_MAX_REQUESTS_PER_HOST);
     }
@@ -177,15 +196,20 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
         Duration t = timeout == null ? Duration.ofSeconds(60) : timeout;
         // 四个超时同值，与 openai4j 0.23 的 OpenAiClient 口径一致：callTimeout 是整通墙钟上限，
         // readTimeout 靠 OpenRouter 的保活注释刷新，不会在模型静默思考时误触发
-        okhttp3.Dispatcher dispatcher = new okhttp3.Dispatcher();
-        dispatcher.setMaxRequestsPerHost(Math.max(1, maxRequestsPerHost));
-        this.client = new OkHttpClient.Builder()
+        int targetMaxPerHost = Math.max(1, maxRequestsPerHost);
+        if (targetMaxPerHost != SHARED_CLIENT.dispatcher().getMaxRequestsPerHost()) {
+            SHARED_CLIENT.dispatcher().setMaxRequestsPerHost(targetMaxPerHost);
+        }
+        this.client = SHARED_CLIENT.newBuilder()
                 .callTimeout(t)
                 .connectTimeout(t)
                 .readTimeout(t)
                 .writeTimeout(t)
-                .dispatcher(dispatcher)
                 .build();
+    }
+
+    OkHttpClient httpClient() {
+        return client;
     }
 
     public String modelName() {
@@ -204,8 +228,8 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
 
     public Call generateCancellable(List<ChatMessage> messages, int maxOutputTokens,
                                     StreamingResponseHandler<AiMessage> handler) {
-        if (maxOutputTokens < 256 || maxOutputTokens > 4096) {
-            throw new IllegalArgumentException("Writing output limit must be between 256 and 4096 tokens");
+        if (maxOutputTokens < 256 || maxOutputTokens > 8192) {
+            throw new IllegalArgumentException("Writing output limit must be between 256 and 8192 tokens");
         }
         return send(messages, null, maxOutputTokens, handler).firstCall;
     }
@@ -307,13 +331,14 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
         if (reasoningEffort != null) {
             body = withReasoningEffort(body, reasoningEffort);
         }
-        // 写作通道（maxOutputTokens 非 null）不带路由偏好：那条路是 qwen 单供应商，且不做重发
-        if (providerRouting != null && maxOutputTokens == null) {
+        // Explicit routing also applies to bounded writing; local provider requeue remains disabled below.
+        if (providerRouting != null) {
             body = withProviderRouting(body, providerRouting);
         }
-        // Verified Flash writing must not spend its small output budget on hidden reasoning.
-        // Other Qwen endpoints can require reasoning; leave every unverified model at its default.
-        if (maxOutputTokens != null && "qwen/qwen3.7-flash".equals(modelName)) {
+        // Default Flash writing keeps its small budget for output; explicit model reasoning is preserved.
+        // The verified DeepSeek Flash disable control uses enabled=false, not an unsupported effort tier.
+        if (maxOutputTokens != null && (reasoningEffort == null && "qwen/qwen3.7-flash".equals(modelName)
+                || "none".equals(reasoningEffort) && "deepseek/deepseek-v4-flash".equals(modelName))) {
             try {
                 ObjectNode writing = (ObjectNode) LENIENT.readTree(body);
                 writing.set("reasoning", LENIENT.createObjectNode().put("enabled", false));
@@ -372,6 +397,7 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
 
             @Override
             public void onResponse(Call call, Response response) {
+                boolean completed = false;
                 try (Response r = response) {
                     ResponseBody rb0 = r.body();
                     if (!r.isSuccessful()) {
@@ -385,9 +411,13 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
                     }
                     // 部分情况下 OpenRouter 在响应头里就带了供应商名（多数流式响应要等首个分片）
                     session.noteProvider(r.header("X-Provider-Name"));
-                    session.consume(rb0.source());
+                    completed = session.consume(rb0.source());
                 } catch (Throwable t) {
                     session.fail(t);
+                    return;
+                }
+                if (completed) {
+                    session.complete();
                 }
             }
         });
@@ -800,16 +830,16 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
             this.reasoningHandler = handler instanceof ReasoningStreamingHandler rh ? rh : null;
         }
 
-        void consume(BufferedSource source) throws IOException {
+        boolean consume(BufferedSource source) throws IOException {
             StringBuilder data = new StringBuilder();
             String line;
             while ((line = source.readUtf8Line()) != null) {
-                if (settled.get()) return;
+                if (settled.get()) return false;
                 if (line.isEmpty()) {
                     if (data.length() > 0) {
                         boolean done = dispatch(data.toString());
                         data.setLength(0);
-                        if (done) return;
+                        if (done) return !settled.get();
                     }
                     continue;
                 }
@@ -824,15 +854,14 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
                 }
                 // event:/id:/retry: 行在 chat completions 流里不出现，忽略
             }
-            if (data.length() > 0 && dispatch(data.toString())) return;
+            if (data.length() > 0 && dispatch(data.toString())) return !settled.get();
             // 没等到 [DONE] 就 EOF：与 okhttp-sse 的 onClosed 行为一致，按已收到的内容收尾
-            complete();
+            return !settled.get();
         }
 
         /** 返回 true 表示流已终结（[DONE] 或错误），调用方停止读取。 */
         private boolean dispatch(String payload) {
             if ("[DONE]".equals(payload)) {
-                complete();
                 return true;
             }
             JsonNode root;

@@ -14,10 +14,20 @@ const source = readFileSync(resolve(root, 'sdk/plugin-sdk/awd-plugin-sdk.js'))
 
 for (const copy of [
   'examples/hello-web-plugin/web/awd-plugin-sdk.js',
+  'examples/checklist-helper/web/awd-plugin-sdk.js',
   'backend/src/main/resources/plugin-dev/awd-plugin-sdk.js'
 ]) {
   test('SDK 副本逐字节一致：' + copy, () => {
     assert.ok(source.equals(readFileSync(resolve(root, copy))), copy + ' 与 sdk/plugin-sdk/awd-plugin-sdk.js 不一致')
+  })
+}
+
+for (const [sourcePath, copyPath] of [
+  ['sdk/plugin-sdk/awd-plugin-sdk.d.ts', 'examples/checklist-helper/web/awd-plugin-sdk.d.ts'],
+  ['sdk/plugin-sdk/manifest.schema.json', 'examples/checklist-helper/manifest.schema.json']
+]) {
+  test('Checklist distribution matches SDK: ' + copyPath, () => {
+    assert.deepEqual(readFileSync(resolve(root, copyPath)), readFileSync(resolve(root, sourcePath)))
   })
 }
 
@@ -48,9 +58,9 @@ test('SDK 暴露 v2.7 的 doc.exec / doc.active / events.* / ai.request', () => 
   }
 })
 
-test('SDK 暴露 v2.9 的 settings.get，版本号 1.4.0', () => {
+test('SDK 暴露 v2.9 的 settings.get，版本号 1.5.0', () => {
   const text = source.toString('utf8')
   assert.ok(text.indexOf("call('settings.get'") >= 0, '缺 settings.get')
   assert.ok(text.indexOf("'settings.changed'") >= 0 || text.indexOf('settings.changed') >= 0, '缺 settings.changed 事件说明')
-  assert.ok(text.indexOf('1.4.0') >= 0, 'SDK 版本号应为 1.4.0')
+  assert.ok(text.indexOf('1.5.0') >= 0, 'SDK 版本号应为 1.5.0')
 })

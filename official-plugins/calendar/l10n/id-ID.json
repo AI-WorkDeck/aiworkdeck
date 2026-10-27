@@ -1,0 +1,6 @@
+{
+  "plugin.name": "Kalender",
+  "plugin.description": "Kalender lintas proyek, tugas, pengingat, dan tautan berkas.",
+  "view.sidebar.name": "Kalender",
+  "view.main.name": "Kalender"
+}

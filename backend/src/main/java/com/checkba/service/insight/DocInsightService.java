@@ -15,6 +15,7 @@ import com.checkba.repository.ProjectFileRepository;
 import com.checkba.service.DocumentTextService;
 import com.checkba.service.LangText;
 import com.checkba.service.ProjectMemberService;
+import com.checkba.service.ProjectFileAccessService;
 import com.checkba.service.QichachaService;
 import com.checkba.service.ai.AuxModelResolver;
 import com.checkba.service.ai.ChatModelFactory;
@@ -167,6 +168,7 @@ public class DocInsightService {
     private final PlatformGatewayClient platformGatewayClient;
     private final InsightProperties props;
     private final ObjectMapper om;
+    private final ProjectFileAccessService fileAccess;
 
     /** 同一份文档同时只跑一个解析。DB 里的 RUNNING 行是跨重启的兜底，这个集合是同进程的原子闸。 */
     private final Set<String> inFlight = ConcurrentHashMap.newKeySet();
@@ -236,7 +238,7 @@ public class DocInsightService {
         requireDoc(projectId, docFileId);
         List<ParagraphInput> safe = inputs == null ? List.of() : inputs.stream()
                 .filter(java.util.Objects::nonNull)
-                .map(p -> new ParagraphInput(p.index(), p.text() == null ? "" : p.text()))
+                .map(p -> new ParagraphInput(p.index(), p.text() == null ? "" : p.text(), p.numbering()))
                 .toList();
         if (safe.size() > 10_000) throw new IllegalArgumentException("too many paragraphs");
         Set<Integer> indexes = new HashSet<>();
@@ -251,7 +253,7 @@ public class DocInsightService {
 
         List<Fact> out = new ArrayList<>();
         ContractStructureAudit.Report report = ContractStructureAudit.run(
-                safe.stream().map(p -> new ContractStructureAudit.Paragraph(p.index(), p.text())).toList(),
+                safe.stream().map(p -> new ContractStructureAudit.Paragraph(p.index(), p.text(), p.numbering())).toList(),
                 List.of(), null);
         addAudit(out, "SCRIPT_OUTLIER", "warn", LangText.of("字形不一致", "Inconsistent script"), report.scriptOutliers, safe);
         addAudit(out, "NUMBERING", "warn", LangText.of("编号异常", "Numbering issue"), report.numbering, safe);
@@ -267,7 +269,7 @@ public class DocInsightService {
         if (deep) {
             chatModelFactory.ensurePaidAccess(userId);
             String key = projectId + ":" + docFileId;
-            if (!deepReviews.add(key)) throw new IllegalStateException("这份文档正在深入审校中");
+            if (!deepReviews.add(key)) throw new IllegalStateException(LangText.of("这份文档正在深入审校中", "Deep review is already running for this document"));
             try {
                 List<InlineDeepReview.Issue> issues = new ArrayList<>();
                 DeepRun run = new DeepRun();
@@ -286,6 +288,8 @@ public class DocInsightService {
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("findingCount", out.size());
         summary.put("paragraphCount", safe.size());
+        summary.put("numberingKnownParagraphs", report.numberingKnownParagraphs);
+        summary.put("numberingUnknownParagraphs", report.numberingUnknownParagraphs);
         summary.put("dominantScript", report.dominantScript);
         summary.put("currencies", report.currencies);
         summary.put("deepComplete", deepComplete);
@@ -891,7 +895,9 @@ public class DocInsightService {
         row.setRetrievalStatus(DocInsightEntity.RETRIEVAL_OK);
         row.setRetrievalSource(src.getRetrievalSource());
         row.setRetrievalJson(src.getRetrievalJson());
-        row.setRetrievalNote(null);
+        JsonNode cachedJson = readJson(src.getRetrievalJson());
+        boolean preserveNote = cachedJson != null && cachedJson.path("fuzzyMatched").asBoolean(false);
+        row.setRetrievalNote(preserveNote ? src.getRetrievalNote() : null);
         row.setFetchedAt(src.getFetchedAt());
         return true;
     }
@@ -909,7 +915,7 @@ public class DocInsightService {
         try {
             String json = qichachaService.queryEciInfoJson(name);
             if (StringUtils.hasText(json)) {
-                okCompany(row, json, "qichacha");
+                okCompany(row, json, "qichacha", name, null);
                 return;
             }
         } catch (GatewayException ge) {
@@ -926,14 +932,14 @@ public class DocInsightService {
         String fullName = resolveFullNameViaMcp(name);
         if (fullName == null || fullName.equals(name)) {
             notFound(row, "qichacha", join(first, LangText.of(
-                    "未查询到该企业（企查查只认工商全称，文中可能写的是简称）",
-                    "Company not found (the registry only accepts the full registered name)")));
+                    "未查询到该企业（企查查只认工商全称，文中可能写的是简称或名称有误）",
+                    "Company not found (the registry only accepts the full registered name; check for abbreviations or typos)")));
             return;
         }
         try {
             String json = qichachaService.queryEciInfoJson(fullName);
             if (StringUtils.hasText(json)) {
-                okCompany(row, json, "qichacha+mcp");
+                okCompany(row, json, "qichacha+mcp", name, fullName);
                 return;
             }
             notFound(row, "qichacha+mcp", LangText.of("按全称「", "Full name \"") + fullName
@@ -951,43 +957,145 @@ public class DocInsightService {
         }
     }
 
-    /** 企查查 MCP 模糊搜索：从多个候选里挑与文中写法最接近的全称。通道不可用返回 null。 */
+    /**
+     * 企查查模糊搜索：优先走企查查 MCP，平台档无 MCP 凭证时回退网关网页检索捞出工商全称候选，
+     * 再从多个候选里挑与文中写法最接近的全称（随后由调用方再打一次企查查精确核验）。
+     */
     String resolveFullNameViaMcp(String name) {
-        String raw;
+        String raw = null;
         try {
             raw = mcpClientService.callTool(QICHACHA_MCP_SERVER, QICHACHA_MCP_TOOL, Map.of("searchKey", name));
         } catch (Exception e) {
             log.warn("企查查 MCP 模糊搜索失败 name={}: {}", name, e.getMessage());
-            return null;
         }
-        if (!StringUtils.hasText(raw) || raw.startsWith(ERROR_PREFIX)) return null;
-        List<String> candidates = companyNames(raw);
-        if (candidates.isEmpty()) return null;
+        if (StringUtils.hasText(raw) && !raw.startsWith(ERROR_PREFIX) && !raw.startsWith(McpProvider.NO_CREDENTIAL_PREFIX)) {
+            List<String> candidates = companyNames(raw, name);
+            String picked = pickBestCompanyCandidate(name, candidates, false);
+            if (picked != null) return picked;
+        }
+        // 平台档桌面端未配置本机 QICHACHA_MCP_TOKEN 时，走平台网关 search/web 检索候选全称，
+        // 命中的候选随后仍由 qichachaService.queryEciInfoJson 做权威工商核验。
+        if (externalProviderResolver != null
+                && externalProviderResolver.resolve(ExternalServiceProvider.QICHACHA) == ExternalServiceProvider.PLATFORM
+                && platformGatewayClient != null) {
+            try {
+                PlatformGatewayClient.Result searchRes = platformGatewayClient.call(
+                        "search", "web", Map.of("query", name + " 工商 全称 企查查", "count", 5), 15);
+                if (searchRes != null && searchRes.data() != null) {
+                    List<String> webCandidates = companyNames(writeJson(searchRes.data()), name);
+                    String picked = pickBestCompanyCandidate(name, webCandidates, true);
+                    if (picked != null) return picked;
+                }
+            } catch (Exception e) {
+                log.debug("平台网关企查查候选名称搜索跳过 name={}: {}", name, e.getMessage());
+            }
+        }
+        return null;
+    }
 
-        String key = DocInsightChecks.normalizeSubject(name);
+    /**
+     * 从候选全称列表里挑出与查询词最接近的一项。
+     *
+     * @param strictSimilarity true = 来自网页检索，必须达到最小字符重合度才采纳；
+     *                         false = 来自企查查 MCP 搜索接口，无高分项时仍可退回首条候选。
+     */
+    static String pickBestCompanyCandidate(String queryName, List<String> candidates, boolean strictSimilarity) {
+        if (candidates == null || candidates.isEmpty()) return null;
+        String key = DocInsightChecks.normalizeSubject(queryName);
+        if (key.isEmpty()) return strictSimilarity ? null : candidates.get(0);
+
+        for (String c : candidates) {
+            if (DocInsightChecks.normalizeSubject(c).equals(key) && !c.equals(queryName)) return c;
+        }
         for (String c : candidates) {
             if (DocInsightChecks.normalizeSubject(c).equals(key)) return c;
         }
         for (String c : candidates) {
-            if (DocInsightChecks.normalizeSubject(c).contains(key)) return c;
+            String norm = DocInsightChecks.normalizeSubject(c);
+            if ((norm.contains(key) || key.contains(norm)) && norm.length() >= 2 && !c.equals(queryName)) return c;
         }
-        return candidates.get(0);
+
+        String best = null;
+        double bestScore = -1.0;
+        int minLcs = Math.max(2, (int) Math.ceil(key.length() * 0.6));
+        String prefix2 = key.substring(0, Math.min(2, key.length()));
+        for (String c : candidates) {
+            if (c.equals(queryName)) continue;
+            String norm = DocInsightChecks.normalizeSubject(c);
+            if (norm.length() < 2) continue;
+            int lcs = lcsLength(key, norm);
+            if (lcs < minLcs) continue;
+            double coverage = (double) lcs / key.length();
+            double dice = (2.0 * lcs) / (key.length() + norm.length());
+            double bonus = (norm.startsWith(prefix2) ? 0.3 : (norm.charAt(0) == key.charAt(0) ? 0.15 : 0.0));
+            double score = coverage + dice + bonus;
+            if (score > bestScore) {
+                bestScore = score;
+                best = c;
+            }
+        }
+        if (best != null) return best;
+        return strictSimilarity ? null : candidates.get(0);
+    }
+
+    private static int lcsLength(String a, String b) {
+        int m = a.length();
+        int n = b.length();
+        int[] dp = new int[n + 1];
+        for (int i = 1; i <= m; i++) {
+            int prev = 0;
+            char ca = a.charAt(i - 1);
+            for (int j = 1; j <= n; j++) {
+                int temp = dp[j];
+                if (ca == b.charAt(j - 1)) {
+                    dp[j] = prev + 1;
+                } else {
+                    dp[j] = Math.max(dp[j], dp[j - 1]);
+                }
+                prev = temp;
+            }
+        }
+        return dp[n];
     }
 
     private static final Set<String> NAME_FIELDS = Set.of("企业名称", "公司名称", "name", "Name", "CompanyName", "companyName");
     private static final Pattern NAME_LINE = Pattern.compile("企业名称[：:]\\s*([^\\s,，、}\"]{4,60})");
+    private static final Pattern FULL_COMPANY_TOKEN = Pattern.compile(
+            "([\\u4e00-\\u9fa5]{2,36}(?:有限责任公司|股份有限公司|有限公司|股份公司|集团公司|合伙企业(?:（有限合伙）|\\(有限合伙\\)|（普通合伙）|\\(普通合伙\\))?))");
+    private static final Pattern LEADING_COMPANY_NOISE = Pattern.compile(
+            "^(?:.*?(?:企查查|天眼查|爱企查|为您提供|查询到|查询|显示|关于|名称为|全称为|简称为|变更前为|现更名为|即|系|是|为|在|由|与|和|对|于|向|按|据))+");
 
     /** 从 MCP 返回里捞候选企业名。返回可能是 JSON、也可能是排版好的文本，两种都要能吃。 */
     List<String> companyNames(String raw) {
+        return companyNames(raw, null);
+    }
+
+    List<String> companyNames(String raw, String queryHint) {
         Set<String> out = new LinkedHashSet<>();
+        if (!StringUtils.hasText(raw)) return new ArrayList<>();
         try {
-            collectNames(om.readTree(raw), out);
+            JsonNode tree = unwrapMcp(raw);
+            if (tree != null) collectNames(tree, out);
         } catch (Exception ignore) {
             // 不是 JSON，走文本兜底
         }
-        if (out.isEmpty()) {
-            Matcher m = NAME_LINE.matcher(raw);
-            while (m.find()) out.add(m.group(1));
+        Matcher m = NAME_LINE.matcher(raw);
+        while (m.find()) out.add(m.group(1).trim());
+        if (out.isEmpty() || StringUtils.hasText(queryHint)) {
+            String key = DocInsightChecks.normalizeSubject(queryHint);
+            String prefix2 = key.length() >= 2 ? key.substring(0, 2) : "";
+            Matcher cm = FULL_COMPANY_TOKEN.matcher(raw);
+            while (cm.find()) {
+                String candidate = cm.group(1).trim();
+                if (!prefix2.isEmpty()) {
+                    int idx = candidate.indexOf(prefix2);
+                    if (idx > 0) {
+                        candidate = candidate.substring(idx);
+                    }
+                }
+                candidate = LEADING_COMPANY_NOISE.matcher(candidate).replaceFirst("").trim();
+                if (candidate.length() >= 6) out.add(candidate);
+            }
         }
         return new ArrayList<>(out);
     }
@@ -1004,7 +1112,11 @@ public class DocInsightService {
             Map.Entry<String, JsonNode> f = it.next();
             JsonNode v = f.getValue();
             if (v.isTextual() && NAME_FIELDS.contains(f.getKey()) && StringUtils.hasText(v.asText())) {
-                out.add(v.asText().trim());
+                String text = v.asText().trim();
+                // 网页搜索结果的 name 字段往往带「 - 企查查」后缀，仅在本身就是纯企业名时直接收
+                if (!text.contains(" - ") && !text.contains("_") && text.length() <= 50) {
+                    out.add(text);
+                }
             } else if (v.isContainerNode()) {
                 collectNames(v, out);
             }
@@ -1012,12 +1124,15 @@ public class DocInsightService {
     }
 
     /** 企查查 Result → 裁过的工商摘要。字段缺就缺，不补零不编造。 */
-    private void okCompany(DocInsightEntity row, String json, String source) {
+    private void okCompany(DocInsightEntity row, String json, String source, String queriedName, String fallbackMatchedName) {
         ObjectNode out = om.createObjectNode();
         out.put("source", source);
         ObjectNode basic = out.putObject("basic");
+        String actualName = fallbackMatchedName;
         try {
             JsonNode r = om.readTree(json);
+            String n = str(r, "Name");
+            if (StringUtils.hasText(n)) actualName = n.trim();
             put(basic, "企业名称", r, "Name");
             put(basic, "统一社会信用代码", r, "CreditCode");
             put(basic, "法定代表人", r, "OperName");
@@ -1032,24 +1147,39 @@ public class DocInsightService {
             if (partners != null && partners.isArray() && !partners.isEmpty()) {
                 ArrayNode arr = out.putArray("shareholders");
                 partners.forEach(p -> {
-                    ObjectNode n = arr.addObject();
-                    put(n, "股东", p, "StockName");
-                    put(n, "持股比例", p, "StockPercent");
-                    put(n, "认缴出资", p, "ShouldCapi");
+                    ObjectNode nNode = arr.addObject();
+                    put(nNode, "股东", p, "StockName");
+                    put(nNode, "持股比例", p, "StockPercent");
+                    put(nNode, "认缴出资", p, "ShouldCapi");
                 });
             }
         } catch (Exception e) {
             // 上游改了形状也不能丢结果：原文照留，窗格至少还能显示点什么
             out.put("raw", json);
         }
+        boolean fuzzy = "qichacha+mcp".equals(source)
+                && StringUtils.hasText(queriedName)
+                && StringUtils.hasText(actualName)
+                && !queriedName.trim().equals(actualName.trim());
+        if (fuzzy) {
+            String qName = queriedName.trim();
+            String mName = actualName.trim();
+            out.put("fuzzyMatched", true);
+            out.put("queriedName", qName);
+            out.put("matchedName", mName);
+            row.setRetrievalNote(LangText.of(
+                    "模糊匹配提示：未精准命中「" + qName + "」，已为您匹配「" + mName + "」，正文中的企业名称可能书写有误，请核对。",
+                    "Fuzzy match: no exact match for \"" + qName + "\"; matched \"" + mName + "\". Please check if the company name in the document is misspelled."));
+        } else {
+            row.setRetrievalNote(null);
+        }
         row.setRetrievalStatus(DocInsightEntity.RETRIEVAL_OK);
         row.setRetrievalSource(source);
         row.setRetrievalJson(writeJson(out));
-        row.setRetrievalNote(null);
     }
 
     /**
-     * 法规：有条号走语义库的 get_article，没条号走关键词库的 get_law_list。
+     * 法规：有条号走语义库的 get_article（未命中或裸条号退 search_article），没条号走关键词库的 get_law_list。
      *
      * <p><b>点数耗尽（401）会走到这里，是预期内的</b>：法宝按点数计费，账号点数用完时
      * tools/call 直接 401。这不是我们的 bug，也不该让整轮解析失败——落 UNAVAILABLE +
@@ -1059,16 +1189,25 @@ public class DocInsightService {
         String[] parts = splitLawName(row.getName());
         String title = parts[0];
         String article = parts[1];
-        boolean byArticle = StringUtils.hasText(article);
-        String server = byArticle ? PKULAW_SEMANTIC : PKULAW_KEYWORD;
-        String tool = byArticle ? "get_article" : "get_law_list";
-        Map<String, Object> args = byArticle
-                ? Map.of("title", title, "number", article)
-                : Map.of("title", title);
-        callAndStore(row, server, tool, args,
-                LangText.of("法规检索本次不可用：", "Statute lookup is unavailable this time: "),
-                LangText.of("未检索到该法规条文（可能条号有误或法规名不准）",
-                        "No matching statute article was found (the number or the title may be wrong)"));
+        String unavailablePrefix = LangText.of("法规检索本次不可用：", "Statute lookup is unavailable this time: ");
+        String notFoundNote = LangText.of("未检索到该法规条文（可能条号有误或法规名不准）",
+                "No matching statute article was found (the number or the title may be wrong)");
+        if (StringUtils.hasText(article)) {
+            if (StringUtils.hasText(title)) {
+                boolean ok = callAndStore(row, PKULAW_SEMANTIC, "get_article",
+                        Map.of("title", title, "number", article),
+                        unavailablePrefix, notFoundNote);
+                if (ok || !DocInsightEntity.RETRIEVAL_NOT_FOUND.equals(row.getRetrievalStatus())) {
+                    return;
+                }
+            }
+            String query = StringUtils.hasText(title) ? title + " " + article : article;
+            callAndStore(row, PKULAW_SEMANTIC, "search_article",
+                    Map.of("text", query), unavailablePrefix, notFoundNote);
+            return;
+        }
+        callAndStore(row, PKULAW_KEYWORD, "get_law_list",
+                Map.of("title", title), unavailablePrefix, notFoundNote);
     }
 
     /**
@@ -1223,7 +1362,7 @@ public class DocInsightService {
             return false;
         }
         JsonNode unwrapped = unwrapMcp(raw);
-        if (unwrapped != null && unwrapped.isArray() && unwrapped.isEmpty()) {
+        if (isEmptyRetrievalResult(tool, unwrapped)) {
             notFound(row, server, notFoundNote);   // 上游把话说清楚了：没有这一条
             return false;
         }
@@ -1241,6 +1380,35 @@ public class DocInsightService {
         row.setRetrievalNote(null);
         row.setRetrievalHint(null);
         return true;
+    }
+
+    /**
+     * 判别法宝回包是否表示「查询无结果」：
+     * <ul>
+     *   <li>空数组 {@code []}；</li>
+     *   <li>{@code get_article} 回的对象里 {@code article}/{@code content}/{@code text} 全部为空串；</li>
+     *   <li>{@code get_law_list} 回的 {@code Data} 为 {@code null} 或空数组；</li>
+     *   <li>{@code search_article} 回的 {@code articles} 为空数组。</li>
+     * </ul>
+     */
+    private static boolean isEmptyRetrievalResult(String tool, JsonNode unwrapped) {
+        if (unwrapped == null) return false;
+        if (unwrapped.isArray()) return unwrapped.isEmpty();
+        if (!unwrapped.isObject()) return false;
+        if ("get_article".equals(tool) && unwrapped.has("article")) {
+            return !StringUtils.hasText(str(unwrapped, "article"))
+                    && !StringUtils.hasText(str(unwrapped, "content"))
+                    && !StringUtils.hasText(str(unwrapped, "text"));
+        }
+        if ("get_law_list".equals(tool) && unwrapped.has("Data")) {
+            JsonNode data = unwrapped.get("Data");
+            return data == null || data.isNull() || (data.isArray() && data.isEmpty());
+        }
+        if ("search_article".equals(tool) && unwrapped.has("articles")) {
+            JsonNode articles = unwrapped.get("articles");
+            return articles == null || articles.isNull() || (articles.isArray() && articles.isEmpty());
+        }
+        return false;
     }
 
     /** 往已落库的 retrievalJson 上补一个字段（案号识别、权威条文原文都走它）。 */
@@ -1269,11 +1437,35 @@ public class DocInsightService {
         return inner == null ? node : inner;
     }
 
-    /** 「《公司法》第二十条」→ {公司法, 第二十条}；不带书名号的原样当标题。 */
+    private static final String CN_NUM = "[零〇一二三四五六七八九十百千万两0-9]+";
+    private static final Pattern ARTICLE_HEAD = Pattern.compile(
+            "^(第" + CN_NUM + "条(?:之" + CN_NUM + ")?)(?:\\s*第" + CN_NUM + "款)?(?:\\s*第" + CN_NUM + "项)?(?:的?规定)?$");
+    private static final Pattern UNBRACKETED_LAW_ARTICLE = Pattern.compile(
+            "^(.*?)\\s*(第" + CN_NUM + "条(?:之" + CN_NUM + ")?)(?:\\s*第" + CN_NUM + "款)?(?:\\s*第" + CN_NUM + "项)?(?:的?规定)?$");
+
+    /**
+     * 「《公司法》第二十条」→ {公司法, 第二十条}；
+     * 「《民法典》第五百零九条第一款」→ {民法典, 第五百零九条}（法宝 get_article 只认到「第X条」）；
+     * 「劳动合同法第五十条」→ {劳动合同法, 第五十条}；
+     * 裸条号「第五十条」→ {"", 第五十条}。
+     */
     static String[] splitLawName(String name) {
         String s = name == null ? "" : name.trim();
         Matcher m = LAW_NAME.matcher(s);
-        if (m.matches()) return new String[]{m.group(1).trim(), m.group(2).trim()};
+        if (m.matches()) {
+            String title = m.group(1).trim();
+            String rest = m.group(2).trim();
+            Matcher ah = ARTICLE_HEAD.matcher(rest);
+            return new String[]{title, ah.matches() ? ah.group(1) : rest};
+        }
+        Matcher u = UNBRACKETED_LAW_ARTICLE.matcher(s);
+        if (u.matches()) {
+            String title = u.group(1).trim();
+            if (title.startsWith("《") && title.endsWith("》") && title.length() > 2) {
+                title = title.substring(1, title.length() - 1).trim();
+            }
+            return new String[]{title, u.group(2).trim()};
+        }
         return new String[]{s, ""};
     }
 
@@ -1575,11 +1767,11 @@ public class DocInsightService {
     public EntityView lookupSelection(Long userId, Long projectId, String kind, String text) {
         requireWrite(projectId, userId);
         if (kind == null || !Set.of("COMPANY", "LAW", "CASE").contains(kind)) {
-            throw new IllegalArgumentException("在线查询仅支持机构、法规和案例");
+            throw new IllegalArgumentException(LangText.of("在线查询仅支持机构、法规和案例", "Online lookup only supports companies, statutes, and cases"));
         }
         String name = text == null ? "" : text.strip();
         if (name.length() < 2 || name.length() > 160 || name.codePoints().anyMatch(Character::isISOControl)) {
-            throw new IllegalArgumentException("查询文本须为 2 至 160 字的单行文字");
+            throw new IllegalArgumentException(LangText.of("查询文本须为 2 至 160 字的单行文字", "Lookup text must be a single line between 2 and 160 characters"));
         }
         ensureLookupAccount(kind);
         DocInsightExtraction.RawEntity raw;
@@ -1758,12 +1950,16 @@ public class DocInsightService {
     // ---------------------------------------------------------------- 鉴权
 
     private void requireRead(Long projectId, Long userId) {
+        // Derived results may contain excerpts from multiple private source files.
+        if (fileAccess.isClient(projectId, userId)) throw new ProjectFileAccessService.FileAccessDeniedException();
         if (userId == null || projectId == null || !members.hasReadPermission(projectId, userId)) {
             throw new IllegalArgumentException(LangText.of("无权限访问该项目", "No access to this project"));
         }
     }
 
     private void requireWrite(Long projectId, Long userId) {
+        // Derived results may contain excerpts from multiple private source files.
+        if (fileAccess.isClient(projectId, userId)) throw new ProjectFileAccessService.FileAccessDeniedException();
         if (userId == null || projectId == null || !members.hasWritePermission(projectId, userId)) {
             throw new IllegalArgumentException(LangText.of("无权限修改该项目", "No write access to this project"));
         }

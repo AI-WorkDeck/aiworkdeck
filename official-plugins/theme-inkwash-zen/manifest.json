@@ -1,0 +1,20 @@
+{
+  "id": "theme-inkwash-zen",
+  "name": "%plugin.name%",
+  "version": "1.0.3",
+  "description": "%plugin.desc%",
+  "author": "AI WorkDeck",
+  "frontendEntry": "web/index.html",
+  "contributes": {
+    "themes": [
+      {
+        "id": "inkwash-zen",
+        "name": "%theme.name%",
+        "description": "%theme.desc%",
+        "file": "themes/inkwash-zen.json"
+      }
+    ],
+    "views": []
+  },
+  "minHostVersion": "0.72.0"
+}

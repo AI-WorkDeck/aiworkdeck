@@ -8,6 +8,7 @@ import com.checkba.repository.UserRepository;
 import com.checkba.service.AdminAccessService;
 import com.checkba.service.LangText;
 import com.checkba.service.ai.PluginService;
+import com.checkba.service.ai.PluginContributionService;
 import com.checkba.service.ai.ToolRegistry;
 import com.checkba.service.ai.tools.ToolContext;
 import lombok.RequiredArgsConstructor;
@@ -128,7 +129,7 @@ public class PluginController {
     public ResponseEntity<Map<String, Object>> listMarket(
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         if (AuthController.getUserIdFromSession(sessionId) == null) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("未登录"));
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error(LangText.of("未登录", "Not signed in")));
         }
         try {
             Map<String, Object> result = ok();
@@ -415,60 +416,213 @@ public class PluginController {
         }
     }
 
-    /** 插件设置：声明 + 当前值（secret 只回显尾 4 位） */
-    @GetMapping("/{id}/settings")
-    public ResponseEntity<Map<String, Object>> getPluginSettings(
-            @PathVariable("id") String pluginId,
+    /** 已启用插件贡献的外观皮肤主题清单 + 当前选中项 */
+    @GetMapping("/contributed/themes")
+    public ResponseEntity<Map<String, Object>> listContributedThemes(
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         if (AuthController.getUserIdFromSession(sessionId) == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error(LangText.of("请先登录", "Please sign in first")));
         }
-        if (pluginService.getPlugin(pluginId) == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(LangText.of("插件不存在: ", "Plugin not found: ") + pluginId));
-        }
         Map<String, Object> result = ok();
-        result.put("settings", contributionService.settingsView(pluginId));
+        result.put("selected", contributionService.selectedThemeRef());
+        result.put("themes", contributionService.listThemes());
         return ResponseEntity.ok(result);
     }
 
-    /** 保存插件设置（admin，与启停同口径；按声明校验类型，未声明的键拒绝） */
-    @PostMapping("/{id}/settings")
-    public ResponseEntity<Map<String, Object>> savePluginSettings(
-            @PathVariable("id") String pluginId,
-            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> values,
+    /** 选定/清除全局外观皮肤；ref 形如 "<pluginId>:<themeId>"，空或 "default" = 恢复默认 */
+    @PostMapping("/contributed/themes/select")
+    public ResponseEntity<Map<String, Object>> selectContributedTheme(
+            @org.springframework.web.bind.annotation.RequestBody(required = false) Map<String, String> body,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         if (!isAdmin(sessionId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error(LangText.of("仅管理员可操作", "Administrator permission required")));
         }
         try {
-            contributionService.saveSettings(pluginId, values);
-            return ResponseEntity.ok(ok());
+            contributionService.selectTheme(body == null ? null : body.get("ref"));
+            Map<String, Object> result = ok();
+            result.put("selected", contributionService.selectedThemeRef());
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
             return ResponseEntity.ok(error(e.getMessage()));
         }
     }
 
+    /** 插件设置：声明 + 当前值（secret 只回显尾 4 位） */
+    public ResponseEntity<Map<String, Object>> getPluginSettings(String pluginId, String sessionId) {
+        return getPluginSettings(pluginId, null, sessionId);
+    }
+
+    @GetMapping("/{id}/settings")
+    public ResponseEntity<Map<String, Object>> getPluginSettings(
+            @PathVariable("id") String pluginId,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Long projectId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("Sign in required"));
+        if (pluginService.getPlugin(pluginId) == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Plugin not found"));
+        if (projectId != null && !projectMemberService.hasReadPermission(projectId, userId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("No access to this project"));
+        }
+        Map<String, Object> result = ok();
+        result.put("settings", contributionService.settingsView(pluginId, userId, projectId));
+        return ResponseEntity.ok(result);
+    }
+
+    public ResponseEntity<Map<String, Object>> savePluginSettings(String pluginId, Map<String, Object> values, String sessionId) {
+        return savePluginSettings(pluginId, values, null, sessionId);
+    }
+
+    @PostMapping("/{id}/settings")
+    public ResponseEntity<Map<String, Object>> savePluginSettings(
+            @PathVariable("id") String pluginId,
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> values,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Long projectId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("Sign in required"));
+        synchronized (pluginService) {
+        PluginService.PluginMetadata meta = pluginService.getPlugin(pluginId);
+        if (meta == null || meta.getSettings() == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Plugin settings not found"));
+        try {
+            for (String key : values.keySet()) {
+                PluginService.PluginSettingDecl decl = meta.getSettings().stream().filter(d -> key.equals(d.getKey())).findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Undeclared setting"));
+                String scope = PluginContributionService.settingScope(decl);
+                if ("installation".equals(scope) && !isAdmin(sessionId)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Administrator permission required"));
+                if ("project".equals(scope) && (projectId == null || !projectMemberService.hasWritePermission(projectId, userId))) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("No access to this project"));
+                }
+            }
+            contributionService.saveSettings(pluginId, values, userId, projectId);
+            return ResponseEntity.ok(ok());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(error(e.getMessage()));
+        }
+        }
+    }
+
     private PluginView toView(PluginService.PluginMetadata meta) {
+        String id = meta.getId();
         PluginView view = new PluginView();
-        view.setId(meta.getId());
-        view.setName(meta.getName());
+        view.setId(id);
+        view.setName(pluginService.localize(id, meta.getName()));
         view.setVersion(meta.getVersion());
-        view.setDescription(meta.getDescription());
+        view.setDescription(pluginService.localize(id, meta.getDescription()));
         view.setIcon(meta.getIcon());
-        view.setAuthor(meta.getAuthor());
+        view.setAuthor(pluginService.localize(id, meta.getAuthor()));
         view.setHomepage(meta.getHomepage());
         view.setFrontendEntry(meta.getFrontendEntry());
         view.setPermissions(meta.getPermissions() == null ? List.of() : meta.getPermissions());
-        view.setTools(meta.getTools() == null ? List.of() : meta.getTools());
+        if (meta.getTools() == null) {
+            view.setTools(List.of());
+        } else {
+            view.setTools(meta.getTools().stream().map(tool -> {
+                PluginService.PluginToolInfo copy = new PluginService.PluginToolInfo();
+                copy.setName(tool.getName());
+                copy.setDescription(pluginService.localize(id, tool.getDescription()));
+                copy.setPermissions(tool.getPermissions());
+                return copy;
+            }).toList());
+        }
         view.setToolCount(view.getTools().size());
-        view.setGuide(meta.getGuide());
-        view.setEnabled(pluginService.isEnabled(meta.getId()));
-        view.setRevokedReason(pluginService.revokedReason(meta.getId()));
+        view.setGuide(localizeGuide(id, meta.getGuide()));
+        view.setEnabled(pluginService.isEnabled(id));
+        view.setRevokedReason(pluginService.revokedReason(id));
         view.setMinHostVersion(meta.getMinHostVersion());
-        view.setIncompatibleReason(pluginService.incompatibleReason(meta.getId()));
-        view.setDevInstalled(pluginService.isDevInstalled(meta.getId()));
-        view.setContributes(meta.getContributes());
+        view.setIncompatibleReason(pluginService.incompatibleReason(id));
+        view.setDevInstalled(pluginService.isDevInstalled(id));
+        view.setContributes(localizeContributes(id, meta.getContributes()));
         return view;
+    }
+
+    private PluginService.PluginGuide localizeGuide(String pluginId, PluginService.PluginGuide guide) {
+        if (guide == null) {
+            return null;
+        }
+        PluginService.PluginGuide copy = new PluginService.PluginGuide();
+        copy.setIntro(pluginService.localize(pluginId, guide.getIntro()));
+        if (guide.getSteps() != null) {
+            copy.setSteps(guide.getSteps().stream()
+                    .map(step -> pluginService.localize(pluginId, step))
+                    .toList());
+        }
+        if (guide.getQuickActions() != null) {
+            copy.setQuickActions(guide.getQuickActions().stream().map(qa -> {
+                PluginService.PluginQuickAction qaCopy = new PluginService.PluginQuickAction();
+                qaCopy.setLabel(pluginService.localize(pluginId, qa.getLabel()));
+                qaCopy.setPrompt(pluginService.localize(pluginId, qa.getPrompt()));
+                qaCopy.setHint(pluginService.localize(pluginId, qa.getHint()));
+                return qaCopy;
+            }).toList());
+        }
+        return copy;
+    }
+
+    private PluginService.Contributes localizeContributes(String pluginId, PluginService.Contributes contributes) {
+        if (contributes == null) {
+            return null;
+        }
+        PluginService.Contributes copy = new PluginService.Contributes();
+        copy.setCapabilities(contributes.getCapabilities());
+        copy.setMcpServers(contributes.getMcpServers());
+        copy.setConnections(contributes.getConnections());
+        if (contributes.getViews() != null) {
+            copy.setViews(contributes.getViews().stream().map(v -> {
+                PluginService.PluginViewDecl vc = new PluginService.PluginViewDecl();
+                vc.setId(v.getId());
+                vc.setName(pluginService.localize(pluginId, v.getName()));
+                vc.setEntry(v.getEntry());
+                vc.setPlacement(v.getPlacement());
+                vc.setScope(v.getScope());
+                vc.setDefaultDock(v.getDefaultDock());
+                vc.setAllowedDocks(v.getAllowedDocks());
+                return vc;
+            }).toList());
+        }
+        if (contributes.getThemes() != null) {
+            copy.setThemes(contributes.getThemes().stream().map(theme -> {
+                PluginService.ThemeDecl tc = new PluginService.ThemeDecl();
+                tc.setId(theme.getId());
+                tc.setName(pluginService.localize(pluginId, theme.getName()));
+                tc.setDescription(pluginService.localize(pluginId, theme.getDescription()));
+                tc.setFile(theme.getFile());
+                return tc;
+            }).toList());
+        }
+        if (contributes.getTemplates() != null) {
+            copy.setTemplates(contributes.getTemplates().stream().map(t -> {
+                PluginService.TemplateDecl tc = new PluginService.TemplateDecl();
+                tc.setId(t.getId());
+                tc.setName(pluginService.localize(pluginId, t.getName()));
+                tc.setGenre(t.getGenre());
+                tc.setFile(t.getFile());
+                tc.setDescription(pluginService.localize(pluginId, t.getDescription()));
+                tc.setLanguage(t.getLanguage());
+                return tc;
+            }).toList());
+        }
+        if (contributes.getStyleProfiles() != null) {
+            copy.setStyleProfiles(contributes.getStyleProfiles().stream().map(sp -> {
+                PluginService.StyleProfileDecl spc = new PluginService.StyleProfileDecl();
+                spc.setId(sp.getId());
+                spc.setName(pluginService.localize(pluginId, sp.getName()));
+                spc.setFile(sp.getFile());
+                return spc;
+            }).toList());
+        }
+        if (contributes.getEvidenceSources() != null) {
+            copy.setEvidenceSources(contributes.getEvidenceSources().stream().map(es -> {
+                PluginService.EvidenceSourceDecl esc = new PluginService.EvidenceSourceDecl();
+                esc.setSourceId(es.getSourceId());
+                esc.setName(pluginService.localize(pluginId, es.getName()));
+                esc.setDescription(pluginService.localize(pluginId, es.getDescription()));
+                esc.setTransport(es.getTransport());
+                esc.setServer(es.getServer());
+                esc.setTool(es.getTool());
+                return esc;
+            }).toList());
+        }
+        return copy;
     }
 
     /** 与 AdminConfigController 相同的管理员判定：session -> userId -> AdminAccessService（桌面单机全员管理员的唯一出口） */

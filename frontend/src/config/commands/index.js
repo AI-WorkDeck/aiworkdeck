@@ -15,6 +15,7 @@ import { VIEW_COMMANDS } from './view.js'
 import { GO_COMMANDS } from './go.js'
 import { TOOLS_COMMANDS } from './tools.js'
 import { HELP_COMMANDS } from './help.js'
+import { LOCALE_REGISTRY } from '../../locales/registry.js'
 
 export const COMMANDS = [
   ...APP_COMMANDS, ...FILE_COMMANDS, ...EDIT_COMMANDS, ...DOCUMENT_COMMANDS,
@@ -46,7 +47,7 @@ export const EDITOR_RESERVED_EXCEPTIONS = new Set([
   'CmdOrCtrl+O', 'CmdOrCtrl+W', 'CmdOrCtrl+F', 'CmdOrCtrl+,',
 ])
 
-const lang = (l) => (String(l || '').startsWith('en') ? 'en' : 'zh')
+const lang = (l) => (String(l || '').startsWith('zh') ? 'zh' : 'en')
 
 /** 取本地化文案。label 是 {zh,en}，没有对应语言时回落中文。 */
 export function labelOf(item, appLang) {
@@ -93,6 +94,26 @@ function toItem(cmd, state, appLang) {
     item.type = 'checkbox'
     item.checked = !!((state && state.flags) || {})[cmd.checked]
   }
+  if (cmd.id === 'app.language') {
+    const currentPref = (state && state.langPref) || appLang || 'zh-CN'
+    const followLabel = lang(appLang) === 'en' ? 'Follow System' : '跟随系统'
+    item.submenu = [
+      {
+        id: 'app.lang.system',
+        label: followLabel,
+        type: 'checkbox',
+        checked: currentPref === 'system',
+        enabled: true,
+      },
+      ...LOCALE_REGISTRY.map((entry) => ({
+        id: `app.lang.${entry.code}`,
+        label: entry.nativeName,
+        type: 'checkbox',
+        checked: currentPref === 'system' ? false : appLang === entry.code,
+        enabled: true,
+      })),
+    ]
+  }
   return item
 }
 
@@ -119,7 +140,7 @@ export function buildMenuPayload(state, appLang) {
   const menus = []
   for (const m of MENU_ORDER) {
     const entries = COMMANDS
-      .filter((c) => c.menu === m.id)
+      .filter((c) => c.menu === m.id && c.inMenu !== false)
       .map((c) => ({ group: c.group || 0, item: toItem(c, s, appLang) }))
 
     // 文件 → 打开最近（group 2，夹在打开动作与导入之间）

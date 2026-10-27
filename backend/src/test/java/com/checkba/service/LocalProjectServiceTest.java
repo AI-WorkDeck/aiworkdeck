@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -33,7 +34,7 @@ import static org.mockito.Mockito.*;
  * IDE 化本地文件夹项目的落地语义（H2 真库）：
  * - 打开即导入：文件夹现有内容进数据库文件树，隐藏项（.git/.awd/.DS_Store）跳过；
  * - 幂等：重复打开同一文件夹复用同一项目，不产生重复行（含根级 parentId=null 的查重）；
- * - 围栏：拒绝软件内部数据目录、拒绝与既有项目文件夹嵌套。
+ * - 围栏：拒绝软件内部数据目录、嵌套文件夹经确认后可打开，跨账号仍拒绝。
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -54,6 +55,8 @@ class LocalProjectServiceTest {
 
     private LocalProjectService svc;
     private ProjectFileService projectFileService;
+    private ProjectMemberService memberService;
+    private ProjectStorageResolver resolver;
     private Path globalRoot;
 
     @BeforeEach
@@ -61,7 +64,7 @@ class LocalProjectServiceTest {
         globalRoot = tmp.resolve("appdata");
         StorageProperties props = new StorageProperties();
         props.getLocal().setRootPath(globalRoot.toAbsolutePath().toString());
-        ProjectStorageResolver resolver = new ProjectStorageResolver(props, projectRepository);
+        resolver = new ProjectStorageResolver(props, projectRepository);
 
         // ProjectFileService 的非仓库协作者全部无害化：RAG/存储/版本信号与导入语义无关
         com.checkba.storage.StorageServiceFactory storageFactory = mock(com.checkba.storage.StorageServiceFactory.class);
@@ -79,7 +82,7 @@ class LocalProjectServiceTest {
 
         projectFileService.setStorageResolverForTest(resolver);
 
-        ProjectMemberService memberService = mock(ProjectMemberService.class);
+        memberService = mock(ProjectMemberService.class);
         when(memberService.hasReadPermission(anyLong(), anyLong())).thenReturn(true);
 
         svc = new LocalProjectService(projectRepository, projectMemberRepository,
@@ -187,12 +190,119 @@ class LocalProjectServiceTest {
     }
 
     @Test
-    void rejectsNestedFolders(@TempDir Path folder) throws Exception {
-        Files.createDirectories(folder.resolve("outer/inner"));
-        svc.openLocalFolder(folder.resolve("outer").toString(), false, null, null, 1L);
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> svc.openLocalFolder(folder.resolve("outer/inner").toString(), false, null, null, 1L));
-        assertTrue(e.getMessage().contains("嵌套"));
+    void nestedFolderNeedsConfirmationBeforeCreatingAnything(@TempDir Path folder) throws Exception {
+        svc.openLocalFolder(folder.toString(), false, "父项目", null, 1L);
+        Path child = folder.resolve("新项目");
+        long countBefore = projectRepository.count();
+        var error = assertThrows(LocalProjectService.NestedFolderConfirmationRequired.class,
+                () -> svc.openLocalFolder(child.toString(), true, null, null, 1L));
+        assertEquals(List.of("父项目"), error.projectNames());
+        assertFalse(Files.exists(child));
+        assertEquals(countBefore, projectRepository.count());
+
+        var opened = svc.openLocalFolder(child.toString(), true, null, null, 1L, true);
+        assertTrue(Files.isDirectory(child));
+        assertFalse(opened.reused());
+        assertTrue(svc.openLocalFolder(child.toString(), false, null, null, 1L).reused(),
+                "已确认的项目重开不必重复询问");
+    }
+
+    @Test
+    void exactFolderBecomingVisibleDuringNestedScanIsReused(@TempDir Path folder) {
+        Project existing = svc.openLocalFolder(folder.toString(), false, "同一项目", null, 1L).project();
+        long countBefore = projectRepository.count();
+        // Both the owner and an authorized collaborator must follow the ordinary reuse path.
+        for (Long userId : List.of(1L, 2L)) {
+            LocalProjectService raced = serviceWithDelayedExactLookup(existing);
+            var opened = raced.openLocalFolder(folder.toString(), false, null, null, userId);
+            assertTrue(opened.reused());
+            assertEquals(existing.getId(), opened.project().getId());
+            verify(memberService).hasReadPermission(existing.getId(), userId);
+        }
+        assertEquals(countBefore, projectRepository.count());
+    }
+
+    @Test
+    void exactFolderBecomingVisibleDuringNestedScanStillChecksPermission(@TempDir Path folder) throws Exception {
+        Project existing = svc.openLocalFolder(folder.toString(), false, "private project name", null, 1L).project();
+        when(memberService.hasReadPermission(existing.getId(), 2L)).thenReturn(false);
+        Files.writeString(folder.resolve("未导入.txt"), "private contents");
+        long countBefore = projectRepository.count();
+        long filesBefore = projectFileRepository.count();
+
+        LocalProjectService raced = serviceWithDelayedExactLookup(existing);
+        var error = assertThrows(IllegalArgumentException.class,
+                () -> raced.openLocalFolder(folder.toString(), false, null, null, 2L));
+
+        assertFalse(error instanceof LocalProjectService.NestedFolderConfirmationRequired);
+        assertFalse(error.getMessage().contains("private project name"));
+        verify(memberService).hasReadPermission(existing.getId(), 2L);
+        assertEquals(countBefore, projectRepository.count());
+        assertEquals(filesBefore, projectFileRepository.count(), "拒绝权限后不得导入文件");
+        assertEquals("private contents", Files.readString(folder.resolve("未导入.txt")));
+    }
+
+    private LocalProjectService serviceWithDelayedExactLookup(Project existing) {
+        // Deterministically reproduce a registration committed between the exact lookup and list query.
+        ProjectRepository delayed = mock(ProjectRepository.class,
+                org.mockito.AdditionalAnswers.delegatesTo(projectRepository));
+        doReturn(Optional.empty()).doAnswer(invocation -> projectRepository.findByLocalRoot(invocation.getArgument(0)))
+                .when(delayed).findByLocalRoot(existing.getLocalRoot());
+        return new LocalProjectService(delayed, projectMemberRepository,
+                projectFileRepository, projectFileService, memberService, resolver,
+                mock(org.springframework.context.ApplicationEventPublisher.class),
+                mock(com.checkba.service.telemetry.TelemetryService.class), transactionManager);
+    }
+
+    @Test
+    void parentAndChildKeepSeparateIndexesOfTheSameFiles(@TempDir Path folder) throws Exception {
+        Path child = Files.createDirectories(folder.resolve("子目录"));
+        Files.writeString(child.resolve("共同文件.txt"), "initial");
+        Files.writeString(folder.resolve("父级文件.txt"), "parent only");
+        // Child first covers the reverse direction (opening a parent around an existing project).
+        Long childId = svc.openLocalFolder(child.toString(), false, "子项目", null, 1L).project().getId();
+        assertThrows(LocalProjectService.NestedFolderConfirmationRequired.class,
+                () -> svc.openLocalFolder(folder.toString(), false, null, null, 1L));
+        Long parentId = svc.openLocalFolder(folder.toString(), false, null, null, 1L, true).project().getId();
+        assertNotEquals(childId, parentId);
+        var childFile = live(projectFileRepository.findByProjectId(childId), "共同文件.txt");
+        var parentFile = live(projectFileRepository.findByProjectId(parentId), "共同文件.txt");
+        assertNotEquals(childFile.getId(), parentFile.getId());
+        assertEquals("projects/" + childId + "/共同文件.txt", childFile.getFilePath());
+        assertEquals("projects/" + parentId + "/子目录/共同文件.txt", parentFile.getFilePath());
+        assertNull(live(projectFileRepository.findByProjectId(childId), "父级文件.txt"));
+
+        Files.writeString(child.resolve("共同文件.txt"), "updated contents");
+        Files.writeString(child.resolve("新增.txt"), "new");
+        svc.reconcileProject(childId);
+        svc.reconcileProject(parentId);
+        assertEquals(16L, live(projectFileRepository.findByProjectId(childId), "共同文件.txt").getFileSize());
+        assertEquals(16L, live(projectFileRepository.findByProjectId(parentId), "共同文件.txt").getFileSize());
+        assertNotNull(live(projectFileRepository.findByProjectId(childId), "新增.txt"));
+        assertNotNull(live(projectFileRepository.findByProjectId(parentId), "新增.txt"));
+        Files.delete(child.resolve("共同文件.txt"));
+        svc.reconcileProject(parentId);
+        svc.reconcileProject(childId);
+        assertNull(live(projectFileRepository.findByProjectId(childId), "共同文件.txt"));
+        assertNull(live(projectFileRepository.findByProjectId(parentId), "共同文件.txt"));
+        assertEquals("new", Files.readString(child.resolve("新增.txt")));
+    }
+
+    @Test
+    void confirmationCannotOverrideAnotherAccountsNestedProject(@TempDir Path folder) throws Exception {
+        Path child = Files.createDirectories(folder.resolve("child"));
+        svc.openLocalFolder(child.toString(), false, "private project name", null, 1L);
+        long countBefore = projectRepository.count();
+        for (boolean allow : List.of(false, true)) {
+            var error = assertThrows(IllegalArgumentException.class,
+                    () -> svc.openLocalFolder(folder.toString(), false, null, null, 2L, allow));
+            assertFalse(error instanceof LocalProjectService.NestedFolderConfirmationRequired);
+            assertFalse(error.getMessage().contains("private project name"));
+            assertThrows(IllegalArgumentException.class,
+                    () -> svc.openLocalFolder(child.resolve("new").toString(), true, null, null, 2L, allow));
+            assertFalse(Files.exists(child.resolve("new")));
+        }
+        assertEquals(countBefore, projectRepository.count());
     }
 
     // ---- 对账（watcher 触发的 reconcileProject）----
@@ -420,7 +530,7 @@ class LocalProjectServiceTest {
             }
         }).when(probed).reconcileProject(anyLong());
 
-        LocalRootWatchService watch = new LocalRootWatchService(projectRepository, probed);
+        LocalRootWatchService watch = new LocalRootWatchService(projectRepository, probed, mock(LocalProjectFileChangeService.class));
         try {
             assertTrue(watch.ensureWatch(projectId, folder.normalize().toString()),
                     "watcher 必须真的挂上项目文件夹（挂不上是硬失败，不是慢）");

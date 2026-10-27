@@ -20,7 +20,7 @@ const source = readFileSync(
 /** 稿态那一段模板（v-if="onDraft" 到下一个 template 分支之前）。 */
 function draftBlock() {
   const start = source.indexOf('<template v-if="onDraft">')
-  const end = source.indexOf('<template v-else-if="working">')
+  const end = source.indexOf('<template v-else-if=', start + 1)
   assert.ok(start > 0 && end > start, '模板结构变了，先来核对这个测试')
   return source.slice(start, end)
 }
@@ -29,7 +29,7 @@ test('稿态露出「结束本次工作」，点的是主线那个命名弹窗',
   const block = draftBlock()
   assert.match(block, /\$t\('version\.endSession'\)/,
     '稿上没有这个入口，改动就只剩无名的自动存档')
-  assert.match(block, /@tap="openNaming">\{\{ \$t\('version\.endSession'\) \}\}/,
+  assert.match(block, /@click="openNaming">\{\{ \$t\('version\.endSession'\) \}\}/,
     '必须复用主线那条命名流程（openNaming → 弹窗 → end），不另造一套')
 })
 

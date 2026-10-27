@@ -1,505 +1,134 @@
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
-  <!-- Vue 3 多根节点：直接暴露内部元素，无需包裹层 -->
-  
-  <!-- 面板标题由外壳的 sidebar-header 统一出。这里只留分组头（带计数与「＋」），
-       原来那份自画 header 是全应用唯一让外壳标题让位的例外，已取消。 -->
-  <view class="dd-sec-head">
-    <text class="dd-sec-title">{{ $t('panels.dfListLabel') }}</text>
-    <text class="dd-sec-count">{{ requests.length }}</text>
-    <view class="dd-sec-spacer"></view>
-    <view class="dd-add-btn" v-if="canCreateRequest" @tap="createRequest" :title="$t('panels.dfCreateTitle')">
-      <text class="dd-add-icon">＋</text>
+  <view class="dd-panel">
+    <view class="dd-panel-head">
+      <text>{{ $t('ddWorkflow.lists') }}</text><text class="muted">{{ requests.length }}</text>
+      <button class="icon-button" :disabled="loading || busy" :aria-label="$t('ddWorkflow.refresh')" @tap="fetchRequests">↻</button>
     </view>
-  </view>
-
-  <!-- List -->
-  <view class="dd-request-list">
-    <view
-      v-for="req in requests"
-      :key="req.id"
-      class="dd-request-item"
-      :class="{ active: activeRequestId === req.id }"
-      @tap="openRequest(req)"
-      @mouseenter="hoveredId = req.id"
-      @mouseleave="hoveredId = null"
-    >
-      <view class="dd-req-icon">
-        <image
-          v-if="hoveredId === req.id || req.id === activeRequestId"
-          src="/static/checklist_selected.png"
-          class="dd-icon-img"
-        />
-        <image
-          v-else
-          src="/static/checklist_unselected.png"
-          class="dd-icon-img"
-        />
-      </view>
-      <view class="dd-req-info">
-        <!-- Edit Mode -->
-        <input
-          v-if="editingId === req.id"
-          class="dd-rename-input"
-          v-model="editName"
-          @blur="saveRename(req)"
-          @confirm="saveRename(req)"
-          @tap.stop
-          :focus="true"
-        />
-        <!-- View Mode -->
-        <template v-else>
-           <text class="dd-req-name">{{ req.name }}</text>
-           <text class="dd-req-status" :class="req.status.toLowerCase()">{{ getStatusText(req.status) }}</text>
-        </template>
-      </view>
-
-      <!-- Action Icons (Hover) -->
-      <view class="dd-item-actions" v-if="canCreateRequest && hoveredId === req.id && !editingId">
-        <view
-            class="dd-action-btn"
-            @tap.stop="copyRequest(req)"
-            :title="$t('panels.dfCopy')"
-        >
-            <image src="/static/copy.png" class="dd-action-img default" />
-            <image src="/static/copy_selected.png" class="dd-action-img hover" />
-        </view>
-        <view
-            class="dd-action-btn"
-            @tap.stop="startRename(req)"
-            :title="$t('panels.dfRename')"
-        >
-            <image src="/static/rename.png" class="dd-action-img default" />
-            <image src="/static/rename_selected.png" class="dd-action-img hover" />
-        </view>
-        <view
-            class="dd-action-btn"
-            @tap.stop="confirmDelete(req)"
-            :title="$t('panels.dfDeleteTitle')"
-        >
-            <image src="/static/delete.png" class="dd-action-img default" />
-            <image src="/static/delete_selected.png" class="dd-action-img hover" />
-        </view>
-      </view>
+    <view v-if="notifications.length" class="dd-notifications">
+      <text class="hint">{{ $t('ddWorkflow.pendingNotifications') }}</text>
+      <button v-for="notification in notifications.slice(0, 5)" :key="notification.id" @tap="openNotification(notification)">{{ notification.title }}</button>
     </view>
-
-    <view v-if="requests.length === 0" class="dd-empty-state">
-      <text>{{ $t('panels.dfEmptyState') }}</text>
+    <view v-if="canCreateRequest" class="dd-create">
+      <button class="primary" :disabled="busy" @tap="startCreate">{{ $t('ddWorkflow.newList') }}</button>
+      <view v-if="creating" class="create-form">
+        <input v-model="newName" :aria-label="$t('ddWorkflow.listName')" :placeholder="$t('ddWorkflow.listName')" maxlength="120" @confirm="createRequest" />
+        <view class="actions"><button :disabled="busy" @tap="creating = false">{{ $t('ddWorkflow.cancel') }}</button><button :disabled="busy || !newName.trim()" @tap="createRequest">{{ $t(busy ? 'ddWorkflow.creating' : 'ddWorkflow.create') }}</button></view>
+      </view>
+      <button class="import-button" :disabled="busy" @tap="importing = !importing">{{ $t('ddWorkflow.importList') }}</button>
+      <DdImportForm v-if="importing" :project-id="projectId" @imported="onImported" @cancel="importing = false" />
+      <text class="hint">{{ $t('ddWorkflow.newListHint') }}</text>
     </view>
-  </view>
-
-  <!-- Custom AI WorkDeck Delete Confirm Dialog -->
-  <view class="dd-dialog-mask" v-if="showDeleteDialog" @tap="showDeleteDialog = false">
-    <view class="dd-dialog-content" @tap.stop>
-      <view class="dd-dialog-header">
-        <text class="dd-dialog-title">{{ $t('panels.dfDialogTitle') }}</text>
+    <view v-if="error" class="error" role="alert"><text>{{ error }}</text><button :disabled="loading" @tap="fetchRequests">{{ $t('ddWorkflow.retry') }}</button></view>
+    <text v-if="loading && !requests.length" class="empty" role="status">{{ $t('ddWorkflow.loading') }}</text>
+    <view v-else class="dd-lists">
+      <view v-for="req in requests" :key="req.id" class="dd-list" :class="{ active: String(activeRequestId) === String(req.id) }">
+        <button class="list-open" @tap="openRequest(req)">
+          <text class="list-name">{{ req.name }}</text>
+          <view class="list-meta"><text>{{ statusText(req.status) }}</text><text v-if="req.itemCount != null">{{ $t('ddWorkflow.itemCount', { count: req.itemCount }) }}</text></view>
+        </button>
+        <view v-if="canCreateRequest" class="list-actions"><button :disabled="busy" :aria-label="$t('ddWorkflow.copyList', { name: req.name })" @tap="copyRequest(req)">{{ $t('ddWorkflow.copy') }}</button></view>
       </view>
-      <view class="dd-dialog-body">
-        <text class="dd-dialog-msg">{{ $t('panels.dfDeleteConfirmBody') }}</text>
-      </view>
-      <view class="dd-dialog-footer">
-        <view class="dd-dialog-btn cancel" @tap="showDeleteDialog = false">{{ $t('panels.dfCancel') }}</view>
-        <view class="dd-dialog-btn confirm" @tap="handleDelete">{{ $t('panels.dfConfirm') }}</view>
-      </view>
+      <view v-if="!loading && !requests.length && !error" class="empty"><text>{{ $t(canCreateRequest ? 'ddWorkflow.noLists' : 'ddWorkflow.noPublishedLists') }}</text></view>
     </view>
   </view>
 </template>
-
 <script>
 import api from '@/services/api'
+import DdImportForm from '@/components/dd/DdImportForm.vue'
 
 export default {
   name: 'DdFilesPanel',
-  props: {
-    projectId: {
-      type: Number,
-      required: true
-    },
-    currentUser: {
-      type: Object,
-      default: null
-    }
-  },
-  emits: ['open-request'],
-  data() {
-    return {
-      requests: [],
-      hoveredId: null,
-      editingId: null,
-      editName: '',
-      activeRequestId: null,
-      showDeleteDialog: false,
-      deletingRequest: null
-    }
-  },
-  computed: {
-    canCreateRequest() {
-      if (!this.currentUser) return false
-      return this.currentUser.role !== 'CLIENT'
-    }
-  },
-  mounted() {
-    this.fetchRequests()
-  },
+  components: { DdImportForm },
+  props: { projectId: { type: [Number, String], required: true }, currentUser: { type: Object, default: null }, canWrite: { type: Boolean, default: true }, notifications: { type: Array, default: () => [] } },
+  emits: ['open-request', 'notification-read'],
+  data() { return { requests: [], activeRequestId: null, loading: false, busy: false, error: '', creating: false, importing: false, newName: '', fetchSeq: 0 } },
+  computed: { canCreateRequest() { return this.canWrite && !!this.currentUser && this.currentUser.role !== 'CLIENT' } },
+  mounted() { this.fetchRequests() },
+  beforeUnmount() { this.fetchSeq++ },
+  watch: { projectId() { this.requests = []; this.activeRequestId = null; this.creating = false; this.importing = false; this.fetchRequests() } },
   methods: {
     async fetchRequests() {
+      const seq = ++this.fetchSeq
+      this.loading = true; this.error = ''
       try {
         const res = await api.getDdRequests(this.projectId)
-        this.requests = res
-      } catch (e) {
-        console.error('Failed to fetch DD requests', e)
-      }
+        if (seq === this.fetchSeq) this.requests = Array.isArray(res) ? res : res.data || []
+      } catch (e) { if (seq === this.fetchSeq) this.error = e.message || this.$t('ddWorkflow.loadFailed') }
+      finally { if (seq === this.fetchSeq) this.loading = false }
     },
+    async openNotification(notification) {
+      const request = this.requests.find(req => String(req.id) === String(notification.requestId))
+      if (request) this.openRequest({ ...request, focusItemId: notification.itemId })
+      else {
+        try { const details = await api.getDdRequestDetails(notification.requestId, this.projectId); this.openRequest({ ...(details.request || details.data?.request), focusItemId: notification.itemId }) }
+        catch (e) { this.error = e.message || this.$t('ddWorkflow.loadFailed'); return }
+      }
+      this.$emit('notification-read', notification.id)
+    },
+    async onImported(req) { this.importing = false; await this.fetchRequests(); this.openRequest(req) },
+    startCreate() { this.newName = this.$t('ddWorkflow.defaultName'); this.creating = true },
     async createRequest() {
+      if (this.busy || !this.canCreateRequest || !this.newName.trim()) return
+      const projectId = this.projectId
+      this.busy = true; this.error = ''
       try {
-        await api.createDdRequest(this.projectId, {
-          name: 'newddlist',
-          content: ''
-        })
+        const response = await api.createDdRequest(projectId, { name: this.newName.trim(), content: '' })
+        if (String(projectId) !== String(this.projectId)) return
+        const req = response.data || response
+        this.creating = false
         await this.fetchRequests()
-      } catch (e) {
-        console.error('Failed to create DD request', e)
-        uni.showToast({ title: this.$t('panels.dfCreateFailed'), icon: 'none' })
-      }
+        this.openRequest(req)
+      } catch (e) { if (String(projectId) === String(this.projectId)) this.error = e.message || this.$t('ddWorkflow.operationFailed') }
+      finally { this.busy = false }
     },
-    async openRequest(req) {
-      if (this.editingId) return // Don't open if editing
-      this.activeRequestId = req.id
-      this.$emit('open-request', req)
-    },
+    openRequest(req) { this.activeRequestId = req.id; this.$emit('open-request', req) },
     async copyRequest(req) {
+      if (this.busy || !this.canCreateRequest) return
+      const projectId = this.projectId
+      this.busy = true; this.error = ''
       try {
-        await api.copyDdRequest(req.id, this.projectId)
-        uni.showToast({ title: this.$t('panels.dfCopied'), icon: 'none' })
+        const response = await api.copyDdRequest(req.id, projectId)
+        if (String(projectId) !== String(this.projectId)) return
         await this.fetchRequests()
-      } catch (e) {
-        console.error('Failed to copy request', e)
-        uni.showToast({ title: this.$t('panels.dfCopyFailed'), icon: 'none' })
-      }
+        if (response?.id || response?.data?.id) this.openRequest(response.data || response)
+      } catch (e) { if (String(projectId) === String(this.projectId)) this.error = e.message || this.$t('ddWorkflow.operationFailed') }
+      finally { this.busy = false }
     },
-    confirmDelete(req) {
-      this.deletingRequest = req
-      this.showDeleteDialog = true
-    },
-    async handleDelete() {
-      if (!this.deletingRequest) return
-      try {
-        await api.deleteDdRequest(this.deletingRequest.id, this.projectId)
-        uni.showToast({ title: this.$t('panels.dfDeleted'), icon: 'none' })
-        this.showDeleteDialog = false
-        this.deletingRequest = null
-        await this.fetchRequests()
-      } catch (e) {
-        console.error('Failed to delete request', e)
-        uni.showToast({ title: this.$t('panels.dfDeleteFailed'), icon: 'none' })
-      }
-    },
-    startRename(req) {
-        this.editingId = req.id
-        this.editName = req.name
-    },
-    async saveRename(req) {
-        if (!this.editingId) return
-        if (this.editName && this.editName !== req.name) {
-            try {
-                await api.updateDdRequest(req.id, this.editName, this.projectId)
-                req.name = this.editName
-                uni.showToast({ title: this.$t('panels.dfRenamed'), icon: 'none' })
-            } catch (e) {
-                console.error(e)
-                uni.showToast({ title: this.$t('panels.dfRenameFailed'), icon: 'none' })
-            }
-        }
-        this.editingId = null
-    },
-    getStatusText(status) {
-      const map = {
-        'DRAFT': this.$t('panels.dfStatusDraft'),
-        'PUBLISHED': this.$t('panels.dfStatusPublished'),
-        'COMPLETED': this.$t('panels.dfStatusCompleted')
-      }
-      return map[status] || status
-    }
+    statusText(status) { return this.$t(`ddWorkflow.requestStatus.${status || 'DRAFT'}`) }
   }
 }
 </script>
-
-<style lang="scss" scoped>
-/* Vue 3 多根节点 - 无需包裹层 */
-
-/* 分组头 - 直接作为 sidebar-left 的子元素（密度令牌见 App.vue 的 --awd-panel-*） */
-.dd-sec-head {
-  height: var(--awd-panel-sec-h);
-  padding: 0 var(--awd-panel-pad-x);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background-color: var(--awd-surface);
-  box-sizing: border-box;
-  flex-shrink: 0;
-
-  .dd-sec-title {
-    font-size: var(--awd-panel-fs-sec);
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    color: var(--awd-panel-text-2);
-  }
-
-  .dd-sec-count {
-    font-size: 10px;
-    color: var(--awd-panel-text-3);
-    background: var(--awd-panel-hover);
-    border-radius: 999px;
-    padding: 0 6px;
-    line-height: 14px;
-  }
-
-  .dd-sec-spacer { flex: 1; }
-
-  .dd-add-btn {
-    width: 22px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: var(--awd-text-2);
-    border-radius: 4px;
-    border: 1px solid transparent;
-    transition: all 0.2s;
-    
-    &:hover {
-      background-color: rgba(0,0,0,0.05);
-      border-color: transparent;
-      color: var(--awd-text);
-    }
-    
-    .dd-add-icon {
-        font-size: 14px;
-        line-height: 1;
-    }
-  }
-}
-
-/* List - 直接作为 sidebar-left 的子元素 */
-.dd-request-list {
-  flex: 1;
-  padding: 2px var(--awd-panel-pad-x) var(--awd-panel-gap-lg);
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  box-sizing: border-box;
-  background-color: var(--awd-bg);
-  overflow-y: auto;
-  min-height: 0;
-}
-
-.dd-request-item {
-  display: flex;
-  align-items: center;
-  padding: 6px 8px;
-  background-color: var(--awd-surface);
-  border-radius: var(--awd-panel-radius);
-  margin: 0 0 2px;
-  cursor: pointer;
-  border: 1px solid transparent;
-  box-sizing: border-box;
-  position: relative;
-  width: auto;
-  flex-shrink: 0;
-
-  &:hover {
-    background-color: var(--awd-bg); 
-  }
-
-  &.active {
-    border-color: var(--awd-accent);
-    background-color: var(--awd-accent-soft);
-    box-shadow: 0 2px 8px rgba(46, 90, 80, 0.1);
-  }
-
-  &.active:hover {
-    background-color: var(--awd-accent-soft);
-  }
-
-  .dd-req-icon {
-    width: 18px;
-    height: 18px;
-    margin-right: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    .dd-icon-img {
-      width: 100%;
-      height: 100%;
-    }
-  }
-
-  .dd-req-info {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    overflow: hidden;
-    min-width: 0;
-
-    .dd-req-name {
-      font-size: 13px;
-      color: var(--awd-text);
-      margin-bottom: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      font-weight: 500;
-    }
-
-    .dd-req-status {
-      font-size: 11px;
-      color: var(--awd-text-3);
-      
-      &.published { color: var(--awd-accent-text); }
-      &.completed { color: var(--awd-text-2); }
-    }
-    
-    .dd-rename-input {
-        font-size: 13px;
-        border: 1px solid var(--awd-info);
-        background: var(--awd-surface);
-        border-radius: 4px;
-        padding: 2px 4px;
-        width: 100%;
-    }
-  }
-  
-  .dd-item-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-left: auto;
-    padding-left: 8px;
-    flex-shrink: 0;
-    z-index: 2;
-
-    .dd-action-btn {
-      width: 20px;
-      height: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      position: relative;
-
-      .dd-action-img {
-        width: 14px;
-        height: 14px;
-        position: absolute;
-        transition: opacity 0.2s;
-
-        &.hover {
-          opacity: 0;
-        }
-      }
-
-      &:hover {
-        .dd-action-img.default {
-          opacity: 0;
-        }
-        .dd-action-img.hover {
-          opacity: 1;
-        }
-      }
-    }
-  }
-}
-
-.dd-dialog-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: var(--awd-overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  backdrop-filter: blur(2px);
-}
-
-.dd-dialog-content {
-  width: 320px;
-  height: 198px;
-  background-color: var(--awd-surface);
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  overflow: hidden;
-  border: 1px solid var(--awd-border);
-}
-
-.dd-dialog-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--awd-border-subtle);
-  
-  .dd-dialog-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--awd-text);
-  }
-}
-
-.dd-dialog-body {
-  flex: 1;
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  
-  .dd-dialog-msg {
-    font-size: 13px;
-    color: var(--awd-text-2);
-    line-height: 1.6;
-    text-align: center;
-  }
-}
-
-.dd-dialog-footer {
-  display: flex;
-  padding: 12px 20px 20px;
-  gap: 12px;
-  justify-content: flex-end;
-
-  .dd-dialog-btn {
-    padding: 6px 20px;
-    border-radius: 6px;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.2s;
-    
-    &.cancel {
-      background-color: var(--awd-surface-2);
-      color: var(--awd-text-2);
-      &:hover {
-        background-color: var(--awd-surface-3);
-      }
-    }
-    
-    &.confirm {
-      background-color: var(--awd-info);
-      color: var(--awd-text-on-accent);
-      &:hover {
-        background-color: var(--awd-info);
-      }
-    }
-  }
-}
-
-.dd-empty-state {
-  padding: 20px;
-  text-align: center;
-  color: var(--awd-text-3);
-  font-size: 12px;
-}
+<style scoped lang="scss">
+.dd-panel { display: flex; flex-direction: column; min-height: 0; height: 100%; color: var(--awd-text); font-size: var(--awd-panel-fs); }
+.dd-panel-head { min-height: var(--awd-panel-sec-h); display: flex; align-items: center; gap: 6px; padding: 0 var(--awd-panel-pad-x); font-weight: 600; }
+.dd-panel button { margin: 0; font: inherit; line-height: 1.4; padding: 0 10px; min-height: 30px; border-radius: var(--awd-radius-sm); color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.dd-panel button::after { border: 0; display: none; }
+.dd-panel button:disabled, .dd-panel button[disabled] { opacity: .48; cursor: not-allowed; background: var(--awd-surface); color: var(--awd-text-3); }
+.dd-panel button:focus-visible, .dd-panel input:focus-visible { outline: 2px solid var(--awd-accent-text); outline-offset: 2px; }
+.dd-panel .primary { color: var(--awd-text-on-accent); background: var(--awd-accent); border-color: var(--awd-accent); width: 100%; font-weight: 500; }
+.dd-panel .primary:disabled, .dd-panel .primary[disabled] { color: var(--awd-text-on-accent); background: var(--awd-accent); border-color: var(--awd-accent); opacity: .48; }
+.dd-panel .import-button { width: 100%; margin-top: 6px; }
+.dd-panel .icon-button { margin-left: auto; border-color: transparent; background: transparent; }
+.dd-notifications { padding: 0 var(--awd-panel-pad-x) 10px; border-bottom: 1px solid var(--awd-border-subtle); }
+.dd-notifications button { width: 100%; text-align: left; justify-content: flex-start; margin-top: 6px; background: var(--awd-accent-soft); color: var(--awd-accent-text); font-size: var(--awd-panel-fs-meta); }
+.dd-create { padding: 6px var(--awd-panel-pad-x) 12px; border-bottom: 1px solid var(--awd-border-subtle); }
+.hint, .muted, .list-meta { color: var(--awd-text-2); font-size: var(--awd-panel-fs-meta); }
+.hint { display: block; line-height: 1.6; margin-top: 8px; }
+.create-form { padding-top: 8px; }
+.create-form input { width: 100%; box-sizing: border-box; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); background: var(--awd-surface); color: var(--awd-text); font: inherit; height: 32px; padding: 0 8px; line-height: 32px; }
+.dd-panel :deep(.uni-input-placeholder) { color: var(--awd-text-3); }
+.actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; }
+.dd-lists { min-height: 0; flex: 1; overflow: auto; padding: 6px var(--awd-panel-pad-x); }
+.dd-list { margin-bottom: 4px; border: 1px solid transparent; border-radius: var(--awd-radius-sm); }
+.dd-list.active { background: var(--awd-accent-soft); border-color: var(--awd-accent); }
+.dd-panel .list-open { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 8px; }
+.list-name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.list-meta { display: flex; gap: 8px; padding-top: 5px; }
+.list-actions { display: flex; justify-content: flex-end; padding: 0 6px 6px; }
+.dd-panel .list-actions button { border: 0; background: transparent; color: var(--awd-text-2); font-size: var(--awd-panel-fs-meta); min-height: 24px; }
+.empty { display: block; padding: 24px 12px; color: var(--awd-text-2); line-height: 1.7; text-align: center; }
+.error { padding: 10px; margin: 6px; color: var(--awd-danger-text); background: var(--awd-danger-soft); border-radius: var(--awd-radius-sm); line-height: 1.6; }
+.error button { display: block; margin-top: 8px; }
 </style>

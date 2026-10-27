@@ -11,7 +11,9 @@ description: 辅助小工具领域。任务涉及浏览器面板、截图/OCR、
 
 **浏览器**：`frontend/src/components/BrowserPane.vue`；desktop `desktop/main/browser-views.js`（BrowserView 注册表）+ `desktop/main/main.js`（`makeBrowserView` 建 view 并接事件、window.open 拦截转工作区新 tab → 事件 `checkba:browser-open-new-tab`、全屏/黑屏兜底恢复、IPC handlers）；后端 `controller/BrowserProxyController.java`（GET /api/browser/proxy）。
 
-**工具栏收藏与快捷方式抽屉（dev-board#214）**：BrowserPane 工具栏在 ↵ 之后有两个新按钮——
+**工具栏设计与输入（dev-board#1217）**：沿用共享颜色/尺寸令牌与 `ICONS`，导航、地址、页面动作分组；按面板容器宽度换行（480px 以下动作另行，360px 以下地址独行），不裁掉按钮。粗指针命中区为48px。工具栏仍参与文档流，加载线留在工具栏；原生 BrowserView 的边界仍取 mount 的真实尺寸。uni-h5 对 `v-model` 更新有100ms节流，快速输入后 `confirm` 先到，不能直接把旧 `inputUrl` 作为导航地址：确认读 `$event.detail.value`，失焦也以完整事件值回填，确保点击打开按钮时地址不截断。验收用隔离 QA 的真实工作台入口与合成代理页；Chrome 键盘 Enter/Space、地址快速输入确认/点击、前进后退刷新及明暗/窄栏通过，触摸模拟用真实 touch 事件而非鼠标 click。此证据不代替 Electron 原生 BrowserView 或用户安装版本验收。
+
+**工具栏收藏与快捷方式抽屉（dev-board#214）**：BrowserPane 工具栏在地址框之后有两个按钮——
 「收藏本页」星形（已收藏该 URL 时实心；判定按去尾斜杠的 URL 匹配收藏列表，再点只提示不重复入库，
 删除仍去收藏面板坞位）与「收藏夹/快捷方式」抽屉开关。契约：BrowserPane 新增 prop
 `projectId`（收藏落库目标，缺席即星形禁用）与事件 `favorite-added {id,url,title}`；
@@ -169,7 +171,16 @@ PDFParser 调 PDFBox2 已删除的 `PDDocument.load` 会抛 `NoSuchMethodError`�
 `options.signal` → `uni.request` 的 `RequestTask.abort()`，以 `AbortError` 拒绝且不打「网络请求失败」
 日志），`beforeUnmount` 收尾。守护：`ContentSearchServiceCacheTest`、
 `frontend/tests/project-home/search-panel-debounce-abort.test.mjs`。
-标签筛选区默认折叠、按命中频次排序——**那不是排版偏好，是给一个数据 bug 兜底**：
+大项目搜索（dev-board#1468）：先发 `filenameOnly:true`，同步匹配文件名，不读正文、
+不进入全文线程池，再发完整查询。两阶段都走同一项目权限和标签/格式过滤；
+`ProjectFileAccessService.readFilterForProject` 只在本次请求解析一次项目权限/客户身份，
+逐文件仍核对项目、删除状态、所有者和客户可见标记，不能跨请求缓存权限。
+名字结果在全文等待、失败或停止等待时仍可打开，必须明确其尚非完整结果；新查询清空旧结果。
+全文 HTTP 与插件 SDK 两层均为 300 秒，名字阶段 60 秒；输入法 composition 期间不启动查询，
+停止等待还要清除输入防抖。HTTP abort 仅终止等待，当前同步后端扫描不保证立即中断。
+正文解析失败不能吞掉已匹配的文件名。搜索插件版本与构建产物一起更新，保证随附安装器升级旧副本。
+回归：`ContentSearchServiceAccessSnapshotTest`、`search-panel-progress.test.mjs`，另验实际打包插件桥。
+标签筛选区曾默认折叠、按命中频次排序，作为历史数据膨胀的界面兜底：
 `/api/files/{id}/upload` 同时是编辑器自动保存的落点，挂在 legacy 分支上的
 `AutoTaggingService.autoTagFile` 因此每存一次盘就跑一次 LLM，每轮 5 个措辞不同的新词，
 而 `getOrCreateSystemTag` 只按精确字符串去重（实测单个文件积到 338 个标签）。
@@ -178,11 +189,19 @@ PDFParser 调 PDFBox2 已删除的 `PDDocument.load` 会抛 `NoSuchMethodError`�
 `maintenance.autoTagDedup.done` 标志）：**按文件保留最早 5 条自动标签关联、删掉后续重复批次，
 自动标签不超过 5 个的文件一行不动**（健康安装零变化），再清掉零引用的自动标签；
 手工标签一律不碰。改这段前先读它的 javadoc——那是一段会在每台存量机器上自动跑一次的删数据代码。
-标签筛选区**默认折叠**（`tagsOpen:false`）：自动打标签能给一个项目攒出上百个词，
-平铺出来的标签墙会把搜索框和结果一起挤出屏幕。展开后按「已选优先 → 本次结果命中文件数
-降序 → 名称」排（计数在 `updateVisibleTags` 里顺带数出来，没搜过就退回按名称排），
-超过 24 个截断给「显示全部 N 个」，超过 12 个再加一个过滤框；**折叠态仍常驻显示已选标签**——
-否则「搜不到东西」的原因被藏起来了。根因不在这个面板，见下面的自动打标签条目。
+**标签检索（dev-board#1446）**：`TagFilter.vue` 为搜索与资源管理器共用的筛选控件，
+默认展开，名称过滤框常驻，候选列表限高 144px 滚动，避免标签墙挤走结果；已选项在折叠时仍显示。
+组内按「已选 → 命中文件数 → 名称」排序，零结果不移除项目里的其他候选标签。多选统一 AND，
+界面明确显示「同时包含所选标签」。空关键词允许纯标签搜索，统计只显示文件数。
+`pluginBusinessServices` 的 search/query 与组件均不再硬编码格式白名单；后端标签检索支持所有格式，
+图片/音视频带关键词时只匹配文件名，显式 fileTypes 仍须生效，文件夹/已删除/无权限文件不进入结果。
+`awd:files-changed` 刷新标签与当前查询；请求序号、取消、项目切换和卸载守卫保留。
+搜索失败显示持续的重试提示并隐藏旧结果；标签加载失败保留已选条件。
+回归：`ContentSearchServiceTagFilterTest`、`search-panel-tag-filter.test.mjs`、
+`plugins/business-services.test.mjs`；`plugins/tag-filter-browser.mjs` 以构建后的 opaque iframe
+和真实宿主服务桥配合合成 API 验证媒体筛选、键盘、打开结果、刷新及失败重试，不能替代正式客户端验收。
+搜索插件清单同步升至 `1.0.1`；`PluginBundledInstaller` 仅在更高版本时替换宿主安装的旧包，
+只更新 web 文件会使原 `1.0.0` 用户继续读旧界面。`PluginBundledInstallerTest` 使用实际随包清单和资源验证旧版更新。
 
 **标签类型维度（2026-08-20，dev-board#63）**：`Tag.type` = `NORMAL`/`PARTY`（当事人）/
 `ISSUE`（争议焦点），**可空且 null 视同 NORMAL**（存量行零迁移）——前端判断一律走
@@ -191,8 +210,7 @@ PDFParser 调 PDFBox2 已删除的 `PDDocument.load` 会抛 `NoSuchMethodError`�
 含改回 NORMAL）。同名唯一约束不分型：`TagService.getOrCreateTag` 撞同名不同型时**复用不改型**
 （改型是用户在标签管理里的决定）。新建默认色按类型（PARTY `#B45309` / ISSUE `#9B1C31` /
 NORMAL `#3B82F6`，`tagTypes.js` 与 TagService 两处同值）。分组展示在 TagSelector（可选列表三组）
-与 SearchPanel（展开态三个 `.tag-subsec-head` 分组头，**只是 shownTags 的按型切片渲染**，
-过滤/截断/排序仍是那一份全局逻辑，别按组各写一套）。AI 工具 `service/ai/tools/TagTools.java`
+与 TagFilter（当事人、争议焦点、其他标签三组，共用过滤与排序）。AI 工具 `service/ai/tools/TagTools.java`
 三件：`tag_list`（描述里强制先查再打、防同义词膨胀）/ `tag_file`（`ToolFileGuard` 校验归属，
 幂等）/ `tag_remove_from_file`（只解关联）；接线同步 `RealToolBeans` 与前端 `toolDisplayNames.js`。
 `AutoTaggingService` 刻意不产类型标签（当事人/争点判定不适合挂在每次自动保存的便宜档链路上）。
@@ -228,6 +246,11 @@ NORMAL `#3B82F6`，`tagTypes.js` 与 TagService 两处同值）。分组展示�
    原样出现在英文界面上。修饰词归各处的 i18n 串。**注意 `MeetingRecordingPanel` 整个面板
    仍是硬编码中文、没做 i18n**，英文版下那一片本来就是中文——这是既有欠账，不是本条引入的。
 
+**长文即时朗读（dev-board#1337/#1338）**：`EasyVoicePane.vue` 的按钮是“开始朗读”，通过 `utils/ttsText.js` 按自然标点/长度上限保留原文分段，`utils/ttsReader.js` 串行调用现有 `/api/tts/generate`，首段返回即播、同时准备后段；不要再次等全部段完成才建播放器。字幕来自朗读时的文本快照，由每段真实 `playing` 事件更新，保留 `highlight-sentence/clear-highlight` 对文档宿主的兼容事件；不按字数占比猜时间。播放中语速直接修改 HTMLAudioElement.playbackRate（保音高），合成固定 rate=1，避免倍率叠乘；下载按钮明确为原速 WAV，仅全部合成成功后可用，`utils/ttsWav.js` 合并PCM数据并重写头部，不能拼接多个RIFF文件。编辑/清空/导入新文本、停止和卸载都使旧任务失效并abort客户端请求，禁止迟到播放；已在Python运行的单段仍可能算完，不声称推理即时中止。`generateTtsAudio` 传 signal、logBody:false，避免记录文书正文。回归 `npm run test:tts`，现有 `test:project-home` 和 `test:optional-components`；真实浏览器/本机模型性能另见本次PR和 `docs/tts-instant-reading-research-2026-10-17.md`，源码合并不等于已发版。
+
+**朗读面板与键盘（dev-board#1339）**：音色使用共享 `AwdSelect` 的可选 `searchable/searchLabel/searchPlaceholder/emptyText`，过滤后仍发出原始 `range` 下标；当前朗读使用启动时的音色快照，更换音色在下次朗读生效。播放速度0.5–2x，方向键每次0.05、PageUp/Down每次0.25、Home/End到边界，恢复原速不重合成。Uni H5 的按钮和滑杆不是原生 HTML 控件，Enter/Space、焦点、禁用态和 slider ARIA 须显式接通；正文通过真实 textarea 的原生 input 监听同步（卸载时解除），避免 Uni 的100ms输入节流截尾，也不要在开始时无条件将DOM值反灌模型（导入后的DOM可能尚未更新）。真正聚焦的 textarea/search input 还须设置可访问名称，不能只标 Uni 外壳。错误提示持久显示，面板遵守 `doc/sidebar-ui-standard.md` 和跨平台设计令牌。真实 Uni 编译的隔离浏览器回归见 `frontend/tests/tts-panel-ui/README.md`，其服务与音频为合成夹具，不等同于已安装 Electron、完整工作台或正式发版验收。
+
+
 **录音（ASR 方向）**：会议录音插件的录音单例 `frontend/src/utils/meetingRecorder.js`（getUserMedia+MediaRecorder 配方源自 FeedbackWidget；分片追加上传走 /api/files/{id}/upload 的 X-File-Offset 协议；轨道必须 stop 否则 macOS 录音灯常亮）；转写三档 platform / byok / local，详见 `.claude/agents/licensing-billing.md`「平台服务网关」与 `.claude/agents/plugin-system.md` 会议录音条目。反馈浮窗的 `VoiceTranscriptionService`（OpenAI 兼容接口位）与它无关、各管各的。macOS 麦克风 entitlement 与 NSMicrophoneUsageDescription 已覆盖两个用途（desktop/package.json:103），**权限问题只在签名包暴露，dev 态测不出**。
   **`recorderState.projectId` 必须与 `status='starting'` 同步写入**（`startRecording()`）：不能等 `getUserMedia`+`createMeetingRecording` 两个 await 都过了才赋值——`MeetingRecordingPanel.vue` 的 `recordingHere` 计算属性同时判 `isRecordingActive()` 与 `recState.projectId === this.projectId`，projectId 还是 null 的窗口期会被误判成"别的项目在录音"（新机首次要等系统麦克风授权弹窗，窗口被拉长到必现；e2e 的假麦克风走 `--use-fake-device-for-media-stream` 秒过，覆盖不到这段）。`MeetingRecordingIndicator.vue` 的 `visible()` 也不许手写状态枚举，统一复用 `isRecordingActive()`——之前它漏了 `'starting'`，会出现"面板让你去顶部胶囊停止，胶囊却还没出现"的假象。
 
@@ -245,6 +268,25 @@ mtime+size 指纹没变，缓存里那句「请先转写」会永久生效且不
 `ChatInterface` 的未转写提示条共用它。`meeting_get_transcript` / `meeting_list_recordings`
 是模型**主动**读会议的入口（按 meetingId），与这条「附件自动注入」互不替代。
 
+**QTA 转写（dev-board#1310）**：前后端音频判据含 `.qta`（大小写不敏感），可右键转写，
+但听悟官方格式清单未列 QTA，**三档均不得将转码失败回退的 QTA 原件上传或送 ASR**。
+`MeetingAudioTranscoder` 先探测音轨：单轨须可解码；多轨只接受唯一 AAC 加其余均为 `apac` 的空间辅助轨。
+多条 AAC 或其他不明确的多轨可能是分层录音，直接失败并提示在语音备忘录中分离录音层、分别导出 M4A，不能静默只取一层。
+转码在本机生成 16kHz 单声道 MP3，原文件不改；损坏/缺少解码器/空音轨都会在出站调用前落失败。
+真实 APAC 仍未实测，不承诺全部 Apple QTA 变体。回归 `MeetingAudioTranscoderQtaTest`、
+`MeetingQtaTranscriptionTest` 使用合成 QuickTime 多音轨和本机原生库，云端协作者全 mock；
+夹具来源与限制在 `backend/src/test/resources/fixtures/media/two-track-audio.md`。
+**QTA 预览（dev-board#1378）**：工作台打开判据与 `mediaTypes.js` 均接受 QTA；`MediaPlayer` 通过带会话头的
+`GET /api/files/{id}/audio-preview` 获取本机生成的 MP3 blob，不直播 QTA 原件、不走转写云端。
+端点先用 `ProjectFileAccessService` 检查读权限；临时原件/MP3 在错误或响应流关闭时清理，下载原件接口不变。
+预览复用上述安全选轨，44.1kHz、最多双声道；源文件复制上限512 MB（长度未知也有界），超限提示分段或导出M4A。
+多层拒绝、组件缺失、磁盘读写、超时分别显示提示；JavaCV的编解码异常本身也是IOException，须优先区分，native加载失败沿cause链识别LinkageError。
+前端请求超时5分钟，转码逐帧检查4分钟期限/线程中断（不是对原生调用阻塞的强制终止）。
+压缩包内 QTA 需先解压为项目文件；临时 blob 不走伪造项目ID。回归 `FileControllerQtaPreviewTest`、`tests/media/qtaPreview.test.mjs`。
+依据：[Apple QTA/AAC/APAC](https://developer.apple.com/videos/play/wwdc2025/251/)、
+[Apple 分层录音](https://support.apple.com/en-ie/guide/ipad/ipadb372d34f/27/ipados/27)、
+[听悟功能说明](https://help.aliyun.com/zh/tingwu/features)。
+
 **会议录音实测回归（dev-board#478/#483/#487）**：麦克风面板每次初开优先浏览器
 `deviceId='default'`，不再恢复历史 `awd_meeting_mic_device_id`；设备变化按当前选中的
 **设备 ID** 保留选择，离线才回默认，重新出现不能抢回来。两个改名输入框走 uni-input 的
@@ -256,6 +298,15 @@ mtime+size 指纹没变，缓存里那句「请先转写」会永久生效且不
 **不承诺静音免扣**（结算在官网网关）；EMPTY 提示按落库 `gatewayTaskId` 判断，不能按当前
 档位推断那次任务是否收费。回归：`node --test frontend/tests/meeting-recorder/*.test.mjs`、
 `MeetingTranscriptParserTest` / `MeetingTranscriptionServiceTest`。
+**语音插件麦克风过桥（dev-board#1447）**：独立语音面板通过
+`plugin-app/voice/meetingRecorder.js` → `pluginVoiceServices.js` 的 `devices` 获取设备。
+原生 `MediaDeviceInfo` 的字段是原型 getter，直接交给 `clonePluginData` 会变成空对象，
+导致名称全退为「麦克风 N」、设备 ID 丢失并回退默认输入。宿主返回前须显式映射
+`{ deviceId, label, kind, groupId }` 普通对象；不要扩大通用克隆器的原型访问范围，
+也不要为修名称在后台打开麦克风。回归 `tests/plugins/voice-insight-services.test.mjs`
+使用原型 getter 设备对象，覆盖过桥后的名称、所选设备 ID 与未授权空名称。
+`node frontend/tests/plugins/voice-devices-browser.mjs` 用 Chromium 假麦克风产生原生设备对象，
+经过真实业务桥进入打包语音 iframe，验证名称和所选输入；不使用用户麦克风或真实项目。
 **空录音与读不出的结果（BUG-57）**：静音结果的 AudioInfo 也可能嵌在 `Transcription.AudioInfo`
 （同层只允许空 `AudioSegments`），同样落 `EMPTY`。平台档网关已 `completed` 但本机读不出结果时，
 FAILED 文案按网关回的 `billing.chargedCents`：>0 写「已结算 N Credits、不会自动退还、重试可能再计费」；
@@ -322,7 +373,23 @@ AwdDialog 队列非空时持有 `overlayState` 的 `'awd-dialog'`（`utils/dialo
 
 **文件存储位置（PR-C）**：`service/storage/StorageLocationService.java` + `GET /api/storage/location`、`POST /api/storage/location`（迁移，需 stage.unlimited）、`POST /api/storage/location/reset`（恢复默认，不需权益）。搬的是**全局存储根**（项目文件与缓存区文件的落盘位置），因为缓存区文件就是项目文件。迁移策略：**复制 → 校验文件数与字节数（含源侧复查）→ 落配置 → 换指针，原目录保留为备份绝不删**；任一步失败清掉本次复制的副本并保持原路径。目标必须是空目录或不存在，且与源不互相嵌套——**嵌套判断在 `toRealPath()` 之后做**，纯词法比较挡不住指向源内部的软链（会把源复制进它自己，在数据根里造出几百个垃圾目录）。**源侧要复查**：只比「复制前的源」与「复制后的目标」，迁移期间自动保存进已复制目录的文件两边数字仍相等，会被静默留在旧根。源目录不可访问时拒绝迁移（否则 copyTree 会把源建出来，「0 个文件迁移成功」）。配置落 `~/.aiworkdeck/storage-location.json`（不落 DB：存储根必须在 JPA 起来之前就确定）。`ProjectStorageResolver.globalRoot` 因此改为 volatile + `relocate()`；能热切是因为 DB 存的是逻辑路径、git 的 gitDir/workTree 每次现算。
 
-**文件预览/插入**：`FilePreview.vue`（docx/pdf/pptx/压缩包分流见 project-overview ~:5110-5157；PDF 走 Chromium 原生引擎渲染，标准 annotation 可见；watch `file.wpsFileId` 在 AI 改完 PDF 后自动重拉字节——reload_file 是 Object.assign 原地更新，file 对象引用不变，别删这个 watch）、`FilePickerDialog.vue`、`FileStagingArea.vue`（原 `FileLinkDropZone.vue` 已删：文件关联的落点改成编辑器画布本身，见 ai-doc-bridge.md「EvidenceLink 契约 → 前端」）；`FilePreview.vue` 还吃 `locator` prop（EvidenceLink 定位，详见下一条）；图片插入走 `libreofficeExecutorClient.js` insertImage → office_thread.js；desktop `file-service.js` + IPC `checkba:fs-read-file`（含敏感路径拦截+大小上限）；后端 `FileController.java`（download/upload/text/compare）、`ProjectFileController.java`（列表/folder/archive/批量/回收站/tags）、`DocFileLinkController.java`（doc-links）。
+**资源管理器 Office 转 PDF（dev-board#1385）**：`ProjectFilePdfService` 的 Office 路径只接受
+`LibreOfficePdfConverter` 的完整排版输出；原 POI/PDFBox 抽正文重画/过滤缺字的备用分支已删除。
+缺 LO、启动失败、超时、非零退出、无产物或无效 PDF 都阻断且不创建项目文件；图片转 PDF 与已有 PDF 合卷仍用内置 PDFBox。
+`FileTree` 单文件错误提供「使用内置引擎导出 PDF」，经 `file-export-pdf` → `fileTreePdfRecovery.js` 打开或激活普通可见标签，等待实际加载就绪后调用既有 `exportPdf({isCurrent})`，不替换或保存已打开的脏内容。保存失败不阻断当前内容导出；加载失败重试时必须等待异步加载完成，不能提前清编辑器的保存闸。
+过程条可取消/就地重试，切项目、关标签、换 executor 都作废旧任务；系统另存为由用户选位置，只有 download-done 才表示保存成功。多文件仍先分别导出再合卷，不虚报自动合并。
+发现器接受 `external.libreoffice.executable`、`LIBREOFFICE_PATH`、`SOFFICE_PATH`，支持完整执行文件/安装目录/app bundle，
+其次 Mac 系统/用户 Applications、Homebrew/常见 bin，Windows ProgramFiles/ProgramW6432/x86/LOCALAPPDATA 和 PATH。
+显式覆盖无效时不悄悄切另一套安装。独立 profile、参数数组无 shell、输出丢弃防管道阻塞、默认120秒等待后终止子进程。
+组件管理可注入同一 bean 的 `probe()`：只执行最多5秒 `--version`，返回 `Readiness(status, executable, message)`，
+状态 AVAILABLE/MISSING/NOT_EXECUTABLE/FAILED/TIMED_OUT。转换成功仅证明生成了有效 PDF，不能据此承诺任意专有字体像素级相同。
+桌面后端 spawnEnv 将真实包/开发目录的 `frontend/dist/zetaoffice/cjk-kai.ttf` 注入 `EXTERNAL_PDF_EDIT_CJK_FONT_PATH`，
+保留用户已有变量；`PdfEditService` 先验证可嵌入中文，实际替换/页码写入前再验证全部目标字形，失败不改原件。
+回归：`ProjectFilePdfFidelityTest`（合成中文/表格/页眉脚/分页，真实native有安装才跑）、`LibreOfficePdfConverterTest`、
+`PdfEditFontSafetyTest`（AWD_TEST_CJK_FONT 指向实际随包字体才跑嵌入项）、`backend-pdf-font.test.js`、
+`file-tree-pdf-recovery.test.mjs` 和真实H5 `pdf-conversion-recovery-ui.mjs`（只mock服务错误，不联系用户后端）。
+
+**文件预览/插入**：`FilePreview.vue`（docx/pdf/pptx/压缩包分流见 project-overview ~:5110-5157；PDF 走 Chromium 原生引擎渲染，标准 annotation 可见；`previewLoadIdentity` 将文件对象与 `wpsFileId` 合成一个 watch（dev-board#1504），切文件或同一轮更新对象/版本只加载一次；AI 改完 PDF 的 reload_file 仍可通过 Object.assign 原地更新版本触发重拉，不能只监视对象引用。定位符单独更新只跳转，不重新下载；回归 `tests/project-home/preview-load-watch.test.mjs`）、`FilePickerDialog.vue`、`FileStagingArea.vue`（原 `FileLinkDropZone.vue` 已删：文件关联的落点改成编辑器画布本身，见 ai-doc-bridge.md「EvidenceLink 契约 → 前端」）；`FilePreview.vue` 还吃 `locator` prop（EvidenceLink 定位，详见下一条）；图片插入走 `libreofficeExecutorClient.js` insertImage → office_thread.js；desktop `file-service.js` + IPC `checkba:fs-read-file`（含敏感路径拦截+大小上限）；后端 `FileController.java`（download/upload/text/compare）、`ProjectFileController.java`（列表/folder/archive/批量/回收站/tags）、`DocFileLinkController.java`（doc-links）。
 
 **回收站「彻底删除」送系统废纸篓（dev-board#1051）**：桌面壳（`host.fs.trashItems` 存在，`FileTree.vue` 计算属性 `trashesToSystem`）下，单个与批量彻底删除（批量即「清空回收站」，没有单独端点）都走 `FileTree.permDeleteOne`：`GET /api/projects/{pid}/files/{id}/permanent/disk-paths`（仅 `security.local-mode`；物理路径经 `ProjectStorageResolver` 解析，与 `local-path` 同源；落在另一路径之下的子路径已折叠掉）→ 主进程 IPC `fs:trashItems`（`desktop/main/file-service.js` 的 `trashItems`，逐个 `shell.trashItem`，本来就不在算成功；只收已规范化的绝对路径，拒绝文件系统根、主目录及其祖先）→ **全部成功才** `DELETE .../permanent?diskHandled=true`（仅 local-mode 认，只清行不碰磁盘）。送废纸篓有一项失败就不清行，行留在回收站。非桌面壳原路（后端 `Files.delete`）。`ProjectFileService` 里磁盘半边（`collectPhysicalTargets`，缓存区目录与被活着的同名行占着的路径不在其中）与行半边（`purgeRows`）拆开，`diskPathsForPurge` 与后端直删共用同一份判定。护栏：`ProjectFileServiceTrashPurgeTest`、`ProjectFileControllerTrashDiskPathsTest`、`desktop/tests/trash-items.test.js`、`frontend/tests/project-home/file-tree-perm-delete-system-trash.test.mjs`。
 
@@ -523,3 +590,58 @@ FilePickerDialog :298 / EasyVoicePane :537 / DesensitizePane :543 / SearchPanel 
 ## 转写超时与重取结果（2026-09-15，dev-board#650）
 
 云转写等待阈值为max(3小时,音频时长×3)，先查询上游结果再判断本地等待超时。结果下载失败保留原taskId；本地超时后重试查询原任务，不重新提交计费。兼容旧“转写超时”记录，EMPTY终态幂等，锁内用最新快照判断任务与终态。外部真正FAILED仍走原重试流程。本地请求取消不保证上游停止计费，详见 `doc/ai-timeout-cost-audit.md`。
+
+
+## 压缩包内文件预览与拖出（dev-board#1357/#1358，2026-10-19）
+
+`isEditorOpenableFile` 必须在 wpsFileId 兜底前排除 zip/rar/7z，否则实际工作台把压缩包送进 LOWA。`FilePreview` 保留整包列表与解压入口，`ArchiveEntriesPane.vue` 提供列表/右侧只读预览。
+单条目 GET `.../archive/entry?path=...` 只读、128MiB 流式限额；本机 ZIP 直接 seek，按住方向键合并连续选择，避免每次载入整个包。POST `.../archive/import-entry`
+收 `{path,parentId}`，同项目写权限、临时文件完整写入后经 `moveNew` 无覆盖发布，事务失败清理；不经 `createFile` 的空模板路径，磁盘尚未索引的同名文件也拒绝覆盖。文件夹及嵌套包需先解压，RAR5/加密限制沿用。
+子预览走 `FilePreview.sourceUrl` 的已准备 blob，不伪造项目文件 ID；音视频通过 `MediaPlayer.sourceUrl`，
+不出现转写写入入口。选择切换中止旧请求、释放 blob；FilePreview 卸载或换文件也中止旧图片 XHR 并作废代次。
+
+原生拖出先经受限 `host.fs.cacheArchiveEntry({name,bytes})` 生成真实临时文件，主frame限定、128MiB单项/
+1GiB总预算，相同文件名+内容复用；临时文件保留到进程退出，不能在 dragend 删除，接收软件可能迟读。
+未准备完时内部复制仍可用，向外拖出提示先等待预览准备；缓存失败有重试反馈。
+包内拖拽只用 `archiveEntryDrag.js` 专属 MIME/全局兜底及 `archive-drag-end`，**不发普通
+`file-drag-start`，不写 `__checkbaDraggedFile`**，否则 LOWA 会为不存在的项目文件挂证据接收层。
+FileTree 的节点/根/空白落点先认包内载荷，先同步快照与 claim 再 await 导入；清理复用
+`installExternalDragCleanup`，仅安装一套，不再叠 `startExternalFileDrag` 的第二套。
+包内条目与普通文件一样，拿到真实同步 dragstart 事件后、原生临时路径准备好时先
+`preventDefault()` 再启动 Electron 拖拽，避免两套拖拽竞争宿主输入。原生启动成功不等于结束；
+启动失败必须结束本次包内身份并提示，旧请求迟到失败不得清理或提示覆盖新手势。
+回归：`archive-entry-preview`、`archive-media-lifecycle`、`file-tree-archive-drop`、desktop `file-drag`。
+
+### 扫描 PDF 转 Word 的依赖与数据去向（dev-board#1387）
+
+本地路径按 `pptx-runtime` → `mineru-runtime` + `mineru-models` 准备，复用 `component_required` 停轮/装好后续跑。专用 `/api/pdf/ocr-markdown-local` 强制 local_only，旧资源包404不回退旧端点。Python一般解析默认本地、失败不暗转云；明确配置的其它云解析入口保留。
+
+本地不可用或失败时，`OcrRoutingService` 按当前用户的明确偏好继续：默认ask；已保存cloud允许调用既有 `OcrService` 的阿里云/计费通道；local进入既有组件准备卡。没有同意时发 `ocr_route_required`（复用同一component等待终态，编排器显示选择方式而非误说下载）。用户点击 `/api/ocr/routing/choice` 后前端自动续原会话；服务端随机decision绑定用户、会话、项目、文件及文件指纹，30分钟有效，严格重检会话归属与文件权限。用户可只选本次或记住；设置「账户与用量→扫描件识别」可更改。provider默认值、密钥、AI跨境同意、模型工具参数都不算此选择。云失败重新展示重试/本地选择，不自动无限重试；逐页全部完成才生成Word，单页失败/空白结果不产残缺文件，重试可能重复消耗已识别页的费用。OCR产物明确为内容转换而非保真布局。
+
+取消选择调用 `/api/ocr/routing/cancel` 撤回本任务 decision，保留到期前的取消记录，迟到 choice 不得重新授权；取消不修改用户此前记住的偏好。原 run 和已续跑 run 被取消后不能借保存的 cloud 偏好继续，新任务须重新选择。前端成功交接只清 UI，不误撤权；取消失败显示重试，并保留原账户/服务端请求范围。逐页渲染前、上传前和结果导出前重检取消及权限，最后一页请求期间取消也不生成迟到 Word；已发出的 HTTP 无法撤回，已识别页面可能已计费。纯白页不上传、不计费，但仍执行取消检查。
+
+验证：`PdfOcrDependenciesTest`、`OcrRoutingServiceTest`、`PdfCloudOcrServiceTest`、`AgentOrchestratorEditorBootingAndComponentStopTest`；前端 `tests/optional-components/ocr-routing.test.mjs` 与真实ChatInterface/SSE浏览器 `tests/chat-presentation-ui/ocr-routing.mjs`。合成输入/传输替身不等于真实付费调用、模型推理或安装包更新。线上pptx-runtime1.0.1无专用local端点，后续需另行构建签名发布；当前版本本地路径会明确不可用，但用户可选择已披露的云端OCR继续，无需等待本地新包。
+
+
+### 顶栏账户菜单与原生网页（dev-board#1417）
+
+账户菜单也必须参与 `overlayState`：`AccountEntry` 以每实例 holder 持有，关闭、退出登录与卸载释放；工作台原有 watcher 统一执行 BrowserView 隐藏/恢复。不能只调高 CSS z-index，也不能在组件内另开显隐控制器。真实原生合成验证入口 `frontend/tests/project-home/shell-native-ui.mjs`；窗口级截图与 `win.getBrowserViews()` 同时核对，单独 `win.capturePage()` 只含渲染层，不能作为网页遮挡的视觉证据。
+
+
+## 可选本地软件检测与安装引导（dev-board#1416，2026-10-21）
+
+`ExternalDependenciesPanel` 明确软件均可选，按用途显示；AVAILABLE 是已安装且探测成功，Docker 的 DAEMON_UNAVAILABLE 是已找到 CLI 但服务未就绪，不要求重装。MISSING 只说未找到可用程序，不断言磁盘上未安装。腾讯会议桌面 App 不等于 CLI。`TmeetCliService.probeCliStatus` 区分 AVAILABLE/MISSING/RUNTIME_MISSING/FAILED/TIMED_OUT，探测仅 `--version`，不读授权。
+
+`TmeetCliLocator` 在 Unix 检查 Node shebang，解析配置、脚本同目录、PATH、用户 `.local/bin`、Homebrew 的 Node 绝对路径；运行、授权与检测共用前缀，不加载 shell 配置。本机 `env PATH=/usr/bin:/bin ~/.local/bin/tmeet --version` 确认原有 npm 入口因找不到 Node 返回127；修复夹具验证脚本旁 Node 在精简 PATH 下被使用；另用编译后的生产定位器在同一精简 PATH 执行本机 `--version` 返回0，未读取授权或安装软件。Windows 仍保留参数数组与 shim/包路径校验。
+
+安装指引核验来源（2026-10-21）：腾讯官方 https://github.com/TencentCloud/tencentmeeting-cli#安装 的 `npm install -g @tencentcloud/tmeet`，前置 Node.js LTS；LibreOffice https://www.libreoffice.org/download/ 保留官方选择系统/架构的下载页；Docker https://docs.docker.com/desktop/setup/install/mac-install/ 与 https://docs.docker.com/desktop/setup/install/windows-install/ 的 main/{arm64,amd64} 官方安装包链接（Windows ARM 按官方标明抢先体验）。打开页面/复制命令不表示安装完成，回到页面重新检测。所有按钮只响应用户点击，不后台下载或安装。
+
+回归：`TmeetCliLocatorTest`、`TmeetCliServiceTest`、`ExternalDependenciesControllerTest`、`PythonToolsDockerProbeTest`、`LibreOfficePdfConverterTest`；`tests/external-dependencies/preparation.test.mjs` 与 `preparation-ui.mjs`。UI/API 与剪贴板均用替身；不代表 Windows 真安装、Docker 服务启动或腾讯账户授权已实测。
+
+## PDF 加载与保活（dev-board#1504/#1514）
+
+`PdfPreviewPane.vue` 为工作台 PDF 提供每窗格最多2个已访问查看器，隐藏用 visibility，保留页码/缩放，不对所有 FilePreview 无界保活。关闭、项目/账户/实际权限变化清理池，后台版本变化逐出。成员轮询按当前用户的身份、全局角色和项目有效角色判断；所有者不依赖成员清单，其他成员变化或同内容新数组不销毁查看器。权限重建后仍把当前 PDF 记入池。`FilePreview.reloadFromBackend()` 强制刷新，即使 wpsFileId 未改变；取消旧请求并以请求世代隔离迟到结果。
+
+H5 的项目 PDF 先用鉴权 HEAD 校验，再让内置查看器直连 `/api/files/{id}/download?inline=true`，复用媒体 URL 的 session 鉴权，不打印带 token 的 URL。Spring 与轻量 LocalCore 同时支持 PDF-only inline，原下载仍 attachment，Range 和每次权限校验不变。旧服务未支持 inline、查看器加载失败时回退鉴权 Blob；sourceUrl 与非 H5 保留 Blob 路径。iframe load 仅为导航接收确认，首屏性能必须另看正文像素。
+
+版本恢复按 affectedFileIds 处理 PDF，包括受保护的项目版本流程；AI 后端更新有新版本号时等待 watcher 的既有加载，无新版本号则显式重载，两者都须等待查看器接收结果，失败不得报更新成功；文件树同步同时更新 PDF 版本及大小。覆盖测试：`tests/project-home/pdf-version-restore.test.mjs`；后端 `FileControllerRangeTest`、`LocalCoreHttpReadsTest`。PDF 按真实阅读/AI修改/版本能力验收，不把 Word 的输入和保存结论外推。

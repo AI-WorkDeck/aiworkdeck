@@ -1,0 +1,17 @@
+{
+  "plugin.name": "Tencent Meeting",
+  "plugin.description": "Connect Tencent Meeting to sync meetings and recordings on demand, view transcripts and smart minutes, archive to projects, and generate meeting minutes and action items. Requires the official tmeet CLI and account authorization.",
+  "tool.tencent_meeting_action.description": "Tencent Meeting plugin: check connection, authorize login, sync on demand, view meetings and transcripts, and archive project files.",
+  "panel.refreshList": "Muat semula",
+  "panel.selectMeeting": "Pilih mesyuarat",
+  "panel.backToList": "Kembali ke mesyuarat",
+  "panel.meetingCount": "mesyuarat",
+  "panel.connectInSidebar": "Sambungkan Tencent Meeting di bar sisi",
+  "panel.loadingList": "Memuatkan mesyuarat…",
+  "panel.loadingDetail": "Memuatkan kandungan mesyuarat…",
+  "panel.syncing": "Menyegerakkan mesyuarat…",
+  "panel.exporting": "Menyimpan bahan mesyuarat…",
+  "panel.preparingAi": "Menyediakan bahan mesyuarat untuk AI…",
+  "view.account.name": "Tencent Meeting",
+  "view.meetings.name": "Tencent Meeting"
+}

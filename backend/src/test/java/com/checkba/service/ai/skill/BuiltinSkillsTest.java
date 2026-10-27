@@ -239,6 +239,7 @@ class BuiltinSkillsTest {
                 "text-to-speech", SkillDefinition.ToolPolicy.PASSTHROUGH));
         // Map.of 最多 10 对，第 11 个起逐个 put
         expected.put("evidence-linked-report", SkillDefinition.ToolPolicy.PASSTHROUGH);
+        expected.put("file-organization", SkillDefinition.ToolPolicy.PASSTHROUGH);
         Map<String, SkillDefinition.ToolPolicy> actual = new TreeMap<>();
         for (SkillDefinition skill : registry.getSkills()) {
             actual.put(skill.getId(), skill.getToolPolicy());
@@ -482,6 +483,30 @@ class BuiltinSkillsTest {
         // 触发词不得用会与 restrict 审查类 skill 同句高频共现的单字词（passthrough 会让整轮放弃裁剪）
         for (String banned : List.of("报告", "核查", "审查", "证据")) {
             assertFalse(s.getTriggers().contains(banned), "触发词过宽: " + banned);
+        }
+        // 懒人模式（#1431）：证据整理高频触发词直接归入证据整理与闭环报告内置工作流
+        assertTrue(s.getTriggers().containsAll(List.of("证据整理", "整理证据", "梳理证据", "证据目录", "证据清单")));
+    }
+
+    @Test
+    @DisplayName("#1431/#1438 懒人模式：四大高频核心工作流（合同审查、证据整理、文件整理、法律意见书核查）内置且恒为 AUTO 启用")
+    void lazyModeBuiltinWorkflowsAreAlwaysAutoEnabled() {
+        Set<String> expectedBuiltins = Set.of(
+                "contract-review",
+                "legal-opinion-review",
+                "evidence-linked-report",
+                "file-organization"
+        );
+        for (SkillDefinition skill : registry.getSkills()) {
+            assertEquals(expectedBuiltins.contains(skill.getId()), skill.isBuiltinWorkflow(),
+                    skill.getId() + " 的 builtin_workflow 标记不符合懒人模式边界");
+        }
+        for (String id : expectedBuiltins) {
+            registry.setEnabled(id, false);
+            assertTrue(registry.isEnabled(id), id + " 作为内置高频工作流不可被停用");
+            registry.setActivationMode(id, SkillRegistry.ActivationMode.MANUAL);
+            assertFalse(registry.isManual(id), id + " 作为内置高频工作流不可退化为仅手动");
+            assertEquals(SkillRegistry.ActivationMode.AUTO, registry.activationMode(id));
         }
     }
 }

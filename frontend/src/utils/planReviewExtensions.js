@@ -91,7 +91,12 @@ const reviewTheme = EditorView.baseTheme({
  * @returns {{ extensions: import('@codemirror/state').Extension[], refresh: (view: EditorView) => void }}
  */
 export function createReviewExtensions({ getBaseline, getComments, onAddComment, deletedLabel }) {
-  const label = typeof deletedLabel === 'function' ? deletedLabel : (count) => `已删除 ${count} 行`
+  let isEn = false
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') isEn = true
+    else if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') isEn = true
+  } catch (_) { /* ignore */ }
+  const label = typeof deletedLabel === 'function' ? deletedLabel : (count) => (isEn ? `Deleted ${count} lines` : `已删除 ${count} 行`)
   const recompute = StateEffect.define()
 
   function build(state) {

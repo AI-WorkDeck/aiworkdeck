@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Desensibilização",
+  "plugin.description": "Inspecione informações sensíveis, gere cópias desensibilizadas e restaure com pacotes de recuperação.",
+  "view.main.name": "Desensibilização"
+}

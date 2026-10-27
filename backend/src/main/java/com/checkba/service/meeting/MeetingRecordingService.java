@@ -136,7 +136,7 @@ public class MeetingRecordingService {
 
     /** 可注册转写的音频扩展名。与前端 FileTree 右键菜单的判定保持一致。 */
     private static final Set<String> AUDIO_EXTENSIONS = Set.of(
-            "mp3", "m4a", "aac", "wav", "flac", "ogg", "opus", "amr", "wma", "webm");
+            "mp3", "m4a", "aac", "wav", "flac", "ogg", "opus", "amr", "wma", "webm", "qta");
 
     /**
      * 可注册转写的视频扩展名（dev-board#1024）：转写前由 MeetingTranscriptionService 抽音轨成 mp3。

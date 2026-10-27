@@ -232,6 +232,7 @@ class DocumentEditToolsAnchorInsertAndPdfExportTest {
         verify(repo).save(created);
         assertTrue(out.contains("股权转让协议 (1).pdf") && out.contains("77") && out.contains("原文档没有改动"), out);
         assertFalse(out.startsWith("Error"), out);
+        assertEquals(77L, GeneratedFileLocation.createdId(out));
         try (var s = Files.list(root)) {
             assertTrue(s.noneMatch(p -> p.getFileName().toString().startsWith(".export-pdf-")), "临时文件必须搬走或清掉");
         }

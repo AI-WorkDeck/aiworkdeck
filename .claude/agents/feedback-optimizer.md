@@ -28,7 +28,7 @@ description: 用户反馈闭环领域。任务涉及右下角反馈浮窗、反�
 - `controller/FeedbackIngestController` — `/api/feedback/ingest`（公开+配额）、
   `/pending`、`/{id}/resolution`、`/inbox/status`（`X-Optimizer-Token`）
 - `service/feedback/FeedbackIngestGuard` — 配额与体积闸；`FeedbackService.ingest` — 幂等收件
-- `service/feedback/FeedbackUploadService` — 桌面端异步补传（本地先落库，永不删）
+- `service/feedback/FeedbackUploadService` — 桌面端异步补传（本地先落库，永不删）；启动补传与处理状态同步在 `ApplicationReadyEvent` 后启动，避免在 Bean 构造时争抢 JPA 初始化；提交后触发与半小时重试保留
 
 **优化者（后端 `service/optimizer/`）**
 - `OptimizerProperties`（前缀 `optimizer`，默认 enabled=false，source=local）

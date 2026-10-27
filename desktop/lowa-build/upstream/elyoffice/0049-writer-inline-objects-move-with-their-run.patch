@@ -1,0 +1,199 @@
+Writer: an inline object moves with its run's w:position
+
+Word lowers or raises an inline picture or OLE object with the
+w:position of its run; MathType equations rely on it to sit on
+the baseline (Gitea #9: 25 pictures and an OLE fraction stood
+above their lines). The import kept w:position as a deferred
+character property and applied it to text only, so an object's
+run lost it.
+
+The import now puts the position on the object's anchor
+character, as a fixed escapement against that character's own
+font size, and does not expand it to the text after. Layout
+moves an as-character object by its anchor character's fixed
+escapement (vertAlign's automatic values keep objects still,
+as before). Every export already writes the anchor character's
+escapement (w:position in DOCX), so the position round-trips.
+The w:position arithmetic moves into one helper both use.
+
+--- a/sw/source/core/inc/ascharanchoredobjectposition.hxx
++++ b/sw/source/core/inc/ascharanchoredobjectposition.hxx
+@@ -86,6 +86,9 @@ namespace objectpositioning
+         // method to cast <SwAnchoredObjectPosition::GetAnchorFrame()>
+         const SwTextFrame& GetAnchorTextFrame() const;
+ 
++        // the anchor character's fixed raise
++        SwTwips GetRaise() const;
++
+         /** determine the relative position to base line for object position
+ 
+             @param _ObjBoundHeight
+--- a/sw/source/core/objectpositioning/ascharanchoredobjectposition.cxx
++++ b/sw/source/core/objectpositioning/ascharanchoredobjectposition.cxx
+@@ -29,6 +29,11 @@
+ #include <editeng/ulspitem.hxx>
+ #include <osl/diagnose.h>
+ #include <fmtornt.hxx>
++#include <fmtanchr.hxx>
++#include <ndtxt.hxx>
++#include <hintids.hxx>
++#include <editeng/escapementitem.hxx>
++#include <editeng/fhgtitem.hxx>
+ 
+ 
+ using namespace ::com::sun::star;
+@@ -60,6 +65,23 @@ SwAsCharAnchoredObjectPosition::SwAsCharAnchoredObjectPosition(
+ SwAsCharAnchoredObjectPosition::~SwAsCharAnchoredObjectPosition()
+ {}
+ 
++/** the anchor character's fixed raise */
++SwTwips SwAsCharAnchoredObjectPosition::GetRaise() const
++{
++    const SwPosition* pAnchor = GetFrameFormat().GetAnchor().GetContentAnchor();
++    const SwTextNode* pNode = pAnchor ? pAnchor->GetNode().GetTextNode() : nullptr;
++    if (!pNode)
++        return 0;
++    SfxItemSetFixed<RES_CHRATR_ESCAPEMENT, RES_CHRATR_FONTSIZE> aSet(
++        const_cast<SwAttrPool&>(pNode->GetDoc().GetAttrPool()));
++    const sal_Int32 nIndex = pAnchor->GetContentIndex();
++    pNode->GetParaAttr(aSet, nIndex, nIndex + 1);
++    const short nEsc = aSet.Get(RES_CHRATR_ESCAPEMENT).GetEsc();
++    if (nEsc == DFLT_ESC_AUTO_SUPER || nEsc == DFLT_ESC_AUTO_SUB)
++        return 0;
++    return SwTwips(aSet.Get(RES_CHRATR_FONTSIZE).GetHeight()) * nEsc / 100;
++}
++
+ /** method to cast <SwAnchoredObjectPosition::GetAnchorFrame()> to needed type */
+ const SwTextFrame& SwAsCharAnchoredObjectPosition::GetAnchorTextFrame() const
+ {
+@@ -162,7 +184,8 @@ void SwAsCharAnchoredObjectPosition::CalcPosition()
+     const SwTwips nObjBoundHeight = ( mnFlags & AsCharFlags::Rotate )
+                                     ? aObjBoundRect.Width()
+                                     : aObjBoundRect.Height();
+-    const SwTwips nRelPos = GetRelPosToBase( nObjBoundHeight, rVert );
++    // it moves with its raised character, as in Word
++    const SwTwips nRelPos = GetRelPosToBase( nObjBoundHeight, rVert ) - GetRaise();
+ 
+     // for initial positioning:
+     // adjust the proposed anchor position by difference between
+--- a/sw/source/writerfilter/dmapper/DomainMapper.cxx
++++ b/sw/source/writerfilter/dmapper/DomainMapper.cxx
+@@ -3979,26 +3979,11 @@ void DomainMapper::processDeferredCharacterProperties(
+         {
+         case NS_ooxml::LN_EG_RPrBase_position:
+         {
+-            double nEscapement = 0;
+-            sal_Int8 nProp = 0;
+-            if ( nIntValue )
+-            {
+-                nProp = 100;
+-                double fFontSize = 0;
+-                m_pImpl->GetAnyProperty(PROP_CHAR_HEIGHT, rContext) >>= fFontSize;
+-                if ( fFontSize )
+-                    // nIntValue is in half-points, fontsize is in points, escapement is a percentage.
+-                    nEscapement = round( nIntValue/2.0 / fFontSize * 100 );
+-                else
+-                    nEscapement = nIntValue > 0 ? DFLT_ESC_SUPER : DFLT_ESC_SUB;
+-            }
+-            if ( nEscapement > MAX_ESC_POS )
+-                nEscapement = MAX_ESC_POS;
+-            else if ( nEscapement < -MAX_ESC_POS )
+-                nEscapement = -MAX_ESC_POS;
+-
+-            rContext->Insert(PROP_CHAR_ESCAPEMENT,         uno::Any( sal_Int16(nEscapement) ) );
+-            rContext->Insert(PROP_CHAR_ESCAPEMENT_HEIGHT,  uno::Any( nProp ) );
++            double fFontSize = 0;
++            m_pImpl->GetAnyProperty(PROP_CHAR_HEIGHT, rContext) >>= fFontSize;
++            const sal_Int16 nEscapement = DomainMapper_Impl::GetPositionEscapement(nIntValue, fFontSize);
++            rContext->Insert(PROP_CHAR_ESCAPEMENT,         uno::Any( nEscapement ) );
++            rContext->Insert(PROP_CHAR_ESCAPEMENT_HEIGHT,  uno::Any( sal_Int8(nIntValue ? 100 : 0) ) );
+         }
+         break;
+         default:
+--- a/sw/source/writerfilter/dmapper/DomainMapper_Impl.hxx
++++ b/sw/source/writerfilter/dmapper/DomainMapper_Impl.hxx
+@@ -345,6 +345,7 @@ public:
+     const css::uno::Reference<css::text::XTextRange>& GetStartRange() const { return m_xStartRange; }
+ 
+     void                    AppendCommand(std::u16string_view rPart);
++    /// Deleted command text has no look.
+     const OUString&  GetCommand() const {return m_sCommand[m_bCommandType]; }
+     bool GetCommandIsEmpty(bool bType) const { return m_sCommand[bType].isEmpty(); }
+     void SetCommandType(bool cType) { m_bCommandType = cType; }
+@@ -839,6 +840,10 @@ public:
+     void MergeAtContentImageRedlineWithNext(const css::uno::Reference<css::text::XTextAppend>& xTextAppend);
+     void appendTextPortion( const OUString& rString, const PropertyMapPtr& pPropertyMap );
+     void appendTextContent(const css::uno::Reference<css::text::XTextContent>&, const css::uno::Sequence<css::beans::PropertyValue>&);
++    /// w:position's half-points as an escapement percentage.
++    static sal_Int16 GetPositionEscapement(sal_Int32 nHalfPoints, double fFontSize);
++    /// Word moves an inline object with its run's w:position.
++    void moveWithRun(const css::uno::Reference<css::text::XTextContent>& xContent);
+     void appendOLE( const OUString& rStreamName, const std::shared_ptr<OLEHandler>& pOleHandler );
+     void appendStarMath( const Value& v);
+     void adjustLastPara(sal_Int8 nAlign);
+--- a/sw/source/writerfilter/dmapper/DomainMapper_Impl.cxx
++++ b/sw/source/writerfilter/dmapper/DomainMapper_Impl.cxx
+@@ -135,6 +135,13 @@
+ #include <docufld.hxx>
+ #include <txtfld.hxx>
+ #include <ndtxt.hxx>
++#include <doc.hxx>
++#include <fmtanchr.hxx>
++#include <frmfmt.hxx>
++#include <IDocumentContentOperations.hxx>
++#include <editeng/escapementitem.hxx>
++#include <editeng/fhgtitem.hxx>
++#include <hintids.hxx>
+ #include <unicode/errorcode.h>
+ #include <unicode/regex.h>
+ #include <unotextcursor.hxx>
+@@ -3652,6 +3659,7 @@ void DomainMapper_Impl::appendTextContent(
+             xTextAppendAndConvert->insertTextContentWithProperties( xContent, xPropertyValues, m_aTextAppendStack.top().xInsertPosition );
+         else
+             xTextAppendAndConvert->appendTextContent( xContent, xPropertyValues );
++        moveWithRun(xContent);
+     }
+     catch(const lang::IllegalArgumentException&)
+     {
+@@ -3661,6 +3669,41 @@ void DomainMapper_Impl::appendTextContent(
+     }
+ }
+ 
++sal_Int16 DomainMapper_Impl::GetPositionEscapement(sal_Int32 nHalfPoints, double fFontSize)
++{
++    if (!nHalfPoints)
++        return 0;
++    // half-points against the font size in points, as a percentage
++    double fEscapement = fFontSize ? round(nHalfPoints / 2.0 / fFontSize * 100)
++                                   : nHalfPoints > 0 ? DFLT_ESC_SUPER : DFLT_ESC_SUB;
++    return sal_Int16(std::clamp<double>(fEscapement, -MAX_ESC_POS, MAX_ESC_POS));
++}
++
++void DomainMapper_Impl::moveWithRun(const uno::Reference<text::XTextContent>& xContent)
++{
++    auto& rDeferred = m_StreamStateStack.top().deferredCharacterProperties;
++    auto it = rDeferred.find(NS_ooxml::LN_EG_RPrBase_position);
++    if (it == rDeferred.end())
++        return;
++    SwXFrame* pFrame = dynamic_cast<SwXFrame*>(xContent.get());
++    SwFrameFormat* pFormat = pFrame ? pFrame->GetFrameFormat() : nullptr;
++    if (!pFormat || pFormat->GetAnchor().GetAnchorId() != RndStdIds::FLY_AS_CHAR)
++        return;
++    // the anchor character carries the raise
++    SwPaM aChar(*pFormat->GetAnchor().GetContentAnchor());
++    aChar.SetMark();
++    aChar.GetPoint()->AdjustContent(1);
++    // a percentage of the anchor character's own size
++    SfxItemSetFixed<RES_CHRATR_FONTSIZE, RES_CHRATR_FONTSIZE> aSize(aChar.GetDoc().GetAttrPool());
++    aChar.GetPointNode().GetTextNode()->GetParaAttr(aSize, aChar.Start()->GetContentIndex(), aChar.End()->GetContentIndex());
++    const sal_Int16 nEsc = GetPositionEscapement(it->second.get<sal_Int32>(), aSize.Get(RES_CHRATR_FONTSIZE).GetHeight() / 20.0);
++    if (!nEsc)
++        return;
++    // the run's text after it keeps its own position
++    aChar.GetDoc().getIDocumentContentOperations().InsertPoolItem(
++        aChar, SvxEscapementItem(nEsc, 100, RES_CHRATR_ESCAPEMENT), SetAttrMode::DONTEXPAND);
++}
++
+ void DomainMapper_Impl::appendOLE( const OUString& rStreamName, const std::shared_ptr<OLEHandler>& pOLEHandler )
+ {
+     try

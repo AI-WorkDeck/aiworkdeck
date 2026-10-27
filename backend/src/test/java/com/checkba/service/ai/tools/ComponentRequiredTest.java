@@ -76,7 +76,10 @@ class ComponentRequiredTest {
                                      PptxServiceClient client,
                                      com.checkba.storage.ProjectStorageResolver storage,
                                      NativePackService packs) {
-        return new PdfTools(pdf, files, null, bridge, docx, client, storage, packs);
+        var routing = mock(com.checkba.service.ocr.OcrRoutingService.class);
+        try { when(routing.route(any(), any())).thenReturn(com.checkba.service.ocr.OcrRoutingService.Route.LOCAL); }
+        catch (Exception e) { throw new RuntimeException(e); }
+        return new PdfTools(pdf, files, null, bridge, docx, client, storage, packs, mock(com.checkba.service.pack.ModelPresence.class), routing, mock(com.checkba.service.ocr.PdfCloudOcrService.class));
     }
 
     private static ProjectFile pdfFile(Path onDisk) {
@@ -193,7 +196,7 @@ class ComponentRequiredTest {
     }
 
     @Test
-    @DisplayName("扫描件 OCR 失败且 mineru-runtime 未装：发 component_required，不说「稍后重试」")
+    @DisplayName("扫描件入口已装、mineru-runtime 未装：OCR前发 component_required，不说「稍后重试」")
     void scannedPdfPromptsForMineruComponent(@TempDir Path tmp) throws Exception {
         Path onDisk = Files.writeString(tmp.resolve("scan.pdf"), "%PDF-1.7");
         PdfEditService pdf = mock(PdfEditService.class);
@@ -204,8 +207,8 @@ class ComponentRequiredTest {
                 mock(com.checkba.storage.ProjectStorageResolver.class);
         when(storage.resolve(onDisk.toString())).thenReturn(onDisk);
         PptxServiceClient client = mock(PptxServiceClient.class);
-        when(client.ocrPdfToMarkdown(onDisk.toString())).thenThrow(new RuntimeException("connection refused"));
         NativePackService packs = mock(NativePackService.class);
+        when(packs.isReady("pptx-runtime")).thenReturn(true);
         when(packs.isReady("mineru-runtime")).thenReturn(false);
         when(packs.knownSizes("mineru-runtime")).thenReturn(new NativePackService.Sizes(1_048_576_000L, 0L));
         EditorBridgeService bridge = mock(EditorBridgeService.class);
@@ -217,6 +220,7 @@ class ComponentRequiredTest {
                 eq("mineru-models"), eq(1000L),
                 eq(OptionalComponents.byPackId("mineru-runtime").featureKeys()), eq("pdf_to_word"));
         assertFalse(out.contains("稍后重试"), out);
+        verify(client, never()).ocrPdfToMarkdown(anyString());
     }
 
     /** 文本型 PDF + 版式级转换打不通 的公共夹具。 */

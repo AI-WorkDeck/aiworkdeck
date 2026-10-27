@@ -78,6 +78,15 @@ public class ProjectFile {
     @Column(length = 512)
     private String filePath;
 
+    /** Exact file selected on this computer; never a directory grant or cloud metadata. */
+    @Column(columnDefinition = "TEXT")
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String externalPath;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public String getExternalPath() { return externalPath; }
+    public void setExternalPath(String externalPath) { this.externalPath = externalPath; }
+
     /**
      * WPS 文件 ID（仅文件有效，用于 WPS 在线编辑）
      * 例如：project_1_doc_1_v1234567890
@@ -97,6 +106,13 @@ public class ProjectFile {
     @Column(nullable = false)
     private Long userId;
 
+    /** Explicit customer access; old rows with null remain private. */
+    @Column(columnDefinition = "boolean default false")
+    private Boolean clientVisible = false;
+
+    public Boolean getClientVisible() { return Boolean.TRUE.equals(clientVisible); }
+    public void setClientVisible(Boolean clientVisible) { this.clientVisible = clientVisible; }
+
     /**
      * 创建时间
      */
@@ -115,6 +131,11 @@ public class ProjectFile {
     /** 跨机器稳定身份（清单 v2）。本机新建行由 capture 回填，克隆行来自云端清单。 */
     @Column(length = 36)
     private String uid;
+
+    @jakarta.persistence.PrePersist
+    void assignUid() {
+        if (uid == null || uid.isBlank()) uid = java.util.UUID.randomUUID().toString();
+    }
 
     public String getUid() { return uid; }
     public void setUid(String uid) { this.uid = uid; }

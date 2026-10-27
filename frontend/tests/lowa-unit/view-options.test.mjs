@@ -7,17 +7,20 @@ import vm from 'node:vm'
 
 const source = readFileSync(new URL('../../src/zetaoffice/public/office_thread.js', import.meta.url), 'utf8')
 const method = source.slice(source.indexOf('  set_view_options(p) {'), source.indexOf('  // 修订开关（工具栏'))
-function harness({ rejectBoundaryWrite = false } = {}) {
+function harness({ rejectBoundaryWrite = false, rejectMark = null } = {}) {
   const values = new Map(Object.entries({
     ShowTextBoundaries: true, ShowNonprintingCharacters: true,
+    ShowParaBreaks: true, ShowBreaks: true, ShowSpaces: true, ShowTabstops: true,
     ShowRulers: true, ShowHoriRuler: true, ShowVertRuler: true,
   }))
   const writes = []
   const view = {
-    getPropertyValue: name => values.get(name),
+    getPropertyValue(name) { if (!values.has(name)) throw Error('unknown: ' + name); return values.get(name) },
     setPropertyValue(name, value) {
       writes.push([name, value])
       if (name === 'ShowTextBoundaries' && rejectBoundaryWrite) throw Error('rejected')
+      if (name === rejectMark) throw Error('rejected')
+      if (!values.has(name)) throw Error('unknown: ' + name)
       values.set(name, value)
     },
   }
@@ -61,4 +64,43 @@ test('其它视图选项不隐式重写文本边界', () => {
 test('设置被引擎拒绝时，读回不谎报已经隐藏', () => {
   const h = harness({ rejectBoundaryWrite: true })
   assert.equal(h.run({ textBoundaries: false }).textBoundaries, true)
+})
+
+const markProperties = { paragraphMarks: 'ShowParaBreaks', lineBreaks: 'ShowBreaks', spaces: 'ShowSpaces', tabs: 'ShowTabstops' }
+for (const [key, property] of Object.entries(markProperties)) {
+  test(`${key}: 单独关开，不碰其它类别、标尺、文本边界或模型`, () => {
+    const h = harness()
+    for (const value of [false, false, true]) {
+      const result = h.run({ [key]: value })
+      assert.equal(result.success, true)
+      assert.equal(result[key], value)
+      for (const other of Object.keys(markProperties).filter(k => k !== key)) assert.equal(result[other], true)
+      assert.equal(result.formattingMarks, true)
+      assert.equal(result.ruler, true)
+      assert.equal(result.textBoundaries, true)
+    }
+    assert.deepEqual(h.writes, [[property, false], [property, false], [property, true]])
+  })
+  test(`${key}: 引擎拒写则报告失败`, () => {
+    const h = harness({ rejectMark: property })
+    assert.equal(h.run({ [key]: false }).success, false)
+    assert.equal(h.run()[key], true)
+  })
+}
+test('关闭总闸仍读回独立分类偏好，无参读取不写入', () => {
+  const h = harness()
+  h.run({ paragraphMarks: false, spaces: false, tabs: false, lineBreaks: true, formattingMarks: false })
+  h.writes.length = 0
+  const result = h.run()
+  assert.equal(result.lineBreaks, true)
+  assert.equal(result.paragraphMarks, false)
+  assert.equal(result.formattingMarks, false)
+  assert.deepEqual(h.writes, [])
+})
+
+test('总闸拒写不能误报分类已生效', () => {
+  const h = harness({ rejectMark: 'ShowNonprintingCharacters' })
+  const result = h.run({ formattingMarks: false, spaces: false })
+  assert.equal(result.success, false)
+  assert.equal(h.run().formattingMarks, true)
 })
