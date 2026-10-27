@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  newMarkdown: 'Markdown (.md)',
+  newPlainText: 'Văn bản thuần túy (.txt)',
   "newItem": "Mới",
   "newFileMenu": "Tệp mới",
   "newRecording": "Đang ghi",

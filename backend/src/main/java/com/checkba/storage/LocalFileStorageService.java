@@ -104,7 +104,9 @@ public class LocalFileStorageService implements StorageService {
         try {
             Files.createDirectories(filePath.getParent());
             String fileName = filePath.getFileName().toString().toLowerCase(Locale.ROOT);
-            if (fileName.endsWith(".xlsx")) {
+            if (fileName.endsWith(".md") || fileName.endsWith(".txt")) {
+                Files.createFile(filePath);
+            } else if (fileName.endsWith(".xlsx")) {
                 try (XSSFWorkbook workbook = new XSSFWorkbook();
                      OutputStream out = Files.newOutputStream(filePath)) {
                     workbook.createSheet("Sheet1");
