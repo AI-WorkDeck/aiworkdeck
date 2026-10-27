@@ -159,16 +159,20 @@ class ContentSearchToolsTest {
                 .thenAnswer(inv -> new org.springframework.core.io.ByteArrayResource(gbk));
         com.checkba.storage.StorageServiceFactory factory = Mockito.mock(com.checkba.storage.StorageServiceFactory.class);
         when(factory.getStorageService()).thenReturn(storage);
+        com.checkba.service.ProjectFileAccessService fileAccess = Mockito.mock(com.checkba.service.ProjectFileAccessService.class);
+        when(fileAccess.readFilterForProject(7L, 9L)).thenReturn(file -> file == txt);
+        ToolContextHolder.set(new ToolContext(7L, null, 9L, null));
         ContentSearchService realSearch = new ContentSearchService(realRepo,
                 Mockito.mock(com.checkba.repository.FileTagRepository.class),
                 Mockito.mock(com.checkba.repository.TagRepository.class),
-                new com.checkba.service.DocumentTextService(factory), null);
+                new com.checkba.service.DocumentTextService(factory), null, fileAccess);
         try {
             String out = new ContentSearchTools(realSearch, realRepo).search_project_content("违约金", null, null, null);
             assertTrue(out.contains("会议纪要.txt (fileId=61)"), out);
             assertTrue(out.contains("第 2 行：第八条 违约责任"), "命中片段要是正确解码的中文：" + out);
         } finally {
             realSearch.shutdown();
+            ToolContextHolder.clear();
         }
     }
 }

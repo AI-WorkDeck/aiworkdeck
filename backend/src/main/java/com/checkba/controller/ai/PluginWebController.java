@@ -117,6 +117,8 @@ public class PluginWebController {
                 .header(HttpHeaders.CONTENT_TYPE, contentTypeOf(subPath))
                 .header("Content-Security-Policy", cspFor(meta))
                 .header("X-Content-Type-Options", "nosniff")
+                // Opaque sandbox frames need CORS for their own ES-module assets. No API or credentials are exposed.
+                .header(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*")
                 .header(HttpHeaders.CACHE_CONTROL, "no-cache")
                 .body(body);
     }
@@ -164,7 +166,7 @@ public class PluginWebController {
     static String cspFor(PluginService.PluginMetadata meta) {
         List<String> permissions = meta.getPermissions();
         boolean network = permissions != null && permissions.contains("network");
-        return CSP_BASE + (network ? "https:" : "'none'");
+        return CSP_BASE + (network ? "https:" : "'none'") + "; media-src blob:";
     }
 
     static String contentTypeOf(String subPath) {

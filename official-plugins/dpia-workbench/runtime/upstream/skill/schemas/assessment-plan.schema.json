@@ -1,0 +1,362 @@
+{
+  "type": "object",
+  "properties": {
+    "rule_scopes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "rule_id": {
+            "type": "string"
+          },
+          "activity_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fact_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "coverage_level": {
+            "type": "string",
+            "enum": [
+              "activity",
+              "project"
+            ]
+          }
+        },
+        "required": [
+          "rule_id",
+          "activity_ids",
+          "fact_ids",
+          "rationale"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "building",
+        "reviewed"
+      ]
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "design",
+        "pre_launch",
+        "operational"
+      ]
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "layer": {
+            "type": "string",
+            "enum": [
+              "core",
+              "jurisdiction",
+              "scenario"
+            ]
+          },
+          "phases": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "design",
+                "pre_launch",
+                "operational"
+              ]
+            }
+          },
+          "activity_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rule_bindings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "rule_id": {
+                  "type": "string"
+                },
+                "required_fact": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "rule_id",
+                "required_fact"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "template_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requirements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "predicate": {
+                  "type": "string"
+                },
+                "value_type": {
+                  "type": "string",
+                  "enum": [
+                    "string",
+                    "boolean",
+                    "integer",
+                    "number",
+                    "array",
+                    "object"
+                  ]
+                },
+                "activity_id": {
+                  "type": "string"
+                },
+                "importance": {
+                  "type": "string",
+                  "enum": [
+                    "blocking",
+                    "advisory"
+                  ]
+                },
+                "accepted_implementation": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "planned",
+                      "partial",
+                      "implemented",
+                      "verified",
+                      "not_applicable"
+                    ]
+                  }
+                },
+                "accepted_source_kinds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "satisfied",
+                    "missing",
+                    "not_applicable"
+                  ]
+                },
+                "fact_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "rationale": {
+                  "type": "string"
+                },
+                "followup": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "description",
+                "predicate",
+                "value_type",
+                "activity_id",
+                "importance",
+                "accepted_implementation",
+                "accepted_source_kinds",
+                "status",
+                "fact_ids",
+                "rationale",
+                "followup"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "requirement_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "requirement_id": {
+                  "type": "string"
+                },
+                "activity_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "importance": {
+                  "type": "string",
+                  "enum": [
+                    "blocking",
+                    "advisory"
+                  ]
+                },
+                "rationale": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "requirement_id",
+                "activity_ids",
+                "importance",
+                "rationale"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "question",
+          "layer",
+          "phases",
+          "activity_ids",
+          "rule_bindings",
+          "template_refs",
+          "requirements"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "contract_version": {
+      "type": "string",
+      "enum": [
+        "1.0",
+        "1.1"
+      ]
+    },
+    "shared_requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "predicate": {
+            "type": "string"
+          },
+          "value_type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "boolean",
+              "integer",
+              "number",
+              "array",
+              "object"
+            ]
+          },
+          "accepted_implementation": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "planned",
+                "partial",
+                "implemented",
+                "verified",
+                "not_applicable"
+              ]
+            }
+          },
+          "accepted_source_kinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "satisfied",
+              "missing",
+              "not_applicable"
+            ]
+          },
+          "fact_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "followup": {
+            "type": "string"
+          },
+          "scope_activity_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "description",
+          "predicate",
+          "value_type",
+          "accepted_implementation",
+          "accepted_source_kinds",
+          "status",
+          "fact_ids",
+          "rationale",
+          "followup",
+          "scope_activity_ids"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "rule_scopes",
+    "status",
+    "phase",
+    "questions"
+  ],
+  "additionalProperties": false
+}

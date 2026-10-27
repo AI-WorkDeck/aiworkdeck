@@ -124,6 +124,49 @@ class ProjectRepoHistoryTest {
     }
 
     @Test
+    void pendingChangesDoesNotWriteIndexOrObjects(@TempDir Path root) throws Exception {
+        ProjectRepoService s = seeded(root);
+        Path index = s.gitDir(7L).resolve("index");
+        byte[] before = Files.readAllBytes(index);
+        long objectsBefore;
+        try (var paths = Files.walk(s.gitDir(7L).resolve("objects"))) {
+            objectsBefore = paths.filter(Files::isRegularFile).count();
+        }
+        Files.writeString(s.workTree(7L).resolve("new.mp4"), "untracked recording");
+        Files.writeString(s.workTree(7L).resolve("合同.txt"), "修改正文");
+
+        assertEquals(2, s.pendingChanges(7L).size());
+
+        assertArrayEquals(before, Files.readAllBytes(index), "读取状态不得改写索引");
+        try (var paths = Files.walk(s.gitDir(7L).resolve("objects"))) {
+            assertEquals(objectsBefore, paths.filter(Files::isRegularFile).count(),
+                    "读取状态不得压缩文件写入版本库");
+        }
+    }
+
+    @Test
+    void pendingChangesComparesWorkingTreeWithHeadAcrossStagedChanges(@TempDir Path root) throws Exception {
+        ProjectRepoService s = seeded(root);
+        Path original = s.workTree(7L).resolve("合同.txt");
+        Path added = s.workTree(7L).resolve("新增.txt");
+        Files.writeString(original, "暂存修改");
+        Files.writeString(added, "暂存新增");
+        try (var repo = s.open(7L); var git = new org.eclipse.jgit.api.Git(repo)) {
+            git.add().addFilepattern(".").call();
+        }
+        Files.writeString(original, "初稿");
+        Files.delete(added);
+        assertTrue(s.pendingChanges(7L).isEmpty(), "暂存后还原到 HEAD 不应显示修改或删除新增文件");
+        try (var repo = s.open(7L); var git = new org.eclipse.jgit.api.Git(repo)) {
+            git.reset().setMode(org.eclipse.jgit.api.ResetCommand.ResetType.MIXED).call();
+            git.rm().setCached(true).addFilepattern("合同.txt").call();
+        }
+        assertTrue(s.pendingChanges(7L).isEmpty(), "索引已删除、磁盘保留 HEAD 原文仍无变化");
+        Files.writeString(original, "磁盘保留了新正文");
+        assertEquals(List.of(new FileChange("合同.txt", FileChange.Type.MODIFY)), s.pendingChanges(7L));
+    }
+
+    @Test
     void logForPathReturnsOnlyCommitsTouchingThatFile(@TempDir Path root) throws Exception {
         ProjectRepoService s = seeded(root);
         Files.writeString(root.resolve("projects/7/别的.txt"), "x");

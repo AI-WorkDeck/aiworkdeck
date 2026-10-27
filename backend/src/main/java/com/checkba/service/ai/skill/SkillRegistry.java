@@ -5,7 +5,6 @@ package com.checkba.service.ai.skill;
 
 import com.checkba.service.SystemSettingService;
 import com.checkba.service.ai.PluginService;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
@@ -116,7 +115,6 @@ public class SkillRegistry {
      */
     static final List<String> VOICE_MERGED_SKILL_IDS = List.of("text-to-speech", "meeting-recorder");
 
-    @PostConstruct
     public void init() {
         loadDisabledState();
         scan();
@@ -184,26 +182,33 @@ public class SkillRegistry {
     }
 
     /**
-     * 语言过滤（EN 版 PR5）：skill.yml 的 languages 列表声明可用的应用语言，
-     * **缺省（空）= 只在 zh-CN 可用**——存量 skill 没有该字段，英文版下自动隐藏，方向安全
-     * （如 listing-pathway 的触发词含 IPO/SPAC/VIE，会命中英文输入，必须真隐藏）。
-     * 收口选在 isAvailable：match（自动匹配）、activateForTurn（钉选）、activeSkill（注入前复查）
-     * 三条路径都过它，不会出现"列表过滤了、注入没过滤"的缝。
-     * zh-CN 下空列表恒可用，行为与引入前逐字节一致。
+     * 未声明 languages 的存量 skill 仅中文可用；zh-TW 可复用 zh-CN 声明，
+     * 其他非中文语种可复用 en-US 声明。所有匹配、钉选和注入路径共用 isAvailable 过滤。
      */
     private boolean supportsCurrentLanguage(SkillDefinition skill) {
         String lang = appLanguageService != null
                 ? appLanguageService.language()
                 : com.checkba.service.AppLanguageService.ZH_CN;
+        com.checkba.util.AppLocale current = com.checkba.util.AppLocale.fromCode(lang);
         List<String> langs = skill.getLanguages();
         if (langs == null || langs.isEmpty()) {
-            return com.checkba.service.AppLanguageService.ZH_CN.equals(lang);
+            return current.isChinese();
         }
-        return langs.contains(lang);
+        if (langs.contains(lang)) {
+            return true;
+        }
+        if (current == com.checkba.util.AppLocale.ZH_TW && langs.contains("zh-CN")) {
+            return true;
+        }
+        return !current.isChinese() && langs.contains("en-US");
     }
 
-    /** skill 是否为"仅手动"（不参与触发词自动匹配） */
+    /** skill 是否为"仅手动"（不参与触发词自动匹配）；工程内置工作流（builtin_workflow）恒为自动匹配 */
     public boolean isManual(String skillId) {
+        SkillDefinition skill = skills.get(skillId);
+        if (skill != null && skill.isBuiltinWorkflow()) {
+            return false;
+        }
         maybeRefreshDisabledState();
         return manualSkillIds.contains(skillId);
     }
@@ -224,8 +229,17 @@ public class SkillRegistry {
      * @throws IllegalArgumentException skillId 不在已注册列表中
      */
     public synchronized void setActivationMode(String skillId, ActivationMode mode) {
-        if (!skills.containsKey(skillId)) {
+        SkillDefinition skill = skills.get(skillId);
+        if (skill == null) {
             throw new IllegalArgumentException("Unknown skill: " + skillId);
+        }
+        if (skill.isBuiltinWorkflow()) {
+            disabledSkillIds.remove(skillId);
+            manualSkillIds.remove(skillId);
+            persist(DISABLED_KEY, disabledSkillIds);
+            persist(MANUAL_KEY, manualSkillIds);
+            log.info("Skill {} is a builtin workflow, keeping activation mode AUTO", skillId);
+            return;
         }
         if (mode == ActivationMode.DISABLED) {
             disabledSkillIds.add(skillId);
@@ -264,8 +278,12 @@ public class SkillRegistry {
         }
     }
 
-    /** skill 是否启用（默认启用，禁用名单持久化在 system_setting，带 TTL 缓存） */
+    /** skill 是否启用（默认启用，禁用名单持久化在 system_setting，带 TTL 缓存；工程内置工作流恒启用） */
     public boolean isEnabled(String skillId) {
+        SkillDefinition skill = skills.get(skillId);
+        if (skill != null && skill.isBuiltinWorkflow()) {
+            return true;
+        }
         maybeRefreshDisabledState();
         return !disabledSkillIds.contains(skillId);
     }
@@ -275,8 +293,15 @@ public class SkillRegistry {
      * @throws IllegalArgumentException skillId 不在已注册列表中
      */
     public synchronized void setEnabled(String skillId, boolean enabled) {
-        if (!skills.containsKey(skillId)) {
+        SkillDefinition skill = skills.get(skillId);
+        if (skill == null) {
             throw new IllegalArgumentException("Unknown skill: " + skillId);
+        }
+        if (skill.isBuiltinWorkflow()) {
+            disabledSkillIds.remove(skillId);
+            persist(DISABLED_KEY, disabledSkillIds);
+            log.info("Skill {} is a builtin workflow, keeping enabled", skillId);
+            return;
         }
         if (enabled) {
             disabledSkillIds.remove(skillId);
@@ -449,6 +474,8 @@ public class SkillRegistry {
         skill.setTriggers(asStringList(raw.get("triggers")));
         skill.setAllowedTools(asStringList(raw.get("allowed_tools")));
         applyToolPolicy(skill, raw.get("tool_policy"));
+        SkillDefinition.VerificationPolicy.parse(asString(raw.get("verification_policy")))
+                .ifPresent(skill::setVerificationPolicy);
         skill.setOutput(asString(raw.get("output")));
         skill.setRequires(asStringList(raw.get("requires")));
         skill.setCategory(asString(raw.get("category")));
@@ -462,11 +489,16 @@ public class SkillRegistry {
         // 应用语言相关的可选字段（EN 版 PR5）：缺省时全部为空，语义 = 只在 zh-CN 可用
         skill.setLanguages(asStringList(raw.get("languages")));
         skill.setNameEn(asString(raw.get("name_en")));
+        skill.setDescriptionEn(asString(raw.get("description_en")));
         skill.setTriggersEn(asStringList(raw.get("triggers_en")));
         skill.setOutputEn(asString(raw.get("output_en")));
         Boolean enabledByDefault = asBoolean(raw.get("enabled_by_default"));
         if (enabledByDefault != null) {
             skill.setEnabledByDefault(enabledByDefault);
+        }
+        Boolean builtinWorkflow = asBoolean(raw.get("builtin_workflow"));
+        if (builtinWorkflow != null) {
+            skill.setBuiltinWorkflow(builtinWorkflow);
         }
         String promptFile = asString(raw.get("prompt"));
         if (promptFile != null && !promptFile.isBlank()) {

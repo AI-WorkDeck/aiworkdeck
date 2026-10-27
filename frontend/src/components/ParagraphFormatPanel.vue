@@ -155,36 +155,37 @@ export default {
 </script>
 
 <style scoped>
-.pfp { display: flex; flex-direction: column; gap: 8px; padding: 4px 4px 2px; }
-.pfp-head { display: flex; align-items: baseline; justify-content: space-between; }
-.pfp-title { font-size: 13px; font-weight: 600; color: var(--awd-text); }
+.pfp { display: flex; flex-direction: column; gap: 9px; padding: 4px 4px 2px; }
+.pfp-head { display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 4px; border-bottom: 1px solid var(--awd-border); }
+.pfp-title { font-size: 12.5px; font-weight: 600; letter-spacing: 0.01em; color: var(--awd-text); }
 .pfp-scope { font-size: 11px; color: var(--awd-text-3); }
 .pfp-presets { display: flex; flex-wrap: wrap; gap: 5px; }
-.pfp-chip { padding: 3px 8px; border: 1px solid var(--awd-border); border-radius: 11px; font-size: 11px;
-  color: var(--awd-text-2); background: var(--awd-surface); }
-.pfp-chip:hover { border-color: var(--awd-mint); color: var(--awd-accent-text); }
+.pfp-chip { padding: 3px 9px; border: 1px solid var(--awd-border); border-radius: 11px; font-size: 11px;
+  color: var(--awd-text-2); background: var(--awd-surface-2, var(--awd-surface)); cursor: pointer; transition: border-color 0.12s, background 0.12s; }
+.pfp-chip:hover { border-color: var(--awd-mint); color: var(--awd-accent-text); background: var(--awd-accent-soft); }
 .pfp-chip.sm { padding: 2px 7px; font-size: 10.5px; }
-.pfp-grid { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 7px 8px; }
-.pfp-l { font-size: 12px; color: var(--awd-text-2); }
+.pfp-grid { display: grid; grid-template-columns: 68px 1fr; align-items: center; gap: 7px 8px; }
+.pfp-l { font-size: 11.5px; font-weight: 500; color: var(--awd-text-2); }
 .pfp-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
-.pfp-seg { display: flex; border: 1px solid var(--awd-border); border-radius: 5px; overflow: hidden; }
-.pfp-seg-b { padding: 3px 7px; font-size: 11.5px; color: var(--awd-text-2); border-right: 1px solid var(--awd-border); }
+.pfp-seg { display: flex; border: 1px solid var(--awd-border); border-radius: 5px; overflow: hidden; background: var(--awd-surface); }
+.pfp-seg-b { padding: 3px 7px; font-size: 11.5px; color: var(--awd-text-2); border-right: 1px solid var(--awd-border); cursor: pointer; }
 .pfp-seg-b:last-child { border-right: none; }
-.pfp-seg-b.on { background: var(--awd-accent-soft); color: var(--awd-accent-text); }
+.pfp-seg-b:hover { background: var(--awd-surface-2); }
+.pfp-seg-b.on { background: var(--awd-accent-soft); color: var(--awd-accent-text); font-weight: 500; }
 .pfp-num { width: 44px; height: 24px; padding: 0 5px; box-sizing: border-box; font-size: 12px; color: var(--awd-text);
   border: 1px solid var(--awd-border); border-radius: 4px; background: var(--awd-surface); }
 .pfp-u { font-size: 11px; color: var(--awd-text-3); }
 .pfp-dash { font-size: 11px; color: var(--awd-text-3); padding: 0 2px; }
 .pfp-seg.wrap { flex-wrap: wrap; }
 .pfp-acts { display: flex; justify-content: flex-end; gap: 6px; }
-.pfp-b { padding: 3px 11px; border: 1px solid var(--awd-border); border-radius: 5px; font-size: 12px; color: var(--awd-text-2); }
-.pfp-b:hover { border-color: var(--awd-border-strong); }
-.pfp-b.ok { border-color: var(--awd-mint); color: var(--awd-accent-text); background: var(--awd-accent-soft); }
+.pfp-b { padding: 3px 11px; border: 1px solid var(--awd-border); border-radius: 5px; font-size: 12px; color: var(--awd-text-2); cursor: pointer; }
+.pfp-b:hover { border-color: var(--awd-border-strong); background: var(--awd-surface-2); }
+.pfp-b.ok { border-color: var(--awd-mint); color: var(--awd-accent-text); background: var(--awd-accent-soft); font-weight: 500; }
 .pfp-b.ai { border-color: var(--awd-mint); color: var(--awd-accent-text); }
 .pfp-b.busy { opacity: 0.6; }
 .pfp-err { padding: 4px 7px; border-radius: 5px; background: var(--awd-danger-soft); color: var(--awd-danger-text); font-size: 11px; }
 .pfp-sec { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--awd-border); }
-.pfp-sec-t { font-size: 12px; font-weight: 600; color: var(--awd-text-2); }
+.pfp-sec-t { font-size: 11.5px; font-weight: 600; color: var(--awd-text-2); }
 .pfp-hint { font-size: 10.5px; color: var(--awd-text-3); flex: 1; min-width: 0; }
 .pfp-ta { width: 100%; height: 54px; padding: 5px 7px; box-sizing: border-box; font-size: 12px; line-height: 1.45; color: var(--awd-text);
   border: 1px solid var(--awd-border); border-radius: 5px; background: var(--awd-surface); }

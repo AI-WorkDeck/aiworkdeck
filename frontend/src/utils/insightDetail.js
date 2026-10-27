@@ -13,12 +13,20 @@
 //
 // 纯函数、不 import Vue/uni/i18n——测试 tests/insight/insightDetail.test.mjs 直接导入。
 
-/** 从若干别名里取第一个非空值。 */
+/** 从若干别名里取第一个非空值（数组元素以顿号拼接）。 */
 function pick(obj, keys) {
   if (!obj || typeof obj !== 'object') return ''
   for (const k of keys) {
     const v = obj[k]
     if (v == null) continue
+    if (Array.isArray(v)) {
+      const joined = v
+        .map((item) => (item != null && typeof item !== 'object' ? String(item).trim() : ''))
+        .filter(Boolean)
+        .join('、')
+      if (joined) return joined
+      continue
+    }
     if (typeof v === 'string' && v.trim() === '') continue
     if (typeof v === 'object') continue
     return String(v)
@@ -62,8 +70,8 @@ function unwrapEnvelope(r) {
   return r
 }
 
-/** 上游把结果放在数组里的常见键名。 */
-const LIST_KEYS = ['data', 'list', 'items', 'results', 'records', 'rows', 'cases', 'articles']
+/** 上游把结果放在数组里的常见键名（含法宝 get_law_list 的大写 Data）。 */
+const LIST_KEYS = ['data', 'Data', 'list', 'items', 'results', 'records', 'rows', 'cases', 'articles']
 
 /**
  * 把「结果」整形成 {records:[...], text:''}：
@@ -112,25 +120,70 @@ export function companyShareholders(detail) {
 
 // —————————————————————————— LAW ——————————————————————————
 
-const LAW_TITLE = ['title', 'law_name', 'lawName', 'name', '法规名称', '标题', '名称']
+const LAW_TITLE = ['title', 'Title', 'law_name', 'lawName', 'name', '法规名称', '标题', '名称']
 const LAW_ARTICLE = ['article', 'articleNo', 'number', 'no', '条号', '条文序号']
-const LAW_TIMELINESS = ['timeliness', 'validity', 'status', 'effectiveness', '时效性', '效力级别']
+const LAW_TIMELINESS = ['timeliness', 'TimelinessDic', 'validity', 'status', 'effectiveness', 'EffectivenessDic', '时效性', '效力级别']
 const LAW_CONTENT = ['content', 'text', 'articleContent', 'body', 'fullText', '条文内容', '正文', '内容']
+const ARTICLE_INLINE_BODY = /^(第[零〇一二三四五六七八九十百千万两\d]+条(?:之[零〇一二三四五六七八九十百千万两\d]+)?)(?:[\s\u3000：:、.．-]+([\s\S]+))?$/u
+
+function synthesizeLawMetaContent(record) {
+  let en = false
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') en = true
+    else if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') en = true
+  } catch (_) { /* ignore */ }
+  const docNo = pick(record, ['DocumentNO', 'doc_no', 'documentNo'])
+  const dept = pick(record, ['IssueDepartment', 'issueDepartment', '发布部门'])
+  const eff = pick(record, ['EffectivenessDic', 'effectiveness', '效力级别'])
+  const issueDate = pick(record, ['IssueDate', 'issueDate', '发布日期'])
+  const implDate = pick(record, ['ImplementDate', 'implementDate', '实施日期'])
+  const lines = [
+    docNo ? (en ? `Document No.: ${docNo}` : `发文字号：${docNo}`) : '',
+    dept ? (en ? `Issuing Authority: ${dept}` : `发布部门：${dept}`) : '',
+    eff ? (en ? `Level of Authority: ${eff}` : `效力级别：${eff}`) : '',
+    issueDate ? (en ? `Issue Date: ${issueDate}` : `发布日期：${issueDate}`) : '',
+    implDate ? (en ? `Effective Date: ${implDate}` : `实施日期：${implDate}`) : '',
+  ].filter(Boolean)
+  return lines.join('\n')
+}
 
 /**
  * 法条原文。返回 {title, article, timeliness, content, more:[…]}——
  * more 是同名法规的其余候选（关键词库 get_law_list 会返回一串）。
+ *
+ * 北大法宝 pkulaw-semantic 的 get_article/search_article 把「第五十条　用人单位应当……」整段
+ * 放在 article 字段里，没有独立的 content 字段；这里自动拆出条号与正文，避免下游因 content 为空
+ * 而把命中的法条当成「暂无可插入的资料」（dev-board#1289）。
  */
 export function lawArticle(detail) {
   const { records, text } = resultRecords(unwrapResult(detail))
   if (!records.length) return { title: '', article: '', timeliness: '', content: text, more: [] }
-  const first = records[0]
+  const activeIdx = records.findIndex((r) => pick(r, LAW_TIMELINESS).includes('现行有效'))
+  const ordered = activeIdx > 0
+    ? [records[activeIdx], ...records.slice(0, activeIdx), ...records.slice(activeIdx + 1)]
+    : records
+  const first = ordered[0]
+  let article = pick(first, LAW_ARTICLE)
+  let content = pick(first, LAW_CONTENT)
+  if (!content && article) {
+    const m = ARTICLE_INLINE_BODY.exec(article.trim())
+    if (m && m[2]) {
+      article = m[1]
+      content = m[2].trim()
+    } else if (!m) {
+      content = article
+      article = ''
+    }
+  }
+  if (!content) {
+    content = synthesizeLawMetaContent(first)
+  }
   return {
     title: pick(first, LAW_TITLE),
-    article: pick(first, LAW_ARTICLE),
+    article,
     timeliness: pick(first, LAW_TIMELINESS),
-    content: pick(first, LAW_CONTENT),
-    more: records.slice(1).map((r) => pick(r, LAW_TITLE)).filter(Boolean),
+    content,
+    more: ordered.slice(1).map((r) => pick(r, LAW_TITLE)).filter(Boolean),
   }
 }
 

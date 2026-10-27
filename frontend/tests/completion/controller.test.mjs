@@ -5,9 +5,10 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { JSDOM } from 'jsdom'
 import { attachWritingAssistance } from '../../src/composables/zetaOfficeCompletion.js'
+import { createWritingAssistanceHost } from '../../src/composables/writingAssistanceHost.js'
 
 const tick = () => new Promise(resolve => setTimeout(resolve, 0))
-const debounce = () => new Promise(resolve => setTimeout(resolve, 190))
+const debounce = () => new Promise(resolve => setTimeout(resolve, 10))
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r }); return { promise, resolve } }
 const entries = [
   { id: 'one', text: '北京当红晴天律师事务所', kind: 'COMPANY', scope: 'project', source: 'project', entityId: 1 },
@@ -24,7 +25,8 @@ function harness(t, overrides = {}) {
     send: msg => {
       if (msg.type === 'writing-assistance-state') { stateMessages.push(msg); return }
       messages.push(msg)
-      if (msg.action === 'preferences' || (msg.action === 'learn' && !overrides.deferLearning)) deliver({ type: 'writing-response', id: msg.id, session: msg.session, result: {} })
+      if (msg.action === 'preferences' && !overrides.deferPreferences) deliver({ type: 'writing-config', config: { ...msg.data, session: msg.session } })
+      if ((msg.action === 'preferences' && !overrides.deferPreferences) || (msg.action === 'learn' && !overrides.deferLearning)) deliver({ type: 'writing-response', id: msg.id, session: msg.session, result: {} })
     },
   }
   const execute = async (action, params) => {
@@ -53,7 +55,7 @@ function harness(t, overrides = {}) {
     openSettings: () => deliver({ type: 'writing-assistance-panel', open: true }),
     closeSettings: () => deliver({ type: 'writing-assistance-panel', open: false }) }
 }
-async function suggestions(h) { h.api.committed('北京当红'); await debounce(); assert.equal(h.input.getAttribute('aria-expanded'), 'true') }
+async function suggestions(h) { h.input.focus(); h.key(' ', { ctrlKey: true }); await tick(); assert.equal(h.input.getAttribute('aria-expanded'), 'true') }
 async function openManagement(h) {
   h.openSettings(); h.button('已学词库').click(); await tick()
   h.respond('refresh', {}); await tick()
@@ -64,10 +66,10 @@ test('跨文档偏好消息保留当前词库，切换文档仍清空旧词库',
   h.config({ items: [{ text: '向阳律师事务所', kind: 'COMPANY', source: 'variable', scope: 'project' }] })
   h.deliver({ type: 'writing-config', config: { session: 'doc-1', learning: false } })
   h.setContext({ before: '向阳' })
-  h.api.committed('向阳'); await debounce()
+  h.key(' ', { ctrlKey: true }); await tick()
   assert.equal(h.doc.querySelector('[role="option"]').firstChild.textContent, '向阳律师事务所')
   h.deliver({ type: 'writing-config', config: { session: 'doc-2', learning: false } })
-  h.api.committed('向阳'); await debounce()
+  h.key(' ', { ctrlKey: true }); await tick()
   assert.equal(h.input.getAttribute('aria-expanded'), 'false')
 })
 
@@ -90,7 +92,7 @@ test('候选接管 Tab/上下键并维护 ARIA，普通键和修饰方向键保�
 
 test('IME 组合不接受候选，旧上下文响应及禁用后的响应不能重新显示', async t => {
   const waiting = deferred(), h = harness(t, { get_completion_context: () => waiting.promise })
-  h.api.committed('北京当红'); await debounce()
+  h.key(' ', { ctrlKey: true }); await tick()
   h.input.dispatchEvent(new h.dom.window.CompositionEvent('compositionstart'))
   assert.equal(h.key('Tab', { isComposing: true }).handled, false)
   waiting.resolve({ success: true, available: true, before: '北京当红', token: 'old' }); await tick()
@@ -103,7 +105,7 @@ test('IME 组合不接受候选，旧上下文响应及禁用后的响应不能�
 
 test('禁用、关闭面板和销毁均使在飞建议失效', async t => {
   const waiting = deferred(), h = harness(t, { get_completion_context: () => waiting.promise })
-  h.api.committed('北京当红'); await debounce()
+  h.key(' ', { ctrlKey: true }); await tick()
   h.config({ enabled: false })
   waiting.resolve({ success: true, available: true, before: '北京当红', token: 'old' }); await tick()
   assert.equal(h.panel().hidden, true)
@@ -111,7 +113,7 @@ test('禁用、关闭面板和销毁均使在飞建议失效', async t => {
   assert.equal(h.doc.querySelector('.awd-writing-assistance'), null)
   assert.equal(h.input.getAttribute('aria-hidden'), 'true')
   assert.equal(h.input.hasAttribute('role'), false)
-  h.api.committed('北京当红'); await debounce()
+  h.key(' ', { ctrlKey: true }); await tick()
   assert.equal(h.queries().length, 1)
 })
 
@@ -222,7 +224,7 @@ test('缓存详情可复用，外查后刷新词库不破坏当前详情和选�
   const cached = { id: 'learned:7', text: '北京当红晴天律师事务所', kind: 'COMPANY', source: 'learned', scope: 'user', hasDetail: true }
   h.config({ items: [cached] })
   h.setContext({ before: cached.text })
-  h.api.committed('所'); await debounce()
+  h.key(' ', { ctrlKey: true }); await tick()
   h.button('查看已有资料').click()
   assert.equal(h.messages.find(m => m.action === 'detail').data.id, 'learned:7')
   h.respond('detail', { title: cached.text, variants: [{ text: '本地已有资料' }] }); await tick()
@@ -263,7 +265,7 @@ test('WORD/PHRASE 的低频学习项不抢候选；错误 session 的回复被�
     { id: 'learned:2', text: '违约损害赔偿', kind: 'PHRASE', source: 'learned', scope: 'user', uses: 2 },
   ] })
   h.setContext({ before: '违约' })
-  h.api.committed('违约'); await debounce()
+  h.key(' ', { ctrlKey: true }); await tick()
   assert.deepEqual([...h.doc.querySelectorAll('[role="option"]')].map(el => el.firstChild.textContent), ['违约损害赔偿'])
   h.api.invalidate()
   h.setContext({ available: false, hasSelection: true, selectedText: '违约责任', token: 'selection' })
@@ -319,11 +321,14 @@ test('真实编辑器 AI 通知只让对应 guest 失效，未开审阅面板也
   assert.equal(h.panel().hidden, true, 'AI 修改前发出的详情晚回也不复活')
 })
 
-test('光标移到已有前缀后重新给本地候选，不要求再敲一个字符', async t => {
+test('移动光标不再自动给词库候选，手动唤出仍使用当前位置', async t => {
   const h = harness(t)
   h.setContext({ before: '北京当红', token: 'new-position' })
   h.api.cursorMoved()
   await debounce()
+  assert.equal(h.input.getAttribute('aria-expanded'), 'false')
+  assert.equal(h.queries().length, 0)
+  h.key(' ', { ctrlKey: true }); await tick()
   assert.equal(h.input.getAttribute('aria-expanded'), 'true')
   h.key('Tab'); await tick()
   assert.equal(h.calls.find(c => c.action === 'accept_completion').params.token, 'new-position')
@@ -334,7 +339,7 @@ test('显示法规完整来源名称，接受使用实际输入形式，保留�
   const h = harness(t)
   h.config({ items: [{ text: '《民法典》', kind: 'LAW', scope: 'project' }] })
   h.setContext({ before: '民法', token: 'law-position' })
-  h.api.cursorMoved(); await debounce()
+  h.api.cursorMoved(); h.key(' ', { ctrlKey: true }); await tick()
   assert.ok(h.doc.querySelector('[role=option]').textContent.includes('《民法典》'))
   h.key('Tab'); await tick()
   assert.deepEqual(h.calls.find(c => c.action === 'accept_completion').params, { token: 'law-position', prefix: '民法', text: '民法典' })
@@ -453,22 +458,6 @@ test('Ctrl+Space手动无匹配有明确反馈，IME或只读时不接管快捷�
   assert.equal(h.key('/', { code: 'Slash', altKey: true }).handled, false)
 })
 
-test('首弹80ms、继续输入35ms调度；旧候选令牌在输入后立即失效', async t => {
-  const h = harness(t)
-  t.mock.timers.enable({ apis: ['setTimeout'] })
-  h.api.committed('北京当红')
-  t.mock.timers.tick(79); await Promise.resolve()
-  assert.equal(h.queries().length, 0)
-  t.mock.timers.tick(1); await Promise.resolve()
-  assert.equal(h.input.getAttribute('aria-expanded'), 'true')
-  h.key('a')
-  assert.equal(h.panel().hidden, true, '旧候选立即隐藏，无法点选旧令牌')
-  h.setContext({ before: '北京当红晴', token: 'new' })
-  h.api.committed('晴')
-  t.mock.timers.tick(35); await Promise.resolve()
-  assert.equal(h.input.getAttribute('aria-expanded'), 'true')
-})
-
 test('候选高度受光标一侧可用空间限制，窗口变化后重新定位而不清空资料', async t => {
   const h = harness(t)
   Object.defineProperty(h.dom.window, 'innerHeight', { value: 400 })
@@ -503,7 +492,7 @@ test('画布上不再有常驻入口；面板关着时根节点整块藏起来',
   assert.equal(h.panel().hidden, true)
   assert.equal(h.root().hidden, true)
   // 打字候选不是这颗按钮开出来的：它照弹，根节点跟着露出来。
-  h.api.committed('北京当红'); await debounce()
+  h.key(' ', { ctrlKey: true }); await tick()
   assert.equal(h.root().hidden, false)
   assert.equal(h.input.getAttribute('aria-expanded'), 'true')
 })
@@ -519,7 +508,7 @@ test('可用态与开合态回报给宿主；只有设置面板算「开着」',
   h.closeSettings()
   assert.equal(h.states().at(-1).open, false)
   // 打字候选/右键卡片不点亮工具栏那颗按钮。
-  h.api.committed('北京当红'); await debounce()
+  h.key(' ', { ctrlKey: true }); await tick()
   assert.equal(h.states().at(-1).open, false)
   // 不可写就没有这项能力，宿主据此把按钮整个收掉。
   h.config({ writable: false })
@@ -532,7 +521,7 @@ test('设置面板里说明右键查询要点一下才联网，开关文案不�
   const h = harness(t)
   h.openSettings()
   const text = h.panel().textContent
-  assert.ok(text.includes('自动弹出候选'), '面板内的开关不能再叫「自动补全」，会与面板标题同名')
+  assert.ok(text.includes('自动语义补全'), '面板内的开关不能再叫「自动补全」，会与面板标题同名')
   assert.ok(text.includes('选中文字后右键可查询机构 / 法规 / 案例，点了才联网、才可能扣费。'))
 })
 
@@ -546,7 +535,7 @@ test('宿主工具栏打开面板时客体输入框会失焦，面板不许跟�
   assert.equal(h.states().at(-1).open, true)
   // 候选列表仍然吃失焦：它钉着光标，焦点走了不该留在画布上。
   h.closeSettings()
-  h.api.committed('北京当红'); await debounce()
+  h.input.focus(); h.key(' ', { ctrlKey: true }); await tick()
   assert.equal(h.input.getAttribute('aria-expanded'), 'true')
   h.input.focus(); h.doc.querySelector('#outside').focus(); await tick()
   assert.equal(h.panel().hidden, true)
@@ -623,4 +612,236 @@ test('迟到的右键预解析不能覆盖新文档或关闭后的菜单', async
   waiting.resolve({ success: true, selectedText: '北京示例有限公司', token: 'old' }); await tick()
   assert.equal(h.panel().hidden, true)
   assert.equal(h.messages.some(m => m.action === 'lookup'), false)
+})
+
+const automaticText = '现有材料显示服务渠道较为分散，因此建议先明确受理流程和责任分工'
+const automaticResult = { view: { status: 'READY', advice: [{ text: '，以便及时跟进并反馈处理进度。', explanation: '承接当前段落的工作安排。', factIds: ['F1'], sourceIds: ['active-document'] }] } }
+const automaticRequests = h => h.messages.filter(m => m.action === 'semantic-auto-generate')
+async function advance(t, ms) { t.mock.timers.tick(ms); await Promise.resolve(); await Promise.resolve() }
+async function automatic(t, h) {
+  h.api.committed(automaticText)
+  await advance(t, 1800)
+  assert.equal(automaticRequests(h).length, 1)
+  h.respond('semantic-auto-generate', automaticResult)
+  await advance(t, 0)
+}
+
+test('输入只在停笔1800ms且新增20字后请求语义判断，不自动匹配词库', async t => {
+  const h = harness(t)
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] })
+  h.api.committed('北京当红')
+  await advance(t, 2000)
+  assert.equal(h.queries().length, 0)
+  assert.equal(automaticRequests(h).length, 0)
+  h.api.committed(automaticText)
+  await advance(t, 1799)
+  assert.equal(automaticRequests(h).length, 0)
+  await advance(t, 1)
+  assert.equal(automaticRequests(h).length, 1)
+  assert.equal(h.panel().hidden, true, '等待模型时不出现加载浮窗')
+  h.respond('semantic-auto-generate', automaticResult); await advance(t, 0)
+  assert.match(h.panel().textContent, /建议续写/)
+  assert.match(h.panel().textContent, /跟进并反馈/)
+  h.key('Tab'); await advance(t, 0)
+  assert.ok(h.messages.some(m => m.action === 'semantic-auto-accept'))
+  assert.equal(h.calls.some(c => c.action === 'accept_completion'), false, '语义建议通过快照协议接受')
+  h.respond('semantic-auto-accept', { applied: true }); await advance(t, 0)
+})
+
+test('持续输入、光标移动、IME与关闭使在途语义结果失效并发出取消', async t => {
+  const h = harness(t)
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] })
+  h.api.committed(automaticText); await advance(t, 1800)
+  h.api.cursorMoved()
+  assert.ok(h.messages.some(m => m.action === 'semantic-auto-cancel'))
+  h.respond('semantic-auto-generate', automaticResult); await advance(t, 0)
+  assert.equal(h.panel().hidden, true)
+  await advance(t, 45000)
+  h.api.committed(automaticText); await advance(t, 1800)
+  h.input.dispatchEvent(new h.dom.window.CompositionEvent('compositionstart'))
+  h.respond('semantic-auto-generate', automaticResult); await advance(t, 0)
+  assert.equal(h.panel().hidden, true)
+  h.input.dispatchEvent(new h.dom.window.CompositionEvent('compositionend'))
+  await advance(t, 45000)
+  h.api.committed(automaticText); await advance(t, 1800)
+  h.config({ enabled: false })
+  h.respond('semantic-auto-generate', automaticResult); await advance(t, 0)
+  h.api.committed(automaticText); await advance(t, 45000)
+  assert.equal(automaticRequests(h).length, 3)
+  assert.equal(h.panel().hidden, true)
+  assert.equal(h.key('Tab').handled, false)
+})
+
+test('Esc后暂停两分钟且不再提示同一建议，手动词库仍可用', async t => {
+  const h = harness(t)
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] })
+  await automatic(t, h)
+  h.key('Escape')
+  h.api.committed(automaticText); await advance(t, 45000)
+  assert.equal(automaticRequests(h).length, 1)
+  await advance(t, 76000)
+  h.api.committed(automaticText); await advance(t, 1800)
+  h.respond('semantic-auto-generate', automaticResult); await advance(t, 0)
+  assert.equal(h.panel().hidden, true)
+  h.key(' ', { ctrlKey: true }); await advance(t, 0)
+  assert.equal(h.doc.querySelectorAll('[role=option]').length, 2)
+})
+
+test('自动请求至少间隔45秒；EMPTY与失败静默，不靠词库兜底', async t => {
+  const h = harness(t)
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] })
+  h.api.committed(automaticText); await advance(t, 1800)
+  h.respond('semantic-auto-generate', { view: { status: 'EMPTY', advice: [] } }); await advance(t, 0)
+  h.api.committed(automaticText); await advance(t, 44000)
+  assert.equal(automaticRequests(h).length, 1)
+  h.api.committed(automaticText); await advance(t, 1800)
+  assert.equal(automaticRequests(h).length, 2)
+  h.respond('semantic-auto-generate', {}, 'network failed'); await advance(t, 0)
+  assert.equal(h.panel().hidden, true)
+  h.api.committed(automaticText); await advance(t, 45000)
+  assert.equal(automaticRequests(h).length, 2)
+})
+
+test('候选中的关闭按钮立即停止轮询与提示，重新启用不立刻弹窗', async t => {
+  const h = harness(t)
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] })
+  await automatic(t, h)
+  h.button('关闭自动补全').click(); await advance(t, 0)
+  assert.deepEqual(h.messages.findLast(m => m.action === 'preferences').data, { enabled: false })
+  assert.equal(h.panel().hidden, true)
+  h.api.committed(automaticText); await advance(t, 45000)
+  assert.equal(automaticRequests(h).length, 1)
+  h.config({ enabled: true }); await advance(t, 2000)
+  assert.equal(automaticRequests(h).length, 1)
+  h.api.committed(automaticText); await advance(t, 1800)
+  assert.equal(automaticRequests(h).length, 2)
+})
+
+test('语义生成轮询与打开有据续写、失焦的取消互不复活', async t => {
+  const h = harness(t)
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] })
+  h.api.committed(automaticText); await advance(t, 1800)
+  h.respond('semantic-auto-generate', { view: { status: 'RUNNING' } }); await advance(t, 0); await advance(t, 800)
+  assert.ok(h.messages.some(m => m.action === 'semantic-auto-poll'))
+  h.deliver({ type: 'semantic-writing-panel', open: true })
+  h.respond('semantic-auto-poll', automaticResult); await advance(t, 0)
+  assert.equal(h.panel().hidden, true)
+  await advance(t, 45000)
+  h.api.committed(automaticText); await advance(t, 1800)
+  h.doc.querySelector('#outside').focus()
+  h.respond('semantic-auto-generate', automaticResult); await advance(t, 0)
+  assert.equal(h.panel().hidden, true)
+})
+
+
+test('有据续写面板开着或正文从别处修改时不弹自动建议', async t => {
+  const h = harness(t)
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] })
+  const sheet = h.doc.createElement('div'); sheet.className = 'awd-semantic-sheet'; h.doc.body.append(sheet)
+  h.api.committed(automaticText); await advance(t, 1800)
+  assert.equal(automaticRequests(h).length, 0)
+  sheet.hidden = true
+  h.api.committed(automaticText); await advance(t, 1800)
+  h.respond('semantic-auto-generate', automaticResult); await advance(t, 0)
+  assert.equal(h.panel().hidden, false)
+  h.deliver({ type: 'writing-config', config: { session: 'doc-1', automatic: { state: 'STALE' } } })
+  assert.equal(h.panel().hidden, true)
+})
+
+test('候选可直接关闭自动弹出，重开恢复，手动补全不受影响', async t => {
+  const h = harness(t)
+  await suggestions(h)
+  h.button('关闭自动补全').click(); await tick()
+  assert.equal(h.panel().hidden, true)
+  assert.deepEqual(h.messages.findLast(m => m.action === 'preferences').data, { enabled: false })
+  h.config({ enabled: false })
+  const queries = h.queries().length
+  h.api.committed('北京当红'); await debounce()
+  assert.equal(h.queries().length, queries)
+  assert.equal(h.panel().hidden, true)
+  h.key('/', { altKey: true }); await tick()
+  assert.ok(h.doc.querySelector('[role="option"]'))
+  assert.equal(h.button('关闭自动补全'), undefined, '关闭时手动候选不冒充自动开启')
+  h.key('Escape')
+  h.config({ enabled: true })
+  await suggestions(h)
+  assert.ok(h.button('关闭自动补全'))
+})
+
+test('直接关闭保存失败显示失败且仍按原状态补全，迟到失败不干扰新输入', async t => {
+  const h = harness(t, { deferPreferences: true })
+  await suggestions(h)
+  h.button('关闭自动补全').click()
+  h.config({ enabled: true })
+  h.respond('preferences', undefined, 'PREFERENCES_SAVE_FAILED'); await tick()
+  assert.match(h.panel().textContent, /设置未能保存，仍保持原状态/)
+  h.key('Escape')
+  await suggestions(h)
+  h.button('关闭自动补全').click()
+  h.api.committed('北京当红')
+  h.respond('preferences', undefined, '旧保存失败'); await debounce()
+  assert.equal(h.panel().hidden, true, '旧错误不能覆盖新的输入')
+  await suggestions(h)
+  assert.ok(h.doc.querySelector('[role="option"]'))
+  assert.doesNotMatch(h.panel().textContent, /旧保存失败/)
+})
+
+test('右键菜单融入「AI 修订选中内容…」：默认收起不抢焦点，点开输入回车即发 revise 请求并收起卡片', async t => {
+  const h = harness(t)
+  h.setContext({ available: false, hasSelection: true, selectedText: '违约金按合同总额百分之三十计算', token: 'sel-revise' })
+  h.canvas.dispatchEvent(new h.dom.window.MouseEvent('contextmenu', { bubbles: true, clientX: 160, clientY: 140 }))
+  await tick()
+  assert.equal(h.panel().hidden, false)
+  assert.equal(h.panel().dataset.mode, 'context')
+  assert.equal(h.doc.activeElement, h.input, '默认收起时不抢 IME 焦点')
+  const toggleBtn = h.button('AI 修订选中内容…')
+  assert.ok(toggleBtn, '右键菜单应显示 AI 修订选中内容… 入口')
+  const form = h.panel().querySelector('.awd-wa-revise-form')
+  assert.ok(form && form.hidden === true, '默认不展开内联输入框')
+
+  toggleBtn.click()
+  assert.equal(form.hidden, false, '点击后内联展开修订输入框')
+  assert.equal(toggleBtn.getAttribute('aria-expanded'), 'true', '展开后切换按钮标记 aria-expanded=true')
+  const input = h.panel().querySelector('.awd-wa-revise-input')
+  assert.equal(h.doc.activeElement, input, '展开后自动聚焦到修订意见输入框')
+
+  input.value = '违约金比例下调为百分之十，语气更中性'
+  input.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+  await tick()
+
+  const req = h.messages.find(m => m.action === 'revise')
+  assert.ok(req, '应向宿主发送 revise 请求')
+  assert.deepEqual(req.data, {
+    text: '违约金按合同总额百分之三十计算',
+    instruction: '违约金比例下调为百分之十，语气更中性',
+  })
+  h.respond('revise', { ok: true })
+  await tick()
+  assert.equal(h.panel().hidden, true, '发送后右键菜单收起')
+
+  // 验证 writingAssistanceHost 的 revise 分发
+  const revisedPayloads = []
+  const host = createWritingAssistanceHost({
+    projectId: 9,
+    fileId: 42,
+    userId: 'u1',
+    writable: true,
+    execute: async () => ({ success: true }),
+    send() {},
+    storage: { get: () => null, set() {} },
+    api: { list: async () => ({ items: [] }) },
+    onRevise: (payload) => revisedPayloads.push(payload),
+  })
+  host.start()
+  await host.handle({
+    __lo: 'lo-relay',
+    type: 'writing-request',
+    id: 99,
+    session: host.session,
+    action: 'revise',
+    data: { text: '违约金按合同总额百分之三十计算', instruction: '改为百分之十' },
+  })
+  assert.deepEqual(revisedPayloads, [
+    { text: '违约金按合同总额百分之三十计算', instruction: '改为百分之十', fileId: 42, projectId: 9 },
+  ])
 })

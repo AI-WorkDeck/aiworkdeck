@@ -33,7 +33,7 @@ function topLevel(name) {
 }
 // EXEC 里的方法：两格缩进的 `name(p) {` 到同缩进的 `},`。
 function method(name) {
-  const m = SRC.match(new RegExp('\\n  ' + name + '\\((p)?\\) \\{\\n[\\s\\S]*?\\n  \\},\\n'))
+  const m = SRC.match(new RegExp('\\n  ' + name + '\\([^\\n)]*\\) \\{\\n[\\s\\S]*?\\n  \\},\\n'))
   assert.ok(m, 'office_thread.js 里找不到原语 ' + name)
   return m[0].trim()
 }
@@ -47,7 +47,7 @@ const KEY = { DOWN: 1024, UP: 1025, LEFT: 1026, RIGHT: 1027, HOME: 1028, END: 10
 const SERVICE = { writer: 'com.sun.star.text.TextDocument', calc: 'com.sun.star.sheet.SpreadsheetDocument', impress: 'com.sun.star.presentation.PresentationDocument' }
 
 function build(kind, opts = {}) {
-  const seen = { posted: [], dispatched: [], writerInserts: [], timers: [], fullScreen: true }
+  const seen = { posted: [], dispatched: [], writerInserts: [], timers: [], fullScreen: true, refreshScheduled: 0 }
   const componentWindow = { name: 'component-window' }
   const container = {}
   Object.defineProperty(container, 'FullScreen', { get: () => seen.fullScreen, set: (v) => { seen.fullScreen = v } })
@@ -84,6 +84,7 @@ function build(kind, opts = {}) {
     UI_COMMANDS: { line_start: '.uno:GoToStartOfLine', page_down: '.uno:PageDown', bold: '.uno:Bold' },
     deselect: () => ({ success: true, name: 'escape', writer: true }),
     ensureFullScreen: () => { seen.fullScreen = true },
+    scheduleNativeKeySelectionRefresh: () => { seen.refreshScheduled++ },
     setTimeout: (fn) => { seen.timers.push(fn) },
   }
   const body = consts + '\nlet keyRobot = null;\n' + HELPERS.map(topLevel).join('\n')

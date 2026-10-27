@@ -125,7 +125,11 @@ test('坏文件：解析返回 null，扫描跳过且不抛', (t) => {
 
 test('真实字体文件（若构建产物里有）也能解析', (t) => {
   const root = path.join(__dirname, '../../frontend/dist/zetaoffice')
-  const cands = ['cjk-kai.ttf', 'cjk-fangsong.ttf', 'cjk-serif.otf', 'cjk.ttc'].map((n) => path.join(root, n)).filter((p) => fs.existsSync(p))
+  const cands = [
+    'cjk-kai.ttf', 'cjk-fangsong.ttf', 'cjk-serif.otf', 'cjk.ttc',
+    'cjk-kr.otf', 'cjk-kr-serif.otf', 'cjk-thai.ttf', 'cjk-thai-serif.ttf',
+    'cjk-khmer.ttf', 'cjk-lao.ttf', 'cjk-myanmar.ttf', 'cjk-arabic.ttf', 'cjk-devanagari.ttf',
+  ].map((n) => path.join(root, n)).filter((p) => fs.existsSync(p))
   if (!cands.length) { t.skip('no built fonts'); return }
   for (const p of cands) {
     const r = sf.parseFontFile(p)

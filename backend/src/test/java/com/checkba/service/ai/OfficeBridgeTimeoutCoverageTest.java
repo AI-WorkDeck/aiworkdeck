@@ -43,9 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       这一档在下面逐条列出并写明理由，新增时得自己想清楚再加。</li>
  * </ul>
  *
- * <p><b>读取类刻意不在这张表里</b>：LOWA 桥的读取类是 dev-board#729 ③ 拿真机 telemetry
- * （86 次超时里 79 次是读命令）换来的，插件桥这边没有同等证据，而读取超时只是白等、
- * 不会造成双写。等有了真机数据再说，不跟着抄。
+ * <p>大文档读取与跨文档参考读取同为 120 秒；瞬时 UI 选择仍为 30 秒。
  */
 class OfficeBridgeTimeoutCoverageTest {
 
@@ -172,6 +170,10 @@ class OfficeBridgeTimeoutCoverageTest {
         while (m.find()) dispatched.add(m.group(1));
         assertTrue(dispatched.size() > 50, "命令抽取失败（只找到 " + dispatched.size() + " 条），正则该跟着源码改");
 
+        // 跨文档参考读取不在工具包装类中，由 OpenDocSource 下发。
+        assertTrue(Files.readString(Path.of("src/main/java/com/checkba/service/ai/ref/OpenDocSource.java"))
+                .contains("\"read_for_reference\""));
+        dispatched.add("read_for_reference");
         Set<String> unknown = new TreeSet<>(table().keySet());
         unknown.removeAll(dispatched);
         assertTrue(unknown.isEmpty(),
@@ -179,9 +181,19 @@ class OfficeBridgeTimeoutCoverageTest {
     }
 
     @Test
+    void documentReadsHaveEnoughTime() {
+        for (String command : Set.of("get_text", "get_selection", "search", "get_formatting",
+                "table_read", "get_comments", "get_revisions", "excel_get_range", "excel_search",
+                "excel_get_overview", "excel_get_comments", "ppt_get_slides", "ppt_get_slide_details",
+                "ppt_table_read", "read_for_reference")) {
+            assertEquals(120, OfficeBridgeService.timeoutSecondsFor(command), command);
+        }
+    }
+
+    @Test
     @DisplayName("表外命令仍是 30 秒默认值，null 键不抛 NPE")
     void defaultsUnchanged() {
-        assertEquals(30, OfficeBridgeService.timeoutSecondsFor("get_text"));
+        assertEquals(30, OfficeBridgeService.timeoutSecondsFor("excel_select_range"));
         assertEquals(30, OfficeBridgeService.timeoutSecondsFor("replace_text"));
         assertEquals(30, OfficeBridgeService.timeoutSecondsFor(null));
     }

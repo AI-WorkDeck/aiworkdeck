@@ -37,7 +37,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -90,11 +89,16 @@ public class EvidenceVerifyService {
     /** 在跑的批次：key = projectId:userId，value = 取消标记。照 PluginJobService 的 AtomicBoolean 轮询法。 */
     private final Map<String, AtomicBoolean> runningBatches = new ConcurrentHashMap<>();
 
-    private final ExecutorService textPool = Executors.newCachedThreadPool(r -> {
-        Thread t = new Thread(r, "evidence-verify-text");
-        t.setDaemon(true);
-        return t;
-    });
+    // 有界线程池：core=2, max=8, 队列 256，打满时由调用线程兜底执行，避免无界 cached pool
+    private final ExecutorService textPool = new java.util.concurrent.ThreadPoolExecutor(
+            2, 8, 60L, java.util.concurrent.TimeUnit.SECONDS,
+            new java.util.concurrent.LinkedBlockingQueue<>(256),
+            r -> {
+                Thread t = new Thread(r, "evidence-verify-text");
+                t.setDaemon(true);
+                return t;
+            },
+            new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
 
     @PreDestroy
     void shutdown() {

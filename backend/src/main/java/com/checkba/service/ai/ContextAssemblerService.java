@@ -122,6 +122,35 @@ public class ContextAssemblerService {
     @Autowired(required = false)
     private StyleProfileResolver styleProfileResolver;
 
+    /**
+     * 跨项目只读附件（dev-board#1479）。字段注入 + required=false，口径同
+     * {@link #styleProfileResolver}——不能往构造器里加 final 牵动既有测试；
+     * null 时视觉附件维持原来的项目内围栏。
+     */
+    @Autowired(required = false)
+    private com.checkba.service.ProjectMemberService projectMemberService;
+
+    public void setProjectMemberService(com.checkba.service.ProjectMemberService projectMemberService) {
+        this.projectMemberService = projectMemberService;
+    }
+
+    /**
+     * 附件来自其他项目时给 <file>/<image> 补 project / readonly 属性，
+     * 让模型知道这是一份跨项目只读引用（dev-board#1479）。
+     */
+    private String extraFileAttrs(com.checkba.controller.ai.AiAgentController.ContextItem item) {
+        if (item == null) return "";
+        StringBuilder sb = new StringBuilder();
+        if (item.getProjectName() != null && !item.getProjectName().isBlank()) {
+            sb.append(" project=\"").append(attrSafe(item.getProjectName())).append("\"");
+        }
+        if (item.getProjectName() != null && !item.getProjectName().isBlank()
+                || Boolean.TRUE.equals(item.getReadOnly())) {
+            sb.append(" readonly=\"true\"");
+        }
+        return sb.toString();
+    }
+
     /** 供测试直接装配。 */
     void setStyleProfileResolver(StyleProfileResolver resolver) {
         this.styleProfileResolver = resolver;
@@ -409,8 +438,9 @@ public class ContextAssemblerService {
             ProjectContextHolder.setUserId(userId);
         }
 
-        // 应用语言：本次组装全程按它二选一（协议面 zh/en 完全一致，只有措辞与 Language 行不同）
+        // 既有中英文路径保持原文；新增语种复用同一基底，仅替换最终 Language 规则。
         final boolean english = appLanguageService.isEnglish();
+        final String rawLang = appLanguageService.language();
 
         // 本轮的 projectId 数值形态。**必须在扇出之前解析**：下面几个后台任务都按它查库。
         // 纯本地解析、无副作用，提前到这里不改变任何行为。
@@ -466,8 +496,8 @@ public class ContextAssemblerService {
         String currentPhase = determinePhase(planId, taskListId);
 
         // [Injection] Enforcement (HIGHEST PRIORITY)
-        // zh/en 差异只有 Language 一节（SIMPLIFIED CHINESE ONLY -> ENGLISH ONLY）与
-        // artifact 命名示例；停机条件/输出顺序/工具规则两版逐条一致。
+        // 中英文基底保持原文，其他语种在最终组装后只替换 Language 规则。
+        // 停机条件/输出顺序/工具规则不因应用语言变化。
         //
         // **这一段三档能力共用，所以不许点名任何挑客户端的工具**（dev-board#809 / K29）：
         // doc_* / sheet_* / slide_* / office_* 在别的能力档下压根不可见，提到名字就是在
@@ -551,7 +581,13 @@ public class ContextAssemblerService {
         if (agentMode != AgentMode.ASK) {
             for (com.checkba.service.ai.skill.SkillRouter.ActiveSkill active
                     : skillRouter.activeSkills(runId)) {
-                systemText.append(skillRouter.promptInjectionFor(active.definition()));
+                String injection = skillRouter.promptInjectionFor(active.definition(), userId, projectId);
+                if (injection == null) {
+                    injection = skillRouter.promptInjectionFor(active.definition());
+                }
+                if (injection != null) {
+                    systemText.append(injection);
+                }
             }
         }
 
@@ -723,7 +759,8 @@ public class ContextAssemblerService {
                         // 模型能直接转述给用户的说明。原来它照样被当成附件正文写进 CDATA，
                         // 于是模型会「引用」一句 Java 异常文案当合同原文。
                         systemText.append("<file id=\"").append(item.getId())
-                                  .append("\" name=\"").append(attrSafe(item.getName())).append("\">")
+                                  .append("\" name=\"").append(attrSafe(item.getName())).append("\"")
+                                  .append(extraFileAttrs(item)).append(">")
                                   .append(english ? "This attachment could not be read: "
                                                   : "该附件内容暂不可读：")
                                   .append(attrSafe(isToolFailureText(content)
@@ -742,7 +779,8 @@ public class ContextAssemblerService {
                     int effectiveCap = Math.min(maxCharsPerFile, Math.max(0, attachmentCharBudget));
                     if (effectiveCap <= 0) {
                         systemText.append("<file id=\"").append(item.getId())
-                                  .append("\" name=\"").append(attrSafe(item.getName())).append("\">")
+                                  .append("\" name=\"").append(attrSafe(item.getName())).append("\"")
+                                  .append(extraFileAttrs(item)).append(">")
                                   .append(english
                                           ? "Body omitted: this turn's combined attachment budget is used up. "
                                             + "Call extract_file_text with this id if you need its content."
@@ -762,7 +800,8 @@ public class ContextAssemblerService {
                     }
                     attachmentCharBudget -= content.length();
                     systemText.append("<file id=\"").append(item.getId())
-                              .append("\" name=\"").append(attrSafe(item.getName())).append("\"><![CDATA[\n");
+                              .append("\" name=\"").append(attrSafe(item.getName())).append("\"")
+                              .append(extraFileAttrs(item)).append("><![CDATA[\n");
                     systemText.append(fenceSafe(content));
                     systemText.append("\n]]></file>\n");
                     ledger.attachment(item.getId(), item.getName(), item.getFileType(), "file", false);
@@ -781,6 +820,10 @@ public class ContextAssemblerService {
         // 直送不了才 OCR 并明示降级。null = 活跃文档不是图片；true = 模型能看到图像本身；
         // false = 模型手上只有 OCR 转写。末位提醒据此选文案。
         Boolean activeImageVisible = null;
+        int activeBodyStart = -1;
+        int activeBodyEnd = -1;
+        String activeBody = null;
+        boolean activeBodyTruncated = false;
         if (activeContext != null && activeContext.getId() != null && !activeContext.getId().isEmpty()) {
             log.info("[Context] Injecting active document: id={}, name={}, inline={}",
                      activeContext.getId(), activeContext.getName(),
@@ -919,23 +962,18 @@ public class ContextAssemblerService {
             // 别注入一段空 CDATA 让模型以为文档本身是空的。
             // 工具返回的错误/警告文案同样不是正文（dev-board#779 K8）——见 isToolFailureText。
             if (!isToolFailureText(content) && content != null && !content.isBlank()) {
-                // 截断上限与普通附件解耦（审查 E-10）：附件是「顺手带一份参考」，
-                // 活跃文档是「用户此刻正在看的那一份」，按 5 万砍会把「通篇审一下」
-                // 变成只审前三分之一却说得像通篇审过
                 int maxChars = contextProperties.getFiles().getMaxCharsActiveDocument();
-                if (content.length() > maxChars) {
-                    // 内联路径已经截过并留了自己的标记时不再截第二刀（会把那个标记切掉），
-                    // 但提示照发——对用户来说「只读了前 N 字」是同一件事
-                    if (!content.endsWith(INLINE_TRUNCATION_MARKER)) {
-                        content = truncateAtCharBoundary(content, maxChars) + "\n... [TRUNCATED - File too long]";
-                    }
-                    ledger.notice(ContextTurnSink.TRUNCATED, activeContext.getId(),
-                            activeContext.getName(), String.valueOf(maxChars));
-                }
-
+                // Older clients cap locally at exactly 200k without reporting truncation.
+                // At that boundary completeness is unknown: label the supplied prefix explicitly.
+                boolean inlineBoundary = (activeContext.getInlineContent() != null
+                        || activeContext.getInlineContentHash() != null) && content.length() >= 200_000;
+                activeBodyTruncated = content.length() > maxChars || inlineBoundary;
+                activeBody = truncateAtCharBoundary(content, Math.min(content.length(), Math.max(0, maxChars)));
                 systemText.append("<active_document id=\"").append(activeContext.getId())
                           .append("\" name=\"").append(attrSafe(activeContext.getName())).append("\"><![CDATA[\n");
-                systemText.append(fenceSafe(content));
+                activeBodyStart = systemText.length();
+                systemText.append(fenceSafe(activeBody));
+                activeBodyEnd = systemText.length();
                 systemText.append("\n]]></active_document>\n");
             } else {
                 // 正文暂时读不到也要保留文档标识，模型仍可用读取类工具（按会话能力）直接读
@@ -956,6 +994,17 @@ public class ContextAssemblerService {
                 systemText.append("<active_document id=\"").append(activeContext.getId())
                           .append("\" name=\"").append(attrSafe(activeContext.getName()))
                           .append("\">").append(readHint).append("</active_document>\n");
+            }
+            String rawSelection = activeContext.getSelectionText();
+            if (rawSelection != null && !rawSelection.isBlank()) {
+                String trimmedSelection = rawSelection.trim();
+                String normalizedSelection = truncateAtCharBoundary(trimmedSelection,
+                        Math.min(trimmedSelection.length(), 2000));
+                volatileText.append("\n\n## Active Selection\n");
+                volatileText.append("<active_selection id=\"").append(activeContext.getId())
+                            .append("\" name=\"").append(attrSafe(activeContext.getName())).append("\"><![CDATA[\n");
+                volatileText.append(fenceSafe(normalizedSelection));
+                volatileText.append("\n]]></active_selection>\n");
             }
             } // end non-image active document
         }
@@ -1017,7 +1066,7 @@ public class ContextAssemblerService {
                     if (mem.getMemoryKey() != null) {
                         volatileText.append(mem.getMemoryKey()).append(": ");
                     }
-                    volatileText.append(mem.getMemoryValue()).append("\n");
+                    volatileText.append(MemoryManager.cleanMemoryValue(mem.getMemoryValue())).append("\n");
                 }
             }
         }
@@ -1072,6 +1121,24 @@ public class ContextAssemblerService {
         // 通道层按它拆 content block 并只缓存前半段。标记恰好一次，且必须在最后拼——
         // 任何在这行之后再往 systemText 追加的内容都会掉进被缓存的前缀里。
         systemText.append(SYSTEM_VOLATILE_SEPARATOR).append(volatileText);
+
+        if ("zh-TW".equals(rawLang)) {
+            int at = systemText.indexOf("SIMPLIFIED CHINESE ONLY");
+            if (at >= 0) {
+                systemText.replace(at, at + "SIMPLIFIED CHINESE ONLY".length(),
+                        "TRADITIONAL CHINESE (繁體中文, zh-TW) ONLY");
+            }
+        } else if (rawLang != null && !"zh-CN".equals(rawLang) && !"en-US".equals(rawLang)) {
+            com.checkba.util.AppLocale locale = com.checkba.util.AppLocale.fromCode(rawLang);
+            String englishRule = "- ENGLISH ONLY for all user-facing output.";
+            String localizedRule = "- Reply in " + locale.englishName() + " (" + locale.nativeName()
+                    + ", " + locale.code() + ") by default for all user-facing output."
+                    + " If the user explicitly writes in another language, follow the user's message language.";
+            int at = systemText.indexOf(englishRule);
+            if (at >= 0) {
+                systemText.replace(at, at + englishRule.length(), localizedRule);
+            }
+        }
 
         messages.add(dev.langchain4j.data.message.SystemMessage.from(systemText.toString()));
 
@@ -1152,7 +1219,42 @@ public class ContextAssemblerService {
                         clientCapabilityService.capabilityOf(conversationId),
                         clientCapabilityService.officeHostOf(conversationId)))
                 + templateProfileFact(activeContext, clientCapabilityService.capabilityOf(conversationId), projectId)
-                + clarificationReminder(agentMode, userPrompt, english);
+                + clarificationReminder(agentMode, userPrompt, english)
+                + questionPresentationReminder(agentMode, english);
+
+        // Limit the actual active-document injection after history compression. The reserve
+        // covers tools added by the orchestrator; this is a conservative estimate, not a
+        // provider-tokenizer guarantee. Keep the full body in the in-memory cache.
+        if (activeBodyStart >= 0) {
+            String withoutBody = systemText.substring(0, activeBodyStart) + systemText.substring(activeBodyEnd);
+            long fixedTokens = (long) contextProperties.getSystemPromptReserve() + conservativeTokens(withoutBody);
+            long historyTokens = 0;
+            for (dev.langchain4j.data.message.ChatMessage history : historyMessages) {
+                if (history instanceof dev.langchain4j.data.message.UserMessage u) historyTokens += conservativeTokens(u.singleText());
+                else if (history instanceof dev.langchain4j.data.message.AiMessage a) historyTokens += conservativeTokens(a.text());
+            }
+            long remaining = Math.max(0L, (long) contextProperties.maxContextTokensFor(modelKey)
+                    - fixedTokens - historyTokens - conservativeTokens(userText)
+                    - contextProperties.getMemoryReserve() - contextProperties.getResponseReserve()
+                    - (long) visionAttachments.size() * contextProperties.getVision().getTokenEstimatePerImage() - 256L);
+            int allowedChars = prefixCharsForTokens(activeBody, remaining);
+            boolean budgetTruncated = allowedChars < activeBody.length();
+            if (activeBodyTruncated || budgetTruncated) {
+                String prefix = truncateAtCharBoundary(activeBody, allowedChars);
+                String marker = budgetTruncated
+                        ? "\n... [TRUNCATED - Model context budget; only the prefix above was supplied. Read remaining sections before claiming complete review.]"
+                        : INLINE_TRUNCATION_MARKER;
+                systemText.replace(activeBodyStart, activeBodyEnd, fenceSafe(prefix + marker));
+                messages.set(0, dev.langchain4j.data.message.SystemMessage.from(systemText.toString()));
+                ledger.notice(ContextTurnSink.TRUNCATED, activeContext.getId(),
+                        activeContext.getName(), String.valueOf(prefix.length()));
+                userText += english
+                        ? "\n[System reminder] Only the first " + prefix.length()
+                            + " characters of the active document were supplied; completeness is not guaranteed. Read the remaining sections before claiming a full-document review."
+                        : "\n[系统提醒] 本轮仅提供活跃文档前 " + prefix.length()
+                            + " 个字符，不能据此认定全文完整。如需作全文审查结论，须先分段读取其余正文。";
+            }
+        }
 
         if (visionAttachments.isEmpty()) {
             // 没有图片时**保持旧构造**。语义上「只含一个 TextContent 的 list」与纯文本等价
@@ -1299,7 +1401,8 @@ public class ContextAssemblerService {
                 log.warn("[Vision] File not found: id={}", item.getId());
                 return null;
             }
-            String denied = com.checkba.service.ai.tools.ToolFileGuard.rejectIfOutsideProject(file);
+            String denied = com.checkba.service.ai.tools.ToolFileGuard
+                    .rejectIfCannotRead(file, projectMemberService);
             if (denied != null) {
                 log.warn("[Vision] Refusing image attachment id={}: {}", item.getId(), denied);
                 return null;
@@ -1699,8 +1802,23 @@ public class ContextAssemblerService {
                   + "不要去 list_files / search_project_files 找模板文件夹，也不要调 `doc_apply_style_profile`。";
     }
 
+    /** Common to ordinary conversations and plugin/skill workflows; never infer a question from prose. */
+    static String questionPresentationReminder(AgentMode mode, boolean english) {
+        boolean hasAskTool = mode == null || mode == AgentMode.AGENT;
+        String protocol = hasAskTool ? "ask_user" : "<question>...</question>";
+        return english
+                ? "\n\n[Interaction contract] Only when a real user choice or missing information prevents useful progress, use "
+                    + protocol + " to present an interactive question and end the turn. Do not ask the user to type A/B, a number, or an option into chat prose. "
+                    + "This also applies inside plugin/skill workflows. Preserve required confirmation details in the question. "
+                    + "Clear requests, capability questions that request action, and answers already given do not require another question; proceed."
+                : "\n\n[交互约定] 仅在确有需要用户决定的选择或缺失信息阻碍继续完成任务时，使用 "
+                    + protocol + " 显示可交互问题卡并结束本轮；不要只在正文列出选项后要求用户在聊天中回复字母、编号或选项。"
+                    + "插件和技能流程同样遵守此约定，必要的确认细节保留在问题中。"
+                    + "要求明确、以能力问句提出的行动要求、用户已经回答过的事项，直接继续，不为展示卡片而反问。";
+    }
+
     /**
-     * 「拿不准先问」的末位提醒（dev-board#868），拼在用户消息的<b>最末尾</b>。
+     * 「拿不准先问」的末位提醒（dev-board#868），拼在用户消息末尾的交互约定之前。
      *
      * <p>为什么非挂末位不可：同样的规则在基底 prompt 的 Clarification 一节与 AGENT 模式约束里
      * 都写了，但弱模型对 system prompt 中段的行为约束稳定无视（PR#209 实证，本仓的
@@ -1760,7 +1878,7 @@ public class ContextAssemblerService {
             return activeDocumentReminderEn(activeContext, capability, officeHost);
         }
         String docLabel = activeDocDisplayName(activeContext.getName());
-        return switch (capability) {
+        String baseReminder = switch (capability) {
             case OFFICE -> switch (officeHost) {
                 // 末位只留判据句与测试钉住的几个名字，完整工具目录在 system 的「文档工具」片段里（dev-board#1073）
                 case EXCEL -> "\n\n[系统提醒] 用户此刻在表格软件（Microsoft Excel 或 WPS 表格）中打开着工作簿" + docLabel + "，"
@@ -1823,6 +1941,57 @@ public class ContextAssemblerService {
                         + "**不要**把报告正文写进当前文档。被当作材料、依据引用的文件是输入，不是写入目标。";
             };
         };
+        return baseReminder + activeSelectionReminder(activeContext, capability, officeHost, false);
+    }
+
+    /**
+     * 当前文档选区的末位提醒（dev-board#1430）：无选区时返回空串（保持存量行为零变化）。
+     */
+    private String activeSelectionReminder(com.checkba.controller.ai.AiAgentController.ContextItem activeContext,
+                                           ClientCapabilityService.Capability capability,
+                                           ClientCapabilityService.OfficeHost officeHost,
+                                           boolean english) {
+        if (activeContext == null || activeContext.getSelectionText() == null || activeContext.getSelectionText().isBlank()) {
+            return "";
+        }
+        String trimmed = activeContext.getSelectionText().trim();
+        String excerpt = truncateAtCharBoundary(trimmed, Math.min(trimmed.length(), 2000));
+        if (english) {
+            String toolHint = switch (capability) {
+                case OFFICE -> switch (officeHost) {
+                    case EXCEL -> "operate on the selected cells via office_excel_* tools";
+                    case POWERPOINT -> "operate on the selected slide text via office_ppt_* tools";
+                    default -> "use office_replace_text (targeting this selected excerpt) so the revision lands in-place as native Word tracked changes without spending a round discovering the selection";
+                };
+                case NONE -> "focus your analysis or suggested revision on this selected excerpt";
+                default -> switch (lowaDocKind(activeContext)) {
+                    case "sheet" -> "operate on this selected content via sheet_* tools";
+                    case "slide" -> "operate on this selected content via slide_* tools";
+                    case "text" -> "use text_find_replace to revise this selected excerpt directly in-place";
+                    default -> "use doc_find_replace or doc_replace_selection to revise this selected excerpt directly in-place with tracked changes — do NOT spend a round calling doc_get_cursor_context to rediscover the selection";
+                };
+            };
+            return "\n[Active selection] The user currently has the following excerpt selected in the active document (also in <active_selection>): \""
+                    + excerpt + "\". When the user gives revision feedback, asks to polish/rewrite, or does not specify another section, target this selected excerpt by default — "
+                    + toolHint + ".";
+        }
+        String toolHint = switch (capability) {
+            case OFFICE -> switch (officeHost) {
+                case EXCEL -> "优先调用 office_excel_* 工具针对该选中区域操作";
+                case POWERPOINT -> "优先调用 office_ppt_* 工具针对该选中内容操作";
+                default -> "优先调用 office_replace_text（以该选中片段为原文）直接就地修订（以 Word 原生修订呈现），无需再调工具确认选区";
+            };
+            case NONE -> "请围绕该选中片段作答或给出修改建议";
+            default -> switch (lowaDocKind(activeContext)) {
+                case "sheet" -> "优先调用 sheet_* 工具针对该选中内容操作";
+                case "slide" -> "优先调用 slide_* 工具针对该选中内容操作";
+                case "text" -> "优先调用 text_find_replace 直接替换该选中片段";
+                default -> "优先调用 doc_find_replace 或 doc_replace_selection 直接对该选中片段做就地修订（修订留痕），**无需**再调 doc_get_cursor_context 探测选区";
+            };
+        };
+        return "\n[当前选区] 用户已在当前文档中选中以下片段（完整内容亦见 <active_selection>）：「"
+                + excerpt + "」。当用户提出修改意见、润色要求或未指明其他段落时，默认针对这段选中内容操作——"
+                + toolHint + "。";
     }
 
     /**
@@ -1856,19 +2025,17 @@ public class ContextAssemblerService {
     }
 
     /**
-     * 内联正文被截断时留下的尾巴。**注入处据它判「这段已经截过了」**，
-     * 不然会被按活跃文档上限再截一刀，把这个更具体的标记本身切掉、换成通用的那个
-     *（客户端上传的正文太长 vs 文件本身太长，对用户是两件事）。
+     * 包括旧插件恰好截至 200k 的边界：只能确认收到此前缀，不能保证全文完整。
+     * 模型预算可能进一步缩短前缀；缓存始终保存上传的原文而非这个标记。
      */
-    private static final String INLINE_TRUNCATION_MARKER = "\n... [TRUNCATED - Inline content too long]";
+    private static final String INLINE_TRUNCATION_MARKER = "\n... [TRUNCATED - Inline content too long] Only the supplied prefix is available; completeness is not guaranteed. Read remaining sections before claiming complete review.";
 
     /**
      * 活跃文档正文来源三选一：
      * 1) 请求随带的内联正文（Office 插件等场景——文档在客户端本地，后端没有可读的 fileId）优先，
      *    同时按会话存入 InlineContentCache 供后续「省传」轮次取用；
      * 2) 只带内联正文哈希（文档自上一轮起没变，客户端省掉了整篇正文的上行）：凭哈希查缓存，
-     *    命中即复用；未命中（缓存已被 LRU 驱逐、或哈希对不上说明文档已改）返回 null，
-     *    由调用方按「正文暂不可读」现状处理——模型可改用读取类工具，不报错；
+     *    命中即复用；未命中明确失败要求重传，不能让模型当作无正文继续；
      * 3) 两者都没有时走既有 read_document(fileId) 路径。
      * 三条路径产出同格式正文，后续统一由调用方做 CDATA 包裹与 maxCharsPerFile 截断。
      */
@@ -1877,14 +2044,6 @@ public class ContextAssemblerService {
             String conversationId) {
         String inline = activeContext.getInlineContent();
         if (inline != null && !inline.isEmpty()) {
-            // 上限与「活跃文档正文上限」是同一个概念，走同一个配置项（dev-board#793 K14 ⑥）。
-            // 两处各写一个数的后果就是 E-10 那条：这里按 20 万截、注入处再按 5 万砍一刀，
-            // 实际生效的是小的那个，而插件每轮上传的正文有一大半是白传的。
-            int inlineMax = contextProperties.getFiles().getMaxCharsActiveDocument();
-            if (inline.length() > inlineMax) {
-                // 超限正文不入缓存：缓存的内存上界按每条上限字符估算
-                return truncateAtCharBoundary(inline, inlineMax) + INLINE_TRUNCATION_MARKER;
-            }
             inlineContentCache.put(conversationId, inline);
             return inline;
         }
@@ -1892,12 +2051,45 @@ public class ContextAssemblerService {
         if (hash != null && !hash.isBlank()) {
             String cached = inlineContentCache.get(conversationId, hash);
             if (cached == null) {
-                log.info("[Context] Inline content hash miss for conversation {}, falling back to no inline body",
-                        conversationId);
+                throw new InlineContentCache.CacheMiss();
             }
             return cached;
         }
         return legalTools.read_document(activeContext.getId());
+    }
+
+    // Chinese and other non-ASCII text can consume substantially more than chars/2.
+    // Use two tokens per Unicode code point, and the configured ratio only for ASCII.
+    private double estimatedCodePointTokens(int codePoint) {
+        return codePoint > 127 ? 2.0 : 1.0 / Math.max(0.1, contextProperties.getCharsPerToken());
+    }
+
+    private long conservativeTokens(String text) {
+        if (text == null) return 0;
+        double tokens = 0;
+        for (int i = 0; i < text.length();) {
+            int cp = text.codePointAt(i);
+            tokens += estimatedCodePointTokens(cp);
+            i += Character.charCount(cp);
+        }
+        return (long) Math.ceil(tokens);
+    }
+
+    private int prefixCharsForTokens(String text, long budget) {
+        double tokens = 0;
+        int i = 0;
+        while (i < text.length()) {
+            int cp = text.codePointAt(i);
+            double cost = estimatedCodePointTokens(cp);
+            // fenceSafe expands the CDATA terminator from three ASCII characters to six.
+            if (cp == '>' && i >= 2 && text.charAt(i - 1) == ']' && text.charAt(i - 2) == ']') {
+                cost += 3 * estimatedCodePointTokens('a');
+            }
+            if (tokens + cost > budget) break;
+            tokens += cost;
+            i += Character.charCount(cp);
+        }
+        return i;
     }
 
     /**
@@ -2020,15 +2212,16 @@ public class ContextAssemblerService {
 1. **FORBIDDEN ACTIONS** - 以下操作在 Ask 模式下完全禁止：
    - DO NOT output `<artifact>` tags - 不生成任何计划或任务清单
    - DO NOT output `<process>` tags - 不执行任何操作流程
-   - 除 memory_list、memory_read、memory_search 外，不允许调用任何工具
+   - 除 memory_list、memory_read、memory_search、version_status、version_history、version_changes 外，不允许调用任何工具
    - memory_write、memory_edit、memory_delete、save_memory 等写操作严格禁止
 
 2. **ALLOWED ACTIONS** - 在 Ask 模式下你只能：
    - 直接回答用户问题（使用 `<thinking>` + 纯文本或 `<final>` 标签）
    - 基于已有上下文（文件内容、历史记录）进行分析和解答
    - 可用 memory_list、memory_read、memory_search 只读查询当前用户有权访问的长期记忆
+   - 可用 version_status、version_history、version_changes 只读检查项目版本；禁止提交、取回、恢复或合并
    - 提供建议和意见，但不执行任何操作
-   - 如果用户请求需要工具才能完成，请告知用户切换到 Agent 模式
+   - 如果用户请求需要修改内容或执行其他工具，请告知用户切换到 Agent 模式
 
 3. **OUTPUT FORMAT**:
    <thinking>分析用户意图...</thinking>
@@ -2177,15 +2370,16 @@ public class ContextAssemblerService {
 1. **FORBIDDEN ACTIONS** - the following are completely prohibited in Ask mode:
    - DO NOT output `<artifact>` tags - no plans or task lists
    - DO NOT output `<process>` tags - no operation flows
-   - Do not call any tool except memory_list, memory_read, and memory_search
+   - Do not call any tool except memory_list, memory_read, memory_search, version_status, version_history, and version_changes
    - memory_write, memory_edit, memory_delete, save_memory, and all other writes are prohibited
 
 2. **ALLOWED ACTIONS** - in Ask mode you may ONLY:
    - Answer the user's question directly (using `<thinking>` + plain text or the `<final>` tag)
    - Analyze and explain based on context you already have (file contents, conversation history)
    - Use memory_list, memory_read, and memory_search to read long-term memory the current user may access
+   - Use version_status, version_history, and version_changes to inspect project versions; commits, pulls, restores, and merges are prohibited
    - Offer advice and opinions, without performing any operation
-   - If the user's request requires tools to complete, tell the user to switch to Agent mode
+   - If the user's request needs changes or other tools, tell the user to switch to Agent mode
 
 3. **OUTPUT FORMAT**:
    <thinking>Analyzing the user's intent...</thinking>
@@ -2390,7 +2584,7 @@ All doc_* editing and reading tools act directly on this document. You need NOT 
                                             ClientCapabilityService.Capability capability,
                                             ClientCapabilityService.OfficeHost officeHost) {
         String docLabel = activeDocDisplayNameEn(activeContext.getName());
-        return switch (capability) {
+        String baseReminder = switch (capability) {
             case OFFICE -> switch (officeHost) {
                 case EXCEL -> "\n\n[System reminder] The user currently has the workbook " + docLabel
                         + " open in Microsoft Excel or WPS Spreadsheets; the active worksheet's content is inlined in the system prompt's "
@@ -2470,6 +2664,7 @@ All doc_* editing and reading tools act directly on this document. You need NOT 
                         + "material or evidence is an input, not a write target.";
             };
         };
+        return baseReminder + activeSelectionReminder(activeContext, capability, officeHost, true);
     }
     void setMemoryDocumentServiceForTest(MemoryDocumentService service) {
         this.memoryDocumentService = service;

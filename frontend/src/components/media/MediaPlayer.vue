@@ -36,7 +36,7 @@
         <div class="mp-hit" @click="onStageClick" @dblclick="onStageDblClick"></div>
 
         <div v-if="stageStatus === 'loading'" class="mp-spinner" aria-hidden="true"></div>
-        <div v-else-if="stageStatus === 'error'" class="mp-stage-msg" role="alert">{{ $t('files.player.playFailed') }}</div>
+        <div v-else-if="stageStatus === 'error'" class="mp-stage-msg" role="alert">{{ failureMessage || $t('files.player.playFailed') }}</div>
         <div v-else-if="stageStatus === 'pip'" class="mp-stage-msg">
           <svg class="mp-stage-msg-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path v-for="(d, gi) in ICONS.pip" :key="gi" :d="d" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
@@ -152,7 +152,7 @@
           <div class="mp-mark-btn" role="button" tabindex="0" @click="playFromMark" @keydown.enter.space.prevent.stop="playFromMark">{{ $t('files.locate.playFromMark') }}</div>
           <div class="mp-mark-close" role="button" tabindex="0" :aria-label="$t('files.locate.close')" :title="$t('files.locate.close')" @click="markVisible = false" @keydown.enter.space.prevent.stop="markVisible = false">×</div>
         </div>
-        <div v-if="stageStatus === 'error'" class="mp-card-msg is-error" role="alert">{{ $t('files.player.playFailed') }}</div>
+        <div v-if="stageStatus === 'error'" class="mp-card-msg is-error" role="alert">{{ failureMessage || $t('files.player.playFailed') }}</div>
         <div v-else-if="ccState === 'empty'" class="mp-card-msg">{{ $t('files.captions.empty') }}</div>
       </div>
       <MediaTranscript
@@ -176,7 +176,7 @@ import MediaControls from './MediaControls.vue'
 import MediaTranscript from './MediaTranscript.vue'
 import { ICONS } from '@/config/icons.js'
 import {
-  getFileBytesUrl, getMeetingByFile, getMeetingRecording,
+  getFileBytesUrl, getFileAudioPreviewUrl, getMeetingByFile, getMeetingRecording,
   registerMeetingFromFile, transcribeMeetingRecording,
 } from '@/services/api.js'
 import { getAuthHeaders, getSessionId } from '@/utils/auth.js'
@@ -205,6 +205,7 @@ export default {
   name: 'MediaPlayer',
   components: { MediaControls, MediaTranscript },
   props: {
+    sourceUrl: { type: String, default: '' },
     kind: { type: String, default: 'video' }, // 'video' | 'audio'
     // 需要 id / wpsFileId / name / fileType / projectId
     file: { type: Object, default: null },
@@ -226,6 +227,7 @@ export default {
       loading: true,
       buffering: false,
       failed: false,
+      failureMessage: '',
       fullscreen: false,
       pipActive: false,
       pipAvailable: false,
@@ -380,6 +382,8 @@ export default {
 
     // ==================== 媒体元素 ====================
     setupMedia() {
+      this.failed = false
+      this.failureMessage = ''
       const f = this.file
       if (!f) return
       let el
@@ -429,8 +433,15 @@ export default {
       this._media = el
       this._fellBack = false
       this._autoplayed = false
+      if (String(f.fileType).toLowerCase() === 'qta') {
+        // QTA 可能包含浏览器不能识别的 APAC/多层录音；只播放后端安全选轨后的 MP3。
+        this._fellBack = true
+        if (this.sourceUrl) this.markFailed({ message: this.$t('files.player.qtaExtractFirst') })
+        else this.loadBlob(true)
+        return
+      }
       // 直链流式播放（#1025）：媒体元素设不了请求头，鉴权走 ?token=
-      this._streamUrl = buildStreamUrl(getFileBytesUrl(f.id), getSessionId())
+      this._streamUrl = this.sourceUrl || buildStreamUrl(getFileBytesUrl(f.id), getSessionId())
       el.src = this._streamUrl
     },
     teardownMedia() {
@@ -588,6 +599,7 @@ export default {
     },
     markFailed(detail) {
       this.failed = true
+      this.failureMessage = detail?.message || ''
       this.loading = false
       this.buffering = false
       this.playing = false
@@ -595,19 +607,20 @@ export default {
     },
     // 直链不通时的回退（原 FilePreview.loadMediaResource 的 XHR blob 逻辑，连竞态防护一起搬来）：
     // 带 X-Session-Id 整个拉成 blob 再播。只回退一次，blob 也失败就是真的放不了。
-    loadBlob() {
+    loadBlob(qtaPreview = false) {
       const f = this.file
       if (!f) return
-      const url = getFileBytesUrl(f.id)
+      const url = qtaPreview ? getFileAudioPreviewUrl(f.id) : (this.sourceUrl || getFileBytesUrl(f.id))
       const reqId = (this._mediaReqId = (this._mediaReqId || 0) + 1)
       this.loading = true
       const headers = getAuthHeaders() || {}
-      const mimeType = mimeTypeFor(f.fileType)
+      const mimeType = qtaPreview ? 'audio/mpeg' : mimeTypeFor(f.fileType)
       const xhr = new XMLHttpRequest()
       xhr.open('GET', url, true)
+      xhr.timeout = qtaPreview ? 300000 : 60000
       xhr.responseType = 'blob' // 直接要 blob，避开 arraybuffer 的大小限制
       Object.keys(headers).forEach((key) => xhr.setRequestHeader(key, headers[key]))
-      xhr.onload = () => {
+      xhr.onload = async () => {
         if (this._destroyed || this._mediaReqId !== reqId) return // 已换文件或卸载，丢弃陈旧响应
         this._xhr = null
         if (xhr.status === 200) {
@@ -619,7 +632,12 @@ export default {
           if (this._media) this._media.src = this._blobUrl
         } else {
           console.error('[MediaPlayer] blob 回退请求失败 status=', xhr.status)
-          this.markFailed({ code: 0, status: xhr.status })
+          let message = ''
+          if (qtaPreview && String(xhr.getResponseHeader('Content-Type')).startsWith('text/plain')) {
+            try { message = await xhr.response.text() } catch (e) { /* 使用通用播放失败提示 */ }
+            if (this._destroyed || this._mediaReqId !== reqId) return
+          }
+          this.markFailed({ code: 0, status: xhr.status, message })
         }
       }
       xhr.onerror = () => {
@@ -627,6 +645,11 @@ export default {
         this._xhr = null
         console.error('[MediaPlayer] blob 回退网络错误')
         this.markFailed({ code: 2 })
+      }
+      xhr.ontimeout = () => {
+        if (this._destroyed || this._mediaReqId !== reqId) return
+        this._xhr = null
+        this.markFailed({ message: this.$t('files.player.previewTimeout') })
       }
       this._xhr = xhr
       xhr.send()

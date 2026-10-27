@@ -17,7 +17,7 @@ const CODE = stripComments(SRC)
 
 // 从起始位置抠出一段花括号配平的函数体（跳过字符串里的括号）
 function braceBody(src, header) {
-  const at = src.indexOf(header)
+  const at = src.indexOf('\n    ' + header + ' {')
   assert.ok(at >= 0, `找不到 ${header}`)
   let i = src.indexOf('{', at)
   const start = i + 1
@@ -48,9 +48,9 @@ function braceBody(src, header) {
 // await 回来再读 this.renameProjectName，写进标题的是空串（显示成「未命名项目」），
 // 而服务端存的其实是正确的新名字。名字必须在 await 之前取下来。
 function buildConfirmRename(renameProject, uni) {
-  const body = braceBody(CODE, 'async confirmRenameProject()')
+  const body = braceBody(CODE, 'async confirmRenameProject(event)')
   // eslint-disable-next-line no-new-func
-  return new Function('renameProject', 'uni', `return async function confirmRenameProject() {${body}}`)(
+  return new Function('renameProject', 'uni', `return async function confirmRenameProject(event) {${body}}`)(
     renameProject,
     uni
   )
@@ -61,7 +61,7 @@ test('确认重命名后立刻 blur（uni 的 confirm 必然触发），标题�
   const renameProject = () => new Promise((r) => { resolveRename = r })
   const fn = buildConfirmRename(renameProject, { showToast() {} })
   const ctx = {
-    projectId: 7,
+    projectId: 7, renameProjectTargetId: 7, canRenameProject: true,
     project: { name: '旧名字' },
     renameProjectName: '新名字',
     isRenamingProject: true,
@@ -80,7 +80,7 @@ test('重命名请求带上的也是确认那一刻的名字', async () => {
   const seen = []
   const renameProject = (id, name) => { seen.push([id, name]); return Promise.resolve({ code: 0 }) }
   const fn = buildConfirmRename(renameProject, { showToast() {} })
-  const ctx = { projectId: 7, project: {}, renameProjectName: '  带空格的名字  ', $t: (k) => k }
+  const ctx = { projectId: 7, renameProjectTargetId: 7, canRenameProject: true, isRenamingProject: true, project: {}, renameProjectName: '  带空格的名字  ', $t: (k) => k }
   await fn.call(ctx)
   assert.deepEqual(seen, [[7, '带空格的名字']])
 })

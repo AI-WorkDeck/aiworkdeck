@@ -46,7 +46,7 @@
         <view v-else-if="isOffice" class="preview-unsupported">
           <text>{{ $t('files.officePreviewUnsupported') }}</text>
           <text class="preview-hint">{{ $t('files.fileTypeHintOpenLocal', { type: file.fileType || $t('files.unknown') }) }}</text>
-          <button class="btn-open-local" type="default" size="mini" @tap="handleOpenLocal">
+          <button v-if="!sourceUrl" class="btn-open-local" type="default" size="mini" @tap="handleOpenLocal">
             {{ isDesktopShell ? $t(revealInFolderKey) : $t('files.openFileInBrowser') }}
           </button>
         </view>
@@ -54,10 +54,10 @@
         <!-- PDF 预览：本地 blob 由浏览器/Electron 内置 PDF 引擎原生渲染，数据不出本机（#36） -->
         <view v-else-if="isPdf" class="preview-pdf">
           <!-- #ifdef H5 -->
-          <iframe v-if="blobUrl" :src="pdfSrc" class="preview-iframe" frameborder="0"></iframe>
+          <iframe v-if="pdfResourceUrl" :key="pdfResourceUrl" ref="pdfViewer" :src="pdfSrc" referrerpolicy="no-referrer" class="preview-iframe" frameborder="0" @load="onPdfViewerLoad" @error="onPdfViewerError"></iframe>
           <!-- #endif -->
           <!-- #ifndef H5 -->
-          <web-view v-if="blobUrl" :src="pdfSrc" />
+          <web-view v-if="pdfResourceUrl" :key="pdfResourceUrl" ref="pdfViewer" :src="pdfSrc" referrerpolicy="no-referrer" @load="onPdfViewerLoad" @error="onPdfViewerError" />
           <!-- #endif -->
 
           <!-- EvidenceLink 引文定位卡（P3）：跳页由 pdfSrc 的 #page= 完成，这张卡负责
@@ -141,6 +141,7 @@
             ref="mediaPlayer"
             :key="mediaKey"
             :kind="isVideo ? 'video' : 'audio'"
+            :source-url="sourceUrl"
             :file="file"
             :project-id="projectId"
             :locator-sec="mediaLocatorSec"
@@ -164,13 +165,7 @@
           </view>
           <view v-if="archiveLoading" class="archive-status"><text>{{ $t('files.readingArchive') }}</text></view>
           <view v-else-if="archiveError" class="archive-status archive-error"><text>{{ archiveError }}</text></view>
-          <scroll-view v-else scroll-y class="archive-list">
-            <view v-for="(entry, i) in archiveEntries" :key="i" class="archive-entry">
-              <svg class="entry-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path v-for="(d, gi) in (entry.dir ? ICONS.folder : ICONS.doc)" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
-              <text class="entry-path">{{ entry.path }}</text>
-              <text class="entry-size" v-if="!entry.dir">{{ formatFileSize(entry.size) }}</text>
-            </view>
-          </scroll-view>
+          <ArchiveEntriesPane v-else :key="file.id + '-' + (file.wpsFileId || '')" :file="file" :entries="archiveEntries" />
         </view>
 
         <!-- 不支持预览的文件类型 -->
@@ -178,7 +173,7 @@
           <text>{{ $t('files.previewUnsupportedType') }}</text>
           <text class="preview-hint">{{ $t('files.fileTypeHint', { type: file.fileType || $t('files.unknown') }) }}</text>
           <text class="preview-hint">{{ $t('files.fileIdHint', { id: file.wpsFileId || file.id }) }}</text>
-          <button class="btn-open-local" type="default" size="mini" @tap="handleOpenLocal">
+          <button v-if="!sourceUrl" class="btn-open-local" type="default" size="mini" @tap="handleOpenLocal">
             {{ isDesktopShell ? $t(revealInFolderKey) : $t('files.openFileInBrowser') }}
           </button>
         </view>
@@ -190,7 +185,7 @@
 <script>
 import { getFileBytesUrl, getArchiveEntries, extractArchive } from '@/services/api.js'
 import { getAuthHeaders, getSessionId } from '@/utils/auth.js'
-import { ICONS } from '@/config/icons.js'
+import { buildStreamUrl } from '@/utils/media/mediaSource.js'
 import { getFileLocalPath } from '@/services/api.js'
 import { host } from '@/services/host.js'
 import { revealInFolderKey } from '@/utils/windowChrome.js'
@@ -198,6 +193,7 @@ import { shouldAcceptResponse } from '@/utils/requestGeneration.js'
 import { previewKindOf } from '@/utils/media/mediaTypes.js'
 import { shouldGrabMediaFocus } from '@/utils/media/mediaShortcuts.js'
 import MediaPlayer from '@/components/media/MediaPlayer.vue'
+import ArchiveEntriesPane from '@/components/ArchiveEntriesPane.vue'
 import {
   parsePdfLocator, parseImageRect, parseMediaStartSec,
   imageTransform, imageRectBox, rotatedDisplaySize, normalizeRotation,
@@ -215,11 +211,14 @@ const IS_H5 = false
 // 图片查看器缩放范围：10% ~ 800%，到边界停住不继续缩
 const IMAGE_MIN_SCALE = 0.1
 const IMAGE_MAX_SCALE = 8
+const PDF_VIEWER_ACK_TIMEOUT_MS = 15000
 
 export default {
   name: 'FilePreview',
-  components: { MediaPlayer },
+  components: { MediaPlayer, ArchiveEntriesPane },
   props: {
+    // A read-only archive entry is supplied as a prepared blob, never as a project file ID.
+    sourceUrl: { type: String, default: '' },
     file: {
       type: Object,
       default: null
@@ -249,6 +248,7 @@ export default {
       textContent: '',
       loading: false,
       blobUrl: '',
+      pdfStreamUrl: '',
       docxLoading: false,
       docxRenderFailed: false,
       // docx-preview 仅在 H5/桌面（Chromium）渲染；非 H5 落 Office 占位分支
@@ -287,14 +287,18 @@ export default {
     }
   },
   computed: {
+    previewLoadIdentity() {
+      // 对象替换与原地内容版本更新共用一个 watch，切文件时只加载一次。
+      return { file: this.file, version: this.file && this.file.wpsFileId }
+    },
     revealInFolderKey() {
       return revealInFolderKey()
     },
-    ICONS() { return ICONS },
     isDesktopShell() {
       return !!(host.fs && host.fs.showItemInFolder)
     },
     fileUrl() {
+      if (this.sourceUrl) return this.sourceUrl
       if (!this.file) {
         console.log('FilePreview: file 为空')
         return ''
@@ -380,9 +384,10 @@ export default {
     },
     // 定位用的是 appliedLocator（prop 的本地副本）：宿主收到 locator-consumed 会把 prop 清空，
     // 直接读 prop 的话 pdf 的 #page= 会跟着掉、iframe 重载回第 1 页。
+    pdfResourceUrl() { return this.pdfStreamUrl || this.blobUrl },
     pdfSrc() {
       const loc = this.pdfLocate
-      return this.blobUrl + (loc && loc.page ? '#page=' + loc.page : '')
+      return this.pdfResourceUrl + (loc && loc.page ? '#page=' + loc.page : '')
     },
     // {page, quote, rects}；缺字段的 locator（OCR 常见）在这里就退化成 null
     pdfLocate() {
@@ -410,11 +415,11 @@ export default {
     }
   },
   watch: {
-    file: {
+    previewLoadIdentity: {
       immediate: true,
-      handler(newFile) {
-        console.log('FilePreview file 变化:', newFile)
-        this.reloadPreview(newFile)
+      handler(identity, previous) {
+        if (previous && identity.file === previous.file && !identity.version) return
+        this.reloadPreview(identity.file)
       }
     },
     // 宿主 openFile(file, {locator}) 落到 tab.pendingLocator → 这里的 prop。收到即拷贝成
@@ -426,18 +431,13 @@ export default {
         if (!loc) return
         this.applyLocator(loc)
       }
-    },
-    // AI 修改文件后（pdf_highlight/pdf_redact 等）后端会更新 wpsFileId 并发 reload_file，
-    // reload 处理是对既有 file 对象 Object.assign 原地更新——对象引用不变，上面的
-    // file watch 不会触发。监听 wpsFileId 让预览重新拉取最新字节（编辑器同款语义）。
-    'file.wpsFileId'(newVal, oldVal) {
-      if (newVal && newVal !== oldVal) {
-        console.log('FilePreview wpsFileId 变化，重新加载预览:', newVal)
-        this.reloadPreview(this.file)
-      }
     }
   },
   beforeUnmount() {
+    if (this._pdfViewerAck) this._pdfViewerAck.finish(false)
+    this._mediaReqId = (this._mediaReqId || 0) + 1
+    this._mediaXhr?.abort()
+    this._archiveReqSeq = (this._archiveReqSeq || 0) + 1
     this.clearEvidenceRectTimers()
     if (this.blobUrl) {
       URL.revokeObjectURL(this.blobUrl)
@@ -457,14 +457,38 @@ export default {
     this.syncImageViewportListeners()
   },
   methods: {
-    // file watch 与 wpsFileId watch 共用的加载分发（原 file watch handler 逻辑原样抽出）
-    reloadPreview(newFile) {
+    async reloadFromBackend(force = true) {
+      if (!this.file || !this.isPdf) return false
+      return this.reloadPreview(this.file, force)
+    },
+    onPdfViewerLoad(event) {
+      const pending = this._pdfViewerAck
+      if (pending && pending.source === this.pdfResourceUrl && (!event || event.target === this.$refs.pdfViewer)) pending.finish(true)
+    },
+    onPdfViewerError(event) {
+      const pending = this._pdfViewerAck
+      if (!pending || pending.source !== this.pdfResourceUrl || (event && event.target !== this.$refs.pdfViewer)) return
+      if (pending.stream) {
+        pending.stream = false
+        pending.finish(this.loadMediaResource(false))
+      } else pending.finish(false)
+    },
+    // 文件身份或内容版本变更时重新加载；定位符变化不重新下载。
+    reloadPreview(newFile, force = false) {
+      if (!force && newFile && this.isPdf && this._mediaLoadPromise && this._mediaLoadFile === newFile && this._mediaLoadVersion === newFile.wpsFileId) {
+        return this._mediaLoadPromise
+      }
+      if (this._pdfViewerAck) this._pdfViewerAck.finish(false)
+      this._mediaReqId = (this._mediaReqId || 0) + 1
+      this._mediaXhr?.abort()
+      this._archiveReqSeq = (this._archiveReqSeq || 0) + 1
       // 换文件：定位副本随之作废（新文件的 locator 会经 prop watch 重新 apply）
       this.clearEvidenceRectTimers()
       this.appliedLocator = null
       this.evidenceRectVisible = false
       this.evidenceRectUndimmed = false
       this.pdfLocateVisible = false
+      this.pdfStreamUrl = ''
       // 清理旧的 blobUrl
       if (this.blobUrl) {
         URL.revokeObjectURL(this.blobUrl)
@@ -475,22 +499,23 @@ export default {
       this.pptxRenderFailed = false
       this.resetImageViewState()
 
-      if (!newFile) return
+      if (!newFile) return false
 
       if (this.isText) {
-        this.loadTextContent()
+        return this.loadTextContent()
       } else if (this.isWord && this.useDocxPreview) {
-        this.renderDocx()
+        return this.renderDocx()
       } else if (this.isPptx && this.usePptxPreview) {
-        this.renderPptx()
+        return this.renderPptx()
       } else if (this.isImage || this.isPdf) {
-        this.loadMediaResource()
+        return this.loadMediaResource()
       } else if (this.isArchive) {
-        this.loadArchiveEntries()
+        return this.loadArchiveEntries()
       } else if (this.isVideo || this.isAudio) {
         // 音视频由 MediaPlayer 自己取源；这里只负责焦点无主时把快捷键接过来
         this.$nextTick(() => this.focusMediaPlayer())
       }
+      return false
     },
     // 换文件（或重新加载同一文件）时清空缩放平移状态。真正的「适应窗口」尺寸
     // 要等图片解码完成、handleImageLoad 拿到 naturalWidth/Height 后才能算，
@@ -531,82 +556,97 @@ export default {
         this.loading = false
       }
     },
-    async loadMediaResource() {
-        if (!this.file || !this.fileUrl) return
-
-        this.loading = true
-        // 竞态防护：记录本次请求序号，onload 时若已切到别的文件则丢弃陈旧响应，避免显示错文件
-        const reqId = (this._mediaReqId = (this._mediaReqId || 0) + 1)
-        console.log('loadMediaResource: 开始加载', this.fileUrl)
-
-        const headers = getAuthHeaders() || {}
-        console.log('loadMediaResource: 使用认证头', headers)
-        const mimeType = this.getMimeType(this.file.fileType)
-        const self = this
-        
-        // 使用 XMLHttpRequest 来正确处理大文件的 arraybuffer 响应
-        const xhr = new XMLHttpRequest()
-        xhr.open('GET', this.fileUrl, true)
-        xhr.responseType = 'blob'  // 直接获取 blob，避免 arraybuffer 大小限制
-        
-        // 设置认证头
-        Object.keys(headers).forEach(key => {
-          xhr.setRequestHeader(key, headers[key])
-        })
-        
-        xhr.onload = function() {
-          if (self._mediaReqId !== reqId) return // 已切换到别的文件，丢弃陈旧响应
-          if (xhr.status === 200) {
-            const blob = xhr.response
-            console.log('loadMediaResource: 获取到数据', blob.size, 'bytes, MIME:', mimeType || blob.type)
-            
-            // 如果 blob 没有正确的 MIME 类型，重新创建一个带类型的 blob
-            let finalBlob = blob
-            if (mimeType && blob.type !== mimeType) {
-              finalBlob = new Blob([blob], { type: mimeType })
-            }
-            
-            self.blobUrl = URL.createObjectURL(finalBlob)
-            console.log('loadMediaResource: blobUrl 已创建', self.blobUrl)
-          } else {
-            console.error('loadMediaResource: 请求失败', xhr.status)
-            uni.showToast({
-              title: self.$t('files.resourceLoadFailedStatus', { status: xhr.status }),
-              icon: 'none'
-            })
+    async loadMediaResource(tryStream = true) {
+      if (!this.file || !this.fileUrl) return false
+      this.loading = true
+      const reqId = (this._mediaReqId = (this._mediaReqId || 0) + 1)
+      this._mediaLoadVersion = this.file.wpsFileId
+      this._mediaLoadFile = this.file
+      const headers = getAuthHeaders() || {}
+      const mimeType = this.getMimeType(this.file.fileType)
+      const self = this
+      const stream = tryStream && IS_H5 && this.isPdf && !this.sourceUrl
+      // HEAD validates access and server support without downloading the PDF.
+      const resourceUrl = stream ? this.fileUrl + '?inline=true&v=' + Date.now() + '-' + reqId : this.fileUrl
+      const xhr = new XMLHttpRequest()
+      this._mediaXhr = xhr
+      const promise = new Promise((resolve) => {
+        let settled = false
+        const finish = (accepted) => {
+          if (settled) return
+          settled = true
+          if (self._pdfViewerAck && self._pdfViewerAck.reqId === reqId) {
+            clearTimeout(self._pdfViewerAck.timer)
+            self._pdfViewerAck = null
           }
-          self.loading = false
+          if (self._mediaReqId === reqId) self.loading = false
+          resolve(accepted)
         }
-        
+        xhr.open(stream ? 'HEAD' : 'GET', resourceUrl, true)
+        if (!stream) xhr.responseType = 'blob'
+        Object.keys(headers).forEach(key => xhr.setRequestHeader(key, headers[key]))
+        xhr.onload = async function() {
+          if (self._mediaReqId !== reqId) { finish(false); return }
+          if (xhr.status !== 200) {
+            console.error('loadMediaResource: 请求失败', xhr.status)
+            uni.showToast({ title: self.$t('files.resourceLoadFailedStatus', { status: xhr.status }), icon: 'none' })
+            finish(false)
+            return
+          }
+          if (stream && !/^inline(?:;|$)/i.test(xhr.getResponseHeader('Content-Disposition') || '')) {
+            // Older servers keep download semantics. Preserve their Blob path.
+            finish(self.loadMediaResource(false))
+            return
+          }
+          let source
+          if (stream) source = buildStreamUrl(resourceUrl, getSessionId())
+          else {
+            let blob = xhr.response
+            if (mimeType && blob.type !== mimeType) blob = new Blob([blob], { type: mimeType })
+            source = URL.createObjectURL(blob)
+          }
+          if (self.isPdf) {
+            const pending = { reqId, source, stream, finish, timer: null }
+            pending.timer = setTimeout(() => { if (self._pdfViewerAck === pending) self.onPdfViewerError() }, PDF_VIEWER_ACK_TIMEOUT_MS)
+            self._pdfViewerAck = pending
+          }
+          if (stream) self.pdfStreamUrl = source
+          else { self.pdfStreamUrl = ''; self.blobUrl = source }
+          if (!self.isPdf) finish(true)
+        }
         xhr.onerror = function() {
+          if (self._mediaReqId !== reqId) { finish(false); return }
           console.error('loadMediaResource: 网络错误')
-          uni.showToast({
-            title: self.$t('files.networkErrorResource'),
-            icon: 'none'
-          })
-          self.loading = false
+          uni.showToast({ title: self.$t('files.networkErrorResource'), icon: 'none' })
+          finish(false)
         }
-        
+        xhr.onabort = () => finish(false)
         xhr.onprogress = function(event) {
-          if (event.lengthComputable) {
+          if (self._mediaReqId === reqId && event.lengthComputable) {
             const percent = Math.round((event.loaded / event.total) * 100)
             console.log('loadMediaResource: 下载进度', percent + '%', event.loaded, '/', event.total)
           }
         }
-        
         xhr.send()
+      })
+      const tracked = promise.finally(() => {
+        if (self._mediaLoadPromise === tracked) self._mediaLoadPromise = null
+        if (self._mediaXhr === xhr) self._mediaXhr = null
+      })
+      this._mediaLoadPromise = tracked
+      return tracked
     },
     // 带鉴权下载为 Blob（复用 loadMediaResource 的 XHR 鉴权方式，但返回 Promise<Blob>）
     fetchAuthedBlob() {
       return new Promise((resolve, reject) => {
-        if (!this.fileUrl) return reject(new Error('文件地址为空'))
+        if (!this.fileUrl) return reject(new Error(this.$t('files.fileUrlEmptyError')))
         const headers = getAuthHeaders() || {}
         const xhr = new XMLHttpRequest()
         xhr.open('GET', this.fileUrl, true)
         xhr.responseType = 'blob'
         Object.keys(headers).forEach(key => xhr.setRequestHeader(key, headers[key]))
         xhr.onload = () => xhr.status === 200 ? resolve(xhr.response) : reject(new Error('HTTP ' + xhr.status))
-        xhr.onerror = () => reject(new Error('网络错误'))
+        xhr.onerror = () => reject(new Error(this.$t('common.networkError')))
         xhr.send()
       })
     },
@@ -619,7 +659,7 @@ export default {
         await this.$nextTick()
         const ref = this.$refs.docxContainer
         const container = ref && (ref.$el || ref)
-        if (!container) throw new Error('渲染容器未就绪')
+        if (!container) throw new Error(this.$t('files.renderContainerNotReadyError'))
         container.innerHTML = ''
         const { renderAsync } = await import('docx-preview')
         await renderAsync(blob, container, null, {
@@ -647,7 +687,7 @@ export default {
         await this.$nextTick()
         const ref = this.$refs.pptxContainer
         const container = ref && (ref.$el || ref)
-        if (!container) throw new Error('渲染容器未就绪')
+        if (!container) throw new Error(this.$t('files.renderContainerNotReadyError'))
         container.innerHTML = ''
         const { init } = await import('pptx-preview')
         const width = Math.max(320, (container.clientWidth || 960) - 32)
@@ -1378,38 +1418,5 @@ export default {
   color: var(--awd-danger-text);
 }
 
-.archive-list {
-  flex: 1;
-  min-height: 0;
-}
-
-.archive-entry {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  padding: 12rpx 24rpx;
-  border-bottom: 1rpx solid var(--awd-border-subtle);
-}
-
-.entry-icon {
-
-  width: 28rpx;
-  height: 28rpx;
-  flex-shrink: 0;
-}
-
-.entry-path {
-  flex: 1;
-  font-size: 26rpx;
-  color: var(--awd-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.entry-size {
-  font-size: 24rpx;
-  color: var(--awd-text-3);
-}
 </style>
 

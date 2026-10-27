@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: Clean Windows dependency acceptance
+on:
+  workflow_call:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  acceptance:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-pr-dependency-installer
+          path: installer
+      # javac is preparation-only; the standard-user probe uses the installed trimmed JRE.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install and exercise real dependencies in isolated standard account
+        shell: pwsh
+        run: |
+          $installer = @(Get-ChildItem installer -Filter *.exe)
+          if ($installer.Count -ne 1) { throw 'Expected exactly one PR installer' }
+          ./desktop/scripts/dependency-clean-windows/run.ps1 -Installer $installer[0].FullName -OutDir "$env:RUNNER_TEMP/dependency-evidence"
+      - name: Preserve evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clean-windows-dependency-evidence
+          path: ${{ runner.temp }}/dependency-evidence
+          retention-days: 7
+          if-no-files-found: warn

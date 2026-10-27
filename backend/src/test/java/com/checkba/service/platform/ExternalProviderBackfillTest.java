@@ -4,6 +4,10 @@
 package com.checkba.service.platform;
 
 import com.checkba.service.SystemSettingService;
+import com.checkba.config.StartupDataInitializer;
+import com.checkba.service.ai.PluginService;
+import com.checkba.service.ai.skill.SkillRegistry;
+import com.checkba.service.plugin.PluginJobService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -197,6 +201,9 @@ class ExternalProviderBackfillTest {
         AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext();
         ctx.registerBean(ExternalProviderBackfill.class, () -> new ExternalProviderBackfill(
                 settings, resolver, true, "", "", "", "", "", "", "", "", "", ""));
+        ctx.registerBean(StartupDataInitializer.class, () -> new StartupDataInitializer(
+                ctx.getBean(ExternalProviderBackfill.class), mock(PluginJobService.class),
+                mock(PluginService.class), mock(SkillRegistry.class)));
         try {
             // 只 refresh()，刻意不发 ApplicationReadyEvent——对应内嵌 Tomcat 已经开始
             // 收连接、但 ApplicationReadyEvent 尚未发出的那个窗口。

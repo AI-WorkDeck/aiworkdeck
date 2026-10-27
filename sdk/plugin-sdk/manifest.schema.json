@@ -1,0 +1,712 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aiworkdeck:plugin-manifest:1.6",
+  "$comment": "SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors; SPDX-License-Identifier: AGPL-3.0-or-later",
+  "title": "AI WorkDeck plugin manifest (SDK 1.6)",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,49}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "description": {
+      "type": "string"
+    },
+    "author": {
+      "type": "string"
+    },
+    "homepage": {
+      "type": "string"
+    },
+    "icon": {
+      "type": "string"
+    },
+    "minHostVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "frontendEntry": {
+      "type": "string",
+      "pattern": "^(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*[\\\\%?#:])web/.+\\.html?$"
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "file_read",
+          "file_write",
+          "network",
+          "editor",
+          "ai",
+          "im",
+          "notifications",
+          "lawfirm",
+          "speech",
+          "tasks",
+          "clipboard"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "backendJars": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+      }
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+      }
+    },
+    "packs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]{1,49}$"
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": true
+      }
+    },
+    "guide": {
+      "type": "object"
+    },
+    "settings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/setting"
+      },
+      "maxItems": 20
+    },
+    "contributes": {
+      "type": "object",
+      "properties": {
+        "views": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/view"
+          },
+          "maxItems": 2,
+          "description": "Omitted preserves legacy UI. An empty array disables rail, panel and workspace entries; otherwise only declared placements are available. UI declarations do not grant permissions."
+        },
+        "connections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/connection"
+          },
+          "maxItems": 10
+        },
+        "templates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fileContribution"
+          }
+        },
+        "styleProfiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fileContribution"
+          }
+        },
+        "themes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fileContribution"
+          }
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/capability"
+          }
+        },
+        "evidenceSources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidenceSource"
+          }
+        },
+        "mcpServers": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/mcpServer"
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "version"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "setting": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$"
+        },
+        "type": {
+          "enum": [
+            "string",
+            "boolean",
+            "number",
+            "select"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "default": {},
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "secret": {
+          "type": "boolean"
+        },
+        "scope": {
+          "enum": [
+            "installation",
+            "user",
+            "project"
+          ]
+        }
+      },
+      "required": [
+        "key",
+        "type",
+        "label"
+      ],
+      "additionalProperties": false
+    },
+    "view": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,49}$"
+        },
+        "name": {
+          "type": "string"
+        },
+        "entry": {
+          "type": "string",
+          "pattern": "^(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*[\\\\%?#:])web/.+\\.html?$"
+        },
+        "placement": {
+          "enum": [
+            "sidebar",
+            "workspace"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "project",
+            "global"
+          ]
+        },
+        "defaultDock": {
+          "enum": [
+            "left",
+            "right",
+            "bottom"
+          ]
+        },
+        "allowedDocks": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "left",
+              "right",
+              "bottom"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "entry",
+        "placement",
+        "scope"
+      ],
+      "additionalProperties": false
+    },
+    "connection": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,49}$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseUrl": {
+          "type": "string",
+          "pattern": "^https://[^\\s]+$"
+        },
+        "auth": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": [
+                "none",
+                "bearer",
+                "oauth2"
+              ]
+            },
+            "authorizationUrl": {
+              "type": "string",
+              "pattern": "^https://[^\\s]+$"
+            },
+            "tokenUrl": {
+              "type": "string",
+              "pattern": "^https://[^\\s]+$"
+            },
+            "clientId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "scopes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "pattern": "^\\S+$"
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "properties": {
+                "type": {
+                  "const": "none"
+                }
+              }
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "bearer"
+                }
+              }
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "oauth2"
+                }
+              },
+              "required": [
+                "authorizationUrl",
+                "tokenUrl",
+                "clientId"
+              ]
+            }
+          ]
+        },
+        "operations": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,63}$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^/(?!.*//)[a-zA-Z0-9/_-]*$"
+              },
+              "method": {
+                "enum": [
+                  "GET",
+                  "POST"
+                ]
+              }
+            },
+            "required": [
+              "path",
+              "method"
+            ],
+            "additionalProperties": false
+          },
+          "maxProperties": 30
+        },
+        "billing": {
+          "type": "object",
+          "properties": {
+            "statusOperation": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$"
+            },
+            "checkoutUrl": {
+              "type": "string",
+              "pattern": "^https://[^\\s]+$"
+            }
+          },
+          "required": [
+            "statusOperation",
+            "checkoutUrl"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "baseUrl",
+        "auth",
+        "operations"
+      ],
+      "additionalProperties": false
+    },
+    "capability": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$"
+        },
+        "capability": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "web",
+            "data",
+            "process"
+          ]
+        },
+        "entry": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+        },
+        "protocol": {
+          "type": "string"
+        },
+        "runtime": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "capability",
+        "kind",
+        "entry",
+        "protocol"
+      ],
+      "additionalProperties": false
+    },
+    "evidenceSource": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "transport": {
+          "enum": [
+            "spi",
+            "mcp"
+          ]
+        },
+        "server": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "pattern": "^https://[^\\s]+$"
+            },
+            "tokenSettingKey": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "additionalProperties": false
+        },
+        "tool": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceId",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "fileContribution": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$"
+        },
+        "name": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+        },
+        "genre": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "file"
+      ],
+      "additionalProperties": false
+    },
+    "mcpServer": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,39}$"
+        },
+        "transport": {
+          "const": "streamable-http"
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https://[^\\s]+$"
+        },
+        "credentialKey": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+        },
+        "connectionId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,49}$"
+        },
+        "tools": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/mcpTool"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "transport",
+        "url",
+        "tools"
+      ],
+      "additionalProperties": false
+    },
+    "mcpTool": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]{1,128}$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "inputSchema": {
+          "$ref": "#/$defs/mcpObjectSchema"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "inputSchema"
+      ],
+      "additionalProperties": false
+    },
+    "mcpObjectSchema": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "object"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "title": {
+          "type": "string"
+        },
+        "properties": {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,63}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/mcpSchema"
+          }
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "mcpSchema": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/mcpObjectSchema"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "array"
+            },
+            "description": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "title": {
+              "type": "string"
+            },
+            "items": {
+              "$ref": "#/$defs/mcpSchema"
+            }
+          },
+          "required": [
+            "type",
+            "items"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "string"
+            },
+            "description": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "title": {
+              "type": "string"
+            },
+            "enum": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 100,
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": [
+                "number",
+                "integer",
+                "boolean"
+              ]
+            },
+            "description": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

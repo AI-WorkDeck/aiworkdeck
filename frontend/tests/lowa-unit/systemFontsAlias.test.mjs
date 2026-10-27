@@ -9,16 +9,43 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { buildCjkAliasConf, systemFontFileName } from '../../src/composables/zetaOfficeBoot.js'
 
-const BUNDLED = { sans: 'Noto Sans SC', serif: 'Noto Serif SC', kai: '霞鹜文楷', fangsong: '朱雀仿宋（预览测试版）' }
+const BUNDLED = {
+  sans: 'Noto Sans SC',
+  serif: 'Noto Serif SC',
+  kai: '霞鹜文楷',
+  fangsong: '朱雀仿宋（预览测试版）',
+  kr: 'Noto Sans KR',
+  'kr-serif': 'Noto Serif KR',
+  thai: 'Noto Sans Thai',
+  'thai-serif': 'Noto Serif Thai',
+  khmer: 'Noto Sans Khmer',
+  lao: 'Noto Sans Lao',
+  myanmar: 'Noto Sans Myanmar',
+  arabic: 'Noto Sans Arabic',
+  devanagari: 'Noto Sans Devanagari',
+}
 const hasRule = (conf, fam) => conf.includes('<string>' + fam + '</string></test>')
 
-test('没有本机字体：与原先一致，全部专有名都有别名规则', () => {
+test('没有本机字体：与原先一致，全部专有名都有别名规则，且包含多语种字体与跨语种回退链', () => {
   const r = buildCjkAliasConf(BUNDLED, [])
   assert.ok(r)
   assert.equal(r.skipped, 0)
-  for (const fam of ['宋体', 'SimSun', '仿宋_GB2312', '黑体', '楷体']) assert.ok(hasRule(r.conf, fam), fam)
+  for (const fam of [
+    '宋体', 'SimSun', '仿宋_GB2312', '黑体', '楷体',
+    'MS Gothic', 'MS Mincho', 'Meiryo', 'Yu Gothic',
+    'Malgun Gothic', 'Batang', 'Dotum', 'NanumGothic',
+    'TH Sarabun New', 'Angsana New', 'Tahoma',
+    'Khmer OS', 'Phetsarath OT', 'Padauk', 'Amiri', 'Mangal',
+  ]) {
+    assert.ok(hasRule(r.conf, fam), fam)
+  }
   assert.deepEqual(r.targets, ['Noto Sans SC', 'Noto Serif SC', '霞鹜文楷', '朱雀仿宋（预览测试版）'])
   assert.ok(r.conf.includes('mode="assign"'))
+  // 仿宋规则必须带跨语种回退（韩语/泰语等），防止选仿宋输入韩文/泰文变方框
+  assert.ok(r.conf.includes('<string>朱雀仿宋（预览测试版）</string><string>Noto Serif SC</string><string>Noto Serif KR</string>'))
+  // 通用族名 sans-serif / serif / monospace 均挂上多语种回退
+  assert.ok(r.conf.includes('<family>sans-serif</family>'))
+  assert.ok(r.conf.includes('<family>Noto Sans Thai</family>'))
 })
 
 test('启用了真的仿宋_GB2312 / 宋体：同名规则跳过（大小写与空白不敏感），其余照常', () => {

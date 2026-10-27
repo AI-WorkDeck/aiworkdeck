@@ -15,6 +15,7 @@ import assert from 'node:assert/strict'
 import vm from 'node:vm'
 import { readFileSync } from 'node:fs'
 import { CN_FONT_SIZES, PT_FONT_SIZES } from '../../src/utils/paragraphFormat.js'
+import * as viewPrefs from '../../src/utils/editorViewPrefs.js'
 import { EDITOR_ACTIONS, createLibreOfficeExecutor } from '../../src/composables/libreofficeExecutorClient.js'
 
 const WORKER_SRC = readFileSync(new URL('../../src/zetaoffice/public/office_thread.js', import.meta.url), 'utf8')
@@ -55,8 +56,9 @@ function loadToolbar() {
   const script = src.match(/<script>([\s\S]*?)<\/script>/)[1]
   return new Function('bindHorizontalWheel', 'watchScrollEdges', 'isEnglish', 'host',
     'CN_FONT_SIZES', 'PT_FONT_SIZES', 'ParagraphFormatPanel', 'SystemFontsPanel',
+    ...Object.keys(viewPrefs),
     script.replace(/^import .*$/gm, '').replace('export default', 'return'))(
-    () => () => {}, () => () => {}, () => false, {}, CN_FONT_SIZES, PT_FONT_SIZES, {}, {})
+    () => () => {}, () => () => {}, () => false, {}, CN_FONT_SIZES, PT_FONT_SIZES, {}, {}, ...Object.values(viewPrefs))
 }
 
 // engineView: worker 侧 get_ui_state 回的 view 段（= 引擎的真实读回）
@@ -140,9 +142,9 @@ test('工具栏重挂（bootstrap）先清空状态，不端着上一份文档�
   revisionView = 'all'
   vm.calls.length = 0
   await vm.bootstrap()
-  assert.deepEqual(seen, [undefined, 'all'], 'bootstrap 先 EMPTY() 读新文档，再在应用视图偏好后刷新')
+  assert.deepEqual(seen, [undefined], 'bootstrap 先 EMPTY()，应用视图偏好后一次回读新文档状态')
   assert.deepEqual(vm.calls.filter(c => ['get_ui_state', 'set_view_options'].includes(c.action)).map(c => c.action),
-    ['get_ui_state', 'set_view_options', 'get_ui_state'])
+    ['set_view_options', 'get_ui_state'])
   assert.equal(vm.state.view.revisionView, 'all')
 })
 
@@ -215,8 +217,8 @@ test('__agent 命令按页边语义执行：内联态下临时切页边，跑完
 
 // dev-board#1082: the first AI edit creates redlines inside the command. Its
 // verification result must already see final text, even when it started clean.
-function firstEditView() {
-  let mode = 'all', redlines = false
+function firstEditView({ blockedModes = [], existingRedlines = false } = {}) {
+  let mode = 'all', redlines = existingRedlines
   const switches = []
   const start = WORKER_SRC.indexOf('const FINAL_TEXT_ACTIONS = ')
   const end = WORKER_SRC.indexOf('\nconst RESOLVE_REVISION_ACTIONS', start)
@@ -226,7 +228,8 @@ function firstEditView() {
     revisionViewState: () => ({ mode }),
     hasAnyRedline: () => redlines,
     withViewOnlyChange: fn => fn(),
-    applyRevisionView(next) { switches.push(next); mode = next; return { mode } },
+    applyRevisionView(next) { switches.push(next); if (!blockedModes.includes(next)) mode = next; return { mode } },
+    tableFail: message => ({ success: false, error: message, message }),
     ctrl: { getViewCursor: () => ({}) }, paragraphTextOf: () => '',
   })
   vm.runInContext(WORKER_SRC.slice(start, end), realm)
@@ -257,4 +260,32 @@ test('an unrecognized AI action cannot bypass final-text semantics before its fi
   const view = firstEditView()
   assert.equal(view.run('future_write_action', () => view.replace()).paragraphAfterEdit, '新')
   assert.equal(view.mode(), 'all')
+})
+
+test('AI reads and writes stop when both final-text view paths fail', () => {
+  for (const action of ['find_text_locations', 'replace_at_position']) {
+    const view = firstEditView({ blockedModes: ['final', 'margin'], existingRedlines: true })
+    let called = false
+    const result = view.run(action, () => { called = true; return { success: true } })
+    assert.equal(called, false, action + ' must not consume inline deleted text')
+    assert.equal(result.success, false)
+    assert.match(result.message, /删除修订/)
+    assert.equal(view.mode(), 'all')
+    assert.deepEqual(view.switches, ['final', 'margin', 'all'])
+  }
+})
+
+test('the first AI write also stops if final-text view is unavailable', () => {
+  const view = firstEditView({ blockedModes: ['final', 'margin'] })
+  let called = false
+  assert.equal(view.run('replace_at_position', () => { called = true; return view.replace() }).success, false)
+  assert.equal(called, false, 'a clean document can create deletions inside the write')
+})
+
+test('the margin fallback still runs the command and restores the original view', () => {
+  const view = firstEditView({ blockedModes: ['final'], existingRedlines: true })
+  const result = view.run('find_text_locations', () => ({ mode: view.mode() }))
+  assert.equal(result.mode, 'margin')
+  assert.equal(view.mode(), 'all')
+  assert.deepEqual(view.switches, ['final', 'margin', 'all'])
 })

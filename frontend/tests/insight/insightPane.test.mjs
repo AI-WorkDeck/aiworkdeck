@@ -20,6 +20,7 @@ import {
 function makeVm(overrides = {}) {
   const calls = { parse: [], latest: [], entity: [], refresh: [], exec: [], prepare: [] }
   const deps = {
+    ContractReviewPane: {},
     parseDocInsight: async (pid, did) => { calls.parse.push([pid, did]); return { code: 0, data: { runId: 1, status: 'RUNNING' } } },
     getDocInsight: async (pid, did) => { calls.latest.push([pid, did]); return { code: 0, data: overrides.latest || { run: null, entities: [], findings: [] } } },
     getDocInsightEntity: async (pid, id) => { calls.entity.push([pid, id]); return { code: 0, data: { detail: { basic: { 企业名称: 'X' } } } } },

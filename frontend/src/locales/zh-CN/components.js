@@ -11,7 +11,7 @@ export default {
   later: '稍后再说',
   laterHint: '随时可以在「设置 → 组件管理」里下载。',
   // 面板里已就绪的组件不再给复选框，收成底部这一行（dev-board#751）
-  alreadyReady: '已就绪：{names}。',
+  alreadyReady: '已安装：{names}。',
   nameSeparator: '、',
   manageTitle: '组件管理',
 
@@ -21,7 +21,9 @@ export default {
 
   sizeUnknown: '体积获取中…',
   stateNotInstalled: '未安装',
-  stateReady: '已就绪',
+  stateReady: '已安装（尚未验证运行）',
+  stateServiceStarted: '服务已启动（功能待使用验证）',
+  errorServiceUnavailable: '组件服务未能启动，请检查组件是否完整后重试。',
   stateDownloadingRuntime: '正在下载运行时 {percent}%',
   stateDownloadingModel: '正在下载模型 {percent}%',
   stateStartingService: '正在启动组件…',
@@ -32,8 +34,11 @@ export default {
   stateFinalizingRuntime: '正在写入…',
   errorStalled: '长时间没有进展，已停止等待。请重试；仍失败可查看 ~/.aiworkdeck/logs 下的后端日志。',
   errorBackendRestarted: '后台服务已重启，下载被中断，请重试。',
-  stateFailed: '下载失败：{msg}',
+  stateFailed: '准备失败：{msg}',
   progressTotal: '总进度 {done}/{count}（{percent}%）',
+  cancelDownload: '取消下载',
+  checkStartup: '检查启动',
+  verifyRepair: '校验并修复',
   retry: '重试',
 
   chatTitle: '需要下载组件',
@@ -59,7 +64,7 @@ export default {
   // 后台下载（dev-board#581）：关掉面板/收起卡片后下载继续，完成或失败时全局提示
   backgroundDownload: '后台下载',
   backgroundStarted: '已转入后台下载，可在「设置 → 组件管理」查看进度。',
-  backgroundDone: '{name}已下载完成，可以使用了。',
+  backgroundDone: '{name}已安装并启动，可尝试使用。',
   backgroundFailed: '{name}下载失败：{msg}',
 
   asrRuntimeMissingAction: '下载本机语音识别组件',

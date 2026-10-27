@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 const path = require('path')
-const { app, BrowserWindow, BrowserView, ipcMain, shell, desktopCapturer, screen, clipboard, Menu, globalShortcut, nativeTheme } = require('electron')
+const { app, BrowserWindow, BrowserView, ipcMain, shell, desktopCapturer, screen, clipboard, Menu, globalShortcut, nativeTheme, powerMonitor } = require('electron')
 const { createServiceManager } = require('./services/service-manager')
+const { BackendSupervisor } = require('./services/backend-supervisor')
 const { createBackendDescriptor } = require('./services/backend-service')
 const { createPptxDescriptor } = require('./services/pptx-service')
 const { createMineruDescriptor } = require('./services/mineru-service')
@@ -31,14 +32,21 @@ if (!singleInstanceLock) {
   app.quit()
   return
 }
-app.on('second-instance', () => {
-  // 用户又点了一次图标/关联文件：把已经在跑的这个实例的窗口拉到前台，
-  // 而不是让第二次点击悄无声息地什么都不发生
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore()
-    mainWindow.focus()
-  }
-})
+
+// NSIS may still be replacing files after a very fast manual reopen.
+if (app.isPackaged && process.platform === 'win32' && require('./services/full-update').deferWindowsLaunch(path.join(app.getPath('home'), '.aiworkdeck'), undefined, () => {
+  const { t: langT } = require('./app-language')
+  require('electron').dialog.showErrorBox(
+    langT({ zh: 'AI WorkDeck 更新仍在进行', en: 'AI WorkDeck Update Still in Progress' }),
+    langT({
+      zh: '安装过程超过预期，请检查正在运行的安装程序后再打开应用。',
+      en: 'Installation is taking longer than expected. Check the running installer before reopening the app.'
+    })
+  )
+}, require('./open-paths').pathsFromArgv(process.argv))) {
+  app.exit(0)
+  return
+}
 
 // BUG-28：Chromium 内置 PDF 查看器的「更多」菜单（Two page view / Annotations /
 // Document properties）字符串来自 Chromium 自己那份 .pak 本地化资源，只认启动期
@@ -98,6 +106,8 @@ function escapeHtml(s) {
     .replace(/'/g, '&#039;')
 }
 
+let backendSupervisor = null
+let backendStartupFailed = false
 /** @type {BrowserWindow | null} */
 let mainWindow = null
 // mac activate 可能早于异步服务启动完成；首窗统一由启动链创建。
@@ -105,10 +115,57 @@ let mainWindowStartupReady = false
 let services = null
 let modelManager = null
 let updateService = null
+let fullUpdate = null
+let updateRestartRequested = false
+let quitInProgress = false
 // 首启进度窗的引用。0.38.0 起首启不再解压 pysvc（四个 Python 服务改走 native pack），
 // 这里只剩「等本机服务起来」这一段的兜底；当前没有创建它的路径，保留是为了
 // retireFirstLaunchSplash 的调用点不必跟着分支。
 let firstLaunchSplash = null
+
+// 启动链失败也必须留下可查询的终态；只有拥有 child 的管理器才允许恢复。
+function configureBackendSupervision(startupFailed = false) {
+  backendStartupFailed = startupFailed
+  if (backendSupervisor || !services) return
+  if (startupFailed && (!services.isOwned('backend') || !services.ports.backend)) return
+  backendSupervisor = new BackendSupervisor(services, (health, verifiedLaunch) => {
+    if (health.ok && verifiedLaunch) recordBackendBoot(true, verifiedLaunch)
+    logDesktopEvent('backend-health', health)
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send('checkba:backend-health-changed', health)
+    }
+  }, { onStartupFailure: (launch, reason) => recordBackendBoot(false, launch, reason) })
+  backendSupervisor.bindPowerMonitor(powerMonitor)
+  if (startupFailed) backendSupervisor.publish('failed', 'startup-failed')
+  backendSupervisor.start()
+}
+
+function getBackendHealth() {
+  return backendSupervisor?.getHealth() || {
+    state: backendStartupFailed ? 'failed' : 'starting', ok: false, owned: false, attempts: 0,
+    reason: backendStartupFailed ? 'startup-failed' : '', updatedAt: Date.now()
+  }
+}
+
+// Bind the verdict to the overlay actually used by this owned launch. A background
+// update may already have activated a different overlay while Spring was starting.
+function recordBackendBoot(ok, launch, reason = '') {
+  if (!launch?.bootOverlay || launch.bootRecorded) return { reverted: false }
+  launch.bootRecorded = true
+  try {
+    const overlay = require('./services/overlay')
+    const { context, current } = launch.bootOverlay
+    const active = overlay.readCurrent(context)
+    if (active?.version !== current?.version || JSON.stringify(active?.components) !== JSON.stringify(current?.components)) {
+      return { reverted: false }
+    }
+    if (ok) { overlay.markBootOk(context); return { reverted: false } }
+    if (!active) return { reverted: false }
+    const result = overlay.noteBackendBootFailure(context)
+    updateService?.logEvent(result.reverted ? 'reverted' : 'boot-failure', { message: reason })
+    return result
+  } catch (e) { console.error('[overlay]', e); return { reverted: false } }
+}
 
 // 增量更新（docs/INCREMENTAL_UPDATE_DESIGN.md）：overlay 上下文——三个 seam
 // （backend jar / h5 / zetaoffice 壳层）与 update-service 共用
@@ -414,6 +471,7 @@ function createMainWindow() {
       additionalArguments: [
         '--checkba-api-base=http://127.0.0.1:' + backendPort,
         '--checkba-system-memory=' + require('node:os').totalmem(),
+        '--checkba-native-docx-max-bytes=' + (process.platform === 'darwin' && process.env?.AWD_EDITOR_ENGINE === 'lok' ? 64 * 1024 * 1024 : 0),
         // ARM 版 Windows（Mac 虚拟机）转译运行时启动看门狗已放宽 8 倍（dev-board#340），
         // 渲染层的等待死线要跟着放大，否则前端仍按 90 秒判超时（dev-board#341）
         ...(require('./services/win-arch').isWinArmEmulated() ? ['--checkba-win-emulated=1'] : [])
@@ -450,6 +508,9 @@ function createMainWindow() {
   // 官网头像的 CORP 放行（dev-board#603）。必须赶在第一次 load 之前挂上，
   // 否则首屏那次头像请求会漏在拦截器外面。只挂一次（函数内自带去重标记）。
   attachAvatarCorpRelaxation(mainWindow.webContents.session)
+  require('./services/backend-request-gate').installBackendRequestGate(mainWindow.webContents.session, {
+    getState: () => ({ port: services?.ports.backend, launch: services?.getLaunch('backend'), closing: services?.closing })
+  })
 
   // UI：直接复用现有 frontend（开发态用 dev server）
   if (IS_DEV) {
@@ -536,6 +597,24 @@ function createMainWindow() {
   }
 
   const createdWindow = mainWindow
+  let closePreparationPending = false
+  createdWindow.on('close', (event) => {
+    if (quitInProgress && !services) return
+    event.preventDefault()
+    if (quitInProgress || closePreparationPending) return
+    if (process.platform !== 'darwin') { app.quit(); return }
+    closePreparationPending = true
+    prepareRendererForQuit().then(() => {
+      // Cmd+Q during the confirmation adopts this same preparation for real exit.
+      if (quitInProgress || createdWindow.isDestroyed()) return
+      createdWindow.hide()
+      createdWindow.webContents.send('checkba:quit-cancelled', { windowHidden: true })
+    }).catch((error) => {
+      if (!quitInProgress && !createdWindow.isDestroyed()) {
+        createdWindow.webContents.send('checkba:quit-cancelled', { error: String(error.message || error) })
+      }
+    }).finally(() => { closePreparationPending = false })
+  })
   createdWindow.on('closed', () => {
     // 旧窗迟到的 closed 不能断开新窗的剪贴板、菜单和原生弹窗。
     if (mainWindow === createdWindow) mainWindow = null
@@ -639,7 +718,7 @@ ipcMain.handle('checkba:ocr-start-selection', async (_evt, payload) => {
 <body>
   <div class="layer">
     <div class="shade"></div>
-    <div class="hint">拖动框选网页区域 · 点击其它区域或 ESC 退出</div>
+    <div class="hint">${escapeHtml(require('./app-language').t({ zh: '拖动框选网页区域 · 点击其它区域或 ESC 退出', en: 'Drag to select an area · Click outside or press ESC to cancel' }))}</div>
     <div id="rect" class="rect"></div>
   </div>
   <script>
@@ -1549,26 +1628,31 @@ ipcMain.handle('checkba:model-status', async () => {
   if (!modelManager) return { components: [] }
   const components = modelManager.status()
   // 「运行中」标注：对应服务端口是否有监听
-  const { isPortOpen } = require('./services/service-manager')
+  const { checkServiceHealth } = require('./services/pysvc-runtime')
   for (const c of components) {
     const svc = COMPONENT_SERVICE[c.id]
     if (svc && services && services.ports[svc]) {
-      c.serviceRunning = await isPortOpen(services.ports[svc])
+      c.serviceRunning = await checkServiceHealth(svc, services.ports[svc])
       c.serviceName = svc
     }
   }
   return { components }
 })
 ipcMain.handle('checkba:model-download', async (_evt, payload) => {
-  if (!modelManager) return { ok: false, message: 'model manager 未就绪' }
-  return modelManager.download(payload && payload.id)
+  if (!modelManager) return { ok: false, message: require('./app-language').t({ zh: 'model manager 未就绪', en: 'model manager not ready' }) }
+  const id = payload && payload.id
+  const repair = payload?.repair === true
+  const svc = COMPONENT_SERVICE[id]
+  return modelManager.download(id, { repair, beforeStart: async () => {
+    if (svc && services && (repair || !modelManager.isInstalled(id))) await services.stop(svc)
+  } })
 })
 ipcMain.handle('checkba:model-cancel', async (_evt, payload) => {
-  if (!modelManager) return { ok: false, message: 'model manager 未就绪' }
+  if (!modelManager) return { ok: false, message: require('./app-language').t({ zh: 'model manager 未就绪', en: 'model manager not ready' }) }
   return modelManager.cancel(payload && payload.id)
 })
 ipcMain.handle('checkba:model-remove', async (_evt, payload) => {
-  if (!modelManager) return { ok: false, message: 'model manager 未就绪' }
+  if (!modelManager) return { ok: false, message: require('./app-language').t({ zh: 'model manager 未就绪', en: 'model manager not ready' }) }
   // 先停服务再删模型，避免删除运行中文件
   const svc = payload && COMPONENT_SERVICE[payload.id]
   if (svc && services) {
@@ -1579,8 +1663,15 @@ ipcMain.handle('checkba:model-remove', async (_evt, payload) => {
 ipcMain.handle('checkba:service-ensure', async (_evt, payload) => {
   if (!services) return { ok: false, message: 'services not ready' }
   try {
-    const res = await services.start(payload && payload.name)
-    return { ok: !!res.ok, ...res }
+    const name = payload && payload.name
+    const res = { ...await services.start(name) }
+    delete res.launch // Child-process/overlay evidence stays in the main process, never Electron IPC.
+    if (!res.ok) return { ...res, ok: false }
+    const { PACK_ID_BY_SERVICE, waitForServiceHealth } = require('./services/pysvc-runtime')
+    if (PACK_ID_BY_SERVICE[name] && !(await waitForServiceHealth(name, services.ports[name]))) {
+      return { ok: false, message: require('./app-language').t({ zh: '组件服务启动检查未通过，请重试或校验并修复组件。', en: 'Component service did not pass its HTTP startup check. Retry or repair the component.' }) }
+    }
+    return { ...res, ok: true, validation: 'service-started' }
   } catch (e) {
     return { ok: false, message: String(e && e.message ? e.message : e) }
   }
@@ -1619,7 +1710,7 @@ ipcMain.handle('checkba:prefs-set', async (_evt, payload) => {
 ipcMain.handle('checkba:reveal-logs', async () => {
   try {
     const dir = path.join(app.getPath('home'), '.aiworkdeck', 'logs')
-    if (!require('fs').existsSync(dir)) return { ok: false, message: '日志目录尚未生成' }
+    if (!require('fs').existsSync(dir)) return { ok: false, message: require('./app-language').t({ zh: '日志目录尚未生成', en: 'Log directory has not been created yet' }) }
     shell.showItemInFolder(path.join(dir, '.'))
     return { ok: true, path: dir }
   } catch (e) {
@@ -1633,12 +1724,12 @@ ipcMain.handle('checkba:update-status', async () => {
   return updateService.getState()
 })
 ipcMain.handle('checkba:update-check', async () => {
-  if (!updateService) return { phase: 'error', error: 'update service 未就绪' }
+  if (!updateService) return { phase: 'error', error: require('./app-language').t({ zh: 'update service 未就绪', en: 'update service not ready' }) }
   return updateService.check()
 })
 ipcMain.handle('checkba:update-restart', async () => {
   // 补丁已在下载完成时原子激活（overlay.activate），重启后三个 seam 自然读到新版本
-  app.relaunch()
+  updateRestartRequested = true
   app.quit()
   return { ok: true }
 })
@@ -1648,7 +1739,20 @@ ipcMain.handle('checkba:update-restart', async () => {
 // starts the shared same-origin server (so LOWA/page are isolated) on first ask,
 // then returns the URL + the webview preload path + the partition. Dormant until
 // the renderer (LibreOfficeEditor.vue) requests it.
-ipcMain.handle('checkba:zetaoffice-editor', async () => {
+let nativeEditorManager = null
+ipcMain.handle('checkba:zetaoffice-editor', async (event, options) => {
+  // Only a named DOCX within the native byte limit opts into this slice. Generic spares and the
+  // comparison/merge callers require the complete WASM command service; their
+  // later document type is not known when this handler is called.
+  if (process.platform === 'darwin' && process.env.AWD_EDITOR_ENGINE === 'lok'
+      && typeof options?.readOnly === 'boolean' && /\.docx$/i.test(options.name || '')
+      && Number.isSafeInteger(options.size) && options.size >= 0 && options.size <= 64 * 1024 * 1024) {
+    nativeEditorManager ||= require('./native/editor-ipc').createNativeEditorManager({
+      root: path.join(app.getPath('temp'), 'aiworkdeck-native-editors'),
+      configFile: process.env.AWD_NATIVE_EDITOR_CONFIG,
+    })
+    return nativeEditorManager.open(event.sender, options)
+  }
   const { installZetaOfficeIsolation, ZETAOFFICE_PARTITION } = require('./zetaoffice-session')
   const { startEditorServer, editorUrl } = require('./zetaoffice-server')
   installZetaOfficeIsolation(ZETAOFFICE_PARTITION)
@@ -1656,10 +1760,18 @@ ipcMain.handle('checkba:zetaoffice-editor', async () => {
   return {
     // LO 画布 UI 语言跟随应用语言；只影响新建的编辑器实例（保活池里已 boot 的
     // 实例保持原语言，重启应用后全量生效）。
-    url: editorUrl(origin, { uilang: require('./app-language').getAppLanguage() }),
+    url: editorUrl(origin, { uilang: (typeof require('./app-language').getLowaUiLang === 'function' ? require('./app-language').getLowaUiLang() : require('./app-language').getAppLanguage()) }),
     preload: require('url').pathToFileURL(path.join(__dirname, '../preload/zetaoffice-webview-preload.js')).href,
     partition: ZETAOFFICE_PARTITION,
   }
+})
+ipcMain.handle('checkba:native-editor-request', (event, sessionId, action, params) => {
+  if (!nativeEditorManager) throw Error('Native editor is not enabled')
+  return nativeEditorManager.request(event.sender, sessionId, action, params)
+})
+ipcMain.handle('checkba:native-editor-close', (event, sessionId) => {
+  if (!nativeEditorManager) throw Error('Native editor is not enabled')
+  return nativeEditorManager.close(event.sender, sessionId)
 })
 
 // 编辑器本机字体（desktop/main/system-fonts.js）：设置面板列出/保存启用集；
@@ -1699,26 +1811,22 @@ ipcMain.on('checkba:app-language', (_evt, lang) => {
 // （system 态下渲染层拿不准——见 applyNativeTheme 的注释）。
 ipcMain.handle('checkba:set-theme', (_evt, mode) => applyNativeTheme(String(mode || 'light')))
 
-// IDE 化：Finder「打开方式」/ 拖到 Dock 图标进来的路径（macOS open-file 事件，
-// 可能早于窗口创建，先存后发；目录/文件在主进程判好再交渲染层走 open-path 流程）
-let pendingOpenPath = null
-function dispatchOpenPath(p) {
-  if (!p) return
-  let isDirectory = false
-  try {
-    isDirectory = require('fs').statSync(p).isDirectory()
-  } catch (e) {
-    return
-  }
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('checkba:menu-action', { action: 'open-path', path: p, isDirectory })
-  } else {
-    pendingOpenPath = p
-  }
-}
-app.on('open-file', (event, p) => {
-  event.preventDefault()
-  dispatchOpenPath(p)
+// 系统文件打开请求由主进程排队，直到工作台明确 ready；每条处理后 ack 再发下一条。
+// Windows 启动 argv / second-instance 与 macOS open-file 共用同一条交付链。
+const openPaths = require('./open-paths').installOpenPaths({
+  app, ipcMain,
+  queueFile: path.join(app.getPath('home'), '.aiworkdeck', 'restart-open-paths.json'),
+  isQuitting: () => quitInProgress,
+  requestRelaunch: () => { updateRestartRequested = true },
+  getWindow: () => mainWindow,
+  focusWindow: () => {
+    if ((!mainWindow || mainWindow.isDestroyed()) && mainWindowStartupReady) createMainWindow()
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    }
+  },
 })
 
 app.whenReady().then(() => {
@@ -1731,9 +1839,17 @@ app.whenReady().then(() => {
   // 「跟随系统」时用户在系统设置里切深浅，渲染层靠 matchMedia 跟上，原生窗控靠这里
   try { nativeTheme.on('updated', () => syncTitleBarOverlay()) } catch (e) { /* ignore */ }
   initLocalFileService()
+  try {
+    require('./permissions-service').initPermissionsService({
+      ipcMain,
+      getMainWindow: () => (quitInProgress ? null : mainWindow),
+    })
+  } catch (e) {
+    console.error('[permissions-service]', e)
+  }
   // IDE 化应用菜单（File 全套 + 最近打开；动作发回渲染层处理）
   try {
-    require('./app-menu').initAppMenu(() => mainWindow, { destroyAllBrowserViews: () => views.destroyAll() })
+    require('./app-menu').initAppMenu(() => quitInProgress ? null : mainWindow, { destroyAllBrowserViews: () => views.destroyAll() })
   } catch (e) {
     console.error('[app-menu]', e)
   }
@@ -1751,41 +1867,55 @@ app.whenReady().then(() => {
   } catch (e) { /* ignore */ }
   // 增量更新：清理非本大版本的 overlay 残留（全量升级后安装器不会替我们清）
   try { require('./services/overlay').cleanupStaleMajors(overlayCtx()) } catch (e) { console.error('[overlay]', e) }
-  // 桌面端启动时自动拉起本机服务（Java 后端 9696 + 已装 runtime pack 的 Python 服务）。
-  // 0.38.0 起没有 pysvc 解压这一步：四个 Python 服务的 descriptor 各自判 pack 在不在场，
-  // 不在场就不启动（用户在「可选组件」面板下载后 host.services.ensure 拉起）。
+  // 主窗口只等待 Java 后端真正 HTTP 就绪；已装 Python 组件不参与首屏关键路径。
+  // 四个 Python 服务会在主页面加载后启动，避免模型加载与 Java/H5 首启争抢资源。
   Promise.resolve()
     .then(() => {
       services = createServices()
       return services.allocatePorts()
     })
-    .then(() => services.startEager())
+    .then(() => services.start('backend').then(
+      (backend) => ({ backend }),
+      (e) => ({ backend: { ok: false, error: String(e && e.message ? e.message : e) } })
+    ))
     .then(async (results) => {
       // 增量更新自愈（设计 §6）：overlay 生效时后端起不来 → 记账，连续 2 次
       // 自动回滚到上一版本/内置并当场重试一次；启动健康则清零计数并清理旧版本
       try {
-        const overlay = require('./services/overlay')
-        const ctx = overlayCtx()
         const b0 = results.backend
-        if (b0 && b0.ok) {
-          overlay.markBootOk(ctx)
-        } else if (overlay.readCurrent(ctx)) {
-          const { reverted } = overlay.noteBackendBootFailure(ctx)
-          if (updateService) updateService.logEvent(reverted ? 'reverted' : 'boot-failure', { message: b0 && b0.error })
+        if (b0 && b0.ok && b0.fullReady !== false) {
+          recordBackendBoot(true, b0.launch)
+        } else if (!b0?.ok) {
+          const { reverted } = recordBackendBoot(false, services?.getLaunch?.('backend'), b0 && b0.error)
           if (reverted) {
             console.error('[overlay] 后端连续启动失败，已回滚补丁并重试')
             results.backend = await services.restart('backend').catch((e) => ({ ok: false, error: String(e && e.message ? e.message : e) }))
+            if (results.backend.ok && results.backend.fullReady !== false) recordBackendBoot(true, results.backend.launch)
           }
         }
       } catch (e) { console.error('[overlay]', e) }
+      configureBackendSupervision(results.backend?.ok === false)
       mainWindowStartupReady = true
       createMainWindow()
       retireFirstLaunchSplash()
+      const startupServices = services
+      mainWindow.webContents.once('did-finish-load', () => {
+        // 退出期间页面可能才加载完；不要把已停止的组件重新拉起。
+        if (quitInProgress || startupServices.closing) return
+        startupServices.startEager(['backend']).then((optionalResults) => {
+          for (const [name, result] of Object.entries(optionalResults)) {
+            if (!result.ok && !result.disabled) console.error(`[${name}]`, result.error || 'failed to start')
+          }
+        }).catch((e) => console.error('[startup] optional services failed', e))
+      })
       // 应用内更新检查（P1）：启动 2 分钟后静默首查，之后每 6 小时一次
       try {
         const { createUpdateService } = require('./services/update-service')
         const { extractTar } = require('./services/pysvc-runtime')
+        fullUpdate = require('./services/full-update').createFullUpdate({ app, autoUpdater: require('electron').autoUpdater, dataDir: overlayCtx().dataDir })
         updateService = createUpdateService(overlayCtx(), {
+          initialError: fullUpdate.lastError(),
+          prepareInstaller: (file, version) => fullUpdate.prepare(file, version),
           extractTar,
           onEvent: (evt) => {
             try { if (mainWindow) mainWindow.webContents.send('checkba:update-event', evt) } catch (e) { /* ignore */ }
@@ -1815,14 +1945,6 @@ app.whenReady().then(() => {
         })
         updateService.start()
       } catch (e) { console.error('[update]', e) }
-      // 启动前就收到的 open-file 路径：等渲染层就绪（App.onLaunch 注册好处理器）再补发
-      if (pendingOpenPath && mainWindow) {
-        const queued = pendingOpenPath
-        pendingOpenPath = null
-        mainWindow.webContents.once('did-finish-load', () => {
-          setTimeout(() => dispatchOpenPath(queued), 1500)
-        })
-      }
       const b = results.backend
       if (b && !b.ok) {
         // 后端失败也允许打开 UI（方便你调试），但会提示错误
@@ -1834,15 +1956,11 @@ app.whenReady().then(() => {
           // ignore
         }
       }
-      const p = results['pptx-service']
-      if (p && !p.ok) {
-        // pptx 失败不阻塞主流程：功能触发时后端会报服务不可达，日志见 ~/.aiworkdeck/logs
-        console.error('[pptx-service]', p.error || 'failed to start')
-      }
     })
     .catch((err) => {
       // 端口分配/启动链失败也要建出主窗口并提示，避免 app 起来却无窗口无提示（静默失败）
       console.error('[startup] service init failed', err)
+      configureBackendSupervision(true)
       mainWindowStartupReady = true
       try { createMainWindow() } catch (e) { /* ignore */ }
       retireFirstLaunchSplash()
@@ -1852,18 +1970,77 @@ app.whenReady().then(() => {
     })
 })
 
+// Acknowledgement comes only from the main renderer, after task suspension and
+// dirty editors have been saved. An old/stale window cannot authorize exit.
+let quitPreparation = null
+let quitHandlerSender = null
+ipcMain.on('checkba:quit-handler-ready', (event) => {
+  if (event.sender === mainWindow?.webContents) quitHandlerSender = event.sender
+})
+ipcMain.handle('checkba:quit-prepared', (event, data = {}) => {
+  if (quitPreparation && event.sender === mainWindow?.webContents && data.requestId === quitPreparation.id) {
+    data.ok === true ? quitPreparation.resolve() : quitPreparation.reject(new Error(data.error || '退出前保存未完成'))
+  }
+})
+ipcMain.handle('checkba:cancel-quit', (event) => {
+  if (event.sender === mainWindow?.webContents) quitPreparation?.reject(new Error('已取消退出'))
+})
+ipcMain.handle('checkba:quit-stage', (event, data = {}) => {
+  if (!quitPreparation || quitPreparation.settled || event.sender !== mainWindow?.webContents
+      || data.requestId !== quitPreparation.id) return false
+  if (!['pausing', 'saving', 'confirming'].includes(data.stage)) return false
+  quitPreparation.setStage(data.stage)
+  return true
+})
+async function prepareRendererForQuit() {
+  if (quitPreparation) return quitPreparation.promise
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (quitHandlerSender !== mainWindow.webContents) throw new Error('工作台尚未准备好退出，请稍后重试')
+  const preparation = { id: require('crypto').randomUUID(), settled: false }
+  let timer
+  preparation.promise = new Promise((resolve, reject) => {
+    const finish = (error) => {
+      if (preparation.settled) return
+      preparation.settled = true
+      clearTimeout(timer)
+      error ? reject(error) : resolve()
+    }
+    preparation.resolve = () => finish()
+    preparation.reject = finish
+    preparation.setStage = (stage) => {
+      clearTimeout(timer)
+      if (stage !== 'confirming') timer = setTimeout(() => finish(new Error('任务或文档仍在保存，已取消退出')), 60000)
+    }
+  })
+  quitPreparation = preparation
+  preparation.setStage('pausing')
+  const sender = mainWindow.webContents
+  const rendererLost = () => preparation.reject(new Error('工作台已停止响应，已取消退出'))
+  sender.once('destroyed', rendererLost)
+  sender.once('render-process-gone', rendererLost)
+  try {
+    try { sender.send('checkba:prepare-quit', { requestId: preparation.id }) }
+    catch (error) { preparation.reject(error) }
+    await preparation.promise
+  } finally {
+    sender.removeListener('destroyed', rendererLost)
+    sender.removeListener('render-process-gone', rendererLost)
+    if (quitPreparation === preparation) quitPreparation = null
+  }
+}
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
 app.on('activate', () => {
-  if (mainWindowStartupReady && BrowserWindow.getAllWindows().length === 0) createMainWindow()
+  if (quitInProgress) { updateRestartRequested = true; return }
+  if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.show(); mainWindow.focus() }
+  else if (mainWindowStartupReady && BrowserWindow.getAllWindows().length === 0) createMainWindow()
 })
 
-// 退出时等服务停干净的总墙钟上限。stopAll 里每个服务各有 3s 的 SIGTERM→SIGKILL 兜底，
-// 并行之后正常就是一次 3s 上下；这里给一个略宽的硬上限，任何一个服务卡在 kill 之外的
-// 地方都不至于让应用「既没有窗口也不退出」（dev-board#602）。
-const QUIT_STOP_TIMEOUT_MS = 4000
+// 后端有 45s 事务/文件退出宽限，再给强杀确认与队列清理留时间。
+const QUIT_STOP_TIMEOUT_MS = 55000
 
 function hideAllWindowsForQuit() {
   try {
@@ -1874,19 +2051,35 @@ function hideAllWindowsForQuit() {
 }
 
 app.on('before-quit', async (e) => {
+  if (!services) { quitInProgress = true; return }
+  if (quitInProgress && services) { e.preventDefault(); return }
   // 尽量在退出时停止我们启动的本地服务进程
   if (services) {
     const quitStartedAt = Date.now()
     try {
       e.preventDefault()
+      quitInProgress = true
+      try { await prepareRendererForQuit() } catch (err) {
+        updateRestartRequested = false
+        quitInProgress = false
+        try { mainWindow?.webContents.send('checkba:quit-cancelled', { error: String(err.message || err) }) } catch (_) { /* Renderer already gone. */ }
+        logDesktopEvent('quit-cancelled', { message: String(err.message || err) })
+        openPaths.resume()
+        return
+      }
       // ① 先记账：下次再出现「应用自己消失了」，能直接从 desktop.log 读出退出起点与耗时，
       //    不用再去反推 macOS 统一日志（dev-board#602 那次就是这么查的）。
       logDesktopEvent('quit-begin', { pid: process.pid })
+      backendSupervisor?.stop()
       // ② 立刻把窗口藏掉。preventDefault 之后停服务要好几秒，原来这段时间里窗口
       //    完全可用、还能建 SSE 发新请求，然后整个应用在同一瞬间消失——用户看到的
       //    就是「闪退」。先 hide 才是 Mac 应用按 ⌘Q 的正常观感：窗口立刻消失，
       //    收尾在后台进行。
       hideAllWindowsForQuit()
+      if (nativeEditorManager) {
+        try { await nativeEditorManager.closeAll() }
+        catch (error) { logDesktopEvent('native-editor-stop-error', { message: String(error.message || error) }) }
+      }
       // 先终止进行中的模型下载子进程，否则退出时它们会变孤儿继续占用资源
       if (modelManager) modelManager.killAllActive()
       // ③ 停服务带总墙钟上限：到点就走，不再无限等
@@ -1901,16 +2094,27 @@ app.on('before-quit', async (e) => {
     services = null
     stopClipboardWatcher()
     logDesktopEvent('quit-end', { elapsedMs: Date.now() - quitStartedAt })
+    updateService?.stop()
+    try {
+      if (fullUpdate?.isReady()) {
+        const restart = updateRestartRequested
+        if (await fullUpdate.installOnQuit(restart)) return
+        // A second launch can arrive while the Windows helper is starting.
+        // The successor will see its lock and ask it to reopen after installation.
+        if (!restart && updateRestartRequested) app.relaunch()
+      } else if (updateRestartRequested) app.relaunch()
+    } catch (err) {
+      logDesktopEvent('update-install-error', { message: String(err.message || err) })
+      if (updateRestartRequested) app.relaunch()
+    }
     app.exit(0)
   }
 })
 
 ipcMain.handle('checkba:backend-restart', async () => {
-  if (!services) {
-    services = createServices()
-    await services.allocatePorts()
-  }
-  return services.restart('backend')
+  if (!backendSupervisor) return { ok: false, error: backendStartupFailed ? 'backend startup failed; reopen the application' : 'backend is still starting' }
+  const result = { ...await backendSupervisor.recover() }
+  delete result.launch
+  return result
 })
-
-
+ipcMain.handle('checkba:backend-health', getBackendHealth)

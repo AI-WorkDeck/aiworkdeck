@@ -1,0 +1,169 @@
+Writer: Word EQ fields open as formulas
+
+DOCX import read only EQ's \o, \s\do and ruby forms; every other
+EQ field, such as \f(a,b) for a fraction, vanished (Gitea #9).
+The import now turns an EQ field into a Math object through
+the parser of the previous patch. Each command character keeps
+its run's italic and vertAlign, as Word draws them (a with a
+subscript 10 is a_{10}); the formula takes the field's font
+size. A command the parser cannot read shows its field code as
+text, so nothing vanishes and the failure stays visible. Only a
+whole plain \s\do N(text) field stays lowered text, as before;
+the old reader dropped anything after its first bracket.
+
+--- a/sw/source/writerfilter/dmapper/DomainMapper_Impl.hxx
++++ b/sw/source/writerfilter/dmapper/DomainMapper_Impl.hxx
+@@ -26,6 +26,7 @@
+ #include <com/sun/star/style/TabStop.hpp>
+ #include <com/sun/star/container/XNameContainer.hpp>
+ #include <com/sun/star/embed/XStorage.hpp>
++#include <com/sun/star/embed/XEmbeddedObject.hpp>
+ #include <queue>
+ #include <stack>
+ #include <string_view>
+@@ -50,6 +51,7 @@
+ #include "ThemeHandler.hxx"
+ #include "GraphicImport.hxx"
+ #include "OLEHandler.hxx"
++#include "EqField.hxx"
+ #include "FFDataHandler.hxx"
+ #include "SmartTagHandler.hxx"
+ #include "FormControlHelper.hxx"
+@@ -303,6 +305,8 @@ class FieldContext : public virtual SvRefBase
+     // 0: Normal, inserted command line
+     // 1: Deleted command line
+     OUString m_sCommand[2];
++    /// The look of each inserted command character, for EQ fields.
++    std::vector<EqLook> m_aCommandLooks;
+     OUString m_sResult;
+     OUString m_sVariableValue;
+     std::optional<FieldId> m_eFieldId;
+@@ -346,6 +350,12 @@ public:
+ 
+     void                    AppendCommand(std::u16string_view rPart);
+     /// Deleted command text has no look.
++    void AppendLooks(sal_Int32 nCount, EqLook aLook)
++    {
++        if (!m_bCommandType)
++            m_aCommandLooks.insert(m_aCommandLooks.end(), nCount, aLook);
++    }
++    const std::vector<EqLook>& GetCommandLooks() const { return m_aCommandLooks; }
+     const OUString&  GetCommand() const {return m_sCommand[m_bCommandType]; }
+     bool GetCommandIsEmpty(bool bType) const { return m_sCommand[bType].isEmpty(); }
+     void SetCommandType(bool cType) { m_bCommandType = cType; }
+@@ -846,6 +856,9 @@ public:
+     void moveWithRun(const css::uno::Reference<css::text::XTextContent>& xContent);
+     void appendOLE( const OUString& rStreamName, const std::shared_ptr<OLEHandler>& pOleHandler );
+     void appendStarMath( const Value& v);
++    void appendFormula(const css::uno::Reference<css::embed::XEmbeddedObject>& xFormula);
++    /// A Word EQ field as a formula object.
++    void appendEqFormula(const FieldContextPtr& pContext);
+     void adjustLastPara(sal_Int8 nAlign);
+     rtl::Reference<SwXTextSection> appendTextSectionAfter(css::uno::Reference<css::text::XTextRange> const & xBefore);
+ 
+--- a/sw/source/writerfilter/dmapper/DomainMapper_Impl.cxx
++++ b/sw/source/writerfilter/dmapper/DomainMapper_Impl.cxx
+@@ -92,6 +92,9 @@
+ #include <com/sun/star/document/XImporter.hpp>
+ #include <com/sun/star/document/XFilter.hpp>
+ #include <comphelper/indexedpropertyvalues.hxx>
++#include <comphelper/classids.hxx>
++#include <comphelper/embeddedobjectcontainer.hxx>
++#include <tools/globname.hxx>
+ #include <editeng/flditem.hxx>
+ #include <editeng/unotext.hxx>
+ #include <o3tl/deleter.hxx>
+@@ -3815,19 +3818,44 @@ void DomainMapper_Impl::appendOLE( const OUString& rStreamName, const std::share
+ 
+ }
+ 
++void DomainMapper_Impl::appendEqFormula(const FieldContextPtr& pContext)
++{
++    // the looks index the untrimmed command
++    const OUString aMath = EqToStarMath(pContext->GetCommand(), pContext->GetCommandLooks());
++    if (aMath.isEmpty())
++    {
++        // an unreadable field shows its code, never vanishes
++        appendTextPortion(pContext->GetCommand().trim(), pContext->getProperties());
++        return;
++    }
++    comphelper::EmbeddedObjectContainer aContainer;
++    OUString aName;
++    uno::Reference<embed::XEmbeddedObject> xFormula = aContainer.CreateEmbeddedObject(
++        SvGlobalName(SO3_SM_CLASSID).GetByteSequence(), aName, m_aBaseUrl);
++    uno::Reference<beans::XPropertySet> xMath(xFormula->getComponent(), uno::UNO_QUERY_THROW);
++    xMath->setPropertyValue(u"Formula"_ustr, uno::Any(aMath));
++    double fHeight = 0;
++    if (GetAnyProperty(PROP_CHAR_HEIGHT, pContext->getProperties()) >>= fHeight)
++        xMath->setPropertyValue(u"BaseFontHeight"_ustr, uno::Any(sal_Int16(std::round(fHeight))));
++    appendFormula(xFormula);
++}
++
+ void DomainMapper_Impl::appendStarMath( const Value& val )
+ {
+     uno::Reference< embed::XEmbeddedObject > formula;
+     val.getAny() >>= formula;
+-    if( !formula.is() )
+-        return;
++    if( formula.is() )
++        appendFormula(formula);
++}
+ 
++void DomainMapper_Impl::appendFormula(const uno::Reference<embed::XEmbeddedObject>& formula)
++{
+     try
+     {
+         rtl::Reference<SwXTextEmbeddedObject> xStarMath = m_xTextDocument->createTextEmbeddedObject();
+ 
+         xStarMath->setPropertyValue(getPropertyName( PROP_EMBEDDED_OBJECT ),
+-            val.getAny());
++            uno::Any(formula));
+         // tdf#66405: set zero margins for embedded object
+         xStarMath->setPropertyValue(getPropertyName( PROP_LEFT_MARGIN ),
+             uno::Any(sal_Int32(0)));
+@@ -6599,11 +6627,20 @@ void DomainMapper_Impl::AppendFieldCommand(OUString const & rPartOfCommand)
+     {
+         // Set command line type: normal or deleted
+         pContext->SetCommandType(m_bTextDeleted);
++        PropertyMapPtr pCharContext = GetTopContextOfType(CONTEXT_CHARACTER);
+         if (pContext->GetCommand().isEmpty())
+         {
+-            pContext->getProperties()->InsertProps(GetTopContextOfType(CONTEXT_CHARACTER));
++            pContext->getProperties()->InsertProps(pCharContext);
+         }
+         pContext->AppendCommand( rPartOfCommand );
++        EqLook aLook;
++        awt::FontSlant eSlant = awt::FontSlant_NONE;
++        aLook.bItalic = (GetAnyProperty(PROP_CHAR_POSTURE, pCharContext) >>= eSlant)
++                        && eSlant == awt::FontSlant_ITALIC;
++        sal_Int16 nEscapement = 0;
++        GetAnyProperty(PROP_CHAR_ESCAPEMENT, pCharContext) >>= nEscapement;
++        aLook.nScript = nEscapement > 0 ? 1 : nEscapement < 0 ? -1 : 0;
++        pContext->AppendLooks(rPartOfCommand.getLength(), aLook);
+     }
+ }
+ 
+@@ -8209,7 +8246,13 @@ void DomainMapper_Impl::CloseFieldCommand()
+                         sal_Int32 nSpaceIndex = aCommand.indexOf(' ');
+                         if(nSpaceIndex > 0)
+                             aCommand = o3tl::trim(aCommand.subView(nSpaceIndex));
+-                        if (aCommand.startsWith("\\s"))
++                        // only a whole plain lowered run stays text
++                        sal_Int32 nOpen = aCommand.indexOf('(');
++                        bool bLowered = aCommand.startsWith("\\s\\do") && nOpen > 0
++                                        && aCommand.indexOf(')') == aCommand.getLength() - 1
++                                        && aCommand.indexOf('(', nOpen + 1) < 0
++                                        && aCommand.indexOf('\\', 5) < 0;
++                        if (bLowered)
+                         {
+                             aCommand = aCommand.copy(2);
+                             if (aCommand.startsWith("\\do"))
+@@ -8236,6 +8279,8 @@ void DomainMapper_Impl::CloseFieldCommand()
+                         {
+                             handleRubyEQField(pContext);
+                         }
++                        else
++                            appendEqFormula(pContext);
+                     }
+                 }
+                 break;

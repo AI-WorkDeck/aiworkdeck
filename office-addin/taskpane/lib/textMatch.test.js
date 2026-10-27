@@ -109,9 +109,9 @@ test('closestFragment：找不到时给出文档里最接近的一段原文', ()
 test('describeAnchorFailure：报错必须带证据与下一步，而不是只说「请确认精确一致」', () => {
   const doc = '第八条 甲方应于每月十五日前向乙方支付服务费。'
   const msg = describeAnchorFailure('插入文本（修订）', '甲方应于每月十日前向乙方支付服务费', doc)
-  assert.ok(msg.includes('最接近的一段原文'), msg)
+  assert.ok(msg.includes('最接近的一段原文') || msg.includes('closest text in the document'), msg)
   assert.ok(msg.includes('十五日'), '候选片段要把文档原文摆出来')
-  assert.ok(/重试|重新读取/.test(msg), '要告诉模型下一步做什么')
+  assert.ok(/重试|重新读取|retry|re-read/i.test(msg), '要告诉模型下一步做什么')
 })
 
 test('空锚点不产生命中（避免"空串匹配一切"）', () => {

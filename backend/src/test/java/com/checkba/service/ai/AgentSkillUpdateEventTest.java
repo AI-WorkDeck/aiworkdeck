@@ -168,11 +168,13 @@ class AgentSkillUpdateEventTest {
     @DisplayName("生效的 skill 随 skill_update 下发：id / name / source 三个字段是跨端契约")
     void emitsActiveSkillsWithSource() {
         // runId 由编排器现签（UUID），桩不能再按 conversationId 匹配
+        SkillDefinition builtin = skill("contract-review", "合同审查");
+        builtin.setBuiltinWorkflow(true);
         when(skillRouter.activeSkills(anyString())).thenReturn(List.of(
                 new SkillRouter.ActiveSkill(skill("litigation-visual", "诉讼可视化"),
                         "诉讼可视化", SkillRouter.SOURCE_MANUAL),
-                new SkillRouter.ActiveSkill(skill("listing-pathway", "上市路径选择"),
-                        "上市路径选择", SkillRouter.SOURCE_AUTO)));
+                new SkillRouter.ActiveSkill(builtin,
+                        "合同审查", SkillRouter.SOURCE_AUTO)));
 
         run("conv-skill", AgentMode.AGENT, List.of("litigation-visual"));
 
@@ -180,8 +182,9 @@ class AgentSkillUpdateEventTest {
         assertNotNull(data, "每轮都必须发 skill_update：" + sseEvents);
         assertTrue(data.contains("\"id\":\"litigation-visual\""), data);
         assertTrue(data.contains("\"source\":\"manual\""), data);
-        assertTrue(data.contains("\"name\":\"上市路径选择\""), data);
+        assertTrue(data.contains("\"name\":\"合同审查\""), data);
         assertTrue(data.contains("\"source\":\"auto\""), data);
+        assertTrue(data.contains("\"builtinWorkflow\":true"), data);
     }
 
     @Test
@@ -279,6 +282,73 @@ class AgentSkillUpdateEventTest {
     }
 
     @Test
+    @DisplayName("ASK 原生与XML均可执行只读版本检查")
+    void askAllowsReadOnlyVersionInspection() {
+        org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "xmlToolCallParser", new XmlToolCallParser(toolRegistry));
+        List<String> reads = List.of("version_status", "version_history", "version_changes");
+        when(toolRegistry.getAllSpecifications(any(), any())).thenReturn(java.util.stream.Stream.concat(
+                reads.stream(), java.util.stream.Stream.of("version_commit", "version_pull", "version_restore"))
+                .map(AgentSkillUpdateEventTest::spec).toList());
+        for (boolean xml : List.of(false, true)) {
+            for (String tool : reads) {
+                when(toolRegistry.hasTool(tool)).thenReturn(true);
+                when(toolRegistry.execute(eq(tool), any(), any())).thenReturn(new ToolRegistry.ToolResult("{\"changes\":[]}", null, true));
+                java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+                StreamingChatLanguageModel model = new StreamingChatLanguageModel() {
+                    @Override public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) { generate(messages, List.of(), handler); }
+                    @Override public void generate(List<ChatMessage> messages, List<ToolSpecification> tools, StreamingResponseHandler<AiMessage> handler) {
+                        assertEquals(reads, tools.stream().map(ToolSpecification::name).toList());
+                        AiMessage reply = calls.getAndIncrement() == 0
+                                ? (xml ? AiMessage.from("<tool_code>" + tool + "()</tool_code>")
+                                : AiMessage.from(ToolExecutionRequest.builder().id("read1").name(tool).arguments("{}").build()))
+                                : AiMessage.from("<final>inspection complete</final>");
+                        if (reply.text() != null) handler.onNext(reply.text());
+                        handler.onComplete(Response.from(reply));
+                    }
+                };
+                when(chatModelFactory.getStreamingChatModel(MODEL)).thenReturn(model);
+                run("ask-read-" + tool + xml, AgentMode.ASK, null);
+                assertEquals(2, calls.get());
+            }
+        }
+        for (String tool : reads) verify(toolRegistry, times(2)).execute(eq(tool), any(), any());
+        for (String tool : List.of("version_commit", "version_pull", "version_restore")) verify(toolRegistry, never()).execute(eq(tool), any(), any());
+    }
+
+    @Test
+    @DisplayName("ASK 同时拒绝原生与 XML 版本写工具")
+    void askRejectsNativeAndXmlVersionWrites() {
+        org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "xmlToolCallParser",
+                new XmlToolCallParser(toolRegistry));
+        for (boolean xml : List.of(false, true)) {
+            for (String tool : List.of("version_commit", "version_pull", "version_restore")) {
+                when(toolRegistry.getAllSpecifications(any(), any())).thenReturn(List.of(spec(tool)));
+                when(toolRegistry.hasTool(tool)).thenReturn(true);
+                java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+                StreamingChatLanguageModel model = new StreamingChatLanguageModel() {
+                    @Override public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {
+                        generate(messages, List.of(), handler);
+                    }
+                    @Override public void generate(List<ChatMessage> messages, List<ToolSpecification> tools,
+                                                   StreamingResponseHandler<AiMessage> handler) {
+                        assertFalse(tools.stream().anyMatch(s -> s.name().equals(tool)));
+                        AiMessage reply = calls.getAndIncrement() == 0
+                                ? (xml ? AiMessage.from("<tool_code>" + tool + "()</tool_code>")
+                                : AiMessage.from(ToolExecutionRequest.builder().id("v1").name(tool).arguments("{}").build()))
+                                : AiMessage.from("<final>write refused</final>");
+                        if (reply.text() != null) handler.onNext(reply.text());
+                        handler.onComplete(Response.from(reply));
+                    }
+                };
+                when(chatModelFactory.getStreamingChatModel(MODEL)).thenReturn(model);
+                run("conv-ask-" + tool + xml, AgentMode.ASK, null);
+                verify(toolRegistry, never()).execute(eq(tool), any(), any());
+                assertEquals(2, calls.get(), "The attempted write must be rejected and followed by a reply");
+            }
+        }
+    }
+
+    @Test
     @DisplayName("技能裁剪不能隐藏 Agent/Plan 的六个 memory 工具")
     void skillNarrowingRetainsAllOrdinaryMemoryTools() {
         ToolSpecification action = spec("skill_action");
@@ -359,5 +429,37 @@ class AgentSkillUpdateEventTest {
 
     private static ToolSpecification spec(String name) {
         return ToolSpecification.builder().name(name).description(name).build();
+    }
+
+    @Test
+    @DisplayName("智能模式（auto）：按轮确定性路由模型与思考强度，并推送 SSE model_routed 事件")
+    void autoModelEmitsModelRoutedEventAndUsesRoutedModelAndEffort() {
+        when(skillRouter.activeSkills(anyString())).thenReturn(List.of(
+                new SkillRouter.ActiveSkill(skill("legal-opinion-review", "法律意见书审查"),
+                        "法律意见书审查", SkillRouter.SOURCE_AUTO)));
+        when(chatModelFactory.getStreamingChatModel("moonshotai/kimi-k3", "high"))
+                .thenReturn(new OneShotModel());
+
+        AiAgentController.AgentChatRequest request = new AiAgentController.AgentChatRequest();
+        request.setProjectId(1L);
+        request.setConversationId("conv-auto-route");
+        request.setMessage("对这份法律意见书做全面实质审查");
+        request.setModel("auto");
+        request.setMode(AgentMode.AGENT.name());
+        orchestrator.handleUserMessage(request, 7L);
+
+        verify(chatModelFactory).getStreamingChatModel("moonshotai/kimi-k3", "high");
+        String routedPayload = null;
+        for (int i = 0; i < sseEvents.size(); i++) {
+            if ("model_routed".equals(sseEvents.get(i))) {
+                routedPayload = sseData.get(i);
+                break;
+            }
+        }
+        assertNotNull(routedPayload, "智能模式必须推送 model_routed 事件：" + sseEvents);
+        assertTrue(routedPayload.contains("\"requestedModel\":\"auto\""), routedPayload);
+        assertTrue(routedPayload.contains("\"effectiveModel\":\"moonshotai/kimi-k3\""), routedPayload);
+        assertTrue(routedPayload.contains("\"effectiveModelName\":\"Kimi K3\""), routedPayload);
+        assertTrue(routedPayload.contains("\"tier\":\"DEEP\""), routedPayload);
     }
 }

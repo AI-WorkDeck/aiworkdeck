@@ -26,7 +26,7 @@
         <dependency>
             <groupId>com.checkba</groupId>
             <artifactId>plugin-api</artifactId>
-            <version>1.2.0</version>
+            <version>1.4.0</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -116,7 +116,7 @@
         <dependency>
             <groupId>org.eclipse.jgit</groupId>
             <artifactId>org.eclipse.jgit</artifactId>
-            <version>6.9.0.202403050737-r</version>
+            <version>7.7.1.202607240634-r</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -130,10 +130,10 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- LangChain4j + Ollama -->
+        <!-- Tools/model orchestration is explicit; no @AiService proxies or classpath scanner. -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j-spring-boot-starter</artifactId>
+            <artifactId>langchain4j</artifactId>
             <version>0.36.0</version>
         </dependency>
         <dependency>
@@ -231,17 +231,12 @@
              会议录音 webm/opus 转 16kHz 单声道 mp3。原先引的聚合体 javacv-platform
              会把 opencv/openblas/leptonica/tesseract/librealsense2 与一堆摄像头驱动
              一并拖进 backend/lib（mac 51MB、win 101MB），而这些库一个调用方都没有。
-             改成 javacv 本体 + ffmpeg-platform：-Djavacpp.platform=<平台> 照旧把
-             ffmpeg 的原生 jar 收敛到单平台（安装包瘦身 dev-board#528）。 -->
+             使用 javacv 本体，原生库由下方 profile 显式选择目标平台；
+             不依赖仓库 POM 读取命令行属性（Maven 3.10 已限制该行为，dev-board#1335）。 -->
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>javacv</artifactId>
             <version>1.5.10</version>
-        </dependency>
-        <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>ffmpeg-platform</artifactId>
-            <version>6.1.1-1.5.10</version>
         </dependency>
 
         <!-- Apache POI for DOCX Processing -->
@@ -314,6 +309,45 @@
     </repositories>
 
     <profiles>
+        <!-- 未指定目标平台的开发/服务器构建保留原来的全平台依赖。 -->
+        <profile>
+            <id>ffmpeg-all-platforms</id>
+            <activation>
+                <property>
+                    <name>!javacpp.platform</name>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>ffmpeg-platform</artifactId>
+                    <version>6.1.1-1.5.10</version>
+                </dependency>
+            </dependencies>
+        </profile>
+        <!-- 在本项目解析 classifier，避免 Maven 升级后把其他平台的原生库打进安装包。 -->
+        <profile>
+            <id>ffmpeg-target-platform</id>
+            <activation>
+                <property>
+                    <name>javacpp.platform</name>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacpp</artifactId>
+                    <version>1.5.10</version>
+                    <classifier>${javacpp.platform}</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>ffmpeg</artifactId>
+                    <version>6.1.1-1.5.10</version>
+                    <classifier>${javacpp.platform}</classifier>
+                </dependency>
+            </dependencies>
+        </profile>
         <!-- 桌面安装包用（Epic #18 T2）：mac 通用 jar。
              -Djavacpp.platform 的值会被 bytedeco 按构建宿主收敛（实测请求
              macosx-x86_64 仍得到宿主 arm64 natives），所以 Intel 的原生库
@@ -367,7 +401,64 @@
     </profiles>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <!-- 律所管理官方 Web 插件随包内置（dev-board#1282）：源头仍在 official-plugins/，
+                 这里只是打进 app.jar 的 bundled-plugins/，由 LawFirmBundledPluginInstaller 落盘。 -->
+            <resource>
+                <directory>../official-plugins/lawfirm-management</directory>
+                <targetPath>bundled-plugins/lawfirm-management</targetPath>
+                <includes>
+                    <include>manifest.json</include>
+                    <include>web/**</include>
+                    <include>l10n/**</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>../sdk/plugin-sdk</directory>
+                <targetPath>bundled-plugins/lawfirm-management/web</targetPath>
+                <includes>
+                    <include>awd-plugin-sdk.js</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
+
+            <!-- Never package a stale generated contract, including after a skipped/failed generator. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-clean-plugin</artifactId>
+                <executions><execution>
+                    <id>discard-stale-persistence-contract</id><phase>initialize</phase><goals><goal>clean</goal></goals>
+                    <configuration>
+                        <excludeDefaultDirectories>true</excludeDefaultDirectories>
+                        <filesets><fileset><directory>${project.build.outputDirectory}/local-core</directory>
+                            <includes><include>persistence-contract.json</include></includes>
+                        </fileset></filesets>
+                    </configuration>
+                </execution></executions>
+            </plugin>
+            <!-- Runs for test and package (also -DskipTests); no application services are started. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId><artifactId>exec-maven-plugin</artifactId><version>3.5.0</version>
+                <executions><execution>
+                    <id>generate-verified-persistence-contract</id><phase>process-test-classes</phase><goals><goal>java</goal></goals>
+                    <configuration>
+                        <mainClass>com.checkba.localcore.LocalCorePersistenceContractGenerator</mainClass>
+                        <classpathScope>test</classpathScope>
+                        <arguments><argument>${project.build.outputDirectory}/local-core/persistence-contract.json</argument></arguments>
+                    </configuration>
+                </execution><execution>
+                    <id>verify-packaged-persistence-contract</id><phase>verify</phase><goals><goal>java</goal></goals>
+                    <configuration>
+                        <mainClass>com.checkba.localcore.LocalCorePackagedContractVerifier</mainClass>
+                        <classpathScope>test</classpathScope>
+                        <arguments><argument>${project.build.directory}/${project.build.finalName}.jar</argument></arguments>
+                    </configuration>
+                </execution></executions>
+            </plugin>
 
             <plugin>
                 <groupId>org.springframework.boot</groupId>

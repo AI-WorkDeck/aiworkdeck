@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
   <view class="libre-editor-wrapper" :class="{ 'evidence-drop-armed': evidenceDropArmed }">
-    <!-- 保存状态沿用版本身份细栏，保持固定位置；加载与其它错误仍走原有浮层。 -->
+    <!-- 文件保存状态保持固定位置；加载与其它错误仍走原有浮层。 -->
     <!-- 加载进度面板：引擎启动 + 文档下载/打开是感知最慢的一段（尤其大文档），
          把过程阶段化展示出来（用户反馈：不能更快，也要看得见进展）。 -->
     <view v-if="loadingOverlayVisible" class="libre-loading">
@@ -31,7 +31,7 @@
           <text>{{ $t('editor.openFailed.retry') }}</text>
         </view>
       </view>
-      <view v-if="!previewReady && !openFailed" class="libre-loading-card">
+      <view v-if="(!previewReady || chromeInitFailed) && !openFailed" class="libre-loading-card">
         <view class="libre-doc-icon">
           <view class="doc-fold"></view>
           <view class="doc-line l1"></view>
@@ -52,9 +52,10 @@
         <text v-if="!stuck" class="libre-loading-hint">{{ $t('editor.firstOpenHint') }}</text>
         <!-- 引擎 boot 失败：说清楚原因，否则用户只看得到一根不动的进度条。 -->
         <text v-if="bootFailReason" class="libre-loading-error">{{ $t('editor.bootFailedHint', { reason: bootFailReason }) }}</text>
+        <text v-if="chromeInitFailed" class="libre-loading-error">{{ $t('editor.toolbar.viewPrefsFailed') }}</text>
         <!-- 同一阶段长时间无进展（大概率是下载/装载卡住）：给出可点的出路，
              而不是让用户对着一根不动的进度条干等。 -->
-        <view v-if="stuck" class="libre-loading-retry" @click="retryLoad">
+        <view v-if="stuck || chromeInitFailed" class="libre-loading-retry" @click="retryLoad">
           <text>{{ $t('editor.retryLoad') }}</text>
         </view>
       </view>
@@ -63,14 +64,13 @@
          compiler does not know the <webview> tag); it mounts into this host.
          审阅面板与画布并排（挤宽而非浮层）——webview 是独立合成层，浮层压在
          上面的行为不可靠。 -->
-    <!-- 自建工具栏（P2a）：只加不减——LO 自己的菜单栏/工具栏这一期原样保留，
-         等自建这套功能覆盖到位再谈隐藏（体验不能退步是硬约束）。
-         Calc/Impress 的命令面完全不同，先只给 Writer。 -->
+    <!-- 原生外壳先隐藏并核验，再显示正文和自建工具栏。设置中的原生菜单开关仍保留。 -->
     <!-- file 判空不能省：预热备胎（file=null）也会走到 ready，工具栏挂上去就会
          对着一个隐藏的空白实例白跑 get_ui_state/list_styles/list_fonts。 -->
     <EditorToolbar
-      v-if="ready && file && !loadingOverlayVisible && docKind === 'writer'"
+      v-if="ready && file && !loadingOverlayVisible && (docKind === 'writer' || docKind === 'calc' || docKind === 'impress')"
       ref="toolbar"
+      :doc-kind="docKind"
       :executor="executor"
       :refresh-key="uiRefreshKey"
       :review-open="reviewOpen"
@@ -79,39 +79,40 @@
       :writing-assistance-on="writingAssistanceOpen"
       :writing-assistance-available="writingAssistanceAvailable"
       @toggle-review="reviewOpen = !reviewOpen"
+      @visual-review="runVisualReview"
       @toggle-semantic-writing="toggleSemanticWriting"
       @toggle-writing-assistance="toggleWritingAssistance"
       @changed="onDocModified"
-      @ui-state="$emit('menu-state')"
+      @ui-state="onToolbarState"
       @focus-editor="focusEditor"
       @ai-format="onToolbarAiFormat"
     />
-    <!-- 版本身份小条（dev-board#632 起有它，#672 复测改成文件级）：说这份**文件**
-         最近一次有名字的版本，磁盘内容领先版本记录时说「已保存，尚未存为版本」。
-         点一下跳到提交历史并高亮那一行。
-         为什么不再逐段跟光标：律师在这里要读的是「我现在看的这份文件存进版本记录了
-         吗、是哪一版」，而光标随便一动那句话就换个名字、落进表格还整条消失。
-         逐段归属一个字没动，仍在审阅面板的「溯源」标签里（设计稿 §5.5）。 -->
-    <view v-if="saveStateText || provenanceBarVisible" class="libre-prov-bar">
-      <text
-        v-if="provenanceBarVisible"
-        class="libre-prov-text"
-        :class="{ clickable: !!provSha }"
-        @tap="openProvenanceHistory"
-      >{{ provText }}</text>
+    <!-- 文件保存状态只反映当前编辑内容是否落盘；版本提交与同步在全局面板管理。 -->
+    <view v-if="saveStateText" class="libre-save-bar">
       <view v-if="saveStateText" class="libre-save-state" :class="{ error: isError && !saving }" role="status">
         <text class="libre-save-label" :title="saveStateText">{{ saveStateText }}</text>
         <text v-if="(statusKey === 'saveFailed' || statusKey === 'movedSaveFailed') && !saving" class="libre-save-retry" @tap="retrySave">{{ $t('editor.retrySave') }}</text>
         <text v-if="statusKey === 'movedSaveFailed' && !saving" class="libre-save-retry" @tap="saveCopyAs">{{ $t('editor.saveCopyAs') }}</text>
       </view>
     </view>
+    <view v-if="inputError" class="libre-input-error" role="alert">
+      <text>{{ inputError }}</text>
+      <button type="button" :aria-label="$t('common.close')" @click="inputError = ''">×</button>
+    </view>
     <!-- review-overview-open：审阅概览现在浮在画布右侧（不挤宽画布），画布上的
          宿主浮层据此让出面板宽度，见样式 .libre-review-overview 之后那一段。 -->
     <view class="libre-body" :class="{ 'review-overview-open': reviewOverviewShown, 'review-en': reviewPanelEn }">
       <!-- 浮层必须钉在**画布**上而不是整个编辑器上：审阅面板是并排挤宽的，钉在
            外层右上角会正好压住面板的「修订/批注」标题行（真机截图实证）。 -->
+      <OfficeNavigation
+        v-if="ready && file && !loadingOverlayVisible && docKind === 'impress'"
+        :key="'slides-' + file.id" :executor="executor" kind="impress"
+        :refresh-key="uiRefreshKey" :content-key="navigationContentKey" :active="active"
+        :current-item="navigationCurrentItem" :structure-key="navigationStructureKey" :can-background-work="canRunNavigationWork"
+        @navigate="onOfficeNavigate"
+      />
       <view class="libre-canvas-wrap">
-        <view :id="hostId" class="libre-host"></view>
+        <view :id="hostId" class="libre-host" :class="{ 'libre-host-loading': loadingOverlayVisible }"></view>
         <!-- 改字 stale 提示条：绝对定位叠在画布顶部，非阻塞；不依赖审阅面板开着 -->
         <EvidenceStaleBar
           class="libre-stale-bar"
@@ -160,6 +161,7 @@
         :self-author="selfAuthor"
         :provenance="provenanceForPanel"
         :inline-review="inlineReviewState"
+        :autocomplete="writingAssistanceState"
         @open-history="openProvenanceHistory"
         @close="reviewOpen = false"
         @changed="onReviewChanged"
@@ -167,6 +169,13 @@
         @inline-review="onInlineReviewAction"
       />
     </view>
+    <OfficeNavigation
+      v-if="ready && file && !loadingOverlayVisible && docKind === 'calc'"
+      :key="'sheets-' + file.id" :executor="executor" kind="calc"
+      :refresh-key="uiRefreshKey" :content-key="navigationContentKey" :active="active"
+        :current-item="navigationCurrentItem" :structure-key="navigationStructureKey" :can-background-work="canRunNavigationWork" :writable="canWrite"
+      @navigate="onOfficeNavigate" @add-sheet="$refs.toolbar && $refs.toolbar.addCalcSheet()"
+    />
   </view>
 </template>
 
@@ -187,6 +196,7 @@ import { webviewTransport, iframeTransport } from '@/composables/useZetaOfficeWe
 import { createRelayExecutor, PROBE_ACTION, PROBE_BUDGET_MS } from '@/composables/zetaOfficeRelay.js'
 import { classifyLoadFailure, shouldSelfHealLoadFailure, loadBudgetMs, openFailureOf, STATUS_OPEN_FAILED } from '@/utils/editorLoadFailure.js'
 import ReviewPanel from '@/components/ReviewPanel.vue'
+import OfficeNavigation from '@/components/OfficeNavigation.vue'
 import EditorToolbar from '@/components/EditorToolbar.vue'
 import EvidenceStaleBar from '@/components/EvidenceStaleBar.vue'
 import { getCheckpointRestoreWriteState, getFileBytesUrl, getFileWriteUrl, listEvidenceLinks, reportEvidenceAnchors, keepEvidenceAnchor, getCurrentUser as fetchAuthUser, getFileLocalPath } from '@/services/api.js'
@@ -199,7 +209,7 @@ import { StaleQueue } from '@/utils/evidenceStaleQueue.js'
 import { createAnchorChecker, resolveKeepText } from '@/composables/useEvidenceAnchors.js'
 import { EVIDENCE_CHANGED_EVENT } from '@/utils/evidenceEvents.js'
 import { DOC_MUTATED_EVENT } from '@/utils/docEvents.js'
-import { buildAiFormatPrompt, AI_PROMPT_EVENT } from '@/utils/paragraphFormat.js'
+import { buildAiFormatPrompt, buildAiSelectionRevisePrompt, AI_PROMPT_EVENT } from '@/utils/paragraphFormat.js'
 import { getResolvedTheme, APP_THEME_EVENT } from '@/utils/appTheme.js'
 import { isEnglish } from '@/utils/appLanguage.js'
 import { stampApplication } from '@/utils/docxAppProps.js'
@@ -211,7 +221,9 @@ import { createSemanticWritingHost } from '@/composables/semanticWritingHost.js'
 import { getSemanticWritingSettings, saveSemanticWritingSettings, createSemanticWritingSuggestion, getSemanticWritingSuggestion, cancelSemanticWritingSuggestion, acceptSemanticWritingSuggestion } from '@/services/api.js'
 import { getProvenance, reviewDocInsight, listWritingCompletions, learnWritingCompletions, deleteWritingCompletion, clearWritingCompletions, lookupWritingSelection, getDocInsightEntity, getWritingCompletionDetail } from '@/services/api.js'
 import { guestPointToHost } from '@/utils/insightPopup.js'
-import { alignProvenance, fileVersionBar, provenanceSummary } from '@/utils/provenanceAlign.js'
+import { alignProvenance, provenanceSummary } from '@/utils/provenanceAlign.js'
+import { localContentUrl, localContentCapability, observeLocalContentBackend, downloadLocalContent, createLocalContentSave, saveLocalContent, cancelLocalContent } from '@/utils/localContentProtocol.js'
+import { resolveDocumentSaveOperation } from '@/utils/checkpointSaveBarrier.js'
 
 let seq = 0
 
@@ -237,7 +249,7 @@ function currentAuthorName() { return authorNames().current() }
 
 export default {
   name: 'LibreOfficeEditor',
-  components: { ReviewPanel, EditorToolbar, EvidenceStaleBar },
+  components: { OfficeNavigation, ReviewPanel, EditorToolbar, EvidenceStaleBar },
   // command-progress：批量命令（find_replace >50 命中 / apply_house_style）的
   // 「第 x/y 处」进度，{reqId, done, total}；reqId 可用 executeCommand('cancel', {reqId}) 喊停。
   // open-insight：行内写作提示 → 宿主打开「依据」窗格；不自动调用 AI 或外部库。
@@ -271,6 +283,8 @@ export default {
     return {
       hostId: 'libre-host-' + (++seq),
       ready: false,
+      chromeInitialized: false,
+      chromeInitFailed: false,
       // EvidenceLink 拖放：armed = 项目内有文件正在被拖（uni file-drag-start/end），
       // over = 指针正悬在本画布的接收层上（描边高亮）。
       evidenceDropArmed: false,
@@ -291,6 +305,7 @@ export default {
       // 不在本地乐观翻：客体里的「关闭」与 Esc 也走同一条回报，两边才不会漂。
       semanticWritingAvailable: false,
       semanticWritingOpen: false,
+      writingAssistanceState: null,
       writingAssistanceAvailable: false,
       writingAssistanceOpen: false,
       // 当前登录用户名。审阅面板的「我」这一桶按它归类作者（dev-board#377），
@@ -301,6 +316,10 @@ export default {
       // 没有轮询：编辑器页把 worker 的选区监听与 IME 覆盖层的光标移动合流成
       // 一个 selection 事件送过来，覆盖了用户能让光标动起来的所有途径。
       uiRefreshKey: 0,
+      navigationCurrentItem: null,
+      navigationStructureKey: 0,
+      inputError: '',
+      navigationContentKey: 0,
       // 状态用 key 存（editor.status.* 命名空间），显示时经 $t 取文案；
       // isError/displayStatus 与「安静保存」的自比较全部按 key 判断，
       // zh 渲染结果与判定行为都与迁移前逐字节一致。
@@ -309,6 +328,11 @@ export default {
       webviewEl: null,
       executor: null,
       saving: false,
+      backendHealthState: null,
+      backendHealthRecoverySeq: 0,
+      backendFailedUpload: null,
+      versionSaveBusy: false,
+      localSaveReason: null,
       // Autosave: set by the worker's modify signal, cleared when a save starts;
       // read by the host (closeFile / evict) to know if a flush is needed.
       dirty: false,
@@ -338,7 +362,7 @@ export default {
       staleItems: [],
       // 逐段溯源（dev-board#632）。provUnits 是后端按历史算好的「每个单元最后是哪一版
       // 改的」，provRows 是它对到画布此刻段序之后的结果（对齐在 utils/provenanceAlign.js）。
-      // 这两样只喂**侧栏「溯源」标签**；顶上那条小条是文件级的，见下面 provFileVersion。
+      // 这两样只喂侧栏「溯源」标签，不参与文件保存状态。
       // 没开版本记录 / 老服务端 / 拉失败时 provLoaded 恒为 false，侧栏标签整个不出现——
       // 溯源是锦上添花，不该在编辑器里弹错。
       provLoaded: false,
@@ -346,15 +370,16 @@ export default {
       provUnits: [],
       provTruncated: false,
       provRows: [],
-      // 顶上那条版本身份小条的三个入参（#672 复测改成文件级，见 utils/provenanceAlign
-      // 的 fileVersionBar）：版本记录开没开、这份文件磁盘上是不是领先版本记录、
-      // 它最近一次有名字的版本是哪一版。都由后端一次算好随 provenance 回来。
-      provVersioned: false,
-      provDirty: false,
-      provFileVersion: null,
     }
   },
   computed: {
+    localContentSaveText() {
+      if (!this.statusKey.endsWith('Failed')) return ''
+      if (this.localSaveReason === 'OPERATION_CANCELLED') return this.$t('editor.status.contentSaveReloadRequired')
+      if (this.localSaveReason === 'CONTENT_CONFLICT') return this.$t('editor.status.contentSaveConflict')
+      if (this.localSaveReason === 'VERSION_BUSY') return this.$t('editor.status.localVersionSaveBusy')
+      return ''
+    },
     isError() {
       return this.statusKey.endsWith('Failed')
     },
@@ -362,6 +387,8 @@ export default {
     // 状态串（就绪/加载文档中/失败）判定——statusKey 化后保留这个只读
     // 别名，zh 语言下取值与迁移前逐字节一致。改名/删除前先改该套件。
     statusText() {
+      if (this.localContentSaveText) return this.localContentSaveText
+      if (this.statusKey === 'saveFailed' && this.versionSaveBusy) return this.$t('editor.status.versionSaveBusy')
       return this.$t('editor.status.' + this.statusKey)
     },
     // Calc/Impress 都没有修订（redline）机制——审阅面板对它们没有数据可展示。
@@ -384,6 +411,9 @@ export default {
     saveStateText() {
       if (!this.ready || !this.file || this.loadingOverlayVisible || this.docLoadFailed) return ''
       if (this.saving) return this.$t('editor.status.saving')
+      if (this.localContentSaveText) return this.localContentSaveText
+      if (this.statusKey === 'saveFailed' && this.versionSaveBusy) return this.$t('editor.status.versionSaveBusy')
+      if (this.statusKey === 'saveFailed' && this.backendSaveRetryReady()) return this.$t('workbench.backendHealth.saveRetryReady')
       if (this.statusKey === 'saveFailed' || this.statusKey === 'movedSaveFailed') return this.$t('editor.status.' + this.statusKey)
       if (this.statusKey !== 'ready') return ''
       if (this.dirty) return this.$t('editor.status.pendingSave')
@@ -391,29 +421,12 @@ export default {
     },
     displayStatus() {
       if (this.saveStateText) return ''
+      if (this.localContentSaveText) return this.localContentSaveText
+      if (this.statusKey === 'saveFailed' && this.versionSaveBusy) return this.$t('editor.status.versionSaveBusy')
       return this.statusKey === 'ready' ? '' : this.$t('editor.status.' + this.statusKey)
     },
     bootStageText() {
       return this.$t('editor.boot.' + this.bootStageKey)
-    },
-    // ---- 版本身份小条（文件级）与逐段溯源侧栏 ----
-    // 三态（不出现 / 已保存尚未存为版本 / 作者·日期·版本标题）全在纯函数里，
-    // 免得同一套判定在模板、computed、测试里各写一遍走散。
-    provenanceBar() {
-      return fileVersionBar((k, p) => this.$t(k, p), {
-        versioned: this.provVersioned,
-        dirty: this.provDirty,
-        fileVersion: this.provFileVersion,
-      })
-    },
-    provenanceBarVisible() {
-      return !!(this.ready && this.file && !this.loadingOverlayVisible && this.provenanceBar.visible)
-    },
-    provText() {
-      return this.provenanceBar.text
-    },
-    provSha() {
-      return this.provenanceBar.sha
     },
     // 侧栏「溯源」标签的数据。null = 这份文件没有溯源可看，标签整个不出现。
     provenanceForPanel() {
@@ -434,6 +447,9 @@ export default {
       return t === 'docx' || t === 'doc'
     },
     loadingOverlayVisible() {
+      // Model readiness precedes native menu hiding. Keep the guest covered
+      // until its own layout receipt confirms the initial chrome is hidden.
+      if (this.ready && !this.chromeInitialized && !this.docLoadFailed) return true
       // 「文档无法打开」是终态，但原因与出路（只读预览 / 下载 / 重试）只有这块地方能放；
       // 画布上是 boot 出来的空白原型，露出来只会让人以为文档是空的。
       if (this.statusKey === STATUS_OPEN_FAILED) return true
@@ -458,6 +474,7 @@ export default {
     // 可能已空白就绪（_endpointUp），也可能仍在 boot——后者只预取字节，
     // onEndpointReady 会照常装载。file→file 换文档不支持（池按实例=文档）。
     file(newFile, oldFile) {
+      if (newFile?.id !== oldFile?.id) this.invalidateBackendSaveHint()
       if (!newFile || oldFile) return
       this._adoptedSpare = true
       this.prefetchBytes()
@@ -475,14 +492,20 @@ export default {
     },
     // 菜单栏读勾选/置灰的三个信号。合并在这个 watch 里而不是另起一块——
     // 选项对象里两个同名 key，后写的会把先写的整个覆盖掉。
-    reviewOpen() { this.$emit('menu-state') },
+    reviewOpen(v) {
+      this.$emit('menu-state')
+      if (v && this._provRowsPending && this.provLoaded) {
+        this._provRowsPending = false
+        this.alignProvenanceRows(this._provSeq)
+      }
+    },
     ready(v) { this.$emit('menu-state'); if (v) { this.consumeLocator(); this.pushInsightSub(); this.pushTheme(); this.loadProvenance() } },
     // 「依据」窗格开合 → 客体页的光标上报订阅（dev-board#182）
     insightSubscribed() { this.pushInsightSub() },
     // 退到后台的实例停掉即时审校；切回来若正文已变就补一轮（dev-board#724）。
-    active(v) { this._inlineReviewHost?.setActive(!!v) },
+    active(v) { this._inlineReviewHost?.setActive(!!v); this._writingHost?.setActive(!!v) },
     docKind() { this.$emit('menu-state'); this.initWritingAssistance() },
-    canWrite() { this.initWritingAssistance() },
+    canWrite() { this.syncNativeWritePermission(); this.initWritingAssistance() },
     // 宿主 openFile(file, {locator}) 把定位符挂在 tab 对象上；已打开的标签再次被
     // 链接点中时是原地换对象，靠这个路径 watch 触发。
     'file.pendingLocator'(loc) { if (loc) this.consumeLocator() },
@@ -493,7 +516,13 @@ export default {
     },
   },
   async mounted() {
-    this._onEvidenceDragStart = () => { this.evidenceDropArmed = true }
+    this.watchBackendHealth()
+    this._onEvidenceDragStart = () => {
+      this.evidenceDropArmed = true
+      this._draggedFileSnapshot = (typeof document !== 'undefined' && document.__checkbaDraggedFile)
+        ? { ...document.__checkbaDraggedFile }
+        : null
+    }
     // _dragEndedAt：客体代收的 drop 经 IPC 转发到达时，dragend 往往已经先一步把
     // armed 翻回 false（drop 与 dragend 之间只差几百毫秒，IPC 又要过一跳）。
     // 记下拖拽结束时刻，给转发的 drop 留一个宽限窗（见 onGuestEvidenceDrop）。
@@ -524,14 +553,20 @@ export default {
       if (this.file) this.prefetchBytes()
       this.startBootTrickle()
       // { kind:'webview', url, preload, partition } | { kind:'iframe', url }
-      const info = await api.getEditor()
-      this.mountEditor(info)
+      const info = await api.getEditor({ name: this.file?.name || this.file?.fileName, size: this.file?.fileSize, readOnly: !this.canWrite, empty: !this.file?.fileSize })
+      await this.mountEditor(info)
     } catch (e) {
       this.statusKey = 'initFailed'
       this.appendLog('init failed: ' + (e && e.message ? e.message : e))
     }
   },
   beforeUnmount() {
+    this._nativeSurface?.dispose()?.catch(error => this.appendLog('native close failed: ' + error.message))
+    this._nativeSurface = null
+    this._backendHealthDisposed = true
+    this._backendHealthUnsubscribe?.()
+    this._backendHealthUnsubscribe = null
+    this.invalidateBackendSaveHint()
     clearTimeout(this._provReloadTimer)
     clearTimeout(this._provRetryTimer)
     this._provSeq = (this._provSeq || 0) + 1
@@ -567,6 +602,44 @@ export default {
     this.executor = null
   },
   methods: {
+    async watchBackendHealth() {
+      const api = host.backend
+      if (typeof api?.getHealth !== 'function' || typeof api?.onHealthChanged !== 'function') return
+      this._backendHealthDisposed = false
+      this._backendHealthEvents = 0
+      try {
+        this._backendHealthUnsubscribe = api.onHealthChanged(snapshot => {
+          this._backendHealthEvents++
+          this.onBackendHealth(snapshot)
+        })
+        const events = this._backendHealthEvents
+        const snapshot = await api.getHealth()
+        if (!this._backendHealthDisposed && events === this._backendHealthEvents) this.onBackendHealth(snapshot)
+      } catch (e) { /* 旧壳或状态暂不可取时保留原保存失败与手动重试。 */ }
+    },
+    onBackendHealth(snapshot) {
+      if (this._backendHealthDisposed || !snapshot || typeof snapshot.state !== 'string') return
+      if (this.backendHealthState?.updatedAt && snapshot.updatedAt < this.backendHealthState.updatedAt) return
+      if (snapshot.state === 'healthy' && snapshot.ok === true && ['degraded', 'restarting', 'failed'].includes(this.backendHealthState?.state)) {
+        this.backendHealthRecoverySeq = (this.backendHealthRecoverySeq || 0) + 1
+      }
+      observeLocalContentBackend(snapshot)
+      this.backendHealthState = snapshot
+      // 只更新提示。上传结果不明时即使服务恢复，也不能擅自把旧稿再次写回。
+    },
+    invalidateBackendSaveHint() {
+      this.backendFailedUpload = null
+      this.versionSaveBusy = false
+      this.localSaveReason = null
+      this._backendSaveContext = (this._backendSaveContext || 0) + 1
+    },
+    backendSaveRetryReady() {
+      const failure = this.backendFailedUpload
+      return Boolean(failure && !this._backendHealthDisposed && !this._saveDiscarded && !this._reloading && !this._checkpointInvalidated &&
+        this.backendHealthState?.state === 'healthy' && this.backendHealthState.ok === true &&
+        failure.fileId === this.file?.id && failure.projectId === this.projectId &&
+        this.backendHealthRecoverySeq > failure.recoverySeq)
+    },
     // ---- 修订署名 ----
     // 展示名可能不在本地缓存里（桌面 local-mode 免登从不写那个键）：问一次后端，
     // 拿到就同时补给审阅面板的「我」这一桶与引擎的修订署名。拿不到就什么都不做，
@@ -590,12 +663,17 @@ export default {
     // ---- EvidenceLink：拖放接收层 ----
     onEvidenceDragOver(e) {
       this.evidenceDropOver = true
-      try { if (e && e.dataTransfer) e.dataTransfer.dropEffect = 'link' } catch (err) { /* ignore */ }
+      try {
+        if (e && e.dataTransfer) {
+          e.dataTransfer.dropEffect = e.dataTransfer.effectAllowed === 'copy' ? 'copy' : 'link'
+        }
+      } catch (err) { /* ignore */ }
     },
     onEvidenceDragLeave() {
       this.evidenceDropOver = false
     },
     onEvidenceDrop(e) {
+      const wasArmed = this.evidenceDropArmed || (Date.now() - (this._dragEndedAt || 0) < 2000)
       this.evidenceDropOver = false
       this.evidenceDropArmed = false
       let file = null
@@ -614,6 +692,12 @@ export default {
         file = { ...document.__checkbaDraggedFile }
         document.__checkbaDraggedFile = null // 消费即清，免得下一次落空的 drop 捡到陈文件
       }
+      // 桌面端启动 webContents.startDrag 后自定义 MIME 可能为空，且 dragend 可能先于客体 IPC
+      // 清掉 document.__checkbaDraggedFile：在 2s 宽限窗内用 dragstart 时拍下的快照兜底（dev-board#1288）。
+      if (!file && wasArmed && this._draggedFileSnapshot) {
+        file = { ...this._draggedFileSnapshot }
+      }
+      this._draggedFileSnapshot = null
       if (!file || file.fileType === 'folder' || file.isFolder) return
       const id = file.id != null ? file.id : file.fileId
       if (!id) return
@@ -664,9 +748,9 @@ export default {
     // 一律薄转发到工具栏/审阅面板已有的方法，不在这层复制业务逻辑——
     // 菜单和工具栏点同一个按钮必须是同一条代码路径，否则两边会各自漂。
 
-    /** 这个实例现在能接命令吗（引擎起来了、装着真文档、是 Writer）。 */
+    /** 这个实例现在能接命令吗（引擎起来了、装着真文档、是 Writer/Calc/Impress）。 */
     menuReady() {
-      return !!(this.ready && this.file && this.docKind === 'writer')
+      return !!(this.ready && this.file && (this.docKind === 'writer' || this.docKind === 'calc' || this.docKind === 'impress'))
     },
     /** 供菜单读勾选态。工具栏没挂（非 Writer / 未就绪）时全 false。 */
     menuState() {
@@ -716,6 +800,14 @@ export default {
         this._transportSend({ __lo: 'lo-relay', type: 'writing-assistance-panel', open: !this.writingAssistanceOpen })
       } catch (e) { /* 通道没起来：客体就绪后会重新上报可用态 */ }
     },
+    setAutocompleteEnabled(value, session) {
+      if (!this._writingHost || session !== this._writingHost.session) return false
+      return this._writingHost.setEnabled(!!value)
+    },
+    onAutocompleteState(state) {
+      this.writingAssistanceState = state
+      this._transportSend?.({ __lo: 'lo-relay', type: 'writing-assistance-preferences-state', ...state })
+    },
     /** 正文浮球 → 打开右栏审阅面板并落在「AI 审校」页。 */
     openInlineReviewPanel() {
       this.reviewOpen = true
@@ -723,6 +815,10 @@ export default {
     },
     /** 面板上的开关/重查/立即 AI 审校（清单里的定位与采用由面板直接走 executor）。 */
     onInlineReviewAction(payload) {
+      if (payload?.action === 'autocomplete') {
+        this.setAutocompleteEnabled(payload.value, payload.session)
+        return
+      }
       const host = this._inlineReviewHost
       if (!host || !payload) return
       if (payload.action === 'refresh') host.refresh()
@@ -777,6 +873,7 @@ export default {
     // 客体窗口拿回焦点且页内无焦点时，IME 覆盖层会接住键盘（zetaOfficeImeOverlay onWindowFocus），
     // Cmd+Z 由覆盖层转成引擎的 undo。
     focusEditor() {
+      if (this._nativeSurface) { this._nativeSurface.focus(); return }
       try { if (this.webviewEl && this.webviewEl.focus) this.webviewEl.focus() } catch (e) { /* ignore */ }
     },
     // 段落面板「交给 AI 调整格式」：拼一句带文件名与需求的话，交给工作台发进 AI 对话
@@ -789,6 +886,23 @@ export default {
         scope: payload && payload.scope,
       }, (k, v) => this.$t(k, v))
       uni.$emit(AI_PROMPT_EVENT, { prompt, fileId: this.file && this.file.id })
+    },
+    // 右键菜单「AI 修订选中内容…」（dev-board#1430）：带上选区原文与修订意见发进 AI 对话。
+    onWritingRevise(payload) {
+      const selectedText = String((payload && payload.text) || '').trim()
+      const instruction = String((payload && payload.instruction) || '').trim()
+      if (!selectedText || !instruction) return
+      const prompt = buildAiSelectionRevisePrompt({
+        fileName: this.file && this.file.name,
+        selectedText,
+        instruction,
+      }, (k, v) => this.$t(k, v))
+      if (!prompt) return
+      uni.$emit(AI_PROMPT_EVENT, {
+        prompt,
+        fileId: this.file && this.file.id,
+        selectionText: selectedText,
+      })
     },
     menuOpenFind() {
       const tb = this.$refs.toolbar
@@ -824,11 +938,30 @@ export default {
       })
       return { ok: true }
     },
+    async runVisualReview() {
+      if (this._visualReviewBusy || !this.ready || !this.executor || !this.file?.id || !this.canWrite) return
+      this._visualReviewBusy = true
+      const executor = this.executor, fileId = this.file.id
+      try {
+        const [{ runDocumentVisualReview }, { showDialog }, { reviewDocumentLayout }] = await Promise.all([
+          import('@/composables/documentVisualReview.mjs'), import('@/utils/dialog.js'), import('@/services/api.js'),
+        ])
+        await runDocumentVisualReview({
+          execute: (action, params) => executor.executeCommand(action, params),
+          request: data => reviewDocumentLayout(this.projectId, data), dialog: showDialog,
+          busy: on => on ? uni.showLoading({ title: this.$t('editor.visualReview.busy'), mask: false }) : uni.hideLoading(),
+          current: () => this.ready && this.executor === executor && this.file?.id === fileId,
+          t: (key, params) => this.$t('editor.visualReview.' + key, params), fileId,
+        })
+      } finally { this._visualReviewBusy = false }
+    },
     // 原生「文件→导出为→直接导出 PDF / 导出为 PDF…」与原生工具栏 PDF 图标（dev-board#886）。
     // 引擎在 WASM 里起不来文件选择器，派发静默结束；worker 拦下这两条命令转成
     // export-pdf-request，这里取 PDF 字节走应用自己的下载链路（与脱敏复敏包同一条：
     // blob + a[download]，桌面主进程接管成「另存为」），成功失败都有提示。
-    async exportPdf() {
+    async exportPdf(options = {}) {
+      const isCurrent = typeof options.isCurrent === 'function' ? options.isCurrent : () => true
+      if (!isCurrent()) return false
       if (this._pdfExporting) return
       if (!this.executor || !this.ready) return
       this._pdfExporting = true
@@ -842,15 +975,18 @@ export default {
         try {
           const r = await getFileLocalPath(this.file.id)
           const abs = r && r.data && r.data.path
+          if (!isCurrent()) { this._pdfExporting = false; return false }
           if (abs) await host.fs.setNextExportSource(String(abs))
         } catch (e) { /* 拿不到就让它退回系统默认目录，不阻塞导出 */ }
       }
+      if (!isCurrent()) { this._pdfExporting = false; return false }
       try { uni.showLoading({ title: this.$t('editor.pdfExporting'), mask: false }) } catch (e) { /* ignore */ }
       let res = null, reason = ''
       try { res = await this.executor.executeCommand('export_pdf', {}) }
       catch (e) { reason = (e && e.message) || String(e) }
       try { uni.hideLoading() } catch (e) { /* ignore */ }
       this._pdfExporting = false
+      if (!isCurrent()) return false
       // 字节经 relay 两跳结构化克隆后形态不定，同 saveDocument 的归一
       const raw = res && res.success ? res.bytes : null
       let bytes = null
@@ -970,6 +1106,9 @@ export default {
     // 不再自动重启第二次。「文档无法打开」终态上的重试同理（引擎拒收的文件重建引擎
     // 通常也没用，但那是用户明确要的，且能排除引擎自身被卡死的可能）。
     retryLoad() {
+      // The model is already loaded: retry only the failed display setup,
+      // never reload its bytes or alter its saving/dirty state.
+      if (this.chromeInitFailed) { this.prepareInitialChrome(); return }
       this.stuck = false
       this._stageChangedAt = Date.now()
       if (!this._endpointUp && this.statusKey === 'bootFailed') {
@@ -1001,6 +1140,9 @@ export default {
     // 引擎重启：拆掉 boot 失败的那个 webview/iframe，重新走一遍 mounted 里的
     // 建元素流程。文档字节的预取结果仍然有效（失败的是引擎不是下载），留着。
     async remountEditor() {
+      const native = this._nativeSurface
+      this._nativeSurface = null
+      const nativeClosed = native?.dispose()
       if (this._writingHost) { this._writingHost.destroy(); this._writingHost = null }
       if (this._inlineReviewHost) { this._inlineReviewHost.destroy(); this._inlineReviewHost = null }
       this.inlineReviewState = null
@@ -1024,6 +1166,8 @@ export default {
       // 崩溃自愈与 relay 超时自愈则必须靠它把加载面板重新亮出来。
       this._endpointUp = false
       this.ready = false
+      this.chromeInitialized = false
+      this.chromeInitFailed = false
       this.statusKey = 'booting'
       this.bootPct = 3
       this.bootCap = 12
@@ -1031,8 +1175,9 @@ export default {
       this._stageChangedAt = Date.now()
       this.startBootTrickle()
       try {
-        const info = await host.zetaoffice.getEditor()
-        this.mountEditor(info)
+        await nativeClosed
+        const info = await host.zetaoffice.getEditor({ name: this.file?.name || this.file?.fileName, size: this.file?.fileSize, readOnly: !this.canWrite, empty: !this.file?.fileSize })
+        await this.mountEditor(info)
       } catch (e) {
         this.statusKey = 'initFailed'
         this.appendLog('init failed: ' + (e && e.message ? e.message : e))
@@ -1069,18 +1214,56 @@ export default {
       console.log('[libre-editor]', m)
       this.log = (this.log + m + '\n').split('\n').slice(-200).join('\n')
     },
+    async syncNativeWritePermission() {
+      const surface = this._nativeSurface
+      if (!surface) return
+      const request = this._nativePermissionSync = (this._nativePermissionSync || 0) + 1
+      try {
+        // setReadOnly closes its input latch synchronously, even while the
+        // native model is still loading; a grant waits for a fresh view receipt.
+        await surface.setReadOnly(this.canWrite !== true)
+      } catch (error) {
+        if (surface === this._nativeSurface && request === this._nativePermissionSync) {
+          this.appendLog('native permission update failed: ' + (error.message || String(error)))
+        }
+      }
+    },
     // 按宿主给出的容器类型挂编辑器：桌面壳是 Electron <webview>（隔离分区 +
     // preload），Web 服务器版是同源 <iframe>。两者之外的一切——relay 协议、
     // executor 契约、worker、自动保存链路——完全共用。
-    mountEditor(info) {
+    async mountEditor(info) {
       const mountEl = document.getElementById(this.hostId)
+      this._initialDocument = this.file?.fileSize > 0
+      if (info.kind === 'native' && (!mountEl || this._backendHealthDisposed)) {
+        await host.zetaoffice.nativeClose(info.sessionId)
+        return
+      }
       if (!mountEl) { this.appendLog('host element missing'); return }
+      if (info.kind === 'native') {
+        let createNativeOfficeSurface
+        try { ({ createNativeOfficeSurface } = await import('@/composables/nativeOfficeSurface.js')) }
+        catch (error) { await host.zetaoffice.nativeClose(info.sessionId); throw error }
+        if (this._backendHealthDisposed) { await host.zetaoffice.nativeClose(info.sessionId); return }
+        const surface = createNativeOfficeSurface({ api: host.zetaoffice, info })
+        this._nativeSurface = surface
+        this.syncNativeWritePermission()
+        surface.element.style.width = '100%'
+        surface.element.style.height = '100%'
+        mountEl.appendChild(surface.element)
+        this.webviewEl = surface.element
+        this.subscribeHostEvents(surface.transport)
+        this.wireExecutor(surface.transport, 'native editor mounted')
+        surface.start()
+        return
+      }
       // 深浅主题初值随 URL 进客体页（editor.html 据此防白闪）；后续切换走
       // pushTheme 的 lo-relay 推送
       try {
         if (info && info.url) {
           info = Object.assign({}, info, {
             url: info.url + (info.url.indexOf('?') >= 0 ? '&' : '?') + 'theme=' + getResolvedTheme()
+              // A cold nonempty file can be the first model; spares and new files still boot blank.
+              + (this._initialDocument ? '&initialDocument=1' : '')
           })
         }
       } catch (e) { /* ignore */ }
@@ -1149,7 +1332,11 @@ export default {
       this._eventUnsub = transport.subscribe((msg) => {
         if (!msg || msg.__lo !== 'lo-relay') return
         if (msg.type === 'inline-review-request') {
-          if (this._inlineReviewHost) this._inlineReviewHost.handle(msg)
+          if (msg.action === 'autocomplete') {
+            if (msg.session === this._inlineReviewHost?.session && typeof msg.data?.enabled === 'boolean') {
+              this.setAutocompleteEnabled(msg.data.enabled, msg.data.writingSession)
+            }
+          } else if (this._inlineReviewHost) this._inlineReviewHost.handle(msg)
         } else if (msg.type === 'semantic-writing-state') {
           // 有据续写面板的可用/开合回报（dev-board#748）。工具栏按钮的显隐与按下态只认它。
           this.semanticWritingAvailable = !!msg.available
@@ -1163,8 +1350,22 @@ export default {
         } else if (msg.type === 'open-url' && msg.url) {
           this.$emit('open-url', { url: String(msg.url), target: msg.target || null,
             fileId: this.file && this.file.id, meta: this.withHostPoint(msg.meta) })
+        } else if (msg.type === 'save-request') {
+          this.saveDocument()
+        } else if (msg.type === 'review-changed' && this._nativeSurface) {
+          const owner = this._nativeSurface
+          clearTimeout(this._reviewRefreshTimer)
+          this._reviewRefreshTimer = setTimeout(() => {
+            if (this._nativeSurface === owner && this.reviewOpen) this.reviewRefreshKey++
+          }, 1000)
+        } else if (msg.type === 'interaction') {
+          this._lastInteractionAt = Date.now()
+        } else if (msg.type === 'input-error') {
+          this.inputError = String(msg.message || '')
         } else if (msg.type === 'modified') {
           this.onDocModified()
+        } else if (msg.type === 'save-snapshot') {
+          this.onSaveSnapshot(msg)
         } else if (msg.type === 'comment-request') {
           this.onCommentRequest(msg)
         } else if (msg.type === 'export-pdf-request') {
@@ -1219,7 +1420,7 @@ export default {
         this._lastCmdAt = 0
         const innerExec = this.executor.executeCommand.bind(this.executor)
         this.executor.executeCommand = async (action, params, callOpts) => {
-          if (action === 'export_document') return innerExec(action, params, callOpts) // 保存自身不算「活跃编辑」
+          if (action === 'export_document' || ['get_ui_state', 'office_get_navigation', 'slide_get_thumbnail', 'list_fonts', 'list_styles'].includes(action) || (callOpts && callOpts.background)) return innerExec(action, params, callOpts) // 保存自身与后台只读溯源不算「活跃编辑」
           this._cmdBusy++
           this._lastCmdAt = Date.now()
           try { return await innerExec(action, params, callOpts) }
@@ -1248,6 +1449,31 @@ export default {
     // 时才撤回失败态——世代号不符说明文档已切换/已重试/组件已卸载后订阅已断开
     // （dispose() 会取消订阅，届时这个回调根本不会再被触发），这些情形一律
     // 按兵不动，不能让一个作废的迟到结果去污染当前状态。
+    async prepareInitialChrome() {
+      const executor = this.executor, seq = this._docLoadSeq
+      if (!executor || this.chromeInitialized) return
+      if (!['writer', 'calc', 'impress'].includes(this.docKind)) {
+        this.chromeInitialized = true
+        return
+      }
+      try {
+        const res = await executor.executeCommand('set_chrome', {
+          menubar: false, statusbar: false, toolbars: false,
+          ...(this.docKind === 'calc' ? { sheetTabs: false } : {}),
+        })
+        if (executor !== this.executor || seq !== this._docLoadSeq) return
+        const applied = res?.applied
+        const hidden = res?.success && applied?.menubar === false && applied?.statusbar === false
+          && applied.toolbars && Object.values(applied.toolbars).every(value => value === false)
+          && (this.docKind !== 'calc' || applied.sheetTabs === false)
+        this.chromeInitialized = !!hidden
+        this.chromeInitFailed = !hidden
+      } catch (e) {
+        if (executor !== this.executor || seq !== this._docLoadSeq) return
+        this.chromeInitFailed = true
+        this.appendLog('initial chrome setup failed: ' + e)
+      }
+    },
     // After load_document retarget, LO LayoutManager resurrects native chrome.
     // Toolbar bootstrap only runs when executor identity changes — same-executor
     // loads (retry / late success) must re-hide here. Missing toolbar = no-op.
@@ -1268,6 +1494,7 @@ export default {
         this.docLoadFailed = false
         this.openFailCode = ''
         this.statusKey = 'ready'
+        this.prepareInitialChrome()
         this.initWritingAssistance()
         this.appendLog('迟到的 load_document 结果实际成功，撤回失败态 / late load_document result arrived successful, reverting loadFailed')
         this.$nextTick(() => { this.rehideChromeAfterRetarget?.() })
@@ -1280,7 +1507,19 @@ export default {
     async adoptAndLoad() {
       if (await this.probeGuestAlive()) { this.finishDocLoad(); return }
       this.appendLog('备胎探活失败 → 丢弃并冷启动 / spare probe failed, cold boot instead')
-      await this.remountEditor() // onEndpointReady 会接着装载当前文档
+      const retryPreview = this._previewSkippedForWarmEngine
+      this._previewSkippedForWarmEngine = false
+      const remount = this.remountEditor() // 同步清掉 _endpointUp；就绪后会装载当前文档
+      // 字节若早于探活结果到达，预览曾被热引擎跳过。复用它补回冷启动预览；
+      // 尚在下载的原回调会自行预览，不在这里重复排队。
+      const bytes = this._bytesPromise, seq = this._docLoadSeq, fileId = this.file?.id
+      const generation = this._checkpointGeneration
+      if (retryPreview && bytes) bytes.then(buf => {
+        if (this._backendHealthDisposed || seq !== this._docLoadSeq || bytes !== this._bytesPromise
+          || fileId !== this.file?.id || generation !== documentCheckpointGeneration(this.projectId, fileId)) return
+        this.tryDocxPreview(buf)
+      })
+      await remount
     },
     // 最便宜的只读探活：命中就是 6ms 级；guest 死了/冻住就在 3s 预算上失败，
     // 不拖着用户等 relay 的默认预算。
@@ -1339,6 +1578,10 @@ export default {
     // 装载 + 发布就绪。两个入口：onEndpointReady（常规：mount 时就有 file，或
     // 备胎空白 boot 完成），以及 file watcher（备胎在引擎就绪后被过继）。
     async finishDocLoad() {
+      if (!this.$refs?.toolbar) {
+        this.chromeInitialized = false
+        this.chromeInitFailed = false
+      }
       if (this._writingHost) { this._writingHost.destroy(); this._writingHost = null }
       if (this._inlineReviewHost) { this._inlineReviewHost.destroy(); this._inlineReviewHost = null }
       this.inlineReviewState = null
@@ -1399,6 +1642,8 @@ export default {
           this.appendLog('load_document failed: ' + msg)
         }
       }
+      if (!this.docLoadFailed) await this.prepareInitialChrome()
+      if (seq !== this._docLoadSeq) return
       this.bootPct = 100
       clearInterval(this._bootTimer)
       this.ready = true
@@ -1423,13 +1668,15 @@ export default {
       // 也不能端着上一份文档的可用态（可能根本不是 Writer）。
       this.semanticWritingAvailable = false
       this.semanticWritingOpen = false
+      this.writingAssistanceState = null
       this.writingAssistanceAvailable = false
       this.writingAssistanceOpen = false
       if (!this.ready || this._reloading || this.docLoadFailed || this.docKind !== 'writer' || !this.file?.id || !this.projectId || !this._transportSend) return
       this._writingHost = createWritingAssistanceHost({
         projectId: Number(this.projectId), fileId: this.file.id, userId: (getCurrentUser() || {}).id || 'local',
         execute: (action, params) => this.executor.executeCommand(action, params), send: this._transportSend,
-        writable: this.canWrite,
+        writable: this.canWrite, active: this.active !== false,
+        onState: (state) => this.onAutocompleteState(state),
         semantic: createSemanticWritingHost({
           projectId: Number(this.projectId), fileId: this.file.id, title: this.file.name || this.file.fileName || '', writable: this.canWrite,
           execute: (action, params) => this.executor.executeCommand(action, params), send: this._transportSend,
@@ -1442,6 +1689,7 @@ export default {
         openSettings: (opts) => { if (this.openSettingsTab) this.openSettingsTab(opts || {}) },
         openAccount: () => requireAccount({ reason: 'gateway', force: true }),
         openRecharge: () => requireRecharge(),
+        onRevise: (payload) => this.onWritingRevise(payload),
       })
       this._writingHost.start()
       this._inlineReviewHost = createInlineReviewHost({
@@ -1463,9 +1711,10 @@ export default {
       const f = this.file
       const fileId = f && f.id // 数字主键（dev-board#1035）
       if (!fileId) return
+      this._previewSkippedForWarmEngine = false
       const t0 = Date.now()
       this._checkpointGeneration = documentCheckpointGeneration(this.projectId, fileId)
-      this._bytesPromise = this.fetchArrayBuffer(getFileBytesUrl(fileId), (loaded, total) => {
+      this._bytesPromise = this.fetchDocumentBytes(getFileBytesUrl(fileId), (loaded, total) => {
         this.dlLoaded = loaded
         this.dlTotal = total
       })
@@ -1478,15 +1727,22 @@ export default {
     // 同 FilePreview.renderDocx 的配置）。失败静默回落进度卡片。
     async tryDocxPreview(buf, force = false) {
       if (!buf || buf.byteLength === 0 || this.previewReady) return
+      // 热备胎已能直接装载，不再同时用 docx-preview 解包并布局同一份文档。
+      // 冷启动继续提供预览；失败后的显式只读预览不受此条件限制。
+      if (!force && this._endpointUp) { this._previewSkippedForWarmEngine = true; return }
       if (!force && (this.ready || this.previewFailed)) return
       const t = String((this.file && this.file.fileType) || '').toLowerCase()
       if (t !== 'docx' && t !== 'doc') return
+      const seq = this._docLoadSeq, fileId = this.file?.id
+      const generation = documentCheckpointGeneration(this.projectId, fileId)
+      const current = () => !this._backendHealthDisposed && seq === this._docLoadSeq && fileId === this.file?.id
+        && generation === documentCheckpointGeneration(this.projectId, fileId)
       try {
         const { renderAsync } = await import('docx-preview')
         await this.$nextTick() // 过继路径上 overlay 可能刚重新显示，等 ref 挂上
         const ref = this.$refs.docxPreviewHost
         const container = ref && (ref.$el || ref)
-        if (!container || (!force && this.ready)) return
+        if (!container || !current() || (!force && (this._endpointUp || this.ready))) return
         container.innerHTML = ''
         await renderAsync(buf, container, null, {
           className: 'docx',
@@ -1496,11 +1752,12 @@ export default {
           breakPages: true,
           experimental: true,
         })
-        if (!force && this.ready) return
+        if (!current() || (!force && this.ready)) return
         this.previewReady = true
         this.appendLog('只读预览就绪（引擎继续后台启动）')
         return true
       } catch (e) {
+        if (!current()) return
         this.previewFailed = true
         this.appendLog('docx 预览渲染失败（保留进度面板）: ' + (e && e.message ? e.message : e))
         if (force) throw e
@@ -1592,13 +1849,13 @@ export default {
       let buf = this._bytesPromise ? await this._bytesPromise : null
       if (!buf) {
         try {
-          buf = await this.fetchArrayBuffer(url)
+          buf = await this.fetchDocumentBytes(url)
         } catch (e) {
           // 下载失败自动重试一次（弱网/瞬时超时很常见），仍失败就让异常照常
           // 抛出——finishDocLoad 的 catch 会置 docLoadFailed + statusKey='loadFailed'，
           // 走既有的失败可见路径，不静默卡住。
           this.appendLog('下载失败，重试一次 / download failed, retrying once: ' + (e && e.message ? e.message : e))
-          buf = await this.fetchArrayBuffer(url)
+          buf = await this.fetchDocumentBytes(url)
         }
       }
       assertCurrentGeneration()
@@ -1616,15 +1873,19 @@ export default {
         // 署名仍然要下发（dev-board#881）：worker 的修订作者只由 load_document 设置，
         // 这条分支不发 load_document，引擎就一直端着 boot 时的空作者，用户在新建文档里
         // 打的每一个字都署引擎兜底「未知作者」，审阅面板「我」这一桶恒为 0。
-        // 不带 bytes 的 load_document 只记 authorName、不动文档（redline-author.mjs 组 2）。
+        // 此处明确传空 bytes；其他只补署名的调用仍不带 bytes、不动文档。
         if (seq !== (this._docLoadSeq || 0)) throw new Error('装载已被更晚的一次尝试取代 / load superseded')
-        // 署名下发失败不算装载失败（空白文档照样可编辑，只是署名退回引擎兜底）。
-        const blankAuthor = currentAuthorName()
-        if (blankAuthor) {
-          try { await this.executor.executeCommand('load_document', { authorName: blankAuthor }) }
-          catch (e) { this.appendLog('修订署名下发失败 / redline author push failed: ' + (e && e.message ? e.message : e)) }
+        // Explicit empty bytes also initialize a blank model if this cold instance
+        // originally expected content. Author-only updates never create a model.
+        try {
+          const blank = await this.executor.executeCommand('load_document', { bytes, name, authorName: currentAuthorName() })
+          if (!blank?.success && this._initialDocument) throw new Error(blank?.message || 'Blank document initialization failed')
+        } catch (e) {
+          if (this._initialDocument) throw e // This instance has no booted blank model to keep.
+          this.appendLog('修订署名下发失败 / redline author push failed: ' + (e && e.message ? e.message : e))
         }
         assertCurrentGeneration()
+        this._localContentMetadata = this._contentSnapshots?.get(buf) || null
         this._checkpointGeneration = generation
         this._checkpointInvalidated = false
         return false
@@ -1655,6 +1916,7 @@ export default {
       this.appendLog('  ← ' + (Date.now() - t0) + 'ms ' + JSON.stringify(res))
       if (!res || !res.success) throw Object.assign(new Error((res && res.message) || 'load_document returned no success'), { code: res?.code })
       assertCurrentGeneration()
+      this._localContentMetadata = this._contentSnapshots?.get(buf) || null
       this._checkpointGeneration = generation
       this._checkpointInvalidated = false
       if (res.kind) this.docKind = res.kind
@@ -1680,7 +1942,7 @@ export default {
     // Checkpoint restore pauses saves BEFORE the backend overwrites storage. Waiting
     // only after that overwrite cannot stop an already-uploading old document.
     async prepareCheckpointRestore(restoreId) {
-      if (!this.file || !this.executor || !this.ready || this.docLoadFailed || this._reloading || this._loadInFlight) return false
+      if (!this.file || !this.executor || !this.ready || this.docLoadFailed || this._reloading || this._pendingReload || this._loadInFlight) return false
       const fileId = this.file.id, executor = this.executor
       this._checkpointRestoreId = restoreId
       this._docLoadSeq = (this._docLoadSeq || 0) + 1
@@ -1736,6 +1998,38 @@ export default {
         this.appendLog('reload skipped: 编辑器未就绪')
         return false
       }
+      if (this._pendingReload) return false
+      const pendingReload = this._pendingReload = {}
+      const fileId = this.file.id, projectId = this.projectId, executor = this.executor
+      const current = () => this._pendingReload === pendingReload && ownsReload() &&
+        this.file?.id === fileId && this.projectId === projectId && this.executor === executor && !this._backendHealthDisposed && !this._saveDiscarded
+      clearTimeout(this._saveTimer)
+      this._saveTimer = null
+      try {
+        // Keep the current model and dirty inputs until the server durably fences any old PUT.
+        // This gate prevents new exports without suppressing modified events while cancellation waits.
+        while (this.saving && current()) await new Promise(resolve => setTimeout(resolve, 100))
+        if (!current()) return false
+        const pending = this._localContentPending
+        if (pending) {
+          await cancelLocalContent(pending, { headers: getAuthHeaders() || {} })
+          resolveDocumentSaveOperation(pending.projectId, pending.fileId, pending.operationId)
+          if (this._localContentPending === pending) this._localContentPending = null
+        }
+        if (!current()) return false
+      } catch (e) {
+        if (current()) {
+          this.dirty = true
+          this._savePaused = true
+          this.localSaveReason = e?.reason || null
+          this.statusKey = 'saveFailed'
+          this.appendLog('reload blocked: previous save is unconfirmed: ' + (e?.message || e))
+        }
+        return false
+      } finally {
+        if (this._pendingReload === pendingReload) this._pendingReload = null
+      }
+      this.invalidateBackendSaveHint()
       // 清脏 + 等在途保存都拦不住「已经启动、正在 export/upload 路上」的那一笔：
       // 它读的是换文档之前的 worker 内容，等它 upload 完成就把退回结果覆盖回旧字节。
       // saving 标志只在 saveDocument 内部为真，await 它结束之后新的 modified 又能
@@ -1772,6 +2066,7 @@ export default {
         // 换完再清一次脏（retarget 里设 RecordChanges 会触发一次 modified）。
         this.docLoadFailed = false
         this._checkpointInvalidated = false
+        this._savePaused = false
         cancelAutoSave()
         // 它还把 LO 原生那套 chrome（菜单栏 / 工具栏 / 状态栏 / 标尺）重新拉了出来，
         // 而自建工具栏的 bootstrap 只在 executor 变化时跑——正常打开那条路藏过一次，
@@ -1807,6 +2102,19 @@ export default {
     },
     // Authed binary fetch — same XHR auth pattern as FilePreview.fetchAuthedBlob,
     // but ArrayBuffer (the bytes we relay into the worker).
+    async fetchDocumentBytes(url, onProgress) {
+      const fileId = this.file?.id, projectId = this.projectId
+      const protocolUrl = this.file?.fileSize > 0 ? localContentUrl(url, projectId, fileId) : null
+      if (protocolUrl && await localContentCapability(protocolUrl, { headers: getAuthHeaders() || {} })) {
+        const result = await downloadLocalContent({ url: protocolUrl, headers: getAuthHeaders() || {}, onProgress })
+        // Prefetch can outlive the engine's load sequence. Keep the stamp with its exact bytes,
+        // then bind both to the model only after that load succeeds.
+        if (!this._contentSnapshots) this._contentSnapshots = new WeakMap()
+        this._contentSnapshots.set(result.bytes, result.metadata)
+        return result.bytes
+      }
+      return this.fetchArrayBuffer(url, onProgress)
+    },
     fetchArrayBuffer(url, onProgress) {
       return new Promise((resolve, reject) => {
         const headers = getAuthHeaders() || {}
@@ -1963,6 +2271,9 @@ export default {
       if (!this.file) return
       const fid = payload && payload.fileId
       if (fid != null && String(fid) !== String(this.file.id)) return
+      this.navigationStructureKey++
+      this.navigationContentKey++
+      this.uiRefreshKey++
       // 这里只接 AI 写入完成通知，不接人工补全的 modified，避免关闭它自己的资料提示。
       if (this._transportSend) this._transportSend({ __lo: 'lo-relay', type: 'writing-invalidate' })
       if (this.reviewOpen) {
@@ -1971,12 +2282,27 @@ export default {
         this.reviewRefreshKey++
       }
     },
+    onToolbarState(state) {
+      if (state?.success && state.calc) this.navigationCurrentItem = { activeId: state.calc.sheetName, itemCount: state.calc.sheetCount }
+      else if (state?.success && state.impress) this.navigationCurrentItem = { activeId: state.impress.slideNumber, itemCount: state.impress.slideCount }
+      this.$emit('menu-state')
+    },
+    canRunNavigationWork() {
+      return this.active && this.ready && !this.dirty && !this.saving && !this._reloading
+        && !this._cmdBusy && Date.now() - (this._lastInteractionAt || 0) >= 700
+    },
+    onOfficeNavigate() {
+      this.uiRefreshKey++
+      this.$emit('menu-state')
+    },
     onDocModified() {
       // docLoadFailed：画布上是空白 boot 文档，标脏会引发空文档覆盖真文件
       if (!this.ready || !this.file || this.docLoadFailed || this._checkpointInvalidated) return
       // 重载窗口期（版本退回 / 检查点恢复正在换文档）里的 modified 一律丢弃：
       // 它描述的是即将被替换掉的旧文档，标脏只会让 autosave 把旧内容传回去。
       if (this._reloading || this._saveDiscarded) return
+      this._lastInteractionAt = Date.now()
+      this.navigationContentKey++
       this.dirty = true
       this._writingHost?.modified()
       this._inlineReviewHost?.modified()
@@ -1995,13 +2321,13 @@ export default {
     },
     scheduleAutoSave() {
       clearTimeout(this._saveTimer)
-      if (this._savePaused || this._saveDiscarded || this._flushPromise) return
+      if (this._savePaused || this._saveDiscarded || this._flushPromise || this._pendingReload) return
       const elapsed = Date.now() - this._dirtySince
       const delay = Math.max(200, Math.min(2500, 15000 - elapsed))
       this._saveTimer = setTimeout(() => this.autoSave(), delay)
     },
     async autoSave() {
-      if (!this.dirty || this._savePaused || this._saveDiscarded || this._flushPromise) return
+      if (!this.dirty || this._savePaused || this._saveDiscarded || this._flushPromise || this._pendingReload) return
       if (this.saving) { this.scheduleAutoSave(); return } // a save is in flight — retry after it
       // 假死根因修复：export_document 是全文档同步序列化，跑在 office 线程上会把
       // Qt 事件循环（滚动/输入/重绘）整段冻住。AI 修订风暴期间 modify 不断，旧的
@@ -2009,7 +2335,7 @@ export default {
       // 改为：命令在飞或刚结束（<1.5s）时让路、等空闲窗口再导出；只有脏数据
       // 超过 60s 才强制保存（崩溃丢失上限从 15s 放宽到 60s，换取修订期不冻结）。
       const dirtyAge = this._dirtySince ? Date.now() - this._dirtySince : 0
-      const sinceCmd = Date.now() - (this._lastCmdAt || 0)
+      const sinceCmd = Date.now() - Math.max(this._lastCmdAt || 0, this._lastInteractionAt || 0)
       if ((this._cmdBusy > 0 || sinceCmd < 1500) && dirtyAge < 60000) {
         clearTimeout(this._saveTimer)
         this._saveTimer = setTimeout(() => this.autoSave(), 2000)
@@ -2017,7 +2343,7 @@ export default {
       }
       this.dirty = false
       this._dirtySince = 0
-      const ok = await this.saveDocument()
+      const ok = await this.saveDocument({ trackSnapshot: true })
       if (!ok && !this._saveDiscarded) {
         // 引擎超时只代表宿主停止等待，后台可能仍在导出。暂停自动重试，
         // 否则每 15 秒再排一笔，文档永远在「保存中 / 保存失败」间循环。
@@ -2033,6 +2359,7 @@ export default {
     },
     // 用户明确放弃后关闭上传闸；迟到的导出不能把已关闭的旧副本写回磁盘。
     discardPendingSave() {
+      this.invalidateBackendSaveHint()
       this._saveDiscarded = true
       this._savePaused = true
       clearTimeout(this._saveTimer)
@@ -2040,6 +2367,7 @@ export default {
     },
     // Flush before unmount. 关闭方可给等待预算；超时返回 false，不自动丢文档。
     async flushSave({ timeoutMs } = {}) {
+      if (this._pendingReload) return false
       clearTimeout(this._saveTimer)
       if (!this._flushPromise) {
         this._flushPromise = (async () => {
@@ -2050,7 +2378,7 @@ export default {
           if (this.dirty) {
             this.dirty = false
             this._dirtySince = 0
-            const ok = await this.saveDocument()
+            const ok = await this.saveDocument({ trackSnapshot: true })
             if (!ok && !this._saveDiscarded) { this.dirty = true; this._savePaused = true }
             return ok && !this.dirty
           }
@@ -2072,14 +2400,14 @@ export default {
     },
     // ================= 逐段溯源（dev-board#632） =================
     // 数据流：后端按历史算好「每个单元最后是哪一版改的」→ 这里对到画布此刻的段序
-    // → 光标条与侧栏「溯源」标签。对齐必须做：后端的段序是**落版那一刻**的，律师
+    // → 侧栏「溯源」标签。对齐必须做：后端的段序是**落版那一刻**的，律师
     // 手上还没保存的插入/删除会把它推着漂，按 key 硬对会把名字贴到邻段头上。
 
     /** 只读命令的薄封装：溯源整条是锦上添花，任何失败都只让它静默，不打扰编辑。 */
     async provRun(action, params) {
       if (!this.executor) return null
       try {
-        const r = await this.executor.executeCommand(action, params || {})
+        const r = await this.executor.executeCommand(action, params || {}, { background: true })
         return (r && r.success === false) ? null : r
       } catch (e) { return null }
     },
@@ -2093,11 +2421,6 @@ export default {
         const res = await getProvenance(this.projectId, f.id)
         if (seq !== this._provSeq) return
         const d = (res && res.data) || {}
-        // 顶上那条小条的三个值后端**先**算好了（一次早停 walk + 一次单路径 status），
-        // 所以逐段回溯超预算那条路也带着——不然律师要盯着一条空白小条等几十秒。
-        this.provVersioned = !!d.versioned
-        this.provDirty = !!d.dirty
-        this.provFileVersion = d.fileVersion || null
         // 后端还在算逐段归属（首次对着老文件回溯几百版）：3 秒后再问一次。
         if (d.computing) {
           clearTimeout(this._provRetryTimer)
@@ -2107,6 +2430,11 @@ export default {
         this.provUnits = Array.isArray(d.units) ? d.units : []
         this.provTruncated = !!d.truncated
         this.provLoaded = true
+        if (this.reviewOpen === false) {
+          this._provRowsPending = true
+          return
+        }
+        this._provRowsPending = false
         await this.alignProvenanceRows(seq)
       } catch (e) {
         if (seq !== this._provSeq) return
@@ -2114,9 +2442,6 @@ export default {
         this.provLoaded = false
         this.provUnits = []
         this.provRows = []
-        this.provVersioned = false
-        this.provDirty = false
-        this.provFileVersion = null
       } finally {
         if (seq === this._provSeq) this.provLoading = false
       }
@@ -2150,9 +2475,9 @@ export default {
         index: para.index, text: para.text, unit: map.get(para.index) || null,
       }))
     },
-    /** 点版本身份小条 / 侧栏里的某一版 → 提交历史标签页定位到那一行。 */
+    /** 点侧栏里的某一版 → 提交历史标签页定位到那一行。 */
     openProvenanceHistory(payload) {
-      const sha = (payload && payload.sha) || this.provSha
+      const sha = payload && payload.sha
       if (!sha) return
       this.$emit('open-history', { sha, fileId: this.file && this.file.id })
     },
@@ -2161,9 +2486,22 @@ export default {
     // bytes) and persist via the backend upload endpoint (same fileId contract
     // as the download the document was loaded from). Autosave calls this;
     // returns true on success so autoSave can schedule failure retries.
-    async saveDocument() {
+    onSaveSnapshot(msg) {
+      const pending = this._saveSnapshot
+      if (!pending || pending.acknowledged || msg.saveSnapshotId !== pending.id || !this.saving ||
+          this._saveDiscarded || this._reloading || this._checkpointInvalidated ||
+          this.file?.id !== pending.fileId || this.projectId !== pending.projectId ||
+          (this._backendSaveContext || 0) !== pending.context ||
+          documentCheckpointGeneration(this.projectId, pending.fileId) !== pending.generation) return
+      pending.acknowledged = true
+      // This ordered worker event precedes export, after earlier queued input.
+      // Later modified events still re-dirty the document, including during upload.
+      this.dirty = false
+      this._dirtySince = 0
+    },
+    async saveDocument({ trackSnapshot = false } = {}) {
       const f = this.file
-      if (!f || !this.executor || this.saving || this._saveDiscarded) return false
+      if (!f || !this.executor || this.saving || this._saveDiscarded || this._pendingReload) return false
       const generation = documentCheckpointGeneration(this.projectId, f.id)
       const barrier = checkpointSaveBarrier(this.projectId, f.id)
       if ((barrier && !barrier.instances?.includes(this)) ||
@@ -2182,6 +2520,12 @@ export default {
       const lease = beginDocumentSave(this.projectId, fileId)
       if (lease === null) return false
       let safeToOverwrite = true // false only while an HTTP upload has an uncertain outcome
+      const saveContext = this._backendSaveContext || 0
+      const saveProjectId = this.projectId
+      let uploadRecoverySeq = null
+      this.backendFailedUpload = null
+      this.versionSaveBusy = false
+      this.localSaveReason = null
       this.saving = true
       // 固定细栏通过 saving/dirty 显示保存状态；statusKey 保留慢保存的兼容状态。
       // 上一次的「保存失败」不能当成要恢复的状态，这次成功了就该回到就绪。
@@ -2190,10 +2534,29 @@ export default {
       clearTimeout(this._slowSaveTimer)
       this._slowSaveTimer = setTimeout(() => { if (this.saving) this.statusKey = 'saving' }, 2000)
       try {
+        // Resolve the exact earlier upload before exporting anything newer. Its receipt can only
+        // clear that operation's checkpoint guard, never an unrelated upload with unknown outcome.
+        if (this._localContentPending) {
+          const pending = this._localContentPending
+          if (pending.fileId !== fileId || pending.projectId !== saveProjectId || pending.generation !== generation ||
+              pending.saveContext !== saveContext) throw new Error('保存上下文已变化，请保留当前文档并重新核对')
+          lease.setOperationId(pending.operationId)
+          safeToOverwrite = false; uploadRecoverySeq = this.backendHealthRecoverySeq || 0
+          await this.uploadPendingLocalContent(pending)
+          safeToOverwrite = true; uploadRecoverySeq = null
+          if (this._reloading || this._saveDiscarded || saveContext !== (this._backendSaveContext || 0) ||
+              this.file?.id !== fileId || this.projectId !== saveProjectId) return false
+        }
         const name = f.name || (String(fileId) + '.' + String(f.fileType || 'docx'))
         this.appendLog('▶ export_document「' + name + '」…')
         const tExp = Date.now()
-        const res = await this.executor.executeCommand('export_document', { name })
+        const params = { name }
+        if (trackSnapshot) {
+          params.saveSnapshotId = this._saveSnapshotSeq = (this._saveSnapshotSeq || 0) + 1
+          this._saveSnapshot = { id: params.saveSnapshotId, fileId, projectId: saveProjectId,
+            context: saveContext, generation, acknowledged: false }
+        }
+        const res = await this.executor.executeCommand('export_document', params)
         this.appendLog('  ← export ' + (Date.now() - tExp) + 'ms')
         if (!res || !res.success) throw new Error((res && res.message) || 'export_document returned no success')
         // Structured clone across the relay hops may surface bytes as
@@ -2222,9 +2585,47 @@ export default {
         // 而不是在旧路径把旧文件名重新建出来。新建空白文档的第一笔不带：那时它还不在磁盘上。
         const mustExist = f.fileSize > 0 || this._savedOnce
         safeToOverwrite = false
-        await this.uploadBytes(getFileWriteUrl(fileId) + (mustExist ? '?mustExist=1' : ''), u8, name)
+        uploadRecoverySeq = this.backendHealthRecoverySeq || 0
+        if (this._localContentMetadata) {
+          const pending = await createLocalContentSave(this._localContentMetadata, u8)
+          Object.assign(pending, { fileId, projectId: saveProjectId, generation, saveContext })
+          if (this._reloading || this._saveDiscarded || checkpointSaveBarrier(this.projectId, fileId) ||
+              documentCheckpointGeneration(this.projectId, fileId) !== generation ||
+              saveContext !== (this._backendSaveContext || 0) || this.file?.id !== fileId ||
+              this.projectId !== saveProjectId) { safeToOverwrite = true; return false }
+          this._localContentPending = pending
+          lease.setOperationId(pending.operationId)
+          await this.uploadPendingLocalContent(pending)
+        } else {
+          const url = getFileWriteUrl(fileId) + (mustExist ? '?mustExist=1' : '')
+          // Only a confirmed pre-publication rejection is safe to retry. Keep the same export
+          // and save lease; re-exporting would freeze editing and could mix newer input into it.
+          for (let attempt = 0; ; attempt++) {
+            safeToOverwrite = false
+            try {
+              await this.uploadBytes(url, u8, name)
+              break
+            } catch (e) {
+              if (e?.saveNotPublished !== true || attempt >= 3) throw e
+              safeToOverwrite = true
+              this.appendLog('save waiting for version work; retry ' + (attempt + 1))
+              await new Promise(resolve => setTimeout(resolve, 1000))
+              if (this._reloading || this._saveDiscarded || this._pendingReload || this._checkpointInvalidated ||
+                  checkpointSaveBarrier(saveProjectId, fileId) ||
+                  documentCheckpointGeneration(saveProjectId, fileId) !== generation ||
+                  saveContext !== (this._backendSaveContext || 0) || this.file?.id !== fileId ||
+                  this.projectId !== saveProjectId) return false
+            }
+          }
+        }
         safeToOverwrite = true
         this._savedOnce = true
+        // 保存确认后通知项目入口刷新；过期文件/重载中的回执不参与当前状态。
+        if (!this._reloading && !this._saveDiscarded && !this._pendingReload && !this._checkpointInvalidated &&
+            saveContext === (this._backendSaveContext || 0) && this.file?.id === fileId &&
+            this.projectId === saveProjectId && documentCheckpointGeneration(saveProjectId, fileId) === generation) {
+          try { uni.$emit('awd:file-saved', { projectId: saveProjectId, fileId }) } catch (e) { /* ignore */ }
+        }
         this.appendLog('  ← saved to backend (fileId=' + fileId + ')')
         this._savePaused = false
         this.statusKey = prevStatusKey
@@ -2232,6 +2633,17 @@ export default {
         this.scheduleProvenanceReload()
         return true
       } catch (e) {
+        // Only the server's explicit pre-publication busy response proves this upload
+        // cannot arrive later. Network failures and other statuses retain the write guard.
+        const notPublished = uploadRecoverySeq !== null && e?.saveNotPublished === true
+        this.localSaveReason = this._localContentPending ? e?.reason || null : null
+        if (notPublished || (e?.operationFinished === true && e.operationId === this._localContentPending?.operationId)) safeToOverwrite = true
+        this.versionSaveBusy = (notPublished || e?.reason === 'VERSION_BUSY') && saveContext === (this._backendSaveContext || 0) &&
+          this.projectId === saveProjectId && this.file?.id === fileId
+        if (uploadRecoverySeq !== null && e?.backendUnavailable && !this._backendHealthDisposed && !this._saveDiscarded && !this._reloading &&
+            saveContext === (this._backendSaveContext || 0) && this.projectId === saveProjectId && this.file?.id === fileId) {
+          this.backendFailedUpload = { fileId, projectId: saveProjectId, recoverySeq: uploadRecoverySeq }
+        }
         // 409 = 文件已被移动 / 改名 / 删除（后端 mustExist 围栏）：单独一个状态，让律师知道
         // 不是网络问题；改动留脏，对账把这一行改指到新路径之后「重试保存」即可落到新文件。
         // 404 = 对账认不出新位置、这一行已出索引（外部删除不进回收站，dev-board#903）——
@@ -2240,11 +2652,37 @@ export default {
         this.appendLog('save failed: ' + (e && e.message ? e.message : e))
         return false
       } finally {
+        this._saveSnapshot = null
         lease?.finish(safeToOverwrite)
         this.saving = false
         clearTimeout(this._slowSaveTimer)
         // 只收回自己挂上去的「保存中…」；失败态是 catch 里刚设的，必须留着
         if (this.statusKey === 'saving') this.statusKey = prevStatusKey
+      }
+    },
+    async uploadPendingLocalContent(pending) {
+      let saved
+      try {
+        saved = await saveLocalContent(pending, {
+          headers: getAuthHeaders() || {},
+          onXhr: (xhr, finished) => {
+            if (xhr) this._saveXhr = xhr
+            else if (this._saveXhr === finished) this._saveXhr = null
+          },
+        })
+      } catch (e) {
+        if (e?.operationFinished === true && e.operationId === pending.operationId) {
+          resolveDocumentSaveOperation(pending.projectId, pending.fileId, pending.operationId)
+        }
+        throw e
+      }
+      resolveDocumentSaveOperation(pending.projectId, pending.fileId, pending.operationId)
+      if (this._localContentPending === pending) {
+        if (pending.fileId === this.file?.id && pending.projectId === this.projectId &&
+            pending.saveContext === (this._backendSaveContext || 0)) {
+          this._localContentMetadata = { ...pending.metadata, sha256: saved.sha256, size: saved.size }
+        }
+        this._localContentPending = null
       }
     },
     // 「另存为…」（BUG-14）：目标文件已被外部移走 / 改名且对账认不出新位置时，重试保存
@@ -2313,9 +2751,18 @@ export default {
         xhr.open('POST', url, true)
         xhr.timeout = 60000
         Object.keys(headers).forEach((k) => { if (k.toLowerCase() !== 'content-type') xhr.setRequestHeader(k, headers[k]) })
-        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve(xhr.response) : reject(Object.assign(new Error('HTTP ' + xhr.status), { status: xhr.status })))
-        xhr.onerror = () => reject(new Error('网络错误 / network error'))
-        xhr.ontimeout = () => reject(new Error(this.$t('editor.saveTimeout')))
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) return resolve(xhr.response)
+          let response
+          try { response = JSON.parse(xhr.response) } catch { /* An unreadable error cannot prove no write occurred. */ }
+          const saveNotPublished = xhr.status === 423 && response?.code === -1 &&
+            response.reason === 'VERSION_BUSY' && response.writeState === 'not_started'
+          reject(Object.assign(new Error('HTTP ' + xhr.status), {
+            status: xhr.status, backendUnavailable: xhr.status >= 500, saveNotPublished,
+          }))
+        }
+        xhr.onerror = () => reject(Object.assign(new Error('网络错误 / network error'), { backendUnavailable: true }))
+        xhr.ontimeout = () => reject(Object.assign(new Error(this.$t('editor.saveTimeout')), { backendUnavailable: true }))
         xhr.onabort = () => reject(new Error(this.$t('editor.saveCancelled')))
         xhr.onloadend = () => { if (this._saveXhr === xhr) this._saveXhr = null }
         xhr.send(form)
@@ -2326,6 +2773,8 @@ export default {
 </script>
 
 <style scoped>
+.libre-input-error { display: flex; align-items: center; gap: 12px; padding: 6px 12px; color: var(--awd-danger); background: var(--awd-surface); font-size: 13px; }
+.libre-input-error button { margin: 0 0 0 auto; padding: 0 8px; font-size: 18px; line-height: 24px; background: transparent; color: inherit; }
 .libre-editor-wrapper { position: relative; display: flex; flex-direction: column; width: 100%; height: 100%; background: var(--awd-surface); }
 /* Floating status pill, pinned over the CANVAS's top-right corner (not the
    wrapper's — the review panel sits to the right and would be covered). No
@@ -2341,20 +2790,17 @@ export default {
 .libre-body { position: relative; flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: row; }
 .libre-canvas-wrap { position: relative; flex: 1; min-width: 0; min-height: 0; height: 100%; }
 .libre-host { width: 100%; height: 100%; }
+/* Preserve guest dimensions and painting while its independent compositing
+   layer is covered. display:none would suspend the editor's first layout. */
+.libre-host-loading { opacity: 0; pointer-events: none; }
 /* Explicit review overview overlays the native gutter without shrinking the canvas. */
 .libre-review-overview { position: absolute; top: 0; right: 0; bottom: 0; z-index: 30; max-width: 100%; box-shadow: -8px 0 24px #00000018; }
-/* 版本身份小条：工具栏下面一条细带，右对齐一句「谁 · 哪天 · 哪一版」。
-   浅色外壳，不抢戏；能点的时候才给下划线与手型。 */
-.libre-prov-bar {
+/* 文件保存状态固定在工具栏下面，不随正文滚动。 */
+.libre-save-bar {
   display: flex; align-items: center; justify-content: flex-end; gap: 6px;
   height: 22px; flex-shrink: 0; padding: 0 10px; box-sizing: border-box;
   background: var(--awd-bg); border-bottom: 1px solid var(--awd-border-subtle);
 }
-.libre-prov-text {
-  font-size: 11px; color: var(--awd-text-2); min-width: 0;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.libre-prov-text.clickable { color: var(--awd-accent-text); text-decoration: underline; cursor: pointer; }
 .libre-save-state { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; margin-left: auto; font-size: 11px; color: var(--awd-text-2); }
 .libre-save-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .libre-save-state .libre-save-retry { flex-shrink: 0; }

@@ -10,14 +10,36 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
 ## CI（.github/workflows/）
 
 - **ci.yml**（push master + 所有 PR）：三并行 job——backend（temurin **21**，`mvn -B test`）、frontend（node 20，`check:emits` + `check:locales` + `check:nav:full` + `test:project-home` + `test:commands` + `build:h5`）、desktop（仅 `npm ci`）。不打安装包。
-- **desktop-build.yml**（发版主 workflow）：触发 = workflow_dispatch / tag `v*` / PR 改动 desktop|backend|frontend|pptx-service 路径（pptx-service 于 2026-09-09 补入，PR#766：它的源码与 requirements.lock 原样进包，re-vendor 类 PR 必须跑打包冒烟）。矩阵：tag 或手动 = mac+win；**普通 PR 只跑 windows**（mac runner 1h+）。每平台步骤顺序（**不可乱**，PR#176）：build:h5 → build:zetaoffice → fetch-lowa-assets（LOWA_BASE_URL=自建 zh-CN 引擎 24.2.8-zhcn-r2）→ desktop npm test → mvn package(-Djavacpp.platform) + prepare-backend(jar+jlink JRE) → CPython 运行时 `prepare-python-service.js --runtime-only 1`（**0.38.0 起四个 Python 服务不再随包**，见下「Python 运行时 pack」） → **(mac)sign-mac-natives.sh → 冒烟（backend /api/admin/wizard 120s；四个 Python 服务的冒烟移到 pack-release.yml 的 runtime 腿）** → electron-builder（mac 签名+公证，先抬 maxfiles/ulimit 524288 防 EMFILE；win 走 Azure Artifact Signing，tag/手动才签，见 4.3）→ 失败时 notarytool history/log 打印 Apple 拒因 → upload-artifact（dmg/exe + windows 腿单独产的 patch/*）。**发布收口在独立的 `release` job**（`needs: [build]`，不加 `if: always()`，故 build 任一矩阵腿失败则整个 release 不跑，避免 mac/win 各自往同一 tag 独立发布出半成品 Release，dev-board#74）：下载两平台 artifact 合并后统一跑 softprops/action-gh-release 附 dmg/exe/patch + 双语 body。
+- **desktop-build.yml**（发版主 workflow）：触发 = workflow_dispatch / tag `v*` / PR 改动 desktop|backend|frontend|pptx-service 路径（pptx-service 于 2026-09-09 补入，PR#766：它的源码与 requirements.lock 原样进包，re-vendor 类 PR 必须跑打包冒烟）。矩阵：tag 或手动 = mac+win；**普通 PR 只跑 windows**（mac runner 1h+）。每平台步骤顺序（**不可乱**，PR#176）：build:h5 → build:zetaoffice → fetch-lowa-assets（LOWA_BASE_URL=自建 zh-CN 引擎 24.2.8-zhcn-r2）→ desktop npm test → mvn package(-Djavacpp.platform) + prepare-backend(jar+jlink JRE) → CPython 运行时 `prepare-python-service.js --runtime-only 1`（**0.38.0 起四个 Python 服务不再随包**，见下「Python 运行时 pack」） → **(mac)sign-mac-natives.sh → 冒烟（backend /api/admin/wizard 120s；四个 Python 服务的冒烟移到 pack-release.yml 的 runtime 腿）** → electron-builder（mac 签名+公证，先抬 maxfiles/ulimit 524288 防 EMFILE；win 走 Azure Artifact Signing，tag/手动才签，见 4.3）→ 失败时 notarytool history/log 打印 Apple 拒因 → upload-artifact（dmg/exe + windows 腿单独产的 patch/*）。**发布收口在独立的 `release` job**（`needs: [build]`；`always()` 避免 tag 上 PR 专属祖先 job 的跳过传播，再显式检查 `!cancelled()`、`needs.build.result == 'success'` 和 tag，build 任一矩阵腿失败则不发布；`sync-mirror` 同样显式要求 release 成功，dev-board#74/#1399）：下载两平台 artifact 合并后统一跑 softprops/action-gh-release 附 dmg/exe/patch + 双语 body。
 - **star-history.yml**（周一 cron）：重画 star SVG 强推 star-history 分支。
 
+构建字体来源补充（2026-10-27）：NotoSansKhmer 的旧 jsDelivr/googlefonts 路径实际返回 403；`fetch-lowa-assets.js` 仅该字体改为规范仓 notofonts/noto-fonts 的固定提交 raw URL，仍执行原字体校验，不影响运行时离线加载。
+
+## 关于窗口与更新准备状态（dev-board#1401/#1402）
+
+`app-menu.js` 的关于入口使用 `about-window.js` 独立本地窗口，原生 About 的固定 copyright 区无法容纳完整双语许可文案。新窗口正文可换行/滚动、版本仅显示一次；保留版权、AGPL、源码/许可证/商标链接与说明。无脚本、sandbox/contextIsolation 开启，只允许三个固定法律链接交给系统浏览器，重复打开复用窗口。浅色/深色从 `design/tokens/awd-palette.json` 生成 --awd-* 角色令牌快照，测试逐项对拍；更新色源须同步该快照。验证：`desktop/tests/about-window.test.js`，真实窗口用 Electron 运行 `desktop/tests/about-window.electron.js`（独立 profile，不启动产品后端）。
+
+完整更新字节与哈希校验后、`prepareInstaller` 返回前，`update-service.js` 必须广播 `preparing`，只有原生准备成功才 `ready`。前端顶部/设置均覆盖该阶段；主页面就绪不自动弹重启确认，用户点击沿用已有保存/退出守卫。缺平台安装包退回手动下载时也必须广播最终 idle/major-available 快照，不能停在 checking。
+
 ## 发版链路
+
+- 0.72.0 发布准备（dev-board#1516）：LOWA `24.2.8-zhcn-r7` 使用 #1515 的最终 r7b 候选，发布前已在北京、新加坡逐文件解码哈希和 metadata 大小校验。官方插件改资源后必须递增 manifest 版本，避免同版本保留策略让旧用户漏更；JAR 插件同时同步 pom 与 backendJars。独立插件 ZIP 与桌面 extraResources 都须包含 `l10n/`，构建后检查真实包内语言文件。
+
+- **Mac 原生升级的 JRE 权限（dev-board#1368，验收总卡 #1367）**：jlink 产出的 `jre/legal/` 中部分许可证为 `0444`。真实签名升级 run `39217849923` 已证明 ShipIt 在复制候选包后、验签/接管文件前清除 quarantine 时对 `java.xml/bcel.md` 报 `EACCES`，重试三次后放弃。`desktop/scripts/after-pack.js` 现在只给该目录内普通文件补 owner-write，保留内容、其他权限和符号链接，发生在外层 app 签名前；不可在验收时 chmod 已签名候选包来掩盖问题。`after-pack.test.js` 包含 macOS 真实 xattr 红绿复现；修复后仍须重打签名候选并跑 `full-upgrade-mac-smoke.yml`，原成功交接 ShipIt 的 0.65 baseline 可保留。该 smoke 在 ShipIt 明确终止重试时立即失败并保存原因，避免再空等十分钟。
 
 0. **版本规则 0.X.Y**（docs/INCREMENTAL_UPDATE_DESIGN.md）：X=大版本全量安装包；Y=小版本应用内补丁（overlay 机制，组件=backend-app/frontend-h5/zetaoffice-wrapper）。小版本 tag 触发 CI `patch-gate` job（desktop/scripts/patch-gate.sh）：改壳（desktop/）、pom、LOWA 引擎、requirements.lock、`backend/skills/` 都会被拒；内置 skill 需全量版本，requirements.lock 改动走独立 pack 发版。补丁产物+签名 manifest 由 build-patch-assets.js 在 windows job 生成（私钥=secret UPDATE_SIGNING_KEY，备份 ~/.ssh/aiworkdeck_update_signing.pem；公钥内置 update-service.js，换钥须发大版本）；镜像同步 deploy/update-mirror-sync.sh 在官网 ECS 跑。
 0.1. **服务上下文必须传 `appVersion: app.getVersion()`（dev-board#589）**：backendLayout 与 UI 的 overlay 使用不同调用链。漏传时 UI 显示补丁已更新，但后端因无法解析大版本目录而静默回落内置 app.jar。回归必须运行 main.js 的实际 createServices，再验证 backendLayout 读取激活补丁及回滚；只单测 overlay 不足以覆盖接线。旧 0.38 壳存在此缺陷，脱敏 2.0 必须先装完整 0.38.4；修复随 0.39.0 全量版本交付，不能用旧壳自身的补丁修复。
 0.2. **桌面端默认关闭自动 AI 标签（dev-board#590，0.39.0）**：上传、本地导入及编辑器保存共用 AutoTaggingService；脱敏前 flushSave 也会经过此链路。`application-desktop.yml` 设置 `ai.auto-tagging.enabled: false`，在读取正文和调用模型之前返回，避免原文先被自动发送。云端默认行为及手动标签不变。DesktopAutoTaggingPrivacyTest 加载真实 desktop 配置，验证入口不读正文、不调用模型。0.38.4 仅供合成样例测试，真实敏感材料需完整 0.39.0；普通 AI 会话仍须由用户核查项目和历史上下文。
+0.3. **完整版本退出安装（dev-board#1356）**：`update-service.js` 继续先验证 Ed25519 清单；`channels[major].installers` 的 `darwin-arm64` / `win32` 含 `{version,size,sha256,urls}`，只接受更新版本并流式校验完整字节。沿用现有 DMG/NSIS 和 `/update/desktop/installers/` 镜像；`installers/latest.json` 没有签名，仍仅供官网，不作为客户端安装信任依据。`finalize-update-manifest.js` 在 release job 收齐两个平台后验证原清单签名、绑定实际产物哈希并重新签名，任一平台缺失不发布。旧壳不具备完整安装能力，首次仍需安装包含本改动的完整版本；不得声称补丁能升级旧壳。
+   - Mac：`full-update.js` 挂载已校验 DMG、核对 plist 版本、用系统 ditto 转本地 ZIP，由 Electron 内置 Squirrel.Mac 经随机路径的回环 HTTP 校验签名并准备安装；只在 `update-downloaded` 后 ready。正常退出不调用 `quitAndInstall`（ShipIt 随下次启动应用更新），主动重启才调用；签名身份变更可能拒绝自动升级，不能删除签名校验。签名拒绝、替换/回退由原生更新器负责，单测替身不证明正式签名安装成功。
+   - Windows：`install-update.ps1` 复制到数据目录后运行（PowerShell 不认识 app.asar 路径），握手完成才退出；helper 等父进程退出，再次校验 SHA256 与 Authenticode，运行原 NSIS `/S --updated`。只在成功且用户主动重启/安装期间手动重开时启动。helper 存活期间启动锁阻止第二后端；超过20分钟提示检查安装器，不强杀。失败保留已验证下载件和 `.error`，下次状态读出；沿用 NSIS 的失败行为，不保证产品级回退，不能声称 Windows 安装失败自动恢复旧版。
+   - 退出：`host.lifecycle.onPrepareQuit/onQuitCancelled/cancelQuit` 与主renderer的 `checkba:prepare-quit` / `quit-prepared` ACK 共用普通退出/更新重启。renderer暂停任务、保存dirty编辑器、等待项目级提交选择、再次确认保存后ACK；主进程只接受当前主窗口同requestId，60s保存超时/取消不隐藏或停服务。dev-board#1489 新增确认阶段通知，等待选择与提交期间暂停退出计时，取消恢复任务。完成ACK后才停后端再安装。Windows点X同样走此路径；Mac红叉先确认再隐藏并恢复暂停的任务，Dock激活恢复，Cmd+Q与关窗复用在途确认。
+   - 验证：`update-service.test.js` 的本地签名HTTP、`full-update.test.js` 的真实回环feed/平台替身、`quit-lifecycle.test.js` 的实际主进程片段和ACK，以及 Windows CI 才运行的 helper 合成测试。正式签名Mac/Windows升级、Squirrel回退、Windows NSIS安装/安装期间快开须另外隔离实测，不可用源码测试替代；未获本次发版授权不打tag或部署。
+   - 完整 Windows 验收入口：手动 `full-upgrade-smoke.yml` 指定成功的签名 Desktop Build run；`test-full-upgrade.ps1` 仅允许一次性 Actions runner，实际安装、启动、退出、升级并核对签名、后端 JAR、项目/文件 ID、正文及偏好持久化。`LegacyHelper` 只证明新 helper 兼容旧安装目录；`AppUpdater` 必须提供含新更新器的较低版本签名基线，分别验 Restart/Quit/Reopen。本地临时签名清单仅用于测试，不能替代生产清单验签；脚本存在不等于实测已通过，结果以对应 run 的 evidence.json 与截图为准。
+   - 正式 tag 构建验收（dev-board#1523）：两套升级 workflow 均显式输入 baseline/candidate run、40 位源码 SHA 和版本；成功 `push` 构建仅在 `v<version>` 标签解引用提交与 run/输入 SHA 完全一致时接受。tag 包从正式 Release 读取，以该提交源码内置公钥验签 `manifest.json`，再验证安装包大小与 SHA256；Actions 临时 artifact 过期不要求重打正式包。手动构建仍走其唯一未过期 artifact。Mac feed 的版本跟随输入，不再固定 0.65→0.66。Windows 用 AppUpdater × Restart/Quit/Reopen；Mac 现有流程只覆盖普通退出后手动重开，不声称测过 Restart。证据单独保留测试工具提交与产物来源；临时更新 feed 不证明生产客户端自动更新清单信任链。
+   - 完整 Mac 验收：`full-upgrade-mac-smoke.yml` 在全新 ARM64 GitHub-hosted GUI 用户下，用精确提交的两版真实签名包执行 Squirrel 下载准备、普通退出安装和手动重开，核对签名、候选 app.asar/JAR、项目与文件 ID、正文及偏好。仅改 HOME 或 Electron app 路径不足以隔离同用户的 ShipIt launchd job 与 Foundation 缓存，因此不得把本机 QA 路径隔离当成原生升级隔离；测试 feed 的临时签名不代表生产清单信任，真实 LOWA/AI 接续另外验收。
+   - 原生拖拽 Windows 验收：`native-drag-smoke.yml` / `test-native-drag.ps1` 只在一次性 Actions runner 安装真实签名包，用 user32 鼠标拖普通文件和压缩包条目到独立 STA WinForms FileDrop 接收器，校验名称、复制哈希和拖拽后源文件，再用真实坐标点击文件行与关闭标签验证输入恢复。DOM/AX 点击可能绕过宿主鼠标失效，不能替代此检查；CDP 仅用于读取元素位置和结果。要求可访问输入桌面、100% DPI、落点未遮挡，失败保留截图，不把脚本存在当实跑通过。
+   - 完整安装器清单 URL 使用发布资产名（空格换成点号），与 GitHub 上传及 `sync-mirror` 的命名一致；本地哈希仍读构建产物原名。不能直接对含空格的构建文件名做 URL 编码，否则两个下载地址都会指向不存在的资产（#1367）。
 1. 版本号**单一来源 `desktop/package.json` version**（backend 拆为 backend/app.jar + backend/lib/，启动 `java -cp "app.jar:lib/*" com.checkba.CheckbaApplication`，见 backend-service.js javaLaunchArgs；frontend version 不参与）。
 2. `git tag v<ver> && git push origin v<ver>` → 触发 desktop-build 双平台。auto 模式下 tag 推送不被分支保护拦；可用 Monitor 等 PR 合并后自动打 tag（v0.8.0 配方）。
 3. 产物：mac 仅 dmg（**arm64 only**，已放弃 Intel）；win 仅 nsis exe——**单包双架构**（dev-board#341）：主体 x64 全量 + 纯 arm64 Electron 壳（desktop-build.yml 在打包前 `electron-builder --dir --arm64` 产出、剪掉 resources/ 后由 installer.nsh 的 customInstall 在 ARM64 机器上覆盖进安装目录；壳约 260MB 未压缩、装器 +约 106MB）。ARM64 上渲染与 LOWA WASM 原生、JVM/Python 走转译层（javacv/torch 无 windows-arm64 natives，这是为什么不出纯 arm64 包）；x64 机器行为不变；本地构建无壳目录自动降级纯 x64。electron-builder 配置在 desktop/package.json "build" 字段（appId com.aiworkdeck.desktop、extraResources 打入 frontend/dist、backend.jar、jre、python、pysvc.tar.gz+meta、**graphviz、skills（随包内置 skill，v0.11.1 以前漏打）、litviz（诉讼可视化引擎）**；`notarize: true`（**不能写 teamId**：公证走 ASC API Key，@electron/notarize 把 teamId 归为密码凭据、与 API Key 并存即报 "Cannot use password credentials, API key credentials ... at once"，v0.34.0 首次 tag 构建踩过；团队由 issuer 决定=境内主体 8WKHZVR2W8，2026-09-05 起，此前香港主体 X9B97KVA84，dev-board#447）；entitlements desktop/build/entitlements.mac.plist）。**win 侧 `nsis` 字段（2026-08-31 起搜狗式一键 UI，dev-board#339）**：`oneClick:false` 但页面全部换装 `build/win/awd-oneclick-ui.nsh` 引擎——无边框大卡片（立即安装大按钮/协议链接/「自定义安装」展开路径行），点击后主窗收起为桌面右上角小进度卡，完成卡「立即体验」；`allowToChangeInstallationDirectory:false`（目录选择收进卡片，engine 强制追加 `AI WorkDeck` 子目录）；`include: build/installer.nsh` 只做桌面端接线（customWelcomePage/customInstallMode/customFinishPage 三钩子）。引擎设 `ManifestDPIAware`（根治高分屏点阵字）+ `CRCCheck off`（去掉大包启动前 verifying 长进度）；**卸载器仍走 MUI 经典页**，`installerSidebar`/`installerHeader` BMP 只为它保留；**静默安装（/S，自动更新路径）不进 GUI 代码**。改卡片布局必须同步改引擎 AWDUI_* 常量与 `build/win/oneclick-*.html` 的绝对定位（两边同一 96dpi 基准）。
@@ -38,8 +60,8 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
    `notarytool history/log` 同样改 `--key/--key-id/--issuer`，**API Key 认证不接 `--team-id`**
    （团队由 issuer 唯一确定），此前那条「APPLE_TEAM_ID secret 会让 history API 报 403」的注释
    只对 Apple ID 认证成立。团队号全仓只剩 `desktop/package.json` 的 `mac.notarize.teamId` 一处。
-   换主体对存量 mac 用户无影响：桌面端没有应用内自动更新（`build.publish` 为空、不带
-   electron-updater），也不用钥匙串/safeStorage，签名主体变了不会让旧版失效或掉数据。
+   当时换主体对存量 mac 用户无影响：旧桌面壳没有全量自动更新（`build.publish` 为空、不带
+   electron-updater；后续完整更新机制见下），也不用钥匙串/safeStorage，签名主体变了不会让旧版失效或掉数据。
    **`office-addin/installer/build-installers.mjs` 不共用这套**：它在维护者 Mac 上取钥匙串里
    **第一条** `Developer ID Application` 身份，两个主体的证书都装着时选到哪张不确定（见「已知地雷」）。
 4.2. **最终 macOS 打包复用前置签名钥匙串（dev-board#523）**：`Sign bundled backend natives` 已导入证书到 `$RUNNER_TEMP/awd-sign.keychain-db`；最终打包显式解锁它，设置 `CSC_KEYCHAIN` 并 `unset CSC_LINK`。electron-builder 24.13.3 新建随机口令钥匙串后，`importCerts` 却把 P12 口令传给 `set-key-partition-list -k`，可报 `SecKeychainUnlock`；不要把这个错误误判成证书口令失效而轮换 secrets。`CSC_LINK` 未清会优先走旧导入链，`CSC_KEYCHAIN` 不生效。无凭据的 fork 路径不设置钥匙串；ASC 公证流程不变。失败诊断里的 notary history 可能是旧版记录，须核上传时间，不能当本轮已公证的证据。
@@ -49,6 +71,9 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
    electron-builder 24.13.3 没有 `win.azureSignOptions`，走 `build.win.sign` → `desktop/scripts/sign-win.js`（`signingHashAlgorithms: ["sha256"]`，只签一轮）：每个文件起一次 `pwsh` 调 ArtifactSigning 模块（CI 里 `Install-Module -RequiredVersion 0.1.20` 写死；旧名 TrustedSigning 0.5.8 已停更、参数相同）的 `Invoke-ArtifactSigning`，SHA256 + RFC3161 时间戳 `http://timestamp.acs.microsoft.com`，只留 AzureCliCredential、其余凭据全排除（微软 FAQ：否则 400/超时）；签完 `Get-AuthenticodeSignature` 回读必须 Valid 且有时间戳，失败重试两次后抛错让构建红。钩子**串行**执行（模块每次调用都改写 `%LOCALAPPDATA%` 里同一份 metadata.json）。OIDC 主体使用上文含组织与仓库 ID 的格式（build job 挂 `environment: windows-signing`；换环境名或删环境须同步修改 Azure 联合凭据，否则签名认证失败）。已带有效签名的第三方 exe（Temurin 的 java.exe 等）跳过、保留原厂签名。
    覆盖面：win-unpacked 的应用 exe 与 extraResources 里的 exe、卸载器、安装器由 NSIS 目标逐个调钩子；**ARM64 壳**是 `electron-builder --dir --arm64` 那一步里就签好的，installer.nsh 用 `File /r` 原样塞进安装器，之后不会再过签名，所以那一步也必须在签名环境变量生效之后跑。打包后 `Verify Windows signatures` 对安装器、x64 应用 exe、ARM64 壳 exe 跑 `signtool verify /pa /v` 并要求输出含时间戳；卸载器编在安装器里取不出来，只靠钩子自身的回读。DLL 不签（`signDlls` 未开）。
    签名不会让 SmartScreen 立刻消失：信誉随下载量累积在签名主体上，首批用户仍可能见到提示，这是预期，不要加任何绕过。native pack（`pptx/mineru/kokoro/asr-runtime` 等）里的 exe 不经此流程、仍未签名。
+4.3.1. **单平台 FFmpeg 依赖（dev-board#1335）**：Maven 3.10 限制仓库 POM 依据命令行属性激活 profile。旧 `ffmpeg-platform` 因而不再遵循 `-Djavacpp.platform`，0.64.0 Mac 混入16个其他平台原生 JAR（162676460字节），329→345个依赖。现在 `backend/pom.xml` 的本项目 profile 按 `${javacpp.platform}` 显式引入 FFmpeg/JavaCPP classifier；未传属性时保留全平台开发/服务器行为。桌面 CI 跑真实 MP4/QTA 转码测试，`prepare-backend.js --native-platform` 检查拆包后的基础 Java JAR、目标原生 JAR，拒绝其他平台及聚合包。无须降级 Maven 或关闭其安全限制。依赖变更须随完整安装包发布，不能只发 app.jar 补丁。
+
+4.4. **Mac DMG 压缩（dev-board#1335）**：桌面打包完成后、上传 artifact 前运行 `bash desktop/scripts/compress-mac-dmg.sh <DMG>`，把默认 UDZO 转为 ULMO（LZMA，macOS 10.15+；产品仅 Apple Silicon/macOS 11+）。electron-builder 24 的 schema 不接受 ULMO，不能直接填 `dmg.format`；其默认 UDZO 已用 zlib-level=9，继续提高等级无收益。脚本先转临时件、校验，再仅在变小时原子替换；失败保留原件。当前公证/装订的是内部 `.app`；脚本拒绝处理外层已签名或装订的 DMG，未来若改为容器签名须调整顺序。`dmg.writeUpdateInfo=false` 避免重压缩后留下旧 blockmap/更新元数据；本产品更新走自有签名 manifest，不发布 electron-updater 的 latest-mac.yml。0.64.1 同一卷实测630045735→591992141字节（约6%），不裁剪组件。更换压缩格式后必须挂载、逐文件/权限/符号链接对比，并核验应用签名、Gatekeeper、装订与隔离启动；旧macOS真机兼容仍按实测范围说明。
 4.5. **Office 插件安装器是发版硬步骤（2026-08-19 维护者定，自 v0.21.0 之后的发版起强制）**：
    每次发版都要重建并上架插件的 dmg+exe——在维护者 Mac 上
    `cd office-addin/installer && npm run build:installers`（版本自动取
@@ -75,8 +100,22 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
    `cd backend && rm -f target/backend-*.jar && JAVA_HOME=<jdk21> mvn -B -DskipTests
    -Djavacpp.platform=linux-x86_64 clean package`（瘦包 ~424M，先删旧产物防脏包坑）
    → rsync --partial **串行**传两台 `/opt/aiworkdeck/cloud/backend.jar.new` →
-   sha256 对账 → 旧件备份 `backend.jar.rollback-<date>` → mv 换入 →
-   `systemctl restart aiworkdeck-cloud` → 冒烟：journal 无 ERROR、新端点返回体。
+   sha256 对账 → 保留旧 JAR 与静态文件备份 → `systemctl stop aiworkdeck-cloud`
+   → 确认 `MainPID=0` 且 `ActiveState=inactive` → 同一文件系统内原子 `mv` 换入
+   → `systemctl start aiworkdeck-cloud` → 核验健康接口、新进程启动日志和文件哈希后再切静态文件/稳定链接。
+   **不能先换运行中的 JAR 再 restart；回退也先停稳，再原子换回旧件并 start。**
+   2026-10-10 v0.57.0 部署（dev-board#1183）实见先换件后旧 PID 停止时报 Spring
+   `NoClassDefFoundError`，新 PID 随后正常启动；旧 JVM 延迟读取嵌套 JAR 是推断，未做内部加载追踪。
+   该旧停止异常须单独保留，不能混入新启动 ERROR 门禁，也不能从部署记录中抹掉。
+   **现有 unit 的 143 特例**：未声明 `SuccessExitStatus`，Java 对请求的 SIGTERM 退出为 143，
+   systemd 可能记为 failed。仅在本次 `stop` 命令成功、`MainPID=0`、`ActiveState=failed`、
+   `ExecMainStatus=143`、`Result=exit-code` 同时成立时，才 `reset-failed` 并重新确认 inactive；
+   其他退出码、结果、非零 PID 或 stop 失败均拒绝换件，不为本次发版泛化修改 unit。
+   发布与回退复用同一停稳判据。
+   **日志按本次进程分界**：保存新 `InvocationID`、`MainPID` 与启动时间，优先按
+   `_SYSTEMD_INVOCATION_ID` 查询；若字段缺失或无法匹配本轮成功启动行，保留原查询结果，
+   显式退到 `_PID=<新 MainPID>` 加本轮起始时间。必须取得非空日志且含该 PID 的
+   `Started CheckbaApplication`，再断言 ERROR 为零；空日志不能判成功。失败 attempt 与最初回退件分别保留。
    新加坡实例 env 另有 `AI_ACCOUNT_BASE_URL=https://www.workdeck.ai`（代码默认值是国内站，
    漏了国际站账号登录整条断，2026-09-16 实测），换 env 文件或重建机器时别丢
    不再与「不存在的端点」相同（后者恒为 `{"code":1,"message":"服务器内部错误"}` + 200，
@@ -280,7 +319,7 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
 
 ## 端口体系（2026-08 起）
 
-- **打包态桌面后端：5269 → 5369 → 5169 → 随机**（`desktop/main/services/backend-service.js` allocateBackendPort：真实 bind 探测；被占时先探 `/api/admin/wizard` 验明是否自家后端，**并对比 build 指纹**（spawn 时注入 `AWD_BACKEND_BUILD`=app.jar 的 size-mtime，wizard 响应 `build` 字段回显，PR#589/dev-board#139：更新后残留的陈旧后端曾被静默复用导致新前端打旧后端 404）——同指纹复用；指纹不一致按端口找 pid 定点终止后原地重启（终止失败退而复用保可用性，因为旧进程握着 H2 文件锁）；陌生进程降级下一个端口。dev 态不校验指纹（restart-backend.sh 拉起的后端无指纹）。service-manager 的 verifyReuse/reallocatePort 契约即为此加）。实际端口经 BrowserWindow additionalArguments → preload → `window.checkbaDesktop.apiBaseUrl` 注入渲染层，`frontend/src/services/api.js` 最优先读它。
+- **打包态桌面后端：5269 → 5369 → 5169 → 随机**（`desktop/main/services/backend-service.js` allocateBackendPort：真实 bind 探测；被占时先探 `/api/admin/wizard` 验明是否自家后端，**并对比 build 指纹**（spawn 时注入 `AWD_BACKEND_BUILD`=app.jar 的 size-mtime，wizard 响应 `build` 字段回显，PR#589/dev-board#139：更新后残留的陈旧后端曾被静默复用导致新前端打旧后端 404）——同指纹复用；指纹不一致警告并复用，不能杀非本壳创建的进程（旧进程可能握着 H2 文件锁）；陌生进程降级下一个端口。dev 态不校验指纹（restart-backend.sh 拉起的后端无指纹）。service-manager 的 verifyReuse/reallocatePort 契约即为此加）。实际端口经 BrowserWindow additionalArguments → preload → `window.checkbaDesktop.apiBaseUrl` 注入渲染层，`frontend/src/services/api.js` 最优先读它。
 - **dev 态后端仍 9696**：restart-backend.sh / e2e / CI 全部不变；`CHECKBA_BACKEND_PORT` 可显式覆盖两种模式。注入优先级高于 `VITE_API_BASE_URL`，所以**凡是走 Electron 壳的测试/脚本，要换后端必须改 `CHECKBA_BACKEND_PORT`**，只指 dev server 的环境变量不管用（desktop-e2e 曾因此整条链失败）。
 - pptx/mineru/kokoro/asr 打包态是动态回环端口（由后端内部转发，前端不可见）；编辑器静态服务器 47613 因 COOP/COEP 跨源隔离必须独立源，勿并入。
 
@@ -339,7 +378,7 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
   下游 fetch-lowa-assets.js 对 data 只查「长度 ≥1024」，兜不住双重压缩）。
   落盘先落 web root 之外的暂存区、校验通过再 rename 换入，旧版本自动备份到 `/root/lowa-engine-backup/`。
 - 官网部署在独立仓库（website/，gitignore 掉），服务器 ssh -i ~/.ssh/aiworkdeck_ops root@47.92.111.102；ECS 8.137.95.63(~/.ssh/checkba_ecs)。
-- **kokoro/asr 模型下载源顺序（dev-board#583）**：先 ModelScope，失败再回落 hf-mirror 的 `snapshot_download`（`CHECKBA_MODEL_SOURCE=modelscope|hf` 强制单源）。原因：hf-mirror 只代理元数据，大文件 302 到 HF 官方 CDN（cas-bridge.xethub.hf.co），国内无代理必挂 `LocalEntryNotFoundError`。ModelScope 路径是 `desktop/main/services/model-fetch.py`（纯标准库，按 HF 缓存布局落 `HF_HOME/hub/models--*/{blobs/<sha256>, snapshots/<ModelScope commit>, refs/main}`，续传临时文件 `blobs/<sha256>.incomplete`，refs/main 最后写——所以旧的半截缓存里 refs/main 指向不存在的 snapshot 也能直接续下），运行侧 pack 的 app.py 不用改。**地雷**：脚本随 `main/**` 进 app.asar，Python 读不了，model-manager 每次下载前把它拷到 `~/.aiworkdeck/models/.model-fetch.py` 再跑。mineru 仍走 MinerU 官方 CLI（`-s modelscope`），不动。
+- **kokoro/asr 模型下载源顺序（dev-board#583）**：先 ModelScope，失败再回落 hf-mirror，经 `model-fetch.py --source hf` 读取固定 revision 与逐文件 metadata，大小及 LFS SHA256 / Git blob SHA1 验证后才发布 refs/main（`CHECKBA_MODEL_SOURCE=modelscope|hf` 强制单源）。原因：hf-mirror 只代理元数据，大文件 302 到 HF 官方 CDN（cas-bridge.xethub.hf.co），国内无代理必挂 `LocalEntryNotFoundError`。ModelScope 路径是 `desktop/main/services/model-fetch.py`（纯标准库，按 HF 缓存布局落 `HF_HOME/hub/models--*/{blobs/<sha256>, snapshots/<ModelScope commit>, refs/main}`，续传临时文件 `blobs/<sha256>.incomplete`，refs/main 最后写——所以旧的半截缓存里 refs/main 指向不存在的 snapshot 也能直接续下），运行侧 pack 的 app.py 不用改。**地雷**：脚本随 `main/**` 进 app.asar，Python 读不了，model-manager 每次下载前把它拷到 `~/.aiworkdeck/models/.model-fetch.py` 再跑。mineru 仍走 MinerU 官方 CLI（`-s modelscope`），不动。
 - 模型不进包：mineru/kokoro/asr 模型首启在"组件管理"下载（下载进度按字节级整体，PR#142）。asr 的 faster-whisper medium 约 1.5GB，依赖闭包 182MB（压缩后约 57MB 进安装包，大头是 onnxruntime 70MB + PyAV 44MB，两者都是 faster-whisper 的硬依赖）。
 
 ## 已知地雷
@@ -492,10 +531,10 @@ stash 误 pop 之类）之后，5174 上的页面可能变成**整页无样式**
   （2026-08 改 Ollama 设置键时踩过：测试报 expected qwen3:14b but was qwen3-vl:8b，`javap` 确认
   测试类里内联的还是老键名）。CI 是 clean build 所以只坑本地。
 - **删「零引用」的 Spring bean 前先想有没有 `@ConditionalOnMissingBean` 角色**：
-  `service/ai/DynamicContentRetriever` 全仓 grep 不到调用方，但它靠存在本身压住了 langchain4j
-  `RagAutoConfig`——删掉后自动配置自己造 `contentRetriever`，而本项目有两个
-  `EmbeddingStore<TextSegment>`，全部 `@SpringBootTest` 一起 NoUniqueBeanDefinition 起不来
-  （2026-08 清理孤儿类时踩过，16 个 context 加载失败）。`DesktopContextSmokeTest` 是这条的护栏。
+  2026-08 清理 `service/ai/DynamicContentRetriever` 时，langchain4j `RagAutoConfig` 因缺少该 bean
+  自造 `contentRetriever`，但项目有两个 `EmbeddingStore<TextSegment>`，导致16个 context
+  因 NoUniqueBeanDefinition 起不来。当前启动候选已移除通用 starter，保留显式检索器；
+  重新引入自动装配时仍须核对这项依赖。`DesktopContextSmokeTest` 保留为容器装配护栏。
 - **`@Table` 的 `indexes` / `uniqueConstraints` 里必须写 snake_case 物理列名**：这两处不参与
   PhysicalNamingStrategy 的驼峰转换（本仓没配自定义策略，用 Spring Boot 默认的
   CamelCaseToUnderscoresNamingStrategy，字段 `projectId` 落成列 `project_id`）。
@@ -516,6 +555,21 @@ stash 误 pop 之类）之后，5174 上的页面可能变成**整页无样式**
   `startEager` 逐个 `await` 也一样是白等：各服务端口已在 `allocatePorts` 统一分配好，
   互相没有启动时序依赖，串行只是把首启时间累加，已改 `Promise.all` 且保留单服务失败互不影响。
 
+## 桌面首屏关键路径（dev-board#1472）
+
+
+必要的数据库回调由 `StartupDataInitializer`（`SmartInitializingSingleton`）统一在普通 Bean 构造后、WebServer 开始接收请求前执行：外部服务档位回填 → 插件孤儿任务恢复 → 内置插件安装/禁用状态读取与插件加载 → 技能扫描。`PluginService` 加载可执行插件前必须完成旧任务恢复，禁用状态必须先于 JAR 执行；`ToolRegistry` 保留活的插件工具 supplier。这里不改变各回调原有异常处理。反馈补传/反馈处理状态同步、匿名统计/团队统计补传、插件封禁同步与资源包安装/更新定时器改在 `ApplicationReadyEvent` 启动，避免后台线程在对象构造期间提前触发 JPA 等待；原定时重试及用户主动操作保留。非 desktop 的同步 JPA 也沿用同一必要阶段。`StartupDataInitializerTest` 用真实 Spring 生命周期处理器验证构造期间零数据/后台回调、阶段顺序及 Ready 后启动，并用真实 Tomcat 验证必要阶段阻塞/失败时未开始接收业务；测试不代表墙钟收益，性能仍需冻结产物 A/B。
+
+主窗口等待 Java HTTP 健康及补丁失败回滚完成，不等待已装的 PPTX/MinerU/Kokoro/ASR 服务。`main/main.js` 先单独 `start('backend')`，主页面 `did-finish-load` 后再 `startEager(['backend'])`；可选服务失败只记自身错误，不重建窗口。首次页面加载和 JVM 初始化不再与模型加载争抢资源；退出/管理器关闭时不启动迟到组件。按需 `host.services.ensure` 沿用服务串行队列。`startup-readiness.test.js` 执行实际启动链与管理器调度，验证后端等待、可选服务不阻塞、回滚前不加载旧前端及退出护栏；这些合成测试不等于正式安装包的墙钟提速实测。旧补丁的同步目录清理仍在关键路径，未安装可选 pack 的机器也仍需单独测量 Java/H5 启动耗时。
+
+`PgVectorConfig` 对非 PostgreSQL JDBC 数据源直接构造既有内存向量存储；H2 不得先调用模型 `dimension()` 或构建 PG 连接再降级。PostgreSQL 仍动态探测并缓存模型维度。`PgVectorConfigTest` 验证 H2 零模型/PG 调用、两个存储的独立检索及 PostgreSQL 原有建库参数。
+
+桌面 profile 的 JPA 仓库使用 `bootstrap-mode: deferred`，配合异步 EntityManagerFactory 初始化；上下文刷新仍校验全部仓库，不使用全局 lazy 或将查询校验转嫁给首次操作。`AsyncExecutorConfig` 的交互池以 `applicationTaskExecutor` 为正式 bean 名、`taskExecutor` 为兼容别名：Spring Boot 3.2.4 在多个 `AsyncTaskExecutor` 存在时从 Map 按正式名称选择 JPA bootstrap executor，仅把框架名称设为别名会静默失去异步初始化。不得改池大小或复用 memory/context 池来补这个接线问题。`AsyncExecutorConfigTest` 覆盖实际三池 Map、Boot customizer 选择、别名同实例及三种 `@Async` 调用。延后仓库初始化会使 HTTP 端口和 `SELECT 1` 早于业务初始化完成；启动验收须分别记录 HTTP 健康、Spring Ready 事件与 `ACCEPTING_TRAFFIC`，并验证首次身份、项目及文件读写，不把提前可连通算作完整提速。诊断入口的事件耗时与并发区间不能简单相加成墙钟收益；正式 A/B 仍用出货入口、冻结 JAR 和隔离数据目录。
+
+`DesktopHealthController` 只有在 `ApplicationAvailability` 为 `ACCEPTING_TRAFFIC` 且有界数据库探测成功时返回 UP；必要 runner、同步 ready listener 尚未结束或应用正在关闭时返回 503。不要在最高优先级 Ready listener 中提前置位。`DesktopStartupReadinessTest` 使用真实 HTTP 监听与门闩验证未完成/失败启动；其专用配置用 `@TestConfiguration`，避免污染全应用扫描。既有补丁健康判定、回退与退出流程仍消费同一接口。
+
+`LocalRootWatchService` 的存量项目目录注册不再占住同步 Ready 回调，而由已有 `watchExecutor` 承担唯一可取消任务；已打开项目的实时对账继续使用独立 executor。项目显式打开、删除提交、停止与关闭的竞争契约见 `version-control.md` 与 `LocalRootWatchStartupTest`。不要把这项注册延后说成数据库/JPA 迁移完成，正式健康门未放宽。
+
 ## 验证（改本领域自身时）
 
 - 写作辅助（dev-board#538）：CI 跑 `frontend npm run test:completion`（本地提取/排序、资料转换、宿主范围与客体交互）；`test:lowa-completion` 与 `test:writing-ui` 需真实 LOWA 载荷，覆盖位置令牌、中文输入、明确查询预览、资料插入与撤销。第三方响应使用测试资料，不在回归中自动消费查询额度。
@@ -531,3 +585,86 @@ stash 误 pop 之类）之后，5174 上的页面可能变成**整页无样式**
 - 即时审校（dev-board#547）：CI `test:inline-review` 覆盖宿主版本围栏、手动 AI 与 guest 中英文交互；`test:lowa-inline-review` 使用原生浏览器计时器并验证真实定位/修订/撤销，桌面 `tests/desktop-e2e/writing.mjs` 验证中文输入后本地规则自动启动。
 
 - 写作交互复测（dev-board#538/#541/#547/#549）：CI 增加 `test:insight` 覆盖链接预览、来源失效、目标已在后台时的分屏路由。`test:writing-caret` 可配 `LOWA_E2E_DPR=2` 在引擎启动前模拟 Retina，验证正文提取→光标菜单→Tab→撤销；`test:lowa-link-preview` 使用真实 Ctrl/Cmd 鼠标点击覆盖外链、书签和 REF。完整桌面用例要求 `WRITING_E2E_ROOT` 指向独立后端 cwd/user.home，复制壳并在 main 前隔离 Electron home/profile，避免接触用户资料。
+
+
+## 系统文件关联与打开队列（dev-board#1212）
+
+`desktop/main/open-paths.js` 接 macOS `open-file`、Windows 初次 argv 与 `second-instance`，主进程保留 FIFO 请求直到渲染层 ACK。`host.menu.openPathsReady()` 只在工作台 mounted 且标签恢复完成后调用；每条 `open-path` 的 `requestId` 在前端处理/显示错误后由 `ackOpenPath` 确认。hash 导航和重复 ready 不重投在途请求，真正 reload/crash/换窗重投未确认队首。窗口最小化不能注销仍存活的工作台保存出口。
+
+mac 的 `build.mac.fileAssociations` 用 `rank: Alternate`；Windows 在 `build/win/file-associations.nsh` 仅写本应用 ProgID、OpenWithProgids 和 Capabilities。**不要改成 electron-builder 24 的顶层 fileAssociations**：该版本 NSIS 内置宏会写扩展名默认值。安装/升级只登记候选，默认打开程序由用户选择；卸载只移除本应用登记。关联名单须与真实文件预览类型一致。
+
+Windows 实机门：`desktop/scripts/test-file-associations.ps1` 在一次性 Actions runner 上执行安装→改默认→重装→卸载，验证 17 类候选、已有默认与 UserChoice 保留。electron-builder 24 用 StdUtils 重读 `/D`，带空格路径必须给值加引号。其捆绑 NSIS 3.0.4.1 的 `DeleteRegKey /ifempty` 只检查子键，不检查命名值；**不得用它清理共享 OpenWithProgids 键**，只删本应用的值。该错误由真实重装门发现；模拟器须覆盖卸载后重装，不能把 `/ifempty` 当作无操作。
+
+回归：`desktop/tests/open-paths.test.js`、`file-associations.test.js`。`frontend/tests/desktop-e2e/local-files.mjs` 用全新 home/profile/H2/storage/端口测试源码 Electron 的冷启动队列、同名异目录、原位保存、PDF/Word；先构建 H5/editor/backend 并准备本地 LOWA 资源，`JAVA_HOME=<JDK21> node frontend/tests/desktop-e2e/local-files.mjs`。它注入原生打开事件，不能替代正式安装包的 Finder/Windows 打开方式验收。
+
+
+## 本地后端运行期自检（dev-board#1216）
+
+### 本地轻量启动候选（dev-board#1472/#1474，默认未启用）
+
+`desktop.local-core.enabled=true` 仅用于 desktop/local-mode/loopback 的隔离候选。`LocalCoreBootstrap` 在 Spring 建容器前核验现有 H2 的持久化契约与实际 schema proof。构建时用完整实体映射两次生成独立 H2，确认结构一致后打包契约（DDL、H2/Hibernate 版本、JPA/SQL 初始化配置、bootstrap epoch）；启动直接顺序读取自身应用归档的 class 字节指纹，校验构建资源未过期，不再运行 Spring 实体元数据扫描，也不创建 EMF。普通类新增持久化注解同样会使旧指纹失效；构建阶段拒绝自身归档之外的映射类，未来增加外部映射模块须显式扩展契约。字节指纹不进入兼容 ID，兼容重打包仍复用资格。v2 proof 允许应用重打包但契约相同的升级直接进入 CORE；旧 v1、缺失/过期契约、配置差异或 schema 变化仍走完整初始化，完成所有同步 Ready 回调后再记 v2。bootstrap 数据准备语义变化时必须提升 `BOOTSTRAP_EPOCH`。build ID 继续用于进程/健康身份，不能代替数据兼容凭据。全新数据库仍先走完整初始化，不能宣称首次安装已获同等提速。使用原数据库、原 ID/UID、原文件路径，不能再旁建可写 SQLite 权威。早期池禁用 AUTO_SERVER 并要求 IFEXISTS，阻止另一个旧 JVM 同时连接；Hikari 实例交给 JPA 共用，Hibernate/schema SQL 初始化在已验证路径禁用。真正 native EMF 未完成时仍保留 CORE 读取；`StartupDataInitializer` 的首个动作排空 CORE leases，再交权给业务初始化。失败不得自动回 CORE 形成双写。
+
+独立 `LocalCoreGateway` 保持公开端口，Spring 私有 connector 使用随机端口，配置中的 server.port 和回调 URL 仍用公开端口。复用本机准入、CORS、源代码声明过滤器；文件通过现有 ResourceHttpRequestHandler 支持 HEAD/Range/416。关闭独立 Tomcat 必须 stop 后 destroy，否则容器 await 线程会使 JVM 退出不完。未知路由转交完整后端前先释放 CORE lease，不能持 lease 等待交权。
+
+轻量项目列表与 `ProjectService.listProjects` 同时隐藏 `LOOSE_FILES` 和 `SCRATCH`，包括本人和成员的随手工作区；直接访问仍按原 ACL，转正后同一 ID/UID 立即可见。新增聊天模式默认仍从 welcome/ide 进入；明确选择 chat 恢复时，创建随手工作区的 POST 继续等待完整服务，不把写接口混入早期读取白名单。
+
+资格化候选在 CORE leases 完全排空、真实 JPA/版本交接成功且状态已为 JPA 后，通过独立 `onJpaAvailable → jpaDocumentsReady` 发布本地文档能力；DRAINING 仍拒绝新准入。Gateway 只将精确文档方法/路由交给该能力，复用原 H2 的只读/内容协议实现；内容发布此时已绑定真实 `WorkSessionService` 项目锁和 JGit receipt 交接，不需要等私有 Servlet、插件初始化或后续 runners。未知业务接口仍等完整后台，full-health仍503，effects仍到完整Ready后才安装。失败/关闭撤销本地JPA准入，不能退回CORE。
+
+该并行窗口的 `MediaFileTypeReconciler`、`OrphanParentReconciler` 在候选开启时使用同一项目锁：外层只发现项目/文件ID，锁内重新查询实体后才修改，不能把锁外旧实体merge回去覆盖刚保存的file_size/updated_at。资格与schema契约不变；feature-off保留原迁移路径。`LocalCoreJpaContinuityTest` 使用真实Spring Data JPA、H2、项目锁、JGit和HTTP，在没有私有Servlet/完整Ready的场景验证保存与before-image baseline；受控暂停迁移的旧实体发现查询，再并发保存，核验两种迁移不覆盖新元数据。此测试不等于全产品正常负载性能或旧数据库升级验收。
+
+兼容候选另有较窄的「文档路由就绪」门槛：所有 runners 已结束后的 Ready 事件先显式完成 `OrphanParentReconciler`（同次启动只执行一次，失败不提前放行），再允许既有核心 GET/HEAD、内容协议 GET/HEAD/PUT 与 receipt GET/DELETE 经原 MVC 访问。尚未完成的普通 Ready 回调仍挡住其他业务路由；两条精确健康 GET/HEAD 经原 MVC 就绪检查返回503，不能据端口可用提前报UP。该阶段保留原本机准入、控制器鉴权、内容事务和版本锁，保存后的 AI/标签副作用仍等完整 Ready。启动失败/关闭会同时撤销文档准入；无 gateway 的 legacy/首次安装/feature-off 不触发额外修复或提前路由。这条门槛仅负责切换到私有 MVC；更早的 JPA 本地文档能力见上段。`LocalCoreDocumentReadyTest` 用随机本机端口、受控阻塞的 Ready listener、真实 MVC 与 H2 内容发布验证；版本服务使用替身，不能据此称完整 JPA/JGit 或正常负载提速已验。
+
+`/api/desktop/startup-health` 的 UP/phase=core 只表示早期业务读取可用，原 `/api/desktop/health` 此时仍是503。phase=full 与完整健康必须等 ACCEPTING_TRAFFIC，不能只看 ApplicationReadyEvent 或 FactoryBean 代理。桌面首屏只等 startup-health；完整后端在原启动 deadline 内以最多500ms周期检测，确认完整健康后恢复10s。新路由只有明确404才兼容旧健康链，dev 的 wizard 同样不能覆盖已存在的503。健康结果、overlay 成功/失败均绑定实际 launch/process，迟到旧结果不能给新启动记成功；内部 launch 含 child，不得放入 renderer IPC。
+
+完整 UI 曾暴露 HTTP/1.1 六连接饥饿：六个非早期接口在网关等完整后端，使文件树在浏览器排队约4秒，真正读取仅约13ms。`backend-request-gate.js` 在主窗 session 的 onBeforeRequest 中排队这些请求，保留早期 GET/HEAD 与 OPTIONS 通道；能力清单只来自 build 校验成功的 core 健康响应。未知旧后端保持原传输；换 launch、端口、退出或到截止时取消待发请求，不重放到新进程。不要同时给同一 session 安装第二个 onBeforeRequest listener。实际隔离 UI 文件树4019→150ms只属诊断，不替代正常负载正式对照。
+
+排队请求必须按 Chromium request id 在 `onErrorOccurred` / `onCompleted` 中移除，不能再调用已取消请求的回调。Electron 30.5.1 的真实 XHR 超时探针可使旧实现触发 native dangling-pointer 崩溃，JS try/catch 无法捕获；见上游 [electron#42505](https://github.com/electron/electron/issues/42505)。队列同时拥有这三个 webRequest 监听器，清理时一并注销，不能被其他监听器覆盖。`npm --prefix desktop run test:backend-request-gate-e2e` 用隔离 profile、随机本机端口和真实 Electron 验证超时不重放、后续请求成功及进程退出；不使用关闭崩溃检查的启动参数。
+
+后台工具和 RAG 使用项目显式装配；通用 `langchain4j-spring-boot-starter` 已替换为同版本核心库，避免无 `@AiService` 接口时仍进行额外类扫描，Ollama starter 保留。`WebTools` 在 local-mode 不启动浏览器预热线程，实际 browse 请求仍沿原路径创建 Playwright；不能把这项改动称为已验证首次网页读取无额外成本。必要数据恢复、完整仓库校验及 Ready 回调顺序保持原样。
+
+候选的 `LocalCoreContentHttp` 在 CORE/JPA 两阶段提供同一带版本的 GET/HEAD/PUT 与 receipt GET/DELETE 协议。下载快照绑定实际字节的 SHA、文件 UID 与本机身份；上传完整收完后才取得项目版本锁、publication 锁和短数据库事务。持久操作 UUID/回执/取消栅栏阻止重复与迟到写入，任何不确定结果不得降级为旧无条件 POST。客户端先探测数字 `coreContentProtocol=1`，元数据跟随准确的 ArrayBuffer，在模型装入成功后绑定；重载先解决或取消旧保存。早期能力一旦已发布，交接后不能因 schema proof 失效静默撤回。
+
+保存前的 `GET /api/document/generator/settings` 同样属于早期只读能力：直接读取原 H2 的开关，产品名仍取 `ProductIdentity`，保留原控制器的缺省值和匿名读取规则；PUT 仍等完整后端。只拆内容上传还不够：这项可选元数据若排在完整初始化后，`stampGeneratorMetadata` 会把已导出的文档卡在上传之前。`LocalCoreHttpReadsTest` 与原控制器逐项对拍开关语义，`backend-request-gate.test.js` 验证只放行读请求。
+
+保存 journal 位于原 H2 文件旁；即使关闭开关或构建标识变化，存在 journal 时也必须在 legacy DDL 之前恢复并验证记录过的 schema。`LocalCoreVersionHandoff` 保留既有 HEAD，未建库时以首个 before image 建初始版本，原件始终保留最新内容；版本确认后才 ack。feature-off/recovery-only 同样必须完成实际 EMF 和交接才可 full-ready。通知在项目锁释放后执行，失败的本进程回执重试可以重试通知，非持久通知 outbox。DDL 中途崩溃造成 proof 不匹配会保守拒绝启动，不能称已自动恢复所有升级窗口。
+
+隔离的完整 Spring/JPA/H2/HTTP/JGit 联调已覆盖阻塞实际 EMF 时读写/取消、交权后相同路由、CORS、版本基线以及关闭开关/变更构建标识的骤停恢复；变更构建仅为同 JAR 改标识，并非另一二进制/DDL 兼容验证。当前仍默认关闭轻量候选，默认文档引擎仍为 LOWA；完整原生体验和正常负载对照未通过前不得据样板性能切换默认。
+
+`desktop/main/services/backend-supervisor.js` 在服务启动完成后每 10s 检查后端，连续三次失败后按 5/15/45s 退避尝试恢复，最多三次；连续健康 5min 才重置预算。只恢复 `ServiceManager` 创建的 child，复用外部后端同样检查 `/api/desktop/health`，503/超时不能退回 wizard 假报健康；仅明确404且wizard识别成功时标记 `degraded/external-health-unverified`（旧版健康未知），不接管。原来按端口杀陈旧后端的路径已移除。后端初启 HTTP 就绪宽限 120s（Windows ARM 转译延长），运行期使用 `/api/desktop/health`（DB 检查+本次 child 的 build），不以 TCP 通等价健康。dev prod profile 兼容 `/api/admin/wizard`。健康检查固定本次 spawn 指纹，后台下载激活 overlay 不会触发运行中的旧版本被误判并自动换件。
+
+start/stop/restart 共用按服务串行队列。后端端口分配后固定，恢复不能改渲染层已注入的地址。本次 spawn 随机注入 `AWD_BACKEND_CONTROL_TOKEN`，优雅停止请求为 loopback POST `/api/desktop/shutdown` + `X-AWD-Backend-Control-Token`；令牌只在进程内存/env，不写日志。停止先等待 Spring graceful 关闭，45s 后才强杀，且确认 child exit 后才能起新 JVM；尤其 Windows 不能直接把 Node `SIGTERM` 当优雅退出。应用退出总等待55s；睡眠暂停检测，唤醒30s宽限，退出移除监测。恢复不刷新窗口，保留编辑器内未保存内容。
+
+preload `host.backend.getHealth()` / `onHealthChanged(callback)`；主进程 IPC `checkba:backend-health` / `checkba:backend-health-changed`。快照 `{state, ok, owned, attempts, reason, updatedAt}`；state 为 starting/healthy/degraded/restarting/failed/suspended/stopped。启动链异常也保留 failed/startup-failed 快照；只有已有本壳 child 所有权时才启动监督器允许恢复，端口分配失败不能永久显示 starting。回归 `desktop/tests/backend-supervisor.test.js`、`service-manager.test.js`、`quit-lifecycle.test.js` 用随机回环端口/合成 child；端口链测试同样注入随机端口，不占用户默认5269。mac/Windows正式包的数据库耗尽与真实文件写入恢复仍须隔离验收，不得在用户未保存文稿的客户端直接强杀演练。
+
+## 随包业务插件构建（#1340/#1341，待发版）
+
+frontend build:h5前置build:plugins，8个独立Uni/Vite包输出official-plugins/<id>/web，desktop extraResources只带对应manifest/web。后端通过AI_PLUGINS_BUNDLED_DIR读取只读来源，安装到可写plugins目录；OAuth回调由实际分配的后端端口注入AI_PLUGINS_OAUTH_REDIRECT_URI。纯服务端开发显式指定bundled-dir并先构建。QA启动后端必须复制jar到隔离runtime后运行，不可直接运行随后会被Maven改写的target jar；同一target目录不可并行package与test。
+
+### 原生组件失败后的立即重试（dev-board#1260）
+
+`NativePackService.installAsync` 的占用表按每次任务的 `PackStatus` 对象区分。`failed` 对用户可见后即可接受重试；旧任务的 catch 只改自身状态，finally 条件删除自身占用，不能覆盖或释放新任务。失败详情先写、failed 最后发布。不要退回按 packId 的 Set 去重，也不要通过延长轮询或 sleep 掩盖窗口。`NativePackServiceTest.immediateRetryAfterFailureKeepsNewAttemptInFlight` 用 latch 固定这个窗口，并验证运行中与排队中的去重、旧收尾隔离及最终真实安装文件。
+
+### Windows 插件构建与 NSIS 首装门（dev-board#1354/#1355）
+
+`vite.business-plugins.config.js` 必须统一 root、传入模块 ID 和生成的导入目标路径分隔符；Windows 路径不能直接与 POSIX 前缀比较。Desktop Build 的前端步骤明确用 Bash，`build:h5` 后校验非空 `dist/build/h5/index.html`，避免 PowerShell 将前一步失败掩盖为后续编辑器构建成功。随包插件的 Vue scope/chunk hash 受构建绝对路径影响，跨平台校验以源码、结构和运行行为为准。
+
+`desktop/scripts/patch-nsis-known-folder.js` 在 postinstall 精确回移 electron-builder PR#9769，修复 24.13.3 首装路径查询后的固定长度越界读取；未知模板结构必须失败，不能跳过。来源见 `desktop/scripts/UPSTREAM.md`。打包后 Windows 跑 `test-nsis-known-folder.ps1`：旧读法在保护页负例中应以 0xC0000005 退出，实际修复块和真实 KnownFolder 查询应成功。随后仍执行真实安装→重装→卸载关联测试；失败保留安装器一天，并记录 SHA256 与 Windows Application 崩溃事件。首轮失败未取得 fault module/dump，不把相同退出码当成已证明同一根因。
+
+
+### #1356 退出中重开与原生安装失败
+
+`quitInProgress` 从准备开始阻止 open-path 投递及 Dock/second-instance 唤回旧窗口，重开意图交给安装/重启链。打开文件队列保存在本机 `.aiworkdeck/restart-open-paths.json`，下一进程等工作台 ready 再交付并在 ACK 后移除；取消退出恢复投递。Windows 安装锁期间的带文件启动也保存到该队列。renderer 先等已经接受的文件打开结束才暂停/保存；取消期间排队打开等待退出清理完成。
+
+Mac `quitAndInstall` 在窗口与服务关闭后仍可能异步报错，必须保留安装阶段 error 监听：本机记录错误、relaunch 并退出旧进程，不能留下持有单实例锁的无窗口进程。Windows PowerShell 5.1 读取 Node 写入的无 BOM job 必须显式 UTF8，合成回归使用中文目录。相关行为回归含还原病灶转红；仍不等于正式签名安装及 Windows 实机升级已验收。
+
+Windows 下从 pwsh→Node 再启动 powershell.exe 会继承不兼容 PSModulePath（#1356 Windows CI 已复现 Get-FileHash 不存在）。完整更新的签名检查与 helper 使用删除该变量的子进程环境，让 Windows PowerShell 重建系统模块路径；不改用户全局环境。握手超时必须先结束本 helper 并确认 exit，再按 helperPid/job 内容清理本次文件，不能放任迟到 helper 在后继客户端已启动时安装。退出中的原生业务菜单不再获得工作台窗口；服务尚未初始化的退出交给原生关闭。
+
+**Windows helper 冷启动与独立进程交接（dev-board#1369）**：真实签名 NSIS 验收发现两层约束：① PowerShell 冷启动至握手可达 `11656.7881 ms`（run `39221453044`），超过旧 10 秒门限；② Node 直接 `spawn('powershell.exe', ..., { detached: true })` 在无控制台下约 214–323 ms 即退出码 0 结束、脚本首句未执行（run `39225970537` / `39227178526`），而 `detached: false` 直接子进程会在 Electron 退出时被 libuv 终止。现由非 detached 桥接 PowerShell 调用 `Start-Process powershell.exe -WindowStyle Hidden -PassThru`（标准输出/错误重定向到文件并写回独立 `helperPid`），helper 以 `FileMode::CreateNew` 独占写锁 `{ helperPid, jobId }`，父进程在 60 秒窗口内核对 `helperPid` 与 `jobId` 后写 `.ack` 提交，helper 确认 `.ack` 且父进程退出后才校验签名并执行 `NSIS /S --updated`。父进程未写 `.ack` 即退出的桥接异常若伴随 `.launch`，helper 在父进程退出后重开原应用而不执行安装。
+
+## 模型校验与准备阶段取消（2026-10-21，dev-board#1386）
+
+`.aiworkdeck-complete` 使用 schema1 文件清单；启动只检查结构/大小，完整旧时间戳安装可本地迁移，不强制重新下载。显式修复逐文件核对上游摘要，正确缓存保留；HF SDK 仅凭文件存在会复用坏缓存，普通 snapshot 副本即使 force_download 也可能不替换，确认损坏后须移除该 pointer 再下载并校验，不能盲目重写完成清单。ModelScope 失败回落 HF 也走这条链。
+`ModelManager.download({beforeStart})` 在等待关联服务停止之前取得任务所有权，期间取消会阻止迟到下载启动。取消/超时等待子进程 close 后才解锁，避免重试写入竞态。HTTP health 仅证明服务身份和基础启动，界面不称业务能力已验证；真实 OCR/ASR/TTS 仍需独立业务测试。
+回归：`desktop/tests/model-manager.test.js`、`model-fetch.test.py`（真实 SDK 需安装包 Python/lib；普通环境可显式 skip 该项，不把 skip 算通过）。
+
+**真实 ASR 词表格式（2026-10-21，dev-board#1395）**：官方 `Systran/faster-whisper-medium` 实际下载包含 `vocabulary.txt`；不能强制要求 `vocabulary.json`。桌面清单和后端 `ModelPresence` 同步按 CTranslate2 的 JSON 优先、文本备用规则校验；存在但格式错误的 JSON 不静默回退。真实 Mac ARM64 中英 Kokoro→Whisper 推理、缺模型409后同进程恢复已由子代理与主任务分别运行；脚本 `asr-service/tests/real_inference.py` 只接受准备好的运行时/缓存和合成短句。隔离 HOME/临时目录，HF offline+死代理不等于操作系统断网；不据此声称 Windows 或完整 Electron 用户流程通过。

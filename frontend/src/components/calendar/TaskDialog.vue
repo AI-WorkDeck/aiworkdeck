@@ -665,7 +665,7 @@ export default {
   max-width: calc(100vw - 48px);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
+  border-radius: var(--awd-radius-dialog);
   box-shadow: var(--awd-shadow-lg);
   display: flex;
   flex-direction: column;
@@ -680,7 +680,7 @@ export default {
 }
 
 .td-title {
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 600;
   color: var(--awd-text);
 }
@@ -695,7 +695,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   cursor: pointer;
 
@@ -729,7 +729,7 @@ export default {
 }
 
 .td-close {
-  font-size: 18px;
+  font-size: var(--awd-font-size-title);
   line-height: 1;
   color: var(--awd-text-3);
   cursor: pointer;
@@ -747,7 +747,7 @@ export default {
 }
 
 .td-title-input :deep(.mi-textarea) {
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 500;
 }
 
@@ -777,8 +777,8 @@ export default {
   height: 28px;
   padding: 0 10px;
   border: 1px solid var(--awd-border);
-  border-radius: 14px;
-  font-size: 12px;
+  border-radius: 999px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   background: var(--awd-surface);
   cursor: pointer;
@@ -808,7 +808,7 @@ export default {
 }
 
 .td-priority-label {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
@@ -826,14 +826,14 @@ export default {
 }
 
 .td-label {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
 .td-static {
   height: 36px;
   line-height: 36px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -849,7 +849,7 @@ export default {
   right: 30px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   line-height: 1;
   color: var(--awd-text-3);
   cursor: pointer;
@@ -873,9 +873,9 @@ export default {
   height: 26px;
   padding: 0 4px 0 9px;
   border: 1px solid var(--awd-border);
-  border-radius: 5px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-surface-2);
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   box-sizing: border-box;
 
   &.is-missing .td-file-name {
@@ -901,7 +901,7 @@ export default {
   flex: none;
   width: 18px;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-3);
   cursor: pointer;
 
@@ -916,8 +916,8 @@ export default {
   height: 26px;
   padding: 0 10px;
   border: 1px dashed var(--awd-border-strong);
-  border-radius: 5px;
-  font-size: 12px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   cursor: pointer;
   box-sizing: border-box;
@@ -947,16 +947,21 @@ export default {
 }
 
 .td-hint {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   margin-right: 4px;
 }
 
 .td-btn {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
-  padding: 6px 14px;
-  border-radius: 6px;
+  height: var(--awd-control-height);
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border-radius: var(--awd-radius-md);
   border: 1px solid transparent;
   cursor: pointer;
   white-space: nowrap;
@@ -989,7 +994,8 @@ export default {
 }
 
 .td-btn-danger {
-  padding: 6px 8px;
+  height: var(--awd-control-height);
+  padding: 0 8px;
   color: var(--awd-danger-text);
 
   &:hover {
@@ -998,7 +1004,8 @@ export default {
 }
 
 .td-btn-link {
-  padding: 6px 8px;
+  height: var(--awd-control-height);
+  padding: 0 8px;
   color: var(--awd-text-2);
 
   &:hover {

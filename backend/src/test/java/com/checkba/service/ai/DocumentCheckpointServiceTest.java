@@ -249,4 +249,46 @@ class DocumentCheckpointServiceTest {
         }
     }
 
+    @Test
+    @DisplayName("TTL 清理：过期快照从内存移除并删除存储 blob，未过期的保留")
+    void cleanupExpiredCheckpointsRemovesOnlyExpiredOnes() throws Exception {
+        when(projectFileService.getFile(1L)).thenReturn(fileOf(1L, "A.docx", "projects/1/A.docx"));
+        when(projectFileService.getFileBytes(1L)).thenReturn("v1".getBytes());
+        service.ensureCheckpoint("conv-old", 1L);
+        org.mockito.ArgumentCaptor<String> savedKey = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(storage).save(savedKey.capture(), any());
+
+        // 未过期：TTL 之内不清理
+        long freshNow = System.currentTimeMillis() + 1000;
+        assertEquals(0, service.cleanupExpiredCheckpoints(freshNow));
+        assertTrue(service.hasCheckpoint("conv-old"));
+        verify(storage, never()).delete(any());
+
+        // 已过期：内存条目移除，且调用 storage.delete 删除 blob
+        long expiredNow = System.currentTimeMillis() + DocumentCheckpointService.CHECKPOINT_TTL_MS + 1000;
+        assertEquals(1, service.cleanupExpiredCheckpoints(expiredNow));
+        assertFalse(service.hasCheckpoint("conv-old"));
+        verify(storage).delete(eq(savedKey.getValue()));
+
+        // 未过期的另一会话不受影响
+        when(projectFileService.getFile(2L)).thenReturn(fileOf(2L, "B.docx", "projects/1/B.docx"));
+        when(projectFileService.getFileBytes(2L)).thenReturn("v2".getBytes());
+        service.ensureCheckpoint("conv-new", 2L);
+        assertEquals(0, service.cleanupExpiredCheckpoints(System.currentTimeMillis()));
+        assertTrue(service.hasCheckpoint("conv-new"));
+        verify(storage, never()).delete(org.mockito.ArgumentMatchers.contains("conv-new"));
+    }
+
+    @Test
+    @DisplayName("清理时存储删除失败只记 warn，不影响返回计数与其余清理")
+    void cleanupToleratesStorageDeleteFailure() throws Exception {
+        when(projectFileService.getFile(1L)).thenReturn(fileOf(1L, "A.docx", "projects/1/A.docx"));
+        when(projectFileService.getFileBytes(1L)).thenReturn("v1".getBytes());
+        service.ensureCheckpoint("conv-1", 1L);
+        org.mockito.Mockito.doThrow(new RuntimeException("存储抖动")).when(storage).delete(any());
+
+        long expiredNow = System.currentTimeMillis() + DocumentCheckpointService.CHECKPOINT_TTL_MS + 1000;
+        service.cleanupExpiredCheckpoints(expiredNow);
+        assertFalse(service.hasCheckpoint("conv-1"));
+    }
 }

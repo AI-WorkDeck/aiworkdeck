@@ -89,7 +89,7 @@ plugins/
 | `backendJars` | string[] | 否 | 相对插件目录的 JAR 文件名列表，启动/重扫时加载其中带 `@Tool` 注解的类。 |
 | `skills` | string[] | 否 | **v2.1 新增**：插件携带的 Skill 子目录名列表（相对插件目录），见 §7。 |
 | `packs` | string[] | 否 | **v2.3 新增**：依赖的原生资源包 id 列表，见 §9 与 [NATIVE_PACK_DISTRIBUTION.md](NATIVE_PACK_DISTRIBUTION.md)。 |
-| `contributes` | object | 否 | **v2.8 新增**：向宿主贡献的声明式内容——`evidenceSources`（证据来源，§13）；**v2.9 起**再加 `templates`（文书模板）与 `styleProfiles`（样式画像），见 §14。按只加不改逐个扩展。 |
+| `contributes` | object | 否 | **v2.8 新增**：向宿主贡献的声明式内容——`evidenceSources`（证据来源，§13）；**v2.9 起**再加 `templates`（文书模板）与 `styleProfiles`（样式画像），见 §14；**v2.12 起**新增 `themes`（外观皮肤主题），见 §14.6。按只加不改逐个扩展。 |
 | `settings` | object[] | 否 | **v2.9 新增**：用户可配置项声明（§14.3，上限 20 条）。广场详情页渲染成表单，值存宿主侧；插件只读（JAR 经 SPI `Settings.get`、Web 经桥 `settings.get`）。 |
 
 未知字段被忽略（向前兼容）；`permissions` 中出现 v1 未定义的值仅记录 WARN，不拒绝加载。
@@ -250,13 +250,15 @@ plugins/
 
 ### 8.1.1 工作区标签页与左栏协作
 
-动态插件点击左侧入口后，由宿主打开工作区标签；左栏显示简介和「打开工作区」入口。有 `frontendEntry` 时标签正文使用 `PluginPane`，没有时使用 `PluginGuidePane`。腾讯会议、尽调报告及后续动态插件共用这套行为，不需要新增 manifest 字段或 SDK 方法。
+插件安装与界面入口解耦，按 `contributes.views` 声明提供界面（完整字段见 §17.2）。轻量皮肤、模板等可声明空数组，在主题切换等贡献点使用，不占侧栏或专属标签页；panel 插件只声明 `sidebar`；需要完整工作区的插件声明 `workspace` 并获得左侧按钮。两种视图同时声明时，左侧入口打开 panel，插件可用 `awd.ui.openWorkspace()` 打开自己的工作区。只有工作区时，左侧按钮直接开标签，不强制打开简介 panel。
 
-标签按 `pluginId` 跨左右窗格保持单例；重复点击聚焦已有标签。普通标签切换保留 iframe 和未提交输入，关闭标签、禁用、卸载、封禁或不兼容会移除实例。跨窗格移动可能重建 iframe，业务数据应按需持久化。无项目态不打开动态插件。
+缺省或 `null` 的 `views` 保持旧插件行为：有 `frontendEntry` 时工作区使用 `PluginPane`，没有时使用 `PluginGuidePane`，并保留左侧简介导航。显式数组是完整的界面声明，不能用 `frontendEntry` 补出未声明的工作区；空数组与缺省必须区分。权限与界面形态独立，不按权限数量推断插件应占几个位置。
 
-工作区快照只存插件身份和展示名；恢复时用当前启用清单核验，入口 URL、权限与开发安装标志取当前元数据，不能信任快照。插件主界面应适配宽工作区和窄分屏；左栏不再重复挂载同一插件 iframe。已有沙箱与桥协议保持不变，不增加 `allow-same-origin`。
+标签按 `pluginId` 跨左右窗格保持单例；重复点击聚焦已有标签。普通标签切换保留 iframe 和未提交输入，关闭标签、禁用、卸载、封禁或不兼容会移除实例。跨窗格移动可能重建 iframe，业务数据应按需持久化。项目视图需要当前项目，全局视图可在无项目态使用。
 
-开发验收须覆盖安装、启用、左侧入口、工作区主要操作、切换保活、关闭重开和禁用清理。宿主源码合并与客户端发版分别验收，不能把源码已支持当成旧客户端已升级。
+工作区快照只存插件身份和展示名；恢复时用当前启用清单及视图声明核验，入口 URL、权限与开发安装标志取当前元数据，不能信任快照。声明改为无工作区时清理旧标签。已有沙箱与桥协议保持不变，不增加 `allow-same-origin`。
+
+开发验收应按插件实际贡献点覆盖安装、启用、主要操作和禁用清理。轻量插件检查无多余侧栏/标签；panel 检查窄栏操作；工作区检查单例聚焦、切换保活、关闭重开。宿主源码合并与客户端发版分别验收，不能把源码已支持当成旧客户端已升级。
 
 ### 8.2 静态服务与 CSP
 
@@ -555,8 +557,8 @@ insertText(text)/addComment(anchorText, text)`、`awd.events.on(name, cb)`（返
 
 ## 11. 宿主 SPI（`plugin-api`，v2.4）
 
-工件 `com.checkba:plugin-api`（当前 **1.2.0**：1.1.0 加 `Evidence.linkAtQuote`，1.2.0 加
-`evidence` 包——见 §13；源码 `backend/plugin-api/`，Java 21，无第三方依赖）。
+工件 `com.checkba:plugin-api`（当前 **1.3.0**：1.1.0 加 `Evidence.linkAtQuote`，1.2.0 加
+`evidence` 包——见 §13，1.3.0 加 `PluginSessions`——见 §18；源码 `backend/plugin-api/`，Java 21，无第三方依赖）。
 不在远端仓库：本地 `mvn -q -f backend/plugin-api/pom.xml install` 后，插件以 `provided` 依赖它
 （示例 `examples/hello-plugin/pom.xml`）。**只加不破**：已发布的方法签名与 record 字段不改不删，
 新增能力走新方法 / 新 record 字段追加。
@@ -569,6 +571,7 @@ public interface PluginHost {
     String pluginId(); ToolCall call();
     Files files(); Text text(); Tags tags(); Evidence evidence();
     Jobs jobs(); Docs docs(); Settings settings(); Llm llm();
+    default PluginSessions sessions(); // 1.3.0；旧实现默认抛 UnsupportedOperationException
 }
 public record ToolCall(Long projectId, String conversationId, Long userId, String modelId) {}
 ```
@@ -808,8 +811,33 @@ manifest 与 contributes/settings 里的 `name`/`description`/`label` 值**整�
 
 声明式贡献点可叠加在任何插件形态上；**纯声明插件**（无 backendJars/frontendEntry/skills，
 只有 manifest + 数据文件）风险量级最低，广场受理走最轻审核档。宿主落点：
-`PluginContributionService`（模板/画像/设置）+ `PluginService.localize`（l10n）+
+`PluginContributionService`（模板/画像/设置/皮肤）+ `PluginService.localize`（l10n）+
 `StyleProfileResolver` 插档；示例 [examples/hello-declarative-plugin/](../examples/hello-declarative-plugin/)。
+
+### 14.6 外观皮肤（contributes.themes，v2.12）
+
+```json
+"contributes": {
+  "themes": [
+    {
+      "id": "inkwash-zen",
+      "name": "%theme.name%",
+      "description": "%theme.desc%",
+      "file": "themes/inkwash-zen.json"
+    }
+  ]
+}
+```
+
+- `file` 指向插件目录内的皮肤 JSON（上限 20MB，过相对路径与 canonical path 双闸）。
+- 皮肤 JSON 结构：
+  - `roles.light` / `roles.dark`（或 `light` / `dark`）：键为 `--awd-*` 令牌名（可省略 `--awd-` 前缀，后端自动归一），值经过 `UNSAFE_CSS_VALUE` 安全过滤（拦截 `url()` / `expression()` / `@import` / `;` / `{` / `}` 等 CSS 注入面）。
+  - `fonts`：`serif` / `sans` / `mono` 字体栈覆盖（映射为 `--awd-font-*`）。
+  - `effects`：`aiPulseStyle`、`surfaceTexture` 等特征标记（挂载到 `html[data-skin-pulse]` / `html[data-skin-texture]`）。
+  - `previewSwatches`：4 枚十六进制色样，用于插件广场详情页与顶部外观菜单预览。
+- 选择位存 `system_setting` 的 `ui.theme.selected`（值 `<pluginId>:<themeId>`，空串表示恢复默认「温润纸墨」）；插件禁用或卸载时自动回退默认皮肤。
+- 切换皮肤时，`frontend/src/utils/appTheme.js` 将当前明暗模式对应的令牌写入 `document.documentElement` 并触发 `APP_THEME_EVENT`；所有打开的 Web 插件 iframe 通过既有 v2.6 主题通道（`collectThemeTokens()` -> `PluginPane.pushTheme()`）自动同步最新皮肤计算值。
+- 首批随包内置 3 款「圆融破圈」官方皮肤插件：`theme-inkwash-zen`（东方水墨 · 飞白禅圆）、`theme-anime-twilight`（日漫晨昏 · 逢魔之时）、`theme-aurora-glass`（深海极光 · 冰刃琉璃）。
 
 ## 15. 能力槽与能力包（contributes.capabilities，v2.10）
 
@@ -897,3 +925,120 @@ manifest 摘要、档位、权限、文件数、目标槽、`canAutoInstall`、�
 AI 工具 `capability_install(url)` 内部只做 `plan`；模型必须用 `<question>` 停机把计划
 念给用户听，确认后才调 `capability_apply(planId)`。**工具的登录 + admin 闸写在代码里**，
 不靠 skill 的 `allowed_tools`（那份白名单只裁可见性、不拦分发）。
+
+## 16. 项目沟通与项目文件材料（v2.11，宿主 0.61.0+）
+
+SDK 1.5.0 新增可选权限 `im`。`im.request {action,params}` 经 `/api/plugins/{id}/im` 的启用、封禁、权限及身份校验，转到固定协作服务 `/api/im/action`。支持 `self/list/create/invite/join/members/removeMember/leave/messages/send/read/upload/download/fileAccess`；`import/binding/export/sendFile` 在本机执行项目权限校验与文件操作。任意 URL、数据库路径、账户密钥都不进入插件界面。
+
+聊天 ACL 独立于团队/律所和项目 ACL。加入会话不授予项目库权限。邀请为24小时有效的一次性码，私聊最多2人、群聊最多100人，发送使用 clientMessageId 幂等；单附件8 MiB、每会话100 MiB，JSON请求12 MiB。主动存入项目的文件和归档通过普通项目文件链路参与Git；会话关联保存原项目UUID、会话UUID，附件来源保存附件UUID/文件UUID/SHA-256。数据库数字ID不充当跨设备身份，默认不自动归档聊天。项目操作需相应 file_read/file_write 和当前项目权限；sendFile声明两种文件权限，以便首次引用时保存跨Git项目标识。首次引用自动关联须内部写成员，其余成员待关联后才可引用。
+
+`chat.addFile {path}`（file_read）把当前项目真实文件加入AI材料，不自动发送；`files.prepareDrag {path}`（file_read）返回真实文件描述和短时单次 `dragToken/dragType/expiresAt`。插件传入按钮局部 `rect`（left/top/width/height），宿主在该iframe边界内提供原生拖柄，避免opaque iframe无法跨源拖出的浏览器限制；返回 `hostHandle:true`。宿主 dragstart 同步写随机MIME，drop消费票据并再次校验项目；dragend清理。无rect时只能准备票据，不能承诺跨iframe原生拖拽。禁用、卸载、项目/账户变化、失焦与过期清理票据。不得放松sandbox，不信iframe自报的文件ID。
+
+`account.changed` 事件只通知身份改变，不带个人数据；插件必须丢弃缓存及在途结果。SDK源、两份仓内副本及官网模板保持一致。旧宿主返回unknown_method，插件应说明最低版本，不能用localStorage模拟多人通信。
+
+单文件客户权限是服务端统一规则（`ProjectFileAccessService`）：当前项目成员中的内部角色默认可读；项目 CLIENT 或全局 CLIENT 只读自己上传的文件及明确 `clientVisible=true` 的文件。旧 NULL 视为 false。非成员仍不能访问；文件权限不因加入聊天或 Git 克隆扩大。`GET/PUT /api/projects/{projectId}/files/{fileId}/access` 读取或设置客户可见性，写入需非客户项目写权限。拒绝正文固定为“抱歉文件还在准备中，请联系您的律师。”。下载、文本、搜索、移动端文件源共用此规则；拥有整个项目工具能力的律师 AI 工作台及跨文件派生分析暂不向客户开放。
+
+项目文件引用是发送时快照，携带 `source.projectUid/fileUid`，不含本机路径；引用前检查原文件可读。快照权限独立：默认内部可见，上传者本人仍可读，只有会话的非客户 OWNER 或上传者可通过 `fileAccess` 为会话内客户开放/收回。不可读附件消息仅返回 `{id,available:false,message}`，不泄露名称、摘要或来源；下载同样鉴权。权限收回禁止后续读取，但不能撤回对方已保存的副本。每次可见态轮询刷新最近页的附件权限，显式刷新覆盖全部已加载历史。
+
+上传 `clientMessageId` 与发送相同，仅同一发送重试复用附件；同键异内容/来源拒绝，缺键每次新建，新发送不会继承旧附件公开权限。归档同时受10000条和16 MiB限制，超限回滚，不生成部分成品。项目写入用项目行锁串行化，回滚清理本次新增物理文件。
+
+`im.downloadAttachment {conversationId,attachmentId}`（im）在服务端再次校验附件可读后，由宿主 Blob 下载链路触发另存为，不要求项目写权限、不创建项目文件。返回 `{started:true,name}` 只表示发起下载，不表示用户已保存；文件名清洗、8 MiB边界及账户/项目迟到校验均在宿主完成。客户可直接下载自己的或已开放附件，不必先存入项目。
+
+文件变量、音频转写/纪要读取沿用来源文件ACL；股东核查、诉讼图表、内部插件任务结果等可混合私有材料的模块禁止客户读取。`ProjectMemberService.isClient` 与写权限同时检查全局客户身份，防默认成员/owner角色绕过Git与云端内部成员限制。
+
+## 17. SDK 1.6：可安装视图、共享能力与开发者服务（待随宿主发版）
+
+本节描述已实现的新宿主契约。代码合并不代表已升级用户客户端；新方法在旧宿主上返回 `unknown_method`。开发者应检测错误并提示兼容版本，不能用模拟成功替代真实结果。Web SDK 的类型与 JSON Schema 位于 `sdk/plugin-sdk/`，可运行示例为 `examples/plugin-service-demo/`。
+
+### 17.1 开发、验证和提交
+
+对 Agent 可以直接描述：“基于官方插件模板开发一个……插件，使用宿主文件/文档能力，添加用户设置，在本机开发安装，验证主要操作后打包提交审核。” Agent 应先读取 `backend/skills/plugin-dev/prompt.md` 与 SDK 文档，使用 `plugin_dev_scaffold`、`plugin_dev_install` 形成产品内迭代；有本地开发环境时使用 `node scripts/plugin-dev.mjs` 的 `init / validate / package / dev / status / submit`。命令参数、会话获取边界和包大小限制见 SDK README。`submit` 需要开发者本人已有官网会话和显式 HTTPS 地址；投稿进入人工审核，未经审核签名不成为广场可安装版本。
+
+开发免签只限纯 Web 包，不开放本机进程、任意 JAR 或 stdio MCP。开发包声明远程连接或 MCP 后，还需在宿主插件设置中由管理员明确允许服务调用。授权绑定当前 manifest 内容；重新安装或修改清单后重新审核，撤销后停止后续调用。导入、打包均排除宿主授权标记，插件不能通过携带 `.awd-service-trust` 自行取得授权。
+
+### 17.2 视图与侧边栏
+
+`contributes.views` 的每个视图声明 `id / name / entry / placement / scope`；`entry` 必须是插件 `web/` 中真实文件，`placement` 为 `sidebar` 或 `workspace`，`scope` 为 `project` 或 `global`。可声明 `allowedDocks`（left/right/bottom）与其中一个 `defaultDock`。当前每种 placement 最多一个视图。`views` 缺省或 `null` 保持旧插件的 `frontendEntry` / 使用引导兼容入口；显式 `[]` 表示不提供任何独立界面。显式数组只启用列出的 placement：sidebar-only 不自动补工作区；workspace-only 的 rail 按钮直接打开标签，不强制展开左侧 panel；同时声明二者时先开 panel，可按操作需要进入工作区。`frontendEntry` 在显式空视图下可仅作为插件中心的预览入口，不授予工作区。
+
+同时声明两种视图时，rail 的默认入口为 sidebar，并按 sidebar 的作用域显示；workspace 自身的打开/恢复仍按其作用域核验。需要无项目态从 rail 进入的双视图插件，应将 sidebar 声明为 global。
+
+新 manifest 的 `views` 应省略或写数组；`null` 只作为旧元数据兼容，不是 SDK Schema 允许的新声明。
+
+兼容已安装的旧纯皮肤包：仅含全局 `gallery` 预览、无业务权限/工具/其他贡献的旧声明不生成独立入口，原 gallery 继续供插件中心预览；有独立业务视图的插件仍按声明显示。
+
+**SDK 1.8（待随宿主发版）**：`awd.ui.openWorkspace()` → 桥 `ui.openWorkspace {}` → `{}`。无参数，只打开当前 iframe 所属插件已声明的 workspace；宿主根据当前清单核验可用状态和视图作用域，无可用工作区返回 `unavailable`。不允许指定其他插件、URL 或绕过视图声明，不新增权限名。旧宿主返回 `unknown_method`，开发者应明确提示兼容要求。
+
+搜索、语音、脱敏、诉讼可视化、日历、收藏、剪贴板和洞察使用同一安装、启停、视图与权限通道；源码在 `frontend/plugin-app/`，发行内容在 `official-plugins/<id>/`。宿主保留文件树、工作区编辑器、Agent 对话、账户、插件管理与系统设置等运行基础，以及受权限检查的文件、编辑器和本机设备操作。无需把插件加载器本身再做成插件。
+
+桌面资源通过 `AI_PLUGINS_BUNDLED_DIR` 指向只读随包目录，首次启动复制到可写插件目录；禁用状态迁移，用户卸载后不会每次启动强行恢复。随包升级只更新带宿主管理标记且版本更高的副本，不覆盖独立安装的同名插件；可从广场的“随应用提供”项目重新安装。纯服务端开发需显式配置 `ai.plugins.bundled-dir` 并先构建 Web 包。
+
+### 17.3 设置与共享能力
+
+顶层 `settings` 新增 `scope`：缺省 `installation`，仅管理员在可信宿主表单修改；`user` 按本机用户隔离；`project` 按项目隔离并检查项目写权限。SDK `settings.get/open/update` 可读非密设置、打开宿主表单、写已声明的 user/project 非密设置。凭据放进 connections，不能用项目设置或页面存储承载；旧 installation secret 仅保留兼容接口。
+
+`services.request(service, operation, params, options)` 调用固定服务与动作，不接受任意后端 URL。宿主继续验证当前用户、项目和权限；`services.cancel` 支持中止可取消的在途工作，已经完成的写入不能靠取消回滚。共享模型走 `ai.request`，使用用户平台配置及额度；文档操作走 `doc.*`，IM 走 `im.request`。插件无需取得平台密钥。新增 `speech / tasks / clipboard` 权限分别约束语音设备与合成、任务日历、剪贴板能力，导入导出和文档修改仍需相应文件/编辑器权限。录音和付费云端动作使用可信宿主确认界面。
+
+### 17.4 自有登录、服务和付费
+
+`contributes.connections` 声明最多 10 个连接，每项包含 `id / label / baseUrl / auth / operations`。baseUrl 必须是公共 HTTPS origin；操作定义固定路径与 GET/POST 方法，不能由插件传入新目标。`auth.type` 支持 none、bearer、oauth2。bearer 在宿主可信设置表单输入；oauth2 使用公开客户端 Authorization Code + PKCE（S256），需要 authorizationUrl/tokenUrl/clientId/scopes。桌面把当前后端端口组成 `http://localhost:<port>/api/plugins/oauth/callback`，供应商须允许对应回调；无嵌入客户端密钥。暂不提供设备码、动态注册或 stdio 认证。
+
+凭据按用户、宿主账户、插件、连接隔离，在本机使用 AES-GCM 加密保存，密钥位于用户私有文件；连接目标或认证声明变更要求重新连接。SDK 只取得连接状态及业务结果。退出、切换账户、禁用插件或断开连接会使旧上下文结果失效。网络传输限制公共地址、拒绝重定向，并在实际解析连接时检查地址，防止访问本机和内网服务。
+
+可选 `billing: {statusOperation, checkoutUrl}` 把开发者自己的订阅状态与收银页面接入宿主；statusOperation 对应已声明操作，服务必须返回 `{active:boolean, plan?:string}`。`billing.status(connectionId)` 读取服务端真实权益，`billing.checkout(connectionId)` 经宿主确认打开供应商页面。不传 connectionId 时使用现有主产品插件权益与广场购买入口。主产品提供的插件购买渠道与开发者 SaaS 订阅分别核验；本接口不提供自动代收分账或托管第三方收款密钥。
+
+### 17.5 插件 MCP 与 Agent
+
+`contributes.mcpServers` 每插件最多 8 个服务器，transport 当前为 `streamable-http`，声明公共 HTTPS url、可选 connectionId（同一服务 origin）或兼容 credentialKey，以及 1–64 个 tools。工具声明包含 name、description、inputSchema；宿主将其注册为有命名空间的 Agent 工具，也可用 `awd.mcp.servers/call` 调用。身份和项目权限由宿主绑定，不能从插件参数冒充；每次调用重新检查启停、撤销、开发授权和账户状态。
+
+调用执行 MCP initialize、initialized、tools/list 与 tools/call，支持 JSON/SSE 响应及会话清理。实际服务器工具必须与已审核声明匹配。inputSchema 只支持实现明确验证的对象、数组、标量及约束子集，未知关键字拒绝；不要把此实现称为完整 JSON Schema 引擎。副作用调用失败不会自动重放。暂不支持 stdio、本地可执行扩展宿主、MCP resources/prompts/subscriptions 或 VS Code 扩展包兼容。
+
+### 17.6 验收底线
+
+插件需完成安装、启用、即时出现入口、打开视图、至少一次主要操作、禁用/卸载后入口和在途结果清理。另验证无项目场景、身份切换、权限不足、取消/迟到响应、窄面板和主题。服务接入测试应说明是真实供应商联调还是本地协议替身；单元测试不能代替实际 OAuth、支付或跨平台设备验证。
+
+侧栏保留项逐项理由：home 提供当前项目概况；projects 管理切换项目及离开前保存；files 提供文件树、编辑器与拖放根入口；dev/market 是可信安装和授权管理；version/staging 参与文档合并、落盘和发布事务；members 管理成员及访问控制。CLIENT 的 dd-files 是客户访问码下的受限资料门户，继续按角色隔离，云端律师的尽调资料入口维持云端轨道条件。腾讯会议使用已有 tencent-meeting 插件，不保留重复静态面板。
+
+
+## 18. 插件原生 Agent 会话（plugin-api 1.3.0，宿主 0.65.0 起）
+
+`PluginHost.sessions()` 为需要多步工具执行、持久任务和可见过程的 JAR 插件提供原生 Agent 会话。`authorize()` 检查当前插件启用/未撤销、`file_read`/`file_write` 权限以及当前用户对项目的内部成员写权限；CLIENT 不可调用。`ensure(key,title)` 创建或复用持久绑定，`status(key)` 返回 `PluginSession(key, conversationId, running)`。key 为 `session-<UUID>`，标题 1–120 字；用户、项目和插件身份均取可信 `ToolCall`，不接受参数自报。绑定在数据库持久化，空会话不保证立即出现在历史列表。
+
+`submit(key,requestId,prompt,skillIds)` 通过现有持久 inbox 排队，沿用 Agent 的模型配置、付费检查、用量记录和工具调用链；必须有 `ai` 权限，且指定该插件拥有并可用的 skill。prompt 不超过 200,000 字符，requestId 不超过 128 字符；重试复用同一 requestId 和冻结输入，不生成第二份任务。返回 true 表示接受，不表示评估成功。`cancel(key)` 删除待执行输入并向在途任务请求取消；回执不代表已经执行的工具已停止或写入已撤回。停用后旧 JAR 实例也不能继续使用这些接口。
+
+Web 侧通过现有 `awd.call` 使用两个新增方法，无需升级 SDK 副本：
+
+- `chat.open {conversationId}`：需 `ai` 权限；只打开当前项目、当前用户历史列表中的原生会话。查询途中切换项目或账户会丢弃结果。
+- `ui.openUrl {url}`：需 `network` 权限；只接受不含用户名/密码的 HTTPS 地址，交由宿主浏览器入口打开。
+
+### 18.1 DPIA 工作台参考实现
+
+`official-plugins/dpia-workbench/` 包含独立 manifest、JAR、React 面板、受限 Node 适配器与上游 Python 工具。上游固定为 DSH DPIA Workbench `66c5e11c022277625072a50765793b257a6626a7`（0.3.11-beta.6，AGPL-3.0-only）；作者、模板属性和改动清单见该目录 `UPSTREAM.md`。保留上游事实溯源、冻结任务、补答/复评、追加版本及报告检查门槛。
+
+UI 的 `dpia_workbench_action` 和 Agent 的 `dpia_workbench_task` 按可信调用上下文分离：AI 不能经工具替用户确认事实或审批，任务必须绑定本案件原生会话、冻结 requestId 和当前执行阶段；读写限于本案件及只读 skill，不能执行任意脚本。取消可越过长渲染的项目锁。导出先写入当前项目再用 `ui.openFile` 打开，不依赖 sandbox 下载权限。
+
+运行依赖 Node.js、Python 文档库，PDF/页面渲染另需 LibreOffice；路径来自插件设置或系统安装。案件数据在后端用户目录按用户/项目隔离，禁用/卸载保留。模板核验只访问 EDPB 公开来源，业务材料经用户选择的宿主模型处理。GDPR/EU 方法不自动等同中国个人信息保护影响评估。
+
+本次源码和独立包交付未发布宿主 0.65.0，当前 0.64.1 必须拒载；市场签名发布与客户端升级需单独执行。安装装载、模型替身及报告测试的实际范围见插件 README，不将合成测试等同正式业务结论验收。
+
+## 19. AWD Plugin UI v3.0 视觉与交互规范（宋韵精工 · Neo-Oriental Editorial）
+
+为消除第三方与官方 Web 插件在字栈、间距、卡片质感、深浅色适配上的割裂感，`sdk/plugin-sdk/awd-plugin-sdk.js` 内置了 **AWD Plugin UI v3.0（宋韵精工）** 标准样式层（独立参考样式表位于 `sdk/plugin-sdk/awd-plugin-ui.css`）。插件引入同步 `<script src="awd-plugin-sdk.js"></script>` 后，SDK 会自动在 `<head>` 首部注入 `<style id="awd-plugin-ui-v3">`，并与宿主 `PluginPane.vue` 推送的 `--awd-*` 令牌实时联动。
+
+### 19.1 六项核心设计准则
+
+1. **零独立硬编码颜色（Zero-Hardcode Token Contract）**
+   - 插件所有表面、正文、边框、状态色与阴影必须引用宿主注入的 `--awd-*` 令牌（带宣纸浅色 fallback），严禁在业务 CSS 中写死 `#fff`、`#333` 或高饱和 Tailwind 色值，保证浅色「宣纸墨竹」与深色「徽墨夜览」一键无感切换。
+   - 新增宋韵精工建筑层次令牌：`--awd-surface-elevated`、`--awd-specular`、`--awd-shadow-island`、`--awd-shadow-card`、`--awd-shadow-btn`、`--awd-control-xs` (`24px`)、`--awd-control-sm` (`28px`)、`--awd-control-md` (`32px`)、`--awd-radius-lg` (`10px`)、`--awd-island-radius` (`10px`)、`--awd-island-gap` (`6px`)。
+2. **容器查询双态自适应（Container-Query Adaptive Layout）**
+   - 根节点使用 `.awd-plugin-stage`（内置 `container-type: inline-size; max-width: 1120px;`），主布局使用 `.awd-plugin-grid`。
+   - 当插件置于侧边栏或窄分屏（容器宽 `< 640px`）时自动单列流式排布；当插件在主工作区展开（容器宽 `>= 640px`）时自动切换为 `minmax(260px, 320px) minmax(0, 1fr)` 主从双栏布局。
+3. **宋韵刊头与二级分段导航（Editorial Header & Segmented Subnav）**
+   - 页面级标题统一使用 `.awd-plugin-header`（含 `.awd-eyebrow` 大写微章、`.awd-title` 思源宋体/宋体 `20px` 标题、`.awd-subtitle` 副标题及 `.awd-header-actions` 动作区）。
+   - 插件内部多视图切换统一使用 `.awd-subnav` + `.awd-subnav-item.is-active` 分段胶囊导航，禁止自绘与宿主工作区 `.tabs-bar` 视觉冲突的顶部页签栏。
+4. **统一控件高度契约（3-Tier Control Sizing）**
+   - 插件内所有交互控件严格对齐三档高度：紧凑芯片/小按钮 `.awd-btn-xs` (`24px`)、次要按钮 `.awd-btn-sm` (`28px`)、标准按钮/输入框 `.awd-btn` / `.awd-input` / `.awd-select` (`32px`)。
+5. **等宽数字与典籍级排版（Tabular Numerals & Editorial Hierarchy）**
+   - 凡涉及金额、股权比例、条款编号、耗时统计、文件大小（如 `.awd-kpi-value`、`.awd-badge`、表格数字列），一律开启 `font-variant-numeric: tabular-nums`。
+6. **长耗时任务安全进度反馈（Safe Progress Bar）**
+   - 超过 2 秒的文档抽取、批量核查或 AI 推理，必须通过 `awd.ui.progress(target, { title, detail, percent, safetyNote, cancelText, onCancel })` 或 `.awd-safe-progress` 展示当前阶段、进度百分比、可取消按钮及「本地底稿与已保存进度不受影响」的安全感知提示，严禁使用无反馈的全屏死锁遮罩。
+

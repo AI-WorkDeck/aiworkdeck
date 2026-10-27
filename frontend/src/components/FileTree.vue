@@ -1,7 +1,7 @@
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
-  <view class="file-tree" tabindex="0" @keydown="handleKeyDown" @mousedown="focusTree">
+  <view class="file-tree" tabindex="0" @keydown="handleKeyDown" @mousedown="focusTree" @click="focusTree">
 
     <!-- AI WorkDeck Style Modals System -->
     <!-- 删除确认（单个/批量、软删/硬删）走应用内对话框 AwdDialog（showDeleteConfirmDialog
@@ -80,19 +80,15 @@
             @tap="selectTempParent(null)"
           >
             <view class="tree-expand-icon-wrapper" @tap.stop="toggleFolderSelectorExpand('root')">
-              <image
-                class="tree-expand-icon-img"
-                :src="folderSelectorExpanded['root'] !== false ? '/static/down.png' : '/static/right.png'"
-                mode="aspectFit"
-              />
+              <svg class="tree-expand-svg" :class="{ 'is-open': folderSelectorExpanded['root'] !== false }" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M6 4l4 4-4 4" />
+              </svg>
             </view>
-            <image
-              :src="folderSelectorExpanded['root'] !== false ? '/static/folder-opened.png' : '/static/folder-closed.png'"
-              class="folder-icon-img"
-              :class="{ 'is-opened': folderSelectorExpanded['root'] !== false }"
-              style="margin-right: 8px;"
-              mode="aspectFit"
-            />
+            <view class="folder-icon-svg-wrap" :class="{ 'is-opened': folderSelectorExpanded['root'] !== false }" style="margin-right: 8px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              </svg>
+            </view>
             <text class="folder-name">{{ $t('fileTree.rootDirectory') }}</text>
           </view>
 
@@ -105,26 +101,27 @@
           >
             <view class="indent" :style="{ width: (folder.level * 20) + 'px' }"></view>
             <view class="tree-expand-icon-wrapper" @tap.stop="toggleFolderSelectorExpand(folder.id)">
-              <image
-                class="tree-expand-icon-img"
-                :src="folderSelectorExpanded[String(folder.id)] === true ? '/static/down.png' : '/static/right.png'"
-                mode="aspectFit"
-              />
+              <svg class="tree-expand-svg" :class="{ 'is-open': folderSelectorExpanded[String(folder.id)] === true }" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M6 4l4 4-4 4" />
+              </svg>
             </view>
-            <image
-              :src="folderSelectorExpanded[String(folder.id)] === true ? '/static/folder-opened.png' : '/static/folder-closed.png'"
-              class="folder-icon-img"
-              :class="{ 'is-opened': folderSelectorExpanded[String(folder.id)] === true }"
-              mode="aspectFit"
-            />
+            <view class="folder-icon-svg-wrap" :class="{ 'is-opened': folderSelectorExpanded[String(folder.id)] === true }">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              </svg>
+            </view>
             <view v-if="renamingId === folder.id" class="rename-input-wrapper dialog-rename" @tap.stop>
               <input
                 class="rename-input"
+                :confirm-hold="true"
+                :ignore-composition-event="false"
                 v-model="tempRenameValue"
                 :focus="true"
-                @confirm="commitRename"
+                @confirm="handleRenameConfirm"
                 @blur="commitRename"
-                @keydown.esc="renamingId = null"
+                @keydown.esc="!renameComposing && (renamingId = null)"
+                @compositionstart="renameComposing = true"
+                @compositionend="renameComposing = false"
               />
             </view>
             <text v-else class="folder-name">{{ folder.name }}</text>
@@ -137,6 +134,8 @@
         </view>
       </view>
     </view>
+
+    <ExplorerCreateMenu ref="createMenu" @select="onCreateMenuSelect" @close="createMenuOpen = false" />
 
     <!-- 右键上下文菜单 -->
     <view
@@ -202,6 +201,15 @@
           </view>
           <text class="context-menu-text">{{ $t('fileTree.manageTags') }}</text>
         </view>
+        <view v-if="contextMenu.targetItem && !isContextMulti() && !contextMenu.targetItem.isFolder && !contextMenu.targetItem.readOnly && viewMode !== 'recycle'" class="context-menu-item" @tap="handleFileClientAccess(contextMenu.targetItem)">
+          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <rect x="5" y="10" width="14" height="11" rx="2"/>
+              <path d="M8 10V6a4 4 0 0 1 8 0v4" stroke-linecap="round"/>
+            </svg>
+          </view>
+          <text class="context-menu-text">{{ $t('fileTree.clientAccessTitle') }}</text>
+        </view>
         <!-- 事项（dev-board#900）：「添加事项…」交给宿主开工作台唯一的 TaskDialog（预置关联这份文件）；
              这份文件有未完成事项时多一项「查看事项 (N)」，宿主打开 rail 日程面板并按文件过滤 -->
         <view v-if="contextMenu.targetItem && !isContextMulti() && !contextMenu.targetItem.isFolder" class="context-menu-item" @tap="$emit('add-task', contextMenu.targetItem); closeContextMenu()">
@@ -252,6 +260,26 @@
           </view>
           <text class="context-menu-text">{{ $t('fileTree.sendFile') }}</text>
         </view>
+        <view v-if="canConvertContextToPdf()" class="context-menu-item" @tap="handleContextConvertToPdf">
+          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-linecap="round" stroke-linejoin="round"/>
+              <polyline points="14 2 14 8 20 8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M9 15h6" stroke-linecap="round"/>
+            </svg>
+          </view>
+          <text class="context-menu-text">{{ $t('fileTree.convertToPdf') }}</text>
+        </view>
+        <view v-if="canMergeContextToPdf()" class="context-menu-item" @tap="handleContextMergeToPdf">
+          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-2" stroke-linecap="round" stroke-linejoin="round"/>
+              <rect x="4" y="2" width="12" height="16" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M8 10h4M10 8v4" stroke-linecap="round"/>
+            </svg>
+          </view>
+          <text class="context-menu-text">{{ $t('fileTree.mergeToPdf') }}</text>
+        </view>
         <view v-if="contextMenu.targetItem" class="context-menu-item" @tap="handleContextDuplicate">
           <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -273,9 +301,17 @@
       </view>
     </view>
 
+    <view v-if="isTagView" class="tag-view-summary" aria-live="polite">
+      <component :is="'button'" type="button" class="tag-view-back" @click.stop="setTagView(false)">
+        <text aria-hidden="true">‹</text> {{ $t('files.tagViewFolders') }}
+      </component>
+      <text>{{ $t('files.tagViewFileCount', { count: displayFiles.length }) }}</text>
+    </view>
+
     <view
       class="tree-content"
-      :class="{ 'external-drag-over': externalDragActive || stagingDragOver, 'view-mode-recycle': viewMode === 'recycle' }"
+      :class="{ 'external-drag-over': externalDragActive || stagingDragOver, 'view-mode-recycle': viewMode === 'recycle', 'view-mode-tags': isTagView, 'has-tag-sidebar': enableTagView && viewMode !== 'recycle' }"
+      @contextmenu.prevent="onBlankContextMenu"
       @mousedown="onMarqueeStart" @mousemove="onMarqueeMove" @mouseup="onMarqueeEnd" @tap="closeContextMenu"
       @dragenter="onTreeDragEnter" @dragover="onTreeDragOver" @dragleave="onTreeDragLeave" @drop="onTreeDrop"
     >
@@ -311,7 +347,7 @@
       </view>
       <view v-else-if="displayFiles.length === 0" class="tree-empty">
         <view class="empty-content">
-          <text>{{ $t('fileTree.noFiles') }}</text>
+          <text>{{ $t(isTagView ? 'files.tagViewNoFiles' : 'fileTree.noFiles') }}</text>
         </view>
         <!-- Root Drop Zone for empty folders -->
         <!-- #ifdef H5 -->
@@ -344,8 +380,10 @@
             }"
           :data-file-id="item.id"
           :draggable="viewMode !== 'recycle'"
+          @mouseenter="onItemPrimeDrag(item)"
+          @mousedown="onItemPrimeDrag(item)"
           @tap="handleItemClick(item, $event)"
-          @contextmenu.prevent="handleContextMenu(item, $event)"
+          @contextmenu.prevent.stop="handleContextMenu(item, $event)"
           @dragstart="handleDragStart($event, item, index)"
           @dragover.prevent="handleDragOver($event, index)"
           @drop="handleDrop($event, index)"
@@ -400,11 +438,15 @@
             <view v-if="renamingId === item.id" class="rename-input-wrapper" @tap.stop @mousedown.stop>
               <input
                 class="rename-input"
+                :confirm-hold="true"
+                :ignore-composition-event="false"
                 v-model="tempRenameValue"
-                @confirm="commitRename"
+                @confirm="handleRenameConfirm"
                 @blur="commitRename"
                 :focus="true"
                 @keydown.stop="handleRenameKeydown"
+                @compositionstart="renameComposing = true"
+                @compositionend="renameComposing = false"
               />
             </view>
             <text v-else class="tree-item-name">
@@ -413,6 +455,7 @@
                  {{ $t('fileTree.referencedCount', { count: refCounts[item.id] }) }}
                </text>
             </text>
+            <text v-if="isTagView && renamingId !== item.id" class="tag-file-location" :title="tagFileLocation(item)">{{ tagFileLocation(item) }}</text>
             <!-- 最近到期徽标（dev-board#900）：这份文件未完成事项里最早的那条 -->
             <text
               v-if="!item.isFolder && renamingId !== item.id && viewMode !== 'recycle' && fileDueIndex[item.id] && fileDueIndex[item.id].text"
@@ -474,7 +517,7 @@
           }"
           :data-file-id="item.id"
           @tap="handleItemClick(item, $event)"
-          @contextmenu.prevent="handleContextMenu(item, $event)"
+          @contextmenu.prevent.stop="handleContextMenu(item, $event)"
           @touchstart="handleTouchStart($event, index)"
           @touchmove="handleTouchMove($event, index)"
           @touchend="handleTouchEnd($event, index)"
@@ -528,11 +571,15 @@
             <view v-if="renamingId === item.id" class="rename-input-wrapper" @tap.stop @mousedown.stop>
               <input
                 class="rename-input"
+                :confirm-hold="true"
+                :ignore-composition-event="false"
                 v-model="tempRenameValue"
-                @confirm="commitRename"
+                @confirm="handleRenameConfirm"
                 @blur="commitRename"
                 :focus="true"
                 @keydown.stop="handleRenameKeydown"
+                @compositionstart="renameComposing = true"
+                @compositionend="renameComposing = false"
               />
             </view>
             <text v-else class="tree-item-name">
@@ -541,6 +588,7 @@
                  {{ $t('fileTree.referencedCount', { count: refCounts[item.id] }) }}
                </text>
             </text>
+            <text v-if="isTagView && renamingId !== item.id" class="tag-file-location" :title="tagFileLocation(item)">{{ tagFileLocation(item) }}</text>
             <!-- 最近到期徽标（dev-board#900）：这份文件未完成事项里最早的那条 -->
             <text
               v-if="!item.isFolder && renamingId !== item.id && viewMode !== 'recycle' && fileDueIndex[item.id] && fileDueIndex[item.id].text"
@@ -604,6 +652,23 @@
         <!-- #endif -->
       </view> <!-- Close tree-list -->
 
+      <TagFilter
+        :key="projectId"
+        v-if="enableTagView && viewMode !== 'recycle'"
+        class="file-tag-sidebar"
+        @mousedown.stop
+        @contextmenu.stop
+        sidebar
+        :browsing="isTagView"
+        :tags="projectTags"
+        :model-value="selectedTagIds"
+        :counts="tagFileCounts"
+        :loading="tagsLoading"
+        :error="tagsError"
+        @update:model-value="setTagFilter"
+        @browse-all="showAllTaggedFiles"
+        @retry="refreshProjectTags"
+      />
     </view> <!-- Close tree-content -->
 
     <!-- 文档对比按钮（选中 2 个文档时显示） -->
@@ -622,11 +687,11 @@
     <!-- 底部工具栏 -->
     <view v-if="showFooterActions" class="tree-footer">
        <view class="footer-row">
-        <button class="btn-new-folder" @tap="showCreateFolderDialog">
+        <button class="btn-new-folder" @tap="handleCreateFolder()">
           {{ $t('fileTree.newFolder') }}
         </button>
-        <button class="btn-new-word" @tap="handleCreateWord">
-          {{ $t('fileTree.newWord') }}
+        <button class="btn-new-word" data-create-trigger @click.stop="openCreateMenu">
+          {{ $t('fileTree.newItem') }}
         </button>
       </view>
     </view>
@@ -676,18 +741,25 @@
 </template>
 
 <script>
-import { getProjectFiles, createFolder, createFile, renameFile, deleteFile, deleteFilePerm, getFilePermDiskPaths, restoreFile as restoreFileApi, getRecycleBinFiles, moveFile, batchDeleteFiles, batchMoveFiles, batchCopyFiles, getContributedTemplates, createFileFromContributedTemplate, importLocalFile } from '@/services/api.js'
-import { host } from '@/services/host.js'
+import { subscribeLocalProjectFileChanges, getProjectFiles, createFolder, createFile, renameFile, deleteFile, deleteFilePerm, getFilePermDiskPaths, restoreFile as restoreFileApi, getRecycleBinFiles, moveFile, batchDeleteFiles, batchMoveFiles, batchCopyFiles, getContributedTemplates, createFileFromContributedTemplate, importLocalFile, getProjectFileAccess, updateProjectFileAccess, convertFileToPdf, mergeFilesToPdf, getFileLocalPath, getApiBaseUrl } from '@/services/api.js'
+import { getAuthHeaders } from '@/utils/auth.js'
+import { host, isDesktopHost } from '@/services/host.js'
 import { showDialog } from '@/utils/dialog.js'
 import { findTopmostDeletedAncestor, summarizeDeleteResults, collapseToTopmostSelected, computeDisplayFiles } from '@/utils/fileTreeRecycle.js'
 import { groupByParent, buildTreeFromGroups } from '@/utils/fileTreeBuild.js'
 import { evidenceRefCounts } from '@/services/api.js'
 import { createRefCountsFetcher } from '@/utils/fileTreeRefCounts.js'
 import { warmDragImage, applyDragImage } from '@/utils/dragImage.js'
-import { nativeDataTransfer, isExternalFileDrag, claimExternalDrop } from '@/utils/fileTreeExternalDrop.js'
+import { readArchiveEntryDrag, isArchiveEntryDrag } from '@/utils/archiveEntryDrag.js'
+import { importArchiveEntry } from '@/services/api.js'
+import { nativeEvent, nativeDataTransfer, isExternalFileDrag, compatibleDropEffect, claimExternalDrop, captureDroppedFiles, importDroppedFile } from '@/utils/fileTreeExternalDrop.js'
+import { prefetchLocalFilePath, startExternalFileDrag, clearLocalPathCache } from '@/utils/fileLocalDrag.js'
 import { isTranscribableMedia as isTranscribableMediaItem } from '@/utils/audioAttachment.js'
+import { canConvertItemToPdf, canMergeItemsToPdf, pdfConversionRecoveryOptions } from '@/utils/fileTreePdfActions.js'
 import FileTypeIcon from '@/components/FileTypeIcon.vue'
+import ExplorerCreateMenu from '@/components/ExplorerCreateMenu.vue'
 import TagChip from '@/components/TagChip.vue'
+import TagFilter from '@/components/TagFilter.vue'
 import TagSelector from '@/components/TagSelector.vue'
 import TagManager from '@/components/TagManager.vue'
 import { taskStore, loadProjectTasks } from '@/utils/taskStore.js'
@@ -721,8 +793,10 @@ function parentIdsEqual(a, b) {
 export default {
   name: 'FileTree',
   components: {
+    ExplorerCreateMenu,
     FileTypeIcon,
     TagChip,
+    TagFilter,
     TagSelector,
     TagManager
   },
@@ -730,6 +804,12 @@ export default {
     projectId: {
       type: [Number, String],
       required: true
+    },
+    enableTagView: { type: Boolean, default: false },
+    // 仅已确认的本机文件夹项目订阅磁盘变化；托管项目和文件选择器默认不订阅。
+    watchLocalFiles: {
+      type: Boolean,
+      default: false
     },
     parentId: {
       type: Number,
@@ -758,10 +838,15 @@ export default {
   data() {
     return {
       files: [],
+      fileLoadRequest: 0,
+      fileAccessRequest: 0,
+      fileAccessBusy: false,
       loading: false,
       selectedFileId: null,
       showRenameDialog: false,
-      newFolderName: '',
+      creatingItem: false,
+      createMenuOpen: false,
+      createMenuParentId: null,
       renameValue: '',
       renamingFile: null,
       // 拖拽相关
@@ -772,6 +857,8 @@ export default {
       dragOverIndex: -1, // H5拖拽悬停索引
       draggedIndex: -1, // H5拖拽源索引（仅用于"是不是原地放下"的快速判断，实际
                          // 移动谁必须靠下面的 draggedFileId 重新按 id 查，见 handleDrop）
+      dragSequence: 0,
+      draggedFileIds: [], // Snapshot the full selection for this drag, including checkbox selection.
       draggedFileId: null, // H5拖拽源文件 id：dragstart 时记下，drop 时按 id（而不是
                             // 下标）在（可能已经因为后台重载而重排过的）displayFiles
                             // 里重新定位，防止把并发上传触发的 loadFiles() 期间
@@ -824,6 +911,8 @@ export default {
       showRecycleBin: false,
       viewMode: 'files', // 'files' | 'recycle'
       renamingId: null,
+      renameComposing: false,
+      keyboardDeletePending: false,
       tempRenameValue: '',
 
       // Sort
@@ -860,6 +949,12 @@ export default {
       showTagManager: false,
       showTagEditDialog: false,
       projectTags: [],
+      tagView: false,
+      tagFolderScrollTop: 0,
+      selectedTagIds: [],
+      tagsLoading: false,
+      tagsError: '',
+      tagsRequest: 0,
       targetFileForTags: null,
       editingFileId: null // ID of file currently editing tags for
     }
@@ -934,12 +1029,30 @@ export default {
       }
       return map
     },
+    isTagView() {
+      return this.enableTagView && this.tagView && this.viewMode !== 'recycle'
+    },
+    taggedFiles() {
+      // Traverse collapsed folders without changing the user's folder expansion state.
+      const files = this.buildTreeView(this.allFiles, this.parentId, true)
+      return computeDisplayFiles({ files, viewMode: 'files', recycleBin: this.recycleBin, hiddenFileIds: this.hiddenFileIds })
+        .filter(file => !file.isFolder && file.tags?.length)
+    },
+    tagFileCounts() {
+      const counts = {}
+      for (const file of this.taggedFiles) {
+        for (const id of new Set(file.tags.map(tag => String(tag.id)))) counts[id] = (counts[id] || 0) + 1
+      }
+      return counts
+    },
     displayFiles() {
       // 回收站视图不做系统文件夹/暂存区过滤：标题按 recycleBin.length 计数，藏掉的行
       // 会变成看不见也删不掉的幽灵计数（dev-board#1019），见 utils/fileTreeRecycle.js
       return computeDisplayFiles({
         viewMode: this.viewMode,
-        files: this.files,
+        files: this.isTagView
+          ? this.taggedFiles.filter(file => this.selectedTagIds.every(id => file.tags.some(tag => String(tag.id) === String(id))))
+          : this.files,
         recycleBin: this.recycleBin,
         hiddenFileIds: this.hiddenFileIds
       })
@@ -952,13 +1065,13 @@ export default {
       const list = this.displayFiles
       const totalByParent = new Map()
       for (const item of list) {
-        const key = this.windowParentKey(item.parentId)
+        const key = this.windowParentKey(this.isTagView ? null : item.parentId)
         totalByParent.set(key, (totalByParent.get(key) || 0) + 1)
       }
       const emittedByParent = new Map()
       const result = []
       for (const item of list) {
-        const key = this.windowParentKey(item.parentId)
+        const key = this.windowParentKey(this.isTagView ? null : item.parentId)
         const emitted = emittedByParent.get(key) || 0
         const limit = this.revealCounts[key] || WINDOW_INITIAL
         if (emitted >= limit) {
@@ -966,7 +1079,7 @@ export default {
             result.push({
               __loadMore: true,
               id: `__loadmore_${key}`,
-              parentId: item.parentId,
+              parentId: this.isTagView ? null : item.parentId,
               remaining: totalByParent.get(key) - limit
             })
           }
@@ -1060,13 +1173,51 @@ export default {
     }
   },
   watch: {
+    displayFiles(files) {
+      if (!this.isTagView) return
+      const visible = new Set(files.map(file => String(file.id)))
+      if (this.contextMenu.visible && (
+        !visible.has(String(this.contextMenu.targetItem?.id)) ||
+        this.contextMenu.selectionIds?.some(id => !visible.has(String(id)))
+      )) this.closeContextMenu()
+      const checked = Object.fromEntries(Object.entries(this.checkedMap).filter(([id]) => visible.has(id)))
+      if (Object.keys(checked).length !== this.checkedIds.length) {
+        this.checkedMap = checked
+        this.$emit('checked-change', this.checkedIds)
+      }
+      this.multiSelectedIds = this.multiSelectedIds.filter(id => visible.has(String(id)))
+      if (this.selectedFileId != null && !visible.has(String(this.selectedFileId))) {
+        this.selectedFileId = null
+        this.activeFolderId = null
+      }
+    },
+    showTagManager(open, previous) {
+      if (!open && previous) this.loadFiles()
+    },
+    watchLocalFiles() {
+      this.subscribeLocalFileChanges()
+    },
     projectId: {
       immediate: true,
       handler(newVal, oldVal) {
+        this.subscribeLocalFileChanges()
+        this.fileAccessRequest++
+        this.fileAccessBusy = false
         const key = newVal != null ? String(newVal) : ''
         const prevKey = oldVal != null ? String(oldVal) : ''
         if (key !== prevKey) {
+          this.$refs?.createMenu?.close()
           this.refCounts = {}
+          this.tagView = false
+          this.tagFolderScrollTop = 0
+          this.selectedTagIds = []
+          this.projectTags = []
+          this.tagsError = ''
+          this.tagsRequest++
+          this.tagsLoading = false
+          this.showTagEditDialog = false
+          this.showTagManager = false
+          this.targetFileForTags = null
           const cached = key ? projectFileTreeSnapshotCache.get(key) : null
           if (cached && Array.isArray(cached.allFiles) && cached.allFiles.length > 0) {
             this.allFiles = cached.allFiles
@@ -1089,6 +1240,7 @@ export default {
     },
     parentId: {
       handler() {
+        this.$refs?.createMenu?.close()
         this.loadFiles()
       }
     },
@@ -1107,13 +1259,16 @@ export default {
     }
   },
   mounted() {
+    this._fileChangesMounted = true
+    this.subscribeLocalFileChanges()
     // 预加载拖拽 ghost 小徽标（dragstart 现场加载来不及，见 utils/dragImage.js）
     warmDragImage()
+    // uni <view> drops native dblclick fields; delegate from the actual DOM root.
+    this.$el?.addEventListener?.('dblclick', this.onFileDoubleClick)
     // selectionMode 关闭时，确保不残留选中态
     if (!this.selectionMode) {
       this.clearChecked()
     }
-    this.refreshProjectTags() // Tag Management
 
     // Listen for global drag events to show/hide root drop zone
     // 具名 handler + Vue3 的 beforeUnmount（beforeDestroy 在 Vue3 不触发，导致监听泄漏）；
@@ -1121,21 +1276,72 @@ export default {
     // 暂存区的 dragstart 只经 uni 的 file-drag-start 通知本树：$emit 是同步的，此刻
     // window.event 就是那次原生 dragstart，起点从它上面取。
     this._onDragStart = () => { this.isAnyDragging = true; this.recordDragStartPoint() }
-    this._onDragEnd = () => { this.isAnyDragging = false; this.stagingDragOver = false; this.dragStartPoint = null }
+    this._onDragEnd = () => { this.isAnyDragging = false; this.stagingDragOver = false; this.rootDropActive = false; this.externalDragActive = false; this.dragStartPoint = null }
     uni.$on('file-drag-start', this._onDragStart)
     uni.$on('file-drag-end', this._onDragEnd)
+    this._onArchiveDragEnd = () => this.resetExternalDrag()
+    uni.$on('archive-drag-end', this._onArchiveDragEnd)
     // 「管理标签」「标签管理」两个内联弹窗的 Esc（v0.49.0 BUG-74）：它们是 awd-dialog-mask，
     // 不走 AwdDialog，只认鼠标；捕获段挂 window，与 TaskDialog 的 attachKeys 同法。
     this._onTagDialogKeydown = (e) => this.onTagDialogKeydown(e)
     if (typeof window !== 'undefined') window.addEventListener('keydown', this._onTagDialogKeydown, true)
   },
   beforeUnmount() {
+    this._fileChangesMounted = false
+    this.tagsRequest++
+    this._fileChangesStop?.()
+    this._fileChangesStop = null
+    this.fileLoadRequest++
+    this.fileAccessRequest++
+    this.$el?.removeEventListener?.('dblclick', this.onFileDoubleClick)
     if (this._marqueeRaf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this._marqueeRaf)
     uni.$off('file-drag-start', this._onDragStart)
     uni.$off('file-drag-end', this._onDragEnd)
+    uni.$off('archive-drag-end', this._onArchiveDragEnd)
     if (typeof window !== 'undefined') window.removeEventListener('keydown', this._onTagDialogKeydown, true)
   },
   methods: {
+    subscribeLocalFileChanges() {
+      this._fileChangesStop?.()
+      this._fileChangesStop = null
+      if (!this._fileChangesMounted || !this.watchLocalFiles || !this.projectId || !isDesktopHost()) return
+      const projectId = this.projectId
+      this._fileChangesStop = subscribeLocalProjectFileChanges(projectId, () => {
+        if (this._fileChangesMounted && this.watchLocalFiles && String(this.projectId) === String(projectId)) return this.loadFiles()
+      })
+    },
+    async handleFileClientAccess(item) {
+      this.closeContextMenu()
+      if (!item || item.isFolder || item.readOnly || this.viewMode === 'recycle' || this.fileAccessBusy) return
+      const projectId = this.projectId
+      const requestId = ++this.fileAccessRequest
+      const current = () => requestId === this.fileAccessRequest && String(projectId) === String(this.projectId)
+      this.fileAccessBusy = true
+      try {
+        const access = await getProjectFileAccess(projectId, item.id)
+        if (!current()) return
+        const visible = access.clientVisible === true
+        const canManage = access.canManageAccess === true
+        const explanation = this.$t('fileTree.clientAccessExplain')
+        const result = await showDialog({
+          title: this.$t('fileTree.clientAccessTitle'),
+          content: `${item.name}\n${this.$t('fileTree.clientAccessCurrent', { state: visible ? this.$t('fileTree.clientAccessVisible') : this.$t('fileTree.clientAccessInternal') })}\n${explanation}\n${canManage ? (visible ? this.$t('fileTree.clientAccessRevokeNote') : this.$t('fileTree.clientAccessGrantNote')) : this.$t('fileTree.clientAccessReadOnly')}`,
+          showCancel: canManage,
+          confirmText: canManage ? (visible ? this.$t('fileTree.clientAccessRevoke') : this.$t('fileTree.clientAccessGrant')) : this.$t('fileTree.clientAccessOk'),
+          cancelText: this.$t('fileTree.cancel'),
+        })
+        if (!current() || !canManage || !result?.confirm) return
+        const saved = await updateProjectFileAccess(projectId, item.id, !visible)
+        if (!current()) return
+        item.clientVisible = saved.clientVisible === true
+        uni.showToast({ title: item.clientVisible ? this.$t('fileTree.clientAccessGranted') : this.$t('fileTree.clientAccessRevoked'), icon: 'none' })
+        await this.loadFiles()
+      } catch (error) {
+        if (current()) this.showErrorModal(error.message || this.$t('fileTree.clientAccessFailed'), this.$t('fileTree.clientAccessTitle'))
+      } finally {
+        if (current()) this.fileAccessBusy = false
+      }
+    },
     // BUG-40：Plan 模式落盘的根目录物理名是英文 "AI Assistant Files"（后端契约，
     // ProjectOverviewService.AI_ARTIFACT_FOLDER_NAME，改物理名要动落盘路径/统计条剔除
     // 逻辑等多处后端代码，风险不小）。这里只在文件树的展示层加一个中文别名，
@@ -1152,13 +1358,26 @@ export default {
       return item ? item.name : ''
     },
     // 让文件树容器可聚焦，接收键盘事件（H5）
-    focusTree() {
+    // uni-h5 keeps key/code but drops DOM targets and keyboard flags. Resolve the
+    // currently dispatching event by type; an unrelated window.event is never reused.
+    treeInputEvent(event, type) {
+      if (!event) return event
+      const native = typeof window !== 'undefined' ? window.event : null
+      return native?.type === type ? native : event
+    },
+    isTreeControlTarget(target) {
+      return !!target?.closest?.('input, textarea, select, button, a, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="button"], [role="dialog"], .awd-dialog-mask, .dialog-overlay, .context-menu, .tree-footer')
+    },
+    focusTree(event) {
+      if (this.createMenuOpen) return
+      // A row's default mousedown can move focus back to body after our handler.
+      // Refocus on click too, without cancelling mousedown/native drag initiation.
+      const e = this.treeInputEvent(event, event?.type === 'click' ? 'click' : 'mousedown')
+      if (e && this.isTreeControlTarget(e.target)) return
       try {
-        const el = typeof document !== 'undefined' ? document.querySelector('.file-tree') : null
-        if (el && el.focus) el.focus()
-      } catch (e) {
-        // ignore
-      }
+        const el = this.$el
+        if (el?.focus) el.focus({ preventScroll: true })
+      } catch (e) { /* A native-only surface may have no DOM. */ }
     },
     toggleSortMenu() {
       this.showSortMenu = !this.showSortMenu
@@ -1182,34 +1401,28 @@ export default {
         revealCounts: { ...(this.revealCounts || {}) }
       })
     },
-    async loadFiles() {
+    loadFiles() {
+      const pending = this.loadFilesRequest()
+      this._fileLoadPromise = pending
+      return pending
+    },
+    async loadFilesRequest() {
+      const requestId = ++this.fileLoadRequest
+      const current = () => requestId === this.fileLoadRequest
       if (!this.projectId) {
         console.warn('FileTree: projectId 未设置，无法加载文件列表')
         return
       }
-      // 合并同一组件并发触发的重复 loadFiles（如 focus + SSE 同时到达）：
-      // 在途请求完成前不重复打接口，若有新请求排入则结束后静默补拉一次。
-      if (this._loadFilesPromise) {
-        this._loadFilesQueued = true
-        return this._loadFilesPromise
-      }
-      this._loadFilesPromise = this._doLoadFiles().finally(() => {
-        this._loadFilesPromise = null
-        if (this._loadFilesQueued) {
-          this._loadFilesQueued = false
-          this.loadFiles()
-        }
-      })
-      return this._loadFilesPromise
-    },
-    async _doLoadFiles() {
       // 仅当当前还没有任何可展示条目（冷启动首屏且无内存快照）时才置 loading=true，
       // 已经有目录树展示时（如从别的窗口/页面切回触发 focus 刷新、后台 SSE 刷新）保持既有树不闪烁，
       // 待新数据返回后原地无感替换（dev-board#1427）。
-      const hasVisibleItems = this.displayFiles.length > 0
-      if (!hasVisibleItems) {
+      const visibleCount = Array.isArray(this.displayFiles)
+        ? this.displayFiles.length
+        : ((this.files && this.files.length) || (this.allFiles && this.allFiles.length) || 0)
+      if (visibleCount === 0) {
         this.loading = true
       }
+      clearLocalPathCache()
       try {
         // 确保 projectId 是数字类型
         const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
@@ -1218,34 +1431,46 @@ export default {
         }
         if (this.viewMode === 'recycle') {
            this.files = [] // Clear existing
-           this.recycleBin = await getRecycleBinFiles(projectId)
+           const recycleBin = await getRecycleBinFiles(projectId)
+           if (!current()) return
+           this.recycleBin = recycleBin
            // Recycle mode usually displays `recycleBin` data, not `files`.
            // Ensure the template uses `recycleBin`.
         } else if (this.showTree) {
           // 加载完整文件树
-          const fetched = await getProjectFiles(projectId, null, true)
-
+          const allFiles = await getProjectFiles(projectId, null, true)
+          if (!current()) return
           // 过滤掉系统文件夹（在 allFiles 层面过滤，确保所有地方都不会显示）
           const hiddenNames = new Set(['.stagezone', '__staging_area__'])
-          this.allFiles = (fetched || []).filter(f => !hiddenNames.has(f.name))
+          this.allFiles = (allFiles || []).filter(f => !hiddenNames.has(f.name))
 
           this.files = this.buildTreeView(this.allFiles, this.parentId)
-          this.saveSnapshotToCache()
+          if (typeof this.saveSnapshotToCache === 'function') this.saveSnapshotToCache()
         } else {
           // 只加载当前文件夹下的文件
           let files = await getProjectFiles(projectId, this.parentId)
+          if (!current()) return
 
           // 过滤掉系统文件夹
           const hiddenNames = new Set(['.stagezone', '__staging_area__'])
           this.files = (files || []).filter(f => !hiddenNames.has(f.name))
-          this.saveSnapshotToCache()
+          if (typeof this.saveSnapshotToCache === 'function') this.saveSnapshotToCache()
         }
+        if (this.viewMode !== 'recycle') {
+          if (this.targetFileForTags) {
+            this.targetFileForTags = this.allFiles.find(file => String(file.id) === String(this.targetFileForTags.id)) || null
+            if (!this.targetFileForTags) this.showTagEditDialog = false
+          }
+          this.refreshProjectTags()
+        }
+        clearLocalPathCache()
         this.scheduleRefCountsFetch({ reload: true })
         // 插件事件通道（规范 v2.7）：文件清单刷新的单一汇聚点——SSE refresh_files、
         // 窗口 focus 兜底、用户增删改、目录/项目切换全部流经这里；PluginPane 按订阅转发
         uni.$emit('awd:files-changed', { projectId })
         console.log('加载文件列表成功:', this.files)
       } catch (error) {
+        if (!current()) return
         // 完整打印错误信息，包括堆栈、响应数据等
         console.error('加载文件列表失败:', error)
         console.error('错误详情:', {
@@ -1264,7 +1489,7 @@ export default {
           duration: 3000
         })
       } finally {
-        this.loading = false
+        if (current()) this.loading = false
       }
     },
     // Old handleItemClick removed
@@ -1286,77 +1511,77 @@ export default {
       }
       return this.parentId
     },
-    // 命名框走应用内对话框 AwdDialog（utils/dialog.js 的 showDialog）：它挂在 <body> 下、
-    // 不在 .file-tree 根节点内，方向键不会被本组件的 handleKeyDown 抢去折叠文件夹/改选中项
-    // （选中项就是新建落点）；Esc 取消、Enter 确认、打开时全选输入框由 AwdDialog 负责。
-    // 以前这里是内联的 awd-dialog-mask，上述键盘行为一样都没有（BUG-27 复核）。
-    async showCreateFolderDialog(initial = '') {
-      const r = await showDialog({
-        title: this.$t('fileTree.newFolder'),
-        editable: true,
-        content: initial,
-        placeholderText: this.$t('fileTree.folderNamePlaceholder'),
-      })
-      if (!r || !r.confirm) return
-      this.newFolderName = r.content || ''
-      // 名字不合法：提示后带着用户刚填的内容重开，让他接着改
-      if ((await this.handleCreateFolder()) === false) {
-        return this.showCreateFolderDialog(this.newFolderName)
-      }
+    openCreateMenu(event) {
+      if (this.viewMode === 'recycle' || this.creatingItem) return
+      const e = nativeEvent(event) || event
+      const trigger = e?.target?.closest?.('[data-create-trigger]') || event?.currentTarget
+      const rect = trigger?.getBoundingClientRect?.()
+      this.closeContextMenu()
+      this.createMenuParentId = this.createTargetParentId()
+      this.createMenuOpen = true
+      this.$refs.createMenu.open({ x: rect?.left ?? e?.clientX ?? 0, y: rect?.bottom ?? e?.clientY ?? 0, trigger })
     },
-    async handleCreateFolder() {
-      if (!this.newFolderName.trim()) {
-        uni.showToast({
-          title: this.$t('fileTree.folderNamePlaceholder'),
-          icon: 'none'
-        })
-        return false
+    onBlankContextMenu(event) {
+      const e = nativeEvent(event) || event
+      // Only the blank area owns this menu; file rows retain their existing actions.
+      if (this.viewMode === 'recycle' || e?.target?.closest?.('.tree-item, .tree-toolbar, button, input')) return
+      e?.preventDefault?.()
+      e?.stopPropagation?.()
+      this.closeContextMenu()
+      this.createMenuParentId = this.parentId
+      this.createMenuOpen = true
+      this.$refs.createMenu.open({ x: e?.clientX ?? 0, y: e?.clientY ?? 0, mode: 'context', trigger: this.$el })
+    },
+    onCreateMenuSelect(kind) {
+      const parentId = this.createMenuParentId
+      if (kind === 'folder') return this.handleCreateFolder(parentId)
+      if (kind === 'recording') { this.$emit('create-recording'); return }
+      if (kind === 'docx') return this.handleCreateWord(parentId)
+      if (kind === 'pptx' || kind === 'xlsx') return this.openCreateFileDialog(undefined, kind, parentId)
+    },
+    uniqueCreateName(base, extension, parentId) {
+      const names = new Set([...(this.allFiles || []), ...(this.files || [])].filter(f => f && parentIdsEqual(f.parentId || null, parentId || null)).map(f => f.name.toLocaleLowerCase()))
+      let name = base + extension
+      let number = extension ? 1 : 2
+      while (names.has(name.toLocaleLowerCase())) {
+        name = extension ? `${base} (${number++})${extension}` : `${base} ${number++}`
       }
-
-      // 检查是否使用了系统保留名称
-      const reservedNames = ['.stagezone', '__staging_area__']
-      if (reservedNames.includes(this.newFolderName.trim())) {
-        uni.showToast({
-          title: this.$t('fileTree.reservedNameNotAllowed'),
-          icon: 'none'
-        })
-        return false
-      }
-
-      if (!this.projectId) {
-        uni.showToast({
-          title: this.$t('fileTree.projectIdMissingCreateFolder'),
-          icon: 'none'
-        })
-        return
-      }
-
+      return name
+    },
+    async handleCreateFolder(parentId = this.createTargetParentId()) {
+      if (this.creatingItem || !this.projectId || this.viewMode === 'recycle') return
+      this.creatingItem = true
+      const projectId = Number(this.projectId)
       try {
-        // 确保 projectId 是数字类型
-        const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
-        if (isNaN(projectId)) {
-          throw new Error(this.$t('fileTree.projectIdInvalid'))
+        const name = this.uniqueCreateName('Untitled Folder', '', parentId)
+        const created = await createFolder(projectId, parentId, name)
+        if (Number(this.projectId) !== projectId) return
+        if (parentId != null && this.showTree) this.expandedFolders.add(parentId)
+        let refresh = this.loadFiles()
+        for (;;) {
+          await refresh
+          // 刷新广播下一帧同步标签选中态；若通知又发起刷新，继续等当前请求。
+          await this.$nextTick()
+          if (Number(this.projectId) !== projectId) return
+          if (!this._fileLoadPromise || refresh === this._fileLoadPromise) break
+          refresh = this._fileLoadPromise
         }
-        const parentId = this.createTargetParentId()
-        await createFolder(projectId, parentId, this.newFolderName.trim())
-        this.newFolderName = ''
-        await this.loadFiles()
-        uni.showToast({
-          title: this.$t('fileTree.createSuccess'),
-          icon: 'success'
-        })
+        if (this.isTagView) this.setTagView(false)
+        const createdId = created.id || created.data?.id
+        if (this.revealFile(createdId)) {
+          this.activeFolderId = this.selectedFileId
+          uni.showToast({ title: this.$t('fileTree.createSuccess'), icon: 'success' })
+        }
       } catch (error) {
-        console.error('创建文件夹失败:', error)
-        uni.showToast({
-          title: error.message || this.$t('fileTree.createFailed'),
-          icon: 'none'
-        })
+        uni.showToast({ title: error.message || this.$t('fileTree.createFailed'), icon: 'none' })
+      } finally {
+        this.creatingItem = false
       }
     },
     // 「新建 Word」入口（规范 v2.9 P4）：装了带模板的插件时先给选择，「空白文档」永远第一项；
-    // 没有贡献模板/清单拉取失败则与老行为逐字一致（直接建空白，只是现在会先弹命名对话框——
-    // BUG-27：此前静默用英文默认名 newdocument.docx，与「新建文件夹」的命名体验不一致）。
-    async handleCreateWord() {
+    // 没有贡献模板或清单拉取失败时，直接进入空白文档命名框。
+    async handleCreateWord(targetParentId = this.createTargetParentId()) {
+      const projectId = this.projectId
       let templates = []
       try {
         const res = await getContributedTemplates()
@@ -1365,22 +1590,24 @@ export default {
       } catch (e) {
         templates = []
       }
+      if (this.projectId !== projectId) return
       if (!templates.length) {
-        return this.openCreateFileDialog()
+        return this.openCreateFileDialog(undefined, 'docx', targetParentId)
       }
       // actionsheet 项数有限：只列前 5 份，更多模板走 AI 对话（list_contributed_templates）
       const shown = templates.slice(0, 5)
       uni.showActionSheet({
         itemList: [this.$t('fileTree.blankDocOption'), ...shown.map(t => t.name || t.id)],
         success: async (r) => {
+          if (this.projectId !== projectId) return
           if (r.tapIndex === 0) {
-            this.openCreateFileDialog()
+            this.openCreateFileDialog(undefined, 'docx', targetParentId)
             return
           }
           const t = shown[r.tapIndex - 1]
           try {
             const res2 = await createFileFromContributedTemplate(
-              t.pluginId, t.id, Number(this.projectId), this.createTargetParentId() || null, null)
+              t.pluginId, t.id, Number(projectId), targetParentId || null, null)
             const body2 = res2 && res2.code !== undefined ? res2 : (res2 && res2.data) || {}
             if (body2.code !== 0) {
               throw new Error(body2.message || this.$t('fileTree.templateCreateFailed'))
@@ -1397,26 +1624,30 @@ export default {
       })
     },
 
-    // 「新建文件」命名对话框（BUG-27）：与「新建文件夹」同一个 AwdDialog（键盘行为见
-    // showCreateFolderDialog 的注释），默认填好本地化默认名（打开即全选，直接打字就是改名），
-    // Esc/取消不创建任何文件；确认后走 createBlankWord(name) 落地。
-    async openCreateFileDialog(initial) {
+    // Keep document naming in AwdDialog; folders are created directly.
+    async openCreateFileDialog(initial, type = 'docx', targetParentId = this.createTargetParentId()) {
+      const projectId = this.projectId
+      const defaultNameKey = type === 'pptx' ? 'fileTree.defaultPresentationName' : type === 'xlsx' ? 'fileTree.defaultSpreadsheetName' : 'fileTree.defaultDocumentName'
       const r = await showDialog({
         title: this.$t('fileTree.newFileDialogTitle'),
         editable: true,
-        content: initial === undefined ? this.$t('fileTree.defaultDocumentName') : initial,
+        content: initial === undefined ? this.$t(defaultNameKey) : initial,
         placeholderText: this.$t('fileTree.fileNamePlaceholder'),
       })
-      if (!r || !r.confirm) return
+      if (!r || !r.confirm || this.projectId !== projectId) return
       const name = (r.content || '').trim()
       if (!name) {
         uni.showToast({ title: this.$t('fileTree.fileNamePlaceholder'), icon: 'none' })
-        return this.openCreateFileDialog('')
+        return this.openCreateFileDialog('', type, targetParentId)
       }
-      return this.createBlankWord(name)
+      return this.createBlankOffice(type, name, targetParentId)
     },
 
-    async createBlankWord(desiredName) {
+    createBlankWord(desiredName) {
+      return this.createBlankOffice('docx', desiredName)
+    },
+    async createBlankOffice(type, desiredName, targetParentId = this.createTargetParentId()) {
+      if (!['docx', 'pptx', 'xlsx'].includes(type) || this.creatingItem) return
       if (!this.projectId) {
         uni.showToast({
           title: this.$t('fileTree.projectIdMissingCreateFile'),
@@ -1432,40 +1663,25 @@ export default {
           throw new Error(this.$t('fileTree.projectIdInvalid'))
         }
 
-        // Auto Rename Logic: Check displayFiles for collisions
-        const ext = '.docx'
+        const ext = '.' + type
         // desiredName 来自命名对话框，用户可能已经带了 .docx 后缀，去重避免出现 "xx.docx.docx"
         let baseName = (desiredName || this.$t('fileTree.defaultDocumentName')).trim()
         if (baseName.toLowerCase().endsWith(ext)) {
           baseName = baseName.slice(0, -ext.length)
         }
         if (!baseName) baseName = this.$t('fileTree.defaultDocumentName')
-        let name = baseName + ext
-        let counter = 1
-
-        // 落点与「新建文件夹」同一个：选中的文件夹（或选中文件所在的文件夹），没选中才是当前层级
-        // （dev-board#885：此前这里只认 parentId，树模式下恒为根，选中文件夹也落到根目录）。
-        const targetParentId = this.createTargetParentId()
-        const existingNames = new Set(this.displayFiles.map(f => f.name))
-        // 目标文件夹折叠着时它的子项不在 displayFiles 里，同名要从全量里补上，否则后端按 FAIL 拒收
-        for (const f of (this.allFiles || [])) {
-          if (f && (f.parentId ?? null) === (targetParentId ?? null)) existingNames.add(f.name)
-        }
-        while (existingNames.has(name)) {
-           name = `${baseName} (${counter})${ext}`
-           counter++
-        }
-
-        // 创建Word文件（wpsFileId 由服务端生成，dev-board#1035）
+        const name = this.uniqueCreateName(baseName, ext, targetParentId)
+        this.creatingItem = true
         await createFile(
           projectId,
           targetParentId,
           name,
-          'docx',
+          type,
           null, // fileSize
           null // filePath
         )
 
+        if (Number(this.projectId) !== Number(projectId)) return
         if (targetParentId != null && this.showTree && this.expandedFolders) {
           this.expandedFolders.add(targetParentId)
         }
@@ -1475,15 +1691,34 @@ export default {
           icon: 'success'
         })
       } catch (error) {
-        console.error('创建Word文件失败:', error)
+        console.error('创建Office文件失败:', error)
         // 使用模态对话框显示错误
         this.showErrorModal(error.message || this.$t('fileTree.createFileFailedRetry'), this.$t('fileTree.createFailed'))
+      } finally {
+        this.creatingItem = false
       }
     },
-    handleRenameKeydown(e) {
-      if (e.key === 'Enter' || e.key === 'Escape') {
-        this.commitRename()
+    handleRenameConfirm(event) {
+      // uni-h5 emits confirm on keyup. The Enter that opens rename would otherwise
+      // reach the newly mounted input and immediately submit it again.
+      if (typeof window !== 'undefined' && window.event?.type === 'keyup') return
+      const e = this.treeInputEvent(event, 'keydown')
+      if (this.renameComposing || e?.isComposing || e?.keyCode === 229) return
+      return this.commitRename(e || event)
+    },
+    async handleRenameKeydown(event) {
+      const e = this.treeInputEvent(event, 'keydown')
+      if (!e) return
+      if (this.renameComposing || e.isComposing || e.keyCode === 229) return
+      if (e.key !== 'Enter' && e.key !== 'Escape') return
+      e.preventDefault?.()
+      if (e.key === 'Escape') {
+        this.renamingId = null
+        this.tempRenameValue = ''
+      } else {
+        await this.commitRename(e)
       }
+      this.$nextTick(() => this.focusTree())
     },
     // 右键「创建副本」：在原位置建「【副本】xxx」。资源管理器没有文件粘贴，所以不写剪贴板——
     // 以前这里叫「复制」还调 uni.setClipboardData，它自带一条「Content copied」toast，
@@ -1512,12 +1747,16 @@ export default {
        }
     },
     handleRename(item) {
+      this.renameComposing = false
       this.renamingId = item.id
       this.tempRenameValue = item.name
       // this.showRenameDialog = true
     },
-    async commitRename() {
-      if (!this.renamingId) return
+    async commitRename(e) {
+      const native = this.treeInputEvent(e, e?.type === 'keydown' || e?.key ? 'keydown' : 'blur')
+      if (!this.renamingId || this.renameComposing || native?.isComposing || native?.keyCode === 229) return
+      const inputValue = native?.target?.value ?? e?.detail?.value ?? e?.target?.value
+      if (typeof inputValue === 'string') this.tempRenameValue = inputValue
 
       const fileId = this.renamingId
       const newName = (this.tempRenameValue || '').trim()
@@ -1860,7 +2099,7 @@ export default {
     // 见 tests/evidence/treeBuild.test.mjs）：此前每递归一层都对全量 allFiles 做一次
     // filter+sort，千节点树、多层展开时是 O(N × 展开文件夹数)；现在先一次 O(N) 按
     // parentId 分组，递归只在分组表里取子集。
-    buildTreeView(allFiles, parentId) {
+    buildTreeView(allFiles, parentId, expandAll = false) {
       const byParent = groupByParent(allFiles)
       const compareFn = (a, b) => {
          // 文件夹始终置顶
@@ -1895,7 +2134,7 @@ export default {
 
          return this.sortOrder === 'desc' ? -result : result
       }
-      return buildTreeFromGroups(byParent, parentId, compareFn, id => this.expandedFolders.has(id))
+      return buildTreeFromGroups(byParent, parentId, compareFn, id => expandAll || this.expandedFolders.has(id))
     },
     setSortMode(mode) {
       this.sortMode = mode
@@ -1971,7 +2210,7 @@ export default {
     },
     // 计算项目的缩进（用于树形结构）
     getItemPadding(item) {
-      if (!this.showTree || !item) return '0'
+      if (this.isTagView || !this.showTree || !item) return '0'
       // 走 allFilesById Map O(1) 反查父节点，避免每行渲染 O(N) 线性扫描 30,000 个节点
       const byId = this.allFilesById
       let depth = 0
@@ -2155,6 +2394,12 @@ export default {
       nodes.forEach(kids => kids.forEach(f => {
         if (f.isFolder && next[String(f.id)] && !seen.has(String(f.id))) covered(f, seen)
       }))
+    },
+    onFileDoubleClick(event) {
+      if (this.selectionMode || this.viewMode === 'recycle' || this.renamingId != null || event.metaKey || event.ctrlKey || event.shiftKey || this.isTreeControlTarget(event.target)) return
+      const row = event.target?.closest?.('.tree-item[data-file-id]')
+      const item = this.displayFiles.find(file => String(file.id) === row?.getAttribute('data-file-id'))
+      if (item && !item.isFolder) this.$emit('file-open', item)
     },
     handleItemClick(item, event) {
       if (!item) return
@@ -2355,7 +2600,10 @@ export default {
 
     /** 当前多选：批量选择态读勾选（checkedMap），否则读 ⌘ 加选（multiSelectedIds） */
     currentSelectedIds() {
-      return this.selectionMode ? this.checkedIds : this.multiSelectedIds
+      const ids = this.selectionMode ? this.checkedIds : this.multiSelectedIds
+      if (!this.isTagView) return ids
+      const visible = new Set(this.displayFiles.map(file => String(file.id)))
+      return ids.filter(id => visible.has(String(id)))
     },
 
     /** 右键菜单是否作用于多项（决定显示「已选 N 项」与只留批量项） */
@@ -2385,6 +2633,88 @@ export default {
       const items = this.contextTargetItems()
       this.closeContextMenu()
       await this.handleDuplicate(items)
+    },
+
+    canConvertContextToPdf() {
+      if (this.isContextMulti()) return false
+      const item = this.contextMenu && this.contextMenu.targetItem
+      return canConvertItemToPdf(item, this.viewMode)
+    },
+
+    canMergeContextToPdf() {
+      if (!this.isContextMulti()) return false
+      return canMergeItemsToPdf(this.contextTargetItems(), this.viewMode)
+    },
+
+    async handleContextConvertToPdf() {
+      const item = this.contextMenu && this.contextMenu.targetItem
+      this.closeContextMenu()
+      if (!item || !this.projectId) return
+      const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+      if (typeof uni !== 'undefined' && typeof uni.showLoading === 'function') {
+        uni.showLoading({ title: this.$t('fileTree.convertingToPdf') })
+      }
+      try {
+        const res = await convertFileToPdf(projectId, item.id)
+        const created = res && (res.data || res)
+        await this.loadFiles()
+        this.$emit('files-changed')
+        if (created && created.id != null) {
+          this.revealFile(created.id)
+        }
+        uni.showToast({
+          title: this.$t('fileTree.convertToPdfSuccess', { name: (created && created.name) || 'PDF' }),
+          icon: 'none'
+        })
+      } catch (e) {
+        console.error('转 PDF 失败:', e)
+        uni.hideLoading()
+        uni.showModal(pdfConversionRecoveryOptions({
+          error: e, items: [item], t: (key) => this.$t(key),
+          openFile: (file) => this.$emit('file-open', file),
+          exportFile: (file) => { if (this.projectId === projectId) this.$emit('file-export-pdf', file) },
+        }))
+      } finally {
+        if (typeof uni !== 'undefined' && typeof uni.hideLoading === 'function') {
+          uni.hideLoading()
+        }
+      }
+    },
+
+    async handleContextMergeToPdf() {
+      const items = this.contextTargetItems()
+      this.closeContextMenu()
+      if (!Array.isArray(items) || items.length < 2 || !this.projectId) return
+      const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+      const fileIds = items.map(f => f.id)
+      if (typeof uni !== 'undefined' && typeof uni.showLoading === 'function') {
+        uni.showLoading({ title: this.$t('fileTree.mergingToPdf') })
+      }
+      try {
+        const res = await mergeFilesToPdf(projectId, fileIds)
+        const created = res && (res.data || res)
+        await this.loadFiles()
+        this.$emit('files-changed')
+        if (created && created.id != null) {
+          this.revealFile(created.id)
+        }
+        uni.showToast({
+          title: this.$t('fileTree.mergeToPdfSuccess', { name: (created && created.name) || 'PDF' }),
+          icon: 'none'
+        })
+      } catch (e) {
+        console.error('合并为 PDF 失败:', e)
+        uni.hideLoading()
+        uni.showModal(pdfConversionRecoveryOptions({
+          error: e, items, t: (key) => this.$t(key),
+          openFile: (file) => this.$emit('file-open', file),
+          exportFile: (file) => { if (this.projectId === projectId) this.$emit('file-export-pdf', file) },
+        }))
+      } finally {
+        if (typeof uni !== 'undefined' && typeof uni.hideLoading === 'function') {
+          uni.hideLoading()
+        }
+      }
     },
 
     async handleContextDelete() {
@@ -2484,8 +2814,21 @@ export default {
       // 重新构建树形视图
       if (this.showTree && this.allFiles.length > 0) {
         this.files = this.buildTreeView(this.allFiles, this.parentId)
-        this.scheduleRefCountsFetch()
       }
+
+      // 目标和父目录都可能排在每目录前 100 项之外；先补足渲染窗口，再查 DOM 滚动。
+      const revealIds = new Set([targetFile.id, ...parentIds].map(String))
+      const counts = new Map()
+      for (const file of this.displayFiles) {
+        const key = this.windowParentKey(this.isTagView ? null : file.parentId)
+        const count = (counts.get(key) || 0) + 1
+        counts.set(key, count)
+        if (revealIds.has(String(file.id)) && count > (this.revealCounts[key] || 100)) {
+          this.revealCounts[key] = count
+        }
+      }
+      this.saveSnapshotToCache()
+      this.scheduleRefCountsFetch()
 
       // 设置选中状态（单选模式）
       this.selectedFileId = targetFile.id
@@ -2495,7 +2838,7 @@ export default {
       // 延迟滚动到目标元素
       this.$nextTick(() => {
         try {
-          const el = document.querySelector(`.tree-item[data-file-id="${targetFile.id}"]`)
+          const el = this.$el?.querySelector?.(`.tree-item[data-file-id="${targetFile.id}"]`)
           if (el && el.scrollIntoView) {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' })
           }
@@ -2507,31 +2850,80 @@ export default {
       return true
     },
 
-    handleKeyDown(e) {
-      if (!e) return
+    selectKeyboardItem(item) {
+      if (!item) return
+      this.selectedFileId = item.id
+      if (!this.selectionMode) {
+        this.multiSelectedIds = [item.id]
+        this.$emit('multi-select-change', this.multiSelectedIds)
+      }
+      if (!this.selectionMode && this.viewMode !== 'recycle') this.$emit('file-navigate', item)
+      this.activeFolderId = item.isFolder ? item.id : item.parentId
+      this.lastClickItemId = null
+      this.lastClickTime = 0
+      // Reveal a row beyond the per-folder rendering limit before scrolling to it.
+      const siblings = this.isTagView ? this.displayFiles : this.displayFiles.filter(f => String(f.parentId) === String(item.parentId))
+      const needed = siblings.findIndex(f => String(f.id) === String(item.id)) + 1
+      const key = this.windowParentKey(this.isTagView ? null : item.parentId)
+      if (needed > (this.revealCounts[key] || 100)) this.revealCounts[key] = needed
+      this.$nextTick(() => {
+        const rows = this.$el?.querySelectorAll?.('.tree-item[data-file-id]') || []
+        const row = Array.from(rows).find(el => el.getAttribute('data-file-id') === String(item.id))
+        row?.scrollIntoView?.({ block: 'nearest' })
+      })
+    },
+    async handleKeyDown(event) {
+      const e = this.treeInputEvent(event, 'keydown')
+      if (!e || e.defaultPrevented || e.isComposing || e.keyCode === 229 || this.renamingId != null) return
+      if (this.isTreeControlTarget(e.target) || this.showFolderSelector || this.showTagEditDialog || this.showTagManager || this.showRenameDialog || this.contextMenu.visible || this.createMenuOpen) return
+      if (this.keyboardDeletePending || e.altKey || e.shiftKey) return
       const key = e.key
-      const idx = this.files.findIndex(f => f.id === this.selectedFileId)
-      const curIndex = idx >= 0 ? idx : 0
-
-      if (key === 'ArrowDown') {
-        e.preventDefault()
-        const next = this.files[Math.min(this.files.length - 1, curIndex + 1)]
-        if (next) this.handleItemClick(next)
-      } else if (key === 'ArrowUp') {
-        e.preventDefault()
-        const prev = this.files[Math.max(0, curIndex - 1)]
-        if (prev) this.handleItemClick(prev)
-      } else if (key === 'ArrowLeft') {
-        e.preventDefault()
-        const cur = this.files[curIndex]
-        if (cur && cur.isFolder && this.expandedFolders.has(cur.id)) {
-          this.toggleFolder(cur.id)
+      const deleting = key === 'Delete' || key === 'Backspace'
+      if ((e.metaKey || e.ctrlKey) && !deleting && !key?.startsWith('Arrow')) return
+      if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Enter', 'Delete', 'Backspace', ' '].includes(key)) return
+      const list = this.displayFiles
+      if (!list.length) return
+      e.preventDefault?.()
+      e.stopPropagation?.()
+      const idx = list.findIndex(f => String(f.id) === String(this.selectedFileId))
+      const cur = idx < 0 ? null : list[idx]
+      if (key === ' ') {
+        if (!e.repeat && !this.selectionMode && this.viewMode !== 'recycle' && cur && !cur.isFolder) this.$emit('quick-look', cur)
+      } else if (key === 'ArrowDown' || key === 'ArrowUp') {
+        const next = idx < 0 ? 0 : Math.max(0, Math.min(list.length - 1, idx + (key === 'ArrowDown' ? 1 : -1)))
+        this.selectKeyboardItem(list[next])
+      } else if (key === 'ArrowLeft' || key === 'ArrowRight') {
+        if (!cur) { this.selectKeyboardItem(list[0]); return }
+        if (this.viewMode === 'recycle') return
+        if (key === 'ArrowLeft') {
+          if (cur.isFolder && this.expandedFolders.has(cur.id)) this.toggleFolder(cur.id)
+          else this.selectKeyboardItem(list.find(f => String(f.id) === String(cur.parentId)))
+        } else if (cur.isFolder) {
+          if (!this.expandedFolders.has(cur.id)) this.toggleFolder(cur.id)
+          else this.selectKeyboardItem(list.find(f => String(f.parentId) === String(cur.id)))
         }
-      } else if (key === 'ArrowRight') {
-        e.preventDefault()
-        const cur = this.files[curIndex]
-        if (cur && cur.isFolder && !this.expandedFolders.has(cur.id)) {
-          this.toggleFolder(cur.id)
+      } else {
+        if (e.repeat) return
+        const selected = this.currentSelectedIds()
+        const nodes = this.checkTreeNodes()
+        const ids = selected.filter(id => (this.selectionMode ? nodes : list).some(f => String(f.id) === String(id)))
+        if (key === 'Enter') {
+          if (ids.length !== 1 || this.viewMode === 'recycle') return
+          const item = nodes.find(f => String(f.id) === String(ids[0]))
+          if (item && !item.readOnly) this.handleRename(item)
+        } else if (ids.length) {
+          if (ids.some(id => nodes.find(f => String(f.id) === String(id))?.readOnly)) return
+          this.keyboardDeletePending = true
+          try {
+            this.deleteMode = this.viewMode === 'recycle' ? 'hard' : 'soft'
+            this.deleteIsBatch = ids.length > 1
+            this.deleteBatchIds = this.selectionMode ? this.normalizedCheckedIds() : ids
+            this.deleteTargetItem = nodes.find(f => String(f.id) === String(ids[0]))
+            await this.showDeleteConfirmDialog()
+          } finally {
+            this.keyboardDeletePending = false
+            this.$nextTick(() => this.focusTree())
+          }
         }
       }
     },
@@ -2652,11 +3044,46 @@ export default {
       return 'F'
     },
     // #ifdef H5
+    externalDragItems(item) {
+      const ids = this.currentSelectedIds()
+      if (!ids.some(id => String(id) === String(item.id))) return [item]
+      const nodes = this.checkTreeNodes()
+      // Keep missing members so native drag rejects the whole stale selection.
+      return ids.map(id => nodes.find(f => String(f.id) === String(id)))
+    },
+    onItemPrimeDrag(item) {
+      if (!item || item.isFolder || !item.id || this.viewMode === 'recycle') return
+      if (!host.fs || typeof host.fs.startDrag !== 'function') return
+      for (const file of this.externalDragItems(item)) {
+        if (file && !file.isFolder) prefetchLocalFilePath(file.id, getFileLocalPath)
+      }
+    },
     handleDragStart(e, item, index) {
       console.log('拖拽开始:', index)
+      this.dragSequence++
       this.draggedIndex = index
       this.draggedFileId = (item && item.id != null) ? item.id : null
+      const selectedIds = this.currentSelectedIds()
+      this.draggedFileIds = selectedIds.some(id => String(id) === String(item?.id))
+        ? selectedIds.slice() : (item?.id != null ? [item.id] : [])
       this.recordDragStartPoint(e)
+
+      // Fallback: Global variable for environments where dataTransfer is cleared
+      // 先在 emit 与 startExternalFileDrag 之前写入，供 LibreOfficeEditor 快照与
+      // isExternalFileDrag 识别「这是应用内发起的拖拽」（dev-board#1288）。
+      if (typeof document !== 'undefined') {
+        try {
+          if (item && item.id) {
+            document.__checkbaDraggedFile = {
+              fileId: item.id,
+              name: item.name,
+              fileType: item.isFolder ? 'folder' : item.fileType,
+              wpsFileId: item.wpsFileId
+            }
+          }
+        } catch (err) {}
+      }
+
       uni.$emit('file-drag-start')
       // 向外部暴露“拖拽文件开始”（用于 WPS 文档建立关联）
       try {
@@ -2666,19 +3093,21 @@ export default {
       } catch (e) {
         // ignore
       }
-      // 检查 dataTransfer 是否存在（在某些环境中可能不存在）
-      if (e.dataTransfer) {
+      // uni-h5 重建的 <view> 事件不带 dataTransfer，从原生事件回退读取
+      const nativeEv = nativeEvent(e)
+      const dt = nativeDataTransfer(e)
+      if (dt) {
         // 允许 copy/link/move
-        e.dataTransfer.effectAllowed = 'all'
+        dt.effectAllowed = 'all'
 
         // 自定义拖拽影像：预加载好的小徽标（见 utils/dragImage.js——现场 new Image
         // 来不及加载，Chromium 会回退成整行元素快照，操作图标一起浮在正文上）
-        applyDragImage(e)
+        applyDragImage(nativeEv || e)
 
         // 设置拖拽数据
         try {
           // 1. 基础索引，用于列表内排序
-          e.dataTransfer.setData('text/plain', index.toString())
+          dt.setData('text/plain', index.toString())
 
           // 2. 完整文件信息，用于跨组件拖拽（如拖到 WPS）
           if (item && item.id) {
@@ -2689,9 +3118,9 @@ export default {
               wpsFileId: item.wpsFileId
             })
             // 标准自定义类型
-            e.dataTransfer.setData('application/x-checkba-file', fileData)
+            dt.setData('application/x-checkba-file', fileData)
             // 兜底
-            e.dataTransfer.setData('text/checkba-file-json', fileData)
+            dt.setData('text/checkba-file-json', fileData)
           }
         } catch (err) {
           // 某些环境可能不支持 setData，静默失败
@@ -2699,26 +3128,83 @@ export default {
         }
       }
 
-      // Fallback: Global variable for environments where dataTransfer is cleared
-      if (typeof document !== 'undefined') {
-          try {
-             if (item && item.id) {
-                document.__checkbaDraggedFile = {
-                   fileId: item.id,
-                   name: item.name,
-                   fileType: item.isFolder ? 'folder' : item.fileType,
-                   wpsFileId: item.wpsFileId
-                }
-             }
-          } catch(e) {}
+      // 桌面端原生文件拖出（dev-board#1288）：让微信聊天窗口 / Finder / 资源管理器能直接接收文件
+      if (item && item.id && !item.isFolder && this.viewMode !== 'recycle') {
+        const items = this.externalDragItems(item)
+        const result = startExternalFileDrag(items.length === 1 ? items[0] : items, {
+          fs: host.fs,
+          event: nativeEv || e,
+          baseUrl: getApiBaseUrl(),
+          headers: getAuthHeaders(),
+          onCleanup: () => this.handleDragEnd()
+        })
+        const reportFailure = res => {
+          if (host.fs?.startDrag && res?.ok === false && res.reason !== 'unsupported') {
+            uni.showToast({ title: this.$t('fileTree.externalDragFailed'), icon: 'none' })
+          }
+        }
+        if (result && typeof result.then === 'function') result.then(reportFailure)
+        else reportFailure(result)
       }
     },
     // #endif
+    async moveDraggedSelection(targetParentId) {
+      const projectId = this.projectId
+      const sequence = this.dragSequence
+      const nodes = this.checkTreeNodes()
+      const ids = this.draggedFileIds.slice()
+      const byId = new Map(nodes.map(file => [String(file.id), file]))
+      try {
+        if (ids.some(id => !byId.has(String(id)))) throw new Error(this.$t('fileTree.moveFailed'))
+        const roots = collapseToTopmostSelected(ids, nodes).roots
+        // Reject the entire drop into any selected folder or its descendants.
+        const selected = new Set(roots.map(String))
+        const seen = new Set()
+        let parent = targetParentId
+        while (parent != null && !seen.has(String(parent))) {
+          if (selected.has(String(parent))) throw new Error(this.$t('fileTree.dropInvalidTarget'))
+          seen.add(String(parent))
+          parent = byId.get(String(parent))?.parentId
+        }
+        const moving = roots.filter(id => !parentIdsEqual(byId.get(String(id)).parentId, targetParentId))
+        if (!moving.length) return
+        const result = await batchMoveFiles(Number(projectId), moving, targetParentId)
+        const moved = result?.data?.files || []
+        const occupied = moving.filter(id => !moved.some(file => String(file.id) === String(id) && parentIdsEqual(file.parentId, targetParentId))).length
+        if (String(this.projectId) !== String(projectId)) return
+        if (sequence === this.dragSequence) {
+          this.multiSelectedIds = []
+          this.selectedFileId = null
+          this.clearChecked()
+        }
+        uni.showToast({
+          title: occupied > 0
+            ? (occupied === 1 ? this.$t('workbenchOps.fileMoveOccupied') : this.$t('workbenchOps.filesMoveOccupiedCount', { count: occupied }))
+            : this.$t(targetParentId == null ? 'fileTree.moveToRootSuccess' : 'fileTree.moveSuccess'),
+          icon: occupied > 0 ? 'none' : 'success'
+        })
+      } catch (error) {
+        if (String(this.projectId) === String(projectId)) {
+          uni.showToast({ title: error.message || this.$t('fileTree.moveFailed'), icon: 'none' })
+        }
+      } finally {
+        if (sequence === this.dragSequence) this.handleDragEnd()
+        // A rejected batch may already have moved bytes; always read back its final state.
+        if (String(this.projectId) === String(projectId)) await this.loadFiles()
+      }
+    },
     handleDragOver(e, index) {
       e.preventDefault()
-      // 检查 dataTransfer 是否存在（在某些环境中可能不存在）
-      if (e.dataTransfer) {
-        e.dataTransfer.dropEffect = 'move'
+      const dt = nativeDataTransfer(e)
+      if (isArchiveEntryDrag(dt)) {
+        const payload = readArchiveEntryDrag(dt)
+        if (this.viewMode === 'recycle' || (payload && String(payload.projectId) !== String(this.projectId))) return
+        this.dragOverIndex = index
+        try { dt.dropEffect = 'copy' } catch (_) {}
+        return
+      }
+      if (dt) {
+        try { dt.dropEffect = compatibleDropEffect(dt, 'move') } catch (err) { /* ignore */ }
       }
       if (this.dragOverIndex !== index) {
         this.dragOverIndex = index
@@ -2754,6 +3240,10 @@ export default {
       // Case 0: 外部（Finder/资源管理器/微信）文件（dev-board#363）——磁盘上有、项目里没有，
       // 走导入通道而不是移动。dataTransfer 要从原生事件上取（uni 重建的 <view> 事件没有它）。
       const externalDt = nativeDataTransfer(e)
+      if (isArchiveEntryDrag(externalDt)) {
+        await this.importArchiveDrop(e, externalDt, targetParentId)
+        return
+      }
       if (isExternalFileDrag(externalDt)) {
           if (e.stopPropagation) e.stopPropagation()
           await this.importExternalDrop(externalDt, targetParentId)
@@ -2762,7 +3252,7 @@ export default {
 
       // Case 1: Internal FileTree Drag (Reordering)
       if (this.draggedIndex !== -1) {
-          if (this.draggedIndex === index) {
+          if (String(this.draggedFileId) === String(targetItem.id)) {
             this.dragOverIndex = -1
             this.draggedIndex = -1
             this.draggedFileId = null
@@ -2771,6 +3261,11 @@ export default {
           // 误拖（位移 < 8px，dev-board#916/#989）：不移入、不提示，只清高亮。
           // 冒泡到容器的那次由 onTreeDrop 的 isNodeDropTarget 挡掉。
           if (this.isAccidentalDrag(e)) { this.dragOverIndex = -1; return }
+
+          if (this.draggedFileIds.length > 1) {
+            await this.moveDraggedSelection(targetParentId)
+            return
+          }
 
           try {
             // BUGFIX（原用 displayFiles[this.draggedIndex]，仍会撞上同一类竞态）：
@@ -2817,6 +3312,10 @@ export default {
 
                   if (rawData) {
                       const data = JSON.parse(rawData)
+                      if (data.projectId != null && String(data.projectId) !== String(projectId)) {
+                          uni.showToast({ title: this.$t('fileTree.dropInvalidTarget'), icon: 'none' })
+                          return
+                      }
                       if (data.fileId) {
                           droppedFileId = data.fileId
                           droppedFileName = data.name
@@ -2827,6 +3326,11 @@ export default {
 
           // Fallback global check
           if (!droppedFileId && typeof document !== 'undefined' && document.__checkbaDraggedFile) {
+              if (document.__checkbaDraggedFile.projectId != null && String(document.__checkbaDraggedFile.projectId) !== String(projectId)) {
+                  document.__checkbaDraggedFile = null
+                  uni.showToast({ title: this.$t('fileTree.dropInvalidTarget'), icon: 'none' })
+                  return
+              }
               droppedFileId = document.__checkbaDraggedFile.fileId
               droppedFileName = document.__checkbaDraggedFile.name
               document.__checkbaDraggedFile = null // Consume
@@ -2868,16 +3372,27 @@ export default {
       this.draggedFileId = null
     },
     handleDragEnd() {
+      this.draggedFileIds = []
       this.draggedIndex = -1
       this.draggedFileId = null
       this.dragOverIndex = -1
       this.dragStartPoint = null
+      this.rootDropActive = false
+      this.externalDragActive = false
+      this.stagingDragOver = false
+      this.isAnyDragging = false
       // 同 FileStagingArea.onDragEnd：取消的拖拽不许留下全局兜底残留（dev-board#974）
       if (typeof document !== 'undefined') document.__checkbaDraggedFile = null
       this.$emit('file-drag-end')
       uni.$emit('file-drag-end')
     },
     onRootDragOver(e) {
+      const dt = nativeDataTransfer(e)
+      if (isArchiveEntryDrag(dt)) {
+        const payload = readArchiveEntryDrag(dt)
+        if (this.viewMode === 'recycle' || (payload && String(payload.projectId) !== String(this.projectId))) return
+        try { dt.dropEffect = 'copy' } catch (_) {}
+      }
       e.preventDefault()
       this.rootDropActive = true
     },
@@ -2895,6 +3410,10 @@ export default {
 
       // Case 0: 外部文件落到根投放区 → 导入到项目根（同 handleDrop 的 Case 0）
       const externalDt = nativeDataTransfer(e)
+      if (isArchiveEntryDrag(externalDt)) {
+        await this.importArchiveDrop(e, externalDt, targetParentId)
+        return
+      }
       if (isExternalFileDrag(externalDt)) {
           if (e.stopPropagation) e.stopPropagation()
           await this.importExternalDrop(externalDt, targetParentId)
@@ -2905,6 +3424,10 @@ export default {
       if (this.draggedIndex !== -1) {
           // 误拖（位移 < 8px，dev-board#916/#989）：不移动、不提示（高亮已在上面清掉）
           if (this.isAccidentalDrag(e)) return
+          if (this.draggedFileIds.length > 1) {
+            await this.moveDraggedSelection(targetParentId)
+            return
+          }
           try {
             // 同 handleDrop 的 BUGFIX：按 dragstart 时记下的 id 重新定位，不用可能
             // 已经因后台重载而过期的下标。
@@ -2941,11 +3464,20 @@ export default {
                   if (!rawData) rawData = e.dataTransfer.getData('text/checkba-file-json')
                   if (rawData) {
                       const data = JSON.parse(rawData)
+                      if (data.projectId != null && String(data.projectId) !== String(projectId)) {
+                          uni.showToast({ title: this.$t('fileTree.dropInvalidTarget'), icon: 'none' })
+                          return
+                      }
                       if (data.fileId) droppedFileId = data.fileId
                   }
               } catch (err) {}
           }
           if (!droppedFileId && typeof document !== 'undefined' && document.__checkbaDraggedFile) {
+              if (document.__checkbaDraggedFile.projectId != null && String(document.__checkbaDraggedFile.projectId) !== String(projectId)) {
+                  document.__checkbaDraggedFile = null
+                  uni.showToast({ title: this.$t('fileTree.dropInvalidTarget'), icon: 'none' })
+                  return
+              }
               droppedFileId = document.__checkbaDraggedFile.fileId
               document.__checkbaDraggedFile = null
           }
@@ -2975,10 +3507,24 @@ export default {
     // 树空白区落根 / 拖出窗口复位」。四个事件都从原生事件上取 dataTransfer / relatedTarget。
     onTreeDragEnter(e) {
       if (this.viewMode === 'recycle') return
-      if (isExternalFileDrag(nativeDataTransfer(e))) this.externalDragActive = true
+      const dt = nativeDataTransfer(e)
+      if (isArchiveEntryDrag(dt)) {
+        const payload = readArchiveEntryDrag(dt)
+        this.externalDragActive = !payload || String(payload.projectId) === String(this.projectId)
+        return
+      }
+      if (isExternalFileDrag(dt)) this.externalDragActive = true
     },
     onTreeDragOver(e) {
       const dt = nativeDataTransfer(e)
+      if (isArchiveEntryDrag(dt)) {
+        const payload = readArchiveEntryDrag(dt)
+        if (this.viewMode === 'recycle' || (payload && String(payload.projectId) !== String(this.projectId))) return
+        this.externalDragActive = true
+        e.preventDefault?.()
+        try { dt.dropEffect = 'copy' } catch (_) {}
+        return
+      }
       if (!isExternalFileDrag(dt)) {
         // 暂存区拖回来的文件（dev-board#974）：空白区也要 preventDefault，否则浏览器
         // 不派发 drop，只有临时出现的根投放区能接住，其余位置静默无效。回收站视图同样
@@ -2986,7 +3532,7 @@ export default {
         if (this.isStagingFileDrag()) {
           if (this.viewMode !== 'recycle') this.stagingDragOver = true
           if (e.preventDefault) e.preventDefault()
-          try { dt.dropEffect = 'move' } catch (err) { /* ignore */ }
+          try { dt.dropEffect = compatibleDropEffect(dt, 'move') } catch (err) { /* ignore */ }
         } else if (this.draggedIndex !== -1 && this.viewMode !== 'recycle') {
           // 树内拖拽经过空白区 = 放到项目根（dev-board#989，同 VS Code / Finder）。
           // 经过节点时节点自己的 dragOverIndex 在亮，容器不亮。
@@ -2997,7 +3543,7 @@ export default {
           this.stagingDragOver = true
           this.dragOverIndex = -1
           if (e.preventDefault) e.preventDefault()
-          try { dt.dropEffect = 'move' } catch (err) { /* ignore */ }
+          try { dt.dropEffect = compatibleDropEffect(dt, 'move') } catch (err) { /* ignore */ }
         }
         return
       }
@@ -3020,6 +3566,11 @@ export default {
     },
     async onTreeDrop(e) {
       const dt = nativeDataTransfer(e)
+      if (isArchiveEntryDrag(dt)) {
+        if (this.isNodeDropTarget(e)) return
+        await this.importArchiveDrop(e, dt, null)
+        return
+      }
       if (!isExternalFileDrag(dt) && this.isStagingFileDrag()) {
         this.resetExternalDrag()
         if (this.viewMode === 'recycle') {
@@ -3045,7 +3596,7 @@ export default {
         // 已在根目录：原地不动，不发请求也不提示
         const draggedItem = this.displayFiles.find(f => f.id === this.draggedFileId)
         // （parentId 的 0 与 null 都是根，同 utils/fileTreeBuild.js 的 normalizeParentId）
-        if (draggedItem && (Number(draggedItem.parentId) === 0 || parentIdsEqual(draggedItem.parentId, null))) return
+        if (this.draggedFileIds.length <= 1 && draggedItem && (Number(draggedItem.parentId) === 0 || parentIdsEqual(draggedItem.parentId, null))) return
         await this.onRootDrop(e)
         return
       }
@@ -3056,6 +3607,21 @@ export default {
       if (e.preventDefault) e.preventDefault()
       // 树空白区 = 项目根（与 onRootDrop 同口径）
       await this.importExternalDrop(dt, null)
+    },
+    async importArchiveDrop(event, dt, targetParentId) {
+      const payload = readArchiveEntryDrag(dt)
+      event.preventDefault?.()
+      event.stopPropagation?.()
+      this.resetExternalDrag()
+      if (!claimExternalDrop(nativeEvent(event))) return
+      if (this.viewMode === 'recycle' || !payload || String(payload.projectId) !== String(this.projectId)) return
+      const projectId = this.projectId
+      try {
+        await importArchiveEntry(projectId, payload.fileId, payload.path, targetParentId)
+        if (String(this.projectId) === String(projectId)) await this.loadFiles()
+      } catch (error) {
+        uni.showToast({ title: error.message || this.$t('fileTree.moveFailed'), icon: 'none' })
+      }
     },
     // 应用内、且不是本树自己发起的文件拖拽（暂存区 → 树）。判据是 uni 的 file-drag-start
     // （暂存区 onDragStart 会发，dragend 发 file-drag-end 复位）：暂存区条目是 <view>，
@@ -3098,34 +3664,21 @@ export default {
       this.rootDropActive = false
       this.dragOverIndex = -1
     },
-    // 落点确定之后统一走这里（dev-board#513）。资源管理器只剩「导入本机路径」一条通道：
-    // 取 dataTransfer.files 里的**顶层条目**（每条可能是文件，也可能是目录），逐个解析出
-    // 本机绝对路径交给 import-local，让后端把它复制进项目目录，目录由后端递归建行。
-    // 不再用 webkitGetAsEntry 在前端展开目录——那是给 HTTP 分片上传通道准备的，
-    // 那条通道连同上传对话框、上传队列一起撤了（工作台是桌面端专属，H5 部署已于
-    // 2026-08-19 下线）。桌面端的项目本来就是本机的一个文件夹，「拖入 = 复制进来」
-    // 正是用户的心理模型；而老的上传路会先建一份空白模板行、再把已经失效的临时 blob
-    // 传上去（Chromium ERR_UPLOAD_FILE_CHANGED，用户目录里留下 5KB 空白 docx，
-    // dev-board#409）。
+    // 落点确定后统一 import-local（#513/#1182）。稳定路径直接由后端复制；
+    // 无路径 File 同步启动字节快照，再由桌面暂存，复制完成后释放临时 token。
+    // 不恢复 createFile + HTTP 上传旧链，避免临时源失效后遗留空白模板（#409）。
     async importExternalDrop(dt, targetParentId) {
       const native = typeof window !== 'undefined' ? window.event : null
       if (!claimExternalDrop(native)) return
       this.resetExternalDrag()
-      // files 必须在 drop 的同步阶段取——处理器一返回，dataTransfer 就作废了
-      const fileList = dt && dt.files ? Array.from(dt.files) : []
-      if (!fileList.length) return
+      // files/items 与无路径 File 的字节读取必须在 drop 同步阶段开始。
+      const fileList = captureDroppedFiles(dt, host.fs)
+      if (!fileList.length) {
+        uni.showToast({ title: this.$t('fileTree.importDropUnreadable'), icon: 'none' })
+        return
+      }
       if (targetParentId != null && this.showTree) this.expandedFolders.add(targetParentId)
       await this.importDroppedLocalFiles(fileList, targetParentId)
-    },
-    // File → 本机绝对路径。只有桌面壳给得出（Electron 32 起 File.path 没了，走 webUtils），
-    // 浏览器端 host.fs 整个缺席，恒返回空串 = 这次拖入没有可导入的东西。
-    resolveDroppedFilePath(fileObject) {
-      try {
-        if (!fileObject || !host.fs || typeof host.fs.getPathForFile !== 'function') return ''
-        return host.fs.getPathForFile(fileObject) || ''
-      } catch (e) {
-        return ''
-      }
     },
     // 顶层条目逐个调 import-local。暂存区（stagingArea.js#onStagingDropFiles）也直接调它。
     // 不做乐观插行：这条路径没有「传输中」这个阶段，后端返回时字节已经在项目目录里，
@@ -3134,31 +3687,25 @@ export default {
       const items = Array.from(fileList || [])
       if (!items.length) return
       const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
-      const entries = []
-      let unresolved = 0
-      for (const fileObject of items) {
-        const path = this.resolveDroppedFilePath(fileObject)
-        if (path) entries.push({ name: (fileObject && fileObject.name) || '', path })
-        else unresolved++
-      }
-      // 解析不出本机路径 = 不在桌面壳里跑（工作台只有桌面端），这条路走不通，一次 drop 只说一遍
-      if (unresolved > 0) {
-        uni.showToast({ title: this.$t('fileTree.importDesktopOnly'), icon: 'none' })
-      }
-      if (!entries.length) return
-
+      // Start all transient byte reads before the first import request.
+      captureDroppedFiles({ files: items }, host.fs)
       let successCount = 0
       let failCount = 0
       let lastError = ''
-      for (const entry of entries) {
+      let sourceFailCount = 0
+      for (const file of items) {
         try {
-          await importLocalFile(projectId, entry.path, targetParentId)
+          await importDroppedFile(file, host.fs, path => importLocalFile(projectId, path, targetParentId))
           successCount++
         } catch (e) {
           failCount++
-          lastError = (e && e.message) || ''
-          console.error('导入本机文件失败:', entry.name, e)
+          if (e && e.dropCode) sourceFailCount++
+          lastError = e && e.dropCode ? this.$t('fileTree.' + e.dropCode) : ((e && e.message) || '')
         }
+      }
+      if (sourceFailCount === items.length) {
+        uni.showToast({ title: lastError, icon: 'none' })
+        return
       }
       await this.loadFiles()
       if (failCount === 0) {
@@ -3254,14 +3801,76 @@ export default {
     },
 
     // Tag Methods
+    setTagView(value) {
+      const previous = this.isTagView
+      const container = this.$el?.querySelector?.('.tree-content')
+      const projectId = this.projectId
+      if (value && !previous) this.tagFolderScrollTop = container?.scrollTop || 0
+      this.tagView = value
+      if (!value) this.selectedTagIds = []
+      this.resetTagSelection()
+      if (value && !previous) this.refreshProjectTags()
+      if (container && (value || previous)) this.$nextTick(() => {
+        if (this.projectId === projectId && this.isTagView === value) {
+          container.scrollTop = value ? 0 : this.tagFolderScrollTop
+        }
+      })
+    },
+    setTagFilter(ids) {
+      this.selectedTagIds = ids
+      this.setTagView(ids.length > 0)
+    },
+    showAllTaggedFiles() {
+      this.selectedTagIds = []
+      this.setTagView(true)
+    },
+    resetTagSelection() {
+      // A hidden selection must never leak into a later batch delete/move.
+      this.clearChecked()
+      this.multiSelectedIds = []
+      this.selectedFileId = null
+      this.activeFolderId = null
+      this.closeContextMenu()
+      this.$emit('multi-select-change', [])
+      this.scheduleRefCountsFetch()
+    },
+    tagFileLocation(file) {
+      const names = []
+      const seen = new Set()
+      let parentId = file.parentId
+      while (parentId != null && !seen.has(String(parentId))) {
+        seen.add(String(parentId))
+        const parent = this.allFilesById.get(parentId) || this.allFilesById.get(Number(parentId))
+        if (!parent) break
+        names.unshift(parent.name)
+        parentId = parent.parentId
+      }
+      return names.join(' / ') || this.$t('files.tagViewRoot')
+    },
     async refreshProjectTags() {
       if (!this.projectId) return
+      const projectId = this.projectId
+      const request = ++this.tagsRequest
+      this.tagsLoading = true
+      this.tagsError = ''
       try {
-        const res = await getProjectTags(this.projectId)
+        const res = await getProjectTags(projectId)
+        if (request !== this.tagsRequest || String(projectId) !== String(this.projectId)) return
         this.projectTags = res.data || res || []
+        const selected = this.selectedTagIds.filter(id => this.projectTags.some(tag => String(tag.id) === String(id)))
+        if (selected.length !== this.selectedTagIds.length) this.setTagFilter(selected)
       } catch (e) {
-        console.error('Failed to load project tags', e)
+        if (request === this.tagsRequest) this.tagsError = this.$t('files.loadFailed')
+      } finally {
+        if (request === this.tagsRequest) this.tagsLoading = false
       }
+    },
+    applyFileTags(file, tags) {
+      for (const item of [...this.allFiles, ...this.files, file]) {
+        if (String(item.id) === String(file.id)) item.tags = tags
+      }
+      this.saveSnapshotToCache()
+      uni.$emit('awd:files-changed', { projectId: this.projectId })
     },
     // Esc 关标签弹窗，逐层退：标签管理（上层）→ 新建标签子表单（等于点取消）→ 管理标签。
     // 输入框里有字也照关（等于取消）；AwdDialog（删除标签的确认框）开着时让它先处理，
@@ -3291,10 +3900,12 @@ export default {
     async handleAddTag(tag) {
        if (!this.targetFileForTags) return
        try {
-         await addTagToFile(this.projectId, this.targetFileForTags.id, tag.id)
-         // Optimistic update
-         if (!this.targetFileForTags.tags) this.$set(this.targetFileForTags, 'tags', [])
-         this.targetFileForTags.tags.push(tag)
+         const file = this.targetFileForTags
+         const projectId = this.projectId
+         await addTagToFile(projectId, file.id, tag.id)
+         if (String(projectId) !== String(this.projectId)) return
+         const currentFile = this.allFiles.find(item => String(item.id) === String(file.id)) || file
+         this.applyFileTags(file, [...(currentFile.tags || []).filter(t => String(t.id) !== String(tag.id)), tag])
        } catch (e) {
          uni.showToast({ title: 'Failed to add tag', icon: 'none' })
        }
@@ -3308,13 +3919,17 @@ export default {
        if (!this.targetFileForTags || !tagName) return
        try {
          // 1. Create Tag
-         const res = await createTag(this.projectId, { name: tagName, color: tagColor, type: tagType })
+         const projectId = this.projectId
+         const fileId = this.targetFileForTags.id
+         const res = await createTag(projectId, { name: tagName, color: tagColor, type: tagType })
          const newTag = res.data || res
+         if (String(projectId) !== String(this.projectId)) return
 
          // 2. Refresh available tags
          await this.refreshProjectTags()
 
-         // 3. Add to file
+         // 3. Add only to the file for which creation started.
+         if (String(projectId) !== String(this.projectId) || String(fileId) !== String(this.targetFileForTags?.id)) return
          await this.handleAddTag(newTag)
 
        } catch (e) {
@@ -3325,10 +3940,12 @@ export default {
     async handleRemoveTag(tag) {
        if (!this.targetFileForTags) return
        try {
-         await removeTagFromFile(this.projectId, this.targetFileForTags.id, tag.id)
-         // Optimistic update
-         const idx = this.targetFileForTags.tags.findIndex(t => t.id === tag.id)
-         if (idx > -1) this.targetFileForTags.tags.splice(idx, 1)
+         const file = this.targetFileForTags
+         const projectId = this.projectId
+         await removeTagFromFile(projectId, file.id, tag.id)
+         if (String(projectId) !== String(this.projectId)) return
+         const currentFile = this.allFiles.find(item => String(item.id) === String(file.id)) || file
+         this.applyFileTags(file, (currentFile.tags || []).filter(t => String(t.id) !== String(tag.id)))
 
        } catch (e) {
          uni.showToast({ title: 'Failed to remove tag', icon: 'none' })
@@ -3466,6 +4083,23 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.file-tag-sidebar { margin-top: var(--awd-panel-gap-lg); }
+.tree-content.has-tag-sidebar > .tree-list { height: auto; }
+.tag-view-summary {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--awd-space-1);
+  padding: var(--awd-space-1) var(--awd-panel-pad-x); font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2);
+}
+.tag-view-back {
+  display: flex; align-items: center; gap: var(--awd-space-1); margin: 0; padding: 0 var(--awd-space-1);
+  min-height: var(--awd-panel-sec-h); border: 0; border-radius: var(--awd-panel-radius);
+  background: transparent; color: var(--awd-panel-text); font: inherit; cursor: pointer;
+  &::after { border: 0; }
+  &:hover { background: var(--awd-panel-hover); }
+  &:focus-visible { outline: var(--awd-focus-width) solid var(--awd-accent-text); outline-offset: var(--awd-focus-offset); }
+}
+.view-mode-tags .tree-item-content { height: auto; min-height: 48px; flex-wrap: wrap; gap: 0 var(--awd-space-1); padding-block: var(--awd-space-1); }
+.tag-file-location { flex-basis: 100%; padding-left: 32px; box-sizing: border-box; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); }
+
 .file-tree {
   height: 100%;
   display: flex;
@@ -3533,6 +4167,7 @@ export default {
 
 .tree-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 
   /* Custom Scrollbar */
@@ -3543,12 +4178,12 @@ export default {
 
   &::-webkit-scrollbar-thumb {
     background-color: transparent;
-    border-radius: 3px;
+    border-radius: calc(var(--awd-space-1) / 2);
     transition: background-color 0.2s;
   }
 
   &:hover::-webkit-scrollbar-thumb {
-    background-color: rgba(148, 163, 184, 0.3);
+    background-color: var(--awd-surface-3);
   }
 
   &::-webkit-scrollbar-thumb:hover {
@@ -3597,7 +4232,7 @@ export default {
     border-style: solid;
     transform: scale(1.005);
     opacity: 1;
-    box-shadow: 0 2rpx 8rpx rgba(59, 130, 246, 0.08);
+    box-shadow: var(--awd-shadow-md);
   }
 }
 
@@ -3636,7 +4271,7 @@ export default {
   border: 1px solid var(--awd-info);
   background: var(--awd-info-soft);
   pointer-events: none;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
 }
 
 /* 右键上下文菜单样式 */
@@ -3654,8 +4289,8 @@ export default {
   position: fixed;
   min-width: 160px;
   background: var(--awd-surface);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  border-radius: var(--awd-radius-md);
+  box-shadow: var(--awd-shadow-md);
   padding: 4px 0;
   z-index: 10000;
   border: 1px solid var(--awd-border);
@@ -3668,7 +4303,7 @@ export default {
 }
 
 .context-menu-header-text {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 700;
   color: var(--awd-text-2);
 }
@@ -3694,14 +4329,14 @@ export default {
 }
 
 .context-menu-icon {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   margin-right: 10px;
   width: 20px;
   text-align: center;
 }
 
 .context-menu-text {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
 }
 
@@ -3720,7 +4355,7 @@ export default {
 }
 
 .compare-bar-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-info-text);
   font-weight: 500;
 }
@@ -3733,18 +4368,18 @@ export default {
   background: linear-gradient(135deg, var(--awd-info) 0%, var(--awd-info) 100%);
   color: var(--awd-text-on-accent);
   border: none;
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-panel-fs);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+  box-shadow: var(--awd-shadow-sm);
 }
 
 .btn-compare:hover {
   background: linear-gradient(135deg, var(--awd-info) 0%, var(--awd-info) 100%);
   transform: translateY(-1px);
-  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.3);
+  box-shadow: var(--awd-shadow-sm);
 }
 
 .btn-compare:active {
@@ -3768,7 +4403,7 @@ export default {
 .checkbox-box {
   width: 14px;
   height: 14px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   border: 1px solid var(--awd-info);
   background: var(--awd-surface);
   box-sizing: border-box;
@@ -3806,7 +4441,7 @@ export default {
   width: 8px;
   height: 2px;
   background: var(--awd-accent);
-  border-radius: 2px;
+  border-radius: calc(var(--awd-space-1) / 2);
 }
 
 .batch-bar {
@@ -3846,12 +4481,12 @@ export default {
 }
 
 .batch-btn-danger {
-  border-color: rgba(220, 38, 38, 0.25);
+  border-color: var(--awd-danger);
   color: var(--awd-danger-text);
 }
 
 .batch-btn-danger:active {
-  background: rgba(220, 38, 38, 0.06);
+  background: var(--awd-danger-soft);
 }
 
 .batch-btn-ghost {
@@ -3906,14 +4541,14 @@ export default {
   .btn-new-word {
     height: 28px;
     line-height: 28px;
-    font-size: 12px;
-    border-radius: 10px;
+    font-size: var(--awd-panel-fs);
+    border-radius: var(--awd-radius-dialog);
   }
   .tree-footer {
     padding: 8px 10px;
   }
   .tree-item-name {
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
   }
 
   .tree-expand-icon,
@@ -3955,7 +4590,7 @@ export default {
   align-items: center;
   padding: 10px 12px;
   margin-bottom: 4px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
   transition: all 0.2s;
   background-color: transparent;
@@ -4008,7 +4643,7 @@ export default {
   text-align: center;
   color: var(--awd-text-3);
   padding: 20px;
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
 }
 
 .folder-item:active {
@@ -4094,7 +4729,7 @@ export default {
 
 /* Finder 风格：奇偶行浅色差（尽量克制） */
 .tree-list .tree-item:nth-child(odd) {
-  background-color: var(--awd-accent-wash); /* Using Brand Color Tint */
+  background-color: color-mix(in srgb, var(--awd-text) 4%, transparent);
 }
 
 .tree-list .tree-item:nth-child(even) {
@@ -4109,14 +4744,16 @@ export default {
   background-color: var(--awd-accent-soft);
 }
 
-/* Increase specificity to override zebra striping (.tree-list .tree-item:nth-child) */
+/* Selection stays distinct from both alternating rows and hover. */
 .tree-list .tree-item.tree-item-selected {
   background-color: var(--awd-mint) !important; /* Forest Green Lighter Tint - darkened for visibility */
+  box-shadow: var(--awd-shadow-card);
 }
 
 /* Cmd/Ctrl 多选样式 */
 .tree-list .tree-item.tree-item-multi-selected {
   background-color: var(--awd-mint) !important;
+  box-shadow: var(--awd-shadow-card);
 }
 
 /* mint 亮绿底两个主题下都是亮色，行内文字必须钉配对的深墨色，
@@ -4150,11 +4787,11 @@ export default {
 
 /* 外部文件正拖在树上：整个容器描一圈，提示「松手即导入」（dev-board#363） */
 .tree-content.external-drag-over {
-  box-shadow: inset 0 0 0 2px var(--awd-info);
+  box-shadow: var(--awd-shadow-sm);
 }
 
 .tree-item[draggable="true"]:hover {
-  background-color: var(--awd-bg);
+  background-color: var(--awd-accent-soft);
 }
 
 .tree-item-content {
@@ -4177,7 +4814,7 @@ export default {
   bottom: 0;
   width: 1px;
   background-color: transparent;
-  border-left: 1px dashed var(--awd-border);
+  border-left: 1px solid var(--awd-border-subtle);
   pointer-events: none;
 }
 
@@ -4250,11 +4887,11 @@ export default {
   overflow: hidden;
   text-overflow: clip;
   white-space: nowrap;
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 15px;
   padding: 0 5px;
   margin-right: 6px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   color: var(--awd-text-2);
   background: var(--awd-surface-2);
 
@@ -4345,7 +4982,7 @@ export default {
 
 .recycle-back-btn {
   color: var(--awd-info-text) !important;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   cursor: pointer;
   padding: 0 12rpx;
   transition: all 0.2s;
@@ -4404,7 +5041,7 @@ export default {
   max-width: 92vw;
   background-color: var(--awd-surface);
   border-radius: 16rpx;
-  box-shadow: 0 16rpx 40rpx rgba(0, 0, 0, 0.08);
+  box-shadow: var(--awd-shadow-md);
   display: flex;
   flex-direction: column;
 }
@@ -4414,7 +5051,7 @@ export default {
   max-width: 88vw;
   background-color: var(--awd-surface);
   border-radius: 16rpx;
-  box-shadow: 0 12rpx 32rpx rgba(0, 0, 0, 0.08);
+  box-shadow: var(--awd-shadow-md);
   display: flex;
   flex-direction: column;
 }
@@ -4532,14 +5169,14 @@ export default {
   width: 120px;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border-radius: var(--awd-radius-md);
+  box-shadow: var(--awd-shadow-md);
   padding: 4px 0;
   z-index: 100;
 }
 .sort-item {
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   display: flex;
   justify-content: space-between;
@@ -4565,9 +5202,9 @@ export default {
   padding: 4px 12px;
   background-color: var(--awd-surface-2);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   transition: all 0.2s;
   margin-left: auto;
@@ -4609,8 +5246,9 @@ export default {
      滚动而不是让盒子无限长高。 */
   max-height: 85vh;
   background-color: var(--awd-surface);
-  border-radius: 12px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-lg);
   overflow: hidden;
   animation: awd-dialog-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   display: flex;
@@ -4639,7 +5277,8 @@ export default {
 }
 
 .awd-dialog-title {
-  font-size: 20px;
+  font-family: var(--awd-font-serif);
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-accent-text); /* Forest Green */
   line-height: 1.4;
@@ -4648,7 +5287,7 @@ export default {
 
 .awd-dialog-subtitle {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2); /* Gray Medium */
   line-height: 1.5;
   display: block;
@@ -4667,7 +5306,7 @@ export default {
 }
 
 .awd-dialog-text {
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text);
   line-height: 1.6;
 }
@@ -4677,15 +5316,15 @@ export default {
   height: 48px;
   padding: 0 16px;
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
-  font-size: 15px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text);
   transition: all 0.2s;
 }
 
 .awd-input:focus {
   border-color: var(--awd-mint); /* Mint Green */
-  box-shadow: 0 0 0 3px rgba(137, 168, 160, 0.15);
+  box-shadow: var(--awd-shadow-md);
 }
 
 .awd-dialog-footer {
@@ -4705,9 +5344,9 @@ export default {
   justify-content: center;
   height: 44px; /* Slightly taller */
   padding: 0 32px; /* Wider padding */
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 500;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
   transition: all 0.2s;
   min-width: 100px;
@@ -4768,7 +5407,7 @@ export default {
 
 .form-label {
   display: block;
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
   color: var(--awd-text);
   margin-bottom: 8px;
@@ -4780,7 +5419,7 @@ export default {
   align-items: center;
   padding: 10px 12px;
   margin-bottom: 2px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -4799,24 +5438,40 @@ export default {
   justify-content: center;
   cursor: pointer;
 }
-.awd-dialog .tree-expand-icon-img {
-  width: 10px;
-  height: 10px;
+.awd-dialog .tree-expand-icon-img,
+.awd-dialog .tree-expand-svg {
+  width: 11px;
+  height: 11px;
+  color: var(--awd-text-3);
+  transition: transform 0.15s ease;
+}
+.awd-dialog .tree-expand-svg.is-open {
+  transform: rotate(90deg);
 }
 .awd-dialog .tree-expand-placeholder {
   width: 24px;
 }
-.folder-icon-img {
+.folder-icon-img,
+.folder-icon-svg-wrap {
   width: 18px;
   height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--awd-accent-text);
   transition: transform 0.2s;
 }
-.folder-icon-img.is-opened {
-  transform: scale(1.2);
+.folder-icon-svg-wrap svg {
+  width: 16px;
+  height: 16px;
+}
+.folder-icon-img.is-opened,
+.folder-icon-svg-wrap.is-opened {
+  transform: scale(1.08);
 }
 .folder-name {
   margin-left: 8px;
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
 }
 
 .rename-input-wrapper.dialog-rename {
@@ -4829,15 +5484,15 @@ export default {
   height: 28px;
   padding: 0 8px;
   border: 1px solid var(--awd-mint);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   background-color: var(--awd-surface);
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
 }
 .empty-tip {
   padding: 16px;
   text-align: center;
   color: var(--awd-text-3);
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
 }
 
 

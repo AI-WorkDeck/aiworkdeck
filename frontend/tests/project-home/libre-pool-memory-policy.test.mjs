@@ -6,12 +6,13 @@ import { readFileSync } from 'node:fs'
 
 const src = readFileSync(new URL('../../src/pages/project-overview/librePool.js', import.meta.url), 'utf8')
 const GiB = 1024 ** 3
-function vmFor(totalBytes) {
+function vmFor(totalBytes, timers = { setTimeout, clearTimeout }) {
   const body = src.replace(/^\s*import[\s\S]*?from\s*'[^']*'\s*$/gm, '')
     .replace(/export const librePoolMethods = \{/, 'return {')
-  const methods = new Function('isDesktopHost', 'host', body)(() => true, totalBytes === undefined ? {} : { systemMemory: { totalBytes } })
+  const methods = new Function('isDesktopHost', 'host', 'setTimeout', 'clearTimeout', body)(() => true, totalBytes === undefined ? {} : { systemMemory: { totalBytes } }, timers.setTimeout, timers.clearTimeout)
   const vm = {
     libreLruKeys: [], libreSpares: [], _libreRefs: {}, _libreExecMap: {},
+    pdfKeepAliveKeys: [],
     leftFiles: [], rightFiles: [], splitMode: false, activeFileIdLeft: null, activeFileIdRight: null,
     useLibreEditor: () => true,
   }
@@ -29,6 +30,136 @@ function add(vm, pane, id, flushSave = async () => true) {
   return file
 }
 const settle = () => new Promise(resolve => setImmediate(resolve))
+
+function warmupVm() {
+  const pending = new Map()
+  let seq = 0
+  let now = 0
+  const vm = vmFor(16 * GiB, {
+    setTimeout(fn, ms) { const id = ++seq; pending.set(id, { fn, ms, due: now + ms }); return id },
+    clearTimeout(id) { pending.delete(id) },
+  })
+  const advance = ms => {
+    const end = now + ms
+    for (;;) {
+      const next = [...pending.entries()].sort((a, b) => a[1].due - b[1].due)[0]
+      if (!next || next[1].due > end) break
+      const [id, timer] = next
+      now = timer.due
+      pending.delete(id)
+      timer.fn()
+    }
+    now = end
+  }
+  const tick = () => {
+    assert.equal(pending.size, 1)
+    const { ms, due } = pending.values().next().value
+    assert.equal(ms, 4000)
+    advance(due - now)
+  }
+  return { vm, pending, tick, advance }
+}
+
+test('foreground ready restarts the full warmup delay before another engine can boot', () => {
+  const { vm, pending, advance } = warmupVm()
+  add(vm, 'left', 1)
+  vm._libreRefs['left:1'].ready = false
+  vm.scheduleLibreSpare()
+  advance(3800)
+  vm._libreRefs['left:1'].ready = true
+  vm.onLibreReady({ executeCommand() {} }, 'left', 1)
+  assert.equal(pending.size, 1)
+  advance(200)
+  assert.equal(vm.libreSpares.length, 0, 'the original empty-workbench deadline must be cancelled')
+  advance(3799)
+  assert.equal(vm.libreSpares.length, 0)
+  advance(1)
+  assert.equal(vm.libreSpares.length, 1)
+})
+
+test('warmup yields to every loading document and resumes when all are ready', () => {
+  const { vm, pending, tick } = warmupVm()
+  add(vm, 'left', 1)
+  add(vm, 'right', 2)
+  vm._libreRefs['left:1'].ready = false
+  vm._libreRefs['right:2'].ready = false
+  vm.scheduleLibreSpare()
+  tick()
+  assert.equal(vm.libreSpares.length, 0)
+  vm._libreRefs['left:1'].ready = true
+  tick()
+  assert.equal(vm.libreSpares.length, 0)
+  vm._libreRefs['right:2'].ready = true
+  tick()
+  assert.equal(vm.libreSpares.length, 1)
+  assert.equal(pending.size, 0)
+})
+
+for (const statusKey of ['bootFailed', 'loadFailed', 'desktopOnly', 'unsupported']) {
+  test(`warmup resumes after a document reaches ${statusKey}`, () => {
+    const { vm, tick } = warmupVm()
+    add(vm, 'left', 1)
+    vm._libreRefs['left:1'].ready = false
+    vm.scheduleLibreSpare()
+    tick()
+    assert.equal(vm.libreSpares.length, 0)
+    vm._libreRefs['left:1'].statusKey = statusKey
+    tick()
+    assert.equal(vm.libreSpares.length, 1)
+  })
+}
+
+test('warmup waits for a pending mount and resumes after its tab closes, ignoring a stale ref', () => {
+  const { vm, tick } = warmupVm()
+  add(vm, 'left', 1)
+  delete vm._libreRefs['left:1']
+  vm.scheduleLibreSpare()
+  tick()
+  assert.equal(vm.libreSpares.length, 0)
+  vm.leftFiles = []
+  vm.activeFileIdLeft = null
+  vm._libreRefs['left:1'] = { file: { id: 1 }, ready: false }
+  tick()
+  assert.equal(vm.libreSpares.length, 1)
+})
+
+test('a closed right pane and inactive unmounted tabs do not block warmup', () => {
+  const { vm, tick } = warmupVm()
+  add(vm, 'right', 1)
+  vm._libreRefs['right:1'].ready = false
+  vm.leftFiles = [{ id: 2 }]
+  vm.scheduleLibreSpare()
+  tick()
+  assert.equal(vm.libreSpares.length, 0)
+  vm.splitMode = false
+  tick()
+  assert.equal(vm.libreSpares.length, 1)
+})
+
+test('an existing blank spare survives a loading document without another timer', () => {
+  const { vm, pending, tick } = warmupVm()
+  vm.initLibreSpare()
+  const spare = vm.libreSpares[0]
+  add(vm, 'right', 1)
+  vm._libreRefs['right:1'].ready = false
+  vm.scheduleLibreSpare()
+  tick()
+  assert.deepEqual(vm.libreSpares, [spare])
+  assert.equal(pending.size, 0)
+})
+
+test('a deferred warmup stops when its overview becomes inactive', () => {
+  const { vm, pending, tick } = warmupVm()
+  add(vm, 'left', 1)
+  vm._libreRefs['left:1'].ready = false
+  vm.scheduleLibreSpare()
+  tick()
+  assert.equal(vm.libreSpares.length, 0)
+  vm.isActiveOverviewInstance = () => false
+  tick()
+  assert.equal(vm.libreSpares.length, 0)
+  assert.equal(pending.size, 0)
+})
 
 for (const total of [8 * GiB, 7.7 * GiB, undefined, 0, NaN]) {
   test(`8 GiB or unknown memory keeps first-open prewarming but never adds a spare beside a document (${total})`, () => {
@@ -225,3 +356,35 @@ test('closing the sole Office pane restores prewarming beside a non-Office left 
   assert.equal(vm.libreSpares.length, 1)
   assert.equal(vm.libreSpares[0].file, null)
 })
+
+test('acquiring a hidden merge instance under 8 GiB evicts inactive background instances first (#1269 E-3)', async () => {
+  const vm = vmFor(8 * GiB)
+  add(vm, 'left', 1)
+  add(vm, 'left', 2)
+  await settle()
+  assert.deepEqual(vm.libreLruKeys, ['left:2', 'left:1'])
+  const pending = vm.acquireLibreHiddenInstance({ timeoutMs: 500 })
+  await settle()
+  assert.deepEqual(vm.libreLruKeys, ['left:2'], 'inactive background instance should be evicted to free WASM memory before merge')
+  const sp = vm.libreSpares.find(s => s.hidden)
+  vm.onLibreSpareReady(sp, { executeCommand: async () => ({ success: true }) })
+  const handle = await pending
+  vm.releaseLibreHiddenInstance(handle)
+})
+
+test('failed eviction schedules a bounded retry that evicts once save succeeds (#1269 E-2)', async () => {
+  const vm = vmFor(8 * GiB)
+  let allowSave = false
+  add(vm, 'left', 1, async () => allowSave)
+  add(vm, 'left', 2)
+  add(vm, 'left', 3)
+  await settle()
+  assert.ok(vm.libreLruKeys.includes('left:1'), 'retained while save fails')
+  assert.equal(vm._libreEvictRetryCounts['left:1'], 1, 'retry scheduled')
+  clearTimeout(vm._libreEvictRetryTimers['left:1'])
+  allowSave = true
+  await vm.evictLibreInstance('left:1')
+  assert.ok(!vm.libreLruKeys.includes('left:1'), 'evicted once subsequent save succeeds')
+  assert.equal(vm._libreEvictRetryCounts['left:1'], undefined, 'retry state cleared')
+})
+

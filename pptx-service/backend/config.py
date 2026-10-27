@@ -78,7 +78,7 @@ class Config:
     MINERU_LOCAL_URL = os.getenv('MINERU_LOCAL_URL', 'http://mineru-service:8000')
     # [checkba] 是否强制使用云端 MinerU（跳过本地服务优先逻辑）
     # 取值：1/true/yes/on 表示启用
-    MINERU_FORCE_CLOUD = os.getenv('MINERU_FORCE_CLOUD', '1')
+    MINERU_FORCE_CLOUD = os.getenv('MINERU_FORCE_CLOUD', '0')
     
     # 图片识别模型配置
     IMAGE_CAPTION_MODEL = os.getenv('IMAGE_CAPTION_MODEL', 'gemini-3-flash-preview')

@@ -35,6 +35,8 @@ public class MemoryPipelineService {
     private final ConversationSummarizer conversationSummarizer;
     private final ContextCompressor contextCompressor;
     private final com.checkba.version.memory.MemorySyncService memorySyncService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ai.ClientCapabilityService clientCapabilities;
 
     /**
      * 一轮对话（Agent 循环）完成后的记忆更新。异步执行，失败不影响对话主流程。
@@ -44,6 +46,9 @@ public class MemoryPipelineService {
     @Async("memoryExecutor")
     public void onConversationTurnCompleted(String conversationId, String projectId,
                                             Long userId, List<ChatMessage> messages) {
+        // Office tool messages and the current document are transient; do not derive a durable summary.
+        if (clientCapabilities != null && clientCapabilities.capabilityOf(conversationId)
+                == com.checkba.service.ai.ClientCapabilityService.Capability.OFFICE) return;
         // 独立线程池：平台通道按用户计费，摘要/抽取这几次 LLM 调用要落在本人的额度上
         com.checkba.service.ai.PlatformAiUserScope.run(userId,
                 () -> runPipeline(conversationId, projectId, userId, messages));

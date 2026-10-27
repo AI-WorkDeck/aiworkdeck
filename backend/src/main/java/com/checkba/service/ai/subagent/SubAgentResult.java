@@ -22,8 +22,20 @@ public record SubAgentResult(
         String result,
         String error,
         List<String> toolsUsed,
-        int rounds
+        int rounds,
+        List<FileChange> fileChanges
 ) {
+
+    public record FileChange(Long fileId, String changeType) {}
+
+    public SubAgentResult(String subtaskId, boolean success, String result, String error,
+                          List<String> toolsUsed, int rounds) {
+        this(subtaskId, success, result, error, toolsUsed, rounds, List.of());
+    }
+
+    public SubAgentResult withFileChanges(List<FileChange> changes) {
+        return new SubAgentResult(subtaskId, success, result, error, toolsUsed, rounds, List.copyOf(changes));
+    }
 
     public static SubAgentResult success(String subtaskId, String result, List<String> toolsUsed, int rounds) {
         return new SubAgentResult(subtaskId, true, result, null, List.copyOf(toolsUsed), rounds);
@@ -46,6 +58,8 @@ public record SubAgentResult(
         }
         o.set("toolsUsed", toolsUsed);
         o.set("rounds", rounds);
+        o.set("fileChanges", fileChanges.stream().map(change -> java.util.Map.of(
+                "fileId", change.fileId(), "changeType", change.changeType())).toList());
         return o.toString();
     }
 }

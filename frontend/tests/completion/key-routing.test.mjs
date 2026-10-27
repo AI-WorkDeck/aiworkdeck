@@ -70,7 +70,7 @@ function harness(t) {
     press, setBefore: value => { before = value }, expanded: () => overlay.element.getAttribute('aria-expanded'),
     // 设置面板没有画布上的入口了（dev-board#755），只能由宿主工具栏发指令开合。
     openSettings: () => deliver({ type: 'writing-assistance-panel', open: true }),
-    open: async () => { writing.committed('北京当红'); await debounce(); assert.equal(overlay.element.getAttribute('aria-expanded'), 'true', '候选应已展开') } }
+    open: async () => { await tick(); writing.keydown(new dom.window.KeyboardEvent('keydown', { key: ' ', ctrlKey: true, cancelable: true })); await debounce(); assert.equal(overlay.element.getAttribute('aria-expanded'), 'true', '候选应已展开') } }
 }
 
 test('候选可见时落在画布上的 Tab 接受候选，不插制表符也不漏给引擎', async t => {
@@ -135,17 +135,17 @@ test('落在画布上的方向键与回车照旧走引擎，宿主面板里的�
 })
 
 
-test('真实覆盖层重定位不清掉连续输入的候选选择及快速筛选', async t => {
+test('继续输入立即清除手动词库候选，不自动重弹旧匹配', async t => {
   const h = harness(t)
   h.setBefore('北京当')
   await h.open()
   h.press(h.input, 'ArrowDown')
-  const picked = h.input.getAttribute('aria-activedescendant')
   const delays = [], original = globalThis.setTimeout
   t.mock.method(globalThis, 'setTimeout', (fn, delay, ...args) => { delays.push(delay); return original(fn, delay, ...args) })
   h.press(h.input, '红')
   h.input.dispatchEvent(new h.dom.window.InputEvent('input', { data: '红', inputType: 'insertText', bubbles: true }))
   await new Promise(resolve => original(resolve, 120))
-  assert.ok(delays.includes(35), '真正的插入→光标重定位→提交链路必须使用35ms刷新')
-  assert.equal(h.input.getAttribute('aria-activedescendant'), picked, '仍有匹配的已选第二项不能跳回第一项')
+  assert.ok(delays.includes(1800), '真实输入链路使用语义建议停笔时间')
+  assert.equal(h.input.getAttribute('aria-activedescendant'), null)
+  assert.equal(h.expanded(), 'false')
 })

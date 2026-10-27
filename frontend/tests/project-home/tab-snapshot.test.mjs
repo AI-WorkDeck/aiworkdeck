@@ -15,6 +15,7 @@ import {
   restore,
   mergeRestored,
   snapshotNeedsFileCheck,
+  snapshotFileIds,
   tabSnapshotMethods,
 } from '../../src/pages/project-overview/tabSnapshot.js'
 
@@ -28,7 +29,7 @@ const artifact = { id: 'artifact-3', artifactId: 3, tabType: 'markdown', fileTyp
 const merge = { id: 'merge-review_1_a.docx', tabType: 'merge-review', fileType: 'merge-review', name: '合并', mergeSpec: { path: 'a.docx' } }
 const history = { id: 'commit-history_1', tabType: 'commit-history', name: '历史', historyFocus: 'remote', historyFocusSha: 'abc', historyFocusToken: 4 }
 const diff = { id: 'diff-1-2-99', tabType: 'diff', fileType: 'diff', name: 'a ↔ b', diffSource: { id: 1, name: 'a' }, diffTarget: { id: 2, name: 'b' } }
-const dd = { id: 'dd-7', requestId: 7, name: '清单', type: 'dd-request', fileType: 'dd', isFolder: false }
+const dd = { id: 'dd-7', requestId: 7, name: '清单', type: 'dd-request', tabType: 'dd-request', fileType: 'dd', isFolder: false }
 
 // ---------------- 序列化 ----------------
 
@@ -59,7 +60,7 @@ test('serializeTab：认不出来的 tabType、插件标签、没有 url 的网�
   assert.equal(serializeTab({ id: 'web_2', tabType: 'web', url: '' }), null)
   assert.equal(serializeTab({ id: 9, isFolder: true }), null)
   assert.equal(serializeTab({ id: 'abc', name: '非数字 id 的无类型标签' }), null)
-  assert.deepEqual(serializeTab(dd), { id: 'dd-7', requestId: 7, name: '清单', type: 'dd-request', fileType: 'dd', isFolder: false })
+  assert.deepEqual(serializeTab(dd), { id: 'dd-7', requestId: 7, name: '清单', type: 'dd-request', tabType: 'dd-request', fileType: 'dd', isFolder: false })
 })
 
 // ---------------- 恢复 ----------------
@@ -218,7 +219,7 @@ test('restoreTabSnapshot：文件核对走宿主的 fetchTabSnapshotFileIndex，
   const vm = fakeVm()
   vm.store.set('project_7_tabs', serialize([doc(1), doc(2), calendar], [], 1, null, {}))
   let fetched = 0
-  vm.fetchTabSnapshotFileIndex = async () => { fetched++; return new Map([['1', { id: 1, name: 'f1.docx', fileType: 'docx' }]]) }
+  vm.fetchTabSnapshotFileIndex = async (ids) => { assert.deepEqual(ids, ['1', '2']); fetched++; return new Map([['1', { id: 1, name: 'f1.docx', fileType: 'docx' }]]) }
   vm.activeFileIdLeft = 99 // activeTabsByMode 的旧记忆（指向一个已经不在标签条里的 id）
   const restored = await vm.restoreTabSnapshot()
   assert.equal(restored, true)
@@ -247,4 +248,13 @@ test('restoreTabSnapshot：只有全局标签的快照不发文件清单那个 G
   await vm.restoreTabSnapshot()
   assert.equal(fetched, 0)
   assert.deepEqual(vm.leftFiles.map((t) => t.id), ['welcome', 'web_1_abc'])
+})
+
+
+test('snapshotFileIds: only valid file references, both diff sides, deduplicated across panes', () => {
+  const snap = { left: [doc(1), diff, web, { id: 'other', tabType: 'diff', diffSource: { id: 3 }, diffTarget: { id: 'broken' } }],
+    right: [doc('1'), doc(2), settings, null, { id: 0 }] }
+  assert.deepEqual(snapshotFileIds(snap), ['1', '2', '3'])
+  assert.deepEqual(snapshotFileIds(null), [])
+  assert.deepEqual(snapshotFileIds({ left: [welcome, calendar] }), [])
 })

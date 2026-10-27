@@ -34,3 +34,4 @@ export const confirmPaidTranscription = async (opts) => {
 }
 export const setPaidConfirmResult = (v) => { paidConfirmResult = v }
 export const paidConfirmArgs = () => paidConfirmArgList
+export const deleteMeetingRecording = async () => ({ deleted: true })

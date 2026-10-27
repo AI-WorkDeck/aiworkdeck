@@ -143,6 +143,7 @@ public class DesktopRefHandler {
         List<Map<String, Object>> entries = new ArrayList<>();
         if (ALL_PROJECTS.equals(projectKey)) {
             for (Project p : projectRepository.findByUserIdOrderByCreatedAtDesc(userId)) {
+                if (p.isLooseFileWorkspace()) continue;
                 if (entries.size() >= MAX_ENTRIES) break;
                 collect(p.getId(), keyword, MAX_ENTRIES_PER_PROJECT, entries);
             }
@@ -301,7 +302,7 @@ public class DesktopRefHandler {
         } catch (NumberFormatException e) {
             return null;
         }
-        Project project = projectRepository.findById(projectId).orElse(null);
+        Project project = projectRepository.findById(projectId).filter(p -> !p.isLooseFileWorkspace()).orElse(null);
         return project != null && userId != null && userId.equals(project.getUserId()) ? project : null;
     }
 

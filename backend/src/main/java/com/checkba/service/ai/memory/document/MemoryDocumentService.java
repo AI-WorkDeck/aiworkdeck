@@ -11,6 +11,7 @@ import com.checkba.repository.MemoryDocumentRepository;
 import com.checkba.repository.MemoryDocumentSpaceRepository;
 import com.checkba.repository.MemoryEntryRepository;
 import com.checkba.repository.ProjectRepository;
+import com.checkba.service.LangText;
 import com.checkba.service.ProjectMemberService;
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,11 +30,14 @@ import java.util.regex.Pattern;
 @Service
 public class MemoryDocumentService {
     public static final String INDEX_PATH = "remember.md";
+    public static final int MAX_INDEX_HOOK_CHARS = 120;
     private static final int MAX_CONTENT_CHARS = 128 * 1024;
     private static final String LINKS_START = "<!-- memory-topics:start -->";
     private static final String LINKS_END = "<!-- memory-topics:end -->";
     private static final Pattern HEADING = Pattern.compile("(?m)^#\\s+(.+?)\\s*$");
     private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[[^\\]]*]\\(([^)]+)\\)");
+    private static final Pattern INLINE_MARKDOWN_LINK = Pattern.compile("\\[([^\\]]+)]\\([^)]*\\)");
+    private static final Pattern FRONTMATTER_DESCRIPTION = Pattern.compile("(?m)^description:\\s*(.+?)\\s*$");
 
     private final MemoryDocumentRepository documents;
     private final MemoryDocumentSpaceRepository spaces;
@@ -71,26 +75,32 @@ public class MemoryDocumentService {
         requireUser(userId);
         List<MemorySpaceView> result = required(transactions.execute(status -> listLocalSpaces(userId, projectId)));
         List<MemorySpaceView> org = organizations.listSpaces(userId);
-        result.add(findOrg(org, "team", "团队记忆", "团队记忆暂不可用"));
-        result.add(findOrg(org, "firm", "律所记忆", "律所记忆暂不可用"));
+        result.add(findOrg(org, "team", LangText.of("团队记忆", "Team Memory"), LangText.of("团队记忆暂不可用", "Team memory is temporarily unavailable")));
+        result.add(findOrg(org, "firm", LangText.of("律所记忆", "Law Firm Memory"), LangText.of("律所记忆暂不可用", "Law firm memory is temporarily unavailable")));
         return result;
     }
 
     private List<MemorySpaceView> listLocalSpaces(Long userId, Long projectId) {
         List<MemorySpaceView> result = new ArrayList<>(4);
-        MemoryDocumentSpace user = ensureSpace("user", String.valueOf(userId), "个人记忆");
+        MemoryDocumentSpace user = ensureSpace("user", String.valueOf(userId), LangText.of("个人记忆", "Personal Memory"));
         result.add(view(user, true, true, true, null));
 
         if (projectId == null) {
-            result.add(MemorySpaceView.unavailable("project", "项目记忆", "请选择项目"));
+            result.add(MemorySpaceView.unavailable("project", LangText.of("项目记忆", "Project Memory"), LangText.of("请选择项目", "Please select a project")));
         } else {
             if (!projectMembers.hasReadPermission(projectId, userId)) {
-                throw denied("无权访问该项目的记忆");
+                throw denied(LangText.of("无权访问该项目的记忆", "No permission to access this project's memory"));
+            }
+            // Project memory may contain extracts from private staff files. Keep personal
+            // memory available without disclosing the project's space id or real label.
+            if (projectMembers.isClient(projectId, userId)) {
+                result.add(MemorySpaceView.unavailable("project", LangText.of("项目记忆", "Project Memory"), LangText.of("无权访问该项目的记忆", "No permission to access this project's memory")));
+                return result;
             }
             Project project = projects.findById(projectId)
-                    .orElseThrow(() -> bad("项目不存在"));
+                    .orElseThrow(() -> bad(LangText.of("项目不存在", "Project not found")));
             MemoryDocumentSpace projectSpace = ensureSpace("project", String.valueOf(projectId),
-                    project.getName() == null || project.getName().isBlank() ? "项目记忆" : project.getName());
+                    project.getName() == null || project.getName().isBlank() ? LangText.of("项目记忆", "Project Memory") : project.getName());
             result.add(view(projectSpace, true,
                     projectMembers.hasWritePermission(projectId, userId), true, null));
         }
@@ -115,7 +125,7 @@ public class MemoryDocumentService {
             LocalAccess access = requireLocalAccess(userId, spaceId, false);
             if (INDEX_PATH.equals(path)) ensureIndex(access.space());
             MemoryDocument document = documents.findBySpaceIdAndPath(spaceId, path)
-                    .filter(d -> !d.isDeleted()).orElseThrow(() -> bad("记忆文件不存在"));
+                    .filter(d -> !d.isDeleted()).orElseThrow(() -> bad(LangText.of("记忆文件不存在", "Memory file not found")));
             return toView(document, access.writable(), true);
         }));
     }
@@ -135,7 +145,7 @@ public class MemoryDocumentService {
 
     public void delete(Long userId, String spaceId, String path, long expectedRevision) {
         validatePath(path);
-        if (INDEX_PATH.equals(path)) throw bad("remember.md 是空间索引，不能删除；可以编辑或清空正文");
+        if (INDEX_PATH.equals(path)) throw bad(LangText.of("remember.md 是空间索引，不能删除；可以编辑或清空正文", "remember.md is the space index and cannot be deleted; you can edit or clear its content"));
         if (organizations.handles(spaceId)) {
             organizations.delete(requireUser(userId), spaceId, path, expectedRevision);
             return;
@@ -143,7 +153,7 @@ public class MemoryDocumentService {
         transactions.executeWithoutResult(status -> {
             LocalAccess access = requireLocalAccess(userId, spaceId, true);
             MemoryDocument document = documents.findLockedBySpaceIdAndPath(spaceId, path)
-                    .filter(d -> !d.isDeleted()).orElseThrow(() -> bad("记忆文件不存在"));
+                    .filter(d -> !d.isDeleted()).orElseThrow(() -> bad(LangText.of("记忆文件不存在", "Memory file not found")));
             checkRevision(document, expectedRevision);
             document.setDeleted(true);
             document.setRevision(document.getRevision() + 1);
@@ -163,7 +173,7 @@ public class MemoryDocumentService {
     }
 
     public List<MemoryFileView> search(Long userId, String spaceId, String query, int limit) {
-        if (query == null || query.isBlank()) throw bad("搜索词不能为空");
+        if (query == null || query.isBlank()) throw bad(LangText.of("搜索词不能为空", "Search query cannot be empty"));
         int capped = Math.max(1, Math.min(limit, 20));
         if (organizations.handles(spaceId)) {
             return organizations.search(requireUser(userId), spaceId, query, capped);
@@ -213,8 +223,24 @@ public class MemoryDocumentService {
                 current.setRevision(Math.max(current.getRevision() + 1, documentRevision(entry)));
                 current.setUpdatedAt(LocalDateTime.now());
                 documents.save(current);
+                if (!INDEX_PATH.equals(path)) {
+                    refreshIndex(space, entry.getUserId());
+                }
             }
             return toView(current, true, true);
+        }
+        if (path.startsWith("legacy/") && entry.getMemoryKey() != null && !entry.getMemoryKey().isBlank()) {
+            String normalizedTitle = entry.getMemoryKey().trim();
+            for (MemoryDocument doc : documents.findBySpaceIdAndDeletedFalseOrderByPathAsc(space.getId())) {
+                if (doc.getPath().startsWith("legacy/")
+                        && !Objects.equals(doc.getSourceMemoryUid(), entry.getUid())
+                        && normalizedTitle.equals(doc.getTitle())) {
+                    doc.setDeleted(true);
+                    doc.setRevision(doc.getRevision() + 1);
+                    doc.setUpdatedAt(LocalDateTime.now());
+                    documents.save(doc);
+                }
+            }
         }
         return writeLocal(space, entry.getUserId(), path, content, 0, entry.getUid());
     }
@@ -265,13 +291,13 @@ public class MemoryDocumentService {
                                       String content, long expectedRevision, String sourceMemoryUid) {
         MemoryDocument document = documents.findLockedBySpaceIdAndPath(space.getId(), path).orElse(null);
         if (document == null) {
-            if (expectedRevision != 0) throw conflict("记忆文件已发生变化，请刷新后重试");
+            if (expectedRevision != 0) throw conflict(LangText.of("记忆文件已发生变化，请刷新后重试", "Memory file has changed; please refresh and try again"));
             document = new MemoryDocument();
             document.setSpaceId(space.getId());
             document.setPath(path);
             document.setRevision(1);
         } else if (document.isDeleted()) {
-            if (expectedRevision != 0) throw conflict("记忆文件已删除，请刷新后重试");
+            if (expectedRevision != 0) throw conflict(LangText.of("记忆文件已删除，请刷新后重试", "Memory file was deleted; please refresh and try again"));
             document.setRevision(document.getRevision() + 1);
         } else {
             checkRevision(document, expectedRevision);
@@ -287,16 +313,20 @@ public class MemoryDocumentService {
         try {
             document = documents.saveAndFlush(document);
         } catch (DataIntegrityViolationException e) {
-            throw conflict("记忆文件已被另一处创建，请刷新后重试");
+            throw conflict(LangText.of("记忆文件已被另一处创建，请刷新后重试", "Memory file was created concurrently; please refresh and try again"));
         }
         if (document.getSourceMemoryUid() == null) document.setSourceMemoryUid(UUID.randomUUID().toString());
         documents.saveAndFlush(document);
-        syncLegacyIndex(document, space);
+        syncLegacyIndex(document, space, sourceMemoryUid != null);
         if (!INDEX_PATH.equals(path)) refreshIndex(space, userId);
         return toView(document, true, true);
     }
 
     private void syncLegacyIndex(MemoryDocument document, MemoryDocumentSpace space) {
+        syncLegacyIndex(document, space, false);
+    }
+
+    private void syncLegacyIndex(MemoryDocument document, MemoryDocumentSpace space, boolean fromLegacyEntry) {
         MemoryEntry entry = legacyEntries.findFirstByUid(document.getSourceMemoryUid()).orElseGet(MemoryEntry::new);
         boolean derived = entry.getId() == null;
         entry.setUid(document.getSourceMemoryUid());
@@ -309,8 +339,10 @@ public class MemoryDocumentService {
             entry.setImportanceScore(0.7);
             entry.setIsProtected(false);
         }
-        entry.setMemoryKey(document.getTitle());
-        entry.setMemoryValue(document.getContent());
+        if (!fromLegacyEntry || derived) {
+            entry.setMemoryKey(document.getTitle());
+            entry.setMemoryValue(document.getContent());
+        }
         Map<String, Object> metadata = entry.getMetadata() == null
                 ? new LinkedHashMap<>() : new LinkedHashMap<>(entry.getMetadata());
         metadata.put("documentPath", document.getPath());
@@ -357,7 +389,7 @@ public class MemoryDocumentService {
     private LocalAccess requireLocalAccess(Long userId, String spaceId, boolean write) {
         requireUser(userId);
         MemoryDocumentSpace space = spaces.findById(spaceId == null ? "" : spaceId)
-                .orElseThrow(() -> denied("无权访问这个记忆空间"));
+                .orElseThrow(() -> denied(LangText.of("无权访问这个记忆空间", "No permission to access this memory space")));
         boolean readable;
         boolean writable;
         if ("user".equals(space.getScope())) {
@@ -365,12 +397,15 @@ public class MemoryDocumentService {
             writable = readable;
         } else if ("project".equals(space.getScope())) {
             Long projectId = parseLong(space.getOwnerKey());
-            readable = projectId != null && projectMembers.hasReadPermission(projectId, userId);
-            writable = projectId != null && projectMembers.hasWritePermission(projectId, userId);
+            readable = projectId != null && projectMembers.hasReadPermission(projectId, userId)
+                    && !projectMembers.isClient(projectId, userId);
+            writable = readable && projectMembers.hasWritePermission(projectId, userId);
         } else {
-            throw denied("无权访问这个记忆空间");
+            throw denied(LangText.of("无权访问这个记忆空间", "No permission to access this memory space"));
         }
-        if (!readable || (write && !writable)) throw denied(write ? "无权修改这个记忆空间" : "无权读取这个记忆空间");
+        if (!readable || (write && !writable)) throw denied(write
+                ? LangText.of("无权修改这个记忆空间", "No permission to modify this memory space")
+                : LangText.of("无权读取这个记忆空间", "No permission to read this memory space"));
         return new LocalAccess(space, writable);
     }
 
@@ -443,7 +478,7 @@ public class MemoryDocumentService {
             if (!target.toLowerCase(Locale.ROOT).endsWith(".md")) continue;
             validatePath(target);
             if (documents.findBySpaceIdAndPath(space.getId(), target).filter(d -> !d.isDeleted()).isEmpty()) {
-                throw bad("记忆索引链接的文件不存在: " + target);
+                throw bad(LangText.of("记忆索引链接的文件不存在: ", "File linked in memory index does not exist: ") + target);
             }
         }
     }
@@ -452,9 +487,92 @@ public class MemoryDocumentService {
         StringBuilder links = new StringBuilder(LINKS_START).append('\n');
         for (MemoryDocument topic : topics) {
             links.append("- [").append(linkLabel(topic.getTitle())).append("](")
-                    .append(topic.getPath()).append(")\n");
+                    .append(topic.getPath()).append(")");
+            String hook = extractSummaryHook(topic.getTitle(), topic.getContent());
+            if (!hook.isBlank()) {
+                links.append(" — ").append(hook);
+            }
+            links.append('\n');
         }
         return links.append(LINKS_END).toString();
+    }
+
+    /**
+     * 提取细项文档的一句话高密度摘要（Index Hook），用于拼入 {@code remember.md} 总表：
+     * <ol>
+     *   <li>优先读取 YAML frontmatter 中的 {@code description:} 字段（对齐 Claude Code 记忆索引规范）；</li>
+     *   <li>若无 frontmatter 描述，则跳过标题行与注释后提取正文首段第一行作为摘要钩子；</li>
+     *   <li>单行化、剥离内联 Markdown 链接语法并截断至 {@link #MAX_INDEX_HOOK_CHARS} 字符。</li>
+     * </ol>
+     */
+    public static String extractSummaryHook(String title, String content) {
+        if (content == null || content.isBlank()) {
+            return "";
+        }
+        String normalized = content.replace("\r\n", "\n").trim();
+        String rawHook = null;
+        String body = normalized;
+        if (normalized.startsWith("---\n")) {
+            int closingFence = normalized.indexOf("\n---\n", 4);
+            if (closingFence >= 0) {
+                String frontmatter = normalized.substring(4, closingFence);
+                Matcher descMatcher = FRONTMATTER_DESCRIPTION.matcher(frontmatter);
+                if (descMatcher.find()) {
+                    rawHook = stripQuotes(descMatcher.group(1).trim());
+                }
+                body = normalized.substring(closingFence + 5).trim();
+            }
+        }
+        if (rawHook == null || rawHook.isBlank()) {
+            for (String line : body.split("\n")) {
+                String trimmed = line.trim();
+                if (trimmed.isEmpty()
+                        || trimmed.startsWith("#")
+                        || trimmed.startsWith("<!--")
+                        || trimmed.startsWith("```")
+                        || "---".equals(trimmed)) {
+                    continue;
+                }
+                if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+                    trimmed = trimmed.substring(2).trim();
+                }
+                if (!trimmed.isEmpty()) {
+                    rawHook = trimmed;
+                    break;
+                }
+            }
+        }
+        if (rawHook == null || rawHook.isBlank()) {
+            return "";
+        }
+        String cleaned = cleanHookText(rawHook);
+        if (cleaned.isEmpty() || (title != null && cleaned.equalsIgnoreCase(title.trim()))) {
+            return "";
+        }
+        return truncateHook(cleaned, MAX_INDEX_HOOK_CHARS);
+    }
+
+    private static String cleanHookText(String text) {
+        String withoutLinks = INLINE_MARKDOWN_LINK.matcher(text).replaceAll("$1");
+        return withoutLinks.replaceAll("\\s+", " ").trim();
+    }
+
+    private static String stripQuotes(String value) {
+        if (value == null || value.length() < 2) {
+            return value == null ? "" : value;
+        }
+        if ((value.startsWith("\"") && value.endsWith("\""))
+                || (value.startsWith("'") && value.endsWith("'"))) {
+            return value.substring(1, value.length() - 1).trim();
+        }
+        return value;
+    }
+
+    private static String truncateHook(String text, int maxChars) {
+        if (text == null || text.length() <= maxChars) {
+            return text == null ? "" : text;
+        }
+        return text.substring(0, Math.max(1, maxChars - 1)).trim() + "…";
     }
 
     private List<OrganizationIndex> organizationIndexes(Long userId) {
@@ -511,29 +629,50 @@ public class MemoryDocumentService {
     private static void validatePath(String path) {
         if (path == null || path.isBlank() || path.length() > 512 || !path.endsWith(".md")
                 || path.startsWith("/") || path.startsWith("\\") || path.contains("\\")
-                || path.contains(":") || path.contains("//")) throw bad("记忆文件路径不正确");
+                || path.contains(":") || path.contains("//")) throw bad(LangText.of("记忆文件路径不正确", "Invalid memory file path"));
         for (String segment : path.split("/")) {
-            if (segment.isBlank() || ".".equals(segment) || "..".equals(segment)) throw bad("记忆文件路径不正确");
+            if (segment.isBlank() || ".".equals(segment) || "..".equals(segment)) throw bad(LangText.of("记忆文件路径不正确", "Invalid memory file path"));
         }
     }
 
     private static void validateContent(String content) {
-        if (content == null) throw bad("记忆内容不能为空");
+        if (content == null) throw bad(LangText.of("记忆内容不能为空", "Memory content cannot be null"));
         if (content.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_CONTENT_CHARS) {
-            throw bad("记忆文件不能超过 128 KiB");
+            throw bad(LangText.of("记忆文件不能超过 128 KiB", "Memory file cannot exceed 128 KiB"));
         }
     }
 
     private static void checkRevision(MemoryDocument document, long expectedRevision) {
-        if (expectedRevision != document.getRevision()) throw conflict("记忆文件已发生变化，请刷新后重试");
+        if (expectedRevision != document.getRevision()) throw conflict(LangText.of("记忆文件已发生变化，请刷新后重试", "Memory file has changed; please refresh and try again"));
     }
 
     private static String legacyMarkdown(MemoryEntry e) {
-        return "---\nsource: legacy-memory-entry\nuid: " + e.getUid()
-                + "\ntype: " + nullToEmpty(e.getMemoryType())
-                + "\nprotected: " + Boolean.TRUE.equals(e.getIsProtected()) + "\n---\n\n# "
-                + (e.getMemoryKey() == null || e.getMemoryKey().isBlank() ? "历史记忆" : e.getMemoryKey())
-                + "\n\n" + nullToEmpty(e.getMemoryValue());
+        String key = e.getMemoryKey() == null || e.getMemoryKey().isBlank() ? "历史记忆" : e.getMemoryKey().trim();
+        String rawValue = nullToEmpty(e.getMemoryValue()).trim();
+        String firstLine = rawValue.lines()
+                .map(String::trim)
+                .filter(line -> !line.isEmpty() && !line.startsWith("#"))
+                .findFirst()
+                .orElse("");
+        String hook = truncateHook(cleanHookText(firstLine), MAX_INDEX_HOOK_CHARS);
+        StringBuilder sb = new StringBuilder("---\nsource: legacy-memory-entry\nuid: ")
+                .append(e.getUid())
+                .append("\nname: ").append(sanitizeYamlScalar(key));
+        if (!hook.isBlank()) {
+            sb.append("\ndescription: ").append(sanitizeYamlScalar(hook));
+        }
+        sb.append("\ntype: ").append(nullToEmpty(e.getMemoryType()))
+                .append("\nprotected: ").append(Boolean.TRUE.equals(e.getIsProtected()))
+                .append("\n---\n\n# ").append(key)
+                .append("\n\n").append(rawValue);
+        return sb.toString();
+    }
+
+    private static String sanitizeYamlScalar(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replace("\r", " ").replace("\n", " ").trim();
     }
 
     private static String documentPath(MemoryEntry entry) {
@@ -544,7 +683,12 @@ public class MemoryDocumentService {
 
     private static String documentContent(MemoryEntry entry) {
         Object path = entry.getMetadata() == null ? null : entry.getMetadata().get("documentPath");
-        return path == null ? legacyMarkdown(entry) : nullToEmpty(entry.getMemoryValue());
+        String value = nullToEmpty(entry.getMemoryValue());
+        if (path == null || (String.valueOf(path).startsWith("legacy/")
+                && !value.startsWith("---\nsource: legacy-memory-entry\n"))) {
+            return legacyMarkdown(entry);
+        }
+        return value;
     }
 
     private static long documentRevision(MemoryEntry entry) {
@@ -559,7 +703,7 @@ public class MemoryDocumentService {
     }
 
     private static Long requireUser(Long userId) {
-        if (userId == null) throw new MemoryDocumentException(401, "请先登录");
+        if (userId == null) throw new MemoryDocumentException(401, LangText.of("请先登录", "Please sign in first"));
         return userId;
     }
 

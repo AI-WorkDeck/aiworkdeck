@@ -208,36 +208,41 @@ export default {
   max-height: 82vh;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 12px;
+  border-radius: var(--awd-radius-dialog);
   box-shadow: var(--awd-shadow-lg);
   padding: 20px;
   display: flex;
   flex-direction: column;
 }
-.ocd-title { font-size: 18px; font-weight: 600; color: var(--awd-text); }
+.ocd-title { font-size: var(--awd-font-size-title); font-weight: 600; color: var(--awd-text); }
 .ocd-subtitle {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   margin: 6px 0 12px;
   line-height: 1.6;
 }
 .ocd-list { flex: 1; overflow: auto; }
 .ocd-total { margin-top: 10px; }
-.ocd-total-text { font-size: 12px; color: var(--awd-text-2); }
+.ocd-total-text { font-size: var(--awd-panel-fs); color: var(--awd-text-2); }
 .ocd-total-bar {
   height: 6px;
   background: var(--awd-surface-3);
-  border-radius: 3px;
+  border-radius: var(--awd-radius-sm);
   overflow: hidden;
   margin-top: 6px;
 }
 .ocd-total-fill { height: 100%; background: var(--awd-accent); transition: width 0.3s; }
 .ocd-actions { display: flex; gap: 10px; margin-top: 14px; }
 .ocd-btn {
-  padding: 8px 16px;
+  height: var(--awd-control-height);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
   border: 1px solid var(--awd-border-strong);
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   cursor: pointer;
 }
@@ -249,6 +254,6 @@ export default {
 }
 .ocd-btn.primary:hover { background: var(--awd-accent-hover); }
 .ocd-btn.disabled { opacity: 0.5; }
-.ocd-ready { font-size: 12px; color: var(--awd-text-3); margin-top: 10px; line-height: 1.5; }
-.ocd-hint { font-size: 12px; color: var(--awd-text-2); margin-top: 8px; }
+.ocd-ready { font-size: var(--awd-panel-fs); color: var(--awd-text-3); margin-top: 10px; line-height: 1.5; }
+.ocd-hint { font-size: var(--awd-panel-fs); color: var(--awd-text-2); margin-top: 8px; }
 </style>

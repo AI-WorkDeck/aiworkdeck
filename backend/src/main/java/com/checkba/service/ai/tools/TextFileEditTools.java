@@ -7,19 +7,13 @@ import com.checkba.model.entity.ProjectFile;
 import com.checkba.repository.ProjectFileRepository;
 import com.checkba.service.ai.EditorBridgeService;
 import com.checkba.service.ai.context.ProjectContextHolder;
-import com.checkba.storage.StorageServiceFactory;
 import com.checkba.version.WorkSessionService;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
@@ -43,7 +37,7 @@ import java.util.Set;
 public class TextFileEditTools implements AgentToolComponent {
 
     private final ProjectFileRepository projectFileRepository;
-    private final StorageServiceFactory storageServiceFactory;
+    private final com.checkba.service.ProjectFileContentService contentService;
     private final WorkSessionService workSessionService;
     private final EditorBridgeService editorBridgeService;
     private final com.checkba.service.UserService userService;
@@ -69,11 +63,12 @@ public class TextFileEditTools implements AgentToolComponent {
         log.info("Tool: text_write_file called for fileId={}", fileId);
         Resolved r = resolveTextFile(fileId);
         if (r.error != null) return r.error;
-        ProjectFile pf = r.file;
         String text = content == null ? "" : content;
         try {
-            writeBack(pf, text);
-            return "已写入 " + pf.getName() + "（" + text.length() + " 字符）。改动已进入版本记录。";
+            var result = contentService.mutateText(fileId, ProjectContextHolder.getProjectIdAsLong(),
+                    ProjectContextHolder.getUserId(), this::validateFreshTextFile, false, ignored -> text, MAX_TEXT_BYTES);
+            notifyWritten(result.file());
+            return "已写入 " + result.file().getName() + "（" + text.length() + " 字符）。改动已进入版本记录。";
         } catch (Exception e) {
             log.warn("text_write_file failed for fileId={}", fileId, e);
             return "Error: 写入失败: " + e.getMessage();
@@ -109,21 +104,20 @@ public class TextFileEditTools implements AgentToolComponent {
         }
         Resolved r = resolveTextFile(fileId);
         if (r.error != null) return r.error;
-        ProjectFile pf = r.file;
         try {
-            String text = readText(pf);
-            int hits = countOccurrences(text, find);
-            if (hits == 0) {
-                return noHitMessage(find, text.length());
-            }
             String replacement = replace == null ? "" : replace;
-            String updated = replaceAll
-                    ? text.replace(find, replacement)
-                    : text.replaceFirst(java.util.regex.Pattern.quote(find),
-                            java.util.regex.Matcher.quoteReplacement(replacement));
+            var result = contentService.mutateText(fileId, ProjectContextHolder.getProjectIdAsLong(),
+                    ProjectContextHolder.getUserId(), this::validateFreshTextFile, true, text -> {
+                        if (countOccurrences(text, find) == 0) return null;
+                        return replaceAll ? text.replace(find, replacement)
+                                : text.replaceFirst(java.util.regex.Pattern.quote(find),
+                                        java.util.regex.Matcher.quoteReplacement(replacement));
+                    }, MAX_TEXT_BYTES);
+            if (!result.changed()) return noHitMessage(find, result.before().length());
+            int hits = countOccurrences(result.before(), find);
             int applied = replaceAll ? hits : 1;
-            writeBack(pf, updated);
-            return "已在 " + pf.getName() + " 中替换 " + applied + " 处（命中 " + hits + " 处）。改动已进入版本记录。";
+            notifyWritten(result.file());
+            return "已在 " + result.file().getName() + " 中替换 " + applied + " 处（命中 " + hits + " 处）。改动已进入版本记录。";
         } catch (Exception e) {
             log.warn("text_find_replace failed for fileId={}", fileId, e);
             return "Error: 替换失败: " + e.getMessage();
@@ -165,45 +159,16 @@ public class TextFileEditTools implements AgentToolComponent {
         return PLAIN_TEXT_TYPES.contains(ext.toLowerCase(Locale.ROOT));
     }
 
-    /** 存储键与 DocumentTextService.extractText 同口径：只认 filePath（wpsFileId 不是存储键，dev-board#1035）。 */
-    private String storageKey(ProjectFile pf) {
-        String path = pf.getFilePath();
-        if (path == null || path.isBlank()) {
-            throw new IllegalStateException("文件没有存储路径: " + pf.getId());
-        }
-        return path;
-    }
-
-    /** 原始字节按 UTF-8 直读——不能走 Tika 抽取，改写回去要的是逐字节可逆的原文。 */
-    private String readText(ProjectFile pf) throws Exception {
-        Resource resource = storageServiceFactory.getStorageService().load(storageKey(pf));
-        try (InputStream is = resource.getInputStream()) {
-            byte[] bytes = is.readAllBytes();
-            if (bytes.length > MAX_TEXT_BYTES) {
-                throw new IllegalStateException("文件过大（>" + (MAX_TEXT_BYTES / 1024 / 1024) + "MB），拒绝整篇改写。");
-            }
-            return new String(bytes, StandardCharsets.UTF_8);
+    private void validateFreshTextFile(ProjectFile file) {
+        String denied = ToolFileGuard.rejectIfOutsideProject(file);
+        if (denied != null) throw new IllegalArgumentException(denied);
+        if (Boolean.TRUE.equals(file.getIsFolder()) || !isPlainText(file)) {
+            throw new IllegalArgumentException("本工具仅限纯文本文件；Word/Excel/PPT 请使用 doc_* / sheet_* / slide_*。");
         }
     }
 
-    /**
-     * 落盘 + 元数据 + 版本信号 + 前端刷新。
-     * 与 FileController.uploadFile 的收尾同构：字节写成功后元数据/信号失败只记日志，
-     * 不把已生效的写入报成失败。
-     */
-    private void writeBack(ProjectFile pf, String text) throws Exception {
-        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
-        if (bytes.length > MAX_TEXT_BYTES) {
-            throw new IllegalStateException("内容过大（>" + (MAX_TEXT_BYTES / 1024 / 1024) + "MB），拒绝写入。");
-        }
-        storageServiceFactory.getStorageService().save(storageKey(pf), new ByteArrayInputStream(bytes));
-        try {
-            pf.setFileSize((long) bytes.length);
-            pf.setUpdatedAt(LocalDateTime.now());
-            projectFileRepository.save(pf);
-        } catch (Exception e) {
-            log.warn("text write: 回写文件元数据失败 fileId={}", pf.getId(), e);
-        }
+    /** Content service has released the snapshot lock before any version signal or editor I/O. */
+    private void notifyWritten(ProjectFile pf) {
         signalChange(pf);
         try {
             editorBridgeService.sendTextReloadFileAction(pf);

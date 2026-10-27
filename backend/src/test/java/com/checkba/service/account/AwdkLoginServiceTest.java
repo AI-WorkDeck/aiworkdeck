@@ -82,6 +82,17 @@ class AwdkLoginServiceTest {
         }
     }
 
+    @Test
+    void compatibilityChallengeRespectsBridgeSwitchAndUsesSameTransport() {
+        assertThrows(IllegalArgumentException.class, () -> service(false).captchaChallenge(Map.of("phone", "13800138000", "purpose", "login")));
+        assertTrue(transport.calls.isEmpty());
+        transport.enqueue(200, "{\"id\":\"challenge\",\"image\":\"data:image/png;base64,fixture\"}");
+        Map<String, Object> result = service(true).captchaChallenge(Map.of("phone", "13800138000", "purpose", "login", "ip", "forged"));
+        assertEquals("challenge", result.get("id"));
+        assertTrue(transport.calls.get(0).endsWith("/api/auth/captcha-challenge"));
+        assertFalse(transport.bodies.get(0).contains("forged"));
+    }
+
     private StubTransport transport;
     private UserService userService;
     private com.checkba.service.UserSessionService sessionService;
@@ -114,6 +125,10 @@ class AwdkLoginServiceTest {
                 .thenAnswer(inv -> usersById.values().stream()
                         .filter(u -> inv.getArgument(0, String.class).equals(u.getPhone()))
                         .findFirst());
+        when(userRepository.findByVerifiedEmail(anyString()))
+                .thenAnswer(inv -> usersById.values().stream()
+                        .filter(u -> inv.getArgument(0, String.class).equals(u.getVerifiedEmail()))
+                        .findFirst());
         when(userRepository.save(any(User.class))).thenAnswer(inv -> {
             User u = inv.getArgument(0);
             if (u.getId() == null) u.setId(userSeq.getAndIncrement());
@@ -140,6 +155,9 @@ class AwdkLoginServiceTest {
         bindingRepository = mock(AccountBindingRepository.class);
         when(bindingRepository.findByExternalAccountId(anyString()))
                 .thenAnswer(inv -> Optional.ofNullable(bindingsByAccountId.get(inv.getArgument(0, String.class))));
+        when(bindingRepository.findByUserId(anyLong()))
+                .thenAnswer(inv -> bindingsByAccountId.values().stream()
+                        .filter(b -> inv.getArgument(0, Long.class).equals(b.getUserId())).findFirst());
         when(bindingRepository.save(any(AccountBinding.class))).thenAnswer(inv -> {
             AccountBinding b = inv.getArgument(0);
             if (b.getId() == null) b.setId(seq.getAndIncrement());
@@ -601,8 +619,8 @@ class AwdkLoginServiceTest {
     }
 
     @Test
-    @DisplayName("认领转移：号码正被手机号免密建号的孤立用户占用时，转移到桥接用户（同一个人）")
-    void bridgeClaimTransfersPhoneFromStandaloneUser() {
+    @DisplayName("密码桥首次接入复用已验证手机号用户，保留数据归属")
+    void bridgeReusesPhoneUserWithoutMovingData() {
         User orphan = userService.findOrCreateByPhone("18610211590").user();
         assertEquals("18610211590", orphan.getPhone());
 
@@ -610,7 +628,8 @@ class AwdkLoginServiceTest {
         AwdkLoginService.BridgeSession session = service(true).login(KEY);
 
         assertEquals("18610211590", usersById.get(session.userId()).getPhone());
-        assertNull(usersById.get(orphan.getId()).getPhone(), "孤立用户的号码应被转移走");
+        assertEquals(orphan.getId(), session.userId(), "不能新建空用户并把旧用户的手机号拿走");
+        assertEquals(1, usersById.size());
     }
 
     @Test
@@ -635,6 +654,105 @@ class AwdkLoginServiceTest {
         transport.enqueue(200, ME_OK.replace("\"plan\":\"paid\"", "\"plan\":\"paid\",\"phone\":\"+86 186\""));
         AwdkLoginService.BridgeSession session = service(true).login(KEY);
         assertNull(usersById.get(session.userId()).getPhone());
+    }
+
+    @Test
+    void bridgeReusesVerifiedEmailButNeverProfileEmail() {
+        User old = userService.findOrCreateByEmail("legacy@example.test").user();
+        transport.enqueue(200, ME_OK.replace("\"plan\":\"paid\"",
+                "\"plan\":\"paid\",\"verifiedEmail\":\"legacy@example.test\""));
+        assertEquals(old.getId(), service(true).login(KEY).userId());
+        assertEquals(1, usersById.size());
+    }
+
+    @Test
+    @DisplayName("大陆旧邮箱双验证迁移：密码桥复用原 ID/用户名并补手机号，不建空用户")
+    void passwordBridgeMigratesEmailOnlyUserAfterWebsiteDualVerification() {
+        User legacy = userService.findOrCreateByEmail("legacy@example.test").user();
+        Long originalId = legacy.getId();
+        String originalUsername = legacy.getUsername();
+        assertNull(legacy.getPhone());
+        // 官网已用密码会话 + 独立邮箱 OTP 完成双验证；本测试只验证 Java 消费该契约。
+        String verifiedAccount = ME_WITH_PHONE.replace("\"plan\":\"paid\"",
+                "\"plan\":\"paid\",\"verifiedEmail\":\"legacy@example.test\"");
+        transport.enqueue(200, "{\"key\":\"" + KEY + "\"}").enqueue(200, verifiedAccount);
+
+        AwdkLoginService.BridgeSession session = service(true)
+                .loginWithPassword("legacy@example.test", "synthetic-password");
+
+        assertEquals(originalId, session.userId());
+        assertEquals(originalUsername, session.username(), "用户名决定的既有数据路径也必须保留");
+        assertEquals(originalId, deviceTokenService.resolveUserId(session.token()));
+        assertSame(legacy, usersById.get(originalId));
+        assertEquals("18610211590", legacy.getPhone());
+        assertEquals("legacy@example.test", legacy.getVerifiedEmail());
+        assertEquals(originalId, bindingsByAccountId.get("acc_9f3a").getUserId());
+        assertEquals(1, usersById.size());
+        assertEquals(1, usersByName.size());
+        assertEquals(1, bindingsByAccountId.size());
+        assertTrue(transport.bodies.get(0).contains("legacy@example.test"));
+    }
+
+    @Test
+    @DisplayName("大陆旧邮箱已绑另一官网账户：双验证迁移也不能覆盖绑定或认领手机号")
+    void passwordBridgeCannotReplaceExistingLegacyEmailBinding() {
+        User legacy = userService.findOrCreateByEmail("legacy@example.test").user();
+        String originalUsername = legacy.getUsername();
+        String emailOnlyAccount = ME_OK.replace("acc_9f3a", "acc_original")
+                .replace("\"plan\":\"paid\"",
+                        "\"plan\":\"paid\",\"verifiedEmail\":\"legacy@example.test\"");
+        transport.enqueue(200, emailOnlyAccount);
+        service(true).login(KEY);
+        int issuedBefore = tokensByHash.size();
+        String originalDisplayName = legacy.getDisplayName();
+        String incomingAccount = ME_WITH_PHONE.replace("\"plan\":\"paid\"",
+                "\"plan\":\"paid\",\"verifiedEmail\":\"legacy@example.test\"");
+        transport.enqueue(200, "{\"key\":\"" + KEY + "\"}").enqueue(200, incomingAccount);
+
+        AccountException failure = assertThrows(AccountException.class, () -> service(true)
+                .loginWithPassword("legacy@example.test", "synthetic-password"));
+
+        assertEquals(AccountException.Kind.CONFLICT, failure.getKind());
+        assertEquals(issuedBefore, tokensByHash.size());
+        assertNull(legacy.getPhone(), "冲突必须在 claimPhoneFromWebsite 前拒绝");
+        assertEquals(originalUsername, legacy.getUsername());
+        assertEquals(originalDisplayName, legacy.getDisplayName());
+        assertEquals("legacy@example.test", legacy.getVerifiedEmail());
+        assertEquals(legacy.getId(), bindingsByAccountId.get("acc_original").getUserId());
+        assertFalse(bindingsByAccountId.containsKey("acc_9f3a"));
+        assertEquals(1, bindingsByAccountId.size());
+        assertEquals(1, usersById.size());
+    }
+
+    @Test
+    void unverifiedWebsiteEmailCannotClaimLocalUser() {
+        User old = userService.findOrCreateByEmail("legacy@example.test").user();
+        transport.enqueue(200, ME_OK.replace("\"plan\":\"paid\"",
+                "\"plan\":\"paid\",\"email\":\"legacy@example.test\""));
+        assertNotEquals(old.getId(), service(true).login(KEY).userId());
+    }
+
+    @Test
+    void phoneAlreadyBoundToAnotherWebsiteAccountRefusesWithoutToken() {
+        transport.enqueue(200, ME_WITH_PHONE);
+        service(true).login(KEY);
+        int issued = tokensByHash.size();
+        transport.enqueue(200, ME_WITH_PHONE.replace("acc_9f3a", "acc_other"));
+        assertEquals(AccountException.Kind.CONFLICT,
+                assertThrows(AccountException.class, () -> service(true).login(KEY)).getKind());
+        assertEquals(issued, tokensByHash.size());
+        assertEquals(1, usersById.size());
+    }
+
+    @Test
+    void phoneAndVerifiedEmailPointingToDifferentUsersRefuses() {
+        userService.findOrCreateByPhone("18610211590");
+        userService.findOrCreateByEmail("legacy@example.test");
+        transport.enqueue(200, ME_WITH_PHONE.replace("\"plan\":\"paid\"",
+                "\"plan\":\"paid\",\"verifiedEmail\":\"legacy@example.test\""));
+        assertThrows(AccountException.class, () -> service(true).login(KEY));
+        assertTrue(tokensByHash.isEmpty());
+        assertTrue(bindingsByAccountId.isEmpty());
     }
 
     // ==================== 登录页该给哪个 tab（accountIdentity，dev-board#766） ====================

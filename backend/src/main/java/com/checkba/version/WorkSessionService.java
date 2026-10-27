@@ -9,6 +9,8 @@ import com.checkba.service.LangText;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -67,6 +69,10 @@ public class WorkSessionService {
     private final Map<Long, ScheduledFuture<?>> idleTimers = new ConcurrentHashMap<>();
     private final Map<Long, PendingActor> actors = new ConcurrentHashMap<>();
 
+    // 保存请求只登记待处理信号；每项目至多一个重试任务，不能占着数据库连接等仓库锁。
+    private final Map<Long, PendingActor> deferredSignals = new ConcurrentHashMap<>();
+    private final Set<Long> signalTasks = ConcurrentHashMap.newKeySet();
+
     /**
      * 防抖自动存档的连续失败计数（成功一轮就清零，不出现在这个表里）。修复前撞异常
      * 只 log.warn 一句就吞掉——不上抛、不重试、不告警，此后每一轮防抖都同样静默失败
@@ -87,12 +93,16 @@ public class WorkSessionService {
      * 装箱的 Long 相同数值不保证是同一对象，拿它当锁语义不可靠。
      */
     private final Map<Long, ReentrantLock> repoLocks = new ConcurrentHashMap<>();
+    // Compare active physical scopes, so unrelated folders can save during background version work.
+    private final PathScopedRepoLock.Registry localFolderRepoLocks = new PathScopedRepoLock.Registry();
+    private final Set<Long> deletedProjects = ConcurrentHashMap.newKeySet();
 
     /**
      * push 落库延后的项目 → 最早的基线 sha（Task 6）。内存态，服务端重启即丢失——
      * 下一次 push 的 PostReceiveHook 或工作段/裁决收尾会自愈（补做一次全量物化）。
      */
     private final Map<Long, String> pendingIngestBase = new ConcurrentHashMap<>();
+    private final Set<Long> ingestTasks = ConcurrentHashMap.newKeySet();
 
     private record PendingActor(Long userId, String userName) {}
 
@@ -110,7 +120,39 @@ public class WorkSessionService {
     public record AutoEnableRequest(long projectId, Long userId, String userName) {}
 
     ReentrantLock repoLock(long projectId) {
-        return repoLocks.computeIfAbsent(projectId, id -> new ReentrantLock());
+        return repoLocks.computeIfAbsent(projectId,
+                id -> repoService.hasLocalRoot(id)
+                        ? new PathScopedRepoLock(localFolderRepoLocks, () -> repoService.workTree(id))
+                        : new ReentrantLock());
+    }
+
+    /** Acquire the repository lock before deletion takes DB locks, and keep it through commit. */
+    public void runProjectDeletion(long projectId, Runnable body) {
+        ReentrantLock lock = repoLock(projectId);
+        lock.lock();
+        boolean synchronizedTransaction = TransactionSynchronizationManager.isSynchronizationActive()
+                && TransactionSynchronizationManager.isActualTransactionActive();
+        boolean success = false;
+        try {
+            cancelPending(projectId);
+            pendingIngestBase.remove(projectId);
+            autosaveFailureStreak.remove(projectId);
+            if (synchronizedTransaction) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override public void afterCompletion(int status) {
+                        if (status == STATUS_COMMITTED) deletedProjects.add(projectId);
+                        lock.unlock();
+                    }
+                });
+            }
+            body.run();
+            success = true;
+        } finally {
+            if (!synchronizedTransaction) {
+                if (success) deletedProjects.add(projectId);
+                lock.unlock();
+            }
+        }
     }
 
     /**
@@ -197,9 +239,11 @@ public class WorkSessionService {
      * 只此一笔提交，repoService.init 本身不认识清单也不需要改。
      */
     public void enableVersionRecording(long projectId, String authorName, String authorEmail) {
+        repoService.requireVersionRecordingSupported(projectId);
         ReentrantLock lock = repoLock(projectId);
         lock.lock();
         try {
+            if (deletedProjects.contains(projectId)) return;
             if (repoService.isInitialized(projectId)) return;
             manifestService.writeToWorkTree(projectId, manifestService.capture(projectId));
             repoService.init(projectId, authorName, authorEmail);
@@ -444,36 +488,96 @@ public class WorkSessionService {
      * 自动结束）。防抖自动存档仍然照排，稿上的改动也需要落盘存档。
      */
     public void onChangeSignal(long projectId, Long userId, String userName) {
-        if (!repoService.isInitialized(projectId)) {
-            // 存量项目/还没开过版本记录：请求一次自动开启（dev-board#438）。
-            // 判定与开启都在监听方的异步线程上做（含遍历工作区估体积的护栏），
-            // 这里只发一个信号——改动信号这条路上绝不允许变慢，更不允许抛。
-            // 本次信号不追补：开启本身落的那笔「初始版本」就是此刻的状态。
-            requestAutoEnable(projectId, userId, userName);
+        if (deletedProjects.contains(projectId)) return;
+        PendingActor actor = new PendingActor(userId, userName);
+        if (TransactionSynchronizationManager.isActualTransactionActive()
+                && TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    // afterCommit 的线程仍绑定原事务资源；只能派发，不能在这里读写数据库。
+                    deferSignal(projectId, actor);
+                }
+            });
             return;
         }
-        // 采纳裁决期间连信号都不接：既不开段，也不排自动存档（见 awaitingAdoptResolution）。
-        if (awaitingAdoptResolution(projectId)) return;
+        ReentrantLock lock;
+        try {
+            lock = repoLock(projectId);
+        } catch (RuntimeException e) {
+            log.warn("版本锁所属项目暂不可用，延后处理变更: project={}", projectId, e);
+            deferSignal(projectId, actor);
+            return;
+        }
+        if (!lock.tryLock()) {
+            deferSignal(projectId, actor);
+            return;
+        }
+        try {
+            deferredSignals.remove(projectId);
+            applyChangeSignal(projectId, actor);
+        } finally {
+            lock.unlock();
+        }
+    }
 
+    private void deferSignal(long projectId, PendingActor actor) {
+        if (deletedProjects.contains(projectId)) return;
+        deferredSignals.put(projectId, actor);
+        scheduleSignal(projectId);
+    }
+
+    private void scheduleSignal(long projectId) {
+        scheduleSignal(projectId, 100);
+    }
+
+    private void scheduleSignal(long projectId, long delayMillis) {
+        if (!signalTasks.add(projectId)) return;
+        try {
+            taskScheduler.schedule(() -> {
+                try {
+                    ReentrantLock lock = repoLock(projectId);
+                    if (lock.tryLock()) {
+                        PendingActor actor = deferredSignals.remove(projectId);
+                        try {
+                            if (actor != null) applyChangeSignal(projectId, actor);
+                        } catch (Exception e) {
+                            if (actor != null) deferredSignals.putIfAbsent(projectId, actor);
+                            log.warn("处理版本变更信号失败，将重试: project={}", projectId, e);
+                        } finally {
+                            lock.unlock();
+                        }
+                    }
+                } catch (RuntimeException e) {
+                    // Classification failed before taking the actor out of deferredSignals.
+                    log.warn("版本锁所属项目暂不可用，将重试: project={}", projectId, e);
+                } finally {
+                    signalTasks.remove(projectId);
+                    if (deferredSignals.containsKey(projectId)) scheduleSignal(projectId, 1000);
+                }
+            }, Instant.now().plusMillis(delayMillis));
+        } catch (RuntimeException e) {
+            signalTasks.remove(projectId);
+            log.warn("派发版本变更信号失败: project={}", projectId, e);
+        }
+    }
+
+    /** 仓库锁内处理，分支守卫、工作段、署名与定时器保持同一顺序。 */
+    private void applyChangeSignal(long projectId, PendingActor actor) {
+        if (deletedProjects.contains(projectId)) return;
+        if (!repoService.isInitialized(projectId)) {
+            requestAutoEnable(projectId, actor.userId(), actor.userName());
+            return;
+        }
+        if (awaitingAdoptResolution(projectId)) return;
         boolean draft = onDraftBranch(projectId);
         Long sessionId = null;
         if (!draft) {
-            ReentrantLock lock = repoLock(projectId);
-            lock.lock();
-            try {
-                sessionId = ensureSession(projectId, userId, userName).getId();
-            } finally {
-                lock.unlock();
-            }
+            sessionId = ensureSession(projectId, actor.userId(), actor.userName()).getId();
         }
-        actors.put(projectId, new PendingActor(userId, userName));
+        actors.put(projectId, actor);
         scheduleDebounceCommit(projectId);
-
-        if (!draft) {
-            // spec 5.2 三个结束触发之一：30 分钟无变更信号自动结束工作段。
-            // 每次信号都重排——只要还有动静就不断推迟，真正空闲满时长才触发。
-            armIdleTimer(projectId, sessionId);
-        }
+        if (!draft) armIdleTimer(projectId, sessionId);
     }
 
     /** 重排（取消旧的、排一个新的）防抖自动存档。 */
@@ -618,17 +722,13 @@ public class WorkSessionService {
         return saved;
     }
 
-    /**
-     * 供 /status 只读查询用：repoService.pendingChanges 内部会做两次 git add，
-     * 与防抖定时器的 commitNow 并发时会抢同一把 .git/index.lock，谁输谁炸。
-     * 包一层锁，职责只在这层——pendingChanges 本身不加锁（commitNow 内部会调用它，
-     * 锁虽可重入但保持「谁改仓库状态谁负责加锁」的边界更清楚）。
-     */
+    /** /status 不等待耗时提交，避免查询请求与数据库连接排队耗尽。 */
     public List<FileChange> pendingChangesLocked(long projectId) {
         ReentrantLock lock = repoLock(projectId);
-        lock.lock();
+        if (!lock.tryLock()) throw VersionException.busy(LangText.of(
+                "正在整理版本，请稍后重试", "Version history is busy; please try again shortly"));
         try {
-            retryPendingIngest(projectId);
+            schedulePendingIngest(projectId);
             return repoService.pendingChanges(projectId);
         } finally {
             lock.unlock();
@@ -727,7 +827,36 @@ public class WorkSessionService {
         ReentrantLock lock = repoLock(projectId);
         lock.lock();
         try {
+            if (deletedProjects.contains(projectId)) throw VersionException.userFacing(
+                    LangText.of("项目已删除", "Project has been deleted"));
             body.run();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Upload/text publication uses the existing snapshot lock. Callers must finish receiving network
+     * bytes before entering, start their own short DB transactions inside, and notify after returning.
+     * In particular an owner/quota DB lock must never be held while waiting for this lock.
+     */
+    public <T> T withFileContentWriteLock(long projectId, java.util.function.Supplier<T> body) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("Content writes cannot enter with an active database transaction");
+        }
+        ReentrantLock lock = repoLock(projectId);
+        try {
+            if (!lock.tryLock(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                throw VersionException.busy(LangText.of("正在整理版本，请稍后重试保存", "Version history is busy; please retry saving shortly"));
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw VersionException.busy(LangText.of("保存等待已中断，请重试", "Save wait was interrupted; please retry"));
+        }
+        try {
+            if (deletedProjects.contains(projectId)) throw VersionException.userFacing(
+                    LangText.of("项目已删除", "Project has been deleted"));
+            return body.get();
         } finally {
             lock.unlock();
         }
@@ -796,7 +925,31 @@ public class WorkSessionService {
         }
     }
 
-    /** 有延后的落库且守卫已清空时补做。挂在 pendingChangesLocked 与工作段收尾处。 */
+    /** 查询只触发后台恢复，不能在 HTTP/数据库连接上物化远端文件。 */
+    private void schedulePendingIngest(long projectId) {
+        if (!pendingIngestBase.containsKey(projectId) || !ingestTasks.add(projectId)) return;
+        try {
+            taskScheduler.schedule(() -> {
+                ReentrantLock lock = repoLock(projectId);
+                boolean acquired = lock.tryLock();
+                try {
+                    if (acquired) retryPendingIngest(projectId);
+                } catch (Exception e) {
+                    log.warn("后台恢复待同步版本失败: project={}", projectId, e);
+                } finally {
+                    if (acquired) lock.unlock();
+                    ingestTasks.remove(projectId);
+                }
+                // 长提交结束后再试；业务守卫未清空则由收尾路径或下次查询重试。
+                if (!acquired) schedulePendingIngest(projectId);
+            }, Instant.now().plusMillis(1000));
+        } catch (RuntimeException e) {
+            ingestTasks.remove(projectId);
+            log.warn("派发待同步版本恢复失败: project={}", projectId, e);
+        }
+    }
+
+    /** 有延后的落库且守卫已清空时补做。由查询派发的后台任务与工作段收尾调用。 */
     public void retryPendingIngest(long projectId) {
         String base = pendingIngestBase.get(projectId);
         if (base == null) return;
@@ -812,10 +965,10 @@ public class WorkSessionService {
      * 但清单写入与提交照旧，稿上的防抖自动存档必须正常工作。
      */
     public String commitNow(long projectId, Long userId, String userName, String message) {
-        if (!repoService.isInitialized(projectId)) return null;
         ReentrantLock lock = repoLock(projectId);
         lock.lock();
         try {
+            if (deletedProjects.contains(projectId) || !repoService.isInitialized(projectId)) return null;
             if (awaitingAdoptResolution(projectId)) {
                 log.info("采纳裁决进行中，跳过这次自动存档: project={}", projectId);
                 return null;
@@ -859,10 +1012,10 @@ public class WorkSessionService {
      * 读取待提交变更失败时按「有改动」处理：版本记录是保险，宁可多开一段也不能漏掉一次落版。
      */
     public String commitAiRound(long projectId, Long userId, boolean documentEdited) {
-        if (!repoService.isInitialized(projectId)) return null;
         ReentrantLock lock = repoLock(projectId);
         lock.lock();
         try {
+            if (deletedProjects.contains(projectId) || !repoService.isInitialized(projectId)) return null;
             if (awaitingAdoptResolution(projectId)) {
                 log.info("采纳裁决进行中，跳过这次 AI 轮次落版: project={}", projectId);
                 return null;
@@ -939,8 +1092,13 @@ public class WorkSessionService {
             if (onDraftBranch(projectId)) {
                 return endSessionOnDraft(projectId, userId, userName, title);
             }
-            WorkSession s = activeSession(projectId)
-                    .orElseThrow(() -> VersionException.userFacing(LangText.of("当前没有进行中的工作", "No work session in progress")));
+            WorkSession s = activeSession(projectId).orElseGet(() -> {
+                // 插件或 AI 直接落文件可能没有发改动信号；显式提交时只为真实改动补开工作段。
+                if (repoService.pendingChanges(projectId).isEmpty()) {
+                    throw VersionException.userFacing(LangText.of("当前没有进行中的工作", "No work session in progress"));
+                }
+                return ensureSession(projectId, userId, userName);
+            });
 
             cancelPending(projectId);
             commitNow(projectId, userId, userName, null);
@@ -1267,6 +1425,7 @@ public class WorkSessionService {
         lock.lock();
         try {
             requireNotMerging(projectId);
+            repoService.requireObjectsAt(projectId, ref);
             cancelPending(projectId);
 
             // 先给当前状态留一笔，保证「退回」这个动作本身可撤销
@@ -1744,36 +1903,21 @@ public class WorkSessionService {
         // 见 requireMergedHasPendingRecord）。这一档一个字节都不许再写：写 = 用合并前
         // 某一侧的原文把律师刚裁完的成果覆盖掉，而他不会收到任何提示。
         if (choice == Resolution.MERGED) return;
-        byte[] mainBytes = repoService.readBlobAtCommit(projectId, mainTip, rel);
-        byte[] draftBytes = repoService.readBlobAtCommit(projectId, draftTip, rel);
-
+        if (choice != Resolution.DRAFT) repoService.requireObjectsAt(projectId, mainTip);
+        if (choice != Resolution.MAIN) repoService.requireObjectsAt(projectId, draftTip);
         switch (choice) {
-            case MERGED -> { }   // 上面已经 return，这一支只为让 switch 保持穷尽
-            case MAIN -> writeOrDelete(work.resolve(rel), mainBytes);
-            case DRAFT -> writeOrDelete(work.resolve(rel), draftBytes);
+            case MERGED -> { }
+            case MAIN -> repoService.copyBlobAtCommit(projectId, mainTip, rel, work.resolve(rel));
+            case DRAFT -> repoService.copyBlobAtCommit(projectId, draftTip, rel, work.resolve(rel));
             case BOTH -> {
-                writeOrDelete(work.resolve(rel), mainBytes);
-                // 稿把这个文件删掉了的话，「两份都留」里稿的那一份根本不存在，
-                // 留主线那一份就是全部。
-                if (draftBytes != null) {
+                long draftSize = repoService.blobSizeAtCommit(projectId, draftTip, rel);
+                repoService.copyBlobAtCommit(projectId, mainTip, rel, work.resolve(rel));
+                if (draftSize >= 0) {
                     String copyRel = sideBySideRelPath(projectId, rel, draftName);
-                    writeOrDelete(work.resolve(copyRel), draftBytes);
-                    createSideBySideRow(projectId, rel, copyRel, draftBytes.length);
+                    repoService.copyBlobAtCommit(projectId, draftTip, rel, work.resolve(copyRel));
+                    createSideBySideRow(projectId, rel, copyRel, draftSize);
                 }
             }
-        }
-    }
-
-    private void writeOrDelete(Path target, byte[] bytes) {
-        try {
-            if (bytes == null) {
-                Files.deleteIfExists(target);
-                return;
-            }
-            Files.createDirectories(target.getParent());
-            Files.write(target, bytes);
-        } catch (Exception e) {
-            throw new VersionException("写入裁决结果失败: " + target, e);
         }
     }
 
@@ -1964,6 +2108,7 @@ public class WorkSessionService {
     // ---- helpers ----------------------------------------------------------
 
     private void cancelPending(long projectId) {
+        deferredSignals.remove(projectId);
         ScheduledFuture<?> f = pending.remove(projectId);
         if (f != null) f.cancel(false);
         ScheduledFuture<?> idle = idleTimers.remove(projectId);
@@ -1978,6 +2123,7 @@ public class WorkSessionService {
      */
     private void restoreWorkTreeFrom(long projectId, String ref, List<FileChange> changes) {
         Path work = repoService.workTree(projectId);
+        repoService.requireObjectsAt(projectId, ref);
         try {
             for (FileChange c : changes) {
                 // push 上来的提交不可信（ingestPushedMainline 的 diff 直接吃远端内容）：
@@ -1988,13 +2134,7 @@ public class WorkSessionService {
                     continue;
                 }
                 Path target = work.resolve(c.path());
-                byte[] bytes = repoService.readBlobAtCommit(projectId, ref, c.path());
-                if (bytes == null) {
-                    Files.deleteIfExists(target);
-                } else {
-                    Files.createDirectories(target.getParent());
-                    Files.write(target, bytes);
-                }
+                repoService.copyBlobAtCommit(projectId, ref, c.path(), target);
             }
         } catch (Exception e) {
             throw new VersionException("还原文件失败: project=" + projectId + " ref=" + ref, e);

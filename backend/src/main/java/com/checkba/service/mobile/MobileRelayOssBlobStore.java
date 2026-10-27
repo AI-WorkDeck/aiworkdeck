@@ -51,6 +51,27 @@ public final class MobileRelayOssBlobStore implements MobileRelayBlobStore, Auto
     }
 
     @Override
+    public StoredBlob putPersistent(Long userId, String blobId, InputStream content, long declaredSize) {
+        // Fail closed if bucket lifecycle policy would silently expire persistent backups.
+        var rules = oss.getBucketLifecycle(bucket);
+        if (rules != null) for (var rule : rules) {
+            String prefix = rule.getPrefix() == null ? "" : rule.getPrefix();
+            if (rule.getStatus() == com.aliyun.oss.model.LifecycleRule.RuleStatus.Enabled
+                    && ("mobile-backup/".startsWith(prefix) || prefix.startsWith("mobile-backup/"))
+                    && (rule.getExpirationDays() != 0 || rule.getExpirationTime() != null)) {
+                throw new IllegalStateException("Backup storage lifecycle must exclude mobile-backup/");
+            }
+        }
+        String key = "mobile-backup/" + userId + "/" + blobId;
+        CountingInputStream counted = new CountingInputStream(content);
+        ObjectMetadata meta = new ObjectMetadata();meta.setContentLength(declaredSize);
+        try {
+            oss.putObject(bucket, key, counted, meta);
+            return new StoredBlob(key,counted.count);
+        } catch (RuntimeException e) { throw new PersistentWriteException(new StoredBlob(key,counted.count),e); }
+    }
+
+    @Override
     public InputStream open(String locator) throws IOException {
         if (isLegacyLocalPath(locator)) {
             return Files.newInputStream(Path.of(locator));

@@ -35,9 +35,10 @@ components:
         usage: { type: object, additionalProperties: true, description: "code=4003（额度已满）附带的用量明细" }
         gatewayKind: { type: string, description: "code=1（平台网关失败）附带" }
         canUseOwnKey: { type: boolean, description: "code=1（平台网关失败）附带，是否可用自备 Key 绕过" }
+        reason: { type: string, description: 账户密码操作的机器错误码 }
         kind:
           type: string
-          enum: [DISABLED, UNAVAILABLE, NOT_CONNECTED, NOT_FOUND, REJECTED, REVIEW_ACCOUNT, ALREADY_PAID, IDEMPOTENCY_CONFLICT]
+          enum: [DISABLED, UNAVAILABLE, NOT_CONNECTED, NOT_FOUND, REJECTED, REVIEW_ACCOUNT, ALREADY_PAID, IDEMPOTENCY_CONFLICT, password_login_required]
           description: |
             code=1 时 /api/mobile/billing/* 附带的**机器可读判别位**（dev-board#425）。
             **四端一律按它分支，禁止匹配 message 措辞**——message 经服务端 LangText 在英文部署下
@@ -70,11 +71,62 @@ components:
           description: |
             仅 kind=ALREADY_PAID / IDEMPOTENCY_CONFLICT 时出现：官网连同 409 一起回的既有商户订单号。
             这是「App 被杀、本地没存下单号」的恢复路径，客户端拿它调 /recharge/status 查单。
+    CatalogLocation:
+      type: object
+      required: [kind, deviceId, key, online]
+      properties:
+        kind: { type: string, enum: [desktop, cloud] }
+        deviceId: { type: string, description: cloud 为持久云归档目标，其余为桌面设备 }
+        deviceName: { type: string }
+        key: { type: string, description: 此来源的本地项目编号，必须连 deviceId 使用 }
+        cloudProjectId: { type: integer, format: int64 }
+        archiveOnly: { type: boolean, description: 插件影子容器，仅包含插件归档内容 }
+        online: { type: boolean }
+    CatalogProject:
+      type: object
+      required: [projectUid, name, locations]
+      properties:
+        projectUid: { type: string, format: uuid }
+        name: { type: string }
+        locations:
+          type: array
+          items: { $ref: '#/components/schemas/CatalogLocation' }
+    CatalogFiles:
+      type: object
+      required: [files, count, truncated, source, cached]
+      properties:
+        files:
+          type: array
+          items: { $ref: '#/components/schemas/TransferFile' }
+        count: { type: integer }
+        totalCount: { type: integer, nullable: true }
+        truncated: { type: boolean }
+        source: { type: string, enum: [desktop, cloud, catalog] }
+        cached: { type: boolean }
+        updatedAt: { type: string }
+    BackupConsent:
+      type: object
+      required: [enabled, decided, subscriptionActive, consentVersion, cleanupPending]
+      properties:
+        enabled: { type: boolean }
+        decided: { type: boolean }
+        subscriptionActive: { type: boolean }
+        subscriptionAvailable: { type: boolean, description: false代表暂时无法核实订阅，不等于免费用户 }
+        consentVersion: { type: string }
+        cleanupPending: { type: boolean, description: 关闭后立即禁读；后台删除重试尚未完成 }
     TransferFile:
       type: object
       required: [id, name, path, size]
       properties:
-        id: { type: string, description: 桌面本地文件 id，只能连 deviceId/projectKey 使用 }
+        id: { type: string, description: 来源本地文件 id，只能连 deviceId/projectKey 使用 }
+        uid: { type: string, format: uuid, description: 稳定文件身份，旧桌面可能缺失 }
+        isFolder: { type: boolean, description: 文件夹也作为条目返回，包括空文件夹 }
+        parentId: { type: string, nullable: true, description: 同一来源内的父文件夹id；跨来源显示按path构树 }
+        sha256: { type: string, description: 持久备份内容散列 }
+        source: { type: string, enum: [desktop, cloud, backup], description: catalogue 列表明确每件的字节来源 }
+        deviceId: { type: string }
+        projectKey: { type: string }
+        online: { type: boolean }
         name: { type: string }
         path: { type: string, description: 项目内相对展示路径，不是下载 URL }
         size: { type: integer, format: int64 }
@@ -94,7 +146,7 @@ components:
           type: array
           maxItems: 2000
           items: { $ref: '#/components/schemas/TransferFile' }
-          description: 仅 LIST DONE 返回；不含文件夹，按 path 分组展示
+          description: 仅 LIST DONE 返回；含文件夹，按 path 构树展示
         count: { type: integer, minimum: 0, description: LIST DONE 返回的文件数量 }
         totalCount:
           type: integer
@@ -136,6 +188,9 @@ components:
       type: object
       required: [clientMediaId, delivered, waitingSeconds]
       properties:
+        projectUid: { type: string, format: uuid, description: 持久云归档的项目身份 }
+        fileUid: { type: string, format: uuid, description: 持久云归档的文件身份 }
+        fileId: { type: integer, format: int64 }
         clientMediaId: { type: string }
         delivered: { type: boolean, description: 桌面端已 ACK 落盘（中转区已删） }
         waitingSeconds: { type: integer, format: int64, description: 已投递为 0 }
@@ -144,17 +199,23 @@ components:
       type: object
       required: [usedBytes, quotaBytes]
       description: |
-        usedBytes 只统计 inbox 待取件字节（sumPendingBytes）；而配额执行（storeMedia 时的 3GB 判断）
-        同时计入 inbox 与 transfer。手机端设置页显示的用量可能低于实际被计费的量。服务端行为，本轮不改。
+        临时中转 usedBytes 同时统计 inbox 与 transfer 未取件字节；quotaBytes 为 200MiB 临时占用上限，ACK 后释放。
+        订阅持久云空间为独立的 3GiB 配额，不因下载 ACK 删除；这两个池不混算。
       properties:
         usedBytes: { type: integer, format: int64 }
         quotaBytes: { type: integer, format: int64 }
+        persistentUsedBytes: { type: integer, format: int64, description: 持久云文件实际占用，独立于临时中转 }
+        persistentQuotaBytes: { type: integer, format: int64, nullable: true, description: 当前订阅持久额度；上游不可用时为 null，不能当作免费账户 }
+        persistentQuotaAvailable: { type: boolean, description: 上游不可用时明确返回 false }
     UploadResult:
       type: object
       required: [code, id, clientMediaId, delivered]
       properties:
         code: { type: integer, enum: [0] }
         id: { type: integer, format: int64 }
+        projectUid: { type: string, format: uuid, description: 持久云归档的项目身份 }
+        fileId: { type: integer, format: int64, description: cloud 持久归档返回 }
+        fileUid: { type: string, format: uuid, description: cloud 持久归档返回 }
         clientMediaId: { type: string }
         delivered: { type: boolean, description: 幂等重传命中已投递记录时为 true }
     AccountUser:
@@ -167,6 +228,52 @@ components:
         avatarUrl: { type: string, description: 无头像时为空串 }
         role: { type: string }
         subscriptionType: { type: string, nullable: true }
+    AccountBridgeUser:
+      type: object
+      required: [id, username, displayName, avatarUrl, role]
+      properties:
+        id: { type: integer, format: int64 }
+        username: { type: string }
+        displayName: { type: string }
+        avatarUrl: { type: string }
+        role: { type: string }
+        subscriptionType: { type: string }
+        isAdmin: { type: boolean }
+        smsAuthEnabled: { type: boolean }
+        phoneMasked: { type: string }
+        mailAuthEnabled: { type: boolean }
+        emailMasked: { type: string }
+        totpEnabled: { type: boolean }
+    AccountBridgeData:
+      type: object
+      required: [token, sessionId, userId, username, displayName, user]
+      properties:
+        token: { type: string, description: awdt_设备令牌 }
+        sessionId: { type: string, description: token同值别名，后续请求放入X-Session-Id }
+        tokenId: { type: integer, format: int64 }
+        userId: { type: integer, format: int64 }
+        username: { type: string }
+        displayName: { type: string }
+        user: { $ref: '#/components/schemas/AccountBridgeUser' }
+    PasswordSetupChallenge:
+      type: object
+      required: [passwordSetupRequired, setupToken, expiresAt, account]
+      properties:
+        passwordSetupRequired: { type: boolean, enum: [true] }
+        setupToken: { type: string, description: 仅用于创建密码的一次性凭证，不是登录令牌 }
+        expiresAt: { type: integer, format: int64, description: Unix毫秒 }
+        account: { type: string, description: 规范化手机号或邮箱 }
+    AccountBridgeEnvelope:
+      type: object
+      required: [code]
+      properties:
+        code: { type: integer }
+        message: { type: string }
+        reason: { type: string }
+        data:
+          oneOf:
+            - { $ref: '#/components/schemas/AccountBridgeData' }
+            - { $ref: '#/components/schemas/PasswordSetupChallenge' }
     LoginData:
       type: object
       required: [sessionId, isNewUser, user]
@@ -184,6 +291,7 @@ components:
       properties:
         code: { type: integer }
         message: { type: string, nullable: true }
+        kind: { type: string }
         data: { $ref: '#/components/schemas/LoginData' }
     BillingBalance:
       type: object
@@ -199,6 +307,25 @@ components:
       properties:
         balanceCents: { type: integer, format: int64, description: 余额，整数分（Credits 1 元 = 100 分） }
         currency: { type: string, enum: [CNY, USD], description: 站点币种，由部署站点决定 }
+        subscription:
+          type: object
+          description: 订阅服务额度快照，与充值余额分账；旧服务器可能缺失
+          properties:
+            active: { type: boolean }
+            expiresAt: { type: string, nullable: true }
+            periodId: { type: integer, nullable: true }
+            periodStart: { type: string, nullable: true }
+            periodEnd: { type: string, nullable: true }
+            monthlyLimitCents: { type: integer }
+            monthlyUsedCents: { type: integer }
+            weeklyStart: { type: string, nullable: true }
+            weeklyEnd: { type: string, nullable: true }
+            weeklyLimitCents: { type: integer }
+            weeklyUsedCents: { type: integer }
+            availableCents: { type: integer }
+            walletFallbackEnabled: { type: boolean }
+            cloudStorageBytes: { type: integer, format: int64 }
+            relayBytes: { type: integer, format: int64 }
         plan:
           type: string
           nullable: true
@@ -264,10 +391,1119 @@ components:
         appVersion: { type: string }
         fromCamera: { type: boolean, description: 是否强制来自相机 }
         tsaToken: { type: string, nullable: true, description: 可信时间戳，当前恒 null }
+    MobileWorkspaceError:
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          type: integer
+          enum:
+            - 1
+            - 4010
+            - 4001
+            - 4003
+        message:
+          type: string
+          nullable: true
+      additionalProperties: true
+    MobileCalendarSettings:
+      type: object
+      required:
+        - enabled
+        - subscriptionActive
+      properties:
+        enabled:
+          &a1
+          type: boolean
+        subscriptionActive: *a1
+        subscriptionAvailable: *a1
+        consentVersion:
+          &a2
+          type: string
+    MobileCalendarEvent:
+      type: object
+      required:
+        - id
+        - deviceId
+        - projectKey
+        - projectName
+        - title
+        - dueDate
+        - timeZone
+        - status
+        - updatedAt
+        - files
+      properties:
+        id:
+          type: string
+        taskId:
+          type: string
+        deviceId:
+          type: string
+        projectKey:
+          type: string
+        projectUid:
+          type: string
+          nullable: true
+        projectName:
+          type: string
+        title:
+          type: string
+        dueDate:
+          type: string
+        dueTime:
+          type: string
+          nullable: true
+        timeZone:
+          type: string
+        remindAt:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum:
+            - OPEN
+            - DONE
+        updatedAt:
+          type: string
+        files:
+          type: array
+          items:
+            type: object
+            required:
+              - fileId
+              - fileName
+            properties:
+              fileId:
+                type: string
+              fileName:
+                type: string
+    MobileCalendarEvents:
+      type: object
+      required:
+        - enabled
+        - subscriptionActive
+        - events
+      properties:
+        enabled: *a1
+        subscriptionActive: *a1
+        subscriptionAvailable: *a1
+        consentVersion: *a2
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/MobileCalendarEvent"
+        syncedAt:
+          type: string
+          nullable: true
+    MobileWorkspaceConsent:
+      type: object
+      required:
+        - enabled
+        - consentVersion
+      properties:
+        enabled: *a1
+        consentVersion:
+          type: string
+          enum:
+            - 2026-10-27
+    MobileAssistantStatus:
+      type: object
+      required:
+        - enabled
+        - subscriptionActive
+        - backupEnabled
+        - summaryCount
+        - reason
+      properties:
+        enabled: *a1
+        subscriptionActive: *a1
+        subscriptionAvailable: *a1
+        backupEnabled: *a1
+        consentEnabled: *a1
+        consentVersion:
+          type: string
+        notice:
+          type: string
+        summaryCount:
+          &a3
+          type: integer
+        reason:
+          type: string
+    MobileAssistantReference:
+      type: object
+      required:
+        - deviceId
+        - projectKey
+        - projectName
+        - sourceUpdatedAt
+      properties:
+        id: *a3
+        deviceId:
+          type: string
+        projectKey:
+          type: string
+        projectName:
+          type: string
+        sourceUpdatedAt:
+          type: string
+        updatedAt:
+          type: string
+        status:
+          type: string
+        sourceFingerprint:
+          type: string
+      additionalProperties: true
+    MobileAssistantSource:
+      type: object
+      required:
+        - id
+        - name
+        - readForSummary
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        path:
+          type: string
+        readForSummary:
+          type: boolean
+    MobileAssistantSummary:
+      type: object
+      required:
+        - id
+        - deviceId
+        - projectKey
+        - projectName
+        - sourceUpdatedAt
+        - status
+        - summary
+        - sources
+      properties:
+        id: *a3
+        deviceId:
+          type: string
+        projectKey:
+          type: string
+        projectName:
+          type: string
+        sourceUpdatedAt:
+          type: string
+        updatedAt:
+          type: string
+        status:
+          type: string
+        summary:
+          type: string
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/MobileAssistantSource"
+    MobileAssistantChatInput:
+      type: object
+      required:
+        - requestId
+        - message
+      properties:
+        conversationId:
+          type: string
+          nullable: true
+        requestId:
+          type: string
+        message:
+          type: string
+          maxLength: 8000
+    MobileAssistantChatResult:
+      type: object
+      required:
+        - conversationId
+        - requestId
+        - answer
+        - sources
+        - status
+      properties:
+        conversationId:
+          type: string
+        requestId:
+          type: string
+        answer:
+          type: string
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/MobileAssistantReference"
+        status:
+          type: string
+          enum:
+            - running
+            - completed
+            - failed
+    MobileAssistantHistory:
+      type: object
+      required:
+        - conversationId
+        - messages
+      properties:
+        conversationId:
+          type: string
+        messages:
+          type: array
+          items:
+            type: object
+            required:
+              - role
+              - content
+              - createdAt
+            properties:
+              role:
+                type: string
+                enum:
+                  - user
+                  - assistant
+              content:
+                type: string
+              createdAt:
+                type: string
+              requestId:
+                type: string
+              sources:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MobileAssistantReference"
+    MobileAssistantSnapshot:
+      type: object
+      required:
+        - deviceId
+        - projectKey
+        - projectName
+        - sourceUpdatedAt
+        - context
+      properties:
+        deviceId:
+          type: string
+        projectKey:
+          type: string
+        projectName:
+          type: string
+        sourceUpdatedAt:
+          type: string
+          format: date-time
+        context:
+          type: string
+          maxLength: 24000
+    MobileCalendarSnapshot:
+      type: object
+      required:
+        - deviceId
+        - timeZone
+        - sourceUpdatedAt
+        - events
+      properties:
+        deviceId:
+          type: string
+        timeZone:
+          type: string
+        sourceUpdatedAt:
+          type: string
+          format: date-time
+        events:
+          type: array
+          items:
+            type: object
+            required:
+              - projectKey
+              - taskId
+              - title
+              - dueDate
+              - status
+            properties:
+              projectKey:
+                type: string
+              taskId:
+                type: string
+              title:
+                type: string
+              dueDate:
+                type: string
+              dueTime:
+                type: string
+                nullable: true
+              status:
+                type: string
+                enum:
+                  - OPEN
+                  - DONE
+              remindBefore:
+                type: integer
+                nullable: true
+                minimum: 0
+                maximum: 525600
+              files:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - fileId
+                    - fileName
+                  properties:
+                    fileId:
+                      type: string
+                    fileName:
+                      type: string
+    MobileCalendarSnapshotResult:
+      type: object
+      required:
+        - accepted
+        - syncedAt
+      properties:
+        accepted: *a1
+        syncedAt:
+          type: string
+        count: *a3
+    MobileCalendarPushDevice:
+      type: object
+      required:
+        - installationId
+        - token
+        - environment
+      properties:
+        installationId:
+          type: string
+          format: uuid
+        token:
+          type: string
+        environment:
+          type: string
+          enum:
+            - sandbox
+            - production
 paths:
+  "/api/mobile/assistant/requests/{id}":
+    get:
+      summary: 查询本账户请求状态；网络超时后用原requestId恢复，已完成不重复调用模型
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 成功或错误信封；账户与项目范围由服务端验证
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required:
+                      - code
+                      - data
+                    properties:
+                      code:
+                        type: integer
+                        enum:
+                          - 0
+                      data:
+                        $ref: "#/components/schemas/MobileAssistantChatResult"
+                  - $ref: "#/components/schemas/MobileWorkspaceError"
+  /api/mobile/calendar/settings:
+    get:
+      summary: 手机日程同步设置，默认关闭
+      parameters:
+        - &a1
+          $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: 成功或错误信封；账户与项目范围由服务端验证
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required:
+                      - code
+                      - data
+                    properties:
+                      code:
+                        type: integer
+                        enum:
+                          - 0
+                      data:
+                        $ref: "#/components/schemas/MobileCalendarSettings"
+                  - $ref: "#/components/schemas/MobileWorkspaceError"
+    put:
+      summary: 明确开通或关闭日程同步；关闭删除云快照
+      parameters:
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MobileWorkspaceConsent"
+      responses:
+        "200":
+          description: 成功或错误信封；账户与项目范围由服务端验证
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required:
+                      - code
+                      - data
+                    properties:
+                      code:
+                        type: integer
+                        enum:
+                          - 0
+                      data:
+                        $ref: "#/components/schemas/MobileCalendarSettings"
+                  - $ref: "#/components/schemas/MobileWorkspaceError"
+  /api/mobile/calendar/events:
+    get:
+      summary: 账户全部授权项目的日程快照；无权益或停用返回空events
+      parameters:
+        - *a1
+      responses:
+        "200":
+          description: 成功或错误信封；账户与项目范围由服务端验证
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required:
+                      - code
+                      - data
+                    properties:
+                      code:
+                        type: integer
+                        enum:
+                          - 0
+                      data:
+                        $ref: "#/components/schemas/MobileCalendarEvents"
+                  - $ref: "#/components/schemas/MobileWorkspaceError"
+  /api/mobile/calendar/snapshots:
+    put:
+      summary: 桌面完整替换本设备日程快照，拒绝过期及不属于本账户的项目
+      parameters:
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MobileCalendarSnapshot"
+      responses:
+        "200":
+          description: 成功或错误信封；账户与项目范围由服务端验证
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required:
+                      - code
+                      - data
+                    properties:
+                      code:
+                        type: integer
+                        enum:
+                          - 0
+                      data:
+                        $ref: "#/components/schemas/MobileCalendarSnapshotResult"
+                  - $ref: "#/components/schemas/MobileWorkspaceError"
+  /api/mobile/calendar/push/status:
+    get:
+      summary: 是否已配置Apple远程推送；未配置时手机使用本地提醒
+      parameters:
+        - *a1
+      responses:
+        "200":
+          description: 成功或错误信封；账户与项目范围由服务端验证
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required:
+                      - code
+                      - data
+                    properties:
+                      code:
+                        type: integer
+                        enum:
+                          - 0
+                      data:
+                        type: object
+                        required:
+                          - available
+                        properties:
+                          available:
+                            &a2
+                            type: boolean
+                  - $ref: "#/components/schemas/MobileWorkspaceError"
+  /api/mobile/calendar/push/device:
+    put:
+      summary: 绑定当前账户的APNs设备，切换账号重新绑定
+      parameters:
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MobileCalendarPushDevice"
+      responses:
+        "200":
+          description: 成功或错误信封；账户与项目范围由服务端验证
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required:
+                      - code
+                      - data
+                    properties:
+                      code:
+                        type: integer
+                        enum:
+                          - 0
+                      data:
+                        type: object
+                        required:
+                          - available
+                          - registered
+                        properties:
+                          available: *a2
+                          registered: *a2
+                  - $ref: "#/components/schemas/MobileWorkspaceError"
+  "/api/mobile/calendar/push/device/{installationId}":
+    delete:
+      summary: 退出登录或关闭远程提醒时解绑本安装
+      parameters:
+        - *a1
+        - name: installationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功或错误信封；账户与项目范围由服务端验证
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required:
+                      - code
+                      - data
+                    properties:
+                      code:
+                        type: integer
+                        enum:
+                          - 0
+                      data:
+                        type: object
+                        required:
+                          - registered
+                        properties:
+                          registered: *a2
+                  - $ref: "#/components/schemas/MobileWorkspaceError"
+  /api/mobile/assistant/status:
+    get:
+      summary: 云端个人助理权益、授权、摘要数量与开通原因
+      parameters:
+        - *a1
+      responses:
+        "200":
+          description: 成功或错误信封；账户与项目范围由服务端验证
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required:
+                      - code
+                      - data
+                    properties:
+                      code:
+                        type: integer
+                        enum:
+                          - 0
+                      data:
+                        $ref: "#/components/schemas/MobileAssistantStatus"
+                  - $ref: "#/components/schemas/MobileWorkspaceError"
+  /api/mobile/assistant/settings:
+    put:
+      summary: 明确同意云端AI处理或关闭并删除摘要与个人对话
+      parameters:
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MobileWorkspaceConsent"
+      responses:
+        "200":
+          description: 成功或错误信封；账户与项目范围由服务端验证
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required:
+                      - code
+                      - data
+                    properties:
+                      code:
+                        type: integer
+                        enum:
+                          - 0
+                      data:
+                        $ref: "#/components/schemas/MobileAssistantStatus"
+                  - $ref: "#/components/schemas/MobileWorkspaceError"
+  /api/mobile/assistant/snapshots:
+    put:
+      summary: 桌面上报项目档案及待办；云端从已同意备份生成摘要
+      parameters:
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MobileAssistantSnapshot"
+      responses:
+        "200":
+          description: 成功或错误信封；账户与项目范围由服务端验证
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required:
+                      - code
+                      - data
+                    properties:
+                      code:
+                        type: integer
+                        enum:
+                          - 0
+                      data:
+                        $ref: "#/components/schemas/MobileAssistantSummary"
+                  - $ref: "#/components/schemas/MobileWorkspaceError"
+    delete:
+      summary: 删除本账户指定设备项目的摘要
+      parameters:
+        - *a1
+        - name: deviceId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: projectKey
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功或错误信封；账户与项目范围由服务端验证
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required:
+                      - code
+                      - data
+                    properties:
+                      code:
+                        type: integer
+                        enum:
+                          - 0
+                      data:
+                        type: object
+                        required:
+                          - deleted
+                        properties:
+                          deleted: *a2
+                  - $ref: "#/components/schemas/MobileWorkspaceError"
+  /api/mobile/assistant/summaries:
+    get:
+      summary: 查询本账户可读项目摘要
+      parameters:
+        - *a1
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功或错误信封；账户与项目范围由服务端验证
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required:
+                      - code
+                      - data
+                    properties:
+                      code:
+                        type: integer
+                        enum:
+                          - 0
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/MobileAssistantSummary"
+                  - $ref: "#/components/schemas/MobileWorkspaceError"
+  /api/mobile/assistant/chat:
+    post:
+      summary: 无需选择项目的个人助理对话；requestId用于重试去重
+      parameters:
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MobileAssistantChatInput"
+      responses:
+        "200":
+          description: 成功或错误信封；账户与项目范围由服务端验证
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required:
+                      - code
+                      - data
+                    properties:
+                      code:
+                        type: integer
+                        enum:
+                          - 0
+                      data:
+                        $ref: "#/components/schemas/MobileAssistantChatResult"
+                  - $ref: "#/components/schemas/MobileWorkspaceError"
+  "/api/mobile/assistant/conversations/{id}":
+    get:
+      summary: 读取本账户个人会话历史并复验来源权限
+      parameters:
+        - *a1
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功或错误信封；账户与项目范围由服务端验证
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required:
+                      - code
+                      - data
+                    properties:
+                      code:
+                        type: integer
+                        enum:
+                          - 0
+                      data:
+                        $ref: "#/components/schemas/MobileAssistantHistory"
+                  - $ref: "#/components/schemas/MobileWorkspaceError"
+  /api/mobile/backup-consent:
+    get:
+      summary: 账户文件云备份决定，旧账户默认未决定且关闭
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      responses:
+        "200":
+          description: 备份决定或错误信封
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/BackupConsent'
+                  - $ref: '#/components/schemas/Envelope'
+    put:
+      summary: 明确同意或关闭账户文件备份，开启要求有效订阅
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled, consentVersion]
+              properties:
+                enabled: { type: boolean }
+                consentVersion: { type: string, enum: ['2026-10-11'] }
+      responses:
+        "200":
+          description: 决定立即生效；关闭后清理云备份，不删除桌面原件
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/BackupConsent'
+                  - $ref: '#/components/schemas/Envelope'
+  /api/mobile/backup/files:
+    get:
+      summary: 桌面备份版本清单，省略projectKey时返回此设备所有项目的备份
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { name: deviceId, in: query, required: true, schema: { type: string } }
+        - { name: projectKey, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: 文件备份元数据
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [files]
+                    properties:
+                      files:
+                        type: array
+                        items: { $ref: '#/components/schemas/TransferFile' }
+                  - $ref: '#/components/schemas/Envelope'
+    put:
+      summary: 桌面上传持久备份；订阅、同意、目录归属、扩展名、大小和SHA256由服务端校验
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { name: deviceId, in: query, required: true, schema: { type: string } }
+        - { name: projectKey, in: query, required: true, schema: { type: string } }
+        - { name: fileId, in: query, required: true, schema: { type: string } }
+        - { name: uid, in: query, required: true, schema: { type: string } }
+        - { name: name, in: query, required: true, schema: { type: string } }
+        - { name: path, in: query, required: true, schema: { type: string } }
+        - { name: parentId, in: query, schema: { type: string } }
+        - { name: sha256, in: query, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200":
+          description: 已校验备份元数据或错误信封
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/TransferFile'
+                  - $ref: '#/components/schemas/Envelope'
+    delete:
+      summary: 桌面删除备份，立即禁读、后台重试删除对象
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { name: deviceId, in: query, required: true, schema: { type: string } }
+        - { name: projectKey, in: query, required: true, schema: { type: string } }
+        - { name: fileId, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: 处理结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+  /api/mobile/backup/manifest:
+    put:
+      summary: 桌面同步含空目录的完整元数据清单，最多保留2000项并标记截断
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceId, projectKey, files, totalCount]
+              properties:
+                deviceId: { type: string }
+                projectKey: { type: string }
+                totalCount: { type: integer }
+                files:
+                  type: array
+                  items: { $ref: '#/components/schemas/TransferFile' }
+      responses:
+        "200":
+          description: 处理结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+  /api/mobile/preview/pull:
+    post:
+      summary: 手机预览拉取，真实文件名和大小来自桌面清单；拒绝不支持类型而不收费不传输
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceId, projectKey, remoteFileId, requestId]
+              properties:
+                deviceId: { type: string }
+                projectKey: { type: string }
+                remoteFileId: { type: string }
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 后续复用transfer查询/下载/ACK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/TransferCreated'
+                  - $ref: '#/components/schemas/Envelope'
+  /api/mobile/preview/catalog/{uid}/files/{fileUid}/content:
+    get:
+      summary: 手机下载持久云或备份文件，必须有效订阅并明确开启备份
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { name: uid, in: path, required: true, schema: { type: string } }
+        - { name: fileUid, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: 裸字节或错误信封；持久对象无须ACK
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+  /api/auth/account-login:
+    post:
+      summary: 官网统一账号密码登录，桥接到同一云用户
+      description: |
+        日常提交account/password。首次提交phone/code或email/code仅返回PasswordSetupChallenge，
+        不签发token；完成password/setup后再用密码登录。移动端注册与重置在官网受保护流程完成。
+        历史已验证手机号/邮箱用户保留原userId，不凭用户名猜测身份。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                account: { type: string }
+                password: { type: string }
+                phone: { type: string }
+                email: { type: string }
+                code: { type: string }
+      responses:
+        "200":
+          description: code 0为登录成功或必须设密；code 1为失败
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountBridgeEnvelope' }
+  /api/auth/account-login/captcha-config:
+    get:
+      summary: 公开人机验证配置，发验证码前使用
+      responses:
+        "200":
+          description: code 0，data内含provider及accountIdentity
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+  /api/auth/account-login/send-code:
+    post:
+      summary: 首次注册或存量无密码账号验证码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone: { type: string }
+                email: { type: string }
+                captchaToken: { type: string }
+      responses:
+        "200":
+          description: code 0成功但不表示已登录；code 1失败
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+  /api/auth/account-login/password/setup:
+    post:
+      summary: 消费一次性设密凭证创建密码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                setupToken: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: code 0成功但不表示已登录；code 1失败
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+  /api/auth/account-login/password/reset/send-code:
+    post:
+      summary: 重置密码专用验证码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone: { type: string }
+                email: { type: string }
+                captchaToken: { type: string }
+      responses:
+        "200":
+          description: code 0成功但不表示已登录；code 1失败
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+  /api/auth/account-login/password/reset:
+    post:
+      summary: 验证重置码并更新密码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone: { type: string }
+                email: { type: string }
+                code: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: code 0成功但不表示已登录；code 1失败
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
   /api/auth/sms-login/send-code:
     post:
-      summary: 发送短信验证码
+      summary: 旧短信入口（官方已关闭，审核账号精确例外保留）
       requestBody:
         required: true
         content:
@@ -284,7 +1520,7 @@ paths:
               schema: { $ref: '#/components/schemas/Envelope' }
   /api/auth/sms-login/verify:
     post:
-      summary: 校验验证码并签发会话
+      summary: 旧验证码登录（官方普通账号须升级使用密码登录）
       requestBody:
         required: true
         content:
@@ -327,6 +1563,59 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/LoginEnvelope' }
+  /api/mobile/catalog:
+    get:
+      summary: 账户统一项目清单；projectUid 为身份，locations 为可用存储位置
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      responses:
+        "200":
+          description: 项目清单或错误信封
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items: { $ref: '#/components/schemas/CatalogProject' }
+                  - $ref: '#/components/schemas/Envelope'
+  /api/mobile/catalog/{uid}/files:
+    get:
+      summary: 持久云文件或最后成功的桌面清单；首次桌面清单仍需 LIST
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - name: uid
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: 文件清单或错误信封
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/CatalogFiles'
+                  - $ref: '#/components/schemas/Envelope'
+  /api/mobile/catalog/{uid}/files/{fileUid}/content:
+    get:
+      summary: 下载持久云文件原件；不需要 ACK，也不删除云原件
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - name: uid
+          in: path
+          required: true
+          schema: { type: string }
+        - name: fileUid
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: 裸字节与实际 Content-Length；出错为 JSON 信封
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
   /api/mobile/projects:
     get:
       summary: 手机端：该账号全部设备的项目目录并集（裸数组）
@@ -377,7 +1666,8 @@ paths:
                   - $ref: '#/components/schemas/Envelope'
   /api/mobile/media:
     post:
-      summary: 手机端：上传一件现场影像到中转区（幂等键 clientMediaId）
+      summary: 手机采集归档（幂等键 clientMediaId）
+      description: deviceId=cloud 时 projectKey 为目录返回的云项目编号，保存至订阅持久云空间并立即 delivered；其他设备走 ACK 即删的临时中转。
       parameters: [{ $ref: '#/components/parameters/SessionId' }]
       requestBody:
         required: true

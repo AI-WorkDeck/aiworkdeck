@@ -57,8 +57,17 @@ class FileControllerChunkedUploadTest {
     @Mock
     private com.checkba.storage.ProjectStorageResolver storageResolver;
 
+    @Mock private com.checkba.service.ProjectFileAccessService fileAccess;
+
     @InjectMocks
     private FileController controller;
+
+    @org.junit.jupiter.api.BeforeEach
+    void wireContentService() {
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "contentService",
+                com.checkba.service.ContentServiceTestSupport.create(projectFileRepository, storageServiceFactory,
+                        projectMemberService, fileAccess, storageResolver, workSessionService));
+    }
 
     private static final String WPS_FILE_ID = "project_4_doc_1784101301299_a5d5o6u";
     private static final String FILE_ID = "16";
@@ -232,5 +241,16 @@ class FileControllerChunkedUploadTest {
         verifyNoInteractions(storageServiceFactory);
         verify(storageService, never()).save(any(), any());
         verify(storageService, never()).append(any(), any());
+    }
+
+    @Test
+    void uploadFileIsNotAnnotatedWithMethodLevelTransactional() {
+        for (java.lang.reflect.Method m : FileController.class.getDeclaredMethods()) {
+            if ("uploadFile".equals(m.getName())) {
+                org.junit.jupiter.api.Assertions.assertFalse(
+                        m.isAnnotationPresent(org.springframework.transaction.annotation.Transactional.class),
+                        "uploadFile 含网络流式写盘，不得在控制器方法层挂 @Transactional 占住数据库连接");
+            }
+        }
     }
 }

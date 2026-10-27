@@ -118,7 +118,7 @@ test('SettingsView：tab 行按 codeTabs 渲染，只剩一个时整行不出现
   assert.ok(src.includes("import { accountIdentityOf, defaultMode, isModeAvailable, visibleCodeTabs } from '../lib/loginTabs.js'"),
     '组件必须用 lib/loginTabs.js 那份判定，不许在组件里再抄一遍')
   assert.ok(src.includes('visibleCodeTabs(identity.value)'), 'codeTabs 要从 identity 派生')
-  assert.ok(src.includes('v-if="codeTabs.length > 1"'), '只剩一个 tab 时不该渲染 tab 行')
+  assert.ok(src.includes('codeTabs.length > 1"'), '只剩一个 tab 时不该渲染 tab 行')
   assert.ok(src.includes('v-for="tab in codeTabs"'), 'tab 按钮要按 codeTabs 循环，不许写死两个')
   assert.ok(!src.includes('emailMode'), '旧的邮箱 tab 内二级切换应已被 mode=password 取代')
 })
@@ -127,7 +127,7 @@ test('SettingsView：配置到达时落地站点能力（不调 applyIdentity = 
   const src = read(SETTINGS)
   assert.ok(src.includes('applyIdentity(accountIdentityOf(config))'),
     '取 captcha-config 的那一处要顺带把 accountIdentity 落到界面上')
-  assert.ok(src.includes('if (!isModeAvailable(mode.value, next)) mode.value = defaultMode(next)'),
+  assert.ok(src.includes("mode.value !== 'setup' && !isModeAvailable(mode.value, next)"),
     '当前形态在新站点下不成立时必须纠正——那个 tab 马上就要从界面上消失')
 })
 

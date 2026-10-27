@@ -30,6 +30,7 @@ function makeVm(locator, opts = {}) {
   const vm = {
     file: { id: 7, fileType: opts.fileType || 'pdf' },
     blobUrl: 'blob:fake',
+    pdfStreamUrl: '',
     appliedLocator: null,
     evidenceRectVisible: false,
     evidenceRectUndimmed: false,
@@ -48,6 +49,7 @@ function makeVm(locator, opts = {}) {
     timers,
   }
   // 组件里这几个是 computed，测试里按同一份纯函数现算
+  Object.defineProperty(vm, 'pdfResourceUrl', { get: () => vm.pdfStreamUrl || vm.blobUrl })
   Object.defineProperty(vm, 'pdfLocate', { get: () => parsePdfLocator(vm.appliedLocator) })
   Object.defineProperty(vm, 'imageLocatorRect', { get: () => parseImageRect(vm.appliedLocator) })
   Object.defineProperty(vm, 'mediaLocatorSec', { get: () => parseMediaStartSec(vm.appliedLocator) })

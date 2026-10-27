@@ -1,8 +1,12 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-const { ipcMain, dialog, shell, BrowserWindow, ShareMenu } = require('electron');
+const { ipcMain, dialog, shell, BrowserWindow, ShareMenu, nativeImage } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const { createHash } = require('crypto');
+const ARCHIVE_ENTRY_MAX_BYTES = 128 * 1024 * 1024;
+const ARCHIVE_CACHE_MAX_BYTES = 1024 * 1024 * 1024;
 const { execFile, spawn } = require('child_process');
 
 /**
@@ -14,6 +18,15 @@ const { execFile, spawn } = require('child_process');
  */
 function initLocalFileService() {
     console.log('[LocalFileService] Initializing...');
+    require('./dropped-files').initDroppedFileService(ipcMain);
+    const archiveCache = createArchiveEntryCache();
+    // Receiving apps may read the dragged path after DOM dragend or window closure.
+    // Keep our copies until process exit; only remove directories created by this cache.
+    process.once('exit', () => archiveCache.clear());
+    ipcMain.handle('fs:cacheArchiveEntry', (event, payload) => {
+        if (event.senderFrame !== event.sender.mainFrame) return { ok: false, reason: 'not-main-frame' };
+        return archiveCache.cache(payload);
+    });
 
     // Handler: Open File Dialog（仅弹系统选择框，安全）
     ipcMain.handle('fs:showOpenDialog', async (event, options) => {
@@ -36,12 +49,82 @@ function initLocalFileService() {
         return shareFile(process.platform, filePath, win);
     });
 
+    // Handler: 把资源管理器/暂存区的文件直接拖出窗口（如拖到微信聊天、Finder/资源管理器，dev-board#1288）。
+    // invoke 回传启动失败；保留 send 兼容旧入口。成功仅表示已启动，不代表用户已松手。
+    ipcMain.on('fs:startDrag', (event, { paths, path: filePath } = {}) => {
+        startFileDrag(event && event.sender, paths || filePath);
+    });
+    ipcMain.handle('fs:startDrag', async (event, { paths, path: filePath } = {}) => {
+        return startFileDrag(event && event.sender, paths || filePath);
+    });
+
     // Handler: 回收站「彻底删除」把磁盘上的文件送进系统废纸篓（dev-board#1051）。
     // 路径由后端 GET .../permanent/disk-paths 按项目 localRoot 解析，渲染层原样转交；
     // 送废纸篓可从 Finder/资源管理器还原，与 showItemInFolder 同档，不另设白名单。
     ipcMain.handle('fs:trashItems', async (event, { paths } = {}) => {
         return trashItems(paths);
     });
+}
+
+// Materialize archive bytes in a private temporary directory, never at a path
+// supplied by the renderer. The cache has a per-file and aggregate disk budget.
+function createArchiveEntryCache({ tempDir = os.tmpdir() } = {}) {
+    const directories = new Set();
+    const cachedEntries = new Map();
+    let totalBytes = 0;
+    let closed = false;
+    function clear() {
+        closed = true;
+        for (const dir of directories) {
+            try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+        }
+        directories.clear();
+        cachedEntries.clear();
+    }
+    async function cache({ name, bytes } = {}) {
+        if (closed) return { ok: false, reason: 'closed' };
+        if (typeof name !== 'string' || !name || Buffer.byteLength(name, 'utf8') > 255
+            || /[\\/\x00-\x1f<>:"|?*]/.test(name) || /[. ]$/.test(name)
+            || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)) {
+            return { ok: false, reason: 'bad-name' };
+        }
+        if (!(bytes instanceof ArrayBuffer) && !ArrayBuffer.isView(bytes)) return { ok: false, reason: 'bad-bytes' };
+        const size = bytes.byteLength;
+        if (size > ARCHIVE_ENTRY_MAX_BYTES) return { ok: false, reason: 'too-large' };
+        const data = Buffer.from(bytes instanceof ArrayBuffer ? bytes : bytes.buffer, bytes.byteOffset || 0, size);
+        // Re-selecting a photo (or mounting a second preview) must not consume the
+        // budget again. Include the name so native receivers retain the exact name.
+        const key = name + '\0' + createHash('sha256').update(data).digest('hex');
+        if (cachedEntries.has(key)) return cachedEntries.get(key);
+        if (totalBytes + size > ARCHIVE_CACHE_MAX_BYTES) return { ok: false, reason: 'too-large' };
+        // Reserve and publish the promise before awaiting, including concurrent IPCs.
+        totalBytes += size;
+        const pending = (async () => {
+            let dir;
+            try {
+                dir = await fs.promises.mkdtemp(path.join(tempDir, 'awd-archive-'));
+                directories.add(dir);
+                if (closed) throw new Error('closed');
+                const filePath = path.join(dir, name);
+                await fs.promises.writeFile(filePath, data, { flag: 'wx', mode: 0o600 });
+                if (closed) throw new Error('closed');
+                return { ok: true, path: filePath };
+            } catch (_) {
+                totalBytes -= size;
+                if (dir) {
+                    try { await fs.promises.rm(dir, { recursive: true, force: true }); } catch (_) {}
+                    directories.delete(dir);
+                }
+                return { ok: false, reason: closed ? 'closed' : 'cache-failed' };
+            }
+        })();
+        cachedEntries.set(key, pending);
+        const result = await pending;
+        if (!result.ok) cachedEntries.delete(key);
+        return result;
+    }
+
+    return { cache, clear };
 }
 
 /**
@@ -167,9 +250,70 @@ async function launchWeChatWindows() {
     return false;
 }
 
+// 32x32 简洁文档图标 PNG（Electron webContents.startDrag 在 macOS/Windows 上必须提供非空 icon，否则抛异常）。
+const DRAG_FILE_ICON_PNG_BASE64 =
+    'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAZ0lEQVR4nGNgGAWDFVg3fXtNDqaqA/7///+BFExVR5DrABg9oA6giiModQDFjqCGAyhyBCWJkCq5gxwH4HPYqAModkDC0l93SMHDLwRGHTCaBkYdMJoGRh0w6oABcQA1MckOGAX0AgCkHQcm9HXZLQAAAABJRU5ErkJggg==';
+
+let cachedDragFileIcon = null;
+function createDragFileIcon(nativeImageMod = nativeImage) {
+    if (cachedDragFileIcon && nativeImageMod === nativeImage) return cachedDragFileIcon;
+    if (!nativeImageMod || typeof nativeImageMod.createFromDataURL !== 'function') return null;
+    const icon = nativeImageMod.createFromDataURL('data:image/png;base64,' + DRAG_FILE_ICON_PNG_BASE64);
+    if (nativeImageMod === nativeImage) cachedDragFileIcon = icon;
+    return icon;
+}
+
+/**
+ * 启动系统级原生文件拖出（webContents.startDrag，dev-board#1288）。
+ * 只接受磁盘上已存在的绝对文件路径（不接受目录或相对路径），供微信/Finder/资源管理器直接接收文件。
+ */
+function startFileDrag(sender, filePath, deps = {}) {
+    const fsMod = deps.fs || fs;
+    const nativeImageMod = deps.nativeImage || nativeImage;
+    if (!sender || typeof sender.startDrag !== 'function') return { ok: false, reason: 'no-sender' };
+    const filePaths = Array.isArray(filePath) ? filePath : [filePath];
+    if (!filePaths.length) return { ok: false, reason: 'bad-path' };
+    const resolvedPaths = [];
+    for (const candidate of filePaths) {
+        if (typeof candidate !== 'string' || !candidate || !path.isAbsolute(candidate)) {
+            return { ok: false, reason: 'bad-path' };
+        }
+        const resolved = path.resolve(candidate);
+        if (candidate.replace(/[\\/]+$/, '') !== resolved) {
+            return { ok: false, reason: 'not-normalized' };
+        }
+        let stat = null;
+        try {
+            stat = fsMod.statSync(resolved);
+        } catch (e) {
+            return { ok: false, reason: 'not-found' };
+        }
+        if (!stat || (typeof stat.isDirectory === 'function' && stat.isDirectory())) {
+            return { ok: false, reason: 'not-file' };
+        }
+        if (!resolvedPaths.includes(resolved)) resolvedPaths.push(resolved);
+    }
+    const icon = deps.icon || createDragFileIcon(nativeImageMod);
+    if (!icon || (typeof icon.isEmpty === 'function' && icon.isEmpty())) {
+        return { ok: false, reason: 'no-icon' };
+    }
+    try {
+        sender.startDrag({ files: resolvedPaths, icon });
+        return Array.isArray(filePath)
+            ? { ok: true, paths: resolvedPaths }
+            : { ok: true, path: resolvedPaths[0] };
+    } catch (e) {
+        return { ok: false, reason: 'start-drag-failed', message: String((e && e.message) || e) };
+    }
+}
+
 module.exports = {
     initLocalFileService,
+    createArchiveEntryCache,
+    ARCHIVE_ENTRY_MAX_BYTES,
     shareFile,
+    startFileDrag,
+    createDragFileIcon,
     trashItems,
     psQuote,
     windowsClipboardCommand,

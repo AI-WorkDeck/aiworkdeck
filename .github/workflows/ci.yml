@@ -23,14 +23,22 @@ jobs:
       # WCAG 对比度复算与硬闸。零依赖，跟 SPDX 检查共用这个轻量 job。
       - name: Check color palette and generated tokens
         run: node scripts/check-palette.mjs
+      - name: Check migrated design tokens and iframe contract
+        run: node scripts/check-design-system.mjs
+      - name: Test design token guards and control behavior
+        run: node --test frontend/tests/design-system/*.test.mjs frontend/tests/plugin-sdk/theme-channel.test.mjs
       # 两族编辑工具对拍（dev-board#806）：同一件事在工作台（doc_/sheet_/slide_）与
       # Office/WPS 任务窗格（office_*）各有一套工具名，会话按客户端只放行一族——
       # 一族缺了什么，那件事在那个客户端上就是沉默地做不了。同时查 skill 白名单，
       # 审计 A10 就是 contract-review 列了 doc_reply_comment 却漏了 office_reply_comment。
       - name: Check tool parity between LOWA and Office families
         run: node scripts/check-tool-parity.mjs
+      - name: Check multi-language tokenization and locale parity
+        working-directory: frontend
+        run: npm run check:locales
 
   backend:
+    # Keep the required check identity; verify also exercises the packaged contract.
     name: Backend (mvn test)
     runs-on: ubuntu-latest
     steps:
@@ -44,8 +52,15 @@ jobs:
         # backend 以普通依赖引用 com.checkba:plugin-api，它是 backend/plugin-api 独立工程，
         # 不在任何远端仓库，必须先 install 进本机 ~/.m2 再跑 backend 的 Maven。
         run: mvn -B -q -f backend/plugin-api/pom.xml install
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build and test DPIA workbench plugin
+        run: ./official-plugins/dpia-workbench/build.sh
       - name: Build and test Tencent Meeting marketplace plugin
         run: ./official-plugins/tencent-meeting/build.sh
+      - name: Build and test Baoqingtian marketplace plugin
+        run: ./official-plugins/baoqingtian/build.sh
       - name: Test
         working-directory: backend
         # forkNode 走 TCP 而不是默认的 stdout 管道：套件里有测试进程往 native stdout
@@ -53,7 +68,7 @@ jobs:
         # surefire 误判 "VM terminated without properly saying goodbye"（退出码 0、
         # 零断言失败也算 BUILD FAILURE），2026-08-14 一天在 Linux runner 上撞了两次，
         # 两次都死在同一位置附近、重跑又过。TCP 信道对 stdout 污染免疫。
-        run: mvn -B test -Dsurefire.forkNode.factory=org.apache.maven.plugin.surefire.extensions.SurefireForkNodeFactory
+        run: mvn -B verify -Dsurefire.forkNode.factory=org.apache.maven.plugin.surefire.extensions.SurefireForkNodeFactory
       - name: Dump surefire fork diagnostics on failure
         if: failure()
         working-directory: backend
@@ -66,6 +81,33 @@ jobs:
             head -c 20000 "$f" | LC_ALL=C tr -c '[:print:]\n\t' '.'
             echo
           done
+
+  dpia-reports:
+    name: DPIA report lifecycle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install document rendering dependencies
+        run: |
+          python -m pip install -r official-plugins/dpia-workbench/runtime/requirements.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libreoffice-writer fonts-noto-cjk fonts-wqy-zenhei
+      - name: Test original workflow and native report lifecycle
+        env:
+          DSH_DPIA_PYTHON: python
+          AWD_DPIA_SOFFICE: /usr/bin/soffice
+        run: |
+          node --test official-plugins/dpia-workbench/runtime/upstream/test/*.mjs official-plugins/dpia-workbench/tests/lifecycle.test.mjs
+          python official-plugins/dpia-workbench/runtime/upstream/test/template-preservation.test.py
+          python official-plugins/dpia-workbench/runtime/upstream/test/native-pdf.test.py
+          python official-plugins/dpia-workbench/tests/test_render.py
+          python official-plugins/dpia-workbench/tests/test_office_discovery.py
 
   frontend:
     name: Frontend (build:h5)
@@ -84,8 +126,21 @@ jobs:
         # desktop job 一直是干净的 npm ci）。本地验证过 frontend/ 的 lockfile 与
         # package.json 一致（npm ci 能正常跑通），收紧成单纯 npm ci。
         run: npm ci
+      - name: Test plugin platform, SDK and developer packaging
+        run: node --test frontend/tests/calendar/*.test.mjs frontend/tests/plugins/*.test.mjs sdk/plugin-sdk/tests/*.test.mjs scripts/tests/plugin-dev.test.mjs
+      - name: Test incremental speech playback
+        working-directory: frontend
+        run: npm run test:tts
+      - name: Test project IM plugin and bridge
+        run: node --test official-plugins/project-im/tests/*.mjs frontend/tests/plugin-sdk/im-*.test.mjs
+      - name: Test DPIA native navigation boundaries
+        run: node --test frontend/tests/plugin-sdk/dpia-navigation.test.mjs
       - name: Test Tencent Meeting plugin panel
         run: node --test official-plugins/tencent-meeting/tests/web-*.mjs
+      - name: Test Baoqingtian plugin workspace
+        run: NODE_PATH=frontend/node_modules node --test official-plugins/baoqingtian/tests/web-*.mjs
+      - name: Test built-in Tencent Meeting request and UI contracts
+        run: node --test frontend/tests/tmeet/*.test.mjs
       - name: Check emit/binding contracts
         working-directory: frontend
         run: npm run check:emits
@@ -101,9 +156,29 @@ jobs:
       - name: Test account and paid-service access
         working-directory: frontend
         run: npm run test:account
+      - name: Test unified account project catalog
+        working-directory: frontend
+        run: node --test tests/project-catalog.test.mjs
       - name: Test project-home page
         working-directory: frontend
         run: npm run test:project-home
+      - name: Test independent litigation generation
+        working-directory: frontend
+        run: node --test tests/litigation-visual/*.test.mjs
+      - name: Test editor opening and preview fallback
+        working-directory: frontend
+        run: npm run test:editor-open
+      - name: Test native editor transport, input and review guards
+        run: npm --prefix desktop run test:native
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test native UNO guards (real macOS engine acceptance is separate)
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python -m unittest discover -s desktop/tests -p 'test_native_*.py'
+          python desktop/prototypes/native-lok/test_review_view.py
       - name: Test media player pure logic (cues / CC 状态 / 快捷键 / 取源)
         working-directory: frontend
         run: npm run test:media
@@ -165,6 +240,11 @@ jobs:
       - name: Document insight and link preview tests
         working-directory: frontend
         run: npm run test:insight
+      - name: Confirmed contract review standards and results
+        working-directory: frontend
+        run: node --test tests/contract-review/*.test.mjs
+      - name: Office compatible verification API
+        run: node --test office-addin/taskpane/lib/api.test.js
       - name: Inline review contracts (dev-board#547)
         working-directory: frontend
         run: npm run test:inline-review
@@ -174,12 +254,18 @@ jobs:
       - name: Optional components prompts (dev-board#530)
         working-directory: frontend
         run: npm run test:optional-components
+      - name: External software preparation
+        working-directory: frontend
+        run: npm run test:external-dependencies
       - name: Test local redaction panel
         working-directory: frontend
         run: node --test tests/desensitize/*.test.mjs
       - name: "Captcha embed + unlock site language (dev-board#863 #864)"
         working-directory: frontend
         run: npm run test:captcha && npm run test:unlock
+      - name: Test browser-safe build chunks
+        working-directory: frontend
+        run: node --test tests/build/*.test.mjs
       - name: Build H5
         working-directory: frontend
         run: npm run build:h5

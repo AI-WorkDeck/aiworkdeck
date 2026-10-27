@@ -21,7 +21,9 @@
 -->
 <template>
   <view class="awd-select" :class="{ 'is-disabled': disabled, 'is-open': open }">
-    <view class="awd-select-trigger" @tap.stop="toggle">
+    <view class="awd-select-trigger" role="button" aria-haspopup="listbox" :aria-label="ariaLabel || currentLabel"
+      :aria-expanded="open ? 'true' : 'false'" :aria-disabled="disabled ? 'true' : 'false'"
+      :tabindex="disabled ? -1 : 0" @keydown="onTriggerKey" @tap.stop="toggle">
       <slot>
         <view class="awd-select-value">
           <text class="awd-select-text">{{ currentLabel }}</text>
@@ -32,17 +34,26 @@
 
     <!-- 蒙层负责「点外面关掉」；透明但要吃掉点击，否则关菜单的同时会点到下面的东西 -->
     <view v-if="open" class="awd-select-mask" @tap.stop="close"></view>
-    <view v-if="open" class="awd-select-menu" :style="menuStyle">
-      <view
-        v-for="(label, i) in range"
-        :key="i"
-        class="awd-select-item"
-        :class="{ 'is-active': i === value }"
-        @tap.stop="pick(i)"
-      >
-        <text class="awd-select-item-text">{{ label }}</text>
-        <text v-if="i === value" class="awd-select-check">✓</text>
+    <view v-if="open" class="awd-select-menu" :class="{ 'is-searchable': searchable }" :style="menuStyle">
+      <view v-if="searchable" class="awd-select-search">
+        <input class="awd-select-search-input" :value="searchQuery" :placeholder="searchPlaceholder" :confirm-hold="true"
+          :aria-label="searchLabel || ariaLabel" @input="onSearchInput" @keydown.stop="onSearchKey" />
       </view>
+      <view role="listbox" :aria-label="ariaLabel || currentLabel">
+        <view
+          v-for="(option, position) in filteredOptions"
+          :key="option.index"
+          class="awd-select-item"
+          role="option" :aria-selected="option.index === value ? 'true' : 'false'" tabindex="-1"
+          @keydown="onOptionKey($event, position)"
+          :class="{ 'is-active': option.index === value }"
+          @tap.stop="pick(option.index)"
+        >
+          <text class="awd-select-item-text">{{ option.label }}</text>
+          <text v-if="option.index === value" class="awd-select-check">✓</text>
+        </view>
+      </view>
+      <view v-if="searchable && !filteredOptions.length" class="awd-select-empty" role="status">{{ emptyText }}</view>
     </view>
   </view>
 </template>
@@ -53,6 +64,11 @@ export default {
   props: {
     /** 标签数组，与 <picker> 的 range 同义 */
     range: { type: Array, default: () => [] },
+    ariaLabel: { type: String, default: '' },
+    searchable: { type: Boolean, default: false },
+    searchPlaceholder: { type: String, default: '' },
+    searchLabel: { type: String, default: '' },
+    emptyText: { type: String, default: '' },
     /** 当前选中项下标 */
     value: { type: Number, default: 0 },
     disabled: { type: Boolean, default: false },
@@ -61,28 +77,97 @@ export default {
   data() {
     return {
       open: false,
+      searchQuery: '',
       menuStyle: {},
     }
   },
   computed: {
+    filteredOptions() {
+      const options = this.range.map((label, index) => ({ label, index }))
+      const query = this.searchable ? this.searchQuery.trim().toLocaleLowerCase() : ''
+      return query ? options.filter(option => String(option.label).toLocaleLowerCase().includes(query)) : options
+    },
     currentLabel() {
       return this.range[this.value] !== undefined ? this.range[this.value] : ''
     },
+  },
+  updated() {
+    if (this.searchable && this.open) this.syncSearchLabel()
   },
   beforeUnmount() {
     this.detachDismiss()
   },
   methods: {
+    onTriggerKey(event) {
+      if (this.disabled) return
+      if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
+        event.preventDefault()
+        if (!this.open) this.openMenu()
+        this.$nextTick(() => {
+          if (this.searchable) this.focusSearch()
+          else this.focusOption(event.key === 'ArrowUp' ? this.range.length - 1 : this.value)
+        })
+      } else if (event.key === 'Escape') this.close()
+    },
+    focusOption(index) {
+      const items = this.$el && this.$el.querySelectorAll('.awd-select-item')
+      if (items && items.length) items[Math.max(0, Math.min(index, items.length - 1))].focus()
+    },
+    onOptionKey(event, index) {
+      if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'Enter', ' ', 'Escape'].includes(event.key)) event.preventDefault()
+      const options = this.filteredOptions
+      if (event.key === 'ArrowDown' && options.length) this.focusOption((index + 1) % options.length)
+      else if (event.key === 'ArrowUp' && options.length) this.focusOption((index + options.length - 1) % options.length)
+      else if (event.key === 'Home') this.focusOption(0)
+      else if (event.key === 'End') this.focusOption(options.length - 1)
+      else if ((event.key === 'Enter' || event.key === ' ') && options[index]) { this.pick(options[index].index); this.focusTrigger() }
+      else if (event.key === 'Escape') { this.close(); this.focusTrigger() }
+      else if (event.key === 'Tab') this.close()
+    },
+    syncSearchLabel() {
+      const field = this.$el?.querySelector('.awd-select-search-input')
+      const input = field?.querySelector('input') || field
+      input?.setAttribute?.('aria-label', this.searchLabel || this.ariaLabel)
+      return input
+    },
+    focusSearch() {
+      this.syncSearchLabel()?.focus()
+    },
+    onSearchInput(event) {
+      // uni-h5 的 v-model 会节流；键盘选择必须使用本次 input 的完整值。
+      this.searchQuery = event.detail?.value ?? event.target?.value ?? ''
+    },
+    onSearchKey(event) {
+      if (event.isComposing) return
+      // Uni 也可能节流 @input；提交/导航前读取原生输入的最新文本。
+      if (['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key) && typeof event.target?.value === 'string') {
+        this.searchQuery = event.target.value
+      }
+      if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) event.preventDefault()
+      if (event.key === 'ArrowDown') this.$nextTick(() => this.focusOption(0))
+      else if (event.key === 'ArrowUp') this.$nextTick(() => this.focusOption(this.filteredOptions.length - 1))
+      else if (event.key === 'Enter' && this.filteredOptions.length) {
+        this.pick(this.filteredOptions[0].index)
+        this.focusTrigger()
+      } else if (event.key === 'Escape') { this.close(); this.focusTrigger() }
+      else if (event.key === 'Tab') this.close()
+      // 空格和 Home/End 留给输入框编辑，不冒充列表选项快捷键。
+    },
+    focusTrigger() {
+      this.$nextTick(() => this.$el?.querySelector('.awd-select-trigger')?.focus())
+    },
     toggle() {
       if (this.disabled) return
       if (this.open) this.close()
       else this.openMenu()
     },
     openMenu() {
+      this.searchQuery = ''
       this.open = true
       this.$nextTick(() => {
         this.placeMenu()
         this.attachDismiss()
+        if (this.searchable) this.focusSearch()
       })
     },
     close() {
@@ -104,9 +189,14 @@ export default {
       // 下方装不下就翻到上方开——设置页的下拉常常就在可视区底部
       const below = vh - r.bottom
       const openUp = below < 180 && r.top > below
+      const vw = window.innerWidth || 800
+      const width = Math.min(r.width, vw - 8)
+      const horizontal = this.searchable
+        ? { left: Math.max(4, Math.min(r.left, vw - width - 4)) + 'px', width: width + 'px' }
+        : { left: r.left + 'px', minWidth: r.width + 'px' }
       this.menuStyle = openUp
-        ? { left: r.left + 'px', bottom: (vh - r.top + 4) + 'px', minWidth: r.width + 'px' }
-        : { left: r.left + 'px', top: (r.bottom + 4) + 'px', minWidth: r.width + 'px' }
+        ? { ...horizontal, bottom: (vh - r.top + 4) + 'px' }
+        : { ...horizontal, top: (r.bottom + 4) + 'px' }
     },
     attachDismiss() {
       this._dismiss = (e) => {
@@ -144,6 +234,11 @@ export default {
   cursor: pointer;
 }
 
+.awd-select-trigger:focus-visible, .awd-select-item:focus-visible, .awd-select-search-input:focus-within {
+  outline: var(--awd-focus-width) solid var(--awd-accent-text);
+  outline-offset: var(--awd-focus-offset);
+}
+
 .awd-select.is-disabled .awd-select-trigger {
   cursor: not-allowed;
   opacity: 0.55;
@@ -154,21 +249,21 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  height: 36px;
-  padding: 0 12px;
+  gap: var(--awd-space-2);
+  min-height: var(--awd-control-height);
+  padding: var(--awd-space-1) var(--awd-space-3);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background-color: var(--awd-surface);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   box-sizing: border-box;
-  transition: border-color 0.15s ease;
+  transition: border-color var(--awd-motion-fast) ease;
 }
 
 .awd-select-value:hover,
 .awd-select.is-open .awd-select-value {
-  border-color: var(--awd-mint);
+  border-color: var(--awd-accent-text);
 }
 
 .awd-select-text {
@@ -180,8 +275,8 @@ export default {
 .awd-select-caret {
   flex: none;
   color: var(--awd-text-2);
-  font-size: 12px;
-  transition: transform 0.15s ease;
+  font-size: var(--awd-panel-fs);
+  transition: transform var(--awd-motion-fast) ease;
 }
 
 .awd-select.is-open .awd-select-caret {
@@ -199,21 +294,61 @@ export default {
   z-index: 4001;
   max-height: 280px;
   overflow-y: auto;
-  padding: 4px;
+  padding: var(--awd-space-1);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
-  box-shadow: 0 8px 28px rgba(18, 52, 77, 0.16);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-md);
 }
 
+.awd-select-menu.is-searchable { box-sizing: border-box; }
+
+.awd-select-search {
+  position: sticky;
+  top: 0;
+  padding-bottom: var(--awd-space-1);
+  background: var(--awd-surface);
+}
+
+.awd-select-search-input {
+  display: block;
+  width: 100%;
+  min-height: var(--awd-control-height);
+  box-sizing: border-box;
+  padding: 0 var(--awd-space-2);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-md);
+  background: var(--awd-surface);
+  color: var(--awd-text);
+  font-size: var(--awd-font-size-body);
+  line-height: var(--awd-line-height-ui);
+}
+
+.awd-select-search-input::placeholder,
+.awd-select-search-input :deep(.uni-input-placeholder) { color: var(--awd-text-2); }
+
+.awd-select-empty {
+  padding: var(--awd-space-2);
+  color: var(--awd-text-2);
+  font-size: var(--awd-font-size-body);
+  line-height: var(--awd-line-height-ui);
+  overflow-wrap: anywhere;
+}
+
+.awd-select-menu.is-searchable .awd-select-item { white-space: normal; }
+.awd-select-menu.is-searchable .awd-select-item-text { min-width: 0; overflow-wrap: anywhere; }
+
 .awd-select-item {
+  min-height: var(--awd-panel-row-h);
+  box-sizing: border-box;
+  line-height: var(--awd-line-height-ui);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 7px 10px;
-  border-radius: 5px;
-  font-size: 13px;
+  gap: var(--awd-space-3);
+  padding: var(--awd-space-1) var(--awd-panel-pad-x);
+  border-radius: var(--awd-radius-sm);
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   cursor: pointer;
   white-space: nowrap;
@@ -231,6 +366,12 @@ export default {
 .awd-select-check {
   flex: none;
   color: var(--awd-accent-text);
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
+}
+@media (pointer: coarse) {
+  .awd-select-value, .awd-select-item, .awd-select-search-input { min-height: var(--awd-control-height-touch); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .awd-select-value, .awd-select-caret { transition: none; }
 }
 </style>

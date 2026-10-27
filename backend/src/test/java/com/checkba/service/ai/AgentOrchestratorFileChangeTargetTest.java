@@ -70,6 +70,7 @@ class AgentOrchestratorFileChangeTargetTest {
     private List<String> sseData;
     private AgentOrchestrator orchestrator;
     private ProjectFileService projectFileService;
+    private ConversationFileChangeService fileChangeService;
 
     /** 按脚本逐轮吐内容的模型，同时留下最后一轮收到的完整消息栈 */
     private static final class ScriptModel implements StreamingChatLanguageModel {
@@ -140,11 +141,12 @@ class AgentOrchestratorFileChangeTargetTest {
         runState = new AgentRunStateService(
                 mock(com.checkba.repository.AgentRunRecordRepository.class),
                 mock(com.checkba.service.telemetry.TelemetryTurnTracker.class));
+        fileChangeService = mock(ConversationFileChangeService.class);
         orchestrator = new AgentOrchestrator(
                 chatModelFactory, messageService, sse, mock(TokenUsageService.class), assembler,
                 toolRegistry, skillRouter, parser, mock(MemoryPipelineService.class),
                 projectFileService, mock(EditorBridgeService.class),
-                mock(ConversationFileChangeService.class), todoListService,
+                fileChangeService, todoListService,
                 mock(DocumentCheckpointService.class), runState,
                 mock(com.checkba.version.WorkSessionService.class), new AiFailoverProperties(),
                 new RunLoopCompactor(contextProperties, new ContextCompressor(null, null, contextProperties)),
@@ -160,6 +162,7 @@ class AgentOrchestratorFileChangeTargetTest {
         AiAgentController.AgentChatRequest request = new AiAgentController.AgentChatRequest();
         request.setProjectId(1L);
         request.setConversationId(conversationId);
+        request.setClientRequestId("request-" + conversationId);
         request.setMessage("在末尾新增一行");
         request.setModel(MODEL);
         if (activeId != null) {
@@ -170,6 +173,30 @@ class AgentOrchestratorFileChangeTargetTest {
             request.setActiveContext(active);
         }
         orchestrator.handleUserMessage(request, 7L);
+    }
+
+    @Test void lateChildResultRetainsOriginalAssistantIdentityAfterAnotherRunStarts() throws Exception {
+        var captured = new java.util.concurrent.atomic.AtomicReference<com.checkba.service.ai.tools.ToolContext>();
+        var file = new com.checkba.model.entity.ProjectFile();
+        file.setId(99L); file.setProjectId(1L); file.setName("迟到的成果.docx");
+        when(projectFileService.findFile(99L)).thenReturn(java.util.Optional.of(file));
+        var sequence = new java.util.concurrent.atomic.AtomicLong(700L);
+        when(messageService.upsertAssistantMessage(any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> inv.getArgument(3) != null ? inv.getArgument(3) : sequence.incrementAndGet());
+        when(toolRegistry.execute(any(), any(), any())).thenAnswer(inv -> {
+            captured.set(inv.getArgument(2));
+            return new ToolRegistry.ToolResult("{\"success\":false,\"error\":\"timed out\"}", null, false);
+        });
+        run("same-conversation", null, null, call("dispatch_subtask", "{}"), AiMessage.from("子任务超时"));
+        run("same-conversation", null, null, AiMessage.from("新一轮完成"));
+        org.mockito.Mockito.doThrow(new RuntimeException("temporary metadata outage")).doNothing()
+                .when(fileChangeService).saveFileChange("same-conversation", "迟到的成果.docx", "ADDED", 99L, 1L, 701L);
+        captured.get().fileChangeListener().accept(99L, "ADDED");
+        captured.get().fileChangeListener().accept(99L, "ADDED");
+        var events = eventDataAll("file_change");
+        assertEquals(1, events.size(), "snapshot and listener cannot duplicate the same result");
+        assertEquals(701L, json(events.get(0)).path("assistantMessageId").asLong());
+        verify(fileChangeService, org.mockito.Mockito.times(2)).saveFileChange("same-conversation", "迟到的成果.docx", "ADDED", 99L, 1L, 701L);
     }
 
     private List<String> eventDataAll(String event) {
@@ -280,6 +307,105 @@ class AgentOrchestratorFileChangeTargetTest {
         assertNotEquals("重大合同清单.xlsx", d.path("fileName").asText(), changes.get(0));
         assertFalse(d.path("fileId").asLong() == 42L, changes.get(0));
         assertFalse(changes.get(0).contains("Current Document"), changes.get(0));
+    }
+
+    @Test
+    void generatedFileChangeUsesStructuredIdAndActualName() throws Exception {
+        var created = new com.checkba.model.entity.ProjectFile();
+        created.setId(99L); created.setProjectId(1L); created.setName("费用明细表 (1).xlsx");
+        when(projectFileService.findFile(99L)).thenReturn(java.util.Optional.of(created));
+        when(toolRegistry.execute(any(), any(), any())).thenReturn(new ToolRegistry.ToolResult(
+                "{\"status\":\"success\",\"db_id\":99}", tool("fakeSheetCreateFile", "sheet_create_file"), true));
+        run("conv-1181-id", "42", "材料.xlsx", call("sheet_create_file", "{\"fileName\":\"费用明细表.xlsx\"}"), AiMessage.from("完成"));
+        var d = json(eventDataAll("file_change").get(0));
+        assertEquals(99, d.path("fileId").asLong());
+        assertEquals("request-conv-1181-id", d.path("clientRequestId").asText());
+        assertEquals("conv-1181-id", d.path("conversationId").asText());
+        assertEquals("费用明细表 (1).xlsx", d.path("fileName").asText());
+        org.mockito.Mockito.verify(fileChangeService).saveFileChange(
+                "conv-1181-id", "费用明细表 (1).xlsx", "ADDED", 99L, 1L, 1L);
+    }
+
+    @ToolMeta(displayName = "导出 PDF", category = "files", refreshFiles = true)
+    public void fakePdfExport() {}
+
+    @Test void exportedPdfReportsOnlyTheConfirmedNewFileNotTheActiveSource() throws Exception {
+        var created = new com.checkba.model.entity.ProjectFile();
+        created.setId(99L); created.setProjectId(1L); created.setName("合同.pdf");
+        when(projectFileService.findFile(99L)).thenReturn(java.util.Optional.of(created));
+        when(toolRegistry.execute(any(), any(), any())).thenReturn(new ToolRegistry.ToolResult(
+                "{\"status\":\"success\",\"db_id\":99}", tool("fakePdfExport", "doc_export_pdf"), true));
+        run("conv-export-id", "42", "合同.docx", call("doc_export_pdf", "{}"), AiMessage.from("完成"));
+        assertEquals(1, eventDataAll("file_change").size());
+        var change = json(eventDataAll("file_change").get(0));
+        assertEquals(99L, change.path("fileId").asLong());
+        assertEquals("ADDED", change.path("changeType").asText());
+        org.mockito.Mockito.verify(fileChangeService).saveFileChange("conv-export-id", "合同.pdf", "ADDED", 99L, 1L, 1L);
+    }
+
+    @Test void subtaskPartialFailureReportsSavedFilesButRejectsForeignAndDeletedIdentities() throws Exception {
+        for (long id : new long[]{99, 100, 101}) {
+            var file = new com.checkba.model.entity.ProjectFile();
+            file.setId(id); file.setProjectId(id == 100 ? 2L : 1L); file.setName("文件" + id);
+            file.setIsDeleted(id == 101);
+            when(projectFileService.findFile(id)).thenReturn(java.util.Optional.of(file));
+        }
+        when(toolRegistry.execute(any(), any(), any())).thenReturn(new ToolRegistry.ToolResult(
+                "{\"subtaskId\":\"child\",\"success\":false,\"error\":\"later failed\",\"fileChanges\":[{\"fileId\":99,\"changeType\":\"ADDED\"},{\"fileId\":100,\"changeType\":\"ADDED\"},{\"fileId\":101,\"changeType\":\"ADDED\"}]}",
+                tool("fakePdfExport", "dispatch_subtask"), true));
+        run("conv-sub-files", "42", "原件.docx", call("dispatch_subtask", "{}"), AiMessage.from("部分完成"));
+        assertEquals(1, eventDataAll("file_change").size());
+        assertEquals(99L, json(eventDataAll("file_change").get(0)).path("fileId").asLong());
+    }
+
+    @Test
+    void defaultOutputFolderIsCapturedFromValidatedInitialActiveFile() throws Exception {
+        var source = new com.checkba.model.entity.ProjectFile();
+        source.setId(42L); source.setProjectId(1L); source.setParentId(7L);
+        var folder = new com.checkba.model.entity.ProjectFile();
+        folder.setId(7L); folder.setProjectId(1L); folder.setIsFolder(true);
+        when(projectFileService.findFile(42L)).thenReturn(java.util.Optional.of(source));
+        when(projectFileService.findFile(7L)).thenReturn(java.util.Optional.of(folder));
+        var contexts = new ArrayList<com.checkba.service.ai.tools.ToolContext>();
+        when(toolRegistry.execute(any(), any(), any())).thenAnswer(inv -> {
+            contexts.add(inv.getArgument(2));
+            return new ToolRegistry.ToolResult("已创建", tool("fakeSheetCreateFile", "sheet_create_file"), true);
+        });
+        run("conv-1181-folder", "42", "材料.xlsx", call("sheet_create_file", "{}"), AiMessage.from("完成"));
+        var data = new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(contexts.get(0));
+        assertEquals(7, data.path("defaultOutputFolderId").asLong(), "创建工具必须接到本轮源目录");
+    }
+
+    @Test
+    void openingReferenceFileDoesNotChangeFrozenOutputFolder() throws Exception {
+        var source = new com.checkba.model.entity.ProjectFile();
+        source.setId(42L); source.setProjectId(1L); source.setParentId(7L);
+        var folder = new com.checkba.model.entity.ProjectFile();
+        folder.setId(7L); folder.setProjectId(1L); folder.setIsFolder(true);
+        when(projectFileService.findFile(42L)).thenReturn(java.util.Optional.of(source));
+        when(projectFileService.findFile(7L)).thenReturn(java.util.Optional.of(folder));
+        var contexts = new ArrayList<com.checkba.service.ai.tools.ToolContext>();
+        when(toolRegistry.execute(any(), any(), any())).thenAnswer(inv -> {
+            contexts.add(inv.getArgument(2));
+            return new ToolRegistry.ToolResult("已完成", null, true);
+        });
+        run("conv-1181-reference", "42", "材料.xlsx", call("doc_open_file", "{\"fileId\":90}"),
+                call("sheet_create_file", "{}"), AiMessage.from("完成"));
+        assertEquals(2, contexts.size());
+        assertTrue(contexts.stream().allMatch(c -> Long.valueOf(7).equals(c.defaultOutputFolderId())));
+    }
+
+    @Test
+    void generatedResultCannotExposeAnotherProjectsFileId() throws Exception {
+        var foreign = new com.checkba.model.entity.ProjectFile();
+        foreign.setId(99L); foreign.setProjectId(2L); foreign.setName("其他项目文件.xlsx");
+        when(projectFileService.findFile(99L)).thenReturn(java.util.Optional.of(foreign));
+        when(projectFileService.getFile(99L)).thenReturn(foreign);
+        when(toolRegistry.execute(any(), any(), any())).thenReturn(new ToolRegistry.ToolResult(
+                "{\"status\":\"success\",\"db_id\":99}", tool("fakeSheetCreateFile", "sheet_create_file"), true));
+        run("conv-1181-foreign", "42", "材料.xlsx", call("sheet_create_file", "{\"fileId\":99}"), AiMessage.from("完成"));
+        assertTrue(eventDataAll("file_change").isEmpty(), "A foreign id must not create even a placeholder result row");
+        org.mockito.Mockito.verifyNoInteractions(fileChangeService);
     }
 
     @Test

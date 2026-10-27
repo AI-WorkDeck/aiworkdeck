@@ -25,8 +25,22 @@ class AppLanguageServiceTest {
     @Test
     void invalidStoredValueFallsBackToChinese() {
         when(settings.get(eq(AppLanguageService.KEY), eq(AppLanguageService.ZH_CN)))
-                .thenReturn("fr-FR");
+                .thenReturn("tlh-KL");
         assertEquals("zh-CN", service.language());
+    }
+
+    @Test
+    void supportedStoredLocalesAreNormalizedAndExposed() {
+        for (String language : new String[] {"ja-JP", "fr-FR", "zh-TW", "ar-SA"}) {
+            when(settings.get(eq(AppLanguageService.KEY), eq(AppLanguageService.ZH_CN)))
+                    .thenReturn(language);
+            assertEquals(language, service.language());
+            assertEquals(language, service.locale().code());
+            assertEquals(!language.startsWith("zh-"), service.isEnglish());
+        }
+        when(settings.get(eq(AppLanguageService.KEY), eq(AppLanguageService.ZH_CN)))
+                .thenReturn("pt-PT");
+        assertEquals("pt-BR", service.language());
     }
 
     @Test
@@ -40,10 +54,19 @@ class AppLanguageServiceTest {
     }
 
     @Test
+    void setNormalizesSupportedLanguage() {
+        when(settings.get(eq(AppLanguageService.KEY), eq(AppLanguageService.ZH_CN)))
+                .thenReturn("ar-SA");
+        assertEquals("ar-SA", service.setLanguage("ar"));
+        verify(settings).set(AppLanguageService.KEY, "ar-SA");
+    }
+
+    @Test
     void setIgnoresUnsupportedLanguage() {
         when(settings.get(eq(AppLanguageService.KEY), eq(AppLanguageService.ZH_CN)))
                 .thenReturn(AppLanguageService.ZH_CN);
-        service.setLanguage("ja-JP");
+        service.setLanguage("tlh-KL");
+        service.setLanguage("eo");
         service.setLanguage(null);
         verify(settings, never()).set(anyString(), anyString());
     }

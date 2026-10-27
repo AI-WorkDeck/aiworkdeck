@@ -19,6 +19,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -33,6 +34,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -58,6 +61,11 @@ import java.util.regex.Pattern;
 public class PluginMarketService {
 
     private static final Pattern PLUGIN_ID = Pattern.compile("^[a-z0-9][a-z0-9-]{1,49}$");
+    private static final String PRERELEASE_ID = "(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)";
+    private static final Pattern SEMVER = Pattern.compile(
+            "(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)"
+                    + "(?:-(" + PRERELEASE_ID + "(?:\\." + PRERELEASE_ID + ")*))?"
+                    + "(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?");
 
     /** 单个文件下载上限，防御恶意注册表用超大响应打爆内存 */
     private static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
@@ -121,6 +129,8 @@ public class PluginMarketService {
         /** 计价方式，当前只有 "once"（一次性买断）；缺失同样按 once 处理 */
         private String pricingModel;
         private boolean installed;
+        /** 本机扫描到的版本；未安装时为 null，不能由注册表指定。 */
+        private String installedVersion;
         /** 已安装且本地版本低于注册表版本 */
         private boolean updatable;
         /** 付费项且账户权益里有 plugin:{id}（免费项恒 false，前端按 priceCents 判免费） */
@@ -141,6 +151,14 @@ public class PluginMarketService {
         }
         list.removeIf(view -> PluginService.isRetired(view.getId()));
         for (MarketPluginView view : list) {
+            if (view.getId() != null) {
+                view.setName(pluginService.localize(view.getId(), view.getName()));
+                view.setDescription(pluginService.localize(view.getId(), view.getDescription()));
+            }
+            // 安装状态只由本机扫描决定，不能接受远端同名字段。
+            view.setInstalled(false);
+            view.setInstalledVersion(null);
+            view.setUpdatable(false);
             view.setPriceCents(MarketPurchaseGate.normalizePrice(view.getPriceCents()));
             if (view.getPricingModel() == null || view.getPricingModel().isBlank()) {
                 view.setPricingModel("once");
@@ -152,6 +170,7 @@ public class PluginMarketService {
                     .findFirst()
                     .ifPresent(local -> {
                         view.setInstalled(true);
+                        view.setInstalledVersion(local.getVersion());
                         view.setUpdatable(compareSemver(view.getVersion(), local.getVersion()) > 0);
                     });
         }
@@ -167,7 +186,7 @@ public class PluginMarketService {
      * 安装（或更新）一个在线插件。
      *
      * 流程严格按 docs/PLUGIN_DISTRIBUTION.md §7：验签 → 逐文件下载并比对 SHA-256
-     * → 全部匹配后原子落盘 → 标记为禁用等待用户确认。任一步失败都不留半成品。
+     * → 全部匹配后原子落盘 → 标记为禁用等待用户确认。失败不留半成品，升级失败恢复旧版。
      *
      * @return 安装的插件 id
      * @throws IllegalArgumentException id 非法
@@ -226,7 +245,9 @@ public class PluginMarketService {
         // 先下到临时目录，全部校验通过再整体搬过去，避免半成品被扫描到
         Path staging;
         try {
-            staging = Files.createTempDirectory("awd-plugin-" + id + "-");
+            Path root = Path.of(pluginsDir).toAbsolutePath();
+            Files.createDirectories(root);
+            staging = Files.createTempDirectory(root, ".awd-plugin-" + id + "-");
         } catch (Exception e) {
             throw new IllegalStateException(LangText.of("创建临时目录失败: ", "Failed to create temp directory: ") + e.getMessage());
         }
@@ -252,27 +273,76 @@ public class PluginMarketService {
                 Files.write(dest, data);
             }
 
+            JSONObject manifest = JSONUtil.parseObj(Files.readString(staging.resolve("manifest.json")));
+            if (!id.equals(manifest.getStr("id")) || !version.equals(manifest.getStr("version"))) {
+                throw new IllegalStateException(LangText.of(
+                        "插件标识或版本与签名清单不一致", "Plugin ID or version does not match the signed manifest"));
+            }
             // minHostVersion 闸（规范 v2.7 P0）：staging 落齐后、上位前校验——宁可装不上，不可装成半残
             checkMinHostVersion(staging);
 
-            File target = new File(pluginsDir, id);
-            FileUtil.del(target);
-            Files.createDirectories(target.toPath().getParent());
-            moveStagingToTarget(staging, target);
+            replaceInstalledPlugin(staging, id, version);
         } catch (RuntimeException e) {
             FileUtil.del(staging.toFile());
             throw e;
         } catch (Exception e) {
             FileUtil.del(staging.toFile());
-            throw new IllegalStateException(LangText.of("写入插件文件失败: ", "Failed to write plugin files: ") + e.getMessage());
+            throw new IllegalStateException(LangText.of("写入插件文件失败: ", "Failed to write plugin files: ") + e.getMessage(), e);
         }
 
-        // 先置为禁用再 rescan：新装插件在用户确认前不加载任何代码
-        pluginService.markDisabledBeforeLoad(id);
-        pluginService.rescan();
         log.info("Installed market plugin '{}' v{} (disabled until user confirms)", id, version);
         installDeclaredPacks(id);
         return id;
+    }
+
+    /** 升级先保留旧目录；替换或扫描失败时恢复文件及原启用状态。 */
+    private void replaceInstalledPlugin(Path staging, String id, String version) throws IOException {
+        // 与手动 rescan / 启停互斥，避免新目录在写入禁用状态前被扫描加载。
+        synchronized (pluginService) {
+            Path target = Path.of(pluginsDir, id).toAbsolutePath();
+            Path backup = null;
+            boolean wasEnabled = pluginService.getPlugin(id) != null && pluginService.isEnabled(id);
+            if (Files.exists(target)) {
+                Path candidate = target.resolveSibling(".awd-plugin-backup-" + UUID.randomUUID());
+                Files.move(target, candidate, StandardCopyOption.ATOMIC_MOVE);
+                backup = candidate;
+            }
+            boolean stateChanged = false;
+            try {
+                moveStagingToTarget(staging, target.toFile());
+                // 新装和升级均等待调用方确认权限后显式启用。
+                stateChanged = true;
+                pluginService.markDisabledBeforeLoad(id);
+                pluginService.rescan();
+                PluginService.PluginMetadata installed = pluginService.getPlugin(id);
+                if (installed == null || !version.equals(installed.getVersion())) {
+                    throw new IllegalStateException(LangText.of(
+                            "插件安装后未能加载正确版本", "The installed plugin version could not be loaded"));
+                }
+            } catch (IOException | RuntimeException failure) {
+                try {
+                    FileUtil.del(target.toFile());
+                    if (backup != null) {
+                        Files.move(backup, target, StandardCopyOption.ATOMIC_MOVE);
+                    }
+                    if (stateChanged) {
+                        pluginService.rescan();
+                        if (wasEnabled) pluginService.setEnabled(id, true);
+                    }
+                } catch (Exception rollbackFailure) {
+                    failure.addSuppressed(rollbackFailure);
+                    log.error("Could not restore plugin {}; previous files retained at {}", id, backup, rollbackFailure);
+                }
+                throw failure;
+            }
+            if (backup != null) {
+                try {
+                    FileUtil.del(backup.toFile());
+                } catch (Exception e) {
+                    log.warn("Plugin {} updated; could not remove backup {}", id, backup, e);
+                }
+            }
+        }
     }
 
     /**
@@ -282,9 +352,8 @@ public class PluginMarketService {
      * 单独触发"拷贝兜底也失败"这条分支。
      *
      * <p>不变式：任一步失败都不留半成品。拷贝兜底失败时 target 可能已经是半成品（拷贝到
-     * 一半就断了），必须把它一并清掉再把异常抛给调用方——调用方（install()）只清理
-     * staging，且这条异常在 markDisabledBeforeLoad/rescan 之前抛出，PluginService
-     * 账上根本没有这个插件 id，残缺目录不清掉就会永久留在盘上、谁也不认领。
+     * 一半就断了），必须把它一并清掉再把异常抛给调用方；升级时由调用方恢复备份，
+     * 新装时也不能让残缺目录永久留在盘上。
      */
     void moveStagingToTarget(Path staging, File target) throws java.io.IOException {
         try {
@@ -462,23 +531,32 @@ public class PluginMarketService {
         }
     }
 
+    /** 无法识别任一版本时返回 0（未知，不宣称有更新）；build metadata 不影响优先级。 */
     static int compareSemver(String a, String b) {
-        String[] pa = (a == null ? "0.0.0" : a).split("\\.");
-        String[] pb = (b == null ? "0.0.0" : b).split("\\.");
-        for (int i = 0; i < 3; i++) {
-            int va = i < pa.length ? parseIntSafe(pa[i]) : 0;
-            int vb = i < pb.length ? parseIntSafe(pb[i]) : 0;
-            if (va != vb) return Integer.compare(va, vb);
+        if (a == null || b == null) return 0;
+        Matcher pa = SEMVER.matcher(a);
+        Matcher pb = SEMVER.matcher(b);
+        if (!pa.matches() || !pb.matches()) return 0;
+        for (int i = 1; i <= 3; i++) {
+            int compared = new BigInteger(pa.group(i)).compareTo(new BigInteger(pb.group(i)));
+            if (compared != 0) return compared;
         }
-        return 0;
-    }
-
-    private static int parseIntSafe(String s) {
-        try {
-            return Integer.parseInt(s.replaceAll("[^0-9].*$", ""));
-        } catch (Exception e) {
-            return 0;
+        String preA = pa.group(4);
+        String preB = pb.group(4);
+        if (preA == null || preB == null) {
+            return preA == preB ? 0 : preA == null ? 1 : -1;
         }
+        String[] idsA = preA.split("\\.");
+        String[] idsB = preB.split("\\.");
+        for (int i = 0; i < Math.min(idsA.length, idsB.length); i++) {
+            boolean numericA = idsA[i].matches("[0-9]+");
+            boolean numericB = idsB[i].matches("[0-9]+");
+            int compared = numericA && numericB
+                    ? new BigInteger(idsA[i]).compareTo(new BigInteger(idsB[i]))
+                    : numericA != numericB ? (numericA ? -1 : 1) : idsA[i].compareTo(idsB[i]);
+            if (compared != 0) return compared;
+        }
+        return Integer.compare(idsA.length, idsB.length);
     }
 
     private static void requireValidId(String id) {

@@ -3,6 +3,7 @@
 
 package com.checkba.service.sensitive;
 
+import com.checkba.service.LangText;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javax.crypto.*;
@@ -20,19 +21,19 @@ public final class SensitiveRecoveryKit {
 
     public static void validatePassword(String password) {
         if (password == null || password.length() < 10 || password.length() > 1024) {
-            throw new IllegalArgumentException("复敏密码须为10至1024个字符，请妥善保管");
+            throw new IllegalArgumentException(LangText.of("复敏密码须为10至1024个字符，请妥善保管", "Restoration password must be 10 to 1024 characters; please keep it safe"));
         }
     }
 
     public static String encrypt(Map<String, String> mapping, String password) throws Exception {
         validatePassword(password);
-        if (mapping.size() > 20000) throw new IllegalArgumentException("敏感实体超过20000项，请拆分文件处理");
+        if (mapping.size() > 20000) throw new IllegalArgumentException(LangText.of("敏感实体超过20000项，请拆分文件处理", "More than 20,000 sensitive entities found; please split the file before processing"));
         byte[] salt = new byte[16], iv = new byte[12];
         SecureRandom random = new SecureRandom(); random.nextBytes(salt); random.nextBytes(iv);
         byte[] encrypted = cipher(Cipher.ENCRYPT_MODE, password, salt, iv).doFinal(JSON.writeValueAsBytes(mapping));
         String kit = PREFIX + Base64.getEncoder().encodeToString(
                 ByteBuffer.allocate(28 + encrypted.length).put(salt).put(iv).put(encrypted).array());
-        if (kit.length() > 8_000_000) throw new IllegalArgumentException("复敏映射超过8MB，请拆分文件处理");
+        if (kit.length() > 8_000_000) throw new IllegalArgumentException(LangText.of("复敏映射超过8MB，请拆分文件处理", "Restoration mapping exceeds 8 MB; please split the file before processing"));
         return kit;
     }
 
@@ -51,7 +52,7 @@ public final class SensitiveRecoveryKit {
             return mapping;
         } catch (Exception e) {
             // Never reflect parsing errors or decrypted material into responses/logs.
-            throw new IllegalArgumentException("复敏文件无效、已损坏或密码不正确");
+            throw new IllegalArgumentException(LangText.of("复敏文件无效、已损坏或密码不正确", "Invalid or corrupted restoration file, or incorrect password"));
         }
     }
 

@@ -52,6 +52,8 @@ public class AgentOrchestrator {
 
     /** ASK remains read-only but can inspect the user's durable memory. */
     static final Set<String> ASK_MEMORY_TOOLS = Set.of("memory_list", "memory_read", "memory_search");
+    static final Set<String> ASK_READ_TOOLS = Set.of("memory_list", "memory_read", "memory_search",
+            "version_status", "version_history", "version_changes");
     /**
      * Agent/Plan 回合里 skill 收窄时仍补回的 Markdown 记忆工具（dev-board#798 的原始语义：
      * skill 白名单不许把记忆能力藏掉）。没被 skill 收窄的回合只补只读的三个（{@link #ASK_MEMORY_TOOLS}，
@@ -83,6 +85,23 @@ public class AgentOrchestrator {
                 t.setDaemon(true);
                 return t;
             });
+    private static final java.util.concurrent.ExecutorService TITLE_EXECUTOR =
+            new java.util.concurrent.ThreadPoolExecutor(
+                    1, 4, 60L, java.util.concurrent.TimeUnit.SECONDS,
+                    new java.util.concurrent.LinkedBlockingQueue<>(128),
+                    r -> {
+                        Thread t = new Thread(r, "awd-title-gen");
+                        t.setDaemon(true);
+                        return t;
+                    },
+                    new java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy());
+
+    private static final class FileChangeTurn {
+        String clientRequestId;
+        Long assistantMessageId;
+        final java.util.Set<String> reported = new java.util.HashSet<>();
+        final java.util.List<com.checkba.model.entity.ConversationFileChange> pending = new java.util.ArrayList<>();
+    }
 
     /**
      * 单次 Agent 运行（= 一个轮次 = 一个 runId）的全部状态（随递归与两处回调传递）。
@@ -122,6 +141,13 @@ public class AgentOrchestrator {
         final TurnStreamTrace trace = new TurnStreamTrace();
         /** 本轮 ASSISTANT 消息的行 ID：本轮内的增量/最终保存更新同一行，跨轮次互不覆盖。 */
         private volatile Long assistantMessageId;
+        private volatile String clientRequestId;
+        private String inboxItemId;
+        private volatile boolean restartRequested;
+        private volatile String restartAttemptId;
+        private volatile boolean restartUnsafe;
+        private AiAgentController.AgentChatRequest originalRequest;
+        private FileChangeTurn fileChangeTurn = new FileChangeTurn();
         /** 本轮的取消标志。只有 {@link AgentOrchestrator#setCancelled} 解析到的那一轮会被置位。 */
         private final java.util.concurrent.atomic.AtomicBoolean cancelled =
                 new java.util.concurrent.atomic.AtomicBoolean();
@@ -194,8 +220,9 @@ public class AgentOrchestrator {
             }
         }
 
-        void startAssistantSegment() {
+        synchronized void startAssistantSegment() {
             assistantMessageId = null;
+            fileChangeTurn = new FileChangeTurn();
             // 新的一段是一条新消息、前端也是一个新气泡：回放与思考记录都从空开始
             trace.resetSegment();
         }
@@ -218,7 +245,7 @@ public class AgentOrchestrator {
             if (canceller != null && cancelled.get()) cancelInflight();
         }
 
-        void cancel() {
+        synchronized void cancel() {
             cancelled.set(true);
             abandonDecision();
             cancelInflight();
@@ -269,10 +296,14 @@ public class AgentOrchestrator {
         int llmRetries;
         // 截断/未闭合 <tool_code> 的纠正轮次数（防纠正本身进入死循环）
         int malformedToolRounds;
+        // One tool-free completion round after a document stream omitted its chat summary.
+        boolean documentSummaryOnly;
         // 上下文溢出后的强制压缩重试次数（每个成功完成的轮次清零；上限 1，压不动就终态）
         int overflowCompactions;
         // 当前活跃文档 ID（来自 activeContext 或 doc_open_file），用于修改前自动创建检查点
         Long activeFileId;
+        // Frozen at run start; opening reference files must not redirect new outputs.
+        Long defaultOutputFolderId;
         // 活跃文档名（仅用于给模型的反馈文案）
         String activeFileName;
         /**
@@ -286,6 +317,10 @@ public class AgentOrchestrator {
         volatile Long opinionTargetFileId;
         volatile String opinionTargetFileName;
         java.util.List<String> clarificationSkillIds = java.util.List.of();
+        /** dev-board#1481：本轮运行期触发过的 Harness 自愈记录与待配对的回退信号。 */
+        final java.util.List<com.checkba.service.ai.harness.HarnessDiagnosticService.HarnessAdaptation> harnessAdaptations =
+                new java.util.concurrent.CopyOnWriteArrayList<>();
+        volatile com.checkba.service.ai.harness.HarnessEvolutionService.PendingRollbackSignal pendingRollbackSignal;
         /**
          * 本轮下发工具时用的活跃文档类型（dev-board#729 ①）：doc / sheet / slide，
          * null = 不裁剪（没有活跃文档、纯文本、或本轮中途换过文档类型）。
@@ -338,6 +373,8 @@ public class AgentOrchestrator {
         // LLM 往返轮数与首轮 promptTokens（埋点 ai.turn；只由当前轮次记账）
         int llmRounds;
         boolean promptTokensRecorded;
+        /** 智能模式（auto）按轮路由出的思考强度覆盖（"low"/"medium"/"high"，非智能模式为 null）。 */
+        volatile String reasoningEffortOverride;
     }
 
     /**
@@ -387,6 +424,11 @@ public class AgentOrchestrator {
     // 整篇分段过卷的游标状态（dev-board#422）：编排器只读它算本轮步数预算，取消时顺手清掉
     private final OfficePassStateStore officePassStateStore;
     private volatile AgentInboxService inboxService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ClientCapabilityService clientCapabilities;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.service.ProjectMemberService projectMemberService;
 
     @org.springframework.beans.factory.annotation.Autowired
     void setInboxService(AgentInboxService inboxService) {
@@ -427,11 +469,14 @@ public class AgentOrchestrator {
         return guard != null && activeRuns.get(guard.conversationId) == guard;
     }
 
-    /** 轮次收尾：把自己从当前轮次登记里摘掉（若已被取代则什么都不做），并释放 skill 的轮次记录。 */
+    /** 轮次收尾：把自己从当前轮次登记里摘掉（若已被取代则什么都不做），并释放 skill 与桥接层的轮次记录。 */
     private void endRun(RunGuard guard) {
         if (guard == null) return;
         guard.abandonDecision();
-        activeRuns.remove(guard.conversationId, guard);
+        boolean wasCurrent = activeRuns.remove(guard.conversationId, guard);
+        if (wasCurrent && editorBridgeService != null) {
+            editorBridgeService.cleanupAfterRun(guard.conversationId);
+        }
         skillRouter.clearRun(guard.runId);
     }
 
@@ -454,9 +499,22 @@ public class AgentOrchestrator {
             // 必须在摘掉本轮登记之前判断：closeSse 只对当前轮次生效。
             if (next.isEmpty()) closeSse(guard);
             guard.abandonDecision();
-            activeRuns.remove(guard.conversationId, guard);
+            boolean wasCurrent = activeRuns.remove(guard.conversationId, guard);
+            if (wasCurrent && editorBridgeService != null) {
+                editorBridgeService.cleanupAfterRun(guard.conversationId);
+            }
             skillRouter.clearRun(guard.runId);
-            next.ifPresent(item -> acceptInboxSubmission(item.getId()));
+            try {
+                next.ifPresent(item -> acceptInboxSubmission(item.getId()));
+            } catch (SecurityException denied) {
+                // The finished turn remains finished; leave the rejected follow-up pending.
+                // No new guard was created. Only report to the still-current connection.
+                if (activeRunId(guard.conversationId) == null
+                        && sseEmitterService.currentEpoch(guard.conversationId) == guard.connectionEpoch) {
+                    sseEmitterService.send(guard.conversationId, "error", denied.getMessage());
+                    sseEmitterService.close(guard.conversationId, guard.connectionEpoch);
+                }
+            }
         }
     }
 
@@ -479,11 +537,22 @@ public class AgentOrchestrator {
     public boolean setCancelled(String conversationId) {
         RunGuard guard = activeRuns.get(conversationId);
         if (guard == null) {
+            if (inboxService != null) {
+                // A paused restart checkpoint is cancellable too, without executing it.
+                var state = agentRunStateService.get(conversationId);
+                if (state != null && state.status() == AgentRunStateService.RunStatus.INTERRUPTED) {
+                    agentRunStateService.mark(conversationId, AgentRunStateService.RunStatus.CANCELLED);
+                }
+            }
             log.info("Cancel requested for {} but no run is active, ignoring", conversationId);
             return false;
         }
         log.info("Cancelling conversation {} (run {})", conversationId, guard.runId);
-        guard.cancel();
+        synchronized (guard) {
+            guard.cancel();
+            if (activeRuns.get(conversationId) == null)
+                agentRunStateService.mark(conversationId, AgentRunStateService.RunStatus.CANCELLED);
+        }
         if (subAgentService != null) subAgentService.cancelParentRun(conversationId, guard.runId);
         // 桥上的等待与 LLM 请求是两条独立的阻塞，缺一条停止就还是「按了要等」
         editorBridgeService.cancelPendingActions(conversationId);
@@ -532,16 +601,21 @@ public class AgentOrchestrator {
      * 本轮内后续（增量/最终）保存更新同一行；别的轮次有别的 RunGuard，天然互不覆盖。
      */
     private void saveAssistantMessage(RunGuard guard, String projectId, Long userId, String content) {
-        // 思考全文随消息落库（dev-board#1060）：只是给用户回看的，模型永远只读 content。
-        // 本段没有思考时仍走五参重载——非思考型模型的落库路径与改造前逐字一致
-        String reasoning = guard.trace.reasoningJson();
-        Long id = reasoning == null
-                ? messageService.upsertAssistantMessage(
-                        projectId, userId, guard.conversationId, guard.assistantMessageId, content)
-                : messageService.upsertAssistantMessage(
-                        projectId, userId, guard.conversationId, guard.assistantMessageId, content, reasoning);
-        if (id != null) {
+        synchronized (guard) {
+            String reasoning = guard.trace.reasoningJson();
+            Long id = reasoning == null
+                    ? messageService.upsertAssistantMessage(
+                            projectId, userId, guard.conversationId, guard.assistantMessageId, content)
+                    : messageService.upsertAssistantMessage(
+                            projectId, userId, guard.conversationId, guard.assistantMessageId, content, reasoning);
+            if (id == null) return;
             guard.assistantMessageId = id;
+            // Bind queued effects only to the real persisted assistant row. A late child
+            // retains this segment object even after startAssistantSegment replaces it.
+            synchronized (guard.fileChangeTurn) {
+                guard.fileChangeTurn.assistantMessageId = id;
+                persistFileChanges(guard.conversationId, guard.fileChangeTurn);
+            }
         }
     }
 
@@ -762,13 +836,31 @@ public class AgentOrchestrator {
                                          String projectId, Long userId, String modelId, AgentMode agentMode,
                                          StringBuilder executionLog) {
         AgentInboxService inbox = this.inboxService;
-        if (inbox == null || !inbox.hasPendingSteering(guard.conversationId)) return false;
+        if (inbox == null || restartAttempts.containsKey(userId) || !inbox.hasPendingSteering(guard.conversationId)) return false;
+        requireInboxProjectAccess(Long.valueOf(projectId), userId);
         java.util.List<com.checkba.model.entity.AgentInboxItem> inputs =
                 inbox.claimPendingSteering(guard.conversationId, guard.runId);
         if (inputs.isEmpty()) return false;
+        try {
+            // Old/malformed mixed-project input must not survive as "applied" after rejection.
+            // Validate the whole claimed batch before saving or assembling any of its text.
+            for (com.checkba.model.entity.AgentInboxItem input : inputs) {
+                requireInboxProjectAccess(input.getProjectId(), input.getUserId());
+                if (!java.util.Objects.equals(input.getProjectId(), Long.valueOf(projectId))
+                        || !java.util.Objects.equals(input.getUserId(), userId)) {
+                    throw new SecurityException(LangText.of("待处理消息与当前项目或用户不一致",
+                            "The pending message belongs to a different project or user"));
+                }
+            }
+        } catch (SecurityException denied) {
+            inbox.interruptRun(guard.runId);
+            inbox.emitSnapshot(guard.conversationId);
+            throw denied;
+        }
 
         // A new submission has its own consent. Do not classify or narrow it using the old input.
         guard.abandonDecision();
+        guard.documentSummaryOnly = false;
 
         String streamed = guard.takeStreamSnapshot();
         String segment = executionLog.toString() + streamed;
@@ -777,6 +869,7 @@ public class AgentOrchestrator {
         executionLog.setLength(0);
 
         for (com.checkba.model.entity.AgentInboxItem input : inputs) {
+            guard.clientRequestId = input.getClientRequestId();
             AiAgentController.AgentChatRequest request = inbox.requestOf(input);
             // clientRequestId 一起落库：它是「回退到这条消息」的定位键，而主键要到这一刻才生成、
             // 回执与 input_applied 都赶在它前面（见 ProjectAiMessage#clientRequestId）。
@@ -954,14 +1047,26 @@ public class AgentOrchestrator {
                         guard == null ? List.of() : guard.roundCandidates,
                         guard == null ? null : guard.roundOffered,
                         guard == null ? null : guard.runId,
-                        disclosedCategories, guard == null ? null : guard::isCancelled);
+                        disclosedCategories, guard == null ? null : guard::isCancelled,
+                        guard == null ? null : guard.defaultOutputFolderId, guard == null ? null : guard.activeFileId);
+        final FileChangeTurn effectTurn = guard == null ? null : guard.fileChangeTurn;
+        if (effectTurn != null) effectTurn.clientRequestId = guard.clientRequestId;
+        if (effectTurn != null && "dispatch_subtask".equals(toolName)) {
+            ctx = new com.checkba.service.ai.tools.ToolContext(ctx.projectId(), ctx.conversationId(), ctx.userId(),
+                    ctx.modelId(), ctx.sessionTools(), ctx.offeredTools(), ctx.runId(), ctx.disclosedCategories(),
+                    ctx.cancellationCheck(), ctx.defaultOutputFolderId(), ctx.activeFileId(),
+                    (id, kind) -> notifyVerifiedFile(conversationId, id, kind, projectId, effectTurn));
+        }
         long toolStartMs = System.currentTimeMillis();
         ToolRegistry.ToolResult result = toolRegistry.execute(toolName, argsJson, ctx);
+        // A failed/unknown editor or external effect is not evidence of non-execution.
+        // Do not manufacture a safely resumable snapshot after an ambiguous tool outcome.
+        if (guard != null && !result.success()) guard.restartUnsafe = true;
         // 目录展开只在下一轮生效：本轮的工具集已经发给模型了，中途加进去会让
         // 「一轮内工具集不变」那条契约失效（只加不减，所以不会让已宣布的工具消失）。
         noteToolCategoryExpansion(guard, toolName, argsJson, result, disclosedCategories);
         recordToolTelemetry(toolName, result, conversationId, System.currentTimeMillis() - toolStartMs);
-        applyToolSideEffects(result, toolName, argsJson, conversationId, guard);
+        applyToolSideEffects(result, toolName, argsJson, conversationId, guard, projectId);
 
         // 模型仍去列文件时，把活跃文档钉在结果里，让它下一轮自己纠回来（不阻断跨文档场景）
         if (guard != null && guard.activeFileId != null
@@ -1136,7 +1241,19 @@ public class AgentOrchestrator {
      * 根据 @ToolMeta 元数据处理工具副作用（取代原先散落在手写分发链里的硬编码通知）。
      */
     private void applyToolSideEffects(ToolRegistry.ToolResult result, String toolName, String argsJson,
-                                      String conversationId, RunGuard guard) {
+                                      String conversationId, RunGuard guard, Long projectId) {
+        // A subtask may fail after successfully saving files. Only its server-built
+        // effect list is accepted, never filenames or claims from the model's summary.
+        if ("dispatch_subtask".equals(toolName)) {
+            try {
+                var effects = SKILL_UPDATE_MAPPER.readTree(result.output()).path("fileChanges");
+                if (effects.isArray()) for (var effect : effects) {
+                    String type = effect.path("changeType").asText();
+                    if (!java.util.Set.of("ADDED", "MODIFIED").contains(type) || !effect.path("fileId").isIntegralNumber()) continue;
+                    notifyVerifiedFile(conversationId, effect.path("fileId").asLong(), type, projectId, guard);
+                }
+            } catch (Exception ignored) { /* Older subtask results have no effects. */ }
+        }
         if (!result.success() || result.tool() == null || result.tool().meta() == null) {
             return;
         }
@@ -1144,18 +1261,33 @@ public class AgentOrchestrator {
         if (meta.refreshFiles()) {
             sseEmitterService.send(conversationId, "client_action", "{\"action\":\"refresh_files\"}");
         }
+        var generatedIds = com.checkba.service.ai.tools.GeneratedFileLocation.createdIds(toolName, result.output());
+        if (!generatedIds.isEmpty()) {
+            for (Long id : generatedIds) notifyVerifiedFile(conversationId, id, "ADDED", projectId, guard);
+            return;
+        }
+        // PDF derivatives never count the input/source as newly created, including
+        // a download prompt or malformed/failed result with no confirmed identity.
+        if (toolName.startsWith("pdf_") && "ADDED".equals(meta.fileEffect())) return;
         // 「执行成功」不等于「改过文件」：查找替换一次都没命中时照发 MODIFIED，
         // 用户会被告知本轮改了这个文件，去找却找不到任何改动。
         if (!meta.fileEffect().isEmpty() && result.fileChanged()) {
             String fileName = meta.fileArg().isEmpty() ? null : extractArg(argsJson, meta.fileArg());
             Long fileId = null;
-            if ((fileName == null || fileName.isEmpty()) && guard != null && guard.activeFileId != null
+            com.checkba.model.entity.ProjectFile generated = com.checkba.service.ai.tools.GeneratedFileLocation
+                    .createdFile(projectFileService, projectId, toolName, result.output());
+            if (generated != null) {
+                fileId = generated.getId();
+                fileName = generated.getName();
+            } else if ((fileName == null || fileName.isEmpty()) && guard != null && guard.activeFileId != null
                     && actsOnActiveDocument(toolName)) {
                 // doc_* / sheet_* / slide_* 改的就是编辑器里那份活跃文档（dev-board#852）：
                 // 报它的真名与 id，前端改动卡片才能把用户带回这份文件
                 fileId = guard.activeFileId;
                 fileName = activeFileNameOrLookup(guard);
-            } else if ((fileName == null || fileName.isEmpty()) && !actsOnActiveDocument(toolName)) {
+            } else if ((fileName == null || fileName.isEmpty()) && !actsOnActiveDocument(toolName)
+                    && com.checkba.service.ai.tools.GeneratedFileLocation.parentParameter(
+                            toolName, extractArg(argsJson, "fileId")) == null) {
                 // pdf_* / text_* 一族没有 fileArg，但参数里指名了 fileId：按 id 查回真名。
                 // 查不到就当不知道，不把一个查无此文件的 id 发给前端
                 com.checkba.model.entity.ProjectFile target = fileByIdArg(argsJson);
@@ -1169,7 +1301,8 @@ public class AgentOrchestrator {
                 // 它仍要发出去——检查点与改动卡片都靠这条 MODIFIED
                 fileName = activeDocDisplayName(null);
             }
-            notifyFileChange(conversationId, fileName, fileId, meta.fileEffect());
+            notifyFileChange(conversationId, fileName, fileId, generated != null && "doc_start_stream".equals(toolName)
+                    && extractArg(argsJson, "fileId") == null ? "ADDED" : meta.fileEffect(), projectId, guard);
         }
     }
 
@@ -1228,19 +1361,71 @@ public class AgentOrchestrator {
      * <p>推送失败只 log：一个提示 chip 不该让对话中断（与 plan_update 同口径）。
      */
     private void sendSkillUpdate(RunGuard guard,
-                                 List<com.checkba.service.ai.skill.SkillRouter.ActiveSkill> active) {
+                                 List<com.checkba.service.ai.skill.SkillRouter.ActiveSkill> active,
+                                 Long userId,
+                                 String projectId) {
         try {
-            List<java.util.Map<String, String>> skills = active.stream()
-                    .map(a -> java.util.Map.of(
-                            "id", a.definition().getId(),
-                            "name", a.displayName(),
-                            "source", a.source()))
+            List<java.util.Map<String, Object>> skills = active.stream()
+                    .map(a -> {
+                        java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+                        item.put("id", a.definition().getId());
+                        item.put("name", a.displayName());
+                        item.put("source", a.source());
+                        if (a.definition().isBuiltinWorkflow()) {
+                            item.put("builtinWorkflow", true);
+                            var activeVer = skillRouter.resolveActiveWorkflowVersion(a.definition(), userId, projectId);
+                            if (activeVer != null) {
+                                item.put("versionId", activeVer.getId());
+                                item.put("versionName", activeVer.getName());
+                                item.put("customVersion", !activeVer.isSystemDefault());
+                            }
+                        }
+                        return item;
+                    })
                     .toList();
             sendRunEvent(guard, "skill_update",
                     SKILL_UPDATE_MAPPER.writeValueAsString(java.util.Map.of("skills", skills)));
         } catch (Exception e) {
             log.warn("Failed to push skill_update for {}", guard.conversationId, e);
         }
+    }
+
+    /**
+     * SSE {@code model_routed}：当用户选择「智能模式（auto）」时，把本轮实际选中的模型与档位
+     * 推给前端（载荷 {@code {"requestedModel","effectiveModel","effectiveModelName","tier","routed"}}），
+     * 让模型选择器按钮即时展示「智能 · 模型名」。推送失败只打日志，不中断对话。
+     */
+    private void sendModelRouted(RunGuard guard, SmartModelRouter.RouteDecision decision) {
+        if (decision == null || !decision.routed()) {
+            return;
+        }
+        try {
+            java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+            payload.put("requestedModel", decision.requestedModel());
+            payload.put("effectiveModel", decision.effectiveModelId());
+            payload.put("effectiveModelName", decision.effectiveModelName());
+            payload.put("tier", decision.tier() != null ? decision.tier().name() : null);
+            payload.put("routed", true);
+            sendRunEvent(guard, "model_routed", SKILL_UPDATE_MAPPER.writeValueAsString(payload));
+        } catch (Exception e) {
+            log.warn("Failed to push model_routed for {}", guard.conversationId, e);
+        }
+    }
+
+    /**
+     * 按本轮 {@link RunGuard#reasoningEffortOverride} 取流式模型。
+     * 非智能模式（override 为空）时直接走单参 {@link ChatModelFactory#getStreamingChatModel(String)}，
+     * 保持既有单测的 Mockito 单参桩与 verify 计数完全兼容；智能模式有覆盖且两参返回非空时用两参版本。
+     */
+    private StreamingChatLanguageModel resolveStreamingModel(String modelId, RunGuard guard) {
+        String effort = guard == null ? null : guard.reasoningEffortOverride;
+        if (effort != null && !effort.isBlank()) {
+            StreamingChatLanguageModel overridden = chatModelFactory.getStreamingChatModel(modelId, effort);
+            if (overridden != null) {
+                return overridden;
+            }
+        }
+        return chatModelFactory.getStreamingChatModel(modelId);
     }
 
     /**
@@ -1296,6 +1481,55 @@ public class AgentOrchestrator {
     private ToolDecisionPolicy toolDecisionPolicy;
 
     /**
+     * 智能模式路由器（dev-board#1434）。默认提供无状态实例，故各单元测试直接
+     * {@code new AgentOrchestrator(...)} 时无需额外注入即可工作；同样不走构造器。
+     */
+    private volatile SmartModelRouter smartModelRouter = new SmartModelRouter();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSmartModelRouter(SmartModelRouter smartModelRouter) {
+        if (smartModelRouter != null) {
+            this.smartModelRouter = smartModelRouter;
+        }
+    }
+
+    /** 出网区域探测服务（dev-board#1434 智能路由区分 GLOBAL / INTERNATIONAL 用）。为空时按 GLOBAL 保守路由。 */
+    private volatile NetworkRegionService networkRegionService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setNetworkRegionService(NetworkRegionService networkRegionService) {
+        this.networkRegionService = networkRegionService;
+    }
+
+    /**
+     * Harness² 运行期双层诊断自愈、VeriHarness 收尾核验与用户自进化服务（dev-board#1481）。
+     * 走 setter 注入并提供无状态安全兜底，不改动构造器签名。
+     */
+    private volatile com.checkba.service.ai.harness.HarnessDiagnosticService harnessDiagnosticService;
+    private volatile com.checkba.service.ai.harness.VerificationHarness verificationHarness =
+            new com.checkba.service.ai.harness.VerificationHarness();
+    private volatile com.checkba.service.ai.harness.HarnessEvolutionService harnessEvolutionService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setHarnessDiagnosticService(
+            com.checkba.service.ai.harness.HarnessDiagnosticService harnessDiagnosticService) {
+        this.harnessDiagnosticService = harnessDiagnosticService;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setVerificationHarness(com.checkba.service.ai.harness.VerificationHarness verificationHarness) {
+        if (verificationHarness != null) {
+            this.verificationHarness = verificationHarness;
+        }
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setHarnessEvolutionService(
+            com.checkba.service.ai.harness.HarnessEvolutionService harnessEvolutionService) {
+        this.harnessEvolutionService = harnessEvolutionService;
+    }
+
+    /**
      * 处理用户消息 (入口)。
      *
      * <p><b>轮次登记同步发生在调用方（控制器）线程上</b>（dev-board#533）：本方法此前整体挂
@@ -1310,13 +1544,331 @@ public class AgentOrchestrator {
     public void handleUserMessage(AiAgentController.AgentChatRequest request, Long userId) {
         // 本轮的身份证：runId 在这里签发，随 RunGuard 一路传到每一层递归与两处流式回调。
         // 登记发生在做任何事之前——POST /cancel 靠这张表解析「现在跑的是哪一轮」。
-        RunGuard guard = beginRun(request.getConversationId());
+        RunGuard guard;
+        synchronized (restartAdmission) {
+            if (restartAttempts.containsKey(userId)) throw new IllegalStateException("Application restart is being prepared");
+            guard = beginRun(request.getConversationId());
+            guard.userId = userId;
+            guard.originalRequest = request;
+        }
         launchTurn(request, userId, guard);
+    }
+
+    public record RestartPending(String conversationId, Long projectId, Long activeFileId, String activeFileName) {}
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private BackgroundTaskService restartBackgroundTasks;
+
+    private record ParkedRestart(String attemptId, Long userId, Long projectId, Long activeFileId, long epoch) {}
+    private final java.util.Map<String, ParkedRestart> parkedRestarts = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Object restartAdmission = new Object();
+    private final java.util.Map<Long, String> restartAttempts = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Map<Long, java.util.Set<String>> abortedRestarts = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public java.util.Map<String, Object> prepareRestart(Long userId, String attemptId) {
+        int running = 0;
+        synchronized (restartAdmission) {
+            if (abortedRestarts.getOrDefault(userId, java.util.Set.of()).contains(attemptId))
+                return java.util.Map.of("ready", false, "aborted", true, "running", 0, "suspended", 0);
+            restartAttempts.put(userId, attemptId);
+            for (RunGuard guard : activeRuns.values()) {
+                if (!java.util.Objects.equals(userId, guard.userId) || guard.originalRequest == null
+                        || "office".equalsIgnoreCase(guard.originalRequest.getClientCapability())) continue;
+                guard.restartRequested = true;
+                guard.restartAttemptId = attemptId;
+                running++;
+            }
+        }
+        if (restartBackgroundTasks != null) running += (int) restartBackgroundTasks.getActiveTasksForUser(userId).stream()
+                .filter(task -> clientCapabilities == null || clientCapabilities.capabilityOf(task.getConversationId())
+                        != ClientCapabilityService.Capability.OFFICE).count();
+        return java.util.Map.of("ready", running == 0, "running", running,
+                "suspended", pendingRestarts(userId).size());
+    }
+
+    public List<RestartPending> pendingRestarts(Long userId) {
+        if (inboxService == null || userId == null) return List.of();
+        List<RestartPending> pending = new java.util.ArrayList<>();
+        for (var row : inboxService.restartCheckpoints(userId)) {
+            var state = agentRunStateService.get(row.getConversationId());
+            if (state == null || state.status() != AgentRunStateService.RunStatus.INTERRUPTED) continue;
+            var cp = inboxService.restartCheckpoint(row);
+            if (!restartAccountMatches(cp)) continue;
+            try { requireInboxProjectAccess(row.getProjectId(), userId); }
+            catch (SecurityException denied) { continue; }
+            pending.add(new RestartPending(row.getConversationId(), row.getProjectId(),
+                    cp.path("guard").path("activeFileId").isNumber() ? cp.path("guard").path("activeFileId").longValue() : null,
+                    cp.path("guard").path("activeFileName").asText(null)));
+        }
+        return pending;
+    }
+
+    private boolean restartAccountMatches(com.fasterxml.jackson.databind.JsonNode cp) {
+        return cp != null && cp.path("version").asInt() == 1
+                && java.util.Objects.equals(cp.path("accountFingerprint").asText(null),
+                trialTurnMeter == null ? null : trialTurnMeter.accountFingerprint());
+    }
+
+    public java.util.Map<String, Object> abortRestart(Long userId, String attemptId) {
+        synchronized (restartAdmission) {
+            abortedRestarts.computeIfAbsent(userId, key -> java.util.concurrent.ConcurrentHashMap.newKeySet()).add(attemptId);
+            if (!restartAttempts.remove(userId, attemptId)) return java.util.Map.of("aborted", true, "resumed", 0, "paused", 0);
+        }
+        for (RunGuard guard : activeRuns.values()) {
+            synchronized (guard) {
+                if (java.util.Objects.equals(userId, guard.userId)) guard.restartRequested = false;
+            }
+        }
+        int resumed = 0;
+        int paused = 0;
+        for (var entry : List.copyOf(parkedRestarts.entrySet())) {
+            ParkedRestart parked = entry.getValue();
+            if (!java.util.Objects.equals(userId, parked.userId()) || !attemptId.equals(parked.attemptId())) continue;
+            // Same renderer binding is required. If it navigated/reconnected, leave a visible
+            // checkpoint for the workbench to reopen rather than send edits to another editor.
+            try {
+                if (sseEmitterService.currentEpoch(entry.getKey()) == parked.epoch()
+                        && resumeRestart(entry.getKey(), parked.projectId(), parked.activeFileId(), userId)) resumed++;
+                else paused++;
+            } catch (RuntimeException failure) { paused++; }
+        }
+        return java.util.Map.of("aborted", true, "resumed", resumed, "paused", paused);
+    }
+
+    public boolean resumeRestart(String conversationId, Long projectId, Long activeFileId, Long userId) {
+        if (inboxService == null || restartAttempts.containsKey(userId)) return false;
+        synchronized (inboxService.conversationLock(conversationId)) {
+            RunGuard running = activeRuns.get(conversationId);
+            if (running != null) return java.util.Objects.equals(running.userId, userId)
+                    && running.originalRequest != null && java.util.Objects.equals(running.originalRequest.getProjectId(), projectId)
+                    && java.util.Objects.equals(running.activeFileId, activeFileId);
+            var state = agentRunStateService.get(conversationId);
+            if (state == null || state.status() != AgentRunStateService.RunStatus.INTERRUPTED) return false;
+            var row = inboxService.restartCheckpoints(userId).stream()
+                    .filter(item -> conversationId.equals(item.getConversationId())
+                            && java.util.Objects.equals(projectId, item.getProjectId())).findFirst().orElse(null);
+            if (row == null) return false;
+            requireInboxExecutionAccess(conversationId, row.getId(), userId);
+            var cp = inboxService.restartCheckpoint(row);
+            if (!restartAccountMatches(cp)) return false;
+            var data = cp.path("guard");
+            Long expectedFileId = data.path("activeFileId").isNumber() ? data.path("activeFileId").longValue() : null;
+            if (!java.util.Objects.equals(expectedFileId, activeFileId)) return false;
+            var request = inboxService.requestMetadataOf(row);
+            if ("office".equalsIgnoreCase(request.getClientCapability())) return false;
+            var messages = new java.util.ArrayList<>(dev.langchain4j.data.message.ChatMessageDeserializer
+                    .messagesFromJson(cp.path("messages").asText()));
+            StringBuilder executionLog = new StringBuilder(cp.path("executionLog").asText());
+            com.checkba.service.AppLanguageScope.run(request.getAppLanguage(), () -> messages.add(dev.langchain4j.data.message.UserMessage.from(LangText.of(
+                    "[系统恢复提示] 应用已重新启动；上面的工具结果是已完成步骤，不得重放已完成的修改或外部操作。继续原授权任务前，重新读取原目标的当前内容核对进度；编辑器锚点需重新定位，不能复用重启前锚点。恢复本身不扩大授权范围。",
+                    "[System recovery] The app restarted. Prior tool results represent completed steps; do not repeat completed edits or external actions. Before continuing the original authorized task, read the original target again to verify progress. Resolve editor anchors again; pre-restart anchors are stale. Restart does not expand authorization."))));
+            RunGuard guard = new RunGuard(conversationId, row.getRunId(), sseEmitterService.currentEpoch(conversationId));
+            restoreRestartGuard(guard, data);
+            guard.inboxItemId = row.getId();
+            guard.userId = userId;
+            guard.originalRequest = request;
+            if (data.path("decisionChannel").isTextual() && !guard.decisionAbandoned) {
+                guard.decisionContext = new DecisionAssistContext(request.isDecisionAssistEnabled(), projectId, userId,
+                        conversationId, request.getModel(), com.checkba.config.AiModelProperties.Provider.valueOf(data.path("decisionChannel").asText()));
+                guard.decisionInput = request.getMessage();
+            }
+            guard.trialAccountFingerprint = cp.path("accountFingerprint").asText(null);
+            guard.trace.restoreForRestart(cp.path("trace").asText(), cp.path("reasoning").asText(null));
+            guard.streamContent.append(cp.path("streamContent").asText());
+            List<String> skills = new java.util.ArrayList<>();
+            cp.path("skills").forEach(id -> skills.add(id.asText()));
+            skillRouter.activateForTurn(conversationId, guard.runId, request.getMessage(), request.getPinnedSkillId(),
+                    request.getAgentMode() == AgentMode.ASK ? null : request.getSkillIds());
+            skillRouter.restoreAutomaticSkills(conversationId, guard.runId, skills);
+            var restoredSkills = skillRouter.activeSkills(guard.runId).stream().map(skill -> skill.definition().getId())
+                    .collect(java.util.stream.Collectors.toSet());
+            if (!restoredSkills.equals(new java.util.HashSet<>(skills))) {
+                skillRouter.clearRun(guard.runId);
+                return false;
+            }
+            // Consume durably before any new model/tool work. An uncertain crash after this point
+            // returns to the explicit interruption path, never replays this checkpoint twice.
+            synchronized (restartAdmission) {
+                if (restartAttempts.containsKey(userId)) { skillRouter.clearRun(guard.runId); return false; }
+                inboxService.consumeRestartCheckpoint(row.getId());
+                parkedRestarts.remove(conversationId);
+                activeRuns.put(conversationId, guard);
+            }
+            if (clientCapabilities != null) clientCapabilities.record(conversationId, request.getClientCapability(),
+                    request.getOfficeHost(), request.getOfficeFamily());
+            agentRunStateService.mark(conversationId, AgentRunStateService.RunStatus.RUNNING, projectId, userId);
+            sendRunEvent(guard, "run_state", "{\"status\":\"RUNNING\"}");
+            sendRunEvent(guard, "state_recovery", guard.trace.recoveryPayload(guard.streamSnapshot()));
+            Runnable turn = () -> com.checkba.service.AppLanguageScope.run(request.getAppLanguage(),
+                    () -> PlatformAiUserScope.run(userId, () -> com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed, () -> {
+                        try {
+                            requireInboxExecutionAccess(conversationId, row.getId(), userId);
+                            if (!restartAccountMatches(cp)) throw new SecurityException("Account changed during restart");
+                            runLoop(resolveStreamingModel(cp.path("modelId").asText(), guard), messages,
+                                    conversationId, String.valueOf(projectId), userId, cp.path("modelId").asText(),
+                                    cp.path("depth").asInt(), executionLog,
+                                    AgentMode.valueOf(cp.path("mode").asText()), guard);
+                        } catch (Throwable e) {
+                            finishWithError(guard, String.valueOf(projectId), userId, "Restart continuation failed", executionLog);
+                        }
+                    })));
+            try { if (turnExecutor == null) turn.run(); else turnExecutor.execute(turn); }
+            catch (RuntimeException rejected) {
+                // Submission rejection has executed no model/tool: preserve the exact checkpoint.
+                inboxService.saveRestartCheckpoint(row.getId(), cp);
+                agentRunStateService.suspendForRestart(conversationId, projectId, userId);
+                endRun(guard);
+                return false;
+            }
+            return true;
+        }
+    }
+
+    private boolean suspendForRestart(List<dev.langchain4j.data.message.ChatMessage> messages, String projectId,
+                                      Long userId, String modelId, int depth, StringBuilder executionLog,
+                                      AgentMode mode, RunGuard guard) {
+        synchronized (guard) {
+            if (guard.isCancelled() || !guard.restartRequested || guard.restartUnsafe || guard.inboxItemId == null || inboxService == null
+                    || (restartBackgroundTasks != null && restartBackgroundTasks.hasActiveTasks(guard.conversationId))
+                    || !guard.fileChangeTurn.pending.isEmpty() || !isCurrentRun(guard) || editorBridgeService.isStreamingMode(guard.conversationId)) return false;
+            try {
+                var cp = SKILL_UPDATE_MAPPER.createObjectNode();
+                cp.put("version", 1); cp.put("accountFingerprint", guard.trialAccountFingerprint);
+                cp.put("messages", dev.langchain4j.data.message.ChatMessageSerializer.messagesToJson(messages));
+                cp.put("executionLog", executionLog.toString()); cp.put("modelId", modelId);
+                cp.put("mode", mode.name()); cp.put("depth", depth);
+                cp.put("trace", guard.trace.recoveryPayload(guard.streamSnapshot()));
+                cp.put("reasoning", guard.trace.reasoningJson()); cp.put("streamContent", guard.streamSnapshot());
+                cp.set("guard", snapshotRestartGuard(guard));
+                cp.set("skills", SKILL_UPDATE_MAPPER.valueToTree(skillRouter.activeSkills(guard.runId).stream()
+                        .map(skill -> skill.definition().getId()).toList()));
+                // The checkpoint is durable before the run becomes eligible for shutdown.
+                inboxService.saveRestartCheckpoint(guard.inboxItemId, cp);
+                agentRunStateService.suspendForRestart(guard.conversationId, Long.valueOf(projectId), userId);
+                parkedRestarts.put(guard.conversationId, new ParkedRestart(guard.restartAttemptId, userId,
+                        Long.valueOf(projectId), guard.activeFileId, guard.connectionEpoch));
+                sendRunEvent(guard, "run_state", "{\"status\":\"INTERRUPTED\",\"reason\":\"restart_ready\"}");
+                endRun(guard);
+                return true;
+            } catch (RuntimeException failure) {
+                log.warn("Could not checkpoint run {} for restart", guard.runId);
+                // If snapshot persistence was partial, do not perform more side effects behind it.
+                // The quit preparation reports this as blocked until the user cancels the attempt.
+                guard.restartUnsafe = true;
+                try { inboxService.consumeRestartCheckpoint(guard.inboxItemId); }
+                catch (RuntimeException cannotInvalidate) {
+                    finishWithError(guard, projectId, userId, "Restart checkpoint could not be saved", executionLog);
+                    return true;
+                }
+                return false;
+            }
+        }
+    }
+
+    private com.fasterxml.jackson.databind.node.ObjectNode snapshotRestartGuard(RunGuard guard) {
+        var json = SKILL_UPDATE_MAPPER.createObjectNode();
+        json.put("assistantMessageId", guard.assistantMessageId);
+        json.put("clientRequestId", guard.clientRequestId);
+        json.put("documentEdited", guard.documentEdited);
+        json.put("producedText", guard.producedText);
+        json.put("consecutiveFailures", guard.consecutiveFailures);
+        json.put("llmRetries", guard.llmRetries);
+        json.put("malformedToolRounds", guard.malformedToolRounds);
+        json.put("documentSummaryOnly", guard.documentSummaryOnly);
+        json.put("overflowCompactions", guard.overflowCompactions);
+        json.put("activeFileId", guard.activeFileId);
+        json.put("defaultOutputFolderId", guard.defaultOutputFolderId);
+        json.put("activeFileName", guard.activeFileName);
+        json.put("opinionCompletionCheckDone", guard.opinionCompletionCheckDone);
+        json.put("opinionTargetFileId", guard.opinionTargetFileId);
+        json.put("opinionTargetFileName", guard.opinionTargetFileName);
+        json.put("activeDocKind", guard.activeDocKind);
+        json.put("docCategoryTrimActive", guard.docCategoryTrimActive);
+        json.put("catalogOffered", guard.catalogOffered);
+        json.put("llmRounds", guard.llmRounds);
+        json.put("promptTokensRecorded", guard.promptTokensRecorded);
+        json.set("opinionInstructions", SKILL_UPDATE_MAPPER.valueToTree(guard.opinionInstructions));
+        json.set("clarificationSkillIds", SKILL_UPDATE_MAPPER.valueToTree(guard.clarificationSkillIds));
+        json.set("expandedToolCategories", SKILL_UPDATE_MAPPER.valueToTree(guard.expandedToolCategories));
+        json.set("unusableTools", SKILL_UPDATE_MAPPER.valueToTree(guard.unusableTools));
+        json.set("triedModels", SKILL_UPDATE_MAPPER.valueToTree(guard.triedModels));
+        json.set("stuck", SKILL_UPDATE_MAPPER.valueToTree(guard.stuck.snapshot()));
+        json.set("reportedFiles", SKILL_UPDATE_MAPPER.valueToTree(guard.fileChangeTurn.reported));
+        if (guard.decisionContext != null && guard.decisionContext.expectedChannel() != null)
+            json.put("decisionChannel", guard.decisionContext.expectedChannel().name());
+        json.put("decisionAttempted", guard.decisionAttempted);
+        json.put("decisionAbandoned", guard.decisionAbandoned);
+        json.put("assistedDisclosure", guard.assistedDisclosure);
+        json.put("reasoningEffortOverride", guard.reasoningEffortOverride);
+        json.put("platformUsed", guard.platformUsed.get());
+        json.put("trialReported", guard.trialReported.get());
+        return json;
+    }
+
+    private void restoreRestartGuard(RunGuard guard, com.fasterxml.jackson.databind.JsonNode json) {
+        guard.assistantMessageId = json.path("assistantMessageId").isNumber() ? json.path("assistantMessageId").longValue() : null;
+        guard.clientRequestId = json.path("clientRequestId").asText(null);
+        guard.documentEdited = json.path("documentEdited").asBoolean();
+        guard.producedText = json.path("producedText").asBoolean();
+        guard.consecutiveFailures = json.path("consecutiveFailures").asInt();
+        guard.llmRetries = json.path("llmRetries").asInt();
+        guard.malformedToolRounds = json.path("malformedToolRounds").asInt();
+        guard.documentSummaryOnly = json.path("documentSummaryOnly").asBoolean();
+        guard.overflowCompactions = json.path("overflowCompactions").asInt();
+        guard.activeFileId = json.path("activeFileId").isNumber() ? json.path("activeFileId").longValue() : null;
+        guard.defaultOutputFolderId = json.path("defaultOutputFolderId").isNumber() ? json.path("defaultOutputFolderId").longValue() : null;
+        guard.activeFileName = json.path("activeFileName").asText(null);
+        guard.opinionCompletionCheckDone = json.path("opinionCompletionCheckDone").asBoolean();
+        guard.opinionTargetFileId = json.path("opinionTargetFileId").isNumber() ? json.path("opinionTargetFileId").longValue() : null;
+        guard.opinionTargetFileName = json.path("opinionTargetFileName").asText(null);
+        guard.activeDocKind = json.path("activeDocKind").asText(null);
+        guard.docCategoryTrimActive = json.path("docCategoryTrimActive").asBoolean();
+        guard.catalogOffered = json.path("catalogOffered").asBoolean();
+        guard.llmRounds = json.path("llmRounds").asInt();
+        guard.promptTokensRecorded = json.path("promptTokensRecorded").asBoolean();
+        guard.clarificationSkillIds = new java.util.ArrayList<>();
+        guard.unusableTools = new java.util.HashSet<>();
+        json.path("opinionInstructions").forEach(value -> guard.opinionInstructions.add(value.asText()));
+        json.path("clarificationSkillIds").forEach(value -> guard.clarificationSkillIds.add(value.asText()));
+        json.path("expandedToolCategories").forEach(value -> guard.expandedToolCategories.add(value.asText()));
+        json.path("unusableTools").forEach(value -> guard.unusableTools.add(value.asText()));
+        json.path("triedModels").forEach(value -> guard.triedModels.add(value.asText()));
+        try { guard.stuck.restore(SKILL_UPDATE_MAPPER.treeToValue(json.path("stuck"), StuckDetector.Snapshot.class)); }
+        catch (Exception invalid) { throw new IllegalStateException("Invalid restart progress", invalid); }
+        guard.fileChangeTurn.clientRequestId = guard.clientRequestId;
+        guard.fileChangeTurn.assistantMessageId = guard.assistantMessageId;
+        json.path("reportedFiles").forEach(value -> guard.fileChangeTurn.reported.add(value.asText()));
+        guard.decisionAttempted = json.path("decisionAttempted").asBoolean();
+        guard.decisionAbandoned = json.path("decisionAbandoned").asBoolean();
+        guard.assistedDisclosure = json.path("assistedDisclosure").asBoolean();
+        guard.reasoningEffortOverride = json.path("reasoningEffortOverride").asText(null);
+        guard.platformUsed.set(json.path("platformUsed").asBoolean());
+        guard.trialReported.set(json.path("trialReported").asBoolean());
     }
 
     /** Persisted production entrypoint. Returns the active run id for the HTTP receipt. */
     public String acceptInboxSubmission(String itemId) {
         return acceptInboxSubmission(itemId, true);
+    }
+
+    /** Execution admission is separate from historical conversation ownership. */
+    public void requireInboxExecutionAccess(String conversationId, String itemId, Long userId) {
+        com.checkba.model.entity.AgentInboxItem item = inboxService.fresh(itemId);
+        if (!java.util.Objects.equals(conversationId, item.getConversationId())
+                || !java.util.Objects.equals(userId, item.getUserId())) {
+            throw new SecurityException(LangText.of("无权操作该会话", "You do not have permission for this conversation"));
+        }
+        requireInboxProjectAccess(item.getProjectId(), userId);
+    }
+
+    private void requireInboxProjectAccess(Long projectId, Long userId) {
+        // Same staff-workspace admission as POST /chat, using the durable project's identity.
+        if (projectId == null || userId == null || !projectMemberService.hasReadPermission(projectId, userId)) {
+            throw new SecurityException(LangText.of("无权访问该项目", "You do not have access to this project"));
+        }
+        if (projectMemberService.isClient(projectId, userId)) {
+            throw new SecurityException(com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE);
+        }
     }
 
     /** emitApplied=false is used by the originating POST; its receipt already represents the bubble. */
@@ -1332,20 +1884,37 @@ public class AgentOrchestrator {
             if (!AgentInboxService.PENDING.equals(item.getState())) {
                 return item.getRunId() != null ? item.getRunId() : activeRunId(item.getConversationId());
             }
+            requireInboxProjectAccess(item.getProjectId(), item.getUserId());
+            if (restartAttempts.containsKey(item.getUserId())) return null;
             RunGuard current = activeRuns.get(item.getConversationId());
             if (current != null) {
                 if (AgentInboxService.STEER.equals(item.getSubmissionMode())) current.abandonDecision();
                 return current.runId;
             }
 
-            guard = beginRun(item.getConversationId());
+            try {
+                // Resolve transient bodies before claiming: a cache miss has not executed any
+                // tool, so the same idempotency key must remain eligible for a full-body retry.
+                request = inbox.requestOf(item);
+            } catch (AgentInboxService.InlineContentUnavailable e) {
+                sseEmitterService.send(conversationId, "error", "{\"code\":\"INLINE_CONTENT_CACHE_MISS\","
+                        + "\"retryWithInlineContent\":true,\"message\":\"文档正文缓存已失效，请重新发送文档正文。 / Resend the document text.\"}");
+                throw e;
+            }
+            synchronized (restartAdmission) {
+                if (restartAttempts.containsKey(item.getUserId())) return null;
+                guard = beginRun(item.getConversationId());
+                guard.userId = item.getUserId();
+                guard.originalRequest = request;
+                guard.inboxItemId = itemId;
+            }
             claimed = inbox.claim(itemId, guard.runId, emitApplied);
             if (!AgentInboxService.APPLIED.equals(claimed.getState())
                     || !guard.runId.equals(claimed.getRunId())) {
                 endRun(guard);
                 return claimed.getRunId();
             }
-            request = inbox.requestOf(claimed);
+
         }
         // Do not hold the inbox monitor while the turn runs. The guard is already visible, so new
         // submissions queue safely, while completion can reacquire the same monitor to drain once.
@@ -1360,6 +1929,11 @@ public class AgentOrchestrator {
     }
 
     private void launchTurn(AiAgentController.AgentChatRequest request, Long userId, RunGuard guard) {
+        // Inbox replay after restart does not traverse POST /chat's capability registration.
+        if (clientCapabilities != null) {
+            clientCapabilities.record(request.getConversationId(), request.getClientCapability(),
+                    request.getOfficeHost(), request.getOfficeFamily());
+        }
         // 平台通道按用户计费（server 模式多租户）：整轮循环——含其中同步调用的上下文组装、
         // 记忆检索、子 Agent、故障转移换模型——都在这个身份作用域内取 key。
         // 身份作用域必须建在**执行线程**上：提交线程（控制器线程）设了也不跟着走。
@@ -1368,6 +1942,12 @@ public class AgentOrchestrator {
         // 不跟着池线程走，而 system prompt 选中英文版正是在这条循环里做的（ContextAssembler）。
         // 缺省（桌面端不上送）时 AppLanguageScope 不覆盖任何东西，照旧读全局 app.language。
         guard.userId = userId;
+        if (inboxService != null) for (var old : inboxService.restartCheckpoints(userId)) {
+            if (guard.conversationId.equals(old.getConversationId())) inboxService.consumeRestartCheckpoint(old.getId());
+        }
+        guard.originalRequest = request;
+        guard.restartRequested = restartAttempts.containsKey(userId);
+        guard.restartAttemptId = restartAttempts.get(userId);
         guard.trialAccountFingerprint = trialTurnMeter == null ? null : trialTurnMeter.accountFingerprint();
         Runnable turn = () -> com.checkba.service.AppLanguageScope.run(request.getAppLanguage(),
                 () -> PlatformAiUserScope.run(userId,
@@ -1391,7 +1971,23 @@ public class AgentOrchestrator {
 
     private void handleUserMessageInScope(AiAgentController.AgentChatRequest request, Long userId,
                                           RunGuard guard) {
+        // Admission can precede actual execution by an arbitrarily long executor wait.
+        // Recheck before reading context, saving user text, selecting a model or running tools.
+        if (guard.inboxItemId != null) {
+            try {
+                requireInboxExecutionAccess(guard.conversationId, guard.inboxItemId, userId);
+            } catch (SecurityException denied) {
+                inboxService.interruptRun(guard.runId);
+                markRunState(guard, AgentRunStateService.RunStatus.ERROR);
+                sendRunEvent(guard, "error", denied.getMessage());
+                inboxService.emitSnapshot(guard.conversationId);
+                closeSse(guard);
+                endRun(guard);
+                return;
+            }
+        }
         String conversationId = request.getConversationId();
+        guard.clientRequestId = request.getClientRequestId();
         String projectId = String.valueOf(request.getProjectId());
         AgentMode agentMode = request.getAgentMode(); // 获取 Agent 模式
         
@@ -1419,6 +2015,14 @@ public class AgentOrchestrator {
         TurnTimings timings = TurnTimings.start(log, "prep", conversationId);
 
         try {
+            if (request.getActiveContext() != null && request.getActiveContext().getId() != null) {
+                try {
+                    guard.activeFileId = Long.parseLong(request.getActiveContext().getId().trim());
+                    guard.activeFileName = request.getActiveContext().getName();
+                } catch (NumberFormatException ignore) { /* 非数字 ID（如临时文件）不做检查点 */ }
+            }
+            guard.defaultOutputFolderId = com.checkba.service.ai.tools.GeneratedFileLocation.initialParent(
+                    projectFileService, request.getProjectId(), guard.activeFileId);
             if (request.isDecisionAssistEnabled() && toolDecisionPolicy != null && agentMode != AgentMode.ASK) {
                 // Resolve the real channel once for this run; never promote a local run to cloud later.
                 try {
@@ -1470,7 +2074,7 @@ public class AgentOrchestrator {
                     } catch (Exception e) {
                         log.warn("Failed to generate conversation title for {}", convId, e);
                     }
-                }));
+                }), TITLE_EXECUTOR);
             }
             
             // 1.2 Skill 激活（Phase 3B）：手动选择 ∪ 触发词自动命中；一个都不生效时行为与现状一致。
@@ -1490,8 +2094,10 @@ public class AgentOrchestrator {
             }
             // 把本轮真正生效的清单告诉前端（自动命中的那枚在面板里会闪一下）。
             // 空列表也发：前端靠它把上一轮的 chip 清掉。
-            sendSkillUpdate(guard,
-                    skillsEffective ? skillRouter.activeSkills(guard.runId) : List.of());
+            List<com.checkba.service.ai.skill.SkillRouter.ActiveSkill> effectiveSkills =
+                    skillsEffective ? skillRouter.activeSkills(guard.runId) : List.of();
+            String reqProjectId = request.getProjectId() != null ? String.valueOf(request.getProjectId()) : null;
+            sendSkillUpdate(guard, effectiveSkills, userId, reqProjectId);
 
             // A clarification does not authorize editing whichever file is open now.
             if (clarification != null && clarification.targetFileId() != null
@@ -1516,6 +2122,42 @@ public class AgentOrchestrator {
             }
             timings.mark("skills");
 
+            // 1.4 智能模式（auto）零延迟确定性路由（dev-board#1434）：
+            // 放在 Skill 激活之后、ContextAssembler 之前——既能利用本轮命中的 Skill（如 contract-review /
+            // legal-opinion-review）精准分档，又能在图片多模态装配前把有效模型切换为对应的视觉模型。
+            java.util.List<AiAgentController.ContextItem> resolvedContextItems = request.getContextItems() != null
+                    ? request.getContextItems()
+                    : convertFileIdsToContextItems(request.getFileIds());
+            AllowedModels.Region networkRegion = networkRegionService != null
+                    ? networkRegionService.effectiveRegion()
+                    : AllowedModels.Region.GLOBAL;
+            SmartModelRouter.RouteDecision routeDecision =
+                    (smartModelRouter != null ? smartModelRouter : new SmartModelRouter()).route(
+                            request.getModel(),
+                            request.getMessage(),
+                            agentMode,
+                            resolvedContextItems,
+                            request.getActiveContext(),
+                            effectiveSkills,
+                            networkRegion);
+            String effectiveModelId = routeDecision.effectiveModelId();
+            guard.reasoningEffortOverride = routeDecision.reasoningEffort();
+            if (routeDecision.routed()) {
+                log.info("[SmartRouter] conv={} routed '{}' -> model={} (tier={}, effort={}, region={})",
+                        conversationId, request.getModel(), effectiveModelId,
+                        routeDecision.tier(), routeDecision.reasoningEffort(), networkRegion);
+                sendModelRouted(guard, routeDecision);
+                if (guard.decisionContext != null && !guard.decisionAttempted && !guard.decisionAbandoned) {
+                    try {
+                        guard.decisionContext = new DecisionAssistContext(true, request.getProjectId(), userId,
+                                conversationId, effectiveModelId,
+                                chatModelFactory.resolveTarget(effectiveModelId, false).channel());
+                    } catch (Exception ignored) {
+                        guard.abandonDecision();
+                    }
+                }
+            }
+
             // 2. Build Context & History Message Stack (Spec v1.8)
             log.info("Assembling full message context for conversation: {}", conversationId);
             // TODO: Get taskListId/planId from session if available
@@ -1527,15 +2169,14 @@ public class AgentOrchestrator {
                 conversationId,
                 guard.runId,
                 request.getMessage(),
-                request.getContextItems() != null ? request.getContextItems() :
-                    convertFileIdsToContextItems(request.getFileIds()),
+                resolvedContextItems,
                 request.getActiveContext(), // NEW: Pass active document context
                 taskListId,
                 planId,
                 projectId,
                 agentMode,
                 userId,
-                request.getModel(),
+                effectiveModelId,
                 ledger
             );
             ledger.persistTo(userMessageId);
@@ -1555,14 +2196,14 @@ public class AgentOrchestrator {
             }
 
             // 3. 获取流式模型
-            log.info("Getting streaming model: {}", request.getModel());
-            StreamingChatLanguageModel model = chatModelFactory.getStreamingChatModel(request.getModel());
+            log.info("Getting streaming model: {}", effectiveModelId);
+            StreamingChatLanguageModel model = resolveStreamingModel(effectiveModelId, guard);
             
             timings.mark("model");
             timings.done(log);
 
             if (model == null) {
-                throw new RuntimeException("Could not create streaming model for ID: " + request.getModel());
+                throw new RuntimeException("Could not create streaming model for ID: " + effectiveModelId);
             }
 
             // 4. Start Loop
@@ -1573,17 +2214,16 @@ public class AgentOrchestrator {
             documentCheckpointService.clearForNewRun(conversationId);
             // 本轮的整段插入去重闸也一并重置（dev-board#464）——闸只在一轮内有效
             editorBridgeService.clearForNewRun(conversationId);
-            if (request.getActiveContext() != null && request.getActiveContext().getId() != null) {
-                try {
-                    guard.activeFileId = Long.parseLong(request.getActiveContext().getId().trim());
-                    guard.activeFileName = request.getActiveContext().getName();
-                } catch (NumberFormatException ignore) { /* 非数字 ID（如临时文件）不做检查点 */ }
-            }
             // dev-board#1097：本轮最初的用户指令（门控）与最初绑定的活跃文档（核验目标）
             if (clarification != null) guard.opinionInstructions.addAll(clarification.instructions());
             guard.opinionInstructions.add(request.getMessage());
             guard.opinionTargetFileId = clarification == null ? guard.activeFileId : clarification.targetFileId();
             guard.opinionTargetFileName = clarification == null ? guard.activeFileName : clarification.targetFileName();
+            if (harnessEvolutionService != null) {
+                guard.pendingRollbackSignal = harnessEvolutionService
+                        .consumePendingRollback(conversationId)
+                        .orElse(null);
+            }
             // 工具可见性按活跃文档类型收窄（dev-board#729 ①）：本轮只算这一次，
             // 之后每轮递归都沿用，保证同一轮工具集不变
             guard.activeDocKind = initialDocKind(request.getActiveContext());
@@ -1601,29 +2241,35 @@ public class AgentOrchestrator {
                 log.info("[ToolVisibility] conv={} 本轮不下发 {} 个当前用不了的工具：{}",
                         conversationId, guard.unusableTools.size(), guard.unusableTools);
             }
-            runLoop(model, messages, conversationId, projectId, userId, request.getModel(), 0, executionLog, agentMode, guard);
+            runLoop(model, messages, conversationId, projectId, userId, effectiveModelId, 0, executionLog, agentMode, guard);
 
         } catch (com.checkba.service.account.AccountException e) {
             // 账户/额度类失败不是「内部错误」，而是用户可自行处理的状态
             // （如「请先在官网账户页分配 AI 额度」）。原样透出中文文案，不加英文前缀，
             // 也不打 ERROR 级日志——这条路径在未分配额度时每发一条消息都会走到
-            log.info("平台通道不可用 [{}]，会话 {}: {}", e.getKind(), conversationId, e.getMessage());
-            markRunState(guard, AgentRunStateService.RunStatus.ERROR);
-            sendRunEvent(guard, "error", accountErrorPayload(e));
-            // 用户消息在本方法开头已落库：这里不补一条 ASSISTANT，刷新页面后这一轮就只剩用户
-            // 自己的问题，看起来像 AI 完全没回应。落的正是推给用户的那句文案（不加前缀）。
-            saveAssistantMessageQuietly(guard, projectId, userId, e.getMessage());
-            closeSse(guard);
-            endRun(guard);
-        } catch (Exception e) {
-            log.error("Agent Loop Error for conversation: " + conversationId, e);
-            String errorText = "Internal Error: " + e.getMessage();
-            markRunState(guard, AgentRunStateService.RunStatus.ERROR);
-            sendRunEvent(guard, "error", errorText);
-            // 同上：历史里必须留下这一轮出过错的痕迹，且与 SSE 推出去的是同一串文本
-            saveAssistantMessageQuietly(guard, projectId, userId, errorText);
-            closeSse(guard);
-            endRun(guard);
+            try {
+                log.info("平台通道不可用 [{}]，会话 {}: {}", e.getKind(), conversationId, e.getMessage());
+                markRunState(guard, AgentRunStateService.RunStatus.ERROR);
+                sendRunEvent(guard, "error", accountErrorPayload(e));
+                // 用户消息在本方法开头已落库：这里不补一条 ASSISTANT，刷新页面后这一轮就只剩用户
+                // 自己的问题，看起来像 AI 完全没回应。落的正是推给用户的那句文案（不加前缀）。
+                saveAssistantMessageQuietly(guard, projectId, userId, e.getMessage());
+            } finally {
+                closeSse(guard);
+                endRun(guard);
+            }
+        } catch (Throwable e) {
+            try {
+                log.error("Agent Loop Error for conversation: " + conversationId, e);
+                String errorText = "Internal Error: " + e.getMessage();
+                markRunState(guard, AgentRunStateService.RunStatus.ERROR);
+                sendRunEvent(guard, "error", errorText);
+                // 同上：历史里必须留下这一轮出过错的痕迹，且与 SSE 推出去的是同一串文本
+                saveAssistantMessageQuietly(guard, projectId, userId, errorText);
+            } finally {
+                closeSse(guard);
+                endRun(guard);
+            }
         }
     }
 
@@ -1639,6 +2285,8 @@ public class AgentOrchestrator {
             return;
         }
 
+        if (suspendForRestart(messages, projectId, userId, modelId, depth, executionLog, agentMode, guard)) return;
+
         // Productive work has no fixed turn count. Cancellation, bounded request retries, context
         // compaction and the observation-aware no-progress detector remain the terminating guards.
 
@@ -1648,6 +2296,7 @@ public class AgentOrchestrator {
         // 设置当前会话 ID 到 EditorBridgeService，以便文档编辑工具可以发送 SSE 事件
         editorBridgeService.setCurrentConversationId(conversationId);
 
+        final boolean summaryOnly = guard.documentSummaryOnly;
         AgentStreamHandler handler = new AgentStreamHandler(
             sseEmitterService,
             conversationId,
@@ -1660,7 +2309,7 @@ public class AgentOrchestrator {
             // text_delta / reasoning_delta / bubble_start 一律不再打到 emitter 上——
             // 一个会话只有一条流，旧轮次的 token 发出去就是混进新一轮的气泡里。
             // 旧轮次自己照常跑到终态、照常落自己的库，只是对 SSE 静默。
-            () -> isCurrentRun(guard)
+            () -> isCurrentRun(guard) && !summaryOnly
         );
         
 
@@ -1670,7 +2319,7 @@ public class AgentOrchestrator {
         handler.setCancellationCheck(guard::isCancelled);
 
         // 实时更新当前生成的内容 (用于断线重连恢复)
-        handler.setOnToken(guard::appendStream);
+        if (!summaryOnly) handler.setOnToken(guard::appendStream);
         // 思考增量同样进恢复日志，并随消息落库（dev-board#1060）；每次调模型另起一块思考
         guard.trace.beginModelRound(executionLog);
         handler.setOnReasoning(guard::appendReasoning);
@@ -1702,7 +2351,11 @@ public class AgentOrchestrator {
         // 本回调里同步做的这些事都要取 per-user 平台密钥：工具分发、自动 compaction（摘要模型）、
         // 递归下一轮 generate、故障转移换模型——缺身份会被 PlatformAiChannel 判成
         // 「本次 AI 调用未携带用户身份」，在编排器这层看起来就是「平台通道不可用」整轮终止。
-        handler.setOnComplete(response -> PlatformAiUserScope.run(userId, () -> {
+        // 当来自 OkHttp 回调线程且 turnExecutor 已注入时，立刻切到 turnExecutor 执行（dev-board#1270 [A-1]），
+        // 释放 OkHttp Dispatcher 的 maxRequestsPerHost 并发槽位，避免阻塞型工具（编辑器桥最长 180s、
+        // dispatch_subtask 630s）与多轮递归长期占死全局 LLM 并发槽。
+        handler.setOnComplete(response -> dispatchContinuation(() -> PlatformAiUserScope.run(userId,
+                () -> com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed, () -> {
           try {
             // 埋点 ai.turn 的 promptTokensFirstRound（dev-board#729 ⑥）：首轮 prompt 有多大，
             // 是判断「工具 schema / 固定前缀是否过肥」的唯一在线证据（本机实测约 5 万，其中 2/3 是工具）。
@@ -1744,6 +2397,18 @@ public class AgentOrchestrator {
             editorBridgeService.setCurrentConversationId(conversationId);
             
             dev.langchain4j.data.message.AiMessage aiMessage = response.content();
+            if (summaryOnly) {
+                // Buffer this round until validated: neither native nor XML tool hallucinations
+                // may execute or appear as actionable cards during a chat-only report.
+                if (applyPendingSteering(guard, messages, projectId, userId, modelId, agentMode, executionLog)) {
+                    continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
+                            depth + 1, executionLog, agentMode, guard);
+                    return;
+                }
+                String summary = documentSummaryReply(aiMessage, response.finishReason());
+                sendTextDelta(guard, summary);
+                aiMessage = dev.langchain4j.data.message.AiMessage.from(summary);
+            }
 
             // 空响应当瞬时错误重试，不当正常收尾（对标 dsh EMPTY_RESPONSE 教训）：
             // 上游偶发「正常终止 + 零内容零工具调用」，落到默认收尾会静默 FINISHED——
@@ -1766,7 +2431,7 @@ public class AgentOrchestrator {
             // 参数被砍半后 JSON 解析失败还好（已有回喂纠正），恰好仍可解析才最危险——
             // 半篇正文的 write_file 会直接覆盖掉用户的文件。带截断 tool_calls 的 AiMessage
             // 也不入栈：不执行又入栈会让 OpenAI 兼容通道以「tool_calls 无配对结果」400。
-            if (isTruncatedToolCallRound(response.finishReason(), aiMessage)) {
+            if (!summaryOnly && isTruncatedToolCallRound(response.finishReason(), aiMessage)) {
                 if (guard.malformedToolRounds < 2) {
                     guard.malformedToolRounds++;
                     log.warn("LENGTH-truncated native tool calls for {} (correction round {}), asking model to re-emit",
@@ -1814,7 +2479,7 @@ public class AgentOrchestrator {
                     dev.langchain4j.agent.tool.ToolExecutionRequest req = nativeRequests.get(nativeIndex);
                     // Native tool_calls must be paired before the steering USER message is inserted.
                     AgentInboxService inbox = this.inboxService;
-                    if (inbox != null && inbox.hasPendingSteering(conversationId)) {
+                    if (inbox != null && !restartAttempts.containsKey(userId) && inbox.hasPendingSteering(conversationId)) {
                         cancelPendingNativeTools(nativeRequests, nativeIndex, messages, executionLog, guard);
                         applyPendingSteering(guard, messages, projectId, userId, modelId, agentMode, executionLog);
                         continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
@@ -1842,8 +2507,8 @@ public class AgentOrchestrator {
 
                     String result;
                     boolean success;
-                    if (agentMode == AgentMode.ASK && !ASK_MEMORY_TOOLS.contains(req.name())) {
-                        result = "Error: ASK mode permits only memory_list, memory_read, and memory_search.";
+                    if (agentMode == AgentMode.ASK && !ASK_READ_TOOLS.contains(req.name())) {
+                        result = "Error: ASK mode permits only read-only memory and version inspection tools.";
                         success = false;
                     } else {
                         ToolRegistry.ToolResult toolResult = dispatchTool(req.name(), req.arguments(),
@@ -1874,6 +2539,10 @@ public class AgentOrchestrator {
                         stuckNudge = editorBooting ? EDITOR_BOOTING_STUCK_PATTERN : guard.stuck.lastPattern();
                     }
                     result = appendFailureNudge(guard, result, success, editorBooting);
+                    if (!success && !editorBooting) {
+                        result = applyHarnessAdaptationIfDiagnosed(
+                                guard, conversationId, req.name(), req.arguments(), result);
+                    }
                     // 工具刚请用户下载组件（dev-board#1016）：本轮到此为止，等用户装好后自动重发
                     boolean awaitingComponent = editorBridgeService.consumeComponentWait(conversationId);
 
@@ -1985,7 +2654,7 @@ public class AgentOrchestrator {
                 for (int xmlIndex = 0; xmlIndex < xmlCalls.size(); xmlIndex++) {
                     XmlToolCallParser.ParsedCall call = xmlCalls.get(xmlIndex);
                     AgentInboxService inbox = this.inboxService;
-                    if (inbox != null && inbox.hasPendingSteering(conversationId)) {
+                    if (inbox != null && !restartAttempts.containsKey(userId) && inbox.hasPendingSteering(conversationId)) {
                         cancelPendingXmlTools(xmlCalls, xmlIndex, messages, executionLog, guard);
                         applyPendingSteering(guard, messages, projectId, userId, modelId, agentMode, executionLog);
                         continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
@@ -2001,7 +2670,7 @@ public class AgentOrchestrator {
                         return;
                     }
                     String code = call.rawCode();
-                    log.info("Parsed Tool Code: {}", code);
+                    log.info("Parsed XML tool: {}", call.toolName());
 
                     String result;
                     boolean xmlToolSuccess;
@@ -2009,8 +2678,8 @@ public class AgentOrchestrator {
                     if (call.parseError() != null) {
                         result = call.parseError();
                         xmlToolSuccess = false;
-                    } else if (agentMode == AgentMode.ASK && !ASK_MEMORY_TOOLS.contains(call.toolName())) {
-                        result = "Error: ASK mode permits only memory_list, memory_read, and memory_search.";
+                    } else if (agentMode == AgentMode.ASK && !ASK_READ_TOOLS.contains(call.toolName())) {
+                        result = "Error: ASK mode permits only read-only memory and version inspection tools.";
                         xmlToolSuccess = false;
                     } else {
                         toolResult = dispatchTool(call.toolName(), call.argsJson(),
@@ -2044,6 +2713,10 @@ public class AgentOrchestrator {
                         stuckNudge = xmlEditorBooting ? EDITOR_BOOTING_STUCK_PATTERN : guard.stuck.lastPattern();
                     }
                     result = appendFailureNudge(guard, result, xmlToolSuccess, xmlEditorBooting);
+                    if (!xmlToolSuccess && !xmlEditorBooting) {
+                        result = applyHarnessAdaptationIfDiagnosed(
+                                guard, conversationId, call.toolName(), call.argsJson(), result);
+                    }
                     boolean xmlAwaitingComponent = editorBridgeService.consumeComponentWait(conversationId);
 
                     // Add Result to History
@@ -2318,7 +2991,7 @@ public class AgentOrchestrator {
             // 3.3 正文被长度上限截断（LENGTH 且无工具调用）：不能装作正常完成。
             // 半句话戛然而止的回答按「暂停 + 继续」收尾，语义同步数预算耗尽（存档 + 请示）；
             // 刻意不触发记忆管线与版本落档——本轮没有真正结束，续写完成的那轮一并跑。
-            if (response.finishReason() == dev.langchain4j.model.output.FinishReason.LENGTH) {
+            if (!summaryOnly && response.finishReason() == dev.langchain4j.model.output.FinishReason.LENGTH) {
                 log.warn("Answer truncated by output length limit for {}, pausing for continuation", conversationId);
                 String notice = LangText.of(
                         "\n\n> 回答达到单次输出长度上限被截断，点击下方「继续」按钮可接着生成。",
@@ -2338,8 +3011,22 @@ public class AgentOrchestrator {
             // dev-board#1097：法律意见书实质修订的正常收尾由系统安排一次独立只读核验，
             // 把发现接回主助手核对后续一轮；门控与边界见 runOpinionCompletionCheckOnce。
             // 反问/审批/暂停/取消各有自己的终态分支、走不到这里；返回 true 表示已接管收尾。
-            if (runOpinionCompletionCheckOnce(model, messages, conversationId, projectId, userId,
+            if (!summaryOnly && runOpinionCompletionCheckOnce(model, messages, conversationId, projectId, userId,
                     modelId, depth, executionLog, agentMode, guard, content)) {
+                return;
+            }
+            if (!summaryOnly && wasStreaming && streamWrote && isCurrentRun(guard)
+                    && !hasDocumentSummary(content)) {
+                guard.documentSummaryOnly = true;
+                appendBoundedExecutionLog(executionLog, content + "\n");
+                // The body is now in the durable execution log; do not append it again on error/steering.
+                // The separate trace still retains the complete SSE recovery events.
+                guard.takeStreamSnapshot();
+                messages.add(dev.langchain4j.data.message.UserMessage.from(LangText.of(
+                        "[系统提醒] 文档正文生成已结束，但你尚未给用户书面汇报。请仅用 <final> 简要说明本次调整、原因与尚未验证的事项。不要重写正文或调用工具。正文已发往编辑器不代表已保存或已回读核验；不得声称未验证的成功。",
+                        "[System reminder] Document text generation ended without a written report to the user. Reply only with <final>, briefly describing the changes, reasons and anything unverified. Do not repeat the document or call tools. Sending text to the editor does not prove it was saved or read back; do not claim unverified success.")));
+                continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
+                        depth + 1, executionLog, agentMode, guard);
                 return;
             }
             if (!content.isEmpty()) {
@@ -2364,13 +3051,14 @@ public class AgentOrchestrator {
             } catch (Exception vEx) {
                 log.warn("AI 轮次版本落档失败: project={}", projectId, vEx);
             }
+            emitTurnEvolutionIfApplicable(guard, conversationId, projectId, userId);
             markRunState(guard, AgentRunStateService.RunStatus.FINISHED);
             // 发送 bubble_end 表示整个循环真正结束
             sendRunEvent(guard, "bubble_end", bubbleEndPayload(guard, "finished"));
             // 清理本轮登记；队列跑空才关流（见 endRunAndDrain）
             endRunAndDrain(guard);
-          } catch (Exception e) {
-            // 确保异常时也能正确结束 bubble，避免前端一直显示加载状态。
+          } catch (Throwable e) {
+            // 确保异常/Error 时也能正确结束 bubble，避免前端一直显示加载状态且 activeRuns 永久残留。
             //
             // 走 finishWithError 而不是只发一个 SSE：原来这里不落库，于是异常终止的那一轮
             // 在历史里一个字都没有——用户当时看到过工具在跑、看到过半截回复，刷新后全没了
@@ -2384,14 +3072,16 @@ public class AgentOrchestrator {
             // 流式回调运行在可复用线程池线程上，用完清理 ThreadLocal，防止会话串号
             editorBridgeService.clearCurrentConversationId();
           }
-        }));
+        })), userId, guard, projectId, executionLog));
 
         // 流式出错处置（零 token 流出才允许重放，否则用户会看到重复内容）：
         // 1. 限流/瞬时错误 → 按类型退避重试本轮（限流 30/60s，瞬时 8/16/32s）
         // 2. 重试预算耗尽或模型下线（404）→ 换备选模型继续，SSE 明说切了哪个
         // 3. 其余 → 终态清理（关 emitter + 复位状态，避免 SSE 挂到超时、前端永久加载）
         // 同 onComplete：错误回调也在 HTTP 线程上，换模型要取平台密钥，身份必须重建
-        handler.setOnError(err -> PlatformAiUserScope.run(userId, () -> {
+        handler.setOnError(err -> PlatformAiUserScope.run(userId,
+                () -> com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed, () -> {
+          try {
             if (guard.isCancelled()) {
                 // 我们自己掐断在途请求换来的那个 IOException 不是故障（计划 K4 ①）：
                 // 按错误处置会打 ERROR 状态点、发 error 事件、还可能白白切一次模型，
@@ -2412,11 +3102,22 @@ public class AgentOrchestrator {
                         "no_credits");
             }
             if (accountError != null) {
-                markRunState(guard, AgentRunStateService.RunStatus.ERROR);
-                sendRunEvent(guard, "error", accountErrorPayload(accountError));
-                saveAssistantMessageQuietly(guard, projectId, userId, accountError.getMessage());
-                closeSse(guard);
-                endRun(guard);
+                try {
+                    markRunState(guard, AgentRunStateService.RunStatus.ERROR);
+                    sendRunEvent(guard, "error", accountErrorPayload(accountError));
+                    saveAssistantMessageQuietly(guard, projectId, userId, summaryOnly
+                            ? executionLog + "<final>" + accountError.getMessage() + "</final>"
+                            : accountError.getMessage());
+                } finally {
+                    closeSse(guard);
+                    endRun(guard);
+                }
+                return;
+            }
+            if (summaryOnly) {
+                finishWithError(guard, projectId, userId, LangText.of(
+                        "文档正文已发往编辑器，但修改说明生成失败；请检查当前文档。",
+                        "Document text was sent to the editor, but the change summary failed. Please check the current document."), executionLog);
                 return;
             }
             boolean replayable = !handler.hasStreamedTokens();
@@ -2452,7 +3153,7 @@ public class AgentOrchestrator {
                         // 同 depth 重放本轮：messages 只在 onComplete 里被追加，失败轮未污染上下文
                         runLoop(model, messages, conversationId, projectId, userId, modelId,
                                 depth, executionLog, agentMode, guard);
-                    } catch (Exception retryEx) {
+                    } catch (Throwable retryEx) {
                         log.error("Retry runLoop failed for {}", conversationId, retryEx);
                         handleStreamErrorTerminal(guard, projectId, userId, retryEx, null, executionLog);
                     }
@@ -2476,7 +3177,7 @@ public class AgentOrchestrator {
                     try {
                         runLoop(model, messages, conversationId, projectId, userId, modelId,
                                 depth, executionLog, agentMode, guard);
-                    } catch (Exception retryEx) {
+                    } catch (Throwable retryEx) {
                         log.error("Post-compaction retry failed for {}", conversationId, retryEx);
                         handleStreamErrorTerminal(guard, projectId, userId, retryEx, null, executionLog);
                     }
@@ -2509,7 +3210,13 @@ public class AgentOrchestrator {
                 }
             }
             handleStreamErrorTerminal(guard, projectId, userId, err, kind, executionLog);
-        }));
+          } catch (Throwable t) {
+            log.error("Unhandled error in onError callback for conversation: " + conversationId, t);
+            finishWithError(guard, projectId, userId,
+                    LlmErrorClassifier.INTERNAL_ERROR_MARKER + ": Error Callback Failure: " + t.getMessage(),
+                    executionLog);
+          }
+        })));
 
         // 先完成本地压缩和工具准备，再计模型请求的首字等待时间。
         TurnTimings roundTimings = TurnTimings.start(log, "round", conversationId);
@@ -2520,7 +3227,7 @@ public class AgentOrchestrator {
         List<ToolSpecification> registered =
                 toolRegistry.getAllSpecifications(conversationId, guard == null ? null : guard.activeDocKind);
         // 再去掉本轮运行期确定用不了的（dev-board#750）。这一层刻意放在编排器而不是注册表里：
-        // 可见性的最后一道裁剪本来就在这里（skill 白名单、ASK 只留只读记忆工具），而且
+        // 可见性的最后一道裁剪本来就在这里（skill 白名单、ASK 只留只读记忆和版本检查工具），而且
         // guard.unusableTools 是**轮次级**状态，只有这里拿得到。
         if (guard != null && !guard.unusableTools.isEmpty()) {
             registered = registered.stream()
@@ -2536,8 +3243,8 @@ public class AgentOrchestrator {
             guard.roundTrimmed = 0;
         }
         if (agentMode == AgentMode.ASK) {
-            visible = registered.stream().filter(s -> ASK_MEMORY_TOOLS.contains(s.name())).toList();
-            log.info("Ask mode: generating with {} read-only memory tools", visible.size());
+            visible = registered.stream().filter(s -> ASK_READ_TOOLS.contains(s.name())).toList();
+            log.info("Ask mode: generating with {} read-only tools", visible.size());
         } else {
             List<ToolSpecification> afterSkill = skillRouter.visibleTools(guard.runId, registered);
             // skill 的 allowed_tools 本身已经是一次披露；两层叠起来会把 skill 精心挑出来的
@@ -2571,6 +3278,7 @@ public class AgentOrchestrator {
                 guard.catalogOffered = true;
             }
         }
+        if (summaryOnly) visible = List.of();
         roundTimings.mark("tools", visible.size());
         roundTimings.done(log);
         // Cancellation/steering may arrive during the bounded decision call, before main generation starts.
@@ -2602,6 +3310,28 @@ public class AgentOrchestrator {
             // 同步抛错与异步失败共用终态闸：取消看门狗并执行有限重试 / 模型切换。
             handler.onError(e);
         }
+    }
+
+    private static boolean hasDocumentSummary(String content) {
+        if (content == null) return false;
+        var matcher = java.util.regex.Pattern.compile("(?s)<final\\b[^>]*>(.*?)</final>").matcher(content);
+        while (matcher.find()) if (!matcher.group(1).isBlank()) return true;
+        return false;
+    }
+
+    private static String documentSummaryReply(dev.langchain4j.data.message.AiMessage message,
+                                               dev.langchain4j.model.output.FinishReason reason) {
+        String text = message == null || message.text() == null ? "" : message.text().trim();
+        if (text.startsWith("<final>") && text.endsWith("</final>")) {
+            text = text.substring(7, text.length() - 8).trim();
+        }
+        if (message == null || message.hasToolExecutionRequests() || text.isBlank()
+                || reason == dev.langchain4j.model.output.FinishReason.LENGTH
+                || java.util.regex.Pattern.compile("</?[A-Za-z_][^>]*>").matcher(text).find()) {
+            text = LangText.of("文档正文已发往编辑器，但未能生成完整的修改说明。请检查当前文档；本次未确认保存或回读结果。",
+                    "Document text was sent to the editor, but a complete change summary could not be generated. Please check the current document; saving and read-back were not confirmed.");
+        }
+        return "<final>" + text + "</final>";
     }
 
     /**
@@ -2708,7 +3438,7 @@ public class AgentOrchestrator {
      * 没开文档的会话（纯对话、Office 任务窗格）里同样只下发核心集——「帮我建个事项」若不预放回
      * task 类目，就要先花一轮 list_tools，下一轮工具集一变提示缓存还得整段重付（09-29 实测 T-B 20/20 如此）。
      *
-     * <p>ASK 模式只下发只读记忆工具，裁不裁、放不放回都一样，不做。
+     * <p>ASK 模式只下发只读记忆和版本检查工具，裁不裁、放不放回都一样，不做。
      */
     private void prepareToolCategoryPutBack(RunGuard guard, String userMessage, AgentMode agentMode) {
         ToolDisclosurePolicy policy = this.toolDisclosurePolicy;
@@ -2800,6 +3530,36 @@ public class AgentOrchestrator {
     }
 
     /**
+     * 当流式完成回调运行在 OkHttp 回调线程且 {@link #turnExecutor} 已注入时，
+     * 立刻把重工具执行与递归循环切回编排线程池（dev-board#1270 [A-1]），
+     * 让 OkHttp {@code onResponse} 立即返回并释放 {@code Dispatcher.runningAsyncCalls} 槽位。
+     * 测试中直接用同步脚本模型或未注入 {@code turnExecutor} 时保持原地同步执行。
+     */
+    private void dispatchContinuation(Runnable task, Long userId, RunGuard guard,
+                                      String projectId, StringBuilder executionLog) {
+        java.util.concurrent.Executor executor = this.turnExecutor;
+        if (executor != null && isHttpCallbackThread()) {
+            try {
+                executor.execute(task);
+                return;
+            } catch (Throwable rejected) {
+                log.error("Failed to dispatch continuation to turnExecutor for conversation: "
+                        + guard.conversationId, rejected);
+                PlatformAiUserScope.run(userId, () -> finishWithError(guard, projectId, userId,
+                        LlmErrorClassifier.INTERNAL_ERROR_MARKER + ": Callback Error: " + rejected.getMessage(),
+                        executionLog));
+                return;
+            }
+        }
+        task.run();
+    }
+
+    static boolean isHttpCallbackThread() {
+        String name = Thread.currentThread().getName();
+        return name != null && name.startsWith("OkHttp");
+    }
+
+    /**
      * Synchronous scripted models call the next completion callback on the same Java stack. Break
      * that stack every 64 productive rounds; real asynchronous providers also use this harmless
      * boundary, so fixed turn caps are not replaced by StackOverflowError.
@@ -2820,13 +3580,13 @@ public class AgentOrchestrator {
                 try {
                     runLoop(model, messages, conversationId, projectId, userId, modelId,
                             depth, executionLog, agentMode, guard);
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     finishWithError(guard, projectId, userId,
                             LlmErrorClassifier.INTERNAL_ERROR_MARKER + ": Continuation Error: " + e.getMessage(),
                             executionLog);
                 }
             }));
-        } catch (RuntimeException e) {
+        } catch (Throwable e) {
             finishWithError(guard, projectId, userId,
                     LlmErrorClassifier.INTERNAL_ERROR_MARKER + ": Continuation rejected: " + e.getMessage(),
                     executionLog);
@@ -2852,9 +3612,16 @@ public class AgentOrchestrator {
             handleCancellation(guard, projectId, userId, executionLog);
             return true;
         }
+        java.util.Optional<com.checkba.service.ai.skill.SkillDefinition> challengerSkill =
+                verificationHarness != null
+                        ? verificationHarness.resolveChallengerSkill(skillRouter, guard == null ? null : guard.runId)
+                        : java.util.Optional.empty();
+        boolean opinionSkillActive = guard != null
+                && (skillRouter.isActiveInRun(guard.runId, OpinionCompletionCheck.SKILL_ID)
+                || challengerSkill.isPresent());
         if (guard == null || agentMode != AgentMode.AGENT || subAgentService == null
                 || guard.opinionCompletionCheckDone || !isCurrentRun(guard)
-                || !skillRouter.isActiveInRun(guard.runId, OpinionCompletionCheck.SKILL_ID)
+                || !opinionSkillActive
                 || guard.opinionInstructions.isEmpty()
                 || !com.checkba.service.ai.skill.SkillRouter.requestsOpinionReview(
                         String.join("；", guard.opinionInstructions))
@@ -2923,12 +3690,118 @@ public class AgentOrchestrator {
                 status, AgentTagProtocol.escape(truncate(String.valueOf(outcomeText), displayLimit)));
         appendBoundedExecutionLog(executionLog, processCard);
         sendTextDelta(guard, processCard);
+        emitVerificationReportQuietly(guard, challengerSkill.orElse(null), outcome);
 
         messages.add(dev.langchain4j.data.message.UserMessage.from(
                 OpinionCompletionCheck.handoffMessage(outcome)));
         continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
                 depth + 1, executionLog, agentMode, guard);
         return true;
+    }
+
+    private String applyHarnessAdaptationIfDiagnosed(
+            RunGuard guard,
+            String conversationId,
+            String toolName,
+            String argsJson,
+            String resultText) {
+        com.checkba.service.ai.harness.HarnessDiagnosticService diag = this.harnessDiagnosticService;
+        if (diag == null || guard == null) {
+            return resultText;
+        }
+        try {
+            String initialInstruction = guard.opinionInstructions.isEmpty() ? "" : guard.opinionInstructions.get(0);
+            // 点名调了本轮未下发的工具时，noteToolCategoryExpansion 已先把它的类目放回展开集；
+            // 诊断看的是「派发前」的视图，才能把这次放回如实归因并告诉用户/模型（只增不减，算完并回）。
+            java.util.Set<String> diagView = new java.util.LinkedHashSet<>(guard.expandedToolCategories);
+            ToolDisclosurePolicy policy = this.toolDisclosurePolicy;
+            if (policy != null && toolName != null && guard.roundOffered != null
+                    && !guard.roundOffered.isEmpty() && !guard.roundOffered.contains(toolName)) {
+                diagView.remove(policy.categoryOf(toolName));
+            }
+            java.util.Optional<com.checkba.service.ai.harness.HarnessDiagnosticService.HarnessAdaptation> adapted =
+                    diag.diagnoseAndAdapt(
+                            conversationId,
+                            guard.runId,
+                            initialInstruction,
+                            toolName,
+                            argsJson,
+                            resultText,
+                            guard.consecutiveFailures,
+                            diagView,
+                            guard.harnessAdaptations);
+            guard.expandedToolCategories.addAll(diagView);
+            if (adapted.isPresent()) {
+                var record = adapted.get();
+                guard.harnessAdaptations.add(record);
+                sendRunEvent(guard, "harness_adaptation", SKILL_UPDATE_MAPPER.writeValueAsString(record));
+                return resultText + "\n\n" + record.prescription();
+            }
+        } catch (Exception e) {
+            log.warn("Harness diagnostic adaptation skipped for {}: {}", conversationId, e.getMessage());
+        }
+        return resultText;
+    }
+
+    private void emitVerificationReportQuietly(
+            RunGuard guard,
+            com.checkba.service.ai.skill.SkillDefinition challengerSkill,
+            com.checkba.service.ai.subagent.SubAgentResult outcome) {
+        if (guard == null) {
+            return;
+        }
+        try {
+            com.checkba.service.ai.harness.VerificationHarness vh = this.verificationHarness != null
+                    ? this.verificationHarness
+                    : new com.checkba.service.ai.harness.VerificationHarness();
+            String skillId = challengerSkill != null ? challengerSkill.getId() : OpinionCompletionCheck.SKILL_ID;
+            String skillName = challengerSkill != null ? skillRouter.displayName(challengerSkill) : null;
+            var report = vh.buildReport(
+                    skillId,
+                    skillName,
+                    guard.opinionTargetFileId,
+                    guard.opinionTargetFileName,
+                    outcome);
+            sendRunEvent(guard, "verification_report", SKILL_UPDATE_MAPPER.writeValueAsString(report));
+        } catch (Exception e) {
+            log.warn("Failed to emit verification_report for {}: {}", guard.conversationId, e.getMessage());
+        }
+    }
+
+    private void emitTurnEvolutionIfApplicable(
+            RunGuard guard,
+            String conversationId,
+            String projectIdStr,
+            Long userId) {
+        com.checkba.service.ai.harness.HarnessEvolutionService evoSvc = this.harnessEvolutionService;
+        if (evoSvc == null || guard == null) {
+            return;
+        }
+        try {
+            Long projectId = null;
+            try {
+                projectId = projectIdStr != null ? Long.parseLong(projectIdStr) : null;
+            } catch (NumberFormatException ignored) {
+            }
+            String initialInstruction = guard.opinionInstructions.isEmpty() ? "" : guard.opinionInstructions.get(0);
+            java.util.List<String> steered = guard.opinionInstructions.size() > 1
+                    ? guard.opinionInstructions.subList(1, guard.opinionInstructions.size())
+                    : java.util.List.of();
+            var evolved = evoSvc.evaluateTurnEvolution(
+                    conversationId,
+                    userId,
+                    projectId,
+                    initialInstruction,
+                    guard.pendingRollbackSignal,
+                    steered,
+                    guard.harnessAdaptations,
+                    guard.assistantMessageId);
+            if (evolved.isPresent()) {
+                sendRunEvent(guard, "harness_evolution", SKILL_UPDATE_MAPPER.writeValueAsString(evolved.get()));
+            }
+        } catch (Exception e) {
+            log.warn("Failed to evaluate/emit harness_evolution for {}: {}", conversationId, e.getMessage());
+        }
     }
 
     /**
@@ -2950,11 +3823,14 @@ public class AgentOrchestrator {
         try {
             nextModel = chatModelFactory.getStreamingChatModel(nextModelId);
         } catch (com.checkba.service.account.AccountException ae) {
-            log.info("故障转移中止，平台通道不可用 [{}]，会话 {}: {}", ae.getKind(), conversationId, ae.getMessage());
-            markRunState(guard, AgentRunStateService.RunStatus.ERROR);
-            sendRunEvent(guard, "error", accountErrorPayload(ae));
-            closeSse(guard);
-            endRun(guard);
+            try {
+                log.info("故障转移中止，平台通道不可用 [{}]，会话 {}: {}", ae.getKind(), conversationId, ae.getMessage());
+                markRunState(guard, AgentRunStateService.RunStatus.ERROR);
+                sendRunEvent(guard, "error", accountErrorPayload(ae));
+            } finally {
+                closeSse(guard);
+                endRun(guard);
+            }
             return true;
         } catch (Exception e) {
             log.error("Failed to create failover model {} for {}", nextModelId, conversationId, e);
@@ -2965,8 +3841,9 @@ public class AgentOrchestrator {
             return false;
         }
 
-        // 换模型等于换了一条通道，重试预算重新计
+        // 换模型等于换了一条通道，重试预算重新计；原模型的思考强度覆盖不再套在新模型上
         guard.llmRetries = 0;
+        guard.reasoningEffortOverride = null;
         sendTextDelta(guard, String.format(
                 LangText.of("\n\n> 模型「%s」%s，已自动切换到备用模型「%s」继续本轮任务。\n\n",
                         "\n\n> Model \"%s\" %s; automatically switched to fallback model \"%s\" to continue this round.\n\n"),
@@ -2974,7 +3851,7 @@ public class AgentOrchestrator {
         try {
             runLoop(nextModel, messages, conversationId, projectId, userId, nextModelId,
                     depth, executionLog, agentMode, guard);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             log.error("Failover runLoop failed for {}", conversationId, e);
             handleStreamErrorTerminal(guard, projectId, userId, e, null, executionLog);
         }
@@ -3019,27 +3896,30 @@ public class AgentOrchestrator {
     private void finishWithError(RunGuard guard, String projectId, Long userId,
                                  String ssePayload, StringBuilder executionLog) {
         String conversationId = guard.conversationId;
-        sendRunEvent(guard, "error", ssePayload);
-        markRunState(guard, AgentRunStateService.RunStatus.ERROR);
-        boolean wasStreamingOnError = editorBridgeService.isStreamingMode(conversationId);
-        boolean streamWroteOnError = editorBridgeService.hasStreamedContent(conversationId);
-        editorBridgeService.setStreamingMode(conversationId, false);
-        // 出错也要让 worker 收尾（否则 markdown 状态机残留半行/半张表），须在 close 之前发
-        if (wasStreamingOnError) {
-            sendRunEvent(guard, "doc_stream_end",
-                    java.util.Map.of("status", "error", "wrote", streamWroteOnError));
+        try {
+            sendRunEvent(guard, "error", ssePayload);
+            markRunState(guard, AgentRunStateService.RunStatus.ERROR);
+            boolean wasStreamingOnError = editorBridgeService.isStreamingMode(conversationId);
+            boolean streamWroteOnError = editorBridgeService.hasStreamedContent(conversationId);
+            editorBridgeService.setStreamingMode(conversationId, false);
+            // 出错也要让 worker 收尾（否则 markdown 状态机残留半行/半张表），须在 close 之前发
+            if (wasStreamingOnError) {
+                sendRunEvent(guard, "doc_stream_end",
+                        java.util.Map.of("status", "error", "wrote", streamWroteOnError));
+            }
+            // 保存已生成的部分内容，避免"当时看到了回复、历史里却没有"
+            String partialContent = guard.streamSnapshot();
+            String logText = executionLog != null ? executionLog.toString() : "";
+            if (!partialContent.isEmpty() || !logText.isEmpty()) {
+                saveAssistantMessageQuietly(guard, projectId, userId,
+                        logText + partialContent
+                                + LangText.of("\n\n[生成出错，已中断]", "\n\n[Generation error, interrupted]"));
+            }
+        } finally {
+            closeSse(guard);
+            endRun(guard);
+            editorBridgeService.clearCurrentConversationId();
         }
-        // 保存已生成的部分内容，避免"当时看到了回复、历史里却没有"
-        String partialContent = guard.streamSnapshot();
-        String logText = executionLog != null ? executionLog.toString() : "";
-        if (!partialContent.isEmpty() || !logText.isEmpty()) {
-            saveAssistantMessage(guard, projectId, userId,
-                    logText + partialContent
-                            + LangText.of("\n\n[生成出错，已中断]", "\n\n[Generation error, interrupted]"));
-        }
-        closeSse(guard);
-        endRun(guard);
-        editorBridgeService.clearCurrentConversationId();
     }
 
     /**
@@ -3472,7 +4352,10 @@ public class AgentOrchestrator {
      * 而这里的语义（后台没东西在跑、在等用户操作）与反问完全相同。
      */
     private void stopForComponent(RunGuard guard, String projectId, Long userId, String persistedPrefix) {
-        String notice = LangText.of(
+        boolean ocrChoice = editorBridgeService.consumeOcrRouteWait(guard.conversationId);
+        String notice = ocrChoice ? LangText.of(
+                "\n\n> 已显示扫描件识别方式，请选择云端识别或本地处理。确认后会继续原任务。",
+                "\n\n> Choose cloud OCR or local processing in the displayed options. The original task will continue after your choice.") : LangText.of(
                 "\n\n> 这一步需要先安装本机组件，已在界面上请你确认下载。装好后会自动继续这一步。",
                 "\n\n> This step needs a local component first; you have been asked to confirm the download. "
                         + "It will continue automatically once the component is installed.");
@@ -3658,30 +4541,86 @@ public class AgentOrchestrator {
     // =================================================================================
     // Helper to notify frontend of file changes (Added/Modified)
     // =================================================================================
-    private void notifyFileChange(String conversationId, String fileName, Long fileId, String changeType) {
-        try {
-            // Determine pure filename if path is given
-            String name = fileName;
-            if (name.contains("/") || name.contains("\\")) {
-                java.nio.file.Path p = java.nio.file.Paths.get(name);
-                name = p.getFileName().toString();
+    private void notifyVerifiedFile(String conversationId, Long fileId, String changeType, Long projectId, RunGuard guard) {
+        notifyVerifiedFile(conversationId, fileId, changeType, projectId, guard == null ? null : guard.fileChangeTurn);
+    }
+
+    private void notifyVerifiedFile(String conversationId, Long fileId, String changeType, Long projectId, FileChangeTurn turn) {
+        var file = projectFileService.findFile(fileId).orElse(null);
+        if (projectId == null || file == null || !projectId.equals(file.getProjectId())
+                || Boolean.TRUE.equals(file.getIsDeleted()) || Boolean.TRUE.equals(file.getIsFolder())) return;
+        notifyFileChange(conversationId, file.getName(), fileId, changeType, projectId, turn);
+        sseEmitterService.send(conversationId, "client_action", "{\"action\":\"refresh_files\"}");
+    }
+
+    private void notifyFileChange(String conversationId, String fileName, Long fileId, String changeType, Long projectId, RunGuard guard) {
+        FileChangeTurn turn = guard == null ? null : guard.fileChangeTurn;
+        if (turn != null) turn.clientRequestId = guard.clientRequestId;
+        notifyFileChange(conversationId, fileName, fileId, changeType, projectId, turn);
+    }
+
+    /** Caller holds the segment lock; failed writes remain available for the next save/duplicate receipt. */
+    private void persistFileChanges(String conversationId, FileChangeTurn turn) {
+        if (turn.assistantMessageId == null) return;
+        var pending = turn.pending.iterator();
+        while (pending.hasNext()) {
+            var change = pending.next();
+            try {
+                conversationFileChangeService.saveFileChange(conversationId, change.getFileName(), change.getChangeType(),
+                        change.getFileId(), change.getProjectId(), turn.assistantMessageId);
+                pending.remove();
+            } catch (Exception error) {
+                log.warn("File result history could not be saved for message {}", turn.assistantMessageId, error);
             }
-
-            // Send SSE event to frontend. fileId（dev-board#852）：知道是哪份文件时带上，
-            // 前端按 id 打开，不再靠文件名去猜；说不出来时为 null。只加字段，旧客户端不受影响。
-            // 用 Jackson 序列化（与 skill_update 共用那个无状态 mapper）：手拼 JSON 遇到文件名里的反斜杠会坏。
-            java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
-            payload.put("fileName", name);
-            payload.put("changeType", changeType);
-            payload.put("fileId", fileId);
-            sseEmitterService.send(conversationId, "file_change", SKILL_UPDATE_MAPPER.writeValueAsString(payload));
-
-            // Persist to database for history retrieval
-            conversationFileChangeService.saveFileChange(conversationId, name, changeType);
-        } catch (Exception e) {
-            log.warn("Failed to notify file change", e);
         }
     }
+
+    private void notifyFileChange(String conversationId, String fileName, Long fileId, String changeType, Long projectId, FileChangeTurn turn) {
+        synchronized (turn != null ? turn : this) {
+            if (turn != null && !turn.reported.add(changeType + ":" + (fileId == null ? fileName : fileId))) {
+                persistFileChanges(conversationId, turn);
+                return;
+            }
+            try {
+                // Determine pure filename if path is given
+                String name = fileName;
+                if (name.contains("/") || name.contains("\\")) {
+                    java.nio.file.Path p = java.nio.file.Paths.get(name);
+                    name = p.getFileName().toString();
+                }
+
+                // Persist to database for history retrieval
+                if (turn != null) {
+                    var change = new com.checkba.model.entity.ConversationFileChange(conversationId, name, changeType);
+                    change.setFileId(fileId);
+                    change.setProjectId(projectId);
+                    turn.pending.add(change);
+                    persistFileChanges(conversationId, turn);
+                } else {
+                    conversationFileChangeService.saveFileChange(conversationId, name, changeType,
+                            fileId, projectId, turn == null ? null : turn.assistantMessageId);
+                }
+
+                // Send SSE event to frontend. fileId（dev-board#852）：知道是哪份文件时带上，
+                // 前端按 id 打开，不再靠文件名去猜；说不出来时为 null。只加字段，旧客户端不受影响。
+                // 用 Jackson 序列化（与 skill_update 共用那个无状态 mapper）：手拼 JSON 遇到文件名里的反斜杠会坏。
+                java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+                payload.put("fileName", name);
+                payload.put("changeType", changeType);
+                payload.put("fileId", fileId);
+                payload.put("projectId", projectId);
+                payload.put("conversationId", conversationId);
+                payload.put("clientRequestId", turn == null ? null : turn.clientRequestId);
+                payload.put("assistantMessageId", turn == null ? null : turn.assistantMessageId);
+                sseEmitterService.send(conversationId, "file_change", SKILL_UPDATE_MAPPER.writeValueAsString(payload));
+
+
+            } catch (Exception e) {
+                log.warn("Failed to notify file change", e);
+            }
+        }
+    }
+
 
     // Simple naive JSON extractor for single String arg tools
     private String extractArg(String jsonArgs, String key) {

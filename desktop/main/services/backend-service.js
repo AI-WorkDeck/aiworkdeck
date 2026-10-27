@@ -4,6 +4,7 @@ const path = require('path')
 const fs = require('fs')
 const net = require('net')
 const http = require('http')
+const { randomBytes } = require('crypto')
 const { spawn, execFileSync } = require('child_process')
 const { isPortOpen } = require('./service-manager')
 
@@ -17,24 +18,69 @@ const DESKTOP_PORT_CHAIN = [5269, 5369, 5169]
 // 用于防止把陌生进程（恰好占了链上端口）误当后端复用。
 // 返回 { ours, build }：build 是后端启动时经 AWD_BACKEND_BUILD 注入的 jar 指纹
 // （旧后端/非桌面壳拉起的后端为空串）。
-function probeBackend(port, timeoutMs = 1500) {
+function requestBackendJson(port, route, timeoutMs, options = {}) {
   return new Promise((resolve) => {
-    const req = http.get(
-      { host: '127.0.0.1', port, path: '/api/admin/wizard', timeout: timeoutMs },
-      (res) => {
-        let body = ''
-        res.on('data', (c) => { if (body.length < 4096) body += c })
-        res.on('end', () => {
-          const ours = res.statusCode === 200 && body.includes('"initialized"')
-          let build = ''
-          try { build = String(JSON.parse(body).build || '') } catch (e) { /* 旧后端无此字段 */ }
-          resolve({ ours, build })
-        })
-      }
-    )
-    req.on('timeout', () => { req.destroy(); resolve({ ours: false, build: '' }) })
-    req.on('error', () => resolve({ ours: false, build: '' }))
+    let timer
+    let finished = false
+    const finish = (value) => {
+      if (finished) return
+      finished = true
+      clearTimeout(timer)
+      req.destroy()
+      resolve(value)
+    }
+    const req = http.request({ host: '127.0.0.1', port, path: route, method: 'GET', ...options }, (res) => {
+      let body = ''
+      res.on('data', (chunk) => {
+        body += chunk
+        if (body.length > 4096) finish(null)
+      })
+      res.on('error', () => finish(null))
+      res.on('end', () => {
+        let parsed = null
+        try { parsed = body ? JSON.parse(body) : null } catch (e) { /* 非 JSON 仍保留 HTTP 状态 */ }
+        finish({ status: res.statusCode, body: parsed })
+      })
+    })
+    req.on('error', () => finish(null))
+    // 总墙钟超时覆盖“连上后缓慢发数据”，不能只依赖 socket idle timeout。
+    timer = setTimeout(() => finish(null), timeoutMs)
+    req.end()
   })
+}
+
+async function probeBackend(port, timeoutMs = 1500) {
+  const response = await requestBackendJson(port, '/api/admin/wizard', timeoutMs)
+  return { ours: !!(response?.status === 200 && typeof response.body?.initialized === 'boolean'),
+    build: String(response?.body?.build || '') }
+}
+
+async function probeBackendHealth(port, timeoutMs = 5000, expectedBuild = '', legacyHealth) {
+  const response = await requestBackendJson(port, '/api/desktop/health', timeoutMs)
+  if (response?.status === 404 && legacyHealth) return legacyHealth()
+  return !!(response?.status === 200 && response.body?.status === 'UP' &&
+    (!expectedBuild || response.body.build === expectedBuild))
+}
+
+async function probeBackendStartupHealth(port, timeoutMs = 5000, expectedBuild = '', legacyHealth, onCoreReadPaths) {
+  const response = await requestBackendJson(port, '/api/desktop/startup-health', timeoutMs)
+  // Only an explicitly absent route identifies a legacy backend. DOWN/hangs never downgrade.
+  if (response?.status === 404) return legacyHealth ? legacyHealth() : probeBackendHealth(port, timeoutMs, expectedBuild)
+  const healthy = !!(response?.status === 200 && response.body?.status === 'UP' &&
+    ['core', 'full'].includes(response.body.phase) && (!expectedBuild || response.body.build === expectedBuild))
+  if (healthy && expectedBuild && response.body.phase === 'core' &&
+      require('./backend-request-gate').coreReadMatchers(response.body.coreReadPaths)) {
+    onCoreReadPaths?.([...response.body.coreReadPaths], response.body.coreContentProtocol === 1 ? 1 : 0)
+  }
+  return healthy
+}
+
+// 复用服务也检查真实健康；只有明确 404 才识别旧版，503/超时绝不降级。
+async function probeExternalBackendHealth(port) {
+  const response = await requestBackendJson(port, '/api/desktop/health', 5000)
+  if (response?.status === 200 && response.body?.status === 'UP') return { healthy: true, legacy: false }
+  if (response?.status === 404) return { healthy: false, legacy: (await probeBackend(port)).ours }
+  return { healthy: false, legacy: false }
 }
 
 /**
@@ -57,8 +103,8 @@ function backendBuildId(ctx) {
  * 复用裁决（纯函数，单测覆盖）：
  * - 陌生进程 → 'skip'（走下一个端口/重新分配）
  * - 自家后端且指纹一致 → 'reuse'（多开实例/上次残留的同版本后端，正常复用）
- * - 自家后端但指纹不一致（陈旧版本）→ 'replace'（礼貌终止后原地重启；
- *   终止失败时调用方退回 'reuse'——陈旧但能用，好过 H2 文件锁把新后端卡死）
+ * - 自家后端但指纹不一致（陈旧版本）→ 'replace'（版本差异信号；
+ *   分配器只能提示并复用，不能终止并非本壳创建的进程）
  * dev 态不做指纹校验：restart-backend.sh 等外部工作流拉起的后端没有注入指纹，
  * 版本闸只针对打包态「更新后复用残留旧后端」的形态。
  */
@@ -67,60 +113,6 @@ function decideReuse(probe, { packaged, expectedBuild }) {
   if (!packaged) return 'reuse'
   if (!expectedBuild || probe.build === expectedBuild) return 'reuse'
   return 'replace'
-}
-
-/** 找出监听该端口的 pid（仅回环）。失败返回 null。 */
-function pidListeningOn(port) {
-  try {
-    if (process.platform === 'win32') {
-      const out = execFileSync('netstat', ['-ano', '-p', 'tcp'], { encoding: 'utf8' })
-      for (const line of out.split(/\r?\n/)) {
-        const m = line.trim().match(/^TCP\s+\S+:(\d+)\s+\S+\s+LISTENING\s+(\d+)$/i)
-        if (m && Number(m[1]) === port) return Number(m[2])
-      }
-      return null
-    }
-    const out = execFileSync('lsof', ['-ti', `tcp:${port}`, '-sTCP:LISTEN'], { encoding: 'utf8' })
-    const pid = Number(out.split(/\s+/).filter(Boolean)[0])
-    return Number.isFinite(pid) ? pid : null
-  } catch (e) {
-    return null
-  }
-}
-
-/**
- * 终止端口上的陈旧后端并等它放开端口。只在 probeBackend 验明「确是我们的后端、
- * 但版本不是当前要启动的」之后调用——按端口找 pid 定点终止，绝不按进程名扫射
- * （多会话并行时按名杀会误伤别人的后端）。返回是否已释放端口。
- */
-async function terminateStaleBackend(port, waitMs = 8000) {
-  const pid = pidListeningOn(port)
-  if (!pid) return !(await isPortOpen(port))
-  try {
-    if (process.platform === 'win32') execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'])
-    else process.kill(pid, 'SIGTERM')
-  } catch (e) {
-    return false
-  }
-  const deadline = Date.now() + waitMs
-  while (Date.now() < deadline) {
-    // eslint-disable-next-line no-await-in-loop
-    if (!(await isPortOpen(port))) return true
-    // eslint-disable-next-line no-await-in-loop
-    await new Promise((r) => setTimeout(r, 250))
-  }
-  // SIGTERM 没生效：升级 SIGKILL 再等一小段（win32 上面已经是 /F 强杀）
-  if (process.platform !== 'win32') {
-    try { process.kill(pid, 'SIGKILL') } catch (e) { return false }
-    const hardDeadline = Date.now() + 3000
-    while (Date.now() < hardDeadline) {
-      // eslint-disable-next-line no-await-in-loop
-      if (!(await isPortOpen(port))) return true
-      // eslint-disable-next-line no-await-in-loop
-      await new Promise((r) => setTimeout(r, 250))
-    }
-  }
-  return false
 }
 
 // 能否真实绑定该端口（listen 后立刻释放；比 isPortOpen 的 connect 探测可靠——
@@ -133,27 +125,22 @@ function canBind(port) {
   })
 }
 
-async function allocateBackendPort(ctx) {
+async function allocateBackendPort(ctx, candidates = DESKTOP_PORT_CHAIN) {
   // 显式覆盖优先（e2e/脚本用）
   if (process.env.CHECKBA_BACKEND_PORT) return Number(process.env.CHECKBA_BACKEND_PORT)
   // dev 态维持 9696：复用 restart-backend.sh 起的后端，脚本/CI 不受影响
   if (!ctx.packaged) return 9696
   const expectedBuild = backendBuildId(ctx)
-  for (const cand of DESKTOP_PORT_CHAIN) {
+  for (const cand of candidates) {
     // eslint-disable-next-line no-await-in-loop
     if (await isPortOpen(cand)) {
-      // 有人在听：同版本自家后端复用，陌生进程跳过，陈旧自家后端定点终止后原地重启
+      // 有人在听：自家后端复用，陌生进程跳过；不接管外部进程
       // eslint-disable-next-line no-await-in-loop
       const verdict = decideReuse(await probeBackend(cand), { packaged: true, expectedBuild })
       if (verdict === 'reuse') return cand
       if (verdict === 'replace') {
-        // eslint-disable-next-line no-await-in-loop
-        const freed = await terminateStaleBackend(cand)
-        // eslint-disable-next-line no-await-in-loop
-        if (freed && await canBind(cand)) return cand
-        // 终止不了（权限/僵尸）：退而复用陈旧后端——它还握着 H2 文件锁，
-        // 硬起新后端只会双双卡死；陈旧但能用，好过打不开
-        console.warn(`[backend] 端口 ${cand} 上的陈旧后端无法终止，退而复用（功能可能落后于本体版本）`)
+        // 未由本壳启动的进程只能复用/提示，不能凭端口与指纹将它杀掉。
+        console.warn(`[backend] 端口 ${cand} 使用已有后端；版本不同，请关闭其所属应用后重开`)
         return cand
       }
       continue
@@ -239,6 +226,11 @@ function spawnEnv(ctx) {
   // CHECKBA_BACKEND_PORT 口子（会正确流入 ctx.ports.backend），不需要也不该再认
   // 环境里裸的 SERVER_PORT。
   env.SERVER_PORT = String(ctx.ports.backend)
+  if (!env.AI_PLUGINS_BUNDLED_DIR) env.AI_PLUGINS_BUNDLED_DIR = path.join(ctx.packaged ? ctx.resourcesPath : ctx.projectRoot, 'official-plugins')
+  if (!env.AI_PLUGINS_OAUTH_REDIRECT_URI) env.AI_PLUGINS_OAUTH_REDIRECT_URI = `http://localhost:${ctx.ports.backend}/api/plugins/oauth/callback`
+  // PDFBox 直接复用随包 LOWA 的可嵌入 TrueType 字体；用户显式配置优先。
+  const pdfFont = path.join(ctx.packaged ? ctx.resourcesPath : ctx.projectRoot, 'frontend', 'dist', 'zetaoffice', 'cjk-kai.ttf')
+  if (!env.EXTERNAL_PDF_EDIT_CJK_FONT_PATH && fs.existsSync(pdfFont)) env.EXTERNAL_PDF_EDIT_CJK_FONT_PATH = pdfFont
   // 其他本地服务的动态端口注入（Spring SystemEnvironmentPropertySource 将
   // external.pptx-service.base-url 解析为 EXTERNAL_PPTX_SERVICE_BASE_URL）
   if (ctx.ports['pptx-service']) {
@@ -285,6 +277,7 @@ function spawnEnv(ctx) {
   }
   // 后端 build 指纹：wizard 端点回显，复用前对比识破陈旧残留后端（见 backendBuildId）
   env.AWD_BACKEND_BUILD = backendBuildId(ctx)
+  env.AWD_BACKEND_CONTROL_TOKEN = randomBytes(32).toString('hex')
   return env
 }
 
@@ -292,7 +285,9 @@ function spec(ctx, javaCmd) {
   // 打包模式：工作目录必须可写（resources 目录只读）
   const cwd = ctx.packaged ? ctx.dataDir : path.join(ctx.projectRoot, 'backend')
   if (ctx.packaged) fs.mkdirSync(cwd, { recursive: true })
-  return { cmd: javaCmd, args: javaLaunchArgs(ctx), env: spawnEnv(ctx), cwd }
+  const bootOverlay = { context: { packaged: ctx.packaged, dataDir: ctx.dataDir, appVersion: ctx.appVersion },
+    current: require('./overlay').readCurrent(ctx) }
+  return { cmd: javaCmd, args: javaLaunchArgs(ctx), env: spawnEnv(ctx), cwd, bootOverlay }
 }
 
 // 系统 JDK 回退候选（仅打包态、仅当捆绑 JRE 启动失败时才会被用到）
@@ -324,23 +319,23 @@ function createBackendDescriptor() {
     eager: true,
     logName: 'backend',
     port: (ctx) => allocateBackendPort(ctx),
-    // 占用端口的监听者必须验明正身才可复用（防"粘"到陌生进程）。
-    // 打包态额外校验 build 指纹：陈旧残留后端先定点终止（成功则返回 false 让
-    // 管理器重走分配链原地重启；失败则退而复用，理由见 allocateBackendPort）。
-    verifyReuse: async (ctx, port) => {
-      const verdict = decideReuse(await probeBackend(port), {
-        packaged: ctx.packaged, expectedBuild: backendBuildId(ctx),
+    fixedPort: true, // 注入给渲染层后不得漂移
+    verifyReuse: async (_ctx, port) => (await probeBackend(port)).ours,
+    health: (ctx, port, build) => probeBackendHealth(port, 5000, build,
+      ctx.packaged ? undefined : () => probeBackend(port).then((result) => result.ours)),
+    startupHealth: (ctx, port, build, launch) => probeBackendStartupHealth(port, 5000, build,
+      () => probeBackendHealth(port, 5000, build,
+        ctx.packaged ? undefined : () => probeBackend(port).then((result) => result.ours)),
+      (paths, protocol) => { if (launch) { launch.coreReadPaths = paths; launch.coreContentProtocol = protocol } }),
+    requestStop: async (_ctx, port, token) => {
+      if (!token) return false
+      const response = await requestBackendJson(port, '/api/desktop/shutdown', 5000, {
+        method: 'POST', headers: { 'X-AWD-Backend-Control-Token': token }
       })
-      if (verdict === 'reuse') return true
-      if (verdict === 'skip') return false
-      const freed = await terminateStaleBackend(port)
-      if (freed) return false
-      console.warn(`[backend] 端口 ${port} 上的陈旧后端无法终止，退而复用（功能可能落后于本体版本）`)
-      return true
+      return response?.status === 202
     },
-    // 复用校验失败（分配后被抢）时重新走一遍分配链
-    reallocatePort: (ctx) => allocateBackendPort(ctx),
-    startTimeoutMs: (ctx) => (ctx.packaged ? 60000 : 15000),
+    stopTimeoutMs: 45000,
+    startTimeoutMs: (ctx) => (ctx.packaged ? 120000 : 60000),
     prepare: async (ctx) => {
       if (fs.existsSync(jarPath(ctx))) return
       if (ctx.packaged) throw new Error(`bundled backend jar missing: ${jarPath(ctx)}`)
@@ -354,7 +349,7 @@ function createBackendDescriptor() {
 module.exports = {
   createBackendDescriptor, backendLayout, javaLaunchArgs,
   // 复用版本闸的可测面（backend-reuse-gate.test.js）
-  decideReuse, probeBackend, backendBuildId,
+  decideReuse, probeBackend, probeBackendHealth, probeBackendStartupHealth, probeExternalBackendHealth, backendBuildId,
   // 端口链契约的可测面（port-chain-contract.test.js）
-  DESKTOP_PORT_CHAIN,
+  DESKTOP_PORT_CHAIN, allocateBackendPort,
 }

@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.PostConstruct;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -43,7 +42,7 @@ public class PluginService {
 
     /** manifest 已定义的权限值（v1 四项 + v2.7 的 ai），未知值仅告警不拒绝（向前兼容） */
     private static final Set<String> KNOWN_PERMISSIONS =
-            Set.of("file_read", "file_write", "network", "editor", "ai");
+            Set.of("file_read", "file_write", "network", "editor", "ai", "im", "lawfirm", "notifications");
 
     /** manifest.packs 里的 pack id 规则，与 NativePackService / PluginMarketService 同一套 */
     private static final java.util.regex.Pattern PACK_ID =
@@ -136,7 +135,7 @@ public class PluginService {
      * 既有测试则停留 null，rescan() 判空跳过。
      *
      * <p>为什么必须在这里连上：插件携带的 skill 目录是 loadPlugins() 扫出来的，
-     * SkillRegistry 只在自己 @PostConstruct 与 rescan() 时来拉一次。装完/启用完插件
+     * SkillRegistry 只在启动数据初始化阶段与 rescan() 时来拉一次。装完/启用完插件
      * 只重扫了插件侧，skill 侧不动——工具注册上了、skill 却要等下次重启才出现，
      * 用户看到的就是「广场装完、插件开了，但让它干活它不认」。
      */
@@ -240,6 +239,10 @@ public class PluginService {
 
     @lombok.Data
     public static class PluginMetadata {
+        /** Optional editor schema reference; metadata only, never fetched by the host. */
+        @com.fasterxml.jackson.annotation.JsonProperty("$schema")
+        @cn.hutool.core.annotation.Alias("$schema")
+        private String schema;
         private String id;
         private String name;
         private String version;
@@ -299,8 +302,31 @@ public class PluginService {
         private List<TemplateDecl> templates;
         /** 样式画像（规范 v2.9 P4）：styleProfile v1 JSON，可被选为全局默认画像 */
         private List<StyleProfileDecl> styleProfiles;
+        /** 外观皮肤主题（规范 v2.11）：双模式（light/dark）--awd-* 语义令牌与字体/动效预设 */
+        private List<ThemeDecl> themes;
         /** 能力实现（规范 v2.10 §15）：把插件目录里的一份实现挂进宿主的某个能力槽 */
         private List<CapabilityDecl> capabilities;
+        private List<McpServerDecl> mcpServers;
+        private List<PluginViewDecl> views;
+        private List<Map<String, Object>> connections;
+    }
+
+    @lombok.Data
+    public static class PluginViewDecl {
+        private String id, name, entry, placement, scope, defaultDock;
+        private List<String> allowedDocks;
+    }
+
+    @lombok.Data
+    public static class McpServerDecl {
+        private String id, transport, url, credentialKey, connectionId;
+        private List<McpToolDecl> tools;
+    }
+
+    @lombok.Data
+    public static class McpToolDecl {
+        private String name, description;
+        private Map<String, Object> inputSchema;
     }
 
     /**
@@ -347,6 +373,15 @@ public class PluginService {
         private String file;
     }
 
+    /** 一条外观皮肤主题声明（file 指向插件目录内的皮肤令牌 JSON） */
+    @lombok.Data
+    public static class ThemeDecl {
+        private String id;
+        private String name;
+        private String description;
+        private String file;
+    }
+
     /** 一条设置声明。type ∈ string/boolean/number/select；secret 的值只回显尾 4 位、不进插件桥 */
     @lombok.Data
     public static class PluginSettingDecl {
@@ -356,9 +391,11 @@ public class PluginService {
         private String description;
         /** JSON 字段名是 default（Java 关键字），经 Hutool @Alias 映射；统一按字符串存取 */
         @cn.hutool.core.annotation.Alias("default")
+        @com.fasterxml.jackson.annotation.JsonAlias("default")
         private Object defaultValue;
         private List<String> options;
         private Boolean secret;
+        private String scope = "installation";
     }
 
     /**
@@ -417,8 +454,11 @@ public class PluginService {
         private List<String> permissions;
     }
 
-    @PostConstruct
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private PluginBundledInstaller bundledInstaller;
+
     public void init() {
+        if (bundledInstaller != null) bundledInstaller.installDefaults();
         loadDisabledState();
         loadPlugins();
     }
@@ -540,7 +580,7 @@ public class PluginService {
     /** pluginId -> (lang -> (key -> 文案))；来自插件目录 l10n/<lang>.json，rescan 重建 */
     private final Map<String, Map<String, Map<String, String>>> pluginL10n = new ConcurrentHashMap<>();
 
-    private static final Set<String> L10N_LANGS = Set.of("zh-CN", "en-US");
+    private static final Set<String> L10N_LANGS = com.checkba.util.AppLocale.supportedCodes();
     private static final long L10N_MAX_BYTES = 256 * 1024;
 
     private void loadL10n(String pluginId, File pluginDir) {
@@ -574,26 +614,184 @@ public class PluginService {
         }
     }
 
-    /**
-     * 解析 manifest 字符串里的 {@code %key%} 引用（规范 v2.9 P4，VS Code package.nls 机制）：
-     * 整值形如 %key% 才解析；按当前应用语言查表，缺键回退 zh-CN 表，再缺回退原文
-     * （保留 %key% 字面量让作者看见漏了哪个键）。
-     */
+    private static final Map<String, Map<String, String>> BUILTIN_PLUGIN_EN = Map.ofEntries(
+            Map.entry("baoqingtian", Map.ofEntries(
+                    Map.entry("plugin.name", "Baoqingtian · Leads & Notes"),
+                    Map.entry("包晴天 · 案源与笔记", "Baoqingtian · Leads & Notes"),
+                    Map.entry("plugin.description", "Connect your Baoqingtian lawyer account to browse the case lead marketplace and manage platform notes and drafts in an independent workspace. Open a project first."),
+                    Map.entry("连接包晴天律师账号，在独立工作区浏览案源广场、管理平台图文笔记和草稿。先打开一个项目再使用。", "Connect your Baoqingtian lawyer account to browse the case lead marketplace and manage platform notes and drafts in an independent workspace. Open a project first."),
+                    Map.entry("tool.baoqingtian_action.description", "Baoqingtian case leads and platform notes workspace."),
+                    Map.entry("包晴天案源和平台笔记工作区。", "Baoqingtian case leads and platform notes workspace.")
+            )),
+            Map.entry("calendar", Map.ofEntries(
+                    Map.entry("plugin.name", "Calendar"),
+                    Map.entry("view.sidebar.name", "Calendar"),
+                    Map.entry("view.main.name", "Calendar"),
+                    Map.entry("日程", "Calendar"),
+                    Map.entry("plugin.description", "Cross-project calendar, tasks, reminders, and file links."),
+                    Map.entry("跨项目日历、任务、提醒和文件关联。", "Cross-project calendar, tasks, reminders, and file links.")
+            )),
+            Map.entry("clipboard", Map.ofEntries(
+                    Map.entry("plugin.name", "Clipboard"),
+                    Map.entry("view.main.name", "Clipboard"),
+                    Map.entry("剪贴板", "Clipboard"),
+                    Map.entry("plugin.description", "Search clipboard history, copy, and insert content."),
+                    Map.entry("查找剪贴记录、复制和插入内容。", "Search clipboard history, copy, and insert content.")
+            )),
+            Map.entry("desensitize", Map.ofEntries(
+                    Map.entry("plugin.name", "Desensitize"),
+                    Map.entry("view.main.name", "Desensitize"),
+                    Map.entry("脱敏", "Desensitize"),
+                    Map.entry("plugin.description", "Inspect sensitive information, generate desensitized copies, and restore with recovery packages."),
+                    Map.entry("核查敏感信息并生成脱敏副本，可用恢复包复敏。", "Inspect sensitive information, generate desensitized copies, and restore with recovery packages.")
+            )),
+            Map.entry("dpia-workbench", Map.ofEntries(
+                    Map.entry("plugin.name", "DPIA Workbench"),
+                    Map.entry("DPIA 工作台", "DPIA Workbench"),
+                    Map.entry("plugin.description", "Data Protection Impact Assessment: source tracing, fact confirmation, Q&A follow-up, risk & remediation, continuous re-assessment, and versioned reports. Adapted from Zhu Lingfeng's DSH DPIA Workbench; requires Node.js, Python, and LibreOffice."),
+                    Map.entry("数据保护影响评估：材料溯源、事实确认、问题补答、风险与整改、持续复评及分版本报告。基于朱玲凤的 DSH DPIA Workbench 适配；需 Node.js、Python 和 LibreOffice。", "Data Protection Impact Assessment: source tracing, fact confirmation, Q&A follow-up, risk & remediation, continuous re-assessment, and versioned reports. Adapted from Zhu Lingfeng's DSH DPIA Workbench; requires Node.js, Python, and LibreOffice."),
+                    Map.entry("plugin.author", "AI WorkDeck (Upstream: Zhu Lingfeng / The-Data-Galaxy)"),
+                    Map.entry("AI WorkDeck（上游：朱玲凤 / The-Data-Galaxy）", "AI WorkDeck (Upstream: Zhu Lingfeng / The-Data-Galaxy)"),
+                    Map.entry("setting.nodePath.label", "Node.js Executable"),
+                    Map.entry("Node.js 可执行文件", "Node.js Executable"),
+                    Map.entry("setting.nodePath.description", "Leave blank to use node from system PATH; requires Node.js 20 or newer."),
+                    Map.entry("留空使用系统 PATH 中的 node；需要 Node.js 20 或更新版本。", "Leave blank to use node from system PATH; requires Node.js 20 or newer."),
+                    Map.entry("setting.pythonPath.label", "Python Executable"),
+                    Map.entry("Python 可执行文件", "Python Executable"),
+                    Map.entry("setting.pythonPath.description", "Requires document dependencies from runtime/requirements.txt; can specify a Python path from a virtual environment."),
+                    Map.entry("需安装 runtime/requirements.txt 中的文档依赖；可填写独立虚拟环境中的 Python 路径。", "Requires document dependencies from runtime/requirements.txt; can specify a Python path from a virtual environment."),
+                    Map.entry("setting.pdfFontPath.label", "PDF CJK Font File"),
+                    Map.entry("PDF 中文字体文件", "PDF CJK Font File"),
+                    Map.entry("setting.pdfFontPath.description", "Filling CJK text in native PDF templates requires an embeddable TrueType font (TTF/TTC); leave blank to use system font lookup."),
+                    Map.entry("原生 PDF 模板填写中文需可嵌入的 TrueType 字体（TTF/TTC）；Linux 可安装文泉驿正黑。留空使用上游系统字体查找。", "Filling CJK text in native PDF templates requires an embeddable TrueType font (TTF/TTC); leave blank to use system font lookup."),
+                    Map.entry("setting.sofficePath.label", "LibreOffice Executable"),
+                    Map.entry("LibreOffice 可执行文件", "LibreOffice Executable"),
+                    Map.entry("setting.sofficePath.description", "Only needed for report PDF export and page preview; leave blank to try default system locations."),
+                    Map.entry("仅报告 PDF 与页面预览需要；留空尝试系统安装位置。", "Only needed for report PDF export and page preview; leave blank to try default system locations."),
+                    Map.entry("tool.dpia_workbench_action.description", "DPIA case, materials, fact confirmation, Q&A, run status, and report operations. For workbench UI only; AI must not invoke manual confirmation/approval entries."),
+                    Map.entry("DPIA 案件、材料、事实确认、补答、运行状态及报告操作。仅供工作台界面调用，AI 不可调用人工确认/审批入口。", "DPIA case, materials, fact confirmation, Q&A, run status, and report operations. For workbench UI only; AI must not invoke manual confirmation/approval entries."),
+                    Map.entry("tool.dpia_workbench_task.description", "Execute currently frozen DPIA tasks: context/read/write/script/commit/report; strictly scoped to the current user project and case output directory."),
+                    Map.entry("执行当前冻结的 DPIA 任务：context/read/write/script/commit/report；严格限定当前用户项目及案件输出目录，不执行任意代码。", "Execute currently frozen DPIA tasks: context/read/write/script/commit/report; strictly scoped to the current user project and case output directory.")
+            )),
+            Map.entry("favorites", Map.ofEntries(
+                    Map.entry("plugin.name", "Favorites"),
+                    Map.entry("view.main.name", "Favorites"),
+                    Map.entry("收藏夹", "Favorites"),
+                    Map.entry("plugin.description", "Search project favorites, copy, insert, or open sources."),
+                    Map.entry("查找项目收藏，复制、插入或打开来源。", "Search project favorites, copy, insert, or open sources.")
+            )),
+            Map.entry("insight", Map.ofEntries(
+                    Map.entry("plugin.name", "Evidence & Insight"),
+                    Map.entry("view.main.name", "Evidence & Insight"),
+                    Map.entry("依据", "Evidence & Insight"),
+                    Map.entry("plugin.description", "Document evidence retrieval, consistency verification, and contract review."),
+                    Map.entry("文档依据检索、一致性核验和合同审查。", "Document evidence retrieval, consistency verification, and contract review.")
+            )),
+            Map.entry("lawfirm-management", Map.ofEntries(
+                    Map.entry("plugin.name", "Law Firm Management"),
+                    Map.entry("律所管理", "Law Firm Management"),
+                    Map.entry("plugin.description", "Case intake & approval, regulatory-grade conflict-of-interest checks with collaborative clearance, billing & invoice ledger (manual reconciliation and Kingdee/Yonyou integration), and lawyer workload & executive dashboard."),
+                    Map.entry("律所收案立项、法规级利益冲突检索与站内信协同放行、发票与财务收费台账（支持手动核销与金蝶/用友对接）、律师工作负荷与管理决策看板。", "Case intake & approval, regulatory-grade conflict-of-interest checks with collaborative clearance, billing & invoice ledger (manual reconciliation and Kingdee/Yonyou integration), and lawyer workload & executive dashboard.")
+            )),
+            Map.entry("litigation-visual", Map.ofEntries(
+                    Map.entry("plugin.name", "Litigation Visualization"),
+                    Map.entry("view.main.name", "Litigation Visualization"),
+                    Map.entry("诉讼可视化", "Litigation Visualization"),
+                    Map.entry("plugin.description", "Select case materials to generate and manage editable litigation charts."),
+                    Map.entry("选择案卷材料，生成并管理可编辑的诉讼图表。", "Select case materials to generate and manage editable litigation charts.")
+            )),
+            Map.entry("project-im", Map.ofEntries(
+                    Map.entry("plugin.name", "Project Messaging"),
+                    Map.entry("项目沟通", "Project Messaging"),
+                    Map.entry("plugin.description", "Law firm, team, and project communication: shared assistant, direct messages, file archiving, and AI references. Currently available for Mainland China accounts only."),
+                    Map.entry("律所、团队与项目的沟通：共享助手、私聊、文件归档与 AI 引用。目前仅支持中国大陆站账号，国际站暂未开通。", "Law firm, team, and project communication: shared assistant, direct messages, file archiving, and AI references. Currently available for Mainland China accounts only.")
+            )),
+            Map.entry("search", Map.ofEntries(
+                    Map.entry("plugin.name", "Project Search"),
+                    Map.entry("view.main.name", "Project Search"),
+                    Map.entry("项目搜索", "Project Search"),
+                    Map.entry("plugin.description", "Search project files by full text or tags and jump directly to documents."),
+                    Map.entry("按正文、标签搜索项目文件，并定位到文档。", "Search project files by full text or tags and jump directly to documents.")
+            )),
+            Map.entry("tencent-meeting", Map.ofEntries(
+                    Map.entry("plugin.name", "Tencent Meeting"),
+                    Map.entry("腾讯会议", "Tencent Meeting"),
+                    Map.entry("plugin.description", "Connect Tencent Meeting to sync meetings and recordings on demand, view transcripts and smart minutes, archive to projects, and generate meeting minutes and action items. Requires the official tmeet CLI and account authorization."),
+                    Map.entry("连接腾讯会议，按需同步会议与录制、查看逐字稿和智能纪要，归档到项目并生成会议纪要及待办。需安装腾讯会议官方 tmeet CLI 并完成账号授权。", "Connect Tencent Meeting to sync meetings and recordings on demand, view transcripts and smart minutes, archive to projects, and generate meeting minutes and action items. Requires the official tmeet CLI and account authorization."),
+                    Map.entry("tool.tencent_meeting_action.description", "Tencent Meeting plugin: check connection, authorize login, sync on demand, view meetings and transcripts, and archive project files."),
+                    Map.entry("腾讯会议插件：检查连接、用户授权登录、按需同步、查看会议及逐字稿、归档项目文件。", "Tencent Meeting plugin: check connection, authorize login, sync on demand, view meetings and transcripts, and archive project files.")
+            )),
+            Map.entry("voice", Map.ofEntries(
+                    Map.entry("plugin.name", "Voice & Speech"),
+                    Map.entry("view.main.name", "Voice & Speech"),
+                    Map.entry("语音", "Voice & Speech"),
+                    Map.entry("plugin.description", "Instant read-aloud, real-time speed control, subtitle highlighting, and meeting recording."),
+                    Map.entry("即时朗读、实时调速、字幕高亮与会议录音。", "Instant read-aloud, real-time speed control, subtitle highlighting, and meeting recording.")
+            ))
+    );
+
+    /** 按当前语种及其回退链解析 manifest 文案；繁体中文可复用简体中文表。 */
     public String localize(String pluginId, String raw) {
-        if (raw == null || raw.length() < 3 || raw.charAt(0) != '%' || raw.charAt(raw.length() - 1) != '%') {
+        if (raw == null || raw.isBlank()) {
             return raw;
         }
-        Map<String, Map<String, String>> tables = pluginL10n.get(pluginId);
+        boolean isToken = raw.length() >= 3 && raw.charAt(0) == '%' && raw.charAt(raw.length() - 1) == '%';
+        Map<String, Map<String, String>> tables = pluginId != null ? pluginL10n.get(pluginId) : null;
+        com.checkba.util.AppLocale current = com.checkba.util.AppLocale.fromCode(
+                com.checkba.service.LangText.localeCode());
+        if (isToken) {
+            String key = raw.substring(1, raw.length() - 1);
+            String localized = localizeToken(tables, current, key);
+            if (localized != null) {
+                return localized;
+            }
+            if (!current.isChinese() && pluginId != null) {
+                String builtinEn = BUILTIN_PLUGIN_EN.getOrDefault(pluginId, Map.of()).get(key);
+                if (builtinEn != null) {
+                    return builtinEn;
+                }
+            }
+            return raw;
+        }
+        if (pluginId == null) {
+            return raw;
+        }
+        if (tables != null) {
+            Map<String, String> zhTable = tables.getOrDefault("zh-CN", Map.of());
+            for (Map.Entry<String, String> entry : zhTable.entrySet()) {
+                if (raw.equals(entry.getValue())) {
+                    String localized = localizeToken(tables, current, entry.getKey());
+                    if (localized != null && !localized.isBlank()) {
+                        return localized;
+                    }
+                }
+            }
+        }
+        if (!current.isChinese()) {
+            String builtinEn = BUILTIN_PLUGIN_EN.getOrDefault(pluginId, Map.of()).get(raw);
+            return builtinEn != null ? builtinEn : raw;
+        }
+        return raw;
+    }
+
+    private static String localizeToken(Map<String, Map<String, String>> tables,
+                                        com.checkba.util.AppLocale current,
+                                        String key) {
         if (tables == null) {
-            return raw;
+            return null;
         }
-        String key = raw.substring(1, raw.length() - 1);
-        String lang = com.checkba.service.LangText.isEnglish() ? "en-US" : "zh-CN";
-        String v = tables.getOrDefault(lang, Map.of()).get(key);
-        if (v == null) {
-            v = tables.getOrDefault("zh-CN", Map.of()).get(key);
+        for (com.checkba.util.AppLocale candidate : current.fallbackChain()) {
+            String value = tables.getOrDefault(candidate.code(), Map.of()).get(key);
+            if (value == null) {
+                continue;
+            }
+            if (current == com.checkba.util.AppLocale.ZH_TW
+                    && candidate == com.checkba.util.AppLocale.ZH_CN) {
+                return com.checkba.util.ZhHantConverter.toTraditional(value);
+            }
+            return value;
         }
-        return v != null ? v : raw;
+        return null;
     }
 
     /** minHostVersion 与宿主版本比对；不达标返回原因文案，达标/无声明/dev 态宿主返回 null */
@@ -609,7 +807,9 @@ public class PluginService {
             return null;
         }
         if (com.checkba.util.Semver.compare(appVersion, min) < 0) {
-            return "需要宿主版本 ≥ " + min + "（当前 " + appVersion + "），请升级客户端";
+            return com.checkba.service.LangText.of(
+                    "需要宿主版本 ≥ " + min + "（当前 " + appVersion + "），请升级客户端",
+                    "Requires host version >= " + min + " (current " + appVersion + "); please upgrade the client");
         }
         return null;
     }
@@ -671,8 +871,9 @@ public class PluginService {
         }
         // 平台封禁是强制的：用户可以卸载，但不能把被封禁的插件重新启用
         if (enabled && revokedPluginIds.containsKey(pluginId)) {
-            throw new IllegalStateException(
-                    "该插件已被平台下架：" + revokedPluginIds.get(pluginId) + "，无法启用，建议卸载");
+            throw new IllegalStateException(com.checkba.service.LangText.of(
+                    "该插件已被平台下架：" + revokedPluginIds.get(pluginId) + "，无法启用，建议卸载",
+                    "This plugin has been revoked by the platform: " + revokedPluginIds.get(pluginId) + "; cannot enable, please uninstall"));
         }
         // 版本不兼容时拒绝启用：不能静默翻一个不生效的位（规范 v2.7 P0）
         if (enabled && incompatiblePluginIds.containsKey(pluginId)) {
@@ -894,7 +1095,7 @@ public class PluginService {
             return;
         }
 
-        File[] pluginDirs = dir.listFiles(File::isDirectory);
+        File[] pluginDirs = dir.listFiles(file -> file.isDirectory() && !file.getName().startsWith("."));
         if (pluginDirs == null || pluginDirs.length == 0) {
             log.info("No plugin directories found in {}", pluginsDir);
             return;
@@ -922,6 +1123,7 @@ public class PluginService {
                     continue;
                 }
                 validateFrontendEntry(pluginDir, meta);
+                PluginManifestContractValidator.validateViews(meta, pluginDir);
                 plugins.add(meta);
                 pluginDirById.put(meta.getId(), pluginDir);
 
@@ -1028,7 +1230,16 @@ public class PluginService {
      * @return 解析后的元数据；id 缺失时返回 null（插件必须有稳定 id 才能启停）
      */
     PluginMetadata parseManifest(String json) {
-        PluginMetadata meta = cn.hutool.json.JSONUtil.toBean(json, PluginMetadata.class);
+        var manifest = cn.hutool.json.JSONUtil.parseObj(json);
+        // Hutool's field alias accepts the public spelling only; retain historical manifests too.
+        var settings = manifest.getJSONArray("settings");
+        if (settings != null) for (int i = 0; i < settings.size(); i++) {
+            var setting = settings.getJSONObject(i);
+            if (setting != null && !setting.containsKey("default") && setting.containsKey("defaultValue")) {
+                setting.set("default", setting.get("defaultValue"));
+            }
+        }
+        PluginMetadata meta = cn.hutool.json.JSONUtil.toBean(manifest, PluginMetadata.class);
         if (meta.getId() == null || meta.getId().isBlank()) {
             return null;
         }
@@ -1119,6 +1330,19 @@ public class PluginService {
                     valid.add(sp);
                 }
                 meta.getContributes().setStyleProfiles(valid);
+            }
+            if (meta.getContributes().getThemes() != null) {
+                List<ThemeDecl> valid = new ArrayList<>();
+                for (ThemeDecl th : meta.getContributes().getThemes()) {
+                    if (th == null || th.getId() == null || !PACK_ID.matcher(th.getId()).matches()
+                            || !isSafeRelFile(th.getFile())) {
+                        log.warn("Plugin {} theme with invalid id/file ({}), dropped",
+                                meta.getId(), th == null ? null : th.getId());
+                        continue;
+                    }
+                    valid.add(th);
+                }
+                meta.getContributes().setThemes(valid);
             }
             // contributes.capabilities（规范 v2.10 §15）：capability 槽 id 点分、id 过 kebab、
             // kind 三选一、entry 是不逃逸的相对路径、protocol 必填。非法条目丢弃并告警——
@@ -1265,6 +1489,16 @@ public class PluginService {
                 sourceId, provider, () -> isEnabled(pluginId)));
     }
 
+    private boolean safeEvidenceCredential(PluginMetadata meta, McpServerRef ref) {
+        if (ref == null || (ref.getToken() != null && !ref.getToken().isBlank())) return false;
+        String key = ref.getTokenSettingKey();
+        if (key == null || key.isBlank()) return true;
+        String prefix = "plugin." + meta.getId() + ".";
+        return key.startsWith(prefix) && meta.getSettings() != null && meta.getSettings().stream()
+                .anyMatch(setting -> setting != null && (prefix + setting.getKey()).equals(key) && Boolean.TRUE.equals(setting.getSecret())
+                        && (setting.getScope() == null || "installation".equals(setting.getScope())));
+    }
+
     /** manifest 声明的远程 MCP 证据来源 → 证据注册表（规范 v2.8 P3）；transport=spi 的走 JAR 加载路径 */
     void registerDeclaredMcpEvidenceSources(PluginMetadata meta) {
         if (evidenceRetrieverRegistry == null || mcpClientService == null
@@ -1274,6 +1508,11 @@ public class PluginService {
         String pluginId = meta.getId();
         for (EvidenceSourceDecl d : meta.getContributes().getEvidenceSources()) {
             if (!"mcp".equals(d.getTransport())) {
+                continue;
+            }
+            if (isDevInstalled(pluginId) || meta.getPermissions() == null || !meta.getPermissions().contains("network")
+                    || !safeEvidenceCredential(meta, d.getServer())) {
+                log.warn("Plugin {} MCP evidence source rejected by credential/network policy", pluginId);
                 continue;
             }
             com.checkba.service.ai.mcp.McpProperties.ServerConfig cfg =

@@ -1,0 +1,454 @@
+Writer: read Word EQ field commands as StarMath
+
+A parser for Word EQ field commands: \f fraction, \r radical,
+\s super- and subscript, \b brackets, \l list, \a array,
+\i integral, sum and product; \x and \o keep their content
+without the box or overlay, \d moves forward only; \ai and
+\di only space lines. Switches ignore case, as Word reads them.
+Each command character keeps its vertAlign; one script stays one
+script across style changes. Italic letters become identifiers,
+which StarMath and OMML both draw italic. The next patch uses it.
+
+--- a/sw/Library_sw_writerfilter.mk
++++ b/sw/Library_sw_writerfilter.mk
+@@ -89,6 +89,7 @@ $(eval $(call gb_Library_add_exception_objects,sw_writerfilter,\
+     sw/source/writerfilter/dmapper/DomainMapperTableHandler \
+     sw/source/writerfilter/dmapper/DomainMapperTableManager \
+     sw/source/writerfilter/dmapper/DomainMapper_Impl \
++    sw/source/writerfilter/dmapper/EqField \
+ 	sw/source/writerfilter/dmapper/domainmapperfactory \
+     sw/source/writerfilter/dmapper/FFDataHandler \
+     sw/source/writerfilter/dmapper/FontTable \
+--- /dev/null
++++ b/sw/source/writerfilter/dmapper/EqField.hxx
+@@ -0,0 +1,30 @@
++/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
++/*
++ * This file is part of the LibreOffice project.
++ *
++ * This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
++ */
++
++#pragma once
++
++#include <rtl/ustring.hxx>
++
++#include <vector>
++
++namespace writerfilter::dmapper
++{
++/// How one character of a field command looks.
++struct EqLook
++{
++    bool bItalic = false;
++    /// -1 subscript, 0 baseline, 1 superscript.
++    sal_Int8 nScript = 0;
++};
++
++/// A Word EQ field as StarMath; empty if unreadable.
++OUString EqToStarMath(std::u16string_view rCommand, const std::vector<EqLook>& rLooks);
++}
++
++/* vim:set shiftwidth=4 softtabstop=4 expandtab: */
+--- /dev/null
++++ b/sw/source/writerfilter/dmapper/EqField.cxx
+@@ -0,0 +1,397 @@
++/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
++/*
++ * This file is part of the LibreOffice project.
++ *
++ * This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
++ */
++
++#include "EqField.hxx"
++
++#include <rtl/character.hxx>
++#include <rtl/ustrbuf.hxx>
++#include <sal/log.hxx>
++#include <unicode/uchar.h>
++
++#include <map>
++
++namespace writerfilter::dmapper
++{
++namespace
++{
++/// Word's EQ switches as StarMath.
++class EqParser
++{
++    std::u16string_view m_aCommand;
++    const std::vector<EqLook>& m_rLooks;
++    size_t m_nPos = 0;
++    bool m_bFailed = false;
++
++public:
++    EqParser(std::u16string_view aCommand, const std::vector<EqLook>& rLooks)
++        : m_aCommand(aCommand)
++        , m_rLooks(rLooks)
++    {
++    }
++
++    OUString parse()
++    {
++        skipSpaces();
++        if (rtl::toAsciiLowerCase(at(m_nPos)) != 'e' || rtl::toAsciiLowerCase(at(m_nPos + 1)) != 'q')
++            return OUString();
++        m_nPos += 2;
++        skipSpaces();
++        OUString aMath = element(false);
++        return m_bFailed ? OUString() : aMath;
++    }
++
++private:
++    sal_Unicode at(size_t nPos) const { return nPos < m_aCommand.size() ? m_aCommand[nPos] : 0; }
++
++    EqLook look(size_t nPos) const { return nPos < m_rLooks.size() ? m_rLooks[nPos] : EqLook(); }
++
++    void skipSpaces()
++    {
++        while (at(m_nPos) == ' ')
++            ++m_nPos;
++    }
++
++    void fail(const char* pWhy)
++    {
++        SAL_WARN("writerfilter.dmapper", "EQ field: " << pWhy << " at " << m_nPos);
++        m_bFailed = true;
++    }
++
++    static OUString quoted(std::u16string_view aText)
++    {
++        OUStringBuffer aBuf("\"");
++        for (sal_Unicode c : aText)
++        {
++            if (c == '"')
++                aBuf.append('\\');
++            aBuf.append(c);
++        }
++        return aBuf.append('"').makeStringAndClear();
++    }
++
++    /// Italic letters as identifiers, which OMML keeps italic.
++    static void italic(std::vector<OUString>& rRuns, std::u16string_view aText)
++    {
++        OUStringBuffer aOther;
++        auto other = [&]() {
++            if (!aOther.isEmpty())
++                rRuns.push_back("ital " + quoted(aOther.makeStringAndClear()));
++        };
++        for (sal_Unicode c : aText)
++        {
++            if (!u_isalpha(c))
++            {
++                aOther.append(c);
++                continue;
++            }
++            other();
++            rRuns.push_back(OUString(c));
++        }
++        other();
++    }
++
++    /// A bracket character's StarMath name; empty if unknown.
++    static OUString brace(sal_Unicode c, bool bLeft)
++    {
++        static const std::map<sal_Unicode, OUString> aNames{
++            { '(', u"("_ustr },          { ')', u")"_ustr },          { '[', u"["_ustr },
++            { ']', u"]"_ustr },          { '{', u"lbrace"_ustr },     { '}', u"rbrace"_ustr },
++            { '<', u"langle"_ustr },     { '>', u"rangle"_ustr },     { 0x27E8, u"langle"_ustr },
++            { 0x27E9, u"rangle"_ustr },  { 0x230A, u"lfloor"_ustr },  { 0x230B, u"rfloor"_ustr },
++            { 0x2308, u"lceil"_ustr },   { 0x2309, u"rceil"_ustr }
++        };
++        if (c == '|')
++            return bLeft ? u"lline"_ustr : u"rline"_ustr;
++        if (c == 0x2016)
++            return bLeft ? u"ldline"_ustr : u"rdline"_ustr;
++        auto it = aNames.find(c);
++        return it == aNames.end() ? OUString() : it->second;
++    }
++
++    /// A big operator character's StarMath name; empty if unknown.
++    static OUString bigOperator(sal_Unicode c)
++    {
++        static const std::map<sal_Unicode, OUString> aNames{
++            { 0x2211, u"sum"_ustr },  { 0x220F, u"prod"_ustr },  { 0x2210, u"coprod"_ustr },
++            { 0x222B, u"int"_ustr },  { 0x222C, u"iint"_ustr },  { 0x222D, u"iiint"_ustr },
++            { 0x222E, u"lint"_ustr }, { 0x222F, u"llint"_ustr }, { 0x2230, u"lllint"_ustr }
++        };
++        auto it = aNames.find(c);
++        return it == aNames.end() ? OUString() : it->second;
++    }
++
++    /// Puts `aScript` above or below the last atom.
++    static void attach(std::vector<OUString>& rAtoms, sal_Int8 nScript, const OUString& aScript)
++    {
++        // empty text, not a placeholder
++        OUString aBase = u"\"\""_ustr;
++        if (!rAtoms.empty())
++        {
++            aBase = "{" + rAtoms.back() + "}";
++            rAtoms.pop_back();
++        }
++        rAtoms.push_back(aBase + (nScript > 0 ? u"^{" : u"_{") + aScript + "}");
++    }
++
++    /// Text up to an argument's end, or all.
++    OUString element(bool bArgument)
++    {
++        std::vector<OUString> aAtoms;
++        // runs that share one script position
++        std::vector<OUString> aGroup;
++        OUStringBuffer aText;
++        EqLook aLook;
++        auto piece = [&]() {
++            if (aText.isEmpty())
++                return;
++            OUString aRun = aText.makeStringAndClear();
++            if (aLook.bItalic)
++                italic(aGroup, aRun);
++            else
++                aGroup.push_back(quoted(aRun));
++        };
++        auto flush = [&]() {
++            piece();
++            if (aGroup.empty())
++                return;
++            if (aLook.nScript == 0)
++                aAtoms.insert(aAtoms.end(), aGroup.begin(), aGroup.end());
++            else
++            {
++                OUStringBuffer aScript;
++                for (const OUString& rRun : aGroup)
++                    aScript.append((aScript.isEmpty() ? u"" : u" ") + rRun);
++                attach(aAtoms, aLook.nScript, aScript.makeStringAndClear());
++            }
++            aGroup.clear();
++        };
++        auto add = [&](sal_Unicode c, EqLook aNew) {
++            if (aNew.nScript != aLook.nScript)
++                flush();
++            else if (aNew.bItalic != aLook.bItalic)
++                piece();
++            aLook = aNew;
++            aText.append(c);
++        };
++        int nDepth = 0;
++        while (m_nPos < m_aCommand.size() && !m_bFailed)
++        {
++            sal_Unicode c = m_aCommand[m_nPos];
++            if (bArgument && nDepth == 0 && (c == ',' || c == ')'))
++                break;
++            if (c == '\\')
++            {
++                sal_Unicode cNext = at(m_nPos + 1);
++                // general switches such as \* MERGEFORMAT follow the equation
++                if (!bArgument && nDepth == 0
++                    && (cNext == '*' || cNext == '#' || cNext == '@' || cNext == '!'))
++                {
++                    while (!aText.isEmpty() && aText[aText.getLength() - 1] == ' ')
++                        aText.setLength(aText.getLength() - 1);
++                    break;
++                }
++                if (rtl::isAsciiAlpha(cNext))
++                {
++                    flush();
++                    ++m_nPos;
++                    command(aAtoms);
++                    continue;
++                }
++                if (cNext != 0)
++                {
++                    add(cNext, look(m_nPos + 1));
++                    m_nPos += 2;
++                    continue;
++                }
++            }
++            if (c == '(')
++                ++nDepth;
++            else if (c == ')')
++                --nDepth;
++            add(c, look(m_nPos));
++            ++m_nPos;
++        }
++        flush();
++        OUStringBuffer aMath;
++        for (const OUString& rAtom : aAtoms)
++            aMath.append((aMath.isEmpty() ? u"" : u" ") + rAtom);
++        return aMath.makeStringAndClear();
++    }
++
++    /// `(e, e, ...)`.
++    std::vector<OUString> arguments()
++    {
++        std::vector<OUString> aArgs;
++        skipSpaces();
++        if (at(m_nPos) != '(')
++        {
++            fail("no arguments");
++            return aArgs;
++        }
++        ++m_nPos;
++        while (!m_bFailed)
++        {
++            aArgs.push_back(element(true));
++            sal_Unicode c = at(m_nPos++);
++            if (c == ')')
++                break;
++            if (c != ',')
++                fail("unclosed arguments");
++        }
++        return aArgs;
++    }
++
++    /// The switch after `\`, its options and arguments.
++    void command(std::vector<OUString>& rAtoms)
++    {
++        const sal_Unicode cCommand = rtl::toAsciiLowerCase(m_aCommand[m_nPos++]);
++        std::map<OUString, OUString> aOptions;
++        for (skipSpaces(); at(m_nPos) == '\\' && rtl::isAsciiAlpha(at(m_nPos + 1)); skipSpaces())
++        {
++            // switches ignore case, as Word reads them
++            OUString aName = OUString(m_aCommand.substr(m_nPos + 1, 2)).toAsciiLowerCase();
++            m_nPos += 3;
++            if (aName == "lc" || aName == "rc" || aName == "bc" || aName == "fc" || aName == "vc")
++            {
++                if (at(m_nPos) == '\\')
++                    ++m_nPos;
++                aOptions[aName] = OUString(at(m_nPos++));
++                continue;
++            }
++            skipSpaces();
++            size_t nStart = m_nPos;
++            while (rtl::isAsciiDigit(at(m_nPos)))
++                ++m_nPos;
++            aOptions[aName] = OUString(m_aCommand.substr(nStart, m_nPos - nStart));
++        }
++        std::vector<OUString> aArgs = arguments();
++        if (m_bFailed)
++            return;
++        auto join = [&](std::u16string_view aBetween) {
++            OUStringBuffer aBuf;
++            for (size_t i = 0; i < aArgs.size(); ++i)
++                aBuf.append((i ? aBetween : u"") + OUString("{" + aArgs[i] + "}"));
++            return aBuf.makeStringAndClear();
++        };
++        switch (cCommand)
++        {
++            case 'f':
++                if (aArgs.size() != 2)
++                    return fail("a fraction needs two parts");
++                rAtoms.push_back("{" + aArgs[0] + "} over {" + aArgs[1] + "}");
++                break;
++            case 'r':
++                if (aArgs.size() == 1)
++                    rAtoms.push_back("sqrt{" + aArgs[0] + "}");
++                else if (aArgs.size() == 2)
++                    rAtoms.push_back("nroot{" + aArgs[0] + "}{" + aArgs[1] + "}");
++                else
++                    return fail("a radical needs one or two parts");
++                break;
++            case 's':
++                // \ai and \di only add line spacing
++                if (aOptions.contains(u"up"_ustr))
++                    attach(rAtoms, 1, join(u" "));
++                else if (aOptions.contains(u"do"_ustr))
++                    attach(rAtoms, -1, join(u" "));
++                else
++                    rAtoms.push_back("stack{" + join(u" # ") + "}");
++                break;
++            case 'b':
++            {
++                static const std::map<sal_Unicode, sal_Unicode> aClosing{
++                    { '(', ')' }, { '[', ']' }, { '{', '}' }, { '<', '>' }
++                };
++                auto option = [&](const OUString& rKey) {
++                    auto it = aOptions.find(rKey);
++                    return it == aOptions.end() || it->second.isEmpty() ? sal_Unicode(0)
++                                                                        : it->second[0];
++                };
++                const sal_Unicode cBoth = option(u"bc"_ustr);
++                sal_Unicode cLeft = option(u"lc"_ustr);
++                sal_Unicode cRight = option(u"rc"_ustr);
++                if (!cLeft)
++                    cLeft = cBoth ? cBoth : '(';
++                if (!cRight)
++                {
++                    auto it = aClosing.find(cBoth);
++                    cRight = !cBoth ? ')' : it != aClosing.end() ? it->second : cBoth;
++                }
++                const OUString aLeft = brace(cLeft, true);
++                const OUString aRight = brace(cRight, false);
++                if (aLeft.isEmpty() || aRight.isEmpty())
++                    return fail("an unknown bracket");
++                rAtoms.push_back("left " + aLeft + " " + join(u" \",\" ") + " right " + aRight);
++                break;
++            }
++            case 'l':
++                rAtoms.push_back(join(u" \",\" "));
++                break;
++            case 'a':
++            {
++                sal_Int32 nColumns = std::max<sal_Int32>(1, aOptions[u"co"_ustr].toInt32());
++                OUString aAlign = aOptions.contains(u"al"_ustr)   ? u"alignl "_ustr
++                                  : aOptions.contains(u"ar"_ustr) ? u"alignr "_ustr
++                                                                  : OUString();
++                // a short last row is padded, never dropped
++                while (aArgs.size() % nColumns)
++                    aArgs.emplace_back();
++                OUStringBuffer aBuf("matrix{");
++                for (size_t i = 0; i < aArgs.size(); ++i)
++                {
++                    if (i)
++                        aBuf.append(i % nColumns ? u" # " : u" ## ");
++                    aBuf.append(aAlign + "{" + aArgs[i] + "}");
++                }
++                rAtoms.push_back(aBuf.append("}").makeStringAndClear());
++                break;
++            }
++            case 'i':
++            {
++                if (aArgs.size() != 3)
++                    return fail("an integral needs three parts");
++                OUString aOperator = aOptions.contains(u"su"_ustr)   ? u"sum"_ustr
++                                     : aOptions.contains(u"pr"_ustr) ? u"prod"_ustr
++                                                                     : u"int"_ustr;
++                // a given operator character wins
++                for (const OUString& rKey : { u"fc"_ustr, u"vc"_ustr })
++                {
++                    auto it = aOptions.find(rKey);
++                    if (it == aOptions.end())
++                        continue;
++                    aOperator = it->second.isEmpty() ? OUString() : bigOperator(it->second[0]);
++                    if (aOperator.isEmpty())
++                        return fail("an unknown operator");
++                }
++                rAtoms.push_back(aOperator + " from{" + aArgs[0] + "} to{" + aArgs[1] + "} {"
++                                 + aArgs[2] + "}");
++                break;
++            }
++            case 'x':
++            case 'o':
++                rAtoms.push_back(join(u" "));
++                break;
++            case 'd':
++                if (aOptions.contains(u"fo"_ustr))
++                    rAtoms.push_back(u"~"_ustr);
++                break;
++            default:
++                fail("an unknown switch");
++        }
++    }
++};
++}
++
++OUString EqToStarMath(std::u16string_view rCommand, const std::vector<EqLook>& rLooks)
++{
++    return EqParser(rCommand, rLooks).parse();
++}
++}
++
++/* vim:set shiftwidth=4 softtabstop=4 expandtab: */

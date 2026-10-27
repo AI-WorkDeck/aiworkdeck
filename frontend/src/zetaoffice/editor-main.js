@@ -23,6 +23,7 @@ let reviewHover = null
 
 import { startEditorEndpoint } from '../composables/zetaOfficeEditorEndpoint.js'
 import { attachDocumentLinkClicks } from '../composables/zetaOfficeLinkClick.js'
+import { attachSelectionDrag } from '../composables/zetaOfficeSelectionDrag.js'
 import { attachImeOverlay } from '../composables/zetaOfficeImeOverlay.js'
 import { attachWritingAssistance } from '../composables/zetaOfficeCompletion.js'
 import { attachSemanticWritingPanel } from '../composables/semanticWritingPanel.js'
@@ -205,7 +206,11 @@ try {
 try {
   document.addEventListener('dragover', (e) => {
     e.preventDefault()
-    try { if (e.dataTransfer) e.dataTransfer.dropEffect = 'link' } catch (err) { /* ignore */ }
+    try {
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = e.dataTransfer.effectAllowed === 'copy' ? 'copy' : 'link'
+      }
+    } catch (err) { /* ignore */ }
   }, true)
   document.addEventListener('drop', (e) => {
     e.preventDefault()
@@ -223,6 +228,7 @@ try {
 // AI command — see installModifyListener in office_thread.js). The host only
 // needs an edge to debounce-save on, so throttle the relay to 1/500ms.
 let inlineReview = null
+let selectionDrag = null
 let lastModifiedRelay = 0
 function relayCommentRequest(documentSeq) {
   try {
@@ -232,13 +238,20 @@ function relayCommentRequest(documentSeq) {
 }
 function relayModified(d) {
   if (!d || !d.cmd) return
+  if (d.cmd === 'save-snapshot') {
+    // The first edit after this export must reach the host even if the previous
+    // edit was within the ordinary 500 ms throttle window.
+    lastModifiedRelay = 0
+    try { hostTransport.send({ __lo: 'lo-relay', type: 'save-snapshot', saveSnapshotId: d.saveSnapshotId }) } catch (e) { /* ignore */ }
+    return
+  }
   if (d.cmd === 'comment-request') { relayCommentRequest(d.documentSeq); return }
   // 原生「导出为 PDF」入口被 worker 拦下（dev-board#886）：宿主取字节并下载
   if (d.cmd === 'export-pdf-request') {
     try { hostTransport.send({ __lo: 'lo-relay', type: 'export-pdf-request', source: d.source || '' }) } catch (e) { /* ignore */ }
     return
   }
-  if (d.cmd === 'sel_changed') { relaySelection(); return }
+  if (d.cmd === 'sel_changed') { selectionDrag?.refreshSelection(); relaySelection(); return }
   if (d.cmd !== 'modified') return
   reviewBalloons?.documentChanged()
   reviewHover?.documentChanged()
@@ -247,6 +260,16 @@ function relayModified(d) {
   if (now - lastModifiedRelay < 500) return
   lastModifiedRelay = now
   try { hostTransport.send({ __lo: 'lo-relay', type: 'modified' }) } catch (e) { /* ignore */ }
+}
+
+// Only real input resets the save idle window; toolbar reads and thumbnails do not.
+let lastInteractionRelay = 0
+for (const event of ['keydown', 'pointerdown', 'wheel']) {
+  document.addEventListener(event, e => {
+    if (!e.isTrusted || Date.now() - lastInteractionRelay < 100) return
+    lastInteractionRelay = Date.now()
+    try { hostTransport.send({ __lo: 'lo-relay', type: 'interaction' }) } catch (_) {}
+  }, { capture: true, passive: true })
 }
 
 // (自建工具栏) 光标/选区动了 → 宿主重读 get_ui_state 刷新激活态。两个来源：
@@ -351,6 +374,7 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
   zetaJsUrl: q.get('zeta') || './zeta.js',
   workerScriptUrl: q.get('worker') || './office_thread.js',
   houseProfileUrl: q.get('house') || './house-default.js',
+  initialDocument: q.get('initialDocument') === '1',
   // Default to the CJK fonts served next to the page — one per Chinese typeface
   // category (黑体类 sans / 宋体类 serif / 楷体 / 仿宋), baked by
   // desktop/scripts/fetch-lowa-assets.js. bootZetaOffice skips any that 404
@@ -364,6 +388,16 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
     { url: './cjk-serif.otf', family: 'Noto Serif SC', category: 'serif' },
     { url: './cjk-kai.ttf', family: '霞鹜文楷', category: 'kai' },
     { url: './cjk-fangsong.ttf', family: '朱雀仿宋（预览测试版）', category: 'fangsong' },
+    // 多语种字体（dev-board#1478）：韩文无衬线/衬线、泰语无衬线/衬线及东南亚/CTL 主流文字
+    { url: './cjk-kr.otf', family: 'Noto Sans KR', category: 'kr' },
+    { url: './cjk-kr-serif.otf', family: 'Noto Serif KR', category: 'kr-serif' },
+    { url: './cjk-thai.ttf', family: 'Noto Sans Thai', category: 'thai' },
+    { url: './cjk-thai-serif.ttf', family: 'Noto Serif Thai', category: 'thai-serif' },
+    { url: './cjk-khmer.ttf', family: 'Noto Sans Khmer', category: 'khmer' },
+    { url: './cjk-lao.ttf', family: 'Noto Sans Lao', category: 'lao' },
+    { url: './cjk-myanmar.ttf', family: 'Noto Sans Myanmar', category: 'myanmar' },
+    { url: './cjk-arabic.ttf', family: 'Noto Sans Arabic', category: 'arabic' },
+    { url: './cjk-devanagari.ttf', family: 'Noto Sans Devanagari', category: 'devanagari' },
     // 本机字体排在随包字体之后（无 category，不参与别名目标；其族名会让 boot
     // 跳过同名别名规则，真字体不被 assign 劫持到随包字体上）。
     ...systemFonts,
@@ -392,10 +426,21 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
   endpoint.executor.executeCommand = async (action, params, callOpts) => {
     if (['capture_writing_context', 'accept_writing_suggestion'].includes(action) && semanticWriting?.isComposing())
       return { success: false, available: false, reason: 'composing', error: 'composing', message: '请先完成当前输入，再生成或采用建议。' }
-    if (/^(get_|list_)/.test(action) || action === 'capture_writing_context' || action === 'set_review_balloons' || (action === 'set_revision_view' && !params?.mode)) return executeWithReview(action, params, callOpts)
+    if (action === 'get_cursor_rect') {
+      const r = await executeWithReview(action, params, callOpts)
+      if (params?.selectionRects === true || r?.collapsed) selectionDrag?.updateFromCursorRaw(r)
+      return r
+    }
+    if (/^(get_|list_)/.test(action) || action === 'stash_selection_for_drag' || action === 'capture_writing_context' || action === 'set_review_balloons' || (action === 'set_revision_view' && !params?.mode)) return executeWithReview(action, params, callOpts)
     reviewBalloons.suspend(action)
     reviewHover.suspend()
-    try { return await executeWithReview(action, params, callOpts) }
+    try {
+      const res = await executeWithReview(action, params, callOpts)
+      if (action === 'set_selection' || action === 'select_paragraph' || action === 'find_navigate') {
+        selectionDrag?.refreshSelection(20)
+      }
+      return res
+    }
     finally { reviewBalloons.resume(); reviewHover.resume() }
   }
 
@@ -403,6 +448,18 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
   insightExecutor = endpoint.executor
   themeExecutor = endpoint.executor
   applyTheme(currentTheme)
+  let overlay = null
+  let writingAssistance = null
+  selectionDrag = attachSelectionDrag({
+    canvas: document.getElementById('qtcanvas'),
+    execute: (action, params) => endpoint.executor.executeCommand(action, params),
+    onAfterDrop: () => {
+      overlay?.focus()
+      overlay?.reposition()
+      relaySelection()
+    },
+    onLog: (m) => { console.log('[zeta-editor]', m); if (VERIFY) vlog(m) },
+  })
   attachDocumentLinkClicks({
     canvas: document.getElementById('qtcanvas'),
     execute: (action, params) => endpoint.executor.executeCommand(action, params),
@@ -418,8 +475,6 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
   // in the document (Qt5-WASM gives the canvas no IME). Commits at the LO cursor
   // via the same verified path as agent commands. Attached in BOTH webview and
   // verify modes — local typing is a real-user need, not just a verification one.
-  let overlay = null
-  let writingAssistance = null
   try {
     overlay = attachImeOverlay({
       canvas: document.getElementById('qtcanvas'),
@@ -440,6 +495,7 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
       onCommitted: (text) => { writingAssistance?.committed(text); semanticWriting?.committed(text); inlineReview?.committed(text) },
       onAssistanceKey: (event) => writingAssistance?.keydown(event) || false,
       onCommentRequested: () => relayCommentRequest(),
+      onError: message => hostTransport.send({ __lo: 'lo-relay', type: 'input-error', message }),
       onLog: (m) => { console.log('[zeta-editor]', m); if (VERIFY) vlog(m) },
     })
     writingAssistance = attachWritingAssistance({
@@ -451,7 +507,7 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
       transport: hostTransport, focus: overlay.focus })
     inlineReview = attachInlineReview({ canvas: document.getElementById('qtcanvas'), input: overlay.element,
       execute: (action, params) => endpoint.executor.executeCommand(action, params), transport: hostTransport, language: q.get('uilang') || 'zh-CN' })
-    window.addEventListener('pagehide', () => { writingAssistance.destroy(); semanticWriting.destroy(); inlineReview.destroy(); reviewBalloons?.destroy(); reviewHover?.destroy() }, { once: true })
+    window.addEventListener('pagehide', () => { selectionDrag?.destroy(); writingAssistance.destroy(); semanticWriting.destroy(); inlineReview.destroy(); reviewBalloons?.destroy(); reviewHover?.destroy() }, { once: true })
   } catch (e) { console.error('[zeta-editor] IME overlay failed:', e); if (VERIFY) vlog('IME overlay failed: ' + (e && e.message || e)) }
   // 触控板捏合缩放。Chromium 把捏合报成 ctrlKey + wheel；**不拦下来**浏览器就去
   // 缩放整个 webview 页面——LO 自己的工具栏跟着一起放大、画布重采样发糊，而且

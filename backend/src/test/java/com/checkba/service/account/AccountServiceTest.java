@@ -78,6 +78,25 @@ class AccountServiceTest {
         }
     }
 
+    @Test
+    void compatibilityChallengeUsesAccountTransportAndWhitelistsFields() {
+        transport = new StubTransport().enqueue(200, "{\"id\":\"challenge\",\"image\":\"data:image/png;base64,fixture\",\"expiresAt\":123}");
+        Map<String, Object> result = service().captchaChallenge(Map.of("phone", "13800138000", "purpose", "reset", "ip", "forged"));
+        assertEquals("challenge", result.get("id"));
+        assertTrue(transport.calls.get(0).endsWith("/api/auth/captcha-challenge"));
+        assertTrue(transport.bodies.get(0).contains("reset"));
+        assertFalse(transport.bodies.get(0).contains("forged"));
+        assertNull(transport.lastBearer);
+    }
+
+    @Test
+    void deliveryFailureIsNotAnInvalidPassword() {
+        transport = new StubTransport().enqueue(400, "{\"error\":\"sms_send_failed\",\"message\":\"请求过于频繁，60 秒后可重新获取验证码\"}");
+        AccountException error = assertThrows(AccountException.class, () -> service().sendLoginCode("13800138000", "token"));
+        assertEquals(AccountException.Kind.CONFLICT, error.getKind());
+        assertTrue(error.getMessage().contains("60 秒后"));
+    }
+
     private StubTransport transport;
 
     private AccountService service() {
@@ -98,6 +117,31 @@ class AccountServiceTest {
     // ==================== 账户登录（手机号/邮箱直登） ====================
 
     private static final String ME = "{\"username\":\"hanzewei\",\"displayName\":\"韩泽伟\"}";
+
+    @Test
+    void verifiedCodeRequiresPasswordWithoutConnecting() {
+        transport = new StubTransport().enqueue(200,
+                "{\"passwordSetupRequired\":true,\"setupToken\":\"restricted-ticket\",\"account\":\"13800138000\",\"expiresAt\":99}");
+        AccountService service = service();
+        PasswordSetupRequired stage = assertThrows(PasswordSetupRequired.class,
+                () -> service.loginWithPhone("13800138000", "123456"));
+        assertEquals("restricted-ticket", stage.challenge().get("setupToken"));
+        assertNull(service.currentKeyOrNull());
+        assertEquals(1, transport.calls.size(), "must not fetch account profile or connect");
+    }
+
+    @Test
+    void passwordSetupAndResetUseSeparatePathsAndPreserveWhitespace() {
+        transport = new StubTransport().enqueue(200, "{\"ok\":true}").enqueue(200, "{\"ok\":true}");
+        AccountService service = service();
+        service.passwordOperation("setup", Map.of("setupToken", "ticket", "password", " password "));
+        service.passwordOperation("reset", Map.of("phone", "13800138000", "code", "123456", "password", " new-pass "));
+        assertTrue(transport.calls.get(0).endsWith("/api/auth/password/setup"));
+        assertTrue(transport.calls.get(1).endsWith("/api/auth/password/reset"));
+        assertTrue(transport.bodies.get(0).contains(" password "));
+        assertNull(service.currentKeyOrNull());
+        assertThrows(IllegalArgumentException.class, () -> service.passwordOperation("../exchange-key", Map.of()));
+    }
 
     @Test
     @DisplayName("发验证码：转发到官网 sms-login/send-code，且不带 Bearer（登录阶段还没有 Key）")

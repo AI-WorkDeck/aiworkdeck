@@ -84,17 +84,18 @@ public class TencentMeetingService {
 
     /**
      * 同步腾讯会议：拉取用户有权限的已结束会议与云录制，保存逐字稿与智能纪要。
+     * 不挂方法级 @Transactional：外部 CLI 子进程拉取列表与逐字稿耗时长，持事务会占住连接池，
+     * 且异常抛出会把 catch 块回写的 FAILED 状态一并回滚。单条 save 由 Repository 短事务独立提交。
      */
-    @Transactional
     public SyncSummary syncMeetings(Long userId, Long projectId, boolean force) {
         TmeetAuthStatus auth = tmeetCliService.getAuthStatus();
         if (!auth.isLoggedIn()) {
-            throw new IllegalStateException("腾讯会议未登录，请先在插件界面扫码登录");
+            throw new IllegalStateException(LangText.of("腾讯会议未登录，请先在插件界面扫码登录", "Tencent Meeting is not signed in; please scan the QR code in the plugin panel first"));
         }
 
         TencentMeetingSyncConfig cfg = getOrCreateConfig(userId);
         cfg.setLastSyncStatus("RUNNING");
-        cfg.setLastSyncMessage("正在拉取会议列表中...");
+        cfg.setLastSyncMessage(LangText.of("正在拉取会议列表中...", "Fetching meeting list..."));
         configRepository.save(cfg);
 
         int added = 0;
@@ -226,7 +227,9 @@ public class TencentMeetingService {
 
             cfg.setLastSyncAt(LocalDateTime.now());
             cfg.setLastSyncStatus("SUCCESS");
-            cfg.setLastSyncMessage(String.format("同步完成：扫描 %d 场，新增 %d 场，跳过 %d 场", totalFound, added, skipped));
+            cfg.setLastSyncMessage(LangText.of(
+                    String.format("同步完成：扫描 %d 场，新增 %d 场，跳过 %d 场", totalFound, added, skipped),
+                    String.format("Sync completed: scanned %d, added %d, skipped %d", totalFound, added, skipped)));
             configRepository.save(cfg);
 
             return SyncSummary.builder()
@@ -239,9 +242,9 @@ public class TencentMeetingService {
         } catch (Exception e) {
             log.error("腾讯会议同步发生异常", e);
             cfg.setLastSyncStatus("FAILED");
-            cfg.setLastSyncMessage("同步失败: " + e.getMessage());
+            cfg.setLastSyncMessage(LangText.of("同步失败: ", "Sync failed: ") + e.getMessage());
             configRepository.save(cfg);
-            throw new RuntimeException("腾讯会议同步失败: " + e.getMessage(), e);
+            throw new RuntimeException(LangText.of("腾讯会议同步失败: ", "Tencent Meeting sync failed: ") + e.getMessage(), e);
         }
     }
 
@@ -257,9 +260,9 @@ public class TencentMeetingService {
 
     public TencentMeetingRecord getMeeting(Long id, Long userId) {
         TencentMeetingRecord record = recordRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("会议记录不存在: id=" + id));
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("会议记录不存在: id=", "Meeting record not found: id=") + id));
         if (!record.getUserId().equals(userId)) {
-            throw new IllegalArgumentException("无权访问该会议记录");
+            throw new IllegalArgumentException(LangText.of("无权访问该会议记录", "No permission to access this meeting record"));
         }
         return record;
     }

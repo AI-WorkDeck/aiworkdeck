@@ -3,6 +3,7 @@
 
 package com.checkba.service.site;
 
+import com.checkba.service.LangText;
 import com.checkba.service.account.AccountEndpoint;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -173,17 +174,17 @@ public class SiteProfileService {
      */
     synchronized void persistSelection(String siteId) {
         if (pinned) {
-            throw new IllegalArgumentException("当前部署已由配置指定站点，不能在应用内切换");
+            throw new IllegalArgumentException(LangText.of("当前部署已由配置指定站点，不能在应用内切换", "The current deployment has a pinned site in configuration and cannot be switched in-app"));
         }
         SiteProperties.Site site = siteId == null ? null : properties.getSites().get(siteId);
         if (site == null || !site.isEnabled() || site.getBaseUrl() == null || site.getBaseUrl().isBlank()) {
-            throw new IllegalArgumentException("站点不存在或未启用：" + siteId);
+            throw new IllegalArgumentException(LangText.of("站点不存在或未启用：", "Site does not exist or is not enabled: ") + siteId);
         }
         try {
             SiteStateFile.write(stateDir,
                     new SiteStateFile.State(siteId, Instant.now().toString(), "user"));
         } catch (Exception e) {
-            throw new IllegalStateException("站点选择写入失败，请检查磁盘权限", e);
+            throw new IllegalStateException(LangText.of("站点选择写入失败，请检查磁盘权限", "Failed to save site selection; please check disk permissions"), e);
         }
         currentSiteId = siteId;
         log.info("站点已切换到: {}", siteId);

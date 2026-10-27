@@ -212,6 +212,8 @@ export const tabDragSplitMethods = {
         this.focusedPane = 'right'
       }
 
+      this.syncFileTreeSelectionWithActiveTab?.()
+
       // 拖拽换序/跨窗格会改变容器尺寸分配，给 WPS 一个 resize
       this.$nextTick(() => this.triggerWorkbenchResize())
     },
@@ -259,6 +261,8 @@ export const tabDragSplitMethods = {
       if (container) {
         this.resizing.containerWidth = container.clientWidth || 0
         if (target === 'left' && typeof container.querySelector === 'function') {
+          const collapseAnchor = container.querySelector('.sidebar-collapse-anchor')
+          this.resizing.containerWidth -= collapseAnchor?.offsetWidth || 0
           const rail = container.querySelector('.left-rail')
           this.resizing.railWidth = rail ? rail.offsetWidth : 0
           const aiPanel = container.querySelector('.side-panel-ai')
@@ -473,6 +477,7 @@ export const tabDragSplitMethods = {
         // 开启分屏时，默认聚焦右侧，方便用户立即选择文件
         this.focusedPane = 'right'
       }
+      this.syncFileTreeSelectionWithActiveTab?.()
     },
     focusPane(pane) {
       // 只有在分屏模式下才允许聚焦右侧
@@ -480,6 +485,7 @@ export const tabDragSplitMethods = {
 
       const oldPane = this.focusedPane
       this.focusedPane = pane
+      this.syncFileTreeSelectionWithActiveTab?.()
 
       if (oldPane !== pane) {
           // Switch active tracking to the file in the new pane

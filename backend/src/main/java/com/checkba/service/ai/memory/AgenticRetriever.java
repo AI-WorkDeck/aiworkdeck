@@ -39,6 +39,22 @@ public class AgenticRetriever {
     private final com.checkba.service.ai.AuxModelResolver auxModelResolver;
     private final com.checkba.service.ai.TokenUsageService tokenUsageService;
 
+    // 类级别共享的有界守护线程池：此前每次检索 new 一个 fixed pool（且泄漏线程），改为复用
+    private final ExecutorService retrievalExecutor = new ThreadPoolExecutor(
+            2, 8, 60L, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(128),
+            r -> {
+                Thread t = new Thread(r, "agentic-retriever");
+                t.setDaemon(true);
+                return t;
+            },
+            new ThreadPoolExecutor.CallerRunsPolicy());
+
+    @jakarta.annotation.PreDestroy
+    void shutdown() {
+        retrievalExecutor.shutdownNow();
+    }
+
     // 配置参数
     private static final int MIN_RESULTS_THRESHOLD = 3;  // 结果少于此数量时触发多轮召回
     private static final int MAX_SUPPLEMENTARY_QUERIES = 3;  // 最多生成的补充查询数
@@ -293,24 +309,21 @@ public class AgenticRetriever {
                                                                List<String> queries, 
                                                                int limit) {
         List<List<MemoryEntry>> results = new ArrayList<>();
-        ExecutorService executor = Executors.newFixedThreadPool(
-                Math.min(queries.size(), 3)
-        );
-        
+
         try {
             List<CompletableFuture<List<MemoryEntry>>> futures = new ArrayList<>();
-            
+
             for (String query : queries) {
                 CompletableFuture<List<MemoryEntry>> future = CompletableFuture.supplyAsync(() -> {
                     try {
                         return memoryManager.hybridSearch(projectId, query, limit);
                     } catch (Exception e) {
-                        log.error("Supplementary retrieval failed for query '{}': {}", 
+                        log.error("Supplementary retrieval failed for query '{}': {}",
                                 query, e.getMessage());
                         return Collections.emptyList();
                     }
-                }, executor);
-                
+                }, retrievalExecutor);
+
                 futures.add(future);
             }
             
@@ -345,7 +358,7 @@ public class AgenticRetriever {
             }
             
         } finally {
-            executor.shutdown();
+            // 共享线程池不在每次调用后关闭
         }
         
         return results;

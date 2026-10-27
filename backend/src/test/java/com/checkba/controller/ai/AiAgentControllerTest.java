@@ -52,6 +52,7 @@ class AiAgentControllerTest {
     private AgentOrchestrator agentOrchestrator;
     private com.checkba.service.ai.AgentInboxService inboxService;
     private AiAgentController controller;
+    private com.checkba.service.ProjectFileAccessService fileAccess;
     private SseEmitterService sse;
     private com.checkba.service.ai.ChatModelFactory chatModelFactory;
 
@@ -66,6 +67,7 @@ class AiAgentControllerTest {
         inboxService = mock(com.checkba.service.ai.AgentInboxService.class);
         sse = mock(SseEmitterService.class);
         chatModelFactory = mock(com.checkba.service.ai.ChatModelFactory.class);
+        fileAccess = mock(com.checkba.service.ProjectFileAccessService.class);
         controller = new AiAgentController(
                 sse,
                 agentOrchestrator,
@@ -77,7 +79,125 @@ class AiAgentControllerTest {
                 projectMemberService,
                 mock(ClientCapabilityService.class),
                 subAgentService,
-                inboxService, chatModelFactory);
+                inboxService, chatModelFactory, fileAccess);
+    }
+
+    @Test
+    void cacheMissRejectsBeforeInboxOrModelAndFullRetryIsAcceptedOnce() {
+        var cache = new com.checkba.service.ai.InlineContentCache();
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "inlineContentCache", cache);
+        var req = new AiAgentController.AgentChatRequest();
+        req.setProjectId(42L);
+        req.setConversationId("conv-1");
+        req.setMessage("Review document");
+        var context = new AiAgentController.ContextItem();
+        context.setId("office-current-document");
+        context.setInlineContentHash("missing");
+        req.setActiveContext(context);
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(true);
+            when(messageService.canUseConversation("conv-1", 7L)).thenReturn(true);
+            var denied = controller.startSession(req, "s", null);
+            assertEquals(409, denied.getStatusCode().value());
+            var body = (java.util.Map<?, ?>) denied.getBody();
+            assertEquals("INLINE_CONTENT_CACHE_MISS", body.get("code"));
+            assertEquals(true, body.get("retryWithInlineContent"));
+            org.mockito.Mockito.verifyNoInteractions(inboxService, agentOrchestrator, chatModelFactory);
+
+            context.setInlineContent("合成正文");
+            var item = new com.checkba.model.entity.AgentInboxItem();
+            item.setId("retry-item");
+            when(inboxService.submit(req, 7L)).thenReturn(item);
+            assertEquals(200, controller.startSession(req, "s", null).getStatusCode().value());
+            verify(inboxService).submit(req, 7L);
+            verify(agentOrchestrator).acceptInboxSubmission("retry-item", false);
+        }
+    }
+
+    @Test
+    void pendingInboxSnapshotMissReturnsStructuredRetryInsteadOf500() {
+        var req = new AiAgentController.AgentChatRequest();
+        req.setProjectId(42L);
+        req.setConversationId("conv-1");
+        req.setMessage("Review document");
+        req.setClientRequestId("stable-key");
+        var item = new com.checkba.model.entity.AgentInboxItem();
+        item.setId("pending-item");
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(true);
+            when(messageService.canUseConversation("conv-1", 7L)).thenReturn(true);
+            when(inboxService.submit(req, 7L)).thenReturn(item);
+            when(agentOrchestrator.acceptInboxSubmission("pending-item", false))
+                    .thenThrow(new com.checkba.service.ai.AgentInboxService.InlineContentUnavailable());
+            var response = controller.startSession(req, "s", null);
+            assertEquals(409, response.getStatusCode().value());
+            assertEquals("INLINE_CONTENT_CACHE_MISS", ((java.util.Map<?, ?>) response.getBody()).get("code"));
+            assertEquals(true, ((java.util.Map<?, ?>) response.getBody()).get("retryWithInlineContent"));
+            verify(inboxService, never()).receipt(any(), any());
+        }
+    }
+
+    @Test
+    void cacheLookupRequiresOwnershipAndRestoresAllContextsBeforeInbox() throws Exception {
+        var cache = new com.checkba.service.ai.InlineContentCache();
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "inlineContentCache", cache);
+        var req = new AiAgentController.AgentChatRequest();
+        req.setProjectId(42L);
+        req.setConversationId("conv-1");
+        req.setMessage("Review document");
+        var active = new AiAgentController.ContextItem();
+        active.setId("office-current-document");
+        cache.put("conv-1", "合成正文");
+        active.setInlineContentHash(cache.hashOf("conv-1"));
+        var attachment = new AiAgentController.ContextItem();
+        attachment.setId("doc-2");
+        cache.put("conv-1", "attachment:doc-2", "合成附件");
+        attachment.setInlineContentHash(java.util.HexFormat.of().formatHex(java.security.MessageDigest
+                .getInstance("SHA-256").digest("合成附件".getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+        req.setActiveContext(active);
+        req.setContextItems(java.util.List.of(attachment));
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(true);
+            when(messageService.canUseConversation("conv-1", 7L)).thenReturn(false);
+            assertEquals(403, controller.startSession(req, "s", null).getStatusCode().value());
+            org.junit.jupiter.api.Assertions.assertNull(active.getInlineContent());
+            org.junit.jupiter.api.Assertions.assertNull(attachment.getInlineContent());
+            org.mockito.Mockito.verifyNoInteractions(inboxService);
+            when(messageService.canUseConversation("conv-1", 7L)).thenReturn(true);
+            var item = new com.checkba.model.entity.AgentInboxItem();
+            item.setId("hit-item");
+            when(inboxService.submit(req, 7L)).thenAnswer(call -> {
+                assertEquals("合成正文", req.getActiveContext().getInlineContent());
+                assertEquals("合成附件", req.getContextItems().get(0).getInlineContent());
+                return item;
+            });
+            assertEquals(200, controller.startSession(req, "s", null).getStatusCode().value());
+            verify(inboxService).submit(req, 7L);
+        }
+    }
+
+    @Test
+    void revokedAccessBetweenSubmissionAndExecutionReturnsForbidden() {
+        var req = new AiAgentController.AgentChatRequest();
+        req.setProjectId(42L);
+        req.setConversationId("conv-1");
+        req.setMessage("Queued request");
+        var item = new com.checkba.model.entity.AgentInboxItem();
+        item.setId("inbox-revoked");
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(true);
+            when(messageService.canUseConversation("conv-1", 7L)).thenReturn(true);
+            when(inboxService.submit(req, 7L)).thenReturn(item);
+            when(agentOrchestrator.acceptInboxSubmission("inbox-revoked", false))
+                    .thenThrow(new SecurityException("无权访问该项目"));
+
+            assertEquals(403, controller.startSession(req, "s", null).getStatusCode().value());
+            verify(inboxService, never()).receipt(any(), any());
+        }
     }
 
     @Test
@@ -313,4 +433,19 @@ class AiAgentControllerTest {
             verify(agentOrchestrator).acceptInboxSubmission("message-1", false);
         }
     }
+    @Test void clientCannotEnterProjectWideAiToolsEvenWithMembership() {
+        var req = new AiAgentController.AgentChatRequest();
+        req.setProjectId(42L); req.setConversationId("client-conv"); req.setMessage("Read private files");
+        when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(true);
+        when(fileAccess.isClient(42L, 7L)).thenReturn(true);
+        try (var auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            var response = controller.startSession(req, "s", null);
+            org.junit.jupiter.api.Assertions.assertEquals(403, response.getStatusCode().value());
+            org.junit.jupiter.api.Assertions.assertTrue(response.getBody().toString()
+                    .contains(com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE));
+            org.mockito.Mockito.verifyNoInteractions(agentOrchestrator, inboxService, chatModelFactory);
+        }
+    }
+
 }

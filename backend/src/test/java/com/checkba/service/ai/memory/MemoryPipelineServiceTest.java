@@ -48,6 +48,20 @@ class MemoryPipelineServiceTest {
     }
 
     @Test
+    void officeDoesNotSummarizeOrSyncTransientDocumentContext() {
+        var manager = mock(MemoryManager.class);
+        var summarizer = mock(ConversationSummarizer.class);
+        var compressor = mock(ContextCompressor.class);
+        var sync = mock(MemorySyncService.class);
+        var subject = new MemoryPipelineService(manager, summarizer, compressor, sync);
+        var caps = new com.checkba.service.ai.ClientCapabilityService();
+        caps.record("office", "office");
+        org.springframework.test.util.ReflectionTestUtils.setField(subject, "clientCapabilities", caps);
+        subject.onConversationTurnCompleted("office", "1", 9L, messages(20));
+        org.mockito.Mockito.verifyNoInteractions(manager, summarizer, compressor, sync);
+    }
+
+    @Test
     @DisplayName("普通轮次不调用正则或 LLM 记忆抽取器")
     void completedTurnDoesNotRunLegacyExtractors() {
         // @Async 方法在没有 Spring 代理的单测里就是普通同步调用，直接验证副作用即可

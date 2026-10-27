@@ -5,12 +5,110 @@ description: 手机端同步领域。任务涉及手机端项目目录镜像、�
 
 # 手机端同步（项目目录镜像 + 现场影像/录音云中转）
 
+## 个人助理、日程镜像与提醒（dev-board#1539–1541，2026-10-27）
+
+- 手机个人助理直接从账户全部可用项目检索，不要求先选择项目。独立云端分析同意、既有文件备份同意、有效持久云存储订阅同时满足后启用；不新增收费档位。详细模型/工具/来源复验契约见 `ai-chat.md` 的手机个人助理段。
+- `MobileRelayClientService` 独立 worker：日程每60秒、摘要每10分钟。先查云端开关与权益，再读本机项目；冻结 `CatalogSession` 覆盖目录前置上传与内容上传，任何步骤换账号即拒绝旧请求。项目摘要逐项失败重试，日程只有完整读取后才整批替换。目录截断时仅同步云端接纳的前N个项目；空本地库沿用现有目录保护，不清空其它实例的日程或摘要。
+- `MobileCalendarService` + 独立 consent/snapshot 表保存 `(userId,deviceId)` 日程只读镜像，任务权威仍在桌面。`GET/PUT /api/mobile/calendar/settings` 同意版本 `2026-10-27`；`PUT /snapshots` 收全量任务（至多5000条，含项目、日期/时间、状态、提醒提前分钟、文件关联）；`GET /events` 按当前账户目录和权益过滤。撤销同意清除镜像；不接受跨账号、未知项目、倒退时间或重复任务。未指定事项时间的提醒按桌面所报时区09:00计算，已完成事项不提醒。
+- 新个人工作区接口统一 `{code:0,data:...}`，认证错误仍 HTTP200/code4010。OpenAPI真源 `backend/src/main/resources/openapi/mobile-v1.yaml`；手机仓清洁提交后钉版，不手改副本。事项身份由 deviceId/projectKey/taskId 派生，不能只用本地整数项目ID。
+- `MobileCalendarPushService/Gateway` 可选 APNs：`GET /calendar/push/status`，`PUT /device`（installation UUID、token、sandbox/production），`DELETE /device/{installationId}`。令牌绑定当前账户，换账号重新绑定并清理收据；关闭同步、订阅到期、已完成或撤除项目不发提醒。发送成功才记收据，失败重试；APNs collapse ID 限制重复，但进程在发送后落库前退出仍可能重复，不能宣称严格一次送达。
+- APNs 默认关闭。参数 `mobile.calendar.apns.enabled/team-id/key-id/key-path/topic`，环境变量对应 `MOBILE_CALENDAR_APNS_*`。topic默认 `com.aiworkdeck.mobile.cn`，必须使用与北京主体匹配的 APNs key；总表目前仅登记香港旧APNs key，不能拿它给北京App签名。密钥只引用原位路径；还需启用App推送能力与匹配描述文件后，单独验真机远程送达。正文用手机20语资源 `personal.reminders`，仅通用通知和eventId，不传案名或任务正文到锁屏。
+- 客户端按平台提供本地提醒，远程未配置时如实显示能力边界；本地排期需最近一次同步，离线期间桌面修改无法即时撤回。退出、换账号、关闭提醒清理本地排期。订阅、备份或分析撤销后服务端立即拒绝数据访问，账号注销删除本次新增派生数据与推送注册。
+- 验证：`MobileWorkspaceSyncHttpTest`（真实本地HTTP与桌面worker）、`MobileWorkspaceApiContractTest`（真实鉴权/H2/OpenAPI，AI和权益替身）、`MobileCalendarServiceTest`、`MobileCalendarPushServiceTest`、`MobileCalendarPushGatewayTest`、`AccountDeletionServiceTest`。这些测试不代表生产APNs、付费模型或手机锁屏真机验收；不能将编译与本地通知称为远程推送已开通。
+
+
+## 手机密码登录桥与历史身份（dev-board#1299，2026-10-15）
+
+手机日常认证迁到 `POST /api/auth/account-login {account,password}`，官网为密码权威；
+成功 data 保留 token/userId/username/displayName/tokenId，并新增 sessionId=token、真实
+user快照（与 `/auth/me` 同源，avatarUrl无头像为空串）。后续仍经 X-Session-Id 带 awdt_。
+移动首次使用/忘记密码由系统浏览器打开本站官网受保护注册/重置流程，完成后回手机密码登录。
+客户端不得用受限 setupToken 当作sessionId。OpenAPI真源仍为 `backend/src/main/resources/openapi/mobile-v1.yaml`。
+
+`AwdkLoginService` 首次建 account_binding 时先以官网已验证 phone/verifiedEmail 找历史
+移动User，保留 userId及项目/目录归属；不按username猜测。同一个身份映射到冲突用户或已
+绑定另一官网账户时拒绝，不悄悄转移数据；既有account_binding仍是权威。
+正式 cloud profile 启用 `security.official-password-login-required`，普通旧sms/mail/wx免密
+入口返回明确升级/官网设密提示；既有ReviewAccountGate精确审核例外保留，自建默认不变。
+
+验证：`AwdkLoginServiceTest` 历史phone/email继承及冲突拒绝、`AuthControllerOfficialPasswordTest`
+旧入口封闭、`MobileApiContractTest`桥成功/受限challenge形状。生产旧版本需要配合官网先发版、
+客户端升级顺序；源码测试不代表真机/生产密码重置撤销所有设备令牌已经完成。
+
+
 手机端（独立仓 `1-3 aiworkdeck_mobile`：iOS Swift + 微信小程序）拍现场影像与录音，归档到
 桌面端项目的「现场影像/YYYY-MM-DD/」（image/video）或「现场录音/YYYY-MM-DD/」（audio，
-dev-board#228）。**桌面端是项目的唯一权威源**，云端只做两件事：
+dev-board#228）。**旧设备镜像协议**以桌面项目为来源；2026-10-11 的账户统一目录见下节，云端统一项目/文件身份，字节仍分布存储。既有中转协议做两件事：
 目录镜像（手机「选择项目」的数据源）与影像中转区（ACK 即删 + 30 天 TTL 兜底）。
 权威 spec：`aiworkdeck_mobile/docs/specs/2026-08-20-project-sync-relay.md`（根因复盘见
 dev-board#30）；更早的产品设计 `2026-08-17-mobile-clients-design.md`。
+
+## 账户统一目录与持久云归档（dev-board#1188，2026-10-11）
+
+- `GET /api/mobile/catalog` 是账户级统一目录：`{projectUid,name,locations[]}`；位置为
+  `desktop(deviceId,key,deviceName,online)` 或 `cloud(deviceId="cloud",key,cloudProjectId,online=true)`。
+  项目名称不是身份。Project.uid 新建即赋 UUID，存量用 CAS 回填；桌面目录推 `projectUid`，
+  老桌面缺字段时使用用户/设备/本地键的确定性 UUID，旧 `/mobile/projects` 不变。
+- `ProjectRemote` 只有连接地址匹配当前 relay 站点且本地连接属当前用户才上报 `cloudProjectId`；
+  云端再次验证云项目属当前账户。`AddinProjectLink` 影子容器折叠进同一目录条目，云位置带
+  `archiveOnly:true`；它仅有插件归档内容，不能当桌面全部原件的替代来源。
+- 文件身份复用 `ProjectFile.uid`（新建生成、存量 CAS 回填），LIST 的 `id` 仍是本地路由，
+  增量 `uid` 是跨端身份。成功 LIST 的元数据存 `MobileProjectManifest`；
+  `GET /catalog/{uid}/files` 合并云文件与最后一次桌面快照，每文件带 `source/deviceId/projectKey`，
+  同 uid 优先云副本，无 uid 按位置+id区分。缺桌面快照或任一清单截断时 `truncated:true`。
+  缓存只含相对路径与元数据，不含字节；桌面实时列表仍走 LIST。
+- 云原件下载 `GET /catalog/{uid}/files/{fileUid}/content`：校验账号/项目归属，裸字节、
+  `application/octet-stream` 与实际长度；持久原件不 ACK、不随下载删除。
+- 采集仍用 `POST /mobile/media`，`deviceId=cloud` 与目录中的云 key 表示持久归档。
+  `MobileCloudCaptureService` 在同一用户行锁事务下做幂等收据、订阅额度、临时字节落盘→move→
+  文件元数据→`MobileCloudReceipt`。收据不走临时 TTL，重试原样返回身份，换项目重用 UUID 拒绝；
+  `UploadResult` 和 `MediaStatus` 返回 `projectUid/fileUid/fileId`。回滚（含提交失败）删除新 blob。
+- 临时中转池是 **200MiB 同时占用**，媒体与传输一起计算，ACK 即释放；Pro 持久池 **3GiB**
+  独立计量。具体权益与通用云写入闸由 `CloudStorageQuotaService` 实施，不能退回机器级账户。
+- 桌面 `AccountProjectCatalog` 挂左栏项目面板，所有位置可见，既有本地项目也能看云附件；
+  本机代理 `/api/mobile-receive/catalog/*` 只在 local-mode 注册，持有设备令牌，渲染层拿不到令牌。
+  请求与导入必须带当前账户二次哈希 `accountScope`，换账户立即拒旧面板操作；PULL UUID
+  在用户确认报价后按账户/项目/来源持久化，重试不重复扣费；字节核长→move→建库后才 ACK。
+- 插件优先用统一目录生成一条项目选项，普通云项目保持旧云 id，桌面项目仍走归档绑定。
+  只有目录端点 404 才回旧 `/projects/my` + `/mobile/devices`，网络失败不可误报空目录。
+- 验证：`ProjectCatalogServiceTest`、`ProjectCatalogIdentityRepositoryTest`、
+  `MobileCloudCaptureServiceTest`、`MobileApiContractTest.unifiedCatalogAndCloudCaptureMatchSpecAndPreserveBytes`、
+  `MobileRelayClientHttpTest.catalog*`。手机端以 OpenAPI 钉版文件为唯一接口来源。
+
+## 手机预览与明确同意的文件备份（dev-board#1208/#1210，2026-10-11）
+
+- 手机列表继续 `GET /api/mobile/catalog/{uid}/files`；LIST、云目录、备份 manifest 都保留
+  `isFolder/parentId/path`，包括空文件夹。`id/parentId` 只在来源内有效，跨来源合并按相对 path
+  建树。同 uid 的在线桌面条目优先，离线且有权益和同意时可用 `source:backup`。
+- 手机下载使用 `POST /api/mobile/preview/pull`（deviceId/projectKey/remoteFileId/requestId），
+  文件名和大小从服务端已保存的桌面清单取；支持类型由 `MobilePreviewPolicy` 唯一定义。
+  它给传输行/命令加 `previewOnly:true`，桌面再次检查真实本地文件名后才读文件上传。
+  通用 `/transfer/pull` 和 `/catalog/.../content` 仍服务桌面/Office用途，不全面套用手机限制。
+- 手机云/备份原件入口是 `GET /api/mobile/preview/catalog/{uid}/files/{fileUid}/content`，
+  读取目录实际选定来源，要求账户有效订阅、`app_users` 上明确备份同意且扩展名支持；
+  未同意、订阅过期、备份缺失提示需桌面在线。不得把客户端文件名或本机账户权益当云端权限。
+- `GET/PUT /api/mobile/backup-consent` 保存账户决定；PUT 必须显式传 enabled 和当前
+  `consentVersion:2026-10-11`。旧行 nullable 字段默认关闭/未决定，不替用户同意。
+  返回 `enabled/decided/subscriptionActive/consentVersion/cleanupPending`。
+- 桌面 worker 定期查账户决定和订阅；同意后推 `/backup/manifest` 元数据（含空文件夹），
+  仅为支持格式计算 SHA256、读取字节；`GET /backup/files?deviceId=&projectKey=` 对账，
+  省略 projectKey 返回此设备全部备份，便于清理已删除项目。`PUT /backup/files` 是 query
+  元数据 + multipart 单 file，成功返回裸 TransferFile 元数据（**没有 code:0**）。
+  `/backup/manifest` PUT JSON、`/backup/files` DELETE 则返回 code 信封。
+- `MobileFileBackup` 是独立于临时中转的持久行。服务端在同一用户锁下检查订阅、同意、项目
+  归属、200MiB 单件限制、SHA256/实际长度与持久配额；备份和既有云项目共用 3GiB 池。
+  替换先写新对象，旧对象转删除收据，待清理字节仍计占用，故替换需要整份新文件的余量。
+- Blob 接缝新增 `putPersistent`：本地 `mobile-backup/`，OSS key `mobile-backup/{user}/{uuid}`。
+  **旧 OSS setup 曾有全桶35天生命周期，换前缀并不够**：首次使用新版本前必须将真实桶规则
+  限制为 `mobile-relay/` 并授予 GetBucketLifecycle；每次持久写先读取规则，若会过期备份则拒绝。
+  临时 ACK/TTL 不管理备份对象。
+- 关闭同意立即禁读并将所有备份标为待删；账号注销也保留待删收据。每60秒逐行独立事务删除，
+  失败保留行重试。写入散列失败、部分失败或事务回滚也建立独立删除收据，不能只依赖
+  deleteQuietly（备份对象没有TTL兜底）。清理重读用户锁下状态，防与重新启用后的替换竞争。
+- 验证：`MobileBackupServiceTest`、`MobileRelayOssBlobStoreTest` 生命周期护栏、
+  `MobileApiContractTest.backupConsentPreviewAndFolderContractPreserveBytesAndDenyByDefault`、
+  `MobileTransferLoopbackIntegrationTest.realBackupWorkerConsentUploadOfflinePreviewAndRevocationRoundTrip`
+  （真实随机端口/控制器/H2/本地blob/worker，外部账单为合成桩，不代表生产或真机验证）。
 
 ## 关键文件
 
@@ -56,9 +154,9 @@ dev-board#30）；更早的产品设计 `2026-08-17-mobile-clients-design.md`。
   见地雷 9）：file_type 全仓语义是**文件扩展名**，落盘时一律走
   `MobileRelayClientService.fileTypeOf(landedName, mediaType)`（有扩展名取扩展名，
   没有才退回 mediaType）。
-- **每用户 3GB 配额**（dev-board#226）：只计未投递 blob（storagePath 非空行）的 fileSize
-  之和，ACK 即删 = 释放配额。检查在写盘前按声明大小做（幂等重传先于配额检查，不占新
-  空间不得拒）；并发上传可略超上限（最多一件，接受的软度）。拒绝走
+- **临时中转 200MiB、Pro 持久云存储 3GiB**（dev-board#1188，替代 #226 的旧临时池 3GB）：
+  临时池合计媒体与文件传输的未投递 blob，ACK 即释放；持久池不随下载删除。
+  写入在同一用户锁下检查配额，幂等重传不重复占用；不能沿用旧软限额的并发口径。拒绝走
   IllegalArgumentException → HTTP 200 + `{code:1,message:"云端空间已满…"}`，恰是两端
   客户端能透传到界面的形状（非 2xx 的 body 会被客户端丢弃，别改成 413）。
 - `GET /api/mobile/media/usage` → `{usedBytes, quotaBytes}`（裸对象）；
@@ -432,3 +530,30 @@ find-or-create，影子项目从 `/api/projects/my` 滤掉）。绑定后两条�
 - `inboxRunning` 保证手动检查与定时取件不并发下载/落同一件。状态不能把 `landAndAck` 的早退当成功：项目不存在、鉴权失败、下载响应不符合裸字节契约均单独记失败。
 - 重名项目核对必须同时看 **完整 deviceId + 项目 key**，项目路径仅做本机辅助。不得按项目名称匹配。手机改变已上传条目的本地归属不会改变中转行：现有 POST /media 按 clientMediaId 幂等返回原行，没有重分配接口；ACK 后原 blob 删除，不可伪装成可移动。
 - 验证：JDK 21 `mvn test -Dtest='MobileReceiveControllerTest,MobileRelayClientHttpTest,MobileRelayClientServiceTest,MobileRelayClientDoorbellTest'`；前端 `npm run test:media`。`frontend/tests/mobile-receive/ui.mjs` 对实际 dev:h5 工作台跑鼠标入口/检查/状态变更/同名编号/无项目态与双主题截图（API 用合成响应，不代表正式 Electron 或线上跨端实测）。
+
+## 大文件历史对象备份（dev-board#1223）
+
+- `MobileVersionObjectService` / `MobileVersionObject` 是独立不可变历史对象账本；不得与仅保留当前文件的
+  `MobileFileBackup` 替换/删除逻辑混用。范围为 `(userId, deviceId, projectKey, objectSha, partIndex)`，
+  每块 32MiB，最后一块按实际长度，`partIndex=-1` 是整体验长与 SHA256 通过后的完成收据。
+- `/api/mobile/backup/version-objects/{sha}` GET 返回 parts/complete；`/parts/{index}` PUT 原始
+  `application/octet-stream`（必须 Content-Length，query: deviceId/projectKey/size/partSha），
+  `/complete` POST 验证所有块后才发布，`/parts/{index}` GET 只允许完整对象下载。
+  同意、有效订阅和账户目录归属对读写/状态均执行，不开放跨用户散列探测。
+- 实际 blob 复用 `MobileRelayBlobStore.putPersistent` 的 `mobile-backup/` 前缀及生命周期护栏；
+  云对象不随下载、当前文件删除或手机 ACK 删除。关闭备份/注销立即禁读并标待删，60秒清理重试。
+  上传失败/事务回滚保留删除收据，待删对象和未完成块仍计入同一持久配额。
+- 桌面 `syncVersionObjectBackups` 使用独立 worker，不占用取件/保存线程；云同意未开启时不枚举或
+  读取本地对象。开启后保守枚举全部本地对象（包含历史和草稿），服务器已收块按 index 跳过；
+  完整对象复核成功才显示 synced。网络失败、旧服务端或空间不足保持 pending，不删除本地对象。
+- `backupConsent()` 增量 `objectBackup: {state,pendingObjects,lastError}` 供状态UI；数据带本地账户 scope，
+  换账号清除旧状态可见性。`requireVersionObjectCloudConsent()` 供协作分流资格检查，失败关闭。
+- 既有 Pro 3GiB 配额不变；大于权益余量的音视频仍可本地保存及版本退回，不能因上传失败回退为 Git blob。
+  案件库的对象传输按项目权限独立实现，不能把个人 relay 对象定位符当作协作公共下载地址。
+- 验证：`MobileVersionObjectServiceTest`（多块/幂等/校验/范围/撤回/失败清理）、
+  `MobileRelayClientHttpTest.versionObject*`（合成随机端口 HTTP、断点重试/同意/配额/旧服务/账户切换）、
+  `CloudStorageQuotaServiceTest` 的版本对象计费；无生产 OSS 或真实私人文件验证。
+- 明确取回使用 `MobileRelayClientService.restoreVersionObject(projectId, ObjectRef)`：本地项目归属校验→
+  当前账户/本设备云项目目录→完整状态→分块下载到临时文件→`importObject` 整体验 hash/长度并原子发布；
+  失败不覆盖现有对象、不更改工作区。没有保存/status自动下载；同名列表入口 GET
+  `/backup/version-objects?deviceId=&projectKey=` 返回本范围完整对象 SHA/size，不能列其他账号。

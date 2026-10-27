@@ -91,6 +91,14 @@ public class AgentRunRecoveryService {
                     AgentRunStateService.RunStatus.INTERRUPTED);
         }
 
+        // Waiting is durable UI state, never a request to execute or bypass an approval.
+        for (var status : List.of(AgentRunStateService.RunStatus.AWAITING_INPUT,
+                AgentRunStateService.RunStatus.AWAITING_APPROVAL, AgentRunStateService.RunStatus.PAUSED)) {
+            for (AgentRunRecord record : recordRepository.findByStatus(status.name())) {
+                agentRunStateService.restore(record.getConversationId(), status);
+            }
+        }
+
         List<AgentRunRecord> stale = recordRepository.findByStatus(AgentRunStateService.RunStatus.RUNNING.name());
         int count = 0;
         for (AgentRunRecord record : stale) {

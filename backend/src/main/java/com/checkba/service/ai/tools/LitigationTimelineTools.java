@@ -328,7 +328,7 @@ public class LitigationTimelineTools implements AgentToolComponent {
                     (Files.readString(itemsFile, StandardCharsets.UTF_8) + "|" + safeName + "|" + parentFolderId)
                             .hashCode());
             if (fingerprint.equals(s.lastRenderFingerprint) && s.lastRenderNote != null) {
-                return s.lastRenderNote
+                return com.checkba.service.ai.ToolRegistry.ToolResult.UNCHANGED_PREFIX + s.lastRenderNote
                         + "\n\n[本次调用没有重新出图] 同一份 items 刚出过图，文件都在上面那个文件夹里。"
                         + "直接把交付说明讲给用户即可。";
             }
@@ -369,6 +369,7 @@ public class LitigationTimelineTools implements AgentToolComponent {
 
             ProjectFile folder = visualTools.createFolderTolerant(projectId, parentFolderId, safeName);
             List<String> registered = new ArrayList<>();
+            List<ProjectFile> deliveredFiles = new ArrayList<>();
             ProjectFile svg = null;
             ProjectFile drawio = null;
             for (Path p : paths.stream().sorted(Comparator.comparing(x -> x.getFileName().toString())).toList()) {
@@ -376,6 +377,7 @@ public class LitigationTimelineTools implements AgentToolComponent {
                         projectId, folder.getId(), p, LitigationVisualTools.MARKER_ARTIFACT);
                 if (pf == null) continue;
                 registered.add(pf.getName());
+                deliveredFiles.add(pf);
                 if (svg == null && pf.getName().endsWith(".svg") && !pf.getName().endsWith(".drawio.svg")) svg = pf;
                 if (drawio == null && pf.getName().endsWith(".drawio")) drawio = pf;
             }
@@ -388,7 +390,7 @@ public class LitigationTimelineTools implements AgentToolComponent {
             String note = buildDeliveryNote(text, folder.getName(), folder.getId(), registered);
             s.lastRenderFingerprint = fingerprint;
             s.lastRenderNote = note;
-            return note;
+            return GeneratedFileLocation.createdResults(deliveredFiles, note);
         } catch (Exception e) {
             log.error("litigation_timeline_render failed", e);
             return "错误：出图失败：" + e.getMessage();

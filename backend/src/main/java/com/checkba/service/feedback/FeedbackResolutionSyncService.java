@@ -8,7 +8,8 @@ import com.checkba.repository.UserFeedbackRepository;
 import com.checkba.service.telemetry.InstallIdentityService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -113,7 +114,7 @@ public class FeedbackResolutionSyncService {
         return enabled && !statusUrl.isEmpty();
     }
 
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
         if (!isConfigured()) return;
         Thread t = new Thread(this::sync, "feedback-resolution-sync-init");

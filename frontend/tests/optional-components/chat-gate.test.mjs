@@ -166,3 +166,21 @@ test('isUserQuestionAwaiting：component_required 不算反问，普通 awaiting
   const s = readFileSync(new URL('../../src/composables/useAgentStream.js', import.meta.url), 'utf8')
   assert.doesNotMatch(s, /=\s*\(?[^\n]*status === 'awaiting_input'\)?\s*$/m)
 })
+
+test('扫描件按入口、OCR组件与模型依次准备，每次成功才继续，取消OCR准备不重发', async () => {
+  const d = deps({ lastUserMessage: () => '把这份扫描 PDF 转成 Word' })
+  const h = createComponentRequiredHandler(d)
+  const entry = { ...payload, trigger: 'pdf_to_word' }
+  const ocr = { ...entry, packId: 'mineru-runtime', service: 'mineru-service', modelId: 'mineru-models' }
+  assert.deepEqual(await h.onAction(entry), { installed: true, resent: true })
+  d.confirm = async () => false
+  assert.deepEqual(await h.onAction(ocr), { installed: false, resent: false })
+  assert.deepEqual(d.calls, ['install:pptx-runtime', 'resend:把这份扫描 PDF 转成 Word'])
+  assert.equal(h.pendingContinue(), null)
+  d.confirm = async () => true
+  assert.deepEqual(await h.onAction(ocr), { installed: true, resent: true })
+  assert.deepEqual(d.calls, [
+    'install:pptx-runtime', 'resend:把这份扫描 PDF 转成 Word',
+    'install:mineru-runtime', 'resend:把这份扫描 PDF 转成 Word',
+  ])
+})

@@ -420,7 +420,7 @@ public class PdfEditService {
         boolean needsCjk = replace.chars().anyMatch(c -> c > 127);
         File fontFile = needsCjk ? resolveCjkFontFile() : null;
         if (needsCjk && fontFile == null) {
-            throw new PdfEditException("替换文本含中文但未找到可用的 CJK 字体。请配置 external.pdf-edit.cjk-font-path 指向一个 ttf/ttc 字体文件。");
+            throw new PdfEditException("缺少可用于这段文字的中文字体，未修改 PDF。请修复或重新安装 AI WorkDeck 以恢复内置字体；自定义字体可配置 external.pdf-edit.cjk-font-path（TrueType TTF/TTC）。");
         }
 
         TrueTypeCollection ttc = null;
@@ -443,6 +443,8 @@ public class PdfEditService {
             } else {
                 font = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
             }
+
+            ensureTextEncodable(font, replace);
 
             for (TextMatch m : matches) {
                 PDPage page = doc.getPage(m.pageIndex);
@@ -759,7 +761,7 @@ public class PdfEditService {
                 File fontFile = resolveCjkFontFile();
                 if (fontFile == null) {
                     throw new PdfEditException("页码模板含中文但未找到可用的 CJK 字体。"
-                            + "请改用纯英数模板（如 \"{n} / {total}\"），或配置 external.pdf-edit.cjk-font-path。");
+                            + "请改用纯英数模板（如 \"{n} / {total}\"），或修复 AI WorkDeck 恢复内置字体。");
                 }
                 TrueTypeCollection[] holder = new TrueTypeCollection[1];
                 font = loadEmbeddedCjkFont(doc, fontFile, holder);
@@ -768,6 +770,7 @@ public class PdfEditService {
                 font = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
             }
 
+            for (String label : labels) ensureTextEncodable(font, label);
             for (int i = 0; i < total; i++) {
                 stampPageNumber(doc, doc.getPage(i), labels.get(i), font, pos);
             }
@@ -1053,6 +1056,14 @@ public class PdfEditService {
         };
     }
 
+    private void ensureTextEncodable(PDFont font, String text) {
+        try {
+            font.encode(text);
+        } catch (IOException | IllegalArgumentException e) {
+            throw new PdfEditException("当前字体不能完整显示所需文字，未修改 PDF。请改用内置编辑器导出，或配置覆盖这些字符的 TrueType 字体（external.pdf-edit.cjk-font-path）。");
+        }
+    }
+
     /**
      * 把探测到的字体文件子集嵌入 {@code doc}。
      *
@@ -1060,7 +1071,7 @@ public class PdfEditService {
      * 所以这里不自己 close，而是把它交回给调用方的 finally——
      * {@code ttcOut[0]} 只在确实打开了集合时被写入。
      */
-    private PDFont loadEmbeddedCjkFont(PDDocument doc, File fontFile, TrueTypeCollection[] ttcOut)
+    public PDFont loadEmbeddedCjkFont(PDDocument doc, File fontFile, TrueTypeCollection[] ttcOut)
             throws IOException {
         if (!fontFile.getName().toLowerCase().endsWith(".ttc")) {
             return PDType0Font.load(doc, fontFile);
@@ -1081,7 +1092,7 @@ public class PdfEditService {
      * CJK 字体探测：配置覆盖 → 仓内字体（dev 态）→ 操作系统字体。
      * 找不到返回 null（调用方给出配置指引）。
      */
-    File resolveCjkFontFile() {
+    public File resolveCjkFontFile() {
         List<String> candidates = new ArrayList<>();
         if (configuredCjkFontPath != null && !configuredCjkFontPath.isBlank()) {
             candidates.add(configuredCjkFontPath);
@@ -1096,11 +1107,12 @@ public class PdfEditService {
         candidates.add("/System/Library/Fonts/STHeiti Medium.ttc");
         candidates.add("/System/Library/Fonts/Supplemental/Songti.ttc");
         candidates.add("/Library/Fonts/Arial Unicode.ttf");
-        // Windows
-        candidates.add("C:\\Windows\\Fonts\\simkai.ttf");
-        candidates.add("C:\\Windows\\Fonts\\simfang.ttf");
-        candidates.add("C:\\Windows\\Fonts\\simhei.ttf");
-        candidates.add("C:\\Windows\\Fonts\\msyh.ttc");
+        // Windows：系统可能装在非 C 盘。
+        String windowsFonts = Path.of(System.getenv().getOrDefault("SystemRoot", "C:\\Windows"), "Fonts").toString();
+        candidates.add(windowsFonts + File.separator + "simkai.ttf");
+        candidates.add(windowsFonts + File.separator + "simfang.ttf");
+        candidates.add(windowsFonts + File.separator + "simhei.ttf");
+        candidates.add(windowsFonts + File.separator + "msyh.ttc");
         for (String c : candidates) {
             File f = new File(c);
             if (!f.isFile()) continue;
@@ -1112,6 +1124,22 @@ public class PdfEditService {
                 // 「True Type fonts using CFF outlines are not supported」直接甩给用户。
                 log.debug("Skipping CFF-outline font (PDFBox cannot embed it): {}", f);
                 continue;
+            }
+            // 真正嵌入并保存一次，不能仅凭扩展名/存在性判定可用（损坏字体、TTC 子字体也可能失败）。
+            TrueTypeCollection[] holder = new TrueTypeCollection[1];
+            try (PDDocument probe = new PDDocument(); var out = new java.io.ByteArrayOutputStream()) {
+                PDFont font = loadEmbeddedCjkFont(probe, f, holder);
+                font.encode("中文");
+                probe.addPage(new PDPage());
+                try (var stream = new PDPageContentStream(probe, probe.getPage(0))) {
+                    stream.beginText(); stream.setFont(font, 12); stream.showText("中文"); stream.endText();
+                }
+                probe.save(out);
+            } catch (IOException | IllegalArgumentException | PdfEditException e) {
+                log.debug("Skipping font that cannot embed Chinese: {}", f);
+                continue;
+            } finally {
+                if (holder[0] != null) try { holder[0].close(); } catch (IOException ignored) { }
             }
             log.info("PDF CJK font resolved: {}", f);
             return f;

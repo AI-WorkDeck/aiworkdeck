@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -32,11 +33,19 @@ public class ProjectFileController {
 
     private final ProjectFileService projectFileService;
     private final ProjectMemberService projectMemberService;
+    private final com.checkba.service.ProjectFileAccessService fileAccess;
     private final FileTagService fileTagService;
     private final com.checkba.service.quota.StageQuotaService stageQuotaService;
     /** 导入本机文件后的后置钩子，与 FileController.uploadFile 上传完成时同源。 */
     private final com.checkba.service.ai.ProjectRagService projectRagService;
     private final com.checkba.service.ai.AutoTaggingService autoTaggingService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ProjectFilePdfService projectFilePdfService;
+
+    void setProjectFilePdfServiceForTest(com.checkba.service.ProjectFilePdfService projectFilePdfService) {
+        this.projectFilePdfService = projectFilePdfService;
+    }
 
     /**
      * 单机模式判别位。import-local 让调用方指名服务器磁盘上的绝对路径，
@@ -101,12 +110,14 @@ public class ProjectFileController {
      * 获取文件列表（指定父文件夹）
      * GET /api/projects/{projectId}/files?parentId=xxx
      * GET /api/projects/{projectId}/files?tree=true 获取完整文件树
+     * GET /api/projects/{projectId}/files?ids=1,2 仅获取指定存活文件，不加载标签
      */
     @GetMapping
-    public List<ProjectFile> getFiles(
+    public ResponseEntity<?> getFiles(
             @PathVariable Long projectId,
             @RequestParam(required = false) Long parentId,
             @RequestParam(required = false) Boolean tree,
+            @RequestParam(required = false) String ids,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = getUserIdFromSession(sessionId);
         if (userId == null) {
@@ -114,6 +125,28 @@ public class ProjectFileController {
         }
         
         checkFileTreeAccess(projectId, userId);
+
+        // 恢复标签只需少量文件；参数校验放在权限闸后，空列表不能退回整棵树。
+        if (ids != null) {
+            if (ids.isBlank()) return ResponseEntity.ok(Collections.emptyList());
+            String[] values = ids.split(",", -1);
+            if (values.length > 200) {
+                return ResponseEntity.badRequest().body(Map.of("code", 400, "message",
+                        com.checkba.service.LangText.of("一次最多查询 200 个文件", "At most 200 file IDs are allowed")));
+            }
+            List<Long> fileIds = new ArrayList<>(values.length);
+            try {
+                for (String value : values) {
+                    long id = Long.parseLong(value.trim());
+                    if (id <= 0) throw new NumberFormatException();
+                    fileIds.add(id);
+                }
+            } catch (NumberFormatException e) {
+                return ResponseEntity.badRequest().body(Map.of("code", 400, "message",
+                        com.checkba.service.LangText.of("文件 ID 必须为正整数", "File IDs must be positive integers")));
+            }
+            return ResponseEntity.ok(projectFileService.getFilesByIds(projectId, fileIds));
+        }
 
         // 如果请求完整文件树
         List<ProjectFile> files;
@@ -130,14 +163,47 @@ public class ProjectFileController {
             files.forEach(f -> f.setTags(tagsMap.getOrDefault(f.getId(), Collections.emptyList())));
         }
         
-        return files;
+        return ResponseEntity.ok(files);
     }
     
+    @ExceptionHandler(com.checkba.service.ProjectFileAccessService.FileAccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> onFileAccessDenied(
+            com.checkba.service.ProjectFileAccessService.FileAccessDeniedException e) {
+        return ResponseEntity.status(403).body(Map.of("code", 403, "message", e.getMessage()));
+    }
+
+    @GetMapping("/{fileId}/access")
+    public Map<String, Object> getFileAccess(@PathVariable Long projectId, @PathVariable Long fileId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) throw new UnauthorizedException("请先登录");
+        checkFileInProject(fileId, projectId);
+        ProjectFile file = projectFileService.getFile(fileId);
+        fileAccess.requireRead(file, userId);
+        return Map.of("code", 0, "data", Map.of("fileId", fileId, "clientVisible", file.getClientVisible(),
+                "canManageAccess", fileAccess.canManageAccess(file, userId)));
+    }
+
+    @PutMapping("/{fileId}/access")
+    public ResponseEntity<Map<String, Object>> updateFileAccess(@PathVariable Long projectId,
+            @PathVariable Long fileId, @RequestBody Map<String, Object> request,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) throw new UnauthorizedException("请先登录");
+        checkFileInProject(fileId, projectId);
+        if (!(request.get("clientVisible") instanceof Boolean visible)) {
+            return ResponseEntity.badRequest().body(Map.of("code", 400, "message", com.checkba.service.LangText.of("clientVisible 必须为布尔值", "clientVisible must be a boolean")));
+        }
+        ProjectFile file = fileAccess.setClientVisible(projectFileService.getFile(fileId), userId, visible);
+        return ResponseEntity.ok(Map.of("code", 0, "data", Map.of("fileId", fileId,
+                "clientVisible", file.getClientVisible(), "canManageAccess", fileAccess.canManageAccess(file, userId))));
+    }
+
     private void checkFileTreeAccess(Long projectId, Long userId) {
          if (!projectMemberService.hasReadPermission(projectId, userId)) {
               throw new IllegalArgumentException(com.checkba.service.LangText.of("无权访问该项目", "You do not have access to this project"));
          }
-         if (projectMemberService.isClient(projectId, userId)) {
+         if (fileAccess.isClient(projectId, userId)) {
              throw new IllegalArgumentException(com.checkba.service.LangText.of("客户无权访问资源管理器", "Clients do not have access to the Explorer"));
          }
     }
@@ -224,6 +290,63 @@ public class ProjectFileController {
         resp.put("entries", entries);
         resp.put("total", entries.size());
         return resp;
+    }
+
+    @GetMapping("/{fileId}/archive/entry")
+    public ResponseEntity<byte[]> readArchiveEntry(
+            @PathVariable Long projectId,
+            @PathVariable Long fileId,
+            @RequestParam("path") String path,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) throw new UnauthorizedException("请先登录");
+        checkFileTreeAccess(projectId, userId);
+        checkFileInProject(fileId, projectId);
+        ProjectFileService.ArchiveEntryContent entry = projectFileService.readArchiveEntry(fileId, path);
+        String name = entry.name().toLowerCase(java.util.Locale.ROOT);
+        // Use an explicit passive-media allowlist: HTML/SVG/XML must never execute at the API origin.
+        String extension = name.substring(name.lastIndexOf('.') + 1);
+        String mediaType = switch (extension) {
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "png" -> "image/png";
+            case "gif" -> "image/gif";
+            case "webp" -> "image/webp";
+            case "bmp" -> "image/bmp";
+            case "avif" -> "image/avif";
+            case "pdf" -> "application/pdf";
+            case "mp3" -> "audio/mpeg";
+            case "m4a" -> "audio/mp4";
+            case "wav" -> "audio/wav";
+            case "mp4" -> "video/mp4";
+            case "webm" -> "video/webm";
+            case "txt", "md", "csv", "json", "log" -> "text/plain;charset=UTF-8";
+            default -> "application/octet-stream";
+        };
+        return ResponseEntity.ok()
+                .header("Content-Type", mediaType)
+                .header("Content-Disposition", org.springframework.http.ContentDisposition.attachment()
+                        .filename(entry.name(), java.nio.charset.StandardCharsets.UTF_8).build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .header("Content-Security-Policy", "sandbox; default-src 'none'")
+                .header("Cache-Control", "private, no-store")
+                .contentLength(entry.bytes().length)
+                .body(entry.bytes());
+    }
+
+    @PostMapping("/{fileId}/archive/import-entry")
+    public ProjectFile importArchiveEntry(
+            @PathVariable Long projectId,
+            @PathVariable Long fileId,
+            @RequestBody ImportArchiveEntryRequest request,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) throw new UnauthorizedException("请先登录");
+        checkFileWriteAccess(projectId, userId);
+        checkFileInProject(fileId, projectId);
+        Long parentId = request.getParentId();
+        if (Long.valueOf(0L).equals(parentId)) parentId = null;
+        checkParentFolder(parentId, projectId);
+        return projectFileService.importArchiveEntry(projectId, fileId, request.getPath(), parentId, userId);
     }
 
     /**
@@ -490,6 +613,74 @@ public class ProjectFileController {
     }
 
     /**
+     * 将单个文件（Word/PPT/Excel/图片）转为 PDF 并存入同一目录（dev-board#1291）。
+     * POST /api/projects/{projectId}/files/{fileId}/convert-pdf
+     */
+    @PostMapping("/{fileId}/convert-pdf")
+    public Map<String, Object> convertToPdf(
+            @PathVariable Long projectId,
+            @PathVariable Long fileId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) {
+            throw new UnauthorizedException("请先登录");
+        }
+        checkFileWriteAccess(projectId, userId);
+        checkFileInProject(fileId, projectId);
+        ProjectFile created = projectFilePdfService.convertFileToPdf(projectId, fileId, userId);
+        triggerPostFileCreationHooks(projectId, created, userId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 0);
+        result.put("message", com.checkba.service.LangText.of("已转为 PDF", "Converted to PDF"));
+        result.put("data", created);
+        return result;
+    }
+
+    /**
+     * 将多个文件分别转为 PDF 后按顺序合并为一个 PDF（dev-board#1291）。
+     * POST /api/projects/{projectId}/files/batch/merge-pdf
+     */
+    @PostMapping("/batch/merge-pdf")
+    public Map<String, Object> mergeToPdf(
+            @PathVariable Long projectId,
+            @RequestBody ProjectFileBatchRequest request,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) {
+            throw new UnauthorizedException("请先登录");
+        }
+        checkFileWriteAccess(projectId, userId);
+        List<Long> fileIds = request == null ? null : request.getFileIds();
+        ProjectFile created = projectFilePdfService.mergeFilesToPdf(projectId, fileIds, userId);
+        triggerPostFileCreationHooks(projectId, created, userId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 0);
+        result.put("message", com.checkba.service.LangText.of("已合并为 PDF", "Merged into PDF"));
+        result.put("data", created);
+        return result;
+    }
+
+    private void triggerPostFileCreationHooks(Long projectId, ProjectFile created, Long userId) {
+        if (created == null || (projectRagService == null && autoTaggingService == null)) return;
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            if (projectRagService != null) {
+                try {
+                    projectRagService.refreshProjectKnowledgeIncremental(String.valueOf(projectId), created.getFilePath());
+                } catch (Exception e) {
+                    log.warn("生成 PDF 后 RAG 索引失败 fileId={}", created.getId(), e);
+                }
+            }
+            if (autoTaggingService != null) {
+                try {
+                    autoTaggingService.autoTagFile(projectId, created.getId(), created.getFilePath(), userId);
+                } catch (Exception e) {
+                    log.warn("生成 PDF 后自动标签失败 fileId={}", created.getId(), e);
+                }
+            }
+        });
+    }
+
+    /**
      * 移动文件或文件夹（拖拽排序）
      * PUT /api/projects/{projectId}/files/{fileId}/move
      */
@@ -646,6 +837,12 @@ public class ProjectFileController {
         public void setParentId(Long parentId) { this.parentId = parentId; }
         public String getName() { return name; }
         public void setName(String name) { this.name = name; }
+    }
+
+    @Data
+    static class ImportArchiveEntryRequest {
+        private String path;
+        private Long parentId;
     }
 
     static class CreateFileRequest {

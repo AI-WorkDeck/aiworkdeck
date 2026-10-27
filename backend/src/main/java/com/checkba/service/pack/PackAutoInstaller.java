@@ -5,7 +5,8 @@ package com.checkba.service.pack;
 
 import com.checkba.service.ai.skill.SkillDefinition;
 import com.checkba.service.ai.skill.SkillRegistry;
-import jakarta.annotation.PostConstruct;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -50,7 +51,7 @@ public class PackAutoInstaller {
         this.skillRegistry = skillRegistry;
     }
 
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     public void scheduleCheck() {
         if (!props.isEnabled()) return;
         scheduler.schedule(this::checkAndInstall, DELAY_SECONDS, TimeUnit.SECONDS);

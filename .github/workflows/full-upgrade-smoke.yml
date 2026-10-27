@@ -1,0 +1,108 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: full-upgrade-smoke
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run_id:
+        description: Successful desktop-build run containing the signed candidate
+        required: true
+      candidate_version:
+        description: Candidate version
+        required: true
+        default: '0.72.0'
+      baseline_run_id:
+        description: Successful signed baseline build
+        required: true
+        default: '39939848049'
+      baseline_version:
+        description: Baseline version
+        required: true
+        default: '0.71.0'
+      baseline_sha:
+        description: Exact expected baseline source commit
+        required: true
+        default: '58d7fbacbab68a19179467e8b53f0bf4a244adb7'
+      candidate_sha:
+        description: Exact expected candidate source commit
+        required: true
+      mechanism:
+        type: choice
+        options: [LegacyHelper, AppUpdater]
+        default: AppUpdater
+      exit_mode:
+        type: choice
+        options: [Restart, Quit, Reopen]
+        default: Restart
+permissions:
+  contents: read
+  actions: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify real Windows helper red then green
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force evidence | Out-Null
+          $source = 'desktop/main/services/full-update.js'
+          Copy-Item $source "$env:RUNNER_TEMP/full-update-fixed.js"
+          git fetch origin 6cf6cebe3c29e706947e8adaf0268490b1212625 --depth=1
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch pre-fix source' }
+          $old = git show '6cf6cebe3c29e706947e8adaf0268490b1212625:desktop/main/services/full-update.js'
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot read pre-fix source' }
+          [IO.File]::WriteAllText((Join-Path $env:GITHUB_WORKSPACE $source), ($old -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
+          node --test --test-name-pattern='Windows真实helper' desktop/tests/full-update.test.js 2>&1 | Tee-Object evidence/helper-before.log
+          if ($LASTEXITCODE -eq 0) { throw 'Old product source unexpectedly passed' }
+          Copy-Item "$env:RUNNER_TEMP/full-update-fixed.js" $source -Force
+          node --test --test-name-pattern='Windows' desktop/tests/full-update.test.js 2>&1 | Tee-Object evidence/helper-after.log
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed Windows helper tests failed' }
+      - name: Download and identify signed installer builds
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN: ${{ inputs.candidate_run_id }}
+          BASELINE_RUN: ${{ inputs.baseline_run_id }}
+          BASELINE_SHA: ${{ inputs.baseline_sha }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          CANDIDATE_VERSION: ${{ inputs.candidate_version }}
+          BASELINE_VERSION: ${{ inputs.baseline_version }}
+          MECHANISM: ${{ inputs.mechanism }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          node desktop/scripts/download-upgrade-build.mjs baseline win32
+          if ($LASTEXITCODE -ne 0) { throw 'Baseline provenance/download failed' }
+          node desktop/scripts/download-upgrade-build.mjs candidate win32
+          if ($LASTEXITCODE -ne 0) { throw 'Candidate provenance/download failed' }
+          # Use the helper from the candidate's exact source commit, even when test scripts are newer.
+          $candidate = Get-Content evidence/candidate-build.json -Raw | ConvertFrom-Json
+          git fetch origin $candidate.head_sha --depth=1
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch candidate source' }
+          $helper = git show "$($candidate.head_sha):desktop/main/services/install-update.ps1"
+          if ($LASTEXITCODE -ne 0) { throw 'Candidate source helper missing' }
+          [IO.File]::WriteAllText("$env:GITHUB_WORKSPACE/desktop/main/services/install-update.ps1", ($helper -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
+      - name: Exercise real signed NSIS and installed application
+        shell: pwsh
+        env:
+          CANDIDATE_VERSION: ${{ inputs.candidate_version }}
+          BASELINE_VERSION: ${{ inputs.baseline_version }}
+          MECHANISM: ${{ inputs.mechanism }}
+          EXIT_MODE: ${{ inputs.exit_mode }}
+        run: |
+          $old = @(Get-ChildItem baseline -Filter '*.exe' -Recurse)
+          $new = @(Get-ChildItem candidate -Filter '*.exe' -Recurse)
+          if ($old.Count -ne 1 -or $new.Count -ne 1) { throw 'Expected exactly one installer in each artifact' }
+          & ./desktop/scripts/test-full-upgrade.ps1 -OldInstaller $old[0].FullName -CandidateInstaller $new[0].FullName -OldVersion $env:BASELINE_VERSION -CandidateVersion $env:CANDIDATE_VERSION -Mechanism $env:MECHANISM -ExitMode $env:EXIT_MODE -OutDir evidence
+      - name: Preserve screenshots, signatures and process evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-upgrade-${{ inputs.mechanism }}-${{ inputs.exit_mode }}-${{ github.run_attempt }}
+          path: evidence/
+          retention-days: 7
+          if-no-files-found: error

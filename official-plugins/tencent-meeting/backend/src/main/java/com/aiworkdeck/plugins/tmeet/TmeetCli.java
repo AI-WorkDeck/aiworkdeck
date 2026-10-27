@@ -18,54 +18,32 @@ class TmeetCli {
     record Result(int exitCode, String output) {}
     interface Runner {
         Result run(List<String> arguments, Duration timeout);
-        String login(long userId);
+        String login(long userId); // Null means an older plugin instance is still authorizing in its browser page.
         void cancelLogin(long userId);
+        default boolean loginPending() { return false; }
     }
     static class NativeRunner implements Runner {
-        private final List<String> executable;
+        // Plugin rescans create new classloaders. Interned JDK strings and plain system properties survive them.
+        // Keep only PID + start time here: authorization URLs stay private to their original runner.
+        private static final String LOGIN_PROCESS = "com.aiworkdeck.plugins.tencent-meeting.login-process";
+        private static final Object COMMAND_MONITOR = LOGIN_PROCESS.intern();
+        private final java.util.function.Supplier<List<String>> executable;
         private Process loginProcess;
         private long loginUser;
         private String loginUrl;
-        NativeRunner() { this.executable = resolveExecutable(); }
-        NativeRunner(String executable) { this.executable = List.of(executable); }
+        NativeRunner() { this(TmeetCli.NativeRunner::resolveExecutable); }
+        NativeRunner(String executable) { this(() -> List.of(executable)); }
+        NativeRunner(java.util.function.Supplier<List<String>> executable) { this.executable = executable; }
         static boolean windows() { return System.getProperty("os.name").toLowerCase(Locale.ROOT).startsWith("windows"); }
         static List<String> resolveExecutable() {
-            String configured = System.getenv("TMEET_PATH");
-            if (configured != null && !configured.isBlank()) {
-                return configured.endsWith(".js") ? List.of(nodeExecutable(), configured) : List.of(configured);
-            }
-            if (windows()) {
-                String appData = System.getenv("APPDATA");
-                if (appData != null) {
-                    Path script = Path.of(appData, "npm", "node_modules", "@tencentcloud", "tmeet", "scripts", "tmeet.js");
-                    if (Files.isRegularFile(script)) return List.of(nodeExecutable(), script.toString());
-                }
-                return List.of("tmeet.exe");
-            }
-            String home = System.getProperty("user.home");
-            for (String path : List.of(home + "/.local/bin/tmeet", "/opt/homebrew/bin/tmeet", "/usr/local/bin/tmeet")) {
-                if (Files.isExecutable(Path.of(path))) return List.of(path);
-            }
-            return List.of("tmeet");
-        }
-        private static String nodeExecutable() {
-            List<Path> candidates = new ArrayList<>();
-            if (windows()) {
-                for (String env : List.of("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA")) {
-                    String base = System.getenv(env);
-                    if (base != null) candidates.add(Path.of(base, "nodejs", "node.exe"));
-                }
-            } else {
-                candidates.add(Path.of("/opt/homebrew/bin/node")); candidates.add(Path.of("/usr/local/bin/node"));
-            }
-            for (Path candidate : candidates) if (Files.isRegularFile(candidate) && Files.isExecutable(candidate)) return candidate.toString();
-            return windows() ? "node.exe" : "node";
+            return TmeetCliDiscovery.resolve(windows(), System.getenv(), System.getProperty("user.home"));
         }
         private Process start(List<String> args) throws IOException {
             // Never feed identifiers or tokens into cmd.exe/a shell. A Windows npm .cmd shim is not executable here.
-            String first = executable.getFirst().toLowerCase(Locale.ROOT);
+            List<String> resolved = executable.get(); // Resolve again after the user repairs an installation.
+            String first = resolved.getFirst().toLowerCase(Locale.ROOT);
             if (windows() && (first.endsWith(".cmd") || first.endsWith(".bat"))) throw new IOException("unsupported CLI wrapper");
-            List<String> command = new ArrayList<>(executable); command.addAll(args);
+            List<String> command = new ArrayList<>(resolved); command.addAll(args);
             ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true);
             String path = builder.environment().getOrDefault("PATH", "");
             List<String> extra = new ArrayList<>();
@@ -88,7 +66,11 @@ class TmeetCli {
             process.descendants().forEach(ProcessHandle::destroyForcibly);
             process.destroyForcibly();
         }
-        @Override public Result run(List<String> args, Duration timeout) {
+        @Override public synchronized Result run(List<String> args, Duration timeout) {
+            synchronized (COMMAND_MONITOR) { return runExclusive(args, timeout); }
+        }
+        private Result runExclusive(List<String> args, Duration timeout) {
+            if (loginPending()) throw new Failure("正在等待浏览器授权，请完成后再操作");
             Process process;
             try { process = start(args); } catch (IOException e) { throw new Failure(MISSING); }
             try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
@@ -113,12 +95,18 @@ class TmeetCli {
             }
         }
         @Override public synchronized String login(long userId) {
+            synchronized (COMMAND_MONITOR) { return loginExclusive(userId); }
+        }
+        private String loginExclusive(long userId) {
             if (loginProcess != null && loginProcess.isAlive()) {
                 if (loginUser != userId) throw new Failure("本机已有其他用户正在授权，请稍后重试");
                 if (loginUrl != null) return loginUrl;
             }
+            if (loginPending()) return null; // Another plugin instance still owns the existing browser authorization.
+            loginUrl = null;
             try { loginProcess = start(List.of("auth", "login", "--no-browser")); }
             catch (IOException e) { throw new Failure(MISSING); }
+            System.setProperty(LOGIN_PROCESS, processIdentity(loginProcess.toHandle()));
             loginUser = userId;
             Process process = loginProcess;
             CompletableFuture<String> url = new CompletableFuture<>();
@@ -141,11 +129,31 @@ class TmeetCli {
             catch (InterruptedException e) { Thread.currentThread().interrupt(); stop(process); throw new Failure("授权已取消"); }
             catch (ExecutionException | TimeoutException e) { stop(process); throw new Failure("未能取得授权地址，请在终端运行 tmeet auth login 完成授权"); }
         }
+        private static String processIdentity(ProcessHandle process) {
+            return process.pid() + ":" + process.info().startInstant().map(Object::toString).orElse("");
+        }
+        @Override public synchronized boolean loginPending() {
+            synchronized (COMMAND_MONITOR) {
+                if (loginProcess != null && loginProcess.isAlive()) return true;
+                String saved = System.getProperty(LOGIN_PROCESS, "");
+                if (saved.isEmpty()) return false;
+                try {
+                    long pid = Long.parseLong(saved.split(":", 2)[0]);
+                    if (ProcessHandle.of(pid).filter(ProcessHandle::isAlive)
+                        .filter(process -> processIdentity(process).equals(saved)).isPresent()) return true;
+                } catch (IllegalArgumentException ignored) { /* Ignore malformed or expired process identities. */ }
+                System.clearProperty(LOGIN_PROCESS);
+                return false;
+            }
+        }
         @Override public synchronized void cancelLogin(long userId) {
+            synchronized (COMMAND_MONITOR) { cancelLoginExclusive(userId); }
+        }
+        private void cancelLoginExclusive(long userId) {
             if (loginProcess != null && loginProcess.isAlive()) {
                 if (loginUser != userId) throw new Failure("本机已有其他用户正在授权，请稍后重试");
                 stop(loginProcess);
-            }
+            } else if (loginPending()) throw new Failure("授权仍在原浏览器中进行，请完成后再操作");
             loginUrl = null;
         }
     }

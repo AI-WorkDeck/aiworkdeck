@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -30,6 +32,7 @@ import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
@@ -388,7 +391,156 @@ class PluginMarketServiceTest {
         assertTrue(PluginMarketService.compareSemver("1.0.1", "1.0.0") > 0);
         assertTrue(PluginMarketService.compareSemver("1.2.0", "1.10.0") < 0);
         assertEquals(0, PluginMarketService.compareSemver("2.0.0", "2.0.0"));
-        assertTrue(PluginMarketService.compareSemver("1.0.0", null) > 0);
+        assertTrue(PluginMarketService.compareSemver("1.0.0", "1.0.0-rc.1") > 0);
+        assertTrue(PluginMarketService.compareSemver("1.0.0-beta.10", "1.0.0-beta.2") > 0);
+        assertTrue(PluginMarketService.compareSemver("1.0.0-beta", "1.0.0-1") > 0);
+        assertTrue(PluginMarketService.compareSemver("1.0.0-beta.1", "1.0.0-beta") > 0);
+        assertTrue(PluginMarketService.compareSemver("999999999999.0.0", "2.0.0") > 0);
+        assertEquals(0, PluginMarketService.compareSemver("1.0.0+build.2", "1.0.0+build.1"));
+        for (String invalid : new String[]{null, "dev", "1.0", "01.0.0", "1.0.0oops", "1.0.0-01"}) {
+            assertEquals(0, PluginMarketService.compareSemver("1.0.0", invalid), "不能把未知版本当成 0：" + invalid);
+            assertEquals(0, PluginMarketService.compareSemver(invalid, "1.0.0"));
+        }
+    }
+
+    @Test
+    void marketUsesLocalVersionAndDiscardsRemoteInstallationState() throws Exception {
+        writeInstalledPlugin("0.9.0", true);
+        PluginMarketService svc = new PluginMarketService("http://registry.test/plugins", publicKeyPem,
+                pluginsDir.toString(), pluginService, gate) {
+            @Override protected String httpGet(String url) {
+                return """
+                        [{"id":"demo","version":"1.0.0","installedVersion":"99.0.0"},
+                         {"id":"absent","version":"1.0.0","installed":true,"updatable":true,
+                          "installedVersion":"0.1.0","purchased":true}]
+                        """;
+            }
+        };
+        var list = svc.listMarket();
+        assertTrue(list.get(0).isInstalled());
+        assertEquals("0.9.0", list.get(0).getInstalledVersion());
+        assertTrue(list.get(0).isUpdatable());
+        assertFalse(list.get(1).isInstalled());
+        assertNull(list.get(1).getInstalledVersion());
+        assertFalse(list.get(1).isUpdatable());
+        assertFalse(list.get(1).isPurchased());
+    }
+
+    @Test
+    void marketDoesNotOfferEqualOlderOrInvalidVersions() throws Exception {
+        writeInstalledPlugin("1.0.0", true);
+        for (String remote : new String[]{"1.0.0", "0.9.0", "1.0.0-rc.1", "1.0.0+build.2", "dev", "2.0oops"}) {
+            PluginMarketService svc = new PluginMarketService("http://registry.test/plugins", publicKeyPem,
+                    pluginsDir.toString(), pluginService, gate) {
+                @Override protected String httpGet(String url) {
+                    return "[{\"id\":\"demo\",\"version\":\"" + remote + "\",\"updatable\":true}]";
+                }
+            };
+            assertFalse(svc.listMarket().get(0).isUpdatable(), remote);
+        }
+    }
+
+    @Test
+    void updateRestoresOldFilesAndEnabledStateWhenReplacementFails() throws Exception {
+        writeInstalledPlugin("0.9.0", true);
+        PluginMarketService svc = spy(stubbedWithManifest("{\"id\":\"demo\",\"version\":\"1.0.0\"}"));
+        doAnswer(inv -> {
+            File target = inv.getArgument(1);
+            Files.createDirectories(target.toPath());
+            Files.writeString(target.toPath().resolve("partial.txt"), "incomplete download");
+            throw new IOException("simulated replacement failure");
+        }).when(svc).moveStagingToTarget(any(Path.class), any(File.class));
+
+        assertThrows(IllegalStateException.class, () -> svc.install("demo"));
+
+        assertOldPluginRetained(true);
+        assertFalse(Files.exists(pluginsDir.resolve("demo/partial.txt")));
+        assertNoInstallationTempDirectories();
+    }
+
+    @Test
+    void updateRestoresOldFilesAndDisabledStateWhenRescanFails() throws Exception {
+        assertRescanFailureRestores(false);
+    }
+
+    @Test
+    void updateRestoresOldFilesAndEnabledStateWhenRescanFails() throws Exception {
+        assertRescanFailureRestores(true);
+    }
+
+    private void assertRescanFailureRestores(boolean enabled) throws Exception {
+        writeInstalledPlugin("0.9.0", enabled);
+        pluginService = spy(pluginService);
+        doThrow(new IllegalStateException("simulated rescan failure")).doCallRealMethod()
+                .when(pluginService).rescan();
+        PluginMarketService svc = stubbedWithManifest("{\"id\":\"demo\",\"version\":\"1.0.0\"}");
+
+        assertThrows(IllegalStateException.class, () -> svc.install("demo"));
+
+        assertOldPluginRetained(enabled);
+        assertNoInstallationTempDirectories();
+    }
+
+    @Test
+    void updateRestoresOldPluginWhenDownloadedPluginCannotBeRegistered() throws Exception {
+        writeInstalledPlugin("0.9.0", true);
+        PluginMarketService svc = stubbedWithManifest("""
+                {"id":"demo","version":"1.0.0","contributes":{"views":[
+                  {"id":"panel","entry":"web/missing.html","placement":"sidebar","scope":"global"}
+                ]}}
+                """);
+
+        assertThrows(IllegalStateException.class, () -> svc.install("demo"));
+
+        assertOldPluginRetained(true);
+        assertNoInstallationTempDirectories();
+    }
+
+    @Test
+    void updateRejectsSignedManifestIdentityMismatchBeforeTouchingInstalledPlugin() throws Exception {
+        writeInstalledPlugin("0.9.0", true);
+        PluginMarketService svc = stubbedWithManifest("{\"id\":\"other\",\"version\":\"1.0.0\"}");
+
+        assertThrows(IllegalStateException.class, () -> svc.install("demo"));
+
+        assertOldPluginRetained(true);
+        assertNull(pluginService.getPlugin("other"));
+        assertNoInstallationTempDirectories();
+    }
+
+    @Test
+    void successfulUpdateWaitsForConfirmationAndReplacesObsoleteFiles() throws Exception {
+        writeInstalledPlugin("0.9.0", true);
+        PluginMarketService svc = stubbedWithManifest("{\"id\":\"demo\",\"version\":\"1.0.0\"}");
+
+        assertEquals("demo", svc.install("demo"));
+
+        assertEquals("1.0.0", pluginService.getPlugin("demo").getVersion());
+        assertFalse(pluginService.isEnabled("demo"), "新版必须由确认权限后的调用方显式恢复启用");
+        assertFalse(Files.exists(pluginsDir.resolve("demo/old.txt")));
+        assertNoInstallationTempDirectories();
+    }
+
+    private void writeInstalledPlugin(String version, boolean enabled) throws Exception {
+        Files.createDirectories(pluginsDir.resolve("demo"));
+        Files.writeString(pluginsDir.resolve("demo/manifest.json"),
+                "{\"id\":\"demo\",\"version\":\"" + version + "\"}");
+        Files.writeString(pluginsDir.resolve("demo/old.txt"), "previous version content");
+        pluginService.rescan();
+        pluginService.setEnabled("demo", enabled);
+    }
+
+    private void assertOldPluginRetained(boolean enabled) throws Exception {
+        assertTrue(Files.readString(pluginsDir.resolve("demo/manifest.json")).contains("0.9.0"));
+        assertEquals("previous version content", Files.readString(pluginsDir.resolve("demo/old.txt")));
+        assertEquals("0.9.0", pluginService.getPlugin("demo").getVersion());
+        assertEquals(enabled, pluginService.isEnabled("demo"));
+    }
+
+    private void assertNoInstallationTempDirectories() throws Exception {
+        try (var paths = Files.list(pluginsDir)) {
+            assertEquals(java.util.List.of("demo"), paths.map(p -> p.getFileName().toString()).sorted().toList());
+        }
     }
 
     private static String bundleJson(String id, String version, String publishedAt,

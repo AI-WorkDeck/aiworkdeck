@@ -13,6 +13,9 @@ import {
   collectFileTags, GROUP_NONE, STATUS_KEYS,
 } from '../../src/utils/evidenceGrouping.js'
 import { locatorQuote, locatorSummary, buildFileLinkUrl } from '../../src/utils/evidenceLocator.js'
+import { evidenceTagLabel } from '../../src/utils/evidenceTags.js'
+import zhWorkbench from '../../src/locales/zh-CN/workbench.js'
+import zhEvidence from '../../src/locales/zh-CN/evidence.js'
 
 const link = (key, sectionPath, sectionTitle, status, targets) => ({
   linkKey: key, sectionPath, sectionTitle, status, anchorText: key, targets: targets || [],
@@ -122,6 +125,7 @@ test('locatorQuote：有 quote 才给，截断加省略号；没有就留空不�
 
 // EvidencePanel.vue 的 <script> 里 import 的东西当形参喂进去（@/ 别名进不来）。
 const DEPS = {
+  EvidenceTagPicker: {}, evidenceTagLabel,
   listEvidenceLinks: async () => [], keepEvidenceAnchor: async () => ({}), rebindEvidenceLink: async () => ({}),
   deleteEvidenceLink: async () => ({}), updateEvidenceTarget: async () => ({}), removeEvidenceTarget: async () => ({}),
   getProjectFiles: async () => [],
@@ -133,9 +137,9 @@ const DEPS = {
   resolveKeepText: async () => ({ text: '', gone: false }),
 }
 
-async function makeVm(links, tags) {
+async function makeVm(links, tags, overrides = {}) {
   const { groupByParty } = await import('../../src/utils/evidenceGrouping.js')
-  const deps = { ...DEPS, groupByParty }
+  const deps = { ...DEPS, groupByParty, ...overrides }
   const src = readFileSync(new URL('../../src/components/EvidencePanel.vue', import.meta.url), 'utf8')
   const script = src.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import [\s\S]*?from .*$/gm, '')
   const names = Object.keys(deps)
@@ -243,4 +247,122 @@ test('组件：收到 awd:doc-mutated 且是自己这份文档就重拉底稿清
   assert.equal(loads, 1, '别人那份文档的写入不该让本面板重拉')
   vm.onDocMutated({})
   assert.equal(loads, 2, '不带 fileId 的一律重拉')
+})
+
+function pending() {
+  let resolve, reject
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no })
+  return { promise, resolve, reject }
+}
+
+function tagLink() {
+  return link('EVID_TAGS', '一', '材料', 'active', [
+    { id: 71, fileId: 10, method: 'written_review' },
+    { id: 72, fileId: 11, method: 'third_party' },
+  ])
+}
+
+test('组件：标签保存期间保留旧值与选择器，阻止重复提交，成功后广播原文档', async () => {
+  const row = tagLink(), wait = pending(), calls = [], events = []
+  const vm = await makeVm([row], null, {
+    updateEvidenceTarget: (...args) => { calls.push(args); return wait.promise },
+    uni: { $emit: (...args) => events.push(args) },
+  })
+  vm.methodPickerFor = 71
+  const saving = vm.setMethod(row, row.targets[0], '原件核对')
+  assert.equal(vm.busy, true)
+  assert.equal(vm.methodPickerFor, 71)
+  assert.equal(vm.links[0].targets[0].method, 'written_review', '服务确认之前不能显示已保存')
+  await vm.setMethod(row, row.targets[0], '待补充')
+  await vm.setMethod(row, row.targets[1], '真实性核实')
+  assert.deepEqual(calls, [[7, 71, { method: '原件核对' }]], '已有在飞保存时不再提交第二次')
+  wait.resolve({ id: 71, method: '原件核对' })
+  await saving
+  assert.equal(vm.busy, false)
+  assert.equal(vm.methodPickerFor, null)
+  assert.equal(vm.links[0].targets[0].method, '原件核对')
+  assert.equal(vm.links[0].targets[1].method, 'third_party')
+  assert.deepEqual(events, [['awd:evidence-changed', { docFileId: 9, source: 'panel' }]])
+})
+
+test('组件：标签保存失败保留选择器与旧标签，显示错误，允许再次保存', async () => {
+  const row = tagLink(), events = []
+  let fail = true, calls = 0
+  const vm = await makeVm([row], null, {
+    updateEvidenceTarget: async () => { calls++; if (fail) throw new Error('合成网络失败'); return { method: '原件核对' } },
+    uni: { $emit: (...args) => events.push(args) },
+  })
+  vm.methodPickerFor = 71
+  await vm.setMethod(row, row.targets[0], '原件核对')
+  assert.equal(vm.busy, false)
+  assert.equal(vm.methodPickerFor, 71)
+  assert.equal(vm.links[0].targets[0].method, 'written_review')
+  assert.equal(vm.error, '合成网络失败')
+  assert.deepEqual(events, [])
+  fail = false
+  await vm.setMethod(row, row.targets[0], '原件核对')
+  assert.equal(calls, 2)
+  assert.equal(vm.error, '')
+  assert.equal(vm.methodPickerFor, null)
+  assert.equal(vm.links[0].targets[0].method, '原件核对')
+})
+
+test('组件：标签请求在飞时清单刷新，完成后只更新目标，不覆盖新目标和其他标签', async () => {
+  const row = tagLink(), wait = pending()
+  const vm = await makeVm([row], null, {
+    updateEvidenceTarget: () => wait.promise,
+    uni: { $emit: () => {} },
+  })
+  const saving = vm.setMethod(row, row.targets[0], '原件核对')
+  vm.links = [{ ...row, anchorText: '刷新后的原文', targets: [
+    { ...row.targets[0], note: '刷新后的注释' },
+    { ...row.targets[1], method: '真实性核实' },
+    { id: 73, fileId: 12, method: '待补充' },
+  ] }]
+  wait.resolve({ id: 71, method: '原件核对' })
+  await saving
+  assert.equal(vm.links[0].anchorText, '刷新后的原文')
+  assert.deepEqual(vm.links[0].targets, [
+    { ...row.targets[0], note: '刷新后的注释', method: '原件核对' },
+    { ...row.targets[1], method: '真实性核实' },
+    { id: 73, fileId: 12, method: '待补充' },
+  ])
+})
+
+test('组件：标签响应晚于切换文档，不回填旧链接，也不清除新文档选择器', async () => {
+  for (const fail of [false, true]) {
+    const row = tagLink(), wait = pending(), events = []
+    const vm = await makeVm([row], null, {
+      updateEvidenceTarget: () => wait.promise,
+      uni: { $emit: (...args) => events.push(args) },
+    })
+    const saving = vm.setMethod(row, row.targets[0], '原件核对')
+    vm.docFileId = 20
+    // 链接键在另一个项目可能重名：用相同键确认检查的是请求所属上下文。
+    vm.projectId = 8
+    vm.links = [{ ...row, anchorText: '新文档的原文', targets: [{ id: 81, fileId: 21, method: '待确认' }] }]
+    const newLinks = vm.links
+    vm.methodPickerFor = 81
+    vm.error = '新文档已有提示'
+    if (fail) wait.reject(new Error('旧文档请求失败'))
+    else wait.resolve({ id: 71, method: '原件核对' })
+    await saving
+    assert.equal(vm.links, newLinks)
+    assert.equal(vm.links[0].anchorText, '新文档的原文')
+    assert.equal(vm.methodPickerFor, 81)
+    assert.equal(vm.error, '新文档已有提示')
+    assert.equal(vm.busy, false)
+    assert.deepEqual(events, fail ? [] : [['awd:evidence-changed', { docFileId: 9, source: 'panel' }]])
+  }
+})
+
+test('组件：旧标签键使用真实翻译，自定义名称原样显示，空标签使用未注明提示', async () => {
+  const vm = await makeVm([], null)
+  const messages = { workbench: zhWorkbench, evidence: zhEvidence }
+  vm.$t = key => key.split('.').reduce((value, part) => value?.[part], messages) || key
+  assert.equal(vm.tagLabel('written_review'), '书面审查')
+  assert.equal(vm.tagLabel('web_check'), '网络核查')
+  assert.equal(vm.tagLabel('已向客户核实'), '已向客户核实')
+  assert.equal(vm.tagLabel('custom.with.dots'), 'custom.with.dots')
+  assert.equal(vm.tagLabel(null), zhEvidence.method.none)
 })

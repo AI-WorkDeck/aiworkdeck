@@ -183,20 +183,19 @@ check('项目列表页薄壳与「项目」面板的文件都存在', () => {
 const hasSelector = (css, sel) =>
   css.includes(sel + ' ') || css.includes(sel + '\n') || css.includes(sel + ',')
 
-check('project-list-pane.scss 搬齐了必需的样式块', () => {
+check('project-list-pane.scss 保留统一紧凑列表所需的样式块', () => {
   const css = readFrontend(LIST_PANE_SCSS)
-  // .btn-primary-small 已被 .awd-btn/.awd-btn-primary 取代（命名弹窗按钮改走 awd-* 视觉语言）；
-  // .card-deco-header 已随卡片重设计删除（不再用顶部 4px 色条区分项目类型，见「Card 重设计」提交）——
-  // 两处都是有意的设计变更，不是搬迁遗漏，从必需清单里去掉。
+  // #1205：窄侧栏统一列表，旧网格/卡片不是必要结构；继续保护项目行、
+  // 搜索排序、成员操作与加载/空态。#1403：打开操作取代侧栏命名弹窗。
   const need = [
     '.project-list-pane', '.project-list-container', '.main-content',
-    '.content-header', '.header-actions', '.awd-btn', '.awd-btn-primary', '.btn-secondary-small',
+    '.content-header', '.header-actions', '.create-card', '.create-card-primary', '.btn-secondary-small',
     '.cloud-accept-entry', '.projects-stats-row', '.stat-card',
-    '.project-grid', '.project-item-card', '.action-btn-icon',
-    '.project-title-new', '.card-footer-new', '.member-avatar-new', '.add-member-btn-new',
-    '.enter-btn-arrow', '.empty-state-dashed', '.dashed-icon',
+    '.project-table', '.ptable-head', '.ptable-row', '.ptable-item', '.ptable-name', '.ptable-sub',
+    '.project-list-toolbar', '.project-search-input', '.project-sort', '.action-btn-icon',
+    '.member-avatar-new', '.add-member-btn-new', '.project-empty-state', '.project-empty-description',
     '.project-role-badge', '.role-owner', '.role-text',
-    '.manager-avatar-wrapper', '.members-split-container', '.clients-group',
+    '.manager-avatar-wrapper',
     '.act-glyph', '.badge-glyph',
   ].filter((sel) => !hasSelector(css, sel))
   return need.length ? '缺样式块: ' + need.join(', ') : null
@@ -277,14 +276,14 @@ check('「项目」面板点卡片直达工作台（走注入的 leaveWorkbench 
   return null
 })
 
-check('项目列表页自带两个新建入口，且没有「打开单个文件」', () => {
+check('项目侧栏优先打开文件夹，其次打开文件；浏览器保留新建入口', () => {
   const src = readVue(LIST_PANE)
-  const miss = ['openFolderFlow', 'createFolderFlow'].filter((f) => !src.includes(f))
-  if (miss.length) return '缺新建入口: ' + miss.join(', ')
-  if (src.includes('openFileFlow')) {
-    return '「打开单个文件」造出的是没有归属的临时项目，已从新建入口去掉'
-  }
-  if (!src.includes('namingVisible')) return '新建项目文件夹的命名弹窗没搬过来'
+  const miss = ['openFolderFlow', 'openFileFlow'].filter((f) => !src.includes(f))
+  if (miss.length) return '缺打开入口: ' + miss.join(', ')
+  if (!/create-card-primary[^>]*@tap="onOpenFolder"/.test(src)) return '打开文件夹必须是主操作'
+  if (!/create-card-secondary[^>]*@tap="onOpenFile"/.test(src)) return '打开文件必须是次操作'
+  if (!/<view v-else[^>]*@tap="goToNewProject"/.test(src)) return '浏览器缺少托管项目创建入口'
+  if (src.includes('namingVisible')) return '侧栏不再保留独立命名弹窗，目录创建使用系统选择器'
   return null
 })
 
@@ -512,14 +511,14 @@ check('工作台「全部项目」开左栏「项目」面板，不离开工作�
   if (/uni\.(reLaunch|navigateTo|redirectTo)/.test(body) || body.includes('leaveWorkbench')) {
     return '项目列表已经是工作台里的面板，「全部项目…」不该再离开工作台'
   }
-  const exit = extractMethodBody(src, 'async leaveWorkbench(url)')
+  const exit = extractMethodBody(src, 'async leaveWorkbench(url, options)')
   if (!exit) return '找不到统一出口 leaveWorkbench'
   if (!exit.includes('uni.reLaunch')) return 'leaveWorkbench 必须用 reLaunch（工作台参与的跳转一律 reLaunch）'
   if (!exit.includes('flushDirtyEditors')) return '离开工作台前必须先落盘'
   return null
 })
 
-check('账户入口在顶栏右上角（AccountEntry），rail 底部没有账户入口与设置齿轮；下拉恰好三项：我的日程 + 设置 + 退出登录（dev-board#205 / #899 / #1047 / #1062）', () => {
+check('账户入口在顶栏右上角（AccountEntry），rail 没有账户或消息入口；下拉恰好四项：消息中心 + 我的日程 + 设置 + 退出登录（dev-board#1490）', () => {
   // 沿革：2026-08-20 个人中心并进设置后下拉只剩一项，2026-08-21（dev-board#96）撤下拉、
   // 点头像直开设置；2026-08-27（dev-board#205）「退出登录」要有一级入口，下拉恢复成
   // 两项；2026-09-25（dev-board#899）加「我的日程」成三项。2026-09-29（dev-board#1047）
@@ -543,7 +542,7 @@ check('账户入口在顶栏右上角（AccountEntry），rail 底部没有账�
   if (tagAt < header.indexOf('toggleRecording')) return '账户入口应在「活动记录」右侧'
   const tag = header.slice(tagAt, header.indexOf('/>', tagAt))
   if (/\bv-if=/.test(tag)) return '账户入口有无项目两态都渲染、不按 isClientView 收（客户也有自己的个人组）'
-  for (const [ev, handler] of [['@schedule', 'onAvatarMenuSchedule'], ['@settings', 'onAvatarMenuSettings'], ['@sign-out', 'onAvatarMenuSignOut'], ['@login', 'onAccountLogin']]) {
+  for (const [ev, handler] of [['@messages', 'openMessageCenterTab'], ['@schedule', 'onAvatarMenuSchedule'], ['@settings', 'onAvatarMenuSettings'], ['@sign-out', 'onAvatarMenuSignOut'], ['@login', 'onAccountLogin']]) {
     if (!tag.includes(`${ev}="${handler}"`)) return `账户入口没有把 ${ev} 接到 ${handler}`
   }
   // 顶栏整条是 drag 区：账户入口的按钮与下拉要在 App.vue 的 no-drag 名单里
@@ -565,10 +564,14 @@ check('账户入口在顶栏右上角（AccountEntry），rail 底部没有账�
   if (menuIdx < 0) return 'AccountEntry 里找不到下拉 .avatar-menu'
   const menu = entry.slice(menuIdx, entry.indexOf('</template>', menuIdx))
   const actions = menu.match(/class="avatar-menu-item/g) || []
-  if (actions.length !== 3) return `下拉动作项应恰好三项，实际 ${actions.length} 项`
-  for (const ev of ['schedule', 'settings', 'sign-out']) {
+  if (actions.length !== 4) return `下拉动作项应恰好四项，实际 ${actions.length} 项`
+  for (const ev of ['messages', 'schedule', 'settings', 'sign-out']) {
     if (!menu.includes(`emitAndClose('${ev}')`)) return `下拉里没有 ${ev} 项`
   }
+  const firstAction = menu.slice(menu.indexOf('class="avatar-menu-item'), menu.indexOf('</view>', menu.indexOf('class="avatar-menu-item')))
+  if (!firstAction.includes("emitAndClose('messages')")) return '消息中心必须是头像下拉的第一个动作'
+  if (!tag.includes(':message-unread="messageCenterUnread"') || !tag.includes(':message-partial="messageCenterBadgePartial"')) return '头像没有接收消息未读数与来源不完整状态'
+  if (/key:\s*'messages'/.test(readVue('src/config/leftSidebarPlugins.js'))) return '消息入口不应继续占用 rail'
   // 登录就地弹层（dev-board#1046）：未登录点击发 login，宿主 requireAccount({ reason: 'account' })，不离开工作台
   const onTap = extractMethodBody(entry, 'onTap() {')
   if (!onTap || !onTap.includes("this.$emit('login')")) return '未登录态点击没有 emit login'
@@ -588,7 +591,8 @@ check('四条直达工作台的出口一条都没动', () => {
   // 2026-08-16：应用菜单的派发从 App.vue 收口进 appMenuBridge，「最近打开」与
   // 「切换项目」两条都落在那里。行为不变（仍是 reLaunch 直达工作台），锚点跟着搬。
   if (!readFrontend('src/utils/appMenuBridge.js').includes('/pages/project-overview/project-overview?id=')) bad.push('appMenuBridge 应用菜单「最近打开」')
-  if (!readFrontend('src/utils/ideOpen.js').includes('/pages/project-overview/project-overview?')) bad.push('ideOpen.js 打开本地文件夹/文件')
+  if (!readFrontend('src/utils/ideOpen.js').includes('createLocalOpenCoordinator') ||
+      !readFrontend('src/utils/localOpenCoordinator.js').includes('/pages/project-overview/project-overview?')) bad.push('ideOpen.js 打开本地文件夹/文件')
   const ov = readVue('src/pages/project-overview/project-overview.vue')
   const i = ov.indexOf('switchToProject(p) {') // 方法定义；'switchToProject(p)' 会先命中模板里的 @tap 调用
   if (i < 0 || !ov.slice(i, i + 400).includes('/pages/project-overview/project-overview?id=')) bad.push('顶栏切换器 switchToProject')
@@ -981,16 +985,19 @@ check('无项目态：项目面板不挂载、右栏 AI 不渲染、暂存区不
   const src = readVue('src/pages/project-overview/project-overview.vue')
   if (!extractDefinition(src, 'hasProject')) return '缺 hasProject 计算属性'
   const sw = readFrontend('src/pages/project-overview/panelSwitching.js')
-  if (!/if \(!this\.hasProject && !isPaneAllowedWithoutProject\(key\)\) return/.test(sw)) {
+  if (!sw.includes('!this.hasProject || this.isLooseWorkspace') || !sw.includes('!isPaneAllowedWithoutProject(key)') || !sw.includes('!isGlobalPlugin(')) {
     return 'toggleLeftPane 没有在无项目态拦下项目面板的 key'
   }
-  if (!src.includes('v-if="aiPanelMounted && hasProject"')) return '右栏 AI 面板在无项目态仍会渲染'
+  if (!/<ChatInterface\s+v-if="hasProject"/.test(src)) return '右栏 AI 面板在无项目态仍会渲染'
   const tog = extractDefinition(src, 'toggleAiPanel')
   if (!tog || !tog.includes('if (!this.hasProject) return')) return 'toggleAiPanel 在无项目态没有直接返回'
   const onLoad = extractMethodBody(src, 'onLoad(query)')
-  const stagingAt = onLoad.indexOf('this.ensureStagingFolder()')
-  if (stagingAt < 0 || onLoad.lastIndexOf('if (query && query.id)', stagingAt) < 0) {
-    return 'ensureStagingFolder 必须留在 query.id 分支里（无项目态不建暂存区）'
+  const initProject = extractDefinition(src, 'loadProjectInfo') || ''
+  if (!onLoad.includes('if (query && query.id)') || !onLoad.includes('this.loadProjectInfo()') ||
+      !initProject.includes('if (this.isLooseWorkspace)') ||
+      initProject.indexOf('return') > initProject.indexOf('this.ensureStagingFolder()') ||
+      !initProject.includes('this.ensureStagingFolder()')) {
+    return '暂存区必须在真实项目初始化中创建，独立文件工作区须提前返回'
   }
   for (const f of ['src/pages/project-overview/project-overview.vue', 'src/pages/project-overview/panelSwitching.js']) {
     if (/`project_\$\{this\.projectId\}_(leftPaneKey|activeTabsByMode)`/.test(readFrontend(f))) {
@@ -1031,7 +1038,7 @@ check('日程是工作台里的中栏标签：四处入口开 openCalendarTab，
   if (!open || !open.includes("this.$emit('open-calendar')") || /pages\/calendar|leave-workbench/.test(open)) {
     return 'ProjectCalendarPane.openGlobalCalendar 应当 emit open-calendar'
   }
-  if (!src.includes('@open-calendar="openCalendarTab()"')) return '工作台没有把日程面板的 open-calendar 接到 openCalendarTab'
+  if (!readFrontend('src/pages/project-overview/calendarTab.js').includes("this.openPluginTab('calendar')")) return '日程入口未连接真实插件工作区'
   if (src.includes('@leave-workbench="leaveWorkbench"')) return '日程面板的 leave-workbench 绑定应已撤掉'
   // 3. 左栏「项目」面板的事项概览格 / 查看日程 / 下一件
   const list = readVue('src/components/project-list/ProjectListPane.vue')
@@ -1054,40 +1061,20 @@ check('日程是工作台里的中栏标签：四处入口开 openCalendarTab，
   return null
 })
 
-check('日程标签：单例 tabType calendar，左右两条渲染链 embedded + 全局视图，非文件标签', () => {
+check('日程插件：全局工作区贡献，复用双侧插件标签、深链和受限宿主导航', () => {
+  const manifest = JSON.parse(readRepo('official-plugins/calendar/manifest.json'))
+  if (!manifest.contributes.views.some(view => view.placement === 'workspace' && view.scope === 'global')) return '日程缺少全局工作区贡献'
   const src = readVue('src/pages/project-overview/project-overview.vue')
-  const n = countOf(src, "tabType === 'calendar'")
-  if (n !== 2) return `左右两条渲染链应各有一条 calendar 分支，实际 ${n} 处`
-  for (const side of ['Left', 'Right']) {
-    const at = src.indexOf(`v-else-if="activeFile${side}.tabType === 'calendar'"`)
-    const tag = src.slice(src.lastIndexOf('<CalendarPane', at), src.indexOf('/>', at))
-    if (!tag.startsWith('<CalendarPane')) return `${side} 分支渲染的不是 CalendarPane`
-    if (!/\bembedded\b/.test(tag)) return `${side} 分支没有 embedded`
-    if (!tag.includes(':project-id="null"')) return `${side} 分支应传 :project-id="null"（全局视图，筛选里按项目收窄）`
-    for (const ev of ['@open-project="onCalendarOpenProject"', '@open-file="onCalendarOpenFile"', '@close="closeCalendarTab"']) {
-      if (!tag.includes(ev)) return `${side} 分支缺 ${ev}`
-    }
-  }
+  if (countOf(src, ':url="entry.plugin.workspaceView?.url || entry.plugin.frontendEntry"') !== 2) return '左右两侧必须使用当前manifest工作区入口'
+  if (src.includes('<CalendarPane')) return '宿主仍直接挂业务日历组件'
   const tab = readFrontend('src/pages/project-overview/calendarTab.js')
-  if (!tab.includes("export const CALENDAR_TAB_ID = 'calendar'")) return '日程标签的单例 id 不是 calendar'
+  if (!tab.includes("this.openPluginTab('calendar')") || !tab.includes("command: 'calendar-focus'")) return '日程未连接插件标签及深链'
   const op = extractDefinition(tab, 'onCalendarOpenProject')
-  if (!op || !op.includes('this.leaveWorkbench(')) return '日程标签跨项目「进入项目」要走 leaveWorkbench'
+  if (!op || !op.includes('this.leaveWorkbench(')) return '跨项目仍须走保存后离开工作台'
   const of = extractDefinition(tab, 'onCalendarOpenFile')
-  if (!of || !of.includes('this.onTaskOpenFile(') || !of.includes('this.leaveWorkbench(')) {
-    return '日程标签「打开文件」：同项目就地 onTaskOpenFile、跨项目 leaveWorkbench'
-  }
-  const kind = readFrontend('src/pages/project-overview/fileKind.js')
-  if (!/NON_FILE_TAB_TYPES = \[[^\]]*'calendar'/.test(kind)) return "NON_FILE_TAB_TYPES 里没有 'calendar'"
-  // 标签形态下 CalendarPane 的跳转只 emit、不自己 reLaunch（它是 defineAsyncComponent 引入的，
-  // 上面「组件跳出工作台」那条按 import 语句扫不到它，这里单独钉住）
-  const cp = readVue('src/components/calendar/CalendarPane.vue')
-  for (const m of ['goToProject', 'onOpenFile', 'goBack']) {
-    const body = extractDefinition(cp, m)
-    const emitAt = body ? body.indexOf('if (this.embedded)') : -1
-    const navAt = body ? body.search(/uni\.(reLaunch|navigateTo|redirectTo)\(/) : -1
-    if (emitAt < 0 || (navAt >= 0 && navAt < emitAt)) return `CalendarPane.${m} 在 embedded 时必须先 emit 再 return`
-  }
-  if (!/v-if="!embedded" class="cal-back"/.test(cp)) return '标签形态下页头「返回」应隐藏'
+  if (!of || !of.includes('this.onTaskOpenFile(') || !of.includes('this.leaveWorkbench(')) return '日程文件导航丢失同项目/跨项目边界'
+  const cp = readFrontend('plugin-app/calendar/Panel.vue')
+  if (!cp.includes("'sidebar.command'") || !cp.includes("'calendar-file'") || !cp.includes('fileScopeId')) return '日程包缺深链或文件筛选'
   return null
 })
 
@@ -1115,7 +1102,7 @@ check('标签快照：两份键、恢复在 onLoad、leaveWorkbench 前同步写
   const src = readVue('src/pages/project-overview/project-overview.vue')
   const onLoad = extractMethodBody(src, 'onLoad(query)')
   if (!onLoad || !onLoad.includes('this.restoreTabSnapshot()')) return 'onLoad 没有恢复标签快照'
-  const exit = extractMethodBody(src, 'async leaveWorkbench(url)')
+  const exit = extractMethodBody(src, 'async leaveWorkbench(url, options)')
   const flushAt = exit ? exit.indexOf('this.flushTabSnapshot()') : -1
   const navAt = exit ? exit.indexOf('uni.reLaunch') : -1
   if (flushAt < 0 || flushAt > navAt) return 'leaveWorkbench 在 reLaunch 之前没有同步写标签快照'

@@ -26,7 +26,7 @@ function extractBlock(src, marker) {
 }
 
 test('rail 日程徽标：只挂在 calendar 项上，数 = 逾期 + 今天，0 不显，逾期转红', () => {
-  assert.match(overview, /v-if="p\.key === 'calendar' && railScheduleCount > 0"\s+class="rail-badge"/)
+  assert.match(overview, /v-if="p\.key === 'plugin-calendar' && railScheduleCount > 0"\s+class="rail-badge"/)
   assert.match(overview, /'is-overdue': railScheduleSummary\.overdue > 0/)
   const summary = new Function('taskStore', `return function () ${extractBlock(overview, 'railScheduleSummary() {')}`)
   const store = { byProject: { 242: { summary: { overdue: 1, today: 2, week: 5 } } } }
@@ -36,8 +36,9 @@ test('rail 日程徽标：只挂在 calendar 项上，数 = 逾期 + 今天，0 
 
 test('工作台只挂一个 TaskDialog，面板 / 文件树 / 命令都走 openTaskDialog', () => {
   assert.equal((overview.match(/<TaskDialog\b/g) || []).length, 1)
-  assert.match(overview, /@new-task="openTaskDialog\(/)
-  assert.match(overview, /@open-task="openTaskDialog\(\{ mode: 'edit'/)
+  const plugin = readFileSync(new URL('../../plugin-app/calendar/Panel.vue', import.meta.url), 'utf8')
+  assert.match(plugin, /<TaskDialog\b/)
+  assert.match(plugin, /dialogMode: 'create'/)
   assert.match(overview, /@add-task="onFileTreeAddTask"/)
   assert.match(overview, /@view-tasks="onFileTreeViewTasks"/)
   assert.match(menuCommands, /case 'newTask': this\.openTaskDialog\(/)
@@ -51,15 +52,17 @@ test('文件右键「添加事项…」预置关联这份文件；「查看事�
   addTask.call({ openTaskDialog: (o) => { opened = o } }, { id: 2391, name: 'a.docx' })
   assert.deepEqual(opened, { mode: 'create', presetFileIds: [2391] })
 
-  const viewTasks = new Function(`return function (file) ${extractBlock(overview, 'onFileTreeViewTasks(file) {')}`)()
+  const commands = []
+  const viewTasks = new Function('uni', `return function (file) ${extractBlock(overview, 'onFileTreeViewTasks(file) {')}`)({ $emit: (...args) => commands.push(args) })
   const toggled = []
-  const ctx = { leftPaneKey: 'files', sidebarCollapsed: false, toggleLeftPane: (k) => toggled.push(k) }
+  const ctx = { $nextTick: fn => fn(), leftPaneKey: 'files', sidebarCollapsed: false, toggleLeftPane: (k) => toggled.push(k) }
   viewTasks.call(ctx, { id: 2391, name: 'a.docx' })
   assert.equal(ctx.calendarFileFilter, 2391)
   assert.equal(ctx.calendarFileFilterName, 'a.docx')
   assert.deepEqual(toggled, ['calendar'])
+  assert.deepEqual(commands[0][1], { pluginId: 'calendar', command: 'calendar-file', fileId: 2391, name: 'a.docx' })
   // 日程面板已经开着时不能再 toggle（同 key 的 toggle = 收起）
-  const ctx2 = { leftPaneKey: 'calendar', sidebarCollapsed: false, toggleLeftPane: (k) => toggled.push(k) }
+  const ctx2 = { $nextTick: fn => fn(), leftPaneKey: 'plugin-calendar', sidebarCollapsed: false, toggleLeftPane: (k) => toggled.push(k) }
   viewTasks.call(ctx2, { id: 1, name: 'b.docx' })
   assert.deepEqual(toggled, ['calendar'])
 })

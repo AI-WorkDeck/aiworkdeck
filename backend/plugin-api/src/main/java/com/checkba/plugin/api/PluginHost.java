@@ -19,4 +19,11 @@ public interface PluginHost {
     Docs docs();
     Settings settings();
     Llm llm();
+    default Notifications notifications() {
+        throw new UnsupportedOperationException("Message center notifications are unavailable on this host");
+    }
+    /** Available on hosts supporting native plugin Agent sessions. */
+    default PluginSessions sessions() {
+        throw new UnsupportedOperationException("Native Agent sessions are unavailable on this host");
+    }
 }

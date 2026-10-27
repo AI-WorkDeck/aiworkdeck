@@ -7,6 +7,75 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 职责边界：AI 对话功能本身（编排循环、工具注册分发、记忆、SSE、前端聊天 UI、评测）。AI→编辑器指令链路属 ai-doc-bridge 领域；skill 机制属 plugin-system 领域（但 SkillRouter 在编排循环里有两处旁路接入点）。
 
+## AI 项目版本操作（2026-10-26，dev-board#1498）
+
+`VersionTools` 提供 `version_status/history/changes/commit/pull/restore`，独立 `version` 类目，均要求工作台 LOWA 宿主，不要求打开某份文档；Office/none 不可调用，ASK 仅放行状态、历史和变更清单。身份取 `ProjectContextHolder`，不可由模型指定另一项目或用户；客户不可读取版本历史，写动作仍经过既有成员权限与版本接口。`version_changes` 返回路径及增删改类型，不是正文差异；磁盘清单不代表编辑器未保存缓冲。历史可选 `includeAuto`，让 AI 找回恢复前自动保留的工作。
+
+写工具经 `VersionToolActionService` 创建绑定项目、用户、会话、SSE 代次和本轮令牌的一次性操作；`project_version_action` 同步桥由工作台保存所有受支持编辑器、领取执行、重载后回执。`/api/ai/agent/version-action/state` 和 `/execute` 仅接受服务端操作 ID，参数已在服务端固定。重复领取返回在途状态或已完成结果；停止、换轮、超时和旧连接不能开始未执行动作，已开始动作须对账，不能因缺回执重复提交。
+
+AI 自动合并续步也用同一操作的 `/merge`、`/merge-file` 与独立 `stepId` 回执，不能直接调用普通 UI 的写接口后用原提交的终态解锁编辑器。续步在原仓库锁内再次核对本轮有效、权限、同一冲突及 AUTO 分类；最终只允许所有路径已 MERGED 的收尾。`state?stepId=...` 查询指定续步，丢包只查询，不重发。前端入队时捕获固定守卫；停止的冲突身份暂停到显式重试，后台轮询不得把它重新排为自动合并。
+
+恢复必须使用历史列表里核实的完整版本编号，范围是整个项目；沿既有 `revertTo` 先保留当前工作、再追加恢复记录。提交、云端同步与编辑器刷新分别报告；自动合并复用现有 AUTO 流程，有内容取舍的冲突交版本面板，不自动选择一方。项目版本工具不标记单文档 `MODIFIED`，避免误触发活动文档检查点。
+
+按用户要求参考成熟 Git/gh 工作流：可解析状态与分支信息（[git status](https://git-scm.com/docs/git-status)）、取回后集成（[git pull](https://git-scm.com/docs/git-pull)）、明确恢复来源和范围（[git restore](https://git-scm.com/docs/git-restore)）。[gh repo sync](https://cli.github.com/manual/gh_repo_sync) 的普通同步和强制重置是不同动作，本工具不把失败自动升级为强制覆盖。底层仍使用项目既有 JGit/对象过滤/文件树清单，借鉴操作语义，不另造提交或合并算法。
+
+## Harness² 自愈、证据挑战与用户自进化（2026-10-26，dev-board#1481）
+
+对齐 Google `Harness²`（Invariant vs. Domain 双层架构 + Propose–Probe–Compose 自愈 + 对比式自进化）、`VeriHarness`（声明式证据挑战网关）与 `EnvHarness`（Setup/Rule/Link 环境扰动评测）：
+- **双层诊断与运行时自愈**（`service/ai/harness/HarnessDiagnosticService`）：工具失败时先判 Invariant 层（锚点漂移/文本未命中 → `ANCHOR_PROBE_RECOVERY` 优先引导只读回读探针；类目隐藏未展开 → `EXPAND_TOOL_CATEGORY` 自动展开下一轮工具类目）与 Domain 层（复杂审查未挂技能 → `MOUNT_DOMAIN_SKILL` 按最长触发词挂载；需用户补充事实 → `CLARIFY_WITH_USER`），向前端发 SSE `harness_adaptation`（过程卡渲染运行时自愈诊断与处方）并注入探针提示。
+- **声明式证据挑战网关**（`SkillDefinition.VerificationPolicy` + `service/ai/harness/VerificationHarness`）：`skill.yml` 可选声明 `verification_policy: slot_evidence_challenger`（内置 `legal-opinion-review` 已启用）；收尾核验子任务产出解析为结构化 `VerificationReport`，发 SSE `verification_report`，前端 `VerificationReportCard.vue` 展示已证实/待核/冲突计数及逐槽证据明细。
+- **对比式自进化、数据库持久化与历史回放**（`service/ai/harness/HarnessEvolutionService` + `model/entity/HarnessEvolutionEntry` (`ai_harness_evolution` 表) + `repository/HarnessEvolutionEntryRepository` + `controller/ai/HarnessEvolutionController`）：从回退重发（`ROLLBACK_CORRECTION`，`ProjectAiMessageService.rollbackWithArchive` 预挂钩 + 下一轮新提示配对）、插话纠偏（`STEER_INTERJECTION`）、自愈成功恢复（`SELF_HEALING_RECOVERY`）三类真实对比信号提取紧凑规则，写入 `MemoryDocumentService` 的 `topics/harness-evo-<id>.md`（带 `description:` frontmatter 自动入 `remember.md` 索引），同时将含 `assistantMessageId` 的完整记录落库 `ai_harness_evolution`（进程重启后仍可按 id 切换作用域/升格/撤销；升格技能限定 `user-evo-*` 命名空间且仅管理员可升格）。前端 `ChatInterface.restoreHarnessEvolutions` + `utils/harnessEvolutionHistory.mjs` 在加载历史时按 `assistantMessageId` 把自进化卡挂回原气泡；`HarnessEvolutionCard.vue` 支持一键切换作用域（项目级 ⇄ 个人全局）、升格为独立 Skill（`POST /api/agent/harness/evolutions/{id}/promote-skill`）或撤销（`DELETE /api/agent/harness/evolutions/{id}`）。
+- **三维环境扰动回放**（`test/.../eval/EnvPerturbation` + `EvalHarness.run(EvalCase, EnvPerturbation...)`）：支持 `Setup`、`Rule`、`Link` 三类扰动注入，验证编排器在工具隐藏、锚点漂移、跨步恢复下的鲁棒性。
+- `HarnessEvolutionEntry.payloadJson` 必须使用 `@JdbcTypeCode(SqlTypes.LONGVARCHAR)` + `TEXT`，不能加 `@Lob`：PostgreSQL 会将其绑定为 CLOB/OID，DDL 的 `TEXT` 不会覆盖 JDBC 读写类型（dev-board#1522）。`HarnessEvolutionJdbcMappingTest` 验证 PostgreSQL/H2 双方言实际映射及 `setString/getString`，持久化测试另覆盖超过 64K 的 Unicode JSON 落盘回读。
+- 回归：`HarnessDiagnosticServiceTest`、`VerificationHarnessTest`、`HarnessEvolutionServiceTest`、`HarnessEvolutionPersistenceTest`、`EnvHarnessPerturbationEvalTest`、`frontend/tests/project-home/harness-evolution-ui.test.mjs`、真浏览器+隔离真后端端到端 `frontend/tests/ai-alignment-e2e/harness-self-evolving-e2e.mjs`。
+
+## 智能模型路由（Smart Mode / Auto，2026-10-22，dev-board#1434）
+
+- 前端 `ModelSelectorDropdown.vue` 顶部置顶「智能模式（Auto）」（`.model-auto-option`，`modelId = 'auto'`）；本地存储未显式持久化有效具体模型时默认选中 `'auto'`，用户在下拉中显式选定任意具体模型后持久化该模型。当处于 `'auto'` 模式且可用清单中存在任一 `vision: true` 模型时，`currentModelVision` 为 `true`，允许直接上传图片并由后端路由到视觉模型。
+- 后端 `SmartModelRouter` 在 `AgentOrchestrator.handleUserMessageInScope` 中紧随 `skillRouter.activateForTurn` 之后、上下文组装之前执行 0ms 规则路由（不额外发起 LLM/Jev 预判调用），综合 `mode`（`ASK`/`AGENT`/`PLAN`）、已激活技能（`legal-opinion-review`/`contract-review`/`due-diligence` 等）、图片多模态、`contextItems` 文档/目录规模、活跃文档与消息意图，将 `'auto'` 路由为三档目标模型并按需动态调整 `reasoning.effort`（`low`/`medium`/`high`）：
+  - **极速档（`FAST`）**：纯文本寒暄/机械微调/极短问答 → `deepseek/deepseek-v4-flash`（视觉按区域选 `qwen/qwen3.7-flash` 或 `google/gemini-3.6-flash`），`reasoningEffort = "low"`。
+  - **主力均衡档（`BALANCED`）**：常规法律问答、单文档条款修订、工具编排 → `deepseek/deepseek-v4-pro`（带图选 `moonshotai/kimi-k2.6`），`reasoningEffort = "medium"`。
+  - **深度旗舰档（`DEEP`）**：`PLAN` 模式、`legal-opinion-review`、`contract-review`、多文档/目录尽调、长文起草或复杂架构推理 → 国际区选 `anthropic/claude-sonnet-5`；境内区按深度推理/意见书选 `moonshotai/kimi-k3`（`reasoningEffort = "high"`），按合同审查/多文档/长文或带图选 `qwen/qwen3.8-max`。
+- 实际路由的模型写入 `RunGuard.activeModelId` 与 `reasoningEffortOverride`（随重启快照保存；触发跨模型 failover 时自动清除 override），并向前端推送 SSE `model_routed` 事件（`requestedModel`、`effectiveModel`、`effectiveModelName`、`tier`、`routed`），前端在智能模式下更新选择器按钮显示为 `智能 · {模型名}`。
+- 回归：`SmartModelRouterTest`、`ChatModelFactoryTest`、`AgentSkillUpdateEventTest` 及 `frontend/tests/chat-presentation-ui/model-pricing.mjs`。
+
+## Jev 折叠入口（dev-board#1366）
+
+`DecisionAssistControl.vue` 在空会话和已有会话的输入区均默认收成「了解并使用 Jev」；原生 `details/summary` 支持鼠标与 Enter/Space，摘要始终显示启用状态。展开仅改变显示，不代表同意启用；原开关继续通过 `toggle` 和既有按用户隔离的偏好控制下一次发送，费用、数据范围与本地模型说明保留在展开区。回归：`frontend/tests/chat-presentation-ui/decision-assist.mjs`，使用真实 ChatInterface 和合成 HTTP，不代表调用真实 Jev。
+
+## 桌面正常退出与重启接续（2026-10-19，dev-board#1356）
+
+- `AgentRestartController` 只在 local-mode 注册，`/api/agent/restart/{prepare,abort,pending,resume}` 沿现有本机认证；prepare/abort 使用同一 attemptId，迟到 prepare 不得把已取消退出重新冻结。prepare 先封住新 run 与插话消费，再等当前模型/工具到下一次 runLoop 安全边界；不把 SSE 重连当作进程恢复。只有轮次真正暂停、运行态写透 DB 后才返回 ready。桌面此后才 flushDirtyEditors、停止服务和退出。
+- 检查点放在原 inbox requestJson 的服务端 `_restartCheckpoint`，保留同 runId、完整模型消息栈及工具结果、原授权/模型/模式/技能、最初文档与当前文档、输出目录、检查与重试进度、助手消息行/思考轨迹、试用计量归属；正常恢复不重新保存 USER、不重发原请求、不重新执行已完成工具。仅本机 LOWA/纯对话参加，Office 原始正文隐私规则不变。检查点用于恢复的本地上下文在消费时删除；新用户轮替代旧任务时移除旧检查点，删会话沿 inbox 删除。
+- pending/resume 重新检查用户、项目访问与 CLIENT 限制、账户指纹、原目标 ID 和已激活技能；技能集合变化不静默放宽工具权限。工作台打开原项目/会话/文档，等真正 editor ready 才调用 `ChatInterface.resumeAfterRestart(fileId, canResume)`；无目标始终传 null，不能偷带当前其他文档。SSE 建连失败不启动。检查点先原子消费再提交执行，重复请求不重跑；执行队列拒绝（尚未执行任何工具）恢复检查点供重试。新增内部恢复提醒要求回读当前稿、重建编辑器锚点，不能重放已完成修改。
+- 退出被取消/保存失败时 abort 撤销本次意图；同账户且原 SSE 连接代次仍在时恢复本次已暂停任务，连接变化则保留检查点并返回 paused 数量由前端提示。`restartAdmission` 只负责入队与退出屏障，checkpoint 按 RunGuard 锁执行；不要恢复全局 this→inbox 与 inbox→this 的反向锁顺序。
+- 边界：强杀/断电、工具错误或 ACK 不明、仍在流式写文档、尚未完成的后台任务不制造自动恢复承诺；正常退出等待超时应留在应用并允许取消退出，不盲重放副作用。AWAITING_INPUT/AWAITING_APPROVAL/PAUSED 启动后只恢复等待 UI；CANCELLED/FINISHED/ERROR 不自动恢复。多项目未显示的目标不能向当前编辑器发指令，保留待恢复入口。
+- 验证：`AgentOrchestratorInboxTest` 使用真实编排器与脚本模型验证跨服务/编排器实例的完整工具结果续跑、同 runId/单 USER/单次已完成工具、错目标/项目/账户、取消与退出取消、迟到 prepare、新输入屏障；`AgentInboxTransactionBoundaryTest` 用真实 H2/JPA 验证检查点提交、带元数据请求反序列化、跨服务回读、消费幂等。运行状态、思考、打转、试用与并发轮次回归一并运行。这些不等于正式签名安装包、真实 LOWA 或外部服务跨升级 E2E 已验收。
+
+## Office会话隐私（2026-10-16，dev-board#1316–1318）
+
+OfficeConversationPrivacy在ProjectAiMessageService保存助手消息前移除tool_code/tool_output
+原始载荷（含中断未闭合片段）；模型当前轮内存仍可消费完整工具结果，最终回复和用户主动输入照常保存。
+MemoryPipelineService对OFFICE跳过自动摘要及后台同步，避免将SystemMessage活跃正文和ToolResult
+另行转成长期记忆。用户显式写入的项目记忆仍是独立功能。删会话同步清Inbox/摘要/正文缓存；
+启动迁移与hash缺失重传契约见office-addin.md。不要把清历史在线行称为擦除运维备份。
+
+## 下一句建议（dev-board#1224，2026-10-12）
+
+- 桌面 `ChatSuggestionControl` / `useChatSuggestions` 默认开启，用户+后端地址独立偏好。仅真实 SSE `bubble_end status=finished` 回调且面板可见、输入空时请求；历史恢复、等待回答/审批、取消、输入中不发起。开关说明披露额外用量，关闭不再发起；不承诺取消已经送出的模型请求。
+- `POST /api/ai/suggestions` 与 `/{id}/feedback` 仅 local-mode 注册，沿现有 loopback/身份保护。`ChatSuggestionService` 校验会话归属与 FINISHED，最近 6 条×2,000 字符，剔除过程/工具/思考，不额外读取文档；`ChatModelFactory.getChatModel(modelId, timeout, cap)` 沿当前供应商、选定模型，15 秒、256 output tokens、无工具/重试。过长或不合形响应丢弃，不让建议失败影响主对话。按用户+会话+源 assistant 消息+模型复用已生成建议，全局一次一个在途生成。
+- 建议只在点击后回填或焦点在空输入框、无修饰/IME/重复键、无 @ 浮层时按 Tab 走现有发送路径；Shift+Tab 正常导航。点击可改写，收到真实 inbox 收执后才记反馈，失败保留草稿和关联供重试。5 分钟、换会话/身份/模型/文档、开始新轮、用户输入、隐藏页面时丢弃未使用建议；历史重载/回退也清理。
+- `chat_suggestion` 是本机业务记录，不接遥测：记录建议 ID、源消息、真实 clientRequestId 与 accepted/edited/dismissed；后端从 inbox 已接收文字判采纳或修改，不信客户端自报。删会话/回退同步清理反馈，每小时清理 30 天前记录，最近 3 条同用户同会话反馈供后续建议调整。反馈不是事实正确性判定、不是自动训练；中英隐私说明与界面一致。Web/Office 暂无该入口。
+- 回归：`ChatSuggestionServiceTest` + `ChatModelFactoryTest`；`node tests/chat-presentation-ui/chat-suggestions.mjs` 使用真正 ChatInterface、SSE 和键盘与合成模型/HTTP，覆盖 Tab/IME、修改、失败重试、迟到/换会话/身份、开关与 320px 双主题。合成响应不能证明真实模型建议质量或正式客户端表现。
+
+## 文档流式写入后的书面汇报（dev-board#1392，2026-10-21）
+
+正常结束的文档正文流若确有正文、却缺少非空 `<final>`，`AgentOrchestrator` 补一次 `documentSummaryOnly` 回合：不下发工具，输出先缓冲验证，再统一发为聊天 final；原生或 XML 工具、协议产物与截断输出不执行，改发未能生成完整说明的提示。错误不重试总结；原取消、提问、审批与正文截断分支优先。标志随重启快照保存，新插话清除。服务端发出正文不代表编辑器保存/回读成功，汇报提示保留该证据边界。
+
+`useAgentStream` 在 `doc_stream_end` 先冲正文尾部缓冲、再解除正文抑制并删除临时占位；同轮提前来的 final 也删除占位，异步编辑器失败仍追加可见通知。`chatTimeline` 在占位删除后回退文本索引，防短总结落在旧位置。历史裸文档正文去重未在本次扩展；旧会话无 final 不会被自动补写。
+
+验证：`AgentOrchestratorDocumentSummaryTest`、`AgentStreamHandlerDocumentFinalTest`、`frontend/tests/project-home/doc-stream-summary.test.mjs` 与 `frontend/tests/chat-presentation-ui/doc-stream-summary.mjs`（真实 ChatInterface + 合成 SSE）。现场与验收边界见 `doc/verification/2026-10-21-doc-stream-summary-1392.md`；未发正式包，不代表用户客户端实模复测。
+
 ## 试用回合归属（dev-board#1166，2026-10-10）
 
 `launchTurn` 在入执行队列前把当前账户指纹写入 `RunGuard`，收尾原样交给 `TrialTurnMeter`；不得到异步上报时才取当前账户。换账户则放弃旧回合，发送与账户切换共享锁；server 未接 per-user 试用上报前停用机器级计量。接线测试 `AgentOrchestratorTrialHookTest` 验证入队捕获与收尾传递，账户/缓存契约见 licensing-billing。
@@ -109,6 +178,28 @@ dev-board#1107 后续完整来源探针发现：仅删“全部”仍保留无�
 - **通道/计费**：仅当前 OpenRouter 平台或 BYOK 通道可用，本地 Ollama 不外发，不为 Jev 自动换供应商。关闭时在凭据解析/平台 Key 配发前短路，零 Jev 请求/费用；开启但本次不适合预选（如 ASK）同样跳过。平台用既有累计用量对账，BYOK 可记 Jev 返回的实际 cost；不要把平台累计差额与 Jev 响应 cost 叠加双算。主模型选择不变。
 - **验证入口**：`frontend/tests/chat-presentation-ui/decision-assist.mjs` 用真实组件+合成 HTTP 验开关、键盘、窄窗、中英、POST/queue/steer/重新生成、发送期间切换及身份隔离；`frontend/tests/project-home/decision-assist-preference.test.mjs` 验默认关闭/脏值/重试。后端须覆盖 DTO 严格布尔、Inbox 持久化、候选收窄/发现兜底、取消/迟到、默认零调用及平台/BYOK/本地边界；不能只用 POST 字段存在断言代替执行链验证。真实模型对照只用合成材料，比较完成质量、端到端总耗时和完整费用。
 
+## AI 新建文件的默认位置与拖拽（dev-board#1181）
+
+产品内子代理透传父轮 defaultOutputFolderId，但不继承父技能 runId/披露状态。聊天新增文件拖拽须配对发既有 file-drag-start/end 信号；否则目录节点可接收，根空白/空树却不会显示或接收投放。
+
+`pdf_to_word` 独立沿用源 PDF 的可见目录（省略 parentId），显式目录优先、0 明确根目录；目录解析在同轮转换幂等 key 之前完成。它不继承后来打开的参考文档目录。
+
+`GeneratedFileLocation` 是新建落点策略；`ToolRegistry` 只对白名单
+`write_file/write_docx/doc_start_stream（fileId 为空）/sheet_create_file/pptx_generate` 在反射绑定前解析目录。
+显式正 folder ID 优先，`0` 明确表示根目录；省略/null 用本轮启动时从活跃文件查到的可见源目录，无有效源文件才回根。
+`RunGuard.defaultOutputFolderId → ToolContext.defaultOutputFolderId` 固定此默认值，后续 `doc_open_file` 看参考材料不改变它。
+只继承同项目、未删除、真实文件的父目录；隐藏 `.stagezone/__staging_area__` 及其后代不作为默认。
+显式/已冻结目录已失效或跨项目时返回错误，不悄悄换位置；既有文件编辑、移动及 PDF 衍生工具不适用本策略。
+目录先解析再进入工具，因此 `newDocxKey` 使用真正目的地；PPT 配置弹窗也拿到已解析目录。
+
+`write_*`、新建流式 Word 和新建表格返回成功 JSON，`db_id` 是数据库身份，`file_path` 只输出项目内相对路径。
+`file_change` 对此白名单仅从成功 JSON 的整数 db_id 查同项目有效文件，回传冲突改名后的真名/id，绝不按名字反查；事件另带 projectId。
+聊天“新增”清单只有同项目且有真实 id 的项可拖：两种既有 MIME `application/x-checkba-file/text/checkba-file-json`
+与 global fallback 都使用 `{fileId,projectId,name,fileType,source:'chat-generated'}`。旧历史缺 id/projectId 不可猜着拖。
+FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，避免下一次拖错。
+验证：`GeneratedFileLocationTest`、`AgentOrchestratorFileChangeTargetTest`、`generated-file-drag.test.mjs`、
+`node frontend/tests/chat-presentation-ui/generated-files.mjs`（隔离 Chromium、真组件和原生拖拽，HTTP 合成，无模型调用）。
+
 ## 关键文件（后端包根 backend/src/main/java/com/checkba/）
 
 **编排核心**
@@ -137,7 +228,7 @@ dev-board#1107 后续完整来源探针发现：仅删“全部”仍保留无�
   - **新增停机/终止状态必须同步四处**（漏一处是静默故障，AWAITING_INPUT 那次就漏了第四处）：① `service/telemetry/TelemetryTurnTracker.TERMINAL`（不加则 ai.turn 轮次永不闭合）；② `office-addin/taskpane/lib/chatSession.js` 的状态分档（**不是**单一 stillRunning：`generating` 锁输入 / `awaitingUser` 解锁并给 notice——任务窗格没有「继续」按钮，把等人类的状态并进「仍在跑」会把输入框永久锁死）；③ `frontend/src/composables/useAgentStream.js` 里 bubble_end 的 status 解析（**有两处**：无气泡兜底分支与正常分支）**外加 run_state 分支**，共三处；④ 会话列表的状态文案表与圆点判定，具体是 `pages/project-overview/project-overview.vue` 的 `convStatusLabel`（文案）+ `convDotClass` + `historyBadge`（圆点）与 `ChatInterface.recentDotClass` ——**文案表最容易漏**，只加圆点的话新状态在列表上和「待审批」长得一模一样，等于新状态白加。
   - 启动回收（`AgentRunRecoveryService`）只捞 RUNNING（→INTERRUPTED）与 INTERRUPTED（塞回内存），**AWAITING_APPROVAL/AWAITING_INPUT 跨重启保持 DB 原样、不进内存**：问题卡与审批卡由历史消息渲染，用户回来点选项照样有效；代价是重启后会话列表的「待回答」圆点会消失（`AiChatController` 的 runStatus 只读内存）。要改这条得连 AWAITING_APPROVAL 一起改，别只给一个状态开后门。
 - `service/ai/TodoListService.java` — 任务清单（`todo_write` → `plan_update` 事件）。与 run 状态同款「内存 map 快路径 + 写透 DB」：新表 `agent_todo_list`（entity `model/entity/AgentTodoList`，整表 JSON 一行，ddl-auto 自动建表；写失败只 log 不阻断——进度卡坏掉不该让对话中断）。唯一读路径 `currentList()` 未命中时按 conversationId **惰性回填**：此前清单是纯内存的、进程重启即丢，而 run 状态却能回收成 INTERRUPTED 并给用户「继续」按钮，点下去清单已经没了——是个假承诺。空 list 是「查过 DB 确实没有」的**负缓存**占位（`reminder()` 每轮工具执行都调，不占位会每轮打库）；读失败刻意不写负缓存（留恢复窗口）。`purgeStaleLists()` 每日清 30 天未更新的行并摘掉内存条目。**清单刻意不并进 `agent_run_record`**：两条写路径各自 findByConversationId→save 会互相盖字段（lost update），且清理口径不同。`plan_update` 事件形状未变。
-- `service/ai/AgentRunRecoveryService.java` — 启动回收（harness 二期）：ApplicationReadyEvent 把 DB 里遗留的 RUNNING 全部翻成 INTERRUPTED 并塞回内存 map（/connect 的 run_state 只读内存），同时给该会话最后一条半截 ASSISTANT 消息追加 `> **[进程中断]** …`（按「含 [进程中断] 即跳过」幂等）。前端 run_state=INTERRUPTED → `agentPaused={reason:'process_interrupted'}` → 复用「继续」按钮（发一条「继续」消息，编排器起跑照常翻回 RUNNING）。**刻意不做 runLoop 快照重放**：工具副作用无法保证幂等；恢复粒度就是「从已持久化的轮次级执行日志继续」，丢失窗口只有最后一个未完成的 LLM 轮。
+- `service/ai/AgentRunRecoveryService.java` — 启动回收（harness 二期）：ApplicationReadyEvent 把 DB 里遗留的 RUNNING 全部翻成 INTERRUPTED 并塞回内存 map（/connect 的 run_state 只读内存），同时给该会话最后一条半截 ASSISTANT 消息追加 `> **[进程中断]** …`（按「含 [进程中断] 即跳过」幂等）。前端 run_state=INTERRUPTED → `agentPaused={reason:'process_interrupted'}` → 复用「继续」按钮（发一条「继续」消息，编排器起跑照常翻回 RUNNING）。**未经过正常退出屏障的进程中断仍不做 runLoop 快照重放**：工具副作用无法保证幂等；恢复粒度是「从已持久化的轮次级执行日志继续」。正常桌面退出的安全检查点另见 #1356 契约。
 - `service/ai/ContextAssemblerService.java` — assemble()：prompts/system_prompt.md + enforcement 段 + 模式约束 + Skill 注入 + 记忆 + 文件上下文 + 历史栈。**应用语言二选一（EN 版 PR5）**：注入 AppLanguageService，en-US 时基底 prompt 换 `prompts/system_prompt.en.md`（缺失回退中文版），enforcement/模式约束/系统时间格式（Locale.ENGLISH，时区仍 Asia/Shanghai）/活跃文档指引/readHint/末位提醒全部切英文文本（文件尾部的 EN_* 常量与 *En 方法）；zh-CN 路径代码与文本一字未动。**两版协议面（标签/停机条件/工具规则）必须逐条一致**——改中文版任一硬编码段时必须同步对应英文段与 system_prompt.en.md（en 文件里有 zh § 行号对照注释）。语言切换测试在 ContextAssemblerServiceTest 的「应用语言切换」组。activeContext 正文来源二选一：ContextItem.inlineContent（Office 插件等外部客户端随请求内联携带，200k 截断）优先，否则 read_document(fileId)（dev-board#800 起它走 ProjectFileTextExtractor + 落库缓存，桌面端活跃文档不再每轮整篇重抽/重 OCR）——见 resolveActiveDocumentContent；末位 [系统提醒] 两条路径共用不变。 **工具的失败回执不是正文**（dev-board#779 K8）：`read_document` 读不到时不抛异常，而是把一句英文说明当返回值交回来（`Error: File not found.` / `Error reading document: …` / `Warning: no text extracted from …`），这些串非空，原来直接通过 `content != null && !content.isBlank()` 的守卫写进 `<active_document>` 的 CDATA——模型读到的是「当前打开的文档，正文如下：Error reading document: For input string: "artifact-12"」，而末位 [系统提醒] 还在说「其正文已内联注入」。现在注入前先过 `isToolFailureText(content)`（只看首行、只认那三种前缀），认出来就落到既有的 readHint 分支明说「正文暂不可读」。前端同批在源头挡了一道（虚拟标签不再当活跃文档，见 sidebar-shell.md 的 `activeTabContext.js`）。**`<file>` 段（显式附件）同批也上了这道**：命中即**不进 CDATA**，改成 `<file id=… name=…>该附件内容暂不可读：<失败首行></file>`（英文 `This attachment could not be read: `），让模型能把「这份附件读不出来」转述给用户，而不是「引用」一句 Java 异常文案当合同原文；首行取 `toolFailureHeadline`（首个非空行，超 200 字符截断）。OCR 降级那段（`appendOcrFallbackFile`）也补了同一判据——它的 CDATA 顶着一句「以下正文由 OCR 转写而来」的横幅，失败回执落进去就成了「识别结果是这句英文」，那里保留横幅、正文位置换成 `[Empty or unreadable file]`。护栏 `ContextAssemblerServiceTest` 的五条（活跃文档 Error / Warning / 正文首行恰好以 Error 开头的不误杀，附件 Error 不进 CDATA / 附件正常正文照常注入）。
   - **法域与字形规则（dev-board#375，2026-09-02）**：zh 版基底 prompt 的「Simplified Chinese / Mainland China」是产品语言与人设，**不是法域断言**——身份段之后加了一段「适用法域以文档为准」（繁體 + 台灣法源 = 台灣法；禁止跨法域套概念；`law_*` 只覆盖内地法；**写进文档的文字跟随文档字形与用语**，「简体中文」只约束对用户的回答）。en 版对应段落在 jurisdiction-neutral 之后，措辞刻意避开 "Simplified Chinese" 字样（`ContextAssemblerServiceTest.englishModeAssemblesEnglishSystemPrompt` 断言英文模式不含它）。enforcement 段的 Language 小节两版各加一行同义规则（弱模型对 system prompt 中段视而不见，末位 enforcement 才管用）。病灶：台湾认购合约被按内地法审、简体句子插进繁體正文。
   - **系统提示按客户端能力分段（dev-board#809 / K29，2026-09-22）**：基底 prompt 里**只留与客户端能力无关的通用规则**；doc_*/sheet_*/slide_*/office_*/需要桌面端的 pdf 与 pptx 写入工具，指引全部搬进片段文件，由 `spliceToolGuidance` 在基底 prompt 的占位标记 `ContextAssemblerService.TOOL_GUIDANCE_PLACEHOLDER`（`<!-- awd:tool-guidance -->`）处按会话能力拼进去。
@@ -479,7 +570,7 @@ dev-board#1107 后续完整来源探针发现：仅删“全部”仍保留无�
      → 起跑时存进 `RunGuard.unusableTools` → **在编排器里**做最后一道过滤（与 skill 白名单、
      ASK 只读记忆工具同一处；**刻意不放进 ToolRegistry**：那里多一个重载会让只 stub 了旧重载的
      Mockito 测试静默拿到空工具集，本次就踩了两个）。
-     与 `isAvailable()` 的分工：那个是**进程级**的（@PostConstruct 探一次，如本机有没有 Docker），
+     与 `isAvailable()` 的分工：那个是**组件级**的（新轮读取短缓存，如本机 Docker 是否可用），
      这个是**运行期**的（账户随时可连可断）；粒度也不同，这个按工具名——同一组件里常常一半要账户、
      一半是纯本地的（`WebTools` 的 search_web 要、browse_url 不要；`LegalTools` 的 law_* 要、
      read_document 不要），**连坐的表现是「模型以为它连文件都读不了」**。
@@ -688,9 +779,9 @@ dev-board#1107 后续完整来源探针发现：仅删“全部”仍保留无�
     **`RealToolBeans` 的清单必须齐全**：CheckpointTools 与 SlideEditTools 长期漏列，
     于是针对它们的 `offeredToolsExclude` 全是空断言（工具名没注册，排除断言恒过）——
     已于 dev-board#729 补齐，`EvalToolBeanParityTest.KNOWN_MISSING` 现在是空集，别再往里加名字。
-- **组件级可用性闸（dev-board#396）**：`AgentToolComponent.isAvailable()`（default true）。返回 false 的组件**仍然登记进 builtinTools**（resolve/execute 照常命中），但**它的 spec 不进 builtinSpecifications**——模型看不见即不会去试，而万一被 XML 兜底路径调到，拿到的是工具自己那句可行动的错误（远好过 "tool not found"）。探测在 `ToolRegistry.init` 的 @PostConstruct 上跑，所以实现**必须自己缓存且绝不抛异常**（抛了也被 `componentAvailable` 兜成"可用"，最坏多下发一个工具，但不许让后端起不来）。今天唯一的使用者是 `PythonTools`：`run_python` 无条件 `docker run python:3.9-slim`，判据是「docker 可执行文件在 **且** `docker version` 成功」（Docker Desktop 装了没开的机器上 CLI 在、守护进程不在，run 一样起不来），3 秒超时、输出 DISCARD（接了管道又不读会把子进程卡在 write 上）、**进程级**缓存（不是每实例一份：eval 里每个 harness 都会新建一个 PythonTools，逐个 fork docker 子进程会把测试拖慢几分钟）。护栏 `ToolRegistryAvailabilityTest` / `PythonToolsDockerGateTest`。
+- **组件级可用性闸（dev-board#396/#1388）**：`AgentToolComponent.isAvailable()`（default true）。所有 eligible 规格保留登记，`ToolRegistry.getAllSpecifications()` 在每轮读取时按组件当前状态过滤，同一组件每轮只查一次；`offerToModel=false` 仍不下发，resolve/execute 仍可命中。`PythonTools` 检测 Docker CLI 与 daemon，探测最多 3 秒、输出 DISCARD、30 秒缓存；设置页 `refreshDockerStatus()` 强制重检。安装/启动 Docker 后无需重启后端即可恢复工具下发，真正执行使用探测同一可执行文件，不退回宿主 Python。护栏 `ToolRegistryAvailabilityTest` / `PythonToolsDockerGateTest` / `PythonToolsDockerProbeTest`。
 - **永久不下发的工具（dev-board#799，审计 A15）**：`@ToolMeta(offerToModel = false)`。与
-  `isAvailable()`（**进程级**，本机有没有 Docker）和 `currentlyUnusableTools()`（**运行期**，
+  `isAvailable()`（**组件级**，本机 Docker 当前是否可用）和 `currentlyUnusableTools()`（**运行期**，
   账户连没连）同一口径——**只裁 spec、不裁 resolve/execute**，但这一个是**永久的**：工具本身
   已经停用或者压根不该出现在律师面前，与环境无关，所以写成声明而不是每次现算。
   最早的两个使用者：`delete_file`（永久停用，实现就是一句拒绝；每轮白付一份 schema，而且用户说
@@ -959,9 +1050,11 @@ dev-board#1107 后续完整来源探针发现：仅删“全部”仍保留无�
 - `AgentInboxService` / `AgentInboxController` / `AgentInboxItem` 以 DB 保存输入、完整附件上下文、幂等键及 revision。`POST /api/agent/chat` 返回 receipt，正在运行时默认 steer，可选 queue；编辑/排序/删除只针对 pending。删除保留幂等 tombstone。每会话锁覆盖 claim/register/finalize，模型执行在锁外；目前单后端消费，不能将进程锁当成多实例租约。
 - `inbox_updated` 是权威快照；`input_applied` 携带 messageId/runId/sequence。最初 POST 靠 receipt 显示，不重复发 applied；自动接续先发新 run 快照再发 applied。原生/XML 工具批次在安全边界应用新指令，未开始的旧工具回填取消结果；已经执行的副作用保留。取消/错误/待审批/待回答/无进展均暂停队列；只有明确“立即发送”才主动启动暂停队列中的该项。
 - **显式提交 `submissionMode=steer` 就通知幂等入口 `acceptInboxSubmission`**（`AgentInboxController.edit`，dev-board#802/#824），不再由控制器要求 `activeRunId == null`，也不要求曾经 queue→steer。无活跃轮次时启动这条 pending 输入；有活跃轮次时不另开 run，而是取消尚在等待/进行的 Jev 预选，让插话按既有安全边界应用，返回当前 runId。这样，原本已是 steer、但在取消/出错/待审批/待回答/无进展暂停之后留在 pending 的项，仍可通过「立即发送」继续。**纯改正文（不带 `submissionMode`）与显式 queue 都不主动启动，也不触发该 steer 通知**——修改措辞或保留排队不是立即执行。
+- **旧 inbox 不携带永久执行权**（dev-board#1257）：立即发送在修改正文前、接纳 pending 项、执行器真正起跑、自动接续及应用插话时，按落库项原项目和原用户重新检查成员权限与 `isClient`（包含全局 CLIENT）。历史会话归属不能替代当前项目权限；客户、被移出项目者及缺项目的旧项不得重新进入上下文或模型。尚未接纳的项保持 pending；已接纳但起跑前失权的项中断并清理 run。
 - 前端 `AgentInbox.vue` 的 `run-active` prop 决定 steer 项露不露「立即发送」（`canSendNow`：queue 项恒露，steer 项只在没轮次在跑时露），并在没轮次时多渲一行 `chat.inboxIdleNotice`。判据取 `ChatInterface.inboxRunActive` = **`isStreaming` 单一来源**：切回一条后台仍在跑的会话时 `run_state=RUNNING` 会把它置起，所以它不只是「本窗口从头看到尾的那一轮」。**刻意不与 `agentRunStatus === 'RUNNING'` 取或**——用户点停止后 `isStreaming` 立刻 false，而 `agentRunStatus` 要等后端 `cancelled` 事件才落终态，SSE 正好死了就永远停在 RUNNING；用一个可能永不归位的状态去挡救命按钮，等于把病灶换了个地方。护栏在 `tests/chat-presentation-ui/run.mjs`（真组件渲染，停止前后各断一次）。
 - 前端 `AgentInbox.vue`、`agentInboxState.mjs` 与 `chatSubmissionState.mjs` 管理队列、事件去重和提交事务。发送与停止分开，执行中可输入；新会话只断开本地视图，旧会话继续。迟到 receipt 不得清空新会话草稿；附件草稿按原始 HTML 快照比较。
 - `service/ai/memory/document/*`、`MemoryDocumentController`、`MemoryDocument`/`MemoryDocumentSpace` 是 Markdown 记忆真源。`/api/ai/memory/{spaces,files,file,download}`；个人/项目使用权限校验后的 opaque spaceId，团队/律所由官网共享服务校验成员/管理员。每空间 remember.md 自动维护 topic 链接；UTF-8 128 KiB、路径校验、expectedRevision 冲突及删除墓碑由后端负责。legacy 读写/同步向同一文档服务收敛，不保留可独立写入的副本。
+- **项目记忆按内部材料保护**（dev-board#1256）：其中可能含未开放文件的摘录，不能因为客户是项目成员就公开。客户的项目空间只返回无 ID、固定名称的不可用占位，已知 spaceId 的列表/正文/搜索/下载/写入/删除同样拒绝；上下文索引不注入该空间。统一 `isClient` 优先于项目 ADMIN 等角色；客户自己的个人记忆仍可用，内部 READ_ONLY 成员仍可读项目记忆。
 - `MemoryTools` 暴露 memory_list/read/search/write/edit/delete；Agent/Plan 的 skill 白名单不能隐藏这些基础工具，ASK 只允许前三个。没被 skill 收窄的 Agent/Plan 回合里只读三个每轮必下发（每轮注入的索引点名要 memory_read），写入三个归渐进披露的 memory 类目（dev-board#1073，详见「工具规格瘦身与渐进披露」那张核心集表下的注）。ContextAssembler 每轮注入有权限的限量索引，正文按需由模型读取。`MemoryBrowser.vue` 从对话与设置进入，支持索引跳转、编辑、下载及冲突提示。
 - 桌面共享记忆使用已连接账户 Bearer；服务器使用专用 `memory.shared.base-url`/`memory.shared.secret` 与绑定账户 ID，不能复用只读协作目录密钥。官网配套契约与 PR 见 `doc/ai-alignment/memory-report.md`；无账户/服务未配置的共享空间显示不可用，不能伪装成本地共享。
 - 测试与实际结果：`doc/ai-alignment/validation-report.md`；隔离运行配方：`doc/ai-alignment/test-environment.md`。不可将模拟 provider E2E 称为真实模型测试。
@@ -995,7 +1088,7 @@ ChatInterface.handleSubmit（~:927）→ useAgentStream.sendMessage（确保 SSE
 
 **account_action_required**：付费工具或异步 PPT 任务需要登录/充值的非终态通知，JSON 包含 `code`、`message` 与 `reason`，并带 `kind` 或 `gatewayKind`。前端打开相应弹框，不据此结束聊天流；模型自身的账户失败仍走终态 `error`。
 
-connected / bubble_start / text_delta / **reasoning_delta**（思考型模型的 reasoning 增量，`{"content":"…"}`，只进思考卡、不进正文；随消息落 `reasoning` 列，state_recovery 的 `events` 里按序带着它，重连/切回后原样重放，见「思考记录的持久化与断线恢复」）/ artifact / token_usage / bubble_end（status: finished|paused|awaiting_approval|awaiting_input；外加 **documentEdited**，见下）/ error / cancelled / **file_change**（见下）/ client_action / title_update / doc_stream_data（旧名 wps_stream_data 已于 dev-board#816 摘除，出站单名）/ doc_stream_end（编辑器流式写入收尾，前端据此落盘并报失败）/ state_recovery（断线重连快照）/ run_state / plan_update / **skill_update** / background_task_start / background_task_complete / task_progress / heartbeat / subtask_progress / **pass_progress**（整篇分段过卷进度，dev-board#422）/ **context_notice**（附件降级/截断/丢弃 + 上下文超窗，见下）/ inbox_updated / input_applied / **superseded**（本连接已被同会话的另一个客户端实例接管，见下）/ **provider_retry**（首字节前只收到保活、后端已换一家供应商重发，`{"from":"<供应商显示名或 unknown>"}`，只驱动思考卡副文案，dev-board#1061）/ **ask_user**（ask_user 工具的结构化提问，带版本号 `v`，紧跟在同一问题的 `<question kind="ask_user">` 标记之后、`bubble_end status=awaiting_input` 之前，见上文「向用户提问 ask_user 工具」）。前端分派均在 useAgentStream.handleEvent。超限 paused 契约见 PR#172。
+connected / bubble_start / **model_routed**（智能模式 Auto 下后端 0ms 路由器完成档位/模型分派后立即发出的非终态通知，`{"requestedModel":"auto","modelId":"…","modelName":"…","tier":"FAST|BALANCED|DEEP","reason":"…"}`，前端据此在气泡头部/思考卡展示本次实际命中模型，dev-board#1434）/ text_delta / **reasoning_delta**（思考型模型的 reasoning 增量，`{"content":"…"}`，只进思考卡、不进正文；随消息落 `reasoning` 列，state_recovery 的 `events` 里按序带着它，重连/切回后原样重放，见「思考记录的持久化与断线恢复」）/ artifact / token_usage / bubble_end（status: finished|paused|awaiting_approval|awaiting_input；外加 **documentEdited**，见下）/ error / cancelled / **file_change**（见下）/ client_action / title_update / doc_stream_data（旧名 wps_stream_data 已于 dev-board#816 摘除，出站单名）/ doc_stream_end（编辑器流式写入收尾，前端据此落盘并报失败）/ state_recovery（断线重连快照）/ run_state / plan_update / **skill_update** / background_task_start / background_task_complete / task_progress / heartbeat / subtask_progress / **pass_progress**（整篇分段过卷进度，dev-board#422）/ **context_notice**（附件降级/截断/丢弃 + 上下文超窗，见下）/ inbox_updated / input_applied / **superseded**（本连接已被同会话的另一个客户端实例接管，见下）/ **provider_retry**（首字节前只收到保活、后端已换一家供应商重发，`{"from":"<供应商显示名或 unknown>"}`，只驱动思考卡副文案，dev-board#1061）/ **ask_user**（ask_user 工具的结构化提问，带版本号 `v`，紧跟在同一问题的 `<question kind="ask_user">` 标记之后、`bubble_end status=awaiting_input` 之前，见上文「向用户提问 ask_user 工具」） / **harness_adaptation**（Harness² 运行时自愈动作通知，`{"layer":"INVARIANT|DOMAIN","action":"EXPAND_TOOL_CATEGORY|ANCHOR_PROBE_RECOVERY|MOUNT_DOMAIN_SKILL|CLARIFY_WITH_USER","target","failedTool","diagnosis","recoveryAction"}`，dev-board#1481） / **verification_report**（VeriHarness 声明式收尾证据挑战结构化报告，`{"skillId","status":"VERIFIED_CLEAN|GAPS_FOUND|UNVERIFIED","supportedCount","unverifiedCount","conflictCount","totalChecked","items","summary"}`，dev-board#1481） / **harness_evolution**（对比式用户自进化记忆沉淀通知，`{"id","triggerType","layer","scope","spaceId","topicPath","title","ruleSummary","contrastSummary","promotedSkillId"}`，dev-board#1481）。前端分派均在 useAgentStream.handleEvent。超限 paused 契约见 PR#172。
 
 **`error` 事件有两种载荷**（2026-09-29，dev-board#1046 登录后置）：编排器捕获 `AccountException` 的两处
 （主循环 catch、故障转移取模型失败）发 JSON `{message, code, kind, reason?}`（`AgentOrchestrator.accountErrorPayload`，
@@ -1009,8 +1102,8 @@ connected / bubble_start / text_delta / **reasoning_delta**（思考型模型的
 
 **事件名与本清单的对拍有测试守着**（`SseEventNameDocContractTest`）：后端发出的每个字面量事件名都必须在这一节里出现——「加了事件、文档没加」不会有任何东西报错，下一个照着文档写客户端的人只会认为那个事件不存在。反向不校验（清单里可以留已经摘掉的旧名，如 wps_stream_data 那条双轨）。
 
-**`file_change` 载荷** `{fileName, changeType: ADDED|MODIFIED, fileId: Long|null}`（`fileId` 是 dev-board#852 新增字段，只加不改，旧客户端不读它）。
-由 `AgentOrchestrator.applyToolSideEffects` 按 `@ToolMeta` 发出：有 `fileArg` 取参数里的文件名、`fileId` 为 null；
+**`file_change` 载荷** `{fileName, changeType: ADDED|MODIFIED, fileId: Long|null, projectId: Long|null}`（`fileId` 是 dev-board#852 新增字段，只加不改，旧客户端不读它）。
+由 `AgentOrchestrator.applyToolSideEffects` 按 `@ToolMeta` 发出：新建白名单先取结构化成功结果的真实 ID（见 #1181）；其他有 `fileArg` 的取参数里的文件名、`fileId` 为 null；
 没有 `fileArg` 的 doc_\*/sheet_\*/slide_\*（`actsOnActiveDocument`，排除 `sheet_create_file`/`doc_start_stream` 这两个新建类）
 用本轮活跃文档（`RunGuard.activeFileId/activeFileName`，名字为空时按 id 查 `ProjectFileService.getFile`）的**真名 + fileId**；
 其余没有 `fileArg` 的工具（pdf_\* / text_\* 一族）参数里有数字型 `fileId` 时按它查回**真名 + 该 id**（`fileByIdArg`），查不到则当作不知道；
@@ -1068,7 +1161,7 @@ template :1-539；script :541-1879（模式/模型选择 :648-766、文件变更
 
 病灶：用户让 AI 精简一份带表格的 PDF。`pdf_to_word` 在版式级转换组件没装（或正在下载）时**一边弹 component_required、一边照做结构级转换并自动打开**（表格全丢）；模型对刚打开的 docx 调 doc_*，编辑器还在启动、秒回失败，三次后 `appendFailureNudge` 说「停止当前思路」，模型读成换路，改用 `write_docx` / `doc_start_stream` 各建一份（RENAME 加「 (n)」、打开失败的空文件不清理）→ 四份同名文档；组件装完前端又在生成中自动重发原消息，按插话处理，未执行的工具被回填「被用户打断」，整件事再做一遍。而结构级产出的 docx 还带着 PDF 文字层里的 U+0002，document.xml 非法、编辑器打不开（「卡在 95%」）。
 
-- **pdf_to_word 新语义**（`PdfTools.pdf_to_word(fileId, parentId, allowStructuralFallback)`）：版式级失败时 ① `pptx-runtime` 未就绪（`isReady=false`，**含下载中**）→ 发 component_required，返回停止文案「版式级转换需要本机组件……已请用户确认下载……装好后会自动重新执行这一步。你现在不需要重复调用本工具，也不要改用文字提取或其它方式自行生成文档……本轮到此为止」（不以 Error 开头，不出现「稍后重试」，LangText 双语），**哪怕模型带了 allowStructuralFallback=true 也不降级**；② 组件已就绪、服务失败 → 不降级，返回 `Error: 版式级转换失败（原因≤200字）……表格与版式会丢失。请先……征得同意后，再带 allowStructuralFallback=true 调用`；③ 带 `allowStructuralFallback=true` 且组件就绪 → 才做结构级，返回里明写「原文的表格与版式已丢失」。判不出组件状态（isReady 抛异常）按未就绪处置。扫描件分支原本就是停止形态，未动。`prompts/tools-lowa(.en).md` 那一行同步改了。
+- **pdf_to_word 新语义**（`PdfTools.pdf_to_word(fileId, parentId, allowStructuralFallback)`）：版式级失败时 ① `pptx-runtime` 未就绪（`isReady=false`，**含下载中**）→ 发 component_required，返回停止文案「PDF 转 Word 需要本机组件……已请用户确认下载……装好后会自动重新执行这一步。你现在不需要重复调用本工具，也不要改用文字提取或其它方式自行生成文档……本轮到此为止」（不以 Error 开头，不出现「稍后重试」，LangText 双语），**哪怕模型带了 allowStructuralFallback=true 也不降级**；② 组件已就绪、服务失败 → 不降级，返回 `Error: 版式级转换失败（原因≤200字）……表格与版式会丢失。请先……征得同意后，再带 allowStructuralFallback=true 调用`；③ 带 `allowStructuralFallback=true` 且组件就绪 → 才做结构级，返回里明写「原文的表格与版式已丢失」。判不出组件状态（isReady 抛异常）按未就绪处置。扫描件在 #1387 支持用户明确选择的云/本地续跑：本地依赖 `pptx-runtime` → `mineru-runtime` + `mineru-models`；缺失/失败时读取用户OCR偏好，未决定则发 `ocr_route_required` 选择卡（同一component停轮协议）。云路径走现有OcrService，全部页面成功才产Word；本地选择仍连续准备组件后自动继续。Python专用local端点不暗转云，旧包404可选择云端继续。见utility-tools的完整协议。`prompts/tools-lowa(.en).md` 那一行同步改了。
 - **等待组件的编排器终态**：`EditorBridgeService.sendComponentRequiredAction` 发出后在该会话上记一个一次性标记；编排器在原生与 XML 两条工具循环里、每个工具执行完后调 `editorBridgeService.consumeComponentWait(conversationId)`，命中即 `stopForComponent`：同批后续工具不执行、流一句「这一步需要先安装本机组件……装好后会自动继续」、落库、`markRunState(FINISHED)`、`bubble_end {"status":"awaiting_input","reason":"component_required",...}`、关流、`endRun`，**不再调模型**。运行状态刻意记 FINISHED 而不是 AWAITING_INPUT：重连时 `run_state` 只带 status 不带 reason，记 AWAITING_INPUT 会让刷新后的前端把它当成反问（「等你回答」「待回答」）；在线前端靠 bubble_end 的 reason 判「不是反问」（`composables/awaitingInput.mjs` 的 `isUserQuestionAwaiting`）。续跑由前端在组件装好后重发原消息（生成中不重发，改挂「组件已就绪，继续」按钮）。覆盖全部发 component_required 的工具（PptxTools 三处、PdfTools 两处）——此前它们只靠文案让模型自觉停下。标记在 `clearForNewRun` 清掉。**新增任何「请用户下载组件」的工具必须走 `sendComponentRequiredAction`**，自己拼 client_action 就不会停轮。
 - **EDITOR_BOOTING**（与 doc-editor 侧约定）：前端在编辑器仍在启动、等到上限仍未就绪时回 `sendEditorResult(conv, req, false, {error, code:"EDITOR_BOOTING", retryable:true}, error)`（`data` 里的 code，或 error 串里带着码，两处都认，`EditorBridgeService.isEditorBooting`）。桥回执统一换成 `editorBootingResultJson()`：`{"error": "编辑器仍在启动（文档还在加载），这一步没有执行。等它就绪后重试同一步即可；不要改用新建文件、生成副本或其它通道去完成同一件事。", "code": "EDITOR_BOOTING", "retryable": true}`，并撤掉整段插入去重登记（这一步确实没写）。编排器按 `EditorBridgeService.isEditorBootingOutput(result)`（只认 `"code":"EDITOR_BOOTING"` 键值形状，允许引号被转义，正文里碰巧出现这个词不算）判：**不计入 `consecutiveFailures`、不发收敛提示**（`appendFailureNudge(guard, result, success, retryableWait)`）；StuckDetector 仍记录（它是编辑器永远起不来时的唯一兜底），但首次干预换成专用提醒（`EDITOR_BOOTING_STUCK_PATTERN` → 「编辑器已连续多次仍在启动……再等一等重试同一步；如果一直起不来，就停下来如实告诉用户……不要改用新建文件」），二次检出照常 PAUSED。
 - **appendFailureNudge 措辞**：普通失败连续 3 次的提示改为「先读失败原因：参数错了就改正参数重试同一步；确认这一步做不到，就输出 <final> 如实向用户说明……不要为了绕开失败改用新建文件、生成副本等其它通道去完成同一件事，也不要原样盲目重试」。**不许再写回「停止当前思路 / 换条路」**（`AgentOrchestratorEditorBootingAndComponentStopTest` 钉着）。
@@ -1637,3 +1730,37 @@ dev-board#285 那条「**本会话能直接编辑的只有上面这一份打开�
 ```bash
 cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='ReferenceSourceServiceTest,ReferenceToolsTest,OpenDocSourceTest,DesktopSourceTest,CloudProjectSourceTest,CaseLibrarySourceTest,CaseRefClientTest,GitProviderSourceTest,PaneRegistryTest,AddinPaneControllerTest,AddinGitLinkControllerTest,GitProviderClientTest,GitTokenCipherTest,OfficeBridgeCrossPaneTest,ClientCapabilityServiceTest,ContextAssemblerServiceTest,ProjectFileTextExtractorTest,ProjectFileServicePathTest'
 ```
+
+
+### 2026-10-11 问题卡与本轮文件成果（dev-board #1200–1202）
+
+- 普通对话和插件/技能共用 ContextAssemblerService 的末位交互契约：确需用户决定或补充信息才提问；AGENT 调 `ask_user`，无此工具的 ASK/PLAN 用既有 `<question>`。不得把普通正文中的 A/B 选择正则转成授权卡。QuestionCard 的兼容问题也能在卡内输入/提交，结构化回答仍保留服务器 question id；已回答历史不可再次提交。
+- ProcessCard 只隐藏 `litigation_reference`、`list_tools`、`use_skill` 的内部原始输出；业务文件内容和用户要求的代码答案仍可展示，不全局剥除 Markdown 代码块。
+- `file_change` 携带 conversationId、clientRequestId、assistantMessageId；前端按原请求/持久消息匹配，已知但不匹配的事件不能塞当前气泡。ConversationFileChange 新增可空 fileId/projectId/assistantMessageId，历史旧行仍保留独立入口，不冒充新一轮计数。RootBubble 末尾成果与本轮改动/新增数使用同一去重口径。
+- FileChangeTurn 随助手段创建，锁内绑定真实消息 ID、排队保存和去重；子 Agent listener 冻结此对象，超时后工具真实成功返回仍可归原段。待存队列与去重同锁，保存失败保留待存、后续保存/重复回执重试。无法确认的 ID/外项目/已删除/目录不生成文件成果。
+- 子 Agent 接收可信 activeFileId；成功 doc_open_file/doc_start_stream 或打开新编辑文档的 doc_start_stream/sheet_create_file/pdf_to_word 才更新当前文档身份，普通 write_file 不切换。确认产物经 listener 即时上报，同时保留子任务结果快照；部分失败保留此前真实成功文件。
+- 回归：chat-turn-files.test.mjs、question-card-response.test.mjs；ConversationFileChangeServiceTest、AgentOrchestratorFileChangeTargetTest、ContextAssemblerAskUserTest、SubAgentServiceTest。
+
+### 2026-10-26 随手工作区与跨项目只读调取（dev-board#1479）
+
+- **跨项目只读上下文芯片**：`AiAgentController.ContextItem` 新增可选 `projectId`、`projectName`、`readOnly`（前端 `chatMode.buildCrossProjectContextItem`、`chatContextLimits.normalizeContextItem`、`chatAttachments`、`useAgentStream` 全链路保留；`ChatInterface.vue` 渲染 `@项目名 / 文件名` 徽标与 `attachCrossProjectFile` / `sendQuickPrompt` 入口）。`ContextAssemblerService` 对跨项目或只读附件在 `<file>` 标签上附加 `project="..." readonly="true"` 属性。
+- **读写权限分流（`ToolFileGuard.rejectIfCannotRead`）**：写/改/删/移类工具继续严格使用 `ToolFileGuard.rejectIfOutsideProject(file)` 锁定当前 `projectId`；只读链路（`LegalTools.read_document`、`FileTools.extract_file_text`、`ContextAssemblerService.loadVisionAttachment`、`FileContextLoader.buildFolderContextInternal`）改走 `ToolFileGuard.rejectIfCannotRead(file, projectMemberService)`——当文件属于其他项目时校验 `projectMemberService.hasReadPermission(file.getProjectId(), userId)`，有读权限即放行只读抽取。新注入协作者均采用 `@Autowired(required = false)` + setter，保持既有构造器签名不变。
+- **跨项目文件检索工具（`FileTools.search_across_projects`）**：按文件名关键字检索当前用户全部可读正式项目（`projectService.getUserProjects(userId)`，不含 `LOOSE_FILES` 与 `SCRATCH`）中的未删除文件，返回 `[项目: <name> (projectId=<pid>)] <path> (fileId=<fid>, type=<ext>)`，归入 `ToolDisclosurePolicy` 的 `"files"` 类目。
+- **回归**：`ScratchProjectAndCrossProjectReadTest`、`frontend/tests/project-home/chat-mode.test.mjs`。
+
+## 手机个人助理与云摘要（2026-10-27，dev-board#1540/#1541）
+
+- `controller/MobileAssistantController` + `service/mobile/MobileAssistantService` 提供独立 `/api/mobile/assistant/*`，不改变桌面 `/agent/chat` 或 IM 助理。认证仍为 `X-Session-Id`，响应统一 `{code:0,data}`。无需选择项目，所有项目/来源读取由服务端按当前账户及 `(deviceId,projectKey)` 目录归属核验。
+- 三份账户私有实体：`MobileAssistantConsent`、`MobileProjectSummary`、`MobileAssistantTurn`。云备份同意**不等于**AI处理同意；需有效订阅、既有备份同意，再通过 `PUT /settings {enabled,consentVersion:"2026-10-27"}` 一次性开通。关闭在本地事务中删除摘要和对话，账单服务不可用仍可完成关闭；返回 `subscriptionAvailable:false`，不把故障解释为免费账户。原文件继续按备份协议管理。
+- 桌面推送 `PUT /snapshots {deviceId,projectKey,projectName,sourceUpdatedAt,context}`，`sourceUpdatedAt` 必须带时区，`context` 仅项目档案及待办，最长24000字。项目名以该账户目录记录为准，内容hash由服务端计算。PUT与GET返回同一公开摘要/来源形状，来源含context和所有当前备份的readForSummary，内部指纹不混入摘要响应。不另推第二份文件正文；云端通过 `MobileBackupService.content` 读取已有备份，`ProjectFileTextExtractor.extractBytes` 只抽现有文字，不自动OCR。每份摘要最多读20份/每份12000字，并明示覆盖缺口；文字生成走请求用户的 `PlatformAiUserScope` 与 `getPlatformChatModel`，无内容时明确等待，不调用模型编造。
+- 模型工具只给项目摘要索引、摘要/来源读取和既有法宝/企查查6项白名单。索引 `search_project_summaries(query,offset)` 每页20项带total/nextOffset；`read_project_summary(summaryId,offset)` 返回完整摘要及每页20份当前来源，含未参与摘要的其余备份与 `context` 来源；`read_project_source` 以12000字分页正文。内部分页JSON不截断；原始文件和项目内容均作不可信资料，不接任意URL、用户id或桌面写工具。模型最多5轮、10次工具调用；达到上限据实结束，不能声称全案已读。
+- `POST /chat {conversationId?,requestId,message}` 在账户同意行锁下受理。同一requestId的running回执不再起模型，completed返回原回答，确定failed可重试同id及原问题；新问题不能复用旧id。失败前已发生的模型/外部查询可能有费用，不承诺失败免费。`GET /requests/{id}` 返回相同 `status/conversationId/requestId/answer/sources` 结构；客户端未知结果先查/重试原id，running不显示空回复；轮询将超过15分钟的遗留running在锁内标记failed，允许原id恢复。内部attemptRevision在每次重试递增，旧尝试迟到后不得覆盖新尝试的成功/失败状态。对话暂按最近20轮回放。
+- 模型返回、历史与重复请求回放均复验开通revision、项目目录和备份指纹。连续追问继承已送入模型的历史来源，哪怕本轮没有新工具调用也再次校验；正文读取前冻结来源指纹、读完后核对实际字节SHA256并再验，防止读取中材料替换。权限与版本复验走标量查询，避免HTTP持久上下文缓存旧consent、备份授权或来源元数据。撤销项目后旧回答不再回放；材料变化时不把旧摘要当最新事实。来源带截至时间、摘要生成时间及ready/stale状态。客户端轮询必须在退出/换账户/关闭助理时停止。
+- 回归 `MobileAssistantServiceTest` 使用真实H2、备份文本和真实OpenAI HTTP客户端连接本机脚本响应，覆盖多租户、独立同意、关闭时故障、并发幂等/失败重试、22项目分页与第21份文件读取、禁写、撤权历史与连续追问、读取中材料替换、英文请求文案、6项外部工具账户scope转交、遗留请求迟到结果及真实EntityManager缓存中的并发撤权；这不等于真实线上模型质量、第三方付费查询、正式手机包或生产跨端验证。
+
+### 2026-10-27 消息助手上下文与默认入口（dev-board#1533）
+
+- 项目助手快捷入口默认私聊；显式 `private: false` 仍开群聊，已有群聊不吞掉私聊入口。用户本次明确选择「默认私聊自动带入本机项目上下文，群聊只用共享资料」。
+- 本机私聊走 `ImScopedAgentHost` 的项目身份核验，再由 `ImPrivateProjectContext` 按当前/已打开真实文档候选与问题题名相关性读取最多4份、每份6000字。宿主 `messageContextFileIds` 仅提供最多两个真实文件 ID，PluginPane 覆盖插件自给候选；文件仍须属于当前项目并通过 ACL。不能把文件目录当作已读取正文。
+- 云项目群经 `ImSharedProjectContext` 只读向客户开放、全部当前有权成员可读的材料；提取后、模型生成后及提交前复核。团队/律所助手仅读对应共享记忆，最多尝试3份；不注入本机私聊材料。
+- 验证：66项后端合成数据测试，包括排序第7的起诉状命中、正文进入模型请求、跨项目 ID 拒读；前端默认入口与真实 iframe 沙箱验证。没有调用真实付费模型或将用户截图中的案件材料发送给测试服务。

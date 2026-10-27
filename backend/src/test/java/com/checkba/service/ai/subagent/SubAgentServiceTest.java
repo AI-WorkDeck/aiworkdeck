@@ -104,6 +104,108 @@ class SubAgentServiceTest {
         return Response.from(AiMessage.from(text));
     }
 
+    @Test void timedOutToolReportsConfirmedFileThroughOriginalListenerWhenItEventuallyReturns() throws Exception {
+        when(registry.getAllSpecifications(any())).thenReturn(List.of(ToolSpecification.builder().name("write_docx").description("test").build()));
+        props.setTimeoutSeconds(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var delivered = new java.util.concurrent.CountDownLatch(1);
+        var ids = new java.util.concurrent.CopyOnWriteArrayList<Long>();
+        when(model.generate(anyList(), anyList())).thenReturn(toolCallTurn("write_docx", "{}"));
+        when(registry.execute(eq("write_docx"), any(), any())).thenAnswer(inv -> {
+            // The save has completed, but a downstream editor refresh ignores interruption.
+            while (release.getCount() > 0) {
+                try { release.await(); } catch (InterruptedException ignored) { }
+            }
+            return new ToolRegistry.ToolResult("{\"status\":\"success\",\"db_id\":99}", null, true);
+        });
+        var parent = new ToolContext(42L, "conv-main", 7L, AUX_MODEL, List.of(), null,
+                "parent-run", null, null, null, null, (id, kind) -> { ids.add(id); delivered.countDown(); });
+        try {
+            var result = newService().dispatch("创建文件", "文件", List.of("write_docx"), parent);
+            assertFalse(result.success());
+            assertTrue(result.error().contains("timed out"));
+            assertTrue(result.fileChanges().isEmpty(), "At timeout the result identity is not confirmed yet");
+            release.countDown();
+            assertTrue(delivered.await(2, java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals(List.of(99L), ids);
+        } finally { release.countDown(); }
+    }
+
+    @Test void implicitDocumentEditUsesInheritedIdentityAndSuccessfulOpenUpdatesIt() {
+        when(registry.getAllSpecifications(any())).thenReturn(List.of(ToolSpecification.builder().name("doc_open_file").description("test").build(), ToolSpecification.builder().name("doc_find_replace").description("test").build()));
+        var meta = mock(com.checkba.service.ai.tools.ToolMeta.class);
+        when(meta.fileEffect()).thenReturn("MODIFIED");
+        when(meta.fileArg()).thenReturn("");
+        var registered = new ToolRegistry.RegisteredTool(null, null, null, meta, false);
+        when(registry.execute(eq("doc_find_replace"), any(), any())).thenReturn(
+                new ToolRegistry.ToolResult("已修改", registered, true));
+        when(registry.execute(eq("doc_open_file"), any(), any())).thenReturn(
+                new ToolRegistry.ToolResult("已打开", null, true));
+        when(model.generate(anyList(), anyList()))
+                .thenReturn(toolCallTurn("doc_find_replace", "{}"))
+                .thenReturn(toolCallTurn("doc_open_file", "{\"fileId\":102}"))
+                .thenReturn(toolCallTurn("doc_find_replace", "{}"))
+                .thenReturn(textTurn("已完成"));
+        var parent = new ToolContext(42L, "conv-main", 7L, AUX_MODEL, List.of(), null,
+                "parent-run", null, null, null, 101L);
+        var result = newService().dispatch("修订文件", "文件", List.of("doc_find_replace", "doc_open_file"), parent);
+        assertEquals(List.of(new SubAgentResult.FileChange(101L, "MODIFIED"),
+                new SubAgentResult.FileChange(102L, "MODIFIED")), result.fileChanges());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"doc_start_stream", "sheet_create_file", "pdf_to_word"})
+    void newEditorDocumentMovesImplicitEditsToTheCreatedFile(String openingTool) {
+        when(registry.getAllSpecifications(any())).thenReturn(List.of(ToolSpecification.builder().name(openingTool).description("test").build(), ToolSpecification.builder().name("doc_find_replace").description("test").build()));
+        var meta = mock(com.checkba.service.ai.tools.ToolMeta.class);
+        when(meta.fileEffect()).thenReturn("MODIFIED");
+        when(meta.fileArg()).thenReturn("");
+        var registered = new ToolRegistry.RegisteredTool(null, null, null, meta, false);
+        when(registry.execute(eq("doc_find_replace"), any(), any())).thenReturn(
+                new ToolRegistry.ToolResult("已修改", registered, true));
+        when(registry.execute(eq(openingTool), any(), any())).thenReturn(
+                new ToolRegistry.ToolResult("{\"status\":\"success\",\"db_id\":99}", null, true));
+        when(model.generate(anyList(), anyList())).thenReturn(toolCallTurn(openingTool, "{}"))
+                .thenReturn(toolCallTurn("doc_find_replace", "{}"))
+                .thenReturn(textTurn("已完成"));
+        var parent = new ToolContext(42L, "conv-main", 7L, AUX_MODEL, List.of(), null,
+                "parent-run", null, null, null, 101L);
+        var result = newService().dispatch("创建并修改", "文件", List.of(openingTool, "doc_find_replace"), parent);
+        assertEquals(List.of(new SubAgentResult.FileChange(99L, "ADDED"),
+                new SubAgentResult.FileChange(99L, "MODIFIED")), result.fileChanges());
+    }
+
+    @Test void confirmedCreatedFilesSurviveLaterSubtaskFailureWithoutTrustingSummaryText() {
+        when(registry.getAllSpecifications(any())).thenReturn(List.of(
+                ToolSpecification.builder().name("write_docx").description("create document").build()));
+        when(registry.execute(eq("write_docx"), any(), any())).thenReturn(
+                new ToolRegistry.ToolResult("{\"status\":\"success\",\"db_id\":99}", null, true));
+        when(model.generate(anyList(), anyList())).thenReturn(toolCallTurn("write_docx", "{}"))
+                .thenThrow(new RuntimeException("later model failure"));
+        var result = newService().dispatch("创建文件", "文件", List.of("write_docx"), PARENT_CTX);
+        assertFalse(result.success());
+        assertEquals(List.of(new SubAgentResult.FileChange(99L, "ADDED")), result.fileChanges());
+        assertTrue(result.toJson().contains("fileChanges"));
+    }
+
+    @Test
+    void generatedFilesInheritParentRunFolderWithoutInheritingSkillState() {
+        when(registry.getAllSpecifications(any())).thenReturn(List.of(
+                ToolSpecification.builder().name("write_docx").description("create document").build()));
+        ToolContext parent = new ToolContext(42L, "conv-main", 7L, AUX_MODEL, List.of(), null,
+                "parent-run", java.util.Set.of("files"), null, 9L);
+        for (ToolContext context : new ToolContext[]{parent, null}) {
+            org.mockito.Mockito.clearInvocations(registry);
+            when(model.generate(anyList(), anyList())).thenReturn(toolCallTurn("write_docx", "{}"), textTurn("完成"));
+            assertTrue(newService().dispatch("创建文件", "文件", List.of("write_docx"), context).success());
+            ArgumentCaptor<ToolContext> captured = ArgumentCaptor.forClass(ToolContext.class);
+            verify(registry).execute(eq("write_docx"), any(), captured.capture());
+            assertEquals(context == null ? null : Long.valueOf(9), captured.getValue().defaultOutputFolderId());
+            assertNull(captured.getValue().runId());
+            assertNull(captured.getValue().disclosedCategories());
+        }
+    }
+
     @Test
     void invalidQuotedXmlIsNotExecutedAndErrorAllowsCorrection() {
         when(model.generate(anyList(), anyList())).thenReturn(

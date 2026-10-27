@@ -60,6 +60,7 @@
       v-if="!isMerge && inlineReview"
       v-show="tab === 'chk'"
       :state="inlineReview"
+      :autocomplete="autocomplete"
       :executor="executor"
       @count="inlineReviewCount = $event"
       @changed="$emit('changed')"
@@ -326,6 +327,7 @@ export default {
     // 即时审校的状态快照（inlineReviewHost 的 publish）。null = 这份文档没有审校，
     // 「审校」标签整个不出现。
     inlineReview: { type: Object, default: null },
+    autocomplete: { type: Object, default: null },
   },
   data() {
     return {
@@ -334,6 +336,7 @@ export default {
       // 第一次读成功之前两份清单都算「还没读」，空态与计数不渲染（BUG-39）。
       // 读失败不置位——同 reload() 的「读失败不许清零」。
       revLoaded: false, cmtLoaded: false,
+      revisionsTruncated: null, commentsTruncated: null,
       // 批注回复（BUG-37）：同一时刻只展开一张卡片的回复框，按批注 id 认。
       replyingId: null, replyText: '',
       authorFilter: 'all',
@@ -382,7 +385,8 @@ export default {
       ]
     },
     listLimitReached() {
-      return this.tab === 'rev' ? this.revisions.length >= 500 : this.tab === 'cmt' && this.comments.length >= 500
+      return this.tab === 'rev' ? (this.revisionsTruncated ?? this.revisions.length >= 500)
+        : this.tab === 'cmt' && (this.commentsTruncated ?? this.comments.length >= 500)
     },
     activeCardId() {
       const loc = this.documentLocation || {}
@@ -612,7 +616,11 @@ export default {
     //    越忙越读不回来。在飞时只记一笔 _again，收尾时补跑一次——最后一次触发
     //    一定被读到（照 useEvidenceAnchors 的 state.recheck 写法）。
     async reload() {
-      if (!this.executor) { this.revisions = []; this.comments = []; return }
+      if (!this.executor) {
+        this.revisions = []; this.comments = []
+        this.revisionsTruncated = false; this.commentsTruncated = false
+        return
+      }
       if (this._loading) { this._again = true; return }
       this._loading = true
       try {
@@ -621,12 +629,14 @@ export default {
           const [rv, cm] = await Promise.all([this.run('list_revisions', { limit: 500 }), this.run('list_comments', { limit: 500 })])
           if (rv) {
             this.revisions = rv.revisions || []
+            this.revisionsTruncated = typeof rv.truncated === 'boolean' ? rv.truncated : null
             this.reviewRevision = rv.revision ?? null
             this.reviewDocumentSeq = rv.documentSeq ?? null
             this.revLoaded = true
           }
           if (cm) {
             this.comments = (cm.comments || []).map(c => ({ ...c, revision: cm.revision, documentSeq: cm.documentSeq }))
+            this.commentsTruncated = typeof cm.truncated === 'boolean' ? cm.truncated : null
             this.cmtLoaded = true
           }
         } while (this._again)
@@ -771,7 +781,10 @@ export default {
     // 走引擎已有的 reply_comment（父批注同一锚点上追加一条「回复 X：」批注）。
     // asUser：按当前登录用户署名，不署 AI WorkDeck。
     async submitReply(c) {
-      const text = String(this.replyText || '').trim()
+      // uni textarea throttles v-model by 100ms. A fast send must include the
+      // current visible draft, even before that trailing model update arrives.
+      const input = this.$el?.querySelector?.('.rp-reply textarea')
+      const text = String(input?.value ?? this.replyText ?? '').trim()
       if (!text) return
       const res = await this.run('reply_comment', { id: c.id, index: c.index, text, asUser: true })
       if (!res) return // 失败已写进红条；回复框留着，草稿不丢
@@ -799,17 +812,17 @@ export default {
 .rp-head { display: flex; align-items: center; gap: 4px; padding: 6px 8px 6px 6px;
   border-bottom: 1px solid var(--awd-border); }
 .rp-collapse { flex: none; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
-  border-radius: 6px; color: var(--awd-text-2); cursor: pointer; }
+  border-radius: var(--awd-radius-md); color: var(--awd-text-2); cursor: pointer; }
 .rp-collapse:hover { background: var(--awd-surface-2); color: var(--awd-text); }
 .rp-collapse-ico { width: 16px; height: 16px; display: block; }
 /* 一行放不下时（英文标签长得多）横向滚，绝不折行：折行会把每个标签挤成两行。 */
 .rp-tabs { flex: 1; min-width: 0; display: flex; flex-wrap: nowrap; gap: 2px; overflow-x: auto; }
-.rp-tab { flex: none; white-space: nowrap; padding: 3px 7px; border-radius: 6px;
-  font-size: 12px; color: var(--awd-text-2); }
+.rp-tab { flex: none; white-space: nowrap; padding: 3px 7px; border-radius: var(--awd-radius-md);
+  font-size: var(--awd-panel-fs); color: var(--awd-text-2); }
 .rp-tab.on { background: var(--awd-accent-soft); color: var(--awd-accent-text); font-weight: 600; }
 /* 计数与标签同一行、同一条基线，只是小一号淡一档。间距用 margin 不用 flex gap：
    uni-h5 下 <text> 的内容真正落在内层 span 里，外层的 gap 够不着它。 */
-.rp-tab-n { margin-left: 3px; font-size: 10.5px; color: var(--awd-text-3); }
+.rp-tab-n { margin-left: 3px; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); }
 .rp-tab.on .rp-tab-n { color: var(--awd-accent-text); }
 /* 英文（dev-board#874）：五个英文标签 + 计数在 320px 里要约 385px（无头 Chrome 实测，
    -apple-system/Segoe UI 字体），横滚之后「AI Review」「Origin」被截在面板外、用户
@@ -823,20 +836,20 @@ export default {
 .rp.rp-en { width: 432px; }
 .rp-en .rp-tab { padding: 3px 6px; }
 .rp-bulk { display: flex; gap: 6px; padding: 8px 10px 0; }
-.rp-bulk-btn { flex: 1; text-align: center; padding: 4px 0; border: 1px solid var(--awd-border); border-radius: 6px;
-  font-size: 12px; color: var(--awd-text-2); background: var(--awd-surface); }
+.rp-bulk-btn { flex: 1; text-align: center; padding: 4px 0; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-md);
+  font-size: var(--awd-panel-fs); color: var(--awd-text-2); background: var(--awd-surface); }
 .rp-filter { padding: 8px 10px 0; white-space: nowrap; }
 .rp-filter-row { display: flex; gap: 5px; }
 .rp-chip { flex: none; padding: 2px 8px; border: 1px solid var(--awd-border); border-radius: 999px;
-  font-size: 11px; color: var(--awd-text-2); background: var(--awd-surface); }
+  font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); background: var(--awd-surface); }
 .rp-chip.on { background: var(--awd-accent-soft); border-color: var(--awd-accent); color: var(--awd-accent-text); font-weight: 600; }
-.rp-error { margin: 8px 10px 0; padding: 6px 8px; border-radius: 6px; background: var(--awd-danger-soft); color: var(--awd-danger-text); font-size: 12px; }
-.rp-limit { margin: 8px 10px 0; font-size: 12px; color: var(--awd-text-2); }
+.rp-error { margin: 8px 10px 0; padding: 6px 8px; border-radius: var(--awd-radius-md); background: var(--awd-danger-soft); color: var(--awd-danger-text); font-size: var(--awd-panel-fs); }
+.rp-limit { margin: 8px 10px 0; font-size: var(--awd-panel-fs); color: var(--awd-text-2); }
 .rp-list { flex: 1; min-height: 0; padding: 8px 10px; }
 .rp-empty { padding: 28px 6px; display: flex; flex-direction: column; gap: 6px; }
-.rp-empty-t { font-size: 13px; color: var(--awd-text-2); }
-.rp-empty-s { font-size: 12px; color: var(--awd-text-3); line-height: 1.5; }
-.rp-card { margin-bottom: 8px; padding: 8px 9px; background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: 8px; }
+.rp-empty-t { font-size: var(--awd-font-size-body); color: var(--awd-text-2); }
+.rp-empty-s { font-size: var(--awd-panel-fs); color: var(--awd-text-3); line-height: 1.5; }
+.rp-card { margin-bottom: 8px; padding: 8px 9px; background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: var(--awd-radius-dialog); }
 /* 作者色条：一眼分出「AI 改的 / 我改的 / 别人改的」 */
 .rp-card.k-ai { border-left: 3px solid var(--awd-accent); }
 .rp-card.k-me { border-left: 3px solid var(--awd-info); }
@@ -844,10 +857,10 @@ export default {
 .rp-card.active { border-color: var(--awd-accent-text); }
 .rp-card.done { opacity: 0.6; }
 .rp-card-top { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; flex-wrap: wrap; }
-.rp-who { padding: 1px 6px; border-radius: 4px; font-size: 11px; background: var(--awd-surface-2); color: var(--awd-text-2); }
+.rp-who { padding: 1px 6px; border-radius: var(--awd-radius-sm); font-size: var(--awd-panel-fs-meta); background: var(--awd-surface-2); color: var(--awd-text-2); }
 .rp-who.ai { background: var(--awd-accent-soft); color: var(--awd-accent-text); font-weight: 600; }
 .rp-who.me { background: var(--awd-info-soft); color: var(--awd-info-text); }
-.rp-tag { padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+.rp-tag { padding: 1px 6px; border-radius: var(--awd-radius-sm); font-size: var(--awd-panel-fs-meta); }
 .rp-tag.ins { background: var(--awd-accent-soft); color: var(--awd-accent-text); }
 .rp-tag.mov { background: var(--awd-accent-soft); color: var(--awd-accent-text); border: 1px solid var(--awd-accent-text); }
 .rp-tag.del { background: var(--awd-danger-soft); color: var(--awd-danger-text); }
@@ -857,41 +870,41 @@ export default {
 .rp-tag.cnt { background: var(--awd-surface-2); color: var(--awd-text-2); }
 .rp-tag.link { background: var(--awd-accent-wash); color: var(--awd-accent-text); }
 .rp-tag.done { background: var(--awd-surface-2); color: var(--awd-text-2); }
-.rp-date { font-size: 11px; color: var(--awd-text-3); margin-left: auto; }
-.rp-text { display: block; font-size: 13px; color: var(--awd-text); line-height: 1.5; word-break: break-all; }
+.rp-date { font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); margin-left: auto; }
+.rp-text { display: block; font-size: var(--awd-font-size-body); color: var(--awd-text); line-height: 1.5; word-break: break-all; }
 .rp-text.del { text-decoration: line-through; color: var(--awd-danger-text); }
 .rp-text.mov { color: var(--awd-accent-text); text-decoration-style: double; }
-.rp-desc { display: block; margin-top: 3px; font-size: 11px; color: var(--awd-text-2); }
-.rp-ctx { display: block; margin-top: 4px; font-size: 11px; color: var(--awd-text-3); line-height: 1.4;
+.rp-desc { display: block; margin-top: 3px; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); }
+.rp-ctx { display: block; margin-top: 4px; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); line-height: 1.4;
   overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.rp-reason { margin-top: 6px; padding: 5px 7px; border-radius: 6px; background: var(--awd-surface-2);
+.rp-reason { margin-top: 6px; padding: 5px 7px; border-radius: var(--awd-radius-md); background: var(--awd-surface-2);
   border-left: 2px solid var(--awd-accent); }
-.rp-reason-h { display: block; font-size: 10px; color: var(--awd-text-3); margin-bottom: 2px; }
-.rp-reason-t { display: block; font-size: 12px; color: var(--awd-text-2); line-height: 1.45; }
+.rp-reason-h { display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); margin-bottom: 2px; }
+.rp-reason-t { display: block; font-size: var(--awd-panel-fs); color: var(--awd-text-2); line-height: 1.45; }
 .rp-acts { display: flex; gap: 6px; margin-top: 7px; }
 .rp-reply { margin-top: 7px; }
 .rp-reply-input { width: 100%; min-height: 48px; box-sizing: border-box; padding: 5px 7px; border: 1px solid var(--awd-border);
-  border-radius: 6px; font-size: 12px; line-height: 1.45; color: var(--awd-text); background: var(--awd-surface); }
-.rp-act { padding: 2px 10px; border: 1px solid var(--awd-border); border-radius: 6px; font-size: 12px; color: var(--awd-text-2); }
+  border-radius: var(--awd-radius-md); font-size: var(--awd-panel-fs); line-height: 1.45; color: var(--awd-text); background: var(--awd-surface); }
+.rp-act { padding: 2px 10px; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-md); font-size: var(--awd-panel-fs); color: var(--awd-text-2); }
 .rp-act.ok { border-color: var(--awd-mint); color: var(--awd-accent-text); }
 .rp-act.no { border-color: var(--awd-danger); color: var(--awd-danger-text); }
 
 /* 合并比对稿模式的三块（dev-board#630） */
-.rp-merge-title { font-size: 12px; font-weight: 600; color: var(--awd-text); }
+.rp-merge-title { font-size: var(--awd-panel-fs); font-weight: 600; color: var(--awd-text); }
 .rp-sec { margin-bottom: 14px; }
-.rp-sec-h { display: block; font-size: 12px; font-weight: 600; color: var(--awd-text); margin: 4px 0 6px; }
-.rp-sec-s { display: block; font-size: 11px; color: var(--awd-text-3); line-height: 1.5; margin-bottom: 6px; }
+.rp-sec-h { display: block; font-size: var(--awd-panel-fs); font-weight: 600; color: var(--awd-text); margin: 4px 0 6px; }
+.rp-sec-s { display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); line-height: 1.5; margin-bottom: 6px; }
 .rp-sub { margin-bottom: 10px; }
-.rp-sub-h { display: block; font-size: 11px; color: var(--awd-text-2); margin: 6px 0 4px; }
+.rp-sub-h { display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); margin: 6px 0 4px; }
 .rp-conflict { border-left: 3px solid var(--awd-warning); }
 .rp-three { display: flex; flex-direction: column; gap: 5px; margin: 4px 0 2px; }
-.rp-three-col { padding: 5px 7px; border-radius: 6px; background: var(--awd-surface-2); }
-.rp-three-h { display: block; font-size: 10px; color: var(--awd-text-3); margin-bottom: 2px; }
-.rp-three-t { display: block; font-size: 12px; color: var(--awd-text); line-height: 1.45; word-break: break-all; }
+.rp-three-col { padding: 5px 7px; border-radius: var(--awd-radius-md); background: var(--awd-surface-2); }
+.rp-three-h { display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); margin-bottom: 2px; }
+.rp-three-t { display: block; font-size: var(--awd-panel-fs); color: var(--awd-text); line-height: 1.45; word-break: break-all; }
 /* 溯源列表：一行一段，上面是段落首 40 字，下面是它的出处。 */
 .rp-prov { cursor: pointer; }
-.rp-prov-sum { padding: 8px 10px; font-size: 11.5px; color: var(--awd-text-2); }
-.rp-prov-note { padding: 0 10px 8px; font-size: 11px; color: var(--awd-text-3); line-height: 1.6; }
-.rp-prov-from { display: block; margin-top: 4px; font-size: 11px; color: var(--awd-text-3); }
+.rp-prov-sum { padding: 8px 10px; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); }
+.rp-prov-note { padding: 0 10px 8px; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); line-height: 1.6; }
+.rp-prov-from { display: block; margin-top: 4px; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); }
 .rp-prov-from.link { color: var(--awd-accent-text); text-decoration: underline; }
 </style>

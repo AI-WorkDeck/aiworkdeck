@@ -25,6 +25,15 @@ import java.util.Objects;
 @Table(name = "project")
 public class Project {
 
+    public static final String LOOSE_FILES = "LOOSE_FILES";
+    public static final String SCRATCH = "SCRATCH";
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isLooseFileWorkspace() { return LOOSE_FILES.equals(projectType); }
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isScratchWorkspace() { return SCRATCH.equals(projectType); }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -94,6 +103,18 @@ public class Project {
      * 最近更新时间
      */
     private LocalDateTime updatedAt;
+
+    /** Account catalogue identity, independent of the database's device-local numeric id. */
+    @Column(length = 36)
+    private String uid;
+
+    public String getUid() { return uid; }
+    public void setUid(String uid) { this.uid = uid; }
+
+    @jakarta.persistence.PrePersist
+    void assignUid() {
+        if (uid == null || uid.isBlank()) uid = java.util.UUID.randomUUID().toString();
+    }
 
     public Long getId() {
         return id;

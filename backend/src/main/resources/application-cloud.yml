@@ -25,6 +25,10 @@ spring:
     url: jdbc:postgresql://localhost:5432/aiworkdeck_cloud
     username: aiworkdeck_cloud
     password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:30}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: 30000
   jpa:
     hibernate:
       ddl-auto: update
@@ -32,6 +36,8 @@ spring:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
 
 security:
+  # Official identity is shared with the website; old clients must upgrade.
+  official-password-login-required: true
   # server 模式（多租户）：local-mode 的免登/回环闸整套不生效
   local-mode: false
   # 浏览器登录会话滑动过期保持 7 天（已上线契约，见 deploy/cloud/README.md）。
@@ -59,8 +65,12 @@ security:
 ai:
   model:
     provider: awd-cloud
+  subagent:
+    max-parallel: ${AI_SUBAGENT_MAX_PARALLEL:8}
 
 storage:
+  subscription-quota:
+    enabled: true
   type: local
   local:
     root-path: /opt/aiworkdeck/cloud/data

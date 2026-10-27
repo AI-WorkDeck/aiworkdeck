@@ -5,13 +5,13 @@
 import { t } from '@/i18n'
 
 export const OCR_ACTION_LABELS = {
-  refresh: t('config.ocr.refresh'),
-  recognize: t('config.ocr.recognize'),
-  download: t('config.ocr.download'),
-  copy: t('config.ocr.copy'),
-  insertDoc: t('config.ocr.insertDoc'),
-  webLink: t('config.ocr.webLink'),
-  favorite: t('config.ocr.favorite')
+  get refresh() { return t('config.ocr.refresh') },
+  get recognize() { return t('config.ocr.recognize') },
+  get download() { return t('config.ocr.download') },
+  get copy() { return t('config.ocr.copy') },
+  get insertDoc() { return t('config.ocr.insertDoc') },
+  get webLink() { return t('config.ocr.webLink') },
+  get favorite() { return t('config.ocr.favorite') }
 }
 
 // WPS 内部超链接协议：用于拦截点击并在应用内打开

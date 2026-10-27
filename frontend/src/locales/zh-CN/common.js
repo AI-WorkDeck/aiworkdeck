@@ -35,6 +35,9 @@ export default {
   readVersionFileFailed: '读取版本文件失败',
   // ---- utils/ideOpen.js ----
   openProjectFailed: '打开项目失败，请稍后重试',
+  nestedFolderTitle: '打开嵌套文件夹',
+  nestedFolderContent: '所选文件夹与项目「{names}」存在包含关系，可以继续作为项目打开。重叠部分使用的是同一批原文件；在任一项目中编辑、删除文件或退回版本，另一项目也会受到影响。',
+  nestedFolderContinue: '继续打开',
   folderImportTruncatedTitle: '导入已截断',
   folderImportTruncated: '本次导入已截断，约 {count} 项未纳入：目录超过 30000 项，请拆分项目',
   folderImportTruncatedCapped: '本次导入已截断，超过 {count} 项未纳入：目录超过 30000 项，请拆分项目',
@@ -62,4 +65,9 @@ export default {
   sourceChannelWpsExcel: 'WPS 表格',
   sourceChannelWpsPowerpoint: 'WPS 演示',
   sourceChannelPlugin: '插件',
+  // ---- components/LanguagePicker.vue ----
+  languagePickerLabel: '选择界面语言',
+  languageFollowSystem: '跟随系统',
+  languageSearchPlaceholder: '搜索语言…',
+  languageNoMatch: '无匹配语言',
 }

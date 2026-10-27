@@ -40,3 +40,12 @@ export function pickActiveContextTab({ focusedPane, activeFileLeft, activeFileRi
   if (focusedPane === 'right' && right) return right
   return left || right || null
 }
+
+/** Keep open documents available when focus moves from a document to the assistant tab. */
+export function messageContextFileIds(state = {}) {
+  const active = pickActiveContextTab(state)
+  const primary = state.focusedPane === 'right' ? state.rightFiles : state.leftFiles
+  const secondary = state.focusedPane === 'right' ? state.leftFiles : state.rightFiles
+  const candidates = [active, ...(primary || []).slice().reverse(), ...(secondary || []).slice().reverse()]
+  return [...new Set(candidates.filter(isContextEligibleTab).map(tab => String(tab.id)))].slice(0, 2)
+}

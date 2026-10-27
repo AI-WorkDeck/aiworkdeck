@@ -98,8 +98,9 @@ test('模型段等的是 done 事件，不是 download() 的 resolve（它 spawn
   assert.ok(d.calls.includes('ensure:kokoro-service'))
 })
 
-test('模型「已经装过了」抛的错要算成功——否则装了一半的组件永远重试不出去', async () => {
+test('已安装异常必须经主进程文件清单确认才能继续', async () => {
   const d = deps()
+  d.modelStatus = async () => ({ components: [{ id: 'kokoro-models', state: d.calls.includes('model:kokoro-models') ? 'installed' : 'absent' }] })
   d.modelDownload = async (id) => {
     d.calls.push('model:' + id)
     // model-manager.download() 对已装好的模型直接抛这句（model-manager.js:195）
@@ -152,4 +153,75 @@ test('总进度按段加权，中途读得出一个 0..100 的数', async () => 
   c.state.items[1].percent = 50
   const p = c.overallPercent()
   assert.ok(p > 50 && p < 100, '一个装完 + 一个下到一半应当落在 50~100 之间，实际 ' + p)
+})
+
+test('disabled service is not ready after installation', async () => {
+  const c = createOptionalComponentsController(deps({ ensureService: async () => ({ ok: false, disabled: true }) }))
+  await c.load()
+  assert.equal(await c.installOne(c.state.items[0]), false)
+  assert.equal(c.state.items[0].phase, 'failed')
+})
+
+test('IPC ok:false settles without waiting forever for a progress event', async () => {
+  const d = deps({ modelDownload: async () => ({ ok: false, message: 'not ready' }) })
+  const c = createOptionalComponentsController(d)
+  await c.load()
+  assert.equal(await c.installOne(c.state.items[1]), false)
+  assert.equal(c.state.items[1].error, 'not ready')
+  assert.equal(d.listeners.size, 0)
+})
+
+test('cancelled event ends the pending model step and ignores late done', async () => {
+  const d = deps()
+  d.modelDownload = async (id) => {
+    for (const cb of [...d.listeners]) { cb({ id, phase: 'cancelled', message: 'cancelled' }); cb({ id, phase: 'done' }) }
+  }
+  const c = createOptionalComponentsController(d)
+  await c.load()
+  assert.equal(await c.installOne(c.state.items[1]), false)
+  assert.equal(c.state.items[1].modelInstalled, false)
+  assert.ok(!d.calls.includes('ensure:kokoro-service'))
+})
+
+test('model event loss times out and requests cancellation', async () => {
+  const d = deps({ modelDownload: async () => ({ ok: true }), modelStallMs: 10, modelPollMs: 5,
+    modelCancel: async (id) => d.calls.push('cancel:' + id) })
+  const c = createOptionalComponentsController(d)
+  await c.load()
+  assert.equal(await c.installOne(c.state.items[1]), false)
+  await new Promise((r) => setTimeout(r, 0))
+  assert.ok(d.calls.includes('cancel:kokoro-models'))
+  assert.equal(d.listeners.size, 0)
+})
+
+test('desktop inventory overrides a stale backend marker and offers repair', async () => {
+  const d = deps({
+    optionalComponents: async () => ({ components: [{ packId: 'asr-runtime', installed: true, modelId: 'asr-models', modelInstalled: true }] }),
+    modelStatus: async () => ({ components: [{ id: 'asr-models', state: 'error', repairRequired: true, message: 'verify first' }] }),
+  })
+  const c = createOptionalComponentsController(d)
+  await c.load()
+  assert.equal(c.state.items[0].modelInstalled, false)
+  assert.equal(c.state.items[0].phase, 'failed')
+  assert.equal(c.state.items[0].repairRequired, true)
+})
+
+test('broken progress subscription fails immediately without starting a download', async () => {
+  const d = deps({ onModelProgress: () => { throw new Error('bridge unavailable') } })
+  const c = createOptionalComponentsController(d)
+  await c.load()
+  assert.equal(await c.installOne(c.state.items[1]), false)
+  assert.equal(c.state.items[1].error, 'bridge unavailable')
+  assert.ok(!d.calls.includes('model:kokoro-models'))
+})
+
+test('explicit repair verifies even an apparently installed model', async () => {
+  const d = deps({ modelStatus: async () => ({ components: [{ id: 'kokoro-models', state: 'installed' }] }) })
+  const download = d.modelDownload
+  let options
+  d.modelDownload = (id, opts) => { options = opts; return download(id) }
+  const c = createOptionalComponentsController(d)
+  await c.load()
+  assert.equal(await c.installOne(c.state.items[1], { repairModel: true }), true)
+  assert.deepEqual(options, { repair: true })
 })

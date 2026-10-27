@@ -289,6 +289,44 @@ class LocalIdentityServiceTest {
                 "测试账号不在候选集内，不能被选为本机工作区");
     }
 
+    @Test
+    void aRealSelectedRowLockTimeoutCannotChangeTheCachedIdentity() throws Exception {
+        user(1L, "first_user", "First"); user(2L, "second_user", "Second");
+        var database = new org.h2.jdbcx.JdbcDataSource();
+        database.setURL("jdbc:h2:mem:identity-selection-lock;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=100");
+        try (var owner = database.getConnection()) {
+            try (var statement = owner.createStatement()) {
+                statement.execute("CREATE TABLE selected_identity(id INT PRIMARY KEY, selected BIGINT)");
+                statement.execute("INSERT INTO selected_identity VALUES(1,1)");
+            }
+            when(settings.findByKey(LocalIdentityService.SELECTED_KEY)).thenAnswer(invocation -> {
+                try (var c = database.getConnection(); var s = c.createStatement(); var r = s.executeQuery("SELECT selected FROM selected_identity WHERE id=1")) {
+                    assertTrue(r.next()); var row = new SystemSetting(); row.setKey(LocalIdentityService.SELECTED_KEY);
+                    row.setValue(r.getString(1)); return Optional.of(row);
+                }
+            });
+            when(settings.save(any(SystemSetting.class))).thenAnswer(invocation -> {
+                SystemSetting row = invocation.getArgument(0);
+                try (var c = database.getConnection(); var s = c.prepareStatement("UPDATE selected_identity SET selected=? WHERE id=1")) {
+                    s.setLong(1, Long.parseLong(row.getValue())); s.executeUpdate(); return row;
+                } catch (java.sql.SQLException locked) {
+                    throw new org.springframework.dao.CannotAcquireLockException("Selection is busy", locked);
+                }
+            });
+            LocalIdentityService svc = service(false);
+            assertEquals(1L, svc.localUserId());
+            owner.setAutoCommit(false);
+            try (var statement = owner.createStatement(); var ignored = statement.executeQuery("SELECT * FROM selected_identity WHERE id=1 FOR UPDATE")) {
+                assertThrows(org.springframework.dao.CannotAcquireLockException.class, () -> svc.select(2L));
+                assertEquals(1L, svc.localUserId());
+            } finally { owner.rollback(); }
+            assertEquals(2L, svc.select(2L).userId());
+            assertEquals(2L, svc.localUserId());
+            owner.setAutoCommit(true);
+            try (var statement = owner.createStatement()) { statement.execute("SHUTDOWN"); }
+        }
+    }
+
     // ==================== 缓存与 AuthController 接线 ====================
 
     @Test

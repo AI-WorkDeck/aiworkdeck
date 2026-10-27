@@ -86,6 +86,7 @@ const IMPORT_FILTERS = {
 // §0.2 anchors: a bookmark spanning a text range is a STABLE location handle that
 // moves with edits — the model-native replacement for fragile integer offsets.
 const ANCHOR_PREFIX = '__ai_anchor_';
+const anchorTexts = new Map();
 function anchorBookmark(range) {
   const name = ANCHOR_PREFIX + (++anchorSeq);
   const bm = xModel.createInstance('com.sun.star.text.Bookmark');
@@ -102,14 +103,16 @@ function anchorBookmark(range) {
   // 同名从哪来：锚点书签会跟着 docx 存盘（书签经 export/load 往返存活），而 anchorSeq
   // 是 worker 级计数器、每开一个 webview 都从 0 重来。下面 dropAiAnchors() 在换文档时
   // 清掉陈旧锚点是主闸，这里的回读是第二道闸。
-  try { const real = bm.getName(); if (real) return String(real); } catch (e) {}
-  return name;
+  const real = String(bm.getName() || name);
+  anchorTexts.set(real, range.getString());
+  return real;
 }
 // 摘掉文档里全部 __ai_anchor_* 书签，返回摘掉的个数。锚点是一次会话内的临时定位
 // 句柄（§0.2），不该留在用户的 docx 里——clear_anchors（housekeeping）与换文档
 // 时的清场共用这一份。摘除与插入不同源：removeTextContent 本引擎实测容得下别的
 // story 的书签（单元格锚点用正文 XText 照样摘得掉，table-retype 的锚点组守着）。
 function dropAiAnchors() {
+  anchorTexts.clear();
   const bms = xModel.getBookmarks();
   const names = (bms.getElementNames && bms.getElementNames()) || [];
   const xText = xModel.getText();
@@ -125,6 +128,15 @@ function anchorRange(name) {
   const bms = xModel.getBookmarks();
   if (!bms.hasByName(name)) return null;
   return bms.getByName(name).getAnchor(); // XTextRange
+}
+// Compare in the final-text view immediately before selecting/writing. Unrelated
+// edits may move a bookmark without invalidating its unchanged target text.
+function anchorEditError(name, range) {
+  if (!String(name).startsWith(ANCHOR_PREFIX)) return null;
+  if (!anchorTexts.has(String(name)) || range.getString() !== anchorTexts.get(String(name))) {
+    return '锚点原文已变化或失效，未执行编辑；请重新 doc_find_text 核对上下文后再试';
+  }
+  return null;
 }
 // ---- EvidenceLink 书签原语 helpers（dev-board#103）-----------------------------
 function bmFail(msg) { return { success: false, error: msg, message: msg }; }
@@ -224,6 +236,23 @@ function paragraphTextOf(range) {
     return cur.getString();
   } catch (e) { return null; }
 }
+// Keep the rendered list label separate from text: all text offsets remain UTF-16
+// offsets into the unprefixed paragraph. NumberingIsNumber means a label is shown,
+// including bullets; it does not distinguish numeric lists from bullet lists.
+function paragraphNumberingOf(paragraph) {
+  try {
+    const label = paragraph.getPropertyValue('ListLabelString');
+    const listId = paragraph.getPropertyValue('ListId');
+    const level = paragraph.getPropertyValue('NumberingLevel');
+    const hasLabel = paragraph.getPropertyValue('NumberingIsNumber');
+    if (typeof label === 'string' && typeof listId === 'string' && Number.isInteger(level)
+      && (hasLabel == null || typeof hasLabel === 'boolean')) {
+      return { available: true, label: label, listId: listId, level: level, hasLabel: hasLabel == null ? null : hasLabel };
+    }
+  } catch (e) {}
+  // Unavailable properties must never look like a confirmed unnumbered paragraph.
+  return { available: false, label: null, listId: null, level: null, hasLabel: null };
+}
 // ---- 段落索引缓存（dev-board#108 G3）------------------------------------------
 // 每次 get_document_text / get_paragraph 都从头枚举 900+ 段是 O(n)（150 页实测
 // 2-5s/次，AI 逐页读一遍报告 = 每页付一次全扫）。这里一次枚举把每段的 XTextRange
@@ -293,6 +322,130 @@ function eachParagraph(fn) {
 function selectVisibly(range) {
   try { ctrl.getViewCursor().gotoRange(range, false); return true; }
   catch (e) { try { ctrl.select(range); return true; } catch (e2) { return false; } }
+}
+// 读取段落自动编号的可见标签（仅当 NumberingIsNumber !== false 且 ListLabelString 非空时返回）。
+function readParagraphLabel(el) {
+  if (!el || typeof el.getPropertyValue !== 'function') return '';
+  try {
+    const hasLabel = el.getPropertyValue('NumberingIsNumber');
+    if (hasLabel === false) return '';
+    const lbl = el.getPropertyValue('ListLabelString');
+    return typeof lbl === 'string' ? lbl.trim() : '';
+  } catch (e) { return ''; }
+}
+// 拼接自动编号标签与段落正文（如 ListLabelString="第一条" + text="服务内容" -> "第一条 服务内容"），
+// 供条款识别、标题定位与带编号关键词搜索统一匹配自动编号与手打编号。
+function paragraphCombinedText(el) {
+  const raw = String((el && typeof el.getString === 'function' && el.getString()) || '');
+  const lbl = readParagraphLabel(el);
+  if (!lbl) return raw;
+  const trimmed = raw.trim();
+  if (trimmed.indexOf(lbl) === 0) return raw;
+  const needSpace = !/[、.．:：）)\s]$/.test(lbl) && trimmed.length > 0 && !/^[、.．:：）)\s]/.test(trimmed);
+  return lbl + (needSpace ? ' ' : '') + raw;
+}
+// 当 XSearchable.findFirst 找不到带自动编号前缀的查询词（如 "第一条 服务内容"、"1.1 乙方义务" 或单独的 "第一条"）
+// 时，回退扫描段落的 ListLabelString + 正文，返回段落级或段内子区间 XTextRange 及其 paragraphIndex/numbering。
+function findNumberedParagraphRanges(keyword, matchCase, limit) {
+  const kw = String(keyword || '').trim();
+  if (!kw) return { hits: [], truncated: false };
+  const needle = matchCase ? kw : kw.toLowerCase();
+  const norm = function (s) { return (matchCase ? String(s) : String(s).toLowerCase()).replace(/[\s\u3000]+/g, ''); };
+  const needleCompact = norm(kw);
+  const hits = [];
+  let truncated = false;
+  const maxHits = Number(limit) || 50;
+  eachParagraph(function (el, idx) {
+    const lbl = readParagraphLabel(el);
+    if (!lbl) return false;
+    const raw = String(el.getString() || '');
+    const combined = paragraphCombinedText(el);
+    const hay = matchCase ? combined : combined.toLowerCase();
+    const lblCmp = matchCase ? lbl : lbl.toLowerCase();
+    const matched = hay.indexOf(needle) !== -1 || lblCmp === needle || (needleCompact.length > 0 && norm(combined).indexOf(needleCompact) !== -1);
+    if (!matched) return false;
+    if (hits.length >= maxHits) { truncated = true; return true; }
+    let range = el;
+    if (norm(combined).indexOf(needleCompact) === 0 && needleCompact.length > norm(lbl).length) {
+      const stripped = kw.slice(lbl.length).replace(/^[\s\u3000、.．:：）)]+/, '');
+      if (stripped && raw) {
+        const rawHay = matchCase ? raw : raw.toLowerCase();
+        const subNeedle = matchCase ? stripped : stripped.toLowerCase();
+        const pos = rawHay.indexOf(subNeedle);
+        if (pos >= 0 && !/[\uD800-\uDFFF]/.test(raw.slice(0, pos + stripped.length))) {
+          try {
+            const cur = el.getText().createTextCursorByRange(el.getStart());
+            if ((!pos || cur.goRight(pos, false)) && cur.goRight(stripped.length, true)) range = cur;
+          } catch (e) {}
+        }
+      }
+    }
+    hits.push({ range: range, paragraphIndex: idx, numbering: paragraphNumberingOf(el), combinedText: combined });
+    return false;
+  });
+  return { hits: hits, truncated: truncated };
+}
+// 选中闭区间 [startIdx, endIdx] 的正文段落（兼容单段与跨段，滚动视图光标并返回选中的段落数组）。
+function selectParagraphRange(startIdx, endIdx) {
+  const total = getParaIndex().total;
+  const s = Number(startIdx);
+  const e = endIdx != null ? Number(endIdx) : s;
+  if (!Number.isInteger(s) || !Number.isInteger(e) || s < 0 || e < s || s >= total || e >= total) {
+    return { error: 'paragraph index out of range: ' + startIdx + (endIdx != null ? '..' + endIdx : '') + ' (count ' + total + ')' };
+  }
+  const first = paraAt(s);
+  const last = e === s ? first : paraAt(e);
+  if (!first || !last) return { error: 'paragraph index out of range: ' + s + '..' + e + ' (count ' + total + ')' };
+  const paras = [];
+  for (let i = s; i <= e; i++) {
+    const pEl = paraAt(i);
+    if (pEl) paras.push(pEl);
+  }
+  try {
+    const vc = ctrl.getViewCursor();
+    if (s === e) {
+      if (!selectVisibly(first)) return { error: 'could not select paragraph ' + s };
+    } else {
+      vc.gotoRange(first.getStart(), false);
+      vc.gotoRange(last.getEnd(), true);
+    }
+  } catch (err) {
+    if (!selectVisibly(first)) return { error: 'could not select paragraph range ' + s + '..' + e };
+  }
+  return { startIndex: s, endIndex: e, paragraphs: paras, first: first, last: last };
+}
+// 收集当前选区覆盖到的正文段落对象（若选区在表格单元格或无法枚举则返回空数组，调用方回退到 vc）。
+function selectedBodyParagraphs(vc) {
+  const out = [];
+  try {
+    const cur = vc.getText().createTextCursorByRange(vc);
+    const en = cur.createEnumeration();
+    while (en.hasMoreElements()) {
+      const el = en.nextElement();
+      if (el && el.supportsService && el.supportsService('com.sun.star.text.Paragraph')) out.push(el);
+    }
+  } catch (e) {}
+  return out;
+}
+// 解析格式化原语可选携带的定位参数（paragraphIndex / index / startParagraph + endParagraph / anchor），
+// 若传入则先选中目标范围并返回 {paragraphs, startParagraph, endParagraph}；未传则沿用当前选区。
+function resolveFormatTargets(p) {
+  if (p && (p.paragraphIndex != null || p.index != null || p.startParagraph != null || p.endParagraph != null)) {
+    const s = p.startParagraph != null ? Number(p.startParagraph) : (p.paragraphIndex != null ? Number(p.paragraphIndex) : Number(p.index));
+    const e = p.endParagraph != null ? Number(p.endParagraph) : (p.endIndex != null ? Number(p.endIndex) : s);
+    const sel = selectParagraphRange(s, e);
+    if (sel.error) return { error: sel.error };
+    return { paragraphs: sel.paragraphs, startParagraph: sel.startIndex, endParagraph: sel.endIndex, explicitRange: true };
+  }
+  if (p && (p.anchor || p.anchorId)) {
+    const aName = String(p.anchor || p.anchorId);
+    const r = anchorRange(aName);
+    if (!r) return { error: 'anchor not found: ' + aName };
+    selectVisibly(r);
+  }
+  const vc = ctrl.getViewCursor();
+  const paras = selectedBodyParagraphs(vc);
+  return { paragraphs: paras, explicitRange: false };
 }
 function pad2(n) { return (n < 10 ? '0' : '') + n; }
 // ---- 审阅面板（修订/批注）的取址助手 ---------------------------------------
@@ -1036,6 +1189,26 @@ const CHROME_URLS = {
     'private:resource/toolbar/previewobjectbar',
     'private:resource/toolbar/fullscreenbar',
     'private:resource/toolbar/changes',
+    // Calc / Impress 经典与上下文工具栏
+    'private:resource/toolbar/formatobjectbar',
+    'private:resource/toolbar/calcobjectbar',
+    'private:resource/toolbar/inputbar',
+    'private:resource/toolbar/formtextobjectbar',
+    'private:resource/toolbar/formobjectbar',
+    'private:resource/toolbar/formcontrols',
+    'private:resource/toolbar/formdesign',
+    'private:resource/toolbar/moreformcontrols',
+    'private:resource/toolbar/slideviewtoolbar',
+    'private:resource/toolbar/slideviewobjectbar',
+    'private:resource/toolbar/outlinetoolbar',
+    'private:resource/toolbar/masterviewtoolbar',
+    'private:resource/toolbar/commontaskbar',
+    'private:resource/toolbar/optionsbar',
+    'private:resource/toolbar/gluepointsobjectbar',
+    'private:resource/toolbar/3dobjectsbar',
+    'private:resource/toolbar/extrusionobjectbar',
+    'private:resource/toolbar/fontworkobjectbar',
+    'private:resource/toolbar/mediaobjectbar',
   ],
 };
 
@@ -1162,6 +1335,85 @@ function setCharProp(ps, base, value) {
   for (const sfx of ['Asian', 'Complex']) {
     try { ps.setPropertyValue(base + sfx, value); } catch (e) { /* not all props have siblings */ }
   }
+}
+// 中文字号名 → 磅值映射（兼容「小四」「小四号」「四号」「五号」「三号」「小三」等律师常用口令）
+const CN_FONT_SIZE_PT = {
+  '初号': 42, '小初': 36, '一号': 26, '小一': 24, '二号': 22, '小二': 18,
+  '三号': 16, '小三': 15, '四号': 14, '小四': 12, '五号': 10.5, '小五': 9,
+  '六号': 7.5, '小六': 6.5, '七号': 5.5, '八号': 5,
+};
+function parseFontSizePt(v) {
+  if (v == null) return null;
+  if (typeof v === 'number') return (isFinite(v) && v > 0) ? v : null;
+  const s = String(v).trim();
+  if (!s) return null;
+  const key = s.replace(/号$/, '');
+  if (CN_FONT_SIZE_PT[s] != null) return CN_FONT_SIZE_PT[s];
+  if (CN_FONT_SIZE_PT[key] != null) return CN_FONT_SIZE_PT[key];
+  if (CN_FONT_SIZE_PT[key + '号'] != null) return CN_FONT_SIZE_PT[key + '号'];
+  const num = Number(s.replace(/(pt|磅|号)$/i, '').trim());
+  return (isFinite(num) && num > 0) ? num : null;
+}
+// 读取光标/段落的有效字号（优先读中文实际生效的 CharHeightAsian，再读 CharHeight，最后兜底 HOUSE.bodyPt）。
+function effectiveCharHeightPt(ps, fallbackPs) {
+  const sources = [ps, fallbackPs];
+  for (let i = 0; i < sources.length; i++) {
+    const src = sources[i];
+    if (!src || typeof src.getPropertyValue !== 'function') continue;
+    try { const ha = Number(src.getPropertyValue('CharHeightAsian')); if (isFinite(ha) && ha > 0) return ha; } catch (e) {}
+    try { const h = Number(src.getPropertyValue('CharHeight')); if (isFinite(h) && h > 0) return h; } catch (e) {}
+  }
+  return HOUSE.bodyPt || 12;
+}
+// 解析下划线参数：支持 boolean 与字符串线型（single/double/dotted/dashed/dash/wave/bold/none）。
+function resolveUnderlineEnum(u) {
+  const U = (css && css.awt && css.awt.FontUnderline) || {};
+  const NONE = U.NONE != null ? U.NONE : 0;
+  const SINGLE = U.SINGLE != null ? U.SINGLE : 1;
+  const DOUBLE = U.DOUBLE != null ? U.DOUBLE : 2;
+  const DOTTED = U.DOTTED != null ? U.DOTTED : 3;
+  const DASH = U.DASH != null ? U.DASH : 5;
+  const WAVE = U.WAVE != null ? U.WAVE : 10;
+  const BOLD = U.BOLD != null ? U.BOLD : 12;
+  if (typeof u === 'boolean') return { value: u ? SINGLE : NONE, label: u };
+  const s = String(u).trim().toLowerCase();
+  if (!s || s === 'false' || s === 'none' || s === '0' || s === 'off' || s === '无') return { value: NONE, label: false };
+  if (s === 'true' || s === 'single' || s === '1' || s === 'on' || s === '单下划线') return { value: SINGLE, label: s === 'single' ? 'single' : true };
+  if (s === 'double' || s === '双下划线') return { value: DOUBLE, label: 'double' };
+  if (s === 'dotted' || s === '点线' || s === '点式下划线') return { value: DOTTED, label: 'dotted' };
+  if (s === 'dash' || s === 'dashed' || s === '虚线') return { value: DASH, label: 'dashed' };
+  if (s === 'wave' || s === 'wavy' || s === '波浪线') return { value: WAVE, label: 'wave' };
+  if (s === 'bold' || s === 'thick' || s === '粗线') return { value: BOLD, label: 'bold' };
+  return { value: SINGLE, label: true };
+}
+// 解析行距参数（兼容 single/1.5/oneHalf/double/multiple/proportional/atLeast/minimum/exact/exactly/fixed 及直接数字字符串）
+function parseLineSpacingSpec(modeRaw, valueRaw) {
+  const mode = String(modeRaw || '').trim();
+  const modeLower = mode.toLowerCase();
+  const v = Number(valueRaw) || 0;
+  const M = (css && css.style && css.style.LineSpacingMode) || { PROP: 0, MINIMUM: 1, LEADING: 2, FIX: 3 };
+  if (modeLower === 'single' || mode === '1' || mode === '1.0') return { ls: { Mode: M.PROP, Height: 100 }, label: 'single' };
+  if (mode === '1.5' || modeLower === 'onehalf' || modeLower === '1.5x') return { ls: { Mode: M.PROP, Height: 150 }, label: '1.5' };
+  if (modeLower === 'double' || mode === '2' || mode === '2.0' || modeLower === '2x') return { ls: { Mode: M.PROP, Height: 200 }, label: 'double' };
+  if (modeLower === 'proportional' || modeLower === 'multiple' || modeLower === 'multi') {
+    if (v <= 0) return { error: 'proportional/multiple 行距需要正数 lineSpacingValue（百分比或倍数，如 150 或 1.5）' };
+    const pct = v <= 10 ? Math.round(v * 100) : Math.round(v);
+    return { ls: { Mode: M.PROP, Height: pct }, label: 'proportional:' + pct };
+  }
+  if (modeLower === 'atleast' || modeLower === 'minimum' || modeLower === 'min') {
+    if (v <= 0) return { error: 'atLeast 行距需要正数 lineSpacingValue（磅）' };
+    return { ls: { Mode: M.MINIMUM, Height: ptToMm100(v) }, label: 'atLeast:' + v };
+  }
+  if (modeLower === 'exactly' || modeLower === 'exact' || modeLower === 'fixed' || modeLower === 'fix') {
+    if (v <= 0) return { error: 'exactly 行距需要正数 lineSpacingValue（磅）' };
+    return { ls: { Mode: M.FIX, Height: ptToMm100(v) }, label: 'exactly:' + v };
+  }
+  const numMode = Number(mode.replace(/x$/i, ''));
+  if (isFinite(numMode) && numMode > 0) {
+    const pct = numMode <= 10 ? Math.round(numMode * 100) : Math.round(numMode);
+    return { ls: { Mode: M.PROP, Height: pct }, label: 'proportional:' + pct };
+  }
+  return { error: 'bad lineSpacingMode: ' + mode + ' (single/1.5/double/multiple/proportional/atLeast/exactly)' };
 }
 
 // ---- 标准格式（house style）与 markdown 剥离写入 -----------------------------
@@ -1403,16 +1655,39 @@ function applyHouseChar(ps, opts) {
   }
   try { ps.setPropertyValue('CharColor', color); } catch (e) {}
 }
+// 同时对段落对象与跨整段的 XTextCursor 设字符格式，确保 Word 导入的 <w:rPr> run 级直接格式被覆盖。
+function applyHouseCharDeep(el, opts) {
+  applyHouseChar(el, opts);
+  try {
+    if (el && typeof el.getText === 'function') {
+      const cur = el.getText().createTextCursorByRange(el);
+      if (cur && cur !== el) applyHouseChar(cur, opts);
+    }
+  } catch (e) {}
+}
 // 段落规格按画像块取：title = 一级标题块；heading = opts.level 级标题块（缺省二级，
 // house-default 里二至六级与正文同款只加粗）；body / list（不缩进）= 正文块；
 // tableCell = 表格单元格块。opts.afterTable：紧跟表格的首段段前取 afterTableSpaceBefore。
 function houseParaSpec(kind, opts) {
   const o = opts || {};
-  if (kind === 'title') return headingSpec(1);
-  if (kind === 'heading') return headingSpec(o.level != null ? o.level : 2);
-  if (kind === 'tableCell') return HOUSE.cellSpec;
-  if (kind === 'list') return Object.assign({}, HOUSE.bodySpec, { indentMm: 0 });
-  return HOUSE.bodySpec;
+  let base;
+  if (kind === 'title') base = headingSpec(1);
+  else if (kind === 'heading') base = headingSpec(o.level != null ? o.level : 2);
+  else if (kind === 'tableCell') return HOUSE.cellSpec;
+  else if (kind === 'list') base = Object.assign({}, HOUSE.bodySpec, { indentMm: 0 });
+  else base = HOUSE.bodySpec;
+  const ov = o.overrides;
+  if (!ov && !o.isNumbered) return base;
+  const copy = Object.assign({}, base);
+  if (o.isNumbered) copy.indentMm = 0;
+  if (ov) {
+    if (kind !== 'title' && ov.align) copy.align = ov.align;
+    if (ov.topMm != null) copy.topMm = ov.topMm;
+    if (ov.bottomMm != null) copy.bottomMm = ov.bottomMm;
+    if (ov.ls != null) copy.ls = ov.ls;
+    if (kind === 'body' && !o.isNumbered && ov.indentMm != null) copy.indentMm = ov.indentMm;
+  }
+  return copy;
 }
 function applyHousePara(ps, kind, opts) {
   const o = opts || {};
@@ -1542,7 +1817,7 @@ function insertInlineStyled(vc, text) {
 // 文本里是否带 markdown 标记（插入路径按此决定走剥离转换还是原样插入）
 const MD_MARKER_RE = /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`|\[[^\]\n]+\]\([^)\s]+\)|^\s*#{1,6}\s|^\s*>\s)/m;
 
-// 编号规则预设。preset: 'bullet' | 'decimal' | 'chinese' | 'multilevel'。
+// 编号规则预设。preset: 'bullet' | 'decimal' | 'chinese' | 'clause' | 'paren_chinese' | 'multilevel'。
 // replaceByIndex 收 sequence<PropertyValue>（zetajs 编组：纯 Array of PropertyValue）。
 function makeNumberingRules(preset) {
   // 常量组带数值兜底：zetajs 常量组个别项缺失时 undefined 进 PropertyValue 会编组失败
@@ -1560,6 +1835,14 @@ function makeNumberingRules(preset) {
     } else if (preset === 'chinese') {
       props.push(mkProp('NumberingType', NUMBER_LOWER_ZH));
       props.push(mkProp('Suffix', '、')); // 一、二、
+    } else if (preset === 'clause') {
+      props.push(mkProp('NumberingType', NUMBER_LOWER_ZH));
+      props.push(mkProp('Prefix', '第'));
+      props.push(mkProp('Suffix', '条 ')); // 第一条 、第二条 
+    } else if (preset === 'paren_chinese') {
+      props.push(mkProp('NumberingType', NUMBER_LOWER_ZH));
+      props.push(mkProp('Prefix', '（'));
+      props.push(mkProp('Suffix', '）')); // （一）（二）
     } else if (preset === 'multilevel') {
       props.push(mkProp('NumberingType', ARABIC));
       props.push(mkProp('Suffix', '.'));
@@ -1612,28 +1895,70 @@ function borderLineStyle(name) {
   if (n === 'dashed') return S.DASHED != null ? S.DASHED : 2;
   return S.SOLID != null ? S.SOLID : 0;
 }
-// 给一张表设边框。spec: {outsideMm, insideMm, color, style}（宽度单位 1/100mm；
-// 缺省取 HOUSE.tableBorder：Grid 实线、内外同宽）。
+// 给一张表设边框。spec: {preset, outsideMm, insideMm, color, style}（宽度单位 1/100mm；
+// 缺省取 HOUSE.tableBorder：Grid 实线、内外同宽；preset: 'all'|'threeLine'|'outer'|'none'）。
 function applyTableBorders(table, spec) {
   const o = Object.assign({}, HOUSE.tableBorder, spec || {});
-  if (o.insideMm == null) o.insideMm = o.outsideMm;
+  const outsideMm = o.outsideMm != null ? o.outsideMm : HOUSE.tableBorder.outsideMm;
+  const insideMm = o.insideMm != null ? o.insideMm : outsideMm;
+  const rawPreset = String((spec && spec.preset) || o.preset || 'all').trim().toLowerCase();
+  const preset = rawPreset === 'threeline' ? 'threeLine' : rawPreset;
+  const noneStyle = (css.table.BorderLineStyle && css.table.BorderLineStyle.NONE != null) ? css.table.BorderLineStyle.NONE : 0;
   const mk = function (mm) {
+    const w = mm > 0 ? mm : 0;
     return new css.table.BorderLine2({
       Color: o.color == null ? 0x000000 : o.color,
       InnerLineWidth: 0, OuterLineWidth: 0, LineDistance: 0,
-      LineStyle: borderLineStyle(o.style),
-      LineWidth: mm,
+      LineStyle: w <= 0 ? noneStyle : borderLineStyle(o.style),
+      LineWidth: w,
     });
   };
-  const bl = mk(o.outsideMm), il = mk(o.insideMm);
+  try {
+    const names = table.getCellNames();
+    const zeroBorder = mk(0);
+    for (let i = 0; i < names.length; i++) {
+      if (parseInt(String(names[i]).replace(/^[A-Z]+/, ''), 10) !== 1) continue;
+      try {
+        const cell = table.getCellByName(names[i]);
+        cell.setPropertyValue('TopBorder', zeroBorder);
+        cell.setPropertyValue('BottomBorder', zeroBorder);
+      } catch (e) {}
+    }
+  } catch (e) {}
+  let topLine, bottomLine, leftLine, rightLine, horizLine, vertLine;
+  if (preset === 'none') {
+    topLine = bottomLine = leftLine = rightLine = horizLine = vertLine = mk(0);
+  } else if (preset === 'outer') {
+    topLine = bottomLine = leftLine = rightLine = mk(outsideMm);
+    horizLine = vertLine = mk(0);
+  } else if (preset === 'threeLine') {
+    const topBottomMm = spec && spec.outsideMm != null ? spec.outsideMm : ptToMm100(1.5);
+    topLine = bottomLine = mk(topBottomMm);
+    leftLine = rightLine = horizLine = vertLine = mk(0);
+  } else {
+    topLine = bottomLine = leftLine = rightLine = mk(outsideMm);
+    horizLine = vertLine = mk(insideMm);
+  }
   const tb = new css.table.TableBorder2({
-    TopLine: bl, BottomLine: bl, LeftLine: bl, RightLine: bl,
-    HorizontalLine: il, VerticalLine: il,
+    TopLine: topLine, BottomLine: bottomLine, LeftLine: leftLine, RightLine: rightLine,
+    HorizontalLine: horizLine, VerticalLine: vertLine,
     IsTopLineValid: true, IsBottomLineValid: true, IsLeftLineValid: true,
     IsRightLineValid: true, IsHorizontalLineValid: true, IsVerticalLineValid: true,
     Distance: 0, IsDistanceValid: false,
   });
   table.setPropertyValue('TableBorder2', tb);
+  if (preset === 'threeLine') {
+    const headerBottom = mk(spec && spec.insideMm != null ? spec.insideMm : ptToMm100(0.75));
+    try {
+      const names = table.getCellNames();
+      for (let i = 0; i < names.length; i++) {
+        if (parseInt(String(names[i]).replace(/^[A-Z]+/, ''), 10) !== 1) continue;
+        try {
+          table.getCellByName(names[i]).setPropertyValue('BottomBorder', headerBottom);
+        } catch (e) {}
+      }
+    } catch (e) {}
+  }
 }
 // 按标准格式刷一张已存在的表：字号/段距/行距/垂直居中/首行加粗居中/数字居右/边框。
 // keepWeight: 非首行不动原有粗体（apply_house_style 走这里，避免抹掉当事人加粗）。
@@ -2134,6 +2459,15 @@ function nativeKeyDoc() { return isCalcDoc() || isImpressDoc(); }
 const NATIVE_ARROWS = { left: 'LEFT', right: 'RIGHT', up: 'UP', down: 'DOWN' };
 const NATIVE_UI_KEYS = { line_start: 'HOME', line_end: 'END', line_start_sel: 'HOME', line_end_sel: 'END', page_up: 'PAGEUP', page_down: 'PAGEDOWN', escape: 'ESCAPE' };
 let keyRobot = null;
+let nativeKeyRefreshTimer = 0;
+function scheduleNativeKeySelectionRefresh() {
+  if (typeof setTimeout !== 'function') return;
+  if (nativeKeyRefreshTimer) clearTimeout(nativeKeyRefreshTimer);
+  nativeKeyRefreshTimer = setTimeout(function () {
+    nativeKeyRefreshTimer = 0;
+    try { post('sel_changed', { cursorRectRaw: EXEC.get_cursor_rect(), documentSeq: docSeq }); } catch (e) {}
+  }, 60);
+}
 // keys: [{key:'RETURN'|..., shift, ch}]；key 缺省 = 纯字符（KeyCode 0）。
 function postNativeKeys(keys) {
   if (!keyRobot) keyRobot = css.awt.Toolkit.create(context);
@@ -2145,6 +2479,7 @@ function postNativeKeys(keys) {
     keyRobot.keyPress(ev);
     keyRobot.keyRelease(ev);
   }
+  scheduleNativeKeySelectionRefresh();
   return { success: true, native: true, keys: keys.length };
 }
 // 全屏标志在引擎处理完投递的 Esc 之后才翻（异步，时点不定），所以 1.5 秒内每
@@ -2197,7 +2532,12 @@ function resolvePage(p) {
 }
 // XDrawPage 没有稳定的等值比较；退回按 Number 属性比对（GenericDrawPage.Number 只读）。
 function unoSameDrawPage(a, b) {
-  try { return a.getPropertyValue('Number') === b.getPropertyValue('Number'); } catch (e) { return a === b; }
+  try {
+    // 选区也可能是形状；读取不存在的属性即使捕获异常也会破坏 WASM 状态。
+    if (!a.getPropertySetInfo().hasPropertyByName('Number') ||
+        !b.getPropertySetInfo().hasPropertyByName('Number')) return a === b;
+    return a.getPropertyValue('Number') === b.getPropertyValue('Number');
+  } catch (e) { return a === b; }
 }
 // 用 .uno:MovePage* 把"当前页"从 fromIndex 挪到 toIndex（同一份 count 快照下，均
 // 0-based）。调用前必须已 ctrl.setCurrentPage() 到源页。XDrawPages 无直接 move
@@ -2283,20 +2623,23 @@ function ensureShapeNames(page) {
   // 实锤：矩形形状的名字后来指向了标题形状）。先收集页面上已占用的名字集合，
   // 分配新名字时跳过已占用的，保证同一页内任何时刻名字唯一。
   const used = new Set();
+  const shapes = new Array(n), unnamed = [];
   for (let i = 0; i < n; i++) {
     let shape; try { shape = page.getByIndex(i); } catch (e) { continue; }
+    shapes[i] = shape;
     let name = ''; try { name = shape.getName ? shape.getName() : ''; } catch (e) {}
     if (name) used.add(name);
+    else unnamed.push(shape);
   }
   let counter = 0;
-  for (let i = 0; i < n; i++) {
-    let shape; try { shape = page.getByIndex(i); } catch (e) { continue; }
-    let name = ''; try { name = shape.getName ? shape.getName() : ''; } catch (e) {}
-    if (name) continue;
+  for (const shape of unnamed) {
     let candidate;
     do { candidate = '__awd_shape_' + (counter++); } while (used.has(candidate));
     try { shape.setName(candidate); used.add(candidate); } catch (e) {}
   }
+  // Reuse only within this synchronous read; the next call reacquires the page
+  // so edits, reordered shapes and recreated placeholders cannot leave stale refs.
+  return shapes;
 }
 // 形状文字：大多数形状（文本框/标题/占位符）实现 drawing.Text；线条/连接符/表格
 // 外壳等不实现，统一 try/catch 归零而非抛错，读取面据此判断"这个形状没有文字"。
@@ -2308,10 +2651,11 @@ function shapeText(shape) {
 // 形状，经 page.getByIndex() 重新取到的引用上 supportsService('com.sun.star.
 // drawing.TableShape') 报 false，但它的 Model 属性货真价实是一张能读写行列的
 // XTable（slide_add_table 内部用同一属性建表已验证）。service 名判定在这个引擎
-// 构建上对新建表格不可靠，改成直接尝试取 Model 并鸭子类型检查 getRows/
-// getColumns 方法是否存在——不依赖 service 字符串，也不关心它为什么不可靠。
+// 构建上对新建表格不可靠，先确认 Model 属性存在，再鸭子类型检查 getRows/
+// getColumns。普通形状读取不存在的 Model 会破坏 WASM 状态，catch 不能补救。
 function isTableShape(shape) {
   try {
+    if (!shape.getPropertySetInfo().hasPropertyByName('Model')) return false;
     const m = shape.getPropertyValue('Model');
     return !!(m && typeof m.getRows === 'function' && typeof m.getColumns === 'function');
   } catch (e) { return false; }
@@ -2422,25 +2766,367 @@ function layoutNameOf(layout) {
 function shapeCharFormat(shape) {
   let xText; try { xText = shape.getText(); } catch (e) { return null; }
   let full = ''; try { full = xText.getString() || ''; } catch (e) {}
-  if (!full) return null;
-  let cur;
-  try { cur = xText.createTextCursor(); cur.gotoStart(false); cur.goRight(1, true); }
-  catch (e) { return null; }
+  let cur = null;
+  if (full) {
+    try { cur = xText.createTextCursor(); cur.gotoStart(false); cur.goRight(1, true); }
+    catch (e) { cur = null; }
+  }
+  const src = cur || shape;
+  if (!src || typeof src.getPropertyValue !== 'function') return null;
   const out = {};
-  try { out.fontName = cur.getPropertyValue('CharFontName'); } catch (e) {}
-  try { out.fontSize = cur.getPropertyValue('CharHeight'); } catch (e) {}
-  try { out.bold = cur.getPropertyValue('CharWeight') > 100; } catch (e) {}
-  try { out.italic = !enumEq(cur.getPropertyValue('CharPosture'), css.awt.FontSlant.NONE); } catch (e) {}
-  try { out.underline = !enumEq(cur.getPropertyValue('CharUnderline'), css.awt.FontUnderline.NONE); } catch (e) {}
-  try { out.strikethrough = !enumEq(cur.getPropertyValue('CharStrikeout'), css.awt.FontStrikeout.NONE); } catch (e) {}
-  try { const c = cur.getPropertyValue('CharColor'); out.color = c === -1 ? 'auto' : '#' + ('000000' + (c >>> 0).toString(16)).slice(-6); } catch (e) {}
+  try { out.fontName = src.getPropertyValue('CharFontName'); } catch (e) {}
+  try { out.fontNameAsian = src.getPropertyValue('CharFontNameAsian'); } catch (e) {}
+  try { out.fontSize = src.getPropertyValue('CharHeight'); } catch (e) {}
   try {
-    const a = cur.getPropertyValue('ParaAdjust');
+    const wa = Number(src.getPropertyValue('CharWeightAsian')) || 0;
+    const ww = Number(src.getPropertyValue('CharWeight')) || 0;
+    out.bold = wa > 100 || ww > 100;
+  } catch (e) {
+    try { out.bold = src.getPropertyValue('CharWeight') > 100; } catch (e2) {}
+  }
+  try { out.italic = !enumEq(src.getPropertyValue('CharPosture'), css.awt.FontSlant.NONE); } catch (e) {}
+  try { out.underline = !enumEq(src.getPropertyValue('CharUnderline'), css.awt.FontUnderline.NONE); } catch (e) {}
+  try { out.strikethrough = !enumEq(src.getPropertyValue('CharStrikeout'), css.awt.FontStrikeout.NONE); } catch (e) {}
+  try { const c = src.getPropertyValue('CharColor'); out.color = c === -1 ? 'auto' : '#' + ('000000' + (c >>> 0).toString(16)).slice(-6); } catch (e) {}
+  try {
+    const a = src.getPropertyValue('ParaAdjust');
     const A = css.style.ParagraphAdjust;
     out.alignment = enumEq(a, A.CENTER) ? 'center' : enumEq(a, A.RIGHT) ? 'right'
       : (enumEq(a, A.BLOCK) || enumEq(a, A.STRETCH)) ? 'justify' : 'left';
   } catch (e) {}
   return out;
+}
+
+// Calc 当前活动工作表、单元格与选区解析（供 get_ui_state / format_selection / set_paragraph_format / ui_command 共用）
+function cellFormat(ps) {
+  if (!ps) return {};
+  const f = sheetRawFormat(ps);
+  try { f.underline = !enumEq(ps.getPropertyValue('CharUnderline'), css.awt.FontUnderline.NONE); } catch (e) {}
+  try { f.strikeout = !enumEq(ps.getPropertyValue('CharStrikeout'), css.awt.FontStrikeout.NONE); } catch (e) {}
+  return f;
+}
+function activeCalcSelection() {
+  let sheet = null, sheets = null, sheetCount = 1;
+  const sheetNames = [];
+  try {
+    sheets = xModel.getSheets();
+    sheetCount = sheets.getCount();
+    const cap = Math.min(sheetCount, 50);
+    try {
+      sheetNames.push(...Array.from(sheets.getElementNames()).slice(0, cap).map(name => String(name || '')));
+    } catch (e) {
+      for (let i = 0; i < cap; i++) {
+        try { sheetNames.push(String(sheets.getByIndex(i).getName() || '')); } catch (e) {}
+      }
+    }
+  } catch (e) {}
+  try { sheet = ctrl.getActiveSheet(); } catch (e) {}
+  if (!sheet && sheets && sheetCount > 0) {
+    try { sheet = sheets.getByIndex(0); } catch (e) {}
+  }
+  let sheetName = '';
+  try { if (sheet) sheetName = String(sheet.getName() || ''); } catch (e) {}
+  let col = 0, row = 0, endCol = 0, endRow = 0, selRange = null;
+  let sheetIdx = sheetName && sheetNames.indexOf(sheetName) >= 0 ? sheetNames.indexOf(sheetName) : 0;
+  try {
+    const sel = ctrl.getSelection ? ctrl.getSelection() : null;
+    if (sel && typeof sel.getRangeAddress === 'function') {
+      const a = sel.getRangeAddress();
+      col = a.StartColumn; row = a.StartRow; endCol = a.EndColumn; endRow = a.EndRow;
+      if (a.Sheet != null) sheetIdx = a.Sheet;
+      selRange = sel;
+    } else if (sel && typeof sel.getCellAddress === 'function') {
+      const a = sel.getCellAddress();
+      col = endCol = a.Column; row = endRow = a.Row;
+      if (a.Sheet != null) sheetIdx = a.Sheet;
+      selRange = sel;
+    } else if (sel && typeof sel.getByIndex === 'function' && sel.getCount && sel.getCount() > 0) {
+      const first = sel.getByIndex(0);
+      if (first && typeof first.getRangeAddress === 'function') {
+        const a = first.getRangeAddress();
+        col = a.StartColumn; row = a.StartRow; endCol = a.EndColumn; endRow = a.EndRow;
+        if (a.Sheet != null) sheetIdx = a.Sheet;
+        selRange = first;
+      }
+    }
+  } catch (e) {}
+  if (!(col >= 0)) col = 0;
+  if (!(row >= 0)) row = 0;
+  if (!(endCol >= col)) endCol = col;
+  if (!(endRow >= row)) endRow = row;
+  const address = colLetterOf(col) + (row + 1);
+  const range = sheetRangeName({ StartColumn: col, StartRow: row, EndColumn: endCol, EndRow: endRow });
+  let cell = null;
+  try { if (sheet) cell = sheet.getCellByPosition(col, row); } catch (e) {}
+  if (!selRange && sheet) {
+    try { selRange = sheet.getCellRangeByName(range); } catch (e) {}
+  }
+  const rowCount = endRow - row + 1;
+  const colCount = endCol - col + 1;
+  let merged = false, hasFrozenPanes = false, autoFilter = false, isProtected = false;
+  let rowHeightPt = null, colWidthPt = null;
+  try {
+    if (selRange && typeof selRange.getIsMerged === 'function') merged = !!selRange.getIsMerged();
+    else if (cell && typeof cell.getIsMerged === 'function') merged = !!cell.getIsMerged();
+  } catch (e) {}
+  try {
+    if (ctrl && typeof ctrl.hasFrozenPanes === 'function') hasFrozenPanes = !!ctrl.hasFrozenPanes();
+  } catch (e) {}
+  try {
+    const dbs = xModel && typeof xModel.getPropertyValue === 'function' ? xModel.getPropertyValue('DatabaseRanges') : null;
+    const afName = '__awd_af_' + sheetIdx;
+    if (dbs && typeof dbs.hasByName === 'function' && dbs.hasByName(afName)) {
+      const dbRange = dbs.getByName(afName);
+      autoFilter = !!(dbRange && dbRange.getPropertyValue && dbRange.getPropertyValue('AutoFilter'));
+    }
+  } catch (e) {}
+  try {
+    if (sheet && typeof sheet.isProtected === 'function') isProtected = !!sheet.isProtected();
+  } catch (e) {}
+  try {
+    if (sheet && typeof sheet.getRows === 'function') {
+      const rObj = sheet.getRows().getByIndex(row);
+      const h = Number(rObj.getPropertyValue('Height'));
+      if (h > 0) rowHeightPt = hmmToPt(h);
+    }
+  } catch (e) {}
+  try {
+    if (sheet && typeof sheet.getColumns === 'function') {
+      const cObj = sheet.getColumns().getByIndex(col);
+      const w = Number(cObj.getPropertyValue('Width'));
+      if (w > 0) colWidthPt = hmmToPt(w);
+    }
+  } catch (e) {}
+  return {
+    sheet: sheet,
+    sheetName: sheetName,
+    sheetIndex: sheetIdx,
+    sheetIdx: sheetIdx,
+    sheetCount: sheetCount,
+    sheetNames: sheetNames,
+    cell: cell,
+    selRange: selRange,
+    col: col,
+    row: row,
+    endCol: endCol,
+    endRow: endRow,
+    rowCount: rowCount,
+    colCount: colCount,
+    address: address,
+    cellName: address,
+    range: range,
+    rangeName: range,
+    merged: merged,
+    hasFrozenPanes: hasFrozenPanes,
+    autoFilter: autoFilter,
+    protected: isProtected,
+    rowHeightPt: rowHeightPt,
+    colWidthPt: colWidthPt,
+  };
+}
+function activeCalcRangeName() {
+  try { return activeCalcSelection().range || 'A1'; } catch (e) { return 'A1'; }
+}
+
+// Clipboard must use the complete real range, never the toolbar's A1 fallback.
+function calcClipboardSelection() {
+  let range = ctrl.getSelection();
+  if (range && typeof range.getByIndex === 'function' && typeof range.getRangeAddress !== 'function') {
+    if (range.getCount() !== 1) throw new Error('请先选择一个连续区域，再复制或粘贴');
+    range = range.getByIndex(0);
+  }
+  if (!range || typeof range.getRangeAddress !== 'function') throw new Error('请先选择单元格区域，再复制或粘贴');
+  const address = range.getRangeAddress();
+  return { range: range, address: address, sheet: xModel.getSheets().getByIndex(address.Sheet) };
+}
+
+// Impress 当前幻灯片、选中形状与形状列表解析（供 get_ui_state / format_selection / set_paragraph_format / ui_command 共用）
+function slidePages() {
+  try { return xModel.getDrawPages(); } catch (e) { return null; }
+}
+function activeImpressContext(wantShapeName) {
+  let page = null, pageShapes = null;
+  try { if (ctrl && ctrl.getCurrentPage) page = ctrl.getCurrentPage(); } catch (e) {}
+  let pages = null, slideCount = 0;
+  try { pages = xModel.getDrawPages(); slideCount = pages.getCount(); } catch (e) {}
+  if (!page && pages && slideCount > 0) {
+    try { page = pages.getByIndex(0); } catch (e) {}
+  }
+  let slideNumber = 1;
+  if (page) {
+    let n = NaN;
+    try { n = Number(page.getPropertyValue('Number')); } catch (e) {}
+    if (!(n >= 1)) {
+      const idx = locatePageIndex(page, {});
+      if (idx >= 0) n = idx + 1;
+    }
+    if (n >= 1) slideNumber = n;
+    try { pageShapes = ensureShapeNames(page); } catch (e) {}
+  }
+  const currentSlideIndex = Math.max(0, slideNumber - 1);
+  let slideWidthMm = 280, slideHeightMm = 157.5, widthPt = 793.7, heightPt = 446.5;
+  let layout = null, layoutName = null, masterName = '', notesText = '';
+  const masterPages = [];
+  if (page) {
+    try {
+      const wHmm = Number(page.getPropertyValue('Width'));
+      const hHmm = Number(page.getPropertyValue('Height'));
+      if (wHmm > 0) { slideWidthMm = Math.round(wHmm / 10) / 10; widthPt = hmmToPt(wHmm); }
+      if (hHmm > 0) { slideHeightMm = Math.round(hHmm / 10) / 10; heightPt = hmmToPt(hHmm); }
+    } catch (e) {}
+    try { layout = Number(page.getPropertyValue('Layout')); layoutName = layoutNameOf(layout); } catch (e) {}
+    try { masterName = String(page.getMasterPage().getName() || ''); } catch (e) {}
+    try { notesText = notesPageText(page.getNotesPage()); } catch (e) {}
+  }
+  try {
+    const masters = xModel.getMasterPages();
+    const mCount = masters ? masters.getCount() : 0;
+    for (let i = 0; i < Math.min(mCount, 30); i++) {
+      try {
+        const mn = String(masters.getByIndex(i).getName() || '');
+        if (mn) masterPages.push(mn);
+      } catch (e) {}
+    }
+  } catch (e) {}
+  let selectedRawShape = null;
+  try {
+    const sel = ctrl && ctrl.getSelection ? ctrl.getSelection() : null;
+    let cand = null;
+    if (sel && typeof sel.getByIndex === 'function' && sel.getCount && sel.getCount() > 0) {
+      cand = sel.getByIndex(0);
+    } else if (sel && (typeof sel.getPosition === 'function' || typeof sel.getSize === 'function')) {
+      cand = sel;
+    }
+    if (cand && (!page || !unoSameDrawPage(cand, page)) && (typeof cand.getPosition === 'function' || typeof cand.getSize === 'function')) {
+      selectedRawShape = cand;
+    }
+  } catch (e) {}
+  const shapes = [];
+  let fallbackShape = null, fallbackIndex = -1, selectedShapeIndex = -1, selectedShapeName = '';
+  let rawSelectedName = '';
+  try { if (selectedRawShape && selectedRawShape.getName) rawSelectedName = String(selectedRawShape.getName() || ''); } catch (e) {}
+  if (page) {
+    let cnt = 0;
+    try { cnt = pageShapes ? pageShapes.length : page.getCount(); } catch (e) {}
+    for (let i = 0; i < cnt; i++) {
+      let s; try { s = pageShapes ? pageShapes[i] : page.getByIndex(i); } catch (e) { continue; }
+      if (!s) continue;
+      let nm = ''; try { nm = s.getName ? String(s.getName() || '') : ''; } catch (e) {}
+      const kind = shapeKind(s);
+      const txt = shapeText(s);
+      let pos = null, size = null;
+      try { pos = s.getPosition(); } catch (e) {}
+      try { size = s.getSize(); } catch (e) {}
+      shapes.push({
+        index: i + 1,
+        shapeIndex: i,
+        name: nm,
+        shapeName: nm,
+        kind: kind,
+        type: kind,
+        text: txt.slice(0, 40),
+        isTable: kind === 'table',
+        left: pos ? hmmToPt(pos.X) : 0,
+        top: pos ? hmmToPt(pos.Y) : 0,
+        width: size ? hmmToPt(size.Width) : 0,
+        height: size ? hmmToPt(size.Height) : 0,
+      });
+      if (selectedRawShape && (s === selectedRawShape || (rawSelectedName && nm === rawSelectedName))) {
+        selectedShapeIndex = i;
+        selectedShapeName = nm;
+      }
+      if (!fallbackShape && (kind === 'title' || kind === 'placeholder' || kind === 'text' || txt.length > 0)) {
+        fallbackShape = s;
+        fallbackIndex = i;
+      }
+    }
+    if (!fallbackShape && cnt > 0) {
+      try { fallbackShape = pageShapes ? pageShapes[0] : page.getByIndex(0); if (fallbackShape) fallbackIndex = 0; } catch (e) {}
+    }
+  }
+  let targetShape = selectedRawShape || fallbackShape;
+  if (!selectedRawShape && fallbackShape) {
+    selectedShapeIndex = fallbackIndex;
+    try { selectedShapeName = fallbackShape.getName ? String(fallbackShape.getName() || '') : ''; } catch (e) {}
+  }
+  if (page && wantShapeName != null && String(wantShapeName).trim() !== '') {
+    const rs = resolveShape(page, { shapeName: String(wantShapeName).trim() });
+    if (rs && rs.shape) {
+      targetShape = rs.shape;
+      selectedShapeIndex = rs.index;
+      selectedShapeName = rs.name;
+    }
+  }
+  return {
+    page: page,
+    slideNumber: slideNumber,
+    currentSlideIndex: currentSlideIndex,
+    slideCount: slideCount,
+    slideWidthMm: slideWidthMm,
+    slideHeightMm: slideHeightMm,
+    widthPt: widthPt,
+    heightPt: heightPt,
+    layout: layout,
+    layoutName: layoutName,
+    masterName: masterName,
+    masterPages: masterPages,
+    notesText: notesText,
+    shapeCount: shapes.length,
+    selectedRawShape: selectedRawShape,
+    fallbackShape: fallbackShape,
+    targetShape: targetShape,
+    selectedShape: targetShape,
+    selectedShapeIndex: selectedShapeIndex,
+    selectedShapeName: selectedShapeName,
+    shapes: shapes,
+  };
+}
+function impressShapeDetail(shape, index0) {
+  if (!shape) return null;
+  let name = ''; try { name = shape.getName ? String(shape.getName() || '') : ''; } catch (e) {}
+  const kind = shapeKind(shape);
+  let pos = null, size = null;
+  try { pos = shape.getPosition(); } catch (e) {}
+  try { size = shape.getSize(); } catch (e) {}
+  const idx0 = typeof index0 === 'number' && index0 >= 0 ? index0 : 0;
+  const detail = {
+    index: idx0 + 1,
+    shapeIndex: idx0,
+    name: name,
+    shapeName: name,
+    kind: kind,
+    type: kind,
+    left: pos ? hmmToPt(pos.X) : 0,
+    top: pos ? hmmToPt(pos.Y) : 0,
+    width: size ? hmmToPt(size.Width) : 0,
+    height: size ? hmmToPt(size.Height) : 0,
+    isTable: kind === 'table',
+    text: shapeText(shape),
+  };
+  if (detail.isTable) {
+    try {
+      const table = shape.getPropertyValue('Model');
+      detail.rows = table.getRows().getCount();
+      detail.cols = table.getColumns().getCount();
+    } catch (e) {}
+  }
+  try {
+    const fs = shape.getPropertyValue('FillStyle');
+    const fsVal = unoEnumVal(fs);
+    detail.fillStyle = (fsVal === 0 || String(fs) === 'NONE') ? 'none' : 'solid';
+    const fc = shape.getPropertyValue('FillColor');
+    detail.fillColor = (detail.fillStyle === 'none' || fc == null || Number(fc) === -1) ? 'none' : sheetHex(fc);
+  } catch (e) { detail.fillStyle = 'none'; detail.fillColor = 'none'; }
+  try {
+    const ls = shape.getPropertyValue('LineStyle');
+    const lsVal = unoEnumVal(ls);
+    detail.lineStyle = (lsVal === 0 || String(ls) === 'NONE') ? 'none' : 'solid';
+    const lc = shape.getPropertyValue('LineColor');
+    detail.lineColor = (detail.lineStyle === 'none' || lc == null || Number(lc) === -1) ? 'none' : sheetHex(lc);
+  } catch (e) { detail.lineStyle = 'none'; detail.lineColor = 'none'; }
+  try { detail.lineWidthPt = hmmToPt(shape.getPropertyValue('LineWidth')); } catch (e) { detail.lineWidthPt = 0; }
+  try { detail.fillTransparency = Number(shape.getPropertyValue('FillTransparence')) || 0; } catch (e) { detail.fillTransparency = 0; }
+  return detail;
 }
 // 定位一张 Impress 表格形状：shapeName 显式指定；缺省要求该页恰好一张表格形状
 // （Impress 没有"光标所在表"的等价概念，不能像 resolveWriterTable 那样回退）。
@@ -2488,7 +3174,9 @@ function styleProfileSummary() {
   };
 }
 // 段落分类：首个非空短段（idx 0、<=60 字）为 title；OutlineLevel>0 或 Heading 样式为
-// heading（trueLevels 时取真实级别，否则一律二级 = 改造前"小标题=正文款加粗"）；其余 body。
+// heading（trueLevels 时取真实级别，否则一律二级 = 改造前"小标题=正文款加粗"）；
+// 合同短条款头（第X章/节/编、第X条、一、，兼容自动编号与手打编号）同样归为 heading；
+// 非标题的自动编号段落归为 list（不叠加 2 字符首行缩进）；其余 body。
 function paraKindOf(el, isFirst, trueLevels) {
   let lvl = 0, style = '';
   try { lvl = el.getPropertyValue('OutlineLevel') || 0; } catch (e) {}
@@ -2498,15 +3186,79 @@ function paraKindOf(el, isFirst, trueLevels) {
     if (!level) { const m = /(\d+)/.exec(style); level = m ? Number(m[1]) : 2; }
     return { kind: 'heading', level: trueLevels ? level : 2 };
   }
+  const combined = paragraphCombinedText(el).trim();
+  if (combined && combined.length <= 45 && !/[。；;！!？?：:]$/.test(combined)) {
+    if (/^\s*第[一二三四五六七八九十百千零〇0-9１-９]+\s*[章节编]/.test(combined)) {
+      return { kind: 'heading', level: 2 };
+    }
+    if (/^\s*(第[一二三四五六七八九十百千零〇0-9１-９]+\s*条|[一二三四五六七八九十]{1,3}\s*、)/.test(combined)) {
+      return { kind: 'heading', level: trueLevels ? 3 : 2 };
+    }
+  }
+  if (readParagraphLabel(el)) {
+    return { kind: 'list', level: null };
+  }
   return { kind: 'body', level: null };
 }
-function charOptsFor(k) {
-  if (k.kind === 'body') return { sizePt: HOUSE.bodyPt, bold: HOUSE.bodyBold, keepWeight: true };
+function buildStandardOverrides(p) {
+  if (!p || typeof p !== 'object') return null;
+  const ov = {};
+  if (p.fontNameAsian || p.fontName) ov.fontAsian = String(p.fontNameAsian || p.fontName);
+  if (p.fontNameWestern || p.fontName) ov.fontWestern = String(p.fontNameWestern || p.fontName);
+  const bodyPt = parseFontSizePt(p.bodyFontSizePt != null ? p.bodyFontSizePt : p.fontSize);
+  if (bodyPt) ov.bodyPt = bodyPt;
+  const titlePt = parseFontSizePt(p.titleFontSizePt);
+  if (titlePt) ov.titlePt = titlePt;
+  const headingPt = parseFontSizePt(p.headingFontSizePt);
+  if (headingPt) ov.headingPt = headingPt;
+  if (p.alignment && PROFILE_ALIGN[String(p.alignment).toLowerCase()]) {
+    ov.align = PROFILE_ALIGN[String(p.alignment).toLowerCase()];
+  }
+  if (p.spaceBeforePt != null && isFinite(Number(p.spaceBeforePt))) ov.topMm = ptToMm100(Number(p.spaceBeforePt));
+  if (p.spaceAfterPt != null && isFinite(Number(p.spaceAfterPt))) ov.bottomMm = ptToMm100(Number(p.spaceAfterPt));
+  if (p.lineSpacingMode != null) {
+    const parsed = parseLineSpacingSpec(p.lineSpacingMode, p.lineSpacingValue);
+    if (parsed && parsed.ls) {
+      const M = (css && css.style && css.style.LineSpacingMode) || { PROP: 0, MINIMUM: 1, FIX: 3 };
+      if (parsed.ls.Mode === M.PROP) ov.ls = { mode: 'prop', pct: parsed.ls.Height };
+      else if (parsed.ls.Mode === M.FIX) ov.ls = { mode: 'fix', mm: parsed.ls.Height };
+      else ov.ls = { mode: 'min', mm: parsed.ls.Height };
+    }
+  }
+  const effBodyPt = ov.bodyPt || HOUSE.bodyPt || 12;
+  if (p.firstLineIndentChars != null && isFinite(Number(p.firstLineIndentChars))) {
+    ov.indentMm = ptToMm100(Number(p.firstLineIndentChars) * effBodyPt);
+  } else if (p.firstLineIndentPt != null && isFinite(Number(p.firstLineIndentPt))) {
+    ov.indentMm = ptToMm100(Number(p.firstLineIndentPt));
+  }
+  return Object.keys(ov).length ? ov : null;
+}
+function charOptsFor(k, overrides) {
+  const ov = overrides || {};
+  if (k.kind === 'body' || k.kind === 'list') {
+    return {
+      sizePt: ov.bodyPt || HOUSE.bodyPt,
+      bold: HOUSE.bodyBold,
+      keepWeight: true,
+      fontAsian: ov.fontAsian || HOUSE.fontAsian,
+      fontWestern: ov.fontWestern || HOUSE.fontWestern,
+    };
+  }
   const hs = k.kind === 'title' ? headingSpec(1) : headingSpec(k.level);
-  return { sizePt: hs.sizePt, bold: hs.bold, fontAsian: hs.fontAsian, fontWestern: hs.fontWestern, color: hs.color };
+  const sz = k.kind === 'title'
+    ? (ov.titlePt || hs.sizePt)
+    : (ov.headingPt || ov.bodyPt || hs.sizePt);
+  return {
+    sizePt: sz,
+    bold: hs.bold,
+    fontAsian: ov.fontAsian || hs.fontAsian,
+    fontWestern: ov.fontWestern || hs.fontWestern,
+    color: hs.color,
+  };
 }
 async function applyHouseToDocument(p, opts) {
   const trueLevels = !!(opts && opts.trueLevels);
+  const overrides = buildStandardOverrides(p);
   // progress 的 total = 正文段数 + 表数（顶层元素数）；段数走索引缓存，表数一次 getCount。
   let total = 0;
   try { total = getParaIndex().total; } catch (e) {}
@@ -2529,8 +3281,8 @@ async function applyHouseToDocument(p, opts) {
         if (idx === 0 && text.length <= 60) k = { kind: 'title', level: 1 };
       }
       if (k.kind !== 'title') k = paraKindOf(el, idx === 0, trueLevels);
-      applyHousePara(el, k.kind, { afterTable: prevWasTable, level: k.level });
-      applyHouseChar(el, charOptsFor(k));
+      applyHousePara(el, k.kind, { afterTable: prevWasTable, level: k.level, isNumbered: !!readParagraphLabel(el), overrides: overrides });
+      applyHouseCharDeep(el, charOptsFor(k, overrides));
       prevWasTable = false;
       paras++;
     } else if (el.supportsService && el.supportsService('com.sun.star.text.TextTable')) {
@@ -2542,6 +3294,7 @@ async function applyHouseToDocument(p, opts) {
   } finally { unlockModel(); }
   if (idx > BATCH && !cancelled) postProgress(p, idx, total);
   const r = Object.assign({ success: true, paragraphs: paras, tables: tables, truncated: cancelled }, verifySnapshot());
+  if (overrides) r.overrides = overrides;
   if (cancelled) { r.cancelled = true; r.done = idx; }
   return r;
 }
@@ -3026,7 +3779,9 @@ let contextMenuInterceptor = null;
 // 光标（或选区）落在哪一条 redline 上——工具条「接受/拒绝当前」用。与
 // selectionTouchesDeletion 同口径的区间相交：compareRegionStarts(A,B)>0 表示 A 在 B 前，
 // ==0 表示重合。零宽删除（页边态塌到一点）靠端点相等也能命中。
+// 若光标未直接命中修订，默认取光标位置往后的第一个修订（#1287）。
 function revisionIndexAtCursor() {
+  let firstAfter = -1;
   try {
     const vc = ctrl.getViewCursor();
     const text = vc.getText(), start = vc.getStart(), end = vc.getEnd();
@@ -3035,15 +3790,30 @@ function revisionIndexAtCursor() {
     while (en.hasMoreElements()) {
       const r = en.nextElement();
       try {
-        const rs = r.getPropertyValue('RedlineStart'), re = r.getPropertyValue('RedlineEnd');
+        let rs = r.getPropertyValue('RedlineStart'), re = r.getPropertyValue('RedlineEnd');
         if (!rs || !re) { index++; continue; }
+        // UNO may return the redline endpoints in reverse order (r5).
+        if (text.compareRegionStarts(rs, re) < 0) { const tmp = rs; rs = re; re = tmp; }
         // 相交：start 不在 re 之后，且 rs 不在 end 之后（含端点贴合）。
         if (text.compareRegionStarts(start, re) >= 0 && text.compareRegionStarts(rs, end) >= 0) return index;
-      } catch (ignored) {}
+        if (firstAfter < 0 && text.compareRegionStarts(end, rs) > 0) firstAfter = index;
+      } catch (crossStory) {
+        if (firstAfter < 0) {
+          try {
+            const body = xModel.getText();
+            const vcTable = vc.getPropertyValue && vc.getPropertyValue('TextTable');
+            const rs = r.getPropertyValue('RedlineStart');
+            const rTable = rs && rs.getPropertyValue && rs.getPropertyValue('TextTable');
+            const vcAnchor = vcTable ? vcTable.getAnchor().getEnd() : end;
+            const rAnchor = rTable ? rTable.getAnchor().getStart() : rs;
+            if (rAnchor && body.compareRegionStarts(vcAnchor, rAnchor) >= 0) firstAfter = index;
+          } catch (ignored) {}
+        }
+      }
       index++;
     }
   } catch (e) {}
-  return -1;
+  return firstAfter;
 }
 function selectionTouchesDeletion(vc) {
   const text = vc.getText(), start = vc.getStart(), end = vc.getEnd();
@@ -3091,9 +3861,12 @@ function installContextMenuInterceptor(controller) {
 // seed scaffolding text here — earlier dev-prototype seed text would otherwise
 // show through whenever a real load was skipped/failed, looking like the editor
 // loaded the wrong content.
-function bootDoc() {
+function bootDoc(initialDocument = false) {
   context = zetajs.getUnoComponentContext();
   desktop = css.frame.Desktop.create(context);
+  // The relay is usable without a model. A cold file loads directly through the
+  // normal load_document path; ui_ready belongs to that successful first model.
+  if (initialDocument) { log('等待首个真实文档 / waiting for first document'); return; }
   xModel = desktop.loadComponentFromURL('private:factory/swriter', '_default', 0, []);
   ctrl = xModel.getCurrentController();
   installReviewCommentInterceptor(ctrl);
@@ -3179,9 +3952,13 @@ function resumeModifyListener() {
 // **这条通道只覆盖「选区」类变化**：真机实测扩选/全选/选中段落每次都触发，但
 // **纯光标移动（塌陷选区左右挪）基本不触发**。所以编辑器页还会在画布 mouseup
 // 和覆盖层转发控制键之后各补一发——两路合起来才盖得住用户的实际操作。
+let suppressSelectionEvent = false;
 function installSelectionListener(controller) {
   const listener = zetajs.unoObject([css.view.XSelectionChangeListener], {
-    selectionChanged() { try { post('sel_changed'); } catch (e) { /* ignore */ } },
+    selectionChanged() {
+      if (suppressSelectionEvent) return;
+      try { post('sel_changed'); } catch (e) { /* ignore */ }
+    },
     disposing() {},
   });
   controller.addSelectionChangeListener(listener);
@@ -3499,6 +4276,51 @@ function readNativeCaretRect(frame, live, charHeightPt) {
     viewport: { x: x, y: y, width: width, height: height } };
 }
 
+let stashedDragSelection = null;
+function readSelectionCaretRects(frame, vc, charHeightPt) {
+  if (!vc) return null;
+  let selText = '';
+  try { selText = vc.getString() || ''; } catch (e) { return null; }
+  if (!selText || selText.length > 2000) return null;
+  let text = null, s = null, e = null, curPos = null;
+  try {
+    text = vc.getText();
+    s = text.createTextCursorByRange(vc.getStart());
+    e = text.createTextCursorByRange(vc.getEnd());
+    curPos = vc.getPosition();
+  } catch (err) {
+    return null;
+  }
+  let startRect = null, endRect = null, sPos = null, ePos = null;
+  suppressSelectionEvent = true;
+  try {
+    vc.gotoRange(s, false);
+    try { sPos = vc.getPosition(); } catch (err) {}
+    startRect = readNativeCaretRect(frame, ctrl.getViewData(), charHeightPt);
+    vc.gotoRange(e, false);
+    try { ePos = vc.getPosition(); } catch (err) {}
+    endRect = readNativeCaretRect(frame, ctrl.getViewData(), charHeightPt);
+  } catch (err) {
+    startRect = null;
+    endRect = null;
+  } finally {
+    try {
+      const backward = curPos && sPos && ePos
+        && Math.hypot(curPos.X - sPos.X, curPos.Y - sPos.Y) < Math.hypot(curPos.X - ePos.X, curPos.Y - ePos.Y);
+      if (backward) {
+        vc.gotoRange(e, false);
+        vc.gotoRange(s, true);
+      } else {
+        vc.gotoRange(s, false);
+        vc.gotoRange(e, true);
+      }
+    } catch (err) {}
+    suppressSelectionEvent = false;
+  }
+  if (!startRect || !endRect) return null;
+  return { start: startRect, end: endRect };
+}
+
 function completionUnavailable(reason) {
   return { success: false, available: false, reason: reason, error: reason, message: reason };
 }
@@ -3563,20 +4385,21 @@ function writingSectionOf(range) {
     return withParaIndex(function (ix) {
       const index = locator.paraKey;
       if (index >= ix.total) return null;
-      let appendix = '', heading = '';
+      let appendix = '', heading = '', appendixSource = null, headingSource = null;
       for (let i = 0; i <= index; i++) {
-        const paragraph = ix.ranges[i], text = String(paragraph.getString() || '').trim();
+        const paragraph = ix.ranges[i], rawText = String(paragraph.getString() || ''), combined = paragraphCombinedText(paragraph), text = combined.trim();
         const marker = text.match(/^(第[一二三四五六七八九十百零〇0-9]+[条节章]|附件[一二三四五六七八九十零〇0-9]+).{0,100}$/);
         if (marker) {
-          if (marker[1].indexOf('附件') === 0) { appendix = marker[1]; heading = ''; }
-          else heading = marker[1];
+          if (marker[1].indexOf('附件') === 0) { appendix = marker[1]; heading = ''; appendixSource = { index: i, text: combined }; headingSource = null; }
+          else { heading = marker[1]; headingSource = { index: i, text: combined }; }
         } else {
           let level = 0; try { level = Number(paragraph.getPropertyValue('OutlineLevel')) || 0; } catch (e) {}
-          if (level > 0 && level <= 6 && text.length <= 100) heading = text;
+          if (level > 0 && level <= 6 && text.length <= 100) { heading = text; headingSource = text ? { index: i, text: rawText || combined } : null; }
         }
       }
       const path = [appendix, heading].filter(Boolean);
-      return { paragraphIndex: index, sectionPath: path, sectionTitle: path.length ? path.join(' / ') : '正文', scopeKnown: true };
+      return { paragraphIndex: index, sectionPath: path, sectionTitle: path.length ? path.join(' / ') : '正文',
+        scopeHeadings: [appendixSource, headingSource].filter(Boolean), scopeKnown: true };
     });
   } catch (e) { return null; }
 }
@@ -3870,6 +4693,7 @@ const EXEC = {
       if (text == null) return Object.assign(completionUnavailable('unavailable-context'), { revision: currentReviewRevision() });
       return { success: true, available: text.length <= 15000, revision: currentReviewRevision(),
         paragraphIndex: locator.paraKey, text: text.slice(0, 15000), truncated: text.length > 15000,
+        numbering: paragraphNumberingOf(paraAt(locator.paraKey)),
         offset: locator.start, selectedText: String(vc.getString() || '').slice(0, 15000), hasSelection: !vc.isCollapsed(),
         cursorRectRaw: EXEC.get_cursor_rect(), scope: 'body-paragraphs' };
     } catch (e) { return Object.assign(completionUnavailable('unavailable-context'), { revision: currentReviewRevision() }); }
@@ -4056,6 +4880,39 @@ const EXEC = {
   // [verified] replace selection if any, else insert at cursor. '\n' in the new
   // text becomes a paragraph break (insertTextAtCursor).
   replace_selection(p) {
+    const rawText = String((p && p.text) || '');
+    if (typeof isCalcDoc === 'function' && isCalcDoc() && typeof activeCalcSelection === 'function') {
+      const selection = calcClipboardSelection();
+      const lines = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+      if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
+      const rows = (lines.length ? lines : ['']).map(function (ln) { return ln.split('\t'); });
+      const r = EXEC.sheet_write_cells({
+        sheet: selection.sheet.getName(),
+        startCell: colLetterOf(selection.address.StartColumn) + (selection.address.StartRow + 1),
+        rows: rows,
+      });
+      return Object.assign({}, r, { text: rawText });
+    }
+    if (typeof isImpressDoc === 'function' && isImpressDoc()) {
+      // Retain the model-edit contract used by plugins/AI. Only the real
+      // clipboard bridge targets the live outliner/caret instead of a shape.
+      if (!p.clipboard) {
+        const ctx = activeImpressContext(p.shapeName);
+        if (ctx && ctx.selectedShape && ctx.selectedShapeName) return Object.assign({}, EXEC.slide_set_shape_text({
+          slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, text: rawText,
+        }), { text: rawText });
+        return slideFail('请先选择要替换的文本框');
+      }
+      // A live Impress outliner owns its text while editing. Mutating the shape
+      // model reports success but is overwritten by that outliner. Use the same
+      // native input route as typing, preserving the caret, selection and format.
+      const selection = ctrl.getSelection();
+      if (!selection) return slideFail('请先双击文本框，把光标放在要粘贴的位置');
+      const keys = Array.from(rawText.replace(/\r\n?/g, '\n')).map(function (ch) {
+        return ch === '\n' ? { key: 'RETURN', ch: '\r' } : ch === '\t' ? { key: 'TAB', ch: '\t' } : { ch: ch };
+      });
+      return Object.assign(postNativeKeys(keys), { text: rawText });
+    }
     const vc = ctrl.getViewCursor();
     // One paste may contain hundreds of paragraphs. Batch native layout and
     // JS modify callbacks for the entire replacement, including tracked edits.
@@ -4081,6 +4938,32 @@ const EXEC = {
   // 改前面的不影响后面的），只在结束时滚到首处；命中 > 50 时按 30 一批，批间发
   // progress / 检查 cancel（见 batchBreak）。
   async find_replace(p) {
+    if (typeof isCalcDoc === 'function' && isCalcDoc()) {
+      const findVal = p && (p.find != null ? p.find : p.findText);
+      const replaceVal = p && (p.replace != null ? p.replace : p.replaceText);
+      const r = EXEC.sheet_find_replace({
+        find: findVal != null ? String(findVal) : '',
+        replace: replaceVal != null ? String(replaceVal) : '',
+        matchCase: !!(p && p.matchCase),
+        maxReplacements: (p && p.replaceAll === false) ? 1 : undefined,
+        sheet: p && p.sheet,
+        range: p && p.range,
+      });
+      if (r && r.success) r.total = r.replaced || 0;
+      return r;
+    }
+    if (typeof isImpressDoc === 'function' && isImpressDoc()) {
+      const searchVal = p && (p.searchText != null ? p.searchText : p.findText);
+      const replaceVal = p && (p.replaceText != null ? p.replaceText : p.replace);
+      const r = EXEC.slide_replace_text({
+        searchText: searchVal != null ? String(searchVal) : '',
+        replaceText: replaceVal != null ? String(replaceVal) : '',
+        all: !p || p.replaceAll !== false,
+        slideNumber: p && (p.slideNumber != null ? p.slideNumber : (p.slideIndex != null ? Number(p.slideIndex) + 1 : undefined)),
+      });
+      if (r && r.success) r.total = r.replaced || 0;
+      return r;
+    }
     xModel.setPropertyValue('RecordChanges', true);
     const all = p.replaceAll !== false;
     const replaceText = String(p.replaceText || '');
@@ -4131,7 +5014,33 @@ const EXEC = {
     return r;
   },
   // [verified] current selection text (anchor, not integer offset).
-  get_selection() {
+  get_selection(p = {}) {
+    if (typeof isCalcDoc === 'function' && isCalcDoc()) {
+      const selection = calcClipboardSelection();
+      const a = selection.address;
+      const cells = (a.EndRow - a.StartRow + 1) * (a.EndColumn - a.StartColumn + 1);
+      if (cells > 50000) return slideFail('所选区域超过 50,000 个单元格，请缩小范围后复制；未复制或删除任何内容');
+      // One UNO range read instead of thousands of per-cell bridge calls.
+      const rows = Array.from(selection.range.getDataArray());
+      const text = rows.map(function (row) {
+        return Array.from(row).map(function (value) { return value == null ? '' : String(value); }).join('\t');
+      }).join('\n');
+      return { success: true, text: text, hasSelection: true };
+    }
+    if (typeof isImpressDoc === 'function' && isImpressDoc()) {
+      if (!p.clipboard) {
+        const ctx = activeImpressContext();
+        const text = ctx && ctx.selectedShape ? shapeText(ctx.selectedShape) : '';
+        return { success: true, text: text, hasSelection: text.length > 0 };
+      }
+      const selection = ctrl.getSelection();
+      // Only a selected text range is clipboard text. A shape collection also
+      // appears for a collapsed caret; copying its whole text would cut data
+      // outside the user's selection. Object clipboard is not this text bridge.
+      const text = selection && typeof selection.getString === 'function'
+        && typeof selection.getShapeType !== 'function' ? String(selection.getString() || '') : '';
+      return { success: true, text: text, hasSelection: text.length > 0 };
+    }
     const sel = ctrl.getSelection();
     let text = '';
     try {
@@ -4154,9 +5063,20 @@ const EXEC = {
     // 同步执行，200 个匹配足以把 Qt 事件循环冻住好几秒（修订期假死的贡献因素）。
     // 消歧一个目标用不到 50 个候选；批量替换走 find_replace。
     const ranges = [];
+    const fallbackMetas = [];
     let hit = xModel.findFirst(sd);
     while (hit !== null && ranges.length < 50) { ranges.push(hit); hit = xModel.findNext(hit, sd); }
-    const truncated = hit !== null;
+    let truncated = hit !== null;
+    // 若 XSearchable 未命中，而查询词含自动编号前缀（如「第一条 服务内容」「1.1 乙方义务」或「第一条」），
+    // 回退扫描段落的 ListLabelString + 正文合并文本。
+    if (ranges.length === 0 && typeof findNumberedParagraphRanges === 'function') {
+      const fb = findNumberedParagraphRanges(String(p.keyword || ''), !!p.matchCase, 50);
+      for (let k = 0; k < fb.hits.length; k++) {
+        ranges.push(fb.hits[k].range);
+        fallbackMetas.push(fb.hits[k]);
+      }
+      if (fb.truncated) truncated = true;
+    }
     // Each match carries DISAMBIGUATION CONTEXT (chars before/after + enclosing
     // paragraph), so the AI can tell identical hits apart BEFORE editing — the
     // WPS-era "replaced the wrong one" class of bug dies here.
@@ -4165,12 +5085,19 @@ const EXEC = {
       try { anchorId = anchorBookmark(r); } catch (e) {}
       const ctx = contextAround(r, 40);
       const paragraph = paragraphTextOf(r) || '';
-      return {
+      const meta = fallbackMetas[i] || null;
+      const item = {
         matchIndex: i, anchorId: anchorId, text: r.getString(),
         contextBefore: ctx.before, contextAfter: ctx.after,
         paragraph: paragraph.slice(0, 160),
         paragraphLength: paragraph.length, paragraphTruncated: paragraph.length > 160,
       };
+      if (meta) {
+        item.paragraphIndex = meta.paragraphIndex;
+        item.numbering = meta.numbering;
+        item.matchedViaNumberingLabel = true;
+      }
+      return item;
     });
     const res = { success: true, count: matches.length, matches: matches };
     if (truncated) { res.truncated = true; res.note = '匹配超过 50 个，仅返回前 50——请用更长的关键词缩小范围，或用 find_replace 批量处理'; }
@@ -4231,7 +5158,7 @@ const EXEC = {
     const idx = Number(p.index) || 0;
     const el = paraAt(idx);
     if (!el) return { success: false, message: 'paragraph index out of range: ' + idx + ' (count ' + getParaIndex().total + ')' };
-    return { success: true, index: idx, text: el.getString() };
+    return { success: true, index: idx, text: el.getString(), numbering: paragraphNumberingOf(el) };
   },
   // [verified-extend] modify the Nth paragraph's text under RecordChanges.
   modify_paragraph(p) {
@@ -4272,43 +5199,69 @@ const EXEC = {
   // rarely use heading styles, which is why get_outline sees nothing there and
   // the model degraded to counting paragraphs/lines as "clauses".
   get_clauses() {
-    const RE_TIAO  = /^\s*第[一二三四五六七八九十百千零〇0-9１-９]+\s*条/;       // 第X条 — the clause proper
-    const RE_ZHANG = /^\s*第[一二三四五六七八九十百千零〇0-9１-９]+\s*[章节编]/;  // 第X章/节/编 — section above clauses
-    const RE_ENUM  = /^\s*[一二三四五六七八九十]{1,3}\s*、/;                      // 一、 二、 — top-level enum many contracts use
+    const RE_TIAO   = /^\s*第[一二三四五六七八九十百千零〇0-9１-９]+\s*条/;       // 第X条 — the clause proper
+    const RE_ZHANG  = /^\s*第[一二三四五六七八九十百千零〇0-9１-９]+\s*[章节编]/;  // 第X章/节/编 — section above clauses
+    const RE_ENUM   = /^\s*[一二三四五六七八九十]{1,3}\s*、/;                      // 一、 二、 — top-level enum many contracts use
+    const RE_PAREN  = /^\s*[（(][一二三四五六七八九十]{1,3}[）)]/;                  // （一）（二） — fallback enum
+    const RE_ARABIC = /^\s*\d{1,2}\s*[.．、]\s*(?!\d)\S/;                          // 1. / 1、 — top-level numeric clause
     const marks = []; let total = 0;
     eachParagraph(function (el, i) {
       total = i + 1;
-      const t = el.getString() || '';
+      const raw = el.getString() || '';
+      let label = '';
+      if (el && typeof el.getPropertyValue === 'function') {
+        try {
+          if (el.getPropertyValue('NumberingIsNumber') !== false) {
+            const lbl = el.getPropertyValue('ListLabelString');
+            if (typeof lbl === 'string') label = lbl.trim();
+          }
+        } catch (e) {}
+      }
+      const trimmedRaw = raw.trim();
+      const t = (label && trimmedRaw.indexOf(label) !== 0)
+        ? (label + (!/[、.．:：）)\s]$/.test(label) && trimmedRaw ? ' ' : '') + raw)
+        : raw;
       let type = null;
       if (RE_TIAO.test(t)) type = 'tiao';
       else if (RE_ZHANG.test(t)) type = 'zhang';
       else if (RE_ENUM.test(t)) type = 'enum';
-      if (type) marks.push({ index: i, type: type, text: t });
+      else if (RE_PAREN.test(t) && t.trim().length <= 60 && !/[。；;]$/.test(t.trim())) type = 'paren';
+      else if (RE_ARABIC.test(t) && t.trim().length <= 45 && !/[。；;]$/.test(t.trim())) type = 'arabic';
+      if (type) marks.push({ index: i, type: type, text: t, autoNumbered: !!label, listLabel: label || null });
       return false;
     });
     // Granularity: 第X条 wins when present (一、 then is usually a sub-item);
-    // otherwise fall back to the 一、 enum as the clause level. 章/节 always kept.
+    // otherwise fall back to 一、, then （一）, then 1. as the clause level. 章/节 always kept.
     const hasTiao = marks.some(function (m) { return m.type === 'tiao'; });
+    const hasEnum = marks.some(function (m) { return m.type === 'enum'; });
+    const hasParen = marks.some(function (m) { return m.type === 'paren'; });
+    const primaryType = hasTiao ? 'tiao' : (hasEnum ? 'enum' : (hasParen ? 'paren' : 'arabic'));
     const boundaries = marks.filter(function (m) {
-      return m.type === 'zhang' || m.type === (hasTiao ? 'tiao' : 'enum');
+      return m.type === 'zhang' || m.type === primaryType;
     });
     const clauses = [];
     for (let k = 0; k < boundaries.length && clauses.length < 300; k++) {
       const b = boundaries[k];
       const end = (k + 1 < boundaries.length) ? boundaries[k + 1].index - 1 : total - 1;
       const line = b.text.trim();
-      const re = b.type === 'tiao' ? RE_TIAO : (b.type === 'zhang' ? RE_ZHANG : RE_ENUM);
+      const re = b.type === 'tiao' ? RE_TIAO : (b.type === 'zhang' ? RE_ZHANG : (b.type === 'enum' ? RE_ENUM : (b.type === 'paren' ? RE_PAREN : /^\s*\d{1,2}\s*[.．、]/)));
       const m = line.match(re);
-      clauses.push({
+      const item = {
         no: (m ? m[0] : line.slice(0, 8)).trim(),
         type: b.type,
         title: line.slice(0, 60),
         startParagraph: b.index,
         endParagraph: end,
         paragraphCount: end - b.index + 1,
-      });
+      };
+      if (b.autoNumbered) {
+        item.autoNumbered = true;
+        item.listLabel = b.listLabel;
+      }
+      clauses.push(item);
     }
     const firstBoundary = boundaries.length ? boundaries[0].index : total;
+    const granLabel = hasTiao ? '第X条' : (hasEnum ? '一、二、…' : (hasParen ? '（一）（二）…' : (boundaries.length ? '1. 2. …' : 'none')));
     return {
       success: true, totalParagraphs: total, clauseCount: clauses.length,
       totalClauseCount: boundaries.length, truncated: boundaries.length > clauses.length,
@@ -4316,7 +5269,7 @@ const EXEC = {
         nextStartParagraph: boundaries[clauses.length].index,
         note: '条款目录超过 300 条，仅返回前 300 条；totalClauseCount 是完整目录数量。请从 nextStartParagraph 用 get_document_text 继续读取正文。',
       } : {}),
-      granularity: hasTiao ? '第X条' : (boundaries.length ? '一、二、…' : 'none'),
+      granularity: granLabel,
       // 0..preambleParagraphs-1 = 首部（合同名称/当事人信息），不属于任何条款
       preambleParagraphs: firstBoundary,
       clauses: clauses,
@@ -4337,6 +5290,8 @@ const EXEC = {
     if (!p.anchor) return { success: false, message: 'set_selection requires {anchor}; integer offsets unsupported (§0.2)' };
     const range = anchorRange(String(p.anchor));
     if (!range) return { success: false, message: 'anchor not found: ' + p.anchor };
+    const anchorError = anchorEditError(p.anchor, range);
+    if (anchorError) return { success: false, error: anchorError, message: anchorError };
     // 拟人：光标跳过去、视图滚过去、选区亮出来 — 用户看得见 AI 在操作哪里。
     if (!selectVisibly(range)) return { success: false, message: 'could not select anchor: ' + p.anchor };
     const ctx = contextAround(range, 40);
@@ -4348,7 +5303,9 @@ const EXEC = {
     xModel.setPropertyValue('RecordChanges', true);
     const range = anchorRange(String(p.anchor));
     if (!range) return { success: false, message: 'anchor not found: ' + p.anchor };
-    selectVisibly(range); // 拟人：先看见目标再动手
+    const anchorError = anchorEditError(p.anchor, range);
+    if (anchorError) return { success: false, error: anchorError, message: anchorError };
+    if (!selectVisibly(range)) return { success: false, message: 'could not select anchor: ' + p.anchor };
     if (!applyMinimalRedline(range, String(p.newText || ''))) range.setString(String(p.newText || ''));
     // Keep the excerpt budget, but expose whether verification needs a full paragraph read.
     const paragraph = paragraphTextOf(range) || '';
@@ -4401,7 +5358,13 @@ const EXEC = {
   // re-selected the SAME char and deletion jammed after one press (headless-
   // verified). The engine dispatch owns revision semantics: mark + step past for
   // original text, hard-delete for own unaccepted inserts, selection-aware.
-  delete_backward() {
+  delete_backward(p = {}) {
+    if (p.clipboard && isCalcDoc()) {
+      const selected = calcClipboardSelection();
+      // Clear only values, dates, strings and formulas; keep cell formatting.
+      selected.range.clearContents(1 | 2 | 4 | 16);
+      return { success: true };
+    }
     if (nativeKeyDoc()) return postNativeKeys([{ key: 'BACKSPACE', ch: '\b' }]);
     dispatchUno('.uno:SwBackspace');
     return { success: true };
@@ -4445,6 +5408,66 @@ const EXEC = {
     if (name === 'escape') return deselect();
     const url = UI_COMMANDS[name];
     if (!url) return { success: false, message: 'ui_command not allowed: ' + (p.name || '') };
+    const alignMap = { align_left: 'left', align_center: 'center', align_right: 'right', align_justify: 'justify' };
+    if (typeof isCalcDoc === 'function' && isCalcDoc() && typeof activeCalcSelection === 'function') {
+      const selInfo = activeCalcSelection();
+      const rangeName = selInfo.range || 'A1';
+      const cell = selInfo.cell || selInfo.selRange;
+      const cf = cell ? cellFormat(cell) : {};
+      if (name === 'bold' && typeof EXEC.sheet_format_cells === 'function') {
+        EXEC.sheet_format_cells({ range: rangeName, bold: !cf.bold });
+        return { success: true, name: name };
+      }
+      if (name === 'italic' && typeof EXEC.sheet_format_cells === 'function') {
+        EXEC.sheet_format_cells({ range: rangeName, italic: !cf.italic });
+        return { success: true, name: name };
+      }
+      if (name === 'underline' && typeof EXEC.sheet_format_cells === 'function') {
+        EXEC.sheet_format_cells({ range: rangeName, underline: !cf.underline });
+        return { success: true, name: name };
+      }
+      if (name === 'strikeout') {
+        const nextStrike = !cf.strikeout;
+        const target = selInfo.selRange || selInfo.cell;
+        if (target && typeof target.setPropertyValue === 'function') {
+          try { target.setPropertyValue('CharStrikeout', nextStrike ? css.awt.FontStrikeout.SINGLE : css.awt.FontStrikeout.NONE); } catch (e) {}
+        } else {
+          dispatchUno(url);
+        }
+        return { success: true, name: name };
+      }
+      if (alignMap[name] && typeof EXEC.sheet_format_cells === 'function') {
+        const hAlign = alignMap[name] === 'justify' ? 'standard' : alignMap[name];
+        EXEC.sheet_format_cells({ range: rangeName, hAlign: hAlign });
+        return { success: true, name: name };
+      }
+    } else if (typeof isImpressDoc === 'function' && isImpressDoc() && typeof EXEC !== 'undefined' && typeof EXEC.slide_format_text === 'function') {
+      const ctx = typeof activeImpressContext === 'function' ? activeImpressContext(p && p.shapeName) : null;
+      if (ctx && ctx.selectedShape && ctx.selectedShapeName) {
+        const cur = (typeof shapeCharFormat === 'function' ? shapeCharFormat(ctx.selectedShape) : null) || {};
+        if (name === 'bold') {
+          EXEC.slide_format_text({ slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, bold: !cur.bold });
+          return { success: true, name: name };
+        }
+        if (name === 'italic') {
+          EXEC.slide_format_text({ slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, italic: !cur.italic });
+          return { success: true, name: name };
+        }
+        if (name === 'underline') {
+          EXEC.slide_format_text({ slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, underline: cur.underline ? 'none' : 'single' });
+          return { success: true, name: name };
+        }
+        if (name === 'strikeout') {
+          const curStrike = !!(cur.strikethrough != null ? cur.strikethrough : cur.strikeout);
+          EXEC.slide_format_text({ slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, strikethrough: !curStrike });
+          return { success: true, name: name };
+        }
+        if (alignMap[name]) {
+          EXEC.slide_format_text({ slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, alignment: alignMap[name] });
+          return { success: true, name: name };
+        }
+      }
+    }
     dispatchUno(url);
     return { success: true, name: name };
   },
@@ -4458,6 +5481,69 @@ const EXEC = {
     const kw = String((p && p.keyword) || '');
     if (!kw) return tableFail('find_navigate requires {keyword}');
     const dir = String((p && p.direction) || 'next').toLowerCase();
+    if (typeof isCalcDoc === 'function' && isCalcDoc()) {
+      const sr = EXEC.sheet_search({ query: kw, matchCase: !!(p && p.matchCase) });
+      if (!sr || !sr.success) return sr || tableFail('查找失败');
+      const matches = sr.hits || sr.matches || [];
+      if (!matches.length) return { success: true, found: false, total: 0 };
+      const curSel = activeCalcSelection();
+      let curIdx = -1;
+      for (let i = 0; i < matches.length; i++) {
+        if ((matches[i].sheet || sr.sheet) === curSel.sheetName && matches[i].cell === curSel.cellName) {
+          curIdx = i;
+          break;
+        }
+      }
+      const n = matches.length;
+      const target = dir === 'prev'
+        ? (curIdx <= 0 ? n - 1 : curIdx - 1)
+        : (curIdx < 0 ? 0 : (curIdx + 1) % n);
+      const hit = matches[target];
+      const targetSheet = hit.sheet || sr.sheet;
+      EXEC.sheet_select_range({ sheet: targetSheet, range: hit.cell });
+      return { success: true, found: true, index: target + 1, total: n, truncated: !!sr.truncated, sheet: targetSheet, cell: hit.cell };
+    }
+    if (typeof isImpressDoc === 'function' && isImpressDoc()) {
+      const pages = slidePages();
+      if (!pages) return tableFail('非演示文档');
+      const matchCase = !!(p && p.matchCase);
+      const needle = matchCase ? kw : kw.toLowerCase();
+      const hits = [];
+      const totalSlides = pages.getCount();
+      for (let s = 0; s < totalSlides; s++) {
+        let page = null;
+        try { page = pages.getByIndex(s); ensureShapeNames(page); } catch (e) { continue; }
+        const cnt = page.getCount();
+        for (let i = 0; i < cnt; i++) {
+          let sh = null, txt = '', sName = '';
+          try {
+            sh = page.getByIndex(i);
+            txt = typeof shapeText === 'function' ? shapeText(sh) : String(sh.getString() || '');
+            sName = String(sh.getName() || '');
+          } catch (e) { continue; }
+          if (!txt) continue;
+          const hay = matchCase ? txt : txt.toLowerCase();
+          if (hay.indexOf(needle) >= 0) hits.push({ slideIndex: s, slideNumber: s + 1, shapeIndex: i, shapeName: sName, shape: sh });
+        }
+      }
+      if (!hits.length) return { success: true, found: false, total: 0 };
+      const ctx = activeImpressContext();
+      let curIdx = -1;
+      for (let i = 0; i < hits.length; i++) {
+        if (hits[i].slideIndex === ctx.currentSlideIndex && (hits[i].shapeIndex === ctx.selectedShapeIndex || ctx.selectedShapeIndex < 0)) {
+          curIdx = i;
+          if (hits[i].shapeIndex === ctx.selectedShapeIndex) break;
+        }
+      }
+      const n = hits.length;
+      const target = dir === 'prev'
+        ? (curIdx <= 0 ? n - 1 : curIdx - 1)
+        : (curIdx < 0 ? 0 : (curIdx + 1) % n);
+      const chosen = hits[target];
+      EXEC.slide_goto({ slideNumber: chosen.slideNumber, shapeName: chosen.shapeName });
+      try { if (ctrl && ctrl.select) ctrl.select(chosen.shape); } catch (e) {}
+      return { success: true, found: true, index: target + 1, total: n, truncated: false, slideNumber: chosen.slideNumber, slideIndex: chosen.slideIndex, shapeName: chosen.shapeName, shapeIndex: chosen.shapeIndex };
+    }
     const sd = xModel.createSearchDescriptor();
     sd.setSearchString(kw);
     try { sd.setPropertyValue('SearchCaseSensitive', !!(p && p.matchCase)); } catch (e) {}
@@ -4502,7 +5588,8 @@ const EXEC = {
   // 编组成 long 被严格 setter 拒绝（且常被 try 吞掉），必须走 shortAny。
   set_zoom(p) {
     let vs = null;
-    try { vs = ctrl.getViewSettings(); } catch (e) { return { success: false, message: 'no view settings: ' + errStr(e) }; }
+    try { vs = ctrl.getViewSettings(); } catch (e) { vs = ctrl; }
+    if (!vs || typeof vs.getPropertyValue !== 'function') return { success: false, message: 'no view settings' };
     let cur = 100;
     try { cur = Number(vs.getPropertyValue('ZoomValue')) || 100; } catch (e) {}
     const hasValue = p && p.value != null;
@@ -4554,12 +5641,181 @@ const EXEC = {
   // 高频调用（选区事件 + 400ms 聚焦轮询），实测整套读一遍约 6ms——每个字段各自
   // try/catch，缺一个不影响其余，绝不因为某个属性在当前上下文不存在就整体失败。
   get_ui_state() {
-    const out = { success: true, documentSeq: docSeq };
+    const out = { success: true, documentSeq: docSeq, docKind: docKindOf() };
+    const readUndo = function () {
+      try {
+        const um = xModel.getUndoManager();
+        const u = {};
+        try { u.canUndo = !!um.isUndoPossible(); } catch (e) {}
+        try { u.canRedo = !!um.isRedoPossible(); } catch (e) {}
+        if (u.canUndo != null || u.canRedo != null) out.undo = u;
+      } catch (e) { out.undoErr = errStr(e); }
+    };
+    if (isCalcDoc()) {
+      const selInfo = activeCalcSelection();
+      const cell = selInfo.cell || selInfo.selRange;
+      const cf = cell ? cellFormat(cell) : {};
+      const ch = {
+        bold: !!cf.bold,
+        italic: !!cf.italic,
+        underline: !!cf.underline,
+        strikeout: false,
+        superscript: false,
+        subscript: false,
+        font: cf.fontName || '',
+        fontAsian: cf.fontNameAsian || cf.fontName || '',
+        sizePt: cf.fontSize || 11,
+        color: cf.color || 'auto',
+        highlight: cf.background || 'none',
+      };
+      if (cell) {
+        try { ch.strikeout = !enumEq(cell.getPropertyValue('CharStrikeout'), css.awt.FontStrikeout.NONE); } catch (e) {}
+      }
+      out.character = ch;
+      out.paragraph = {
+        styleName: '',
+        alignment: (cf.hAlign === 'center' || cf.hAlign === 'right') ? cf.hAlign : 'left',
+        outlineLevel: 0,
+        inList: false,
+        listKind: 'none',
+      };
+      const view = { zoom: 100, showGrid: true };
+      try { view.zoom = Number(ctrl.getPropertyValue('ZoomValue')) || 100; } catch (e) {}
+      try { view.showGrid = ctrl.getPropertyValue('ShowGrid') !== false; } catch (e) {}
+      out.view = view;
+      let cellText = '', cellFormula = '', cellVal = '';
+      if (selInfo.cell) {
+        try { cellText = String(selInfo.cell.getString() || ''); } catch (e) {}
+        try { cellVal = readCellOut(selInfo.cell); } catch (e) {}
+        try {
+          if (enumEq(selInfo.cell.getType(), css.table.CellContentType.FORMULA)) {
+            cellFormula = String(selInfo.cell.getFormula() || '');
+          } else {
+            cellFormula = cellVal != null ? String(cellVal) : cellText;
+          }
+        } catch (e) {
+          try { cellFormula = String(selInfo.cell.getFormula() || cellText || ''); } catch (e2) {}
+        }
+      }
+      out.selection = {
+        collapsed: selInfo.rowCount <= 1 && selInfo.colCount <= 1,
+        inTable: true,
+        address: selInfo.cellName,
+        range: selInfo.rangeName,
+        cellName: selInfo.cellName,
+        rangeName: selInfo.rangeName,
+        sheetName: selInfo.sheetName,
+      };
+      out.calc = {
+        sheet: selInfo.sheetName,
+        sheetName: selInfo.sheetName,
+        sheetIndex: selInfo.sheetIndex,
+        sheetCount: selInfo.sheetCount,
+        sheets: selInfo.sheetNames,
+        sheetNames: selInfo.sheetNames,
+        address: selInfo.cellName,
+        cellName: selInfo.cellName,
+        range: selInfo.rangeName,
+        rangeName: selInfo.rangeName,
+        row: selInfo.row,
+        col: selInfo.col,
+        rowCount: selInfo.rowCount,
+        colCount: selInfo.colCount,
+        text: cellText,
+        value: cellVal !== '' ? cellVal : cellText,
+        formula: cellFormula,
+        hAlign: cf.hAlign || 'standard',
+        vAlign: cf.vAlign || 'standard',
+        wrap: !!cf.wrap,
+        background: cf.background || 'none',
+        numberFormat: cf.numberFormat || 'General',
+        numberFormatKey: cf.numberFormatKey != null ? cf.numberFormatKey : 0,
+        merged: !!selInfo.merged,
+        hasFrozenPanes: !!selInfo.hasFrozenPanes,
+        autoFilter: !!selInfo.autoFilter,
+        protected: !!selInfo.protected,
+        showGrid: view.showGrid !== false,
+        rowHeightPt: selInfo.rowHeightPt,
+        colWidthPt: selInfo.colWidthPt,
+      };
+      readUndo();
+      return out;
+    }
+    if (isImpressDoc()) {
+      const ctx = activeImpressContext();
+      const shape = ctx.selectedShape;
+      const sf = (shape ? shapeCharFormat(shape) : null) || {};
+      out.character = {
+        bold: !!sf.bold,
+        italic: !!sf.italic,
+        underline: !!sf.underline,
+        strikeout: !!sf.strikeout,
+        superscript: false,
+        subscript: false,
+        font: sf.fontName || '',
+        fontAsian: sf.fontNameAsian || sf.fontName || '',
+        sizePt: sf.fontSize || 18,
+        color: sf.color || 'auto',
+        highlight: 'none',
+      };
+      out.paragraph = {
+        styleName: '',
+        alignment: sf.alignment || 'left',
+        outlineLevel: 0,
+        inList: false,
+        listKind: 'none',
+      };
+      const view = { zoom: 100 };
+      try { view.zoom = Number(ctrl.getPropertyValue('ZoomValue')) || 100; } catch (e) {}
+      out.view = view;
+      const detail = shape ? impressShapeDetail(shape, ctx.selectedShapeIndex) : null;
+      out.selection = {
+        collapsed: !shape,
+        inTable: !!(detail && detail.isTable),
+        hasShape: !!shape,
+        shapeIndex: ctx.selectedShapeIndex,
+        shapeName: ctx.selectedShapeName || '',
+      };
+      out.impress = {
+        slideNumber: ctx.slideNumber,
+        currentSlideIndex: ctx.currentSlideIndex,
+        slideCount: ctx.slideCount,
+        slideWidthMm: ctx.slideWidthMm,
+        slideHeightMm: ctx.slideHeightMm,
+        widthPt: ctx.widthPt,
+        heightPt: ctx.heightPt,
+        layout: ctx.layout,
+        layoutName: ctx.layoutName,
+        masterName: ctx.masterName,
+        masterPages: ctx.masterPages || [],
+        notesText: ctx.notesText || '',
+        shapeCount: ctx.shapeCount,
+        selectedShapeIndex: ctx.selectedShapeIndex,
+        selectedShapeName: ctx.selectedShapeName || '',
+        selectedShape: detail,
+        shapes: ctx.shapes || [],
+      };
+      readUndo();
+      return out;
+    }
     let vc = null;
     try { vc = ctrl.getViewCursor(); } catch (e) { return { success: false, message: errStr(e) }; }
     const ch = {};
-    try { ch.bold = vc.getPropertyValue('CharWeight') > 100; } catch (e) {}
-    try { ch.italic = !enumEq(vc.getPropertyValue('CharPosture'), css.awt.FontSlant.NONE); } catch (e) {}
+    try {
+      const wa = Number(vc.getPropertyValue('CharWeightAsian')) || 0;
+      const ww = Number(vc.getPropertyValue('CharWeight')) || 0;
+      ch.bold = wa > 100 || ww > 100;
+    } catch (e) {
+      try { ch.bold = vc.getPropertyValue('CharWeight') > 100; } catch (e2) {}
+    }
+    try {
+      const paSlant = vc.getPropertyValue('CharPostureAsian');
+      const pwSlant = vc.getPropertyValue('CharPosture');
+      ch.italic = (paSlant != null && !enumEq(paSlant, css.awt.FontSlant.NONE))
+        || (pwSlant != null && !enumEq(pwSlant, css.awt.FontSlant.NONE));
+    } catch (e) {
+      try { ch.italic = !enumEq(vc.getPropertyValue('CharPosture'), css.awt.FontSlant.NONE); } catch (e2) {}
+    }
     try { ch.underline = !enumEq(vc.getPropertyValue('CharUnderline'), css.awt.FontUnderline.NONE); } catch (e) {}
     try { ch.strikeout = !enumEq(vc.getPropertyValue('CharStrikeout'), css.awt.FontStrikeout.NONE); } catch (e) {}
     try {
@@ -4568,7 +5824,7 @@ const EXEC = {
     } catch (e) {}
     try { ch.font = vc.getPropertyValue('CharFontName'); } catch (e) {}
     try { ch.fontAsian = vc.getPropertyValue('CharFontNameAsian'); } catch (e) {}
-    try { ch.sizePt = vc.getPropertyValue('CharHeight'); } catch (e) {}
+    try { ch.sizePt = effectiveCharHeightPt(vc); } catch (e) {}
     try { const c = vc.getPropertyValue('CharColor'); ch.color = c === -1 ? 'auto' : '#' + ('000000' + (c >>> 0).toString(16)).slice(-6); } catch (e) {}
     try { const h = vc.getPropertyValue('CharHighlight'); ch.highlight = h === -1 ? 'none' : '#' + ('000000' + (h >>> 0).toString(16)).slice(-6); } catch (e) {}
     out.character = ch;
@@ -4603,6 +5859,9 @@ const EXEC = {
     // 格式标记 / 标尺的真实读回（set_view_options 写的就是这两个 ViewSettings 属性），
     // 工具栏按引擎状态高亮，不再本地记一份猜测（旧实现用 .uno:ControlCodes 切换语义）。
     try { view.formattingMarks = !!ctrl.getViewSettings().getPropertyValue('ShowNonprintingCharacters'); } catch (e) {}
+    for (const [key, property] of Object.entries({ paragraphMarks: 'ShowParaBreaks', lineBreaks: 'ShowBreaks', spaces: 'ShowSpaces', tabs: 'ShowTabstops' })) {
+      try { view[key] = !!ctrl.getViewSettings().getPropertyValue(property); } catch (e) {}
+    }
     try { view.ruler = !!ctrl.getViewSettings().getPropertyValue('ShowHoriRuler'); } catch (e) {}
     try { view.recordChanges = !!xModel.getPropertyValue('RecordChanges'); } catch (e) {}
     // 修订显示三态（dev-board#368）。工具栏的当前态读的就是这里——真实读回引擎，
@@ -4702,7 +5961,7 @@ const EXEC = {
     };
     // 不带任何字段 = 只读查询：回报当前各处可见性。宿主用它复核「藏了之后
     // 真的没再冒出来」（上下文工具栏是选中表格/图片时由引擎自己拉起来的）。
-    const anyField = ['all', 'menubar', 'statusbar', 'toolbars', 'rulers'].some((k) => req[k] != null);
+    const anyField = ['all', 'menubar', 'statusbar', 'toolbars', 'rulers', 'sheetTabs'].some((k) => req[k] != null);
     if (!anyField) {
       const cur = { toolbars: {} };
       try { cur.all = !!lm.isVisible(); } catch (e) {}
@@ -4716,6 +5975,7 @@ const EXEC = {
         const vs = ctrl.getViewSettings();
         cur.rulers = { ShowHoriRuler: !!vs.getPropertyValue('ShowHoriRuler'), ShowVertRuler: !!vs.getPropertyValue('ShowVertRuler') };
       } catch (e) {}
+      if (isCalcDoc()) { try { cur.sheetTabs = !!ctrl.getPropertyValue('HasSheetTabs'); } catch (e) {} }
       return { success: true, visible: cur };
     }
     if (req.all != null) {
@@ -4729,19 +5989,45 @@ const EXEC = {
     if (req.statusbar != null) out.applied.statusbar = setOne(CHROME_URLS.statusbar, !!req.statusbar);
     if (req.toolbars != null) {
       const states = {};
-      for (let i = 0; i < CHROME_URLS.toolbars.length; i++) {
-        const u = CHROME_URLS.toolbars[i];
+      const urls = CHROME_URLS.toolbars.slice();
+      try {
+        if (typeof lm.getElements === 'function') {
+          const els = lm.getElements() || [];
+          for (let i = 0; i < (els.length || 0); i++) {
+            const u = els[i] && els[i].ResourceURL ? String(els[i].ResourceURL) : '';
+            if (u && u.indexOf('private:resource/toolbar/') === 0 && urls.indexOf(u) < 0) urls.push(u);
+          }
+        }
+      } catch (e) {}
+      for (let i = 0; i < urls.length; i++) {
+        const u = urls[i];
         // fullscreenbar 永不放出来（「全屏」浮条，见 CHROME_NEVER_SHOWN）。
         states[u.slice(u.lastIndexOf('/') + 1)] = setOne(u, !!req.toolbars && CHROME_NEVER_SHOWN.indexOf(u) < 0);
       }
       out.applied.toolbars = states;
     }
+    if (req.all == null) {
+      if (req.menubar || req.statusbar || req.toolbars) {
+        try { lm.setVisible(true); } catch (e) {}
+      } else if (req.menubar === false && req.statusbar === false && req.toolbars === false) {
+        try { lm.setVisible(false); } catch (e) {}
+      }
+    }
+    if (req.sheetTabs != null && isCalcDoc()) {
+      try {
+        ctrl.setPropertyValue('HasSheetTabs', !!req.sheetTabs);
+        out.applied.sheetTabs = !!ctrl.getPropertyValue('HasSheetTabs');
+      } catch (e) { out.sheetTabsErr = errStr(e); }
+    }
     if (req.rulers != null) {
-      const vs = ctrl.getViewSettings();
+      let vs = null;
+      try { vs = ctrl.getViewSettings(); } catch (e) {}
       const r = {};
-      for (const k of ['ShowHoriRuler', 'ShowVertRuler']) {
-        try { vs.setPropertyValue(k, !!req.rulers); } catch (e) {}
-        try { r[k] = !!vs.getPropertyValue(k); } catch (e) {}
+      if (vs) {
+        for (const k of ['ShowHoriRuler', 'ShowVertRuler']) {
+          try { vs.setPropertyValue(k, !!req.rulers); } catch (e) {}
+          try { r[k] = !!vs.getPropertyValue(k); } catch (e) {}
+        }
       }
       out.applied.rulers = r;
     }
@@ -4751,12 +6037,28 @@ const EXEC = {
   // 直写 ViewSettings 而不是派发 .uno:ControlCodes / .uno:Ruler：后两者是切换语义，
   // 宿主想设成确定状态就得先读再判，而 load_document 换文档后视图设置会回到引擎
   // 默认值，宿主要能无条件「设成 X」。不改一个字节的内容。
-  // {formattingMarks?, ruler?, textBoundaries?}；都不带 = 只读回。
+  // {formattingMarks?, paragraphMarks?, lineBreaks?, spaces?, tabs?, ruler?, textBoundaries?}；都不带 = 只读回。
   // ruler 同时管横竖两条（ShowRulers 是总闸）；textBoundaries 是辅助线，不是文档边框。
   set_view_options(p) {
     const req = p || {};
     let vs = null;
-    try { vs = ctrl.getViewSettings(); } catch (e) { return { success: false, message: 'no view settings: ' + errStr(e) }; }
+    try { vs = ctrl.getViewSettings(); } catch (e) {
+      if ((typeof isCalcDoc === 'function' && isCalcDoc()) || (typeof isImpressDoc === 'function' && isImpressDoc())) {
+        const out = { success: true };
+        if (typeof isCalcDoc === 'function' && isCalcDoc()) {
+          if (req.showGrid != null) { try { ctrl.setPropertyValue('ShowGrid', !!req.showGrid); } catch (e2) {} }
+          try { out.showGrid = !!ctrl.getPropertyValue('ShowGrid'); } catch (e2) {}
+        }
+        return out;
+      }
+      return { success: false, message: 'no view settings: ' + errStr(e) };
+    }
+    const marks = { paragraphMarks: 'ShowParaBreaks', lineBreaks: 'ShowBreaks', spaces: 'ShowSpaces', tabs: 'ShowTabstops' };
+    for (const [key, property] of Object.entries(marks)) {
+      if (req[key] == null) continue;
+      try { vs.setPropertyValue(property, !!req[key]); }
+      catch (e) { return { success: false, message: property + ': ' + errStr(e) }; }
+    }
     if (req.formattingMarks != null) {
       try { vs.setPropertyValue('ShowNonprintingCharacters', !!req.formattingMarks); } catch (e) {}
     }
@@ -4769,7 +6071,12 @@ const EXEC = {
       }
     }
     const out = { success: true };
+    for (const [key, property] of Object.entries(marks)) {
+      try { out[key] = !!vs.getPropertyValue(property); } catch (e) {}
+      if (req[key] != null && out[key] !== !!req[key]) return { success: false, message: property + ': value not applied' };
+    }
     try { out.formattingMarks = !!vs.getPropertyValue('ShowNonprintingCharacters'); } catch (e) {}
+    if (req.formattingMarks != null && out.formattingMarks !== !!req.formattingMarks) return { success: false, message: 'ShowNonprintingCharacters: value not applied' };
     try { out.textBoundaries = !!vs.getPropertyValue('ShowTextBoundaries'); } catch (e) {}
     try { out.ruler = !!vs.getPropertyValue('ShowHoriRuler'); } catch (e) {}
     try { out.verticalRuler = !!vs.getPropertyValue('ShowVertRuler'); } catch (e) {}
@@ -4828,7 +6135,7 @@ const EXEC = {
   //   - zoom: ZoomValue (%) from the view settings.
   //   - winPx: the Qt component window rect (px) — the canvas surface bounds.
   // Each field is independently try/caught so a missing API degrades, not throws.
-  get_cursor_rect() {
+  get_cursor_rect(p) {
     // The IME/caret timer can outlive a Writer document during a tab switch.
     if (!isWriterDoc()) return completionUnavailable('not-writer');
     const out = { success: true };
@@ -4863,7 +6170,129 @@ const EXEC = {
     } catch (e) { out.viewDataErr = errStr(e); }
     try { out.nativeCaret = readNativeCaretRect(ctrl.getFrame(), ctrl.getViewData(), out.charHeightPt); }
     catch (e) { /* Older engines retain the click-calibrated fallback. */ }
+    // Endpoint geometry temporarily moves the view cursor. Background caret
+    // reads must stay read-only, especially during mouse selection + scrolling.
+    if (vc && out.collapsed === false && p && p.selectionRects === true) {
+      try {
+        const sr = readSelectionCaretRects(ctrl.getFrame(), vc, out.charHeightPt);
+        if (sr) out.selectionRects = sr;
+      } catch (e) {}
+    }
     return out;
+  },
+  // 选中文字鼠标点击拖拽移动（dev-board#1286）：
+  // Qt5-WASM 的 QDrag 模态循环在浏览器沙箱内不工作，画布内在已选中文本上按下并
+  // 拖动鼠标会被引擎当成从按下点重新拉选区，而不是把原选区搬到松手处。
+  // 客体页在检测到拖离原选区松手时：
+  //   1. 先调 stash_selection_for_drag 暂存原选区起止锚点与 XTransferable（保富格式）；
+  //   2. 向画布派发合成单击，交由 Qt 原生命中测试把视图光标挪到松手字符；
+  //   3. 调 complete_selection_drag，在同一撤销组内删除原选区并在落点插入（支持修订与非修订态），
+  //      并在新位置重新选中被移动的文字（Word 语义）。
+  stash_selection_for_drag() {
+    if (!isWriterDoc()) return bmFail('not-writer');
+    if (!isReviewWritable()) return bmFail('readonly');
+    try {
+      const vc = ctrl.getViewCursor();
+      const selText = vc ? (vc.getString() || '') : '';
+      if (!selText) {
+        stashedDragSelection = null;
+        return { success: false, empty: true, error: 'empty-selection', message: '未选中文字' };
+      }
+      const text = vc.getText();
+      const srcStart = text.createTextCursorByRange(vc.getStart());
+      const srcEnd = text.createTextCursorByRange(vc.getEnd());
+      try { dropAiAnchors(); } catch (e) {}
+      let transferable = null;
+      try {
+        if (typeof ctrl.getTransferable === 'function') transferable = ctrl.getTransferable();
+      } catch (e) {}
+      stashedDragSelection = {
+        model: xModel,
+        text: text,
+        srcStart: srcStart,
+        srcEnd: srcEnd,
+        selText: selText,
+        transferable: transferable,
+        at: Date.now(),
+      };
+      return { success: true, text: selText };
+    } catch (e) {
+      stashedDragSelection = null;
+      return bmFail('stash_selection_for_drag failed: ' + errStr(e));
+    }
+  },
+  complete_selection_drag(p) {
+    if (p && p.cancel) {
+      stashedDragSelection = null;
+      return { success: true, cancelled: true };
+    }
+    const stash = stashedDragSelection;
+    if (!stash || stash.model !== xModel || !isWriterDoc()) {
+      stashedDragSelection = null;
+      return bmFail('no-stashed-selection');
+    }
+    if (!isReviewWritable()) {
+      stashedDragSelection = null;
+      return bmFail('readonly');
+    }
+    try {
+      const vc = ctrl.getViewCursor();
+      const curSel = vc ? (vc.getString() || '') : '';
+      if (curSel.length > 0 && !(p && p.force)) {
+        return { success: true, pendingClick: true };
+      }
+      stashedDragSelection = null;
+      const dstText = vc.getText();
+      const dstPos = vc.getStart();
+      let insideSource = false;
+      try {
+        const afterStart = stash.text.compareRegionStarts(stash.srcStart, dstPos) >= 0;
+        const beforeEnd = stash.text.compareRegionStarts(dstPos, stash.srcEnd) >= 0;
+        if (afterStart && beforeEnd) insideSource = true;
+      } catch (e) {
+        insideSource = false;
+      }
+      if (insideSource) {
+        try {
+          vc.gotoRange(stash.srcStart, false);
+          vc.gotoRange(stash.srcEnd, true);
+        } catch (e) {}
+        return { success: true, moved: false, reason: 'inside-source', text: stash.selText };
+      }
+      const dstCur = dstText.createTextCursorByRange(dstPos);
+      const srcCur = stash.text.createTextCursorByRange(stash.srcStart);
+      srcCur.gotoRange(stash.srcEnd, true);
+      let um = null;
+      try { um = xModel.getUndoManager(); um.enterUndoContext('移动文字'); } catch (e) { um = null; }
+      lockModel();
+      try {
+        srcCur.setString('');
+        vc.gotoRange(dstCur, false);
+        let insertedViaTransferable = false;
+        if (stash.transferable && typeof ctrl.insertTransferable === 'function') {
+          try {
+            ctrl.insertTransferable(stash.transferable);
+            insertedViaTransferable = true;
+          } catch (e) {}
+        }
+        if (!insertedViaTransferable) {
+          insertTextAtCursor(vc, stash.selText);
+        }
+        vc.collapseToEnd();
+        const stepCount = stash.selText.replace(/\r\n/g, '\n').length;
+        if (stepCount > 0) {
+          try { vc.goLeft(stepCount, true); } catch (e) {}
+        }
+      } finally {
+        unlockModel();
+        if (um) { try { um.leaveUndoContext(); } catch (e) {} }
+      }
+      invalidateParaIndex();
+      return Object.assign({ success: true, moved: true, text: stash.selText }, verifySnapshot());
+    } catch (e) {
+      stashedDragSelection = null;
+      return bmFail('complete_selection_drag failed: ' + errStr(e));
+    }
   },
   // [spike] probe 4b: LOAD performance of a 50-page docx (#56 余项). The existing
   // testPerf times GENERATION; this times the docx IMPORT path: generate N pages,
@@ -4934,7 +6363,12 @@ const EXEC = {
     // Empty body = a brand-new / unsaved document (the backend streams 200 + 0
     // bytes for it). That is NOT an error: keep the blank boot doc as-is. The
     // host also guards this, but defend here too.
-    if (!u8 || u8.length === 0) return { success: true, empty: true, name: name, kind: docKindOf() };
+    // An author-only update must not create a model while real bytes are in flight.
+    if (!u8) return { success: true, empty: true, name: name, kind: docKindOf() };
+    if (u8.length === 0) {
+      if (!xModel) bootDoc();
+      return { success: true, empty: true, name: name, kind: docKindOf() };
+    }
     // zeta.js marshals JS→UNO sequences ONLY from plain Arrays (translateToEmbind
     // gates on Array.isArray), and sequence<byte> elements are SIGNED — so go
     // through an Int8Array view, then Array.from. Passing the typed array itself
@@ -4971,6 +6405,7 @@ const EXEC = {
       }
       // _default keeps modified components alive. Close only after successful
       // replacement: 33 retained models exhausted LOWA's 1 GiB heap (#1121).
+      if (!previous) post('ui_ready');
       if (previous && previous !== loaded) {
         try { previous.setModified(false); previous.close(true); }
         catch (e) { log('load_document: previous model close failed: ' + errStr(e)); }
@@ -5064,6 +6499,10 @@ const EXEC = {
     // 导出是同步的、跑在这条 office 线程上，期间不可能有用户编辑挤进来，
     // 复原不会吃掉真实修改；宿主侧的 dirty 是另一套独立记账，也不受影响。
     const wasModified = (() => { try { return !!xModel.isModified(); } catch (e) { return false; } })();
+    // The office queue has now applied earlier IME/AI writes. Export is
+    // synchronous: later input can only modify the model after this snapshot.
+    if (Number.isSafeInteger(p && p.saveSnapshotId) && p.saveSnapshotId > 0)
+      post('save-snapshot', { saveSnapshotId: p.saveSnapshotId });
     exportInFlight = true;
     try {
       withInlineMarkupForExport(function () { if (ext === 'docx') repairMoveRangeBookmarks(); xModel.storeToURL('private:stream', props); });
@@ -5159,7 +6598,7 @@ const EXEC = {
       let chars = 0;
       for (let i = start; i < total && paragraphs.length < maxParas && chars < charBudget; i++) {
         const el = ix.ranges[i];
-        const item = { index: i, text: el.getString() };
+        const item = { index: i, text: el.getString(), numbering: paragraphNumberingOf(el) };
         try {
           const lvl = el.getPropertyValue('OutlineLevel') || 0;
           if (lvl > 0) { item.headingLevel = lvl; item.style = el.getPropertyValue('ParaStyleName') || ''; }
@@ -5182,13 +6621,27 @@ const EXEC = {
       before: ctx.before, after: ctx.after, paragraph: (paragraphTextOf(vc) || '').slice(0, 300),
     };
   },
-  // [定位] select the Nth (0-based) body paragraph, visibly (view scrolls to it).
+  // [定位] select the Nth (0-based) body paragraph or [index, endIndex] range, visibly (view scrolls to it).
   select_paragraph(p) {
-    const idx = Number(p.index) || 0;
+    const idx = Number(p && p.index) || 0;
+    if (p && p.endIndex != null && Number(p.endIndex) !== idx) {
+      const sel = selectParagraphRange(idx, Number(p.endIndex));
+      if (sel.error) return { success: false, message: sel.error };
+      let txt = '';
+      try { txt = ctrl.getViewCursor().getString() || ''; } catch (e) {}
+      if (!txt) txt = sel.paragraphs.map(function (el) { return el.getString(); }).join('\n');
+      return {
+        success: true,
+        index: sel.startIndex,
+        endIndex: sel.endIndex,
+        paragraphCount: sel.paragraphs.length,
+        text: txt.slice(0, 300),
+      };
+    }
     const found = paraAt(idx);
     if (!found) return { success: false, message: 'paragraph index out of range: ' + idx };
     if (!selectVisibly(found)) return { success: false, message: 'could not select paragraph ' + idx };
-    return { success: true, index: idx, text: found.getString() };
+    return { success: true, index: idx, text: found.getString(), numbering: paragraphNumberingOf(found) };
   },
   // [定位] drop the cursor at the start/end edge of the current selection — the
   // human move for "insert BEFORE/AFTER this" (compose with insert_at_cursor).
@@ -5208,7 +6661,8 @@ const EXEC = {
     return Object.assign({ success: true, deletedText: had.slice(0, 200), deletedChars: had.length }, verifySnapshot());
   },
   // [格式] character formatting on the CURRENT selection (select first, then
-  // format — same order a human works in). Any subset of the params applies;
+  // format — same order a human works in) or on an explicit paragraph range
+  // (startParagraph/endParagraph/paragraphIndex). Any subset of the params applies;
   // booleans false/'none' explicitly clear. CJK-safe via Asian/Complex siblings.
   // atCursor:true（自建工具栏传）= Word 语义：没有选区时把格式设在光标处，之后在这里
   // 敲的字沿用新格式。真引擎实证（24.2.8-zhcn-r5）：塌陷视图光标上 setPropertyValue
@@ -5217,92 +6671,287 @@ const EXEC = {
   // AI 管线不传 atCursor，没选区照旧明确报错——否则模型会以为「格式已设」而文档上
   // 什么都看不见。
   format_selection(p) {
+    const hasExplicitPara = p && (p.paragraphIndex != null || p.startParagraph != null || p.endParagraph != null);
+    if (!hasExplicitPara && typeof isCalcDoc === 'function' && isCalcDoc()) {
+      const rangeName = (p && p.range) ? String(p.range) : activeCalcRangeName();
+      const cp = { range: rangeName };
+      if (p && p.bold != null) cp.bold = !!p.bold;
+      if (p && p.italic != null) cp.italic = !!p.italic;
+      const rawUl = p && (p.underlineStyle != null ? p.underlineStyle : p.underline);
+      if (rawUl != null) cp.underline = rawUl !== false && String(rawUl).toLowerCase() !== 'none';
+      if (p && p.strikeout != null) cp.strikeout = !!p.strikeout;
+      if (p && p.fontSize != null) {
+        const sz = parseFontSizePt(p.fontSize);
+        if (sz == null) return { success: false, message: 'bad fontSize: ' + p.fontSize };
+        cp.fontSize = sz;
+      }
+      const fn = p && (p.fontName != null ? p.fontName : (p.fontNameAsian != null ? p.fontNameAsian : p.fontNameWestern));
+      if (fn != null) cp.fontName = String(fn);
+      if (p && p.color != null) cp.color = String(p.color);
+      if (p && p.highlight != null) {
+        if (String(p.highlight).toLowerCase() === 'none') cp.background = 'none';
+        else {
+          const hc = parseColor(p.highlight, HIGHLIGHT_COLORS);
+          if (hc == null) return { success: false, message: 'bad highlight color: ' + p.highlight };
+          cp.background = '#' + ('000000' + (hc >>> 0).toString(16)).slice(-6);
+        }
+      }
+      return EXEC.sheet_format_cells(cp);
+    }
+    if (!hasExplicitPara && typeof isImpressDoc === 'function' && isImpressDoc()) {
+      const ctx = activeImpressContext();
+      const targetShapeName = (p && p.shapeName) ? String(p.shapeName) : ctx.selectedShapeName;
+      if (!targetShapeName) return { success: false, message: '请先选中要设置格式的形状或文本框' };
+      const sp = {
+        slideNumber: (p && p.slideNumber != null) ? Number(p.slideNumber) : ctx.slideNumber,
+        shapeName: targetShapeName,
+      };
+      if (p && p.bold != null) sp.bold = !!p.bold;
+      if (p && p.italic != null) sp.italic = !!p.italic;
+      const rawUl = p && (p.underlineStyle != null ? p.underlineStyle : p.underline);
+      if (rawUl != null) {
+        if (typeof rawUl === 'boolean') sp.underline = rawUl ? 'single' : 'none';
+        else sp.underline = String(rawUl).toLowerCase() === 'none' ? 'none' : String(rawUl).toLowerCase();
+      }
+      if (p && (p.strikeout != null || p.strikethrough != null)) sp.strikethrough = !!(p.strikethrough != null ? p.strikethrough : p.strikeout);
+      if (p && p.fontSize != null) {
+        const sz = parseFontSizePt(p.fontSize);
+        if (sz == null) return { success: false, message: 'bad fontSize: ' + p.fontSize };
+        sp.fontSize = sz;
+      }
+      const fn = p && (p.fontName != null ? p.fontName : (p.fontNameAsian != null ? p.fontNameAsian : p.fontNameWestern));
+      if (fn != null) sp.fontName = String(fn);
+      if (p && p.color != null) sp.color = String(p.color);
+      return EXEC.slide_format_text(sp);
+    }
+    const tgt = resolveFormatTargets(p);
+    if (tgt.error) return { success: false, message: tgt.error };
     const vc = ctrl.getViewCursor();
-    const collapsed = (vc.getString() || '').length === 0;
+    const collapsed = (vc.getString() || '').length === 0 && !tgt.explicitRange;
     if (collapsed && !p.atCursor) return { success: false, message: 'nothing selected — select first, then format' };
-    const applied = {};
-    if (p.bold != null) { setCharProp(vc, 'CharWeight', p.bold ? css.awt.FontWeight.BOLD : css.awt.FontWeight.NORMAL); applied.bold = !!p.bold; }
-    if (p.italic != null) { setCharProp(vc, 'CharPosture', p.italic ? css.awt.FontSlant.ITALIC : css.awt.FontSlant.NONE); applied.italic = !!p.italic; }
-    if (p.underline != null) { vc.setPropertyValue('CharUnderline', p.underline ? css.awt.FontUnderline.SINGLE : css.awt.FontUnderline.NONE); applied.underline = !!p.underline; }
-    if (p.strikeout != null) { vc.setPropertyValue('CharStrikeout', p.strikeout ? css.awt.FontStrikeout.SINGLE : css.awt.FontStrikeout.NONE); applied.strikeout = !!p.strikeout; }
+    let hiColor = null;
     if (p.highlight != null) {
-      const c = parseColor(p.highlight, HIGHLIGHT_COLORS);
-      if (c == null) return { success: false, message: 'bad highlight color: ' + p.highlight + ' (use yellow/green/cyan/magenta/red/blue/gray/none or #RRGGBB)' };
-      vc.setPropertyValue('CharHighlight', c); applied.highlight = String(p.highlight);
+      hiColor = parseColor(p.highlight, HIGHLIGHT_COLORS);
+      if (hiColor == null) return { success: false, message: 'bad highlight color: ' + p.highlight + ' (use yellow/green/cyan/magenta/red/blue/gray/none or #RRGGBB)' };
     }
+    let fgColor = null;
     if (p.color != null) {
-      const c = parseColor(p.color, { auto: -1 });
-      if (c == null) return { success: false, message: 'bad color: ' + p.color + ' (use #RRGGBB or auto)' };
-      vc.setPropertyValue('CharColor', c); applied.color = String(p.color);
+      fgColor = parseColor(p.color, { auto: -1 });
+      if (fgColor == null) return { success: false, message: 'bad color: ' + p.color + ' (use #RRGGBB or auto)' };
     }
-    if (p.fontSize != null) { setCharProp(vc, 'CharHeight', Number(p.fontSize)); applied.fontSize = Number(p.fontSize); }
-    if (p.fontName != null) { setCharProp(vc, 'CharFontName', String(p.fontName)); applied.fontName = String(p.fontName); }
-    // 中文字体单独设（fontName 已把西文/中文/复杂文种三项一起设成同一字体；中西文分设时后设中文）
-    if (p.fontNameAsian != null) { vc.setPropertyValue('CharFontNameAsian', String(p.fontNameAsian)); applied.fontNameAsian = String(p.fontNameAsian); }
+    let parsedSize = null;
+    if (p.fontSize != null) {
+      parsedSize = parseFontSizePt(p.fontSize);
+      if (parsedSize == null) return { success: false, message: 'bad fontSize: ' + p.fontSize + ' (use number in pt or Chinese size like 小四/四号/三号)' };
+    }
+    let ulSpec = null;
+    const rawUl = p.underlineStyle != null ? p.underlineStyle : p.underline;
+    if (rawUl != null) ulSpec = resolveUnderlineEnum(rawUl);
+    const applied = {};
+    if (p.bold != null) applied.bold = !!p.bold;
+    if (p.italic != null) applied.italic = !!p.italic;
+    if (ulSpec != null) applied.underline = ulSpec.label;
+    if (p.strikeout != null) applied.strikeout = !!p.strikeout;
+    if (p.highlight != null) applied.highlight = String(p.highlight);
+    if (p.color != null) applied.color = String(p.color);
+    if (parsedSize != null) applied.fontSize = parsedSize;
+    if (p.fontName != null) applied.fontName = String(p.fontName);
+    if (p.fontNameWestern != null) applied.fontNameWestern = String(p.fontNameWestern);
+    if (p.fontNameAsian != null) applied.fontNameAsian = String(p.fontNameAsian);
     if (Object.keys(applied).length === 0) return { success: false, message: 'no format params given' };
-    return { success: true, applied: applied, selectedText: vc.getString().slice(0, 100), atCursor: collapsed };
+    const applyCharProps = function (target) {
+      if (!target || typeof target.setPropertyValue !== 'function') return;
+      if (p.bold != null) setCharProp(target, 'CharWeight', p.bold ? css.awt.FontWeight.BOLD : css.awt.FontWeight.NORMAL);
+      if (p.italic != null) setCharProp(target, 'CharPosture', p.italic ? css.awt.FontSlant.ITALIC : css.awt.FontSlant.NONE);
+      if (ulSpec != null) target.setPropertyValue('CharUnderline', ulSpec.value);
+      if (p.strikeout != null) target.setPropertyValue('CharStrikeout', p.strikeout ? css.awt.FontStrikeout.SINGLE : css.awt.FontStrikeout.NONE);
+      if (hiColor != null) target.setPropertyValue('CharHighlight', hiColor);
+      if (fgColor != null) target.setPropertyValue('CharColor', fgColor);
+      if (parsedSize != null) setCharProp(target, 'CharHeight', parsedSize);
+      if (p.fontName != null) setCharProp(target, 'CharFontName', String(p.fontName));
+      // 西文字体单独设（不覆盖 CharFontNameAsian）；中文字体单独设时放在后面确保生效
+      if (p.fontNameWestern != null) {
+        target.setPropertyValue('CharFontName', String(p.fontNameWestern));
+        try { target.setPropertyValue('CharFontNameComplex', String(p.fontNameWestern)); } catch (e) {}
+      }
+      if (p.fontNameAsian != null) target.setPropertyValue('CharFontNameAsian', String(p.fontNameAsian));
+    };
+    const selStr = vc.getString() || '';
+    const coverWholeParas = tgt.explicitRange
+      || tgt.paragraphs.length > 1
+      || (tgt.paragraphs.length === 1 && selStr === (tgt.paragraphs[0].getString() || ''));
+    if (coverWholeParas && tgt.paragraphs.length > 0) {
+      lockModel();
+      try {
+        applyCharProps(vc);
+        for (let i = 0; i < tgt.paragraphs.length; i++) {
+          const el = tgt.paragraphs[i];
+          applyCharProps(el);
+          try {
+            if (typeof el.getText === 'function') {
+              const cur = el.getText().createTextCursorByRange(el);
+              if (cur && cur !== el) applyCharProps(cur);
+            }
+          } catch (e) {}
+        }
+      } finally { unlockModel(); }
+    } else {
+      applyCharProps(vc);
+    }
+    const res = { success: true, applied: applied, selectedText: (vc.getString() || '').slice(0, 100), atCursor: collapsed };
+    if (tgt.explicitRange) {
+      res.startParagraph = tgt.startParagraph;
+      res.endParagraph = tgt.endParagraph;
+      res.paragraphCount = tgt.paragraphs.length;
+    }
+    return res;
   },
   // [格式] paragraph-level formatting on the selection's paragraph(s): alignment,
   // paragraph style, line spacing, space before/after, indents. headingLevel 1-9
   // maps to the programmatic style name ('Heading N', valid regardless of UI
   // language); 0 = back to body ('Standard').
   set_paragraph_format(p) {
+    const hasExplicitPara = p && (p.paragraphIndex != null || p.startParagraph != null || p.endParagraph != null);
+    if (!hasExplicitPara && typeof isCalcDoc === 'function' && isCalcDoc()) {
+      const rangeName = (p && p.range) ? String(p.range) : activeCalcRangeName();
+      const cp = { range: rangeName };
+      if (p && p.alignment != null) {
+        const al = String(p.alignment).toLowerCase();
+        cp.hAlign = (al === 'left' || al === 'center' || al === 'right') ? al : 'standard';
+      }
+      if (p && p.vAlign != null) cp.vAlign = String(p.vAlign);
+      if (p && p.wrap != null) cp.wrap = !!p.wrap;
+      if (Object.keys(cp).length <= 1) return { success: true, applied: {} };
+      return EXEC.sheet_format_cells(cp);
+    }
+    if (!hasExplicitPara && typeof isImpressDoc === 'function' && isImpressDoc()) {
+      const ctx = activeImpressContext();
+      const targetShapeName = (p && p.shapeName) ? String(p.shapeName) : ctx.selectedShapeName;
+      if (!targetShapeName) return { success: false, message: '请先选中要设置段落格式的形状或文本框' };
+      const sp = {
+        slideNumber: (p && p.slideNumber != null) ? Number(p.slideNumber) : ctx.slideNumber,
+        shapeName: targetShapeName,
+      };
+      if (p && p.alignment != null) sp.alignment = String(p.alignment).toLowerCase();
+      return EXEC.slide_format_text(sp);
+    }
+    const tgt = resolveFormatTargets(p);
+    if (tgt.error) return { success: false, message: tgt.error };
     const vc = ctrl.getViewCursor();
     const applied = {};
     let alignment = null;
     if (p.alignment != null) {
-      const m = { left: css.style.ParagraphAdjust.LEFT, right: css.style.ParagraphAdjust.RIGHT, center: css.style.ParagraphAdjust.CENTER, justify: css.style.ParagraphAdjust.BLOCK };
+      const m = {
+        left: css.style.ParagraphAdjust.LEFT,
+        right: css.style.ParagraphAdjust.RIGHT,
+        center: css.style.ParagraphAdjust.CENTER,
+        justify: css.style.ParagraphAdjust.BLOCK,
+        both: css.style.ParagraphAdjust.BLOCK,
+        distribute: css.style.ParagraphAdjust.BLOCK,
+      };
       alignment = m[String(p.alignment).toLowerCase()];
       if (alignment == null) return { success: false, message: 'bad alignment: ' + p.alignment + ' (left/right/center/justify)' };
+      applied.alignment = String(p.alignment);
     }
     let styleName = p.styleName != null ? String(p.styleName) : null;
     if (p.headingLevel != null) {
       const lvl = Number(p.headingLevel);
       styleName = lvl >= 1 && lvl <= 9 ? 'Heading ' + lvl : 'Standard';
     }
-    if (styleName != null) { vc.setPropertyValue('ParaStyleName', styleName); applied.styleName = styleName; }
-    // 切换段落样式会重置对齐；用户同次明确给出的格式必须在样式之后应用。
-    if (alignment != null) { vc.setPropertyValue('ParaAdjust', alignment); applied.alignment = String(p.alignment); }
-    // 行距：single / 1.5 / double（固定倍数），proportional（百分比），
-    // atLeast（最小值，磅），exactly（固定值，磅）
+    if (styleName != null) applied.styleName = styleName;
+    // 行距：single / 1.5 / double / multiple / proportional / atLeast / exactly（及常见别名）
+    let parsedLs = null;
     if (p.lineSpacingMode != null) {
+      parsedLs = parseLineSpacingSpec(p.lineSpacingMode, p.lineSpacingValue);
+      if (parsedLs.error) return { success: false, message: parsedLs.error };
       const mode = String(p.lineSpacingMode);
       const v = Number(p.lineSpacingValue) || 0;
-      const M = css.style.LineSpacingMode;
-      let ls = null;
-      if (mode === 'single') ls = { Mode: M.PROP, Height: 100 };
-      else if (mode === '1.5' || mode === 'oneHalf') ls = { Mode: M.PROP, Height: 150 };
-      else if (mode === 'double') ls = { Mode: M.PROP, Height: 200 };
-      else if (mode === 'proportional') { if (v <= 0) return { success: false, message: 'proportional 行距需要 lineSpacingValue（百分比，如 120）' }; ls = { Mode: M.PROP, Height: Math.round(v) }; }
-      else if (mode === 'atLeast') { if (v <= 0) return { success: false, message: 'atLeast 行距需要 lineSpacingValue（磅）' }; ls = { Mode: M.MINIMUM, Height: ptToMm100(v) }; }
-      else if (mode === 'exactly') { if (v <= 0) return { success: false, message: 'exactly 行距需要 lineSpacingValue（磅）' }; ls = { Mode: M.FIX, Height: ptToMm100(v) }; }
-      else return { success: false, message: 'bad lineSpacingMode: ' + mode + ' (single/1.5/double/proportional/atLeast/exactly)' };
-      vc.setPropertyValue('ParaLineSpacing', new css.style.LineSpacing(ls));
       applied.lineSpacing = mode + (v > 0 ? ':' + v : '');
     }
-    if (p.spaceBeforePt != null) { vc.setPropertyValue('ParaTopMargin', ptToMm100(p.spaceBeforePt)); applied.spaceBeforePt = Number(p.spaceBeforePt); }
-    if (p.spaceAfterPt != null) { vc.setPropertyValue('ParaBottomMargin', ptToMm100(p.spaceAfterPt)); applied.spaceAfterPt = Number(p.spaceAfterPt); }
-    // 首行缩进按"字符"数折算：以光标处字号为一个字符宽（CJK 方块字口径）
-    if (p.firstLineIndentChars != null) {
-      let chPt = HOUSE.bodyPt;
-      try { const h = vc.getPropertyValue('CharHeight'); if (h > 0) chPt = h; } catch (e) {}
-      vc.setPropertyValue('ParaFirstLineIndent', ptToMm100(Number(p.firstLineIndentChars) * chPt));
-      applied.firstLineIndentChars = Number(p.firstLineIndentChars);
-    } else if (p.firstLineIndentPt != null) {
-      vc.setPropertyValue('ParaFirstLineIndent', ptToMm100(p.firstLineIndentPt));
-      applied.firstLineIndentPt = Number(p.firstLineIndentPt);
-    }
-    if (p.leftIndentPt != null) { vc.setPropertyValue('ParaLeftMargin', ptToMm100(p.leftIndentPt)); applied.leftIndentPt = Number(p.leftIndentPt); }
-    if (p.rightIndentPt != null) { vc.setPropertyValue('ParaRightMargin', ptToMm100(p.rightIndentPt)); applied.rightIndentPt = Number(p.rightIndentPt); }
+    if (p.spaceBeforePt != null) applied.spaceBeforePt = Number(p.spaceBeforePt);
+    else if (p.spaceBeforeLines != null) applied.spaceBeforeLines = Number(p.spaceBeforeLines);
+    if (p.spaceAfterPt != null) applied.spaceAfterPt = Number(p.spaceAfterPt);
+    else if (p.spaceAfterLines != null) applied.spaceAfterLines = Number(p.spaceAfterLines);
+    if (p.firstLineIndentChars != null) applied.firstLineIndentChars = Number(p.firstLineIndentChars);
+    else if (p.firstLineIndentPt != null) applied.firstLineIndentPt = Number(p.firstLineIndentPt);
+    if (p.leftIndentChars != null) applied.leftIndentChars = Number(p.leftIndentChars);
+    else if (p.leftIndentPt != null) applied.leftIndentPt = Number(p.leftIndentPt);
+    if (p.rightIndentPt != null) applied.rightIndentPt = Number(p.rightIndentPt);
     if (Object.keys(applied).length === 0) return { success: false, message: 'no paragraph format params given' };
-    return Object.assign({ success: true, applied: applied }, verifySnapshot());
+    const applyParaProps = function (target) {
+      if (!target || typeof target.setPropertyValue !== 'function') return;
+      if (styleName != null) target.setPropertyValue('ParaStyleName', styleName);
+      // 切换段落样式会重置对齐；用户同次明确给出的格式必须在样式之后应用。
+      if (alignment != null) target.setPropertyValue('ParaAdjust', alignment);
+      if (parsedLs != null) target.setPropertyValue('ParaLineSpacing', new css.style.LineSpacing(parsedLs.ls));
+      const chPt = effectiveCharHeightPt(target, vc);
+      if (p.spaceBeforePt != null) target.setPropertyValue('ParaTopMargin', ptToMm100(p.spaceBeforePt));
+      else if (p.spaceBeforeLines != null) target.setPropertyValue('ParaTopMargin', ptToMm100(Number(p.spaceBeforeLines) * chPt * 1.2));
+      if (p.spaceAfterPt != null) target.setPropertyValue('ParaBottomMargin', ptToMm100(p.spaceAfterPt));
+      else if (p.spaceAfterLines != null) target.setPropertyValue('ParaBottomMargin', ptToMm100(Number(p.spaceAfterLines) * chPt * 1.2));
+      // 首行缩进按"字符"数折算：优先按中文实际字号 CharHeightAsian 计算（CJK 方块字口径）
+      if (p.firstLineIndentChars != null) {
+        const chars = Number(p.firstLineIndentChars);
+        target.setPropertyValue('ParaFirstLineIndent', ptToMm100(chars * chPt));
+        if (chars === 0 && p.leftIndentPt == null && p.leftIndentChars == null && !readParagraphLabel(target)) {
+          try { target.setPropertyValue('ParaLeftMargin', 0); } catch (e) {}
+        }
+      } else if (p.firstLineIndentPt != null) {
+        const ptVal = Number(p.firstLineIndentPt);
+        target.setPropertyValue('ParaFirstLineIndent', ptToMm100(ptVal));
+        if (ptVal === 0 && p.leftIndentPt == null && p.leftIndentChars == null && !readParagraphLabel(target)) {
+          try { target.setPropertyValue('ParaLeftMargin', 0); } catch (e) {}
+        }
+      }
+      if (p.leftIndentChars != null) target.setPropertyValue('ParaLeftMargin', ptToMm100(Number(p.leftIndentChars) * chPt));
+      else if (p.leftIndentPt != null) target.setPropertyValue('ParaLeftMargin', ptToMm100(p.leftIndentPt));
+      if (p.rightIndentPt != null) target.setPropertyValue('ParaRightMargin', ptToMm100(p.rightIndentPt));
+    };
+    if (tgt.paragraphs.length > 1) {
+      lockModel();
+      try {
+        applyParaProps(vc);
+        for (let i = 0; i < tgt.paragraphs.length; i++) applyParaProps(tgt.paragraphs[i]);
+      } finally { unlockModel(); }
+    } else {
+      applyParaProps(vc);
+      if (tgt.paragraphs.length === 1) applyParaProps(tgt.paragraphs[0]);
+    }
+    const out = Object.assign({ success: true, applied: applied }, verifySnapshot());
+    if (tgt.explicitRange) {
+      out.startParagraph = tgt.startParagraph;
+      out.endParagraph = tgt.endParagraph;
+      out.paragraphCount = tgt.paragraphs.length;
+    }
+    return out;
   },
   // [格式] 给选区所在段落设置编号/项目符号。preset: bullet（•）/ decimal（1. 2.）/
-  // chinese（一、二、）/ multilevel（1. → 1.1 → 1.1.1）/ none（去掉编号）。
+  // chinese（一、二、）/ clause（第一条）/ paren_chinese（（一））/ multilevel（1. → 1.1 → 1.1.1）/ none（去掉编号）。
   set_numbering(p) {
+    const tgt = resolveFormatTargets(p);
+    if (tgt.error) return { success: false, message: tgt.error };
     const preset = String(p.preset || 'decimal');
     if (preset === 'none') {
       dispatchUno('.uno:RemoveBullets');
+      const vc = ctrl.getViewCursor();
+      // 若跨段选区或样式绑定编号导致 RemoveBullets 未彻底清除，逐段补充清空 NumberingStyleName 并复位悬挂缩进
+      const clearNumOn = function (ps) {
+        if (!ps || typeof ps.setPropertyValue !== 'function') return;
+        try {
+          if (ps.getPropertyValue('NumberingIsNumber') !== false) {
+            try { ps.setPropertyValue('NumberingStyleName', ''); } catch (e) {}
+            try { ps.setPropertyValue('NumberingRules', null); } catch (e) {}
+          }
+        } catch (e) {}
+        try {
+          const fi = Number(ps.getPropertyValue('ParaFirstLineIndent')) || 0;
+          if (fi < 0) {
+            ps.setPropertyValue('ParaFirstLineIndent', 0);
+            ps.setPropertyValue('ParaLeftMargin', 0);
+          }
+        } catch (e) {}
+      };
+      for (let i = 0; i < tgt.paragraphs.length; i++) clearNumOn(tgt.paragraphs[i]);
       // UNO 派发可能不抛错却没有生效；去列表必须用真实状态判定，不能只回显 preset。
       const isNumbered = ctrl.getViewCursor().getPropertyValue('NumberingIsNumber');
       if (isNumbered !== false) return tableFail('项目符号或编号尚未清除，请重新选中目标段落后重试，并用 doc_get_formatting 核验');
@@ -5319,6 +6968,17 @@ const EXEC = {
     const vc = ctrl.getViewCursor();
     vc.setPropertyValue('NumberingRules', rules);
     vc.setPropertyValue('NumberingLevel', lvl);
+    if (tgt.paragraphs.length > 1) {
+      lockModel();
+      try {
+        for (let i = 0; i < tgt.paragraphs.length; i++) {
+          try {
+            tgt.paragraphs[i].setPropertyValue('NumberingRules', rules);
+            tgt.paragraphs[i].setPropertyValue('NumberingLevel', lvl);
+          } catch (e) {}
+        }
+      } finally { unlockModel(); }
+    }
     return Object.assign({ success: true, preset: preset, level: lvl + 1 }, verifySnapshot());
   },
   // [格式] 表格格式：边框/字号/首行加粗居中/单元格垂直对齐/数字居右/列宽/行高。
@@ -5332,17 +6992,27 @@ const EXEC = {
       styleTableStandard(table, { headerRows: p.firstRowBold === false ? 0 : 1 });
       applied.standard = true;
     }
-    // 边框：borderWidthPt 内外同宽；outsideBorderWidthPt / insideBorderWidthPt 分设；
+    // 边框：borderPreset(all|threeLine|outer|none)；borderWidthPt 内外同宽；
+    // outsideBorderWidthPt / insideBorderWidthPt 分设；
     // borderColor / borderStyle(single|double|dashed) 单独给时宽度沿用画像值。
-    if (p.borderWidthPt != null || p.outsideBorderWidthPt != null || p.insideBorderWidthPt != null || p.borderColor != null || p.borderStyle != null) {
+    if (p.borderPreset != null || p.borderWidthPt != null || p.outsideBorderWidthPt != null || p.insideBorderWidthPt != null || p.borderColor != null || p.borderStyle != null) {
+      let preset = null;
+      if (p.borderPreset != null) {
+        const rawPreset = String(p.borderPreset).trim().toLowerCase();
+        preset = rawPreset === 'threeline' ? 'threeLine' : rawPreset;
+        if (['all', 'threeLine', 'outer', 'none'].indexOf(preset) < 0) {
+          return { success: false, message: 'bad borderPreset: ' + p.borderPreset + ' (all/threeLine/outer/none)' };
+        }
+      }
       const color = p.borderColor != null ? parseColor(p.borderColor, { black: 0 }) : HOUSE.tableBorder.color;
       if (color == null) return { success: false, message: 'bad borderColor: ' + p.borderColor + ' (use #RRGGBB)' };
       const style = p.borderStyle != null ? String(p.borderStyle).toLowerCase() : HOUSE.tableBorder.style;
       if (['single', 'double', 'dashed'].indexOf(style) < 0) return { success: false, message: 'bad borderStyle: ' + p.borderStyle + ' (single/double/dashed)' };
-      const outsideMm = p.outsideBorderWidthPt != null ? ptToMm100(p.outsideBorderWidthPt) : p.borderWidthPt != null ? ptToMm100(p.borderWidthPt) : HOUSE.tableBorder.outsideMm;
-      const insideMm = p.insideBorderWidthPt != null ? ptToMm100(p.insideBorderWidthPt) : p.borderWidthPt != null ? ptToMm100(p.borderWidthPt) : outsideMm;
-      try { applyTableBorders(table, { outsideMm: outsideMm, insideMm: insideMm, color: color, style: style }); }
+      const outsideMm = p.outsideBorderWidthPt != null ? ptToMm100(p.outsideBorderWidthPt) : p.borderWidthPt != null ? ptToMm100(p.borderWidthPt) : (preset === 'threeLine' ? null : HOUSE.tableBorder.outsideMm);
+      const insideMm = p.insideBorderWidthPt != null ? ptToMm100(p.insideBorderWidthPt) : p.borderWidthPt != null ? ptToMm100(p.borderWidthPt) : (preset === 'threeLine' ? null : outsideMm);
+      try { applyTableBorders(table, { preset: preset || 'all', outsideMm: outsideMm, insideMm: insideMm, color: color, style: style }); }
       catch (e) { return { success: false, message: '边框设置失败: ' + errStr(e) }; }
+      if (preset != null) applied.borderPreset = preset;
       if (p.borderWidthPt != null) applied.borderWidthPt = Number(p.borderWidthPt);
       if (p.outsideBorderWidthPt != null) applied.outsideBorderWidthPt = Number(p.outsideBorderWidthPt);
       if (p.insideBorderWidthPt != null) applied.insideBorderWidthPt = Number(p.insideBorderWidthPt);
@@ -5643,30 +7313,158 @@ const EXEC = {
     };
   },
   // [感知] 读取光标/选区处的字符+段落+表格格式——"先看清现状再动手"的眼睛。
-  get_formatting() {
+  get_formatting(p) {
+    if ((!p || p.paragraphIndex == null) && typeof isCalcDoc === 'function' && isCalcDoc()) {
+      const selInfo = activeCalcSelection();
+      const cell = selInfo.cell || selInfo.range;
+      const cf = cell ? cellFormat(cell) : {};
+      let strikeout = false;
+      if (cell) {
+        try { strikeout = !enumEq(cell.getPropertyValue('CharStrikeout'), css.awt.FontStrikeout.NONE); } catch (e) {}
+      }
+      const out = {
+        success: true,
+        docKind: 'calc',
+        character: {
+          fontWestern: cf.fontName || '',
+          fontAsian: cf.fontNameAsian || cf.fontName || '',
+          sizePt: cf.fontSize || 11,
+          bold: !!cf.bold,
+          italic: !!cf.italic,
+          underline: !!cf.underline,
+          strikeout: strikeout,
+          color: cf.color || 'auto',
+          highlight: cf.background || 'none',
+        },
+        paragraph: {
+          styleName: 'Default',
+          alignment: (cf.hAlign === 'center' || cf.hAlign === 'right') ? cf.hAlign : 'left',
+          outlineLevel: 0,
+          isNumbered: false,
+        },
+        calc: {
+          sheetName: selInfo.sheetName,
+          cellName: selInfo.cellName,
+          rangeName: selInfo.rangeName,
+          hAlign: cf.hAlign || 'standard',
+          vAlign: cf.vAlign || 'standard',
+          wrap: !!cf.wrap,
+          background: cf.background || 'none',
+          numberFormat: cf.numberFormat != null ? cf.numberFormat : 0,
+        },
+      };
+      try {
+        let psName = 'Default';
+        if (selInfo.sheet) {
+          try { psName = String(selInfo.sheet.getPropertyValue('PageStyle') || 'Default'); } catch (e) {}
+        }
+        const ps = xModel.getStyleFamilies().getByName('PageStyles').getByName(psName);
+        const rdMm = function (prop) { try { return Math.round(ps.getPropertyValue(prop)) / 100; } catch (e) { return null; } };
+        out.page = {
+          pageStyle: psName,
+          width: rdMm('Width'),
+          height: rdMm('Height'),
+          landscape: !!ps.getPropertyValue('IsLandscape'),
+          margins: {
+            top: rdMm('TopMargin'),
+            bottom: rdMm('BottomMargin'),
+            left: rdMm('LeftMargin'),
+            right: rdMm('RightMargin'),
+          },
+        };
+      } catch (e) {}
+      return out;
+    }
+    if ((!p || p.paragraphIndex == null) && typeof isImpressDoc === 'function' && isImpressDoc()) {
+      const ctx = activeImpressContext();
+      const shape = ctx.selectedShape;
+      const sf = (shape ? shapeCharFormat(shape) : null) || {};
+      const detail = shape ? impressShapeDetail(shape) : null;
+      if (detail) detail.shapeIndex = ctx.selectedShapeIndex;
+      const w = ctx.slideWidthMm || 280;
+      const h = ctx.slideHeightMm || 157.5;
+      return {
+        success: true,
+        docKind: 'impress',
+        character: {
+          fontWestern: sf.fontName || '',
+          fontAsian: sf.fontNameAsian || sf.fontName || '',
+          sizePt: sf.fontSize || 18,
+          bold: !!sf.bold,
+          italic: !!sf.italic,
+          underline: !!sf.underline,
+          strikeout: !!sf.strikeout,
+          color: sf.color || 'auto',
+          highlight: 'none',
+        },
+        paragraph: {
+          styleName: 'Standard',
+          alignment: sf.alignment || 'left',
+          outlineLevel: 0,
+          isNumbered: false,
+        },
+        page: {
+          pageStyle: 'Default',
+          width: w,
+          height: h,
+          landscape: w >= h,
+          margins: { top: 0, bottom: 0, left: 0, right: 0 },
+        },
+        impress: {
+          currentSlideIndex: ctx.currentSlideIndex,
+          slideCount: ctx.slideCount,
+          slideWidthMm: w,
+          slideHeightMm: h,
+          selectedShapeIndex: ctx.selectedShapeIndex,
+          selectedShape: detail,
+        },
+      };
+    }
+    let targetEl = null;
+    if (p && p.paragraphIndex != null) {
+      const idx = Number(p.paragraphIndex);
+      targetEl = paraAt(idx);
+      if (!targetEl) return { success: false, message: 'paragraph index out of range: ' + idx };
+      try { selectVisibly(targetEl); } catch (e) {}
+    }
     const vc = ctrl.getViewCursor();
+    const src = targetEl || vc;
     const out = { success: true };
+    if (p && p.paragraphIndex != null) out.paragraphIndex = Number(p.paragraphIndex);
     const ch = {};
-    try { ch.fontWestern = vc.getPropertyValue('CharFontName'); } catch (e) {}
-    try { ch.fontAsian = vc.getPropertyValue('CharFontNameAsian'); } catch (e) {}
-    try { ch.sizePt = vc.getPropertyValue('CharHeight'); } catch (e) {}
-    try { ch.bold = vc.getPropertyValue('CharWeight') > 100; } catch (e) {}
-    try { ch.italic = !enumEq(vc.getPropertyValue('CharPosture'), css.awt.FontSlant.NONE); } catch (e) {}
-    try { ch.underline = !enumEq(vc.getPropertyValue('CharUnderline'), css.awt.FontUnderline.NONE); } catch (e) {}
-    try { ch.strikeout = !enumEq(vc.getPropertyValue('CharStrikeout'), css.awt.FontStrikeout.NONE); } catch (e) {}
-    try { const c = vc.getPropertyValue('CharColor'); ch.color = c === -1 ? 'auto' : '#' + ('000000' + (c >>> 0).toString(16)).slice(-6); } catch (e) {}
-    try { const h = vc.getPropertyValue('CharHighlight'); ch.highlight = h === -1 ? 'none' : '#' + ('000000' + (h >>> 0).toString(16)).slice(-6); } catch (e) {}
+    try { ch.fontWestern = src.getPropertyValue('CharFontName'); } catch (e) {}
+    try { ch.fontAsian = src.getPropertyValue('CharFontNameAsian'); } catch (e) {}
+    try { ch.sizePt = effectiveCharHeightPt(src, vc); } catch (e) {}
+    try {
+      const wa = Number(src.getPropertyValue('CharWeightAsian')) || 0;
+      const ww = Number(src.getPropertyValue('CharWeight')) || 0;
+      ch.bold = wa > 100 || ww > 100;
+    } catch (e) {
+      try { ch.bold = src.getPropertyValue('CharWeight') > 100; } catch (e2) {}
+    }
+    try {
+      const paSlant = src.getPropertyValue('CharPostureAsian');
+      const pwSlant = src.getPropertyValue('CharPosture');
+      ch.italic = (paSlant != null && !enumEq(paSlant, css.awt.FontSlant.NONE))
+        || (pwSlant != null && !enumEq(pwSlant, css.awt.FontSlant.NONE));
+    } catch (e) {
+      try { ch.italic = !enumEq(src.getPropertyValue('CharPosture'), css.awt.FontSlant.NONE); } catch (e2) {}
+    }
+    try { ch.underline = !enumEq(src.getPropertyValue('CharUnderline'), css.awt.FontUnderline.NONE); } catch (e) {}
+    try { ch.strikeout = !enumEq(src.getPropertyValue('CharStrikeout'), css.awt.FontStrikeout.NONE); } catch (e) {}
+    try { const c = src.getPropertyValue('CharColor'); ch.color = c === -1 ? 'auto' : '#' + ('000000' + (c >>> 0).toString(16)).slice(-6); } catch (e) {}
+    try { const h = src.getPropertyValue('CharHighlight'); ch.highlight = h === -1 ? 'none' : '#' + ('000000' + (h >>> 0).toString(16)).slice(-6); } catch (e) {}
     out.character = ch;
     const pa = {};
-    try { pa.styleName = vc.getPropertyValue('ParaStyleName'); } catch (e) {}
+    try { pa.styleName = src.getPropertyValue('ParaStyleName'); } catch (e) {}
     try {
-      const a = vc.getPropertyValue('ParaAdjust');
+      const a = src.getPropertyValue('ParaAdjust');
       const A = css.style.ParagraphAdjust;
       pa.alignment = enumEq(a, A.CENTER) ? 'center' : enumEq(a, A.RIGHT) ? 'right'
         : (enumEq(a, A.BLOCK) || enumEq(a, A.STRETCH)) ? 'justify' : 'left';
     } catch (e) {}
     try {
-      const ls = vc.getPropertyValue('ParaLineSpacing');
+      const ls = src.getPropertyValue('ParaLineSpacing');
       if (ls) {
         const M = css.style.LineSpacingMode;
         if (enumEq(ls.Mode, M.PROP)) pa.lineSpacing = { mode: 'proportional', percent: ls.Height };
@@ -5675,13 +7473,20 @@ const EXEC = {
         else pa.lineSpacing = { mode: 'leading', valuePt: Math.round(ls.Height * 72 / 2540 * 10) / 10 };
       }
     } catch (e) {}
-    try { pa.spaceBeforePt = Math.round(vc.getPropertyValue('ParaTopMargin') * 72 / 2540 * 10) / 10; } catch (e) {}
-    try { pa.spaceAfterPt = Math.round(vc.getPropertyValue('ParaBottomMargin') * 72 / 2540 * 10) / 10; } catch (e) {}
-    try { pa.firstLineIndentPt = Math.round(vc.getPropertyValue('ParaFirstLineIndent') * 72 / 2540 * 10) / 10; } catch (e) {}
-    try { pa.leftIndentPt = Math.round(vc.getPropertyValue('ParaLeftMargin') * 72 / 2540 * 10) / 10; } catch (e) {}
-    try { pa.rightIndentPt = Math.round(vc.getPropertyValue('ParaRightMargin') * 72 / 2540 * 10) / 10; } catch (e) {}
-    try { pa.outlineLevel = vc.getPropertyValue('OutlineLevel') || 0; } catch (e) {}
-    try { pa.isNumbered = !!vc.getPropertyValue('NumberingIsNumber'); } catch (e) {}
+    try { pa.spaceBeforePt = Math.round(src.getPropertyValue('ParaTopMargin') * 72 / 2540 * 10) / 10; } catch (e) {}
+    try { pa.spaceAfterPt = Math.round(src.getPropertyValue('ParaBottomMargin') * 72 / 2540 * 10) / 10; } catch (e) {}
+    try {
+      pa.firstLineIndentPt = Math.round(src.getPropertyValue('ParaFirstLineIndent') * 72 / 2540 * 10) / 10;
+      const basePt = ch.sizePt || HOUSE.bodyPt || 12;
+      if (basePt > 0 && isFinite(pa.firstLineIndentPt)) {
+        pa.firstLineIndentChars = Math.round((pa.firstLineIndentPt / basePt) * 10) / 10;
+      }
+    } catch (e) {}
+    try { pa.leftIndentPt = Math.round(src.getPropertyValue('ParaLeftMargin') * 72 / 2540 * 10) / 10; } catch (e) {}
+    try { pa.rightIndentPt = Math.round(src.getPropertyValue('ParaRightMargin') * 72 / 2540 * 10) / 10; } catch (e) {}
+    try { pa.outlineLevel = src.getPropertyValue('OutlineLevel') || 0; } catch (e) {}
+    try { pa.isNumbered = !!src.getPropertyValue('NumberingIsNumber'); } catch (e) {}
+    try { pa.numbering = paragraphNumberingOf(src); } catch (e) {}
     out.paragraph = pa;
     try {
       const table = currentTextTable(null);
@@ -5690,8 +7495,27 @@ const EXEC = {
         try { t.rows = table.getRows().getCount(); } catch (e) {}
         try { t.cols = table.getColumns().getCount(); } catch (e) {}
         try { const cell = vc.getPropertyValue('Cell'); if (cell) t.cell = cell.getPropertyValue('CellName'); } catch (e) {}
+        try { t.repeatHeader = !!table.getPropertyValue('RepeatHeadline'); } catch (e) {}
+        try { const c1 = table.getCellByName('A1'); if (c1) { const bc = c1.getPropertyValue('BackColor'); t.headerFill = (bc === -1 || bc == null) ? 'none' : '#' + ('000000' + (bc >>> 0).toString(16)).slice(-6); } } catch (e) {}
         out.table = t;
       }
+    } catch (e) {}
+    try {
+      const psName = String(vc.getPropertyValue('PageStyleName') || 'Standard');
+      const ps = xModel.getStyleFamilies().getByName('PageStyles').getByName(psName);
+      const rdMm = function (prop) { try { return Math.round(ps.getPropertyValue(prop)) / 100; } catch (e) { return null; } };
+      out.page = {
+        pageStyle: psName,
+        width: rdMm('Width'),
+        height: rdMm('Height'),
+        landscape: !!ps.getPropertyValue('IsLandscape'),
+        margins: {
+          top: rdMm('TopMargin'),
+          bottom: rdMm('BottomMargin'),
+          left: rdMm('LeftMargin'),
+          right: rdMm('RightMargin'),
+        },
+      };
     } catch (e) {}
     try { out.selectedText = (vc.getString() || '').slice(0, 80); } catch (e) {}
     return out;
@@ -5752,8 +7576,8 @@ const EXEC = {
           const el = en.nextElement();
           if (!(el.supportsService && el.supportsService('com.sun.star.text.Paragraph'))) continue;
           const k = paraKindOf(el, false, true);
-          applyHousePara(el, k.kind, { level: k.level });
-          applyHouseChar(el, charOptsFor(k));
+          applyHousePara(el, k.kind, { level: k.level, isNumbered: !!readParagraphLabel(el) });
+          applyHouseCharDeep(el, charOptsFor(k));
           paras++;
         }
       } finally { unlockModel(); }
@@ -5831,7 +7655,12 @@ const EXEC = {
     let target = null;
     eachParagraph(function (el) {
       const t = (el.getString() || '').trim();
-      if (t && (t === headingText || t.indexOf(headingText) !== -1)) { target = el; return true; }
+      const combined = paragraphCombinedText(el).trim();
+      if ((t && (t === headingText || t.indexOf(headingText) !== -1))
+        || (combined && (combined === headingText || combined.indexOf(headingText) !== -1))) {
+        target = el;
+        return true;
+      }
       return false;
     });
     if (!target) return { success: false, message: '未找到标题: ' + headingText };
@@ -6228,15 +8057,64 @@ const EXEC = {
     const gp = css.graphic.GraphicProvider.create(context);
     const graphic = gp.queryGraphic([mkProp('InputStream', stream)]);
     if (!graphic) return { success: false, message: 'GraphicProvider could not decode the image' };
-    const img = xModel.createInstance('com.sun.star.text.TextGraphicObject');
-    img.setPropertyValue('Graphic', graphic);
-    img.setPropertyValue('AnchorType', css.text.TextContentAnchorType.AS_CHARACTER);
-    // natural size (1/100 mm), fall back to pixels @96dpi; cap to ~15cm text width
     let w = 0, h = 0;
     try { const sz = graphic.getPropertyValue('Size100thMM'); w = sz.Width || 0; h = sz.Height || 0; } catch (e) {}
     if (!w || !h) {
       try { const px = graphic.getPropertyValue('SizePixel'); w = Math.round((px.Width || 0) * 2540 / 96); h = Math.round((px.Height || 0) * 2540 / 96); } catch (e) {}
     }
+    if (typeof isImpressDoc === 'function' && isImpressDoc()) {
+      const ctx = activeImpressContext();
+      const wantSlide = p && (p.slideNumber != null ? Number(p.slideNumber) : (p.slideIndex != null ? Number(p.slideIndex) + 1 : ctx.slideNumber));
+      const r0 = resolvePage({ slideNumber: wantSlide });
+      if (r0.error) return { success: false, message: r0.error };
+      const MAX_W = 18000;
+      if (w > 0 && h > 0) {
+        if (w > MAX_W) { h = Math.round(h * MAX_W / w); w = MAX_W; }
+      } else {
+        w = 12000; h = 9000;
+      }
+      const xMm = p && p.x != null ? Number(p.x) : Math.max(10, Math.round(((ctx.slideWidthMm || 280) - w / 100) / 2));
+      const yMm = p && p.y != null ? Number(p.y) : Math.max(10, Math.round(((ctx.slideHeightMm || 157.5) - h / 100) / 2));
+      const shape = xModel.createInstance('com.sun.star.drawing.GraphicObjectShape');
+      shape.setSize(new css.awt.Size({ Width: w, Height: h }));
+      shape.setPosition(new css.awt.Point({ X: Math.round(xMm * 100), Y: Math.round(yMm * 100) }));
+      r0.page.add(shape);
+      try { shape.setPropertyValue('Graphic', graphic); } catch (e) {}
+      try { ensureShapeNames(r0.page); } catch (e) {}
+      let shapeName = '';
+      try { shapeName = String(shape.getName() || ''); } catch (e) {}
+      try { ctrl.select(shape); } catch (e) {}
+      return { success: true, bytes: u8.length, width: w, height: h, slideNumber: r0.index + 1, slideIndex: r0.index, shapeName: shapeName, shapeIndex: r0.page.getCount() - 1 };
+    }
+    if (typeof isCalcDoc === 'function' && isCalcDoc() && typeof activeCalcSelection === 'function') {
+      const selInfo = activeCalcSelection();
+      const sheet = selInfo.sheet;
+      if (!sheet) return { success: false, message: '无法获取当前工作表' };
+      const dp = sheet.getDrawPage();
+      const MAX_W = 12000;
+      if (w > 0 && h > 0) {
+        if (w > MAX_W) { h = Math.round(h * MAX_W / w); w = MAX_W; }
+      } else {
+        w = 8000; h = 6000;
+      }
+      let posX = 1000, posY = 1000;
+      if (selInfo.cell) {
+        try {
+          const pt = selInfo.cell.getPropertyValue('Position');
+          if (pt) { posX = Number(pt.X) || 0; posY = Number(pt.Y) || 0; }
+        } catch (e) {}
+      }
+      const shape = xModel.createInstance('com.sun.star.drawing.GraphicObjectShape');
+      shape.setSize(new css.awt.Size({ Width: w, Height: h }));
+      shape.setPosition(new css.awt.Point({ X: posX, Y: posY }));
+      dp.add(shape);
+      try { shape.setPropertyValue('Graphic', graphic); } catch (e) {}
+      return { success: true, bytes: u8.length, width: w, height: h, sheet: selInfo.sheetName };
+    }
+    const img = xModel.createInstance('com.sun.star.text.TextGraphicObject');
+    img.setPropertyValue('Graphic', graphic);
+    img.setPropertyValue('AnchorType', css.text.TextContentAnchorType.AS_CHARACTER);
+    // natural size (1/100 mm), fall back to pixels @96dpi; cap to ~15cm text width
     if (w > 0 && h > 0) {
       const MAX_W = 15000;
       if (w > MAX_W) { h = Math.round(h * MAX_W / w); w = MAX_W; }
@@ -6424,11 +8302,65 @@ const EXEC = {
   // margins: {top, bottom, left, right}}。作用于文档首节页面样式（取法同 edit_header_footer）。
   // 横向要求宽 > 高：给了 orientation 时按它校正宽高；只给宽高时原样写入。
   set_page_setup(p) {
-    if (!isWriterDoc()) return tableFail(NOT_TEXT_DOC_MSG);
-    const ps = currentPageStyle();
-    if (ps.error) return ps;
-    const pageStyle = ps.pageStyle;
     const mm = function (v) { const n = Number(v); return isFinite(n) && n > 0 ? Math.round(n * 100) : null; };
+    if (typeof isImpressDoc === 'function' && isImpressDoc()) {
+      const pages = slidePages();
+      if (!pages || pages.getCount() === 0) return tableFail('无幻灯片可设置');
+      let w = p && p.width != null ? mm(p.width) : null;
+      let h = p && p.height != null ? mm(p.height) : null;
+      if ((p && p.width != null && w == null) || (p && p.height != null && h == null)) return tableFail('width/height 必须是正数（mm）');
+      const first = pages.getByIndex(0);
+      let W = w != null ? w : Number(first.getPropertyValue('Width')) || 28000;
+      let H = h != null ? h : Number(first.getPropertyValue('Height')) || 15750;
+      const applied = {};
+      if (p && p.orientation != null) {
+        const o = String(p.orientation).toLowerCase();
+        if (o !== 'portrait' && o !== 'landscape') return tableFail("orientation must be 'portrait' or 'landscape'");
+        const land = o === 'landscape';
+        if (land ? W < H : W > H) { const t = W; W = H; H = t; }
+        applied.orientation = o;
+      }
+      if (w != null) applied.width = Math.round(W / 100 * 10) / 10;
+      if (h != null) applied.height = Math.round(H / 100 * 10) / 10;
+      if (Object.keys(applied).length === 0) return tableFail('no page setup params given');
+      try {
+        for (let i = 0; i < pages.getCount(); i++) {
+          const pg = pages.getByIndex(i);
+          pg.setPropertyValue('Width', W);
+          pg.setPropertyValue('Height', H);
+          try { pg.setPropertyValue('Orientation', W >= H ? css.view.PaperOrientation.LANDSCAPE : css.view.PaperOrientation.PORTRAIT); } catch (e) {}
+        }
+        try {
+          const masters = xModel.getMasterPages();
+          for (let i = 0; i < masters.getCount(); i++) {
+            const mp = masters.getByIndex(i);
+            mp.setPropertyValue('Width', W);
+            mp.setPropertyValue('Height', H);
+          }
+        } catch (e) {}
+      } catch (e) { return tableFail('幻灯片尺寸设置失败: ' + errStr(e)); }
+      return {
+        success: true, pageStyle: 'Default', applied: applied,
+        page: { width: Math.round(W) / 100, height: Math.round(H) / 100, landscape: W >= H, margins: { top: 0, bottom: 0, left: 0, right: 0 } },
+      };
+    }
+    let ps = null;
+    if (typeof isCalcDoc === 'function' && isCalcDoc()) {
+      try {
+        const selInfo = activeCalcSelection();
+        let styleName = 'Default';
+        if (selInfo.sheet) {
+          try { styleName = String(selInfo.sheet.getPropertyValue('PageStyle') || 'Default'); } catch (e) {}
+        }
+        const fam = xModel.getStyleFamilies().getByName('PageStyles');
+        ps = { pageStyle: fam.getByName(styleName), styleName: styleName };
+      } catch (e) { return tableFail('获取表格页面样式失败: ' + errStr(e)); }
+    } else {
+      if (!isWriterDoc()) return tableFail(NOT_TEXT_DOC_MSG);
+      ps = currentPageStyle();
+      if (ps.error) return ps;
+    }
+    const pageStyle = ps.pageStyle;
     const applied = {};
     let w = p && p.width != null ? mm(p.width) : null;
     let h = p && p.height != null ? mm(p.height) : null;
@@ -6617,10 +8549,20 @@ const EXEC = {
             it.contiguous = rangeStartsEqual(prevEnd, rs, locate ? locatorCache.body : null);
             let spanLength = null;
             if (!it.text) {
-              const rc = locate && locatorCache.currentParaKey >= 0
-                ? reviewBodyCursorAt(locatorCache, rs) : rs.getText().createTextCursorByRange(rs);
-              rc.gotoRange(re, true);
-              it.text = String(rc.getString() || '');
+              try {
+                const rc = locate && locatorCache.currentParaKey >= 0
+                  ? reviewBodyCursorAt(locatorCache, rs) : rs.getText().createTextCursorByRange(rs);
+                rc.gotoRange(re, true);
+                it.text = String(rc.getString() || '');
+              } catch (e) {
+                // A table boundary can compare inside the body while its range
+                // belongs to a cell. Do not turn a failed body locator into an
+                // empty revision: snapshots must read the same text as balloons.
+                locatorCache.currentParaKey = -1;
+                const rc = rs.getText().createTextCursorByRange(rs);
+                rc.gotoRange(re, true);
+                it.text = String(rc.getString() || '');
+              }
               spanLength = it.text.length; // Only the body span, never hidden deletion text.
             }
             if (locate) {
@@ -7351,6 +9293,93 @@ const EXEC = {
       text: para2 ? String(para2.getString() || '') : '',
     };
   },
+  // Lightweight navigation: read native identities without changing the active page/sheet.
+  office_get_navigation() {
+    try {
+      const kind = docKindOf();
+      const items = [];
+      let activeId = null;
+      if (kind === 'calc') {
+        const sheets = xModel.getSheets();
+        activeId = String(ctrl.getActiveSheet().getName());
+        for (let i = 0; i < sheets.getCount(); i++) {
+          const sheet = sheets.getByIndex(i);
+          if (!sheet.getPropertyValue('IsVisible')) continue;
+          const name = String(sheet.getName());
+          items.push({ id: name, name: name });
+        }
+      } else if (kind === 'impress') {
+        const pages = xModel.getDrawPages();
+        const current = ctrl.getCurrentPage();
+        for (let i = 0; i < pages.getCount(); i++) {
+          const page = pages.getByIndex(i);
+          if (unoSameDrawPage(current, page)) activeId = i + 1;
+          items.push({ id: i + 1, name: String(page.getName()),
+            width: Number(page.getPropertyValue('Width')), height: Number(page.getPropertyValue('Height')) });
+        }
+      }
+      return { success: true, kind: kind, items: items, activeId: activeId, documentSeq: docSeq, revision: currentReviewRevision() };
+    } catch (e) { return { success: false, message: errStr(e) }; }
+  },
+  office_activate_item(p) {
+    if (!p || p.documentSeq !== docSeq) return { success: false, message: '文档已切换，请重试' };
+    try {
+      if (isCalcDoc()) {
+        const sheets = xModel.getSheets();
+        if (typeof p.id !== 'string' || !sheets.hasByName(p.id)) return { success: false, message: '工作表不存在' };
+        const sheet = sheets.getByName(p.id);
+        if (!sheet.getPropertyValue('IsVisible')) return { success: false, message: '工作表不可见' };
+        ctrl.setActiveSheet(sheet);
+      } else if (isImpressDoc()) {
+        const pages = xModel.getDrawPages();
+        if (!Number.isInteger(p.id) || p.id < 1 || p.id > pages.getCount()) return slideFail('页码越界');
+        ctrl.setCurrentPage(pages.getByIndex(p.id - 1));
+      } else return { success: false, message: '当前文档不支持此导航' };
+      return EXEC.office_get_navigation();
+    } catch (e) { return { success: false, message: errStr(e) }; }
+  },
+  // Export one draw page directly; resolvePage would move the user's current page.
+  slide_get_thumbnail(p) {
+    if (!p || p.documentSeq !== docSeq) return slideFail('文档已切换，请重试');
+    if (!isImpressDoc()) return slideFail(NOT_PRESENTATION_MSG);
+    const pages = xModel.getDrawPages();
+    const number = Number(p && p.slideNumber);
+    if (!Number.isInteger(number) || number < 1 || number > pages.getCount()) return slideFail('页码越界');
+    const page = pages.getByIndex(number - 1);
+    const width = Math.max(80, Math.min(480, Math.round(Number(p && p.width) || 240)));
+    const pageWidth = Number(page.getPropertyValue('Width'));
+    const pageHeight = Number(page.getPropertyValue('Height'));
+    const height = Math.max(1, Math.round(width * pageHeight / pageWidth));
+    const chunks = [];
+    let total = 0;
+    const sink = zetajs.unoObject([css.io.XOutputStream], {
+      writeBytes(seq) {
+        const bytes = new Uint8Array(seq.buffer ? seq.buffer.slice(seq.byteOffset, seq.byteOffset + seq.byteLength) : seq);
+        chunks.push(bytes); total += bytes.length;
+      },
+      flush() {}, closeOutput() {},
+    });
+    const wasModified = xModel.isModified();
+    exportInFlight = true;
+    try {
+      const exporter = context.getServiceManager().createInstanceWithContext('com.sun.star.drawing.GraphicExportFilter', context);
+      exporter.setSourceDocument(page);
+      const filterData = new zetajs.Any(zetajs.type.sequence(zetajs.type.struct(css.beans.PropertyValue)), [
+        mkProp('PixelWidth', width), mkProp('PixelHeight', height),
+      ]);
+      if (!exporter.filter([mkProp('MediaType', 'image/png'), mkProp('OutputStream', sink), mkProp('FilterData', filterData)]))
+        return slideFail('缩略图导出失败');
+      if (!total) return slideFail('缩略图为空');
+      const bytes = new Uint8Array(total);
+      let offset = 0;
+      for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+      return { success: true, slideNumber: number, width: width, height: height, bytes: bytes, documentSeq: docSeq, revision: currentReviewRevision() };
+    } catch (e) { return slideFail(errStr(e)); }
+    finally {
+      try { if (xModel.isModified() !== wasModified) xModel.setModified(wasModified); } catch (e) {}
+      exportInFlight = false;
+    }
+  },
   // [逐段溯源] 表格里的「当前这一格」。段落级用 get_review_context 的
   // paragraphIndex，xlsx 这一条与 pptx 的 slide_get_current 是它的对应物。
   sheet_get_active_cell() {
@@ -7605,12 +9634,14 @@ const EXEC = {
   sheet_format_cells(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
-    const range = sheetRange(r0.sheet, String(p.range || ''));
+    const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
+    const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
     const applied = {};
     if (p.bold != null) { setCharProp(range, 'CharWeight', p.bold ? css.awt.FontWeight.BOLD : css.awt.FontWeight.NORMAL); applied.bold = !!p.bold; }
     if (p.italic != null) { setCharProp(range, 'CharPosture', p.italic ? css.awt.FontSlant.ITALIC : css.awt.FontSlant.NONE); applied.italic = !!p.italic; }
     if (p.underline != null) { range.setPropertyValue('CharUnderline', p.underline ? css.awt.FontUnderline.SINGLE : css.awt.FontUnderline.NONE); applied.underline = !!p.underline; }
+    if (p.strikeout != null) { range.setPropertyValue('CharStrikeout', p.strikeout ? css.awt.FontStrikeout.SINGLE : css.awt.FontStrikeout.NONE); applied.strikeout = !!p.strikeout; }
     if (p.fontSize != null) { setCharProp(range, 'CharHeight', Number(p.fontSize)); applied.fontSize = Number(p.fontSize); }
     if (p.fontName != null && String(p.fontName) !== '') { setCharProp(range, 'CharFontName', String(p.fontName)); applied.fontName = String(p.fontName); }
     if (p.color != null) {
@@ -7661,10 +9692,11 @@ const EXEC = {
   sheet_set_borders(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
-    const range = sheetRange(r0.sheet, String(p.range || ''));
+    const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
+    const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
     const preset = String(p.preset || 'all').toLowerCase();
-    if (['all', 'outer', 'none'].indexOf(preset) === -1) return { success: false, message: 'bad preset: ' + preset + ' (all/outer/none)' };
+    if (['all', 'outer', 'bottom', 'none'].indexOf(preset) === -1) return { success: false, message: 'bad preset: ' + preset + ' (all/outer/bottom/none)' };
     const widthPt = Number(p.widthPt) || 0.75;
     const widthMm = ptToMm100(widthPt);
     const color = p.color != null ? parseColor(p.color, { black: 0 }) : 0;
@@ -7676,10 +9708,13 @@ const EXEC = {
         LineStyle: solid, LineWidth: on ? widthMm : 0,
       });
     };
-    const outer = mk(preset !== 'none');
+    const isBottomOnly = preset === 'bottom';
+    const topL = mk(preset !== 'none' && !isBottomOnly);
+    const bottomL = mk(preset !== 'none');
+    const sideL = mk(preset !== 'none' && !isBottomOnly);
     const inner = mk(preset === 'all');
     const tb = new css.table.TableBorder2({
-      TopLine: outer, BottomLine: outer, LeftLine: outer, RightLine: outer,
+      TopLine: topL, BottomLine: bottomL, LeftLine: sideL, RightLine: sideL,
       HorizontalLine: inner, VerticalLine: inner,
       IsTopLineValid: true, IsBottomLineValid: true, IsLeftLineValid: true,
       IsRightLineValid: true, IsHorizontalLineValid: true, IsVerticalLineValid: true,
@@ -7695,7 +9730,8 @@ const EXEC = {
   sheet_set_row_col(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
-    const range = sheetRange(r0.sheet, String(p.range || ''));
+    const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
+    const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
     const applied = {};
     try {
@@ -7726,8 +9762,8 @@ const EXEC = {
   sheet_manage_sheets(p) {
     if (!isCalcDoc()) return { success: false, message: NOT_SPREADSHEET_MSG };
     const sheets = xModel.getSheets();
-    const op = String(p.op || '').toLowerCase();
-    const name = p.name != null ? String(p.name).trim() : '';
+    const op = String((p && (p.op || p.action)) || '').toLowerCase();
+    const name = p && p.name != null ? String(p.name).trim() : '';
     try {
       if (op === 'add') {
         if (!name) return { success: false, message: 'add 需要 {name}（新工作表名）' };
@@ -7735,6 +9771,10 @@ const EXEC = {
         const pos = p.position != null ? Math.max(0, Math.min(Number(p.position), sheets.getCount())) : sheets.getCount();
         sheets.insertNewByName(name, pos);
         try { ctrl.setActiveSheet(sheets.getByName(name)); } catch (e) {}
+      } else if (op === 'activate') {
+        if (!name) return { success: false, message: 'activate 需要 {name}' };
+        if (!sheets.hasByName(name)) return { success: false, message: '工作表不存在: ' + name };
+        ctrl.setActiveSheet(sheets.getByName(name));
       } else if (op === 'rename') {
         const newName = p.newName != null ? String(p.newName).trim() : '';
         if (!name || !newName) return { success: false, message: 'rename 需要 {name, newName}' };
@@ -7752,7 +9792,7 @@ const EXEC = {
         if (p.position == null) return { success: false, message: 'move 需要 {position}（0 开始的目标位置）' };
         sheets.moveByName(name, Math.max(0, Math.min(Number(p.position), sheets.getCount())));
       } else {
-        return { success: false, message: 'bad op: ' + op + ' (add/rename/delete/move)' };
+        return { success: false, message: 'bad op: ' + op + ' (add/rename/delete/move/activate)' };
       }
     } catch (e) { return { success: false, message: '工作表操作失败: ' + errStr(e) }; }
     const list = [];
@@ -7766,33 +9806,41 @@ const EXEC = {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
     const sheet = r0.sheet;
-    const op = String(p.op || '').toLowerCase();
-    const count = Math.max(1, Math.min(Number(p.count) || 1, 100));
+    const op = String((p && (p.op || p.action)) || '').toLowerCase();
+    const count = Math.max(1, Math.min(Number(p && p.count) || 1, 100));
     const isRow = op === 'insert_rows' || op === 'delete_rows';
     const isCol = op === 'insert_cols' || op === 'delete_cols';
     if (!isRow && !isCol) return { success: false, message: 'bad op: ' + op + ' (insert_rows/delete_rows/insert_cols/delete_cols)' };
+    let startRaw = p && p.start;
+    if (startRaw == null || String(startRaw).trim() === '') {
+      const selInfo = activeCalcSelection();
+      const after = p && String(p.position || '').toLowerCase() === 'after';
+      if (isRow) startRaw = String((selInfo.row || 0) + 1 + (after ? (selInfo.rowCount || 1) : 0));
+      else startRaw = colLetterOf((selInfo.col || 0) + (after ? (selInfo.colCount || 1) : 0));
+    }
     let idx;
     if (isRow) {
-      idx = /^\d+$/.test(String(p.start || '').trim()) ? Number(String(p.start).trim()) - 1 : -1;
-      if (idx < 0) return { success: false, message: '行号无效: ' + p.start + '（1 开始的数字）' };
+      idx = /^\d+$/.test(String(startRaw || '').trim()) ? Number(String(startRaw).trim()) - 1 : -1;
+      if (idx < 0) return { success: false, message: '行号无效: ' + startRaw + '（1 开始的数字）' };
     } else {
-      idx = colIndexOf(p.start);
-      if (idx < 0) return { success: false, message: '列标无效: ' + p.start + "（如 'B' 或 1 开始的数字）" };
+      idx = colIndexOf(startRaw);
+      if (idx < 0) return { success: false, message: '列标无效: ' + startRaw + "（如 'B' 或 1 开始的数字）" };
     }
     try {
       const coll = isRow ? sheet.getRows() : sheet.getColumns();
       if (op.indexOf('insert') === 0) coll.insertByIndex(idx, count);
       else coll.removeByIndex(idx, count);
     } catch (e) { return { success: false, message: '行列操作失败: ' + errStr(e) }; }
-    return { success: true, op: op, start: String(p.start), count: count, sheet: sheet.getName() };
+    return { success: true, op: op, start: String(startRaw), count: count, sheet: sheet.getName() };
   },
   // [表格·结构] 合并/取消合并单元格区域（XMergeable）。合并后内容以左上格为准。
   sheet_merge_cells(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
-    const range = sheetRange(r0.sheet, String(p.range || ''));
+    const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
+    const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
-    const merge = p.merge !== false;
+    const merge = p && p.action ? String(p.action).toLowerCase() !== 'unmerge' : (!p || p.merge !== false);
     try { range.merge(merge); } catch (e) { return { success: false, message: '合并操作失败: ' + errStr(e) }; }
     try { ctrl.select(range); } catch (e) {}
     // 验证回路：XMergeable.getIsMerged() 读回实际状态（'IsMerged' 属性不存在）
@@ -7810,8 +9858,18 @@ const EXEC = {
   sheet_sort_range(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
-    const range = sheetRange(r0.sheet, String(p.range || ''));
-    if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
+    let range;
+    if (p && p.range) {
+      range = sheetRange(r0.sheet, String(p.range));
+      if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
+    } else {
+      const activeRef = activeCalcRangeName();
+      if (activeRef && activeRef.indexOf(':') >= 0) range = sheetRange(r0.sheet, activeRef);
+      if (!range) {
+        try { range = r0.sheet.getCellRangeByName(sheetRangeName(usedRangeAddress(r0.sheet))); }
+        catch (e) { return { success: false, message: '无效的区域: ' + (p && p.range || '(空)') }; }
+      }
+    }
     const addr = range.getRangeAddress();
     const nRows = addr.EndRow - addr.StartRow + 1;
     const nCols = addr.EndColumn - addr.StartColumn + 1;
@@ -7931,9 +9989,10 @@ const EXEC = {
   sheet_conditional_format(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
-    const range = sheetRange(r0.sheet, String(p.range || ''));
+    const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
+    const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
-    if (p.clear) {
+    if (p && p.clear) {
       try {
         const cf0 = range.getPropertyValue('ConditionalFormat');
         cf0.clear();
@@ -7942,15 +10001,20 @@ const EXEC = {
       return { success: true, range: sheetRangeName(range.getRangeAddress()), cleared: true };
     }
     const OPS = {
-      greater: 'GREATER', greaterequal: 'GREATER_EQUAL', less: 'LESS', lessequal: 'LESS_EQUAL',
-      equal: 'EQUAL', notequal: 'NOT_EQUAL', between: 'BETWEEN', notbetween: 'NOT_BETWEEN', formula: 'FORMULA',
+      greater: 'GREATER', '>': 'GREATER', greaterequal: 'GREATER_EQUAL', '>=': 'GREATER_EQUAL',
+      less: 'LESS', '<': 'LESS', lessequal: 'LESS_EQUAL', '<=': 'LESS_EQUAL',
+      equal: 'EQUAL', '=': 'EQUAL', '==': 'EQUAL', notequal: 'NOT_EQUAL', '!=': 'NOT_EQUAL',
+      between: 'BETWEEN', notbetween: 'NOT_BETWEEN', formula: 'FORMULA',
     };
-    const opKey = OPS[String(p.rule || '').toLowerCase().replace(/[_-]/g, '')];
-    if (!opKey) return { success: false, message: 'bad rule: ' + p.rule + ' (greater/greaterEqual/less/lessEqual/equal/notEqual/between/notBetween/formula)' };
+    const ruleRaw = (p && (p.rule != null ? p.rule : p.operator)) || '';
+    const opKey = OPS[String(ruleRaw).toLowerCase().replace(/[_-]/g, '')];
+    if (!opKey) return { success: false, message: 'bad rule: ' + ruleRaw + ' (greater/greaterEqual/less/lessEqual/equal/notEqual/between/notBetween/formula)' };
     if (p.value1 == null || String(p.value1) === '') return { success: false, message: '条件格式需要 value1（数值或公式）' };
     if ((opKey === 'BETWEEN' || opKey === 'NOT_BETWEEN') && (p.value2 == null || String(p.value2) === '')) {
       return { success: false, message: 'between/notBetween 需要 value2' };
     }
+    const bgIn = p.background != null ? p.background : p.bgColor;
+    const fgIn = p.color != null ? p.color : p.fontColor;
     // 命中外观 = 一个专用 CellStyle（条件格式只认样式名，不收散属性）
     let styleName;
     try {
@@ -7958,18 +10022,18 @@ const EXEC = {
       do { styleName = '__awd_cf_' + (++cfStyleSeq); } while (styles.hasByName(styleName));
       const style = xModel.createInstance('com.sun.star.style.CellStyle');
       styles.insertByName(styleName, style);
-      if (p.background != null) {
-        const c = parseColor(p.background, { none: -1 });
-        if (c == null) return { success: false, message: 'bad background: ' + p.background };
+      if (bgIn != null) {
+        const c = parseColor(bgIn, { none: -1 });
+        if (c == null) return { success: false, message: 'bad background: ' + bgIn };
         style.setPropertyValue('CellBackColor', c);
       }
-      if (p.color != null) {
-        const c = parseColor(p.color, { auto: -1 });
-        if (c == null) return { success: false, message: 'bad color: ' + p.color };
+      if (fgIn != null) {
+        const c = parseColor(fgIn, { auto: -1 });
+        if (c == null) return { success: false, message: 'bad color: ' + fgIn };
         style.setPropertyValue('CharColor', c);
       }
       if (p.bold) style.setPropertyValue('CharWeight', css.awt.FontWeight.BOLD);
-      if (p.background == null && p.color == null && !p.bold) {
+      if (bgIn == null && fgIn == null && !p.bold) {
         return { success: false, message: '条件格式需要至少一项外观（background/color/bold）' };
       }
     } catch (e) { return { success: false, message: '条件格式样式创建失败: ' + errStr(e) }; }
@@ -7987,7 +10051,7 @@ const EXEC = {
       const readBack = range.getPropertyValue('ConditionalFormat');
       return {
         success: true, range: sheetRangeName(range.getRangeAddress()),
-        rule: String(p.rule), entries: readBack.getCount(), styleName: styleName,
+        rule: String(ruleRaw), entries: readBack.getCount(), styleName: styleName,
       };
     } catch (e) { return { success: false, message: '条件格式设置失败: ' + errStr(e) }; }
   },
@@ -8076,9 +10140,11 @@ const EXEC = {
   sheet_set_data_validation(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return tableFail(r0.error);
-    const range = sheetRange(r0.sheet, String(p.range || ''));
+    const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
+    const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return tableFail('无效的区域: ' + (p.range || '(空)'));
-    if (p && p.clear) {
+    const rawType = String((p && p.type) || '').toLowerCase().replace(/[_-]/g, '');
+    if ((p && p.clear) || rawType === 'any' || rawType === 'clear') {
       try {
         const v0 = range.getPropertyValue('Validation');
         v0.setPropertyValue('Type', css.sheet.ValidationType.ANY);
@@ -8087,12 +10153,13 @@ const EXEC = {
       return { success: true, range: sheetRangeName(range.getRangeAddress()), cleared: true };
     }
     const TYPE_MAP = { list: 'LIST', wholenumber: 'WHOLE', whole: 'WHOLE', decimal: 'DECIMAL', date: 'DATE', time: 'TIME', textlength: 'TEXT_LEN', custom: 'CUSTOM' };
-    const typeKey = TYPE_MAP[String(p && p.type || '').toLowerCase().replace(/[_-]/g, '')];
+    const typeKey = TYPE_MAP[rawType];
     if (!typeKey) return tableFail('bad type: ' + (p && p.type) + ' (list/wholeNumber/decimal/date/time/textLength/custom)');
     const OP_MAP = { greater: 'GREATER', greaterequal: 'GREATER_EQUAL', less: 'LESS', lessequal: 'LESS_EQUAL', equal: 'EQUAL', notequal: 'NOT_EQUAL', between: 'BETWEEN', notbetween: 'NOT_BETWEEN' };
     let formula1 = '', formula2 = '', operatorKey = null;
     if (typeKey === 'LIST') {
-      const items = String((p && p.value1) || '').split(',').map(function (s) { return s.trim(); }).filter(function (s) { return s !== ''; });
+      const listRaw = (p && p.value1 != null) ? String(p.value1) : (Array.isArray(p && p.list) ? p.list.join(',') : String((p && p.list) || ''));
+      const items = listRaw.split(',').map(function (s) { return s.trim(); }).filter(function (s) { return s !== ''; });
       if (!items.length) return tableFail('list 类型的 value1 需要逗号分隔的候选值，如 "合规,不合规,待核查"');
       formula1 = items.map(function (v) { return '"' + v.replace(/"/g, '""') + '"'; }).join(';');
     } else if (typeKey === 'CUSTOM') {
@@ -8100,13 +10167,16 @@ const EXEC = {
       if (!formula1) return tableFail('custom 类型的 value1 需要一个返回布尔值的校验公式');
       formula1 = normalizeFormula(formula1);
     } else {
-      operatorKey = OP_MAP[String((p && p.operator) || '').toLowerCase().replace(/[_-]/g, '')];
+      const opRaw = (p && p.operator) ? String(p.operator) : ((p && p.min != null && p.max != null) ? 'between' : '');
+      operatorKey = OP_MAP[opRaw.toLowerCase().replace(/[_-]/g, '')];
       if (!operatorKey) return tableFail('bad operator: ' + (p && p.operator) + ' (greater/greaterEqual/less/lessEqual/equal/notEqual/between/notBetween)');
-      if (!p || p.value1 == null || String(p.value1) === '') return tableFail(typeKey + ' 类型需要 value1');
-      formula1 = normalizeFormula(String(p.value1));
+      const v1Raw = (p && p.value1 != null && String(p.value1) !== '') ? p.value1 : (p && p.min);
+      const v2Raw = (p && p.value2 != null && String(p.value2) !== '') ? p.value2 : (p && p.max);
+      if (v1Raw == null || String(v1Raw) === '') return tableFail(typeKey + ' 类型需要 value1');
+      formula1 = normalizeFormula(String(v1Raw));
       if (operatorKey === 'BETWEEN' || operatorKey === 'NOT_BETWEEN') {
-        if (p.value2 == null || String(p.value2) === '') return tableFail('between/notBetween 需要 value2');
-        formula2 = normalizeFormula(String(p.value2));
+        if (v2Raw == null || String(v2Raw) === '') return tableFail('between/notBetween 需要 value2');
+        formula2 = normalizeFormula(String(v2Raw));
       }
     }
     try {
@@ -8146,8 +10216,9 @@ const EXEC = {
     if (!range) return tableFail('无效的数据区域: ' + ((p && p.range) || '(空)'));
     const addr = range.getRangeAddress();
     const TYPE_MAP = { column: { cls: 'Bar', vertical: true }, bar: { cls: 'Bar', vertical: false }, line: { cls: 'Line' }, pie: { cls: 'Pie' } };
-    const typeInfo = TYPE_MAP[String((p && p.chartType) || 'column').toLowerCase()];
-    if (!typeInfo) return tableFail('bad chartType: ' + (p && p.chartType) + ' (column/bar/line/pie)');
+    const chartTypeRaw = (p && (p.chartType != null ? p.chartType : p.type)) || 'column';
+    const typeInfo = TYPE_MAP[String(chartTypeRaw).toLowerCase()];
+    if (!typeInfo) return tableFail('bad chartType: ' + chartTypeRaw + ' (column/bar/line/pie)');
     let charts;
     try { charts = sheet.getCharts(); } catch (e) { return tableFail('获取图表集合失败: ' + errStr(e)); }
     const name = (p && p.name != null && String(p.name).trim()) ? String(p.name).trim() : ('Chart_' + Date.now());
@@ -8192,7 +10263,8 @@ const EXEC = {
     const r0 = resolveSheet(p);
     if (r0.error) return tableFail(r0.error);
     const sheet = r0.sheet;
-    const query = (p && p.query != null) ? String(p.query) : '';
+    const queryRaw = p && (p.query != null ? p.query : p.keyword);
+    const query = queryRaw != null ? String(queryRaw) : '';
     if (!query) return tableFail('sheet_search requires {query}');
     const matchCase = !!(p && p.matchCase);
     let addr;
@@ -8324,7 +10396,7 @@ const EXEC = {
   // sheet）/ remove（name）/ list（枚举全部）。add 落成绝对引用公式
   // '$Sheet1.$A$1:$C$10'，与 range 参数所在工作表绑定。
   sheet_define_name(p) {
-    const op = String((p && p.op) || 'list').toLowerCase();
+    const op = String((p && (p.op || p.action)) || 'list').toLowerCase();
     let nr;
     try { nr = xModel.getPropertyValue('NamedRanges'); } catch (e) { return tableFail('读取命名区域集合失败: ' + errStr(e)); }
     if (op === 'list') {
@@ -8384,15 +10456,16 @@ const EXEC = {
     const r0 = resolveSheet(p);
     if (r0.error) return tableFail(r0.error);
     const sheet = r0.sheet;
-    const range = sheetRange(sheet, String((p && p.range) || ''));
+    const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
+    const range = sheetRange(sheet, rangeRef);
     if (!range) return tableFail('无效的区域: ' + ((p && p.range) || '(空)'));
     const addr = range.getRangeAddress();
-    const orientRaw = String((p && p.orient) || 'rows').toLowerCase();
+    const orientRaw = String((p && (p.orient || p.orientation)) || 'rows').toLowerCase();
     const isCols = orientRaw === 'cols' || orientRaw === 'columns';
     const isRows = orientRaw === 'rows';
-    if (!isCols && !isRows) return tableFail('bad orient: ' + (p && p.orient) + ' (rows/cols)');
+    if (!isCols && !isRows) return tableFail('bad orient: ' + (p && (p.orient || p.orientation)) + ' (rows/cols)');
     const orientation = isCols ? css.table.TableOrientation.COLUMNS : css.table.TableOrientation.ROWS;
-    const op = String((p && p.op) || 'group').toLowerCase();
+    const op = String((p && (p.op || p.action)) || 'group').toLowerCase();
     try {
       if (op === 'group') sheet.group(addr, orientation);
       else if (op === 'ungroup') sheet.ungroup(addr, orientation);
@@ -8413,8 +10486,10 @@ const EXEC = {
     const source = sheetRange(sheet, String((p && p.sourceRange) || ''));
     if (!source) return tableFail('无效的源数据区域: ' + ((p && p.sourceRange) || '(空)'));
     const srcAddr = source.getRangeAddress();
-    const rowFieldNames = String((p && p.rowFields) || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
-    const dataFieldName = (p && p.dataField != null) ? String(p.dataField).trim() : '';
+    const rawRowFields = p && p.rowFields;
+    const rowFieldNames = (Array.isArray(rawRowFields) ? rawRowFields : String(rawRowFields || '').split(',')).map(function (s) { return String(s).trim(); }).filter(Boolean);
+    const rawDataField = p && (p.dataField != null ? p.dataField : (Array.isArray(p.dataFields) ? p.dataFields[0] : p.dataFields));
+    const dataFieldName = (rawDataField != null) ? String(rawDataField).trim() : '';
     if (!rowFieldNames.length) return tableFail('sheet_add_pivot_table requires {rowFields}（逗号分隔的表头字段名）');
     if (!dataFieldName) return tableFail('sheet_add_pivot_table requires {dataField}（求和字段的表头字段名）');
     let dpTables;
@@ -8835,14 +10910,16 @@ const EXEC = {
   // 必须走 .uno: 调度」PR#164/166 一个经验），再用页在 getDrawPages() 里的实际下标
   // 双口径复核——不信 dispatch 本身的返回值。
   slide_move_page(p) {
-    const r0 = resolvePage(p); // 顺手把 slideNumber 设为当前页，MovePage* 作用于当前页
+    const pageArg = (p && p.slideNumber == null && p.fromSlide != null) ? Object.assign({}, p, { slideNumber: p.fromSlide }) : p;
+    const r0 = resolvePage(pageArg); // 顺手把 slideNumber 设为当前页，MovePage* 作用于当前页
     if (r0.error) return slideFail(r0.error);
     let pages;
     try { pages = xModel.getDrawPages(); } catch (e) { return slideFail('读取幻灯片列表失败: ' + errStr(e)); }
     const count = pages.getCount();
-    const to = p && p.toPosition != null ? Number(p.toPosition) : NaN;
+    const rawTo = p && (p.toPosition != null ? p.toPosition : p.toSlide);
+    const to = rawTo != null ? Number(rawTo) : NaN;
     if (!Number.isFinite(to) || to < 1 || to > count) {
-      return slideFail('toPosition 越界: ' + (p && p.toPosition) + '（共 ' + count + ' 页，1 开始）');
+      return slideFail('toPosition 越界: ' + rawTo + '（共 ' + count + ' 页，1 开始）');
     }
     const from = r0.index;
     const toIndex = to - 1;
@@ -8911,6 +10988,7 @@ const EXEC = {
     }
     ensureShapeNames(r0.page);
     let name = ''; try { name = shape.getName(); } catch (e) {}
+    try { if (ctrl && ctrl.select) ctrl.select(shape); } catch (e) {}
     return { success: true, shapeName: name };
   },
   // [幻灯片·写] 插入形状：矩形/椭圆/线条走对应 UNO 服务；三角形走 CustomShape +
@@ -8952,6 +11030,7 @@ const EXEC = {
     }
     ensureShapeNames(r0.page);
     let name = ''; try { name = shape.getName(); } catch (e) {}
+    try { if (ctrl && ctrl.select) ctrl.select(shape); } catch (e) {}
     return { success: true, shapeName: name };
   },
   // [幻灯片·写] 按 shapeName 精确删除一个形状。
@@ -9028,7 +11107,10 @@ const EXEC = {
     } else {
       try { cur = xText.createTextCursor(); cur.gotoStart(false); cur.gotoEnd(true); }
       catch (e) { return slideFail('选中形状全部文字失败: ' + errStr(e)); }
-      if ((cur.getString() || '').length === 0) return slideFail('该形状没有文字，无法格式化');
+      if ((cur.getString() || '').length === 0) {
+        if (rs.shape && typeof rs.shape.setPropertyValue === 'function') cur = rs.shape;
+        else return slideFail('该形状没有文字，无法格式化');
+      }
     }
     const applied = {};
     if (p.fontName != null) { setCharProp(cur, 'CharFontName', String(p.fontName)); applied.fontName = String(p.fontName); }
@@ -9043,8 +11125,9 @@ const EXEC = {
       try { cur.setPropertyValue('CharUnderline', v); applied.underline = String(p.underline).toLowerCase(); }
       catch (e) { return slideFail('设置下划线失败: ' + errStr(e)); }
     }
-    if (p.strikethrough != null) {
-      try { cur.setPropertyValue('CharStrikeout', p.strikethrough ? css.awt.FontStrikeout.SINGLE : css.awt.FontStrikeout.NONE); applied.strikethrough = !!p.strikethrough; }
+    const strikeIn = p.strikethrough != null ? p.strikethrough : p.strikeout;
+    if (strikeIn != null) {
+      try { cur.setPropertyValue('CharStrikeout', strikeIn ? css.awt.FontStrikeout.SINGLE : css.awt.FontStrikeout.NONE); applied.strikethrough = !!strikeIn; }
       catch (e) { return slideFail('设置删除线失败: ' + errStr(e)); }
     }
     if (p.color != null) {
@@ -9165,6 +11248,7 @@ const EXEC = {
     }
     ensureShapeNames(r0.page);
     let name = ''; try { name = shape.getName(); } catch (e) {}
+    try { if (ctrl && ctrl.select) ctrl.select(shape); } catch (e) {}
     return { success: true, shapeName: name, rows: rowCount, cols: colCount };
   },
   // [幻灯片·看] 读一张表格形状为二维数组。不传 shapeName 要求该页只有一张表格。
@@ -9274,6 +11358,23 @@ const EXEC = {
       if (ok === 0) result.borders.note = 'Impress 表格单元格未暴露 Top/Bottom/Left/RightBorder 属性（引擎不支持或本 API 路径不适用），边框设置未生效';
     }
 
+    if (p && p.headerFill != null) {
+      didAnything = true;
+      const fillVal = String(p.headerFill).toLowerCase() === 'none' ? -1 : parseColor(p.headerFill);
+      if (fillVal == null) return slideFail('headerFill 格式非法: ' + p.headerFill + '（用 #RRGGBB 或 none）');
+      const FILL_STYLE = (css.drawing && css.drawing.FillStyle) || { NONE: 0, SOLID: 1 };
+      let ok = 0, fail = 0;
+      for (let c = 0; c < cols; c++) {
+        try {
+          const cell = table.getCellByPosition(c, 0);
+          if (fillVal === -1) cell.setPropertyValue('FillStyle', FILL_STYLE.NONE);
+          else { cell.setPropertyValue('FillStyle', FILL_STYLE.SOLID); cell.setPropertyValue('FillColor', fillVal); }
+          ok++;
+        } catch (e) { fail++; }
+      }
+      result.headerFill = { applied: ok > 0, cellsOk: ok, cellsFailed: fail };
+    }
+
     if (p && Array.isArray(p.columnWidthsPt)) {
       didAnything = true;
       let ok = 0, fail = 0;
@@ -9304,12 +11405,23 @@ const EXEC = {
   slide_set_hyperlink(p) {
     const r0 = resolvePage(p);
     if (r0.error) return slideFail(r0.error);
-    const searchText = p && p.searchText != null ? String(p.searchText) : '';
-    if (!searchText) return slideFail('缺少 searchText 参数');
+    let searchText = p && p.searchText != null ? String(p.searchText) : '';
     const url = p && p.url != null ? String(p.url) : '';
     if (!url) return slideFail('缺少 url 参数');
     if (!/^https?:\/\//i.test(url)) return slideFail('url 仅支持 http/https: ' + url);
     ensureShapeNames(r0.page);
+    if (!searchText && p && p.shapeName) {
+      const rs = resolveShape(r0.page, p);
+      if (!rs.error && rs.shape) {
+        try {
+          const CA = (css.presentation && css.presentation.ClickAction) || { DOCUMENT: 6 };
+          rs.shape.setPropertyValue('OnClick', CA.DOCUMENT);
+          rs.shape.setPropertyValue('Bookmark', url);
+          return { success: true, shapeName: rs.name, url: url, via: 'shape-click-action' };
+        } catch (e) { return slideFail('设置超链接失败: ' + errStr(e)); }
+      }
+    }
+    if (!searchText) return slideFail('缺少 searchText 参数');
     const n = r0.page.getCount();
     for (let i = 0; i < n; i++) {
       let shape; try { shape = r0.page.getByIndex(i); } catch (e) { continue; }
@@ -9376,6 +11488,7 @@ const FINAL_TEXT_READ_ACTIONS = new Set([
   'get_review_context', 'get_review_layout', 'get_completion_context', 'capture_writing_context',
   'get_context_menu_context', 'find_text_locations', 'table_read', 'check_link_anchors',
   'list_styles', 'list_fonts', 'list_revisions', 'list_comments', 'var_list', 'debug_revisions', 'probe_modules',
+  'stash_selection_for_drag',
 ]);
 const AGENT_VIEW_EXEMPT = { set_revision_view: 1, export_document: 1, load_document: 1 };
 let agentViewPending = null;
@@ -9423,6 +11536,12 @@ function runAgentCommandInMarginView(action, fn) {
     // 左右横跳」就是这一左一右（真机实测 ±2142 twip / 每次读，dev-board#725）。
     try { paragraphTextOf(ctrl.getViewCursor()); } catch (e) {}
   };
+  // Neither view switch is guaranteed to succeed. Do not search or edit a body
+  // that may still contain deleted revision text, including a first AI write.
+  if (revisionViewState().mode === 'all') {
+    restore();
+    return tableFail('无法排除删除修订，未执行文档操作。请重新打开文档后再定位目标。');
+  }
   let out;
   try { out = fn(); }
   catch (e) { restore(); throw e; }
@@ -9512,6 +11631,12 @@ function execCommand(reqId, action, params) {
     if (action === 'get_review_context' && result && result.success) result.cursorRectRaw = EXEC.get_cursor_rect();
     post('result', { reqId: reqId, result: result });
   };
+  // Early cursor/zoom queries must not touch UNO model/controller before the
+  // first import. A rejected import stays retryable and never exposes a blank.
+  if (!xModel && !['load_document', 'set_app_theme', 'set_host_context_menu', 'set_style_profile'].includes(action)) {
+    finish({ success: false, code: 'DOCUMENT_NOT_READY', message: 'Document is not loaded yet' });
+    return;
+  }
   INFLIGHT[reqId] = true;
   let result;
   try {
@@ -9555,6 +11680,6 @@ Module.zetajs.then(function (pZetajs) {
       default: log('unknown cmd: ' + e.data.cmd);
     }
   };
-  bootDoc();
+  bootDoc(self.__awdInitialDocument === true);
   post('thr_running');
 });

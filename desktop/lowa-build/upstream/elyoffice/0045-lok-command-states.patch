@@ -1,0 +1,86 @@
+LOK: read whether listed commands may run now
+
+LOK pushes enable states only for a fixed list, and only after
+idle bindings update. A menu opened right after a selection needs
+the answer now, for commands outside that list (hide rows, column
+width, clear contents). getCommandValues(".uno:CommandStates?
+commands=.uno:A,.uno:B") flushes the dispatcher and asks it for
+each slot, as the menu bar would: true unless disabled or unknown
+to the current shells. A name that is no slot fails the read.
+
+diff --git a/desktop/source/lib/init.cxx b/desktop/source/lib/init.cxx
+--- a/desktop/source/lib/init.cxx
++++ b/desktop/source/lib/init.cxx
+@@ -152,6 +152,7 @@
+ #include <sfx2/docfile.hxx>
+ #include <sfx2/viewsh.hxx>
+ #include <sfx2/viewfrm.hxx>
++#include <sfx2/msg.hxx>
+ #include <sfx2/msgpool.hxx>
+ #include <sfx2/dispatch.hxx>
+ #include <sfx2/lokcomponenthelpers.hxx>
+@@ -6672,6 +6673,45 @@ enum class UndoOrRedo
+ 
+ }
+ 
++/// Whether each listed command may run now.
++static char* getCommandStates(std::string_view aList)
++{
++    SfxViewShell* pViewShell = SfxViewShell::Current();
++    if (!pViewShell)
++    {
++        SetLastExceptionMsg(u"CommandStates: no current view"_ustr);
++        return nullptr;
++    }
++    SfxViewFrame& rFrame = pViewShell->GetViewFrame();
++    SfxDispatcher* pDispatcher = rFrame.GetBindings().GetDispatcher();
++    pDispatcher->Flush();
++    const SfxSlotPool& rPool = SfxSlotPool::GetSlotPool(&rFrame);
++    tools::JsonWriter aJson;
++    {
++        auto aStates = aJson.startNode("commandStates");
++        sal_Int32 nIndex = 0;
++        do
++        {
++            std::string_view aCommand = o3tl::getToken(aList, 0, ',', nIndex);
++            if (!aCommand.starts_with(".uno:"))
++            {
++                SetLastExceptionMsg(u"CommandStates: not a .uno: command"_ustr);
++                return nullptr;
++            }
++            const SfxSlot* pSlot = rPool.GetUnoSlot(OUString::fromUtf8(aCommand.substr(5)));
++            if (!pSlot)
++            {
++                SetLastExceptionMsg(OUString::fromUtf8(aCommand) + u" : unknown command"_ustr);
++                return nullptr;
++            }
++            SfxPoolItemHolder aState;
++            const SfxItemState eState = pDispatcher->QueryState(pSlot->GetSlotId(), aState);
++            aJson.put(aCommand, eState != SfxItemState::DISABLED && eState != SfxItemState::UNKNOWN);
++        } while (nIndex >= 0);
++    }
++    return convertOString(aJson.finishAndGetAsOString());
++}
++
+ /// Returns the JSON representation of either an undo or a redo stack.
+ static char* getUndoOrRedo(LibreOfficeKitDocument* pThis, UndoOrRedo eCommand)
+ {
+@@ -6808,6 +6848,7 @@ static char* doc_getCommandValues(LibreOfficeKitDocument* pThis, const char* pCo
+     static constexpr std::string_view aViewRowColumnHeaders(".uno:ViewRowColumnHeaders");
+     static constexpr std::string_view aSheetGeometryData(".uno:SheetGeometryData");
+     static constexpr std::string_view aFontSubset(".uno:FontSubset&name=");
++    static constexpr std::string_view aCommandStates(".uno:CommandStates?commands=");
+ 
+     ITiledRenderable* pDoc = getTiledRenderable(pThis);
+     if (!pDoc)
+@@ -6983,6 +7024,10 @@ static char* doc_getCommandValues(LibreOfficeKitDocument* pThis, const char* pCo
+         pDoc->getCellCursor(aJsonWriter);
+         return convertOString(aJsonWriter.finishAndGetAsOString());
+     }
++    else if (aCommand.starts_with(aCommandStates))
++    {
++        return getCommandStates(aCommand.substr(aCommandStates.size()));
++    }
+     else if (aCommand.starts_with(aFontSubset))
+     {
+         return getFontSubset(aCommand.substr(aFontSubset.size()));

@@ -85,24 +85,15 @@
                 <div
                   class="tool-row"
                   :class="{ 'is-clickable': hasOutput(item) }"
-                  :title="hasOutput(item) ? $t('chat.toolClickToView', { name: rawToolName(item.code) }) : rawToolName(item.code)"
+                  :title="hasOutput(item) ? $t('chat.toolClickToView', { name: formatToolName(item.code) }) : formatToolName(item.code)"
                   @click="hasOutput(item) && toggleOutput(idx)"
                 >
                     <div class="tool-content">
                          <span class="tool-name">{{ formatToolName(item.code) }}</span>
                     </div>
                     <div class="tool-right">
-                         <!-- 复制调用 / 复制输出（审查 F6）：工具卡是可审计单元——
-                              律师要能把这次调用的参数拷出来自己复现，把输出拷进邮件或备忘。
-                              必须 @click.stop：整行本身是展开/收起输出的开关，不拦住的话
-                              点复制会顺手把刚看的输出折叠掉。 -->
+                         <!-- 可核查的业务结果仍可复制；内部工具说明不放进用户操作区。 -->
                          <div class="tool-copy">
-                            <div v-if="item.code" class="tool-copy-btn" :title="$t('chat.copyToolCall')" @click.stop="copyCall(item)">
-                               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                  <polyline points="16 18 22 12 16 6"></polyline>
-                                  <polyline points="8 6 2 12 8 18"></polyline>
-                               </svg>
-                            </div>
                             <div v-if="hasOutput(item)" class="tool-copy-btn" :title="$t('chat.copyToolOutput')" @click.stop="copyOutput(item)">
                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -149,7 +140,15 @@
             <span class="step-text">{{ step.text }}</span>
          </div>
       </div>
-      <div style="width: 100%; border-bottom: 1px solid #eee; margin: 0 auto; margin-top: 6px;"></div>
+      <!-- Harness 运行期自愈（dev-board#1481）：失败步骤的「归因 → 处方」，让用户看见系统如何自己纠偏 -->
+      <div v-if="process.harnessAdaptations && process.harnessAdaptations.length" class="harness-adaptation-list" data-harness-adaptation-list>
+        <div v-for="item in process.harnessAdaptations" :key="item.id" class="harness-adaptation-item" :class="`tier-${String(item.tier || '').toLowerCase()}`">
+          <span class="ha-badge">{{ item.tier === 'DOMAIN' ? $t('chat.harnessAdaptationBadgeDomain') : $t('chat.harnessAdaptationBadgeInvariant') }}</span>
+          <div class="ha-title">{{ item.title }}</div>
+          <div v-if="item.diagnosis" class="ha-diagnosis">{{ item.diagnosis }}</div>
+        </div>
+      </div>
+      <div class="process-divider"></div>
 
 
     </div>
@@ -161,8 +160,8 @@ import { computed, ref, watch } from 'vue'
 import ThinkingCard from './ThinkingCard.vue'
 import SubtaskResultCard from './SubtaskResultCard.vue'
 import FileTypeIcon from '../FileTypeIcon.vue'
-import { toolDisplayName, toolRawName } from '@/utils/toolDisplayNames.js'
-import { humanizeToolOutput } from '@/utils/toolOutputHumanize.js'
+import { toolDisplayName } from '@/utils/toolDisplayNames.js'
+import { humanizeToolOutput, isInternalToolOutput } from '@/utils/toolOutputHumanize.js'
 import { copyToClipboard } from '@/utils/chatClipboard.js'
 import { isEnglish } from '@/utils/appLanguage.js'
 import { t } from '@/i18n'
@@ -228,7 +227,6 @@ const formatToolName = (code) => {
     return name.length > 40 ? name.substring(0, 37) + '...' : name
 }
 
-const rawToolName = (code) => toolRawName(code)
 
 // ---- 工具返回结果的折叠区 ----
 // 后端一直把每个工具的输出以 <tool_output status=…> 发到前端（流式与历史都有，
@@ -236,7 +234,7 @@ const rawToolName = (code) => toolRawName(code)
 // （items 只追加不重排，idx 稳定）。
 const openOutputs = ref({})
 
-const hasOutput = (item) => !!(item && item.output && String(item.output).trim())
+const hasOutput = (item) => !isInternalToolOutput(item) && !!(item && item.output && String(item.output).trim())
 
 const outputText = (item) => String((item && item.output) || '').trim()
 
@@ -252,11 +250,7 @@ const humanOutput = (item) => {
     return shown
 }
 
-// ---- 复制调用 / 复制输出（dev-board#790）----
-// 复制的是**原文**：调用串 `read_document({"fileId":12})` 与工具返回的原始输出。
-// 刻意不复制 humanOutput 那份可读化结果——用户按复制是为了拿去复现或存证，
-// 要的是原样，不是我们替他整理过的版本。
-const copyCall = (item) => copyToClipboard(String((item && item.code) || '').trim())
+// Copy a readable business result as returned; internal instruction tools have no control here.
 const copyOutput = (item) => copyToClipboard(outputText(item))
 
 const isOutputOpen = (idx) => !!openOutputs.value[idx]
@@ -378,9 +372,40 @@ const renderItems = computed(() => {
 </script>
 
 <style scoped>
+.harness-adaptation-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--awd-space-1);
+  margin: var(--awd-space-1) 0 2px;
+}
+.harness-adaptation-item {
+  border-left: 2px solid var(--awd-accent);
+  background: var(--awd-accent-soft);
+  border-radius: var(--awd-radius-sm);
+  padding: var(--awd-space-1) var(--awd-space-2);
+  font-size: var(--awd-panel-fs);
+  line-height: 1.5;
+}
+.harness-adaptation-item.tier-domain {
+  border-left-color: var(--awd-gold);
+  background: var(--awd-gold-soft);
+}
+.ha-badge {
+  display: inline-block;
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
+  margin-bottom: 2px;
+}
+.ha-title {
+  font-weight: 600;
+}
+.ha-diagnosis {
+  color: var(--awd-text-2);
+}
+.process-divider { width: 100%; border-bottom: 1px solid var(--awd-border-subtle); margin-top: var(--awd-space-1); }
 .process-card {
   background: var(--awd-surface);
-  border-radius: 12px 12px 0 0;
+  border-radius: var(--awd-radius-dialog) var(--awd-radius-dialog) 0 0;
   /* border-bottom: 1px solid var(--awd-accent); */
   /* box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1); */
   /* margin-bottom: 12px; */
@@ -411,7 +436,7 @@ const renderItems = computed(() => {
 .left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--awd-space-2);
 }
 
 .header-icon-wrapper {
@@ -422,7 +447,7 @@ const renderItems = computed(() => {
 }
 
 .title {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-accent-text); /* Forest Green */
 }
@@ -430,14 +455,14 @@ const renderItems = computed(() => {
 .right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--awd-space-2);
 }
 
 .status-badge {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   padding: 1px 7px;
-  border-radius: 99px;
+  border-radius: var(--awd-radius-sm);
 }
 
 .status-badge.success {
@@ -465,7 +490,7 @@ const renderItems = computed(() => {
 }
 
 .process-body {
-  padding: 4px 12px 4px 12px;
+  padding: var(--awd-space-1) var(--awd-space-3);
 }
 
 .process-item {
@@ -480,7 +505,7 @@ const renderItems = computed(() => {
 .step-row {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: var(--awd-space-2);
   padding-left: 2px;
 }
 
@@ -498,14 +523,14 @@ const renderItems = computed(() => {
 }
 
 .step-text {
-  font-size: 12px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text); /* Gray-Dark */
-  line-height: 1.45;
+  line-height: var(--awd-line-height-ui);
 }
 
 .step-text.is-meta {
     color: var(--awd-text-2); /* Gray-Medium */
-    font-size: 11px;
+    font-size: var(--awd-font-size-body);
 }
 
 /* File Attachment Card */
@@ -514,7 +539,7 @@ const renderItems = computed(() => {
     align-items: center;
     background: var(--awd-bg); /* Gray-Pale */
     border: 1px solid var(--awd-border); /* Gray-Light */
-    border-radius: 8px;
+    border-radius: var(--awd-radius-md);
     padding: 7px 10px;
     gap: 10px;
     margin: 3px 0 5px 0;
@@ -530,7 +555,7 @@ const renderItems = computed(() => {
 }
 
 .file-name {
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     font-weight: 600;
     color: var(--awd-text);
     white-space: nowrap;
@@ -539,7 +564,7 @@ const renderItems = computed(() => {
 }
 
 .file-meta {
-    font-size: 11px;
+    font-size: var(--awd-font-size-body);
     color: var(--awd-text-2);
     margin-top: 1px;
 }
@@ -555,7 +580,7 @@ const renderItems = computed(() => {
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 6px;
+    border-radius: var(--awd-radius-md);
     color: var(--awd-text-2);
     cursor: pointer;
     transition: all 0.2s;
@@ -577,7 +602,7 @@ const renderItems = computed(() => {
   justify-content: space-between;
   padding: 3px 8px;
   background: var(--awd-bg);
-  border-radius: 5px;
+  border-radius: var(--awd-radius-sm);
   margin-left: 0;
 }
 
@@ -611,7 +636,7 @@ const renderItems = computed(() => {
     justify-content: center;
     width: 18px;
     height: 18px;
-    border-radius: 4px;
+    border-radius: var(--awd-radius-sm);
     color: var(--awd-text-3);
     cursor: pointer;
     transition: color 0.15s ease, background-color 0.15s ease;
@@ -637,16 +662,16 @@ const renderItems = computed(() => {
 .tool-output {
     margin: 3px 0 5px 0;
     border: 1px solid var(--awd-border);
-    border-radius: 6px;
+    border-radius: var(--awd-radius-md);
     background: var(--awd-surface);
     overflow: hidden;
 }
 
 .output-text {
     padding: 6px 8px;
-    font-family: 'SF Mono', Menlo, Consolas, monospace;
-    font-size: 11px;
-    line-height: 1.5;
+    font-family: inherit;
+    font-size: var(--awd-font-size-body);
+    line-height: var(--awd-line-height-ui);
     color: var(--awd-text);
     white-space: pre-wrap;
     word-break: break-word;
@@ -660,7 +685,7 @@ const renderItems = computed(() => {
     padding: 4px 8px;
     border-top: 1px solid var(--awd-border-subtle);
     background: var(--awd-bg);
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     color: var(--awd-text-2);
 }
 
@@ -672,7 +697,7 @@ const renderItems = computed(() => {
 }
 
 .tool-name {
-    font-size: 12px;
+    font-size: var(--awd-font-size-body);
     color: var(--awd-accent-text);
     font-weight: 500;
     white-space: nowrap;
@@ -681,7 +706,7 @@ const renderItems = computed(() => {
 }
 
 .tool-status {
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     font-weight: 500;
     flex-shrink: 0;
 }

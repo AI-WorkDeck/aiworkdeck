@@ -5,6 +5,55 @@ description: Microsoft Office 与 WPS 插件领域。任务涉及 Word/Excel/PPT
 
 # Office 插件 领域地图
 
+## 插件后端隐私与正文可靠性（dev-board#1316–1324，2026-10-16）
+
+此节取代后文历史「内联全文一字不动」「缓存未命中静默兜底」口径。
+`POST /api/agent/chat` 鉴权后、入队前按会话+文档标识校验正文哈希；未命中返回
+HTTP 409 `{status:"error",code:"INLINE_CONTENT_CACHE_MISS",retryWithInlineContent:true,message:...}`。
+任务窗格用本次读取快照只补传一次，同一消息保持原 clientRequestId，不重复添加用户气泡。
+缓存保留上传原文及其真实SHA256，模型注入按模型预算进一步取前缀，不能拿注入前缀替代缓存哈希。
+恰好200,000字符也按可能被客户端截断处理，模型和context_notice明确完整性限制。
+模型预算使用现有model-token-budgets，扣除历史、系统、工具预留和输出预算，属于保守估算，
+不是每个供应商tokenizer的绝对保证；超长任务仍须分段读取后才可声称完整审阅。
+
+`AgentInboxService` 持久请求去除inlineContent，只留hash；每个输入独立内存副本最多30分钟，
+128条/640万字符总上限。进程重启或驱逐会明确中断缺正文的任务，禁止按裸提问继续。
+删输入清message/displayText/requestJson但留幂等墓碑；删会话清消息/Inbox/摘要及正文缓存。
+启动分批清历史inline正文，并对可由Inbox识别的Office会话清原始工具载荷与派生摘要；
+更早无来源元数据的历史不能猜测归属。Office消息保存前移除tool_code/tool_output载荷，
+保留过程状态、用户消息、模型回复及思考；Office不再自动写长期摘要。用户粘贴或AI引用文字
+仍随会话保留至删除。不是备份/磁盘物理擦除承诺，完整用户口径见legal/PRIVACY.md。
+
+Word文本改写六工具支持可选reason：replace_text、insert_text、table_set_cell、
+edit_header_footer、insert_footnote、insert_endnote；replace_batch/pass_step的editsJson支持
+逐项reason。桥下发args.reason或args.items[i].reason；成功对象回执追加requestedReason或
+requestedEditReasons[{index:1,reason:...}]（pass_step位于applied内）。这是请求理由元数据，
+不能据此认定逐项成功，也不是Word原生revision ID。插件修订卡须按实际执行位置映射；
+batchEdits.normalizeBatchItems当前会丢弃reason，卡片对接方需补留。后端契约回归通过不等于
+Word/WPS原生修订卡已完成真机验收。
+
+## 默认密码登录与首次设密（dev-board#1299，2026-10-15）
+
+此节取代下文历史「验证码是主路径」：`SettingsView` 默认 password，手机号/邮箱共用文本
+账号输入，日常无验证码。首次使用/注册在窗格内验证手机号（cn）或邮箱（intl），得到一次性
+setupToken 后输入密码与确认密码；成功设密后单独密码登录才保存 awdt_。忘记密码走独立
+`/api/auth/account-login/password/reset/send-code` 与 `/reset`，完成后返回密码表单。
+验证码场景仍按 `loginTabs.js` 的站点能力选择；初始配置到达不能把 password 或 setup 踢回
+验证码模式。密码不 trim，8–72 字符；模式/后端地址切换清空敏感表单与受限票据。
+
+`postAccountLogin` 只在真正登录返回 token 字符串；受限阶段返回 challenge 对象，调用方
+必须判断 passwordSetupRequired，不能写入localStorage。`postAccountPasswordOperation`
+只允许 setup/reset/send-code/reset 三个固定路径。人机验证挂点仍在分支外保持 DOM，日常
+password/setup不展示控件。AppSource注册、条款、隐私入口及高级Key路径仍保留。
+
+官方旧 `/sms-login`、`/mail-login`、`/wx-phone-login` 通过
+`security.official-password-login-required=true` 禁止普通账号绕过密码；仅既有精确审核账号
+例外保留，自建服务器默认 false。官方桥成功额外返回 sessionId（token同值）和真实user
+快照供移动端；旧 token/userId/username/displayName/tokenId 字段兼容保留。
+验证：Office/WPS共用Vite双入口构建；`npm test`；`frontend/tests/account/password-login-ui.mjs`
+真实任务窗格网页合成API旅程。未在Word/WPS宿主内验收，不能声称已升级已安装插件。
+
+
 职责边界：`office-addin/` 目录下的 Office Add-in（任务窗格 UI、Office.js 文档访问、与后端的连接/对话链路、office_command 执行器）。总 spec 见 `docs/superpowers/specs/2026-08-06-office-addin-and-memory-sync.md`（Phase B 脚手架、Phase C 工具桥+会话能力过滤、收尾包 Excel/PPT 宿主+SSE 重连+awdk 直连+部署脚本已落地；Phase D 云后端生产化已于 2026-08-07 部署：官方托管实例 addin.aiworkdeck.com，profile=`application-cloud.yml`，部署材料与实录见 `deploy/cloud/README.md`，配置口径见 licensing-billing.md）。SSE/编排契约本体属 ai-chat 领域；office_* 后端桥（OfficeBridgeService/OfficeEditTools/能力过滤）详见 ai-doc-bridge 领域文档「第二条桥」一节。
 
 ## 关键文件
@@ -446,3 +495,22 @@ spec `docs/superpowers/specs/2026-09-18-addin-cross-file-design.md`。一句话�
 - `cd office-addin && npm test` —— 新增 `paneHeartbeat.test.js`、`chatSessionIdentity.test.js`（身份广播与补发）、`referenceRead.test.js` / `referenceReadOffice.test.js` / `referenceReadWps.test.js`（locator 解析、按页/标题切段、截断、不支持即报错）、`crossDocWrite.test.js`（强制修订、拒绝分支、快照与冲突撤销）、`crossDocChat.test.js`（origin 分流、串行、必定回传）、`officeCrossDoc.test.js` / `wpsCrossDoc.test.js`（两个家族的快照读写接缝）、`revisionLog.test.js` / `revisionLogUi.test.js` / `revisionLogPanel.test.js` / `revisionLocate.test.js`、`gitLink.test.js`、`api.test.js`（心跳/告别/git-links 的请求形状）。
 - UI/vite 动过就再 `npm run build`（与 `npm run build:wps`）。
 - **真机走查是这批的判据，不是可选项**（spec §10）：Mac 上 Word A + Word B 互读互改、Word A 改 Excel/PPT B 并撤销、WPS（Parallels）同样两轮、桌面端常连的冷热耗时与断网回落、案件库与 GitHub 各读一份 docx。未做的项在卡上与汇报里如实标「未验证」。
+
+## 统一项目目录（dev-board#1188，2026-10-11）
+
+`App.refreshProjects` 读取 `/api/mobile/catalog`，`lib/projectCatalog.js` 按 projectUid 生成一条选择项；
+已有普通云项目保留其云 id，桌面项目选在线位置并走既有 ensure-addin-link 归档绑定。
+同名不同项目不合并；影子容器属于同一项目的云位置，不能与完整桌面原件混同。
+目录接口仅 404 兼容旧设备列表，连接失败显示原有重试入口；护栏 `projectCatalog.test.js`。
+
+## 受限网络兼容验证（2026-10-17，dev-board#1330）
+
+`SettingsView.vue` 注册及找回密码均有「使用兼容验证」。经匿名
+`POST /api/auth/account-login/captcha-challenge` 申请官网生成的 PNG 挑战，
+body 为 `{phone|email,purpose:'login'|'reset'}`，返回 `{id,image,expiresAt}`；
+答案只放 `captchaToken=local:<id>:<answer>`，由官网按账号/用途/来源 IP 校验并一次核销。
+验证码仍走原短信/邮件发送路径和限流，前端加载失败不能视为免验证。
+切账号、用途、服务器或卸载清理挑战，迟到响应不恢复旧挑战；第三方脚本15秒超时并允许重载。
+只访问自有站点的备用验证入口与第三方组件独立，不等待第三方 SDK 加载成功。
+验证：`taskpane/lib/api.test.js` 与主仓 `frontend/tests/account/compatible-addin-ui.mjs`
+（实际任务窗格、主动阻断第三方域名、合成账号接口，无真实短信）。

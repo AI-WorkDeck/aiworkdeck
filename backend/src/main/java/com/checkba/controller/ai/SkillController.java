@@ -7,10 +7,12 @@ import com.checkba.controller.AuthController;
 import com.checkba.repository.UserRepository;
 import com.checkba.service.AdminAccessService;
 import com.checkba.service.LangText;
+import com.checkba.service.ai.skill.BuiltinWorkflowVersionService;
 import com.checkba.service.ai.skill.SkillDefinition;
 import com.checkba.service.ai.skill.SkillMarketService;
 import com.checkba.service.ai.skill.SkillRegistry;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
@@ -48,6 +51,13 @@ public class SkillController {
     private final com.checkba.service.telemetry.TelemetryService telemetryService;
     private final com.checkba.service.pack.NativePackService nativePackService;
 
+    @Autowired(required = false)
+    private BuiltinWorkflowVersionService builtinWorkflowVersionService;
+
+    public void setBuiltinWorkflowVersionService(BuiltinWorkflowVersionService builtinWorkflowVersionService) {
+        this.builtinWorkflowVersionService = builtinWorkflowVersionService;
+    }
+
     @lombok.Data
     public static class SkillView {
         private String id;
@@ -55,6 +65,8 @@ public class SkillController {
         /** 英文展示名（skill.yml: name_en），英文界面下前端优先用它；缺省回退 name */
         private String nameEn;
         private String description;
+        /** 英文简介（skill.yml: description_en），英文界面下前端优先用它；缺省回退 description */
+        private String descriptionEn;
         private List<String> triggers;
         private List<String> allowedTools;
         private String sourcePluginId;
@@ -75,6 +87,8 @@ public class SkillController {
          * 否则英文界面下用户能勾中一个 zh-only 的 skill，勾了却永远不生效，也没有任何提示。
          */
         private boolean available;
+        /** 是否为工程内置的高频核心工作流（懒人模式，dev-board#1431）；前端据此从手动选择器与启停管理列表中隐去，改为展示「内置高频能力」感知入口 */
+        private boolean builtinWorkflow;
         /** 依赖的原生资源包 id（skill.yml: requires_pack）；不依赖资源包时为 null */
         private String packId;
         /**
@@ -88,6 +102,111 @@ public class SkillController {
     @GetMapping("/list")
     public List<SkillView> listSkills() {
         return skillRegistry.getSkills().stream().map(this::toView).toList();
+    }
+
+    /**
+     * 获取 4 个内置常驻工作流在当前用户 + 当前项目下的版本列表与选中态（懒人模式，dev-board#1438）。
+     */
+    @GetMapping("/builtin-workflows")
+    public ResponseEntity<Map<String, Object>> listBuiltinWorkflows(
+            @RequestParam(value = "projectId", required = false) String projectId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        if (builtinWorkflowVersionService == null) {
+            Map<String, Object> empty = ok();
+            empty.put("workflows", List.of());
+            return ResponseEntity.ok(empty);
+        }
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        Map<String, Object> result = ok();
+        result.put("workflows", builtinWorkflowVersionService.listWorkflowStates(userId, projectId));
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * 新建或编辑内置常驻工作流的自定义版本（系统默认版只读兜底）。
+     */
+    @PostMapping("/builtin-workflows/{id}/versions")
+    public ResponseEntity<Map<String, Object>> saveBuiltinWorkflowVersion(
+            @PathVariable("id") String skillId,
+            @RequestParam(value = "projectId", required = false) String queryProjectId,
+            @RequestBody BuiltinWorkflowVersionService.SaveVersionRequest body,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        if (builtinWorkflowVersionService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(error(LangText.of("内置工作流版本服务未就绪", "Builtin workflow version service unavailable")));
+        }
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        String effectiveProjectId = (body != null && body.getProjectId() != null && !body.getProjectId().isBlank())
+                ? body.getProjectId()
+                : queryProjectId;
+        try {
+            var updated = builtinWorkflowVersionService.saveCustomVersion(userId, effectiveProjectId, skillId, body);
+            Map<String, Object> result = ok();
+            result.put("workflow", updated);
+            result.put("workflows", builtinWorkflowVersionService.listWorkflowStates(userId, effectiveProjectId));
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(error(e.getMessage()));
+        }
+    }
+
+    /**
+     * 切换当前项目或全局默认选用的内置常驻工作流版本。
+     */
+    @PostMapping("/builtin-workflows/{id}/select")
+    public ResponseEntity<Map<String, Object>> selectBuiltinWorkflowVersion(
+            @PathVariable("id") String skillId,
+            @RequestParam(value = "projectId", required = false) String queryProjectId,
+            @RequestBody BuiltinWorkflowVersionService.SelectVersionRequest body,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        if (builtinWorkflowVersionService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(error(LangText.of("内置工作流版本服务未就绪", "Builtin workflow version service unavailable")));
+        }
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        String effectiveProjectId = (body != null && body.getProjectId() != null && !body.getProjectId().isBlank())
+                ? body.getProjectId()
+                : queryProjectId;
+        String versionId = body != null ? body.getVersionId() : null;
+        String scope = body != null ? body.getScope() : null;
+        try {
+            var updated = builtinWorkflowVersionService.selectVersion(userId, effectiveProjectId, skillId, versionId, scope);
+            Map<String, Object> result = ok();
+            result.put("workflow", updated);
+            result.put("workflows", builtinWorkflowVersionService.listWorkflowStates(userId, effectiveProjectId));
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(error(e.getMessage()));
+        }
+    }
+
+    /**
+     * 删除一个用户自定义版本（若正被当前项目或全局选用，自动回退到系统默认版）。
+     */
+    @PostMapping("/builtin-workflows/{id}/versions/{versionId}/delete")
+    public ResponseEntity<Map<String, Object>> deleteBuiltinWorkflowVersion(
+            @PathVariable("id") String skillId,
+            @PathVariable("versionId") String versionId,
+            @RequestParam(value = "projectId", required = false) String queryProjectId,
+            @RequestBody(required = false) Map<String, String> body,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        if (builtinWorkflowVersionService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(error(LangText.of("内置工作流版本服务未就绪", "Builtin workflow version service unavailable")));
+        }
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        String effectiveProjectId = (body != null && body.get("projectId") != null && !body.get("projectId").isBlank())
+                ? body.get("projectId")
+                : queryProjectId;
+        try {
+            var updated = builtinWorkflowVersionService.deleteCustomVersion(userId, effectiveProjectId, skillId, versionId);
+            Map<String, Object> result = ok();
+            result.put("workflow", updated);
+            result.put("workflows", builtinWorkflowVersionService.listWorkflowStates(userId, effectiveProjectId));
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(error(e.getMessage()));
+        }
     }
 
     @PostMapping("/{id}/enable")
@@ -148,7 +267,7 @@ public class SkillController {
     public ResponseEntity<Map<String, Object>> listMarket(
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         if (AuthController.getUserIdFromSession(sessionId) == null) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("未登录"));
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error(LangText.of("未登录", "Not signed in")));
         }
         try {
             Map<String, Object> result = ok();
@@ -217,6 +336,7 @@ public class SkillController {
         view.setName(skill.getName());
         view.setNameEn(skill.getNameEn());
         view.setDescription(skill.getDescription());
+        view.setDescriptionEn(skill.getDescriptionEn());
         view.setTriggers(skill.getTriggers());
         view.setAllowedTools(skill.getAllowedTools());
         view.setSourcePluginId(skill.getSourcePluginId());
@@ -231,9 +351,18 @@ public class SkillController {
             view.setVersion(com.checkba.service.SensitiveService.VERSION);
             view.setDescription(com.checkba.service.SensitiveService.DESCRIPTION);
         }
+        if (LangText.isEnglish()) {
+            if (skill.getNameEn() != null && !skill.getNameEn().isBlank()) {
+                view.setName(skill.getNameEn());
+            }
+            if (skill.getDescriptionEn() != null && !skill.getDescriptionEn().isBlank()) {
+                view.setDescription(skill.getDescriptionEn());
+            }
+        }
         view.setLicense(skill.getLicense());
         view.setCredits(skill.getCredits());
         view.setAvailable(skillRegistry.isAvailable(skill));
+        view.setBuiltinWorkflow(skill.isBuiltinWorkflow());
         String packId = skill.getRequiresPack();
         if (packId != null && !packId.isBlank()) {
             view.setPackId(packId);

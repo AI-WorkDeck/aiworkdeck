@@ -112,17 +112,22 @@ public class TencentMeetingTools implements HostAware {
         return ok(Map.of("pending", true, "jobId", id));
     }
     private Object status() {
-        try { successful(List.of("--version"), Duration.ofSeconds(5)); }
-        catch (Failure e) { return Map.of("cliAvailable", false, "loggedIn", false, "userName", "", "message", TmeetCli.MISSING); }
-        String output = successful(List.of("auth", "status"), Duration.ofSeconds(10));
-        boolean loggedIn = output.lines().anyMatch(line -> line.trim().equals("Logged in"));
-        String name = output.lines().map(String::trim).filter(line -> line.startsWith("UserName:"))
-            .map(line -> line.substring("UserName:".length()).trim()).findFirst().orElse("");
-        return Map.of("cliAvailable", true, "loggedIn", loggedIn, "userName", name,
-            "message", loggedIn ? "已连接本机腾讯会议账号（本机 CLI 账号由所有桌面用户共享）" : "请先授权本机腾讯会议账号");
+        synchronized (cli) {
+            // The CLI holds token.lock throughout login. Even auth status must wait for that process to exit.
+            if (cli.loginPending()) return Map.of("cliAvailable", true, "loggedIn", false, "loginPending", true, "userName", "");
+            try { successful(List.of("--version"), Duration.ofSeconds(5)); }
+            catch (Failure e) { return Map.of("cliAvailable", false, "loggedIn", false, "userName", "", "message", e.getMessage()); }
+            String output = successful(List.of("auth", "status"), Duration.ofSeconds(10));
+            boolean loggedIn = output.lines().anyMatch(line -> line.trim().equals("Logged in"));
+            String name = output.lines().map(String::trim).filter(line -> line.startsWith("UserName:"))
+                .map(line -> line.substring("UserName:".length()).trim()).findFirst().orElse("");
+            return Map.of("cliAvailable", true, "loggedIn", loggedIn, "userName", name,
+                "message", loggedIn ? "已连接本机腾讯会议账号（本机 CLI 账号由所有桌面用户共享）" : "请先授权本机腾讯会议账号");
+        }
     }
     private Object login(ToolCall call) {
         String url = cli.login(call.userId());
+        if (url == null) return Map.of("loginPending", true);
         if (!TmeetCli.validAuthorizeUrl(url)) throw new Failure("授权地址校验失败，请在终端运行 tmeet auth login");
         return Map.of("authorizeUrl", url);
     }

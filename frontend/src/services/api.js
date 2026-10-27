@@ -10,6 +10,22 @@ import { getAuthHeaders, getSessionId, clearSession } from '@/utils/auth.js'
 import { host, isDesktopHost } from '@/services/host.js'
 import { t } from '@/i18n'
 import { accountRequiredError, isCreditsRequired, isAccountRequired } from '@/utils/requireAccountCore.js'
+import { createCloudConnectivity } from '@/utils/cloudConnectivity.js'
+import { subscribeProjectFileChanges } from '@/utils/projectFileChanges.js'
+
+// Desktop account changes do not replace the local session. Invalidate only on
+// successful identity mutations, never on account-status polling.
+let cloudAccountGeneration = 0
+export function getCloudAccountGeneration() {
+  return cloudAccountGeneration
+}
+function cloudAccountChanged(result) {
+  cloudAccountGeneration++
+  return result
+}
+// Only in-memory identity scoping; never persist or log the session value.
+const observeCloudConnectivity = createCloudConnectivity(() =>
+  JSON.stringify([getApiBaseUrl(), getSessionId(), getCloudAccountGeneration()]))
 
 /**
  * 功能未配置时的统一引导（#18 T7）。
@@ -427,17 +443,28 @@ function request(options) {
           originalUrl: options.url
         })
         // 根据 errMsg 提供更准确的诊断信息
-        let diagnosticMessage = '网络请求失败，请检查：'
+        const isEn = typeof isEnglish === 'function' && isEnglish()
+        let diagnosticMessage = isEn ? 'Network request failed. Please check:' : '网络请求失败，请检查：'
         if (err.errMsg && err.errMsg.includes('request:fail')) {
-          diagnosticMessage += '\n1. 后端服务是否正在运行（检查端口 9696）'
-          diagnosticMessage += '\n2. 后端服务是否启动成功（检查后端日志 backend/app.log）'
-          diagnosticMessage += '\n3. 网络连接是否正常'
-          diagnosticMessage += `\n4. 当前配置的 API 地址: ${baseUrl}`
-          diagnosticMessage += '\n5. 如果使用内网穿透，请确认隧道是否正常运行'
+          diagnosticMessage += isEn
+            ? '\n1. Whether the backend service is running (check port 9696)'
+              + '\n2. Whether the backend service started cleanly (check backend/app.log)'
+              + '\n3. Whether the network connection is healthy'
+              + `\n4. Configured API URL: ${baseUrl}`
+              + '\n5. If using a tunnel, verify that the tunnel is active'
+            : '\n1. 后端服务是否正在运行（检查端口 9696）'
+              + '\n2. 后端服务是否启动成功（检查后端日志 backend/app.log）'
+              + '\n3. 网络连接是否正常'
+              + `\n4. 当前配置的 API 地址: ${baseUrl}`
+              + '\n5. 如果使用内网穿透，请确认隧道是否正常运行'
         } else {
-          diagnosticMessage += '\n1. 网络连接问题'
-          diagnosticMessage += '\n2. 后端服务异常'
-          diagnosticMessage += `\n3. 当前配置的 API 地址: ${baseUrl}`
+          diagnosticMessage += isEn
+            ? '\n1. Network connectivity'
+              + '\n2. Backend service status'
+              + `\n3. Configured API URL: ${baseUrl}`
+            : '\n1. 网络连接问题'
+              + '\n2. 后端服务异常'
+              + `\n3. 当前配置的 API 地址: ${baseUrl}`
         }
         console.error('诊断信息:', diagnosticMessage)
         reject(err);
@@ -488,6 +515,14 @@ export function fetchCompanyBasicInfo(payload) {
 // 注：aiChat（POST /api/ai/chat）已随 v1 同步对话通道一并移除。
 // 对话走 SSE：见 /api/agent/connect + /api/agent/chat。
 
+export function requestChatSuggestion(conversationId, modelId) {
+  return request({ url: '/api/ai/suggestions', method: 'POST', data: { conversationId, modelId }, timeout: 20000, logBody: false, accountPrompt: false });
+}
+
+export function recordChatSuggestionFeedback(id, feedback) {
+  return request({ url: `/api/ai/suggestions/${encodeURIComponent(id)}/feedback`, method: 'POST', data: feedback, logBody: false, accountPrompt: false });
+}
+
 export function getAiHistory(params) {
   return request({
     url: '/api/ai/history',
@@ -495,6 +530,10 @@ export function getAiHistory(params) {
     params: params
   });
 }
+
+export const issueAgentConversation = projectId => request({
+  url: '/api/agent/conversations', method: 'POST', data: { projectId },
+})
 
 export function getAiConversations(projectId) {
   return request({
@@ -725,10 +764,11 @@ export function setPluginEnabled(pluginId, enabled) {
 }
 
 // 在线插件广场：拉取官网注册表列表（仅含已审核签名的插件）
-export function getPluginMarket() {
+export function getPluginMarket({ accountPrompt = true } = {}) {
   return request({
     url: '/api/plugins/market/list',
-    method: 'GET'
+    method: 'GET',
+    accountPrompt,
   });
 }
 
@@ -792,16 +832,40 @@ export function createFileFromContributedTemplate(pluginId, templateId, projectI
 }
 
 // 插件设置：声明 + 当前值（secret 只回显尾 4 位）-> { code, settings: [...] }
-export function getPluginSettings(pluginId) {
-  return request({ url: `/api/plugins/${pluginId}/settings`, method: 'GET' });
+export function getPluginSettings(pluginId, projectId = null) {
+  return request({ url: `/api/plugins/${pluginId}/settings`, method: 'GET', data: projectId == null ? {} : { projectId }, logBody: false });
 }
 
-// 保存插件设置（仅管理员；按声明校验类型）
-export function savePluginSettings(pluginId, values) {
+// Fixed platform routes; plugins never supply an arbitrary URL or host session header.
+export function pluginPlatformRequest(pluginId, action, params = {}, signal) {
+  const base = `/api/plugins/${encodeURIComponent(pluginId)}`
+  const connection = `${base}/connections/${encodeURIComponent(params.connectionId || params.id || '')}`
+  const routes = {
+    'connections.list': ['GET', `${base}/connections`, {}],
+    'connections.connect': ['POST', `${connection}/connect`, { token: params.token }],
+    'connections.authorize': ['POST', `${connection}/authorize`, {}],
+    'connections.disconnect': ['POST', `${connection}/disconnect`, {}],
+    'connections.request': ['POST', `${connection}/request`, { operation: params.operation, params: params.params, projectId: params.projectId }],
+    'billing.status': ['GET', `${base}/billing`, params.connectionId == null ? {} : { connectionId: params.connectionId }],
+    'billing.checkout': ['GET', `${base}/billing/checkout`, params.connectionId == null ? {} : { connectionId: params.connectionId }],
+    'mcp.servers': ['GET', `${base}/mcp/servers`, { projectId: params.projectId }],
+    'mcp.call': ['POST', `${base}/mcp/call`, { serverId: params.serverId, name: params.name, arguments: params.arguments, projectId: params.projectId }]
+  }
+  const route = routes[action]
+  if (!route) return Promise.reject(new Error('Unknown plugin platform action'))
+  return request({ method: route[0], url: route[1], data: route[2], signal, logBody: false, timeout: 60000, accountPrompt: false })
+}
+
+export const getBundledPlugins = () => request({ url: '/api/plugins/bundled', method: 'GET' })
+export const installBundledPlugin = id => request({ url: `/api/plugins/bundled/${encodeURIComponent(id)}/install`, method: 'POST' })
+
+// 保存已声明设置：installation 仅管理员，user/project 按身份与项目权限校验。
+export function savePluginSettings(pluginId, values, projectId = null) {
   return request({
-    url: `/api/plugins/${pluginId}/settings`,
+    url: `/api/plugins/${pluginId}/settings${projectId == null ? '' : '?projectId=' + encodeURIComponent(projectId)}`,
     method: 'POST',
     data: values,
+    logBody: false,
     header: { 'Content-Type': 'application/json' },
   });
 }
@@ -815,6 +879,21 @@ export function getContributedStyleProfiles() {
 export function selectContributedStyleProfile(ref) {
   return request({
     url: '/api/plugins/contributed/style-profiles/select',
+    method: 'POST',
+    data: { ref: ref || '' },
+    header: { 'Content-Type': 'application/json' },
+  });
+}
+
+// 插件贡献的外观皮肤清单 -> { code, selected, themes: [{pluginId, id, name, description, selected, lightTokens, darkTokens, fonts, effects, previewSwatches}] }
+export function getContributedThemes() {
+  return request({ url: '/api/plugins/contributed/themes', method: 'GET' });
+}
+
+// 选定/清除全局外观皮肤；ref 形如 "<pluginId>:<themeId>"，空或 "default" = 恢复默认内置皮肤
+export function selectContributedTheme(ref) {
+  return request({
+    url: '/api/plugins/contributed/themes/select',
     method: 'POST',
     data: { ref: ref || '' },
     header: { 'Content-Type': 'application/json' },
@@ -937,6 +1016,52 @@ export function getSkills() {
   });
 }
 
+// 获取内置常驻工作流（懒人模式，dev-board#1438）的多版本与当前项目选中态
+export function getBuiltinWorkflows(projectId) {
+  const query = projectId ? `?projectId=${encodeURIComponent(String(projectId))}` : '';
+  return request({
+    url: `/api/skills/builtin-workflows${query}`,
+    method: 'GET'
+  });
+}
+
+// 新建或编辑内置常驻工作流的自定义版本（系统默认版只读兜底）
+export function saveBuiltinWorkflowVersion(skillId, payload) {
+  return request({
+    url: `/api/skills/builtin-workflows/${encodeURIComponent(skillId)}/versions`,
+    method: 'POST',
+    data: payload || {},
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
+// 切换当前项目或全局默认选用的内置常驻工作流版本
+export function selectBuiltinWorkflowVersion(skillId, payload) {
+  return request({
+    url: `/api/skills/builtin-workflows/${encodeURIComponent(skillId)}/select`,
+    method: 'POST',
+    data: payload || {},
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
+// 删除内置常驻工作流的自定义版本
+export function deleteBuiltinWorkflowVersion(skillId, versionId, projectId) {
+  const query = projectId ? `?projectId=${encodeURIComponent(String(projectId))}` : '';
+  return request({
+    url: `/api/skills/builtin-workflows/${encodeURIComponent(skillId)}/versions/${encodeURIComponent(versionId)}/delete${query}`,
+    method: 'POST',
+    data: projectId ? { projectId: String(projectId) } : {},
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
 // 启用 / 禁用 Skill（仅管理员）
 export function setSkillEnabled(skillId, enabled) {
   return request({
@@ -1002,6 +1127,10 @@ export function uninstallMarketSkill(skillId) {
 // 四个可选组件的一次性快照（后端 PackController.optionalComponents）。
 // 这条端点**不发网络请求**（体积取内存/落盘快照，0 = 未知），首次登录面板可以放心在
 // 登录后立刻调它；要精确体积再按需打 packInfo。
+export function checkExternalDependencies() {
+  return request({ url: "/api/external-dependencies", method: "GET", timeout: 25000 });
+}
+
 export function optionalComponents() {
   return request({
     url: '/api/packs/optional-components',
@@ -1158,7 +1287,8 @@ export function createProject(payload) {
 }
 
 // IDE 化本地文件夹项目：打开/新建本地文件夹作为项目
-// payload: { localRoot, createFolder, name, openFileName }
+// payload: { localRoot, createFolder, name, openFileName, allowNested }
+// Before opening nested folders, data may request requiresNestedConfirmation with overlappingProjectNames.
 // 返回 { code: 0, data: { projectId, name, reused, openFileId, importedCount, truncated, truncatedCount } }
 export function openLocalProject(payload) {
   return request({
@@ -1168,6 +1298,16 @@ export function openLocalProject(payload) {
     header: {
       'Content-Type': 'application/json',
     },
+  });
+}
+
+// 单文件仅登记明确选择的文件，不扫描父目录；保存仍写回原文件。
+export function openLocalFile(payload) {
+  return request({
+    url: '/api/projects/open-local-file',
+    method: 'POST',
+    data: payload,
+    header: { 'Content-Type': 'application/json' },
   });
 }
 
@@ -1210,7 +1350,7 @@ export function activateLicense(code) {
     header: {
       'Content-Type': 'application/json',
     },
-  });
+  }).then(cloudAccountChanged);
 }
 
 // 当前站点与可选站点（双主站）。
@@ -1234,7 +1374,7 @@ export function selectSite(site) {
     header: {
       'Content-Type': 'application/json',
     },
-  });
+  }).then(cloudAccountChanged);
 }
 
 // 解除授权：回到未解锁状态
@@ -1242,7 +1382,7 @@ export function deactivateLicense() {
   return request({
     url: '/api/license/deactivate',
     method: 'POST',
-  });
+  }).then(cloudAccountChanged);
 }
 
 // ===================== 插件访问令牌（awdt_ 设备令牌）相关 API =====================
@@ -1349,7 +1489,7 @@ export function connectAccount(key) {
     header: {
       'Content-Type': 'application/json',
     },
-  }).then(unwrapEnvelope);
+  }).then(unwrapEnvelope).then(cloudAccountChanged);
 }
 
 // 账户登录：给手机号发验证码（本机后端转发官网）。
@@ -1375,14 +1515,16 @@ export function sendAccountLoginCode(identifier, captchaToken, isPhone = true) {
 
 // 官网人机验证的公开配置（只有公开参数，没有密钥）。未启用时 provider 为空，
 // 调用方据此跳过控件直接发码——与官网此刻确实不校验是同一个判断。
+export function getAccountCaptchaChallenge(payload) {
+  return request({ url: '/api/account/captcha-challenge', method: 'POST', accountPrompt: false, data: payload }).then(unwrapEnvelope);
+}
+
 export function getAccountCaptchaConfig() {
   return request({ url: '/api/account/captcha-config', method: 'GET' }).then(unwrapEnvelope);
 }
 
-// 账户登录（验证码即登录，未注册的号码/邮箱由官网自动建账户）：
-//   { phone, code }（大陆站，短信验证码）或 { email, code }（国际站，邮箱验证码）；
-//   { account, password } 只剩两站存量口令账号在用，解锁页已不再提供这个入口。
-// 成功后本机已连接账户，返回体同 getAccountStatus 再加 isNewUser / mustBindPhone。
+// Daily sign-in: { account, password }. First-time { phone|email, code } returns only
+// a passwordSetupRequired challenge. Only a completed password sign-in connects the account.
 export function loginAccount(payload) {
   return request({
     url: '/api/account/login',
@@ -1392,7 +1534,15 @@ export function loginAccount(payload) {
     header: {
       'Content-Type': 'application/json',
     },
-  }).then(unwrapEnvelope);
+  }).then(unwrapEnvelope).then(cloudAccountChanged);
+}
+
+// Password lifecycle calls never imply a connected account.
+export function accountPasswordOperation(operation, payload) {
+  if (!['setup', 'reset/send-code', 'reset'].includes(operation)) throw new Error('Unknown password operation')
+  return request({ url: `/api/account/password/${operation}`, accountPrompt: false,
+    method: 'POST', data: payload, header: { 'Content-Type': 'application/json' },
+  }).then(unwrapEnvelope)
 }
 
 // 断开账户连接：清除本机保存的账户 Key
@@ -1400,7 +1550,7 @@ export function disconnectAccount() {
   return request({
     url: '/api/account/disconnect',
     method: 'POST',
-  }).then(unwrapEnvelope);
+  }).then(unwrapEnvelope).then(cloudAccountChanged);
 }
 
 // ---------- 账户资料：展示名与头像（Spec §5，dev-board#564–#567） ----------
@@ -1867,6 +2017,21 @@ export function logout() {
   });
 }
 
+export const ensureScratchProject = () => {
+  return request({
+    url: '/api/projects/scratch',
+    method: 'POST'
+  })
+}
+
+export const promoteScratchProject = (projectId, data = {}) => {
+  return request({
+    url: `/api/projects/${projectId}/promote`,
+    method: 'POST',
+    data
+  })
+}
+
 // 获取当前用户的项目列表
 export function getMyProjects() {
   return request({
@@ -1930,6 +2095,15 @@ export async function resolveProjectFileByPath(projectId, path) {
   }
 }
 
+// 本机磁盘对账完成通知，建立连接时也补读一次。
+export function subscribeLocalProjectFileChanges(projectId, onChange) {
+  return subscribeProjectFileChanges(projectId, {
+    url: `${getApiBaseUrl()}/api/projects/${encodeURIComponent(projectId)}/files/changes`,
+    getHeaders: getAuthHeaders,
+    onChange,
+  });
+}
+
 // 获取项目文件列表
 export function getProjectFiles(projectId, parentId = null, tree = false) {
   const params = []
@@ -1944,6 +2118,21 @@ export function getProjectFiles(projectId, parentId = null, tree = false) {
     url: `/api/projects/${projectId}/files${queryString}`,
     method: 'GET',
   });
+}
+
+// 标签恢复只需要少量文件元数据，不加载整棵文件树与标签关联。
+export async function getProjectFilesByIds(projectId, ids) {
+  const files = []
+  for (let start = 0; start < ids.length; start += 200) {
+    const batch = ids.slice(start, start + 200).map(encodeURIComponent).join(',')
+    const result = await request({
+      // 旧后端忽略 ids 时仍返回完整树，避免把子目录文件误判为已删除。
+      url: `/api/projects/${projectId}/files?tree=true&ids=${batch}`,
+      method: 'GET',
+    })
+    files.push(...result)
+  }
+  return files
 }
 
 // 创建文件夹
@@ -1966,6 +2155,19 @@ export function getArchiveEntries(projectId, fileId) {
   return request({
     url: `/api/projects/${projectId}/files/${fileId}/archive/entries`,
     method: 'GET',
+  });
+}
+
+export function getArchiveEntryUrl(projectId, fileId, path) {
+  return `${getApiBaseUrl()}/api/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}/archive/entry?path=${encodeURIComponent(path)}`;
+}
+
+export function importArchiveEntry(projectId, fileId, path, parentId) {
+  return request({
+    url: `/api/projects/${projectId}/files/${fileId}/archive/import-entry`,
+    method: 'POST',
+    data: { path, parentId },
+    header: { 'Content-Type': 'application/json' },
   });
 }
 
@@ -2132,18 +2334,45 @@ export function batchCopyFiles(projectId, fileIds, targetParentId) {
   });
 }
 
+// 单个文件（Word/PPT/Excel/图片）转为 PDF（dev-board#1291）
+export function convertFileToPdf(projectId, fileId) {
+  return request({
+    url: `/api/projects/${projectId}/files/${fileId}/convert-pdf`,
+    method: 'POST',
+    timeout: 120000,
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
+// 多个文件分别转 PDF 后合并为一个 PDF（dev-board#1291）
+export function mergeFilesToPdf(projectId, fileIds) {
+  return request({
+    url: `/api/projects/${projectId}/files/batch/merge-pdf`,
+    method: 'POST',
+    timeout: 180000,
+    data: {
+      fileIds,
+    },
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
 
 // ===================== 脱敏处理 API =====================
 // ===================== 脱敏处理 API =====================
-export function getSensitiveOptions() {
-  return request({
+export function getSensitiveOptions(opts = {}) {
+  return request({ signal: opts.signal, logBody: false,
     url: '/api/sensitive/options',
     method: 'GET',
   });
 }
 
-export function desensitizeFile(payload) {
-  return request({
+export function desensitizeFile(payload, opts = {}) {
+  return request({ signal: opts.signal, logBody: false,
     url: '/api/sensitive/desensitize',
     method: 'POST',
     data: payload,
@@ -2154,12 +2383,12 @@ export function desensitizeFile(payload) {
   });
 }
 
-export function previewSensitiveFile(payload) {
-  return request({ url: '/api/sensitive/preview', method: 'POST', data: payload, timeout: 300000 });
+export function previewSensitiveFile(payload, opts = {}) {
+  return request({ signal: opts.signal, logBody: false, url: '/api/sensitive/preview', method: 'POST', data: payload, timeout: 300000 });
 }
 
-export function restoreSensitiveFile(payload) {
-  return request({ url: '/api/sensitive/restore', method: 'POST', data: payload, timeout: 300000 });
+export function restoreSensitiveFile(payload, opts = {}) {
+  return request({ signal: opts.signal, logBody: false, url: '/api/sensitive/restore', method: 'POST', data: payload, timeout: 300000 });
 }
 
 // 获取文件详情
@@ -2175,6 +2404,11 @@ export function getFileDetail(projectId, fileId) {
 export function getFileBytesUrl(fileId) {
   const baseUrl = getApiBaseUrl()
   return `${baseUrl}/api/files/${fileId}/download`
+}
+
+// QTA 的本机兼容音频副本；不替代下载原件的 URL。
+export function getFileAudioPreviewUrl(fileId) {
+  return `${getApiBaseUrl()}/api/files/${fileId}/audio-preview`
 }
 
 // 覆盖写一份项目文件字节的 URL（POST /api/files/{id}/upload，multipart "file" 或
@@ -2281,11 +2515,13 @@ export function getTtsVoices() {
   });
 }
 
-export function generateTtsAudio(payload) {
+export function generateTtsAudio(payload, options = {}) {
   return request({
     url: '/api/tts/generate',
     method: 'POST',
     data: payload,
+    signal: options.signal,
+    logBody: false,
     responseType: 'arraybuffer'
   });
 }
@@ -2344,6 +2580,9 @@ export function evidenceRefCounts(projectId, fileIds) {
 // 四个端点全在 /api/projects/{pid}/insight 之下；未登录一律 200 + {code:4010}，
 // 由 request() 的统一信封处理（这里不另做分支）。
 /** 发起解析（异步）。返回时 run 已落库为 RUNNING，调用方立刻可以轮询 getInsight。 */
+export function reviewDocumentLayout(projectId, data) {
+  return request({ url: `/api/projects/${projectId}/visual-review`, method: 'POST', data, logBody: false, timeout: 120000 })
+}
 export function reviewDocInsight(projectId, data) {
   return request({ url: `/api/projects/${projectId}/insight/review`, method: 'POST', data, logBody: false, timeout: data.deep ? 120000 : 30000 })
 }
@@ -3257,6 +3496,41 @@ export function deleteMeetingRecording(meetingId) {
 
 // ==================== 编辑器操作结果回调 ====================
 
+export function getProjectVersionActionState(operationId, conversationId, stepId) {
+  const step = stepId ? `&stepId=${encodeURIComponent(stepId)}` : ''
+  return request({ url: `/api/ai/agent/version-action/state?operationId=${encodeURIComponent(operationId)}&conversationId=${encodeURIComponent(conversationId)}${step}`, method: 'GET' })
+}
+
+export function executeProjectVersionAction(operationId, conversationId) {
+  return request({ url: '/api/ai/agent/version-action/execute', method: 'POST', data: { operationId, conversationId } })
+}
+
+export function continueProjectVersionMerge(data) {
+  return request({ url: '/api/ai/agent/version-action/merge', method: 'POST', data })
+}
+
+export function continueProjectVersionMergeFile({ operationId, conversationId, stepId, path, bytes, name }) {
+  const form = new FormData()
+  for (const [key, value] of Object.entries({ operationId, conversationId, stepId, path })) form.append(key, value)
+  form.append('file', bytes instanceof Blob ? bytes : new Blob([bytes], { type: 'application/octet-stream' }), name || String(path).split('/').pop())
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${getApiBaseUrl().replace(/\/$/, '')}/api/ai/agent/version-action/merge-file`)
+    const sessionId = getSessionId()
+    if (sessionId) xhr.setRequestHeader('X-Session-Id', sessionId)
+    xhr.timeout = 180000
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText)
+        if (xhr.status === 200 && data.code === 0) resolve(data)
+        else reject(new Error(data.message || t('common.submitFailed')))
+      } catch { reject(new Error(t('common.parseResponseFailed'))) }
+    }
+    xhr.onerror = xhr.ontimeout = () => reject(new Error(t('common.networkError')))
+    xhr.send(form)
+  })
+}
+
 export function getCheckpointRestoreWriteState(conversationId, fileId, restoreId) {
   return request({
     url: `/api/ai/agent/checkpoint-restore-state?conversationId=${encodeURIComponent(conversationId)}&fileId=${encodeURIComponent(fileId)}&restoreId=${encodeURIComponent(restoreId)}`,
@@ -3289,8 +3563,8 @@ export function sendEditorResult(conversationId, requestId, success, data, error
 }
 
 // ==================== 标签管理 (Tag Management) ====================
-export function getProjectTags(projectId) {
-  return request({
+export function getProjectTags(projectId, opts = {}) {
+  return request({ signal: opts.signal, logBody: false,
     url: `/api/projects/${projectId}/tags`,
     method: 'GET'
   })
@@ -3343,6 +3617,7 @@ export function searchProjectContent(projectId, payload, opts = {}) {
     url: `/api/projects/${projectId}/search`,
     method: 'POST',
     data: payload,
+    timeout: payload.filenameOnly ? 60000 : 300000,
     header: { 'Content-Type': 'application/json' },
     signal: opts.signal
   })
@@ -3845,7 +4120,7 @@ export function getMergeAnalysis(projectId, path) {
 // submitFeedback 已是同样的写法）。
 // bytes：Uint8Array（引擎 export_document 的出参）；decisions：Decision[] 数组，
 // 元素 {key, side: 'M'|'T'|'', action: 'A'|'R'|'X'|'F'}，mode=auto 时允许为空。
-export function postMergeResolveFile(projectId, { path, mode, decisions, bytes, name, ctx }) {
+export function postMergeResolveFile(projectId, { path, mode, decisions, bytes, name, ctx, mainRef, otherRef }) {
   const baseUrl = getApiBaseUrl()
   const sessionId = getSessionId()
   const form = new FormData()
@@ -3853,6 +4128,8 @@ export function postMergeResolveFile(projectId, { path, mode, decisions, bytes, 
   form.append('mode', mode || 'manual')
   form.append('decisions', JSON.stringify(decisions || []))
   if (ctx) form.append('ctx', ctx)
+  if (mainRef) form.append('mainRef', mainRef)
+  if (otherRef) form.append('otherRef', otherRef)
   if (bytes) {
     const blob = bytes instanceof Blob ? bytes : new Blob([bytes], { type: 'application/octet-stream' })
     form.append('file', blob, name || (String(path).split('/').pop() || 'merged.bin'))
@@ -3920,11 +4197,11 @@ export function createComparisonFile(projectId, { bytes, name, baseFileId, revis
 
 // xlsx / pptx：合并文件由后端 POI 按 decisions 拼，前端只送决定，不送字节。
 // decisions 为空数组 = 自动模式（把另一侧独有的改动全部合入）。
-export function postMergeResolveStructured(projectId, { path, decisions }) {
+export function postMergeResolveStructured(projectId, { path, decisions, ctx, mainRef, otherRef }) {
   return request({
     url: `/api/projects/${projectId}/version/merge/resolve-structured`,
     method: 'POST',
-    data: { path, decisions: decisions || [] }
+    data: { path, decisions: decisions || [], ...(ctx ? { ctx } : {}), ...(mainRef ? { mainRef } : {}), ...(otherRef ? { otherRef } : {}) }
   });
 }
 
@@ -3991,19 +4268,23 @@ export function acceptCloudProject(connectionId, remoteProjectId, localRoot) {
 }
 
 export function getCloudStatus(projectId) {
-  return request({ url: `/api/cloud/projects/${projectId}/status`, method: 'GET' })
+  return observeCloudConnectivity(projectId, 'status', () =>
+    request({ url: `/api/cloud/projects/${projectId}/status`, method: 'GET' }))
 }
 
 export function checkCloud(projectId) {
-  return request({ url: `/api/cloud/projects/${projectId}/check`, method: 'POST' })
+  return observeCloudConnectivity(projectId, 'check', () =>
+    request({ url: `/api/cloud/projects/${projectId}/check`, method: 'POST' }))
 }
 
 export function uploadToCloud(projectId) {
-  return request({ url: `/api/cloud/projects/${projectId}/upload`, method: 'POST' })
+  return observeCloudConnectivity(projectId, 'upload', () =>
+    request({ url: `/api/cloud/projects/${projectId}/upload`, method: 'POST' }))
 }
 
 export function updateFromCloud(projectId) {
-  return request({ url: `/api/cloud/projects/${projectId}/update`, method: 'POST' })
+  return observeCloudConnectivity(projectId, 'update', () =>
+    request({ url: `/api/cloud/projects/${projectId}/update`, method: 'POST' }))
 }
 
 // resolutions: { [path]: 'MAIN' | 'DRAFT' | 'BOTH' }（语境映射见 AdoptConflictDialog）
@@ -4227,7 +4508,7 @@ export function getTmeetAuthStatus() {
 
 export function loginTmeet() {
   return request({
-    url: '/api/tmeet/auth/login',
+    url: '/api/tmeet/auth/login-start',
     method: 'POST'
   })
 }
@@ -4256,11 +4537,13 @@ export function updateTmeetSyncConfig(data) {
 }
 
 export function syncTmeetMeetings(options = {}) {
+  const params = new URLSearchParams()
+  if (options.projectId != null) params.set('projectId', String(options.projectId))
+  if (options.force != null) params.set('force', String(options.force))
+  const query = params.toString()
   return request({
-    url: '/api/tmeet/sync',
-    method: 'POST',
-    data: options,
-    header: { 'Content-Type': 'application/json' }
+    url: `/api/tmeet/sync${query ? `?${query}` : ''}`,
+    method: 'POST'
   })
 }
 
@@ -4298,14 +4581,14 @@ export function exportTmeetToDoc(recordId, projectId) {
 export function getTmeetMinutesPrompt(recordId) {
   return request({
     url: `/api/tmeet/meetings/${recordId}/minutes-prompt`,
-    method: 'GET'
+    method: 'POST'
   })
 }
 
 export function getTmeetTodosPrompt(recordId) {
   return request({
     url: `/api/tmeet/meetings/${recordId}/todos-prompt`,
-    method: 'GET'
+    method: 'POST'
   })
 }
 
@@ -4318,3 +4601,126 @@ export function getMobileReceiveStatus(projectKey = '') {
 export function checkMobileReceive() {
   return request({ url: '/api/mobile-receive/check', method: 'POST' })
 }
+
+export function getAccountProjectCatalog() {
+  return request({ url: '/api/mobile-receive/catalog', method: 'GET' })
+}
+export function requestAccountCatalog(method, path, body, accountScope) {
+  return request({ url: '/api/mobile-receive/catalog/request', method: 'POST', data: { method, path, body, accountScope } })
+}
+export function importAccountCatalogFile(data) {
+  return request({ url: '/api/mobile-receive/catalog/import', method: 'POST', data, timeout: 600000 })
+}
+
+export function getMobileBackupConsent() {
+  return request({ url: '/api/mobile-receive/backup-consent', method: 'GET' })
+}
+export function setMobileBackupConsent(data) {
+  return request({ url: '/api/mobile-receive/backup-consent', method: 'PUT', data })
+}
+
+export function requestPluginIm(pluginId, projectId, action, params) {
+  return request({
+    url: `/api/plugins/${encodeURIComponent(pluginId)}/im`,
+    method: 'POST', data: { projectId, action, params }, timeout: 120000
+  })
+}
+
+export const requestPluginNotifications = (pluginId, action, params = {}) => request({
+  url: `/api/plugins/${encodeURIComponent(pluginId)}/notifications`,
+  method: 'POST', data: { action, params }, logBody: false
+})
+
+export const requestPluginLawFirm = (pluginId, projectId, action, params = {}) => request({
+  url: `/api/plugins/${encodeURIComponent(pluginId)}/lawfirm`,
+  method: 'POST',
+  data: { projectId, action, params }
+})
+
+export const getLawFirmOverview = (params = {}) => request({
+  url: '/api/lawfirm/overview',
+  method: 'GET',
+  data: params
+})
+
+export const requestLawFirmAction = (action, params = {}, projectId = null) => request({
+  url: '/api/lawfirm/action',
+  method: 'POST',
+  data: { projectId, action, params }
+})
+
+export const ensureLawFirmPlugin = () => request({
+  url: '/api/lawfirm/ensure-plugin',
+  method: 'POST',
+  data: {}
+})
+
+export const getLawFirmFinanceCsvUrl = () => `${getApiBaseUrl()}/api/lawfirm/finance/export-csv`
+
+
+
+// Graceful desktop restart. Attempt identity prevents a delayed prepare after cancellation.
+export const prepareAgentRestart = (data) => request({ url: '/api/agent/restart/prepare', method: 'POST', data })
+export const abortAgentRestart = (data) => request({ url: '/api/agent/restart/abort', method: 'POST', data })
+export const getPendingAgentRestarts = () => request({ url: '/api/agent/restart/pending', method: 'GET' })
+export const resumeAgentRestart = (data) => request({ url: '/api/agent/restart/resume', method: 'POST', data })
+
+export function getProjectFileAccess(projectId, fileId) {
+  return request({
+    url: `/api/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}/access`,
+    method: 'GET'
+  }).then(unwrapEnvelope)
+}
+
+export function updateProjectFileAccess(projectId, fileId, clientVisible) {
+  return request({
+    url: `/api/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}/access`,
+    method: 'PUT', data: { clientVisible }
+  }).then(unwrapEnvelope)
+}
+
+// Only trusted host settings expose development service approval.
+export function getPluginDevTrust(pluginId) {
+  return request({ url: `/api/plugins/${encodeURIComponent(pluginId)}/dev-trust`, method: 'GET', logBody: false })
+}
+export function setPluginDevTrust(pluginId, trusted) {
+  return request({ url: `/api/plugins/${encodeURIComponent(pluginId)}/dev-trust`, method: 'POST', data: { trusted }, logBody: false })
+}
+
+// Explicit OCR fallback preference and authenticated per-task decisions.
+export const getOcrRouting = () => request({ url: '/api/ocr/routing', method: 'GET' })
+export const setOcrRouting = data => request({ url: '/api/ocr/routing', method: 'PUT', data })
+export const chooseOcrRouting = data => request({ url: '/api/ocr/routing/choice', method: 'POST', data })
+
+// Snapshot scope is held only in the originating UI task, so a late cancellation targets its account/server.
+export const cancelOcrRouting = (data, scope) => request({
+  url: scope ? scope.baseUrl.replace(/\/$/, '') + '/api/ocr/routing/cancel' : '/api/ocr/routing/cancel',
+  method: 'POST', data, header: scope?.headers, logBody: false,
+})
+
+// ===================== Harness² 用户自进化控制面板 API (dev-board#1481) =====================
+export const getHarnessEvolutions = (params = {}) => request({
+  url: '/api/agent/harness/evolutions',
+  method: 'GET',
+  data: params,
+})
+
+export const switchHarnessEvolutionScope = (id, scope) => request({
+  url: `/api/agent/harness/evolutions/${encodeURIComponent(id)}/scope`,
+  method: 'POST',
+  data: { scope },
+  header: { 'Content-Type': 'application/json' },
+})
+
+export const promoteHarnessEvolutionToSkill = (id, payload = {}) => request({
+  url: `/api/agent/harness/evolutions/${encodeURIComponent(id)}/promote-skill`,
+  method: 'POST',
+  data: payload,
+  header: { 'Content-Type': 'application/json' },
+})
+
+export const revertHarnessEvolution = (id) => request({
+  url: `/api/agent/harness/evolutions/${encodeURIComponent(id)}`,
+  method: 'DELETE',
+})
+

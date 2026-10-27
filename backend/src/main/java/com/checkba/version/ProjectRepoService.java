@@ -5,6 +5,10 @@ package com.checkba.version;
 
 import com.checkba.service.LocalIdentityService;
 import com.checkba.storage.ProjectStorageResolver;
+import com.checkba.version.objects.LocalVersionObjectStore;
+import com.checkba.version.objects.VersionObjectFilters;
+import com.checkba.version.objects.VersionObjectPointer;
+import com.checkba.version.objects.VersionObjectRepository;
 import com.checkba.version.merge.Decision;
 import com.checkba.version.merge.MergeRecord;
 import org.eclipse.jgit.api.CreateBranchCommand;
@@ -32,18 +36,29 @@ import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
+import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
+import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.DataOutputStream;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.FileTime;
+import java.security.DigestInputStream;
+import java.security.DigestOutputStream;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
@@ -59,6 +74,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * 每项目一个 Git 仓库的薄封装。只认识 Git 概念，不认识「工作段」——
@@ -77,33 +93,10 @@ public class ProjectRepoService {
     private static final org.slf4j.Logger log =
             org.slf4j.LoggerFactory.getLogger(ProjectRepoService.class);
 
-    /**
-     * 单个历史版本文件读入内存的体积闸（{@link #blobAt}）。可达性不需要特殊操作：
-     * workTree 就是项目存储根目录，commitAll 把工作区里没被 gitignore 挡掉的文件整体
-     * 入库——会议录音的 webm/mp3、手机端回传的现场影像视频、扫描件全都会进版本历史。
-     * 写侧后来加了体积过滤（{@link #maxTrackedFileSizeBytes}），但它只拦**这次新增/
-     * 修改**的超限文件，管不到过滤上线之前就已经在库里的大文件，读侧这道闸因此照样
-     * 必须存在。云端/团队服务器部署的堆上限只有 1.5GB
-     * （deploy/cloud/aiworkdeck-cloud.service 的 {@code -Xmx1536m}），blobAt 原来整份
-     * 读进 ByteArrayOutputStream 没有任何体积闸，几个并发请求各读一份大文件就能把堆打爆。
-     * 50MB 是这个闸的取值：普通法律文档（docx/pdf/xlsx，含内嵌高清扫描件）几乎不会到这个
-     * 量级，真正会撞上它的正是会议录音/现场影像这类本不该走这条内存缓冲路径的媒体文件；
-     * 50MB × 十几个并发请求仍在 1.5GB 堆的安全余量内。
-     */
+    /** Only comparison/parsing is memory-bounded; complete downloads and restores use streams. */
     private static final long MAX_BLOB_SIZE_BYTES = 50L * 1024 * 1024;
 
-    /**
-     * 单个新增/修改文件入版本库的体积上限（尽调模块 P3 稳定性余项 #3，dev-board#100，
-     * 可配置，默认 50MB——与上面读侧的 {@link #MAX_BLOB_SIZE_BYTES} 同一个保守量级）。
-     * {@link #commitAll} 里超过这个阈值的文件这一轮不 {@code git add}，只在提交说明里
-     * 追加一行指纹记录（路径 + 体积 + sha256），不静默吞掉。**只影响这次新增/修改**：
-     * 已经在库里的旧版本不受影响——未被 add 的路径不会被当成删除处理（"文件被删除"
-     * 走单独一条只看"磁盘上已经不存在的已跟踪路径"的分支，与体积无关，见 commitAll）。
-     * 字段级 {@code @Value}（不是构造器参数）：ProjectRepoService 的单参构造器被约
-     * 20 处测试手工 {@code new}，改构造器签名要挨个改，字段注入零改动、精确复刻
-     * SystemProxyRefresher.autoRefresh 的既有写法——手工 new 的测试用不到 Spring
-     * 容器，字段就停留在这里声明的默认值。
-     */
+    /** Small documents stay in Git. Larger files and all audio/video use local immutable objects. */
     @Value("${version.max-tracked-file-size-bytes:52428800}")
     private long maxTrackedFileSizeBytes = DEFAULT_MAX_TRACKED_FILE_SIZE_BYTES;
 
@@ -115,6 +108,10 @@ public class ProjectRepoService {
     }
 
     private final ProjectStorageResolver storageResolver;
+    private final LocalVersionObjectStore objectStore;
+    public static final String OBJECT_FORMAT_TRAILER = "X-AWD-Object-Format: 1";
+
+    public LocalVersionObjectStore objects() { return objectStore; }
 
     /**
      * 逐段溯源的预算钩子（spec 2026-09-14 §4.7）。{@code ObjectProvider} 而不是直接注入：
@@ -126,8 +123,16 @@ public class ProjectRepoService {
     private org.springframework.beans.factory.ObjectProvider<com.checkba.version.merge.ProvenanceService>
             provenanceServiceProvider;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<com.checkba.service.mobile.MobileRelayClientService>
+            versionBackupProvider;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<WorkSessionService> workSessionProvider;
+
     public ProjectRepoService(ProjectStorageResolver storageResolver) {
         this.storageResolver = storageResolver;
+        this.objectStore = new LocalVersionObjectStore(storageResolver);
     }
 
     public Path gitDir(long projectId) {
@@ -138,44 +143,58 @@ public class ProjectRepoService {
         return storageResolver.projectRoot(projectId);
     }
 
+    boolean hasLocalRoot(long projectId) {
+        return storageResolver.hasLocalRootForVersionLock(projectId);
+    }
+
+    public void requireVersionRecordingSupported(long projectId) {
+        if (storageResolver.isLooseFileWorkspace(projectId)) throw VersionException.userFacing(
+                com.checkba.service.LangText.of("独立文件不启用项目版本记录，请先打开项目文件夹",
+                        "Open a project folder to use version history"));
+    }
+
     public boolean isInitialized(long projectId) {
         return Files.isDirectory(gitDir(projectId).resolve("objects"));
     }
 
     /**
-     * 版本历史在磁盘上占了多少（gitDir 递归求和；仓库不存在或读不动一律回 0）。
+     * 版本历史在磁盘上占了多少（Git 与本地版本对象目录求和）。
      * 只给 /status 展示用——律师要能看见"留底占了多少地方"才敢放心让它默认开着。
-     * 不做缓存：/status 本身已经在跑两次 {@code git add "."}（见 pendingChanges），
-     * 相比之下走一遍 gitDir 的目录项可以忽略。
+     * 只统计目录项，不读取或压缩文件内容。
      */
     public long repoSizeBytes(long projectId) {
+        long total = 0;
         Path dir = gitDir(projectId);
-        if (!Files.isDirectory(dir)) return 0L;
-        try (java.util.stream.Stream<Path> walk = Files.walk(dir)) {
-            return walk.filter(Files::isRegularFile).mapToLong(p -> {
-                try {
-                    return Files.size(p);
-                } catch (IOException e) {
-                    return 0L;
+        try {
+            if (Files.isDirectory(dir)) {
+                try (var walk = Files.walk(dir)) {
+                    for (Path file : walk.filter(p -> Files.isRegularFile(p, java.nio.file.LinkOption.NOFOLLOW_LINKS)).toList()) {
+                        total = Math.addExact(total, Files.size(file));
+                    }
                 }
-            }).sum();
+            }
+            return Math.addExact(total, objectStore.usageBytes(projectId));
         } catch (IOException e) {
             log.warn("统计版本记录占用失败: project={}", projectId, e);
-            return 0L;
+            return total;
         }
     }
 
     /**
      * 删掉整个版本库目录（关闭版本记录用，dev-board#438）。
      *
-     * <p><b>只动 gitDir，绝不碰工作区</b>——工作区里是律师自己的文件，关闭版本记录
+     * <p><b>只动 gitDir 与本项目版本对象目录，绝不碰工作区</b>——工作区里是律师自己的文件，关闭版本记录
      * 不该改动其中任何一个字节（也包括不做"切回主线"这类还原：律师此刻磁盘上看到的
      * 就是他要留下的那一份）。这是本方法与「历史永不重写」那条铁律唯一的例外口子：
      * 律师显式要求把留底整个删掉，删的是整座仓库，不是改写其中某段历史。
      */
     public void deleteRepository(long projectId) {
         Path dir = gitDir(projectId);
-        if (!Files.isDirectory(dir)) return;
+        if (!Files.isDirectory(dir)) {
+            try { objectStore.deleteProject(projectId); }
+            catch (IOException e) { throw new VersionException("删除版本对象失败", e); }
+            return;
+        }
         try (java.util.stream.Stream<Path> walk = Files.walk(dir)) {
             walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
                 try {
@@ -190,17 +209,20 @@ public class ProjectRepoService {
         if (Files.exists(dir)) {
             throw new VersionException("删除版本库失败（目录仍在）: project=" + projectId);
         }
+        try { objectStore.deleteProject(projectId); }
+        catch (IOException e) { throw new VersionException("删除版本对象失败", e); }
         log.info("版本记录已关闭，历史已删除: project={}", projectId);
     }
 
     public Repository open(long projectId) {
         ensureExcludes(projectId);
         try {
-            return new FileRepositoryBuilder()
+            Repository repo = new VersionObjectRepository(new FileRepositoryBuilder()
                     .setGitDir(gitDir(projectId).toFile())
                     .setWorkTree(workTree(projectId).toFile())
-                    .setMustExist(true)
-                    .build();
+                    .setMustExist(true).setup());
+            VersionObjectFilters.install(repo, objectStore, projectId, maxTrackedFileSizeBytes);
+            return repo;
         } catch (IOException e) {
             throw new VersionException("打开版本记录失败: project=" + projectId, e);
         }
@@ -208,9 +230,11 @@ public class ProjectRepoService {
 
     /** Office（Word/WPS）打开文档时落在同目录的锁文件，绝不该进版本历史（dev-board#463）。 */
     private static final String EXCLUDE_RULE_OFFICE_LOCK = "~$*";
+    private static final String EXCLUDE_RULE_NESTED_METADATA = "/*/**/.awd/";
     /** 重型依赖与虚拟环境目录，与 LocalProjectService.isIgnoredDirectoryName 对齐（dev-board#1427）。 */
     private static final List<String> DEFAULT_EXCLUDE_RULES = List.of(
             EXCLUDE_RULE_OFFICE_LOCK,
+            EXCLUDE_RULE_NESTED_METADATA,
             "node_modules/",
             "bower_components/",
             "__pycache__/",
@@ -236,7 +260,8 @@ public class ProjectRepoService {
      * 只有它能覆盖已经存在的老仓库与另外两条建仓路径。init 里额外调一次是因为
      * 它自己不走 open，规则必须早于那笔 {@code add(".")}。
      *
-     * <p>只补缺失的规则，不动文件里已有的其它行；写失败只记日志——版本记录是保险，
+     * <p>同时排除任意层级子文件夹的 .awd 及重型依赖目录，保留当前根的清单。只追加缺失规则，不动已有行；
+     * 写失败只记日志——版本记录是保险，
      * 不能因为一条排除规则写不下去就让开仓/提交整个失败。
      */
     private void ensureExcludes(long projectId) {
@@ -244,30 +269,21 @@ public class ProjectRepoService {
         if (!Files.isDirectory(gitDir)) return; // 仓库还不存在，交给调用方原本的错误路径
         Path exclude = gitDir.resolve("info").resolve("exclude");
         try {
-            if (Files.exists(exclude)) {
-                String current = Files.readString(exclude);
-                Set<String> existingLines = current.lines()
-                        .map(String::trim)
-                        .collect(java.util.stream.Collectors.toSet());
-                StringBuilder missing = new StringBuilder();
-                for (String rule : DEFAULT_EXCLUDE_RULES) {
-                    if (!existingLines.contains(rule)) {
-                        missing.append(rule).append("\n");
-                    }
+            String current = Files.exists(exclude) ? Files.readString(exclude) : "";
+            Set<String> existingLines = current.lines()
+                    .map(String::trim)
+                    .collect(java.util.stream.Collectors.toSet());
+            StringBuilder missing = new StringBuilder();
+            for (String rule : DEFAULT_EXCLUDE_RULES) {
+                if (!existingLines.contains(rule)) {
+                    missing.append(rule).append("\n");
                 }
-                if (missing.length() == 0) return;
-                String sep = current.isEmpty() || current.endsWith("\n") ? "" : "\n";
-                Files.writeString(exclude, sep + missing,
-                        java.nio.file.StandardOpenOption.APPEND);
-            } else {
-                Files.createDirectories(exclude.getParent());
-                StringBuilder initContent = new StringBuilder(
-                        "# AI WorkDeck: Office 打开文档时的锁文件及依赖目录不进版本记录\n");
-                for (String rule : DEFAULT_EXCLUDE_RULES) {
-                    initContent.append(rule).append("\n");
-                }
-                Files.writeString(exclude, initContent.toString());
             }
+            if (missing.isEmpty()) return;
+            Files.createDirectories(exclude.getParent());
+            String sep = current.isEmpty() || current.endsWith("\n") ? "" : "\n";
+            Files.writeString(exclude, sep + missing,
+                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
         } catch (IOException e) {
             log.warn("写入版本库排除规则失败: project={} ({})", projectId, e.getMessage());
         }
@@ -275,20 +291,21 @@ public class ProjectRepoService {
 
     /** 建仓库并落一笔「初始版本」。已存在则直接返回。 */
     public void init(long projectId, String authorName, String authorEmail) {
+        requireVersionRecordingSupported(projectId);
         if (isInitialized(projectId)) return;
         try {
             Files.createDirectories(workTree(projectId));
             Files.createDirectories(gitDir(projectId).getParent());
-            try (Repository repo = new FileRepositoryBuilder()
+            try (Repository repo = new VersionObjectRepository(new FileRepositoryBuilder()
                     .setGitDir(gitDir(projectId).toFile())
-                    .setWorkTree(workTree(projectId).toFile())
-                    .build()) {
+                    .setWorkTree(workTree(projectId).toFile()).setup())) {
                 repo.create(true);
                 ensureExcludes(projectId);
+                VersionObjectFilters.install(repo, objectStore, projectId, maxTrackedFileSizeBytes);
                 try (Git git = new Git(repo)) {
-                    git.add().addFilepattern(".").call();
+                    stageAll(git);
                     git.commit()
-                       .setMessage(com.checkba.service.LangText.of("初始版本", "Initial version") + "\n\nX-AWD-Kind: session")
+                       .setMessage(com.checkba.service.LangText.of("初始版本", "Initial version") + "\n\nX-AWD-Kind: session\n" + OBJECT_FORMAT_TRAILER)
                        .setAuthor(authorName, authorEmail)
                        .setAllowEmpty(true)
                        .call();
@@ -300,10 +317,177 @@ public class ProjectRepoService {
         }
     }
 
+    /**
+     * Synchronous core handoff primitive. The caller holds the project repository lock and has
+     * already checked identity, policy and the journal. Only the Git index receives before-images;
+     * working files remain untouched. An existing HEAD is never changed by this operation.
+     */
+    public String initWithCoreBaseline(long projectId, String authorName, String authorEmail,
+                                       String batchId, Map<String, Path> beforeImages) {
+        return initWithCoreBaseline(projectId, authorName, authorEmail, batchId, beforeImages, () -> {});
+    }
+
+    public String initWithCoreBaseline(long projectId, String authorName, String authorEmail,
+                                       String batchId, Map<String, Path> beforeImages, Runnable beforeStaging) {
+        requireVersionRecordingSupported(projectId);
+        Path git = gitDir(projectId);
+        Path marker = git.resolveSibling(git.getFileName() + ".core-baseline.pending");
+        try {
+            requireNoSymlinks(git);
+            if (Files.exists(git, LinkOption.NOFOLLOW_LINKS)) {
+                try (Repository repo = coreBaselineRepository(projectId)) {
+                    ObjectId head = repo.resolve(Constants.HEAD);
+                    if (head != null) {
+                        try (var walk = new RevWalk(repo)) { walk.parseCommit(head); }
+                        return head.name();
+                    }
+                    if (!repo.getRefDatabase().getRefsByPrefix(Constants.R_REFS).isEmpty())
+                        throw new IOException("An unborn repository with existing refs cannot be initialized");
+                }
+            }
+            if (batchId == null || !batchId.matches("[A-Za-z0-9_-]{1,128}") || beforeImages == null || beforeImages.isEmpty())
+                throw new IOException("Invalid core baseline batch");
+            Path work = workTree(projectId).toAbsolutePath().normalize();
+            if (git.startsWith(work) || work.startsWith(git))
+                throw new IOException("Core baseline metadata must be outside the working tree");
+            var images = new TreeMap<String, Path>();
+            var fingerprints = new TreeMap<String, LocalVersionObjectStore.ObjectRef>();
+            for (var image : beforeImages.entrySet()) {
+                String relative = image.getKey();
+                if (relative == null || relative.isBlank() || Path.of(relative).isAbsolute() || relative.startsWith("/") || relative.indexOf('\\') >= 0
+                        || relative.indexOf('\0') >= 0)
+                    throw new IOException("Invalid core baseline path");
+                for (String part : relative.split("/", -1)) {
+                    if (part.isEmpty() || part.equals(".") || part.equals("..") || part.equalsIgnoreCase(".git"))
+                        throw new IOException("Invalid core baseline path");
+                }
+                requireRegularSnapshot(image.getValue());
+                requireRegularSnapshot(workTree(projectId).resolve(relative));
+                try (InputStream input = Files.newInputStream(image.getValue(), LinkOption.NOFOLLOW_LINKS)) {
+                    fingerprints.put(relative, LocalVersionObjectStore.fingerprint(input));
+                }
+                images.put(relative, image.getValue());
+            }
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (var out = new DataOutputStream(new DigestOutputStream(OutputStream.nullOutputStream(), digest))) {
+                out.writeLong(projectId);
+                for (var image : fingerprints.entrySet()) {
+                    byte[] path = image.getKey().getBytes(StandardCharsets.UTF_8);
+                    out.writeInt(path.length); out.write(path);
+                    out.writeUTF(image.getValue().sha256()); out.writeLong(image.getValue().size());
+                }
+            }
+            byte[] expectedMarker = ("awd-core-baseline-v1\n" + batchId + "\n"
+                    + HexFormat.of().formatHex(digest.digest()) + "\n").getBytes(StandardCharsets.UTF_8);
+            if (Files.exists(marker, LinkOption.NOFOLLOW_LINKS)) {
+                requireRegularSnapshot(marker);
+                try (InputStream input = Files.newInputStream(marker, LinkOption.NOFOLLOW_LINKS)) {
+                    if (!java.util.Arrays.equals(expectedMarker, input.readNBytes(expectedMarker.length + 1)))
+                        throw new IOException("Core baseline batch does not match pending initialization");
+                }
+            } else {
+                if (Files.exists(git, LinkOption.NOFOLLOW_LINKS))
+                    throw new IOException("Unmarked unborn repository cannot receive a core baseline");
+                Files.createDirectories(git.getParent());
+                Path temporary = Files.createTempFile(git.getParent(), ".core-baseline-", ".tmp");
+                try {
+                    try (var channel = FileChannel.open(temporary, StandardOpenOption.WRITE)) {
+                        ByteBuffer bytes = ByteBuffer.wrap(expectedMarker);
+                        while (bytes.hasRemaining()) channel.write(bytes);
+                        channel.force(true);
+                    }
+                    Files.move(temporary, marker, StandardCopyOption.ATOMIC_MOVE);
+                    syncDirectory(git.getParent());
+                } finally { Files.deleteIfExists(temporary); }
+            }
+            beforeStaging.run();
+            // This marker owns only an uncommitted private repository. Rebuild its interrupted
+            // creation/index safely; an unmarked receive repository or any existing ref was rejected.
+            if (Files.exists(git, LinkOption.NOFOLLOW_LINKS)) {
+                try (var paths = Files.walk(git)) {
+                    for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) Files.delete(path);
+                }
+            }
+            String head;
+            try (Repository repo = coreBaselineRepository(projectId)) {
+                repo.create(true);
+                ensureExcludes(projectId);
+                VersionObjectFilters.install(repo, objectStore, projectId, maxTrackedFileSizeBytes);
+                try (Git command = new Git(repo)) {
+                    stageAll(command);
+                    var index = repo.lockDirCache();
+                    try {
+                        var editor = index.editor();
+                        for (var image : images.entrySet()) {
+                            var entry = index.getEntry(image.getKey());
+                            if (entry == null) continue; // Keep .gitignore and the existing excludes authoritative.
+                            requireRegularSnapshot(work.resolve(image.getKey()));
+                            if (entry.getFileMode() != org.eclipse.jgit.lib.FileMode.REGULAR_FILE
+                                    && entry.getFileMode() != org.eclipse.jgit.lib.FileMode.EXECUTABLE_FILE)
+                                throw new IOException("Core baseline target is not a regular indexed file");
+                            MessageDigest contentHash = MessageDigest.getInstance("SHA-256");
+                            ObjectId blob;
+                            requireRegularSnapshot(image.getValue());
+                            try (var input = new DigestInputStream(Files.newInputStream(image.getValue(), LinkOption.NOFOLLOW_LINKS), contentHash)) {
+                                blob = VersionObjectFilters.insertSnapshot(repo, image.getKey(), input);
+                            }
+                            if (!fingerprints.get(image.getKey()).sha256().equals(HexFormat.of().formatHex(contentHash.digest())))
+                                throw new IOException("Core baseline image changed while reading");
+                            editor.add(new org.eclipse.jgit.dircache.DirCacheEditor.PathEdit(image.getKey()) {
+                                @Override public void apply(org.eclipse.jgit.dircache.DirCacheEntry item) {
+                                    item.setObjectId(blob);
+                                    item.setLength(0); item.setLastModified(Instant.EPOCH);
+                                }
+                            });
+                        }
+                        if (!editor.commit()) throw new IOException("Core baseline index could not be published");
+                    } finally { index.unlock(); }
+                    head = command.commit().setMessage(com.checkba.service.LangText.of("初始版本", "Initial version")
+                                    + "\n\nX-AWD-Kind: session\n" + OBJECT_FORMAT_TRAILER)
+                            .setAuthor(authorName, authorEmail).setAllowEmpty(true).call().getName();
+                }
+            }
+            Files.delete(marker);
+            syncDirectory(git.getParent());
+            return head;
+        } catch (Exception error) {
+            throw new VersionException("初始化修改前版本失败: project=" + projectId, error);
+        }
+    }
+
+    private Repository coreBaselineRepository(long projectId) throws IOException {
+        return new VersionObjectRepository(new FileRepositoryBuilder()
+                .setGitDir(gitDir(projectId).toFile()).setWorkTree(workTree(projectId).toFile()).setup());
+    }
+
+    /** Read-only HEAD check for handoff; unlike open(), it does not add exclude rules to an unborn repo. */
+    String coreBaselineHead(long projectId) throws IOException {
+        requireNoSymlinks(gitDir(projectId));
+        if (!Files.exists(gitDir(projectId), LinkOption.NOFOLLOW_LINKS)) return null;
+        try (Repository repo = coreBaselineRepository(projectId); var walk = new RevWalk(repo)) {
+            ObjectId head = repo.resolve(Constants.HEAD);
+            return head == null ? null : walk.parseCommit(head).name();
+        }
+    }
+
+    private static void requireNoSymlinks(Path path) throws IOException {
+        if (path == null || !path.isAbsolute() || !path.equals(path.normalize())) throw new IOException("Invalid snapshot path");
+        for (Path current = path; current != null; current = current.getParent()) {
+            if (Files.isSymbolicLink(current)) throw new IOException("Symbolic snapshot path is not supported");
+        }
+    }
+
+    private static void requireRegularSnapshot(Path path) throws IOException {
+        requireNoSymlinks(path);
+        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new IOException("Snapshot file is unavailable");
+    }
+
+    private static void syncDirectory(Path path) throws IOException {
+        try (var channel = FileChannel.open(path, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) { channel.force(true); }
+    }
+
     private static final String KIND_TRAILER = "X-AWD-Kind: ";
     private static final String NOTE_TRAILER = "X-AWD-Note: ";
-    /** 体积过滤跳过的文件清单（尽调 P3#3）：commitAll 里超限文件不入库，指纹落这一行。 */
-    private static final String SKIPPED_TRAILER = "X-AWD-Skipped-Large-Files: ";
     /**
      * 冲突裁决结果（spec 2026-09-14 §2.2）：{@code <path>=<MAIN|DRAFT|BOTH>; ...}。
      * 三个裁决合并调用点（结束工作裁决 / 采纳裁决 / 取回最新稿裁决）共用这一行；
@@ -363,76 +547,32 @@ public class ProjectRepoService {
         }
     }
 
-    /**
-     * 把工作区当前状态整体提交。无任何变更时返回 null（不产生空提交）。
-     * kind 写入提交消息尾注，供时间线区分「自动存档」与「工作段」。
-     *
-     * <p>体积过滤（尽调模块 P3 稳定性余项 #3，dev-board#100）：新增/修改文件超过
-     * {@link #maxTrackedFileSizeBytes} 的这一轮不 add，只记指纹——**只影响新增/修改**：
-     * <ul>
-     *   <li>新增（未跟踪）超限 → 不 add，保持未跟踪，指纹进提交说明；</li>
-     *   <li>已跟踪文件被改动、改动后仍超限 → 不 add 这次改动，文件在最新提交里保持
-     *       旧版本内容，不会被误判成"删除"；</li>
-     *   <li>已跟踪文件在磁盘上被删除 → 正常入库这次删除，不受体积过滤影响（磁盘上
-     *       已经没有这个文件了，谈不上"超限"，这也是"已经在库里的大文件不能被这次
-     *       改动删掉"这条红线的关键：本方法从不对任何路径做"未 add 就视为删除"的
-     *       反向推断）；</li>
-     *   <li>合并冲突路径（getConflicting）不做体积过滤——`git add` 在合并窗口里等于
-     *       "这个冲突我解决了"（见类头 #20 条注释），跳过会让合并卡死在
-     *       MERGING，比让一份大文件多留一版历史严重得多。</li>
-     * </ul>
-     * 被跳过的文件即使这一轮没有其它变更也要落一笔提交（{@code setAllowEmpty(true)}），
-     * 否则"出现过一份超限文件"这件事会连指纹记录都没有、彻底无痕迹——与"不静默丢
-     * 东西"的要求矛盾。
-     */
+    /** Commit the working tree, persisting externalized snapshots before their Git pointers. No cloud I/O. */
     public String commitAll(long projectId, String message, String kind, String note,
                             String authorName, String authorEmail) {
         clearStaleIndexLock(projectId);
         try (Repository repo = open(projectId); Git git = new Git(repo)) {
-            Path workTree = repo.getWorkTree().toPath();
             Status pre = git.status().call();
-
-            List<String> skipped = new ArrayList<>();
-            List<String> okNew = new ArrayList<>(pre.getConflicting());
-            for (String path : pre.getUntracked()) {
-                String fp = oversizedFingerprint(workTree, path);
-                if (fp != null) skipped.add(fp); else okNew.add(path);
+            boolean trackedNestedMetadata = false;
+            var index = repo.readDirCache();
+            for (int i = 0; i < index.getEntryCount(); i++) {
+                if (isNestedProjectMetadata(index.getEntry(i).getPathString())) {
+                    trackedNestedMetadata = true;
+                    break;
+                }
             }
-            List<String> okTracked = new ArrayList<>(pre.getMissing()); // 删除不受体积过滤影响
-            for (String path : pre.getModified()) {
-                String fp = oversizedFingerprint(workTree, path);
-                if (fp != null) skipped.add(fp); else okTracked.add(path);
-            }
-
-            if (!okNew.isEmpty()) {
-                var add = git.add();
-                okNew.forEach(add::addFilepattern);
-                add.call();
-            }
-            if (!okTracked.isEmpty()) {
-                var add = git.add().setUpdate(true);
-                okTracked.forEach(add::addFilepattern);
-                add.call();
-            }
-
-            Status status = git.status().call();
-            if (status.isClean() && skipped.isEmpty()) return null;
-
+            if (pre.isClean() && !trackedNestedMetadata) return null;
+            stageAll(git);
             StringBuilder msg = new StringBuilder(message).append("\n\n")
-                    .append(KIND_TRAILER).append(kind);
-            if (note != null && !note.isBlank()) {
-                msg.append('\n').append(NOTE_TRAILER).append(note);
-            }
-            if (!skipped.isEmpty()) {
-                msg.append('\n').append(SKIPPED_TRAILER).append(String.join("; ", skipped));
-            }
+                    .append(KIND_TRAILER).append(kind).append('\n').append(OBJECT_FORMAT_TRAILER);
+            if (note != null && !note.isBlank()) msg.append('\n').append(NOTE_TRAILER).append(note);
             RevCommit c = git.commit()
                     .setMessage(msg.toString())
-                    .setAllowEmpty(true) // 体积过滤可能导致"这一轮只有跳过记录、树没变化"，仍要落一笔可追溯的提交
+                    .setAllowEmpty(true)
                     .setAuthor(authorName, authorEmail)
                     .call();
-            List<String> touched = new ArrayList<>(okNew);
-            touched.addAll(okTracked);
+            List<String> touched = new ArrayList<>(pre.getUntracked());
+            touched.addAll(pre.getModified());
             precomputeProvenance(projectId, c.getName(), touched);
             return c.getName();
         } catch (Exception e) {
@@ -459,39 +599,37 @@ public class ProjectRepoService {
         }
     }
 
-    /**
-     * 判断该（未跟踪/已修改）路径是否超过体积阈值；不超限返回 null，超限返回一段
-     * 可读的"指纹"文本（相对路径 + 体积 + sha256），供写进提交说明。只在真的超限
-     * 时才流式计算 sha256（不整份读进内存），不影响正常大小文件的提交路径。
-     */
-    private String oversizedFingerprint(Path workTree, String relPath) {
-        Path p = workTree.resolve(relPath);
-        long size;
+    private void stageAll(Git git) throws Exception {
+        // A legacy user file may literally contain the pointer magic. Force it through clean once
+        // before this commit declares the new format, including raw files imported by a mixed-format merge.
+        Repository repo = git.getRepository();
+        var index = repo.lockDirCache();
         try {
-            size = Files.size(p);
-        } catch (IOException e) {
-            return null; // 读不到大小（竞态删除等）当正常处理，交给后续 add 自然处理
-        }
-        if (size <= maxTrackedFileSizeBytes) return null;
-        String fingerprint;
-        try {
-            fingerprint = sha256Hex(p);
-        } catch (IOException e) {
-            fingerprint = "unavailable";
-        }
-        return relPath + " (" + size + " bytes, sha256:" + fingerprint + ")";
-    }
-
-    private static String sha256Hex(Path p) throws IOException {
-        try (InputStream in = Files.newInputStream(p)) {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
-            return HexFormat.of().formatHex(md.digest());
-        } catch (java.security.NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 不可用", e); // JVM 标配算法，不会真的发生
-        }
+            var editor = index.editor();
+            for (int i = 0; i < index.getEntryCount(); i++) {
+                var entry = index.getEntry(i);
+                if (entry.getStage() != 0 || entry.getFileMode().getObjectType() != Constants.OBJ_BLOB) continue;
+                ObjectLoader loader = repo.open(entry.getObjectId());
+                if (loader.getSize() > VersionObjectPointer.MAX_BYTES) continue;
+                byte[] bytes = loader.getBytes();
+                Path file = repo.getWorkTree().toPath().resolve(entry.getPathString());
+                if (VersionObjectPointer.parse(bytes) != null && Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                        && Files.size(file) == bytes.length && java.util.Arrays.equals(bytes, Files.readAllBytes(file))) {
+                    editor.add(new org.eclipse.jgit.dircache.DirCacheEditor.PathEdit(entry.getPathString()) {
+                        @Override public void apply(org.eclipse.jgit.dircache.DirCacheEntry e) {
+                            e.setLength(0); e.setLastModified(java.time.Instant.EPOCH);
+                        }
+                    });
+                }
+            }
+            editor.commit();
+        } finally { index.unlock(); }
+        VersionObjectFilters.staging(() -> {
+            git.add().addFilepattern(".").call();
+            git.add().addFilepattern(".").setUpdate(true).call();
+            removeNestedMetadataFromIndex(repo);
+            return null;
+        });
     }
 
     /**
@@ -1170,33 +1308,61 @@ public class ProjectRepoService {
     }
 
     /**
-     * 工作区相对 HEAD 的未提交变更。只读——add 到暂存区但不提交。
-     *
-     * 合并窗口（MERGING/MERGING_RESOLVED）里**一次 add 都不做**：git add 对一条冲突
-     * 路径的语义是「这个冲突我解决了」，它会把索引里的冲突记录抹掉、仓库从 MERGING
-     * 变 MERGING_RESOLVED（JGit 探针实证）。而版本面板每次挂载都会拉一次 /status、
-     * /status 的 changedCount 正是走这里——律师在三选一弹窗前刷新一下面板，就会让
-     * 随后的裁决校验空转、带 {@code <<<<<<<} 标记的半成品被提交进主线且稿分支被删，
-     * 不可逆。这一档下返回的是「还等着裁决的文件」，changedCount 在冲突窗口里的
-     * 语义就是待裁决文件数，对律师同样说得通。
+     * 工作区相对 HEAD 的未提交变更，绝不写索引或对象库。
+     * 常见状态直接从只读 status 归类；只有暂存与工作区交叠的路径才比较 HEAD，
+     * 避免把「暂存后还原原文」误报成修改，也避免给未跟踪的大文件计算内容哈希。
+     * 合并窗口沿用待裁决文件数语义，不能把查询当作解决冲突的 git add。
      */
     public List<FileChange> pendingChanges(long projectId) {
-        List<FileChange> out = new ArrayList<>();
         try (Repository repo = open(projectId); Git git = new Git(repo)) {
+            Status st = git.status().call();
             RepositoryState state = repo.getRepositoryState();
             if (state == RepositoryState.MERGING || state == RepositoryState.MERGING_RESOLVED) {
-                for (String p : git.status().call().getConflicting().stream().sorted().toList()) {
-                    out.add(new FileChange(p, FileChange.Type.MODIFY));
-                }
-                return out;
+                return st.getConflicting().stream().sorted()
+                        .map(p -> new FileChange(p, FileChange.Type.MODIFY)).toList();
             }
-            git.add().addFilepattern(".").call();
-            git.add().addFilepattern(".").setUpdate(true).call();
-            Status st = git.status().call();
-            for (String p : st.getAdded()) out.add(new FileChange(p, FileChange.Type.ADD));
-            for (String p : st.getChanged()) out.add(new FileChange(p, FileChange.Type.MODIFY));
-            for (String p : st.getRemoved()) out.add(new FileChange(p, FileChange.Type.DELETE));
-            return out;
+            Map<String, FileChange.Type> changes = new java.util.TreeMap<>();
+            for (String p : st.getUntracked()) changes.put(p, FileChange.Type.ADD);
+            for (String p : st.getAdded()) {
+                if (!st.getMissing().contains(p)) changes.put(p, FileChange.Type.ADD);
+            }
+            for (String p : st.getChanged()) changes.put(p, FileChange.Type.MODIFY);
+            for (String p : st.getModified()) {
+                if (!st.getAdded().contains(p)) changes.put(p, FileChange.Type.MODIFY);
+            }
+            for (String p : st.getMissing()) {
+                if (!st.getAdded().contains(p)) changes.put(p, FileChange.Type.DELETE);
+            }
+            for (String p : st.getRemoved()) changes.put(p, FileChange.Type.DELETE);
+
+            Set<String> mixed = new LinkedHashSet<>(st.getChanged());
+            mixed.retainAll(st.getModified());
+            // rm --cached 后文件可能仍在磁盘，且可能被 ignore，不只看 untracked。
+            for (String p : st.getRemoved()) {
+                if (Files.exists(repo.getWorkTree().toPath().resolve(p), java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                    mixed.add(p);
+                }
+            }
+            if (!mixed.isEmpty()) {
+                mixed.forEach(changes::remove);
+                try (ObjectReader reader = repo.newObjectReader()) {
+                    CanonicalTreeParser head = new CanonicalTreeParser();
+                    head.reset(reader, repo.resolve("HEAD^{tree}"));
+                    for (DiffEntry entry : git.diff().setOldTree(head)
+                            .setNewTree(new FileTreeIterator(repo))
+                            .setPathFilter(PathFilterGroup.createFromStrings(mixed)).call()) {
+                        boolean deleted = entry.getChangeType() == DiffEntry.ChangeType.DELETE;
+                        changes.put(deleted ? entry.getOldPath() : entry.getNewPath(),
+                                switch (entry.getChangeType()) {
+                                    case ADD, COPY -> FileChange.Type.ADD;
+                                    case DELETE -> FileChange.Type.DELETE;
+                                    default -> FileChange.Type.MODIFY;
+                                });
+                    }
+                }
+            }
+            return changes.entrySet().stream()
+                    .map(e -> new FileChange(e.getKey(), e.getValue())).toList();
         } catch (Exception e) {
             throw new VersionException("读取未提交变更失败: project=" + projectId, e);
         }
@@ -1271,19 +1437,289 @@ public class ProjectRepoService {
             throws IOException {
         if (commitId == null) return null;
         RevCommit commit = walk.parseCommit(commitId);
-        try (TreeWalk tw = TreeWalk.forPath(repo, relPath, commit.getTree())) {
-            if (tw == null) return null;
-            ObjectLoader loader = repo.open(tw.getObjectId(0));
-            if (loader.getSize() > MAX_BLOB_SIZE_BYTES) {
-                throw VersionException.userFacing(com.checkba.service.LangText.of(
-                        "这份文件超过 " + (MAX_BLOB_SIZE_BYTES / (1024 * 1024)) + "MB，暂不支持在版本记录里读取或对比",
-                        "This file exceeds " + (MAX_BLOB_SIZE_BYTES / (1024 * 1024))
-                                + "MB and can't be read or compared from version history"));
-            }
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            loader.copyTo(bos);
-            return bos.toByteArray();
+        ObjectLoader loader = loaderAt(repo, commit, relPath);
+        if (loader == null) return null;
+        var pointer = pointerAt(repo, commit, loader);
+        long size = pointer == null ? loader.getSize() : pointer.size();
+        if (size > MAX_BLOB_SIZE_BYTES) {
+            throw VersionException.userFacing(com.checkba.service.LangText.of(
+                    "这份文件超过 50MB，暂不支持内容对比；仍可恢复完整版本",
+                    "This file exceeds 50MB and cannot be compared; its complete version can still be restored"));
         }
+        try (InputStream in = contentStream(repo, loader, pointer)) {
+            return in.readNBytes((int) size);
+        }
+    }
+
+    private ObjectLoader loaderAt(Repository repo, RevCommit commit, String path) throws IOException {
+        try (TreeWalk tree = TreeWalk.forPath(repo, path, commit.getTree())) {
+            return tree == null ? null : repo.open(tree.getObjectId(0));
+        }
+    }
+
+    private LocalVersionObjectStore.ObjectRef pointerAt(Repository repo, RevCommit commit, ObjectLoader loader)
+            throws IOException {
+        if (!hasObjectFormat(commit) || loader.getSize() > VersionObjectPointer.MAX_BYTES) return null;
+        return VersionObjectPointer.parse(loader.getBytes(VersionObjectPointer.MAX_BYTES));
+    }
+
+    public static boolean hasObjectFormat(RevCommit commit) {
+        return commit.getFullMessage().lines().anyMatch(OBJECT_FORMAT_TRAILER::equals);
+    }
+
+    private long projectIdOf(Repository repo) {
+        String directory = repo.getDirectory().getName();
+        if (!directory.matches("project-[0-9]+\\.git")) throw new VersionException("Invalid project repository");
+        return Long.parseLong(directory.substring(8, directory.length() - 4));
+    }
+
+    private InputStream contentStream(Repository repo, ObjectLoader loader, LocalVersionObjectStore.ObjectRef pointer)
+            throws IOException {
+        if (pointer == null) return loader.openStream();
+        long projectId = projectIdOf(repo);
+        requireLocalObject(projectId, pointer);
+        return objectStore.open(projectId, pointer.sha256());
+    }
+
+    /** Full content, streamed; the caller must close the stream. Null means the path is absent. */
+    public InputStream openBlobAtCommit(long projectId, String ref, String path) {
+        Repository repo = open(projectId);
+        try (RevWalk walk = new RevWalk(repo)) {
+            ObjectId id = repo.resolve(ref + "^{commit}");
+            if (id == null) { repo.close(); return null; }
+            RevCommit commit = walk.parseCommit(id);
+            ObjectLoader loader = loaderAt(repo, commit, path);
+            if (loader == null) { repo.close(); return null; }
+            InputStream stream = contentStream(repo, loader, pointerAt(repo, commit, loader));
+            return new java.io.FilterInputStream(stream) {
+                @Override public void close() throws IOException {
+                    try { super.close(); } finally { repo.close(); }
+                }
+            };
+        } catch (Exception e) {
+            repo.close();
+            throw new VersionException("读取版本内容失败: project=" + projectId, e);
+        }
+    }
+
+    /** -1 means absent; never reads the full file into memory. */
+    public long blobSizeAtCommit(long projectId, String ref, String path) {
+        try (Repository repo = open(projectId); RevWalk walk = new RevWalk(repo)) {
+            ObjectId id = repo.resolve(ref + "^{commit}");
+            if (id == null) return -1;
+            RevCommit commit = walk.parseCommit(id);
+            ObjectLoader loader = loaderAt(repo, commit, path);
+            if (loader == null) return -1;
+            var pointer = pointerAt(repo, commit, loader);
+            return pointer == null ? loader.getSize() : pointer.size();
+        } catch (IOException e) { throw new VersionException("读取版本大小失败", e); }
+    }
+
+    /** Atomic per-file restore, also supports pre-object-store Git blobs of any size. */
+    public void copyBlobAtCommit(long projectId, String ref, String path, Path target) {
+        Path work = workTree(projectId).toAbsolutePath().normalize();
+        Path normalized = target.toAbsolutePath().normalize();
+        if (!normalized.startsWith(work) || normalized.equals(work)) throw new VersionException("非法路径");
+        if (isNestedProjectMetadata(work.relativize(normalized).toString().replace('\\', '/'))) return;
+        try {
+            for (Path parent = normalized.getParent(); parent != null && !parent.equals(work); parent = parent.getParent()) {
+                if (Files.isSymbolicLink(parent)) throw new IOException("Restore directory is a symbolic link");
+            }
+            try (InputStream in = openBlobAtCommit(projectId, ref, path)) {
+                if (in == null) { Files.deleteIfExists(normalized); return; }
+                Files.createDirectories(normalized.getParent());
+                Path temporary = Files.createTempFile(normalized.getParent(), ".awd-restore-", ".tmp");
+                try {
+                    Files.copy(in, temporary, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    try {
+                        Files.move(temporary, normalized, java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                        Files.move(temporary, normalized, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    }
+                } finally { Files.deleteIfExists(temporary); }
+            }
+        } catch (IOException e) { throw new VersionException("还原版本内容失败: " + path, e); }
+    }
+
+    public List<LocalVersionObjectStore.ObjectRef> objectPointersAt(long projectId, String ref, boolean includeHistory) {
+        try (Repository repo = open(projectId)) { return objectPointersAt(repo, ref, includeHistory); }
+    }
+
+    /** Also accepts an unaccepted receive-pack commit id. Only explicitly marked commits contain pointers. */
+    public List<LocalVersionObjectStore.ObjectRef> objectPointersAt(Repository repo, String ref, boolean includeHistory) {
+        try (RevWalk walk = new RevWalk(repo)) {
+            ObjectId id = repo.resolve(ref + "^{commit}");
+            if (id == null) return List.of();
+            RevCommit tip = walk.parseCommit(id);
+            walk.markStart(tip);
+            Map<String, LocalVersionObjectStore.ObjectRef> objects = new LinkedHashMap<>();
+            for (RevCommit commit : walk) {
+                if (hasObjectFormat(commit)) {
+                    try (TreeWalk tree = new TreeWalk(repo)) {
+                        tree.addTree(commit.getTree());
+                        tree.setRecursive(true);
+                        while (tree.next()) {
+                            if (tree.getFileMode(0).getObjectType() != Constants.OBJ_BLOB) continue;
+                            ObjectLoader loader = repo.open(tree.getObjectId(0));
+                            var pointer = pointerAt(repo, commit, loader);
+                            if (pointer != null) {
+                                var prior = objects.putIfAbsent(pointer.sha256(), pointer);
+                                if (prior != null && prior.size() != pointer.size()) throw new IOException("Conflicting object sizes");
+                            }
+                        }
+                    }
+                }
+                if (!includeHistory) break;
+            }
+            return List.copyOf(objects.values());
+        } catch (IOException e) { throw new VersionException("读取版本对象索引失败", e); }
+    }
+
+    private Map<String, Set<LocalVersionObjectStore.ObjectRef>> pointerPathsAt(Repository repo, String ref) throws IOException {
+        Map<String, Set<LocalVersionObjectStore.ObjectRef>> paths = new LinkedHashMap<>();
+        try (RevWalk walk = new RevWalk(repo)) {
+            ObjectId id = repo.resolve(ref + "^{commit}");
+            if (id == null) return paths;
+            RevCommit commit = walk.parseCommit(id);
+            if (!hasObjectFormat(commit)) return paths;
+            try (TreeWalk tree = new TreeWalk(repo)) {
+                tree.addTree(commit.getTree());
+                tree.setRecursive(true);
+                while (tree.next()) {
+                    if (tree.getFileMode(0).getObjectType() != Constants.OBJ_BLOB) continue;
+                    var pointer = pointerAt(repo, commit, repo.open(tree.getObjectId(0)));
+                    if (pointer != null) paths.put(tree.getPathString(), new LinkedHashSet<>(Set.of(pointer)));
+                }
+            }
+        }
+        return paths;
+    }
+
+    private void requireLocalObject(long projectId, LocalVersionObjectStore.ObjectRef object) throws IOException {
+        try { objectStore.verify(projectId, object); }
+        catch (IOException unavailable) {
+            var backup = versionBackupProvider == null ? null : versionBackupProvider.getIfAvailable();
+            if (backup == null) throw unavailable;
+            Runnable restore = () -> {
+                try {
+                    backup.restoreVersionObject(projectId, object);
+                    objectStore.verify(projectId, object);
+                } catch (IOException e) { throw new java.io.UncheckedIOException(e); }
+            };
+            var sessions = workSessionProvider == null ? null : workSessionProvider.getIfAvailable();
+            try {
+                if (sessions == null) restore.run();
+                else sessions.runLocked(projectId, restore);
+            } catch (java.io.UncheckedIOException e) { throw e.getCause(); }
+        }
+    }
+
+    /** Remove only application metadata from the index; never touch the working files. */
+    private void removeNestedMetadataFromIndex(Repository repo) throws IOException {
+        var index = repo.lockDirCache();
+        try {
+            var editor = index.editor();
+            for (int i = 0; i < index.getEntryCount(); i++) {
+                String path = index.getEntry(i).getPathString();
+                if (isNestedProjectMetadata(path)) {
+                    editor.add(new org.eclipse.jgit.dircache.DirCacheEditor.DeletePath(path));
+                }
+            }
+            editor.commit();
+        } finally { index.unlock(); }
+    }
+
+    /**
+     * Append a metadata-only migration to a local branch before checkout. Merely excluding
+     * paths on the next commit is too late: opening a work session first checks out a branch.
+     * Old commits remain intact, and no child metadata is ever removed from the working tree.
+     */
+    private void migrateNestedMetadataBranch(Repository repo, String name) throws IOException {
+        Ref ref = repo.findRef(name);
+        if (ref == null || ref.getObjectId() == null) return;
+        ref = ref.getLeaf();
+        if (!ref.getName().startsWith(Constants.R_HEADS)) return;
+        boolean current = ref.getName().equals(repo.getFullBranch());
+        try (RevWalk walk = new RevWalk(repo); TreeWalk tree = new TreeWalk(repo)) {
+            RevCommit previous = walk.parseCommit(ref.getObjectId());
+            tree.addTree(previous.getTree());
+            tree.setRecursive(true);
+            var filtered = org.eclipse.jgit.dircache.DirCache.newInCore();
+            var builder = filtered.builder();
+            boolean removed = false;
+            while (tree.next()) {
+                if (isNestedProjectMetadata(tree.getPathString())) {
+                    removed = true;
+                    continue;
+                }
+                var entry = new org.eclipse.jgit.dircache.DirCacheEntry(tree.getPathString());
+                entry.setFileMode(tree.getFileMode(0));
+                entry.setObjectId(tree.getObjectId(0));
+                builder.add(entry);
+            }
+            builder.finish();
+            if (removed) {
+                try (var inserter = repo.newObjectInserter()) {
+                    var commit = new org.eclipse.jgit.lib.CommitBuilder();
+                    commit.setTreeId(filtered.writeTree(inserter));
+                    commit.setParentId(previous);
+                    var author = new org.eclipse.jgit.lib.PersonIdent("AI WorkDeck", "system@aiworkdeck.local");
+                    commit.setAuthor(author);
+                    commit.setCommitter(author);
+                    commit.setMessage("整理项目记录\n\nX-AWD-Kind: auto\n"
+                            + (hasObjectFormat(previous) ? OBJECT_FORMAT_TRAILER : ""));
+                    ObjectId migrated = inserter.insert(commit);
+                    inserter.flush();
+                    var update = repo.updateRef(ref.getName());
+                    update.setExpectedOldObjectId(previous);
+                    update.setNewObjectId(migrated);
+                    var result = update.update();
+                    if (result != org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD
+                            && result != org.eclipse.jgit.lib.RefUpdate.Result.NO_CHANGE) {
+                        throw new IOException("Cannot migrate nested project metadata: " + result);
+                    }
+                }
+            }
+            if (current) removeNestedMetadataFromIndex(repo);
+        }
+    }
+
+    static boolean isNestedProjectMetadata(String path) {
+        return path.contains("/.awd/") || path.endsWith("/.awd");
+    }
+
+    /** Explicit restore only: validate old manifests and recover objects before worktree mutation. */
+    public void requireObjectsAt(Repository repo, String ref) {
+        try {
+            // Older versions may have tracked a child project's metadata before nesting was
+            // supported. Keep that history readable, but do not let checkout overwrite it.
+            try (RevWalk walk = new RevWalk(repo)) {
+                ObjectId id = repo.resolve(ref);
+                if (id != null) {
+                    try (TreeWalk tree = new TreeWalk(repo)) {
+                        tree.addTree(walk.parseCommit(id).getTree());
+                        tree.setRecursive(true);
+                        while (tree.next()) {
+                            if (isNestedProjectMetadata(tree.getPathString())) {
+                                throw VersionException.userFacing(com.checkba.service.LangText.of(
+                                        "这份旧版本包含子文件夹的项目记录，无法直接恢复；请从版本记录中打开所需文件另存",
+                                        "This older version contains a nested folder's project metadata. Open the needed files from version history and save a copy instead"));
+                            }
+                        }
+                    }
+                }
+            }
+            for (var object : objectPointersAt(repo, ref, false)) requireLocalObject(projectIdOf(repo), object);
+        } catch (IOException e) {
+            throw VersionException.userFacing(com.checkba.service.LangText.of(
+                    "这份版本的文件内容尚未完整保存在本机，请完成同步后重试；当前文件未被替换",
+                    "This version's files are not available locally. Complete synchronization before retrying; current files were not replaced"));
+        }
+    }
+
+    public void requireObjectsAt(long projectId, String ref) {
+        try (Repository repo = open(projectId)) { requireObjectsAt(repo, ref); }
     }
 
     private static final String MAIN_BRANCH = "master";
@@ -1329,6 +1765,7 @@ public class ProjectRepoService {
 
     public void createBranch(long projectId, String name, String startPointRef) {
         try (Repository repo = open(projectId); Git git = new Git(repo)) {
+            migrateNestedMetadataBranch(repo, startPointRef);
             git.branchCreate()
                .setName(name)
                .setStartPoint(startPointRef)
@@ -1341,7 +1778,14 @@ public class ProjectRepoService {
 
     public void checkoutBranch(long projectId, String name) {
         try (Repository repo = open(projectId); Git git = new Git(repo)) {
-            git.checkout().setName(name).call();
+            migrateNestedMetadataBranch(repo, "HEAD");
+            migrateNestedMetadataBranch(repo, name);
+            requireObjectsAt(repo, "HEAD");
+            requireObjectsAt(repo, name);
+            VersionObjectFilters.materializing(repo, pointerPathsAt(repo, name),
+                    () -> git.checkout().setName(name).call());
+        } catch (VersionException e) {
+            throw e;
         } catch (Exception e) {
             throw new VersionException("切换分支失败: " + name, e);
         }
@@ -1446,16 +1890,22 @@ public class ProjectRepoService {
                                    String authorName, String authorEmail,
                                    boolean resetOnConflict, boolean commitOnClean) {
         try (Repository repo = open(projectId); Git git = new Git(repo)) {
+            migrateNestedMetadataBranch(repo, "HEAD");
+            migrateNestedMetadataBranch(repo, branchName);
             ObjectId target = repo.resolve(branchName);
             if (target == null) throw new VersionException("分支不存在: " + branchName);
 
-            String fullMessage = message + "\n\n" + KIND_TRAILER + "session";
-            MergeResult r = git.merge()
+            requireObjectsAt(repo, "HEAD");
+            requireObjectsAt(repo, branchName);
+            String fullMessage = message + "\n\n" + KIND_TRAILER + "session\n" + OBJECT_FORMAT_TRAILER;
+            Map<String, Set<LocalVersionObjectStore.ObjectRef>> materialized = pointerPathsAt(repo, "HEAD");
+            pointerPathsAt(repo, branchName).forEach((path, refs) -> materialized.computeIfAbsent(path, p -> new LinkedHashSet<>()).addAll(refs));
+            MergeResult r = VersionObjectFilters.materializing(repo, materialized, () -> git.merge()
                     .include(target)
                     .setMessage(fullMessage)
                     .setFastForward(MergeCommand.FastForwardMode.NO_FF)
                     .setCommit(false)
-                    .call();
+                    .call());
 
             MergeResult.MergeStatus st = r.getMergeStatus();
             if (st.isSuccessful()) {
@@ -1463,6 +1913,7 @@ public class ProjectRepoService {
                 if (st == MergeResult.MergeStatus.ALREADY_UP_TO_DATE) {
                     mergeSha = r.getNewHead() == null ? null : r.getNewHead().getName();
                 } else if (commitOnClean) {
+                    stageAll(git);
                     RevCommit mergeCommit = git.commit()
                             .setMessage(fullMessage)
                             .setAuthor(authorName, authorEmail)
@@ -1478,7 +1929,8 @@ public class ProjectRepoService {
                     ? Collections.emptyList()
                     : new ArrayList<>(r.getConflicts().keySet());
             if (resetOnConflict) {
-                git.reset().setMode(ResetCommand.ResetType.HARD).setRef("HEAD").call();
+                VersionObjectFilters.materializing(repo, pointerPathsAt(repo, "HEAD"),
+                        () -> git.reset().setMode(ResetCommand.ResetType.HARD).setRef("HEAD").call());
             }
             return new MergeOutcome(false, false, conflicts, null);
         } catch (VersionException e) {
@@ -1556,6 +2008,7 @@ public class ProjectRepoService {
             }
 
             if (!paths.isEmpty()) {
+                requireObjectsAt(repo, "HEAD");
                 ResetCommand reset = git.reset().setRef(Constants.HEAD);
                 for (String p : paths) reset.addPath(p);
                 reset.call();
@@ -1563,13 +2016,7 @@ public class ProjectRepoService {
                 Path work = workTree(projectId);
                 for (String p : paths) {
                     Path target = work.resolve(p);
-                    byte[] bytes = blobAt(repo, walk, head, p);
-                    if (bytes == null) {
-                        Files.deleteIfExists(target);
-                    } else {
-                        Files.createDirectories(target.getParent());
-                        Files.write(target, bytes);
-                    }
+                    copyBlobAtCommit(projectId, "HEAD", p, target);
                 }
             }
 
@@ -1640,10 +2087,9 @@ public class ProjectRepoService {
                 log.debug("裁决提交前读工作区状态失败（只影响溯源预算）: project={}", projectId, e);
             }
 
-            git.add().addFilepattern(".").call();
-            git.add().addFilepattern(".").setUpdate(true).call();
+            stageAll(git);
 
-            String fullMessage = message + "\n\n" + KIND_TRAILER + "session";
+            String fullMessage = message + "\n\n" + KIND_TRAILER + "session\n" + OBJECT_FORMAT_TRAILER;
             String resolutionLine = resolutionsTrailerValue(resolutions);
             if (resolutionLine != null) {
                 fullMessage = fullMessage + "\n" + RESOLUTIONS_TRAILER + resolutionLine;
@@ -1884,10 +2330,12 @@ public class ProjectRepoService {
         try (Repository repo = open(projectId); Git git = new Git(repo)) {
             var target = repo.resolve(targetRef);
             if (target == null) throw new VersionException("目标版本不存在: " + targetRef);
-            var result = git.merge()
+            requireObjectsAt(repo, "HEAD");
+            requireObjectsAt(repo, targetRef);
+            var result = VersionObjectFilters.materializing(repo, pointerPathsAt(repo, targetRef), () -> git.merge()
                     .include(target)
                     .setFastForward(MergeCommand.FastForwardMode.FF_ONLY)
-                    .call();
+                    .call());
             if (!result.getMergeStatus().isSuccessful()) {
                 throw new VersionException("快进失败: " + result.getMergeStatus());
             }
@@ -1938,6 +2386,7 @@ public class ProjectRepoService {
      * 只建仓、把 HEAD 指到 master，不调用 commit。已初始化则 no-op（幂等）。
      */
     public void initEmptyForReceive(long projectId) {
+        requireVersionRecordingSupported(projectId);
         if (isInitialized(projectId)) return;
         try {
             Files.createDirectories(workTree(projectId));
@@ -1957,6 +2406,11 @@ public class ProjectRepoService {
 
     /** 从云端整仓克隆（gitDir/workTree 分离布局与 init 一致）。 */
     public void cloneFromRemote(long projectId, String url, String username, String token) {
+        cloneFromRemote(projectId, url, username, token, () -> {});
+    }
+
+    public void cloneFromRemote(long projectId, String url, String username, String token, Runnable beforeCheckout) {
+        requireVersionRecordingSupported(projectId);
         try {
             Files.createDirectories(workTree(projectId));
             Git.cloneRepository()
@@ -1964,12 +2418,19 @@ public class ProjectRepoService {
                     .setGitDir(gitDir(projectId).toFile())
                     .setDirectory(workTree(projectId).toFile())
                     .setBranch(MAIN_BRANCH)
+                    .setNoCheckout(true)
                     .setCredentialsProvider(
                             new org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider(
                                     username == null ? "" : username, token == null ? "" : token))
                     .setTimeout(120)
                     .call()
                     .close();
+            try (Repository repo = open(projectId); Git git = new Git(repo)) {
+                beforeCheckout.run();
+                requireObjectsAt(repo, "HEAD");
+                VersionObjectFilters.materializing(repo, pointerPathsAt(repo, "HEAD"),
+                        () -> git.checkout().setName(MAIN_BRANCH).call());
+            }
         } catch (Exception e) {
             throw new VersionException("从云端接入项目失败: project=" + projectId, e);
         }

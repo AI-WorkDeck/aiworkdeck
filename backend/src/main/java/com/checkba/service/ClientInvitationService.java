@@ -83,7 +83,7 @@ public class ClientInvitationService {
     public Issued issueClientCode(Long projectId, Long requesterId, String clientName) {
         // 1. Check permissions (Allow Admin and Participant)
         if (!projectMemberService.hasWritePermission(projectId, requesterId)) {
-             throw new IllegalArgumentException("权限不足：只有管理员或参与者可以邀请客户");
+             throw new IllegalArgumentException(LangText.of("权限不足：只有管理员或参与者可以邀请客户", "Insufficient permissions: only administrators or participants can invite clients"));
         }
         // 判据与前端 InviteMemberDialog 的轨道同源：local-mode 且没有 project_remote 绑定 = 未放进案件库；
         // 有绑定则必须经案件库签发（本机签的码客户用不了）
@@ -313,11 +313,11 @@ public class ClientInvitationService {
 
     public ProjectInvitation validateCode(String code) {
         ProjectInvitation invitation = invitationRepository.findByAccessCode(code)
-                .orElseThrow(() -> new IllegalArgumentException("访问码无效"));
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("访问码无效", "Invalid access code")));
         // 已作废的码必须在这里挡住：过了这一关 createClientUser 会无条件把持码人
         // 重新加成 CLIENT 成员，被移出的客户就自己回到项目里了。
         if (invitation.getRevokedAt() != null) {
-            throw new IllegalArgumentException("访问码已失效");
+            throw new IllegalArgumentException(LangText.of("访问码已失效", "This access code is no longer valid"));
         }
         LocalDateTime expiry = effectiveExpiry(invitation);
         if (expiry != null && expiry.isBefore(LocalDateTime.now())) {

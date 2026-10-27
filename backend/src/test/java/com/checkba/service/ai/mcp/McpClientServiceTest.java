@@ -136,4 +136,21 @@ class McpClientServiceTest {
 
         assertEquals("", provider.lastToken);
     }
+    @Test void adHocPluginReferencesCannotReadHostCredentialsOrReachPrivateEndpoints() {
+        var config = server("plugin:qa-plugin:source");
+        config.setTokenSettingKey("external.pkulaw.token");
+        assertTrue(service.callTool(config, "echo", Map.of()).startsWith("Error:"));
+        config.setTokenSettingKey("plugin.other.apiKey");
+        assertTrue(service.callTool(config, "echo", Map.of()).startsWith("Error:"));
+        config.setTokenSettingKey("plugin.qa-plugin.apiKey"); config.setToken("inline-secret");
+        assertTrue(service.callTool(config, "echo", Map.of()).startsWith("Error:"));
+        config.setToken(null); config.setUrl("https://127.0.0.1/mcp");
+        assertTrue(service.callTool(config, "echo", Map.of()).startsWith("Error:"));
+        assertNull(provider.lastToolName); verifyNoInteractions(systemSettingService);
+        config.setUrl("https://example.com/mcp");
+        when(systemSettingService.get("plugin.qa-plugin.apiKey", "")).thenReturn("plugin-token");
+        assertEquals("provider-result", service.callTool(config, "echo", Map.of()));
+        assertEquals("plugin-token", provider.lastToken); assertTrue(config.isPluginEndpoint());
+    }
+
 }

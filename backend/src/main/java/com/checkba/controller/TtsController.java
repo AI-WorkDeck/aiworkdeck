@@ -53,7 +53,7 @@ public class TtsController {
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + audioFile.getName() + "\"")
-                .contentType(MediaType.parseMediaType("audio/mpeg"))
+                .contentType(MediaType.parseMediaType("audio/wav"))
                 .body(resource);
     }
 

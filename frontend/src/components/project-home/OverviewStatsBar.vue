@@ -70,36 +70,36 @@ export default {
 .overview-stats-bar {
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
-  padding: 14px 18px;
+  border-radius: var(--awd-radius-md);
+  padding: var(--awd-space-3);
 }
 
 .stats-loading {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
 }
 
 .stats-tiles {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--awd-space-3);
 }
 
 .stat-tile {
   flex: 1 1 160px;
   min-width: 140px;
-  padding: 10px 12px;
+  padding: var(--awd-space-2);
   background: var(--awd-bg);
   border-left: 3px solid var(--awd-mint);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
 }
 
 .stat-value {
   display: block;
-  font-size: 15px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-accent-text);
-  line-height: 22px;
+  line-height: var(--awd-line-height-ui);
 }
 
 .stat-caption {
@@ -114,57 +114,57 @@ export default {
    定义在 project-home-pane.scss），不是靠 compact 布尔值。三档见该文件的注释。 */
 @container home-pane (max-width: 359px) {
   .overview-stats-bar {
-    padding: 10px 12px;
+    padding: var(--awd-space-2);
   }
 
   .stats-tiles {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--awd-space-2);
   }
 
   .stat-tile {
     flex: none;
     min-width: 0;
-    padding: 8px 10px;
+    padding: var(--awd-space-1) var(--awd-space-2);
   }
 
   .stat-value {
-    font-size: 13px;
-    line-height: 19px;
+    font-size: var(--awd-font-size-body);
+    line-height: var(--awd-line-height-ui);
   }
 
   .stat-caption {
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
   }
 }
 
 @container home-pane (min-width: 360px) and (max-width: 559px) {
   .overview-stats-bar {
-    padding: 14px 16px;
+    padding: var(--awd-space-3);
   }
 
   .stats-tiles {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px 12px;
+    gap: var(--awd-space-2) var(--awd-space-3);
   }
 
   .stat-tile {
     min-width: 0;
-    padding: 10px 12px;
+    padding: var(--awd-space-2);
   }
 
   .stat-value {
-    font-size: 14px;
+    font-size: var(--awd-font-size-body);
   }
 }
 .overview-stats-bar.is-sidebar { border: 0; border-top: 1px solid var(--awd-panel-border); border-radius: 0; padding: var(--awd-panel-gap) var(--awd-panel-pad-x); }
 .is-sidebar .stats-tiles { display: grid; grid-template-columns: 1fr; gap: 0; }
-.is-sidebar .stat-tile { min-width: 0; padding: 6px 0; background: transparent; border: 0; border-radius: 0; }
-.is-sidebar .stat-value { font-size: var(--awd-panel-fs); line-height: 18px; color: var(--awd-panel-text); }
+.is-sidebar .stat-tile { min-width: 0; padding: var(--awd-space-1) 0; background: transparent; border: 0; border-radius: 0; }
+.is-sidebar .stat-value { font-size: var(--awd-font-size-body); line-height: var(--awd-line-height-ui); color: var(--awd-panel-text); }
 .is-sidebar .stat-caption { font-size: var(--awd-panel-fs-meta); line-height: 16px; margin-top: 0; }
 @container home-pane (min-width: 360px) {
-  .is-sidebar .stats-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+  .is-sidebar .stats-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--awd-space-4); }
 }
 </style>

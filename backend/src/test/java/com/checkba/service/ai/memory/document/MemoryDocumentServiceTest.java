@@ -69,6 +69,99 @@ class MemoryDocumentServiceTest {
     }
 
     @Test
+    void clientsCannotReadProjectMemoryEvenWithAdminWritePermission() {
+        Project project = project(31L, "内部材料项目");
+        when(projectMembers.hasReadPermission(project.getId(), 31L)).thenReturn(true);
+        when(projectMembers.hasWritePermission(project.getId(), 31L)).thenReturn(true);
+        String projectSpace = space(service.listSpaces(31L, project.getId()), "project").id();
+        MemoryFileView secret = service.write(31L, projectSpace, "private-extract.md",
+                "# 私有材料摘录\n\nPRIVATE-MEMORY-CANARY", 0);
+
+        for (long clientId : List.of(32L, 33L)) {
+            when(projectMembers.hasReadPermission(project.getId(), clientId)).thenReturn(true);
+            // The second case models global CLIENT + project ADMIN/OWNER: the unified
+            // isClient predicate must win even if another caller reports write permission.
+            when(projectMembers.hasWritePermission(project.getId(), clientId)).thenReturn(clientId == 33L);
+            when(projectMembers.isClient(project.getId(), clientId)).thenReturn(true);
+            String personalSpace = space(service.listSpaces(clientId, null), "user").id();
+            service.write(clientId, personalSpace, "client-preferences.md", "个人偏好", 0);
+            MemorySpaceView hidden = space(service.listSpaces(clientId, project.getId()), "project");
+            assertNull(hidden.id());
+            assertEquals("项目记忆", hidden.label());
+            assertFalse(hidden.readable());
+            assertFalse(hidden.writable());
+            assertFalse(hidden.available());
+            // Personal memory stays available to tools that list all spaces in a project context.
+            assertEquals(personalSpace, space(service.listSpaces(clientId, project.getId()), "user").id());
+            String indexes = service.contextIndexes(clientId, project.getId(), 16_000);
+            assertTrue(indexes.contains("client-preferences.md"));
+            assertFalse(indexes.contains("private-extract.md"));
+            assertFalse(indexes.contains("内部材料项目"));
+            assertFalse(indexes.contains(projectSpace));
+            assertFalse(indexes.contains("PRIVATE-MEMORY-CANARY"));
+            assertProjectMemoryDenied(clientId, projectSpace, secret);
+        }
+        assertEquals("# 私有材料摘录\n\nPRIVATE-MEMORY-CANARY",
+                service.read(31L, projectSpace, secret.path()).content());
+    }
+
+    @Test
+    void projectMemoryReadAccessIsRecheckedAfterRemovalAndAllowsReadOnlyStaff() {
+        Project project = project(41L, "权限撤销项目");
+        when(projectMembers.hasReadPermission(project.getId(), 41L)).thenReturn(true);
+        when(projectMembers.hasWritePermission(project.getId(), 41L)).thenReturn(true);
+        String projectSpace = space(service.listSpaces(41L, project.getId()), "project").id();
+        MemoryFileView secret = service.write(41L, projectSpace, "facts.md", "STAFF-CANARY", 0);
+        long readerId = 42L;
+        when(projectMembers.hasReadPermission(project.getId(), readerId)).thenReturn(true);
+        when(projectMembers.hasWritePermission(project.getId(), readerId)).thenReturn(false);
+
+        assertTrue(space(service.listSpaces(readerId, project.getId()), "project").readable());
+        assertFalse(space(service.listSpaces(readerId, project.getId()), "project").writable());
+        assertEquals(secret.content(), service.download(readerId, projectSpace, secret.path()));
+        assertEquals(secret.path(), service.search(readerId, projectSpace, "STAFF-CANARY", 5).get(0).path());
+        assertTrue(service.contextIndexes(readerId, project.getId(), 16_000).contains("facts.md"));
+        assertDenied(() -> service.write(readerId, projectSpace, secret.path(), "cannot overwrite", secret.revision()));
+
+        // A previously known space id is not a capability after membership is revoked.
+        when(projectMembers.hasReadPermission(project.getId(), readerId)).thenReturn(false);
+        assertDenied(() -> service.listSpaces(readerId, project.getId()));
+        assertDenied(() -> service.contextIndexes(readerId, project.getId(), 16_000));
+        assertProjectMemoryDenied(readerId, projectSpace, secret);
+    }
+
+    @Test
+    void clientPersonalMemoryRemainsOwnerOnly() {
+        long clientId = 51L;
+        when(projectMembers.isClient(anyLong(), eq(clientId))).thenReturn(true);
+        String ownSpace = space(service.listSpaces(clientId, null), "user").id();
+        MemoryFileView note = service.write(clientId, ownSpace, "preferences.md", "PERSONAL-CANARY", 0);
+        assertEquals(note.content(), service.download(clientId, ownSpace, note.path()));
+        assertEquals(note.path(), service.search(clientId, ownSpace, "PERSONAL-CANARY", 5).get(0).path());
+        assertTrue(service.contextIndexes(clientId, null, 16_000).contains("preferences.md"));
+        assertAll(
+                () -> assertDenied(() -> service.listFiles(52L, ownSpace)),
+                () -> assertDenied(() -> service.read(52L, ownSpace, note.path())),
+                () -> assertDenied(() -> service.download(52L, ownSpace, note.path())),
+                () -> assertDenied(() -> service.search(52L, ownSpace, "PERSONAL-CANARY", 5)),
+                () -> assertDenied(() -> service.write(52L, ownSpace, note.path(), "overwrite", note.revision())));
+    }
+
+    private void assertProjectMemoryDenied(Long userId, String spaceId, MemoryFileView secret) {
+        assertAll(
+                () -> assertDenied(() -> service.listFiles(userId, spaceId)),
+                () -> assertDenied(() -> service.read(userId, spaceId, secret.path())),
+                () -> assertDenied(() -> service.download(userId, spaceId, secret.path())),
+                () -> assertDenied(() -> service.search(userId, spaceId, "CANARY", 5)),
+                () -> assertDenied(() -> service.write(userId, spaceId, secret.path(), "overwrite", secret.revision())),
+                () -> assertDenied(() -> service.delete(userId, spaceId, secret.path(), secret.revision())));
+    }
+
+    private static void assertDenied(org.junit.jupiter.api.function.Executable action) {
+        assertEquals(403, assertThrows(MemoryDocumentException.class, action).status());
+    }
+
+    @Test
     void topicLinksResolveAndDeleteKeepsIndexValid() {
         Project project = project(7L, "尽调项目");
         when(projectMembers.hasReadPermission(project.getId(), 7L)).thenReturn(true);
@@ -181,6 +274,69 @@ class MemoryDocumentServiceTest {
         assertTrue(documents.findBySourceMemoryUid(legacy.getUid()).orElseThrow().isDeleted());
         String index = service.read(6L, space(service.listSpaces(6L, null), "user").id(), "remember.md").content();
         assertFalse(index.contains("(" + migrated.path() + ")"));
+    }
+
+    @Test
+    void supersededLegacyTopicUpdatesIndexWithoutDuplicateLinksAndPreservesCleanEntryValue() {
+        Project project = project(18L, "并购项目");
+        when(projectMembers.hasReadPermission(project.getId(), 18L)).thenReturn(true);
+        when(projectMembers.hasWritePermission(project.getId(), 18L)).thenReturn(true);
+
+        MemoryEntry first = MemoryEntry.builder()
+                .projectId(project.getId()).userId(18L).scope(MemoryEntry.MemoryScope.PROJECT)
+                .memoryType(MemoryEntry.MemoryType.DECISION)
+                .memoryKey("交易对价").memoryValue("首期估值 5000 万元").build();
+        first.setUid(UUID.randomUUID().toString());
+        first = legacyEntries.saveAndFlush(first);
+        MemoryFileView firstView = service.migrateLegacyEntry(first);
+
+        MemoryEntry second = MemoryEntry.builder()
+                .projectId(project.getId()).userId(18L).scope(MemoryEntry.MemoryScope.PROJECT)
+                .memoryType(MemoryEntry.MemoryType.DECISION)
+                .memoryKey("交易对价").memoryValue("经补充协议调整为 6000 万元").build();
+        second.setUid(UUID.randomUUID().toString());
+        second = legacyEntries.saveAndFlush(second);
+        MemoryFileView secondView = service.migrateLegacyEntry(second);
+
+        String projectSpaceId = space(service.listSpaces(18L, project.getId()), "project").id();
+        String indexContent = service.read(18L, projectSpaceId, "remember.md").content();
+        assertFalse(indexContent.contains("(" + firstView.path() + ")"),
+                "旧版本 legacy 链接应从 remember.md 索引中退场: " + indexContent);
+        assertTrue(indexContent.contains("[交易对价](" + secondView.path() + ") — 经补充协议调整为 6000 万元"),
+                "新版本 legacy 链接及一句话摘要钩子应保留在 remember.md 索引中: " + indexContent);
+        assertEquals("经补充协议调整为 6000 万元",
+                legacyEntries.findFirstByUid(second.getUid()).orElseThrow().getMemoryValue(),
+                "MemoryEntry.memoryValue 不应被 legacy frontmatter 污染");
+    }
+
+    @Test
+    void indexRendersClaudeStyleOneLineSummaryHookWhileKeepingExpandedDetailInTopicFile() {
+        String userSpace = space(service.listSpaces(19L, null), "user").id();
+        String topicContent = """
+                ---
+                name: redline-granularity
+                description: 仅对实质风险点下修订，纯措辞润色一律用批注提示，避免满屏红线
+                type: preference
+                ---
+
+                # 修订颗粒度规范
+
+                在对客户合同进行审阅时，仅对实质权利义务失衡或合规红线直接下修订。
+                **Why:** 客户法务反馈满屏措辞级红线会掩盖核心商业条款争议。
+                **How to apply:** 遇到表述不够凝练但无歧义的条款，保持原文不动，在重点争议处用批注建议。
+                """;
+        service.write(19L, userSpace, "topics/redline-granularity.md", topicContent, 0);
+
+        String indexContent = service.read(19L, userSpace, "remember.md").content();
+        assertTrue(indexContent.contains(
+                "- [修订颗粒度规范](topics/redline-granularity.md) — 仅对实质风险点下修订，纯措辞润色一律用批注提示，避免满屏红线"),
+                "remember.md 应渲染『[标题](路径) — 一句话高密度摘要』索引行: " + indexContent);
+        assertFalse(indexContent.contains("客户法务反馈满屏措辞级红线"),
+                "remember.md 总表只放一句话钩子，不应把 Why/How to apply 展开细节直接塞进总表: " + indexContent);
+
+        String detailContent = service.read(19L, userSpace, "topics/redline-granularity.md").content();
+        assertTrue(detailContent.contains("**Why:**") && detailContent.contains("**How to apply:**"),
+                "细项文件应完整保留展开背景与适用规则");
     }
 
     @Test

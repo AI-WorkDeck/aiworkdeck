@@ -17,6 +17,7 @@
             </svg>
           </view>
           <input
+            ref="searchInput"
             class="search-input"
             v-model="searchQuery"
             :placeholder="$t('files.searchPlaceholder')"
@@ -34,85 +35,42 @@
         </view>
       </view>
 
-      <!-- Tag Filters
-           默认折叠。自动打标签会给项目攒出上百个词（本机实测单个项目 338 个），
-           全量平铺出来的那面标签墙会把搜索框和结果一起挤出屏幕——筛选器反而
-           成了这个面板最难用的部分。折叠 + 计数 + 过滤框 + 已选常驻，是让
-           「有几百个标签」这件事不再阻碍「找一份文件」。 -->
-      <view class="tag-sec-head" v-if="visibleTags && visibleTags.length > 0" @tap="tagsOpen = !tagsOpen">
-        <text class="tag-sec-chevron" :class="{ open: tagsOpen }">›</text>
-        <text class="tag-sec-title">{{ $t('files.filterByTag') }}</text>
-        <text class="tag-sec-count">{{ visibleTags.length }}</text>
-        <view class="tag-sec-spacer"></view>
-        <text class="tag-sec-clear" v-if="selectedTagIds.length" @tap.stop="clearTags">
-          {{ $t('files.tagClear') }}
-        </text>
-      </view>
-
-      <!-- 已选标签：折叠状态下也必须看得见，否则「搜不到东西」的原因被藏起来了 -->
-      <view class="tags-container selected-row" v-if="!tagsOpen && selectedTags.length > 0">
-        <view
-          v-for="tag in selectedTags"
-          :key="'sel-' + tag.id"
-          class="tag-chip"
-          :style="getTagStyle(tag)"
-          @tap="toggleTag(tag.id)"
-        >
-          <text class="tag-name">{{ tag.name }}</text>
-        </view>
-      </view>
-
-      <template v-if="tagsOpen && visibleTags && visibleTags.length > 0">
-        <view class="tag-filter-box" v-if="visibleTags.length > TAG_FILTER_THRESHOLD">
-          <input
-            class="tag-filter-input"
-            v-model="tagFilter"
-            :placeholder="$t('files.tagFilterPlaceholder')"
-          />
-        </view>
-        <!-- 分组只是展示形式，过滤/截断/排序全部作用于 shownTags 这一份全量列表，
-             按组切片渲染，不另起一套逻辑（三个分组共用一份过滤与截断） -->
-        <template v-for="group in shownTagGroups" :key="group.type">
-          <view v-if="group.tags.length > 0" class="tag-subsec-head">
-            <text class="tag-subsec-title">{{ $t(group.labelKey) }}</text>
-          </view>
-          <view v-if="group.tags.length > 0" class="tags-container">
-            <view
-              v-for="tag in group.tags"
-              :key="tag.id"
-              class="tag-chip"
-              :class="{ selected: selectedTagIds.includes(tag.id) }"
-              :style="getTagStyle(tag)"
-              @tap="toggleTag(tag.id)"
-            >
-              <text class="tag-name">{{ tag.name }}</text>
-            </view>
-          </view>
-        </template>
-        <text
-          class="tag-more"
-          v-if="filteredTags.length > shownTags.length"
-          @tap="tagsExpanded = true"
-        >{{ $t('files.tagShowAll', { count: filteredTags.length }) }}</text>
-        <text class="tag-empty" v-else-if="filteredTags.length === 0">{{ $t('files.tagNoMatch') }}</text>
-      </template>
+      <TagFilter
+        :key="projectId"
+        :tags="allProjectTags"
+        :model-value="selectedTagIds"
+        :counts="tagCounts"
+        :loading="tagsLoading"
+        :error="tagsError"
+        @update:model-value="setTags"
+        @retry="refreshTagsAndSearch"
+      />
 
       <!-- Search Stats -->
-      <view class="search-stats" v-if="hasSearched">
-         <text v-if="loading">{{ $t('files.searching') }}</text>
+      <view class="search-stats" v-if="hasSearched" role="status" aria-live="polite">
+         <view v-if="loading" class="search-progress">
+           <text>{{ $t(searchPhase === 'content' ? 'files.searchingContent' : 'files.searching') }}</text>
+           <component :is="'button'" type="button" class="search-retry" @click.stop="stopWaiting()">{{ $t('files.searchStopWaiting') }}</component>
+         </view>
+         <view v-else-if="searchError" class="search-error" role="alert">
+           <text>{{ searchError }}</text>
+           <component :is="'button'" type="button" class="search-retry" @click.stop="performSearch()">{{ $t('files.archiveRetry') }}</component>
+         </view>
          <text v-else-if="results.totalMatches === 0 && (!results.results || results.results.length === 0)">{{ $t('files.noResults') }}</text>
          <template v-else>
-            <text class="highlight">{{ results.totalMatches }}</text> {{ $t('files.matchesSuffix') }} ·
+            <template v-if="searchedQuery.trim()">
+              <text class="highlight">{{ results.totalMatches }}</text> {{ $t('files.matchesSuffix') }} ·
+            </template>
             <text class="highlight">{{ results.totalFiles }}</text> {{ $t('files.filesSuffix') }}
          </template>
       </view>
     </view>
 
     <!-- Results List -->
-    <scroll-view scroll-y class="results-list" v-if="!loading && results.results && results.results.length > 0">
+    <scroll-view scroll-y class="results-list" v-if="results.results && results.results.length > 0">
       <view class="file-group" v-for="file in results.results" :key="file.fileId">
         <!-- File Header -->
-        <view class="file-header" @tap.stop="toggleFile(file.fileId)">
+        <view class="file-header" @tap.stop="onFileHeader(file)">
           <view class="arrow-icon" :class="{ expanded: !collapsedFiles[file.fileId], hidden: file.matchCount === 0 }">
              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                <polyline points="9 18 15 12 9 6"></polyline>
@@ -124,6 +82,12 @@
           <view class="file-info">
              <text class="file-name" @tap.stop="openFile(file)">{{ file.fileName }}</text>
              <text class="file-path">{{ getRelativePath(file.filePath) }}</text>
+             <view v-if="file.tags && file.tags.length" class="result-tags">
+               <text v-for="tag in file.tags" :key="tag.id" class="result-tag" :title="tag.name">
+                 <text class="result-tag-dot" :style="{ backgroundColor: tag.color || 'var(--awd-panel-text-2)' }"></text>
+                 {{ tag.name }}
+               </text>
+             </view>
           </view>
           <view class="badge" v-if="file.matchCount > 0">{{ file.matchCount }}</view>
         </view>
@@ -164,19 +128,16 @@
 <script>
 import { searchProjectContent, getProjectTags } from '@/services/api'
 import FileTypeIcon from '@/components/FileTypeIcon.vue'
-import { TAG_TYPE_PARTY, TAG_TYPE_ISSUE, TAG_TYPE_NORMAL, normalizeTagType } from '@/utils/tagTypes.js'
+import TagFilter from '@/components/TagFilter.vue'
 
-// 标签超过这个数量才值得再给它一个过滤框
-const TAG_FILTER_THRESHOLD = 12
-// 展开后先只铺这么多，剩下的走「显示全部」——一个项目可能有几百个自动标签
-const TAG_MAX_COLLAPSED = 24
 // 输入停顿多久才发搜索（v0.49.0 BUG-12）
 const SEARCH_DEBOUNCE_MS = 300
 
 export default {
   name: 'SearchPanel',
   components: {
-    FileTypeIcon
+    FileTypeIcon,
+    TagFilter
   },
   props: {
     projectId: {
@@ -188,6 +149,10 @@ export default {
   data() {
     return {
       searchQuery: '',
+      searchedQuery: '',
+      searchError: '',
+      searchPhase: '',
+      isComposing: false,
       isSearchFocused: false,
       loading: false,
       hasSearched: false,
@@ -203,62 +168,38 @@ export default {
       },
       collapsedFiles: {},
       debounceTimer: null,
-      allProjectTags: [], // Store all tags
-      visibleTags: [],    // Tags to display
+      allProjectTags: [],
       selectedTagIds: [],
-      // 标签筛选区默认折叠（自动打标签能攒出上百个词，平铺会淹掉整个面板）
-      tagsOpen: false,
-      tagsExpanded: false,   // 「显示全部」点过之后不再截断
-      tagFilter: '',
-      tagCounts: {}          // tagId -> 本次搜索结果里命中的文件数，用来排序
+      tagsLoading: false,
+      tagsError: '',
+      tagCounts: {}
     }
   },
-  computed: {
-    TAG_FILTER_THRESHOLD: () => TAG_FILTER_THRESHOLD,
-    TAG_MAX_COLLAPSED: () => TAG_MAX_COLLAPSED,
-    // 折叠时用来展示「当前正在按哪几个标签筛」
-    selectedTags() {
-      return this.allProjectTags.filter(t => this.selectedTagIds.includes(t.id))
-    },
-    /**
-     * 排序口径：已选的永远在最前（否则勾过的标签会被冲到几百个之后找不回来），
-     * 其次按本次搜索结果里的命中文件数降序——没搜过就没有计数，退回按名称排。
-     */
-    filteredTags() {
-      const q = this.tagFilter.trim().toLowerCase()
-      const list = q
-        ? this.visibleTags.filter(t => (t.name || '').toLowerCase().includes(q))
-        : this.visibleTags.slice()
-      const selected = new Set(this.selectedTagIds)
-      return list.sort((a, b) => {
-        const sa = selected.has(a.id) ? 1 : 0
-        const sb = selected.has(b.id) ? 1 : 0
-        if (sa !== sb) return sb - sa
-        const ca = this.tagCounts[a.id] || 0
-        const cb = this.tagCounts[b.id] || 0
-        if (ca !== cb) return cb - ca
-        return String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hans-CN')
-      })
-    },
-    shownTags() {
-      if (this.tagsExpanded || this.tagFilter.trim()) return this.filteredTags
-      return this.filteredTags.slice(0, TAG_MAX_COLLAPSED)
-    },
-    // 展开态按「当事人 / 争议焦点 / 其他标签」三组渲染；shownTags 已经算好过滤+截断，
-    // 这里只按类型切片，组内相对顺序原样保留（filteredTags 排好的序不受影响）
-    shownTagGroups() {
-      const list = this.shownTags
-      return [
-        { type: TAG_TYPE_PARTY, labelKey: 'files.tagGroupParty', tags: list.filter(t => normalizeTagType(t) === TAG_TYPE_PARTY) },
-        { type: TAG_TYPE_ISSUE, labelKey: 'files.tagGroupIssue', tags: list.filter(t => normalizeTagType(t) === TAG_TYPE_ISSUE) },
-        { type: TAG_TYPE_NORMAL, labelKey: 'files.tagGroupOther', tags: list.filter(t => normalizeTagType(t) === TAG_TYPE_NORMAL) }
-      ]
+  watch: {
+    projectId() {
+      this.resetProject()
+      this.fetchTags()
     }
   },
   mounted() {
     this.fetchTags()
+    uni.$on?.('awd:files-changed', this.onFilesChanged)
+    // Uni's input event does not preserve native isComposing in every build.
+    // Listen on its DOM root so intermediate pinyin never starts a full scan.
+    const input = this.$refs?.searchInput
+    this._compositionRoot = input?.$el || input
+    const nativeInput = this._compositionRoot?.matches?.('input') ? this._compositionRoot : this._compositionRoot?.querySelector?.('input')
+    nativeInput?.focus?.()
+    this._compositionRoot?.addEventListener?.('compositionstart', this.onCompositionStart, true)
+    this._compositionRoot?.addEventListener?.('compositionend', this.onCompositionEnd, true)
   },
   beforeUnmount() {
+    this._unmounted = true
+    this._searchSeq = (this._searchSeq || 0) + 1
+    this._tagsSeq = (this._tagsSeq || 0) + 1
+    uni.$off?.('awd:files-changed', this.onFilesChanged)
+    this._compositionRoot?.removeEventListener?.('compositionstart', this.onCompositionStart, true)
+    this._compositionRoot?.removeEventListener?.('compositionend', this.onCompositionEnd, true)
     // 面板关掉后不许再有待发的防抖或在途请求（后端还在为它逐个抽文件）
     if (this.debounceTimer) clearTimeout(this.debounceTimer)
     this.debounceTimer = null
@@ -266,85 +207,85 @@ export default {
     this._searchAbort = null
   },
   methods: {
-    async fetchTags() {
-      try {
-        const res = await getProjectTags(this.projectId)
-        this.allProjectTags = res || []
-        this.visibleTags = this.allProjectTags // Initially show all
-      } catch (e) {
-        console.error('Failed to load tags', e)
-      }
-    },
-    toggleTag(tagId) {
-      const index = this.selectedTagIds.indexOf(tagId)
-      if (index === -1) {
-        this.selectedTagIds.push(tagId)
-      } else {
-        this.selectedTagIds.splice(index, 1)
-      }
-      this.performSearch()
-    },
-    clearTags() {
-      if (!this.selectedTagIds.length) return
-      this.selectedTagIds = []
-      this.performSearch()
-    },
-    getTagStyle(tag) {
-        const isSelected = this.selectedTagIds.includes(tag.id);
-        const color = tag.color || 'var(--awd-text-2)';
-
-        if (isSelected) {
-            return {
-                backgroundColor: color,
-                borderColor: color,
-                color: '#FFFFFF'
-            };
-        } else {
-            return {
-                backgroundColor: 'var(--awd-surface)',
-                borderColor: 'var(--awd-border)', // Neutral border
-                color: 'var(--awd-text-2)' // Neutral text
-            };
-        }
-    },
-    updateVisibleTags(fileResults) {
-        if (!fileResults || fileResults.length === 0) {
-            this.tagCounts = {}
-            if (this.selectedTagIds.length > 0) {
-                 this.visibleTags = this.allProjectTags.filter(t => this.selectedTagIds.includes(t.id))
-            } else {
-                 this.visibleTags = this.allProjectTags
-            }
-            return
-        }
-
-        // Collect all tag IDs present in the result files
-        const relevantTagIds = new Set()
-        // 顺带数一遍每个标签命中了几个文件：标签区的排序靠它，没有计数就只能按名字排，
-        // 而按名字排在几百个自动标签里等于没有排序
-        const counts = {}
-
-        // Also always include currently selected tags, so they don't disappear
-        this.selectedTagIds.forEach(id => relevantTagIds.add(id))
-
-        fileResults.forEach(file => {
-            if (file.tags) {
-                file.tags.forEach(tag => {
-                    relevantTagIds.add(tag.id)
-                    counts[tag.id] = (counts[tag.id] || 0) + 1
-                })
-            }
-        })
-
-        this.tagCounts = counts
-        // Filter allProjectTags
-        this.visibleTags = this.allProjectTags.filter(t => relevantTagIds.has(t.id))
-    },
-    onSearchInput() {
+    resetProject() {
+      this._searchSeq = (this._searchSeq || 0) + 1
+      this._tagsSeq = (this._tagsSeq || 0) + 1
       if (this.debounceTimer) clearTimeout(this.debounceTimer)
+      this.debounceTimer = null
+      if (this._searchAbort) this._searchAbort.abort()
+      this._searchAbort = null
+      this.searchQuery = ''
+      this.searchedQuery = ''
+      this.searchError = ''
+      this.searchPhase = ''
+      this.isComposing = false
+      this.selectedTagIds = []
+      this.allProjectTags = []
+      this.tagCounts = {}
+      this.tagsError = ''
+      this.tagsLoading = false
+      this.loading = false
+      this.hasSearched = false
+      this.results = { totalMatches: 0, totalFiles: 0, results: [] }
+      this.collapsedFiles = {}
+    },
+    async fetchTags() {
+      const seq = (this._tagsSeq = (this._tagsSeq || 0) + 1)
+      const projectId = this.projectId
+      this.tagsLoading = true
+      this.tagsError = ''
+      try {
+        const tags = await getProjectTags(projectId)
+        if (seq !== this._tagsSeq || this._unmounted || projectId !== this.projectId) return false
+        this.allProjectTags = tags || []
+        const existingIds = new Set(this.allProjectTags.map(tag => String(tag.id)))
+        this.selectedTagIds = this.selectedTagIds.filter(id => existingIds.has(String(id)))
+      } catch (e) {
+        if (seq !== this._tagsSeq || this._unmounted || projectId !== this.projectId) return false
+        this.tagsError = this.$t('files.tagLoadFailed')
+      } finally {
+        if (seq === this._tagsSeq && !this._unmounted) this.tagsLoading = false
+      }
+      return true
+    },
+    async onFilesChanged(event) {
+      if (String(event?.projectId) !== String(this.projectId)) return
+      await this.refreshTagsAndSearch()
+    },
+    async refreshTagsAndSearch() {
+      const fresh = await this.fetchTags()
+      if (fresh && (this.hasSearched || this.searchQuery.trim() || this.selectedTagIds.length)) {
+        this.performSearch()
+      }
+    },
+    setTags(ids) {
+      this.selectedTagIds = ids
+      this.performSearch()
+    },
+    updateTagCounts(fileResults) {
+      const counts = {}
+      for (const file of fileResults || []) {
+        for (const tag of file.tags || []) counts[tag.id] = (counts[tag.id] || 0) + 1
+      }
+      this.tagCounts = counts
+    },
+    onCompositionStart() {
+      this.isComposing = true
+      if (this.debounceTimer) clearTimeout(this.debounceTimer)
+      this.debounceTimer = null
+    },
+    onCompositionEnd(event) {
+      this.isComposing = false
+      if (typeof event?.target?.value === 'string') this.searchQuery = event.target.value
+      this.onSearchInput()
+    },
+    onSearchInput(event) {
+      if (this.debounceTimer) clearTimeout(this.debounceTimer)
+      this.debounceTimer = null
+      if (this.isComposing || event?.isComposing) return
       this.debounceTimer = setTimeout(() => {
         this.debounceTimer = null
-        this.performSearch()
+        this.performSearch(true)
       }, SEARCH_DEBOUNCE_MS)
     },
     toggleOption(option) {
@@ -353,7 +294,13 @@ export default {
         this.performSearch()
       }
     },
-    async performSearch() {
+    async performSearch(syncInput = false) {
+      if (this.isComposing) return
+      // Uni batches v-model updates. Read the native value when the debounced
+      // query actually runs, so a fast paste/type is searched in full.
+      const root = this.$refs?.searchInput?.$el || this.$refs?.searchInput
+      const native = root?.matches?.('input') ? root : root?.querySelector?.('input')
+      if (syncInput && native && typeof native.value === 'string') this.searchQuery = native.value
       // 回车/点标签/清空都会直接调到这里：撤掉还没到点的防抖，免得同一次输入再发一遍
       if (this.debounceTimer) clearTimeout(this.debounceTimer)
       this.debounceTimer = null
@@ -362,26 +309,41 @@ export default {
       // 旧请求不只是丢结果，还要真的断开（v0.49.0 BUG-12：否则连续输入在后端叠成长队）
       if (this._searchAbort) this._searchAbort.abort()
       this._searchAbort = null
-
-      // Allow search if query is non-empty OR if tags are selected
+      this.results = { totalMatches: 0, totalFiles: 0, results: [] }
+      this.tagCounts = {}
+      this.searchError = ''
+      this.searchPhase = ''
+      this.loading = false
+      if (!this.searchQuery.trim() && !this.selectedTagIds.length) {
+        this.hasSearched = false
+        this.searchedQuery = ''
+        return
+      }
       this.loading = true
       this.hasSearched = true
       const controller = (this._searchAbort = new AbortController())
+      const query = this.searchQuery
+      this.searchedQuery = query
+      const payload = { query, ...this.searchOptions, tagIds: [...this.selectedTagIds] }
 
       try {
-        const response = await searchProjectContent(this.projectId, {
-          query: this.searchQuery,
-          ...this.searchOptions,
-          tagIds: this.selectedTagIds,
-          fileTypes: ['docx', 'pdf', 'pptx', 'xlsx', 'txt', 'md'] // Explicitly support these types
-        }, { signal: controller.signal })
+        if (query.trim()) {
+          this.searchPhase = 'names'
+          const names = await searchProjectContent(this.projectId, { ...payload, filenameOnly: true }, { signal: controller.signal })
+          if (seq !== this._searchSeq || controller.signal.aborted) return
+          this.results = names
+          this.updateTagCounts(names.results)
+          this.collapsedFiles = {}
+          this.searchPhase = 'content'
+        }
+        const response = await searchProjectContent(this.projectId, payload, { signal: controller.signal })
 
         if (seq !== this._searchSeq) return // 已有更新的搜索发起，丢弃本次陈旧结果
 
         this.results = response
-
-        // Update visible tags based on results
-        this.updateVisibleTags(response.results)
+        this.searchedQuery = query
+        // Counts only affect ordering; every project tag remains available for changing filters.
+        this.updateTagCounts(response.results)
 
         // Expand all by default
         this.collapsedFiles = {}
@@ -390,13 +352,25 @@ export default {
         if (controller.signal.aborted) return
         console.error('Search failed:', e)
         // 失败提示同样按 seq 收口：陈旧请求的迟到失败不该盖在新结果上弹「搜索失败」
-        if (seq === this._searchSeq) uni.showToast({ title: 'Search failed', icon: 'none' })
+        if (seq === this._searchSeq) {
+          this.searchError = this.$t(this.searchPhase === 'content' ? 'files.searchContentFailed' : 'files.searchFailed')
+          uni.showToast({ title: this.searchError, icon: 'none' })
+        }
       } finally {
         if (seq === this._searchSeq) {
           this.loading = false
           this._searchAbort = null
         }
       }
+    },
+    stopWaiting() {
+      if (this.debounceTimer) clearTimeout(this.debounceTimer)
+      this.debounceTimer = null
+      this._searchSeq = (this._searchSeq || 0) + 1
+      this._searchAbort?.abort()
+      this._searchAbort = null
+      this.loading = false
+      this.searchError = this.$t(this.searchPhase === 'content' ? 'files.searchContentStopped' : 'files.searchStopped')
     },
     refreshSearch() {
       this.performSearch()
@@ -409,6 +383,10 @@ export default {
          })
        }
        this.collapsedFiles = newCollapsed
+    },
+    onFileHeader(file) {
+      if (!this.searchedQuery.trim() || !file.matchCount) this.openFile(file)
+      else this.toggleFile(file.fileId)
     },
     toggleFile(fileId) {
       this.collapsedFiles[fileId] = !this.collapsedFiles[fileId]
@@ -468,12 +446,15 @@ $brand-mint: var(--awd-mint);
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: var(--awd-bg);
+  min-height: 0;
+  min-width: 0;
+  background-color: var(--awd-surface);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 /* 密度令牌见 App.vue 的 --awd-panel-*（基准 = 插件广场） */
 .search-header {
+    flex-shrink: 0;
     padding: var(--awd-panel-gap) 0 var(--awd-panel-gap);
     background-color: var(--awd-bg);
     border-bottom: 1px solid transparent; /* Prepare for sticky behavior if needed */
@@ -486,17 +467,17 @@ $brand-mint: var(--awd-mint);
   .input-box {
     display: flex;
     align-items: center;
-    height: var(--awd-panel-row-h);
+    min-height: var(--awd-control-height);
     background: var(--awd-surface);
     border: 1px solid var(--awd-panel-border);
     border-radius: var(--awd-panel-radius);
     padding: 0 8px;
     transition: all 0.2s ease;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    box-shadow: var(--awd-shadow-sm);
 
     &.focused {
-      border-color: var(--awd-mint);
-      box-shadow: 0 0 0 3px var(--awd-accent-soft);
+      border-color: var(--awd-accent-text);
+      box-shadow: var(--awd-shadow-sm);
     }
 
     .search-icon {
@@ -516,12 +497,12 @@ $brand-mint: var(--awd-mint);
       min-width: 0;
 
       &::placeholder {
-          color: var(--awd-text-3);
+          color: var(--awd-text-2);
       }
     }
 
     .clear-icon {
-        padding: 4px;
+        padding: var(--awd-space-1);
         cursor: pointer;
         display: flex;
         align-items: center;
@@ -531,144 +512,47 @@ $brand-mint: var(--awd-mint);
   }
 }
 
-/* ---- 标签筛选（可折叠）---- */
-.tag-sec-head {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  height: var(--awd-panel-sec-h);
-  padding: 0 var(--awd-panel-pad-x);
-  cursor: pointer;
-  user-select: none;
-
-  &:hover { background: var(--awd-panel-accent-wash); }
-}
-
-.tag-sec-chevron {
-  width: 12px;
-  font-size: 12px;
-  color: var(--awd-panel-text-3);
-  transition: transform 0.12s ease;
-  transform-origin: center;
-
-  &.open { transform: rotate(90deg); }
-}
-
-.tag-sec-title {
-  font-size: var(--awd-panel-fs-sec);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--awd-panel-text-2);
-}
-
-.tag-sec-count {
-  font-size: 10px;
-  color: var(--awd-panel-text-3);
-  background: var(--awd-panel-hover);
-  border-radius: 999px;
-  padding: 0 6px;
-  line-height: 14px;
-}
-
-.tag-sec-spacer { flex: 1; }
-
-.tag-sec-clear {
-  font-size: 10px;
-  color: var(--awd-panel-accent);
-  cursor: pointer;
-
-  &:hover { text-decoration: underline; }
-}
-
-/* 展开态内的三段分组头（当事人/争议焦点/其他标签）：与 .tag-sec-head 同一套令牌，
-   不折叠、不带计数/清除按钮——判据类型已经写在标题里了 */
-.tag-subsec-head {
-  display: flex;
-  align-items: center;
-  height: var(--awd-panel-sec-h);
-  padding: 0 var(--awd-panel-pad-x);
-}
-
-.tag-subsec-title {
-  font-size: var(--awd-panel-fs-sec);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--awd-panel-text-2);
-}
-
-.tag-filter-box {
-  margin: 2px var(--awd-panel-pad-x) 4px;
-}
-
-.tag-filter-input {
-  width: 100%;
-  height: 24px;
-  box-sizing: border-box;
-  padding: 0 8px;
-  font-size: var(--awd-panel-fs-meta);
-  color: var(--awd-panel-text);
-  background: var(--awd-surface);
-  border: 1px solid var(--awd-panel-border);
-  border-radius: 4px;
-  outline: none;
-
-  &::placeholder { color: var(--awd-panel-text-4); }
-}
-
-.tags-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 0 var(--awd-panel-pad-x);
-  margin-bottom: var(--awd-panel-gap);
-
-  &.selected-row { margin-bottom: 4px; }
-
-  .tag-chip {
-    padding: 1px 7px;
-    border-radius: 4px;
-    border: 1px solid; /* Color coming from inline style */
-    cursor: pointer;
-    font-size: 10px;
-    line-height: 16px;
-    font-weight: 500;
-    max-width: 100%;
-
-    &:hover { filter: brightness(0.97); }
-
-    .tag-name {
-        line-height: 1.2;
-    }
-  }
-}
-
-.tag-more,
-.tag-empty {
-  display: block;
-  padding: 0 var(--awd-panel-pad-x) var(--awd-panel-gap);
-  font-size: 10px;
-  color: var(--awd-panel-text-3);
-}
-
-.tag-more {
-  color: var(--awd-panel-accent);
-  cursor: pointer;
-
-  &:hover { text-decoration: underline; }
-}
-
 .search-stats {
   font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
   padding: 0 var(--awd-panel-pad-x);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--awd-space-1);
 
   .highlight {
       color: var(--awd-accent-text);
       font-weight: 600;
   }
+}
+
+.search-progress,
+.search-error {
+  display: flex;
+  align-items: center;
+  gap: var(--awd-panel-gap);
+  min-width: 0;
+  width: 100%;
+}
+
+.search-error { color: var(--awd-danger-text); }
+.search-progress > text,
+.search-error > text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.search-retry {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 var(--awd-space-1);
+  min-height: var(--awd-control-height);
+  border: 0;
+  border-radius: var(--awd-panel-radius);
+  background: transparent;
+  color: var(--awd-accent-text);
+  font-size: var(--awd-panel-fs);
+  cursor: pointer;
+}
+.search-retry:focus-visible {
+  outline: var(--awd-focus-width) solid var(--awd-accent-text);
+  outline-offset: var(--awd-focus-offset);
 }
 
 .results-list {
@@ -718,7 +602,7 @@ $brand-mint: var(--awd-mint);
     }
 
     &.hidden {
-        visibility: hidden;
+        display: none;
     }
   }
 
@@ -735,7 +619,7 @@ $brand-mint: var(--awd-mint);
       flex-direction: column;
 
       .file-name {
-          font-size: 13px;
+          font-size: var(--awd-font-size-body);
           font-weight: 500;
           color: var(--awd-text);
           margin-bottom: 2px;
@@ -750,8 +634,8 @@ $brand-mint: var(--awd-mint);
       }
 
       .file-path {
-          font-size: 10px;
-          color: var(--awd-text-3);
+          font-size: var(--awd-panel-fs-meta);
+          color: var(--awd-text-2);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -761,7 +645,7 @@ $brand-mint: var(--awd-mint);
   .badge {
     background-color: var(--awd-surface-3);
     color: var(--awd-text-2);
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     font-weight: 600;
     padding: 2px 6px;
     border-radius: 99px;
@@ -769,6 +653,36 @@ $brand-mint: var(--awd-mint);
     text-align: center;
     margin-left: 8px;
   }
+}
+
+.result-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--awd-space-1);
+  margin-top: var(--awd-space-1);
+  max-height: 44px;
+  overflow: hidden;
+}
+
+.result-tag {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border: 1px solid var(--awd-panel-border);
+  border-radius: var(--awd-radius-sm);
+  padding: 0 var(--awd-space-1);
+  font-size: var(--awd-panel-fs-meta);
+  line-height: 18px;
+  color: var(--awd-panel-text-2);
+}
+
+.result-tag-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 2px;
 }
 
 .matches-container {
@@ -785,7 +699,7 @@ $brand-mint: var(--awd-mint);
   &:hover {
     background-color: var(--awd-accent-wash);
     .match-highlight {
-        background-color: rgba($brand-mint, 0.3);
+        background-color: var(--awd-accent-soft);
     }
   }
 
@@ -799,8 +713,8 @@ $brand-mint: var(--awd-mint);
   }
 
   .line-number {
-      font-size: 10px;
-      color: var(--awd-text-3);
+      font-size: var(--awd-panel-fs-meta);
+      color: var(--awd-text-2);
       width: 10px;
       text-align: right;
       margin-right: 12px;
@@ -808,7 +722,7 @@ $brand-mint: var(--awd-mint);
   }
 
   .match-content {
-     font-size: 11px;
+     font-size: var(--awd-panel-fs-meta);
      line-height: 1.5;
      color: var(--awd-text-2);
      white-space: pre;
@@ -818,7 +732,7 @@ $brand-mint: var(--awd-mint);
      .match-highlight {
          background-color: var(--awd-accent-soft);
          color: var(--awd-accent-text);
-         border-radius: 2px;
+         border-radius: calc(var(--awd-space-1) / 2);
          padding: 0 1px;
          font-weight: 500;
      }
@@ -838,8 +752,8 @@ $brand-mint: var(--awd-mint);
    }
 
    .empty-text {
-      color: var(--awd-text-3);
-      font-size: 13px;
+      color: var(--awd-text-2);
+      font-size: var(--awd-font-size-body);
    }
 }
 </style>

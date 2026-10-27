@@ -20,9 +20,12 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 本地文件夹项目的文件系统监听：Finder 里的增删改 → 防抖 → LocalProjectService.reconcileProject。
@@ -66,17 +69,31 @@ public class LocalRootWatchService {
 
     private final ProjectRepository projectRepository;
     private final LocalProjectService localProjectService;
+    private final LocalProjectFileChangeService fileChanges;
 
-    private final Map<Long, DirectoryWatcher> watchers = new ConcurrentHashMap<>();
+    private static final class WatchState {
+        // 注册可能遍历很大的目录；只串行同一项目，stop/shutdown 不等待这把锁。
+        final Object registrationLock = new Object();
+        DirectoryWatcher watcher;
+        boolean registered;
+        boolean deleted;
+        long generation;
+        long reconcileGeneration;
+    }
+
+    private final Map<Long, WatchState> watchers = new ConcurrentHashMap<>();
     private final Map<Long, ScheduledFuture<?>> pending = new ConcurrentHashMap<>();
+    private final AtomicBoolean startupScheduled = new AtomicBoolean();
+    private volatile Future<?> startupTask;
+    private volatile boolean closing;
     /** 对账/防抖专用单线程：同一时刻至多一个对账，天然串行。 */
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "local-root-reconcile");
         t.setDaemon(true);
         return t;
     });
-    /** 监听循环线程池：watchAsync 的监听循环会**永久占用**一条线程，绝不能和对账共用
-     *  单线程执行器（那样防抖任务永远排不上队——首版实测踩过）。 */
+    /** 监听循环与单次启动注册：循环会永久占用线程，注册也可能慢；两者都不能占住
+     *  对账单线程，否则已打开项目的实时变动会排在全部存量目录扫描之后。 */
     private final java.util.concurrent.ExecutorService watchExecutor = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "local-root-watch");
         t.setDaemon(true);
@@ -84,17 +101,33 @@ public class LocalRootWatchService {
     });
 
     public LocalRootWatchService(ProjectRepository projectRepository,
-                                 LocalProjectService localProjectService) {
+                                 LocalProjectService localProjectService,
+                                 LocalProjectFileChangeService fileChanges) {
         this.projectRepository = projectRepository;
         this.localProjectService = localProjectService;
+        this.fileChanges = fileChanges;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
-        for (Project p : projectRepository.findByLocalRootIsNotNull()) {
-            if (StringUtils.hasText(p.getLocalRoot())) {
-                ensureWatch(p.getId(), p.getLocalRoot());
-            }
+        if (closing || !startupScheduled.compareAndSet(false, true)) return;
+        try {
+            // watchAsync 只有事件循环是异步的，目录注册仍会阻塞调用线程。
+            startupTask = watchExecutor.submit(() -> {
+                if (closing) return;
+                try {
+                    for (Project p : projectRepository.findByLocalRootIsNotNull()) {
+                        if (closing) return;
+                        if (StringUtils.hasText(p.getLocalRoot())) {
+                            ensureWatch(p.getId(), p.getLocalRoot(), true);
+                        }
+                    }
+                } catch (RuntimeException e) {
+                    if (!closing) log.warn("恢复项目文件夹监听失败（可在重开项目时重试）: {}", e.toString());
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            if (!closing) log.warn("无法安排项目文件夹监听恢复: {}", e.toString());
         }
     }
 
@@ -103,20 +136,107 @@ public class LocalRootWatchService {
         ensureWatch(event.projectId(), event.localRoot());
     }
 
+    @EventListener
+    public void onProjectDeleted(ProjectService.ProjectDeletedEvent event) {
+        WatchState state = watchers.computeIfAbsent(event.projectId(), id -> new WatchState());
+        synchronized (state) { state.deleted = true; }
+        stopWatch(event.projectId());
+    }
+
     /**
      * 幂等：已在监听则无事发生。失败只降级（见类注释）。
      *
      * @return 是否真的挂上了监听。挂不上不是「慢」而是硬失败，调用方（和测试）需要能区分。
      */
     public boolean ensureWatch(long projectId, String localRoot) {
-        if (watchers.containsKey(projectId)) return true;
-        Path root = Paths.get(localRoot);
-        if (!Files.isDirectory(root)) {
-            log.warn("不监听不可达的项目文件夹: project={}, root={}", projectId, root);
-            return false;
+        return ensureWatch(projectId, localRoot, false);
+    }
+
+    private boolean ensureWatch(long projectId, String localRoot, boolean startup) {
+        if (closing) return false;
+        WatchState state = watchers.computeIfAbsent(projectId, id -> new WatchState());
+        synchronized (state.registrationLock) {
+            final long generation;
+            synchronized (state) {
+                // 一次 stop 也取消还没开始的启动恢复；明确重开仍可注册新一代。
+                if (closing || state.deleted || (startup && state.generation != 0)) return false;
+                if (state.registered) return true;
+                generation = state.generation;
+            }
+            DirectoryWatcher watcher = null;
+            try {
+                if (startup && !hasCurrentRoot(projectId, localRoot)) return false;
+                Path root = Paths.get(localRoot);
+                if (!Files.isDirectory(root)) {
+                    log.warn("不监听不可达的项目文件夹: project={}, root={}", projectId, root);
+                    return false;
+                }
+                watcher = createWatcher(root, () -> {
+                    synchronized (state) {
+                        if (!closing && state.generation == generation) scheduleReconcile(projectId);
+                    }
+                });
+                final DirectoryWatcher registeredWatcher = watcher;
+                synchronized (state) {
+                    if (closing || state.deleted || state.generation != generation) return false;
+                    state.watcher = watcher;
+                }
+                CompletableFuture<Void> watching = watcher.watchAsync(watchExecutor);
+                watching.whenComplete((v, err) -> {
+                    boolean endedCurrent;
+                    boolean wasRegistered;
+                    synchronized (state) {
+                        endedCurrent = state.watcher == registeredWatcher;
+                        wasRegistered = state.registered;
+                        if (endedCurrent) {
+                            state.watcher = null;
+                            state.registered = false;
+                            state.generation++;
+                        }
+                    }
+                    if (endedCurrent && !closing) {
+                        log.warn("文件夹监听终止（降级为重开项目时重扫）: project={}, root={} ({})",
+                                projectId, root, err == null ? "监听循环已退出" : err.toString());
+                    }
+                    if (endedCurrent && wasRegistered) closeWatcher(registeredWatcher);
+                });
+                // 启动快照到目录注册之间可能已解绑项目，不能留下迟到的监听。
+                boolean current = !startup || (!closing && hasCurrentRoot(projectId, localRoot));
+                synchronized (state) {
+                    if (closing || state.deleted || !current || state.generation != generation
+                            || state.watcher != watcher || watching.isDone()) return false;
+                    state.registered = true;
+                    // 注册前的文件变动会成为 watcher 的初始基线，不能靠事件补回。
+                    // 只为启动恢复安排一次补偿，沿用本代防抖队列与停止护栏。
+                    if (startup) scheduleReconcile(projectId);
+                }
+                log.info("已监听项目文件夹: project={}, root={}", projectId, root);
+                return true;
+            } catch (Exception e) {
+                if (!closing) log.warn("启动文件夹监听失败（降级为重开项目时重扫）: project={}, root={} ({})",
+                        projectId, localRoot, e.toString());
+                return false;
+            } finally {
+                boolean retained;
+                synchronized (state) {
+                    retained = state.watcher == watcher && state.registered;
+                    if (!retained && watcher != null && state.watcher == watcher) {
+                        state.watcher = null;
+                        state.generation++;
+                    }
+                }
+                if (!retained) closeWatcher(watcher);
+            }
         }
-        try {
-            DirectoryWatcher watcher = DirectoryWatcher.builder()
+    }
+
+    private boolean hasCurrentRoot(long projectId, String localRoot) {
+        return projectRepository.findById(projectId)
+                .filter(project -> localRoot.equals(project.getLocalRoot())).isPresent();
+    }
+
+    DirectoryWatcher createWatcher(Path root, Runnable onChange) throws java.io.IOException {
+        return DirectoryWatcher.builder()
                     .path(root)
                     .fileHasher(WATCH_FILE_HASHER)   // 见 WATCH_FILE_HASHER：默认值会读穿整个文件夹
                     .listener(event -> {
@@ -132,72 +252,84 @@ public class LocalRootWatchService {
                         if (changed != null && LocalProjectService.isIgnoredWatchPath(root, changed)) {
                             return;
                         }
-                        scheduleReconcile(projectId);
+                        onChange.run();
                     })
                     .build();
-            DirectoryWatcher prev = watchers.putIfAbsent(projectId, watcher);
-            if (prev != null) {
-                watcher.close();
-                return true;
-            }
-            // watchAsync 把注册（registerPaths）**同步跑在调用线程上**，只把事件循环丢给执行器；
-            // 注册异常和事件循环中途死亡都只体现在返回的 future 上。以前把这个 future 丢掉，
-            // 于是 inotify 名额耗尽 / 权限被拒 / 目录刚好被移走，全都静默失效——日志还照打
-            // 「已监听」，用户在 Finder 里的改动从此再不同步，且没有任何线索。
-            CompletableFuture<Void> watching = watcher.watchAsync(watchExecutor);
-            watching.whenComplete((v, err) -> {
-                if (err != null) {
-                    log.warn("文件夹监听终止（降级为重开项目时重扫）: project={}, root={} ({})",
-                            projectId, root, err.toString());
-                }
-                // 摘掉自己，让下次 ensureWatch 能重建；按值移除，不会误伤已经重建的新监听
-                watchers.remove(projectId, watcher);
-            });
-            if (watching.isCompletedExceptionally()) {
-                return false;   // 注册当场就失败了，上面的 whenComplete 已打日志并摘除
-            }
-            log.info("已监听项目文件夹: project={}, root={}", projectId, root);
-            return true;
-        } catch (Exception e) {
-            log.warn("启动文件夹监听失败（降级为重开项目时重扫）: project={}, root={} ({})",
-                    projectId, root, e.getMessage());
-            return false;
-        }
     }
 
     /** 该项目当前是否确实在监听中：注册失败或事件循环已死都是 false。 */
     public boolean isWatching(long projectId) {
-        return watchers.containsKey(projectId);
+        WatchState state = watchers.get(projectId);
+        if (state == null) return false;
+        synchronized (state) { return !closing && !state.deleted && state.registered; }
     }
 
     public void stopWatch(long projectId) {
-        DirectoryWatcher w = watchers.remove(projectId);
-        if (w != null) {
-            try { w.close(); } catch (Exception ignored) { }
+        stopWatch(projectId, null);
+    }
+
+    private void stopWatch(long projectId, Long expectedGeneration) {
+        WatchState state = watchers.computeIfAbsent(projectId, id -> new WatchState());
+        DirectoryWatcher watcher;
+        synchronized (state) {
+            if (expectedGeneration != null && state.generation != expectedGeneration) return;
+            state.generation++;
+            // macOS register/close 共用原生监听器的 monitor；未完成注册时 close
+            // 会反过来阻塞退出。撤代后由 ensureWatch 的 finally 在注册返回时关闭。
+            watcher = state.registered ? state.watcher : null;
+            state.registered = false;
+            state.watcher = null;
+            ScheduledFuture<?> f = pending.remove(projectId);
+            if (f != null) f.cancel(false);
         }
-        ScheduledFuture<?> f = pending.remove(projectId);
-        if (f != null) f.cancel(false);
+        closeWatcher(watcher);
+    }
+
+    private void closeWatcher(DirectoryWatcher watcher) {
+        if (watcher == null) return;
+        try { watcher.close(); } catch (java.io.IOException e) {
+            log.warn("关闭文件夹监听失败: {}", e.toString());
+        }
     }
 
     private void scheduleReconcile(long projectId) {
-        ScheduledFuture<?> prev = pending.get(projectId);
-        if (prev != null) prev.cancel(false);
-        pending.put(projectId, executor.schedule(() -> {
-            pending.remove(projectId);
-            try {
-                LocalProjectService.ReconcileResult r = localProjectService.reconcileProject(projectId);
-                if (r.rootMissing()) {
-                    // 文件夹被移走/外置盘拔出：停监听，等下次打开项目时重新建立
-                    stopWatch(projectId);
+        WatchState state = watchers.computeIfAbsent(projectId, id -> new WatchState());
+        synchronized (state) {
+            if (closing || state.deleted) return;
+            long generation = state.generation;
+            long reconcileGeneration = ++state.reconcileGeneration;
+            ScheduledFuture<?> prev = pending.get(projectId);
+            if (prev != null) prev.cancel(false);
+            pending.put(projectId, executor.schedule(() -> {
+                synchronized (state) {
+                    if (closing || state.deleted || state.generation != generation
+                            || state.reconcileGeneration != reconcileGeneration) return;
+                    pending.remove(projectId);
                 }
-            } catch (Exception e) {
-                log.warn("对账失败: project={} ({})", projectId, e.getMessage());
-            }
-        }, DEBOUNCE_MILLIS, TimeUnit.MILLISECONDS));
+                try {
+                    LocalProjectService.ReconcileResult r = localProjectService.reconcileProject(projectId);
+                    // 独立事务已提交、整轮对账结束后才通知，避免文件树读到搬移的中间态。
+                    synchronized (state) {
+                        if (closing || state.deleted || state.generation != generation) return;
+                    }
+                    // 权限查库、SSE 发送与原生 close 均可能阻塞，不持有生命周期锁。
+                    if (r.changed() > 0) fileChanges.filesChanged(projectId);
+                    if (r.rootMissing()) {
+                        // 只停产生这次结果的那一代，不能误停期间已重开的监听。
+                        stopWatch(projectId, generation);
+                    }
+                } catch (Exception e) {
+                    log.warn("对账失败: project={} ({})", projectId, e.getMessage());
+                }
+            }, DEBOUNCE_MILLIS, TimeUnit.MILLISECONDS));
+        }
     }
 
     @PreDestroy
     public void shutdown() {
+        closing = true;
+        Future<?> startup = startupTask;
+        if (startup != null) startup.cancel(true);
         for (Long id : watchers.keySet()) {
             stopWatch(id);
         }

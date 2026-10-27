@@ -14,10 +14,16 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
+  nativeEvent,
   nativeDataTransfer,
   isExternalFileDrag,
+  compatibleDropEffect,
   claimExternalDrop,
 } from '../../src/utils/fileTreeExternalDrop.js'
+import {
+  prefetchLocalFilePath,
+  startExternalFileDrag,
+} from '../../src/utils/fileLocalDrag.js'
 
 const SRC = readFileSync(new URL('../../src/components/FileTree.vue', import.meta.url), 'utf8')
 
@@ -25,12 +31,14 @@ const IMPORT_NAMES = [
   'getProjectFiles', 'createFolder', 'createFile', 'renameFile', 'deleteFile', 'deleteFilePerm',
   'restoreFileApi', 'getRecycleBinFiles', 'moveFile', 'batchDeleteFiles', 'batchMoveFiles',
   'batchCopyFiles', 'getApiBaseUrl', 'getContributedTemplates', 'createFileFromContributedTemplate',
-  'getSessionId', 'host', 'findTopmostDeletedAncestor', 'summarizeDeleteResults',
+  'getSessionId', 'getAuthHeaders', 'getFileLocalPath', 'host', 'findTopmostDeletedAncestor', 'summarizeDeleteResults',
   'groupByParent', 'buildTreeFromGroups', 'evidenceRefCounts', 'createRefCountsFetcher',
-  'warmDragImage', 'applyDragImage', 'FileTypeIcon', 'TagChip', 'TagSelector',
-  'TagManager', 'AwdDatePicker', 'ICONS', 'getProjectTags', 'addTagToFile', 'removeTagFromFile',
+  'warmDragImage', 'applyDragImage', 'FileTypeIcon', 'TagChip', 'TagFilter', 'TagSelector',
+  'TagManager', 'ExplorerCreateMenu', 'AwdDatePicker', 'ICONS', 'getProjectTags', 'addTagToFile', 'removeTagFromFile',
   'createTag', 'createTask', 'importLocalFile',
-  'nativeDataTransfer', 'isExternalFileDrag', 'claimExternalDrop',
+  'isArchiveEntryDrag', 'readArchiveEntryDrag', 'importArchiveEntry',
+  'nativeEvent', 'nativeDataTransfer', 'isExternalFileDrag', 'compatibleDropEffect', 'claimExternalDrop',
+  'prefetchLocalFilePath', 'startExternalFileDrag',
 ]
 
 function loadOptions(stubs) {
@@ -48,7 +56,8 @@ function makeVm() {
     moveFile: async (...a) => { calls.moveFile.push(a); return { parentId: a[2] } },
     ICONS: {},
     host: {},
-    nativeDataTransfer, isExternalFileDrag, claimExternalDrop,
+    nativeEvent, nativeDataTransfer, isExternalFileDrag, compatibleDropEffect, claimExternalDrop,
+    prefetchLocalFilePath, startExternalFileDrag,
   })
   const vm = Object.assign({}, options.data.call({}))
   for (const [k, fn] of Object.entries(options.methods)) vm[k] = fn.bind(vm)

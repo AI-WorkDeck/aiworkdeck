@@ -20,7 +20,7 @@ class ProjectFileComparisonControllerTest {
     MockMvc mvc;
     @BeforeEach void setup() {
         files = mock(ProjectFileService.class); members = mock(ProjectMemberService.class);
-        var controller = new ProjectFileController(files, members, null, null,
+        var controller = new ProjectFileController(files, members, mock(com.checkba.service.ProjectFileAccessService.class), null, null,
                 mock(com.checkba.service.ai.ProjectRagService.class), mock(com.checkba.service.ai.AutoTaggingService.class));
         mvc = MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new GlobalExceptionHandler()).build();
     }

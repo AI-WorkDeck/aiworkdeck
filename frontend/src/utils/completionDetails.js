@@ -28,16 +28,29 @@ function pick(record, keys) {
   if (!record || typeof record !== 'object') return ''
   for (const key of keys) {
     const value = record[key]
-    if (value != null && typeof value !== 'object' && String(value).trim()) return String(value)
+    if (value != null && typeof value !== 'object' && String(value).trim()) {
+      const s = String(value).trim()
+      const mdLink = /^\[[^\]]*\]\((https?:\/\/[^)\s]+)\)$/u.exec(s)
+      return mdLink ? mdLink[1] : s
+    }
   }
   return ''
 }
 
+function isEnLang() {
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') return true
+    if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') return true
+  } catch (_) { /* ignore */ }
+  return false
+}
+
 function insertionText(content, source, date) {
   if (!content) return undefined
+  const en = isEnLang()
   const footer = [
-    source ? `来源 / Source：${source}` : '',
-    date ? `查询日期：${date}` : '',
+    source ? (en ? `Source: ${source}` : `来源 / Source：${source}`) : '',
+    date ? (en ? `Queried on: ${date}` : `查询日期：${date}`) : '',
   ].filter(Boolean)
   return footer.length ? `${content}\n\n${footer.join('\n')}` : content
 }
@@ -52,8 +65,9 @@ function recordDetails(detail) {
 }
 
 function lawVariants(detail, source, date, fallbackTitle) {
-  const records = recordDetails(detail)
-  if (!records.length) {
+  const en = isEnLang()
+  const rawRecords = recordDetails(detail)
+  if (!rawRecords.length) {
     const law = lawArticle(detail)
     if (!law.content) return []
     const title = [law.title, law.article].filter(Boolean).join(' ') || fallbackTitle
@@ -62,23 +76,28 @@ function lawVariants(detail, source, date, fallbackTitle) {
       text: citationText([law.title || fallbackTitle, law.article], law.content, source, date),
     }]
   }
+  const activeIdx = rawRecords.findIndex((r) => lawArticle({ result: r }).timeliness.includes('现行有效'))
+  const records = activeIdx > 0
+    ? [rawRecords[activeIdx], ...rawRecords.slice(0, activeIdx), ...rawRecords.slice(activeIdx + 1)]
+    : rawRecords
   return records.map((record) => {
     const law = lawArticle({ result: record })
-    const url = pick(record, ['url', 'link', '链接'])
+    const url = pick(record, ['url', 'Url', 'link', '链接'])
     const title = [law.title, law.article].filter(Boolean).join(' ') || law.title || law.article
     return {
       title,
       ...(law.content ? { text: citationText([
         law.title,
         law.article,
-        law.timeliness ? `时效性：${law.timeliness}` : '',
-        url ? `URL：${url}` : '',
+        law.timeliness ? (en ? `Validity: ${law.timeliness}` : `时效性：${law.timeliness}`) : '',
+        url ? (en ? `URL: ${url}` : `URL：${url}`) : '',
       ], law.content, source, date) } : {}),
     }
   }).filter((variant) => variant.text)
 }
 
 function caseVariants(detail, source, date, fallbackTitle) {
+  const en = isEnLang()
   const records = recordDetails(detail)
   if (!records.length) {
     const item = caseRecord(detail)
@@ -89,38 +108,39 @@ function caseVariants(detail, source, date, fallbackTitle) {
       title,
       text: citationText([
         item.title || fallbackTitle,
-        item.caseNumber ? `案号：${item.caseNumber}` : '',
-        item.court ? `法院：${item.court}` : '',
-        item.date ? `裁判日期：${item.date}` : '',
+        item.caseNumber ? (en ? `Case No.: ${item.caseNumber}` : `案号：${item.caseNumber}`) : '',
+        item.court ? (en ? `Court: ${item.court}` : `法院：${item.court}`) : '',
+        item.date ? (en ? `Decision Date: ${item.date}` : `裁判日期：${item.date}`) : '',
       ], content, source, date),
     }]
   }
   return records.map((record) => {
     const item = caseRecord({ result: record })
     const content = item.sections.map((section) => section.text).filter(Boolean).join('\n\n')
-    const url = pick(record, ['url', 'link', '链接'])
+    const url = pick(record, ['url', 'Url', 'link', '链接'])
     return {
       title: item.title || item.caseNumber,
       ...(content ? { text: citationText([
         item.title,
-        item.caseNumber ? `案号：${item.caseNumber}` : '',
-        item.court ? `法院：${item.court}` : '',
-        item.date ? `裁判日期：${item.date}` : '',
-        url ? `URL：${url}` : '',
+        item.caseNumber ? (en ? `Case No.: ${item.caseNumber}` : `案号：${item.caseNumber}`) : '',
+        item.court ? (en ? `Court: ${item.court}` : `法院：${item.court}`) : '',
+        item.date ? (en ? `Decision Date: ${item.date}` : `裁判日期：${item.date}`) : '',
+        url ? (en ? `URL: ${url}` : `URL：${url}`) : '',
       ], content, source, date) } : {}),
     }
   }).filter((variant) => variant.text)
 }
 
 function authoritativeVariant(detail, source, date) {
+  const en = isEnLang()
   const item = authoritative(detail)
   if (!item) return null
   return {
     title: item.title,
     ...(item.text ? { text: citationText([
       item.title,
-      item.date ? `实施日期：${item.date}` : '',
-      item.url ? `URL：${item.url}` : '',
+      item.date ? (en ? `Effective Date: ${item.date}` : `实施日期：${item.date}`) : '',
+      item.url ? (en ? `URL: ${item.url}` : `URL：${item.url}`) : '',
     ], item.text, source, date) } : {}),
   }
 }
@@ -148,7 +168,30 @@ export function completionDetails(entityView) {
   if (entity.kind === 'COMPANY') {
     if (!failed) {
       const rows = companyRows(detail)
-      if (rows.length) base.variants.push({ title: base.title, rows: rows.map(({ label, value }) => [label, value]) })
+      const matchedName = String(detail.matchedName || detail.basic?.['企业名称'] || '').trim()
+      const queriedName = String(detail.queriedName || base.title || '').trim()
+      const fuzzy = Boolean(
+        detail.fuzzyMatched ||
+        (source === 'qichacha+mcp' && matchedName && queriedName && matchedName !== queriedName)
+      )
+      const en = isEnLang()
+      if (fuzzy && matchedName && !base.note) {
+        base.note = en
+          ? `Fuzzy match note: No exact match for "${queriedName}". Matched "${matchedName}" instead; please verify the company name in the document.`
+          : `模糊匹配提示：未精准命中「${queriedName}」，已为您匹配「${matchedName}」，正文中的企业名称可能书写有误，请核对。`
+      }
+      if (rows.length) {
+        base.variants.push({
+          title: fuzzy && matchedName ? (en ? `${matchedName} (Registration Profile)` : `${matchedName}（工商信息表）`) : base.title,
+          rows: rows.map(({ label, value }) => [label, value]),
+        })
+      }
+      if (fuzzy && matchedName) {
+        base.variants.push({
+          title: en ? `Replace with full legal name only: ${matchedName}` : `仅替换为正确全称：${matchedName}`,
+          text: matchedName,
+        })
+      }
     }
   } else if (entity.kind === 'LAW' || entity.kind === 'ARTICLE') {
     if (!failed) {

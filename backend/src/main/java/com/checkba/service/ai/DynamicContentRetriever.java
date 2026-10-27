@@ -17,16 +17,10 @@ import java.util.List;
 /**
  * 按项目动态取 RAG 内容的 ContentRetriever。
  *
- * <p><b>不要因为「grep 不到调用方」就删掉它。</b>唯一的显式注入方（AiConfiguration 的
- * projectAssistant bean）已随 v1 对话链路一起移除，但这个 @Component **靠存在本身**
- * 满足了 langchain4j `RagAutoConfig` 的 {@code @ConditionalOnMissingBean(ContentRetriever.class)}：
- * 一旦容器里没有任何 ContentRetriever，自动配置就会自己造一个，而它要求容器里
- * 恰好只有一个 {@code EmbeddingStore<TextSegment>} —— 本项目有两个
- * （memoryEmbeddingStore 与 projectDocEmbeddingStore），于是全部 @SpringBootTest
- * 直接 NoUniqueBeanDefinitionException 起不来。2026-08 清理孤儿类时踩过一次。
- *
- * <p>护栏是 {@code DesktopContextSmokeTest}（它就是这么抓到的）。
- * 真要移除，得同时排除 RagAutoConfig，那是另一件事，别顺手做。
+ * <p>保留显式的项目作用域检索器。原 v1 projectAssistant 已移除，当前工具与 RAG
+ * 均由项目代码装配，不依赖 @AiService 扫描。启动优化已将通用 LangChain4j Spring
+ * starter 换成核心库；Ollama 的模型自动配置仍保留。若重新引入 RagAutoConfig，
+ * 须保留此检索器：本项目有两个 EmbeddingStore，默认检索器无法单凭类型选择。
  */
 @Component
 @RequiredArgsConstructor

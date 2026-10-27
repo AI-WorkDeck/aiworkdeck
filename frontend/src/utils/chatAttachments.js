@@ -59,6 +59,11 @@ export function attachmentRecord(file) {
     wpsFileId: file.wpsFileId || null,
     kind,
     isDir: kind === KIND_FOLDER,
+    ...((file.projectId != null || file.projectName || file.readOnly) ? {
+      projectId: file.projectId || null,
+      projectName: file.projectName || '',
+      readOnly: Boolean(file.readOnly),
+    } : {}),
   }
 }
 
@@ -70,6 +75,9 @@ export function attachmentsFromHistory(rows) {
     name: row.name,
     fileType: row.fileType,
     kind: row.kind,
+    projectId: row.projectId,
+    projectName: row.projectName,
+    readOnly: row.readOnly,
   })).filter(Boolean)
 }
 
@@ -89,5 +97,10 @@ export function fileListFromBubble(bubble) {
     fileType: f.fileType || '',
     wpsFileId: f.wpsFileId || null,
     isDir: attachmentKind(f) === KIND_FOLDER,
+    ...((f.projectId != null || f.projectName || f.readOnly) ? {
+      projectId: f.projectId || null,
+      projectName: f.projectName || '',
+      readOnly: Boolean(f.readOnly),
+    } : {}),
   }))
 }

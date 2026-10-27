@@ -15,7 +15,7 @@
 
 /** 与 backend MeetingRecordingService.AUDIO_EXTENSIONS 逐项一致。 */
 export const AUDIO_EXTENSIONS = [
-  'mp3', 'm4a', 'aac', 'wav', 'flac', 'ogg', 'opus', 'amr', 'wma', 'webm',
+  'mp3', 'm4a', 'aac', 'wav', 'flac', 'ogg', 'opus', 'amr', 'wma', 'webm', 'qta',
 ]
 
 /**

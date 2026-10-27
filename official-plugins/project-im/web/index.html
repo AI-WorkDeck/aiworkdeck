@@ -1,0 +1,73 @@
+<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>项目沟通 · AI WorkDeck</title>
+  <link rel="stylesheet" href="panel.css">
+  <script src="awd-plugin-sdk.js"></script><script src="panel.js" defer></script>
+</head>
+<body>
+  <div id="notice" role="status" aria-live="polite">正在连接项目沟通…</div>
+  <main id="workspace">
+    <aside id="sidebar" aria-label="会话与通讯录">
+      <div class="list-tools">
+        <button id="new-chat" type="button">新建会话</button>
+        <button id="join-chat" type="button">邀请码加入</button>
+      </div>
+      <label class="search"><span class="sr-only">搜索会话或联系人</span><input id="search" type="search" placeholder="搜索会话或联系人" autocomplete="off"></label>
+      <div id="agents" aria-label="项目、团队与律所助手"></div>
+      <section class="conv-section" aria-label="对话列表">
+        <div class="section-heading">
+          <strong>会话</strong>
+          <button id="refresh" type="button" class="link-btn">刷新</button>
+        </div>
+        <div id="conversations"></div>
+        <p id="empty-list" class="hint">还没有会话。新建会话，或用邀请码加入。</p>
+      </section>
+      <details id="directory">
+        <summary>通讯录 <span class="hint">律所 · 团队 · 项目</span></summary>
+        <div id="org-switcher" aria-label="当前团队与律所"></div>
+        <div id="directory-groups"></div>
+        <button id="add-friend" type="button">添加联系人</button>
+      </details>
+    </aside>
+    <section id="chat" aria-label="当前会话">
+      <div id="welcome">
+        <div class="welcome-copy">
+          <h1>项目沟通</h1>
+          <p>从左侧选择会话，继续讨论。</p>
+        </div>
+      </div>
+      <div id="active-chat" hidden>
+        <header class="chat-header">
+          <button id="back" type="button" aria-label="返回会话列表">返回</button>
+          <button id="directory-home" type="button" title="展开通讯录">通讯录</button>
+          <div class="chat-heading"><strong id="chat-title"></strong><span id="chat-subtitle" class="hint"></span></div>
+          <button id="agent-private" type="button" hidden>与助手私聊</button>
+          <button id="members-button" type="button">成员</button>
+        </header>
+        <div id="project-bar"><span id="binding" class="hint"></span><button id="bind" type="button">关联当前项目</button><button id="export" type="button">归档聊天</button></div>
+        <div id="message-scroll"><button id="older" type="button" hidden>加载更早消息</button><div id="messages" role="log" aria-label="聊天消息" aria-live="polite"></div><p id="empty-messages" class="hint">还没有消息，打个招呼吧。</p></div>
+        <div class="compose-area">
+        <div id="agent-info" hidden>
+          <p id="agent-info-summary"></p>
+          <details><summary>上下文与模型</summary><p id="agent-info-detail"></p></details>
+        </div>
+        <div id="agent-status" role="status" aria-live="polite" hidden></div>
+        <form id="composer">
+          <div class="composer-tools"><button type="button" id="local-file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 11-8.5 8.5a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg>发送本机文件</button><button type="button" id="project-file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>引用项目文件</button></div>
+          <input type="file" id="file-input" hidden>
+          <div id="attachment" hidden><span id="attachment-name"></span><button type="button" id="clear-file">移除</button></div>
+          <label class="sr-only" for="draft">输入消息</label><textarea id="draft" rows="3" maxlength="8000" placeholder="输入消息…"></textarea>
+          <div class="send-row"><button id="agent-reply" type="button" hidden>请助手回复</button><span class="hint">Enter 发送 · Shift+Enter 换行</span><button class="primary" id="send" type="submit">发送</button></div>
+        </form>
+        </div>
+      </div>
+    </section>
+  </main>
+  <dialog id="dialog" aria-labelledby="dialog-title"><form id="dialog-form"><header><strong id="dialog-title"></strong><button type="button" id="close-dialog" aria-label="关闭">关闭</button></header><div id="dialog-body"></div><p id="dialog-error" role="alert"></p><button id="dialog-submit" class="primary" type="submit">确定</button></form></dialog>
+  <dialog id="confirmation" aria-labelledby="confirmation-title"><strong id="confirmation-title">确认操作</strong><p id="confirmation-text"></p><div class="dialog-actions"><button id="confirmation-cancel" type="button">取消</button><button id="confirmation-ok" type="button" class="primary">继续</button></div></dialog>
+</body>
+</html>

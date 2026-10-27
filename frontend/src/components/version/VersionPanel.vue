@@ -25,9 +25,11 @@
         <text class="version-history-link" @tap="$emit('open-history')">{{ $t('version.openFullHistory') }}</text>
       </view>
       <WorkSessionBar
-        :working="working"
-        :changed-count="changedCount"
-        :on-draft="onDraft"
+        :working="sessionStatus.working"
+        :changed-count="sessionStatus.changedCount"
+        :on-draft="sessionStatus.onDraft"
+        :before-commit="beforeCommit"
+        :cloud-linked="!!displayCloud?.linked"
         @ended="onVersionLanded"
         @discarded="onReload"
         @mainline-resumed="onReload"
@@ -35,10 +37,10 @@
         @draft-abandoned="onReload"
       />
       <CloudSyncBar
-        :cloud="cloud"
+        :cloud="displayCloud"
         :has-connection="hasConnection"
         :conflict-pending="!!(sessionEndConflict || cloudConflict || adoptConflict)"
-        :working="working"
+        :working="sessionStatus.working"
         @open-collab="$emit('open-collab', $event)"
       />
       <view v-if="fileFilter" class="version-file-filter">
@@ -69,7 +71,7 @@
            互斥挂载（后端保证命中前两者中任一个时第三个必为 null，前端按同序取。含崩溃后
            重开面板的场景。 -->
       <AdoptConflictDialog
-        v-if="sessionEndConflict"
+        v-if="sessionEndConflict && mergePresentation.show"
         mode="session-end"
         :project-id="projectId"
         :session-id="sessionEndConflict.sessionId"
@@ -77,7 +79,7 @@
         :conflicting-paths="sessionEndConflict.conflictingPaths"
         :mainline-tip="sessionEndConflict.mainlineTip"
         :draft-tip="sessionEndConflict.sessionTip"
-        :document-merges="sessionEndConflict.documentMerges || []"
+        :document-merges="mergePresentation.rows"
         :sides="sessionEndConflict.sides || {}"
         :merge-base="sessionEndConflict.mergeBase"
         @resolved="onReload"
@@ -87,13 +89,13 @@
         @retry-merge="$emit('retry-merge', $event)"
       />
       <AdoptConflictDialog
-        v-else-if="cloudConflict"
+        v-else-if="!sessionEndConflict && cloudConflict && mergePresentation.show"
         mode="cloud"
         :project-id="projectId"
         :conflicting-paths="cloudConflict.conflictingPaths"
         :mainline-tip="cloudConflict.mainlineTip"
         :draft-tip="cloudConflict.cloudTip"
-        :document-merges="cloudConflict.documentMerges || []"
+        :document-merges="mergePresentation.rows"
         :sides="cloudConflict.sides || {}"
         :merge-base="cloudConflict.mergeBase"
         @resolved="onReload"
@@ -103,14 +105,14 @@
         @retry-merge="$emit('retry-merge', $event)"
       />
       <AdoptConflictDialog
-        v-else-if="adoptConflict"
+        v-else-if="!sessionEndConflict && !cloudConflict && adoptConflict && mergePresentation.show"
         :project-id="projectId"
         :draft-id="adoptConflict.draftId"
         :draft-name="adoptConflict.draftName"
         :conflicting-paths="adoptConflict.conflictingPaths"
         :mainline-tip="adoptConflict.mainlineTip"
         :draft-tip="adoptConflict.draftTip"
-        :document-merges="adoptConflict.documentMerges || []"
+        :document-merges="mergePresentation.rows"
         :sides="adoptConflict.sides || {}"
         :merge-base="adoptConflict.mergeBase"
         @resolved="onReload"
@@ -129,6 +131,7 @@ import {
   getCloudStatus, checkCloud, listCloudConnections, getOfficialCloud,
 } from '@/services/api.js'
 import { shouldAcceptResponse } from '@/utils/requestGeneration.js'
+import { documentMergePresentation } from '@/composables/useDocumentMerge.js'
 import WorkSessionBar from './WorkSessionBar.vue'
 import VersionTimeline from './VersionTimeline.vue'
 import DraftList from './DraftList.vue'
@@ -139,11 +142,17 @@ export default {
   name: 'VersionPanel',
   components: { WorkSessionBar, VersionTimeline, DraftList, AdoptConflictDialog, CloudSyncBar },
   props: {
+    workStatus: { type: Object, default: null },
+    beforeCommit: { type: Function, default: null },
     projectId: { type: [String, Number], required: true },
     fileFilter: { type: Object, default: null },
+    documentMergeState: { type: Object, default: null },
     // 页面上的协作抽屉做完动作（交稿/取回/放进案件库/连案件库）后自增一次，
     // 本面板据此重拉状态——否则侧栏这行状态会停在动作之前的样子。
     collabRefreshToken: { type: Number, default: 0 },
+    // Parent owns the network snapshot. Undefined keeps standalone usage working;
+    // explicit null means the parent has not read this project's status yet.
+    cloudSnapshot: { type: Object, default: undefined },
   },
   // adopt-conflict：把「有没有采纳等待处理」同步给页面。本面板一关（切去资源管理器
   // 等），三选一弹窗随组件卸载消失，而后端仍停在待裁决状态、版本捕获整体关闭——
@@ -178,6 +187,17 @@ export default {
     }
   },
   computed: {
+    sessionStatus() {
+      return this.workStatus || { working: this.working, changedCount: this.changedCount, onDraft: this.onDraft }
+    },
+    displayCloud() {
+      return this.cloudSnapshot === undefined ? this.cloud : this.cloudSnapshot
+    },
+    mergePresentation() {
+      const conflict = this.sessionEndConflict || this.cloudConflict || this.adoptConflict
+      const ctx = this.sessionEndConflict ? 'session-end' : this.cloudConflict ? 'cloud' : 'adopt'
+      return documentMergePresentation(conflict, ctx, this.documentMergeState)
+    },
     // 仓里没有公共的字节格式化工具（FilePreview/FileStagingArea/MarketPane 各写各的），
     // 这里照 FileStagingArea.formatSize 的口径写一份，不为一处新造公共模块。
     repoSizeText() {
@@ -193,13 +213,19 @@ export default {
       this.refresh()
     },
   },
-  mounted() {
-    this.refresh()
+  async mounted() {
+    const seq = this.refreshSeq + 1
+    await this.refresh()
+    if (!shouldAcceptResponse(seq, this.refreshSeq)) return
+    if (this.cloudSnapshot !== undefined) return
     // 静默探活一次案件库连通性（会真的 fetch 远端，不同于 refresh() 里 getCloudStatus
     // 读的本地快照）；失败不打断——状态行里的「暂时连不上案件库」已经覆盖了这种情况。
     checkCloud(this.projectId).then((res) => {
-      this.cloud = (res && res.data) || null
+      if (shouldAcceptResponse(seq, this.refreshSeq)) this.cloud = (res && res.data) || null
     }).catch(() => {})
+  },
+  beforeUnmount() {
+    this.refreshSeq += 1
   },
   methods: {
     // refresh() 的触发源很多（mounted/collabRefreshToken watcher/onReload，onReload 又被
@@ -211,7 +237,19 @@ export default {
       const seq = ++this.refreshSeq
       this.loading = true
       try {
-        const res = await getVersionStatus(this.projectId)
+        let res
+        // A cloud fetch may hold the repository lock. Retry only this transient read failure;
+        // never wait for the lock on a server thread or replay a write operation.
+        for (let attempt = 0; attempt < 10; attempt++) {
+          if (!shouldAcceptResponse(seq, this.refreshSeq)) return
+          try {
+            res = await getVersionStatus(this.projectId)
+            break
+          } catch (e) {
+            if (e.kind !== 'VERSION_BUSY' || attempt === 9) throw e
+            await new Promise((resolve) => setTimeout(resolve, 500))
+          }
+        }
         if (!shouldAcceptResponse(seq, this.refreshSeq)) return
         const d = (res && res.data) || {}
         this.enabled = !!d.enabled
@@ -258,12 +296,14 @@ export default {
     // 与「设不设得出共享按钮」。两者互相独立失败，各自吞错误置默认，不拖累 refresh()
     // 主流程（离线时版本记录本地功能照常可用）。
     async fetchCloudState() {
-      try {
-        const res = await getCloudStatus(this.projectId)
-        this.cloud = (res && res.data) || null
-      } catch (e) {
-        console.warn('[Version] 读取云端状态失败', e)
-        this.cloud = null
+      if (this.cloudSnapshot === undefined) {
+        try {
+          const res = await getCloudStatus(this.projectId)
+          this.cloud = (res && res.data) || null
+        } catch (e) {
+          console.warn('[Version] 读取云端状态失败', e)
+          this.cloud = null
+        }
       }
       try {
         const res = await listCloudConnections()
@@ -340,34 +380,35 @@ export default {
 
 <style lang="scss" scoped>
 .version-panel { display: flex; flex-direction: column; height: 100%; }
-.version-empty { padding: 24rpx; color: var(--awd-text-3); font-size: 26rpx; }
-.version-intro { padding: 32rpx 24rpx; }
-.version-intro-title { font-size: 30rpx; font-weight: 600; margin-bottom: 12rpx; }
-.version-intro-desc { font-size: 26rpx; color: var(--awd-text-2); line-height: 1.6; margin-bottom: 24rpx; }
-.version-error { padding: 32rpx 24rpx; }
-.version-error-desc { font-size: 26rpx; color: var(--awd-danger-text); line-height: 1.6; margin-bottom: 24rpx; }
+.version-empty { padding: 12px var(--awd-panel-pad-x); color: var(--awd-text-3); font-size: var(--awd-font-size-body); }
+.version-intro { padding: 16px var(--awd-panel-pad-x); }
+.version-intro-title { font-size: var(--awd-font-size-title); font-weight: 600; margin-bottom: 6px; }
+.version-intro-desc { font-size: var(--awd-font-size-body); color: var(--awd-text-2); line-height: 1.6; margin-bottom: 12px; }
+.version-error { padding: 16px var(--awd-panel-pad-x); }
+.version-error-desc { font-size: var(--awd-font-size-body); color: var(--awd-danger-text); line-height: 1.6; margin-bottom: 12px; }
 .version-file-filter {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12rpx 24rpx; background: var(--awd-accent-soft); border-bottom: 1px solid var(--awd-border);
-  font-size: 24rpx; color: var(--awd-text-2);
+  padding: 6px var(--awd-panel-pad-x); background: var(--awd-accent-soft); border-bottom: 1px solid var(--awd-border);
+  font-size: var(--awd-panel-fs); color: var(--awd-text-2);
 }
 .version-file-filter-clear { color: var(--awd-text); text-decoration: underline; }
 .version-history-row {
   display: flex; justify-content: flex-end;
-  padding: 8rpx 24rpx; border-bottom: 1px solid var(--awd-border);
+  padding: 4px var(--awd-panel-pad-x); border-bottom: 1px solid var(--awd-border);
 }
-.version-history-link { font-size: 23rpx; color: var(--awd-text); text-decoration: underline; }
+.version-history-link { font-size: var(--awd-panel-fs-meta); color: var(--awd-text); text-decoration: underline; }
 .version-footer {
-  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8rpx;
-  padding: 12rpx 24rpx; border-top: 1px solid var(--awd-border);
-  font-size: 22rpx; color: var(--awd-text-3);
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px;
+  padding: 6px var(--awd-panel-pad-x); border-top: 1px solid var(--awd-border);
+  font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3);
 }
 .version-footer-off { color: var(--awd-text-3); text-decoration: underline; flex-shrink: 0; }
 
 /* awd-* 没有集中定义，各组件 scoped 内各自定义 */
 .awd-btn {
-  display: inline-block; padding: 14rpx 28rpx; border-radius: 8rpx;
-  font-size: 26rpx; text-align: center;
+  display: inline-flex; align-items: center; justify-content: center; height: var(--awd-control-height);
+  padding: 0 14px; border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body); text-align: center;
 }
 .awd-btn-primary { background: var(--awd-info); color: var(--awd-text-on-accent); }
 </style>

@@ -122,6 +122,19 @@ public class User {
      */
     private LocalDateTime updatedAt;
 
+    /** Account-level explicit cloud backup decision; legacy rows stay undecided and disabled. */
+    private Boolean fileCloudBackupEnabled;
+    private LocalDateTime fileCloudBackupDecidedAt;
+    @Column(length = 32)
+    private String fileCloudBackupConsentVersion;
+
+    public boolean isFileCloudBackupEnabled() { return Boolean.TRUE.equals(fileCloudBackupEnabled); }
+    public void setFileCloudBackupEnabled(boolean enabled) { this.fileCloudBackupEnabled = enabled; }
+    public LocalDateTime getFileCloudBackupDecidedAt() { return fileCloudBackupDecidedAt; }
+    public void setFileCloudBackupDecidedAt(LocalDateTime value) { this.fileCloudBackupDecidedAt = value; }
+    public String getFileCloudBackupConsentVersion() { return fileCloudBackupConsentVersion; }
+    public void setFileCloudBackupConsentVersion(String value) { this.fileCloudBackupConsentVersion = value; }
+
     // Getters and Setters
 
     public Long getId() {

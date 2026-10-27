@@ -89,6 +89,27 @@ public class EditorBridgeService {
      */
     private final ConcurrentHashMap<String, PendingAction> pendingRequests = new ConcurrentHashMap<>();
 
+    // Version writes may start only while their original AI run is still live.
+    private final ConcurrentHashMap<String, Object> versionRunTokens = new ConcurrentHashMap<>();
+
+    public Object versionRunToken(String conversationId) {
+        return conversationId == null ? null : versionRunTokens.get(conversationId);
+    }
+
+    public boolean claimVersionAction(String conversationId, Object token, Runnable claim) {
+        if (token == null) return false;
+        synchronized (token) {
+            if (versionRunTokens.get(conversationId) != token) return false;
+            claim.run();
+            return true;
+        }
+    }
+
+    private void retireVersionRun(String conversationId) {
+        Object token = versionRunTokens.get(conversationId);
+        if (token != null) synchronized (token) { versionRunTokens.remove(conversationId, token); }
+    }
+
     /** 一次在途的编辑器命令：它属于哪个会话，以及谁在等它。 */
     private record PendingAction(String conversationId, CompletableFuture<EditorActionResult> future) {}
     
@@ -238,7 +259,7 @@ public class EditorBridgeService {
 
     static int timeoutSecondsFor(String action) {
         // Host-level save/reload handshake, not a worker/relay action.
-        if ("doc_checkpoint_restore".equals(action)) return 180;
+        if ("doc_checkpoint_restore".equals(action) || "project_version_action".equals(action)) return 180;
         if (action == null) return EDITOR_ACTION_TIMEOUT; // Map.of 对 null 键抛 NPE
         return ACTION_TIMEOUT_SECONDS.getOrDefault(action, EDITOR_ACTION_TIMEOUT);
     }
@@ -252,9 +273,27 @@ public class EditorBridgeService {
     /** 新一轮（新用户消息）开始：清空本轮的整段插入登记、生成物登记与「等组件」标记。 */
     public void clearForNewRun(String conversationId) {
         if (conversationId == null) return;
+        retireVersionRun(conversationId);
+        versionRunTokens.put(conversationId, new Object());
         dispatchedBulkInserts.remove(conversationId);
         generatedThisRun.remove(conversationId);
         componentWaits.remove(conversationId);
+        ocrRouteWaits.remove(conversationId);
+    }
+
+    /**
+     * 轮次终态收尾（dev-board#1270 [A-2 / P2-1]）：释放可能残留的挂起编辑器请求，
+     * 并回收会话级临时状态（{@code activeDocKeys} / {@code streamingModes} / {@code streamWroteContent}
+     * 与本轮去重登记），避免长期运行后按 conversationId 无限累积。
+     */
+    public void cleanupAfterRun(String conversationId) {
+        if (conversationId == null) return;
+        cancelPendingActions(conversationId);
+        clearForNewRun(conversationId);
+        retireVersionRun(conversationId);
+        activeDocKeys.remove(conversationId);
+        streamingModes.remove(conversationId);
+        streamWroteContent.remove(conversationId);
     }
 
     // ==================== 本轮生成物登记（dev-board#1017） ====================
@@ -638,6 +677,20 @@ public class EditorBridgeService {
         }
     }
 
+    private final java.util.Set<String> ocrRouteWaits = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    public boolean consumeOcrRouteWait(String conversationId) {
+        return conversationId != null && ocrRouteWaits.remove(conversationId);
+    }
+
+    /** OCR route choice shares the component wait terminal state and safe continuation. */
+    public void sendOcrRouteRequiredAction(Map<String, Object> fields) {
+        String conversationId = currentConversationId.get();
+        if (conversationId == null) return;
+        ocrRouteWaits.add(conversationId);
+        sendClientAction("ocr_route_required", conversationId, fields);
+        componentWaits.add(conversationId);
+    }
+
     /** 埋点：服务端往返（action 是原语枚举名，params 内容不采集） */
     private void recordBridge(String action, String outcome, String conversationId, long startMs) {
         telemetryService.recordConv("editor.bridge", conversationId, Map.of(
@@ -802,6 +855,7 @@ public class EditorBridgeService {
      */
     public int cancelPendingActions(String conversationId) {
         if (conversationId == null) return 0;
+        retireVersionRun(conversationId);
         int released = 0;
         for (PendingAction pending : pendingRequests.values()) {
             if (conversationId.equals(pending.conversationId()) && pending.future().cancel(false)) {

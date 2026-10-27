@@ -20,7 +20,7 @@ function loadComponent(name, bindings) {
   return new Function(...Object.keys(bindings), script.replace('export default', 'return'))(...Object.values(bindings))
 }
 
-function setup() {
+function setup(t) {
   const listeners = {}
   const uni = {
     $emit(name, event) { for (const f of listeners[name] || []) f(event) },
@@ -42,13 +42,14 @@ function setup() {
     packStatus: async () => ({ status: null }),
     packInstall: async () => {}
   })
-  const instance = { ...component.data(), projectId: 1, $t: k => k }
+  const instance = { ...component.data(), projectId: 1, $t: k => k, generationRequest: async () => ({ phase: 'idle' }) }
   for (const [name, method] of Object.entries(component.methods)) instance[name] = method.bind(instance)
+  t.after(() => component.beforeUnmount.call(instance))
   return { component, instance, uni, diagramCalls: () => diagramCalls, statusCalls: () => statusCalls }
 }
 
-test('mounted() 订阅了 awd:files-changed（画廊刷新的单一汇聚点），不是只订阅换风格事件', async () => {
-  const s = setup()
+test('mounted() 订阅了 awd:files-changed（画廊刷新的单一汇聚点），不是只订阅换风格事件', async t => {
+  const s = setup(t)
   await s.component.mounted.call(s.instance)
   // reload() 是异步的，等它跑完（mounted 里 refreshPackStatus 不影响 diagramCalls）
   await Promise.resolve()
@@ -62,8 +63,8 @@ test('mounted() 订阅了 awd:files-changed（画廊刷新的单一汇聚点）�
   assert.equal(s.diagramCalls(), before + 1, '同项目的 files-changed 事件应触发画廊重新拉取列表')
 })
 
-test('files-changed 事件的 projectId 与当前面板不一致时不重载画廊', async () => {
-  const s = setup()
+test('files-changed 事件的 projectId 与当前面板不一致时不重载画廊', async t => {
+  const s = setup(t)
   await s.component.mounted.call(s.instance)
   await Promise.resolve()
 
@@ -75,8 +76,8 @@ test('files-changed 事件的 projectId 与当前面板不一致时不重载画�
   assert.equal(s.diagramCalls(), before, '其它项目的 files-changed 不该触发本项目画廊重载')
 })
 
-test('beforeUnmount() 取消订阅 awd:files-changed，卸载后事件不再触发重载', async () => {
-  const s = setup()
+test('beforeUnmount() 取消订阅 awd:files-changed，卸载后事件不再触发重载', async t => {
+  const s = setup(t)
   await s.component.mounted.call(s.instance)
   await Promise.resolve()
   s.component.beforeUnmount.call(s.instance)
@@ -131,8 +132,8 @@ test('refresh_files：文件树挂着时交给 loadFiles() 发，页面这层不
   assert.equal(events.filter(e => e.name === 'awd:files-changed').length, 0)
 })
 
-test('端到端：树未挂载时 refresh_files 让已打开的诉讼可视化画廊重拉', async () => {
-  const s = setup()
+test('端到端：树未挂载时 refresh_files 让已打开的诉讼可视化画廊重拉', async t => {
+  const s = setup(t)
   await s.component.mounted.call(s.instance)
   await Promise.resolve()
   const before = s.diagramCalls()

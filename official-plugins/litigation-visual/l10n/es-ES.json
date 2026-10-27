@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Visualización de litigios",
+  "plugin.description": "Seleccione materiales del caso para generar y gestionar gráficos de litigio editables.",
+  "view.main.name": "Visualización de litigios"
+}

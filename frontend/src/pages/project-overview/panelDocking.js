@@ -18,8 +18,8 @@ import {
   isDockAllowed,
   isMovablePanel,
   resolveDock,
-  sanitizeDockOverrides,
 } from '@/config/panelRegistry.js'
+import { migrateLeftPaneKey } from '@/config/leftSidebarPlugins.js'
 import { NO_PROJECT_DEFAULT_PANE } from './noProjectShell.js'
 
 const DOCK_STORAGE_KEY = 'awd_panel_docks'
@@ -43,7 +43,8 @@ export const panelDockingMethods = {
   // ——————————————————— 状态读写 ———————————————————
   loadPanelDocks() {
     try {
-      this.panelDockOverrides = sanitizeDockOverrides(uni.getStorageSync(DOCK_STORAGE_KEY))
+      const saved = uni.getStorageSync(DOCK_STORAGE_KEY)
+      this.panelDockOverrides = Object.fromEntries(Object.entries(saved && typeof saved === 'object' ? saved : {}).filter(([, dock]) => DOCKS.includes(dock)).map(([key, dock]) => [migrateLeftPaneKey(key), dock]))
     } catch (e) {
       this.panelDockOverrides = {}
     }
@@ -67,12 +68,13 @@ export const panelDockingMethods = {
   applyPanelDocks(list) {
     if (this.isClientView) return list
     const leftKeys = this.panelDocks.left.map((p) => p.key)
-    const kept = list.filter((p) => !isMovablePanel(p.key) || leftKeys.includes(p.key))
+    const kept = list.filter((p) => !isMovablePanel(p.key, this.dockPanels) || leftKeys.includes(p.key))
     const known = new Set(kept.map((p) => p.key))
     const extras = this.panelDocks.left
       .filter((p) => !known.has(p.key))
-      .map((p) => ({ key: p.key, label: this.$t(p.labelKey), svgPaths: p.svgPaths }))
-    return [...kept, ...extras]
+      .map((p) => ({ key: p.key, label: p.label || this.$t(p.labelKey), svgPaths: p.svgPaths }))
+    // 项目搜索由资源管理器标题栏打开；保留插件与停靠状态，只移除 rail 入口。
+    return [...kept, ...extras].filter(p => p.key !== 'plugin-search')
   },
 
   /**
@@ -90,9 +92,9 @@ export const panelDockingMethods = {
     if (this.rightPaneKey !== 'ai' && !rightKeys.includes(this.rightPaneKey)) this.rightPaneKey = 'ai'
 
     const leftKeys = docks.left.map((p) => p.key)
-    if (isMovablePanel(this.leftPaneKey) && !leftKeys.includes(this.leftPaneKey)) {
+    if (isMovablePanel(this.leftPaneKey, this.dockPanels) && !leftKeys.includes(this.leftPaneKey)) {
       // 无项目态没有资源管理器，回落「项目」面板（dev-board#1047）
-      this.leftPaneKey = this.hasProject ? 'files' : NO_PROJECT_DEFAULT_PANE
+      this.leftPaneKey = this.hasProject && !this.isLooseWorkspace ? 'files' : NO_PROJECT_DEFAULT_PANE
     }
   },
 
@@ -107,12 +109,16 @@ export const panelDockingMethods = {
 
   /** 不管它现在停在哪，把它打开并显示出来（菜单命令与状态条工具入口共用）。 */
   openPanelInItsDock(key) {
-    const dock = resolveDock(key, this.panelDockOverrides)
+    key = migrateLeftPaneKey(key)
+    const dock = resolveDock(key, this.panelDockOverrides, this.dockPanels)
     if (dock === 'left') {
       if (this.leftPaneKey === key) this.sidebarCollapsed = false
       else this.toggleLeftPane(key)
     } else if (dock === 'right') {
-      if (!this.showAiPanel) this.toggleAiPanel()
+      if (!this.showAiPanel) {
+        if (this.hasProject) this.toggleAiPanel()
+        else { this.showAiPanel = true; this.aiPanelMounted = true }
+      }
       this.rightPaneKey = key
     } else if (dock === 'bottom') {
       this.switchToolTab(key)
@@ -124,8 +130,8 @@ export const panelDockingMethods = {
   /** 右键菜单与拖拽投放的落点：把面板搬到另一个 dock。 */
   movePanelToDock(key, dock) {
     this.closeDockMenu()
-    if (!isMovablePanel(key) || !isDockAllowed(key, dock)) return
-    const from = resolveDock(key, this.panelDockOverrides)
+    if (!isMovablePanel(key, this.dockPanels) || !isDockAllowed(key, dock, this.dockPanels)) return
+    const from = resolveDock(key, this.panelDockOverrides, this.dockPanels)
     if (from === dock) return
 
     const wasOpen = this.isPanelOpenIn(key, from)
@@ -140,6 +146,7 @@ export const panelDockingMethods = {
 
   /** 右侧面板 tab 切换（'ai' = 对话本体，它挂在 v-show 上，切走不丢会话状态）。 */
   switchRightPane(key) {
+    key = migrateLeftPaneKey(key)
     this.rightPaneKey = key
     this.$nextTick(() => {
       this.triggerWorkbenchResize()
@@ -151,7 +158,7 @@ export const panelDockingMethods = {
   openDockMenu(key, evt) {
     // rail 上不是每个按钮都能移动（文件树/搜索不行），不能移动的就把右键让给系统默认行为，
     // 所以 preventDefault 在这里做、不在模板上写 .prevent 修饰符。
-    if (!isMovablePanel(key)) return
+    if (!isMovablePanel(key, this.dockPanels)) return
     // uni 会把 <view> 上的原生事件重建成普通对象，只有 mouse 系补了坐标；
     // 补不到就从正在派发的原生事件上取（同 fileOpenTabs.js 的 mouseButtonOf）。
     const native = typeof window !== 'undefined' ? window.event : null
@@ -177,7 +184,7 @@ export const panelDockingMethods = {
 
   // ——————————————————— HTML5 拖拽（桌面增强） ———————————————————
   onPanelDragStart(key, evt) {
-    if (!isMovablePanel(key)) return
+    if (!isMovablePanel(key, this.dockPanels)) return
     this.draggingPanelKey = key
     this.dockDragOver = null
     this.closeDockMenu()

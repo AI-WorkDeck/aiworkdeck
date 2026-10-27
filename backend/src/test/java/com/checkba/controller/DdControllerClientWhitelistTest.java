@@ -41,19 +41,23 @@ class DdControllerClientWhitelistTest {
     private static final long CLIENT = 3L;
 
     private DdService ddService;
+    private com.checkba.service.DdWorkflowService workflow;
     private ProjectMemberService pms;
+    private com.checkba.service.ProjectFileAccessService fileAccess;
     private DdController controller;
     private MockedStatic<AuthController> auth;
 
     @BeforeEach
     void setUp() {
         ddService = mock(DdService.class);
+        workflow = mock(com.checkba.service.DdWorkflowService.class);
         pms = mock(ProjectMemberService.class);
-        controller = new DdController(ddService, pms);
+        fileAccess = mock(com.checkba.service.ProjectFileAccessService.class);
+        controller = new DdController(ddService, workflow, pms, fileAccess);
         when(ddService.getProjectIdByRequestId(REQUEST)).thenReturn(PROJECT);
         when(ddService.getProjectIdByItemId(ITEM)).thenReturn(PROJECT);
         when(pms.hasReadPermission(PROJECT, CLIENT)).thenReturn(true);
-        when(pms.isClient(PROJECT, CLIENT)).thenReturn(true);
+        when(fileAccess.isClient(PROJECT, CLIENT)).thenReturn(true);
         auth = mockStatic(AuthController.class);
         auth.when(() -> AuthController.getUserIdFromSession("c")).thenReturn(CLIENT);
     }
@@ -108,7 +112,7 @@ class DdControllerClientWhitelistTest {
         assertDoesNotThrow(() -> controller.getRequestDetails(REQUEST, "c"));
         MockMultipartFile file = new MockMultipartFile("file", "a.pdf", "application/pdf", new byte[]{1});
         assertDoesNotThrow(() -> controller.uploadFile(ITEM, file, "c"));
-        verify(ddService).uploadFile(ITEM, file, CLIENT);
+        verify(workflow).uploadLegacy(ITEM, file, CLIENT);
         DdController.CommentDto comment = new DdController.CommentDto();
         comment.setContent("已上传");
         assertDoesNotThrow(() -> controller.addComment(ITEM, comment, "c"));
@@ -118,20 +122,22 @@ class DdControllerClientWhitelistTest {
     @Test
     @DisplayName("律师（非客户）的写端点照常")
     void staffStillWrites() {
-        when(pms.isClient(PROJECT, CLIENT)).thenReturn(false);
+        when(fileAccess.isClient(PROJECT, CLIENT)).thenReturn(false);
+        when(pms.hasWritePermission(PROJECT, CLIENT)).thenReturn(true);
         assertDoesNotThrow(() -> controller.deleteRequest(REQUEST, "c"));
-        verify(ddService).deleteRequest(REQUEST, CLIENT);
+        verify(workflow).deleteRequest(REQUEST, CLIENT);
     }
 
     @Test
     @DisplayName("律师审核：带理由与操作人交给业务层；非法流转映射成真 400")
     void staffReviewPassesReasonAndMaps400() {
-        when(pms.isClient(PROJECT, CLIENT)).thenReturn(false);
+        when(fileAccess.isClient(PROJECT, CLIENT)).thenReturn(false);
+        when(pms.hasWritePermission(PROJECT, CLIENT)).thenReturn(true);
         DdController.UpdateStatusDto dto = new DdController.UpdateStatusDto();
         dto.setStatus("REJECTED");
         dto.setReason("扫描件不清晰");
         assertDoesNotThrow(() -> controller.updateStatus(ITEM, dto, "c"));
-        verify(ddService).updateItemStatus(ITEM, "REJECTED", "扫描件不清晰", CLIENT);
+        verify(workflow).review(ITEM, "REJECTED", "扫描件不清晰", null, null, CLIENT);
         var resp = controller.onIllegalTransition(new DdService.IllegalTransitionException("x"));
         assertEquals(HttpStatus.BAD_REQUEST, resp.getStatusCode());
         assertEquals(400, resp.getBody().get("code"));

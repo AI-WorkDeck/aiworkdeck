@@ -10,89 +10,89 @@ import { t } from '@/i18n'
 export const PROJECT_TYPES = [
   {
     value: 'MAJOR_ASSET_RESTRUCTURING',
-    label: t('config.projectTypes.majorAssetRestructuring'),
+    get label() { return t('config.projectTypes.majorAssetRestructuring') },
     formFields: [
       {
         field: 'listedCompanyName',
-        label: t('config.projectFields.listedCompanyName'),
+        get label() { return t('config.projectFields.listedCompanyName') },
         required: true,
-        placeholder: t('config.projectFields.listedCompanyNamePlaceholder'),
+        get placeholder() { return t('config.projectFields.listedCompanyNamePlaceholder') },
       },
       {
         field: 'targetCompanyName',
-        label: t('config.projectFields.targetCompanyName'),
+        get label() { return t('config.projectFields.targetCompanyName') },
         required: true,
-        placeholder: t('config.projectFields.targetCompanyNamePlaceholder'),
+        get placeholder() { return t('config.projectFields.targetCompanyNamePlaceholder') },
       },
     ],
     companyDisplay: {
-      LISTED: { label: t('config.projectFields.listedCompanyInfo'), fields: [], lists: [] },
-      TARGET: { label: t('config.projectFields.targetCompanyInfo'), fields: [], lists: [] }
+      LISTED: { get label() { return t('config.projectFields.listedCompanyInfo') }, fields: [], lists: [] },
+      TARGET: { get label() { return t('config.projectFields.targetCompanyInfo') }, fields: [], lists: [] }
     }
   },
   {
     value: 'PRIVATE_PLACEMENT',
-    label: t('config.projectTypes.privatePlacement'),
+    get label() { return t('config.projectTypes.privatePlacement') },
     formFields: [
       {
         field: 'listedCompanyName',
-        label: t('config.projectFields.listedCompanyName'),
+        get label() { return t('config.projectFields.listedCompanyName') },
         required: true,
-        placeholder: t('config.projectFields.listedCompanyNamePlaceholder'),
+        get placeholder() { return t('config.projectFields.listedCompanyNamePlaceholder') },
       },
     ],
     companyDisplay: {
-      LISTED: { label: t('config.projectFields.listedCompanyInfo'), fields: [], lists: [] },
+      LISTED: { get label() { return t('config.projectFields.listedCompanyInfo') }, fields: [], lists: [] },
       TARGET: null
     }
   },
   {
     value: 'PUBLIC_PLACEMENT',
-    label: t('config.projectTypes.publicPlacement'),
+    get label() { return t('config.projectTypes.publicPlacement') },
     formFields: [
       {
         field: 'listedCompanyName',
-        label: t('config.projectFields.listedCompanyName'),
+        get label() { return t('config.projectFields.listedCompanyName') },
         required: true,
-        placeholder: t('config.projectFields.listedCompanyNamePlaceholder'),
+        get placeholder() { return t('config.projectFields.listedCompanyNamePlaceholder') },
       },
     ],
     companyDisplay: {
-      LISTED: { label: t('config.projectFields.listedCompanyInfo'), fields: [], lists: [] },
+      LISTED: { get label() { return t('config.projectFields.listedCompanyInfo') }, fields: [], lists: [] },
       TARGET: null
     }
   },
   {
     value: 'ACQUISITION',
-    label: t('config.projectTypes.acquisition'),
+    get label() { return t('config.projectTypes.acquisition') },
     formFields: [
       {
         field: 'listedCompanyName',
-        label: t('config.projectFields.listedCompanyName'),
+        get label() { return t('config.projectFields.listedCompanyName') },
         required: true,
-        placeholder: t('config.projectFields.listedCompanyNamePlaceholder'),
+        get placeholder() { return t('config.projectFields.listedCompanyNamePlaceholder') },
       },
       {
         field: 'targetCompanyName',
-        label: t('config.projectFields.targetCompanyName'),
+        get label() { return t('config.projectFields.targetCompanyName') },
         required: true,
-        placeholder: t('config.projectFields.targetCompanyNamePlaceholder'),
+        get placeholder() { return t('config.projectFields.targetCompanyNamePlaceholder') },
       },
     ],
     companyDisplay: {
-      LISTED: { label: t('config.projectFields.listedCompanyInfo'), fields: [], lists: [] },
-      TARGET: { label: t('config.projectFields.targetCompanyInfo'), fields: [], lists: [] }
+      LISTED: { get label() { return t('config.projectFields.listedCompanyInfo') }, fields: [], lists: [] },
+      TARGET: { get label() { return t('config.projectFields.targetCompanyInfo') }, fields: [], lists: [] }
     }
   },
   {
     value: 'BLANK',
-    label: t('config.projectTypes.blank'),
+    get label() { return t('config.projectTypes.blank') },
     formFields: [
         {
             field: 'name',
-            label: t('config.projectFields.projectName'),
+            get label() { return t('config.projectFields.projectName') },
             required: true,
-            placeholder: t('config.projectFields.projectNamePlaceholder'),
+            get placeholder() { return t('config.projectFields.projectNamePlaceholder') },
         }
     ],
     companyDisplay: null

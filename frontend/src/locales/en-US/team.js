@@ -8,7 +8,7 @@
 export default {
   navTeam: 'Team',
 
-  subtitle: 'Roll the firm-wide usage picture up for whoever runs it',
+  subtitle: 'Collaborate across law firms, teams and projects; review usage by team',
   privacyLine: 'Team stats upload counts and anonymous project codes only, never document content, file names, or conversations',
   needAccountTitle: 'No account connected',
   needAccountDesc: 'Teams live on your AI WorkDeck account. Connect one under "Account & Usage", then come back.',
@@ -18,7 +18,7 @@ export default {
 
   createTitle: 'Create a team',
   createDesc: 'You become the owner and can invite colleagues by phone number.',
-  teamNamePlaceholder: 'Team name, e.g. Smith & Partners',
+  teamNamePlaceholder: 'Team name, e.g. M&A Team',
   createButton: 'Create team',
   createFailedEmpty: 'Team name cannot be empty',
   joinTitle: 'Join with a code',
@@ -161,4 +161,43 @@ export default {
   goTeam: 'Go to Team',
 
   emptyData: 'No stats yet. They appear the day after members turn sharing on.',
+
+  // ---- Law Firm Decision-Maker Dashboard (TeamPanel.vue) ----
+  lawfirmDashboardTitle: 'Law Firm Executive & Management Committee Dashboard',
+  lawfirmDashboardDesc: 'Review revenue and risk by practice category, lead lawyer and individual lawyer. Open the law firm workbench for details.',
+  lawfirmSeedDemoBtn: 'Seed Wufangzhai Demo',
+  lawfirmOpenPluginBtn: 'Open Law Firm Workbench',
+  lawfirmKpiActiveMatters: 'Active Matters',
+  lawfirmKpiPendingClearances: 'Pending Conflicts / Reviews',
+  lawfirmKpiContracted: 'Total Contracted',
+  lawfirmKpiBilled: 'Total Billed',
+  lawfirmKpiCollected: 'Total Collected',
+  lawfirmKpiCollectionRate: 'Firm Collection Rate',
+  lawfirmDimDepartments: 'By Practice Category',
+  lawfirmDimTeamLeads: 'By Lead Lawyer',
+  lawfirmDimUnits: 'By Lawyer',
+  lawfirmColName: 'Name',
+  lawfirmColHead: 'Lead / Members',
+  lawfirmColMatters: 'Matters',
+  lawfirmColContracted: 'Contracted',
+  lawfirmColCollected: 'Collected',
+  lawfirmColRate: 'Collection Rate',
+  lawfirmWanSuffix: '¥{amount}0k',
+  lawfirmActionFailedToast: 'Operation failed',
+  lawfirmOpenWorkbenchFailedToast: 'Failed to open workbench',
+
+  // ---- Switch team / firm (one team per account, one firm per team; two non-atomic steps) ----
+  switchTeamTitle: 'Switch team',
+  switchTeamDesc: 'Current team: {team}. An account belongs to one team at a time; switching leaves the current team, then joins a new one with its code.',
+  switchTeamButton: 'Leave and join new team',
+  switchTeamOwnerBlocked: 'You own this team. Owners cannot leave, so you cannot switch to another team yet.',
+  confirmSwitchTeam: 'You will leave "{team}" first, then join the new team with the code. You will lose access to the old team stats and directory; existing project chats stay according to chat membership. If joining fails, the old team must invite you again. Continue?',
+  switchTeamHalfDone: 'You left "{team}", but joining the new team did not finish: {reason}. Check the code and try again, or ask the old team owner to re-invite you.',
+  switchTeamDone: 'Switched to the new team',
+  switchFirmTitle: 'Switch firm',
+  switchFirmButton: 'Leave and join new firm',
+  switchFirmHeadBlocked: 'This is the head team of the firm. The head team cannot leave, so it cannot switch firms.',
+  confirmSwitchFirm: 'This team will leave "{firm}" first, then join the new firm with its code. You will lose the old firm roll-up and directory. If joining fails, the team will belong to no firm for now. Continue?',
+  switchFirmHalfDone: 'This team left "{firm}", but joining the new firm did not finish: {reason}. Check the firm code and try again.',
+  switchFirmDone: 'Switched to the new firm',
 }

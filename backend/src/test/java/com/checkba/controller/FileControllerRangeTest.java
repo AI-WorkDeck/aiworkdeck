@@ -61,6 +61,8 @@ class FileControllerRangeTest {
     @Mock
     private AutoTaggingService autoTaggingService;
 
+    @Mock private com.checkba.service.ProjectFileAccessService fileAccess;
+
     @InjectMocks
     private FileController controller;
 
@@ -96,12 +98,31 @@ class FileControllerRangeTest {
     private MvcResult download(String range, boolean member) throws Exception {
         try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(7L);
-            when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(member);
+            when(fileAccess.canRead(any(ProjectFile.class), eq(7L))).thenReturn(member);
             var req = get("/api/files/5/download").param("token", "sess");
             if (range != null) {
                 req = req.header("Range", range);
             }
             return mvc.perform(req).andReturn();
+        }
+    }
+
+    @Test
+    void pdf_inline_preview_preserves_range_and_authorization() throws Exception {
+        givenFile("scan.pdf", "pdf");
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(7L);
+            when(fileAccess.canRead(any(ProjectFile.class), eq(7L))).thenReturn(true);
+            var response = mvc.perform(get("/api/files/5/download").param("token", "sess")
+                    .param("inline", "true").header("Range", "bytes=0-99")).andReturn().getResponse();
+            assertEquals(206, response.getStatus());
+            assertEquals("application/pdf", response.getContentType());
+            assertTrue(response.getHeader("Content-Disposition").startsWith("inline;"));
+            assertEquals("bytes 0-99/1000", response.getHeader("Content-Range"));
+            assertArrayEquals(Arrays.copyOfRange(content, 0, 100), response.getContentAsByteArray());
+            when(fileAccess.canRead(any(ProjectFile.class), eq(7L))).thenReturn(false);
+            assertEquals(403, mvc.perform(get("/api/files/5/download").param("token", "sess")
+                    .param("inline", "true").header("Range", "bytes=0-99")).andReturn().getResponse().getStatus());
         }
     }
 
@@ -141,7 +162,8 @@ class FileControllerRangeTest {
         givenFile("clip.mp4", "mp4");
         MvcResult r = download("bytes=0-99", false);
         assertEquals(403, r.getResponse().getStatus());
-        assertEquals(0, r.getResponse().getContentAsByteArray().length);
+        assertEquals(com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE,
+                r.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     @Test

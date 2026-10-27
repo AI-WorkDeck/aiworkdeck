@@ -27,6 +27,7 @@
         <text class="mr-tier-desc">{{ localSwitchNote }}</text>
       </view>
       <AwdSwitch
+        :aria-label="$t('meeting.localSwitchLabel')"
         :checked="asrProvider === 'local'"
         :disabled="tierBusy"
         @change="onToggleLocalAsr"
@@ -92,7 +93,7 @@
     <template v-if="!recordingActive">
       <view class="mr-device-picker" v-if="audioDevices.length > 1">
         <text class="mr-device-picker-label">{{ $t('meeting.micDeviceLabel') }}</text>
-        <AwdSelect :range="deviceLabels" :value="selectedDeviceIndex" @change="onDeviceChange" />
+        <AwdSelect :aria-label="$t('meeting.micDeviceLabel')" :range="deviceLabels" :value="selectedDeviceIndex" @change="onDeviceChange" />
       </view>
       <view class="mr-record-btn" @tap="onStartRecording">
         <view class="mr-record-dot"></view>
@@ -322,31 +323,17 @@ import AwdSelect from '@/components/AwdSelect.vue'
 const POLL_INTERVAL_MS = 8000
 
 /**
- * 告知那一块的全部可见文案，**集中在这一处**。
- *
- * 这个组件整体还是硬编码中文（既有欠账，另有一张卡在做整组件 i18n 迁移）。
- * 把这几句摊到模板和方法里各处的话，迁移时很容易顺手改坏它们背后的闸门逻辑——
- * 而那道闸拦的是「录音在用户不知情的情况下被交出去」。集中放，迁移时换成 $t 只动这一个对象。
+ * 告知那一块的全部可见文案，集中在 computed.noticeCopy（走 locales/meeting.js）。
  *
  * 告知正文（body）不在这里：它由后端给，与版本号同源——改文案就得推版本，
  * 旧确认随即失效。这里只有围绕它的标题、勾选项与两个动作。
  */
-const NOTICE_COPY = {
-  title: '录音转写告知',
-  checkLabel: '我已知悉上述处理方式',
-  confirm: '确认，继续用云端转写',
-  switchLocal: '改用本机转写',
-  saveFailed: '保存失败，稍后重试',
-  // 拦在录音开始之前，是因为那是唯一一个「什么都还没发生」的时刻
-  blockBeforeRecording: '开始录音前，看一下上方的转写告知',
-  // 覆盖「本地档录的、之后切平台档再手动转写」这条绕过开始录音那道口的路
-  blockBeforeUpload: '上传前，看一下上方的转写告知',
-}
 
 export default {
   name: 'MeetingRecordingPanel',
   components: { AwdSwitch, AwdSelect },
   props: {
+    loadAudio: { type: Function, default: null },
     projectId: {
       type: [String, Number],
       required: true
@@ -449,9 +436,17 @@ export default {
     needsAsrNotice() {
       return this.asrProvider === 'platform' && !!this.asrNotice && !this.asrNotice.acknowledged
     },
-    // 告知那块的文案集中在模块顶部的 NOTICE_COPY 里，模板经这里读（理由见那处注释）
+    // 告知那块的文案集中在 locales/meeting.js，模板与方法经这里读
     noticeCopy() {
-      return NOTICE_COPY
+      return {
+        title: this.$t('meeting.noticeTitle'),
+        checkLabel: this.$t('meeting.noticeCheckLabel'),
+        confirm: this.$t('meeting.noticeConfirm'),
+        switchLocal: this.$t('meeting.noticeSwitchLocal'),
+        saveFailed: this.$t('meeting.noticeSaveFailed'),
+        blockBeforeRecording: this.$t('meeting.noticeBlockBeforeRecording'),
+        blockBeforeUpload: this.$t('meeting.noticeBlockBeforeUpload'),
+      }
     },
     // 本地档能不能真正用起来。**读的是 platformServices 那个唯一出口**，
     // 与 admin 的档位下拉同源——只在一处接探测的话，用户从另一处照样能切进一个用不了的档。
@@ -615,7 +610,7 @@ export default {
       try {
         this.asrNotice = (await acknowledgeMeetingAsrNotice(true)) || this.asrNotice
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || NOTICE_COPY.saveFailed, icon: 'none' })
+        uni.showToast({ title: (e && e.message) || this.noticeCopy.saveFailed, icon: 'none' })
       } finally {
         this.noticeBusy = false
       }
@@ -808,7 +803,7 @@ export default {
       // 用户看完上面那段点一下就继续；换成录完两小时再拦，他只剩「放弃录音」
       // 或「照传不误」两条路，后者正好绕过了这段告知存在的理由。
       if (this.needsAsrNotice) {
-        uni.showToast({ title: NOTICE_COPY.blockBeforeRecording, icon: 'none' })
+        uni.showToast({ title: this.noticeCopy.blockBeforeRecording, icon: 'none' })
         return
       }
       try {
@@ -915,7 +910,7 @@ export default {
       // 这里给的是一句提示 + 上方已经摆着的那块告知，不是模态框：告知块本来就在屏幕上，
       // 确认只要一下。
       if (this.needsAsrNotice) {
-        uni.showToast({ title: NOTICE_COPY.blockBeforeUpload, icon: 'none' })
+        uni.showToast({ title: this.noticeCopy.blockBeforeUpload, icon: 'none' })
         return
       }
       // 平台档还没登录账户：先就地登录（登录后置，dev-board#1046），再走扣费确认
@@ -1054,11 +1049,12 @@ export default {
         return
       }
       try {
-        const resp = await fetch(`${getApiBaseUrl()}/api/files/${m.audioFileId}/download`, {
-          headers: getAuthHeaders()
-        })
-        if (!resp.ok) throw new Error('HTTP ' + resp.status)
-        const blob = await resp.blob()
+        const blob = this.loadAudio ? await this.loadAudio(m) : await (async () => {
+          const resp = await fetch(`${getApiBaseUrl()}/api/files/${m.audioFileId}/download`, { headers: getAuthHeaders() })
+          if (!resp.ok) throw new Error('HTTP ' + resp.status)
+          return resp.blob()
+        })()
+        if (this._unmounted) return
         this._audioUrl = URL.createObjectURL(blob)
         this._player = new window.Audio(this._audioUrl)
         this._player.onended = () => { this.playingId = null }
@@ -1125,7 +1121,7 @@ export default {
 }
 
 .mr-sec-count {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-panel-text-3);
   background: var(--awd-panel-hover);
   border-radius: 999px;
@@ -1186,14 +1182,14 @@ export default {
 }
 
 .mr-tier-label {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .mr-tier-value {
   flex: none;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   padding: 2px 9px;
   border-radius: 999px;
   color: var(--awd-text-2);
@@ -1211,7 +1207,7 @@ export default {
 }
 
 .mr-tier-desc {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
   line-height: 1.5;
 }
@@ -1256,7 +1252,7 @@ export default {
 }
 
 .mr-notice-title {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-text);
 }
@@ -1280,7 +1276,7 @@ export default {
   height: 13px;
   flex: none;
   border: 1px solid var(--awd-border-strong);
-  border-radius: 3px;
+  border-radius: calc(var(--awd-space-1) / 2);
   background: var(--awd-surface);
 
   &.checked {
@@ -1322,7 +1318,7 @@ export default {
 }
 
 .mr-device-picker-label {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
 }
 
@@ -1345,25 +1341,25 @@ export default {
   height: 9px;
   border-radius: 50%;
   background: var(--awd-surface);
-  border: 2px solid rgba(255, 255, 255, 0.45);
+  border: 2px solid var(--awd-text-on-accent);
   box-sizing: content-box;
 }
 
 .mr-record-text {
   color: var(--awd-text-on-accent);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
 }
 
 .mr-record-hint {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
   text-align: center;
   line-height: 1.5;
 }
 
 .mr-record-error {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-danger-text);
 }
 
@@ -1390,7 +1386,7 @@ export default {
 
   &.paused {
     animation: none;
-    background: #B0B4BA;
+    background: var(--awd-text-3);
   }
 }
 
@@ -1407,21 +1403,21 @@ export default {
 }
 
 .mr-live-label {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
 .mr-level-track {
   width: 80%;
   height: 4px;
-  border-radius: 2px;
+  border-radius: calc(var(--awd-space-1) / 2);
   background: var(--awd-surface-3);
   overflow: hidden;
 }
 
 .mr-level-bar {
   height: 100%;
-  border-radius: 2px;
+  border-radius: calc(var(--awd-space-1) / 2);
   background: var(--awd-mint);
   transition: width 0.15s linear;
 }
@@ -1437,8 +1433,8 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 5px 14px;
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-panel-fs);
   cursor: pointer;
   user-select: none;
 
@@ -1464,7 +1460,7 @@ export default {
 
   &.small {
     padding: 3px 10px;
-    font-size: 11px;
+    font-size: var(--awd-panel-fs-meta);
   }
 
   &.disabled {
@@ -1504,7 +1500,7 @@ export default {
 }
 
 .mr-item-title {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-text);
   overflow: hidden;
@@ -1513,13 +1509,13 @@ export default {
 }
 
 .mr-item-meta {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
 }
 
 .mr-status {
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   padding: 0 6px;
   line-height: 15px;
   border-radius: 999px;
@@ -1541,7 +1537,7 @@ export default {
   justify-content: center;
   width: 20px;
   height: 20px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   color: var(--awd-text-2);
   opacity: 0;
   /* 不显示时不能吃点击：opacity 不影响命中测试，漏了这行的话，行右侧那块看不见的
@@ -1594,9 +1590,9 @@ export default {
   flex: 1;
   min-width: 0;
   border: 1px solid var(--awd-border-strong);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 4px 8px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   background: var(--awd-surface);
 }
 
@@ -1607,13 +1603,13 @@ export default {
 }
 
 .mr-section-title {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .mr-hint {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
   line-height: 1.5;
 }
@@ -1650,7 +1646,7 @@ export default {
 
 .mr-progress-bar {
   height: 4px;
-  border-radius: 2px;
+  border-radius: calc(var(--awd-space-1) / 2);
   background: var(--awd-border);
   overflow: hidden;
 }
@@ -1676,8 +1672,8 @@ export default {
 
 .mr-speaker-chip {
   padding: 2px 10px;
-  border-radius: 10px;
-  font-size: 11px;
+  border-radius: var(--awd-radius-dialog);
+  font-size: var(--awd-panel-fs-meta);
   cursor: pointer;
   border: 1px solid transparent;
 
@@ -1713,13 +1709,13 @@ export default {
 }
 
 .mr-summary-strong {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .mr-summary-text {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
   line-height: 1.6;
 }
@@ -1732,7 +1728,7 @@ export default {
   flex-direction: column;
   gap: 8px;
   border: 1px solid var(--awd-border-subtle);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 8px;
   background: var(--awd-bg);
 }
@@ -1750,20 +1746,20 @@ export default {
 }
 
 .mr-seg-speaker {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   padding: 1px 8px;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-md);
 }
 
 .mr-seg-time {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   font-variant-numeric: tabular-nums;
 }
 
 .mr-seg-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   line-height: 1.6;
   word-break: break-word;
@@ -1783,9 +1779,9 @@ export default {
 .mr-dialog-content {
   width: 300px;
   background: var(--awd-surface);
-  border-radius: 10px;
+  border-radius: var(--awd-radius-dialog);
   overflow: hidden;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--awd-shadow-md);
 }
 
 .mr-dialog-header {
@@ -1793,14 +1789,14 @@ export default {
 }
 
 .mr-dialog-title {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .mr-dialog-body {
   padding: 10px 16px 16px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   line-height: 1.6;
 }
@@ -1814,7 +1810,7 @@ export default {
   flex: 1;
   text-align: center;
   padding: 10px 0;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   cursor: pointer;
 
   &.cancel { color: var(--awd-text-2); }

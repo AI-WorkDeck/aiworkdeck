@@ -15,12 +15,12 @@
 
         <AwdSelect
           v-if="editingKey === f.fieldKey && f.fieldKey === 'matterType'"
-          :range="matterTypes"
+          :range="matterTypeLabels"
           :value="matterTypeIndex"
           @change="onPickMatterType"
           @cancel="cancelEdit"
         >
-          <view class="profile-field-picker">{{ draft || $t('projects.selectMatterType') }}</view>
+          <view class="profile-field-picker">{{ draft ? matterTypeLabel(draft) : $t('projects.selectMatterType') }}</view>
         </AwdSelect>
 
         <input
@@ -39,7 +39,7 @@
           class="profile-field-value"
           :class="{ 'profile-field-empty': !f.fieldValue, 'profile-field-weak': isWeak(f) }"
           @tap="startEdit(f.fieldKey)"
-        >{{ f.fieldValue || $t('projects.notFilled') }}</text>
+        >{{ (f.fieldKey === 'matterType' && f.fieldValue ? matterTypeLabel(f.fieldValue) : f.fieldValue) || $t('projects.notFilled') }}</text>
 
         <text v-if="hintOf(f)" class="profile-field-hint">{{ hintOf(f) }}</text>
       </view>
@@ -58,6 +58,7 @@
 // 空态引导因此写成手填口径而不是「让 AI 读一遍项目里的文件」——
 // Plan 2 上线 AI 抽取后，把空态引导改回 AI 文案，并把按钮随抽取链路一起放出来。
 import { MATTER_TYPES } from '@/config/matterTypes.js'
+import { matterTypeLabel as formatMatterTypeLabel } from '@/config/matterTypes.js'
 import { isProfileEmpty, profileFieldHint } from '@/utils/projectHomeFormat.js'
 import { t } from '@/i18n'
 import AwdSelect from '@/components/AwdSelect.vue'
@@ -93,6 +94,9 @@ export default {
     matterTypeIndex() {
       return this.matterTypes.indexOf(this.draft)
     },
+    matterTypeLabels() {
+      return this.matterTypes.map((opt) => this.matterTypeLabel(opt))
+    },
   },
   watch: {
     // 换了项目就把半截的编辑态丢掉，避免把 A 项目的输入提交到 B 项目
@@ -101,6 +105,9 @@ export default {
     },
   },
   methods: {
+    matterTypeLabel(val) {
+      return formatMatterTypeLabel(val, (key) => (this.$t ? this.$t(key) : t(key)))
+    },
     isWeak(f) {
       return f.source === 'default' || f.source === 'ai'
     },
@@ -154,13 +161,13 @@ export default {
 .profile-header {
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
-  padding: 18px 20px;
+  border-radius: var(--awd-radius-md);
+  padding: var(--awd-space-3);
 }
 
 .profile-project-name {
   display: block;
-  font-size: 20px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-accent-text);
   line-height: 28px;
@@ -171,12 +178,12 @@ export default {
   padding: 12px 14px;
   background: var(--awd-bg);
   border-left: 3px solid var(--awd-mint);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
 }
 
 .profile-guide-desc {
   display: block;
-  font-size: 12px;
+  font-size: var(--awd-font-size-body);
   line-height: 19px;
   color: var(--awd-text-2);
 }
@@ -187,8 +194,8 @@ export default {
   padding: 5px 14px;
   background: var(--awd-accent);
   color: var(--awd-text-on-accent);
-  border-radius: 4px;
-  font-size: 12px;
+  border-radius: var(--awd-radius-sm);
+  font-size: var(--awd-font-size-body);
   cursor: pointer;
 }
 
@@ -218,8 +225,8 @@ export default {
 .profile-field-value {
   display: block;
   margin-top: 2px;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--awd-font-size-body);
+  line-height: var(--awd-line-height-ui);
   color: var(--awd-text);
   cursor: pointer;
   word-break: break-word;
@@ -238,12 +245,12 @@ export default {
 .profile-field-picker {
   margin-top: 2px;
   padding: 3px 6px;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--awd-font-size-body);
+  line-height: var(--awd-line-height-ui);
   color: var(--awd-text);
   background: var(--awd-surface);
   border: 1px solid var(--awd-accent);
-  border-radius: 3px;
+  border-radius: var(--awd-radius-sm);
   box-sizing: border-box;
   width: 100%;
 }
@@ -259,17 +266,17 @@ export default {
    定义在 project-home-pane.scss），不是靠 compact 布尔值。三档见该文件的注释。 */
 @container home-pane (max-width: 359px) {
   .profile-header {
-    padding: 10px 12px;
+    padding: var(--awd-space-2) var(--awd-panel-pad-x);
   }
 
   .profile-project-name {
-    font-size: 15px;
-    line-height: 22px;
+    font-size: var(--awd-font-size-title);
+    line-height: var(--awd-line-height-ui);
   }
 
   .profile-guide {
     margin-top: 10px;
-    padding: 10px 12px;
+    padding: var(--awd-space-2) var(--awd-panel-pad-x);
   }
 
   .profile-fields {
@@ -284,24 +291,24 @@ export default {
   }
 
   .profile-field-label {
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
   }
 
   .profile-field-value,
   .profile-field-input,
   .profile-field-picker {
-    font-size: 12px;
-    line-height: 18px;
+    font-size: var(--awd-font-size-body);
+    line-height: var(--awd-line-height-ui);
   }
 }
 
 @container home-pane (min-width: 360px) and (max-width: 559px) {
   .profile-header {
-    padding: 14px 16px;
+    padding: var(--awd-space-3);
   }
 
   .profile-project-name {
-    font-size: 17px;
+    font-size: var(--awd-font-size-title);
     line-height: 24px;
   }
 
@@ -319,7 +326,7 @@ export default {
   .profile-field-value,
   .profile-field-input,
   .profile-field-picker {
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     line-height: 20px;
   }
 }
@@ -329,15 +336,15 @@ export default {
   border: 0;
   border-radius: 0;
 }
-.is-sidebar .profile-project-name { font-size: 13px; line-height: 22px; color: var(--awd-panel-text); }
+.is-sidebar .profile-project-name { font-size: var(--awd-font-size-body); line-height: var(--awd-line-height-ui); color: var(--awd-panel-text); }
 .is-sidebar .profile-guide { margin-top: 8px; padding: 0; border: 0; background: transparent; }
 .is-sidebar .profile-guide-desc { font-size: var(--awd-panel-fs-meta); line-height: 1.5; }
 .is-sidebar .profile-guide-btn { margin-top: 6px; padding: 3px 10px; }
 .is-sidebar .profile-fields { display: grid; grid-template-columns: 1fr; gap: 0; margin-top: 8px; }
-.is-sidebar .profile-field { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: baseline; gap: 0 8px; min-width: 0; padding: 5px 0; border-bottom: 1px solid var(--awd-border-subtle); }
+.is-sidebar .profile-field { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: baseline; gap: 0 8px; min-width: 0; padding: var(--awd-space-1) 0; border-bottom: 1px solid var(--awd-border-subtle); }
 .is-sidebar .profile-field:last-child { border-bottom: 0; }
 .is-sidebar .profile-field-label { font-size: var(--awd-panel-fs-meta); }
-.is-sidebar .profile-field-value, .is-sidebar .profile-field-input, .is-sidebar .profile-field-picker { font-size: var(--awd-panel-fs); line-height: 18px; margin-top: 0; }
+.is-sidebar .profile-field-value, .is-sidebar .profile-field-input, .is-sidebar .profile-field-picker { font-size: var(--awd-font-size-body); line-height: var(--awd-line-height-ui); margin-top: 0; }
 .is-sidebar .profile-field-hint { grid-column: 2; font-size: var(--awd-panel-fs-meta); }
 @container home-pane (min-width: 360px) {
   .is-sidebar .profile-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }

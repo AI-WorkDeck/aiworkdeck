@@ -3,6 +3,7 @@
 
 package com.checkba.service.sensitive;
 
+import com.checkba.service.LangText;
 import org.w3c.dom.*;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -35,9 +36,9 @@ public final class SensitiveDocx {
                 byte[] bytes = zip.readNBytes(32 * 1024 * 1024 + 1);
                 total += bytes.length;
                 if (bytes.length > 32 * 1024 * 1024 || total > 128 * 1024 * 1024) {
-                    throw new IllegalArgumentException("Word 文件解压后过大，请拆分处理");
+                    throw new IllegalArgumentException(LangText.of("Word 文件解压后过大，请拆分处理", "Word file is too large after decompression; please split it before processing"));
                 }
-                if (entries.putIfAbsent(entry.getName(), bytes) != null) throw new IllegalArgumentException("Word 文件存在重复条目");
+                if (entries.putIfAbsent(entry.getName(), bytes) != null) throw new IllegalArgumentException(LangText.of("Word 文件存在重复条目", "Word file contains duplicate entries"));
                 if (entry.getName().startsWith("word/") && entry.getName().endsWith(".xml")) {
                     Document document = factory.newDocumentBuilder().parse(new ByteArrayInputStream(bytes));
                     documents.put(entry.getName(), document);
@@ -45,17 +46,26 @@ public final class SensitiveDocx {
                     for (int i = 0; i < nodes.getLength(); i++) {
                         List<Node> texts = new ArrayList<>();
                         collect(nodes.item(i), texts, true);
-                        if (!texts.isEmpty()) paragraphs.add(texts);
+                        // Word separators are layout nodes, not text runs. Keep them in
+                        // the XML and end the recognition fragment at each boundary.
+                        List<Node> fragment = new ArrayList<>();
+                        for (Node node : texts) {
+                            if (Set.of("br", "cr", "tab").contains(node.getLocalName())) {
+                                if (!fragment.isEmpty()) paragraphs.add(fragment);
+                                fragment = new ArrayList<>();
+                            } else fragment.add(node);
+                        }
+                        if (!fragment.isEmpty()) paragraphs.add(fragment);
                     }
                 }
             }
         }
-        if (!documents.containsKey("word/document.xml")) throw new IllegalArgumentException("不是有效的 DOCX 文件");
+        if (!documents.containsKey("word/document.xml")) throw new IllegalArgumentException(LangText.of("不是有效的 DOCX 文件", "Not a valid DOCX file"));
     }
 
     private static void collect(Node node, List<Node> texts, boolean root) {
         if (!root && W.equals(node.getNamespaceURI()) && "p".equals(node.getLocalName())) return;
-        if (W.equals(node.getNamespaceURI()) && Set.of("t", "delText", "instrText").contains(node.getLocalName())) {
+        if (W.equals(node.getNamespaceURI()) && Set.of("t", "delText", "instrText", "br", "cr", "tab").contains(node.getLocalName())) {
             texts.add(node);
             return;
         }

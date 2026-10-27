@@ -464,8 +464,8 @@ async function refreshCatalogs() {
     }
   }).catch(() => {})
   fetchSkills(settings).then((list) => {
-    // 只给用户看「已启用且非 disabled 生效方式」的；勾选态剔除已消失的
-    const usable = list.filter((s) => s && s.enabled !== false && s.activation !== 'disabled')
+    // 只给用户看「非内置高频工作流、已启用且非 disabled 生效方式」的；勾选态剔除已消失的
+    const usable = list.filter((s) => s && !s.builtinWorkflow && s.enabled !== false && s.activation !== 'disabled')
     skillList.value = usable
     selectedSkillIds.value = selectedSkillIds.value.filter((id) => usable.some((s) => s.id === id))
   }).catch(() => {})
@@ -1594,7 +1594,9 @@ export async function send(overrideText, sendOpts) {
     }
     if (!activeContext) activeContext = readDocumentMeta()
 
+    const clientRequestId = randomId()
     const buildPayload = (context) => ({
+      clientRequestId,
       projectId: parseInt(projectId, 10),
       conversationId,
       message: prompt,
@@ -1626,20 +1628,28 @@ export async function send(overrideText, sendOpts) {
     try {
       await postChat(settings, buildPayload(activeContext))
     } catch (e) {
-      // chat 与 connect 走的是同一个 canUseConversation（dev-board#715）：连得上不等于
-      // 发得出——SSE 的重连循环把 403 吞在退避里只显示「正在重连」，POST /chat 却当场
-      // 报错，于是用户看到「每条都失败，只有点新对话才恢复」。这里与 connect 同一套自愈：
-      // 换一条会话 → 重发这一条 → 再失败才报错。
-      if (!canHealConversation(e)) throw e
-      console.warn('[Addin] 会话已失效（chat HTTP ' + e.status + '），丢弃并重新签发后重发一次', conversationId)
-      if (!(await renewConversation())) return { needSettings: false }
-      await ensureConnection()
-      // 新会话在后端没有正文缓存：重建 activeContext，让省传退回全文，
-      // 否则重发的这条消息在模型眼里是一份「只有哈希、没有正文」的空上下文
-      let retryContext = activeContext
-      if (read && read.doc) retryContext = buildActiveContext(read.doc, read.hash)
-      await postChat(settings, buildPayload(retryContext))
-      notice.value = t('conversationRenewedNotice')
+      if (e.status === 409 && e.code === 'INLINE_CONTENT_CACHE_MISS'
+          && e.retryWithInlineContent && read?.doc) {
+        // Retry this same send once with the already-read snapshot, without adding bubbles.
+        // The same idempotency key restores a pending inbox snapshot without consuming another turn.
+        if (perfRound) { perfRound.docReused = false; perfRound.docChars = (read.doc.inlineContent || '').length }
+        await postChat(settings, buildPayload({ ...read.doc, inlineContentHash: read.hash }))
+      } else {
+        // chat 与 connect 走的是同一个 canUseConversation（dev-board#715）：连得上不等于
+        // 发得出——SSE 的重连循环把 403 吞在退避里只显示「正在重连」，POST /chat 却当场
+        // 报错，于是用户看到「每条都失败，只有点新对话才恢复」。这里与 connect 同一套自愈：
+        // 换一条会话 → 重发这一条 → 再失败才报错。
+        if (!canHealConversation(e)) throw e
+        console.warn('[Addin] 会话已失效（chat HTTP ' + e.status + '），丢弃并重新签发后重发一次', conversationId)
+        if (!(await renewConversation())) return { needSettings: false }
+        await ensureConnection()
+        // 新会话在后端没有正文缓存：重建 activeContext，让省传退回全文，
+        // 否则重发的这条消息在模型眼里是一份「只有哈希、没有正文」的空上下文
+        let retryContext = activeContext
+        if (read && read.doc) retryContext = buildActiveContext(read.doc, read.hash)
+        await postChat(settings, buildPayload(retryContext))
+        notice.value = t('conversationRenewedNotice')
+      }
     }
     // 消息已被后端收下 = 这条会话从此有落库消息，后续 403 不再是「已失效」
     conversationPersisted = true

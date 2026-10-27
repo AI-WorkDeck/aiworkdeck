@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // 编辑器工具栏的两条布局契约（dev-board#502 / #503）。都是「不跑引擎也能红」的
 // 结构断言——真机那一层的证据在下面各自的说明里。
 //
@@ -129,6 +131,9 @@ test('横滚仍然能用（滚轮映射成横向），且是原生挂在真实�
 test('主命令区与右侧常驻区在同一行里居中对齐', () => {
   assert.ok(declares('etb', 'align-items', 'center'), '.etb 丢了 align-items:center')
   assert.ok(declares('etb', 'height', '38px'), '.etb 的行高被改了；两侧对齐是按这一行的高度算的')
+  // 外层只居中 wrap；wrap 内也要居中，否则真实 H5 中左侧仍贴顶、高出右侧 6px。
+  assert.ok(declares('etb-scroll-wrap', 'display', 'flex'), '.etb-scroll-wrap 必须建立内部 flex 对齐（dev-board#1443）')
+  assert.ok(declares('etb-scroll-wrap', 'align-items', 'center'), '.etb-scroll-wrap 内部未居中，左侧按钮会贴顶')
   // .etb-scroll 的定高只许跟着 .etb 那一行走——写死像素或写满 100%，
   // 都会在有/没有滑轨的两种情况里各偏（见上面那条）。
   const h = rulesFor('etb-scroll').map((b) => /(?:^|;)\s*height\s*:\s*([^;]+)/.exec(b)).find(Boolean)

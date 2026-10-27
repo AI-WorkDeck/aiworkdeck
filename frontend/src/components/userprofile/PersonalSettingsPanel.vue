@@ -178,23 +178,12 @@
       <!-- 界面语言。2026-08-18 从设置页「系统配置」搬来：语言是每个人自己的
            偏好（storage 权威源、人人可改、不要 admin 权限）。
            独立保存链（setAppLanguage 直写），与本栏其它字段无关。 -->
-      <SettingsSection :title="appLanguage === 'en-US' ? 'Language' : '语言 / Language'">
+      <SettingsSection :title="$t('account.languageGroupTitle')">
         <text class="bind-tip">
-          {{ appLanguage === 'en-US'
-            ? 'Applies to the interface, document editor, and AI replies. Newly opened editors use the new language; restart the app for full effect.'
-            : '作用于界面、文档编辑器与 AI 回复。新打开的编辑器使用新语言，重启应用后完全生效。' }}
+          {{ $t('account.languageGroupHint') }}
         </text>
         <view class="lang-row">
-          <view
-            v-for="opt in appLanguageOptions"
-            :key="opt.value"
-            class="lang-item"
-            :class="{ checked: appLanguage === opt.value }"
-            @tap="onAppLanguagePick(opt.value)"
-          >
-            <view class="lang-dot"></view>
-            <text class="lang-label">{{ opt.label }}</text>
-          </view>
+          <LanguagePicker @change="onAppLanguageChange" />
         </view>
       </SettingsSection>
 
@@ -222,18 +211,20 @@ import { submittedInputValue } from '@/utils/identityProfile.js'
 import { getDocumentGeneratorSettings, updateDocumentGeneratorSettings } from '@/services/api.js'
 import { resetDocumentStampCache } from '@/utils/documentGeneratorSetting.js'
 import AwdSwitch from '@/components/AwdSwitch.vue'
+import LanguagePicker from '@/components/LanguagePicker.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
 import { isDesktopHost } from '@/services/host.js'
 import { getCurrentUser, setSessionUser } from '@/utils/auth.js'
 import { signOut } from '@/utils/signOut.js'
-import { getAppLanguage, setAppLanguage } from '@/utils/appLanguage.js'
+import { getAppLanguage, setAppLanguage, getLocaleEntry, LOCALE_REGISTRY } from '@/utils/appLanguage.js'
+import { applyI18nLocale } from '@/i18n/index.js'
 import { getInitial } from '@/utils/textInitial.js'
 import { shouldAcceptResponse } from '@/utils/requestGeneration.js'
 
 export default {
   name: 'PersonalSettingsPanel',
-  components: { AwdSwitch, SettingsSection, SettingsRow },
+  components: { AwdSwitch, LanguagePicker, SettingsSection, SettingsRow },
   computed: {
     isDesktop() {
       return isDesktopHost()
@@ -275,10 +266,10 @@ export default {
       // 界面语言：读写走 utils/appLanguage.js（storage 权威源 + App.vue 镜像同步）。
       // 选项标签用各自母语，刻意不随语言翻译。
       appLanguage: getAppLanguage(),
-      appLanguageOptions: [
-        { value: 'zh-CN', label: '简体中文' },
-        { value: 'en-US', label: 'English' },
-      ],
+      appLanguageOptions: (Array.isArray(LOCALE_REGISTRY) ? LOCALE_REGISTRY : []).map((entry) => ({
+        value: entry.code,
+        label: entry.nativeName,
+      })),
 
       // 文档属性里的产品标识（B4）：默认按「开」渲染，拉到后端值再纠正——
       // 缺省就是开，先画成关会在加载瞬间闪一下。
@@ -595,19 +586,19 @@ export default {
     handleLogout() {
       signOut()
     },
-    onAppLanguagePick(value) {
-      if (value === this.appLanguage) return
-      this.appLanguage = setAppLanguage(value)
+    onAppLanguageChange({ resolved } = {}) {
+      this.appLanguage = resolved || getAppLanguage()
+      const entry = getLocaleEntry(this.appLanguage)
       uni.showToast({
-        title: this.appLanguage === 'en-US' ? 'Switching to English…' : '正在切换为简体中文…',
+        title: this.$t('account.languageSwitchedToast', { lang: entry.nativeName }),
         icon: 'none',
       })
-      // 整页 reload：i18n 单例的 locale、config 模块顶层取值的静态 label、
-      // LOWA 编辑器 uilang 全部随之重建。延迟给 App.vue 的镜像同步
-      //（主进程 IPC + 后端 POST）留出发出的窗口。
-      setTimeout(() => {
-        try { window.location.reload() } catch (e) { /* 非浏览器环境忽略 */ }
-      }, 600)
+    },
+    onAppLanguagePick(value) {
+      if (value === this.appLanguage) return
+      const resolved = setAppLanguage(value)
+      applyI18nLocale(resolved)
+      this.onAppLanguageChange({ resolved })
     },
     async toggleTotpPanel() {
       if (this.totpBusy) return // startSetup 在飞期间禁用，防止二次点击触发并发请求
@@ -817,17 +808,15 @@ export default {
 <style lang="scss" scoped>
 @import '@/components/settings/settings.scss';
 
-$brand-dark: #221F1A;
-$text-secondary: var(--awd-text-2);
-
 .panel-settings {
+  --awd-font-size-avatar: 20px;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
 }
 
 .form-value {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   font-weight: 500;
 }
@@ -836,12 +825,12 @@ $text-secondary: var(--awd-text-2);
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: $brand-dark;
+  background: var(--awd-accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #EDE9DF;
-  font-size: 20px;
+  color: var(--awd-text-on-accent);
+  font-size: var(--awd-font-size-avatar);
   overflow: hidden;
   flex-shrink: 0;
 
@@ -857,7 +846,7 @@ $text-secondary: var(--awd-text-2);
 .form-error {
   display: block;
   margin-top: 6px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-danger-text);
 }
 
@@ -866,13 +855,13 @@ $text-secondary: var(--awd-text-2);
   margin-bottom: 12px;
   padding: 8px 12px;
   border: 1px solid var(--awd-accent-soft);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-accent-wash);
   cursor: pointer;
 }
 
 .name-nudge-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 18px;
   color: var(--awd-text);
 }
@@ -922,14 +911,14 @@ $text-secondary: var(--awd-text-2);
 }
 
 .lang-label {
-    font-size: 14px;
+    font-size: var(--awd-font-size-body);
     color: var(--awd-text);
 }
 
 /* 手机号 / 邮箱 / 认证器绑定 */
 .bind-link {
     color: var(--awd-accent-text);
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     margin-left: 12px;
     cursor: pointer;
 }
@@ -940,23 +929,23 @@ $text-secondary: var(--awd-text-2);
 }
 .bind-input {
     flex: 1;
-    height: 36px;
+    height: var(--awd-control-height);
     border: 1px solid var(--awd-border);
-    border-radius: 6px;
+    border-radius: var(--awd-radius-md);
     padding: 0 10px;
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     background: var(--awd-surface);
 }
 .btn-send-code {
-    height: 36px;
-    line-height: 34px;
+    height: var(--awd-control-height);
+    line-height: calc(var(--awd-control-height) - 2px);
     margin-left: 8px;
     padding: 0 12px;
     border: 1px solid var(--awd-border);
-    border-radius: 6px;
+    border-radius: var(--awd-radius-md);
     background: var(--awd-surface);
     color: var(--awd-text);
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     cursor: pointer;
 
     &[disabled] {
@@ -970,24 +959,24 @@ $text-secondary: var(--awd-text-2);
     margin-top: 10px;
 }
 .btn-bind-confirm {
-    height: 36px;
-    line-height: 36px;
+    height: var(--awd-control-height);
+    line-height: var(--awd-control-height);
     padding: 0 18px;
-    border-radius: 6px;
+    border-radius: var(--awd-radius-md);
     background: var(--awd-accent);
     color: var(--awd-text-on-accent);
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     cursor: pointer;
 }
 .bind-tip {
     display: block;
     margin-top: 8px;
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     color: var(--awd-text-2);
 }
 .token-meta {
     margin-top: 2px;
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     color: var(--awd-text-2);
 }
 .totp-qr {
@@ -995,12 +984,12 @@ $text-secondary: var(--awd-text-2);
     margin: 10px 0;
     background: var(--awd-surface);
     border: 1px solid var(--awd-border);
-    border-radius: 6px;
+    border-radius: var(--awd-radius-md);
 }
 .totp-secret {
     flex: 1;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     letter-spacing: 1px;
     color: var(--awd-text);
     word-break: break-all;

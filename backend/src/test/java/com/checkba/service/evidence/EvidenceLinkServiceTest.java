@@ -72,6 +72,7 @@ class EvidenceLinkServiceTest {
     FileTagRepository fileTags = mock(FileTagRepository.class);
     ProjectMemberService members = mock(ProjectMemberService.class);
     EvidenceLinkService svc;
+    com.checkba.service.ProjectFileAccessService fileAccess = mock(com.checkba.service.ProjectFileAccessService.class);
 
     /** 所有 targets.save 过的对象，供 view() 回读。 */
     List<EvidenceLinkTarget> savedTargets = new ArrayList<>();
@@ -79,7 +80,7 @@ class EvidenceLinkServiceTest {
 
     @BeforeEach
     void setUp() {
-        svc = new EvidenceLinkService(links, targets, files, fileTags, members, new ObjectMapper());
+        svc = new EvidenceLinkService(links, targets, files, fileTags, members, new ObjectMapper(), fileAccess);
         when(members.hasReadPermission(1L, 9L)).thenReturn(true);
         when(members.hasWritePermission(1L, 9L)).thenReturn(true);
         when(links.save(any())).thenAnswer(inv -> {
@@ -202,15 +203,57 @@ class EvidenceLinkServiceTest {
     }
 
     @Test
-    @DisplayName("create：relation / method 不在白名单 → 拒绝")
+    @DisplayName("create：非法关系、过长标签、置信度越界 → 拒绝")
     void createRejectsBadRelationOrMethod() {
         assertThrows(IllegalArgumentException.class, () -> svc.create(9L, 1L, 10L, null, "x", null, null, "human",
                 List.of(new TargetInput(11L, null, "maybe", null, null, null))));
         assertThrows(IllegalArgumentException.class, () -> svc.create(9L, 1L, 10L, null, "x", null, null, "human",
-                List.of(new TargetInput(11L, null, null, "guess", null, null))));
+                List.of(new TargetInput(11L, null, null, "字".repeat(33), null, null))));
         assertThrows(IllegalArgumentException.class, () -> svc.create(9L, 1L, 10L, null, "x", null, null, "human",
                 List.of(new TargetInput(11L, null, null, null, (short) 101, null))));
         verify(links, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create / addTargets：自定义标签去首尾空格，保留完整32字符与原五种标签")
+    void createAndAddTargetsAcceptCustomAndBuiltInMethods() {
+        for (String method : EvidenceLinkTarget.METHODS) {
+            LinkView v = svc.create(9L, 1L, 10L, null, "x", null, null, "human",
+                    List.of(new TargetInput(11L, null, null, method, null, null)));
+            assertEquals(method, v.targets().get(v.targets().size() - 1).method());
+        }
+        LinkView custom = svc.create(9L, 1L, 10L, "EVID_CUSTOM", "x", null, null, "human",
+                List.of(new TargetInput(11L, null, null, "  原件核对  ", null, null)));
+        assertEquals("原件核对", custom.targets().get(custom.targets().size() - 1).method());
+
+        existing("EVID_CUSTOM", "active", "x");
+        String maximumLength = "字".repeat(32);
+        LinkView added = svc.addTargets(9L, 1L, "EVID_CUSTOM",
+                List.of(new TargetInput(12L, null, null, " " + maximumLength + " ", null, null)), "human");
+        assertEquals(maximumLength, added.targets().get(added.targets().size() - 1).method());
+    }
+
+    @Test
+    @DisplayName("create / addTargets：所有标签先校验，控制字符和过长标签不产生部分写入")
+    void createAndAddTargetsRejectInvalidMethodsBeforeSaving() {
+        existing("EVID_A", "active", "x");
+        for (String method : List.of("字".repeat(33), "原件\n核对", "\t原件", "原件\u0000", "原件\u007f")) {
+            List<TargetInput> batch = List.of(target(11L, null), new TargetInput(12L, null, null, method, null, null));
+            assertThrows(IllegalArgumentException.class,
+                    () -> svc.create(9L, 1L, 10L, null, "x", null, null, "human", batch));
+            assertThrows(IllegalArgumentException.class,
+                    () -> svc.addTargets(9L, 1L, "EVID_A", batch, "human"));
+        }
+        verify(links, never()).save(any());
+        verify(targets, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create：空白标签仍存为null")
+    void createStoresBlankMethodAsNull() {
+        LinkView v = svc.create(9L, 1L, 10L, null, "x", null, null, "human",
+                List.of(new TargetInput(11L, null, null, "  ", null, null)));
+        assertNull(v.targets().get(0).method());
     }
 
     @Test
@@ -306,6 +349,42 @@ class EvidenceLinkServiceTest {
                 () -> svc.updateTarget(9L, 1L, 7L, new TargetInput(null, null, "maybe", null, null, null)));
         assertThrows(IllegalArgumentException.class,
                 () -> svc.updateTarget(9L, 2L, 7L, new TargetInput(null, null, null, "interview", null, null)));
+    }
+
+    @Test
+    @DisplayName("updateTarget：自定义标签可更新；null不改，空字符串清空")
+    void updateTargetAcceptsCustomMethodAndPreservesPatchSemantics() {
+        EvidenceLink l = existing("EVID_A", "active", "x");
+        EvidenceLinkTarget t = new EvidenceLinkTarget();
+        t.setId(7L); t.setLinkId(100L); t.setFileId(11L); t.setMethod("written_review");
+        when(targets.findById(7L)).thenReturn(Optional.of(t));
+        when(links.findById(100L)).thenReturn(Optional.of(l));
+
+        assertEquals("原件核对", svc.updateTarget(9L, 1L, 7L,
+                new TargetInput(null, null, null, "  原件核对  ", null, null)).method());
+        assertEquals("原件核对", svc.updateTarget(9L, 1L, 7L,
+                new TargetInput(null, null, null, null, null, "备注")).method());
+        assertNull(svc.updateTarget(9L, 1L, 7L,
+                new TargetInput(null, null, null, "", null, null)).method());
+        assertNull(svc.updateTarget(9L, 1L, 7L,
+                new TargetInput(null, null, null, "  ", null, null)).method());
+    }
+
+    @Test
+    @DisplayName("updateTarget：非法标签保留旧值，不静默截断或落库")
+    void updateTargetRejectsInvalidMethodWithoutChangingExistingValue() {
+        EvidenceLink l = existing("EVID_A", "active", "x");
+        EvidenceLinkTarget t = new EvidenceLinkTarget();
+        t.setId(7L); t.setLinkId(100L); t.setFileId(11L); t.setMethod("written_review");
+        when(targets.findById(7L)).thenReturn(Optional.of(t));
+        when(links.findById(100L)).thenReturn(Optional.of(l));
+
+        for (String method : List.of("字".repeat(33), "原件\n核对", "\t原件", "原件\u0000", "原件\u007f")) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> svc.updateTarget(9L, 1L, 7L, new TargetInput(null, null, null, method, null, null)));
+            assertEquals("written_review", t.getMethod());
+        }
+        verify(targets, never()).save(any());
     }
 
     @Test
@@ -592,4 +671,23 @@ class EvidenceLinkServiceTest {
         assertThrows(IllegalArgumentException.class, () -> EvidenceLinkService.locatorHash("42"));
         assertThrows(IllegalArgumentException.class, () -> EvidenceLinkService.locatorHash("null"));
     }
+
+    @Test void globalClientCannotReadDerivedEvidenceExcerptsThroughAnyReadView() {
+        var users = mock(com.checkba.repository.UserRepository.class);
+        var customer = new com.checkba.model.entity.User(); customer.setRole("CLIENT");
+        when(users.findById(9L)).thenReturn(Optional.of(customer));
+        fileAccess = new com.checkba.service.ProjectFileAccessService(members, users, files);
+        svc = new EvidenceLinkService(links, targets, files, fileTags, members, new ObjectMapper(), fileAccess);
+        for (Runnable read : List.<Runnable>of(
+                () -> svc.getByKey(9L, 1L, "private-anchor"),
+                () -> svc.listByDoc(9L, 1L, 10L, null, null),
+                () -> svc.listByFile(9L, 1L, 10L),
+                () -> svc.listByParty(9L, 1L, 10L, 20L))) {
+            assertEquals(com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE,
+                    assertThrows(IllegalArgumentException.class, read::run).getMessage());
+        }
+        verify(links, never()).findByProjectIdAndLinkKey(anyLong(), any());
+        verify(targets, never()).findByFileId(anyLong());
+    }
+
 }

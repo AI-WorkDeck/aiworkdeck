@@ -12,11 +12,14 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import org.apache.poi.xslf.usermodel.XMLSlideShow;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.util.Locale;
 
 /**
  * 本地文件系统存储服务实现
@@ -28,6 +31,8 @@ public class LocalFileStorageService implements StorageService {
 
     private final ProjectStorageResolver storageResolver;
     private final Path templateDoc;
+    @Autowired(required = false)
+    private com.checkba.service.DdOriginalGuard ddOriginalGuard;
 
     @Autowired
     public LocalFileStorageService(ProjectStorageResolver storageResolver) {
@@ -39,8 +44,13 @@ public class LocalFileStorageService implements StorageService {
     @Override
     public String save(String fileId, InputStream inputStream) throws StorageException {
         Path filePath = resolveFilePath(fileId);
+        requireMutable(fileId, filePath);
         
         try {
+            if (storageResolver.isExternalFileKey(fileId)) {
+                saveExternal(fileId, filePath, inputStream, false);
+                return fileId;
+            }
             // 确保父目录存在
             Files.createDirectories(filePath.getParent());
             
@@ -89,9 +99,24 @@ public class LocalFileStorageService implements StorageService {
         if (Files.exists(filePath)) {
             return;
         }
+        requireMutable(fileId, filePath);
+        if (storageResolver.isExternalFileKey(fileId)) throw new StorageException("原文件已不存在，请重新打开文件");
         try {
             Files.createDirectories(filePath.getParent());
-            if (Files.exists(templateDoc)) {
+            String fileName = filePath.getFileName().toString().toLowerCase(Locale.ROOT);
+            if (fileName.endsWith(".xlsx")) {
+                try (XSSFWorkbook workbook = new XSSFWorkbook();
+                     OutputStream out = Files.newOutputStream(filePath)) {
+                    workbook.createSheet("Sheet1");
+                    workbook.write(out);
+                }
+            } else if (fileName.endsWith(".pptx")) {
+                try (XMLSlideShow presentation = new XMLSlideShow();
+                     OutputStream out = Files.newOutputStream(filePath)) {
+                    presentation.createSlide();
+                    presentation.write(out);
+                }
+            } else if (Files.exists(templateDoc)) {
                 Files.copy(templateDoc, filePath, StandardCopyOption.REPLACE_EXISTING);
                 log.info("从模板创建新文件: fileId={}, path={}", fileId, filePath);
             } else {
@@ -111,7 +136,9 @@ public class LocalFileStorageService implements StorageService {
 
     @Override
     public void delete(String fileId) throws StorageException {
+        rejectExternalStructureChange(fileId);
         Path filePath = resolveFilePath(fileId);
+        requireMutable(fileId, filePath);
         
         try {
             if (Files.exists(filePath)) {
@@ -128,6 +155,10 @@ public class LocalFileStorageService implements StorageService {
 
     @Override
     public void moveNew(String fromId, String toId) throws StorageException {
+        rejectExternalStructureChange(fromId);
+        rejectExternalStructureChange(toId);
+        requireMutable(fromId, resolveFilePath(fromId));
+        requireMutable(toId, resolveFilePath(toId));
         try {
             Path target = resolveFilePath(toId);
             Files.createDirectories(target.getParent());
@@ -147,8 +178,12 @@ public class LocalFileStorageService implements StorageService {
     /** 原子 move（同卷）：覆盖式落盘的收尾步。ATOMIC_MOVE 不支持时退化为普通 REPLACE move。 */
     @Override
     public void move(String fromId, String toId) throws StorageException {
+        rejectExternalStructureChange(fromId);
+        rejectExternalStructureChange(toId);
         Path from = resolveFilePath(fromId);
         Path to = resolveFilePath(toId);
+        requireMutable(fromId, from);
+        requireMutable(toId, to);
         try {
             Files.createDirectories(to.getParent());
             try {
@@ -172,11 +207,53 @@ public class LocalFileStorageService implements StorageService {
         return storageResolver.resolve(relative);
     }
 
+    private void requireMutable(String key, Path path) {
+        if (ddOriginalGuard != null) ddOriginalGuard.requireMutablePath(key, path);
+    }
+
+    private void rejectExternalStructureChange(String key) {
+        if (storageResolver.isExternalFileKey(key)) throw new StorageException(
+                "独立文件请在 Finder 或资源管理器中移动、改名或删除");
+    }
+
+    /** Finish reading the upload before replacing the original; failed input leaves it untouched. */
+    private void saveExternal(String key, Path original, InputStream input, boolean append) throws IOException {
+        if (!Files.isRegularFile(original) || !Files.isWritable(original)) {
+            throw new IOException("原文件已不存在或不可写");
+        }
+        // Existing watcher and Git rules both exclude Office's ~$ prefix.
+        Path pending = Files.createTempFile(original.getParent(), "~$awd-save-", ".tmp");
+        try {
+            var posix = Files.getFileAttributeView(original, java.nio.file.attribute.PosixFileAttributeView.class);
+            if (posix != null) Files.setPosixFilePermissions(pending, posix.readAttributes().permissions());
+            try (OutputStream out = Files.newOutputStream(pending)) {
+                if (append) Files.copy(original, out);
+                input.transferTo(out);
+            }
+            // An external rename/deletion while uploading must not resurrect the old path.
+            if (!resolveFilePath(key).equals(original) || !Files.isRegularFile(original)) {
+                throw new IOException("原文件位置已变化，请重新打开文件");
+            }
+            try {
+                Files.move(pending, original, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(pending, original, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(pending);
+        }
+    }
+
     @Override
     public String append(String fileId, InputStream inputStream) throws StorageException {
         Path filePath = resolveFilePath(fileId);
+        requireMutable(fileId, filePath);
 
         try {
+            if (storageResolver.isExternalFileKey(fileId)) {
+                saveExternal(fileId, filePath, inputStream, true);
+                return fileId;
+            }
             // 确保父目录存在
             if (!Files.exists(filePath.getParent())) {
                 Files.createDirectories(filePath.getParent());

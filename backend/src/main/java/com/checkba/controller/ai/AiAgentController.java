@@ -39,6 +39,29 @@ public class AiAgentController {
     private final com.checkba.service.ai.subagent.SubAgentService subAgentService;
     private final com.checkba.service.ai.AgentInboxService agentInboxService;
     private final com.checkba.service.ai.ChatModelFactory chatModelFactory;
+    private final com.checkba.service.ProjectFileAccessService fileAccess;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.service.ai.InlineContentCache inlineContentCache;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @org.springframework.beans.factory.annotation.Qualifier("taskExecutor")
+    private java.util.concurrent.Executor taskExecutor;
+
+    private static final java.util.concurrent.ExecutorService FALLBACK_PPT_EXECUTOR =
+            new java.util.concurrent.ThreadPoolExecutor(
+                    1, 4, 60L, java.util.concurrent.TimeUnit.SECONDS,
+                    new java.util.concurrent.LinkedBlockingQueue<>(64),
+                    r -> {
+                        Thread t = new Thread(r, "ppt-gen-worker");
+                        t.setDaemon(true);
+                        return t;
+                    },
+                    new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
+
+    private java.util.concurrent.Executor pptExecutor() {
+        return taskExecutor != null ? taskExecutor : FALLBACK_PPT_EXECUTOR;
+    }
 
     @org.springframework.beans.factory.annotation.Autowired
     public AiAgentController(SseEmitterService sseEmitterService,
@@ -52,7 +75,8 @@ public class AiAgentController {
                             com.checkba.service.ai.ClientCapabilityService clientCapabilityService,
                             com.checkba.service.ai.subagent.SubAgentService subAgentService,
                             com.checkba.service.ai.AgentInboxService agentInboxService,
-                            com.checkba.service.ai.ChatModelFactory chatModelFactory) {
+                            com.checkba.service.ai.ChatModelFactory chatModelFactory,
+                            com.checkba.service.ProjectFileAccessService fileAccess) {
         this.sseEmitterService = sseEmitterService;
         this.agentOrchestrator = agentOrchestrator;
         this.messageService = messageService;
@@ -65,6 +89,7 @@ public class AiAgentController {
         this.subAgentService = subAgentService;
         this.agentInboxService = agentInboxService;
         this.chatModelFactory = chatModelFactory;
+        this.fileAccess = fileAccess;
     }
 
     /**
@@ -158,10 +183,15 @@ public class AiAgentController {
         // ToolRegistry 把 projectId 强制注入工具参数只挡得住 LLM，挡不住 HTTP 调用方，
         // 于是「按项目隔离」的工具反而成了跨租户读写别家文档的入口
         if (userId == null) {
-            return chatError(401, "请先登录");
+            return chatError(401, LangText.of("请先登录", "Please sign in first"));
         }
         if (request.getProjectId() == null || !projectMemberService.hasReadPermission(request.getProjectId(), userId)) {
             return chatError(403, LangText.of("无权访问该项目", "You do not have access to this project"));
+        }
+        // The full workbench includes project-wide disk and Python tools. Customers use the
+        // DD/IM file access paths; a file-level grant does not grant this staff tool workspace.
+        if (fileAccess.isClient(request.getProjectId(), userId)) {
+            return chatError(403, com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE);
         }
         if (!canUseConversation(request.getConversationId(), userId)) {
             return chatError(403, LangText.of("无权操作该会话", "You do not have permission for this conversation"));
@@ -180,10 +210,21 @@ public class AiAgentController {
             return chatError(400, LangText.of("消息内容不能为空", "Message cannot be empty"));
         }
 
+        // Resolve before inbox persistence or model execution. A retry must not duplicate a turn.
+        try {
+            if (request.getContextItems() != null) {
+                for (ContextItem item : request.getContextItems()) {
+                    restoreInlineContent(request.getConversationId(), item, false);
+                }
+            }
+            restoreInlineContent(request.getConversationId(), request.getActiveContext(), true);
+        } catch (com.checkba.service.ai.InlineContentCache.CacheMiss e) {
+            return inlineContentCacheMiss();
+        }
         chatModelFactory.ensurePaidAccess(userId);
 
-        log.info("Received Agent Chat Request: project={}, conversation={}, mode={}, msg={}",
-                request.getProjectId(), request.getConversationId(), request.getAgentMode(), request.getMessage());
+        log.info("Received Agent Chat Request: project={}, conversation={}, mode={}, messageChars={}",
+                request.getProjectId(), request.getConversationId(), request.getAgentMode(), request.getMessage().length());
 
         // 会话级客户端能力登记（Phase C）：lowa（默认，主前端）/ office（Office 插件）/ none（纯对话）；
         // office 会话再按宿主细分（word / excel / powerpoint，缺省 word），工具可见性按宿主过滤
@@ -196,9 +237,33 @@ public class AiAgentController {
             // item to avoid a duplicate user bubble; later steering/auto-drain claims do emit it.
             String activeRunId = agentOrchestrator.acceptInboxSubmission(item.getId(), false);
             return ResponseEntity.ok(agentInboxService.receipt(item, activeRunId));
+        } catch (com.checkba.service.ai.AgentInboxService.InlineContentUnavailable e) {
+            return inlineContentCacheMiss();
+        } catch (SecurityException e) {
+            return chatError(403, e.getMessage());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(java.util.Map.of("status", "error", "message", e.getMessage()));
         }
+    }
+
+    private static ResponseEntity<?> inlineContentCacheMiss() {
+        return ResponseEntity.status(409).body(java.util.Map.of(
+                "status", "error", "code", "INLINE_CONTENT_CACHE_MISS", "retryWithInlineContent", true,
+                "message", LangText.of("文档正文缓存已失效，请重新发送全文", "Document content expired; resend the full content")));
+    }
+
+    private void restoreInlineContent(String conversationId, ContextItem item, boolean active) {
+        if (item == null) return;
+        String body = item.getInlineContent();
+        String key = active ? null : "attachment:" + java.util.Objects.toString(item.getId(), "");
+        if ((body == null || body.isEmpty()) && item.getInlineContentHash() != null
+                && !item.getInlineContentHash().isBlank()) {
+            body = inlineContentCache.get(conversationId, key, item.getInlineContentHash());
+            if (body == null) throw new com.checkba.service.ai.InlineContentCache.CacheMiss();
+            item.setInlineContent(body);
+        }
+        // Preserve whole content and its server-computed hash, never a model-budget prefix.
+        if (body != null && !body.isEmpty()) inlineContentCache.put(conversationId, key, body);
     }
 
     private static ResponseEntity<?> chatError(int status, String message) {
@@ -380,9 +445,11 @@ public class AiAgentController {
         Long userId = AuthController.getUserIdFromSession(sessionId);
         // 越权校验：此前未登录会顶着写死的 10001 号用户往请求体给定的项目里写文件
         if (userId == null) {
-            return ResponseEntity.status(401).body("{\"status\":\"error\", \"message\":\"请先登录\"}");
+            return ResponseEntity.status(401).body("{\"status\":\"error\", \"message\":\"" +
+                    LangText.of("请先登录", "Please sign in first") + "\"}");
         }
-        if (request.getProjectId() == null || !projectMemberService.hasWritePermission(request.getProjectId(), userId)) {
+        if (request.getProjectId() == null || !projectMemberService.hasWritePermission(request.getProjectId(), userId)
+                || fileAccess.isClient(request.getProjectId(), userId)) {
             return ResponseEntity.status(403).body("{\"status\":\"error\", \"message\":\"" +
                     LangText.of("无权写入该项目", "You do not have write access to this project") + "\"}");
         }
@@ -419,7 +486,7 @@ public class AiAgentController {
                                 cn.hutool.json.JSONUtil.toJsonStr(com.checkba.service.account.AccountRequired.envelope(e)));
                     }
                 }
-            }));
+            }), pptExecutor());
 
         return ResponseEntity.ok().body("{\"status\":\"ok\", \"message\":\"PPT generation started\"}");
     }
@@ -675,9 +742,29 @@ public class AiAgentController {
          * 模型会拿着改动之前的版本给结论。置 true 即只带壳，让模型走编辑器桥读实时正文。
          */
         private boolean staleBody;
+        /**
+         * 可选：用户在当前活跃文档中选中的文本片段（dev-board#1430）。
+         * 非空时注入 volatileText 的 <active_selection> 并追加末位提醒，
+         * 让模型直接针对该选区就地修订或解释，无需先花一轮工具调用去探测选区。
+         */
+        private String selectionText;
+
+        /** 可选（dev-board#1479）：附件来自其他项目时的跨项目只读引用标注。 */
+        private Long projectId;
+        private String projectName;
+        private Boolean readOnly;
+
+        public Long getProjectId() { return projectId; }
+        public void setProjectId(Long projectId) { this.projectId = projectId; }
+        public String getProjectName() { return projectName; }
+        public void setProjectName(String projectName) { this.projectName = projectName; }
+        public Boolean getReadOnly() { return readOnly; }
+        public void setReadOnly(Boolean readOnly) { this.readOnly = readOnly; }
 
         public boolean isStaleBody() { return staleBody; }
         public void setStaleBody(boolean staleBody) { this.staleBody = staleBody; }
+        public String getSelectionText() { return selectionText; }
+        public void setSelectionText(String selectionText) { this.selectionText = selectionText; }
 
         public String getId() { return id; }
         public void setId(String id) { this.id = id; }

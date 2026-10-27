@@ -450,10 +450,14 @@ cd frontend && npm run build:h5 && npm run build:zetaoffice   # 改 editor-main.
 ## 即时审校（dev-board#547）
 
 `POST /api/projects/{projectId}/insight/review` 接收当前未保存的正文段落
-`{docFileId, paragraphs:[{index,text}], deep, truncated}`，返回
+`{docFileId, paragraphs:[{index,text,numbering?}], deep, truncated}`，返回
 `{findings, summary, truncated, scope:"body", deep}`。段落 index 为 0 基；finding 带当前段落全文
 `expectedParagraph` 和定位区间，宿主必须按同一编辑器 revision 接收结果，过期响应直接丢弃。
 
+- 编号元数据（dev-board#1176）透传 `numbering:{available,label,listId,level,hasLabel}`，含义见 ai-doc-bridge。
+  `summary.numberingKnownParagraphs/numberingUnknownParagraphs` 分别统计已读取/未知覆盖，不把失败当“无列表”。
+  宿主规则缓存包含编号元数据，正文不变但标签/列表/层级变化也重查；模型去重仍只看实际发送的正文，单改编号不增加自动 AI 调用。
+  自动标签不拼入 `text/expectedParagraph/quote`，重复前缀与自动/手写混用只报疑点供核对，不自动修改。
 - `deep:false` 只运行 `ContractStructureAudit` 的字形、编号、交叉引用、待定内容、同段算术规则，
   以及 `DocInsightChecks.usccIssues`。不调模型、不查外部库、不写 insight run/entity/finding 表。
 - `deep:true` 只能由有写权限的用户点击“深入审校”触发：辅助模型在一次分块调用中抽取 claims
@@ -511,3 +515,18 @@ cd backend && mvn clean test                      # 全量（跨类常量内联�
 - `startParse` 投递异步任务前、`review(deep=true)` 调模型前调用 `ChatModelFactory.ensurePaidAccess(userId)`；账户错误保留结构化响应，不降级成“部分完成”。异步解析每个抽取块重新经模型工厂检查账户与余额；中途账户失败停止后续块及外部检索，不按普通坏输出跳过后继续收费。`deep=false` 仍纯本地，不要求账户或余额。
 - `lookupSelection` 在参数与项目权限校验后、读取检索凭证前检查平台账户；非 DOC 的 `refreshEntity` 同样检查。显式查询遇到 NOT_CONNECTED / UNAUTHORIZED / NO_CREDITS 必须向 HTTP 层抛出，让前端显示登录或充值框，不能只落一条“未配置 Key”说明。批量解析的实体失败仍保留逐条结果。
 - `ExternalProviderResolver` 在官方桌面运行时把付费服务固定到平台网关，防止历史 BYOK 或非法 LOCAL 档绕过账户；仅本地 ASR 保留 LOCAL。TTS、本地审校、DOC 项目内文件匹配不产生平台费用，不受此限制。
+
+## 法条选区查询与企查查模糊匹配提示（dev-board#1289/#1290，2026-10-15）
+
+- **北大法宝返回形状与选区拆分（#1289）**：`get_article`/`search_article` 将条号与条文正文合并在 `article` 字段（无独立 `content` 字段），`get_law_list` 返回挂在大写 `Data` 键下；前端 `insightDetail.js` 与 `completionDetails.js` 兼容 `article`/`Data`/`Title`/`TimelinessDic` 字段解析。后端 `DocInsightService` 拒绝把 `{"title":null,"article":""}` 空壳对象判为 `OK`，在 `get_article` 返回空壳时继续回退 `search_article`；支持无书名号法条、条号附带款/项后缀归一化及结合上下文自动关联最近法规名。
+- **企查查模糊匹配与名称纠错提示（#1290）**：精确查询未命中时走企查查模糊检索（兼容自备 Key 与平台网关），择优匹配候选企业；当登记全称与原查询词不一致时，保留并透传模糊匹配提示（指明未精确命中原词、已模糊匹配至工商登记全称、提醒核对正文企业名称是否缺漏字），在选区查询资料卡与依据窗格顶部显著展示。
+
+
+## 可确认审查标准与逐项结果（2026-10-17，dev-board#1331）
+
+- 「依据」窗格增加「合同审查」页签（`ContractReviewPane.vue`），项目内编辑并保存标准，确认具体版本后才可运行。标准包括立场、法域和有稳定 ID 的规则；修改后版本递增、确认失效，保存和确认均校验版本，不能用旧确认覆盖新规则。
+- REST 位于 `ContractReviewController` / `service/contractreview/`，前端 `services/contractReview.js` 复用统一认证请求。`/api/projects/{projectId}/contract-review/standards` 保存/读取；`/standards/{id}/confirm` 确认；`/runs` 运行及读取最近结果。仅项目内部可读成员能看，写成员能编辑/运行，文件仍检查 ACL；客户角色不能读内部审查资料。
+- 运行前由现有 `prepareInsightDocument` 保存当前 DOCX，服务端读取完整文件，超过 60000 字符明确拒绝，不截断后声称已审全文。最多 20 条规则；辅助模型调用有付费闸、用户作用域、用量记录和 90 秒等待上限。当前为同步请求，失败不留 RUNNING 记录。
+- `ContractReviewStandard` 和 `ContractReviewRun` 落库保存规则版本及确认时间、文档文本哈希和每规则的原文/理由/建议快照。未覆盖、输出截断、无效引文统一保留为 UNREVIEWED/PARTIAL；PASS 只表示模型判断符合该规则，不代表已经外部核实法源。建议仅展示，不自动修改原文。正文变化会使旧结果标记过期；定位仍通过既有只读 `find_navigate`，不新增书签或修改正文。
+- 删除项目时 `ProjectService.PROJECT_SCOPED_ENTITIES` 同时清理两张审查表；完成运行落库前重查权限并锁项目父行，避免删项目后重建审查残留。
+- 验证：后端 `ContractReviewServiceTest,ContractReviewOutputTest,ContractReviewPersistenceTest,ProjectDeleteCascadeTest`；前端 `tests/contract-review/*.test.mjs` 与 `tests/insight/insightPane.test.mjs`。测试桩通过不等于真实模型法律判断准确率或正式客户端已发布。

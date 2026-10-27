@@ -26,7 +26,8 @@ class SensitiveControllerTest {
     private final StorageServiceFactory storage = mock(StorageServiceFactory.class);
     private final StorageService local = mock(StorageService.class);
     private final ObjectMapper json = new ObjectMapper();
-    private MockMvc mvc() { return MockMvcBuilders.standaloneSetup(new SensitiveController(new SensitiveService(), storage, files, members)).build(); }
+    private final ProjectFileAccessService fileAccess = mock(ProjectFileAccessService.class);
+    private MockMvc mvc() { return MockMvcBuilders.standaloneSetup(new SensitiveController(new SensitiveService(), storage, files, members, fileAccess)).build(); }
     private void file() throws Exception {
         Path path = dir.resolve("input.txt"); Files.writeString(path, "甲方：北京星河科技有限公司。电话13800001111");
         var source = new ProjectFile(); source.setId(1L); source.setProjectId(2L); source.setFilePath("projects/2/input.txt");
@@ -82,4 +83,23 @@ class SensitiveControllerTest {
             assertTrue(json.readTree(output).get("recoveryKit").asText().startsWith("AWD-RECOVERY-1:"));
         }
     }
+
+    @Test void globalClientCannotPreviewPrivateTextEvenWithProjectReadPermission() throws Exception {
+        var source = new ProjectFile(); source.setId(1L); source.setProjectId(2L); source.setUserId(4L);
+        when(files.getFile(1L)).thenReturn(source);
+        when(members.hasReadPermission(2L, 9L)).thenReturn(true);
+        var users = mock(com.checkba.repository.UserRepository.class);
+        var customer = new com.checkba.model.entity.User(); customer.setRole("CLIENT");
+        when(users.findById(9L)).thenReturn(Optional.of(customer));
+        var gate = new ProjectFileAccessService(members, users, mock(com.checkba.repository.ProjectFileRepository.class));
+        MockMvc guarded = MockMvcBuilders.standaloneSetup(new SensitiveController(new SensitiveService(), storage, files, members, gate)).build();
+        try (var auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(9L);
+            guarded.perform(post("/api/sensitive/preview").header("X-Session-Id", "s")
+                    .contentType("application/json").content("{\"fileId\":1}"))
+                    .andExpect(status().isForbidden()).andExpect(jsonPath("$.error").value(ProjectFileAccessService.UNAVAILABLE_MESSAGE));
+            verifyNoInteractions(storage);
+        }
+    }
+
 }

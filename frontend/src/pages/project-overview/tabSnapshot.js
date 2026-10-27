@@ -31,7 +31,7 @@ export const TAB_SNAPSHOT_SUFFIX = 'tabs'
 export const TAB_SNAPSHOT_THROTTLE_MS = 300
 
 /** 全局单例标签：一个工作台里至多一个，恢复时跨两窗格按 id 去重 */
-export const SINGLETON_TAB_TYPES = ['welcome', 'calendar', 'admin-settings', 'market-detail', 'commit-history', 'insight-entity', 'plugin']
+export const SINGLETON_TAB_TYPES = ['message-center', 'dd-client', 'welcome', 'calendar', 'admin-settings', 'market-detail', 'commit-history', 'insight-entity', 'plugin']
 
 /** 只在有项目时才有意义的标签（文件标签另判） */
 const PROJECT_ONLY_KINDS = ['file', 'dd-request', 'diff', 'version-compare', 'version-text-diff', 'commit-history', 'insight-entity', 'plugin']
@@ -75,12 +75,14 @@ const SERIALIZERS = {
     filePath: t.filePath === undefined ? null : t.filePath,
   }),
   'dd-request': (t) => (t.requestId === null || t.requestId === undefined ? null : {
-    id: t.id, requestId: t.requestId, name: str(t.name), type: 'dd-request', fileType: 'dd', isFolder: false,
+    id: t.id, requestId: t.requestId, name: str(t.name), type: 'dd-request', tabType: 'dd-request', fileType: 'dd', isFolder: false,
   }),
   web: (t) => (typeof t.url === 'string' && t.url ? { id: t.id, tabType: 'web', name: str(t.name), url: t.url } : null),
   plugin: (t) => (typeof t.pluginId === 'string' && t.pluginId ? {
     id: `plugin-${t.pluginId}`, tabType: 'plugin', pluginId: t.pluginId, name: str(t.name),
   } : null),
+  'message-center': (t) => ({ id: 'message-center', tabType: 'message-center', name: str(t.name) }),
+  'dd-client': (t) => ({ id: 'dd-client', tabType: 'dd-client', name: str(t.name) }),
   welcome: (t) => ({ id: t.id, tabType: 'welcome', name: str(t.name) }),
   calendar: (t) => ({ id: t.id, tabType: 'calendar', name: str(t.name) }),
   'admin-settings': (t) => ({
@@ -161,14 +163,24 @@ export function serialize(leftFiles, rightFiles, activeLeft, activeRight, splitS
   }
 }
 
-/** 快照里有没有需要核对「文件还在不在」的标签（没有就不必发那一个 GET） */
+/** 只核对快照里的文件与比对两侧；不为恢复几个标签重复下载整个项目。 */
+export function snapshotFileIds(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') return []
+  const ids = new Set()
+  const add = (id) => { if (isNumericId(id)) ids.add(String(id).trim()) }
+  for (const tab of [].concat(Array.isArray(snapshot.left) ? snapshot.left : [], Array.isArray(snapshot.right) ? snapshot.right : [])) {
+    const kind = tabKind(tab)
+    if (kind === 'file') add(tab.id)
+    if (kind === 'diff') {
+      add(tab.diffSource?.id)
+      add(tab.diffTarget?.id)
+    }
+  }
+  return [...ids]
+}
+
 export function snapshotNeedsFileCheck(snapshot) {
-  if (!snapshot || typeof snapshot !== 'object') return false
-  const all = [].concat(Array.isArray(snapshot.left) ? snapshot.left : [], Array.isArray(snapshot.right) ? snapshot.right : [])
-  return all.some((t) => {
-    const k = tabKind(t)
-    return k === 'file' || k === 'diff'
-  })
+  return snapshotFileIds(snapshot).length > 0
 }
 
 const FRESH_FILE_FIELDS = ['name', 'fileType', 'wpsFileId', 'filePath']
@@ -283,6 +295,8 @@ function storageOf(vm) {
 
 // 名字随语言走的单例标签：恢复时按当前语言重取，不用快照里存的旧语言文案
 const LOCALIZED_NAME_KEYS = {
+  'message-center': 'messageCenter.title',
+  'dd-client': 'ddWorkflow.clientWorkspace',
   welcome: 'welcome.tabName',
   calendar: 'calendar.tabName',
   'admin-settings': 'workbench.settingsTabName',
@@ -333,7 +347,7 @@ export const tabSnapshotMethods = {
 
   /**
    * onLoad 调一次。返回是否恢复出了至少一个标签。
-   * 文件核对用宿主的 fetchTabSnapshotFileIndex()（一次 GET 整棵树 → Map<String(id), file>），
+   * 文件核对用宿主的 fetchTabSnapshotFileIndex(ids)（仅查快照引用的文件 → Map<String(id), file>），
    * 拉失败就不核对（文件标签原样保留，打开时编辑器自己会报「文件不存在」）。
    */
   async restoreTabSnapshot() {
@@ -349,7 +363,7 @@ export const tabSnapshotMethods = {
       let index = null
       if (this.hasProject && snapshotNeedsFileCheck(snap) && typeof this.fetchTabSnapshotFileIndex === 'function') {
         try {
-          index = await this.fetchTabSnapshotFileIndex()
+          index = await this.fetchTabSnapshotFileIndex(snapshotFileIds(snap))
         } catch (e) {
           index = null
         }

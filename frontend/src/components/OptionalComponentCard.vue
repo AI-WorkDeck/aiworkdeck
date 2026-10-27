@@ -24,11 +24,20 @@
       <view class="oc-progress-fill" :style="{ width: (item.percent || 0) + '%' }" />
     </view>
     <view class="oc-actions">
+      <view v-if="!selectable && item.phase === 'model'" class="oc-btn" @tap="$emit('cancel', item.packId)">
+        {{ $t('components.cancelDownload') }}
+      </view>
+      <view v-if="!selectable && item.phase === 'ready' && item.modelId" class="oc-btn" :class="{ disabled: busy }" @tap="$emit('retry', item.packId, { repairModel: true })">
+        {{ $t('components.verifyRepair') }}
+      </view>
+      <view v-if="!selectable && item.phase === 'ready' && !item.serviceStarted" class="oc-btn" :class="{ disabled: busy }" @tap="$emit('install', item.packId)">
+        {{ $t('components.checkStartup') }}
+      </view>
       <view v-if="!selectable && item.phase === 'idle'" class="oc-btn primary" :class="{ disabled: busy }" @tap="$emit('install', item.packId)">
         {{ $t('components.installOne') }}
       </view>
       <view v-if="item.phase === 'failed'" class="oc-btn" @tap="$emit('retry', item.packId)">
-        {{ $t('components.retry') }}
+        {{ $t(item.repairRequired ? 'components.verifyRepair' : 'components.retry') }}
       </view>
     </view>
   </view>
@@ -45,7 +54,7 @@ export default {
     selectable: { type: Boolean, default: false },
     busy: { type: Boolean, default: false },
   },
-  emits: ['toggle', 'install', 'retry'],
+  emits: ['toggle', 'install', 'retry', 'cancel'],
   computed: {
     title() {
       return this.$t('components.' + this.item.localeKey + '.name')
@@ -80,7 +89,7 @@ export default {
         case 'runtime': return this.runtimeLine(p)
         case 'model': return this.$t('components.stateDownloadingModel', { percent: p })
         case 'starting': return this.$t('components.stateStartingService')
-        case 'ready': return this.$t('components.stateReady')
+        case 'ready': return this.$t(this.item.serviceStarted ? 'components.stateServiceStarted' : 'components.stateReady')
         case 'failed': return this.$t('components.stateFailed', { msg: this.failureText })
         default: return this.$t('components.stateNotInstalled')
       }
@@ -120,7 +129,7 @@ export default {
   height: 16px;
   flex-shrink: 0;
   border: 1px solid var(--awd-border-strong);
-  border-radius: 3px;
+  border-radius: var(--awd-radius-sm);
 }
 .oc-check.checked { background: var(--awd-accent); border-color: var(--awd-accent); }
 .oc-title { font-size: var(--awd-panel-fs); font-weight: 600; color: var(--awd-text); flex: 1; }
@@ -138,7 +147,7 @@ export default {
 .oc-progress {
   height: 6px;
   background: var(--awd-surface-3);
-  border-radius: 3px;
+  border-radius: var(--awd-radius-sm);
   overflow: hidden;
   margin-top: 8px;
 }
@@ -147,7 +156,7 @@ export default {
 .oc-btn {
   padding: 4px 10px;
   border: 1px solid var(--awd-border-strong);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text);
   cursor: pointer;

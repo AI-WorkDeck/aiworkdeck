@@ -182,8 +182,8 @@ test('无项目态存储键落 global_*，不再写出 project_null_*', () => {
   assert.equal(workbenchStorageKey('12', 'leftPaneKey'), 'project_12_leftPaneKey')
 })
 
-test('无项目态 rail 只留全局面板：项目 / 日程 / 插件中心 / 剪贴板', () => {
-  assert.deepEqual([...NO_PROJECT_PANE_KEYS].sort(), ['calendar', 'clipboard', 'market', 'projects'])
+test('无项目态 rail 只留全局面板：项目 / 日程 / 插件中心 / 剪贴板 / 客户协作', () => {
+  assert.deepEqual([...NO_PROJECT_PANE_KEYS].sort(), ['calendar', 'clipboard', 'dd-client', 'market', 'projects'])
   assert.equal(NO_PROJECT_DEFAULT_PANE, 'projects')
   for (const k of ['files', 'search', 'version', 'voice', 'desensitize', 'litigation-visual', 'home', 'insight', 'favorites', 'dev', 'staging', 'plugin-foo']) {
     assert.equal(isPaneAllowedWithoutProject(k), false, k + ' 要项目，无项目态不许挂载')
@@ -198,8 +198,17 @@ test('ProjectListPane 是面板不是页面：没有页面级生命周期，跳�
   assert.match(pane, /inject:\s*\{\s*leaveWorkbench:\s*\{\s*default:\s*null\s*\}/)
   assert.match(pane, /\n  mounted\(\) \{[\s\S]*?this\.loadProjects\(\)/, '挂载即拉项目清单')
   assert.match(pane, /class="project-list-pane"/)
-  // 点的是当前打开的那个项目：什么都不做（重进一次等于把标签与编辑器全拆了）
-  assert.match(pane, /goToProject\(projectId\) \{\s*if \(this\.currentProjectId != null && Number\(projectId\) === Number\(this\.currentProjectId\)\) return/)
+  // 当前项目只打开文件面板，不能重建仍有编辑器的工作台。
+  const events = []
+  const goToProject = new Function('uni', `return function(projectId) ${methodBody(pane, 'goToProject(projectId) {')}`)({
+    reLaunch() { assert.fail('当前项目不应重建工作台') }
+  })
+  goToProject.call({
+    currentProjectId: 12,
+    $emit: (...args) => events.push(args),
+    leaveWorkbench() { assert.fail('当前项目不应离开工作台') }
+  }, '12')
+  assert.deepEqual(events, [['activate-current-project']])
 })
 
 test('项目列表页退成薄壳：路由保留，不再承载内容', () => {
@@ -270,12 +279,10 @@ test('portal 形态：案件库地址没取到时如实提示，不打开任何�
   assert.equal(vm.errorText, 'welcome.portalUnavailable')
 })
 
-test('访问码：登录页用 login 形态（原样）；欢迎标签桌面端用 portal 形态、不显示服务器地址栏', () => {
-  assert.match(read('pages/login/login.vue'), /<ClientAccessCodeForm \/>/)
+test('欢迎页访问码入口打开客户协作标签，不改主账号或外开浏览器', () => {
   const welcome = read('components/welcome/WelcomePane.vue')
-  assert.match(welcome, /<ClientAccessCodeForm\s+v-if="isDesktop"\s+mode="portal"[\s\S]*?:portal-base="caseServerUrl"/)
-  assert.match(welcome, /<ClientAccessCodeForm v-else compact autofocus \/>/)
-  assert.match(welcome, /getOfficialCloud\(\)/, '门户根地址取官方案件库地址（cloud.collab.base-url）')
-  assert.ok(!/showServerField|show-server-field|serverInput|submitRemote/.test(CLIENT_FORM), '服务器地址栏与远端兑换那条路已撤')
-  assert.match(CLIENT_FORM, /import \{ openExternalUrl \} from '@\/utils\/externalLink\.js'/)
+  assert.match(welcome, /data-action="access-code" @tap="\$emit\('open-client-workspace'\)"/)
+  assert.doesNotMatch(welcome, /<ClientAccessCodeForm|mode="portal"|clientLogin|saveSession/)
+  const workbench = read('pages/project-overview/project-overview.vue')
+  assert.equal((workbench.match(/@open-client-workspace="openDdClientTab"/g) || []).length, 2)
 })

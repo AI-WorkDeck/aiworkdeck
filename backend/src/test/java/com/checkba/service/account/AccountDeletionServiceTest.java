@@ -31,6 +31,38 @@ import static org.mockito.Mockito.*;
  */
 class AccountDeletionServiceTest {
 
+    @Test
+    void removesLocalSuggestionFeedbackWhenDeletingAccount() {
+        Fixture f = fixture(List.of());
+        var suggestions = mock(com.checkba.repository.ChatSuggestionRepository.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(f.svc(), "chatSuggestions", suggestions);
+        f.svc().deleteAccount(7L);
+        verify(suggestions).deleteByUserId(7L);
+    }
+
+    @Test
+    void removesAssistantCalendarAndPushDerivedDataDuringAccountDeletion() {
+        Fixture f=fixture(List.of());
+        var assistantConsents=mock(MobileAssistantConsentRepository.class);
+        var assistantSummaries=mock(MobileProjectSummaryRepository.class);
+        var assistantTurns=mock(MobileAssistantTurnRepository.class);
+        var calendarConsents=mock(MobileCalendarConsentRepository.class);
+        var calendarSnapshots=mock(MobileCalendarSnapshotRepository.class);
+        var calendarPushDevices=mock(MobileCalendarPushDeviceRepository.class);
+        var calendarDeliveries=mock(MobileCalendarDeliveryRepository.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(f.svc(),"assistantConsents",assistantConsents);
+        org.springframework.test.util.ReflectionTestUtils.setField(f.svc(),"assistantSummaries",assistantSummaries);
+        org.springframework.test.util.ReflectionTestUtils.setField(f.svc(),"assistantTurns",assistantTurns);
+        org.springframework.test.util.ReflectionTestUtils.setField(f.svc(),"calendarConsents",calendarConsents);
+        org.springframework.test.util.ReflectionTestUtils.setField(f.svc(),"calendarSnapshots",calendarSnapshots);
+        org.springframework.test.util.ReflectionTestUtils.setField(f.svc(),"calendarPushDevices",calendarPushDevices);
+        org.springframework.test.util.ReflectionTestUtils.setField(f.svc(),"calendarDeliveries",calendarDeliveries);
+        f.svc().deleteAccount(7L);
+        verify(assistantConsents).deleteById(7L);verify(assistantSummaries).deleteByUserId(7L);verify(assistantTurns).deleteByUserId(7L);
+        verify(calendarConsents).deleteById(7L);verify(calendarSnapshots).deleteByUserId(7L);
+        verify(calendarPushDevices).deleteByUserId(7L);verify(calendarDeliveries).deleteByUserId(7L);
+    }
+
     private record Fixture(AccountDeletionService svc, UserRepository users,
                            MobileMediaInboxRepository inbox, MobileRelayBlobStore blobs,
                            UserSessionRepository sessions, MobileProjectDirRepository dirs,
@@ -200,5 +232,13 @@ class AccountDeletionServiceTest {
 
         verifyNoInteractions(f.billing());
         verify(f.users()).deleteById(7L);
+    }
+
+    @Test void accountDeletionKeepsVersionObjectCleanupReceiptsBeforeRemovingOwner() {
+        Fixture f=fixture(List.of());
+        var objects=mock(com.checkba.service.mobile.MobileVersionObjectService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(f.svc(),"versionObjects",objects);
+        f.svc().deleteAccount(7L);
+        InOrder order=inOrder(objects,f.users());order.verify(objects).revoke(7L);order.verify(f.users()).deleteById(7L);
     }
 }

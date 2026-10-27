@@ -53,6 +53,7 @@ public class ContentSearchService {
     private final DocumentTextService documentTextService;
     /** 抽取结果的跨重启缓存；单测传 null 即退化成「每次重抽」。 */
     private final ProjectFileTextCacheService textCache;
+    private final ProjectFileAccessService fileAccess;
 
     /**
      * 抽取与匹配的有界线程池，所有搜索请求共用。
@@ -90,12 +91,21 @@ public class ContentSearchService {
      * 在项目中搜索内容
      */
     public SearchResult searchContent(Long projectId, SearchRequest request) {
+        var context = com.checkba.service.ai.tools.ToolContextHolder.get();
+        return searchContent(projectId, request, context == null ? null : context.userId());
+    }
+
+    public SearchResult searchContent(Long projectId, SearchRequest request, Long userId) {
+        if (userId == null) throw new IllegalArgumentException("请先登录");
         String query = request.getQuery() != null ? request.getQuery().trim() : "";
         boolean hasQuery = !query.isEmpty();
-        boolean isTagOnlySearch = !hasQuery && request.getTagIds() != null && !request.getTagIds().isEmpty();
+        List<Long> tagIds = request.getTagIds() == null
+                ? Collections.emptyList() : request.getTagIds().stream().distinct().toList();
+        boolean hasTagFilter = !tagIds.isEmpty();
+        boolean isTagOnlySearch = !hasQuery && hasTagFilter;
         
         log.info("[Search] projectId={}, query='{}', hasQuery={}, isTagOnlySearch={}, tagIds={}", 
-            projectId, query, hasQuery, isTagOnlySearch, request.getTagIds());
+            projectId, query, hasQuery, isTagOnlySearch, tagIds);
 
         if (!hasQuery && !isTagOnlySearch) {
             return SearchResult.builder()
@@ -109,22 +119,22 @@ public class ContentSearchService {
 
         // 0. Resolve allowed file IDs if tags are specified
         Set<Long> allowedFileIds = null;
-        if (request.getTagIds() != null && !request.getTagIds().isEmpty()) {
-            List<FileTag> fileTags = fileTagRepository.findByTagIdIn(request.getTagIds());
+        if (hasTagFilter) {
+            List<FileTag> fileTags = fileTagRepository.findByTagIdIn(tagIds);
             
             // AND logic: File must have ALL selected tags
             // Group by fileId and count matches
             Map<Long, Long> fileTagCounts = fileTags.stream()
                 .collect(Collectors.groupingBy(FileTag::getFileId, Collectors.counting()));
             
-            int requiredCount = request.getTagIds().size();
+            int requiredCount = tagIds.size();
             allowedFileIds = fileTagCounts.entrySet().stream()
                 .filter(entry -> entry.getValue() == requiredCount)
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
             
             log.info("[Search] Tag filter (AND logic): Found matches for tagIds {}. allowedFileIds size: {}", 
-                request.getTagIds(), allowedFileIds.size());
+                tagIds, allowedFileIds.size());
 
             // If tags selected but no files match, return empty early
             if (allowedFileIds.isEmpty()) {
@@ -139,12 +149,13 @@ public class ContentSearchService {
         final Set<Long> finalAllowedFileIds = allowedFileIds;
         
         // 获取项目所有可搜索文件
-        // 如果是纯标签搜索，不过滤文件类型（允许搜索所有已被打标签的文件，包括图片等）
+        // 标签筛选支持所有文件格式及文件名匹配，显式选择的文件类型仍须生效。
         List<ProjectFile> files = projectFileRepository.findByProjectIdAndIsDeletedFalseOrderBySortOrderAsc(projectId)
             .stream()
-            .filter(f -> !"folder".equals(f.getFileType()))
-            .filter(f -> isTagOnlySearch || isSearchableType(f.getFileType()))
-            .filter(f -> isTagOnlySearch || matchesTypeFilter(f, request.getFileTypes()))
+            .filter(fileAccess.readFilterForProject(projectId, userId))
+            .filter(f -> !Boolean.TRUE.equals(f.getIsFolder()) && !"folder".equals(f.getFileType()))
+            .filter(f -> hasTagFilter || isSearchableType(f.getFileType()))
+            .filter(f -> matchesTypeFilter(f, request.getFileTypes()))
             .filter(f -> finalAllowedFileIds == null || finalAllowedFileIds.contains(f.getId()))
             .collect(Collectors.toList());
         
@@ -176,28 +187,39 @@ public class ContentSearchService {
         // 构建搜索模式 (仅当有查询词时)
         Pattern searchPattern = hasQuery ? buildSearchPattern(query, request) : null;
 
-        // 逐文件并行：抽取（先查缓存）+ 匹配。按文件原顺序收集，结果顺序不随线程调度变化。
-        List<Future<FileSearchResult>> futures = new ArrayList<>(files.size());
-        for (ProjectFile file : files) {
-            futures.add(searchPool.submit(() -> searchOneFile(file, hasQuery, query, queryLower,
-                    searchPattern, request, fileTagsMap)));
-        }
-        for (int i = 0; i < futures.size(); i++) {
-            FileSearchResult fileResult;
-            try {
-                fileResult = futures.get(i).get();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                futures.forEach(f -> f.cancel(true));
-                break;
-            } catch (ExecutionException e) {
-                // searchOneFile 自己已经兜住 Throwable，走到这里只会是池子被关等极端情况
-                log.warn("Failed to search file {}: {}", files.get(i).getName(), e.getMessage());
-                continue;
+        if (request.isFilenameOnly()) {
+            // 文件名先返回，不读正文，也不排在此前尚未完成的全文任务后面。
+            for (ProjectFile file : files) {
+                FileSearchResult fileResult = searchOneFile(file, hasQuery, query, queryLower,
+                        searchPattern, request, fileTagsMap);
+                if (fileResult != null) {
+                    results.add(fileResult);
+                    totalMatches += fileResult.getMatchCount();
+                }
             }
-            if (fileResult != null) {
-                results.add(fileResult);
-                totalMatches += fileResult.getMatchCount();
+        } else {
+            // 逐文件并行：抽取（先查缓存）+ 匹配。按文件原顺序收集，结果顺序不随线程调度变化。
+            List<Future<FileSearchResult>> futures = new ArrayList<>(files.size());
+            for (ProjectFile file : files) {
+                futures.add(searchPool.submit(() -> searchOneFile(file, hasQuery, query, queryLower,
+                        searchPattern, request, fileTagsMap)));
+            }
+            for (int i = 0; i < futures.size(); i++) {
+                FileSearchResult fileResult;
+                try {
+                    fileResult = futures.get(i).get();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    futures.forEach(f -> f.cancel(true));
+                    break;
+                } catch (ExecutionException e) {
+                    log.warn("Failed to search file {}: {}", files.get(i).getName(), e.getMessage());
+                    continue;
+                }
+                if (fileResult != null) {
+                    results.add(fileResult);
+                    totalMatches += fileResult.getMatchCount();
+                }
             }
         }
 
@@ -212,27 +234,27 @@ public class ContentSearchService {
     }
 
     /**
-     * 单个文件的搜索：文件名匹配 + 内容匹配。不命中返回 null。在 {@link #searchPool} 里跑。
+     * 单个文件的搜索：文件名匹配 + 内容匹配。不命中返回 null；仅文件名搜索不进线程池。
      */
     private FileSearchResult searchOneFile(ProjectFile file, boolean hasQuery, String query, String queryLower,
                                            Pattern searchPattern, SearchRequest request,
                                            Map<Long, List<Tag>> fileTagsMap) {
-        try {
-            List<MatchInfo> matches = new ArrayList<>();
-            boolean fileNameMatches = false;
+        List<MatchInfo> matches = new ArrayList<>();
+        boolean fileNameMatches = false;
 
-            // 1. 检查文件名是否匹配
-            String fileName = file.getName();
-            if (hasQuery && fileName != null) {
-                if (request.isCaseSensitive()) {
-                    fileNameMatches = fileName.contains(query);
-                } else {
-                    fileNameMatches = fileName.toLowerCase().contains(queryLower);
-                }
+        // 1. 检查文件名是否匹配
+        String fileName = file.getName();
+        if (hasQuery && fileName != null) {
+            if (request.isCaseSensitive()) {
+                fileNameMatches = fileName.contains(query);
+            } else {
+                fileNameMatches = fileName.toLowerCase().contains(queryLower);
             }
+        }
 
-            // 2. 提取内容并搜索 (仅当有查询词时)
-            if (hasQuery) {
+        try {
+            // 2. 仅对可抽取正文的格式搜索内容；图片、音视频等只匹配文件名。
+            if (hasQuery && !request.isFilenameOnly() && isSearchableType(file.getFileType())) {
                 String content = extractContent(file);
                 if (content != null && !content.isEmpty()) {
                     matches = findMatches(content, searchPattern, query);
@@ -241,27 +263,25 @@ public class ContentSearchService {
                     log.debug("[Search] File {} has no extractable content", file.getName());
                 }
             }
-
-            // 3. 如果文件名匹配或内容匹配，或者没有查询词（纯标签过滤），都加入结果
-            if (!hasQuery || fileNameMatches || !matches.isEmpty()) {
-                return FileSearchResult.builder()
-                    .fileId(file.getId())
-                    .wpsFileId(file.getWpsFileId())
-                    .fileName(file.getName())
-                    .filePath(file.getFilePath())
-                    .fileType(file.getFileType())
-                    .matchCount(matches.size())
-                    .matches(matches.size() > MAX_MATCHES_PER_FILE
-                        ? matches.subList(0, MAX_MATCHES_PER_FILE)
-                        : matches)
-                    .tags(fileTagsMap.getOrDefault(file.getId(), Collections.emptyList()))
-                    .build();
-            }
         } catch (Throwable e) {
-            // Throwable 而非 Exception：某些格式解析库在 classpath 不兼容时抛的是
-            // Error（如 NoSuchMethodError），一旦漏挡就会打断整个搜索请求、
-            // 连带丢掉本该找到的其它文件命中。
-            log.warn("Failed to search file {}: {}", file.getName(), e.getMessage(), e);
+            // 解析库的 Error（如 NoSuchMethodError）也只影响正文，不能丢掉已匹配的文件名。
+            log.warn("Failed to search file content {}: {}", file.getName(), e.getMessage(), e);
+        }
+
+        // 3. 如果文件名匹配或内容匹配，或者没有查询词（纯标签过滤），都加入结果
+        if (!hasQuery || fileNameMatches || !matches.isEmpty()) {
+            return FileSearchResult.builder()
+                .fileId(file.getId())
+                .wpsFileId(file.getWpsFileId())
+                .fileName(file.getName())
+                .filePath(file.getFilePath())
+                .fileType(file.getFileType())
+                .matchCount(matches.size())
+                .matches(matches.size() > MAX_MATCHES_PER_FILE
+                    ? matches.subList(0, MAX_MATCHES_PER_FILE)
+                    : matches)
+                .tags(fileTagsMap.getOrDefault(file.getId(), Collections.emptyList()))
+                .build();
         }
         return null;
     }

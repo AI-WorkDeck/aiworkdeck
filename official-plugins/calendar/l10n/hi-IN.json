@@ -1,0 +1,6 @@
+{
+  "plugin.name": "कैलेंडर",
+  "plugin.description": "क्रॉस-प्रोजेक्ट कैलेंडर, कार्य, रिमाइंडर और फ़ाइल लिंक।",
+  "view.sidebar.name": "कैलेंडर",
+  "view.main.name": "कैलेंडर"
+}

@@ -342,9 +342,9 @@ test('锚点未命中的报错必须带证据：给出文档里最接近的原�
   await assert.rejects(
     H.insert_text({ anchorText: '甲方应于每月十日前向乙方支付服务费', text: 'x', position: 'after' }),
     (e) => {
-      assert.ok(/最接近的一段原文/.test(e.message), `报错要摆出候选：${e.message}`)
+      assert.ok(/最接近的一段原文|closest text in the document/i.test(e.message), `报错要摆出候选：${e.message}`)
       assert.ok(/十五日/.test(e.message), '候选片段要是文档原文')
-      assert.ok(/重试|重新读取/.test(e.message), '要告诉模型下一步做什么')
+      assert.ok(/重试|重新读取|retry|re-read/i.test(e.message), '要告诉模型下一步做什么')
       return true
     }
   )
@@ -1137,4 +1137,34 @@ test('set_page_setup：一个参数都不给 / 非法枚举 → 报错，且一�
   await assert.rejects(() => H.set_page_setup({ marginTopPt: -1 }), /非负数/)
   assert.deepEqual(writes, [])
 })
+
+test('set_paragraph_format & format_text：支持行距倍数自动换算、首行缩进字符数、中西文字体与连续多段范围', async () => {
+  const { state } = installWps({ text: '第一条 服务内容\r1.1 甲方应提供资料。\r1.2 乙方应按期交付。\r' })
+  const pf = await H.set_paragraph_format({
+    anchorText: '第一条 服务内容',
+    paragraphCount: 3,
+    firstLineIndentChars: 2,
+    lineSpacing: 1.5,
+    spaceBefore: 6,
+    spaceAfter: 12,
+  })
+  assert.equal(pf.formatted, 1)
+  const lsWrites = state.writes.filter((w) => w.kind === 'paraFormat' && w.prop === 'LineSpacing')
+  assert.ok(lsWrites.length >= 1)
+  assert.equal(lsWrites[0].value, 18, '1.5 倍行距应自动折算为 18pt (1.5 * 12)')
+
+  const ft = await H.format_text({
+    anchorText: '第一条 服务内容',
+    paragraphCount: 2,
+    fontNameAsian: '仿宋_GB2312',
+    fontNameWestern: 'Times New Roman',
+    fontSize: 12,
+  })
+  assert.equal(ft.formatted, 1)
+  const asianWrites = state.writes.filter((w) => w.kind === 'font' && w.prop === 'NameFarEast')
+  const asciiWrites = state.writes.filter((w) => w.kind === 'font' && w.prop === 'NameAscii')
+  assert.ok(asianWrites.some((w) => w.value === '仿宋_GB2312'))
+  assert.ok(asciiWrites.some((w) => w.value === 'Times New Roman'))
+})
+
 

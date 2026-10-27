@@ -42,6 +42,9 @@ public class DocumentEditTools implements AgentToolComponent {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.checkba.service.document.DocumentGeneratorSettings documentGeneratorSettings;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.DdOriginalGuard ddOriginalGuard;
+
     private final ProjectFileService projectFileService;
     private final ProjectFileRepository projectFileRepository;
     private final EditorBridgeService editorBridgeService;
@@ -287,7 +290,7 @@ public class DocumentEditTools implements AgentToolComponent {
     @Tool("开始实时流式写入文档。使用此工具后，模型生成的后续内容将直接写入打开的文档中。" +
           "**重要：创建新文件时必须提供 fileName 参数（fileId 传 null）。** " +
           "用户指名了要放进哪个文件夹时，先调 list_project_folders 拿到该文件夹的 ID，再作为 parentFolderId 传进来；" +
-          "不传就落在项目根目录——不要在用户指定了文件夹时省略它。" +
+          "省略则沿用本轮开始时打开文档所在目录，没有有效文档才用根目录；传0明确放根目录。" +
           "调用此工具后，你必须立即开始生成文档内容，并且必须使用严格的 Markdown 格式（Markdown Heading #, ##, ### 等）。" +
           "不要在调用此工具后输出任何非文档内容的闲聊，也不要把正文包进 <artifact>/<process>/<thinking> 等协议标签"
           + "（标签内的文字不会进入文档，会得到一份空白文件），直接开始输出文档标题和正文。"
@@ -296,7 +299,7 @@ public class DocumentEditTools implements AgentToolComponent {
             @P("要打开的文件ID (如果是新建文件则传 null)") Long fileId,
             @P("新建文件名 (如 '法律意见书.docx')，仅当 fileId=null 时必填") String fileName,
             @P("项目ID，仅当 fileId=null 时必填") Long projectId,
-            @P(value = "目标文件夹ID（可选，不填则放项目根目录）。用户指名文件夹时必须传，ID 用 list_project_folders 取。",
+            @P(value = "目标文件夹ID（可选；省略沿用本轮源文档目录，传0明确放根目录）。用户指名文件夹时必须传，ID 用 list_project_folders 取。",
                required = false) Long parentFolderId
     ) {
         log.info("Tool: doc_start_stream called fileId={}, fileName={}, projectId={}, parentFolderId={}",
@@ -333,7 +336,7 @@ public class DocumentEditTools implements AgentToolComponent {
                 if (existingId != null) {
                     ProjectFile existing = projectFileService.findFile(existingId).orElse(null);
                     if (existing != null && !Boolean.TRUE.equals(existing.getIsDeleted())) {
-                        return EditorBridgeService.reusedGeneratedMessage(existing.getName(), existing.getId());
+                        return GeneratedFileLocation.createdResult(existing, EditorBridgeService.reusedGeneratedMessage(existing.getName(), existing.getId()));
                     }
                     editorBridgeService.forgetGenerated(runKey);
                 }
@@ -391,11 +394,12 @@ public class DocumentEditTools implements AgentToolComponent {
             // 3. 开启流式模式
             editorBridgeService.setStreamingMode(conversationId, true);
 
-            return "文档流式写入模式已激活，文件: " + file.getName() + "。请立即开始生成文档内容。" +
+            String message = "文档流式写入模式已激活，文件: " + file.getName() + "。请立即开始生成文档内容。" +
                     "**务必使用严格的 Markdown 格式输出**（主标题=#、小标题=##/###、表格用 | 语法、列表用 - 或 1.、加粗用 **）。" +
                     "Markdown 标记不会原样落入文档：编辑器会实时把它转换成律所标准格式" +
                     "（楷体_GB2312/Arial、主标题 16 号加粗居中、正文 12 号两端对齐、表格 Grid 边框等），" +
                     "所以不要为了排版手动加空行或符号装饰。";
+            return createdHere == null ? message : GeneratedFileLocation.createdResult(file, message);
         } catch (Exception e) {
             log.error("Failed to start doc stream", e);
             return "Error: " + e.getMessage();
@@ -478,9 +482,10 @@ public class DocumentEditTools implements AgentToolComponent {
     // ==================== 查找和替换 ====================
 
     @ToolMeta(displayName = "查找定位", category = "document")
-    @Tool("【找】在文档中查找文本。anchorId 只覆盖 matches[].text（命中的文本）；contextBefore/contextAfter 和 paragraph 仅供定位，不在替换范围内。每个匹配返回：text（匹配原文）、matchIndex（序号，从 1 开始）、anchorId（通常随编辑移动的临时书签，并非用一次就失效；切换/重开文档或清理锚点后失效（按引文建证据链接也会清理），失效时重新查找）、前后文 contextBefore/contextAfter、段落片段 paragraph（最多160字，paragraphLength 为完整长度；paragraphTruncated=true 时须回读完整目标段落）。" +
+    @Tool("【找】在文档中查找文本。anchorId 只覆盖 matches[].text（命中的文本）；contextBefore/contextAfter 和 paragraph 仅供定位，不在替换范围内。每个匹配返回：text（匹配原文）、matchIndex（序号，从 1 开始）、anchorId（通常随编辑移动的临时书签，并非用一次就失效，目标原文未变时可复用；目标原文变化须重新查找；切换/重开文档或清理锚点后失效（按引文建证据链接也会清理），失效时重新查找）、前后文 contextBefore/contextAfter、段落片段 paragraph（最多160字，paragraphLength 为完整长度；paragraphTruncated=true 时须回读完整目标段落）。" +
+          "支持自动编号回退匹配：若段落使用 Word/Writer 自动编号（如 ListLabelString 为「第一条」「一、」「1.1」），搜索「第一条 服务内容」或「第一条」会自动匹配编号标签+正文，并额外返回 paragraphIndex 与 numbering。" +
           "有多个匹配时先根据上下文确认哪一个才是目标，再用 anchorId 直接 doc_replace_at_anchor（精准替换，会自动滚动定位并返回改后段落）。" +
-          "多处独立修改：拿到各自 anchorId 后在同一轮连续输出多个替换调用。目标文本全文唯一时不必先找，直接 doc_find_replace。")
+          "单处修改先定位并核对上下文，不凭印象判断全文唯一。正文查找排除已删除修订；删除历史用 doc_list_revisions。多处独立修改拿到各自 anchorId 后连续调用。")
     public String doc_find_text(
             @P("要查找的文本") String keyword,
             @P("是否区分大小写，默认 false") Boolean matchCase
@@ -521,7 +526,7 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "查找替换", category = "document", fileEffect = "MODIFIED")
-    @Tool("在文档中查找并替换文本。所有修改将以修订模式进行，用户可以审阅后接受或拒绝。" +
+    @Tool("仅在用户明确要求全文统一修改时使用查找替换；单处修改先 doc_find_text 核对上下文，再 doc_replace_at_anchor。查找以最终正文为准，排除已删除修订。所有修改将以修订模式进行，用户可以审阅后接受或拒绝。" +
           "全文替换一次调用即可完成（大量命中也很快；纯插入型替换会分批处理并回传进度），不要因为耗时较长而重复调用；" +
           "返回 replaced（已替换数）与 total（命中数），cancelled=true 表示用户中途取消、done 为已完成数。" +
           "replaceText 传空字符串即删除（以修订删除痕迹呈现）。" +
@@ -902,14 +907,15 @@ public class DocumentEditTools implements AgentToolComponent {
                     (long) bytes.length, null,
                     "project_" + source.getProjectId() + "_ai_" + System.currentTimeMillis(),
                     AGENT_USER_ID, ProjectFileService.ConflictPolicy.RENAME);
+            if (ddOriginalGuard != null) ddOriginalGuard.requireMutableTree(created);
             java.nio.file.Path target = storageResolver.resolve(created.getFilePath());
             java.nio.file.Files.createDirectories(target.getParent());
             java.nio.file.Files.move(temp, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             temp = null;
             created.setFileSize((long) bytes.length);
             projectFileRepository.save(created);
-            return String.format("已把『%s』导出为 PDF『%s』（文件 ID: %d，%d KB），放在原文档所在的文件夹；原文档没有改动。",
-                    source.getName(), created.getName(), created.getId(), Math.max(1, bytes.length / 1024));
+            return GeneratedFileLocation.createdResult(created, String.format("已把『%s』导出为 PDF『%s』（文件 ID: %d，%d KB），放在原文档所在的文件夹；原文档没有改动。",
+                    source.getName(), created.getName(), created.getId(), Math.max(1, bytes.length / 1024)));
         } catch (Exception e) {
             log.error("Failed to save exported pdf: {}", name, e);
             return "Error: 导出 PDF 失败：保存到项目时出错：" + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
@@ -999,7 +1005,8 @@ public class DocumentEditTools implements AgentToolComponent {
     // 禁止使用整数字符偏移（跨富文本必然错位）。
 
     @ToolMeta(displayName = "通读文档", category = "document")
-    @Tool("【看】分段读取文档正文。返回带编号的段落列表（含标题级别），是了解文档内容的首选工具。" +
+    @Tool("【看】分段读取文档正文。返回带编号的段落列表（含标题级别与自动编号元数据 numbering），是了解文档内容的首选工具。" +
+          "每段含 index（0 开始）、text（段落纯文本）和 numbering（{available, label, level, hasLabel}）：当段落使用 Word/Writer 自动编号时，可见编号前缀在 numbering.label（如 '第一条'、'一、'、'1.1'），不在 text 中。" +
           "文档很长时结果会分页：返回 truncated=true 和 nextStartParagraph，用它继续读下一段。" +
           "多段或结构调整后，最后一次修改结束须回读改动范围及相邻段落，核对标题分段、编号和句意完整，再交付。")
     public String doc_get_document_text(
@@ -1019,11 +1026,11 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "识别合同条款", category = "document")
-    @Tool("【看】识别合同/协议的条款结构。按「第X条 / 第X章 / 一、二、」等编号文本把段落归并成条款，" +
-          "返回每条条款的编号、标题和段落范围（startParagraph~endParagraph）。" +
-          "统计条款数、按条款定位或修订时必须先用本工具，禁止把段落数/行数当条款数。" +
+    @Tool("【看】识别合同/协议的条款结构。同时识别正文手打编号与 Word/Writer 自动编号（ListLabelString，如「第X条 / 第X章 / 一、二、 / （一） / 1.」），" +
+          "把段落归并成条款，返回每条条款的编号、标题、段落范围（startParagraph~endParagraph）及是否自动编号（autoNumbered/listLabel）。" +
+          "统计条款数、按条款定位或整条修改格式时必须先用本工具，禁止把段落数/行数当条款数。" +
           "目录最多返回 300 条，totalClauseCount 为完整目录数量；truncated=true 时用 nextStartParagraph 继续读取剩余正文。" +
-          "拿到段落范围后可用 doc_get_document_text(startParagraph) 精读某条条款。")
+          "拿到段落范围后可用 doc_get_document_text(startParagraph) 精读某条条款，或将 startParagraph/endParagraph 传给 doc_format_selection / doc_set_paragraph_format 批量调整条款格式。")
     public String doc_get_clauses() {
         log.info("Tool: doc_get_clauses called");
         try {
@@ -1063,14 +1070,18 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "选中段落", category = "document")
-    @Tool("【选】按段落号选中整个段落（0 开始，配合 doc_get_document_text 的编号）。编辑器会滚动到该段落并高亮。")
+    @Tool("【选】按段落号选中单个段落或连续多段范围（0 开始，配合 doc_get_document_text / doc_get_clauses 的段落号）。" +
+          "只传 index 选中单段；同时传 index 与 endIndex 则跨段选中 [index, endIndex] 闭区间内的所有段落。编辑器会滚动到该处并高亮。")
     public String doc_select_paragraph(
-            @P("段落号（0 开始）") Integer index
+            @P("段落号（0 开始）") Integer index,
+            @P(value = "结束段落号（0 开始，可选；传入则跨段选中 index..endIndex 闭区间）", required = false) Integer endIndex
     ) {
-        log.info("Tool: doc_select_paragraph called index={}", index);
+        log.info("Tool: doc_select_paragraph called index={}, endIndex={}", index, endIndex);
         try {
-            return editorBridgeService.executeEditorCommand("select_paragraph",
-                    java.util.Map.of("index", index != null ? index : 0));
+            java.util.Map<String, Object> params = new java.util.HashMap<>();
+            params.put("index", index != null ? index : 0);
+            if (endIndex != null) params.put("endIndex", endIndex);
+            return editorBridgeService.executeEditorCommand("select_paragraph", params);
         } catch (Exception e) {
             log.error("Failed to select paragraph", e);
             return "Error: " + e.getMessage();
@@ -1096,7 +1107,7 @@ public class DocumentEditTools implements AgentToolComponent {
 
     @ToolMeta(displayName = "锚点替换", category = "document", fileEffect = "MODIFIED")
     @Tool("【改】仅把 anchorId 覆盖的 matches[].text 替换为 newText，以修订模式进行，锚点外文字保持不变。contextBefore/contextAfter 和 paragraph 仅供定位，不要把它们拼进 newText。整段重写须先查找完整原段取得整段锚点，或用 doc_modify_paragraph；仅被替换范围内未改动的字需照抄。会自动把编辑器视图滚动到该处；返回 paragraphAfterEdit（最多200字）及完整长度 paragraphAfterEditLength；paragraphAfterEditTruncated=true 时用 doc_get_paragraph 回读完整目标段落（段号未知先用 doc_get_document_text 定位），不得把片段当作完整验证；未截断时核对回执即可，不需要先 doc_select_anchor。" +
-          "先 doc_find_text 拿到带上下文的匹配列表，选定目标的 anchorId 后用本工具替换；多处独立替换在同一轮连续输出多个调用。" +
+          "先 doc_find_text 拿到带上下文的匹配列表，选定目标的 anchorId 后用本工具替换；执行前自动核对锚点原文，变化或失效则拒绝，须重新查找核对，不能用全文替换绕过；多处独立替换在同一轮连续输出多个调用。" +
           "newText 传空字符串即删除该处文本（以修订删除痕迹呈现）。" +
           REDLINE_GRANULARITY_NOTE)
     public String doc_replace_at_anchor(
@@ -1128,8 +1139,12 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "设置文字格式", category = "document", fileEffect = "MODIFIED")
-    @Tool("【格式】给当前选中的文本设置字符格式：加粗/斜体/下划线/删除线/高亮/字色/字号/字体。只传需要改的参数。" +
-          "必须先选中文本（doc_select_anchor / doc_select_paragraph）；选中与本工具之间不需要任何判断，放在同一轮连续输出。高亮支持 yellow/green/cyan/magenta/red/blue/gray/none 或 #RRGGBB；none 取消高亮。")
+    @Tool("【格式】设置字符格式：加粗/斜体/下划线/删除线/高亮/字色/字号/中西文字体。只传需要改的参数。" +
+          "可先选中文本（doc_select_anchor / doc_select_paragraph），也可直接传 startParagraph（及可选 endParagraph）对整段或连续多段批量设字符格式（会自动覆盖段内原有的 run 级直接格式）。" +
+          "常见中文字号对应磅值：初号=42、小初=36、一号=26、小一=24、二号=22、小二=18、三号=16、小三=15、四号=14、小四=12、五号=10.5、小五=9。" +
+          "中西文字体分设时传 fontNameAsian（如 宋体/仿宋_GB2312/楷体_GB2312/黑体）与 fontNameWestern（如 Times New Roman/Arial）。" +
+          "下划线：underline=true/false，或用 underlineStyle 指定 single/double/dotted/dashed/wave/bold/none。" +
+          "高亮支持 yellow/green/cyan/magenta/red/blue/gray/none 或 #RRGGBB；none 取消高亮。")
     public String doc_format_selection(
             @P("加粗 true/false，不改则不传") Boolean bold,
             @P("斜体 true/false，不改则不传") Boolean italic,
@@ -1137,22 +1152,30 @@ public class DocumentEditTools implements AgentToolComponent {
             @P("删除线 true/false，不改则不传") Boolean strikeout,
             @P("高亮颜色：yellow/green/cyan/magenta/red/blue/gray/none 或 #RRGGBB，不改则不传") String highlight,
             @P("文字颜色：#RRGGBB 或 auto，不改则不传") String color,
-            @P("字号（磅），不改则不传") Double fontSize,
+            @P("字号（磅，如 小四=12、五号=10.5、四号=14、小三=15、三号=16、小二=18、二号=22），不改则不传") Double fontSize,
             @P("字体名（中西文一起改），不改则不传") String fontName,
-            @P("中文字体名（只改中文，如 楷体_GB2312；与 fontName 同给时以它为准），不改则不传") String fontNameAsian
+            @P("中文字体名（只改中文，如 宋体、仿宋_GB2312、楷体_GB2312、黑体；与 fontName 同给时以它为准），不改则不传") String fontNameAsian,
+            @P(value = "西文字体名（只改西文与数字，如 Times New Roman、Arial、Calibri），不改则不传", required = false) String fontNameWestern,
+            @P(value = "下划线线型（single/double/dotted/dashed/wave/bold/none；传了优先于 underline），不改则不传", required = false) String underlineStyle,
+            @P(value = "起始段落号（0 开始，可选；传入则无需预先选中，直接对该段或 startParagraph..endParagraph 范围设格式）", required = false) Integer startParagraph,
+            @P(value = "结束段落号（0 开始，可选；缺省等于 startParagraph）", required = false) Integer endParagraph
     ) {
-        log.info("Tool: doc_format_selection called");
+        log.info("Tool: doc_format_selection called startParagraph={}, endParagraph={}", startParagraph, endParagraph);
         try {
             java.util.Map<String, Object> params = new java.util.HashMap<>();
             if (bold != null) params.put("bold", bold);
             if (italic != null) params.put("italic", italic);
             if (underline != null) params.put("underline", underline);
+            if (underlineStyle != null && !underlineStyle.isEmpty()) params.put("underlineStyle", underlineStyle);
             if (strikeout != null) params.put("strikeout", strikeout);
             if (highlight != null && !highlight.isEmpty()) params.put("highlight", highlight);
             if (color != null && !color.isEmpty()) params.put("color", color);
             if (fontSize != null) params.put("fontSize", fontSize);
             if (fontName != null && !fontName.isEmpty()) params.put("fontName", fontName);
             if (fontNameAsian != null && !fontNameAsian.isEmpty()) params.put("fontNameAsian", fontNameAsian);
+            if (fontNameWestern != null && !fontNameWestern.isEmpty()) params.put("fontNameWestern", fontNameWestern);
+            if (startParagraph != null) params.put("startParagraph", startParagraph);
+            if (endParagraph != null) params.put("endParagraph", endParagraph);
             return editorBridgeService.executeEditorCommand("format_selection", params);
         } catch (Exception e) {
             log.error("Failed to format selection", e);
@@ -1161,23 +1184,33 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "设置段落格式", category = "document", fileEffect = "MODIFIED")
-    @Tool("【格式】设置当前选区所在段落的段落格式：对齐、标题级别、行距、段前段后间距、缩进。只传需要改的参数。" +
+    @Tool("【格式】设置当前选区所在段落或指定段落范围（startParagraph..endParagraph）的段落格式：对齐、标题级别、行距、段前段后间距、缩进。只传需要改的参数。" +
+          "可先选中段落，也可直接传 startParagraph（及可选 endParagraph）一次批量设置多段。" +
           "headingLevel: 1-9 设为对应级别标题，0 恢复正文。alignment: left/right/center/justify。" +
-          "行距 lineSpacingMode: single/1.5/double 直接传；proportional 配 lineSpacingValue=百分比（如 120）；" +
-          "atLeast（最小值）/exactly（固定值）配 lineSpacingValue=磅数。" +
-          "缩进：firstLineIndentChars 首行缩进 N 字符（中文文档惯例，如 2）；也可用 firstLineIndentPt/leftIndentPt/rightIndentPt 按磅设。")
+          "行距 lineSpacingMode: single(单倍)/1.5(1.5倍)/double(2倍) 直接传；multiple 或 proportional 配 lineSpacingValue（支持传百分比 125/150 或倍数 1.25/1.5）；" +
+          "atLeast（最小值）/exactly（固定值，如 20 磅、22 磅）配 lineSpacingValue=磅数。" +
+          "段前段后：spaceBeforePt/spaceAfterPt 按磅设（如 6、12、18），或 spaceBeforeLines/spaceAfterLines 按行设（如 0.5、1）。" +
+          "缩进：firstLineIndentChars 首行缩进字符数（中文合同常用 2；传 0 取消首行缩进并顶格，按段落当前中文字号精算），" +
+          "firstLineIndentPt 首行缩进磅数，leftIndentChars 左缩进字符数，leftIndentPt/rightIndentPt 左右缩进磅数。")
     public String doc_set_paragraph_format(
             @P("对齐：left/right/center/justify，不改则不传") String alignment,
             @P("标题级别：1-9 为标题，0 恢复正文，不改则不传") Integer headingLevel,
-            @P("行距模式：single/1.5/double/proportional/atLeast/exactly，不改则不传") String lineSpacingMode,
-            @P("行距值：proportional 时为百分比，atLeast/exactly 时为磅数") Double lineSpacingValue,
+            @P("行距模式：single/1.5/double/multiple/proportional/atLeast/exactly，不改则不传") String lineSpacingMode,
+            @P("行距值：proportional/multiple 时为百分比(如 150)或倍数(如 1.5)，atLeast/exactly 时为磅数(如 20)") Double lineSpacingValue,
             @P("段前间距（磅），不改则不传") Double spaceBeforePt,
             @P("段后间距（磅），不改则不传") Double spaceAfterPt,
-            @P("首行缩进（字符数，如 2），不改则不传") Double firstLineIndentChars,
+            @P("首行缩进（字符数，如 2；传 0 取消缩进顶格），不改则不传") Double firstLineIndentChars,
             @P("左缩进（磅），不改则不传") Double leftIndentPt,
-            @P("右缩进（磅），不改则不传") Double rightIndentPt
+            @P("右缩进（磅），不改则不传") Double rightIndentPt,
+            @P(value = "首行缩进（磅；传 0 取消缩进），不改则不传", required = false) Double firstLineIndentPt,
+            @P(value = "左缩进（字符数，如 2），不改则不传", required = false) Double leftIndentChars,
+            @P(value = "段前间距（行数，如 0.5 或 1），不改则不传", required = false) Double spaceBeforeLines,
+            @P(value = "段后间距（行数，如 0.5 或 1），不改则不传", required = false) Double spaceAfterLines,
+            @P(value = "起始段落号（0 开始，可选；传入则直接对该段或 startParagraph..endParagraph 范围设段落格式）", required = false) Integer startParagraph,
+            @P(value = "结束段落号（0 开始，可选；缺省等于 startParagraph）", required = false) Integer endParagraph
     ) {
-        log.info("Tool: doc_set_paragraph_format called alignment={}, headingLevel={}, lineSpacing={}/{}", alignment, headingLevel, lineSpacingMode, lineSpacingValue);
+        log.info("Tool: doc_set_paragraph_format called alignment={}, headingLevel={}, lineSpacing={}/{}, range={}..{}",
+                alignment, headingLevel, lineSpacingMode, lineSpacingValue, startParagraph, endParagraph);
         try {
             java.util.Map<String, Object> params = new java.util.HashMap<>();
             if (alignment != null && !alignment.isEmpty()) params.put("alignment", alignment);
@@ -1185,10 +1218,16 @@ public class DocumentEditTools implements AgentToolComponent {
             if (lineSpacingMode != null && !lineSpacingMode.isEmpty()) params.put("lineSpacingMode", lineSpacingMode);
             if (lineSpacingValue != null) params.put("lineSpacingValue", lineSpacingValue);
             if (spaceBeforePt != null) params.put("spaceBeforePt", spaceBeforePt);
+            if (spaceBeforeLines != null) params.put("spaceBeforeLines", spaceBeforeLines);
             if (spaceAfterPt != null) params.put("spaceAfterPt", spaceAfterPt);
+            if (spaceAfterLines != null) params.put("spaceAfterLines", spaceAfterLines);
             if (firstLineIndentChars != null) params.put("firstLineIndentChars", firstLineIndentChars);
+            if (firstLineIndentPt != null) params.put("firstLineIndentPt", firstLineIndentPt);
+            if (leftIndentChars != null) params.put("leftIndentChars", leftIndentChars);
             if (leftIndentPt != null) params.put("leftIndentPt", leftIndentPt);
             if (rightIndentPt != null) params.put("rightIndentPt", rightIndentPt);
+            if (startParagraph != null) params.put("startParagraph", startParagraph);
+            if (endParagraph != null) params.put("endParagraph", endParagraph);
             return editorBridgeService.executeEditorCommand("set_paragraph_format", params);
         } catch (Exception e) {
             log.error("Failed to set paragraph format", e);
@@ -1197,14 +1236,14 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "设置编号", category = "document", fileEffect = "MODIFIED")
-    @Tool("【格式】给当前选区所在段落设置自动编号或项目符号（先选中段落，可跨多段）。" +
-          "preset: bullet(•)/decimal(1. 2. 3.)/chinese(一、二、)/multilevel(多级编号 1. → 1.1 → 1.1.1)/none(清除自动编号和项目符号)。" +
+    @Tool("【格式】给当前选区所在段落设置自动编号或项目符号（先用 doc_select_paragraph 选中段落，传 endIndex 可跨多段）。" +
+          "preset: bullet(•)/decimal(1. 2. 3.)/chinese(一、二、)/clause(第一条、第二条)/paren_chinese(（一）（二）)/multilevel(多级编号 1. → 1.1 → 1.1.1)/none(清除自动编号和项目符号)。" +
           "用户要求普通段落或去掉项目符号时用 none；只改字号、居中或 headingLevel=0 不会清除列表。" +
           "要把图注改成普通居中段落：先选中该段设 preset=none，再用 doc_set_paragraph_format 设 headingLevel=0、alignment=center。" +
           "完成后用 doc_get_formatting 读回 paragraph.isNumbered=false 核验，不得只凭命令已发送就宣称完成。" +
           "level: 编号层级 1-9，默认 1；multilevel 配合不同 level 形成 1.1、1.1.1 结构。")
     public String doc_set_numbering(
-            @P("编号类型：bullet/decimal/chinese/multilevel/none") String preset,
+            @P("编号类型：bullet/decimal/chinese/clause/paren_chinese/multilevel/none") String preset,
             @P("编号层级 1-9，默认 1") Integer level
     ) {
         log.info("Tool: doc_set_numbering called preset={}, level={}", preset, level);
@@ -1502,12 +1541,20 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "读取格式", category = "document")
-    @Tool("【看/格式】读取当前光标或选区处的完整格式信息：字体（中西文）、字号、加粗/斜体/下划线/删除线、" +
-          "颜色、高亮、段落样式、对齐、行距、段前段后、缩进、编号状态、所在表格（表名/行列数/单元格）。" +
+    @Tool("【看/格式】读取当前光标、选区或指定段落（paragraphIndex）处的完整格式信息：字体（中西文）、字号、加粗/斜体/下划线（含线型 underlineStyle）/删除线、" +
+          "颜色、高亮、段落样式、对齐、行距、段前段后、缩进（含首行缩进字符数 firstLineIndentChars）、" +
+          "编号状态（含自动编号前缀 listLabel、文本预览 textPreview、带编号全文 combinedTextPreview）、所在表格（表名/行列数/单元格）。" +
           "改格式前先用本工具看清现状。")
-    public String doc_get_formatting() {
-        log.info("Tool: doc_get_formatting called");
+    public String doc_get_formatting(
+            @P(value = "段落索引（0 开始，可选；不传则读取当前光标或选区）", required = false) Integer paragraphIndex
+    ) {
+        log.info("Tool: doc_get_formatting called paragraphIndex={}", paragraphIndex);
         try {
+            if (paragraphIndex != null) {
+                java.util.Map<String, Object> params = new java.util.HashMap<>();
+                params.put("paragraphIndex", paragraphIndex);
+                return editorBridgeService.executeEditorCommand("get_formatting", params);
+            }
             return editorBridgeService.executeEditorCommand("get_formatting", null);
         } catch (Exception e) {
             log.error("Failed to get formatting", e);
@@ -1516,16 +1563,36 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "应用标准格式", category = "document", fileEffect = "MODIFIED")
-    @Tool("【格式】对整篇文档应用律所标准格式：正文楷体_GB2312/西文 Arial 12 号黑色、两端对齐、段前 0 段后 18 磅、" +
-          "行距最小值 16 磅、首行缩进 2 字符；首段短文本视为主标题（16 号加粗居中）；标题段整段加粗；" +
+    @Tool("【格式】对整篇文档应用律所标准格式（支持传参覆盖默认正文格式）：默认正文楷体_GB2312/西文 Arial 12 号黑色、两端对齐、段前 0 段后 18 磅、" +
+          "行距最小值 16 磅、首行缩进 2 字符（自动编号列表项不额外加首行缩进）；首段短文本视为主标题（16 号加粗居中）；" +
+          "章/节/条标题（含第X章/第X条/一、，无论手打还是自动编号）整段加粗；" +
           "表格套 Grid 1.5 磅边框、10 号字、首行加粗居中、数字居右；表格后首段段前 18 磅。" +
-          "用户要求'规范格式/按标准排版'时用本工具，正文中既有的加粗强调不会被抹掉。" +
+          "用户要求'规范格式/按标准排版'时用本工具，正文中既有的加粗强调不会被抹掉，且会穿透清除段落内残留的局部字体/字号直接格式。" +
+          "若用户同时指定了具体字体/字号/行距/缩进/段前段后（如'全文改为宋体小四、1.5倍行距'），可直接传入对应可选参数覆盖默认值。" +
           "系统提醒说「本项目模板画像：无」时，排版一律用本工具，不要去找模板文件夹。" +
           "长文档会分批处理并回传进度（最长约 2 分钟），一次调用即可完成，不要重复调用；返回 truncated=false 表示全文已处理。")
-    public String doc_apply_standard_format() {
+    public String doc_apply_standard_format(
+            @P(value = "覆盖正文中文字体（如 宋体、仿宋_GB2312、楷体_GB2312），不传用默认", required = false) String fontNameAsian,
+            @P(value = "覆盖正文西文字体（如 Times New Roman、Arial），不传用默认", required = false) String fontNameWestern,
+            @P(value = "覆盖正文字号（磅，如 小四=12、四号=14），不传用默认", required = false) Double fontSize,
+            @P(value = "覆盖正文行距模式（single/1.5/double/multiple/proportional/atLeast/exactly），不传用默认", required = false) String lineSpacingMode,
+            @P(value = "覆盖正文行距值（倍数如 1.5、百分比如 150、或磅数如 20），不传用默认", required = false) Double lineSpacingValue,
+            @P(value = "覆盖正文首行缩进字符数（如 2；传 0 取消缩进），不传用默认", required = false) Double firstLineIndentChars,
+            @P(value = "覆盖正文段前间距（磅），不传用默认", required = false) Double spaceBeforePt,
+            @P(value = "覆盖正文段后间距（磅），不传用默认", required = false) Double spaceAfterPt
+    ) {
         log.info("Tool: doc_apply_standard_format called");
         try {
-            return editorBridgeService.executeEditorCommand("apply_house_style", null);
+            java.util.Map<String, Object> params = new java.util.HashMap<>();
+            if (fontNameAsian != null && !fontNameAsian.isEmpty()) params.put("fontNameAsian", fontNameAsian);
+            if (fontNameWestern != null && !fontNameWestern.isEmpty()) params.put("fontNameWestern", fontNameWestern);
+            if (fontSize != null) params.put("fontSize", fontSize);
+            if (lineSpacingMode != null && !lineSpacingMode.isEmpty()) params.put("lineSpacingMode", lineSpacingMode);
+            if (lineSpacingValue != null) params.put("lineSpacingValue", lineSpacingValue);
+            if (firstLineIndentChars != null) params.put("firstLineIndentChars", firstLineIndentChars);
+            if (spaceBeforePt != null) params.put("spaceBeforePt", spaceBeforePt);
+            if (spaceAfterPt != null) params.put("spaceAfterPt", spaceAfterPt);
+            return editorBridgeService.executeEditorCommand("apply_house_style", params.isEmpty() ? null : params);
         } catch (Exception e) {
             log.error("Failed to apply standard format", e);
             return "Error: " + e.getMessage();
@@ -2510,7 +2577,7 @@ public class DocumentEditTools implements AgentToolComponent {
     public String sheet_create_file(
             @P("文件名，如 '费用明细表.xlsx'（.xlsx 后缀可省略）") String fileName,
             @P("项目ID") Long projectId,
-            @P(value = "目标文件夹ID（可选，不填则放项目根目录）。用户指名文件夹时必须传，ID 用 list_project_folders 取。",
+            @P(value = "目标文件夹ID（可选；省略沿用本轮源文档目录，传0明确放根目录）。用户指名文件夹时必须传，ID 用 list_project_folders 取。",
                required = false) Long parentFolderId
     ) {
         log.info("Tool: sheet_create_file called fileName={}, projectId={}, parentFolderId={}",
@@ -2540,8 +2607,8 @@ public class DocumentEditTools implements AgentToolComponent {
 
             editorBridgeService.sendRefreshFilesAction();
             editorBridgeService.sendOpenFileAction(file);
-            return String.format("已创建空白表格文件并发送打开指令。文件ID: %d, 文件名: %s。" +
-                    "请等待编辑器加载完成后，用 sheet_write_cells 写入内容。", file.getId(), file.getName());
+            return GeneratedFileLocation.createdResult(file, String.format("已创建空白表格文件并发送打开指令。文件ID: %d, 文件名: %s。" +
+                    "请等待编辑器加载完成后，用 sheet_write_cells 写入内容。", file.getId(), file.getName()));
         } catch (Exception e) {
             log.error("Failed to create xlsx file", e);
             return "Error: " + e.getMessage();

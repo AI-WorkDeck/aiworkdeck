@@ -1,0 +1,32 @@
+{
+  "id": "voice",
+  "name": "语音",
+  "version": "1.0.3",
+  "description": "即时朗读、实时调速、字幕高亮与会议录音。",
+  "author": "AI WorkDeck",
+  "permissions": [
+    "speech",
+    "file_read",
+    "file_write",
+    "editor",
+    "network",
+    "ai"
+  ],
+  "frontendEntry": "web/index.html",
+  "contributes": {
+    "views": [
+      {
+        "id": "main",
+        "name": "语音",
+        "entry": "web/index.html",
+        "placement": "sidebar",
+        "scope": "project",
+        "defaultDock": "left",
+        "allowedDocks": [
+          "left",
+          "right"
+        ]
+      }
+    ]
+  }
+}

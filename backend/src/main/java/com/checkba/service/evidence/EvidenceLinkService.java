@@ -13,6 +13,7 @@ import com.checkba.repository.FileTagRepository;
 import com.checkba.repository.ProjectFileRepository;
 import com.checkba.service.LangText;
 import com.checkba.service.ProjectMemberService;
+import com.checkba.service.ProjectFileAccessService;
 import com.checkba.service.evidence.EvidenceLinkViews.AnchorReport;
 import com.checkba.service.evidence.EvidenceLinkViews.AnchorReportResult;
 import com.checkba.service.evidence.EvidenceLinkViews.FileBrief;
@@ -67,6 +68,7 @@ public class EvidenceLinkService {
     private static final Set<String> KINDS = Set.of(KIND_HUMAN, KIND_AI, KIND_PLUGIN);
     private static final String LINK_KEY_PATTERN = "[A-Za-z0-9_]{1,64}";
     private static final int ANCHOR_TEXT_MAX = 1000;
+    private static final int METHOD_MAX = 32;
 
     private final EvidenceLinkRepository links;
     private final EvidenceLinkTargetRepository targets;
@@ -74,6 +76,7 @@ public class EvidenceLinkService {
     private final FileTagRepository fileTags;
     private final ProjectMemberService members;
     private final ObjectMapper om;
+    private final ProjectFileAccessService fileAccess;
 
     // ---------------------------------------------------------------- write
 
@@ -173,10 +176,7 @@ public class EvidenceLinkService {
             t.setRelation(patch.relation());
         }
         if (patch.method() != null) {
-            if (!patch.method().isEmpty() && !EvidenceLinkTarget.METHODS.contains(patch.method())) {
-                throw new IllegalArgumentException(LangText.of("method 非法: ", "Illegal method: ") + patch.method());
-            }
-            t.setMethod(patch.method().isEmpty() ? null : patch.method());
+            t.setMethod(normalizeMethod(patch.method()));
         }
         if (patch.confidence() != null) {
             validateConfidence(patch.confidence());
@@ -446,12 +446,16 @@ public class EvidenceLinkService {
     }
 
     private void requireRead(Long projectId, Long userId) {
+        // Derived results may contain excerpts from multiple private source files.
+        if (fileAccess.isClient(projectId, userId)) throw new ProjectFileAccessService.FileAccessDeniedException();
         if (userId == null || projectId == null || !members.hasReadPermission(projectId, userId)) {
             throw new IllegalArgumentException(LangText.of("无权限访问该项目", "No access to this project"));
         }
     }
 
     private void requireWrite(Long projectId, Long userId) {
+        // Derived results may contain excerpts from multiple private source files.
+        if (fileAccess.isClient(projectId, userId)) throw new ProjectFileAccessService.FileAccessDeniedException();
         if (userId == null || projectId == null || !members.hasWritePermission(projectId, userId)) {
             throw new IllegalArgumentException(LangText.of("无权限修改该项目", "No write access to this project"));
         }
@@ -489,9 +493,7 @@ public class EvidenceLinkService {
         if (t.relation() != null && !EvidenceLinkTarget.RELATIONS.contains(t.relation())) {
             throw new IllegalArgumentException(LangText.of("relation 非法: ", "Illegal relation: ") + t.relation());
         }
-        if (StringUtils.hasText(t.method()) && !EvidenceLinkTarget.METHODS.contains(t.method())) {
-            throw new IllegalArgumentException(LangText.of("method 非法: ", "Illegal method: ") + t.method());
-        }
+        normalizeMethod(t.method());
         if (t.confidence() != null) validateConfidence(t.confidence());
         locatorHash(t.locatorJson()); // 非法 JSON 在这里就抛
     }
@@ -502,6 +504,18 @@ public class EvidenceLinkService {
         }
     }
 
+    private static String normalizeMethod(String method) {
+        if (method == null) return null;
+        if (method.chars().anyMatch(Character::isISOControl)) {
+            throw new IllegalArgumentException(LangText.of("标签不能包含控制字符", "Tags cannot contain control characters"));
+        }
+        String value = method.trim();
+        if (value.length() > METHOD_MAX) {
+            throw new IllegalArgumentException(LangText.of("标签不能超过32个字符", "Tags cannot exceed 32 characters"));
+        }
+        return value.isBlank() ? null : value;
+    }
+
     private void saveTarget(EvidenceLink l, TargetInput in, String locatorHash, int order, String kind, Long userId,
                             LocalDateTime now) {
         EvidenceLinkTarget t = new EvidenceLinkTarget();
@@ -510,7 +524,7 @@ public class EvidenceLinkService {
         t.setLocatorJson(StringUtils.hasText(in.locatorJson()) ? in.locatorJson() : null);
         t.setLocatorHash(locatorHash);
         t.setRelation(in.relation() == null ? EvidenceLinkTarget.RELATION_SUPPORTS : in.relation());
-        t.setMethod(StringUtils.hasText(in.method()) ? in.method() : null);
+        t.setMethod(normalizeMethod(in.method()));
         t.setConfidence(in.confidence());
         t.setNote(in.note());
         t.setSortOrder(order);

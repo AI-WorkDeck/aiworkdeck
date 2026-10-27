@@ -20,17 +20,17 @@ function loadOptions(searchProjectContent, uni) {
     .replace(/^\s*import[\s\S]*?from\s*'[^']*'\s*$/gm, '')
     .replace(/export\s+default/, 'return')
   const factory = new Function(
-    'searchProjectContent', 'getProjectTags', 'FileTypeIcon',
+    'searchProjectContent', 'getProjectTags', 'FileTypeIcon', 'TagFilter',
     'TAG_TYPE_PARTY', 'TAG_TYPE_ISSUE', 'TAG_TYPE_NORMAL', 'normalizeTagType',
     'uni', body)
-  return factory(searchProjectContent, () => Promise.resolve([]), {},
+  return factory(searchProjectContent, () => Promise.resolve([]), {}, {},
     'PARTY', 'ISSUE', 'NORMAL', () => 'NORMAL', uni || { showToast() {} })
 }
 
 function makeVm(options, props) {
   const vm = Object.assign({}, options.data(), props)
   for (const [k, fn] of Object.entries(options.methods)) vm[k] = fn.bind(vm)
-  for (const [k, fn] of Object.entries(options.computed))
+  for (const [k, fn] of Object.entries(options.computed || {}))
     Object.defineProperty(vm, k, { get: fn.bind(vm) })
   vm.$t = (k) => k
   return vm
@@ -111,6 +111,8 @@ test('被取消的请求静默收尾：不弹「搜索失败」、不关掉新�
   assert.equal(vm.loading, true, '新请求还在路上，加载态要保持')
 
   api.calls[1].resolve(RESULT)
+  await Promise.resolve()
+  api.calls[2].resolve(RESULT)
   await second
   assert.equal(vm.loading, false)
   assert.equal(vm.results.totalMatches, 1)
@@ -133,7 +135,7 @@ test('只选了标签（关键词为空）照常发请求', () => {
   const api = abortableApi()
   const vm = makeVm(loadOptions(api.fn), { projectId: 1 })
 
-  vm.toggleTag(7)
+  vm.setTags([7])
 
   assert.equal(api.calls.length, 1, '纯标签筛选是合法搜索')
   assert.deepEqual(api.calls[0].payload.tagIds, [7])

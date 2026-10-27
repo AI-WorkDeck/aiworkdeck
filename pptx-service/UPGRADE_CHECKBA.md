@@ -25,10 +25,10 @@ a9a5c36 这一版新进来的）。本项目自己的 CLA 在 `legal/CLA.md`、�
 | 文件 | 定制内容 |
 |---|---|
 | `backend/services/ai_service_manager.py` + `backend/controllers/project_controller.py` + `backend/controllers/export_controller.py` | **模型配置 model_config 消费端**（见下方专节，2026-08-08 补回）：主后端在每个生成请求体里下发供应商/密钥/模型，本服务据此建 AIService，而不是用自己的 `GOOGLE_API_KEY` |
-| `backend/services/file_parser_service.py` | 本地 MinerU 优先逻辑：`_truthy`/`_should_force_cloud`/`_get_local_mineru_url` 辅助函数、`__init__` 的 `mineru_local_url` 参数（缺省自动读 Flask config/env，调用点无需改动）、`_check_local_service`/`_parse_with_local_service`/`_save_local_mineru_result` 三个方法、`parse_file` 里"本地优先→云端兜底→无 token 报错"路由 |
-| `backend/config.py` | `MINERU_LOCAL_URL`（默认 `http://mineru-service:8000`）与 `MINERU_FORCE_CLOUD`（默认 `'1'`，桌面端 spawn 时会传 env=0 放开本地优先） |
+| `backend/services/file_parser_service.py` | 本地 MinerU 优先逻辑：`_truthy`/`_should_force_cloud`/`_get_local_mineru_url` 辅助函数、`__init__` 的 `mineru_local_url` / `local_only` 参数（缺省自动读 Flask config/env，调用点无需改动）、`_check_local_service`/`_parse_with_local_service`/`_save_local_mineru_result` 三个方法、`parse_file` 默认只走本地，失败不转云；只有显式 `MINERU_FORCE_CLOUD=1` 一般解析入口走云；`local_only` 覆盖云配置并禁用图片caption |
+| `backend/config.py` | `MINERU_LOCAL_URL`（默认 `http://mineru-service:8000`）与 `MINERU_FORCE_CLOUD`（默认 `'0'`，只有管理员显式配置 `1` 才使用云端；专用本地OCR仍不转云） |
 | `backend/app.py` | 四项：① `PPTX_DATA_DIR` 数据目录外置（桌面打包态 resources 只读，DB/uploads 必须写到注入目录）；配套测试 `backend/tests/test_data_dir.py`。**v0.7.0 tag 首次构建就是因 re-vendor 漏掉此项+下面端口语义变化而红**；② 注册 `pptx_edit_bp` / `pdf_convert_bp` 两个自有蓝图（见下方对应行）；③ `create_app()` 末尾调 `task_manager.reconcile_orphaned_tasks()` 做启动对账（见 task_manager 行）；④ 两处安全加固——`debug` 改成只认显式 `FLASK_ENV=development`（上游默认值就是 `development`，漏配等于开着 Werkzeug 交互式控制台），`app.run` 的 host 改成 `os.getenv('PPTX_BIND_HOST', '127.0.0.1')`（上游硬编码 `0.0.0.0`，本服务端点不做鉴权，桌面版绑 0.0.0.0 等于把按路径读写文件的能力开放给同一局域网；容器内由 compose 显式设 `PPTX_BIND_HOST=0.0.0.0`） |
-| `.env.example` | MinerU 本地服务段（`MINERU_LOCAL_URL` / `MINERU_FORCE_CLOUD=0`）+ `BACKEND_PORT=5001` + `MINERU_TOKEN` 默认置空（上游是占位串 `your-mineru-token`，非空会让「本地优先→云端兜底」的兜底分支拿着假 token 去打云端） |
+| `.env.example` | MinerU 本地服务段（`MINERU_LOCAL_URL` / `MINERU_FORCE_CLOUD=0`）+ `BACKEND_PORT=5001` + `MINERU_TOKEN` 默认置空（上游是占位串 `your-mineru-token`，历史版本非空会导致隐式云回退；现版本默认已禁止该回退） |
 | `docker-compose.yml` / `docker-compose.prod.yml` | 宿主机端口默认 `5001:5000`（对齐 PptxServiceClient 默认 base-url） |
 | `requirements.lock` | 桌面打包/CI 用（`desktop/scripts/prepare-python-service.js`、`.github/workflows/desktop-build.yml`）。再生成：`uv export --no-dev --no-hashes --no-emit-project -o requirements.lock` |
 | `uv.lock` | 上游文件，但要随 `pyproject.toml` 多出的 `pdf2docx` 重新解析。**不要手改**，`uv lock` / `uv export` 会顺带更新它 |
@@ -37,7 +37,7 @@ a9a5c36 这一版新进来的）。本项目自己的 CLA 在 `legal/CLA.md`、�
 | `backend/utils/pptx_format_utils.py` | **checkba 新增**：run/段落格式读写（东亚字体 `<a:ea>`、删除线、高亮、buChar/buAutoNum 的 oxml 补齐；HOUSE 字体常量 楷体_GB2312/Arial，env `PPTX_HOUSE_EA_FONT`/`PPTX_HOUSE_LATIN_FONT` 可覆盖） |
 | `backend/utils/pptx_builder.py` | **checkba 改造**：`add_text_element`/`add_table_element` 落字走 sanitizer（markdown → 真格式）、写 HOUSE 字体、多行文本逐行成段修复只有首段吃到样式的缺陷、列表行写真实项目符号；`_set_core_properties` 去掉必抛的 `last_printed=None` |
 | `backend/services/pptx_format_service.py` + `backend/controllers/pptx_edit_controller.py` | **checkba 新增**：存量 pptx 格式识别与操作端点 `POST /api/pptx/inspect`、`POST /api/pptx/format`（六种 op：run 格式/段落格式/替换文本/整框重写/单元格文本/单元格格式），注册见 `app.py`、`controllers/__init__.py` 的 `[checkba]` 标记 |
-| `backend/services/pdf_convert_service.py` + `backend/controllers/pdf_convert_controller.py` | **checkba 新增**：PDF 转换端点 `POST /api/pdf/to-docx`（pdf2docx 版式级转 Word，限文本型）、`POST /api/pdf/ocr-markdown`（扫描件经 FileParserService 走本地 MinerU 优先/云端兜底出 markdown，不引入第三方云 OCR）。依赖 `pdf2docx`（连带 pymupdf/opencv-headless，desktop 包体积 +~130MB）已进 pyproject 与 requirements.lock |
+| `backend/services/pdf_convert_service.py` + `backend/controllers/pdf_convert_controller.py` | **checkba 新增**：PDF 转换端点 `POST /api/pdf/to-docx`（pdf2docx 版式级转 Word，限文本型）、`POST /api/pdf/ocr-markdown-local`（新客户端专用，旧路径保留同一安全实现；扫描件经 FileParserService(local_only=True) 只走本地 MinerU，失败不转云，不调用云图片caption）。依赖 `pdf2docx`（连带 pymupdf/opencv-headless，desktop 包体积 +~130MB）已进 pyproject 与 requirements.lock |
 | `backend/controllers/settings_controller.py` | **checkba 改动（PR#241）**：新增 `_reject_without_settings_token()`——`PPTX_SETTINGS_TOKEN` 未配置即 403 关闭写入面（而不是默认放开），配置了则用 `hmac.compare_digest` 比 `X-Settings-Token` 头。三个调用点：`update_settings`（PUT /api/settings/）、`reset_settings`（POST /api/settings/reset）、`run_settings_test`（POST /api/settings/tests/<name>，它能用请求体的 `api_base_url` 覆盖出网地址却沿用已存的真实 key，等于一次不落库的凭据外泄，所以与写设置同级把关）。**全仓从不设置这个变量，所以这三个端点在产品里恒 403**——这正是 model_config 必须由主后端按请求下发的原因 |
 | `backend/tests/unit/test_api_settings_provider.py` | **上游用例，checkba 打了补丁**：上游 a9a5c36 新增的 `test_update_settings_accepts_lazyllm_provider` 裸调 `update_settings()`，撞上上一行那道 403 闸。补丁给它塞 `PPTX_SETTINGS_TOKEN` 环境变量与 `X-Settings-Token` 请求头，用例仍测「lazyllm 是合法取值」。**下次 re-vendor 若这条用例又红成 `assert 403 == 200`，就是这处补丁没跟上** |
 | `backend/services/task_manager.py` | **checkba 新增（PR#526）**：`TaskManager.reconcile_orphaned_tasks()` 静态方法——进程重启后数据库里残留的 `PENDING`/`PROCESSING` 任务一律判 `FAILED`（`active_tasks` 是进程内字典，执行器早没了，前端会永远轮询转圈）。由 `app.py` 的 `create_app()` 在 app context 里调用。回归用例 `backend/tests/unit/test_task_reconcile.py` |
@@ -175,4 +175,8 @@ a9a5c36 这一版新进来的）。本项目自己的 CLA 在 `legal/CLA.md`、�
 > | POST | /api/pptx/inspect | 存量 pptx 结构化格式全览（字体/字号/粗斜删下/高亮/颜色/对齐/行距/项目符号/表格） |
 > | POST | /api/pptx/format | 批量格式操作（set_run_format / set_paragraph_format / replace_text / set_shape_text / set_cell_text / set_cell_format），落字自动去 markdown |
 > | POST | /api/pdf/to-docx | 版式级 PDF→Word（pdf2docx；文本型未加密 PDF） |
-> | POST | /api/pdf/ocr-markdown | 扫描件 MinerU OCR 出 markdown（本地 mineru-service 优先，云端 token 兜底） |
+> | POST | /api/pdf/ocr-markdown-local | 扫描件仅本地 MinerU OCR 出 markdown（旧 /api/pdf/ocr-markdown 保留同一实现） |
+
+### 本地 OCR 资源包升级边界（dev-board#1387）
+
+Java 客户端只请求 `POST /api/pdf/ocr-markdown-local`。原 `ocr-markdown` 在旧包可能转云，因此新端点404时必须停止并提示组件版本不支持可靠本地OCR，不请求旧端点、不自动循环安装同版本。2026-10-21核验的线上 `pptx-runtime` 1.0.1 不含新端点；本修复需后续构建并签名发布包含这些Python源码的 `pptx-runtime` 新版本（最早计划1.0.2），再实际更新组件。**本文不是已发布记录**；可用性以新端点和本地路由能力为准，不凭版本字符串假定安全。仅更新Java应用而未更新资源包时，本地扫描PDF转Word会明确暂不可用，不以旧接口继续；工具层可按用户明确选择走现有阿里云OCR服务完成内容级转换。

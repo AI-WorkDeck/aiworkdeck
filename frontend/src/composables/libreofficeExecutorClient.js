@@ -40,6 +40,7 @@ export const EDITOR_ACTIONS = [
   // [spike/IME] implemented by the worker since Phase B but never whitelisted
   // (found by the primitive self-test: "Unknown action: move_cursor").
   'move_cursor', 'delete_backward', 'delete_forward', 'insert_paragraph', 'get_cursor_rect',
+  'stash_selection_for_drag', 'complete_selection_drag',
   // [overlay Tab] 表格里跳格 / 正文里插制表符——判定在 worker（宿主不知道光标属于
   // 哪个 story）。宿主发起，不是 AI 管线。
   'tab_key',
@@ -110,6 +111,7 @@ export const EDITOR_ACTIONS = [
   // 「当前这一格 / 当前这一页」的取数原语（顶上那条版本身份小条 #672 起是文件级的，
   // 不再用它们；两条原语本身是引擎公开 API，lowa-e2e 组 34 有用例）。
   'build_merge_draft', 'merge_take_other', 'sheet_get_active_cell', 'slide_get_current',
+  'office_get_navigation', 'office_activate_item', 'slide_get_thumbnail',
   // [格式增强] 富格式原语：编号/表格/格式读取/全文标准格式化；insert_under_heading
   // 是后端一直在派发但从未接通的原语（本次补齐 worker 实现）。
   'set_numbering', 'format_table', 'insert_table', 'get_formatting', 'apply_house_style',
@@ -303,7 +305,18 @@ export function createLibreOfficeExecutor(opts = {}) {
       (action === 'build_comparison_document' || action === 'export_document')
     return new Promise((resolve, reject) => {
       const timer = waitForCompletion ? null : setTimeout(() => {
-        if (pending.has(reqId)) { pending.delete(reqId); reject(Object.assign(new Error('等待编辑器结果超时，操作可能仍在执行。请先检查文档和修订记录，确认结果前不要重复执行写入操作。 / Editor result timed out; the operation may still be running. Check the document and tracked changes before repeating any write.'), { code: 'EDITOR_RESULT_TIMEOUT' })) }
+        if (pending.has(reqId)) {
+          pending.delete(reqId)
+          let isEn = false
+          try {
+            if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') isEn = true
+            else if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') isEn = true
+          } catch (_) { /* ignore */ }
+          const timeoutMsg = isEn
+            ? 'Editor result timed out; the operation may still be running. Check the document and tracked changes before repeating any write.'
+            : '等待编辑器结果超时，操作可能仍在执行。请先检查文档和修订记录，确认结果前不要重复执行写入操作。'
+          reject(Object.assign(new Error(timeoutMsg), { code: 'EDITOR_RESULT_TIMEOUT' }))
+        }
       }, budget)
       pending.set(reqId, { resolve, reject, timer, onProgress: callOpts && callOpts.onProgress })
       if (callOpts && callOpts.onIssued) { try { callOpts.onIssued(reqId) } catch (e) { /* ignore */ } }

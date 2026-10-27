@@ -33,3 +33,27 @@ test('Qt resize follows actual canvas changes, never an idle heartbeat', async t
   boot.dispose();assert.equal(disconnected,true)
   canvas.clientWidth=1000;observe([]);assert.equal(pulses,3,'late callback after disposal is ignored')
 })
+
+test('only explicit initial-document boot reaches the office pthread; UI stays hidden until model readiness', async t => {
+  const names = ['document', 'Module', 'ResizeObserver', 'dispatchEvent']
+  const saved = new Map(names.map(k => [k, Object.getOwnPropertyDescriptor(globalThis, k)]))
+  t.after(() => { for (const [k, d] of saved) d ? Object.defineProperty(globalThis, k, d) : delete globalThis[k] })
+  globalThis.ResizeObserver = class { observe() {} disconnect() {} }
+  globalThis.dispatchEvent = () => {}
+  for (const initialDocument of [false, true]) {
+    const port = { onmessage: null }, canvas = { clientWidth: 800, clientHeight: 600, style: { visibility: 'hidden' } }
+    globalThis.document = { createElement: () => ({}), body: { appendChild: s => {
+      globalThis.Module.uno_main = Promise.resolve(port); s.onload()
+    } } }
+    const boot = await bootZetaOffice({ canvas, sofficeBaseUrl: 'http://localhost/lowa/', initialDocument, uiLang: '' })
+    const bootstrap = await globalThis.Module.mainScriptUrlOrBlob.text()
+    const worker = {}, imports = []
+    new Function('self', 'importScripts', bootstrap)(worker, url => imports.push(url))
+    assert.equal(worker.__awdInitialDocument === true, initialDocument)
+    assert.deepEqual(imports, ['http://localhost/lowa/soffice.js'])
+    assert.equal(canvas.style.visibility, 'hidden', 'the command port is not document readiness')
+    port.onmessage({ data: { cmd: 'ui_ready' } })
+    assert.equal(canvas.style.visibility, 'visible')
+    boot.dispose()
+  }
+})

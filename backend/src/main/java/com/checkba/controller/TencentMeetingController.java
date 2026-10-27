@@ -6,6 +6,7 @@ package com.checkba.controller;
 import com.checkba.model.entity.ProjectFile;
 import com.checkba.model.entity.TencentMeetingRecord;
 import com.checkba.model.entity.TencentMeetingSyncConfig;
+import com.checkba.service.LangText;
 import com.checkba.service.tmeet.TencentMeetingService;
 import com.checkba.service.tmeet.dto.TmeetAuthStatus;
 import lombok.Data;
@@ -45,7 +46,7 @@ public class TencentMeetingController {
     @PostMapping("/auth/logout")
     public Map<String, Object> logout() {
         boolean ok = tencentMeetingService.logout();
-        return Map.of("code", 0, "data", ok, "message", ok ? "已登出" : "登出失败");
+        return Map.of("code", 0, "data", ok, "message", ok ? LangText.of("已登出", "Signed out") : LangText.of("登出失败", "Failed to sign out"));
     }
 
     @GetMapping("/config")
@@ -130,7 +131,7 @@ public class TencentMeetingController {
             @RequestBody ExportDocDto body) {
         Long userId = resolveUserId(sessionId);
         if (body.getProjectId() == null) {
-            throw new IllegalArgumentException("必须指定目标项目 projectId");
+            throw new IllegalArgumentException(LangText.of("必须指定目标项目 projectId", "Target projectId is required"));
         }
         ProjectFile file = tencentMeetingService.exportToProjectDoc(id, body.getProjectId(), userId);
         Map<String, Object> res = new HashMap<>();

@@ -73,40 +73,42 @@
               class="staging-item"
               :class="{ selected: selectedIds.includes(file.id) }"
               :data-id="file.id"
-              ref="fileItems"
-              draggable="true" 
-              @dragstart.stop="onDragStart(file, $event)"
-              @dragend="onDragEnd"
-              @tap.stop="onItemClick(file, $event)"
-              @dblclick.stop="handleDoubleClick(file)"
-           >
-              <view class="checkbox-wrapper" @tap.stop="toggleCheck(file.id)">
-                <view class="custom-checkbox" :class="{ checked: selectedIds.includes(file.id) }">
-                  <text v-if="selectedIds.includes(file.id)" class="check-mark">√</text>
-                </view>
-              </view>
-              <!-- 与资源管理器文件行同一个图标组件（dev-board#973） -->
-              <view class="file-icon"><FileTypeIcon :type="file.fileType" /></view>
-              <text class="file-name" :title="file.name">{{ file.name }}</text>
-              <text class="remove-btn" @tap.stop="$emit('remove', file.id)">×</text>
-           </view>
-       </scroll-view>
-      
-    </view>
+               ref="fileItems"
+               draggable="true"
+               @mouseenter="onItemPrimeDrag(file)"
+               @mousedown="onItemPrimeDrag(file)"
+               @dragstart.stop="onDragStart(file, $event)"
+               @dragend="onDragEnd"
+               @tap.stop="onItemClick(file, $event)"
+               @dblclick.stop="handleDoubleClick(file)"
+            >
+               <view class="checkbox-wrapper" @tap.stop="toggleCheck(file.id)">
+                 <view class="custom-checkbox" :class="{ checked: selectedIds.includes(file.id) }">
+                   <text v-if="selectedIds.includes(file.id)" class="check-mark">√</text>
+                 </view>
+               </view>
+               <!-- 与资源管理器文件行同一个图标组件（dev-board#973） -->
+               <view class="file-icon"><FileTypeIcon :type="file.fileType" /></view>
+               <text class="file-name" :title="file.name">{{ file.name }}</text>
+               <text class="remove-btn" @tap.stop="$emit('remove', file.id)">×</text>
+            </view>
+        </scroll-view>
 
-    <!-- Drop Overlay (Only visible when dragging over THIS component) -->
-    <view 
-      v-if="isDragOver"
-      class="drop-overlay"
-      @dragenter.prevent
-      @dragover.prevent
-      @dragleave.prevent="onDragLeave"
-      @drop.prevent="onDrop"
-    >
-      <text>{{ $t('files.dropToStage') }}</text>
-    </view>
-    
-  </view>
+     </view>
+
+     <!-- Drop Overlay (Only visible when dragging over THIS component) -->
+     <view
+       v-if="isDragOver"
+       class="drop-overlay"
+       @dragenter.prevent
+       @dragover.prevent
+       @dragleave.prevent="onDragLeave"
+       @drop.prevent="onDrop"
+     >
+       <text>{{ $t('files.dropToStage') }}</text>
+     </view>
+
+   </view>
 </template>
 
 <script>
@@ -114,6 +116,11 @@ import { ICONS } from '@/config/icons.js'
 import { warmDragImage, applyDragImage } from '@/utils/dragImage.js'
 import UnlockHint from '@/components/UnlockHint.vue'
 import FileTypeIcon from '@/components/FileTypeIcon.vue'
+import { host } from '@/services/host.js'
+import { getFileLocalPath, getApiBaseUrl } from '@/services/api.js'
+import { getAuthHeaders } from '@/utils/auth.js'
+import { nativeEvent, nativeDataTransfer, captureDroppedFiles, isExternalFileDrag } from '@/utils/fileTreeExternalDrop.js'
+import { prefetchLocalFilePath, startExternalFileDrag } from '@/utils/fileLocalDrag.js'
 export default {
   name: 'FileStagingArea',
   components: { UnlockHint, FileTypeIcon },
@@ -230,32 +237,14 @@ export default {
         this.$emit('compare', selectedFiles)
     },
     
-    // Handling Drag Out (Staging -> Editor/Tree)
-    // Handling Drag Out (Staging -> Editor/Tree)
+    // Handling Drag Out (Staging -> Editor/Tree/WeChat)
+    onItemPrimeDrag(file) {
+      if (!file || !file.id || file.fileType === 'folder') return
+      if (!host.fs || typeof host.fs.startDrag !== 'function') return
+      prefetchLocalFilePath(file.id, getFileLocalPath)
+    },
     onDragStart(file, event) {
-      // Standard data format for internal file drag
-      if (event.dataTransfer) {
-          event.dataTransfer.effectAllowed = 'copy'
-          // 小徽标拖拽影像：不设的话是整行元素快照（含 × 删除钮）浮在正文上
-          applyDragImage(event)
-          // Use the same format as FileTree to handle drop in editors
-          event.dataTransfer.setData('application/json', JSON.stringify(file))
-          // Also text/plain for general use
-          event.dataTransfer.setData('text/plain', file.name)
-          
-          // Internal custom format
-          try {
-             const fileData = JSON.stringify({
-                 fileId: file.id,
-                 name: file.name,
-                 fileType: file.fileType || 'file',
-                 wpsFileId: file.wpsFileId
-             })
-             event.dataTransfer.setData('application/x-checkba-file', fileData)
-          } catch(err) {}
-      }
-      
-      // Global fallback for all envs
+      // Global fallback for all envs (set before emit and startExternalFileDrag)
       if (typeof document !== 'undefined') {
          document.__checkbaDraggedFile = {
              fileId: file.id,
@@ -265,6 +254,45 @@ export default {
          }
       }
       uni.$emit('file-drag-start')
+
+      const nativeEv = nativeEvent(event)
+      const dt = nativeDataTransfer(event)
+      // Standard data format for internal file drag
+      if (dt) {
+          dt.effectAllowed = 'copy'
+          // 小徽标拖拽影像：不设的话是整行元素快照（含 × 删除钮）浮在正文上
+          applyDragImage(nativeEv || event)
+          // Use the same format as FileTree to handle drop in editors
+          try {
+             dt.setData('application/json', JSON.stringify(file))
+             // Also text/plain for general use
+             dt.setData('text/plain', file.name)
+             const fileData = JSON.stringify({
+                 fileId: file.id,
+                 name: file.name,
+                 fileType: file.fileType || 'file',
+                 wpsFileId: file.wpsFileId
+             })
+             dt.setData('application/x-checkba-file', fileData)
+          } catch(err) {}
+      }
+
+      if (file && file.id && file.fileType !== 'folder') {
+        const result = startExternalFileDrag(file, {
+          fs: host.fs,
+          event: nativeEv || event,
+          baseUrl: getApiBaseUrl(),
+          headers: getAuthHeaders(),
+          onCleanup: () => this.onDragEnd()
+        })
+        const reportFailure = res => {
+          if (host.fs?.startDrag && res?.ok === false && res.reason !== 'unsupported') {
+            uni.showToast({ title: this.$t('fileTree.externalDragFailed'), icon: 'none' })
+          }
+        }
+        if (result && typeof result.then === 'function') result.then(reportFailure)
+        else reportFailure(result)
+      }
     },
     onDragEnd() {
       // 拖拽被取消（拖出窗口 / Esc / 落空）时全局兜底没人消费，留着会被下一次
@@ -356,9 +384,11 @@ export default {
       const nativeDt = (e && e.dataTransfer)
         || (typeof window !== 'undefined' && window.event && window.event.dataTransfer)
         || null
-      const osFiles = nativeDt && nativeDt.files
-      if (osFiles && osFiles.length > 0) {
-          this.$emit('drop-files', Array.from(osFiles))
+      const osFiles = captureDroppedFiles(nativeDt, host.fs)
+      if (osFiles.length > 0) {
+          this.$emit('drop-files', osFiles)
+      } else if (isExternalFileDrag(nativeDt)) {
+          uni.showToast({ title: this.$t('fileTree.importDropUnreadable'), icon: 'none' })
       }
     },
     
@@ -391,7 +421,7 @@ export default {
   
   background: var(--awd-surface);
   border-top: 1px solid var(--awd-border);
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--awd-shadow-sm);
   transition: all 0.2s ease;
 }
 
@@ -401,7 +431,7 @@ export default {
 }
 
 .staging-header {
-    height: 32px;
+    height: var(--awd-control-height);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -417,7 +447,7 @@ export default {
 }
 
 .staging-title {
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     font-weight: 600;
     color: var(--awd-text-2);
 }
@@ -430,7 +460,7 @@ export default {
     justify-content: center;
     cursor: pointer;
     color: var(--awd-text-3);
-    border-radius: 4px;
+    border-radius: var(--awd-radius-sm);
 }
 
 .collapse-btn:hover {
@@ -440,12 +470,12 @@ export default {
 
 .collapse-icon {
     font-family: "Material Icons"; /* Assuming material icons are available or use text */
-    font-size: 16px;
+    font-size: var(--awd-font-size-title);
     line-height: 1;
 }
 
 .clear-btn {
-    font-size: 11px;
+    font-size: var(--awd-panel-fs-meta);
     color: var(--awd-text-3);
     cursor: pointer;
 }
@@ -466,7 +496,7 @@ export default {
 .quota-bar {
     flex: 1;
     height: 3px;
-    border-radius: 2px;
+    border-radius: var(--awd-radius-sm);
     background: var(--awd-surface-3);
     overflow: hidden;
 }
@@ -474,12 +504,12 @@ export default {
 .quota-fill {
     height: 100%;
     background: var(--awd-surface-3);
-    border-radius: 2px;
+    border-radius: var(--awd-radius-sm);
     transition: width 0.2s ease, background 0.2s ease;
 }
 
 .quota-text {
-    font-size: 11px;
+    font-size: var(--awd-panel-fs-meta);
     color: var(--awd-text-3);
     flex-shrink: 0;
 }
@@ -502,10 +532,10 @@ export default {
     align-items: center;
     justify-content: center;
     color: var(--awd-text-3);
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     border: 2px dashed var(--awd-border);
     margin: 8px;
-    border-radius: 6px;
+    border-radius: var(--awd-radius-md);
 }
 
 .staging-list-container {
@@ -527,10 +557,10 @@ export default {
     display: flex;
     align-items: center;
     padding: 4px 8px;
-    border-radius: 4px;
+    border-radius: var(--awd-radius-sm);
     cursor: pointer;
     margin-bottom: 2px;
-    background: white;
+    background: var(--awd-surface);
     border: 1px solid transparent;
     user-select: none; /* Prevent text selection */
 }
@@ -545,7 +575,7 @@ export default {
     width: 14px;
     height: 14px;
     border: 1px solid var(--awd-border-strong);
-    border-radius: 3px;
+    border-radius: var(--awd-radius-sm);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -560,7 +590,7 @@ export default {
 
 .check-mark {
     color: var(--awd-text-on-accent);
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     font-weight: bold;
     line-height: 1;
 }
@@ -585,7 +615,7 @@ export default {
 }
 
 .file-name {
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     color: var(--awd-text);
     flex: 1;
     white-space: nowrap;
@@ -597,7 +627,7 @@ export default {
     margin-left: 8px;
     color: var(--awd-text-3);
     cursor: pointer;
-    font-size: 16px;
+    font-size: var(--awd-font-size-title);
     line-height: 1;
     padding: 4px;
 }
@@ -614,20 +644,20 @@ export default {
 }
 
 .btn-compare {
-    background: var(--awd-info);
-    color: white;
+    background: var(--awd-accent);
+    color: var(--awd-text-on-accent);
     border: none;
-    border-radius: 4px;
+    border-radius: var(--awd-radius-sm);
     padding: 4px 12px;
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     display: flex;
     align-items: center;
     gap: 4px;
     cursor: pointer;
-    line-height: 1.5;
+    line-height: var(--awd-line-height-ui);
 }
 .btn-compare:hover {
-    background: var(--awd-info);
+    background: var(--awd-accent-hover);
 }
 
 .drop-overlay {
@@ -636,12 +666,12 @@ export default {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(59, 130, 246, 0.1);
-    border: 2px dashed var(--awd-info);
+    background: var(--awd-accent-wash);
+    border: 2px dashed var(--awd-accent);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--awd-info-text);
+    color: var(--awd-accent-text);
     font-weight: 600;
     pointer-events: none; /* Let drag events pass through to layer below if needed, but here overlay is top */
     z-index: 101;
@@ -655,8 +685,8 @@ export default {
 
 .marquee-box {
     position: absolute;
-    background: rgba(59, 130, 246, 0.2);
-    border: 1px solid var(--awd-info);
+    background: var(--awd-accent-soft);
+    border: 1px solid var(--awd-accent);
     pointer-events: none;
     z-index: 1000;
 }

@@ -65,6 +65,7 @@ class ContentSearchServiceCacheTest {
     private ProjectFileRepository projectFileRepository;
     private StorageService storageService;
     private ContentSearchService service;
+    private final ProjectFileAccessService fileAccess = mock(ProjectFileAccessService.class);
 
     /** 文件被真正打开字节流（= 真抽取一次）的次数。 */
     private final AtomicInteger reads = new AtomicInteger();
@@ -113,6 +114,7 @@ class ContentSearchServiceCacheTest {
 
     @BeforeEach
     void setUp() {
+        when(fileAccess.readFilterForProject(PROJECT_ID, 9L)).thenReturn(file -> true);
         projectFileRepository = mock(ProjectFileRepository.class);
         FileTagRepository fileTagRepository = mock(FileTagRepository.class);
         TagRepository tagRepository = mock(TagRepository.class);
@@ -140,7 +142,7 @@ class ContentSearchServiceCacheTest {
         ProjectFileTextCacheService textCache =
                 new ProjectFileTextCacheService(cacheRepo, new AiContextProperties());
         service = new ContentSearchService(projectFileRepository, fileTagRepository, tagRepository,
-                documentTextService, textCache);
+                documentTextService, textCache, fileAccess);
     }
 
     @AfterEach
@@ -186,12 +188,12 @@ class ContentSearchServiceCacheTest {
     void secondSearchDoesNotReExtract() {
         seedTxtFiles(FILE_COUNT);
 
-        SearchResult first = service.searchContent(PROJECT_ID, query("借款合同"));
+        SearchResult first = service.searchContent(PROJECT_ID, query("借款合同"), 9L);
         assertEquals(FILE_COUNT / 2, first.getTotalFiles());
         assertEquals(FILE_COUNT, reads.get(), "第一次搜索每个文件抽一次");
 
         reads.set(0);
-        SearchResult second = service.searchContent(PROJECT_ID, query("银行流水"));
+        SearchResult second = service.searchContent(PROJECT_ID, query("银行流水"), 9L);
 
         assertEquals(FILE_COUNT / 2, second.getTotalFiles(), "换了查询词，结果必须照样对");
         assertEquals(0, reads.get(), "文件一个字节都没变，第二次搜索不该再抽取任何文件");
@@ -201,14 +203,14 @@ class ContentSearchServiceCacheTest {
     @DisplayName("文件改过（mtime 变）就重抽那一份，搜到的是新内容，其余照旧命中缓存")
     void changedFileIsReExtracted() {
         List<ProjectFile> files = seedTxtFiles(FILE_COUNT);
-        service.searchContent(PROJECT_ID, query("借款合同"));
+        service.searchContent(PROJECT_ID, query("借款合同"), 9L);
 
         ProjectFile edited = files.get(0); // id=1，原本不含「借款合同」
         when(storageService.load(edited.getFilePath()))
                 .thenReturn(new DiskLikeResource("改过之后：补签借款合同", 9_999L));
         reads.set(0);
 
-        SearchResult after = service.searchContent(PROJECT_ID, query("借款合同"));
+        SearchResult after = service.searchContent(PROJECT_ID, query("借款合同"), 9L);
 
         assertEquals(FILE_COUNT / 2 + 1, after.getTotalFiles(), "改过的文件必须按新内容命中");
         assertTrue(after.getResults().stream().anyMatch(r -> r.getFileId() == 1L));
@@ -221,7 +223,7 @@ class ContentSearchServiceCacheTest {
         seedTxtFiles(8);
         extractDelayMs = 60;
 
-        SearchResult result = service.searchContent(PROJECT_ID, query("借款合同"));
+        SearchResult result = service.searchContent(PROJECT_ID, query("借款合同"), 9L);
 
         assertEquals(4, result.getTotalFiles());
         assertTrue(maxInFlight.get() >= 2,
@@ -234,7 +236,7 @@ class ContentSearchServiceCacheTest {
         seedTxtFiles(FILE_COUNT);
         extractDelayMs = 3;
 
-        SearchResult result = service.searchContent(PROJECT_ID, query("借款合同"));
+        SearchResult result = service.searchContent(PROJECT_ID, query("借款合同"), 9L);
 
         List<Long> ids = result.getResults().stream().map(r -> r.getFileId()).toList();
         List<Long> expected = new ArrayList<>();
@@ -255,7 +257,7 @@ class ContentSearchServiceCacheTest {
             List<Future<SearchResult>> futures = new ArrayList<>();
             for (int i = 0; i < 12; i++) {
                 String q = i % 2 == 0 ? "借款合同" : "银行流水";
-                Callable<SearchResult> call = () -> service.searchContent(PROJECT_ID, query(q));
+                Callable<SearchResult> call = () -> service.searchContent(PROJECT_ID, query(q), 9L);
                 futures.add(callers.submit(call));
             }
             for (Future<SearchResult> f : futures) {
@@ -269,7 +271,7 @@ class ContentSearchServiceCacheTest {
         assertEquals(FILE_COUNT, rows.size(), "每个文件最终都应落进缓存，且只占一行");
 
         reads.set(0);
-        service.searchContent(PROJECT_ID, query("借款合同"));
+        service.searchContent(PROJECT_ID, query("借款合同"), 9L);
         assertEquals(0, reads.get(), "并发写完缓存之后，再搜不该有任何重抽");
     }
 
@@ -281,7 +283,7 @@ class ContentSearchServiceCacheTest {
                 .thenReturn(List.of(pdf));
         when(storageService.load(pdf.getFilePath())).thenReturn(new DiskLikeResource(pdfWithText("p.1"), 5_000L));
 
-        service.searchContent(PROJECT_ID, query("p.1"));
+        service.searchContent(PROJECT_ID, query("p.1"), 9L);
 
         assertFalse(rows.containsKey(99L), "文字层不可用的 PDF 不能以 text 来源写进共享缓存");
     }
