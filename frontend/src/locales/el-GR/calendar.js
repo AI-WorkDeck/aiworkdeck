@@ -157,5 +157,16 @@ export default {
   "paneEmptyMonth": "Καμία εργασία αυτόν τον μήνα",
   "paneEmptyFile": "Καμία εργασία συνδεδεμένη με αυτό το αρχείο ακόμη",
   "railScheduleTitle": "Πρόγραμμα ({overdue} εκτός προθεσμίας · {today} σήμερα)",
-  "tabName": "Πρόγραμμα"
+  "tabName": "Πρόγραμμα",
+  "workspaceAll": "Όλα τα έργα",
+  "workspaceCurrent": "Τρέχον έργο",
+  "workspaceUpcoming": "Προσεχώς",
+  "workspaceDays": "Επόμενες {count} ημέρες",
+  "workspaceRetry": "Επαναφόρτωση",
+  "workspaceOverdue": "{count} εκπρόθεσμα",
+  "workspaceNoUpcoming": "Καμία προθεσμία στις επόμενες {count} ημέρες",
+  "workspaceLinked": "Τα φίλτρα συγχρονίζονται με το ημερολόγιο. Επιλέξτε στοιχείο για λεπτομέρειες.",
+  "workspaceDay": "Ημέρα",
+  "workspaceYear": "Έτος",
+  "workspaceEventCount": "{count} στοιχεία",
 }

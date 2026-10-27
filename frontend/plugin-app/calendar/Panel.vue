@@ -1,43 +1,15 @@
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
-<!--
-  日程主体（跨项目事项的日历 + 议程）。dev-board #50 起步，#897 重做，#1048 从
-  pages/calendar/calendar.vue 抽成组件，供全局日程页（薄壳）与工作台「日程」标签共用。
-  spec: docs/superpowers/specs/2026-09-25-task-calendar-redesign.md 第三节；
-        docs/superpowers/specs/2026-09-29-defer-login-welcome-tab-design.md 第 7 节。
-
-  契约
-    props  projectId   可空。空 = 全局视图（loadGlobal，跨项目）；有值 = 只看这个项目
-                       （仍读 loadGlobal 的全局缓存，按 projectId 收窄；筛选里的项目段隐藏，
-                       新建事项锁定到该项目）。组件不会拼 /api/projects/{id}/ 一类路径。
-           embedded    标签形态为 true。
-           focus       深链：事项 id，定位到其所在月并打开编辑（值变化时再次生效）。
-           group       深链：overdue|today|week|later，议程滚到该组（值变化时再次生效）。
-    emits  open-project({projectId})         「进入项目」
-           open-file({projectId, fileId})    文件芯片
-           close                             页头「返回」（仅页面形态渲染；标签形态关标签走标签条）
-    跳转   embedded=false（页面形态）时组件自己保持原行为：open-project / open-file 走
-           reLaunch 进工作台，「返回」按栈深度 navigateBack / redirectTo 项目列表；
-           embedded=true 时一律只 emit，由宿主决定就地打开还是 reLaunch。
-    页面形态现状：已无调用方——直链薄壳 pages/calendar/calendar 进来即 reLaunch 工作台开日程标签，
-           不再挂本组件。embedded=false 那几支（页头「返回」、自己 reLaunch 的 open-project / open-file）
-           刻意保留，只作 fork / 自建宿主的兜底（不挂在工作台里时组件仍能独立工作），不是误留的死代码。
-    方法   updateSize()  宿主在标签从隐藏变可见、或窗格尺寸变了之后调，让 FullCalendar 重排。
-
-  数据：所有读写经 utils/taskStore。挂载先全量拉一次（议程要逾期与之后，不跟视图区间走），
-  日历翻页时按视图区间 loadGlobal（已覆盖则直接回缓存）；写操作由 TaskDialog / 本组件经
-  taskStore 完成，本组件订阅 store 广播就地重画，不自己重拉。筛选（项目 / 类型 / 含已完成）
-  日历与议程共用。
-
-  页头自绘（左返回 + 标题 / 中间翻页 + 月份 / 右侧视图分段 + 筛选 + 新建），FullCalendar
-  自带 headerToolbar 关掉，导航调 calendarApi。
-  FullCalendar 集成：@fullcalendar/vue3 组件式，options.events 是「复杂选项」，vue3 适配器
-  deep watch + resetOptions 增量更新，直接给 calendarOptions.events 赋新数组即可。
--->
+<!-- The sidebar is a shortcut surface; the workspace alone owns the calendar and dialogs.
+     Both use the host's revisioned presentation state through calendar.workspace. -->
 <template>
-  <view class="calendar-pane" :class="{ 'is-embedded': embedded }">
+  <CalendarSidebar v-if="isSidebar" :dir="$i18n.locale === 'ar-SA' ? 'rtl' : 'ltr'" :state="workspaceState" :projects="filterProjects" :tasks="agendaTasks" :today="todayKey"
+    :current-project-id="currentProjectId" :loading="!allLoaded" :error="hasLoadError"
+    @change="changeWorkspace($event, true)" @open="openWorkspace()" @create="openWorkspace({ create: true })"
+    @open-task="openWorkspace({ focus: $event.id })" @toggle="onToggle" @open-file="onOpenFile" @delete="onDelete"
+    @retry="retryLoad" @overdue="openOverdue" />
+  <view v-else :dir="$i18n.locale === 'ar-SA' ? 'rtl' : 'ltr'" class="calendar-pane" :class="{ 'is-embedded': embedded }">
     <view class="calendar-container">
-      <button v-if="fileScopeId" @click="fileScopeId = null; fileScopeName = ''; rebuildEvents()">{{ fileScopeName }} ×</button>
       <view class="content-header cal-header">
         <view class="cal-header-left">
           <!-- 标签形态（embedded）没有「返回」：关标签走标签条上的 ×（dev-board#1048） -->
@@ -45,7 +17,8 @@
             <svg viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
             <text>{{ $t('calendar.back') }}</text>
           </view>
-          <text class="header-title">{{ $t('calendar.schedulePageTitle') }}</text>
+          <view class="cal-title-block"><text class="header-title">{{ $t('calendar.schedulePageTitle') }}</text>
+            <text class="cal-scope-label">{{ scopeLabel }}</text></view>
         </view>
 
         <view class="cal-header-center">
@@ -65,6 +38,8 @@
           <view class="cal-seg">
             <view
               v-for="v in VIEWS"
+              role="button" tabindex="0" :aria-pressed="viewType === v.type"
+              @keydown.enter.prevent="changeView(v.type)" @keydown.space.prevent="changeView(v.type)"
               :key="v.type"
               class="cal-seg-btn"
               :class="{ active: viewType === v.type }"
@@ -132,24 +107,34 @@
         </view>
       </view>
 
+      <view v-if="!allLoaded || hasLoadError" class="cal-load-state" role="status">
+        <text>{{ $t(hasLoadError ? 'calendar.loadFailed' : 'calendar.loading') }}</text>
+        <button v-if="hasLoadError" @click="retryLoad">{{ $t('calendar.workspaceRetry') }}</button>
+      </view>
+      <view v-if="fileScopeId" class="cal-file-scope">
+        <text>{{ $t('calendar.paneOnlyFile', { name: fileScopeName || '#' + fileScopeId }) }}</text>
+        <button :aria-label="$t('calendar.paneClearFilter')" @click="changeWorkspace({ fileId: '' })">×</button>
+      </view>
       <view class="calendar-body">
         <view class="calendar-main">
-          <FullCalendar ref="fc" class="fc-host" :options="calendarOptions" />
+          <view v-if="viewType === 'year'" class="cal-year">
+            <view v-for="month in yearGrid" :key="month.month" class="cal-year-month">
+              <button class="cal-year-month-title" @click="openMonth(month.month)">{{ month.label }}</button>
+              <view class="cal-year-grid">
+                <text v-for="(day, weekday) in weekdayLabels" :key="weekday" class="cal-year-weekday">{{ day }}</text>
+                <template v-for="(day, index) in month.days" :key="index">
+                  <button v-if="day" class="cal-year-day" :class="{ 'is-today': day.date === todayKey, 'has-events': day.count }"
+                    :aria-label="day.date + (day.count ? ' · ' + $t('calendar.workspaceEventCount', { count: day.count }) : '')"
+                    @click="changeWorkspace({ date: day.date, viewType: 'timeGridDay' })">
+                    {{ day.day }}<span v-if="day.count" class="cal-year-dot"></span>
+                  </button><view v-else></view>
+                </template>
+              </view>
+            </view>
+          </view>
+          <FullCalendar v-else ref="fc" class="fc-host" :options="calendarOptions" />
         </view>
-        <view class="calendar-sidebar">
-          <AgendaPanel
-            ref="agenda"
-            :tasks="agendaTasks"
-            :empty="agendaEmpty"
-            :today="todayKey"
-            @open="openEdit"
-            @toggle="onToggle"
-            @open-file="onOpenFile"
-            @open-project="(t) => goToProject(t && t.projectId)"
-            @delete="onDelete"
-            @create="openCreate()"
-          />
-        </view>
+
       </view>
     </view>
 
@@ -157,7 +142,7 @@
       :visible="dialogVisible"
       :mode="dialogMode"
       :task="editingTask"
-      :project-id="scopedProjectId"
+      :project-id="dialogMode === 'create' && filter.projectIds.length === 1 ? filter.projectIds[0] : scopedProjectId"
       :projects="projects"
       :preset-date="presetDate"
       :preset-time="presetTime"
@@ -174,22 +159,25 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
-import zhCnLocale from '@fullcalendar/core/locales/zh-cn'
+import calendarLocales from '@fullcalendar/core/locales-all'
 
 import { getTaskProjectOptions, perform, subscribeChanges } from './api.js'
-import { getAppLanguage } from '@/utils/appLanguage.js'
+import { i18n } from '@/i18n'
 import { getDayMarkType } from '@/components/calendar/holidayMarks.js'
 import {
   TASK_TYPES, typeMeta, isDone, isHigh, timeOf, toEventStart, taskFiles, addDaysKey, localDateKey,
 } from '@/components/calendar/taskUtils.js'
 import { taskStore, loadGlobal, updateTask, deleteTask, subscribe } from '@/utils/taskStore.js'
 import TaskDialog from './TaskDialog.vue'
-import AgendaPanel from '@/components/calendar/AgendaPanel.vue'
+import CalendarSidebar from './Sidebar.vue'
+import { createCalendarWorkspaceState, yearMonths } from '@/components/calendar/workspaceState.js'
 import AwdSwitch from '@/components/AwdSwitch.vue'
 
 const VIEWS = [
-  { type: 'dayGridMonth', labelKey: 'calendar.viewMonth' },
+  { type: 'timeGridDay', labelKey: 'calendar.workspaceDay' },
   { type: 'timeGridWeek', labelKey: 'calendar.viewWeek' },
+  { type: 'dayGridMonth', labelKey: 'calendar.viewMonth' },
+  { type: 'year', labelKey: 'calendar.workspaceYear' },
   { type: 'listMonth', labelKey: 'calendar.viewList' },
 ]
 
@@ -209,8 +197,9 @@ function defaultFilter() {
 
 export default {
   name: 'CalendarPane',
-  components: { FullCalendar, TaskDialog, AgendaPanel, AwdSwitch },
+  components: { FullCalendar, TaskDialog, CalendarSidebar, AwdSwitch },
   props: {
+    viewPlacement: { type: String, default: 'workspace' },
     projectId: { type: [Number, String], default: null },
     embedded: { type: Boolean, default: true },
     focus: { type: [Number, String], default: '' },
@@ -220,6 +209,13 @@ export default {
   data() {
     return {
       VIEWS,
+      workspaceState: createCalendarWorkspaceState(),
+      currentProjectId: '',
+      workspaceReady: false,
+      loadFailed: false,
+      projectLoadFailed: false,
+      workspaceLoadFailed: false,
+      currentDate: localDateKey(),
       calendarOptions: {},
       // 当前视图区间内的事项（日历用）；议程直接读 taskStore.global.list
       tasks: [],
@@ -247,6 +243,14 @@ export default {
     }
   },
   computed: {
+    hasLoadError() { return this.loadFailed || this.projectLoadFailed || this.workspaceLoadFailed },
+    isSidebar() { return this.viewPlacement === 'sidebar' },
+    scopeLabel() {
+      const names = this.filterProjects.filter(project => this.filter.projectIds.includes(String(project.id))).map(project => project.name)
+      return names.length ? names.join(' · ') : this.$t('calendar.filterAllProjects')
+    },
+    yearGrid() { return yearMonths(Number(this.currentDate.slice(0, 4)), i18n.global.locale, this.agendaTasks) },
+    weekdayLabels() { return Array.from({ length: 7 }, (_, i) => new Date(2026, 0, 5 + i).toLocaleDateString(i18n.global.locale, { weekday: 'narrow' })) },
     // 项目收窄：空串与 null 都当全局
     scopedProjectId() {
       return Number(this.projectId) > 0 ? this.projectId : null
@@ -276,17 +280,11 @@ export default {
     agendaTasks() {
       return taskStore.global.list.filter((t) => this.matchesFilter(t))
     },
-    agendaEmpty() {
-      if (!this.allLoaded) return false
-      const scope = this.scopedProjectId
-      if (scope === null) return taskStore.global.list.length === 0
-      return !taskStore.global.list.some((t) => t && String(t.projectId) === String(scope))
-    },
   },
   watch: {
     filter: {
       deep: true,
-      handler() { this.rebuildEvents() },
+      handler() { this.rebuildEvents(); this.publishFilter() },
     },
     projectId() { this.rebuildEvents() },
     focus() { this.takeDeepLinks(); if (this.allLoaded) this.applyDeepLinks() },
@@ -298,12 +296,11 @@ export default {
     this.buildCalendarOptions()
     this.loadProjects()
     this.loadAll()
+    this.loadWorkspace()
     this.unsubscribe = subscribe(this.onStoreEvent)
     this.unsubscribeChanges = subscribeChanges(() => this.loadAll())
-    this.unsubscribeCommands = window.awd.events.on('sidebar.command', event => {
-      if (event.command === 'calendar-focus') { this.focusId = String(event.focus || ''); this.focusGroup = event.group || ''; if (this.allLoaded) this.applyDeepLinks() }
-      if (event.command === 'calendar-file') { this.fileScopeId = event.fileId; this.fileScopeName = event.name || ''; this.rebuildEvents() }
-    })
+    this.unsubscribeCommands = window.awd.events.on('sidebar.command', this.onWorkspaceCommand)
+
   },
   beforeUnmount() {
     if (this.unsubscribe) this.unsubscribe()
@@ -311,6 +308,70 @@ export default {
     this.unsubscribeCommands?.()
   },
   methods: {
+    async loadWorkspace() {
+      this.workspaceLoadFailed = false
+      try { this.applyWorkspaceState(await perform('workspace')); this.workspaceReady = true }
+      catch (error) { this.workspaceLoadFailed = true }
+    },
+    async changeWorkspace(patch, open = false) {
+      try { this.applyWorkspaceState(await perform('workspace', { patch, open })) }
+      catch (error) { uni.showToast({ title: error.message || this.$t('calendar.saveFailed'), icon: 'none' }) }
+    },
+    async openWorkspace(options = {}) {
+      try { this.applyWorkspaceState(await perform('workspace', { open: true, ...options })) }
+      catch (error) { uni.showToast({ title: error.message || this.$t('calendar.loadFailed'), icon: 'none' }) }
+    },
+    async retryLoad() { await Promise.all([this.loadAll(), this.loadProjects(), this.loadWorkspace()]) },
+    publishFilter() {
+      if (!this.workspaceReady) return
+      const patch = { projectIds: this.filter.projectIds, types: this.filter.types, includeDone: this.filter.includeDone }
+      if (Object.keys(patch).some(key => JSON.stringify(patch[key]) !== JSON.stringify(this.workspaceState[key]))) this.changeWorkspace(patch)
+    },
+    applyWorkspaceState(state) {
+      if (!state || !Number.isFinite(state.revision) || state.revision < this.workspaceState.revision) return
+      this.workspaceState = state
+      this.currentProjectId = state.currentProjectId || ''
+      this.filter = { projectIds: state.projectIds, types: state.types, includeDone: state.includeDone }
+      this.fileScopeId = state.fileId
+      this.fileScopeName = state.fileName
+      const changed = this.viewType !== state.viewType || this.currentDate !== state.date
+      this.viewType = state.viewType
+      this.currentDate = state.date
+      if (this.isSidebar) return
+      if (this.viewType === 'year') {
+        this.periodTitle = String(Number(state.date.slice(0, 4)))
+        this.currentFrom = state.date.slice(0, 4) + '-01-01'
+        this.currentTo = String(Number(state.date.slice(0, 4)) + 1) + '-01-01'
+        this.syncFromStore()
+      } else if (changed) {
+        this.calendarOptions.initialView = state.viewType
+        this.calendarOptions.initialDate = state.date
+        this.$nextTick(() => {
+          const api = this.getApi()
+          if (!api) return
+          if (api.view.type !== state.viewType) api.changeView(state.viewType, state.date)
+          else api.gotoDate(state.date)
+        })
+      }
+    },
+    onWorkspaceCommand(event) {
+      if (event.command === 'calendar-state') {
+        this.applyWorkspaceState(event.state)
+        if (this.isSidebar) return
+        if (event.focus) { this.focusId = String(event.focus); if (this.allLoaded) this.applyDeepLinks() }
+        if (event.create) this.openCreate()
+      }
+      if (event.command === 'calendar-focus' && !this.isSidebar) {
+        this.focusId = String(event.focus || ''); this.focusGroup = event.group || ''
+        if (this.allLoaded) this.applyDeepLinks()
+      }
+      if (event.command === 'calendar-file') this.changeWorkspace({ fileId: String(event.fileId), fileName: event.name || '' })
+    },
+    openOverdue() {
+      const task = this.agendaTasks.find(task => !isDone(task) && task.dueDate && task.dueDate < this.todayKey)
+      if (task) this.openWorkspace({ focus: task.id })
+    },
+    openMonth(month) { this.changeWorkspace({ date: this.currentDate.slice(0, 4) + '-' + String(month + 1).padStart(2, '0') + '-01', viewType: 'dayGridMonth' }) },
     takeDeepLinks() {
       if (this.focus !== null && this.focus !== undefined && this.focus !== '') this.focusId = String(this.focus)
       if (['overdue', 'today', 'week', 'later'].includes(this.group)) this.focusGroup = this.group
@@ -322,13 +383,15 @@ export default {
     },
 
     buildCalendarOptions() {
-      const isZh = getAppLanguage() === 'zh-CN'
+      const language = i18n.global.locale
       this.calendarOptions = {
         plugins: [dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin],
-        initialView: window.innerWidth < 600 ? 'listMonth' : 'dayGridMonth',
+        initialView: 'dayGridMonth',
         headerToolbar: false,
-        locale: isZh ? zhCnLocale : undefined,
-        firstDay: isZh ? 1 : 0,
+        locales: calendarLocales,
+        locale: language.toLowerCase(),
+        direction: language === 'ar-SA' ? 'rtl' : 'ltr',
+        firstDay: 1,
         height: '100%',
         editable: true,
         eventDurationEditable: false,
@@ -360,9 +423,11 @@ export default {
     },
 
     async loadProjects() {
+      this.projectLoadFailed = false
       try {
         this.projects = (await getTaskProjectOptions()) || []
       } catch (e) {
+        this.projectLoadFailed = true
         console.error('[calendar] 加载项目列表失败', e)
       }
     },
@@ -370,15 +435,16 @@ export default {
     // 议程要全部事项（逾期、之后、无日期），与日历视图区间解耦：翻到别的月份浏览时
     // 议程不能跟着漂移（漂了会把本周真正紧迫的事项藏掉）。进页强制重拉一次。
     async loadAll() {
+      this.loadFailed = false
       try {
         await loadGlobal({ force: true })
+        this.allLoaded = true
+        this.syncFromStore()
+        if (!this.isSidebar) this.applyDeepLinks()
       } catch (e) {
-        console.error('[calendar] 加载事项失败', e)
-        uni.showToast({ title: this.$t('calendar.loadFailed'), icon: 'none' })
+        this.loadFailed = true
+        this.allLoaded = true
       }
-      this.allLoaded = true
-      this.syncFromStore()
-      this.applyDeepLinks()
     },
 
     async loadTasks(from, to) {
@@ -450,29 +516,27 @@ export default {
     },
 
     onDatesSet(info) {
+      // FullCalendar can emit a final datesSet while Vue is switching to the year grid.
+      if (this.workspaceReady && this.workspaceState.viewType === 'year') return
       this.currentFrom = info.startStr.slice(0, 10)
       this.currentTo = info.endStr.slice(0, 10)
       this.viewType = info.view.type
-      this.periodTitle = this.formatPeriod(info.view.currentStart)
+      this.currentDate = localDateKey(info.view.currentStart)
+      this.periodTitle = info.view.title
       this.loadTasks(this.currentFrom, this.currentTo)
+      if (this.workspaceReady && (this.workspaceState.date !== this.currentDate || this.workspaceState.viewType !== this.viewType)) {
+        this.changeWorkspace({ date: this.currentDate, viewType: this.viewType })
+      }
     },
 
-    formatPeriod(date) {
-      if (!date) return ''
-      const isZh = getAppLanguage() === 'zh-CN'
-      const month = isZh
-        ? date.getMonth() + 1
-        : date.toLocaleString('en-US', { month: 'long' })
-      return this.$t('calendar.monthTitle', { year: date.getFullYear(), month })
+    navPrev() { this.navigatePeriod(-1) },
+    navNext() { this.navigatePeriod(1) },
+    navigatePeriod(step) {
+      if (this.viewType === 'year') this.changeWorkspace({ date: String(Number(this.currentDate.slice(0, 4)) + step) + '-01-01' })
+      else { const api = this.getApi(); if (api) step < 0 ? api.prev() : api.next() }
     },
-
-    navPrev() { const api = this.getApi(); if (api) api.prev() },
-    navNext() { const api = this.getApi(); if (api) api.next() },
-    navToday() { const api = this.getApi(); if (api) api.today() },
-    changeView(type) {
-      const api = this.getApi()
-      if (api && this.viewType !== type) api.changeView(type)
-    },
+    navToday() { this.changeWorkspace({ date: localDateKey() }) },
+    changeView(type) { this.changeWorkspace({ viewType: type }) },
 
     toggleProjectFilter(id) {
       const key = String(id)
@@ -523,7 +587,7 @@ export default {
       // 月视图拖拽保持原时刻。
       let newTime = timeOf(task) || null
       if (startStr.length > 10) newTime = startStr.slice(11, 16)
-      else if (info.event.allDay && info.oldEvent && !info.oldEvent.allDay && info.view.type === 'timeGridWeek') newTime = null
+      else if (info.event.allDay && info.oldEvent && !info.oldEvent.allDay && ['timeGridWeek', 'timeGridDay'].includes(info.view.type)) newTime = null
       try {
         await updateTask(task.id, { dueDate: newDate, dueTime: newTime })
       } catch (e) {
@@ -571,23 +635,19 @@ export default {
     },
 
     applyDeepLinks() {
-      if (this.focusId) {
-        const id = this.focusId
-        this.focusId = ''
-        const task = taskStore.global.list.find((t) => t && String(t.id) === id)
-        if (task) {
-          const api = this.getApi()
-          if (api && task.dueDate) api.gotoDate(task.dueDate)
-          this.openEdit(task)
-        }
-      }
-      if (this.focusGroup) {
+      if (this.isSidebar) return
+      let task = this.focusId ? taskStore.global.list.find(task => task && String(task.id) === this.focusId) : null
+      this.focusId = ''
+      if (!task && this.focusGroup) {
         const group = this.focusGroup
-        this.focusGroup = ''
-        this.$nextTick(() => {
-          const agenda = this.$refs.agenda
-          if (agenda && agenda.scrollToGroup) agenda.scrollToGroup(group)
-        })
+        task = taskStore.global.list.find(task => !isDone(task) && task.dueDate &&
+          (group === 'overdue' ? task.dueDate < this.todayKey : group === 'today' ? task.dueDate === this.todayKey :
+            group === 'week' ? task.dueDate >= this.todayKey && task.dueDate < addDaysKey(this.todayKey, 7) : task.dueDate >= addDaysKey(this.todayKey, 7)))
+      }
+      this.focusGroup = ''
+      if (task) {
+        this.changeWorkspace({ date: task.dueDate || this.todayKey, viewType: 'timeGridDay', projectIds: [String(task.projectId)], fileId: '' })
+        this.openEdit(task)
       }
     },
 
@@ -646,7 +706,7 @@ export default {
     // 内部用一个固定参考周取值），套节假日判定会张冠李戴；只在周视图（表头即具体
     // 某一天）里标节假日。
     dayHeaderClassNames(arg) {
-      if (!arg.view || arg.view.type !== 'timeGridWeek') return []
+      if (!arg.view || !['timeGridWeek', 'timeGridDay'].includes(arg.view.type)) return []
       const mark = getDayMarkType(arg.date)
       if (mark === 'holiday') return ['fc-day-holiday']
       if (mark === 'makeup') return ['fc-day-makeup']
@@ -655,10 +715,10 @@ export default {
     },
 
     renderDayHeaderContent(arg) {
-      if (!arg.view || arg.view.type !== 'timeGridWeek') return true
+      if (!arg.view || !['timeGridWeek', 'timeGridDay'].includes(arg.view.type)) return true
       const mark = getDayMarkType(arg.date)
       // 「周一 21」：星期 + 日，比 locale 默认的「9/21周一」好扫
-      const lang = getAppLanguage() === 'zh-CN' ? 'zh-CN' : 'en-US'
+      const lang = i18n.global.locale
       const weekday = arg.date.toLocaleDateString(lang, { weekday: 'short' })
       let html = `<span class="fc-dh-weekday">${escapeHtml(weekday)}</span><span class="fc-dh-day">${arg.date.getDate()}</span>`
       if (mark === 'holiday') {
@@ -698,19 +758,32 @@ export default {
 <style lang="scss" scoped src="../../src/components/calendar/calendar-pane.scss"></style>
 
 <style scoped>
-/* The same bundle can be a full workspace tab or a narrow sidebar iframe. */
-@media (max-width: 600px) {
-  .calendar-pane.is-embedded { padding: 12px; }
-  .content-header { align-items: flex-start; gap: 12px; }
-  .cal-header-left, .cal-header-center, .cal-header-right { width: 100%; min-width: 0; }
-  .cal-header-center, .cal-header-right { flex-wrap: wrap; justify-content: flex-start; gap: 8px; }
-  .cal-nav, .cal-nav-btn, .cal-today-btn, .cal-seg, .cal-filter-wrap, .cal-primary-btn { flex-shrink: 0; }
-  .cal-today-btn, .cal-primary-btn, .cal-filter-btn { white-space: nowrap; }
-  .cal-primary-btn :deep(uni-text), .cal-filter-btn :deep(uni-text) { white-space: nowrap; }
-  .cal-seg { width: 100%; box-sizing: border-box; }
-  .cal-seg-btn { flex: 1; text-align: center; padding: 0 6px; }
-  .calendar-main { height: 280px; padding: 8px; }
-  .calendar-body { gap: 12px; }
-  .cal-filter-pop { left: 0; right: auto; max-width: calc(100vw - 24px); box-sizing: border-box; }
+.cal-title-block { display:flex; flex-direction:column; min-width:0; gap:5px; }
+.cal-scope-label { font-size:12px; color:var(--awd-text-3); max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cal-load-state, .cal-file-scope { display:flex; gap:12px; align-items:center; padding:8px 0; color:var(--awd-text-3); font-size:12px; }
+.cal-load-state button, .cal-file-scope button { margin:0; padding:2px 8px; font:inherit; line-height:1.5; color:var(--awd-accent-text); border:1px solid var(--awd-border); background:var(--awd-surface); }
+.cal-year { min-height:0; flex:1; overflow-y:auto; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; padding:10px; }
+.cal-year-month-title { padding:0 0 8px; margin:0; font-size:14px; font-weight:650; text-align:start; color:var(--awd-text); background:none; border:0; line-height:1.5; }
+.cal-year-month-title::after, .cal-year-day::after { border:0; }
+.cal-year-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:2px; }
+.cal-year-weekday { text-align:center; font-size:10px; color:var(--awd-text-3); padding:4px 0; }
+.cal-year-day { position:relative; min-width:0; padding:5px 0 7px; margin:0; font-size:12px; font-variant-numeric:tabular-nums; line-height:1.5; color:var(--awd-text-2); border:0; background:none; border-radius:var(--awd-radius-sm); cursor:pointer; }
+.cal-year-day.has-events { background:var(--awd-accent-wash); color:var(--awd-accent-text); font-weight:600; }
+.cal-year-day.is-today { background:var(--awd-accent); color:var(--awd-text-on-accent); }
+.cal-year-day:hover, .cal-year-month-title:hover { background:var(--awd-hover-bg); }
+.cal-year-day:focus-visible, .cal-year-month-title:focus-visible { outline:2px solid var(--awd-accent); }
+.cal-year-dot { width:3px; height:3px; border-radius:50%; position:absolute; inset-inline-start:calc(50% - 1.5px); bottom:3px; background:currentColor; }
+@container cal-pane (max-width:800px) { .cal-year { grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; } }
+@container cal-pane (max-width:460px) { .cal-year { grid-template-columns:minmax(0,1fr); } }
+@media (max-width:600px) {
+  .calendar-pane.is-embedded { padding:12px; }
+  .content-header { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px; }
+  .cal-header-left, .cal-header-center, .cal-header-right { min-width:0; width:100%; }
+  .cal-header-center, .cal-header-right { flex-wrap:wrap; justify-content:flex-start; gap:8px; }
+  .cal-seg { width:100%; }
+  .cal-seg-btn { flex:1; text-align:center; padding:0 6px; }
+  .calendar-body { overflow:hidden; }
+  .calendar-main { flex:1; height:auto; min-height:250px; padding:8px; }
+  .cal-filter-pop { inset-inline-start:0; inset-inline-end:auto; max-width:calc(100vw - 24px); box-sizing:border-box; }
 }
 </style>

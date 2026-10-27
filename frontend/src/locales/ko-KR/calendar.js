@@ -157,5 +157,16 @@ export default {
   "paneEmptyMonth": "No tasks this month",
   "paneEmptyFile": "No tasks linked to this file yet",
   "railScheduleTitle": "Schedule ({overdue} overdue · {today} today)",
-  "tabName": "Schedule"
+  "tabName": "Schedule",
+  "workspaceAll": "모든 프로젝트",
+  "workspaceCurrent": "현재 프로젝트",
+  "workspaceUpcoming": "다가오는 할 일",
+  "workspaceDays": "향후 {count}일",
+  "workspaceRetry": "새로 고침",
+  "workspaceOverdue": "기한 초과 {count}건",
+  "workspaceNoUpcoming": "향후 {count}일 내 할 일이 없습니다",
+  "workspaceLinked": "필터가 캘린더와 동기화됩니다. 항목을 선택하면 세부 정보가 표시됩니다.",
+  "workspaceDay": "일",
+  "workspaceYear": "년",
+  "workspaceEventCount": "{count}개 항목",
 }

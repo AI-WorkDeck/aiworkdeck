@@ -847,6 +847,7 @@
             :key="activeDynamicPlugin.pluginId + ':' + activeDynamicPlugin.version + ':' + activeDynamicPlugin.sidebarView.id"
             :business-actions="pluginBusinessActions"
             :url="activeDynamicPlugin.sidebarView.url"
+            view-placement="sidebar"
             :plugin-id="activeDynamicPlugin.pluginId"
             :permissions="activeDynamicPlugin.permissions || []"
             :project-id="activeDynamicPlugin.sidebarView.scope === 'global' ? null : projectId"
@@ -1717,6 +1718,7 @@
             :key="activeBottomDynamicPlugin.pluginId + ':' + activeBottomDynamicPlugin.version + ':' + activeBottomDynamicPlugin.sidebarView.id"
             :business-actions="pluginBusinessActions"
             :url="activeBottomDynamicPlugin.sidebarView.url"
+            view-placement="sidebar"
             :plugin-id="activeBottomDynamicPlugin.pluginId"
             :permissions="activeBottomDynamicPlugin.permissions || []"
             :project-id="activeBottomDynamicPlugin.sidebarView.scope === 'global' ? null : projectId"
@@ -1827,6 +1829,7 @@
               :key="activeRightDynamicPlugin.pluginId + ':' + activeRightDynamicPlugin.version + ':' + activeRightDynamicPlugin.sidebarView.id"
             :business-actions="pluginBusinessActions"
             :url="activeRightDynamicPlugin.sidebarView.url"
+            view-placement="sidebar"
             :plugin-id="activeRightDynamicPlugin.pluginId"
             :permissions="activeRightDynamicPlugin.permissions || []"
             :project-id="activeRightDynamicPlugin.sidebarView.scope === 'global' ? null : projectId"
@@ -2743,6 +2746,7 @@ export default {
       // 工作台唯一的 TaskDialog 的状态（dev-board#899），见 openTaskDialog
       taskDialog: { visible: false, mode: 'create', task: null, presetFileIds: [] },
       // 日程面板按文件过滤（文件右键「查看事项 (N)」），null = 不过滤
+      calendarWorkspaceState: null,
       calendarFileFilter: null,
       calendarFileFilterName: '',
       // 单文件历史：右键「这份文件的历史」时设置，version 面板据此只显示这份文件的版本
@@ -3381,6 +3385,7 @@ export default {
         insertContent: payload => this.insertPlainTextToWps(payload),
         previewImage: url => this.openImagePreview(url),
         copyText: text => this.insertClipboardAndCopy(text),
+        calendarWorkspace: params => this.calendarWorkspace(params),
         openProject: payload => this.onCalendarOpenProject(payload),
         openTaskFile: payload => this.onCalendarOpenFile(payload),
         insightContext: () => ({ docFileId: this.insightDocFileId, docName: this.insightDocName, canWrite: this.canWriteProject, cursorContext: this.insightCursorContext }),
