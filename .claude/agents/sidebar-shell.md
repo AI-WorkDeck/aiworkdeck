@@ -1589,6 +1589,16 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 
 移除侧栏外缘收起按钮及14px占位；再次点当前 rail 入口复用 `toggleSidebar` 收起/展开，保留顶栏/快捷键。收起动态插件时不重新打开工作区；宽度回夹不再扣外缘占位。
 
+## 日程插件左右联动（dev-board#1538，2026-10-27）
+
+真实入口是 `frontend/plugin-app/calendar/Panel.vue`，由 `official-plugins/calendar` 打包；旧 `components/calendar/CalendarPane.vue` / `ProjectCalendarPane.vue` 不是当前插件入口。宿主 `PluginPane` 握手 `surface: sidebar|workspace` 明确视图用途，禁止按窗口宽度猜左栏：左栏 `Sidebar.vue` 只放项目快捷筛选、含今天的近 3/5 个自然日未完成事项和逾期入口；中央承载日/周/月/年/列表、编辑与文件关联。rail 选中日历时同时激活单例工作区标签，其余插件的面板规则不变。
+
+`calendarTabMethods.calendarWorkspace` 持有工作台本次生命周期的唯一展示状态；插件经 `calendar.workspace` 命名操作读/改，沿原 `sidebar.command` 发布 `calendar-state`。状态含项目/类型/完成项筛选、日期、视图、近期天数与文件筛选，递增 revision 防迟到响应回退；不写入用户项目、不扩大数据访问，所有任务/文件请求继续经原权限闸。任一侧修改局部字段不覆盖另一侧字段，初次挂载主动读取状态；左栏打开事项与新建请求只在工作区弹窗。年视图是 12 个月的实际日期网格，点击日期切入日视图，包含闰日。`calendar-focus` / `calendar-file` 旧入口继续接入，任务定位会清除冲突筛选并转到其项目和日期。
+
+宿主发给插件的状态必须复制为可 structured-clone 的普通值，尤其不能直接发送 Vue reactive 的 `projectIds` / `types` 数组；真实 H5 双面板已复现过 `DataCloneError`，状态单测覆盖此回归。
+
+验证：`tests/calendar/workspace-state.test.mjs`、`tests/plugins/collections-services.test.mjs`、`tests/project-home/plugin-workspace-tabs.test.mjs`；`node tests/plugins/calendar-workspace-browser.mjs` 使用两个真实沙箱插件 iframe 和合成 API，覆盖筛选双向联动、3/5 天、日/年切换、关联编辑、刷新失败重试及窄栏。完整 H5 另用 `CALENDAR_WORKBENCH_BASE=http://127.0.0.1:5197 node tests/plugins/calendar-workbench-browser.mjs`（先启动该端口 H5 dev server），实际挂载工作台、PluginPane 与 rail，拦截全部 API 为合成数据，核对两端 revision、关闭再开、单例标签及移除插件入口；截图默认在 `/tmp/calendar-workbench-ui`，可用 `CALENDAR_WORKBENCH_OUT` 改目录。该验证不等于正式客户端/市场安装/真实用户数据验收；包源码修改后需 `node scripts/build-business-plugins.mjs calendar` 同步构建且提高插件版本。
+
 ### 插件入口按声明选择（dev-board#1531）
 
 `contributes.views: []` 不提供 rail、panel 或工作区。仅 workspace 的插件保留 rail，点击只打开/聚焦标签，不切换当前左栏；rail 高亮取真实工作区状态。仅 sidebar 不自动开标签，两者兼有可通过 SDK `ui.openWorkspace()` 打开自己的 workspace。缺省/null 沿用旧入口。新规则集中在 `utils/pluginViews.js` 与 `pluginWorkspaceTabs.js`，快照恢复及直达入口使用同一闸；每个视图按自己的 scope 检查项目上下文，不能借另一个 global 视图越过 project 限制。旧纯皮肤 gallery（无业务权限、工具及其他贡献）仅作预览，更新宿主即隐藏其入口并清理旧标签；非 gallery 的主题编辑器等业务视图仍按声明显示。

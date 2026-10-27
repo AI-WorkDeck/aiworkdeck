@@ -4,6 +4,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { createCalendarWorkspaceState } from '../../src/components/calendar/workspaceState.js'
+import { localDateKey } from '../../src/components/calendar/taskUtils.js'
 const require = createRequire(import.meta.url)
 const { parse, compileTemplate } = require('@vue/compiler-sfc')
 const root = new URL('../../plugin-app/', import.meta.url)
@@ -17,7 +19,7 @@ function component(path, deps = {}) {
     else names.push(spec.trim())
     return ''
   }).replace('export default', 'return')
-  const all = { ...Object.fromEntries(names.map(name => [name, {}])), uni: { showToast() {}, $emit() {} }, ...deps }
+  const all = { ...Object.fromEntries(names.map(name => [name, {}])), uni: { showToast() {}, $emit() {} }, createCalendarWorkspaceState, localDateKey, ...deps }
   return new Function(...Object.keys(all), script)(...Object.values(all))
 }
 function vm(options, props = {}) {
@@ -33,7 +35,7 @@ function api(name, request, awd = { events: { on() {} } }) {
 }
 
 test('all migrated Vue templates compile, with no host credential/native module imports', () => {
-  for (const path of ['calendar/Panel.vue', 'calendar/TaskDialog.vue', 'calendar/FilePickerDialog.vue', 'favorites/Panel.vue', 'favorites/SafeImage.vue', 'clipboard/Panel.vue', 'clipboard/SafeImage.vue', 'clipboard/UnlockHint.vue']) {
+  for (const path of ['calendar/Panel.vue', 'calendar/Sidebar.vue', 'calendar/TaskDialog.vue', 'calendar/FilePickerDialog.vue', 'favorites/Panel.vue', 'favorites/SafeImage.vue', 'clipboard/Panel.vue', 'clipboard/SafeImage.vue', 'clipboard/UnlockHint.vue']) {
     const text = source(path)
     const { descriptor, errors } = parse(text, { filename: path })
     assert.deepEqual(errors, [])

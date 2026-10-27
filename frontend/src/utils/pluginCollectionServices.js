@@ -103,6 +103,10 @@ export function createPluginCollectionServices({ projectId, permissions, isCurre
     if (!params || typeof params !== 'object' || Array.isArray(params)) fail('invalid_params')
     if (service === 'calendar') {
       need('tasks')
+      if (operation === 'workspace') {
+        if (typeof actions.calendarWorkspace !== 'function') fail('unavailable')
+        return await wait(actions.calendarWorkspace(pick(params, ['patch', 'open', 'focus', 'create'])))
+      }
       if (operation === 'projects') {
         const result = await wait(getTaskProjectOptions())
         return scoped ? result.filter(p => String(p.id) === String(mountedProject)) : result

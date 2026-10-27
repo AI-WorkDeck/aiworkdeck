@@ -157,5 +157,16 @@ export default {
   "paneEmptyMonth": "No tasks this month",
   "paneEmptyFile": "No tasks linked to this file yet",
   "railScheduleTitle": "Schedule ({overdue} overdue · {today} today)",
-  "tabName": "Schedule"
+  "tabName": "Schedule",
+  "workspaceAll": "すべてのプロジェクト",
+  "workspaceCurrent": "現在のプロジェクト",
+  "workspaceUpcoming": "近日の予定",
+  "workspaceDays": "今後 {count} 日",
+  "workspaceRetry": "再読み込み",
+  "workspaceOverdue": "期限超過 {count} 件",
+  "workspaceNoUpcoming": "今後 {count} 日の予定はありません",
+  "workspaceLinked": "絞り込みはカレンダーと連動します。項目を選択して詳細を表示。",
+  "workspaceDay": "日",
+  "workspaceYear": "年",
+  "workspaceEventCount": "{count} 件",
 }
