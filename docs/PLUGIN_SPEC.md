@@ -960,6 +960,8 @@ SDK 1.5.0 新增可选权限 `im`。`im.request {action,params}` 经 `/api/plugi
 
 `contributes.views` 的每个视图声明 `id / name / entry / placement / scope`；`entry` 必须是插件 `web/` 中真实文件，`placement` 为 `sidebar` 或 `workspace`，`scope` 为 `project` 或 `global`。可声明 `allowedDocks`（left/right/bottom）与其中一个 `defaultDock`。当前每种 placement 最多一个视图。`views` 缺省或 `null` 保持旧插件的 `frontendEntry` / 使用引导兼容入口；显式 `[]` 表示不提供任何独立界面。显式数组只启用列出的 placement：sidebar-only 不自动补工作区；workspace-only 的 rail 按钮直接打开标签，不强制展开左侧 panel；同时声明二者时先开 panel，可按操作需要进入工作区。`frontendEntry` 在显式空视图下可仅作为插件中心的预览入口，不授予工作区。
 
+同时声明两种视图时，rail 的默认入口为 sidebar，并按 sidebar 的作用域显示；workspace 自身的打开/恢复仍按其作用域核验。需要无项目态从 rail 进入的双视图插件，应将 sidebar 声明为 global。
+
 新 manifest 的 `views` 应省略或写数组；`null` 只作为旧元数据兼容，不是 SDK Schema 允许的新声明。
 
 兼容已安装的旧纯皮肤包：仅含全局 `gallery` 预览、无业务权限/工具/其他贡献的旧声明不生成独立入口，原 gallery 继续供插件中心预览；有独立业务视图的插件仍按声明显示。
