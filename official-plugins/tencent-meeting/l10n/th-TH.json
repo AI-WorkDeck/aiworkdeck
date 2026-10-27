@@ -1,7 +1,7 @@
 {
-  "plugin.name": "การประชุม Tencent",
-  "plugin.description": "เชื่อมต่อ Tencent Meeting เพื่อซิงก์การประชุมและไฟล์บันทึกเสียงตามต้องการ ดูข้อความถอดเสียงและรายงานสรุปอัจฉริยะ จัดเก็บเข้าสู่โปรเจกต์ และสร้างรายงานการประชุมและรายการสิ่งที่ต้องดำเนินการ ต้องใช้ CLI tmeet อย่างเป็นทางการและการอนุญาตบัญชี",
-  "tool.tencent_meeting_action.description": "ปลั๊กอิน Tencent Meeting: ตรวจสอบการเชื่อมต่อ อนุญาตการเข้าสู่ระบบ ซิงก์ตามต้องการ ดูการประชุมและข้อความถอดเสียง และจัดเก็บไฟล์ของโปรเจกต์",
+  "plugin.name": "Tencent Meeting",
+  "plugin.description": "Connect Tencent Meeting to sync meetings and recordings on demand, view transcripts and smart minutes, archive to projects, and generate meeting minutes and action items. Requires the official tmeet CLI and account authorization.",
+  "tool.tencent_meeting_action.description": "Tencent Meeting plugin: check connection, authorize login, sync on demand, view meetings and transcripts, and archive project files.",
   "panel.refreshList": "รีเฟรช",
   "panel.selectMeeting": "เลือกการประชุม",
   "panel.backToList": "กลับไปที่รายการประชุม",
