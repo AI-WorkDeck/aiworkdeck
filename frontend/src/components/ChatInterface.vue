@@ -2018,6 +2018,7 @@ export default {
     const switchBuiltinWorkflowVersion = async (bw, versionId, scopeOverride) => {
       if (!bw || !versionId) return
       closeBuiltinWorkflowContextMenu()
+      const projectId = props.projectId
       try {
         const scope = scopeOverride || (props.projectId ? 'project' : 'global')
         const res = await selectBuiltinWorkflowVersion(bw.id, {
@@ -2025,6 +2026,7 @@ export default {
           scope,
           projectId: props.projectId || ''
         })
+        if (projectId !== props.projectId) { notifyBuiltinWorkflowsChanged(); return }
         const workflows = res?.workflows || res?.data?.workflows
         if (Array.isArray(workflows) && workflows.length) {
           builtinWorkflowStates.value = workflows

@@ -31,6 +31,10 @@ config = config.replaceAll(join(frontend, 'tests/tts-panel-ui/api.js'), join(bui
 if (process.env.WORKFLOW_EDITOR_NEGATIVE === 'layout') {
   config = config.replace('plugins:[', `plugins:[{name:'negative-workflow-layout',enforce:'pre',transform(code,id){if(!id.endsWith('/BuiltinWorkflowEditor.vue'))return null;if(!code.includes('@container (max-width: 600px)'))throw Error('Negative layout marker missing');return code.replace('@container (max-width: 600px)','@container (max-width: 1px)');}},`);
 }
+if (process.env.WORKFLOW_EDITOR_NEGATIVE === 'mutation') {
+  const guard = 'if (projectId !== props.projectId || request !== props.request) { notifyBuiltinWorkflowsChanged(); return }';
+  config = config.replace('plugins:[', `plugins:[{name:'negative-workflow-mutation',enforce:'pre',transform(code,id){if(!id.endsWith('/BuiltinWorkflowEditor.vue'))return null;const guard=${JSON.stringify(guard)};if(!code.includes(guard))throw Error('Negative mutation marker missing');return code.replaceAll(guard,'');}},`);
+}
 await writeFile(join(built.workspace, 'vite.config.mjs'), config);
 const sourceHashes = {};
 for (const file of ['src/components/BuiltinWorkflowEditor.vue', 'src/composables/useBuiltinWorkflows.js', 'src/App.vue']) {
@@ -93,9 +97,9 @@ async function load(width, theme) {
     width,
     height: 800
   });
-  await page.goto(origin + '/?theme=' + theme + '#/pages/tts/index', {
-    waitUntil: 'networkidle0'
-  });
+  const url = origin + '/?theme=' + theme + '#/pages/tts/index';
+  if (page.url() === url) await page.reload({ waitUntil: 'networkidle0' });
+  else await page.goto(url, { waitUntil: 'networkidle0' });
   await page.waitForSelector('.bw-editor-dialog');
 }
 try {
@@ -182,6 +186,63 @@ try {
   await page.screenshot({
     path: join(output, 'project-race.png')
   });
+  // Hold the API response until the replacement form is mounted and edited.
+  // This tests stale mutations deterministically instead of depending on timing.
+  for (const scenario of [
+    { operation: 'save', target: 'project' },
+    { operation: 'save', target: 'request' },
+    { operation: 'delete', target: 'project' }
+  ]) {
+    await load(1000, 'light');
+    await page.evaluate(() => { window.__workflowFixtures.holdMutations = true; });
+    if (scenario.operation === 'save') {
+      await page.click('.bw-sidebar-new-btn');
+      await page.click('.bw-footer-right .awd-btn-primary');
+    } else {
+      await page.click('.bw-sidebar-item:nth-child(2)');
+      await page.click('.bw-btn-danger');
+    }
+    await page.waitForFunction(() => window.__workflowFixtures.pendingMutations.length === 1);
+    await page.evaluate(target => {
+      window.__workflowFixtures.delay = 250;
+      if (target === 'project') window.__workflowQA.projectId = 2;
+      else window.__workflowQA.request = { workflowId: 'contract-review', versionId: 'custom-1' };
+    }, scenario.target);
+    await page.waitForFunction(() => !document.querySelector('.bw-editor-dialog'));
+    assert.equal(await page.$('.bw-footer-right .awd-btn-primary'), null, 'old draft must not remain saveable during the next read');
+    await page.evaluate(() => { window.__workflowFixtures.delay = 0; });
+    await page.waitForSelector('.bw-editor-dialog');
+    const expectedRule = scenario.target === 'project' ? '合成规则2' : '个人规则1';
+    assert.equal(await page.$eval('.bw-textarea-code textarea', el => el.value), expectedRule);
+    if (scenario.target === 'project') {
+      await page.click('.bw-sidebar-new-btn');
+      await page.waitForFunction(() => document.querySelector('.bw-input input').value.startsWith('我的自定义版'));
+    }
+    await page.click('.bw-textarea-code textarea');
+    await page.$eval('.bw-textarea-code textarea', el => el.select());
+    const replacementDraft = `新表单草稿-${scenario.operation}-${scenario.target}`;
+    await cdp.send('Input.insertText', { text: replacementDraft });
+    const before = await page.evaluate(() => ({
+      name: document.querySelector('.bw-input input').value,
+      rule: document.querySelector('.bw-textarea-code textarea').value,
+      closed: window.__workflowQA.closed
+    }));
+    assert.equal(before.rule, replacementDraft);
+    await page.evaluate(() => window.__workflowFixtures.releaseMutations());
+    await page.waitForFunction(() => window.__workflowFixtures.completedMutations.length === 1 && !document.querySelector('.bw-footer-right .awd-btn-primary.disabled'));
+    await wait(100);
+    const after = await page.evaluate(() => ({
+      name: document.querySelector('.bw-input input').value,
+      rule: document.querySelector('.bw-textarea-code textarea').value,
+      closed: window.__workflowQA.closed
+    }));
+    assert.deepEqual(after, before, `${scenario.operation} response for old ${scenario.target} must preserve the replacement form and not close its tab`);
+    if (scenario.target === 'project') {
+      const versions = await page.$$eval('.bw-sidebar-item-name', els => els.map(el => el.textContent));
+      assert(versions.includes('合成个人版本2') && !versions.includes('合成个人版本1'), 'stale mutation must not replace the current project version list');
+    }
+    results.checks.push({ name: `delayed ${scenario.operation} after ${scenario.target} change`, before, after, pass: true });
+  }
   assert.equal(errors.length, 0);
   results.passed = true;
   await writeFile(join(output, 'results.json'), JSON.stringify(results, null, 2));

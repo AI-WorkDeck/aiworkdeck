@@ -108,4 +108,18 @@ class ImPrivateProjectContextTest {
         assertFalse(byActive.contains("别的项目"));
     }
 
+    @Test void privateContextLabelsFollowLanguageWithoutTranslatingProjectData() throws Exception {
+        var file = file(1, 2, "起诉状.txt");
+        when(files.findByProjectIdAndIsDeletedFalseOrderBySortOrderAsc(2L)).thenReturn(List.of(file));
+        when(access.canRead(file, 7L)).thenReturn(true); when(extractor.extract(file)).thenReturn("原告：合成公司".repeat(1000));
+        String english = AppLanguageScope.call("en-US", () -> context.build(7L, project));
+        assertTrue(english.contains("Project: 合成案件")); assertTrue(english.contains("客户：合成公司"));
+        assertTrue(english.contains("Material: 起诉状.txt")); assertTrue(english.contains("原告：合成公司"));
+        assertTrue(english.contains("[Content truncated]")); assertTrue(english.contains("Successfully read 1 materials"));
+        assertFalse(english.contains("本次成功读取"));
+        String traditional = AppLanguageScope.call("zh-TW", () -> context.build(7L, project));
+        assertTrue(traditional.contains("可讀文件清單")); assertTrue(traditional.contains("合成案件"));
+        assertNull(AppLanguageScope.current());
+    }
+
 }
