@@ -17,6 +17,12 @@ final class ChineseNameRecognizer {
             + "总经理|董事长|经理|律师|证人|原告|被告|甲方|乙方|丙方|姓名|签名|签字|"
             + "出席人员|参会人员|股东|由|与|和|及|向|联系|通知|感谢|交给|委托)"
             + "\\h*(?:[（(](?:签字|签名)[）)]\\h*)?[:：]?\\h*(?:\\r?\\n\\h*)?");
+    // Numbering belongs to the party label, never to the person's name. Require
+    // a field separator so ordinary references to a numbered party remain prose.
+    private static final Pattern NUMBERED_PARTY = Pattern.compile(
+            "(?:原告|被告|申请人|被申请人|上诉人|被上诉人)\\h*"
+            + "(?:[0-9０-９一二三四五六七八九十百零〇两]+|[（(]\\h*[0-9０-９一二三四五六七八九十百零〇两]+\\h*[）)])"
+            + "\\h*[:：]\\h*(?:\\r?\\n\\h*)?");
     private static final Pattern DELIMITED = Pattern.compile("(?<![\\p{IsHan}A-Za-z0-9_])(?=[\\p{IsHan}])");
     private static final Pattern LIST_HEADER = Pattern.compile("(?:姓名|名单|人员|签名|签字|股东|联系人|原告|被告)[:：]");
     private static final Pattern PERSON_ACTION = Pattern.compile(
@@ -76,6 +82,11 @@ final class ChineseNameRecognizer {
         while (prefix.find()) {
             starts.set(prefix.end());
             if (!prefix.group().strip().matches("[由与和及向]")) fieldStarts.set(prefix.end());
+        }
+        var party = NUMBERED_PARTY.matcher(text);
+        while (party.find()) {
+            starts.set(party.end());
+            fieldStarts.set(party.end());
         }
         var delimited = DELIMITED.matcher(text);
         while (delimited.find()) starts.set(delimited.start());

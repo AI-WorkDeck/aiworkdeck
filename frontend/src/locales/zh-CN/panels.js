@@ -169,8 +169,9 @@ export default {
   deDownloadRetry: '结果已生成，复敏文件下载未完成，请点击下方重新下载',
   deAiWorkflowNotice: 'AI 功能在右侧助手中使用，本面板不会自动发送文件。普通对话可能带入历史和项目上下文，不是隔离会话；请核查材料范围，勿加入原件、映射或复敏后的文件。',
 
-  deRedactTab: '脱敏',
-  deRestoreTab: '复敏',
+  deOperationTitle: '选择功能',
+  deRedactTab: '脱敏（隐藏信息）',
+  deRestoreTab: '复敏（还原信息）',
   deLocalNotice: '使用本地规则处理，不调用大模型。请仅将核查后的脱敏文件提供给 AI。',
   deFormats: '支持 DOCX、文本型 PDF、UTF-8 文本；不支持扫描件、图片或旧版 DOC。',
   deModeTitle: '替换方式',

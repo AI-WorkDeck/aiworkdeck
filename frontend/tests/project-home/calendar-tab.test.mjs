@@ -19,7 +19,7 @@ function fakeWorkbench(overrides = {}) {
   const vm = {
     projectId: null,
     dynamicPluginsLoaded: true,
-    dynamicPlugins: [{ pluginId: 'calendar', label: '日程', views: [{ scope: 'global' }] }],
+    dynamicPlugins: [{ pluginId: 'calendar', label: '日程', hasDeclaredViews: true, workspaceView: { placement: 'workspace', scope: 'global' }, views: [{ placement: 'workspace', scope: 'global' }] }],
     hasProject: false,
     leftFiles: [],
     rightFiles: [],

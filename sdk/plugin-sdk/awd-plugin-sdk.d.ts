@@ -50,6 +50,8 @@ declare namespace awd {
       endDrag(options?: CallOptions): Promise<unknown>;
     };
     ui: {
+      /** Open this plugin's declared workspace. Rejects unavailable or unknown_method on older hosts. */
+      openWorkspace(): Promise<Record<string, never>>;
       toast(message: string, options?: CallOptions): Promise<unknown>;
       openFile(path: string, options?: CallOptions): Promise<unknown>;
       progress(target: string | Element | null, state?: ProgressState | null | false): ProgressController;

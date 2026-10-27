@@ -6,7 +6,7 @@ Web 插件与宿主之间那座 postMessage 桥的插件侧实现。单文件、
 **这里是源头。** 官网插件模板 zip 里的 `web/awd-plugin-sdk.js`
 （官网仓 `lib/plugin-template.ts` 的 `WEB_SDK_JS` 常量）与
 本仓 `examples/hello-web-plugin/web/awd-plugin-sdk.js` 都是**分发副本**，
-必须与本文件逐字节一致。改动顺序：先改这里，再同步两份副本。
+必须与本文件逐字节一致。改动顺序：先改这里，再同步示例、后端 plugin-dev 与官网模板的分发副本；类型和 manifest schema 同步其对应副本。
 
 对应的宿主端实现在 `frontend/src/components/PluginPane.vue`。
 桥协议是双方共同的契约，任何一方单独改动都会让另一方的插件跑不起来——
@@ -136,3 +136,38 @@ node scripts/plugin-dev.mjs submissions --endpoint https://YOUR-PORTAL/api/plugi
 声明 `notifications` 后，使用 `awd.notifications.publish({eventKey,title,body?,actionState?,target?})` 向当前账号发布持久通知；业务真正完成后调用 `awd.notifications.resolve(eventKey, 'done')`。已读不代表业务确认。通知目标只能打开本插件，禁止任意 URL、执行代码或指定其他收件人。
 
 完整约束、受控跨成员 Java SPI、客户身份和导航契约见 [消息中心接口](../../docs/message-center/README.md)。旧宿主应按 `unknown_method`/不可用提示降级，不能用 `ui.toast` 冒充持久消息已投递。
+
+## 按功能选择界面入口（SDK 1.8，待随宿主发版）
+
+插件权限决定能够调用哪些宿主能力，`contributes.views` 决定在哪显示界面。两者独立；安装插件不意味着必须占用侧栏或专属标签页。
+
+| `contributes.views` | 宿主行为 |
+| --- | --- |
+| 缺省或 `null` | 兼容旧插件：保留左侧入口与 `frontendEntry` 工作区（没有入口文件时显示使用引导） |
+| `[]` | 无左侧入口、panel 或专属标签页；皮肤、模板等在自己的贡献点使用 |
+| 仅 `sidebar` | 左侧入口打开 panel，不自动创建工作区标签 |
+| 仅 `workspace` | 左侧按钮直接打开工作区单例标签，不额外打开简介 panel |
+| `sidebar` 和 `workspace` | 左侧入口打开 panel；需要更大空间时，由插件调用 `awd.ui.openWorkspace()` 打开声明的工作区 |
+
+新 manifest 的 `views` 应省略或写数组；`null` 只作为旧元数据兼容，不是 SDK Schema 允许的新声明。
+
+每种 `placement` 最多声明一个视图，`entry` 必须是包内 `web/` 文件；`scope: 'project'` 需要项目，`scope: 'global'` 不需要项目。只声明 panel 时不会因为同时保留了 `frontendEntry` 而额外获得工作区。显式空视图仍可保留 `frontendEntry` 供插件中心预览使用；皮肤只需在主题切换处选择，不应为预览另占独立工作区。更改为无工作区的插件，其旧工作区标签在清单刷新后清理。
+
+```json
+{
+  "contributes": {
+    "views": [
+      { "id": "panel", "name": "工具面板", "entry": "web/panel.html", "placement": "sidebar", "scope": "project" },
+      { "id": "workspace", "name": "完整操作", "entry": "web/workspace.html", "placement": "workspace", "scope": "project" }
+    ]
+  }
+}
+```
+
+```js
+await awd.ui.openWorkspace();
+```
+
+该方法无参数，只能打开当前插件自己已声明的工作区；成功返回 `{}`，无可用工作区返回 `unavailable`。宿主仍核对当前安装、启用、权限和作用域，不接受调用方指定其他插件、任意 URL 或未声明视图。旧宿主返回 `unknown_method`，应提示升级，不能声称已经打开。桥协议新增方法不代表用户客户端已升级。
+
+验收按实际入口进行：轻量插件检查主题等贡献点可用、无多余侧栏和标签；panel 插件检查主要操作与窄栏；工作区插件检查打开、单例聚焦、切换保活和关闭；所有形态检查禁用/卸载后对应入口和实例消失。

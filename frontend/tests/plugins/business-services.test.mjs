@@ -74,7 +74,10 @@ test('view contributions reject escaped entries, unknown placement, duplicate id
   ] } }, (id, entry) => id + '/' + entry)
   assert.deepEqual(views.map(v => v.id), ['main', 'global'])
   assert.equal(views[0].url, 'search/web/index.html')
-  assert.equal(isGlobalPlugin({ views }), true)
+  // Navigation uses the selected sidebar, not another view's global scope.
+  assert.equal(isGlobalPlugin({ views }), false)
+  assert.equal(isGlobalPlugin({ views: [views[1]] }), true)
+  assert.equal(isGlobalPlugin({ views: [valid, { ...valid, id: 'workspace', placement: 'workspace', scope: 'global' }] }), false)
 })
 
 test('the packaged search bridge includes tagged media and archives, with or without a keyword', async () => {

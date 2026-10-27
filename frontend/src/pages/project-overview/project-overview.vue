@@ -329,6 +329,7 @@
     <view class="main-layout" :class="{ 'is-compact': isCompactLayout }">
       <!-- Cursor 风格：最左常驻栏（Activity Bar） -->
       <view class="left-rail">
+        <view class="rail-tools" tabindex="0">
         <!-- rail 的顺序就是 config/leftSidebarPlugins.js 里数组的顺序（项目概览 →
              资源管理器 → 插件中心 → 语音 → 脱敏 → 门控项）。
              2026-08-19 起「项目概览」和「插件中心」也在这个数组里：它们走的都是
@@ -337,7 +338,7 @@
           v-for="p in LEFT_SIDEBAR_PLUGINS"
           :key="p.key"
           class="rail-btn"
-          :class="{ active: ((leftPaneKey === p.key || (p.key === 'files' && isExplorerPane)) && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned), 'is-movable': isMovablePanel(p.key), 'is-sortable': !isClientView, 'rail-dragging': draggingRailKey === p.key }"
+          :class="{ active: (p.isDynamic && p.hasDeclaredViews && !p.sidebarView && workspaceTabState('plugin', p.pluginId) === 'active') || ((leftPaneKey === p.key || (p.key === 'files' && isExplorerPane)) && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned), 'is-movable': isMovablePanel(p.key), 'is-sortable': !isClientView, 'rail-dragging': draggingRailKey === p.key }"
           :title="p.label"
           :draggable="!isClientView"
           @tap="onRailBtnTap(p.key)"
@@ -392,8 +393,10 @@
 
         <!-- 整理模式开关已挪到顶栏 header-tools（dev-board#221，原在 rail 上太显眼） -->
 
-        <!-- Spacer -->
-        <view style="flex: 1"></view>
+        </view>
+
+        <!-- 项目操作常驻底部，不随上方工具列表滚动。成员浮层须能向右展开。 -->
+        <view class="rail-footer">
 
         <!-- Staging Area (Moved to bottom)：暂存区挂在项目下（.stagezone），无项目态不给 -->
         <view
@@ -510,7 +513,7 @@
             </svg>
           </view>
         </view>
-
+        </view>
       </view>
 
       <!-- File Picker Dialog (for EasyVoice Import) -->
@@ -2382,7 +2385,7 @@ import VariablePanel from '@/components/VariablePanel.vue'
 import EvidenceMethodBar from '@/components/EvidenceMethodBar.vue'
 import FileStagingArea from '@/components/FileStagingArea.vue'
 import PluginPane from '@/components/PluginPane.vue' // Added
-import { pluginViews, isGlobalPlugin } from '@/utils/pluginViews.js'
+import { pluginViews, isGlobalPlugin, hasPluginNavigation, hasPluginPanel, isLegacyThemeGallery } from '@/utils/pluginViews.js'
 import PluginGuidePane from '@/components/PluginGuidePane.vue'
 import PluginWorkspaceSummary from '@/components/PluginWorkspaceSummary.vue'
 import PluginDevPanel from '@/components/PluginDevPanel.vue'
@@ -3184,12 +3187,12 @@ export default {
       // 动态插件与项目面板一律不上 rail——它们都带着 projectId 干活。
       if (user?.role === 'CLIENT') return getPluginsForUser('CLIENT')
       if (!this.hasProject || this.isLooseWorkspace) {
-        const globals = [...LEFT_SIDEBAR_PLUGINS.filter(p => isPaneAllowedWithoutProject(p.key)), ...this.dynamicPlugins.filter(p => !p.isThemePlugin && isGlobalPlugin(p))]
+        const globals = [...LEFT_SIDEBAR_PLUGINS.filter(p => isPaneAllowedWithoutProject(p.key)), ...this.dynamicPlugins.filter(p => hasPluginNavigation(p) && isGlobalPlugin(p))]
         return this.applyRailOrder(this.applyPanelDocks(globals).filter(p => isPaneAllowedWithoutProject(p.key) || isGlobalPlugin(p)))
       }
       const base = (user && user.role === 'CLIENT')
         ? getPluginsForUser('CLIENT')
-        : [...getPluginsForUser(user && user.role, { cloudTrack: this.ddCloudTrack }), ...this.dynamicPlugins.filter(p => !p.isThemePlugin)]
+        : [...getPluginsForUser(user && user.role, { cloudTrack: this.ddCloudTrack }), ...this.dynamicPlugins.filter(p => hasPluginNavigation(p))]
       // 声明了 requiresSkill 的插件位（诉讼可视化）跟着 skill 启停走：默认不安装，
       // 用户在广场里装了才出现在左栏。
       //
@@ -3395,6 +3398,10 @@ export default {
         insightHover: payload => this.openInsightHoverCard(payload),
         insightOpenDoc: payload => this.openInsightDocFile(payload),
         openBrowser: url => this.openBrowserTab(url),
+        openPluginWorkspace: pluginId => {
+          const plugin = this.dynamicPlugins.find(p => p.pluginId === pluginId)
+          return !!plugin?.workspaceView && this.openPluginTab(pluginId) === true
+        },
         openConversation: async conversation => {
           if (!await this.resolveChatInterface()) return false
           return this.loadHistoryChat(conversation)
@@ -3455,7 +3462,7 @@ export default {
     activeBottomDynamicPlugin() { return this.dynamicPlugins.find(p => p.key === this.activeToolKey) || null },
     activeDynamicPlugin() {
       if (!this.leftPaneKey) return null
-      return this.dynamicPlugins.find(p => p.key === this.leftPaneKey) || null
+      return this.dynamicPlugins.find(p => p.key === this.leftPaneKey && hasPluginPanel(p)) || null
     },
     isExplorerPane() {
       return this.leftPaneKey === 'files' || this.leftPaneKey === 'plugin-search'
@@ -8004,8 +8011,9 @@ export default {
               isDynamic: true,
               // 有真正的前端入口才走 iframe（PluginPane）；纯工具/skill 插件走宿主渲染的
               // 启动面板（PluginGuidePane）——否则点开只有一句「未配置入口地址」。
-              hasFrontend: !!frontendEntry,
-              isThemePlugin: Array.isArray(p?.contributes?.themes) && p.contributes.themes.length > 0 && !views.some(view => view.placement === 'sidebar'),
+              hasFrontend: !!(views.find(view => view.placement === 'workspace')?.url || frontendEntry),
+              hasDeclaredViews: Array.isArray(p?.contributes?.views),
+              legacyThemeGallery: isLegacyThemeGallery(p),
               views,
               sidebarView: views.find(view => view.placement === 'sidebar') || null,
               workspaceView: views.find(view => view.placement === 'workspace') || null,

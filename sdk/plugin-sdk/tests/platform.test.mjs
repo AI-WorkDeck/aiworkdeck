@@ -25,6 +25,7 @@ function harness(t) {
 test('new APIs round-trip actual structured messages with no signal/secret crossing bridge', async t => {
   const h = harness(t)
   const cases = [
+    [() => h.awd.ui.openWorkspace(), 'ui.openWorkspace', {}],
     [() => h.awd.services.request('search', 'query', { query: 'demo' }, { requestId: 'request-one' }), 'services.request', { service: 'search', operation: 'query', params: { query: 'demo' }, requestId: 'request-one' }],
     [() => h.awd.services.cancel({ requestId: 'request-one' }), 'services.cancel', { requestId: 'request-one' }],
     [() => h.awd.mcp.servers(), 'mcp.servers', {}],
@@ -162,4 +163,19 @@ test('five-minute services survive two minutes, settle normally, and cancel only
   await advance(59999); assert.equal(timers.size, 1)
   await advance(1); await defaultExpired
   assert.equal(timers.size, 0)
+})
+
+// The target identity comes from the host iframe, never from a plugin argument.
+test('workspace opening sends no target and preserves unavailable / old-host errors', async t => {
+  const h = harness(t)
+  assert.equal(h.awd.version, '1.8.0')
+  for (const code of ['unavailable', 'unknown_method']) {
+    const next = h.next(), promise = h.awd.ui.openWorkspace({ pluginId: 'another-plugin', viewId: 'other' })
+    const message = await next
+    assert.equal(message.method, 'ui.openWorkspace')
+    assert.deepEqual(message.params, {})
+    h.response(message, null, { code, message: code })
+    await assert.rejects(promise, error => error.code === code)
+    assert.equal(h.timers.size, 0)
+  }
 })
