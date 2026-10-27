@@ -61,9 +61,13 @@ function makeVm(exec, fileSize = 4096) {
     $emit(ev, arg) { this.emitted.push([ev, arg]) },
     appendLog() {}, startBootTrickle() {}, logLoadFailure() {}, initEvidence() {},
     fetchDocumentBytes: async () => new ArrayBuffer(fileSize),
-    executor: { executeCommand: (action, params, opts) => { vm.calls.push({ action, params, opts }); return exec(action, params, opts) } },
+    executor: { executeCommand: (action, params, opts) => {
+      vm.calls.push({ action, params, opts })
+      if (action === 'set_chrome') return Promise.resolve({ success: true, applied: { menubar: false, statusbar: false, toolbars: { standardbar: false } } })
+      return exec(action, params, opts)
+    } },
   }
-  for (const name of ['finishDocLoad', 'loadDocument', 'retryLoad', 'bootMilestone', 'initWritingAssistance', 'loadWaitBudgetMs']) if (METHODS[name]) vm[name] = METHODS[name].bind(vm)
+  for (const name of ['finishDocLoad', 'prepareInitialChrome', 'loadDocument', 'retryLoad', 'bootMilestone', 'initWritingAssistance', 'loadWaitBudgetMs']) if (METHODS[name]) vm[name] = METHODS[name].bind(vm)
   // remountEditor 用真实现（它负责让在途链路作废），只把建元素那一步桩掉。
   // 新引擎的 executor 由 mountEditor 接线；这里复用同一个桩（各用例可改它的 executeCommand）。
   const execStub = vm.executor
