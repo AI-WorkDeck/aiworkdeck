@@ -5,8 +5,8 @@
 // 病灶：composable 里的 SSE reader 循环、心跳 interval、待触发的重连定时器全都活在闭包里，
 // 没有任何生命周期钩子回收。工作台的跳转按约定一律 reLaunch（CLAUDE.md），页面栈整个销毁，
 // 于是流到一半离开工作台的那个实例变成僵尸：它仍会 scheduleReconnect，与新挂载的实例
-// 轮流把对方从同一会话的 SSE 上挤下去（后端每会话只留一个 emitter）；模块级单例
-// activeNetworkRecoveryHook 也还指着已销毁实例的闭包。
+// 轮流把对方从同一会话的 SSE 上挤下去（后端每会话只留一个 emitter）；模块级恢复回调集合
+// 也可能还留着已销毁实例的闭包。
 //
 // 与本目录既有用例同口径，做源码级契约断言：useAgentStream.js 带 @/ 别名与 uni 全局，
 // node 直接 import 不进来（见 api-contract.test.mjs 抬头的说明）。
@@ -60,13 +60,15 @@ test('清理块先清 currentConversationId，断掉 scheduleReconnect 的续命
     'scheduleReconnect/重连回调都以 currentConversationId 为准，不清就还会重连')
 })
 
-test('只在模块级单例仍指向本实例时才释放它', () => {
+test('卸载经 resetSSE 只移除本实例的恢复回调', () => {
   const body = unmountBody(CODE)
-  assert.match(body, /activeNetworkRecoveryHook\s*===\s*myNetworkRecoveryHook/,
-    '无条件置空会踩掉后挂载实例的网络恢复入口')
-  assert.match(body, /activeNetworkRecoveryHook\s*=\s*null/)
-  // 比对的前提：connectSSE 里赋值时要留下本实例的那份引用
+  assert.match(body, /resetSSE\(\)/)
+  const reset = CODE.slice(CODE.indexOf('const resetSSE ='), CODE.indexOf('const clearBubbles ='))
+  assert.match(reset, /activeNetworkRecoveryHooks\.delete\(myNetworkRecoveryHook\)/,
+    '只能移除本实例，不能清空其他会话的恢复回调')
+  assert.match(reset, /myNetworkRecoveryHook\s*=\s*null/)
   assert.match(CODE, /myNetworkRecoveryHook\s*=\s*\(reason\)\s*=>/,
-    'connectSSE 要先把回调存进实例级变量再挂到模块级单例上')
-  assert.match(CODE, /activeNetworkRecoveryHook\s*=\s*myNetworkRecoveryHook/)
+    'connectSSE 要保留本实例的回调引用')
+  assert.match(CODE, /activeNetworkRecoveryHooks\.add\(myNetworkRecoveryHook\)/)
+  assert.doesNotMatch(CODE, /activeNetworkRecoveryHooks\.clear\(/)
 })

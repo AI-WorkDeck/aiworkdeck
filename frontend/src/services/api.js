@@ -531,6 +531,10 @@ export function getAiHistory(params) {
   });
 }
 
+export const issueAgentConversation = projectId => request({
+  url: '/api/agent/conversations', method: 'POST', data: { projectId },
+})
+
 export function getAiConversations(projectId) {
   return request({
     url: '/api/ai/conversations',
