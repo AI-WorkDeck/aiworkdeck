@@ -71,12 +71,27 @@ try {
   assert.equal(await workspace.$('.calendar-sidebar'),null,'workspace must devote width to calendar')
   assert.equal(await sidebar.$eval('.calendar-shortcuts',el=>el.scrollWidth<=el.clientWidth),true)
   await page.screenshot({path:out+'/initial.png'})
+  const clickText=async(frame,selector,text)=>{for(const el of await frame.$$(selector))if((await el.evaluate(el=>el.textContent)).includes(text)){await el.click();return}throw Error('Missing '+selector+' '+text)}
+  await workspace.click('.cal-filter-btn')
+  await clickText(workspace,'.fp-option','合成甲项目')
+  await clickText(workspace,'.fp-option','合成乙项目')
+  await page.waitForFunction(()=>workbench.calendarWorkspaceState.projectIds.length===2)
+  await sidebar.waitForFunction(()=>document.querySelector('.shortcut-project')?.selectedOptions[0]?.textContent==='合成甲项目 · 合成乙项目')
+  assert.equal(await sidebar.$eval('.shortcut-project',el=>el.selectedOptions[0].disabled),true)
+  assert.deepEqual(await page.evaluate(()=>workbench.calendarWorkspaceState.projectIds),['7','8'])
+  await workspace.click('.cal-filter-mask')
+  await page.screenshot({path:out+'/multiple-projects.png'})
+  await sidebar.select('.shortcut-project','')
+  await workspace.waitForFunction(()=>document.querySelector('.cal-scope-label')?.textContent==='全部项目')
+  assert.deepEqual(await page.evaluate(()=>workbench.calendarWorkspaceState.projectIds),[])
+  assert.equal(await sidebar.$eval('.shortcut-project',el=>el.selectedOptions[0].textContent),'全部项目')
   await sidebar.select('.shortcut-project','7')
   await workspace.waitForFunction(()=>!document.querySelector('.calendar-main').textContent.includes('乙项目会面'))
+  await workspace.waitForFunction(()=>document.querySelector('.cal-scope-label')?.textContent==='合成甲项目')
+  assert.equal(await sidebar.$eval('.shortcut-project',el=>el.selectedOptions[0].textContent),'合成甲项目')
   assert.equal(await page.evaluate(()=>workbench.calendarWorkspaceState.projectIds[0]),'7')
   assert.match(await sidebar.$eval('.shortcut-list',el=>el.textContent),/第三天提交文件/)
   assert.doesNotMatch(await sidebar.$eval('.shortcut-list',el=>el.textContent),/第五天出庭/)
-  const clickText=async(frame,selector,text)=>{for(const el of await frame.$$(selector))if((await el.evaluate(el=>el.textContent)).includes(text)){await el.click();return}throw Error('Missing '+selector+' '+text)}
   await clickText(sidebar,'.shortcut-segments uni-button','5')
   await sidebar.waitForFunction(()=>document.querySelector('.shortcut-list').textContent.includes('第五天出庭'))
   await sidebar.click('[data-task-id="34"]')
@@ -130,6 +145,6 @@ try {
     assert.equal(await translatedWorkspace.$eval('.calendar-pane',el=>el.getAttribute('dir')),language==='ar-SA'?'rtl':'ltr')
   }
   assert.deepEqual(errors,[])
-  const report={passed:true,checks:['separate sidebar/workspace','project filter sync','3/5 day boundary','task focus and day view','12-month year and date navigation','sidebar create / complete and refresh','persistent failure and retry','associated file navigation and shared filter clear','220/260/320px sidebar','packaged German and Arabic strings and RTL'],screenshots:['initial.png','year.png','narrow.png']}
+  const report={passed:true,checks:['separate sidebar/workspace','central multi-project selection labels sidebar then resets to all/single','project filter sync','3/5 day boundary','task focus and day view','12-month year and date navigation','sidebar create / complete and refresh','persistent failure and retry','associated file navigation and shared filter clear','220/260/320px sidebar','packaged German and Arabic strings and RTL'],screenshots:['initial.png','multiple-projects.png','year.png','narrow.png']}
   await writeFile(out+'/report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report))
 } finally { await browser?.close();await new Promise(done=>server.close(done)) }
