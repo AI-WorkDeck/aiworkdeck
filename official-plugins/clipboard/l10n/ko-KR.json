@@ -1,5 +1,5 @@
 {
   "plugin.name": "클립보드",
-  "plugin.description": "Search clipboard history, copy, and insert content.",
+  "plugin.description": "클립보드 기록을 검색하고, 내용을 복사하여 삽입합니다.",
   "view.main.name": "클립보드"
 }

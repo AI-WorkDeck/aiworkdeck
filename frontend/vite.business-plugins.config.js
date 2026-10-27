@@ -25,11 +25,22 @@ export default defineConfig({
       const compile = value => typeof value === 'string' ? '(' + baseCompile(value, { mode: 'normal' }).code + ')'
         : Array.isArray(value) ? '[' + value.map(compile).join(',') + ']'
           : value && typeof value === 'object' ? '{' + Object.entries(value).map(([key, child]) => JSON.stringify(key) + ':' + compile(child)).join(',') + '}' : JSON.stringify(value)
+      const pluginNamespaces = {
+        search: ['common', 'files', 'account'],
+        desensitize: ['common', 'panels', 'account'],
+        'litigation-visual': ['common', 'panels', 'account'],
+        insight: ['common', 'insight', 'contractReview', 'account'],
+        voice: ['common', 'workbench', 'panels', 'components', 'account', 'meeting', 'onboarding', 'accountPassword', 'admin'],
+        calendar: ['common', 'calendar', 'account', 'chat', 'files', 'config'],
+        favorites: ['common', 'panels'],
+        clipboard: ['common', 'panels', 'config', 'onboarding'],
+      }[id]
       const locales = {}
-      for (const language of id === 'calendar' ? SUPPORTED_LOCALE_CODES : ['zh-CN', 'en-US']) {
+      for (const language of SUPPORTED_LOCALE_CODES) {
         locales[language] = {}
         const dir = resolve(root, 'src/locales', language)
-        for (const file of await readdir(dir)) if (file.endsWith('.js') && (['zh-CN', 'en-US'].includes(language) || file === 'calendar.js')) locales[language][file.slice(0, -3)] = (await import(pathToFileURL(resolve(dir, file)).href)).default
+        const files = pluginNamespaces ? pluginNamespaces.map(ns => ns + '.js') : (await readdir(dir)).filter(f => f.endsWith('.js'))
+        for (const file of files) locales[language][file.slice(0, -3)] = (await import(pathToFileURL(resolve(dir, file)).href)).default
       }
       return 'export default ' + compile(locales)
     },

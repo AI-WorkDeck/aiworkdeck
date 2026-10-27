@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Desensitize",
-  "plugin.description": "Inspect sensitive information, generate desensitized copies, and restore with recovery packages.",
-  "view.main.name": "Desensitize"
+  "plugin.name": "민감정보 비식별화",
+  "plugin.description": "민감 정보를 검사하고, 비식별화된 사본을 생성하며, 복구 패키지로 복원합니다.",
+  "view.main.name": "민감정보 비식별화"
 }

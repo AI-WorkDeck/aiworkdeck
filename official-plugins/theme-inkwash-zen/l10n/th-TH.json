@@ -1,8 +1,8 @@
 {
-  "plugin.name": "Ink Wash Zen · Calligraphy Skin",
-  "plugin.desc": "Xuan paper whitespace, five-step ink wash hierarchy, and purple-ink focal accents across light and dark modes.",
-  "theme.name": "Ink Wash Zen",
-  "theme.desc": "Xuan Paper × Five-Tone Ink Wash × Purple Ink Drop × Cinnabar Seal",
+  "plugin.name": "หมึกสายน้ำเซน · สกินลายมือเขียน",
+  "plugin.desc": "พื้นที่ว่างแบบกระดาษเสวียน ลำดับโทนหมึกห้าขั้น และจุดเน้นสีหมึกม่วง ทั้งโหมดสว่างและโหมดมืด",
+  "theme.name": "หมึกสายน้ำเซน",
+  "theme.desc": "กระดาษซวน × หมึกล้างห้าเฉด × หยดหมึกม่วง × ตราประทับแดงชาน",
   "gallery.badge": "แกลเลอรีธีม",
   "gallery.swatch1": "ขาวกระดาษข้าว",
   "gallery.swatch2": "หมึกเข้ม",

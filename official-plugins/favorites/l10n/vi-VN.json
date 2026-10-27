@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Favorites",
-  "plugin.description": "Search project favorites, copy, insert, or open sources.",
-  "view.main.name": "Favorites"
+  "plugin.name": "Mục yêu thích",
+  "plugin.description": "Tìm kiếm mục yêu thích của dự án, sao chép, chèn hoặc mở nguồn.",
+  "view.main.name": "Mục yêu thích"
 }

@@ -1,6 +1,6 @@
 {
-  "plugin.name": "Calendar",
-  "plugin.description": "Cross-project calendar, tasks, reminders, and file links.",
-  "view.sidebar.name": "Calendar",
-  "view.main.name": "Calendar"
+  "plugin.name": "日程",
+  "plugin.description": "跨項目日曆、任務、提醒和文件關聯。",
+  "view.sidebar.name": "日程",
+  "view.main.name": "日程"
 }

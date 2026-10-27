@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Project Search",
-  "plugin.description": "Search project files by full text or tags and jump directly to documents.",
-  "view.main.name": "Project Search"
+  "plugin.name": "프로젝트 검색",
+  "plugin.description": "전체 텍스트 또는 태그로 프로젝트 파일을 검색하고 문서로 바로 이동합니다.",
+  "view.main.name": "프로젝트 검색"
 }

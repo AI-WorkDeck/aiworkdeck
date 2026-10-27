@@ -3,87 +3,87 @@
 
 export default {
   "sidebar": {
-    "projectHome": "Project Overview",
-    "projects": "Projects",
-    "files": "Explorer",
-    "ddFiles": "Due Diligence Files",
-    "market": "Extensions",
-    "dev": "Plugin Development",
-    "voice": "Voice",
-    "meetingRecorder": "Meeting Recording",
+    "projectHome": "Ringkasan Proyek",
+    "projects": "Proyek",
+    "files": "Penjelajah",
+    "ddFiles": "Berkas Uji Tuntas",
+    "market": "Ekstensi",
+    "dev": "Pengembangan Plugin",
+    "voice": "Suara",
+    "meetingRecorder": "Rekaman Rapat",
     "litigationVisual": "Visualisasi Litigasi",
     "tmeet": "Tencent Meeting",
-    "search": "Search",
-    "tts": "Text to Speech",
-    "desensitize": "File Redaction",
+    "search": "Cari",
+    "tts": "Teks ke Suara",
+    "desensitize": "Penyuntingan Berkas",
     "version": "Version History",
     "calendar": "Kalender"
   },
   "tools": {
-    "variables": "Variable Library",
+    "variables": "Pustaka Variabel",
     "favorites": "Favorit",
     "clipboard": "Papan Klip"
   },
   "fileActions": {
-    "move": "Move",
-    "cut": "Cut",
-    "copy": "Copy",
+    "move": "Pindahkan",
+    "cut": "Potong",
+    "copy": "Salin",
     "delete": "Hapus",
     "cancel": "Batal",
-    "newFile": "New File",
-    "newFolder": "New Folder",
+    "newFile": "Berkas Baru",
+    "newFolder": "Folder Baru",
     "sort": "Urutkan"
   },
   "ocr": {
-    "refresh": "Refresh View",
-    "recognize": "Recognize Text",
-    "download": "Download",
-    "copy": "Copy",
-    "insertDoc": "Insert into Document",
-    "webLink": "Link to Web Verification",
-    "favorite": "Add to Favorites"
+    "refresh": "Muat Ulang Tampilan",
+    "recognize": "Kenali Teks",
+    "download": "Unduh",
+    "copy": "Salin",
+    "insertDoc": "Sisipkan ke Dokumen",
+    "webLink": "Tautkan ke Verifikasi Web",
+    "favorite": "Tambahkan ke Favorit"
   },
   "projectTypes": {
-    "majorAssetRestructuring": "Listed Company Major Asset Restructuring",
-    "privatePlacement": "Listed Company Private Placement",
-    "publicPlacement": "Listed Company Public Offering",
-    "acquisition": "Listed Company Takeover",
-    "blank": "Blank Project"
+    "majorAssetRestructuring": "Restrukturisasi Aset Utama Perusahaan Terbuka",
+    "privatePlacement": "Penempatan Pribadi Perusahaan Terbuka",
+    "publicPlacement": "Penawaran Umum Perusahaan Terbuka",
+    "acquisition": "Pengambilalihan Perusahaan Terbuka",
+    "blank": "Proyek Kosong"
   },
   "projectFields": {
-    "listedCompanyName": "Listed Company Name",
-    "listedCompanyNamePlaceholder": "Enter the listed company's full or short name",
-    "targetCompanyName": "Target Company Name",
-    "targetCompanyNamePlaceholder": "Enter the target company's full name",
-    "projectName": "Project Name",
-    "projectNamePlaceholder": "Enter a project name",
-    "listedCompanyInfo": "Listed Company Basic Information",
-    "targetCompanyInfo": "Target Company Basic Information"
+    "listedCompanyName": "Nama Perusahaan Terbuka",
+    "listedCompanyNamePlaceholder": "Masukkan nama lengkap atau singkat perusahaan terbuka",
+    "targetCompanyName": "Nama Perusahaan Sasaran",
+    "targetCompanyNamePlaceholder": "Masukkan nama lengkap perusahaan sasaran",
+    "projectName": "Nama Proyek",
+    "projectNamePlaceholder": "Masukkan nama proyek",
+    "listedCompanyInfo": "Informasi Dasar Perusahaan Terbuka",
+    "targetCompanyInfo": "Informasi Dasar Perusahaan Sasaran"
   },
   "roles": {
-    "owner": "Owner",
-    "admin": "Case Admin",
-    "participant": "Collaborator",
-    "readOnly": "Read-only",
-    "client": "Client"
+    "owner": "Pemilik",
+    "admin": "Admin Kasus",
+    "participant": "Kolaborator",
+    "readOnly": "Hanya Baca",
+    "client": "Klien"
   },
   "roleHints": {
-    "admin": "Can edit files, add members, and manage permissions",
-    "participant": "Can edit files and submit drafts",
-    "readOnly": "View only, no editing"
+    "admin": "Dapat mengedit berkas, menambahkan anggota, dan mengelola izin",
+    "participant": "Dapat mengedit berkas dan mengirimkan draf",
+    "readOnly": "Hanya melihat, tanpa mengedit"
   },
   "memberGroups": {
-    "admin": "Owners & Case Admins",
-    "member": "Collaborators",
-    "client": "Clients"
+    "admin": "Pemilik & Admin Kasus",
+    "member": "Kolaborator",
+    "client": "Klien"
   },
   "clipboardTypes": {
-    "text": "Text",
-    "image": "Image",
-    "file": "File",
-    "unknown": "Unknown"
+    "text": "Teks",
+    "image": "Gambar",
+    "file": "Berkas",
+    "unknown": "Tidak Diketahui"
   },
   "variables": {
-    "searchPlaceholder": "Search variable names or content"
+    "searchPlaceholder": "Cari nama atau konten variabel"
   }
 }

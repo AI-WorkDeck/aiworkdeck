@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Desensitize",
-  "plugin.description": "Inspect sensitive information, generate desensitized copies, and restore with recovery packages.",
-  "view.main.name": "Desensitize"
+  "plugin.name": "ปกปิดข้อมูลอ่อนไหว",
+  "plugin.description": "ตรวจสอบข้อมูลอ่อนไหว สร้างสำเนาที่ปกปิดแล้ว และกู้คืนด้วยแพ็กเกจการกู้คืน",
+  "view.main.name": "ปกปิดข้อมูลอ่อนไหว"
 }
