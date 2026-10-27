@@ -56,7 +56,7 @@ export const panelSwitchingMethods = {
       }
 
       if (this.leftPaneKey === key) {
-        // 收展走统一出口（dev-board#727）：与左栏右缘/顶栏的收起按钮共用同一个
+        // 收展走统一出口（dev-board#727）：与顶栏的收起按钮共用同一个
         // toggleSidebar，确保持久化与 triggerWorkbenchResize 两条路径不会各走各的。
         this.toggleSidebar()
       } else {
@@ -75,7 +75,7 @@ export const panelSwitchingMethods = {
 
       if (key === 'dd-client') this.openDdClientTab()
 
-      if (plugin && !plugin.sidebarView) this.openPluginTab(plugin.pluginId)
+      if (plugin && !this.sidebarCollapsed && (!plugin.sidebarView || plugin.pluginId === 'tencent-meeting')) this.openPluginTab(plugin.pluginId)
 
       // Persistence：有项目按项目分，无项目落 global_*（此前无项目态写的是 project_null_*）
       uni.setStorageSync(workbenchStorageKey(this.projectId, 'leftPaneKey'), key)

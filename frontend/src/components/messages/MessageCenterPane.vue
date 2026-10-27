@@ -3,7 +3,7 @@
 <template>
   <section class="message-center" :aria-label="$t('messageCenter.title')">
     <header class="center-heading">
-      <div class="center-heading-copy"><h2>{{ $t('messageCenter.title') }}</h2><p>{{ $t('messageCenter.subtitle') }}</p></div>
+      <div class="center-heading-copy"><h2>{{ $t('messageCenter.title') }}</h2></div>
       <button class="refresh-button" :disabled="loading" @click="refresh()">
         <svg :class="{ spinning: loading }" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.5-1L20 9M4 15l2.4 3A7 7 0 0 0 17.9 17" /></svg>
         <span>{{ $t(loading ? 'messageCenter.loading' : 'messageCenter.refresh') }}</span>
@@ -25,11 +25,11 @@
         <p v-if="loading && !items.length" class="list-loading" role="status">{{ $t('messageCenter.loading') }}</p>
         <div class="list-scroll">
           <template v-if="category === 'conversations'">
-            <div v-if="availableAgents.length" class="scope-agents"><small>{{ $t('messageCenter.assistants') }}</small><button v-for="agent in availableAgents" :key="agent.scopeKey" :disabled="creating" @click="openAgent(agent)"><span>{{ agent.title || agent.name }}</span><small>{{ $t('messageCenter.' + agent.scope) }}</small></button></div>
+            <div v-if="availableAgents.length" class="scope-agents"><small>{{ $t('messageCenter.assistants') }}</small><button v-for="agent in availableAgents" :key="agent.scopeKey" :disabled="creating" @click="openAgent(agent)"><svg class="agent-avatar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3m-6 0h12a3 3 0 0 1 3 3v9H3V9a3 3 0 0 1 3-3Zm2 5h.01M16 11h.01M8 15h8M1 11v4m22-4v4" /></svg><span>{{ agent.title || agent.name }}</span><small>{{ $t('messageCenter.' + agent.scope) }}</small></button></div>
             <p v-if="projectReason" class="center-hint">{{ projectReason }}</p>
           </template>
           <button v-for="item in items" :key="itemKey(item)" class="inbox-row" :class="{ selected: selection === itemKey(item), unread: category === 'conversations' ? item.unreadCount > 0 : !isNoticeRead(item) }" :aria-current="selection === itemKey(item) ? 'true' : undefined" @click="selectItem(item)">
-            <span class="row-icon" :class="{ 'is-pending': item.actionState === 'pending' }" aria-hidden="true"><svg viewBox="0 0 24 24"><path v-if="category === 'conversations'" d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-3 3V11.5a9 9 0 1 1 18 0Z" /><path v-else-if="item.actionState === 'pending'" d="M8 4H5v17h14V4h-3M8 2h8v5H8zM8 14l3 3 5-6" /><path v-else d="M14 2H5v20h14V7l-5-5Zm0 0v6h5M8 12h8M8 16h6" /></svg></span>
+            <span class="row-icon" :class="{ 'is-pending': item.actionState === 'pending' }" aria-hidden="true"><svg viewBox="0 0 24 24"><path v-if="item.agent" d="M12 3v3m-6 0h12a3 3 0 0 1 3 3v9H3V9a3 3 0 0 1 3-3Zm2 5h.01M16 11h.01M8 15h8M1 11v4m22-4v4" /><path v-else-if="category === 'conversations'" d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-3 3V11.5a9 9 0 1 1 18 0Z" /><path v-else-if="item.actionState === 'pending'" d="M8 4H5v17h14V4h-3M8 2h8v5H8zM8 14l3 3 5-6" /><path v-else d="M14 2H5v20h14V7l-5-5Zm0 0v6h5M8 12h8M8 16h6" /></svg></span>
             <span class="row-content">
               <span class="row-title"><span class="row-title-text">{{ item.title }}<template v-if="item.historicalDiscussion"> · {{ $t('messageCenter.historicalDiscussion') }}</template></span><span v-if="category === 'conversations' && item.unreadCount" class="unread-count">{{ item.unreadCount > 99 ? '99+' : item.unreadCount }}</span><span v-else-if="category !== 'conversations' && !isNoticeRead(item)" class="unread-dot" :aria-label="$t('messageCenter.unread')"></span></span>
               <span v-if="category === 'conversations' ? item.lastMessage : item.body" class="row-preview">{{ category === 'conversations' ? (item.lastMessage?.text || item.lastMessage || '') : item.body }}</span>
@@ -58,7 +58,7 @@
             </footer>
           </div>
         </article>
-        <div v-else class="center-placeholder"><div class="placeholder-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 6l8 6 8-6" /></svg></div><h3>{{ $t('messageCenter.choose') }}</h3><p>{{ $t('messageCenter.chooseHint') }}</p></div>
+        <div v-else class="center-placeholder"><div class="placeholder-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 6l8 6 8-6" /></svg></div><h3>{{ $t('messageCenter.choose') }}</h3></div>
         <div v-if="inviteCode && selectedConversation" class="invite-result" role="status"><strong>{{ $t('messageCenter.inviteLabel') }}</strong><code>{{ inviteCode }}</code><button @click="inviteCode = ''">{{ $t('messageCenter.cancel') }}</button></div>
       </div>
     </div>
@@ -74,10 +74,10 @@ const conversationKey = row => `${row.sourceId === 'dd-client' ? `dd:${row.conne
 const historyState = () => ({ messages: [], pending: [], draft: '', failures: {}, status: null, admitting: false, loading: false, hasMore: false, error: '', humanCount: null, selfId: null })
 export default {
   components: { MessageConversationPane },
-  props: { currentProjectId: { type: [String, Number], default: null }, initialConversationId: { type: String, default: '' }, openTarget: { type: Function, required: true }, inviteProject: { type: Function, default: null } },
+  props: { activeFileIds: { type: Array, default: () => [] }, currentProjectId: { type: [String, Number], default: null }, initialConversationId: { type: String, default: '' }, openTarget: { type: Function, required: true }, inviteProject: { type: Function, default: null } },
   data: () => ({ category: 'conversations', selection: '', search: '', projectKey: '', projects: [], conversations: [], notifications: [], counts: {}, agents: [], projectReason: '', unavailableSources: [], histories: {}, selfId: null, loading: false, error: '', accountRequired: false, hasMore: false, identityLoaded: false, form: '', formType: 'DIRECT', formValue: '', creating: false, noticeError: '', opening: false, inviteCode: '', epoch: 0, listSerial: 0 }),
   computed: {
-    availableAgents() { return this.agents.filter(agent => !this.conversations.some(row => row.agent?.scopeKey === agent.scopeKey && row.agent.scope === agent.scope && !row.agent.private && row.type !== 'AGENT_DIRECT')) },
+    availableAgents() { return this.agents.filter(agent => !this.conversations.some(row => row.agent && (row.agent.scopeKey === agent.scopeKey || (agent.scope === 'project' && row.agent.scopeKey === agent.legacyScopeKey)) && row.agent.scope === agent.scope && !!(row.agent.private || row.type === 'AGENT_DIRECT') === (agent.scope === 'project'))) },
     categories() { return [{ key: 'conversations', count: this.counts.unreadMessages }, { key: 'notifications', count: this.counts.unreadNotifications }, { key: 'pending', count: this.counts.pending }] },
     items() { const list = this.category === 'conversations' ? this.conversations : this.notifications.filter(row => this.category !== 'pending' || row.actionState === 'pending'); const query = this.search.trim().toLowerCase(); return query ? list.filter(row => `${row.title || ''} ${row.body || ''} ${row.projectName || ''}`.toLowerCase().includes(query)) : list },
     selectedConversation() { return this.category === 'conversations' ? this.conversations.find(row => conversationKey(row) === this.selection) : null },
@@ -206,11 +206,11 @@ export default {
       if (conversation.agent?.scope === 'project' && (conversation.agent.private || conversation.type === 'AGENT_DIRECT') && !conversation.localProjectId) { fail(this.$t('messageCenter.openAssistantProject')); return }
       if (state.admitting) { fail(this.$t('messageCenter.admissionPending')); return }
       state.admitting = true
-      try { const result = await this.im('agentReply', { conversationId: conversation.id, messageId }, conversation); if (!this.valid(ticket)) return; delete state.failures[id]; this.applyStatus(state, { status: result.status, messageId: result.messageId || messageId }) }
+      try { const result = await this.im('agentReply', { conversationId: conversation.id, messageId, question: state.messages.find(message => String(message.id) === id)?.text || '', preferredFileIds: String(conversation.localProjectId) === String(this.currentProjectId) ? this.activeFileIds : [] }, conversation); if (!this.valid(ticket)) return; delete state.failures[id]; this.applyStatus(state, { status: result.status, messageId: result.messageId || messageId }) }
       catch (error) { if (this.valid(ticket)) fail(error.message) }
       finally { if (this.valid(ticket)) state.admitting = false }
     },
-    async openAgent(agent, privateChat = false, source = null) {
+    async openAgent(agent, privateChat = agent.scope === 'project', source = null) {
       const ticket = this.ticket(); this.creating = true
       try { const conversation = await this.im('ensureAgent', { scope: agent.scope, scopeKey: agent.scopeKey, title: agent.title || agent.name, private: privateChat }, source); if (!this.valid(ticket)) return; this.upsertConversation(conversation); this.category = 'conversations'; this.selectItem(conversation) }
       catch (error) { if (this.valid(ticket)) this.error = error.message }
@@ -363,4 +363,5 @@ input::placeholder { color: var(--awd-text-3); }
   .row-icon { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .spinning { animation: none; } }
+.agent-avatar{width:30px;height:30px;flex:0 0 30px;padding:5px;box-sizing:border-box;border-radius:50%;background:var(--awd-accent-wash);color:var(--awd-accent)}.scope-agents button>span{flex:1}
 </style>

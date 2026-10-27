@@ -18,7 +18,7 @@ const m=event.data;let result={};if(m.method==='tools.invoke'){const action=m.pa
 const server = createServer(async (req, res) => {
   const name = req.url?.replace('/plugin/', '')
   if (req.url === '/') { res.setHeader('Content-Type', 'text/html'); return res.end(host) }
-  if (!['index.html', 'panel.css', 'panel.js', 'awd-plugin-sdk.js'].includes(name)) { res.statusCode = 404; return res.end() }
+  if (!['index.html', 'panel.css', 'panel.js', 'panel-l10n.js', 'awd-plugin-sdk.js'].includes(name)) { res.statusCode = 404; return res.end() }
   res.setHeader('Content-Type', name.endsWith('.html') ? 'text/html' : name.endsWith('.css') ? 'text/css' : 'text/javascript')
   res.end(await readFile(new URL('../web/' + name, import.meta.url)))
 })

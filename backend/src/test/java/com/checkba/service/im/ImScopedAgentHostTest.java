@@ -84,7 +84,7 @@ class ImScopedAgentHostTest {
     }
     @Test void privateProjectMaterialIsBuiltOnlyForTheMatchingProject() {
         info(true, "project", uid);
-        when(context.build(7L, project)).thenReturn("verified project context");
+        when(context.build(7L, project, "", List.of())).thenReturn("verified project context");
         host.execute(7L, 2L, "agentReply", Map.of("conversationId", "chat", "messageId", 41, "projectContext", "untrusted"));
         verify(gateway).executeWithinScope(7L, "qa-account", "agentReply", Map.of("conversationId", "chat", "messageId", 41,
                 "projectContext", "verified project context"));
@@ -108,7 +108,7 @@ class ImScopedAgentHostTest {
     @Test void revokedProjectAfterExtractionDoesNotSendTheMaterial() {
         info(true, "project", uid);
         when(members.hasReadPermission(2L, 7L)).thenReturn(true, false);
-        when(context.build(7L, project)).thenReturn("private");
+        when(context.build(7L, project, "", List.of())).thenReturn("private");
         assertThrows(IllegalArgumentException.class, () -> host.execute(7L, 2L, "agentReply", Map.of("conversationId", "chat", "messageId", 41)));
         verify(gateway, never()).executeWithinScope(any(), anyString(), eq("agentReply"), anyMap());
     }
@@ -135,4 +135,13 @@ class ImScopedAgentHostTest {
         assertEquals(List.of(team), result.get("agents"));
         assertNotNull(result.get("projectReason"));
     }
+    @Test void privateReplyUsesBoundedSelectionHintsButNeverForwardsLocalIdsToCloud() {
+        info(true, "project", uid);
+        when(context.build(7L, project, "李某是谁", List.of(71L))).thenReturn("原告：李某。合成本机起诉状正文");
+        host.execute(7L, 2L, "agentReply", Map.of("conversationId", "chat", "messageId", 41,
+                "question", "李某是谁", "preferredFileIds", List.of("plugin-tab", 71L), "projectContext", "forged"));
+        verify(gateway).executeWithinScope(7L, "qa-account", "agentReply", Map.of("conversationId", "chat", "messageId", 41,
+                "projectContext", "原告：李某。合成本机起诉状正文"));
+    }
+
 }

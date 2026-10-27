@@ -226,3 +226,15 @@ test('conversation-authorized download also works without a current project', as
   assert.equal((await h.vm.handleCall('im.downloadAttachment', downloadParams)).ok, true)
   assert.equal(h.calls[0][1], null); assert.equal(h.downloads.length, 1)
 })
+
+
+test('assistant context uses host open documents and rejects plugin supplied candidates', async () => {
+  const calls = []
+  const h = harness({ requestPluginIm: async (...args) => { calls.push(args); return { code: 0, data: {} } } })
+  h.vm.activeFileIds = ['42', '43']
+  await h.vm.handleCall('im.request', { action: 'agentReply', params: { conversationId: 'private', preferredFileIds: [999], question: 'who is the claimant?' } })
+  assert.deepEqual(calls[0][3], { conversationId: 'private', preferredFileIds: ['42', '43'], question: 'who is the claimant?' })
+  h.vm.activeFileIds = []
+  await h.vm.handleCall('im.request', { action: 'agentReply', params: { preferredFileIds: [999] } })
+  assert.deepEqual(calls[1][3].preferredFileIds, [])
+})

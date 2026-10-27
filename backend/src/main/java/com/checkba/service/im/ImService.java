@@ -336,6 +336,7 @@ public class ImService {
         boolean agent = "AGENT".equals(m.getActorType()); result.put("actorType", agent ? "AGENT" : "HUMAN");
         result.put("senderName", agent ? m.getAgentName() : displayName(m.getSenderId()));
         if (agent) result.put("agentName", m.getAgentName());
+        else users.findById(m.getSenderId()).map(user -> projectPermissions == null ? user.getAvatarUrl() : projectPermissions.avatarUrlFor(user)).filter(url -> !url.isBlank()).ifPresent(url -> result.put("senderAvatarUrl", url));
         result.put("text", m.getText()); result.put("createdAt", m.getCreatedAt());
         if (m.getAttachmentId() != null) {
             // Fetch only metadata: a page of 100 messages must not hydrate 100 attachment blobs.

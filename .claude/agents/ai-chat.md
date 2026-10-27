@@ -1747,3 +1747,10 @@ cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='Refe
 - **读写权限分流（`ToolFileGuard.rejectIfCannotRead`）**：写/改/删/移类工具继续严格使用 `ToolFileGuard.rejectIfOutsideProject(file)` 锁定当前 `projectId`；只读链路（`LegalTools.read_document`、`FileTools.extract_file_text`、`ContextAssemblerService.loadVisionAttachment`、`FileContextLoader.buildFolderContextInternal`）改走 `ToolFileGuard.rejectIfCannotRead(file, projectMemberService)`——当文件属于其他项目时校验 `projectMemberService.hasReadPermission(file.getProjectId(), userId)`，有读权限即放行只读抽取。新注入协作者均采用 `@Autowired(required = false)` + setter，保持既有构造器签名不变。
 - **跨项目文件检索工具（`FileTools.search_across_projects`）**：按文件名关键字检索当前用户全部可读正式项目（`projectService.getUserProjects(userId)`，不含 `LOOSE_FILES` 与 `SCRATCH`）中的未删除文件，返回 `[项目: <name> (projectId=<pid>)] <path> (fileId=<fid>, type=<ext>)`，归入 `ToolDisclosurePolicy` 的 `"files"` 类目。
 - **回归**：`ScratchProjectAndCrossProjectReadTest`、`frontend/tests/project-home/chat-mode.test.mjs`。
+
+### 2026-10-27 消息助手上下文与默认入口（dev-board#1533）
+
+- 项目助手快捷入口默认私聊；显式 `private: false` 仍开群聊，已有群聊不吞掉私聊入口。用户本次明确选择「默认私聊自动带入本机项目上下文，群聊只用共享资料」。
+- 本机私聊走 `ImScopedAgentHost` 的项目身份核验，再由 `ImPrivateProjectContext` 按当前/已打开真实文档候选与问题题名相关性读取最多4份、每份6000字。宿主 `messageContextFileIds` 仅提供最多两个真实文件 ID，PluginPane 覆盖插件自给候选；文件仍须属于当前项目并通过 ACL。不能把文件目录当作已读取正文。
+- 云项目群经 `ImSharedProjectContext` 只读向客户开放、全部当前有权成员可读的材料；提取后、模型生成后及提交前复核。团队/律所助手仅读对应共享记忆，最多尝试3份；不注入本机私聊材料。
+- 验证：66项后端合成数据测试，包括排序第7的起诉状命中、正文进入模型请求、跨项目 ID 拒读；前端默认入口与真实 iframe 沙箱验证。没有调用真实付费模型或将用户截图中的案件材料发送给测试服务。

@@ -43,18 +43,22 @@
       synced: 'Sync complete. Meetings: ', loggedOut: 'Signed out of Tencent Meeting.', badExport: 'Meeting material could not be saved. Nothing was sent to AI chat.', timedOut: 'Processing has not finished. Waiting stopped; check the meeting list again later.'
     }
   };
-  let context = {}, language = 'zh', epoch = 0, busy = false, status = null, meetings = [], selected = null;
+  let context = {}, language = 'zh', locale = 'zh-CN', epoch = 0, busy = false, status = null, meetings = [], selected = null;
   let loginTimer = null, loginAttempts = 0, loginEpoch = 0, statusRequest = null;
-  const t = (key) => copy[language][key];
+  const t = (key) => window.AWD_TMEET_L10N[locale]?.['panel.' + key] ?? window.AWD_TMEET_L10N['en-US']?.['panel.' + key] ?? copy[language][key];
   const value = (input) => typeof input === 'string' || typeof input === 'number' ? String(input) : '';
   const stale = () => Object.assign(new Error('stale'), { stale: true });
   function feedback(message, error = false) { $('feedback').textContent = message; $('feedback').dataset.error = String(error); }
   function controls() {
+    $('workspace').setAttribute('aria-busy', String(busy));
     document.querySelectorAll('button').forEach((button) => { button.disabled = busy || !context.projectId; });
     $('login').disabled ||= status?.cliAvailable === false || status?.loggedIn === true || (status?.loginPending === true && !!$('authorize-url').value);
     $('login').textContent = t(status?.loginPending ? 'resumeLogin' : 'login');
+    $('login').hidden = status?.loggedIn === true;
+    $('logout').hidden = status?.loggedIn !== true;
     $('logout').disabled ||= !status?.loggedIn;
     $('sync').disabled ||= !status?.loggedIn;
+    $('reload-detail').disabled ||= !selected;
     ['export', 'draft-minutes', 'draft-todos'].forEach((id) => { $(id).disabled ||= !selected || selected.complete === false || !!selected.errors?.length; });
     $('copy-url').disabled = !$('authorize-url').value;
     $('lookback').disabled = $('exclude').disabled = busy || !context.projectId;
@@ -79,10 +83,10 @@
       await new Promise((resolve) => setTimeout(resolve, 3000));
     }
   }
-  async function run(work) {
+  async function run(work, label = 'busy') {
     if (busy || !context.projectId) return;
     const current = epoch;
-    busy = true; controls(); feedback(t('busy'));
+    busy = true; controls(); feedback(t(label));
     try { await work(current); }
     catch (error) {
       if (current === epoch && !error.stale) feedback(t(error.code === 'unknown_method' ? 'unsupported' : (copy[language][error.message] ? error.message : 'failed')), true);
@@ -94,10 +98,11 @@
   function paintStatus(data) {
     status = data || {};
     $('connection-status').textContent = status.cliAvailable === false ? (value(status.message) || t('missingCli')) : status.loggedIn ? t('connected') + (value(status.userName) ? ' · ' + value(status.userName) : '') : status.loginPending ? t('waiting') : t('disconnected');
+    $('workspace-status').textContent = status.loggedIn ? $('connection-status').textContent : t('connectInSidebar');
     if (status.loggedIn) { stopLogin(); $('authorization').hidden = true; $('authorize-url').value = ''; }
     else if (status.loginPending) {
       $('login-wait').textContent = t('waiting');
-      if (!loginTimer && context.projectId) { loginAttempts = 0; pollLogin(epoch, loginEpoch); }
+      if (context.surface !== 'workspace' && !loginTimer && context.projectId) { loginAttempts = 0; pollLogin(epoch, loginEpoch); }
     }
     controls();
   }
@@ -111,6 +116,7 @@
     const query = $('search').value.trim().toLocaleLowerCase();
     const filtered = meetings.filter((meeting) => (value(meeting.subject) + ' ' + value(meeting.meetingCode)).toLocaleLowerCase().includes(query));
     $('meetings').replaceChildren();
+    $('meeting-count').textContent = filtered.length + ' ' + t('meetingCount');
     $('list-empty').hidden = filtered.length > 0;
     $('list-empty').textContent = query ? t('noMatch') : t('noMeetings');
     for (const meeting of filtered) {
@@ -123,7 +129,7 @@
       button.addEventListener('click', () => run(async (current) => {
         const detail = await invoke('detail', { key: meeting.key }, current);
         selected = { ...detail, key: meeting.key }; paintDetail(); paintList(); feedback('');
-      }));
+      }, 'loadingDetail'));
     }
     controls();
   }
@@ -136,6 +142,8 @@
   }
   function paintDetail() {
     $('detail').hidden = !selected;
+    $('detail-empty').hidden = !!selected;
+    document.body.dataset.detail = String(!!selected);
     $('transcript').replaceChildren(); $('minutes').replaceChildren(); $('completeness').replaceChildren(); $('completeness').hidden = true;
     if (!selected) { $('meeting-title').textContent = ''; $('meeting-meta').textContent = ''; return; }
     const errors = Array.isArray(selected.errors) ? selected.errors : [];
@@ -168,6 +176,7 @@
     const config = await invoke('config', {}, current);
     $('lookback').value = config?.lookbackDays ?? 30;
     $('exclude').value = Array.isArray(config?.excludeKeywords) ? config.excludeKeywords.join('\n') : '';
+    if (context.surface === 'sidebar') return;
     const list = await invoke('list', {}, current);
     meetings = Array.isArray(list?.meetings) ? list.meetings : []; paintList();
   }
@@ -195,9 +204,21 @@
       pollLogin(current, session);
     }, 3000);
   }
-  $('refresh').addEventListener('click', () => run(async (current) => {
-    const data = await readStatus(current); paintStatus(data); await loadLocal(current); feedback('');
-  }));
+  function refreshLocal() {
+    return run(async (current) => {
+      const data = await readStatus(current); paintStatus(data); await loadLocal(current); feedback('');
+    }, 'loadingList');
+  }
+  $('refresh').addEventListener('click', refreshLocal);
+  $('workspace-refresh').addEventListener('click', refreshLocal);
+  $('back-to-list').addEventListener('click', () => {
+    selected = null; paintDetail(); paintList(); $('search').focus();
+  });
+  $('reload-detail').addEventListener('click', () => run(async (current) => {
+    const key = selected.key;
+    selected = { ...await invoke('detail', { key }, current), key };
+    paintDetail(); paintList(); feedback('');
+  }, 'loadingDetail'));
   $('login').addEventListener('click', () => run(async (current) => {
     stopLogin();
     const data = await invoke('login', {}, current);
@@ -239,7 +260,7 @@
     const list = await invoke('list', {}, current); meetings = Array.isArray(list?.meetings) ? list.meetings : [];
     selected = null; paintDetail(); paintList();
     feedback(t('synced') + (Number.isFinite(result?.count) ? result.count : meetings.length) + (result?.errors?.length ? ' · ' + t('partial') : ''));
-  }));
+  }, 'syncing'));
   $('search').addEventListener('input', paintList);
   for (const tab of ['transcript', 'minutes']) {
     $(tab + '-tab').addEventListener('click', () => showTab(tab));
@@ -256,7 +277,7 @@
   }
   $('export').addEventListener('click', () => run(async (current) => {
     const result = await exportMeeting(current); feedback(t('exported') + value(result.fileName));
-  }));
+  }, 'exporting'));
   for (const kind of ['minutes', 'todos']) {
     $('draft-' + kind).addEventListener('click', () => run(async (current) => {
       const result = await exportMeeting(current);
@@ -267,12 +288,19 @@
       if (task.length > 4000) throw new Error('badExport');
       if (current !== epoch) throw stale();
       await awd.chat.send(task); if (current !== epoch) throw stale(); feedback(t('sent'));
-    }));
+    }, 'preparingAi'));
   }
   function setContext(data) {
-    context = data || {}; language = String(context.language).startsWith('en') ? 'en' : 'zh';
-    document.documentElement.lang = language === 'en' ? 'en-US' : 'zh-CN'; document.title = t('title') + ' · AI WorkDeck';
+    context = data || {};
+    locale = Object.hasOwn(window.AWD_TMEET_L10N, context.language) ? context.language : 'en-US';
+    if (!context.language) locale = 'zh-CN';
+    language = locale.startsWith('zh') ? 'zh' : 'en';
+    document.body.dataset.surface = ['sidebar', 'workspace'].includes(context.surface) ? context.surface : 'combined';
+    document.documentElement.lang = locale; document.documentElement.dir = locale === 'ar-SA' ? 'rtl' : 'ltr'; document.title = t('title') + ' · AI WorkDeck';
     document.querySelectorAll('[data-i18n]').forEach((element) => { element.textContent = t(element.dataset.i18n); });
+    $('workspace').setAttribute('aria-label', t('title')); $('meeting-browser').setAttribute('aria-label', t('recordings'));
+    $('search').placeholder = t('search'); $('search').setAttribute('aria-label', t('search'));
+    $('workspace-status').textContent = '';
     $('meetings').setAttribute('aria-label', t('recordings')); $('authorize-url').setAttribute('aria-label', t('authHint'));
     $('connection-status').textContent = t('unchecked'); $('authorization').hidden = true; $('authorize-url').value = '';
     $('logout-confirmation').hidden = true;
@@ -282,13 +310,22 @@
   controls();
   awd.ready().then((data) => {
     setContext(data);
+    if (context.surface) refreshLocal();
     awd.events.on('project.switched', async () => {
       const current = ++epoch; stopLogin(); busy = false; setContext({});
-      try { const fresh = await awd.call('context.get', {}); if (current === epoch) setContext(fresh); }
+      try { const fresh = await awd.call('context.get', {}); if (current === epoch) { setContext(fresh); if (context.surface) refreshLocal(); } }
       catch { if (current === epoch) feedback(t('failed'), true); }
     });
   });
   function refreshAuthorization() {
+    if (context.surface === 'workspace') {
+      if (!busy && context.projectId) {
+        const current = epoch;
+        readStatus(current).then((data) => { if (current === epoch) paintStatus(data); })
+          .catch(() => { if (current === epoch) $('workspace-status').textContent = t('checkingFailed'); });
+      }
+      return;
+    }
     if (($('authorization').hidden && !status?.loginPending) || status?.loggedIn || busy || !context.projectId) return;
     run(async (current) => {
       const data = await readStatus(current); paintStatus(data);
