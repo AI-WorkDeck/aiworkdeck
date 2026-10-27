@@ -13,7 +13,7 @@
    - 新增文件用 `write_file`，路径写相对项目根的完整路径（如 `插件开发/<id>/web/app.js`）；
    - 不要改 `web/awd-plugin-sdk.js`（那是官方 SDK 副本，改了桥会断）。
 4. **装机自测**：改完调 `plugin_dev_install(folderId)`。源码每次改动后都必须重装才生效。校验失败会返回逐条错误明细——逐条修复后重装，不要原样重试。
-5. **交给用户测试**：安装并验证可用入口后告诉用户「点击左侧〈插件名〉，在工作区标签页使用」，然后按用户反馈回到第 3 步继续迭代。
+5. **交给用户测试**：安装并验证后说明实际入口：皮肤在主题切换处，panel 或工作区插件才指向其左侧按钮，然后按用户反馈回到第 3 步继续迭代。
 
 ## 目录契约
 
@@ -68,6 +68,7 @@
 | `awd.storage.set(key, value)` | 字符串 + 可序列化值 | `{}` | 插件级 KV，总量上限 64KB，超限报 `quota_exceeded` |
 | `awd.tools.invoke(name, args?)` | 工具名 + 可选参数对象 | 工具原始字符串输出（自行 `JSON.parse`） | **v2.5 新增**：直调本插件 manifest `tools` 里声明的 JAR 工具，绕过模型；`name` 不是本插件工具时报 `invoke_failed` |
 | `awd.chat.send(prompt)` | 字符串，上限 4000 字 | `{}` | **v2.5 新增**：把 `prompt` 作为可见用户消息发进 AI 对话（起草类动作走这条，不要直调工具） |
+| `awd.ui.openWorkspace()` | 无 | `{}` | **SDK 1.8**：打开本插件已声明的 workspace；未声明或不可用返回 `unavailable`，旧宿主返回 `unknown_method` |
 | `awd.ui.openFile(path)` | 文件 path | `{}` | **v2.5 新增**：把项目文件打开到工作台中栏；需 `file_read` |
 | `awd.evidence.link(params)` | `{ anchor: {selection:true}\|{quote}, docPath?, targets:[{path, locator?, relation?, note?}] }` | `{ linkKey, targetIds }` | 在当前 Word 文档的选区/引文上建底稿关联；需 `editor` |
 | `awd.evidence.list(params)` | `{ docPath?, path?, status? }` | `{ links: [...] }` | 列底稿关联；需 `file_read` |
@@ -112,9 +113,11 @@ manifest 建议：用到 v2.7 能力（doc.*/events/ai.request）时声明 `"min
   - **纸张卡片与统一控件**：内容区块装入 `.awd-card`（含 `.awd-card-header` + `.awd-card-title`）；按钮使用 `.awd-btn` / `.awd-btn-primary` / `.awd-btn-sm` / `.awd-btn-xs` / `.awd-btn-danger`；表单使用 `.awd-input` / `.awd-select` / `.awd-textarea`；状态标签使用 `.awd-badge`（`.awd-badge-accent` / `.awd-badge-gold` / `.awd-badge-info` / `.awd-badge-warning` / `.awd-badge-danger`）。
   - **长耗时任务安全进度卡片**：超过 2 秒的 AI 推理、批量抽取或外部调用，调用 `var prog = awd.ui.progress('#progress', { title: '正在核查第 3/12 份底稿…', percent: 25, safetyNote: '本地底稿与已保存进度不受影响，可随时安全中止', onCancel: function () { ... } })` 展示阶段、百分比与安全兜底说明，完成后 `prog.clear()`。
 - **严禁独立造色**：背景、文字、边框、阴影一律消费 `var(--awd-*)` 令牌（如 `var(--awd-bg)`、`var(--awd-surface)`、`var(--awd-text)`、`var(--awd-border)`、`var(--awd-accent)`），确保浅色「宣纸墨竹」与深色「徽墨夜览」双模无缝切换。
-- 仅用 `frontendEntry` 的兼容路径会在工作区标签页打开，左栏显示基本信息和「打开工作区」入口。新宿主可通过 `contributes.views` 明确选择 sidebar 或 workspace；清单助手示例使用 sidebar。不要调用不存在的 `awd.ui.openTab()`。
+- 先按功能选择 `contributes.views`，不要给每个插件强加左侧入口和专属标签：皮肤、模板等轻量插件用 `[]`，从主题切换等贡献点使用；仅 `sidebar` 时只开 panel；仅 `workspace` 时左侧按钮直接开标签，不附加简介 panel；两者都有时先开 panel，按需要调用 `awd.ui.openWorkspace()` 打开自己的已声明工作区。权限与界面形态独立。
+- `views` 缺省或 `null` 保持旧 `frontendEntry` / 使用引导兼容路径；显式数组不补未声明的工作区，空数组不等于缺省。`frontendEntry` 可只用于插件中心预览。每种 placement 最多一个视图；项目视图需要项目，全局视图可在无项目态使用。不要调用不存在的 `awd.ui.openTab()`。
+- 新 manifest 的 `views` 应省略或写数组；`null` 仅兼容旧元数据，不通过新 manifest Schema。
 - 同一插件在两个窗格间共用一个标签。普通标签切换保留页面实例；关闭、禁用、卸载会结束实例，跨窗格移动也可能重建。重要业务进度需自行持久化，不能依赖 iframe 永不销毁。
-- 交付前实际走通「安装 → 启用 → 左侧入口出现 → 点击打开工作区 → 完成一个主要操作」，再检查标签切换、窄分屏、关闭重开及禁用清理。只验证安装接口成功不算交付；无法实测的部分明确说明。
+- 交付前实际走通「安装 → 启用 → 对应贡献点/入口 → 完成主要操作」；轻量插件检查无多余侧栏/标签，panel 检查窄栏操作，工作区检查单例、标签切换与关闭重开；所有形态检查禁用/卸载清理。只验证安装接口成功不算交付；无法实测的部分明确说明。
 - 这是宿主工作区能力；旧客户端仍可能使用侧栏，未发版的宿主改动不能说成用户已获得。
 
 ## 与用户协作的守则
@@ -133,7 +136,7 @@ manifest 建议：用到 v2.7 能力（doc.*/events/ai.request）时声明 `"min
 
 ## SDK 1.6 开发路径（新宿主，待发版）
 
-可声明 contributes.views 选择 sidebar/workspace 和 project/global，使用主题令牌适配窄栏。每种 placement 最多一个视图。旧 frontendEntry 兼容工作区入口。迁移后验收以实际 manifest 的入口为准。
+可声明 contributes.views 选择 sidebar/workspace 和 project/global；显式 [] 为无独立界面，缺省/null 才保留旧兼容入口。需要从 panel 打开更宽的界面时，同时声明 workspace 并调用 SDK 1.8 的 ui.openWorkspace；只打开自身声明，不传其他插件或 URL。使用主题令牌适配窄栏，迁移后验收以实际 manifest 的入口为准。
 
 设置可声明 scope=installation/user/project；用 settings.open 打开可信宿主表单，settings.update 只改 user/project 非密设置。插件自有登录放 contributes.connections，支持 bearer 或 OAuth PKCE；SDK connections.connect 打开宿主连接界面，不在插件页面索取平台密钥。独立订阅用 connections.billing 的服务端状态与 checkoutUrl；共享模型仍用 ai.request 及主产品额度。
 

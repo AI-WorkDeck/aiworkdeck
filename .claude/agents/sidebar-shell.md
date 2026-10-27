@@ -1585,3 +1585,7 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 内置工作流规则从 ChatInterface 通过 provide/inject 的 `openWorkflowEditorTab` 打开单例 `builtin-workflow-settings` 标签；`BuiltinWorkflowEditor.vue` 与 `useBuiltinWorkflows.js` 复用既有版本 API，版本修改广播刷新聊天卡片。两侧标签池用 v-show 保留编辑草稿，切项目重选版本，虚拟标签不进入文件上下文。菜单 Teleport 到 body 并按视口限宽限高，不能再放进聊天栏的裁剪/定位上下文。回归 `builtin-workflow-tab.test.mjs` 与真实 Uni 编辑器测试。
 
 移除侧栏外缘收起按钮及14px占位；再次点当前 rail 入口复用 `toggleSidebar` 收起/展开，保留顶栏/快捷键。收起动态插件时不重新打开工作区；宽度回夹不再扣外缘占位。
+
+### 插件入口按声明选择（dev-board#1531）
+
+`contributes.views: []` 不提供 rail、panel 或工作区。仅 workspace 的插件保留 rail，点击只打开/聚焦标签，不切换当前左栏；rail 高亮取真实工作区状态。仅 sidebar 不自动开标签，两者兼有可通过 SDK `ui.openWorkspace()` 打开自己的 workspace。缺省/null 沿用旧入口。新规则集中在 `utils/pluginViews.js` 与 `pluginWorkspaceTabs.js`，快照恢复及直达入口使用同一闸；每个视图按自己的 scope 检查项目上下文，不能借另一个 global 视图越过 project 限制。旧纯皮肤 gallery（无业务权限、工具及其他贡献）仅作预览，更新宿主即隐藏其入口并清理旧标签；非 gallery 的主题编辑器等业务视图仍按声明显示。

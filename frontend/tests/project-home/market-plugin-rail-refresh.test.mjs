@@ -6,7 +6,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { pluginWorkspaceTabMethods } from '../../src/pages/project-overview/pluginWorkspaceTabs.js'
-import { pluginViews, isGlobalPlugin } from '../../src/utils/pluginViews.js'
+import { pluginViews, isGlobalPlugin, hasPluginNavigation, hasPluginPanel, isLegacyThemeGallery } from '../../src/utils/pluginViews.js'
 
 const page = readFileSync(new URL('../../src/pages/project-overview/project-overview.vue', import.meta.url), 'utf8')
 const sidebar = readFileSync(new URL('../../src/components/MarketSidebarPanel.vue', import.meta.url), 'utf8')
@@ -33,7 +33,7 @@ function harness() {
     showModal(options) { options.success({ confirm: true }) },
   }
   const deps = {
-    pluginViews, isGlobalPlugin,
+    pluginViews, isGlobalPlugin, hasPluginNavigation, hasPluginPanel, isLegacyThemeGallery,
     uni, console: quiet, NO_PROJECT_DEFAULT_PANE: 'projects', getPlugins: () => get(), getSkills: async () => [],
     resolvePluginEntryUrl: (id, path) => path ? `/api/plugin-web/${id}/${path.slice(4)}` : '',
     getCurrentUser: () => ({ role: 'ADMIN' }), getPluginsForUser: () => [{ key: 'files' }],
@@ -163,3 +163,44 @@ for (const [language, expected] of [
     assert.deepEqual(h.vm.dynamicPlugins.map(p => p.pluginId), [...migratedPluginIds, 'custom-review', 'constructor'])
   })
 }
+
+test('explicit view declarations control navigation, including all three installed skins', async () => {
+  const h = harness(); await flush()
+  const skins = ['theme-inkwash-zen', 'theme-anime-twilight', 'theme-aurora-glass'].map(id =>
+    plugin(JSON.parse(readFileSync(new URL(`../../../official-plugins/${id}/manifest.json`, import.meta.url), 'utf8'))))
+  const view = placement => ({ id: placement, name: placement, entry: 'web/index.html', placement, scope: 'project' })
+  h.setResponse([...skins, plugin({ id: 'service-only', contributes: { views: [] } }),
+    plugin({ id: 'panel-only', contributes: { views: [view('sidebar')] } }),
+    plugin({ id: 'workspace-only', frontendEntry: '', contributes: { views: [view('workspace')] } }), plugin()])
+  await h.vm.loadDynamicPlugins()
+  assert.deepEqual(h.vm.rail.map(p => p.key), ['files', 'plugin-panel-only', 'plugin-workspace-only', 'plugin-tencent-meeting'])
+  assert.equal(h.vm.dynamicPlugins.find(p => p.pluginId === 'workspace-only').hasFrontend, true)
+  for (const id of [...skins.map(p => p.id), 'service-only', 'panel-only']) {
+    h.vm.leftPaneKey = 'plugin-' + id
+    if (id !== 'panel-only') assert.equal(h.vm.activeDynamicPlugin, null)
+    assert.equal(h.vm.openPluginTab(id), false)
+  }
+  // Updating an installed plugin to no UI cleans old selections and snapshots.
+  h.vm.leftFiles = [{ id: 'plugin-service-only', tabType: 'plugin', pluginId: 'service-only' }]
+  h.vm.activeFileIdLeft = 'plugin-service-only'; h.vm.leftPaneKey = 'plugin-service-only'
+  await h.emit('awd:market-changed')
+  assert.deepEqual(h.vm.leftFiles, [])
+  assert.equal(h.vm.activeFileIdLeft, null)
+  assert.equal(h.vm.leftPaneKey, 'files')
+})
+
+
+test('already installed legacy skin galleries stay preview-only, while functional theme workspaces keep navigation', async () => {
+  const h = harness(); await flush()
+  const gallery = { id: 'gallery', name: 'Preview', entry: 'web/index.html', placement: 'workspace', scope: 'global' }
+  const skin = plugin({ id: 'old-skin', permissions: [], contributes: { themes: [{ id: 'skin', file: 'themes/skin.json' }], views: [gallery] } })
+  h.setResponse([skin, { ...skin, id: 'theme-editor', contributes: { ...skin.contributes, views: [{ ...gallery, id: 'editor' }] } },
+    { ...skin, id: 'business-plugin', permissions: ['file_read'] }])
+  await h.vm.loadDynamicPlugins()
+  assert.deepEqual(h.vm.rail.map(p => p.key), ['files', 'plugin-theme-editor', 'plugin-business-plugin'])
+  assert.equal(h.vm.openPluginTab('old-skin'), false)
+  h.vm.leftFiles = [{ id: 'plugin-old-skin', pluginId: 'old-skin', tabType: 'plugin' }]
+  assert.deepEqual(h.vm.pluginWorkspaceTabs(h.vm.leftFiles), [])
+  h.vm.reconcilePluginTabs()
+  assert.deepEqual(h.vm.leftFiles, [])
+})
