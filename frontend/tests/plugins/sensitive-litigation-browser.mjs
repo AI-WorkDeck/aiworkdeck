@@ -10,30 +10,35 @@ import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
 import assert from 'node:assert/strict'
 import puppeteer from 'puppeteer-core'
+import workbenchMessages from '../../src/locales/zh-CN/workbench.js'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const out = process.env.BUSINESS_AUDIT_UI_OUT || await mkdtemp(resolve(tmpdir(), 'awd-business-audit-'))
 await mkdir(out, { recursive: true })
+console.log('Browser evidence:', out)
 const pluginSource = await readFile(resolve(root, 'src/components/PluginPane.vue'), 'utf8')
 const workspaceSource = await readFile(resolve(root, 'src/pages/project-overview/project-overview.vue'), 'utf8')
 function method(source, name) {
-  const start = new RegExp(`\\n    (?:async )?${name}\\([^\\n]*\\) \\{`).exec(source)
-  assert.ok(start, `${name} exists`)
+  const matches = [...source.matchAll(new RegExp(`\\n    (?:async )?${name}\\([^\\n]*\\) \\{`, 'g'))]
+  assert.equal(matches.length, 1, `${name} has one effective definition; do not test a shadowed method`)
+  const start = matches[0]
   return source.slice(start.index, source.indexOf('\n    },', start.index) + 6)
 }
 const host = `<!doctype html><meta charset="UTF-8"><body style="margin:0">
 <iframe id="plugin" sandbox="allow-scripts allow-forms" style="width:320px;height:1100px;border:0"></iframe>
 <button id="pick">选择合成文件</button><button id="cancel">取消选择</button>
+<aside id="existing-chat" data-conversation="existing-chat">保留现有对话</aside>
 <script type="module">
 import { createPluginBusinessServices, clonePluginData } from '/business-services.js';
 const pluginId=new URL(location.href).searchParams.get('plugin');
+const scopeMessages=${JSON.stringify(Object.fromEntries(['folderScopeLabel','folderScopeDesc','fileScopeDesc'].map(key=>['workbench.'+key,workbenchMessages[key]])))};
 const frame=document.querySelector('iframe');window.frame=frame;window.calls=[];window.opened=[];window.events=[];window.prompts=[];window.saved=[];
 window.files=[{id:1,name:'合成材料.txt',fileType:'txt',filePath:'synthetic/合成材料.txt'},{id:2,name:'合成材料.pdf',fileType:'pdf',filePath:'synthetic/合成材料.pdf'},
 {id:3,name:'合成材料.md',fileType:'md',filePath:'synthetic/合成材料.md'},{id:4,name:'合成材料.docx',fileType:'docx',filePath:'synthetic/合成材料.docx'},
 {id:5,name:'卷宗 A',fileType:'folder',isFolder:true},{id:61,name:'合成关系.drawio',filePath:'synthetic/合成关系.drawio'},
 {id:62,name:'合成关系.svg',filePath:'synthetic/合成关系.svg'}];
 window.diagrams=[{folderId:60,name:'合成关系',drawioFileId:61,svgFileId:62,mapFileId:63,layout:'relation_tree',mode:'奇川风',formats:['drawio','svg','png']}];
-window.packState='not_installed';window.pickId=1;window.failPreview=false;window.changed=false;window.failRestyle=false;
+window.packState='not_installed';window.pickId=1;window.failPreview=false;window.changed=false;window.failRestyle=false;window.generation={phase:'idle'};window.failGenerationStatus=false;window.failGenerationStart=false;
 const uni={ $emit(name,data){events.push({name,data});if(name==='awd:open-evidence-target')opened.push(data.fileId)},showToast({title}){events.push({name:'toast',title})} };
 const getSensitiveOptions=async()=>[{value:'CHINESE_NAME',label:'姓名'},{value:'PHONE',label:'电话'},{value:'ADDRESS',label:'地址'}];
 const previewSensitiveFile=async p=>{calls.push({operation:'preview',params:p});if(failPreview)throw Error('合成预览失败');return {text:'联系人 [[姓名1_demo]]，电话 [[电话1_demo]]',counts:{CHINESE_NAME:1,PHONE:1},suspects:{},warnings:[]}};
@@ -41,16 +46,40 @@ const desensitizeFile=async p=>{calls.push({operation:'redact',params:p});const 
 const restoreSensitiveFile=async p=>{calls.push({operation:'restore',params:p});const file={id:11,name:'复敏副本.txt',fileType:'txt',filePath:'synthetic/restored.txt'};files.push(file);return {file,counts:{CHINESE_NAME:1,PHONE:1},warnings:[]}};
 const getLitigationVisualStatus=async()=>({available:packState==='ready',graphviz:true,timelineAvailable:true,reason:packState==='ready'?'':'合成引擎待安装'});
 const getLitigationDiagrams=async()=>diagrams;
+const getFileDetail=async(projectId,fileId)=>files.find(file=>String(file.id)===String(fileId));
 const getLitigationKickoffPrompt=async (id,p)=>{calls.push({operation:'kickoff',params:p});return {prompt:'诉讼可视化：'+p.scope+'；'+p.diagramHint}};
 const restyleLitigationDiagram=async(id,folderId,mode,confirmOverwrite)=>{calls.push({operation:'restyle',id,folderId,mode,confirmOverwrite});if(failRestyle)throw Error('合成换风格失败');diagrams[0].mode=mode;return {ok:true}};
 const packStatus=async()=>({status:{state:packState,bytesDownloaded:50,bytesTotal:100}});
 const packInstall=async()=>{calls.push({operation:'packInstall'});packState='downloading';setTimeout(()=>{packState='ready'},30);return {}};
 const searchProjectContent=async()=>({}),getProjectTags=async()=>[];
 const createPluginVoiceServices=()=>({}),createPluginCollectionServices=()=>({}),createPluginInsightServices=()=>({});
-const wsMethods={${['pluginBusinessActions','handleDesensitizeActiveFile','handleDesensitizeSelectFile','handleFilePickerCancel','handleLitigationScopeSelect','handleFilePickerConfirm'].map(n=>method(workspaceSource,n)).join(',')}};
-window.workspace={focusedPane:'left',activeFileLeft:files[0],activeFileRight:null,leftFiles:[files[0]],getPluginActiveEditor:()=>null,projectId:42,
-  $t:(key,p)=>key==='workbench.folderScopeLabel'?'文件夹：'+p.name:key,prepareSensitiveFile:async id=>{saved.push(id);const result=changed;changed=false;return result}};
+const wsMethods={${['pluginBusinessActions','handleDesensitizeActiveFile','handleDesensitizeSelectFile','handleFilePickerCancel','handleLitigationScopeSelect','handleFilePickerConfirm','handleLitigationOpenFile'].map(n=>method(workspaceSource,n)).join(',')}};
+window.workspace={focusedPane:'left',activeFileLeft:files[0],activeFileRight:null,leftFiles:[files[0]],getPluginActiveEditor:()=>null,projectId:42,showAiPanel:false,aiPanelMounted:false,chatId:'existing-chat',openFile:file=>opened.push(file.id),resolveChatInterface:()=>{throw Error('Unexpected chat panel access')},
+  $t:(key,p)=>{let text=scopeMessages[key]||key;for(const [name,value] of Object.entries(p||{}))text=text.split('{'+name+'}').join(String(value));return text},prepareSensitiveFile:async id=>{saved.push(id);const result=changed;changed=false;return result}};
 for(const [name,fn] of Object.entries(wsMethods))workspace[name]=fn.bind(workspace);
+// Only the task runner is synthetic. SDK, PluginPane, named service and the
+// workspace action below are production implementations, including permissions.
+workspace.requestLitigationGeneration=async(operation,params)=>{
+  calls.push({operation,params});
+  if(operation==='generation' && failGenerationStatus)throw Error('合成状态连接中断');
+  if(operation==='generate'){
+    if(failGenerationStart)throw Error('合成启动失败，请重试');
+    generation={taskId:'task-'+params.clientRequestId,phase:'running',startedAt:Date.now(),message:'正在核对材料中的事件和日期'};
+  }
+  if(operation==='answer'){
+    if(params.taskId!==generation.taskId||params.questionKey!==generation.question?.key)throw Error('Unexpected question answer');
+    generation={...generation,phase:'running',question:null,message:'正在根据你的选择生成图表'};
+  }
+  if(operation==='stop')generation={...generation,phase:'stopping',message:'已发送停止请求，正在等待确认'};
+  if(operation==='continue')generation={...generation,phase:'running'};
+  return structuredClone(generation);
+};
+window.finishDrawing=async()=>{
+  files.push({id:81,name:'已生成合成图.drawio',filePath:'synthetic/generated.drawio'});
+  diagrams.push({folderId:80,name:'已生成合成图',drawioFileId:81,layout:'graphviz_relation',formats:['drawio','svg','png']});
+  await workspace.handleLitigationOpenFile({fileId:81});
+  generation={...generation,phase:'completed',question:null,resultFileId:81,message:'图表已写入项目'};
+};
 const hostMethods={${['businessServices','handleCall'].map(n=>method(pluginSource,n)).join(',')}};
 window.mounted={sessionGeneration:1,projectId:42,businessActions:workspace.pluginBusinessActions(),activeEditor:()=>null,
  effectivePermissions:()=>['file_read','file_write','ai'],listProjectFiles:async()=>files,$emit:(name,data)=>{if(name==='kickoff')prompts.push(data.prompt)}};
@@ -78,11 +107,11 @@ const server = createServer(async (req, res) => {
   } catch { res.statusCode = 404; res.end() }
 })
 await new Promise(done => server.listen(0, '127.0.0.1', done))
-let browser
+let browser, page
 const checks = []
 try {
   browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true, args: ['--no-sandbox'] })
-  const page = await browser.newPage()
+  page = await browser.newPage()
   await page.setViewport({ width: 1000, height: 1200 })
   const errors = []
   page.on('pageerror', e => errors.push(e.stack || e.message))
@@ -181,10 +210,6 @@ try {
   await frame.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   assert.match(await frame.$eval('.lv-field-value', el => el.textContent), /卷宗 A/)
   await frame.click('.lv-kind')
-  await frame.click('.lv-btn.primary')
-  await page.waitForFunction(() => prompts.length === 1)
-  assert.match(await page.evaluate(() => prompts[0]), /folderId=5/)
-  assert.match(await page.evaluate(() => prompts[0]), /事实经过时间轴/)
   await frame.click('.lv-row-head')
   await page.waitForFunction(() => opened.includes(61))
   await clickText(frame, '.lv-link', '看母版')
@@ -205,8 +230,110 @@ try {
   assert.deepEqual(await page.evaluate(() => events.filter(e => e.name.startsWith('awd:litviz')).map(e => e.name)), ['awd:litviz-restyling','awd:litviz-restyled'])
   await page.evaluate(() => { diagrams.push({folderId:70,name:'新增合成图',svgFileId:62});frame.contentWindow.postMessage({awd:1,type:'event',event:'files.changed',data:{}},'*') })
   await frame.waitForFunction(() => document.querySelectorAll('.lv-row').length === 2)
-  checks.push('pack readiness/install poll', 'scope folder/cancel retention', 'kickoff reaches chat', 'editable/master open', 'restyle cancel/confirm/events', 'gallery file-change refresh')
-  await (await page.$('#plugin')).screenshot({ path: resolve(out, 'litigation.png') })
+  checks.push('pack readiness/install poll', 'scope folder/cancel retention', 'editable/master open', 'restyle cancel/confirm/events', 'gallery file-change refresh')
+  await frame.waitForSelector('.uni-toast', { hidden: true })
+  // A real native keyboard activation must cross the actual workspace action.
+  await frame.focus('.lv-btn.primary')
+  await page.keyboard.press('Enter')
+  await page.waitForFunction(() => calls.filter(c => c.operation === 'generate').length === 1)
+  assert.match(await page.evaluate(() => calls.find(c => c.operation === 'generate').params.scope), /folderId=5/)
+  assert.equal(await page.evaluate(() => calls.find(c => c.operation === 'generate').params.diagramHint), '事实经过时间轴')
+  await frame.waitForFunction(() => document.querySelector('.lv-generation-title')?.textContent === '正在读取材料并出图')
+  assert.equal(await frame.$eval('.lv-btn.primary', el => el.disabled), true)
+  assert.equal(await frame.$eval('.lv-field', el => el.disabled), true)
+  await page.evaluate(() => { generation.startedAt=Date.now()-46000 })
+  await frame.waitForFunction(() => document.querySelector('.lv-generation')?.textContent.includes('材料较多时可能需要更久'))
+  assert.equal(await page.evaluate(() => calls.filter(c => c.operation === 'generate').length), 1)
+  assert.deepEqual(await page.evaluate(() => ({ prompts, show:workspace.showAiPanel, mounted:workspace.aiPanelMounted, id:workspace.chatId, text:document.querySelector('#existing-chat').textContent })),
+    {prompts:[],show:false,mounted:false,id:'existing-chat',text:'保留现有对话'})
+  checks.push('keyboard generate through real SDK/PluginPane/business/workspace action', 'acknowledgment and slow progress remain busy', 'existing AI panel untouched')
+  await page.evaluate(() => { failGenerationStatus=true })
+  await frame.waitForFunction(() => document.querySelector('.lv-generation-error')?.textContent.includes('合成状态连接中断'))
+  assert.equal(await frame.$eval('.lv-btn.primary', el => el.disabled), true)
+  await page.evaluate(() => { failGenerationStatus=false })
+  await frame.waitForSelector('.lv-generation-error', { hidden: true })
+  await page.evaluate(() => { generation={...generation,phase:'paused',message:'等待继续出图'} })
+  await frame.waitForFunction(() => document.querySelector('.lv-generation-title')?.textContent === '出图已暂停')
+  await clickText(frame, '.lv-generation .lv-btn', '继续出图')
+  await page.waitForFunction(() => calls.some(c => c.operation === 'continue'))
+  checks.push('status interruption remains visible and recovers', 'paused task continues from the panel')
+
+  await page.evaluate(() => {
+    generation={...generation,phase:'waiting',message:'请核对材料中的日期和重点。',question:{key:'q-1',text:'是否采用原始日期，并将保证期间作为重点？',options:['采用原始日期','保证期间作为重点'],descriptions:['按所选材料记载的日期出图','不推断材料未记载的起止日期'],multiSelect:true}};
+    frame.style.width='260px';
+  })
+  await frame.waitForSelector('.lv-question-option')
+  const assertQuestionFits = async theme => {
+    const metrics = await frame.evaluate(() => ({
+      width:innerWidth, scrollWidth:document.documentElement.scrollWidth,
+      controls:[...document.querySelectorAll('.lv-question-option,.lv-answer-input,.lv-question .lv-btn')].map(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,width:r.width}}),
+      optionColor:getComputedStyle(document.querySelector('.lv-question-option')).color,
+      optionBackground:getComputedStyle(document.querySelector('.lv-question-option')).backgroundColor,
+    }))
+    assert.equal(metrics.width, 260)
+    assert.ok(metrics.scrollWidth <= 260, theme+' panel has no horizontal overflow')
+    for (const rect of metrics.controls) assert.ok(rect.left>=0 && rect.right<=260 && rect.width>0, theme+' question controls fit')
+    assert.notEqual(metrics.optionColor, metrics.optionBackground)
+    return metrics
+  }
+  await assertQuestionFits('light')
+  await (await page.$('#plugin')).screenshot({ path: resolve(out, 'litigation-question-light-260.png') })
+  await page.evaluate(() => frame.contentWindow.postMessage({awd:1,type:'theme',theme:'dark',tokens:{'--awd-surface':'#202723','--awd-bg':'#151c18','--awd-text':'#f4f1e8','--awd-text-2':'#d0d7cf','--awd-text-3':'#b0bab0','--awd-panel-text':'#f4f1e8','--awd-panel-text-2':'#d0d7cf','--awd-panel-text-3':'#b0bab0','--awd-panel-text-4':'#a3b1a5','--awd-panel-border':'#58695e','--awd-border':'#58695e','--awd-panel-accent':'#9ac8ad','--awd-accent-wash':'#314638','--awd-accent-hover':'#badcc7','--awd-text-on-accent':'#102519','--awd-danger':'#e6a6a6','--awd-danger-soft':'#4a2424'}},'*'))
+  await frame.waitForFunction(() => document.documentElement.dataset.theme === 'dark')
+  const darkMetrics=await assertQuestionFits('dark')
+  assert.equal(darkMetrics.optionColor,'rgb(244, 241, 232)')
+  await frame.focus('.lv-question-option')
+  // Establish keyboard modality with real traversal; programmatic focus after
+  // a pointer click correctly does not activate :focus-visible in Chromium.
+  await page.keyboard.press('Tab')
+  await page.keyboard.down('Shift')
+  await page.keyboard.press('Tab')
+  await page.keyboard.up('Shift')
+  assert.equal(await frame.$eval('.lv-question-option', el=>getComputedStyle(el).outlineStyle), 'solid')
+  await page.keyboard.press('Space')
+  await frame.waitForFunction(() => document.querySelector('.lv-question-option')?.getAttribute('aria-pressed') === 'true')
+  await (await frame.$$('.lv-question-option'))[1].click()
+  await frame.type('.lv-answer-input', '保留材料原文，不推断缺失日期')
+  await (await page.$('#plugin')).screenshot({ path: resolve(out, 'litigation-question-dark-260.png') })
+  await clickText(frame, '.lv-question .lv-btn', '按以上选择继续')
+  await page.waitForFunction(() => calls.some(c => c.operation === 'answer'))
+  assert.deepEqual(await page.evaluate(() => calls.find(c => c.operation === 'answer').params.answer), {selected:['采用原始日期','保证期间作为重点'],other:'保留材料原文，不推断缺失日期'})
+  await frame.waitForSelector('.lv-question', {hidden:true})
+  checks.push('260px light/dark controls and visible keyboard focus', 'in-panel multi-choice and immediate free-text answer')
+
+  // No usable file means visible failure; a retry keeps its submission ID.
+  await page.evaluate(() => { generation={...generation,phase:'failed',message:'未生成可用的图表，请重试'} })
+  await frame.waitForFunction(() => document.querySelector('.lv-generation')?.textContent.includes('未生成可用的图表，请重试'))
+  assert.equal(await frame.$eval('.lv-btn.primary',el=>el.disabled),false)
+  assert.equal(await page.evaluate(() => opened.includes(81)),false)
+  await frame.click('.lv-btn.primary')
+  await page.waitForFunction(() => calls.filter(c => c.operation === 'generate').length === 2)
+  assert.equal(await page.evaluate(() => calls.filter(c=>c.operation==='generate')[0].params.clientRequestId),await page.evaluate(() => calls.filter(c=>c.operation==='generate')[1].params.clientRequestId))
+  await page.evaluate(() => finishDrawing())
+  await frame.waitForFunction(() => document.querySelector('.lv-generation-title')?.textContent === '图表已生成')
+  await frame.waitForFunction(() => document.querySelectorAll('.lv-row').length === 3)
+  assert.equal(await page.evaluate(() => opened.includes(81)),true)
+  checks.push('visible no-file failure and retry', 'successful status refreshes gallery and opens generated file through workbench handler')
+
+  await page.evaluate(() => { failGenerationStart=true })
+  await frame.click('.lv-btn.primary')
+  await frame.waitForFunction(() => document.querySelector('.lv-generation-error')?.textContent.includes('合成启动失败，请重试'))
+  await page.evaluate(() => { failGenerationStart=false })
+  await frame.click('.lv-btn.primary')
+  await frame.waitForFunction(() => document.querySelector('.lv-generation-title')?.textContent === '正在读取材料并出图')
+  assert.equal(await page.evaluate(() => calls.filter(c=>c.operation==='generate').at(-2).params.clientRequestId), await page.evaluate(() => calls.filter(c=>c.operation==='generate').at(-1).params.clientRequestId), 'retry after a completed task keeps the failed start identity')
+  await clickText(frame,'.lv-generation-stop','停止出图')
+  await frame.waitForFunction(() => document.querySelector('.lv-generation-title')?.textContent === '正在请求停止')
+  assert.equal(await frame.$eval('.lv-btn.primary',el=>el.disabled),true)
+  await page.evaluate(() => { generation={...generation,phase:'cancelled',message:'已停止，现有文件保留'} })
+  await frame.waitForFunction(() => document.querySelector('.lv-generation-title')?.textContent === '已停止出图')
+  assert.equal(await frame.$eval('.lv-btn.primary',el=>el.disabled),false)
+  assert.deepEqual(await page.evaluate(() => ({ prompts, show:workspace.showAiPanel, mounted:workspace.aiPanelMounted, id:workspace.chatId })), {prompts:[],show:false,mounted:false,id:'existing-chat'})
+  checks.push('persistent start rejection and retry', 'stop stays pending until confirmed', 'AI panel unchanged across complete journey')
+  await (await page.$('#plugin')).screenshot({ path: resolve(out, 'litigation-cancelled-dark-260.png') })
   assert.deepEqual(errors, [])
-  console.log(JSON.stringify({ passed: true, checks, output: out, limitations: ['synthetic backend and file picker', 'no real drawing engine or paid AI', 'no installed Electron client'] }))
+  console.log(JSON.stringify({ passed: true, checks, output: out, limitations: ['synthetic task runner, backend and file picker; real business bridge and workspace actions', 'no real drawing engine or paid AI', 'no installed Electron client'] }))
+} catch (error) {
+  await page?.screenshot({ path: resolve(out, 'failure.png'), fullPage: true }).catch(() => {})
+  throw error
 } finally { await browser?.close(); server.closeAllConnections(); await new Promise(done => server.close(done)) }
