@@ -157,5 +157,16 @@ export default {
   "paneEmptyMonth": "No tasks this month",
   "paneEmptyFile": "No tasks linked to this file yet",
   "railScheduleTitle": "Schedule ({overdue} overdue · {today} today)",
-  "tabName": "Schedule"
+  "tabName": "Schedule",
+  "workspaceAll": "सभी परियोजनाएँ",
+  "workspaceCurrent": "वर्तमान परियोजना",
+  "workspaceUpcoming": "आगामी कार्य",
+  "workspaceDays": "अगले {count} दिन",
+  "workspaceRetry": "फिर से लोड करें",
+  "workspaceOverdue": "{count} विलंबित",
+  "workspaceNoUpcoming": "अगले {count} दिनों में कोई कार्य नहीं",
+  "workspaceLinked": "फ़िल्टर कैलेंडर से सिंक होते हैं। विवरण देखने के लिए कोई कार्य चुनें।",
+  "workspaceDay": "दिन",
+  "workspaceYear": "वर्ष",
+  "workspaceEventCount": "{count} कार्य",
 }

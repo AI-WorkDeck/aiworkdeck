@@ -157,5 +157,16 @@ export default {
   "paneEmptyMonth": "No tasks this month",
   "paneEmptyFile": "No tasks linked to this file yet",
   "railScheduleTitle": "Schedule ({overdue} overdue · {today} today)",
-  "tabName": "Schedule"
+  "tabName": "Schedule",
+  "workspaceAll": "Tüm projeler",
+  "workspaceCurrent": "Geçerli proje",
+  "workspaceUpcoming": "Yaklaşan işler",
+  "workspaceDays": "Önümüzdeki {count} gün",
+  "workspaceRetry": "Yeniden yükle",
+  "workspaceOverdue": "{count} gecikmiş",
+  "workspaceNoUpcoming": "Önümüzdeki {count} gün için iş yok",
+  "workspaceLinked": "Filtreler takvimle eşitlenir. Ayrıntılar için bir öğe seçin.",
+  "workspaceDay": "Gün",
+  "workspaceYear": "Yıl",
+  "workspaceEventCount": "{count} öğe",
 }

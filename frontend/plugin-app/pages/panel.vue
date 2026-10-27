@@ -1,6 +1,6 @@
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
-<template><BusinessPanel v-if="context" :project-id="Number(context.projectId)" :prepare-file="prepareFile" :download-artifact="downloadArtifact" :generation-request="generationRequest" @open-file="openFile" @request-file-select="selectFile" @request-active-file="activeFile" @request-scope-select="selectScope" /></template>
+<template><BusinessPanel v-if="context" :project-id="Number(context.projectId)" :view-placement="context.surface || 'workspace'" :prepare-file="prepareFile" :download-artifact="downloadArtifact" :generation-request="generationRequest" @open-file="openFile" @request-file-select="selectFile" @request-active-file="activeFile" @request-scope-select="selectScope" /></template>
 <script>
 import BusinessPanel from '@business-panel'
 import { applyI18nLocale } from '@/i18n'

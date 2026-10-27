@@ -1,7 +1,7 @@
 {
   "id": "calendar",
   "name": "日程",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "跨项目日历、任务、提醒和文件关联。",
   "author": "AI WorkDeck",
   "permissions": [

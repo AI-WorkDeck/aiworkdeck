@@ -75,7 +75,7 @@ export const panelSwitchingMethods = {
 
       if (key === 'dd-client') this.openDdClientTab()
 
-      if (plugin && !this.sidebarCollapsed && (!plugin.sidebarView || plugin.pluginId === 'tencent-meeting')) this.openPluginTab(plugin.pluginId)
+      if (plugin && !this.sidebarCollapsed && (!plugin.sidebarView || ['calendar', 'tencent-meeting'].includes(plugin.pluginId))) this.openPluginTab(plugin.pluginId)
 
       // Persistence：有项目按项目分，无项目落 global_*（此前无项目态写的是 project_null_*）
       uni.setStorageSync(workbenchStorageKey(this.projectId, 'leftPaneKey'), key)

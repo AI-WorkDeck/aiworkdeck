@@ -2759,6 +2759,7 @@ export default {
       // 工作台唯一的 TaskDialog 的状态（dev-board#899），见 openTaskDialog
       taskDialog: { visible: false, mode: 'create', task: null, presetFileIds: [] },
       // 日程面板按文件过滤（文件右键「查看事项 (N)」），null = 不过滤
+      calendarWorkspaceState: null,
       calendarFileFilter: null,
       calendarFileFilterName: '',
       // 单文件历史：右键「这份文件的历史」时设置，version 面板据此只显示这份文件的版本
@@ -3399,6 +3400,7 @@ export default {
         insertContent: payload => this.insertPlainTextToWps(payload),
         previewImage: url => this.openImagePreview(url),
         copyText: text => this.insertClipboardAndCopy(text),
+        calendarWorkspace: params => this.calendarWorkspace(params),
         openProject: payload => this.onCalendarOpenProject(payload),
         openTaskFile: payload => this.onCalendarOpenFile(payload),
         insightContext: () => ({ docFileId: this.insightDocFileId, docName: this.insightDocName, canWrite: this.canWriteProject, cursorContext: this.insightCursorContext }),
