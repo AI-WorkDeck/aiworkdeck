@@ -1537,7 +1537,7 @@ export default {
       if (kind === 'folder') return this.handleCreateFolder(parentId)
       if (kind === 'recording') { this.$emit('create-recording'); return }
       if (kind === 'docx') return this.handleCreateWord(parentId)
-      if (kind === 'pptx' || kind === 'xlsx') return this.openCreateFileDialog(undefined, kind, parentId)
+      if (['pptx', 'xlsx', 'md', 'txt'].includes(kind)) return this.openCreateFileDialog(undefined, kind, parentId)
     },
     uniqueCreateName(base, extension, parentId) {
       const names = new Set([...(this.allFiles || []), ...(this.files || [])].filter(f => f && parentIdsEqual(f.parentId || null, parentId || null)).map(f => f.name.toLocaleLowerCase()))
@@ -1647,7 +1647,7 @@ export default {
       return this.createBlankOffice('docx', desiredName)
     },
     async createBlankOffice(type, desiredName, targetParentId = this.createTargetParentId()) {
-      if (!['docx', 'pptx', 'xlsx'].includes(type) || this.creatingItem) return
+      if (!['docx', 'pptx', 'xlsx', 'md', 'txt'].includes(type) || this.creatingItem) return
       if (!this.projectId) {
         uni.showToast({
           title: this.$t('fileTree.projectIdMissingCreateFile'),

@@ -83,7 +83,7 @@ flushDirtyEditors），单测见 `frontend/tests/project-home/flush-dirty-editor
 
 ## 资源管理器新建菜单（dev-board#1444/#1445）
 
-顶部新建由 `FileTree.openCreateMenu` 打开 `ExplorerCreateMenu.vue`：Word / PPT / Excel / 录音。空白处右键的新建文件带 Office 子菜单，文件夹直接建 `Untitled Folder`（同目录重名从 `Untitled Folder 2` 递增），不弹命名框；Office 文档保留命名框与 Word 插件模板入口。工具栏使用选中项对应目录，空白右键使用当前浏览层级；打开菜单时捕获落点，回收站不提供新建。
+顶部新建由 `FileTree.openCreateMenu` 打开 `ExplorerCreateMenu.vue`：Word / PPT / Excel / Markdown（.md）/ 纯文本（.txt）/ 录音。空白处右键的新建文件带相同文件类型子菜单，文件夹直接建 `Untitled Folder`（同目录重名从 `Untitled Folder 2` 递增），不弹命名框；文件保留命名框与 Word 插件模板入口。MD/TXT 复用命名、落点与重名处理；LocalFileStorageService 为两者创建零字节文本，不能回落到 DOCX 模板（dev-board#1557）。工具栏使用选中项对应目录，空白右键使用当前浏览层级；打开菜单时捕获落点，回收站不提供新建。
 
 新建文件夹成功后通过 `revealFile` 定位到新条目（dev-board#1469）；标签视图切回文件夹视图。定位成功同步 `activeFolderId`，后续新建文档落在当前选中的新目录。定位时既展开父目录，也补足目标和父目录所在的每目录 100 项渲染窗口，然后在当前 FileTree 实例内滚动，不能只刷新列表后提示成功。`loadFiles` 保留最新请求的 Promise，创建定位等待当前请求与下一帧标签选中态同步；旧请求被通知/聚焦刷新作废时不能提前定位或提示成功。创建或刷新期间切换项目，不选择旧项目的新条目。回归 `file-tree-created-folder-visible.test.mjs`；`created-folder-visible-ui.mjs` 用真实 Uni 工作台、合成 API 验证 148 个同级文件夹后的根目录/子目录创建、选中与可见滚动、继续在新目录创建文档，不代表用户客户端或真实落盘已验。
 

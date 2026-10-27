@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  newMarkdown: 'Markdown (.md)',
+  newPlainText: 'सादा पाठ (.txt)',
   "newItem": "नया",
   "newFileMenu": "नई फ़ाइल",
   "newRecording": "रिकॉर्डिंग हो रही है",

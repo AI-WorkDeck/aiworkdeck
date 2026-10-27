@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // File tree (FileTree.vue): context menu, batch actions, confirm dialogs, drag hints, local import
 export default {
+  newMarkdown: 'Markdown (.md)',
+  newPlainText: 'Plain text (.txt)',
   newItem: "New",
   newFileMenu: "New File",
   newRecording: "Recording",
