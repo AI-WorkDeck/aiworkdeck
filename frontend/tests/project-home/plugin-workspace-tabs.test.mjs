@@ -12,10 +12,14 @@ const { panelSwitchingMethods } = await import('data:text/javascript;base64,' + 
 test('rail click opens the plugin workspace instead of only selecting a narrow pane', () => {
   const opened = []
   globalThis.uni = { setStorageSync() {} }
-  const vm = { hasProject: true, projectId: 1, leftPaneKey: 'files', lastActiveIdsByMode: { left: {}, right: {} }, dynamicPlugins: [{ key: 'plugin-tencent-meeting', pluginId: 'tencent-meeting' }], openPluginTab(id) { opened.push(id) }, saveActiveIdsByMode() {}, toggleSidebar() {} }
+  const vm = { hasProject: true, projectId: 1, leftPaneKey: 'files', lastActiveIdsByMode: { left: {}, right: {} }, dynamicPlugins: [{ key: 'plugin-tencent-meeting', pluginId: 'tencent-meeting' }], openPluginTab(id) { opened.push(id) }, saveActiveIdsByMode() {}, toggleSidebar() { this.sidebarCollapsed = !this.sidebarCollapsed } }
   panelSwitchingMethods.toggleLeftPane.call(vm, 'plugin-tencent-meeting')
   assert.deepEqual(opened, ['tencent-meeting'])
   panelSwitchingMethods.toggleLeftPane.call(vm, 'plugin-tencent-meeting')
+  assert.equal(vm.sidebarCollapsed, true)
+  assert.deepEqual(opened, ['tencent-meeting'], 'collapse never reopens the workspace')
+  panelSwitchingMethods.toggleLeftPane.call(vm, 'plugin-tencent-meeting')
+  assert.equal(vm.sidebarCollapsed, false)
   assert.deepEqual(opened, ['tencent-meeting', 'tencent-meeting'])
 })
 

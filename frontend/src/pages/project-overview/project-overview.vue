@@ -850,10 +850,12 @@
             :key="activeDynamicPlugin.pluginId + ':' + activeDynamicPlugin.version + ':' + activeDynamicPlugin.sidebarView.id"
             :business-actions="pluginBusinessActions"
             :url="activeDynamicPlugin.sidebarView.url"
+            surface="sidebar"
             :plugin-id="activeDynamicPlugin.pluginId"
             :permissions="activeDynamicPlugin.permissions || []"
             :project-id="activeDynamicPlugin.sidebarView.scope === 'global' ? null : projectId"
             :get-active-editor="getPluginActiveEditor"
+            :active-file-ids="messageActiveFileIds"
             :add-file-to-ai="onPluginAddFileToAi"
             :dev-installed="!!activeDynamicPlugin.devInstalled"
             @files-changed="onArchiveExtracted"
@@ -896,24 +898,6 @@
 
         <!-- 拖拽手柄 -->
         <view class="resize-handle" :title="$t('workbench.resizePanel')" @touchstart="startResize('left', $event)" @mousedown="startResize('left', $event)"></view>
-      </view>
-
-      <!-- 外缘把手独立于侧栏裁剪区，保留窄幅空间以免遮挡编辑器和原生浏览器。 -->
-      <view v-if="!sidebarCollapsed" class="sidebar-collapse-anchor">
-        <view
-          class="sidebar-collapse-tab"
-          role="button"
-          tabindex="0"
-          :aria-label="$t('workbench.collapseSidebar')"
-          :title="$t('workbench.collapseSidebar')"
-          @tap.stop="toggleSidebar"
-          @keydown.enter.prevent="toggleSidebar"
-          @keydown.space.prevent="toggleSidebar"
-        >
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M14 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </view>
       </view>
 
       <ChatModeSidebar
@@ -1210,12 +1194,20 @@
                       :permissions="entry.plugin.permissions || []"
                       :project-id="entry.plugin.workspaceView?.scope === 'global' ? null : projectId"
                       :get-active-editor="getPluginActiveEditor"
+                      :active-file-ids="messageActiveFileIds"
                       :add-file-to-ai="onPluginAddFileToAi"
                       @files-changed="onArchiveExtracted"
                       :dev-installed="!!entry.plugin.devInstalled"
                       @kickoff="onPluginQuickAction"
                     />
                     <PluginGuidePane v-else :plugin="entry.plugin" @kickoff="onPluginQuickAction" />
+                  </view>
+                  <view v-for="tab in leftFiles.filter(item => item.tabType === 'builtin-workflow-settings')"
+                    :key="'workflow-left-' + tab.id"
+                    v-show="activeFileLeft && activeFileLeft.id === tab.id"
+                    class="pane-content">
+                    <BuiltinWorkflowEditor :project-id="projectId" :request="tab.workflowRequest"
+                      @close="closeFile(tab.id, 'left')" />
                   </view>
                   <view v-if="activeFileLeft && activeFileLeft.tabType === 'plugin' && !leftPluginTabs.some(entry => entry.tab.id === activeFileLeft.id)" class="pane-content plugin-workspace-pending">
                     <text>{{ $t('panels.pgWorkspacePending') }}</text>
@@ -1232,7 +1224,7 @@
                     @extracted="onArchiveExtracted"
                     @locator-consumed="onLocatorConsumed"
                   />
-                  <view v-if="activeFileLeft && activeFileLeft.tabType !== 'plugin' && !useLibreEditor(activeFileLeft) && !isBrowserTab(activeFileLeft) && !isPdfPreviewFile(activeFileLeft)" class="pane-content">
+                  <view v-if="activeFileLeft && activeFileLeft.tabType !== 'plugin' && activeFileLeft.tabType !== 'builtin-workflow-settings' && !useLibreEditor(activeFileLeft) && !isBrowserTab(activeFileLeft) && !isPdfPreviewFile(activeFileLeft)" class="pane-content">
                     <MarkdownPreview
                       v-if="isMarkdownTab(activeFileLeft)"
                       :content="activeFileLeft.content"
@@ -1282,7 +1274,7 @@
                       :key="activeFileLeft.id"
                       :version-spec="activeFileLeft.versionSpec"
                     />
-                    <MessageCenterPane v-else-if="activeFileLeft.tabType === 'message-center'" :current-project-id="projectId" :initial-conversation-id="activeFileLeft.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" />
+                    <MessageCenterPane v-else-if="activeFileLeft.tabType === 'message-center'" :current-project-id="projectId" :active-file-ids="messageActiveFileIds" :initial-conversation-id="activeFileLeft.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" />
                     <DdClientWorkspace v-else-if="activeFileLeft.tabType === 'dd-client'" :navigation-target="activeFileLeft.ddClientTarget || null" />
                     <DdRequestEditor
                       v-else-if="isDdRequest(activeFileLeft)"
@@ -1481,12 +1473,20 @@
                       :permissions="entry.plugin.permissions || []"
                       :project-id="entry.plugin.workspaceView?.scope === 'global' ? null : projectId"
                       :get-active-editor="getPluginActiveEditor"
+                      :active-file-ids="messageActiveFileIds"
                       :add-file-to-ai="onPluginAddFileToAi"
                       @files-changed="onArchiveExtracted"
                       :dev-installed="!!entry.plugin.devInstalled"
                       @kickoff="onPluginQuickAction"
                     />
                     <PluginGuidePane v-else :plugin="entry.plugin" @kickoff="onPluginQuickAction" />
+                  </view>
+                  <view v-for="tab in rightFiles.filter(item => item.tabType === 'builtin-workflow-settings')"
+                    :key="'workflow-right-' + tab.id"
+                    v-show="activeFileRight && activeFileRight.id === tab.id"
+                    class="pane-content">
+                    <BuiltinWorkflowEditor :project-id="projectId" :request="tab.workflowRequest"
+                      @close="closeFile(tab.id, 'right')" />
                   </view>
                   <view v-if="activeFileRight && activeFileRight.tabType === 'plugin' && !rightPluginTabs.some(entry => entry.tab.id === activeFileRight.id)" class="pane-content plugin-workspace-pending">
                     <text>{{ $t('panels.pgWorkspacePending') }}</text>
@@ -1503,7 +1503,7 @@
                     @extracted="onArchiveExtracted"
                     @locator-consumed="onLocatorConsumed"
                   />
-                  <view v-if="activeFileRight && activeFileRight.tabType !== 'plugin' && !useLibreEditor(activeFileRight) && !isBrowserTab(activeFileRight) && !isPdfPreviewFile(activeFileRight)" class="pane-content">
+                  <view v-if="activeFileRight && activeFileRight.tabType !== 'plugin' && activeFileRight.tabType !== 'builtin-workflow-settings' && !useLibreEditor(activeFileRight) && !isBrowserTab(activeFileRight) && !isPdfPreviewFile(activeFileRight)" class="pane-content">
                     <MarkdownPreview
                       v-if="isMarkdownTab(activeFileRight)"
                       :content="activeFileRight.content"
@@ -1545,7 +1545,7 @@
                       :key="activeFileRight.id"
                       :version-spec="activeFileRight.versionSpec"
                     />
-                    <MessageCenterPane v-else-if="activeFileRight.tabType === 'message-center'" :current-project-id="projectId" :initial-conversation-id="activeFileRight.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" />
+                    <MessageCenterPane v-else-if="activeFileRight.tabType === 'message-center'" :current-project-id="projectId" :active-file-ids="messageActiveFileIds" :initial-conversation-id="activeFileRight.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" />
                     <DdClientWorkspace v-else-if="activeFileRight.tabType === 'dd-client'" :navigation-target="activeFileRight.ddClientTarget || null" />
                     <DdRequestEditor
                       v-else-if="isDdRequest(activeFileRight)"
@@ -1720,10 +1720,12 @@
             :key="activeBottomDynamicPlugin.pluginId + ':' + activeBottomDynamicPlugin.version + ':' + activeBottomDynamicPlugin.sidebarView.id"
             :business-actions="pluginBusinessActions"
             :url="activeBottomDynamicPlugin.sidebarView.url"
+            surface="sidebar"
             :plugin-id="activeBottomDynamicPlugin.pluginId"
             :permissions="activeBottomDynamicPlugin.permissions || []"
             :project-id="activeBottomDynamicPlugin.sidebarView.scope === 'global' ? null : projectId"
             :get-active-editor="getPluginActiveEditor"
+            :active-file-ids="messageActiveFileIds"
             :add-file-to-ai="onPluginAddFileToAi"
             :dev-installed="!!activeBottomDynamicPlugin.devInstalled"
             @files-changed="onArchiveExtracted"
@@ -1792,6 +1794,7 @@
               <ChatInterface
                 v-if="hasProject"
                 ref="chatInterface"
+                :visible="showAiPanel && rightPaneKey === 'ai'"
                 :onVnodeMounted="notifyRestartRecovery"
                 :project-id="String(projectId)"
                 :project-name="isLooseWorkspace ? $t('workbench.looseFiles') : project.name"
@@ -1830,10 +1833,12 @@
               :key="activeRightDynamicPlugin.pluginId + ':' + activeRightDynamicPlugin.version + ':' + activeRightDynamicPlugin.sidebarView.id"
             :business-actions="pluginBusinessActions"
             :url="activeRightDynamicPlugin.sidebarView.url"
+            surface="sidebar"
             :plugin-id="activeRightDynamicPlugin.pluginId"
             :permissions="activeRightDynamicPlugin.permissions || []"
             :project-id="activeRightDynamicPlugin.sidebarView.scope === 'global' ? null : projectId"
             :get-active-editor="getPluginActiveEditor"
+            :active-file-ids="messageActiveFileIds"
             :add-file-to-ai="onPluginAddFileToAi"
             :dev-installed="!!activeRightDynamicPlugin.devInstalled"
             @files-changed="onArchiveExtracted"
@@ -2363,7 +2368,7 @@ import { registerQuitSave, unregisterQuitSave } from '@/utils/desktopQuitGuard.j
 import { claimRestartStartup, createRestartRecovery } from './restartRecovery.js'
 import { flushActiveDocument } from './flushActiveDocument.js'
 import { isTabVisibleInPane } from './tabVisibility.js'
-import { pickActiveContextTab, isContextEligibleTab } from './activeTabContext.js'
+import { pickActiveContextTab, isContextEligibleTab, messageContextFileIds } from './activeTabContext.js'
 import { readActiveSelection } from './activeSelectionContext.js'
 import { nativeDataTransfer, captureDroppedFiles, isExternalFileDrag, compatibleDropEffect } from '@/utils/fileTreeExternalDrop.js'
 import { consumePluginImDrag } from '@/utils/pluginImDrag.js'
@@ -2384,6 +2389,8 @@ import QuickLookDialog from '@/components/QuickLookDialog.vue'
 import VariablePanel from '@/components/VariablePanel.vue'
 import EvidenceMethodBar from '@/components/EvidenceMethodBar.vue'
 import FileStagingArea from '@/components/FileStagingArea.vue'
+import BuiltinWorkflowEditor from '@/components/BuiltinWorkflowEditor.vue'
+import { builtinWorkflowTabMethods } from './builtinWorkflowTab.js'
 import PluginPane from '@/components/PluginPane.vue' // Added
 import { pluginViews, isGlobalPlugin, hasPluginNavigation, hasPluginPanel, isLegacyThemeGallery } from '@/utils/pluginViews.js'
 import PluginGuidePane from '@/components/PluginGuidePane.vue'
@@ -2608,6 +2615,7 @@ export default {
     return {
       leaveWorkbench: (url) => this.leaveWorkbench(url),
       openSettingsTab: (opts) => this.openSettingsTab(opts || {}),
+      openWorkflowEditorTab: (request) => this.openWorkflowEditorTab(request),
       // 日程标签（dev-board#1048）：项目面板、设置里的「个人 → 事项」等子组件开日程不离开工作台
       openCalendarTab: (opts) => this.openCalendarTab(opts || {}),
     }
@@ -2643,6 +2651,7 @@ export default {
     ChatInterface,
     ChatModeSidebar,
     MarkdownPreview,
+    BuiltinWorkflowEditor,
     PluginPane, // Added
     PluginGuidePane,
     PluginWorkspaceSummary,
@@ -3031,6 +3040,7 @@ export default {
     }
   },
   computed: {
+    messageActiveFileIds() { return messageContextFileIds(this) },
     // 标签快照的变化信号（dev-board#1049）：只读快照白名单字段，所以名字、网页地址、分屏、
     // 激活标签变了会触发写，编辑器内部状态不会
     tabSnapshotSignature() {
@@ -4768,6 +4778,7 @@ export default {
     ...calendarTabMethods,
     ...pluginWorkspaceTabMethods,
     ...tmeetTabMethods,
+    ...builtinWorkflowTabMethods,
     ...tabSnapshotMethods,
     ...documentLinkPreviewMethods,
     initRestartRecovery(query) {
@@ -6060,8 +6071,7 @@ export default {
       const layout = sidebar?.parentElement
       if (!layout?.clientWidth) return
       const rail = layout.querySelector('.left-rail')
-      const collapseAnchor = layout.querySelector('.sidebar-collapse-anchor')
-      const fit = fitPanelWidths(layout.clientWidth - (collapseAnchor?.offsetWidth || 0), rail?.offsetWidth || 0,
+      const fit = fitPanelWidths(layout.clientWidth, rail?.offsetWidth || 0,
         this.sidebarCollapsed ? 0 : this.sidebarWidth, this.showAiPanel ? this.aiPanelWidth : 0)
       if (!this.sidebarCollapsed) this.sidebarWidth = fit.left
       if (this.showAiPanel) this.aiPanelWidth = fit.right

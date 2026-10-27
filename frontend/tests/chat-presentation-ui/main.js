@@ -17,7 +17,7 @@ window.projectFiles = [
 window.fixtureStorage = JSON.parse(sessionStorage.getItem('chat-fixture-storage') || 'null') || { checkba_user: { id: 1001 }, checkba_session_id: 'synthetic-session' }
 window.chatPosts = []
 window.uni = {
-  getStorageSync: key => key === 'awd_app_language' ? new URLSearchParams(location.search).get('lang') || 'zh-CN' : window.fixtureStorage[key],
+  getStorageSync: key => (key === 'app_language' || key === 'awd_app_language') ? new URLSearchParams(location.search).get('lang') || 'zh-CN' : window.fixtureStorage[key],
   setStorageSync(key, value) { window.fixtureStorage[key] = value; sessionStorage.setItem('chat-fixture-storage', JSON.stringify(window.fixtureStorage)) },
   removeStorageSync(key) { delete window.fixtureStorage[key]; sessionStorage.setItem('chat-fixture-storage', JSON.stringify(window.fixtureStorage)) },
   $on() {}, $off() {}, $emit() {},
@@ -108,11 +108,19 @@ const { createApp, h, ref, reactive, nextTick, watch } = await import('vue')
 window.__vueWatch = watch
 window.__markdownInstance = (await import('@/utils/markdownRenderer.js')).markdownInstance
 window.__chatTurnsUrl = new URL('../../src/components/AgentMessage/chatTurns.mjs', import.meta.url).href
+const { default: BuiltinWorkflowEditor } = await import('../../src/components/BuiltinWorkflowEditor.vue')
 const { default: ChatInterface } = await import('../../src/components/ChatInterface.vue')
 const { i18n } = await import('../../src/i18n/index.js')
 const chat = ref()
 window.chatFixtureProps = reactive({ projectId: '1', projectName: '合同审查 · 对话展示' })
-const app = createApp({ setup: () => () => h(ChatInterface, { ref: chat, ...window.chatFixtureProps }) })
+const workflowRequest = ref(null)
+const app = createApp({ setup: () => () => [
+  h(ChatInterface, { ref: chat, ...window.chatFixtureProps }),
+  workflowRequest.value && h('div', { class: 'fixture-workflow-tab', style: 'position:fixed;inset:0;z-index:3000;background:var(--awd-surface);' }, [
+    h(BuiltinWorkflowEditor, { projectId: window.chatFixtureProps.projectId, request: workflowRequest.value, onClose: () => { workflowRequest.value = null } })
+  ])
+] })
+app.provide('openWorkflowEditorTab', request => { workflowRequest.value = request })
 app.use(i18n)
 app.mount('#app')
 await nextTick()

@@ -36,6 +36,7 @@ class ImServiceTest {
  @Autowired UserRepository users;
  @Autowired ImInvitationRepository invitations;
  @Autowired ImMessageRepository messages;
+ @Autowired AccountBindingRepository accountBindings;
  @Autowired ProjectRepository projects;
  @Autowired ProjectMemberRepository projectMembers;
  Long owner, colleague, client, stranger;
@@ -82,6 +83,15 @@ class ImServiceTest {
  void join(Long user,String id,String role) { call(user,"join",Map.of("code",invite(id,role))); }
  Map<String,Object> send(Long user,String id,String key,String text) { return call(user,"send",Map.of("conversationId",id,"clientMessageId",key,"text",text)); }
 
+ @Test void messageAvatarsUseAccountBindingAndUploadedAvatarPrecedence() {
+  var binding=new com.checkba.model.entity.AccountBinding(); binding.setUserId(owner); binding.setExternalAccountId("synthetic-avatar-"+owner); binding.setCreatedAt(LocalDateTime.now()); accountBindings.saveAndFlush(binding);
+  var policy=ReflectionTestUtils.getField(service,"projectPermissions");
+  ReflectionTestUtils.setField(policy,"accountBaseUrl","https://accounts.example.test");
+  String id=create("GROUP");
+  assertEquals("https://accounts.example.test/api/avatar/synthetic-avatar-"+owner,send(owner,id,"bound-avatar","合成消息").get("senderAvatarUrl"));
+  User user=users.findById(owner).orElseThrow(); user.setAvatarUrl("https://files.example.test/uploaded.png"); users.saveAndFlush(user);
+  assertEquals("https://files.example.test/uploaded.png",send(owner,id,"uploaded-avatar","后续消息").get("senderAvatarUrl"));
+ }
  @Test void crossOrganizationMembersAndClientsChatWithoutProjectMembership() {
   String id=create("GROUP"); join(colleague,id,"MEMBER"); join(client,id,"CLIENT");
   var sent=send(client,id,"one","客户材料说明"); assertEquals(client,sent.get("senderId"));

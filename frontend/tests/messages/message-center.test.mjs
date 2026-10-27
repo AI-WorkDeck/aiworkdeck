@@ -18,7 +18,7 @@ const script = source.script.content.replace(/^import .*$/gm, '').replace('expor
 const tick = async () => { await new Promise(resolve => setImmediate(resolve)); await Vue.nextTick() }
 const deferred = () => { let resolve, reject; const promise = new Promise((yes,no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
 const conv = (extra = {}) => ({id:'c1',title:'测试项目群',type:'GROUP',role:'OWNER',unreadCount:2,...extra})
-async function mount(t, { conversations = [conv()], notices = [], override, selfId = 7, projectId = null, inviteProject = null } = {}) {
+async function mount(t, { conversations = [conv()], notices = [], override, selfId = 7, projectId = null, inviteProject = null, activeFileIds = [] } = {}) {
   let identity = 'account-one'; const calls = [], targets = [], events = new Map(), state = { messages: [], status: null, conversations, notices }
   const request = async (action, params, project) => {
     calls.push({action,params:structuredClone(params),project})
@@ -40,7 +40,7 @@ async function mount(t, { conversations = [conv()], notices = [], override, self
   const uni = { $on(name,callback){events.set(name,callback)},$off(name){events.delete(name)},$emit(){} }
   const options = new Function('MessageConversationPane','messageCenterRequest','messageCenterIdentity','normalizeMessageTarget','requireAccount','ACCOUNT_CHANGED_EVENT','uni',script)(Child,request,()=>identity,normalizeMessageTarget,async()=>false,'account-changed',uni)
   let vm; const host=document.createElement('div');document.body.append(host)
-  const app=Vue.createApp({render:()=>Vue.h({...options,template:source.template.content},{currentProjectId:projectId,inviteProject,openTarget:async(...args)=>targets.push(args),ref:value=>vm=value})})
+  const app=Vue.createApp({render:()=>Vue.h({...options,template:source.template.content},{currentProjectId:projectId,activeFileIds,inviteProject,openTarget:async(...args)=>targets.push(args),ref:value=>vm=value})})
   app.config.globalProperties.$t=(key,args)=>{let result=zh[key.split('.').at(-1)]||key; for(const[k,v]of Object.entries(args||{}))result=result.replace(`{${k}}`,v);return result}
   app.mount(host);t.after(()=>{app.unmount();host.remove()});await tick();clearInterval(vm._poll)
   return {host,vm,calls,targets,state,accountChanged(){identity='account-two';events.get('account-changed')()},request}
@@ -147,4 +147,34 @@ test('explicit unread overrides an old timestamp and failed read remains retryab
  let fails=true;const f=await mount(t,{notices:[{id:'notice:unread',title:'待读通知',read:false,readAt:'2026-01-01T00:00:00Z',actionState:'none'}],override:a=>a==='read'&&fails?Promise.reject(new Error('读取未确认')):undefined})
  f.vm.changeCategory('notifications');await tick();assert.ok(f.host.querySelector('.inbox-row.unread'));f.host.querySelector('.inbox-row').click();await tick();assert.equal(f.vm.selectedNotice.read,false)
  fails=false;await f.vm.markNoticeRead(f.vm.selectedNotice);assert.equal(f.vm.selectedNotice.read,true);assert.equal(f.vm.selectedNotice.readAt,'2026-01-01T00:00:00Z')
+})
+
+test('conversation shows assistant icons and sender photos while keeping explanations collapsed', async t => {
+ const f=await mount(t,{conversations:[conv({agent:{scope:'project',scopeKey:'project:77'}})]})
+ f.state.messages=[{id:1,actorType:'AGENT',senderId:0,senderName:'项目助手',text:'合成答复'},{id:2,actorType:'HUMAN',senderId:7,senderName:'测试用户',senderAvatarUrl:'https://example.test/avatar.png',text:'合成问题'}]
+ await selectChat(f)
+ assert.equal(f.host.querySelectorAll('.message-avatar.assistant svg').length,1)
+ assert.equal(f.host.querySelector('.message-avatar img').getAttribute('src'),'https://example.test/avatar.png')
+ assert.equal(f.host.querySelector('.message-cloud-info details').open,false)
+ assert.equal(f.host.querySelector('.message-cloud-info > p'),null)
+})
+
+test('native project assistant shortcut defaults to private while explicit shared opening remains available', async t => {
+ const agent={scope:'project',scopeKey:'project:77',localProjectId:9,name:'项目助手'}
+ const f=await mount(t,{projectId:9,conversations:[conv({agent:{...agent,private:false}})],override:(a,p)=>p.action==='agentScopes'?{agents:[agent]}:p.action==='ensureAgent'?conv({id:'private',type:p.params.private?'AGENT_DIRECT':'GROUP',agent:{...agent,private:p.params.private}}):undefined})
+ assert.equal(f.vm.availableAgents.length,1)
+ f.host.querySelector('.scope-agents button').click();await tick()
+ assert.equal(f.calls.find(c=>c.params.action==='ensureAgent').params.params.private,true)
+ await f.vm.openAgent(agent,false);await tick()
+ assert.equal(f.calls.filter(c=>c.params.action==='ensureAgent').at(-1).params.params.private,false)
+})
+
+
+test('private project replies pass current file ids and question only for the matching local project', async t => {
+ const f=await mount(t,{projectId:1,activeFileIds:[71],conversations:[conv({type:'AGENT_DIRECT',localProjectId:1,agent:{scope:'project',scopeKey:'p1',private:true}})]});await selectChat(f)
+ type(f,'他是原告还是被告？');await f.vm.sendMessage();await tick()
+ const reply=f.calls.find(c=>c.params.action==='agentReply').params.params
+ assert.deepEqual(reply.preferredFileIds,[71]);assert.equal(reply.question,'他是原告还是被告？')
+ f.vm.selectedConversation.localProjectId=2;await f.vm.requestReply(f.vm.selectedConversation,10)
+ assert.deepEqual(f.calls.filter(c=>c.params.action==='agentReply').at(-1).params.params.preferredFileIds,[])
 })

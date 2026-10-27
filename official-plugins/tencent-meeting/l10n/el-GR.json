@@ -1,5 +1,17 @@
 {
   "plugin.name": "Tencent Meeting",
   "plugin.description": "Συνδέστε το Tencent Meeting για συγχρονισμό συσκέψεων και ηχογραφμήσεων κατ' απαίτηση, προβολή απομαγνητοφωνήσεων και έξυπνων πρακτικών, αρχειοθέτηση σε έργα και δημιουργία πρακτικών συσκέψεων και ενεργειών. Απαιτεί το επίσημο tmeet CLI και εξουσιοδότηση λογαριασμού.",
-  "tool.tencent_meeting_action.description": "Πρόσθετο Tencent Meeting: έλεγχος σύνδεσης, εξουσιοδότηση σύνδεσης, συγχρονισμός κατ' απαίτηση, προβολή συσκέψεων και απομαγνητοφωνήσεων και αρχειοθέτηση αρχείων έργου."
+  "tool.tencent_meeting_action.description": "Πρόσθετο Tencent Meeting: έλεγχος σύνδεσης, εξουσιοδότηση σύνδεσης, συγχρονισμός κατ' απαίτηση, προβολή συσκέψεων και απομαγνητοφωνήσεων και αρχειοθέτηση αρχείων έργου.",
+  "panel.refreshList": "Ανανέωση",
+  "panel.selectMeeting": "Επιλέξτε συνάντηση",
+  "panel.backToList": "Επιστροφή στις συναντήσεις",
+  "panel.meetingCount": "συναντήσεις",
+  "panel.connectInSidebar": "Συνδέστε το Tencent Meeting από την πλαϊνή στήλη",
+  "panel.loadingList": "Φόρτωση συναντήσεων…",
+  "panel.loadingDetail": "Φόρτωση περιεχομένου συνάντησης…",
+  "panel.syncing": "Συγχρονισμός συναντήσεων…",
+  "panel.exporting": "Αποθήκευση υλικού συνάντησης…",
+  "panel.preparingAi": "Προετοιμασία υλικού συνάντησης για την AI…",
+  "view.account.name": "Tencent Meeting",
+  "view.meetings.name": "Tencent Meeting"
 }
