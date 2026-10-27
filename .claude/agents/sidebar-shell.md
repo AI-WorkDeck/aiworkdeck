@@ -1579,3 +1579,8 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 - **随手工作区（`Project.SCRATCH = "SCRATCH"`）**：无项目态切入 `chat` 模式时，宿主调 `ensureScratchProject()`（`POST /api/projects/scratch` → `ProjectService.getOrCreateScratchProject`）幂等获取每用户唯一的隐形托管项目（`versionOptOut = true`，在 `getUserProjects` / 律所目录 / 冲突检索中过滤隐藏），原地绑定 `projectId` 并拉取会话与文件。顶栏与侧栏提供「转为正式项目」（`POST /api/projects/{id}/promote` → `ProjectService.promoteScratchProject`），原地将 `SCRATCH` 转为 `BLANK` 并解除 `versionOptOut`，文件与对话历史零迁移保留。
 - **轻量侧栏与按需画布（`ChatModeSidebar.vue`）**：`chat` 模式下隐藏 `.left-rail` 与 `.sidebar-left`，左侧挂载可折叠 `ChatModeSidebar.vue`（近期对话、当前工作区文稿 `+ Word` / `+ MD`、跨项目调取树 `getMyProjects` + 按需展开 `getProjectFiles(id, null, true)`）。`.workbench-main` 通过 CSS flex `order` 将 `.side-panel-ai` 置左、`.content-area` 置右：无打开文档时 `.side-panel-ai` 居中流式（`max-width: 840px`），`.content-area` 零宽隐藏保活；打开/新建文稿或 AI 产物时 `chatCanvasOpen = true` 自动展开右侧画布（标签栏附「收起画布」按钮）。
 - **验证**：`frontend/tests/project-home/chat-mode.test.mjs`、`npm --prefix frontend run check:nav`、`npm --prefix frontend run check:emits`、`Backend ScratchProjectAndCrossProjectReadTest`。
+
+
+### 插件入口按声明选择（dev-board#1531）
+
+`contributes.views: []` 不提供 rail、panel 或工作区。仅 workspace 的插件保留 rail，点击只打开/聚焦标签，不切换当前左栏；rail 高亮取真实工作区状态。仅 sidebar 不自动开标签，两者兼有可通过 SDK `ui.openWorkspace()` 打开自己的 workspace。缺省/null 沿用旧入口。新规则集中在 `utils/pluginViews.js` 与 `pluginWorkspaceTabs.js`，快照恢复及直达入口使用同一闸；每个视图按自己的 scope 检查项目上下文，不能借另一个 global 视图越过 project 限制。旧纯皮肤 gallery（无业务权限、工具及其他贡献）仅作预览，更新宿主即隐藏其入口并清理旧标签；非 gallery 的主题编辑器等业务视图仍按声明显示。

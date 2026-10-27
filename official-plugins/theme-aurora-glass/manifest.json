@@ -1,7 +1,7 @@
 {
   "id": "theme-aurora-glass",
   "name": "%plugin.name%",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "%plugin.desc%",
   "author": "AI WorkDeck",
   "frontendEntry": "web/index.html",
@@ -14,15 +14,7 @@
         "file": "themes/aurora-glass.json"
       }
     ],
-    "views": [
-      {
-        "id": "gallery",
-        "name": "%plugin.name%",
-        "entry": "web/index.html",
-        "placement": "workspace",
-        "scope": "global"
-      }
-    ]
+    "views": []
   },
   "minHostVersion": "0.72.0"
 }

@@ -250,13 +250,15 @@ plugins/
 
 ### 8.1.1 工作区标签页与左栏协作
 
-动态插件点击左侧入口后，由宿主打开工作区标签；左栏显示简介和「打开工作区」入口。有 `frontendEntry` 时标签正文使用 `PluginPane`，没有时使用 `PluginGuidePane`。腾讯会议、尽调报告及后续动态插件共用这套行为，不需要新增 manifest 字段或 SDK 方法。
+插件安装与界面入口解耦，按 `contributes.views` 声明提供界面（完整字段见 §17.2）。轻量皮肤、模板等可声明空数组，在主题切换等贡献点使用，不占侧栏或专属标签页；panel 插件只声明 `sidebar`；需要完整工作区的插件声明 `workspace` 并获得左侧按钮。两种视图同时声明时，左侧入口打开 panel，插件可用 `awd.ui.openWorkspace()` 打开自己的工作区。只有工作区时，左侧按钮直接开标签，不强制打开简介 panel。
 
-标签按 `pluginId` 跨左右窗格保持单例；重复点击聚焦已有标签。普通标签切换保留 iframe 和未提交输入，关闭标签、禁用、卸载、封禁或不兼容会移除实例。跨窗格移动可能重建 iframe，业务数据应按需持久化。无项目态不打开动态插件。
+缺省或 `null` 的 `views` 保持旧插件行为：有 `frontendEntry` 时工作区使用 `PluginPane`，没有时使用 `PluginGuidePane`，并保留左侧简介导航。显式数组是完整的界面声明，不能用 `frontendEntry` 补出未声明的工作区；空数组与缺省必须区分。权限与界面形态独立，不按权限数量推断插件应占几个位置。
 
-工作区快照只存插件身份和展示名；恢复时用当前启用清单核验，入口 URL、权限与开发安装标志取当前元数据，不能信任快照。插件主界面应适配宽工作区和窄分屏；左栏不再重复挂载同一插件 iframe。已有沙箱与桥协议保持不变，不增加 `allow-same-origin`。
+标签按 `pluginId` 跨左右窗格保持单例；重复点击聚焦已有标签。普通标签切换保留 iframe 和未提交输入，关闭标签、禁用、卸载、封禁或不兼容会移除实例。跨窗格移动可能重建 iframe，业务数据应按需持久化。项目视图需要当前项目，全局视图可在无项目态使用。
 
-开发验收须覆盖安装、启用、左侧入口、工作区主要操作、切换保活、关闭重开和禁用清理。宿主源码合并与客户端发版分别验收，不能把源码已支持当成旧客户端已升级。
+工作区快照只存插件身份和展示名；恢复时用当前启用清单及视图声明核验，入口 URL、权限与开发安装标志取当前元数据，不能信任快照。声明改为无工作区时清理旧标签。已有沙箱与桥协议保持不变，不增加 `allow-same-origin`。
+
+开发验收应按插件实际贡献点覆盖安装、启用、主要操作和禁用清理。轻量插件检查无多余侧栏/标签；panel 检查窄栏操作；工作区检查单例聚焦、切换保活、关闭重开。宿主源码合并与客户端发版分别验收，不能把源码已支持当成旧客户端已升级。
 
 ### 8.2 静态服务与 CSP
 
@@ -956,7 +958,15 @@ SDK 1.5.0 新增可选权限 `im`。`im.request {action,params}` 经 `/api/plugi
 
 ### 17.2 视图与侧边栏
 
-`contributes.views` 的每个视图声明 `id / name / entry / placement / scope`；`entry` 必须是插件 `web/` 中真实文件，`placement` 为 `sidebar` 或 `workspace`，`scope` 为 `project` 或 `global`。可声明 `allowedDocks`（left/right/bottom）与其中一个 `defaultDock`。当前每种 placement 最多一个视图。未声明 views 的旧插件仍按 `frontendEntry` 打开工作区。
+`contributes.views` 的每个视图声明 `id / name / entry / placement / scope`；`entry` 必须是插件 `web/` 中真实文件，`placement` 为 `sidebar` 或 `workspace`，`scope` 为 `project` 或 `global`。可声明 `allowedDocks`（left/right/bottom）与其中一个 `defaultDock`。当前每种 placement 最多一个视图。`views` 缺省或 `null` 保持旧插件的 `frontendEntry` / 使用引导兼容入口；显式 `[]` 表示不提供任何独立界面。显式数组只启用列出的 placement：sidebar-only 不自动补工作区；workspace-only 的 rail 按钮直接打开标签，不强制展开左侧 panel；同时声明二者时先开 panel，可按操作需要进入工作区。`frontendEntry` 在显式空视图下可仅作为插件中心的预览入口，不授予工作区。
+
+同时声明两种视图时，rail 的默认入口为 sidebar，并按 sidebar 的作用域显示；workspace 自身的打开/恢复仍按其作用域核验。需要无项目态从 rail 进入的双视图插件，应将 sidebar 声明为 global。
+
+新 manifest 的 `views` 应省略或写数组；`null` 只作为旧元数据兼容，不是 SDK Schema 允许的新声明。
+
+兼容已安装的旧纯皮肤包：仅含全局 `gallery` 预览、无业务权限/工具/其他贡献的旧声明不生成独立入口，原 gallery 继续供插件中心预览；有独立业务视图的插件仍按声明显示。
+
+**SDK 1.8（待随宿主发版）**：`awd.ui.openWorkspace()` → 桥 `ui.openWorkspace {}` → `{}`。无参数，只打开当前 iframe 所属插件已声明的 workspace；宿主根据当前清单核验可用状态和视图作用域，无可用工作区返回 `unavailable`。不允许指定其他插件、URL 或绕过视图声明，不新增权限名。旧宿主返回 `unknown_method`，开发者应明确提示兼容要求。
 
 搜索、语音、脱敏、诉讼可视化、日历、收藏、剪贴板和洞察使用同一安装、启停、视图与权限通道；源码在 `frontend/plugin-app/`，发行内容在 `official-plugins/<id>/`。宿主保留文件树、工作区编辑器、Agent 对话、账户、插件管理与系统设置等运行基础，以及受权限检查的文件、编辑器和本机设备操作。无需把插件加载器本身再做成插件。
 
