@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  newMarkdown: 'Markdown (.md)',
+  newPlainText: 'プレーンテキスト (.txt)',
   "newItem": "新規",
   "newFileMenu": "新規ファイル",
   "newRecording": "録音",
