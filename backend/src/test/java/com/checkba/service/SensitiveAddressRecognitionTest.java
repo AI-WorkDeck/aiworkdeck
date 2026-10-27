@@ -23,6 +23,10 @@ class SensitiveAddressRecognitionTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
+        "住址：成都市武侯区锦华路28号春和园2栋608房|住址：XX市XX区XXXX",
+        "住址：幸福路8号608房|住址：XXXX",
+        "住址：608房|住址：XXXX",
+        "成都市武侯区锦华路28号春和园2栋608房|XX市XX区XXXX",
         "注册地址：中国（上海）自由贸易试验区世纪大道100号|注册地址：XXXX",
         "注册地址：北京市朝阳区建国路88号东侧|注册地址：XX市XX区XXXX",
         "注册地址：北京市朝阳区建国路88号院内|注册地址：XX市XX区XXXX",
@@ -69,10 +73,47 @@ class SensitiveAddressRecognitionTest {
         "北京市朝阳区人民法院依法审理本案。",
         "甲方：北京市朝阳区星河科技有限公司。",
         "市场发展空间广阔，地区经济不断增长。",
-        "地址：合同中约定的送达地址。"
+        "地址：合同中约定的送达地址。",
+        "户型：三房", "三房", "户型：2房", "户型：三房两厅"
     })
     void ordinaryProseAndOrganizationsAreNotAddresses(String input) {
         assertEquals(input, service.replaceSensitiveData(input, "ADDRESS"));
+    }
+
+    @Test void litigationPartiesAcrossDocxRunsPreviewGenerateAndRestore() throws Exception {
+        Path source = dir.resolve("synthetic-complaint.docx");
+        List<String> lines = List.of("民事起诉状", "原告：李小红", "住址：北京市海淀区清和路18号301室",
+                "被告一：陈安平", "住址：成都市武侯区锦华路28号春和园2栋608房", "联系电话：13800001111",
+                "被告二：杭州星河科技有限公司", "诉讼请求：请求依法判决。");
+        try (var doc = new XWPFDocument()) {
+            for (String line : lines) {
+                var paragraph = doc.createParagraph();
+                // Word may split a field/name/address across styled runs.
+                paragraph.createRun().setText(line.substring(0, Math.min(4, line.length())));
+                var tail = paragraph.createRun(); tail.setBold(true); tail.setText(line.substring(Math.min(4, line.length())));
+            }
+            try (var out = Files.newOutputStream(source)) { doc.write(out); }
+        }
+        for (String mode : List.of("TOKEN", "MASK")) {
+            var options = new SensitiveService.Options(List.of("CHINESE_NAME", "ADDRESS", "COMPANY", "PHONE"),
+                    mode, List.of(), List.of(), "address-test-2026");
+            var preview = service.previewFile(source.toString(), options);
+            var result = service.processFile(source.toString(), options);
+            String output = String.join("\n", new SensitiveDocx(Path.of(result.path())).texts());
+            for (String original : List.of("李小红", "陈安平", "清和路", "锦华路", "608房", "星河", "13800001111")) {
+                assertFalse(preview.text().contains(original), preview.text());
+                assertFalse(output.contains(original), output);
+            }
+            assertEquals(2, result.counts().get("CHINESE_NAME"));
+            assertEquals(2, result.counts().get("ADDRESS"));
+            assertEquals(preview.counts(), result.counts());
+            assertTrue(output.contains("被告一："));
+            assertTrue(output.endsWith("诉讼请求：请求依法判决。"));
+            if (mode.equals("TOKEN")) {
+                var restored = service.restoreFile(result.path(), result.recoveryKit(), "address-test-2026");
+                assertEquals(lines, new SensitiveDocx(Path.of(restored.path())).texts());
+            } else assertEquals(preview.text(), output);
+        }
     }
 
     @Test void defaultStrategiesKeepBoundariesAcrossMixedContractEntities() throws Exception {

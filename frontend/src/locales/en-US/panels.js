@@ -132,8 +132,9 @@ export default {
   deDownloadRetry: 'The result was created, but recovery download failed. Use the download button below.',
   deAiWorkflowNotice: 'AI tools are in the right-hand assistant. This panel never sends files automatically. Normal chats may include history and project context; they are not isolated. Check the context and exclude originals, recovery mappings and restored files.',
 
-  deRedactTab: 'Redact',
-  deRestoreTab: 'Restore',
+  deOperationTitle: 'Choose action',
+  deRedactTab: 'Redact (hide data)',
+  deRestoreTab: 'Restore original data',
   deLocalNotice: 'Processed by local rules without an LLM. Send only reviewed, redacted files to AI.',
   deFormats: 'DOCX, text PDFs and UTF-8 text are supported. Scans, images and legacy DOC are not supported.',
   deModeTitle: 'Replacement mode',
