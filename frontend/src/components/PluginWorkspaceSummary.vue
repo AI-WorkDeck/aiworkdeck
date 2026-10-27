@@ -51,7 +51,7 @@
       <scroll-view scroll-y class="pws-scroll">
         <view v-if="filteredAgents.length || projectAgentReason" class="pws-section pws-agent-section">
           <button v-for="agent in filteredAgents" :key="agent.scope + ':' + agent.scopeKey" class="pws-agent-entry" @tap="openAgent(agent)">
-            <text class="pws-agent-badge">AI</text>
+            <view class="pws-agent-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3m-6 0h12a3 3 0 0 1 3 3v9H3V9a3 3 0 0 1 3-3Zm2 5h.01M16 11h.01M8 15h8M1 11v4m22-4v4" /></svg></view>
             <text class="pws-agent-name">{{ agent.name || (agentScopeLabel(agent.scope) + tr('panels.pwsAgentDefaultSuffix', '助手')) }}</text>
             <text class="pws-contact-badge">{{ agentScopeLabel(agent.scope) }}</text>
           </button>
@@ -85,7 +85,6 @@
 
           <view v-if="filteredConversations.length === 0" class="pws-conv-empty">
             <text class="pws-conv-empty-title">{{ searchKeyword ? tr('panels.pwsNoMatchingConvs', '没有匹配的对话') : tr('panels.pwsNoActiveConvs', '暂无活跃对话') }}</text>
-            <text class="pws-conv-empty-desc">{{ tr('panels.pwsConvEmptyDesc', '新建会话或用邀请码加入。需要联系同事与客户时，展开下方通讯录。') }}</text>
 
           </view>
 
@@ -98,7 +97,7 @@
               @tap="selectConversation(c)"
             >
               <view class="pws-conv-avatar" :class="c.type === 'DIRECT' ? 'direct' : 'group'">
-                <text>{{ c.agent ? 'AI' : (c.type === 'DIRECT' ? tr('panels.pwsDirectAvatar', '私') : tr('panels.pwsGroupAvatar', '群')) }}</text>
+                <svg v-if="c.agent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3m-6 0h12a3 3 0 0 1 3 3v9H3V9a3 3 0 0 1 3-3Zm2 5h.01M16 11h.01M8 15h8M1 11v4m22-4v4" /></svg><text v-else>{{ c.type === 'DIRECT' ? tr('panels.pwsDirectAvatar', '私') : tr('panels.pwsGroupAvatar', '群') }}</text>
               </view>
               <view class="pws-conv-main">
                 <view class="pws-conv-top">
@@ -667,7 +666,7 @@ export default {
       return list.filter(f => (f.name + ' ' + (f.org || '') + ' ' + (f.roleLabel || '')).toLowerCase().includes(this.kw))
     },
     filteredAgents() {
-      return this.agents.filter(agent => (!this.kw || [agent.name, agent.title, this.agentScopeLabel(agent.scope)].filter(Boolean).join(' ').toLowerCase().includes(this.kw)) && !this.conversations.some(c => c.agent && !c.agent.private && c.type !== 'AGENT_DIRECT' && c.agent.scope === agent.scope && c.agent.scopeKey === agent.scopeKey))
+      return this.agents.filter(agent => (!this.kw || [agent.name, agent.title, this.agentScopeLabel(agent.scope)].filter(Boolean).join(' ').toLowerCase().includes(this.kw)) && !this.conversations.some(c => c.agent && !!(c.agent.private || c.type === 'AGENT_DIRECT') === (agent.scope === 'project') && c.agent.scope === agent.scope && (c.agent.scopeKey === agent.scopeKey || (agent.scope === 'project' && c.agent.scopeKey === agent.legacyScopeKey))))
     },
     filteredConversations() {
       let list = this.conversations || []
@@ -875,7 +874,7 @@ export default {
       }[scope] || ''
     },
     openAgent(agent) {
-      this.emitCommand('open-agent', { scope: agent.scope, scopeKey: agent.scopeKey, title: agent.title || agent.name, private: false })
+      this.emitCommand('open-agent', { scope: agent.scope, scopeKey: agent.scopeKey, title: agent.title || agent.name, private: agent.scope === 'project' })
     },
     conversationLabel(c) {
       if (c.agent) {
@@ -1775,4 +1774,5 @@ export default {
 .pws-about { padding: var(--awd-panel-gap) var(--awd-panel-pad-x); }
 .pws-about-toggle { justify-content: space-between; color: var(--awd-panel-text-2); font-size: var(--awd-panel-fs-meta); }
 .pws-about .pws-brand-desc { display: block; padding: var(--awd-panel-gap); overflow-wrap: anywhere; }
+.pws-agent-badge svg,.pws-conv-avatar svg{width:21px;height:21px}.pws-agent-badge,.pws-conv-avatar:has(svg){border-radius:50%;background:var(--awd-accent-wash);color:var(--awd-accent)}
 </style>

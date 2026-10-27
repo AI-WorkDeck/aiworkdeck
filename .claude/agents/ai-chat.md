@@ -1757,3 +1757,10 @@ cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='Refe
 - `POST /chat {conversationId?,requestId,message}` 在账户同意行锁下受理。同一requestId的running回执不再起模型，completed返回原回答，确定failed可重试同id及原问题；新问题不能复用旧id。失败前已发生的模型/外部查询可能有费用，不承诺失败免费。`GET /requests/{id}` 返回相同 `status/conversationId/requestId/answer/sources` 结构；客户端未知结果先查/重试原id，running不显示空回复；轮询将超过15分钟的遗留running在锁内标记failed，允许原id恢复。内部attemptRevision在每次重试递增，旧尝试迟到后不得覆盖新尝试的成功/失败状态。对话暂按最近20轮回放。
 - 模型返回、历史与重复请求回放均复验开通revision、项目目录和备份指纹。连续追问继承已送入模型的历史来源，哪怕本轮没有新工具调用也再次校验；正文读取前冻结来源指纹、读完后核对实际字节SHA256并再验，防止读取中材料替换。权限与版本复验走标量查询，避免HTTP持久上下文缓存旧consent、备份授权或来源元数据。撤销项目后旧回答不再回放；材料变化时不把旧摘要当最新事实。来源带截至时间、摘要生成时间及ready/stale状态。客户端轮询必须在退出/换账户/关闭助理时停止。
 - 回归 `MobileAssistantServiceTest` 使用真实H2、备份文本和真实OpenAI HTTP客户端连接本机脚本响应，覆盖多租户、独立同意、关闭时故障、并发幂等/失败重试、22项目分页与第21份文件读取、禁写、撤权历史与连续追问、读取中材料替换、英文请求文案、6项外部工具账户scope转交、遗留请求迟到结果及真实EntityManager缓存中的并发撤权；这不等于真实线上模型质量、第三方付费查询、正式手机包或生产跨端验证。
+
+### 2026-10-27 消息助手上下文与默认入口（dev-board#1533）
+
+- 项目助手快捷入口默认私聊；显式 `private: false` 仍开群聊，已有群聊不吞掉私聊入口。用户本次明确选择「默认私聊自动带入本机项目上下文，群聊只用共享资料」。
+- 本机私聊走 `ImScopedAgentHost` 的项目身份核验，再由 `ImPrivateProjectContext` 按当前/已打开真实文档候选与问题题名相关性读取最多4份、每份6000字。宿主 `messageContextFileIds` 仅提供最多两个真实文件 ID，PluginPane 覆盖插件自给候选；文件仍须属于当前项目并通过 ACL。不能把文件目录当作已读取正文。
+- 云项目群经 `ImSharedProjectContext` 只读向客户开放、全部当前有权成员可读的材料；提取后、模型生成后及提交前复核。团队/律所助手仅读对应共享记忆，最多尝试3份；不注入本机私聊材料。
+- 验证：66项后端合成数据测试，包括排序第7的起诉状命中、正文进入模型请求、跨项目 ID 拒读；前端默认入口与真实 iframe 沙箱验证。没有调用真实付费模型或将用户截图中的案件材料发送给测试服务。

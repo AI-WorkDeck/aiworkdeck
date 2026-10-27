@@ -167,6 +167,22 @@ test('settings expansion retains selected rules and custom terms; processing exp
 })
 
 
+test('initial pane omits repeated instructions and keeps token guidance at the review step', async () => {
+  const initial = await renderPane()
+  assert.doesNotMatch(initial, /panels.deLocalNotice|panels.deStepSelect|panels.deStepReview|panels.deStepCreate/)
+  assert.doesNotMatch(initial, /class="help-text">panels.deTokenNotice/)
+  const reviewing = await renderPane({ fileId: 1, preview: { text: 'synthetic preview' } })
+  assert.match(reviewing, /class="help-text">panels.deTokenNotice/)
+  assert.match(reviewing, /panels.deReviewNotice/)
+})
+
+test('irreversible modes keep their limitations visible before preview', async () => {
+  const masking = await renderPane({ mode: 'MASK' })
+  assert.match(masking, /class="help-text">panels.deMaskNotice/)
+  const pdf = await renderPane({ fileName: 'synthetic.pdf' })
+  assert.match(pdf, /class="help-text">panels.dePdfNotice/)
+})
+
 test('choosing an operation keeps the file selected first, including after another generation', () => {
   const { state } = pane()
   state.lastRedaction = {

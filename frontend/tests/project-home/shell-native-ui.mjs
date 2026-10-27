@@ -28,10 +28,7 @@ const overlayStart = page.indexOf('    desktopOverlayActive(open) {')
 const overlayWatcher = page.slice(overlayStart, page.indexOf('\n    },', overlayStart)) + '\n}'
 const toggleStart = page.indexOf('    toggleSidebar() {')
 const toggle = page.slice(toggleStart, page.indexOf('\n    },', toggleStart)) + '\n}'
-const tabStart = page.indexOf('      <view v-if="!sidebarCollapsed" class="sidebar-collapse-anchor">')
-if (tabStart < 0) throw new Error('sidebar collapse tab missing')
-const tab = page.slice(tabStart, page.indexOf('      <!-- IDE 工作台', tabStart))
-const tabRender = compile(`<div class="sidebar-left" :style="{width: sidebarCollapsed ? '0px' : '260px'}"><div v-if="!sidebarCollapsed" class="sidebar-header">资源管理器</div><div v-if="!sidebarCollapsed" style="padding:16px">合成测试项目</div></div>${tab}`, { mode: 'function' }).code
+const tabRender = compile(`<div class="sidebar-left" :style="{width: sidebarCollapsed ? '0px' : '260px'}"><div v-if="!sidebarCollapsed" class="sidebar-header">资源管理器</div><div v-if="!sidebarCollapsed" style="padding:16px">合成测试项目</div></div>`, { mode: 'function' }).code
 const css = sass.compileString(component.styles[0].content).css + sass.compileString(read('src/pages/project-overview/project-overview.scss')).css
 const translations = { 'workbench.accountMenu': '账户菜单', 'workbench.settingsTabName': '设置', 'account.logoutBtn': '退出登录', 'calendar.mySchedule': '我的日程', 'workbench.walletMenuLabel': '账户与用量', 'workbench.collapseSidebar': '收起左侧栏' }
 fs.copyFileSync(require.resolve('vue/dist/vue.global.js'), path.join(out, 'vue.js'))
@@ -68,13 +65,13 @@ ipcMain.on('visible',(_,visible)=>views.setAllVisible(visible));
 const run=code=>win.webContents.executeJavaScript(code);const pause=()=>new Promise(r=>setTimeout(r,150));
 await win.loadFile(path.join(out,'index.html'));
 const {view}=views.ensure('foreground');await view.webContents.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent('<body style="background:#dce9f5;font:24px system-ui;padding:36px">原生浏览器合成网页<input id="draft" value="保留输入内容"><script>window.persisted=42</script>'));
-const browserX=await run("Math.ceil(document.querySelector('.sidebar-collapse-anchor').getBoundingClientRect().right)");
+const browserX=await run("Math.ceil(document.querySelector('.sidebar-left').getBoundingClientRect().right)");
 views.setBounds('foreground',{x:browserX,y:90,width:1100-browserX,height:640});views.attach('foreground');win.showInactive();await new Promise(r=>setTimeout(r,800));
 const screenshot=async name=>{fs.writeFileSync(path.join(out,name+'-renderer.png'),(await win.capturePage()).toPNG());for(let attempt=0;attempt<10;attempt++){const sources=await desktopCapturer.getSources({types:['window'],thumbnailSize:{width:2200,height:1600}});const own=sources.find(s=>s.name==='AWD Shell Native QA '+process.pid);if(own&&!own.thumbnail.isEmpty()){fs.writeFileSync(path.join(out,name+'.png'),own.thumbnail.toPNG());return;}await new Promise(r=>setTimeout(r,300));}throw new Error('Native window capture unavailable: '+name);};
 await screenshot('01-browser');
-const card=await run("(()=>{const r=document.querySelector('.sidebar-collapse-tab').getBoundingClientRect();return {width:r.width,height:r.height,right:r.right}})()");assert.ok(card.width<=18&&card.height<=36,JSON.stringify(card));
-await run("document.querySelector('.sidebar-collapse-tab').dispatchEvent(new Event('tap',{bubbles:true}))");await pause();assert.equal(await run("document.querySelector('.sidebar-collapse-tab')===null"),true);
-await run("document.querySelector('#rail').click()");await pause();assert.equal(await run("!!document.querySelector('.sidebar-collapse-tab')"),true);
+assert.equal(await run("document.querySelector('.sidebar-collapse-tab')===null"),true);
+await run("document.querySelector('#rail').click()");await pause();assert.equal(await run("shellTest.side.sidebarCollapsed"),true);
+await run("document.querySelector('#rail').click()");await pause();assert.equal(await run("shellTest.side.sidebarCollapsed"),false);
 await run("document.querySelector('.account-entry-btn').dispatchEvent(new Event('tap',{bubbles:true}))");await pause();await screenshot('02-account-open');
 if(${baseline}){assert.deepEqual(views._state().attached,['foreground']);fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({baselineReproduced:true,out},null,2));}
 else{
@@ -85,7 +82,7 @@ await run('shellTest.hold(false)');await pause();assert.deepEqual(views._state()
 await screenshot('03-browser-restored');
 await run("document.querySelector('.account-entry-btn').dispatchEvent(new Event('tap',{bubbles:true}))");await pause();await run('shellTest.unmount()');await pause();assert.deepEqual(views._state().attached,['foreground']);
 const paths=Object.fromEntries(['home','userData','sessionData'].map(k=>[k,app.getPath(k)]));for(const value of Object.values(paths))assert.ok(value.startsWith(profile));
-fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({passed:true,checks:['narrow tab','collapse hides tab','rail reopens','native view hidden under account','other overlay retained','same browser state restored','unmount restores'],paths,out},null,2));
+fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({passed:true,checks:['no protruding collapse tab','rail collapses','rail reopens','native view hidden under account','other overlay retained','same browser state restored','unmount restores'],paths,out},null,2));
 }views.destroyAll();win.destroy();app.quit();}catch(error){fs.writeFileSync(path.join(out,'failure.txt'),error.stack);if(win&&!win.isDestroyed())win.destroy();app.exit(1);}});`)
 const executable = process.env.SHELL_UI_ELECTRON || createRequire(path.join(root, '../desktop/package.json'))('electron')
 const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE

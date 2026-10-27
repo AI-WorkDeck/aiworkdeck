@@ -1,5 +1,17 @@
 {
   "plugin.name": "Tencent Meeting",
   "plugin.description": "اربط Tencent Meeting لمزامنة الاجتماعات والتسجيلات عند الطلب، وعرض النصوص والمحاضر الذكية، والأرشفة في المشاريع، وإنشاء محاضر الاجتماعات وبنود الإجراءات. يتطلب واجهة tmeet الرسمية (CLI) وتفويض الحساب.",
-  "tool.tencent_meeting_action.description": "إضافة Tencent Meeting: التحقق من الاتصال، وتفويض تسجيل الدخول، والمزامنة عند الطلب، وعرض الاجتماعات والنصوص، وأرشفة ملفات المشروع."
+  "tool.tencent_meeting_action.description": "إضافة Tencent Meeting: التحقق من الاتصال، وتفويض تسجيل الدخول، والمزامنة عند الطلب، وعرض الاجتماعات والنصوص، وأرشفة ملفات المشروع.",
+  "panel.refreshList": "تحديث",
+  "panel.selectMeeting": "اختر اجتماعًا",
+  "panel.backToList": "العودة إلى الاجتماعات",
+  "panel.meetingCount": "اجتماعات",
+  "panel.connectInSidebar": "اربط Tencent Meeting من الشريط الجانبي",
+  "panel.loadingList": "جارٍ تحميل الاجتماعات…",
+  "panel.loadingDetail": "جارٍ تحميل محتوى الاجتماع…",
+  "panel.syncing": "جارٍ مزامنة الاجتماعات…",
+  "panel.exporting": "جارٍ حفظ مواد الاجتماع…",
+  "panel.preparingAi": "جارٍ تجهيز مواد الاجتماع للذكاء الاصطناعي…",
+  "view.account.name": "Tencent Meeting",
+  "view.meetings.name": "Tencent Meeting"
 }

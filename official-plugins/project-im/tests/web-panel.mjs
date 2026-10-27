@@ -265,21 +265,23 @@ async function agentPanel(options = {}) {
     if (action === 'send') { const message = { id: nextId++, senderId: 9, actorType: 'HUMAN', text: params.text, clientMessageId: params.clientMessageId }; messages.push(message); return message; }
     if (action === 'agentReply') { status = { status: 'queued', messageId: params.messageId }; return { accepted: true, ...status }; }
   } });
+  if (!options.keepDefault && !p.$('active-chat').hidden) await p.select(0);
   return { ...p, group, privateChat, messages, setStatus: (next) => { status = next; } };
 }
-test('project assistant opens its shared conversation by default and responds automatically for one human', async (t) => {
+test('selecting an existing shared conversation preserves its group behavior and single-human replies', async (t) => {
   const p = await agentPanel(); close(t, p);
   assert.equal(p.$('active-chat').hidden, false);
   assert.equal(p.$('chat-title').textContent, '合成项目助手群');
   assert.match(p.$('chat-subtitle').textContent, /群成员可见/);
   assert.equal(p.$('agents').children.length, 0, 'existing assistant group is not duplicated as a shortcut');
-  assert.equal(p.calls.find((c) => c.action === 'ensureAgent').params.private, false);
+  assert.equal(p.calls.find((c) => c.action === 'ensureAgent').params.private, true);
   await p.click('members-button');
   assert.match(p.$('dialog-body').textContent, /合成项目助手 · AI 助手/);
   assert.equal([...p.$('dialog-body').querySelectorAll('.member-row button')].some((b) => b.textContent === '移除'), false);
   assert.doesNotMatch(p.$('dialog-body').textContent, /退出会话/);
   await p.click('close-dialog'); p.write('这个项目下一步做什么？'); await p.submit();
   const send = p.calls.find((c) => c.action === 'send'), reply = p.calls.find((c) => c.action === 'agentReply');
+  assert.equal(reply.params.question, send.params.text);
   assert.ok(send); assert.equal(reply.params.messageId, 30);
   assert.match(p.$('agent-status').textContent, /等待助手回复/);
   assert.doesNotMatch(p.$('messages').textContent, /AI 助手/);
@@ -433,3 +435,23 @@ test('a second human message sent while admission is pending retains an assistan
   assert.deepEqual(p.calls.filter((c) => c.action === 'agentReply').map((c) => c.params.messageId), [30, 31]);
   assert.equal(p.calls.filter((c) => c.action === 'send').length, 2);
 });
+
+test('assistant and member avatars render safely without verbose empty-chat instructions', async t => {
+ const group={...c1,agent:{scope:'project',scopeKey:'project:1',name:'项目助手',private:false}}
+ const p=await panel({call:({action})=> action==='list'?{conversations:[group]}:action==='messages'?{messages:[{id:1,actorType:'AGENT',senderId:0,senderName:'项目助手',text:'合成答复'},{...msg,senderAvatarUrl:'https://example.test/avatar.png',attachment:null}],hasMore:false}:undefined})
+ close(t,p);await p.select()
+ assert.equal(p.$('messages').querySelectorAll('.assistant-avatar svg').length,1)
+ assert.equal(p.$('messages').querySelector('img').getAttribute('src'),'https://example.test/avatar.png')
+ assert.equal(p.$('binding').textContent,'');assert.equal(p.$('agent-info-summary').hidden,true)
+ assert.equal(p.$('agent-info').querySelector('details').open,false)
+ assert.equal(p.$('empty-messages').textContent,'')
+})
+
+test('project assistant defaults to private context while an explicit shared command stays shared', async t => {
+ const p=await agentPanel({keepDefault:true});close(t,p)
+ assert.match(p.$('chat-subtitle').textContent,/仅你可见/)
+ assert.equal(p.calls.find(c=>c.action==='ensureAgent').params.private,true)
+ await p.events['sidebar.command']({command:'open-agent',scope:'project',scopeKey:'project-uuid',private:false});await tick()
+ assert.match(p.$('chat-subtitle').textContent,/群成员可见/)
+ assert.equal(p.calls.filter(c=>c.action==='ensureAgent').at(-1).params.private,false)
+})

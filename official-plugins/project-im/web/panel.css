@@ -150,3 +150,19 @@ dialog label input,dialog label select{margin-top:5px}
 #agent-info p{margin:0;line-height:1.5}
 #agent-info summary{cursor:pointer;width:fit-content;margin-top:2px}
 #agent-info details p{margin-top:4px}
+
+/* Conversation avatars share the host's semantic palette in every theme. */
+.avatar{position:relative;overflow:hidden;border-radius:50%;color:var(--awd-text-2,var(--fallback-muted))}
+.avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:var(--awd-surface,var(--fallback-surface))}
+.assistant-avatar{color:var(--awd-accent,var(--fallback-accent));background:var(--awd-accent-wash,var(--fallback-bg))}
+.assistant-avatar svg{width:21px;height:21px}
+.message{flex-direction:row;align-items:flex-start;gap:10px}
+.message>.avatar{flex:0 0 30px;width:30px;height:30px}
+.message.mine{flex-direction:row-reverse;align-items:flex-start}
+.message-content{display:flex;flex-direction:column;align-items:flex-start;min-width:0;max-width:calc(100% - 40px)}
+.mine .message-content{align-items:flex-end}
+.message-content .bubble{max-width:100%;box-sizing:border-box}
+#project-bar:has(#binding:empty){justify-content:flex-end;padding-block:6px}
+#agent-info{padding-block:4px 0}
+
+.message.mine:not(:has(.message-content)){flex-direction:column;align-items:flex-end}

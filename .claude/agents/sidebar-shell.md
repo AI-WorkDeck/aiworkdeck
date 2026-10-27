@@ -1583,10 +1583,15 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 - **轻量侧栏与按需画布（`ChatModeSidebar.vue`）**：`chat` 模式下隐藏 `.left-rail` 与 `.sidebar-left`，左侧挂载可折叠 `ChatModeSidebar.vue`（近期对话、当前工作区文稿 `+ Word` / `+ MD`、跨项目调取树 `getMyProjects` + 按需展开 `getProjectFiles(id, null, true)`）。`.workbench-main` 通过 CSS flex `order` 将 `.side-panel-ai` 置左、`.content-area` 置右：无打开文档时 `.side-panel-ai` 居中流式（`max-width: 840px`），`.content-area` 零宽隐藏保活；打开/新建文稿或 AI 产物时 `chatCanvasOpen = true` 自动展开右侧画布（标签栏附「收起画布」按钮）。
 - **验证**：`frontend/tests/project-home/chat-mode.test.mjs`、`npm --prefix frontend run check:nav`、`npm --prefix frontend run check:emits`、`Backend ScratchProjectAndCrossProjectReadTest`。
 
+## 规则编辑与侧栏收展（2026-10-27，#1532/#1536）
+
+内置工作流规则从 ChatInterface 通过 provide/inject 的 `openWorkflowEditorTab` 打开单例 `builtin-workflow-settings` 标签；`BuiltinWorkflowEditor.vue` 与 `useBuiltinWorkflows.js` 复用既有版本 API，版本修改广播刷新聊天卡片。两侧标签池用 v-show 保留编辑草稿，切项目重选版本，虚拟标签不进入文件上下文。菜单 Teleport 到 body 并按视口限宽限高，不能再放进聊天栏的裁剪/定位上下文。回归 `builtin-workflow-tab.test.mjs` 与真实 Uni 编辑器测试。
+
+移除侧栏外缘收起按钮及14px占位；再次点当前 rail 入口复用 `toggleSidebar` 收起/展开，保留顶栏/快捷键。收起动态插件时不重新打开工作区；宽度回夹不再扣外缘占位。
 
 ## 日程插件左右联动（dev-board#1538，2026-10-27）
 
-真实入口是 `frontend/plugin-app/calendar/Panel.vue`，由 `official-plugins/calendar` 打包；旧 `components/calendar/CalendarPane.vue` / `ProjectCalendarPane.vue` 不是当前插件入口。宿主 `PluginPane` 握手 `viewPlacement: sidebar|workspace` 明确视图用途，禁止按窗口宽度猜左栏：左栏 `Sidebar.vue` 只放项目快捷筛选、含今天的近 3/5 个自然日未完成事项和逾期入口；中央承载日/周/月/年/列表、编辑与文件关联。rail 选中日历时同时激活单例工作区标签，其余插件的面板规则不变。
+真实入口是 `frontend/plugin-app/calendar/Panel.vue`，由 `official-plugins/calendar` 打包；旧 `components/calendar/CalendarPane.vue` / `ProjectCalendarPane.vue` 不是当前插件入口。宿主 `PluginPane` 握手 `surface: sidebar|workspace` 明确视图用途，禁止按窗口宽度猜左栏：左栏 `Sidebar.vue` 只放项目快捷筛选、含今天的近 3/5 个自然日未完成事项和逾期入口；中央承载日/周/月/年/列表、编辑与文件关联。rail 选中日历时同时激活单例工作区标签，其余插件的面板规则不变。
 
 `calendarTabMethods.calendarWorkspace` 持有工作台本次生命周期的唯一展示状态；插件经 `calendar.workspace` 命名操作读/改，沿原 `sidebar.command` 发布 `calendar-state`。状态含项目/类型/完成项筛选、日期、视图、近期天数与文件筛选，递增 revision 防迟到响应回退；不写入用户项目、不扩大数据访问，所有任务/文件请求继续经原权限闸。任一侧修改局部字段不覆盖另一侧字段，初次挂载主动读取状态；左栏打开事项与新建请求只在工作区弹窗。年视图是 12 个月的实际日期网格，点击日期切入日视图，包含闰日。`calendar-focus` / `calendar-file` 旧入口继续接入，任务定位会清除冲突筛选并转到其项目和日期。
 

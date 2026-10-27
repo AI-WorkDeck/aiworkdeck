@@ -70,7 +70,14 @@ try {
         await (await page.$('.composer-advanced-settings')).screenshot({ path: `/tmp/awd-advanced-${lang}-${theme}-${empty ? 'empty' : 'conversation'}-open.png` })
         assert.equal((await page.$eval('.builtin-workflows-adv-btn', el => el.textContent)).trim(), lang === 'zh-CN' ? '编辑规则' : 'Edit rules')
         await page.click('.builtin-workflows-adv-btn')
-        assert.ok(await page.$('.bw-editor-dialog'), 'existing workflow editor remains reachable')
+        await page.waitForSelector('.bw-editor-dialog')
+        assert.ok(await page.$('.fixture-workflow-tab .bw-editor-dialog'), 'rules open in the workspace host')
+        assert.equal(await page.$('.chat-interface .bw-editor-dialog'), null, 'editor is outside the narrow chat')
+        for (const width of [320, 600, 1000]) {
+          await page.setViewport({ width, height: 900, deviceScaleFactor: 2 })
+          assert.ok(await page.$eval('.bw-editor-dialog', el => el.scrollWidth <= el.clientWidth + 1), `workflow width ${width}`)
+          assert.ok(await page.$eval('.bw-editor-main', el => el.scrollWidth <= el.clientWidth + 1), `workflow form width ${width}`)
+        }
       }
     }
   }
