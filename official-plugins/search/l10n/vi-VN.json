@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Project Search",
-  "plugin.description": "Search project files by full text or tags and jump directly to documents.",
-  "view.main.name": "Project Search"
+  "plugin.name": "Tìm kiếm dự án",
+  "plugin.description": "Tìm kiếm tệp dự án theo toàn văn hoặc thẻ và chuyển thẳng đến tài liệu.",
+  "view.main.name": "Tìm kiếm dự án"
 }

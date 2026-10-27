@@ -82,7 +82,7 @@ export default {
     "almostReady": "Almost ready",
     "rendering": "Rendering the document"
   },
-  "reviewBtn": "Review",
+  "reviewBtn": "Überprüfung",
   "previewReadableHint": "Readable now; editing is available once the editor is ready",
   "preparingEditor": "Preparing the editor",
   "dlProgress": "Document content {loaded} / {total}",
@@ -466,7 +466,7 @@ export default {
     "headerTitle": "Set the page header",
     "footerTitle": "Set the page footer",
     "textRequired": "Enter the text",
-    "nativeMenus": "Native menus",
+    "nativeMenus": "Native Menüs",
     "nativeMenusTitle": "Temporarily show the LibreOffice menu bar and toolbars",
     "page": "Page",
     "pageSetup": "Page Setup",

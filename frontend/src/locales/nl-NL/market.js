@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "themesTitle": "UI Skins",
-  "themeSelect": "Apply skin",
-  "themeSelected": "Active (tap for default)",
-  "themeNote": "Applying a skin updates semantic color tokens across the workbench, plugins, and editor chrome in both Light and Dark modes.",
+  "themesTitle": "UI-skins",
+  "themeSelect": "Skin toepassen",
+  "themeSelected": "Actief (tik voor standaard)",
+  "themeNote": "Het toepassen van een skin werkt semantische kleurtokens bij in de werkbank, plugins en editor-interface, in zowel lichte als donkere modus.",
   "redactionEngineUpdateNotice": "Lokale regels detecteren automatisch bedrijven en Chinese namen, met voorbeelden, tokens en herstel. De engine wordt bijgewerkt via desktoppatches; het opnieuw installeren van Skill-instructies werkt deze niet bij.",
   "redactionEngineUpdateButton": "Controleer updates van de redactie-engine",
   "heroWatermark": "E",
@@ -58,7 +58,7 @@ export default {
   "installingShort": "Installeren",
   "pluginTrustNote": "Controleer de bron en de opgegeven mogelijkheden vóór installatie. Webweergaven draaien geïsoleerd met hosttoegang na toestemmingscontrole; plug-ins met backendcode hebben toegang tot lokale bronnen. Handmatige installaties starten uitgeschakeld.",
   "skillWord": "Skill",
-  "sectionSkillTitle": "Skills",
+  "sectionSkillTitle": "Vaardigheden",
   "sectionPluginTitle": "Plug-ins",
   "sectionPluginSub": "Zelfstandige mogelijkheden: bieden hun eigen tools en UI, zichtbaar in de zijbalk zodra ingeschakeld",
   "loadingLocalPlugins": "Lokale plug-ins lezen",
@@ -94,7 +94,7 @@ export default {
   "toolCount": "{count} tools",
   "requiresPerms": "Vereist {perms}",
   "noSensitiveCapability": "Geen gevoelige mogelijkheden opgegeven",
-  "triggerWrap": "\"{trigger}\"",
+  "triggerWrap": "‘{trigger}’",
   "unknownSize": "Onbekende grootte",
   "confirmInstallPluginTitle": "Plug-ininstallatie bevestigen",
   "updateAvailableCount": "{count} plug-inupdates beschikbaar",

@@ -11,5 +11,8 @@
   "setting.sofficePath.label": "Ejecutable de LibreOffice",
   "setting.sofficePath.description": "Solo es necesario para la exportación de informes a PDF y la vista previa de páginas; déjelo en blanco para probar las ubicaciones predeterminadas del sistema.",
   "tool.dpia_workbench_action.description": "Casos DPIA, materiales, confirmación de hechos, preguntas y respuestas, estado de ejecución y operaciones de informes. Solo para la interfaz del taller; la IA no debe invocar entradas de confirmación/aprobación manual.",
-  "tool.dpia_workbench_task.description": "Ejecute las tareas DPIA actualmente congeladas: context/read/write/script/commit/report; estrictamente limitado al proyecto del usuario actual y al directorio de salida del caso."
+  "tool.dpia_workbench_task.description": "Ejecute las tareas DPIA actualmente congeladas: context/read/write/script/commit/report; estrictamente limitado al proyecto del usuario actual y al directorio de salida del caso.",
+  "plugin": {
+    "author": "AI WorkDeck (Origen: Zhu Lingfeng / The-Data-Galaxy)"
+  }
 }

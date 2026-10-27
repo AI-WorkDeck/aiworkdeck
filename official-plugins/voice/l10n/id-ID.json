@@ -1,5 +1,5 @@
 {
   "plugin.name": "Suara & Ucapan",
-  "plugin.description": "Pembacaan langsung instan, kontrol kecepatan real-time, penyorotan subtitle, dan perekaman rapat.",
+  "plugin.description": "Baca nyaring instan, kontrol kecepatan real-time, sorotan teks, dan perekaman rapat.",
   "view.main.name": "Suara & Ucapan"
 }

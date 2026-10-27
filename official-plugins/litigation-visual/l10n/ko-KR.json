@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Litigation Visualization",
-  "plugin.description": "Select case materials to generate and manage editable litigation charts.",
-  "view.main.name": "Litigation Visualization"
+  "plugin.name": "소송 시각화",
+  "plugin.description": "소송 자료를 선택하여 편집 가능한 소송 차트를 생성하고 관리합니다.",
+  "view.main.name": "소송 시각화"
 }

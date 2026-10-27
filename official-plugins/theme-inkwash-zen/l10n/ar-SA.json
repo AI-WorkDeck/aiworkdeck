@@ -1,8 +1,8 @@
 {
-  "plugin.name": "Ink Wash Zen · Calligraphy Skin",
-  "plugin.desc": "Xuan paper whitespace, five-step ink wash hierarchy, and purple-ink focal accents across light and dark modes.",
-  "theme.name": "Ink Wash Zen",
-  "theme.desc": "Xuan Paper × Five-Tone Ink Wash × Purple Ink Drop × Cinnabar Seal",
+  "plugin.name": "زن غسيل الحبر · مظهر الخط العربي",
+  "plugin.desc": "مساحات بيضاء على ورق شيوان، تدرج هرمي بخمس درجات من الحبر، ولمسات تركيز بحبر بنفسجي في الوضعين الفاتح والداكن.",
+  "theme.name": "زن غسيل الحبر",
+  "theme.desc": "ورق شيوان × غسيل حبر بخمس درجات × قطرة حبر بنفسجية × ختم اليناعة الحمراء",
   "gallery.badge": "معرض السمات",
   "gallery.swatch1": "أبيض ورق الأرز",
   "gallery.swatch2": "حبر داكن",

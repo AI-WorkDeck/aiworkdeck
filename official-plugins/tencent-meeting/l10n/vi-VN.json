@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Tencent Meeting",
-  "plugin.description": "Connect Tencent Meeting to sync meetings and recordings on demand, view transcripts and smart minutes, archive to projects, and generate meeting minutes and action items. Requires the official tmeet CLI and account authorization.",
-  "tool.tencent_meeting_action.description": "Tencent Meeting plugin: check connection, authorize login, sync on demand, view meetings and transcripts, and archive project files."
+  "plugin.name": "Họp Tencent",
+  "plugin.description": "Kết nối Tencent Meeting để đồng bộ cuộc họp và bản ghi theo yêu cầu, xem bản ghi chép và biên bản thông minh, lưu trữ vào dự án, và tạo biên bản họp cùng các mục hành động. Yêu cầu CLI tmeet chính thức và xác thực tài khoản.",
+  "tool.tencent_meeting_action.description": "Plugin Tencent Meeting: kiểm tra kết nối, xác thực đăng nhập, đồng bộ theo yêu cầu, xem cuộc họp và bản ghi chép, và lưu trữ tệp dự án."
 }

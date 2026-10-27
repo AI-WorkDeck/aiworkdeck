@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Litigation Visualization",
-  "plugin.description": "Select case materials to generate and manage editable litigation charts.",
-  "view.main.name": "Litigation Visualization"
+  "plugin.name": "Trực quan hóa tố tụng",
+  "plugin.description": "Chọn tài liệu vụ án để tạo và quản lý biểu đồ tố tụng có thể chỉnh sửa.",
+  "view.main.name": "Trực quan hóa tố tụng"
 }

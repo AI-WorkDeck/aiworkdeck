@@ -1,5 +1,5 @@
 {
   "plugin.name": "收藏夾",
-  "plugin.description": "Search project favorites, copy, insert, or open sources.",
+  "plugin.description": "查找項目收藏，複製、插入或打開來源。",
   "view.main.name": "收藏夾"
 }

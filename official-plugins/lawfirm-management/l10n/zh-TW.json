@@ -1,4 +1,4 @@
 {
-  "plugin.name": "Law Firm Management",
-  "plugin.description": "Case intake & approval, regulatory-grade conflict-of-interest checks with collaborative clearance, billing & invoice ledger (manual reconciliation and Kingdee/Yonyou integration), and lawyer workload & executive dashboard."
+  "plugin.name": "律所管理",
+  "plugin.description": "律所收案立項、法規級利益衝突檢索與站內信協同放行、發票與財務收費台賬（支持手動核銷與金蝶/用友對接）、律師工作負荷與管理決策看板。"
 }

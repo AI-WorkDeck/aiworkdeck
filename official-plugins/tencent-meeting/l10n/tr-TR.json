@@ -1,5 +1,8 @@
 {
   "plugin.name": "Tencent Meeting",
   "plugin.description": "Toplantıları ve kayıtları talep üzerine eşitlemek, transkriptleri ve akıllı tutanakları görüntülemek, projelere arşivlemek ve toplantı tutanakları ile eylem maddeleri oluşturmak için Tencent Meeting'e bağlanın. Resmi tmeet CLI ve hesap yetkilendirmesi gerekir.",
-  "tool.tencent_meeting_action.description": "Tencent Meeting eklentisi: bağlantıyı kontrol edin, girişi yetkilendirin, talep üzerine eşitleyin, toplantıları ve transkriptleri görüntüleyin ve proje dosyalarını arşivleyin."
+  "tool.tencent_meeting_action.description": "Tencent Meeting eklentisi: bağlantıyı kontrol edin, girişi yetkilendirin, talep üzerine eşitleyin, toplantıları ve transkriptleri görüntüleyin ve proje dosyalarını arşivleyin.",
+  "plugin": {
+    "name": "Tencent Meeting"
+  }
 }

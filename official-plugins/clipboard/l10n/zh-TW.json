@@ -1,5 +1,5 @@
 {
   "plugin.name": "剪貼簿",
-  "plugin.description": "Search clipboard history, copy, and insert content.",
+  "plugin.description": "查找剪貼記錄、複製和插入內容。",
   "view.main.name": "剪貼簿"
 }
