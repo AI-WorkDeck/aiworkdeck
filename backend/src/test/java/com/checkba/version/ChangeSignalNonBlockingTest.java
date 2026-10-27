@@ -81,6 +81,7 @@ class ChangeSignalNonBlockingTest {
 
     @Test
     void lockClassificationFailuresKeepTheLatestActorAndAllowBackgroundRetry() {
+        when(repos.workTree(7L)).thenReturn(java.nio.file.Path.of(System.getProperty("java.io.tmpdir"), "signal-project"));
         when(repos.hasLocalRoot(7L))
                 .thenThrow(new IllegalStateException("first lookup failed"))
                 .thenThrow(new IllegalStateException("second lookup failed"))

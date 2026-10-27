@@ -31,7 +31,7 @@
           <text>{{ $t('editor.openFailed.retry') }}</text>
         </view>
       </view>
-      <view v-if="!previewReady && !openFailed" class="libre-loading-card">
+      <view v-if="(!previewReady || chromeInitFailed) && !openFailed" class="libre-loading-card">
         <view class="libre-doc-icon">
           <view class="doc-fold"></view>
           <view class="doc-line l1"></view>
@@ -52,9 +52,10 @@
         <text v-if="!stuck" class="libre-loading-hint">{{ $t('editor.firstOpenHint') }}</text>
         <!-- 引擎 boot 失败：说清楚原因，否则用户只看得到一根不动的进度条。 -->
         <text v-if="bootFailReason" class="libre-loading-error">{{ $t('editor.bootFailedHint', { reason: bootFailReason }) }}</text>
+        <text v-if="chromeInitFailed" class="libre-loading-error">{{ $t('editor.toolbar.viewPrefsFailed') }}</text>
         <!-- 同一阶段长时间无进展（大概率是下载/装载卡住）：给出可点的出路，
              而不是让用户对着一根不动的进度条干等。 -->
-        <view v-if="stuck" class="libre-loading-retry" @click="retryLoad">
+        <view v-if="stuck || chromeInitFailed" class="libre-loading-retry" @click="retryLoad">
           <text>{{ $t('editor.retryLoad') }}</text>
         </view>
       </view>
@@ -63,9 +64,7 @@
          compiler does not know the <webview> tag); it mounts into this host.
          审阅面板与画布并排（挤宽而非浮层）——webview 是独立合成层，浮层压在
          上面的行为不可靠。 -->
-    <!-- 自建工具栏（P2a）：只加不减——LO 自己的菜单栏/工具栏这一期原样保留，
-         等自建这套功能覆盖到位再谈隐藏（体验不能退步是硬约束）。
-         Calc/Impress 的命令面完全不同，先只给 Writer。 -->
+    <!-- 原生外壳先隐藏并核验，再显示正文和自建工具栏。设置中的原生菜单开关仍保留。 -->
     <!-- file 判空不能省：预热备胎（file=null）也会走到 ready，工具栏挂上去就会
          对着一个隐藏的空白实例白跑 get_ui_state/list_styles/list_fonts。 -->
     <EditorToolbar
@@ -113,7 +112,7 @@
         @navigate="onOfficeNavigate"
       />
       <view class="libre-canvas-wrap">
-        <view :id="hostId" class="libre-host"></view>
+        <view :id="hostId" class="libre-host" :class="{ 'libre-host-loading': loadingOverlayVisible }"></view>
         <!-- 改字 stale 提示条：绝对定位叠在画布顶部，非阻塞；不依赖审阅面板开着 -->
         <EvidenceStaleBar
           class="libre-stale-bar"
@@ -284,6 +283,8 @@ export default {
     return {
       hostId: 'libre-host-' + (++seq),
       ready: false,
+      chromeInitialized: false,
+      chromeInitFailed: false,
       // EvidenceLink 拖放：armed = 项目内有文件正在被拖（uni file-drag-start/end），
       // over = 指针正悬在本画布的接收层上（描边高亮）。
       evidenceDropArmed: false,
@@ -446,6 +447,9 @@ export default {
       return t === 'docx' || t === 'doc'
     },
     loadingOverlayVisible() {
+      // Model readiness precedes native menu hiding. Keep the guest covered
+      // until its own layout receipt confirms the initial chrome is hidden.
+      if (this.ready && !this.chromeInitialized && !this.docLoadFailed) return true
       // 「文档无法打开」是终态，但原因与出路（只读预览 / 下载 / 重试）只有这块地方能放；
       // 画布上是 boot 出来的空白原型，露出来只会让人以为文档是空的。
       if (this.statusKey === STATUS_OPEN_FAILED) return true
@@ -1102,6 +1106,9 @@ export default {
     // 不再自动重启第二次。「文档无法打开」终态上的重试同理（引擎拒收的文件重建引擎
     // 通常也没用，但那是用户明确要的，且能排除引擎自身被卡死的可能）。
     retryLoad() {
+      // The model is already loaded: retry only the failed display setup,
+      // never reload its bytes or alter its saving/dirty state.
+      if (this.chromeInitFailed) { this.prepareInitialChrome(); return }
       this.stuck = false
       this._stageChangedAt = Date.now()
       if (!this._endpointUp && this.statusKey === 'bootFailed') {
@@ -1159,6 +1166,8 @@ export default {
       // 崩溃自愈与 relay 超时自愈则必须靠它把加载面板重新亮出来。
       this._endpointUp = false
       this.ready = false
+      this.chromeInitialized = false
+      this.chromeInitFailed = false
       this.statusKey = 'booting'
       this.bootPct = 3
       this.bootCap = 12
@@ -1440,6 +1449,31 @@ export default {
     // 时才撤回失败态——世代号不符说明文档已切换/已重试/组件已卸载后订阅已断开
     // （dispose() 会取消订阅，届时这个回调根本不会再被触发），这些情形一律
     // 按兵不动，不能让一个作废的迟到结果去污染当前状态。
+    async prepareInitialChrome() {
+      const executor = this.executor, seq = this._docLoadSeq
+      if (!executor || this.chromeInitialized) return
+      if (!['writer', 'calc', 'impress'].includes(this.docKind)) {
+        this.chromeInitialized = true
+        return
+      }
+      try {
+        const res = await executor.executeCommand('set_chrome', {
+          menubar: false, statusbar: false, toolbars: false,
+          ...(this.docKind === 'calc' ? { sheetTabs: false } : {}),
+        })
+        if (executor !== this.executor || seq !== this._docLoadSeq) return
+        const applied = res?.applied
+        const hidden = res?.success && applied?.menubar === false && applied?.statusbar === false
+          && applied.toolbars && Object.values(applied.toolbars).every(value => value === false)
+          && (this.docKind !== 'calc' || applied.sheetTabs === false)
+        this.chromeInitialized = !!hidden
+        this.chromeInitFailed = !hidden
+      } catch (e) {
+        if (executor !== this.executor || seq !== this._docLoadSeq) return
+        this.chromeInitFailed = true
+        this.appendLog('initial chrome setup failed: ' + e)
+      }
+    },
     // After load_document retarget, LO LayoutManager resurrects native chrome.
     // Toolbar bootstrap only runs when executor identity changes — same-executor
     // loads (retry / late success) must re-hide here. Missing toolbar = no-op.
@@ -1460,6 +1494,7 @@ export default {
         this.docLoadFailed = false
         this.openFailCode = ''
         this.statusKey = 'ready'
+        this.prepareInitialChrome()
         this.initWritingAssistance()
         this.appendLog('迟到的 load_document 结果实际成功，撤回失败态 / late load_document result arrived successful, reverting loadFailed')
         this.$nextTick(() => { this.rehideChromeAfterRetarget?.() })
@@ -1543,6 +1578,10 @@ export default {
     // 装载 + 发布就绪。两个入口：onEndpointReady（常规：mount 时就有 file，或
     // 备胎空白 boot 完成），以及 file watcher（备胎在引擎就绪后被过继）。
     async finishDocLoad() {
+      if (!this.$refs?.toolbar) {
+        this.chromeInitialized = false
+        this.chromeInitFailed = false
+      }
       if (this._writingHost) { this._writingHost.destroy(); this._writingHost = null }
       if (this._inlineReviewHost) { this._inlineReviewHost.destroy(); this._inlineReviewHost = null }
       this.inlineReviewState = null
@@ -1603,6 +1642,8 @@ export default {
           this.appendLog('load_document failed: ' + msg)
         }
       }
+      if (!this.docLoadFailed) await this.prepareInitialChrome()
+      if (seq !== this._docLoadSeq) return
       this.bootPct = 100
       clearInterval(this._bootTimer)
       this.ready = true
@@ -2556,7 +2597,26 @@ export default {
           lease.setOperationId(pending.operationId)
           await this.uploadPendingLocalContent(pending)
         } else {
-          await this.uploadBytes(getFileWriteUrl(fileId) + (mustExist ? '?mustExist=1' : ''), u8, name)
+          const url = getFileWriteUrl(fileId) + (mustExist ? '?mustExist=1' : '')
+          // Only a confirmed pre-publication rejection is safe to retry. Keep the same export
+          // and save lease; re-exporting would freeze editing and could mix newer input into it.
+          for (let attempt = 0; ; attempt++) {
+            safeToOverwrite = false
+            try {
+              await this.uploadBytes(url, u8, name)
+              break
+            } catch (e) {
+              if (e?.saveNotPublished !== true || attempt >= 3) throw e
+              safeToOverwrite = true
+              this.appendLog('save waiting for version work; retry ' + (attempt + 1))
+              await new Promise(resolve => setTimeout(resolve, 1000))
+              if (this._reloading || this._saveDiscarded || this._pendingReload || this._checkpointInvalidated ||
+                  checkpointSaveBarrier(saveProjectId, fileId) ||
+                  documentCheckpointGeneration(saveProjectId, fileId) !== generation ||
+                  saveContext !== (this._backendSaveContext || 0) || this.file?.id !== fileId ||
+                  this.projectId !== saveProjectId) return false
+            }
+          }
         }
         safeToOverwrite = true
         this._savedOnce = true
@@ -2730,6 +2790,9 @@ export default {
 .libre-body { position: relative; flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: row; }
 .libre-canvas-wrap { position: relative; flex: 1; min-width: 0; min-height: 0; height: 100%; }
 .libre-host { width: 100%; height: 100%; }
+/* Preserve guest dimensions and painting while its independent compositing
+   layer is covered. display:none would suspend the editor's first layout. */
+.libre-host-loading { opacity: 0; pointer-events: none; }
 /* Explicit review overview overlays the native gutter without shrinking the canvas. */
 .libre-review-overview { position: absolute; top: 0; right: 0; bottom: 0; z-index: 30; max-width: 100%; box-shadow: -8px 0 24px #00000018; }
 /* 文件保存状态固定在工具栏下面，不随正文滚动。 */

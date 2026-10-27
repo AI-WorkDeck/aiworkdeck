@@ -180,6 +180,9 @@ rail 点击 → toggleLeftPane(key)（:2988）：staging 单独分支 → 把当
 
 ## 左栏入口（frontend/src/config/leftSidebarPlugins.js）
 
+**侧栏溢出（dev-board#1546）**：普通工具放在 `.rail-tools`，保留既有排序，独立纵向滚动；`.rail-footer` 固定暂存区、版本控制、项目成员和反馈。两区内按钮禁止 flex 压缩；不要给整个 `.left-rail` 加 overflow 裁剪，否则成员浮层会被裁掉。隔离布局验证：`node frontend/tests/project-home/rail-overflow-ui.mjs`（需 Chrome）；覆盖30工具、480/640/900窗口高度、滚动后点击末项与成员浮层，非正式客户端验收。
+
+
 **rail 从上到下的顺序就是 `LEFT_SIDEBAR_PLUGINS` 数组的顺序，只有这一个出处。**
 2026-08-19 起「项目概览」与「插件中心」也收进了数组——它们走的都是普通的
 `toggleLeftPane` 语义，单独硬编码成 rail 按钮只会让顺序有两个出处。
@@ -1579,3 +1582,8 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 - **随手工作区（`Project.SCRATCH = "SCRATCH"`）**：无项目态切入 `chat` 模式时，宿主调 `ensureScratchProject()`（`POST /api/projects/scratch` → `ProjectService.getOrCreateScratchProject`）幂等获取每用户唯一的隐形托管项目（`versionOptOut = true`，在 `getUserProjects` / 律所目录 / 冲突检索中过滤隐藏），原地绑定 `projectId` 并拉取会话与文件。顶栏与侧栏提供「转为正式项目」（`POST /api/projects/{id}/promote` → `ProjectService.promoteScratchProject`），原地将 `SCRATCH` 转为 `BLANK` 并解除 `versionOptOut`，文件与对话历史零迁移保留。
 - **轻量侧栏与按需画布（`ChatModeSidebar.vue`）**：`chat` 模式下隐藏 `.left-rail` 与 `.sidebar-left`，左侧挂载可折叠 `ChatModeSidebar.vue`（近期对话、当前工作区文稿 `+ Word` / `+ MD`、跨项目调取树 `getMyProjects` + 按需展开 `getProjectFiles(id, null, true)`）。`.workbench-main` 通过 CSS flex `order` 将 `.side-panel-ai` 置左、`.content-area` 置右：无打开文档时 `.side-panel-ai` 居中流式（`max-width: 840px`），`.content-area` 零宽隐藏保活；打开/新建文稿或 AI 产物时 `chatCanvasOpen = true` 自动展开右侧画布（标签栏附「收起画布」按钮）。
 - **验证**：`frontend/tests/project-home/chat-mode.test.mjs`、`npm --prefix frontend run check:nav`、`npm --prefix frontend run check:emits`、`Backend ScratchProjectAndCrossProjectReadTest`。
+
+
+### 插件入口按声明选择（dev-board#1531）
+
+`contributes.views: []` 不提供 rail、panel 或工作区。仅 workspace 的插件保留 rail，点击只打开/聚焦标签，不切换当前左栏；rail 高亮取真实工作区状态。仅 sidebar 不自动开标签，两者兼有可通过 SDK `ui.openWorkspace()` 打开自己的 workspace。缺省/null 沿用旧入口。新规则集中在 `utils/pluginViews.js` 与 `pluginWorkspaceTabs.js`，快照恢复及直达入口使用同一闸；每个视图按自己的 scope 检查项目上下文，不能借另一个 global 视图越过 project 限制。旧纯皮肤 gallery（无业务权限、工具及其他贡献）仅作预览，更新宿主即隐藏其入口并清理旧标签；非 gallery 的主题编辑器等业务视图仍按声明显示。
