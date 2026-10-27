@@ -17,12 +17,15 @@ final class ChineseNameRecognizer {
             + "总经理|董事长|经理|律师|证人|原告|被告|甲方|乙方|丙方|姓名|签名|签字|"
             + "出席人员|参会人员|股东|由|与|和|及|向|联系|通知|感谢|交给|委托)"
             + "\\h*(?:[（(](?:签字|签名)[）)]\\h*)?[:：]?\\h*(?:\\r?\\n\\h*)?");
-    // Numbering belongs to the party label, never to the person's name. Require
-    // a field separator so ordinary references to a numbered party remain prose.
-    private static final Pattern NUMBERED_PARTY = Pattern.compile(
-            "(?:原告|被告|申请人|被申请人|上诉人|被上诉人)\\h*"
-            + "(?:[0-9０-９一二三四五六七八九十百零〇两]+|[（(]\\h*[0-9０-９一二三四五六七八九十百零〇两]+\\h*[）)])"
-            + "\\h*[:：]\\h*(?:\\r?\\n\\h*)?");
+    // Explicit fields may carry party numbers and a bounded legal-role qualifier.
+    private static final Pattern PERSON_FIELD = Pattern.compile(
+            "(?:原告|被告|申请人|被申请人|上诉人|被上诉人|第三人|申请执行人|被执行人|"
+            + "姓名|曾用名|联系人|法定代表人|负责人|经办人|委托诉讼代理人|委托代理人|代理人|证人)"
+            + "\\h*(?:[0-9０-９一二三四五六七八九十百零〇两]+|[（(]\\h*[0-9０-９一二三四五六七八九十百零〇两]+\\h*[）)])?"
+            + "(?:\\h*[（(](?:自然人|反诉原告|反诉被告)[）)])?\\h*[:：]\\h*(?:\\r?\\n\\h*)?");
+    private static final Pattern SPACED_FIELD_NAME = Pattern.compile(
+            "[\\p{IsHan}](?:[ 　]*[\\p{IsHan}]){1,3}(?=[ 　]*(?:$|[，,。；;（(\\r\\n\\t])|"
+            + "\\h+[\\p{IsHan}]{1,12}\\h*[:：])");
     private static final Pattern DELIMITED = Pattern.compile("(?<![\\p{IsHan}A-Za-z0-9_])(?=[\\p{IsHan}])");
     private static final Pattern LIST_HEADER = Pattern.compile("(?:姓名|名单|人员|签名|签字|股东|联系人|原告|被告)[:：]");
     private static final Pattern PERSON_ACTION = Pattern.compile(
@@ -83,15 +86,27 @@ final class ChineseNameRecognizer {
             starts.set(prefix.end());
             if (!prefix.group().strip().matches("[由与和及向]")) fieldStarts.set(prefix.end());
         }
-        var party = NUMBERED_PARTY.matcher(text);
+        List<Span> result = new ArrayList<>();
+        BitSet spacedNames = new BitSet(text.length());
+        var party = PERSON_FIELD.matcher(text);
         while (party.find()) {
             starts.set(party.end());
             fieldStarts.set(party.end());
+            var spaced = SPACED_FIELD_NAME.matcher(text).region(party.end(), text.length());
+            if (spaced.lookingAt() && spaced.group().matches(".*[ 　].*")) {
+                // Block partial-name fallback even when the complete candidate is rejected.
+                spacedNames.set(spaced.start(), spaced.end());
+                String compact = spaced.group().replace(" ", "").replace("　", "");
+                if (SensitiveType.CHINESE_NAME.isPlausible(compact) && !NON_NAME.matcher(compact).find()
+                        && allowsOccurrence(text, spaced.start(), spaced.end(), protectedText)) {
+                    result.add(new Span(spaced.start(), spaced.end()));
+                }
+            }
         }
         var delimited = DELIMITED.matcher(text);
         while (delimited.find()) starts.set(delimited.start());
-        List<Span> result = new ArrayList<>();
         for (int start = starts.nextSetBit(0); start >= 0; start = starts.nextSetBit(start + 1)) {
+            if (spacedNames.get(start)) continue;
             int limit = start;
             while (limit < text.length() && limit - start < 4
                     && Character.UnicodeScript.of(text.charAt(limit)) == Character.UnicodeScript.HAN) limit++;
@@ -118,7 +133,12 @@ final class ChineseNameRecognizer {
                     if (lineEnd < 0) lineEnd = text.length();
                     boolean alone = text.substring(lineStart, start).isBlank()
                             && text.substring(end, lineEnd).matches("[\\h。.!！?？]*");
-                    boolean list = LIST_HEADER.matcher(text).region(Math.max(lineStart, start - 500), start).find();
+                    var header = LIST_HEADER.matcher(text).region(Math.max(lineStart, start - 500), start);
+                    boolean list = false;
+                    while (header.find()) {
+                        list = !text.substring(header.end(), start).matches(".*[:：（(].*");
+                    }
+                    if (Pattern.compile("\\h*[:：]").matcher(text).region(end, text.length()).lookingAt()) list = false;
                     if (!alone && !list) continue;
                 }
                 if (!allowsOccurrence(text, start, end, protectedText)) continue;

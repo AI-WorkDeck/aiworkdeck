@@ -102,6 +102,15 @@ public final class SensitiveTextEngine {
         List<Hit> suspectHits = new ArrayList<>();
         List<Hit> hits = detect(text, suspectHits);
         BitSet protectedNames = strategies.contains("CHINESE_NAME") ? ChineseNameRecognizer.protectedRanges(text) : new BitSet();
+        // A learned short name must not replace part of a longer preserved name.
+        for (String value : excluded) {
+            if (value.isEmpty()) continue;
+            int from = 0, at;
+            while ((at = text.indexOf(value, from)) >= 0) {
+                protectedNames.set(at, at + value.length());
+                from = at + value.length();
+            }
+        }
         known.forEach((value, code) -> {
             int from = 0, at;
             while ((at = text.indexOf(value, from)) >= 0) {
@@ -155,6 +164,8 @@ public final class SensitiveTextEngine {
         }
         return edits;
     }
+
+    public boolean accepts(String code, String value) { return strategies.contains(code) && !excluded.contains(value); }
 
     public String apply(String text) { return apply(text, edits(text)); }
     public Map<String, String> recovery() { return Map.copyOf(recovery); }
