@@ -99,4 +99,10 @@ class MobileCalendarServiceTest {
         service.replace(1L,"desktop","UTC",source,List.of(task));
         assertEquals("Review draft\nwith client",events().get(0).get("title"));
     }
+    @Test void truncationIsExplicitAndExactlyFiveThousandIsNotTruncated() {
+        var full=service.replace(1L,"desktop","UTC",source,List.of(task(null,"OPEN")),false);
+        assertEquals(false,full.get("truncated"));
+        var capped=service.replace(1L,"desktop","UTC",Instant.now().toString(),List.of(task(null,"OPEN")),true);
+        assertEquals(true,capped.get("truncated"));
+    }
 }

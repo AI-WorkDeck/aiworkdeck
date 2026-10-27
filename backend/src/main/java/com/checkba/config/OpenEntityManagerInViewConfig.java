@@ -48,7 +48,11 @@ public class OpenEntityManagerInViewConfig implements WebMvcConfigurer {
             // 整条流结束才还——池子默认 10 条，十来台桌面端同时在线就占满，与 D1 同一个病灶。
             // 护栏 DoorbellStreamPoolReleaseTest。
             "/api/mobile/desktop/stream",
-            "/api/projects/*/files/changes"
+            "/api/projects/*/files/changes",
+            // Synchronous model calls can hold a request for minutes; do not pin a pooled JDBC
+            // connection through chat or summary generation. Repository calls use their own transactions.
+            "/api/mobile/assistant/chat",
+            "/api/mobile/assistant/snapshots"
     };
 
     @Bean

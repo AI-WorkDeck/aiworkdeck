@@ -65,6 +65,12 @@ public class MobileCalendarService {
     @Transactional
     public Map<String,Object> replace(Long user, String device, String timeZone, String sourceUpdatedAt,
             List<Map<String,Object>> incoming) {
+        return replace(user, device, timeZone, sourceUpdatedAt, incoming, false);
+    }
+
+    @Transactional
+    public Map<String,Object> replace(Long user, String device, String timeZone, String sourceUpdatedAt,
+            List<Map<String,Object>> incoming, boolean truncated) {
         lock(user); requireEnabled(user);
         text(device,64,"deviceId");
         ZoneId zone;
@@ -129,7 +135,7 @@ public class MobileCalendarService {
         } catch(com.fasterxml.jackson.core.JsonProcessingException e) { throw new IllegalStateException(e); }
         row.setUserId(user); row.setDeviceId(device); row.setSourceUpdatedAt(source); row.setSyncedAt(Instant.now());
         snapshots.save(row);
-        return Map.of("accepted",true,"syncedAt",row.getSyncedAt().toString(),"count",events.size());
+        return Map.of("accepted",true,"syncedAt",row.getSyncedAt().toString(),"count",events.size(),"truncated",truncated);
     }
 
     @Transactional
