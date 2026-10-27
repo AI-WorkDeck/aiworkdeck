@@ -142,7 +142,7 @@
       :visible="dialogVisible"
       :mode="dialogMode"
       :task="editingTask"
-      :project-id="dialogMode === 'create' && filter.projectIds.length === 1 ? filter.projectIds[0] : scopedProjectId"
+      :project-id="dialogProjectId"
       :projects="projects"
       :preset-date="presetDate"
       :preset-time="presetTime"
@@ -170,7 +170,7 @@ import {
 import { taskStore, loadGlobal, updateTask, deleteTask, subscribe } from '@/utils/taskStore.js'
 import TaskDialog from './TaskDialog.vue'
 import CalendarSidebar from './Sidebar.vue'
-import { createCalendarWorkspaceState, yearMonths } from '@/components/calendar/workspaceState.js'
+import { createCalendarWorkspaceState, yearMonths, calendarCreateProjectId } from '@/components/calendar/workspaceState.js'
 import AwdSwitch from '@/components/AwdSwitch.vue'
 
 const VIEWS = [
@@ -254,6 +254,10 @@ export default {
     // 项目收窄：空串与 null 都当全局
     scopedProjectId() {
       return Number(this.projectId) > 0 ? this.projectId : null
+    },
+    dialogProjectId() {
+      return calendarCreateProjectId({ mode: this.dialogMode, filterProjectIds: this.filter.projectIds,
+        scopedProjectId: this.scopedProjectId, projects: this.projects })
     },
     typeMetas() {
       return TASK_TYPES.map((k) => typeMeta(k, (key) => this.$t(key)))

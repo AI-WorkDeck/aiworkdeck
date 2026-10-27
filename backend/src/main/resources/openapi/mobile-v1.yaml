@@ -752,16 +752,22 @@ components:
                       type: string
                     fileName:
                       type: string
+        truncated:
+          type: boolean
+          description: 桌面本次只同步前5000条；为true时客户端不得把快照当作完整历史
     MobileCalendarSnapshotResult:
       type: object
       required:
         - accepted
         - syncedAt
+        - truncated
       properties:
         accepted: *a1
         syncedAt:
           type: string
         count: *a3
+        truncated:
+          type: boolean
     MobileCalendarPushDevice:
       type: object
       required:

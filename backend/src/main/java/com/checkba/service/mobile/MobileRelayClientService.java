@@ -774,8 +774,13 @@ public class MobileRelayClientService {
                     .put("timeZone", java.time.ZoneId.systemDefault().getId())
                     .put("sourceUpdatedAt", java.time.Instant.now().toString());
             ArrayNode events = body.putArray("events");
+            boolean truncated = false;
             for (Project project : projects) {
                 for (Map<String, Object> task : mobileTasks.listByProject(project.getId(), null, null)) {
+                    if (events.size() >= 5000) {
+                        truncated = true;
+                        break;
+                    }
                     ObjectNode event = events.addObject().put("projectKey", project.getId().toString())
                             .put("taskId", String.valueOf(task.get("id"))).put("title", String.valueOf(task.get("title")))
                             .put("dueDate", String.valueOf(task.get("dueDate"))).put("status", String.valueOf(task.get("status")));
@@ -789,6 +794,8 @@ public class MobileRelayClientService {
                     }
                 }
             }
+            body.put("truncated", truncated);
+            if (truncated) log.warn("Mobile calendar snapshot limited to 5000 tasks");
             // Publish only a complete read. A failed project read must not erase the previous snapshot.
             workspaceJson(session, "PUT", "/api/mobile/calendar/snapshots", body);
         } catch (Exception e) {
@@ -807,6 +814,9 @@ public class MobileRelayClientService {
                     || !status.path("backupEnabled").asBoolean()) return;
             List<Project> projects = mobileWorkspaceProjects();
             if (projects.isEmpty()) return;
+            // Read the old summary set before replacing the directory, or deleted projects can
+            // no longer be found for cleanup. The local-empty guard above remains unchanged.
+            JsonNode summaries = workspaceJson(session, "GET", "/api/mobile/assistant/summaries", null);
             projects = pushWorkspaceDirectory(session, projects);
             requireCatalogAccountScope(session.scope());
             Set<String> keys = projects.stream().map(p -> p.getId().toString()).collect(java.util.stream.Collectors.toSet());
@@ -828,7 +838,6 @@ public class MobileRelayClientService {
                     log.warn("One mobile project summary pending retry ({})", e.getClass().getSimpleName());
                 }
             }
-            JsonNode summaries = workspaceJson(session, "GET", "/api/mobile/assistant/summaries", null);
             JsonNode list = summaries.isArray() ? summaries : summaries.path("summaries");
             for (JsonNode summary : list) if (deviceId().equals(summary.path("deviceId").asText())
                     && !keys.contains(summary.path("projectKey").asText()))
