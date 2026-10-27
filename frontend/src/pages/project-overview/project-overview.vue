@@ -2598,6 +2598,7 @@ import {
 } from '@/composables/useOptionalComponents.js'
 import { documentLinkPreviewMethods } from './documentLinkPreview.js'
 import DocumentLinkPreview from '@/components/DocumentLinkPreview.vue'
+import { useLitigationGeneration } from '@/composables/useLitigationGeneration.js'
 
 // 网页标签保活上限（只在 Web/H5 生效，桌面端保活是 BrowserView 的活，见 leftWebTabs）。
 // 为什么要有上限、而桌面端可以不要：从窗口摘下的 BrowserView 会被 Chromium 冻住渲染进程，
@@ -2608,6 +2609,9 @@ const WEB_KEEPALIVE_MAX = 5
 
 export default {
   mixins: [explorerRecordingMixin],
+  setup() {
+    return { requestLitigationGeneration: useLitigationGeneration() }
+  },
   // 工作台里渲染的组件（协作抽屉、加人弹窗……）要跳出工作台时，也得走同一个出口：
   // 先落盘再 reLaunch。组件拿不到页面实例，只能靠注入（check:nav 钉着）。
   // 要去的是设置页时不用离开：工作台里设置是一个标签（dev-board#582），组件走 openSettingsTab。
@@ -3390,6 +3394,7 @@ export default {
     // 当前左栏选中的动态插件（rail key = plugin-<id>）；决定走 iframe 还是启动面板
     pluginBusinessActions() {
       return {
+        litigationGeneration: (operation, params) => this.requestLitigationGeneration(operation, params),
         activeFileId: () => ((this.focusedPane === 'left' ? this.activeFileLeft : this.activeFileRight) || this.activeFileLeft)?.id,
         insertContent: payload => this.insertPlainTextToWps(payload),
         previewImage: url => this.openImagePreview(url),
@@ -5749,7 +5754,7 @@ export default {
       })
     },
 
-    async onPluginQuickAction({ prompt }) {
+    async onPluginChatPrompt({ prompt }) {
       if (!prompt) return
       const chat = await this.resolveChatInterface()
       if (!chat) return
@@ -5758,12 +5763,21 @@ export default {
 
     async handleLitigationOpenFile({ fileId }) {
       if (!fileId) return
+      const projectId = this.projectId
+      const sessionId = getSessionId()
+      const accountGeneration = getCloudAccountGeneration()
+      const isCurrent = () => projectId === this.projectId && sessionId === getSessionId()
+        && accountGeneration === getCloudAccountGeneration() && this.isActiveOverviewInstance()
       try {
-        const pid = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+        const pid = typeof projectId === 'string' ? Number(projectId) : projectId
         const file = await getFileDetail(pid, fileId)
-        if (file && file.id) this.openFile(file)
+        if (!isCurrent()) return
+        if (!file?.id) throw new Error(this.$t('workbench.openFailed'))
+        await this.openFile(file)
       } catch (e) {
+        if (!isCurrent()) return
         uni.showToast({ title: this.$t('workbench.openFailed'), icon: 'none' })
+        throw e
       }
     },
 
@@ -8060,7 +8074,7 @@ export default {
       }
     },
 
-    onPluginQuickAction(payload = {}) {
+    async onPluginQuickAction(payload = {}) {
       if (payload.pluginId) {
         this.openPluginTab(payload.pluginId)
       }
@@ -8078,6 +8092,7 @@ export default {
           }
         })
       }
+      if (payload.prompt) await this.onPluginChatPrompt(payload)
     },
 
     // 拉「哪些 skill 是启用的」，供左栏插件位过滤（诉讼可视化默认不安装，装了才显示）。
