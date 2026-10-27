@@ -2,10 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "themesTitle": "Temas de interfaz",
-  "themeSelect": "Aplicar tema",
-  "themeSelected": "Activo (pulse para el predeterminado)",
-  "themeNote": "Aplicar un tema actualiza los tokens de color semánticos en el espacio de trabajo, los plugins y la interfaz del editor, tanto en modo claro como oscuro.",
   "redactionEngineUpdateNotice": "Las reglas locales detectan automáticamente nombres de empresas y nombres chinos, con vistas previas, tokens y restauración. El motor se actualiza mediante parches de escritorio; reinstalar las instrucciones de las skills no lo actualiza.",
   "redactionEngineUpdateButton": "Comprobar actualizaciones del motor de censura",
   "heroWatermark": "E",
@@ -73,6 +69,10 @@ export default {
   "profileSelect": "Establecer como perfil predeterminado",
   "profileSelected": "Predeterminado actual (pulse para borrar)",
   "styleProfileNote": "Exports and standard formatting follow the selected profile; a project-level _模板/画像.json still takes precedence.",
+  "themesTitle": "Temas de interfaz",
+  "themeSelect": "Aplicar tema",
+  "themeSelected": "Activo (pulse para el predeterminado)",
+  "themeNote": "Aplicar un tema actualiza los tokens de color semánticos en el espacio de trabajo, los plugins y la interfaz del editor, tanto en modo claro como oscuro.",
   "revokedPrefix": "Eliminado por la plataforma: ",
   "enabledTag": "Activado",
   "disabledTag": "Desactivado",

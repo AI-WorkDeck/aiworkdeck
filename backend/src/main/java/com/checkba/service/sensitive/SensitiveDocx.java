@@ -46,7 +46,16 @@ public final class SensitiveDocx {
                     for (int i = 0; i < nodes.getLength(); i++) {
                         List<Node> texts = new ArrayList<>();
                         collect(nodes.item(i), texts, true);
-                        if (!texts.isEmpty()) paragraphs.add(texts);
+                        // Word separators are layout nodes, not text runs. Keep them in
+                        // the XML and end the recognition fragment at each boundary.
+                        List<Node> fragment = new ArrayList<>();
+                        for (Node node : texts) {
+                            if (Set.of("br", "cr", "tab").contains(node.getLocalName())) {
+                                if (!fragment.isEmpty()) paragraphs.add(fragment);
+                                fragment = new ArrayList<>();
+                            } else fragment.add(node);
+                        }
+                        if (!fragment.isEmpty()) paragraphs.add(fragment);
                     }
                 }
             }
@@ -56,7 +65,7 @@ public final class SensitiveDocx {
 
     private static void collect(Node node, List<Node> texts, boolean root) {
         if (!root && W.equals(node.getNamespaceURI()) && "p".equals(node.getLocalName())) return;
-        if (W.equals(node.getNamespaceURI()) && Set.of("t", "delText", "instrText").contains(node.getLocalName())) {
+        if (W.equals(node.getNamespaceURI()) && Set.of("t", "delText", "instrText", "br", "cr", "tab").contains(node.getLocalName())) {
             texts.add(node);
             return;
         }

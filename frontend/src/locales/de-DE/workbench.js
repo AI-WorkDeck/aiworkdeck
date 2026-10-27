@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "skinSectionTitle": "Design-Skin",
-  "skinDefaultName": "Orientalische Gelassenheit (Standard)",
   "restartPending": "{count} Aufgaben können fortgesetzt werden",
   "restartContinue": "Fortsetzen: {name}",
   "restartRestoring": "Das ursprüngliche Gespräch und Dokument werden wiederhergestellt…",
@@ -118,6 +116,8 @@ export default {
   "appearanceLight": "Hell",
   "appearanceDark": "Dunkel",
   "appearanceSystem": "System folgen",
+  "skinSectionTitle": "Design-Skin",
+  "skinDefaultName": "Orientalische Gelassenheit (Standard)",
   "walletChipTitle": "Guthaben und Mitgliedschaftsstufe; klicken, um die Kontoeinstellungen zu öffnen",
   "walletMenuLabel": "Konto und Nutzung",
   "trialInfo": "Über die Testversion",

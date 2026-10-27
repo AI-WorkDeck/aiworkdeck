@@ -157,5 +157,16 @@ export default {
   "paneEmptyMonth": "這個月沒有事項",
   "paneEmptyFile": "這份文件還沒有關聯事項",
   "railScheduleTitle": "日程（逾期 {overdue} · 今天 {today}）",
-  "tabName": "日程"
+  "tabName": "日程",
+  "workspaceAll": "全部專案",
+  "workspaceCurrent": "目前專案",
+  "workspaceUpcoming": "近期待辦",
+  "workspaceDays": "近 {count} 天",
+  "workspaceRetry": "重新載入",
+  "workspaceOverdue": "已逾期 {count} 項",
+  "workspaceNoUpcoming": "近 {count} 天沒有待辦",
+  "workspaceLinked": "篩選與右側日曆同步；點擊事項查看詳情。",
+  "workspaceDay": "日",
+  "workspaceYear": "年",
+  "workspaceEventCount": "{count} 項事項"
 }

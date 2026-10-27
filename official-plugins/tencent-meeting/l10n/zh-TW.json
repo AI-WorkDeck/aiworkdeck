@@ -1,5 +1,17 @@
 {
   "plugin.name": "騰訊會議",
   "plugin.description": "連接騰訊會議，按需同步會議與錄制、查看逐字稿和智能紀要，歸檔到項目並生成會議紀要及待辦。需安裝騰訊會議官方 tmeet CLI 並完成賬號授權。",
-  "tool.tencent_meeting_action.description": "騰訊會議插件：檢查連接、用戶授權登錄、按需同步、查看會議及逐字稿、歸檔項目文件。"
+  "tool.tencent_meeting_action.description": "騰訊會議插件：檢查連接、用戶授權登錄、按需同步、查看會議及逐字稿、歸檔項目文件。",
+  "panel.refreshList": "重新整理",
+  "panel.selectMeeting": "選擇一場會議",
+  "panel.backToList": "返回列表",
+  "panel.meetingCount": "場會議",
+  "panel.connectInSidebar": "請在左側連接騰訊會議",
+  "panel.loadingList": "正在讀取會議列表…",
+  "panel.loadingDetail": "正在讀取會議內容…",
+  "panel.syncing": "正在同步會議…",
+  "panel.exporting": "正在儲存會議資料…",
+  "panel.preparingAi": "正在準備會議資料並交給 AI…",
+  "view.account.name": "騰訊會議",
+  "view.meetings.name": "騰訊會議"
 }

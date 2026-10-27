@@ -2,10 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "themesTitle": "Giao diện UI (Skin)",
-  "themeSelect": "Áp dụng skin",
-  "themeSelected": "Đang hoạt động (nhấn để về mặc định)",
-  "themeNote": "Áp dụng skin sẽ cập nhật các token màu ngữ nghĩa trên toàn bộ workbench, plugin và giao diện trình soạn thảo ở cả chế độ Sáng và Tối.",
   "redactionEngineUpdateNotice": "Quy tắc cục bộ tự động phát hiện tên công ty và tên tiếng Trung, với bản xem trước, token và khôi phục. Công cụ được cập nhật qua bản vá desktop; cài đặt lại hướng dẫn kỹ năng không cập nhật công cụ này.",
   "redactionEngineUpdateButton": "Kiểm tra cập nhật công cụ che chắn dữ liệu",
   "heroWatermark": "E",
@@ -73,6 +69,10 @@ export default {
   "profileSelect": "Đặt làm hồ sơ mặc định",
   "profileSelected": "Mặc định hiện tại (nhấn để xóa)",
   "styleProfileNote": "Exports and standard formatting follow the selected profile; a project-level _模板/画像.json still takes precedence.",
+  "themesTitle": "Giao diện UI (Skin)",
+  "themeSelect": "Áp dụng skin",
+  "themeSelected": "Đang hoạt động (nhấn để về mặc định)",
+  "themeNote": "Áp dụng skin sẽ cập nhật các token màu ngữ nghĩa trên toàn bộ workbench, plugin và giao diện trình soạn thảo ở cả chế độ Sáng và Tối.",
   "revokedPrefix": "Đã bị xóa bởi nền tảng: ",
   "enabledTag": "Đã bật",
   "disabledTag": "Đã tắt",

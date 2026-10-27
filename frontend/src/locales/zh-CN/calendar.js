@@ -208,4 +208,15 @@ export default {
   railScheduleTitle: '日程（逾期 {overdue} · 今天 {today}）',
   // 工作台中栏「日程」标签（dev-board#1048）
   tabName: '日程',
+  "workspaceAll": "全部项目",
+  "workspaceCurrent": "当前项目",
+  "workspaceUpcoming": "近期待办",
+  "workspaceDays": "近 {count} 天",
+  "workspaceRetry": "重新加载",
+  "workspaceOverdue": "已逾期 {count} 项",
+  "workspaceNoUpcoming": "近 {count} 天没有待办",
+  "workspaceLinked": "筛选与右侧日历同步；点击事项查看详情。",
+  "workspaceDay": "日",
+  "workspaceYear": "年",
+  "workspaceEventCount": "{count} 项事项",
 }

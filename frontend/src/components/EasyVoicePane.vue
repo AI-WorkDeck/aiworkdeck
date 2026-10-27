@@ -73,7 +73,6 @@
         @tap="handleGenerate" @keydown="onActionKey($event, handleGenerate, startDisabled)" :disabled="startDisabled">
         {{ startLabel }}
       </button>
-      <text v-if="!canReadText && !reading.segments.length" class="field-hint">{{ $t('panels.evEnterTextHint') }}</text>
     </view>
 
     <view v-if="reading.segments.length" class="section result-area">
@@ -498,7 +497,7 @@ export default {
 .easy-voice-pane {
   height: 100%;
   min-width: 0;
-  background: var(--awd-surface);
+  background: var(--awd-bg);
   color: var(--awd-text);
   box-sizing: border-box;
   container-type: inline-size;

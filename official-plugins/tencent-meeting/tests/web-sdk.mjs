@@ -43,6 +43,7 @@ async function host(options = {}) {
     push({ awd: 1, type: 'result', seq: message.seq, ok: true, result });
   }
   dom.window.eval(read('awd-plugin-sdk.js'));
+  dom.window.eval(read('panel-l10n.js'));
   dom.window.eval(read('panel.js'));
   push({ awd: 1, type: 'init', context }); await tick();
   const $ = (id) => dom.window.document.getElementById(id);

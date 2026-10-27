@@ -2,10 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "themesTitle": "Arayüz temaları",
-  "themeSelect": "Temayı uygula",
-  "themeSelected": "Etkin (varsayılan için dokunun)",
-  "themeNote": "Bir tema uygulamak, hem Açık hem de Koyu modda çalışma alanı, eklentiler ve düzenleyici genelindeki anlamsal renk belirteçlerini günceller.",
   "redactionEngineUpdateNotice": "Yerel kurallar, önizleme, token ve geri yükleme özellikleriyle şirketleri ve Çince adları otomatik olarak algılar. Motor masaüstü yamalarıyla güncellenir; beceri talimatlarının yeniden yüklenmesi motoru güncellemez.",
   "redactionEngineUpdateButton": "Sansür motoru güncellemelerini kontrol et",
   "heroWatermark": "E",
@@ -73,6 +69,10 @@ export default {
   "profileSelect": "Varsayılan profil olarak ayarla",
   "profileSelected": "Mevcut varsayılan (temizlemek için dokunun)",
   "styleProfileNote": "Exports and standard formatting follow the selected profile; a project-level _模板/画像.json still takes precedence.",
+  "themesTitle": "Arayüz temaları",
+  "themeSelect": "Temayı uygula",
+  "themeSelected": "Etkin (varsayılan için dokunun)",
+  "themeNote": "Bir tema uygulamak, hem Açık hem de Koyu modda çalışma alanı, eklentiler ve düzenleyici genelindeki anlamsal renk belirteçlerini günceller.",
   "revokedPrefix": "Platform tarafından kaldırıldı: ",
   "enabledTag": "Etkin",
   "disabledTag": "Devre dışı",

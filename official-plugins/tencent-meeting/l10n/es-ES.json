@@ -1,5 +1,17 @@
 {
   "plugin.name": "Reunión de Tencent",
   "plugin.description": "Conecte Tencent Meeting para sincronizar reuniones y grabaciones a demanda, ver transcripciones y actas inteligentes, archivar en proyectos y generar actas de reunión y tareas. Requiere el CLI oficial tmeet y la autorización de la cuenta.",
-  "tool.tencent_meeting_action.description": "Plugin de Tencent Meeting: comprobar la conexión, autorizar el inicio de sesión, sincronizar a demanda, ver reuniones y transcripciones y archivar archivos del proyecto."
+  "tool.tencent_meeting_action.description": "Plugin de Tencent Meeting: comprobar la conexión, autorizar el inicio de sesión, sincronizar a demanda, ver reuniones y transcripciones y archivar archivos del proyecto.",
+  "panel.refreshList": "Actualizar",
+  "panel.selectMeeting": "Seleccionar una reunión",
+  "panel.backToList": "Volver a las reuniones",
+  "panel.meetingCount": "reuniones",
+  "panel.connectInSidebar": "Conecta Tencent Meeting en la barra lateral",
+  "panel.loadingList": "Cargando reuniones…",
+  "panel.loadingDetail": "Cargando contenido de la reunión…",
+  "panel.syncing": "Sincronizando reuniones…",
+  "panel.exporting": "Guardando material de la reunión…",
+  "panel.preparingAi": "Preparando material de la reunión para la IA…",
+  "view.account.name": "Tencent Meeting",
+  "view.meetings.name": "Tencent Meeting"
 }

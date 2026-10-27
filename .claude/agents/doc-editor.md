@@ -623,3 +623,11 @@ IME 光标定位优先用 `XController.getViewData()` 的实时分号数据与 V
 - 宿主只读状态/导航/字体/缩略图不更新编辑空闲计时；真实 guest 键盘、指针与滚轮事件以及 modified 更新交互时间。保存屏障、修改后再次标脏、失败暂停、版本恢复保护仍保留。
 - `OfficeNavigation` 合并在途读取，切页直接使用返回清单；工具栏状态提供当前页/表及数量。普通修改只失效当前页，未知/结构变化保守失效全部。缩略图仅可见项加一个邻项、逐项让出事件循环；输入、未保存、保存中不启动新图，每次开工前复核。单页在途时再次修改须丢弃旧图并重画，不能将旧结果重新标为最新。
 - 回归：`tests/lowa-unit/clipboard-selection.test.mjs`、`tests/revision-view/clipboard-errors.test.mjs`、`tests/toolbar/office-navigation-scheduling.test.mjs`、`open-critical-path.test.mjs`。组件/模拟事件测试不等于 macOS 实际中文候选窗测试。
+
+## 首次显示的原生菜单隐藏屏障（dev-board#1530）
+
+`LibreOfficeEditor.finishDocLoad` 在真实模型装载后、发布 `ready` 前调用 `prepareInitialChrome`；初始 `set_chrome` 必须回报菜单、状态栏、各工具栏均不可见，Calc 还须确认原生 sheet tabs 不可见。仅 `success:true` 不够。`chromeInitialized` 独立于 `ready`/`docLoadFailed`：隐藏失败保留加载遮罩并提供仅重试显示设置的入口，不重载已打开字节、不把显示失败误判成文档装载失败、也不改变保存闸或脏标记。此时 `ready` 仍表示模型能执行命令，AI 编辑与正常保存不因显示失败停用；不能把它当成用户已看到正文的信号。执行器与装载世代不符的迟到回执不得放开新文档。
+
+加载中的 guest 容器用 `opacity:0;pointer-events:none` 隐藏独立合成层，保持真实尺寸与布局，不用 `display:none` 或固定延时。空白与备胎也先准备；备胎过继时重新确认新布局。已有工具栏的就地重载继续按 `reapplyChrome` 保留用户当前原生菜单逃生开关，首次确认不能把该开关强行关闭。工具栏字体/样式清单继续后台读取，不参与这一显示屏障。
+
+回归：`tests/toolbar/first-paint-chrome.test.mjs`（真实组件方法的延迟/失败/旧世代/备胎/逃生开关，`CHROME_EDITOR_SOURCE` 可还原旧源码负对照）；`tests/lowa-e2e/first-paint-chrome.mjs` 使用实际 Vue 显示门与 LOWA，覆盖四种冷启动、原生可见性读回、逐帧 CSS 状态及前后截图。后者是小宿主验证，不等同完整工作台、正式 Electron 或 Windows；实际运行结果以本卡落实记录为准。

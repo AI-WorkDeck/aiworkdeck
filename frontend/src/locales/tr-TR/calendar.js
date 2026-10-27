@@ -157,5 +157,16 @@ export default {
   "paneEmptyMonth": "Bu ay görev yok",
   "paneEmptyFile": "Bu dosyaya bağlı henüz görev yok",
   "railScheduleTitle": "Zamanlama ({overdue} gecikmiş · {today} bugün)",
-  "tabName": "Zamanlama"
+  "tabName": "Zamanlama",
+  "workspaceAll": "Tüm projeler",
+  "workspaceCurrent": "Geçerli proje",
+  "workspaceUpcoming": "Yaklaşan işler",
+  "workspaceDays": "Önümüzdeki {count} gün",
+  "workspaceRetry": "Yeniden yükle",
+  "workspaceOverdue": "{count} gecikmiş",
+  "workspaceNoUpcoming": "Önümüzdeki {count} gün için iş yok",
+  "workspaceLinked": "Filtreler takvimle eşitlenir. Ayrıntılar için bir öğe seçin.",
+  "workspaceDay": "Gün",
+  "workspaceYear": "Yıl",
+  "workspaceEventCount": "{count} öğe"
 }

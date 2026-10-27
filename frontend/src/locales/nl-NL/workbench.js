@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "skinSectionTitle": "Thema-skin",
-  "skinDefaultName": "Oosterse sereniteit (standaard)",
   "restartPending": "{count} taken kunnen worden hervat",
   "restartContinue": "Doorgaan: {name}",
   "restartRestoring": "Oorspronkelijk gesprek en document worden hersteld…",
@@ -118,6 +116,8 @@ export default {
   "appearanceLight": "Licht",
   "appearanceDark": "Donker",
   "appearanceSystem": "Systeem volgen",
+  "skinSectionTitle": "Thema-skin",
+  "skinDefaultName": "Oosterse sereniteit (standaard)",
   "walletChipTitle": "Credit saldo en lidmaatschapsniveau; klik om accountinstellingen te openen",
   "walletMenuLabel": "Account en gebruik",
   "trialInfo": "Over de proefversie",

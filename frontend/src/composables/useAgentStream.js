@@ -15,19 +15,18 @@ import { createLegacyAskUserMarkup } from './legacyAskUserMarkup.mjs'
 import { isUserQuestionAwaiting } from './awaitingInput.mjs'
 import { applyInboxReceipt, applyInboxSnapshot, applyInputApplied, createInboxState, markInboxEvent, removeInboxItem, replaceInboxItem } from './agentInboxState.mjs'
 
-// 网络恢复/页面回前台时触发重连的激活实例指针（模块级单例）。
-// 页面栈会多次实例化本 composable（PR#148 重复订阅地雷），window 监听只挂一次，
-// 回调经该指针分发到最近建连的实例。
-let activeNetworkRecoveryHook = null
+// window 监听只挂一次，各活跃会话分别登记恢复回调。工作台的后台出图与
+// 右侧聊天可以同时连接，不能让最后建连的实例夺走其他会话的恢复入口。
+const activeNetworkRecoveryHooks = new Set()
 if (typeof window !== 'undefined' && !window.__awdSseNetworkHooks) {
     window.__awdSseNetworkHooks = true
     window.addEventListener('online', () => {
-        if (activeNetworkRecoveryHook) activeNetworkRecoveryHook('network-online')
+        for (const hook of activeNetworkRecoveryHooks) hook('network-online')
     })
     if (typeof document !== 'undefined') {
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible' && activeNetworkRecoveryHook) {
-                activeNetworkRecoveryHook('page-visible')
+            if (document.visibilityState === 'visible') {
+                for (const hook of activeNetworkRecoveryHooks) hook('page-visible')
             }
         })
     }
@@ -173,8 +172,7 @@ export function useAgentStream() {
     // Abort Controllers
     let sseAbortController = null
     let messageAbortController = null
-    // 本实例最近一次挂上模块级单例的网络恢复回调（卸载时据此判断单例是不是自己的，
-    // 无条件置空会踩掉后挂载实例的重连入口）
+    // 本实例的网络恢复回调；切会话/卸载只移除自身，不影响并行会话。
     let myNetworkRecoveryHook = null
 
     // --- 断线自动重连状态（F-05）---
@@ -395,6 +393,8 @@ export function useAgentStream() {
         console.log('[AgentStream] Resetting SSE state')
         if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
         stopHeartbeatMonitor()
+        if (myNetworkRecoveryHook) activeNetworkRecoveryHooks.delete(myNetworkRecoveryHook)
+        myNetworkRecoveryHook = null
         // Abort any existing connections
         if (sseAbortController) {
             try { sseAbortController.abort() } catch (e) { }
@@ -648,6 +648,9 @@ export function useAgentStream() {
 
                 clearTimeout(connectTimer) // 仅限制响应头等待，不限制长时间流式任务
                 if (!response.ok) throw new Error(`SSE Connection Failed: ${response.status}`)
+                if (sseAbortController !== myController || myController.signal.aborted) {
+                    throw new DOMException('Aborted', 'AbortError')
+                }
 
                 isConnected.value = true
                 streamOpened = true
@@ -658,11 +661,13 @@ export function useAgentStream() {
                 linkStatus.value = { state: 'live', attempt: 0 }
                 lastSseActivityAt = Date.now()
                 startHeartbeatMonitor()
-                // 网络恢复/回前台时经模块级单例回调触发本实例重连
-                myNetworkRecoveryHook = (reason) => {
-                    if (!isConnected.value && currentConversationId.value) scheduleReconnect(reason)
+                // 重连复用同一回调，避免每次连接都留下一个过期闭包。
+                if (!myNetworkRecoveryHook) {
+                    myNetworkRecoveryHook = (reason) => {
+                        if (!isConnected.value && currentConversationId.value) scheduleReconnect(reason)
+                    }
+                    activeNetworkRecoveryHooks.add(myNetworkRecoveryHook)
                 }
-                activeNetworkRecoveryHook = myNetworkRecoveryHook
                 resolve()
 
                 // 建连即补拉一次在跑的后台任务：background_task_start 只在任务起跑那一刻发一次，
@@ -989,7 +994,6 @@ export function useAgentStream() {
             // POST 已经受理，现在才等建连——多半早就连上了（两件事是并行跑的）。
             // 仍然要等：建连失败必须照旧抛出去走同一条错误处置，
             // 否则用户会看到「消息发出去了，但界面永远停在等待」。
-            await connectPromise
             const receipt = responseBody && responseBody.data ? responseBody.data : responseBody
             if (!receipt || receipt.status !== 'accepted' || !receipt.messageId) {
                 throw new Error(t('agentStream.chatRequestFailed', { status: chatResp.status }))
@@ -998,6 +1002,8 @@ export function useAgentStream() {
             // The request still belongs to the captured conversation even if the user opened
             // another chat while HTTP was in flight. Return its receipt to the sender, but do
             // not let that late completion repopulate the newly selected conversation.
+            if (currentConversationId.value !== conversationId) return receipt
+            await connectPromise
             if (currentConversationId.value !== conversationId) return receipt
 
             const entry = applyInboxReceipt(inboxState, receipt, {
@@ -1782,6 +1788,9 @@ export function useAgentStream() {
             }
         } else if (evt === 'cancelled') {
             // 处理取消事件
+            agentRunStatus.value = 'CANCELLED'
+            agentAwaitingInput.value = false
+            agentPaused.value = null
             console.log('[SSE] Received cancelled event')
             flushRemainingBuffer()
             clearDocStreamingPlaceholder(currentAssistantBubble.value)
@@ -2837,16 +2846,14 @@ export function useAgentStream() {
     // 组件卸载时收尾：SSE reader 循环、心跳 interval、待触发的重连定时器都活在闭包里，
     // 页面被销毁（工作台的跳转一律 reLaunch，整个页面栈都拆掉）后它们不会自己停。
     // 后果不只是白耗流量：僵尸实例还会 scheduleReconnect，与新挂载的实例轮流把对方
-    // 从同一会话的 SSE 上挤下去。activeNetworkRecoveryHook 是模块级单例，
-    // 只有它当前指向本实例时才置空，否则会踩掉后挂载实例的重连入口。
+    // 从同一会话的 SSE 上挤下去。resetSSE 同时移除本实例的网络恢复回调，
+    // 保留其他活跃会话的恢复入口。
     if (getCurrentInstance()) {
         onUnmounted(() => {
             if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
             // 先清会话 id：scheduleReconnect 与重连回调都以它为准，置空即断掉续命链
             currentConversationId.value = null
             stopHeartbeatMonitor()
-            if (activeNetworkRecoveryHook === myNetworkRecoveryHook) activeNetworkRecoveryHook = null
-            myNetworkRecoveryHook = null
             resetSSE()
         })
     }

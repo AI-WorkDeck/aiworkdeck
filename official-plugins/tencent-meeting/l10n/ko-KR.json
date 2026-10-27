@@ -1,5 +1,17 @@
 {
   "plugin.name": "Tencent 회의",
   "plugin.description": "Tencent Meeting을 연결하여 회의 및 녹화를 온디맨드로 동기화하고, 녹취록과 스마트 회의록을 확인하고, 프로젝트에 보관하며, 회의록과 실행 항목을 생성합니다. 공식 tmeet CLI 및 계정 인증이 필요합니다.",
-  "tool.tencent_meeting_action.description": "Tencent Meeting 플러그인: 연결 확인, 로그인 인증, 온디맨드 동기화, 회의 및 녹취록 확인, 프로젝트 파일 보관."
+  "tool.tencent_meeting_action.description": "Tencent Meeting 플러그인: 연결 확인, 로그인 인증, 온디맨드 동기화, 회의 및 녹취록 확인, 프로젝트 파일 보관.",
+  "panel.refreshList": "새로고침",
+  "panel.selectMeeting": "회의 선택",
+  "panel.backToList": "회의 목록으로",
+  "panel.meetingCount": "개의 회의",
+  "panel.connectInSidebar": "사이드바에서 Tencent Meeting을 연결하세요",
+  "panel.loadingList": "회의 목록 불러오는 중…",
+  "panel.loadingDetail": "회의 내용 불러오는 중…",
+  "panel.syncing": "회의 동기화 중…",
+  "panel.exporting": "회의 자료 저장 중…",
+  "panel.preparingAi": "AI에 전달할 회의 자료 준비 중…",
+  "view.account.name": "Tencent Meeting",
+  "view.meetings.name": "Tencent Meeting"
 }

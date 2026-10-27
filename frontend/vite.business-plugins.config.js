@@ -6,6 +6,7 @@ import { resolve } from 'node:path'
 import { readdir } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { baseCompile } from '@intlify/message-compiler'
+import { SUPPORTED_LOCALE_CODES } from './src/locales/registry.js'
 // Vite module IDs use forward slashes even when node:path resolves Windows paths.
 const normalizePath = path => path.replace(/\\/g, '/')
 const root = normalizePath(resolve(__dirname))
@@ -19,8 +20,8 @@ export default defineConfig({
   plugins: [{
     name: 'business-plugin-import-boundary', enforce: 'pre',
     resolveId(id) { if (id === 'virtual:business-messages') return '\0business-messages' },
-    async load(id) {
-      if (id !== '\0business-messages') return
+    async load(moduleId) {
+      if (moduleId !== '\0business-messages') return
       const compile = value => typeof value === 'string' ? '(' + baseCompile(value, { mode: 'normal' }).code + ')'
         : Array.isArray(value) ? '[' + value.map(compile).join(',') + ']'
           : value && typeof value === 'object' ? '{' + Object.entries(value).map(([key, child]) => JSON.stringify(key) + ':' + compile(child)).join(',') + '}' : JSON.stringify(value)
@@ -35,12 +36,9 @@ export default defineConfig({
         clipboard: ['common', 'panels', 'config', 'onboarding'],
       }[id]
       const locales = {}
-      const localesRoot = resolve(root, 'src/locales')
-      for (const entry of await readdir(localesRoot, { withFileTypes: true })) {
-        if (!entry.isDirectory()) continue
-        const language = entry.name
+      for (const language of SUPPORTED_LOCALE_CODES) {
         locales[language] = {}
-        const dir = resolve(localesRoot, language)
+        const dir = resolve(root, 'src/locales', language)
         const files = pluginNamespaces ? pluginNamespaces.map(ns => ns + '.js') : (await readdir(dir)).filter(f => f.endsWith('.js'))
         for (const file of files) locales[language][file.slice(0, -3)] = (await import(pathToFileURL(resolve(dir, file)).href)).default
       }

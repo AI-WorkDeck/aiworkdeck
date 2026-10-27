@@ -157,5 +157,16 @@ export default {
   "paneEmptyMonth": "Aucune tâche ce mois-ci",
   "paneEmptyFile": "Aucune tâche liée à ce fichier pour le moment",
   "railScheduleTitle": "Planning ({overdue} en retard · {today} aujourd'hui)",
-  "tabName": "Planning"
+  "tabName": "Planning",
+  "workspaceAll": "Tous les projets",
+  "workspaceCurrent": "Projet actuel",
+  "workspaceUpcoming": "À venir",
+  "workspaceDays": "{count} prochains jours",
+  "workspaceRetry": "Recharger",
+  "workspaceOverdue": "{count} en retard",
+  "workspaceNoUpcoming": "Aucune échéance dans les {count} prochains jours",
+  "workspaceLinked": "Les filtres sont synchronisés avec le calendrier. Sélectionnez un élément pour voir les détails.",
+  "workspaceDay": "Jour",
+  "workspaceYear": "Année",
+  "workspaceEventCount": "{count} éléments"
 }

@@ -157,5 +157,16 @@ export default {
   "paneEmptyMonth": "Không có tác vụ nào trong tháng này",
   "paneEmptyFile": "Chưa có tác vụ nào liên kết với tệp này",
   "railScheduleTitle": "Lịch trình ({overdue} quá hạn · {today} hôm nay)",
-  "tabName": "Lịch trình"
+  "tabName": "Lịch trình",
+  "workspaceAll": "Tất cả dự án",
+  "workspaceCurrent": "Dự án hiện tại",
+  "workspaceUpcoming": "Sắp tới",
+  "workspaceDays": "{count} ngày tới",
+  "workspaceRetry": "Tải lại",
+  "workspaceOverdue": "{count} mục quá hạn",
+  "workspaceNoUpcoming": "Không có việc đến hạn trong {count} ngày tới",
+  "workspaceLinked": "Bộ lọc đồng bộ với lịch. Chọn một mục để xem chi tiết.",
+  "workspaceDay": "Ngày",
+  "workspaceYear": "Năm",
+  "workspaceEventCount": "{count} mục"
 }

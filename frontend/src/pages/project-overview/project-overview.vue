@@ -331,6 +331,7 @@
     <view class="main-layout" :class="{ 'is-compact': isCompactLayout }">
       <!-- Cursor 风格：最左常驻栏（Activity Bar） -->
       <view class="left-rail">
+        <view class="rail-tools" tabindex="0">
         <!-- rail 的顺序就是 config/leftSidebarPlugins.js 里数组的顺序（项目概览 →
              资源管理器 → 插件中心 → 语音 → 脱敏 → 门控项）。
              2026-08-19 起「项目概览」和「插件中心」也在这个数组里：它们走的都是
@@ -339,7 +340,7 @@
           v-for="p in LEFT_SIDEBAR_PLUGINS"
           :key="p.key"
           class="rail-btn"
-          :class="{ active: ((leftPaneKey === p.key || (p.key === 'files' && isExplorerPane)) && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned), 'is-movable': isMovablePanel(p.key), 'is-sortable': !isClientView, 'rail-dragging': draggingRailKey === p.key }"
+          :class="{ active: (p.isDynamic && p.hasDeclaredViews && !p.sidebarView && workspaceTabState('plugin', p.pluginId) === 'active') || ((leftPaneKey === p.key || (p.key === 'files' && isExplorerPane)) && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned), 'is-movable': isMovablePanel(p.key), 'is-sortable': !isClientView, 'rail-dragging': draggingRailKey === p.key }"
           :title="p.label"
           :draggable="!isClientView"
           @tap="onRailBtnTap(p.key)"
@@ -394,8 +395,10 @@
 
         <!-- 整理模式开关已挪到顶栏 header-tools（dev-board#221，原在 rail 上太显眼） -->
 
-        <!-- Spacer -->
-        <view style="flex: 1"></view>
+        </view>
+
+        <!-- 项目操作常驻底部，不随上方工具列表滚动。成员浮层须能向右展开。 -->
+        <view class="rail-footer">
 
         <!-- Staging Area (Moved to bottom)：暂存区挂在项目下（.stagezone），无项目态不给 -->
         <view
@@ -512,7 +515,7 @@
             </svg>
           </view>
         </view>
-
+        </view>
       </view>
 
       <!-- File Picker Dialog (for EasyVoice Import) -->
@@ -849,10 +852,12 @@
             :key="activeDynamicPlugin.pluginId + ':' + activeDynamicPlugin.version + ':' + activeDynamicPlugin.sidebarView.id"
             :business-actions="pluginBusinessActions"
             :url="activeDynamicPlugin.sidebarView.url"
+            surface="sidebar"
             :plugin-id="activeDynamicPlugin.pluginId"
             :permissions="activeDynamicPlugin.permissions || []"
             :project-id="activeDynamicPlugin.sidebarView.scope === 'global' ? null : projectId"
             :get-active-editor="getPluginActiveEditor"
+            :active-file-ids="messageActiveFileIds"
             :add-file-to-ai="onPluginAddFileToAi"
             :dev-installed="!!activeDynamicPlugin.devInstalled"
             @files-changed="onArchiveExtracted"
@@ -895,24 +900,6 @@
 
         <!-- 拖拽手柄 -->
         <view class="resize-handle" :title="$t('workbench.resizePanel')" @touchstart="startResize('left', $event)" @mousedown="startResize('left', $event)"></view>
-      </view>
-
-      <!-- 外缘把手独立于侧栏裁剪区，保留窄幅空间以免遮挡编辑器和原生浏览器。 -->
-      <view v-if="!sidebarCollapsed" class="sidebar-collapse-anchor">
-        <view
-          class="sidebar-collapse-tab"
-          role="button"
-          tabindex="0"
-          :aria-label="$t('workbench.collapseSidebar')"
-          :title="$t('workbench.collapseSidebar')"
-          @tap.stop="toggleSidebar"
-          @keydown.enter.prevent="toggleSidebar"
-          @keydown.space.prevent="toggleSidebar"
-        >
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M14 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </view>
       </view>
 
       <ChatModeSidebar
@@ -1209,12 +1196,20 @@
                       :permissions="entry.plugin.permissions || []"
                       :project-id="entry.plugin.workspaceView?.scope === 'global' ? null : projectId"
                       :get-active-editor="getPluginActiveEditor"
+                      :active-file-ids="messageActiveFileIds"
                       :add-file-to-ai="onPluginAddFileToAi"
                       @files-changed="onArchiveExtracted"
                       :dev-installed="!!entry.plugin.devInstalled"
                       @kickoff="onPluginQuickAction"
                     />
                     <PluginGuidePane v-else :plugin="entry.plugin" @kickoff="onPluginQuickAction" />
+                  </view>
+                  <view v-for="tab in leftFiles.filter(item => item.tabType === 'builtin-workflow-settings')"
+                    :key="'workflow-left-' + tab.id"
+                    v-show="activeFileLeft && activeFileLeft.id === tab.id"
+                    class="pane-content">
+                    <BuiltinWorkflowEditor :project-id="projectId" :request="tab.workflowRequest"
+                      @close="closeFile(tab.id, 'left')" />
                   </view>
                   <view v-if="activeFileLeft && activeFileLeft.tabType === 'plugin' && !leftPluginTabs.some(entry => entry.tab.id === activeFileLeft.id)" class="pane-content plugin-workspace-pending">
                     <text>{{ $t('panels.pgWorkspacePending') }}</text>
@@ -1231,7 +1226,7 @@
                     @extracted="onArchiveExtracted"
                     @locator-consumed="onLocatorConsumed"
                   />
-                  <view v-if="activeFileLeft && activeFileLeft.tabType !== 'plugin' && !useLibreEditor(activeFileLeft) && !isBrowserTab(activeFileLeft) && !isPdfPreviewFile(activeFileLeft)" class="pane-content">
+                  <view v-if="activeFileLeft && activeFileLeft.tabType !== 'plugin' && activeFileLeft.tabType !== 'builtin-workflow-settings' && !useLibreEditor(activeFileLeft) && !isBrowserTab(activeFileLeft) && !isPdfPreviewFile(activeFileLeft)" class="pane-content">
                     <MarkdownPreview
                       v-if="isMarkdownTab(activeFileLeft)"
                       :content="activeFileLeft.content"
@@ -1281,7 +1276,7 @@
                       :key="activeFileLeft.id"
                       :version-spec="activeFileLeft.versionSpec"
                     />
-                    <MessageCenterPane v-else-if="activeFileLeft.tabType === 'message-center'" :current-project-id="projectId" :initial-conversation-id="activeFileLeft.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" />
+                    <MessageCenterPane v-else-if="activeFileLeft.tabType === 'message-center'" :current-project-id="projectId" :active-file-ids="messageActiveFileIds" :initial-conversation-id="activeFileLeft.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" />
                     <DdClientWorkspace v-else-if="activeFileLeft.tabType === 'dd-client'" :navigation-target="activeFileLeft.ddClientTarget || null" />
                     <DdRequestEditor
                       v-else-if="isDdRequest(activeFileLeft)"
@@ -1480,12 +1475,20 @@
                       :permissions="entry.plugin.permissions || []"
                       :project-id="entry.plugin.workspaceView?.scope === 'global' ? null : projectId"
                       :get-active-editor="getPluginActiveEditor"
+                      :active-file-ids="messageActiveFileIds"
                       :add-file-to-ai="onPluginAddFileToAi"
                       @files-changed="onArchiveExtracted"
                       :dev-installed="!!entry.plugin.devInstalled"
                       @kickoff="onPluginQuickAction"
                     />
                     <PluginGuidePane v-else :plugin="entry.plugin" @kickoff="onPluginQuickAction" />
+                  </view>
+                  <view v-for="tab in rightFiles.filter(item => item.tabType === 'builtin-workflow-settings')"
+                    :key="'workflow-right-' + tab.id"
+                    v-show="activeFileRight && activeFileRight.id === tab.id"
+                    class="pane-content">
+                    <BuiltinWorkflowEditor :project-id="projectId" :request="tab.workflowRequest"
+                      @close="closeFile(tab.id, 'right')" />
                   </view>
                   <view v-if="activeFileRight && activeFileRight.tabType === 'plugin' && !rightPluginTabs.some(entry => entry.tab.id === activeFileRight.id)" class="pane-content plugin-workspace-pending">
                     <text>{{ $t('panels.pgWorkspacePending') }}</text>
@@ -1502,7 +1505,7 @@
                     @extracted="onArchiveExtracted"
                     @locator-consumed="onLocatorConsumed"
                   />
-                  <view v-if="activeFileRight && activeFileRight.tabType !== 'plugin' && !useLibreEditor(activeFileRight) && !isBrowserTab(activeFileRight) && !isPdfPreviewFile(activeFileRight)" class="pane-content">
+                  <view v-if="activeFileRight && activeFileRight.tabType !== 'plugin' && activeFileRight.tabType !== 'builtin-workflow-settings' && !useLibreEditor(activeFileRight) && !isBrowserTab(activeFileRight) && !isPdfPreviewFile(activeFileRight)" class="pane-content">
                     <MarkdownPreview
                       v-if="isMarkdownTab(activeFileRight)"
                       :content="activeFileRight.content"
@@ -1544,7 +1547,7 @@
                       :key="activeFileRight.id"
                       :version-spec="activeFileRight.versionSpec"
                     />
-                    <MessageCenterPane v-else-if="activeFileRight.tabType === 'message-center'" :current-project-id="projectId" :initial-conversation-id="activeFileRight.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" />
+                    <MessageCenterPane v-else-if="activeFileRight.tabType === 'message-center'" :current-project-id="projectId" :active-file-ids="messageActiveFileIds" :initial-conversation-id="activeFileRight.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" />
                     <DdClientWorkspace v-else-if="activeFileRight.tabType === 'dd-client'" :navigation-target="activeFileRight.ddClientTarget || null" />
                     <DdRequestEditor
                       v-else-if="isDdRequest(activeFileRight)"
@@ -1719,10 +1722,12 @@
             :key="activeBottomDynamicPlugin.pluginId + ':' + activeBottomDynamicPlugin.version + ':' + activeBottomDynamicPlugin.sidebarView.id"
             :business-actions="pluginBusinessActions"
             :url="activeBottomDynamicPlugin.sidebarView.url"
+            surface="sidebar"
             :plugin-id="activeBottomDynamicPlugin.pluginId"
             :permissions="activeBottomDynamicPlugin.permissions || []"
             :project-id="activeBottomDynamicPlugin.sidebarView.scope === 'global' ? null : projectId"
             :get-active-editor="getPluginActiveEditor"
+            :active-file-ids="messageActiveFileIds"
             :add-file-to-ai="onPluginAddFileToAi"
             :dev-installed="!!activeBottomDynamicPlugin.devInstalled"
             @files-changed="onArchiveExtracted"
@@ -1791,6 +1796,7 @@
               <ChatInterface
                 v-if="hasProject"
                 ref="chatInterface"
+                :visible="showAiPanel && rightPaneKey === 'ai'"
                 :onVnodeMounted="notifyRestartRecovery"
                 :project-id="String(projectId)"
                 :project-name="isLooseWorkspace ? $t('workbench.looseFiles') : project.name"
@@ -1829,10 +1835,12 @@
               :key="activeRightDynamicPlugin.pluginId + ':' + activeRightDynamicPlugin.version + ':' + activeRightDynamicPlugin.sidebarView.id"
             :business-actions="pluginBusinessActions"
             :url="activeRightDynamicPlugin.sidebarView.url"
+            surface="sidebar"
             :plugin-id="activeRightDynamicPlugin.pluginId"
             :permissions="activeRightDynamicPlugin.permissions || []"
             :project-id="activeRightDynamicPlugin.sidebarView.scope === 'global' ? null : projectId"
             :get-active-editor="getPluginActiveEditor"
+            :active-file-ids="messageActiveFileIds"
             :add-file-to-ai="onPluginAddFileToAi"
             :dev-installed="!!activeRightDynamicPlugin.devInstalled"
             @files-changed="onArchiveExtracted"
@@ -2362,7 +2370,7 @@ import { registerQuitSave, unregisterQuitSave } from '@/utils/desktopQuitGuard.j
 import { claimRestartStartup, createRestartRecovery } from './restartRecovery.js'
 import { flushActiveDocument } from './flushActiveDocument.js'
 import { isTabVisibleInPane } from './tabVisibility.js'
-import { pickActiveContextTab, isContextEligibleTab } from './activeTabContext.js'
+import { pickActiveContextTab, isContextEligibleTab, messageContextFileIds } from './activeTabContext.js'
 import { readActiveSelection } from './activeSelectionContext.js'
 import { nativeDataTransfer, captureDroppedFiles, isExternalFileDrag, compatibleDropEffect } from '@/utils/fileTreeExternalDrop.js'
 import { consumePluginImDrag } from '@/utils/pluginImDrag.js'
@@ -2383,8 +2391,10 @@ import QuickLookDialog from '@/components/QuickLookDialog.vue'
 import VariablePanel from '@/components/VariablePanel.vue'
 import EvidenceMethodBar from '@/components/EvidenceMethodBar.vue'
 import FileStagingArea from '@/components/FileStagingArea.vue'
+import BuiltinWorkflowEditor from '@/components/BuiltinWorkflowEditor.vue'
+import { builtinWorkflowTabMethods } from './builtinWorkflowTab.js'
 import PluginPane from '@/components/PluginPane.vue' // Added
-import { pluginViews, isGlobalPlugin } from '@/utils/pluginViews.js'
+import { pluginViews, isGlobalPlugin, hasPluginNavigation, hasPluginPanel, isLegacyThemeGallery } from '@/utils/pluginViews.js'
 import PluginGuidePane from '@/components/PluginGuidePane.vue'
 import PluginWorkspaceSummary from '@/components/PluginWorkspaceSummary.vue'
 import PluginDevPanel from '@/components/PluginDevPanel.vue'
@@ -2591,6 +2601,7 @@ import {
 } from '@/composables/useOptionalComponents.js'
 import { documentLinkPreviewMethods } from './documentLinkPreview.js'
 import DocumentLinkPreview from '@/components/DocumentLinkPreview.vue'
+import { useLitigationGeneration } from '@/composables/useLitigationGeneration.js'
 
 // 网页标签保活上限（只在 Web/H5 生效，桌面端保活是 BrowserView 的活，见 leftWebTabs）。
 // 为什么要有上限、而桌面端可以不要：从窗口摘下的 BrowserView 会被 Chromium 冻住渲染进程，
@@ -2601,6 +2612,9 @@ const WEB_KEEPALIVE_MAX = 5
 
 export default {
   mixins: [explorerRecordingMixin],
+  setup() {
+    return { requestLitigationGeneration: useLitigationGeneration() }
+  },
   // 工作台里渲染的组件（协作抽屉、加人弹窗……）要跳出工作台时，也得走同一个出口：
   // 先落盘再 reLaunch。组件拿不到页面实例，只能靠注入（check:nav 钉着）。
   // 要去的是设置页时不用离开：工作台里设置是一个标签（dev-board#582），组件走 openSettingsTab。
@@ -2608,6 +2622,7 @@ export default {
     return {
       leaveWorkbench: (url) => this.leaveWorkbench(url),
       openSettingsTab: (opts) => this.openSettingsTab(opts || {}),
+      openWorkflowEditorTab: (request) => this.openWorkflowEditorTab(request),
       // 日程标签（dev-board#1048）：项目面板、设置里的「个人 → 事项」等子组件开日程不离开工作台
       openCalendarTab: (opts) => this.openCalendarTab(opts || {}),
     }
@@ -2643,6 +2658,7 @@ export default {
     ChatInterface,
     ChatModeSidebar,
     MarkdownPreview,
+    BuiltinWorkflowEditor,
     PluginPane, // Added
     PluginGuidePane,
     PluginWorkspaceSummary,
@@ -2747,6 +2763,7 @@ export default {
       // 工作台唯一的 TaskDialog 的状态（dev-board#899），见 openTaskDialog
       taskDialog: { visible: false, mode: 'create', task: null, presetFileIds: [] },
       // 日程面板按文件过滤（文件右键「查看事项 (N)」），null = 不过滤
+      calendarWorkspaceState: null,
       calendarFileFilter: null,
       calendarFileFilterName: '',
       // 单文件历史：右键「这份文件的历史」时设置，version 面板据此只显示这份文件的版本
@@ -3032,6 +3049,7 @@ export default {
     }
   },
   computed: {
+    messageActiveFileIds() { return messageContextFileIds(this) },
     // 标签快照的变化信号（dev-board#1049）：只读快照白名单字段，所以名字、网页地址、分屏、
     // 激活标签变了会触发写，编辑器内部状态不会
     tabSnapshotSignature() {
@@ -3184,12 +3202,12 @@ export default {
       // 动态插件与项目面板一律不上 rail——它们都带着 projectId 干活。
       if (user?.role === 'CLIENT') return getPluginsForUser('CLIENT')
       if (!this.hasProject || this.isLooseWorkspace) {
-        const globals = [...LEFT_SIDEBAR_PLUGINS.filter(p => isPaneAllowedWithoutProject(p.key)), ...this.dynamicPlugins.filter(p => !p.isThemePlugin && isGlobalPlugin(p))]
+        const globals = [...LEFT_SIDEBAR_PLUGINS.filter(p => isPaneAllowedWithoutProject(p.key)), ...this.dynamicPlugins.filter(p => hasPluginNavigation(p) && isGlobalPlugin(p))]
         return this.applyRailOrder(this.applyPanelDocks(globals).filter(p => isPaneAllowedWithoutProject(p.key) || isGlobalPlugin(p)))
       }
       const base = (user && user.role === 'CLIENT')
         ? getPluginsForUser('CLIENT')
-        : [...getPluginsForUser(user && user.role, { cloudTrack: this.ddCloudTrack }), ...this.dynamicPlugins.filter(p => !p.isThemePlugin)]
+        : [...getPluginsForUser(user && user.role, { cloudTrack: this.ddCloudTrack }), ...this.dynamicPlugins.filter(p => hasPluginNavigation(p))]
       // 声明了 requiresSkill 的插件位（诉讼可视化）跟着 skill 启停走：默认不安装，
       // 用户在广场里装了才出现在左栏。
       //
@@ -3381,10 +3399,12 @@ export default {
     // 当前左栏选中的动态插件（rail key = plugin-<id>）；决定走 iframe 还是启动面板
     pluginBusinessActions() {
       return {
+        litigationGeneration: (operation, params) => this.requestLitigationGeneration(operation, params),
         activeFileId: () => ((this.focusedPane === 'left' ? this.activeFileLeft : this.activeFileRight) || this.activeFileLeft)?.id,
         insertContent: payload => this.insertPlainTextToWps(payload),
         previewImage: url => this.openImagePreview(url),
         copyText: text => this.insertClipboardAndCopy(text),
+        calendarWorkspace: params => this.calendarWorkspace(params),
         openProject: payload => this.onCalendarOpenProject(payload),
         openTaskFile: payload => this.onCalendarOpenFile(payload),
         insightContext: () => ({ docFileId: this.insightDocFileId, docName: this.insightDocName, canWrite: this.canWriteProject, cursorContext: this.insightCursorContext }),
@@ -3394,6 +3414,10 @@ export default {
         insightHover: payload => this.openInsightHoverCard(payload),
         insightOpenDoc: payload => this.openInsightDocFile(payload),
         openBrowser: url => this.openBrowserTab(url),
+        openPluginWorkspace: pluginId => {
+          const plugin = this.dynamicPlugins.find(p => p.pluginId === pluginId)
+          return !!plugin?.workspaceView && this.openPluginTab(pluginId) === true
+        },
         openConversation: async conversation => {
           if (!await this.resolveChatInterface()) return false
           return this.loadHistoryChat(conversation)
@@ -3454,7 +3478,7 @@ export default {
     activeBottomDynamicPlugin() { return this.dynamicPlugins.find(p => p.key === this.activeToolKey) || null },
     activeDynamicPlugin() {
       if (!this.leftPaneKey) return null
-      return this.dynamicPlugins.find(p => p.key === this.leftPaneKey) || null
+      return this.dynamicPlugins.find(p => p.key === this.leftPaneKey && hasPluginPanel(p)) || null
     },
     isExplorerPane() {
       return this.leftPaneKey === 'files' || this.leftPaneKey === 'plugin-search'
@@ -4765,6 +4789,7 @@ export default {
     ...calendarTabMethods,
     ...pluginWorkspaceTabMethods,
     ...tmeetTabMethods,
+    ...builtinWorkflowTabMethods,
     ...tabSnapshotMethods,
     ...documentLinkPreviewMethods,
     initRestartRecovery(query) {
@@ -5735,7 +5760,7 @@ export default {
       })
     },
 
-    async onPluginQuickAction({ prompt }) {
+    async onPluginChatPrompt({ prompt }) {
       if (!prompt) return
       const chat = await this.resolveChatInterface()
       if (!chat) return
@@ -5744,12 +5769,21 @@ export default {
 
     async handleLitigationOpenFile({ fileId }) {
       if (!fileId) return
+      const projectId = this.projectId
+      const sessionId = getSessionId()
+      const accountGeneration = getCloudAccountGeneration()
+      const isCurrent = () => projectId === this.projectId && sessionId === getSessionId()
+        && accountGeneration === getCloudAccountGeneration() && this.isActiveOverviewInstance()
       try {
-        const pid = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+        const pid = typeof projectId === 'string' ? Number(projectId) : projectId
         const file = await getFileDetail(pid, fileId)
-        if (file && file.id) this.openFile(file)
+        if (!isCurrent()) return
+        if (!file?.id) throw new Error(this.$t('workbench.openFailed'))
+        await this.openFile(file)
       } catch (e) {
+        if (!isCurrent()) return
         uni.showToast({ title: this.$t('workbench.openFailed'), icon: 'none' })
+        throw e
       }
     },
 
@@ -6057,8 +6091,7 @@ export default {
       const layout = sidebar?.parentElement
       if (!layout?.clientWidth) return
       const rail = layout.querySelector('.left-rail')
-      const collapseAnchor = layout.querySelector('.sidebar-collapse-anchor')
-      const fit = fitPanelWidths(layout.clientWidth - (collapseAnchor?.offsetWidth || 0), rail?.offsetWidth || 0,
+      const fit = fitPanelWidths(layout.clientWidth, rail?.offsetWidth || 0,
         this.sidebarCollapsed ? 0 : this.sidebarWidth, this.showAiPanel ? this.aiPanelWidth : 0)
       if (!this.sidebarCollapsed) this.sidebarWidth = fit.left
       if (this.showAiPanel) this.aiPanelWidth = fit.right
@@ -7994,8 +8027,9 @@ export default {
               isDynamic: true,
               // 有真正的前端入口才走 iframe（PluginPane）；纯工具/skill 插件走宿主渲染的
               // 启动面板（PluginGuidePane）——否则点开只有一句「未配置入口地址」。
-              hasFrontend: !!frontendEntry,
-              isThemePlugin: Array.isArray(p?.contributes?.themes) && p.contributes.themes.length > 0 && !views.some(view => view.placement === 'sidebar'),
+              hasFrontend: !!(views.find(view => view.placement === 'workspace')?.url || frontendEntry),
+              hasDeclaredViews: Array.isArray(p?.contributes?.views),
+              legacyThemeGallery: isLegacyThemeGallery(p),
               views,
               sidebarView: views.find(view => view.placement === 'sidebar') || null,
               workspaceView: views.find(view => view.placement === 'workspace') || null,
@@ -8046,7 +8080,7 @@ export default {
       }
     },
 
-    onPluginQuickAction(payload = {}) {
+    async onPluginQuickAction(payload = {}) {
       if (payload.pluginId) {
         this.openPluginTab(payload.pluginId)
       }
@@ -8064,6 +8098,7 @@ export default {
           }
         })
       }
+      if (payload.prompt) await this.onPluginChatPrompt(payload)
     },
 
     // 拉「哪些 skill 是启用的」，供左栏插件位过滤（诉讼可视化默认不安装，装了才显示）。

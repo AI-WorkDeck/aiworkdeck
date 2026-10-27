@@ -97,3 +97,13 @@ test('host sidebar visibility follows matching sync and restores fallback for th
   props.plugin = { pluginId: 'other-plugin' }; await Vue.nextTick()
   assert.deepEqual(hostEvents.at(-1).payload, { pluginId: 'project-im', command: 'host-sidebar', projectId: 2, visible: false })
 })
+
+test('project assistant shortcut opens private context even when a shared project group exists', async t => {
+ const agent={scope:'project',scopeKey:'project:7',legacyScopeKey:'local-marker',name:'项目助手'}
+ const {host,vm,events}=await mount(t,[agent])
+ vm.conversations=[{id:'group',type:'GROUP',agent:{scope:'project',scopeKey:'project:7',private:false}}];await Vue.nextTick()
+ host.querySelector('.pws-agent-entry').click();await Vue.nextTick()
+ assert.equal(events.at(-1).private,true)
+ vm.conversations.push({id:'private',type:'AGENT_DIRECT',agent:{scope:'project',scopeKey:'local-marker',private:true}});await Vue.nextTick()
+ assert.equal(host.querySelector('.pws-agent-entry'),null)
+})

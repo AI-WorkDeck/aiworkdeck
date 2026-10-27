@@ -33,7 +33,7 @@ function setup(overrides = {}, config = {}) {
   const make = new Function(...Object.keys(deps), body)(...Object.values(deps))
   const service = make({ projectId: () => project, permissions: () => permissions, isCurrent: () => current,
     listFiles: async () => [{ id: 70, name: 'Contract' }, { id: 71, name: 'Folder', isFolder: true }],
-    openFile: record('openFile'), actions: Object.fromEntries(['insertContent', 'previewImage', 'openBrowser', 'copyText', 'openProject', 'openTaskFile', 'openAccount'].map(name => [name, record(name)])) })
+    openFile: record('openFile'), actions: Object.fromEntries(['insertContent', 'previewImage', 'openBrowser', 'copyText', 'openProject', 'openTaskFile', 'openAccount', 'calendarWorkspace'].map(name => [name, record(name)])) })
   return { ...service, calls, emitted, project: value => { project = value }, current: value => { current = value }, permissions: value => { permissions = value } }
 }
 const rejects = (promise, code) => assert.rejects(promise, error => error.code === code)
@@ -219,4 +219,14 @@ test('scoped calendar retains directory metadata instead of SDK flat file projec
   const tree = [{ id: 70, name: 'Contract', parentId: 71 }, { id: 71, name: 'Evidence', isFolder: true }, { id: 72, name: '__staging_area__', isFolder: true }, { id: 73, name: 'Hidden', parentId: 72 }]
   const s = setup({ getProjectFiles: async () => tree })
   assert.deepEqual(await s.request('calendar', 'files', { projectId: 7 }), tree)
+})
+
+
+test('calendar workspace operation retains the tasks permission gate and sends only fixed presentation parameters', async () => {
+  const service = setup({}, { global: true })
+  await service.request('calendar', 'workspace', { patch: { projectIds: ['7'] }, open: true, arbitrary: 'ignored' })
+  assert.deepEqual(service.calls, [['calendarWorkspace', { patch: { projectIds: ['7'] }, open: true }]])
+  service.permissions([])
+  await rejects(service.request('calendar', 'workspace', { open: true }), 'permission_denied')
+  assert.equal(service.calls.length, 1)
 })

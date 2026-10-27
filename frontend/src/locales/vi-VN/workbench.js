@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "skinSectionTitle": "Giao diện chủ đề",
-  "skinDefaultName": "Oriental Serenity (Mặc định)",
   "restartPending": "{count} tác vụ có thể tiếp tục",
   "restartContinue": "Tiếp tục: {name}",
   "restartRestoring": "Đang khôi phục cuộc trò chuyện và tài liệu gốc…",
@@ -118,6 +116,8 @@ export default {
   "appearanceLight": "Sáng",
   "appearanceDark": "Tối",
   "appearanceSystem": "Theo hệ thống",
+  "skinSectionTitle": "Giao diện chủ đề",
+  "skinDefaultName": "Oriental Serenity (Mặc định)",
   "walletChipTitle": "Số dư tín dụng và cấp thành viên; nhấp để mở cài đặt tài khoản",
   "walletMenuLabel": "Tài khoản và mức sử dụng",
   "trialInfo": "Giới thiệu về bản dùng thử",

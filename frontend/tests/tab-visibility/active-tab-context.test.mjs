@@ -80,3 +80,13 @@ test('两侧都空时返回 null', () => {
   assert.equal(pickActiveContextTab({ focusedPane: 'left', activeFileLeft: null, activeFileRight: null }), null)
   assert.equal(pickActiveContextTab({}), null)
 })
+
+
+test('assistant keeps two real open documents after switching to its workspace', async () => {
+  const { messageContextFileIds } = await import('../../src/pages/project-overview/activeTabContext.js')
+  const leftFiles = [{ id: 7, fileType: 'docx' }, { id: 8, fileType: 'pdf' }, { id: 9, tabType: 'plugin' }]
+  assert.deepEqual(messageContextFileIds({ focusedPane: 'left', activeFileLeft: leftFiles[0], leftFiles }), ['7', '8'])
+  assert.deepEqual(messageContextFileIds({ focusedPane: 'left', activeFileLeft: leftFiles[2], leftFiles }), ['8', '7'])
+  assert.deepEqual(messageContextFileIds({ leftFiles: [{ id: 'artifact-1', fileType: 'md' }, { id: 9, tabType: 'cross-project-preview' }] }), [])
+  assert.deepEqual(messageContextFileIds({}), [])
+})

@@ -56,7 +56,11 @@ class FileContentCoordinationTest {
         document = directory.resolve("note.txt");
         Files.writeString(document, "old");
         when(storage.getSize(anyString())).thenAnswer(i -> Files.size(document));
-        sessions = spy(new WorkSessionService(mock(ProjectRepoService.class), mock(ProjectTreeManifestService.class),
+        var roots = mock(ProjectStorageResolver.class);
+        when(roots.hasLocalRootForVersionLock(anyLong())).thenReturn(true);
+        when(roots.projectRoot(anyLong())).thenAnswer(i -> directory.resolve("project-" + i.getArgument(0)));
+        var repos = new ProjectRepoService(roots);
+        sessions = spy(new WorkSessionService(repos, mock(ProjectTreeManifestService.class),
                 mock(WorkSessionRepository.class), mock(TaskScheduler.class), files, event -> {}));
         doNothing().when(sessions).onChangeSignal(anyLong(), any(), any());
         controller = new FileController();
@@ -91,6 +95,27 @@ class FileContentCoordinationTest {
             verify(storage, never()).save(anyString(), any());
             assertEquals("old", Files.readString(document));
             release.countDown(); holder.get(3, TimeUnit.SECONDS);
+        } finally { release.countDown(); pool.shutdownNow(); }
+    }
+
+    @Test void unrelatedLocalVersionWorkCannotBlockDocumentPublication() throws Exception {
+        CountDownLatch acquired = new CountDownLatch(1), release = new CountDownLatch(1);
+        when(storage.save(anyString(), any())).thenAnswer(i -> {
+            try (java.io.InputStream input = i.getArgument(1)) { Files.write(document, input.readAllBytes()); }
+            return i.getArgument(0);
+        });
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> holder = pool.submit(() -> sessions.runLocked(8L, () -> {
+                acquired.countDown();
+                try { assertTrue(release.await(5, TimeUnit.SECONDS)); }
+                catch (InterruptedException e) { throw new RuntimeException(e); }
+            }));
+            assertTrue(acquired.await(2, TimeUnit.SECONDS));
+            var response = pool.submit(() -> uploadResponse()).get(3, TimeUnit.SECONDS);
+            assertEquals(200, response.getStatusCode().value());
+            assertEquals("complete", Files.readString(document));
+            release.countDown(); holder.get(2, TimeUnit.SECONDS);
         } finally { release.countDown(); pool.shutdownNow(); }
     }
 

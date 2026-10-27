@@ -103,7 +103,16 @@ public class ImScopedAgentHost implements ImProjectActionHandler {
                 if (boundProject==null || !String.valueOf(boundProject).equals(String.valueOf(conversation.get("projectId"))))
                     throw new IllegalArgumentException(com.checkba.service.LangText.of("请切换到这位助手所属的项目后再私聊", "Please switch to the project this assistant belongs to before chatting privately"));
             }
-            request.put("projectContext", context.build(userId, project));
+            List<Long> preferred = new ArrayList<>();
+            if (p.get("preferredFileIds") instanceof List<?> ids) {
+                for (Object id : ids.stream().limit(8).toList()) {
+                    try { preferred.add(Long.valueOf(String.valueOf(id))); }
+                    catch (NumberFormatException invalid) { /* UI tab IDs are not file capabilities. */ }
+                }
+            }
+            String question = ImService.string(p, "question");
+            request.put("projectContext", context.build(userId, project,
+                    question == null ? "" : question.substring(0, Math.min(4000, question.length())), preferred));
             requireProject(userId, projectId);
         }
         return gateway.executeWithinScope(userId, accountScope, action, request);

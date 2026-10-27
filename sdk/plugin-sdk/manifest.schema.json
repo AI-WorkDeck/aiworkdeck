@@ -116,7 +116,8 @@
           "items": {
             "$ref": "#/$defs/view"
           },
-          "maxItems": 2
+          "maxItems": 2,
+          "description": "Omitted preserves legacy UI. An empty array disables rail, panel and workspace entries; otherwise only declared placements are available. UI declarations do not grant permissions."
         },
         "connections": {
           "type": "array",

@@ -15,6 +15,21 @@
   const scope = () => ({ epoch: state.epoch, selection: state.selection, id: state.active?.id });
   const current = (s) => s.epoch === state.epoch && s.selection === state.selection && s.id === state.active?.id;
   const node = (tag, text, className) => { const el = document.createElement(tag); if (text != null) el.textContent = text; if (className) el.className = className; return el; };
+  function avatar(name, url, assistant = false) {
+    const el = node('span', assistant ? null : (name || '').slice(0, 1), 'avatar' + (assistant ? ' assistant-avatar' : ''));
+    el.setAttribute('aria-hidden', 'true');
+    if (assistant) {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      for (const [key, value] of Object.entries({ viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })) svg.setAttribute(key, value);
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', 'M12 3v3m-6 0h12a3 3 0 0 1 3 3v9H3V9a3 3 0 0 1 3-3Zm2 5h.01M16 11h.01M8 15h8M1 11v4m22-4v4');
+      svg.append(path); el.append(svg);
+    } else if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+      const image = node('img'); image.alt = ''; image.referrerPolicy = 'no-referrer'; image.src = url;
+      image.addEventListener('error', () => image.remove()); el.append(image);
+    }
+    return el;
+  }
   function notice(text = '', error = false) { $('notice').textContent = text; $('notice').dataset.error = String(error); }
   function button(text, action, className) { const el = node('button', text, className); el.type = 'button'; el.addEventListener('click', () => run(el, action)); return el; }
   async function run(el, fn) {
@@ -195,15 +210,15 @@
   function renderAgents() {
     const el = $('agents'); el.replaceChildren();
     const query = $('search').value.trim().toLowerCase();
-    for (const agent of state.agents.filter((a) => matches(query, a.name, a.title, scopeLabels[a.scope]) && !state.conversations.some((c) => c.agent && !privateAgent(c) && c.agent.scope === a.scope && c.agent.scopeKey === a.scopeKey))) {
+    for (const agent of state.agents.filter((a) => matches(query, a.name, a.title, scopeLabels[a.scope]) && !state.conversations.some((c) => c.agent && privateAgent(c) === (a.scope === 'project') && c.agent.scope === a.scope && (c.agent.scopeKey === a.scopeKey || (a.scope === 'project' && c.agent.scopeKey === a.legacyScopeKey))))) {
       const row = button('', () => openAgent(agent), 'agent-entry');
-      row.append(node('span', 'AI', 'avatar'), node('span', agent.name || `${scopeLabels[agent.scope]}助手`, 'agent-name'), node('small', scopeLabels[agent.scope] || ''));
+      row.append(avatar(agent.name, null, true), node('span', agent.name || `${scopeLabels[agent.scope]}助手`, 'agent-name'), node('small', scopeLabels[agent.scope] || ''));
       el.append(row);
     }
     if (state.projectAgentReason) el.append(node('p', state.projectAgentReason, 'hint'));
     el.hidden = !el.children.length;
   }
-  async function openAgent(agent, isPrivate = false) {
+  async function openAgent(agent, isPrivate = agent.scope === 'project') {
     const s = scope(), sequence = ++state.agentOpenSequence;
     if (!state.self || !state.context?.projectId) throw new Error('请先连接项目沟通账户。');
     const conversation = await request('ensureAgent', { scope: agent.scope, scopeKey: agent.scopeKey, title: agent.title || agent.name, private: isPrivate });
@@ -217,6 +232,7 @@
     $('agent-info').hidden = !c.agent;
     if (!c.agent) return;
     const projectPrivate = privateAgent(c) && c.agent.scope === 'project';
+    $('agent-info-summary').hidden = true;
     $('agent-info-summary').textContent = privateAgent(c)
       ? (projectPrivate ? '使用平台 AI 额度，结合你可读的当前项目资料在云端回复。' : '使用平台 AI 额度，结合本层级共享信息在云端回复。')
       : '使用平台 AI 额度，结合本群公开材料在云端回复。';
@@ -274,7 +290,7 @@
     }
     state.agentRequesting = true; renderAgentStatus();
     try {
-      const result = await request('agentReply', { conversationId: s.id, messageId });
+      const result = await request('agentReply', { conversationId: s.id, messageId, question: source?.text || '' });
       if (s.epoch !== state.epoch) return;
       failedReplies(s.id).delete(messageId);
       if (current(s)) applyAgentStatus({ ...result, status: result.status || 'queued', messageId });
@@ -314,7 +330,7 @@
     $('empty-list').textContent = query ? '没有匹配的会话。' : '还没有会话。新建会话，或用邀请码加入。';
     for (const c of items) {
       const el = button('', () => select(c), 'conversation'); el.setAttribute('aria-pressed', String(c.id === state.active?.id));
-      el.append(node('span', c.agent ? 'AI' : (c.type === 'DIRECT' ? '私' : '群'), 'avatar'));
+      el.append(avatar(c.title, c.avatarUrl, !!c.agent));
       const text = node('span', null, 'conversation-text'); text.append(node('strong', c.title), node('small', conversationLabel(c))); el.append(text);
       if (c.unreadCount) el.append(node('span', c.unreadCount > 99 ? '99+' : c.unreadCount, 'unread'));
       $('conversations').append(el);
@@ -344,9 +360,9 @@
     $('project-bar').hidden = privateAgent(c);
     document.querySelector('.composer-tools').hidden = privateAgent(c);
     $('members-button').hidden = privateAgent(c);
-    $('empty-messages').textContent = c.agent ? (privateAgent(c) ? '与助手开始私聊；这段对话仅你可见。' : '助手已加入本群。只有你一人时会自动回复；有其他成员时，发送后点击「请助手回复」。') : '还没有消息，打个招呼吧。';
+    $('empty-messages').textContent = '';
     $('draft').placeholder = c.agent ? (privateAgent(c) ? '与助手私聊，仅你可见…' : '向群成员和助手发送消息…') : '输入消息…';
-    $('binding').textContent = c.agent ? '群内回复供成员查看；个人项目资料可在助手私聊中讨论。' : '可关联当前项目，或将聊天记录归档到项目。'; $('older').hidden = true;
+    $('binding').textContent = ''; $('older').hidden = true;
     showDraft(); renderList(); renderMessages(); closeDialog();
     syncHostSidebar();
     await loadMessages('initial');
@@ -385,10 +401,12 @@
     $('messages').replaceChildren();
     for (const message of state.messages) {
       const row = node('article', null, 'message' + (String(message.senderId) === String(state.self?.id) ? ' mine' : ''));
-      row.append(node('div', `${message.senderName || message.agentName || '成员'}${message.actorType === 'AGENT' ? ' · AI 助手' : ''} · ${time(message.createdAt)}`, 'message-meta'));
+      const content = node('div', null, 'message-content');
+      row.append(avatar(message.senderName || message.agentName, message.senderAvatarUrl, message.actorType === 'AGENT'), content);
+      content.append(node('div', `${message.senderName || message.agentName || '成员'}${message.actorType === 'AGENT' ? ' · AI 助手' : ''} · ${time(message.createdAt)}`, 'message-meta'));
       const bubble = node('div', null, 'bubble'); if (message.text) bubble.append(node('div', message.text));
       if (message.attachment) bubble.append(fileCard(message.attachment));
-      row.append(bubble); $('messages').append(row);
+      content.append(bubble); $('messages').append(row);
     }
     for (const pending of state.pending.get(state.active?.id) || []) {
       const row = node('article', null, 'message mine'); row.append(node('div', pending.text || pending.file?.name || '文件', 'bubble'));
@@ -515,6 +533,7 @@
   let dialogAction = null, dialogScope = null;
   function closeDialog() { if ($('dialog').close) $('dialog').close(); else $('dialog').removeAttribute('open'); dialogAction = null; }
   function dialog(title, submit, action) {
+    awd.call('files.endDrag', {}).catch(() => {});
     closeDialog(); dialogScope = scope(); $('dialog-title').textContent = title; $('dialog-body').replaceChildren(); $('dialog-error').textContent = '';
     $('dialog-submit').textContent = submit; $('dialog-submit').hidden = !action; $('dialog-submit').disabled = false; dialogAction = action;
     if ($('dialog').showModal) $('dialog').showModal(); else $('dialog').setAttribute('open', '');
@@ -873,7 +892,7 @@
     if (cmd === 'open-agent') {
       const agent = state.agents.find((a) => a.scope === payload.scope && a.scopeKey === payload.scopeKey);
       if (!agent) throw new Error('助手信息尚未就绪，请刷新会话后重试。');
-      await openAgent(agent, !!payload.private);
+      await openAgent(agent, typeof payload.private === 'boolean' ? payload.private : undefined);
       return;
     }
     if (cmd === 'open-new-chat') { createDialog(); return; }

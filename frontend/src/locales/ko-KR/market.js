@@ -2,10 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "themesTitle": "UI 스킨",
-  "themeSelect": "스킨 적용",
-  "themeSelected": "활성화됨 (탭하여 기본값으로)",
-  "themeNote": "스킨을 적용하면 라이트 및 다크 모드 모두에서 워크벤치, 플러그인, 편집기 전반의 의미론적 색상 토큰이 업데이트됩니다.",
   "redactionEngineUpdateNotice": "로컬 규칙은 회사명과 중국어 이름을 자동으로 감지하며, 미리보기, 토큰 및 복원 기능을 제공합니다. 엔진은 데스크톱 패치를 통해 업데이트되며, 스킬 지침을 재설치해도 업데이트되지 않습니다.",
   "redactionEngineUpdateButton": "마스킹 엔진 업데이트 확인",
   "heroWatermark": "E",
@@ -73,6 +69,10 @@ export default {
   "profileSelect": "기본 프로필로 설정",
   "profileSelected": "현재 기본 프로필 (탭하여 해제)",
   "styleProfileNote": "내보내기 및 표준 서식은 선택한 프로필을 따르며, 프로젝트 수준의 _模板/画像.json이 우선 적용됩니다.",
+  "themesTitle": "UI 스킨",
+  "themeSelect": "스킨 적용",
+  "themeSelected": "활성화됨 (탭하여 기본값으로)",
+  "themeNote": "스킨을 적용하면 라이트 및 다크 모드 모두에서 워크벤치, 플러그인, 편집기 전반의 의미론적 색상 토큰이 업데이트됩니다.",
   "revokedPrefix": "플랫폼에서 제거됨: ",
   "enabledTag": "켜짐",
   "disabledTag": "꺼짐",

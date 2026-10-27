@@ -2,10 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "themesTitle": "UI-Skins",
-  "themeSelect": "Skin anwenden",
-  "themeSelected": "Aktiv (antippen für Standard)",
-  "themeNote": "Das Anwenden eines Skins aktualisiert semantische Farbtokens in Workbench, Plugins und Editor-Oberfläche – im hellen und dunklen Modus.",
   "redactionEngineUpdateNotice": "Lokale Regeln erkennen automatisch Firmen- und chinesische Namen, mit Vorschau, Token und Wiederherstellung. Die Engine wird über Desktop-Patches aktualisiert; eine Neuinstallation der Skill-Anweisungen aktualisiert sie nicht.",
   "redactionEngineUpdateButton": "Aktualisierungen der Schwärzungs-Engine prüfen",
   "heroWatermark": "E",
@@ -73,6 +69,10 @@ export default {
   "profileSelect": "Als Standardprofil festlegen",
   "profileSelected": "Aktuelles Standardprofil (antippen zum Aufheben)",
   "styleProfileNote": "Exports and standard formatting follow the selected profile; a project-level _模板/画像.json still takes precedence.",
+  "themesTitle": "UI-Skins",
+  "themeSelect": "Skin anwenden",
+  "themeSelected": "Aktiv (antippen für Standard)",
+  "themeNote": "Das Anwenden eines Skins aktualisiert semantische Farbtokens in Workbench, Plugins und Editor-Oberfläche – im hellen und dunklen Modus.",
   "revokedPrefix": "Von der Plattform entfernt: ",
   "enabledTag": "Aktiviert",
   "disabledTag": "Deaktiviert",

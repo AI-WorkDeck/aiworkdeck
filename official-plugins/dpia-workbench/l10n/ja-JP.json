@@ -11,8 +11,5 @@
   "setting.sofficePath.label": "LibreOffice 実行ファイル",
   "setting.sofficePath.description": "レポートのPDFエクスポートとページプレビューにのみ必要です。空欄にするとシステムの既定の場所を試します。",
   "tool.dpia_workbench_action.description": "DPIAケース、資料、事実確認、Q&A、実行ステータス、レポートの操作。ワークベンチUI専用。AIが手動確認/承認エントリを呼び出してはなりません。",
-  "tool.dpia_workbench_task.description": "現在フリーズされているDPIAタスクを実行します: context/read/write/script/commit/report。現在のユーザープロジェクトとケース出力ディレクトリに厳密に限定されます。",
-  "plugin": {
-    "name": "DPIAワークベンチ"
-  }
+  "tool.dpia_workbench_task.description": "現在フリーズされているDPIAタスクを実行します: context/read/write/script/commit/report。現在のユーザープロジェクトとケース出力ディレクトリに厳密に限定されます。"
 }

@@ -1,5 +1,17 @@
 {
   "plugin.name": "Tencent ミーティング",
   "plugin.description": "Tencent Meeting を接続して、会議や録画をオンデマンドで同期し、文字起こしやスマート議事録を表示、プロジェクトにアーカイブし、議事録とアクションアイテムを生成します。公式の tmeet CLI とアカウント認証が必要です。",
-  "tool.tencent_meeting_action.description": "Tencent Meeting プラグイン: 接続の確認、ログインの認証、オンデマンド同期、会議と文字起こしの表示、プロジェクトファイルのアーカイブ。"
+  "tool.tencent_meeting_action.description": "Tencent Meeting プラグイン: 接続の確認、ログインの認証、オンデマンド同期、会議と文字起こしの表示、プロジェクトファイルのアーカイブ。",
+  "panel.refreshList": "更新",
+  "panel.selectMeeting": "会議を選択",
+  "panel.backToList": "会議一覧に戻る",
+  "panel.meetingCount": "件の会議",
+  "panel.connectInSidebar": "サイドバーで Tencent Meeting に接続してください",
+  "panel.loadingList": "会議一覧を読み込み中…",
+  "panel.loadingDetail": "会議内容を読み込み中…",
+  "panel.syncing": "会議を同期中…",
+  "panel.exporting": "会議資料を保存中…",
+  "panel.preparingAi": "AI に渡す会議資料を準備中…",
+  "view.account.name": "Tencent Meeting",
+  "view.meetings.name": "Tencent Meeting"
 }

@@ -157,5 +157,16 @@ export default {
   "paneEmptyMonth": "이번 달에 작업이 없습니다",
   "paneEmptyFile": "이 파일에 연결된 작업이 아직 없습니다",
   "railScheduleTitle": "일정 ({overdue}개 기한 초과 · {today}개 오늘)",
-  "tabName": "일정"
+  "tabName": "일정",
+  "workspaceAll": "모든 프로젝트",
+  "workspaceCurrent": "현재 프로젝트",
+  "workspaceUpcoming": "다가오는 할 일",
+  "workspaceDays": "향후 {count}일",
+  "workspaceRetry": "새로 고침",
+  "workspaceOverdue": "기한 초과 {count}건",
+  "workspaceNoUpcoming": "향후 {count}일 내 할 일이 없습니다",
+  "workspaceLinked": "필터가 캘린더와 동기화됩니다. 항목을 선택하면 세부 정보가 표시됩니다.",
+  "workspaceDay": "일",
+  "workspaceYear": "년",
+  "workspaceEventCount": "{count}개 항목"
 }

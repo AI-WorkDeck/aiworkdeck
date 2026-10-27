@@ -1,5 +1,17 @@
 {
   "plugin.name": "Mesyuarat Tencent",
   "plugin.description": "Sambungkan Tencent Meeting untuk menyegerakkan mesyuarat dan rakaman atas permintaan, lihat transkrip dan minit pintar, arkib ke projek, dan jana minit mesyuarat serta tindakan. Memerlukan CLI tmeet rasmi dan kebenaran akaun.",
-  "tool.tencent_meeting_action.description": "Plugin Tencent Meeting: semak sambungan, benarkan log masuk, segerak atas permintaan, lihat mesyuarat dan transkrip, serta arkib fail projek."
+  "tool.tencent_meeting_action.description": "Plugin Tencent Meeting: semak sambungan, benarkan log masuk, segerak atas permintaan, lihat mesyuarat dan transkrip, serta arkib fail projek.",
+  "panel.refreshList": "Muat semula",
+  "panel.selectMeeting": "Pilih mesyuarat",
+  "panel.backToList": "Kembali ke mesyuarat",
+  "panel.meetingCount": "mesyuarat",
+  "panel.connectInSidebar": "Sambungkan Tencent Meeting di bar sisi",
+  "panel.loadingList": "Memuatkan mesyuarat…",
+  "panel.loadingDetail": "Memuatkan kandungan mesyuarat…",
+  "panel.syncing": "Menyegerakkan mesyuarat…",
+  "panel.exporting": "Menyimpan bahan mesyuarat…",
+  "panel.preparingAi": "Menyediakan bahan mesyuarat untuk AI…",
+  "view.account.name": "Tencent Meeting",
+  "view.meetings.name": "Tencent Meeting"
 }

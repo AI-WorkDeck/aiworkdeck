@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "skinSectionTitle": "Θέμα",
-  "skinDefaultName": "Ανατολική Γαλήνη (Προεπιλογή)",
   "restartPending": "{count} εργασίες μπορούν να συνεχιστούν",
   "restartContinue": "Συνέχεια: {name}",
   "restartRestoring": "Επαναφορά της αρχικής συνομιλίας και εγγράφου…",
@@ -118,6 +116,8 @@ export default {
   "appearanceLight": "Φωτεινό",
   "appearanceDark": "Σκοτεινό",
   "appearanceSystem": "Σύμφωνα με το σύστημα",
+  "skinSectionTitle": "Θέμα",
+  "skinDefaultName": "Ανατολική Γαλήνη (Προεπιλογή)",
   "walletChipTitle": "Υπόλοιπο μονάδων και επίπεδο συνδρομής· κάντε κλικ για να ανοίξετε τις ρυθμίσεις λογαριασμού",
   "walletMenuLabel": "Λογαριασμός και χρήση",
   "trialInfo": "Σχετικά με τη δοκιμαστική περίοδο",

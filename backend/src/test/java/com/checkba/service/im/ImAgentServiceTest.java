@@ -199,8 +199,8 @@ class ImAgentServiceTest {
         assertNotEquals(shared,a);assertNotEquals(a,b);assertEquals("AGENT_DIRECT",ensure(owner,"project",project,true).get("type"));
         send(owner,a,"仅我与助手的讨论");assertTrue(history(owner,shared).isEmpty());assertTrue(history(colleague,b).isEmpty());
         assertThrows(IllegalArgumentException.class,()->history(colleague,a));assertThrows(IllegalArgumentException.class,()->invite(a,"MEMBER"));
-        long source=send(owner,a,"读取我提供的项目材料");call(owner,"agentReply",Map.of("conversationId",a,"messageId",source,"projectContext","私聊项目资料"));jobs.remove().run();
-        assertTrue(prompt.get().contains("私聊项目资料"));
+        long source=send(owner,a,"读取我提供的项目材料");call(owner,"agentReply",Map.of("conversationId",a,"messageId",source,"projectContext","材料：本机合成起诉状.txt\n原告：李某。被告：合成公司。"));jobs.remove().run();
+        assertTrue(prompt.get().contains("原告：李某。被告：合成公司。"));
     }
 
     @Test void sharedReplyHasAiIdentityIsIdempotentAndUsesOnlySharedAttachments() {
@@ -229,6 +229,55 @@ class ImAgentServiceTest {
         assertThrows(IllegalArgumentException.class,()->invite(id,"MEMBER"));
         allowed.remove(colleague);assertThrows(IllegalArgumentException.class,()->history(colleague,id));
         assertTrue(((List<?>)call(colleague,"list",Map.of()).get("conversations")).isEmpty());
+    }
+
+    @Test void teamAgentReadsSharedDocumentsBeyondTheIndex() {
+        grant(owner,"team",team);String id=(String)ensure(owner,"team",team,false).get("id");
+        when(memory.read(owner,team,MemoryDocumentService.INDEX_PATH)).thenReturn(new MemoryFileView("remember.md","索引","流程见 delivery.md",1,null,false));
+        when(memory.listFiles(owner,team)).thenReturn(List.of(new MemoryFileView("delivery.md","交付约定",null,1,null,false)));
+        when(memory.read(owner,team,"delivery.md")).thenReturn(new MemoryFileView("delivery.md","交付约定","每次交付先经第二位成员复核",1,null,false));
+        long source=send(owner,id,"团队如何交付");reply(owner,id,source);jobs.remove().run();
+        assertTrue(prompt.get().contains("每次交付先经第二位成员复核"));
+        assertEquals("completed",turns.findById(source).orElseThrow().getStatus());
+    }
+
+    @Test void sharedProjectMaterialIsUsedAndRecheckedBeforePostingReply() {
+        Long projectId=boundProject(); String id=(String)call(owner,"projectGroup",Map.of("projectId",projectId)).get("id");
+        ImSharedProjectContext shared=mock(ImSharedProjectContext.class);
+        ReflectionTestUtils.setField(agent,"sharedProjects",shared);
+        var prepared=new ImSharedProjectContext.Prepared(projectId,List.of(owner),List.of(42L),"项目起诉状：李某为原告");
+        when(shared.prepare(eq(projectId),anyList(),anyString())).thenReturn(prepared);
+        long source=send(owner,id,"李某是原告还是被告");reply(owner,id,source);jobs.remove().run();
+        assertTrue(prompt.get().contains("李某为原告")); verify(shared).recheck(prepared);
+        assertEquals("completed",turns.findById(source).orElseThrow().getStatus());
+        doThrow(new IllegalArgumentException("revoked")).when(shared).recheck(prepared);
+        long second=send(owner,id,"再确认");reply(owner,id,second);jobs.remove().run();
+        assertEquals("failed",turns.findById(second).orElseThrow().getStatus());
+        assertEquals(1,history(owner,id).stream().filter(row -> "AGENT".equals(row.get("actorType"))).count());
+    }
+
+    @Test void emptySharedDocumentsStillRespectThreeReadAttempts() {
+        grant(owner,"team",team);String id=(String)ensure(owner,"team",team,false).get("id");
+        String index="one.md two.md three.md four.md";
+        when(memory.read(owner,team,MemoryDocumentService.INDEX_PATH)).thenReturn(new MemoryFileView("remember.md","索引",index,1,null,false));
+        when(memory.listFiles(owner,team)).thenReturn(Arrays.stream(index.split(" ")).map(path -> new MemoryFileView(path,path,null,1,null,false)).toList());
+        long source=send(owner,id,"总结团队");reply(owner,id,source);jobs.remove().run();
+        verify(memory, times(4)).read(eq(owner),eq(team),anyString()); // index plus three attempts
+        verify(memory, never()).read(owner,team,"four.md");
+    }
+
+    @Test void previouslyRevokedProjectMembersAreNotReadersButMidRunChangesStillBlockReply() {
+        Long projectId=boundProject();String id=(String)call(owner,"projectGroup",Map.of("projectId",projectId)).get("id");
+        call(client,"projectGroup",Map.of("projectId",projectId));
+        projectAccess.remove(projectId+":"+client);
+        ImSharedProjectContext shared=mock(ImSharedProjectContext.class);ReflectionTestUtils.setField(agent,"sharedProjects",shared);
+        when(shared.prepare(eq(projectId),eq(List.of(owner)),anyString())).thenReturn(new ImSharedProjectContext.Prepared(projectId,List.of(owner),List.of(),"项目材料"));
+        long source=send(owner,id,"继续讨论");reply(owner,id,source);jobs.remove().run();
+        assertEquals("completed",turns.findById(source).orElseThrow().getStatus());
+        verify(shared).prepare(eq(projectId),eq(List.of(owner)),anyString());
+        when(model.generate(any(ChatMessage[].class))).thenAnswer(call -> {projectAccess.add(projectId+":"+client);return Response.from(AiMessage.from("受众变化，不应送达"));});
+        long second=send(owner,id,"再次讨论");reply(owner,id,second);jobs.remove().run();
+        assertEquals("failed",turns.findById(second).orElseThrow().getStatus());
     }
 
     @Test void teamAgentReadsOnlyItsScopeAndRechecksMembershipAfterModelReturns() {
@@ -294,4 +343,22 @@ class ImAgentServiceTest {
         assertThrows(IllegalArgumentException.class,()->reply(colleague,id,source));
         String another=(String)ensure(owner,"project",UUID.randomUUID().toString(),false).get("id");assertThrows(IllegalArgumentException.class,()->reply(owner,another,source));assertTrue(jobs.isEmpty());
     }
+    @Test void queuedAssistantKeepsRequestLanguageAndRestoresWorkerScope() {
+        grant(owner,"team",team);String id=(String)ensure(owner,"team",team,false).get("id");
+        when(memory.read(owner,team,MemoryDocumentService.INDEX_PATH)).thenReturn(new MemoryFileView("remember.md","索引","流程见 delivery.md",1,null,false));
+        when(memory.listFiles(owner,team)).thenReturn(List.of(new MemoryFileView("delivery.md","交付约定",null,1,null,false)));
+        when(memory.read(owner,team,"delivery.md")).thenReturn(new MemoryFileView("delivery.md","交付约定","客户原文保持不变",1,null,false));
+        long source=send(owner,id,"What is the delivery process?");
+        com.checkba.service.AppLanguageScope.run("en-US", () -> reply(owner,id,source));
+        assertNull(com.checkba.service.AppLanguageScope.current());
+        com.checkba.service.AppLanguageScope.run("zh-CN", () -> {
+            jobs.remove().run();
+            assertEquals("zh-CN", com.checkba.service.AppLanguageScope.current());
+        });
+        assertTrue(prompt.get().contains("Shared material: delivery.md"));
+        assertTrue(prompt.get().contains("Shared memory of the selected scope"));
+        assertTrue(prompt.get().contains("客户原文保持不变")); assertFalse(prompt.get().contains("共享资料："));
+        assertNull(com.checkba.service.AppLanguageScope.current());
+    }
+
 }

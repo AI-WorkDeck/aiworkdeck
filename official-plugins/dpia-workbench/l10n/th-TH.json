@@ -11,8 +11,5 @@
   "setting.sofficePath.label": "ไฟล์ปฏิบัติการ LibreOffice",
   "setting.sofficePath.description": "จำเป็นเฉพาะสำหรับการส่งออกรายงานเป็น PDF และตัวอย่างหน้าเอกสาร; เว้นว่างไว้เพื่อลองตำแหน่งเริ่มต้นของระบบ",
   "tool.dpia_workbench_action.description": "การดำเนินการเกี่ยวกับเคส DPIA วัสดุ การยืนยันข้อเท็จจริง คำถาม-คำตอบ สถานะการรัน และรายงาน สำหรับ UI ของเวิร์กเบนช์เท่านั้น; AI ต้องไม่เรียกใช้รายการยืนยัน/อนุมัติด้วยตนเอง",
-  "tool.dpia_workbench_task.description": "ดำเนินการงาน DPIA ที่ถูกตรึงไว้ในปัจจุบัน: context/read/write/script/commit/report; จำกัดอย่างเคร่งครัดเฉพาะโปรเจกต์ผู้ใช้ปัจจุบันและไดเรกทอรีผลลัพธ์ของเคส",
-  "plugin": {
-    "name": "DPIA Workbench"
-  }
+  "tool.dpia_workbench_task.description": "ดำเนินการงาน DPIA ที่ถูกตรึงไว้ในปัจจุบัน: context/read/write/script/commit/report; จำกัดอย่างเคร่งครัดเฉพาะโปรเจกต์ผู้ใช้ปัจจุบันและไดเรกทอรีผลลัพธ์ของเคส"
 }

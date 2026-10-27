@@ -11,8 +11,5 @@
   "setting.sofficePath.label": "LibreOffice 실행 파일",
   "setting.sofficePath.description": "보고서 PDF 내보내기 및 페이지 미리보기에만 필요합니다. 비워 두면 시스템 기본 위치를 시도합니다.",
   "tool.dpia_workbench_action.description": "DPIA 케이스, 자료, 사실 확인, Q&A, 실행 상태 및 보고서 작업. 워크벤치 UI 전용이며 AI는 수동 확인/승인 항목을 호출해서는 안 됩니다.",
-  "tool.dpia_workbench_task.description": "현재 고정된 DPIA 작업 실행: context/read/write/script/commit/report. 현재 사용자 프로젝트와 케이스 출력 디렉터리로 엄격하게 범위가 제한됩니다.",
-  "plugin": {
-    "name": "DPIA 워크벤치"
-  }
+  "tool.dpia_workbench_task.description": "현재 고정된 DPIA 작업 실행: context/read/write/script/commit/report. 현재 사용자 프로젝트와 케이스 출력 디렉터리로 엄격하게 범위가 제한됩니다."
 }

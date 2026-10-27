@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "skinSectionTitle": "Tema visual",
-  "skinDefaultName": "Serenidad oriental (predeterminado)",
   "restartPending": "Se pueden reanudar {count} tareas",
   "restartContinue": "Continuar: {name}",
   "restartRestoring": "Restaurando la conversación y el documento originales…",
@@ -118,6 +116,8 @@ export default {
   "appearanceLight": "Claro",
   "appearanceDark": "Oscuro",
   "appearanceSystem": "Seguir el sistema",
+  "skinSectionTitle": "Tema visual",
+  "skinDefaultName": "Serenidad oriental (predeterminado)",
   "walletChipTitle": "Saldo de créditos y nivel de membresía; haga clic para abrir la configuración de la cuenta",
   "walletMenuLabel": "Cuenta y uso",
   "trialInfo": "Acerca de la prueba",

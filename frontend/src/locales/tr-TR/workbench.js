@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "skinSectionTitle": "Tema Görünümü",
-  "skinDefaultName": "Doğu Huzuru (Varsayılan)",
   "restartPending": "{count} görev devam ettirilebilir",
   "restartContinue": "Devam et: {name}",
   "restartRestoring": "Orijinal sohbet ve belge geri yükleniyor…",
@@ -118,6 +116,8 @@ export default {
   "appearanceLight": "Açık",
   "appearanceDark": "Koyu",
   "appearanceSystem": "Sistemi takip et",
+  "skinSectionTitle": "Tema Görünümü",
+  "skinDefaultName": "Doğu Huzuru (Varsayılan)",
   "walletChipTitle": "Credits bakiyesi ve üyelik seviyesi; hesap ayarlarını açmak için tıklayın",
   "walletMenuLabel": "Hesap ve kullanım",
   "trialInfo": "Deneme Hakkında",

@@ -580,6 +580,7 @@ $color-accent: var(--awd-mint); // Mint Green
 /* Left Rail (Activity Bar) - Match Doc Dark BG */
 .left-rail {
   width: 50px;
+  min-height: 0;
   background-color: var(--awd-bg); // AI WorkDeck Gray-Pale (Light Mode)
   display: flex;
   flex-direction: column;
@@ -588,6 +589,48 @@ $color-accent: var(--awd-mint); // Mint Green
   z-index: 150;
   flex-shrink: 0;
   border-right: none;
+}
+
+.rail-tools {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable both-edges;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--awd-border-strong);
+    border-radius: 4px;
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--awd-accent);
+    outline-offset: -1px;
+  }
+}
+
+.rail-footer {
+  flex-shrink: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--awd-border);
+}
+
+.left-rail .rail-btn,
+.left-rail .rail-members-container {
+  flex-shrink: 0;
 }
 
 .rail-btn {
@@ -1444,47 +1487,6 @@ $color-accent: var(--awd-mint); // Mint Green
     width: 0;
     border-right: none;
     box-shadow: none;
-  }
-}
-
-.sidebar-collapse-anchor {
-  position: relative;
-  flex: 0 0 14px;
-  width: 14px;
-  background: var(--awd-bg);
-  z-index: 12;
-
-  &::before {
-    content: "";
-    display: block;
-    height: var(--awd-workbench-header-height);
-    box-sizing: border-box;
-    background: var(--awd-bg);
-    border-bottom: 1px solid var(--awd-workbench-divider);
-  }
-}
-
-.sidebar-collapse-tab {
-  position: absolute;
-  top: calc(var(--awd-workbench-header-height) + 12px);
-  left: 0;
-  width: 100%;
-  box-sizing: border-box;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--awd-border);
-  border-left: 0;
-  border-radius: 0 var(--awd-radius-sm) var(--awd-radius-sm) 0;
-  background: var(--awd-surface);
-  color: var(--awd-text-3);
-  cursor: pointer;
-
-  svg { width: 12px; height: 12px; }
-  &:hover, &:focus-visible {
-    color: var(--awd-accent-text);
-    background: var(--awd-surface-2);
   }
 }
 
@@ -5027,8 +5029,7 @@ $color-accent: var(--awd-mint); // Mint Green
 }
 
 .page-project-overview.chat-mode .left-rail,
-.page-project-overview.chat-mode .sidebar-left,
-.page-project-overview.chat-mode .sidebar-collapse-anchor {
+.page-project-overview.chat-mode .sidebar-left {
   display: none;
 }
 
