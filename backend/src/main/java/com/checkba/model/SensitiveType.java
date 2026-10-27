@@ -15,7 +15,7 @@ public enum SensitiveType {
     PHONE(
         "PHONE",
         "手机号",
-        "(?<!\\d)1[3-9]\\d{9}(?!\\d)",
+        "(?<![0-9０-９])[1１][3-9３-９][0-9０-９](?:[0-9０-９]{8}|[ 　-][0-9０-９]{4}[ 　-][0-9０-９]{4})(?![0-9０-９])",
         "138****1234",
         "保留前3后4位"
     ),
@@ -357,7 +357,8 @@ public enum SensitiveType {
             case COMPANY:
                 return "[公司]";
             case PHONE:
-                if (len == 11) return original.substring(0, 3) + "****" + original.substring(7);
+                String digits = original.replaceAll("[ 　-]", "");
+                if (digits.length() == 11) return digits.substring(0, 3) + "****" + digits.substring(7);
                 break;
                 
             case ID_CARD:

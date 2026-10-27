@@ -43,6 +43,69 @@ class SensitiveChineseNameRecognitionTest {
     }
 
     @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+        "第三人：陈安平|陈安平", "第三人一：陈安平|陈安平", "被执行人：陈安平|陈安平",
+        "申请执行人：陈安平|陈安平", "被告（自然人）：陈安平|陈安平", "被告一（自然人）：陈安平|陈安平",
+        "原告（反诉被告）：陈安平|陈安平", "曾用名：李小红|李小红",
+        "姓名：陈 安平|陈 安平", "姓名：陈安 平|陈安 平", "姓名：欧阳 明|欧阳 明",
+        "原告：张 伟|张 伟", "被告一：陈 安 平|陈 安 平", "姓名：陈　安平|陈　安平",
+        "姓名：陈 安平 联系电话：13800001111|陈 安平",
+        "姓名：陈安 平 民族：汉族|陈安 平", "姓名：陈 安平 手机 ：13800001111|陈 安平"
+    })
+    void explicitPersonFieldsRedactTheWholeOriginalValue(String text, String name) {
+        var engine = new SensitiveTextEngine(List.of("CHINESE_NAME"), true, List.of(), List.of());
+        engine.learn(text);
+        String output = engine.apply(text);
+        assertTrue(engine.recovery().containsValue(name), output + engine.recovery());
+        assertEquals(1, engine.recovery().size());
+        assertEquals(1, engine.counts().get("CHINESE_NAME"));
+        assertEquals(text.substring(0, text.indexOf('：') + 1), output.substring(0, output.indexOf('：') + 1));
+        assertEquals(text, SensitiveTextEngine.apply(output, SensitiveTextEngine.restoreEdits(output, engine.recovery())));
+    }
+
+    @Test void spacedNamesKeepExclusionsAndFollowingFields() {
+        String text = "姓名：陈 安平  电话：13800001111";
+        var engine = new SensitiveTextEngine(List.of("CHINESE_NAME"), true, List.of(), List.of());
+        String output = engine.apply(text);
+        assertTrue(engine.recovery().containsValue("陈 安平"), output);
+        assertTrue(output.endsWith("  电话：13800001111"), output);
+        var excluded = new SensitiveTextEngine(List.of("CHINESE_NAME"), true, List.of(), List.of("陈 安平"));
+        excluded.learn(text);
+        assertEquals(text, excluded.apply(text));
+        String trailingSpace = "姓名：陈 安平  ";
+        var trailing = new SensitiveTextEngine(List.of("CHINESE_NAME"), true, List.of(), List.of());
+        assertTrue(trailing.apply(trailingSpace).endsWith("  "));
+        assertTrue(trailing.recovery().containsValue("陈 安平"));
+    }
+
+    @Test void nameListsDoNotTurnFollowingFieldLabelsIntoNames() {
+        String text = "姓名：陈安平；曾用名：李小红；单位：星河公司";
+        var engine = new SensitiveTextEngine(List.of("CHINESE_NAME"), true, List.of(), List.of());
+        String output = engine.apply(text);
+        assertEquals(java.util.Set.of("陈安平", "李小红"), new java.util.HashSet<>(engine.recovery().values()));
+        assertTrue(output.contains("；曾用名："), output);
+        assertTrue(output.endsWith("；单位：星河公司"), output);
+    }
+
+    @Test void nameListsKeepSemicolonSeparatorsAndSpacedFieldLabels() {
+        String text = "名单：张三；李四\n姓名：陈安平 单位 ：星河公司";
+        var engine = new SensitiveTextEngine(List.of("CHINESE_NAME"), true, List.of(), List.of());
+        String output = engine.apply(text);
+        assertEquals(java.util.Set.of("张三", "李四", "陈安平"), new java.util.HashSet<>(engine.recovery().values()));
+        assertTrue(output.endsWith(" 单位 ：星河公司"), output);
+    }
+
+    @Test void learnedShortNamesDoNotPierceExcludedSpacedNames() {
+        String text = "姓名：陈安 平。\n联系人：陈安";
+        var engine = new SensitiveTextEngine(List.of("CHINESE_NAME"), true, List.of(), List.of("陈安 平"));
+        engine.learn(text);
+        String output = engine.apply(text);
+        assertTrue(output.startsWith("姓名：陈安 平。\n联系人：[[中文姓名"), output);
+        assertEquals(1, engine.counts().get("CHINESE_NAME"));
+        assertEquals(text, SensitiveTextEngine.apply(output, SensitiveTextEngine.restoreEdits(output, engine.recovery())));
+    }
+
+    @ParameterizedTest
     @MethodSource("surnameContexts")
     void surnameAndContextCombinations(String text, String name) {
         detectsNamesWithoutCustomInput(text, name);
@@ -75,6 +138,8 @@ class SensitiveChineseNameRecognitionTest {
         "双方应当履行合同。乙方应当。被告申请。原告请求。",
         "被告一：申请延期。被告二：公司。原告1：待填写。第一被告：陈述意见。",
         "姓名：待填写。联系人：暂无。负责人：待定。",
+        "第三人：陈述意见。被执行人：未知。被告（自然人）：待填写。",
+        "姓名：待 填写。被告（自然人）：陈安平科技有限公司。",
         "甲方：有限公司。乙方：公司。原告：申请人。",
         "法定代表人签字。负责人签名。联系人信息。姓名不得为空。",
         "王府井、马鞍山、张家口、唐山市、北京市。",
