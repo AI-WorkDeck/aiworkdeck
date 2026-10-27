@@ -162,6 +162,9 @@ jobs:
       - name: Test project-home page
         working-directory: frontend
         run: npm run test:project-home
+      - name: Test independent litigation generation
+        working-directory: frontend
+        run: node --test tests/litigation-visual/*.test.mjs
       - name: Test editor opening and preview fallback
         working-directory: frontend
         run: npm run test:editor-open

@@ -39,27 +39,68 @@
     <text class="lv-sec-title">{{ $t('panels.litNewDiagramSectionTitle') }}</text>
   </view>
   <view class="lv-sec-body">
-    <view class="lv-field" @tap="pickScope">
+    <component :is="'button'" type="button" class="lv-field lv-native-button" :disabled="generationLocked" @click.stop="pickScope">
       <text class="lv-field-label">{{ $t('panels.litScopeLabel') }}</text>
       <text class="lv-field-value" :class="{ placeholder: !scopeLabel }">
         {{ scopeLabel || $t('panels.litScopeDefault') }}
       </text>
       <text class="lv-field-caret">›</text>
-    </view>
+    </component>
 
     <view class="lv-kinds">
-      <view
+      <component :is="'button'" type="button"
         v-for="k in KINDS"
         :key="k.value"
-        class="lv-kind"
+        class="lv-kind lv-native-button"
         :class="{ active: diagramHint === k.value }"
-        @tap="diagramHint = diagramHint === k.value ? '' : k.value"
-      >{{ k.label }}</view>
+        :aria-pressed="diagramHint === k.value"
+        :disabled="generationLocked"
+        @click.stop="selectKind(k.value)"
+      >{{ k.label }}</component>
     </view>
     <text class="lv-tip">{{ $t('panels.litKindTip') }}</text>
 
-    <view class="lv-btn primary" :class="{ disabled: starting }" @tap="start">
-      {{ starting ? $t('panels.litStarting') : $t('panels.litStart') }}
+    <component :is="'button'" type="button" class="lv-btn primary lv-native-button" :disabled="generationLocked" @click.stop="start">
+      {{ generationStartLabel }}
+    </component>
+
+    <view v-if="generation.phase !== 'idle'" class="lv-generation" :class="{ failed: generation.phase === 'failed' }" :aria-busy="generationBusy">
+      <view class="lv-generation-status" role="status" aria-live="polite">
+        <text class="lv-generation-title">{{ generationPhaseLabel }}</text>
+        <text v-if="generation.message" class="lv-generation-message">{{ generation.message }}</text>
+      </view>
+      <text v-if="generationBusy && generation.startedAt" class="lv-generation-meta">{{ $t('panels.litGenerationElapsed', { seconds: generationElapsed }) }}</text>
+      <text v-if="generationBusy && generationElapsed >= 45" class="lv-generation-meta">{{ $t('panels.litGenerationSlow') }}</text>
+      <text v-if="generationBusy" class="lv-generation-meta">{{ $t('panels.litGenerationBackground') }}</text>
+
+      <view v-if="generation.phase === 'waiting' && generation.question" class="lv-question">
+        <text class="lv-question-text">{{ generation.question.text }}</text>
+        <view class="lv-question-options" role="group" :aria-label="generation.question.text">
+          <component :is="'button'" v-for="(option, index) in generation.question.options || []" :key="index" type="button"
+            class="lv-question-option lv-native-button" :class="{ selected: generationSelected.includes(option) }"
+            :aria-pressed="generationSelected.includes(option)" :disabled="starting" @click.stop="selectAnswer(option)">
+            <text>{{ option }}</text>
+            <text v-if="generation.question.descriptions && generation.question.descriptions[index]" class="lv-option-description">{{ generation.question.descriptions[index] }}</text>
+          </component>
+        </view>
+        <component :is="'textarea'" class="lv-answer-input" :value="generationOther" :disabled="starting" maxlength="4000" rows="3"
+          :aria-label="$t('panels.litGenerationOther')" :placeholder="$t('panels.litGenerationOther')" @input="generationOther = $event.target.value" />
+        <component :is="'button'" type="button" class="lv-btn primary lv-native-button" :disabled="starting || !canAnswerGeneration" @click.stop="answerGeneration">
+          {{ $t('panels.litGenerationAnswer') }}
+        </component>
+      </view>
+      <component :is="'button'" v-if="generation.phase === 'paused'" type="button" class="lv-btn primary lv-native-button" :disabled="starting" @click.stop="continueGeneration">
+        {{ $t('panels.litGenerationContinue') }}
+      </component>
+      <component :is="'button'" v-if="generationActive && generation.phase !== 'stopping'" type="button" class="lv-generation-stop lv-native-button" :disabled="starting" @click.stop="stopGeneration">
+        {{ $t('panels.litGenerationStop') }}
+      </component>
+    </view>
+    <view v-if="generationError || generationSyncError" class="lv-generation-error" role="alert">
+      <text>{{ generationError || generationSyncError }}</text>
+      <component :is="'button'" v-if="generationSyncError" type="button" class="lv-generation-stop lv-native-button" :disabled="generationLoading" @click.stop="refreshGeneration">
+        {{ $t('panels.litGenerationRefresh') }}
+      </component>
     </view>
   </view>
 
@@ -129,7 +170,6 @@ import {
   getLitigationVisualStatus,
   getLitigationDiagrams,
   restyleLitigationDiagram,
-  getLitigationKickoffPrompt,
   packStatus,
   packInstall
 } from '@/services/api.js'
@@ -167,9 +207,10 @@ const LAYOUT_LABEL_KEYS = {
 export default {
   name: 'LitigationVisualPanel',
   props: {
-    projectId: { type: [String, Number], default: null }
+    projectId: { type: [String, Number], default: null },
+    generationRequest: { type: Function, default: null }
   },
-  emits: ['start-drawing', 'open-file', 'request-scope-select'],
+  emits: ['open-file', 'request-scope-select'],
   data() {
     return {
       MODES,
@@ -178,6 +219,18 @@ export default {
       diagrams: [],
       loading: false,
       starting: false,
+      generation: { phase: 'idle' },
+      generationLoading: true,
+      generationError: '',
+      generationSyncError: '',
+      generationSelected: [],
+      generationOther: '',
+      generationTimer: null,
+      generationEpoch: 0,
+      generationRevision: 0,
+      generationAlive: false,
+      generationNow: Date.now(),
+      generationSubmission: null,
       restylingId: null,
       diagramHint: '',
       scope: null,            // { label, description } —— 由父页面的文件选择器回填
@@ -188,6 +241,30 @@ export default {
     }
   },
   computed: {
+    generationActive() {
+      return ['starting', 'running', 'waiting', 'checking', 'stopping', 'paused'].includes(this.generation.phase)
+    },
+    generationBusy() {
+      return ['starting', 'running', 'checking', 'stopping'].includes(this.generation.phase)
+    },
+    generationLocked() {
+      return this.starting || this.generationLoading || !!this.generationSyncError || this.generationActive
+    },
+    generationElapsed() {
+      return Math.max(0, Math.floor((this.generationNow - Number(this.generation.startedAt || this.generationNow)) / 1000))
+    },
+    generationPhaseLabel() {
+      return this.$t('panels.litGenerationPhase' + this.generation.phase[0].toUpperCase() + this.generation.phase.slice(1))
+    },
+    generationStartLabel() {
+      if (this.starting) return this.$t('panels.litStarting')
+      if (this.generationLoading) return this.$t('panels.litGenerationLoading')
+      if (this.generationActive) return this.$t('panels.litGenerationInProgress')
+      return this.$t(this.generation.phase === 'failed' || this.generationError ? 'panels.litGenerationRetry' : 'panels.litStart')
+    },
+    canAnswerGeneration() {
+      return this.generationSelected.length > 0 || this.generationOther.trim().length > 0
+    },
     scopeLabel() {
       return this.scope ? this.scope.label : ''
     },
@@ -216,7 +293,18 @@ export default {
   watch: {
     projectId: {
       immediate: true,
-      handler() { this.reload() }
+      handler() {
+        this.generationEpoch++
+        this.generation = { phase: 'idle' }
+        this.generationSubmission = null
+        this.generationError = ''
+        this.generationSyncError = ''
+        this.generationLoading = true
+        this.starting = false
+        this.scope = null
+        this.reload()
+        if (this.generationAlive) this.refreshGeneration()
+      }
     }
   },
   mounted() {
@@ -227,11 +315,20 @@ export default {
     // 不然计数永远停在第一张（dev-board BUG-21）。
     uni.$on('awd:files-changed', this.onFilesChanged)
     this.refreshPackStatus()
+    this.generationAlive = true
+    this.refreshGeneration()
+    this.generationTimer = setInterval(() => {
+      this.generationNow = Date.now()
+      this.refreshGeneration()
+    }, 1000)
   },
   beforeUnmount() {
     uni.$off('awd:litviz-restyled', this.onDiagramChanged)
     uni.$off('awd:files-changed', this.onFilesChanged)
     this.stopPackPoll()
+    this.generationAlive = false
+    this.generationEpoch++
+    if (this.generationTimer) clearInterval(this.generationTimer)
   },
   methods: {
     // ---- 原生资源包（native pack）状态条 ----
@@ -309,31 +406,108 @@ export default {
     },
 
     pickScope() {
-      // 文件/文件夹选择器归父页面管（FilePickerDialog 挂在 project-overview 上）
-      this.$emit('request-scope-select', (picked) => { this.scope = picked })
+      if (this.generationLocked) return
+      const epoch = this.generationEpoch
+      this.$emit('request-scope-select', (picked) => {
+        if (epoch === this.generationEpoch && !this.generationLocked) this.scope = picked
+      })
+    },
+
+    selectKind(value) {
+      if (!this.generationLocked) this.diagramHint = this.diagramHint === value ? '' : value
+    },
+
+    applyGeneration(snapshot) {
+      if (!snapshot || !snapshot.phase) throw new Error(this.$t('panels.litGenerationInvalid'))
+      const previous = this.generation
+      if (previous.taskId !== snapshot.taskId || previous.question?.key !== snapshot.question?.key) {
+        this.generationSelected = []
+        this.generationOther = ''
+      }
+      this.generation = snapshot
+      this.generationNow = Date.now()
+      if (snapshot.phase === 'completed' && (previous.taskId !== snapshot.taskId || previous.phase !== 'completed')) this.reload()
+    },
+
+    async refreshGeneration() {
+      if (!this.generationAlive || !this.projectId || this.starting || this._generationRefreshing) return
+      const epoch = this.generationEpoch
+      const revision = this.generationRevision
+      this._generationRefreshing = true
+      try {
+        if (!this.generationRequest) throw new Error(this.$t('panels.litGenerationUnavailable'))
+        const snapshot = await this.generationRequest('generation', {})
+        if (!this.generationAlive || epoch !== this.generationEpoch || revision !== this.generationRevision) return
+        this.applyGeneration(snapshot)
+        this.generationSyncError = ''
+      } catch (e) {
+        if (this.generationAlive && epoch === this.generationEpoch && revision === this.generationRevision) this.generationSyncError = e?.message || this.$t('panels.litGenerationSyncFailed')
+      } finally {
+        this._generationRefreshing = false
+        if (epoch === this.generationEpoch) this.generationLoading = false
+      }
+    },
+
+    async generationCommand(operation, params) {
+      if (this.starting) return
+      const epoch = this.generationEpoch
+      this.generationRevision++
+      this.starting = true
+      this.generationError = ''
+      try {
+        if (!this.generationRequest) throw new Error(this.$t('panels.litGenerationUnavailable'))
+        const snapshot = await this.generationRequest(operation, params)
+        if (this.generationAlive && epoch === this.generationEpoch) this.applyGeneration(snapshot)
+      } catch (e) {
+        if (this.generationAlive && epoch === this.generationEpoch) this.generationError = e?.message || this.$t('panels.litStartFailedFallback')
+      } finally {
+        if (epoch === this.generationEpoch) this.starting = false
+      }
     },
 
     async start() {
-      if (this.starting || !this.projectId) return
+      if (this.generationLocked || !this.projectId) return
       if (this.status && !this.status.available) {
-        uni.showToast({ title: this.status.reason || this.$t('panels.litUnavailableFallback'), icon: 'none' })
+        this.generationError = this.status.reason || this.$t('panels.litUnavailableFallback')
         return
       }
-      this.starting = true
-      try {
-        // prompt 由服务端拼：触发词必须原样在正文里才能命中 skill 注入
-        const res = await getLitigationKickoffPrompt(this.projectId, {
-          scope: this.scope ? this.scope.description : '',
-          diagramHint: this.diagramHint
-        })
-        if (res && res.prompt) {
-          this.$emit('start-drawing', { prompt: res.prompt })
-        }
-      } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('panels.litStartFailedFallback'), icon: 'none' })
-      } finally {
-        this.starting = false
+      const input = { scope: this.scope ? this.scope.description : '', diagramHint: this.diagramHint }
+      const signature = JSON.stringify(input)
+      if (!this.generationSubmission || this.generationSubmission.signature !== signature
+          || (['completed', 'cancelled'].includes(this.generation.phase) && this.generationSubmission.fromTaskId !== this.generation.taskId)) {
+        const id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
+        this.generationSubmission = { signature, fromTaskId: this.generation.taskId, clientRequestId: 'litviz-' + id }
       }
+      await this.generationCommand('generate', { ...input, clientRequestId: this.generationSubmission.clientRequestId })
+    },
+
+    selectAnswer(option) {
+      if (this.starting || this.generation.phase !== 'waiting') return
+      if (this.generation.question.multiSelect) {
+        this.generationSelected = this.generationSelected.includes(option)
+          ? this.generationSelected.filter(value => value !== option) : [...this.generationSelected, option]
+      } else {
+        this.generationSelected = this.generationSelected.includes(option) ? [] : [option]
+      }
+    },
+
+    async answerGeneration() {
+      if (this.starting || this.generation.phase !== 'waiting' || !this.canAnswerGeneration) return
+      await this.generationCommand('answer', {
+        taskId: this.generation.taskId,
+        questionKey: this.generation.question.key,
+        answer: { selected: [...this.generationSelected], other: this.generationOther.trim() }
+      })
+    },
+
+    async stopGeneration() {
+      if (!this.generationActive || this.generation.phase === 'stopping') return
+      await this.generationCommand('stop', { taskId: this.generation.taskId })
+    },
+
+    async continueGeneration() {
+      if (this.generation.phase !== 'paused') return
+      await this.generationCommand('continue', { taskId: this.generation.taskId })
     },
 
     // 整行点开 = 打开可继续编辑的那份（.drawio，走内嵌 draw.io）。
@@ -516,13 +690,34 @@ export default {
 }
 
 .lv-btn {
+  width: 100%; box-sizing: border-box;
   display: flex; align-items: center; justify-content: center;
   height: var(--awd-panel-row-h); font-size: var(--awd-panel-fs);
   border-radius: var(--awd-panel-radius); cursor: pointer; user-select: none;
 }
 .lv-btn.primary { background: var(--awd-panel-accent); color: var(--awd-text-on-accent); font-weight: 500; }
 .lv-btn.primary:hover { background: var(--awd-accent-hover); }
-.lv-btn.disabled { opacity: .5; pointer-events: none; }
+.lv-btn.disabled, .lv-native-button:disabled { opacity: .5; cursor: default; }
+.lv-native-button { appearance: none; font-family: inherit; line-height: inherit; margin: 0; }
+.lv-native-button::after { border: 0; }
+.lv-btn.lv-native-button, .lv-generation-stop { border: 0; }
+.lv-field.lv-native-button { width: 100%; box-sizing: border-box; margin-bottom: var(--awd-panel-gap); }
+.lv-native-button:focus-visible, .lv-answer-input:focus-visible { outline: 2px solid var(--awd-panel-accent); outline-offset: 2px; }
+.lv-generation { margin-top: var(--awd-panel-gap-lg); padding: var(--awd-panel-gap); border: 1px solid var(--awd-panel-border); border-radius: var(--awd-panel-radius); background: var(--awd-surface); }
+.lv-generation.failed { border-color: var(--awd-danger); }
+.lv-generation-title, .lv-generation-message, .lv-generation-meta, .lv-question-text, .lv-option-description { display: block; line-height: 1.55; overflow-wrap: anywhere; }
+.lv-generation-title { font-size: var(--awd-panel-fs); font-weight: 600; color: var(--awd-panel-text); }
+.lv-generation-message, .lv-question-text { margin-top: 4px; white-space: pre-wrap; font-size: var(--awd-panel-fs); color: var(--awd-panel-text-2); }
+.lv-generation-meta, .lv-option-description { margin-top: 4px; font-size: var(--awd-panel-fs-meta); color: var(--awd-panel-text-3); }
+.lv-question { margin-top: var(--awd-panel-gap); }
+.lv-question-options { display: flex; flex-direction: column; gap: 4px; margin-top: var(--awd-panel-gap); }
+.lv-question-option { width: 100%; box-sizing: border-box; padding: 6px 8px; text-align: left; border: 1px solid var(--awd-panel-border); border-radius: var(--awd-panel-radius); background: var(--awd-surface); color: var(--awd-panel-text); font-size: var(--awd-panel-fs); white-space: normal; overflow-wrap: anywhere; cursor: pointer; }
+.lv-question-option.selected { border-color: var(--awd-panel-accent); background: var(--awd-accent-wash); }
+.lv-question-option:hover:not(:disabled) { border-color: var(--awd-panel-accent); }
+.lv-answer-input { display: block; box-sizing: border-box; width: 100%; margin: var(--awd-panel-gap) 0; padding: 6px 8px; min-height: 64px; resize: vertical; font: inherit; font-size: var(--awd-panel-fs); line-height: 1.55; color: var(--awd-panel-text); background: var(--awd-surface); border: 1px solid var(--awd-panel-border); border-radius: var(--awd-panel-radius); }
+.lv-generation-stop { margin-top: var(--awd-panel-gap); padding: 4px 0; color: var(--awd-panel-accent); background: transparent; font-size: var(--awd-panel-fs); text-align: left; cursor: pointer; }
+.lv-generation-error { margin-top: var(--awd-panel-gap); padding: 6px 8px; background: var(--awd-danger-soft); border: 1px solid var(--awd-danger); border-radius: var(--awd-panel-radius); font-size: var(--awd-panel-fs); line-height: 1.55; color: var(--awd-text); overflow-wrap: anywhere; }
+.lv-generation-error text { display: block; }
 
 .lv-empty { padding: 14px var(--awd-panel-pad-x); text-align: center; }
 .lv-empty-text { font-size: var(--awd-panel-fs-meta); color: var(--awd-panel-text-4); line-height: 1.6; }
