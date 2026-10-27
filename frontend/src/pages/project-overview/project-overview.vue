@@ -329,6 +329,7 @@
     <view class="main-layout" :class="{ 'is-compact': isCompactLayout }">
       <!-- Cursor 风格：最左常驻栏（Activity Bar） -->
       <view class="left-rail">
+        <view class="rail-tools" tabindex="0">
         <!-- rail 的顺序就是 config/leftSidebarPlugins.js 里数组的顺序（项目概览 →
              资源管理器 → 插件中心 → 语音 → 脱敏 → 门控项）。
              2026-08-19 起「项目概览」和「插件中心」也在这个数组里：它们走的都是
@@ -392,8 +393,10 @@
 
         <!-- 整理模式开关已挪到顶栏 header-tools（dev-board#221，原在 rail 上太显眼） -->
 
-        <!-- Spacer -->
-        <view style="flex: 1"></view>
+        </view>
+
+        <!-- 项目操作常驻底部，不随上方工具列表滚动。成员浮层须能向右展开。 -->
+        <view class="rail-footer">
 
         <!-- Staging Area (Moved to bottom)：暂存区挂在项目下（.stagezone），无项目态不给 -->
         <view
@@ -510,7 +513,7 @@
             </svg>
           </view>
         </view>
-
+        </view>
       </view>
 
       <!-- File Picker Dialog (for EasyVoice Import) -->
