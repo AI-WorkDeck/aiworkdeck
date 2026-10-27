@@ -93,9 +93,8 @@ public class WorkSessionService {
      * 装箱的 Long 相同数值不保证是同一对象，拿它当锁语义不可靠。
      */
     private final Map<Long, ReentrantLock> repoLocks = new ConcurrentHashMap<>();
-    // Local folders may overlap. Use one stable lock even if the parent is opened after a child,
-    // so a checkout cannot race another project's snapshot of the same physical files.
-    private final ReentrantLock localFolderRepoLock = new ReentrantLock();
+    // Compare active physical scopes, so unrelated folders can save during background version work.
+    private final PathScopedRepoLock.Registry localFolderRepoLocks = new PathScopedRepoLock.Registry();
     private final Set<Long> deletedProjects = ConcurrentHashMap.newKeySet();
 
     /**
@@ -122,7 +121,9 @@ public class WorkSessionService {
 
     ReentrantLock repoLock(long projectId) {
         return repoLocks.computeIfAbsent(projectId,
-                id -> repoService.hasLocalRoot(id) ? localFolderRepoLock : new ReentrantLock());
+                id -> repoService.hasLocalRoot(id)
+                        ? new PathScopedRepoLock(localFolderRepoLocks, () -> repoService.workTree(id))
+                        : new ReentrantLock());
     }
 
     /** Acquire the repository lock before deletion takes DB locks, and keep it through commit. */
