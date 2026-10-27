@@ -67,14 +67,15 @@ description: 插件系统领域（具体插件实现）。任务涉及尽调/脱
 
 **「语音」合并插件（dev-board#66，2026-08-20）**：概念模型「左栏一个图标 = 一个插件，skill 只在 AI 对话生效」——text-to-speech 与 meeting-recorder 两个成员 skill 在广场三处 UI 里合并成**一个**「语音」条目（分组定义 `VOICE_PLUGIN_GROUP` + 合成视图 `buildVoiceGroupSkill()`，都在 `leftSidebarPlugins.js`），启停一体：前端开关一次翻全部成员，后端 `SkillRegistry.convergeVoiceMergedSkills()` 每次扫描后把分裂态收敛为「任一启用 → 全部启用」（防「tab 可见但生成纪要 kick-off 命不中 skill」的静默断裂）；meeting-recorder 的 `enabled_by_default` 因此也改为 true。两个 skill 文件本身、AI 对话行为、触发词都没动。
 
-**动态 JAR / Web 插件（dev-board#1143/#1144，2026-10-08；#1493，2026-10-26）**：点击 rail 使用 `pluginWorkspaceTabs.js` 的 `openPluginTab(pluginId)` 打开或聚焦工作区单例标签（`tabType:'plugin'`）。左栏 `PluginWorkspaceSummary.vue` 显示轻量工作区导航和真实标签状态，简介默认折叠在「关于此插件」。腾讯会议与尽调报告的 Web 主界面由工作区承载；后续动态插件默认复用该能力，不要再把复杂操作全部塞在左栏。
+**动态 JAR / Web 插件（dev-board#1531，2026-10-27）**：入口按 `contributes.views` 决定，不以安装或权限数量强制分配侧栏与标签。`views` 缺省/null 才保留旧版 rail + 简介导航 + `frontendEntry` / guide 工作区；显式 `[]` 无独立界面；sidebar-only 只开 panel；workspace-only 的 rail 按钮直接打开单例标签，不强制展开空 panel；两者都有则 rail 开 panel，插件按需用 SDK 1.8 `awd.ui.openWorkspace()` 打开自己的已声明工作区。旧宿主对新桥返回 `unknown_method`，源码支持与客户端发版分开记录。
 
-- 有 `frontendEntry` → 工作区 `PluginPane`；无入口 → `PluginGuidePane`（manifest.guide 的 intro/steps/quickActions 与工具清单）。两者都连接 `onPluginQuickAction`，prompt 仍需包含 skill 触发词。
-- 左右工作区分别按标签 `v-for/v-show` 保留实例，普通标签切换不丢输入；关闭、禁用、卸载、封禁或不兼容卸载实例。跨窗格移动可能重建，不承诺未持久化表单保活。插件禁止 Alt 双开。
-- 标签只保存身份，实时 URL/permissions/devInstalled 从 `dynamicPlugins` 解析；快照恢复与插件清单加载两条完成路径都协调清理，清单失败不视为空列表。尚未核验时不挂 iframe。无项目态不提供动态插件入口。
-- 不再走 `openFile({fileType:'plugin'})`：文件类型闸不支持它。旧中栏死分支已由正式插件标签替代。`fileKind` 把插件列入非文档，避免误入编辑器/AI 文档上下文。
-- 图标不要回退不存在的 `/static/plugin_default.png`；rail 仍使用 SVG 兜底。标题取 `activeDynamicPlugin.label`。
-- 新插件须参照 `docs/PLUGIN_SPEC.md §8.1.1` 与 `backend/skills/plugin-dev/prompt.md`，实际走通安装→启用→rail→工作区主要操作，不能只验安装接口。源码支持与客户端发版分开记录。
+- 工作区仍使用 `pluginWorkspaceTabs.js` 的 `openPluginTab(pluginId)`，身份跨左右窗格保持单例；只挂当前声明允许的工作区。显式空数组或 sidebar-only 不得因为保留 `frontendEntry` 被自动补出标签。
+- 皮肤等轻量插件在主题切换等贡献点使用，保留插件中心预览/管理；`frontendEntry` 可以只是预览文件，不等于主界面。三款官方皮肤声明 `views: []`。
+- SDK `ui.openWorkspace {}` 无参数，不加权限名，只能打开当前 iframe 自己的已声明 workspace；当前清单不可用、未声明工作区或作用域不允许时返回 `unavailable`。权限与视图声明各自校验，不能通过传其他插件 ID 或 URL 越界。
+- 左右工作区分别按标签 `v-for/v-show` 保留实例，普通标签切换不丢输入；关闭、禁用、卸载、封禁、不兼容或视图不再提供工作区时清理。跨窗格移动可能重建，不承诺未持久化表单保活。插件禁止 Alt 双开。
+- 标签只保存身份，实时 URL/permissions/devInstalled 从 `dynamicPlugins` 解析；快照恢复与插件清单加载两条完成路径都协调清理，清单失败不视为空列表。尚未核验时不挂 iframe。项目视图需要项目，全局视图可以在无项目态使用。
+- 不再走 `openFile({fileType:'plugin'})`：文件类型闸不支持它。`fileKind` 把插件列入非文档，避免误入编辑器/AI 文档上下文。
+- 新插件参照 `docs/PLUGIN_SPEC.md §8.1.1 / §17.2` 与 `backend/skills/plugin-dev/prompt.md`，按实际贡献点验证安装→启用→主要操作→禁用/卸载；轻量插件验证无多余入口，panel 验窄栏，工作区验单例、保活与关闭。不能只验安装接口。
 
 ### 三方 Web 插件（规范 v2.5，docs/PLUGIN_SPEC.md §8）
 
@@ -106,7 +107,7 @@ description: 插件系统领域（具体插件实现）。任务涉及尽调/脱
 
 **v2.9 生态路线 P4（dev-board#284，宿主 0.28 起）**：声明式长尾四贡献点（PLUGIN_SPEC §14）。要点：
 - **落点**：`PluginContributionService`（模板清单/落地、画像选择与降级、设置校验与掩码、外观皮肤 `contributes.themes` 解析与选择、声明文件 canonical 逃逸闸）+ `PluginService.localize`（l10n %key%，表在 `pluginL10n`，rescan 重建）+ `StyleProfileResolver` 插档（可选注入，选中的插件画像在「项目画像」与「系统默认」之间）。
-- **外观皮肤（dev-board#1480，PLUGIN_SPEC §14.6）**：`contributes.themes` 声明皮肤 JSON（`roles.light` / `roles.dark`、`fonts`、`effects`、`previewSwatches`），后端 `PluginContributionService` 归一化 `--awd-*` 键并以 `UNSAFE_CSS_VALUE` 过滤 CSS 注入，选择位存 `ui.theme.selected`（`GET /api/plugins/contributed/themes`、`POST /api/plugins/contributed/themes/select`）。前端 `utils/appTheme.js` 的 `setActiveSkin()` 将当前明暗模式对应的皮肤令牌与字体栈挂到 `document.documentElement` 并广播 `APP_THEME_EVENT`（Web 插件 iframe 经 `collectThemeTokens()` 自动同步）；`MarketDetailPane.vue` 与工作台顶部 `.theme-menu`（`themeSwitch.js`）均可一键切换。广场预览 iframe 仅 `allow-scripts`，明暗与令牌由宿主通过现有 `theme` 消息单向推送，禁止 `allow-same-origin` 或读取 parent.document；全局选择位写入沿用管理员闸。正式包 `extraResources` 必须包含皮肤 manifest/web/themes/l10n，既有内置插件也包含 l10n。首批随包内置 3 款官方皮肤插件（`PluginBundledInstaller.IDS`）：`theme-inkwash-zen`（东方水墨 · 飞白禅圆）、`theme-anime-twilight`（日漫晨昏 · 逢魔之时）、`theme-aurora-glass`（深海极光 · 冰刃琉璃），左栏 rail 自动过滤纯皮肤插件不占图标位。
+- **外观皮肤（dev-board#1480，PLUGIN_SPEC §14.6）**：`contributes.themes` 声明皮肤 JSON（`roles.light` / `roles.dark`、`fonts`、`effects`、`previewSwatches`），后端 `PluginContributionService` 归一化 `--awd-*` 键并以 `UNSAFE_CSS_VALUE` 过滤 CSS 注入，选择位存 `ui.theme.selected`（`GET /api/plugins/contributed/themes`、`POST /api/plugins/contributed/themes/select`）。前端 `utils/appTheme.js` 的 `setActiveSkin()` 将当前明暗模式对应的皮肤令牌与字体栈挂到 `document.documentElement` 并广播 `APP_THEME_EVENT`（Web 插件 iframe 经 `collectThemeTokens()` 自动同步）；`MarketDetailPane.vue` 与工作台顶部 `.theme-menu`（`themeSwitch.js`）均可一键切换。广场预览 iframe 仅 `allow-scripts`，明暗与令牌由宿主通过现有 `theme` 消息单向推送，禁止 `allow-same-origin` 或读取 parent.document；全局选择位写入沿用管理员闸。正式包 `extraResources` 必须包含皮肤 manifest/web/themes/l10n，既有内置插件也包含 l10n。首批随包内置 3 款官方皮肤插件（`PluginBundledInstaller.IDS`）：`theme-inkwash-zen`（东方水墨 · 飞白禅圆）、`theme-anime-twilight`（日漫晨昏 · 逢魔之时）、`theme-aurora-glass`（深海极光 · 冰刃琉璃），三款皮肤通过显式 `contributes.views: []` 不占 rail 或工作区，主题菜单与插件中心预览继续可用。
 - **模板**：`FileTree.handleCreateWord` 变成选择（空白永远第一项，actionsheet 只列前 5；老行为在 `createBlankWord`）；AI 工具 `ContributedTemplateTools`（list/create 两枚，已进 RealToolBeans 与 toolDisplayNames）。
 - **设置**：值直存 `plugin.<id>.<key>`（与 SPI Settings 同命名空间，JAR 免转接）；写入只经广场详情页表单（`MarketDetailPane.loadContribution/doSaveSettings`，admin 同启停口径）；保存后 `uni.$emit('awd:plugin-settings-changed')` → PluginPane 只转发给设置所属插件的 `settings.changed` 事件；**secret 不进桥**（桥 settings.get 回 permission_denied），表单里掩码值原样未动 = 不回写。
 - **地雷**：manifest `settings[].default` 是 Java 关键字，PluginSettingDecl 用 Hutool `@Alias("default")` 映射（`PluginContributionServiceTest.settingsRoundTrip` 钉着）；dev 直装仍要求 frontendEntry，纯声明插件走广场/手动安装。SDK `1.4.0`；示例 `examples/hello-declarative-plugin/`。

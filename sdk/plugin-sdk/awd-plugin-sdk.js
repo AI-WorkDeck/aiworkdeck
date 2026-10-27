@@ -301,7 +301,7 @@
 
   var awd = {
     /** SDK 版本，与桥协议版本无关 */
-    version: '1.7.0',
+    version: '1.8.0',
     /** 握手拿到的上下文；ready() 之前为 null */
     context: null,
     /** 等待宿主握手，resolve 值即 awd.context */
@@ -319,6 +319,8 @@
       endDrag: function (options) { return call('files.endDrag', {}, options); }
     },
     ui: {
+      /** 打开本插件已声明的工作区；无工作区返回 unavailable，旧宿主返回 unknown_method。 */
+      openWorkspace: function () { return call('ui.openWorkspace', {}); },
       toast: function (message, options) { return call('ui.toast', { message: message }, options); },
       /** 把项目文件打开到工作台中栏（需 file_read） */
       openFile: function (path, options) { return call('ui.openFile', { path: path }, options); },
