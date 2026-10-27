@@ -118,6 +118,31 @@ class SensitiveDocumentSeparatorsTest {
     }
 
     @Test
+    void pdfEmailRectangleCoversDescendersAndAllRenderedInk() throws Exception {
+        Path source = pdf("gyp@example.com");
+        try (var doc = Loader.loadPDF(source.toFile())) {
+            var areas = service.computeRedactionAreas(doc, List.of("EMAIL"));
+            assertEquals(1, areas.size());
+            var area = areas.get(0);
+            float scale = 2;
+            var image = new org.apache.pdfbox.rendering.PDFRenderer(doc).renderImage(0, scale);
+            float pageHeight = doc.getPage(0).getMediaBox().getHeight();
+            int ink = 0, uncovered = 0;
+            for (int y = 0; y < image.getHeight(); y++) {
+                for (int x = 0; x < image.getWidth(); x++) {
+                    if ((image.getRGB(x, y) & 0xFFFFFF) == 0xFFFFFF) continue;
+                    ink++;
+                    float pdfX = (x + 0.5f) / scale, pdfY = pageHeight - (y + 0.5f) / scale;
+                    if (pdfX < area.x || pdfX > area.x + area.width || pdfY < area.y || pdfY > area.y + area.height) uncovered++;
+                }
+            }
+            assertTrue(ink > 0);
+            assertEquals(0, uncovered, "Sensitive glyph pixels outside the redaction rectangle");
+            assertTrue(area.height < 24, "One line must not produce a box spanning adjacent lines");
+        }
+    }
+
+    @Test
     void pdfIndependentPhonesRemainSeparateInPreviewAndActualBlackBoxes() throws Exception {
         Path source = pdf("13800001111", "13900002222");
         var opts = options("MASK", "PHONE");

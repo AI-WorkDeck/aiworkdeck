@@ -470,15 +470,26 @@ public class SensitiveService {
                 float x = tp.getXDirAdj();
                 float w = tp.getWidthDirAdj();
                 float yBottom = tp.getPageHeight() - tp.getYDirAdj(); // 翻转为 PDF 底部起算坐标
-                float h = tp.getHeightDir();
+                float ascent = tp.getHeightDir();
+                float descent = 0;
+                var descriptor = tp.getFont() == null ? null : tp.getFont().getFontDescriptor();
+                if (descriptor != null) {
+                    float scale = tp.getTextMatrix().getScalingFactorY() / 1000f;
+                    ascent = Math.max(ascent, descriptor.getAscent() * scale);
+                    descent = Math.min(0, descriptor.getDescent() * scale);
+                }
                 if (x < minX) minX = x;
                 if (x + w > maxX) maxX = x + w;
-                if (yBottom < minY) minY = yBottom;
-                if (yBottom + h > maxY) maxY = yBottom + h;
+                if (yBottom + descent < minY) minY = yBottom + descent;
+                if (yBottom + ascent > maxY) maxY = yBottom + ascent;
             }
             // 用真实的包围盒（minX~maxX）而不是"逐字宽度求和"：同一行内命中区间可能跨越词间距，
             // 求和会得到与实际视觉跨度对不上的宽度，导致黑框覆盖不全。
-            redactionAreas.add(new RedactionArea(currentPdfPageIndex, minX, minY, maxX - minX, maxY - minY));
+            // Include descenders below the baseline and a half-point antialiasing fringe.
+            // Keep the margin small so one line does not cover its neighbours.
+            float padding = 0.5f;
+            redactionAreas.add(new RedactionArea(currentPdfPageIndex, minX, minY - padding,
+                    maxX - minX, maxY - minY + 2 * padding));
         }
     }
 
