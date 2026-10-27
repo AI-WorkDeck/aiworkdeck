@@ -3,19 +3,13 @@
 <template>
   <scroll-view scroll-y class="desensitize-pane">
     <view class="section">
-      <view class="actions-row operation-tabs">
-        <button class="mini-btn" :class="{ active: operation === 'redact' }" :disabled="processing" @tap="chooseOperation('redact')">{{ $t('panels.deRedactTab') }}</button>
-        <button class="mini-btn" :class="{ active: operation === 'restore' }" :disabled="processing" @tap="chooseOperation('restore')">{{ $t('panels.deRestoreTab') }}</button>
-      </view>
-      <text class="help-text">{{ $t('panels.deLocalNotice') }}</text>
-      <view class="workflow" v-if="operation === 'redact'" aria-live="polite">
-        <text :class="{ current: !fileId }">{{ $t('panels.deStepSelect') }}</text>
-        <text :class="{ current: fileId && !preview && !result }">{{ $t('panels.deStepReview') }}</text>
-        <text :class="{ current: preview || result }">{{ $t('panels.deStepCreate') }}</text>
+      <view class="actions-row operation-tabs" role="group" :aria-label="$t('panels.deRedactTab') + ' / ' + $t('panels.deRestoreTab')">
+        <button class="mini-btn" :class="{ active: operation === 'redact' }" :aria-pressed="operation === 'redact'" :disabled="processing" @tap="chooseOperation('redact')">{{ $t('panels.deRedactTab') }}</button>
+        <button class="mini-btn" :class="{ active: operation === 'restore' }" :aria-pressed="operation === 'restore'" :disabled="processing" @tap="chooseOperation('restore')">{{ $t('panels.deRestoreTab') }}</button>
       </view>
       <view class="section-title">{{ $t('panels.deSectionFileSelect') }}</view>
       <view class="path-display" :class="{ empty: !filePath }" @tap="triggerFileSelect">{{ fileName || $t('panels.deFilePlaceholder') }}</view>
-      <view class="actions-row">
+      <view class="actions-row file-actions">
         <button class="mini-btn" :disabled="processing" @tap="importFromActiveTab">{{ $t('panels.deImportCurrent') }}</button>
         <button class="mini-btn" :disabled="processing" @tap="triggerFileSelect">{{ $t('panels.deBrowse') }}</button>
       </view>
@@ -38,11 +32,11 @@
       </view>
       <view class="section">
         <view class="section-title">{{ $t('panels.deModeTitle') }}</view>
-        <view v-if="!isPdf" class="actions-row">
-          <button class="mini-btn" :class="{ active: mode === 'TOKEN' }" :disabled="processing" @tap="mode = 'TOKEN'">{{ $t('panels.deTokenMode') }}</button>
-          <button class="mini-btn" :class="{ active: mode === 'MASK' }" :disabled="processing" @tap="mode = 'MASK'">{{ $t('panels.deMaskMode') }}</button>
+        <view v-if="!isPdf" class="actions-row mode-options">
+          <button class="mini-btn" :class="{ active: mode === 'TOKEN' }" :aria-pressed="mode === 'TOKEN'" :title="$t('panels.deTokenNotice')" :disabled="processing" @tap="mode = 'TOKEN'">{{ $t('panels.deTokenMode') }}</button>
+          <button class="mini-btn" :class="{ active: mode === 'MASK' }" :aria-pressed="mode === 'MASK'" :disabled="processing" @tap="mode = 'MASK'">{{ $t('panels.deMaskMode') }}</button>
         </view>
-        <text class="help-text">{{ $t(isPdf ? 'panels.dePdfNotice' : effectiveMode === 'TOKEN' ? 'panels.deTokenNotice' : 'panels.deMaskNotice') }}</text>
+        <text v-if="isPdf || effectiveMode === 'MASK' || preview" class="help-text">{{ $t(isPdf ? 'panels.dePdfNotice' : effectiveMode === 'TOKEN' ? 'panels.deTokenNotice' : 'panels.deMaskNotice') }}</text>
       </view>
       <view class="section settings-section">
         <button class="settings-toggle" :aria-expanded="settingsOpen" :disabled="processing" @tap="settingsOpen = !settingsOpen">
@@ -275,153 +269,91 @@ export default {
 </script>
 
 <style scoped>
-/* 密度令牌见 App.vue 的 --awd-panel-*（基准 = 插件广场）。
-   原来是「灰底 + 白卡片 + 16px 内边距 + 1px 描边」三层套娃，在 260px 宽里
-   实际可用宽度只剩 196px。 */
 .desensitize-pane {
   height: 100%;
-  background-color: var(--awd-surface);
+  min-width: 0;
   box-sizing: border-box;
+  background: var(--awd-bg);
+  color: var(--awd-panel-text);
+  container-type: inline-size;
 }
-
-.section {
-  padding: 0 var(--awd-panel-pad-x) var(--awd-panel-gap-lg);
-  background: var(--awd-surface);
-}
-
+.section { padding: 0 var(--awd-panel-pad-x) var(--awd-panel-gap-lg); }
 .section-title {
   display: flex;
   align-items: center;
-  height: var(--awd-panel-sec-h);
+  min-height: var(--awd-panel-sec-h);
   font-size: var(--awd-panel-fs-sec);
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-weight: 600;
   color: var(--awd-panel-text-2);
 }
-
-
 .path-display {
-    padding: 6px 8px;
-    background: var(--awd-bg);
-    border: 1px dashed var(--awd-border-strong);
-    border-radius: var(--awd-panel-radius);
-    font-size: var(--awd-panel-fs);
-    color: var(--awd-panel-text);
-    word-break: break-all;
-    min-height: var(--awd-panel-row-h);
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-}
-.path-display.empty {
-    color: var(--awd-text-3);
-    justify-content: center;
-}
-
-.actions-row {
-    display: flex;
-    gap: 6px;
-}
-
-.mini-btn {
-    flex: 1;
-    height: 24px;
-    line-height: 22px;
-    text-align: center;
-    background: var(--awd-surface);
-    border: 1px solid var(--awd-panel-border);
-    border-radius: var(--awd-radius-sm);
-    font-size: var(--awd-panel-fs-meta);
-    color: var(--awd-text-2);
-    cursor: pointer;
-    transition: all 0.2s;
-}
-.mini-btn:hover {
-    background: var(--awd-bg);
-    border-color: var(--awd-border-strong);
-}
-
-.strategies-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-}
-
-.strategy-item {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    height: 24px;
-}
-.strategy-item:hover { background: var(--awd-panel-accent-wash); }
-
-.checkbox {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-    border: 1px solid var(--awd-border-strong);
-    border-radius: var(--awd-radius-sm);
-    margin-right: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-}
-.checkbox.checked {
-    background-color: var(--awd-accent);
-    border-color: var(--awd-accent);
-}
-.check-mark {
-    color: var(--awd-text-on-accent);
-    font-size: var(--awd-panel-fs-meta);
-}
-
-.strategy-label {
-    font-size: var(--awd-panel-fs);
-    color: var(--awd-panel-text);
-}
-
-
-.workdeck-btn {
   display: flex;
-  justify-content: center;
   align-items: center;
-  height: 32px;
+  min-height: var(--awd-control-height);
+  box-sizing: border-box;
+  padding: var(--awd-space-2);
+  background: var(--awd-surface);
+  border: 1px dashed var(--awd-border-strong);
   border-radius: var(--awd-panel-radius);
-  font-size: var(--awd-panel-fs);
-  font-weight: 600;
+  font-size: var(--awd-font-size-body);
+  overflow-wrap: anywhere;
   cursor: pointer;
+}
+.path-display.empty { color: var(--awd-text-3); justify-content: center; }
+.actions-row { display: flex; gap: var(--awd-panel-gap); }
+.file-actions { margin-top: var(--awd-panel-gap); }
+.mini-btn, .workdeck-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: var(--awd-control-height);
+  height: auto;
+  box-sizing: border-box;
+  margin: 0;
+  padding: var(--awd-space-1) var(--awd-space-2);
+  line-height: var(--awd-line-height-ui);
   border: 1px solid var(--awd-panel-border);
-  background-color: var(--awd-surface);
+  border-radius: var(--awd-panel-radius);
+  background: var(--awd-surface);
   color: var(--awd-panel-text);
-  transition: opacity 0.2s;
+  font-size: var(--awd-font-size-body);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: background-color var(--awd-motion-fast), border-color var(--awd-motion-fast);
 }
-.workdeck-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.help-text { display: block; color: var(--awd-text-2); font-size: var(--awd-panel-fs); line-height: 1.6; margin: 8px 0; }
+.mini-btn { flex: 1; }
+.mini-btn::after, .workdeck-btn::after, .settings-toggle::after { border: none; }
+.mini-btn:not([disabled]):hover, .workdeck-btn:not([disabled]):hover { background: var(--awd-panel-hover); border-color: var(--awd-border-strong); }
+.mini-btn.active { color: var(--awd-accent-text); background: var(--awd-accent-soft); border-color: var(--awd-accent); font-weight: 600; }
+.workdeck-btn-primary { border-color: var(--awd-accent); background: var(--awd-accent); color: var(--awd-text-on-accent); font-weight: 600; }
+.workdeck-btn-primary:not([disabled]):hover { background: var(--awd-accent-hover); border-color: var(--awd-accent-hover); }
+.mini-btn[disabled], .workdeck-btn[disabled] { background: var(--awd-surface-2); color: var(--awd-text-3); border-color: var(--awd-border); cursor: not-allowed; }
+.operation-tabs { padding-block: var(--awd-panel-gap); }
+.full-width { width: 100%; }
+.help-text { display: block; color: var(--awd-text-2); font-size: var(--awd-panel-fs); line-height: 1.6; margin: var(--awd-panel-gap) 0; overflow-wrap: anywhere; }
 .suspect-text { color: var(--awd-warning-text); }
-.text-input { width: 100%; box-sizing: border-box; min-height: 64px; height: 76px; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); padding: 8px; color: var(--awd-text); background: var(--awd-surface); font-size: var(--awd-panel-fs); }
-.password-input { min-height: 36px; height: 36px; margin-bottom: 12px; }
-.preview-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 300px; overflow: auto; padding: 8px; margin: 8px 0; border: 1px solid var(--awd-border); font-size: var(--awd-panel-fs); line-height: 1.7; user-select: text; }
-.mini-btn.active { color: var(--awd-accent-text); border-color: currentColor; }
-button.mini-btn { min-height: 28px; height: auto; padding: 4px 6px; line-height: 1.5; margin: 0; white-space: normal; }
-.workdeck-btn-primary { border-color: var(--awd-accent); background: var(--awd-accent); color: var(--awd-text-on-accent); }
-.full-width { width: 100%; box-sizing: border-box; margin: 0; }
-.operation-tabs { padding-top: var(--awd-panel-gap); }
-.workflow { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); padding: 4px 0; }
-.workflow .current { color: var(--awd-accent-text); font-weight: 600; }
-.settings-toggle { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; margin: 0; padding: 6px 0; background: transparent; color: var(--awd-panel-text-2); font-size: var(--awd-panel-fs-sec); font-weight: 600; line-height: 1.5; text-align: left; border: none; border-radius: 0; }
-.settings-toggle::after { border: none; }
-.settings-summary { font-size: var(--awd-panel-fs-meta); font-weight: 400; flex-shrink: 0; }
+.text-input { width: 100%; box-sizing: border-box; min-height: 64px; height: 76px; border: 1px solid var(--awd-border); border-radius: var(--awd-panel-radius); padding: var(--awd-space-2); color: var(--awd-text); background: var(--awd-surface); font-size: var(--awd-font-size-body); }
+.password-input { min-height: var(--awd-control-height); height: var(--awd-control-height); margin-bottom: var(--awd-panel-gap); }
+.preview-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 300px; overflow: auto; padding: var(--awd-space-2); margin: var(--awd-panel-gap) 0; border: 1px solid var(--awd-border); border-radius: var(--awd-panel-radius); background: var(--awd-surface); font-size: var(--awd-font-size-body); line-height: 1.7; user-select: text; }
+.settings-toggle { display: flex; align-items: center; justify-content: space-between; gap: var(--awd-space-2); width: 100%; min-height: var(--awd-control-height); margin: 0; padding: var(--awd-space-1) 0; background: transparent; color: var(--awd-panel-text); font-size: var(--awd-panel-fs); font-weight: 600; line-height: var(--awd-line-height-ui); text-align: left; border: none; border-radius: var(--awd-panel-radius); }
+.settings-summary { font-size: var(--awd-panel-fs-meta); font-weight: 400; flex-shrink: 0; color: var(--awd-text-2); }
 .settings-section { border-top: 1px solid var(--awd-panel-border); }
-.strategies-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(94px, 1fr)); }
-.settings-content { padding-top: 4px; }
-.error-text, .processing-text { margin: 0 var(--awd-panel-pad-x) var(--awd-panel-gap); padding: 8px; font-size: var(--awd-panel-fs); line-height: 1.5; border-radius: var(--awd-panel-radius); overflow-wrap: anywhere; }
+.settings-content { padding-top: var(--awd-space-1); }
+.strategies-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr)); gap: var(--awd-space-1) var(--awd-space-2); }
+.strategy-item { display: flex; align-items: center; min-width: 0; min-height: var(--awd-control-sm); cursor: pointer; }
+.strategy-item:hover { background: var(--awd-panel-accent-wash); }
+.checkbox { width: 14px; height: 14px; flex-shrink: 0; border: 1px solid var(--awd-border-strong); border-radius: var(--awd-radius-sm); margin-right: var(--awd-space-2); display: flex; align-items: center; justify-content: center; }
+.checkbox.checked { background: var(--awd-accent); border-color: var(--awd-accent); }
+.check-mark { color: var(--awd-text-on-accent); font-size: var(--awd-panel-fs-meta); }
+.strategy-label { font-size: var(--awd-panel-fs); color: var(--awd-panel-text); overflow-wrap: anywhere; }
+.error-text, .processing-text { margin: 0 var(--awd-panel-pad-x) var(--awd-panel-gap); padding: var(--awd-space-2); font-size: var(--awd-panel-fs); line-height: 1.5; border-radius: var(--awd-panel-radius); overflow-wrap: anywhere; }
 .error-text { color: var(--awd-danger-text); background: var(--awd-danger-soft); }
 .processing-text { color: var(--awd-accent-text); background: var(--awd-accent-wash); }
-button:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 2px; }
+button:focus-visible, .text-input:focus-within { outline: var(--awd-focus-width) solid var(--awd-accent); outline-offset: var(--awd-focus-offset); }
+@container (max-width: 300px) { .mode-options { flex-direction: column; } }
+@container (max-width: 240px) { .settings-toggle { flex-wrap: wrap; } }
+@media (pointer: coarse) { .mini-btn, .workdeck-btn, .settings-toggle, .strategy-item { min-height: var(--awd-control-height-touch); } }
+@media (prefers-reduced-motion: reduce) { .mini-btn, .workdeck-btn { transition: none; } }
 </style>

@@ -38,7 +38,7 @@ test('builtinWorkflow skills are hidden from installedRows in lazy mode', () => 
   assert.deepEqual(rows.map(r => r.id), ['custom-skill'])
 })
 
-test('ChatInterface builtin workflows fold like Jev with Advanced settings, more button, right-click menu, and version manager modal', () => {
+test('ChatInterface builtin workflows fold like Jev with Advanced settings, more button, right-click menu, and workspace version manager', () => {
   const chatSource = readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
   assert.ok(chatSource.includes('<details class="builtin-workflows-fold"'))
   assert.ok(chatSource.includes('builtin-workflows-summary'))
@@ -46,7 +46,9 @@ test('ChatInterface builtin workflows fold like Jev with Advanced settings, more
   assert.ok(chatSource.includes('builtin-workflow-more-btn'))
   assert.ok(chatSource.includes('@contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)"'))
   assert.ok(chatSource.includes('bw-context-menu'))
-  assert.ok(chatSource.includes('bw-editor-dialog'))
-  assert.ok(chatSource.includes('bw-workflow-tabs'))
-  assert.ok(chatSource.includes('submitBuiltinWorkflowVersion'))
+  const editorSource = readFileSync(new URL('../../src/components/BuiltinWorkflowEditor.vue', import.meta.url), 'utf8')
+  assert.ok(chatSource.includes('openWorkflowEditorTab'))
+  assert.ok(editorSource.includes('bw-editor-dialog'))
+  assert.ok(editorSource.includes('bw-workflow-tabs'))
+  assert.ok(editorSource.includes('submitBuiltinWorkflowVersion'))
 })
