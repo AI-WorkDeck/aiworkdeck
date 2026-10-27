@@ -16,5 +16,34 @@ export function pluginViews(plugin, resolveEntry) {
 }
 
 export function isGlobalPlugin(plugin) {
-  return plugin?.views?.some(view => view.scope === 'global') === true
+  const entry = plugin?.sidebarView || plugin?.workspaceView
+    || plugin?.views?.find(view => view.placement === 'sidebar')
+    || plugin?.views?.find(view => view.placement === 'workspace')
+  return entry?.scope === 'global'
+}
+
+// UI declarations are independent of data permissions. null/omitted preserves
+// legacy navigation; an explicit empty array opts out of all standalone UI.
+export function hasPluginNavigation(plugin) {
+  return !!plugin && !plugin.legacyThemeGallery && (plugin.hasDeclaredViews !== true || plugin.views.length > 0)
+}
+
+export function hasPluginPanel(plugin) {
+  return hasPluginNavigation(plugin) && (plugin.hasDeclaredViews !== true || !!plugin.sidebarView)
+}
+
+export function canOpenPluginWorkspace(plugin, hasProject) {
+  if (!plugin || plugin.legacyThemeGallery || (plugin.hasDeclaredViews === true && !plugin.workspaceView)) return false
+  return !!hasProject || plugin.workspaceView?.scope === 'global'
+}
+
+// Older theme packs used a global gallery as their preview entry. Preserve their
+// lightweight behavior until those installed packs receive the explicit views: [].
+export function isLegacyThemeGallery(plugin) {
+  const c = plugin?.contributes
+  if (!c?.themes?.length || plugin.tools?.length || plugin.permissions?.length || plugin.guide?.quickActions?.length) return false
+  if (Object.entries(c).some(([key, value]) => !['themes', 'views'].includes(key) && Array.isArray(value) && value.length)) return false
+  return c.views?.length === 1 && c.views[0].id === 'gallery'
+    && c.views[0].placement === 'workspace' && c.views[0].scope === 'global'
+    && c.views[0].entry === plugin.frontendEntry
 }

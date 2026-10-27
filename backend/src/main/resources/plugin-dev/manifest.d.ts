@@ -34,7 +34,10 @@ export interface PluginManifest {
   tools?: { name: string; description?: string; [key: string]: unknown }[];
   settings?: SettingDeclaration[]; guide?: Record<string, unknown>;
   contributes?: {
-    mcpServers?: McpServerDeclaration[]; views?: ViewDeclaration[]; connections?: ConnectionDeclaration[]; templates?: FileContribution[]; styleProfiles?: FileContribution[]; themes?: FileContribution[];
+    mcpServers?: McpServerDeclaration[];
+    /** Omitted: legacy UI. []: no rail, panel or workspace. Otherwise only declared placements. */
+    views?: ViewDeclaration[];
+    connections?: ConnectionDeclaration[]; templates?: FileContribution[]; styleProfiles?: FileContribution[]; themes?: FileContribution[];
     capabilities?: { id: string; capability: string; kind: 'web' | 'data' | 'process'; entry: string; protocol: string; runtime?: string }[];
     evidenceSources?: { sourceId: string; name: string; description?: string; transport?: 'spi' | 'mcp'; server?: { url: string; tokenSettingKey?: string }; tool?: string }[];
   };
