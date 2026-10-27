@@ -3,87 +3,87 @@
 
 export default {
   "sidebar": {
-    "projectHome": "Project Overview",
-    "projects": "Projects",
-    "files": "Explorer",
-    "ddFiles": "Due Diligence Files",
-    "market": "Extensions",
-    "dev": "Plugin Development",
-    "voice": "Voice",
-    "meetingRecorder": "Meeting Recording",
-    "litigationVisual": "Litigation Visualization",
-    "tmeet": "Tencent Meeting",
-    "search": "Search",
-    "tts": "Text to Speech",
-    "desensitize": "File Redaction",
+    "projectHome": "Panoramica del progetto",
+    "projects": "Progetti",
+    "files": "Esploratore",
+    "ddFiles": "File di Due Diligence",
+    "market": "Estensioni",
+    "dev": "Sviluppo di plugin",
+    "voice": "Voce",
+    "meetingRecorder": "Registrazione delle riunioni",
+    "litigationVisual": "Visualizzazione contenziosi",
+    "tmeet": "Riunioni Tencent",
+    "search": "Ricerca",
+    "tts": "Testo in voce",
+    "desensitize": "Oscuramento dei file",
     "version": "Version History",
-    "calendar": "Calendar"
+    "calendar": "Calendario"
   },
   "tools": {
-    "variables": "Variable Library",
-    "favorites": "Favorites",
-    "clipboard": "Clipboard"
+    "variables": "Libreria delle variabili",
+    "favorites": "Preferiti",
+    "clipboard": "Appunti"
   },
   "fileActions": {
-    "move": "Move",
-    "cut": "Cut",
-    "copy": "Copy",
-    "delete": "Delete",
+    "move": "Sposta",
+    "cut": "Taglia",
+    "copy": "Copia",
+    "delete": "Elimina",
     "cancel": "Annulla",
-    "newFile": "New File",
-    "newFolder": "New Folder",
-    "sort": "Sort"
+    "newFile": "Nuovo file",
+    "newFolder": "Nuova cartella",
+    "sort": "Ordina"
   },
   "ocr": {
-    "refresh": "Refresh View",
-    "recognize": "Recognize Text",
-    "download": "Download",
-    "copy": "Copy",
-    "insertDoc": "Insert into Document",
-    "webLink": "Link to Web Verification",
-    "favorite": "Add to Favorites"
+    "refresh": "Aggiorna visualizzazione",
+    "recognize": "Riconosci il testo",
+    "download": "Scarica",
+    "copy": "Copia",
+    "insertDoc": "Inserisci nel documento",
+    "webLink": "Collega alla verifica web",
+    "favorite": "Aggiungi ai preferiti"
   },
   "projectTypes": {
-    "majorAssetRestructuring": "Listed Company Major Asset Restructuring",
-    "privatePlacement": "Listed Company Private Placement",
-    "publicPlacement": "Listed Company Public Offering",
-    "acquisition": "Listed Company Takeover",
-    "blank": "Blank Project"
+    "majorAssetRestructuring": "Ristrutturazione rilevante di asset di società quotate",
+    "privatePlacement": "Collocamento privato di società quotate",
+    "publicPlacement": "Offerta pubblica di società quotate",
+    "acquisition": "Acquisizione di società quotate",
+    "blank": "Progetto vuoto"
   },
   "projectFields": {
-    "listedCompanyName": "Listed Company Name",
-    "listedCompanyNamePlaceholder": "Enter the listed company's full or short name",
-    "targetCompanyName": "Target Company Name",
-    "targetCompanyNamePlaceholder": "Enter the target company's full name",
-    "projectName": "Project Name",
-    "projectNamePlaceholder": "Enter a project name",
-    "listedCompanyInfo": "Listed Company Basic Information",
-    "targetCompanyInfo": "Target Company Basic Information"
+    "listedCompanyName": "Nome della società quotata",
+    "listedCompanyNamePlaceholder": "Inserisci il nome completo o abbreviato della società quotata",
+    "targetCompanyName": "Nome della società target",
+    "targetCompanyNamePlaceholder": "Inserisci il nome completo della società target",
+    "projectName": "Nome del progetto",
+    "projectNamePlaceholder": "Inserisci un nome per il progetto",
+    "listedCompanyInfo": "Informazioni di base della società quotata",
+    "targetCompanyInfo": "Informazioni di base della società target"
   },
   "roles": {
     "owner": "Proprietario",
-    "admin": "Case Admin",
-    "participant": "Collaborator",
-    "readOnly": "Read-only",
-    "client": "Client"
+    "admin": "Amministratore del caso",
+    "participant": "Collaboratore",
+    "readOnly": "Sola lettura",
+    "client": "Cliente"
   },
   "roleHints": {
-    "admin": "Can edit files, add members, and manage permissions",
-    "participant": "Can edit files and submit drafts",
-    "readOnly": "View only, no editing"
+    "admin": "Può modificare i file, aggiungere membri e gestire le autorizzazioni",
+    "participant": "Può modificare i file e inviare bozze",
+    "readOnly": "Solo visualizzazione, senza modifica"
   },
   "memberGroups": {
-    "admin": "Owners & Case Admins",
-    "member": "Collaborators",
-    "client": "Clients"
+    "admin": "Proprietari e amministratori del caso",
+    "member": "Collaboratori",
+    "client": "Clienti"
   },
   "clipboardTypes": {
-    "text": "Text",
-    "image": "Image",
+    "text": "Testo",
+    "image": "Immagine",
     "file": "File",
-    "unknown": "Unknown"
+    "unknown": "Sconosciuto"
   },
   "variables": {
-    "searchPlaceholder": "Search variable names or content"
+    "searchPlaceholder": "Cerca nomi o contenuti delle variabili"
   }
 }

@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "skinSectionTitle": "Theme Skin",
-  "skinDefaultName": "Oriental Serenity (Default)",
   "restartPending": "{count} कार्य फिर से शुरू किए जा सकते हैं",
   "restartContinue": "जारी रखें: {name}",
   "restartRestoring": "मूल बातचीत और दस्तावेज़ पुनर्स्थापित किए जा रहे हैं…",
@@ -118,6 +116,8 @@ export default {
   "appearanceLight": "लाइट",
   "appearanceDark": "डार्क",
   "appearanceSystem": "सिस्टम के अनुसार",
+  "skinSectionTitle": "थीम स्किन",
+  "skinDefaultName": "पूर्वी शांति (डिफ़ॉल्ट)",
   "walletChipTitle": "Credits बैलेंस और सदस्यता स्तर; खाता सेटिंग्स खोलने के लिए क्लिक करें",
   "walletMenuLabel": "खाता और उपयोग",
   "trialInfo": "ट्रायल के बारे में",

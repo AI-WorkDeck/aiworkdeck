@@ -1,4 +1,4 @@
 {
-  "plugin.name": "Law Firm Management",
-  "plugin.description": "Case intake & approval, regulatory-grade conflict-of-interest checks with collaborative clearance, billing & invoice ledger (manual reconciliation and Kingdee/Yonyou integration), and lawyer workload & executive dashboard."
+  "plugin.name": "Quản lý công ty luật",
+  "plugin.description": "Tiếp nhận & phê duyệt vụ việc, kiểm tra xung đột lợi ích đạt chuẩn tuân thủ với quy trình phê duyệt cộng tác, sổ cái thanh toán & hóa đơn (đối soát thủ công và tích hợp Kingdee/Yonyou), cùng bảng điều khiển khối lượng công việc của luật sư & dashboard điều hành."
 }

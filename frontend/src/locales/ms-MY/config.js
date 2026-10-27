@@ -3,87 +3,87 @@
 
 export default {
   "sidebar": {
-    "projectHome": "Project Overview",
+    "projectHome": "Ringkasan Projek",
     "projects": "Projek",
-    "files": "Explorer",
-    "ddFiles": "Due Diligence Files",
-    "market": "Extensions",
-    "dev": "Plugin Development",
-    "voice": "Voice",
-    "meetingRecorder": "Meeting Recording",
-    "litigationVisual": "Litigation Visualization",
-    "tmeet": "Tencent Meeting",
-    "search": "Search",
-    "tts": "Text to Speech",
-    "desensitize": "File Redaction",
+    "files": "Penjelajah",
+    "ddFiles": "Fail Usaha Tuntas",
+    "market": "Sambungan",
+    "dev": "Pembangunan Pemalam",
+    "voice": "Suara",
+    "meetingRecorder": "Rakaman Mesyuarat",
+    "litigationVisual": "Visualisasi Perbicaraan",
+    "tmeet": "Mesyuarat Tencent",
+    "search": "Cari",
+    "tts": "Teks kepada Pertuturan",
+    "desensitize": "Penyuraian Fail",
     "version": "Version History",
-    "calendar": "Calendar"
+    "calendar": "Kalendar"
   },
   "tools": {
-    "variables": "Variable Library",
-    "favorites": "Favorites",
-    "clipboard": "Clipboard"
+    "variables": "Pustaka Pemboleh Ubah",
+    "favorites": "Kegemaran",
+    "clipboard": "Papan Keratan"
   },
   "fileActions": {
-    "move": "Move",
-    "cut": "Cut",
-    "copy": "Copy",
+    "move": "Pindah",
+    "cut": "Potong",
+    "copy": "Salin",
     "delete": "Padam",
     "cancel": "Batal",
-    "newFile": "New File",
-    "newFolder": "New Folder",
-    "sort": "Sort"
+    "newFile": "Fail Baharu",
+    "newFolder": "Folder Baharu",
+    "sort": "Isih"
   },
   "ocr": {
-    "refresh": "Refresh View",
-    "recognize": "Recognize Text",
-    "download": "Download",
-    "copy": "Copy",
-    "insertDoc": "Insert into Document",
-    "webLink": "Link to Web Verification",
-    "favorite": "Add to Favorites"
+    "refresh": "Segarkan Semula Paparan",
+    "recognize": "Kenali Teks",
+    "download": "Muat Turun",
+    "copy": "Salin",
+    "insertDoc": "Sisipkan ke dalam Dokumen",
+    "webLink": "Pautan ke Pengesahan Web",
+    "favorite": "Tambah ke Kegemaran"
   },
   "projectTypes": {
-    "majorAssetRestructuring": "Listed Company Major Asset Restructuring",
-    "privatePlacement": "Listed Company Private Placement",
-    "publicPlacement": "Listed Company Public Offering",
-    "acquisition": "Listed Company Takeover",
-    "blank": "Blank Project"
+    "majorAssetRestructuring": "Penstrukturan Semula Aset Utama Syarikat Tersenarai",
+    "privatePlacement": "Penerbitan Peribadi Syarikat Tersenarai",
+    "publicPlacement": "Penerbitan Awam Syarikat Tersenarai",
+    "acquisition": "Pengambilalihan Syarikat Tersenarai",
+    "blank": "Projek Kosong"
   },
   "projectFields": {
-    "listedCompanyName": "Listed Company Name",
-    "listedCompanyNamePlaceholder": "Enter the listed company's full or short name",
-    "targetCompanyName": "Target Company Name",
-    "targetCompanyNamePlaceholder": "Enter the target company's full name",
-    "projectName": "Project Name",
-    "projectNamePlaceholder": "Enter a project name",
-    "listedCompanyInfo": "Listed Company Basic Information",
-    "targetCompanyInfo": "Target Company Basic Information"
+    "listedCompanyName": "Nama Syarikat Tersenarai",
+    "listedCompanyNamePlaceholder": "Masukkan nama penuh atau nama pendek syarikat tersenarai",
+    "targetCompanyName": "Nama Syarikat Sasaran",
+    "targetCompanyNamePlaceholder": "Masukkan nama penuh syarikat sasaran",
+    "projectName": "Nama Projek",
+    "projectNamePlaceholder": "Masukkan nama projek",
+    "listedCompanyInfo": "Maklumat Asas Syarikat Tersenarai",
+    "targetCompanyInfo": "Maklumat Asas Syarikat Sasaran"
   },
   "roles": {
-    "owner": "Owner",
-    "admin": "Case Admin",
-    "participant": "Collaborator",
-    "readOnly": "Read-only",
-    "client": "Client"
+    "owner": "Pemilik",
+    "admin": "Pentadbir Kes",
+    "participant": "Kolaborator",
+    "readOnly": "Baca sahaja",
+    "client": "Klien"
   },
   "roleHints": {
-    "admin": "Can edit files, add members, and manage permissions",
-    "participant": "Can edit files and submit drafts",
-    "readOnly": "View only, no editing"
+    "admin": "Boleh menyunting fail, menambah ahli dan mengurus kebenaran",
+    "participant": "Boleh menyunting fail dan menghuna draf",
+    "readOnly": "Paparan sahaja, tiada suntingan"
   },
   "memberGroups": {
-    "admin": "Owners & Case Admins",
-    "member": "Collaborators",
-    "client": "Clients"
+    "admin": "Pemilik & Pentadbir Kes",
+    "member": "Kolaborator",
+    "client": "Klien"
   },
   "clipboardTypes": {
-    "text": "Text",
-    "image": "Image",
-    "file": "File",
-    "unknown": "Unknown"
+    "text": "Teks",
+    "image": "Imej",
+    "file": "Fail",
+    "unknown": "Tidak Diketahui"
   },
   "variables": {
-    "searchPlaceholder": "Search variable names or content"
+    "searchPlaceholder": "Cari nama atau kandungan pemboleh ubah"
   }
 }

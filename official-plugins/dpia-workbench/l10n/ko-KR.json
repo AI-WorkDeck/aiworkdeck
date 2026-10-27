@@ -1,15 +1,15 @@
 {
-  "plugin.name": "DPIA Workbench",
-  "plugin.description": "Data Protection Impact Assessment: source tracing, fact confirmation, Q&A follow-up, risk & remediation, continuous re-assessment, and versioned reports. Adapted from Zhu Lingfeng's DSH DPIA Workbench; requires Node.js, Python, and LibreOffice.",
-  "plugin.author": "AI WorkDeck (Upstream: Zhu Lingfeng / The-Data-Galaxy)",
-  "setting.nodePath.label": "Node.js Executable",
-  "setting.nodePath.description": "Leave blank to use node from system PATH; requires Node.js 20 or newer.",
-  "setting.pythonPath.label": "Python Executable",
-  "setting.pythonPath.description": "Requires document dependencies from runtime/requirements.txt; can specify a Python path from a virtual environment.",
-  "setting.pdfFontPath.label": "PDF CJK Font File",
-  "setting.pdfFontPath.description": "Filling CJK text in native PDF templates requires an embeddable TrueType font (TTF/TTC); leave blank to use system font lookup.",
-  "setting.sofficePath.label": "LibreOffice Executable",
-  "setting.sofficePath.description": "Only needed for report PDF export and page preview; leave blank to try default system locations.",
-  "tool.dpia_workbench_action.description": "DPIA case, materials, fact confirmation, Q&A, run status, and report operations. For workbench UI only; AI must not invoke manual confirmation/approval entries.",
-  "tool.dpia_workbench_task.description": "Execute currently frozen DPIA tasks: context/read/write/script/commit/report; strictly scoped to the current user project and case output directory."
+  "plugin.name": "DPIA 워크벤치",
+  "plugin.description": "데이터 보호 영향 평가: 소스 추적, 사실 확인, Q&A 후속 조치, 위험 및 개선, 지속적인 재평가, 버전 관리된 보고서. Zhu Lingfeng의 DSH DPIA Workbench를 각색한 것으로 Node.js, Python, LibreOffice가 필요합니다.",
+  "plugin.author": "AI WorkDeck (업스트림: Zhu Lingfeng / The-Data-Galaxy)",
+  "setting.nodePath.label": "Node.js 실행 파일",
+  "setting.nodePath.description": "비워 두면 시스템 PATH의 node를 사용합니다. Node.js 20 이상이 필요합니다.",
+  "setting.pythonPath.label": "Python 실행 파일",
+  "setting.pythonPath.description": "runtime/requirements.txt의 문서 종속성이 필요합니다. 가상 환경의 Python 경로를 지정할 수 있습니다.",
+  "setting.pdfFontPath.label": "PDF CJK 글꼴 파일",
+  "setting.pdfFontPath.description": "네이티브 PDF 템플릿에 CJK 텍스트를 채우려면 포함 가능한 TrueType 글꼴(TTF/TTC)이 필요합니다. 비워 두면 시스템 글꼴 검색을 사용합니다.",
+  "setting.sofficePath.label": "LibreOffice 실행 파일",
+  "setting.sofficePath.description": "보고서 PDF 내보내기 및 페이지 미리보기에만 필요합니다. 비워 두면 시스템 기본 위치를 시도합니다.",
+  "tool.dpia_workbench_action.description": "DPIA 케이스, 자료, 사실 확인, Q&A, 실행 상태 및 보고서 작업. 워크벤치 UI 전용이며 AI는 수동 확인/승인 항목을 호출해서는 안 됩니다.",
+  "tool.dpia_workbench_task.description": "현재 고정된 DPIA 작업 실행: context/read/write/script/commit/report. 현재 사용자 프로젝트와 케이스 출력 디렉터리로 엄격하게 범위가 제한됩니다."
 }

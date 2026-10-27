@@ -3,87 +3,87 @@
 
 export default {
   "sidebar": {
-    "projectHome": "Project Overview",
-    "projects": "Projects",
+    "projectHome": "Projektübersicht",
+    "projects": "Projekte",
     "files": "Explorer",
-    "ddFiles": "Due Diligence Files",
-    "market": "Extensions",
-    "dev": "Plugin Development",
-    "voice": "Voice",
-    "meetingRecorder": "Meeting Recording",
-    "litigationVisual": "Litigation Visualization",
+    "ddFiles": "Due-Diligence-Dateien",
+    "market": "Erweiterungen",
+    "dev": "Plugin-Entwicklung",
+    "voice": "Sprache",
+    "meetingRecorder": "Besprechungsaufzeichnung",
+    "litigationVisual": "Prozessvisualisierung",
     "tmeet": "Tencent Meeting",
-    "search": "Search",
-    "tts": "Text to Speech",
-    "desensitize": "File Redaction",
+    "search": "Suche",
+    "tts": "Text zu Sprache",
+    "desensitize": "Dateischwärzung",
     "version": "Version History",
-    "calendar": "Calendar"
+    "calendar": "Kalender"
   },
   "tools": {
-    "variables": "Variable Library",
+    "variables": "Variablenbibliothek",
     "favorites": "Favoriten",
     "clipboard": "Zwischenablage"
   },
   "fileActions": {
-    "move": "Move",
-    "cut": "Cut",
-    "copy": "Copy",
+    "move": "Verschieben",
+    "cut": "Ausschneiden",
+    "copy": "Kopieren",
     "delete": "Löschen",
     "cancel": "Abbrechen",
-    "newFile": "New File",
-    "newFolder": "New Folder",
-    "sort": "Sort"
+    "newFile": "Neue Datei",
+    "newFolder": "Neuer Ordner",
+    "sort": "Sortieren"
   },
   "ocr": {
-    "refresh": "Refresh View",
-    "recognize": "Recognize Text",
-    "download": "Download",
-    "copy": "Copy",
-    "insertDoc": "Insert into Document",
-    "webLink": "Link to Web Verification",
-    "favorite": "Add to Favorites"
+    "refresh": "Ansicht aktualisieren",
+    "recognize": "Text erkennen",
+    "download": "Herunterladen",
+    "copy": "Kopieren",
+    "insertDoc": "In Dokument einfügen",
+    "webLink": "Mit Web-Verifizierung verknüpfen",
+    "favorite": "Zu Favoriten hinzufügen"
   },
   "projectTypes": {
-    "majorAssetRestructuring": "Listed Company Major Asset Restructuring",
-    "privatePlacement": "Listed Company Private Placement",
-    "publicPlacement": "Listed Company Public Offering",
-    "acquisition": "Listed Company Takeover",
-    "blank": "Blank Project"
+    "majorAssetRestructuring": "Umstrukturierung wesentlicher Vermögenswerte eines börsennotierten Unternehmens",
+    "privatePlacement": "Private Platzierung eines börsennotierten Unternehmens",
+    "publicPlacement": "Öffentliches Angebot eines börsennotierten Unternehmens",
+    "acquisition": "Übernahme eines börsennotierten Unternehmens",
+    "blank": "Leeres Projekt"
   },
   "projectFields": {
-    "listedCompanyName": "Listed Company Name",
-    "listedCompanyNamePlaceholder": "Enter the listed company's full or short name",
-    "targetCompanyName": "Target Company Name",
-    "targetCompanyNamePlaceholder": "Enter the target company's full name",
-    "projectName": "Project Name",
-    "projectNamePlaceholder": "Enter a project name",
-    "listedCompanyInfo": "Listed Company Basic Information",
-    "targetCompanyInfo": "Target Company Basic Information"
+    "listedCompanyName": "Name des börsennotierten Unternehmens",
+    "listedCompanyNamePlaceholder": "Vollständigen oder kurzen Namen des börsennotierten Unternehmens eingeben",
+    "targetCompanyName": "Name des Zielunternehmens",
+    "targetCompanyNamePlaceholder": "Vollständigen Namen des Zielunternehmens eingeben",
+    "projectName": "Projektname",
+    "projectNamePlaceholder": "Projektnamen eingeben",
+    "listedCompanyInfo": "Grundinformationen zum börsennotierten Unternehmen",
+    "targetCompanyInfo": "Grundinformationen zum Zielunternehmen"
   },
   "roles": {
-    "owner": "Owner",
-    "admin": "Case Admin",
-    "participant": "Collaborator",
-    "readOnly": "Read-only",
-    "client": "Client"
+    "owner": "Eigentümer",
+    "admin": "Falladministrator",
+    "participant": "Mitarbeiter",
+    "readOnly": "Nur Lesen",
+    "client": "Mandant"
   },
   "roleHints": {
-    "admin": "Can edit files, add members, and manage permissions",
-    "participant": "Can edit files and submit drafts",
-    "readOnly": "View only, no editing"
+    "admin": "Kann Dateien bearbeiten, Mitglieder hinzufügen und Berechtigungen verwalten",
+    "participant": "Kann Dateien bearbeiten und Entwürfe einreichen",
+    "readOnly": "Nur Ansehen, keine Bearbeitung"
   },
   "memberGroups": {
-    "admin": "Owners & Case Admins",
-    "member": "Collaborators",
-    "client": "Clients"
+    "admin": "Eigentümer & Falladministratoren",
+    "member": "Mitarbeiter",
+    "client": "Mandanten"
   },
   "clipboardTypes": {
     "text": "Text",
-    "image": "Image",
-    "file": "File",
+    "image": "Bild",
+    "file": "Datei",
     "unknown": "Unbekannt"
   },
   "variables": {
-    "searchPlaceholder": "Search variable names or content"
+    "searchPlaceholder": "Variablennamen oder -inhalte durchsuchen"
   }
 }

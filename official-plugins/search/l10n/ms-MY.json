@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Project Search",
-  "plugin.description": "Search project files by full text or tags and jump directly to documents.",
-  "view.main.name": "Project Search"
+  "plugin.name": "Carian Projek",
+  "plugin.description": "Cari fail projek melalui teks penuh atau tag dan terus lompat ke dokumen.",
+  "view.main.name": "Carian Projek"
 }

@@ -4,9 +4,9 @@
 export default {
   "edit": "보내기 전에 편집",
   "tab": "Tab 키로 전송",
-  "dismiss": "Dismiss suggestion",
-  "on": "Next message · On",
-  "off": "Next message · Off",
+  "dismiss": "제안 닫기",
+  "on": "다음 메시지 · 켜기",
+  "off": "다음 메시지 · 끄기",
   "about": "정보",
-  "help": "After a reply, your current model suggests one next message, adding a small amount of model usage without reading extra attachments. Click to edit, or press Tab in the empty input to send. Acceptance, edits and dismissals are stored on this device for 30 days; recent feedback is sent to your current model with later suggestion requests in this conversation. It does not train the model or enter usage statistics."
+  "help": "답장 후 현재 모델이 다음 메시지를 하나 제안하며, 추가 첨부 파일을 읽지 않으면서 소량의 모델 사용량만 소모합니다. 클릭하여 편집하거나, 빈 입력창에서 Tab 키를 눌러 보내세요. 수락, 편집, 닫기 기록은 이 기기에 30일간 저장되며, 최근 피드백은 이 대화에서 이후 제안 요청 시 현재 모델에 함께 전송됩니다. 모델 학습이나 사용 통계에는 사용되지 않습니다."
 }

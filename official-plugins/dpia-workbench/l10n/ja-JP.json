@@ -1,15 +1,15 @@
 {
-  "plugin.name": "DPIA Workbench",
-  "plugin.description": "Data Protection Impact Assessment: source tracing, fact confirmation, Q&A follow-up, risk & remediation, continuous re-assessment, and versioned reports. Adapted from Zhu Lingfeng's DSH DPIA Workbench; requires Node.js, Python, and LibreOffice.",
-  "plugin.author": "AI WorkDeck (Upstream: Zhu Lingfeng / The-Data-Galaxy)",
-  "setting.nodePath.label": "Node.js Executable",
-  "setting.nodePath.description": "Leave blank to use node from system PATH; requires Node.js 20 or newer.",
-  "setting.pythonPath.label": "Python Executable",
-  "setting.pythonPath.description": "Requires document dependencies from runtime/requirements.txt; can specify a Python path from a virtual environment.",
-  "setting.pdfFontPath.label": "PDF CJK Font File",
-  "setting.pdfFontPath.description": "Filling CJK text in native PDF templates requires an embeddable TrueType font (TTF/TTC); leave blank to use system font lookup.",
-  "setting.sofficePath.label": "LibreOffice Executable",
-  "setting.sofficePath.description": "Only needed for report PDF export and page preview; leave blank to try default system locations.",
-  "tool.dpia_workbench_action.description": "DPIA case, materials, fact confirmation, Q&A, run status, and report operations. For workbench UI only; AI must not invoke manual confirmation/approval entries.",
-  "tool.dpia_workbench_task.description": "Execute currently frozen DPIA tasks: context/read/write/script/commit/report; strictly scoped to the current user project and case output directory."
+  "plugin.name": "DPIAワークベンチ",
+  "plugin.description": "データ保護影響評価：ソースの追跡、事実確認、Q&Aフォローアップ、リスクと改善、継続的な再評価、バージョン管理されたレポート。Zhu Lingfeng氏のDSH DPIA Workbenchから改変。Node.js、Python、LibreOfficeが必要です。",
+  "plugin.author": "AI WorkDeck (上流: Zhu Lingfeng / The-Data-Galaxy)",
+  "setting.nodePath.label": "Node.js 実行ファイル",
+  "setting.nodePath.description": "空欄にするとシステムのPATHからnodeを使用します。Node.js 20以降が必要です。",
+  "setting.pythonPath.label": "Python 実行ファイル",
+  "setting.pythonPath.description": "runtime/requirements.txt のドキュメント依存関係が必要です。仮想環境のPythonパスを指定できます。",
+  "setting.pdfFontPath.label": "PDF CJK フォントファイル",
+  "setting.pdfFontPath.description": "ネイティブPDFテンプレートへのCJKテキストの埋め込みには、埋め込み可能なTrueTypeフォント(TTF/TTC)が必要です。空欄にするとシステムのフォント検索を使用します。",
+  "setting.sofficePath.label": "LibreOffice 実行ファイル",
+  "setting.sofficePath.description": "レポートのPDFエクスポートとページプレビューにのみ必要です。空欄にするとシステムの既定の場所を試します。",
+  "tool.dpia_workbench_action.description": "DPIAケース、資料、事実確認、Q&A、実行ステータス、レポートの操作。ワークベンチUI専用。AIが手動確認/承認エントリを呼び出してはなりません。",
+  "tool.dpia_workbench_task.description": "現在フリーズされているDPIAタスクを実行します: context/read/write/script/commit/report。現在のユーザープロジェクトとケース出力ディレクトリに厳密に限定されます。"
 }

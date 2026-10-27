@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Clipboard",
-  "plugin.description": "Search clipboard history, copy, and insert content.",
-  "view.main.name": "Clipboard"
+  "plugin.name": "クリップボード",
+  "plugin.description": "クリップボードの履歴を検索し、コンテンツをコピーして挿入します。",
+  "view.main.name": "クリップボード"
 }

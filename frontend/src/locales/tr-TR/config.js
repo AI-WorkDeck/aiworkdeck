@@ -3,36 +3,36 @@
 
 export default {
   "sidebar": {
-    "projectHome": "Project Overview",
-    "projects": "Projects",
-    "files": "Explorer",
-    "ddFiles": "Due Diligence Files",
-    "market": "Extensions",
-    "dev": "Plugin Development",
-    "voice": "Voice",
-    "meetingRecorder": "Meeting Recording",
-    "litigationVisual": "Litigation Visualization",
+    "projectHome": "Projeye Genel Bakış",
+    "projects": "Projeler",
+    "files": "Gezgin",
+    "ddFiles": "Due Diligence Dosyaları",
+    "market": "Uzantılar",
+    "dev": "Eklenti Geliştirme",
+    "voice": "Ses",
+    "meetingRecorder": "Toplantı Kaydı",
+    "litigationVisual": "Dava Görselleştirme",
     "tmeet": "Tencent Meeting",
-    "search": "Search",
-    "tts": "Text to Speech",
-    "desensitize": "File Redaction",
+    "search": "Arama",
+    "tts": "Metinden Sese",
+    "desensitize": "Dosya Karartma",
     "version": "Version History",
-    "calendar": "Calendar"
+    "calendar": "Takvim"
   },
   "tools": {
-    "variables": "Variable Library",
-    "favorites": "Favorites",
-    "clipboard": "Clipboard"
+    "variables": "Değişken Kütüphanesi",
+    "favorites": "Sık Kullanılanlar",
+    "clipboard": "Pano"
   },
   "fileActions": {
-    "move": "Move",
-    "cut": "Cut",
-    "copy": "Copy",
+    "move": "Taşı",
+    "cut": "Kes",
+    "copy": "Kopyala",
     "delete": "Sil",
     "cancel": "İptal",
-    "newFile": "New File",
-    "newFolder": "New Folder",
-    "sort": "Sort"
+    "newFile": "Yeni Dosya",
+    "newFolder": "Yeni Klasör",
+    "sort": "Sırala"
   },
   "ocr": {
     "refresh": "Görünümü Yenile",

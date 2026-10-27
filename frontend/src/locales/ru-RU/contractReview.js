@@ -55,8 +55,8 @@ export default {
   },
   "resultStatus": {
     "PASS": "Meets rule",
-    "ISSUE": "Change required",
-    "NEEDS_DECISION": "Client decision needed",
-    "UNREVIEWED": "Not fully checked"
+    "ISSUE": "Требуется изменение",
+    "NEEDS_DECISION": "Требуется решение клиента",
+    "UNREVIEWED": "Проверено не полностью"
   }
 }

@@ -3,69 +3,69 @@
 
 export default {
   "sidebar": {
-    "projectHome": "Project Overview",
-    "projects": "Projects",
-    "files": "Explorer",
-    "ddFiles": "Due Diligence Files",
-    "market": "Extensions",
-    "dev": "Plugin Development",
-    "voice": "Voice",
-    "meetingRecorder": "Meeting Recording",
+    "projectHome": "نظرة عامة على المشروع",
+    "projects": "المشاريع",
+    "files": "المستكشف",
+    "ddFiles": "ملفات العناية الواجبة",
+    "market": "الإضافات",
+    "dev": "تطوير الإضافات",
+    "voice": "الصوت",
+    "meetingRecorder": "تسجيل الاجتماعات",
     "litigationVisual": "التصور التقاضي",
     "tmeet": "Tencent Meeting",
-    "search": "Search",
-    "tts": "Text to Speech",
-    "desensitize": "File Redaction",
+    "search": "بحث",
+    "tts": "تحويل النص إلى كلام",
+    "desensitize": "حجب بيانات الملفات",
     "version": "Version History",
     "calendar": "التقويم"
   },
   "tools": {
-    "variables": "Variable Library",
+    "variables": "مكتبة المتغيرات",
     "favorites": "المفضلة",
     "clipboard": "الحافظة"
   },
   "fileActions": {
-    "move": "Move",
-    "cut": "Cut",
-    "copy": "Copy",
+    "move": "نقل",
+    "cut": "قص",
+    "copy": "نسخ",
     "delete": "حذف",
     "cancel": "إلغاء",
-    "newFile": "New File",
-    "newFolder": "New Folder",
-    "sort": "Sort"
+    "newFile": "ملف جديد",
+    "newFolder": "مجلد جديد",
+    "sort": "فرز"
   },
   "ocr": {
-    "refresh": "Refresh View",
-    "recognize": "Recognize Text",
+    "refresh": "تحديث العرض",
+    "recognize": "التعرّف على النص",
     "download": "التنزيل",
-    "copy": "Copy",
-    "insertDoc": "Insert into Document",
-    "webLink": "Link to Web Verification",
-    "favorite": "Add to Favorites"
+    "copy": "نسخ",
+    "insertDoc": "إدراج في المستند",
+    "webLink": "رابط للتحقق عبر الويب",
+    "favorite": "إضافة إلى المفضلة"
   },
   "projectTypes": {
-    "majorAssetRestructuring": "Listed Company Major Asset Restructuring",
-    "privatePlacement": "Listed Company Private Placement",
-    "publicPlacement": "Listed Company Public Offering",
-    "acquisition": "Listed Company Takeover",
-    "blank": "Blank Project"
+    "majorAssetRestructuring": "إعادة الهيكلة الكبرى لأصول الشركة المدرجة",
+    "privatePlacement": "الطرح الخاص للشركة المدرجة",
+    "publicPlacement": "الطرح العام للشركة المدرجة",
+    "acquisition": "استحواذ على الشركة المدرجة",
+    "blank": "مشروع فارغ"
   },
   "projectFields": {
-    "listedCompanyName": "Listed Company Name",
-    "listedCompanyNamePlaceholder": "Enter the listed company's full or short name",
-    "targetCompanyName": "Target Company Name",
-    "targetCompanyNamePlaceholder": "Enter the target company's full name",
-    "projectName": "Project Name",
-    "projectNamePlaceholder": "Enter a project name",
-    "listedCompanyInfo": "Listed Company Basic Information",
-    "targetCompanyInfo": "Target Company Basic Information"
+    "listedCompanyName": "اسم الشركة المدرجة",
+    "listedCompanyNamePlaceholder": "أدخل الاسم الكامل أو المختصر للشركة المدرجة",
+    "targetCompanyName": "اسم الشركة المستهدفة",
+    "targetCompanyNamePlaceholder": "أدخل الاسم الكامل للشركة المستهدفة",
+    "projectName": "اسم المشروع",
+    "projectNamePlaceholder": "أدخل اسم المشروع",
+    "listedCompanyInfo": "المعلومات الأساسية للشركة المدرجة",
+    "targetCompanyInfo": "المعلومات الأساسية للشركة المستهدفة"
   },
   "roles": {
-    "owner": "Owner",
-    "admin": "Case Admin",
-    "participant": "Collaborator",
-    "readOnly": "Read-only",
-    "client": "Client"
+    "owner": "المالك",
+    "admin": "مسؤول القضية",
+    "participant": "متعاون",
+    "readOnly": "للقراءة فقط",
+    "client": "العميل"
   },
   "roleHints": {
     "admin": "يمكنه تعديل الملفات وإضافة الأعضاء وإدارة الصلاحيات",

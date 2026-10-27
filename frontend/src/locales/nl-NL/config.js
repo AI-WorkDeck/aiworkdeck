@@ -45,45 +45,45 @@ export default {
   },
   "projectTypes": {
     "majorAssetRestructuring": "Herstructurering van grote activa van beursgenoteerde onderneming",
-    "privatePlacement": "Listed Company Private Placement",
-    "publicPlacement": "Listed Company Public Offering",
-    "acquisition": "Listed Company Takeover",
-    "blank": "Blank Project"
+    "privatePlacement": "Private plaatsing beursgenoteerd bedrijf",
+    "publicPlacement": "Publieke aanbieding beursgenoteerd bedrijf",
+    "acquisition": "Overname beursgenoteerd bedrijf",
+    "blank": "Leeg project"
   },
   "projectFields": {
-    "listedCompanyName": "Listed Company Name",
-    "listedCompanyNamePlaceholder": "Enter the listed company's full or short name",
-    "targetCompanyName": "Target Company Name",
-    "targetCompanyNamePlaceholder": "Enter the target company's full name",
-    "projectName": "Project Name",
-    "projectNamePlaceholder": "Enter a project name",
-    "listedCompanyInfo": "Listed Company Basic Information",
-    "targetCompanyInfo": "Target Company Basic Information"
+    "listedCompanyName": "Naam beursgenoteerd bedrijf",
+    "listedCompanyNamePlaceholder": "Voer de volledige of korte naam van het beursgenoteerde bedrijf in",
+    "targetCompanyName": "Naam doelbedrijf",
+    "targetCompanyNamePlaceholder": "Voer de volledige naam van het doelbedrijf in",
+    "projectName": "Projectnaam",
+    "projectNamePlaceholder": "Voer een projectnaam in",
+    "listedCompanyInfo": "Basisgegevens beursgenoteerd bedrijf",
+    "targetCompanyInfo": "Basisgegevens doelbedrijf"
   },
   "roles": {
     "owner": "Eigenaar",
-    "admin": "Case Admin",
-    "participant": "Collaborator",
-    "readOnly": "Read-only",
-    "client": "Client"
+    "admin": "Dossierbeheerder",
+    "participant": "Medewerker",
+    "readOnly": "Alleen-lezen",
+    "client": "Klant"
   },
   "roleHints": {
-    "admin": "Can edit files, add members, and manage permissions",
-    "participant": "Can edit files and submit drafts",
-    "readOnly": "View only, no editing"
+    "admin": "Kan bestanden bewerken, leden toevoegen en rechten beheren",
+    "participant": "Kan bestanden bewerken en concepten indienen",
+    "readOnly": "Alleen bekijken, niet bewerken"
   },
   "memberGroups": {
-    "admin": "Owners & Case Admins",
-    "member": "Collaborators",
-    "client": "Clients"
+    "admin": "Eigenaren & dossierbeheerders",
+    "member": "Medewerkers",
+    "client": "Klanten"
   },
   "clipboardTypes": {
-    "text": "Text",
-    "image": "Image",
-    "file": "File",
-    "unknown": "Unknown"
+    "text": "Tekst",
+    "image": "Afbeelding",
+    "file": "Bestand",
+    "unknown": "Onbekend"
   },
   "variables": {
-    "searchPlaceholder": "Search variable names or content"
+    "searchPlaceholder": "Zoek op variabelenamen of inhoud"
   }
 }
