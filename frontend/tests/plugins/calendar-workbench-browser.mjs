@@ -18,8 +18,11 @@ const today=localDateKey()
 const tasks=[{id:31,projectId:42,projectName:projects[0].name,title:'今天核对起诉材料',dueDate:today,status:'OPEN',type:'TODO',files:[]},
 {id:32,projectId:43,projectName:projects[1].name,title:'第五天准备开庭',dueDate:addDaysKey(today,4),status:'OPEN',type:'HEARING',files:[]}]
 const browser=await puppeteer.launch({executablePath:process.env.CHROME||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true,args:['--no-sandbox']})
-const page=await browser.newPage(), errors=[], api=[]
+const page=await browser.newPage(), errors=[], api=[], lifecycle=[]
+let phase='initial navigation'
 page.on('pageerror',error=>errors.push(error.message))
+page.on('framenavigated',frame=>{if(frame===page.mainFrame())lifecycle.push({event:'main-navigation',at:Date.now()})})
+page.on('console',message=>{if(message.text().startsWith('[vite]'))lifecycle.push({event:message.text(),at:Date.now()})})
 if(process.env.DEBUG_CALENDAR)page.on('console',message=>console.log(message.type(),message.text()))
 await page.setViewport({width:1600,height:960})
 await page.evaluateOnNewDocument(()=>{if(window!==window.top)return;localStorage.setItem('app_language','zh-CN');localStorage.setItem('awd_app_language','zh-CN');localStorage.setItem('awd_theme','light')})
@@ -40,7 +43,7 @@ page.on('request',async req=>{
   if(url.pathname==='/api/projects/42')body=projects[0]
   else if(url.pathname==='/api/projects/my')body=projects
   else if(url.pathname==='/api/auth/me')body={id:7,username:'synthetic',role:'USER'}
-  else if(url.pathname==='/api/plugins/list')body=enabled?[{...manifest,enabled:true}]:[]
+  else if(url.pathname==='/api/plugins/list'){body=enabled?[{...manifest,enabled:true}]:[];lifecycle.push({event:'plugin-list',enabled,at:Date.now()})}
   else if(url.pathname==='/api/plugins/market/list')body={plugins:[],accountConnected:false}
   else if(url.pathname==='/api/plugins/bundled')body={plugins:[]}
   else if(url.pathname==='/api/calendar')body={code:0,data:{tasks}}
@@ -64,15 +67,17 @@ const getPanels=async()=>{
 try{
   await page.goto(base+'/#/pages/project-overview/project-overview?id=42',{waitUntil:'networkidle0',timeout:90000})
   await page.waitForSelector(rail,{visible:true})
+  phase='first rail click'
   await page.click(rail)
   let {sidebar,workspace}=await getPanels()
   await sidebar.waitForSelector('[data-task-id="31"]');await workspace.waitForSelector('.fc-event')
   assert.equal((await page.$$eval('.tab-item',nodes=>nodes.filter(el=>el.textContent.includes('日程')).length)),1)
   assert.equal(await sidebar.$('.fc'),null)
-  assert.equal(await sidebar.evaluate(()=>window.awd.context.viewPlacement),'sidebar')
-  assert.equal(await workspace.evaluate(()=>window.awd.context.viewPlacement),'workspace')
+  assert.equal(await sidebar.evaluate(()=>window.awd.context.surface),'sidebar')
+  assert.equal(await workspace.evaluate(()=>window.awd.context.surface),'workspace')
   await page.waitForFunction(()=>![...document.querySelectorAll('uni-toast')].some(el=>el.getBoundingClientRect().height>0))
   await page.screenshot({path:out+'/workbench-month.png'})
+  phase='sidebar and workspace state propagation'
   await sidebar.select('.shortcut-project','43')
   await workspace.waitForFunction(()=>document.querySelector('.cal-scope-label')?.textContent==='日历合成乙项目')
   await clickText(sidebar,'.shortcut-segments uni-button','5')
@@ -91,6 +96,7 @@ try{
   assert.equal(yearState.viewType,'year')
   await sidebar.waitForFunction(async()=>{const state=await window.awd.services.request('calendar','workspace');return state.viewType==='year'})
   await clickText(page,'.tab-item','日程')
+  phase='close and reopen workspace'
   const tab=await page.evaluateHandle(()=>[...document.querySelectorAll('.tab-item')].find(el=>el.textContent.includes('日程')))
   await (await tab.$('.tab-close')).click()
   await page.waitForFunction(()=>![...document.querySelectorAll('.tab-item')].some(el=>el.textContent.includes('日程')))
@@ -103,11 +109,17 @@ try{
   assert.equal((await page.$$eval('.tab-item',nodes=>nodes.filter(el=>el.textContent.includes('日程')).length)),1)
   await page.click(rail)
   enabled=false
+  phase='plugin removal'
   await page.evaluate(()=>uni.$emit('awd:market-changed'))
   await page.waitForSelector(rail,{hidden:true})
   await page.waitForFunction(()=>![...document.querySelectorAll('.tab-item')].some(el=>el.textContent.includes('日程')))
   assert.deepEqual(errors,[])
   const report={passed:true,checks:['real rail opens real sidebar plus singleton workspace','host-authoritative view placement','project and 3/5-day filter propagation','same revision from both sandboxes','sidebar event focuses workspace day and dialog','year state round trip','close and reopen preserves state','repeated rail does not duplicate','plugin removal closes tab and removes rail'],apiRequests:api.length}
   await writeFile(out+'/workbench-report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report))
-}catch(error){await page.screenshot({path:out+'/workbench-failure.png'});console.error('PAGE_ERRORS',JSON.stringify(errors));throw error}
+}catch(error){
+  await page.screenshot({path:out+'/workbench-failure.png'})
+  const dom=await page.evaluate(()=>({rail:[...document.querySelectorAll('.left-rail .rail-btn')].map(el=>el.title),tabs:[...document.querySelectorAll('.tab-item')].map(el=>el.textContent),iframes:document.querySelectorAll('iframe').length}))
+  await writeFile(out+'/workbench-failure.json',JSON.stringify({phase,errors,lifecycle,dom,apiRequests:api.length},null,2))
+  console.error('PAGE_ERRORS',JSON.stringify(errors));throw error
+}
 finally{await browser.close()}

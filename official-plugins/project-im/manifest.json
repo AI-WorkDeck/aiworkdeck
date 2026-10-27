@@ -1,7 +1,7 @@
 {
   "id": "project-im",
   "name": "项目沟通",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "律所、团队与项目的沟通：共享助手、私聊、文件归档与 AI 引用。目前仅支持中国大陆站账号，国际站暂未开通。",
   "author": "AI WorkDeck",
   "minHostVersion": "0.69.0",
