@@ -8,6 +8,7 @@
   <title>腾讯会议 · AI WorkDeck</title>
   <link rel="stylesheet" href="panel.css">
   <script src="awd-plugin-sdk.js"></script>
+  <script src="panel-l10n.js"></script>
   <script src="panel.js" defer></script>
 </head>
 <body>
@@ -40,19 +41,19 @@
       <header class="workspace-toolbar">
         <h1 data-i18n="recordings">会议记录</h1>
         <span id="workspace-status" class="hint" role="status"></span>
-        <div class="actions"><button id="workspace-refresh" data-i18n="refreshList">刷新</button><button id="sync" class="primary" data-i18n="sync">同步会议</button></div>
+        <div class="actions"><button id="workspace-refresh" data-i18n="refreshList"></button><button id="sync" class="primary" data-i18n="sync">同步会议</button></div>
       </header>
       <div class="workspace-body">
         <section id="meeting-browser" aria-label="会议记录">
           <div class="search-box"><label class="sr-only" for="search" data-i18n="search">搜索已同步会议</label><input id="search" type="search" autocomplete="off"><span id="meeting-count" class="hint"></span></div>
           <div class="meeting-scroll"><p id="list-empty" class="empty-state"></p><ul id="meetings" aria-label="会议记录"></ul></div>
         </section>
-        <div id="detail-empty" class="empty-state" data-i18n="selectMeeting">选择一场会议</div>
+        <div id="detail-empty" class="empty-state" data-i18n="selectMeeting"></div>
         <section id="detail" hidden aria-labelledby="meeting-title">
           <header class="detail-header">
-            <button id="back-to-list" data-i18n="backToList">返回列表</button>
+            <button id="back-to-list" data-i18n="backToList"></button>
             <h2 id="meeting-title"></h2><p id="meeting-meta" class="hint"></p>
-            <div class="tabs" role="tablist"><button id="transcript-tab" role="tab" aria-selected="true" aria-controls="transcript" data-i18n="transcript">逐字稿</button><button id="minutes-tab" role="tab" aria-selected="false" aria-controls="minutes" data-i18n="minutes">智能纪要</button><button id="reload-detail" data-i18n="refreshList">刷新</button></div>
+            <div class="tabs" role="tablist"><button id="transcript-tab" role="tab" aria-selected="true" aria-controls="transcript" data-i18n="transcript">逐字稿</button><button id="minutes-tab" role="tab" aria-selected="false" aria-controls="minutes" data-i18n="minutes">智能纪要</button><button id="reload-detail" data-i18n="refreshList"></button></div>
           </header>
           <div class="detail-content">
             <div id="completeness" class="notice" role="status" hidden></div>

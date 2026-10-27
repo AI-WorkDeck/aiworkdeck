@@ -9,7 +9,7 @@ const require = createRequire(new URL('../../../frontend/package.json', import.m
 const puppeteer = require('puppeteer-core')
 const meetings = Array.from({ length: 35 }, (_, i) => ({ key: 'meeting-' + i, subject: `项目讨论 ${i + 1}：交付安排与会议记录`, meetingCode: '1000' + i, startTime: 1791000000 + i * 3600 }))
 const host = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;height:100%;overflow:hidden}iframe{width:100%;height:100%;border:0}</style><iframe sandbox="allow-scripts allow-forms" src="/plugin/index.html"></iframe><script>
-window.calls=[];window.frame=document.querySelector('iframe');window.context={pluginId:'tencent-meeting',projectId:7,language:'zh-CN',theme:'light',surface:new URL(location.href).searchParams.get('surface')||'workspace'};
+window.calls=[];window.frame=document.querySelector('iframe');window.context={pluginId:'tencent-meeting',projectId:7,language:new URL(location.href).searchParams.get('language')||'zh-CN',theme:'light',surface:new URL(location.href).searchParams.get('surface')||'workspace'};
 frame.onload=()=>frame.contentWindow.postMessage({awd:1,type:'init',context},'*');
 addEventListener('message',event=>{if(event.source!==frame.contentWindow||event.data?.type!=='call')return;
 const m=event.data;let result={};if(m.method==='tools.invoke'){const action=m.params.args.action;calls.push(action);let data={};if(action==='status')data={cliAvailable:true,loggedIn:true,userName:'合成测试账号'};if(action==='config')data={lookbackDays:30,excludeKeywords:[]};if(action==='list')data={meetings:${JSON.stringify(meetings)}};if(action==='detail')data={key:'meeting-0',subject:'交付安排讨论',complete:true,paragraphs:Array.from({length:80},(_,i)=>({speaker:'发言人 '+i,text:'合成会议内容，用于检验独立滚动和窄窗口阅读。'.repeat(8),startTime:'00:03'})),smartMinutes:'会议纪要：明确下一步工作。'};result={output:JSON.stringify({success:true,data})};}if(m.method==='events.subscribe')result={subscribed:m.params.events};if(m.method==='context.get')result=context;frame.contentWindow.postMessage({awd:1,type:'result',seq:m.seq,ok:true,result},'*');});
@@ -17,7 +17,7 @@ const m=event.data;let result={};if(m.method==='tools.invoke'){const action=m.pa
 const server = createServer(async (req, res) => {
   if (req.url?.startsWith('/?')) { res.setHeader('Content-Type', 'text/html'); return res.end(host) }
   const name = req.url?.replace('/plugin/', '')
-  if (!['index.html', 'panel.css', 'panel.js', 'awd-plugin-sdk.js'].includes(name)) { res.statusCode = 404; return res.end() }
+  if (!['index.html', 'panel.css', 'panel.js', 'panel-l10n.js', 'awd-plugin-sdk.js'].includes(name)) { res.statusCode = 404; return res.end() }
   res.setHeader('Content-Type', name.endsWith('.html') ? 'text/html' : name.endsWith('.css') ? 'text/css' : 'text/javascript')
   res.end(await readFile(new URL('../web/' + name, import.meta.url)))
 })
@@ -78,6 +78,15 @@ try {
   assert.equal(await frame.$eval('#settings', e => e.open), true)
   assert.equal(await page.evaluate(() => calls.some(action => ['list','detail','login','sync'].includes(action))), false)
   if (process.env.TMEET_SCREENSHOT_DIR) await page.screenshot({ path: process.env.TMEET_SCREENSHOT_DIR + '/meeting-account-sidebar.png' })
+  for (const [language, refresh, direction] of [['ja-JP', '更新', 'ltr'], ['ar-SA', 'تحديث', 'rtl']]) {
+    await page.setViewport({ width: 360, height: 680 })
+    await page.goto(origin + '/?surface=workspace&language=' + language)
+    frame = await (await page.$('iframe')).contentFrame()
+    await frame.waitForFunction(() => document.querySelector('.meeting') && !document.querySelector('.meeting').disabled)
+    assert.equal(await frame.$eval('#workspace-refresh', e => e.textContent), refresh)
+    assert.equal(await frame.evaluate(() => document.documentElement.dir), direction)
+    assert.equal(await frame.evaluate(() => document.documentElement.scrollWidth > innerWidth), false)
+  }
   assert.deepEqual(errors, [])
-  console.log(JSON.stringify({ passed: true, checks: ['wide split layout', 'independent scrolling', 'visible action bar', 'narrow list/detail navigation', 'search', 'keyboard tabs', 'dark theme', '280px account sidebar', 'no implicit login or sync', 'no page errors'] }))
+  console.log(JSON.stringify({ passed: true, checks: ['wide split layout', 'independent scrolling', 'visible action bar', 'narrow list/detail navigation', 'search', 'keyboard tabs', 'dark theme', '280px account sidebar', 'no implicit login or sync', 'Japanese and Arabic locale scripts in opaque iframe', 'no page errors'] }))
 } finally { await browser?.close(); server.closeAllConnections(); await new Promise(done => server.close(done)) }

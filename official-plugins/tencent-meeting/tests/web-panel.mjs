@@ -35,6 +35,7 @@ async function panel(options = {}) {
     events: { on: (name, callback) => { events[name] = callback; } },
     call: async () => context
   };
+  dom.window.eval(readFileSync(new URL('../web/panel-l10n.js', import.meta.url), 'utf8'));
   dom.window.eval(source); await tick();
   const $ = (id) => dom.window.document.getElementById(id);
   return {
@@ -316,4 +317,26 @@ test('focusing the workspace does not disable or rebuild the meeting button bein
   await p.select(); assert.equal(p.$('detail').hidden, false);
   releaseStatus(fixture.status); await tick();
   assert.equal(p.$('detail').hidden, false);
+});
+
+test('new workspace labels and view names have all 20 locales and use the packaged dictionary', async t => {
+  const locales = ['ar-SA','de-DE','el-GR','en-US','es-ES','fr-FR','hi-IN','id-ID','it-IT','ja-JP','ko-KR','ms-MY','nl-NL','pt-BR','ru-RU','th-TH','tr-TR','vi-VN','zh-CN','zh-TW'];
+  const keys = ['refreshList','selectMeeting','backToList','meetingCount','connectInSidebar','loadingList','loadingDetail','syncing','exporting','preparingAi'];
+  for (const locale of locales) {
+    const dictionary = JSON.parse(readFileSync(new URL('../l10n/' + locale + '.json', import.meta.url), 'utf8'));
+    const p = await panel({ context: { language: locale } });
+    try {
+      for (const key of keys) {
+        assert.ok(dictionary['panel.' + key]?.trim(), locale + ':' + key);
+        assert.equal(p.dom.window.AWD_TMEET_L10N[locale]['panel.' + key], dictionary['panel.' + key]);
+      }
+      assert.equal(dictionary['view.account.name'], dictionary['plugin.name']);
+      assert.equal(dictionary['view.meetings.name'], dictionary['plugin.name']);
+      assert.equal(p.$('workspace-refresh').textContent, dictionary['panel.refreshList']);
+      assert.equal(p.$('detail-empty').textContent, dictionary['panel.selectMeeting']);
+      assert.equal(p.$('back-to-list').textContent, dictionary['panel.backToList']);
+      assert.equal(p.dom.window.document.documentElement.lang, locale);
+      assert.equal(p.dom.window.document.documentElement.dir, locale === 'ar-SA' ? 'rtl' : 'ltr');
+    } finally { p.dom.window.close(); }
+  }
 });

@@ -1,5 +1,17 @@
 {
   "plugin.name": "腾讯会议",
   "plugin.description": "连接腾讯会议，按需同步会议与录制、查看逐字稿和智能纪要，归档到项目并生成会议纪要及待办。需安装腾讯会议官方 tmeet CLI 并完成账号授权。",
-  "tool.tencent_meeting_action.description": "腾讯会议插件：检查连接、用户授权登录、按需同步、查看会议及逐字稿、归档项目文件。"
+  "tool.tencent_meeting_action.description": "腾讯会议插件：检查连接、用户授权登录、按需同步、查看会议及逐字稿、归档项目文件。",
+  "panel.refreshList": "刷新",
+  "panel.selectMeeting": "选择一场会议",
+  "panel.backToList": "返回列表",
+  "panel.meetingCount": "场会议",
+  "panel.connectInSidebar": "请在左侧连接腾讯会议",
+  "panel.loadingList": "正在读取会议列表…",
+  "panel.loadingDetail": "正在读取会议内容…",
+  "panel.syncing": "正在同步会议…",
+  "panel.exporting": "正在保存会议材料…",
+  "panel.preparingAi": "正在准备会议材料并交给 AI…",
+  "view.account.name": "腾讯会议",
+  "view.meetings.name": "腾讯会议"
 }
