@@ -127,6 +127,7 @@
              （dev-board#1047 起不再单独占顶栏，spec 2026-09-29 §5.3；入口位置见 dev-board#1062）。 -->
         <!-- 顶部工具区（IDE 风格）：整理 / 分屏 / 浏览器 / 摘录 / AI / 工具 -->
         <view class="header-tools" v-if="!isClientView">
+          <LanguagePicker compact align="end" class="header-lang-picker" />
           <!-- 外观主题（dev-board#223）：浅色/深色/跟随系统三选一。
                图标显示的是**当前生效**的外观（跟随系统时也显示解析后的那个）。 -->
           <!-- 键盘/辅助技术可达（v0.49.0 BUG-53）：角色 + tabindex + 上下/Enter/Esc，见 themeSwitch.js -->
@@ -278,6 +279,7 @@
         <view v-else>
             <!-- Client View Only Tools -->
             <view class="header-tools">
+               <LanguagePicker compact align="end" class="header-lang-picker" />
                <view class="icon-btn" @tap="handleLogout" :title="$t('workbench.logout')">
                    <text class="tool-icon">×</text>
                </view>
@@ -2576,6 +2578,7 @@ import { isPaneAllowedWithoutProject, NO_PROJECT_DEFAULT_PANE, NO_PROJECT_PANE_K
 import ProjectListPane from '@/components/project-list/ProjectListPane.vue'
 import WelcomePane from '@/components/welcome/WelcomePane.vue'
 import AccountEntry from '@/components/account/AccountEntry.vue'
+import LanguagePicker from '@/components/LanguagePicker.vue'
 import OptionalComponentsDialog from '@/components/OptionalComponentsDialog.vue'
 import MobileReceiveStatus from '@/components/MobileReceiveStatus.vue'
 import BackendHealthStatus from '@/components/BackendHealthStatus.vue'
@@ -2662,6 +2665,7 @@ export default {
     ProjectListPane,
     WelcomePane,
     AccountEntry,
+    LanguagePicker,
     OptionalComponentsDialog
   },
   data() {

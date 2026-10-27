@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Tencent Meeting",
+  "plugin.name": "Réunion Tencent",
   "plugin.description": "Connectez Tencent Meeting pour synchroniser les réunions et les enregistrements à la demande, consulter les transcriptions et les comptes rendus intelligents, archiver dans les projets et générer des comptes rendus et des actions à suivre. Nécessite le CLI officiel tmeet et l'autorisation du compte.",
   "tool.tencent_meeting_action.description": "Plugin Tencent Meeting : vérifier la connexion, autoriser la connexion, synchroniser à la demande, consulter les réunions et transcriptions, et archiver les fichiers du projet."
 }

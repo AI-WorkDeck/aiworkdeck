@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Evidence & Insight",
-  "plugin.description": "Document evidence retrieval, consistency verification, and contract review.",
-  "view.main.name": "Evidence & Insight"
+  "plugin.name": "Bukti & Cerapan",
+  "plugin.description": "Pengambilan bukti dokumen, pengesahan ketekalan, dan semakan kontrak.",
+  "view.main.name": "Bukti & Cerapan"
 }

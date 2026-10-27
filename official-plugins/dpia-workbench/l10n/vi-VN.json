@@ -1,15 +1,18 @@
 {
-  "plugin.name": "DPIA Workbench",
-  "plugin.description": "Data Protection Impact Assessment: source tracing, fact confirmation, Q&A follow-up, risk & remediation, continuous re-assessment, and versioned reports. Adapted from Zhu Lingfeng's DSH DPIA Workbench; requires Node.js, Python, and LibreOffice.",
-  "plugin.author": "AI WorkDeck (Upstream: Zhu Lingfeng / The-Data-Galaxy)",
-  "setting.nodePath.label": "Node.js Executable",
-  "setting.nodePath.description": "Leave blank to use node from system PATH; requires Node.js 20 or newer.",
-  "setting.pythonPath.label": "Python Executable",
-  "setting.pythonPath.description": "Requires document dependencies from runtime/requirements.txt; can specify a Python path from a virtual environment.",
-  "setting.pdfFontPath.label": "PDF CJK Font File",
-  "setting.pdfFontPath.description": "Filling CJK text in native PDF templates requires an embeddable TrueType font (TTF/TTC); leave blank to use system font lookup.",
-  "setting.sofficePath.label": "LibreOffice Executable",
-  "setting.sofficePath.description": "Only needed for report PDF export and page preview; leave blank to try default system locations.",
-  "tool.dpia_workbench_action.description": "DPIA case, materials, fact confirmation, Q&A, run status, and report operations. For workbench UI only; AI must not invoke manual confirmation/approval entries.",
-  "tool.dpia_workbench_task.description": "Execute currently frozen DPIA tasks: context/read/write/script/commit/report; strictly scoped to the current user project and case output directory."
+  "plugin.name": "Bàn làm việc DPIA",
+  "plugin.description": "Đánh giá tác động bảo vệ dữ liệu: truy nguồn, xác minh sự thật, theo dõi hỏi đáp, rủi ro & khắc phục, đánh giá lại liên tục và báo cáo có phiên bản. Được điều chỉnh từ DSH DPIA Workbench của Zhu Lingfeng; yêu cầu Node.js, Python và LibreOffice.",
+  "plugin.author": "AI WorkDeck (Nguồn gốc: Zhu Lingfeng / The-Data-Galaxy)",
+  "setting.nodePath.label": "Tệp thực thi Node.js",
+  "setting.nodePath.description": "Để trống để dùng node từ PATH hệ thống; yêu cầu Node.js 20 trở lên.",
+  "setting.pythonPath.label": "Tệp thực thi Python",
+  "setting.pythonPath.description": "Yêu cầu các phụ thuộc tài liệu từ runtime/requirements.txt; có thể chỉ định đường dẫn Python từ môi trường ảo.",
+  "setting.pdfFontPath.label": "Tệp phông chữ CJK cho PDF",
+  "setting.pdfFontPath.description": "Điền văn bản CJK vào mẫu PDF gốc yêu cầu phông chữ TrueType có thể nhúng (TTF/TTC); để trống để dùng tìm kiếm phông chữ hệ thống.",
+  "setting.sofficePath.label": "Tệp thực thi LibreOffice",
+  "setting.sofficePath.description": "Chỉ cần để xuất báo cáo PDF và xem trước trang; để trống để thử các vị trí mặc định của hệ thống.",
+  "tool.dpia_workbench_action.description": "Các thao tác hồ sơ DPIA, tài liệu, xác minh sự thật, hỏi đáp, trạng thái chạy và báo cáo. Chỉ dành cho giao diện workbench; AI không được gọi các mục xác nhận/phê duyệt thủ công.",
+  "tool.dpia_workbench_task.description": "Thực thi các tác vụ DPIA đang bị đóng băng hiện tại: context/read/write/script/commit/report; phạm vi giới hạn nghiêm ngặt trong dự án người dùng hiện tại và thư mục đầu ra của hồ sơ.",
+  "plugin": {
+    "name": "Bàn làm việc DPIA"
+  }
 }

@@ -3,87 +3,87 @@
 
 export default {
   "sidebar": {
-    "projectHome": "Project Overview",
-    "projects": "Projects",
-    "files": "Explorer",
-    "ddFiles": "Due Diligence Files",
-    "market": "Extensions",
-    "dev": "Plugin Development",
-    "voice": "Voice",
-    "meetingRecorder": "Meeting Recording",
-    "litigationVisual": "Litigation Visualization",
-    "tmeet": "Tencent Meeting",
-    "search": "Search",
-    "tts": "Text to Speech",
-    "desensitize": "File Redaction",
+    "projectHome": "プロジェクト概要",
+    "projects": "プロジェクト",
+    "files": "エクスプローラー",
+    "ddFiles": "デューデリジェンスファイル",
+    "market": "拡張機能",
+    "dev": "プラグイン開発",
+    "voice": "音声",
+    "meetingRecorder": "会議録音",
+    "litigationVisual": "訴訟の可視化",
+    "tmeet": "Tencent Meeting（テンセント会議）",
+    "search": "検索",
+    "tts": "テキスト読み上げ",
+    "desensitize": "ファイル墨消し",
     "version": "Version History",
-    "calendar": "Calendar"
+    "calendar": "カレンダー"
   },
   "tools": {
-    "variables": "Variable Library",
-    "favorites": "Favorites",
-    "clipboard": "Clipboard"
+    "variables": "変数ライブラリ",
+    "favorites": "お気に入り",
+    "clipboard": "クリップボード"
   },
   "fileActions": {
-    "move": "Move",
-    "cut": "Cut",
+    "move": "移動",
+    "cut": "切り取り",
     "copy": "コピー",
-    "delete": "Delete",
+    "delete": "削除",
     "cancel": "キャンセル",
-    "newFile": "New File",
-    "newFolder": "New Folder",
-    "sort": "Sort"
+    "newFile": "新規ファイル",
+    "newFolder": "新規フォルダー",
+    "sort": "並べ替え"
   },
   "ocr": {
-    "refresh": "Refresh View",
-    "recognize": "Recognize Text",
-    "download": "Download",
+    "refresh": "表示の更新",
+    "recognize": "テキスト認識",
+    "download": "ダウンロード",
     "copy": "コピー",
-    "insertDoc": "Insert into Document",
-    "webLink": "Link to Web Verification",
-    "favorite": "Add to Favorites"
+    "insertDoc": "ドキュメントに挿入",
+    "webLink": "ウェブ検証へのリンク",
+    "favorite": "お気に入りに追加"
   },
   "projectTypes": {
-    "majorAssetRestructuring": "Listed Company Major Asset Restructuring",
-    "privatePlacement": "Listed Company Private Placement",
-    "publicPlacement": "Listed Company Public Offering",
-    "acquisition": "Listed Company Takeover",
-    "blank": "Blank Project"
+    "majorAssetRestructuring": "上場企業の重要資産再編",
+    "privatePlacement": "上場企業の第三者割当増資",
+    "publicPlacement": "上場企業の公募増資",
+    "acquisition": "上場企業の経営権取得",
+    "blank": "空白プロジェクト"
   },
   "projectFields": {
-    "listedCompanyName": "Listed Company Name",
-    "listedCompanyNamePlaceholder": "Enter the listed company's full or short name",
-    "targetCompanyName": "Target Company Name",
-    "targetCompanyNamePlaceholder": "Enter the target company's full name",
-    "projectName": "Project Name",
-    "projectNamePlaceholder": "Enter a project name",
-    "listedCompanyInfo": "Listed Company Basic Information",
-    "targetCompanyInfo": "Target Company Basic Information"
+    "listedCompanyName": "上場企業名",
+    "listedCompanyNamePlaceholder": "上場企業の正式名称または略称を入力してください",
+    "targetCompanyName": "対象会社名",
+    "targetCompanyNamePlaceholder": "対象会社の正式名称を入力してください",
+    "projectName": "プロジェクト名",
+    "projectNamePlaceholder": "プロジェクト名を入力してください",
+    "listedCompanyInfo": "上場企業の基本情報",
+    "targetCompanyInfo": "対象会社の基本情報"
   },
   "roles": {
-    "owner": "Owner",
-    "admin": "Case Admin",
-    "participant": "Collaborator",
-    "readOnly": "Read-only",
-    "client": "Client"
+    "owner": "所有者",
+    "admin": "案件管理者",
+    "participant": "共同作業者",
+    "readOnly": "閲覧のみ",
+    "client": "クライアント"
   },
   "roleHints": {
-    "admin": "Can edit files, add members, and manage permissions",
-    "participant": "Can edit files and submit drafts",
-    "readOnly": "View only, no editing"
+    "admin": "ファイルの編集、メンバーの追加、権限の管理ができます",
+    "participant": "ファイルの編集と草案の提出ができます",
+    "readOnly": "閲覧のみ可能、編集はできません"
   },
   "memberGroups": {
-    "admin": "Owners & Case Admins",
-    "member": "Collaborators",
-    "client": "Clients"
+    "admin": "オーナーと案件管理者",
+    "member": "共同作業者",
+    "client": "クライアント"
   },
   "clipboardTypes": {
-    "text": "Text",
-    "image": "Image",
-    "file": "File",
-    "unknown": "Unknown"
+    "text": "テキスト",
+    "image": "画像",
+    "file": "ファイル",
+    "unknown": "不明"
   },
   "variables": {
-    "searchPlaceholder": "Search variable names or content"
+    "searchPlaceholder": "変数名または内容を検索"
   }
 }

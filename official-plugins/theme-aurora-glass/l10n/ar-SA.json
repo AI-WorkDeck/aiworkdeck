@@ -1,12 +1,15 @@
 {
-  "plugin.name": "Aurora Glass · Abyssal Pro Skin",
-  "plugin.desc": "Abyssal navy depths, frosted ice-cyan glass, and amethyst crystal core for deep focus.",
+  "plugin.name": "Aurora Glass · مظهر Abyssal Pro",
+  "plugin.desc": "أعماق كحلية هاوية، زجاج سماوي جليدي مصنفر، وقلب من بلور الجمشت للتركيز العميق.",
   "theme.name": "Aurora Glass",
-  "theme.desc": "Abyssal Navy × Frosted Ice Cyan × Amethyst Crystal Core",
+  "theme.desc": "كحلي هاوي × سماوي جليدي مصنفر × بلور الجمشت",
   "gallery.badge": "معرض السمات",
   "gallery.swatch1": "فجر جليدي",
   "gallery.swatch2": "زجاج جليدي",
   "gallery.swatch3": "جمشت",
   "gallery.swatch4": "سماوي الشفق",
-  "gallery.swatch5": "محيط عميق"
+  "gallery.swatch5": "محيط عميق",
+  "theme": {
+    "name": "Aurora Glass"
+  }
 }

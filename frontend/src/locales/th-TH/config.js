@@ -3,82 +3,82 @@
 
 export default {
   "sidebar": {
-    "projectHome": "Project Overview",
+    "projectHome": "ภาพรวมโครงการ",
     "projects": "โปรเจกต์",
-    "files": "Explorer",
-    "ddFiles": "Due Diligence Files",
-    "market": "Extensions",
-    "dev": "Plugin Development",
-    "voice": "Voice",
-    "meetingRecorder": "Meeting Recording",
-    "litigationVisual": "Litigation Visualization",
+    "files": "ตัวสำรวจไฟล์",
+    "ddFiles": "ไฟล์การตรวจสอบความถูกต้อง (Due Diligence)",
+    "market": "ส่วนขยาย",
+    "dev": "การพัฒนาปลั๊กอิน",
+    "voice": "เสียง",
+    "meetingRecorder": "การบันทึกการประชุม",
+    "litigationVisual": "การแสดงภาพคดีความ",
     "tmeet": "Tencent Meeting",
-    "search": "Search",
-    "tts": "Text to Speech",
-    "desensitize": "File Redaction",
+    "search": "ค้นหา",
+    "tts": "ข้อความเป็นคำพูด",
+    "desensitize": "การปกปิดข้อมูลในไฟล์",
     "version": "Version History",
-    "calendar": "Calendar"
+    "calendar": "ปฏิทิน"
   },
   "tools": {
-    "variables": "Variable Library",
+    "variables": "คลังตัวแปร",
     "favorites": "รายการโปรด",
     "clipboard": "คลิปบอร์ด"
   },
   "fileActions": {
-    "move": "Move",
-    "cut": "Cut",
-    "copy": "Copy",
+    "move": "ย้าย",
+    "cut": "ตัด",
+    "copy": "คัดลอก",
     "delete": "ลบ",
     "cancel": "ยกเลิก",
-    "newFile": "New File",
-    "newFolder": "New Folder",
-    "sort": "Sort"
+    "newFile": "สร้างไฟล์ใหม่",
+    "newFolder": "สร้างโฟลเดอร์ใหม่",
+    "sort": "จัดเรียง"
   },
   "ocr": {
-    "refresh": "Refresh View",
-    "recognize": "Recognize Text",
+    "refresh": "รีเฟรชมุมมอง",
+    "recognize": "จดจำข้อความ",
     "download": "ดาวน์โหลด",
-    "copy": "Copy",
-    "insertDoc": "Insert into Document",
-    "webLink": "Link to Web Verification",
-    "favorite": "Add to Favorites"
+    "copy": "คัดลอก",
+    "insertDoc": "แทรกลงในเอกสาร",
+    "webLink": "ลิงก์ไปยังการตรวจสอบบนเว็บ",
+    "favorite": "เพิ่มในรายการโปรด"
   },
   "projectTypes": {
-    "majorAssetRestructuring": "Listed Company Major Asset Restructuring",
-    "privatePlacement": "Listed Company Private Placement",
-    "publicPlacement": "Listed Company Public Offering",
-    "acquisition": "Listed Company Takeover",
-    "blank": "Blank Project"
+    "majorAssetRestructuring": "การปรับโครงสร้างสินทรัพย์สำคัญของบริษัทมหาชนจำกัด",
+    "privatePlacement": "การเพิ่มทุนแบบเสนอขายเฉพาะบุคคลของบริษัทมหาชนจำกัด",
+    "publicPlacement": "การเสนอขายหลักทรัพย์ต่อประชาชนของบริษัทมหาชนจำกัด",
+    "acquisition": "การเข้าซื้อกิจการบริษัทมหาชนจำกัด",
+    "blank": "โครงการเปล่า"
   },
   "projectFields": {
-    "listedCompanyName": "Listed Company Name",
-    "listedCompanyNamePlaceholder": "Enter the listed company's full or short name",
-    "targetCompanyName": "Target Company Name",
-    "targetCompanyNamePlaceholder": "Enter the target company's full name",
-    "projectName": "Project Name",
-    "projectNamePlaceholder": "Enter a project name",
-    "listedCompanyInfo": "Listed Company Basic Information",
-    "targetCompanyInfo": "Target Company Basic Information"
+    "listedCompanyName": "ชื่อบริษัทมหาชนจำกัด",
+    "listedCompanyNamePlaceholder": "กรอกชื่อเต็มหรือชื่อย่อของบริษัทมหาชนจำกัด",
+    "targetCompanyName": "ชื่อบริษัทเป้าหมาย",
+    "targetCompanyNamePlaceholder": "กรอกชื่อเต็มของบริษัทเป้าหมาย",
+    "projectName": "ชื่อโครงการ",
+    "projectNamePlaceholder": "กรอกชื่อโครงการ",
+    "listedCompanyInfo": "ข้อมูลพื้นฐานของบริษัทมหาชนจำกัด",
+    "targetCompanyInfo": "ข้อมูลพื้นฐานของบริษัทเป้าหมาย"
   },
   "roles": {
-    "owner": "Owner",
-    "admin": "Case Admin",
-    "participant": "Collaborator",
-    "readOnly": "Read-only",
-    "client": "Client"
+    "owner": "เจ้าของ",
+    "admin": "ผู้ดูแลคดี",
+    "participant": "ผู้ร่วมงาน",
+    "readOnly": "ดูอย่างเดียว",
+    "client": "ลูกค้า"
   },
   "roleHints": {
-    "admin": "Can edit files, add members, and manage permissions",
-    "participant": "Can edit files and submit drafts",
-    "readOnly": "View only, no editing"
+    "admin": "สามารถแก้ไขไฟล์ เพิ่มสมาชิก และจัดการสิทธิ์การเข้าถึง",
+    "participant": "สามารถแก้ไขไฟล์และส่งร่างเอกสาร",
+    "readOnly": "ดูได้อย่างเดียว ไม่สามารถแก้ไขได้"
   },
   "memberGroups": {
-    "admin": "Owners & Case Admins",
-    "member": "Collaborators",
-    "client": "Clients"
+    "admin": "เจ้าของและผู้ดูแลคดี",
+    "member": "ผู้ร่วมงาน",
+    "client": "ลูกค้า"
   },
   "clipboardTypes": {
-    "text": "Text",
+    "text": "ข้อความ",
     "image": "รูปภาพ",
     "file": "ไฟล์",
     "unknown": "ไม่ทราบ"

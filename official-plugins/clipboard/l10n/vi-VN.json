@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Bộ nhớ tạm (Clipboard)",
-  "plugin.description": "Search clipboard history, copy, and insert content.",
-  "view.main.name": "Bộ nhớ tạm (Clipboard)"
+  "plugin.name": "Bộ nhớ tạm",
+  "plugin.description": "Tìm kiếm lịch sử bộ nhớ tạm, sao chép và chèn nội dung.",
+  "view.main.name": "Bộ nhớ tạm"
 }

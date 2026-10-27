@@ -11,6 +11,18 @@
 -->
 <template>
   <view class="panel-settings awd-set-container">
+      <!-- 界面语言。2026-08-18 从设置页「系统配置」搬来：语言是每个人自己的
+           偏好（storage 权威源、人人可改、不要 admin 权限）。
+           独立保存链（setAppLanguage 直写），置顶在首屏以便一目了然。 -->
+      <SettingsSection :title="$t('account.languageGroupTitle')">
+        <text class="bind-tip">
+          {{ $t('account.languageGroupHint') }}
+        </text>
+        <view class="lang-row">
+          <LanguagePicker @change="onAppLanguageChange" />
+        </view>
+      </SettingsSection>
+
       <SettingsSection :title="$t('account.basicInfoGroupTitle')">
         <!-- 姓名引导（Spec §6）：手机号注册的默认展示名是打码手机号，
              而同事在案卷参与人列表、时间线、批注作者里看到的就是这个字段 -->
@@ -173,18 +185,6 @@
         <text v-if="docGeneratorEnabled && docGeneratorApplication" class="bind-tip">
           {{ $t('account.docGeneratorCurrent', { application: docGeneratorApplication }) }}
         </text>
-      </SettingsSection>
-
-      <!-- 界面语言。2026-08-18 从设置页「系统配置」搬来：语言是每个人自己的
-           偏好（storage 权威源、人人可改、不要 admin 权限）。
-           独立保存链（setAppLanguage 直写），与本栏其它字段无关。 -->
-      <SettingsSection :title="$t('account.languageGroupTitle')">
-        <text class="bind-tip">
-          {{ $t('account.languageGroupHint') }}
-        </text>
-        <view class="lang-row">
-          <LanguagePicker @change="onAppLanguageChange" />
-        </view>
       </SettingsSection>
 
       <!-- 退出登录。**桌面端也要有**：此前这一块写着 v-if="!isDesktop"，

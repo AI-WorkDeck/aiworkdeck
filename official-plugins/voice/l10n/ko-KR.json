@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Voice & Speech",
-  "plugin.description": "Instant read-aloud, real-time speed control, subtitle highlighting, and meeting recording.",
-  "view.main.name": "Voice & Speech"
+  "plugin.name": "음성 및 스피치",
+  "plugin.description": "즉시 읽어주기, 실시간 속도 조절, 자막 강조, 회의 녹음 기능 제공.",
+  "view.main.name": "음성 및 스피치"
 }

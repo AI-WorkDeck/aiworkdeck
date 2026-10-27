@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Favorites",
-  "plugin.description": "Search project favorites, copy, insert, or open sources.",
-  "view.main.name": "Favorites"
+  "plugin.name": "Kegemaran",
+  "plugin.description": "Cari kegemaran projek, salin, sisipkan atau buka sumber.",
+  "view.main.name": "Kegemaran"
 }

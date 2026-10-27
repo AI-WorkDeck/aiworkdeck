@@ -1,12 +1,15 @@
 {
-  "plugin.name": "Aurora Glass · Abyssal Pro Skin",
-  "plugin.desc": "Abyssal navy depths, frosted ice-cyan glass, and amethyst crystal core for deep focus.",
+  "plugin.name": "Aurora Glass · Abyssal Pro स्किन",
+  "plugin.desc": "गहरी समुद्री नीली गहराइयाँ, तुषार-मुक्त बर्फ़-सियान काँच, और गहरे ध्यान के लिए अमेथिस्ट क्रिस्टल कोर।",
   "theme.name": "Aurora Glass",
-  "theme.desc": "Abyssal Navy × Frosted Ice Cyan × Amethyst Crystal Core",
+  "theme.desc": "गहरा नेवी नीला × तुषार बर्फ़-सियान × अमेथिस्ट क्रिस्टल",
   "gallery.badge": "थीम गैलरी",
   "gallery.swatch1": "हिमनद का सवेरा",
   "gallery.swatch2": "बर्फ़ीला काँच",
   "gallery.swatch3": "जमुनिया",
   "gallery.swatch4": "ध्रुवीय सियान",
-  "gallery.swatch5": "गहरा महासागर"
+  "gallery.swatch5": "गहरा महासागर",
+  "theme": {
+    "name": "Aurora Glass"
+  }
 }

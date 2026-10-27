@@ -31,7 +31,7 @@ export default {
   "thIdle": "Masa Terbiar",
   "loadingEllipsis": "Memuatkan…",
   "noRecords": "Tiada rekod",
-  "minutesSuffix": "{count} min",
+  "minutesSuffix": "{count} minit",
   "allProjectsOption": "Semua Projek",
   "unassociatedProjectOption": "Tiada Projek",
   "actionLogin": "Log Masuk",

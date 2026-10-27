@@ -1,12 +1,15 @@
 {
-  "plugin.name": "Aurora Glass · Abyssal Pro Skin",
-  "plugin.desc": "Abyssal navy depths, frosted ice-cyan glass, and amethyst crystal core for deep focus.",
+  "plugin.name": "Aurora Glass · Abyssal Pro Teması",
+  "plugin.desc": "Derin lacivert derinlikler, buzlu buz-mavisi cam ve derin odaklanma için ametist kristal çekirdek.",
   "theme.name": "Aurora Glass",
-  "theme.desc": "Abyssal Navy × Frosted Ice Cyan × Amethyst Crystal Core",
+  "theme.desc": "Derin lacivert × Buzlu buz mavisi × Ametist kristali",
   "gallery.badge": "Tema galerisi",
   "gallery.swatch1": "Buzul şafağı",
   "gallery.swatch2": "Buzlu cam",
   "gallery.swatch3": "Ametist",
   "gallery.swatch4": "Kutup ışığı camgöbeği",
-  "gallery.swatch5": "Derin okyanus"
+  "gallery.swatch5": "Derin okyanus",
+  "theme": {
+    "name": "Aurora Glass"
+  }
 }

@@ -2,89 +2,89 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "title": "依据",
-  "noDoc": "未打开文档",
-  "parse": "全文在线核验（可能产生费用）",
-  "reparse": "再次全文在线核验（可能产生费用）",
-  "onlineHint": "点击后先保存当前文档，再在线核验已保存版本。AI 与外部检索可能产生费用。",
-  "saveRequired": "当前文档未能完成保存，请保存成功后再在线核验。",
-  "running": "正在在线核验…",
-  "done": "在线核验完成",
-  "failed": "在线核验失败",
+  "title": "依據",
+  "noDoc": "未打開文檔",
+  "parse": "全文在線核驗（可能產生費用）",
+  "reparse": "再次全文在線核驗（可能產生費用）",
+  "onlineHint": "點擊後先保存當前文檔，再在線核驗已保存版本。AI 與外部檢索可能產生費用。",
+  "saveRequired": "當前文檔未能完成保存，請保存成功後再在線核驗。",
+  "running": "正在在線核驗…",
+  "done": "在線核驗完成",
+  "failed": "在線核驗失敗",
   "loading": "載入中…",
-  "loadingDetail": "正在取检索详情…",
-  "noDetail": "这一条没有检索详情",
-  "loadFailed": "读取在线核验结果失败",
-  "parseFailed": "发起在线核验失败",
-  "detailFailed": "取检索详情失败",
-  "refreshFailed": "重新检索失败",
+  "loadingDetail": "正在取檢索詳情…",
+  "noDetail": "這一條沒有檢索詳情",
+  "loadFailed": "讀取在線核驗結果失敗",
+  "parseFailed": "發起在線核驗失敗",
+  "detailFailed": "取檢索詳情失敗",
+  "refreshFailed": "重新檢索失敗",
   "retry": "重試",
-  "goConnectAccount": "去连接账户",
+  "goConnectAccount": "去連接賬戶",
   "goRecharge": "去充值",
   "hint": {
-    "NO_CREDENTIAL": "该检索通道的凭据需要由部署管理员在服务端配置。"
+    "NO_CREDENTIAL": "該檢索通道的憑據需要由部署管理員在服務端配置。"
   },
   "tab": {
-    "retrieval": "外部检索",
-    "checks": "一致性校验"
+    "retrieval": "外部檢索",
+    "checks": "一致性校驗"
   },
   "kind": {
     "COMPANY": "公司",
-    "LAW": "法规",
+    "LAW": "法規",
     "CASE": "案例",
-    "DOC": "文档"
+    "DOC": "文檔"
   },
   "entityKind": {
     "COMPANY": "公司",
-    "LAW": "法规",
+    "LAW": "法規",
     "CASE": "案例",
-    "DOC": "文档"
+    "DOC": "文檔"
   },
-  "openInNewTab": "在新标签页打开",
-  "openDocFile": "打开文件",
-  "docNotFound": "项目中未找到该文件",
-  "docMissing": "文件已不在项目中",
+  "openInNewTab": "在新標籤頁打開",
+  "openDocFile": "打開文件",
+  "docNotFound": "項目中未找到該文件",
+  "docMissing": "文件已不在項目中",
   "source": {
-    "projectFile": "项目文件",
+    "projectFile": "項目文件",
     "qichacha": "企查查"
   },
-  "mentions": "{count} 处",
-  "mentionsTitle": "文中出处",
-  "shareholders": "股东出资",
-  "moreCandidates": "其余候选",
+  "mentions": "{count} 處",
+  "mentionsTitle": "文中出處",
+  "shareholders": "股東出資",
+  "moreCandidates": "其餘候選",
   "caseSection": {
-    "ascertain": "查明事实",
+    "ascertain": "查明事實",
     "reason": "裁判理由",
-    "result": "裁判结果",
+    "result": "裁判結果",
     "gist": "裁判要旨",
-    "fullText": "判决书全文"
+    "fullText": "判決書全文"
   },
-  "authoritative": "权威原文（北大法宝）",
+  "authoritative": "權威原文（北大法寶）",
   "implementDate": "施行日期 {date}",
-  "recognition": "案号识别",
-  "openInPkulaw": "在法宝打开",
+  "recognition": "案號識別",
+  "openInPkulaw": "在法寶打開",
   "citation": {
-    "citedText": "引用条文",
-    "candidates": "按内容定位到的条文",
-    "article": "第 {n} 条"
+    "citedText": "引用條文",
+    "candidates": "按內容定位到的條文",
+    "article": "第 {n} 條"
   },
   "severity": {
     "warn": "存疑",
-    "error": "错误"
+    "error": "錯誤"
   },
-  "unifyTo": "统一为 {value}",
-  "cannotFix": "不能一键修改：{reason}",
-  "fixNotUnique": "未能唯一定位，请手动修改。",
-  "fixPartial": "已修改 {done} 处，另有 {failed} 处未能唯一定位，请手动修改。",
+  "unifyTo": "統一為 {value}",
+  "cannotFix": "不能一鍵修改：{reason}",
+  "fixNotUnique": "未能唯一定位，請手動修改。",
+  "fixPartial": "已修改 {done} 處，另有 {failed} 處未能唯一定位，請手動修改。",
   "fixed": "已修改",
-  "fixedHint": "可用 Cmd+Z 撤销；重新解析可刷新结论。",
-  "noEditor": "请先激活一个文档编辑窗口",
+  "fixedHint": "可用 Cmd+Z 撤銷；重新解析可刷新結論。",
+  "noEditor": "請先激活一個文檔編輯窗口",
   "empty": {
-    "noRun": "这份文档尚未在线核验",
-    "noRunHint": "日常写作提示在本地进行。点击上方在线核验后，AI 才会通读已保存文档、抽取实体、查询外部资料并检查前后一致性。",
-    "noEntity": "没有抽到可检索的实体",
-    "noEntityHint": "文档里没有出现公司名、法规条号或案号。",
-    "noFinding": "没有发现前后矛盾",
-    "noFindingHint": "数量陈述与统一社会信用代码都校验通过了。"
+    "noRun": "這份文檔尚未在線核驗",
+    "noRunHint": "日常寫作提示在本地進行。點擊上方在線核驗後，AI 才會通讀已保存文檔、抽取實體、查詢外部資料並檢查前後一致性。",
+    "noEntity": "沒有抽到可檢索的實體",
+    "noEntityHint": "文檔里沒有出現公司名、法規條號或案號。",
+    "noFinding": "沒有發現前後矛盾",
+    "noFindingHint": "數量陳述與統一社會信用代碼都校驗通過了。"
   }
 }

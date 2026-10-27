@@ -11,5 +11,8 @@
   "setting.sofficePath.label": "LibreOffice Uitvoerbaar Bestand",
   "setting.sofficePath.description": "Alleen nodig voor PDF-export van rapporten en paginavoorbeeld; laat leeg om standaard systeemlocaties te proberen.",
   "tool.dpia_workbench_action.description": "DPIA-zaak, materialen, feitenbevestiging, Q&A, uitvoeringsstatus en rapportbewerkingen. Alleen voor de workbench-UI; AI mag handmatige bevestigings-/goedkeuringsingangen niet aanroepen.",
-  "tool.dpia_workbench_task.description": "Voer momenteel bevroren DPIA-taken uit: context/read/write/script/commit/report; strikt beperkt tot de huidige uitvoermap van gebruikersproject en zaak."
+  "tool.dpia_workbench_task.description": "Voer momenteel bevroren DPIA-taken uit: context/read/write/script/commit/report; strikt beperkt tot de huidige uitvoermap van gebruikersproject en zaak.",
+  "plugin": {
+    "author": "AI WorkDeck (Bron: Zhu Lingfeng / The-Data-Galaxy)"
+  }
 }

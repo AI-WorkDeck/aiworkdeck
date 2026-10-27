@@ -225,20 +225,20 @@ const CATEGORY_GLYPHS = {
   other: ICONS.catOther,
 }
 
-const CATEGORY_LABELS = {
-  contract: t('market.catContract'),
-  litigation: t('market.catLitigation'),
-  compliance: t('market.catCompliance'),
-  research: t('market.catResearch'),
-  corporate: t('market.catCorporate'),
-  office: t('market.catOffice'),
-  other: t('market.catOther'),
+const CATEGORY_KEYS = {
+  contract: 'market.catContract',
+  litigation: 'market.catLitigation',
+  compliance: 'market.catCompliance',
+  research: 'market.catResearch',
+  corporate: 'market.catCorporate',
+  office: 'market.catOffice',
+  other: 'market.catOther',
 }
 
-const ACTIVATION_STATE = {
-  auto: t('market.activationStateAuto'),
-  manual: t('market.activationStateManual'),
-  disabled: t('market.activationDisabled'),
+const ACTIVATION_STATE_KEYS = {
+  auto: 'market.activationStateAuto',
+  manual: 'market.activationStateManual',
+  disabled: 'market.activationDisabled',
 }
 
 function fmtDownloads(n) {
@@ -312,7 +312,7 @@ export default {
             ? this.$t('market.packDownloadingShort')
             : panel
               ? (s.enabled ? this.$t('market.enabledTag') : this.$t('market.disabledTag'))
-              : (ACTIVATION_STATE[mode] || this.$t('market.activationStateAuto')),
+              : this.$t(ACTIVATION_STATE_KEYS[mode] || 'market.activationStateAuto'),
           stateClass: packPending ? 'downloading' : (mode === 'disabled' ? 'off' : 'ok'),
           raw: s,
         })
@@ -368,7 +368,7 @@ export default {
         if (m.bundled) metaParts.push(this.$t('pluginPlatform.bundled'))
         const dl = fmtDownloads(m.downloads)
         if (dl) metaParts.push(dl + this.$t('market.downloadsSuffix'))
-        metaParts.push(CATEGORY_LABELS[cat] || this.$t('market.catOther'))
+        metaParts.push(this.$t(CATEGORY_KEYS[cat] || 'market.catOther'))
         metaParts.push(priceLabel(m))
         const state = paidState(m, this.accountConnected)
         return {

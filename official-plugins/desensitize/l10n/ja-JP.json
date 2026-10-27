@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Desensitize",
-  "plugin.description": "Inspect sensitive information, generate desensitized copies, and restore with recovery packages.",
-  "view.main.name": "Desensitize"
+  "plugin.name": "匿名化",
+  "plugin.description": "機密情報を検査し、匿名化したコピーを生成し、リカバリーパッケージで復元します。",
+  "view.main.name": "匿名化"
 }

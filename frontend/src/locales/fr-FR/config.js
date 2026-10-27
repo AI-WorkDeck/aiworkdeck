@@ -35,55 +35,55 @@ export default {
     "sort": "Trier"
   },
   "ocr": {
-    "refresh": "Refresh View",
-    "recognize": "Recognize Text",
+    "refresh": "Actualiser la vue",
+    "recognize": "Reconnaître le texte",
     "download": "Télécharger",
-    "copy": "Copy",
-    "insertDoc": "Insert into Document",
-    "webLink": "Link to Web Verification",
-    "favorite": "Add to Favorites"
+    "copy": "Copier",
+    "insertDoc": "Insérer dans le document",
+    "webLink": "Lier à la vérification web",
+    "favorite": "Ajouter aux favoris"
   },
   "projectTypes": {
-    "majorAssetRestructuring": "Listed Company Major Asset Restructuring",
-    "privatePlacement": "Listed Company Private Placement",
-    "publicPlacement": "Listed Company Public Offering",
-    "acquisition": "Listed Company Takeover",
-    "blank": "Blank Project"
+    "majorAssetRestructuring": "Restructuration majeure d'actifs d'une société cotée",
+    "privatePlacement": "Augmentation de capital réservée d'une société cotée",
+    "publicPlacement": "Offre publique d'une société cotée",
+    "acquisition": "Prise de contrôle d'une société cotée",
+    "blank": "Projet vierge"
   },
   "projectFields": {
-    "listedCompanyName": "Listed Company Name",
-    "listedCompanyNamePlaceholder": "Enter the listed company's full or short name",
-    "targetCompanyName": "Target Company Name",
-    "targetCompanyNamePlaceholder": "Enter the target company's full name",
-    "projectName": "Project Name",
-    "projectNamePlaceholder": "Enter a project name",
-    "listedCompanyInfo": "Listed Company Basic Information",
-    "targetCompanyInfo": "Target Company Basic Information"
+    "listedCompanyName": "Nom de la société cotée",
+    "listedCompanyNamePlaceholder": "Saisissez le nom complet ou abrégé de la société cotée",
+    "targetCompanyName": "Nom de la société cible",
+    "targetCompanyNamePlaceholder": "Saisissez le nom complet de la société cible",
+    "projectName": "Nom du projet",
+    "projectNamePlaceholder": "Saisissez un nom de projet",
+    "listedCompanyInfo": "Informations de base de la société cotée",
+    "targetCompanyInfo": "Informations de base de la société cible"
   },
   "roles": {
-    "owner": "Owner",
-    "admin": "Case Admin",
-    "participant": "Collaborator",
-    "readOnly": "Read-only",
+    "owner": "Propriétaire",
+    "admin": "Administrateur du dossier",
+    "participant": "Collaborateur",
+    "readOnly": "Lecture seule",
     "client": "Client"
   },
   "roleHints": {
-    "admin": "Can edit files, add members, and manage permissions",
-    "participant": "Can edit files and submit drafts",
-    "readOnly": "View only, no editing"
+    "admin": "Peut modifier les fichiers, ajouter des membres et gérer les autorisations",
+    "participant": "Peut modifier les fichiers et soumettre des projets de documents",
+    "readOnly": "Consultation uniquement, sans modification"
   },
   "memberGroups": {
-    "admin": "Owners & Case Admins",
-    "member": "Collaborators",
+    "admin": "Propriétaires et administrateurs de dossier",
+    "member": "Collaborateurs",
     "client": "Clients"
   },
   "clipboardTypes": {
-    "text": "Text",
+    "text": "Texte",
     "image": "Image",
-    "file": "File",
-    "unknown": "Unknown"
+    "file": "Fichier",
+    "unknown": "Inconnu"
   },
   "variables": {
-    "searchPlaceholder": "Search variable names or content"
+    "searchPlaceholder": "Rechercher des noms de variables ou du contenu"
   }
 }

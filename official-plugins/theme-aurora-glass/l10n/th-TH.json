@@ -1,12 +1,15 @@
 {
-  "plugin.name": "Aurora Glass · Abyssal Pro Skin",
-  "plugin.desc": "Abyssal navy depths, frosted ice-cyan glass, and amethyst crystal core for deep focus.",
+  "plugin.name": "Aurora Glass · สกิน Abyssal Pro",
+  "plugin.desc": "น้ำเงินเข้มดงสมุทรลึก กระจกน้ำแข็งสีฟ้าใส และแกนคริสตัลอเมทิสต์ เพื่อการจดจ่ออย่างลึกซึ้ง",
   "theme.name": "Aurora Glass",
-  "theme.desc": "Abyssal Navy × Frosted Ice Cyan × Amethyst Crystal Core",
+  "theme.desc": "น้ำเงินเข้มสมุทรลึก × ฟ้าน้ำแข็งใส × แกนคริสตัลอเมทิสต์",
   "gallery.badge": "แกลเลอรีธีม",
   "gallery.swatch1": "รุ่งอรุณธารน้ำแข็ง",
   "gallery.swatch2": "แก้วน้ำแข็ง",
-  "gallery.swatch3": "แอเมทิสต์",
+  "gallery.swatch3": "อเมทิสต์",
   "gallery.swatch4": "ฟ้าออโรรา",
-  "gallery.swatch5": "มหาสมุทรลึก"
+  "gallery.swatch5": "มหาสมุทรลึก",
+  "theme": {
+    "name": "Aurora Glass"
+  }
 }
