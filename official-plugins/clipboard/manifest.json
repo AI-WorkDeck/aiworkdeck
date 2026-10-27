@@ -1,7 +1,7 @@
 {
   "id": "clipboard",
   "name": "剪贴板",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "查找剪贴记录、复制和插入内容。",
   "author": "AI WorkDeck",
   "permissions": [

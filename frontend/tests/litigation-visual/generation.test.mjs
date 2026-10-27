@@ -336,3 +336,18 @@ for (const status of ['AWAITING_INPUT', 'FINISHED']) {
     assert.equal(recovered.posts.length, 0)
   })
 }
+
+test('approval shows the implementation plan and only continues after an explicit answer', async t => {
+  const f = fixture(t)
+  await f.start()
+  f.event('artifact', { operation: 'create', id: 'plan-1', type: 'implementation_plan', status: 'draft', data: { content: '1. 核对材料\n2. 生成关系图' } })
+  f.event('bubble_end', { status: 'awaiting_approval' })
+  const waiting = await f.generation.observe()
+  assert.equal(waiting.phase, 'waiting')
+  assert.equal(waiting.question.text, '1. 核对材料\n2. 生成关系图')
+  assert.equal(f.posts.length, 1, 'no automatic approval is submitted')
+  await f.generation.request('answer', { taskId: waiting.taskId, questionKey: waiting.question.key, answer: { selected: [], other: '按此计划继续' } })
+  await flush()
+  assert.equal(f.posts.length, 2)
+  assert.match(f.posts[1].message, /按此计划继续/)
+})

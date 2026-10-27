@@ -485,6 +485,7 @@ components:
         - enabled
         - subscriptionActive
         - events
+        - truncated
       properties:
         enabled: *a1
         subscriptionActive: *a1
@@ -497,6 +498,9 @@ components:
         syncedAt:
           type: string
           nullable: true
+        truncated:
+          type: boolean
+          description: 任一设备快照被截断时为true，客户端不得把返回事件当作完整历史
     MobileWorkspaceConsent:
       type: object
       required:
@@ -752,16 +756,22 @@ components:
                       type: string
                     fileName:
                       type: string
+        truncated:
+          type: boolean
+          description: 桌面本次只同步前5000条；为true时客户端不得把快照当作完整历史
     MobileCalendarSnapshotResult:
       type: object
       required:
         - accepted
         - syncedAt
+        - truncated
       properties:
         accepted: *a1
         syncedAt:
           type: string
         count: *a3
+        truncated:
+          type: boolean
     MobileCalendarPushDevice:
       type: object
       required:
@@ -1148,6 +1158,13 @@ paths:
           required: false
           schema:
             type: string
+        - name: includeRemoved
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: 仅同步清理使用；为true时返回本账户全部摘要的deviceId/projectKey，含已移出目录项目
       responses:
         "200":
           description: 成功或错误信封；账户与项目范围由服务端验证

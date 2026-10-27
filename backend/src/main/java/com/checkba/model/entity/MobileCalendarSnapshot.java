@@ -14,4 +14,5 @@ public class MobileCalendarSnapshot {
     @Column(nullable=false) private Instant sourceUpdatedAt;
     @Column(nullable=false) private Instant syncedAt;
     @Column(nullable=false,columnDefinition="TEXT") private String eventsJson;
+    @Column(nullable=false,columnDefinition="boolean not null default false") private boolean truncated;
 }

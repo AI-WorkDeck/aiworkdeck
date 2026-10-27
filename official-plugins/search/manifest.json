@@ -1,7 +1,7 @@
 {
   "id": "search",
   "name": "项目搜索",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "按正文、标签搜索项目文件，并定位到文档。",
   "author": "AI WorkDeck",
   "permissions": ["file_read"],

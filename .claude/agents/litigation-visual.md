@@ -84,7 +84,8 @@ JSON 对不对，不取决于模型对像素多聪明——这是上游的核心
 - `composables/useLitigationGeneration.js` / `utils/litigationGeneration.mjs` — 工作台持有独立
   `useAgentStream`，复用原生会话签发、inbox 与 SSE。操作为 generate / generation /
   answer / stop / continue；权限要求 file_read、file_write、ai，技能每轮显式激活。
-  左栏显示持续状态、原始确认问题与选项；用户明确提交答案后才继续。任务按本地账户、
+  左栏显示持续状态、原始确认问题与选项；`AWAITING_APPROVAL` 同时展示 implementation_plan 原文，
+  用户明确提交答案后才继续，不把待审批折叠成无内容的“继续”。任务按本地账户、
   云账户、API 与项目隔离保存；发前持久化 clientRequestId，回执丢失先查 inbox/history
   再决定恢复或使用原 ID 重试，不能把幂等旧回执误当作新的执行。
 - `pages/project-overview/project-overview.vue` — businessActions 接入独立任务、材料选择与
