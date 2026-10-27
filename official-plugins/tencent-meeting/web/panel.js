@@ -5,6 +5,7 @@
   const $ = (id) => document.getElementById(id);
   const copy = {
     zh: {
+      refreshList: '刷新', selectMeeting: '选择一场会议', backToList: '返回列表', meetingCount: '场会议', connectInSidebar: '请在左侧连接腾讯会议', loadingList: '正在读取会议列表…', loadingDetail: '正在读取会议内容…', syncing: '正在同步会议…', exporting: '正在保存会议材料…', preparingAi: '正在准备会议材料并交给 AI…',
       logoutWarning: '退出将清除本机共享的腾讯会议 CLI 授权，其他使用它的应用也需要重新登录。', confirmLogout: '确认退出本机登录', cancel: '取消', incomplete: '会议材料尚未完整读取，暂不能导出或交给 AI。请重新打开会议重试。', detailErrors: '未完成的读取：', title: '腾讯会议', subtitle: '连接会议记录，把讨论带回项目。', connection: '连接',
       localCli: '需要本机安装腾讯会议 tmeet CLI。登录凭据由 CLI 保存在本机。', refresh: '检查连接', login: '登录授权', resumeLogin: '继续授权', logout: '退出登录',
       originalLogin: '授权仍在原浏览器中进行，请切回原授权页完成。这里会自动更新；如已关闭原页面，请等待此次授权结束后重新点击“登录授权”。',
@@ -24,6 +25,7 @@
       synced: '同步完成，会议数：', loggedOut: '已退出腾讯会议登录。', badExport: '会议材料未能保存，尚未发送到 AI 对话。', timedOut: '处理仍未完成，已停止等待。请稍后检查会议列表。'
     },
     en: {
+      refreshList: 'Refresh', selectMeeting: 'Select a meeting', backToList: 'Back to meetings', meetingCount: 'meetings', connectInSidebar: 'Connect Tencent Meeting in the sidebar', loadingList: 'Loading meetings…', loadingDetail: 'Loading meeting content…', syncing: 'Syncing meetings…', exporting: 'Saving meeting material…', preparingAi: 'Preparing meeting material for AI…',
       logoutWarning: 'Signing out clears the shared Tencent Meeting CLI authorization on this computer. Other applications using it will also need to sign in again.', confirmLogout: 'Confirm sign out on this computer', cancel: 'Cancel', incomplete: 'Meeting material is incomplete. Export and AI actions are unavailable. Reopen the meeting to retry.', detailErrors: 'Incomplete reads: ', title: 'Tencent Meeting', subtitle: 'Bring meeting records into your project.', connection: 'Connection',
       localCli: 'Requires the Tencent Meeting tmeet CLI on this computer. Login credentials stay with the local CLI.', refresh: 'Check connection', login: 'Authorize login', resumeLogin: 'Continue authorization', logout: 'Sign out',
       originalLogin: 'Authorization is still running in the original browser page. Complete it there and this view will update. If that page was closed, wait for this attempt to finish, then click Authorize login again.',
@@ -50,11 +52,15 @@
   const stale = () => Object.assign(new Error('stale'), { stale: true });
   function feedback(message, error = false) { $('feedback').textContent = message; $('feedback').dataset.error = String(error); }
   function controls() {
+    $('workspace').setAttribute('aria-busy', String(busy));
     document.querySelectorAll('button').forEach((button) => { button.disabled = busy || !context.projectId; });
     $('login').disabled ||= status?.cliAvailable === false || status?.loggedIn === true || (status?.loginPending === true && !!$('authorize-url').value);
     $('login').textContent = t(status?.loginPending ? 'resumeLogin' : 'login');
+    $('login').hidden = status?.loggedIn === true;
+    $('logout').hidden = status?.loggedIn !== true;
     $('logout').disabled ||= !status?.loggedIn;
     $('sync').disabled ||= !status?.loggedIn;
+    $('reload-detail').disabled ||= !selected;
     ['export', 'draft-minutes', 'draft-todos'].forEach((id) => { $(id).disabled ||= !selected || selected.complete === false || !!selected.errors?.length; });
     $('copy-url').disabled = !$('authorize-url').value;
     $('lookback').disabled = $('exclude').disabled = busy || !context.projectId;
@@ -79,10 +85,10 @@
       await new Promise((resolve) => setTimeout(resolve, 3000));
     }
   }
-  async function run(work) {
+  async function run(work, label = 'busy') {
     if (busy || !context.projectId) return;
     const current = epoch;
-    busy = true; controls(); feedback(t('busy'));
+    busy = true; controls(); feedback(t(label));
     try { await work(current); }
     catch (error) {
       if (current === epoch && !error.stale) feedback(t(error.code === 'unknown_method' ? 'unsupported' : (copy[language][error.message] ? error.message : 'failed')), true);
@@ -94,10 +100,11 @@
   function paintStatus(data) {
     status = data || {};
     $('connection-status').textContent = status.cliAvailable === false ? (value(status.message) || t('missingCli')) : status.loggedIn ? t('connected') + (value(status.userName) ? ' · ' + value(status.userName) : '') : status.loginPending ? t('waiting') : t('disconnected');
+    $('workspace-status').textContent = status.loggedIn ? $('connection-status').textContent : t('connectInSidebar');
     if (status.loggedIn) { stopLogin(); $('authorization').hidden = true; $('authorize-url').value = ''; }
     else if (status.loginPending) {
       $('login-wait').textContent = t('waiting');
-      if (!loginTimer && context.projectId) { loginAttempts = 0; pollLogin(epoch, loginEpoch); }
+      if (context.surface !== 'workspace' && !loginTimer && context.projectId) { loginAttempts = 0; pollLogin(epoch, loginEpoch); }
     }
     controls();
   }
@@ -111,6 +118,7 @@
     const query = $('search').value.trim().toLocaleLowerCase();
     const filtered = meetings.filter((meeting) => (value(meeting.subject) + ' ' + value(meeting.meetingCode)).toLocaleLowerCase().includes(query));
     $('meetings').replaceChildren();
+    $('meeting-count').textContent = filtered.length + ' ' + t('meetingCount');
     $('list-empty').hidden = filtered.length > 0;
     $('list-empty').textContent = query ? t('noMatch') : t('noMeetings');
     for (const meeting of filtered) {
@@ -123,7 +131,7 @@
       button.addEventListener('click', () => run(async (current) => {
         const detail = await invoke('detail', { key: meeting.key }, current);
         selected = { ...detail, key: meeting.key }; paintDetail(); paintList(); feedback('');
-      }));
+      }, 'loadingDetail'));
     }
     controls();
   }
@@ -136,6 +144,8 @@
   }
   function paintDetail() {
     $('detail').hidden = !selected;
+    $('detail-empty').hidden = !!selected;
+    document.body.dataset.detail = String(!!selected);
     $('transcript').replaceChildren(); $('minutes').replaceChildren(); $('completeness').replaceChildren(); $('completeness').hidden = true;
     if (!selected) { $('meeting-title').textContent = ''; $('meeting-meta').textContent = ''; return; }
     const errors = Array.isArray(selected.errors) ? selected.errors : [];
@@ -168,6 +178,7 @@
     const config = await invoke('config', {}, current);
     $('lookback').value = config?.lookbackDays ?? 30;
     $('exclude').value = Array.isArray(config?.excludeKeywords) ? config.excludeKeywords.join('\n') : '';
+    if (context.surface === 'sidebar') return;
     const list = await invoke('list', {}, current);
     meetings = Array.isArray(list?.meetings) ? list.meetings : []; paintList();
   }
@@ -195,9 +206,21 @@
       pollLogin(current, session);
     }, 3000);
   }
-  $('refresh').addEventListener('click', () => run(async (current) => {
-    const data = await readStatus(current); paintStatus(data); await loadLocal(current); feedback('');
-  }));
+  function refreshLocal() {
+    return run(async (current) => {
+      const data = await readStatus(current); paintStatus(data); await loadLocal(current); feedback('');
+    }, 'loadingList');
+  }
+  $('refresh').addEventListener('click', refreshLocal);
+  $('workspace-refresh').addEventListener('click', refreshLocal);
+  $('back-to-list').addEventListener('click', () => {
+    selected = null; paintDetail(); paintList(); $('search').focus();
+  });
+  $('reload-detail').addEventListener('click', () => run(async (current) => {
+    const key = selected.key;
+    selected = { ...await invoke('detail', { key }, current), key };
+    paintDetail(); paintList(); feedback('');
+  }, 'loadingDetail'));
   $('login').addEventListener('click', () => run(async (current) => {
     stopLogin();
     const data = await invoke('login', {}, current);
@@ -239,7 +262,7 @@
     const list = await invoke('list', {}, current); meetings = Array.isArray(list?.meetings) ? list.meetings : [];
     selected = null; paintDetail(); paintList();
     feedback(t('synced') + (Number.isFinite(result?.count) ? result.count : meetings.length) + (result?.errors?.length ? ' · ' + t('partial') : ''));
-  }));
+  }, 'syncing'));
   $('search').addEventListener('input', paintList);
   for (const tab of ['transcript', 'minutes']) {
     $(tab + '-tab').addEventListener('click', () => showTab(tab));
@@ -256,7 +279,7 @@
   }
   $('export').addEventListener('click', () => run(async (current) => {
     const result = await exportMeeting(current); feedback(t('exported') + value(result.fileName));
-  }));
+  }, 'exporting'));
   for (const kind of ['minutes', 'todos']) {
     $('draft-' + kind).addEventListener('click', () => run(async (current) => {
       const result = await exportMeeting(current);
@@ -267,12 +290,16 @@
       if (task.length > 4000) throw new Error('badExport');
       if (current !== epoch) throw stale();
       await awd.chat.send(task); if (current !== epoch) throw stale(); feedback(t('sent'));
-    }));
+    }, 'preparingAi'));
   }
   function setContext(data) {
     context = data || {}; language = String(context.language).startsWith('en') ? 'en' : 'zh';
+    document.body.dataset.surface = ['sidebar', 'workspace'].includes(context.surface) ? context.surface : 'combined';
     document.documentElement.lang = language === 'en' ? 'en-US' : 'zh-CN'; document.title = t('title') + ' · AI WorkDeck';
     document.querySelectorAll('[data-i18n]').forEach((element) => { element.textContent = t(element.dataset.i18n); });
+    $('workspace').setAttribute('aria-label', t('title')); $('meeting-browser').setAttribute('aria-label', t('recordings'));
+    $('search').placeholder = t('search'); $('search').setAttribute('aria-label', t('search'));
+    $('workspace-status').textContent = '';
     $('meetings').setAttribute('aria-label', t('recordings')); $('authorize-url').setAttribute('aria-label', t('authHint'));
     $('connection-status').textContent = t('unchecked'); $('authorization').hidden = true; $('authorize-url').value = '';
     $('logout-confirmation').hidden = true;
@@ -282,13 +309,22 @@
   controls();
   awd.ready().then((data) => {
     setContext(data);
+    if (context.surface) refreshLocal();
     awd.events.on('project.switched', async () => {
       const current = ++epoch; stopLogin(); busy = false; setContext({});
-      try { const fresh = await awd.call('context.get', {}); if (current === epoch) setContext(fresh); }
+      try { const fresh = await awd.call('context.get', {}); if (current === epoch) { setContext(fresh); if (context.surface) refreshLocal(); } }
       catch { if (current === epoch) feedback(t('failed'), true); }
     });
   });
   function refreshAuthorization() {
+    if (context.surface === 'workspace') {
+      if (!busy && context.projectId) {
+        const current = epoch;
+        readStatus(current).then((data) => { if (current === epoch) paintStatus(data); })
+          .catch(() => { if (current === epoch) $('workspace-status').textContent = t('checkingFailed'); });
+      }
+      return;
+    }
     if (($('authorization').hidden && !status?.loginPending) || status?.loggedIn || busy || !context.projectId) return;
     run(async (current) => {
       const data = await readStatus(current); paintStatus(data);

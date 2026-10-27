@@ -1579,3 +1579,9 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 - **随手工作区（`Project.SCRATCH = "SCRATCH"`）**：无项目态切入 `chat` 模式时，宿主调 `ensureScratchProject()`（`POST /api/projects/scratch` → `ProjectService.getOrCreateScratchProject`）幂等获取每用户唯一的隐形托管项目（`versionOptOut = true`，在 `getUserProjects` / 律所目录 / 冲突检索中过滤隐藏），原地绑定 `projectId` 并拉取会话与文件。顶栏与侧栏提供「转为正式项目」（`POST /api/projects/{id}/promote` → `ProjectService.promoteScratchProject`），原地将 `SCRATCH` 转为 `BLANK` 并解除 `versionOptOut`，文件与对话历史零迁移保留。
 - **轻量侧栏与按需画布（`ChatModeSidebar.vue`）**：`chat` 模式下隐藏 `.left-rail` 与 `.sidebar-left`，左侧挂载可折叠 `ChatModeSidebar.vue`（近期对话、当前工作区文稿 `+ Word` / `+ MD`、跨项目调取树 `getMyProjects` + 按需展开 `getProjectFiles(id, null, true)`）。`.workbench-main` 通过 CSS flex `order` 将 `.side-panel-ai` 置左、`.content-area` 置右：无打开文档时 `.side-panel-ai` 居中流式（`max-width: 840px`），`.content-area` 零宽隐藏保活；打开/新建文稿或 AI 产物时 `chatCanvasOpen = true` 自动展开右侧画布（标签栏附「收起画布」按钮）。
 - **验证**：`frontend/tests/project-home/chat-mode.test.mjs`、`npm --prefix frontend run check:nav`、`npm --prefix frontend run check:emits`、`Backend ScratchProjectAndCrossProjectReadTest`。
+
+## 规则编辑与侧栏收展（2026-10-27，#1532/#1536）
+
+内置工作流规则从 ChatInterface 通过 provide/inject 的 `openWorkflowEditorTab` 打开单例 `builtin-workflow-settings` 标签；`BuiltinWorkflowEditor.vue` 与 `useBuiltinWorkflows.js` 复用既有版本 API，版本修改广播刷新聊天卡片。两侧标签池用 v-show 保留编辑草稿，切项目重选版本，虚拟标签不进入文件上下文。菜单 Teleport 到 body 并按视口限宽限高，不能再放进聊天栏的裁剪/定位上下文。回归 `builtin-workflow-tab.test.mjs` 与真实 Uni 编辑器测试。
+
+移除侧栏外缘收起按钮及14px占位；再次点当前 rail 入口复用 `toggleSidebar` 收起/展开，保留顶栏/快捷键。收起动态插件时不重新打开工作区；宽度回夹不再扣外缘占位。

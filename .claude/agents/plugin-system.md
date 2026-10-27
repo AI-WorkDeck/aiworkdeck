@@ -468,3 +468,9 @@ Web协议仍为awd:1。新增contributes.views/connections/mcpServers和settings
 ### 主题画廊分发与语言（dev-board#1527）
 
 三主题 1.0.2 的 `web/index.html` 使用包内相对 SDK、gallery runtime 与生成的 20 语词典；`official-plugins/build-theme-plugins.sh` 从 canonical SDK 和各包 l10n 重建、打 ZIP，禁止引用不存在的 `/api/plugins/sdk/awd-plugin-sdk.js`。真实静态路由是 `/api/plugin-web/{id}/**`。宿主 0.72.1 的 MarketDetailPane/PluginPane 通过既有 theme 消息携带当前应用 language，监听 APP_LANGUAGE_EVENT 并卸载清理；PluginPane 初次 init.context.language 保持原契约。0.72.0 预览缺语言时明确以 en-US 回退，不能用 navigator 冒充应用偏好。iframe 保持 opaque origin，语言/主题消息只接受 parent。Node 渲染回归见 theme-gallery.test.mjs；浏览器脚本必须连接真实隔离后端，不能伪造 SDK 路由。浏览器受宿主禁用时只报告 HTTP/Node 验证，不称 UI 实测。
+
+## 会议与侧栏面板体验（2026-10-27，#1534/#1535/#1537）
+
+腾讯会议声明 sidebar/account 与 workspace/meetings 两个视图，复用同一可信入口；PluginPane 握手 `context.surface` 区分 `sidebar`/`workspace`，未提供时插件保留 combined 兼容。左栏只处理账号授权及同步范围，工作区为可搜索会议列表与正文双列，620px以下在列表/正文间返回；正文、列表独立滚动，纪要/待办/导出操作常驻。重新聚焦只后台检查授权，不锁按钮或重建列表；同步与刷新列表仍是明确操作，不能在登录锁持有期间并发 CLI 调用。测试 `official-plugins/tencent-meeting/tests/workspace-browser.mjs` 使用真实sandbox iframe/SDK与合成接口。
+
+语音/脱敏根背景用侧栏 `--awd-bg`，表单保留 surface；脱敏按钮清除 Uni 默认伪元素描边、引用公共控件令牌，窄栏模式按钮纵排。长编号说明在预览阶段显示，不移除不可逆/PDF/恢复密码等必要操作提示。语音/脱敏编译资源与manifest版本应随源码一并准备，源码验证不等于用户已安装新版。

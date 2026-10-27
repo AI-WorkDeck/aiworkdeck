@@ -250,3 +250,70 @@ test('a plugin reload without its old link keeps checking and explains how to fi
   connected = true; await p.timer();
   assert.equal(p.$('sync').disabled, false);
 });
+
+test('sidebar loads only account and sync settings, without reading or syncing meetings', async (t) => {
+  const p = await panel({ context: { surface: 'sidebar' } }); t.after(() => p.dom.window.close());
+  assert.equal(p.dom.window.document.body.dataset.surface, 'sidebar');
+  assert.deepEqual(p.calls.map(call => call.action), ['status', 'config']);
+  assert.match(p.$('connection-status').textContent, /Synthetic User/);
+  assert.equal(p.calls.some(call => ['sync', 'login', 'list', 'detail'].includes(call.action)), false);
+});
+
+test('workspace opens saved meetings immediately and refreshes connection after sidebar authorization', async (t) => {
+  let connected = false;
+  const p = await panel({ context: { surface: 'workspace' }, invoke: ({ action }) => action === 'status'
+    ? { cliAvailable: true, loggedIn: connected, loginPending: !connected } : undefined });
+  t.after(() => p.dom.window.close());
+  assert.equal(p.dom.window.document.body.dataset.surface, 'workspace');
+  assert.deepEqual(p.calls.map(call => call.action), ['status', 'config', 'list']);
+  assert.match(p.$('workspace-status').textContent, /左侧连接/);
+  assert.equal(p.$('sync').disabled, true);
+  assert.equal(p.timers.length, 0, 'workspace must not duplicate sidebar authorization polling');
+  connected = true;
+  p.dom.window.dispatchEvent(new p.dom.window.Event('focus')); await tick();
+  assert.equal(p.$('sync').disabled, false);
+  assert.match(p.$('workspace-status').textContent, /已连接/);
+  assert.equal(p.calls.some(call => ['sync', 'login'].includes(call.action)), false);
+});
+
+test('selected meeting can retry incomplete reads and return to the filtered list', async (t) => {
+  let complete = false;
+  const p = await panel({ context: { surface: 'workspace' }, invoke: ({ action }) => action === 'detail'
+    ? { ...fixture.detail, complete, errors: complete ? [] : ['Synthetic retry'] } : undefined });
+  t.after(() => p.dom.window.close());
+  p.$('search').value = '10001'; p.$('search').dispatchEvent(new p.dom.window.Event('input'));
+  await p.select();
+  assert.equal(p.dom.window.document.body.dataset.detail, 'true');
+  assert.equal(p.$('export').disabled, true);
+  complete = true; await p.click('reload-detail');
+  assert.equal(p.$('export').disabled, false);
+  assert.equal(p.$('completeness').hidden, true);
+  await p.click('back-to-list');
+  assert.equal(p.dom.window.document.body.dataset.detail, 'false');
+  assert.equal(p.$('search').value, '10001');
+  assert.equal(p.$('meetings').children.length, 1);
+});
+
+test('workspace project switching clears old material and loads only the new project local data', async (t) => {
+  const p = await panel({ context: { surface: 'workspace' } }); t.after(() => p.dom.window.close());
+  await p.select(); assert.match(p.$('transcript').textContent, /PRIVATE_FIXTURE_TRANSCRIPT/);
+  await p.switch({ projectId: 2, surface: 'workspace', language: 'en-US' });
+  assert.equal(p.$('detail').hidden, true);
+  assert.doesNotMatch(p.$('transcript').textContent, /PRIVATE_FIXTURE/);
+  assert.equal(p.calls.some(call => ['sync', 'login'].includes(call.action)), false);
+  assert.deepEqual(p.calls.slice(-3).map(call => call.action), ['status', 'config', 'list']);
+});
+
+test('focusing the workspace does not disable or rebuild the meeting button being clicked', async (t) => {
+  let holdStatus = false, releaseStatus;
+  const p = await panel({ context: { surface: 'workspace' }, invoke: ({ action }) => action === 'status' && holdStatus
+    ? new Promise(resolve => { releaseStatus = resolve }) : undefined });
+  t.after(() => p.dom.window.close());
+  const meetingButton = p.dom.window.document.querySelector('.meeting');
+  holdStatus = true; p.dom.window.dispatchEvent(new p.dom.window.Event('focus')); await tick();
+  assert.equal(meetingButton.disabled, false);
+  assert.equal(meetingButton.isConnected, true);
+  await p.select(); assert.equal(p.$('detail').hidden, false);
+  releaseStatus(fixture.status); await tick();
+  assert.equal(p.$('detail').hidden, false);
+});

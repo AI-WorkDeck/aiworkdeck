@@ -247,9 +247,13 @@ try {
       await key('.play-btn', ' ')
       await wait(() => window.__panelQA.snapshot().status === 'paused')
       const geometry = await page.evaluate(() => ({ documentWidth: document.documentElement.scrollWidth, viewport: innerWidth,
+        panelBackground: getComputedStyle(document.querySelector('.easy-voice-pane')).backgroundColor,
+        sidebarBackground: getComputedStyle(document.documentElement).getPropertyValue('--awd-bg').trim(),
         controls: [...document.querySelectorAll('.ev-btn,.awd-select-trigger,.rate-slider,uni-textarea')].filter(el => el.getBoundingClientRect().width > 0).map(el => {
           const r = el.getBoundingClientRect(); return { tag: el.tagName, className: el.className, left: r.left, right: r.right, width: r.width, height: r.height }
         }) }))
+      const expectedBackground = await page.evaluate(color => { const element = document.createElement('div'); element.style.color = color; document.body.append(element); const resolved = getComputedStyle(element).color; element.remove(); return resolved }, geometry.sidebarBackground)
+      assert.equal(geometry.panelBackground, expectedBackground, 'Voice panel must use the sidebar background')
       assert(geometry.documentWidth <= width + 1, `Horizontal page overflow at ${width}/${theme}/${lang}`)
       assert(geometry.controls.every(control => control.left >= -1 && control.right <= width + 1), `Clipped controls at ${width}/${theme}/${lang}`)
       const file = `${width}-${theme}-${lang}.png`
