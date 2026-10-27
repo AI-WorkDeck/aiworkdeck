@@ -10,7 +10,7 @@ import { parse as parseJs } from '@babel/parser'
 import { ICONS } from '../../src/config/icons.js'
 import * as registry from '../../src/config/panelRegistry.js'
 import * as shell from '../../src/pages/project-overview/noProjectShell.js'
-import { isGlobalPlugin } from '../../src/utils/pluginViews.js'
+import { isGlobalPlugin, hasPluginNavigation, hasPluginPanel } from '../../src/utils/pluginViews.js'
 
 const read = path => readFileSync(new URL(`../../src/${path}`, import.meta.url), 'utf8')
 const page = parseSfc(read('pages/project-overview/project-overview.vue')).descriptor
@@ -30,10 +30,10 @@ const { migrateLeftPaneKey } = moduleValue('config/leftSidebarPlugins.js', '{ mi
 function computedMethod(name) {
   const node = computed.properties.find(node => node.key?.name === name)
   assert.ok(node, `real computed ${name} exists`)
-  return new Function('getMovablePanel', 'getLeftSidebarPlugin', `return ({${page.script.content.slice(node.start, node.end)}}).${name}`)(registry.getMovablePanel, () => ({ label: 'other' }))
+  return new Function('getMovablePanel', 'getLeftSidebarPlugin', 'hasPluginPanel', `return ({${page.script.content.slice(node.start, node.end)}}).${name}`)(registry.getMovablePanel, () => ({ label: 'other' }), hasPluginPanel)
 }
 const switching = moduleValue('pages/project-overview/panelSwitching.js', 'panelSwitchingMethods', {
-  ...shell, migrateLeftPaneKey, isGlobalPlugin, track() {}, uni: { setStorageSync() {} },
+  ...shell, migrateLeftPaneKey, isGlobalPlugin, hasPluginNavigation, track() {}, uni: { setStorageSync() {} },
 })
 const docking = moduleValue('pages/project-overview/panelDocking.js', 'panelDockingMethods', {
   ...shell, ...registry, migrateLeftPaneKey, track() {},
