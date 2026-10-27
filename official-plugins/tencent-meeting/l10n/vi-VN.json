@@ -1,5 +1,17 @@
 {
   "plugin.name": "Họp Tencent",
   "plugin.description": "Kết nối Tencent Meeting để đồng bộ cuộc họp và bản ghi theo yêu cầu, xem bản ghi chép và biên bản thông minh, lưu trữ vào dự án, và tạo biên bản họp cùng các mục hành động. Yêu cầu CLI tmeet chính thức và xác thực tài khoản.",
-  "tool.tencent_meeting_action.description": "Plugin Tencent Meeting: kiểm tra kết nối, xác thực đăng nhập, đồng bộ theo yêu cầu, xem cuộc họp và bản ghi chép, và lưu trữ tệp dự án."
+  "tool.tencent_meeting_action.description": "Plugin Tencent Meeting: kiểm tra kết nối, xác thực đăng nhập, đồng bộ theo yêu cầu, xem cuộc họp và bản ghi chép, và lưu trữ tệp dự án.",
+  "panel.refreshList": "Làm mới",
+  "panel.selectMeeting": "Chọn cuộc họp",
+  "panel.backToList": "Quay lại danh sách",
+  "panel.meetingCount": "cuộc họp",
+  "panel.connectInSidebar": "Kết nối Tencent Meeting trong thanh bên",
+  "panel.loadingList": "Đang tải danh sách cuộc họp…",
+  "panel.loadingDetail": "Đang tải nội dung cuộc họp…",
+  "panel.syncing": "Đang đồng bộ cuộc họp…",
+  "panel.exporting": "Đang lưu tài liệu cuộc họp…",
+  "panel.preparingAi": "Đang chuẩn bị tài liệu cuộc họp cho AI…",
+  "view.account.name": "Tencent Meeting",
+  "view.meetings.name": "Tencent Meeting"
 }

@@ -19,19 +19,19 @@ public final class ChineseAddressRecognizer {
     private static final Pattern CONTEXT = Pattern.compile("(?:位于|坐落于|居住于|住在|迁至|寄至|送至|在)\\h*");
     private static final Pattern BOUNDARY = Pattern.compile("(?:^|[\\r\\n，,。；;：:])\\h*", Pattern.MULTILINE);
     private static final Pattern STOP = Pattern.compile(
-            "[\\r\\n，,。；;：:！？!?\\t]|(?:法定代表人|负责人|联系人|联系电话|电话|邮编|电子邮箱|邮箱|统一社会信用代码|注册资本|经营范围|公司名称|企业名称|身份证号|姓名|传真|邮政编码|开户银行|开户行|银行账号|甲方|乙方)\\h*(?:[：:]|(?=\\h))"
+            "[\\r\\n，,。；;：:！？!?\\t]|(?:法定代表人|负责人|联系人|联系电话|电话|手机号码|手机号|手机|邮编|电子邮箱|邮箱|统一社会信用代码|注册资本|经营范围|公司名称|企业名称|身份证号码|身份证号|出生日期|性别|民族|现住址|曾用名|姓名|传真|邮政编码|开户银行|开户行|银行账号|甲方|乙方|(?:共同)?(?:原告|被告|第三人|申请执行人|被执行人|申请人|被申请人|上诉人|被上诉人)\\h*(?:[0-9０-９一二三四五六七八九十百零〇两]+|[（(]\\h*[0-9０-９一二三四五六七八九十百零〇两]+\\h*[）)])?(?:\\h*[（(](?:自然人|反诉原告|反诉被告)[）)])?)\\h*(?:[：:]|(?=\\h))"
             + "|(?:签署|签订|履行|约定|经营业务|开展业务|从事|办理|应当|已经|依法|负责|进行|并将|并于|需要|拟于|应于)|(?:办公|居住|经营)(?=$|[，,。；;\\s])");
     private static final Pattern DETAIL = Pattern.compile(
-            "(?:[\\p{IsHan}A-Za-z0-9]{1,32}(?:街道|大道|大街|胡同|路|街|巷|镇|乡|村|社区|小区|园区|大厦|广场|花园|公寓|写字楼|中心|道|区|园|城|座)"
-            + "|[A-Za-z0-9零一二三四五六七八九十百甲乙丙丁之至\\-—]{1,16}(?:号院|号楼|号|栋|幢|座|单元|楼|层|室|弄))+");
+            "(?:[\\p{IsHan}A-Za-z0-9０-９]{1,32}(?:街道|大道|大街|胡同|路|街|巷|镇|乡|村|社区|小区|园区|大厦|广场|花园|公寓|写字楼|中心|道|区|园|城|座)"
+            + "|[A-Za-z0-9０-９零一二三四五六七八九十百甲乙丙丁之至\\-—]{1,16}(?:号院|号楼|号|栋|幢|座|单元|楼|层|室|房|弄))+");
     private static final Pattern PROSE = Pattern.compile("(?:本合同|本协议|双方|应当|约定|送达|通知|另行|待补充|位于|寄至|签署|签订)");
     private static final Pattern INTRO = Pattern.compile("^(?:我们|你们|他们|她们|我|公司|本公司|该公司|企业|项目|甲方|乙方|本人|他|她)(?:在|于|迁至|住在)");
     private static final Pattern ORGANIZATION = Pattern.compile("(?:有限公司|有限责任公司|人民法院|人民政府|委员会)");
-    private static final Pattern TAIL = Pattern.compile("(?:[A-Za-z0-9][A-Za-z0-9\\-—/]{0,20})?(?:[（(][\\p{IsHan}A-Za-z0-9\\-]{1,30}[）)])?");
+    private static final Pattern TAIL = Pattern.compile("(?:[A-Za-z0-9０-９][A-Za-z0-9０-９\\-—/]{0,20})?(?:[（(][\\p{IsHan}A-Za-z0-9０-９\\-]{1,30}[）)])?");
     // Explicit address fields can contain trade-zone prefixes and locative suffixes that
     // are not administrative levels. Require postal detail and a plausible address ending.
-    private static final Pattern FIELD_POSTAL_DETAIL = Pattern.compile("[0-9零一二三四五六七八九十百甲乙丙丁]+(?:号|栋|幢|座|单元|楼|层|室|弄)");
-    private static final Pattern FIELD_ADDRESS = Pattern.compile("[\\p{IsHan}A-Za-z0-9（）()\\-—/]+(?:号|院|栋|幢|座|单元|楼|层|室|弄|[东南西北]侧|院内|院外|附近|[0-9]|[）)])$");
+    private static final Pattern FIELD_POSTAL_DETAIL = Pattern.compile("[0-9０-９零一二三四五六七八九十百甲乙丙丁]+(?:号|栋|幢|座|单元|楼|层|室|房|弄)");
+    private static final Pattern FIELD_ADDRESS = Pattern.compile("[\\p{IsHan}A-Za-z0-9０-９（）()\\-—/]+(?:号|院|栋|幢|座|单元|楼|层|室|房|弄|[东南西北]侧|院内|院外|附近|[0-9０-９]|[）)])$");
     private static final Pattern SUFFIX = Pattern.compile("(?:特别行政区|自治区|自治州|自治县|自治旗|地区|省|市|区|县|旗|盟)$");
 
     private ChineseAddressRecognizer() {}
@@ -74,12 +74,16 @@ public final class ChineseAddressRecognizer {
         boolean boundedFieldAddress = field && FIELD_POSTAL_DETAIL.matcher(candidate).find()
                 && FIELD_ADDRESS.matcher(candidate).matches();
         if ((end != candidate.length() || end == 0) && !boundedFieldAddress) return;
+        // A room count such as “户型：三房” is not a standalone postal address.
+        // A lone room number needs an explicit address field; full addresses keep it.
+        if (!field && adminEnd == 0
+                && candidate.matches("[A-Za-z0-9０-９零一二三四五六七八九十百甲乙丙丁之至\\-—]{1,16}房")) return;
         if (!field && adminEnd == end) {
             List<String> levels = new ArrayList<>();
             administrativeEnd(candidate, levels);
             if (levels.size() < 2) return;
         }
-        if (!field && adminEnd == 0 && !candidate.matches(".*[0-9零一二三四五六七八九十].*")) return;
+        if (!field && adminEnd == 0 && !candidate.matches(".*[0-9０-９零一二三四五六七八九十].*")) return;
         spans.add(new Span(start, start + original.length()));
     }
 

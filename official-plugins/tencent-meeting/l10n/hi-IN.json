@@ -2,7 +2,16 @@
   "plugin.name": "Tencent Meeting",
   "plugin.description": "मीटिंग और रिकॉर्डिंग को मांग पर सिंक करने, ट्रांसक्रिप्ट और स्मार्ट मिनट्स देखने, प्रोजेक्ट में संग्रहित करने तथा मीटिंग मिनट्स और कार्य आइटम बनाने के लिए Tencent Meeting से कनेक्ट करें। आधिकारिक tmeet CLI और खाता प्राधिकरण आवश्यक है।",
   "tool.tencent_meeting_action.description": "Tencent Meeting प्लगइन: कनेक्शन जांचें, लॉगिन अधिकृत करें, मांग पर सिंक करें, मीटिंग और ट्रांसक्रिप्ट देखें, और प्रोजेक्ट फ़ाइलें संग्रहित करें।",
-  "plugin": {
-    "name": "Tencent Meeting"
-  }
+  "panel.refreshList": "रीफ़्रेश करें",
+  "panel.selectMeeting": "बैठक चुनें",
+  "panel.backToList": "बैठकों पर वापस जाएँ",
+  "panel.meetingCount": "बैठकें",
+  "panel.connectInSidebar": "साइडबार में Tencent Meeting कनेक्ट करें",
+  "panel.loadingList": "बैठकें लोड हो रही हैं…",
+  "panel.loadingDetail": "बैठक की सामग्री लोड हो रही है…",
+  "panel.syncing": "बैठकें सिंक हो रही हैं…",
+  "panel.exporting": "बैठक की सामग्री सहेजी जा रही है…",
+  "panel.preparingAi": "AI के लिए बैठक की सामग्री तैयार हो रही है…",
+  "view.account.name": "Tencent Meeting",
+  "view.meetings.name": "Tencent Meeting"
 }

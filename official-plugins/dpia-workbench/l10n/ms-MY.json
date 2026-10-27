@@ -11,8 +11,5 @@
   "setting.sofficePath.label": "Boleh Laku LibreOffice",
   "setting.sofficePath.description": "Hanya diperlukan untuk eksport laporan PDF dan pratonton halaman; biar kosong untuk mencuba lokasi lalai sistem.",
   "tool.dpia_workbench_action.description": "Operasi kes DPIA, bahan, pengesahan fakta, soal jawab, status pelaksanaan dan laporan. Untuk UI workbench sahaja; AI tidak boleh memanggil entri pengesahan/kelulusan manual.",
-  "tool.dpia_workbench_task.description": "Laksanakan tugas DPIA yang dibekukan semasa: context/read/write/script/commit/report; skop terhad secara ketat kepada projek pengguna semasa dan direktori output kes.",
-  "plugin": {
-    "name": "DPIA Workbench"
-  }
+  "tool.dpia_workbench_task.description": "Laksanakan tugas DPIA yang dibekukan semasa: context/read/write/script/commit/report; skop terhad secara ketat kepada projek pengguna semasa dan direktori output kes."
 }

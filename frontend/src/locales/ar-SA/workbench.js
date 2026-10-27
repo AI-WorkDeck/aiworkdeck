@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "skinSectionTitle": "سمة المظهر",
-  "skinDefaultName": "صفاء الشرق (افتراضي)",
   "restartPending": "يمكن استئناف {count} من المهام",
   "restartContinue": "متابعة: {name}",
   "restartRestoring": "جارٍ استعادة المحادثة والمستند الأصليين…",
@@ -118,6 +116,8 @@ export default {
   "appearanceLight": "فاتح",
   "appearanceDark": "داكن",
   "appearanceSystem": "اتباع النظام",
+  "skinSectionTitle": "سمة المظهر",
+  "skinDefaultName": "صفاء الشرق (افتراضي)",
   "walletChipTitle": "رصيد Credits ومستوى العضوية؛ انقر لفتح إعدادات الحساب",
   "walletMenuLabel": "الحساب والاستخدام",
   "trialInfo": "حول الفترة التجريبية",

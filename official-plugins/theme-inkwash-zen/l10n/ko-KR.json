@@ -2,14 +2,11 @@
   "plugin.name": "수묵 선 · 서예 스킨",
   "plugin.desc": "선지의 여백, 5단계 수묵 위계, 보랏빛 먹 포인트가 라이트 모드와 다크 모드에 모두 적용됩니다.",
   "theme.name": "수묵 선",
-  "theme.desc": "Xuan Paper × Five-Tone Ink Wash × Purple Ink Drop × Cinnabar Seal",
+  "theme.desc": "쉬엔지 × 오색 먹물 물감 × 보라색 잉크 드롭 × 주홍 인장",
   "gallery.badge": "테마 갤러리",
   "gallery.swatch1": "한지 흰색",
   "gallery.swatch2": "짙은 먹",
   "gallery.swatch3": "보랏빛 먹",
   "gallery.swatch4": "주사색",
-  "gallery.swatch5": "밤의 먹",
-  "theme": {
-    "desc": "쉬엔지 × 오색 먹물 물감 × 보라색 잉크 드롭 × 주홍 인장"
-  }
+  "gallery.swatch5": "밤의 먹"
 }

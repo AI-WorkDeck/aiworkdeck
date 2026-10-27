@@ -2,10 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "themesTitle": "外觀皮膚",
-  "themeSelect": "套用皮膚",
-  "themeSelected": "使用中（點擊恢復預設）",
-  "themeNote": "皮膚會同步更新工作台、插件與編輯器外觀的語意色彩，支援淺色與深色模式。",
   "redactionEngineUpdateNotice": "本地規則自動識別公司與中文姓名，支持預覽、編號替換和復敏。實際功能隨桌面端補丁升級，重新安裝說明文件不會更新引擎。",
   "redactionEngineUpdateButton": "檢查脫敏引擎更新",
   "heroWatermark": "技",
@@ -73,6 +69,10 @@ export default {
   "profileSelect": "設為默認畫像",
   "profileSelected": "當前默認（點擊取消）",
   "styleProfileNote": "設為默認後，文檔導出與標準格式化按該畫像排版；項目里的 _模板/畫像.json 優先級更高。",
+  "themesTitle": "外觀皮膚",
+  "themeSelect": "套用皮膚",
+  "themeSelected": "使用中（點擊恢復預設）",
+  "themeNote": "皮膚會同步更新工作台、插件與編輯器外觀的語意色彩，支援淺色與深色模式。",
   "revokedPrefix": "已被平台下架：",
   "enabledTag": "已啓用",
   "disabledTag": "已停用",

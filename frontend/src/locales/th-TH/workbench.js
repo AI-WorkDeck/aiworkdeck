@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "skinSectionTitle": "ธีมสี",
-  "skinDefaultName": "Oriental Serenity (ค่าเริ่มต้น)",
   "restartPending": "สามารถดำเนินงานต่อได้ {count} รายการ",
   "restartContinue": "ดำเนินการต่อ: {name}",
   "restartRestoring": "กำลังกู้คืนบทสนทนาและเอกสารต้นฉบับ…",
@@ -118,6 +116,8 @@ export default {
   "appearanceLight": "สว่าง",
   "appearanceDark": "มืด",
   "appearanceSystem": "ตามระบบ",
+  "skinSectionTitle": "ธีมสี",
+  "skinDefaultName": "Oriental Serenity (ค่าเริ่มต้น)",
   "walletChipTitle": "ยอดเครดิตคงเหลือและระดับสมาชิก คลิกเพื่อเปิดการตั้งค่าบัญชี",
   "walletMenuLabel": "บัญชีและการใช้งาน",
   "trialInfo": "เกี่ยวกับช่วงทดลองใช้",

@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "skinSectionTitle": "Тема оформления",
-  "skinDefaultName": "Восточная безмятежность (по умолчанию)",
   "restartPending": "Можно возобновить задач: {count}",
   "restartContinue": "Продолжить: {name}",
   "restartRestoring": "Восстановление исходного разговора и документа…",
@@ -118,6 +116,8 @@ export default {
   "appearanceLight": "Светлая",
   "appearanceDark": "Тёмная",
   "appearanceSystem": "Как в системе",
+  "skinSectionTitle": "Тема оформления",
+  "skinDefaultName": "Восточная безмятежность (по умолчанию)",
   "walletChipTitle": "Баланс кредитов и уровень подписки; нажмите, чтобы открыть настройки аккаунта",
   "walletMenuLabel": "Аккаунт и использование",
   "trialInfo": "О пробном периоде",

@@ -2,10 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "themesTitle": "Εμφανίσεις διεπαφής",
-  "themeSelect": "Εφαρμογή εμφάνισης",
-  "themeSelected": "Ενεργή (πατήστε για την προεπιλογή)",
-  "themeNote": "Η εφαρμογή εμφάνισης ενημερώνει τα σημασιολογικά χρωματικά tokens σε όλο το workbench, τα πρόσθετα και τη γραφική διασύνδεση του επεξεργαστή, τόσο σε φωτεινή όσο και σε σκούρα λειτουργία.",
   "redactionEngineUpdateNotice": "Οι τοπικοί κανόνες εντοπίζουν αυτόματα εταιρείες και κινεζικά ονόματα, με προεπισκόπηση, tokens και επαναφορά. Η μηχανή ενημερώνεται μέσω επιτραπέζιων ενημερώσεων· η επανεγκατάσταση των οδηγιών skills δεν την ενημερώνει.",
   "redactionEngineUpdateButton": "Έλεγχος ενημερώσεων μηχανής αποκρύψεως",
   "heroWatermark": "E",
@@ -73,6 +69,10 @@ export default {
   "profileSelect": "Ορισμός ως προεπιλεγμένο προφίλ",
   "profileSelected": "Τρέχον προεπιλεγμένο (πατήστε για επαναφορά)",
   "styleProfileNote": "Exports and standard formatting follow the selected profile; a project-level _模板/画像.json still takes precedence.",
+  "themesTitle": "Εμφανίσεις διεπαφής",
+  "themeSelect": "Εφαρμογή εμφάνισης",
+  "themeSelected": "Ενεργή (πατήστε για την προεπιλογή)",
+  "themeNote": "Η εφαρμογή εμφάνισης ενημερώνει τα σημασιολογικά χρωματικά tokens σε όλο το workbench, τα πρόσθετα και τη γραφική διασύνδεση του επεξεργαστή, τόσο σε φωτεινή όσο και σε σκούρα λειτουργία.",
   "revokedPrefix": "Αφαιρέθηκε από την πλατφόρμα: ",
   "enabledTag": "Ενεργοποιημένο",
   "disabledTag": "Απενεργοποιημένο",

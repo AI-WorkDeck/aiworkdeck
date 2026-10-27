@@ -2,10 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "themesTitle": "Skin UI",
-  "themeSelect": "Terapkan skin",
-  "themeSelected": "Aktif (ketuk untuk bawaan)",
-  "themeNote": "Menerapkan skin akan memperbarui token warna semantik di seluruh workbench, plugin, dan antarmuka editor baik dalam mode Terang maupun Gelap.",
   "redactionEngineUpdateNotice": "Aturan lokal secara otomatis mendeteksi perusahaan dan nama Tionghoa, dengan pratinjau, token, dan pemulihan. Mesin diperbarui melalui patch desktop; memasang ulang instruksi Skill tidak memperbaruinya.",
   "redactionEngineUpdateButton": "Periksa pembaruan mesin penyuntingan",
   "heroWatermark": "E",
@@ -73,6 +69,10 @@ export default {
   "profileSelect": "Jadikan profil bawaan",
   "profileSelected": "Bawaan saat ini (ketuk untuk menghapus)",
   "styleProfileNote": "Exports and standard formatting follow the selected profile; a project-level _模板/画像.json still takes precedence.",
+  "themesTitle": "Skin UI",
+  "themeSelect": "Terapkan skin",
+  "themeSelected": "Aktif (ketuk untuk bawaan)",
+  "themeNote": "Menerapkan skin akan memperbarui token warna semantik di seluruh workbench, plugin, dan antarmuka editor baik dalam mode Terang maupun Gelap.",
   "revokedPrefix": "Dihapus oleh platform: ",
   "enabledTag": "Diaktifkan",
   "disabledTag": "Dinonaktifkan",

@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "skinSectionTitle": "Tema Tampilan",
-  "skinDefaultName": "Oriental Serenity (Bawaan)",
   "restartPending": "{count} tugas dapat dilanjutkan",
   "restartContinue": "Lanjutkan: {name}",
   "restartRestoring": "Memulihkan percakapan dan dokumen asli…",
@@ -118,6 +116,8 @@ export default {
   "appearanceLight": "Terang",
   "appearanceDark": "Gelap",
   "appearanceSystem": "Ikuti sistem",
+  "skinSectionTitle": "Tema Tampilan",
+  "skinDefaultName": "Oriental Serenity (Bawaan)",
   "walletChipTitle": "Saldo kredit dan tingkat keanggotaan; klik untuk membuka pengaturan akun",
   "walletMenuLabel": "Akun dan penggunaan",
   "trialInfo": "Tentang Uji Coba",

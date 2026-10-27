@@ -2,10 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "themesTitle": "Thèmes d'interface",
-  "themeSelect": "Appliquer le thème",
-  "themeSelected": "Actif (appuyez pour le thème par défaut)",
-  "themeNote": "L'application d'un thème met à jour les jetons de couleur sémantiques dans l'atelier, les plugins et l'éditeur, en modes clair et sombre.",
   "redactionEngineUpdateNotice": "Les règles locales détectent automatiquement les noms de sociétés et les noms chinois, avec aperçus, jetons et restauration. Le moteur est mis à jour via les correctifs du bureau ; la réinstallation des instructions de Skill ne le met pas à jour.",
   "redactionEngineUpdateButton": "Vérifier les mises à jour du moteur de rédaction",
   "heroWatermark": "E",
@@ -73,6 +69,10 @@ export default {
   "profileSelect": "Définir comme profil par défaut",
   "profileSelected": "Profil par défaut actuel (appuyez pour effacer)",
   "styleProfileNote": "Exports and standard formatting follow the selected profile; a project-level _模板/画像.json still takes precedence.",
+  "themesTitle": "Thèmes d'interface",
+  "themeSelect": "Appliquer le thème",
+  "themeSelected": "Actif (appuyez pour le thème par défaut)",
+  "themeNote": "L'application d'un thème met à jour les jetons de couleur sémantiques dans l'atelier, les plugins et l'éditeur, en modes clair et sombre.",
   "revokedPrefix": "Supprimé par la plateforme : ",
   "enabledTag": "Activé",
   "disabledTag": "Désactivé",

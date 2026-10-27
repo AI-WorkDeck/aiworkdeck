@@ -2,10 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "themesTitle": "UI スキン",
-  "themeSelect": "スキンを適用",
-  "themeSelected": "適用中（タップでデフォルトに戻す）",
-  "themeNote": "スキンを適用すると、ライトモードとダークモードの両方で、ワークベンチ、プラグイン、エディター全体のセマンティックカラートークンが更新されます。",
   "redactionEngineUpdateNotice": "ローカルルールは企業名や中国語名を自動検出し、プレビュー・トークン・復元に対応しています。エンジンはデスクトップパッチを通じて更新され、スキル手順の再インストールでは更新されません。",
   "redactionEngineUpdateButton": "マスキングエンジンの更新を確認",
   "heroWatermark": "E",
@@ -73,6 +69,10 @@ export default {
   "profileSelect": "デフォルトプロファイルに設定",
   "profileSelected": "現在のデフォルト（タップで解除）",
   "styleProfileNote": "エクスポートと標準フォーマットは選択したプロファイルに従いますが、プロジェクトレベルの _模板/画像.json が優先されます。",
+  "themesTitle": "UI スキン",
+  "themeSelect": "スキンを適用",
+  "themeSelected": "適用中（タップでデフォルトに戻す）",
+  "themeNote": "スキンを適用すると、ライトモードとダークモードの両方で、ワークベンチ、プラグイン、エディター全体のセマンティックカラートークンが更新されます。",
   "revokedPrefix": "プラットフォームにより削除済み: ",
   "enabledTag": "有効",
   "disabledTag": "無効",

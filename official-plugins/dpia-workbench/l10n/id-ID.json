@@ -1,5 +1,5 @@
 {
-  "plugin.name": "DPIA Workbench",
+  "plugin.name": "Meja Kerja DPIA",
   "plugin.description": "Penilaian Dampak Perlindungan Data: penelusuran sumber, konfirmasi fakta, tindak lanjut tanya jawab, risiko & perbaikan, penilaian ulang berkelanjutan, dan laporan berversi. Diadaptasi dari DSH DPIA Workbench milik Zhu Lingfeng; memerlukan Node.js, Python, dan LibreOffice.",
   "plugin.author": "AI WorkDeck (Hulu: Zhu Lingfeng / The-Data-Galaxy)",
   "setting.nodePath.label": "Executable Node.js",
@@ -11,8 +11,5 @@
   "setting.sofficePath.label": "Executable LibreOffice",
   "setting.sofficePath.description": "Hanya diperlukan untuk ekspor laporan PDF dan pratinjau halaman; biarkan kosong untuk mencoba lokasi default sistem.",
   "tool.dpia_workbench_action.description": "Operasi kasus DPIA, materi, konfirmasi fakta, tanya jawab, status eksekusi, dan laporan. Hanya untuk UI workbench; AI tidak boleh memanggil entri konfirmasi/persetujuan manual.",
-  "tool.dpia_workbench_task.description": "Menjalankan tugas DPIA yang dibekukan saat ini: context/read/write/script/commit/report; ruang lingkup dibatasi ketat pada proyek pengguna saat ini dan direktori keluaran kasus.",
-  "plugin": {
-    "name": "DPIA Workbench"
-  }
+  "tool.dpia_workbench_task.description": "Menjalankan tugas DPIA yang dibekukan saat ini: context/read/write/script/commit/report; ruang lingkup dibatasi ketat pada proyek pengguna saat ini dan direktori keluaran kasus."
 }

@@ -85,6 +85,10 @@ public class MobileRelayClientService {
     @Autowired(required = false) private ProjectCatalogService projectCatalog;
     @Autowired(required = false) private com.checkba.repository.ProjectRemoteRepository projectRemotes;
     @Autowired(required = false) private com.checkba.repository.CloudConnectionRepository cloudConnections;
+    @Autowired(required = false) private com.checkba.service.task.ProjectTaskService mobileTasks;
+    @Autowired(required = false) private com.checkba.service.ProjectProfileService mobileProfiles;
+    private final AtomicBoolean calendarSyncRunning = new AtomicBoolean();
+    private final AtomicBoolean assistantSyncRunning = new AtomicBoolean();
 
     @Autowired(required=false) private com.checkba.version.objects.LocalVersionObjectStore versionObjectStore;
     private final AtomicBoolean versionBackupRunning = new AtomicBoolean();
@@ -744,6 +748,141 @@ public class MobileRelayClientService {
     }
 
     // ==================== 周期任务 ====================
+
+    @Scheduled(initialDelay = 70_000, fixedDelay = 60_000)
+    public void scheduleMobileCalendar() {
+        if (active()) dispatchNudge("calendar-sync", this::syncMobileCalendar);
+    }
+
+    @Scheduled(initialDelay = 90_000, fixedDelay = 600_000)
+    public void scheduleMobileAssistant() {
+        if (active()) dispatchNudge("assistant-sync", this::syncMobileAssistant);
+    }
+
+    /** No task content leaves the desktop before the account's explicit calendar consent. */
+    public void syncMobileCalendar() {
+        if (!active() || mobileTasks == null || !calendarSyncRunning.compareAndSet(false, true)) return;
+        try {
+            CatalogSession session = beginCatalogSession(catalogAccountScope());
+            JsonNode settings = workspaceJson(session, "GET", "/api/mobile/calendar/settings", null);
+            if (!settings.path("enabled").asBoolean() || !settings.path("subscriptionActive").asBoolean()) return;
+            List<Project> projects = mobileWorkspaceProjects();
+            if (projects.isEmpty()) return;
+            projects = pushWorkspaceDirectory(session, projects);
+            requireCatalogAccountScope(session.scope());
+            ObjectNode body = mapper.createObjectNode().put("deviceId", deviceId())
+                    .put("timeZone", java.time.ZoneId.systemDefault().getId())
+                    .put("sourceUpdatedAt", java.time.Instant.now().toString());
+            ArrayNode events = body.putArray("events");
+            for (Project project : projects) {
+                for (Map<String, Object> task : mobileTasks.listByProject(project.getId(), null, null)) {
+                    ObjectNode event = events.addObject().put("projectKey", project.getId().toString())
+                            .put("taskId", String.valueOf(task.get("id"))).put("title", String.valueOf(task.get("title")))
+                            .put("dueDate", String.valueOf(task.get("dueDate"))).put("status", String.valueOf(task.get("status")));
+                    if (task.get("dueTime") != null) event.put("dueTime", task.get("dueTime").toString());
+                    if (task.get("remindBefore") instanceof Number n) event.put("remindBefore", n.intValue());
+                    ArrayNode files = event.putArray("files");
+                    if (task.get("files") instanceof List<?> linked) for (Object raw : linked) {
+                        if (raw instanceof Map<?, ?> file && file.get("fileId") != null)
+                            files.addObject().put("fileId", file.get("fileId").toString())
+                                    .put("fileName", Objects.toString(file.get("fileName"), ""));
+                    }
+                }
+            }
+            // Publish only a complete read. A failed project read must not erase the previous snapshot.
+            workspaceJson(session, "PUT", "/api/mobile/calendar/snapshots", body);
+        } catch (Exception e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            log.warn("Mobile calendar sync pending retry ({})", e.getClass().getSimpleName());
+        } finally { calendarSyncRunning.set(false); }
+    }
+
+    /** Cloud extracts document evidence from already consented backups; this sends only project facts and tasks. */
+    public void syncMobileAssistant() {
+        if (!active() || mobileTasks == null || mobileProfiles == null || !assistantSyncRunning.compareAndSet(false, true)) return;
+        try {
+            CatalogSession session = beginCatalogSession(catalogAccountScope());
+            JsonNode status = workspaceJson(session, "GET", "/api/mobile/assistant/status", null);
+            if (!status.path("enabled").asBoolean() || !status.path("subscriptionActive").asBoolean()
+                    || !status.path("backupEnabled").asBoolean()) return;
+            List<Project> projects = mobileWorkspaceProjects();
+            if (projects.isEmpty()) return;
+            projects = pushWorkspaceDirectory(session, projects);
+            requireCatalogAccountScope(session.scope());
+            Set<String> keys = projects.stream().map(p -> p.getId().toString()).collect(java.util.stream.Collectors.toSet());
+            for (Project project : projects) {
+                requireCatalogAccountScope(session.scope());
+                try {
+                    StringBuilder context = new StringBuilder("Project: ").append(project.getName()).append('\n');
+                    context.append("Profile: ").append(mobileProfiles.getProfile(project.getId())).append('\n');
+                    context.append("Tasks: ").append(mobileTasks.listByProject(project.getId(), null, null));
+                    if (context.length() > 23_900) context.setLength(23_900);
+                    if (context.length() == 23_900) context.append("\n[Context truncated; consult source files for detail.]");
+                    ObjectNode body = mapper.createObjectNode().put("deviceId", deviceId())
+                            .put("projectKey", project.getId().toString()).put("projectName", project.getName())
+                            .put("sourceUpdatedAt", java.time.Instant.now().toString()).put("context", context.toString());
+                    workspaceJson(session, "PUT", "/api/mobile/assistant/snapshots", body);
+                } catch (Exception e) {
+                    requireCatalogAccountScope(session.scope());
+                    if (e instanceof InterruptedException) { Thread.currentThread().interrupt(); throw e; }
+                    log.warn("One mobile project summary pending retry ({})", e.getClass().getSimpleName());
+                }
+            }
+            JsonNode summaries = workspaceJson(session, "GET", "/api/mobile/assistant/summaries", null);
+            JsonNode list = summaries.isArray() ? summaries : summaries.path("summaries");
+            for (JsonNode summary : list) if (deviceId().equals(summary.path("deviceId").asText())
+                    && !keys.contains(summary.path("projectKey").asText()))
+                workspaceJson(session, "DELETE", "/api/mobile/assistant/snapshots?deviceId=" + queryValue(deviceId())
+                        + "&projectKey=" + queryValue(summary.path("projectKey").asText()), null);
+        } catch (Exception e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            log.warn("Mobile assistant summary sync pending retry ({})", e.getClass().getSimpleName());
+        } finally { assistantSyncRunning.set(false); }
+    }
+
+    private List<Project> mobileWorkspaceProjects() {
+        return projectRepository.findByUserIdOrderByCreatedAtDesc(localIdentityService.localUserId()).stream()
+                .filter(p -> p.getId() != null && p.getName() != null && !p.isLooseFileWorkspace()).toList();
+    }
+
+    private List<Project> pushWorkspaceDirectory(CatalogSession session, List<Project> projects) throws IOException {
+        requireCatalogAccountScope(session.scope());
+        ObjectNode body = mapper.createObjectNode().put("deviceId", deviceId()).put("deviceName", deviceName());
+        ArrayNode entries = body.putArray("projects");
+        for (Project p : projects) {
+            ObjectNode entry = entries.addObject().put("key", p.getId().toString()).put("name", p.getName());
+            if (projectCatalog != null) entry.put("projectUid", projectCatalog.ensureProjectUid(p));
+            Long cloudId = cloudProjectId(p);
+            if (cloudId != null) entry.put("cloudProjectId", cloudId);
+        }
+        // Never rebind the credential mid-operation, including the directory prerequisite.
+        HttpResponse<String> response = catalogExchange(session, "PUT", "/api/mobile/projects", mapper.writeValueAsString(body));
+        if (!okEnvelope(response)) throw new IOException("Project directory sync unavailable");
+        JsonNode result = mapper.readTree(response.body());
+        if (result.path("truncated").asBoolean(false)) {
+            int stored = result.path("count").asInt(-1);
+            if (stored < 0 || stored > projects.size()) throw new IOException("Invalid directory sync count");
+            log.warn("Mobile workspace directory limited to {} of {} projects", stored, projects.size());
+            return projects.subList(0, stored);
+        }
+        return projects;
+    }
+
+    private JsonNode workspaceJson(CatalogSession session, String method, String path, JsonNode body)
+            throws IOException, InterruptedException {
+        requireCatalogAccountScope(session.scope());
+        HttpRequest.Builder builder = request(path, Duration.ofMinutes(3))
+                .header("X-Session-Id", session.token()).header("Content-Type", "application/json");
+        builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody()
+                : HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)));
+        HttpResponse<String> response = http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+        requireCatalogAccountScope(session.scope());
+        if (response.statusCode() != 200) throw new IOException("Workspace sync unavailable");
+        JsonNode envelope = mapper.readTree(response.body());
+        if (!envelope.has("code") || envelope.path("code").asInt(-1) != 0 || !envelope.has("data"))
+            throw new IOException("Workspace sync failed");
+        return envelope.path("data");
+    }
 
     /** 项目目录推送：启动后 45 秒首推，此后每 10 分钟（清单无变化则跳过出站）。 */
     @Scheduled(initialDelay = 45_000, fixedDelay = 600_000)

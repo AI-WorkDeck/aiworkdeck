@@ -157,5 +157,16 @@ export default {
   "paneEmptyMonth": "Geen taken deze maand",
   "paneEmptyFile": "Nog geen taken gekoppeld aan dit bestand",
   "railScheduleTitle": "Agenda ({overdue} achterstallig · {today} vandaag)",
-  "tabName": "Planning"
+  "tabName": "Planning",
+  "workspaceAll": "Alle projecten",
+  "workspaceCurrent": "Huidig project",
+  "workspaceUpcoming": "Binnenkort",
+  "workspaceDays": "Komende {count} dagen",
+  "workspaceRetry": "Opnieuw laden",
+  "workspaceOverdue": "{count} te laat",
+  "workspaceNoUpcoming": "Geen deadlines in de komende {count} dagen",
+  "workspaceLinked": "Filters synchroniseren met de agenda. Selecteer een item voor details.",
+  "workspaceDay": "Dag",
+  "workspaceYear": "Jaar",
+  "workspaceEventCount": "{count} items"
 }

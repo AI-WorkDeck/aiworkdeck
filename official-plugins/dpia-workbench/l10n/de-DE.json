@@ -11,8 +11,5 @@
   "setting.sofficePath.label": "LibreOffice-Executable",
   "setting.sofficePath.description": "Nur für den PDF-Export von Berichten und die Seitenvorschau erforderlich; leer lassen, um Standard-Systempfade zu versuchen.",
   "tool.dpia_workbench_action.description": "DPIA-Fall, Materialien, Faktenbestätigung, Q&A, Ausführungsstatus und Berichtsvorgänge. Nur für die Workbench-Benutzeroberfläche; die KI darf keine manuellen Bestätigungs-/Genehmigungseinträge aufrufen.",
-  "tool.dpia_workbench_task.description": "Derzeit eingefrorene DPIA-Aufgaben ausführen: context/read/write/script/commit/report; strikt auf das aktuelle Benutzerprojekt und das Fall-Ausgabeverzeichnis beschränkt.",
-  "plugin": {
-    "author": "AI WorkDeck (Upstream: Zhu Lingfeng / The-Data-Galaxy)"
-  }
+  "tool.dpia_workbench_task.description": "Derzeit eingefrorene DPIA-Aufgaben ausführen: context/read/write/script/commit/report; strikt auf das aktuelle Benutzerprojekt und das Fall-Ausgabeverzeichnis beschränkt."
 }

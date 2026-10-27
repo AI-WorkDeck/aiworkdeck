@@ -157,5 +157,16 @@ export default {
   "paneEmptyMonth": "ไม่มีงานในเดือนนี้",
   "paneEmptyFile": "ยังไม่มีงานที่เชื่อมโยงกับไฟล์นี้",
   "railScheduleTitle": "ตารางเวลา ({overdue} เกินกำหนด · {today} วันนี้)",
-  "tabName": "กำหนดการ"
+  "tabName": "กำหนดการ",
+  "workspaceAll": "ทุกโครงการ",
+  "workspaceCurrent": "โครงการปัจจุบัน",
+  "workspaceUpcoming": "สิ่งที่ต้องทำเร็ว ๆ นี้",
+  "workspaceDays": "อีก {count} วัน",
+  "workspaceRetry": "โหลดใหม่",
+  "workspaceOverdue": "เกินกำหนด {count} รายการ",
+  "workspaceNoUpcoming": "ไม่มีรายการครบกำหนดในอีก {count} วัน",
+  "workspaceLinked": "ตัวกรองเชื่อมกับปฏิทิน เลือกรายการเพื่อดูรายละเอียด",
+  "workspaceDay": "วัน",
+  "workspaceYear": "ปี",
+  "workspaceEventCount": "{count} รายการ"
 }

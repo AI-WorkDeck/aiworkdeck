@@ -2,10 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "themesTitle": "UI-skins",
-  "themeSelect": "Skin toepassen",
-  "themeSelected": "Actief (tik voor standaard)",
-  "themeNote": "Het toepassen van een skin werkt semantische kleurtokens bij in de werkbank, plugins en editor-interface, in zowel lichte als donkere modus.",
   "redactionEngineUpdateNotice": "Lokale regels detecteren automatisch bedrijven en Chinese namen, met voorbeelden, tokens en herstel. De engine wordt bijgewerkt via desktoppatches; het opnieuw installeren van Skill-instructies werkt deze niet bij.",
   "redactionEngineUpdateButton": "Controleer updates van de redactie-engine",
   "heroWatermark": "E",
@@ -73,6 +69,10 @@ export default {
   "profileSelect": "Instellen als standaardprofiel",
   "profileSelected": "Huidige standaard (tik om te wissen)",
   "styleProfileNote": "Exports en standaardopmaak volgen het geselecteerde profiel; een _模板/画像.json op projectniveau heeft nog steeds voorrang.",
+  "themesTitle": "UI-skins",
+  "themeSelect": "Skin toepassen",
+  "themeSelected": "Actief (tik voor standaard)",
+  "themeNote": "Het toepassen van een skin werkt semantische kleurtokens bij in de werkbank, plugins en editor-interface, in zowel lichte als donkere modus.",
   "revokedPrefix": "Verwijderd door het platform: ",
   "enabledTag": "Ingeschakeld",
   "disabledTag": "Uitgeschakeld",

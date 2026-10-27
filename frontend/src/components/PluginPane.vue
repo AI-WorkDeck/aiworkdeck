@@ -131,6 +131,8 @@ export default {
   // prompt 作为可见的用户消息进入 AI 对话，用户随时可停，不存在静默注入
   emits: ['kickoff', 'files-changed'],
   props: {
+    surface: { type: String, default: 'workspace' },
+    activeFileIds: { type: Array, default: () => [] },
     businessActions: { type: Object, default: () => ({}) },
     url: {
       type: String,
@@ -461,6 +463,7 @@ export default {
     buildContext() {
       return {
         pluginId: this.pluginId || '',
+        surface: this.surface,
         projectId: this.projectId == null ? '' : String(this.projectId),
         language: getAppLanguage(),
         // 外壳自 dev-board#223 起有深浅两态，握手把当前生效的那个告诉插件
@@ -545,6 +548,13 @@ export default {
         }
       }
       switch (method) {
+        case 'ui.openWorkspace': {
+          // The caller cannot select another plugin or supply an arbitrary URL.
+          const opened = this.businessActions.openPluginWorkspace?.(this.pluginId)
+          return opened === true
+            ? { ok: true, result: {} }
+            : { ok: false, error: { code: 'unavailable', message: L('此插件没有可用的工作区视图', 'This plugin has no available workspace view') } }
+        }
         case 'services.cancel':
           return { ok: true, result: this.businessServices().cancel(params.requestId) }
         case 'services.request': {
@@ -626,7 +636,9 @@ export default {
           }
           const generation = this.sessionGeneration
           try {
-            const res = await requestPluginIm(this.pluginId, this.projectId, action, params.params || {})
+            const requestParams = { ...(params.params || {}) }
+            if (action === 'agentReply') requestParams.preferredFileIds = this.activeFileIds || []
+            const res = await requestPluginIm(this.pluginId, this.projectId, action, requestParams)
             if (generation !== this.sessionGeneration) return this.staleContext()
             if (!res || res.code !== 0) return { ok: false, error: { code: 'invoke_failed', message: res?.message || L('沟通服务请求失败', 'Communication service request failed') } }
             if (['import', 'export', 'sendFile', 'binding'].includes(action)) this.$emit('files-changed')

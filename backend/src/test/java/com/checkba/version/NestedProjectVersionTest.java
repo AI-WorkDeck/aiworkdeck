@@ -119,7 +119,7 @@ class NestedProjectVersionTest {
     }
 
     @Test
-    void unresolvedLockClassificationRetriesAndThenSharesTheLocalFolderLock() {
+    void unresolvedLockClassificationRetriesAndThenCoordinatesTheLocalFolderScope() throws Exception {
         for (boolean databaseFailure : List.of(true, false)) {
             var projects = mock(com.checkba.repository.ProjectRepository.class);
             var parent = new com.checkba.model.entity.Project();
@@ -142,7 +142,14 @@ class NestedProjectVersionTest {
 
             assertThrows(RuntimeException.class, () -> sessions.repoLock(7L));
             var retried = sessions.repoLock(7L);
-            assertSame(sessions.repoLock(8L), retried, "A failed lookup must not cache a separate managed lock");
+            retried.lock();
+            try {
+                assertFalse(java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                    var childLock = sessions.repoLock(8L);
+                    if (!childLock.tryLock()) return false;
+                    childLock.unlock(); return true;
+                }).get(3, java.util.concurrent.TimeUnit.SECONDS), "A failed lookup must not cache an isolated managed lock");
+            } finally { retried.unlock(); }
             assertSame(retried, sessions.repoLock(7L));
             verify(projects, times(2)).findById(7L);
         }

@@ -2,10 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "themesTitle": "Skin UI",
-  "themeSelect": "Gunakan skin",
-  "themeSelected": "Aktif (ketik untuk lalai)",
-  "themeNote": "Menggunakan skin akan mengemas kini token warna semantik merentas workbench, pemalam dan antara muka penyunting dalam mod Cerah dan Gelap.",
   "redactionEngineUpdateNotice": "Peraturan setempat mengesan nama syarikat dan nama Cina secara automatik, dengan pratonton, token dan pemulihan. Enjin dikemas kini melalui patch desktop; memasang semula arahan kemahiran tidak mengemas kininya.",
   "redactionEngineUpdateButton": "Semak kemas kini enjin redaksi",
   "heroWatermark": "E",
@@ -73,6 +69,10 @@ export default {
   "profileSelect": "Tetapkan sebagai profil lalai",
   "profileSelected": "Lalai semasa (ketik untuk kosongkan)",
   "styleProfileNote": "Exports and standard formatting follow the selected profile; a project-level _模板/画像.json still takes precedence.",
+  "themesTitle": "Skin UI",
+  "themeSelect": "Gunakan skin",
+  "themeSelected": "Aktif (ketik untuk lalai)",
+  "themeNote": "Menggunakan skin akan mengemas kini token warna semantik merentas workbench, pemalam dan antara muka penyunting dalam mod Cerah dan Gelap.",
   "revokedPrefix": "Dibuang oleh platform: ",
   "enabledTag": "Diaktifkan",
   "disabledTag": "Dinyahaktifkan",

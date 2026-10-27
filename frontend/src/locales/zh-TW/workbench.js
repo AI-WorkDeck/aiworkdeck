@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "skinSectionTitle": "外觀皮膚",
-  "skinDefaultName": "東方清雅（預設）",
   "restartPending": "{count} 個任務可繼續",
   "restartContinue": "繼續：{name}",
   "restartRestoring": "正在恢復原會話與文檔…",
@@ -118,6 +116,8 @@ export default {
   "appearanceLight": "淺色",
   "appearanceDark": "深色",
   "appearanceSystem": "跟隨系統",
+  "skinSectionTitle": "外觀皮膚",
+  "skinDefaultName": "東方清雅（預設）",
   "walletChipTitle": "Credits 餘額與會員等級，點擊開啟帳戶設定",
   "walletMenuLabel": "帳戶與用量",
   "trialInfo": "試用版說明",

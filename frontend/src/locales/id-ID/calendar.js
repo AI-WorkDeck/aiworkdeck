@@ -157,5 +157,16 @@ export default {
   "paneEmptyMonth": "Tidak ada tugas bulan ini",
   "paneEmptyFile": "Belum ada tugas yang terhubung ke file ini",
   "railScheduleTitle": "Jadwal ({overdue} terlambat · {today} hari ini)",
-  "tabName": "Jadwal"
+  "tabName": "Jadwal",
+  "workspaceAll": "Semua proyek",
+  "workspaceCurrent": "Proyek saat ini",
+  "workspaceUpcoming": "Segera jatuh tempo",
+  "workspaceDays": "{count} hari ke depan",
+  "workspaceRetry": "Muat ulang",
+  "workspaceOverdue": "{count} terlambat",
+  "workspaceNoUpcoming": "Tidak ada tenggat dalam {count} hari ke depan",
+  "workspaceLinked": "Filter tersinkron dengan kalender. Pilih item untuk melihat detail.",
+  "workspaceDay": "Hari",
+  "workspaceYear": "Tahun",
+  "workspaceEventCount": "{count} item"
 }

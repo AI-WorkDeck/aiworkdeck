@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "skinSectionTitle": "테마 스킨",
-  "skinDefaultName": "Oriental Serenity(기본값)",
   "restartPending": "{count}개의 작업을 재개할 수 있습니다",
   "restartContinue": "계속: {name}",
   "restartRestoring": "원본 대화 및 문서를 복원하는 중…",
@@ -118,6 +116,8 @@ export default {
   "appearanceLight": "라이트",
   "appearanceDark": "다크",
   "appearanceSystem": "시스템 설정 따르기",
+  "skinSectionTitle": "테마 스킨",
+  "skinDefaultName": "Oriental Serenity(기본값)",
   "walletChipTitle": "크레딧 잔액 및 멤버십 등급; 클릭하여 계정 설정 열기",
   "walletMenuLabel": "계정 및 사용량",
   "trialInfo": "체험판 정보",

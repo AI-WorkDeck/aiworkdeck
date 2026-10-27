@@ -2,14 +2,11 @@
   "plugin.name": "墨彩禅 · 書道スキン",
   "plugin.desc": "宣紙の余白、五段階の墨階層、紫墨のアクセントをライトモードとダークモードの両方に反映。",
   "theme.name": "墨彩禅",
-  "theme.desc": "宣紙 × 五色の墨彩 × 紫のインクドロップ × 朱肉の印",
+  "theme.desc": "宣紙 × 五色の墨彩 × 紫のインクドロップ × 朱肉の印章",
   "gallery.badge": "テーマギャラリー",
   "gallery.swatch1": "和紙の白",
   "gallery.swatch2": "濃墨",
   "gallery.swatch3": "紫墨",
   "gallery.swatch4": "朱砂",
-  "gallery.swatch5": "夜の墨",
-  "theme": {
-    "desc": "宣紙 × 五色の墨彩 × 紫のインクドロップ × 朱肉の印章"
-  }
+  "gallery.swatch5": "夜の墨"
 }

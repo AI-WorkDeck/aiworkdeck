@@ -157,5 +157,16 @@ export default {
   "paneEmptyMonth": "Нет задач в этом месяце",
   "paneEmptyFile": "К этому файлу пока не привязаны задачи",
   "railScheduleTitle": "Расписание ({overdue} просрочено · {today} сегодня)",
-  "tabName": "Расписание"
+  "tabName": "Расписание",
+  "workspaceAll": "Все проекты",
+  "workspaceCurrent": "Текущий проект",
+  "workspaceUpcoming": "Ближайшие дела",
+  "workspaceDays": "Следующие {count} дней",
+  "workspaceRetry": "Обновить",
+  "workspaceOverdue": "Просрочено: {count}",
+  "workspaceNoUpcoming": "Нет дел на ближайшие {count} дней",
+  "workspaceLinked": "Фильтры синхронизируются с календарём. Выберите запись для просмотра сведений.",
+  "workspaceDay": "День",
+  "workspaceYear": "Год",
+  "workspaceEventCount": "Записей: {count}"
 }

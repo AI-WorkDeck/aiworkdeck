@@ -27,3 +27,9 @@ const mcpManifest: PluginManifest = {
   contributes: { mcpServers: [{ id: 'research', transport: 'streamable-http', url: 'https://research.example.invalid/mcp', credentialKey: 'apiKey', tools: [{ name: 'search', description: 'Search records', inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } }] }] },
 };
 void mcpManifest;
+
+const workspace: Promise<Record<string, never>> = awd.ui.openWorkspace();
+// @ts-expect-error A plugin cannot choose another plugin's workspace.
+awd.ui.openWorkspace('other-plugin');
+const contributionOnly: PluginManifest = { id: 'light-plugin', name: 'Light', version: '1.0.0', contributes: { views: [] } };
+void workspace; void contributionOnly;
