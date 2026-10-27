@@ -203,6 +203,12 @@ public class MobileAssistantService {
         result.forEach(item -> item.remove("sourceFingerprint"));
         return result;
     }
+    public List<Map<String,Object>> cleanupCandidates(Long user) {
+        requireEnabled(user);
+        return summaries.findByUserIdOrderByUpdatedAtDesc(user).stream()
+                .map(s -> Map.<String,Object>of("deviceId",s.getDeviceId(),"projectKey",s.getProjectKey()))
+                .toList();
+    }
     private List<Map<String,Object>> searchVerified(Long user,String query) {
         long revision=requireEnabled(user);
         String needle=Objects.toString(query,"").trim().toLowerCase(Locale.ROOT);

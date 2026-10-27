@@ -39,8 +39,9 @@ public class MobileAssistantController {
         service.removeSnapshot(user(session),deviceId,projectKey);return ok(Map.of("deleted",true));
     }
     @GetMapping("/summaries")
-    public Map<String,Object> summaries(@RequestHeader(value="X-Session-Id",required=false) String session,@RequestParam(defaultValue="") String query) {
-        return ok(service.search(user(session),query));
+    public Map<String,Object> summaries(@RequestHeader(value="X-Session-Id",required=false) String session,
+            @RequestParam(defaultValue="") String query,@RequestParam(defaultValue="false") boolean includeRemoved) {
+        return ok(includeRemoved ? service.cleanupCandidates(user(session)) : service.search(user(session),query));
     }
     @PostMapping("/chat")
     public Map<String,Object> chat(@RequestHeader(value="X-Session-Id",required=false) String session,@RequestBody MobileAssistantService.ChatInput request) {

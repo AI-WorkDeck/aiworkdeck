@@ -104,5 +104,6 @@ class MobileCalendarServiceTest {
         assertEquals(false,full.get("truncated"));
         var capped=service.replace(1L,"desktop","UTC",Instant.now().toString(),List.of(task(null,"OPEN")),true);
         assertEquals(true,capped.get("truncated"));
+        assertEquals(true,service.events(1L).get("truncated"));
     }
 }

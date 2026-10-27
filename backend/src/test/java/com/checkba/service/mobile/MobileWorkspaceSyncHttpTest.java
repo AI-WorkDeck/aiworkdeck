@@ -58,6 +58,7 @@ class MobileWorkspaceSyncHttpTest {
             } else if(path.equals("/api/mobile/calendar/snapshots")) calendar.add(json.readTree(body));
             else if(path.equals("/api/mobile/assistant/snapshots") && "PUT".equals(ex.getRequestMethod())) summaries.add(json.readTree(body));
             else if(path.equals("/api/mobile/assistant/summaries")) data=staleSummary
+                    && "includeRemoved=true".equals(ex.getRequestURI().getQuery())
                     ? List.of(Map.of("deviceId","fixture-device","projectKey","99","summary","Deleted project")) : List.of();
             Map<String,Object> envelope=new LinkedHashMap<>(Map.of("code",0,"data",data));
             if(path.equals("/api/mobile/projects") && truncateDirectory) envelope.putAll(Map.of("truncated",true,"count",1,"totalCount",2));
@@ -126,12 +127,16 @@ class MobileWorkspaceSyncHttpTest {
         assertTrue(requestPaths.contains("DELETE /api/mobile/assistant/snapshots"),requestPaths.toString());
     }
     @Test void calendarSnapshotCapsAtFiveThousandAndMarksTruncation() {
-        when(tasks.listByProject(42L,null,null)).thenReturn(java.util.Collections.nCopies(5001,
-                Map.of("id",3L,"title","Review draft","dueDate",LocalDate.of(2026,11,2),"status","OPEN")));
+        List<Map<String,Object>> history=new ArrayList<>(java.util.Collections.nCopies(5000,
+                Map.of("id",3L,"projectId",42L,"title","Completed history","dueDate",LocalDate.of(2020,1,1),"status","DONE")));
+        history.add(Map.of("id",9L,"projectId",42L,"title","Upcoming deadline","dueDate",LocalDate.of(2026,11,2),"status","OPEN","remindBefore",60));
+        when(tasks.listByProject(42L,null,null)).thenReturn(history);
         client.syncMobileCalendar();
         assertEquals(1,calendar.size());
         assertEquals(5000,calendar.get(0).path("events").size());
         assertTrue(calendar.get(0).path("truncated").asBoolean());
+        assertEquals("9",calendar.get(0).path("events").get(0).path("taskId").asText(),"活动提醒必须优先于已完成历史");
+        assertEquals("OPEN",calendar.get(0).path("events").get(0).path("status").asText());
     }
     private void addSecondProject() {
         var first=projects.findByUserIdOrderByCreatedAtDesc(7L).get(0);
