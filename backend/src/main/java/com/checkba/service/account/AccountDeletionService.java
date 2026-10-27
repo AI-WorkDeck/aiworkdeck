@@ -90,6 +90,20 @@ public class AccountDeletionService {
     private com.checkba.service.mobile.MobileVersionObjectService versionObjects;
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private com.checkba.repository.ChatSuggestionRepository chatSuggestions;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.repository.MobileAssistantConsentRepository assistantConsents;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.repository.MobileProjectSummaryRepository assistantSummaries;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.repository.MobileAssistantTurnRepository assistantTurns;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.repository.MobileCalendarConsentRepository calendarConsents;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.repository.MobileCalendarSnapshotRepository calendarSnapshots;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.repository.MobileCalendarPushDeviceRepository calendarPushDevices;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.repository.MobileCalendarDeliveryRepository calendarDeliveries;
     private final MobileRelayBlobStore blobStore;
     /** 官网统一账户的内部记账口，注销传导用（dev-board#434）。 */
     private final MobileBillingClient billing;
@@ -145,6 +159,13 @@ public class AccountDeletionService {
         }
         if (versionObjects != null) versionObjects.revoke(userId);
         if (chatSuggestions != null) chatSuggestions.deleteByUserId(userId);
+        if (assistantTurns != null) assistantTurns.deleteByUserId(userId);
+        if (assistantSummaries != null) assistantSummaries.deleteByUserId(userId);
+        if (assistantConsents != null) assistantConsents.deleteById(userId);
+        if (calendarDeliveries != null) calendarDeliveries.deleteByUserId(userId);
+        if (calendarPushDevices != null) calendarPushDevices.deleteByUserId(userId);
+        if (calendarSnapshots != null) calendarSnapshots.deleteByUserId(userId);
+        if (calendarConsents != null) calendarConsents.deleteById(userId);
         List<MobileMediaInbox> items = inboxRepository.findByUserId(userId);
         for (MobileMediaInbox item : items) {
             if (item.getStoragePath() != null) {
