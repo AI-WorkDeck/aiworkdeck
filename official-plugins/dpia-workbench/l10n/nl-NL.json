@@ -1,7 +1,7 @@
 {
   "plugin.name": "DPIA-werkbank",
   "plugin.description": "Data Protection Impact Assessment: bronherleiding, feitencontrole, vraag-en-antwoord-opvolging, risico's & maatregelen, doorlopende herevaluatie en rapporten met versiebeheer. Aangepast van Zhu Lingfengs DSH DPIA Workbench; vereist Node.js, Python en LibreOffice.",
-  "plugin.author": "AI WorkDeck (Upstream: Zhu Lingfeng / The-Data-Galaxy)",
+  "plugin.author": "AI WorkDeck (Bron: Zhu Lingfeng / The-Data-Galaxy)",
   "setting.nodePath.label": "Node.js Uitvoerbaar Bestand",
   "setting.nodePath.description": "Laat leeg om node uit het systeem-PATH te gebruiken; vereist Node.js 20 of nieuwer.",
   "setting.pythonPath.label": "Python Uitvoerbaar Bestand",

@@ -1,4 +1,4 @@
 {
-  "plugin.name": "法律事務所マネジメント",
-  "plugin.description": "Case intake & approval, regulatory-grade conflict-of-interest checks with collaborative clearance, billing & invoice ledger (manual reconciliation and Kingdee/Yonyou integration), and lawyer workload & executive dashboard."
+  "plugin.name": "法律事務所管理",
+  "plugin.description": "案件の受付と承認、協働クリアランスによる規制レベルの利益相反チェック、請求・請求書台帳（手動消込および金蝶/用友との連携）、弁護士の業務負荷と経営ダッシュボード。"
 }

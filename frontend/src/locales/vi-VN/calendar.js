@@ -168,5 +168,5 @@ export default {
   "workspaceLinked": "Bộ lọc đồng bộ với lịch. Chọn một mục để xem chi tiết.",
   "workspaceDay": "Ngày",
   "workspaceYear": "Năm",
-  "workspaceEventCount": "{count} mục",
+  "workspaceEventCount": "{count} mục"
 }

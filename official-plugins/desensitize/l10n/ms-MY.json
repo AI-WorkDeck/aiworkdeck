@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Desensitize",
-  "plugin.description": "Inspect sensitive information, generate desensitized copies, and restore with recovery packages.",
-  "view.main.name": "Desensitize"
+  "plugin.name": "Nyahpeka",
+  "plugin.description": "Periksa maklumat sensitif, jana salinan yang telah dinyahpekakan, dan pulihkan dengan pakej pemulihan.",
+  "view.main.name": "Nyahpeka"
 }

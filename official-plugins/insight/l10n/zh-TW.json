@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Evidence & Insight",
-  "plugin.description": "Document evidence retrieval, consistency verification, and contract review.",
-  "view.main.name": "Evidence & Insight"
+  "plugin.name": "依據",
+  "plugin.description": "文檔依據檢索、一致性核驗和合同審查。",
+  "view.main.name": "依據"
 }

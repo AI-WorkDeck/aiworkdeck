@@ -55,8 +55,8 @@ export default {
   },
   "resultStatus": {
     "PASS": "Meets rule",
-    "ISSUE": "Change required",
-    "NEEDS_DECISION": "Client decision needed",
-    "UNREVIEWED": "Not fully checked"
+    "ISSUE": "Değişiklik gerekli",
+    "NEEDS_DECISION": "Müşteri kararı gerekli",
+    "UNREVIEWED": "Tam olarak kontrol edilmedi"
   }
 }

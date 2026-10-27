@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Desensitize",
-  "plugin.description": "Inspect sensitive information, generate desensitized copies, and restore with recovery packages.",
-  "view.main.name": "Desensitize"
+  "plugin.name": "Che giấu thông tin",
+  "plugin.description": "Kiểm tra thông tin nhạy cảm, tạo bản sao đã được che giấu, và khôi phục bằng gói khôi phục.",
+  "view.main.name": "Che giấu thông tin"
 }

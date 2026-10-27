@@ -72,7 +72,7 @@ export default {
   "milestoneNamePlaceholder": "bijv. Eerste concept naar klant verzonden",
   "nameDraftTitle": "Dit concept een naam geven",
   "draftNamePlaceholder": "bijv. Optie B van klant",
-  "start": "Start",
+  "start": "Starten",
   "changeTypeAdd": "Toegevoegd",
   "changeTypeModify": "Gewijzigd",
   "changeTypeDelete": "Verwijderd",

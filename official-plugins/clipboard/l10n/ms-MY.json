@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Clipboard",
-  "plugin.description": "Search clipboard history, copy, and insert content.",
-  "view.main.name": "Clipboard"
+  "plugin.name": "Papan Keratan",
+  "plugin.description": "Cari sejarah papan keratan, salin, dan sisipkan kandungan.",
+  "view.main.name": "Papan Keratan"
 }

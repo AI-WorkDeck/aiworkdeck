@@ -3,87 +3,87 @@
 
 export default {
   "sidebar": {
-    "projectHome": "Project Overview",
+    "projectHome": "Επισκόπηση έργου",
     "projects": "Έργα",
-    "files": "Explorer",
-    "ddFiles": "Due Diligence Files",
-    "market": "Extensions",
-    "dev": "Plugin Development",
-    "voice": "Voice",
-    "meetingRecorder": "Meeting Recording",
-    "litigationVisual": "Litigation Visualization",
+    "files": "Εξερευνητής",
+    "ddFiles": "Αρχεία Due Diligence",
+    "market": "Επεκτάσεις",
+    "dev": "Ανάπτυξη πρόσθετων",
+    "voice": "Φωνή",
+    "meetingRecorder": "Ηχογράφηση συνάντησης",
+    "litigationVisual": "Οπτικοποίηση δικαστικής υπόθεσης",
     "tmeet": "Tencent Meeting",
-    "search": "Search",
-    "tts": "Text to Speech",
-    "desensitize": "File Redaction",
+    "search": "Αναζήτηση",
+    "tts": "Μετατροπή κειμένου σε ομιλία",
+    "desensitize": "Απόκρυψη στοιχείων αρχείου",
     "version": "Version History",
-    "calendar": "Calendar"
+    "calendar": "Ημερολόγιο"
   },
   "tools": {
-    "variables": "Variable Library",
-    "favorites": "Favorites",
-    "clipboard": "Clipboard"
+    "variables": "Βιβλιοθήκη μεταβλητών",
+    "favorites": "Αγαπημένα",
+    "clipboard": "Πρόχειρο"
   },
   "fileActions": {
-    "move": "Move",
-    "cut": "Cut",
-    "copy": "Copy",
+    "move": "Μετακίνηση",
+    "cut": "Αποκοπή",
+    "copy": "Αντιγραφή",
     "delete": "Διαγραφή",
     "cancel": "Ακύρωση",
-    "newFile": "New File",
-    "newFolder": "New Folder",
-    "sort": "Sort"
+    "newFile": "Νέο αρχείο",
+    "newFolder": "Νέος φάκελος",
+    "sort": "Ταξινόμηση"
   },
   "ocr": {
-    "refresh": "Refresh View",
-    "recognize": "Recognize Text",
-    "download": "Download",
-    "copy": "Copy",
-    "insertDoc": "Insert into Document",
-    "webLink": "Link to Web Verification",
-    "favorite": "Add to Favorites"
+    "refresh": "Ανανέωση προβολής",
+    "recognize": "Αναγνώριση κειμένου",
+    "download": "Λήψη",
+    "copy": "Αντιγραφή",
+    "insertDoc": "Εισαγωγή στο έγγραφο",
+    "webLink": "Σύνδεσμος προς διαδικτυακή επαλήθευση",
+    "favorite": "Προσθήκη στα αγαπημένα"
   },
   "projectTypes": {
-    "majorAssetRestructuring": "Listed Company Major Asset Restructuring",
-    "privatePlacement": "Listed Company Private Placement",
-    "publicPlacement": "Listed Company Public Offering",
-    "acquisition": "Listed Company Takeover",
-    "blank": "Blank Project"
+    "majorAssetRestructuring": "Αναδιάρθρωση σημαντικού ενεργητικού εισηγμένης εταιρείας",
+    "privatePlacement": "Ιδιωτική τοποθέτηση εισηγμένης εταιρείας",
+    "publicPlacement": "Δημόσια προσφορά εισηγμένης εταιρείας",
+    "acquisition": "Εξαγορά εισηγμένης εταιρείας",
+    "blank": "Κενό έργο"
   },
   "projectFields": {
-    "listedCompanyName": "Listed Company Name",
-    "listedCompanyNamePlaceholder": "Enter the listed company's full or short name",
-    "targetCompanyName": "Target Company Name",
-    "targetCompanyNamePlaceholder": "Enter the target company's full name",
-    "projectName": "Project Name",
-    "projectNamePlaceholder": "Enter a project name",
-    "listedCompanyInfo": "Listed Company Basic Information",
-    "targetCompanyInfo": "Target Company Basic Information"
+    "listedCompanyName": "Όνομα εισηγμένης εταιρείας",
+    "listedCompanyNamePlaceholder": "Εισαγάγετε την πλήρη ή σύντομη επωνυμία της εισηγμένης εταιρείας",
+    "targetCompanyName": "Όνομα εταιρείας-στόχου",
+    "targetCompanyNamePlaceholder": "Εισαγάγετε την πλήρη επωνυμία της εταιρείας-στόχου",
+    "projectName": "Όνομα έργου",
+    "projectNamePlaceholder": "Εισαγάγετε όνομα έργου",
+    "listedCompanyInfo": "Βασικές πληροφορίες εισηγμένης εταιρείας",
+    "targetCompanyInfo": "Βασικές πληροφορίες εταιρείας-στόχου"
   },
   "roles": {
-    "owner": "Owner",
-    "admin": "Case Admin",
-    "participant": "Collaborator",
-    "readOnly": "Read-only",
-    "client": "Client"
+    "owner": "Κάτοχος",
+    "admin": "Διαχειριστής υπόθεσης",
+    "participant": "Συνεργάτης",
+    "readOnly": "Μόνο για ανάγνωση",
+    "client": "Πελάτης"
   },
   "roleHints": {
-    "admin": "Can edit files, add members, and manage permissions",
-    "participant": "Can edit files and submit drafts",
-    "readOnly": "View only, no editing"
+    "admin": "Μπορεί να επεξεργάζεται αρχεία, να προσθέτει μέλη και να διαχειρίζεται δικαιώματα",
+    "participant": "Μπορεί να επεξεργάζεται αρχεία και να υποβάλλει προσχέδια",
+    "readOnly": "Μόνο προβολή, χωρίς επεξεργασία"
   },
   "memberGroups": {
-    "admin": "Owners & Case Admins",
-    "member": "Collaborators",
-    "client": "Clients"
+    "admin": "Ιδιοκτήτες & διαχειριστές υπόθεσης",
+    "member": "Συνεργάτες",
+    "client": "Πελάτες"
   },
   "clipboardTypes": {
-    "text": "Text",
-    "image": "Image",
-    "file": "File",
-    "unknown": "Unknown"
+    "text": "Κείμενο",
+    "image": "Εικόνα",
+    "file": "Αρχείο",
+    "unknown": "Άγνωστο"
   },
   "variables": {
-    "searchPlaceholder": "Search variable names or content"
+    "searchPlaceholder": "Αναζήτηση ονομάτων μεταβλητών ή περιεχομένου"
   }
 }

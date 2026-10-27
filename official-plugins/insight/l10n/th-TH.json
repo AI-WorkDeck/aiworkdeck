@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Evidence & Insight",
-  "plugin.description": "Document evidence retrieval, consistency verification, and contract review.",
-  "view.main.name": "Evidence & Insight"
+  "plugin.name": "หลักฐานและข้อมูลเชิงลึก",
+  "plugin.description": "การค้นคืนหลักฐานจากเอกสาร การตรวจสอบความสอดคล้อง และการทบทวนสัญญา",
+  "view.main.name": "หลักฐานและข้อมูลเชิงลึก"
 }
