@@ -12,7 +12,8 @@
         <button :class="{ selected: !state.projectIds.length }" @click="selectProject('')">{{ $t('calendar.workspaceAll') }}</button>
         <button v-if="currentProjectId" :class="{ selected: state.projectIds.length === 1 && state.projectIds[0] === currentProjectId }" @click="selectProject(currentProjectId)">{{ $t('calendar.workspaceCurrent') }}</button>
       </view>
-      <select class="shortcut-project" :value="state.projectIds.length === 1 ? state.projectIds[0] : ''" :aria-label="$t('calendar.filterProjects')" @change="selectProject($event.target.value)">
+      <select class="shortcut-project" :value="state.projectIds.length > 1 ? '__multiple__' : state.projectIds[0] || ''" :title="selectedProjectNames" :aria-label="$t('calendar.filterProjects')" @change="selectProject($event.target.value)">
+        <option v-if="state.projectIds.length > 1" value="__multiple__" disabled>{{ selectedProjectNames }}</option>
         <option value="">{{ $t('calendar.filterAllProjects') }}</option>
         <option v-for="project in projects" :key="project.id" :value="String(project.id)">{{ project.name }}</option>
       </select>
@@ -57,6 +58,7 @@ export default {
     currentProjectId: { type: String, default: '' }, today: { type: String, required: true }, loading: Boolean, error: Boolean },
   emits: ['change', 'open', 'create', 'open-task', 'toggle', 'open-file', 'delete', 'retry', 'overdue'],
   computed: {
+    selectedProjectNames() { return this.state.projectIds.map(id => this.projects.find(project => String(project.id) === String(id))?.name || '#' + id).join(' · ') },
     upcoming() { return upcomingTasks(this.tasks, this.today, this.state.recentDays) },
     overdue() { return this.tasks.filter(task => !isDone(task) && task.dueDate && task.dueDate < this.today).length },
   },
