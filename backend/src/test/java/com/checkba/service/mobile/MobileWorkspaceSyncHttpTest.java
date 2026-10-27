@@ -128,7 +128,7 @@ class MobileWorkspaceSyncHttpTest {
     }
     @Test void calendarSnapshotCapsAtFiveThousandAndMarksTruncation() {
         List<Map<String,Object>> history=new ArrayList<>(java.util.Collections.nCopies(5000,
-                Map.of("id",3L,"projectId",42L,"title","Completed history","dueDate",LocalDate.of(2020,1,1),"status","DONE")));
+                Map.of("id",3L,"projectId",42L,"title","Overdue without reminder","dueDate",LocalDate.of(2020,1,1),"status","OPEN")));
         history.add(Map.of("id",9L,"projectId",42L,"title","Upcoming deadline","dueDate",LocalDate.of(2026,11,2),"status","OPEN","remindBefore",60));
         when(tasks.listByProject(42L,null,null)).thenReturn(history);
         client.syncMobileCalendar();
