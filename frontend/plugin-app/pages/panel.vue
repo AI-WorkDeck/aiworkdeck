@@ -1,6 +1,6 @@
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
-<template><BusinessPanel v-if="context" :project-id="Number(context.projectId)" :view-placement="context.surface || 'workspace'" :prepare-file="prepareFile" :download-artifact="downloadArtifact" @open-file="openFile" @request-file-select="selectFile" @request-active-file="activeFile" @request-scope-select="selectScope" @start-drawing="startDrawing" /></template>
+<template><BusinessPanel v-if="context" :project-id="Number(context.projectId)" :view-placement="context.surface || 'workspace'" :prepare-file="prepareFile" :download-artifact="downloadArtifact" :generation-request="generationRequest" @open-file="openFile" @request-file-select="selectFile" @request-active-file="activeFile" @request-scope-select="selectScope" /></template>
 <script>
 import BusinessPanel from '@business-panel'
 import { applyI18nLocale } from '@/i18n'
@@ -24,7 +24,13 @@ export default {
     },
     activeFile(callback) { window.awd.services.request('sensitive', 'active', {}).then(file => { if (file) callback(file) }) },
     selectScope(callback) { window.awd.services.request('litigation', 'scope', {}, { timeoutMs: 120000 }).then(scope => { if (scope) callback(scope) }) },
-    startDrawing({ prompt }) { return window.awd.chat.send(prompt) },
+    async generationRequest(operation, params) {
+      try { return await window.awd.services.request('litigation', operation, params) }
+      catch (error) {
+        if (['panels.litTaskDisabled', 'panels.litGenerationUnavailable'].includes(error?.message)) error.message = this.$t(error.message)
+        throw error
+      }
+    },
     async openFile(file) {
       const service = { search: 'search', desensitize: 'sensitive', 'litigation-visual': 'litigation' }[__BUSINESS_PLUGIN__]
       await window.awd.services.request(service, 'open', { fileId: file.fileId || file.id })
