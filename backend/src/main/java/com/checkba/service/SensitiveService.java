@@ -118,13 +118,22 @@ public class SensitiveService {
     public Preview previewFile(String filePath, Options options) throws Exception {
         Path source = Path.of(filePath);
         String ext = validateSource(source, options.mode().equals("TOKEN"));
-        String text;
-        if (ext.equals("docx")) text = String.join("\n", new SensitiveDocx(source).texts());
-        else if (ext.equals("pdf")) {
-            try (PDDocument pdf = org.apache.pdfbox.Loader.loadPDF(source.toFile())) { text = pdfText(pdf); }
-        } else text = Files.readString(source, StandardCharsets.UTF_8);
-        SensitiveTextEngine engine = engine(options, text);
-        String preview = engine.apply(text);
+        SensitiveTextEngine engine;
+        String preview;
+        if (ext.equals("docx")) {
+            List<String> fragments = new SensitiveDocx(source).texts();
+            engine = engine(options, String.join("\n", fragments));
+            preview = String.join("\n", fragments.stream().map(engine::apply).toList());
+        } else if (ext.equals("pdf")) {
+            try (PDDocument pdf = org.apache.pdfbox.Loader.loadPDF(source.toFile())) {
+                engine = engine(options, pdfText(pdf));
+                preview = scanPdf(pdf, engine).previewText.toString();
+            }
+        } else {
+            String text = Files.readString(source, StandardCharsets.UTF_8);
+            engine = engine(options, text);
+            preview = engine.apply(text);
+        }
         var messages = new ArrayList<>(warnings(ext));
         if (engine.counts().isEmpty()) messages.add(LangText.of("未识别到敏感信息，不代表原文没有敏感信息。", "No sensitive items were detected; this does not guarantee the document contains none."));
         if (preview.length() > 12000) messages.add(LangText.of("预览仅显示前12000字符，统计和实际处理覆盖全文。", "Preview shows only the first 12,000 characters; statistics and actual processing cover the full document."));
@@ -272,6 +281,10 @@ public class SensitiveService {
     }
 
     private List<RedactionArea> computeRedactionAreas(PDDocument document, SensitiveTextEngine engine) throws IOException {
+        return scanPdf(document, engine).getRedactionAreas();
+    }
+
+    private SensitiveTextStripper scanPdf(PDDocument document, SensitiveTextEngine engine) throws IOException {
         SensitiveTextStripper stripper = new SensitiveTextStripper(engine);
         stripper.setSortByPosition(true);
         int totalPages = document.getNumberOfPages();
@@ -283,7 +296,7 @@ public class SensitiveService {
             stripper.getText(document); // This triggers writeString logic, accumulating into the page buffer
             stripper.finishPage(); // 整页文本收集完毕，统一匹配、求黑框，并清空缓冲避免跨页串号
         }
-        return stripper.getRedactionAreas();
+        return stripper;
     }
 
     // Inner class for coordinate extraction
@@ -314,6 +327,12 @@ public class SensitiveService {
 
         private final StringBuilder pageText = new StringBuilder();
         private final List<TextPosition> pagePositions = new ArrayList<>();
+        private final BitSet separators = new BitSet();
+        private final StringBuilder previewText = new StringBuilder();
+        // Preserve the existing split-phone behavior without concatenating whole
+        // lines (which turns two complete phones into an unrecognizable 22 digits).
+        private static final java.util.regex.Pattern SPLIT_PHONE = java.util.regex.Pattern.compile(
+                "(?<![0-9])1[3-9](?:\\n?[0-9]){9}(?![0-9])");
 
         public SensitiveTextStripper(SensitiveTextEngine engine) throws IOException {
             super();
@@ -345,15 +364,44 @@ public class SensitiveService {
             pagePositions.addAll(textPositions);
         }
 
-        /**
-         * 一页文字全部收集完毕后调用：在整页文本上做正则匹配，把命中区间映射回 TextPosition 求黑框，
-         * 然后清空缓冲，避免跨页串号。必须在每次 getText(document) 处理完一页后由调用方显式调用。
-         */
+        @Override
+        protected void writeLineSeparator() { appendSeparator('\n'); }
+
+        @Override
+        protected void writeWordSeparator() { appendSeparator(' '); }
+
+        @Override
+        protected void writeParagraphSeparator() { appendSeparator('\n'); }
+
+        private void appendSeparator(char value) {
+            if (pageText.isEmpty() || (value == '\n' && pageText.charAt(pageText.length() - 1) == '\n')) return;
+            separators.set(pageText.length());
+            pageText.append(value);
+            pagePositions.add(null);
+        }
+
         void finishPage() {
+            var splitPhones = SPLIT_PHONE.matcher(pageText).results()
+                    .filter(match -> match.group().contains("\n")).toList();
+            for (int i = splitPhones.size() - 1; i >= 0; i--) {
+                var match = splitPhones.get(i);
+                String joined = match.group().replace("\n", "");
+                if (!engine.accepts("PHONE", joined) || !SensitiveType.PHONE.getPattern().matcher(joined).matches()) continue;
+                for (int at = match.end() - 1; at >= match.start(); at--) {
+                    if (pageText.charAt(at) != '\n' || !separators.get(at)) continue;
+                    pageText.deleteCharAt(at);
+                    pagePositions.remove(at);
+                    for (int k = at; k < pageText.length(); k++) separators.set(k, separators.get(k + 1));
+                    separators.clear(pageText.length());
+                }
+            }
             String text = pageText.toString();
-            for (var edit : engine.edits(text)) addRedactionArea(edit.start(), edit.end());
+            var edits = engine.edits(text);
+            for (var edit : edits) addRedactionArea(edit.start(), edit.end());
+            previewText.append(SensitiveTextEngine.apply(text, edits)).append('\n');
             pageText.setLength(0);
             pagePositions.clear();
+            separators.clear();
         }
 
         private void addRedactionArea(int start, int end) {
@@ -372,6 +420,15 @@ public class SensitiveService {
             Float lineY = null;
             for (int k = start; k < end; k++) {
                 TextPosition tp = pagePositions.get(k);
+                if (tp == null && separators.get(k)) {
+                    if (segStart < k) {
+                        segmentStarts.add(segStart);
+                        segmentEnds.add(k);
+                    }
+                    segStart = k + 1;
+                    lineY = null;
+                    continue;
+                }
                 if (tp == null) {
                     // 该字符缺少可靠坐标（字符数/位置数不一致的片段），不能猜一个位置去画框——
                     // 如实记为"这次命中没能画框"，避免出现"看起来已脱敏、实则未覆盖"的假阳性。
@@ -390,8 +447,10 @@ public class SensitiveService {
                     lineY = y;
                 }
             }
-            segmentStarts.add(segStart);
-            segmentEnds.add(end);
+            if (segStart < end) {
+                segmentStarts.add(segStart);
+                segmentEnds.add(end);
+            }
 
             for (int s = 0; s < segmentStarts.size(); s++) {
                 addSingleLineArea(segmentStarts.get(s), segmentEnds.get(s));
@@ -411,15 +470,26 @@ public class SensitiveService {
                 float x = tp.getXDirAdj();
                 float w = tp.getWidthDirAdj();
                 float yBottom = tp.getPageHeight() - tp.getYDirAdj(); // 翻转为 PDF 底部起算坐标
-                float h = tp.getHeightDir();
+                float ascent = tp.getHeightDir();
+                float descent = 0;
+                var descriptor = tp.getFont() == null ? null : tp.getFont().getFontDescriptor();
+                if (descriptor != null) {
+                    float scale = tp.getTextMatrix().getScalingFactorY() / 1000f;
+                    ascent = Math.max(ascent, descriptor.getAscent() * scale);
+                    descent = Math.min(0, descriptor.getDescent() * scale);
+                }
                 if (x < minX) minX = x;
                 if (x + w > maxX) maxX = x + w;
-                if (yBottom < minY) minY = yBottom;
-                if (yBottom + h > maxY) maxY = yBottom + h;
+                if (yBottom + descent < minY) minY = yBottom + descent;
+                if (yBottom + ascent > maxY) maxY = yBottom + ascent;
             }
             // 用真实的包围盒（minX~maxX）而不是"逐字宽度求和"：同一行内命中区间可能跨越词间距，
             // 求和会得到与实际视觉跨度对不上的宽度，导致黑框覆盖不全。
-            redactionAreas.add(new RedactionArea(currentPdfPageIndex, minX, minY, maxX - minX, maxY - minY));
+            // Include descenders below the baseline and a half-point antialiasing fringe.
+            // Keep the margin small so one line does not cover its neighbours.
+            float padding = 0.5f;
+            redactionAreas.add(new RedactionArea(currentPdfPageIndex, minX, minY - padding,
+                    maxX - minX, maxY - minY + 2 * padding));
         }
     }
 
