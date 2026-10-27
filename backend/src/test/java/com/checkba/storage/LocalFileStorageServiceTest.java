@@ -10,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.Files;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -55,5 +56,28 @@ class LocalFileStorageServiceTest {
     void rejectsTraversalOnDelete() {
         assertThrows(StorageException.class,
                 () -> storage.delete("../../secret"));
+    }
+    @Test
+    void createsEmptyTextFilesAndPreservesExistingContent(@TempDir Path tempDir) throws Exception {
+        for (boolean withTemplate : new boolean[] { false, true }) {
+            StorageProperties props = new StorageProperties();
+            props.getLocal().setRootPath(tempDir.resolve("files-" + withTemplate).toString());
+            Path template = tempDir.resolve("template-" + withTemplate + ".docx");
+            if (withTemplate) Files.writeString(template, "Office template must not enter text files");
+            props.getLocal().setTemplatePath(template.toString());
+            LocalFileStorageService textStorage = new LocalFileStorageService(new ProjectStorageResolver(props, null));
+            int index = 0;
+            for (String extension : new String[] { "md", "txt", "MD", "TXT" }) {
+                String key = "projects/1/note-" + index++ + "." + extension;
+                textStorage.createFromTemplate(key);
+                assertTrue(textStorage.exists(key));
+                assertEquals(0, textStorage.load(key).contentLength());
+                textStorage.save(key, bytes("中文笔记\n# hello"));
+                textStorage.createFromTemplate(key);
+                try (var input = textStorage.load(key).getInputStream()) {
+                    assertEquals("中文笔记\n# hello", new String(input.readAllBytes(), StandardCharsets.UTF_8));
+                }
+            }
+        }
     }
 }

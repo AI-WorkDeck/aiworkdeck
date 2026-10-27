@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 文件树（FileTree.vue）：右键菜单/批量操作/确认弹窗/拖拽提示/本机文件导入
 export default {
+  newMarkdown: 'Markdown (.md)',
+  newPlainText: '纯文本 (.txt)',
   newItem: "新建",
   newFileMenu: "新建文件",
   newRecording: "录音",
