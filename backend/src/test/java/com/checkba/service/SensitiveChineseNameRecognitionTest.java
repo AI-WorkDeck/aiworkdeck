@@ -50,7 +50,8 @@ class SensitiveChineseNameRecognitionTest {
         "姓名：陈 安平|陈 安平", "姓名：陈安 平|陈安 平", "姓名：欧阳 明|欧阳 明",
         "原告：张 伟|张 伟", "被告一：陈 安 平|陈 安 平", "姓名：陈　安平|陈　安平",
         "姓名：陈 安平 联系电话：13800001111|陈 安平",
-        "姓名：陈安 平 民族：汉族|陈安 平", "姓名：陈 安平 手机 ：13800001111|陈 安平"
+        "姓名：陈安 平 民族：汉族|陈安 平", "姓名：陈 安平 手机 ：13800001111|陈 安平",
+        "被告⼀：徐⽂清|徐⽂清"
     })
     void explicitPersonFieldsRedactTheWholeOriginalValue(String text, String name) {
         var engine = new SensitiveTextEngine(List.of("CHINESE_NAME"), true, List.of(), List.of());
@@ -103,6 +104,18 @@ class SensitiveChineseNameRecognitionTest {
         assertTrue(output.startsWith("姓名：陈安 平。\n联系人：[[中文姓名"), output);
         assertEquals(1, engine.counts().get("CHINESE_NAME"));
         assertEquals(text, SensitiveTextEngine.apply(output, SensitiveTextEngine.restoreEdits(output, engine.recovery())));
+    }
+
+    @Test void radicalMatchingKeepsOriginalExclusionsCustomTermsAndOrdinaryText() {
+        String text = "被告⼀：徐⽂清。普通⽂字保持原样。";
+        var excluded = new SensitiveTextEngine(List.of("CHINESE_NAME"), true, List.of(), List.of("徐⽂清"));
+        excluded.learn(text);
+        assertEquals(text, excluded.apply(text));
+        var custom = new SensitiveTextEngine(List.of(), true, List.of("徐⽂清"), List.of());
+        String output = custom.apply(text);
+        assertTrue(output.startsWith("被告⼀：[[自定义"), output);
+        assertTrue(output.endsWith("。普通⽂字保持原样。"), output);
+        assertEquals(text, SensitiveTextEngine.apply(output, SensitiveTextEngine.restoreEdits(output, custom.recovery())));
     }
 
     @ParameterizedTest

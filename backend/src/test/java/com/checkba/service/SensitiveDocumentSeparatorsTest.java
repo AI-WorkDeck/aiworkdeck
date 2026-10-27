@@ -185,11 +185,12 @@ class SensitiveDocumentSeparatorsTest {
         assertTrue(preview.text().contains("1380000\n1111"), preview.text());
     }
 
-    @Test
-    void pdfChineseCoordinateCallbacksKeepFieldsSeparateFromFollowingProse() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"被告一：徐文清", "被告⼀：徐⽂清"})
+    void pdfChineseCoordinateCallbacksKeepFieldsSeparateFromFollowingProse(String party) throws Exception {
         // Exercise PDFBox's text/line callback contract without a machine-specific CJK font.
         var engine = new SensitiveTextEngine(List.of("CHINESE_NAME", "ADDRESS"), false, List.of(), List.of());
-        var lines = List.of("被告一：徐文清", "住址：成都市武侯区星河路12号8栋608房", "请求判令支付款项");
+        var lines = List.of(party, "住址：成都市武侯区星河路12号8栋608房", "请求判令支付款项");
         engine.learn(String.join("\n", lines));
         Class<?> type = Class.forName("com.checkba.service.SensitiveService$SensitiveTextStripper");
         var constructor = type.getDeclaredConstructor(SensitiveService.class, SensitiveTextEngine.class);
@@ -214,6 +215,7 @@ class SensitiveDocumentSeparatorsTest {
         var preview = type.getDeclaredField("previewText"); preview.setAccessible(true);
         String text = preview.get(stripper).toString();
         assertFalse(text.contains("徐文清"));
+        assertFalse(text.contains("徐⽂清"));
         assertFalse(text.contains("星河路"));
         assertTrue(text.contains("请求判令支付款项"));
         var result = type.getDeclaredMethod("getRedactionAreas"); result.setAccessible(true);
