@@ -343,4 +343,22 @@ class ImAgentServiceTest {
         assertThrows(IllegalArgumentException.class,()->reply(colleague,id,source));
         String another=(String)ensure(owner,"project",UUID.randomUUID().toString(),false).get("id");assertThrows(IllegalArgumentException.class,()->reply(owner,another,source));assertTrue(jobs.isEmpty());
     }
+    @Test void queuedAssistantKeepsRequestLanguageAndRestoresWorkerScope() {
+        grant(owner,"team",team);String id=(String)ensure(owner,"team",team,false).get("id");
+        when(memory.read(owner,team,MemoryDocumentService.INDEX_PATH)).thenReturn(new MemoryFileView("remember.md","索引","流程见 delivery.md",1,null,false));
+        when(memory.listFiles(owner,team)).thenReturn(List.of(new MemoryFileView("delivery.md","交付约定",null,1,null,false)));
+        when(memory.read(owner,team,"delivery.md")).thenReturn(new MemoryFileView("delivery.md","交付约定","客户原文保持不变",1,null,false));
+        long source=send(owner,id,"What is the delivery process?");
+        com.checkba.service.AppLanguageScope.run("en-US", () -> reply(owner,id,source));
+        assertNull(com.checkba.service.AppLanguageScope.current());
+        com.checkba.service.AppLanguageScope.run("zh-CN", () -> {
+            jobs.remove().run();
+            assertEquals("zh-CN", com.checkba.service.AppLanguageScope.current());
+        });
+        assertTrue(prompt.get().contains("Shared material: delivery.md"));
+        assertTrue(prompt.get().contains("Shared memory of the selected scope"));
+        assertTrue(prompt.get().contains("客户原文保持不变")); assertFalse(prompt.get().contains("共享资料："));
+        assertNull(com.checkba.service.AppLanguageScope.current());
+    }
+
 }

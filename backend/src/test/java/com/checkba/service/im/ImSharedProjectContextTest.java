@@ -68,4 +68,20 @@ class ImSharedProjectContextTest {
     @Test void unboundLocalGroupDoesNotGainCloudProjectAccess() {
         assertEquals("", context.prepare(null, List.of(7L), "").text()); verifyNoInteractions(projects, files, extractor);
     }
+    @Test void localizedLabelsPreserveSourceTextAndPermissionErrorsUseRequestLanguage() throws Exception {
+        var file = file(1, 2, true);
+        when(files.findByProjectIdAndIsDeletedFalseOrderBySortOrderAsc(2L)).thenReturn(List.of(file));
+        when(extractor.extract(file)).thenReturn("客户原文保持不变".repeat(1000));
+        String english = AppLanguageScope.call("en-US", () -> context.prepare(2L, List.of(7L), "").text());
+        assertTrue(english.contains("Current cloud project: 合成项目"));
+        assertTrue(english.contains("Readable file directory")); assertTrue(english.contains("[Text truncated]"));
+        assertTrue(english.contains("客户原文保持不变")); assertFalse(english.contains("当前云端项目"));
+        String traditional = AppLanguageScope.call("zh-TW", () -> context.prepare(2L, List.of(7L), "").text());
+        assertTrue(traditional.contains("雲端項目")); assertTrue(traditional.contains("客户原文保持不变"));
+        when(members.hasReadPermission(2L, 7L)).thenReturn(false);
+        var error = assertThrows(IllegalArgumentException.class, () -> AppLanguageScope.call("en-US", () -> context.prepare(2L, List.of(7L), "")));
+        assertEquals("Project audience access changed", error.getMessage());
+        assertNull(AppLanguageScope.current());
+    }
+
 }

@@ -205,6 +205,8 @@ const { builtinWorkflowStates, builtinQuickWorkflows, loadBuiltinWorkflowStates 
 
     const switchBuiltinWorkflowVersion = async (bw, versionId, scopeOverride) => {
       if (!bw || !versionId) return
+      const projectId = props.projectId
+      const request = props.request
       try {
         const scope = scopeOverride || (props.projectId ? 'project' : 'global')
         const res = await selectBuiltinWorkflowVersion(bw.id, {
@@ -212,6 +214,7 @@ const { builtinWorkflowStates, builtinQuickWorkflows, loadBuiltinWorkflowStates 
           scope,
           projectId: props.projectId || ''
         })
+        if (projectId !== props.projectId || request !== props.request) { notifyBuiltinWorkflowsChanged(); return }
         const workflows = res?.workflows || res?.data?.workflows
         if (Array.isArray(workflows) && workflows.length) {
           builtinWorkflowStates.value = workflows
@@ -261,6 +264,8 @@ const { builtinWorkflowStates, builtinQuickWorkflows, loadBuiltinWorkflowStates 
       const wf = activeModalWorkflow.value
       if (!wf || bwEditorSaving.value) return
       bwEditorSaving.value = true
+      const projectId = props.projectId
+      const request = props.request
       try {
         const payload = {
           id: bwModalSelectedVersionId.value === '__new__' ? '' : bwEditorForm.value.id,
@@ -273,6 +278,7 @@ const { builtinWorkflowStates, builtinQuickWorkflows, loadBuiltinWorkflowStates 
           projectId: props.projectId || ''
         }
         const res = await saveBuiltinWorkflowVersion(wf.id, payload)
+        if (projectId !== props.projectId || request !== props.request) { notifyBuiltinWorkflowsChanged(); return }
         const workflows = res?.workflows || res?.data?.workflows
         if (Array.isArray(workflows) && workflows.length) {
           builtinWorkflowStates.value = workflows
@@ -305,8 +311,11 @@ const { builtinWorkflowStates, builtinQuickWorkflows, loadBuiltinWorkflowStates 
       if (!wf || !verId || verId === 'default' || bwEditorSaving.value) return
       const verName = bwEditorForm.value.name || verId
       bwEditorSaving.value = true
+      const projectId = props.projectId
+      const request = props.request
       try {
         const res = await deleteBuiltinWorkflowVersion(wf.id, verId, props.projectId || '')
+        if (projectId !== props.projectId || request !== props.request) { notifyBuiltinWorkflowsChanged(); return }
         const workflows = res?.workflows || res?.data?.workflows
         if (Array.isArray(workflows) && workflows.length) {
           builtinWorkflowStates.value = workflows
@@ -331,6 +340,7 @@ const { builtinWorkflowStates, builtinQuickWorkflows, loadBuiltinWorkflowStates 
 
 
 watch([() => props.request, () => props.projectId], async ([request, projectId]) => {
+  bwModalWorkflowId.value = ''
   await loadBuiltinWorkflowStates()
   if (request !== props.request || projectId !== props.projectId) return
   bwModalWorkflowId.value = request.workflowId

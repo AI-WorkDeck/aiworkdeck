@@ -26,10 +26,20 @@ const sample = pid => [{
 window.__workflowFixtures = {
   calls: [],
   delay: 0,
+  holdMutations: false,
+  pendingMutations: [],
+  completedMutations: [],
+  releaseMutations() {
+    this.pendingMutations.splice(0).forEach(resolve => resolve());
+  },
   fail: false
 };
 const f = window.__workflowFixtures;
 const wait = ms => new Promise(r => setTimeout(r, ms));
+async function waitForMutation(type, pid) {
+  if (f.holdMutations) await new Promise(resolve => f.pendingMutations.push(resolve));
+  f.completedMutations.push([type, pid]);
+}
 export async function getBuiltinWorkflows(pid) {
   const data = JSON.parse(JSON.stringify(records[pid] || sample(pid)));
   f.calls.push(['get', pid]);
@@ -49,6 +59,7 @@ export async function saveBuiltinWorkflowVersion(id, payload) {
     systemDefault: false
   });
   records[payload.projectId] = rows;
+  await waitForMutation('save', payload.projectId);
   return {
     workflows: rows
   };
@@ -56,6 +67,7 @@ export async function saveBuiltinWorkflowVersion(id, payload) {
 ;
 export async function selectBuiltinWorkflowVersion(id, payload) {
   f.calls.push(['select', id, payload]);
+  await waitForMutation('select', payload.projectId);
   return {
     workflows: sample(payload.projectId)
   };
@@ -63,6 +75,7 @@ export async function selectBuiltinWorkflowVersion(id, payload) {
 ;
 export async function deleteBuiltinWorkflowVersion(id, version, pid) {
   f.calls.push(['delete', id, version, pid]);
+  await waitForMutation('delete', pid);
   return {
     workflows: sample(pid)
   };
