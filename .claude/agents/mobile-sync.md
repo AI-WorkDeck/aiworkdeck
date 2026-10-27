@@ -8,7 +8,7 @@ description: 手机端同步领域。任务涉及手机端项目目录镜像、�
 ## 个人助理、日程镜像与提醒（dev-board#1539–1541，2026-10-27）
 
 - 手机个人助理直接从账户全部可用项目检索，不要求先选择项目。独立云端分析同意、既有文件备份同意、有效持久云存储订阅同时满足后启用；不新增收费档位。详细模型/工具/来源复验契约见 `ai-chat.md` 的手机个人助理段。
-- `MobileRelayClientService` 独立 worker：日程每60秒、摘要每10分钟。先查云端开关与权益，再读本机项目；冻结 `CatalogSession` 覆盖目录前置上传与内容上传，任何步骤换账号即拒绝旧请求。项目摘要逐项失败重试，日程只有完整读取后才整批替换；超过5000条时按“未完成优先、截止日期升序”上传前5000，保留活动提醒，并在请求、响应和快照读取中显式标记 `truncated`，不得当作完整历史。目录截断时仅同步云端接纳的前N个项目；空本地库沿用现有目录保护，不清空其它实例的日程或摘要。摘要清理使用 `includeRemoved=true` 的账户内全部候选，独立目录推送先于清理也不会漏掉已删项目。
+- `MobileRelayClientService` 独立 worker：日程每60秒、摘要每10分钟。先查云端开关与权益，再读本机项目；冻结 `CatalogSession` 覆盖目录前置上传与内容上传，任何步骤换账号即拒绝旧请求。项目摘要逐项失败重试，日程只有完整读取后才整批替换；超过5000条时按“有待提醒优先、未完成优先、截止日期升序”上传前5000，保留活动提醒，并在请求、响应和快照读取中显式标记 `truncated`，不得当作完整历史。目录截断时仅同步云端接纳的前N个项目；空本地库沿用现有目录保护，不清空其它实例的日程或摘要。摘要清理使用 `includeRemoved=true` 的账户内全部候选，独立目录推送先于清理也不会漏掉已删项目。
 - `MobileCalendarService` + 独立 consent/snapshot 表保存 `(userId,deviceId)` 日程只读镜像，任务权威仍在桌面。`GET/PUT /api/mobile/calendar/settings` 同意版本 `2026-10-27`；`PUT /snapshots` 收全量任务（至多5000条，含项目、日期/时间、状态、提醒提前分钟、文件关联）；`GET /events` 按当前账户目录和权益过滤。撤销同意清除镜像；不接受跨账号、未知项目、倒退时间或重复任务。未指定事项时间的提醒按桌面所报时区09:00计算，已完成事项不提醒。移动助手摘要与对话的同步模型调用排除 OSIV，避免长请求占满数据库连接池。
 - 新个人工作区接口统一 `{code:0,data:...}`，认证错误仍 HTTP200/code4010。OpenAPI真源 `backend/src/main/resources/openapi/mobile-v1.yaml`；手机仓清洁提交后钉版，不手改副本。事项身份由 deviceId/projectKey/taskId 派生，不能只用本地整数项目ID。
 - `MobileCalendarPushService/Gateway` 可选 APNs：`GET /calendar/push/status`，`PUT /device`（installation UUID、token、sandbox/production），`DELETE /device/{installationId}`。令牌绑定当前账户，换账号重新绑定并清理收据；关闭同步、订阅到期、已完成或撤除项目不发提醒。发送成功才记收据，失败重试；APNs collapse ID 限制重复，但进程在发送后落库前退出仍可能重复，不能宣称严格一次送达。

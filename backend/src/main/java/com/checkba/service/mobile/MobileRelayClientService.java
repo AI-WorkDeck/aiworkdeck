@@ -781,6 +781,8 @@ public class MobileRelayClientService {
                 }
             }
             tasks.sort((a, b) -> {
+                int reminder = Boolean.compare(a.getValue().get("remindBefore") == null, b.getValue().get("remindBefore") == null);
+                if (reminder != 0) return reminder;
                 int status = Boolean.compare("DONE".equals(a.getValue().get("status")), "DONE".equals(b.getValue().get("status")));
                 if (status != 0) return status;
                 int due = Objects.toString(a.getValue().get("dueDate"), "9999-12-31").compareTo(Objects.toString(b.getValue().get("dueDate"), "9999-12-31"));
