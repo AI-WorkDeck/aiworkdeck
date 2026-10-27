@@ -208,9 +208,21 @@ public class ProjectRepoService {
 
     /** Office（Word/WPS）打开文档时落在同目录的锁文件，绝不该进版本历史（dev-board#463）。 */
     private static final String EXCLUDE_RULE_OFFICE_LOCK = "~$*";
+    /** 重型依赖与虚拟环境目录，与 LocalProjectService.isIgnoredDirectoryName 对齐（dev-board#1427）。 */
+    private static final List<String> DEFAULT_EXCLUDE_RULES = List.of(
+            EXCLUDE_RULE_OFFICE_LOCK,
+            "node_modules/",
+            "bower_components/",
+            "__pycache__/",
+            "site-packages/",
+            "venv/",
+            "virtualenv/",
+            ".venv/",
+            "Pods/"
+    );
 
     /**
-     * 幂等地把排除规则写进 {@code $GIT_DIR/info/exclude}（dev-board#463）。
+     * 幂等地把排除规则写进 {@code $GIT_DIR/info/exclude}（dev-board#463 / dev-board#1427）。
      *
      * <p>写在 gitDir 而不是工作区的 .gitignore：gitDir 恒在
      * {@code {globalRoot}/repos/project-{id}.git}，律师自己的文件夹里不会多出一个
@@ -224,7 +236,7 @@ public class ProjectRepoService {
      * 只有它能覆盖已经存在的老仓库与另外两条建仓路径。init 里额外调一次是因为
      * 它自己不走 open，规则必须早于那笔 {@code add(".")}。
      *
-     * <p>只补这一条规则，不动文件里已有的其它行；写失败只记日志——版本记录是保险，
+     * <p>只补缺失的规则，不动文件里已有的其它行；写失败只记日志——版本记录是保险，
      * 不能因为一条排除规则写不下去就让开仓/提交整个失败。
      */
     private void ensureExcludes(long projectId) {
@@ -234,17 +246,27 @@ public class ProjectRepoService {
         try {
             if (Files.exists(exclude)) {
                 String current = Files.readString(exclude);
-                boolean present = current.lines()
-                        .anyMatch(l -> l.trim().equals(EXCLUDE_RULE_OFFICE_LOCK));
-                if (present) return;
+                Set<String> existingLines = current.lines()
+                        .map(String::trim)
+                        .collect(java.util.stream.Collectors.toSet());
+                StringBuilder missing = new StringBuilder();
+                for (String rule : DEFAULT_EXCLUDE_RULES) {
+                    if (!existingLines.contains(rule)) {
+                        missing.append(rule).append("\n");
+                    }
+                }
+                if (missing.length() == 0) return;
                 String sep = current.isEmpty() || current.endsWith("\n") ? "" : "\n";
-                Files.writeString(exclude, sep + EXCLUDE_RULE_OFFICE_LOCK + "\n",
+                Files.writeString(exclude, sep + missing,
                         java.nio.file.StandardOpenOption.APPEND);
             } else {
                 Files.createDirectories(exclude.getParent());
-                Files.writeString(exclude,
-                        "# AI WorkDeck: Office 打开文档时的锁文件不进版本记录\n"
-                                + EXCLUDE_RULE_OFFICE_LOCK + "\n");
+                StringBuilder initContent = new StringBuilder(
+                        "# AI WorkDeck: Office 打开文档时的锁文件及依赖目录不进版本记录\n");
+                for (String rule : DEFAULT_EXCLUDE_RULES) {
+                    initContent.append(rule).append("\n");
+                }
+                Files.writeString(exclude, initContent.toString());
             }
         } catch (IOException e) {
             log.warn("写入版本库排除规则失败: project={} ({})", projectId, e.getMessage());

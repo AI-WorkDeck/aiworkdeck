@@ -72,6 +72,20 @@ public class LocalProjectService {
     private final com.checkba.service.telemetry.TelemetryService telemetryService;
     private final org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
+    /**
+     * 按项目串行化导入与对账（dev-board#1427）：
+     * 此前 openLocalFolder 与 reconcileProject 均无项目级互斥，前端/桌面壳连续触发两次打开或打开同时触发
+     * watcher 对账时，两个线程并发跑 importFolder，同时读到空 rowIndex 并各自插入一整套顶层目录与文件，
+     * 造成资源管理器出现成对的重复顶层文件夹且 H2 锁竞争与全表扫描耗时翻倍。
+     */
+    private final java.util.concurrent.ConcurrentHashMap<Long, java.util.concurrent.locks.ReentrantLock> projectLocks =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private final Object resolveProjectLock = new Object();
+
+    private java.util.concurrent.locks.ReentrantLock lockForProject(Long projectId) {
+        return projectLocks.computeIfAbsent(projectId, k -> new java.util.concurrent.locks.ReentrantLock());
+    }
+
     public LocalProjectService(ProjectRepository projectRepository,
                                ProjectMemberRepository projectMemberRepository,
                                ProjectFileRepository projectFileRepository,
@@ -122,18 +136,27 @@ public class LocalProjectService {
         Path root = validateLocalRoot(localRootRaw, createFolder);
         String canonical = root.toString();
 
-        ProjectResolution resolution = transactionTemplate.execute(status -> resolveProject(canonical, root, name, userId));
+        ProjectResolution resolution;
+        synchronized (resolveProjectLock) {
+            resolution = transactionTemplate.execute(status -> resolveProject(canonical, root, name, userId));
+        }
         Project project = resolution.project();
         boolean reused = resolution.reused();
 
-        ImportStats stats = importFolder(project.getId(), root, userId);
-
+        ImportStats stats;
         Long openFileId = null;
-        if (StringUtils.hasText(openFileName)) {
-            openFileId = projectFileRepository
-                    .findByProjectIdAndParentIdAndNameAndIsDeletedFalse(project.getId(), null, openFileName)
-                    .map(ProjectFile::getId)
-                    .orElse(null);
+        java.util.concurrent.locks.ReentrantLock projectLock = lockForProject(project.getId());
+        projectLock.lock();
+        try {
+            stats = importFolder(project.getId(), root, userId);
+            if (StringUtils.hasText(openFileName)) {
+                openFileId = projectFileRepository
+                        .findByProjectIdAndParentIdAndNameAndIsDeletedFalse(project.getId(), null, openFileName)
+                        .map(ProjectFile::getId)
+                        .orElse(null);
+            }
+        } finally {
+            projectLock.unlock();
         }
         log.info("打开本地文件夹项目: project={}, root={}, reused={}, imported={}, truncated={}, truncatedCount={}",
                 project.getId(), canonical, reused, stats.imported, stats.truncated, stats.truncatedCount);
@@ -204,6 +227,19 @@ public class LocalProjectService {
      * 与"跳过这条坏数据、把其余导完"的既有设计意图一致。
      */
     public ReconcileResult reconcileProject(Long projectId) {
+        if (projectId == null) {
+            return new ReconcileResult(0, false, false, 0, false);
+        }
+        java.util.concurrent.locks.ReentrantLock projectLock = lockForProject(projectId);
+        projectLock.lock();
+        try {
+            return doReconcileProject(projectId);
+        } finally {
+            projectLock.unlock();
+        }
+    }
+
+    private ReconcileResult doReconcileProject(Long projectId) {
         Project project = projectRepository.findById(projectId).orElse(null);
         if (project == null || !StringUtils.hasText(project.getLocalRoot())) {
             return new ReconcileResult(0, false, false, 0, false);
@@ -231,7 +267,7 @@ public class LocalProjectService {
 
         // 删除同步：行在库、物理不存在 → 出索引（文件按 filePath 解析，文件夹按父链拼相对路径）
         java.util.List<ProjectFile> rows = projectFileRepository.findByProjectId(projectId);
-        Map<Long, ProjectFile> byId = new HashMap<>();
+        Map<Long, ProjectFile> byId = new HashMap<>(rows.size() * 2);
         for (ProjectFile f : rows) byId.put(f.getId(), f);
         for (ProjectFile f : rows) {
             if (Boolean.TRUE.equals(f.getIsDeleted())) continue;
@@ -437,7 +473,7 @@ public class LocalProjectService {
 
                 @Override
                 public FileVisitResult preVisitDirectory(Path d, BasicFileAttributes attrs) {
-                    if (!d.equals(dir) && d.getFileName().toString().startsWith(".")) return FileVisitResult.SKIP_SUBTREE;
+                    if (!d.equals(dir) && isIgnoredDirectoryName(d.getFileName().toString())) return FileVisitResult.SKIP_SUBTREE;
                     return tally();
                 }
 
@@ -460,6 +496,33 @@ public class LocalProjectService {
     }
 
     /**
+     * 磁盘扫描与监听时一律跳过的重型依赖/运行环境目录名（dev-board#1427）：
+     * 用户项目文件夹内若内嵌前端/Python/小程序工程，单个 {@code node_modules} 就可达十余万文件
+     * （如真机现场 17.2 万个非隐藏条目中 {@code node_modules} 占 13.9 万、{@code site-packages}
+     * 占 1330），深度优先扫描会把 30,000 条导入上限全部耗尽在依赖包里，导致根目录上百个业务
+     * 文件夹被成片截断、打开耗时超过 5 分钟。只列无歧义的包管理与运行时缓存目录，不列
+     * {@code target}/{@code build} 等可能与业务命名重合的通用词。
+     */
+    private static final java.util.Set<String> IGNORED_DIRECTORY_NAMES = java.util.Set.of(
+            "node_modules",
+            "bower_components",
+            "__pycache__",
+            "site-packages",
+            "venv",
+            "virtualenv",
+            "Pods"
+    );
+
+    /**
+     * 目录名是否应在本地文件夹导入、对账、监听与版本估算中整棵跳过：
+     * 点开头的隐藏目录（{@code .git}/{@code .awd}/{@code .venv}/{@code .idea} 等）
+     * 以及 {@link #IGNORED_DIRECTORY_NAMES} 中的重型依赖目录。
+     */
+    public static boolean isIgnoredDirectoryName(String name) {
+        return name != null && (name.startsWith(".") || IGNORED_DIRECTORY_NAMES.contains(name));
+    }
+
+    /**
      * 磁盘扫描时要跳过的条目名（dev-board#463）。两类：
      * <ul>
      *   <li>点开头的隐藏项——{@code .git}/{@code .awd}/{@code .DS_Store} 一并覆盖；</li>
@@ -468,21 +531,57 @@ public class LocalProjectService {
      *       管理器，等 Word 关闭把它删掉，对账又把这行软删进回收站，一次开关文档就
      *       留一个幽灵，还顺带触发一次没有意义的版本记录存档。</li>
      * </ul>
-     * <b>只用在文件站点</b>：目录站点仍按点开头判断——一个名字以 {@code ~$} 开头的
+     * <b>只用在文件站点</b>：目录站点按 {@link #isIgnoredDirectoryName} 判断——一个名字以 {@code ~$} 开头的
      * 目录（Office 从不创建）若被 SKIP_SUBTREE，整棵子树会从文件树上消失却照样进
      * 版本库，白添一种"看不见但被收录"的不对称。
      */
     static boolean isIgnoredEntryName(String name) {
-        return name.startsWith(".") || name.startsWith("~$");
+        return name != null && (name.startsWith(".") || name.startsWith("~$"));
     }
 
     /**
-     * 把文件夹现有内容登记进数据库文件树。幂等：
+     * 文件系统监听事件路径是否属于应忽略的噪声路径（dev-board#1427）：
+     * 此前 {@code LocalRootWatchService} 只检查 {@code changed.getFileName()}，导致
+     * {@code .awd/tree.json}、{@code .git/index.lock}、{@code node_modules/pkg/index.js}
+     * 的末段文件名不以点开头而漏网，每一次内部写清单或依赖变动都触发全量对账。
+     * 这里沿相对于项目根的每一段父目录检查 {@link #isIgnoredDirectoryName}，末段同时检查
+     * {@link #isIgnoredEntryName} 与 {@link #isIgnoredDirectoryName}。
+     */
+    static boolean isIgnoredWatchPath(Path root, Path changed) {
+        if (changed == null) return false;
+        if (root != null && changed.equals(root)) return false;
+        if (root != null && changed.startsWith(root)) {
+            Path rel = root.relativize(changed);
+            int count = rel.getNameCount();
+            if (count == 0) return false;
+            for (int i = 0; i < count - 1; i++) {
+                if (isIgnoredDirectoryName(rel.getName(i).toString())) {
+                    return true;
+                }
+            }
+            String leaf = rel.getName(count - 1).toString();
+            return isIgnoredEntryName(leaf) || isIgnoredDirectoryName(leaf);
+        }
+        Path fn = changed.getFileName();
+        return fn != null && (isIgnoredEntryName(fn.toString()) || isIgnoredDirectoryName(fn.toString()));
+    }
+
+    private static final int BATCH_SAVE_CHUNK_SIZE = 500;
+
+    private record DirLevelNode(Path dir, Long folderId, int depth) {}
+    private record DiskEntry(Path path, String name, BasicFileAttributes attrs) {}
+    private record PendingFolder(Path dir, int depth, ProjectFile entity) {}
+
+    /**
+     * 把文件夹现有内容按广度优先（层序）批量登记进数据库文件树（dev-board#1427）。幂等：
      * - 已有同名同大小同路径的行一字不动（避免 DB 行翻搅与版本记录噪声）；
-     * - **回收站里的行（isDeleted）不复活**——软删除不动磁盘文件，重扫时把磁盘上
+     * - <b>回收站里的行（isDeleted）不复活</b>——软删除不动磁盘文件，重扫时把磁盘上
      *   仍存在的它当「新文件」再导入会静默撤销律师刚做的删除；
-     * - 跳过噪声条目（{@link #isIgnoredEntryName}）：点开头的隐藏项（.git/.awd/.DS_Store
-     *   等一并覆盖），以及 Office 打开文档时落在同目录的 {@code ~$} 锁文件。
+     * - 跳过噪声目录（{@link #isIgnoredDirectoryName}）与噪声文件（{@link #isIgnoredEntryName}）；
+     * - 广度优先（Level-Order）：先导入根目录（第 1 层）、再第 2 层、第 3 层……即使超大项目触发
+     *   {@code maxImportEntries} 上限，根目录和浅层业务文件夹也永远完整呈现，不会被某个深层子目录饥饿截断；
+     * - 内存维护 {@code maxSortByParent} + 按层分批 {@code saveAll} + 末尾单次 {@code signalChange}：
+     *   消除逐文件事务提交、逐文件 {@code maxSortOrder} 全表扫描与逐文件模板检查。
      */
     private ImportStats importFolder(Long projectId, Path root, Long userId) {
         return importFolder(projectId, root, userId, java.util.Collections.emptyMap());
@@ -490,142 +589,410 @@ public class LocalProjectService {
 
     private ImportStats importFolder(Long projectId, Path root, Long userId, Map<Long, ProjectFile> vanished) {
         ImportStats stats = new ImportStats();
-        Map<Path, Long> dirIds = new HashMap<>();
-        dirIds.put(root, null);
 
-        // 一次拉全量行建索引：既省 per-entry 查询，也让「含已删行」的查重成为可能
-        Map<String, ProjectFile> rowIndex = new HashMap<>();
-        for (ProjectFile f : projectFileRepository.findByProjectId(projectId)) {
-            String key = rowKey(f.getParentId(), f.getName());
+        // 一次拉全量行并自愈历史并发重复行与噪声目录行
+        List<ProjectFile> existingRows = healExistingRows(projectId, projectFileRepository.findByProjectId(projectId));
+        Map<String, ProjectFile> rowIndex = new HashMap<>(Math.max(16, existingRows.size() * 2));
+        Map<Long, Integer> maxSortByParent = new HashMap<>();
+        for (ProjectFile f : existingRows) {
+            Long normParent = normalizeParentId(f.getParentId());
+            String key = rowKey(normParent, f.getName());
             ProjectFile prev = rowIndex.get(key);
             // 同键多行时非删除行优先
             if (prev == null || Boolean.TRUE.equals(prev.getIsDeleted())) {
                 rowIndex.put(key, f);
             }
+            if (!Boolean.TRUE.equals(f.getIsDeleted()) && f.getSortOrder() != null) {
+                maxSortByParent.merge(normParent, f.getSortOrder(), Math::max);
+            }
         }
 
-        try {
-            Files.walkFileTree(root, java.util.Collections.emptySet(), MAX_IMPORT_DEPTH,
-                    new SimpleFileVisitor<>() {
-                @Override
-                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-                    if (dir.equals(root)) return FileVisitResult.CONTINUE;
-                    if (dir.getFileName().toString().startsWith(".")) return FileVisitResult.SKIP_SUBTREE;
-                    if (stats.imported >= maxImportEntries) {
-                        // 命中上限后不再把子树入库，只做一次有界计数（上限 truncatedCountCap），
-                        // 让前端的「约 N 项未纳入」有一个接近真实的数字。
-                        countSkippedSubtree(dir, stats);
-                        return FileVisitResult.SKIP_SUBTREE;
-                    }
-                    Long parentId = dirIds.get(dir.getParent());
-                    if (parentId == null && !dir.getParent().equals(root)) {
-                        return FileVisitResult.SKIP_SUBTREE; // 父目录导入失败/被跳过
-                    }
-                    String dirName = dir.getFileName().toString();
-                    ProjectFile row = rowIndex.get(rowKey(parentId, dirName));
-                    if (row != null && Boolean.TRUE.equals(row.getIsFolder())) {
-                        if (Boolean.TRUE.equals(row.getIsDeleted())) {
-                            return FileVisitResult.SKIP_SUBTREE; // 回收站里的文件夹不复活
-                        }
-                        dirIds.put(dir, row.getId());
-                        stats.imported++;
-                        return FileVisitResult.CONTINUE;
-                    }
-                    try {
-                        ProjectFile created = projectFileService.createFolder(projectId, parentId, dirName, userId);
-                        rowIndex.put(rowKey(parentId, dirName), created);
-                        dirIds.put(dir, created.getId());
-                        stats.imported++;
-                        stats.changed++;
-                    } catch (Exception e) {
-                        log.warn("导入文件夹失败，跳过子树: {} ({})", dir, e.getMessage());
-                        return FileVisitResult.SKIP_SUBTREE;
-                    }
-                    return FileVisitResult.CONTINUE;
-                }
+        List<DirLevelNode> currentLevel = List.of(new DirLevelNode(root, null, 0));
+        while (!currentLevel.isEmpty()) {
+            List<DiskEntry> levelFiles = new java.util.ArrayList<>();
+            List<Long> levelFileParents = new java.util.ArrayList<>();
+            List<DiskEntry> levelDirs = new java.util.ArrayList<>();
+            List<DirLevelNode> levelDirParents = new java.util.ArrayList<>();
 
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                    String fileName = file.getFileName().toString();
-                    if (isIgnoredEntryName(fileName)) return FileVisitResult.CONTINUE;
+            for (DirLevelNode parentNode : currentLevel) {
+                List<Path> children;
+                try (java.util.stream.Stream<Path> stream = Files.list(parentNode.dir())) {
+                    children = stream
+                            .sorted(java.util.Comparator.comparing(p -> p.getFileName().toString()))
+                            .toList();
+                } catch (IOException e) {
+                    log.warn("导入时无法访问目录，跳过: {} ({})", parentNode.dir(), e.getMessage());
+                    continue;
+                }
+                for (Path child : children) {
+                    String name = child.getFileName().toString();
+                    BasicFileAttributes attrs;
+                    try {
+                        attrs = Files.readAttributes(child, BasicFileAttributes.class, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+                    } catch (IOException e) {
+                        log.warn("导入时无法访问，跳过: {} ({})", child, e.getMessage());
+                        continue;
+                    }
                     if (attrs.isDirectory()) {
-                        // walkFileTree 到达 maxDepth=MAX_IMPORT_DEPTH 时，正卡在边界上的目录
-                        // 不会走 preVisitDirectory（那样就得再往下探一层，超出 maxDepth），
-                        // 而是被当成一个不透明的条目直接扔进 visitFile——这里看到的"文件"
-                        // 其实是目录，就是深度封顶的信号：它自己和它底下的一切都不会再被
-                        // 任何回调访问到，是本轮扫描静默漏掉的那一段。与 MAX_IMPORT_ENTRIES
-                        // 上限不同，这里没有天然会执行到的判断点，必须主动识别这个信号。
-                        countSkippedSubtree(file, stats);
-                        return FileVisitResult.CONTINUE;
+                        if (isIgnoredDirectoryName(name)) continue;
+                        levelDirs.add(new DiskEntry(child, name, attrs));
+                        levelDirParents.add(parentNode);
+                    } else if (attrs.isRegularFile()) {
+                        if (isIgnoredEntryName(name)) continue;
+                        levelFiles.add(new DiskEntry(child, name, attrs));
+                        levelFileParents.add(parentNode.folderId());
                     }
-                    if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
-                    if (stats.imported >= maxImportEntries) {
-                        // 不再 TERMINATE 掉整个 walk：那样连"还有多少项没纳入"都数不出来。
-                        // 继续遍历同级/回溯到上级目录的其余兄弟节点计数，但目录分支已经在
-                        // preVisitDirectory 里 SKIP_SUBTREE，不会再下钻——总耗时仍然有界。
-                        stats.truncated = true;
+                }
+            }
+
+            List<ProjectFile> filesToSave = new java.util.ArrayList<>();
+            for (int i = 0; i < levelFiles.size(); i++) {
+                DiskEntry entry = levelFiles.get(i);
+                Long parentId = levelFileParents.get(i);
+                String fileName = entry.name();
+                if (stats.imported >= maxImportEntries) {
+                    stats.truncated = true;
+                    if (stats.truncatedCount < truncatedCountCap) {
                         stats.truncatedCount++;
-                        return FileVisitResult.CONTINUE;
+                    } else {
+                        stats.truncatedCountCapped = true;
                     }
-                    Long parentId = dirIds.get(file.getParent());
-                    if (parentId == null && !file.getParent().equals(root)) {
-                        return FileVisitResult.CONTINUE; // 父目录导入失败被跳过
+                    continue;
+                }
+                String rel = root.relativize(entry.path()).toString().replace('\\', '/');
+                String logicalPath = "projects/" + projectId + "/" + rel;
+                ProjectFile row = rowIndex.get(rowKey(parentId, fileName));
+                if (row != null && !Boolean.TRUE.equals(row.getIsFolder())) {
+                    if (Boolean.TRUE.equals(row.getIsDeleted())) {
+                        stats.imported++;
+                        continue; // 回收站里的文件不复活
                     }
-                    String rel = root.relativize(file).toString().replace('\\', '/');
-                    String logicalPath = "projects/" + projectId + "/" + rel;
-                    ProjectFile row = rowIndex.get(rowKey(parentId, fileName));
-                    if (row != null && !Boolean.TRUE.equals(row.getIsFolder())) {
-                        if (Boolean.TRUE.equals(row.getIsDeleted())) {
+                    boolean sameSize = row.getFileSize() != null && row.getFileSize() == entry.attrs().size();
+                    boolean samePath = logicalPath.equals(row.getFilePath());
+                    if (sameSize && samePath) {
+                        stats.imported++;
+                        continue; // 无变化不动行
+                    }
+                    row.setFileSize(entry.attrs().size());
+                    row.setFileType(safeExtensionOf(fileName));
+                    row.setFilePath(logicalPath);
+                    row.setUpdatedAt(LocalDateTime.now());
+                    filesToSave.add(row);
+                    stats.imported++;
+                    stats.changed++;
+                    continue;
+                }
+                if (row != null && Boolean.TRUE.equals(row.getIsFolder()) && !Boolean.TRUE.equals(row.getIsDeleted())) {
+                    log.warn("导入文件失败，跳过: {} (同名文件夹已存在)", entry.path());
+                    continue;
+                }
+                if (row == null) {
+                    ProjectFile moved = claimMovedRow(vanished, parentId, fileName, entry.attrs().size());
+                    if (moved != null) {
+                        try {
+                            ProjectFile saved = projectFileService.relinkExternallyMoved(
+                                    moved.getId(), parentId, fileName, logicalPath, userId);
+                            vanished.remove(moved.getId());
+                            rowIndex.put(rowKey(parentId, fileName), saved);
                             stats.imported++;
-                            return FileVisitResult.CONTINUE; // 回收站里的文件不复活
-                        }
-                        boolean sameSize = row.getFileSize() != null && row.getFileSize() == attrs.size();
-                        boolean samePath = logicalPath.equals(row.getFilePath());
-                        if (sameSize && samePath) {
-                            stats.imported++;
-                            return FileVisitResult.CONTINUE; // 无变化不动行
+                            stats.changed++;
+                            continue;
+                        } catch (Exception e) {
+                            log.warn("外部改名对齐失败，按新文件导入: {} ({})", entry.path(), e.getMessage());
                         }
                     }
-                    if (row == null) {
-                        ProjectFile moved = claimMovedRow(vanished, parentId, fileName, attrs.size());
-                        if (moved != null) {
-                            try {
-                                ProjectFile saved = projectFileService.relinkExternallyMoved(
-                                        moved.getId(), parentId, fileName, logicalPath, userId);
-                                vanished.remove(moved.getId());
-                                rowIndex.put(rowKey(parentId, fileName), saved);
-                                stats.imported++;
-                                stats.changed++;
-                                return FileVisitResult.CONTINUE;
-                            } catch (Exception e) {
-                                log.warn("外部改名对齐失败，按新文件导入: {} ({})", file, e.getMessage());
+                }
+                if (!isValidNodeName(fileName)) {
+                    log.warn("导入文件失败，跳过非法名称: {}", entry.path());
+                    continue;
+                }
+                ProjectFile createdFile = buildNewFileEntity(
+                        projectId, parentId, fileName, safeExtensionOf(fileName),
+                        entry.attrs().size(), logicalPath, nextSortOrder(parentId, maxSortByParent), userId);
+                filesToSave.add(createdFile);
+                rowIndex.put(rowKey(parentId, fileName), createdFile);
+                stats.imported++;
+                stats.changed++;
+            }
+
+            if (!filesToSave.isEmpty()) {
+                saveFilesBatchSafely(filesToSave);
+            }
+
+            List<PendingFolder> foldersToCreate = new java.util.ArrayList<>();
+            List<DirLevelNode> nextLevel = new java.util.ArrayList<>();
+            for (int i = 0; i < levelDirs.size(); i++) {
+                DiskEntry entry = levelDirs.get(i);
+                DirLevelNode parentNode = levelDirParents.get(i);
+                Long parentId = parentNode.folderId();
+                int childDepth = parentNode.depth() + 1;
+                String dirName = entry.name();
+                if (childDepth >= MAX_IMPORT_DEPTH) {
+                    countSkippedSubtree(entry.path(), stats);
+                    continue;
+                }
+                if (stats.imported >= maxImportEntries) {
+                    countSkippedSubtree(entry.path(), stats);
+                    continue;
+                }
+                ProjectFile row = rowIndex.get(rowKey(parentId, dirName));
+                if (row != null && Boolean.TRUE.equals(row.getIsFolder())) {
+                    if (Boolean.TRUE.equals(row.getIsDeleted())) {
+                        continue; // 回收站里的文件夹不复活
+                    }
+                    stats.imported++;
+                    nextLevel.add(new DirLevelNode(entry.path(), row.getId(), childDepth));
+                    continue;
+                }
+                if (row != null && !Boolean.TRUE.equals(row.getIsFolder()) && !Boolean.TRUE.equals(row.getIsDeleted())) {
+                    log.warn("导入文件夹失败，跳过子树: {} (同名文件已存在)", entry.path());
+                    continue;
+                }
+                if (!isValidNodeName(dirName)) {
+                    log.warn("导入文件夹失败，跳过非法名称: {}", entry.path());
+                    continue;
+                }
+                ProjectFile createdFolder = buildNewFolderEntity(
+                        projectId, parentId, dirName, nextSortOrder(parentId, maxSortByParent), userId);
+                foldersToCreate.add(new PendingFolder(entry.path(), childDepth, createdFolder));
+                rowIndex.put(rowKey(parentId, dirName), createdFolder);
+                stats.imported++;
+                stats.changed++;
+            }
+
+            if (!foldersToCreate.isEmpty()) {
+                nextLevel.addAll(saveFoldersBatchSafely(foldersToCreate));
+            }
+            currentLevel = nextLevel;
+        }
+
+        if (stats.changed > 0) {
+            projectFileService.signalChange(projectId, userId);
+        }
+        return stats;
+    }
+
+    /**
+     * 自愈清理：
+     * 1) 历史已入库的重型依赖目录（如 {@code node_modules}）及其子孙直接出索引（不碰磁盘）；
+     * 2) 历史因无锁并发打开而产生的同父、同名、同类型存活重复行自动合并（子项归并到最早创建的唯一存活行，多余壳行删除）。
+     */
+    private static final Long HEAL_ROOT_KEY = 0L;
+
+    private List<ProjectFile> healExistingRows(Long projectId, List<ProjectFile> rawRows) {
+        if (rawRows == null || rawRows.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, List<ProjectFile>> byParent = new HashMap<>();
+        for (ProjectFile f : rawRows) {
+            Long normParent = normalizeParentId(f.getParentId());
+            Long pKey = normParent == null ? HEAL_ROOT_KEY : normParent;
+            byParent.computeIfAbsent(pKey, k -> new java.util.ArrayList<>()).add(f);
+        }
+
+        java.util.Set<Long> idsToPurge = new java.util.LinkedHashSet<>();
+        java.util.Deque<Long> purgeQueue = new java.util.ArrayDeque<>();
+        for (ProjectFile f : rawRows) {
+            if (f.getId() == null) continue;
+            boolean ignoredDir = Boolean.TRUE.equals(f.getIsFolder())
+                    && !ProjectFileService.isRootStagingFolder(f)
+                    && isIgnoredDirectoryName(f.getName());
+            boolean ignoredFile = !Boolean.TRUE.equals(f.getIsFolder())
+                    && isIgnoredEntryName(f.getName());
+            if (ignoredDir || ignoredFile) {
+                if (idsToPurge.add(f.getId()) && Boolean.TRUE.equals(f.getIsFolder())) {
+                    purgeQueue.add(f.getId());
+                }
+            }
+        }
+        while (!purgeQueue.isEmpty()) {
+            Long folderId = purgeQueue.poll();
+            for (ProjectFile child : byParent.getOrDefault(folderId, List.of())) {
+                if (child.getId() != null && idsToPurge.add(child.getId()) && Boolean.TRUE.equals(child.getIsFolder())) {
+                    purgeQueue.add(child.getId());
+                }
+            }
+        }
+
+        List<ProjectFile> reparented = new java.util.ArrayList<>();
+        java.util.Deque<Long> bfsParents = new java.util.ArrayDeque<>();
+        java.util.Set<Long> visitedParents = new java.util.HashSet<>();
+        bfsParents.add(HEAL_ROOT_KEY);
+        visitedParents.add(HEAL_ROOT_KEY);
+
+        while (!bfsParents.isEmpty()) {
+            Long parentKey = bfsParents.poll();
+            List<ProjectFile> children = byParent.getOrDefault(parentKey, List.of());
+            if (children.isEmpty()) continue;
+
+            Map<String, List<ProjectFile>> liveGroups = new java.util.LinkedHashMap<>();
+            for (ProjectFile c : children) {
+                if (c.getId() == null || idsToPurge.contains(c.getId()) || Boolean.TRUE.equals(c.getIsDeleted())) {
+                    continue;
+                }
+                String groupKey = (Boolean.TRUE.equals(c.getIsFolder()) ? "D:" : "F:") + c.getName();
+                liveGroups.computeIfAbsent(groupKey, k -> new java.util.ArrayList<>()).add(c);
+            }
+
+            for (List<ProjectFile> group : liveGroups.values()) {
+                group.sort(java.util.Comparator.comparing(ProjectFile::getId));
+                ProjectFile canonical = group.get(0);
+                if (group.size() > 1) {
+                    for (int i = 1; i < group.size(); i++) {
+                        ProjectFile dup = group.get(i);
+                        idsToPurge.add(dup.getId());
+                        if (Boolean.TRUE.equals(canonical.getIsFolder())) {
+                            List<ProjectFile> dupChildren = byParent.getOrDefault(dup.getId(), List.of());
+                            for (ProjectFile dc : dupChildren) {
+                                if (dc.getId() == null || idsToPurge.contains(dc.getId())) continue;
+                                dc.setParentId(canonical.getId());
+                                reparented.add(dc);
+                                byParent.computeIfAbsent(canonical.getId(), k -> new java.util.ArrayList<>()).add(dc);
                             }
                         }
                     }
-                    int dot = fileName.lastIndexOf('.');
-                    String ext = dot > 0 ? fileName.substring(dot + 1).toLowerCase() : "";
-                    try {
-                        ProjectFile saved = projectFileService.createOrUpdateFile(projectId, parentId, fileName, ext,
-                                attrs.size(), logicalPath, null, userId);
-                        rowIndex.put(rowKey(parentId, fileName), saved);
-                        stats.imported++;
-                        stats.changed++;
-                    } catch (Exception e) {
-                        log.warn("导入文件失败，跳过: {} ({})", file, e.getMessage());
-                    }
-                    return FileVisitResult.CONTINUE;
                 }
+                if (Boolean.TRUE.equals(canonical.getIsFolder()) && visitedParents.add(canonical.getId())) {
+                    bfsParents.add(canonical.getId());
+                }
+            }
+        }
 
-                @Override
-                public FileVisitResult visitFileFailed(Path file, IOException exc) {
-                    log.warn("导入时无法访问，跳过: {} ({})", file, exc.getMessage());
-                    return FileVisitResult.CONTINUE;
+        if (idsToPurge.isEmpty() && reparented.isEmpty()) {
+            return rawRows;
+        }
+
+        List<ProjectFile> validReparented = reparented.stream()
+                .filter(r -> r.getId() != null && !idsToPurge.contains(r.getId()))
+                .toList();
+        List<Long> purgeList = new java.util.ArrayList<>(idsToPurge);
+        try {
+            transactionTemplate.executeWithoutResult(status -> {
+                if (!validReparented.isEmpty()) {
+                    projectFileRepository.saveAll(validReparented);
+                }
+                for (int i = 0; i < purgeList.size(); i += BATCH_SAVE_CHUNK_SIZE) {
+                    List<Long> chunk = purgeList.subList(i, Math.min(i + BATCH_SAVE_CHUNK_SIZE, purgeList.size()));
+                    projectFileRepository.deleteAllByIdInBatch(chunk);
                 }
             });
-        } catch (IOException e) {
-            log.warn("扫描文件夹失败（已导入 {} 项）: {}", stats.imported, e.getMessage());
+            log.info("自动清理本地项目历史重复/噪声行: project={}, purged={}, reparented={}",
+                    projectId, purgeList.size(), validReparented.size());
+        } catch (Exception e) {
+            log.warn("自动清理本地项目历史重复/噪声行失败，继续正常导入: project={} ({})", projectId, e.getMessage());
+            return rawRows;
         }
-        return stats;
+
+        return rawRows.stream()
+                .filter(r -> r.getId() == null || !idsToPurge.contains(r.getId()))
+                .toList();
+    }
+
+    private void saveFilesBatchSafely(List<ProjectFile> files) {
+        for (int i = 0; i < files.size(); i += BATCH_SAVE_CHUNK_SIZE) {
+            List<ProjectFile> chunk = files.subList(i, Math.min(i + BATCH_SAVE_CHUNK_SIZE, files.size()));
+            try {
+                transactionTemplate.executeWithoutResult(status -> projectFileRepository.saveAll(chunk));
+            } catch (Exception batchEx) {
+                log.warn("批量保存文件块失败，退回逐条保存: size={} ({})", chunk.size(), batchEx.getMessage());
+                for (ProjectFile f : chunk) {
+                    try {
+                        transactionTemplate.executeWithoutResult(status -> projectFileRepository.save(f));
+                    } catch (Exception singleEx) {
+                        log.warn("导入文件失败，跳过: {} ({})", f.getName(), singleEx.getMessage());
+                    }
+                }
+            }
+        }
+    }
+
+    private List<DirLevelNode> saveFoldersBatchSafely(List<PendingFolder> folders) {
+        List<DirLevelNode> savedNodes = new java.util.ArrayList<>(folders.size());
+        for (int i = 0; i < folders.size(); i += BATCH_SAVE_CHUNK_SIZE) {
+            List<PendingFolder> chunk = folders.subList(i, Math.min(i + BATCH_SAVE_CHUNK_SIZE, folders.size()));
+            List<ProjectFile> entities = chunk.stream().map(PendingFolder::entity).toList();
+            try {
+                transactionTemplate.executeWithoutResult(status -> projectFileRepository.saveAll(entities));
+                for (PendingFolder pf : chunk) {
+                    if (pf.entity().getId() != null) {
+                        savedNodes.add(new DirLevelNode(pf.dir(), pf.entity().getId(), pf.depth()));
+                    }
+                }
+            } catch (Exception batchEx) {
+                log.warn("批量保存文件夹块失败，退回逐条保存: size={} ({})", chunk.size(), batchEx.getMessage());
+                for (PendingFolder pf : chunk) {
+                    try {
+                        ProjectFile saved = transactionTemplate.execute(status -> projectFileRepository.save(pf.entity()));
+                        if (saved != null && saved.getId() != null) {
+                            savedNodes.add(new DirLevelNode(pf.dir(), saved.getId(), pf.depth()));
+                        }
+                    } catch (Exception singleEx) {
+                        log.warn("导入文件夹失败，跳过子树: {} ({})", pf.dir(), singleEx.getMessage());
+                    }
+                }
+            }
+        }
+        return savedNodes;
+    }
+
+    private static Long normalizeParentId(Long parentId) {
+        return (parentId != null && parentId == 0L) ? null : parentId;
+    }
+
+    private static int nextSortOrder(Long parentId, Map<Long, Integer> maxSortByParent) {
+        Long normParent = normalizeParentId(parentId);
+        Integer currentMax = maxSortByParent.get(normParent);
+        int next = currentMax == null ? 0 : currentMax + 1;
+        maxSortByParent.put(normParent, next);
+        return next;
+    }
+
+    private static boolean isValidNodeName(String raw) {
+        if (!StringUtils.hasText(raw)) return false;
+        String trimmed = raw.trim();
+        if (trimmed.length() > 200) return false;
+        if (trimmed.contains("/") || trimmed.contains("\\")) return false;
+        return !".".equals(trimmed) && !"..".equals(trimmed);
+    }
+
+    private static String safeExtensionOf(String name) {
+        String ext = extensionOf(name);
+        return ext.length() > 32 ? ext.substring(0, 32) : ext;
+    }
+
+    private static ProjectFile buildNewFolderEntity(Long projectId, Long parentId, String dirName, int sortOrder, Long userId) {
+        ProjectFile folder = new ProjectFile();
+        folder.setProjectId(projectId);
+        folder.setParentId(normalizeParentId(parentId));
+        folder.setIsFolder(true);
+        folder.setName(dirName.trim());
+        folder.setSortOrder(sortOrder);
+        folder.setUserId(userId);
+        LocalDateTime now = LocalDateTime.now();
+        folder.setCreatedAt(now);
+        folder.setUpdatedAt(now);
+        folder.setIsDeleted(false);
+        return folder;
+    }
+
+    private ProjectFile buildNewFileEntity(Long projectId, Long parentId, String fileName, String fileType,
+                                           long fileSize, String logicalPath, int sortOrder, Long userId) {
+        ProjectFile file = new ProjectFile();
+        file.setProjectId(projectId);
+        file.setParentId(normalizeParentId(parentId));
+        file.setIsFolder(false);
+        file.setName(fileName.trim());
+        file.setFileType(fileType);
+        file.setFileSize(fileSize);
+        file.setFilePath(logicalPath);
+        file.setWpsFileId(projectFileService.generateWpsFileId(projectId));
+        file.setSortOrder(sortOrder);
+        file.setUserId(userId);
+        LocalDateTime now = LocalDateTime.now();
+        file.setCreatedAt(now);
+        file.setUpdatedAt(now);
+        file.setIsDeleted(false);
+        return file;
     }
 
     /** 库里活着、按 filePath 在磁盘上已找不到的文件行（按 id 索引，可变：认领后移除）。 */
