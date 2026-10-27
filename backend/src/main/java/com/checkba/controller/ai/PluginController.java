@@ -579,6 +579,16 @@ public class PluginController {
                 return vc;
             }).toList());
         }
+        if (contributes.getThemes() != null) {
+            copy.setThemes(contributes.getThemes().stream().map(theme -> {
+                PluginService.ThemeDecl tc = new PluginService.ThemeDecl();
+                tc.setId(theme.getId());
+                tc.setName(pluginService.localize(pluginId, theme.getName()));
+                tc.setDescription(pluginService.localize(pluginId, theme.getDescription()));
+                tc.setFile(theme.getFile());
+                return tc;
+            }).toList());
+        }
         if (contributes.getTemplates() != null) {
             copy.setTemplates(contributes.getTemplates().stream().map(t -> {
                 PluginService.TemplateDecl tc = new PluginService.TemplateDecl();

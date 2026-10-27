@@ -7,7 +7,7 @@ import { serializeTab, restore } from '../../src/pages/project-overview/tabSnaps
 import { isContextEligibleTab } from '../../src/pages/project-overview/activeTabContext.js'
 
 const source = readFileSync(new URL('../../src/pages/project-overview/panelSwitching.js', import.meta.url), 'utf8')
-const { panelSwitchingMethods } = await import('data:text/javascript;base64,' + Buffer.from(source.replace(/^import .*$/gm, '') + '\nconst migrateLeftPaneKey = key => key; const isGlobalPlugin = plugin => plugin?.views?.some(v => v.scope === "global"); const track = () => {}; const isPaneAllowedWithoutProject = () => false; const workbenchStorageKey = () => "pane";').toString('base64'))
+const { panelSwitchingMethods } = await import('data:text/javascript;base64,' + Buffer.from(readFileSync(new URL('../../src/utils/pluginViews.js', import.meta.url), 'utf8').replace(/export /g, '') + '\n' + source.replace(/^import .*$/gm, '') + '\nconst migrateLeftPaneKey = key => key; const track = () => {}; const isPaneAllowedWithoutProject = () => false; const workbenchStorageKey = () => "pane";').toString('base64'))
 
 test('rail click opens the plugin workspace instead of only selecting a narrow pane', () => {
   const opened = []
@@ -174,4 +174,46 @@ test('workspace navigation reveals an existing plugin in a hidden right pane wit
   assert.equal(vm.rightFiles[0], existing)
   assert.equal(vm.rightFiles.length, 1)
   assert.equal(vm.leftFiles.length, 0)
+})
+
+const declaredPlugin = (placements, scopes = {}) => {
+  const views = placements.map(placement => ({ id: placement, placement, scope: scopes[placement] || 'project', url: '/api/plugin-web/test/' + placement + '.html' }))
+  return { ...plugin('test'), hasDeclaredViews: true, views, sidebarView: views.find(v => v.placement === 'sidebar'), workspaceView: views.find(v => v.placement === 'workspace') }
+}
+
+test('workspace-only rail preserves current panel, while sidebar does not auto-open a tab', () => {
+  globalThis.uni = { setStorageSync() {} }
+  for (const placements of [[], ['workspace'], ['sidebar'], ['sidebar', 'workspace']]) {
+    const p = declaredPlugin(placements), opened = []
+    const vm = { hasProject: true, leftPaneKey: 'files', sidebarCollapsed: true, dynamicPlugins: [p],
+      lastActiveIdsByMode: { left: {}, right: {} }, openPluginTab: id => opened.push(id), saveActiveIdsByMode() {}, toggleSidebar() { this.sidebarCollapsed = !this.sidebarCollapsed } }
+    panelSwitchingMethods.toggleLeftPane.call(vm, p.key)
+    assert.deepEqual(opened, placements.length === 1 && placements[0] === 'workspace' ? ['test'] : [])
+    assert.equal(vm.leftPaneKey, placements.includes('sidebar') ? p.key : 'files')
+    assert.equal(vm.sidebarCollapsed, !placements.includes('sidebar'))
+  }
+})
+
+test('no UI and sidebar-only cannot open, mount or restore a workspace', () => {
+  for (const placements of [[], ['sidebar']]) {
+    const vm = workbench({ dynamicPlugins: [declaredPlugin(placements)] })
+    assert.equal(vm.openPluginTab('test'), false)
+    vm.leftFiles.push({ id: 'plugin-test', tabType: 'plugin', pluginId: 'test' })
+    assert.deepEqual(vm.pluginWorkspaceTabs(vm.leftFiles), [])
+    vm.reconcilePluginTabs()
+    assert.deepEqual(vm.leftFiles, [])
+  }
+})
+
+test('workspace uses its own scope, not an unrelated global sidebar', () => {
+  const vm = workbench({ hasProject: false, dynamicPlugins: [declaredPlugin(['sidebar', 'workspace'], { sidebar: 'global' })] })
+  assert.equal(vm.openPluginTab('test'), false)
+  vm.dynamicPlugins = [declaredPlugin(['workspace'], { workspace: 'global' })]
+  assert.equal(vm.openPluginTab('test'), true)
+  assert.equal(vm.pluginWorkspaceTabs(vm.leftFiles).length, 1)
+  vm.hasProject = true; vm.isLooseWorkspace = true
+  vm.dynamicPlugins = [declaredPlugin(['sidebar', 'workspace'], { sidebar: 'global' })]
+  assert.equal(vm.openPluginTab('test'), false)
+  vm.reconcilePluginTabs()
+  assert.deepEqual(vm.leftFiles, [])
 })
