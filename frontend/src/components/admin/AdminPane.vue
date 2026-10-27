@@ -882,6 +882,16 @@
         <scroll-view v-else-if="activeNav === 'personal_settings'" scroll-y class="config-scroll">
           <PersonalSettingsPanel />
         </scroll-view>
+        <scroll-view v-else-if="activeNav === 'language'" scroll-y class="config-scroll">
+          <SettingsSection :title="$t('account.languageGroupTitle')">
+            <text class="field-note">
+              {{ $t('account.languageGroupHint') }}
+            </text>
+            <view style="margin-top: 12px;">
+              <LanguagePicker />
+            </view>
+          </SettingsSection>
+        </scroll-view>
 
         <!-- 能力升级（dev-board#497）：一项「能力」= 一个槽，槽有内置实现与若干候选，
              切换即生效、可回滚。粘一个 GitHub 链接让 AI 去装，是这里唯一的写入口。
@@ -1055,10 +1065,30 @@ import OcrRoutingSettings from '@/components/admin/OcrRoutingSettings.vue'
 import OptionalComponentCard from '@/components/OptionalComponentCard.vue'
 import ExternalDependenciesPanel from '@/components/admin/ExternalDependenciesPanel.vue'
 import MemoryBrowser from '@/components/MemoryBrowser.vue'
+import LanguagePicker from '@/components/LanguagePicker.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
 import { componentDownloads } from '@/services/componentDownloads.js'
 import { openPermissionOnboarding, normalizePermissionItems } from '@/utils/permissionOnboarding.js'
+
+const NAV_LABEL_KEYS = {
+  language: 'account.languageGroupTitle',
+  work_log: 'account.tabWorkLog',
+  case_intake: 'account.tabCaseIntake',
+  favorites: 'account.tabFavorites',
+  todos: 'account.tabTodos',
+  personal_settings: 'admin.navPersonalSettings',
+  team: 'team.navTeam',
+  memory: 'chat.memoryButton',
+  account: 'admin.navAccount',
+  ai: 'admin.navAi',
+  updates: 'admin.navUpdates',
+  components: 'admin.navComponents',
+  permissions: 'admin.navPermissions',
+  capabilities: 'admin.navCapabilities',
+  telemetry: 'admin.navTelemetry',
+  feedback: 'admin.navFeedback',
+}
 
 /**
  * 缓存里的登录用户是不是管理员。isAdmin 由 /api/auth/me 下发（桌面单机=全员管理员；
@@ -1080,6 +1110,8 @@ export function resolveAdminNavKey(key) {
     work_log: 'work_log',
     security: 'personal_settings',
     personal_settings: 'personal_settings',
+    lang: 'language',
+    language: 'language',
   }
   return map[k] || k
 }
@@ -1091,7 +1123,7 @@ export default {
     UnlockHint, RechargeDialog, AwdSelect, AwdSwitch,
     PersonalWorkLogPanel, PersonalCaseIntakePanel, PersonalFavoritesPanel, PersonalTodosPanel, PersonalSettingsPanel,
     TeamPanel, OptionalComponentCard, MemoryBrowser, ExternalDependenciesPanel,
-    SettingsSection, SettingsRow,
+    LanguagePicker, SettingsSection, SettingsRow,
   },
   /**
    * ai-prompt：把一句话交给工作台的 AI 对话（「能力升级」的「让 AI 升级」按钮）。
@@ -1135,6 +1167,7 @@ export default {
       navItems: [
         // 「个人」组：2026-08-20 从个人中心搬来的四栏。key 刻意避开 'account'
         //（系统组的「账户与用量」已经占了这个 key）。
+        { key: 'language', label: this.$t('account.languageGroupTitle'), group: 'personal' },
         { key: 'work_log', label: this.$t('account.tabWorkLog'), group: 'personal' },
         { key: 'case_intake', label: this.$t('account.tabCaseIntake'), group: 'personal' },
         { key: 'favorites', label: this.$t('account.tabFavorites'), group: 'personal' },
@@ -1364,12 +1397,17 @@ export default {
     // 可见性只有这一处：desktopOnly（浏览器端没有的能力）+ 系统组要管理员。
     // 个人组对所有人可见，客户视图也一样——他也有自己的工作记录与账号安全。
     visibleNavItems() {
-      return this.navItems.filter((n) => {
-        if (n.desktopOnly && !this.isDesktop) return false
-        if (n.macOnly && !this.permissionsSupported) return false
-        if (n.group === 'system' && !this.isAdminUser) return false
-        return true
-      })
+      return this.navItems
+        .filter((n) => {
+          if (n.desktopOnly && !this.isDesktop) return false
+          if (n.macOnly && !this.permissionsSupported) return false
+          if (n.group === 'system' && !this.isAdminUser) return false
+          return true
+        })
+        .map((n) => ({
+          ...n,
+          label: NAV_LABEL_KEYS[n.key] ? this.$t(NAV_LABEL_KEYS[n.key]) : n.label,
+        }))
     },
     navGroups() {
       const groups = [

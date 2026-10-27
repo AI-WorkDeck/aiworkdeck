@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "title": "References",
+  "title": "Referências",
   "noDoc": "No document open",
   "parse": "Full-document online verification (charges may apply)",
   "reparse": "Repeat full-document online verification (charges may apply)",

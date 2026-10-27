@@ -3,87 +3,87 @@
 
 export default {
   "sidebar": {
-    "projectHome": "Project Overview",
-    "projects": "Projects",
-    "files": "Explorer",
-    "ddFiles": "Due Diligence Files",
-    "market": "Extensions",
-    "dev": "Plugin Development",
-    "voice": "Voice",
-    "meetingRecorder": "Meeting Recording",
+    "projectHome": "Обзор проекта",
+    "projects": "Проекты",
+    "files": "Проводник",
+    "ddFiles": "Файлы Due Diligence",
+    "market": "Расширения",
+    "dev": "Разработка плагинов",
+    "voice": "Голос",
+    "meetingRecorder": "Запись встреч",
     "litigationVisual": "Визуализация судебных процессов",
     "tmeet": "Tencent Meeting",
-    "search": "Search",
-    "tts": "Text to Speech",
-    "desensitize": "File Redaction",
+    "search": "Поиск",
+    "tts": "Текст в речь",
+    "desensitize": "Редактирование файлов",
     "version": "Version History",
     "calendar": "Календарь"
   },
   "tools": {
-    "variables": "Variable Library",
+    "variables": "Библиотека переменных",
     "favorites": "Избранное",
     "clipboard": "Буфер обмена"
   },
   "fileActions": {
-    "move": "Move",
-    "cut": "Cut",
-    "copy": "Copy",
+    "move": "Переместить",
+    "cut": "Вырезать",
+    "copy": "Копировать",
     "delete": "Удалить",
     "cancel": "Отмена",
-    "newFile": "New File",
-    "newFolder": "New Folder",
-    "sort": "Sort"
+    "newFile": "Новый файл",
+    "newFolder": "Новая папка",
+    "sort": "Сортировка"
   },
   "ocr": {
-    "refresh": "Refresh View",
-    "recognize": "Recognize Text",
-    "download": "Download",
-    "copy": "Copy",
-    "insertDoc": "Insert into Document",
-    "webLink": "Link to Web Verification",
-    "favorite": "Add to Favorites"
+    "refresh": "Обновить вид",
+    "recognize": "Распознать текст",
+    "download": "Скачать",
+    "copy": "Копировать",
+    "insertDoc": "Вставить в документ",
+    "webLink": "Ссылка на веб-проверку",
+    "favorite": "Добавить в избранное"
   },
   "projectTypes": {
-    "majorAssetRestructuring": "Listed Company Major Asset Restructuring",
-    "privatePlacement": "Listed Company Private Placement",
-    "publicPlacement": "Listed Company Public Offering",
-    "acquisition": "Listed Company Takeover",
-    "blank": "Blank Project"
+    "majorAssetRestructuring": "Крупная сделка с активами публичной компании",
+    "privatePlacement": "Частное размещение публичной компании",
+    "publicPlacement": "Публичное размещение публичной компании",
+    "acquisition": "Поглощение публичной компании",
+    "blank": "Пустой проект"
   },
   "projectFields": {
-    "listedCompanyName": "Listed Company Name",
-    "listedCompanyNamePlaceholder": "Enter the listed company's full or short name",
-    "targetCompanyName": "Target Company Name",
-    "targetCompanyNamePlaceholder": "Enter the target company's full name",
-    "projectName": "Project Name",
-    "projectNamePlaceholder": "Enter a project name",
-    "listedCompanyInfo": "Listed Company Basic Information",
-    "targetCompanyInfo": "Target Company Basic Information"
+    "listedCompanyName": "Название публичной компании",
+    "listedCompanyNamePlaceholder": "Введите полное или краткое название публичной компании",
+    "targetCompanyName": "Название целевой компании",
+    "targetCompanyNamePlaceholder": "Введите полное название целевой компании",
+    "projectName": "Название проекта",
+    "projectNamePlaceholder": "Введите название проекта",
+    "listedCompanyInfo": "Основная информация о публичной компании",
+    "targetCompanyInfo": "Основная информация о целевой компании"
   },
   "roles": {
-    "owner": "Owner",
-    "admin": "Case Admin",
-    "participant": "Collaborator",
-    "readOnly": "Read-only",
-    "client": "Client"
+    "owner": "Владелец",
+    "admin": "Администратор дела",
+    "participant": "Соисполнитель",
+    "readOnly": "Только чтение",
+    "client": "Клиент"
   },
   "roleHints": {
-    "admin": "Can edit files, add members, and manage permissions",
-    "participant": "Can edit files and submit drafts",
-    "readOnly": "View only, no editing"
+    "admin": "Может редактировать файлы, добавлять участников и управлять правами доступа",
+    "participant": "Может редактировать файлы и отправлять черновики",
+    "readOnly": "Только просмотр, без редактирования"
   },
   "memberGroups": {
-    "admin": "Owners & Case Admins",
-    "member": "Collaborators",
-    "client": "Clients"
+    "admin": "Владельцы и администраторы дела",
+    "member": "Соисполнители",
+    "client": "Клиенты"
   },
   "clipboardTypes": {
-    "text": "Text",
-    "image": "Image",
-    "file": "File",
+    "text": "Текст",
+    "image": "Изображение",
+    "file": "Файл",
     "unknown": "Неизвестно"
   },
   "variables": {
-    "searchPlaceholder": "Search variable names or content"
+    "searchPlaceholder": "Поиск по названиям или содержимому переменных"
   }
 }

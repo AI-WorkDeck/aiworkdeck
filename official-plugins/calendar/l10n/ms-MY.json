@@ -1,6 +1,6 @@
 {
   "plugin.name": "Kalendar",
-  "plugin.description": "Cross-project calendar, tasks, reminders, and file links.",
+  "plugin.description": "Kalendar merentas projek, tugasan, peringatan dan pautan fail.",
   "view.sidebar.name": "Kalendar",
   "view.main.name": "Kalendar"
 }

@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "edit": "Edit before sending",
-  "tab": "Tab to send",
-  "dismiss": "Dismiss suggestion",
-  "on": "Next message · On",
-  "off": "Next message · Off",
-  "about": "About",
-  "help": "After a reply, your current model suggests one next message, adding a small amount of model usage without reading extra attachments. Click to edit, or press Tab in the empty input to send. Acceptance, edits and dismissals are stored on this device for 30 days; recent feedback is sent to your current model with later suggestion requests in this conversation. It does not train the model or enter usage statistics."
+  "edit": "Editar antes de enviar",
+  "tab": "Pulsa Tab para enviar",
+  "dismiss": "Descartar sugerencia",
+  "on": "Siguiente mensaje · Activado",
+  "off": "Siguiente mensaje · Desactivado",
+  "about": "Acerca de",
+  "help": "Tras una respuesta, tu modelo actual sugiere un siguiente mensaje, añadiendo una pequeña cantidad de uso del modelo sin leer adjuntos adicionales. Haz clic para editar o pulsa Tab en el campo de entrada vacío para enviar. Las aceptaciones, ediciones y descartes se guardan en este dispositivo durante 30 días; los comentarios recientes se envían a tu modelo actual junto con las solicitudes de sugerencias posteriores en esta conversación. Esto no entrena el modelo ni entra en las estadísticas de uso."
 }

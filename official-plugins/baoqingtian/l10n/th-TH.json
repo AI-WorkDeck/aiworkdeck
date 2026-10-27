@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Baoqingtian · Leads & Notes",
-  "plugin.description": "Connect your Baoqingtian lawyer account to browse the case lead marketplace and manage platform notes and drafts in an independent workspace. Open a project first.",
-  "tool.baoqingtian_action.description": "Baoqingtian case leads and platform notes workspace."
+  "plugin.name": "Baoqingtian · โอกาสลูกค้าและโน้ต",
+  "plugin.description": "เชื่อมต่อบัญชีทนายความ Baoqingtian ของคุณเพื่อเรียกดูตลาดโอกาสคดีและจัดการโน้ตและฉบับร่างของแพลตฟอร์มในพื้นที่ทำงานอิสระ กรุณาเปิดโครงการก่อน",
+  "tool.baoqingtian_action.description": "พื้นที่ทำงานสำหรับโอกาสคดี Baoqingtian และโน้ตของแพลตฟอร์ม"
 }

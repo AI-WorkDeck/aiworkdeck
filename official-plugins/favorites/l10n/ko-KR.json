@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Favorites",
-  "plugin.description": "Search project favorites, copy, insert, or open sources.",
-  "view.main.name": "Favorites"
+  "plugin.name": "즐겨찾기",
+  "plugin.description": "프로젝트 즐겨찾기를 검색하고, 복사, 삽입 또는 소스를 엽니다.",
+  "view.main.name": "즐겨찾기"
 }

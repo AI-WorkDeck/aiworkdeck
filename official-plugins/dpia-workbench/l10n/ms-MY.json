@@ -1,15 +1,15 @@
 {
   "plugin.name": "DPIA Workbench",
-  "plugin.description": "Data Protection Impact Assessment: source tracing, fact confirmation, Q&A follow-up, risk & remediation, continuous re-assessment, and versioned reports. Adapted from Zhu Lingfeng's DSH DPIA Workbench; requires Node.js, Python, and LibreOffice.",
-  "plugin.author": "AI WorkDeck (Upstream: Zhu Lingfeng / The-Data-Galaxy)",
-  "setting.nodePath.label": "Node.js Executable",
-  "setting.nodePath.description": "Leave blank to use node from system PATH; requires Node.js 20 or newer.",
-  "setting.pythonPath.label": "Python Executable",
-  "setting.pythonPath.description": "Requires document dependencies from runtime/requirements.txt; can specify a Python path from a virtual environment.",
-  "setting.pdfFontPath.label": "PDF CJK Font File",
-  "setting.pdfFontPath.description": "Filling CJK text in native PDF templates requires an embeddable TrueType font (TTF/TTC); leave blank to use system font lookup.",
-  "setting.sofficePath.label": "LibreOffice Executable",
-  "setting.sofficePath.description": "Only needed for report PDF export and page preview; leave blank to try default system locations.",
-  "tool.dpia_workbench_action.description": "DPIA case, materials, fact confirmation, Q&A, run status, and report operations. For workbench UI only; AI must not invoke manual confirmation/approval entries.",
-  "tool.dpia_workbench_task.description": "Execute currently frozen DPIA tasks: context/read/write/script/commit/report; strictly scoped to the current user project and case output directory."
+  "plugin.description": "Penilaian Kesan Perlindungan Data: penjejakan sumber, pengesahan fakta, susulan soal jawab, risiko & pemulihan, penilaian semula berterusan, dan laporan berversi. Diadaptasi daripada DSH DPIA Workbench oleh Zhu Lingfeng; memerlukan Node.js, Python dan LibreOffice.",
+  "plugin.author": "AI WorkDeck (Huluan: Zhu Lingfeng / The-Data-Galaxy)",
+  "setting.nodePath.label": "Boleh Laku Node.js",
+  "setting.nodePath.description": "Biar kosong untuk menggunakan node daripada PATH sistem; memerlukan Node.js 20 atau lebih baharu.",
+  "setting.pythonPath.label": "Boleh Laku Python",
+  "setting.pythonPath.description": "Memerlukan kebergantungan dokumen daripada runtime/requirements.txt; boleh nyatakan laluan Python daripada persekitaran maya.",
+  "setting.pdfFontPath.label": "Fail Fon CJK PDF",
+  "setting.pdfFontPath.description": "Mengisi teks CJK dalam templat PDF asal memerlukan fon TrueType yang boleh disemat (TTF/TTC); biar kosong untuk menggunakan carian fon sistem.",
+  "setting.sofficePath.label": "Boleh Laku LibreOffice",
+  "setting.sofficePath.description": "Hanya diperlukan untuk eksport laporan PDF dan pratonton halaman; biar kosong untuk mencuba lokasi lalai sistem.",
+  "tool.dpia_workbench_action.description": "Operasi kes DPIA, bahan, pengesahan fakta, soal jawab, status pelaksanaan dan laporan. Untuk UI workbench sahaja; AI tidak boleh memanggil entri pengesahan/kelulusan manual.",
+  "tool.dpia_workbench_task.description": "Laksanakan tugas DPIA yang dibekukan semasa: context/read/write/script/commit/report; skop terhad secara ketat kepada projek pengguna semasa dan direktori output kes."
 }

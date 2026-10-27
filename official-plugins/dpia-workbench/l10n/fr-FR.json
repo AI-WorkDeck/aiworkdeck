@@ -1,7 +1,7 @@
 {
   "plugin.name": "Atelier DPIA",
   "plugin.description": "Évaluation d'impact sur la protection des données : traçabilité des sources, confirmation des faits, questions-réponses de suivi, risques et remédiation, réévaluation continue et rapports versionnés. Adapté de l'atelier DPIA DSH de Zhu Lingfeng ; nécessite Node.js, Python et LibreOffice.",
-  "plugin.author": "AI WorkDeck (En amont : Zhu Lingfeng / The-Data-Galaxy)",
+  "plugin.author": "AI WorkDeck (Amont : Zhu Lingfeng / The-Data-Galaxy)",
   "setting.nodePath.label": "Exécutable Node.js",
   "setting.nodePath.description": "Laissez vide pour utiliser le nœud du PATH système ; nécessite Node.js 20 ou plus récent.",
   "setting.pythonPath.label": "Exécutable Python",

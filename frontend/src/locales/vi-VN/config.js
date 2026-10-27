@@ -3,73 +3,73 @@
 
 export default {
   "sidebar": {
-    "projectHome": "Project Overview",
+    "projectHome": "Tổng quan dự án",
     "projects": "Dự án",
-    "files": "Explorer",
-    "ddFiles": "Due Diligence Files",
-    "market": "Extensions",
-    "dev": "Plugin Development",
-    "voice": "Voice",
-    "meetingRecorder": "Meeting Recording",
-    "litigationVisual": "Litigation Visualization",
+    "files": "Trình khám phá",
+    "ddFiles": "Tệp thẩm định thực trạng",
+    "market": "Tiện ích mở rộng",
+    "dev": "Phát triển plugin",
+    "voice": "Giọng nói",
+    "meetingRecorder": "Ghi âm cuộc họp",
+    "litigationVisual": "Trực quan hóa tranh chấp",
     "tmeet": "Tencent Meeting",
-    "search": "Search",
-    "tts": "Text to Speech",
-    "desensitize": "File Redaction",
+    "search": "Tìm kiếm",
+    "tts": "Chuyển văn bản thành giọng nói",
+    "desensitize": "Che giấu thông tin tệp",
     "version": "Version History",
-    "calendar": "Calendar"
+    "calendar": "Lịch"
   },
   "tools": {
-    "variables": "Variable Library",
-    "favorites": "Favorites",
-    "clipboard": "Clipboard"
+    "variables": "Thư viện biến",
+    "favorites": "Mục yêu thích",
+    "clipboard": "Bộ nhớ tạm"
   },
   "fileActions": {
-    "move": "Move",
-    "cut": "Cut",
-    "copy": "Copy",
+    "move": "Di chuyển",
+    "cut": "Cắt",
+    "copy": "Sao chép",
     "delete": "Xóa",
     "cancel": "Hủy",
-    "newFile": "New File",
-    "newFolder": "New Folder",
+    "newFile": "Tệp mới",
+    "newFolder": "Thư mục mới",
     "sort": "Sắp xếp"
   },
   "ocr": {
-    "refresh": "Refresh View",
-    "recognize": "Recognize Text",
-    "download": "Download",
-    "copy": "Copy",
-    "insertDoc": "Insert into Document",
-    "webLink": "Link to Web Verification",
-    "favorite": "Add to Favorites"
+    "refresh": "Làm mới chế độ xem",
+    "recognize": "Nhận dạng văn bản",
+    "download": "Tải xuống",
+    "copy": "Sao chép",
+    "insertDoc": "Chèn vào tài liệu",
+    "webLink": "Liên kết xác minh web",
+    "favorite": "Thêm vào mục yêu thích"
   },
   "projectTypes": {
-    "majorAssetRestructuring": "Listed Company Major Asset Restructuring",
-    "privatePlacement": "Listed Company Private Placement",
-    "publicPlacement": "Listed Company Public Offering",
-    "acquisition": "Listed Company Takeover",
-    "blank": "Blank Project"
+    "majorAssetRestructuring": "Tái cấu trúc tài sản lớn của công ty niêm yết",
+    "privatePlacement": "Chào bán riêng lẻ của công ty niêm yết",
+    "publicPlacement": "Chào bán công khai của công ty niêm yết",
+    "acquisition": "Mua bán toàn bộ công ty niêm yết",
+    "blank": "Dự án trống"
   },
   "projectFields": {
-    "listedCompanyName": "Listed Company Name",
-    "listedCompanyNamePlaceholder": "Enter the listed company's full or short name",
-    "targetCompanyName": "Target Company Name",
-    "targetCompanyNamePlaceholder": "Enter the target company's full name",
-    "projectName": "Project Name",
-    "projectNamePlaceholder": "Enter a project name",
-    "listedCompanyInfo": "Listed Company Basic Information",
-    "targetCompanyInfo": "Target Company Basic Information"
+    "listedCompanyName": "Tên công ty niêm yết",
+    "listedCompanyNamePlaceholder": "Nhập tên đầy đủ hoặc tên viết tắt của công ty niêm yết",
+    "targetCompanyName": "Tên công ty mục tiêu",
+    "targetCompanyNamePlaceholder": "Nhập tên đầy đủ của công ty mục tiêu",
+    "projectName": "Tên dự án",
+    "projectNamePlaceholder": "Nhập tên dự án",
+    "listedCompanyInfo": "Thông tin cơ bản của công ty niêm yết",
+    "targetCompanyInfo": "Thông tin cơ bản của công ty mục tiêu"
   },
   "roles": {
-    "owner": "Owner",
-    "admin": "Case Admin",
-    "participant": "Collaborator",
-    "readOnly": "Read-only",
-    "client": "Client"
+    "owner": "Chủ sở hữu",
+    "admin": "Quản trị vụ việc",
+    "participant": "Cộng tác viên",
+    "readOnly": "Chỉ xem",
+    "client": "Khách hàng"
   },
   "roleHints": {
-    "admin": "Can edit files, add members, and manage permissions",
-    "participant": "Can edit files and submit drafts",
+    "admin": "Có thể chỉnh sửa tệp, thêm thành viên và quản lý quyền hạn",
+    "participant": "Có thể chỉnh sửa tệp và nộp bản dự thảo",
     "readOnly": "Chỉ xem, không chỉnh sửa"
   },
   "memberGroups": {

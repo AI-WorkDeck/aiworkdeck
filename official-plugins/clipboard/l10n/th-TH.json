@@ -1,5 +1,5 @@
 {
   "plugin.name": "คลิปบอร์ด",
-  "plugin.description": "Search clipboard history, copy, and insert content.",
+  "plugin.description": "ค้นหาประวัติคลิปบอร์ด คัดลอก และแทรกเนื้อหา",
   "view.main.name": "คลิปบอร์ด"
 }

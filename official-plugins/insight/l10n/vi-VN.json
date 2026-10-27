@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Evidence & Insight",
-  "plugin.description": "Document evidence retrieval, consistency verification, and contract review.",
-  "view.main.name": "Evidence & Insight"
+  "plugin.name": "Bằng chứng & Thông tin chi tiết",
+  "plugin.description": "Truy xuất bằng chứng tài liệu, xác minh tính nhất quán và rà soát hợp đồng.",
+  "view.main.name": "Bằng chứng & Thông tin chi tiết"
 }

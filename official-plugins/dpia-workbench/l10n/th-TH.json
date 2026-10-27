@@ -1,15 +1,15 @@
 {
   "plugin.name": "DPIA Workbench",
-  "plugin.description": "Data Protection Impact Assessment: source tracing, fact confirmation, Q&A follow-up, risk & remediation, continuous re-assessment, and versioned reports. Adapted from Zhu Lingfeng's DSH DPIA Workbench; requires Node.js, Python, and LibreOffice.",
-  "plugin.author": "AI WorkDeck (Upstream: Zhu Lingfeng / The-Data-Galaxy)",
-  "setting.nodePath.label": "Node.js Executable",
-  "setting.nodePath.description": "Leave blank to use node from system PATH; requires Node.js 20 or newer.",
-  "setting.pythonPath.label": "Python Executable",
-  "setting.pythonPath.description": "Requires document dependencies from runtime/requirements.txt; can specify a Python path from a virtual environment.",
-  "setting.pdfFontPath.label": "PDF CJK Font File",
-  "setting.pdfFontPath.description": "Filling CJK text in native PDF templates requires an embeddable TrueType font (TTF/TTC); leave blank to use system font lookup.",
-  "setting.sofficePath.label": "LibreOffice Executable",
-  "setting.sofficePath.description": "Only needed for report PDF export and page preview; leave blank to try default system locations.",
-  "tool.dpia_workbench_action.description": "DPIA case, materials, fact confirmation, Q&A, run status, and report operations. For workbench UI only; AI must not invoke manual confirmation/approval entries.",
-  "tool.dpia_workbench_task.description": "Execute currently frozen DPIA tasks: context/read/write/script/commit/report; strictly scoped to the current user project and case output directory."
+  "plugin.description": "การประเมินผลกระทบด้านการคุ้มครองข้อมูล: การตรวจสอบแหล่งที่มา การยืนยันข้อเท็จจริง การถาม-ตอบตามข้อซักถาม ความเสี่ยงและการแก้ไข การประเมินซ้ำอย่างต่อเนื่อง และรายงานแบบมีเวอร์ชัน ดัดแปลงจาก DSH DPIA Workbench ของ Zhu Lingfeng; ต้องใช้ Node.js, Python และ LibreOffice",
+  "plugin.author": "AI WorkDeck (ต้นทาง: Zhu Lingfeng / The-Data-Galaxy)",
+  "setting.nodePath.label": "ไฟล์ปฏิบัติการ Node.js",
+  "setting.nodePath.description": "เว้นว่างไว้เพื่อใช้ node จาก PATH ของระบบ; ต้องใช้ Node.js เวอร์ชัน 20 ขึ้นไป",
+  "setting.pythonPath.label": "ไฟล์ปฏิบัติการ Python",
+  "setting.pythonPath.description": "ต้องใช้ไลบรารีเอกสารจาก runtime/requirements.txt; สามารถระบุพาธ Python จากสภาพแวดล้อมเสมือนได้",
+  "setting.pdfFontPath.label": "ไฟล์ฟอนต์ CJK สำหรับ PDF",
+  "setting.pdfFontPath.description": "การกรอกข้อความ CJK ลงในเทมเพลต PDF แบบเนทีฟต้องใช้ฟอนต์ TrueType แบบฝังได้ (TTF/TTC); เว้นว่างไว้เพื่อใช้การค้นหาฟอนต์ของระบบ",
+  "setting.sofficePath.label": "ไฟล์ปฏิบัติการ LibreOffice",
+  "setting.sofficePath.description": "จำเป็นเฉพาะสำหรับการส่งออกรายงานเป็น PDF และตัวอย่างหน้าเอกสาร; เว้นว่างไว้เพื่อลองตำแหน่งเริ่มต้นของระบบ",
+  "tool.dpia_workbench_action.description": "การดำเนินการเกี่ยวกับเคส DPIA วัสดุ การยืนยันข้อเท็จจริง คำถาม-คำตอบ สถานะการรัน และรายงาน สำหรับ UI ของเวิร์กเบนช์เท่านั้น; AI ต้องไม่เรียกใช้รายการยืนยัน/อนุมัติด้วยตนเอง",
+  "tool.dpia_workbench_task.description": "ดำเนินการงาน DPIA ที่ถูกตรึงไว้ในปัจจุบัน: context/read/write/script/commit/report; จำกัดอย่างเคร่งครัดเฉพาะโปรเจกต์ผู้ใช้ปัจจุบันและไดเรกทอรีผลลัพธ์ของเคส"
 }
