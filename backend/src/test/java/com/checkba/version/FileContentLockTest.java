@@ -12,6 +12,8 @@ class FileContentLockTest {
     @Test void nestedLocalProjectsShareTheExistingLockWhileManagedProjectsRemainIndependent() throws Exception {
         var repo = mock(ProjectRepoService.class);
         when(repo.hasLocalRoot(7L)).thenReturn(true); when(repo.hasLocalRoot(8L)).thenReturn(true);
+        when(repo.workTree(7L)).thenReturn(java.nio.file.Path.of(System.getProperty("java.io.tmpdir"), "parent"));
+        when(repo.workTree(8L)).thenReturn(java.nio.file.Path.of(System.getProperty("java.io.tmpdir"), "parent", "child"));
         var sessions = new WorkSessionService(repo, null, null, null, null, null);
         ExecutorService pool = Executors.newFixedThreadPool(2);
         CountDownLatch entered = new CountDownLatch(1);
