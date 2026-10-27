@@ -5,7 +5,6 @@
   const $ = (id) => document.getElementById(id);
   const copy = {
     zh: {
-      refreshList: '刷新', selectMeeting: '选择一场会议', backToList: '返回列表', meetingCount: '场会议', connectInSidebar: '请在左侧连接腾讯会议', loadingList: '正在读取会议列表…', loadingDetail: '正在读取会议内容…', syncing: '正在同步会议…', exporting: '正在保存会议材料…', preparingAi: '正在准备会议材料并交给 AI…',
       logoutWarning: '退出将清除本机共享的腾讯会议 CLI 授权，其他使用它的应用也需要重新登录。', confirmLogout: '确认退出本机登录', cancel: '取消', incomplete: '会议材料尚未完整读取，暂不能导出或交给 AI。请重新打开会议重试。', detailErrors: '未完成的读取：', title: '腾讯会议', subtitle: '连接会议记录，把讨论带回项目。', connection: '连接',
       localCli: '需要本机安装腾讯会议 tmeet CLI。登录凭据由 CLI 保存在本机。', refresh: '检查连接', login: '登录授权', resumeLogin: '继续授权', logout: '退出登录',
       originalLogin: '授权仍在原浏览器中进行，请切回原授权页完成。这里会自动更新；如已关闭原页面，请等待此次授权结束后重新点击“登录授权”。',
@@ -25,7 +24,6 @@
       synced: '同步完成，会议数：', loggedOut: '已退出腾讯会议登录。', badExport: '会议材料未能保存，尚未发送到 AI 对话。', timedOut: '处理仍未完成，已停止等待。请稍后检查会议列表。'
     },
     en: {
-      refreshList: 'Refresh', selectMeeting: 'Select a meeting', backToList: 'Back to meetings', meetingCount: 'meetings', connectInSidebar: 'Connect Tencent Meeting in the sidebar', loadingList: 'Loading meetings…', loadingDetail: 'Loading meeting content…', syncing: 'Syncing meetings…', exporting: 'Saving meeting material…', preparingAi: 'Preparing meeting material for AI…',
       logoutWarning: 'Signing out clears the shared Tencent Meeting CLI authorization on this computer. Other applications using it will also need to sign in again.', confirmLogout: 'Confirm sign out on this computer', cancel: 'Cancel', incomplete: 'Meeting material is incomplete. Export and AI actions are unavailable. Reopen the meeting to retry.', detailErrors: 'Incomplete reads: ', title: 'Tencent Meeting', subtitle: 'Bring meeting records into your project.', connection: 'Connection',
       localCli: 'Requires the Tencent Meeting tmeet CLI on this computer. Login credentials stay with the local CLI.', refresh: 'Check connection', login: 'Authorize login', resumeLogin: 'Continue authorization', logout: 'Sign out',
       originalLogin: 'Authorization is still running in the original browser page. Complete it there and this view will update. If that page was closed, wait for this attempt to finish, then click Authorize login again.',
@@ -45,9 +43,9 @@
       synced: 'Sync complete. Meetings: ', loggedOut: 'Signed out of Tencent Meeting.', badExport: 'Meeting material could not be saved. Nothing was sent to AI chat.', timedOut: 'Processing has not finished. Waiting stopped; check the meeting list again later.'
     }
   };
-  let context = {}, language = 'zh', epoch = 0, busy = false, status = null, meetings = [], selected = null;
+  let context = {}, language = 'zh', locale = 'zh-CN', epoch = 0, busy = false, status = null, meetings = [], selected = null;
   let loginTimer = null, loginAttempts = 0, loginEpoch = 0, statusRequest = null;
-  const t = (key) => copy[language][key];
+  const t = (key) => window.AWD_TMEET_L10N[locale]?.['panel.' + key] ?? window.AWD_TMEET_L10N['en-US']?.['panel.' + key] ?? copy[language][key];
   const value = (input) => typeof input === 'string' || typeof input === 'number' ? String(input) : '';
   const stale = () => Object.assign(new Error('stale'), { stale: true });
   function feedback(message, error = false) { $('feedback').textContent = message; $('feedback').dataset.error = String(error); }
@@ -293,9 +291,12 @@
     }, 'preparingAi'));
   }
   function setContext(data) {
-    context = data || {}; language = String(context.language).startsWith('en') ? 'en' : 'zh';
+    context = data || {};
+    locale = Object.hasOwn(window.AWD_TMEET_L10N, context.language) ? context.language : 'en-US';
+    if (!context.language) locale = 'zh-CN';
+    language = locale.startsWith('zh') ? 'zh' : 'en';
     document.body.dataset.surface = ['sidebar', 'workspace'].includes(context.surface) ? context.surface : 'combined';
-    document.documentElement.lang = language === 'en' ? 'en-US' : 'zh-CN'; document.title = t('title') + ' · AI WorkDeck';
+    document.documentElement.lang = locale; document.documentElement.dir = locale === 'ar-SA' ? 'rtl' : 'ltr'; document.title = t('title') + ' · AI WorkDeck';
     document.querySelectorAll('[data-i18n]').forEach((element) => { element.textContent = t(element.dataset.i18n); });
     $('workspace').setAttribute('aria-label', t('title')); $('meeting-browser').setAttribute('aria-label', t('recordings'));
     $('search').placeholder = t('search'); $('search').setAttribute('aria-label', t('search'));
