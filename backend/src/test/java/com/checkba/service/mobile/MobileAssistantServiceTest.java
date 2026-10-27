@@ -144,6 +144,8 @@ class MobileAssistantServiceTest {
         enable();var file=source("原资料");service.snapshot(user,snapshot("资料"));file.setSha256("b".repeat(64));backups.saveAndFlush(file);
         assertEquals("stale",service.search(user,"").get(0).get("status"));
         directories.deleteAll(directories.findByUserIdAndDeviceId(user,device));assertTrue(service.search(user,"").isEmpty());
+        var cleanup=service.cleanupCandidates(user);
+        assertEquals(1,cleanup.size());assertEquals(key,cleanup.get(0).get("projectKey"));
     }
     @Test void idempotentChatDoesNotChargeTwiceAndRejectsRequestIdReuse() {
         enable();var request=chat("你好");var first=service.chat(user,request);assertEquals(first,service.chat(user,request));

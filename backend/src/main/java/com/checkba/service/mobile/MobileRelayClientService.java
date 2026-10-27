@@ -774,29 +774,39 @@ public class MobileRelayClientService {
                     .put("timeZone", java.time.ZoneId.systemDefault().getId())
                     .put("sourceUpdatedAt", java.time.Instant.now().toString());
             ArrayNode events = body.putArray("events");
-            boolean truncated = false;
+            List<Map.Entry<Long, Map<String, Object>>> tasks = new ArrayList<>();
             for (Project project : projects) {
                 for (Map<String, Object> task : mobileTasks.listByProject(project.getId(), null, null)) {
-                    if (events.size() >= 5000) {
-                        truncated = true;
-                        break;
-                    }
-                    ObjectNode event = events.addObject().put("projectKey", project.getId().toString())
-                            .put("taskId", String.valueOf(task.get("id"))).put("title", String.valueOf(task.get("title")))
-                            .put("dueDate", String.valueOf(task.get("dueDate"))).put("status", String.valueOf(task.get("status")));
-                    if (task.get("dueTime") != null) event.put("dueTime", task.get("dueTime").toString());
-                    if (task.get("remindBefore") instanceof Number n) event.put("remindBefore", n.intValue());
-                    ArrayNode files = event.putArray("files");
-                    if (task.get("files") instanceof List<?> linked) for (Object raw : linked) {
-                        if (raw instanceof Map<?, ?> file && file.get("fileId") != null)
-                            files.addObject().put("fileId", file.get("fileId").toString())
-                                    .put("fileName", Objects.toString(file.get("fileName"), ""));
-                    }
+                    tasks.add(Map.entry(project.getId(), task));
+                }
+            }
+            tasks.sort((a, b) -> {
+                int status = Boolean.compare("DONE".equals(a.getValue().get("status")), "DONE".equals(b.getValue().get("status")));
+                if (status != 0) return status;
+                int due = Objects.toString(a.getValue().get("dueDate"), "9999-12-31").compareTo(Objects.toString(b.getValue().get("dueDate"), "9999-12-31"));
+                return due != 0 ? due : Objects.toString(a.getValue().get("id"), "").compareTo(Objects.toString(b.getValue().get("id"), ""));
+            });
+            boolean truncated = false;
+            for (Map.Entry<Long, Map<String, Object>> task : tasks) {
+                if (events.size() >= 5000) {
+                    truncated = true;
+                    break;
+                }
+                ObjectNode event = events.addObject().put("projectKey", task.getKey().toString())
+                        .put("taskId", String.valueOf(task.getValue().get("id"))).put("title", String.valueOf(task.getValue().get("title")))
+                        .put("dueDate", String.valueOf(task.getValue().get("dueDate"))).put("status", String.valueOf(task.getValue().get("status")));
+                if (task.getValue().get("dueTime") != null) event.put("dueTime", task.getValue().get("dueTime").toString());
+                if (task.getValue().get("remindBefore") instanceof Number n) event.put("remindBefore", n.intValue());
+                ArrayNode files = event.putArray("files");
+                if (task.getValue().get("files") instanceof List<?> linked) for (Object raw : linked) {
+                    if (raw instanceof Map<?, ?> file && file.get("fileId") != null)
+                        files.addObject().put("fileId", file.get("fileId").toString())
+                                .put("fileName", Objects.toString(file.get("fileName"), ""));
                 }
             }
             body.put("truncated", truncated);
             if (truncated) log.warn("Mobile calendar snapshot limited to 5000 tasks");
-            // Publish only a complete read. A failed project read must not erase the previous snapshot.
+            // Publish only a fully read, explicitly capped snapshot. Failed reads never erase prior data.
             workspaceJson(session, "PUT", "/api/mobile/calendar/snapshots", body);
         } catch (Exception e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
@@ -814,9 +824,9 @@ public class MobileRelayClientService {
                     || !status.path("backupEnabled").asBoolean()) return;
             List<Project> projects = mobileWorkspaceProjects();
             if (projects.isEmpty()) return;
-            // Read the old summary set before replacing the directory, or deleted projects can
-            // no longer be found for cleanup. The local-empty guard above remains unchanged.
-            JsonNode summaries = workspaceJson(session, "GET", "/api/mobile/assistant/summaries", null);
+            // Cleanup candidates intentionally include summaries already hidden by the current
+            // directory, so an independently scheduled directory push cannot strand deleted projects.
+            JsonNode summaries = workspaceJson(session, "GET", "/api/mobile/assistant/summaries?includeRemoved=true", null);
             projects = pushWorkspaceDirectory(session, projects);
             requireCatalogAccountScope(session.scope());
             Set<String> keys = projects.stream().map(p -> p.getId().toString()).collect(java.util.stream.Collectors.toSet());
