@@ -29,6 +29,20 @@ class SensitiveChineseNameRecognitionTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"被告一", "被告二", "原告十二", "被告1", "被告 ２", "被告（一）", "被告(2)",
+            "第一被告", "第2原告", "申请人一", "被申请人二", "上诉人1", "被上诉人（二）"})
+    void numberedPartyFieldsRecognizeOnlyTheName(String label) {
+        String text = label + "：陈安平\n住址：成都市武侯区锦华路28号春和园2栋608房";
+        var engine = new SensitiveTextEngine(List.of("CHINESE_NAME"), true, List.of(), List.of());
+        String output = engine.apply(text);
+        assertFalse(output.contains("陈安平"), output);
+        assertTrue(output.startsWith(label + "：[[中文姓名"), output);
+        assertTrue(output.endsWith("\n住址：成都市武侯区锦华路28号春和园2栋608房"));
+        assertEquals(1, engine.counts().get("CHINESE_NAME"));
+        assertEquals(text, SensitiveTextEngine.apply(output, SensitiveTextEngine.restoreEdits(output, engine.recovery())));
+    }
+
+    @ParameterizedTest
     @MethodSource("surnameContexts")
     void surnameAndContextCombinations(String text, String name) {
         detectsNamesWithoutCustomInput(text, name);
@@ -59,6 +73,7 @@ class SensitiveChineseNameRecognitionTest {
     @ValueSource(strings = {
         "本合同由甲方北京市朝阳区某科技有限公司与乙方签订，被告应于判决生效之日起十日内履行。",
         "双方应当履行合同。乙方应当。被告申请。原告请求。",
+        "被告一：申请延期。被告二：公司。原告1：待填写。第一被告：陈述意见。",
         "姓名：待填写。联系人：暂无。负责人：待定。",
         "甲方：有限公司。乙方：公司。原告：申请人。",
         "法定代表人签字。负责人签名。联系人信息。姓名不得为空。",
