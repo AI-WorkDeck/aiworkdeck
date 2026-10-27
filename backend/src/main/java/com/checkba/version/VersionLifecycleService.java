@@ -217,7 +217,9 @@ public class VersionLifecycleService {
             Files.walkFileTree(root, new SimpleFileVisitor<>() {
                 @Override
                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-                    return ".awd".equals(String.valueOf(dir.getFileName()))
+                    if (dir.equals(root)) return FileVisitResult.CONTINUE;
+                    String dirName = String.valueOf(dir.getFileName());
+                    return ".awd".equals(dirName) || com.checkba.service.LocalProjectService.isIgnoredDirectoryName(dirName)
                             ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
                 }
 

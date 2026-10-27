@@ -727,4 +727,161 @@ class LocalProjectServiceTest {
         assertTrue(e.getMessage().contains("嵌套"));
         assertFalse(Files.exists(nested));
     }
+
+    // ---- dev-board#1427：大型本地文件夹性能优化与并发去重自愈 ----
+
+    @Test
+    void skipsHeavyDependencyDirectoriesLikeNodeModules(@TempDir Path folder) throws Exception {
+        Files.createDirectories(folder.resolve("01-业务合同"));
+        Files.writeString(folder.resolve("01-业务合同/主合同.docx"), "ok");
+        Files.createDirectories(folder.resolve("node_modules/pkg/sub"));
+        Files.writeString(folder.resolve("node_modules/pkg/sub/index.js"), "console.log(1)");
+        Files.createDirectories(folder.resolve("01-业务合同/__pycache__"));
+        Files.writeString(folder.resolve("01-业务合同/__pycache__/mod.pyc"), "bytecode");
+        Files.createDirectories(folder.resolve("venv/lib/site-packages"));
+        Files.writeString(folder.resolve("venv/lib/site-packages/pip.py"), "pip");
+
+        LocalProjectService.OpenLocalResult r = svc.openLocalFolder(folder.toString(), false, null, null, 1L);
+        List<ProjectFile> rows = projectFileRepository.findByProjectId(r.project().getId());
+
+        assertEquals(2, rows.size(), "只应导入 01-业务合同 与 主合同.docx，跳过 node_modules/__pycache__/venv: " + rows);
+        assertNotNull(live(rows, "01-业务合同"));
+        assertNotNull(live(rows, "主合同.docx"));
+        assertNull(live(rows, "node_modules"));
+        assertNull(live(rows, "__pycache__"));
+        assertNull(live(rows, "venv"));
+    }
+
+    @Test
+    void breadthFirstImportPrioritizesTopLevelFoldersOverDeepSubtrees(@TempDir Path folder) throws Exception {
+        svc.setMaxImportEntriesForTest(10);
+        // 01-早目录 底下塞 30 个深层文件；若按深度优先遍历，02~08 顶层文件夹会被全部截断饿死
+        Path earlyDeep = Files.createDirectories(folder.resolve("01-早目录/deep"));
+        for (int i = 0; i < 30; i++) {
+            Files.writeString(earlyDeep.resolve("f" + i + ".txt"), "x");
+        }
+        for (int i = 2; i <= 8; i++) {
+            Files.createDirectories(folder.resolve(String.format("0%d-顶层目录", i)));
+        }
+
+        LocalProjectService.OpenLocalResult r = svc.openLocalFolder(folder.toString(), false, null, null, 1L);
+        assertTrue(r.truncated());
+        List<ProjectFile> rows = projectFileRepository.findByProjectId(r.project().getId());
+        for (int i = 1; i <= 8; i++) {
+            String expectedTopFolder = i == 1 ? "01-早目录" : String.format("0%d-顶层目录", i);
+            assertNotNull(live(rows, expectedTopFolder), "广度优先导入必须优先保住全部根级目录: 缺少 " + expectedTopFolder);
+        }
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void concurrentOpenLocalFolderDoesNotCreateDuplicateRows(@TempDir Path folder) throws Exception {
+        for (int i = 1; i <= 6; i++) {
+            Path sub = Files.createDirectories(folder.resolve("目录-" + i));
+            Files.writeString(sub.resolve("文档-" + i + ".docx"), "content-" + i);
+        }
+
+        int threads = 4;
+        java.util.concurrent.CountDownLatch startGate = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
+        List< java.util.concurrent.Future<LocalProjectService.OpenLocalResult>> futures = new ArrayList<>();
+        for (int t = 0; t < threads; t++) {
+            futures.add(pool.submit(() -> {
+                startGate.await();
+                return svc.openLocalFolder(folder.toString(), false, null, null, 1L);
+            }));
+        }
+        startGate.countDown();
+        Long projectId = null;
+        for (var f : futures) {
+            LocalProjectService.OpenLocalResult res = f.get();
+            if (projectId == null) projectId = res.project().getId();
+            assertEquals(projectId, res.project().getId());
+        }
+        pool.shutdown();
+
+        List<ProjectFile> rows = projectFileRepository.findByProjectId(projectId).stream()
+                .filter(f -> !Boolean.TRUE.equals(f.getIsDeleted()))
+                .toList();
+        assertEquals(12, rows.size(), "并发打开同一文件夹绝不能产生重复目录或文件行: " + rows);
+    }
+
+    @Test
+    void healsPreExistingDuplicateFoldersAndIgnoredDirectoryRows(@TempDir Path folder) throws Exception {
+        Files.createDirectories(folder.resolve("15-境外工作台"));
+        Files.writeString(folder.resolve("15-境外工作台/协议.docx"), "abc");
+        Files.createDirectories(folder.resolve("node_modules/pkg"));
+        Files.writeString(folder.resolve("node_modules/pkg/index.js"), "js");
+
+        Long pid = svc.openLocalFolder(folder.toString(), false, null, null, 1L).project().getId();
+        ProjectFile canonicalDir = live(projectFileRepository.findByProjectId(pid), "15-境外工作台");
+        assertNotNull(canonicalDir);
+
+        // 模拟修复前因并发与未过滤依赖而残留在库里的脏数据：
+        // 1) 第二个同名顶层文件夹 15-境外工作台，且某个子文件挂在重复文件夹下；
+        // 2) 已入库的 node_modules 目录及子文件。
+        ProjectFile dupDir = new ProjectFile();
+        dupDir.setProjectId(pid);
+        dupDir.setParentId(null);
+        dupDir.setIsFolder(true);
+        dupDir.setName("15-境外工作台");
+        dupDir.setSortOrder(99);
+        dupDir.setUserId(1L);
+        dupDir.setIsDeleted(false);
+        dupDir = projectFileRepository.save(dupDir);
+
+        ProjectFile childUnderDup = live(projectFileRepository.findByProjectId(pid), "协议.docx");
+        childUnderDup.setParentId(dupDir.getId());
+        projectFileRepository.save(childUnderDup);
+
+        ProjectFile pollutedNodeModules = new ProjectFile();
+        pollutedNodeModules.setProjectId(pid);
+        pollutedNodeModules.setParentId(null);
+        pollutedNodeModules.setIsFolder(true);
+        pollutedNodeModules.setName("node_modules");
+        pollutedNodeModules.setSortOrder(100);
+        pollutedNodeModules.setUserId(1L);
+        pollutedNodeModules.setIsDeleted(false);
+        pollutedNodeModules = projectFileRepository.save(pollutedNodeModules);
+
+        ProjectFile pollutedJs = new ProjectFile();
+        pollutedJs.setProjectId(pid);
+        pollutedJs.setParentId(pollutedNodeModules.getId());
+        pollutedJs.setIsFolder(false);
+        pollutedJs.setName("index.js");
+        pollutedJs.setFilePath("projects/" + pid + "/node_modules/pkg/index.js");
+        pollutedJs.setSortOrder(0);
+        pollutedJs.setUserId(1L);
+        pollutedJs.setIsDeleted(false);
+        projectFileRepository.save(pollutedJs);
+
+        // 重新打开/对账时自动自愈
+        svc.openLocalFolder(folder.toString(), false, null, null, 1L);
+
+        List<ProjectFile> healed = projectFileRepository.findByProjectId(pid);
+        List<ProjectFile> dirs = healed.stream()
+                .filter(f -> "15-境外工作台".equals(f.getName()) && !Boolean.TRUE.equals(f.getIsDeleted()))
+                .toList();
+        assertEquals(1, dirs.size(), "重复的 15-境外工作台 顶层目录必须被合并为唯一一条: " + dirs);
+        assertEquals(canonicalDir.getId(), dirs.get(0).getId());
+        ProjectFile healedChild = live(healed, "协议.docx");
+        assertNotNull(healedChild);
+        assertEquals(canonicalDir.getId(), healedChild.getParentId(), "原本挂在重复目录上的子文件应归并到主目录");
+        assertTrue(healed.stream().noneMatch(f -> "node_modules".equals(f.getName()) || "index.js".equals(f.getName())),
+                "历史入库的 node_modules 及其子孙应从索引清理: " + healed);
+        assertTrue(Files.exists(folder.resolve("node_modules/pkg/index.js")), "清理索引绝不删除磁盘上的文件");
+    }
+
+    @Test
+    void isIgnoredWatchPathFiltersNestedDotAndDependencyDirs(@TempDir Path root) {
+        assertTrue(LocalProjectService.isIgnoredWatchPath(root, root.resolve(".awd/tree.json")));
+        assertTrue(LocalProjectService.isIgnoredWatchPath(root, root.resolve(".git/index.lock")));
+        assertTrue(LocalProjectService.isIgnoredWatchPath(root, root.resolve("sub/node_modules/pkg/index.js")));
+        assertTrue(LocalProjectService.isIgnoredWatchPath(root, root.resolve("sub/__pycache__/a.pyc")));
+        assertTrue(LocalProjectService.isIgnoredWatchPath(root, root.resolve("sub/~$合同.docx")));
+        assertTrue(LocalProjectService.isIgnoredWatchPath(root, root.resolve(".DS_Store")));
+        assertFalse(LocalProjectService.isIgnoredWatchPath(root, root.resolve("sub/合同.docx")));
+        assertFalse(LocalProjectService.isIgnoredWatchPath(root, null));
+    }
 }
