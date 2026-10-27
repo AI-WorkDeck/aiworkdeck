@@ -17,7 +17,7 @@ public class MobileCalendarController {
         return id;
     }
     public record Settings(Boolean enabled,String consentVersion) {}
-    public record Snapshot(String deviceId,String timeZone,String sourceUpdatedAt,List<Map<String,Object>> events) {}
+    public record Snapshot(String deviceId,String timeZone,String sourceUpdatedAt,List<Map<String,Object>> events,Boolean truncated) {}
     @GetMapping("/events") public Map<String,Object> events(@RequestHeader(value="X-Session-Id",required=false) String session) {
         return Map.of("code",0,"data",calendar.events(user(session)));
     }
@@ -29,6 +29,6 @@ public class MobileCalendarController {
         return Map.of("code",0,"data",calendar.settings(user(session),request.enabled(),request.consentVersion()));
     }
     @PutMapping("/snapshots") public Map<String,Object> snapshot(@RequestHeader(value="X-Session-Id",required=false) String session,@RequestBody Snapshot request) {
-        return Map.of("code",0,"data",calendar.replace(user(session),request.deviceId(),request.timeZone(),request.sourceUpdatedAt(),request.events()));
+        return Map.of("code",0,"data",calendar.replace(user(session),request.deviceId(),request.timeZone(),request.sourceUpdatedAt(),request.events(),Boolean.TRUE.equals(request.truncated())));
     }
 }

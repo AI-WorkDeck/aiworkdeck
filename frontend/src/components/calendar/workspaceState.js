@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { addDaysKey, localDateKey, isDone, compareDue } from './taskUtils.js'
+import { writableProjects } from '../../utils/personalCollections.js'
 
 export const CALENDAR_VIEWS = ['timeGridDay', 'timeGridWeek', 'dayGridMonth', 'year', 'listMonth']
 export function createCalendarWorkspaceState() {
@@ -32,6 +33,14 @@ export function patchCalendarWorkspaceState(current, patch = {}) {
 export function upcomingTasks(tasks, today, days) {
   const end = addDaysKey(today, days === 5 ? 5 : 3)
   return tasks.filter(task => !isDone(task) && task.dueDate >= today && task.dueDate < end).slice().sort(compareDue)
+}
+
+export function calendarCreateProjectId({ mode, filterProjectIds, scopedProjectId, projects }) {
+  if (mode !== 'create') return scopedProjectId
+  const candidate = filterProjectIds.length === 1 ? filterProjectIds[0] : scopedProjectId
+  if (candidate === null || candidate === '') return candidate
+  const project = (Array.isArray(projects) ? projects : []).find(item => String(item?.id) === String(candidate))
+  return project && writableProjects([project]).length ? candidate : null
 }
 
 export function yearMonths(year, locale, tasks = []) {

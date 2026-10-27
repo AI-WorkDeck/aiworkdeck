@@ -31,8 +31,8 @@ class MobileWorkspaceSyncHttpTest {
     ObjectMapper json=new ObjectMapper();
     List<JsonNode> calendar=new CopyOnWriteArrayList<>(), summaries=new CopyOnWriteArrayList<>();
     volatile boolean enabled=true, subscribed=true, switchAccount=false;
-    volatile boolean switchDuringDirectory=false, failFirstSummary=false, truncateDirectory=false;
-    List<String> directoryTokens=new CopyOnWriteArrayList<>();
+    volatile boolean switchDuringDirectory=false, failFirstSummary=false, truncateDirectory=false, staleSummary=false;
+    List<String> directoryTokens=new CopyOnWriteArrayList<>(), requestPaths=new CopyOnWriteArrayList<>();
     @BeforeEach void setup() throws Exception {
         when(account.currentKeyOrNull()).thenReturn("awdk_fixture");
         when(account.accountFingerprintOrNull()).thenReturn("fixture-owner");
@@ -46,6 +46,7 @@ class MobileWorkspaceSyncHttpTest {
         server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
         server.createContext("/api/mobile",ex->{
             String path=ex.getRequestURI().getPath();
+            requestPaths.add(ex.getRequestMethod()+" "+path);
             String body=new String(ex.getRequestBody().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
             Object data=Map.of();
             if(path.equals("/api/mobile/projects")) {
@@ -55,8 +56,10 @@ class MobileWorkspaceSyncHttpTest {
                 data=Map.of("enabled",enabled,"subscriptionActive",subscribed,"backupEnabled",true);
                 if(switchAccount) when(account.accountFingerprintOrNull()).thenReturn("different-owner");
             } else if(path.equals("/api/mobile/calendar/snapshots")) calendar.add(json.readTree(body));
-            else if(path.equals("/api/mobile/assistant/snapshots")) summaries.add(json.readTree(body));
-            else if(path.equals("/api/mobile/assistant/summaries")) data=List.of();
+            else if(path.equals("/api/mobile/assistant/snapshots") && "PUT".equals(ex.getRequestMethod())) summaries.add(json.readTree(body));
+            else if(path.equals("/api/mobile/assistant/summaries")) data=staleSummary
+                    && "includeRemoved=true".equals(ex.getRequestURI().getQuery())
+                    ? List.of(Map.of("deviceId","fixture-device","projectKey","99","summary","Deleted project")) : List.of();
             Map<String,Object> envelope=new LinkedHashMap<>(Map.of("code",0,"data",data));
             if(path.equals("/api/mobile/projects") && truncateDirectory) envelope.putAll(Map.of("truncated",true,"count",1,"totalCount",2));
             if(path.equals("/api/mobile/assistant/snapshots") && failFirstSummary && json.readTree(body).path("projectKey").asText().equals("42")) envelope.put("code",1);
@@ -114,6 +117,26 @@ class MobileWorkspaceSyncHttpTest {
         client.syncMobileCalendar();client.syncMobileAssistant();
         assertTrue(calendar.isEmpty());assertTrue(summaries.isEmpty());assertTrue(directoryTokens.isEmpty());
         verifyNoInteractions(tasks,profiles);
+    }
+    @Test void summariesAreReadBeforeDirectoryReplacementSoDeletedProjectsAreCleaned() {
+        staleSummary=true;
+        client.syncMobileAssistant();
+        int oldSummaries=requestPaths.indexOf("GET /api/mobile/assistant/summaries");
+        int newDirectory=requestPaths.indexOf("PUT /api/mobile/projects");
+        assertTrue(oldSummaries>=0 && newDirectory>oldSummaries,requestPaths.toString());
+        assertTrue(requestPaths.contains("DELETE /api/mobile/assistant/snapshots"),requestPaths.toString());
+    }
+    @Test void calendarSnapshotCapsAtFiveThousandAndMarksTruncation() {
+        List<Map<String,Object>> history=new ArrayList<>(java.util.Collections.nCopies(5000,
+                Map.of("id",3L,"projectId",42L,"title","Overdue without reminder","dueDate",LocalDate.of(2020,1,1),"status","OPEN")));
+        history.add(Map.of("id",9L,"projectId",42L,"title","Upcoming deadline","dueDate",LocalDate.of(2026,11,2),"status","OPEN","remindBefore",60));
+        when(tasks.listByProject(42L,null,null)).thenReturn(history);
+        client.syncMobileCalendar();
+        assertEquals(1,calendar.size());
+        assertEquals(5000,calendar.get(0).path("events").size());
+        assertTrue(calendar.get(0).path("truncated").asBoolean());
+        assertEquals("9",calendar.get(0).path("events").get(0).path("taskId").asText(),"活动提醒必须优先于已完成历史");
+        assertEquals("OPEN",calendar.get(0).path("events").get(0).path("status").asText());
     }
     private void addSecondProject() {
         var first=projects.findByUserIdOrderByCreatedAtDesc(7L).get(0);

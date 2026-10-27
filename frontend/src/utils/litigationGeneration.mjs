@@ -154,7 +154,15 @@ export function createLitigationGeneration({ stream, api, storage, isCurrent, op
       if (status === 'FINISHED') await checkResult()
       else if (!stream.isStreaming.value && [null, 'AWAITING_INPUT', 'PAUSED', 'INTERRUPTED', 'AWAITING_APPROVAL'].includes(status)) setPhase('cancelled', task.message)
       else if (now() - task.stoppingAt > 15000) task.message = text('stopUnconfirmed')
-    } else if (['PAUSED', 'INTERRUPTED', 'AWAITING_APPROVAL'].includes(status)) setPhase('paused', text('paused'))
+    } else if (status === 'AWAITING_APPROVAL') {
+      const plan = (bubble?.artifacts || []).findLast(artifact => ['implementation_plan', 'plan'].includes(artifact.type)
+        && artifact.status === 'draft' && artifact.data?.content?.trim())
+      if (plan) {
+        task.question = { text: plan.data.content.trim(), options: [], descriptions: [], answered: false,
+          key: `${task.pending?.clientRequestId || task.conversationId}:approval:${plan.id || 'current'}` }
+        setPhase('waiting')
+      } else setPhase('paused', text('paused'))
+    } else if (['PAUSED', 'INTERRUPTED'].includes(status)) setPhase('paused', text('paused'))
     else if ((status === 'AWAITING_INPUT' || stream.agentAwaitingInput.value || question) && !stream.isStreaming.value) {
       const q = question
       if (!q || q.answered) setPhase('failed', text('missingQuestion'))

@@ -65,6 +65,12 @@ public class MobileCalendarService {
     @Transactional
     public Map<String,Object> replace(Long user, String device, String timeZone, String sourceUpdatedAt,
             List<Map<String,Object>> incoming) {
+        return replace(user, device, timeZone, sourceUpdatedAt, incoming, false);
+    }
+
+    @Transactional
+    public Map<String,Object> replace(Long user, String device, String timeZone, String sourceUpdatedAt,
+            List<Map<String,Object>> incoming, boolean truncated) {
         lock(user); requireEnabled(user);
         text(device,64,"deviceId");
         ZoneId zone;
@@ -128,8 +134,9 @@ public class MobileCalendarService {
             row.setEventsJson(json);
         } catch(com.fasterxml.jackson.core.JsonProcessingException e) { throw new IllegalStateException(e); }
         row.setUserId(user); row.setDeviceId(device); row.setSourceUpdatedAt(source); row.setSyncedAt(Instant.now());
+        row.setTruncated(truncated);
         snapshots.save(row);
-        return Map.of("accepted",true,"syncedAt",row.getSyncedAt().toString(),"count",events.size());
+        return Map.of("accepted",true,"syncedAt",row.getSyncedAt().toString(),"count",events.size(),"truncated",truncated);
     }
 
     @Transactional
@@ -138,6 +145,7 @@ public class MobileCalendarService {
         Map<String,Object> result=new LinkedHashMap<>(settings(user));
         List<Map<String,Object>> events=new ArrayList<>();
         Instant synced=null;
+        boolean truncated=false;
         if(Boolean.TRUE.equals(result.get("enabled")) && Boolean.TRUE.equals(result.get("subscriptionActive"))) {
             Set<String> known=new HashSet<>();
             for(var dir:directories.findByUserIdOrderByUpdatedAtDesc(user)) known.add(dir.getDeviceId()+"\n"+dir.getProjectKey());
@@ -147,10 +155,12 @@ public class MobileCalendarService {
                     for(var event:list) if(known.contains(row.getDeviceId()+"\n"+event.get("projectKey"))) events.add(event);
                 } catch(com.fasterxml.jackson.core.JsonProcessingException e) { throw new IllegalStateException(LangText.of("暂时无法读取日程数据","Calendar data unavailable"),e); }
                 if(synced==null || row.getSyncedAt().isAfter(synced)) synced=row.getSyncedAt();
+                truncated |= row.isTruncated();
             }
             events.sort(Comparator.comparing(e -> e.get("dueDate")+"T"+Objects.toString(e.get("dueTime"),"00:00")));
         }
         result.put("events",events); result.put("syncedAt",synced==null ? null : synced.toString());
+        result.put("truncated",truncated);
         return result;
     }
 
