@@ -131,6 +131,7 @@ export default {
   // prompt 作为可见的用户消息进入 AI 对话，用户随时可停，不存在静默注入
   emits: ['kickoff', 'files-changed'],
   props: {
+    viewPlacement: { type: String, default: 'workspace' },
     businessActions: { type: Object, default: () => ({}) },
     url: {
       type: String,
@@ -461,6 +462,7 @@ export default {
     buildContext() {
       return {
         pluginId: this.pluginId || '',
+        viewPlacement: this.viewPlacement === 'sidebar' ? 'sidebar' : 'workspace',
         projectId: this.projectId == null ? '' : String(this.projectId),
         language: getAppLanguage(),
         // 外壳自 dev-board#223 起有深浅两态，握手把当前生效的那个告诉插件

@@ -157,5 +157,16 @@ export default {
   "paneEmptyMonth": "No tasks this month",
   "paneEmptyFile": "No tasks linked to this file yet",
   "railScheduleTitle": "Schedule ({overdue} overdue · {today} today)",
-  "tabName": "Schedule"
+  "tabName": "Schedule",
+  "workspaceAll": "Alle Projekte",
+  "workspaceCurrent": "Aktuelles Projekt",
+  "workspaceUpcoming": "Demnächst",
+  "workspaceDays": "Nächste {count} Tage",
+  "workspaceRetry": "Neu laden",
+  "workspaceOverdue": "{count} überfällig",
+  "workspaceNoUpcoming": "Keine Termine in den nächsten {count} Tagen",
+  "workspaceLinked": "Filter werden mit dem Kalender synchronisiert. Eintrag für Details auswählen.",
+  "workspaceDay": "Tag",
+  "workspaceYear": "Jahr",
+  "workspaceEventCount": "{count} Einträge",
 }

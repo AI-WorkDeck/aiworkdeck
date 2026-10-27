@@ -157,5 +157,16 @@ export default {
   "paneEmptyMonth": "No tasks this month",
   "paneEmptyFile": "No tasks linked to this file yet",
   "railScheduleTitle": "Schedule ({overdue} overdue · {today} today)",
-  "tabName": "Schedule"
+  "tabName": "Schedule",
+  "workspaceAll": "Semua proyek",
+  "workspaceCurrent": "Proyek saat ini",
+  "workspaceUpcoming": "Segera jatuh tempo",
+  "workspaceDays": "{count} hari ke depan",
+  "workspaceRetry": "Muat ulang",
+  "workspaceOverdue": "{count} terlambat",
+  "workspaceNoUpcoming": "Tidak ada tenggat dalam {count} hari ke depan",
+  "workspaceLinked": "Filter tersinkron dengan kalender. Pilih item untuk melihat detail.",
+  "workspaceDay": "Hari",
+  "workspaceYear": "Tahun",
+  "workspaceEventCount": "{count} item",
 }

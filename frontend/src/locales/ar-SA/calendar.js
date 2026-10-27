@@ -157,5 +157,16 @@ export default {
   "paneEmptyMonth": "No tasks this month",
   "paneEmptyFile": "No tasks linked to this file yet",
   "railScheduleTitle": "Schedule ({overdue} overdue · {today} today)",
-  "tabName": "Schedule"
+  "tabName": "Schedule",
+  "workspaceAll": "كل المشاريع",
+  "workspaceCurrent": "المشروع الحالي",
+  "workspaceUpcoming": "المهام القادمة",
+  "workspaceDays": "الأيام {count} القادمة",
+  "workspaceRetry": "إعادة التحميل",
+  "workspaceOverdue": "{count} متأخرة",
+  "workspaceNoUpcoming": "لا توجد مهام خلال الأيام {count} القادمة",
+  "workspaceLinked": "تتزامن عوامل التصفية مع التقويم. اختر عنصراً لعرض التفاصيل.",
+  "workspaceDay": "يوم",
+  "workspaceYear": "سنة",
+  "workspaceEventCount": "{count} عناصر",
 }

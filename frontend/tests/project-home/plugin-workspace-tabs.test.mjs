@@ -171,3 +171,15 @@ test('workspace navigation reveals an existing plugin in a hidden right pane wit
   assert.equal(vm.rightFiles.length, 1)
   assert.equal(vm.leftFiles.length, 0)
 })
+
+
+test('calendar rail opens its workspace even when it also has a real sidebar', () => {
+  const opened = []
+  globalThis.uni = { setStorageSync() {} }
+  const vm = { hasProject: true, projectId: 1, leftPaneKey: 'files', lastActiveIdsByMode: { left: {}, right: {} },
+    dynamicPlugins: [{ key: 'plugin-calendar', pluginId: 'calendar', sidebarView: { id: 'sidebar' } }],
+    openPluginTab: id => opened.push(id), saveActiveIdsByMode() {}, toggleSidebar() {} }
+  panelSwitchingMethods.toggleLeftPane.call(vm, 'plugin-calendar')
+  assert.equal(vm.leftPaneKey, 'plugin-calendar')
+  assert.deepEqual(opened, ['calendar'])
+})

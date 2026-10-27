@@ -1579,3 +1579,14 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 - **随手工作区（`Project.SCRATCH = "SCRATCH"`）**：无项目态切入 `chat` 模式时，宿主调 `ensureScratchProject()`（`POST /api/projects/scratch` → `ProjectService.getOrCreateScratchProject`）幂等获取每用户唯一的隐形托管项目（`versionOptOut = true`，在 `getUserProjects` / 律所目录 / 冲突检索中过滤隐藏），原地绑定 `projectId` 并拉取会话与文件。顶栏与侧栏提供「转为正式项目」（`POST /api/projects/{id}/promote` → `ProjectService.promoteScratchProject`），原地将 `SCRATCH` 转为 `BLANK` 并解除 `versionOptOut`，文件与对话历史零迁移保留。
 - **轻量侧栏与按需画布（`ChatModeSidebar.vue`）**：`chat` 模式下隐藏 `.left-rail` 与 `.sidebar-left`，左侧挂载可折叠 `ChatModeSidebar.vue`（近期对话、当前工作区文稿 `+ Word` / `+ MD`、跨项目调取树 `getMyProjects` + 按需展开 `getProjectFiles(id, null, true)`）。`.workbench-main` 通过 CSS flex `order` 将 `.side-panel-ai` 置左、`.content-area` 置右：无打开文档时 `.side-panel-ai` 居中流式（`max-width: 840px`），`.content-area` 零宽隐藏保活；打开/新建文稿或 AI 产物时 `chatCanvasOpen = true` 自动展开右侧画布（标签栏附「收起画布」按钮）。
 - **验证**：`frontend/tests/project-home/chat-mode.test.mjs`、`npm --prefix frontend run check:nav`、`npm --prefix frontend run check:emits`、`Backend ScratchProjectAndCrossProjectReadTest`。
+
+
+## 日程插件左右联动（dev-board#1538，2026-10-27）
+
+真实入口是 `frontend/plugin-app/calendar/Panel.vue`，由 `official-plugins/calendar` 打包；旧 `components/calendar/CalendarPane.vue` / `ProjectCalendarPane.vue` 不是当前插件入口。宿主 `PluginPane` 握手 `viewPlacement: sidebar|workspace` 明确视图用途，禁止按窗口宽度猜左栏：左栏 `Sidebar.vue` 只放项目快捷筛选、含今天的近 3/5 个自然日未完成事项和逾期入口；中央承载日/周/月/年/列表、编辑与文件关联。rail 选中日历时同时激活单例工作区标签，其余插件的面板规则不变。
+
+`calendarTabMethods.calendarWorkspace` 持有工作台本次生命周期的唯一展示状态；插件经 `calendar.workspace` 命名操作读/改，沿原 `sidebar.command` 发布 `calendar-state`。状态含项目/类型/完成项筛选、日期、视图、近期天数与文件筛选，递增 revision 防迟到响应回退；不写入用户项目、不扩大数据访问，所有任务/文件请求继续经原权限闸。任一侧修改局部字段不覆盖另一侧字段，初次挂载主动读取状态；左栏打开事项与新建请求只在工作区弹窗。年视图是 12 个月的实际日期网格，点击日期切入日视图，包含闰日。`calendar-focus` / `calendar-file` 旧入口继续接入，任务定位会清除冲突筛选并转到其项目和日期。
+
+宿主发给插件的状态必须复制为可 structured-clone 的普通值，尤其不能直接发送 Vue reactive 的 `projectIds` / `types` 数组；真实 H5 双面板已复现过 `DataCloneError`，状态单测覆盖此回归。
+
+验证：`tests/calendar/workspace-state.test.mjs`、`tests/plugins/collections-services.test.mjs`、`tests/project-home/plugin-workspace-tabs.test.mjs`；`node tests/plugins/calendar-workspace-browser.mjs` 使用两个真实沙箱插件 iframe 和合成 API，覆盖筛选双向联动、3/5 天、日/年切换、关联编辑、刷新失败重试及窄栏。完整 H5 另用 `CALENDAR_WORKBENCH_BASE=http://127.0.0.1:5197 node tests/plugins/calendar-workbench-browser.mjs`（先启动该端口 H5 dev server），实际挂载工作台、PluginPane 与 rail，拦截全部 API 为合成数据，核对两端 revision、关闭再开、单例标签及移除插件入口；截图默认在 `/tmp/calendar-workbench-ui`，可用 `CALENDAR_WORKBENCH_OUT` 改目录。该验证不等于正式客户端/市场安装/真实用户数据验收；包源码修改后需 `node scripts/build-business-plugins.mjs calendar` 同步构建且提高插件版本。
