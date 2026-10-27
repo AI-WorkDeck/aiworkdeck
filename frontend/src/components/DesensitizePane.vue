@@ -3,10 +3,6 @@
 <template>
   <scroll-view scroll-y class="desensitize-pane">
     <view class="section">
-      <view class="actions-row operation-tabs" role="group" :aria-label="$t('panels.deRedactTab') + ' / ' + $t('panels.deRestoreTab')">
-        <button class="mini-btn" :class="{ active: operation === 'redact' }" :aria-pressed="operation === 'redact'" :disabled="processing" @tap="chooseOperation('redact')">{{ $t('panels.deRedactTab') }}</button>
-        <button class="mini-btn" :class="{ active: operation === 'restore' }" :aria-pressed="operation === 'restore'" :disabled="processing" @tap="chooseOperation('restore')">{{ $t('panels.deRestoreTab') }}</button>
-      </view>
       <view class="section-title">{{ $t('panels.deSectionFileSelect') }}</view>
       <view class="path-display" :class="{ empty: !filePath }" @tap="triggerFileSelect">{{ fileName || $t('panels.deFilePlaceholder') }}</view>
       <view class="actions-row file-actions">
@@ -14,6 +10,13 @@
         <button class="mini-btn" :disabled="processing" @tap="triggerFileSelect">{{ $t('panels.deBrowse') }}</button>
       </view>
       <text class="help-text">{{ $t('panels.deFormats') }}</text>
+    </view>
+    <view class="section">
+      <view class="section-title">{{ $t('panels.deOperationTitle') }}</view>
+      <view class="actions-row operation-tabs" role="group" :aria-label="$t('panels.deOperationTitle')">
+        <button class="mini-btn" :class="{ active: operation === 'redact' }" :aria-pressed="operation === 'redact'" :disabled="processing" @tap="chooseOperation('redact')">{{ $t('panels.deRedactTab') }}</button>
+        <button class="mini-btn" :class="{ active: operation === 'restore' }" :aria-pressed="operation === 'restore'" :disabled="processing" @tap="chooseOperation('restore')">{{ $t('panels.deRestoreTab') }}</button>
+      </view>
     </view>
 
     <view v-if="error" class="section error-text" role="alert">{{ error }}</view>
@@ -30,14 +33,6 @@
           <text class="help-text">{{ $t('panels.deCustomWordsHint') }}</text>
         </view>
       </view>
-      <view class="section">
-        <view class="section-title">{{ $t('panels.deModeTitle') }}</view>
-        <view v-if="!isPdf" class="actions-row mode-options">
-          <button class="mini-btn" :class="{ active: mode === 'TOKEN' }" :aria-pressed="mode === 'TOKEN'" :title="$t('panels.deTokenNotice')" :disabled="processing" @tap="mode = 'TOKEN'">{{ $t('panels.deTokenMode') }}</button>
-          <button class="mini-btn" :class="{ active: mode === 'MASK' }" :aria-pressed="mode === 'MASK'" :disabled="processing" @tap="mode = 'MASK'">{{ $t('panels.deMaskMode') }}</button>
-        </view>
-        <text v-if="isPdf || effectiveMode === 'MASK' || preview" class="help-text">{{ $t(isPdf ? 'panels.dePdfNotice' : effectiveMode === 'TOKEN' ? 'panels.deTokenNotice' : 'panels.deMaskNotice') }}</text>
-      </view>
       <view class="section settings-section">
         <button class="settings-toggle" :aria-expanded="settingsOpen" :disabled="processing" @tap="settingsOpen = !settingsOpen">
           <text>{{ $t('panels.deStrategiesTitle') }}</text>
@@ -53,6 +48,14 @@
         <view class="section-title">{{ $t('panels.deExcludedTerms') }}</view>
         <textarea v-model="excludedTerms" :disabled="processing" class="text-input" :maxlength="100000" :placeholder="$t('panels.deExcludedPlaceholder')" />
         </view>
+      </view>
+      <view class="section">
+        <view class="section-title">{{ $t('panels.deModeTitle') }}</view>
+        <view v-if="!isPdf" class="actions-row mode-options">
+          <button class="mini-btn" :class="{ active: mode === 'TOKEN' }" :aria-pressed="mode === 'TOKEN'" :title="$t('panels.deTokenNotice')" :disabled="processing" @tap="mode = 'TOKEN'">{{ $t('panels.deTokenMode') }}</button>
+          <button class="mini-btn" :class="{ active: mode === 'MASK' }" :aria-pressed="mode === 'MASK'" :disabled="processing" @tap="mode = 'MASK'">{{ $t('panels.deMaskMode') }}</button>
+        </view>
+        <text v-if="isPdf || effectiveMode === 'MASK' || preview" class="help-text">{{ $t(isPdf ? 'panels.dePdfNotice' : effectiveMode === 'TOKEN' ? 'panels.deTokenNotice' : 'panels.deMaskNotice') }}</text>
       </view>
       <view class="section">
         <button class="workdeck-btn full-width" :class="{ 'workdeck-btn-primary': !preview }" :disabled="processing || !fileId || (!selectedStrategies.length && !customTerms.trim())" @tap="handlePreview">{{ $t('panels.dePreview') }}</button>
@@ -84,8 +87,8 @@
       <text v-for="(warning, i) in (result?.warnings || preview?.warnings || [])" :key="i" class="help-text">{{ warning }}</text>
     </view>
     <view v-if="result?.file && operation === 'redact'" class="section">
-      <text class="help-text">{{ $t(isPdf ? 'panels.dePdfResult' : 'panels.deResultEditing') }}</text>
-      <button v-if="exportedKit" class="workdeck-btn full-width" :disabled="processing" @tap="chooseOperation('restore')">{{ $t('panels.deRestoreResult') }}</button>
+      <text v-if="isPdf || effectiveMode === 'MASK' || preview" class="help-text">{{ $t(isPdf ? 'panels.dePdfResult' : 'panels.deResultEditing') }}</text>
+      <button v-if="exportedKit" class="workdeck-btn full-width" :disabled="processing" @tap="restoreLastResult">{{ $t('panels.deRestoreResult') }}</button>
       <text class="help-text">{{ $t('panels.deAiWorkflowNotice') }}</text>
     </view>
     <view v-if="exportedKit" class="section">
@@ -147,13 +150,13 @@ export default {
       if (this.processing || this.operation === operation) return
       this.operation = operation
       this.preview = null; this.result = null; this.error = ''; this.password = ''
-      if (operation === 'restore' && this.lastRedaction?.kit) {
-        this.selectFile(this.lastRedaction.file)
-        this.recoveryKit = this.lastRedaction.kit
-        this.kitName = this.$t('panels.deCurrentKit')
-      } else if (operation === 'redact' && this.lastRedaction?.source) {
-        this.selectFile(this.lastRedaction.source)
-      }
+    },
+    restoreLastResult() {
+      if (this.processing || !this.lastRedaction?.kit) return
+      this.chooseOperation('restore')
+      this.selectFile(this.lastRedaction.file)
+      this.recoveryKit = this.lastRedaction.kit
+      this.kitName = this.$t('panels.deCurrentKit')
     },
     toggleStrategy(value) {
       if (this.processing) return

@@ -62,15 +62,15 @@ test('打开浮窗的唯一通道仍是 awd:open-feedback 事件', () => {
   assert.match(fn, /uni\.\$emit\('awd:open-feedback'\)/, 'openFeedbackWidget 必须发这个事件')
 })
 
-test('工作台 rail 底部有反馈按钮（spacer 之后，与暂存区/版本记录同一簇）', () => {
+test('工作台 rail 固定底部有反馈按钮（与暂存区/版本记录同一簇）', () => {
   const rail = WORKBENCH.slice(WORKBENCH.indexOf('<view class="left-rail">'))
   const railEnd = rail.indexOf('<!-- File Picker Dialog')
   assert.ok(railEnd > 0, '找不到 rail 段落的结尾')
   const body = rail.slice(0, railEnd)
   assert.match(body, /@tap="openFeedback"/, 'rail 里要有反馈按钮')
   assert.match(body, /GLYPHS\.feedback/, '反馈按钮用内联 SVG 图标（禁 emoji）')
-  const spacerAt = body.indexOf('style="flex: 1"')
-  assert.ok(spacerAt > 0 && body.indexOf('@tap="openFeedback"') > spacerAt, '反馈按钮在 spacer 之后（rail 底部）')
+  const footerAt = body.indexOf('class="rail-footer"')
+  assert.ok(footerAt > 0 && body.indexOf('@tap="openFeedback"') > footerAt, '反馈按钮在固定底部区')
   assert.match(WORKBENCH, /openFeedback\s*\(\)\s*\{[^}]*openFeedbackWidget\(\)/,
     '工作台的 openFeedback 走 utils/feedbackWidget.js 的统一出口')
 })

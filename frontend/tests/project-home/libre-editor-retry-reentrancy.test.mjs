@@ -67,10 +67,14 @@ function makeVm() {
     logLoadFailure() {},     // 诊断行只写 devtools，与装载时序无关
     initEvidence() {},       // EvidenceLink 首轮核对是 ready 之后的后台事，与装载重入无关
     executor: {
-      executeCommand: async (action) => { vm.dispatched.push(action); return { success: true, kind: 'writer' } },
+      executeCommand: async (action) => {
+        vm.dispatched.push(action)
+        if (action === 'set_chrome') return { success: true, applied: { menubar: false, statusbar: false, toolbars: { standardbar: false } } }
+        return { success: true, kind: 'writer' }
+      },
     },
   }
-  for (const name of ['finishDocLoad', 'loadDocument', 'retryLoad', 'bootMilestone', 'initWritingAssistance']) vm[name] = METHODS[name].bind(vm)
+  for (const name of ['finishDocLoad', 'prepareInitialChrome', 'loadDocument', 'retryLoad', 'bootMilestone', 'initWritingAssistance']) vm[name] = METHODS[name].bind(vm)
   return vm
 }
 
@@ -116,7 +120,7 @@ test('没有并发时正常装载不受影响', async () => {
   const vm = makeVm()
   vm.fetchDocumentBytes = async () => new ArrayBuffer(4096)
   await vm.finishDocLoad()
-  assert.deepEqual(vm.dispatched, ['load_document'])
+  assert.deepEqual(vm.dispatched, ['load_document', 'set_chrome'])
   assert.equal(vm.statusKey, 'ready')
   assert.equal(vm.ready, true)
   assert.equal(vm.emitted.filter((e) => e === 'ready').length, 1)
