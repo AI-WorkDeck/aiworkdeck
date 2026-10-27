@@ -180,6 +180,9 @@ rail 点击 → toggleLeftPane(key)（:2988）：staging 单独分支 → 把当
 
 ## 左栏入口（frontend/src/config/leftSidebarPlugins.js）
 
+**侧栏溢出（dev-board#1546）**：普通工具放在 `.rail-tools`，保留既有排序，独立纵向滚动；`.rail-footer` 固定暂存区、版本控制、项目成员和反馈。两区内按钮禁止 flex 压缩；不要给整个 `.left-rail` 加 overflow 裁剪，否则成员浮层会被裁掉。隔离布局验证：`node frontend/tests/project-home/rail-overflow-ui.mjs`（需 Chrome）；覆盖30工具、480/640/900窗口高度、滚动后点击末项与成员浮层，非正式客户端验收。
+
+
 **rail 从上到下的顺序就是 `LEFT_SIDEBAR_PLUGINS` 数组的顺序，只有这一个出处。**
 2026-08-19 起「项目概览」与「插件中心」也收进了数组——它们走的都是普通的
 `toggleLeftPane` 语义，单独硬编码成 rail 按钮只会让顺序有两个出处。
@@ -1590,3 +1593,7 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 宿主发给插件的状态必须复制为可 structured-clone 的普通值，尤其不能直接发送 Vue reactive 的 `projectIds` / `types` 数组；真实 H5 双面板已复现过 `DataCloneError`，状态单测覆盖此回归。
 
 验证：`tests/calendar/workspace-state.test.mjs`、`tests/plugins/collections-services.test.mjs`、`tests/project-home/plugin-workspace-tabs.test.mjs`；`node tests/plugins/calendar-workspace-browser.mjs` 使用两个真实沙箱插件 iframe 和合成 API，覆盖筛选双向联动、3/5 天、日/年切换、关联编辑、刷新失败重试及窄栏。完整 H5 另用 `CALENDAR_WORKBENCH_BASE=http://127.0.0.1:5197 node tests/plugins/calendar-workbench-browser.mjs`（先启动该端口 H5 dev server），实际挂载工作台、PluginPane 与 rail，拦截全部 API 为合成数据，核对两端 revision、关闭再开、单例标签及移除插件入口；截图默认在 `/tmp/calendar-workbench-ui`，可用 `CALENDAR_WORKBENCH_OUT` 改目录。该验证不等于正式客户端/市场安装/真实用户数据验收；包源码修改后需 `node scripts/build-business-plugins.mjs calendar` 同步构建且提高插件版本。
+
+### 插件入口按声明选择（dev-board#1531）
+
+`contributes.views: []` 不提供 rail、panel 或工作区。仅 workspace 的插件保留 rail，点击只打开/聚焦标签，不切换当前左栏；rail 高亮取真实工作区状态。仅 sidebar 不自动开标签，两者兼有可通过 SDK `ui.openWorkspace()` 打开自己的 workspace。缺省/null 沿用旧入口。新规则集中在 `utils/pluginViews.js` 与 `pluginWorkspaceTabs.js`，快照恢复及直达入口使用同一闸；每个视图按自己的 scope 检查项目上下文，不能借另一个 global 视图越过 project 限制。旧纯皮肤 gallery（无业务权限、工具及其他贡献）仅作预览，更新宿主即隐藏其入口并清理旧标签；非 gallery 的主题编辑器等业务视图仍按声明显示。

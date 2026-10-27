@@ -3,16 +3,6 @@
 <template>
   <scroll-view scroll-y class="desensitize-pane">
     <view class="section">
-      <view class="actions-row operation-tabs">
-        <button class="mini-btn" :class="{ active: operation === 'redact' }" :disabled="processing" @tap="chooseOperation('redact')">{{ $t('panels.deRedactTab') }}</button>
-        <button class="mini-btn" :class="{ active: operation === 'restore' }" :disabled="processing" @tap="chooseOperation('restore')">{{ $t('panels.deRestoreTab') }}</button>
-      </view>
-      <text class="help-text">{{ $t('panels.deLocalNotice') }}</text>
-      <view class="workflow" v-if="operation === 'redact'" aria-live="polite">
-        <text :class="{ current: !fileId }">{{ $t('panels.deStepSelect') }}</text>
-        <text :class="{ current: fileId && !preview && !result }">{{ $t('panels.deStepReview') }}</text>
-        <text :class="{ current: preview || result }">{{ $t('panels.deStepCreate') }}</text>
-      </view>
       <view class="section-title">{{ $t('panels.deSectionFileSelect') }}</view>
       <view class="path-display" :class="{ empty: !filePath }" @tap="triggerFileSelect">{{ fileName || $t('panels.deFilePlaceholder') }}</view>
       <view class="actions-row">
@@ -20,6 +10,14 @@
         <button class="mini-btn" :disabled="processing" @tap="triggerFileSelect">{{ $t('panels.deBrowse') }}</button>
       </view>
       <text class="help-text">{{ $t('panels.deFormats') }}</text>
+    </view>
+    <view class="section">
+      <view class="section-title">{{ $t('panels.deOperationTitle') }}</view>
+      <view class="actions-row operation-tabs">
+        <button class="mini-btn" :class="{ active: operation === 'redact' }" :aria-pressed="operation === 'redact'" :disabled="processing" @tap="chooseOperation('redact')">{{ $t('panels.deRedactTab') }}</button>
+        <button class="mini-btn" :class="{ active: operation === 'restore' }" :aria-pressed="operation === 'restore'" :disabled="processing" @tap="chooseOperation('restore')">{{ $t('panels.deRestoreTab') }}</button>
+      </view>
+      <text class="help-text">{{ $t('panels.deLocalNotice') }}</text>
     </view>
 
     <view v-if="error" class="section error-text" role="alert">{{ error }}</view>
@@ -36,14 +34,6 @@
           <text class="help-text">{{ $t('panels.deCustomWordsHint') }}</text>
         </view>
       </view>
-      <view class="section">
-        <view class="section-title">{{ $t('panels.deModeTitle') }}</view>
-        <view v-if="!isPdf" class="actions-row">
-          <button class="mini-btn" :class="{ active: mode === 'TOKEN' }" :disabled="processing" @tap="mode = 'TOKEN'">{{ $t('panels.deTokenMode') }}</button>
-          <button class="mini-btn" :class="{ active: mode === 'MASK' }" :disabled="processing" @tap="mode = 'MASK'">{{ $t('panels.deMaskMode') }}</button>
-        </view>
-        <text class="help-text">{{ $t(isPdf ? 'panels.dePdfNotice' : effectiveMode === 'TOKEN' ? 'panels.deTokenNotice' : 'panels.deMaskNotice') }}</text>
-      </view>
       <view class="section settings-section">
         <button class="settings-toggle" :aria-expanded="settingsOpen" :disabled="processing" @tap="settingsOpen = !settingsOpen">
           <text>{{ $t('panels.deStrategiesTitle') }}</text>
@@ -59,6 +49,14 @@
         <view class="section-title">{{ $t('panels.deExcludedTerms') }}</view>
         <textarea v-model="excludedTerms" :disabled="processing" class="text-input" :maxlength="100000" :placeholder="$t('panels.deExcludedPlaceholder')" />
         </view>
+      </view>
+      <view class="section">
+        <view class="section-title">{{ $t('panels.deModeTitle') }}</view>
+        <view v-if="!isPdf" class="actions-row">
+          <button class="mini-btn" :class="{ active: mode === 'TOKEN' }" :disabled="processing" @tap="mode = 'TOKEN'">{{ $t('panels.deTokenMode') }}</button>
+          <button class="mini-btn" :class="{ active: mode === 'MASK' }" :disabled="processing" @tap="mode = 'MASK'">{{ $t('panels.deMaskMode') }}</button>
+        </view>
+        <text class="help-text">{{ $t(isPdf ? 'panels.dePdfNotice' : effectiveMode === 'TOKEN' ? 'panels.deTokenNotice' : 'panels.deMaskNotice') }}</text>
       </view>
       <view class="section">
         <button class="workdeck-btn full-width" :class="{ 'workdeck-btn-primary': !preview }" :disabled="processing || !fileId || (!selectedStrategies.length && !customTerms.trim())" @tap="handlePreview">{{ $t('panels.dePreview') }}</button>
@@ -91,7 +89,7 @@
     </view>
     <view v-if="result?.file && operation === 'redact'" class="section">
       <text class="help-text">{{ $t(isPdf ? 'panels.dePdfResult' : 'panels.deResultEditing') }}</text>
-      <button v-if="exportedKit" class="workdeck-btn full-width" :disabled="processing" @tap="chooseOperation('restore')">{{ $t('panels.deRestoreResult') }}</button>
+      <button v-if="exportedKit" class="workdeck-btn full-width" :disabled="processing" @tap="restoreLastResult">{{ $t('panels.deRestoreResult') }}</button>
       <text class="help-text">{{ $t('panels.deAiWorkflowNotice') }}</text>
     </view>
     <view v-if="exportedKit" class="section">
@@ -153,13 +151,13 @@ export default {
       if (this.processing || this.operation === operation) return
       this.operation = operation
       this.preview = null; this.result = null; this.error = ''; this.password = ''
-      if (operation === 'restore' && this.lastRedaction?.kit) {
-        this.selectFile(this.lastRedaction.file)
-        this.recoveryKit = this.lastRedaction.kit
-        this.kitName = this.$t('panels.deCurrentKit')
-      } else if (operation === 'redact' && this.lastRedaction?.source) {
-        this.selectFile(this.lastRedaction.source)
-      }
+    },
+    restoreLastResult() {
+      if (this.processing || !this.lastRedaction?.kit) return
+      this.chooseOperation('restore')
+      this.selectFile(this.lastRedaction.file)
+      this.recoveryKit = this.lastRedaction.kit
+      this.kitName = this.$t('panels.deCurrentKit')
     },
     toggleStrategy(value) {
       if (this.processing) return
@@ -411,9 +409,6 @@ export default {
 button.mini-btn { min-height: 28px; height: auto; padding: 4px 6px; line-height: 1.5; margin: 0; white-space: normal; }
 .workdeck-btn-primary { border-color: var(--awd-accent); background: var(--awd-accent); color: var(--awd-text-on-accent); }
 .full-width { width: 100%; box-sizing: border-box; margin: 0; }
-.operation-tabs { padding-top: var(--awd-panel-gap); }
-.workflow { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); padding: 4px 0; }
-.workflow .current { color: var(--awd-accent-text); font-weight: 600; }
 .settings-toggle { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; margin: 0; padding: 6px 0; background: transparent; color: var(--awd-panel-text-2); font-size: var(--awd-panel-fs-sec); font-weight: 600; line-height: 1.5; text-align: left; border: none; border-radius: 0; }
 .settings-toggle::after { border: none; }
 .settings-summary { font-size: var(--awd-panel-fs-meta); font-weight: 400; flex-shrink: 0; }

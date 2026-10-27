@@ -580,6 +580,7 @@ $color-accent: var(--awd-mint); // Mint Green
 /* Left Rail (Activity Bar) - Match Doc Dark BG */
 .left-rail {
   width: 50px;
+  min-height: 0;
   background-color: var(--awd-bg); // AI WorkDeck Gray-Pale (Light Mode)
   display: flex;
   flex-direction: column;
@@ -588,6 +589,48 @@ $color-accent: var(--awd-mint); // Mint Green
   z-index: 150;
   flex-shrink: 0;
   border-right: none;
+}
+
+.rail-tools {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable both-edges;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--awd-border-strong);
+    border-radius: 4px;
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--awd-accent);
+    outline-offset: -1px;
+  }
+}
+
+.rail-footer {
+  flex-shrink: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--awd-border);
+}
+
+.left-rail .rail-btn,
+.left-rail .rail-members-container {
+  flex-shrink: 0;
 }
 
 .rail-btn {

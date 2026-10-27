@@ -547,6 +547,13 @@ export default {
         }
       }
       switch (method) {
+        case 'ui.openWorkspace': {
+          // The caller cannot select another plugin or supply an arbitrary URL.
+          const opened = this.businessActions.openPluginWorkspace?.(this.pluginId)
+          return opened === true
+            ? { ok: true, result: {} }
+            : { ok: false, error: { code: 'unavailable', message: L('此插件没有可用的工作区视图', 'This plugin has no available workspace view') } }
+        }
         case 'services.cancel':
           return { ok: true, result: this.businessServices().cancel(params.requestId) }
         case 'services.request': {
