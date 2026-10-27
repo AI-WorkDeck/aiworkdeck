@@ -47,6 +47,7 @@ const restoreSensitiveFile=async p=>{calls.push({operation:'restore',params:p});
 const getLitigationVisualStatus=async()=>({available:packState==='ready',graphviz:true,timelineAvailable:true,reason:packState==='ready'?'':'合成引擎待安装'});
 const getLitigationDiagrams=async()=>diagrams;
 const getFileDetail=async(projectId,fileId)=>files.find(file=>String(file.id)===String(fileId));
+const getSessionId=()=> 'synthetic-session',getCloudAccountGeneration=()=>1;
 const getLitigationKickoffPrompt=async (id,p)=>{calls.push({operation:'kickoff',params:p});return {prompt:'诉讼可视化：'+p.scope+'；'+p.diagramHint}};
 const restyleLitigationDiagram=async(id,folderId,mode,confirmOverwrite)=>{calls.push({operation:'restyle',id,folderId,mode,confirmOverwrite});if(failRestyle)throw Error('合成换风格失败');diagrams[0].mode=mode;return {ok:true}};
 const packStatus=async()=>({status:{state:packState,bytesDownloaded:50,bytesTotal:100}});
@@ -54,7 +55,7 @@ const packInstall=async()=>{calls.push({operation:'packInstall'});packState='dow
 const searchProjectContent=async()=>({}),getProjectTags=async()=>[];
 const createPluginVoiceServices=()=>({}),createPluginCollectionServices=()=>({}),createPluginInsightServices=()=>({});
 const wsMethods={${['pluginBusinessActions','handleDesensitizeActiveFile','handleDesensitizeSelectFile','handleFilePickerCancel','handleLitigationScopeSelect','handleFilePickerConfirm','handleLitigationOpenFile'].map(n=>method(workspaceSource,n)).join(',')}};
-window.workspace={focusedPane:'left',activeFileLeft:files[0],activeFileRight:null,leftFiles:[files[0]],getPluginActiveEditor:()=>null,projectId:42,showAiPanel:false,aiPanelMounted:false,chatId:'existing-chat',openFile:file=>opened.push(file.id),resolveChatInterface:()=>{throw Error('Unexpected chat panel access')},
+window.workspace={isActiveOverviewInstance:()=>true,focusedPane:'left',activeFileLeft:files[0],activeFileRight:null,leftFiles:[files[0]],getPluginActiveEditor:()=>null,projectId:42,showAiPanel:false,aiPanelMounted:false,chatId:'existing-chat',openFile:file=>opened.push(file.id),resolveChatInterface:()=>{throw Error('Unexpected chat panel access')},
   $t:(key,p)=>{let text=scopeMessages[key]||key;for(const [name,value] of Object.entries(p||{}))text=text.split('{'+name+'}').join(String(value));return text},prepareSensitiveFile:async id=>{saved.push(id);const result=changed;changed=false;return result}};
 for(const [name,fn] of Object.entries(wsMethods))workspace[name]=fn.bind(workspace);
 // Only the task runner is synthetic. SDK, PluginPane, named service and the
@@ -174,7 +175,7 @@ try {
   await clickText(frame, 'uni-button', '已使用本次生成的加密映射')
   await (await choosingKit).accept([resolve(out, download)])
   await frame.waitForFunction(name => Array.from(document.querySelectorAll('uni-button')).some(el => el.textContent.trim() === name), {}, download)
-  await clickText(frame, 'uni-button', '脱敏')
+  await frame.click('.operation-tabs uni-button:first-child')
   await page.evaluate(() => { failPreview = true })
   await clickText(frame, 'uni-button', '预览脱敏结果')
   await frame.waitForFunction(() => document.querySelector('.error-text')?.textContent === '合成预览失败')
