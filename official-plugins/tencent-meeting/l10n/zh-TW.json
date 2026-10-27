@@ -1,7 +1,7 @@
 {
   "plugin.name": "騰訊會議",
-  "plugin.description": "連接騰訊會議，按需同步會議與錄制、查看逐字稿和智能紀要，歸檔到項目並生成會議紀要及待辦。需安裝騰訊會議官方 tmeet CLI 並完成賬號授權。",
-  "tool.tencent_meeting_action.description": "騰訊會議插件：檢查連接、用戶授權登錄、按需同步、查看會議及逐字稿、歸檔項目文件。",
+  "plugin.description": "Connect Tencent Meeting to sync meetings and recordings on demand, view transcripts and smart minutes, archive to projects, and generate meeting minutes and action items. Requires the official tmeet CLI and account authorization.",
+  "tool.tencent_meeting_action.description": "Tencent Meeting plugin: check connection, authorize login, sync on demand, view meetings and transcripts, and archive project files.",
   "panel.refreshList": "重新整理",
   "panel.selectMeeting": "選擇一場會議",
   "panel.backToList": "返回列表",

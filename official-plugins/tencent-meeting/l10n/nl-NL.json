@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Tencent-vergadering",
+  "plugin.name": "Tencent Meeting",
   "plugin.description": "Verbind Tencent Meeting om vergaderingen en opnames op aanvraag te synchroniseren, transcripten en slimme notulen te bekijken, te archiveren in projecten en vergadernotulen en actiepunten te genereren. Vereist de officiële tmeet CLI en accountautorisatie.",
   "tool.tencent_meeting_action.description": "Tencent Meeting-plug-in: controleer verbinding, autoriseer login, synchroniseer op aanvraag, bekijk vergaderingen en transcripten en archiveer projectbestanden.",
   "panel.refreshList": "Vernieuwen",

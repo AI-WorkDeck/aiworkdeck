@@ -1,7 +1,7 @@
 {
-  "plugin.name": "Rapat Tencent",
-  "plugin.description": "Hubungkan Tencent Meeting untuk menyinkronkan rapat dan rekaman sesuai permintaan, lihat transkrip dan notulen cerdas, arsipkan ke proyek, serta buat notulen rapat dan tindak lanjut. Memerlukan CLI tmeet resmi dan otorisasi akun.",
-  "tool.tencent_meeting_action.description": "Plugin Tencent Meeting: periksa koneksi, otorisasi masuk, sinkronkan sesuai permintaan, lihat rapat dan transkrip, serta arsipkan berkas proyek.",
+  "plugin.name": "Tencent Meeting",
+  "plugin.description": "Hubungkan Tencent Meeting untuk menyinkronkan rapat dan rekaman sesuai permintaan, lihat transkrip dan notulen pintar, arsipkan ke proyek, serta buat notulen rapat dan tindakan tindak lanjut. Memerlukan CLI tmeet resmi dan otorisasi akun.",
+  "tool.tencent_meeting_action.description": "Plugin Tencent Meeting: periksa koneksi, otorisasi login, sinkronisasi sesuai permintaan, lihat rapat dan transkrip, serta arsipkan berkas proyek.",
   "panel.refreshList": "Segarkan",
   "panel.selectMeeting": "Pilih rapat",
   "panel.backToList": "Kembali ke rapat",
