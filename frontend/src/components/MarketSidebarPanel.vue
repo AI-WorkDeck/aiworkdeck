@@ -235,7 +235,7 @@ const CATEGORY_KEYS = {
   other: 'market.catOther',
 }
 
-const ACTIVATION_STATE_KEYS = {
+const ACTIVATION_STATE = {
   auto: 'market.activationStateAuto',
   manual: 'market.activationStateManual',
   disabled: 'market.activationDisabled',
@@ -312,7 +312,7 @@ export default {
             ? this.$t('market.packDownloadingShort')
             : panel
               ? (s.enabled ? this.$t('market.enabledTag') : this.$t('market.disabledTag'))
-              : this.$t(ACTIVATION_STATE_KEYS[mode] || 'market.activationStateAuto'),
+              : this.$t(ACTIVATION_STATE[mode] || 'market.activationStateAuto'),
           stateClass: packPending ? 'downloading' : (mode === 'disabled' ? 'off' : 'ok'),
           raw: s,
         })
