@@ -9,9 +9,11 @@ export function attachSemanticWritingPanel({ canvas, input, transport, focus, ov
   function sw(key, params) {
     let en = false
     try {
-      if (doc?.documentElement?.lang === 'en-US') en = true
-      else if (win?.localStorage?.getItem('checkba_app_language') === 'en-US') en = true
-      else if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') en = true
+      const l = doc?.documentElement?.lang
+        || win?.localStorage?.getItem('checkba_app_language')
+        || (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language'))
+        || ''
+      if (l && !l.startsWith('zh')) en = true
     } catch (_) { /* ignore */ }
     const dict = (en ? editorEn : editorZh)?.semanticWriting || editorZh.semanticWriting
     let text = dict[key] || editorZh.semanticWriting[key] || key

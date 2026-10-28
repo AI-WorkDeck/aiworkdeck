@@ -19,8 +19,10 @@ export function reanchorComment(comment, currentText) {
 
 function isEnLang() {
   try {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') return true
-    if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') return true
+    const l = (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language'))
+      || (typeof document !== 'undefined' && document.documentElement?.lang)
+      || ''
+    if (l && !l.startsWith('zh')) return true
   } catch (_) { /* ignore */ }
   return false
 }
@@ -28,7 +30,7 @@ function isEnLang() {
 export function buildPlanReviewPrompt({ lang, currentText, diff, comments }) {
   const n = diff ? diff.hunks : 0
   const m = Array.isArray(comments) ? comments.length : 0
-  const en = lang ? (lang === 'en' || lang === 'en-US') : isEnLang()
+  const en = lang ? !String(lang).startsWith('zh') : isEnLang()
   if (!n && !m) {
     return en
       ? { message: 'Implementation plan confirmed, please proceed.', displayText: 'Proceed' }

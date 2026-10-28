@@ -10,7 +10,7 @@ export default {
   "configFailed": "تعذر تحميل إعدادات المزامنة أو حفظها. حاول مرة أخرى.",
   "listFailed": "تعذر تحميل الاجتماعات. حاول مرة أخرى.",
   "prepareFailed": "تعذر تجهيز مواد الاجتماع. أعد المحاولة قبل إرسالها إلى الذكاء الاصطناعي.",
-  "panelTitle": "Tencent Meeting",
+  "panelTitle": "اجتماعات Tencent Meeting",
   "authStatus": "حالة الاتصال",
   "account": "الحساب",
   "connected": "متصل",

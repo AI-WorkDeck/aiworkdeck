@@ -1234,13 +1234,6 @@ export default {
       feedbackLoading: false,
       feedbackListSeq: 0, // 请求代次：切筛选档太快时，只认"此刻最新一次"发出的列表响应
       feedbackFilter: '',
-      feedbackFilters: [
-        { key: '', label: this.$t('admin.filterAll') },
-        { key: 'NEW', label: this.$t('admin.pendingLabel') },
-        { key: 'PR_OPENED', label: this.$t('admin.prOpened') },
-        { key: 'EMAILED', label: this.$t('admin.emailed') },
-        { key: 'FAILED', label: this.$t('admin.filterFailed') },
-      ],
       optimizer: {
         enabled: false,
         running: false,
@@ -1287,11 +1280,6 @@ export default {
       // 前端不许再自己硬编码任何模型清单。
       modelCatalog: null,
       modelCatalogError: '',
-      networkRegionOptions: [
-        { value: 'auto', label: this.$t('admin.regionAuto') },
-        { value: 'domestic', label: this.$t('admin.regionDomestic') },
-        { value: 'international', label: this.$t('admin.regionInternational') },
-      ],
       // 平台 AI 通道是否可选（= 是否已连接账户），来自 /api/account/status
       platformAiAvailable: false,
       // 花费闸门 + 预扣/低余额提醒的数据源（GET /api/platform-services 与其 /remote 端点）。
@@ -1568,6 +1556,22 @@ export default {
     catalogModels() {
       const models = this.modelCatalog && this.modelCatalog.models
       return Array.isArray(models) ? models : []
+    },
+    feedbackFilters() {
+      return [
+        { key: '', label: this.$t('admin.filterAll') },
+        { key: 'NEW', label: this.$t('admin.pendingLabel') },
+        { key: 'PR_OPENED', label: this.$t('admin.prOpened') },
+        { key: 'EMAILED', label: this.$t('admin.emailed') },
+        { key: 'FAILED', label: this.$t('admin.filterFailed') },
+      ]
+    },
+    networkRegionOptions() {
+      return [
+        { value: 'auto', label: this.$t('admin.regionAuto') },
+        { value: 'domestic', label: this.$t('admin.regionDomestic') },
+        { value: 'international', label: this.$t('admin.regionInternational') },
+      ]
     },
     // 后端解析出的「当前真正会用的默认模型」（DB 的 ai.defaultModel 优先于 yml）。
     // 展示它是为了让「跟随内置默认」这个选项有可核对的落点。
@@ -2568,15 +2572,22 @@ export default {
         this.membershipData = null
       }
     },
-    /** 七档表里一档的展示名，按当前语言取 nameZh/nameEn。 */
+    /** 七档表里一档的展示名，优先按 tier.key 取当前语言词条，兜底按语言取 nameZh/nameEn。 */
     tierDisplayName(tier) {
       if (!tier) return ''
-      const en = this.$i18n && this.$i18n.locale === 'en-US'
-      return (en ? tier.nameEn : tier.nameZh) || tier.nameZh || tier.nameEn || tier.key || ''
+      if (tier.key && typeof this.$t === 'function') {
+        const i18nKey = 'admin.membershipTiers.' + tier.key
+        const translated = this.$t(i18nKey)
+        if (translated && translated !== i18nKey) return translated
+      }
+      const locale = (this.$i18n && this.$i18n.locale) || ''
+      const zh = !locale || locale.startsWith('zh')
+      return (zh ? tier.nameZh : tier.nameEn) || tier.nameEn || tier.nameZh || tier.key || ''
     },
     /** 官网会员规则页，语言按当前 locale。 */
     openMembershipRules() {
-      const lang = this.$i18n && this.$i18n.locale === 'en-US' ? 'en' : 'zh'
+      const locale = (this.$i18n && this.$i18n.locale) || 'zh-CN'
+      const lang = locale.startsWith('zh') ? 'zh' : 'en'
       openExternalUrl(siteBaseUrl() + '/' + lang + '/membership')
     },
     // 官网账户页：生成账户 Key 与充值都在这里。

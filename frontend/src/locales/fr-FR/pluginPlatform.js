@@ -2,20 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "devTrustNotice": "Development plugins can send data to declared remote services and expose Agent tools. Review the source before approval. Manifest changes require approval again.",
-  "grantTrust": "Approve development services",
-  "revokeTrust": "Revoke service approval",
-  "connections": "Plugin service connections",
-  "credentialNotice": "Credentials are stored per user by the host and are not exposed to plugin pages.",
+  "devTrustNotice": "Les extensions en développement peuvent envoyer des données à des services distants déclarés et exposer des outils Agent. Vérifiez la source avant d'approuver. Toute modification du manifeste nécessite une nouvelle approbation.",
+  "grantTrust": "Approuver les services de développement",
+  "revokeTrust": "Révoquer l'approbation du service",
+  "connections": "Connexions aux services de l'extension",
+  "credentialNotice": "Les identifiants sont stockés par utilisateur par l'application hôte et ne sont pas exposés aux pages de l'extension.",
   "connected": "Connecté",
-  "disconnected": "Not connected",
-  "token": "Service access token",
-  "connect": "Connect service",
-  "disconnect": "Disconnect",
-  "refresh": "Refresh status",
-  "subscription": "Check subscription",
-  "active": "Subscription active",
-  "inactive": "No active subscription",
-  "bundled": "Included with the app",
-  "checkout": "Open checkout"
+  "disconnected": "Non connecté",
+  "token": "Jeton d'accès au service",
+  "connect": "Connecter le service",
+  "disconnect": "Déconnecter",
+  "refresh": "Actualiser l'état",
+  "subscription": "Vérifier l'abonnement",
+  "active": "Abonnement actif",
+  "inactive": "Aucun abonnement actif",
+  "bundled": "Inclus avec l'application",
+  "checkout": "Ouvrir la page de paiement"
 }

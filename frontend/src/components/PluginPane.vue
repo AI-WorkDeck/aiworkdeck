@@ -501,7 +501,7 @@ export default {
       try {
         out = await this.handleCall(String(msg.method || ''), msg.params || {})
       } catch (e) {
-        out = { ok: false, error: { code: 'internal_error', message: (e && e.message) || (typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US' ? 'Invocation failed' : '调用失败') } }
+        out = { ok: false, error: { code: 'internal_error', message: (e && e.message) || (typeof getAppLanguage === 'function' && !String(getAppLanguage() || 'zh-CN').startsWith('zh') ? 'Invocation failed' : '调用失败') } }
       }
       if (!await this.verifyAuthorization(generation)) return
       this.reply(msg.seq, out, generation)
@@ -523,7 +523,7 @@ export default {
     },
 
     denied(permission) {
-      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
+      const en = typeof getAppLanguage === 'function' && !String(getAppLanguage() || 'zh-CN').startsWith('zh')
       return {
         ok: false,
         error: { code: 'permission_denied', message: (en ? 'Permission not declared in manifest.permissions: ' : 'manifest.permissions 未声明 ') + permission }
@@ -531,7 +531,7 @@ export default {
     },
 
     async handleCall(method, params) {
-      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
+      const en = typeof getAppLanguage === 'function' && !String(getAppLanguage() || 'zh-CN').startsWith('zh')
       const L = (zh, enText) => (en ? enText : zh)
       const generation = this.sessionGeneration
       if (/^(settings|connections|mcp|billing)\./.test(method)) {
@@ -962,7 +962,7 @@ export default {
     // ==== 证据链接（evidence.*）====
 
     noActiveDocument(message) {
-      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
+      const en = typeof getAppLanguage === 'function' && !String(getAppLanguage() || 'zh-CN').startsWith('zh')
       return { ok: false, error: { code: 'no_active_document', message: message || (en ? 'No Word document is open' : '没有打开的 Word 文档') } }
     },
 
@@ -983,7 +983,7 @@ export default {
     },
 
     async evidenceList(params) {
-      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
+      const en = typeof getAppLanguage === 'function' && !String(getAppLanguage() || 'zh-CN').startsWith('zh')
       const L = (zh, enText) => (en ? enText : zh)
       const { idByPath, pathById } = await this.pathTables()
       let query
@@ -1009,7 +1009,7 @@ export default {
     },
 
     async evidenceLink(params) {
-      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
+      const en = typeof getAppLanguage === 'function' && !String(getAppLanguage() || 'zh-CN').startsWith('zh')
       const L = (zh, enText) => (en ? enText : zh)
       const ed = this.activeEditor()
       if (!ed) return this.noActiveDocument()
@@ -1068,7 +1068,7 @@ export default {
     },
 
     async evidenceLocate(params) {
-      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
+      const en = typeof getAppLanguage === 'function' && !String(getAppLanguage() || 'zh-CN').startsWith('zh')
       const L = (zh, enText) => (en ? enText : zh)
       const linkKey = String(params.linkKey || '')
       let link = null
@@ -1105,7 +1105,7 @@ export default {
     // ==== 项目文件 ====
 
     staleContext() {
-      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
+      const en = typeof getAppLanguage === 'function' && !String(getAppLanguage() || 'zh-CN').startsWith('zh')
       return { ok: false, error: { code: 'stale_context', message: en ? 'Project or account has switched. Please try again.' : '项目或账户已切换，请重试' } }
     },
 
@@ -1134,7 +1134,7 @@ export default {
     },
 
     async readProjectFile(path) {
-      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
+      const en = typeof getAppLanguage === 'function' && !String(getAppLanguage() || 'zh-CN').startsWith('zh')
       const L = (zh, enText) => (en ? enText : zh)
       if (!path) {
         return { ok: false, error: { code: 'not_found', message: L('文件不存在：', 'File not found: ') + path } }
@@ -1188,7 +1188,7 @@ export default {
     // ==== 项目沟通 · 通讯录（组织 / 律所 / 朋友）与宿主左栏同步 ====
 
     async handleImDirectory(params = {}) {
-      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
+      const en = typeof getAppLanguage === 'function' && !String(getAppLanguage() || 'zh-CN').startsWith('zh')
       const L = (zh, enText) => (en ? enText : zh)
       // 通讯录数据统一由 utils/imDirectory.js 提供（只用真实数据）。测试夹具会剥掉 import，故先判函数存在。
       if (typeof loadImDirectory !== 'function') {

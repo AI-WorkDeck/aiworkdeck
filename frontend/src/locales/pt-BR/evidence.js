@@ -3,81 +3,81 @@
 
 export default {
   "view": {
-    "bySection": "By Section",
-    "byParty": "By Party"
+    "bySection": "Por seção",
+    "byParty": "Por parte"
   },
   "filter": {
-    "allSections": "All sections",
-    "allParties": "All parties"
+    "allSections": "Todas as seções",
+    "allParties": "Todas as partes"
   },
   "stat": {
-    "total": "{count} total"
+    "total": "{count} no total"
   },
   "status": {
-    "all": "Tudo",
-    "active": "Active",
-    "unverified": "Unverified",
-    "stale": "Changed",
-    "orphan": "Orphaned"
+    "all": "Todos",
+    "active": "Ativo",
+    "unverified": "Não verificado",
+    "stale": "Alterado",
+    "orphan": "Órfão"
   },
   "group": {
-    "none": "Unassigned",
-    "untitled": "(No section)"
+    "none": "Não atribuído",
+    "untitled": "(Sem seção)"
   },
   "action": {
-    "keep": "Keep Link",
-    "rebind": "Reassign",
-    "confirmRebind": "Confirm",
+    "keep": "Manter vínculo",
+    "rebind": "Reatribuir",
+    "confirmRebind": "Confirmar",
     "cancelRebind": "Cancelar",
-    "delete": "Delete",
+    "delete": "Excluir",
     "removeTarget": "Remover",
-    "open": "View Source",
-    "ignore": "Ignore",
-    "expand": "Expand",
-    "collapse": "Collapse"
+    "open": "Ver documento-base",
+    "ignore": "Ignorar",
+    "expand": "Expandir",
+    "collapse": "Recolher"
   },
   "method": {
-    "written_review": "Document Review",
-    "written_statement": "Written Statement",
-    "web_check": "Online Check",
-    "third_party": "Third-Party Material",
-    "interview": "Interview",
-    "none": "No method"
+    "written_review": "Revisão documental",
+    "written_statement": "Declaração por escrito",
+    "web_check": "Verificação online",
+    "third_party": "Material de terceiros",
+    "interview": "Entrevista",
+    "none": "Sem método"
   },
   "relation": {
-    "supports": "Supports",
-    "contradicts": "Contradicts",
-    "partial": "Partial"
+    "supports": "Corrobora",
+    "contradicts": "Contradiz",
+    "partial": "Corrobora parcialmente"
   },
   "loc": {
-    "wholeFile": "Whole file",
-    "page": "Page {page}",
-    "quote": "\"{quote}\"",
-    "region": "Image region",
+    "wholeFile": "Arquivo inteiro",
+    "page": "Página {page}",
+    "quote": "“{quote}”",
+    "region": "Região da imagem",
     "time": "{time}",
     "web": "{host}",
     "cell": "{sheet}!{cell}"
   },
-  "empty": "No source files linked to this document yet",
-  "emptyHint": "Drag a file from the explorer onto selected text to link it",
-  "emptyFiltered": "No links match the current filter",
-  "fileMissing": "(file no longer exists)",
-  "fileDeleted": "(in recycle bin)",
-  "targetsCount": "{count} sources",
-  "rebindHint": "Select the new text in the document, then tap Confirm",
-  "rebindNoSelection": "Selecione o texto no documento primeiro",
+  "empty": "Nenhum arquivo-base vinculado a este documento ainda",
+  "emptyHint": "Arraste um arquivo do explorador sobre o texto selecionado para vinculá-lo",
+  "emptyFiltered": "Nenhum vínculo corresponde ao filtro atual",
+  "fileMissing": "(o arquivo não existe mais)",
+  "fileDeleted": "(na lixeira)",
+  "targetsCount": "{count} documentos-base",
+  "rebindHint": "Selecione o novo texto no documento e toque em Confirmar",
+  "rebindNoSelection": "Selecione primeiro um texto no documento",
   "rebindFailed": "Falha ao reatribuir",
   "rebindRetryHint": "O novo marcador já está no documento; toque em Confirmar novamente para tentar de novo.",
-  "keepGone": "Este texto não está mais no documento, então o link não pode ser mantido. Use Reatribuir na aba Fontes.",
-  "orphanGoto": "A âncora deste texto não está mais no documento. Toque em Reatribuir para selecionar um novo texto.",
+  "keepGone": "Este texto não está mais no documento, portanto o vínculo não pode ser mantido. Use Reatribuir na aba Documentos-base.",
+  "orphanGoto": "A âncora deste texto não está mais no documento. Toque em Reatribuir para escolher um novo texto.",
   "confidence": "Confiança {value}",
   "loading": "Carregando…",
-  "loadFailed": "Falha ao carregar links",
-  "fileTagsLoadFailed": "Falha ao carregar as tags de partido; a visualização \"Por Partido\" pode estar imprecisa",
+  "loadFailed": "Falha ao carregar vínculos",
+  "fileTagsLoadFailed": "Falha ao carregar as tags de partes; a visualização \"Por parte\" pode estar imprecisa",
   "opFailed": "Falha na operação",
-  "deleteConfirm": "Excluir este link? O arquivo de origem não será excluído.",
-  "deleteTargetConfirm": "Remover esta fonte?",
-  "staleOne": "Este texto tem {count} fontes vinculadas e foi alterado",
+  "deleteConfirm": "Excluir este vínculo? O arquivo-base não será excluído.",
+  "deleteTargetConfirm": "Remover este documento-base?",
+  "staleOne": "Este texto possui {count} documentos-base vinculados e foi alterado",
   "staleMany": "{count} trechos vinculados foram alterados",
   "stalePrefix": "Alterado: "
 }

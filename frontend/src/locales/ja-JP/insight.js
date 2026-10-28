@@ -3,88 +3,88 @@
 
 export default {
   "title": "根拠",
-  "noDoc": "No document open",
-  "parse": "Full-document online verification (charges may apply)",
-  "reparse": "Repeat full-document online verification (charges may apply)",
-  "onlineHint": "Clicking saves this document, then verifies the saved version online. AI and external lookups may incur charges.",
-  "saveRequired": "This document could not be saved. Save it successfully before online verification.",
-  "running": "Verifying online…",
-  "done": "Online verification complete",
-  "failed": "Online verification failed",
-  "loading": "Loading…",
-  "loadingDetail": "Fetching lookup details…",
-  "noDetail": "No lookup details for this item",
-  "loadFailed": "Could not load online verification results",
-  "parseFailed": "Could not start online verification",
-  "detailFailed": "Could not load the lookup details",
-  "refreshFailed": "Could not re-run the lookup",
+  "noDoc": "ドキュメントが開かれていません",
+  "parse": "全文オンライン検証（料金が発生する場合があります）",
+  "reparse": "全文オンライン検証を再実行（料金が発生する場合があります）",
+  "onlineHint": "クリックすると現在のドキュメントを保存し、保存済みバージョンをオンラインで検証します。AIおよび外部照会には料金が発生する場合があります。",
+  "saveRequired": "現在のドキュメントを保存できませんでした。保存してからオンライン検証を行ってください。",
+  "running": "オンライン検証中…",
+  "done": "オンライン検証が完了しました",
+  "failed": "オンライン検証に失敗しました",
+  "loading": "読み込み中…",
+  "loadingDetail": "照会詳細を取得中…",
+  "noDetail": "この項目には照会詳細がありません",
+  "loadFailed": "オンライン検証結果の読み込みに失敗しました",
+  "parseFailed": "オンライン検証の開始に失敗しました",
+  "detailFailed": "照会詳細の取得に失敗しました",
+  "refreshFailed": "再照会に失敗しました",
   "retry": "再試行",
-  "goConnectAccount": "Connect account",
-  "goRecharge": "Add credits",
+  "goConnectAccount": "アカウントを接続",
+  "goRecharge": "クレジットを追加",
   "hint": {
-    "NO_CREDENTIAL": "This lookup channel needs a credential configured on the server by your administrator."
+    "NO_CREDENTIAL": "この照会チャネルの認証情報は、管理者がサーバー側で設定する必要があります。"
   },
   "tab": {
-    "retrieval": "Lookups",
-    "checks": "Consistency"
+    "retrieval": "外部照会",
+    "checks": "整合性チェック"
   },
   "kind": {
-    "COMPANY": "Companies",
-    "LAW": "Statutes",
-    "CASE": "Cases",
-    "DOC": "Documents"
+    "COMPANY": "企業",
+    "LAW": "法令",
+    "CASE": "判例",
+    "DOC": "文書"
   },
   "entityKind": {
-    "COMPANY": "Company",
-    "LAW": "Statute",
-    "CASE": "Case",
-    "DOC": "Document"
+    "COMPANY": "企業",
+    "LAW": "法令",
+    "CASE": "判例",
+    "DOC": "文書"
   },
-  "openInNewTab": "Open in a new tab",
-  "openDocFile": "Open file",
-  "docNotFound": "No such file in this project",
-  "docMissing": "That file is no longer in this project",
+  "openInNewTab": "新しいタブで開く",
+  "openDocFile": "ファイルを開く",
+  "docNotFound": "プロジェクト内に該当ファイルが見つかりません",
+  "docMissing": "ファイルはすでにプロジェクト内にありません",
   "source": {
-    "projectFile": "Project file",
-    "qichacha": "Qichacha"
+    "projectFile": "プロジェクトファイル",
+    "qichacha": "Qichacha（企査査）"
   },
-  "mentions": "{count} mention(s)",
-  "mentionsTitle": "Mentions in this document",
-  "shareholders": "Shareholders",
-  "moreCandidates": "Other candidates",
+  "mentions": "{count} 箇所",
+  "mentionsTitle": "本文中の出現箇所",
+  "shareholders": "株主・出資情報",
+  "moreCandidates": "その他の候補",
   "caseSection": {
-    "ascertain": "Facts found",
-    "reason": "Reasoning",
-    "result": "Judgment",
-    "gist": "Key holding",
-    "fullText": "Full judgment"
+    "ascertain": "認定事実",
+    "reason": "判断理由",
+    "result": "主文・結論",
+    "gist": "判示事項",
+    "fullText": "判決全文"
   },
-  "authoritative": "Authoritative text (Pkulaw)",
-  "implementDate": "In force from {date}",
-  "recognition": "Case number recognition",
-  "openInPkulaw": "Open in Pkulaw",
+  "authoritative": "公式条文（Pkulaw）",
+  "implementDate": "施行日 {date}",
+  "recognition": "事件番号の認識",
+  "openInPkulaw": "Pkulawで開く",
   "citation": {
-    "citedText": "Cited article",
-    "candidates": "Articles matched by content",
-    "article": "Article {n}"
+    "citedText": "引用された条文",
+    "candidates": "内容から特定された条文",
+    "article": "第{n}条"
   },
   "severity": {
-    "warn": "Questionable",
-    "error": "Error"
+    "warn": "要確認",
+    "error": "エラー"
   },
-  "unifyTo": "Set all to {value}",
-  "cannotFix": "Cannot fix automatically: {reason}",
-  "fixNotUnique": "Could not locate a unique match — please edit manually.",
-  "fixPartial": "Fixed {done}; {failed} had no unique match — please edit those manually.",
-  "fixed": "Fixed",
-  "fixedHint": "Press Cmd+Z to undo; re-analyze to refresh the findings.",
-  "noEditor": "Activate a document editor window first",
+  "unifyTo": "{value} に統一",
+  "cannotFix": "一括修正できません：{reason}",
+  "fixNotUnique": "一意に特定できなかったため、手動で修正してください。",
+  "fixPartial": "{done} 箇所を修正しました。残り {failed} 箇所は一意に特定できなかったため手動で修正してください。",
+  "fixed": "修正済み",
+  "fixedHint": "Cmd+Z で元に戻せます。再解析すると結果を更新できます。",
+  "noEditor": "先にドキュメント編集ウィンドウをアクティブにしてください",
   "empty": {
-    "noRun": "This document has not been verified online",
-    "noRunHint": "Everyday writing hints run locally. Only clicking online verification sends the saved document for AI extraction, external lookups and consistency checks.",
-    "noEntity": "No lookupable entities found",
-    "noEntityHint": "The document mentions no company name, statute article or case number.",
-    "noFinding": "No inconsistencies found",
-    "noFindingHint": "Quantity statements and unified social credit codes all check out."
+    "noRun": "このドキュメントはまだオンライン検証されていません",
+    "noRunHint": "通常の執筆ヒントはローカルで動作します。上のオンライン検証をクリックしたときのみ、保存済みドキュメントに対してAI抽出・外部照会・整合性チェックを実行します。",
+    "noEntity": "照会可能なエンティティが見つかりませんでした",
+    "noEntityHint": "文書内に企業名、法令条文、事件番号が含まれていません。",
+    "noFinding": "矛盾は見つかりませんでした",
+    "noFindingHint": "数量の記述および統一社会信用コードはすべて整合しています。"
   }
 }

@@ -3,88 +3,88 @@
 
 export default {
   "title": "Références",
-  "noDoc": "No document open",
-  "parse": "Full-document online verification (charges may apply)",
-  "reparse": "Repeat full-document online verification (charges may apply)",
-  "onlineHint": "Clicking saves this document, then verifies the saved version online. AI and external lookups may incur charges.",
-  "saveRequired": "This document could not be saved. Save it successfully before online verification.",
-  "running": "Verifying online…",
-  "done": "Online verification complete",
-  "failed": "Online verification failed",
+  "noDoc": "Aucun document ouvert",
+  "parse": "Vérification en ligne du document complet (des frais peuvent s’appliquer)",
+  "reparse": "Relancer la vérification en ligne du document complet (des frais peuvent s’appliquer)",
+  "onlineHint": "Un clic enregistre ce document, puis vérifie en ligne la version enregistrée. L’IA et les recherches externes peuvent entraîner des frais.",
+  "saveRequired": "Ce document n’a pas pu être enregistré. Enregistrez-le avant de lancer la vérification en ligne.",
+  "running": "Vérification en ligne…",
+  "done": "Vérification en ligne terminée",
+  "failed": "Échec de la vérification en ligne",
   "loading": "Chargement…",
-  "loadingDetail": "Fetching lookup details…",
-  "noDetail": "No lookup details for this item",
-  "loadFailed": "Could not load online verification results",
-  "parseFailed": "Could not start online verification",
-  "detailFailed": "Could not load the lookup details",
-  "refreshFailed": "Could not re-run the lookup",
+  "loadingDetail": "Récupération des détails…",
+  "noDetail": "Aucun détail de recherche pour cet élément",
+  "loadFailed": "Impossible de charger les résultats de la vérification en ligne",
+  "parseFailed": "Impossible de démarrer la vérification en ligne",
+  "detailFailed": "Impossible de charger les détails de la recherche",
+  "refreshFailed": "Impossible de relancer la recherche",
   "retry": "Réessayer",
-  "goConnectAccount": "Connect account",
-  "goRecharge": "Add credits",
+  "goConnectAccount": "Connecter un compte",
+  "goRecharge": "Ajouter des crédits",
   "hint": {
-    "NO_CREDENTIAL": "This lookup channel needs a credential configured on the server by your administrator."
+    "NO_CREDENTIAL": "Ce canal de recherche nécessite des identifiants configurés sur le serveur par votre administrateur."
   },
   "tab": {
-    "retrieval": "Lookups",
-    "checks": "Consistency"
+    "retrieval": "Recherches",
+    "checks": "Cohérence"
   },
   "kind": {
-    "COMPANY": "Companies",
-    "LAW": "Statutes",
-    "CASE": "Cases",
-    "DOC": "Documents"
+    "COMPANY": "Sociétés",
+    "LAW": "Textes de loi",
+    "CASE": "Jurisprudence",
+    "DOC": "Documents liés"
   },
   "entityKind": {
-    "COMPANY": "Company",
-    "LAW": "Statute",
-    "CASE": "Case",
-    "DOC": "Document"
+    "COMPANY": "Société",
+    "LAW": "Texte de loi",
+    "CASE": "Décision",
+    "DOC": "Document lié"
   },
-  "openInNewTab": "Open in a new tab",
-  "openDocFile": "Open file",
-  "docNotFound": "No such file in this project",
-  "docMissing": "That file is no longer in this project",
+  "openInNewTab": "Ouvrir dans un nouvel onglet",
+  "openDocFile": "Ouvrir le fichier",
+  "docNotFound": "Fichier introuvable dans ce projet",
+  "docMissing": "Ce fichier ne fait plus partie du projet",
   "source": {
-    "projectFile": "Project file",
+    "projectFile": "Fichier du projet",
     "qichacha": "Qichacha"
   },
-  "mentions": "{count} mention(s)",
-  "mentionsTitle": "Mentions dans ce document",
+  "mentions": "{count} occurrence(s)",
+  "mentionsTitle": "Occurrences dans ce document",
   "shareholders": "Actionnaires",
-  "moreCandidates": "Autres candidats",
+  "moreCandidates": "Autres résultats possibles",
   "caseSection": {
-    "ascertain": "Faits établis",
-    "reason": "Motivation",
-    "result": "Jugement",
-    "gist": "Principale décision",
-    "fullText": "Jugement intégral"
+    "ascertain": "Faits constatés",
+    "reason": "Motifs",
+    "result": "Dispositif",
+    "gist": "Sommaire",
+    "fullText": "Texte intégral de la décision"
   },
-  "authoritative": "Texte faisant autorité (Pkulaw)",
+  "authoritative": "Texte faisant foi (Pkulaw)",
   "implementDate": "En vigueur depuis le {date}",
-  "recognition": "Reconnaissance du numéro d'affaire",
+  "recognition": "Identification du numéro d’affaire",
   "openInPkulaw": "Ouvrir dans Pkulaw",
   "citation": {
     "citedText": "Article cité",
-    "candidates": "Articles identifiés par le contenu",
-    "article": "Article {n}"
+    "candidates": "Articles correspondant au contenu",
+    "article": "Article n° {n}"
   },
   "severity": {
-    "warn": "Douteux",
+    "warn": "À vérifier",
     "error": "Erreur"
   },
-  "unifyTo": "Tout définir sur {value}",
-  "cannotFix": "Impossible de corriger automatiquement : {reason}",
-  "fixNotUnique": "Impossible de trouver une correspondance unique — veuillez modifier manuellement.",
-  "fixPartial": "{done} corrections effectuées ; {failed} sans correspondance unique — veuillez les modifier manuellement.",
+  "unifyTo": "Uniformiser en {value}",
+  "cannotFix": "Correction automatique impossible : {reason}",
+  "fixNotUnique": "Impossible d’identifier une occurrence unique — veuillez modifier manuellement.",
+  "fixPartial": "{done} corrigé(s) ; {failed} sans correspondance unique — veuillez les modifier manuellement.",
   "fixed": "Corrigé",
-  "fixedHint": "Appuyez sur Cmd+Z pour annuler ; relancez l'analyse pour actualiser les résultats.",
-  "noEditor": "Activez d'abord une fenêtre d'éditeur de document",
+  "fixedHint": "Appuyez sur Cmd+Z pour annuler ; relancez l’analyse pour actualiser les résultats.",
+  "noEditor": "Activez d’abord une fenêtre d’édition de document",
   "empty": {
-    "noRun": "Ce document n'a pas été vérifié en ligne",
-    "noRunHint": "Les suggestions de rédaction courante s'exécutent localement. Seul un clic sur la vérification en ligne envoie le document enregistré pour l'extraction par IA, les recherches externes et les contrôles de cohérence.",
-    "noEntity": "Aucune entité identifiable trouvée",
-    "noEntityHint": "Le document ne mentionne aucun nom de société, article de loi ou numéro d'affaire.",
+    "noRun": "Ce document n’a pas encore été vérifié en ligne",
+    "noRunHint": "Les suggestions d’écriture courantes s’exécutent localement. Seul un clic sur la vérification en ligne envoie le document enregistré pour l’extraction IA, les recherches externes et les contrôles de cohérence.",
+    "noEntity": "Aucune entité vérifiable détectée",
+    "noEntityHint": "Le document ne mentionne aucun nom de société, article de loi ni numéro d’affaire.",
     "noFinding": "Aucune incohérence détectée",
-    "noFindingHint": "Les quantités et les codes de crédit social unifié sont tous conformes."
+    "noFindingHint": "Les montants, quantités et codes d’identification concordent."
   }
 }

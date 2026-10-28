@@ -41,6 +41,8 @@ description: 侧边栏与工作台外壳领域。任务涉及左侧 rail/左栏�
 
 Windows 顶栏（dev-board#1370）由 `App.vue` 平台样式分成菜单行与项目/工具行，不重复展示中央 Logo，保留原生窗口控件的右侧安全区。全局平台样式必须显式覆盖 `.page-project-overview.compact-mode`：项目 scoped 样式会增加属性选择器权重，单靠全局加载顺序不能覆盖窄屏的高度和 padding。非 Windows 布局中央保留绝对居中的 100px 品牌标志（`left: 50%` 相对 padding-box），`.header-left` 按 `calc(50% - (var(--awd-header-pad-start) - var(--awd-header-pad-end)) / 2 - 64px)` 限制最大宽度，使长协作状态 chip 与 `.project-meta` 在 1440px 等宽度下优先收缩省略、不压中央标志；`.header-left`、`.project-info`、`.project-title-row` 不得设 `overflow: hidden`，否则会截断 `.switcher-menu` 最近项目下拉。原生拖拽验收同时检查顶栏几何不重叠及真实鼠标菜单开关。
 
+顶栏对齐（dev-board#1567）：普通与 compact 模式共用 40px 内容高度，避免窗口缩窄时相对 macOS 交通灯下移；项目名保留 block 单行省略，以控件高度减边框作为行高，箭头与状态内容显式居中。768px 以下中央模式组进入正常横向布局，不再把固定高度标题栏改成纵向堆叠。`tests/project-home/titlebar-alignment-ui.mjs` 用合成 API 在真实 H5 上检查中英、四种宽度及三种平台 CSS；平台 CSS 模拟不等于 Windows 原生验收。
+
 ## 离开工作台前必须落盘（已踩）
 
 自动保存是防抖的，用户敲完最后一个字到真正落盘之间有一段窗口。`closeFile`

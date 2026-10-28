@@ -36,12 +36,12 @@ export default {
     "pause": "Pausa",
     "mute": "Disattiva audio",
     "unmute": "Riattiva audio",
-    "volume": "Volume",
+    "volume": "Volume audio",
     "progress": "Avanza",
     "speed": "Velocità di riproduzione",
     "fullscreen": "Schermo intero",
     "exitFullscreen": "Esci da schermo intero",
-    "pip": "Picture in picture",
+    "pip": "Finestra nell'immagine",
     "exitPip": "Esci da picture in picture",
     "pipActive": "Riproduzione in picture-in-picture",
     "transcript": "Trascrizione",
@@ -52,7 +52,7 @@ export default {
     "previewTimeout": "Timeout nella preparazione dell'anteprima audio. Chiudi questa scheda e riaprila.",
     "playFailed": "Impossibile riprodurre questo file. Il codec potrebbe non essere supportato.",
     "backToCurrent": "Torna alla posizione corrente",
-    "speakerPrefix": "{name}: ",
+    "speakerPrefix": "{name} — ",
     "summary": "{count} segmenti · {duration}"
   },
   "captions": {

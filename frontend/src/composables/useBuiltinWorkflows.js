@@ -53,12 +53,12 @@ export function useBuiltinWorkflows(props) {
           : fallbackVersions
         const activeVersionId = st?.activeVersionId || 'default'
         const activeIsSystemDefault = st ? !!st.activeIsSystemDefault : activeVersionId === 'default'
-        const activeVersionName = st?.activeVersionName || sysDefaultName
+        const activeVersionName = activeIsSystemDefault ? sysDefaultName : (st?.activeVersionName || sysDefaultName)
         return {
           ...def,
-          title: st?.shortName || def.title,
-          desc: st?.hint || def.desc,
-          prompt: st?.activeQuickPrompt || def.prompt,
+          title: def.title || st?.shortName,
+          desc: def.desc || st?.hint,
+          prompt: activeIsSystemDefault ? def.prompt : (st?.activeQuickPrompt || def.prompt),
           activeVersionId,
           activeVersionName,
           activeIsSystemDefault,

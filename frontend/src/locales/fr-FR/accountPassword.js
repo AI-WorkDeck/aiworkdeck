@@ -2,21 +2,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "intro": "Sign in with your phone number or email and password. First time? Verify and create a password.",
+  "intro": "Connectez-vous avec votre numéro de téléphone ou votre e-mail et votre mot de passe. Première utilisation ? Vérifiez votre identité et créez un mot de passe.",
   "password": "Mot de passe",
-  "confirm": "Confirm password",
-  "register": "First time / Create password",
+  "confirm": "Confirmer le mot de passe",
+  "register": "Première utilisation / Créer un mot de passe",
   "reset": "Mot de passe oublié",
   "back": "Retour à la connexion par mot de passe",
-  "setup": "Create password",
-  "resetTitle": "Reset password",
-  "verify": "Verify and continue",
+  "setup": "Créer un mot de passe",
+  "resetTitle": "Réinitialiser le mot de passe",
+  "verify": "Vérifier et continuer",
   "signIn": "Se connecter",
-  "passwordHint": "8–72 characters. Use a unique password.",
-  "invalid": "Use a password with 8–72 characters",
-  "mismatch": "Passwords do not match",
+  "passwordHint": "8 à 72 caractères. Utilisez un mot de passe unique.",
+  "invalid": "Utilisez un mot de passe de 8 à 72 caractères",
+  "mismatch": "Les mots de passe ne correspondent pas",
   "required": "Saisissez votre mot de passe",
-  "resetDone": "Password reset. Sign in with your new password.",
-  "setupHint": "Verified. Create a password to continue.",
-  "resetHint": "This code is only for resetting your password."
+  "resetDone": "Mot de passe réinitialisé. Connectez-vous avec votre nouveau mot de passe.",
+  "setupHint": "Vérification réussie. Créez un mot de passe pour continuer.",
+  "resetHint": "Ce code sert uniquement à réinitialiser votre mot de passe."
 }

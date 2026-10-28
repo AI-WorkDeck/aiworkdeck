@@ -19,6 +19,10 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 真实 AI 验收须使用产品 Agent/工具/编辑器完整链，隔离数据与专用 QA 账户；后端 BYOK 可执行条件不等于前端模型选择免登录。模型接口请求成功、技能存在或模拟模型单测通过，都不能替代参考 Word/PPT 的成品逐页视觉验收。当前实测及待验记录见 `doc/verification/2026-10-28-ppt-quality.md`。
 
+## 手动展开与阅读位置（dev-board#1568）
+
+`ChatInterface.message-list` 使用 `scrollbar-gutter: stable both-edges`，经典滚动条出现/消失时保持正文宽度与居中轴稳定。`RootBubble`、`ProcessCard`、`ThinkingCard` 在用户手动展开/收起前逐层发出 `reading-interaction`，由聊天宿主暂停 `followLatest`，避免内容高度变化触发 ResizeObserver 把读者拉到底部；自动展开和流式更新不发此事件，回到最新仍恢复跟随。回归 `tests/chat-presentation-ui/scrollbar-stability.mjs`；无头浏览器默认隐藏滚动条，需要关闭该默认参数才能复现经典滚动条造成的横移。
+
 ## AI 项目版本操作（2026-10-26，dev-board#1498）
 
 `VersionTools` 提供 `version_status/history/changes/commit/pull/restore`，独立 `version` 类目，均要求工作台 LOWA 宿主，不要求打开某份文档；Office/none 不可调用，ASK 仅放行状态、历史和变更清单。身份取 `ProjectContextHolder`，不可由模型指定另一项目或用户；客户不可读取版本历史，写动作仍经过既有成员权限与版本接口。`version_changes` 返回路径及增删改类型，不是正文差异；磁盘清单不代表编辑器未保存缓冲。历史可选 `includeAuto`，让 AI 找回恢复前自动保留的工作。

@@ -3,81 +3,81 @@
 
 export default {
   "view": {
-    "bySection": "By Section",
-    "byParty": "By Party"
+    "bySection": "حسب القسم",
+    "byParty": "حسب الطرف"
   },
   "filter": {
-    "allSections": "All sections",
-    "allParties": "All parties"
+    "allSections": "جميع الأقسام",
+    "allParties": "جميع الأطراف"
   },
   "stat": {
-    "total": "{count} total"
+    "total": "الإجمالي {count}"
   },
   "status": {
     "all": "الكل",
-    "active": "Active",
-    "unverified": "Unverified",
-    "stale": "Changed",
-    "orphan": "Orphaned"
+    "active": "نشط",
+    "unverified": "غير متحقق منه",
+    "stale": "معدّل",
+    "orphan": "فاقد الارتباط"
   },
   "group": {
-    "none": "Unassigned",
-    "untitled": "(No section)"
+    "none": "غير معيّن",
+    "untitled": "(بلا قسم)"
   },
   "action": {
-    "keep": "Keep Link",
-    "rebind": "Reassign",
-    "confirmRebind": "Confirm",
+    "keep": "الاحتفاظ بالرابط",
+    "rebind": "إعادة التعيين",
+    "confirmRebind": "تأكيد",
     "cancelRebind": "إلغاء",
     "delete": "حذف",
     "removeTarget": "إزالة",
-    "open": "View Source",
-    "ignore": "Ignore",
-    "expand": "Expand",
-    "collapse": "Collapse"
+    "open": "عرض المصدر",
+    "ignore": "تجاهل",
+    "expand": "توسيع",
+    "collapse": "طي"
   },
   "method": {
-    "written_review": "Document Review",
-    "written_statement": "Written Statement",
-    "web_check": "Online Check",
-    "third_party": "Third-Party Material",
-    "interview": "Interview",
-    "none": "No method"
+    "written_review": "مراجعة مستندية",
+    "written_statement": "إفادة خطية",
+    "web_check": "تحقق عبر الإنترنت",
+    "third_party": "مواد طرف ثالث",
+    "interview": "مقابلة",
+    "none": "بلا طريقة"
   },
   "relation": {
-    "supports": "Supports",
-    "contradicts": "Contradicts",
-    "partial": "Partial"
+    "supports": "يدعم",
+    "contradicts": "يناقض",
+    "partial": "يدعم جزئيًا"
   },
   "loc": {
-    "wholeFile": "Whole file",
-    "page": "Page {page}",
-    "quote": "\"{quote}\"",
-    "region": "Image region",
+    "wholeFile": "الملف بالكامل",
+    "page": "صفحة {page}",
+    "quote": "«{quote}»",
+    "region": "منطقة في الصورة",
     "time": "{time}",
     "web": "{host}",
     "cell": "{sheet}!{cell}"
   },
-  "empty": "No source files linked to this document yet",
-  "emptyHint": "Drag a file from the explorer onto selected text to link it",
-  "emptyFiltered": "No links match the current filter",
-  "fileMissing": "(file no longer exists)",
-  "fileDeleted": "(in recycle bin)",
-  "targetsCount": "{count} sources",
-  "rebindHint": "Select the new text in the document, then tap Confirm",
-  "rebindNoSelection": "Select text in the document first",
-  "rebindFailed": "Reassign failed",
-  "rebindRetryHint": "The new bookmark is already in the document; tap Confirm again to retry.",
-  "keepGone": "This text is no longer in the document, so the link cannot be kept. Use Reassign in the Sources tab.",
-  "orphanGoto": "The anchor for this text is no longer in the document. Tap Reassign to pick new text.",
-  "confidence": "Confidence {value}",
-  "loading": "Loading…",
-  "loadFailed": "Failed to load links",
-  "fileTagsLoadFailed": "Failed to load party tags; the \"By Party\" view may be inaccurate",
-  "opFailed": "Operation failed",
-  "deleteConfirm": "Delete this link? The source file will not be deleted.",
-  "deleteTargetConfirm": "Remove this source?",
-  "staleOne": "This text has {count} linked sources and has been changed",
-  "staleMany": "{count} linked passages have been changed",
-  "stalePrefix": "Changed: "
+  "empty": "لا توجد ملفات مصدر مرتبطة بهذا المستند بعد",
+  "emptyHint": "اسحب ملفًا من المستكشف إلى النص المحدد لربطه",
+  "emptyFiltered": "لا توجد روابط تطابق عامل التصفية الحالي",
+  "fileMissing": "(الملف لم يعد موجودًا)",
+  "fileDeleted": "(في سلة المحذوفات)",
+  "targetsCount": "{count} مصادر",
+  "rebindHint": "حدد النص الجديد في المستند، ثم انقر على تأكيد",
+  "rebindNoSelection": "حدد نصًا في المستند أولاً",
+  "rebindFailed": "فشلت إعادة التعيين",
+  "rebindRetryHint": "الإشارة المرجعية الجديدة موجودة بالفعل في المستند؛ انقر على تأكيد مرة أخرى لإعادة المحاولة.",
+  "keepGone": "لم يعد هذا النص موجودًا في المستند، لذا لا يمكن الاحتفاظ بالرابط. استخدم إعادة التعيين في علامة تبويب المصادر.",
+  "orphanGoto": "لم يعد موضع ربط هذا النص موجودًا في المستند. انقر على إعادة التعيين لاختيار نص جديد.",
+  "confidence": "درجة الثقة {value}",
+  "loading": "جارٍ التحميل…",
+  "loadFailed": "فشل تحميل الروابط",
+  "fileTagsLoadFailed": "فشل تحميل وسوم الأطراف؛ قد يكون العرض «حسب الطرف» غير دقيق",
+  "opFailed": "فشلت العملية",
+  "deleteConfirm": "هل تريد حذف هذا الرابط؟ لن يتم حذف ملف المصدر.",
+  "deleteTargetConfirm": "هل تريد إزالة هذا المصدر؟",
+  "staleOne": "يحتوي هذا النص على {count} مصادر مرتبطة وقد تم تعديله",
+  "staleMany": "تم تعديل {count} مقاطع مرتبطة",
+  "stalePrefix": "معدّل: "
 }

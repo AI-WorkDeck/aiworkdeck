@@ -176,6 +176,16 @@ export default {
   tierColThreshold: 'Threshold (points)',
   tierColBonus: 'Top-up bonus',
   tierBonusCell: '{permille}‰',
+  membershipTiers: {
+    paralegal: 'Paralegal',
+    associate: 'Associate',
+    lead: 'Lead Counsel',
+    senior: 'Senior Counsel',
+    'salaried-partner': 'Salaried Partner',
+    'equity-partner': 'Equity Partner',
+    'managing-partner': 'Managing Partner',
+    silver: 'Silver Member',
+  },
   // Recharge dialog (dev-board#184)
   rechargeTitle: 'Top Up Account',
   rechargeSubtitle: 'Adds to your Credits wallet; arrives instantly after payment',

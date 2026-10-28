@@ -36,7 +36,7 @@ export default {
     "pause": "Pausar",
     "mute": "Silenciar",
     "unmute": "Ativar som",
-    "volume": "Volume",
+    "volume": "Volume do áudio",
     "progress": "Buscar",
     "speed": "Velocidade de reprodução",
     "fullscreen": "Tela cheia",
@@ -52,7 +52,7 @@ export default {
     "previewTimeout": "O tempo limite da preparação da pré-visualização de áudio foi excedido. Feche esta aba e abra-a novamente.",
     "playFailed": "Não é possível reproduzir este arquivo. O codec pode não ser suportado.",
     "backToCurrent": "Voltar ao atual",
-    "speakerPrefix": "{name}: ",
+    "speakerPrefix": "{name} — ",
     "summary": "{count} segmentos · {duration}"
   },
   "captions": {
@@ -125,7 +125,7 @@ export default {
   "tagLoading": "Carregando tags…",
   "tagLoadFailed": "Não foi possível carregar as tags",
   "tagViewFolders": "Pastas",
-  "tagViewTags": "Tags",
+  "tagViewTags": "Etiquetas",
   "tagViewAllTagged": "Todos os arquivos com tag",
   "tagViewNoFiles": "Nenhum arquivo corresponde a essas tags",
   "tagViewFileCount": "{count} arquivos",
@@ -172,7 +172,7 @@ export default {
   "tagTypeLabel": "Tipo",
   "tagGroupParty": "Parte",
   "tagGroupIssue": "Questão",
-  "tagGroupNormal": "Tags",
+  "tagGroupNormal": "Etiquetas",
   "tagGroupOther": "Outras Tags",
   "loadingDots": "Carregando...",
   "loadFailedWithReason": "Falha ao carregar: {reason}"

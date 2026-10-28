@@ -93,8 +93,10 @@ const reviewTheme = EditorView.baseTheme({
 export function createReviewExtensions({ getBaseline, getComments, onAddComment, deletedLabel }) {
   let isEn = false
   try {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') isEn = true
-    else if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') isEn = true
+    const l = (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language'))
+      || (typeof document !== 'undefined' && document.documentElement?.lang)
+      || ''
+    if (l && !l.startsWith('zh')) isEn = true
   } catch (_) { /* ignore */ }
   const label = typeof deletedLabel === 'function' ? deletedLabel : (count) => (isEn ? `Deleted ${count} lines` : `已删除 ${count} 行`)
   const recompute = StateEffect.define()
