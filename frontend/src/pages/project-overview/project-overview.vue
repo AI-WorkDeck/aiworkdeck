@@ -8665,13 +8665,17 @@ export default {
     },
 
     async loadChatWorkspaceFiles() {
+      const requestId = this._chatFilesRequestId = (this._chatFilesRequestId || 0) + 1
+      const projectId = this.projectId
       if (!this.hasProject) {
         this.chatWorkspaceFiles = []
         return []
       }
-      const res = await getProjectFiles(this.projectId, null, true)
+      const res = await getProjectFiles(projectId, null, true)
+      if (requestId !== this._chatFilesRequestId || String(projectId) !== String(this.projectId)) return this.chatWorkspaceFiles
       const nodes = Array.isArray(res) ? res : (res?.data || [])
       this.chatWorkspaceFiles = flattenProjectFileTree(nodes)
+      this.chatWorkspaceFiles.forEach(file => this.handleFileRenamed(file))
       return this.chatWorkspaceFiles
     },
 

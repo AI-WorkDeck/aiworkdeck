@@ -1622,3 +1622,8 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 ### 插件入口按声明选择（dev-board#1531）
 
 `contributes.views: []` 不提供 rail、panel 或工作区。仅 workspace 的插件保留 rail，点击只打开/聚焦标签，不切换当前左栏；rail 高亮取真实工作区状态。仅 sidebar 不自动开标签，两者兼有可通过 SDK `ui.openWorkspace()` 打开自己的 workspace。缺省/null 沿用旧入口。新规则集中在 `utils/pluginViews.js` 与 `pluginWorkspaceTabs.js`，快照恢复及直达入口使用同一闸；每个视图按自己的 scope 检查项目上下文，不能借另一个 global 视图越过 project 限制。旧纯皮肤 gallery（无业务权限、工具及其他贡献）仅作预览，更新宿主即隐藏其入口并清理旧标签；非 gallery 的主题编辑器等业务视图仍按声明显示。
+
+
+## 随手工作区文件改名刷新（dev-board#1587）
+
+`ChatModeSidebar` 的文件列表来自独立 `chatWorkspaceFiles`，不依赖 `FileTree.allFiles`。AI 的 `refresh_files` 在对话模式同时调用 `loadChatWorkspaceFiles`；加载器按请求序号与项目 ID 丢弃迟到结果，并沿 `handleFileRenamed` 更新左右已开标签、窗口标题与当前文档上下文。不能只刷新 FileTree，否则 AI 已改名但左侧仍显示旧名。回归 `file-rename-sync.test.mjs` 覆盖文件树挂载/未挂载、Word/PPT/Excel/PDF/Markdown 名称同步与跨项目迟到响应；这是合成清单的真实方法执行测试，不替代正式客户端模型调用与编辑器保存重开验收。
