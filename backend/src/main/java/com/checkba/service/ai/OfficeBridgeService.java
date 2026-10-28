@@ -117,6 +117,10 @@ public class OfficeBridgeService {
             Map.entry("ppt_add_slide", 120),
             // 建表并逐格落字
             Map.entry("ppt_add_table", 120),
+            // 图片预处理与原生插入、批量图表序列和样式需要长预算，避免未完成时重试。
+            Map.entry("ppt_add_image", 120),
+            Map.entry("ppt_add_chart", 120),
+            Map.entry("ppt_format_chart", 120),
             // 遍历全篇每页每个形状（含组合与表格递归）找命中，再逐处从右到左替换
             Map.entry("ppt_replace_text", 120),
             // 与 ppt_replace_text 同一条全篇遍历，只是把替换换成设字体
