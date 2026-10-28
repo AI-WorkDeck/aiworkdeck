@@ -3,7 +3,7 @@
 <template>
   <!-- Inline Variant (Nested) -->
   <div v-if="variant === 'inline'" class="thinking-inline">
-     <div class="h-wrap" @click="isExpanded = !isExpanded">
+     <div class="h-wrap" @click="toggle">
         <!-- Removed Emoji Icon -->
          <span class="label">
             <span v-if="status === 'thinking'">{{ $t('chat.thinkingLive', { seconds: liveSeconds }) }}</span>
@@ -69,7 +69,7 @@ const props = defineProps({
   stoppable: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['stop'])
+const emit = defineEmits(['stop', 'reading-interaction'])
 
 // 等过 60 秒才出副文案：短思考不打扰。三句话分开——
 // 还没收到任何增量（只有保活）= 排在服务商队里；换过家还没字 = 已换一家重试；已在收思考 = 模型仍在推理。
@@ -148,6 +148,7 @@ const displayDuration = computed(() => {
 })
 
 const toggle = () => {
+  emit('reading-interaction')
   isExpanded.value = !isExpanded.value
 }
 
