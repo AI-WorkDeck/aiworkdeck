@@ -2,6 +2,58 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "插入投影片圖片",
+  cmdPptAddChart: "插入投影片圖表",
+  cmdPptFormatChart: "設定投影片圖表格式",
+  cmdPptSetTransition: "設定投影片轉場效果",
+  wordStyleUnsupported: "目前宿主無法完整套用這些樣式欄位：{fields}。尚未開始修改。",
+  wordStyleNotApplied: "宿主未套用要求的段落樣式，請檢查文件後再重試。",
+
+  cmdGetParagraphs: "讀取段落",
+  cmdGetOutline: "讀取大綱",
+  cmdGetClauses: "識別條款",
+  cmdReplaceNthMatch: "取代指定符合項目",
+  cmdApplyStyleProfile: "套用樣式設定",
+
+  wordStructureTooLarge: "文件結構過大，無法在單次安全處理範圍內完整讀取。請縮小文件後重試。",
+  wordStructurePartial: "部分格式可能已套用。請先檢查目前文件，不要重複執行。",
+
+  cmdPptTableSetStyle: "設定投影片表格格式",
+  cmdPptReadNotes: "讀取演講者備註",
+  cmdPptWriteNotes: "寫入演講者備註",
+
+  excelConditionalActionInvalid: "條件格式操作必須為 apply 或 clearAll。",
+  wordImagePartial: "圖片可能已插入，但後續設定未完成。請檢查現有圖片，不要重複插入。",
+
+  excelRangeTooLarge: "範圍超過 50,000 個儲存格，請縮小範圍後再試；本次未修改。",
+
+  fileOperationUnavailable: "目前無法執行或確認此檔案操作。",
+  fileOperationStale: "文件已切換，請重新讀取目前文件後再試。",
+  fileOperationInvalidArguments: "檔案操作參數無效。",
+  fileOperationInvalidBytes: "未傳回有效且完整的檔案位元組。",
+  cmdFileCreate: "新增檔案",
+  cmdFileSave: "儲存目前檔案",
+  cmdFileExportPdf: "匯出 PDF 至專案",
+  cmdFileOpen: "開啟檔案或匯入副本",
+  excelChartPartial: "圖表「{name}」可能已建立，但設定失敗且無法確認復原。請先檢查現有圖表，不要重複建立。",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "投影片或圖案目標無效。",
+  pptStaleTarget: "目標文字已變更，請重新讀取後再修改。",
+  pptInvalidArguments: "簡報編輯參數無效。",
+  pptCapabilityUnavailable: "目前簡報宿主不支援此功能。",
+  cmdPptSetShapeText: "設定圖案文字",
+  cmdPptSetShapeGeometry: "設定圖案位置和大小",
+  cmdPptFormatShape: "設定圖案格式",
+  cmdPptGoto: "跳至投影片或圖案",
+  cmdPptSetLayout: "設定投影片版面配置或背景",
+  excelValidationCustomRequired: "自訂驗證需要公式。",
+  excelValidationTypeInvalid: "不支援的資料驗證類型。",
+  excelPivotFieldsMissing: "找不到樞紐分析表欄位：{fields}",
+  excelValidationActionInvalid: "資料驗證操作必須為 apply 或 clear。",
+  excelValidationValueRequired: "此資料驗證規則需要比較值。",
+  excelValidationBoundsRequired: "區間驗證需要兩個邊界值。",
+
   "dictate": "語音輸入",
   "dictateRecording": "錄音中，點擊結束",
   "dictateTranscribing": "轉寫中…",

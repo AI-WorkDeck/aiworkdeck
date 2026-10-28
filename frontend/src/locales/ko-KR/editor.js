@@ -2,6 +2,39 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  officeToolNames: {
+    "office_ppt_add_image": "슬라이드 이미지 삽입",
+    "office_ppt_add_chart": "슬라이드 차트 삽입",
+    "office_ppt_format_chart": "슬라이드 차트 서식 설정",
+    "office_ppt_set_transition": "슬라이드 전환 효과 설정",
+    "office_file_create": "새 파일 만들기",
+    "office_file_save": "현재 파일 저장",
+    "office_file_export_pdf": "프로젝트로 PDF 내보내기",
+    "office_file_open": "프로젝트 파일 복사본 열기",
+    "office_ppt_goto": "슬라이드 또는 도형으로 이동",
+    "office_ppt_set_layout": "슬라이드 레이아웃 또는 배경 설정",
+    "office_get_paragraphs": "단락 읽기",
+    "office_get_outline": "개요 읽기",
+    "office_get_clauses": "조항 식별",
+    "office_replace_nth_match": "지정한 일치 항목 바꾸기",
+    "office_apply_style_profile": "스타일 프로필 적용",
+    "office_ppt_table_set_style": "슬라이드 표 서식 지정",
+    "office_ppt_read_notes": "발표자 노트 읽기",
+    "office_ppt_write_notes": "발표자 노트 쓰기",
+    "office_audit_structure": "문서 구조 검토"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "정렬 범위에 병합된 셀이 있습니다. 병합을 해제한 후 정렬하세요.",
+    "SHEET_SORT_FAILED": "정렬하지 못했습니다. 시트를 다시 읽고 확인한 후 재시도하세요.",
+    "SHEET_PROTECTED_CELL": "보호된 셀이 포함되어 있어 쓰지 않았습니다.",
+    "SHEET_INVALID_RANGE": "잘못된 범위입니다. 시트를 다시 읽고 유효한 범위를 지정하세요.",
+    "SHEET_INVALID_START_CELL": "유효한 시작 셀을 지정하세요.",
+    "SHEET_INVALID_ROWS": "유효한 2차원 셀 배열을 제공하세요.",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "쓰기 범위가 시트 경계를 초과합니다.",
+    "SHEET_RANGE_CHECK_FAILED": "범위를 확인할 수 없어 쓰지 않았습니다.",
+    "SHEET_WRITE_PARTIAL": "쓰기가 중단되어 일부 셀이 변경되었을 수 있습니다. 다시 읽고 수정하세요. 전체 작업을 재시도하지 마세요.",
+    "SHEET_CHART_PARTIAL": "차트가 생성되었지만 설정이 완료되지 않았습니다. 기존 차트를 확인하고 수정하세요. 중복 생성하지 마세요."
+},
   "navigation": {
     "slides": "슬라이드",
     "sheets": "시트",

@@ -98,7 +98,7 @@ export async function executeWpsCommand(command, args) {
   } catch (e) {
     const message = (e && e.message) || String(e)
     console.warn('[Addin] office_command 执行失败（WPS）', command, e)
-    return { ok: false, error: message }
+    return { ok: false, error: message, ...(e?.partialResult ? { partialResult: e.partialResult } : {}) }
   }
 }
 

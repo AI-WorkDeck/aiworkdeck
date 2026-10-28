@@ -2,6 +2,39 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  officeToolNames: {
+    "office_ppt_add_image": "स्लाइड में चित्र डालें",
+    "office_ppt_add_chart": "स्लाइड में चार्ट डालें",
+    "office_ppt_format_chart": "स्लाइड चार्ट का स्वरूप सेट करें",
+    "office_ppt_set_transition": "स्लाइड ट्रांज़िशन सेट करें",
+    "office_file_create": "नई फ़ाइल बनाएँ",
+    "office_file_save": "वर्तमान फ़ाइल सहेजें",
+    "office_file_export_pdf": "प्रोजेक्ट में PDF निर्यात करें",
+    "office_file_open": "परियोजना फ़ाइल की प्रति खोलें",
+    "office_ppt_goto": "स्लाइड या आकृति पर जाएँ",
+    "office_ppt_set_layout": "स्लाइड का लेआउट या पृष्ठभूमि सेट करें",
+    "office_get_paragraphs": "अनुच्छेद पढ़ें",
+    "office_get_outline": "रूपरेखा पढ़ें",
+    "office_get_clauses": "खंड पहचानें",
+    "office_replace_nth_match": "निर्दिष्ट मिलान बदलें",
+    "office_apply_style_profile": "शैली प्रोफ़ाइल लागू करें",
+    "office_ppt_table_set_style": "स्लाइड तालिका फ़ॉर्मैट करें",
+    "office_ppt_read_notes": "वक्ता नोट्स पढ़ें",
+    "office_ppt_write_notes": "वक्ता नोट्स लिखें",
+    "office_audit_structure": "दस्तावेज़ संरचना की जाँच करें"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "क्रमबद्ध करने की सीमा में मर्ज किए गए सेल हैं। क्रमबद्ध करने से पहले उनका मर्ज हटाएँ।",
+    "SHEET_SORT_FAILED": "क्रमबद्ध करना विफल हुआ। दोबारा कोशिश करने से पहले वर्कशीट फिर पढ़ें और जाँचें।",
+    "SHEET_PROTECTED_CELL": "कुछ सेल सुरक्षित हैं; कोई डेटा नहीं लिखा गया।",
+    "SHEET_INVALID_RANGE": "अमान्य रेंज। शीट दोबारा पढ़ें और मान्य रेंज चुनें।",
+    "SHEET_INVALID_START_CELL": "मान्य शुरुआती सेल चुनें।",
+    "SHEET_INVALID_ROWS": "मान्य द्वि-आयामी सेल ऐरे दें।",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "लिखने की रेंज वर्कशीट की सीमा से बाहर है।",
+    "SHEET_RANGE_CHECK_FAILED": "रेंज की जाँच नहीं हो सकी; कोई डेटा नहीं लिखा गया।",
+    "SHEET_WRITE_PARTIAL": "लिखना रुक गया; कुछ सेल बदल गए हो सकते हैं। दोबारा पढ़कर सुधारें; पूरा बैच फिर न चलाएँ।",
+    "SHEET_CHART_PARTIAL": "चार्ट बन गया है, लेकिन सेटअप अधूरा है। मौजूदा चार्ट की जाँच करके सुधारें; दूसरा चार्ट न बनाएँ।"
+},
   "navigation": {
     "slides": "स्लाइड्स",
     "sheets": "वर्कशीट्स",

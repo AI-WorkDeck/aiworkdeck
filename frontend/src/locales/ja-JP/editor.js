@@ -2,6 +2,39 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  officeToolNames: {
+    "office_ppt_add_image": "スライドに画像を挿入",
+    "office_ppt_add_chart": "スライドにグラフを挿入",
+    "office_ppt_format_chart": "スライドのグラフを書式設定",
+    "office_ppt_set_transition": "スライドの切り替え効果を設定",
+    "office_file_create": "ファイルを新規作成",
+    "office_file_save": "現在のファイルを保存",
+    "office_file_export_pdf": "PDF をプロジェクトに書き出す",
+    "office_file_open": "プロジェクトファイルのコピーを開く",
+    "office_ppt_goto": "スライドまたは図形へ移動",
+    "office_ppt_set_layout": "スライドのレイアウトまたは背景を設定",
+    "office_get_paragraphs": "段落を読み取る",
+    "office_get_outline": "アウトラインを読み取る",
+    "office_get_clauses": "条項を識別する",
+    "office_replace_nth_match": "指定した一致箇所を置換する",
+    "office_apply_style_profile": "スタイルプロファイルを適用",
+    "office_ppt_table_set_style": "スライドの表の書式設定",
+    "office_ppt_read_notes": "発表者ノートを読む",
+    "office_ppt_write_notes": "発表者ノートを書き込む",
+    "office_audit_structure": "文書構造を検証"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "並べ替え範囲に結合セルが含まれています。結合を解除してから並べ替えてください。",
+    "SHEET_SORT_FAILED": "並べ替えに失敗しました。シートを読み直して確認してから再試行してください。",
+    "SHEET_PROTECTED_CELL": "保護されたセルが含まれるため、書き込みませんでした。",
+    "SHEET_INVALID_RANGE": "範囲が無効です。シートを読み直して有効な範囲を指定してください。",
+    "SHEET_INVALID_START_CELL": "有効な開始セルを指定してください。",
+    "SHEET_INVALID_ROWS": "有効な二次元のセル配列を指定してください。",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "書き込み範囲がシートの境界を超えています。",
+    "SHEET_RANGE_CHECK_FAILED": "範囲を確認できないため、書き込みませんでした。",
+    "SHEET_WRITE_PARTIAL": "書き込みが中断され、一部のセルが変更された可能性があります。読み直して修正し、一括で再試行しないでください。",
+    "SHEET_CHART_PARTIAL": "グラフは作成されましたが設定が未完了です。既存のグラフを確認して修正し、重複作成しないでください。"
+},
   "navigation": {
     "slides": "スライド一覧",
     "sheets": "シート一覧",

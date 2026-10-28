@@ -2,6 +2,39 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  officeToolNames: {
+    "office_ppt_add_image": "Sisipkan gambar pada slide",
+    "office_ppt_add_chart": "Sisipkan grafik pada slide",
+    "office_ppt_format_chart": "Format grafik slide",
+    "office_ppt_set_transition": "Atur transisi slide",
+    "office_file_create": "Buat berkas baru",
+    "office_file_save": "Simpan berkas saat ini",
+    "office_file_export_pdf": "Ekspor PDF ke proyek",
+    "office_file_open": "Buka salinan berkas proyek",
+    "office_ppt_goto": "Buka slide atau bentuk",
+    "office_ppt_set_layout": "Atur tata letak atau latar belakang slide",
+    "office_get_paragraphs": "Baca paragraf",
+    "office_get_outline": "Baca kerangka",
+    "office_get_clauses": "Identifikasi klausul",
+    "office_replace_nth_match": "Ganti kecocokan tertentu",
+    "office_apply_style_profile": "Terapkan profil gaya",
+    "office_ppt_table_set_style": "Format tabel slide",
+    "office_ppt_read_notes": "Baca catatan pembicara",
+    "office_ppt_write_notes": "Tulis catatan pembicara",
+    "office_audit_structure": "Periksa struktur dokumen"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "Rentang pengurutan berisi sel yang digabungkan. Pisahkan sel tersebut sebelum mengurutkan.",
+    "SHEET_SORT_FAILED": "Pengurutan gagal. Baca ulang dan periksa lembar sebelum mencoba lagi.",
+    "SHEET_PROTECTED_CELL": "Ada sel terlindungi; tidak ada data yang ditulis.",
+    "SHEET_INVALID_RANGE": "Rentang tidak valid. Baca ulang lembar dan pilih rentang yang valid.",
+    "SHEET_INVALID_START_CELL": "Pilih sel awal yang valid.",
+    "SHEET_INVALID_ROWS": "Berikan larik sel dua dimensi yang valid.",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "Rentang penulisan melewati batas lembar kerja.",
+    "SHEET_RANGE_CHECK_FAILED": "Rentang tidak dapat diperiksa; tidak ada data yang ditulis.",
+    "SHEET_WRITE_PARTIAL": "Penulisan terhenti; beberapa sel mungkin berubah. Baca ulang dan perbaiki tanpa mengulangi seluruh kelompok.",
+    "SHEET_CHART_PARTIAL": "Grafik telah dibuat, tetapi pengaturannya belum selesai. Periksa dan perbaiki grafik yang ada tanpa membuat grafik baru."
+},
   "navigation": {
     "slides": "Salindia",
     "sheets": "Lembar Kerja",

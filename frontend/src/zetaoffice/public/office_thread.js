@@ -2201,16 +2201,35 @@ let cfStyleSeq = 0; // 条件格式的"命中样式"（CellStyle）命名序号
 // 必须是分号（逗号 Err:508），跨表引用必须是 Sheet.A1（Sheet!A1 报 #NAME?
 // Err:525）。AI 与用户都按 Excel 习惯写逗号和 '!'，在此归一化——只动双引号
 // 字符串字面量之外的字符（Calc 转义引号是成对 ""，相邻翻转两次天然兼容）。
-// 代价：Excel 数组字面量的逗号列分隔与 Calc 交集操作符 '!' 会被误转，两者在
-// AI 生成的公式里出现率趋近于零，换取最高频的多参数函数全部可用。
-function normalizeFormula(f) {
+// 单引号包裹的工作表名同样必须保持字面值，包括其中的逗号、感叹号和双引号。
+// Incoming formulas use Excel array constants. Readback converts native array
+// separators back, so both the formula bar and AI read/edit/write retain shape.
+function normalizeFormula(f, toExcelArray = false) {
+  if (toExcelArray && f.charAt(0) !== '=') return f;
   let out = '';
-  let inStr = false;
+  let quote = '';
+  let arrayDepth = 0;
   for (let i = 0; i < f.length; i++) {
     const ch = f.charAt(i);
-    if (ch === '"') { inStr = !inStr; out += ch; continue; }
-    if (!inStr && ch === ',') { out += ';'; continue; }
-    if (!inStr && ch === '!') { out += '.'; continue; }
+    if (quote) {
+      out += ch;
+      if (ch === quote) {
+        if (f.charAt(i + 1) === quote) { out += f.charAt(++i); }
+        else quote = '';
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'") { quote = ch; out += ch; continue; }
+    if (ch === '{') arrayDepth++;
+    else if (ch === '}') arrayDepth = Math.max(0, arrayDepth - 1);
+    if (toExcelArray) {
+      if (arrayDepth && ch === ';') { out += ','; continue; }
+      if (arrayDepth && ch === '|') { out += ';'; continue; }
+    } else {
+      if (arrayDepth && ch === ';') { out += '|'; continue; }
+      if (ch === ',') { out += ';'; continue; }
+      if (ch === '!') { out += '.'; continue; }
+    }
     out += ch;
   }
   return out;
@@ -5821,12 +5840,12 @@ const EXEC = {
         try { cellVal = readCellOut(selInfo.cell); } catch (e) {}
         try {
           if (enumEq(selInfo.cell.getType(), css.table.CellContentType.FORMULA)) {
-            cellFormula = String(selInfo.cell.getFormula() || '');
+            cellFormula = normalizeFormula(String(selInfo.cell.getFormula() || ''), true);
           } else {
             cellFormula = cellVal != null ? String(cellVal) : cellText;
           }
         } catch (e) {
-          try { cellFormula = String(selInfo.cell.getFormula() || cellText || ''); } catch (e2) {}
+          try { cellFormula = normalizeFormula(String(selInfo.cell.getFormula() || cellText || ''), true); } catch (e2) {}
         }
       }
       out.selection = {
@@ -9610,8 +9629,8 @@ const EXEC = {
         const cell = range.getCellByPosition(c, r);
         row.push(readCellOut(cell));
         try {
-          if (enumEq(cell.getType(), css.table.CellContentType.FORMULA) && formulas.length < 100) {
-            formulas.push({ cell: colLetterOf(addr.StartColumn + c) + (addr.StartRow + r + 1), formula: cell.getFormula() });
+          if (enumEq(cell.getType(), css.table.CellContentType.FORMULA)) {
+            formulas.push({ cell: colLetterOf(addr.StartColumn + c) + (addr.StartRow + r + 1), formula: normalizeFormula(cell.getFormula(), true) });
           }
         } catch (e) {}
       }
@@ -9674,18 +9693,32 @@ const EXEC = {
     const rows = p && p.rows;
     if (!Array.isArray(rows) || !rows.length) return { success: false, message: 'sheet_write_cells requires {rows: any[][]}' };
     if (rows.length > 500) return { success: false, message: '一次最多写 500 行，请分批写入' };
-    const anchor = sheetRange(sheet, String(p.startCell || 'A1'));
+    if (!p.startCell || !/^\$?[A-Za-z]+\$?[1-9]\d*$/.test(String(p.startCell))) return tableFail('SHEET_INVALID_START_CELL');
+    for (const line of rows) {
+      if (!Array.isArray(line) || !line.length || line.some(v => v != null && !['string', 'number', 'boolean'].includes(typeof v)) || line.some(v => typeof v === 'number' && !Number.isFinite(v))) return tableFail('SHEET_INVALID_ROWS');
+    }
+    const anchor = sheetRange(sheet, String(p.startCell));
     if (!anchor) return { success: false, message: '无效的起始单元格: ' + p.startCell };
     const a0 = anchor.getRangeAddress();
     let nCols = 1;
     for (let i = 0; i < rows.length; i++) if (Array.isArray(rows[i])) nCols = Math.max(nCols, rows[i].length);
     if (nCols > 100) return { success: false, message: '一次最多写 100 列，请分批写入' };
+    try {
+      if (a0.StartRow + rows.length > sheet.getRows().getCount() || a0.StartColumn + nCols > sheet.getColumns().getCount()) return tableFail('SHEET_RANGE_OUT_OF_BOUNDS');
+    } catch (e) { return tableFail('SHEET_RANGE_CHECK_FAILED'); }
+    if (sheet.isProtected()) {
+      for (let r = 0; r < rows.length; r++) {
+        for (let c = 0; c < rows[r].length; c++) {
+          if (rows[r][c] != null && sheet.getCellByPosition(a0.StartColumn + c, a0.StartRow + r).getPropertyValue('CellProtection').IsLocked) return tableFail('SHEET_PROTECTED_CELL');
+        }
+      }
+    }
     let written = 0;
     const formulaCells = []; // 写完统一验错：解析失败/求值出错的公式要报给 AI 自纠
     // 追加到表格下方时沿用上一行格式（dev-board#844，判定见 shouldInheritRowFormat）。
     // inheritFormat 缺省开，显式 false 才关。逐行判定、逐行级联：多行追加时第 2 行
     // 看的「上一行」就是刚写好的第 1 行。
-    const inherit = !(p && p.inheritFormat === false);
+    const inherit = !sheet.isProtected() && !(p && p.inheritFormat === false);
     const formatInherited = [];
     // 抄格式是一串属性写入：摘下修改监听器（每条写入一次 35ms 回调，见
     // suspendModifyListener），并把值和格式收进同一个撤销组——撤销一次，新行连同
@@ -9725,6 +9758,8 @@ const EXEC = {
         written++;
       }
     }
+    } catch (e) {
+      return { ...tableFail('SHEET_WRITE_PARTIAL'), cellsWritten: written, retryable: false, sheet: sheet.getName(), startCell: String(p.startCell) };
     } finally {
       unlockModel();
       if (um) { try { um.leaveUndoContext(); } catch (e) {} }
@@ -9765,8 +9800,14 @@ const EXEC = {
     if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
     try { ctrl.select(range); } catch (e) { return { success: false, message: '选中失败: ' + errStr(e) }; }
     const addr = range.getRangeAddress();
+    let visibleRange = null;
+    try {
+      ctrl.setFirstVisibleRow(addr.StartRow);
+      ctrl.setFirstVisibleColumn(addr.StartColumn);
+      visibleRange = sheetRangeName(ctrl.getVisibleRange());
+    } catch (_) { /* Selection remains valid even if the host cannot reveal it. */ }
     return {
-      success: true, sheet: r0.sheet.getName(), range: sheetRangeName(addr),
+      success: true, sheet: r0.sheet.getName(), range: sheetRangeName(addr), visibleRange,
       topLeftText: String(range.getCellByPosition(0, 0).getString() || ''),
     };
   },
@@ -9775,6 +9816,7 @@ const EXEC = {
   sheet_format_cells(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
     const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
@@ -9833,6 +9875,7 @@ const EXEC = {
   sheet_set_borders(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
     const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
@@ -9871,6 +9914,7 @@ const EXEC = {
   sheet_set_row_col(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
     const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
@@ -9946,6 +9990,7 @@ const EXEC = {
   sheet_edit_rows_cols(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
     const op = String((p && (p.op || p.action)) || '').toLowerCase();
     const count = Math.max(1, Math.min(Number(p && p.count) || 1, 100));
@@ -9978,6 +10023,7 @@ const EXEC = {
   sheet_merge_cells(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
     const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
@@ -9991,14 +10037,13 @@ const EXEC = {
   },
   // [表格·结构] 区域排序。byColumn 是列标（'B'，须在区域内），ascending 默认
   // true，hasHeader 默认 true（首行不参与排序）。
-  // 为什么不走 XSortable.sort()：SortFields 需要 sequence<TableSortField>，而
-  // 引擎 WASM 没为该类型预编 embind 序列构造器（getEmbindSequenceCtor 直接抛，
-  // 裸 Array 又被猜成 sequence<any> 被 Calc 静默忽略——组 19 真机实证两条路都
-  // 死）。改为 worker 内读值 → JS 排 → 回写：值与公式文本随行整体移动；代价是
-  // 单元格格式不随行移动、公式相对引用不重定位（数值表主流场景无影响）。
+  // Native Calc sorting preserves row formats and relocates formula references.
+  // XSortable's TableSortField sequence is not bound in this WASM build; use the
+  // equivalent scalar UNO dispatch contract (sc/sdi/scalc.sdi: DataSort).
   sheet_sort_range(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     let range;
     if (p && p.range) {
       range = sheetRange(r0.sheet, String(p.range));
@@ -10022,52 +10067,30 @@ const EXEC = {
     const asc = p.ascending !== false;
     const headerOfs = p.hasHeader !== false ? 1 : 0;
     const keyOfs = byCol - addr.StartColumn;
-    const T = css.table.CellContentType;
-    // 读出待排行（每格记类型，回写时保真：公式回 setFormula、数值回 setValue）
-    const dataRows = [];
-    for (let r = headerOfs; r < nRows; r++) {
-      const line = [];
-      for (let c = 0; c < nCols; c++) {
-        const cell = range.getCellByPosition(c, r);
-        const t = cell.getType();
-        if (enumEq(t, T.EMPTY)) line.push({ k: 'e' });
-        else if (enumEq(t, T.FORMULA)) line.push({ k: 'f', f: cell.getFormula(), sort: readCellOut(cell) });
-        else if (enumEq(t, T.VALUE)) line.push({ k: 'v', v: cell.getValue() });
-        else line.push({ k: 's', s: cell.getString() });
-      }
-      dataRows.push(line);
-    }
-    const keyOf = function (line) {
-      const it = line[keyOfs];
-      if (!it || it.k === 'e') return null; // 空值恒排最后（Calc 口径）
-      if (it.k === 'v') return it.v;
-      if (it.k === 'f') return it.sort;
-      return it.s;
-    };
-    dataRows.sort(function (a, b) {
-      const ka = keyOf(a), kb = keyOf(b);
-      if (ka === null && kb === null) return 0;
-      if (ka === null) return 1;
-      if (kb === null) return -1;
-      const na = typeof ka === 'number', nb = typeof kb === 'number';
-      let cmp;
-      if (na && nb) cmp = ka - kb;
-      else if (na !== nb) cmp = na ? -1 : 1; // 数值排在文本前（Calc 升序口径）
-      else cmp = String(ka).localeCompare(String(kb), 'zh');
-      return asc ? cmp : -cmp;
-    });
+    // A one-row selection has nothing to sort. Dispatching a single cell would
+    // let Calc expand it to the surrounding data region.
+    if (nRows <= 1) return { success: true, range: sheetRangeName(addr), byColumn: colLetterOf(byCol), ascending: asc, sortedSample: [] };
     try {
-      for (let r = 0; r < dataRows.length; r++) {
-        for (let c = 0; c < nCols; c++) {
-          const cell = range.getCellByPosition(c, headerOfs + r);
-          const it = dataRows[r][c];
-          if (it.k === 'v') cell.setValue(it.v);
-          else if (it.k === 'f') cell.setFormula(it.f);
-          else if (it.k === 's') cell.setString(it.s);
-          else cell.setString('');
-        }
-      }
-    } catch (e) { return { success: false, message: '排序回写失败: ' + errStr(e) }; }
+      // Expand the target once to catch a merged anchor outside its boundaries.
+      const cursor = r0.sheet.createCursorByRange(range);
+      cursor.collapseToMergedArea();
+      const expanded = cursor.getRangeAddress();
+      if (expanded.StartRow !== addr.StartRow || expanded.EndRow !== addr.EndRow
+          || expanded.StartColumn !== addr.StartColumn || expanded.EndColumn !== addr.EndColumn) return tableFail('SHEET_SORT_MERGED_RANGE');
+      if (range.getIsMerged()) return tableFail('SHEET_SORT_MERGED_RANGE');
+      ctrl.setActiveSheet(r0.sheet);
+      ctrl.select(range);
+      const dispatcher = context.getServiceManager().createInstanceWithContext('com.sun.star.frame.DispatchHelper', context);
+      dispatcher.executeDispatch(ctrl.getFrame(), '.uno:DataSort', '', 0, [
+        mkProp('ByRows', true), mkProp('HasHeader', headerOfs === 1),
+        mkProp('CaseSensitive', false), mkProp('NaturalSort', false),
+        mkProp('IncludeAttribs', true), mkProp('IncludeComments', true), mkProp('IncludeImages', true),
+        mkProp('UserDefIndex', new zetajs.Any(zetajs.type.unsigned_short, 0)),
+        mkProp('Col1', new zetajs.Any(zetajs.type.long, byCol + 1)), mkProp('Ascending1', asc),
+        mkProp('Col2', new zetajs.Any(zetajs.type.long, 0)), mkProp('Col3', new zetajs.Any(zetajs.type.long, 0))
+      ]);
+    } catch (e) { return { success: false, error: 'SHEET_SORT_FAILED', message: 'SHEET_SORT_FAILED', detail: errStr(e) }; }
+
     try { ctrl.select(range); } catch (e) {}
     // 验证回路：回读排序列前几个值
     const sample = [];
@@ -10083,6 +10106,7 @@ const EXEC = {
   sheet_set_autofilter(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
     let addr;
     if (p.range) {
@@ -10130,6 +10154,7 @@ const EXEC = {
   sheet_conditional_format(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
     const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
@@ -10204,6 +10229,7 @@ const EXEC = {
   sheet_add_comment(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return tableFail(r0.error);
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
     const cellStr = p && p.cell ? String(p.cell).trim() : '';
     const text = p && p.text != null ? String(p.text) : '';
@@ -10243,7 +10269,14 @@ const EXEC = {
         const item = { index: i, cell: colLetterOf(pos.Column) + (pos.Row + 1) };
         try { item.author = String(anno.getAuthor() || ''); } catch (e) {}
         try { item.date = String(anno.getDate() || ''); } catch (e) {}
-        try { item.text = String(anno.getString() || '').slice(0, 500); } catch (e) {}
+        try {
+          // Imported XLSX notes keep lazy caption text until the annotation shape is materialized.
+          let text = String(anno.getString() || '');
+          if (!text) text = String(anno.getAnnotationShape().getString() || '');
+          item.text = text.slice(0, 500);
+          item.textLength = text.length;
+          item.textTruncated = text.length > item.text.length;
+        } catch (e) { item.textUnavailable = true; }
         out.push(item);
       }
     } catch (e) { return tableFail(errStr(e)); }
@@ -10252,6 +10285,7 @@ const EXEC = {
   sheet_delete_comment(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return tableFail(r0.error);
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
     const cellStr = p && p.cell ? String(p.cell).trim() : '';
     if (!cellStr) return tableFail('sheet_delete_comment requires {cell}（如 "B2"）');
@@ -10281,6 +10315,7 @@ const EXEC = {
   sheet_set_data_validation(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return tableFail(r0.error);
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
     const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return tableFail('无效的区域: ' + (p.range || '(空)'));
@@ -10323,9 +10358,9 @@ const EXEC = {
     try {
       const v = range.getPropertyValue('Validation');
       v.setPropertyValue('Type', css.sheet.ValidationType[typeKey]);
-      if (operatorKey) v.setPropertyValue('Operator', css.sheet.ConditionOperator[operatorKey]);
-      v.setPropertyValue('Formula1', formula1);
-      if (formula2) v.setPropertyValue('Formula2', formula2);
+      if (operatorKey) v.setOperator(css.sheet.ConditionOperator[operatorKey]);
+      v.setFormula1(formula1);
+      v.setFormula2(formula2);
       v.setPropertyValue('IgnoreBlankCells', (p && p.allowBlank) !== false);
       if (p && p.showInputMessage) {
         v.setPropertyValue('ShowInputMessage', true);
@@ -10352,11 +10387,12 @@ const EXEC = {
   sheet_add_chart(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return tableFail(r0.error);
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
     const range = sheetRange(sheet, String((p && p.range) || ''));
     if (!range) return tableFail('无效的数据区域: ' + ((p && p.range) || '(空)'));
     const addr = range.getRangeAddress();
-    const TYPE_MAP = { column: { cls: 'Bar', vertical: true }, bar: { cls: 'Bar', vertical: false }, line: { cls: 'Line' }, pie: { cls: 'Pie' } };
+    const TYPE_MAP = { column: { cls: 'Bar', vertical: false }, bar: { cls: 'Bar', vertical: true }, line: { cls: 'Line' }, pie: { cls: 'Pie' } };
     const chartTypeRaw = (p && (p.chartType != null ? p.chartType : p.type)) || 'column';
     const typeInfo = TYPE_MAP[String(chartTypeRaw).toLowerCase()];
     if (!typeInfo) return tableFail('bad chartType: ' + chartTypeRaw + ' (column/bar/line/pie)');
@@ -10385,16 +10421,16 @@ const EXEC = {
       if (p && p.title) {
         try {
           embedded.setPropertyValue('HasMainTitle', true);
-          embedded.getTitle().setString(String(p.title));
+          embedded.getTitle().setPropertyValue('String', String(p.title));
         } catch (e) { note.push('标题设置失败'); }
       }
     } catch (e) { note.push('图表类型/标题设置失败: ' + errStr(e)); }
     const res = {
-      success: true, name: name, chartType: String((p && p.chartType) || 'column').toLowerCase(),
+      success: true, name: name, chartType: String(chartTypeRaw).toLowerCase(),
       range: sheetRangeName(addr), sheet: sheet.getName(),
     };
     if (p && p.title) res.title = String(p.title);
-    if (note.length) res.note = note.join('；');
+    if (note.length) return { ...res, ...tableFail('SHEET_CHART_PARTIAL'), created: true, retryable: false };
     return res;
   },
   // [表格·看] Excel 专用查找：遍历区域（缺省=已用区域）逐格比对字符串，不区分
@@ -10411,6 +10447,7 @@ const EXEC = {
     let addr;
     try {
       const range = (p && p.range) ? sheetRange(sheet, p.range) : null;
+      if (p && p.range && !range) return tableFail('SHEET_INVALID_RANGE');
       addr = range ? range.getRangeAddress() : usedRangeAddress(sheet);
     } catch (e) { return tableFail('读取搜索区域失败: ' + errStr(e)); }
     const nRows = addr.EndRow - addr.StartRow + 1;
@@ -10449,6 +10486,7 @@ const EXEC = {
   sheet_find_replace(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return tableFail(r0.error);
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
     const find = (p && p.find != null) ? String(p.find) : '';
     if (!find) return tableFail('sheet_find_replace requires {find}');
@@ -10565,7 +10603,7 @@ const EXEC = {
       const range = sheetRange(r0.sheet, String((p && p.range) || ''));
       if (!range) return tableFail('无效的区域: ' + ((p && p.range) || '(空)'));
       const addr = range.getRangeAddress();
-      const content = '$' + r0.sheet.getName() + '.' + absCellRef(addr.StartColumn, addr.StartRow)
+      const content = "$'" + r0.sheet.getName().replace(/'/g, "''") + "'." + absCellRef(addr.StartColumn, addr.StartRow)
         + ((addr.StartColumn !== addr.EndColumn || addr.StartRow !== addr.EndRow) ? ':' + absCellRef(addr.EndColumn, addr.EndRow) : '');
       try {
         nr.addNewByName(name, content, new css.table.CellAddress({ Sheet: addr.Sheet, Column: addr.StartColumn, Row: addr.StartRow }), 0);
@@ -10596,6 +10634,7 @@ const EXEC = {
   sheet_group_rows_cols(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return tableFail(r0.error);
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
     const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
     const range = sheetRange(sheet, rangeRef);
@@ -10623,6 +10662,7 @@ const EXEC = {
   sheet_add_pivot_table(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return tableFail(r0.error);
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
     const source = sheetRange(sheet, String((p && p.sourceRange) || ''));
     if (!source) return tableFail('无效的源数据区域: ' + ((p && p.sourceRange) || '(空)'));

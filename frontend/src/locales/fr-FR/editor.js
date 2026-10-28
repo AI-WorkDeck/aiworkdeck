@@ -2,6 +2,39 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  officeToolNames: {
+    "office_ppt_add_image": "Insérer une image dans la diapositive",
+    "office_ppt_add_chart": "Insérer un graphique dans la diapositive",
+    "office_ppt_format_chart": "Mettre en forme le graphique de la diapositive",
+    "office_ppt_set_transition": "Définir la transition de la diapositive",
+    "office_file_create": "Créer un fichier",
+    "office_file_save": "Enregistrer le fichier actuel",
+    "office_file_export_pdf": "Exporter le PDF vers le projet",
+    "office_file_open": "Ouvrir une copie du fichier du projet",
+    "office_ppt_goto": "Aller à la diapositive ou à la forme",
+    "office_ppt_set_layout": "Définir la disposition ou le fond de la diapositive",
+    "office_get_paragraphs": "Lire les paragraphes",
+    "office_get_outline": "Lire le plan",
+    "office_get_clauses": "Identifier les clauses",
+    "office_replace_nth_match": "Remplacer la correspondance indiquée",
+    "office_apply_style_profile": "Appliquer le profil de styles",
+    "office_ppt_table_set_style": "Mettre en forme le tableau de la diapositive",
+    "office_ppt_read_notes": "Lire les notes du présentateur",
+    "office_ppt_write_notes": "Écrire les notes du présentateur",
+    "office_audit_structure": "Vérifier la structure du document"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "La plage à trier contient des cellules fusionnées. Annulez leur fusion avant de trier.",
+    "SHEET_SORT_FAILED": "Le tri a échoué. Relisez et vérifiez la feuille avant de réessayer.",
+    "SHEET_PROTECTED_CELL": "Cellules protégées ; aucune écriture effectuée.",
+    "SHEET_INVALID_RANGE": "Plage invalide. Relisez la feuille et choisissez une plage valide.",
+    "SHEET_INVALID_START_CELL": "Choisissez une cellule de départ valide.",
+    "SHEET_INVALID_ROWS": "Fournissez un tableau de cellules valide à deux dimensions.",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "La plage dépasse les limites de la feuille.",
+    "SHEET_RANGE_CHECK_FAILED": "Impossible de vérifier la plage ; aucune écriture effectuée.",
+    "SHEET_WRITE_PARTIAL": "Écriture interrompue ; certaines cellules peuvent avoir changé. Relisez et corrigez sans relancer tout le lot.",
+    "SHEET_CHART_PARTIAL": "Le graphique est créé, mais sa configuration est incomplète. Vérifiez et corrigez le graphique existant sans en créer un autre."
+},
   "navigation": {
     "slides": "Diapositives",
     "sheets": "Feuilles",

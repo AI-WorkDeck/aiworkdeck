@@ -12,6 +12,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { getLangPreference, setLang } from './i18n.js'
 
 const HostType = { Word: 'Word', Excel: 'Excel', PowerPoint: 'PowerPoint' }
 
@@ -103,4 +104,38 @@ test('WPS：新建未保存（FullName 为空）同样是 saved:false', () => {
     assert.match(id.key, /^word:/, 'WPS 文字归一到 word 宿主标签')
     assert.match(id.key, /#/, '未保存时带本窗格实例后缀')
   } finally { restore() }
+})
+
+for (const [collection, active, host] of [['Documents','ActiveDocument','word'],['Workbooks','ActiveWorkbook','excel'],['Presentations','ActivePresentation','powerpoint']]) {
+  test(`WPS ${host}: two unsaved documents in one pane have distinct stable identities`, () => {
+    let name='Native1'
+    // Fresh wrappers simulate a native bridge that does not retain JS object identity.
+    const app={ [collection]:{}, get [active]() {return {Name:name,FullName:name}} }
+    const restore=setGlobals(wpsGlobals(app))
+    try {
+      const first=documentIdentity();assert.equal(first.saved,false)
+      assert.equal(documentIdentity().key,first.key)
+      name='Native2';const second=documentIdentity();assert.equal(second.saved,false);assert.notEqual(second.key,first.key)
+      name='Native1';assert.equal(documentIdentity().key,first.key)
+      const lang=getLangPreference()
+      try {
+        setLang('zh-CN');assert.equal(documentIdentity().key,first.key)
+        setLang('en-US');assert.equal(documentIdentity().key,first.key)
+      } finally {setLang(lang)}
+    }finally{restore()}
+  })
+}
+
+test('WPS unidentified unsaved document fails closed instead of sharing a pane-wide key',()=>{
+  const app={Workbooks:{},ActiveWorkbook:{Name:'',FullName:''}}
+  const restore=setGlobals(wpsGlobals(app))
+  try{
+    assert.deepEqual(documentIdentity(),{key:'',saved:false})
+    app.ActiveWorkbook={get Name(){throw new Error('native read failed')},FullName:''}
+    assert.deepEqual(documentIdentity(),{key:'',saved:false})
+    app.ActiveWorkbook={Name:'Native1',FullName:''}
+    const before=documentIdentity();assert.equal(before.saved,false)
+    app.ActiveWorkbook.FullName='/tmp/Native1.xlsx'
+    assert.deepEqual(documentIdentity(),{key:'/tmp/Native1.xlsx',saved:true})
+  }finally{restore()}
 })

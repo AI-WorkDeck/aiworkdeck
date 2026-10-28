@@ -1630,4 +1630,101 @@ class OfficeEditToolsTest {
         assertEquals(0, args.getValue().get("startChar"), "\u8d1f\u8d77\u70b9\u6309 0 \u5904\u7406");
         assertEquals(80_000, args.getValue().get("maxChars"));
     }
+    @Test
+    void excelNewOptionalParametersReachHost() {
+        tools.office_excel_search("c", "Data", "Tax", "B2:C9", true);
+        verify(bridge).executeOfficeCommand("c", "excel_search", Map.of("sheetName", "Data", "query", "Tax", "rangeAddress", "B2:C9", "matchCase", true));
+        tools.office_excel_add_chart("c", "Data", "A1:B3", "bar", "Sales", "chart-sales");
+        verify(bridge).executeOfficeCommand("c", "excel_add_chart", Map.of("sheetName", "Data", "dataRangeAddress", "A1:B3", "chartType", "bar", "title", "Sales", "name", "chart-sales"));
+        tools.office_excel_set_data_validation("c", null, "A1", "apply", "custom", null, "=A1>0", null, null,
+                false, "Input", "Enter positive", "Invalid", "Must be positive");
+        verify(bridge).executeOfficeCommand(eq("c"), eq("excel_set_data_validation"), org.mockito.ArgumentMatchers.argThat(args ->
+                "=A1>0".equals(args.get("value1")) && Boolean.FALSE.equals(args.get("showInputMessage"))
+                && "Input".equals(args.get("inputTitle")) && "Enter positive".equals(args.get("inputMessage"))
+                && "Invalid".equals(args.get("errorTitle")) && "Must be positive".equals(args.get("errorMessage"))));
+    }
+
+    @Test
+    void pptNavigationLayoutAndTransparencyReachHost() {
+        tools.office_ppt_goto("c", 2, "shape-4");
+        verify(bridge).executeOfficeCommand("c", "ppt_goto", Map.of("slideNumber", 2, "shapeId", "shape-4"));
+        tools.office_ppt_set_layout("c", 2, "layout-1", "#123456");
+        verify(bridge).executeOfficeCommand("c", "ppt_set_layout", Map.of("slideNumber", 2, "layoutId", "layout-1", "backgroundColor", "#123456"));
+        tools.office_ppt_format_shape("c", 2, "shape-4", null, null, null, null, null, 50.0);
+        verify(bridge).executeOfficeCommand("c", "ppt_format_shape", Map.of("slideNumber", 2, "shapeId", "shape-4", "transparency", 50.0));
+    }
+
+    @Test
+    void newTargetValidationFailsBeforeBridge() {
+        assertTrue(tools.office_ppt_replace_text("c", "old", "new", null, "shape", null, true).startsWith("Error:"));
+        assertTrue(tools.office_ppt_replace_text("c", "old", "new", 1, null, "old", true).startsWith("Error:"));
+        assertTrue(tools.office_excel_search("c", null, "x", "not-a-range", false).startsWith("Error:"));
+        assertTrue(tools.office_ppt_set_shape_geometry("c", 1, "shape", null, null, -1.0, null, null).startsWith("Error:"));
+        assertTrue(tools.office_ppt_set_shape_geometry("c", 1, "shape", Double.NaN, null, null, null, null).startsWith("Error:"));
+        assertTrue(tools.office_ppt_goto("c", 0, null).startsWith("Error:"));
+        assertTrue(tools.office_ppt_goto("c", 1, " ").startsWith("Error:"));
+        assertTrue(tools.office_ppt_set_layout("c", 1, null, null).startsWith("Error:"));
+        assertTrue(tools.office_ppt_set_layout("c", 1, "layout", "red").startsWith("Error:"));
+        assertTrue(tools.office_ppt_format_shape("c", 1, "shape", null, null, null, null, null, Double.NaN).startsWith("Error:"));
+        assertTrue(tools.office_ppt_format_shape("c", 1, "shape", null, null, null, null, null, 101.0).startsWith("Error:"));
+        verifyNoInteractions(bridge);
+    }
+
+    @Test
+    void fileLifecycleCommandsAndFilenamePreflight() {
+        tools.office_file_create("c");
+        tools.office_file_save("c");
+        tools.office_file_export_pdf("c", "report.pdf");
+        verify(bridge).executeOfficeCommand("c", "file_create", Map.of());
+        verify(bridge).executeOfficeCommand("c", "file_save", Map.of());
+        verify(bridge).executeOfficeCommand("c", "file_export_pdf", Map.of("fileName", "report.pdf"));
+        assertTrue(tools.office_file_export_pdf("c", "../report.pdf").startsWith("Error:"));
+        assertTrue(tools.office_file_export_pdf("c", "C:\\report.pdf").startsWith("Error:"));
+    }
+
+    @Test
+    void projectFileOpenChecksPermissionAndForwardsBoundedBytes() throws Exception {
+        var file = new com.checkba.model.entity.ProjectFile();
+        file.setId(1L); file.setProjectId(10L); file.setName("report.xlsx"); file.setFilePath("stored-key");
+        when(projectFileRepository.findById(1L)).thenReturn(java.util.Optional.of(file));
+        assertTrue(tools.office_file_open("c", 1L).startsWith("Error:"));
+        verifyNoInteractions(storageServiceFactory, bridge);
+        com.checkba.service.ai.context.ProjectContextHolder.setProjectId("10");
+        try {
+            var storage = mock(com.checkba.storage.StorageService.class);
+            when(storageServiceFactory.getStorageService()).thenReturn(storage);
+            byte[] bytes = new byte[]{'P', 'K', 3, 4, 1};
+            when(storage.load("stored-key")).thenReturn(new org.springframework.core.io.ByteArrayResource(bytes));
+            tools.office_file_open("c", 1L);
+            verify(bridge).executeOfficeCommand("c", "file_open", Map.of("host", "excel", "fileId", 1L,
+                    "fileName", "report.xlsx", "base64", java.util.Base64.getEncoder().encodeToString(bytes)));
+        } finally { com.checkba.service.ai.context.ProjectContextHolder.clear(); }
+    }
+
+    @Test
+    void pptNotesAndTableStyleKeepPreciseTargets() {
+        tools.office_ppt_read_notes("c", 2);
+        verify(bridge).executeOfficeCommand("c", "ppt_read_notes", Map.of("slideNumber", 2));
+        tools.office_ppt_write_notes("c", 2, "", "before");
+        verify(bridge).executeOfficeCommand("c", "ppt_write_notes",
+                Map.of("slideNumber", 2, "text", "", "expectedText", "before"));
+        tools.office_ppt_table_set_style("c", 2, "shape", 0, 1, 2, 3,
+                Map.of("bold", false, "slideNumber", 99, "unknown", true));
+        verify(bridge).executeOfficeCommand("c", "ppt_table_set_style",
+                Map.of("slideNumber", 2, "shapeId", "shape", "row", 0, "col", 1,
+                        "endRow", 2, "endCol", 3, "bold", false));
+    }
+
+    @Test
+    void pptFormatCanTargetWholeShapeWithParagraphOptions() {
+        tools.office_ppt_format_text("c", null, false, null, null, true, null, null, null,
+                2, "shape", "before", Map.of("alignment", "center"));
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> args = ArgumentCaptor.forClass(Map.class);
+        verify(bridge).executeOfficeCommand(eq("c"), eq("ppt_format_text"), args.capture());
+        assertEquals("shape", args.getValue().get("shapeId"));
+        assertEquals("before", args.getValue().get("expectedText"));
+        assertEquals(Map.of("alignment", "center"), args.getValue().get("paragraphFormat"));
+    }
+
 }

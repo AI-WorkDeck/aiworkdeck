@@ -17,6 +17,16 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 
 专项 `frontend/tests/lowa-e2e/ppt-precision.mjs` 覆盖真实引擎插页、局部替换、陈旧目标拒绝、背景、段距/行距/缩进及导出重开；`frontend/tests/lowa-unit/slide-precision.test.mjs` 覆盖部分失败与无副作用拒绝。全套 LOWA 回归、专项结果与真实 AI 验收边界见 `doc/verification/2026-10-28-ppt-quality.md`，不能用 PPT 结果替代 Word/Excel/PDF 对应路径的验证。
 
+## Calc 排序的原生契约（2026-10-28，dev-board#1576）
+
+`office_thread.js` 的 `sheet_sort_range` 已移除“读单元格→JS排序→逐格写回”路径。旧路径移动了公式文本，却不重定位相对引用，且字体/底色不随记录移动；真实引擎负对照中，应为200/600/300的结果变成400/900/100，不能再将此作为可接受的功能边界。
+
+当前WASM的 `XSortable.createSortDescriptor()` 会因未绑定的 `TableSortField` 序列报 `unregistered UNO type`。改走同一Calc原生排序的 `.uno:DataSort` 标量调度：选定目标sheet和range，`ByRows=true`，显式 `HasHeader`/`Ascending1`，`IncludeAttribs/IncludeComments/IncludeImages=true`，`Col1`为工作表绝对列号（1开始，UNO long），`Col2/Col3=0`，`UserDefIndex=0`，不继承旧的多字段或自定义顺序。依据为 [scalc.sdi 的 DataSort](https://github.com/LibreOffice/core/blob/master/sc/sdi/scalc.sdi) 和 [ScCellShell 的 SID_SORT](https://github.com/LibreOffice/core/blob/master/sc/source/ui/view/cellsh2.cxx)，不是猜测的dispatch参数。
+
+排序仍先拒绝受保护表、无效/越界排序列和超过5000格的范围；单行/单格明确no-op，防止Calc自动扩大单格选区。原生排序负责移动单元格内容、随行样式和行内相对公式引用，不覆盖用户的外部引用策略。本轮默认配置下，范围外 `H1=D2` 保持指向D2坐标，排序后跟随D2当前值；不能承诺外部公式自动跟随原记录。错误回执为 `SHEET_SORT_FAILED`，detail保留宿主异常。
+
+独立 `frontend/tests/lowa-unit/sheet-sort.test.mjs` 5项通过；`frontend/tests/lowa-e2e/sheet-sort.mjs` 真实Calc覆盖非A1范围、表头、升序/无表头降序、公式结果与文本、字体底色随行、保存重开及单格不扩大目标。默认读取当前worker源码并经测试服务内存替换；`SHEET_SORT_WORKER`可指定旧源码负对照。详细命令、日志及临时产物见 `doc/verification/2026-10-28-excel-desktop-quality.md`。该专项不是完整AI编排，也不证明Office/WPS实机通过。
+
 ## Calc 标题与输入时钟候选（dev-board#1509 / #1511）
 
 当前正式基线是 **24.2.8-zhcn-r6**（2026-10-20 PR#1164，四个产物SHA见 `desktop/lowa-build/RECIPE.md`）；下文历史段落的 r5/r6 描述不能当作当前未完成清单。本轮候选范围与近期内核限制复核在 `desktop/lowa-build/REBUILD-2026-10-26.md`，候选已于2026-10-26编译，哈希与真实验收边界见 `RECIPE.md`；默认下载地址仍为r6，未发布或升级客户端。

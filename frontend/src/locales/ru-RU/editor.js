@@ -2,6 +2,39 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  officeToolNames: {
+    "office_ppt_add_image": "Вставить изображение на слайд",
+    "office_ppt_add_chart": "Вставить диаграмму на слайд",
+    "office_ppt_format_chart": "Форматировать диаграмму слайда",
+    "office_ppt_set_transition": "Настроить переход слайда",
+    "office_file_create": "Создать файл",
+    "office_file_save": "Сохранить текущий файл",
+    "office_file_export_pdf": "Экспортировать PDF в проект",
+    "office_file_open": "Открыть копию файла проекта",
+    "office_ppt_goto": "Перейти к слайду или фигуре",
+    "office_ppt_set_layout": "Задать макет или фон слайда",
+    "office_get_paragraphs": "Прочитать абзацы",
+    "office_get_outline": "Прочитать структуру",
+    "office_get_clauses": "Определить положения",
+    "office_replace_nth_match": "Заменить указанное совпадение",
+    "office_apply_style_profile": "Применить профиль стилей",
+    "office_ppt_table_set_style": "Форматировать таблицу слайда",
+    "office_ppt_read_notes": "Прочитать заметки докладчика",
+    "office_ppt_write_notes": "Записать заметки докладчика",
+    "office_audit_structure": "Проверить структуру документа"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "Диапазон сортировки содержит объединённые ячейки. Отмените объединение перед сортировкой.",
+    "SHEET_SORT_FAILED": "Не удалось выполнить сортировку. Прочитайте и проверьте лист перед повторной попыткой.",
+    "SHEET_PROTECTED_CELL": "Есть защищённые ячейки; запись не выполнена.",
+    "SHEET_INVALID_RANGE": "Недопустимый диапазон. Прочитайте лист заново и укажите допустимый диапазон.",
+    "SHEET_INVALID_START_CELL": "Укажите допустимую начальную ячейку.",
+    "SHEET_INVALID_ROWS": "Укажите корректный двумерный массив ячеек.",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "Диапазон записи выходит за границы листа.",
+    "SHEET_RANGE_CHECK_FAILED": "Не удалось проверить диапазон; запись не выполнена.",
+    "SHEET_WRITE_PARTIAL": "Запись прервана; некоторые ячейки могли измениться. Прочитайте и исправьте данные, не повторяя всю операцию.",
+    "SHEET_CHART_PARTIAL": "Диаграмма создана, но настройка не завершена. Проверьте и исправьте её, не создавая новую."
+},
   "navigation": {
     "slides": "Слайды",
     "sheets": "Листы",

@@ -81,10 +81,13 @@ tool_policy: restrict
 allowed_tools:
   # 看：通读、条款结构、机械审计、既有修订与批注
   - doc_get_clauses
+  - office_get_clauses
   - doc_get_document_text
   - doc_get_outline
+  - office_get_outline
   - doc_get_paragraph
   - doc_audit_structure
+  - office_audit_structure
   - doc_list_revisions
   - doc_get_comments
   - doc_table_read
