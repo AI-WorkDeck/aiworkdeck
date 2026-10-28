@@ -23,6 +23,8 @@ const template = source.slice(start, source.indexOf('<!-- File Picker Dialog', s
   .replace(/@tap/g, '@click')
 const render = compile(template, { mode: 'function', isCustomElement: () => true }).code
 const css = sass.compileString(read('project-overview.scss'), { logger: sass.Logger.silent }).css
+const appStyles = fs.readFileSync(new URL('../../src/App.vue', import.meta.url), 'utf8')
+const hairlineCss = appStyles.slice(appStyles.indexOf('/* ---- 悬浮细滑轨'), appStyles.indexOf('/* mac：三颗交通灯'))
 const browser = await puppeteer.launch({ executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true })
 try {
   const page = await browser.newPage()
@@ -31,8 +33,8 @@ try {
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
   await page.setRequestInterception(true)
   page.on('request', request => request.abort())
-  await page.setContent(`<style>${css}
-    :root {--awd-bg:#f1efe6;--awd-surface:#fffdf9;--awd-surface-2:#e4efeb;--awd-text:#262923;--awd-text-2:#63685f;--awd-border:#d9d8cc;--awd-accent:#2e6056;--awd-accent-text:#2e6056;--awd-accent-soft:#e4efeb}
+  await page.setContent(`<style>${hairlineCss}\n${css}
+    :root {--awd-bg:#f1efe6;--awd-surface:#fffdf9;--awd-surface-2:#e4efeb;--awd-text:#262923;--awd-text-2:#63685f;--awd-border:#d9d8cc;--awd-border-strong:#c3bca9;--awd-accent:#2e6056;--awd-accent-text:#2e6056;--awd-accent-soft:#e4efeb}
     body{margin:0;font:14px system-ui}view,text,scroll-view{display:block}#app{height:100vh;display:flex;flex-direction:column}.test-header{height:48px;flex-shrink:0}.test-status{height:26px;flex-shrink:0}
   </style><div id="app"></div>`)
   await page.addScriptTag({ path: require.resolve('vue/dist/vue.global.prod.js') })
@@ -61,6 +63,13 @@ try {
       assert.ok(rect.top >= 48 && rect.bottom <= height - 26, `fixed action outside viewport at ${height}px: ${JSON.stringify(rect)}`)
       assert.equal(rect.height, 40, 'buttons must not shrink')
     }
+    await page.mouse.move(900, 20)
+    const scrollbar = await page.$eval('.rail-tools', el => ({
+      width: getComputedStyle(el, '::-webkit-scrollbar').width,
+      color: getComputedStyle(el, '::-webkit-scrollbar-thumb').backgroundColor,
+    }))
+    assert.equal(scrollbar.width, '4px')
+    assert.equal(scrollbar.color, 'rgba(0, 0, 0, 0)', 'idle rail scrollbar is transparent')
     await page.mouse.move(25, 130)
     await page.mouse.wheel({ deltaY: 2000 })
     await page.waitForFunction(() => {
