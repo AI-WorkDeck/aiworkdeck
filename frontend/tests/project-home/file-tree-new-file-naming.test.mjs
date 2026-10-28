@@ -155,3 +155,20 @@ test('默认名中英文案：中文「新建文档」、英文 "New document"',
   assert.equal(zh.defaultDocumentName, '新建文档')
   assert.equal(en.defaultDocumentName, 'New document')
 })
+
+for (const type of ['md', 'txt']) {
+  test(`快捷新建 ${type}：保留目录、后缀去重与重名处理`, async () => {
+    const vm = makeVm({ replies: [{ confirm: true, content: `笔记.${type}` }] })
+    vm.createMenuParentId = 7
+    vm.allFiles = [{ id: 9, parentId: 7, name: `笔记.${type}` }]
+    await vm.onCreateMenuSelect(type)
+    assert.equal(vm.calls.dialogs.length, 1)
+    assert.deepEqual(vm.calls.createFile[0].slice(0, 4), [42, 7, `笔记 (1).${type}`, type])
+  })
+  test(`快捷新建 ${type}：取消命名不创建文件`, async () => {
+    const vm = makeVm()
+    await vm.onCreateMenuSelect(type)
+    assert.equal(vm.calls.dialogs.length, 1)
+    assert.equal(vm.calls.createFile.length, 0)
+  })
+}

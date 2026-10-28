@@ -54,6 +54,8 @@ export default {
         { key: 'docx', type: 'docx', label: 'Word' },
         { key: 'pptx', type: 'pptx', label: 'PPT' },
         { key: 'xlsx', type: 'xlsx', label: 'Excel' },
+        { key: 'md', type: 'md', label: this.$t('fileTree.newMarkdown') },
+        { key: 'txt', type: 'txt', label: this.$t('fileTree.newPlainText') },
       ]
     },
     rootItems() {

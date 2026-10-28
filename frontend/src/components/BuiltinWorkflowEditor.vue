@@ -5,8 +5,9 @@
         <view class="awd-dialog-header bw-editor-header">
           <view class="bw-editor-header-text">
             <text class="awd-dialog-title">{{ $t('chat.builtinWorkflowModalTitle', { name: activeModalWorkflow.title }) }}</text>
+            <text class="bw-editor-subtitle">{{ $t('chat.builtinWorkflowModalSubtitle') }}</text>
           </view>
-          <text class="awd-dialog-close" @tap="closeBuiltinWorkflowModal">×</text>
+          <text v-if="!embeddedInSettings" class="awd-dialog-close" @tap="closeBuiltinWorkflowModal">×</text>
         </view>
 
         <!-- 顶部四大工作流切换栏：从「高级设置」进入后可一站式配置任意内置工作流 -->
@@ -41,6 +42,17 @@
                 <view class="bw-sidebar-item-meta">
                   <text v-if="ver.systemDefault" class="bw-meta-pill">{{ $t('chat.builtinWorkflowReadOnlyTag') }}</text>
                   <text v-if="activeModalWorkflow.activeVersionId === ver.id" class="bw-meta-pill active">{{ projectId ? $t('chat.builtinWorkflowProjectTag') : $t('chat.builtinWorkflowGlobalTag') }}</text>
+                </view>
+              </view>
+              <view v-if="bwModalSelectedVersionId === '__new__'"
+                    class="bw-sidebar-item selected is-new-draft"
+                    @tap="selectVersionInModal('__new__')">
+                <view class="bw-sidebar-item-top">
+                  <text class="bw-sidebar-item-name">{{ bwEditorForm.name || $t('chat.builtinWorkflowNewVersionDefaultName') }}</text>
+                  <text class="bw-sidebar-active-dot">✦</text>
+                </view>
+                <view class="bw-sidebar-item-meta">
+                  <text class="bw-meta-pill active">{{ $t('chat.builtinWorkflowNewVersionBtn') }}</text>
                 </view>
               </view>
             </view>
@@ -122,10 +134,10 @@
             </view>
           </view>
           <view class="bw-footer-right">
-            <view class="awd-btn awd-btn-secondary" @tap="closeBuiltinWorkflowModal">{{ $t('chat.cancel') }}</view>
+            <view v-if="!embeddedInSettings || bwModalSelectedVersionId === '__new__'" class="awd-btn awd-btn-secondary" @tap="handleCancelBuiltinWorkflowModal">{{ $t('chat.cancel') }}</view>
             <view v-if="isModalViewingSystemDefault && activeModalWorkflow.activeVersionId !== 'default'"
                   class="awd-btn awd-btn-primary"
-                  @tap="switchBuiltinWorkflowVersion(activeModalWorkflow, 'default'); closeBuiltinWorkflowModal()">
+                  @tap="switchBuiltinWorkflowVersion(activeModalWorkflow, 'default')">
               {{ projectId ? $t('chat.builtinWorkflowApplyToProject') : $t('chat.builtinWorkflowSetAsGlobal') }}
             </view>
             <view v-if="!isModalViewingSystemDefault"
@@ -143,7 +155,11 @@ import { ref, computed, watch } from 'vue'
 import { saveBuiltinWorkflowVersion, selectBuiltinWorkflowVersion, deleteBuiltinWorkflowVersion } from '@/services/api.js'
 import { useBuiltinWorkflows, notifyBuiltinWorkflowsChanged } from '@/composables/useBuiltinWorkflows.js'
 import { t } from '@/i18n'
-const props = defineProps({ projectId: { type: [String, Number], default: '' }, request: { type: Object, required: true } })
+const props = defineProps({
+  projectId: { type: [String, Number], default: '' },
+  request: { type: Object, default: () => ({ workflowId: 'contract-review', versionId: 'default' }) },
+  embeddedInSettings: { type: Boolean, default: false }
+})
 const emit = defineEmits(['close'])
 const { builtinWorkflowStates, builtinQuickWorkflows, loadBuiltinWorkflowStates } = useBuiltinWorkflows(props)
     const bwModalWorkflowId = ref('')
@@ -246,6 +262,14 @@ const { builtinWorkflowStates, builtinQuickWorkflows, loadBuiltinWorkflowStates 
       emit('close')
     }
 
+    const handleCancelBuiltinWorkflowModal = () => {
+      if (bwModalSelectedVersionId.value === '__new__') {
+        selectVersionInModal(activeModalWorkflow.value?.activeVersionId || 'default')
+        return
+      }
+      emit('close')
+    }
+
     const startNewVersionFromDefault = () => {
       selectVersionInModal('__new__')
     }
@@ -285,6 +309,10 @@ const { builtinWorkflowStates, builtinQuickWorkflows, loadBuiltinWorkflowStates 
         } else {
           await loadBuiltinWorkflowStates()
         }
+        const updatedWf = activeModalWorkflow.value
+        const savedVer = (updatedWf?.versions || []).find(v => !v.systemDefault && v.id !== 'default' && (payload.id ? v.id === payload.id : v.name === payload.name))
+          || (updatedWf?.versions || []).filter(v => !v.systemDefault && v.id !== 'default').slice(-1)[0]
+        selectVersionInModal(savedVer ? savedVer.id : (updatedWf?.activeVersionId || 'default'))
         notifyBuiltinWorkflowsChanged()
         if (typeof uni !== 'undefined' && uni.showToast) {
           uni.showToast({
@@ -293,7 +321,6 @@ const { builtinWorkflowStates, builtinQuickWorkflows, loadBuiltinWorkflowStates 
             duration: 2200
           })
         }
-        emit('close')
       } catch (e) {
         console.error('[ChatInterface] 保存内置工作流版本失败:', e)
         notifyBuiltinWorkflowsChanged()
@@ -371,6 +398,29 @@ watch([() => props.request, () => props.projectId], async ([request, projectId])
   display: flex;
   flex-direction: column;
   row-gap: 3px;
+}
+.awd-dialog-title {
+  font-size: var(--awd-font-size-reading);
+  font-weight: 600;
+  color: var(--awd-text);
+  line-height: 1.4;
+}
+.awd-dialog-close {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--awd-radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--awd-font-size-title);
+  color: var(--awd-text-3);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.awd-dialog-close:hover {
+  background: var(--awd-bg);
+  color: var(--awd-text);
 }
 .bw-editor-subtitle {
   font-size: var(--awd-panel-fs-meta);
@@ -655,10 +705,58 @@ watch([() => props.request, () => props.projectId], async ([request, projectId])
   align-items: center;
   column-gap: 8px;
 }
+.awd-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 16px;
+  font-size: var(--awd-panel-fs);
+  font-weight: 500;
+  border-radius: var(--awd-radius-md);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+}
+.awd-btn:active {
+  transform: translateY(1px);
+}
+.awd-btn-primary {
+  background-color: var(--awd-accent);
+  color: var(--awd-text-on-accent);
+  border-color: var(--awd-accent);
+}
+.awd-btn-primary:hover {
+  background-color: var(--awd-accent-hover);
+  border-color: var(--awd-accent-hover);
+}
+.awd-btn-primary.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.awd-btn-secondary {
+  background-color: var(--awd-surface);
+  color: var(--awd-text-2);
+  border-color: var(--awd-border);
+}
+.awd-btn-secondary:hover {
+  background-color: var(--awd-bg);
+  color: var(--awd-text);
+  border-color: var(--awd-text-3);
+}
 .bw-btn-danger {
   color: var(--awd-danger);
   background: transparent;
   border: 1px solid var(--awd-danger);
+}
+.bw-btn-danger:hover {
+  background: var(--awd-danger-soft);
+}
+.bw-sidebar-item.is-new-draft {
+  border-style: dashed;
 }
 
 
