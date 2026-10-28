@@ -1101,8 +1101,17 @@ public class AgentOrchestrator {
         // 还被裁着——模型第一步做成了、第二步没有工具可用，这是最坏的一种半途而废。
         if (guard != null && result.success()) {
             String createdKind = NEW_DOCUMENT_TOOL_KINDS.get(toolName);
-            if (createdKind != null) {
-                widenDocKindAfterDocumentSwitch(guard, createdKind, toolName, conversationId);
+            if (createdKind != null && com.checkba.service.ai.tools.GeneratedFileLocation
+                    .parentParameter(toolName, extractArg(argsJson, "fileId")) != null) {
+                var created = com.checkba.service.ai.tools.GeneratedFileLocation
+                        .createdFile(projectFileService, projectId, toolName, result.output());
+                if (created != null) {
+                    // The following edit and checkpoint belong to the newly opened file,
+                    // not the reference document that was active when this run started.
+                    guard.activeFileId = created.getId();
+                    guard.activeFileName = created.getName();
+                    widenDocKindAfterDocumentSwitch(guard, createdKind, toolName, conversationId);
+                }
             }
         }
         return result;
@@ -1121,12 +1130,13 @@ public class AgentOrchestrator {
     /**
      * 「新建并打开一份新文档」的工具 → 它建出来的文档类型（dev-board#729 ①）。
      *
-     * <p>这两个是 {@code ClientCapabilityService.KIND_AGNOSTIC_LOWA_TOOLS} 里的「新建」那一类：
+     * <p>这些是 {@code ClientCapabilityService.KIND_AGNOSTIC_LOWA_TOOLS} 里的「新建」那一类：
      * 跨类型新建流程的第一步。第二步（往新文档里写）需要的是另一套原语，
      * 所以它们一旦成功就要把工具集放回全集。
      */
     private static final Map<String, String> NEW_DOCUMENT_TOOL_KINDS = Map.of(
             "sheet_create_file", ClientCapabilityService.DOC_KIND_SHEET,
+            "slide_create_file", ClientCapabilityService.DOC_KIND_SLIDE,
             "doc_start_stream", ClientCapabilityService.DOC_KIND_WRITER);
 
     /** 新建并打开的文档与本轮裁剪用的类型不一致时放回全集；一致时什么都不做。 */

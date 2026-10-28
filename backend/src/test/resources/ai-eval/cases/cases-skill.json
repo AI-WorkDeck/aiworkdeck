@@ -115,7 +115,7 @@
     "userInput": "把刚才那场会议的会议纪要整理好，直接写进我现在打开的这份文档里",
     "turns": [
       {
-        "text": "<process name=\"读取转写稿\"><tool_code>meeting_get_transcript(recordingId=\"42\")</tool_code></process>"
+        "text": "<process name=\"读取转写稿\"><tool_code>meeting_get_transcript(meetingId=\"42\")</tool_code></process>"
       },
       {
         "text": "<process name=\"写入当前文档\"><tool_code>doc_insert_at_cursor(text=\"一、议题与讨论要点\")</tool_code></process>"
@@ -131,7 +131,8 @@
     "expect": {
       "toolCalls": [
         {
-          "name": "meeting_get_transcript"
+          "name": "meeting_get_transcript",
+          "argsContain": { "meetingId": "42" }
         },
         {
           "name": "doc_insert_at_cursor"

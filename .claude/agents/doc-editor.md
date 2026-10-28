@@ -7,6 +7,16 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 
 职责边界：编辑器内核与宿主集成。AI 发编辑指令的链路属 ai-doc-bridge 领域。引擎 = LibreOffice 24.2.8 自建 zh-CN 版（LO core 分支 distro/allotropia/zeta-24-2）。
 
+## PPT 局部格式与视觉复核（2026-10-28，dev-board#1570/#1571/#1572）
+
+`office_thread.js` 的 PPT 替换按具体页/形状和可选完整原文校验后，用文字范围游标局部写入，保留其余混合字形；插页按 LO 24.2 前驱页索引语义定位，并在后续填充失败时报告已创建页，不能让上层盲目重试。段落读取增加 runs 与背景/几何信息；段距、行距、首行/左缩进写入共用 Impress 专属处理。非零右缩进当前导出 PPTX 不保留，因此在任何其他格式写入前拒绝；不以运行时成功回包代替保存重开验证。
+
+表格创建必须先扩充行列再设整表尺寸，否则第一行会占满传入高度。真实 LOWA 已核对 5×3 表格总高 220 pt 时每行 44 pt，随后显式行高 36/38/38/38/38 pt、深蓝表头白字及白底深字可导出重开；回读 pt 值允许引擎单位换算造成的舍入。单元格样式写入由 `slide_table_set_style` 承担，整形状填充不能替代单元格色彩。专项证据见 `/tmp/ppt-precision-table.log`。
+
+新增 AI 工具 `PdfVisualTools.pdf_inspect_visual` 与工具栏 `DocumentVisualReviewService` 分属两条入口：AI 工具接收已导出的 PDF 文件，实际渲染目标页与可选参考页交给支持视觉的辅助模型；工具栏仍沿用用户发起、revision 守卫与当前编辑器导出流程。两者均不能用结构数据冒充像素核验，也不自动修改文档。参考 Word/PPT 须先读格式再导出对照，精确字号/缩进以结构为准，视觉判断覆盖布局、密度、颜色与裁切。
+
+专项 `frontend/tests/lowa-e2e/ppt-precision.mjs` 覆盖真实引擎插页、局部替换、陈旧目标拒绝、背景、段距/行距/缩进及导出重开；`frontend/tests/lowa-unit/slide-precision.test.mjs` 覆盖部分失败与无副作用拒绝。全套 LOWA 回归、专项结果与真实 AI 验收边界见 `doc/verification/2026-10-28-ppt-quality.md`，不能用 PPT 结果替代 Word/Excel/PDF 对应路径的验证。
+
 ## Calc 标题与输入时钟候选（dev-board#1509 / #1511）
 
 当前正式基线是 **24.2.8-zhcn-r6**（2026-10-20 PR#1164，四个产物SHA见 `desktop/lowa-build/RECIPE.md`）；下文历史段落的 r5/r6 描述不能当作当前未完成清单。本轮候选范围与近期内核限制复核在 `desktop/lowa-build/REBUILD-2026-10-26.md`，候选已于2026-10-26编译，哈希与真实验收边界见 `RECIPE.md`；默认下载地址仍为r6，未发布或升级客户端。
