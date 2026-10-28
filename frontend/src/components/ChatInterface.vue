@@ -3,8 +3,6 @@
 <template>
   <view class="chat-interface" :class="{ 'is-empty': bubbles.length === 0 && !isStreaming }">
 
-    <MemoryBrowser :open="showMemoryBrowser" :project-id="projectId" @close="showMemoryBrowser = false" />
-
     <!-- Upload File Modal (reused from FileTree pattern) -->
     <view v-if="showUploadDialog" class="awd-dialog-mask" @tap="cancelUpload">
       <view class="awd-dialog awd-dialog-large" @tap.stop>
@@ -270,7 +268,7 @@
           <text class="project-name-display" :title="projectName">{{ projectName }}</text>
        </view>
        <view class="header-actions">
-          <view class="memory-header-btn" @tap="showMemoryBrowser = true">{{ $t('chat.memoryButton') }}</view>
+          <view class="memory-header-btn" @tap="$emit('open-settings', { nav: 'memory' })">{{ $t('chat.memoryButton') }}</view>
           <view class="icon-btn" @tap="$emit('toggle-history')" title="History">
              <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                <circle cx="12" cy="12" r="9" />
@@ -1069,7 +1067,6 @@ import { buildChatTurns, isPlanSnapshotCall, pendingAttention, recoverPlanTodos 
 import { useChatReadingPosition } from '@/composables/useChatReadingPosition.js'
 import BackgroundTaskIndicator from './BackgroundTaskIndicator.vue'
 import AgentInbox from './AgentInbox.vue'
-import MemoryBrowser from './MemoryBrowser.vue'
 import { useAgentStream } from '@/composables/useAgentStream.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 import { useBuiltinWorkflows, notifyBuiltinWorkflowsChanged } from '@/composables/useBuiltinWorkflows.js'
@@ -1133,7 +1130,7 @@ import {
 
 export default {
   name: 'ChatInterface',
-  components: { OcrRoutingCard, ChatSuggestionControl, DecisionAssistControl, ModelSelectorDropdown, RootBubble, ChatTurnRail, MentionPicker, BackgroundTaskIndicator, AgentInbox, MemoryBrowser, OptionalComponentCard },
+  components: { OcrRoutingCard, ChatSuggestionControl, DecisionAssistControl, ModelSelectorDropdown, RootBubble, ChatTurnRail, MentionPicker, BackgroundTaskIndicator, AgentInbox, OptionalComponentCard },
   props: {
     visible: { type: Boolean, default: true },
     projectId: String,
@@ -1440,7 +1437,6 @@ export default {
 
     const inputPrompt = ref('')
     const richInput = ref(null)
-    const showMemoryBrowser = ref(false)
     const submissionTracker = { failed: null, inflight: {} }
     const followUpMode = ref('steer')
     try {
@@ -2157,7 +2153,7 @@ export default {
 
     const goToSkillManagement = () => {
       showSkillDropdown.value = false
-      uni.navigateTo({ url: '/pages/plugin-market/plugin-market' })
+      emit('manage-skills')
     }
 
     // Rollback Dialog State
@@ -4607,7 +4603,6 @@ export default {
        backgroundComponentGate,
        inputPrompt,
        richInput,
-       showMemoryBrowser,
        decisionAssistEnabled, toggleDecisionAssist, isLocalOnlyProvider,
        chatSuggestions, suggestionEnabled, visibleSuggestion,
        followUpMode,
