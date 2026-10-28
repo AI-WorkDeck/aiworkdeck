@@ -108,11 +108,16 @@ public class PptxServiceClient {
      * @return 项目 ID
      */
     public String createProject(String topic) {
+        return createProject(topic, null);
+    }
+
+    public String createProject(String topic, String templateStyle) {
         log.info("Creating PPTX project with topic: {}", topic.length() > 50 ? topic.substring(0, 50) + "..." : topic);
         
         JSONObject body = new JSONObject();
         body.set("creation_type", "idea");
         body.set("idea_prompt", topic);
+        body.set("template_style", presentationStyle(templateStyle));
         
         HttpResponse resp = HttpRequest.post(baseUrl + "/api/projects")
                 .header("Content-Type", "application/json")
@@ -128,6 +133,22 @@ public class PptxServiceClient {
         String projectId = result.getJSONObject("data").getStr("project_id");
         log.info("PPTX project created: {}", projectId);
         return projectId;
+    }
+
+    private static String presentationStyle(String requestedStyle) {
+        String quality = LangText.of(
+                "保证清晰的标题层级、对齐网格、可读字号和充分的文字背景对比；用有意义的分组、对照表和图表组织信息。"
+                        + "同一论点及其证据尽量放在同页，不为凑页数拆散相关内容，不用装饰填补空洞。",
+                "Use clear title hierarchy, aligned grids, readable type and strong text/background contrast. "
+                        + "Organize information into meaningful groups, comparisons and charts. Keep a claim and its evidence "
+                        + "together; do not split related content to inflate page counts or use decoration to conceal empty content.");
+        if (requestedStyle != null && !requestedStyle.isBlank()) {
+            return requestedStyle.trim() + "\n\n" + quality;
+        }
+        return LangText.of(
+                "商务演示风格：深蓝主色、浅蓝灰背景、青色强调色，保持全稿配色一致。",
+                "Business presentation: navy primary color, pale blue-gray backgrounds and teal accents, consistent throughout.")
+                + "\n\n" + quality;
     }
 
     /**
@@ -501,7 +522,7 @@ public class PptxServiceClient {
         
         try {
             // 1. 创建项目
-            String projectId = createProject(topic);
+            String projectId = createProject(topic, templateStyle);
             result.setProjectId(projectId);
             
             // 2. 生成大纲（传递模型配置）
@@ -657,7 +678,7 @@ public class PptxServiceClient {
             // 1. 创建项目 (2%)
             reportProgress.accept(2, new String[]{"creating_project",
                     LangText.of("正在创建 PPT 项目...", "Creating the PPT project...")});
-            String projectId = createProject(topic);
+            String projectId = createProject(topic, templateStyle);
             result.setProjectId(projectId);
             
             // 2. 生成大纲 (10%)

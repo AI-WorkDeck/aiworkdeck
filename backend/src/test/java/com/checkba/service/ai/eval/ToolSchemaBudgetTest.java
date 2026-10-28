@@ -13,6 +13,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * 按活跃文档类型裁工具到底省下多少（dev-board#729 ①）。
@@ -68,7 +69,7 @@ class ToolSchemaBudgetTest {
     }
 
     @Test
-    @DisplayName("docx 会话的工具 schema 比全集小一大截（slide_* 全隐藏、sheet_* 只留新建）")
+    @DisplayName("docx 会话的工具 schema 比全集小一大截（slide_* / sheet_* 只留跨类型新建）")
     void writerSessionShipsAMateriallySmallerSchema() {
         RecordingToolRegistry registry = registry();
         List<ToolSpecification> all = registry.getAllSpecifications("conv", null);
@@ -88,8 +89,9 @@ class ToolSchemaBudgetTest {
         assertTrue(saved > 0.15,
                 "docx 会话省下的 schema 体量不足 15%（实际 " + String.format("%.1f%%", saved * 100)
                         + "）——裁剪多半被改回全集了");
-        assertTrue(writer.stream().noneMatch(s -> s.name().startsWith("slide_")),
-                "docx 会话不该下发任何 slide_* 工具");
+        assertEquals(List.of("slide_create_file"),
+                writer.stream().map(ToolSpecification::name).filter(name -> name.startsWith("slide_")).toList(),
+                "docx 会话只保留跨类型新建 PPT，不能下发作用于当前文档的 slide_* 编辑工具");
     }
 
     /**

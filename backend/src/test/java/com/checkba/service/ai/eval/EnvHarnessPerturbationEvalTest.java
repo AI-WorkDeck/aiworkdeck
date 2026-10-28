@@ -20,10 +20,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class EnvHarnessPerturbationEvalTest {
 
     @Test
-    void linkPerturbationAnchorDriftAfterWriteTriggersSelfHealingAndEvolution() {
+    void linkPerturbationAnchorDriftRecoversWithoutPersistingRuntimeMechanics() {
         EvalCase c = new EvalCase();
         c.id = "envharness-link-anchor-drift";
-        c.title = "Link Perturbation: Edit after prior write encounters anchor drift, probes via doc_find_text, and recovers";
+        c.title = "Link Perturbation: Edit after prior write encounters anchor drift, probes via doc_find_text, and recovers without long-term evolution";
         c.mode = "AGENT";
         c.userInput = "在合同第一条插入定义后，把违约金比例替换为 15%";
         EvalCase.ActiveDocument doc = new EvalCase.ActiveDocument();
@@ -78,9 +78,16 @@ class EnvHarnessPerturbationEvalTest {
                 "Expected harness_adaptation SSE event when anchor drift occurs");
         assertTrue(result.events("harness_adaptation").get(0).data().contains("ANCHOR_PROBE_RECOVERY"));
 
-        assertFalse(result.events("harness_evolution").isEmpty(),
-                "Expected harness_evolution SSE event after self-healing recovery completes");
-        assertTrue(result.events("harness_evolution").get(0).data().contains("SELF_HEALING_RECOVERY"));
+        assertEquals(List.of("doc_insert_at_cursor", "doc_replace_at_anchor", "doc_find_text", "doc_replace_at_anchor"),
+                result.dispatches().stream().map(RecordingToolRegistry.Dispatch::resolvedName).toList());
+        assertTrue(result.dispatches().get(1).argsJson().contains("p8_stale"));
+        assertTrue(result.dispatches().get(3).argsJson().contains("p8_fresh"));
+        assertTrue(result.lastAssistantMessage().orElseThrow().contains("\"replaced\":1"),
+                "The recovery must include the successful replacement tool result");
+        assertTrue(result.errorEvents().isEmpty());
+        assertTrue(result.events("bubble_end").stream().anyMatch(event -> event.data().contains("\"status\":\"finished\"")));
+        assertTrue(result.events("harness_evolution").isEmpty(),
+                "Anchor probing is a per-turn runtime mechanism, not a rule to persist in user memory");
     }
 
     @Test

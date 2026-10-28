@@ -801,8 +801,6 @@ export function useAgentStream() {
             || (Array.isArray(bubble.processes) && bubble.processes.length)
             || (Array.isArray(bubble.artifacts) && bubble.artifacts.length)
             || bubble.verificationReport
-            || bubble.harnessEvolution
-            || (Array.isArray(bubble.harnessAdaptations) && bubble.harnessAdaptations.length)
         )
     )
 

@@ -205,6 +205,21 @@ class DocumentEditToolsNewFileFolderTest {
     }
 
     @Test
+    void slideCreateFileProducesEditableWideDeckInFolder(@TempDir Path dir) throws Exception {
+        Harness h = harness(dir);
+        String out = h.tools().slide_create_file("汇报", PROJECT_ID, FOLDER_ID);
+        assertEquals(999L, GeneratedFileLocation.createdId(out));
+        Path saved = dir.resolve("08-尽调清单与工作底稿/汇报.pptx");
+        try (var in = Files.newInputStream(saved);
+             var deck = new org.apache.poi.xslf.usermodel.XMLSlideShow(in)) {
+            assertEquals(1, deck.getSlides().size());
+            assertEquals(new java.awt.Dimension(960, 540), deck.getPageSize());
+        }
+        verify(h.fileService()).createFile(eq(PROJECT_ID), eq(FOLDER_ID), eq("汇报.pptx"), eq("pptx"),
+                any(), any(), anyString(), anyLong(), eq(ProjectFileService.ConflictPolicy.RENAME));
+    }
+
+    @Test
     @DisplayName("同名不再覆盖：走 ConflictPolicy.RENAME（「已存在则加 (n)」策略保留）")
     void duplicateNamesGoThroughRenamePolicy(@TempDir Path dir) {
         Harness h = harness(dir);
