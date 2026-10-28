@@ -83,6 +83,34 @@ class PptxServiceClientTest {
     }
 
     @Test
+    void projectCreationPersistsRequestedStyleAndQualityRequirements() {
+        server.createContext("/api/projects", ex -> {
+            var body = cn.hutool.json.JSONUtil.parseObj(readBody(ex.getRequestBody()));
+            assertEquals("Synthetic outline", body.getStr("idea_prompt"));
+            String style = body.getStr("template_style");
+            assertTrue(style.startsWith("Reference: navy background, 32pt title, 18pt body"));
+            assertTrue(style.length() > 100, "Quality requirements must accompany the requested style");
+            respond(ex, 201, "{\"data\":{\"project_id\":\"styled\"}}");
+        });
+        startServer();
+        assertEquals("styled", client.createProject("Synthetic outline",
+                "Reference: navy background, 32pt title, 18pt body"));
+    }
+
+    @Test
+    void projectCreationAlwaysProvidesStyleForRuntimeImageGeneration() {
+        server.createContext("/api/projects", ex -> {
+            var body = cn.hutool.json.JSONUtil.parseObj(readBody(ex.getRequestBody()));
+            assertFalse(body.getStr("template_style", "").isBlank(),
+                    "Python runtime rejects image generation without a template or stored style");
+            respond(ex, 201, "{\"data\":{\"project_id\":\"default-style\"}}");
+        });
+        startServer();
+        assertEquals("default-style", client.createProject("Synthetic outline"));
+        assertEquals("default-style", client.createProject("Synthetic outline", "  "));
+    }
+
+    @Test
     void localOcrUsesDedicatedEndpoint() {
         server.createContext("/api/pdf/ocr-markdown-local", ex -> {
             String body = readBody(ex.getRequestBody());
@@ -156,6 +184,25 @@ class PptxServiceClientTest {
         assertFalse(result.isSuccess());
         assertTrue(result.getError().contains("配额已用尽"),
                 "真实失败原因必须出现在最终结果里：" + result.getError());
+    }
+
+    @Test
+    void bothGenerationPipelinesPersistTheActualRequestedStyle() {
+        stubUpToDescriptionsThenFail("stop after style verification");
+        server.removeContext("/api/projects");
+        var receivedStyles = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        server.createContext("/api/projects", ex -> {
+            var body = cn.hutool.json.JSONUtil.parseObj(readBody(ex.getRequestBody()));
+            receivedStyles.add(body.getStr("template_style", ""));
+            respond(ex, 201, "{\"data\":{\"project_id\":\"proj-1\"}}");
+        });
+        startServer();
+        client.generatePptxSync("Synthetic", "en", "Reference style A", null, null, false);
+        client.generatePptxWithProgress("Synthetic", "en", "Reference style B", null, null,
+                false, (progress, stage, message) -> { });
+        assertEquals(2, receivedStyles.size());
+        assertTrue(receivedStyles.get(0).startsWith("Reference style A"));
+        assertTrue(receivedStyles.get(1).startsWith("Reference style B"));
     }
 
     // ==== 修复 6：downloadPptx 校验非空 + PPTX 魔数 ====

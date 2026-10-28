@@ -55,7 +55,7 @@ public class TemplateTools implements AgentToolComponent {
             + "Pass the database fileIds of the templates (comma-separated for several; the majority value wins and a "
             + "confidence is reported). The profile is saved automatically as the project's _模板/画像.json (that is the "
             + "file write_docx reads, and in desktop sessions doc_apply_style_profile too), so you never need to write it yourself; "
-            + "the returned JSON carries savedProfileFileId/savedProfilePath.")
+            + "the returned JSON carries savedProfileFileId/savedProfilePath. For reference-only learning (including PPT creation), pass options={\"saveProfile\":false}; this reads styles without changing the project Word template.")
     public String docx_inspect_template(
             @P("Template file database IDs, comma-separated, e.g. \"123\" or \"123,456\"") String fileIds,
             @P(value = "Optional JSON options, e.g. {\"name\":\"某律所尽调报告模板\"}", required = false) String options
@@ -101,6 +101,14 @@ public class TemplateTools implements AgentToolComponent {
             return skipped.isEmpty() ? "Error: no readable .docx template." : String.join("\n", skipped);
         }
         try {
+            boolean saveProfile = true;
+            if (options != null && !options.isBlank()) {
+                var opts = StyleProfiles.mapper().readTree(options);
+                if (opts.has("saveProfile")) {
+                    if (!opts.get("saveProfile").isBoolean()) return "Error: " + com.checkba.service.LangText.of("saveProfile须为布尔值", "saveProfile must be a boolean.");
+                    saveProfile = opts.get("saveProfile").booleanValue();
+                }
+            }
             StyleProfile profile = DocxProfileReader.read(sources);
             String name = optionName(options);
             if (name != null) profile.root().put("name", name);
@@ -109,11 +117,11 @@ public class TemplateTools implements AgentToolComponent {
             // 以前只把 JSON 交给模型让它 write_file 转抄——实测会掉字段（黄金对照 B v6/v7）。
             Long projectId = sources.isEmpty() ? null : projectIdOf(ids);
             try {
-                ProjectFile saved = saveProjectProfile(projectId, json);
+                ProjectFile saved = saveProfile ? saveProjectProfile(projectId, json) : null;
                 if (saved != null) {
                     profile.root().put("savedProfileFileId", saved.getId());
                     profile.root().put("savedProfilePath", StyleProfileResolver.TEMPLATE_FOLDER + "/" + StyleProfileResolver.PROFILE_FILE);
-                } else {
+                } else if (saveProfile) {
                     profile.root().put("saveError", "没有项目上下文，画像未保存：请用 write_file 写入 "
                             + StyleProfileResolver.TEMPLATE_FOLDER + "/" + StyleProfileResolver.PROFILE_FILE);
                 }

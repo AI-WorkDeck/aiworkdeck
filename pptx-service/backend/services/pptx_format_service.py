@@ -16,6 +16,10 @@ import os
 from typing import Any, Dict, List, Optional
 
 from pptx import Presentation
+from lxml import etree
+
+NS = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+      'p': 'http://schemas.openxmlformats.org/presentationml/2006/main'}
 
 from utils import pptx_format_utils as fmt
 from utils.text_sanitizer import parse_lines, strip_markdown
@@ -59,39 +63,115 @@ def _load(pptx_path: str) -> Presentation:
 
 # ==================== inspect ====================
 
+def _color_xml(element):
+    """Preserve theme references/transforms; never call an unresolved theme color RGB."""
+    if element is None:
+        return None
+    for child in element:
+        kind = child.tag.rsplit('}', 1)[-1]
+        if kind.endswith('Clr'):
+            return {'kind': kind, 'value': child.get('val') or child.get('lastClr'),
+                    'transforms': [{'kind': c.tag.rsplit('}', 1)[-1], 'value': c.get('val')}
+                                   for c in child]}
+    return None
+
+
+def _fill_xml(element):
+    if element is None:
+        return None
+    for child in element:
+        kind = child.tag.rsplit('}', 1)[-1]
+        if kind in ('solidFill', 'gradFill', 'blipFill', 'pattFill', 'noFill', 'grpFill'):
+            return {'kind': kind, 'color': _color_xml(child),
+                    'xml': etree.tostring(child, encoding='unicode')}
+    return None
+
+
+def _background(slide):
+    for owner, source in ((slide, 'slide'), (slide.slide_layout, 'layout'),
+                          (slide.slide_layout.slide_master, 'master')):
+        bg = owner._element.find('p:cSld/p:bg', namespaces=NS)
+        if bg is not None:
+            props = bg.find('p:bgPr', namespaces=NS)
+            ref = bg.find('p:bgRef', namespaces=NS)
+            return {'source': source, 'fill': _fill_xml(props),
+                    'theme_style_index': ref.get('idx') if ref is not None else None,
+                    'theme_color': _color_xml(ref)}
+    return {'source': 'unspecified', 'fill': None}
+
+
+def _theme(slide):
+    master = slide.slide_layout.slide_master
+    for rel in master.part.rels.values():
+        if rel.reltype.endswith('/theme') and not rel.is_external:
+            root = etree.fromstring(rel.target_part.blob)
+            colors = root.find('a:themeElements/a:clrScheme', namespaces=NS)
+            fonts = root.find('a:themeElements/a:fontScheme', namespaces=NS)
+            return {'colors': {c.tag.rsplit('}', 1)[-1]: _color_xml(c) for c in colors}
+                    if colors is not None else {},
+                    'font_scheme_xml': etree.tostring(fonts, encoding='unicode') if fonts is not None else None,
+                    'color_map': dict(master._element.find('p:clrMap', namespaces=NS).attrib)
+                    if master._element.find('p:clrMap', namespaces=NS) is not None else {}}
+    return None
+
+
+def _shape_info(shape, index):
+    info = {'shape_index': index, 'shape_id': shape.shape_id, 'name': shape.name,
+            'shape_type': str(shape.shape_type) if shape.shape_type is not None else None,
+            'has_text_frame': bool(getattr(shape, 'has_text_frame', False)),
+            'has_table': bool(getattr(shape, 'has_table', False)),
+            'bounds_pt': {key: getattr(shape, key).pt if getattr(shape, key) is not None else None
+                          for key in ('left', 'top', 'width', 'height')},
+            'rotation_degrees': shape.rotation,
+            'fill': _fill_xml(shape._element.find('p:spPr', namespaces=NS))}
+    if shape.is_placeholder:
+        info['placeholder'] = {'index': shape.placeholder_format.idx,
+                               'type': str(shape.placeholder_format.type)}
+    if info['has_text_frame']:
+        info['paragraphs'] = _read_text_frame(shape.text_frame)
+        tf = shape.text_frame
+        info['text_frame'] = {key + '_pt': getattr(tf, key).pt
+                              for key in ('margin_left', 'margin_right', 'margin_top', 'margin_bottom')}
+        info['text_frame'].update({'vertical_anchor': str(tf.vertical_anchor), 'word_wrap': tf.word_wrap,
+                                   'auto_size': str(tf.auto_size)})
+        lst = tf._txBody.find('a:lstStyle', namespaces=NS)
+        info['text_frame']['list_style_xml'] = etree.tostring(lst, encoding='unicode') if lst is not None else None
+    if info['has_table']:
+        tbl = shape.table
+        info['table'] = {'rows': len(tbl.rows), 'cols': len(tbl.columns),
+                         'column_widths_pt': [col.width.pt for col in tbl.columns],
+                         'row_heights_pt': [row.height.pt for row in tbl.rows],
+                         'cells': [{'row': r, 'col': c, 'text': tbl.cell(r, c).text,
+                                    'paragraphs': _read_text_frame(tbl.cell(r, c).text_frame)}
+                                   for r in range(len(tbl.rows)) for c in range(len(tbl.columns))]}
+    if hasattr(shape, 'shapes'):
+        info['children'] = [_shape_info(child, i) for i, child in enumerate(shape.shapes)]
+        info['child_coordinate_space'] = 'group-local; apply group transform before comparing page positions'
+        info['group_transform_xml'] = etree.tostring(shape._element.find('p:grpSpPr', namespaces=NS), encoding='unicode')
+    return info
+
+
 def inspect(pptx_path: str) -> Dict[str, Any]:
     prs = _load(pptx_path)
     slides = []
     for s_idx, slide in enumerate(prs.slides):
-        shapes = []
-        for sh_idx, shape in enumerate(slide.shapes):
-            info: Dict[str, Any] = {
-                'shape_index': sh_idx,
-                'name': shape.name,
-                'shape_type': str(shape.shape_type) if shape.shape_type is not None else None,
-                'has_text_frame': bool(getattr(shape, 'has_text_frame', False)),
-                'has_table': bool(getattr(shape, 'has_table', False)),
-            }
-            if info['has_text_frame']:
-                info['paragraphs'] = _read_text_frame(shape.text_frame)
-            if info['has_table']:
-                tbl = shape.table
-                info['table'] = {
-                    'rows': len(tbl.rows),
-                    'cols': len(tbl.columns),
-                    'cells': [
-                        {
-                            'row': r, 'col': c,
-                            'text': tbl.cell(r, c).text,
-                            'paragraphs': _read_text_frame(tbl.cell(r, c).text_frame),
-                        }
-                        for r in range(len(tbl.rows))
-                        for c in range(len(tbl.columns))
-                    ],
-                }
-            shapes.append(info)
-        slides.append({'slide_index': s_idx, 'shapes': shapes})
-    return {'slide_count': len(prs.slides), 'slides': slides}
+        layout = slide.slide_layout
+        master = layout.slide_master
+        text_styles = master._element.find('p:txStyles', namespaces=NS)
+        slides.append({'slide_index': s_idx, 'background': _background(slide),
+                       'layout_name': layout.name, 'master_name': master.name,
+                       'theme': _theme(slide),
+                       'layout_placeholders': [_shape_info(s, i) for i, s in enumerate(layout.placeholders)],
+                       'master_placeholders': [_shape_info(s, i) for i, s in enumerate(master.placeholders)],
+                       'master_text_styles_xml': etree.tostring(text_styles, encoding='unicode') if text_styles is not None else None,
+                       'shapes': [_shape_info(shape, i) for i, shape in enumerate(slide.shapes)]})
+    return {'slide_count': len(prs.slides),
+            'page_size_pt': {'width': prs.slide_width.pt, 'height': prs.slide_height.pt},
+            'format_semantics': 'Run and paragraph fields are direct formatting: null means inherited/unspecified, not absent. '
+                                'Use placeholder, list-style, master text-style and theme metadata to inspect inheritance. '
+                                'Theme colors retain tokens and transforms; no resolved RGB is claimed. '
+                                'Render and visually compare representative pages before claiming a visual match.',
+            'slides': slides}
 
 
 def _read_text_frame(tf) -> List[Dict[str, Any]]:
@@ -100,10 +180,17 @@ def _read_text_frame(tf) -> List[Dict[str, Any]]:
         p_info = fmt.read_paragraph_format(para)
         p_info['paragraph_index'] = p_idx
         p_info['text'] = para.text
+        p_info['level'] = para.level
+        props = para._p.find('a:pPr', namespaces=NS)
+        p_info['left_margin_pt'] = int(props.get('marL')) / 12700 if props is not None and props.get('marL') else None
+        p_info['first_line_indent_pt'] = int(props.get('indent')) / 12700 if props is not None and props.get('indent') else None
+        p_info['paragraph_properties_xml'] = etree.tostring(props, encoding='unicode') if props is not None else None
         p_info['runs'] = []
         for r_idx, run in enumerate(para.runs):
             r_info = fmt.read_run_format(run)
             r_info['run_index'] = r_idx
+            props = run._r.find('a:rPr', namespaces=NS)
+            r_info['color_reference'] = _color_xml(props.find('a:solidFill', namespaces=NS)) if props is not None else None
             p_info['runs'].append(r_info)
         paragraphs.append(p_info)
     return paragraphs

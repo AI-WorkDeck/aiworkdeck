@@ -204,6 +204,9 @@ public final class EvalHarness {
         List<ArtifactSave> artifactSaves = new CopyOnWriteArrayList<>();
         List<String> folderRenames = new CopyOnWriteArrayList<>();
         ProjectFileService projectFileService = mock(ProjectFileService.class);
+        for (var file : c.projectFiles) {
+            when(projectFileService.findFile(file.getId())).thenReturn(Optional.of(file));
+        }
         when(projectFileService.saveArtifactFile(any(), any(), any(), any(), any()))
                 .thenAnswer(inv -> {
                     artifactSaves.add(new ArtifactSave(inv.getArgument(2), inv.getArgument(3)));

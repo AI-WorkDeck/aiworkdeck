@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+id: presentation-design
+name: 演示文稿制作与样式参照
+name_en: Presentation Design and Reference Matching
+description: 先理解读者与内容，学习参考文档的实际样式，再组合原子工具制作信息充实、层级清晰的演示文稿并逐页视觉检查。
+description_en: Understand the audience and content, learn actual reference styles, compose atomic tools into a substantive presentation, and visually verify each page.
+builtin_workflow: true
+category: 通用
+languages: [zh-CN, en-US]
+triggers:
+  - 制作PPT
+  - 做个PPT
+  - 生成PPT
+  - 制作 PPT
+  - 做个 PPT
+  - 生成 PPT
+  - 制作演示文稿
+  - 参考PPT
+  - 参照PPT
+triggers_en:
+  - create a presentation
+  - make a presentation
+  - create a slide deck
+  - match the reference deck
+prompt: prompt.md
+tool_policy: passthrough
+allowed_tools: []
+output: 汇报实际交付、内容组织、参考样式的落实情况和已检查页码；未验证项明确说明。
+output_en: Report delivered artifacts, content organization, reference fidelity and checked pages; disclose unverified aspects.

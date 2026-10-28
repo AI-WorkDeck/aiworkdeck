@@ -7,6 +7,18 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 职责边界：AI 对话功能本身（编排循环、工具注册分发、记忆、SSE、前端聊天 UI、评测）。AI→编辑器指令链路属 ai-doc-bridge 领域；skill 机制属 plugin-system 领域（但 SkillRouter 在编排循环里有两处旁路接入点）。
 
+## PPT 生成与设计流程（2026-10-28，dev-board#1570/#1571/#1572）
+
+内置 `presentation-design` workflow skill 使用 `tool_policy: passthrough`，不锁死原子工具组合。中英文 LOWA 提示共同要求：先明确读者与结论、把证据和结论组织在同页、学习参考的结构与视觉、形成一致配色/字级/网格、编辑后逐页视觉复核。不能为了增加页数拆散可放在一页的内容，也不能用缩小正文掩盖拥挤；修复后重查受影响页。仅完成结构回读不得声称“已视觉验收”。
+
+`slide_create_file` 已纳入工具注册、客户端能力与披露策略，支持直接创建可编辑 PPTX 后组合 `slide_*`。`PdfVisualTools.pdf_inspect_visual` 通过现有辅助模型、权限、计费及用量链路传入真实 PDF 页面图片；参考和目标有分别标注，不是仅给模型文本描述。字体/段落精确值仍由结构读取负责，参考只读选项与部分失败处理见 ai-doc-bridge。
+
+图片型生成仍由 `PptxServiceClient` 接入附属服务：`createProject(topic, templateStyle)` 将风格实际写入请求 `template_style`，旧单参数签名保留；两个同步生成入口都传递该值。质量约束与用户风格共同传入，无用户风格时才加入默认深蓝、浅蓝灰与青绿配色。不能只在客户端配置里保存风格却漏传服务端；这会令无参考图片的图片生成接口拒绝请求。
+
+真实 Word→PPT 与 PPT→PPT 各生成三页，已逐页视觉检查及正常保存重开。Word 场景曾因可选润色反复检查而用自然语言引导收尾；PPT 场景在补强新建入口的参考像素学习要求后，模型自行修复换行/重叠/低对比并结束，一次视觉超时重试成功。两类原稿 hash 未变；失败轮与最终快照范围详见验收记录，不将首稿或纯工具通过称为成品通过。
+
+真实 AI 验收须使用产品 Agent/工具/编辑器完整链，隔离数据与专用 QA 账户；后端 BYOK 可执行条件不等于前端模型选择免登录。模型接口请求成功、技能存在或模拟模型单测通过，都不能替代参考 Word/PPT 的成品逐页视觉验收。当前实测及待验记录见 `doc/verification/2026-10-28-ppt-quality.md`。
+
 ## 手动展开与阅读位置（dev-board#1568）
 
 `ChatInterface.message-list` 使用 `scrollbar-gutter: stable both-edges`，经典滚动条出现/消失时保持正文宽度与居中轴稳定。`RootBubble`、`ProcessCard`、`ThinkingCard` 在用户手动展开/收起前逐层发出 `reading-interaction`，由聊天宿主暂停 `followLatest`，避免内容高度变化触发 ResizeObserver 把读者拉到底部；自动展开和流式更新不发此事件，回到最新仍恢复跟随。回归 `tests/chat-presentation-ui/scrollbar-stability.mjs`；无头浏览器默认隐藏滚动条，需要关闭该默认参数才能复现经典滚动条造成的横移。
