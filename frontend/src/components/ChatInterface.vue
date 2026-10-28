@@ -1830,9 +1830,9 @@ export default {
     // Agent Mode Selection (Ask, Plan, Agent)
     const showModeDropdown = ref(false)
     const ALL_MODES = [
-      { id: 'AGENT', get name() { return t('chat.modeAgentName') }, icon: '', get desc() { return t('chat.modeAgentDesc') } },
-      { id: 'ASK', get name() { return t('chat.modeAskName') }, icon: '', get desc() { return t('chat.modeAskDesc') } },
-      { id: 'PLAN', get name() { return t('chat.modePlanName') }, icon: '', get desc() { return t('chat.modePlanDesc') } }
+      { id: 'AGENT', name: t('chat.modeAgentName'), nameKey: 'chat.modeAgentName', icon: '', desc: t('chat.modeAgentDesc'), descKey: 'chat.modeAgentDesc' },
+      { id: 'ASK', name: t('chat.modeAskName'), nameKey: 'chat.modeAskName', icon: '', desc: t('chat.modeAskDesc'), descKey: 'chat.modeAskDesc' },
+      { id: 'PLAN', name: t('chat.modePlanName'), nameKey: 'chat.modePlanName', icon: '', desc: t('chat.modePlanDesc'), descKey: 'chat.modePlanDesc' }
     ]
     // 当前供应商（GET /api/ai/config 的 activeProvider）：模型目录端点不回 provider，
     // 而模式可选范围是按供应商定的，只能另取这个信号
@@ -1840,9 +1840,10 @@ export default {
     // 本地 Ollama 只支持 ASK：langchain4j 0.36 的 OllamaStreamingChatModel 没有三参
     // generate，选 AGENT/PLAN 会在流式过程中抛英文异常，不如在选择器里就不给
     const isLocalOnlyProvider = computed(() => String(activeProvider.value).toUpperCase() === 'OLLAMA')
-    const availableModes = computed(() =>
-      isLocalOnlyProvider.value ? ALL_MODES.filter(m => m.id === 'ASK') : ALL_MODES
-    )
+    const availableModes = computed(() => {
+      const list = isLocalOnlyProvider.value ? ALL_MODES.filter(m => m.id === 'ASK') : ALL_MODES
+      return list.map(m => ({ ...m, name: t(m.nameKey), desc: t(m.descKey) }))
+    })
     const localModeNotice = computed(() =>
       isLocalOnlyProvider.value ? t('chat.localModeNotice') : ''
     )
@@ -1850,7 +1851,7 @@ export default {
     const currentModeId = ref(ALL_MODES[0].id)
     const currentModeName = computed(() => {
       const hit = ALL_MODES.find(m => m.id === currentModeId.value) || ALL_MODES[0]
-      return hit ? hit.name : t('chat.modeAgentName')
+      return hit ? t(hit.nameKey) : t('chat.modeAgentName')
     })
     const currentModeIcon = ref(ALL_MODES[0].icon)
 
