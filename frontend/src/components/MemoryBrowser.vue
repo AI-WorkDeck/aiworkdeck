@@ -113,7 +113,7 @@ export default {
     projectId: { type: [String, Number], default: null },
     // 内嵌态（设置页「记忆」栏目直接嵌入）：不带遮罩、不带关闭钮，也不接管桌面端
     // BrowserView 遮挡——它不是全屏浮层，本来就不挡任何东西。
-    // 弹窗态（默认，ChatInterface 的「记忆」浮层）：保留原有全屏遮罩行为。
+    // 弹窗态保留给独立宿主；工作台聊天入口统一打开设置标签。
     inline: { type: Boolean, default: false },
   },
   data() {
@@ -123,7 +123,7 @@ export default {
       showCreate: false, newTopic: '',
       viewGeneration: 0, currentSpaceId: null,
       // 弹窗态是否正持有全局 overlay：只在这个标志与目标状态不同的那一刻才调用
-      // setGlobalOverlay。持有者键按实例唯一（ChatInterface 与设置页各有一个实例），
+      // setGlobalOverlay。持有者键按实例唯一，
       // 见 utils/overlayState.js 的按持有者记账。
       overlayHeld: false,
       overlayKey: `memory-browser:${++overlayInstanceSeq}`,
@@ -417,7 +417,7 @@ export default {
 .memory-dialog { width: min(900px, 92vw); height: min(680px, 88vh); display: flex; flex-direction: column; overflow: hidden; border-radius: 12px; background: var(--awd-surface); box-shadow: 0 20px 50px rgba(0,0,0,.18); }
 /* 内嵌态：设置页「记忆」栏目直接嵌入，不是全屏浮层——不设遮罩、不设固定定位，
    高度随内容区自适应，只保证编辑器区域至少 360px 高（见 .memory-body-inline）。 */
-.memory-inline { display: block; width: 100%; }
+.memory-inline { display: block; width: 100%; container: memory-panel / inline-size; }
 .memory-panel-inline { width: 100%; display: flex; flex-direction: column; overflow: hidden; background: var(--awd-surface); }
 .memory-body-inline { min-height: 360px; }
 .memory-body-inline .memory-textarea { min-height: 360px; }
@@ -457,6 +457,18 @@ export default {
 .memory-button.primary { border-color: var(--awd-accent); background: var(--awd-accent); color: var(--awd-text-on-accent); }
 .memory-button.danger { color: var(--awd-danger); }
 .memory-button.disabled { opacity: .4; cursor: default; }
+
+/* 设置页可能处于分屏或对话画布，按面板宽度而不是整窗宽度安排编辑区。 */
+@container memory-panel (max-width: 620px) {
+  .memory-spaces { padding: 8px 12px; overflow-x: auto; }
+  .memory-space { flex-shrink: 0; }
+  .memory-body-inline { flex-direction: column; }
+  .memory-files { width: auto; max-height: 150px; border-right: 0; border-bottom: 1px solid var(--awd-border); }
+  .memory-editor { padding: 10px; }
+  .memory-meta { flex-direction: column; gap: 3px; }
+  .memory-related,.memory-actions { flex-wrap: wrap; }
+  .memory-button { white-space: nowrap; }
+}
 
 @media (max-width: 620px) {
   .memory-mask { padding: 8px; }

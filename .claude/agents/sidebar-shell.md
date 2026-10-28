@@ -441,6 +441,13 @@ rail 底部的**齿轮与用户头像都撤了**，收进顶栏右上角「活�
   已经开着时再带深链进来只改 props——所以 **`AdminPane` 里加了
   `watch: { initialNav, initialService }`**，没有它第二次深链会停在用户上次看的面板上。
   工作台里 `goToAccountPanel()`（顶栏「已连接账户」chip）也改走这条。
+- **AI 聊天管理入口（2026-10-28，dev-board#1573/#1574）**：`ChatInterface` 的
+  「记忆」发出 `open-settings({ nav: 'memory' })`，唯一宿主接到 `openSettingsTab`，
+  不再挂侧栏内的 `MemoryBrowser` 弹窗。当前 `memory` 是个人组的 Markdown 记忆页
+  （`MemoryBrowser inline`，保留项目 ID），不是下文历史上撤掉的「记忆同步」配置。
+  对话模式打开设置时先置 `chatCanvasOpen = true`，确保标签可见。
+  「技能管理」发出 `manage-skills`，宿主 `goToPluginMarket()` 在对话模式切工作台，
+  并确保 market 左栏展开；重复入口不得反向收起。插件列表本身仍是左栏，详情才是标签页。
 - **应用菜单的「设置…」（⌘,）**：命令表**没动**（仍是 `app:openSettings`，
   `test:commands` 因此不受影响）；分流在 `appMenuBridge.js` 的
   `case 'openSettings'`——`state.page === 'workbench'` 时 `uni.$emit(COMMAND_EVENT,

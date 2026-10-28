@@ -899,9 +899,7 @@ checkFull('app-e2e：启动落工作台外壳、经「项目」面板进项目�
 // 目的地是设置页的，同一个方法里优先走注入的 this.openSettingsTab(...)（工作台里设置是标签，
 // 根本不该离开，dev-board#582）也算合规。
 const WORKBENCH_NAV_ALLOWLIST = {
-  // 以下两处早于本条护栏，行为（navigateTo 保留工作台在栈里 / 切身份整站重走启动链）
-  // 各有产品含义，改动要单独评估，先记名在此不许再新增。
-  'components/ChatInterface.vue#goToSkillManagement': '预存在：技能下拉跳插件广场，待单独评估',
+  // 切身份需要整站重走启动链；保留这处例外，不许再新增。
   'components/admin/AdminPane.vue#onSwitchIdentity': '预存在：切换本机身份后整站回启动链重建',
 }
 
