@@ -175,6 +175,7 @@ export const EDITOR_ACTIONS = [
   // 表格整体样式（表头加粗/边框/列宽，能做多少做多少）/ 超链接。设计依据同上 §4.2
   // （原语表 16-20；slide_format_shape/slide_table_set_style 不在原表里，是任务方
   // 直接点名要补的两项）。
+  'slide_show_control', 'slide_add_image', 'slide_add_chart', 'slide_format_chart', 'slide_set_transition',
   'slide_format_text', 'slide_format_shape', 'slide_add_table', 'slide_table_read',
   'slide_table_set_cell', 'slide_table_set_style', 'slide_set_hyperlink',
   // [诊断] 当前文档内核类型（writer/calc/impress/unknown）——审阅按钮等 UI 按 kind

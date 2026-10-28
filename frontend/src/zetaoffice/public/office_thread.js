@@ -2801,6 +2801,17 @@ function shapeCharFormat(shape) {
   return out;
 }
 
+// Pane configuration is view-only and belongs to one loaded document.
+let slideShowViewState = null;
+function restoreSlideShowView() {
+  const saved = slideShowViewState;
+  slideShowViewState = null;
+  if (!saved || saved.documentSeq !== docSeq) return;
+  saved.controller.restoreConfiguration(saved.configuration);
+  saved.controller.update();
+  Module.resumeMainLoop();
+}
+
 function slideError(code, details) {
   return Object.assign({ success: false, error: code, message: code, errorCode: code }, details || {});
 }
@@ -6493,6 +6504,10 @@ const EXEC = {
     // the shape of RESULTS only, and only in some zetajs builds.)
     const bytes = Array.from(new Int8Array(u8.buffer, u8.byteOffset, u8.byteLength));
 
+    if(slideShowViewState) {
+      try{if(isImpressDoc() && xModel.getPresentation().isRunning())xModel.getPresentation().end();}catch(_){}
+      try{restoreSlideShowView();}catch(_){}
+    }
     // Retarget the worker's model/controller onto a freshly-loaded component.
     const retarget = (loaded) => {
       const previous = xModel;
@@ -10664,6 +10679,233 @@ const EXEC = {
   // 机制，写入即生效；安全网是 doc_undo 与后端文档检查点（fileEffect=MODIFIED）。
   // [幻灯片·看] 每页页码/名称/版式/母版/标题/形状数/是否有备注/是否含表格。
   // 打开演示文稿后的第一步。
+  // Native chart data is embedded in the document, never rasterized.
+  slide_add_image(p) {
+    const r0 = resolvePage(p);
+    if (r0.error) return slideFail(r0.error);
+    const fit = p.fit || 'cover';
+    if (!['cover', 'contain', 'stretch'].includes(fit) || [p.left,p.top,p.width,p.height].some(v => typeof v !== 'number' || !Number.isFinite(v)) || p.width <= 0 || p.height <= 0)
+      return slideError('SLIDE_INVALID_GEOMETRY');
+    const focalX=p.focalX==null?0.5:p.focalX,focalY=p.focalY==null?0.5:p.focalY;
+    if([focalX,focalY].some(v=>typeof v!=='number'||!Number.isFinite(v)||v<0||v>1))return slideError('SLIDE_INVALID_GEOMETRY');
+    let shape, added = false;
+    try {
+      const bin = atob(String(p.base64 || ''));
+      if (!bin.length) return slideError('SLIDE_INVALID_IMAGE');
+      const bytes = Array.from(bin, c => { const n=c.charCodeAt(0); return n>127?n-256:n; });
+      const stream = css.io.SequenceInputStream.createStreamFromSequence(context, bytes);
+      const graphic = css.graphic.GraphicProvider.create(context).queryGraphic([mkProp('InputStream', stream)]);
+      if (!graphic) return slideError('SLIDE_INVALID_IMAGE');
+      let natural = graphic.getPropertyValue('Size100thMM');
+      if (!natural.Width || !natural.Height) {
+        // Images without density metadata use the native output device's pixel scale.
+        // A fixed 96 DPI doubles crop distances on a 192 DPI/Retina canvas.
+        const pixels = graphic.getPropertyValue('SizePixel');
+        const device = css.awt.Toolkit.create(context).createScreenCompatibleDevice(1,1);
+        natural = device.convertSizeToLogic(pixels,css.util.MeasureUnit.MM_100TH);
+      }
+      if (!Number.isFinite(natural.Width) || !Number.isFinite(natural.Height) || natural.Width <= 0 || natural.Height <= 0)
+        return slideError('SLIDE_INVALID_IMAGE');
+      let w=ptToMm100(p.width), h=ptToMm100(p.height), x=ptToMm100(p.left), y=ptToMm100(p.top);
+      const targetW=w,targetH=h;
+      if (fit === 'contain') { const scale=Math.min(w/natural.Width,h/natural.Height);w=Math.round(natural.Width*scale);h=Math.round(natural.Height*scale);x+=Math.round((targetW-w)/2);y+=Math.round((targetH-h)/2); }
+      shape=xModel.createInstance('com.sun.star.drawing.GraphicObjectShape');
+      shape.setSize(new css.awt.Size({Width:w,Height:h}));shape.setPosition(new css.awt.Point({X:x,Y:y}));
+      r0.page.add(shape);added=true;ensureShapeNames(r0.page);shape.setPropertyValue('Graphic',graphic);
+      if (fit === 'cover') {
+        // GraphicCrop is expressed in the graphic's natural 1/100 mm units.
+        const physical=natural;
+        const scale=Math.max(w/physical.Width,h/physical.Height);
+        const excessX=Math.max(0,Math.round(physical.Width-w/scale)),excessY=Math.max(0,Math.round(physical.Height-h/scale));
+        const cropX=Math.round(excessX*focalX),cropY=Math.round(excessY*focalY);
+        shape.setPropertyValue('GraphicCrop',new css.text.GraphicCrop({Left:cropX,Right:excessX-cropX,Top:cropY,Bottom:excessY-cropY}));
+      }
+      if (p.sendToBack === true) shape.setPropertyValue('ZOrder',0);
+      return {success:true,slideNumber:r0.index+1,shapeName:String(shape.getName()),fit,left:hmmToPt(x),top:hmmToPt(y),width:hmmToPt(w),height:hmmToPt(h)};
+    } catch(e) {
+      let name='';try{name=String(shape.getName());}catch(_){}
+      return {...slideError(added?'SLIDE_IMAGE_PARTIAL':'SLIDE_INVALID_IMAGE'),created:added,outcomeUnknown:added,retryable:false,slideNumber:r0.index+1,shapeName:name};
+    }
+  },
+  slide_add_chart(p) {
+    const r0 = resolvePage(p);
+    if (r0.error) return slideFail(r0.error);
+    const types = { column: 'Bar', bar: 'Bar', line: 'Line', area: 'Area', pie: 'Pie', doughnut: 'Donut', scatter: 'XY' };
+    const type = p.chartType;
+    const categories = p.categories, series = p.series;
+    if (!Object.hasOwn(types,type) || !Array.isArray(categories) || !categories.length || categories.length > 100 ||
+        categories.some(v => typeof v !== 'string') || !Array.isArray(series) || !series.length || series.length > 12 ||
+        series.some(s => !s || typeof s.name !== 'string' || !Array.isArray(s.values) || s.values.length !== categories.length || s.values.some(v => typeof v !== 'number' || !Number.isFinite(v))) ||
+        (['pie', 'doughnut'].includes(type) && (series.length !== 1 || series[0].values.some(v => v < 0) || !series[0].values.some(v => v > 0))))
+      return slideError('SLIDE_INVALID_CHART_DATA');
+    const geometry = [p.left, p.top, p.width, p.height];
+    if (geometry.some(v => typeof v !== 'number' || !Number.isFinite(v)) || p.width <= 0 || p.height <= 0)
+      return slideError('SLIDE_INVALID_GEOMETRY');
+    if (type === 'scatter' && categories.some(v => !v.trim() || !Number.isFinite(Number(v)))) return slideError('SLIDE_INVALID_CHART_DATA');
+    let shape, added = false;
+    try {
+      shape = xModel.createInstance('com.sun.star.drawing.OLE2Shape');
+      shape.setPropertyValue('CLSID', '12DCAE26-281F-416F-A234-C3086127382E');
+      shape.setSize(new css.awt.Size({ Width: ptToMm100(p.width), Height: ptToMm100(p.height) }));
+      shape.setPosition(new css.awt.Point({ X: ptToMm100(p.left), Y: ptToMm100(p.top) }));
+      r0.page.add(shape); added = true;
+      ensureShapeNames(r0.page);
+      const model = shape.getPropertyValue('Model');
+      const diagram = model.createInstance('com.sun.star.chart.' + types[type] + 'Diagram');
+      model.setDiagram(diagram);
+      if (type === 'column' || type === 'bar') diagram.setPropertyValue('Vertical', type === 'bar');
+      const data = model.getData();
+      data.setData(categories.map((label, index) => type === 'scatter' ? [Number(label), ...series.map(s => s.values[index])] : series.map(s => s.values[index])));
+      data.setRowDescriptions(categories);
+      data.setColumnDescriptions(type === 'scatter' ? ['X', ...series.map(s => s.name)] : series.map(s => s.name));
+      if (type === 'scatter') {
+        const provider=model.getDataProvider(), chartType=model.getFirstDiagram().getCoordinateSystems()[0].getChartTypes()[0];
+        const chartSeries=series.map((s,i)=>{
+          const item=context.getServiceManager().createInstanceWithContext('com.sun.star.chart2.DataSeries',context);
+          const x=context.getServiceManager().createInstanceWithContext('com.sun.star.chart2.data.LabeledDataSequence',context), y=context.getServiceManager().createInstanceWithContext('com.sun.star.chart2.data.LabeledDataSequence',context);
+          const xValues=provider.createDataSequenceByRangeRepresentation('0');xValues.setPropertyValue('Role','values-x');x.setValues(xValues);
+          const yValues=provider.createDataSequenceByRangeRepresentation(String(i+1));yValues.setPropertyValue('Role','values-y');y.setValues(yValues);
+          y.setLabel(provider.createDataSequenceByRangeRepresentation('label '+(i+1)));
+          item.setData([x,y]);
+          item.setPropertyValue('LineStyle',css.drawing.LineStyle.NONE);
+          return item;
+        });
+        chartType.setDataSeries(chartSeries);
+        diagram.setPropertyValue('SymbolType', -2);
+        diagram.setPropertyValue('SymbolSize',new css.awt.Size({Width:250,Height:250}));
+      }
+      if (p.title) { model.setPropertyValue('HasMainTitle', true); model.getTitle().setPropertyValue('String', String(p.title)); }
+      model.setPropertyValue('HasLegend', series.length > 1 || type === 'pie' || type === 'doughnut');
+      return { success: true, slideNumber: r0.index + 1, shapeName: String(shape.getName()), chartType: type, categories, series };
+    } catch (e) {
+      let name = ''; try { name = String(shape.getName()); } catch (_) {}
+      return { ...slideError('SLIDE_CHART_PARTIAL'), created: added, outcomeUnknown: true, retryable: false, slideNumber: r0.index + 1, shapeName: name };
+    }
+  },
+  slide_format_chart(p) {
+    if (typeof p.shapeName !== 'string' || !p.shapeName.trim() ||
+        (p.showLegend != null && typeof p.showLegend !== 'boolean') ||
+        (p.showGrid != null && typeof p.showGrid !== 'boolean') ||
+        !['backgroundColor', 'textColor', 'fontSize', 'seriesColors', 'showLegend', 'showGrid'].some(key => p[key] != null)) return slideError('SLIDE_INVALID_CHART_STYLE');
+    const r0=resolvePage(p);if(r0.error)return slideFail(r0.error);
+    ensureShapeNames(r0.page);const rs=resolveShape(r0.page,p);if(rs.error)return slideFail(rs.error);
+    if ((p.backgroundColor != null && parseColor(p.backgroundColor)==null) || (p.textColor != null && parseColor(p.textColor)==null) ||
+        (p.fontSize != null && (typeof p.fontSize!=='number'||!Number.isFinite(p.fontSize)||p.fontSize<8||p.fontSize>72)) ||
+        (p.seriesColors != null && (!Array.isArray(p.seriesColors)||!p.seriesColors.length||p.seriesColors.length>12||p.seriesColors.some(c=>parseColor(c)==null)))) return slideError('SLIDE_INVALID_CHART_STYLE');
+    let model;try{model=rs.shape.getPropertyValue('Model');if(!model.supportsService('com.sun.star.chart.ChartDocument'))return slideError('SLIDE_NOT_CHART');}catch(e){return slideError('SLIDE_NOT_CHART');}
+    try {
+      const diagram=model.getDiagram(), diagramType=String(diagram.getDiagramType());
+      const circular=/PieDiagram|DonutDiagram/.test(diagramType), scatter=/XYDiagram/.test(diagramType);
+      if(p.backgroundColor!=null){
+        for(const target of (circular ? [model.getArea()] : [model.getArea(),diagram.getWall()])){
+          target.setPropertyValue('FillStyle',css.drawing.FillStyle.SOLID);target.setPropertyValue('FillColor',parseColor(p.backgroundColor));target.setPropertyValue('LineStyle',css.drawing.LineStyle.NONE);
+        }
+      }
+      const legend=model.getLegend();
+      legend.setPropertyValue('FillStyle',css.drawing.FillStyle.NONE);
+      legend.setPropertyValue('LineStyle',css.drawing.LineStyle.NONE);
+      if(p.showLegend!=null)model.setPropertyValue('HasLegend',p.showLegend===true);
+      if(p.showGrid!=null && !circular)diagram.setPropertyValue('HasYAxisGrid',p.showGrid===true);
+      if(p.fontSize!=null||p.textColor!=null){
+        const targets=[model.getTitle(),model.getLegend()];
+        if(!circular && diagram.getPropertyValue('HasXAxis'))targets.push(diagram.getXAxis());
+        if(!circular && diagram.getPropertyValue('HasYAxis'))targets.push(diagram.getYAxis());
+        for(const target of targets){if(p.fontSize!=null)target.setPropertyValue('CharHeight',new zetajs.Any(zetajs.type.float,p.fontSize));if(p.textColor!=null)target.setPropertyValue('CharColor',parseColor(p.textColor));}
+      }
+      if(p.seriesColors!=null){
+        const nativeSeries=model.getFirstDiagram().getCoordinateSystems().flatMap(system=>system.getChartTypes().flatMap(type=>type.getDataSeries()));
+        const count=circular ? model.getData().getRowDescriptions().length : nativeSeries.length;
+        for(let i=0;i<count;i++) {
+          const target=circular ? diagram.getDataPointProperties(i,0) : nativeSeries[i];
+          const color=parseColor(p.seriesColors[i%p.seriesColors.length]);
+          target.setPropertyValue('FillColor',color);
+          target.setPropertyValue('LineColor',color);
+          if(scatter){
+            target.setPropertyValue('Color',color);
+            target.setPropertyValue('Symbol',new css.chart2.Symbol({Style:css.chart2.SymbolStyle.STANDARD,StandardSymbol:i%8,Size:new css.awt.Size({Width:250,Height:250}),FillColor:color,BorderColor:color}));
+          }
+        }
+      }
+      return {success:true,slideNumber:r0.index+1,shapeName:rs.name};
+    }catch(e){return {...slideError('SLIDE_CHART_STYLE_PARTIAL'),outcomeUnknown:true,retryable:false,slideNumber:r0.index+1,shapeName:rs.name};}
+  },
+  // View-only native slideshow. UNO navigation must also wake the Qt worker render loop.
+  async slide_show_control(p) {
+    if (!isImpressDoc()) return slideFail(NOT_PRESENTATION_MSG);
+    const operation=p.operation || 'state';
+    const ownerModel=xModel, ownerDocumentSeq=docSeq;
+    if (!['start','next','previous','end','state'].includes(operation)) return slideError('SLIDE_INVALID_SHOW_OPERATION');
+    try {
+      const presentation=xModel.getPresentation();
+      if(operation==='start'){
+        const active=activeImpressContext();
+        const target=resolvePage({slideNumber:p.slideNumber==null?active.slideNumber:p.slideNumber});
+        if(target.error)return slideFail(target.error);
+        if(presentation.isRunning())presentation.end();
+        restoreSlideShowView();
+        const configurationController=ctrl.getConfigurationController();
+        const configuration=configurationController.getRequestedConfiguration();
+        slideShowViewState={documentSeq:docSeq,controller:configurationController,configuration};
+        // PaneHider waits synchronously up to 60s for these requests inside native
+        // startShow. Complete them while this JS action can still yield to Qt.
+        for(const resource of configuration.getResources(null,'private:resource/pane/',css.drawing.framework.AnchorBindingMode.DIRECT)) {
+          if(resource.getResourceURL()!=='private:resource/pane/CenterPane')configurationController.requestResourceDeactivation(resource);
+        }
+        configurationController.update();
+        Module.resumeMainLoop();
+        for(let attempt=0;attempt<30 && configurationController.hasPendingRequests();attempt++) {
+          await new Promise(resolve=>setTimeout(resolve,50));
+          css.awt.Toolkit.create(context).reschedule();
+        }
+        if(configurationController.hasPendingRequests() || slideShowViewState?.documentSeq!==docSeq)throw new Error('Slideshow view not ready');
+        Module.resumeMainLoop();
+        await new Promise(resolve=>setTimeout(resolve,0));
+        if(xModel!==ownerModel || docSeq!==ownerDocumentSeq)throw new Error('Slideshow document changed');
+        presentation.startWithArguments([mkProp('IsFullScreen',false),mkProp('FirstPage',target.page.getName())]);
+        const controller=presentation.getController();
+        if(!controller)throw new Error('Slideshow controller unavailable');
+        controller.activate();
+      }else if(operation==='end'){
+        if(presentation.isRunning())presentation.end();
+        restoreSlideShowView();
+      }else if(operation==='next'||operation==='previous'){
+        if(!presentation.isRunning())return slideError('SLIDE_SHOW_NOT_RUNNING');
+        const controller=presentation.getController();controller.activate();
+        if(operation==='next')controller.gotoNextSlide();else controller.gotoPreviousSlide();
+      }
+      const running=presentation.isRunning();
+      if(!running)restoreSlideShowView();
+      if(running && ['start','next','previous'].includes(operation)) Module.resumeMainLoop();
+      const controller=running?presentation.getController():null;
+      return {success:true,running,slideNumber:controller?controller.getCurrentSlideIndex()+1:null,slideCount:xModel.getDrawPages().getCount()};
+    }catch(e){
+      log('slide_show_control failed: '+errStr(e));
+      if((operation==='start' || operation==='end') && xModel===ownerModel && docSeq===ownerDocumentSeq) {
+        try{if(ownerModel.getPresentation().isRunning())ownerModel.getPresentation().end();}catch(_){}
+        try{restoreSlideShowView();}catch(_){}
+      }
+      return slideError('SLIDE_SHOW_UNAVAILABLE');
+    }
+  },
+  slide_set_transition(p) {
+    const r0 = resolvePage(p);
+    if (r0.error) return slideFail(r0.error);
+    // LibreOffice animations TransitionType / TransitionSubType IDL constants.
+    const effects = { none: [0, 0], fade: [37, 101], push: [35, 97], wipe: [1, 1] };
+    const effect = Object.hasOwn(effects,p.effect) ? effects[p.effect] : null;
+    const seconds = p.durationSeconds == null ? 0.6 : p.durationSeconds;
+    if (!effect || typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0.1 || seconds > 5)
+      return slideError('SLIDE_INVALID_TRANSITION');
+    try {
+      r0.page.setPropertyValue('TransitionType', shortAny(effect[0]));
+      r0.page.setPropertyValue('TransitionSubtype', shortAny(effect[1]));
+      r0.page.setPropertyValue('TransitionDirection', true);
+      r0.page.setPropertyValue('TransitionDuration', seconds);
+      return { success: true, slideNumber: r0.index + 1, transition: {
+        type: r0.page.getPropertyValue('TransitionType'), subtype: r0.page.getPropertyValue('TransitionSubtype'),
+        durationSeconds: r0.page.getPropertyValue('TransitionDuration') } };
+    } catch (e) { return { ...slideError('SLIDE_TRANSITION_PARTIAL'), outcomeUnknown: true, retryable: false, slideNumber: r0.index + 1 }; }
+  },
   slide_get_overview() {
     if (!isImpressDoc()) return slideFail(NOT_PRESENTATION_MSG);
     let pages;
@@ -10735,12 +10977,34 @@ const EXEC = {
         item.format = shapeCharFormat(shape);
         item.textDetails = slideTextDetails(shape);
       }
+      try {
+        const model = shape.getPropertyValue('Model');
+        if (model && model.supportsService('com.sun.star.chart.ChartDocument')) {
+          item.isChart = true;
+          const data = model.getData();
+          const values = data.getData(), labels = data.getColumnDescriptions(), categories = data.getRowDescriptions();
+          const plots=model.getFirstDiagram().getCoordinateSystems().flatMap(system=>system.getChartTypes().flatMap(type=>type.getDataSeries().map(series=>({
+            sequences:series.getDataSequences().map(sequence=>({
+              role:String(sequence.getValues().getPropertyValue('Role')),
+              values:sequence.getValues().getData().slice(0,100).map(value=>zetajs.fromAny(value)),
+              label:sequence.getLabel()?sequence.getLabel().getData().map(value=>zetajs.fromAny(value)):[]
+            }))
+          }))));
+          item.chart = { plots, diagramType: model.getDiagram().getDiagramType(),
+            categories: categories.slice(0, 100), seriesNames: labels.slice(0, 12),
+            values: values.slice(0, 100).map(row => row.slice(0, 12)),
+            truncated: values.length > 100 || labels.length > 12 || values.some(row => row.length > 12) };
+        }
+      } catch (e) {}
       shapes.push(item);
     }
     return {
       success: true, number: r0.index + 1, width: width, height: height,
       layout: layout, layoutName: layoutNameOf(layout), masterName: masterName,
       notesText: notesText, background: slideBackground(page), shapes: shapes,
+      transition: (() => { try { return { type: page.getPropertyValue('TransitionType'),
+        subtype: page.getPropertyValue('TransitionSubtype'), durationSeconds: page.getPropertyValue('TransitionDuration') }; }
+        catch (e) { return { available: false }; } })(),
     };
   },
   // [幻灯片·看] 备注页（Speaker Notes）文字。不传 slideNumber 读取全篇。

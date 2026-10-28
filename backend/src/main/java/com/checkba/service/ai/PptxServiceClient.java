@@ -260,6 +260,33 @@ public class PptxServiceClient {
         return taskId;
     }
 
+    public String startAsset(String projectId, String prompt, String ratio, ModelConfig config) {
+        JSONObject body = new JSONObject();
+        body.set("prompt", prompt); body.set("aspect_ratio", ratio); body.set("model_config", config.toJson());
+        try (HttpResponse response = HttpRequest.post(baseUrl + "/api/projects/" + projectId + "/materials/generate")
+                .header("Content-Type", "application/json").body(body.toString()).timeout(30000).execute()) {
+            if (response.getStatus() != 202) throw new IllegalStateException("Material request was not accepted");
+            String id = JSONUtil.parseObj(response.body()).getJSONObject("data").getStr("task_id");
+            if (id == null || id.isBlank()) throw new IllegalStateException("Missing material task ID");
+            return id;
+        }
+    }
+
+    public byte[] readAsset(String serviceProjectId, String relativeUrl) {
+        // Only fetch the task's own local service image; never arbitrary upstream URLs.
+        if (relativeUrl == null || !relativeUrl.startsWith("/files/" + serviceProjectId + "/materials/")
+                || relativeUrl.contains("..") || relativeUrl.contains("?") || relativeUrl.contains("%"))
+            throw new IllegalArgumentException("Invalid material URL");
+        try (HttpResponse response = HttpRequest.get(baseUrl + relativeUrl).setFollowRedirects(false).timeout(30000).executeAsync()) {
+            if (response.getStatus() != 200) throw new IllegalStateException("Material download failed");
+            byte[] data;
+            try (var stream = response.bodyStream()) { data = stream.readNBytes(12 * 1024 * 1024 + 1); }
+            catch (java.io.IOException e) { throw new IllegalStateException("Material read failed"); }
+            if (data.length == 0 || data.length > 12 * 1024 * 1024) throw new IllegalStateException("Invalid material size");
+            return data;
+        }
+    }
+
     /**
      * 查询任务状态
      * 
