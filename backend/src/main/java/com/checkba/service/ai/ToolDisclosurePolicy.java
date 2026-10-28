@@ -147,6 +147,9 @@ public class ToolDisclosurePolicy {
             // doc_restore_checkpoint 回到核心集：Impress 上 doc_undo 是空操作（引擎不记撤销栈，
             // lowa-e2e undo-redo-kinds 实测），pptx 会话里它是唯一的后悔药，约 300 字符。
             "doc_add_comment", "doc_undo", "doc_restore_checkpoint",
+            // LOWA Word/Calc/Impress visual verification needs export without a files discovery round.
+            // Upstream capability gates still exclude this command from Office add-ins and none sessions.
+            "doc_export_pdf",
 
             // ==================== LOWA 表格（xlsx）段：5 个 ====================
             // sheet_create_file 在 docx 会话里同样可见（新建一份表格，不依赖活跃文档类型）。
@@ -213,7 +216,7 @@ public class ToolDisclosurePolicy {
         // doc_* 里剩下的全是版式与排版：字符格式、段落格式、页面、页眉页脚、目录、脚注、图片、超链接……
         CATEGORIES.put("format", List.of("doc_"));
         CATEGORIES.put("spreadsheet", List.of("sheet_"));
-        CATEGORIES.put("slides", List.of("slide_", "pptx_"));
+        CATEGORIES.put("slides", List.of("slide_", "pptx_", "image_generate_asset", "image_get_generation"));
         CATEGORIES.put("office", List.of("office_"));
         CATEGORIES.put("pdf", List.of("pdf_"));
         CATEGORIES.put("litigation", List.of("litigation_"));

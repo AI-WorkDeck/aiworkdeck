@@ -1420,7 +1420,7 @@ export default {
         this._lastCmdAt = 0
         const innerExec = this.executor.executeCommand.bind(this.executor)
         this.executor.executeCommand = async (action, params, callOpts) => {
-          if (action === 'export_document' || ['get_ui_state', 'office_get_navigation', 'slide_get_thumbnail', 'list_fonts', 'list_styles'].includes(action) || (callOpts && callOpts.background)) return innerExec(action, params, callOpts) // 保存自身与后台只读溯源不算「活跃编辑」
+          if ((action === 'slide_show_control' && params?.operation === 'state') || action === 'export_document' || ['get_ui_state', 'office_get_navigation', 'slide_get_thumbnail', 'list_fonts', 'list_styles'].includes(action) || (callOpts && callOpts.background)) return innerExec(action, params, callOpts) // 保存自身与后台只读溯源不算「活跃编辑」
           this._cmdBusy++
           this._lastCmdAt = Date.now()
           try { return await innerExec(action, params, callOpts) }

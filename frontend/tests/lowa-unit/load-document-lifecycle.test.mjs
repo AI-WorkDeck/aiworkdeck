@@ -14,7 +14,7 @@ function harness({ failLoad = false, same = false, failClose = false } = {}) {
   }
   const loaded = same ? old : { getCurrentController: () => 'new-controller', setPropertyValue() {} }
   const context = {
-    xModel: old, ctrl: 'old-controller', docSeq: 0, humanAuthor: '', IMPORT_FILTERS: { docx: 'docx' },
+    xModel: old, ctrl: 'old-controller', docSeq: 0, slideShowViewState: null, humanAuthor: '', IMPORT_FILTERS: { docx: 'docx' },
     css: { ucb: { SimpleFileAccess: { create: () => ({ exists: () => false, writeFile() {} }) } },
       io: { SequenceInputStream: { createStreamFromSequence: () => ({ closeInput() {} }) } } },
     context: {}, desktop: { loadComponentFromURL: () => { calls.push(['load']); return failLoad ? null : loaded } },
@@ -57,4 +57,15 @@ test('close veto is reported without retrying import or replacing the new model'
   assert.equal(h.context.xModel, h.loaded)
   assert.equal(h.calls.filter(x => x[0] === 'load').length, 1)
   assert.ok(h.calls.some(x => x[0] === 'log' && x[1].includes('previous model close failed')))
+})
+
+test('replacement ends a running presentation and restores its view before importing', () => {
+  const h = harness()
+  h.context.slideShowViewState = { documentSeq: 0 }
+  h.context.isImpressDoc = () => true
+  h.old.getPresentation = () => ({ isRunning: () => true, end: () => h.calls.push(['end-show']) })
+  h.context.restoreSlideShowView = () => { h.calls.push(['restore-view']); h.context.slideShowViewState = null }
+  assert.equal(h.run({ bytes: [1], name: 'new.docx' }).success, true)
+  assert.deepEqual(h.calls.slice(0, 3), [['end-show'], ['restore-view'], ['load']])
+  assert.equal(h.context.slideShowViewState, null)
 })

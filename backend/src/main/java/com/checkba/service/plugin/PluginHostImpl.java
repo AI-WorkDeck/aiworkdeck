@@ -115,7 +115,8 @@ class PluginHostImpl implements PluginHost {
             "slide_move_page", "slide_add_text_box", "slide_add_shape", "slide_add_table", "slide_delete_shape",
             "slide_format_shape", "slide_format_text", "slide_read_notes", "slide_write_notes", "slide_set_layout",
             "slide_set_shape_text", "slide_replace_text", "slide_set_shape_geometry", "slide_set_hyperlink",
-            "slide_table_read", "slide_table_set_cell", "slide_table_set_style");
+            "slide_table_read", "slide_table_set_cell", "slide_table_set_style",
+            "slide_add_chart", "slide_format_chart", "slide_set_transition");
 
     static final Set<String> IMAGE_TYPES = Set.of("png", "jpg", "jpeg", "bmp", "gif", "webp", "tif", "tiff");
     static final int OCR_MAX_PAGES = 50;

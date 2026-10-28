@@ -15,7 +15,7 @@ function harness(kind = 'writer') {
   const model = { getCurrentController: () => ({}), setPropertyValue() {}, setModified() {}, close() { calls.push('close') } }
   const desktop = { loadComponentFromURL(url) { calls.push(url); return failLoad ? null : model } }
   const state = {
-    xModel: null, ctrl: null, context: null, desktop: null, docSeq: 0, humanAuthor: '',
+    xModel: null, ctrl: null, context: null, desktop: null, docSeq: 0, slideShowViewState: null, humanAuthor: '',
     zetajs: { getUnoComponentContext: () => ({}) },
     css: { frame: { Desktop: { create: () => desktop } },
       ucb: { SimpleFileAccess: { create: () => ({ exists: () => false, writeFile() {} }) } },
