@@ -248,7 +248,7 @@ $color-accent: var(--awd-mint); // Mint Green
 .switcher-menu {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
+  inset-inline-start: 0;
   min-width: 240px;
   max-width: 360px;
   background: var(--awd-surface);
@@ -257,6 +257,22 @@ $color-accent: var(--awd-mint); // Mint Green
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
   z-index: 2000;
   padding: 6px 0;
+}
+
+.switcher-search {
+  margin: 6px 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-sm);
+  color: var(--awd-text);
+  background: var(--awd-bg);
+  font-size: 13px;
+}
+
+.switcher-list {
+  max-height: min(320px, 50vh);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .switcher-title {
