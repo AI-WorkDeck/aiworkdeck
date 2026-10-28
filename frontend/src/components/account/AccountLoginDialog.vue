@@ -314,7 +314,7 @@ export default {
       return this.isPhoneSite ? '¥99.99' : '$9.90'
     },
     isEn() {
-      return !String(this.uiLang || 'zh-CN').startsWith('zh')
+      return this.uiLang === 'en-US' || !String(this.uiLang || 'zh-CN').startsWith('zh')
     },
     reasonText() {
       const key = `account.loginDialog.reason.${this.reason || 'generic'}`
