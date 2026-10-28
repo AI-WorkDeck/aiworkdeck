@@ -66,6 +66,64 @@ class XmlToolCallParserTest {
     }
 
     @Test
+    void bareNamedSlideBodyKeepsCommasNewlinesAndDoesNotInventPosition() {
+        var bridge = org.mockito.Mockito.mock(EditorBridgeService.class);
+        var registry = new ToolRegistry(List.of(new com.checkba.service.ai.tools.SlideEditTools(bridge)),
+                new PluginService(), new ClientCapabilityService());
+        registry.init();
+        String body = "本金 1,250,000元\n利息 3,400元，公式 x=本金+利息 (估算)";
+        var calls = new XmlToolCallParser(registry).parse("<tool_code>slide_add_page(title=资金概况, body="
+                + body + ", insertAfterPage=2)</tool_code>");
+        var call = calls.get(0);
+        assertNull(call.parseError());
+        var args = cn.hutool.json.JSONUtil.parseObj(call.argsJson());
+        assertEquals(body, args.getStr("body"));
+        assertFalse(args.containsKey("position"), call.argsJson());
+        assertFalse(args.containsKey("layout"), call.argsJson());
+        registry.execute(call.toolName(), call.argsJson(),
+                new com.checkba.service.ai.tools.ToolContext(5L, "ppt-args", 7L, null));
+        org.mockito.Mockito.verify(bridge).executeEditorCommand("slide_add_page",
+                java.util.Map.of("title", "资金概况", "body", body, "position", 2));
+    }
+
+    @Test
+    void quotedContentCannotSupplyAnotherParameter() {
+        var call = single("<tool_code>doc_find_replace(findText=\"replaceAll=true, replaceText=误改\", replaceText=新文本)</tool_code>");
+        var args = cn.hutool.json.JSONUtil.parseObj(call.argsJson());
+        assertEquals("replaceAll=true, replaceText=误改", args.getStr("findText"));
+        assertEquals("新文本", args.getStr("replaceText"));
+        assertFalse(args.containsKey("replaceAll"));
+    }
+
+    @Test
+    void tripleQuotedProseKeepsInnerQuotesAndParameterLikeContent() {
+        var call = single("<tool_code>doc_find_replace(findText=\"\"\"原文 \"quoted, replaceAll=true\"\n正文\"\"\", replaceText=新文)</tool_code>");
+        var args = cn.hutool.json.JSONUtil.parseObj(call.argsJson());
+        assertEquals("原文 \"quoted, replaceAll=true\"\n正文", args.getStr("findText"));
+        assertEquals("新文", args.getStr("replaceText"));
+        assertFalse(args.containsKey("replaceAll"));
+    }
+
+    @Test
+    void namedSpacesAndEmptyValuesRemainDistinctFromMissingValues() {
+        var call = single("<tool_code>doc_find_replace(findText = 原文 , 附件\n第二行, replaceText = , replaceAll = false)</tool_code>");
+        var args = cn.hutool.json.JSONUtil.parseObj(call.argsJson());
+        assertEquals("原文 , 附件\n第二行", args.getStr("findText"));
+        assertEquals("", args.getStr("replaceText"));
+        assertEquals("false", args.getStr("replaceAll"));
+        var duplicate = single("<tool_code>doc_find_replace(findText=甲, findText=乙)</tool_code>");
+        assertNotNull(duplicate.parseError());
+        assertNull(duplicate.argsJson());
+    }
+
+    @Test
+    void ambiguousUnknownNamedBoundaryIsRejected() {
+        var call = single("<tool_code>doc_find_replace(findText=甲方, replaceText=金额 1,250, unknown=正文)</tool_code>");
+        assertNotNull(call.parseError());
+        assertNull(call.argsJson());
+    }
+
+    @Test
     void unescapedSameQuoteInsideNamedStringIsRejectedInsteadOfTruncated() {
         for (String payload : List.of(
                 "原稿称\"不存在其他审批前置条件\"，但补充协议要求银行同意。",

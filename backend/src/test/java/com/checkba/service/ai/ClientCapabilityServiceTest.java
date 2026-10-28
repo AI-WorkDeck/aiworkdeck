@@ -36,6 +36,13 @@ class ClientCapabilityServiceTest {
     }
 
     @Test
+    void visualExportWorksAcrossLowaDocumentKindsWithoutLeakingIntoOffice() {
+        for (String kind : KINDS) assertTrue(capabilities.isToolVisible("doc_export_pdf", "conv-lowa", kind));
+        for (String conv : new String[]{"conv-office", "conv-office-excel", "conv-office-ppt", "conv-none"})
+            assertFalse(capabilities.isToolVisible("doc_export_pdf", conv));
+    }
+
+    @Test
     @DisplayName("ref_* 只对 OFFICE 会话可见（三类宿主、两个家族都可见）")
     void refToolsAreVisibleOnlyToOfficeSessions() {
         for (String tool : new String[] {"ref_list", "ref_read", "ref_edit", "ref_open"}) {

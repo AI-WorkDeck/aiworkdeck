@@ -67,6 +67,25 @@ class TemplateToolsTest {
     }
 
     @Test
+    void referenceOnlyLearningDoesNotOverwriteProjectWordProfile() {
+        ProjectContextHolder.setProjectId("7");
+        ProjectFileRepository repo = Mockito.mock(ProjectFileRepository.class);
+        Mockito.when(repo.findById(1L)).thenReturn(Optional.of(file(1L, 7L, "reference.docx", "docx")));
+        StorageService storage = Mockito.mock(StorageService.class);
+        Mockito.when(storage.load(Mockito.anyString())).thenReturn(new ClassPathResource("fixtures/template-sample.docx"));
+        StorageServiceFactory factory = Mockito.mock(StorageServiceFactory.class);
+        Mockito.when(factory.getStorageService()).thenReturn(storage);
+        ProjectFileService pfs = Mockito.mock(ProjectFileService.class);
+        String out = new TemplateTools(repo, factory, pfs).docx_inspect_template("1", "{\"saveProfile\":false}");
+        StyleProfile profile = StyleProfiles.parse(out);
+        assertEquals("楷体_GB2312", profile.body().font().eastAsia());
+        assertFalse(profile.root().has("savedProfileFileId"));
+        assertFalse(profile.root().has("saveError"));
+        Mockito.verifyNoInteractions(pfs);
+        Mockito.verify(storage, Mockito.never()).save(Mockito.anyString(), Mockito.any(InputStream.class));
+    }
+
+    @Test
     @DisplayName("学完自己落盘 _模板/画像.json：建夹 + 建文件 + 存字节，返回带 savedProfileFileId")
     void savesProfileIntoProject() {
         ProjectContextHolder.setProjectId("7");

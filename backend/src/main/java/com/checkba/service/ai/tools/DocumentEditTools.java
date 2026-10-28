@@ -2569,6 +2569,36 @@ public class DocumentEditTools implements AgentToolComponent {
         }
     }
 
+    @ToolMeta(displayName = "新建演示文稿", category = "slides", fileEffect = "ADDED")
+    @Tool("Start a new PPT here, including when a Word reference is active: create a native editable 16:9 PPTX with one blank slide and open it. If a reference is supplied, inspect its structure AND actual rendered pages first (doc_export_pdf then pdf_inspect_visual purpose=reference); structured text alone does not establish its appearance. Other slide_* tools may be hidden until this succeeds; do not wait to discover them before creating. "
+            + "Use slide_* primitives to compose content, backgrounds and formatting. No image-generation service is required. "
+            + "When a destination folder is specified, first resolve its ID with list_project_folders. Existing files are not overwritten. Omitted parentFolderId follows the source document folder; 0 selects the root.")
+    public String slide_create_file(
+            @P("File name, with optional .pptx suffix") String fileName,
+            @P("Project ID") Long projectId,
+            @P(value = "Optional destination folder database ID; resolve with list_project_folders", required = false) Long parentFolderId) {
+        if (fileName == null || fileName.isBlank() || projectId == null)
+            return "Error: " + com.checkba.service.LangText.of("请提供文件名与项目", "File name and project are required");
+        try {
+            String name = fileName.trim();
+            if (!name.toLowerCase(java.util.Locale.ROOT).endsWith(".pptx")) name += ".pptx";
+            ProjectFile file = createAgentFile(projectId, parentFolderId, name, "pptx", "slide", target -> {
+                try (var presentation = new org.apache.poi.xslf.usermodel.XMLSlideShow();
+                     var out = java.nio.file.Files.newOutputStream(target)) {
+                    presentation.setPageSize(new java.awt.Dimension(960, 540));
+                    presentation.createSlide();
+                    com.checkba.util.DocumentGeneratorStamp.apply(presentation, documentGeneratorSettings);
+                    presentation.write(out);
+                }
+            });
+            editorBridgeService.sendRefreshFilesAction();
+            editorBridgeService.sendOpenFileAction(file);
+            return GeneratedFileLocation.createdResult(file, com.checkba.service.LangText.of(
+                    "已创建可编辑演示文稿，含1张空白页。打开后先读取页面尺寸，再组合幻灯片工具制作。",
+                    "Created an editable presentation with one blank slide. Read its dimensions after opening, then compose it with slide tools."));
+        } catch (Exception e) { return "Error: " + e.getMessage(); }
+    }
+
     @ToolMeta(displayName = "新建表格文件", category = "document", fileEffect = "ADDED")
     @Tool("【表格·建】在项目中新建一个空白 Excel 表格文件（.xlsx）并在编辑器中打开。" +
           "创建后用 sheet_write_cells 写入数据、sheet_format_cells 等做格式。重名会自动加序号。" +

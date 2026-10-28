@@ -199,10 +199,11 @@ class ToolDisclosurePolicyTest {
                 "office_excel_search", "office_excel_replace", "office_excel_set_values")), "Excel 窗格：" + core.get("Excel 窗格"));
         assertTrue(core.get("PPT 窗格").containsAll(List.of("office_ppt_get_slides", "office_ppt_replace_text",
                 "office_ppt_format_text", "office_ppt_add_slide")), "PPT 窗格：" + core.get("PPT 窗格"));
+        assertTrue(core.get("docx").contains("slide_create_file"), "Word 参考生成 PPT 必须可见新建入口");
         // 反向：别家宿主的段不会漏进来（能力闸在上游裁，核心集是扁平的）
         assertFalse(core.get("Excel 窗格").contains("office_replace_text"), "Word 面工具漏进了 Excel 窗格");
-        assertFalse(core.get("docx").stream().anyMatch(n -> n.startsWith("office_") || n.startsWith("slide_")),
-                "docx 会话里不该有 office_* / slide_*：" + core.get("docx"));
+        assertFalse(core.get("docx").stream().anyMatch(n -> n.startsWith("office_") || (n.startsWith("slide_") && !n.equals("slide_create_file"))),
+                "docx 会话里只允许跨类型新建 PPT，不应泄漏其他宿主编辑工具：" + core.get("docx"));
     }
 
     @Test

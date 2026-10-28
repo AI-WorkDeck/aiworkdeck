@@ -681,6 +681,8 @@ public class PptxTools implements AgentToolComponent {
                 cn.hutool.json.JSONArray slides = data.getJSONArray("slides");
                 cn.hutool.json.JSONObject filtered = new cn.hutool.json.JSONObject();
                 filtered.set("slide_count", slideCount);
+                filtered.set("page_size_pt", data.get("page_size_pt"));
+                filtered.set("format_semantics", data.get("format_semantics"));
                 filtered.set("slides", new cn.hutool.json.JSONArray().set(slides.getJSONObject(slideIndex)));
                 return filtered.toString();
             }
