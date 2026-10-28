@@ -29,6 +29,7 @@
  * 7. 空工作表的 UsedRange 行为（VBA 口径返回 A1 单格而非 null）。
  */
 
+import { t } from './i18n.js'
 import { etRangeText } from './wpsDoc.js'
 import { parseLocator, capReferenceText, unsupportedLocatorError } from './referenceRead.js'
 // excel_replace 的纯函数层与 Office 版共用（同一条指令在 Excel 和 WPS 表格上
@@ -177,6 +178,8 @@ function usedRangeIsEmpty(used) {
 /* ==================== 数值常量表（VBA 同值，不依赖 wps.Enum） ==================== */
 
 /** excel_get_range 返回值的行数上限（与 officeExecutor.MAX_EXCEL_RESULT_ROWS 同值） */
+// Bound both dimensions before transferring values or formulas across the host bridge.
+const MAX_EXCEL_SCAN_CELLS = 50000
 const MAX_EXCEL_RESULT_ROWS = 500
 /** excel_search 展示的命中上限（与 officeExecutor.MAX_SEARCH_HITS 同值） */
 const MAX_SEARCH_HITS = 20
@@ -237,7 +240,8 @@ const xlBetween = 1
 const ET_CF_OPERATORS = { greaterthan: 5, lessthan: 6, between: xlBetween, equalto: 3 }
 
 /** XlDVType / XlDVAlertStyle */
-const ET_DV_TYPES = { wholenumber: 1, list: 3, date: 4 }
+const ET_DV_TYPES = { wholenumber: 1, decimal: 2, list: 3, date: 4, time: 5, textlength: 6, custom: 7 }
+const ET_DV_OPERATORS = { greaterthan: 5, greater: 5, greaterequal: 7, lessthan: 6, less: 6, lessequal: 8, between: 1, notbetween: 2, equalto: 3, equal: 3, notequal: 4 }
 const xlValidAlertStop = 1
 
 /** XlChartType：chartType 小写短名 → 数值（v1 起步四种，与 Office 版同集） */
@@ -536,8 +540,9 @@ export const WPS_ET_HANDLERS = {
     // **先 Resize 再取值**：只回 MAX_EXCEL_RESULT_ROWS 行，却把整片区域编组过同步桥
     // 就是白搬——几万行的台账会把 WPS 表格拖到长时间无响应。原先的 slice 只保护了
     // 回给模型的 token 预算，一点也没保护跨桥载荷。
-    const truncated = totalRows > MAX_EXCEL_RESULT_ROWS
-    const source = truncated ? rng.Resize(MAX_EXCEL_RESULT_ROWS, totalCols) : rng
+    const returnedRows = Math.min(totalRows, MAX_EXCEL_RESULT_ROWS, Math.floor(MAX_EXCEL_SCAN_CELLS / totalCols))
+    const truncated = returnedRows < totalRows
+    const source = truncated ? rng.Resize(returnedRows, totalCols) : rng
     const values = read2D(source)
     const out = {
       sheet: name,
@@ -545,6 +550,8 @@ export const WPS_ET_HANDLERS = {
       rows: totalRows,
       cols: totalCols,
       values,
+      formulas: readFormula2D(source),
+      returnedRows,
       truncated
     }
     if (args.withFormat === true) {
@@ -574,7 +581,7 @@ export const WPS_ET_HANDLERS = {
     const rangeAddress = String(args.rangeAddress || '')
     const values = args.values
     if (!rangeAddress) throw new Error('区域地址不能为空')
-    if (!Array.isArray(values) || !values.length || !Array.isArray(values[0])) {
+    if (!Array.isArray(values) || !values.length || !Array.isArray(values[0]) || !values[0].length || values.some(row => !Array.isArray(row) || row.length !== values[0].length || row.some(value => value !== null && !['string', 'number', 'boolean'].includes(typeof value) || typeof value === 'number' && !Number.isFinite(value)))) {
       throw new Error('values 必须是非空二维数组')
     }
     const sheet = resolveSheet(sheetName)
@@ -615,17 +622,17 @@ export const WPS_ET_HANDLERS = {
     if (!query) throw new Error('查找文本不能为空')
     const sheet = resolveSheet(sheetName)
     const name = String(sheet.Name)
-    const used = sheet.UsedRange
+    const used = args.rangeAddress ? sheet.Range(String(args.rangeAddress)) : sheet.UsedRange
     if (usedRangeIsEmpty(used)) return { sheet: name, count: 0, matches: [] }
     const totalRows = used.Rows.Count
     // 同 excel_get_range：先限行再过桥，否则几万行的台账一搜就白屏几十秒
-    const scanRows = Math.min(totalRows, MAX_SEARCH_SCAN_ROWS)
+    const scanRows = Math.min(totalRows, MAX_SEARCH_SCAN_ROWS, Math.floor(MAX_EXCEL_SCAN_CELLS / used.Columns.Count))
     const scanned = scanRows < totalRows ? used.Resize(scanRows, used.Columns.Count) : used
     const values = read2D(scanned)
     // WPS 的 Row/Column 是 1 起，cellAddress 收 0 起——先归零再拼
     const baseRow = used.Row - 1
     const baseCol = used.Column - 1
-    const needle = query.toLowerCase()
+    const needle = args.matchCase === true ? query : query.toLowerCase()
     const matches = []
     let count = 0
     for (let r = 0; r < values.length; r++) {
@@ -634,7 +641,7 @@ export const WPS_ET_HANDLERS = {
         const cell = row[c]
         if (cell == null) continue
         const text = String(cell)
-        if (text.toLowerCase().includes(needle)) {
+        if ((args.matchCase === true ? text : text.toLowerCase()).includes(needle)) {
           count++
           if (matches.length < MAX_SEARCH_HITS) {
             matches.push({ address: cellAddress(baseRow + r, baseCol + c), value: text.slice(0, 500) })
@@ -677,6 +684,7 @@ export const WPS_ET_HANDLERS = {
         replaced: 0, occurrences: 0, skippedFormula: 0, skippedNumeric: 0, truncated: false, cap
       })
     }
+    if (rng.Rows.Count * rng.Columns.Count > MAX_EXCEL_SCAN_CELLS) throw new Error(t('excelRangeTooLarge'))
     const totalRows = rng.Rows.Count
     const scanRows = Math.min(totalRows, MAX_SEARCH_SCAN_ROWS)
     const scanned = scanRows < totalRows ? rng.Resize(scanRows, rng.Columns.Count) : rng
@@ -970,7 +978,7 @@ export const WPS_ET_HANDLERS = {
     const rangeAddress = String(args.rangeAddress || '')
     const formulas = args.formulas
     if (!rangeAddress) throw new Error('区域地址不能为空')
-    if (!Array.isArray(formulas) || !formulas.length || !Array.isArray(formulas[0])) {
+    if (!Array.isArray(formulas) || !formulas.length || !Array.isArray(formulas[0]) || !formulas[0].length || formulas.some(row => !Array.isArray(row) || row.length !== formulas[0].length || row.some(value => value !== null && !['string', 'number', 'boolean'].includes(typeof value) || typeof value === 'number' && !Number.isFinite(value)))) {
       throw new Error('formulas 必须是非空二维数组')
     }
     const sheet = resolveSheet(sheetName)
@@ -1055,6 +1063,7 @@ export const WPS_ET_HANDLERS = {
     const rangeAddress = String(args.rangeAddress || '')
     if (!rangeAddress) throw new Error('区域地址不能为空')
     const action = String(args.action || 'apply').trim().toLowerCase()
+    if (action !== 'apply' && action !== 'clearall') throw new Error(t('excelConditionalActionInvalid'))
     const sheet = resolveSheet(sheetName)
     const fcs = sheet.Range(rangeAddress).FormatConditions
     if (action === 'clearall') {
@@ -1192,7 +1201,7 @@ export const WPS_ET_HANDLERS = {
     const sheet = resolveSheet(sheetName)
     if (action !== 'apply' && action !== 'clear') {
       // 收严 action：原先除 clear 外的任何值（含拼错的）都会掉进 apply 分支先删规则
-      throw new Error(`action 值非法：${args.action}（合法值：apply/clear）`)
+      throw new Error(t('excelValidationActionInvalid'))
     }
     const rng = sheet.Range(rangeAddress)
     const v = rng.Validation
@@ -1209,24 +1218,32 @@ export const WPS_ET_HANDLERS = {
       if (!source) throw new Error('type=list 时 listSource 不能为空')
       // Formula1 = 逗号分隔值列表 或 "=$A$1:$A$5" 工作表引用；Operator 对 list 无实义，按官方示例传 xlBetween 占位
       addArgs = [ET_DV_TYPES.list, xlValidAlertStop, xlBetween, source]
-    } else if (type === 'wholenumber' || type === 'date') {
-      const operator = ET_CF_OPERATORS[String(args.operator || '').trim().toLowerCase()]
+    } else if (type === 'custom') {
+      if (!args.value1) throw new Error(t('excelValidationCustomRequired'))
+      addArgs = [ET_DV_TYPES.custom, xlValidAlertStop, xlBetween, String(args.value1)]
+    } else if (['wholenumber', 'decimal', 'date', 'time', 'textlength'].includes(type)) {
+      const operator = ET_DV_OPERATORS[String(args.operator || '').trim().toLowerCase()]
       if (!operator) throw new Error(`operator 值非法：${args.operator}`)
       if (args.value1 == null || String(args.value1) === '') {
-        throw new Error(`type=${type} 需要 value1（比较的阈值）`)
+        throw new Error(t('excelValidationValueRequired'))
       }
-      if (operator === ET_CF_OPERATORS.between && (args.value2 == null || String(args.value2) === '')) {
-        throw new Error('between 规则需要 value1 与 value2 两个边界值')
+      if ([1, 2].includes(operator) && (args.value2 == null || String(args.value2) === '')) {
+        throw new Error(t('excelValidationBoundsRequired'))
       }
-      addArgs = operator === ET_CF_OPERATORS.between
+      addArgs = [1, 2].includes(operator)
         ? [ET_DV_TYPES[type], xlValidAlertStop, operator, String(args.value1), String(args.value2)]
         : [ET_DV_TYPES[type], xlValidAlertStop, operator, String(args.value1)]
     } else {
-      throw new Error(`type 值非法：${args.type}（合法值：wholeNumber/list/date）`)
+      throw new Error(t('excelValidationTypeInvalid'))
     }
     // 校验全过，到这里才允许破坏既有规则
     v.Delete()
     v.Add(...addArgs)
+    if (args.showInputMessage != null) v.ShowInput = args.showInputMessage === true
+    if (args.inputTitle != null) v.InputTitle = String(args.inputTitle)
+    if (args.inputMessage != null) v.InputMessage = String(args.inputMessage)
+    if (args.errorTitle != null) v.ErrorTitle = String(args.errorTitle)
+    if (args.errorMessage != null) { v.ErrorMessage = String(args.errorMessage); v.ShowError = true }
     if (type === 'list') v.InCellDropdown = true
     return { action: 'apply', type, address: rng.Address(false, false) }
   },
@@ -1242,16 +1259,25 @@ export const WPS_ET_HANDLERS = {
     if (!chartType) throw new Error(`chartType 值非法：${args.chartType}（合法值：column/line/pie/bar）`)
     const sheet = resolveSheet(sheetName)
     // ChartObjects 是方法（带括号）；Add(Left, Top, Width, Height) 四参必选，单位磅
+    const source = sheet.Range(dataRangeAddress)
     const co = sheet.ChartObjects().Add(50, 40, 360, 220)
-    const chart = co.Chart
-    chart.SetSourceData(sheet.Range(dataRangeAddress))
-    chart.ChartType = chartType
-    if (args.title) {
-      // HasTitle 前置是硬要求（不置 true 直接设 ChartTitle 报错）
-      chart.HasTitle = true
-      chart.ChartTitle.Text = String(args.title)
+    try {
+      if (args.name) co.Name = String(args.name)
+      const chart = co.Chart
+      chart.SetSourceData(source)
+      chart.ChartType = chartType
+      if (args.title) {
+        // HasTitle 前置是硬要求（不置 true 直接设 ChartTitle 报错）
+        chart.HasTitle = true
+        chart.ChartTitle.Text = String(args.title)
+      }
+      return { added: true, name: String(co.Name), chartType: typeKey }
+    } catch (error) {
+      try { co.Delete() } catch (_) {
+        throw new Error(t('excelChartPartial', { name: String(args.name || dataRangeAddress) }))
+      }
+      throw error
     }
-    return { added: true, name: String(co.Name), chartType: typeKey }
   },
 
   // ==================== 命名区域 ====================
@@ -1270,7 +1296,7 @@ export const WPS_ET_HANDLERS = {
       const sheet = resolveSheet(sheetName)
       const rng = sheet.Range(rangeAddress)
       // RefersTo 走 A1 字符串路线（表名加引号防空格），Range 对象编组待真机验证
-      wb.Names.Add(name, "='" + String(sheet.Name) + "'!" + rng.Address())
+      wb.Names.Add(name, "='" + String(sheet.Name).replace(/'/g, "''") + "'!" + rng.Address())
       return { action: 'add', name }
     }
     let nm
@@ -1336,13 +1362,23 @@ export const WPS_ET_HANDLERS = {
     const wb = app().ActiveWorkbook
     if (!wb) throw new Error('当前没有打开的工作簿')
     const sheet = resolveSheet(sheetName)
+    const sourceRange = sheet.Range(sourceRangeAddress)
+    const header = read2D(sourceRange.Resize(1, sourceRange.Columns.Count))[0] || []
+    const available = header.map(String)
+    const missing = rowFields.concat(valueFields).map(String).filter(field => !available.includes(field))
+    if (missing.length) throw new Error(t('excelPivotFieldsMissing', { fields: missing.join(', ') }))
     // 真机验证清单第二位：PivotCaches().Create → CreatePivotTable → 字段编排编组链最长，
     // 任何一环编组失败可能表现为 undefined 而非异常，写入后要读回校验
-    const src = "'" + String(sheet.Name) + "'!" + sourceRangeAddress
+    const src = "'" + String(sheet.Name).replace(/'/g, "''") + "'!" + sourceRangeAddress
+    const at = destinationCellAddress.lastIndexOf('!')
+    let destinationName = at < 0 ? '' : destinationCellAddress.slice(0, at)
+    if (destinationName.startsWith("'") && destinationName.endsWith("'")) destinationName = destinationName.slice(1, -1).replace(/''/g, "'")
+    const destinationSheet = destinationName ? resolveSheet(destinationName) : sheet
+    const destination = destinationSheet.Range(at < 0 ? destinationCellAddress : destinationCellAddress.slice(at + 1))
     // PivotCaches 是方法不是属性（带括号）；Version 省略 = xlPivotTableVersion12
     const cache = wb.PivotCaches().Create(xlDatabase, src)
     const name = args.pivotName ? String(args.pivotName) : `PivotTable_${Date.now()}`
-    const pivot = cache.CreatePivotTable(sheet.Range(destinationCellAddress), name)
+    const pivot = cache.CreatePivotTable(destination, name)
     if (!pivot) throw new Error('透视表创建失败：CreatePivotTable 未返回对象')
     for (const field of rowFields) {
       const pf = pivotFieldOrThrow(pivot, field)

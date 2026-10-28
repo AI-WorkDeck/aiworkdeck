@@ -2,6 +2,53 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  wordStyleUnsupported: "このホストでは次のプロファイル項目を完全には適用できません：{fields}。変更は開始していません。",
+
+  cmdGetParagraphs: "段落を読み取る",
+  cmdGetOutline: "アウトラインを読み取る",
+  cmdGetClauses: "条項を識別する",
+  cmdReplaceNthMatch: "指定した一致箇所を置換する",
+  cmdApplyStyleProfile: "スタイルプロファイルを適用",
+
+  wordStructureTooLarge: "文書構造が大きすぎるため、1回の安全な処理で全体を読み取れません。文書を小さくしてから再試行してください。",
+  wordStructurePartial: "一部の書式はすでに適用されている可能性があります。現在の文書を確認し、確認せずに操作を繰り返さないでください。",
+
+  cmdPptTableSetStyle: "スライドの表の書式設定",
+  cmdPptReadNotes: "発表者ノートを読む",
+  cmdPptWriteNotes: "発表者ノートを書き込む",
+
+  excelConditionalActionInvalid: "条件付き書式の操作は apply または clearAll で指定してください。",
+  wordImagePartial: "画像は挿入済みの可能性がありますが、設定が完了していません。既存の画像を確認し、重複して挿入しないでください。",
+
+  excelRangeTooLarge: "範囲が 50,000 セルを超えています。範囲を狭めて再試行してください。変更は行われていません。",
+
+  fileOperationUnavailable: "このファイル操作は利用できないか、完了を確認できません。",
+  fileOperationStale: "ドキュメントが切り替わりました。現在のドキュメントを読み直してください。",
+  fileOperationInvalidArguments: "ファイル操作の引数が無効です。",
+  fileOperationInvalidBytes: "有効で完全なファイルデータが返されませんでした。",
+  cmdFileCreate: "ファイルを新規作成",
+  cmdFileSave: "現在のファイルを保存",
+  cmdFileExportPdf: "PDF をプロジェクトに書き出す",
+  cmdFileOpen: "ファイルを開く、またはコピーを取り込む",
+  excelChartPartial: "グラフ「{name}」は作成された可能性がありますが、設定に失敗し、復元を確認できません。再試行前に既存のグラフを確認し、重複して作成しないでください。",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "スライドまたは図形の指定が無効です。",
+  pptStaleTarget: "対象のテキストが変更されています。再度読み取ってから編集してください。",
+  pptInvalidArguments: "プレゼンテーション編集の引数が無効です。",
+  pptCapabilityUnavailable: "現在のプレゼンテーションホストではこの機能を利用できません。",
+  cmdPptSetShapeText: "図形のテキストを設定",
+  cmdPptSetShapeGeometry: "図形の位置とサイズを設定",
+  cmdPptFormatShape: "図形の書式を設定",
+  cmdPptGoto: "スライドまたは図形へ移動",
+  cmdPptSetLayout: "スライドのレイアウトまたは背景を設定",
+  excelValidationCustomRequired: "ユーザー設定の入力規則には数式が必要です。",
+  excelValidationTypeInvalid: "未対応のデータ入力規則の種類です。",
+  excelPivotFieldsMissing: "ピボットフィールドが見つかりません: {fields}",
+  excelValidationActionInvalid: "入力規則の操作は apply または clear にしてください。",
+  excelValidationValueRequired: "この入力規則には比較値が必要です。",
+  excelValidationBoundsRequired: "範囲の入力規則には上下限の値が必要です。",
+
   "dictate": "Voice input",
   "dictateRecording": "Recording, click to finish",
   "dictateTranscribing": "Transcribing...",

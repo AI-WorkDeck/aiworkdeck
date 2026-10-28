@@ -2,6 +2,35 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  officeToolNames: {
+    "office_file_create": "Cipta fail baharu",
+    "office_file_save": "Simpan fail semasa",
+    "office_file_export_pdf": "Eksport PDF ke projek",
+    "office_file_open": "Buka salinan fail projek",
+    "office_ppt_goto": "Pergi ke slaid atau bentuk",
+    "office_ppt_set_layout": "Tetapkan susun atur atau latar belakang slaid",
+    "office_get_paragraphs": "Baca perenggan",
+    "office_get_outline": "Baca rangka",
+    "office_get_clauses": "Kenal pasti klausa",
+    "office_replace_nth_match": "Ganti padanan tertentu",
+    "office_apply_style_profile": "Gunakan profil gaya",
+    "office_ppt_table_set_style": "Format jadual slaid",
+    "office_ppt_read_notes": "Baca nota pembentang",
+    "office_ppt_write_notes": "Tulis nota pembentang",
+    "office_audit_structure": "Semak struktur dokumen"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "Julat pengisihan mengandungi sel yang digabungkan. Nyahgabungkan sel sebelum mengisih.",
+    "SHEET_SORT_FAILED": "Pengisihan gagal. Baca semula dan semak helaian sebelum mencuba lagi.",
+    "SHEET_PROTECTED_CELL": "Terdapat sel dilindungi; tiada data ditulis.",
+    "SHEET_INVALID_RANGE": "Julat tidak sah. Baca semula helaian dan pilih julat yang sah.",
+    "SHEET_INVALID_START_CELL": "Pilih sel permulaan yang sah.",
+    "SHEET_INVALID_ROWS": "Berikan tatasusunan sel dua dimensi yang sah.",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "Julat penulisan melebihi sempadan lembaran kerja.",
+    "SHEET_RANGE_CHECK_FAILED": "Julat tidak dapat disemak; tiada data ditulis.",
+    "SHEET_WRITE_PARTIAL": "Penulisan terhenti; sesetengah sel mungkin berubah. Baca semula dan baiki tanpa mengulangi seluruh kelompok.",
+    "SHEET_CHART_PARTIAL": "Carta telah dicipta tetapi tetapannya belum lengkap. Semak dan baiki carta sedia ada tanpa mencipta carta lain."
+},
   "navigation": {
     "slides": "Slaid",
     "sheets": "Lembaran Kerja",

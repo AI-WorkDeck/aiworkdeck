@@ -2,6 +2,53 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  wordStyleUnsupported: "Esta aplicación no puede aplicar completamente estos campos del perfil: {fields}. No se ha iniciado ningún cambio.",
+
+  cmdGetParagraphs: "Leer párrafos",
+  cmdGetOutline: "Leer esquema",
+  cmdGetClauses: "Identificar cláusulas",
+  cmdReplaceNthMatch: "Reemplazar coincidencia indicada",
+  cmdApplyStyleProfile: "Aplicar perfil de estilos",
+
+  wordStructureTooLarge: "La estructura del documento es demasiado grande para leerla completamente en una sola operación segura. Reduzca el tamaño del documento y vuelva a intentarlo.",
+  wordStructurePartial: "Es posible que parte del formato ya se haya aplicado. Revise primero el documento actual; no repita la operación sin comprobarlo.",
+
+  cmdPptTableSetStyle: "Dar formato a la tabla de la diapositiva",
+  cmdPptReadNotes: "Leer notas del orador",
+  cmdPptWriteNotes: "Escribir notas del orador",
+
+  excelConditionalActionInvalid: "La acción de formato condicional debe ser apply o clearAll.",
+  wordImagePartial: "Es posible que la imagen se haya insertado, pero la configuración está incompleta. Revise la imagen existente; no inserte otra copia.",
+
+  excelRangeTooLarge: "El rango supera las 50.000 celdas. Elige uno más pequeño y reintenta; no se ha modificado nada.",
+
+  fileOperationUnavailable: "Esta operación de archivo no está disponible o no se pudo confirmar.",
+  fileOperationStale: "El documento ha cambiado. Vuelve a leer el documento actual antes de reintentar.",
+  fileOperationInvalidArguments: "Parámetros de operación de archivo no válidos.",
+  fileOperationInvalidBytes: "No se devolvieron datos de archivo válidos y completos.",
+  cmdFileCreate: "Crear archivo",
+  cmdFileSave: "Guardar archivo actual",
+  cmdFileExportPdf: "Exportar PDF al proyecto",
+  cmdFileOpen: "Abrir archivo o importar una copia",
+  excelChartPartial: "Es posible que se haya creado el gráfico «{name}», pero la configuración falló y no se pudo confirmar la reversión. Revisa el gráfico existente antes de reintentar; no crees un duplicado.",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "Destino de diapositiva o forma no válido.",
+  pptStaleTarget: "El texto de destino ha cambiado. Vuelve a leerlo antes de editarlo.",
+  pptInvalidArguments: "Parámetros de edición de presentación no válidos.",
+  pptCapabilityUnavailable: "Esta función no está disponible en la aplicación de presentación actual.",
+  cmdPptSetShapeText: "Establecer texto de la forma",
+  cmdPptSetShapeGeometry: "Establecer posición y tamaño de la forma",
+  cmdPptFormatShape: "Dar formato a la forma",
+  cmdPptGoto: "Ir a la diapositiva o forma",
+  cmdPptSetLayout: "Establecer diseño o fondo de la diapositiva",
+  excelValidationCustomRequired: "La validación personalizada requiere una fórmula.",
+  excelValidationTypeInvalid: "Tipo de validación de datos no compatible.",
+  excelPivotFieldsMissing: "No se encontraron campos de tabla dinámica: {fields}",
+  excelValidationActionInvalid: "La acción de validación debe ser apply o clear.",
+  excelValidationValueRequired: "Esta regla de validación requiere un valor de comparación.",
+  excelValidationBoundsRequired: "La validación de intervalo requiere ambos límites.",
+
   "dictate": "Entrada de voz",
   "dictateRecording": "Grabando, haga clic para finalizar",
   "dictateTranscribing": "Transcribiendo...",

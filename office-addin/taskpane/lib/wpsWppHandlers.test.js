@@ -441,7 +441,7 @@ test('ppt_add_shape：ellipse 映射 msoShapeOval=9，填充先 Solid 再 RGB', 
 
 // ==================== ppt_get_slide_details ====================
 
-test('ppt_get_slide_details：Type 数值转可读名、Id 转字符串、文本截断 500', async () => {
+test('ppt_get_slide_details：Type 数值转可读名、Id 转字符串、完整返回超过 500 字的文本', async () => {
   install(makeDeck([[
     { id: 5, type: 17, text: '长'.repeat(600), left: 1, top: 2, width: 3, height: 4 },
     { id: 6, table: [['x']] },
@@ -450,7 +450,7 @@ test('ppt_get_slide_details：Type 数值转可读名、Id 转字符串、文本
   const out = await H.ppt_get_slide_details({ slideNumber: 1 })
   assert.equal(out.shapeCount, 3)
   assert.deepEqual(out.shapes[0], {
-    id: '5', type: 'textBox', left: 1, top: 2, width: 3, height: 4, text: '长'.repeat(500)
+    id: '5', type: 'textBox', left: 1, top: 2, width: 3, height: 4, text: '长'.repeat(600), textLength: 600, textTruncated: false
   })
   assert.equal(out.shapes[1].type, 'table')
   assert.equal(out.shapes[2].type, 'unknown(42)')
@@ -555,3 +555,26 @@ test('ppt_set_hyperlink：未命中与空参报错', async () => {
     /查找文本不能为空/)
   await assert.rejects(H.ppt_set_hyperlink({ slideNumber: 1, searchText: '正文', url: '' }), /url 不能为空/)
 })
+
+ test('precision target affects one shape and one occurrence; stale text leaves content unchanged', async () => {
+   const pres = install(makeDeck([[{ id: 10, text: 'cost 100 and 100' }, { id: 11, text: 'cost 100 and 100' }]]))
+   await H.ppt_replace_text({slideNumber: 1, shapeId: '11', expectedText: 'cost 100 and 100', searchText: '100', replaceText: '200', all: false})
+   assert.equal(pres.Slides.Item(1).Shapes.Item(1)._state.text, 'cost 100 and 100')
+   assert.equal(pres.Slides.Item(1).Shapes.Item(2)._state.text, 'cost 200 and 100')
+   await assert.rejects(H.ppt_replace_text({slideNumber: 1, shapeId: '11', expectedText: 'cost 100 and 100', searchText: '100', replaceText: '300'}))
+   assert.equal(pres.Slides.Item(1).Shapes.Item(2)._state.text, 'cost 200 and 100')
+ })
+ test('geometry preflight rejects invalid sizes before moving a shape', async () => {
+   const pres = install(makeDeck([[{ id: 10, text: 'x', left: 10 }]]))
+   await assert.rejects(H.ppt_set_shape_geometry({slideNumber: 1, shapeId: '10', left: 50, width: -1}))
+   assert.equal(pres.Slides.Item(1).Shapes.Item(1).Left, 10)
+   const out = await H.ppt_set_shape_geometry({slideNumber: 1, shapeId: '10', left: 50, width: 300})
+   assert.deepEqual(out.after, {left: 50, width: 300})
+ })
+ test('explicit empty shape text clears; missing text does not clear', async () => {
+   const pres = install(makeDeck([[{ id: 10, text: 'keep' }]]))
+   await assert.rejects(H.ppt_set_shape_text({slideNumber: 1, shapeId: '10'}))
+   assert.equal(pres.Slides.Item(1).Shapes.Item(1)._state.text, 'keep')
+   const out = await H.ppt_set_shape_text({slideNumber: 1, shapeId: '10', expectedText: 'keep', text: ''})
+   assert.equal(out.text, '')
+ })

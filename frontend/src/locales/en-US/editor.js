@@ -3,6 +3,35 @@
 // Document editor domain: user-visible copy for LibreOfficeEditor / ReviewPanel /
 // DocDiffViewer / CompareDocDialog / VariablePanel / DrawioEditor.
 export default {
+  officeToolNames: {
+    "office_file_create": "Create a new file",
+    "office_file_save": "Save current file",
+    "office_file_export_pdf": "Export PDF to project",
+    "office_file_open": "Open project file copy",
+    "office_ppt_goto": "Go to slide or shape",
+    "office_ppt_set_layout": "Set slide layout or background",
+    "office_get_paragraphs": "Read paragraphs",
+    "office_get_outline": "Read outline",
+    "office_get_clauses": "Identify clauses",
+    "office_replace_nth_match": "Replace specified match",
+    "office_apply_style_profile": "Apply style profile",
+    "office_ppt_table_set_style": "Format slide table",
+    "office_ppt_read_notes": "Read speaker notes",
+    "office_ppt_write_notes": "Write speaker notes",
+    "office_audit_structure": "Audit document structure"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "The sort range contains merged cells. Unmerge them before sorting.",
+    "SHEET_SORT_FAILED": "Sorting failed. Read the worksheet again before retrying.",
+    "SHEET_PROTECTED_CELL": "Protected cells; nothing was written.",
+    "SHEET_INVALID_RANGE": "Invalid range. Read the sheet and select a valid range.",
+    "SHEET_INVALID_START_CELL": "Select a valid start cell.",
+    "SHEET_INVALID_ROWS": "Provide a valid two-dimensional cell array.",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "The write range exceeds worksheet bounds.",
+    "SHEET_RANGE_CHECK_FAILED": "The range could not be checked; nothing was written.",
+    "SHEET_WRITE_PARTIAL": "Writing stopped; some cells may have changed. Read back and repair; do not retry the whole batch.",
+    "SHEET_CHART_PARTIAL": "The chart was created but setup is incomplete. Inspect and repair it; do not create another chart."
+},
   navigation: {
     "slides": "Slides",
     "sheets": "Sheets",

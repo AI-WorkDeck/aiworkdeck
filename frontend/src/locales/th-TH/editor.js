@@ -2,6 +2,35 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  officeToolNames: {
+    "office_file_create": "สร้างไฟล์ใหม่",
+    "office_file_save": "บันทึกไฟล์ปัจจุบัน",
+    "office_file_export_pdf": "ส่งออก PDF ไปยังโครงการ",
+    "office_file_open": "เปิดสำเนาไฟล์โครงการ",
+    "office_ppt_goto": "ไปที่สไลด์หรือรูปร่าง",
+    "office_ppt_set_layout": "ตั้งค่าเค้าโครงหรือพื้นหลังสไลด์",
+    "office_get_paragraphs": "อ่านย่อหน้า",
+    "office_get_outline": "อ่านเค้าร่าง",
+    "office_get_clauses": "ระบุข้อสัญญา",
+    "office_replace_nth_match": "แทนที่รายการที่ตรงกันที่ระบุ",
+    "office_apply_style_profile": "ใช้โปรไฟล์สไตล์",
+    "office_ppt_table_set_style": "จัดรูปแบบตารางสไลด์",
+    "office_ppt_read_notes": "อ่านบันทึกย่อของผู้บรรยาย",
+    "office_ppt_write_notes": "เขียนบันทึกย่อของผู้บรรยาย",
+    "office_audit_structure": "ตรวจสอบโครงสร้างเอกสาร"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "ช่วงที่จะเรียงลำดับมีเซลล์ที่ผสานอยู่ โปรดยกเลิกการผสานก่อนเรียงลำดับ",
+    "SHEET_SORT_FAILED": "เรียงลำดับไม่สำเร็จ โปรดอ่านและตรวจสอบแผ่นงานอีกครั้งก่อนลองใหม่",
+    "SHEET_PROTECTED_CELL": "มีเซลล์ที่ป้องกันอยู่ จึงยังไม่ได้เขียนข้อมูล",
+    "SHEET_INVALID_RANGE": "ช่วงไม่ถูกต้อง โปรดอ่านแผ่นงานอีกครั้งและเลือกช่วงที่ถูกต้อง",
+    "SHEET_INVALID_START_CELL": "โปรดเลือกเซลล์เริ่มต้นที่ถูกต้อง",
+    "SHEET_INVALID_ROWS": "โปรดระบุอาร์เรย์เซลล์สองมิติที่ถูกต้อง",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "ช่วงที่เขียนเกินขอบเขตแผ่นงาน",
+    "SHEET_RANGE_CHECK_FAILED": "ตรวจสอบช่วงไม่ได้ จึงยังไม่ได้เขียนข้อมูล",
+    "SHEET_WRITE_PARTIAL": "การเขียนหยุดชะงัก บางเซลล์อาจเปลี่ยนแล้ว โปรดอ่านกลับและแก้ไข อย่าลองใหม่ทั้งชุด",
+    "SHEET_CHART_PARTIAL": "สร้างแผนภูมิแล้วแต่ตั้งค่าไม่ครบ โปรดตรวจสอบและแก้ไขแผนภูมิเดิม อย่าสร้างซ้ำ"
+},
   "navigation": {
     "slides": "สไลด์",
     "sheets": "แผ่นงาน",

@@ -2,6 +2,35 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  officeToolNames: {
+    "office_file_create": "إنشاء ملف جديد",
+    "office_file_save": "حفظ الملف الحالي",
+    "office_file_export_pdf": "تصدير PDF إلى المشروع",
+    "office_file_open": "فتح نسخة من ملف المشروع",
+    "office_ppt_goto": "الانتقال إلى الشريحة أو الشكل",
+    "office_ppt_set_layout": "تعيين تخطيط الشريحة أو خلفيتها",
+    "office_get_paragraphs": "قراءة الفقرات",
+    "office_get_outline": "قراءة المخطط التفصيلي",
+    "office_get_clauses": "تحديد البنود",
+    "office_replace_nth_match": "استبدال التطابق المحدد",
+    "office_apply_style_profile": "تطبيق ملف الأنماط",
+    "office_ppt_table_set_style": "تنسيق جدول الشريحة",
+    "office_ppt_read_notes": "قراءة ملاحظات المتحدث",
+    "office_ppt_write_notes": "كتابة ملاحظات المتحدث",
+    "office_audit_structure": "تدقيق بنية المستند"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "يحتوي نطاق الفرز على خلايا مدمجة. ألغِ دمجها قبل الفرز.",
+    "SHEET_SORT_FAILED": "فشل الفرز. أعد قراءة ورقة العمل والتحقق منها قبل المحاولة مجددًا.",
+    "SHEET_PROTECTED_CELL": "توجد خلايا محمية؛ لم تتم كتابة أي بيانات.",
+    "SHEET_INVALID_RANGE": "النطاق غير صالح. أعد قراءة الورقة وحدد نطاقًا صالحًا.",
+    "SHEET_INVALID_START_CELL": "حدد خلية بداية صالحة.",
+    "SHEET_INVALID_ROWS": "قدّم مصفوفة خلايا صالحة ثنائية الأبعاد.",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "يتجاوز نطاق الكتابة حدود ورقة العمل.",
+    "SHEET_RANGE_CHECK_FAILED": "تعذر التحقق من النطاق؛ لم تتم كتابة أي بيانات.",
+    "SHEET_WRITE_PARTIAL": "توقفت الكتابة؛ ربما تغيرت بعض الخلايا. أعد القراءة وأصلح البيانات دون إعادة تنفيذ الدفعة كاملة.",
+    "SHEET_CHART_PARTIAL": "تم إنشاء المخطط لكن إعداده لم يكتمل. افحص المخطط الحالي وأصلحه دون إنشاء مخطط آخر."
+},
   "navigation": {
     "slides": "الشرائح",
     "sheets": "أوراق العمل",

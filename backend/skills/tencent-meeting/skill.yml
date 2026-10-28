@@ -64,6 +64,7 @@ allowed_tools:
   # 文档内编辑与改动（LOWA 工作台）
   - doc_get_document_text
   - doc_get_outline
+  - office_get_outline
   - doc_find_text
   - doc_get_cursor_context
   - doc_insert_at_cursor

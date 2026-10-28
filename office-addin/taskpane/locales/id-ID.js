@@ -2,6 +2,53 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  wordStyleUnsupported: "Aplikasi ini tidak dapat menerapkan seluruh bidang profil ini: {fields}. Belum ada perubahan yang dimulai.",
+
+  cmdGetParagraphs: "Baca paragraf",
+  cmdGetOutline: "Baca kerangka",
+  cmdGetClauses: "Identifikasi klausul",
+  cmdReplaceNthMatch: "Ganti kecocokan tertentu",
+  cmdApplyStyleProfile: "Terapkan profil gaya",
+
+  wordStructureTooLarge: "Struktur dokumen terlalu besar untuk dibaca seluruhnya dalam satu operasi aman. Kurangi ukuran dokumen lalu coba lagi.",
+  wordStructurePartial: "Sebagian pemformatan mungkin sudah diterapkan. Periksa dokumen saat ini terlebih dahulu; jangan ulangi operasi tanpa memeriksanya.",
+
+  cmdPptTableSetStyle: "Format tabel slide",
+  cmdPptReadNotes: "Baca catatan pembicara",
+  cmdPptWriteNotes: "Tulis catatan pembicara",
+
+  excelConditionalActionInvalid: "Tindakan pemformatan bersyarat harus apply atau clearAll.",
+  wordImagePartial: "Gambar mungkin sudah disisipkan, tetapi penyiapannya belum selesai. Periksa gambar yang ada; jangan sisipkan salinan lain.",
+
+  excelRangeTooLarge: "Rentang melebihi 50.000 sel. Pilih rentang yang lebih kecil dan coba lagi; tidak ada perubahan yang dilakukan.",
+
+  fileOperationUnavailable: "Operasi berkas ini tidak tersedia atau tidak dapat dikonfirmasi.",
+  fileOperationStale: "Dokumen telah berganti. Baca dokumen saat ini sebelum mencoba lagi.",
+  fileOperationInvalidArguments: "Parameter operasi berkas tidak valid.",
+  fileOperationInvalidBytes: "Tidak ada data berkas yang valid dan lengkap yang dikembalikan.",
+  cmdFileCreate: "Buat berkas baru",
+  cmdFileSave: "Simpan berkas saat ini",
+  cmdFileExportPdf: "Ekspor PDF ke proyek",
+  cmdFileOpen: "Buka berkas atau impor salinan",
+  excelChartPartial: "Bagan “{name}” mungkin telah dibuat, tetapi penyiapan gagal dan pembatalan tidak dapat dikonfirmasi. Periksa bagan yang ada sebelum mencoba lagi; jangan membuat duplikat.",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "Target slide atau bentuk tidak valid.",
+  pptStaleTarget: "Teks target telah berubah. Baca ulang sebelum mengedit.",
+  pptInvalidArguments: "Parameter pengeditan presentasi tidak valid.",
+  pptCapabilityUnavailable: "Fitur ini tidak tersedia di aplikasi presentasi saat ini.",
+  cmdPptSetShapeText: "Atur teks bentuk",
+  cmdPptSetShapeGeometry: "Atur posisi dan ukuran bentuk",
+  cmdPptFormatShape: "Format bentuk",
+  cmdPptGoto: "Buka slide atau bentuk",
+  cmdPptSetLayout: "Atur tata letak atau latar belakang slide",
+  excelValidationCustomRequired: "Validasi kustom memerlukan rumus.",
+  excelValidationTypeInvalid: "Jenis validasi data tidak didukung.",
+  excelPivotFieldsMissing: "Bidang tabel pivot tidak ditemukan: {fields}",
+  excelValidationActionInvalid: "Tindakan validasi data harus apply atau clear.",
+  excelValidationValueRequired: "Aturan validasi ini memerlukan nilai pembanding.",
+  excelValidationBoundsRequired: "Validasi rentang memerlukan kedua batas.",
+
   "dictate": "Input suara",
   "dictateRecording": "Merekam, klik untuk menyelesaikan",
   "dictateTranscribing": "Transcribing...",

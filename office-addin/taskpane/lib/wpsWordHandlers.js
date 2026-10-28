@@ -32,6 +32,9 @@
  *  6. 逐段/逐格循环的跨桥性能（500 段 apply_standard_format、大表读写）。
  */
 
+import { t } from './i18n.js'
+import { wordClauses, wordOutline, wordParagraphPage } from './wordStructure.js'
+import { applyWpsWordStyleProfile, validateWordStyleProfile } from './wordStyleProfile.js'
 import { minimalEdits } from './minimalEdit.js'
 import { findAllNormalized, describeAnchorFailure } from './textMatch.js'
 import { normalizeBatchItems, sortByIndex } from './batchEdits.js'
@@ -1034,7 +1037,55 @@ export async function locateInWpsDocument(text) {
 
 /* ==================== HANDLERS ==================== */
 
+function readWordParagraphs(doc, args) {
+  const collection = doc.Paragraphs, count = Number(collection.Count)
+  if (!Number.isInteger(count) || count > 12000) throw new Error(t('wordStructureTooLarge'))
+  const paragraphs = []
+  let chars = 0
+  const start = args ? Math.max(0, Math.floor(Number(args.startParagraph) || 0)) : 0
+  const end = args ? Math.min(count, start + Math.min(500, Math.max(1, Math.floor(Number(args.maxParagraphs) || 200)))) : count
+  for (let i = start + 1; i <= end; i++) {
+    const paragraph = collection.Item(i), range = paragraph.Range
+    const text = String(range.Text || '').replace(/\r$/, '')
+    chars += text.length
+    if (chars > 2000000 || text.length > 80000) throw new Error(t('wordStructureTooLarge'))
+    const level = Number(paragraph.OutlineLevel)
+    let label = '', listLevel = 0, available = false
+    try { label = String(range.ListFormat.ListString || ''); listLevel = Math.max(0, (Number(range.ListFormat.ListLevelNumber) || 1) - 1); available = true } catch (_) { /* Older WPS versions may not expose list metadata. */ }
+    paragraphs.push({ index: i - 1, text, headingLevel: level >= 1 && level <= 9 ? level : 0,
+      style: String(paragraph.Style?.NameLocal || paragraph.Style || ''),
+      numbering: { available, label, level: listLevel, hasLabel: !!label } })
+  }
+  return { paragraphs, totalParagraphs: count }
+}
+
 export const WPS_WORD_HANDLERS = {
+  async apply_style_profile(args) {
+    validateWordStyleProfile(args, 'wps')
+    const doc = activeDoc()
+    return withTracking(doc, () => applyWpsWordStyleProfile(doc, app(), args))
+  },
+  async get_paragraphs(args) {
+    const result = readWordParagraphs(activeDoc(), args || {})
+    return wordParagraphPage(result.paragraphs, args, result.totalParagraphs)
+  },
+  async get_outline() { return wordOutline(readWordParagraphs(activeDoc()).paragraphs) },
+  async get_clauses() { return wordClauses(readWordParagraphs(activeDoc()).paragraphs) },
+  async replace_nth_match(args) {
+    const needle = args.findText, replacement = args.replaceText
+    if (typeof needle !== 'string' || !needle || /[\r\n]/.test(needle)
+        || typeof replacement !== 'string' || !Number.isInteger(args.matchIndex) || args.matchIndex < 1) throw new Error(t('fileOperationInvalidArguments'))
+    const doc = activeDoc(), body = bodyText(doc), offsets = allIndexes(body, needle)
+    const at = offsets[args.matchIndex - 1]
+    if (at == null) throw new Error(t('fileOperationInvalidArguments'))
+    const coords = makeDocCoords(body), range = verifiedRange(doc, coords, at, needle, args.matchIndex - 1)
+    return withTracking(doc, () => {
+      const text = normalizeNewlines(replacement)
+      const result = applyHit(doc, coords, at, needle, text, /\r/.test(text))
+      if (!result) range.Text = text
+      return { replaced: 1, totalMatches: offsets.length, matchIndex: args.matchIndex }
+    })
+  },
   // 分页读取（dev-board#806）：切法与上限在 textPaging.js 单源，与 Office 面同一份口径
   async get_text(args) {
     return pageText(bodyText(activeDoc()), args)
@@ -2193,12 +2244,51 @@ export const WPS_WORD_HANDLERS = {
     })
   },
 
-  // ==================== 图片插入（本版不支持） ====================
+  // ==================== 图片插入（原生嵌入，不保留外部链接） ====================
 
-  async insert_image() {
-    // WPS 的 InlineShapes.AddPicture 只吃本地文件路径，没有 base64 直插通路，
-    // wps.FileSystem 也没有可用的二进制写接口——不能静默吞，明确告知模型
-    throw new Error('WPS 宿主暂不支持插入图片：当前版本无法从 base64 数据直接插图（本地路径方案待后续版本支持），请勿重试该命令，可改为在文中说明图片位置')
+  async insert_image(args) {
+    const base64 = args.imageBase64
+    const limit = 2 * 1024 * 1024
+    if (typeof base64 !== 'string' || !base64 || base64.length > Math.ceil(limit / 3) * 4) throw new Error(t('fileOperationInvalidBytes'))
+    if (args.position != null && !['before', 'after'].includes(args.position)) throw new Error(t('fileOperationInvalidArguments'))
+    if (args.width != null && (!Number.isFinite(Number(args.width)) || Number(args.width) <= 0)) throw new Error(t('fileOperationInvalidArguments'))
+    let binary
+    try { binary = atob(base64) } catch (_) { throw new Error(t('fileOperationInvalidBytes')) }
+    const extension = binary.startsWith('\x89PNG\r\n\x1a\n') ? 'png'
+      : binary.startsWith('\xff\xd8\xff') ? 'jpg'
+      : /^GIF8[79]a/.test(binary) ? 'gif' : binary.startsWith('BM') ? 'bmp' : ''
+    if (!extension || binary.length > limit) throw new Error(t('fileOperationInvalidBytes'))
+    const a = app(), doc = activeDoc(), fs = a.FileSystem
+    if (typeof doc.InlineShapes?.AddPicture !== 'function' || typeof a.Env?.GetTempPath !== 'function'
+        || typeof fs?.writeAsBinaryString !== 'function' || typeof fs?.readAsBinaryString !== 'function'
+        || typeof fs?.Remove !== 'function' || typeof globalThis.crypto?.randomUUID !== 'function') throw new Error(t('fileOperationUnavailable'))
+    const anchorText = String(args.anchorText || '')
+    let target
+    if (anchorText) {
+      const { range } = anchorRange(doc, anchorText)
+      const at = args.position === 'before' ? range.Start : range.End
+      target = doc.Range(at, at)
+    } else target = a.Selection?.Range
+    if (!target) throw new Error(t('fileOperationUnavailable'))
+    const folder = a.Env.GetTempPath()
+    if (!folder) throw new Error(t('fileOperationUnavailable'))
+    const path = String(folder).replace(/[\\/]?$/, '/') + 'aiworkdeck-' + globalThis.crypto.randomUUID() + '.' + extension
+    try {
+      fs.writeAsBinaryString(path, binary)
+      if (fs.readAsBinaryString(path) !== binary) throw new Error(t('fileOperationInvalidBytes'))
+      return withTracking(doc, () => {
+        let picture
+        try {
+          picture = doc.InlineShapes.AddPicture(path, false, true, target)
+          if (!picture) throw new Error(t('wordImagePartial'))
+          if (args.width != null) { picture.LockAspectRatio = -1; picture.Width = Number(args.width) }
+        } catch (error) {
+          // A native insert may succeed before a later property assignment fails.
+          throw new Error(t('wordImagePartial'))
+        }
+        return { inserted: true, anchored: !!anchorText, position: anchorText ? (args.position || 'after') : 'selection' }
+      })
+    } finally { try { fs.Remove(path) } catch (_) { /* Embedded image no longer needs its temporary source. */ } }
   },
 
   // ==================== 样式应用 ====================

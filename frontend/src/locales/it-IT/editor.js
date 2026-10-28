@@ -2,6 +2,35 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  officeToolNames: {
+    "office_file_create": "Crea file",
+    "office_file_save": "Salva file corrente",
+    "office_file_export_pdf": "Esporta PDF nel progetto",
+    "office_file_open": "Apri copia del file di progetto",
+    "office_ppt_goto": "Vai alla diapositiva o alla forma",
+    "office_ppt_set_layout": "Imposta layout o sfondo della diapositiva",
+    "office_get_paragraphs": "Leggi paragrafi",
+    "office_get_outline": "Leggi struttura",
+    "office_get_clauses": "Identifica clausole",
+    "office_replace_nth_match": "Sostituisci la corrispondenza specificata",
+    "office_apply_style_profile": "Applica profilo di stile",
+    "office_ppt_table_set_style": "Formatta tabella della diapositiva",
+    "office_ppt_read_notes": "Leggi note del relatore",
+    "office_ppt_write_notes": "Scrivi note del relatore",
+    "office_audit_structure": "Verifica struttura del documento"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "L’intervallo da ordinare contiene celle unite. Separale prima di ordinare.",
+    "SHEET_SORT_FAILED": "Ordinamento non riuscito. Rileggi e controlla il foglio prima di riprovare.",
+    "SHEET_PROTECTED_CELL": "Celle protette; non è stato scritto nulla.",
+    "SHEET_INVALID_RANGE": "Intervallo non valido. Rileggi il foglio e scegli un intervallo valido.",
+    "SHEET_INVALID_START_CELL": "Scegli una cella iniziale valida.",
+    "SHEET_INVALID_ROWS": "Fornisci una matrice di celle bidimensionale valida.",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "L’intervallo di scrittura supera i limiti del foglio.",
+    "SHEET_RANGE_CHECK_FAILED": "Impossibile verificare l’intervallo; non è stato scritto nulla.",
+    "SHEET_WRITE_PARTIAL": "Scrittura interrotta; alcune celle potrebbero essere cambiate. Rileggi e correggi senza ripetere l’intera operazione.",
+    "SHEET_CHART_PARTIAL": "Il grafico è stato creato, ma la configurazione è incompleta. Controlla e correggi quello esistente senza crearne un altro."
+},
   "navigation": {
     "slides": "Diapositive",
     "sheets": "Fogli",

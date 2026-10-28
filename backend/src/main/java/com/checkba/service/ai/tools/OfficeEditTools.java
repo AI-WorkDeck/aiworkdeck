@@ -50,6 +50,67 @@ public class OfficeEditTools implements AgentToolComponent {
     private final com.checkba.service.ai.OfficePassStateStore officePassStateStore;
     /** office_pass_step 的进度事件（pass_progress），只为任务窗格的可见进度 */
     private final com.checkba.service.ai.SseEmitterService sseEmitterService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ai.StyleProfileResolver wordStyleProfileResolver;
+
+    @Tool("在当前 Office/WPS 宿主中新建空白文件。Word创建文档，Excel创建工作簿，PowerPoint创建演示文稿。" +
+          "这是宿主中的未保存新文件，不是项目文件；WPS表格/演示须先在宿主另存为才能使用保存命令。成功后须等待新文档会话绑定，不能继续向旧文档发送编辑命令。")
+    @ToolMeta(displayName = "新建宿主文件", category = "office", fileEffect = "CREATED")
+    public String office_file_create(@P("会话ID（系统自动注入）") String conversationId) {
+        return officeBridgeService.executeOfficeCommand(conversationId, "file_create", Map.of());
+    }
+
+    @Tool("保存当前 Office/WPS 原生文件到宿主管理的位置。WPS表格/演示必须已有保存路径，新文件先由用户在宿主另存为；其他宿主可能显示保存对话框。不等同于上传项目文件。" +
+          "支持Office Word/Excel与WPS三类宿主，Microsoft PowerPoint不支持此命令。完成后重新绑定文档身份。")
+    @ToolMeta(displayName = "保存宿主文件", category = "office", fileEffect = "MODIFIED")
+    public String office_file_save(@P("会话ID（系统自动注入）") String conversationId) {
+        return officeBridgeService.executeOfficeCommand(conversationId, "file_save", Map.of());
+    }
+
+    @Tool("将当前原生文档导出PDF并上传当前项目。仅成功返回的fileId代表已上传文件；宿主或平台不支持时明确报错。" +
+          "fileName仅为文件名，不接受路径。导出不替代保存源文档。")
+    @ToolMeta(displayName = "导出宿主PDF", category = "office", fileEffect = "CREATED")
+    public String office_file_export_pdf(
+            @P("会话ID（系统自动注入）") String conversationId,
+            @P(value = "可选：PDF文件名，省略使用document.pdf", required = false) String fileName) {
+        if (fileName == null) return officeBridgeService.executeOfficeCommand(conversationId, "file_export_pdf", Map.of());
+        String name = fileName.trim();
+        if (name.isEmpty() || name.equals(".") || name.equals("..")
+                || name.chars().anyMatch(c -> c < 32 || c == '/' || c == '\\'))
+            return "Error: " + OfficeToolMessages.text("fileNameInvalid");
+        return officeBridgeService.executeOfficeCommand(conversationId, "file_export_pdf", Map.of("fileName", name));
+    }
+
+    @Tool("打开当前项目中的原生Office文件为宿主中的新副本，fileId来自项目文件清单。" +
+          "只接受与当前宿主匹配的docx/xlsx/pptx；不会覆盖项目原文件。WPS打开临时副本，须另存为长期文件。成功后须等待新文档会话绑定再编辑，保存副本不代表回写项目。")
+    @ToolMeta(displayName = "打开项目文件副本", category = "office", fileEffect = "CREATED")
+    public String office_file_open(
+            @P("会话ID（系统自动注入）") String conversationId,
+            @P("当前项目文件ID") Long fileId) {
+        if (fileId == null || fileId <= 0) return "Error: " + OfficeToolMessages.text("fileIdInvalid");
+        var file = projectFileRepository.findById(fileId).orElse(null);
+        if (file == null) return "Error: " + OfficeToolMessages.text("fileNotFound");
+        String denied = ToolFileGuard.rejectIfOutsideProject(file);
+        if (denied != null) return denied;
+        String name = file.getName() == null ? "" : file.getName();
+        String lower = name.toLowerCase(java.util.Locale.ROOT);
+        String host = lower.endsWith(".docx") ? "word" : lower.endsWith(".xlsx") ? "excel" : lower.endsWith(".pptx") ? "powerpoint" : null;
+        if (host == null || name.chars().anyMatch(c -> c < 32 || c == '/' || c == '\\'))
+            return "Error: " + OfficeToolMessages.text("fileTypeUnsupported");
+        if (file.getFilePath() == null || file.getFilePath().isBlank())
+            return "Error: " + OfficeToolMessages.text("fileContentUnavailable");
+        final int maxBytes = 50 * 1024 * 1024;
+        try (var input = storageServiceFactory.getStorageService().load(file.getFilePath()).getInputStream()) {
+            byte[] bytes = input.readNBytes(maxBytes + 1);
+            if (bytes.length > maxBytes || bytes.length < 4 || bytes[0] != 'P' || bytes[1] != 'K' || bytes[2] != 3 || bytes[3] != 4)
+                return "Error: " + OfficeToolMessages.text("fileContentInvalid");
+            return officeBridgeService.executeOfficeCommand(conversationId, "file_open", Map.of(
+                    "host", host, "fileId", fileId, "fileName", name,
+                    "base64", java.util.Base64.getEncoder().encodeToString(bytes)));
+        } catch (java.io.IOException | com.checkba.storage.StorageException e) {
+            return "Error: " + OfficeToolMessages.text("fileReadFailed");
+        }
+    }
 
     /** Excel 区域地址（A1 表示法，不带工作表名）：A1 或 A1:B10 */
     private static final java.util.regex.Pattern RANGE_ADDRESS =
@@ -64,6 +125,98 @@ public class OfficeEditTools implements AgentToolComponent {
      * LOWA / Office / WPS 三个宿主上必须一样，否则模型换个宿主就撞到不同的墙。
      */
     static final int MAX_EXCEL_REPLACEMENTS = 2000;
+
+    @ToolMeta(displayName = "读取文档段落", category = "office")
+    @Tool("按原生段落读取Word正文、标题级别及自动编号。段落index从0开始；truncated时按nextStartParagraph继续，结构变化后须重新读取。")
+    public String office_get_paragraphs(@P("会话ID（系统自动注入）") String conversationId,
+            @P(value = "起始段落，默认0", required = false) Integer startParagraph,
+            @P(value = "最多段落，默认200，上限500", required = false) Integer maxParagraphs) {
+        Map<String, Object> args = new HashMap<>();
+        if (startParagraph != null) args.put("startParagraph", startParagraph);
+        if (maxParagraphs != null) args.put("maxParagraphs", maxParagraphs);
+        return officeBridgeService.executeOfficeCommand(conversationId, "get_paragraphs", args);
+    }
+
+    @ToolMeta(displayName = "获取文档大纲", category = "office")
+    @Tool("读取Word真实标题样式大纲及0起始段落位置；合同手打或自动编号条款用office_get_clauses。")
+    public String office_get_outline(@P("会话ID（系统自动注入）") String conversationId) {
+        return officeBridgeService.executeOfficeCommand(conversationId, "get_outline", Map.of());
+    }
+
+    @ToolMeta(displayName = "套用模板画像", category = "office", fileEffect = "MODIFIED")
+    @Tool("按当前项目模板画像修改Word样式定义及正文格式。scope为document全文、selection选区或styles-only只改样式定义。宿主不支持画像所需格式时明确拒绝，不能把标准格式当模板画像。")
+    public String office_apply_style_profile(@P("会话ID（系统自动注入）") String conversationId,
+            @P(value = "document/selection/styles-only，默认document", required = false) String scope) {
+        String target = scope == null || scope.isBlank() ? "document" : scope;
+        if (!java.util.Set.of("document", "selection", "styles-only").contains(target))
+            return "Error: " + OfficeToolMessages.text("formatScopeInvalid");
+        var profile = wordStyleProfileResolver == null ? com.checkba.util.style.StyleProfiles.houseDefault()
+                : wordStyleProfileResolver.resolve(com.checkba.service.ai.context.ProjectContextHolder.getProjectIdAsLong(), null);
+        return officeBridgeService.executeOfficeCommand(conversationId, "apply_style_profile",
+                Map.of("scope", target, "profile", DocumentEditTools.profileAsMap(profile)));
+    }
+
+    @ToolMeta(displayName = "识别合同条款", category = "office")
+    @Tool("识别Word正文编号与自动编号条款，返回标题、段落范围、完整条款总数；目录最多300条，truncated时用office_get_paragraphs从nextStartParagraph读取剩余正文。")
+    public String office_get_clauses(@P("会话ID（系统自动注入）") String conversationId) {
+        return officeBridgeService.executeOfficeCommand(conversationId, "get_clauses", Map.of());
+    }
+
+    @ToolMeta(displayName = "替换指定匹配", category = "office", fileEffect = "MODIFIED")
+    @Tool("精确替换Word中第N个匹配项，matchIndex从1开始。先搜索核对上下文；空replaceText表示删除。只改该处，保留其他匹配并使用原生修订。查找文本必须在同一段内。")
+    public String office_replace_nth_match(@P("会话ID（系统自动注入）") String conversationId,
+            @P("精确查找文本") String findText, @P("替换文本，可为空") String replaceText,
+            @P("第几个匹配，从1开始") Integer matchIndex) {
+        if (findText == null || findText.isEmpty() || findText.contains("\n") || findText.contains("\r")
+                || replaceText == null || matchIndex == null || matchIndex < 1)
+            return "Error: " + OfficeToolMessages.text("replaceArgumentsInvalid");
+        return officeBridgeService.executeOfficeCommand(conversationId, "replace_nth_match",
+                Map.of("findText", findText, "replaceText", replaceText, "matchIndex", matchIndex));
+    }
+
+    @ToolMeta(displayName = "结构审计", category = "office")
+    @Tool("完整分页读取Word原生段落后复用桌面合同机械审计：字形、编号连续性、引用、空白待定、金额与算术、币种及修订汇总。只报事实，不下法律结论；修改前调用。")
+    public String office_audit_structure(@P("会话ID（系统自动注入）") String conversationId) {
+        var paragraphs = new java.util.ArrayList<com.checkba.service.ai.review.ContractStructureAudit.Paragraph>();
+        try {
+            int start = 0;
+            long chars = 0;
+            boolean complete = false;
+            for (int page = 0; page < 60; page++) {
+                var node = objectMapper.readTree(officeBridgeService.executeOfficeCommand(conversationId,
+                        "get_paragraphs", Map.of("startParagraph", start, "maxParagraphs", 500)));
+                if (!node.path("paragraphs").isArray() || node.hasNonNull("error"))
+                    return "Error: " + OfficeToolMessages.text("structureReadFailed");
+                for (var p : node.path("paragraphs")) {
+                    chars += p.path("text").asText().length();
+                    if (chars > 2_000_000) return "Error: " + OfficeToolMessages.text("structureTooLarge");
+                    var numbering = p.hasNonNull("numbering") ? objectMapper.treeToValue(p.get("numbering"),
+                            com.checkba.service.ai.review.ContractStructureAudit.Numbering.class) : null;
+                    paragraphs.add(new com.checkba.service.ai.review.ContractStructureAudit.Paragraph(p.path("index").asInt(), p.path("text").asText(), numbering));
+                }
+                if (!node.path("truncated").asBoolean()) { complete = true; break; }
+                int next = node.path("nextStartParagraph").asInt(-1);
+                if (next <= start) break;
+                start = next;
+            }
+            if (!complete || paragraphs.isEmpty()) return "Error: " + OfficeToolMessages.text("structureIncomplete");
+            var revisions = new java.util.ArrayList<com.checkba.service.ai.review.ContractStructureAudit.Revision>();
+            String revisionNote = null;
+            try {
+                var node = objectMapper.readTree(officeBridgeService.executeOfficeCommand(conversationId, "get_revisions", Map.of()));
+                if (!node.path("revisions").isArray() || node.hasNonNull("error")) throw new IllegalStateException();
+                for (var revision : node.path("revisions")) revisions.add(new com.checkba.service.ai.review.ContractStructureAudit.Revision(
+                        revision.path("type").asText(), revision.path("author").asText(), revision.path("text").asText(), revision.path("paragraph").asText()));
+                // Host revision snippets are bounded; do not claim full deletion-content analysis.
+                revisionNote = OfficeToolMessages.text("revisionExcerpts");
+            } catch (Exception unavailable) {
+                revisionNote = OfficeToolMessages.text("revisionsUnavailable");
+            }
+            return com.checkba.service.ai.review.ContractStructureAudit.run(paragraphs, revisions, revisionNote).render();
+        } catch (Exception failure) {
+            return "Error: " + OfficeToolMessages.text("structureAuditFailed");
+        }
+    }
 
     /** 文字颜色格式：#RRGGBB */
     private static final java.util.regex.Pattern HEX_COLOR = java.util.regex.Pattern.compile("^#[0-9A-Fa-f]{6}$");
@@ -176,9 +329,9 @@ public class OfficeEditTools implements AgentToolComponent {
 
     /** Excel 数据验证白名单 */
     private static final java.util.Set<String> EXCEL_DV_ACTIONS = java.util.Set.of("apply", "clear");
-    private static final java.util.Set<String> EXCEL_DV_TYPES = java.util.Set.of("wholenumber", "list", "date");
+    private static final java.util.Set<String> EXCEL_DV_TYPES = java.util.Set.of("wholenumber", "decimal", "time", "textlength", "custom", "list", "date");
     private static final java.util.Set<String> EXCEL_DV_OPERATORS =
-            java.util.Set.of("between", "greaterthan", "lessthan", "equalto");
+            java.util.Set.of("between", "notbetween", "greater", "greaterequal", "less", "lessequal", "equal", "notequal", "greaterthan", "lessthan", "equalto");
 
     /** Excel 图表类型白名单（v1 起步四种） */
     private static final java.util.Set<String> EXCEL_CHART_TYPES = java.util.Set.of("column", "line", "pie", "bar");
@@ -1428,9 +1581,9 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "读取区域", category = "office")
     public String office_excel_get_range(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
-            @P("区域地址，A1 表示法如 A1:D20（可选；为空取已用区域）") String rangeAddress,
-            @P("是否同时返回单元格格式（可选，缺省 false）") Boolean withFormat
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
+            @P(value = "区域地址，A1 表示法如 A1:D20（可选；为空取已用区域）", required = false) String rangeAddress,
+            @P(value = "是否同时返回单元格格式（可选，缺省 false）", required = false) Boolean withFormat
     ) {
         log.info("Tool: office_excel_get_range called, sheet={}, range={}, withFormat={}", sheetName, rangeAddress, withFormat);
         String addr = rangeAddress == null ? "" : rangeAddress.trim();
@@ -1455,10 +1608,10 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "写入区域", category = "office", fileEffect = "MODIFIED")
     public String office_excel_set_values(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("起始单元格或区域地址，A1 表示法如 B2 或 B2:C4") String rangeAddress,
             @P("要写入的值，JSON 二维数组（按行），元素为字符串/数字/布尔") String valuesJson,
-            @P("空行是否沿用上一行格式（可选，缺省 true；只想写值、不动格式时传 false）") Boolean inheritFormat
+            @P(value = "空行是否沿用上一行格式（可选，缺省 true；只想写值、不动格式时传 false）", required = false) Boolean inheritFormat
     ) {
         log.info("Tool: office_excel_set_values called, sheet={}, range={}", sheetName, rangeAddress);
         String addr = rangeAddress == null ? "" : rangeAddress.trim();
@@ -1500,15 +1653,17 @@ public class OfficeEditTools implements AgentToolComponent {
         return officeBridgeService.executeOfficeCommand(conversationId, "excel_set_values", args);
     }
 
-    @Tool("在当前 Excel 工作表的已用区域中查找文本（大小写不敏感的包含匹配），" +
+    @Tool("在当前 Excel 工作表中查找文本（默认已用区域、大小写不敏感的包含匹配），" +
           "返回命中单元格地址与内容。sheetName 缺省为当前活动工作表。" +
           "要成批改写命中的内容，直接用 office_excel_replace，不要「查出地址再 office_excel_set_values 回写」" +
           "——后者按矩形区域写，会把区域内不该动的格子一起覆盖掉。")
     @ToolMeta(displayName = "查找单元格", category = "office")
     public String office_excel_search(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
-            @P("要查找的文本") String query
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
+            @P("要查找的文本") String query,
+            @P(value = "可选：搜索区域 A1 表示法", required = false) String rangeAddress,
+            @P(value = "可选：区分大小写，默认 false", required = false) Boolean matchCase
     ) {
         log.info("Tool: office_excel_search called, sheet={}, query={}", sheetName, query);
         if (query == null || query.isBlank()) {
@@ -1517,10 +1672,18 @@ public class OfficeEditTools implements AgentToolComponent {
         if (query.length() > 255) {
             return "Error: 查找文本过长（上限 255 字符），请缩短后重试";
         }
+        if (rangeAddress != null && !rangeAddress.isBlank() && !RANGE_ADDRESS.matcher(rangeAddress.trim()).matches())
+            return "Error: " + com.checkba.service.LangText.of("搜索区域须为 A1 表示法", "Search range must use A1 notation");
         Map<String, Object> args = new HashMap<>();
         args.put("sheetName", sheetName == null ? "" : sheetName.trim());
         args.put("query", query);
+        if (rangeAddress != null && !rangeAddress.isBlank()) args.put("rangeAddress", rangeAddress.trim());
+        if (matchCase != null) args.put("matchCase", matchCase);
         return officeBridgeService.executeOfficeCommand(conversationId, "excel_search", args);
+    }
+
+    public String office_excel_search(String conversationId, String sheetName, String query) {
+        return office_excel_search(conversationId, sheetName, query, null, null);
     }
 
     @Tool("在 Excel 区域内查找并替换文本，只改命中的那些格——区域内其他格一个字都不动。" +
@@ -1536,13 +1699,13 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "替换单元格文本", category = "office", fileEffect = "MODIFIED")
     public String office_excel_replace(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
-            @P("区域地址，A1 表示法如 A1:D100（可选；为空取整张表的已用区域）") String rangeAddress,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
+            @P(value = "区域地址，A1 表示法如 A1:D100（可选；为空取整张表的已用区域）", required = false) String rangeAddress,
             @P("查找内容（字面量，不是正则）") String find,
             @P("替换成什么；传空字符串表示删除命中的文本。不能省略") String replace,
-            @P("区分大小写，默认不区分（不改则不传）") Boolean matchCase,
-            @P("整格匹配：true 时要求整格内容与 find 完全相等才替换，默认 false（不改则不传）") Boolean wholeCell,
-            @P("最多替换多少格，不传按上限；命中更多时提前停下并在返回值里标 truncated") Integer maxReplacements
+            @P(value = "区分大小写，默认不区分（不改则不传）", required = false) Boolean matchCase,
+            @P(value = "整格匹配：true 时要求整格内容与 find 完全相等才替换，默认 false（不改则不传）", required = false) Boolean wholeCell,
+            @P(value = "最多替换多少格，不传按上限；命中更多时提前停下并在返回值里标 truncated", required = false) Integer maxReplacements
     ) {
         log.info("Tool: office_excel_replace called, sheet={}, range={}, find={}", sheetName, rangeAddress, find);
         if (find == null || find.isBlank()) {
@@ -1580,18 +1743,18 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "设置单元格格式", category = "office", fileEffect = "MODIFIED")
     public String office_excel_format_cells(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("区域地址，A1 表示法如 A1 或 A1:D20") String rangeAddress,
-            @P("字体名（不改则不传）") String fontName,
-            @P("字号（磅，1~409）（不改则不传）") Double fontSize,
-            @P("加粗 true/false（不改则不传）") Boolean bold,
-            @P("斜体 true/false（不改则不传）") Boolean italic,
-            @P("文字颜色 #RRGGBB（不改则不传）") String fontColor,
-            @P("填充色 #RRGGBB（不改则不传）") String fillColor,
-            @P("水平对齐：left/center/right（不改则不传）") String horizontalAlignment,
-            @P("垂直对齐：top/middle/bottom（不改则不传）") String verticalAlignment,
-            @P("数字格式码，如 0.00% 或 yyyy-mm-dd（不改则不传）") String numberFormat,
-            @P("是否自动换行 true/false（不改则不传）") Boolean wrapText
+            @P(value = "字体名（不改则不传）", required = false) String fontName,
+            @P(value = "字号（磅，1~409）（不改则不传）", required = false) Double fontSize,
+            @P(value = "加粗 true/false（不改则不传）", required = false) Boolean bold,
+            @P(value = "斜体 true/false（不改则不传）", required = false) Boolean italic,
+            @P(value = "文字颜色 #RRGGBB（不改则不传）", required = false) String fontColor,
+            @P(value = "填充色 #RRGGBB（不改则不传）", required = false) String fillColor,
+            @P(value = "水平对齐：left/center/right（不改则不传）", required = false) String horizontalAlignment,
+            @P(value = "垂直对齐：top/middle/bottom（不改则不传）", required = false) String verticalAlignment,
+            @P(value = "数字格式码，如 0.00% 或 yyyy-mm-dd（不改则不传）", required = false) String numberFormat,
+            @P(value = "是否自动换行 true/false（不改则不传）", required = false) Boolean wrapText
     ) {
         log.info("Tool: office_excel_format_cells called, sheet={}, range={}", sheetName, rangeAddress);
         String addr = rangeAddress == null ? "" : rangeAddress.trim();
@@ -1640,11 +1803,11 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "设置边框", category = "office", fileEffect = "MODIFIED")
     public String office_excel_set_borders(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("区域地址，A1 表示法如 A1:D20") String rangeAddress,
             @P("边框范围：all/outside/inside/none") String borders,
-            @P("线宽：thin/medium/thick（缺省 thin，borders=none 时无意义）") String style,
-            @P("边框颜色 #RRGGBB（缺省 #000000，borders=none 时无意义）") String color
+            @P(value = "线宽：thin/medium/thick（缺省 thin，borders=none 时无意义）", required = false) String style,
+            @P(value = "边框颜色 #RRGGBB（缺省 #000000，borders=none 时无意义）", required = false) String color
     ) {
         log.info("Tool: office_excel_set_borders called, sheet={}, range={}, borders={}", sheetName, rangeAddress, borders);
         String addr = rangeAddress == null ? "" : rangeAddress.trim();
@@ -1684,10 +1847,10 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "编辑行列", category = "office", fileEffect = "MODIFIED")
     public String office_excel_edit_rows_cols(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("动作：insert_rows/delete_rows/insert_cols/delete_cols/set_width/set_height") String action,
             @P("起始行/列序号（0 起）") Integer index,
-            @P("影响的行列数（缺省 1，上限 100）") Integer count,
+            @P(value = "影响的行列数（缺省 1，上限 100）", required = false) Integer count,
             @P("set_width/set_height 专用：列宽（约合像素）或行高（磅）") Double size
     ) {
         log.info("Tool: office_excel_edit_rows_cols called, sheet={}, action={}, index={}", sheetName, action, index);
@@ -1724,7 +1887,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "合并单元格", category = "office", fileEffect = "MODIFIED")
     public String office_excel_merge_cells(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("区域地址，A1 表示法如 A1:D1") String rangeAddress,
             @P("动作：merge/unmerge") String action
     ) {
@@ -1754,11 +1917,11 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "排序", category = "office", fileEffect = "MODIFIED")
     public String office_excel_sort_range(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("区域地址，A1 表示法如 A1:D20") String rangeAddress,
             @P("排序依据列：区域内偏移，0 起（区域第一列是 0）") Integer keyColumn,
-            @P("是否升序（缺省 true）") Boolean ascending,
-            @P("区域是否带表头（表头行不参与排序，缺省 false）") Boolean hasHeader
+            @P(value = "是否升序（缺省 true）", required = false) Boolean ascending,
+            @P(value = "区域是否带表头（表头行不参与排序，缺省 false）", required = false) Boolean hasHeader
     ) {
         log.info("Tool: office_excel_sort_range called, sheet={}, range={}, keyColumn={}", sheetName, rangeAddress, keyColumn);
         String addr = rangeAddress == null ? "" : rangeAddress.trim();
@@ -1785,7 +1948,7 @@ public class OfficeEditTools implements AgentToolComponent {
     public String office_excel_manage_sheets(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("动作：add/rename/delete/move/activate") String action,
-            @P("目标工作表名（add 时可选新表名；其余动作必填）") String sheetName,
+            @P(value = "目标工作表名（add 时可选新表名；其余动作必填）", required = false) String sheetName,
             @P("新名称（仅 rename 用）") String newName,
             @P("新位置，0 起（仅 move 用）") Integer position
     ) {
@@ -1823,9 +1986,9 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "冻结窗格", category = "office", fileEffect = "MODIFIED")
     public String office_excel_freeze_panes(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("动作：freeze_rows/freeze_cols/freeze_at/unfreeze") String action,
-            @P("冻结的行数或列数（freeze_rows/freeze_cols 用，缺省 1）") Integer count,
+            @P(value = "冻结的行数或列数（freeze_rows/freeze_cols 用，缺省 1）", required = false) Integer count,
             @P("冻结基准单元格，A1 表示法（freeze_at 用）") String cellAddress
     ) {
         log.info("Tool: office_excel_freeze_panes called, sheet={}, action={}", sheetName, action);
@@ -1867,7 +2030,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "写入公式", category = "office", fileEffect = "MODIFIED")
     public String office_excel_set_formulas(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("起始单元格或区域地址，A1 表示法如 B2 或 B2:B10") String rangeAddress,
             @P("要写入的公式，JSON 二维数组（按行），元素为以 = 开头的公式字符串") String formulasJson
     ) {
@@ -1924,7 +2087,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "选中区域", category = "office")
     public String office_excel_select_range(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("区域地址，A1 表示法如 A1 或 A1:D20") String rangeAddress
     ) {
         log.info("Tool: office_excel_select_range called, sheet={}, range={}", sheetName, rangeAddress);
@@ -1946,7 +2109,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "设置自动筛选", category = "office", fileEffect = "MODIFIED")
     public String office_excel_set_autofilter(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("区域地址，A1 表示法如 A1:D20（仅 apply 需要）") String rangeAddress,
             @P("动作：apply/clear/remove") String action
     ) {
@@ -1982,14 +2145,14 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "设置条件格式", category = "office", fileEffect = "MODIFIED")
     public String office_excel_conditional_format(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("区域地址，A1 表示法如 A1:D20") String rangeAddress,
             @P("规则类型：cellValue/colorScale（action=apply 时必填）") String ruleType,
             @P("比较运算符：greaterThan/lessThan/between/equalTo（ruleType=cellValue 时必填）") String operator,
             @P("比较值 1（ruleType=cellValue 时必填）") Double value1,
             @P("比较值 2（operator=between 时必填，用作区间上界）") Double value2,
-            @P("命中单元格填充色 #RRGGBB（ruleType=cellValue 用，缺省 #FFC7CE）") String fillColor,
-            @P("动作：apply（套用，缺省）/clearAll（清除该区域全部条件格式规则）") String action
+            @P(value = "命中单元格填充色 #RRGGBB（ruleType=cellValue 用，缺省 #FFC7CE）", required = false) String fillColor,
+            @P(value = "动作：apply（套用，缺省）/clearAll（清除该区域全部条件格式规则）", required = false) String action
     ) {
         log.info("Tool: office_excel_conditional_format called, sheet={}, range={}, action={}",
                 sheetName, rangeAddress, action);
@@ -2045,6 +2208,127 @@ public class OfficeEditTools implements AgentToolComponent {
         return officeBridgeService.executeOfficeCommand(conversationId, "excel_conditional_format", args);
     }
 
+    @Tool("整体覆盖形状文字，可能重置框内混合格式。局部修改须用 office_ppt_replace_text。先读取详情，按页码与形状ID定位。")
+    @ToolMeta(displayName = "设置形状文字", category = "office", fileEffect = "MODIFIED")
+    public String office_ppt_set_shape_text(
+            @P(value = "会话ID（系统自动注入）", required = true) String conversationId,
+            @P(value = "页码，从1开始", required = true) Integer slideNumber,
+            @P(value = "读取详情返回的形状ID", required = true) String shapeId,
+            @P(value = "完整新文字，空字符串表示清空", required = true) String text,
+            @P(value = "可选：编辑前完整原文，变化则拒绝", required = false) String expectedText
+    ) {
+        if (slideNumber == null || slideNumber < 1 || shapeId == null || shapeId.isBlank())
+            return "Error: " + com.checkba.service.LangText.of("请指定有效页码与形状ID", "Specify a valid slide number and shape ID");
+        Map<String, Object> args = new HashMap<>();
+        args.put("slideNumber", slideNumber);
+        args.put("shapeId", shapeId);
+        if (text == null) return "Error: " + com.checkba.service.LangText.of("缺少文字参数", "Missing text argument");
+        if (text != null) args.put("text", text);
+        if (expectedText != null) args.put("expectedText", expectedText);
+        return officeBridgeService.executeOfficeCommand(conversationId, "ppt_set_shape_text", args);
+    }
+
+    @Tool("设置形状位置尺寸。先读取幻灯片详情，按页码与形状ID精确定位；只修改明确提供的参数。")
+    @ToolMeta(displayName = "设置形状位置尺寸", category = "office", fileEffect = "MODIFIED")
+    public String office_ppt_set_shape_geometry(
+            @P(value = "会话ID（系统自动注入）", required = true) String conversationId,
+            @P(value = "页码，从1开始", required = true) Integer slideNumber,
+            @P(value = "读取详情返回的形状ID", required = true) String shapeId,
+            @P(value = "可选：左侧位置（磅）", required = false) Double left,
+            @P(value = "可选：顶部位置（磅）", required = false) Double top,
+            @P(value = "可选：宽度（正数磅）", required = false) Double width,
+            @P(value = "可选：高度（正数磅）", required = false) Double height,
+            @P(value = "可选：旋转角度", required = false) Double rotation
+    ) {
+        if (slideNumber == null || slideNumber < 1 || shapeId == null || shapeId.isBlank())
+            return "Error: " + com.checkba.service.LangText.of("请指定有效页码与形状ID", "Specify a valid slide number and shape ID");
+        if ((left != null && !Double.isFinite(left)) || (top != null && !Double.isFinite(top))
+                || (rotation != null && !Double.isFinite(rotation))
+                || (width != null && (!Double.isFinite(width) || width <= 0))
+                || (height != null && (!Double.isFinite(height) || height <= 0))
+                || (left == null && top == null && width == null && height == null && rotation == null))
+            return "Error: " + com.checkba.service.LangText.of("形状位置尺寸参数无效", "Invalid shape geometry arguments");
+        Map<String, Object> args = new HashMap<>();
+        args.put("slideNumber", slideNumber);
+        args.put("shapeId", shapeId);
+        if (left != null) args.put("left", left);
+        if (top != null) args.put("top", top);
+        if (width != null) args.put("width", width);
+        if (height != null) args.put("height", height);
+        if (rotation != null) args.put("rotation", rotation);
+        return officeBridgeService.executeOfficeCommand(conversationId, "ppt_set_shape_geometry", args);
+    }
+
+    @Tool("设置形状样式。先读取幻灯片详情，按页码与形状ID精确定位；只修改明确提供的参数。")
+    @ToolMeta(displayName = "设置形状样式", category = "office", fileEffect = "MODIFIED")
+    public String office_ppt_format_shape(
+            @P(value = "会话ID（系统自动注入）", required = true) String conversationId,
+            @P(value = "页码，从1开始", required = true) Integer slideNumber,
+            @P(value = "读取详情返回的形状ID", required = true) String shapeId,
+            @P(value = "可选：填充色 #RRGGBB", required = false) String fillColor,
+            @P(value = "可选：线条色 #RRGGBB", required = false) String lineColor,
+            @P(value = "可选：线宽（磅）", required = false) Double lineWidth,
+            @P(value = "可选：移除填充", required = false) Boolean noFill,
+            @P(value = "可选：移除线条", required = false) Boolean noLine,
+            @P(value = "可选：填充透明度 0–100", required = false) Double transparency
+    ) {
+        if (slideNumber == null || slideNumber < 1 || shapeId == null || shapeId.isBlank())
+            return "Error: " + com.checkba.service.LangText.of("请指定有效页码与形状ID", "Specify a valid slide number and shape ID");
+        if ((transparency != null && (!Double.isFinite(transparency) || transparency < 0 || transparency > 100))
+                || (lineWidth != null && (!Double.isFinite(lineWidth) || lineWidth < 0))
+                || (fillColor != null && !HEX_COLOR.matcher(fillColor).matches())
+                || (lineColor != null && !HEX_COLOR.matcher(lineColor).matches()))
+            return "Error: " + com.checkba.service.LangText.of("形状样式参数无效", "Invalid shape style arguments");
+        Map<String, Object> args = new HashMap<>();
+        args.put("slideNumber", slideNumber);
+        args.put("shapeId", shapeId);
+        if (fillColor != null) args.put("fillColor", fillColor);
+        if (lineColor != null) args.put("lineColor", lineColor);
+        if (lineWidth != null) args.put("lineWidth", lineWidth);
+        if (noFill != null) args.put("noFill", noFill);
+        if (transparency != null) args.put("transparency", transparency);
+        if (noLine != null) args.put("noLine", noLine);
+        return officeBridgeService.executeOfficeCommand(conversationId, "ppt_format_shape", args);
+    }
+
+    public String office_ppt_format_shape(String conversationId, Integer slideNumber, String shapeId,
+            String fillColor, String lineColor, Double lineWidth, Boolean noFill, Boolean noLine) {
+        return office_ppt_format_shape(conversationId, slideNumber, shapeId, fillColor, lineColor,
+                lineWidth, noFill, noLine, null);
+    }
+
+    @Tool("定位幻灯片或形状。页码从1开始，shapeId须来自当前页面详情。")
+    @ToolMeta(displayName = "定位幻灯片", category = "office")
+    public String office_ppt_goto(
+            @P("会话ID（系统自动注入）") String conversationId,
+            @P("页码，从1开始") Integer slideNumber,
+            @P(value = "可选：形状ID", required = false) String shapeId) {
+        if (slideNumber == null || slideNumber < 1 || (shapeId != null && shapeId.isBlank()))
+            return "Error: " + com.checkba.service.LangText.of("请指定有效页码与形状ID", "Specify a valid slide number and shape ID");
+        Map<String, Object> args = new HashMap<>();
+        args.put("slideNumber", slideNumber);
+        if (shapeId != null) args.put("shapeId", shapeId);
+        return officeBridgeService.executeOfficeCommand(conversationId, "ppt_goto", args);
+    }
+
+    @Tool("设置幻灯片版式或背景。layoutId须使用当前宿主返回的版式ID，不可跨Office/WPS复用；至少提供版式或背景之一。")
+    @ToolMeta(displayName = "设置幻灯片版式", category = "office", fileEffect = "MODIFIED")
+    public String office_ppt_set_layout(
+            @P("会话ID（系统自动注入）") String conversationId,
+            @P("页码，从1开始") Integer slideNumber,
+            @P(value = "可选：当前宿主的版式ID", required = false) String layoutId,
+            @P(value = "可选：背景色 #RRGGBB", required = false) String backgroundColor) {
+        if (slideNumber == null || slideNumber < 1 || (layoutId == null && backgroundColor == null)
+                || (layoutId != null && layoutId.isBlank())
+                || (backgroundColor != null && !HEX_COLOR.matcher(backgroundColor).matches()))
+            return "Error: " + com.checkba.service.LangText.of("幻灯片版式参数无效", "Invalid slide layout arguments");
+        Map<String, Object> args = new HashMap<>();
+        args.put("slideNumber", slideNumber);
+        if (layoutId != null) args.put("layoutId", layoutId);
+        if (backgroundColor != null) args.put("backgroundColor", backgroundColor);
+        return officeBridgeService.executeOfficeCommand(conversationId, "ppt_set_layout", args);
+    }
+
     // ==================== PowerPoint（office_ppt_*，仅 PowerPoint 会话可见） ====================
 
     @Tool("读取当前 PowerPoint 演示文稿各页的文本清单（每页各形状的文字）。" +
@@ -2064,7 +2348,11 @@ public class OfficeEditTools implements AgentToolComponent {
     public String office_ppt_replace_text(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("要查找的原文（须与幻灯片文本精确一致）") String searchText,
-            @P("替换后的新文本") String replaceText
+            @P("替换后的新文本") String replaceText,
+            @P(value = "可选：页码，从1开始", required = false) Integer slideNumber,
+            @P(value = "可选：形状ID，须同时指定页码", required = false) String shapeId,
+            @P(value = "可选：目标完整原文，变化则拒绝", required = false) String expectedText,
+            @P(value = "可选：true替换所有匹配，false仅第一处；默认true兼容旧调用", required = false) Boolean all
     ) {
         log.info("Tool: office_ppt_replace_text called, search={}", searchText);
         if (searchText == null || searchText.isBlank()) {
@@ -2076,10 +2364,62 @@ public class OfficeEditTools implements AgentToolComponent {
         if (replaceText == null) {
             return "Error: 替换文本不能为 null（删除文本请传空字符串）";
         }
+        if ((slideNumber != null && slideNumber < 1)
+                || (shapeId != null && (shapeId.isBlank() || slideNumber == null))
+                || (expectedText != null && (slideNumber == null || shapeId == null)))
+            return "Error: " + com.checkba.service.LangText.of("请指定有效页码与形状ID", "Specify a valid slide number and shape ID");
         Map<String, Object> args = new HashMap<>();
         args.put("searchText", searchText);
         args.put("replaceText", replaceText);
+        if (slideNumber != null) args.put("slideNumber", slideNumber);
+        if (shapeId != null) args.put("shapeId", shapeId);
+        if (expectedText != null) args.put("expectedText", expectedText);
+        if (all != null) args.put("all", all);
         return officeBridgeService.executeOfficeCommand(conversationId, "ppt_replace_text", args);
+    }
+
+    @Tool("Read speaker notes in WPS Presentation. slideNumber is 1-based; omit it to read all slides. Returns complete body notes, excluding page numbers and headers. Microsoft PowerPoint Office.js does not expose notes and this tool is hidden there.")
+    @ToolMeta(displayName = "读取演讲备注", category = "office")
+    public String office_ppt_read_notes(@P("Conversation ID, injected automatically") String conversationId,
+            @P(value = "Optional 1-based slide number", required = false) Integer slideNumber) {
+        Map<String, Object> args = new HashMap<>();
+        if (slideNumber != null) args.put("slideNumber", slideNumber);
+        return officeBridgeService.executeOfficeCommand(conversationId, "ppt_read_notes", args);
+    }
+
+    @Tool("Replace the body speaker notes of one WPS Presentation slide. Requires a 1-based slideNumber and text; empty text clears notes. expectedText guards against stale content. Does not alter notes-page headers or page numbers. Hidden in Microsoft PowerPoint because Office.js has no notes API.")
+    @ToolMeta(displayName = "修改演讲备注", category = "office", fileEffect = "MODIFIED")
+    public String office_ppt_write_notes(@P("Conversation ID, injected automatically") String conversationId,
+            @P("1-based slide number") Integer slideNumber, @P("Complete replacement notes; empty clears") String text,
+            @P(value = "Expected complete notes before writing", required = false) String expectedText) {
+        Map<String, Object> args = new HashMap<>();
+        args.put("slideNumber", slideNumber); args.put("text", text);
+        if (expectedText != null) args.put("expectedText", expectedText);
+        return officeBridgeService.executeOfficeCommand(conversationId, "ppt_write_notes", args);
+    }
+
+    @Tool("Format an existing presentation table without recreating it. Requires slideNumber (1-based) and shapeId from slide details. Office requires PowerPointApi 1.9; WPS uses native table cells. Cell coordinates row/col/endRow/endCol are zero-based, inclusive, omitted means the whole table. style accepts fontName, fontSize (points), bold, color/fillColor (#RRGGBB), alignment (left/center/right/justify), headerBold, headerFill (#RRGGBB or none), borderColor, borderWidthPt, columnWidthsPt and rowHeightsPt arrays from the first column/row. Only supplied properties change. Sizes return actual host dimensions. On partial failure inspect the receipt before retrying.")
+    @ToolMeta(displayName = "设置幻灯片表格样式", category = "office", fileEffect = "MODIFIED")
+    public String office_ppt_table_set_style(@P("Conversation ID, injected automatically") String conversationId,
+            @P("1-based slide number") Integer slideNumber, @P("Exact table shape ID") String shapeId,
+            @P(value = "Zero-based first row", required = false) Integer row,
+            @P(value = "Zero-based first column", required = false) Integer col,
+            @P(value = "Inclusive zero-based last row", required = false) Integer endRow,
+            @P(value = "Inclusive zero-based last column", required = false) Integer endCol,
+            @P("Style properties described in the tool documentation") Map<String, Object> style) {
+        Map<String, Object> args = new HashMap<>();
+        if (style != null) for (String key : java.util.List.of("fontName", "fontSize", "bold", "color", "fillColor", "alignment",
+                "headerBold", "headerFill", "borderColor", "borderWidthPt", "columnWidthsPt", "rowHeightsPt")) {
+            if (style.get(key) != null) args.put(key, style.get(key));
+        }
+        args.put("slideNumber", slideNumber); args.put("shapeId", shapeId);
+        if (row != null) args.put("row", row); if (col != null) args.put("col", col);
+        if (endRow != null) args.put("endRow", endRow); if (endCol != null) args.put("endCol", endCol);
+        return officeBridgeService.executeOfficeCommand(conversationId, "ppt_table_set_style", args);
+    }
+
+    public String office_ppt_replace_text(String conversationId, String searchText, String replaceText) {
+        return office_ppt_replace_text(conversationId, searchText, replaceText, null, null, null, null);
     }
 
     @Tool("在当前 PowerPoint 演示文稿中查找文本并设置其字符格式：字体、字号、加粗、斜体、下划线、颜色。" +
@@ -2089,20 +2429,24 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "设置幻灯片文字格式", category = "office", fileEffect = "MODIFIED")
     public String office_ppt_format_text(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("要查找的文本（须与幻灯片文本精确一致）") String searchText,
+            @P(value = "Text within target; omit with exact shapeId to format its entire text", required = false) String searchText,
             @P("是否对所有匹配生效（false=仅第一处）") Boolean applyToAll,
             @P("字体名（不改则不传）") String fontName,
             @P("字号（磅）（不改则不传）") Double fontSize,
             @P("加粗 true/false（不改则不传）") Boolean bold,
             @P("斜体 true/false（不改则不传）") Boolean italic,
             @P("下划线线型：none/single/double/dotted/wave（不改则不传）") String underline,
-            @P("文字颜色 #RRGGBB，如 #C00000（不改则不传）") String color
+            @P("文字颜色 #RRGGBB，如 #C00000（不改则不传）") String color,
+            @P(value = "Optional 1-based target slide", required = false) Integer slideNumber,
+            @P(value = "Optional exact shape ID; requires slideNumber", required = false) String shapeId,
+            @P(value = "Optional complete expected shape text; requires shapeId", required = false) String expectedText,
+            @P(value = "Paragraph options: alignment left/center/right/justify on both hosts. WPS additionally supports spaceBeforePt/spaceAfterPt/spaceBeforeLines/spaceAfterLines and lineSpacingMode single/1.5/double/multiple/proportional/exactly with lineSpacingValue. Unsupported options reject before any formatting.", required = false) Map<String, Object> paragraphFormat
     ) {
         log.info("Tool: office_ppt_format_text called, search={}, applyToAll={}", searchText, applyToAll);
-        if (searchText == null || searchText.isBlank()) {
+        if ((searchText == null || searchText.isBlank()) && shapeId == null) {
             return "Error: 查找文本不能为空";
         }
-        if (searchText.length() > 255) {
+        if (shapeId == null && searchText != null && searchText.length() > 255) {
             return "Error: 查找文本过长（上限 255 字符），请缩短后重试";
         }
         if (fontSize != null && (fontSize <= 0 || fontSize > 1638)) {
@@ -2124,12 +2468,22 @@ public class OfficeEditTools implements AgentToolComponent {
         if (italic != null) args.put("italic", italic);
         if (underlineValue != null) args.put("underline", underlineValue);
         if (color != null && !color.isBlank()) args.put("color", color.trim());
-        if (args.isEmpty()) {
+        if (args.isEmpty() && (paragraphFormat == null || paragraphFormat.isEmpty())) {
             return "Error: 未给出任何格式参数（fontName/fontSize/bold/italic/underline/color 至少给一个）";
         }
         args.put("searchText", searchText);
         args.put("applyToAll", applyToAll != null && applyToAll);
+        if (paragraphFormat != null) args.put("paragraphFormat", paragraphFormat);
+        if (slideNumber != null) args.put("slideNumber", slideNumber);
+        if (shapeId != null) args.put("shapeId", shapeId);
+        if (expectedText != null) args.put("expectedText", expectedText);
         return officeBridgeService.executeOfficeCommand(conversationId, "ppt_format_text", args);
+    }
+
+    public String office_ppt_format_text(String conversationId, String searchText, Boolean applyToAll,
+            String fontName, Double fontSize, Boolean bold, Boolean italic, String underline, String color) {
+        return office_ppt_format_text(conversationId, searchText, applyToAll, fontName, fontSize,
+                bold, italic, underline, color, null, null, null, null);
     }
 
     @Tool("在当前 PowerPoint 演示文稿中新增一页幻灯片，可选写入标题与正文文本框。" +
@@ -2343,7 +2697,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "添加批注", category = "office", fileEffect = "MODIFIED")
     public String office_excel_add_comment(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("单元格地址，A1 表示法，须为单格如 B2") String cellAddress,
             @P("批注内容") String comment
     ) {
@@ -2367,8 +2721,8 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "读取批注", category = "office")
     public String office_excel_get_comments(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表，仅 scope=sheet 时有效）") String sheetName,
-            @P("范围：sheet（缺省，当前工作表）或 workbook（整个工作簿）") String scope
+            @P(value = "工作表名（可选；为空取当前活动工作表，仅 scope=sheet 时有效）", required = false) String sheetName,
+            @P(value = "范围：sheet（缺省，当前工作表）或 workbook（整个工作簿）", required = false) String scope
     ) {
         log.info("Tool: office_excel_get_comments called, sheet={}, scope={}", sheetName, scope);
         String scopeValue;
@@ -2388,7 +2742,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "回复批注", category = "office", fileEffect = "MODIFIED")
     public String office_excel_reply_comment(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("目标单元格地址，A1 表示法（须已有批注）") String cellAddress,
             @P("回复内容") String reply
     ) {
@@ -2412,9 +2766,9 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "解决批注", category = "office", fileEffect = "MODIFIED")
     public String office_excel_resolve_comment(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("目标单元格地址，A1 表示法（须已有批注）") String cellAddress,
-            @P("标记为已解决（true，缺省）还是重新打开（false）") Boolean resolved
+            @P(value = "标记为已解决（true，缺省）还是重新打开（false）", required = false) Boolean resolved
     ) {
         log.info("Tool: office_excel_resolve_comment called, cell={}", cellAddress);
         String addr = cellAddress == null ? "" : cellAddress.trim();
@@ -2433,7 +2787,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "删除批注", category = "office", fileEffect = "MODIFIED")
     public String office_excel_delete_comment(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("目标单元格地址，A1 表示法（须已有批注）") String cellAddress
     ) {
         log.info("Tool: office_excel_delete_comment called, cell={}", cellAddress);
@@ -2451,20 +2805,25 @@ public class OfficeEditTools implements AgentToolComponent {
 
     @Tool("给 Excel 区域设置或清除数据验证规则。action=apply 时 type 必填：" +
           "wholeNumber=整数（operator+value1[+value2]）、list=下拉列表（listSource 逗号分隔的候选值）、" +
-          "date=日期（operator+value1[+value2]，日期用 yyyy-mm-dd）。operator=between 时 value2 是区间上界，" +
+          "decimal=小数、date=日期、time=时间、textLength=文本长度，均用operator+value1[+value2]；custom用value1公式。between/notBetween需要value2。" +
           "其余 operator 只需 value1。action=clear 清除该区域已有的验证规则（此时其余参数不需要）。" +
           "需要 ExcelApi 1.8。直接生效（Excel 没有修订机制）。sheetName 缺省为当前活动工作表。")
     @ToolMeta(displayName = "设置数据验证", category = "office", fileEffect = "MODIFIED")
     public String office_excel_set_data_validation(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("区域地址，A1 表示法如 B2:B20") String rangeAddress,
-            @P("动作：apply（套用，缺省）/clear（清除）") String action,
-            @P("验证类型：wholeNumber/list/date（action=apply 时必填）") String type,
-            @P("比较运算符：between/greaterThan/lessThan/equalTo（wholeNumber/date 用，between 时必填 value2）") String operator,
-            @P("比较值 1（wholeNumber 用数字字符串，date 用 yyyy-mm-dd）") String value1,
-            @P("比较值 2（operator=between 时必填，用作区间上界）") String value2,
-            @P("下拉候选值，逗号分隔（type=list 时必填，如 是,否,待定）") String listSource
+            @P(value = "动作：apply（套用，缺省）/clear（清除）", required = false) String action,
+            @P(value = "验证类型：wholeNumber/decimal/date/time/textLength/custom/list（action=apply 时必填）", required = false) String type,
+            @P(value = "比较运算符：between/notBetween/greater/greaterEqual/less/lessEqual/equal/notEqual（兼容 greaterThan/lessThan/equalTo）（wholeNumber/date 用，between 时必填 value2）", required = false) String operator,
+            @P(value = "比较值 1（wholeNumber 用数字字符串，date 用 yyyy-mm-dd）", required = false) String value1,
+            @P(value = "比较值 2（operator=between 时必填，用作区间上界）", required = false) String value2,
+            @P(value = "下拉候选值，逗号分隔（type=list 时必填，如 是,否,待定）", required = false) String listSource,
+            @P(value = "可选：显示输入提示", required = false) Boolean showInputMessage,
+            @P(value = "可选：输入提示标题", required = false) String inputTitle,
+            @P(value = "可选：输入提示正文", required = false) String inputMessage,
+            @P(value = "可选：验证错误标题", required = false) String errorTitle,
+            @P(value = "可选：验证错误正文", required = false) String errorMessage
     ) {
         log.info("Tool: office_excel_set_data_validation called, sheet={}, range={}, action={}", sheetName, rangeAddress, action);
         String addr = rangeAddress == null ? "" : rangeAddress.trim();
@@ -2489,7 +2848,7 @@ public class OfficeEditTools implements AgentToolComponent {
         args.put("action", actionValue);
         if ("apply".equals(actionValue)) {
             if (typeValue == null) {
-                return "Error: type 不能为空（apply 时必填：wholeNumber/list/date）";
+                return "Error: type 不能为空（apply 时必填：wholeNumber/decimal/date/time/textLength/custom/list）";
             }
             args.put("type", typeValue);
             if ("list".equals(typeValue)) {
@@ -2497,14 +2856,17 @@ public class OfficeEditTools implements AgentToolComponent {
                     return "Error: type=list 时 listSource 不能为空（逗号分隔的候选值）";
                 }
                 args.put("listSource", listSource.trim());
+            } else if ("custom".equals(typeValue)) {
+                if (value1 == null || value1.isBlank()) return "Error: " + com.checkba.service.LangText.of("自定义验证须提供公式", "Custom validation requires a formula");
+                args.put("value1", value1.trim());
             } else {
                 if (operatorValue == null) {
-                    return "Error: type=" + typeValue + " 时 operator 不能为空（between/greaterThan/lessThan/equalTo）";
+                    return "Error: type=" + typeValue + " 时 operator 不能为空（between/notBetween/greater/greaterEqual/less/lessEqual/equal/notEqual（兼容 greaterThan/lessThan/equalTo））";
                 }
                 if (value1 == null || value1.isBlank()) {
                     return "Error: value1 不能为空";
                 }
-                if ("between".equals(operatorValue) && (value2 == null || value2.isBlank())) {
+                if (("between".equals(operatorValue) || "notbetween".equals(operatorValue)) && (value2 == null || value2.isBlank())) {
                     return "Error: operator=between 时 value2 不能为空（区间上界）";
                 }
                 args.put("operator", operatorValue);
@@ -2512,7 +2874,20 @@ public class OfficeEditTools implements AgentToolComponent {
                 if (value2 != null && !value2.isBlank()) args.put("value2", value2.trim());
             }
         }
+        if ("apply".equals(actionValue)) {
+            if (showInputMessage != null) args.put("showInputMessage", showInputMessage);
+            if (inputTitle != null) args.put("inputTitle", inputTitle);
+            if (inputMessage != null) args.put("inputMessage", inputMessage);
+            if (errorTitle != null) args.put("errorTitle", errorTitle);
+            if (errorMessage != null) args.put("errorMessage", errorMessage);
+        }
         return officeBridgeService.executeOfficeCommand(conversationId, "excel_set_data_validation", args);
+    }
+
+    public String office_excel_set_data_validation(String conversationId, String sheetName, String rangeAddress,
+            String action, String type, String operator, String value1, String value2, String listSource) {
+        return office_excel_set_data_validation(conversationId, sheetName, rangeAddress, action, type, operator,
+                value1, value2, listSource, null, null, null, null, null);
     }
 
     // ==================== Excel 图表（office_excel_add_chart，批次 9，ExcelApi 1.1） ====================
@@ -2523,10 +2898,11 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "插入图表", category = "office", fileEffect = "MODIFIED")
     public String office_excel_add_chart(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("数据源区域，A1 表示法如 A1:C5") String dataRangeAddress,
             @P("图表类型：column（柱状图）/line（折线图）/pie（饼图）/bar（条形图）") String chartType,
-            @P("图表标题（可选）") String title
+            @P(value = "图表标题（可选）", required = false) String title,
+            @P(value = "可选：图表对象名称", required = false) String name
     ) {
         log.info("Tool: office_excel_add_chart called, sheet={}, range={}, type={}", sheetName, dataRangeAddress, chartType);
         String addr = dataRangeAddress == null ? "" : dataRangeAddress.trim();
@@ -2547,7 +2923,13 @@ public class OfficeEditTools implements AgentToolComponent {
         args.put("dataRangeAddress", addr);
         args.put("chartType", typeValue);
         if (title != null && !title.isBlank()) args.put("title", title.trim());
+        if (name != null && !name.isBlank()) args.put("name", name.trim());
         return officeBridgeService.executeOfficeCommand(conversationId, "excel_add_chart", args);
+    }
+
+    public String office_excel_add_chart(String conversationId, String sheetName, String dataRangeAddress,
+            String chartType, String title) {
+        return office_excel_add_chart(conversationId, sheetName, dataRangeAddress, chartType, title, null);
     }
 
     // ==================== Excel 命名区域（office_excel_define_name，批次 9，ExcelApi 1.1） ====================
@@ -2558,7 +2940,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "管理命名区域", category = "office", fileEffect = "MODIFIED")
     public String office_excel_define_name(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表，用于解析 rangeAddress）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表，用于解析 rangeAddress）", required = false) String sheetName,
             @P("动作：add/remove") String action,
             @P("命名区域名称") String name,
             @P("区域地址，A1 表示法如 A1:D1（action=add 时必填）") String rangeAddress
@@ -2598,9 +2980,9 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "保护工作表", category = "office", fileEffect = "MODIFIED")
     public String office_excel_protect_sheet(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("动作：protect/unprotect") String action,
-            @P("密码（可选，不落日志）") String password
+            @P(value = "密码（可选，不落日志）", required = false) String password
     ) {
         log.info("Tool: office_excel_protect_sheet called, sheet={}, action={}", sheetName, action);
         String actionValue;
@@ -2627,7 +3009,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "分组行列", category = "office", fileEffect = "MODIFIED")
     public String office_excel_group_rows_cols(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
             @P("整行区域（如 4:9）或整列区域（如 C:E）") String rangeAddress,
             @P("动作：group/ungroup") String action,
             @P("分组方向：rows/cols，须与 rangeAddress 一致") String by
@@ -2675,12 +3057,12 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "创建透视表", category = "office", fileEffect = "MODIFIED")
     public String office_excel_add_pivot_table(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("工作表名（可选；为空取当前活动工作表，源区域所在表）") String sheetName,
+            @P(value = "工作表名（可选；为空取当前活动工作表，源区域所在表）", required = false) String sheetName,
             @P("源数据区域，A1 表示法，含表头，如 A1:D50") String sourceRangeAddress,
             @P("透视表放置的左上角单元格，A1 表示法，如 F1") String destinationCellAddress,
             @P("行分组字段名，JSON 字符串数组，如 [\"部门\"]") String rowFieldsJson,
             @P("求和汇总字段名，JSON 字符串数组，如 [\"金额\"]") String valueFieldsJson,
-            @P("透视表名称（可选）") String pivotName
+            @P(value = "透视表名称（可选）", required = false) String pivotName
     ) {
         log.info("Tool: office_excel_add_pivot_table called, sheet={}, source={}, dest={}",
                 sheetName, sourceRangeAddress, destinationCellAddress);

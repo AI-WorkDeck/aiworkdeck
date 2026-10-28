@@ -153,4 +153,27 @@ class OfficeBridgeServiceTest {
         assertTrue(objectMapper.readTree(result).has("error"));
         assertFalse(new ToolRegistry.ToolResult(result, null, true).success());
     }
+    @Test
+    void failedUploadRetainsPartialFileWithoutBecomingSuccess() throws Exception {
+        autoRespond(false, Map.of("fileId", 42, "uploaded", false, "destination", "project"), "Upload failed");
+        String out = bridge.executeOfficeCommand("conv-1", "file_export_pdf", Map.of());
+        var result = objectMapper.readTree(out);
+        assertTrue(out.startsWith("{\"error\":"));
+        assertEquals("Upload failed", result.get("error").asText());
+        assertEquals(42, result.get("partialResult").get("fileId").asInt());
+        assertFalse(result.get("partialResult").get("uploaded").asBoolean());
+        assertFalse(new ToolRegistry.ToolResult(out, null, true).success());
+    }
+
+    @Test
+    void nativeFileCommandsHaveFiniteExtendedBudgets() {
+        assertEquals(120, OfficeBridgeService.timeoutSecondsFor("file_create"));
+        assertEquals(120, OfficeBridgeService.timeoutSecondsFor("get_paragraphs"));
+        assertEquals(120, OfficeBridgeService.timeoutSecondsFor("get_outline"));
+        assertEquals(120, OfficeBridgeService.timeoutSecondsFor("get_clauses"));
+        assertEquals(180, OfficeBridgeService.timeoutSecondsFor("apply_style_profile"));
+        for (String command : List.of("file_open", "file_save", "file_export_pdf"))
+            assertEquals(180, OfficeBridgeService.timeoutSecondsFor(command));
+    }
+
 }

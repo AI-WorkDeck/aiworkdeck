@@ -333,3 +333,39 @@ test('横幅：同一来源 10 秒内合并计数，换来源或过了窗口就�
   b = mergeCrossDocBanner(b, 'B.xlsx', 26000)
   assert.equal(b.count, 1)
 })
+
+for (const command of ['file_create', 'file_open', 'file_save', 'file_export_pdf']) {
+  test(`cross-pane file lifecycle is rejected: ${command}`, async () => {
+    let called = false
+    const { result, entry } = await runCrossDocWrite({ command, args: {}, origin,
+      host: 'excel', family: 'office', exec: async () => { called = true; return { ok: true } } })
+    assert.equal(result.ok, false)
+    assert.equal(called, false)
+    assert.equal(entry, null)
+  })
+}
+
+test('PPT notes and table styles require their own pane; notes reading stays read-only', async () => {
+  let calls = 0
+  for (const command of ['ppt_write_notes', 'ppt_table_set_style']) {
+    const result = await runCrossDocWrite({ command, args: {}, host: 'powerpoint', family: 'wps',
+      exec: async () => { calls++; return { ok: true } } })
+    assert.equal(result.result.ok, false)
+  }
+  assert.equal(calls, 0)
+  assert.equal(isReadOnlyCommand('ppt_read_notes'), true)
+})
+
+test('style definitions cannot create a fake rejectable cross-document revision in either Word family', async () => {
+  for (const family of ['office', 'wps']) {
+    let ran = false
+    const { result, entry } = await runCrossDocWrite({
+      command: 'apply_style_profile', args: { scope: 'styles-only' }, origin, host: 'word', family,
+      exec: async () => { ran = true; return { ok: true, data: {} } },
+      capture: async () => null, trackingOk: () => true
+    })
+    assert.equal(result.ok, false)
+    assert.equal(ran, false)
+    assert.equal(entry, null)
+  }
+})
