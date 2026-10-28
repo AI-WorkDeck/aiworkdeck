@@ -80,23 +80,15 @@ public class AiModelCatalogController {
 
         AllowedModels.Region region = networkRegionService.effectiveRegion();
 
-        // 本地 Ollama 档下 vision 位一律归一为 false（dev-board#801 K21 ⑨，审查 E-15）。
-        //
-        // 病灶：这个端点只按区域过滤白名单、不感知当前 provider，而
-        // ChatModelFactory.effectiveModelSupportsVision 对 OLLAMA 档**恒返回 false**
-        // （langchain4j-ollama 是另一套图片编组，本仓没接）。于是用户把供应商切到本地
-        // Ollama 后，模型下拉里仍是云端白名单，选中一个 vision:true 的条目时前端认为
-        // 「能读图」——既不弹提示也不显示 OCR 降级说明，而后端实际一律降级走 OCR。
-        // 「显示与实际不一致」正是本仓治理过一轮的老毛病，判据收敛在后端这一处。
+        // Billing and image support follow the actual route for this cloud catalogue.
+        // An implicit Ollama default still permits cloud selections through BYOK.
         AiModelProperties.Provider provider = null;
         try {
-            provider = chatModelFactory.resolveProvider();
+            provider = chatModelFactory.resolveTarget(AllowedModels.availableIn(region).get(0).getModelId(), false).channel();
         } catch (Exception e) {
-            // 供应商解析不出来时不改写能力位：宁可维持白名单原值，也不要凭一次异常
-            // 把所有模型都标成读不了图（那是对全体云端用户的误报）
-            log.warn("[Models] Provider probe failed; keeping AllowedModels vision flags as-is", e);
+            // Without a resolved billing channel, do not invent a charged-price conversion.
+            log.warn("[Models] Provider probe failed; using list prices", e);
         }
-        boolean visionDisabledByProvider = provider == AiModelProperties.Provider.OLLAMA;
 
         // 价格显示口径（dev-board#853）。只有平台通道才有「实付价」：那条路按官网扣费汇率 × 毛利乘数
         // 从 Credits 里扣钱；自备 Key 的用户直接按厂商美元标价付给 OpenRouter，本地 Ollama 不计费——
@@ -117,13 +109,14 @@ public class AiModelCatalogController {
 
             Map<String, Object> dto = new LinkedHashMap<>();
             dto.put("id", m.getModelId());
+            dto.put("aliases", m.getAliases());
             dto.put("name", m.getDisplayName());
             dto.put("vendor", m.getVendor().getDisplayName());
             dto.put("region", m.getRegion().name());
             dto.put("contextLength", m.getContextLength());
             // 视觉能力：前端在「选模型的那一刻」就据此提示「这个模型看不了图，图片会按 OCR 文本处理」。
             // 不下发这个字段，前端只能自己维护一张模型 → 支持视觉的表，正好踩回上面那条历史债。
-            dto.put("vision", !visionDisabledByProvider && m.isVision());
+            dto.put("vision", chatModelFactory.effectiveModelSupportsVision(m.getModelId()));
             dto.put("inputPricePerM", first.inputPricePerM());
             dto.put("outputPricePerM", first.outputPricePerM());
             dto.put("tiered", m.getPriceTiers().size() > 1);

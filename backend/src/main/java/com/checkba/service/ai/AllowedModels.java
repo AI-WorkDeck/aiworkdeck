@@ -67,7 +67,7 @@ import java.util.List;
  * <p><b>vision 位与单价一样是人手抄的、会在我们背后变</b>：来源是 OpenRouter
  * {@code /models} 响应的 {@code architecture.input_modalities} 是否含 {@code "image"}
  * （{@code modality} 字段是同一信息的字符串形式）。对拍在 {@code AllowedModelsLiveContractTest}，
- * 同样是 {@code RUN_LIVE_MODEL_CHECK=1} 门控、不进 CI，所以改模型相关的 PR 顺手手动跑一次。
+ * 使用 {@code RUN_LIVE_MODEL_CHECK=1} 门控，由每日及目录 PR 的 model-catalogue-audit 工作流运行。
  *
  * <p><b>刻意不建模的第三件事：图片单价</b>。OpenRouter 的 {@code pricing.image}（按张计费）
  * 在我们这 11 条视觉模型里只有 Gemini 3.6 Flash 有值，且是 $7.5e-7/张——其余 10 条的图像开销
@@ -76,32 +76,39 @@ import java.util.List;
  */
 public enum AllowedModels {
 
+    // Catalogue snapshot: https://openrouter.ai/api/v1/models, checked 2026-10-29.
     // ==================== 国内直连（境内外均可用）====================
 
     DEEPSEEK_V4_FLASH("deepseek/deepseek-v4-flash", "DeepSeek V4 Flash",
             Vendor.DEEPSEEK, Region.GLOBAL, 1_048_576,
-            tier(0, 0.08596, 0.17192)),
+            tier(0, 0.091, 0.182)),
 
     DEEPSEEK_V4_PRO("deepseek/deepseek-v4-pro", "DeepSeek V4 Pro",
             Vendor.DEEPSEEK, Region.GLOBAL, 1_048_576,
-            tier(0, 0.711312, 1.422624)),
+            tier(0, 0.888966, 1.777932)),
 
     GLM_5_2("z-ai/glm-5.2", "GLM-5.2",
             Vendor.ZHIPU, Region.GLOBAL, 1_048_576,
-            tier(0, 1.19, 3.74)),
+            tier(0, 0.0068, 7.0)),
 
     KIMI_K2_6("moonshotai/kimi-k2.6", "Kimi K2.6",
             Vendor.MOONSHOT, Region.GLOBAL, 262_144,
             true,
-            tier(0, 0.95, 4.0)),
+            tier(0, 0.65, 3.41)),
 
     // 国产旗舰档：上面几条都是中档，重活（长文书起草、复杂检索推理）需要够强的落点
     KIMI_K3("moonshotai/kimi-k3", "Kimi K3",
             Vendor.MOONSHOT, Region.GLOBAL, 1_048_576,
             true,
-            tier(0, 3.0, 15.0)),
+            tier(0, 0.192, 20.0)),
 
-    QWEN_3_8_MAX("qwen/qwen3.8-max", "通义千问 3.8 Max",
+    KIMI_K3_1_PRO("moonshotai/kimi-k3.1-pro", "Kimi K3.1 Pro",
+            Vendor.MOONSHOT, Region.GLOBAL, 1_048_576,
+            true,
+            tier(0, 2.0, 10.0)),
+
+    // The unversioned ID is no longer listed; retain the enum name for existing router references.
+    QWEN_3_8_MAX("qwen/qwen3.8-max-0902", "Qwen3.8 Max (0902)",
             Vendor.ALIBABA, Region.GLOBAL, 1_000_000,
             true,
             tier(0, 2.0, 6.0)),
@@ -330,9 +337,19 @@ public enum AllowedModels {
         return fromId(modelId) != null;
     }
 
+    public List<String> getAliases() {
+        return this == QWEN_3_8_MAX ? List.of("qwen/qwen3.8-max") : List.of();
+    }
+
+    /** Preserve saved selections when a provider retires an ID in favour of its dated release. */
+    public static String canonicalModelId(String modelId) {
+        return modelId != null && QWEN_3_8_MAX.getAliases().get(0).equalsIgnoreCase(modelId.trim())
+                ? QWEN_3_8_MAX.getModelId() : modelId;
+    }
+
     public static AllowedModels fromId(String modelId) {
         if (modelId == null || modelId.trim().isEmpty()) return null;
-        String needle = modelId.trim();
+        String needle = canonicalModelId(modelId).trim();
         for (AllowedModels m : values()) {
             if (m.modelId.equalsIgnoreCase(needle)) return m;
         }

@@ -99,15 +99,15 @@ class AllowedModelsTest {
     // ==================== availableIn ====================
 
     @Test
-    @DisplayName("境内只放行 GLOBAL 的 9 条，国际网络给全部 14 条")
+    @DisplayName("境内只放行 GLOBAL 的 10 条，国际网络给全部 15 条")
     void availableInFiltersByRegion() {
         List<AllowedModels> domestic = AllowedModels.availableIn(AllowedModels.Region.GLOBAL);
-        assertEquals(9, domestic.size(), "境内可用模型数变了：要么加了国内模型，要么误把国际模型标成 GLOBAL");
+        assertEquals(10, domestic.size(), "境内可用模型数变了：要么加了国内模型，要么误把国际模型标成 GLOBAL");
         assertTrue(domestic.stream().allMatch(m -> m.getRegion() == AllowedModels.Region.GLOBAL),
                 "境内清单里出现 INTERNATIONAL 模型，用户点了必然 403 region");
 
         List<AllowedModels> international = AllowedModels.availableIn(AllowedModels.Region.INTERNATIONAL);
-        assertEquals(14, international.size(), "国际网络应能用全部白名单模型");
+        assertEquals(15, international.size(), "国际网络应能用全部白名单模型");
         assertEquals(AllowedModels.values().length, international.size());
     }
 
@@ -132,7 +132,30 @@ class AllowedModelsTest {
         assertFalse(AllowedModels.supportsVision(null));
         assertFalse(AllowedModels.supportsVision(""));
         assertTrue(AllowedModels.supportsVision("moonshotai/kimi-k3"));
+        assertTrue(AllowedModels.supportsVision("moonshotai/kimi-k3.1-pro"));
         assertFalse(AllowedModels.supportsVision("deepseek/deepseek-v4-flash"));
+    }
+
+    @Test
+    @DisplayName("新版 Kimi 在两区可选且具备完整视觉与计价元数据")
+    void kimi31ProIsAvailableInBothRegions() {
+        AllowedModels model = AllowedModels.fromId("moonshotai/kimi-k3.1-pro");
+        assertSame(AllowedModels.KIMI_K3_1_PRO, model);
+        for (AllowedModels.Region region : AllowedModels.Region.values()) {
+            assertTrue(AllowedModels.availableIn(region).contains(model));
+            assertTrue(AllowedModels.visionCapableIn(region).contains(model));
+        }
+        assertEquals(1_048_576, model.getContextLength());
+        assertFalse(model.getPriceTiers().isEmpty());
+    }
+
+    @Test
+    @DisplayName("下线的 Qwen 无版本 ID 不再发送；目录与智能路由使用可用的 0902 快照")
+    void retiredQwenIdResolvesToCurrentDatedRelease() {
+        assertSame(AllowedModels.QWEN_3_8_MAX, AllowedModels.fromId("qwen/qwen3.8-max"));
+        assertEquals("qwen/qwen3.8-max-0902", AllowedModels.canonicalModelId("qwen/qwen3.8-max"));
+        assertSame(AllowedModels.QWEN_3_8_MAX, AllowedModels.fromId("qwen/qwen3.8-max-0902"));
+        assertTrue(AllowedModels.QWEN_3_8_MAX.isVision());
     }
 
     // ==================== fromId / isAllowed ====================

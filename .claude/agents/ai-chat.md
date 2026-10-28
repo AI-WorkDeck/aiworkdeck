@@ -276,7 +276,12 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
 - `ProjectMemoryExtractor` 与 `project_memory` **保持现状不动**，概览页只是不读它。
 
 **模型目录与区域判定（2026-08 供应商三档改造）**
-- `service/ai/AllowedModels.java` 是**模型目录的唯一事实来源**（14 条：GLOBAL 9 + INTERNATIONAL 5）。枚举带元数据：displayName（中文）/ Vendor（中文厂商名，前端按它分组）/ Region / contextLength / **vision（是否支持图像输入）** / priceTiers。前端**不许再硬编码任何模型清单**——历史上有三份互不同步的副本（本枚举、ChatInterface.vue 硬编码数组、project-overview.vue 死代码），后果是「后端加模型用户看不到、前端加模型被工厂静默回落默认模型」。
+
+2026-10-29 更新（dev-board#1593/#1594）：目录为15条（GLOBAL10/INTERNATIONAL5），新增 Kimi K3.1 Pro，Qwen3.8 Max 使用当前 `qwen/qwen3.8-max-0902`；旧保存ID由 `AllowedModels.canonicalModelId` 精确映射到该版本，覆盖请求及默认/辅助/子模型设置，发送前规范化；目录下发aliases供前端保留旧选择，PPT直传路径也须规范化；不改写无关模型、不改数据库原设置。图片标记必须调用 `ChatModelFactory.effectiveModelSupportsVision(id)`，与实际消息路由一致；不能用原始 `resolveProvider()==OLLAMA` 覆盖整表，因为未显式选择本地时白名单模型仍可能走云端。显式本地选择保持无图片直送。国际平台USD与图片能力独立；计费渠道同样按目录模型实际路由解析，隐式本地默认但实际云端的请求不得提示免费。
+
+`.github/workflows/model-catalogue-audit.yml` 每日及目录PR运行联网检查：在线、tools、image、上下文与全部价格档位。离线测试仍默认跳过；显式联网检查遇网络/响应错误必须失败，不能伪装通过。价格是上游当时的路由报价快照，供应商变动可导致快速漂移；失败须核对新数据，不能放宽容差。Codex本会话另设每周一10:00（Asia/Singapore）复查新模型与审计结果、测试并合并修正；不自动发版。合并只更新源码，已安装桌面目录随后端组件版本更新，不能声称远端Mac即时生效。
+
+- `service/ai/AllowedModels.java` 是**模型目录的唯一事实来源**（15 条：GLOBAL 10 + INTERNATIONAL 5）。枚举带元数据：displayName（中文）/ Vendor（中文厂商名，前端按它分组）/ Region / contextLength / **vision（是否支持图像输入）** / priceTiers。前端**不许再硬编码任何模型清单**——历史上有三份互不同步的副本（本枚举、ChatInterface.vue 硬编码数组、project-overview.vue 死代码），后果是「后端加模型用户看不到、前端加模型被工厂静默回落默认模型」。
 - **分档计价**：OpenRouter 对部分模型按输入长度分档涨价，白名单里 4 个模型有档（qwen3.7-flash 三档，seed-2.0-lite / gpt-5.6-terra / grok-4.5 两档）。价格是 `PriceTier(minPromptTokens, inputPricePerM, outputPricePerM)` 列表，按 minPromptTokens 升序、首档下限恒为 0，取档用 `priceTierFor(promptTokens)`（负数/0 回落首档，取档不许抛异常——记账抛异常会把整条流式对话带崩）。`TokenUsageService.calculateCost` 已按档计价；**只读首档会在长上下文下系统性低报**。刻意不建模提示缓存命中价（langchain4j 0.36 的 TokenUsage 只回 input/output，拿不到命中 token 数），因此估算值对命中缓存的轮次偏高——**已知偏差不是 bug**，真花的钱以 PlatformUsageAccountant 对账为准。
 - **价格漂移唯一护栏**：`AllowedModelsLiveContractTest`（联网对拍 `GET https://openrouter.ai/api/v1/models`，断言在线 + supported_parameters 含 tools + 单价一致，容差 1%）。门控 `RUN_LIVE_MODEL_CHECK=1`，默认跳过——mvn test 默认离线可跑是硬要求。首次对拍就抓到 5 条价格错，其中 kimi-k2.6 的输入/输出价分别对用户超收 14% 与 40%。**2026-08-10 第二次对拍又抓到两条**：glm-5.2 与 kimi-k2.6 的上游单价分别涨了 3.0 倍与 1.6 倍，而枚举还是旧值——方向是低报，BYOK 估算系统性偏低且没有任何东西会报警（平台通道走真实扣费，看不出来）。**因为这条护栏是 env 门控、不进 CI，漂移只会在有人手动跑的时候被发现**，所以改动模型相关的 PR 顺手跑一次 `RUN_LIVE_MODEL_CHECK=1 mvn test -Dtest=AllowedModelsLiveContractTest`。**测试红了不许放宽容差**，先核对线上再改枚举。结构性前提（首档为 0、严格升序）与区域集合大小由离线的 `AllowedModelsTest` 守。
   - **同一条护栏现在也对拍 vision 位**（2026-08-29）：判据是 `architecture.input_modalities` 含 `"image"`。两个方向严重性不同——我们标 true 而上游没有 = 图片块发给读不了图的模型换来必然的 400，必须红；我们标 false 而上游有 = 只是把用户的图白白降级成 OCR，也断言但错误信息说清是「漏标」。vision 位与单价一样是**人手抄的、会在我们背后变**，而这条护栏同样 env 门控不进 CI。
@@ -298,7 +303,7 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
 **图片多模态（视觉直送，2026-08-29 dev-board#266）**
 
 - **一句话**：模型支持视觉 → 图片附件作为 `ImageContent` 内容块直送模型；不支持 → 降级走既有 OCR，并在选模型时就告诉用户。降级全自动，前端不做任何拦截。
-- **能力判据只有一处**：`AllowedModels.vision` 位（14 条里 11 条 true，纯文本的是 deepseek-v4-flash / deepseek-v4-pro / glm-5.2）。经 `GET /api/ai/models` 下发，**前端不许自建「哪些模型能看图」的表**。境内 GLOBAL 9 条里有 6 条支持视觉，所以这条路在境内是通的。
+- **能力判据只有一处**：`AllowedModels.vision` 位（15 条里 12 条 true，纯文本的是 deepseek-v4-flash / deepseek-v4-pro / glm-5.2）。经 `GET /api/ai/models` 下发，**前端不许自建「哪些模型能看图」的表**。境内 GLOBAL 10 条里有 7 条支持视觉，所以这条路在境内是通的。
 - **默认模型是纯文本的**（`ai.model.open-router.default-model` = deepseek/deepseek-v4-flash），所以降级是常态而不是边缘情况。前端提示必须覆盖「用户从没手动选过模型」这一档，否则绝大多数用户静默无提示。
 - **判定必须落在「真正生效的模型」上**：`ChatModelFactory.resolveTarget(modelId, logFallback)` 是通道+模型 id 的**唯一解析口径**，`getChatModel` / `getStreamingChatModel` 都改成调它再分派（两份会漂移，漂移的表现是同步路与流式路发给不同模型）。能力判定走 `effectiveModelSupportsVision(modelId)`：请求里的 modelId 有三条静默改写路径（非白名单回落默认模型 / 显式本地档忽略云端模型 / 平台通道回落），按请求 id 判就会把 image 块发给读不了图的模型。**OLLAMA 档恒 false**（langchain4j-ollama 是另一套图片编组，本次不接）。
 - **组装点**：`ContextAssemblerService`。图片项在 contextItems 循环里分叉——直送时**不调 read_document、不注入 `<file>` 正文**，只在 system 里留一条 `<image id name note=.../>` 标识（告诉模型图随消息发了、别再调读取工具），字节收进 `visionAttachments`，在**末位用户消息**里以 `UserMessage.from(List<Content>)` 组装（`TextContent` 必须排第一——末位提醒的注意力位置是真机日志换来的结论）。**同一张图绝不许既进视觉又进 OCR**：那会既付图像 token 又付 OCR 的钱，还给模型两份可能打架的输入。
@@ -340,7 +345,7 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
 - **`GET /api/ai/config` 新增 `contextLimits`**：`maxFilesPerContext / maxCharsPerFile / maxCharsActiveDocument / maxImagesPerTurn / maxImageBytes / visionCountsTowardFileQuota`。前端 `chatContextLimits.js` 的 `DEFAULT_CONTEXT_LIMITS` 只是拉不到时的兜底，**必须与后端默认值一致**；`normalizeContextLimits` 对 0/负数/NaN/缺字段一律退回兜底（拿 0 去拦截会让用户一份都加不进来）。
 - **前端前置拦截**：`addFile` 走 `admitFileToContext`（到顶 toast `chat.contextFileCapReached`，重复添加静默），粘贴/拖图走 `admitPastedImage`（张数 / 体积两种理由分开报）。**判据都在 `src/utils/chatContextLimits.js`**，不许在组件里再写一份。
 - **「模型看不了图」改成常驻提示（K21 ⑨，审查 E-6）**：`visionNoticeKey` 的判据是 `modelVision === false && (有粘贴图 || contextFiles 里有图)`，图片判据 `isImageAttachment` 取 fileType 与文件名后缀的**并集**（桌面端那张映射表没有 bmp，项目树里是 'other'），与插件 `chatSession.js` 同口径。提示从 `v-if="pastedImages.length > 0"` 的缩略图块里挪到输入卡片底部——原来从文件树拖进来的项目图片（走 contextFiles）完全不触发，用户拖一张现场照片进去、模型读不了图时界面上没有任何线索。**`currentModelVision` 仍是三态，未知一律不提示。**
-- **Ollama 档 vision 位在模型目录端点归一为 false**（K21 ⑨，审查 E-15）：`AiModelCatalogController` 按 `chatModelFactory.resolveProvider()` 判，与 `effectiveModelSupportsVision` 对 OLLAMA 恒 false 对齐。provider 探测抛异常时**不改写**能力位（宁可维持白名单原值，也不要凭一次异常把全体云端用户的模型都标成读不了图）。
+- **Ollama 档 vision 位在模型目录端点归一为 false**（K21 ⑨，审查 E-15）：`AiModelCatalogController` 按 `chatModelFactory.effectiveModelSupportsVision(id)` 判，与实际消息路由对齐（原始供应商默认值不能代替实际路由）。provider 探测抛异常时**不改写**能力位（宁可维持白名单原值，也不要凭一次异常把全体云端用户的模型都标成读不了图）。
 - **三种图片降级各说各的原因**（真机实测发现）：原来三条降级路共用一句「这一张图未能直送（超出本轮张数或单张体积上限，或读取失败）」，模型据此告诉用户「因超出**单张体积**限制」，而真实原因是这一轮的**张数**上限——用户会去压缩一张其实不大的图。现在 `OCR_FALLBACK_COUNT/SIZE/READ/NO_VISION` 四句各写各的，**写进 prompt 的原因与 notice 的 kind 一一对应**。前端 `contextNoticeOcrFallback` 的文案刻意**不断言原因**（那条通道也覆盖「读盘失败后改走 OCR」），「模型看不了图」由输入框上方的常驻提示负责。
 - **OCR 系统提示不再被当正文**（审查 E-7）：`appendOcrFallbackFile` 现在认 `[System:` 开头并按「读不出来」处理，同时回传 readable 供 sink 发 `unreadable`。原来 `[System: 文件超过大小限制]` 非空、也不带 Error/Warning 前缀，顶着「以下正文由 OCR 从图片转写而来」的横幅进 CDATA。
 - **读不出正文的单个附件不再注入空 CDATA**：与 K8 的失败回执同款，改成一句 `该附件内容暂不可读：…` 的说明（中英各一份）。
