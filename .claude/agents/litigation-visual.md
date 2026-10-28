@@ -88,6 +88,12 @@ JSON 对不对，不取决于模型对像素多聪明——这是上游的核心
   用户明确提交答案后才继续，不把待审批折叠成无内容的“继续”。任务按本地账户、
   云账户、API 与项目隔离保存；发前持久化 clientRequestId，回执丢失先查 inbox/history
   再决定恢复或使用原 ID 重试，不能把幂等旧回执误当作新的执行。
+- **插件与旧技能启停（2026-10-28）**：独立 Web 插件不携带 `manifest.skills`，使用宿主内置的
+  `litigation-visual` 技能；安装该插件时，`SkillRegistry.isEnabled` 以插件开关为准，避免默认关闭的
+  旧技能成为隐藏的第二道开关。插件停用、封禁、不兼容或缺 file_read/file_write/ai 任一权限仍不可用；
+  语言可用性判定照旧。旧技能的持久启停偏好不被修改，无插件的旧安装继续使用原技能开关。
+  `SkillRegistryTest` 验证真实插件注册→技能 API 可用→手选技能路由、禁用/重启扫描/封禁/卸载与权限边界；
+  前端 `useLitigationGeneration` 继续核查插件和技能，不通过移除门控掩盖后端未激活。
 - `pages/project-overview/project-overview.vue` — businessActions 接入独立任务、材料选择与
   图表打开。完成态须由本任务文件 ID（或新目录+会话元数据中的准确图名）与图廊核对；
   优先打开 draw.io。异步详情返回后再次核对项目/账户/页面，避免旧项目文件打开到新项目。

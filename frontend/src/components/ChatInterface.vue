@@ -331,7 +331,8 @@
           :class="msg.role.toLowerCase()"
         >
           <!-- User Message -->
-          <div v-if="msg.role === 'USER'" class="user-bubble" :class="{ 'is-unread': msg.receiptState === 'pending' }">
+          <template v-if="msg.role === 'USER'">
+          <div class="user-bubble" :class="{ 'is-unread': msg.receiptState === 'pending' }">
             <!-- Image Thumbnails (above message) -->
             <view v-if="msg.images && msg.images.length > 0" class="user-bubble-images">
                <image v-for="(img, idx) in msg.images" :key="idx" :src="img.path" mode="aspectFill" class="bubble-image-thumb" />
@@ -357,6 +358,7 @@
             <view v-if="msg.contextNotices && msg.contextNotices.length" class="context-notices">
               <text v-for="(n, ni) in msg.contextNotices" :key="ni" class="context-notice">{{ contextNoticeText(n) }}</text>
             </view>
+          </div>
             <div class="bubble-footer">
               <!-- 从此分叉（dev-board#779 K18，审查 D-06/F4）：非破坏。原对话一个字不动，
                    只把「到这条为止」复制成一条新对话并切过去。可用性判据与回退同源
@@ -399,7 +401,7 @@
               <span v-if="receiptLabel(msg)" class="bubble-receipt" :class="{ 'is-pending': msg.receiptState === 'pending' }">{{ receiptLabel(msg) }}</span>
               <span v-if="msg.timestamp" class="bubble-timestamp user">{{ msg.timestamp }}</span>
             </div>
-          </div>
+          </template>
 
           <!-- Assistant Message (Root Bubble) -->
           <div v-else-if="msg.role === 'ASSISTANT'" class="assistant-root-wrapper">
@@ -549,13 +551,13 @@
                              <text class="skill-builtin-sub">{{ $t('chat.builtinWorkflowsSub') }}</text>
                              <view class="skill-builtin-pills">
                                 <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
-                                      class="skill-builtin-pill"
+                                      class="skill-builtin-pill" :data-bw-pill="bw.id"
                                       :class="{ 'is-custom': !bw.activeIsSystemDefault }"
                                       :title="$t('chat.builtinWorkflowRightClickHint')"
                                       @tap.stop="applyBuiltinWorkflow(bw)"
                                       @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
                                    <text class="skill-builtin-pill-label">{{ bw.activeIsSystemDefault ? bw.title : `${bw.title} · ${bw.activeVersionName}` }}</text>
-                                   <text class="skill-builtin-pill-more" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
+                                   <text class="skill-builtin-pill-more" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
                                 </view>
                              </view>
                           </view>
@@ -624,14 +626,14 @@
              <view class="builtin-workflows-body">
                 <view class="builtin-workflows-grid">
                    <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
-                         class="builtin-workflow-card"
+                         class="builtin-workflow-card" :data-bw-card="bw.id"
                          :class="{ 'is-custom-version': !bw.activeIsSystemDefault }"
                          :title="$t('chat.builtinWorkflowRightClickHint')"
                          @tap="applyBuiltinWorkflow(bw)"
                          @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
                       <view class="builtin-workflow-card-top">
                          <text class="builtin-workflow-name">{{ bw.title }}</text>
-                         <view class="builtin-workflow-card-actions" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                         <view class="builtin-workflow-card-actions" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">
                             <text class="builtin-workflow-ver-tag" :class="{ custom: !bw.activeIsSystemDefault }">{{ bw.activeVersionName }}</text>
                             <text class="builtin-workflow-more-btn">⋯</text>
                          </view>
@@ -879,13 +881,13 @@
                          <text class="skill-builtin-sub">{{ $t('chat.builtinWorkflowsSub') }}</text>
                          <view class="skill-builtin-pills">
                             <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
-                                  class="skill-builtin-pill"
+                                  class="skill-builtin-pill" :data-bw-pill="bw.id"
                                   :class="{ 'is-custom': !bw.activeIsSystemDefault }"
                                   :title="$t('chat.builtinWorkflowRightClickHint')"
                                   @tap.stop="applyBuiltinWorkflow(bw)"
                                   @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
                                <text class="skill-builtin-pill-label">{{ bw.activeIsSystemDefault ? bw.title : `${bw.title} · ${bw.activeVersionName}` }}</text>
-                               <text class="skill-builtin-pill-more" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
+                               <text class="skill-builtin-pill-more" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
                             </view>
                          </view>
                       </view>
@@ -955,14 +957,14 @@
              <view class="builtin-workflows-body">
                 <view class="builtin-workflows-grid">
                    <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
-                         class="builtin-workflow-card"
+                         class="builtin-workflow-card" :data-bw-card="bw.id"
                          :class="{ 'is-custom-version': !bw.activeIsSystemDefault }"
                          :title="$t('chat.builtinWorkflowRightClickHint')"
                          @tap="applyBuiltinWorkflow(bw)"
                          @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
                       <view class="builtin-workflow-card-top">
                          <text class="builtin-workflow-name">{{ bw.title }}</text>
-                         <view class="builtin-workflow-card-actions" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                         <view class="builtin-workflow-card-actions" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">
                             <text class="builtin-workflow-ver-tag" :class="{ custom: !bw.activeIsSystemDefault }">{{ bw.activeVersionName }}</text>
                             <text class="builtin-workflow-more-btn">⋯</text>
                          </view>
@@ -1018,7 +1020,9 @@
           @tap="closeBuiltinWorkflowContextMenu"
           @contextmenu.prevent="closeBuiltinWorkflowContextMenu">
       <view class="bw-context-menu"
-            :style="{ left: `${builtinWorkflowMenu.x}px`, top: `${builtinWorkflowMenu.y}px`, maxHeight: `calc(100vh - ${builtinWorkflowMenu.y + 12}px)` }"
+            :style="builtinWorkflowMenu.bottom
+              ? { left: `${builtinWorkflowMenu.x}px`, bottom: `${builtinWorkflowMenu.bottom}px`, maxHeight: `calc(100vh - ${builtinWorkflowMenu.bottom + 12}px)` }
+              : { left: `${builtinWorkflowMenu.x}px`, top: `${builtinWorkflowMenu.y}px`, maxHeight: `calc(100vh - ${builtinWorkflowMenu.y + 12}px)` }"
             @tap.stop>
         <view class="bw-menu-head">
           <text class="bw-menu-title">{{ activeMenuWorkflow.title }}</text>
@@ -1035,7 +1039,7 @@
               <text v-if="ver.systemDefault" class="bw-menu-version-tag">{{ $t('chat.builtinWorkflowReadOnlyTag') }}</text>
             </view>
             <text class="bw-menu-version-edit"
-                  @tap.stop="openBuiltinWorkflowEditor(activeMenuWorkflow, ver.id)">{{ ver.systemDefault ? '查看' : '编辑' }}</text>
+                  @tap.stop="openBuiltinWorkflowEditor(activeMenuWorkflow, ver.id)">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</text>
           </view>
         </view>
         <view class="skill-divider"></view>
@@ -1958,7 +1962,7 @@ export default {
 
     // ---- 内置常驻工作流（懒人模式，dev-board#1438）：多版本与按项目切换偏好 ----
     const { builtinWorkflowStates, builtinQuickWorkflows, loadBuiltinWorkflowStates } = useBuiltinWorkflows(props)
-    const builtinWorkflowMenu = ref({ visible: false, x: 0, y: 0, workflowId: '' })
+    const builtinWorkflowMenu = ref({ visible: false, x: 0, y: 0, bottom: null, workflowId: '' })
     const openWorkflowEditorTab = inject('openWorkflowEditorTab', null)
 
     const builtinCustomActiveCount = computed(() =>
@@ -1970,26 +1974,68 @@ export default {
     )
     const openBuiltinWorkflowContextMenu = (event, bw) => {
       if (!bw) return
+      const rawEv = (event && typeof event.clientX === 'number')
+        ? event
+        : ((typeof window !== 'undefined' && window.event) || event?.$orig || event)
+      const domTarget = [
+        rawEv?.currentTarget,
+        rawEv?.target,
+        event?.currentTarget,
+        event?.target,
+        event?.currentTarget?.$el,
+        event?.target?.$el,
+      ].find(el => el && typeof el.getBoundingClientRect === 'function')
+      let anchorEl = domTarget?.closest?.('.builtin-workflow-card-actions, .skill-builtin-pill, .builtin-workflow-card') || domTarget
+      if (!anchorEl && typeof document !== 'undefined') {
+        const candidates = document.querySelectorAll(`[data-bw-actions="${bw.id}"], [data-bw-card="${bw.id}"], [data-bw-pill="${bw.id}"]`)
+        anchorEl = Array.from(candidates).find(el => {
+          const r = el.getBoundingClientRect()
+          return r.width > 0 && r.height > 0
+        }) || null
+      }
+      const rect = anchorEl?.getBoundingClientRect?.() || null
+      const pointerX = (typeof rawEv?.clientX === 'number' && rawEv.clientX > 0)
+        ? rawEv.clientX
+        : (event?.detail?.x || rawEv?.changedTouches?.[0]?.clientX || rawEv?.touches?.[0]?.clientX || event?.changedTouches?.[0]?.clientX || 0)
+      const pointerY = (typeof rawEv?.clientY === 'number' && rawEv.clientY > 0)
+        ? rawEv.clientY
+        : (event?.detail?.y || rawEv?.changedTouches?.[0]?.clientY || rawEv?.touches?.[0]?.clientY || event?.changedTouches?.[0]?.clientY || 0)
+
+      const maxW = (typeof window !== 'undefined' && window.innerWidth) || 1024
+      const maxH = (typeof window !== 'undefined' && window.innerHeight) || 768
+      const menuW = Math.min(260, maxW - 24)
+      const menuEstH = 236
+
       let x = 220
       let y = 260
-      if (event && typeof event.clientX === 'number' && event.clientX > 0) {
-        x = event.clientX
-        y = event.clientY
-      } else if (event?.currentTarget?.getBoundingClientRect) {
-        const rect = event.currentTarget.getBoundingClientRect()
-        x = rect.left + Math.min(rect.width - 20, 80)
-        y = rect.bottom + 4
+      let bottom = null
+
+      if (rawEv?.type === 'contextmenu' && pointerX > 0 && pointerY > 0) {
+        x = pointerX
+        y = pointerY
+        if (y + menuEstH > maxH - 12 && rect && rect.top > menuEstH) {
+          bottom = Math.max(12, maxH - rect.top + 6)
+        }
+      } else if (rect && (rect.width > 0 || rect.height > 0)) {
+        x = rect.width < 140 ? Math.max(12, rect.right - menuW) : rect.left
+        if (rect.bottom + menuEstH > maxH - 12 && rect.top > menuEstH) {
+          bottom = Math.max(12, maxH - rect.top + 6)
+        } else {
+          y = rect.bottom + 6
+        }
+      } else if (pointerX > 0 || pointerY > 0) {
+        x = pointerX
+        y = pointerY
       }
-      if (typeof window !== 'undefined') {
-        const maxW = window.innerWidth || 1024
-        const maxH = window.innerHeight || 768
-        x = Math.max(12, Math.min(x, maxW - 272))
-        y = Math.max(12, Math.min(y, maxH - 280))
-      }
+
+      x = Math.max(12, Math.min(x, maxW - menuW - 12))
+      y = Math.max(12, Math.min(y, maxH - menuEstH))
+
       builtinWorkflowMenu.value = {
         visible: true,
         x,
         y,
+        bottom,
         workflowId: bw.id
       }
       loadBuiltinWorkflowStates()
@@ -5069,7 +5115,7 @@ export default {
   color: var(--awd-text-3);
   /* margin-top: 4px; */
 }
-.user-bubble .bubble-timestamp { text-align: right; }
+.bubble-footer .bubble-timestamp { text-align: end; white-space: nowrap; }
 
 /* 送达状态（dev-board#779 K7②）：模型还没读到的插话先淡一档，让它和已经被读过的
    消息一眼分得开；一行小字说明它在等什么。浅色外壳不变，只降不透明度。 */
@@ -7416,18 +7462,18 @@ export default {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  width: 100%;
   margin-top: 4px;
-  position: absolute;
-  bottom: -24px;
-  right: 0px;
-  min-width: 134px;
 }
 
 .rollback-btn,
 .branch-btn {
   display: flex;
   align-items: center;
-  margin-left: 8px;
+  flex: none;
+  white-space: nowrap;
   opacity: 0;
   transition: all 0.2s ease;
   cursor: pointer;
@@ -7437,8 +7483,8 @@ export default {
   /* border: 1px solid rgba(46, 90, 80, 0.1); */
 }
 
-.user-bubble:hover .rollback-btn,
-.user-bubble:hover .branch-btn {
+.message-row.user:hover .rollback-btn,
+.message-row.user:hover .branch-btn {
   opacity: 1;
 }
 
@@ -7449,8 +7495,8 @@ export default {
   cursor: not-allowed;
 }
 
-.user-bubble:hover .rollback-btn.is-disabled,
-.user-bubble:hover .branch-btn.is-disabled {
+.message-row.user:hover .rollback-btn.is-disabled,
+.message-row.user:hover .branch-btn.is-disabled {
   opacity: 0.4;
 }
 
@@ -7463,7 +7509,8 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 4px;
+  margin-inline-end: 4px;
+  flex: none;
   color: var(--awd-accent-text); /* Forest Green */
 }
 

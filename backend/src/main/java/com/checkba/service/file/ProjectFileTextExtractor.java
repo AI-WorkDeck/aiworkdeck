@@ -3,6 +3,7 @@
 
 package com.checkba.service.file;
 
+import com.checkba.service.sensitive.SensitiveRecoveryKit;
 import com.checkba.model.entity.MeetingRecording;
 import com.checkba.model.entity.ProjectFile;
 import com.checkba.model.entity.ProjectFileTextCache;
@@ -139,6 +140,8 @@ public class ProjectFileTextExtractor {
      */
     private String extractText(ProjectFile pf, boolean allowOcr) throws IOException {
         String name = pf.getName();
+        if (SensitiveRecoveryKit.isRecoveryFile(name) || SensitiveRecoveryKit.isRecoveryFile(pf.getFilePath()))
+            throw new IOException(SensitiveRecoveryKit.aiReadNotice());
         // 音频必须排在缓存之前：转写稿是会后才出现的，而音频字节一个都没变，
         // mtime+size 指纹也就一个字节都没变。把「请先转写」写进缓存，用户转写完成之后
         // 这份文件在本机永远读不到转写稿——而且不报错。见 audioText 的注释。
@@ -206,6 +209,7 @@ public class ProjectFileTextExtractor {
      * @param fileName 文件名或路径，只用于判断扩展名
      */
     public String extractBytes(String fileName, byte[] bytes) throws IOException {
+        if (SensitiveRecoveryKit.isRecoveryFile(fileName)) throw new IOException(SensitiveRecoveryKit.aiReadNotice());
         if (bytes == null) {
             return "";
         }

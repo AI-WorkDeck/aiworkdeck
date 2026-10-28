@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
 export default {
   "workspaceNavigation": "Espaço de trabalho",
   "workspaceAiActions": "Assistente de IA",
@@ -160,7 +159,7 @@ export default {
   "deResultEditing": "A cópia anonimizada está aberta para edição. O arquivo selecionado aqui não acompanha automaticamente a troca de abas de documento.",
   "dePdfResult": "O PDF anonimizado está aberto para revisão. Esta cópia rasterizada não pode ser editada ou restaurada diretamente.",
   "deRestoreResult": "Restaurar este resultado",
-  "deCurrentKit": "Usando o mapeamento criptografado gerado nesta execução",
+  "deCurrentKit": "Arquivo de restauração vinculado a este resultado",
   "dePreviewChanged": "As alterações do documento acabaram de ser salvas. Pré-visualize novamente antes de gerar.",
   "deDownloadRetry": "O resultado foi gerado, mas o download do arquivo de recuperação falhou. Use o botão de download abaixo.",
   "deAiWorkflowNotice": "As ferramentas de IA ficam no assistente à direita. Este painel nunca envia arquivos automaticamente. Conversas normais podem incluir histórico e contexto do projeto; elas não são isoladas. Verifique o contexto e exclua originais, mapeamentos de recuperação e arquivos restaurados.",
@@ -181,9 +180,9 @@ export default {
   "deExcludedPlaceholder": "Um valor completo detectado por linha para excluir falsos positivos.",
   "dePreview": "Pré-visualizar anonimização",
   "dePassword": "Senha de recuperação",
-  "dePasswordHint": "Pelo menos 10 caracteres; mantenha-a em segurança",
-  "deRestoreNotice": "Selecione um arquivo DOCX ou de texto contendo tokens (incluindo saída da IA), importe o arquivo de recuperação e informe a senha. Apenas tokens não alterados podem ser restaurados. Asteriscos e caixas pretas de PDF não podem.",
-  "deImportKit": "Importar arquivo de recuperação",
+  "dePasswordHint": "Digite a senha de restauração",
+  "deRestoreNotice": "Selecione acima o documento anonimizado que deseja restaurar. O arquivo de restauração será associado automaticamente; se não for encontrado, selecione o arquivo correspondente no projeto e digite a senha. Apenas os marcadores preservados podem ser restaurados, não os asteriscos nem os retângulos pretos dos PDFs.",
+  "deImportKit": "Selecionar arquivo de restauração do projeto",
   "deRestoreGenerate": "Gerar arquivo restaurado",
   "deMatchCount": "{count} ocorrências correspondidas / restauradas",
   "deSuspectCount": "{count} números semelhantes a IDs/cartões falharam na verificação do dígito verificador e foram mantidos intactos. Adicione os que deseja anonimizar em \"Termos Sensíveis Adicionais\" acima.",
@@ -191,8 +190,8 @@ export default {
   "deKitFallbackName": "arquivo-anonimizado",
   "deBrowseUnavailable": "Não foi possível abrir o seletor de arquivos do projeto. Use \"Importar Atual\", ou reabra o workbench e tente novamente.",
   "deDownloadKit": "Baixar novamente o arquivo de recuperação criptografado",
-  "deSaveKitNotice": "Download do arquivo de recuperação solicitado; verifique se ele foi salvo. Não será possível baixá-lo novamente após sair deste painel. Guarde-o fora do projeto e nunca o envie para a IA ou junto com o arquivo anonimizado. Senhas perdidas não podem ser recuperadas.",
-  "deKitInvalid": "Arquivo de recuperação inválido ou arquivo maior que 8 MB",
+  "deSaveKitNotice": "O documento anonimizado e o arquivo de restauração criptografado foram salvos no projeto. Guarde sua senha; ao selecionar o documento para restaurá-lo, o arquivo de restauração será associado automaticamente.",
+  "deKitInvalid": "Selecione o arquivo de restauração correspondente (.awd-recovery), não o documento anonimizado",
   "deSectionFileSelect": "Seleção de arquivo",
   "deFilePlaceholder": "Clique para selecionar ou arraste um arquivo",
   "deImportFromTabTitle": "Importar do arquivo aberto atualmente",
@@ -620,5 +619,7 @@ export default {
   "pwsDdAiRiskMatrixBtn": "IA: Resumir matriz de riscos de DD",
   "pwsDdAiRiskMatrixPrompt": "Resuma os principais riscos jurídicos de due diligence identificados no projeto atual em um resumo estruturado abrangendo riscos materiais, riscos gerais e recomendações de remediação.",
   "pwsTmAiSummaryBtn": "IA: Extrair atas de reuniões e itens de ação",
-  "pwsTmAiSummaryPrompt": "Revise as transcrições do Tencent Meeting no projeto atual e extraia as posições das partes interessadas principais, as questões em disputa e os itens de ação pós-reunião."
+  "pwsTmAiSummaryPrompt": "Revise as transcrições do Tencent Meeting no projeto atual e extraia as posições das partes interessadas principais, as questões em disputa e os itens de ação pós-reunião.",
+  "deRecoveryMissing": "Nenhum arquivo de restauração encontrado. Selecione o arquivo .awd-recovery correspondente no projeto.",
+  "deRestoreDocument": "Documento anonimizado a restaurar"
 }

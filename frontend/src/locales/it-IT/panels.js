@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
 export default {
   "workspaceNavigation": "Area di lavoro",
   "workspaceAiActions": "Assistenza IA",
@@ -160,7 +159,7 @@ export default {
   "deResultEditing": "La copia oscurata è aperta per la modifica. Il file selezionato qui non segue automaticamente il cambio di scheda documento.",
   "dePdfResult": "Il PDF oscurato è aperto per la revisione. Questa copia rasterizzata non può essere modificata o ripristinata direttamente.",
   "deRestoreResult": "Ripristina questo risultato",
-  "deCurrentKit": "Utilizzo della mappatura crittografata di questa esecuzione",
+  "deCurrentKit": "File di ripristino collegato a questo risultato",
   "dePreviewChanged": "Le modifiche al documento sono state appena salvate. Visualizza di nuovo l'anteprima prima di generare.",
   "deDownloadRetry": "Il risultato è stato creato, ma il download del file di ripristino non è riuscito. Usa il pulsante di download qui sotto.",
   "deAiWorkflowNotice": "Gli strumenti IA si trovano nell'assistente a destra. Questo pannello non invia mai file automaticamente. Le chat normali possono includere cronologia e contesto del progetto; non sono isolate. Verifica il contesto ed escludi originali, mappature di ripristino e file ripristinati.",
@@ -181,9 +180,9 @@ export default {
   "deExcludedPlaceholder": "Un valore rilevato per riga per escludere i falsi positivi.",
   "dePreview": "Anteprima oscuramento",
   "dePassword": "Password di ripristino",
-  "dePasswordHint": "Almeno 10 caratteri; conservala in modo sicuro",
-  "deRestoreNotice": "Seleziona un file DOCX o di testo contenente token (incluso l'output dell'IA), importa il relativo file di ripristino e inserisci la password. Solo i token rimasti invariati possono essere ripristinati. Asterischi e riquadri neri nei PDF non possono essere ripristinati.",
-  "deImportKit": "Importa file di ripristino",
+  "dePasswordHint": "Inserisci la password di ripristino",
+  "deRestoreNotice": "Seleziona sopra il documento anonimizzato da ripristinare. Il file di ripristino verrà associato automaticamente; se non viene trovato, seleziona il file corrispondente dal progetto e inserisci la password. È possibile ripristinare solo i segnaposto conservati, non gli asterischi né i riquadri neri dei PDF.",
+  "deImportKit": "Seleziona il file di ripristino dal progetto",
   "deRestoreGenerate": "Genera file ripristinato",
   "deMatchCount": "{count} occorrenze trovate / ripristinate",
   "deSuspectCount": "Altri {count} numeri simili a documenti/carte non hanno superato il controllo della cifra di verifica e non sono stati toccati. Aggiungi quelli che desideri oscurare in \"Termini sensibili aggiuntivi\" qui sopra.",
@@ -191,8 +190,8 @@ export default {
   "deKitFallbackName": "file-oscurato",
   "deBrowseUnavailable": "Impossibile aprire il selettore dei file di progetto. Usa \"Importa attuale\" oppure riapri l'area di lavoro e riprova.",
   "deDownloadKit": "Scarica di nuovo il file di ripristino crittografato",
-  "deSaveKitNotice": "Download del file di ripristino richiesto; verificare che sia stato salvato. Non potrà essere scaricato di nuovo dopo aver chiuso questo pannello. Conservarlo fuori dal progetto e non inviarlo mai all'IA né insieme al file oscurato. Le password perse non possono essere recuperate.",
-  "deKitInvalid": "File di ripristino non valido o file di dimensioni superiori a 8 MB",
+  "deSaveKitNotice": "Il documento anonimizzato e il file di ripristino cifrato sono stati salvati nel progetto. Conserva la password; selezionando il documento da ripristinare, il relativo file di ripristino verrà associato automaticamente.",
+  "deKitInvalid": "Seleziona il file di ripristino corrispondente (.awd-recovery), non il documento anonimizzato",
   "deSectionFileSelect": "Selezione file",
   "deFilePlaceholder": "Fai clic per selezionare o trascina un file",
   "deImportFromTabTitle": "Importa dal file attualmente aperto",
@@ -620,5 +619,7 @@ export default {
   "pwsDdAiRiskMatrixBtn": "IA: Riepiloga la matrice dei rischi DD",
   "pwsDdAiRiskMatrixPrompt": "Riepiloghi i principali rischi legali di due diligence individuati nel progetto corrente in un riepilogo strutturato che copra i rischi materiali, i rischi generali e le raccomandazioni di rimedio.",
   "pwsTmAiSummaryBtn": "IA: Estrai verbali di riunione e azioni",
-  "pwsTmAiSummaryPrompt": "Esamini le trascrizioni di Tencent Meeting nel progetto corrente ed estragga le posizioni dei principali stakeholder, le questioni controverse e le azioni successive alla riunione."
+  "pwsTmAiSummaryPrompt": "Esamini le trascrizioni di Tencent Meeting nel progetto corrente ed estragga le posizioni dei principali stakeholder, le questioni controverse e le azioni successive alla riunione.",
+  "deRecoveryMissing": "File di ripristino non ancora trovato. Seleziona il file .awd-recovery corrispondente dal progetto.",
+  "deRestoreDocument": "Documento anonimizzato da ripristinare"
 }

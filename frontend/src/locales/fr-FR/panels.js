@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
 export default {
   "workspaceNavigation": "Espace de travail",
   "workspaceAiActions": "Assistance IA",
@@ -160,7 +159,7 @@ export default {
   "deResultEditing": "La copie anonymisée est ouverte en modification. La sélection ici ne suit pas automatiquement les changements d'onglets de documents.",
   "dePdfResult": "Le PDF anonymisé est ouvert en consultation. Cette copie rastérisée ne peut pas être directement modifiée ni restaurée.",
   "deRestoreResult": "Restaurer ce résultat",
-  "deCurrentKit": "En utilisant le mappage chiffré de cette exécution",
+  "deCurrentKit": "Fichier de restauration associé à ce résultat",
   "dePreviewChanged": "Les modifications du document viennent d'être enregistrées. Vérifiez à nouveau l'aperçu avant de générer.",
   "deDownloadRetry": "Le résultat a été créé, mais le téléchargement de restauration a échoué. Utilisez le bouton de téléchargement ci-dessous.",
   "deAiWorkflowNotice": "Les outils IA se trouvent dans l'assistant à droite. Ce panneau n'envoie jamais de fichiers automatiquement. Les conversations normales peuvent inclure l'historique et le contexte du projet ; elles ne sont pas isolées. Vérifiez le contexte et excluez les originaux, les mappages de restauration et les fichiers restaurés.",
@@ -181,9 +180,9 @@ export default {
   "deExcludedPlaceholder": "Une valeur détectée complète par ligne pour exclure les faux positifs.",
   "dePreview": "Aperçu de l'anonymisation",
   "dePassword": "Mot de passe de récupération",
-  "dePasswordHint": "Au moins 10 caractères ; conservez-le précieusement",
-  "deRestoreNotice": "Sélectionnez un fichier DOCX ou texte contenant des jetons (y compris une sortie générée par l'IA), importez son fichier de restauration et saisissez le mot de passe. Seuls les jetons inchangés peuvent être restaurés. Les astérisques et les zones noires PDF ne peuvent pas l'être.",
-  "deImportKit": "Importer le fichier de restauration",
+  "dePasswordHint": "Saisissez le mot de passe de restauration",
+  "deRestoreNotice": "Sélectionnez ci-dessus le document expurgé à restaurer. Son fichier de restauration sera associé automatiquement. Si aucun fichier n’est trouvé, sélectionnez le fichier correspondant dans le projet, puis saisissez le mot de passe. Seuls les marqueurs conservés peuvent être restaurés, pas les astérisques ni les zones noires des PDF.",
+  "deImportKit": "Choisir le fichier de restauration dans le projet",
   "deRestoreGenerate": "Générer le fichier restauré",
   "deMatchCount": "{count} occurrence(s) correspondante(s) / restaurée(s)",
   "deSuspectCount": "{count} autre(s) numéro(s) de type pièce d'identité ou carte n'ont pas passé le contrôle de clé et ont été laissés intacts. Ajoutez ceux que vous souhaitez occulter dans « Termes sensibles supplémentaires » ci-dessus.",
@@ -191,8 +190,8 @@ export default {
   "deKitFallbackName": "fichier-anonymise",
   "deBrowseUnavailable": "Impossible d'ouvrir le sélecteur de fichiers du projet. Utilisez plutôt « Importer le fichier actuel », ou rouvrez l'espace de travail et réessayez.",
   "deDownloadKit": "Télécharger à nouveau le fichier de récupération chiffré",
-  "deSaveKitNotice": "Téléchargement du fichier de récupération demandé ; vérifiez qu'il a bien été enregistré. Il ne pourra plus être téléchargé après la fermeture de ce panneau. Conservez-le hors du projet et ne l'envoyez jamais à l'IA ni avec le fichier expurgé. Les mots de passe perdus ne peuvent pas être récupérés.",
-  "deKitInvalid": "Fichier de récupération invalide ou fichier de plus de 8 Mo",
+  "deSaveKitNotice": "Le document expurgé et le fichier de restauration chiffré ont été enregistrés dans le projet. Conservez votre mot de passe en lieu sûr. Sélectionner le document à restaurer permet d’associer automatiquement son fichier de restauration.",
+  "deKitInvalid": "Sélectionnez le fichier de restauration correspondant (.awd-recovery), et non le document expurgé",
   "deSectionFileSelect": "Sélection de fichier",
   "deFilePlaceholder": "Cliquez pour sélectionner ou glissez-déposez un fichier",
   "deImportFromTabTitle": "Importer depuis le fichier actuellement ouvert",
@@ -620,5 +619,7 @@ export default {
   "pwsDdAiRiskMatrixBtn": "IA : résumer la matrice des risques de DD",
   "pwsDdAiRiskMatrixPrompt": "Veuillez résumer les principaux risques juridiques de due diligence identifiés dans le projet en cours sous forme de synthèse structurée couvrant les risques majeurs, les risques généraux et les recommandations de remédiation.",
   "pwsTmAiSummaryBtn": "IA : extraire les comptes rendus de réunion et les actions à suivre",
-  "pwsTmAiSummaryPrompt": "Veuillez examiner les transcriptions des réunions Tencent Meeting du projet en cours et extraire les positions des parties prenantes clés, les points litigieux et les actions à suivre après la réunion."
+  "pwsTmAiSummaryPrompt": "Veuillez examiner les transcriptions des réunions Tencent Meeting du projet en cours et extraire les positions des parties prenantes clés, les points litigieux et les actions à suivre après la réunion.",
+  "deRecoveryMissing": "Aucun fichier de restauration trouvé. Sélectionnez le fichier .awd-recovery correspondant dans le projet.",
+  "deRestoreDocument": "Document expurgé à restaurer"
 }

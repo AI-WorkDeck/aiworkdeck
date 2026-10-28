@@ -56,7 +56,7 @@ import {
   requestPluginLawFirm,
   createEvidenceLink, addEvidenceTargets, getEvidenceLink, listEvidenceLinks,
   getTeam, getProjectMembers, getCurrentUser, searchProjectContent, getProjectTags,
-  getSensitiveOptions, previewSensitiveFile, desensitizeFile, restoreSensitiveFile,
+  getSensitiveOptions, previewSensitiveFile, desensitizeFile, restoreSensitiveFile, getSensitiveRecovery,
   getLitigationVisualStatus, getLitigationDiagrams, getLitigationKickoffPrompt, restyleLitigationDiagram, packStatus, packInstall
 } from '@/services/api.js'
 import { host } from '@/services/host.js'
@@ -424,7 +424,7 @@ export default {
         const insight = createPluginInsightServices({ projectId: () => this.projectId, permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration, actions, listFiles: () => this.listProjectFiles() })
         this._businessServices = createPluginBusinessServices({
           delegates: { ...Object.fromEntries(['calendar', 'favorites', 'clipboard'].map(service => [service, (operation, params, signal) => collections.request(service, operation, params, signal)])), voice: (operation, params, signal) => voice.request(operation, params, signal), insight: (operation, params, signal) => insight.request(operation, params, signal) },
-          api: { searchProjectContent, getProjectTags, getSensitiveOptions, previewSensitiveFile, desensitizeFile, restoreSensitiveFile,
+          api: { searchProjectContent, getProjectTags, getSensitiveOptions, previewSensitiveFile, desensitizeFile, restoreSensitiveFile, getSensitiveRecovery,
             getLitigationVisualStatus, getLitigationDiagrams, getLitigationKickoffPrompt, restyleLitigationDiagram, packStatus, packInstall },
           projectId: () => this.projectId,
           permissions: () => this.effectivePermissions(),

@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
 export default {
   "workspaceNavigation": "Espacio de trabajo",
   "workspaceAiActions": "Asistencia de IA",
@@ -160,7 +159,7 @@ export default {
   "deResultEditing": "La copia anonimizada está abierta para su edición. El archivo seleccionado aquí no cambia automáticamente al cambiar de pestaña de documento.",
   "dePdfResult": "El PDF anonimizado está abierto para su revisión. Esta copia rasterizada no se puede editar ni restaurar directamente.",
   "deRestoreResult": "Restaurar este resultado",
-  "deCurrentKit": "Usando el mapeo cifrado generado en esta ejecución",
+  "deCurrentKit": "Archivo de restauración vinculado a este resultado",
   "dePreviewChanged": "Los cambios del documento se acaban de guardar. Vuelva a previsualizar antes de generar.",
   "deDownloadRetry": "El resultado se ha generado, pero falló la descarga del archivo de restauración. Utilice el botón de descarga de abajo.",
   "deAiWorkflowNotice": "Las herramientas de IA están en el asistente de la derecha. Este panel nunca envía archivos automáticamente. Las conversaciones normales pueden incluir el historial y el contexto del proyecto; no están aisladas. Revise el contexto y excluya los originales, los mapeos de restauración y los archivos restaurados.",
@@ -181,9 +180,9 @@ export default {
   "deExcludedPlaceholder": "Un valor detectado por línea para excluir falsos positivos.",
   "dePreview": "Vista previa de la anonimización",
   "dePassword": "Contraseña de recuperación",
-  "dePasswordHint": "Al menos 10 caracteres; guárdela en un lugar seguro",
-  "deRestoreNotice": "Seleccione un archivo DOCX o de texto con códigos (incluida la salida de IA), importe su archivo de restauración e introduzca la contraseña. Solo se pueden restaurar los códigos intactos. Los asteriscos y los recuadros negros de PDF no se pueden restaurar.",
-  "deImportKit": "Importar archivo de restauración",
+  "dePasswordHint": "Introduzca la contraseña de restauración",
+  "deRestoreNotice": "Seleccione arriba el documento anonimizado que desea restaurar. Su archivo de restauración se asociará automáticamente; si no se encuentra, seleccione el archivo correspondiente del proyecto e introduzca la contraseña. Solo se pueden restaurar los marcadores conservados, no los asteriscos ni los recuadros negros de los PDF.",
+  "deImportKit": "Seleccionar archivo de restauración del proyecto",
   "deRestoreGenerate": "Generar archivo restaurado",
   "deMatchCount": "{count} coincidencias / restauraciones en esta ejecución",
   "deSuspectCount": " otros {count} números similares a documentos/tarjetas no superaron el dígito de control y no se procesaron. Añada los que desee ocultar en «Términos sensibles adicionales» más arriba.",
@@ -191,8 +190,8 @@ export default {
   "deKitFallbackName": "archivo-anonimizado",
   "deBrowseUnavailable": "No se pudo abrir el selector de archivos del proyecto. Utilice «Importar actual» en su lugar, o vuelva a abrir el área de trabajo e inténtelo de nuevo.",
   "deDownloadKit": "Descargar de nuevo el archivo de recuperación cifrado",
-  "deSaveKitNotice": "Descarga del archivo de recuperación solicitada; compruebe que se ha guardado. No se podrá volver a descargar después de salir de este panel. Guárdelo fuera del proyecto y nunca lo envíe a la IA ni junto con el archivo censurado. Las contraseñas perdidas no se pueden recuperar.",
-  "deKitInvalid": "Archivo de recuperación no válido o archivo de más de 8 MB",
+  "deSaveKitNotice": "El documento anonimizado y el archivo de restauración cifrado se han guardado en el proyecto. Conserve su contraseña; al seleccionar el documento para restaurarlo se asociará automáticamente su archivo de restauración.",
+  "deKitInvalid": "Seleccione el archivo de restauración correspondiente (.awd-recovery), no el documento anonimizado",
   "deSectionFileSelect": "Selección de archivo",
   "deFilePlaceholder": "Haga clic para seleccionar o arrastre un archivo",
   "deImportFromTabTitle": "Importar desde el archivo abierto actualmente",
@@ -620,5 +619,7 @@ export default {
   "pwsDdAiRiskMatrixBtn": "IA: Resumir matriz de riesgos de DD",
   "pwsDdAiRiskMatrixPrompt": "Resuma los principales riesgos legales de debida diligencia identificados en el proyecto actual en un resumen estructurado que abarque riesgos materiales, riesgos generales y recomendaciones de subsanación.",
   "pwsTmAiSummaryBtn": "IA: Extraer actas de reuniones y acciones",
-  "pwsTmAiSummaryPrompt": "Revise las transcripciones de Tencent Meeting del proyecto actual y extraiga las posiciones de las partes interesadas clave, las cuestiones en disputa y las acciones posteriores a la reunión."
+  "pwsTmAiSummaryPrompt": "Revise las transcripciones de Tencent Meeting del proyecto actual y extraiga las posiciones de las partes interesadas clave, las cuestiones en disputa y las acciones posteriores a la reunión.",
+  "deRecoveryMissing": "No se ha encontrado el archivo de restauración. Seleccione el archivo .awd-recovery correspondiente del proyecto.",
+  "deRestoreDocument": "Documento anonimizado que se restaurará"
 }

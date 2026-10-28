@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
 export default {
   "workspaceNavigation": "Arbeitsbereich",
   "workspaceAiActions": "KI-Unterstützung",
@@ -160,7 +159,7 @@ export default {
   "deResultEditing": "Die geschwärzte Kopie ist zur Bearbeitung geöffnet. Die hier gewählte Datei folgt einem Wechsel der Dokument-Tabs nicht automatisch.",
   "dePdfResult": "Das geschwärzte PDF ist zur Prüfung geöffnet. Diese gerasterte Kopie kann nicht direkt bearbeitet oder wiederhergestellt werden.",
   "deRestoreResult": "Dieses Ergebnis wiederherstellen",
-  "deCurrentKit": "Verwendet die verschlüsselte Zuordnung aus diesem Durchlauf",
+  "deCurrentKit": "Wiederherstellungsdatei für dieses Ergebnis verknüpft",
   "dePreviewChanged": "Dokumentänderungen wurden gerade gespeichert. Bitte vor dem Erstellen erneut in der Vorschau prüfen.",
   "deDownloadRetry": "Das Ergebnis wurde erstellt, aber der Download der Wiederherstellungsdatei ist fehlgeschlagen. Nutzen Sie die Download-Schaltfläche unten.",
   "deAiWorkflowNotice": "KI-Funktionen befinden sich im Assistenten rechts. Dieses Panel sendet niemals automatisch Dateien. Normale Chats können Verlauf und Projektkontext enthalten; sie sind nicht isoliert. Prüfen Sie den Kontext und schließen Sie Originale, Wiederherstellungszuordnungen und wiederhergestellte Dateien aus.",
@@ -181,9 +180,9 @@ export default {
   "deExcludedPlaceholder": "Ein erkannter Wert pro Zeile, um Fehlalarme auszuschließen.",
   "dePreview": "Schwärzungsvorschau",
   "dePassword": "Wiederherstellungspasswort",
-  "dePasswordHint": "Mindestens 10 Zeichen; sicher aufbewahren",
-  "deRestoreNotice": "Wählen Sie eine DOCX- oder Textdatei mit Platzhaltern (auch KI-Ausgaben), importieren Sie die zugehörige Wiederherstellungsdatei und geben Sie das Passwort ein. Nur unveränderte Platzhalter können wiederhergestellt werden; Sternchen und schwarze PDF-Balken nicht.",
-  "deImportKit": "Wiederherstellungsdatei importieren",
+  "dePasswordHint": "Wiederherstellungspasswort eingeben",
+  "deRestoreNotice": "Wählen Sie oben das geschwärzte Dokument zur Wiederherstellung aus. Die Wiederherstellungsdatei wird automatisch zugeordnet. Wird keine gefunden, wählen Sie die zugehörige Datei aus dem Projekt und geben Sie das Passwort ein. Nur erhaltene Platzhalter können wiederhergestellt werden; Sternchen und schwarze PDF-Flächen nicht.",
+  "deImportKit": "Wiederherstellungsdatei aus dem Projekt wählen",
   "deRestoreGenerate": "Wiederhergestellte Datei erstellen",
   "deMatchCount": "{count} Vorkommen abgeglichen / wiederhergestellt",
   "deSuspectCount": "{count} weitere ausweis-/kartenähnliche Nummern haben die Prüfziffernprüfung nicht bestanden und wurden unverändert gelassen. Fügen Sie diejenigen, die geschwärzt werden sollen, oben unter „Zusätzliche sensible Begriffe“ hinzu.",
@@ -191,8 +190,8 @@ export default {
   "deKitFallbackName": "geschwaerzte-datei",
   "deBrowseUnavailable": "Die Projektdateiauswahl konnte nicht geöffnet werden. Verwenden Sie stattdessen „Aktuelle importieren“ oder öffnen Sie die Workbench erneut und versuchen Sie es noch einmal.",
   "deDownloadKit": "Verschlüsselte Wiederherstellungsdatei erneut herunterladen",
-  "deSaveKitNotice": "Download der Wiederherstellungsdatei angefordert; prüfen Sie, ob sie gespeichert wurde. Nach dem Verlassen dieses Bedienfelds kann sie nicht erneut heruntergeladen werden. Bewahren Sie sie außerhalb des Projekts auf und senden Sie sie niemals an die KI oder zusammen mit der geschwärzten Datei. Verlorene Passwörter können nicht wiederhergestellt werden.",
-  "deKitInvalid": "Ungültige Wiederherstellungsdatei oder Datei größer als 8 MB",
+  "deSaveKitNotice": "Das geschwärzte Dokument und die verschlüsselte Wiederherstellungsdatei wurden im Projekt gespeichert. Bewahren Sie Ihr Passwort sicher auf. Bei der Auswahl des Dokuments zur Wiederherstellung wird die zugehörige Datei automatisch zugeordnet.",
+  "deKitInvalid": "Wählen Sie die zugehörige Wiederherstellungsdatei (.awd-recovery), nicht das geschwärzte Dokument",
   "deSectionFileSelect": "Dateiauswahl",
   "deFilePlaceholder": "Klicken Sie, um eine Datei auszuwählen, oder ziehen Sie sie hierher",
   "deImportFromTabTitle": "Aus der aktuell geöffneten Datei importieren",
@@ -620,5 +619,7 @@ export default {
   "pwsDdAiRiskMatrixBtn": "KI: DD-Risikomatrix zusammenfassen",
   "pwsDdAiRiskMatrixPrompt": "Bitte fassen Sie die im aktuellen Projekt identifizierten zentralen rechtlichen Due-Diligence-Risiken in einer strukturierten Zusammenfassung zusammen, die wesentliche Risiken, allgemeine Risiken und Empfehlungen zur Behebung umfasst.",
   "pwsTmAiSummaryBtn": "KI: Besprechungsprotokolle & Maßnahmen extrahieren",
-  "pwsTmAiSummaryPrompt": "Bitte prüfen Sie die Tencent Meeting-Transkripte im aktuellen Projekt und extrahieren Sie die Positionen wichtiger Stakeholder, strittige Punkte sowie die Maßnahmen nach der Besprechung."
+  "pwsTmAiSummaryPrompt": "Bitte prüfen Sie die Tencent Meeting-Transkripte im aktuellen Projekt und extrahieren Sie die Positionen wichtiger Stakeholder, strittige Punkte sowie die Maßnahmen nach der Besprechung.",
+  "deRecoveryMissing": "Noch keine Wiederherstellungsdatei gefunden. Wählen Sie die zugehörige .awd-recovery-Datei aus dem Projekt.",
+  "deRestoreDocument": "Geschwärztes Dokument zur Wiederherstellung"
 }
