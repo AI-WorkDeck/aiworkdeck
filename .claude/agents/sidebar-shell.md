@@ -182,7 +182,7 @@ rail 点击 → toggleLeftPane(key)（:2988）：staging 单独分支 → 把当
 
 ## 左栏入口（frontend/src/config/leftSidebarPlugins.js）
 
-**侧栏溢出（dev-board#1546）**：普通工具放在 `.rail-tools`，保留既有排序，独立纵向滚动；`.rail-footer` 固定暂存区、版本控制、项目成员和反馈。两区内按钮禁止 flex 压缩；不要给整个 `.left-rail` 加 overflow 裁剪，否则成员浮层会被裁掉。隔离布局验证：`node frontend/tests/project-home/rail-overflow-ui.mjs`（需 Chrome）；覆盖30工具、480/640/900窗口高度、滚动后点击末项与成员浮层，非正式客户端验收。
+**侧栏溢出（dev-board#1546）**：普通工具放在 `.rail-tools`，保留既有排序，独立纵向滚动；`.rail-footer` 固定暂存区、版本控制、项目成员和反馈。两区内按钮禁止 flex 压缩；`.rail-tools` 与 `ProjectListPane` 根节点复用 `.awd-hairline-scroll`（dev-board#1575），4px 滑轨静止透明、悬停显形，不再在 rail 写常驻 thumb。不要给整个 `.left-rail` 加 overflow 裁剪，否则成员浮层会被裁掉。隔离布局验证：`node frontend/tests/project-home/rail-overflow-ui.mjs`（需 Chrome）；覆盖30工具、480/640/900窗口高度、滚动后点击末项与成员浮层，非正式客户端验收。
 
 
 **rail 从上到下的顺序就是 `LEFT_SIDEBAR_PLUGINS` 数组的顺序，只有这一个出处。**
