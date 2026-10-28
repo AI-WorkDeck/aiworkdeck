@@ -46,7 +46,7 @@ function setup(shapes = []) {
   const collection = { getCount: () => pages.length, getByIndex: i => pages[i],
     insertNewByIndex(index) { const added = page(); added.shapes.push({ kind: 'placeholder' }); pages.splice(Math.min(index + 1, pages.length), 0, added); return added } }
   const realm = vm.createContext({
-    xModel: { getDrawPages: () => collection, createInstance: () => properties({}) },
+    xModel: { getDrawPages: () => collection, createInstance: () => properties({}), setModified() {} },
     isImpressDoc: () => true, ensureShapeNames: () => {}, shapeKind: s => s.kind || 'text',
     shapeText: s => s.getText?.().getString() || '', slideFail: error => ({ success: false, error, message: error }),
     errStr: e => e.message, locatePageIndex: page => pages.indexOf(page), movePageTo: () => -1,
@@ -469,3 +469,39 @@ test('image cover uses native pixel-to-logic conversion on both standard and Ret
     assert.ok(crop.Left+crop.Right<naturalWidth);
   }
 });
+
+
+test('shape text marks modified only after a real successful write and preserves newline bytes', () => {
+  for (const replacement of ['first\nsecond', String.raw`first\nsecond`]) {
+    let value = 'old', marked = 0
+    const text = { getString: () => value, setString: v => { value = v } }
+    const s = setup([shape('body', text)])
+    s.realm.xModel.setModified = flag => { assert.equal(flag, true); marked++ }
+    const setText = method('slide_set_shape_text', s.realm)
+    assert.equal(setText({ slideNumber: 1, shapeName: 'body', text: replacement }).success, true)
+    assert.equal(value, replacement); assert.equal(marked, 1)
+    assert.equal(setText({ slideNumber: 1, shapeName: 'body', text: replacement }).success, true)
+    assert.equal(marked, 1)
+    text.setString = () => { throw new Error('write failed') }
+    assert.equal(setText({ slideNumber: 1, shapeName: 'body', text: 'different' }).success, false)
+    assert.equal(marked, 1)
+  }
+})
+
+test('replacement marks each successful write, including before a later partial failure', () => {
+  const text = textObject('a a'), s = setup([shape('body', text)])
+  let marked = 0
+  s.realm.xModel.setModified = flag => { assert.equal(flag, true); marked++ }
+  assert.equal(s.replace({ searchText: 'missing', replaceText: 'b', all: true }).replaced, 0)
+  assert.equal(s.replace({ searchText: 'a', replaceText: 'a', all: true }).replaced, 0)
+  assert.equal(marked, 0)
+  const cursor = text.createTextCursor
+  let calls = 0
+  text.createTextCursor = () => {
+    if (++calls === 2) throw new Error('second replacement failed')
+    return cursor()
+  }
+  const result = s.replace({ searchText: 'a', replaceText: 'b', all: true })
+  assert.equal(result.success, false); assert.equal(result.outcomeUnknown, true)
+  assert.equal(text.getString(), 'a b'); assert.equal(marked, 1)
+})
