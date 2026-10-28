@@ -2387,6 +2387,10 @@ export function previewSensitiveFile(payload, opts = {}) {
   return request({ signal: opts.signal, logBody: false, url: '/api/sensitive/preview', method: 'POST', data: payload, timeout: 300000 });
 }
 
+export function getSensitiveRecovery(payload, opts = {}) {
+  return request({ signal: opts.signal, logBody: false, url: '/api/sensitive/recovery', method: 'POST', data: payload });
+}
+
 export function restoreSensitiveFile(payload, opts = {}) {
   return request({ signal: opts.signal, logBody: false, url: '/api/sensitive/restore', method: 'POST', data: payload, timeout: 300000 });
 }

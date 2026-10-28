@@ -19,9 +19,17 @@ public final class SensitiveRecoveryKit {
     private static final ObjectMapper JSON = new ObjectMapper();
     private SensitiveRecoveryKit() {}
 
+    public static boolean isRecoveryFile(String name) {
+        return name != null && name.toLowerCase(Locale.ROOT).endsWith(".awd-recovery");
+    }
+
+    public static String aiReadNotice() {
+        return LangText.of("加密恢复材料仅供复敏功能使用，不作为 AI 参考材料读取", "Encrypted recovery material is only for restoration and is not read as AI reference material");
+    }
+
     public static void validatePassword(String password) {
-        if (password == null || password.length() < 10 || password.length() > 1024) {
-            throw new IllegalArgumentException(LangText.of("复敏密码须为10至1024个字符，请妥善保管", "Restoration password must be 10 to 1024 characters; please keep it safe"));
+        if (password == null || password.isBlank() || password.length() > 1024) {
+            throw new IllegalArgumentException(LangText.of("请输入复敏密码（最多1024个字符），请妥善保管", "Enter a restoration password (up to 1024 characters); please keep it safe"));
         }
     }
 

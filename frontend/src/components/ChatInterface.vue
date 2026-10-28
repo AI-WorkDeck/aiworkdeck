@@ -331,7 +331,8 @@
           :class="msg.role.toLowerCase()"
         >
           <!-- User Message -->
-          <div v-if="msg.role === 'USER'" class="user-bubble" :class="{ 'is-unread': msg.receiptState === 'pending' }">
+          <template v-if="msg.role === 'USER'">
+          <div class="user-bubble" :class="{ 'is-unread': msg.receiptState === 'pending' }">
             <!-- Image Thumbnails (above message) -->
             <view v-if="msg.images && msg.images.length > 0" class="user-bubble-images">
                <image v-for="(img, idx) in msg.images" :key="idx" :src="img.path" mode="aspectFill" class="bubble-image-thumb" />
@@ -357,6 +358,7 @@
             <view v-if="msg.contextNotices && msg.contextNotices.length" class="context-notices">
               <text v-for="(n, ni) in msg.contextNotices" :key="ni" class="context-notice">{{ contextNoticeText(n) }}</text>
             </view>
+          </div>
             <div class="bubble-footer">
               <!-- 从此分叉（dev-board#779 K18，审查 D-06/F4）：非破坏。原对话一个字不动，
                    只把「到这条为止」复制成一条新对话并切过去。可用性判据与回退同源
@@ -399,7 +401,7 @@
               <span v-if="receiptLabel(msg)" class="bubble-receipt" :class="{ 'is-pending': msg.receiptState === 'pending' }">{{ receiptLabel(msg) }}</span>
               <span v-if="msg.timestamp" class="bubble-timestamp user">{{ msg.timestamp }}</span>
             </div>
-          </div>
+          </template>
 
           <!-- Assistant Message (Root Bubble) -->
           <div v-else-if="msg.role === 'ASSISTANT'" class="assistant-root-wrapper">
@@ -5070,7 +5072,7 @@ export default {
   color: var(--awd-text-3);
   /* margin-top: 4px; */
 }
-.user-bubble .bubble-timestamp { text-align: right; }
+.bubble-footer .bubble-timestamp { text-align: end; white-space: nowrap; }
 
 /* 送达状态（dev-board#779 K7②）：模型还没读到的插话先淡一档，让它和已经被读过的
    消息一眼分得开；一行小字说明它在等什么。浅色外壳不变，只降不透明度。 */
@@ -7417,18 +7419,18 @@ export default {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  width: 100%;
   margin-top: 4px;
-  position: absolute;
-  bottom: -24px;
-  right: 0px;
-  min-width: 134px;
 }
 
 .rollback-btn,
 .branch-btn {
   display: flex;
   align-items: center;
-  margin-left: 8px;
+  flex: none;
+  white-space: nowrap;
   opacity: 0;
   transition: all 0.2s ease;
   cursor: pointer;
@@ -7438,8 +7440,8 @@ export default {
   /* border: 1px solid rgba(46, 90, 80, 0.1); */
 }
 
-.user-bubble:hover .rollback-btn,
-.user-bubble:hover .branch-btn {
+.message-row.user:hover .rollback-btn,
+.message-row.user:hover .branch-btn {
   opacity: 1;
 }
 
@@ -7450,8 +7452,8 @@ export default {
   cursor: not-allowed;
 }
 
-.user-bubble:hover .rollback-btn.is-disabled,
-.user-bubble:hover .branch-btn.is-disabled {
+.message-row.user:hover .rollback-btn.is-disabled,
+.message-row.user:hover .branch-btn.is-disabled {
   opacity: 0.4;
 }
 
@@ -7464,7 +7466,8 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 4px;
+  margin-inline-end: 4px;
+  flex: none;
   color: var(--awd-accent-text); /* Forest Green */
 }
 

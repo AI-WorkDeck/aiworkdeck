@@ -71,6 +71,7 @@ button { margin:0; padding:0; border:0; background:transparent; font:inherit; li
 button::after { border:0; }
 button:focus-visible, select:focus-visible { outline:2px solid var(--awd-accent); outline-offset:2px; }
 .shortcut-actions { padding:16px 14px 12px; display:flex; flex-direction:column; gap:8px; }
+.shortcut-primary, .shortcut-link, .shortcut-segments button { display:flex; align-items:center; justify-content:center; text-align:center; }
 .shortcut-primary { min-height:34px; background:var(--awd-accent); color:var(--awd-text-on-accent); border-radius:var(--awd-radius-md); font-weight:600; }
 .shortcut-link { font-size:12px; color:var(--awd-accent-text); padding:3px; }
 .shortcut-section { padding:14px; border-top:1px solid var(--awd-border); display:flex; flex-direction:column; gap:10px; }

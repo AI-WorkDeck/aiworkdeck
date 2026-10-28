@@ -95,3 +95,12 @@ test('the packaged search bridge includes tagged media and archives, with or wit
   const keyword = await services.request('search', 'query', { query: 'photo', tagIds: [7] })
   assert.deepEqual(keyword.results.map(file => file.fileName), ['photo.png'])
 })
+
+test('recovery material reads only a current project file and never prepares an editor', async () => {
+  const calls = []
+  const { services } = fixture({ api: { getSensitiveRecovery: async payload => { calls.push(payload); return { recoveryKit: 'encrypted' } } } })
+  assert.deepEqual(await services.request('sensitive', 'recovery', { fileId: 1, projectId: 99 }), { recoveryKit: 'encrypted' })
+  assert.deepEqual(calls, [{ fileId: 1 }])
+  await assert.rejects(services.request('sensitive', 'recovery', { fileId: 2 }), { code: 'not_found' })
+  assert.equal(calls.length, 1)
+})
