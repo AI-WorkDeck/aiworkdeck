@@ -200,6 +200,7 @@ const NAMES = {
   sheet_group_rows_cols: { zh: '行列分组', en: 'Group rows/columns' },
   sheet_add_pivot_table: { zh: '插入数据透视表', en: 'Add pivot table' },
   // 演示文稿（Impress / pptx）slide_* 原语（Phase 1：打开/读取/文本编辑）
+  slide_create_file: { zh: '新建演示文稿', en: 'Create presentation' },
   slide_get_overview: { zh: '查看幻灯片总览', en: 'Slide overview' },
   slide_get_page: { zh: '读取幻灯片明细', en: 'Read slide details' },
   slide_read_notes: { zh: '读取备注', en: 'Read notes' },
@@ -330,6 +331,7 @@ const NAMES = {
   pptx_apply_format: { zh: '设置PPT格式', en: 'Format slides' },
   // PDF
   pdf_list_files: { zh: '列出PDF文件', en: 'List PDF files' },
+  pdf_inspect_visual: { zh: '检查页面设计', en: 'Inspect page design' },
   pdf_inspect: { zh: '读取PDF内容', en: 'Inspect PDF' },
   pdf_highlight: { zh: '高亮PDF文本', en: 'Highlight PDF text' },
   pdf_annotate: { zh: '添加PDF批注', en: 'Annotate PDF' },

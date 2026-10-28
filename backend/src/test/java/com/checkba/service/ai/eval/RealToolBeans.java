@@ -121,6 +121,7 @@ final class RealToolBeans {
                 MemoryTools.class,
                 OfficeEditTools.class,
                 PdfTools.class,
+                com.checkba.service.ai.tools.PdfVisualTools.class,
                 PluginDevTools.class,
                 PptxTools.class,
                 PythonTools.class,

@@ -22,8 +22,9 @@
       },
       { "text": "<final>已新建《付款条款对照表.xlsx》并填入表头与三期付款条款。</final>" }
     ],
+    "projectFiles": [{ "id": 2001, "projectId": 1, "name": "付款条款对照表.xlsx", "isDeleted": false, "isFolder": false }],
     "toolStubs": {
-      "sheet_create_file": "{\"success\": true, \"fileId\": 2001, \"name\": \"付款条款对照表.xlsx\"}",
+      "sheet_create_file": "{\"status\": \"success\", \"db_id\": 2001, \"file_name\": \"付款条款对照表.xlsx\"}",
       "sheet_write_cells": "{\"success\": true, \"written\": 3}"
     },
     "expect": {
@@ -31,6 +32,7 @@
         { "name": "sheet_create_file" },
         { "name": "sheet_write_cells" }
       ],
+      "checkpointForFileId": "2001",
       "offeredToolsInclude": ["sheet_create_file"],
       "offeredToolsExcludeFirstCall": ["sheet_write_cells", "slide_add_page"],
       "offeredToolsIncludeLastCall": ["sheet_write_cells"],
@@ -58,8 +60,9 @@
       },
       { "text": "<final>已新建《股权款说明.docx》并按律所标准格式排版。</final>" }
     ],
+    "projectFiles": [{ "id": 2002, "projectId": 1, "name": "股权款说明.docx", "isDeleted": false, "isFolder": false }],
     "toolStubs": {
-      "doc_start_stream": "{\"success\": true, \"fileId\": 2002, \"name\": \"股权款说明.docx\"}",
+      "doc_start_stream": "{\"status\": \"success\", \"db_id\": 2002, \"file_name\": \"股权款说明.docx\"}",
       "doc_apply_standard_format": "{\"success\": true, \"truncated\": false}"
     },
     "expect": {
@@ -67,6 +70,7 @@
         { "name": "doc_start_stream" },
         { "name": "doc_apply_standard_format" }
       ],
+      "checkpointForFileId": "2002",
       "offeredToolsInclude": ["doc_start_stream"],
       "offeredToolsExcludeFirstCall": ["doc_apply_standard_format", "doc_find_replace"],
       "offeredToolsIncludeLastCall": ["doc_apply_standard_format", "doc_find_replace"],
