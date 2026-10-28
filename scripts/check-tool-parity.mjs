@@ -166,7 +166,9 @@ const LOWA_ONLY = {
   '表格行高列宽：插件面并进了 office_excel_edit_rows_cols 的 set_width / set_height 两个 action': [
     'sheet_set_row_col'
   ],
-
+  'WorkDeck原生Impress素材/图表/过渡：主线新增UNO GraphicCrop、chart2与放映控制工具；Office/WPS PPT尚无对应协议，属于明确未补齐的能力，不得将本机引擎工具暴露给插件会话或声称已对齐': [
+    'slide_add_image', 'slide_add_chart', 'slide_format_chart', 'slide_set_transition'
+  ]
 }
 
 /**

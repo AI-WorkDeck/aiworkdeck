@@ -4,7 +4,7 @@
   <!-- 左栏「项目」面板（dev-board#1047）：原 pages/project-list 整页的内容本体。
        标题由工作台外壳的 .sidebar-header 出（左栏统一口径），这里不再画「我的项目」大标题；
        原页头的「日程」「反馈」「个人中心」三个按钮也不再搬——工作台 rail 上各有入口。 -->
-  <view class="project-list-pane" :class="{ 'is-client': isClientUser }">
+  <view class="project-list-pane awd-hairline-scroll" :class="{ 'is-client': isClientUser }">
     <view class="project-list-container">
       <view class="main-content">
         <!-- 打开文件夹为主入口；需要新目录时可在系统选择器中创建。

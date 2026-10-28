@@ -246,7 +246,7 @@ public class PptxTools implements AgentToolComponent {
      *
      * @return 已发提示则返回给模型的说明文本；不该发提示时返回 null
      */
-    private String promptComponentIfMissing(String trigger) {
+    String promptComponentIfMissing(String trigger) {
         OptionalComponents.Entry e = OptionalComponents.byService("pptx-service");
         if (packService.isReady(e.packId())) return null;
         long sizeMb = packService.knownSizes(e.packId()).downloadBytes() / (1024 * 1024);
@@ -1063,7 +1063,7 @@ public class PptxTools implements AgentToolComponent {
      * 构建文件的物理存储路径
      * 格式: projects/{projectId}/{logical_path}/{fileName}
      */
-    private String buildPhysicalPath(Long projectId, Long parentId, String fileName) {
+    String buildPhysicalPath(Long projectId, Long parentId, String fileName) {
         List<ProjectFile> allFiles = projectFileRepository.findByProjectIdOrderBySortOrderAsc(projectId);
         String logicalPath = getFileFolderPath(parentId, allFiles);
         
@@ -1088,7 +1088,7 @@ public class PptxTools implements AgentToolComponent {
      * @throws com.checkba.exception.FeatureNotConfiguredException 当前供应商跑不了 AI PPT（本地 Ollama / 缺 key）
      * @throws com.checkba.service.account.AccountException 平台通道密钥不可用（原样抛，不回退 BYOK key）
      */
-    private PptxServiceClient.ModelConfig buildModelConfig(String modelId) {
+    PptxServiceClient.ModelConfig buildModelConfig(String modelId) {
         AiModelProperties.OpenRouter orConfig = aiModelProperties.getOpenRouter();
         AiModelProperties.Provider provider = chatModelFactory.resolveProvider();
 

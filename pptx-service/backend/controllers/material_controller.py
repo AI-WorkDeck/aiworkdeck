@@ -274,8 +274,15 @@ def generate_material_image(project_id):
             if not project:
                 return not_found('Project')
 
-        # Initialize services
-        ai_service = get_ai_service()
+        aspect_ratio = data.get('aspect_ratio') or (project.image_aspect_ratio if project else None) or current_app.config.get('DEFAULT_ASPECT_RATIO', '16:9')
+        resolution = str(data.get('resolution') or current_app.config.get('DEFAULT_RESOLUTION', '2K')).upper()
+        if aspect_ratio not in {'1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '21:9'}:
+            return bad_request("Unsupported aspect_ratio")
+        if resolution not in {'1K', '2K', '4K'}:
+            return bad_request("Unsupported resolution")
+
+        # Bind this task to the explicit caller configuration, not a previous request.
+        ai_service = get_ai_service(model_config=data.get('model_config'))
         file_service = FileService(current_app.config['UPLOAD_FOLDER'])
 
         # 创建临时目录保存参考图片（后台任务会清理）
@@ -330,8 +337,8 @@ def generate_material_image(project_id):
                 file_service,
                 ref_path_str,
                 additional_ref_images if additional_ref_images else None,
-                (project.image_aspect_ratio if project else None) or current_app.config.get('DEFAULT_ASPECT_RATIO', '16:9'),
-                current_app.config['DEFAULT_RESOLUTION'],
+                aspect_ratio,
+                resolution,
                 temp_dir_str,
                 app
             )

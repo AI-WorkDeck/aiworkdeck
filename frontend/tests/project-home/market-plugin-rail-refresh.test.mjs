@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { NO_PROJECT_DEFAULT_PANE } from '../../src/pages/project-overview/noProjectShell.js'
 // Execute the real SFC methods and market event subscriptions with a fake transport/event bus.
 // No Vue dependency: unrelated page lifecycle and imports stay outside this harness.
 import { test } from 'node:test'
@@ -34,7 +35,7 @@ function harness() {
   }
   const deps = {
     pluginViews, isGlobalPlugin, hasPluginNavigation, hasPluginPanel, isLegacyThemeGallery,
-    uni, console: quiet, NO_PROJECT_DEFAULT_PANE: 'projects', getPlugins: () => get(), getSkills: async () => [],
+    uni, console: quiet, NO_PROJECT_DEFAULT_PANE, getPlugins: () => get(), getSkills: async () => [],
     resolvePluginEntryUrl: (id, path) => path ? `/api/plugin-web/${id}/${path.slice(4)}` : '',
     getCurrentUser: () => ({ role: 'ADMIN' }), getPluginsForUser: () => [{ key: 'files' }],
     filterPluginsByEnabledSkills: rows => rows,
@@ -44,7 +45,7 @@ function harness() {
     installMarketPlugin: async () => { response = [plugin({ enabled: false })] },
     isAccountLoginRetry: () => false,
   }
-  const vm = { dynamicPlugins: [], enabledSkillIds: null, hasProject: true, leftPaneKey: 'files',
+  const vm = { dynamicPlugins: [], enabledSkillIds: null, hasProject: true, hasNamedProject: true, leftPaneKey: 'files',
     leftFiles: [], rightFiles: [], lastActiveIdsByMode: { left: {}, right: {} }, saveActiveIdsByMode() {},
     ...pluginWorkspaceTabMethods,
     applyPanelDocks: rows => rows, applyRailOrder: rows => rows, ttsEnabled: true }
@@ -133,9 +134,9 @@ test('a delayed old enabled response cannot resurrect an entry removed by a newe
 
 test('removed dynamic selection falls back without a project; unrelated selection and failures are preserved', async () => {
   const h = harness(); await flush()
-  h.vm.hasProject = false; h.vm.leftPaneKey = 'plugin-tencent-meeting'
+  h.vm.hasProject = false; h.vm.hasNamedProject = false; h.vm.leftPaneKey = 'plugin-tencent-meeting'
   await h.vm.loadDynamicPlugins()
-  assert.equal(h.vm.leftPaneKey, 'projects')
+  assert.equal(h.vm.leftPaneKey, null)
   h.vm.leftPaneKey = 'market'; await h.vm.loadDynamicPlugins()
   assert.equal(h.vm.leftPaneKey, 'market')
   h.vm.leftPaneKey = 'plugin-tencent-meeting'

@@ -228,10 +228,10 @@ check('项目列表页薄壳根节点带 e2e 锚点类名，「项目」面板�
   const src = readVue('src/pages/project-list/project-list.vue')
   if (!src.includes('class="page-project-list"')) return '薄壳页根节点必须是 .page-project-list（e2e 锚点）'
   const pane = readVue(LIST_PANE)
-  return /class="project-list-pane"/.test(pane) ? null : '「项目」面板根节点必须是 .project-list-pane'
+  return /class="project-list-pane(?:\s[^"]*)?"/.test(pane) ? null : '「项目」面板根节点必须是 .project-list-pane'
 })
 
-check('项目列表页是直链薄壳：redirectTo 工作台外壳并打开「项目」面板', () => {
+check('项目列表页是直链薄壳：保留旧参数，转到工作台欢迎目录', () => {
   const src = readVue('src/pages/project-list/project-list.vue')
   const body = extractMethodBody(src, 'onLoad()')
   if (!body) return '薄壳页缺 onLoad()'
@@ -245,7 +245,7 @@ check('项目列表页是直链薄壳：redirectTo 工作台外壳并打开「�
   }
   if (/uni\.navigateTo\(/.test(src)) return '薄壳页不许 navigateTo'
   if (src.includes('<ProjectListPane') || src.includes('getMyProjects')) {
-    return '薄壳页只做转发，内容本体在工作台左栏的「项目」面板里'
+    return '薄壳页只做转发，内容本体在工作台欢迎页的目录列表里'
   }
   return null
 })
@@ -871,11 +871,11 @@ checkFull('sidebar-shell.md 的页面路由一节收录了两个新页', () => {
 
 // dev-board#1027/#1047：启动落工作台外壳（不带 id）+ 欢迎标签，解锁页与项目列表页都不再是
 // 启动路过的一站。J1 用 J1_EXPECT_ROUTE 钉落点，并把 unlock / project-list 列为「路过即红」；
-// J2/J3 仍从项目列表直链（薄壳 → 外壳「项目」面板）出发进工作台。
-checkFull('app-e2e：启动落工作台外壳、经「项目」面板进项目，不把个人中心当必经之路', () => {
+// J2/J3 仍从项目列表直链（薄壳 → 外壳欢迎目录）出发进工作台。
+checkFull('app-e2e：启动落工作台外壳、经欢迎目录进项目，不把个人中心当必经之路', () => {
   const src = readFrontend('tests/app-e2e/run.mjs')
   if (!src.includes(LIST_ROUTE)) return 'J2/J3 没有从项目列表直链出发'
-  if (!src.includes('pane=projects')) return 'J2/J3 没有断言项目列表直链落到外壳的「项目」面板（?pane=projects）'
+  if (!src.includes('pane=projects')) return 'J2/J3 没有断言项目列表直链落到外壳欢迎目录（兼容 ?pane=projects）'
   if (!src.includes(HOME_ROUTE)) return 'J3 没有经过项目概览页'
   if (src.includes("mouseClickText('我的项目')")) return '个人中心已经没有「我的项目」tab 了'
   if (!/const J1_EXPECT_ROUTE = 'pages\/project-overview\/project-overview'/.test(src)) {
@@ -963,12 +963,22 @@ check('工作台里渲染的组件跳出工作台必须走 leaveWorkbench（先�
 
 // ==================== 无项目态外壳与欢迎标签（dev-board#1047） ====================
 
-check('rail 上有「项目」面板，左栏渲染 ProjectListPane', () => {
+check('目录入口在欢迎页，旧 projects 命令与存储迁移均保留', () => {
   const rail = readFrontend('src/config/leftSidebarPlugins.js')
-  if (!/key:\s*'projects'/.test(rail)) return "LEFT_SIDEBAR_PLUGINS 里没有 key: 'projects'"
+  if (/key:\s*'projects'/.test(rail)) return "rail 不应再有 projects 面板"
+  if (!/projects:\s*'files'/.test(rail)) return '旧 projects 存储值必须迁移到 files'
   const src = readVue('src/pages/project-overview/project-overview.vue')
-  if (!src.includes('<ProjectListPane') || !src.includes("leftPaneKey === 'projects'")) {
-    return "左栏没有 leftPaneKey === 'projects' 渲染 ProjectListPane 的分支"
+  if (src.includes("leftPaneKey === 'projects'")) return '左栏不应再渲染 projects 面板'
+  const open = extractDefinition(src, 'openProjectsPane') || ''
+  if (!open.includes('this.openWelcomeTab()') || !open.includes('this.welcomeCatalogRequest')) {
+    return '旧目录入口必须打开欢迎标签并请求全部目录'
+  }
+  const sw = readFrontend('src/pages/project-overview/panelSwitching.js')
+  if (!sw.includes("if (key === 'projects') return this.openProjectsPane()")) return '旧 projects 切栏命令必须转欢迎目录'
+  const shell = readFrontend('src/pages/project-overview/noProjectShell.js')
+  if (!/NO_PROJECT_DEFAULT_PANE = null/.test(shell)) return '无项目态默认应为空面板'
+  if (!/if \(this\.isLooseWorkspace \|\| !this\.leftPaneKey\) this\.sidebarCollapsed = true/.test(src)) {
+    return '无项目空面板和独立文件恢复时必须收起侧栏'
   }
   // 无项目态 rail 直接读 LEFT_SIDEBAR_PLUGINS 常量；合并 master 时这个 import 成员丢过一次
   // （2026-09-29，症状 = 无项目态 rail 只剩折叠/反馈/登录/设置，vite 构建不报错，只有跑起来才炸）

@@ -93,8 +93,9 @@ export const panelDockingMethods = {
 
     const leftKeys = docks.left.map((p) => p.key)
     if (isMovablePanel(this.leftPaneKey, this.dockPanels) && !leftKeys.includes(this.leftPaneKey)) {
-      // 无项目态没有资源管理器，回落「项目」面板（dev-board#1047）
+      // 无项目态没有资源管理器，回到收起侧栏的默认态。
       this.leftPaneKey = this.hasProject && !this.isLooseWorkspace ? 'files' : NO_PROJECT_DEFAULT_PANE
+      if (!this.leftPaneKey) this.sidebarCollapsed = true
     }
   },
 

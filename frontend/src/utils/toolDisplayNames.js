@@ -240,6 +240,12 @@ const NAMES = {
   // 演示文稿 slide_* 原语（Phase 3：格式与表格）
   slide_format_text: { zh: '设置文字格式', en: 'Format slide text' },
   slide_format_shape: { zh: '设置形状样式', en: 'Format shape' },
+  image_generate_asset: { zh: '生成图片素材', en: 'Generate image asset' },
+  image_get_generation: { zh: '查询图片素材', en: 'Check image generation' },
+  slide_add_image: { zh: '插入幻灯片图片', en: 'Insert slide image' },
+  slide_format_chart: { zh: '设置图表样式', en: 'Format native chart' },
+  slide_add_chart: { zh: '插入原生图表', en: 'Add native chart' },
+  slide_set_transition: { zh: '设置翻页过渡', en: 'Set slide transition' },
   slide_add_table: { zh: '插入表格', en: 'Add table' },
   slide_table_read: { zh: '读取表格', en: 'Read table' },
   slide_table_set_cell: { zh: '写表格单元格', en: 'Set table cell' },

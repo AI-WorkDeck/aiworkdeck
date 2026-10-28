@@ -48,7 +48,7 @@ class OpenAIImageProvider(ImageProvider):
             api_key=api_key,
             base_url=api_base,
             timeout=get_config().OPENAI_TIMEOUT,  # set timeout from config
-            max_retries=get_config().OPENAI_MAX_RETRIES  # set max retries from config
+            max_retries=0  # Never automatically repeat a potentially billed image request.
         )
         self.api_base = api_base or ""
         self.model = model
@@ -87,6 +87,15 @@ class OpenAIImageProvider(ImageProvider):
         """
         # Ensure resolution is uppercase (some providers require "4K" not "4k")
         resolution_upper = resolution.upper()
+        # OpenRouter uses image_config, not the legacy proxy generationConfig.
+        from urllib.parse import urlparse
+        endpoint = urlparse(self.api_base)
+        if endpoint.hostname == "openrouter.ai" or (
+            endpoint.hostname == "addin.workdeck.ai"
+            and endpoint.path.rstrip('/') == "/openrouter-relay/api/v1"
+        ):
+            return {"image_config": {"aspect_ratio": aspect_ratio, "image_size": resolution_upper}}
+
         
         # Build comprehensive extra_body that works with multiple providers
         extra_body = {
@@ -175,7 +184,28 @@ class OpenAIImageProvider(ImageProvider):
             logger.debug("OpenAI API call completed")
             
             # Extract image from response - handle different response formats
-            message = response.choices[0].message
+            def field(value, key, default=None):
+                return value.get(key, default) if isinstance(value, dict) else getattr(value, key, default)
+
+            message = field(field(response, 'choices')[0], 'message')
+            from urllib.parse import urlparse
+            endpoint = urlparse(self.api_base)
+            is_openrouter = endpoint.hostname == "openrouter.ai" or (
+                endpoint.hostname == "addin.workdeck.ai"
+                and endpoint.path.rstrip('/') == "/openrouter-relay/api/v1"
+            )
+            # OpenRouter returns generated images separately from textual content.
+            # Only inline data is accepted; model-provided URLs must not trigger requests.
+            for part in field(message, 'images', []) or []:
+                url = field(field(part, 'image_url', {}), 'url', '')
+                if isinstance(url, str) and re.fullmatch(r'data:image/[^;,]+;base64,[A-Za-z0-9+/=\r\n]+', url):
+                    image_data = base64.b64decode(url.split(',', 1)[1])
+                    image = Image.open(BytesIO(image_data))
+                    image.load()
+                    return image
+            if isinstance(message, dict):
+                from types import SimpleNamespace
+                message = SimpleNamespace(**message)
             
             # Debug: log available attributes
             logger.debug(f"Response message attributes: {dir(message)}")
@@ -184,8 +214,6 @@ class OpenAIImageProvider(ImageProvider):
             if hasattr(message, 'multi_mod_content') and message.multi_mod_content:
                 parts = message.multi_mod_content
                 for part in parts:
-                    if "text" in part:
-                        logger.debug(f"Response text: {part['text'][:100] if len(part['text']) > 100 else part['text']}")
                     if "inline_data" in part:
                         image_data = base64.b64decode(part["inline_data"]["data"])
                         image = Image.open(BytesIO(image_data))
@@ -211,8 +239,6 @@ class OpenAIImageProvider(ImageProvider):
                             # Handle text type
                             elif part.get('type') == 'text':
                                 text = part.get('text', '')
-                                if text:
-                                    logger.debug(f"Response text: {text[:100] if len(text) > 100 else text}")
                         elif hasattr(part, 'type'):
                             # Handle as object with attributes
                             if part.type == 'image_url':
@@ -230,14 +256,12 @@ class OpenAIImageProvider(ImageProvider):
                 # If content is a string, try to extract image from it
                 elif isinstance(message.content, str):
                     content_str = message.content
-                    logger.debug(f"Response content (string): {content_str[:200] if len(content_str) > 200 else content_str}")
                     
                     # Try to extract Markdown image URL: ![...](url)
                     markdown_pattern = r'!\[.*?\]\((https?://[^\s\)]+)\)'
                     markdown_matches = re.findall(markdown_pattern, content_str)
-                    if markdown_matches:
+                    if markdown_matches and not is_openrouter:
                         image_url = markdown_matches[0]  # Use the first image URL found
-                        logger.debug(f"Found Markdown image URL: {image_url}")
                         try:
                             response = requests.get(image_url, timeout=30, stream=True)
                             response.raise_for_status()
@@ -251,9 +275,8 @@ class OpenAIImageProvider(ImageProvider):
                     # Try to extract plain URL (not in Markdown format)
                     url_pattern = r'(https?://[^\s\)\]]+\.(?:png|jpg|jpeg|gif|webp|bmp)(?:\?[^\s\)\]]*)?)'
                     url_matches = re.findall(url_pattern, content_str, re.IGNORECASE)
-                    if url_matches:
+                    if url_matches and not is_openrouter:
                         image_url = url_matches[0]
-                        logger.debug(f"Found plain image URL: {image_url}")
                         try:
                             response = requests.get(image_url, timeout=30, stream=True)
                             response.raise_for_status()
@@ -281,11 +304,10 @@ class OpenAIImageProvider(ImageProvider):
             # Log raw response for debugging
             logger.warning(f"Unable to extract image. Raw message type: {type(message)}")
             logger.warning(f"Message content type: {type(getattr(message, 'content', None))}")
-            logger.warning(f"Message content: {getattr(message, 'content', 'N/A')}")
             
             raise ValueError("No valid multimodal response received from OpenAI API")
             
         except Exception as e:
-            error_detail = f"Error generating image with OpenAI (model={self.model}): {type(e).__name__}: {str(e)}"
-            logger.error(error_detail, exc_info=True)
-            raise Exception(error_detail) from e
+            error_detail = f"Image generation failed: {type(e).__name__}"
+            logger.error(error_detail)
+            raise Exception(error_detail) from None
