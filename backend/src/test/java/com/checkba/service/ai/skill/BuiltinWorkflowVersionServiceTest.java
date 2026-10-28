@@ -40,13 +40,13 @@ class BuiltinWorkflowVersionServiceTest {
     }
 
     @Test
-    @DisplayName("默认列出四大内置常驻工作流，每个均含只读的系统默认版")
-    void listsAllFourBuiltinWorkflowsWithSystemDefault() {
+    @DisplayName("默认列出五个内置常驻工作流，每个均含只读的系统默认版")
+    void listsAllFiveBuiltinWorkflowsWithSystemDefault() {
         List<BuiltinWorkflowVersionService.WorkflowStateView> states =
                 versionService.listWorkflowStates(1L, "proj-1");
 
         assertEquals(
-                List.of("contract-review", "evidence-linked-report", "file-organization", "legal-opinion-review"),
+                List.of("contract-review", "evidence-linked-report", "file-organization", "legal-opinion-review", "presentation-design"),
                 states.stream().map(BuiltinWorkflowVersionService.WorkflowStateView::getSkillId).toList());
 
         for (var state : states) {

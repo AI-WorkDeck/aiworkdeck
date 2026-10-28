@@ -134,11 +134,11 @@ class ToolDeclarationContractTest {
      * 改的人必须回来决定「这个新工具要不要声明 requiresHost」。
      *
      * <p>{@code DocumentEditTools} 在列但<b>不需要声明</b>：它里面发 open_file 的是
-     * {@code doc_open_file} 与 {@code sheet_create_file}，两个都带 doc_/sheet_ 前缀，
+     * {@code doc_open_file}、{@code sheet_create_file} 与 {@code slide_create_file}，均带 doc_/sheet_/slide_ 前缀，
      * 前缀链本来就只放给 LOWA 会话，声明是多余的。
      */
     private static final Map<String, Integer> DOCUMENT_UI_ACTION_CALL_SITES = new TreeMap<>(Map.of(
-            "DocumentEditTools.java", 2,      // doc_open_file、sheet_create_file（前缀链已管）
+            "DocumentEditTools.java", 3,      // doc_open_file、sheet_create_file、slide_create_file（前缀链已管）
             "LitigationTimelineTools.java", 1, // litigation_timeline_render
             "LitigationVisualTools.java", 1,   // litigation_render
             "PdfTools.java", 4,                // pdf_to_word 三个分支 + finishModification
@@ -286,6 +286,8 @@ class ToolDeclarationContractTest {
         for (String conv : new String[]{"conv-word", "conv-excel", "conv-ppt", "conv-none"}) {
             List<String> names = registry.getAllSpecifications(conv, null).stream()
                     .map(ToolSpecification::name).toList();
+            assertFalse(names.contains("slide_create_file"), "跨类型新建仍须 LOWA 宿主：" + conv);
+            assertTrue(registry.resolve("slide_create_file", conv).isEmpty());
             for (String tool : EXPECTED_LOWA_ONLY) {
                 assertFalse(names.contains(tool), tool + " 不该下发给 " + conv);
                 assertTrue(registry.resolve(tool, conv).isEmpty(),
@@ -295,6 +297,8 @@ class ToolDeclarationContractTest {
 
         List<String> lowaNames = registry.getAllSpecifications("conv-lowa", null).stream()
                 .map(ToolSpecification::name).toList();
+        assertTrue(lowaNames.contains("slide_create_file"));
+        assertTrue(registry.resolve("slide_create_file", "conv-lowa").isPresent());
         for (String tool : EXPECTED_LOWA_ONLY) {
             if (EXPECTED_NOT_OFFERED.contains(tool)) {
                 // 两道闸是叠加的：requiresHost 管「换一类客户端还剩什么」，offerToModel 管
