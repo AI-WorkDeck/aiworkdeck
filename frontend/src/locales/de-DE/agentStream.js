@@ -18,7 +18,7 @@ export default {
   "errorWithMessage": "**Fehler**: {message}",
   "executionInterrupted": "> **Ausführung unterbrochen**: {message}",
   "regionBlockedNotice": "> **Dieses Modell ist in Ihrer aktuellen Netzwerkregion nicht verfügbar**: Im Ausland gehostete Modelle werden von ihren Anbietern gesperrt, wenn sie über ein Festlandchina-Netzwerk aufgerufen werden. Wechseln Sie in den Einstellungen zum AI WorkDeck Cloud-Kanal oder wählen Sie ein Modell, das in beiden Regionen verfügbar ist, und senden Sie die Nachricht erneut.",
-  "quotaExhaustedNotice": "> **KI-Dienstguthaben aufgebraucht**: Das Guthaben oder Kontingent des aktuellen Kanals ist verbraucht. Mit Ihrem eigenen Schlüssel laden Sie bei Ihrem Anbieter auf (z. B. OpenRouter); beim AI WorkDeck Cloud-Kanal überprüfen Sie Ihre Guthobenzuteilung auf der Kontoseite.",
+  "quotaExhaustedNotice": "> **KI-Dienstguthaben aufgebraucht**: Das Guthaben oder Kontingent des aktuellen Kanals ist verbraucht. Mit Ihrem eigenen Schlüssel laden Sie bei Ihrem Anbieter auf (z. B. OpenRouter); beim AI WorkDeck Cloud-Kanal überprüfen Sie Ihre Guthabenzuteilung auf der Kontoseite.",
   "contextOverflowNotice": "> **Die Unterhaltung überschreitet das Kontextfenster des Modells**: Eine automatische Komprimierung wurde versucht, sie passt aber dennoch nicht. Starten Sie eine neue Unterhaltung oder fügen Sie weniger oder kürzere Dateien an.",
   "networkUnreachableNotice": "> **Netzwerkverbindung fehlgeschlagen**: Dieser Computer konnte den KI-Dienst nicht erreichen (das Netzwerk ist möglicherweise ausgefallen, das DNS könnte versagt haben oder ein Proxy blockiert die Verbindung). Überprüfen Sie Ihre Verbindung und senden Sie die Nachricht erneut.",
   "interruptedRunEndedNotice": "> **Die Verbindung wurde unterbrochen**: Dieser Durchlauf wurde im Hintergrund abgeschlossen, während die Verbindung unterbrochen war, daher kann der obige Text unvollständig sein. Aktualisieren Sie die Seite oder öffnen Sie diese Unterhaltung erneut, um den vollständigen Verlauf zu sehen.",
@@ -55,8 +55,8 @@ export default {
   "checkpointRestoringStepSkippedError": "Die Checkpoint-Wiederherstellung läuft; dieser Schritt wurde nicht ausgeführt. Bitte warten Sie, bis die Wiederherstellung abgeschlossen ist",
   "pdfExportFailedError": "PDF-Export fehlgeschlagen",
   "pdfExportEmptyError": "Das Ergebnis des PDF-Exports ist leer",
-  "pdfExportTooLargeError": "Die exportierte PDF überschreitet {mb}MB und kann nicht per AI im Projekt gespeichert werden; bitte verwenden Sie stattdessen \"Datei -> Als PDF exportieren\"",
+  "pdfExportTooLargeError": "Die exportierte PDF überschreitet {mb}MB und kann nicht per KI im Projekt gespeichert werden; bitte verwenden Sie stattdessen „Datei -> Als PDF exportieren“",
   "systemOperation": "Systemaktionen",
   "taskListArtifact": "Aufgabenliste",
-  "planArtifact": "Plan"
+  "planArtifact": "Arbeitsplan"
 }

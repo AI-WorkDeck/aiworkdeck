@@ -2,20 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "devTrustNotice": "Development plugins can send data to declared remote services and expose Agent tools. Review the source before approval. Manifest changes require approval again.",
-  "grantTrust": "Approve development services",
-  "revokeTrust": "Revoke service approval",
-  "connections": "Plugin service connections",
-  "credentialNotice": "Credentials are stored per user by the host and are not exposed to plugin pages.",
-  "connected": "Connected",
-  "disconnected": "Not connected",
-  "token": "Service access token",
-  "connect": "Connect service",
-  "disconnect": "Disconnect",
-  "refresh": "Refresh status",
-  "subscription": "Check subscription",
-  "active": "Subscription active",
-  "inactive": "No active subscription",
-  "bundled": "Included with the app",
-  "checkout": "Open checkout"
+  "devTrustNotice": "Ontwikkelplug-ins kunnen gegevens verzenden naar gedeclareerde externe diensten en Agent-tools beschikbaar stellen. Controleer de bron vóór goedkeuring. Bij wijzigingen in het manifest is opnieuw goedkeuring vereist.",
+  "grantTrust": "Ontwikkeldiensten goedkeuren",
+  "revokeTrust": "Dienstgoedkeuring intrekken",
+  "connections": "Dienstverbindingen van plug-in",
+  "credentialNotice": "Inloggegevens worden per gebruiker door de host opgeslagen en niet blootgesteld aan plug-inpagina's.",
+  "connected": "Verbonden",
+  "disconnected": "Niet verbonden",
+  "token": "Toegangstoken voor dienst",
+  "connect": "Dienst verbinden",
+  "disconnect": "Verbinding verbreken",
+  "refresh": "Status vernieuwen",
+  "subscription": "Abonnement controleren",
+  "active": "Abonnement actief",
+  "inactive": "Geen actief abonnement",
+  "bundled": "Meegeleverd met de app",
+  "checkout": "Betaalpagina openen"
 }

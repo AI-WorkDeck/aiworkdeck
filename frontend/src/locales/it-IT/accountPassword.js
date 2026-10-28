@@ -3,7 +3,7 @@
 
 export default {
   "intro": "Accedi con il tuo numero di telefono o email e password. Prima volta? Verifica e crea una password.",
-  "password": "Password",
+  "password": "Password di accesso",
   "confirm": "Conferma password",
   "register": "Prima volta / Crea password",
   "reset": "Password dimenticata",

@@ -52,7 +52,7 @@ export default {
     "previewTimeout": "音声プレビューの準備がタイムアウトしました。このタブを閉じて、再度開いてください。",
     "playFailed": "このファイルは再生できません。コーデックがサポートされていない可能性があります。",
     "backToCurrent": "現在位置に戻る",
-    "speakerPrefix": "{name}: ",
+    "speakerPrefix": "{name}：",
     "summary": "{count} セグメント · {duration}"
   },
   "captions": {

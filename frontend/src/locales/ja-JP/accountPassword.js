@@ -2,21 +2,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "intro": "Sign in with your phone number or email and password. First time? Verify and create a password.",
+  "intro": "電話番号またはメールアドレスとパスワードでサインインします。初めての場合は、本人確認を行ってパスワードを作成してください。",
   "password": "パスワード",
-  "confirm": "Confirm password",
-  "register": "First time / Create password",
+  "confirm": "パスワードを確認",
+  "register": "初回利用 / パスワードを作成",
   "reset": "パスワードをお忘れですか",
   "back": "パスワードでのサインインに戻る",
-  "setup": "Create password",
-  "resetTitle": "Reset password",
-  "verify": "Verify and continue",
+  "setup": "パスワードを作成",
+  "resetTitle": "パスワードをリセット",
+  "verify": "確認して続行",
   "signIn": "サインイン",
-  "passwordHint": "8–72 characters. Use a unique password.",
-  "invalid": "Use a password with 8–72 characters",
-  "mismatch": "Passwords do not match",
+  "passwordHint": "8〜72文字。他のサイトと使い回さない固有のパスワードを設定してください。",
+  "invalid": "8〜72文字のパスワードを設定してください",
+  "mismatch": "入力されたパスワードが一致しません",
   "required": "パスワードを入力してください",
-  "resetDone": "Password reset. Sign in with your new password.",
-  "setupHint": "Verified. Create a password to continue.",
-  "resetHint": "This code is only for resetting your password."
+  "resetDone": "パスワードをリセットしました。新しいパスワードでサインインしてください。",
+  "setupHint": "確認が完了しました。続行するにはパスワードを作成してください。",
+  "resetHint": "この確認コードはパスワードのリセット専用です。"
 }

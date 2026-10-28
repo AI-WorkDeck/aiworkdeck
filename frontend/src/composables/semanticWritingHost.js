@@ -6,8 +6,10 @@ import editorEn from '../locales/en-US/editor.js'
 function sw(key) {
   let en = false
   try {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') en = true
-    else if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') en = true
+    const l = (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language'))
+      || (typeof document !== 'undefined' && document.documentElement?.lang)
+      || ''
+    if (l && !l.startsWith('zh')) en = true
   } catch (_) { /* ignore */ }
   const dict = (en ? editorEn : editorZh)?.semanticWriting || editorZh.semanticWriting
   return dict[key] || editorZh.semanticWriting[key] || key

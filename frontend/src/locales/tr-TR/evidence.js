@@ -3,81 +3,81 @@
 
 export default {
   "view": {
-    "bySection": "By Section",
-    "byParty": "By Party"
+    "bySection": "Bölüme Göre",
+    "byParty": "Tarafa Göre"
   },
   "filter": {
-    "allSections": "All sections",
-    "allParties": "All parties"
+    "allSections": "Tüm bölümler",
+    "allParties": "Tüm taraflar"
   },
   "stat": {
-    "total": "{count} total"
+    "total": "Toplam {count}"
   },
   "status": {
-    "all": "All",
-    "active": "Active",
-    "unverified": "Unverified",
-    "stale": "Changed",
-    "orphan": "Orphaned"
+    "all": "Tümü",
+    "active": "Etkin",
+    "unverified": "Doğrulanmamış",
+    "stale": "Değişti",
+    "orphan": "Bağlantısız"
   },
   "group": {
     "none": "Atanmamış",
-    "untitled": "(No section)"
+    "untitled": "(Bölüm yok)"
   },
   "action": {
-    "keep": "Keep Link",
-    "rebind": "Reassign",
-    "confirmRebind": "Confirm",
+    "keep": "Bağlantıyı Koru",
+    "rebind": "Yeniden Ata",
+    "confirmRebind": "Onayla",
     "cancelRebind": "İptal",
     "delete": "Sil",
-    "removeTarget": "Remove",
-    "open": "View Source",
-    "ignore": "Ignore",
-    "expand": "Expand",
-    "collapse": "Collapse"
+    "removeTarget": "Kaldır",
+    "open": "Kaynağı Görüntüle",
+    "ignore": "Yoksay",
+    "expand": "Genişlet",
+    "collapse": "Daralt"
   },
   "method": {
-    "written_review": "Document Review",
-    "written_statement": "Written Statement",
-    "web_check": "Online Check",
-    "third_party": "Third-Party Material",
-    "interview": "Interview",
-    "none": "No method"
+    "written_review": "Belge İncelemesi",
+    "written_statement": "Yazılı Beyan",
+    "web_check": "Çevrimiçi Kontrol",
+    "third_party": "Üçüncü Taraf Materyali",
+    "interview": "Görüşme",
+    "none": "Yöntem yok"
   },
   "relation": {
-    "supports": "Supports",
-    "contradicts": "Contradicts",
-    "partial": "Partial"
+    "supports": "Destekler",
+    "contradicts": "Çelişir",
+    "partial": "Kısmen Destekler"
   },
   "loc": {
-    "wholeFile": "Whole file",
-    "page": "Page {page}",
-    "quote": "\"{quote}\"",
-    "region": "Image region",
+    "wholeFile": "Tüm dosya",
+    "page": "Sayfa {page}",
+    "quote": "“{quote}”",
+    "region": "Görsel alanı",
     "time": "{time}",
     "web": "{host}",
     "cell": "{sheet}!{cell}"
   },
-  "empty": "No source files linked to this document yet",
-  "emptyHint": "Drag a file from the explorer onto selected text to link it",
-  "emptyFiltered": "No links match the current filter",
-  "fileMissing": "(file no longer exists)",
-  "fileDeleted": "(in recycle bin)",
-  "targetsCount": "{count} sources",
-  "rebindHint": "Select the new text in the document, then tap Confirm",
-  "rebindNoSelection": "Select text in the document first",
-  "rebindFailed": "Reassign failed",
-  "rebindRetryHint": "The new bookmark is already in the document; tap Confirm again to retry.",
-  "keepGone": "This text is no longer in the document, so the link cannot be kept. Use Reassign in the Sources tab.",
-  "orphanGoto": "The anchor for this text is no longer in the document. Tap Reassign to pick new text.",
-  "confidence": "Confidence {value}",
-  "loading": "Loading…",
-  "loadFailed": "Failed to load links",
-  "fileTagsLoadFailed": "Failed to load party tags; the \"By Party\" view may be inaccurate",
-  "opFailed": "Operation failed",
-  "deleteConfirm": "Delete this link? The source file will not be deleted.",
-  "deleteTargetConfirm": "Remove this source?",
-  "staleOne": "This text has {count} linked sources and has been changed",
-  "staleMany": "{count} linked passages have been changed",
-  "stalePrefix": "Changed: "
+  "empty": "Bu belgeye henüz kaynak dosya bağlanmadı",
+  "emptyHint": "Bağlamak için gezginden bir dosyayı seçili metnin üzerine sürükleyin",
+  "emptyFiltered": "Mevcut filtreyle eşleşen bağlantı yok",
+  "fileMissing": "(dosya artık mevcut değil)",
+  "fileDeleted": "(geri dönüşüm kutusunda)",
+  "targetsCount": "{count} kaynak",
+  "rebindHint": "Belgede yeni metni seçin, ardından Onayla düğmesine dokunun",
+  "rebindNoSelection": "Önce belgede metin seçin",
+  "rebindFailed": "Yeniden atama başarısız oldu",
+  "rebindRetryHint": "Yeni yer imi zaten belgede; tekrar denemek için Onayla düğmesine yeniden dokunun.",
+  "keepGone": "Bu metin artık belgede olmadığından bağlantı korunamaz. Kaynaklar sekmesinde Yeniden Ata seçeneğini kullanın.",
+  "orphanGoto": "Bu metnin çapası artık belgede değil. Yeni metin seçmek için Yeniden Ata seçeneğine dokunun.",
+  "confidence": "Güven {value}",
+  "loading": "Yükleniyor…",
+  "loadFailed": "Bağlantılar yüklenemedi",
+  "fileTagsLoadFailed": "Taraf etiketleri yüklenemedi; \"Tarafa Göre\" görünümü hatalı olabilir",
+  "opFailed": "İşlem başarısız oldu",
+  "deleteConfirm": "Bu bağlantı silinsin mi? Kaynak dosya silinmeyecektir.",
+  "deleteTargetConfirm": "Bu kaynak kaldırılsın mı?",
+  "staleOne": "Bu metnin {count} bağlı kaynağı var ve metin değiştirildi",
+  "staleMany": "{count} bağlı pasaj değiştirildi",
+  "stalePrefix": "Değiştirildi: "
 }

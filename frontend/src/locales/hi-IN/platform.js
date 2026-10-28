@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "svcAsrName": "Meeting Transcription",
-  "svcAsrDesc": "Turn meeting recordings into speaker-separated text",
+  "svcAsrName": "मीटिंग ट्रांसक्रिप्शन",
+  "svcAsrDesc": "मीटिंग रिकॉर्डिंग को वक्ता-पृथक टेक्स्ट में बदलें",
   "svcOcrName": "छवि पाठ पहचान",
   "svcOcrDesc": "स्क्रीनशॉट, स्कैन और फ़ोटो से पाठ निकालें",
   "svcSearchName": "वेब खोज",
@@ -31,15 +31,15 @@ export default {
   "switchFailed": "स्विच नहीं कर सके। बाद में पुनः प्रयास करें।",
   "switched": "स्विच हो गया",
   "usageMonthLabel": "इस माह",
-  "usageUnknown": "—",
-  "usageCredits": "{credits} Credits",
+  "usageUnknown": "अनुपलब्ध",
+  "usageCredits": "{credits} क्रेडिट (Credits)",
   "usageTotal": "{credits} Credits इस माह ({month})",
   "usageUnavailable": "इस माह का व्यय अस्थायी रूप से पढ़ा नहीं जा सका; इसका अर्थ यह नहीं कि यह शून्य है।",
   "budgetTitle": "व्यय चेतावनियाँ",
   "budgetSubtitle": "बंद करने के लिए इसे 0 पर सेट करें। ये तय करते हैं कि हम आपसे कब प्रश्न पूछें, कोई कठोर सीमा नहीं।",
   "budgetLowBalanceLabel": "चेतावनी दें जब बैलेंस इससे कम हो जाए",
   "budgetLowBalanceNote": "बैलेंस इस राशि से कम होने पर इस पैनल पर चेतावनी दिखाता है, ताकि कोई ट्रांसक्रिप्शन बीच में बंद न हो जाए।",
-  "budgetUnit": "Credits",
+  "budgetUnit": "क्रेडिट (Credits)",
   "budgetSave": "सीमाएँ सहेजें",
   "budgetSaved": "सहेजा गया",
   "budgetSaveFailed": "सहेजा नहीं जा सका। बाद में पुनः प्रयास करें।",
@@ -48,5 +48,5 @@ export default {
   "aiRowName": "AI चैट और लेखन",
   "aiRowDesc": "AI इस मार्ग का उपयोग नहीं करता: मॉडल अनुरोध इस डिवाइस से सीधे आपके चुने हुए प्रदाता को जाते हैं और कभी भी AI WorkDeck सर्वर से गुजरते नहीं हैं। प्रदाता, मॉडल और खाता बैलेंस AI सेटिंग्स में कॉन्फ़िगर किए जाते हैं।",
   "goAiSettings": "AI सेटिंग्स खोलें",
-  "localAsrPending": "ऑन-डिवाइस ट्रांसक्रिप्शन मॉडल अभी तक डाउनलोड नहीं हुआ है, इसलिए \"इस डिवाइस पर\" स्तर अभी पेश नहीं किया जा रहा है। मीटिंग पैनल में \"रिकॉर्डिंग इस डिवाइस पर रखें\" चालू करें ताकि वहाँ डाउनलोड हो (लगभग 1.5GB), या Components के अंतर्गत डाउनलोड करें।"
+  "localAsrPending": "ऑन-डिवाइस ट्रांसक्रिप्शन मॉडल अभी तक डाउनलोड नहीं हुआ है, इसलिए \"इस डिवाइस पर\" स्तर अभी पेश नहीं किया जा रहा है। मीटिंग पैनल में \"रिकॉर्डिंग इस डिवाइस पर रखें\" चालू करें ताकि वहाँ डाउनलोड हो (लगभग 1.5GB), या घटक के अंतर्गत डाउनलोड करें।"
 }

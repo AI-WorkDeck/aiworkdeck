@@ -3,81 +3,81 @@
 
 export default {
   "view": {
-    "bySection": "By Section",
-    "byParty": "By Party"
+    "bySection": "Por sección",
+    "byParty": "Por parte"
   },
   "filter": {
-    "allSections": "All sections",
-    "allParties": "All parties"
+    "allSections": "Todas las secciones",
+    "allParties": "Todas las partes"
   },
   "stat": {
-    "total": "{count} total"
+    "total": "{count} en total"
   },
   "status": {
-    "all": "Todo",
-    "active": "Activa",
-    "unverified": "Unverified",
-    "stale": "Changed",
-    "orphan": "Orphaned"
+    "all": "Todos",
+    "active": "Activo",
+    "unverified": "Sin verificar",
+    "stale": "Modificado",
+    "orphan": "Huérfano"
   },
   "group": {
-    "none": "Unassigned",
-    "untitled": "(No section)"
+    "none": "Sin asignar",
+    "untitled": "(Sin sección)"
   },
   "action": {
-    "keep": "Keep Link",
-    "rebind": "Reassign",
-    "confirmRebind": "Confirm",
+    "keep": "Mantener vínculo",
+    "rebind": "Reasignar",
+    "confirmRebind": "Confirmar",
     "cancelRebind": "Cancelar",
     "delete": "Eliminar",
-    "removeTarget": "Eliminar",
-    "open": "View Source",
-    "ignore": "Ignore",
-    "expand": "Expand",
-    "collapse": "Collapse"
+    "removeTarget": "Quitar",
+    "open": "Ver soporte",
+    "ignore": "Ignorar",
+    "expand": "Expandir",
+    "collapse": "Contraer"
   },
   "method": {
-    "written_review": "Document Review",
-    "written_statement": "Written Statement",
-    "web_check": "Online Check",
-    "third_party": "Third-Party Material",
-    "interview": "Interview",
-    "none": "No method"
+    "written_review": "Revisión documental",
+    "written_statement": "Declaración escrita",
+    "web_check": "Verificación en línea",
+    "third_party": "Material de terceros",
+    "interview": "Entrevista",
+    "none": "Sin método"
   },
   "relation": {
-    "supports": "Supports",
-    "contradicts": "Contradicts",
-    "partial": "Partial"
+    "supports": "Respalda",
+    "contradicts": "Contradice",
+    "partial": "Respalda parcialmente"
   },
   "loc": {
-    "wholeFile": "Whole file",
-    "page": "Page {page}",
-    "quote": "\"{quote}\"",
-    "region": "Image region",
+    "wholeFile": "Archivo completo",
+    "page": "Página {page}",
+    "quote": "«{quote}»",
+    "region": "Región de la imagen",
     "time": "{time}",
     "web": "{host}",
     "cell": "{sheet}!{cell}"
   },
-  "empty": "No source files linked to this document yet",
-  "emptyHint": "Drag a file from the explorer onto selected text to link it",
-  "emptyFiltered": "Ningún enlace coincide con el filtro actual",
+  "empty": "Aún no hay archivos de soporte vinculados a este documento",
+  "emptyHint": "Arrastra un archivo desde el explorador hasta el texto seleccionado para vincularlo",
+  "emptyFiltered": "Ningún vínculo coincide con el filtro actual",
   "fileMissing": "(el archivo ya no existe)",
-  "fileDeleted": "(en la papelera de reciclaje)",
-  "targetsCount": "{count} fuentes",
-  "rebindHint": "Selecciona el nuevo texto en el documento y luego pulsa Confirmar",
-  "rebindNoSelection": "Selecciona primero el texto en el documento",
+  "fileDeleted": "(en la papelera)",
+  "targetsCount": "{count} soportes",
+  "rebindHint": "Selecciona el texto nuevo en el documento y pulsa Confirmar",
+  "rebindNoSelection": "Primero selecciona texto en el documento",
   "rebindFailed": "Error al reasignar",
-  "rebindRetryHint": "El nuevo marcador ya está en el documento; pulsa Confirmar de nuevo para reintentarlo.",
-  "keepGone": "Este texto ya no está en el documento, por lo que no se puede mantener el enlace. Usa Reasignar en la pestaña de Fuentes.",
+  "rebindRetryHint": "El nuevo marcador ya está en el documento; pulsa Confirmar de nuevo para reintentar.",
+  "keepGone": "Este texto ya no está en el documento, por lo que no se puede mantener el vínculo. Usa Reasignar en la pestaña Soportes.",
   "orphanGoto": "El ancla de este texto ya no está en el documento. Pulsa Reasignar para elegir un texto nuevo.",
   "confidence": "Confianza {value}",
   "loading": "Cargando…",
-  "loadFailed": "Error al cargar los enlaces",
-  "fileTagsLoadFailed": "Error al cargar las etiquetas de partes; la vista \"Por parte\" puede ser inexacta",
+  "loadFailed": "No se pudieron cargar los vínculos",
+  "fileTagsLoadFailed": "No se pudieron cargar las etiquetas de partes; la vista «Por parte» puede ser inexacta",
   "opFailed": "Error en la operación",
-  "deleteConfirm": "¿Eliminar este enlace? El archivo de origen no se eliminará.",
-  "deleteTargetConfirm": "¿Quitar esta fuente?",
-  "staleOne": "Este texto tiene {count} fuentes vinculadas y ha sido modificado",
-  "staleMany": "Se han modificado {count} pasajes vinculados",
+  "deleteConfirm": "¿Eliminar este vínculo? El archivo de soporte no se eliminará.",
+  "deleteTargetConfirm": "¿Quitar este soporte?",
+  "staleOne": "Este texto tiene {count} soportes vinculados y ha cambiado",
+  "staleMany": "Han cambiado {count} fragmentos vinculados",
   "stalePrefix": "Modificado: "
 }

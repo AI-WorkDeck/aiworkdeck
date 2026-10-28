@@ -105,7 +105,7 @@ export default {
   "getCodeBtn": "Λήψη κωδικού",
   "confirmBindBtn": "Επιβεβαίωση σύνδεσης",
   "bindPhoneTip": "Μετά τη σύνδεση, οι συνδέσεις με κωδικό πρόσβασης για αυτόν τον λογαριασμό στο web και στις εφαρμογές γραφείου θα απαιτούν κωδικό SMS",
-  "emailLabel": "Email",
+  "emailLabel": "Ηλ. ταχυδρομείο",
   "newEmailLabel": "Νέο email",
   "emailInputPlaceholder": "Εισάγετε μια διεύθυνση email",
   "bindEmailTip": "Μετά τη σύνδεση email, η επαλήθευση σύνδεσης θα γίνεται με email αντί για SMS",

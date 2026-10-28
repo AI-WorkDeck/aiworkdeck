@@ -2,89 +2,89 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "title": "Αναφορές",
-  "noDoc": "No document open",
-  "parse": "Full-document online verification (charges may apply)",
-  "reparse": "Repeat full-document online verification (charges may apply)",
-  "onlineHint": "Clicking saves this document, then verifies the saved version online. AI and external lookups may incur charges.",
-  "saveRequired": "This document could not be saved. Save it successfully before online verification.",
-  "running": "Verifying online…",
-  "done": "Online verification complete",
-  "failed": "Online verification failed",
-  "loading": "Loading…",
-  "loadingDetail": "Fetching lookup details…",
-  "noDetail": "No lookup details for this item",
-  "loadFailed": "Could not load online verification results",
-  "parseFailed": "Could not start online verification",
-  "detailFailed": "Could not load the lookup details",
-  "refreshFailed": "Could not re-run the lookup",
+  "title": "Τεκμηρίωση",
+  "noDoc": "Δεν υπάρχει ανοιχτό έγγραφο",
+  "parse": "Διαδικτυακή επαλήθευση πλήρους εγγράφου (ενδέχεται να ισχύουν χρεώσεις)",
+  "reparse": "Επανάληψη διαδικτυακής επαλήθευσης πλήρους εγγράφου (ενδέχεται να ισχύουν χρεώσεις)",
+  "onlineHint": "Με το κλικ αποθηκεύεται το έγγραφο και επαληθεύεται διαδικτυακά η αποθηκευμένη έκδοση. Το AI και οι εξωτερικές αναζητήσεις ενδέχεται να επιφέρουν χρεώσεις.",
+  "saveRequired": "Δεν ήταν δυνατή η αποθήκευση του εγγράφου. Αποθηκεύστε το επιτυχώς πριν από τη διαδικτυακή επαλήθευση.",
+  "running": "Διαδικτυακή επαλήθευση σε εξέλιξη…",
+  "done": "Η διαδικτυακή επαλήθευση ολοκληρώθηκε",
+  "failed": "Η διαδικτυακή επαλήθευση απέτυχε",
+  "loading": "Φόρτωση…",
+  "loadingDetail": "Ανάκτηση λεπτομερειών αναζήτησης…",
+  "noDetail": "Δεν υπάρχουν λεπτομέρειες αναζήτησης για αυτό το στοιχείο",
+  "loadFailed": "Αδυναμία φόρτωσης αποτελεσμάτων διαδικτυακής επαλήθευσης",
+  "parseFailed": "Αδυναμία έναρξης διαδικτυακής επαλήθευσης",
+  "detailFailed": "Αδυναμία φόρτωσης λεπτομερειών αναζήτησης",
+  "refreshFailed": "Αδυναμία επανάληψης της αναζήτησης",
   "retry": "Επανάληψη",
-  "goConnectAccount": "Connect account",
-  "goRecharge": "Add credits",
+  "goConnectAccount": "Σύνδεση λογαριασμού",
+  "goRecharge": "Προσθήκη μονάδων",
   "hint": {
-    "NO_CREDENTIAL": "This lookup channel needs a credential configured on the server by your administrator."
+    "NO_CREDENTIAL": "Αυτό το κανάλι αναζήτησης απαιτεί διαπιστευτήρια ρυθμισμένα στον διακομιστή από τον διαχειριστή σας."
   },
   "tab": {
-    "retrieval": "Lookups",
-    "checks": "Consistency"
+    "retrieval": "Εξωτερικές αναζητήσεις",
+    "checks": "Συνέπεια"
   },
   "kind": {
-    "COMPANY": "Companies",
-    "LAW": "Statutes",
-    "CASE": "Cases",
-    "DOC": "Documents"
+    "COMPANY": "Εταιρείες",
+    "LAW": "Νομοθεσία",
+    "CASE": "Υποθέσεις",
+    "DOC": "Έγγραφα"
   },
   "entityKind": {
-    "COMPANY": "Company",
-    "LAW": "Statute",
-    "CASE": "Case",
-    "DOC": "Document"
+    "COMPANY": "Εταιρεία",
+    "LAW": "Νόμος",
+    "CASE": "Υπόθεση",
+    "DOC": "Έγγραφο"
   },
-  "openInNewTab": "Open in a new tab",
-  "openDocFile": "Open file",
-  "docNotFound": "No such file in this project",
-  "docMissing": "That file is no longer in this project",
+  "openInNewTab": "Άνοιγμα σε νέα καρτέλα",
+  "openDocFile": "Άνοιγμα αρχείου",
+  "docNotFound": "Δεν βρέθηκε τέτοιο αρχείο σε αυτό το έργο",
+  "docMissing": "Αυτό το αρχείο δεν βρίσκεται πλέον στο έργο",
   "source": {
-    "projectFile": "Project file",
-    "qichacha": "Qichacha"
+    "projectFile": "Αρχείο έργου",
+    "qichacha": "Qichacha (Αναζήτηση)"
   },
-  "mentions": "{count} mention(s)",
-  "mentionsTitle": "Mentions in this document",
-  "shareholders": "Shareholders",
-  "moreCandidates": "Other candidates",
+  "mentions": "{count} αναφορά(-ές)",
+  "mentionsTitle": "Αναφορές στο έγγραφο",
+  "shareholders": "Μέτοχοι",
+  "moreCandidates": "Άλλοι υποψήφιοι",
   "caseSection": {
-    "ascertain": "Facts found",
-    "reason": "Reasoning",
-    "result": "Judgment",
-    "gist": "Key holding",
-    "fullText": "Full judgment"
+    "ascertain": "Πραγματικά περιστατικά",
+    "reason": "Σκεπτικό",
+    "result": "Διατακτικό",
+    "gist": "Βασική κρίση",
+    "fullText": "Πλήρες κείμενο απόφασης"
   },
-  "authoritative": "Authoritative text (Pkulaw)",
-  "implementDate": "In force from {date}",
-  "recognition": "Case number recognition",
-  "openInPkulaw": "Open in Pkulaw",
+  "authoritative": "Επίσημο κείμενο (Pkulaw)",
+  "implementDate": "Σε ισχύ από {date}",
+  "recognition": "Αναγνώριση αριθμού υπόθεσης",
+  "openInPkulaw": "Άνοιγμα στο Pkulaw",
   "citation": {
-    "citedText": "Cited article",
-    "candidates": "Articles matched by content",
-    "article": "Article {n}"
+    "citedText": "Παρατιθέμενο άρθρο",
+    "candidates": "Άρθρα που αντιστοιχούν βάσει περιεχομένου",
+    "article": "Άρθρο {n}"
   },
   "severity": {
-    "warn": "Questionable",
-    "error": "Error"
+    "warn": "Αμφίβολο",
+    "error": "Σφάλμα"
   },
-  "unifyTo": "Set all to {value}",
-  "cannotFix": "Cannot fix automatically: {reason}",
-  "fixNotUnique": "Could not locate a unique match — please edit manually.",
-  "fixPartial": "Fixed {done}; {failed} had no unique match — please edit those manually.",
-  "fixed": "Fixed",
-  "fixedHint": "Press Cmd+Z to undo; re-analyze to refresh the findings.",
-  "noEditor": "Activate a document editor window first",
+  "unifyTo": "Ενοποίηση όλων σε {value}",
+  "cannotFix": "Αδυναμία αυτόματης διόρθωσης: {reason}",
+  "fixNotUnique": "Δεν βρέθηκε μοναδική αντιστοιχία — επεξεργαστείτε χειροκίνητα.",
+  "fixPartial": "Διορθώθηκαν {done}· {failed} δεν είχαν μοναδική αντιστοιχία — επεξεργαστείτε τα χειροκίνητα.",
+  "fixed": "Διορθώθηκε",
+  "fixedHint": "Πατήστε Cmd+Z για αναίρεση· αναλύστε ξανά για ανανέωση των ευρημάτων.",
+  "noEditor": "Ενεργοποιήστε πρώτα ένα παράθυρο επεξεργασίας εγγράφου",
   "empty": {
-    "noRun": "This document has not been verified online",
-    "noRunHint": "Everyday writing hints run locally. Only clicking online verification sends the saved document for AI extraction, external lookups and consistency checks.",
-    "noEntity": "No lookupable entities found",
-    "noEntityHint": "The document mentions no company name, statute article or case number.",
-    "noFinding": "No inconsistencies found",
-    "noFindingHint": "Quantity statements and unified social credit codes all check out."
+    "noRun": "Αυτό το έγγραφο δεν έχει επαληθευτεί διαδικτυακά",
+    "noRunHint": "Οι καθημερινές υποδείξεις γραφής εκτελούνται τοπικά. Μόνο με κλικ στη διαδικτυακή επαλήθευση αποστέλλεται το αποθηκευμένο έγγραφο για εξαγωγή AI, εξωτερικές αναζητήσεις και ελέγχους συνέπειας.",
+    "noEntity": "Δεν βρέθηκαν οντότητες προς αναζήτηση",
+    "noEntityHint": "Το έγγραφο δεν αναφέρει επωνυμία εταιρείας, άρθρο νόμου ή αριθμό υπόθεσης.",
+    "noFinding": "Δεν βρέθηκαν ασυνέπειες",
+    "noFindingHint": "Οι δηλώσεις ποσοτήτων και οι κωδικοί κοινωνικής πίστωσης επαληθεύτηκαν επιτυχώς."
   }
 }

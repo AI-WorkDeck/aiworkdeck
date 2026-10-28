@@ -341,7 +341,7 @@
           :key="p.key"
           class="rail-btn"
           :class="{ active: (p.isDynamic && p.hasDeclaredViews && !p.sidebarView && workspaceTabState('plugin', p.pluginId) === 'active') || ((leftPaneKey === p.key || (p.key === 'files' && isExplorerPane)) && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned), 'is-movable': isMovablePanel(p.key), 'is-sortable': !isClientView, 'rail-dragging': draggingRailKey === p.key }"
-          :title="p.label"
+          :title="(p.labelKey && $t(p.labelKey)) || p.label"
           :draggable="!isClientView"
           @tap="onRailBtnTap(p.key)"
           @dragstart="onRailDragStart(p.key, $event)"
@@ -3138,12 +3138,18 @@ export default {
       const cents = Number(this.wallet.balanceCents)
       return Number.isFinite(cents) && cents < 2000
     },
-    // 等级名小徽章：level>=2 才显示（律师助理档只显示余额），按语言取 nameZh/nameEn
+    // 等级名小徽章：level>=2 才显示（律师助理档只显示余额），优先取多语言词条，否则按语言取 nameZh/nameEn
     walletTierName() {
       const m = this.wallet.membership
       if (!m || !(Number(m.level) >= 2)) return ''
-      const en = this.$i18n && this.$i18n.locale === 'en-US'
-      return (en ? m.nameEn : m.nameZh) || m.nameZh || m.nameEn || ''
+      if (m.key && typeof this.$t === 'function') {
+        const k = `admin.membershipTiers.${m.key}`
+        const t = this.$t(k)
+        if (t && t !== k) return t
+      }
+      const loc = String((this.$i18n && this.$i18n.locale) || '')
+      const zh = loc === 'zh-CN' || loc === 'zh-TW'
+      return (zh ? m.nameZh : m.nameEn) || m.nameEn || m.nameZh || ''
     },
     meetingRecorderEnabled() { return this.dynamicPlugins.some(plugin => plugin.pluginId === 'voice') },
     /**
@@ -3492,10 +3498,10 @@ export default {
       // 停靠到左栏的工具面板（变量库/收藏夹/剪贴板）在 leftSidebarPlugins 里查不到，
       // 会掉进兜底显示成「资源管理器」——从注册表取它的 labelKey（dev-board#180）
       const movable = getMovablePanel(this.leftPaneKey, this.dockPanels)
-      if (movable) return movable.label || this.$t(movable.labelKey)
+      if (movable) return (movable.labelKey && this.$t(movable.labelKey)) || movable.label
       // 动态插件的标题在 getLeftSidebarPlugin（只认静态 + OFF_RAIL）里查不到，
       // 会掉进兜底显示成「资源管理器」——从 dynamicPlugins 直接取它的 label。
-      if (this.activeDynamicPlugin) return this.activeDynamicPlugin.label || this.$t('workbench.explorerFallback')
+      if (this.activeDynamicPlugin) return (this.activeDynamicPlugin.labelKey && this.$t(this.activeDynamicPlugin.labelKey)) || this.activeDynamicPlugin.label || this.$t('workbench.explorerFallback')
       try {
         return getLeftSidebarPlugin(this.leftPaneKey)?.label || this.$t('workbench.explorerFallback')
       } catch (e) {
@@ -3707,11 +3713,11 @@ export default {
     // 底部抽屉的 tab 列表（原 WORKBENCH_TOOLS）。底栏 tab 条与状态条工具入口同源消费，
     // 面板被搬到左/右之后这里自动少一项，两处一起变。
     bottomToolsList() {
-      return this.panelDocks.bottom.map(p => ({ key: p.key, label: p.label || this.$t(p.labelKey) }))
+      return this.panelDocks.bottom.map(p => ({ key: p.key, label: (p.labelKey && this.$t(p.labelKey)) || p.label }))
     },
     // 停靠到右侧面板的面板（非空时右栏才长出 tab 条；平时右侧只有 AI 对话，零视觉回归）
     rightDockPanels() {
-      return this.panelDocks.right.map(p => ({ key: p.key, label: p.label || this.$t(p.labelKey) }))
+      return this.panelDocks.right.map(p => ({ key: p.key, label: (p.labelKey && this.$t(p.labelKey)) || p.label }))
     },
     // 右键「移到…」菜单的选项：只列这个面板允许的 dock，当前所在的那一档置灰
     dockMenuOptions() {
@@ -3728,7 +3734,7 @@ export default {
     },
     dockMenuTitle() {
       const p = getMovablePanel(this.dockMenu.panelKey, this.dockPanels)
-      return p ? p.label || this.$t(p.labelKey) : ''
+      return p ? (p.labelKey && this.$t(p.labelKey)) || p.label : ''
     },
     // 拖拽中的面板允许落到哪几个 dock（决定投放高亮层渲染哪几块）
     dockDropZones() {
@@ -4626,6 +4632,7 @@ export default {
     leftPaneKey() { this.pushMenuState() },
     isRecording() { this.pushMenuState() },
     LEFT_SIDEBAR_PLUGINS() { this.pushMenuState() },
+    '$i18n.locale'() { this.refreshLocalizedLabels() },
     // 桌面端统一守卫：弹窗/蒙层打开 → 隐藏 BrowserView；全部关闭 → 恢复并重同步 bounds
     desktopOverlayActive(open) {
       if (!this.isDesktopApp) return
@@ -8014,6 +8021,8 @@ export default {
               // 两者别混用
               pluginId: p.id,
               version: p.version,
+              labelKey: labelKey || '',
+              rawName: p.name || '',
               label: (translatedLabel && translatedLabel !== labelKey)
                 ? translatedLabel
                 : (p.name || (typeof this.$t === 'function' ? this.$t('workbench.pluginFallbackName') : '插件')),
@@ -8062,6 +8071,37 @@ export default {
         }
       } catch (e) {
         console.error('Failed to load dynamic plugins:', e)
+      }
+    },
+
+    refreshLocalizedLabels() {
+      if (typeof this.$t !== 'function') return
+      if (Array.isArray(this.dynamicPlugins) && this.dynamicPlugins.length) {
+        this.dynamicPlugins = this.dynamicPlugins.map(p => {
+          if (!p) return p
+          const translated = p.labelKey ? this.$t(p.labelKey) : ''
+          const nextLabel = (translated && translated !== p.labelKey)
+            ? translated
+            : (p.rawName || p.label || this.$t('workbench.pluginFallbackName'))
+          return nextLabel === p.label ? p : { ...p, label: nextLabel }
+        })
+      }
+      const tabKeys = {
+        'message-center': 'messageCenter.title',
+        'dd-client': 'ddWorkflow.clientWorkspace',
+        welcome: 'welcome.tabName',
+        calendar: 'calendar.tabName',
+        'admin-settings': 'workbench.settingsTabName',
+        'commit-history': 'version.historyTabName',
+      }
+      const pluginLabelById = new Map((this.dynamicPlugins || []).map(p => [p.pluginId, (p.labelKey && this.$t(p.labelKey)) || p.label]))
+      for (const tab of [...(this.leftFiles || []), ...(this.rightFiles || [])]) {
+        if (!tab || !tab.tabType) continue
+        if (tab.tabType === 'plugin' && tab.pluginId && pluginLabelById.has(tab.pluginId)) {
+          tab.name = pluginLabelById.get(tab.pluginId)
+        } else if (tabKeys[tab.tabType]) {
+          tab.name = this.$t(tabKeys[tab.tabType])
+        }
       }
     },
 
