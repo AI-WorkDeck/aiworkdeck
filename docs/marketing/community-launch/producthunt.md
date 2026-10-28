@@ -37,3 +37,13 @@ We welcome feedback from legal practitioners and developers, especially reproduc
 - 不填写未经核实的用户数、star 数或团队规模，不将团队支持表述为律所官方出品或机构背书。
 - 定价字段须按实际服务核对；开源许可不意味着云模型等服务全部免费。
 - AGPL、CLA、商业许可及第三方组件条款以仓库原法律文件为准，本次不修改。
+
+## 历史图片资产与生成管线
+
+下列记录用于维护已有素材，不表示本轮已核验图片中的功能、数量或宣传文字。重用前按当前文案和实际产品状态核对。
+
+- `ph-assets/thumbnail-240.png`：240×240 缩略图，来源 `desktop/build/icon.png`。
+- `ph-assets/gallery-01-hero.png` 至 `gallery-07-opensource.png`：七张 2540×1520 画廊图，顺序为主视觉、修订、可视化、手机取证、插件、Office/WPS、开源；第一张也用于社交分享预览。
+- `ph-assets/ph-cards.html`：HTML 经无头 Chrome 截图生成图片；修改源 HTML 后重新渲染。
+- 历史画廊截图取自官网 `hero-dashboard.png`（中文界面）；可按原截图管线更新为当前界面。
+- 不使用官网 `plugin-marketplace.png` 愿景图中的虚构数量或课程内容作为事实宣传；插件列表与版本须按实际发布状态核对。
