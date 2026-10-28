@@ -44,6 +44,7 @@
         <scroll-view scroll-y class="msb-list">
         <view v-if="installedTab === 'skill'" class="msb-builtin-note">
           <text>{{ $t('market.builtinWorkflowsMarketNotice') }}</text>
+          <text class="msb-builtin-action" @tap.stop="openBuiltinWorkflowSettings">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</text>
         </view>
         <view v-if="!activeInstalledRows.length" class="msb-empty">
           <text>{{ searchText ? activeInstalledEmptyText : $t('market.noInstalledYet') }}</text>
@@ -107,6 +108,7 @@
         <template v-if="marketTab === 'skill'">
           <view class="msb-builtin-note">
             <text>{{ $t('market.builtinWorkflowsMarketNotice') }}</text>
+            <text class="msb-builtin-action" @tap.stop="openBuiltinWorkflowSettings">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</text>
           </view>
           <view v-if="marketLoading" class="msb-empty"><text>{{ $t('market.loadingEllipsis') }}</text></view>
           <view v-else-if="marketError" class="msb-empty msb-error">
@@ -250,6 +252,7 @@ function fmtDownloads(n) {
 
 export default {
   name: 'MarketSidebarPanel',
+  inject: { openWorkflowEditorTab: { default: null }, openSettingsTab: { default: null } },
   emits: ['open-detail'],
   data() {
     return {
@@ -565,6 +568,15 @@ export default {
         uni.showToast({ title: e?.message || this.$t('market.scanFailedNeedAdmin'), icon: 'none' })
       } finally {
         this.rescanning = false
+      }
+    },
+    openBuiltinWorkflowSettings() {
+      if (this.openWorkflowEditorTab) {
+        this.openWorkflowEditorTab({ workflowId: 'contract-review', versionId: 'default' })
+        return
+      }
+      if (this.openSettingsTab) {
+        this.openSettingsTab({ nav: 'workflows' })
       }
     },
   },
@@ -1043,11 +1055,25 @@ export default {
   border-radius: var(--awd-radius-sm);
   background: var(--awd-accent-wash);
   border: 1px solid var(--awd-accent-soft);
+  display: flex;
+  flex-direction: column;
+  row-gap: 4px;
 
   text {
     font-size: var(--awd-panel-fs-meta);
     color: var(--awd-text-2);
     line-height: 1.45;
+  }
+
+  .msb-builtin-action {
+    align-self: flex-start;
+    color: var(--awd-accent-text);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
   }
 }
 </style>

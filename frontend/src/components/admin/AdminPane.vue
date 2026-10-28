@@ -185,6 +185,17 @@
                 </view>
               </SettingsRow>
               <text class="field-note region-summary-note">{{ networkRegionSummary }}</text>
+
+              <view class="section-divider"></view>
+              <view class="section-header-inline">
+                  <text class="section-title-sm">{{ $t('chat.builtinWorkflowsFoldEntry') }}</text>
+              </view>
+              <text class="field-note">
+                {{ $t('chat.builtinWorkflowsSub') }}
+              </text>
+              <SettingsRow :label="$t('chat.builtinWorkflowsHeader')" :hint="$t('chat.builtinWorkflowsScope')">
+                <button type="button" class="comp-btn" @tap="onNavTap({ key: 'workflows' })">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</button>
+              </SettingsRow>
           </SettingsSection>
 
           <!-- 保存按钮 -->
@@ -973,6 +984,13 @@
               <MemoryBrowser inline :open="true" :project-id="projectId" />
           </SettingsSection>
         </scroll-view>
+        <scroll-view v-else-if="activeNav === 'workflows'" scroll-y class="config-scroll">
+          <SettingsSection :title="$t('chat.builtinWorkflowsFoldEntry')" :description="$t('chat.builtinWorkflowModalSubtitle')">
+            <view class="admin-builtin-workflow-wrap">
+              <BuiltinWorkflowEditor :project-id="projectId || ''" :embedded-in-settings="true" />
+            </view>
+          </SettingsSection>
+        </scroll-view>
         <scroll-view v-else-if="activeNav === 'permissions'" scroll-y class="config-scroll">
           <SettingsSection :title="$t('admin.permissionsSectionTitle')" :description="$t('admin.permissionsSectionSubtitle')">
             <template #actions>
@@ -1065,6 +1083,7 @@ import OcrRoutingSettings from '@/components/admin/OcrRoutingSettings.vue'
 import OptionalComponentCard from '@/components/OptionalComponentCard.vue'
 import ExternalDependenciesPanel from '@/components/admin/ExternalDependenciesPanel.vue'
 import MemoryBrowser from '@/components/MemoryBrowser.vue'
+import BuiltinWorkflowEditor from '@/components/BuiltinWorkflowEditor.vue'
 import LanguagePicker from '@/components/LanguagePicker.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
@@ -1080,6 +1099,7 @@ const NAV_LABEL_KEYS = {
   personal_settings: 'admin.navPersonalSettings',
   team: 'team.navTeam',
   memory: 'chat.memoryButton',
+  workflows: 'chat.builtinWorkflowsFoldEntry',
   account: 'admin.navAccount',
   ai: 'admin.navAi',
   updates: 'admin.navUpdates',
@@ -1112,6 +1132,9 @@ export function resolveAdminNavKey(key) {
     personal_settings: 'personal_settings',
     lang: 'language',
     language: 'language',
+    workflow: 'workflows',
+    workflows: 'workflows',
+    'builtin-workflows': 'workflows',
   }
   return map[k] || k
 }
@@ -1122,7 +1145,7 @@ export default {
     OcrRoutingSettings,
     UnlockHint, RechargeDialog, AwdSelect, AwdSwitch,
     PersonalWorkLogPanel, PersonalCaseIntakePanel, PersonalFavoritesPanel, PersonalTodosPanel, PersonalSettingsPanel,
-    TeamPanel, OptionalComponentCard, MemoryBrowser, ExternalDependenciesPanel,
+    TeamPanel, OptionalComponentCard, MemoryBrowser, BuiltinWorkflowEditor, ExternalDependenciesPanel,
     LanguagePicker, SettingsSection, SettingsRow,
   },
   /**
@@ -1177,6 +1200,7 @@ export default {
         // 普通成员也要看得到自己的统计与那个数据共享开关，而「系统」组对非管理员整组收起
         { key: 'team', label: this.$t('team.navTeam'), group: 'personal' },
         { key: 'memory', label: this.$t('chat.memoryButton'), group: 'personal' },
+        { key: 'workflows', label: this.$t('chat.builtinWorkflowsFoldEntry'), group: 'personal' },
         // 「系统」组：'config'（系统配置）已撤，内容分别并入 'ai' 与「账户与安全」；
         // 'platform'（平台服务）2026-08-27 已撤——官方版外部服务统一平台代采，档位
         // 下拉全是单选项，分区已无实际作用（花费闸门/预扣提醒搬进了 'account' 末尾）。
@@ -4296,6 +4320,15 @@ $brand-accent: $brand-mint;
   font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
   text-decoration: underline;
+}
+.admin-builtin-workflow-wrap {
+  border: 1px solid var(--awd-border-subtle);
+  border-radius: var(--awd-radius-lg);
+  overflow: hidden;
+  min-height: 560px;
+  height: 620px;
+  display: flex;
+  flex-direction: column;
 }
 
 </style>
