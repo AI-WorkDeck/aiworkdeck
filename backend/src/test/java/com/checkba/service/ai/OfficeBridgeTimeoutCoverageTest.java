@@ -70,6 +70,8 @@ class OfficeBridgeTimeoutCoverageTest {
                 "单图上限 2MB，经 base64 过桥后体积再膨胀约三分之一，落笔前先要把整串搬进宿主");
         JUDGMENT_BULK.put("ppt_add_slide",
                 "追加空白页 + moveTo 挪位置 + 标题/正文两个文本框，一条命令里四次 sync");
+        JUDGMENT_BULK.put("ppt_add_image",
+                "图片最多12MB，插入前解码裁剪，宿主插入后还需读取形状并设置层级");
         JUDGMENT_BULK.put("ppt_replace_text",
                 "遍历全篇每一页每一个形状（含组合与表格递归）找命中，再逐处从右到左替换");
         JUDGMENT_BULK.put("ppt_format_text",

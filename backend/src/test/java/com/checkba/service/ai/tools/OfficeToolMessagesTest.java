@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class OfficeToolMessagesTest {
     @Test void everyNewMessageHasAllSupportedLocalesAndUsesTheirExactText() {
-        assertEquals(17, OfficeToolMessages.MESSAGES.size());
+        assertEquals(18, OfficeToolMessages.MESSAGES.size());
         for (var entry : OfficeToolMessages.MESSAGES.entrySet()) {
             assertEquals(AppLocale.values().length, entry.getValue().size(), entry.getKey());
             for (var locale : AppLocale.values()) {
