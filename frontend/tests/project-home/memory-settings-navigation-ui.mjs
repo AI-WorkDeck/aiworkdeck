@@ -28,7 +28,12 @@ try {
     if (req.method() === 'OPTIONS') return req.respond({ status: 204, headers })
     const project = { id: 42, name: language === 'zh-CN' ? '15-合成诉讼项目' : '15-Synthetic Litigation Project', userId: 7, myRole: 'OWNER', projectType: 'BLANK', createdAt: '2026-10-27T12:00:00', manager: 'Synthetic Owner' }
     let body = []
-    if (url.pathname === '/api/ai/memory/spaces') body = [{ id: 'project:42', scope: 'project', label: 'Synthetic Project', available: true, writable: true }]
+    if (url.pathname === '/api/ai/memory/spaces') body = [
+      { id: 'project:42', scope: 'project', label: 'Synthetic Project', available: true, writable: true },
+      { id: 'user:7', scope: 'user', available: true, writable: true },
+      { id: 'team:3', scope: 'team', available: true, writable: true },
+      { id: null, scope: 'firm', available: false, writable: false },
+    ]
     else if (url.pathname === '/api/ai/memory/files') body = [{ path: 'remember.md', writable: true }]
     else if (url.pathname === '/api/ai/memory/file') body = { path: 'remember.md', content: 'Synthetic memory', revision: 'r1', writable: true }
     else if (url.pathname === '/api/projects/42') body = project
@@ -91,8 +96,36 @@ try {
     await page.evaluate(() => window.qaWorkbench.openSettingsTab({ nav: 'memory' }))
     await page.waitForFunction(() => window.qaWorkbench.chatCanvasVisible)
     await page.evaluate(() => window.qaWorkbench.$nextTick())
+    // Poll rendered geometry rather than RAF-based selector visibility: the canvas starts display:none.
+    await page.waitForFunction(() => {
+      const el = document.querySelector('.memory-inline .memory-textarea')
+      const box = el?.getBoundingClientRect()
+      return box?.width > 0 && box?.height > 0 && getComputedStyle(el).visibility === 'visible'
+    }, { polling: 100 })
+    await settle()
+    const memoryGeometry = await page.evaluate(() => {
+      const root = document.querySelector('.memory-inline')
+      const rect = selector => { const r = root.querySelector(selector).getBoundingClientRect(); return { x:r.x, y:r.y, width:r.width, height:r.height, bottom:r.bottom } }
+      const save = root.querySelector('.memory-button.primary')
+      const range = document.createRange(); range.selectNodeContents(save)
+      return {
+        inlineWidth: root.getBoundingClientRect().width, editor: rect('.memory-editor'), textarea: rect('.memory-textarea'), files: rect('.memory-files'),
+        saveTextLines: new Set([...range.getClientRects()].map(r => Math.round(r.top))).size,
+        scopes: root.querySelectorAll('.memory-space').length,
+        unavailable: root.querySelectorAll('.memory-space.unavailable').length,
+        overflow: [...root.querySelectorAll('.memory-panel-inline,.memory-body,.memory-editor,.memory-actions')].some(el => el.scrollWidth > el.clientWidth + 1),
+        activeScope: root.querySelector('.memory-space.active')?.textContent,
+      }
+    })
+    assert.equal(memoryGeometry.scopes, 4, 'all four scope tabs rendered')
+    assert.equal(memoryGeometry.unavailable, 1, 'unavailable firm remains visible')
+    assert.ok(memoryGeometry.activeScope.includes('Synthetic Project'), 'project scope stays selected')
+    assert.ok(memoryGeometry.inlineWidth <= 620, 'canvas fixture exercises narrow container in a wide viewport')
+    assert.ok(memoryGeometry.textarea.width >= memoryGeometry.inlineWidth - 50, 'editor uses available narrow canvas width')
+    assert.ok(memoryGeometry.files.bottom <= memoryGeometry.editor.y + 1, 'file list stacks above editor')
+    assert.equal(memoryGeometry.saveTextLines, 1, 'save label does not wrap')
+    assert.equal(memoryGeometry.overflow, false, 'memory content has no horizontal overflow')
     await page.screenshot({path: `${out}/canvas-${history}.png`})
-    await page.waitForSelector('.memory-inline', { visible: true })
     assert.equal(await page.$eval('.chat-input-rich', el => el.textContent), draft, 'chat draft retained')
     if (history) assert.ok(await page.$eval('.message-list', el => el.textContent.includes('Synthetic preserved answer')), 'messages retained')
     for (let repeat = 0; repeat < 2; repeat++) {
@@ -101,10 +134,16 @@ try {
       assert.equal(await page.evaluate(() => window.qaWorkbench.isChatMode), false, 'skill management opens IDE market')
     }
     assert.equal(await page.$eval('.chat-input-rich', el => el.textContent), draft, 'skill navigation retains draft')
-    results.push({ history, passed: true })
+    results.push({ history, memoryGeometry, passed: true })
     await page.screenshot({ path: `${out}/${history ? 'history' : 'empty'}.png` })
   }
   assert.deepEqual(errors, [], 'no render errors')
   await writeFile(`${out}/report.json`, JSON.stringify({results, requests, errors}, null, 2))
   console.log(JSON.stringify({results, errors}))
+} catch (error) {
+  const pages = await browser.pages()
+  const failedPage = pages.at(-1)
+  await writeFile(`${out}/failure.json`, JSON.stringify({ error: error.message, state: await failedPage.evaluate(() => ({ mode: window.qaWorkbench?.viewMode, canvas: window.qaWorkbench?.chatCanvasVisible, left: window.qaWorkbench?.activeFileIdLeft, admin: document.querySelector('.page-admin')?.innerText, memories: [...document.querySelectorAll('.memory-inline')].map(e => ({box:e.getBoundingClientRect().toJSON(),visibility:getComputedStyle(e).visibility,textarea:[...e.querySelectorAll('.memory-textarea')].map(t=>({box:t.getBoundingClientRect().toJSON(),visibility:getComputedStyle(t).visibility,display:getComputedStyle(t).display,html:t.outerHTML.slice(0,500)}))})) })) }, null, 2))
+  await failedPage.screenshot({path: `${out}/failure.png`})
+  throw error
 } finally { await browser.close() }
