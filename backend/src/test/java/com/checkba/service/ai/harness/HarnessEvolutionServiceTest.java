@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -143,5 +144,54 @@ class HarnessEvolutionServiceTest {
         HarnessEvolutionService.HarnessEvolutionRecord reverted = evolutionService.revertEvolution(7L, id);
         assertEquals(HarnessEvolutionService.STATUS_REVERTED, reverted.status());
         assertTrue(skillRegistry.getSkill(promoted.promotedSkillId()).isEmpty());
+    }
+
+    @Test
+    void invariantToolAdaptationIsIgnoredAndNeverPollutesMemory() {
+        HarnessDiagnosticService.HarnessAdaptation expandFiles = new HarnessDiagnosticService.HarnessAdaptation(
+                "ha-expand-files",
+                HarnessDiagnosticService.TIER_INVARIANT,
+                HarnessDiagnosticService.ACTION_EXPAND_TOOL_CATEGORY,
+                "list_files",
+                "Harness 自愈：自动展开工具类目 [files]",
+                "归因 [INVARIANT / 工具可见性]：当前步骤涉及尚未展开的专项工具类目（files）。",
+                "[Harness 运行期自愈] 已为你动态展开工具类目 [files]。",
+                List.of("files"),
+                null,
+                System.currentTimeMillis());
+
+        Optional<HarnessEvolutionService.HarnessEvolutionRecord> recordOpt =
+                evolutionService.evaluateTurnEvolution(
+                        "conv-ppt-1",
+                        7L,
+                        10L,
+                        "帮我做一个解释这个案子进展的PPT",
+                        null,
+                        List.of(),
+                        List.of(expandFiles));
+
+        assertTrue(recordOpt.isEmpty(), "底层工具类目展开属于单轮内部自愈，绝不应沉淀为用户记忆或弹窗打扰用户");
+        verify(memoryDocumentService, never()).write(anyLong(), anyString(), anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    void autonomousJudgmentInfersUserScopeAndAutoPromotesDomainSkill() {
+        Optional<HarnessEvolutionService.HarnessEvolutionRecord> recordOpt =
+                evolutionService.evaluateTurnEvolution(
+                        "conv-auto-skill",
+                        7L,
+                        10L,
+                        "审查担保条款",
+                        null,
+                        List.of("以后所有「对外担保条款」审查规范一律先核验股东会决议证据，缺失必须标为待核实"),
+                        List.of());
+
+        assertTrue(recordOpt.isPresent());
+        HarnessEvolutionService.HarnessEvolutionRecord record = recordOpt.get();
+        assertEquals("user", record.scope(), "跨项目通用规范应自动判定为 user 全局作用域");
+        assertEquals("user:7", record.memorySpaceId());
+        assertEquals(HarnessEvolutionService.STATUS_PROMOTED_SKILL, record.status(), "跨项目领域规范应自动升格为专属技能");
+        assertNotNull(record.promotedSkillId());
+        assertTrue(skillRegistry.getSkill(record.promotedSkillId()).isPresent());
     }
 }

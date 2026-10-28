@@ -1780,3 +1780,13 @@ cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='Refe
 - 本机私聊走 `ImScopedAgentHost` 的项目身份核验，再由 `ImPrivateProjectContext` 按当前/已打开真实文档候选与问题题名相关性读取最多4份、每份6000字。宿主 `messageContextFileIds` 仅提供最多两个真实文件 ID，PluginPane 覆盖插件自给候选；文件仍须属于当前项目并通过 ACL。不能把文件目录当作已读取正文。
 - 云项目群经 `ImSharedProjectContext` 只读向客户开放、全部当前有权成员可读的材料；提取后、模型生成后及提交前复核。团队/律所助手仅读对应共享记忆，最多尝试3份；不注入本机私聊材料。
 - 验证：66项后端合成数据测试，包括排序第7的起诉状命中、正文进入模型请求、跨项目 ID 拒读；前端默认入口与真实 iframe 沙箱验证。没有调用真实付费模型或将用户截图中的案件材料发送给测试服务。
+
+### 2026-10-28 Harness² 运行期自愈、独立核验与零打扰自动自进化（dev-board#1481）
+
+- **运行期双层归因与静默自愈（`service/ai/harness/HarnessDiagnosticService`）**：区分 `INVARIANT`（`EXPAND_TOOL_CATEGORY` 动态展开工具类目、`ANCHOR_PROBE_RECOVERY` 强制回读探针）与 `DOMAIN`（`MOUNT_DOMAIN_SKILL` 动态挂载领域技能、`CLARIFY_WITH_USER` 事实缺失澄清）。自愈处方在后台注入编排循环，**不在 `ProcessCard.vue` 内联渲染底层归因诊断块**，避免向用户暴露内部工具名与工程术语。
+- **零打扰自动判断自进化（`service/ai/harness/HarnessEvolutionService`）**：
+  1. **过滤底层运行期噪音**：`EXPAND_TOOL_CATEGORY` 与 `ANCHOR_PROBE_RECOVERY` 属于单轮内部工具调度机制，`isEvolvableSelfHealing` 一律跳过，绝不写入 `topics/harness-evo-*.md` 污染用户记忆。
+  2. **自动判定作用域（`inferOptimalScope`）与自动升格技能（`shouldAutoPromoteToSkill`）**：绑定本案具体材料（`《…》`、`这份`、`本案`、`补充协议`等）的规则自动写入 `project` 记忆；跨项目通用规范或显式「…专项规范」自动写入 `user` 全局记忆，并在属于 `DOMAIN` 领域规范时自动升格注册为 `user-evo-*` Skill（无需人工点击）。
+  3. **对话流零打扰**：`RootBubble.vue` 不挂载 `HarnessEvolutionCard`，不在对话流弹出让用户三选一的卡片；用户可随时在「我的记忆 / 项目记忆」面板或 `/api/agent/harness/evolutions` 查看与回滚。
+- **收尾 Challenger 独立核验（`service/ai/harness/VerificationHarness`）**：仅对声明 `verification_policy: slot_evidence_challenger` 的高风险技能（如 `legal-opinion`）在 `<final>` 前执行独立证据核对，未核实主张自动触发 1 次自我修正闭环。
+- **回归**：`HarnessDiagnosticServiceTest`、`VerificationHarnessTest`、`HarnessEvolutionServiceTest`、`HarnessEvolutionPersistenceTest`、`frontend/tests/project-home/harness-evolution-ui.test.mjs`、`frontend/tests/ai-alignment-e2e/harness-self-evolving-e2e.mjs`。
