@@ -17,7 +17,7 @@
 
 <p align="center">
   <a href="README.md">English</a> · <strong>简体中文</strong><br>
-  <a href="WHY.zh-CN.md">产品判断</a> · <a href="#一起建设">一起建设</a> · <a href="docs/architecture.md">技术架构</a> · <a href="https://github.com/AI-WorkDeck/aiworkdeck/releases/latest">下载体验</a> · <a href="mailto:hi@aiworkdeck.com">投资与合作</a>
+  <a href="WHY.zh-CN.md">产品判断</a> · <a href="#一起建设">一起建设</a> · <a href="docs/architecture.md">技术架构</a> · <a href="https://github.com/AI-WorkDeck/aiworkdeck/releases/latest">下载体验</a> · <a href="mailto:hi@aiworkdeck.com">社区交流</a>
 </p>
 
 一份合同能够交付，意味着有人愿意对它负责。为此，需要核对依据、协商修改、保留文档结构，也需要知道哪一版经过了谁的审阅。写出初稿，只是其中一步。
@@ -25,6 +25,8 @@
 <strong>AI WorkDeck 把这些工作放进同一个可扩展的工作台。</strong> 智能体与文档编辑器、项目文件、来源依据和版本记录共同工作。律师可以在文档里检查 AI 提出的修改，逐项接受或拒绝，并把成果保留在项目历史中。开发者则可以在同一套编辑器、智能体工具和插件运行时之上，构建自己的专业工作流。
 
 <strong>我们希望把它建设成专业 AI 的共同基础：</strong>从要求严格的法律场景切入，将底层文档能力做成可复用的接口，让不同领域的开发者能够在其上继续创造。
+
+AI WorkDeck 是一项源于一线法律工作、在工作之余开展的开源探索，得到团队支持，并在同事的实践反馈中逐步完善。发起人韩泽伟是一名执业律师，曾在金杜律师事务所工作并支持所内法律科技团队的项目，现为 Beijing Redsunny Law 合伙人，也是《大模型时代的法律科技》的合著者。项目希望把实践中积累的工具与方法开放出来，供同行和开发者交流、检验与改进。
 
 <p align="center">
   <img src="docs/images/marketing/01-workspace.png" alt="同一工作台中的项目文件、文档编辑器与 AI 对话" width="1000">
@@ -112,18 +114,6 @@ AI 编程工具已经展示了智能体进入实际工作环境的价值。专�
 
 欢迎带着具体场景参与 [Discussions](https://github.com/AI-WorkDeck/aiworkdeck/discussions)，或提出范围清楚的 [Issue](https://github.com/AI-WorkDeck/aiworkdeck/issues)。开发者与专业人士可以一起定义这些工作。
 
-## 开源与商业如何相互支持
-
-开源工作台给开发者提供可以检查、修改和扩展的代码。商业模式包括按用量计费的平台服务、商业许可与实施支持，以及分发专业工作流的广场。我们希望先进入经常发生的法律工作，再支持机构部署，并让专业开发者向相邻场景扩展。一个有用的扩展，可以成为另一类团队采用工作台的理由；共同的运行环境，则减少后来者需要重复建设的基础工作。
-
-项目管理方为<strong>北京京微资易科技有限公司</strong>，国际业务由<strong>真善美承泽有限公司（Zhen Shan Mei Grace Legacy Limited）</strong>运营。商业许可覆盖管理方拥有权利的代码，第三方组件仍遵循各自条款。详见[商业许可](legal/COMMERCIAL-LICENSE.md)、[第三方组件](legal/THIRD-PARTY-COMPONENTS.md)与[商标说明](legal/TRADEMARKS.md)。
-
-### 社区基金
-
-管理方现行政策将<strong>商业许可净收入的 20%</strong>用于社区基金，支持悬赏、Skill 创作资助与社区活动。这是一项可向未来调整的公开政策，不构成对个人的合同性权益承诺。治理角色对应技术权限，经济安排另按[悬赏政策](BOUNTIES.md)与[广场条款](legal/MARKETPLACE-TERMS.md)执行。
-
-<strong>希望投资、基于这套基础开发垂直产品，或成为实施合作伙伴？</strong> 欢迎联系 [hi@aiworkdeck.com](mailto:hi@aiworkdeck.com)，交流产品、技术基础与商业方向。我们期待关心交付质量的合作伙伴，也期待愿意共同定义专业智能体工作方式的开发者。
-
 <a id="快速开始"></a>
 
 ## 进一步了解
@@ -134,3 +124,11 @@ AI 编程工具已经展示了智能体进入实际工作环境的价值。专�
 - <strong>了解许可：</strong>[AGPL-3.0-or-later](legal/LICENSE) · [CLA](legal/CLA.md) · [商业许可](legal/COMMERCIAL-LICENSE.md)。
 
 可以从关注[版本更新](https://github.com/AI-WorkDeck/aiworkdeck/releases)、参与一场[讨论](https://github.com/AI-WorkDeck/aiworkdeck/discussions)，或写一个小扩展开始。具体的成果，会让我们更清楚下一步值得一起做什么。
+
+## 许可与项目管理
+
+项目管理方为<strong>北京京微资易科技有限公司</strong>，国际业务由<strong>真善美承泽有限公司（Zhen Shan Mei Grace Legacy Limited）</strong>运营。商业许可覆盖管理方拥有权利的代码，第三方组件仍遵循各自条款。详见[商业许可](legal/COMMERCIAL-LICENSE.md)、[第三方组件](legal/THIRD-PARTY-COMPONENTS.md)与[商标说明](legal/TRADEMARKS.md)。
+
+管理方现行政策将<strong>商业许可净收入的 20%</strong>用于社区基金，支持悬赏、Skill 创作资助与社区活动。这是一项可向未来调整的公开政策，不构成对个人的合同性权益承诺。治理角色对应技术权限，经济安排另按[悬赏政策](BOUNTIES.md)与[广场条款](legal/MARKETPLACE-TERMS.md)执行。
+
+如有 AGPL 之外的授权需求，请联系 [hi@aiworkdeck.com](mailto:hi@aiworkdeck.com)，具体权利义务以[商业许可](legal/COMMERCIAL-LICENSE.md)为准。
