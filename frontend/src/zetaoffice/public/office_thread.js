@@ -2818,6 +2818,7 @@ function slideError(code, details) {
 
 // Replace only the selected characters; whole-frame setString destroys mixed formatting.
 function slideReplaceTextRange(text, search, replacement, all) {
+  if (search === replacement) return 0;
   const full = String(text.getString() || '');
   const offsets = [];
   for (let at = full.indexOf(search); at !== -1; at = full.indexOf(search, at + search.length)) {
@@ -2830,6 +2831,9 @@ function slideReplaceTextRange(text, search, replacement, all) {
     if (offsets[i] && !cur.goRight(offsets[i], false)) throw new Error('Cannot locate replacement start');
     if (!cur.goRight(search.length, true) || cur.getString() !== search) throw new Error('Replacement text changed');
     cur.setString(replacement);
+    // Impress text UNO writes do not set the model dirty or emit modify events.
+    // Mark each completed edit so a later failed replacement still gets saved.
+    xModel.setModified(true);
   }
   return offsets.length;
 }
@@ -11069,7 +11073,13 @@ const EXEC = {
     if (rs.error) return slideFail(rs.error);
     const text = p && p.text != null ? String(p.text) : '';
     let previousText = ''; try { previousText = shapeText(rs.shape); } catch (e) {}
-    try { rs.shape.getText().setString(text); } catch (e) { return slideFail('写入形状文字失败: ' + errStr(e)); }
+    try {
+      if (previousText !== text) {
+        rs.shape.getText().setString(text);
+        // Impress setString alone leaves isModified false; trigger the normal autosave listener.
+        xModel.setModified(true);
+      }
+    } catch (e) { return slideFail('写入形状文字失败: ' + errStr(e)); }
     return { success: true, previousText: previousText };
   },
   // [幻灯片·写] 跨页（或限定单页）查找替换文字，覆盖普通文本框与表格单元格。
