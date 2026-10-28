@@ -15,7 +15,7 @@ public final class GeneratedFileLocation {
     private static final Map<String, String> PARENTS = Map.of(
             "write_file", "parentFolderId", "write_docx", "parentFolderId",
             "doc_start_stream", "parentFolderId", "sheet_create_file", "parentFolderId",
-            "pptx_generate", "parentId");
+            "slide_create_file", "parentFolderId", "pptx_generate", "parentId");
     private GeneratedFileLocation() {}
 
     public static String parentParameter(String toolName, Object existingFileId) {

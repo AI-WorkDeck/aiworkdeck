@@ -7,6 +7,18 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 职责边界：AI 对话功能本身（编排循环、工具注册分发、记忆、SSE、前端聊天 UI、评测）。AI→编辑器指令链路属 ai-doc-bridge 领域；skill 机制属 plugin-system 领域（但 SkillRouter 在编排循环里有两处旁路接入点）。
 
+## PPT 生成与设计流程（2026-10-28，dev-board#1570/#1571/#1572）
+
+内置 `presentation-design` workflow skill 使用 `tool_policy: passthrough`，不锁死原子工具组合。中英文 LOWA 提示共同要求：先明确读者与结论、把证据和结论组织在同页、学习参考的结构与视觉、形成一致配色/字级/网格、编辑后逐页视觉复核。不能为了增加页数拆散可放在一页的内容，也不能用缩小正文掩盖拥挤；修复后重查受影响页。仅完成结构回读不得声称“已视觉验收”。
+
+`slide_create_file` 已纳入工具注册、客户端能力与披露策略，支持直接创建可编辑 PPTX 后组合 `slide_*`。`PdfVisualTools.pdf_inspect_visual` 通过现有辅助模型、权限、计费及用量链路传入真实 PDF 页面图片；参考和目标有分别标注，不是仅给模型文本描述。字体/段落精确值仍由结构读取负责，参考只读选项与部分失败处理见 ai-doc-bridge。
+
+图片型生成仍由 `PptxServiceClient` 接入附属服务：`createProject(topic, templateStyle)` 将风格实际写入请求 `template_style`，旧单参数签名保留；两个同步生成入口都传递该值。质量约束与用户风格共同传入，无用户风格时才加入默认深蓝、浅蓝灰与青绿配色。不能只在客户端配置里保存风格却漏传服务端；这会令无参考图片的图片生成接口拒绝请求。
+
+真实 Word→PPT 回放已完成精确格式学习、参考 PDF 视觉读取和三页生成，并暴露表格尺寸/单元格色彩、可选参数 schema、工具目录和创建后回执文件身份问题；这些问题已修复，但该次产物不能记作最终验收通过。最终需用干净环境重跑 Word 与 PPT 两种参考，逐页检查成品。
+
+真实 AI 验收须使用产品 Agent/工具/编辑器完整链，隔离数据与专用 QA 账户；后端 BYOK 可执行条件不等于前端模型选择免登录。模型接口请求成功、技能存在或模拟模型单测通过，都不能替代参考 Word/PPT 的成品逐页视觉验收。当前实测及待验记录见 `doc/verification/2026-10-28-ppt-quality.md`。
+
 ## AI 项目版本操作（2026-10-26，dev-board#1498）
 
 `VersionTools` 提供 `version_status/history/changes/commit/pull/restore`，独立 `version` 类目，均要求工作台 LOWA 宿主，不要求打开某份文档；Office/none 不可调用，ASK 仅放行状态、历史和变更清单。身份取 `ProjectContextHolder`，不可由模型指定另一项目或用户；客户不可读取版本历史，写动作仍经过既有成员权限与版本接口。`version_changes` 返回路径及增删改类型，不是正文差异；磁盘清单不代表编辑器未保存缓冲。历史可选 `includeAuto`，让 AI 找回恢复前自动保留的工作。

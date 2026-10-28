@@ -295,6 +295,58 @@ class EditorBridgeServiceTest {
     }
 
     @Test
+    void slideFailureRetainsTypedPartialWriteReceiptButNotArbitraryData() throws Exception {
+        var mapper = new ObjectMapper();
+        var sse = mock(SseEmitterService.class);
+        var svc = new EditorBridgeService(sse, mapper,
+                mock(com.checkba.service.telemetry.TelemetryService.class));
+        svc.setCurrentConversationId("slide-failure");
+        Map<String, Object> data = Map.of(
+                "created", true, "retryable", false, "slideNumber", 4,
+                "errorCode", "SLIDE_PAGE_CREATE_PARTIAL", "stage", "move",
+                "outcomeUnknown", false, "replaced", 1,
+                "hits", List.of(Map.of("slideNumber", 4, "shapeName", "body", "replaced", 1, "private", "omit")),
+                "private", "omit", "error", "must not overwrite canonical error");
+        var receipt = new AtomicReference<>(data);
+        doAnswer(inv -> {
+            var payload = mapper.readTree((String) inv.getArgument(2));
+            svc.completeEditorAction(payload.get("requestId").asText(), "slide-failure", false, receipt.get(), "Move failed");
+            return null;
+        }).when(sse).send(anyString(), anyString(), anyString());
+        var result = mapper.readTree(svc.executeEditorCommand("slide_add_page", Map.of()));
+        assertEquals("Move failed", result.path("error").asText());
+        assertTrue(result.path("created").asBoolean());
+        receipt.set(Map.of("shapeName", "table-1", "row", 2, "col", 1, "cellsOk", 5));
+        var tableResult = mapper.readTree(svc.executeEditorCommand("slide_table_set_style", Map.of()));
+        assertEquals("table-1", tableResult.path("shapeName").asText());
+        assertEquals(2, tableResult.path("row").asInt());
+        assertEquals(1, tableResult.path("col").asInt());
+        assertEquals(5, tableResult.path("cellsOk").asInt());
+        receipt.set(data);
+
+        assertEquals(false, result.path("retryable").asBoolean(true));
+        assertEquals(4, result.path("slideNumber").asInt());
+        assertEquals("SLIDE_PAGE_CREATE_PARTIAL", result.path("errorCode").asText());
+        assertEquals("move", result.path("stage").asText());
+        assertEquals(false, result.path("outcomeUnknown").asBoolean(true));
+        assertEquals(1, result.path("replaced").asInt());
+        assertEquals("body", result.path("hits").get(0).path("shapeName").asText());
+        assertEquals(false, result.has("private"));
+        assertEquals(false, result.path("hits").get(0).has("private"));
+        var wordResult = mapper.readTree(svc.executeEditorCommand("find_replace", Map.of()));
+        assertEquals(1, wordResult.size(), "Other document failure contracts remain unchanged");
+        receipt.set(Map.of("created", "true", "retryable", "false", "slideNumber", -1,
+                "replaced", 1.2, "errorCode", List.of("not a scalar"),
+                "hits", java.util.Collections.nCopies(51, Map.of("slideNumber", 3, "shapeName", "body"))));
+        var invalid = mapper.readTree(svc.executeEditorCommand("slide_replace_text", Map.of()));
+        for (String key : List.of("created", "retryable", "slideNumber", "replaced", "errorCode")) {
+            assertEquals(false, invalid.has(key), "Malformed receipt field must not be coerced: " + key);
+        }
+        assertEquals(50, invalid.path("hits").size());
+        assertTrue(invalid.path("hitsTruncated").asBoolean());
+    }
+
+    @Test
     @DisplayName("轮次收尾 cleanupAfterRun 清理会话级状态表并取消残留等待")
     void cleanupAfterRunClearsPerConversationState() {
         EditorBridgeService b = bridge();
