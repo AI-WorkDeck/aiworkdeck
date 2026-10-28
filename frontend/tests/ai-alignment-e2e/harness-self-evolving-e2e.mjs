@@ -1,21 +1,16 @@
 #!/usr/bin/env node
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Harness² / VeriHarness / 用户可掌舵自进化 真浏览器 + 真后端端到端走查（dev-board#1481）。
+// Harness² / VeriHarness / 零打扰自动判断自进化 真浏览器 + 真后端端到端走查（dev-board#1481）。
 //
 // 覆盖完整用户链路：
 // 1) 在隔离后端（独立 user.home + H2 文件库）与真实前端（H5 dev + 无头 Chromium）中创建项目并打开 AI 助手面板；
 // 2) 第 1 轮模型先调失败的检索工具（extract_file_text 不存在的文件 ID），真实触发后端
-//    HarnessDiagnosticService（SSE harness_adaptation）→ 过程卡内联渲染「Harness 自愈」诊断与处方；
-// 3) 第 2 轮模型结合自愈处方收敛输出 <final>，真实触发后端 HarnessEvolutionService（SSE harness_evolution）
-//    写入记忆空间 topics/harness-evo-*.md 并落库 ai_harness_evolution 表 → 根气泡渲染自进化卡片；
-// 4) 在浏览器中真实点击自进化卡片：
-//    a) 展开「查看进化前后对比」（[data-evolution-contrast]）；
-//    b) 点击「设为跨项目全局生效」（[data-evolution-scope-btn]）→ 验证前后端 scope 变为 user；
-//    c) 点击「升格为专属技能」（[data-evolution-promote-btn]）→ 验证显示「已升格技能：user-evo-*」且 /api/skills/list 查得到该技能；
-// 5) 刷新页面（重走历史回放 getAiHistory + restoreHarnessEvolutions），验证自进化卡按 assistantMessageId
-//    精准挂回原历史气泡，且仍保持 PROMOTED_SKILL 状态；
-// 6) 在刷新后的历史气泡上真实点击「撤销此次学习」（[data-evolution-revert-btn]），验证状态变为 REVERTED 且技能目录被清理。
+//    HarnessDiagnosticService 后台静默自愈；
+// 3) 第 2 轮模型结合自愈处方收敛输出 <final>，真实触发后端 HarnessEvolutionService：
+//    a) 对话流与过程卡零打扰（严禁渲染 [data-harness-evolution-card] 与 [data-harness-adaptation-list]）；
+//    b) 后端自动判定作用域（scope=user）并自动升格为专属技能（status=PROMOTED_SKILL，注册入 /api/skills/list）；
+// 4) 验证事后回滚接口 DELETE /api/agent/harness/evolutions/:id 正常清理记忆与自动升格的技能目录。
 
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -340,108 +335,65 @@ try {
   }
   await page.waitForSelector('.side-panel-ai .chat-input-rich', { visible: true, timeout: 30000 })
 
-  // 5. 发送指令：触发 Round 1 工具失败 → Harness 自愈（harness_adaptation）→ Round 2 收尾 → 自进化卡片（harness_evolution）
+  // 5. 发送指令：触发 Round 1 工具失败 → Harness 后台静默自愈 → Round 2 收尾 → 后台自动判定全局作用域并自动升格为专属技能
   const promptText = `${MARKER} 请按「违约金条款」专项规范核查补充协议`
   await click('.side-panel-ai .chat-input-rich')
   await page.keyboard.type(promptText, { delay: 2 })
   await sleep(150)
   await click('.send-btn')
 
-  // 等待本轮完成并渲染出 HarnessEvolutionCard
-  await page.waitForSelector('[data-harness-evolution-card]', { visible: true, timeout: 45000 })
-  console.log('PASS 1: 根气泡已渲染 Harness 自进化卡片 [data-harness-evolution-card]')
+  // 等待本轮正文完成渲染
+  await page.waitForFunction((marker) => {
+    const answers = [...document.querySelectorAll('[data-chat-answer]')]
+    return answers.some((el) => (el.innerText || '').includes(marker))
+  }, { timeout: 45000 }, MARKER)
+  console.log('PASS 1: 真实浏览器完成自愈闭环并渲染最终正文回答')
 
-  // 展开执行过程摘要，核实 ProcessCard 内联渲染了 [data-harness-adaptation-list]
-  const hasActivitySummary = await page.$('.activity-summary')
-  if (hasActivitySummary) {
-    const isExpanded = await page.$eval('.activity-summary', (btn) => btn.getAttribute('aria-expanded') === 'true')
-    if (!isExpanded) {
-      await page.$eval('.activity-summary', (btn) => btn.click())
-    }
+  // 6. 验证零打扰 UI：对话流与过程卡中严禁弹出打扰用户的三选一卡片或底层自愈归因块
+  const botheringCard = await page.$('[data-harness-evolution-card]')
+  if (botheringCard) {
+    throw new Error('Chat stream must NOT render bothering [data-harness-evolution-card]')
   }
-  const collapsedProcHeader = await page.$('.process-card:not(.is-expanded) .process-header')
-  if (collapsedProcHeader) {
-    await page.$eval('.process-card:not(.is-expanded) .process-header', (hdr) => hdr.click())
+  const botheringAdaptationList = await page.$('[data-harness-adaptation-list]')
+  if (botheringAdaptationList) {
+    throw new Error('ProcessCard must NOT render noisy [data-harness-adaptation-list]')
   }
-  await page.waitForSelector('[data-harness-adaptation-list]', { visible: true, timeout: 15000 })
-  const adaptationText = await page.$eval('[data-harness-adaptation-list]', (el) => el.innerText)
-  if (!adaptationText.includes('Harness 自愈') && !adaptationText.includes('Harness Self-Healing')) {
-    throw new Error(`Unexpected adaptation card text: ${adaptationText}`)
-  }
-  console.log('PASS 2: 过程卡内联展示「Harness 自愈」诊断与处方:', adaptationText.replace(/\s+/g, ' ').slice(0, 80))
+  console.log('PASS 2: 对话流零打扰验证通过（无自进化选择卡、无底层自愈噪音块）')
 
-  // 6. 在自进化卡片上交互：展开前后对比 → 切换作用域为跨项目全局 → 升格为专属技能
-  await click('[data-evolution-contrast-toggle]')
-  await page.waitForSelector('[data-evolution-contrast]', { visible: true, timeout: 10000 })
-  console.log('PASS 3: 自进化卡展开「进化前后对比」成功')
-
-  await click('[data-evolution-scope-btn]')
-  await until(async () => {
+  // 7. 验证后端自动判断并处理（无需人工点击：自动判定 scope=user 且自动升格 status=PROMOTED_SKILL）
+  const autoEvolved = await until(async () => {
     const list = dataOf(await api(`/api/agent/harness/evolutions?projectId=${project.id}`))
-    return Array.isArray(list) && list.length > 0 && list[0].scope === 'user' ? list[0] : false
-  }, 15000, 'evolution scope switched to user')
-  console.log('PASS 4: 切换进化规则作用域（project -> user）成功并已落库')
+    return Array.isArray(list) && list.length > 0 ? list[0] : false
+  }, 15000, 'autonomous evolution record persisted')
 
-  await click('[data-evolution-promote-btn]')
-  await page.waitForSelector('[data-evolution-promoted-pill]', { visible: true, timeout: 15000 })
-  const pillText = await page.$eval('[data-evolution-promoted-pill]', (el) => el.innerText)
-  if (!pillText.includes('user-evo-')) {
-    throw new Error(`Expected promoted skill pill to contain user-evo-*, got: ${pillText}`)
+  if (autoEvolved.scope !== 'user') {
+    throw new Error(`Expected automatic scope judgment to select 'user', got: ${autoEvolved.scope}`)
   }
+  if (autoEvolved.status !== 'PROMOTED_SKILL' || !autoEvolved.promotedSkillId?.startsWith('user-evo-')) {
+    throw new Error(`Expected automatic skill promotion to PROMOTED_SKILL, got: ${JSON.stringify(autoEvolved)}`)
+  }
+  console.log('PASS 3: 后端自动判断作用域（scope=user）并自动升格为专属技能（status=PROMOTED_SKILL）:', autoEvolved.promotedSkillId)
+
   const skills = await api('/api/skills/list')
-  const promotedSkill = Array.isArray(skills) && skills.find((s) => s.id && s.id.startsWith('user-evo-'))
+  const promotedSkill = Array.isArray(skills) && skills.find((s) => s.id === autoEvolved.promotedSkillId)
   if (!promotedSkill) {
-    throw new Error('Promoted skill not found in /api/skills/list')
+    throw new Error(`Auto-promoted skill ${autoEvolved.promotedSkillId} not found in /api/skills/list`)
   }
-  console.log('PASS 5: 一键升格为专属技能成功，SkillRegistry 已注册:', promotedSkill.id)
-  await page.screenshot({ path: path.join(OUT, 'harness-evolved-promoted.png') })
+  console.log('PASS 4: SkillRegistry 已自动注册新技能:', promotedSkill.id)
+  await page.screenshot({ path: path.join(OUT, 'harness-silent-auto-evolved.png') })
 
-  // 7. 刷新页面并重新打开历史会话，验证持久化与 restoreHarnessEvolutions 历史回放
-  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 })
-  await hardenPageInput(page)
-  await page.waitForSelector('[title="AI 助手"], [title="AI Assistant"]', { timeout: 60000 })
-  const aiPanelVisible = await page.$('.side-panel-ai .chat-input-rich')
-  if (!aiPanelVisible) {
-    await click('[title="AI 助手"], [title="AI Assistant"]')
-    await page.waitForSelector('.side-panel-ai .chat-input-rich', { visible: true, timeout: 30000 })
-  }
-  // 从 History 下拉切回刚才的会话
-  const cardAlreadyVisible = await page.$('[data-harness-evolution-card]')
-  if (!cardAlreadyVisible) {
-    await click('[title="History"], [title="历史对话"], [title="历史记录"]')
-    await page.waitForFunction(() => {
-      const rows = [...document.querySelectorAll('.ai-dropdown-panel .menu-item:not(.header)')]
-      return rows.length > 0 && !rows.some((n) => /加载中|Loading/i.test(n.innerText))
-    }, { timeout: 15000 })
-    const histPoint = await page.evaluate((marker) => {
-      const rows = [...document.querySelectorAll('.ai-dropdown-panel .menu-item:not(.header)')]
-      const row = rows.find((n) => n.innerText.includes(marker)) || rows[0]
-      if (!row) return null
-      const box = row.getBoundingClientRect()
-      return { x: box.left + box.width / 2, y: box.top + box.height / 2 }
-    }, MARKER)
-    if (!histPoint) throw new Error('Conversation entry missing from History dropdown')
-    await page.mouse.click(histPoint.x, histPoint.y)
-  }
-
-  await page.waitForSelector('[data-harness-evolution-card]', { visible: true, timeout: 25000 })
-  await page.waitForSelector('[data-evolution-promoted-pill]', { visible: true, timeout: 10000 })
-  console.log('PASS 6: 页面刷新并回放历史后，自进化卡片按 assistantMessageId 恢复挂载且保留已升格状态')
-
-  // 8. 在历史气泡上点击「撤销此次学习」，验证状态变为 REVERTED 且升格技能被移除
-  await click('[data-evolution-revert-btn]')
-  await page.waitForSelector('[data-evolution-reverted-notice]', { visible: true, timeout: 15000 })
+  // 8. 验证事后回滚接口仍可正常清理记忆与自动升格的技能目录
+  await api(`/api/agent/harness/evolutions/${autoEvolved.id}`, { method: 'DELETE' })
   const evolutionsAfterRevert = dataOf(await api(`/api/agent/harness/evolutions?projectId=${project.id}`))
   if (!Array.isArray(evolutionsAfterRevert) || evolutionsAfterRevert[0]?.status !== 'REVERTED') {
-    throw new Error(`Expected REVERTED status in DB after revert, got: ${JSON.stringify(evolutionsAfterRevert)}`)
+    throw new Error(`Expected REVERTED status in DB after DELETE, got: ${JSON.stringify(evolutionsAfterRevert)}`)
   }
   const skillsAfterRevert = await api('/api/skills/list')
   if (Array.isArray(skillsAfterRevert) && skillsAfterRevert.some((s) => s.id === promotedSkill.id)) {
-    throw new Error(`Promoted skill ${promotedSkill.id} should be removed after revert`)
+    throw new Error(`Auto-promoted skill ${promotedSkill.id} should be removed after revert`)
   }
-  await page.screenshot({ path: path.join(OUT, 'harness-reverted-after-reload.png') })
-  console.log('PASS 7: 刷新后点击「撤销此次学习」成功，数据库状态已更新为 REVERTED 且技能目录已清理')
-  console.log(`Harness² Self-Evolving E2E ALL PASSED. Screenshots saved to: ${OUT}`)
+  console.log('PASS 5: 事后撤销接口验证通过，状态已更新为 REVERTED 且技能目录已清理')
+  console.log(`Harness² Silent Auto-Evolving E2E ALL PASSED. Screenshots saved to: ${OUT}`)
 } catch (err) {
   failed = true
   if (browser) {

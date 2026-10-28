@@ -57,14 +57,11 @@ import java.util.regex.Pattern;
  *     区分 {@code INVARIANT}（工具/格式/范围不变式）与 {@code DOMAIN}（法律/业务领域规则），自动写入
  *     {@link MemoryDocumentService} 的 {@code topics/harness-evo-<id>.md}，通过 frontmatter
  *     {@code description:} 挂接至 {@code remember.md} 索引钩子，下一轮起自动注入上下文尾部。</li>
- *   <li><b>用户可感知、可掌控（Interactive UI Control）</b>：
- *     通过 SSE {@code harness_evolution} 事件向前端推送 {@link HarnessEvolutionRecord}，支持用户在聊天气泡内：
- *     <ul>
- *       <li>切换规则生效范围（当前项目 {@code project} ⇄ 跨项目个人全局 {@code user}）；</li>
- *       <li>一键晋升为专属 Skill（自动生成 {@code skill.yml} + {@code prompt.md} 并触发 {@link SkillRegistry#rescan()}）；</li>
- *       <li>一键撤销本次进化（同步清理记忆文件与已生成的 Skill）。</li>
- *     </ul>
- *   </li>
+ *   <li><b>静默自动判定与升格（Autonomous Scope &amp; Skill Promotion）</b>：
+ *     不在聊天气泡中弹出打扰用户的三选一卡片；由后端自动判定规则属于当前项目专属（{@code project}）
+ *     还是跨项目个人全局（{@code user}），并在满足领域可复用条件时自动升格为专属 Skill（写入
+ *     {@code skills/user-evo-<id>/{skill.yml, prompt.md, prompt.en.md}} 并触发 {@link SkillRegistry#rescan()}），
+ *     同时保留管理接口与记忆面板供事后查阅或回滚。</li>
  * </ol>
  */
 @Service
@@ -351,13 +348,47 @@ public class HarnessEvolutionService {
             }
         }
 
-        // 优先级 3：运行期 Harness 自愈恢复信号（Propose-Probe-Compose 成功闭环）
+        // 优先级 3：运行期 Harness 自愈恢复信号（仅沉淀真正涉及领域规范挂载/显式「…」规范的 DOMAIN 级自愈；
+        // 展开工具类目 EXPAND_TOOL_CATEGORY、锚点回读探针 ANCHOR_PROBE_RECOVERY 等底层运行期不变式属于单轮内部动作，绝不污染用户记忆）
         if (adaptations != null && !adaptations.isEmpty()) {
-            return Optional.of(createFromSelfHealing(
-                    conversationId, userId, projectId, initialUserInstruction, adaptations));
+            List<HarnessDiagnosticService.HarnessAdaptation> domainAdaptations = adaptations.stream()
+                    .filter(a -> a != null && isEvolvableSelfHealing(a, initialUserInstruction))
+                    .toList();
+            if (!domainAdaptations.isEmpty()) {
+                return Optional.of(createFromSelfHealing(
+                        conversationId, userId, projectId, initialUserInstruction, domainAdaptations));
+            }
         }
 
         return Optional.empty();
+    }
+
+    /**
+     * 判断一条运行期自愈是否值得沉淀为跨轮次长期记忆：
+     * <ul>
+     *   <li>{@code EXPAND_TOOL_CATEGORY} 与 {@code ANCHOR_PROBE_RECOVERY} 是渐进披露和文档锚点回读的底层执行机制，
+     *       在当轮透明自愈即可，不应写入用户/项目记忆；</li>
+     *   <li>只有 {@code TIER_DOMAIN}（如动态挂载领域技能，或用户在指令中明确引用了「…」专项规范并完成自愈闭环）才沉淀为长期规则。</li>
+     * </ul>
+     */
+    static boolean isEvolvableSelfHealing(
+            HarnessDiagnosticService.HarnessAdaptation adaptation,
+            @Nullable String initialUserInstruction) {
+        if (adaptation == null) {
+            return false;
+        }
+        String action = adaptation.actionType() == null ? "" : adaptation.actionType();
+        if (HarnessDiagnosticService.ACTION_EXPAND_TOOL_CATEGORY.equals(action)
+                || HarnessDiagnosticService.ACTION_ANCHOR_PROBE_RECOVERY.equals(action)) {
+            return false;
+        }
+        if (!HarnessDiagnosticService.TIER_DOMAIN.equalsIgnoreCase(adaptation.tier())) {
+            return false;
+        }
+        if (HarnessDiagnosticService.ACTION_MOUNT_DOMAIN_SKILL.equals(action)) {
+            return true;
+        }
+        return initialUserInstruction != null && QUOTED_TERM.matcher(initialUserInstruction).find();
     }
 
     private HarnessEvolutionRecord createFromRollback(
@@ -391,7 +422,7 @@ public class HarnessEvolutionService {
                 userId,
                 SIGNAL_ROLLBACK_CORRECTION,
                 category,
-                defaultScope(projectId),
+                inferOptimalScope(correctiveInstruction, category, projectId),
                 title,
                 beforeSummary,
                 afterSummary,
@@ -410,6 +441,7 @@ public class HarnessEvolutionService {
             List<String> steeredInstructions) {
         String id = shortEvoId();
         String combinedSteer = String.join("；", steeredInstructions);
+        String combinedContext = combinedSteer + " " + (initialInstruction == null ? "" : initialInstruction);
         String category = classifyCategory(combinedSteer);
         String rule = synthesizeContrastiveRule(
                 initialInstruction,
@@ -422,7 +454,7 @@ public class HarnessEvolutionService {
                 "Steer Adaptation: " + summarizeTitle(combinedSteer, category));
         String beforeSummary = truncate(initialInstruction == null ? "" : initialInstruction, 140);
         String afterSummary = truncate(combinedSteer, 160);
-        List<String> triggers = extractCandidateTriggers(combinedSteer + " " + (initialInstruction == null ? "" : initialInstruction));
+        List<String> triggers = extractCandidateTriggers(combinedContext);
         String suggestedSkillName = suggestSkillName(combinedSteer, category);
 
         return persistEvolution(
@@ -432,7 +464,7 @@ public class HarnessEvolutionService {
                 userId,
                 SIGNAL_STEER_INTERJECTION,
                 category,
-                defaultScope(projectId),
+                inferOptimalScope(combinedContext, category, projectId),
                 title,
                 beforeSummary,
                 afterSummary,
@@ -471,7 +503,7 @@ public class HarnessEvolutionService {
                 userId,
                 SIGNAL_SELF_HEALING_RECOVERY,
                 category,
-                defaultScope(projectId),
+                inferOptimalScope(initialInstruction, category, projectId),
                 title,
                 beforeSummary,
                 afterSummary,
@@ -527,7 +559,33 @@ public class HarnessEvolutionService {
                 Instant.now().toString(),
                 CURRENT_ASSISTANT_MESSAGE.get());
         store(record);
+
+        // 自动判断并升格技能：无需打扰用户手动点击按钮，当规则判定为跨项目全局（user）且属于可复用领域规范（DOMAIN）时，
+        // 自动沉淀并注册到 SkillRegistry。
+        if (shouldAutoPromoteToSkill(record)) {
+            try {
+                return promoteToSkill(
+                        userId,
+                        record.id(),
+                        record.suggestedSkillName(),
+                        record.suggestedSkillTriggers(),
+                        record.actionableRule(),
+                        record.verificationPolicy());
+            } catch (Exception e) {
+                log.warn("Auto-promote skill skipped for evolution {}: {}", record.id(), e.getMessage());
+            }
+        }
         return record;
+    }
+
+    private boolean shouldAutoPromoteToSkill(HarnessEvolutionRecord record) {
+        if (skillRegistry == null || record == null) {
+            return false;
+        }
+        return SCOPE_USER.equalsIgnoreCase(record.scope())
+                && CATEGORY_DOMAIN.equalsIgnoreCase(record.category())
+                && record.suggestedSkillTriggers() != null
+                && !record.suggestedSkillTriggers().isEmpty();
     }
 
     /**
@@ -824,8 +882,45 @@ public class HarnessEvolutionService {
         dir.delete();
     }
 
-    private static String defaultScope(Long projectId) {
-        return projectId != null ? SCOPE_PROJECT : SCOPE_USER;
+    /**
+     * 自动判断进化规则的最佳作用域（{@code user} 跨项目全局 vs {@code project} 当前项目专属），无需打扰用户手动选择：
+     * <ul>
+     *   <li>若指令包含显式全局/跨项目/通用规范标记（如「所有项目」「以后所有」「一律」「默认」「专项规范」「审查规范」），自动归入 {@code user}；</li>
+     *   <li>若指令绑定当前项目的具体案件材料或当事主体（如《…》具体文件名、扩展名、「本案」「这份」「补充协议」「甲方」「乙方」等），自动归入 {@code project}；</li>
+     *   <li>其余通用表述、排版、工作流与领域审查习惯，默认归入 {@code user} 跨项目全局生效。</li>
+     * </ul>
+     */
+    static String inferOptimalScope(@Nullable String text, String category, @Nullable Long projectId) {
+        if (projectId == null) {
+            return SCOPE_USER;
+        }
+        if (text == null || text.isBlank()) {
+            return SCOPE_PROJECT;
+        }
+        String normalized = text.toLowerCase(Locale.ROOT);
+        List<String> globalMarkers = List.of(
+                "所有项目", "跨项目", "全局", "以后所有", "以后每次", "以后一律",
+                "每次都", "一律", "默认", "专项规范", "审查规范", "工作流规范",
+                "all projects", "across projects", "globally", "by default");
+        for (String marker : globalMarkers) {
+            if (normalized.contains(marker)) {
+                return SCOPE_USER;
+            }
+        }
+        if (normalized.matches(".*《[^》]+》.*")
+                || normalized.matches(".*\\.(docx|doc|pdf|xlsx|xls|pptx|ppt)\\b.*")) {
+            return SCOPE_PROJECT;
+        }
+        List<String> projectBoundMarkers = List.of(
+                "本案", "这个案子", "该案", "本合同", "这份", "该份", "该项目", "当前项目", "这个项目",
+                "补充协议", "附件", "甲方", "乙方", "原告", "被告", "目标公司", "标的公司",
+                "this case", "this contract", "this project");
+        for (String marker : projectBoundMarkers) {
+            if (normalized.contains(marker)) {
+                return SCOPE_PROJECT;
+            }
+        }
+        return SCOPE_USER;
     }
 
     static String classifyCategory(String text) {
