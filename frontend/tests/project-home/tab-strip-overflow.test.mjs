@@ -88,11 +88,12 @@ test('滚轮横滚改成原生 addEventListener 挂在真实元素上，且会�
 test('.awd-hairline-scroll 定义在全局样式里，静止透明、悬停才显形', () => {
   assert.match(APP, /\.awd-hairline-scroll[^{]*::-webkit-scrollbar[^{]*\{[^}]*height:\s*4px/,
     'App.vue 里没有 .awd-hairline-scroll 的 4px 滑轨定义')
-  assert.match(APP, /\.awd-hairline-scroll[^{]*::-webkit-scrollbar-thumb[^{]*\{[^}]*background:\s*transparent/,
+  assert.match(APP, /\.awd-hairline-scroll\s*\{[^}]*--awd-scrollbar-thumb:\s*transparent/,
     '静止时 thumb 要是透明的')
+  assert.match(APP, /::-webkit-scrollbar-thumb[^{]*\{[^}]*background:\s*var\(--awd-scrollbar-thumb\)/)
   assert.match(APP, /\.awd-hairline-scroll[^{]*::-webkit-scrollbar-thumb[^{]*\{[^}]*border-radius:\s*999px/,
     'thumb 要圆角（4px 的方块线条在浅色外壳上很硌眼）')
-  assert.match(APP, /\.awd-hairline-scroll:hover[^{]*::-webkit-scrollbar-thumb[^{]*\{[^}]*var\(--awd-border-strong\)/,
+  assert.match(APP, /\.awd-hairline-scroll:hover\s*\{[^}]*--awd-scrollbar-thumb:\s*var\(--awd-border-strong\)/,
     '悬停时 thumb 要用 --awd-border-strong 显形（跟随主题，不写死颜色）')
 })
 

@@ -197,7 +197,7 @@ test('ProjectListPane 是面板不是页面：没有页面级生命周期，跳�
   assert.ok(!/\n  onLoad\(|\n  onShow\(/.test(pane), '组件里写 onLoad/onShow 不会被调用（那是页面钩子）')
   assert.match(pane, /inject:\s*\{\s*leaveWorkbench:\s*\{\s*default:\s*null\s*\}/)
   assert.match(pane, /\n  mounted\(\) \{[\s\S]*?this\.loadProjects\(\)/, '挂载即拉项目清单')
-  assert.match(pane, /class="project-list-pane"/)
+  assert.match(pane, /class="project-list-pane(?:\s[^"]*)?"/)
   // 当前项目只打开文件面板，不能重建仍有编辑器的工作台。
   const events = []
   const goToProject = new Function('uni', `return function(projectId) ${methodBody(pane, 'goToProject(projectId) {')}`)({
