@@ -1821,6 +1821,8 @@
                 @artifact-open-tab="handleArtifactOpenTab"
                 @open-file="handleOpenFileFromChat"
                 @open-review-tab="handleOpenPlanReviewTab"
+                @open-settings="openSettingsTab"
+                @manage-skills="goToPluginMarket"
                 @transcribe-audio="onTranscribeAudio"
               />
             </view>
@@ -6613,6 +6615,7 @@ export default {
      * 已开着的标签再带深链进来时就地改 props（key 不变，组件不重建）。
      */
     openSettingsTab(opts) {
+      if (this.isChatMode) this.chatCanvasOpen = true
       const nav = (opts && opts.nav) || ''
       const service = (opts && opts.service) || ''
       const tabId = 'admin-settings'
@@ -6762,10 +6765,11 @@ export default {
         console.warn('[project-overview] 可选组件检查跳过', e)
       }
     },
-    goToPluginMarket() {
+    async goToPluginMarket() {
       // VS Code 扩展栏形态：rail 按钮开左栏列表面板（保留标签页与编辑区），
       // 点列表项再在中栏开详情 tab。独立页面路由仍保留给 admin 入口与直链兜底。
-      this.toggleLeftPane('market')
+      if (this.isChatMode) await this.switchViewMode('ide')
+      if (this.leftPaneKey !== 'market' || this.sidebarCollapsed) this.toggleLeftPane('market')
     },
     // 左栏列表点行 → 中栏开该项详情 tab（同 id 单例，任一窗格已开则激活）
     openMarketDetail(spec) {
