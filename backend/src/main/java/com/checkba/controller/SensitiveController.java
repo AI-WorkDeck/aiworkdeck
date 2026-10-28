@@ -63,6 +63,12 @@ public class SensitiveController {
         return execute(request, sessionId, "restore");
     }
 
+    @PostMapping("/recovery")
+    public ResponseEntity<?> recovery(@RequestBody Request request,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        return execute(request, sessionId, "recovery");
+    }
+
     private ResponseEntity<?> execute(Request request, String sessionId, String action) {
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (userId == null) return response(401, Map.of("error", "Unauthorized"));
@@ -71,8 +77,25 @@ public class SensitiveController {
             ProjectFile source = projectFileService.getFile(request.fileId());
             fileAccess.requireRead(source, userId);
             if (!projectMemberService.hasReadPermission(source.getProjectId(), userId)
-                    || (!action.equals("preview") && !projectMemberService.hasWritePermission(source.getProjectId(), userId))) {
+                    || (!Set.of("preview", "recovery").contains(action) && !projectMemberService.hasWritePermission(source.getProjectId(), userId))) {
                 return response(403, Map.of("error", LangText.of("无权读取文件或在该项目生成文件", "No permission to read the file or create files in this project")));
+            }
+            if (action.equals("recovery")) {
+                ProjectFile kit = source;
+                if (!source.getFilePath().endsWith(".awd-recovery")) {
+                    String kitPath = source.getFilePath() + ".awd-recovery";
+                    kit = projectFileService.getFilesByParent(source.getProjectId(), source.getParentId()).stream()
+                            .filter(candidate -> kitPath.equals(candidate.getFilePath())).findFirst().orElse(null);
+                }
+                if (kit == null) return response(200, Map.of("recoveryKit", "", "name", ""));
+                fileAccess.requireRead(kit, userId);
+                try (var stream = storageServiceFactory.getStorageService().load(kit.getFilePath()).getInputStream()) {
+                    byte[] bytes = stream.readNBytes(8_000_001);
+                    String content = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+                    if (bytes.length > 8_000_000 || !content.startsWith("AWD-RECOVERY-1:"))
+                        throw new IllegalArgumentException(LangText.of("请选择对应的加密恢复材料（.awd-recovery）", "Select the matching encrypted recovery material (.awd-recovery)"));
+                    return response(200, Map.of("recoveryKit", content, "name", kit.getName()));
+                }
             }
             File file = storageServiceFactory.getStorageService().load(source.getFilePath()).getFile();
             if (action.equals("preview")) return response(200, sensitiveService.previewFile(file.getAbsolutePath(), request.options()));
@@ -80,8 +103,24 @@ public class SensitiveController {
                     ? sensitiveService.restoreFile(file.getAbsolutePath(), request.recoveryKit(), request.password())
                     : sensitiveService.processFile(file.getAbsolutePath(), request.options());
             ProjectFile saved;
-            try { saved = register(source, Path.of(result.path()), userId); }
-            catch (Exception e) { Files.deleteIfExists(Path.of(result.path())); throw e; }
+            Path output = Path.of(result.path());
+            Path kitPath = output.resolveSibling(output.getFileName() + ".awd-recovery");
+            ProjectFile recoveryFile = null;
+            boolean kitCreated = false;
+            try {
+                if (!result.recoveryKit().isEmpty()) {
+                    Files.writeString(kitPath, result.recoveryKit(), java.nio.charset.StandardCharsets.UTF_8,
+                            StandardOpenOption.CREATE_NEW);
+                    kitCreated = true;
+                    recoveryFile = register(source, kitPath, userId);
+                }
+                saved = register(source, output, userId);
+            } catch (Exception e) {
+                Files.deleteIfExists(output);
+                if (recoveryFile != null) projectFileService.permDelete(recoveryFile.getId(), userId);
+                if (kitCreated) Files.deleteIfExists(kitPath);
+                throw e;
+            }
             // Preserve the original endpoint contract for clients which do not yet send a mode.
             if (action.equals("desensitize") && request.mode() == null) return response(200, saved);
             return response(200, Map.of("file", saved, "recoveryKit", result.recoveryKit(),

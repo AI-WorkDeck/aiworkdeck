@@ -3,6 +3,7 @@
 
 package com.checkba.service.ai.context;
 
+import com.checkba.service.sensitive.SensitiveRecoveryKit;
 import com.checkba.config.AiContextProperties;
 import com.checkba.model.entity.ProjectFile;
 import com.checkba.service.ProjectFileService;
@@ -117,6 +118,8 @@ public class FileContextLoader {
         if (fileEntity == null) {
             return "[文件内容为空或无法读取]";
         }
+        if (SensitiveRecoveryKit.isRecoveryFile(fileEntity.getName())
+                || SensitiveRecoveryKit.isRecoveryFile(fileEntity.getFilePath())) return SensitiveRecoveryKit.aiReadNotice();
         Path tempPath = null;
         try {
             byte[] fileBytes = projectFileService.getFileBytes(fileEntity.getId());
@@ -164,6 +167,8 @@ public class FileContextLoader {
         List<ProjectFile> children = projectFileService.getFilesByParent(projectId, parentId);
 
         for (ProjectFile file : children) {
+            if (!Boolean.TRUE.equals(file.getIsFolder()) && (SensitiveRecoveryKit.isRecoveryFile(file.getName())
+                    || SensitiveRecoveryKit.isRecoveryFile(file.getFilePath()))) continue;
             if (counter[0] >= maxFiles) break;
 
             if (Boolean.TRUE.equals(file.getIsFolder())) {
@@ -362,6 +367,8 @@ public class FileContextLoader {
         boolean depthLimited = false;
         List<ProjectFile> children = projectFileService.getFilesByParent(projectId, parentId);
         for (ProjectFile child : children) {
+            if (!Boolean.TRUE.equals(child.getIsFolder()) && (SensitiveRecoveryKit.isRecoveryFile(child.getName())
+                    || SensitiveRecoveryKit.isRecoveryFile(child.getFilePath()))) continue;
             String relativePath = parentPath + child.getName();
             collector.add(new FolderEntry(child, relativePath));
             if (Boolean.TRUE.equals(child.getIsFolder())) {

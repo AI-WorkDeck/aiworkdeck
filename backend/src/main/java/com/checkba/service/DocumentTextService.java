@@ -3,6 +3,7 @@
 
 package com.checkba.service;
 
+import com.checkba.service.sensitive.SensitiveRecoveryKit;
 import com.checkba.model.entity.ProjectFile;
 import com.checkba.storage.StorageException;
 import com.checkba.storage.StorageServiceFactory;
@@ -85,6 +86,8 @@ public class DocumentTextService {
      *（某些 Resource 实现不支持）时一律当缓存未命中处理，宁可重抽一次也不给出陈旧正文。
      */
     public String extractText(ProjectFile file) throws IOException, TikaException {
+        if (SensitiveRecoveryKit.isRecoveryFile(file.getName()) || SensitiveRecoveryKit.isRecoveryFile(file.getFilePath()))
+            throw new IOException(SensitiveRecoveryKit.aiReadNotice());
         String filePath = resolvePath(file);
 
         boolean isPdf = "pdf".equalsIgnoreCase(file.getFileType())
@@ -122,6 +125,8 @@ public class DocumentTextService {
      *（dev-board#1065）。判据用 {@code FileContentExtractorService.isPlainTextName}，与 AI 读文件同一份。
      */
     public String extractPlainText(ProjectFile file) throws IOException {
+        if (SensitiveRecoveryKit.isRecoveryFile(file.getName()) || SensitiveRecoveryKit.isRecoveryFile(file.getFilePath()))
+            throw new IOException(SensitiveRecoveryKit.aiReadNotice());
         String filePath = resolvePath(file);
         try {
             Resource resource = storageServiceFactory.getStorageService().load(filePath);

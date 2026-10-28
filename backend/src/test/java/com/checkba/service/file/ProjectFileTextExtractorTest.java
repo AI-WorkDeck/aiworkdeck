@@ -72,6 +72,36 @@ class ProjectFileTextExtractorTest {
     }
 
     @Test
+    void recoveryMaterialIsNeverReadIntoAiTextOrSearch(@TempDir Path tmp) throws Exception {
+        String kit = com.checkba.service.sensitive.SensitiveRecoveryKit.encrypt(
+                java.util.Map.of("[[中文姓名1-test]]", "合成姓名"), "1");
+        Path onDisk = Files.writeString(tmp.resolve("document.docx.AWD-RECOVERY"), kit);
+        // This format is ASCII text to Tika: a nonstandard extension does not protect it.
+        assertThat(documentTextService.parse(new java.io.ByteArrayInputStream(kit.getBytes(StandardCharsets.UTF_8))))
+                .contains("AWD-RECOVERY-1:");
+        ProjectFile pf = file(9L, onDisk.getFileName().toString(), "awd-recovery", onDisk.toString(), Files.size(onDisk));
+        String notice = com.checkba.service.sensitive.SensitiveRecoveryKit.aiReadNotice();
+        assertThatThrownBy(() -> extractor.extract(pf)).isInstanceOf(IOException.class).hasMessage(notice);
+        assertThatThrownBy(() -> extractor.extractText(pf)).isInstanceOf(IOException.class).hasMessage(notice);
+        assertThatThrownBy(() -> extractor.extractBytes(pf.getName(), kit.getBytes(StandardCharsets.UTF_8)))
+                .isInstanceOf(IOException.class).hasMessage(notice);
+        assertThatThrownBy(() -> documentTextService.extractText(pf)).isInstanceOf(IOException.class).hasMessage(notice);
+        assertThatThrownBy(() -> documentTextService.extractPlainText(pf)).isInstanceOf(IOException.class).hasMessage(notice);
+        verifyNoInteractions(storageFactory, fileService);
+
+        var resolver = mock(com.checkba.storage.ProjectStorageResolver.class);
+        when(resolver.projectRoot(7L)).thenReturn(tmp);
+        var tools = new com.checkba.service.ai.tools.FileTools(fileService, null, null, ocr,
+                resolver, documentTextService, null, null, extractor);
+        com.checkba.service.ai.context.ProjectContextHolder.setProjectId("7");
+        try {
+            assertThat(tools.read_file(onDisk.getFileName().toString())).isEqualTo(notice);
+        } finally {
+            com.checkba.service.ai.context.ProjectContextHolder.clear();
+        }
+    }
+
+    @Test
     void extractReadsProjectFileThroughStorage(@TempDir Path tmp) throws Exception {
         Path onDisk = tmp.resolve("说明.txt");
         Files.writeString(onDisk, "第一条 甲方应于十日内付款。", StandardCharsets.UTF_8);

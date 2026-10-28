@@ -70,7 +70,7 @@ test('sensitive import current reads the focused non-LOWA document through the r
     workspace.handleDesensitizeActiveFile = method(workbench, 'handleDesensitizeActiveFile').bind(workspace)
     const actions = method(workbench, 'pluginBusinessActions').call(workspace)
     const dependencies = Object.fromEntries(['searchProjectContent', 'getProjectTags', 'getSensitiveOptions', 'previewSensitiveFile',
-      'desensitizeFile', 'restoreSensitiveFile', 'getLitigationVisualStatus', 'getLitigationDiagrams', 'getLitigationKickoffPrompt',
+      'desensitizeFile', 'restoreSensitiveFile', 'getSensitiveRecovery', 'getLitigationVisualStatus', 'getLitigationDiagrams', 'getLitigationKickoffPrompt',
       'restyleLitigationDiagram', 'packStatus', 'packInstall'].map(key => [key, async () => ({})]))
     Object.assign(dependencies, { createPluginBusinessServices,
       createPluginVoiceServices: () => ({}), createPluginCollectionServices: () => ({}), createPluginInsightServices: () => ({}),

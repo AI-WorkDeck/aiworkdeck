@@ -339,6 +339,84 @@ class SkillRegistryTest {
     }
 
     @Test
+    void litigationWebPluginOwnsHostSkillEnablementWithoutChangingLegacyPreference() throws IOException {
+        Path skillsDir = tempDir.resolve("skills");
+        writeSkill(skillsDir.resolve("litigation-visual"), "litigation-visual", "enabled_by_default: false\n");
+        Path pluginsDir = tempDir.resolve("plugins");
+        Path pluginDir = pluginsDir.resolve("litigation-visual");
+        Files.createDirectories(pluginDir);
+        Path manifest = pluginDir.resolve("manifest.json");
+        Files.writeString(manifest, """
+                {"id":"litigation-visual","name":"Litigation","version":"1.0.3",
+                 "permissions":["file_read","file_write","ai"]}
+                """);
+        InMemorySystemSettingService settings = new InMemorySystemSettingService();
+        PluginService plugins = new PluginService(settings, pluginsDir.toString());
+        plugins.init();
+        SkillProperties props = new SkillProperties();
+        props.setDir(skillsDir.toString());
+        SkillRegistry registry = new SkillRegistry(props, settings, plugins, null);
+        registry.init();
+        SkillDefinition skill = registry.getSkill("litigation-visual").orElseThrow();
+        assertNull(skill.getSourcePluginId(), "Web plugin consumes the host skill, not a bundled skill directory");
+        assertTrue(settings.get(SkillRegistry.DISABLED_KEY, "").contains("litigation-visual"));
+        assertTrue(registry.isEnabled(skill.getId()), "visible enabled plugin must not be blocked by the hidden legacy switch");
+        assertTrue(registry.isAvailable(skill));
+        assertEquals(SkillRegistry.ActivationMode.AUTO, registry.activationMode(skill.getId()));
+        var controller = new com.checkba.controller.ai.SkillController(registry, null, null, null, null, null);
+        assertTrue(controller.listSkills().get(0).isEnabled());
+        assertTrue(controller.listSkills().get(0).isAvailable());
+        SkillRouter router = new SkillRouter(registry, props,
+                org.mockito.Mockito.mock(com.checkba.service.telemetry.TelemetryService.class), null);
+        router.activateForTurn("lit-test", "run-1", "confirm", null, List.of(skill.getId()));
+        assertEquals(skill.getId(), router.activeSkill("run-1").orElseThrow().getId());
+
+        plugins.setEnabled(skill.getId(), false);
+        assertFalse(registry.isEnabled(skill.getId()));
+        assertFalse(registry.isAvailable(skill));
+        router.activateForTurn("lit-test", "run-2", "confirm", null, List.of(skill.getId()));
+        assertTrue(router.activeSkill("run-2").isEmpty(), "disabled plugin cannot be manually activated");
+        plugins.setEnabled(skill.getId(), true);
+        registry.rescan();
+        assertTrue(registry.isAvailable(registry.getSkill(skill.getId()).orElseThrow()));
+
+        plugins.applyRevocations(java.util.Map.of(skill.getId(), "synthetic revocation"));
+        assertFalse(registry.isAvailable(skill));
+        assertThrows(IllegalStateException.class, () -> plugins.setEnabled(skill.getId(), true));
+
+        Files.delete(manifest);
+        plugins.rescan();
+        assertFalse(registry.isEnabled(skill.getId()), "uninstall restores the unchanged disabled legacy preference");
+        registry.setEnabled(skill.getId(), true);
+        assertTrue(registry.isAvailable(skill), "legacy installations without a Web plugin retain their own switch");
+    }
+
+    @Test
+    void litigationWebPluginCannotEnableSkillWithoutPermissionsOrWithIncompatibleHost() throws IOException {
+        writeSkill(tempDir.resolve("skills/litigation-visual"), "litigation-visual", "enabled_by_default: false\n");
+        Path pluginsDir = tempDir.resolve("plugins");
+        Path pluginDir = pluginsDir.resolve("litigation-visual");
+        Files.createDirectories(pluginDir);
+        Path manifest = pluginDir.resolve("manifest.json");
+        Files.writeString(manifest, """
+                {"id":"litigation-visual","name":"Litigation","version":"1.0.3",
+                 "permissions":["file_read","ai"]}
+                """);
+        PluginService plugins = new PluginService(null, pluginsDir.toString());
+        plugins.init();
+        SkillRegistry registry = newRegistry(tempDir.resolve("skills"), plugins);
+        SkillDefinition skill = registry.getSkill("litigation-visual").orElseThrow();
+        assertFalse(registry.isAvailable(skill), "file_write is required by the generation workflow");
+        Files.writeString(manifest, """
+                {"id":"litigation-visual","name":"Litigation","version":"1.0.3",
+                 "minHostVersion":"9999.0.0","permissions":["file_read","file_write","ai"]}
+                """);
+        org.springframework.test.util.ReflectionTestUtils.setField(plugins, "appVersion", "0.73.0");
+        plugins.rescan();
+        assertFalse(registry.isAvailable(skill), "incompatible plugin must stay unavailable");
+    }
+
+    @Test
     @DisplayName("启停：setEnabled 生效；未知 id 抛 IllegalArgumentException；rescan 后保持")
     void enableDisableAndRescan() throws IOException {
         writeSkill(tempDir.resolve("test-skill"), "test-skill", null);

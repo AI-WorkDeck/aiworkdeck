@@ -114,36 +114,16 @@ test('C2 提示文案两侧语言都有，且写明"未处理"与下一步', asy
   }
 })
 
-// ==================== C3：复敏映射文件名 ====================
-
-test('C3 映射文件名带原文件名：<原名>-复敏-<时间戳>.awd-recovery', () => {
-  const { state } = pane()
-  const name = state.kitFileName('2026年租赁合同.docx')
-  assert.match(name, /^2026年租赁合同-panels\.deKitFileTag-\d+\.awd-recovery$/, name)
-  assert.match(state.kitFileName(''), /^panels\.deKitFallbackName-/, '没有原文件名时要有兜底名')
-  assert.ok(state.kitFileName('a.docx').endsWith('.awd-recovery'), '扩展名决定桌面端另存目录，不能改')
-})
-
-test('C3 文件名取的是原件名而不是生成出来的副本名', async () => {
+test('project recovery stays linked to the generated copy without a system download', async () => {
   const { state } = pane({
     desensitizeFile: async () => ({ file: { id: 4, name: '[已脱敏]-9876.docx', filePath: 'x' }, recoveryKit: 'AWD-RECOVERY-1:enc', counts: {} }),
   })
   state.fileId = 1; state.fileName = '股权转让协议.docx'; state.filePath = '股权转让协议.docx'
-  state.preview = {}; state.password = 'long-enough-password'
-  state.downloadKit = () => {}
+  state.preview = {}; state.password = '1'
   await state.handleGenerate()
-  assert.match(state.exportedKitName, /^股权转让协议-/, '带上原文件名才分得清哪个映射配哪份副本')
-  assert.ok(!state.exportedKitName.includes('已脱敏'), '副本名是中性名，拿它当映射名等于白改')
-})
-
-test('C3 downloadKit 用的就是这个文件名', () => {
-  const link = { href: '', download: '', click() {}, remove() {} }
-  const doc = { createElement: () => link, body: { appendChild() {} } }
-  const { state } = pane({ document: doc })
-  state.exportedKit = 'AWD-RECOVERY-1:enc'
-  state.exportedKitName = '租赁合同-复敏-123.awd-recovery'
-  state.downloadKit()
-  assert.equal(link.download, '租赁合同-复敏-123.awd-recovery')
+  assert.equal(state.lastRedaction.file.id, 4)
+  assert.equal(state.lastRedaction.kit, 'AWD-RECOVERY-1:enc')
+  assert.equal(state.downloadKit, undefined)
 })
 
 // ==================== 模板：提示行真的渲染出来 ====================
