@@ -13,6 +13,8 @@ export const panelSwitchingMethods = {
       this.toggleLeftPane(this.leftPaneKey === 'plugin-search' ? 'files' : 'plugin-search')
     },
     toggleLeftPane(key) {
+      // 兼容旧菜单/命令：目录列表统一在欢迎页，不再切换左栏面板。
+      if (key === 'projects') return this.openProjectsPane()
       // A visible cloud/client DD entry is current, not a stale hidden-pane preference.
       if (key !== 'dd-files' || (!this.isClientView && !this.ddCloudTrack)) key = migrateLeftPaneKey(key)
       // 无项目态（dev-board#1047）：只有全局面板能开。项目面板不挂载——它们带着
