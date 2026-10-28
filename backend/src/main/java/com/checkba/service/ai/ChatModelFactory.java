@@ -217,7 +217,7 @@ public class ChatModelFactory {
      * 只有前端下拉的默认选项变了、后端回落路径还钉在 yml 上（两份口径的老毛病）。
      */
     public String resolveDefaultModel() {
-        return getSetting("ai.defaultModel", aiModelProperties.getOpenRouter().getDefaultModel());
+        return AllowedModels.canonicalModelId(getSetting("ai.defaultModel", aiModelProperties.getOpenRouter().getDefaultModel()));
     }
 
     /**
@@ -380,7 +380,7 @@ public class ChatModelFactory {
         boolean isAuto = SmartModelRouter.isAutoModel(modelId);
         String targetModel = (modelId == null || modelId.isEmpty())
                 ? "default"
-                : (isAuto ? resolveDefaultModel() : modelId);
+                : (isAuto ? resolveDefaultModel() : AllowedModels.canonicalModelId(modelId));
 
         // 平台通道必须先于白名单短路判定：白名单模型走的是 BYOK 的 OpenRouter key，
         // 而平台通道用的是官网 provision 的 key，两者不能混

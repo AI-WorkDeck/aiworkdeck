@@ -18,7 +18,7 @@ const tokens = source.slice(source.indexOf("html,\nhtml[data-theme='light']"), s
 const shots = process.env.AWD_SHOTS || '/tmp'
 mkdirSync(shots, { recursive: true })
 
-// 合成目录：形状照 AiModelCatalogController 的响应。单价取自 AllowedModels（首档，美元 / 百万 tokens），
+// 合成目录：形状照 AiModelCatalogController 的响应。价格为固定测试样本（美元 / 百万 tokens），
 // 档位按后端同一规则（0.8×输入 + 0.2×输出，阈值 0.3 / 1.0 / 3.0）算好——这里只是夹具，判据在后端
 const CATALOG = [
   ['deepseek/deepseek-v4-flash', 'DeepSeek V4 Flash', 'DeepSeek', 'GLOBAL', false, 0.08596, 0.17192, false],
@@ -26,7 +26,8 @@ const CATALOG = [
   ['z-ai/glm-5.2', 'GLM-5.2', '智谱', 'GLOBAL', false, 1.19, 3.74, false],
   ['moonshotai/kimi-k2.6', 'Kimi K2.6', '月之暗面', 'GLOBAL', true, 0.95, 4.0, false],
   ['moonshotai/kimi-k3', 'Kimi K3', '月之暗面', 'GLOBAL', true, 3.0, 15.0, false],
-  ['qwen/qwen3.8-max', '通义千问 3.8 Max', '阿里云', 'GLOBAL', true, 2.0, 6.0, false],
+  ['moonshotai/kimi-k3.1-pro', 'Kimi K3.1 Pro', '月之暗面', 'GLOBAL', true, 2.0, 10.0, false],
+  ['qwen/qwen3.8-max-0902', '通义千问 3.8 Max', '阿里云', 'GLOBAL', true, 2.0, 6.0, false],
   ['qwen/qwen3.7-flash', '通义千问 3.7 Flash', '阿里云', 'GLOBAL', true, 0.03, 0.13, true],
   ['bytedance-seed/seed-2.0-lite', '豆包 Seed 2.0 Lite', '字节跳动', 'GLOBAL', true, 0.25, 2.0, true],
   ['minimax/minimax-m3', 'MiniMax M3', 'MiniMax', 'GLOBAL', true, 0.3, 1.2, false],
@@ -48,9 +49,11 @@ const catalog = (priceDisplay, region = 'INTERNATIONAL') => ({
     id, name, vendor, region: reg, contextLength: 1000000, vision, inputPricePerM: inP, outputPricePerM: outP, tiered,
     displayInputPerM: round6(inP * priceDisplay.factor), displayOutputPerM: round6(outP * priceDisplay.factor),
     priceLevel: level(inP, outP),
+    aliases: id === 'qwen/qwen3.8-max-0902' ? ['qwen/qwen3.8-max'] : [],
   })),
 })
 const CHARGED_CNY = { basis: 'charged', channel: 'platform', currency: 'CNY', factor: 8.096, exchangeRate: 6.7468, marginMultiplier: 1.2, currencyBasis: 'reported', rateSource: 'live', rateUpdatedAt: '2026-09-23T02:00:00Z' }
+const CHARGED_USD = { basis: 'charged', channel: 'platform', currency: 'USD', factor: 1.2, exchangeRate: 1, marginMultiplier: 1.2, currencyBasis: 'reported', rateSource: 'live', rateUpdatedAt: '2026-10-29T00:00:00Z' }
 const LIST_PLATFORM = { basis: 'list', channel: 'platform', currency: 'USD', factor: 1, exchangeRate: null, marginMultiplier: null, currencyBasis: null, rateSource: null, rateUpdatedAt: null }
 
 const server = await createServer({ configFile: false, root: fixture, plugins: [vue()], resolve: { alias: { '@': `${root}src` }, dedupe: ['vue'] }, server: { host: '127.0.0.1', port: 5203, strictPort: true, fs: { allow: [root, fileURLToPath(new URL('../../node_modules', import.meta.url))] } } })
@@ -205,7 +208,7 @@ try {
   await open(catalog(LIST_PLATFORM, 'GLOBAL'), { empty: true })
   assert.ok(await page.$('.model-dropdown.down'), '空态应向下展开')
   r = await rows()
-  assert.equal(r.length, 9, '境内清单 9 条')
+  assert.equal(r.length, 10, '境内清单 10 条')
   assert.deepEqual(r.find(x => x.name === 'Kimi K3').nums, ['$3.0', '$15.0'])
   assert.deepEqual(r.find(x => x.name === '通义千问 3.7 Flash').nums, ['$0.030', '$0.13'])
   assert.equal(new Set(r.map(x => x.level)).size, 4, '境内清单四档都要有')
@@ -249,6 +252,64 @@ try {
   await page.waitForFunction(() => window.chatState.currentModelId === 'auto' && !document.querySelector('.model-dropdown'))
   assert.equal(await page.evaluate(() => window.fixtureStorage.ai_selected_model), 'auto')
   assert.equal(await page.evaluate(() => window.chatState.currentModelName), 'Smart Mode (Auto)')
+
+  // A provider-renamed model retains the user's selection through backend-supplied aliases.
+  await page.evaluate(() => {
+    sessionStorage.setItem('chat-fixture-storage', JSON.stringify({
+      checkba_user: { id: 1001 }, checkba_session_id: 'synthetic-session',
+      ai_selected_model: 'qwen/qwen3.8-max',
+    }))
+  })
+  await open(catalog(CHARGED_USD), { lang: 'en-US' })
+  assert.equal(await page.evaluate(() => window.chatState.currentModelId), 'qwen/qwen3.8-max-0902')
+  assert.equal(await page.evaluate(() => window.fixtureStorage.ai_selected_model), 'qwen/qwen3.8-max-0902')
+  assert.equal(await page.evaluate(() => window.chatState.currentModelVision), true)
+  assert.equal(await page.evaluate(() => window.lastToast), undefined, 'known alias does not warn or switch to the unrelated default')
+  console.log('PASS: saved Qwen alias restores and persists the canonical model with vision')
+
+  // International fresh-install regression: charged USD must not change vision capability.
+  for (const lang of ['en-US', 'zh-CN']) {
+    for (const empty of [false, true]) {
+      await page.evaluate(() => sessionStorage.clear())
+      await open(catalog(CHARGED_USD), { lang, empty })
+      assert.equal(await page.evaluate(() => window.chatState.currentModelId), 'auto', 'fresh profile starts in Auto')
+      assert.ok(await page.$(`.model-dropdown.${empty ? 'down' : 'up'}`))
+      const capabilityRows = await page.$$eval('.model-dropdown .model-option', els => els.map(el => ({
+        name: el.querySelector('.model-option-name').textContent.trim(),
+        noVision: Boolean(el.querySelector('.model-novision-tag')),
+        prices: [...el.querySelectorAll('.model-price-num')].map(n => n.textContent.trim()),
+      })))
+      for (const name of ['Kimi K3', 'Kimi K3.1 Pro']) {
+        assert.equal(capabilityRows.find(row => row.name === name)?.noVision, false, `${lang} ${name}: no false no-image badge`)
+      }
+      assert.equal(capabilityRows.find(row => row.name === 'DeepSeek V4 Flash')?.noVision, true)
+      assert.ok(capabilityRows.every(row => row.prices.every(price => price.startsWith('$'))))
+      assert.deepEqual(capabilityRows.find(row => row.name === 'Kimi K3.1 Pro').prices, ['$2.4', '$12.0'])
+      const notes = await footnote()
+      assert.match(notes[0], lang === 'en-US' ? /USD per 1M tokens/ : /美元 \/ 百万 tokens/)
+      assert.match(notes[1], lang === 'en-US' ? /Charged price/ : /实付价/)
+      await shot(`charged-usd-${lang}-${empty ? 'empty' : 'chat'}`)
+      for (const [name, id, vision] of [
+        ['Kimi K3', 'moonshotai/kimi-k3', true],
+        ['Kimi K3.1 Pro', 'moonshotai/kimi-k3.1-pro', true],
+        ['DeepSeek V4 Flash', 'deepseek/deepseek-v4-flash', false],
+      ]) {
+        if (!await page.$('.model-dropdown')) {
+          await page.$eval('.model-selector', el => el.dispatchEvent(new CustomEvent('tap', { bubbles: true })))
+          await page.waitForSelector('.model-dropdown .model-option')
+        }
+        await page.evaluate(name => {
+          const option = [...document.querySelectorAll('.model-dropdown .model-option')]
+            .find(el => el.querySelector('.model-option-name').textContent.trim() === name)
+          option.dispatchEvent(new CustomEvent('tap', { bubbles: true }))
+        }, name)
+        await page.waitForFunction(id => window.chatState.currentModelId === id && !document.querySelector('.model-dropdown'), {}, id)
+        assert.equal(await page.evaluate(() => window.chatState.currentModelVision), vision, `${lang} ${empty ? 'empty' : 'chat'} ${name}: attachment capability`)
+        assert.equal(await page.evaluate(() => window.fixtureStorage.ai_selected_model), id)
+      }
+    }
+  }
+  console.log('PASS: international charged USD, zh/en, empty/chat, K3 and K3.1 image support and text-only distinction')
 
   assert.deepEqual(errors, [])
   console.log(`PASS: charged CNY / list USD, both placements, alignment, 4 tiers, footnote, en-US, select. Shots in ${shots}`)

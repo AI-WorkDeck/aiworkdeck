@@ -52,6 +52,12 @@ class PptxToolsTest {
     private PptxTools pptxTools;
     private PlatformAiChannel platformAiChannel;
 
+    @Test
+    void retiredQwenSelectionUsesCurrentProviderId() {
+        org.junit.jupiter.api.Assertions.assertEquals("qwen/qwen3.8-max-0902",
+                pptxTools.buildModelConfig("qwen/qwen3.8-max").getTextModel());
+    }
+
     @TempDir
     Path tmp;
 
