@@ -855,6 +855,10 @@ DdFilesPanel / ShareholderMeetingPanel。新面板照抄这套，不要再自定
   `--awd-border-strong` 显形。用在 `.etb-scroll`（EditorToolbar）与左右两条
   `.tabs-scroll`；`:show-scrollbar="false"` 与那几条 `display:none` 兜底一起删掉了
   （它们会让 uni 给内层元素挂 `.uni-scroll-view-scrollbar-hidden`，把细滑轨也灭掉）。
+  **直接滚动容器（dev-board#1575）**：侧栏复用时发现，当前 Chrome 仅设置
+  `:hover::-webkit-scrollbar-thumb` 可能不刷新直接滚动容器的滑块，而内层滚动结构正常。
+  现由宿主设置 `--awd-scrollbar-thumb`（静止透明、hover 为边框色），伪元素读变量。
+  回归 `hairline-scroll-ui.mjs` 对照直接/内层、横/纵向；不能将不显形先入为主归为截图局限。
   **标准属性 `scrollbar-width` 被关在 `@supports not selector(::-webkit-scrollbar)` 里**：
   Chromium 一看到它就整个忽略 `::-webkit-scrollbar` 那套，4px 会退化成 thin（约 8px），
   把按 4px 算好的两处偏移带歪。
@@ -872,11 +876,10 @@ DdFilesPanel / ShareholderMeetingPanel。新面板照抄这套，不要再自定
     `#C3BCA9`，改回 z1 只剩 y79.0..79.5 那 1px，其余是编辑器白底）。
   z-index 只给 `.tabs-scroll`，**不要给 `.etb-scroll` 或 `.etb-wrap`**——工具栏下拉是
   `position:fixed` 弹层，多一个层叠上下文就把它们框住了。
-  **验证滑轨只能抓真实屏幕**：CDP 截图（puppeteer `page.screenshot`，`fromSurface`
-  两种都试过）**根本拍不到 `::-webkit-scrollbar`**——纯 HTML 对照页里一条写死红色的
-  4px thumb，CDP 截图零个红像素，同一画面 macOS `screencapture` 有 1200 个。
-  用 `screencapture -x -o -R x,y,w,h`，坐标别信 `window.screenX/screenY`（这台机器上
-  对不上），往页面里临时刷一块洋红标记整屏抓一次、用它的外接框反推偏移。
+  **截图验证边界**：#543 的历史环境曾出现 CDP 截图拍不到滑轨、系统截图可见的
+  对照。#1575 在 Chrome 156 中实测，Puppeteer 显式去掉默认 `--hide-scrollbars`
+  后可拍到原生滑块；测试必须先确认没有隐藏滑轨，再联合截图、真实 hover 与滚动验证。
+  若当前环境仍拍不到，可用系统区域截图做对照，不要直接断言所有 CDP 截图都不支持。
 - **工具栏那一行里带边框的定高控件必须 `box-sizing: border-box`（dev-board#543）**：
   本仓没有全局 `* { box-sizing }`（uni 只给 `uni-page-wrapper/uni-page-body` 设了），
   `.etb-field` 与 `.etb-stepper` 写的是 `height: 26px` + `1px` 边框，边框盒因此是 28px，
