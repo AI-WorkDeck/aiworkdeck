@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "スライドに画像を挿入",
+  cmdPptAddChart: "スライドにグラフを挿入",
+  cmdPptFormatChart: "スライドのグラフを書式設定",
+  cmdPptSetTransition: "スライドの切り替え効果を設定",
   wordStyleUnsupported: "このホストでは次のプロファイル項目を完全には適用できません：{fields}。変更は開始していません。",
+  wordStyleNotApplied: "ホストが指定された段落スタイルを適用しませんでした。文書を確認してから再試行してください。",
 
   cmdGetParagraphs: "段落を読み取る",
   cmdGetOutline: "アウトラインを読み取る",

@@ -3,6 +3,10 @@
 
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "إدراج صورة في الشريحة",
+    "office_ppt_add_chart": "إدراج مخطط في الشريحة",
+    "office_ppt_format_chart": "تنسيق مخطط الشريحة",
+    "office_ppt_set_transition": "تعيين انتقال الشريحة",
     "office_file_create": "إنشاء ملف جديد",
     "office_file_save": "حفظ الملف الحالي",
     "office_file_export_pdf": "تصدير PDF إلى المشروع",

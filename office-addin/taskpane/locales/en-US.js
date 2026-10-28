@@ -1,7 +1,12 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export const EN = {
+  cmdPptAddImage: "Insert slide image",
+  cmdPptAddChart: "Insert slide chart",
+  cmdPptFormatChart: "Format slide chart",
+  cmdPptSetTransition: "Set slide transition",
   wordStyleUnsupported: "This host cannot fully apply these profile fields: {fields}. No changes have started.",
+  wordStyleNotApplied: "The host did not apply the requested paragraph style. Inspect the document before retrying.",
 
   cmdGetParagraphs: "Read paragraphs",
   cmdGetOutline: "Read outline",

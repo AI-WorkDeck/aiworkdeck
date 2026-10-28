@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "Sisipkan gambar pada slide",
+  cmdPptAddChart: "Sisipkan grafik pada slide",
+  cmdPptFormatChart: "Format grafik slide",
+  cmdPptSetTransition: "Atur transisi slide",
   wordStyleUnsupported: "Aplikasi ini tidak dapat menerapkan seluruh bidang profil ini: {fields}. Belum ada perubahan yang dimulai.",
+  wordStyleNotApplied: "Aplikasi host tidak menerapkan gaya paragraf yang diminta. Periksa dokumen sebelum mencoba lagi.",
 
   cmdGetParagraphs: "Baca paragraf",
   cmdGetOutline: "Baca kerangka",

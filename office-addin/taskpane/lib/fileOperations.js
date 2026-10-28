@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { t } from './i18n.js'
+import { createWpsTemporaryPath } from './wpsNativeServices.js'
 import { createProjectFile, uploadFileBytes } from './api.js'
 
 export const FILE_OPERATION_COMMANDS = Object.freeze(['file_create', 'file_open', 'file_save', 'file_export_pdf'])
@@ -15,7 +16,10 @@ function assertIdentity(env, source) {
 }
 function pdfBytes(value) {
   let bytes
-  if (typeof value === 'string') bytes = Uint8Array.from(value, c => c.charCodeAt(0) & 255)
+  if (typeof value === 'string') {
+    if (value.length > FILE_MAX_BYTES || /[^\x00-\xff]/.test(value)) fail('fileOperationInvalidBytes')
+    bytes = Uint8Array.from(value, c => c.charCodeAt(0))
+  }
   else if (value instanceof Uint8Array) bytes = value
   else if (value instanceof ArrayBuffer) bytes = new Uint8Array(value)
   else if (Array.isArray(value)) bytes = Uint8Array.from(value)
@@ -65,11 +69,9 @@ function wpsDocument(env) {
   return doc
 }
 function wpsPdf(env) {
-  const app = env.application, doc = wpsDocument(env), fs = app.FileSystem
-  if (typeof doc.ExportAsFixedFormat !== 'function' || typeof app.Env?.GetTempPath !== 'function' || typeof fs?.readAsBinaryString !== 'function' || typeof fs?.Remove !== 'function') fail('fileOperationUnavailable')
-  const folder = app.Env.GetTempPath()
-  if (!folder || typeof globalThis.crypto?.randomUUID !== 'function') fail('fileOperationUnavailable')
-  const path = String(folder).replace(/[\\/]?$/, '/') + 'aiworkdeck-' + globalThis.crypto.randomUUID() + '.pdf'
+  const doc = wpsDocument(env), fs = env.nativeServices?.fileSystem
+  if (typeof doc.ExportAsFixedFormat !== 'function' || typeof fs?.readAsBinaryString !== 'function' || typeof fs?.Remove !== 'function') fail('fileOperationUnavailable')
+  const path = createWpsTemporaryPath(env.nativeServices, 'pdf')
   try {
     if (env.host === 'excel') doc.ExportAsFixedFormat(0, path)
     else if (env.host === 'word') doc.ExportAsFixedFormat(path, 17)
@@ -104,13 +106,11 @@ export async function executeFileOperation(command, args = {}, env = {}) {
     try { binary = atob(args.base64) } catch { fail('fileOperationInvalidBytes') }
     if (!binary.startsWith('PK\x03\x04') || binary.length > FILE_MAX_BYTES) fail('fileOperationInvalidBytes')
     if (env.family === 'wps') {
-      const app = env.application, fs = app?.FileSystem
+      const app = env.application, fs = env.nativeServices?.fileSystem
       const collection = env.host === 'word' ? app?.Documents : env.host === 'excel' ? app?.Workbooks : app?.Presentations
-      if (typeof collection?.Open !== 'function' || typeof app?.Env?.GetTempPath !== 'function' || typeof fs?.writeAsBinaryString !== 'function' || typeof fs?.readAsBinaryString !== 'function' || typeof fs?.Remove !== 'function' || typeof globalThis.crypto?.randomUUID !== 'function') fail('fileOperationUnavailable')
-      const folder = app.Env.GetTempPath()
-      if (!folder) fail('fileOperationUnavailable')
+      if (typeof collection?.Open !== 'function' || typeof fs?.writeAsBinaryString !== 'function' || typeof fs?.readAsBinaryString !== 'function' || typeof fs?.Remove !== 'function') fail('fileOperationUnavailable')
       const extension = env.host === 'word' ? 'docx' : env.host === 'excel' ? 'xlsx' : 'pptx'
-      const path = String(folder).replace(/[\\/]?$/, '/') + 'aiworkdeck-' + globalThis.crypto.randomUUID() + '.' + extension
+      const path = createWpsTemporaryPath(env.nativeServices, extension)
       let opened = false
       try {
         fs.writeAsBinaryString(path, binary)

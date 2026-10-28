@@ -3,6 +3,10 @@
 
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "スライドに画像を挿入",
+    "office_ppt_add_chart": "スライドにグラフを挿入",
+    "office_ppt_format_chart": "スライドのグラフを書式設定",
+    "office_ppt_set_transition": "スライドの切り替え効果を設定",
     "office_file_create": "ファイルを新規作成",
     "office_file_save": "現在のファイルを保存",
     "office_file_export_pdf": "PDF をプロジェクトに書き出す",

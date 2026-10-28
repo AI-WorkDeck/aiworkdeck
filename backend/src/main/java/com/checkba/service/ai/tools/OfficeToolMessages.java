@@ -10,6 +10,28 @@ public final class OfficeToolMessages {
     private OfficeToolMessages() {}
     public static String text(String key) { return LangText.of(MESSAGES.get(key)); }
     static final Map<String, Map<String, String>> MESSAGES = Map.ofEntries(
+        Map.entry("mediaArgumentsInvalid", Map.ofEntries(
+                Map.entry("zh-CN", "图片、图表或过渡参数无效。"),
+                Map.entry("zh-TW", "圖片、圖表或轉場參數無效。"),
+                Map.entry("en-US", "Invalid image, chart, or transition arguments."),
+                Map.entry("ja-JP", "画像、グラフ、または画面切り替えの引数が無効です。"),
+                Map.entry("ko-KR", "이미지, 차트 또는 전환 효과의 매개변수가 유효하지 않습니다."),
+                Map.entry("de-DE", "Ungültige Parameter für Bild, Diagramm oder Übergang."),
+                Map.entry("fr-FR", "Paramètres d’image, de graphique ou de transition non valides."),
+                Map.entry("es-ES", "Los parámetros de imagen, gráfico o transición no son válidos."),
+                Map.entry("pt-BR", "Parâmetros de imagem, gráfico ou transição inválidos."),
+                Map.entry("it-IT", "Parametri di immagine, grafico o transizione non validi."),
+                Map.entry("nl-NL", "Ongeldige parameters voor afbeelding, grafiek of overgang."),
+                Map.entry("ru-RU", "Недопустимые параметры изображения, диаграммы или перехода."),
+                Map.entry("ar-SA", "معلمات الصورة أو المخطط أو الانتقال غير صالحة."),
+                Map.entry("hi-IN", "चित्र, चार्ट या ट्रांज़िशन के पैरामीटर अमान्य हैं।"),
+                Map.entry("tr-TR", "Resim, grafik veya geçiş parametreleri geçersiz."),
+                Map.entry("vi-VN", "Tham số hình ảnh, biểu đồ hoặc hiệu ứng chuyển trang không hợp lệ."),
+                Map.entry("th-TH", "พารามิเตอร์รูปภาพ แผนภูมิ หรือเอฟเฟ็กต์เปลี่ยนสไลด์ไม่ถูกต้อง"),
+                Map.entry("id-ID", "Parameter gambar, grafik, atau transisi tidak valid."),
+                Map.entry("ms-MY", "Parameter imej, carta atau peralihan tidak sah."),
+                Map.entry("el-GR", "Μη έγκυρες παράμετροι εικόνας, γραφήματος ή μετάβασης.")
+        )),
         Map.entry("fileNameInvalid", Map.ofEntries(
                 Map.entry("zh-CN", "请提供文件名，不含路径或控制字符"),
                 Map.entry("zh-TW", "請提供檔案名稱，不含路徑或控制字元"),

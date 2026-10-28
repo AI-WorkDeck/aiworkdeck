@@ -26,7 +26,7 @@ Mac Excel 16.114.1 的隔离 QA 任务窗格已跑实际 `hostBridge.executeComm
   必须匹配当前宿主。Office 用 createDocument/createWorkbook/createPresentation 打开新副本；
   WPS 写随机临时文件、逐字节读回核对后 Open，成功保留临时文件供延迟读取，明确返回
   `openedAs:'copy'`、`temporary:true`、`requiresSaveAs:true`。都不回写原项目文件。
-- save 保存原生文件。Office Word 用基本 save（WordApi 1.1），Excel 用 save('Prompt')
+- save 保存原生文件。Office Word 已保存文档用基本 save（WordApi 1.1）；未保存文档必须 WordApi 1.5 并用 save('Prompt')。原生调用后报错保留失败并标记 outcomeUnknown，不等同取消或未落盘。Excel 用 save('Prompt')
   （ExcelApi 1.11）；Microsoft PowerPoint 没有本实现可用的保存API，工具隐藏且执行器拒绝。
   WPS三宿主支持Save，但ET/WPP无保存路径的新文件在写前拒绝，须用户先在宿主另存为。
   WPS核对Saved及FullName；临时副本保存仍返回temporary/requiresSaveAs，不冒充长期文件。
@@ -35,6 +35,19 @@ Mac Excel 16.114.1 的隔离 QA 任务窗格已跑实际 `hostBridge.executeComm
   WPS二进制读取之后才校验50 MB，不得声称已经具备同等的预读内存限制。
   上传失败保留 `partialResult`（含未完整上传的fileId）；hostBridge → chatSession data →
   OfficeBridgeService error-first JSON的partialResult全链保留，整体仍为失败。
+
+WPS 的 `Application.FileSystem` / `Application.Env` 属于加载项 JS 根对象（`wps` 是官方别名），
+不是 `wpsApp()` 返回的 WpsApplication/EtApplication/WppApplication 文档模型。
+`wpsNativeServices.js` 独立解析根服务，hostBridge 注入 `nativeServices`；不能整体替换文档模型。
+临时名优先用 `crypto.randomUUID`，HTTP 宿主缺该方法时用 `crypto.getRandomValues` 的128位随机数；
+两者均不可用则拒绝，且 `FileSystem.Exists(path)` 必须严格为 false 才允许写入，不用弱随机数。
+PDF 的原生字符串只接受0–255码元；非byte字符串上传前明确失败，不能以 `&255` 静默截断。
+文件打开和图片写入均严格读回核对；当前 WPS 二进制字符串异常编码没有已验证的兼容转换。
+
+2026-10-28 Windows WPS 文字核心命令已真实保存并关闭重开读回；高级测试曾因标题样式
+未生效失败，代码修复后仍待原生复测。用户随后停止 Windows VM 验证，WPS `file_open`、
+PDF、表格及演示高级链路均未验收；测试页 btoa 编码失败发生在调用产品 file_open 之前。
+不得把自动化回归、根服务能力探针或 Office 通过记录扩展为 WPS 全面通过。详见审计文档。
 
 本地命令串行执行，文件命令带会话缓存的 `expectedDocumentKey`。先向原会话POST回执，
 待挂起回执结束才重绑。create/open成功必须锁住当前轮后续命令，**即使新文件开在另一窗口，
@@ -421,7 +434,7 @@ password/setup不展示控件。AppSource注册、条款、隐私入口及高级
 
 ## WPS 加载项（2026-08-28，dev-board#244）
 
-同一套任务窗格 Vue 源码构建出的第二个宿主家族：WPS 文字/表格/演示（Windows/Linux 版 WPS；**Mac 版 WPS 不支持加载项**）。后端零改动——officeHost 仍是 word/excel/powerpoint 三值、clientCapability 仍是 'office'、office_command 契约与回传路径完全一致。
+同一套任务窗格 Vue 源码构建出的第二个宿主家族：WPS 文字/表格/演示（Windows/Linux 版 WPS；Mac 6.13+据WPS官方技术支持支持JS加载项，需本地配置注册，在线部署与具体API兼容性须按版本实测；本轮Mac尚未完成验收，见 `doc/verification/2026-10-28-ppt-addin-parity.md`）。后端零改动——officeHost 仍是 word/excel/powerpoint 三值、clientCapability 仍是 'office'、office_command 契约与回传路径完全一致。
 
 ### 关键文件
 

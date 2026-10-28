@@ -121,8 +121,9 @@ test('saved Word keeps the WordApi 1.1 default save behavior', async () => {
 test('WPS uses correct native PDF signatures and cleans temporary file', async () => {
   for (const host of ['word', 'excel', 'powerpoint']) {
     const f = fixture(host); let removed = '', exported = []
-    f.env.family = 'wps'; f.env.application = { Env: { GetTempPath: () => '/tmp/' },
-      FileSystem: { readAsBinaryString: () => String.fromCharCode(...f.bytes), Remove: path => { removed = path } } }
+    f.env.family = 'wps'; f.env.application = {}
+    f.env.nativeServices = { environment: { GetTempPath: () => '/tmp/' },
+      fileSystem: { Exists: () => false, readAsBinaryString: () => String.fromCharCode(...f.bytes), Remove: path => { removed = path } } }
     f.env.application[host === 'word' ? 'ActiveDocument' : host === 'excel' ? 'ActiveWorkbook' : 'ActivePresentation'] = { ExportAsFixedFormat: (...args) => { exported = args } }
     await executeFileOperation('file_export_pdf', {}, f.env)
     assert.match(removed, /^\/tmp\/aiworkdeck-.*\.pdf$/)
@@ -156,9 +157,10 @@ test('WPS imported copy retains its verified temporary file while open; failure 
   for (const shouldFail of [false, true]) {
     const f = fixture('excel'); const binary = 'PK\x03\x04workbook'; let written, removed = 0
     f.env.family = 'wps'
-    f.env.application = { Env: { GetTempPath: () => '/tmp' }, FileSystem: {
-      writeAsBinaryString: (path, bytes) => { written = bytes }, readAsBinaryString: () => written, Remove: () => removed++
-    }, Workbooks: { Open: path => { assert.match(path, /\.xlsx$/); if (shouldFail) throw new Error('open failed') } } }
+    f.env.nativeServices = { environment: { GetTempPath: () => '/tmp' }, fileSystem: {
+      Exists: () => false, writeAsBinaryString: (path, bytes) => { written = bytes }, readAsBinaryString: () => written, Remove: () => removed++
+    } }
+    f.env.application = { Workbooks: { Open: path => { assert.match(path, /\.xlsx$/); if (shouldFail) throw new Error('open failed') } } }
     const run = executeFileOperation('file_open', { base64: btoa(binary) }, f.env)
     if (shouldFail) { await assert.rejects(run, /open failed/); assert.equal(removed, 1) }
     else { const result = await run; assert.equal(result.temporary, true); assert.equal(result.requiresSaveAs, true); assert.equal(result.openedAs, 'copy'); assert.equal(removed, 0) }
@@ -171,4 +173,20 @@ test('PDF uses PdfFile requirement set even when File is unsupported', async () 
   f.env.Office.context.requirements.isSetSupported = (name, version) => { checked.push([name, version]); return name === 'PdfFile' }
   assert.equal((await executeFileOperation('file_export_pdf', {}, f.env)).exported, true)
   assert.deepEqual(checked, [['PdfFile', '1.1']])
+})
+
+test('WPS non-byte binary strings fail before creating or uploading a PDF', async () => {
+  for (const suffix of ['\u0100', '\u20ac', '\ud83d\ude00']) {
+    const f = fixture(); let removed = 0, uploads = 0
+    f.env.family = 'wps'
+    f.env.application = { ActiveDocument: { ExportAsFixedFormat() {} } }
+    f.env.nativeServices = { environment: { GetTempPath: () => '/tmp' }, fileSystem: {
+      Exists: () => false, readAsBinaryString: () => '%PDF-1.7\n' + suffix, Remove: () => removed++
+    } }
+    f.env.uploadFileBytes = async () => { uploads++ }
+    await assert.rejects(executeFileOperation('file_export_pdf', {}, f.env))
+    assert.equal(f.counts().created, 0)
+    assert.equal(uploads, 0)
+    assert.equal(removed, 1, 'invalid native bytes still release the temporary PDF')
+  }
 })

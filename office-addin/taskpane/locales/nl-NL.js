@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "Afbeelding in dia invoegen",
+  cmdPptAddChart: "Grafiek in dia invoegen",
+  cmdPptFormatChart: "Diagrafiek opmaken",
+  cmdPptSetTransition: "Diaovergang instellen",
   wordStyleUnsupported: "Deze toepassing kan deze profielvelden niet volledig toepassen: {fields}. Er zijn nog geen wijzigingen gestart.",
+  wordStyleNotApplied: "De hosttoepassing heeft de gevraagde alineastijl niet toegepast. Controleer het document voordat u het opnieuw probeert.",
 
   cmdGetParagraphs: "Alinea’s lezen",
   cmdGetOutline: "Overzicht lezen",

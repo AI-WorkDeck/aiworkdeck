@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "إدراج صورة في الشريحة",
+  cmdPptAddChart: "إدراج مخطط في الشريحة",
+  cmdPptFormatChart: "تنسيق مخطط الشريحة",
+  cmdPptSetTransition: "تعيين انتقال الشريحة",
   wordStyleUnsupported: "لا يمكن لهذا التطبيق تطبيق حقول الملف بالكامل: {fields}. لم تبدأ أي تغييرات.",
+  wordStyleNotApplied: "لم يطبّق التطبيق المضيف نمط الفقرة المطلوب. افحص المستند قبل إعادة المحاولة.",
 
   cmdGetParagraphs: "قراءة الفقرات",
   cmdGetOutline: "قراءة المخطط التفصيلي",

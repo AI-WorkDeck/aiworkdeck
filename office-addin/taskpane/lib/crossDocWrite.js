@@ -213,7 +213,8 @@ export async function runCrossDocWrite({
     return { result: await safeExec(exec, cmd, a), entry: null }
   }
 
-  if (['ppt_write_notes', 'ppt_table_set_style'].includes(cmd)) {
+  if (['ppt_write_notes', 'ppt_table_set_style', 'ppt_add_image', 'ppt_add_chart',
+    'ppt_format_chart', 'ppt_set_transition'].includes(cmd)) {
     return { result: { ok: false, error: untrackableError(cmd) }, entry: null }
   }
 

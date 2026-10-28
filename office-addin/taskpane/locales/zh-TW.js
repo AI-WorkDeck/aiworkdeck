@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "插入投影片圖片",
+  cmdPptAddChart: "插入投影片圖表",
+  cmdPptFormatChart: "設定投影片圖表格式",
+  cmdPptSetTransition: "設定投影片轉場效果",
   wordStyleUnsupported: "目前宿主無法完整套用這些樣式欄位：{fields}。尚未開始修改。",
+  wordStyleNotApplied: "宿主未套用要求的段落樣式，請檢查文件後再重試。",
 
   cmdGetParagraphs: "讀取段落",
   cmdGetOutline: "讀取大綱",

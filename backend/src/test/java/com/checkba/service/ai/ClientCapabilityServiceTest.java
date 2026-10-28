@@ -214,4 +214,17 @@ class ClientCapabilityServiceTest {
         assertFalse(capabilities.isToolVisible("office_ppt_table_set_style", "conv-office-excel"));
     }
 
+    @Test
+    void nativeChartsAndTransitionsRequireWpsButPicturesSupportBothFamilies() {
+        capabilities.record("microsoft-ppt", "office", "powerpoint", "office");
+        for (String tool : new String[]{"office_ppt_add_chart", "office_ppt_format_chart", "office_ppt_set_transition"}) {
+            assertTrue(capabilities.isToolVisible(tool, "conv-office-ppt"));
+            for (String conv : new String[]{"microsoft-ppt", "conv-office", "conv-office-excel", "conv-lowa", "conv-none"})
+                assertFalse(capabilities.isToolVisible(tool, conv));
+        }
+        assertTrue(capabilities.isToolVisible("office_ppt_add_image", "microsoft-ppt"));
+        assertTrue(capabilities.isToolVisible("office_ppt_add_image", "conv-office-ppt"));
+        assertFalse(capabilities.isToolVisible("office_ppt_add_image", "conv-office-excel"));
+    }
+
 }

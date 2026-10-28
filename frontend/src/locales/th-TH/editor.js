@@ -3,6 +3,10 @@
 
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "แทรกรูปภาพในสไลด์",
+    "office_ppt_add_chart": "แทรกแผนภูมิในสไลด์",
+    "office_ppt_format_chart": "จัดรูปแบบแผนภูมิในสไลด์",
+    "office_ppt_set_transition": "ตั้งค่าเอฟเฟ็กต์เปลี่ยนสไลด์",
     "office_file_create": "สร้างไฟล์ใหม่",
     "office_file_save": "บันทึกไฟล์ปัจจุบัน",
     "office_file_export_pdf": "ส่งออก PDF ไปยังโครงการ",

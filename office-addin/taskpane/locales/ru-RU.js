@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "Вставить изображение на слайд",
+  cmdPptAddChart: "Вставить диаграмму на слайд",
+  cmdPptFormatChart: "Форматировать диаграмму слайда",
+  cmdPptSetTransition: "Настроить переход слайда",
   wordStyleUnsupported: "Это приложение не может полностью применить поля профиля: {fields}. Изменения не начаты.",
+  wordStyleNotApplied: "Приложение не применило запрошенный стиль абзаца. Проверьте документ перед повторной попыткой.",
 
   cmdGetParagraphs: "Прочитать абзацы",
   cmdGetOutline: "Прочитать структуру",

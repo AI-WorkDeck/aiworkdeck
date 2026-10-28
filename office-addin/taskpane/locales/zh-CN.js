@@ -1,7 +1,12 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export const ZH = {
+  cmdPptAddImage: "插入幻灯片图片",
+  cmdPptAddChart: "插入幻灯片图表",
+  cmdPptFormatChart: "设置幻灯片图表格式",
+  cmdPptSetTransition: "设置幻灯片切换效果",
   wordStyleUnsupported: "当前宿主无法完整应用这些画像字段：{fields}。未开始修改。",
+  wordStyleNotApplied: "宿主未应用请求的段落样式，请检查文档后再重试。",
 
   cmdGetParagraphs: "读取段落",
   cmdGetOutline: "读取大纲",

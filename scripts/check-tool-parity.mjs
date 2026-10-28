@@ -127,6 +127,10 @@ const MATRIX = [
   ['移动幻灯片', 'slide_move_page', 'office_ppt_move_slide'],
   ['插入文本框', 'slide_add_text_box', 'office_ppt_add_text_box'],
   ['插入形状', 'slide_add_shape', 'office_ppt_add_shape'],
+  ['插入图片（插件cover预裁剪；桌面原生裁剪）', 'slide_add_image', 'office_ppt_add_image'],
+  ['新增图表（仅WPS；Office无稳定公开API）', 'slide_add_chart', 'office_ppt_add_chart'],
+  ['图表样式（仅WPS；Office无稳定公开API）', 'slide_format_chart', 'office_ppt_format_chart'],
+  ['过渡效果（仅WPS；Office无稳定公开API）', 'slide_set_transition', 'office_ppt_set_transition'],
   ['删除形状', 'slide_delete_shape', 'office_ppt_delete_shape'],
   ['演示插表格', 'slide_add_table', 'office_ppt_add_table'],
   ['演示读表格', 'slide_table_read', 'office_ppt_table_read'],
@@ -165,9 +169,6 @@ const LOWA_ONLY = {
   ],
   '表格行高列宽：插件面并进了 office_excel_edit_rows_cols 的 set_width / set_height 两个 action': [
     'sheet_set_row_col'
-  ],
-  'WorkDeck原生Impress素材/图表/过渡：主线新增UNO GraphicCrop、chart2与放映控制工具；Office/WPS PPT尚无对应协议，属于明确未补齐的能力，不得将本机引擎工具暴露给插件会话或声称已对齐': [
-    'slide_add_image', 'slide_add_chart', 'slide_format_chart', 'slide_set_transition'
   ]
 }
 

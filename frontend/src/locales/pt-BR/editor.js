@@ -3,6 +3,10 @@
 
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "Inserir imagem no slide",
+    "office_ppt_add_chart": "Inserir gráfico no slide",
+    "office_ppt_format_chart": "Formatar gráfico do slide",
+    "office_ppt_set_transition": "Definir transição do slide",
     "office_file_create": "Criar arquivo",
     "office_file_save": "Salvar arquivo atual",
     "office_file_export_pdf": "Exportar PDF para o projeto",

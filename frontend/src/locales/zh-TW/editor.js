@@ -3,6 +3,10 @@
 
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "插入投影片圖片",
+    "office_ppt_add_chart": "插入投影片圖表",
+    "office_ppt_format_chart": "設定投影片圖表格式",
+    "office_ppt_set_transition": "設定投影片轉場效果",
     "office_file_create": "新增檔案",
     "office_file_save": "儲存目前檔案",
     "office_file_export_pdf": "匯出 PDF 至專案",

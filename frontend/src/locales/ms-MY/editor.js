@@ -3,6 +3,10 @@
 
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "Sisipkan imej pada slaid",
+    "office_ppt_add_chart": "Sisipkan carta pada slaid",
+    "office_ppt_format_chart": "Format carta slaid",
+    "office_ppt_set_transition": "Tetapkan peralihan slaid",
     "office_file_create": "Cipta fail baharu",
     "office_file_save": "Simpan fail semasa",
     "office_file_export_pdf": "Eksport PDF ke projek",

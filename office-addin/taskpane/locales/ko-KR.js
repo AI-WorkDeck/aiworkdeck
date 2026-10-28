@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "슬라이드 이미지 삽입",
+  cmdPptAddChart: "슬라이드 차트 삽입",
+  cmdPptFormatChart: "슬라이드 차트 서식 설정",
+  cmdPptSetTransition: "슬라이드 전환 효과 설정",
   wordStyleUnsupported: "이 호스트는 다음 프로필 필드를 완전히 적용할 수 없습니다: {fields}. 변경은 시작되지 않았습니다.",
+  wordStyleNotApplied: "호스트가 요청한 단락 스타일을 적용하지 않았습니다. 문서를 확인한 후 다시 시도하세요.",
 
   cmdGetParagraphs: "단락 읽기",
   cmdGetOutline: "개요 읽기",

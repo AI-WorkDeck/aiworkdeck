@@ -3,6 +3,10 @@
 
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "Вставить изображение на слайд",
+    "office_ppt_add_chart": "Вставить диаграмму на слайд",
+    "office_ppt_format_chart": "Форматировать диаграмму слайда",
+    "office_ppt_set_transition": "Настроить переход слайда",
     "office_file_create": "Создать файл",
     "office_file_save": "Сохранить текущий файл",
     "office_file_export_pdf": "Экспортировать PDF в проект",

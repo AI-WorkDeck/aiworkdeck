@@ -53,6 +53,86 @@ public class OfficeEditTools implements AgentToolComponent {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.checkba.service.ai.StyleProfileResolver wordStyleProfileResolver;
 
+    @ToolMeta(displayName = "插入幻灯片图片", category = "office", fileEffect = "MODIFIED")
+    @Tool("Insert a project image into an exact native slide rectangle in points. fit=cover/contain/stretch; focalX/focalY 0..1 default0.5. Negative positions allow bleed. Cover embeds a cropped PNG preserving transparency; original cropped pixels are not recoverable in the native picture. At most12MB. sendToBack requires Office PowerPointApi1.8 or native WPS ZOrder. Inspect partial failures before retrying.")
+    public String office_ppt_add_image(@P("Conversation ID") String conversationId,
+            @P("Project image file ID") Long fileId, @P("Slide number, 1-based") Integer slideNumber,
+            @P("Left points") Double left, @P("Top points") Double top,
+            @P("Width points") Double width, @P("Height points") Double height,
+            @P(value="cover/contain/stretch",required=false) String fit,
+            @P(value="Send behind existing shapes",required=false) Boolean sendToBack,
+            @P(value="Crop X 0..1",required=false) Double focalX,
+            @P(value="Crop Y 0..1",required=false) Double focalY) {
+        if (!validMediaGeometry(slideNumber,left,top,width,height)
+                || fit != null && !java.util.Set.of("cover","contain","stretch").contains(fit)
+                || focalX != null && (!Double.isFinite(focalX)||focalX<0||focalX>1)
+                || focalY != null && (!Double.isFinite(focalY)||focalY<0||focalY>1)) return invalidMedia();
+        if(fileId==null||fileId<=0)return "Error: "+OfficeToolMessages.text("fileIdInvalid");
+        var file=projectFileRepository.findById(fileId).orElse(null);
+        if(file==null||Boolean.TRUE.equals(file.getIsDeleted())||Boolean.TRUE.equals(file.getIsFolder()))return "Error: "+OfficeToolMessages.text("fileNotFound");
+        String denied=ToolFileGuard.rejectIfOutsideProject(file);if(denied!=null)return denied;
+        if(file.getFilePath()==null||file.getFilePath().isBlank())return "Error: "+OfficeToolMessages.text("fileContentUnavailable");
+        try(var input=storageServiceFactory.getStorageService().load(file.getFilePath()).getInputStream()){
+            byte[] bytes=input.readNBytes(12*1024*1024+1);
+            if(bytes.length<4||bytes.length>12*1024*1024)return "Error: "+OfficeToolMessages.text("fileContentInvalid");
+            var args=mediaGeometry(slideNumber,left,top,width,height);
+            args.put("base64",java.util.Base64.getEncoder().encodeToString(bytes));
+            if(fit!=null)args.put("fit",fit);if(sendToBack!=null)args.put("sendToBack",sendToBack);
+            if(focalX!=null)args.put("focalX",focalX);if(focalY!=null)args.put("focalY",focalY);
+            return officeBridgeService.executeOfficeCommand(conversationId,"ppt_add_image",args);
+        }catch(java.io.IOException|com.checkba.storage.StorageException e){return "Error: "+OfficeToolMessages.text("fileReadFailed");}
+    }
+
+    @ToolMeta(displayName = "插入原生图表", category = "office", fileEffect = "MODIFIED")
+    @Tool("WPS Presentation only: create an editable native column/bar/line/area/pie/doughnut/scatter chart. categoriesJson is labels (numeric for scatter); seriesJson is [{name,values:[numbers]}]. Pie/doughnut require one nonnegative series. No Office.js equivalent; hidden on Microsoft PowerPoint. Partial failure can leave a created chart: inspect returned shape before retrying.")
+    public String office_ppt_add_chart(@P("Conversation ID") String conversationId,
+            @P("Slide number, 1-based") Integer slideNumber, @P("Chart type") String chartType,
+            @P("JSON categories") String categoriesJson,@P("JSON series") String seriesJson,
+            @P("Left points") Double left,@P("Top points") Double top,@P("Width points") Double width,@P("Height points") Double height,
+            @P(value="Title",required=false) String title){
+        if(!validMediaGeometry(slideNumber,left,top,width,height)||chartType==null||!java.util.Set.of("column","bar","line","area","pie","doughnut","scatter").contains(chartType))return invalidMedia();
+        try{
+            var categories=objectMapper.readValue(categoriesJson,java.util.List.class);
+            var series=objectMapper.readValue(seriesJson,java.util.List.class);
+            if(categories.isEmpty()||categories.size()>1000||series.isEmpty()||series.size()>50)return invalidMedia();
+            for(Object value:categories)if(!(value instanceof String)&&!(value instanceof Number n&&Double.isFinite(n.doubleValue())))return invalidMedia();
+            boolean pie=chartType.equals("pie")||chartType.equals("doughnut");
+            if(pie&&series.size()!=1)return invalidMedia();
+            if(chartType.equals("scatter")&&categories.stream().anyMatch(v->!(v instanceof Number)))return invalidMedia();
+            for(Object value:series){
+                if(!(value instanceof Map<?,?> item)||!(item.get("name") instanceof String)||!(item.get("values") instanceof java.util.List<?> values)||values.size()!=categories.size())return invalidMedia();
+                for(Object v:values)if(!(v instanceof Number n)||!Double.isFinite(n.doubleValue())||pie&&n.doubleValue()<0)return invalidMedia();
+            }
+            var args=mediaGeometry(slideNumber,left,top,width,height);args.put("chartType",chartType);args.put("categories",categories);args.put("series",series);if(title!=null)args.put("title",title);
+            return officeBridgeService.executeOfficeCommand(conversationId,"ppt_add_chart",args);
+        }catch(Exception e){return invalidMedia();}
+    }
+
+    @ToolMeta(displayName = "设置图表样式", category = "office", fileEffect = "MODIFIED")
+    @Tool("WPS Presentation only: format a native chart by exact shapeName. Optional colors are #RRGGBB, fontSize8..72; seriesColorsJson applies to series or pie/doughnut slices. showGrid requires a value axis. Microsoft PowerPoint Office.js has no public native chart-format API. Native chart property support is checked before applying requested writes.")
+    public String office_ppt_format_chart(@P("Conversation ID") String conversationId,@P("Slide number") Integer slideNumber,@P("Exact chart shape name") String shapeName,
+            @P(value="Background #RRGGBB",required=false) String backgroundColor,@P(value="Text #RRGGBB",required=false) String textColor,
+            @P(value="Font size8..72",required=false) Double fontSize,@P(value="JSON series or slice colors",required=false) String seriesColorsJson,
+            @P(value="Show legend",required=false) Boolean showLegend,@P(value="Show value-axis grid",required=false) Boolean showGrid){
+        if(slideNumber==null||slideNumber<1||shapeName==null||shapeName.isBlank()||backgroundColor!=null&&!backgroundColor.matches("#[0-9a-fA-F]{6}")||textColor!=null&&!textColor.matches("#[0-9a-fA-F]{6}")||fontSize!=null&&(!Double.isFinite(fontSize)||fontSize<8||fontSize>72))return invalidMedia();
+        if(backgroundColor==null&&textColor==null&&fontSize==null&&seriesColorsJson==null&&showLegend==null&&showGrid==null)return invalidMedia();
+        var args=new HashMap<String,Object>();args.put("slideNumber",slideNumber);args.put("shapeName",shapeName);
+        if(backgroundColor!=null)args.put("backgroundColor",backgroundColor);if(textColor!=null)args.put("textColor",textColor);if(fontSize!=null)args.put("fontSize",fontSize);if(showLegend!=null)args.put("showLegend",showLegend);if(showGrid!=null)args.put("showGrid",showGrid);
+        if(seriesColorsJson!=null)try{var colors=objectMapper.readValue(seriesColorsJson,java.util.List.class);if(colors.isEmpty()||colors.stream().anyMatch(v->!(v instanceof String color)||!color.matches("#[0-9a-fA-F]{6}")))return invalidMedia();args.put("seriesColors",colors);}catch(Exception e){return invalidMedia();}
+        return officeBridgeService.executeOfficeCommand(conversationId,"ppt_format_chart",args);
+    }
+
+    @ToolMeta(displayName = "设置翻页过渡", category = "office", fileEffect = "MODIFIED")
+    @Tool("WPS Presentation only: set none/fade/push/wipe with exact durationSeconds0.1..5 default0.6. Runtime must expose native effect enum and exact Duration; otherwise refuse without modifying. Never approximates duration by Speed and never changes automatic advance. Office.js has no public transition API; playback must be verified separately.")
+    public String office_ppt_set_transition(@P("Conversation ID") String conversationId,@P("Slide number") Integer slideNumber,@P("none/fade/push/wipe") String effect,@P(value="Duration seconds0.1..5",required=false) Double durationSeconds){
+        if(slideNumber==null||slideNumber<1||effect==null||!java.util.Set.of("none","fade","push","wipe").contains(effect)||durationSeconds!=null&&(!Double.isFinite(durationSeconds)||durationSeconds<0.1||durationSeconds>5))return invalidMedia();
+        var args=new HashMap<String,Object>();args.put("slideNumber",slideNumber);args.put("effect",effect);if(durationSeconds!=null)args.put("durationSeconds",durationSeconds);
+        return officeBridgeService.executeOfficeCommand(conversationId,"ppt_set_transition",args);
+    }
+    private static boolean validMediaGeometry(Integer slide,Double left,Double top,Double width,Double height){return slide!=null&&slide>0&&left!=null&&top!=null&&width!=null&&height!=null&&Double.isFinite(left)&&Double.isFinite(top)&&Double.isFinite(width)&&Double.isFinite(height)&&width>0&&height>0;}
+    private static Map<String,Object> mediaGeometry(Integer slide,Double left,Double top,Double width,Double height){var args=new HashMap<String,Object>();args.put("slideNumber",slide);args.put("left",left);args.put("top",top);args.put("width",width);args.put("height",height);return args;}
+    private static String invalidMedia(){return "Error: "+OfficeToolMessages.text("mediaArgumentsInvalid");}
+
     @Tool("在当前 Office/WPS 宿主中新建空白文件。Word创建文档，Excel创建工作簿，PowerPoint创建演示文稿。" +
           "这是宿主中的未保存新文件，不是项目文件；WPS表格/演示须先在宿主另存为才能使用保存命令。成功后须等待新文档会话绑定，不能继续向旧文档发送编辑命令。")
     @ToolMeta(displayName = "新建宿主文件", category = "office", fileEffect = "CREATED")

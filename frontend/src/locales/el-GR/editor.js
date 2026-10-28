@@ -3,6 +3,10 @@
 
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "Εισαγωγή εικόνας στη διαφάνεια",
+    "office_ppt_add_chart": "Εισαγωγή γραφήματος στη διαφάνεια",
+    "office_ppt_format_chart": "Μορφοποίηση γραφήματος διαφάνειας",
+    "office_ppt_set_transition": "Ορισμός μετάβασης διαφάνειας",
     "office_file_create": "Δημιουργία αρχείου",
     "office_file_save": "Αποθήκευση τρέχοντος αρχείου",
     "office_file_export_pdf": "Εξαγωγή PDF στο έργο",
