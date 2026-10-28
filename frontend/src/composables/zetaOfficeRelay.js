@@ -105,6 +105,7 @@ const ACTION_BUDGET_MS = {
   slide_set_layout: 120000, slide_add_text_box: 120000, slide_set_shape_text: 120000,
   slide_format_text: 120000, slide_format_shape: 120000, slide_add_shape: 120000,
   slide_delete_shape: 120000, slide_set_shape_geometry: 120000, slide_replace_text: 120000,
+  slide_add_image: 120000, slide_add_chart: 120000, slide_format_chart: 120000, slide_set_transition: 120000,
   slide_add_table: 120000, slide_table_set_cell: 120000, slide_table_set_style: 120000,
   slide_set_hyperlink: 120000, slide_write_notes: 120000,
 }

@@ -506,3 +506,11 @@ txt/md/markdown 自 dev-board#37 起不进 LOWA（前端走 PlainTextEditor.vue�
 - **Word 自动编号定位、连续多段选区与六项常用格式对齐（dev-board#1372）**：
   - `office_thread.js` 新增 `readParagraphListLabel(el)` / `readParagraphDisplayText(el)` 读取 `ListLabelString`，使 `get_clauses`、`find_text_locations`、`insert_under_heading`、`writingSectionOf` 能同时识别自动编号与手打编号条款（如 `第一条`、`一、`、`1.1`），并在 `find_text_locations` / `get_clauses` / `get_formatting` 中返回 `listLabel` 与 `isListItem`。
   - `select_paragraph`、`format_selection`、`set_paragraph_format`、`office_format_text`、`office_set_paragraph_format` 支持 `paragraphCount`（按起止段或锚点向后连续扩展 $N$ 段）、`fontNameAsian` / `fontNameWestern` 中西文字体分设、`firstLineIndentChars`（按段落当前字号自动换算 `mm100` / `pt`，且自动编号段落默认不叠加首行缩进以免二次缩进），并对 `lineSpacing <= 5` 自动按倍数（`MULTIPLE` / `×12pt`）处理，修复 `1.5` 倍行距被误设为固定值或 `1.5pt` 的问题。
+
+### PPT 进阶素材与原生图表（dev-board#1578/#1581）
+
+`SlideMediaTools.slide_add_image` 从有读取权限的项目图片插入精确页码/形状矩形，单位 pt；合法负坐标用于出血，cover/contain/stretch 与 focalX/focalY 控制裁切，sendToBack 用于背景。先验目标项目写权限、源读权限、参数与12MB限制；部分完成回执须读回后继续。
+
+`SlideEditTools` 新增 `slide_add_chart`（column/bar/line/area/pie/doughnut/scatter）、`slide_format_chart`（精确shapeName、配色、字号、图例/网格）、`slide_set_transition`（none/fade/push/wipe）。chart2 散点显式配对 X/Y sequence；不把横轴列当数据系列。样式取真实 chart2 series；标记用完整 `css.chart2.Symbol`，不能只修改返回结构的字段。UNO `CharHeight` 必须用 float Any；普通整数看似设置成功，却会导致 PPTX 导出失败。过渡 Type/Subtype 用 short Any，fade CROSSFADE=101。
+
+图片生成与插入独立：`image_generate_asset` 创建带请求键的任务，`image_get_generation` 查询并幂等导入，返回 `db_id` 给 `slide_add_image.fileId`。生成图片不切换当前PPT身份；未完成回执不发虚假新增文件事件。权限/下载/导入测试见 ImageAssetToolsTest、ImageAssetClientTest、SlideMediaToolsTest；真实引擎测试见 `ppt-advanced-design.mjs`、`ppt-image-layout.mjs`。设置回读、保存重开、实际图片和放映四种证据不能互相替代。

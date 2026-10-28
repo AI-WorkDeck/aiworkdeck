@@ -79,6 +79,14 @@ public class SlideEditTools implements AgentToolComponent {
                 case "SLIDE_TABLE_WRITE_PARTIAL" -> LangText.of("表格已创建，但单元格内容写入中断。请按返回的形状名及行列位置回读并修复，勿重复创建", "Table created, but cell writing was interrupted. Inspect and repair the returned shape and cell coordinates; do not create it again");
                 case "SLIDE_TABLE_SIZE_PARTIAL" -> LangText.of("表格已创建，但行列尺寸设置未完成，请回读并修复现有表格，勿重复创建", "Table created, but row/column sizing is incomplete; inspect and repair the existing table, do not create it again");
                 case "SLIDE_ROW_HEIGHT_FAILED" -> LangText.of("行高设置中断，请读取实际行高核对", "Row height update interrupted; inspect the actual row heights");
+                case "SLIDE_INVALID_CHART_DATA" -> LangText.of("图表分类和系列数据无效，请核对数量、数值和图表类型", "Invalid chart categories or series; check lengths, values and chart type");
+                case "SLIDE_INVALID_GEOMETRY" -> LangText.of("位置须为有限数值，宽高须大于0", "Position must be finite and dimensions must be positive");
+                case "SLIDE_CHART_PARTIAL" -> LangText.of("图表创建中断，请先回读现有形状再修复，勿重复创建", "Chart creation interrupted; inspect existing shapes before repairing, do not create again");
+                case "SLIDE_INVALID_TRANSITION" -> LangText.of("过渡须为none/fade/push/wipe，时长须为0.1至5秒", "Use none/fade/push/wipe with a duration from 0.1 to 5 seconds");
+                case "SLIDE_TRANSITION_PARTIAL" -> LangText.of("过渡设置中断，请先回读当前页设置", "Transition update interrupted; inspect current slide settings");
+                case "SLIDE_INVALID_CHART_STYLE" -> LangText.of("图表样式参数无效", "Invalid chart style parameters");
+                case "SLIDE_NOT_CHART" -> LangText.of("目标形状不是原生图表", "The target shape is not a native chart");
+                case "SLIDE_CHART_STYLE_PARTIAL" -> LangText.of("图表样式修改中断，请回读确认后继续", "Chart styling interrupted; inspect the result before continuing");
                 default -> null;
             };
             if (message == null) return response;
@@ -89,6 +97,74 @@ public class SlideEditTools implements AgentToolComponent {
         } catch (RuntimeException ignored) {
             return response;
         }
+    }
+
+    @ToolMeta(displayName = "插入原生图表", category = "document", fileEffect = "MODIFIED")
+    @Tool("Create an editable native chart on a slide. chartType: column/bar/line/area/pie/doughnut/scatter. "
+            + "categoriesJson is an array of category labels (numeric X labels for scatter); seriesJson is an array of {name,values:[numbers]}. "
+            + "Every series must match category count. Pie/doughnut accept one nonnegative series. Geometry is in points. "
+            + "Use factual source data, preserve units, and inspect the rendered chart. On partial failure read back before retrying.")
+    public String slide_add_chart(
+            @P("Slide number, 1-based") Integer slideNumber,
+            @P("column/bar/line/area/pie/doughnut/scatter") String chartType,
+            @P("JSON array of category labels") String categoriesJson,
+            @P("JSON array of {name,values}") String seriesJson,
+            @P("Left in points") Double left, @P("Top in points") Double top,
+            @P("Width in points") Double width, @P("Height in points") Double height,
+            @P(value = "Optional chart title", required = false) String title) {
+        try {
+            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            Object categories = mapper.readValue(categoriesJson, java.util.List.class);
+            Object series = mapper.readValue(seriesJson, java.util.List.class);
+            Map<String, Object> params = new HashMap<>();
+            params.put("slideNumber", slideNumber); params.put("chartType", chartType);
+            params.put("categories", categories); params.put("series", series);
+            params.put("left", left); params.put("top", top); params.put("width", width); params.put("height", height);
+            if (title != null) params.put("title", title);
+            return executeEditorCommand("slide_add_chart", params);
+        } catch (Exception e) {
+            return "Error: " + LangText.of("图表参数无效，请核对分类与系列JSON", "Invalid chart parameters; check category and series JSON");
+        }
+    }
+
+    @ToolMeta(displayName = "设置图表样式", category = "document", fileEffect = "MODIFIED")
+    @Tool("Style a native chart by its exact shapeName from slide_get_page. Colors are #RRGGBB. "
+            + "seriesColorsJson is a JSON array of colors; pie/doughnut apply it to slices. "
+            + "Optional values leave existing settings unchanged. Inspect actual rendered labels and contrast.")
+    public String slide_format_chart(
+            @P("Slide number, 1-based") Integer slideNumber, @P("Exact chart shape name") String shapeName,
+            @P(value = "Chart and plot background color", required = false) String backgroundColor,
+            @P(value = "Title, legend and axis text color", required = false) String textColor,
+            @P(value = "Font size in points, 8 to 72", required = false) Double fontSize,
+            @P(value = "JSON color array for series or slices", required = false) String seriesColorsJson,
+            @P(value = "Show legend", required = false) Boolean showLegend,
+            @P(value = "Show value-axis grid", required = false) Boolean showGrid) {
+        try {
+            Map<String, Object> params = new HashMap<>();
+            params.put("slideNumber", slideNumber); params.put("shapeName", shapeName);
+            if (backgroundColor != null) params.put("backgroundColor", backgroundColor);
+            if (textColor != null) params.put("textColor", textColor);
+            if (fontSize != null) params.put("fontSize", fontSize);
+            if (seriesColorsJson != null) params.put("seriesColors", new com.fasterxml.jackson.databind.ObjectMapper().readValue(seriesColorsJson, java.util.List.class));
+            if (showLegend != null) params.put("showLegend", showLegend);
+            if (showGrid != null) params.put("showGrid", showGrid);
+            return executeEditorCommand("slide_format_chart", params);
+        } catch (Exception e) {
+            return "Error: " + LangText.of("图表样式参数无效", "Invalid chart style parameters");
+        }
+    }
+
+    @ToolMeta(displayName = "设置翻页过渡", category = "document", fileEffect = "MODIFIED")
+    @Tool("Set a slide transition: none/fade/push/wipe, with durationSeconds from 0.1 to 5 (default 0.6). "
+            + "Does not change automatic slide advancement. Static PDF cannot demonstrate motion; verify actual playback separately.")
+    public String slide_set_transition(
+            @P("Slide number, 1-based") Integer slideNumber,
+            @P("none/fade/push/wipe") String effect,
+            @P(value = "Duration in seconds, default 0.6", required = false) Double durationSeconds) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("slideNumber", slideNumber); params.put("effect", effect);
+        if (durationSeconds != null) params.put("durationSeconds", durationSeconds);
+        return executeEditorCommand("slide_set_transition", params);
     }
 
     private static final String NO_REVISION_NOTE =
