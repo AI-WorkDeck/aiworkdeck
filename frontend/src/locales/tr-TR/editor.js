@@ -2,6 +2,39 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  officeToolNames: {
+    "office_ppt_add_image": "Slayda resim ekle",
+    "office_ppt_add_chart": "Slayda grafik ekle",
+    "office_ppt_format_chart": "Slayt grafiğini biçimlendir",
+    "office_ppt_set_transition": "Slayt geçişini ayarla",
+    "office_file_create": "Yeni dosya oluştur",
+    "office_file_save": "Geçerli dosyayı kaydet",
+    "office_file_export_pdf": "PDF’yi projeye aktar",
+    "office_file_open": "Proje dosyasının kopyasını aç",
+    "office_ppt_goto": "Slayda veya şekle git",
+    "office_ppt_set_layout": "Slayt düzenini veya arka planını ayarla",
+    "office_get_paragraphs": "Paragrafları oku",
+    "office_get_outline": "Ana hatları oku",
+    "office_get_clauses": "Maddeleri belirle",
+    "office_replace_nth_match": "Belirtilen eşleşmeyi değiştir",
+    "office_apply_style_profile": "Stil profilini uygula",
+    "office_ppt_table_set_style": "Slayt tablosunu biçimlendir",
+    "office_ppt_read_notes": "Konuşmacı notlarını oku",
+    "office_ppt_write_notes": "Konuşmacı notlarını yaz",
+    "office_audit_structure": "Belge yapısını denetle"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "Sıralama aralığında birleştirilmiş hücreler var. Sıralamadan önce birleştirmeyi kaldırın.",
+    "SHEET_SORT_FAILED": "Sıralama başarısız oldu. Yeniden denemeden önce çalışma sayfasını okuyup kontrol edin.",
+    "SHEET_PROTECTED_CELL": "Korumalı hücreler var; hiçbir şey yazılmadı.",
+    "SHEET_INVALID_RANGE": "Geçersiz aralık. Sayfayı yeniden okuyup geçerli bir aralık seçin.",
+    "SHEET_INVALID_START_CELL": "Geçerli bir başlangıç hücresi seçin.",
+    "SHEET_INVALID_ROWS": "Geçerli bir iki boyutlu hücre dizisi sağlayın.",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "Yazma aralığı çalışma sayfası sınırlarını aşıyor.",
+    "SHEET_RANGE_CHECK_FAILED": "Aralık doğrulanamadı; hiçbir şey yazılmadı.",
+    "SHEET_WRITE_PARTIAL": "Yazma kesildi; bazı hücreler değişmiş olabilir. Verileri okuyup düzeltin; tüm toplu işlemi tekrar denemeyin.",
+    "SHEET_CHART_PARTIAL": "Grafik oluşturuldu ancak ayarlar tamamlanmadı. Yeni bir grafik oluşturmadan mevcut grafiği kontrol edip düzeltin."
+},
   "navigation": {
     "slides": "Slaytlar",
     "sheets": "Çalışma Sayfaları",

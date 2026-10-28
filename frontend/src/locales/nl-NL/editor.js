@@ -2,6 +2,39 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  officeToolNames: {
+    "office_ppt_add_image": "Afbeelding in dia invoegen",
+    "office_ppt_add_chart": "Grafiek in dia invoegen",
+    "office_ppt_format_chart": "Diagrafiek opmaken",
+    "office_ppt_set_transition": "Diaovergang instellen",
+    "office_file_create": "Nieuw bestand maken",
+    "office_file_save": "Huidig bestand opslaan",
+    "office_file_export_pdf": "PDF naar project exporteren",
+    "office_file_open": "Kopie van projectbestand openen",
+    "office_ppt_goto": "Naar dia of vorm gaan",
+    "office_ppt_set_layout": "Dia-indeling of achtergrond instellen",
+    "office_get_paragraphs": "Alinea’s lezen",
+    "office_get_outline": "Overzicht lezen",
+    "office_get_clauses": "Clausules herkennen",
+    "office_replace_nth_match": "Opgegeven overeenkomst vervangen",
+    "office_apply_style_profile": "Stijlprofiel toepassen",
+    "office_ppt_table_set_style": "Diatabel opmaken",
+    "office_ppt_read_notes": "Sprekersnotities lezen",
+    "office_ppt_write_notes": "Sprekersnotities schrijven",
+    "office_audit_structure": "Documentstructuur controleren"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "Het sorteerbereik bevat samengevoegde cellen. Maak de samenvoeging ongedaan voordat u sorteert.",
+    "SHEET_SORT_FAILED": "Sorteren mislukt. Lees en controleer het werkblad voordat u het opnieuw probeert.",
+    "SHEET_PROTECTED_CELL": "Beveiligde cellen; er is niets geschreven.",
+    "SHEET_INVALID_RANGE": "Ongeldig bereik. Lees het werkblad opnieuw en kies een geldig bereik.",
+    "SHEET_INVALID_START_CELL": "Kies een geldige begincel.",
+    "SHEET_INVALID_ROWS": "Geef een geldige tweedimensionale celmatrix op.",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "Het schrijfbereik overschrijdt de werkbladgrenzen.",
+    "SHEET_RANGE_CHECK_FAILED": "Het bereik kon niet worden gecontroleerd; er is niets geschreven.",
+    "SHEET_WRITE_PARTIAL": "Schrijven onderbroken; sommige cellen kunnen zijn gewijzigd. Lees en herstel de gegevens zonder de hele batch te herhalen.",
+    "SHEET_CHART_PARTIAL": "De grafiek is gemaakt, maar de instellingen zijn onvolledig. Controleer en herstel de bestaande grafiek zonder een nieuwe te maken."
+},
   "navigation": {
     "slides": "Dia's",
     "sheets": "Werkbladen",

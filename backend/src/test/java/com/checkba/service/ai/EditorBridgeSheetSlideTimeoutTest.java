@@ -59,7 +59,7 @@ class EditorBridgeSheetSlideTimeoutTest {
     }
 
     private static final Pattern DISPATCH = Pattern.compile(
-            "executeEditorCommand\\(\\s*\"((?:sheet|slide)_[a-z_0-9]+)\"");
+            "(?:executeEditorCommand|executeSheetCommand)\\(\\s*\"((?:sheet|slide)_[a-z_0-9]+)\"");
 
     /** 后端真的会下发的 sheet_/slide_ action（从工具层源码抽，名单不会腐烂）。 */
     private static Set<String> dispatchedActions() throws IOException {

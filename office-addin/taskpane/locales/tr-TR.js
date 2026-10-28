@@ -2,6 +2,58 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "Slayda resim ekle",
+  cmdPptAddChart: "Slayda grafik ekle",
+  cmdPptFormatChart: "Slayt grafiğini biçimlendir",
+  cmdPptSetTransition: "Slayt geçişini ayarla",
+  wordStyleUnsupported: "Bu uygulama şu profil alanlarını tam olarak uygulayamıyor: {fields}. Hiçbir değişiklik başlatılmadı.",
+  wordStyleNotApplied: "Ana uygulama istenen paragraf stilini uygulamadı. Yeniden denemeden önce belgeyi kontrol edin.",
+
+  cmdGetParagraphs: "Paragrafları oku",
+  cmdGetOutline: "Ana hatları oku",
+  cmdGetClauses: "Maddeleri belirle",
+  cmdReplaceNthMatch: "Belirtilen eşleşmeyi değiştir",
+  cmdApplyStyleProfile: "Stil profilini uygula",
+
+  wordStructureTooLarge: "Belge yapısı, tek bir güvenli işlemde tamamen okunamayacak kadar büyük. Belge boyutunu küçültüp yeniden deneyin.",
+  wordStructurePartial: "Bazı biçimlendirmeler zaten uygulanmış olabilir. Önce mevcut belgeyi kontrol edin; kontrol etmeden işlemi tekrarlamayın.",
+
+  cmdPptTableSetStyle: "Slayt tablosunu biçimlendir",
+  cmdPptReadNotes: "Konuşmacı notlarını oku",
+  cmdPptWriteNotes: "Konuşmacı notlarını yaz",
+
+  excelConditionalActionInvalid: "Koşullu biçimlendirme eylemi apply veya clearAll olmalıdır.",
+  wordImagePartial: "Görüntü eklenmiş olabilir ancak ayarlar tamamlanmadı. Mevcut görüntüyü kontrol edin; başka bir kopya eklemeyin.",
+
+  excelRangeTooLarge: "Aralık 50.000 hücreyi aşıyor. Daha küçük bir aralık seçip yeniden deneyin; hiçbir değişiklik yapılmadı.",
+
+  fileOperationUnavailable: "Bu dosya işlemi kullanılamıyor veya doğrulanamadı.",
+  fileOperationStale: "Belge değişti. Yeniden denemeden önce mevcut belgeyi okuyun.",
+  fileOperationInvalidArguments: "Geçersiz dosya işlemi parametreleri.",
+  fileOperationInvalidBytes: "Geçerli ve eksiksiz dosya verileri döndürülmedi.",
+  cmdFileCreate: "Yeni dosya oluştur",
+  cmdFileSave: "Geçerli dosyayı kaydet",
+  cmdFileExportPdf: "PDF’yi projeye aktar",
+  cmdFileOpen: "Dosyayı aç veya kopyasını içe aktar",
+  excelChartPartial: "“{name}” grafiği oluşturulmuş olabilir, ancak yapılandırma başarısız oldu ve geri alma doğrulanamadı. Yeniden denemeden önce mevcut grafiği inceleyin; kopyasını oluşturmayın.",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "Geçersiz slayt veya şekil hedefi.",
+  pptStaleTarget: "Hedef metin değişti. Düzenlemeden önce yeniden okuyun.",
+  pptInvalidArguments: "Geçersiz sunu düzenleme parametreleri.",
+  pptCapabilityUnavailable: "Bu özellik mevcut sunu uygulamasında kullanılamıyor.",
+  cmdPptSetShapeText: "Şekil metnini ayarla",
+  cmdPptSetShapeGeometry: "Şekil konumunu ve boyutunu ayarla",
+  cmdPptFormatShape: "Şekli biçimlendir",
+  cmdPptGoto: "Slayda veya şekle git",
+  cmdPptSetLayout: "Slayt düzenini veya arka planını ayarla",
+  excelValidationCustomRequired: "Özel doğrulama bir formül gerektirir.",
+  excelValidationTypeInvalid: "Desteklenmeyen veri doğrulama türü.",
+  excelPivotFieldsMissing: "Özet tablo alanları bulunamadı: {fields}",
+  excelValidationActionInvalid: "Veri doğrulama eylemi apply veya clear olmalıdır.",
+  excelValidationValueRequired: "Bu veri doğrulama kuralı bir karşılaştırma değeri gerektirir.",
+  excelValidationBoundsRequired: "Aralık doğrulaması her iki sınırı gerektirir.",
+
   "dictate": "Ses girişi",
   "dictateRecording": "Kaydediliyor, bitirmek için tıklayın",
   "dictateTranscribing": "Yazıya dökülüyor...",

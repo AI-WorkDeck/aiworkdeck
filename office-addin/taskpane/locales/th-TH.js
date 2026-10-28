@@ -2,6 +2,58 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "แทรกรูปภาพในสไลด์",
+  cmdPptAddChart: "แทรกแผนภูมิในสไลด์",
+  cmdPptFormatChart: "จัดรูปแบบแผนภูมิในสไลด์",
+  cmdPptSetTransition: "ตั้งค่าเอฟเฟ็กต์เปลี่ยนสไลด์",
+  wordStyleUnsupported: "แอปนี้ไม่สามารถใช้ฟิลด์โปรไฟล์เหล่านี้ได้ครบถ้วน: {fields} ยังไม่ได้เริ่มเปลี่ยนแปลง",
+  wordStyleNotApplied: "แอปพลิเคชันโฮสต์ไม่ได้ใช้สไตล์ย่อหน้าที่ร้องขอ โปรดตรวจสอบเอกสารก่อนลองอีกครั้ง",
+
+  cmdGetParagraphs: "อ่านย่อหน้า",
+  cmdGetOutline: "อ่านเค้าร่าง",
+  cmdGetClauses: "ระบุข้อสัญญา",
+  cmdReplaceNthMatch: "แทนที่รายการที่ตรงกันที่ระบุ",
+  cmdApplyStyleProfile: "ใช้โปรไฟล์สไตล์",
+
+  wordStructureTooLarge: "โครงสร้างเอกสารใหญ่เกินกว่าจะอ่านทั้งหมดได้ในการดำเนินการที่ปลอดภัยครั้งเดียว โปรดลดขนาดเอกสารแล้วลองอีกครั้ง",
+  wordStructurePartial: "อาจใช้การจัดรูปแบบบางส่วนแล้ว โปรดตรวจสอบเอกสารปัจจุบันก่อนและอย่าทำซ้ำโดยไม่ตรวจสอบ",
+
+  cmdPptTableSetStyle: "จัดรูปแบบตารางสไลด์",
+  cmdPptReadNotes: "อ่านบันทึกย่อของผู้บรรยาย",
+  cmdPptWriteNotes: "เขียนบันทึกย่อของผู้บรรยาย",
+
+  excelConditionalActionInvalid: "การดำเนินการจัดรูปแบบตามเงื่อนไขต้องเป็น apply หรือ clearAll",
+  wordImagePartial: "อาจแทรกรูปภาพแล้ว แต่ยังตั้งค่าไม่เสร็จ โปรดตรวจสอบรูปภาพที่มีอยู่และอย่าแทรกสำเนาอีกครั้ง",
+
+  excelRangeTooLarge: "ช่วงมีมากกว่า 50,000 เซลล์ โปรดเลือกช่วงที่เล็กลงแล้วลองอีกครั้ง ยังไม่มีการเปลี่ยนแปลงใด ๆ",
+
+  fileOperationUnavailable: "การดำเนินการไฟล์นี้ไม่พร้อมใช้งานหรือไม่สามารถยืนยันได้",
+  fileOperationStale: "เอกสารถูกเปลี่ยนแล้ว โปรดอ่านเอกสารปัจจุบันก่อนลองอีกครั้ง",
+  fileOperationInvalidArguments: "พารามิเตอร์การดำเนินการไฟล์ไม่ถูกต้อง",
+  fileOperationInvalidBytes: "ไม่ได้รับข้อมูลไฟล์ที่ถูกต้องและครบถ้วน",
+  cmdFileCreate: "สร้างไฟล์ใหม่",
+  cmdFileSave: "บันทึกไฟล์ปัจจุบัน",
+  cmdFileExportPdf: "ส่งออก PDF ไปยังโครงการ",
+  cmdFileOpen: "เปิดไฟล์หรือนำเข้าสำเนา",
+  excelChartPartial: "อาจสร้างแผนภูมิ “{name}” แล้ว แต่การตั้งค่าล้มเหลวและไม่สามารถยืนยันการย้อนกลับได้ โปรดตรวจสอบแผนภูมิที่มีอยู่ก่อนลองอีกครั้ง อย่าสร้างซ้ำ",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "เป้าหมายสไลด์หรือรูปร่างไม่ถูกต้อง",
+  pptStaleTarget: "ข้อความเป้าหมายเปลี่ยนแล้ว โปรดอ่านอีกครั้งก่อนแก้ไข",
+  pptInvalidArguments: "พารามิเตอร์การแก้ไขงานนำเสนอไม่ถูกต้อง",
+  pptCapabilityUnavailable: "ฟีเจอร์นี้ไม่พร้อมใช้งานในแอปนำเสนอปัจจุบัน",
+  cmdPptSetShapeText: "ตั้งค่าข้อความรูปร่าง",
+  cmdPptSetShapeGeometry: "ตั้งค่าตำแหน่งและขนาดรูปร่าง",
+  cmdPptFormatShape: "จัดรูปแบบรูปร่าง",
+  cmdPptGoto: "ไปที่สไลด์หรือรูปร่าง",
+  cmdPptSetLayout: "ตั้งค่าเค้าโครงหรือพื้นหลังสไลด์",
+  excelValidationCustomRequired: "การตรวจสอบแบบกำหนดเองต้องมีสูตร",
+  excelValidationTypeInvalid: "ไม่รองรับประเภทการตรวจสอบข้อมูลนี้",
+  excelPivotFieldsMissing: "ไม่พบฟิลด์ตาราง Pivot: {fields}",
+  excelValidationActionInvalid: "การดำเนินการตรวจสอบข้อมูลต้องเป็น apply หรือ clear",
+  excelValidationValueRequired: "กฎการตรวจสอบข้อมูลนี้ต้องมีค่าสำหรับเปรียบเทียบ",
+  excelValidationBoundsRequired: "การตรวจสอบช่วงต้องมีค่าขอบเขตทั้งสองด้าน",
+
   "dictate": "Voice input",
   "dictateRecording": "Recording, click to finish",
   "dictateTranscribing": "Transcribing...",

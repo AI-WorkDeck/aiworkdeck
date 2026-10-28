@@ -2,6 +2,39 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  officeToolNames: {
+    "office_ppt_add_image": "Chèn hình ảnh vào trang chiếu",
+    "office_ppt_add_chart": "Chèn biểu đồ vào trang chiếu",
+    "office_ppt_format_chart": "Định dạng biểu đồ trang chiếu",
+    "office_ppt_set_transition": "Đặt hiệu ứng chuyển trang chiếu",
+    "office_file_create": "Tạo tệp mới",
+    "office_file_save": "Lưu tệp hiện tại",
+    "office_file_export_pdf": "Xuất PDF vào dự án",
+    "office_file_open": "Mở bản sao tệp dự án",
+    "office_ppt_goto": "Đi đến trang chiếu hoặc hình",
+    "office_ppt_set_layout": "Đặt bố cục hoặc nền trang chiếu",
+    "office_get_paragraphs": "Đọc đoạn văn",
+    "office_get_outline": "Đọc dàn ý",
+    "office_get_clauses": "Nhận diện điều khoản",
+    "office_replace_nth_match": "Thay thế kết quả khớp được chỉ định",
+    "office_apply_style_profile": "Áp dụng hồ sơ kiểu",
+    "office_ppt_table_set_style": "Định dạng bảng trang chiếu",
+    "office_ppt_read_notes": "Đọc ghi chú diễn giả",
+    "office_ppt_write_notes": "Viết ghi chú diễn giả",
+    "office_audit_structure": "Kiểm tra cấu trúc tài liệu"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "Vùng sắp xếp có các ô đã hợp nhất. Hãy hủy hợp nhất trước khi sắp xếp.",
+    "SHEET_SORT_FAILED": "Sắp xếp thất bại. Đọc lại và kiểm tra trang tính trước khi thử lại.",
+    "SHEET_PROTECTED_CELL": "Có ô được bảo vệ; chưa ghi dữ liệu.",
+    "SHEET_INVALID_RANGE": "Phạm vi không hợp lệ. Đọc lại trang tính và chọn phạm vi hợp lệ.",
+    "SHEET_INVALID_START_CELL": "Chọn ô bắt đầu hợp lệ.",
+    "SHEET_INVALID_ROWS": "Cung cấp mảng ô hai chiều hợp lệ.",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "Phạm vi ghi vượt quá giới hạn trang tính.",
+    "SHEET_RANGE_CHECK_FAILED": "Không thể kiểm tra phạm vi; chưa ghi dữ liệu.",
+    "SHEET_WRITE_PARTIAL": "Quá trình ghi bị gián đoạn; một số ô có thể đã thay đổi. Đọc lại và sửa, không chạy lại cả lô.",
+    "SHEET_CHART_PARTIAL": "Biểu đồ đã được tạo nhưng thiết lập chưa hoàn tất. Kiểm tra và sửa biểu đồ hiện có, không tạo thêm biểu đồ."
+},
   "navigation": {
     "slides": "Trang chiếu",
     "sheets": "Trang tính",

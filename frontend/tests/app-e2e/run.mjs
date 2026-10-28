@@ -640,13 +640,14 @@ try {
       }
     })
 
-    await step('无项目态：AI 栏不渲染、项目专属 rail 项不挂、有「项目」入口', async () => {
+    await step('无项目态：AI 栏不渲染、项目专属 rail 项不挂、有顶部项目切换器', async () => {
       if (await j1Page.$('.chat-input-rich')) throw new Error('无项目态不该渲染 AI 输入框')
       if (await j1Page.$('.left-rail .version-entry')) throw new Error('无项目态 rail 不该有版本入口')
       for (const title of ['资源管理器', '文件暂存区']) {
         if (await j1Page.$('.left-rail [title="' + title + '"]')) throw new Error('无项目态 rail 不该有「' + title + '」')
       }
-      if (!(await j1Page.$('.left-rail [title="项目"]'))) throw new Error('无项目态 rail 缺「项目」入口')
+      if (await j1Page.$('.left-rail [title="项目"]')) throw new Error('已移除的项目 rail 入口重新出现')
+      if (!(await j1Page.$('.project-switcher'))) throw new Error('无项目态缺顶部项目切换器')
     })
 
     // 欢迎标签不能当活跃文档、不能拖进 AI 上下文（isContextEligibleTab 为假）。
@@ -665,34 +666,40 @@ try {
     await j1Page.close().catch(() => {})
   }
 
-  // ============ J2 左栏「项目」面板 + 统一设置页的「个人」组 ============
-  //  ① 项目列表直链落到工作台外壳的「项目」面板，能加载出项目行（J3 的起点，必须先立住）。
+  // ============ J2 欢迎页全部目录 + 统一设置页的「个人」组 ============
+  //  ① 项目列表直链落到工作台欢迎页的全部目录，能加载出项目行（J3 的起点，必须先立住）。
   //     dev-board#1047 起 pages/project-list 是直链薄壳：redirectTo 外壳 ?pane=projects，
-  //     内容本体是 components/project-list/ProjectListPane.vue（.project-list-pane）。
+  //     目录本体是 components/welcome/FolderCatalog.vue（#1582）。
   //  ② 个人内容仍然到得了、四个栏目都不是空白页
   // 2026-08-20：个人中心并进了统一「设置」页（AdminPane 的「个人」组），
   // /pages/userprofile 薄壳页仍在、落点就是这一组，所以这一段的入口 URL 没变，
   // 变的是页面结构（.page-admin 的侧栏分组，不再是 .nav-menu 那套 tab）。
-  console.log('== J2 左栏「项目」面板 + 个人设置 ==')
+  console.log('== J2 欢迎页全部目录 + 个人设置 ==')
 
-  // 到左栏「项目」面板。已经在工作台里就走用户真实会走的那条路——点 rail「项目」（面板是
-  // 开关：已开着就不点）；不在工作台才用项目列表直链（薄壳页 redirectTo 外壳 ?pane=projects）。
-  // 不在工作台里硬改 hash 去直链：那样进来的薄壳页 getCurrentPages() 为空、redirectTo 不动，
-  // 停在一张空白页（2026-09-29 实测，已作为业务问题上报，见 J2 第一步的直链断言）。
+  // #1582：顶部切换器和欢迎页全部目录替代 projects rail；保留真实入口导航。
   const gotoProjectsPane = async () => {
-    const inWorkbench = await page.evaluate(() => !!document.querySelector('.page-project-overview .left-rail [title="项目"]'))
-    if (inWorkbench) {
-      if (!(await page.$('.project-list-pane'))) await mouseClickSel('.left-rail [title="项目"]')
+    if (await page.$('.page-project-overview .project-switcher')) {
+      if (!(await page.$('.switcher-menu'))) await mouseClickSel('.project-switcher')
+      await mouseClickSel('.switcher-menu .switcher-all')
     } else {
       await page.goto(BASE + '/#/pages/project-list/project-list', { waitUntil: 'networkidle2' })
-      await page.waitForFunction(
-        () => location.hash.includes('pages/project-overview/project-overview') && location.hash.includes('pane=projects'),
-        { timeout: 20000 })
     }
-    await page.waitForSelector('.project-list-pane .ptable-row', { timeout: 20000 })
+    await page.waitForSelector('.welcome-pane .folder-catalog .folder-name', { timeout: 20000 })
+  }
+  const openQaProject = async () => {
+    await page.waitForFunction(name => [...document.querySelectorAll('.folder-catalog .folder-name')]
+      .some(el => el.textContent.trim() === name), { timeout: 20000 }, QA.project)
+    const point = await page.evaluate(name => {
+      const el = [...document.querySelectorAll('.folder-catalog .folder-name')].find(el => el.textContent.trim() === name)
+      el.scrollIntoView({ block: 'center' })
+      const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
+    }, QA.project)
+    await page.mouse.click(point.x, point.y)
+    await page.waitForFunction(pid => new URLSearchParams(location.hash.split('?')[1]).get('id') === String(pid),
+      { timeout: 20000 }, QA.projectId)
   }
 
-  await step('项目列表直链 → 外壳「项目」面板加载出项目行', async () => {
+  await step('项目列表直链 → 欢迎页全部目录加载出项目行', async () => {
     // 这一步刻意走直链（新文档，不在工作台里），验薄壳页的 redirectTo
     if (await page.$('.page-project-overview')) throw new Error('直链断言要从工作台之外出发')
     await gotoProjectsPane()
@@ -702,8 +709,8 @@ try {
     if (n !== 0) throw new Error('薄壳页 redirectTo 之后页面栈里仍留着 ' + n + ' 个列表页实例')
   })
 
-  await step('「项目」面板文案巡检', async () => {
-    const t = await page.$eval('.project-list-pane', (e) => e.innerText.replace(/\n{2,}/g, '\n'))
+  await step('欢迎页全部目录文案巡检', async () => {
+    const t = await page.$eval('.welcome-pane', (e) => e.innerText.replace(/\n{2,}/g, '\n'))
     const m = t.match(/.{0,40}(undefined|NaN|\[object|服务器内部错误).{0,40}/)
     if (m) throw new Error('页面文本可疑: ' + m[0])
     // 官方案件库零配置直连（#439）后入口已恢复；验收与当前产品口径一致。
@@ -768,11 +775,11 @@ try {
   // 所以后面回工作台必须先点回「资源管理器」（见「回到工作台继续后续旅程」）。
   console.log('== J3 两级导航 ==')
 
-  await step('「项目」面板点项目行 → 直达工作台', async () => {
+  await step('欢迎页全部目录点项目行 → 直达工作台', async () => {
     await gotoProjectsPane()
     await waitText(QA.project.slice(0, 8))
     // 项目行主体（包括名称）进入项目；重命名使用独立操作按钮。
-    await mouseClickSel('.project-list-pane .ptable-row')
+    await openQaProject()
     await page.waitForFunction(
       () => location.hash.includes('pages/project-overview/project-overview'), { timeout: 20000 })
     await waitText('资源管理器', 30000)
@@ -783,21 +790,21 @@ try {
     }
   })
 
-  await step('「项目」面板有新建入口，且没有「打开文件」', async () => {
+  await step('欢迎页全部目录有新建入口，浏览器降级不提供文件系统入口', async () => {
     await gotoProjectsPane()
-    await page.waitForSelector('.project-list-pane .create-section', { timeout: 15000 })
-    const t = await page.$eval('.project-list-pane', (e) => e.innerText)
+    await page.waitForSelector('.welcome-pane [data-action="new-project"]', { timeout: 15000 })
+    const t = await page.$eval('.welcome-pane', (e) => e.innerText)
     // 浏览器目标注入的是最小桌面桩（只有 shell.openExternal，没有 fs），列表页的
     // isDesktop 判据正是「有没有系统文件夹对话框」，所以这里必然走浏览器降级分支：
     // 只渲染一张「新建项目」卡，点进去是 newproject 页的托管空白项目表单。
     // 桌面版那两张（打开文件夹 / 新建项目文件夹）在这个目标下渲染不出来，
     // 由 check-navigation-contract 的静态断言守（校验 openFolderFlow /
     // createFolderFlow / 命名弹窗真的接在页面上），别在这里断言它们。
-    const cards = await page.evaluate(() => document.querySelectorAll('.project-list-pane .create-card').length)
+    const cards = await page.evaluate(() => document.querySelectorAll('.welcome-pane [data-action="new-project"]').length)
     if (cards !== 1) throw new Error('浏览器降级下新建卡应当恰好 1 张，实际 ' + cards)
     if (!t.includes('新建项目')) throw new Error('列表下方缺新建入口')
     if (t.includes('打开文件…')) throw new Error('「单独打开文件」应当已从新建入口去掉')
-    await mouseClickSel('.project-list-pane .ptable-row')
+    await openQaProject()
     await page.waitForFunction(
       () => location.hash.includes('pages/project-overview/project-overview'), { timeout: 20000 })
     await waitText('资源管理器', 30000)
@@ -868,7 +875,7 @@ try {
     await page.waitForFunction(
       () => location.hash.includes('pages/project-overview/project-overview') && location.hash.includes('pane=projects'),
       { timeout: 15000 })
-    await page.waitForSelector('.project-list-pane .ptable-row', { timeout: 15000 })
+    await page.waitForSelector('.welcome-pane .folder-catalog .folder-name', { timeout: 15000 })
     // uni h5 的页面栈在 DOM 里是并存的（navigateTo 压栈时旧页留在文档里只是隐藏），
     // 所以根节点计数就是页面栈实例数的直接证据。
     const n = await page.evaluate(() => ({
@@ -880,7 +887,7 @@ try {
   })
 
   await step('回到工作台继续后续旅程', async () => {
-    await mouseClickSel('.project-list-pane .ptable-row')
+    await openQaProject()
     await page.waitForFunction(
       () => location.hash.includes('pages/project-overview/project-overview'), { timeout: 20000 })
     // **这里不能用 waitText('资源管理器')**：上一步点过「项目概览」，leftPaneKey 已经
@@ -1244,8 +1251,13 @@ try {
   console.log('== J6.35 左栏收起按钮 ==')
   await step('rail 收起按钮把 .sidebar-left 收到 0 宽，再点一次能展开回来', async () => {
     await page.waitForSelector('.sidebar-left', { timeout: 10000 })
+    // 进入设置标签可保留收起状态；先经真实展开按钮建立本用例起点。
+    if (await page.$eval('.sidebar-left', el => el.getBoundingClientRect().width) <= 0) {
+      await mouseClickSel('.top-bar-btn[title="展开左侧栏"]')
+      await page.waitForFunction(() => document.querySelector('.sidebar-left').getBoundingClientRect().width > 0,
+        { timeout: 10000 })
+    }
     const widthBefore = await page.$eval('.sidebar-left', (el) => el.getBoundingClientRect().width)
-    if (widthBefore <= 0) throw new Error('测试起点应为左栏展开状态，实际宽度: ' + widthBefore)
     await mouseClickSel('.top-bar-btn[title="收起左侧栏"]')
     await page.waitForFunction(
       () => document.querySelector('.sidebar-left')?.getBoundingClientRect().width === 0,
@@ -2636,7 +2648,7 @@ try {
       // 入口在左栏「项目」面板头部（dev-board#1047 起项目列表页是直链薄壳）。欢迎标签的 Start 区
       // 也有一个同名入口，限定在面板里点，别点到另一个宿主上去。
       await gotoProjectsPane()
-      await mouseClickSel('.project-list-pane .header-actions .btn-secondary-small')
+      await mouseClickSel('.welcome-pane [data-action="pull-case"]')
       await page.waitForSelector('.cloud-project-list', { timeout: 20000 })
       const rows = await page.evaluate(() => [...document.querySelectorAll('.cloud-project-row')].map((r) => ({
         name: ((r.querySelector('.cloud-project-name') || {}).innerText || '').trim(),
@@ -3479,6 +3491,10 @@ try {
           await j13ClickSel('.mdp .mdp-btn.danger')
           await j13ClickSel('.awd-dlg-mask .awd-dlg__confirm')
           await j13WaitState('not_installed')
+          const skillsAfterUninstall = await j13Api('/api/skills/list')
+          const skillAfterUninstall = skillsAfterUninstall.find(s => s.id === 'litigation-visual')
+          console.log('    J13 uninstall readback: ' + JSON.stringify({ packId: skillAfterUninstall?.packId,
+            packReady: skillAfterUninstall?.packReady, enabled: skillAfterUninstall?.enabled }))
           await j13ClickSel('[title="诉讼可视化"]')
           const frame = await j13PackFrame()
           await frame.waitForSelector('.lv-pack-retry', { visible: true, timeout: 15000 })

@@ -2,6 +2,58 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "إدراج صورة في الشريحة",
+  cmdPptAddChart: "إدراج مخطط في الشريحة",
+  cmdPptFormatChart: "تنسيق مخطط الشريحة",
+  cmdPptSetTransition: "تعيين انتقال الشريحة",
+  wordStyleUnsupported: "لا يمكن لهذا التطبيق تطبيق حقول الملف بالكامل: {fields}. لم تبدأ أي تغييرات.",
+  wordStyleNotApplied: "لم يطبّق التطبيق المضيف نمط الفقرة المطلوب. افحص المستند قبل إعادة المحاولة.",
+
+  cmdGetParagraphs: "قراءة الفقرات",
+  cmdGetOutline: "قراءة المخطط التفصيلي",
+  cmdGetClauses: "تحديد البنود",
+  cmdReplaceNthMatch: "استبدال التطابق المحدد",
+  cmdApplyStyleProfile: "تطبيق ملف الأنماط",
+
+  wordStructureTooLarge: "بنية المستند كبيرة جدًا لقراءتها بالكامل ضمن عملية آمنة واحدة. قلّل حجم المستند وأعد المحاولة.",
+  wordStructurePartial: "ربما طُبّق بعض التنسيق بالفعل. افحص المستند الحالي أولًا ولا تكرر العملية دون التحقق.",
+
+  cmdPptTableSetStyle: "تنسيق جدول الشريحة",
+  cmdPptReadNotes: "قراءة ملاحظات المتحدث",
+  cmdPptWriteNotes: "كتابة ملاحظات المتحدث",
+
+  excelConditionalActionInvalid: "يجب أن يكون إجراء التنسيق الشرطي apply أو clearAll.",
+  wordImagePartial: "ربما أُدرجت الصورة، لكن إعدادها لم يكتمل. افحص الصورة الموجودة ولا تُدرج نسخة أخرى.",
+
+  excelRangeTooLarge: "يتجاوز النطاق 50,000 خلية. اختر نطاقًا أصغر وحاول مجددًا؛ لم يتم تغيير أي شيء.",
+
+  fileOperationUnavailable: "عملية الملف هذه غير متاحة أو تعذر تأكيدها.",
+  fileOperationStale: "تم تبديل المستند. اقرأ المستند الحالي قبل المحاولة مجددًا.",
+  fileOperationInvalidArguments: "معلمات عملية الملف غير صالحة.",
+  fileOperationInvalidBytes: "لم يتم إرجاع بيانات ملف صالحة وكاملة.",
+  cmdFileCreate: "إنشاء ملف جديد",
+  cmdFileSave: "حفظ الملف الحالي",
+  cmdFileExportPdf: "تصدير PDF إلى المشروع",
+  cmdFileOpen: "فتح ملف أو استيراد نسخة",
+  excelChartPartial: "ربما تم إنشاء المخطط «{name}»، لكن الإعداد فشل وتعذر تأكيد التراجع. افحص المخطط الحالي قبل إعادة المحاولة؛ لا تنشئ نسخة مكررة.",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "هدف الشريحة أو الشكل غير صالح.",
+  pptStaleTarget: "تغير النص المستهدف. أعد قراءته قبل التحرير.",
+  pptInvalidArguments: "معلمات تحرير العرض التقديمي غير صالحة.",
+  pptCapabilityUnavailable: "هذه الميزة غير متاحة في تطبيق العرض التقديمي الحالي.",
+  cmdPptSetShapeText: "تعيين نص الشكل",
+  cmdPptSetShapeGeometry: "تعيين موضع الشكل وحجمه",
+  cmdPptFormatShape: "تنسيق الشكل",
+  cmdPptGoto: "الانتقال إلى الشريحة أو الشكل",
+  cmdPptSetLayout: "تعيين تخطيط الشريحة أو خلفيتها",
+  excelValidationCustomRequired: "يتطلب التحقق المخصص صيغة.",
+  excelValidationTypeInvalid: "نوع التحقق من صحة البيانات غير مدعوم.",
+  excelPivotFieldsMissing: "لم يتم العثور على حقول الجدول المحوري: {fields}",
+  excelValidationActionInvalid: "يجب أن يكون إجراء التحقق من صحة البيانات apply أو clear.",
+  excelValidationValueRequired: "تتطلب قاعدة التحقق هذه قيمة للمقارنة.",
+  excelValidationBoundsRequired: "يتطلب التحقق من النطاق كلا الحدين.",
+
   "dictate": "الإدخال الصوتي",
   "dictateRecording": "جارٍ التسجيل، انقر للإنهاء",
   "dictateTranscribing": "جارٍ التفريغ النصي...",

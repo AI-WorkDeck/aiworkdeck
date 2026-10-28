@@ -24,7 +24,7 @@ import {
   answerDisplayText, linkAskUserAnswers, isAskUserQuestion
 } from './askUser.js'
 import { runCrossDocWrite, mergeCrossDocBanner } from './crossDocWrite.js'
-import { record as recordRevision } from './revisionLog.js'
+import { record as recordRevision, bindDocument } from './revisionLog.js'
 
 /**
  * 本窗格的宿主标签，用作会话 ID 存储键的一层作用域（settings.loadConversationId）。
@@ -48,6 +48,23 @@ function hostScope() {
  * 取不到（普通浏览器调试）回空串 = 退回按「项目+宿主」分，与改造前一致。
  */
 let docScopeCache = null
+let documentChangedDuringTurn = false
+let forceDocumentRebind = false
+let pendingOfficeResults = 0
+let localCommandQueue = Promise.resolve()
+
+function rejectChangedDocument() {
+  if (docScope() && documentIdentity().key !== docScope()) documentChangedDuringTurn = true
+  return documentChangedDuringTurn
+}
+
+function rebindAfterOfficeResults() {
+  if (!documentChangedDuringTurn || streaming.value || pendingOfficeResults) return
+  // Let the terminal SSE handler finish before replacing its conversation/messages.
+  Promise.resolve().then(() => {
+    if (!streaming.value && !pendingOfficeResults) return syncActiveDocument()
+  }).catch(() => { banner.value = t('fileOperationStale') })
+}
 
 /**
  * 重新取一次文档身份。两处刻意不动缓存：
@@ -56,7 +73,7 @@ let docScopeCache = null
  *   - **取不到身份**（宿主忙/半初始化，key 为空）：当成「没变」，绝不拿空值顶掉一条活会话。
  */
 function refreshDocScope() {
-  if (docScopeCache && streaming.value) return
+  if (docScopeCache && (streaming.value || pendingOfficeResults)) return
   const next = documentIdentity()
   if (!next.key && docScopeCache) return
   docScopeCache = next
@@ -369,6 +386,8 @@ export async function activateSession({ settings, projectId }) {
   const key = sessionIdentityKey(settings, pid)
   if (key === sessionKey) return
   sessionKey = key
+  documentChangedDuringTurn = false
+  forceDocumentRebind = false
   ctx.projectId = pid
   const gen = ++generation
 
@@ -435,16 +454,28 @@ export async function activateSession({ settings, projectId }) {
  * 流式进行中不切（refreshDocScope 会守住缓存），下一次调用再说。
  */
 export async function syncActiveDocument() {
+  if (streaming.value || pendingOfficeResults) {
+    rejectChangedDocument()
+    return false
+  }
   const before = docIdentity()
   refreshDocScope()
   const after = docIdentity()
-  if (after.key === before.key) return false
+  if (after.key === before.key) {
+    if (after.key && documentIdentity().key === after.key) {
+      documentChangedDuringTurn = false
+      forceDocumentRebind = false
+    }
+    return false
+  }
+  bindDocument(after.key)
   // 新建的文档刚被保存：它一直就是这一份文档，只是从此有了名字。把当前会话挂到新键上、
   // 会话身份原地跟上，不重来一遍——否则用户按一次 Ctrl+S，正在进行的对话就被清屏重拉。
   // 真正的「另存为新名」（存过盘的 A → 另一条路径 B）不走这条，按维护者定的规矩当新文档处理。
-  if (!before.saved && after.saved && conversationId) {
+  if (!forceDocumentRebind && !before.saved && after.saved && conversationId) {
     rememberConversation(conversationId)
     sessionKey = sessionIdentityKey(ctx.settings, ctx.projectId)
+    documentChangedDuringTurn = false
     return true
   }
   await activateSession({ settings: ctx.settings, projectId: ctx.projectId })
@@ -875,7 +906,10 @@ function finishStreaming() {
   // 文档镜像（dev-board#299）：本轮真的写过文档且项目有归档绑定才触发；
   // finishStreaming 是所有轮次终态（bubble_end/error/cancelled/run_state 兜底）的
   // 单一汇合点，挂这里保证「写了就有机会归档」，maybeArchiveSnapshot 自身全程无害降级
-  maybeArchiveSnapshot()
+  rejectChangedDocument()
+  if (!documentChangedDuringTurn) maybeArchiveSnapshot()
+  else turnHadWrite = false
+  rebindAfterOfficeResults()
 }
 
 // ==================== 文档镜像（dev-board#299） ====================
@@ -1330,12 +1364,35 @@ async function handleClientAction(dataStr) {
   let action = null
   try { action = JSON.parse(dataStr) } catch (e) { return }
   if (!action || action.tool !== 'office_command' || !action.requestId) return
+  const scope = { generation, settings: { ...ctx.settings }, projectId: ctx.projectId, documentKey: docScope() }
   // 带 origin = 别的窗格的 AI 经云端下发、要读/改本文档（dev-board#717），走另一条路
   if (action.origin) {
-    crossDocQueue = crossDocQueue.then(() => handleCrossDocAction(action))
+    pendingOfficeResults++
+    const run = () => handleCrossDocAction(action, scope)
+    crossDocQueue = crossDocQueue.then(run, run).finally(() => {
+      pendingOfficeResults--
+      rebindAfterOfficeResults()
+    })
     return
   }
 
+  pendingOfficeResults++
+  const run = () => handleLocalAction(action, scope)
+  localCommandQueue = localCommandQueue.then(run, run).finally(() => {
+    pendingOfficeResults--
+    rebindAfterOfficeResults()
+  })
+}
+
+async function handleLocalAction(action, scope) {
+  // A queued action belongs to the session that received it, even if its previous
+  // result POST was still pending when the user changed project/account.
+  if (scope.generation !== generation) {
+    try {
+      await postOfficeResult(scope.settings, { requestId: action.requestId, ok: false, data: null, error: t('fileOperationStale') })
+    } catch (_) { /* An old session cannot put a failure banner into the new one. */ }
+    return
+  }
   // chip 上存的是 command 而不是翻好的 label（dev-board#713）：显示名由界面渲染时经
   // commandDisplayName 现查，切语言后已经画出来的 chip 也跟着换。
   const chip = reactive({ command: action.command, status: 'running', error: '' })
@@ -1349,7 +1406,19 @@ async function handleClientAction(dataStr) {
   // 光标一直闪。失败要落在 chip 上（错误详情给用户看，不只回传给模型）。
   let result
   try {
-    result = await executeCommand(action.command, action.args)
+    if (rejectChangedDocument()) throw new Error(t('fileOperationStale'))
+    const args = action.command.startsWith('file_')
+      ? { ...action.args, expectedDocumentKey: scope.documentKey } : action.args
+    result = await executeCommand(action.command, args, scope)
+    if (scope.generation === generation && result.ok && result.data?.requiresSessionRebind) {
+      if (action.command === 'file_create' || action.command === 'file_open') {
+        // Office can open a separate window while this pane still targets the source file.
+        // End this turn's editing permission even when the source key remains unchanged.
+        forceDocumentRebind = true
+        documentChangedDuringTurn = true
+      }
+      rejectChangedDocument()
+    }
   } catch (e) {
     result = { ok: false, error: (e && e.message) || String(e) }
   }
@@ -1357,18 +1426,18 @@ async function handleClientAction(dataStr) {
   if (!result.ok) chip.error = result.error || ''
   // 文档镜像触发条件（dev-board#299）：本轮有成功的写入类命令。读命令不算——
   // 不在只读名单里的一律按写处理（多拍无害：内容哈希不变时上传会被跳过）
-  if (result.ok && !isReadOnlyCommand(action.command)) turnHadWrite = true
+  if (scope.generation === generation && result.ok && !documentChangedDuringTurn && !isReadOnlyCommand(action.command)) turnHadWrite = true
   try {
-    await postOfficeResult(ctx.settings, {
+    await postOfficeResult(scope.settings, {
       requestId: action.requestId,
       ok: result.ok,
-      data: result.ok ? result.data : null,
+      data: result.ok ? result.data : (result.partialResult || null),
       error: result.ok ? null : result.error
     })
   } catch (e) {
     chip.status = 'failed'
     chip.error = t('resultSendFailedPrefix') + ((e && e.message) || t('networkError'))
-    banner.value = t('toolResultSendFailed')
+    if (scope.generation === generation) banner.value = t('toolResultSendFailed')
   }
 }
 
@@ -1385,21 +1454,30 @@ let crossDocQueue = Promise.resolve()
  *   - 写入成功记进修订记录并弹横幅（同一来源合并计数），本文档的用户一眼看得到谁改了什么。
  * 无论成败都照常回传结果——发起方的工具调用在等它。永不 throw。
  */
-async function handleCrossDocAction(action) {
+async function handleCrossDocAction(action, scope) {
   let outcome
   try {
+    if (scope.generation !== generation || documentIdentity().key !== scope.documentKey || rejectChangedDocument()) throw new Error(t('fileOperationStale'))
     outcome = await runCrossDocWrite({
       command: action.command,
       args: action.args || {},
       origin: action.origin,
       host: detectHost(),
-      family: hostFamily()
+      family: hostFamily(),
+      // Snapshot reads can yield before the mutation; recheck at the actual write.
+      exec: (command, args) => {
+        if (scope.generation !== generation || documentIdentity().key !== scope.documentKey || rejectChangedDocument()) {
+          return { ok: false, error: t('fileOperationStale') }
+        }
+        return executeCommand(command, args, scope)
+      }
     })
   } catch (e) {
     outcome = { result: { ok: false, error: (e && e.message) || String(e) }, entry: null }
   }
   const result = outcome.result
-  if (outcome.entry) {
+  const sameDocument = scope.generation === generation && documentIdentity().key === scope.documentKey && !documentChangedDuringTurn
+  if (sameDocument && outcome.entry) {
     try { recordRevision(outcome.entry) } catch (e) { /* 记录失败不影响回传 */ }
     crossDocBanner.value = mergeCrossDocBanner(crossDocBanner.value, outcome.entry.originDocName, nowMs())
   }
@@ -1407,19 +1485,19 @@ async function handleCrossDocAction(action) {
   // **必须就地汇合一次**：turnHadWrite 平时由 finishStreaming 消费，而本窗格这会儿并没有
   // 在跑自己的轮次——只置位的话，镜像要等到本窗格的用户下次自己发消息才跑，用户从此不再
   // 用这个窗格的话就永远不跑，桌面端项目里那份副本停在改动之前，还没有任何迹象说明它是旧的。
-  if (result.ok && !isReadOnlyCommand(action.command)) {
+  if (sameDocument && result.ok && !isReadOnlyCommand(action.command)) {
     turnHadWrite = true
     maybeArchiveSnapshot()
   }
   try {
-    await postOfficeResult(ctx.settings, {
+    await postOfficeResult(scope.settings, {
       requestId: action.requestId,
       ok: result.ok,
-      data: result.ok ? result.data : null,
+      data: result.ok ? result.data : (result.partialResult || null),
       error: result.ok ? null : result.error
     })
   } catch (e) {
-    banner.value = t('toolResultSendFailed')
+    if (scope.generation === generation) banner.value = t('toolResultSendFailed')
   }
 }
 
@@ -1437,14 +1515,23 @@ async function ensureConnection() {
     return
   }
   const startedAt = nowMs()
-  const conn = createSseConnection({
+  const connectionGeneration = generation
+  const connectedConversation = conversationId
+  let conn = null
+  const isCurrentConnection = () => conn !== null && connection === conn
+    && generation === connectionGeneration && conversationId === connectedConversation
+  conn = createSseConnection({
     baseUrl: ctx.settings.serverUrl,
     token: ctx.settings.token,
     conversationId,
     clientId: paneId,
-    onEvent: handleEvent,
+    onEvent: (event, data) => {
+      // An already-resolved read may arrive after close/abort. It must not
+      // acquire the replacement session's generation and execution context.
+      if (isCurrentConnection()) handleEvent(event, data)
+    },
     onStatus: (status) => {
-      if (connection !== conn) return
+      if (!isCurrentConnection()) return
       if (status === 'reconnecting') {
         // 轮次中途断的才算「断线过」；每轮结束那次是后端主动收尾，不是故障
         if (streaming.value) { everReconnected = true; turnDisconnected = true }
@@ -1470,14 +1557,15 @@ async function ensureConnection() {
       }
     },
     onClose: () => {
-      if (connection === conn) { connection = null; connectionConvId = null }
+      if (!isCurrentConnection()) return
+      connection = null; connectionConvId = null
       clearReconnectNotice()
       // 连接彻底关闭时不静默卡死输入框（断线重连由 sse.js 内部处理，不走这里）
       if (streaming.value) finishStreaming()
     }
   })
   connection = conn
-  connectionConvId = conversationId
+  connectionConvId = connectedConversation
   try {
     await conn.ready
   } catch (e) {
@@ -1552,7 +1640,11 @@ export async function send(overrideText, sendOpts) {
     return { needSettings: false }
   }
   const prompt = (override === null ? input.value : override).trim()
-  if (!prompt || streaming.value) return { needSettings: false }
+  if (!prompt || streaming.value || pendingOfficeResults) return { needSettings: false }
+  if (documentChangedDuringTurn) {
+    await syncActiveDocument()
+    if (documentChangedDuringTurn) { banner.value = t('fileOperationStale'); return { needSettings: false } }
+  }
 
   const settings = ctx.settings
   const projectId = ctx.projectId

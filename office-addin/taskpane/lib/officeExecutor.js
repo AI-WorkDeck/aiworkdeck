@@ -32,7 +32,11 @@ import { minimalEdits, substringEdits } from './minimalEdit.js'
 import { findAllNormalized, describeAnchorFailure } from './textMatch.js'
 import { normalizeBatchItems, sortByIndex } from './batchEdits.js'
 import { pageText } from './textPaging.js'
+import { wordClauses, wordOutline, wordParagraphPage } from './wordStructure.js'
+import { applyOfficeWordStyleProfile, validateWordStyleProfile } from './wordStyleProfile.js'
 import { t } from './i18n.js'
+import { preparePptImage } from './pptMedia.js'
+import { pptTarget, pptExpected, pptGeometry, pptShapeStyle, officePptShape, pptTableStyle, pptParagraphFormat } from './pptPrecision.js'
 // 律所标准格式（HOUSE）单源：backend/src/main/resources/style-profiles/house-default.json 的字节副本，
 // 由 frontend/scripts/sync-house-profile.mjs 同步（npm run build 前自动跑），构建时内联进产物；
 // houseProfile.test.js 断言与后端源 sha256 一致。
@@ -828,7 +832,90 @@ function buildParagraphPatch(args) {
   return patch
 }
 
+async function readWordStructure(context, args) {
+  if (!builtInStyleSupported()) throw new Error(t('fileOperationUnavailable'))
+  const collection = context.document.body.paragraphs
+  collection.load('items')
+  await context.sync()
+  if (collection.items.length > 12000) throw new Error(t('wordStructureTooLarge'))
+  const totalParagraphs = collection.items.length
+  const start = args ? Math.max(0, Math.floor(Number(args.startParagraph) || 0)) : 0
+  const limit = args ? Math.min(500, Math.max(1, Math.floor(Number(args.maxParagraphs) || 200))) : totalParagraphs
+  const items = collection.items.slice(start, start + limit)
+  for (const paragraph of items) paragraph.load('text,styleBuiltIn,outlineLevel,isListItem')
+  await context.sync()
+  let chars = 0
+  for (const paragraph of items) {
+    chars += paragraph.text.length
+    if (chars > 2000000 || paragraph.text.length > 80000) throw new Error(t('wordStructureTooLarge'))
+    if (paragraph.isListItem) paragraph.listItem.load('listString,level')
+  }
+  await context.sync()
+  const paragraphs = items.map((paragraph, offset) => {
+    const label = paragraph.isListItem ? paragraph.listItem.listString : ''
+    const heading = /^Heading([1-9])$/.exec(paragraph.styleBuiltIn || '')
+    const outline = Number(paragraph.outlineLevel)
+    return { index: start + offset, text: paragraph.text, style: paragraph.styleBuiltIn, headingLevel: outline >= 1 && outline <= 9 ? outline : (heading ? Number(heading[1]) : 0),
+      numbering: { available: true, label, level: paragraph.isListItem ? paragraph.listItem.level : 0, hasLabel: !!label } }
+  })
+  return { paragraphs, totalParagraphs }
+}
+
 const HANDLERS = {
+  // Stable Common API image insertion; preview ShapeCollection.addPicture is not used.
+  async ppt_add_image(args) {
+    if(!pptApiSupported('1.4')||(args.sendToBack&&!pptApiSupported('1.8'))||!Office.context.requirements.isSetSupported('ImageCoercion','1.1'))throw new Error(t('pptCapabilityUnavailable'))
+    const source=Office.context.document.url
+    const image=await preparePptImage(args)
+    if(Office.context.document.url!==source)throw new Error(t('fileOperationStale'))
+    return PowerPoint.run(async context=>{
+      const slides=context.presentation.slides;slides.load('items/id');await context.sync()
+      const slide=getSlideOrThrow(slides,args.slideNumber);slide.shapes.load('items/id');await context.sync()
+      const before=new Set(slide.shapes.items.map(s=>s.id));context.presentation.setSelectedSlides([slide.id]);await context.sync()
+      const selected=context.presentation.getSelectedSlides();selected.load('items/id');await context.sync()
+      if(Office.context.document.url!==source||selected.items.length!==1||selected.items[0].id!==slide.id)throw new Error(t('fileOperationStale'))
+      let issued=false, createdShapeId
+      try{
+        issued=true
+        await new Promise((resolve,reject)=>Office.context.document.setSelectedDataAsync(image.base64,{coercionType:Office.CoercionType.Image,imageLeft:image.left,imageTop:image.top,imageWidth:image.width,imageHeight:image.height},r=>r.status===Office.AsyncResultStatus.Succeeded?resolve():reject(new Error(r.error?.message||t('pptCapabilityUnavailable')))))
+        if(Office.context.document.url!==source)throw new Error(t('fileOperationStale'))
+        slide.shapes.load('items/id,items/type');await context.sync()
+        const added=slide.shapes.items.filter(s=>!before.has(s.id));if(added.length!==1||String(added[0].type).toLowerCase()!=='image')throw new Error(t('pptInvalidTarget'))
+        const shape=added[0];createdShapeId=shape.id;if(args.sendToBack)shape.setZOrder('SendToBack');await context.sync()
+        return {slideNumber:args.slideNumber,shapeId:shape.id,created:true,fit:image.fit,cropped:image.cropped}
+      }catch(error){if(issued)error.partialResult={slideNumber:args.slideNumber,...(createdShapeId?{shapeId:createdShapeId,created:true}:{}),outcomeUnknown:true,retryable:false};throw error}
+    })
+  },
+  async ppt_add_chart() { throw new Error(t('pptCapabilityUnavailable')) },
+  async ppt_format_chart() { throw new Error(t('pptCapabilityUnavailable')) },
+  async ppt_set_transition() { throw new Error(t('pptCapabilityUnavailable')) },
+
+  async apply_style_profile(args) {
+    validateWordStyleProfile(args, 'office')
+    return Word.run(context => withTracking(context, () => applyOfficeWordStyleProfile(context, args)))
+  },
+  async get_paragraphs(args) { return Word.run(async context => {
+    const result = await readWordStructure(context, args || {})
+    return wordParagraphPage(result.paragraphs, args, result.totalParagraphs)
+  }) },
+  async get_outline() { return Word.run(async context => wordOutline((await readWordStructure(context)).paragraphs)) },
+  async get_clauses() { return Word.run(async context => wordClauses((await readWordStructure(context)).paragraphs)) },
+  async replace_nth_match(args) {
+    if (typeof args.findText !== 'string' || !args.findText || /[\r\n]/.test(args.findText)
+        || typeof args.replaceText !== 'string' || !Number.isInteger(args.matchIndex) || args.matchIndex < 1) throw new Error(t('fileOperationInvalidArguments'))
+    return Word.run(async context => {
+      const matches = await searchExact(context, args.findText, true)
+      const range = matches[args.matchIndex - 1]
+      if (!range) throw new Error(t('fileOperationInvalidArguments'))
+      range.load('text')
+      await context.sync()
+      return withTracking(context, async () => {
+        const applied = /[\r\n]/.test(args.replaceText) ? null : await applyMinimalRedline(context, range, range.text, args.replaceText)
+        if (applied == null) { range.insertText(args.replaceText, Word.InsertLocation.replace); await context.sync() }
+        return { replaced: 1, totalMatches: matches.length, matchIndex: args.matchIndex }
+      })
+    })
+  },
   // 分页读取（dev-board#806）：切法与上限在 textPaging.js 单源，与 WPS 文字面同一份口径
   async get_text(args) {
     return Word.run(async (context) => {
@@ -2279,11 +2366,12 @@ const HANDLERS = {
         return { sheet: sheet.name, address: '', rows: 0, cols: 0, values: [], note: '工作表为空' }
       }
       const totalRows = range.rowCount
-      const truncated = totalRows > MAX_EXCEL_RESULT_ROWS
+      const returnedRows = Math.min(totalRows, MAX_EXCEL_RESULT_ROWS, Math.floor(MAX_EXCEL_SCAN_CELLS / range.columnCount))
+      const truncated = returnedRows < totalRows
       const target = truncated
-        ? sheet.getRangeByIndexes(range.rowIndex, range.columnIndex, MAX_EXCEL_RESULT_ROWS, range.columnCount)
+        ? sheet.getRangeByIndexes(range.rowIndex, range.columnIndex, returnedRows, range.columnCount)
         : range
-      target.load('values')
+      target.load('values,formulas')
       await context.sync()
       const out = {
         sheet: sheet.name,
@@ -2291,6 +2379,8 @@ const HANDLERS = {
         rows: totalRows,
         cols: range.columnCount,
         values: target.values || [],
+        formulas: target.formulas || [],
+        returnedRows,
         truncated
       }
       if (args.withFormat === true) {
@@ -2315,7 +2405,7 @@ const HANDLERS = {
     const rangeAddress = String(args.rangeAddress || '')
     const values = args.values
     if (!rangeAddress) throw new Error('区域地址不能为空')
-    if (!Array.isArray(values) || !values.length || !Array.isArray(values[0])) {
+    if (!Array.isArray(values) || !values.length || !Array.isArray(values[0]) || !values[0].length || values.some(row => !Array.isArray(row) || row.length !== values[0].length || row.some(value => value !== null && !['string', 'number', 'boolean'].includes(typeof value) || typeof value === 'number' && !Number.isFinite(value)))) {
       throw new Error('values 必须是非空二维数组')
     }
     const inheritFormat = args.inheritFormat !== false
@@ -2359,19 +2449,23 @@ const HANDLERS = {
     return Excel.run(async (context) => {
       const sheet = resolveSheet(context, sheetName)
       sheet.load('name')
-      const used = sheet.getUsedRangeOrNullObject(true)
-      used.load('values,rowIndex,columnIndex,isNullObject')
+      const used = args.rangeAddress ? sheet.getRange(String(args.rangeAddress)) : sheet.getUsedRangeOrNullObject(true)
+      used.load('rowCount,columnCount,rowIndex,columnIndex,isNullObject')
       await context.sync()
       if (used.isNullObject) return { sheet: sheet.name, count: 0, matches: [] }
-      const needle = query.toLowerCase()
+      const scanRows = Math.min(used.rowCount, 5000, Math.floor(MAX_EXCEL_SCAN_CELLS / used.columnCount))
+      const scanned = scanRows < used.rowCount ? sheet.getRangeByIndexes(used.rowIndex, used.columnIndex, scanRows, used.columnCount) : used
+      scanned.load('values')
+      await context.sync()
+      const needle = args.matchCase === true ? query : query.toLowerCase()
       const matches = []
       let count = 0
-      for (let r = 0; r < used.values.length; r++) {
-        for (let c = 0; c < used.values[r].length; c++) {
-          const cell = used.values[r][c]
+      for (let r = 0; r < scanned.values.length; r++) {
+        for (let c = 0; c < scanned.values[r].length; c++) {
+          const cell = scanned.values[r][c]
           if (cell == null) continue
           const text = String(cell)
-          if (text.toLowerCase().includes(needle)) {
+          if ((args.matchCase === true ? text : text.toLowerCase()).includes(needle)) {
             count++
             if (matches.length < MAX_SEARCH_HITS) {
               matches.push({ address: cellAddress(used.rowIndex + r, used.columnIndex + c), value: text.slice(0, 500) })
@@ -2379,7 +2473,7 @@ const HANDLERS = {
           }
         }
       }
-      return { sheet: sheet.name, count, shown: matches.length, matches }
+      return { sheet: sheet.name, count, shown: matches.length, matches, truncated: scanRows < used.rowCount, scannedRows: scanRows, totalRows: used.rowCount }
     })
   },
 
@@ -2399,7 +2493,7 @@ const HANDLERS = {
       const sheet = resolveSheet(context, sheetName)
       sheet.load('name')
       const target = rangeAddress ? sheet.getRange(rangeAddress) : sheet.getUsedRangeOrNullObject(true)
-      target.load('values,formulas,rowIndex,columnIndex,rowCount,columnCount,address,isNullObject')
+      target.load('rowIndex,columnIndex,rowCount,columnCount,address,isNullObject')
       await context.sync()
       if (target.isNullObject) {
         return buildReplaceResult({
@@ -2407,6 +2501,9 @@ const HANDLERS = {
           replaced: 0, occurrences: 0, skippedFormula: 0, skippedNumeric: 0, truncated: false, cap
         })
       }
+      if (target.rowCount * target.columnCount > MAX_EXCEL_SCAN_CELLS) throw new Error(t('excelRangeTooLarge'))
+      target.load('values,formulas')
+      await context.sync()
       const values = target.values || []
       const formulas = target.formulas || []
       const cells = []
@@ -2676,7 +2773,7 @@ const HANDLERS = {
     const rangeAddress = String(args.rangeAddress || '')
     const formulas = args.formulas
     if (!rangeAddress) throw new Error('区域地址不能为空')
-    if (!Array.isArray(formulas) || !formulas.length || !Array.isArray(formulas[0])) {
+    if (!Array.isArray(formulas) || !formulas.length || !Array.isArray(formulas[0]) || !formulas[0].length || formulas.some(row => !Array.isArray(row) || row.length !== formulas[0].length || row.some(value => value !== null && !['string', 'number', 'boolean'].includes(typeof value) || typeof value === 'number' && !Number.isFinite(value)))) {
       throw new Error('formulas 必须是非空二维数组')
     }
     return Excel.run(async (context) => {
@@ -2782,6 +2879,7 @@ const HANDLERS = {
     const rangeAddress = String(args.rangeAddress || '')
     if (!rangeAddress) throw new Error('区域地址不能为空')
     const action = String(args.action || 'apply').trim().toLowerCase()
+    if (action !== 'apply' && action !== 'clearall') throw new Error(t('excelConditionalActionInvalid'))
     if (!excelApiSupported('1.6')) {
       throw new Error('当前 Excel 版本不支持条件格式（需要 ExcelApi 1.6）')
     }
@@ -2919,6 +3017,7 @@ const HANDLERS = {
     const sheetName = String(args.sheetName || '')
     const rangeAddress = String(args.rangeAddress || '')
     const action = String(args.action || 'apply').trim().toLowerCase()
+    if (action !== 'apply' && action !== 'clear') throw new Error(t('excelValidationActionInvalid'))
     if (!rangeAddress) throw new Error('区域地址不能为空')
     if (!excelApiSupported('1.8')) throw new Error('当前 Excel 版本不支持数据验证（需要 ExcelApi 1.8）')
     return Excel.run(async (context) => {
@@ -2935,16 +3034,30 @@ const HANDLERS = {
         const source = String(args.listSource || '')
         if (!source) throw new Error('type=list 时 listSource 不能为空')
         rule = { list: { inCellDropDown: true, source } }
-      } else if (type === 'wholenumber' || type === 'date') {
+      } else if (type === 'custom') {
+        if (!args.value1) throw new Error(t('excelValidationCustomRequired'))
+        rule = { custom: { formula: String(args.value1) } }
+      } else if (['wholenumber', 'decimal', 'date', 'time', 'textlength'].includes(type)) {
         const operator = EXCEL_DV_OPERATORS[String(args.operator || '').trim().toLowerCase()]
         if (!operator) throw new Error(`operator 值非法：${args.operator}`)
-        const basic = { formula1: args.value1, operator }
-        if (operator === 'Between') basic.formula2 = args.value2
-        rule = type === 'wholenumber' ? { wholeNumber: basic } : { date: basic }
+        if (args.value1 == null || String(args.value1) === '') throw new Error(t('excelValidationValueRequired'))
+        if (['Between', 'NotBetween'].includes(operator) && (args.value2 == null || String(args.value2) === '')) throw new Error(t('excelValidationBoundsRequired'))
+        // Office date/time validation accepts date strings or formulas, not serial literals.
+        // A constant formula preserves the workbook's date system and WPS/desktop semantics.
+        const validationFormula = value => {
+          const text = String(value).trim()
+          return ['date', 'time'].includes(type) && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text) && Number.isFinite(Number(text))
+            ? `=${text}` : value
+        }
+        const basic = { formula1: validationFormula(args.value1), operator }
+        if (['Between', 'NotBetween'].includes(operator)) basic.formula2 = validationFormula(args.value2)
+        rule = { [{ wholenumber: 'wholeNumber', textlength: 'textLength' }[type] || type]: basic }
       } else {
-        throw new Error(`type 值非法：${args.type}（合法值：wholeNumber/list/date）`)
+        throw new Error(t('excelValidationTypeInvalid'))
       }
       range.dataValidation.rule = rule
+      if (args.showInputMessage != null || args.inputTitle != null || args.inputMessage != null) range.dataValidation.prompt = { showPrompt: args.showInputMessage === true, title: String(args.inputTitle || ''), message: String(args.inputMessage || '') }
+      if (args.errorMessage != null || args.errorTitle != null) range.dataValidation.errorAlert = { showAlert: true, style: 'Stop', title: String(args.errorTitle || ''), message: String(args.errorMessage || '') }
       range.load('address')
       await context.sync()
       return { action: 'apply', type, address: range.address }
@@ -2963,13 +3076,21 @@ const HANDLERS = {
       const sheet = resolveSheet(context, sheetName)
       const range = sheet.getRange(dataRangeAddress)
       const chart = sheet.charts.add(chartType, range, Excel.ChartSeriesBy.auto)
-      if (args.title) {
-        chart.title.text = String(args.title)
-        chart.title.visible = true
+      try {
+        if (args.name) chart.name = String(args.name)
+        if (args.title) {
+          chart.title.text = String(args.title)
+          chart.title.visible = true
+        }
+        chart.load('name')
+        await context.sync()
+        return { added: true, name: chart.name, chartType: String(args.chartType).trim().toLowerCase() }
+      } catch (error) {
+        try { chart.delete(); await context.sync() } catch (_) {
+          throw new Error(t('excelChartPartial', { name: String(args.name || dataRangeAddress) }))
+        }
+        throw error
       }
-      chart.load('name')
-      await context.sync()
-      return { added: true, name: chart.name, chartType: String(args.chartType).trim().toLowerCase() }
     })
   },
 
@@ -3072,6 +3193,13 @@ const HANDLERS = {
     return Excel.run(async (context) => {
       const sheet = resolveSheet(context, sheetName)
       const source = sheet.getRange(sourceRangeAddress)
+      const header = source.getRow(0)
+      sheet.load('name')
+      header.load('values')
+      await context.sync()
+      const available = (header.values[0] || []).map(String)
+      const missing = rowFields.concat(valueFields).map(String).filter(field => !available.includes(field))
+      if (missing.length) throw new Error(t('excelPivotFieldsMissing', { fields: missing.join(', ') }))
       // **目标地址允许跨表**（dev-board#288）：工具描述一直承诺可以把透视表放到另一张
       // 工作表，代码却把 "报表!A1" 整个丢给源表的 getRange，跨表落点根本到不了。
       const dest = splitSheetQualifiedAddress(destinationCellAddress)
@@ -3080,24 +3208,6 @@ const HANDLERS = {
       const name = args.pivotName ? String(args.pivotName) : `PivotTable_${Date.now()}`
       const pivot = sheet.pivotTables.add(name, source, destination)
       pivot.load('name')
-      // 字段名要在**落笔之前**校验完（dev-board#288）：旧写法先建表、再逐个
-      // hierarchies.getItem(字段)，字段名拼错时抛的是英文 ItemNotFound，
-      // 而那张空透视表已经留在用户的工作表上了。层级名只有建表后才拿得到，
-      // 所以改成「建表 → 读层级名 → 全部对得上才继续，对不上就把表删掉再报错」。
-      pivot.hierarchies.load('items/name')
-      await context.sync()
-      const available = (pivot.hierarchies.items || []).map((h) => String(h.name))
-      const wanted = rowFields.concat(valueFields).map(String)
-      const missing = wanted.filter((f) => !available.includes(f))
-      if (missing.length) {
-        try {
-          pivot.delete()
-          await context.sync()
-        } catch (e) { /* 删不掉也要把错误说清楚，不能吞掉 */ }
-        throw new Error(`透视表字段不存在：${missing.join('、')}。`
-          + `源区域 ${sourceRangeAddress} 可用字段：${available.join('、') || '（无——请确认源区域第一行是标题行）'}。`
-          + '请用其中之一重试；已自动清除刚建出的空透视表。')
-      }
       for (const field of rowFields) {
         pivot.rowHierarchies.add(pivot.hierarchies.getItem(String(field)))
       }
@@ -3134,11 +3244,25 @@ const HANDLERS = {
 
   async ppt_replace_text(args) {
     const searchText = String(args.searchText || '')
-    const replaceText = args.replaceText == null ? '' : String(args.replaceText)
     if (!searchText) throw new Error('查找文本不能为空')
+    if (args.replaceText == null) throw new Error(t('pptInvalidArguments'))
+    const replaceText = String(args.replaceText)
     requirePptTextApi()
     return PowerPoint.run(async (context) => {
-      const frames = await loadPptTextFrames(context)
+      let frames
+      if (args.shapeId != null) {
+        const shape = await officePptShape(context, args)
+        const frame = shape.getTextFrameOrNullObject()
+        frame.load('hasText,isNullObject'); frame.textRange.load('text')
+        await context.sync()
+        if (frame.isNullObject) throw new Error(t('officeTargetTextFrameMissing'))
+        pptExpected(frame.textRange.text || '', args)
+        frames = [[frame]]
+      } else {
+        if (args.expectedText != null) throw new Error(t('pptInvalidTarget'))
+        if (args.slideNumber != null) pptTarget(args, false)
+        frames = await loadPptTextFrames(context, args.slideNumber == null ? undefined : Number(args.slideNumber))
+      }
       let replaced = 0
       const touchedSlides = []
       frames.forEach((slideFrames, i) => {
@@ -3148,6 +3272,7 @@ const HANDLERS = {
           const text = tf.textRange.text || ''
           // 归一化定位（dev-board#286）：命中区间是原文坐标
           const hits = findAllNormalized(text, searchText)
+          if (args.all === false) { if (replaced) continue; hits.splice(1) }
           if (!hits.length) continue
           // **只改命中的那一段，不整框回写**（dev-board#288）：
           // 旧写法 `tf.textRange.text = 整段新文本` 会把这个文本框里所有分段字符格式
@@ -3164,7 +3289,7 @@ const HANDLERS = {
           replaced += hits.length
           slideTouched = true
         }
-        if (slideTouched) touchedSlides.push(i + 1)
+        if (slideTouched) touchedSlides.push(args.slideNumber != null ? Number(args.slideNumber) : i + 1)
       })
       if (!replaced) {
         throw new Error('未找到目标文本，请确认 searchText 与幻灯片文本精确一致（可先用 ppt_get_slides 核对）')
@@ -3176,8 +3301,9 @@ const HANDLERS = {
   },
 
   async ppt_format_text(args) {
+    const paragraph = pptParagraphFormat(args.paragraphFormat, 'office')
     const searchText = String(args.searchText || '')
-    if (!searchText) throw new Error('查找文本不能为空')
+    if (!searchText && args.shapeId == null) throw new Error(t('pptInvalidTarget'))
     const font = {}
     if (args.fontName) font.name = String(args.fontName)
     if (args.fontSize != null) font.size = Number(args.fontSize)
@@ -3185,12 +3311,25 @@ const HANDLERS = {
     if (args.italic != null) font.italic = !!args.italic
     if (args.underline != null) font.underline = toEnumValue(PPT_UNDERLINE_TYPES, args.underline, 'underline')
     if (args.color) font.color = String(args.color)
-    if (!Object.keys(font).length) {
+    if (!Object.keys(font).length && !Object.keys(paragraph).length) {
       throw new Error('未给出任何格式参数（fontName/fontSize/bold/italic/underline/color 至少给一个）')
     }
     requirePptTextApi()
     return PowerPoint.run(async (context) => {
-      const frames = await loadPptTextFrames(context)
+      let frames
+      if (args.shapeId != null) {
+        const shape = await officePptShape(context, args)
+        const frame = shape.getTextFrameOrNullObject()
+        frame.load('hasText,isNullObject'); frame.textRange.load('text')
+        await context.sync()
+        if (frame.isNullObject) throw new Error(t('officeTargetTextFrameMissing'))
+        pptExpected(frame.textRange.text || '', args)
+        frames = [[frame]]
+      } else {
+        if (args.expectedText != null) throw new Error(t('pptInvalidTarget'))
+        if (args.slideNumber != null) pptTarget(args, false)
+        frames = await loadPptTextFrames(context, args.slideNumber == null ? undefined : Number(args.slideNumber))
+      }
       // 逐个 TextFrame 在其纯文本上找偏移，再用 getSubstring 切出精确子串设字体——
       // 不改变文本长度，找到的偏移不会因为落格而失效，不需要像 Word 的字符级修订那样从右到左应用。
       const targets = []
@@ -3200,7 +3339,7 @@ const HANDLERS = {
           if (tf.isNullObject || !tf.hasText) continue
           const text = tf.textRange.text || ''
           // 归一化定位（dev-board#286）：命中区间是原文坐标，长度按命中原文算
-          for (const h of findAllNormalized(text, searchText)) {
+          for (const h of (searchText ? findAllNormalized(text, searchText) : [{ start: 0, end: text.length }])) {
             targets.push({ tf, start: h.start, len: h.end - h.start })
             if (!args.applyToAll) break outer
           }
@@ -3212,9 +3351,10 @@ const HANDLERS = {
       for (const t of targets) {
         const sub = t.tf.textRange.getSubstring(t.start, t.len)
         applyProps(sub.font, font)
+        if (paragraph.alignment) sub.paragraphFormat.horizontalAlignment = { left: 'Left', center: 'Center', right: 'Right', justify: 'Justify' }[paragraph.alignment]
       }
       await context.sync()
-      return { formatted: targets.length, applied: font }
+      return { formatted: targets.length, applied: font, paragraphFormat: paragraph }
     })
   },
 
@@ -3406,10 +3546,105 @@ const HANDLERS = {
           top: shape.top,
           width: shape.width,
           height: shape.height,
-          text: hasText ? (tf.textRange.text || '').slice(0, 500) : ''
+          text: hasText ? (tf.textRange.text || '') : '',
+          textLength: hasText ? (tf.textRange.text || '').length : 0,
+          textTruncated: false
         }
       })
-      return { slideNumber, shapeCount: result.length, shapes: result }
+      const out = { slideNumber, shapeCount: result.length, shapes: result }
+      if (pptApiSupported('1.8')) {
+        const layouts = slide.slideMaster.layouts
+        layouts.load('items/id,items/name'); await context.sync()
+        out.layouts = layouts.items.map(layout => ({ id: layout.id, name: layout.name }))
+      }
+      return out
+    })
+  },
+
+  async ppt_goto(args) {
+    const { slideNumber } = pptTarget(args, false)
+    if (!pptApiSupported('1.5')) throw new Error(t('pptCapabilityUnavailable'))
+    return PowerPoint.run(async context => {
+      const slides = context.presentation.slides
+      slides.load('items/id'); await context.sync()
+      if (slideNumber > slides.items.length) throw new Error(t('pptInvalidTarget'))
+      const slide = slides.items[slideNumber - 1]
+      if (args.shapeId != null) await officePptShape(context, args)
+      context.presentation.setSelectedSlides([slide.id])
+      if (args.shapeId != null) slide.setSelectedShapes([String(args.shapeId)])
+      await context.sync()
+      return { slideNumber, shapeId: args.shapeId == null ? null : String(args.shapeId) }
+    })
+  },
+
+  async ppt_set_layout(args) {
+    const { slideNumber } = pptTarget(args, false)
+    if (args.layoutId == null && args.backgroundColor == null) throw new Error(t('pptInvalidArguments'))
+    if (args.backgroundColor != null) pptShapeStyle({ fillColor: args.backgroundColor })
+    if ((args.layoutId != null && !pptApiSupported('1.8')) || (args.backgroundColor != null && !pptApiSupported('1.10'))) throw new Error(t('pptCapabilityUnavailable'))
+    return PowerPoint.run(async context => {
+      const slides = context.presentation.slides
+      slides.load('items'); await context.sync()
+      if (slideNumber > slides.items.length) throw new Error(t('pptInvalidTarget'))
+      const slide = slides.items[slideNumber - 1]
+      let layout
+      if (args.layoutId != null) {
+        const layouts = slide.slideMaster.layouts
+        layouts.load('items/id'); await context.sync()
+        layout = layouts.items.find(item => item.id === String(args.layoutId))
+        if (!layout) throw new Error(t('pptInvalidTarget'))
+      }
+      if (layout) slide.applyLayout(layout)
+      if (args.backgroundColor != null) slide.background.fill.setSolidFill({ color: args.backgroundColor })
+      await context.sync()
+      return { slideNumber, layoutId: args.layoutId, backgroundColor: args.backgroundColor }
+    })
+  },
+
+  async ppt_set_shape_text(args) {
+    if (args.text == null) throw new Error(t('pptInvalidArguments'))
+    requirePptTextApi()
+    return PowerPoint.run(async context => {
+      const shape = await officePptShape(context, args)
+      const frame = shape.getTextFrameOrNullObject()
+      frame.load('isNullObject'); frame.textRange.load('text')
+      await context.sync()
+      if (frame.isNullObject) throw new Error(t('officeTargetTextFrameMissing'))
+      const before = frame.textRange.text || ''
+      pptExpected(before, args)
+      frame.textRange.text = String(args.text)
+      await context.sync()
+      frame.textRange.load('text'); await context.sync()
+      return { slideNumber: Number(args.slideNumber), shapeId: String(args.shapeId), text: frame.textRange.text }
+    })
+  },
+
+  async ppt_set_shape_geometry(args) {
+    const geometry = pptGeometry(args)
+    requirePptTextApi()
+    return PowerPoint.run(async context => {
+      const shape = await officePptShape(context, args)
+      shape.load(Object.keys(geometry).join(',')); await context.sync()
+      const before = Object.fromEntries(Object.keys(geometry).map(key => [key, shape[key]]))
+      Object.assign(shape, geometry); await context.sync()
+      shape.load(Object.keys(geometry).join(',')); await context.sync()
+      return { slideNumber: Number(args.slideNumber), shapeId: String(args.shapeId), before, after: Object.fromEntries(Object.keys(geometry).map(key => [key, shape[key]])) }
+    })
+  },
+
+  async ppt_format_shape(args) {
+    const style = pptShapeStyle(args)
+    requirePptTextApi()
+    return PowerPoint.run(async context => {
+      const shape = await officePptShape(context, args)
+      if (style.noFill === true) shape.fill.clear()
+      else if (style.fillColor) shape.fill.setSolidColor(style.fillColor)
+      if (style.transparency != null) shape.fill.transparency = style.transparency / 100
+      if (style.noLine != null) shape.lineFormat.visible = !style.noLine
+      if (style.lineColor) shape.lineFormat.color = style.lineColor
+      if (style.lineWidth != null) shape.lineFormat.weight = style.lineWidth
+      await context.sync()
+      return { slideNumber: Number(args.slideNumber), shapeId: String(args.shapeId), applied: style }
     })
   },
 
@@ -3456,6 +3691,71 @@ const HANDLERS = {
   },
 
   // ==================== PPT 表格与超链接（批次 9） ====================
+
+  async ppt_table_set_style(args) {
+    const target = pptTarget(args)
+    if (!pptApiSupported('1.9')) throw new Error(t('pptCapabilityUnavailable'))
+    return PowerPoint.run(async context => {
+      const shape = await officePptShape(context, args), table = shape.getTable()
+      table.load('rowCount,columnCount')
+      await context.sync()
+      const { row, col, endRow, endCol, style: s } = pptTableStyle(args, table.rowCount, table.columnCount)
+      const hasBorders = s.borderColor != null || s.borderWidthPt != null
+      const cells = new Map()
+      const getCell = (r, c) => {
+        const key = `${r},${c}`
+        if (!cells.has(key)) { const cell = table.getCellOrNullObject(r, c); cell.load(hasBorders ? 'isNullObject,rowCount,columnCount' : 'isNullObject'); cells.set(key, cell) }
+        return cells.get(key)
+      }
+      for (let r = row; r <= endRow; r++) for (let c = col; c <= endCol; c++) getCell(r, c)
+      if (s.headerBold != null || s.headerFill != null) for (let c = 0; c < table.columnCount; c++) getCell(0, c)
+      const mirrors = [], borderCells = new Set()
+      if (hasBorders) for (let r = row; r <= endRow; r++) for (let c = col; c <= endCol; c++) {
+        borderCells.add(getCell(r, c))
+        for (const [nr, nc, edge] of [[r - 1, c, 'bottom'], [r + 1, c, 'top'], [r, c - 1, 'right'], [r, c + 1, 'left']]) {
+          if (nr >= 0 && nr < table.rowCount && nc >= 0 && nc < table.columnCount) { const cell = getCell(nr, nc); borderCells.add(cell); mirrors.push({ cell, edge }) }
+        }
+      }
+      await context.sync()
+      if ([...cells.values()].some(cell => cell.isNullObject)) throw new Error(t('pptInvalidTarget'))
+      // A merged neighbor can span more than the selected shared segment. Reject
+      // before mutation rather than widening its complete edge beyond this target.
+      if (hasBorders && [...borderCells].some(cell => cell.rowCount !== 1 || cell.columnCount !== 1)) throw new Error(t('pptInvalidTarget'))
+      const applyBorder = (border, format) => {
+        if (format.borderColor != null) border.color = format.borderColor
+        // Native Mac PowerPoint persists transparency=0 as alpha=0. Avoid it.
+        if (format.borderWidthPt != null) border.weight = format.borderWidthPt
+      }
+      const applyCell = (cell, format) => {
+        if (format.fillColor === 'none') cell.fill.clear()
+        else if (format.fillColor != null) cell.fill.setSolidColor(format.fillColor)
+        if (format.fontName != null) cell.font.name = format.fontName
+        if (format.fontSize != null) cell.font.size = format.fontSize
+        if (format.bold != null) cell.font.bold = format.bold
+        if (format.color != null) cell.font.color = format.color
+        if (format.alignment != null) cell.horizontalAlignment = { left: 'Left', center: 'Center', right: 'Right', justify: 'Justify' }[format.alignment]
+        if (format.borderColor != null || format.borderWidthPt != null) for (const edge of ['top', 'bottom', 'left', 'right']) {
+          applyBorder(cell.borders[edge], format)
+        }
+      }
+      try {
+        for (let r = row; r <= endRow; r++) for (let c = col; c <= endCol; c++) applyCell(getCell(r, c), s)
+        // PowerPoint reopens shared edges using the neighboring cell's side.
+        // Mirror only that same physical edge; never copy its fill/font/text.
+        for (const { cell, edge } of mirrors) applyBorder(cell.borders[edge], s)
+        if (s.headerBold != null || s.headerFill != null) for (let c = 0; c < table.columnCount; c++) applyCell(getCell(0, c), { bold: s.headerBold, fillColor: s.headerFill })
+        if (s.columnWidthsPt) s.columnWidthsPt.forEach((width, i) => { table.columns.getItemAt(i).width = width })
+        if (s.rowHeightsPt) s.rowHeightsPt.forEach((height, i) => { table.rows.getItemAt(i).height = height })
+        await context.sync()
+      const actualRows = s.rowHeightsPt?.map((_, i) => { const item = table.rows.getItemAt(i); item.load('currentHeight'); return item })
+      const actualColumns = s.columnWidthsPt?.map((_, i) => { const item = table.columns.getItemAt(i); item.load('width'); return item })
+      await context.sync()
+      return { ...target, updated: true, row, col, endRow, endCol,
+        ...(actualRows ? { rowHeightsPt: actualRows.map(item => item.currentHeight) } : {}),
+        ...(actualColumns ? { columnWidthsPt: actualColumns.map(item => item.width) } : {}) }
+      } catch (error) { error.partialResult = { ...target, outcomeUnknown: true, retryable: false }; throw error }
+    })
+  },
 
   async ppt_add_table(args) {
     const slideNumber = Math.floor(Number(args.slideNumber))
@@ -3682,6 +3982,8 @@ async function readPptForReference(loc) {
 }
 
 /** excel_get_range 返回值的行数上限（防超长工具输出撑爆模型上下文） */
+// Bound both dimensions before transferring values or formulas across the host bridge.
+const MAX_EXCEL_SCAN_CELLS = 50000
 const MAX_EXCEL_RESULT_ROWS = 500
 
 /**
@@ -3975,7 +4277,7 @@ function getExcelComment(context, sheetName, cellAddress) {
 
 /** operator 小写短名 → Excel.DataValidationOperator（与条件格式的 EXCEL_CF_OPERATORS 同款归一） */
 const EXCEL_DV_OPERATORS = {
-  between: 'Between', greaterthan: 'GreaterThan', lessthan: 'LessThan', equalto: 'EqualTo'
+  between: 'Between', notbetween: 'NotBetween', greaterthan: 'GreaterThan', greater: 'GreaterThan', greaterequal: 'GreaterThanOrEqualTo', lessthan: 'LessThan', less: 'LessThan', lessequal: 'LessThanOrEqualTo', equalto: 'EqualTo', equal: 'EqualTo', notequal: 'NotEqualTo'
 }
 
 /** chartType 小写短名 → Excel.ChartType（v1 起步四种） */
@@ -4136,6 +4438,11 @@ async function loadPptTextFrames(context, onlySlide) {
  * 正是这么来的。现在由 commandDisplayName() 在**每次渲染时**查字典。
  */
 export const COMMAND_DISPLAY_KEYS = {
+  apply_style_profile: 'cmdApplyStyleProfile',
+  get_paragraphs: 'cmdGetParagraphs',
+  get_outline: 'cmdGetOutline',
+  get_clauses: 'cmdGetClauses',
+  replace_nth_match: 'cmdReplaceNthMatch',
   get_text: 'cmdGetText',
   get_selection: 'cmdGetSelection',
   search: 'cmdSearch',
@@ -4201,6 +4508,18 @@ export const COMMAND_DISPLAY_KEYS = {
   excel_protect_sheet: 'cmdExcelProtectSheet',
   excel_group_rows_cols: 'cmdExcelGroupRowsCols',
   excel_add_pivot_table: 'cmdExcelAddPivotTable',
+  ppt_set_shape_text: 'cmdPptSetShapeText',
+  ppt_set_shape_geometry: 'cmdPptSetShapeGeometry',
+  ppt_format_shape: 'cmdPptFormatShape',
+  ppt_goto: 'cmdPptGoto',
+  ppt_set_layout: 'cmdPptSetLayout',
+  ppt_table_set_style: 'cmdPptTableSetStyle',
+  ppt_add_image: 'cmdPptAddImage',
+  ppt_add_chart: 'cmdPptAddChart',
+  ppt_format_chart: 'cmdPptFormatChart',
+  ppt_set_transition: 'cmdPptSetTransition',
+  ppt_read_notes: 'cmdPptReadNotes',
+  ppt_write_notes: 'cmdPptWriteNotes',
   ppt_get_slides: 'cmdPptGetSlides',
   ppt_replace_text: 'cmdPptReplaceText',
   ppt_format_text: 'cmdPptFormatText',
@@ -4215,6 +4534,10 @@ export const COMMAND_DISPLAY_KEYS = {
   ppt_table_read: 'cmdPptTableRead',
   ppt_table_set_cell: 'cmdPptTableSetCell',
   ppt_set_hyperlink: 'cmdPptSetHyperlink',
+  file_create: 'cmdFileCreate',
+  file_open: 'cmdFileOpen',
+  file_save: 'cmdFileSave',
+  file_export_pdf: 'cmdFileExportPdf',
   read_for_reference: 'cmdReadForReference'
 }
 
@@ -4223,6 +4546,11 @@ export const COMMAND_DISPLAY_KEYS = {
  * read_for_reference 三宿主通用（按当前宿主分支），刻意不登记。
  */
 const COMMAND_HOSTS = {
+  apply_style_profile: 'word',
+  get_paragraphs: 'word',
+  get_outline: 'word',
+  get_clauses: 'word',
+  replace_nth_match: 'word',
   get_text: 'word',
   get_selection: 'word',
   search: 'word',
@@ -4288,6 +4616,18 @@ const COMMAND_HOSTS = {
   excel_protect_sheet: 'excel',
   excel_group_rows_cols: 'excel',
   excel_add_pivot_table: 'excel',
+  ppt_set_shape_text: 'powerpoint',
+  ppt_set_shape_geometry: 'powerpoint',
+  ppt_format_shape: 'powerpoint',
+  ppt_goto: 'powerpoint',
+  ppt_set_layout: 'powerpoint',
+  ppt_table_set_style: 'powerpoint',
+  ppt_add_image: 'powerpoint',
+  ppt_add_chart: 'powerpoint',
+  ppt_format_chart: 'powerpoint',
+  ppt_set_transition: 'powerpoint',
+  ppt_read_notes: 'powerpoint',
+  ppt_write_notes: 'powerpoint',
   ppt_get_slides: 'powerpoint',
   ppt_replace_text: 'powerpoint',
   ppt_format_text: 'powerpoint',
@@ -4345,7 +4685,8 @@ export async function executeOfficeCommand(command, args) {
     return { ok: true, data: data == null ? {} : data }
   } catch (e) {
     console.warn('[Addin] office_command 执行失败', command, e)
-    return { ok: false, error: await describeExecutionError(e, command, cleanArgs) }
+    return { ok: false, error: await describeExecutionError(e, command, cleanArgs),
+      ...(e?.partialResult ? { partialResult: e.partialResult } : {}) }
   } finally {
     if (forceTracking) forcedTrackingDepth--
   }

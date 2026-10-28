@@ -2,6 +2,39 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  officeToolNames: {
+    "office_ppt_add_image": "Bild in Folie einfügen",
+    "office_ppt_add_chart": "Diagramm in Folie einfügen",
+    "office_ppt_format_chart": "Foliendiagramm formatieren",
+    "office_ppt_set_transition": "Folienübergang festlegen",
+    "office_file_create": "Neue Datei erstellen",
+    "office_file_save": "Aktuelle Datei speichern",
+    "office_file_export_pdf": "PDF ins Projekt exportieren",
+    "office_file_open": "Kopie der Projektdatei öffnen",
+    "office_ppt_goto": "Zu Folie oder Form wechseln",
+    "office_ppt_set_layout": "Folienlayout oder Hintergrund festlegen",
+    "office_get_paragraphs": "Absätze lesen",
+    "office_get_outline": "Gliederung lesen",
+    "office_get_clauses": "Klauseln erkennen",
+    "office_replace_nth_match": "Bestimmten Treffer ersetzen",
+    "office_apply_style_profile": "Stilprofil anwenden",
+    "office_ppt_table_set_style": "Folientabelle formatieren",
+    "office_ppt_read_notes": "Sprechernotizen lesen",
+    "office_ppt_write_notes": "Sprechernotizen schreiben",
+    "office_audit_structure": "Dokumentstruktur prüfen"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "Der Sortierbereich enthält verbundene Zellen. Heben Sie die Verbindung vor dem Sortieren auf.",
+    "SHEET_SORT_FAILED": "Sortieren fehlgeschlagen. Lesen und prüfen Sie das Blatt vor einem erneuten Versuch.",
+    "SHEET_PROTECTED_CELL": "Geschützte Zellen; es wurde nichts geschrieben.",
+    "SHEET_INVALID_RANGE": "Ungültiger Bereich. Lesen Sie das Blatt erneut und wählen Sie einen gültigen Bereich.",
+    "SHEET_INVALID_START_CELL": "Wählen Sie eine gültige Startzelle.",
+    "SHEET_INVALID_ROWS": "Geben Sie ein gültiges zweidimensionales Zellarray an.",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "Der Schreibbereich überschreitet die Blattgrenzen.",
+    "SHEET_RANGE_CHECK_FAILED": "Der Bereich konnte nicht geprüft werden; es wurde nichts geschrieben.",
+    "SHEET_WRITE_PARTIAL": "Schreiben unterbrochen; einige Zellen könnten geändert sein. Lesen und korrigieren Sie sie, ohne den gesamten Vorgang zu wiederholen.",
+    "SHEET_CHART_PARTIAL": "Das Diagramm wurde erstellt, aber nicht fertig eingerichtet. Prüfen und korrigieren Sie es, statt ein weiteres zu erstellen."
+},
   "navigation": {
     "slides": "Folien",
     "sheets": "Tabellenblätter",

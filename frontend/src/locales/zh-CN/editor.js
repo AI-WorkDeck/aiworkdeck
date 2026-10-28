@@ -3,6 +3,39 @@
 // 文档编辑器域：LibreOfficeEditor / ReviewPanel / DocDiffViewer /
 // CompareDocDialog / VariablePanel / DrawioEditor 的用户可见文案。
 export default {
+  officeToolNames: {
+    "office_ppt_add_image": "插入幻灯片图片",
+    "office_ppt_add_chart": "插入幻灯片图表",
+    "office_ppt_format_chart": "设置幻灯片图表格式",
+    "office_ppt_set_transition": "设置幻灯片切换效果",
+    "office_file_create": "新建文件",
+    "office_file_save": "保存当前文件",
+    "office_file_export_pdf": "导出 PDF 到项目",
+    "office_file_open": "打开项目文件副本",
+    "office_ppt_goto": "跳转到幻灯片或形状",
+    "office_ppt_set_layout": "设置幻灯片布局或背景",
+    "office_get_paragraphs": "读取段落",
+    "office_get_outline": "读取大纲",
+    "office_get_clauses": "识别条款",
+    "office_replace_nth_match": "替换指定匹配",
+    "office_apply_style_profile": "应用样式画像",
+    "office_ppt_table_set_style": "设置幻灯片表格格式",
+    "office_ppt_read_notes": "读取演讲者备注",
+    "office_ppt_write_notes": "写入演讲者备注",
+    "office_audit_structure": "审计文档结构"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "排序区域包含合并单元格，请先取消合并后再排序。",
+    "SHEET_SORT_FAILED": "排序失败，请重新读取并核对工作表后再试。",
+    "SHEET_PROTECTED_CELL": "目标包含受保护单元格，本次未写入。",
+    "SHEET_INVALID_RANGE": "区域地址无效，请重新读取工作表后指定区域。",
+    "SHEET_INVALID_START_CELL": "请指定有效的起始单元格。",
+    "SHEET_INVALID_ROWS": "写入内容须为有效的二维单元格数组。",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "写入范围超过工作表边界。",
+    "SHEET_RANGE_CHECK_FAILED": "无法核对写入范围，本次未写入。",
+    "SHEET_WRITE_PARTIAL": "写入中断，部分单元格可能已改变。请回读核对后修复，勿整批重试。",
+    "SHEET_CHART_PARTIAL": "图表已创建但配置未完成。请检查现有图表后修复，勿重复创建。"
+},
   navigation: {
     "slides": "幻灯片",
     "sheets": "工作表",

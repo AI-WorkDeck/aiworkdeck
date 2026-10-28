@@ -1,6 +1,58 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export const EN = {
+  cmdPptAddImage: "Insert slide image",
+  cmdPptAddChart: "Insert slide chart",
+  cmdPptFormatChart: "Format slide chart",
+  cmdPptSetTransition: "Set slide transition",
+  wordStyleUnsupported: "This host cannot fully apply these profile fields: {fields}. No changes have started.",
+  wordStyleNotApplied: "The host did not apply the requested paragraph style. Inspect the document before retrying.",
+
+  cmdGetParagraphs: "Read paragraphs",
+  cmdGetOutline: "Read outline",
+  cmdGetClauses: "Identify clauses",
+  cmdReplaceNthMatch: "Replace specified match",
+  cmdApplyStyleProfile: "Apply style profile",
+
+  wordStructureTooLarge: "The document structure is too large to read completely within one safe operation. Reduce the document size and retry.",
+  wordStructurePartial: "Some formatting may already have been applied. Inspect the current document before retrying; do not repeat the operation blindly.",
+
+  cmdPptTableSetStyle: "Format slide table",
+  cmdPptReadNotes: "Read speaker notes",
+  cmdPptWriteNotes: "Write speaker notes",
+
+  excelConditionalActionInvalid: "Conditional formatting action must be apply or clearAll.",
+  wordImagePartial: "The image may have been inserted, but setup is incomplete. Inspect the existing image; do not insert another copy.",
+
+  excelRangeTooLarge: "The range exceeds 50,000 cells. Choose a smaller range and retry; nothing was changed.",
+
+  fileOperationUnavailable: "This file operation is unavailable or could not be confirmed.",
+  fileOperationStale: "The document changed. Read the current document before retrying.",
+  fileOperationInvalidArguments: "Invalid file operation arguments.",
+  fileOperationInvalidBytes: "No valid complete file bytes were returned.",
+  cmdFileCreate: "Create a new file",
+  cmdFileSave: "Save current file",
+  cmdFileExportPdf: "Export PDF to project",
+  cmdFileOpen: "Open file or import a copy",
+  excelChartPartial: "Chart “{name}” may have been created, but setup failed and rollback could not be confirmed. Inspect the existing chart before retrying; do not create a duplicate.",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "Invalid slide or shape target.",
+  pptStaleTarget: "The target text has changed. Read it again before editing.",
+  pptInvalidArguments: "Invalid presentation editing arguments.",
+  pptCapabilityUnavailable: "This capability is unavailable in the current presentation host.",
+  cmdPptSetShapeText: "Set shape text",
+  cmdPptSetShapeGeometry: "Set shape position and size",
+  cmdPptFormatShape: "Format shape",
+  cmdPptGoto: "Go to slide or shape",
+  cmdPptSetLayout: "Set slide layout or background",
+  excelValidationCustomRequired: "Custom validation requires a formula.",
+  excelValidationTypeInvalid: "Unsupported data validation type.",
+  excelPivotFieldsMissing: "Pivot fields not found: {fields}",
+  excelValidationActionInvalid: "Data validation action must be apply or clear.",
+  excelValidationValueRequired: "This data validation rule requires a comparison value.",
+  excelValidationBoundsRequired: "Range validation requires both bounds.",
+
   // ---- App.vue ----
   // ---- 语音听写（dev-board#153）----
   dictate: 'Voice input',

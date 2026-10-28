@@ -2,6 +2,58 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "Sisipkan imej pada slaid",
+  cmdPptAddChart: "Sisipkan carta pada slaid",
+  cmdPptFormatChart: "Format carta slaid",
+  cmdPptSetTransition: "Tetapkan peralihan slaid",
+  wordStyleUnsupported: "Aplikasi ini tidak dapat menggunakan medan profil ini sepenuhnya: {fields}. Tiada perubahan telah dimulakan.",
+  wordStyleNotApplied: "Aplikasi hos tidak menggunakan gaya perenggan yang diminta. Periksa dokumen sebelum mencuba lagi.",
+
+  cmdGetParagraphs: "Baca perenggan",
+  cmdGetOutline: "Baca rangka",
+  cmdGetClauses: "Kenal pasti klausa",
+  cmdReplaceNthMatch: "Ganti padanan tertentu",
+  cmdApplyStyleProfile: "Gunakan profil gaya",
+
+  wordStructureTooLarge: "Struktur dokumen terlalu besar untuk dibaca sepenuhnya dalam satu operasi selamat. Kurangkan saiz dokumen dan cuba lagi.",
+  wordStructurePartial: "Sebahagian pemformatan mungkin telah digunakan. Periksa dokumen semasa terlebih dahulu; jangan ulangi operasi tanpa memeriksanya.",
+
+  cmdPptTableSetStyle: "Format jadual slaid",
+  cmdPptReadNotes: "Baca nota pembentang",
+  cmdPptWriteNotes: "Tulis nota pembentang",
+
+  excelConditionalActionInvalid: "Tindakan pemformatan bersyarat mestilah apply atau clearAll.",
+  wordImagePartial: "Imej mungkin telah disisipkan, tetapi persediaannya belum lengkap. Periksa imej sedia ada; jangan sisipkan salinan lain.",
+
+  excelRangeTooLarge: "Julat melebihi 50,000 sel. Pilih julat yang lebih kecil dan cuba semula; tiada perubahan dibuat.",
+
+  fileOperationUnavailable: "Operasi fail ini tidak tersedia atau tidak dapat disahkan.",
+  fileOperationStale: "Dokumen telah bertukar. Baca dokumen semasa sebelum mencuba semula.",
+  fileOperationInvalidArguments: "Parameter operasi fail tidak sah.",
+  fileOperationInvalidBytes: "Tiada data fail yang sah dan lengkap dikembalikan.",
+  cmdFileCreate: "Cipta fail baharu",
+  cmdFileSave: "Simpan fail semasa",
+  cmdFileExportPdf: "Eksport PDF ke projek",
+  cmdFileOpen: "Buka fail atau import salinan",
+  excelChartPartial: "Carta “{name}” mungkin telah dicipta, tetapi persediaan gagal dan pemulihan tidak dapat disahkan. Semak carta sedia ada sebelum mencuba semula; jangan cipta pendua.",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "Sasaran slaid atau bentuk tidak sah.",
+  pptStaleTarget: "Teks sasaran telah berubah. Baca semula sebelum menyunting.",
+  pptInvalidArguments: "Parameter penyuntingan persembahan tidak sah.",
+  pptCapabilityUnavailable: "Ciri ini tidak tersedia dalam aplikasi persembahan semasa.",
+  cmdPptSetShapeText: "Tetapkan teks bentuk",
+  cmdPptSetShapeGeometry: "Tetapkan kedudukan dan saiz bentuk",
+  cmdPptFormatShape: "Format bentuk",
+  cmdPptGoto: "Pergi ke slaid atau bentuk",
+  cmdPptSetLayout: "Tetapkan susun atur atau latar belakang slaid",
+  excelValidationCustomRequired: "Pengesahan tersuai memerlukan formula.",
+  excelValidationTypeInvalid: "Jenis pengesahan data tidak disokong.",
+  excelPivotFieldsMissing: "Medan jadual pangsi tidak ditemui: {fields}",
+  excelValidationActionInvalid: "Tindakan pengesahan data mestilah apply atau clear.",
+  excelValidationValueRequired: "Peraturan pengesahan ini memerlukan nilai perbandingan.",
+  excelValidationBoundsRequired: "Pengesahan julat memerlukan kedua-dua had.",
+
   "dictate": "Voice input",
   "dictateRecording": "Recording, click to finish",
   "dictateTranscribing": "Transcribing...",

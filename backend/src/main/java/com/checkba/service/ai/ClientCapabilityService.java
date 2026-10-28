@@ -268,6 +268,18 @@ public class ClientCapabilityService {
         if (!satisfiesDeclaredHost(toolName, conversationId)) {
             return false;
         }
+        if (java.util.Set.of("office_file_open", "office_file_create", "office_file_save", "office_file_export_pdf").contains(toolName)) {
+            if (capabilityOf(conversationId) != Capability.OFFICE) return false;
+            return !"office_file_save".equals(toolName)
+                    || officeHostOf(conversationId) != OfficeHost.POWERPOINT
+                    || officeFamilyOf(conversationId) == OfficeFamily.WPS;
+        }
+        if (java.util.Set.of("office_ppt_read_notes", "office_ppt_write_notes",
+                "office_ppt_add_chart", "office_ppt_format_chart", "office_ppt_set_transition").contains(toolName)) {
+            return capabilityOf(conversationId) == Capability.OFFICE
+                    && officeHostOf(conversationId) == OfficeHost.POWERPOINT
+                    && officeFamilyOf(conversationId) == OfficeFamily.WPS;
+        }
         boolean lowaOnly = isLowaTool(toolName);
         boolean officeOnly = toolName.startsWith("office_");
         // ref_ 这一闸刻意放在两个前缀判定之后、总放行之前：它与 lowaOnly 那一行之间隔着一整行，

@@ -2,6 +2,58 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "Afbeelding in dia invoegen",
+  cmdPptAddChart: "Grafiek in dia invoegen",
+  cmdPptFormatChart: "Diagrafiek opmaken",
+  cmdPptSetTransition: "Diaovergang instellen",
+  wordStyleUnsupported: "Deze toepassing kan deze profielvelden niet volledig toepassen: {fields}. Er zijn nog geen wijzigingen gestart.",
+  wordStyleNotApplied: "De hosttoepassing heeft de gevraagde alineastijl niet toegepast. Controleer het document voordat u het opnieuw probeert.",
+
+  cmdGetParagraphs: "Alinea’s lezen",
+  cmdGetOutline: "Overzicht lezen",
+  cmdGetClauses: "Clausules herkennen",
+  cmdReplaceNthMatch: "Opgegeven overeenkomst vervangen",
+  cmdApplyStyleProfile: "Stijlprofiel toepassen",
+
+  wordStructureTooLarge: "De documentstructuur is te groot om volledig in één veilige bewerking te lezen. Verklein het document en probeer het opnieuw.",
+  wordStructurePartial: "Een deel van de opmaak is mogelijk al toegepast. Controleer eerst het huidige document; herhaal de bewerking niet zonder controle.",
+
+  cmdPptTableSetStyle: "Diatabel opmaken",
+  cmdPptReadNotes: "Sprekersnotities lezen",
+  cmdPptWriteNotes: "Sprekersnotities schrijven",
+
+  excelConditionalActionInvalid: "De actie voor voorwaardelijke opmaak moet apply of clearAll zijn.",
+  wordImagePartial: "De afbeelding is mogelijk ingevoegd, maar de instellingen zijn niet voltooid. Controleer de bestaande afbeelding; voeg geen tweede exemplaar in.",
+
+  excelRangeTooLarge: "Het bereik bevat meer dan 50.000 cellen. Kies een kleiner bereik en probeer het opnieuw; er is niets gewijzigd.",
+
+  fileOperationUnavailable: "Deze bestandsbewerking is niet beschikbaar of kon niet worden bevestigd.",
+  fileOperationStale: "Het document is gewisseld. Lees het huidige document voordat u het opnieuw probeert.",
+  fileOperationInvalidArguments: "Ongeldige parameters voor bestandsbewerking.",
+  fileOperationInvalidBytes: "Er zijn geen geldige, volledige bestandsgegevens teruggegeven.",
+  cmdFileCreate: "Nieuw bestand maken",
+  cmdFileSave: "Huidig bestand opslaan",
+  cmdFileExportPdf: "PDF naar project exporteren",
+  cmdFileOpen: "Bestand openen of kopie importeren",
+  excelChartPartial: "Diagram “{name}” is mogelijk aangemaakt, maar de configuratie is mislukt en het terugdraaien kon niet worden bevestigd. Controleer het bestaande diagram voordat u het opnieuw probeert; maak geen duplicaat.",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "Ongeldig dia- of vormdoel.",
+  pptStaleTarget: "De doeltekst is gewijzigd. Lees deze opnieuw voordat u deze bewerkt.",
+  pptInvalidArguments: "Ongeldige parameters voor presentatiebewerking.",
+  pptCapabilityUnavailable: "Deze functie is niet beschikbaar in de huidige presentatie-app.",
+  cmdPptSetShapeText: "Vormtekst instellen",
+  cmdPptSetShapeGeometry: "Positie en grootte van vorm instellen",
+  cmdPptFormatShape: "Vorm opmaken",
+  cmdPptGoto: "Naar dia of vorm gaan",
+  cmdPptSetLayout: "Dia-indeling of achtergrond instellen",
+  excelValidationCustomRequired: "Aangepaste validatie vereist een formule.",
+  excelValidationTypeInvalid: "Niet-ondersteund type gegevensvalidatie.",
+  excelPivotFieldsMissing: "Draaitabelvelden niet gevonden: {fields}",
+  excelValidationActionInvalid: "De validatieactie moet apply of clear zijn.",
+  excelValidationValueRequired: "Deze validatieregel vereist een vergelijkingswaarde.",
+  excelValidationBoundsRequired: "Bereikvalidatie vereist beide grenswaarden.",
+
   "dictate": "Spraakinvoer",
   "dictateRecording": "Opname bezig, klik om te voltooien",
   "dictateTranscribing": "Transcriberen...",

@@ -2,6 +2,58 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "슬라이드 이미지 삽입",
+  cmdPptAddChart: "슬라이드 차트 삽입",
+  cmdPptFormatChart: "슬라이드 차트 서식 설정",
+  cmdPptSetTransition: "슬라이드 전환 효과 설정",
+  wordStyleUnsupported: "이 호스트는 다음 프로필 필드를 완전히 적용할 수 없습니다: {fields}. 변경은 시작되지 않았습니다.",
+  wordStyleNotApplied: "호스트가 요청한 단락 스타일을 적용하지 않았습니다. 문서를 확인한 후 다시 시도하세요.",
+
+  cmdGetParagraphs: "단락 읽기",
+  cmdGetOutline: "개요 읽기",
+  cmdGetClauses: "조항 식별",
+  cmdReplaceNthMatch: "지정한 일치 항목 바꾸기",
+  cmdApplyStyleProfile: "스타일 프로필 적용",
+
+  wordStructureTooLarge: "문서 구조가 너무 커서 한 번의 안전한 작업으로 전체를 읽을 수 없습니다. 문서 크기를 줄인 후 다시 시도하세요.",
+  wordStructurePartial: "일부 서식이 이미 적용되었을 수 있습니다. 먼저 현재 문서를 확인하고 확인 없이 작업을 반복하지 마세요.",
+
+  cmdPptTableSetStyle: "슬라이드 표 서식 지정",
+  cmdPptReadNotes: "발표자 노트 읽기",
+  cmdPptWriteNotes: "발표자 노트 쓰기",
+
+  excelConditionalActionInvalid: "조건부 서식 작업은 apply 또는 clearAll이어야 합니다.",
+  wordImagePartial: "이미지가 삽입되었을 수 있지만 설정이 완료되지 않았습니다. 기존 이미지를 확인하고 다른 사본을 삽입하지 마세요.",
+
+  excelRangeTooLarge: "범위가 50,000개 셀을 초과합니다. 범위를 줄인 후 다시 시도하세요. 변경된 내용은 없습니다.",
+
+  fileOperationUnavailable: "이 파일 작업을 사용할 수 없거나 완료 여부를 확인할 수 없습니다.",
+  fileOperationStale: "문서가 전환되었습니다. 현재 문서를 다시 읽은 후 시도하세요.",
+  fileOperationInvalidArguments: "파일 작업 인수가 잘못되었습니다.",
+  fileOperationInvalidBytes: "유효하고 완전한 파일 데이터가 반환되지 않았습니다.",
+  cmdFileCreate: "새 파일 만들기",
+  cmdFileSave: "현재 파일 저장",
+  cmdFileExportPdf: "프로젝트로 PDF 내보내기",
+  cmdFileOpen: "파일 열기 또는 사본 가져오기",
+  excelChartPartial: "차트 “{name}”이 생성되었을 수 있지만 설정에 실패했으며 롤백을 확인할 수 없습니다. 다시 시도하기 전에 기존 차트를 확인하고 중복 생성하지 마세요.",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "슬라이드 또는 도형 대상이 잘못되었습니다.",
+  pptStaleTarget: "대상 텍스트가 변경되었습니다. 다시 읽은 후 편집하세요.",
+  pptInvalidArguments: "프레젠테이션 편집 인수가 잘못되었습니다.",
+  pptCapabilityUnavailable: "현재 프레젠테이션 호스트에서 이 기능을 사용할 수 없습니다.",
+  cmdPptSetShapeText: "도형 텍스트 설정",
+  cmdPptSetShapeGeometry: "도형 위치 및 크기 설정",
+  cmdPptFormatShape: "도형 서식 설정",
+  cmdPptGoto: "슬라이드 또는 도형으로 이동",
+  cmdPptSetLayout: "슬라이드 레이아웃 또는 배경 설정",
+  excelValidationCustomRequired: "사용자 지정 유효성 검사에는 수식이 필요합니다.",
+  excelValidationTypeInvalid: "지원하지 않는 데이터 유효성 검사 유형입니다.",
+  excelPivotFieldsMissing: "피벗 필드를 찾을 수 없습니다: {fields}",
+  excelValidationActionInvalid: "데이터 유효성 검사 작업은 apply 또는 clear여야 합니다.",
+  excelValidationValueRequired: "이 데이터 유효성 검사 규칙에는 비교 값이 필요합니다.",
+  excelValidationBoundsRequired: "범위 유효성 검사에는 두 경곗값이 필요합니다.",
+
   "dictate": "Voice input",
   "dictateRecording": "Recording, click to finish",
   "dictateTranscribing": "Transcribing...",

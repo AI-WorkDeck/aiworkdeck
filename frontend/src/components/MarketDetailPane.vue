@@ -836,8 +836,10 @@ export default {
     },
     async refreshPackStatus() {
       if (!this.packId) return
+      const generation = this.reloadGeneration
       try {
         const res = await packStatus(this.packId)
+        if (generation !== this.reloadGeneration) return
         this.packStatusInfo = (res && res.status) || null
       } catch (e) {
         // 轮询途中网络抖动很常见，不中止——下一拍再试
@@ -917,6 +919,9 @@ export default {
       })
       if (!ok) return
       this.busy = true
+      // Invalidate pending ready responses before uninstall can change native state.
+      this.reloadGeneration++
+      this.stopPackPoll()
       try {
         // 先走现有停用流程，再删资源包目录（§6：卸载 = 停用 + 删 packs/<id>/）
         await setSkillActivation(this.spec.id, 'disabled')

@@ -12,6 +12,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { t } from './i18n.js'
 
 import { WPS_ET_HANDLERS } from './wpsEtHandlers.js'
 
@@ -31,6 +32,18 @@ globalThis.Office = {
 }
 
 const { executeOfficeCommand } = await import('./officeExecutor.js')
+
+test('Office conditional formatting invalid action is rejected before entering the host', async () => {
+  const saved = globalThis.Excel
+  let entered = false
+  globalThis.Excel = { run() { entered = true; throw new Error('must not enter host') } }
+  try {
+    const result = await executeOfficeCommand('excel_conditional_format', { rangeAddress: 'A1:A3', action: 'typo', ruleType: 'colorScale' })
+    assert.equal(result.ok, false)
+    assert.ok(result.error.includes(t('excelConditionalActionInvalid')))
+    assert.equal(entered, false)
+  } finally { globalThis.Excel = saved }
+})
 
 function colIndexOf(letters) {
   let n = 0
@@ -111,6 +124,7 @@ function installOfficeSheet({ values, cellFmt = () => ({}), rowHeights = {} }) {
       isNullObject: false,
       get address() { return `Sheet1!${letter(c)}${r + 1}:${letter(c + nc - 1)}${r + nr}` },
       load(p) { log.loads.push({ r, nr, p: String(p) }) },
+      get formulas() { return this.values.map(row => row.map(v => typeof v === 'number' ? '=50*2' : v)) },
       get values() {
         return Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => {
           const row = grid[r + i]
@@ -397,6 +411,7 @@ function installEtSheet({ values, cellPreset = () => ({}) }) {
       Columns: { Count: nc },
       Address() { return nr === 1 && nc === 1 ? `${letter(c - 1)}${r}` : `${letter(c - 1)}${r}:${letter(c + nc - 2)}${r + nr - 1}` },
       Resize(a, b) { return region(r, c, a, b) },
+      get Formula() { const v = this.Value2; return Array.isArray(v) ? v.map(row => row.map(x => typeof x === 'number' ? '=50*2' : x)) : v },
       get Value2() {
         const out = Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => {
           const row = grid[r - 1 + i]
@@ -533,4 +548,119 @@ test('WPS get_range(withFormat)：与 Office 同一套字段，表头例外、�
     const plain = await WPS_ET_HANDLERS.excel_get_range({ rangeAddress: 'A1:C4' })
     assert.equal(plain.format, undefined)
   } finally { env.restore() }
+})
+
+for (const host of ['Office', 'WPS']) {
+  test(`${host} range read preserves formula expressions beside calculated values`, async () => {
+    const env = host === 'Office' ? installOfficeSheet({ values: CONTRACTS, cellFmt: contractFmt }) : installEtSheet({ values: CONTRACTS, cellFmt: contractFmt })
+    try {
+      const args = { rangeAddress: 'A1:C4' }
+      const out = host === 'Office' ? await runOffice('excel_get_range', args) : await WPS_ET_HANDLERS.excel_get_range(args)
+      assert.equal(out.values[1][2], 100)
+      assert.equal(out.formulas[1][2], '=50*2')
+    } finally { env.restore() }
+  })
+}
+
+test('Office pivot rejects missing fields before adding a table', async () => {
+  let created = 0
+  const saved = globalThis.Excel
+  const sheet = { load() {}, getRange: () => ({ getRow: () => ({ load() {}, values: [['Category', 'Amount']] }) }), pivotTables: { add() { created++; throw new Error('must not create') } } }
+  globalThis.Excel = { run: cb => cb({ workbook: { worksheets: { getActiveWorksheet: () => sheet } }, sync: async () => {} }) }
+  try {
+    await assert.rejects(runOffice('excel_add_pivot_table', { sourceRangeAddress: 'A1:B3', destinationCellAddress: 'D1', rowFields: ['Missing'], valueFields: ['Amount'] }))
+    assert.equal(created, 0)
+  } finally { globalThis.Excel = saved }
+})
+
+test('Office validation supports decimal, time, textLength and custom without losing comparison bounds', async () => {
+  const saved = globalThis.Excel
+  const range = { dataValidation: {}, load() {}, address: 'A1' }
+  globalThis.Excel = { run: cb => cb({ workbook: { worksheets: { getActiveWorksheet: () => ({ getRange: () => range }) } }, sync: async () => {} }) }
+  try {
+    for (const type of ['decimal', 'time', 'textLength']) {
+      await runOffice('excel_set_data_validation', { rangeAddress: 'A1', type, operator: 'notBetween', value1: '1', value2: '2' })
+      assert.deepEqual(range.dataValidation.rule[type], { operator: 'NotBetween', formula1: type === 'time' ? '=1' : '1', formula2: type === 'time' ? '=2' : '2' })
+    }
+    await runOffice('excel_set_data_validation', { rangeAddress: 'A1', type: 'custom', value1: '=A1>0', showInputMessage: true, inputTitle: 'Input', inputMessage: 'Positive', errorTitle: 'Invalid', errorMessage: 'Use positive values' })
+    assert.deepEqual(range.dataValidation.rule, { custom: { formula: '=A1>0' } })
+    assert.deepEqual(range.dataValidation.prompt, { showPrompt: true, title: 'Input', message: 'Positive' })
+    assert.deepEqual(range.dataValidation.errorAlert, { showAlert: true, style: 'Stop', title: 'Invalid', message: 'Use positive values' })
+  } finally { globalThis.Excel = saved }
+})
+
+test('Office search bounds values transfer and preserves case-sensitive explicit range', async () => {
+  const saved = globalThis.Excel
+  const loads = []
+  const used = { rowIndex: 10, columnIndex: 2, rowCount: 100000, columnCount: 1, isNullObject: false, load: p => loads.push(p) }
+  const scanned = { values: [['abc'], ['ABC']], load: p => assert.equal(p, 'values') }
+  const sheet = { name: 'S', load() {}, getRange: address => { assert.equal(address, 'C11:C100010'); return used }, getRangeByIndexes(r,c,n,m) { assert.deepEqual([r,c,n,m], [10,2,5000,1]); return scanned } }
+  globalThis.Excel = { run: cb => cb({ workbook: { worksheets: { getActiveWorksheet: () => sheet } }, sync: async () => {} }) }
+  try {
+    const out = await runOffice('excel_search', { rangeAddress: 'C11:C100010', query: 'ABC', matchCase: true })
+    assert.equal(out.count, 1)
+    assert.equal(out.matches[0].address, 'C12')
+    assert.equal(out.truncated, true)
+    assert.equal(loads.some(p => p.includes('values')), false)
+  } finally { globalThis.Excel = saved }
+})
+
+for (const command of ['excel_get_range', 'excel_search', 'excel_replace']) {
+  test(`Office ${command} bounds huge column spans before reading host values`, async () => {
+    const saved = globalThis.Excel
+    const used = { address: 'A1:XFD5000', rowIndex: 0, columnIndex: 0, rowCount: 5000, columnCount: 16384, isNullObject: false, load(p) { assert.ok(!p.includes('values')) } }
+    const scanned = { values: [['hit']], formulas: [['hit']], load() {} }
+    const sheet = { name: 'S', load() {}, getRange: () => used, getRangeByIndexes(r,c,n,m) { assert.deepEqual([r,c,n,m],[0,0,3,16384]); return scanned } }
+    globalThis.Excel = { run: cb => cb({ workbook: { worksheets: { getActiveWorksheet: () => sheet } }, sync: async () => {} }) }
+    try {
+      const args={rangeAddress:'A1:XFD5000',query:'hit',find:'hit',replace:'next'}
+      if(command==='excel_replace') await assert.rejects(runOffice(command,args), e=>e.message.includes(t('excelRangeTooLarge')))
+      else {const out=await runOffice(command,args);assert.equal(out.truncated,true);assert.equal(out.returnedRows || out.scannedRows,3)}
+    } finally { globalThis.Excel = saved }
+  })
+}
+
+test('Office chart setup failure deletes only the newly created chart; rollback failure is explicit', async () => {
+  const saved=globalThis.Excel
+  try {
+    for(const rollbackFails of [false,true]) {
+      let deleted=0
+      const chart={title:{set text(v){throw new Error('setup failed')}},delete(){deleted++;if(rollbackFails)throw new Error('delete failed')}}
+      const sheet={getRange:()=>({}),charts:{add:()=>chart}}
+      globalThis.Excel={ChartSeriesBy:{auto:'Auto'},run:cb=>cb({workbook:{worksheets:{getActiveWorksheet:()=>sheet}},sync:async()=>{}})}
+      await assert.rejects(runOffice('excel_add_chart',{dataRangeAddress:'A1:B3',chartType:'column',title:'Revenue'}),rollbackFails ? /excelChartPartial|可能已创建|may have been created/ : /setup failed/)
+      assert.equal(deleted,1)
+    }
+  } finally {globalThis.Excel=saved}
+})
+
+// Native Mac Excel throws PropertyNotLoaded when a receipt reads Worksheet.name without loading it.
+test('Office pivot loads the destination worksheet name before returning a successful receipt', async () => {
+  const saved = globalThis.Excel
+  let nameRequested = false, nameLoaded = false, created = 0
+  const pivot = { name: 'QA_Pivot', load() {}, hierarchies: { getItem: x => x }, rowHierarchies: { add() {} }, dataHierarchies: { add() {} } }
+  const sheet = {
+    load(properties) { if (properties.includes('name')) nameRequested = true },
+    get name() { if (!nameLoaded) throw new Error('PropertyNotLoaded: Worksheet.name'); return 'Data' },
+    getRange: () => ({ getRow: () => ({ load() {}, values: [['Category', 'Amount']] }) }),
+    pivotTables: { add() { created++; return pivot } }
+  }
+  globalThis.Excel = { run: cb => cb({ workbook: { worksheets: { getActiveWorksheet: () => sheet } }, sync: async () => { nameLoaded = nameRequested } }) }
+  try {
+    const result = await runOffice('excel_add_pivot_table', { sourceRangeAddress: 'A1:B3', destinationCellAddress: 'D1', rowFields: ['Category'], valueFields: ['Amount'], pivotName: 'QA_Pivot' })
+    assert.equal(result.added, true)
+    assert.equal(result.destinationSheet, 'Data')
+    assert.equal(created, 1)
+  } finally { globalThis.Excel = saved }
+})
+
+test('Office date/time validation converts serial bounds to constant formulas without locale or epoch conversion', async () => {
+  const saved = globalThis.Excel, range = { dataValidation: {}, load() {}, address: 'A1' }
+  globalThis.Excel = { run: cb => cb({ workbook: { worksheets: { getActiveWorksheet: () => ({ getRange: () => range }) } }, sync: async () => {} }) }
+  try {
+    for (const [type, a, b, first, second] of [['date', '45000', 50000, '=45000', '=50000'], ['time', '0.25', '.75', '=0.25', '=.75'], ['date', '2026-01-01', '=TODAY()', '2026-01-01', '=TODAY()']]) {
+      await runOffice('excel_set_data_validation', { rangeAddress: 'A1', type, operator: 'between', value1: a, value2: b })
+      assert.deepEqual(range.dataValidation.rule[type], { operator: 'Between', formula1: first, formula2: second })
+    }
+  } finally { globalThis.Excel = saved }
 })

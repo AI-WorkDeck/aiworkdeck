@@ -2,6 +2,58 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "स्लाइड में चित्र डालें",
+  cmdPptAddChart: "स्लाइड में चार्ट डालें",
+  cmdPptFormatChart: "स्लाइड चार्ट का स्वरूप सेट करें",
+  cmdPptSetTransition: "स्लाइड ट्रांज़िशन सेट करें",
+  wordStyleUnsupported: "यह होस्ट इन प्रोफ़ाइल फ़ील्ड को पूरी तरह लागू नहीं कर सकता: {fields}। कोई बदलाव शुरू नहीं हुआ है।",
+  wordStyleNotApplied: "होस्ट ने अनुरोधित अनुच्छेद शैली लागू नहीं की। दोबारा प्रयास करने से पहले दस्तावेज़ की जाँच करें।",
+
+  cmdGetParagraphs: "अनुच्छेद पढ़ें",
+  cmdGetOutline: "रूपरेखा पढ़ें",
+  cmdGetClauses: "खंड पहचानें",
+  cmdReplaceNthMatch: "निर्दिष्ट मिलान बदलें",
+  cmdApplyStyleProfile: "शैली प्रोफ़ाइल लागू करें",
+
+  wordStructureTooLarge: "दस्तावेज़ की संरचना इतनी बड़ी है कि उसे एक सुरक्षित कार्रवाई में पूरा नहीं पढ़ा जा सकता। दस्तावेज़ का आकार घटाकर फिर कोशिश करें।",
+  wordStructurePartial: "कुछ फ़ॉर्मैटिंग पहले ही लागू हो सकती है। पहले मौजूदा दस्तावेज़ जाँचें; जाँच किए बिना कार्रवाई न दोहराएँ।",
+
+  cmdPptTableSetStyle: "स्लाइड तालिका फ़ॉर्मैट करें",
+  cmdPptReadNotes: "वक्ता नोट्स पढ़ें",
+  cmdPptWriteNotes: "वक्ता नोट्स लिखें",
+
+  excelConditionalActionInvalid: "सशर्त फ़ॉर्मैटिंग की कार्रवाई apply या clearAll होनी चाहिए।",
+  wordImagePartial: "छवि शायद डाल दी गई है, लेकिन उसका सेटअप अधूरा है। मौजूदा छवि जाँचें; दूसरी कॉपी न डालें।",
+
+  excelRangeTooLarge: "सीमा में 50,000 से अधिक सेल हैं। छोटी सीमा चुनकर फिर प्रयास करें; कोई बदलाव नहीं किया गया।",
+
+  fileOperationUnavailable: "यह फ़ाइल कार्रवाई उपलब्ध नहीं है या इसकी पुष्टि नहीं हो सकी।",
+  fileOperationStale: "दस्तावेज़ बदल गया है। फिर से प्रयास करने से पहले वर्तमान दस्तावेज़ पढ़ें।",
+  fileOperationInvalidArguments: "फ़ाइल कार्रवाई के पैरामीटर अमान्य हैं।",
+  fileOperationInvalidBytes: "मान्य और पूर्ण फ़ाइल डेटा वापस नहीं मिला।",
+  cmdFileCreate: "नई फ़ाइल बनाएँ",
+  cmdFileSave: "वर्तमान फ़ाइल सहेजें",
+  cmdFileExportPdf: "प्रोजेक्ट में PDF निर्यात करें",
+  cmdFileOpen: "फ़ाइल खोलें या प्रतिलिपि आयात करें",
+  excelChartPartial: "चार्ट “{name}” शायद बन गया है, लेकिन सेटअप विफल रहा और पूर्व स्थिति बहाल होने की पुष्टि नहीं हुई। फिर से प्रयास करने से पहले मौजूदा चार्ट जाँचें; डुप्लिकेट न बनाएँ।",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "स्लाइड या आकृति का लक्ष्य अमान्य है।",
+  pptStaleTarget: "लक्ष्य पाठ बदल गया है। संपादन से पहले इसे फिर से पढ़ें।",
+  pptInvalidArguments: "प्रस्तुति संपादन के पैरामीटर अमान्य हैं।",
+  pptCapabilityUnavailable: "वर्तमान प्रस्तुति ऐप में यह सुविधा उपलब्ध नहीं है।",
+  cmdPptSetShapeText: "आकृति का पाठ सेट करें",
+  cmdPptSetShapeGeometry: "आकृति की स्थिति और आकार सेट करें",
+  cmdPptFormatShape: "आकृति का प्रारूप सेट करें",
+  cmdPptGoto: "स्लाइड या आकृति पर जाएँ",
+  cmdPptSetLayout: "स्लाइड का लेआउट या पृष्ठभूमि सेट करें",
+  excelValidationCustomRequired: "कस्टम सत्यापन के लिए सूत्र आवश्यक है।",
+  excelValidationTypeInvalid: "यह डेटा सत्यापन प्रकार समर्थित नहीं है।",
+  excelPivotFieldsMissing: "पिवट फ़ील्ड नहीं मिले: {fields}",
+  excelValidationActionInvalid: "डेटा सत्यापन की कार्रवाई apply या clear होनी चाहिए।",
+  excelValidationValueRequired: "इस डेटा सत्यापन नियम के लिए तुलना मान आवश्यक है।",
+  excelValidationBoundsRequired: "सीमा सत्यापन के लिए दोनों सीमा मान आवश्यक हैं।",
+
   "dictate": "वॉइस इनपुट",
   "dictateRecording": "रिकॉर्डिंग चल रही है, समाप्त करने के लिए क्लिक करें",
   "dictateTranscribing": "ट्रांसक्राइब हो रहा है...",

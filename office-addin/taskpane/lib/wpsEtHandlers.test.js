@@ -12,6 +12,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { t } from './i18n.js'
 
 import { WPS_ET_HANDLERS, hexToBgr, bgrToHex } from './wpsEtHandlers.js'
 
@@ -113,6 +114,7 @@ test('excel_get_range：二维值批量读回与地址口径', async () => {
     Rows: { Count: 2 },
     Columns: { Count: 2 },
     Value2: [[1, 'x'], [null, 2]],
+    Formula: [['=1', 'x'], [null, '=1+1']],
     Address(rowAbs, colAbs) {
       assert.equal(rowAbs, false)
       assert.equal(colAbs, false)
@@ -124,7 +126,7 @@ test('excel_get_range：二维值批量读回与地址口径', async () => {
     const out = await WPS_ET_HANDLERS.excel_get_range({ rangeAddress: 'A1:B2' })
     assert.deepEqual(out, {
       sheet: 'Sheet1', address: 'A1:B2', rows: 2, cols: 2,
-      values: [[1, 'x'], [null, 2]], truncated: false
+      values: [[1, 'x'], [null, 2]], formulas: [['=1', 'x'], [null, '=1+1']], returnedRows: 2, truncated: false
     })
   } finally { restore() }
 })
@@ -823,6 +825,25 @@ test('excel_add_chart：ChartObjects() 函数调用建图，HasTitle 前置', as
 
 /* ==================== excel_define_name ==================== */
 
+test('excel_define_name: apostrophes in worksheet names are escaped in RefersTo', async () => {
+  let reference
+  const sheet = makeSheet("O'Brien", { Range: () => makeRange({ Address: () => '$A$1:$B$2' }) })
+  const restore = installWps(makeApp({ workbook: { ActiveSheet: sheet, Worksheets: makeSheetsCollection([sheet]), Names: { Add(name, value) { reference = value } } } }))
+  try {
+    await WPS_ET_HANDLERS.excel_define_name({ action: 'add', name: 'Summary', rangeAddress: 'A1:B2' })
+    assert.equal(reference, "='O''Brien'!$A$1:$B$2")
+  } finally { restore() }
+})
+
+test('excel_conditional_format: invalid action cannot delete existing rules', async () => {
+  let deleted = false
+  const { restore } = makeSingleSheetEnv({ Range: () => makeRange({ FormatConditions: { Delete() { deleted = true } } }) })
+  try {
+    await assert.rejects(WPS_ET_HANDLERS.excel_conditional_format({ rangeAddress: 'A1:A3', action: 'typo', ruleType: 'colorScale' }), e => e.message === t('excelConditionalActionInvalid'))
+    assert.equal(deleted, false)
+  } finally { restore() }
+})
+
 test('excel_define_name：add 拼带引号表名的 RefersTo；remove 未找到报错', async () => {
   let addArgs = null
   const names = {
@@ -898,7 +919,7 @@ test('excel_add_pivot_table：PivotCaches().Create 全签名链路与字段编�
   }
   const cache = { CreatePivotTable(dest, name) { createPivotArgs = [dest, name]; return pivot } }
   const destRng = { _tag: 'dest' }
-  const sheet = makeSheet('Sheet1', { Range: () => destRng })
+  const sheet = makeSheet('Sheet1', { Range: address => address === 'A1:C10' ? { Columns: { Count: 3 }, Resize: () => ({ Rows: { Count: 1 }, Columns: { Count: 3 }, Value2: [['地区', '销量', 'Other']] }) } : destRng })
   const workbook = {
     ActiveSheet: sheet,
     Worksheets: makeSheetsCollection([sheet]),
@@ -921,7 +942,7 @@ test('excel_add_pivot_table：PivotCaches().Create 全签名链路与字段编�
         sourceRangeAddress: 'A1:C10', destinationCellAddress: 'E1',
         rowFields: ['不存在的列'], valueFields: ['销量']
       }),
-      /未找到透视表字段：不存在的列/
+      error => error.message === t('excelPivotFieldsMissing', { fields: '不存在的列' })
     )
   } finally { restore() }
 })
@@ -1016,7 +1037,7 @@ test('excel_set_data_validation：type 非法时不许删掉用户已有的下�
   try {
     await assert.rejects(
       WPS_ET_HANDLERS.excel_set_data_validation({ rangeAddress: 'D2:D99', type: 'whole_number', operator: 'greaterThan', value1: 0 }),
-      /type 值非法/
+      error => error.message === t('excelValidationTypeInvalid')
     )
     assert.equal(deleted, false)
   } finally { restore() }
@@ -1029,7 +1050,7 @@ test('excel_set_data_validation：action 拼错不许掉进 apply 分支去删�
   try {
     await assert.rejects(
       WPS_ET_HANDLERS.excel_set_data_validation({ rangeAddress: 'D2:D99', action: 'reset', type: 'list', listSource: 'a,b' }),
-      /action 值非法/
+      error => error.message === t('excelValidationActionInvalid')
     )
     assert.equal(deleted, false)
   } finally { restore() }
@@ -1080,4 +1101,86 @@ test('excel_search：超大表只扫前若干行并如实交代', async () => {
     assert.equal(out.totalRows, 40000)
     assert.match(out.note, /只扫描了前 5000 行/)
   } finally { restore() }
+})
+
+test('invalid matrix rejects every row before resolving a sheet or changing formats', async () => {
+  const restore = installWps({ get ActiveWorkbook() { throw new Error('must not touch workbook') } })
+  try {
+    for (const values of [[[]], [[1], [2, 3]], [[1], null], [[1], [{}]], [[NaN]]]) {
+      await assert.rejects(WPS_ET_HANDLERS.excel_set_values({ rangeAddress: 'A1', values }), /二维数组/)
+      await assert.rejects(WPS_ET_HANDLERS.excel_set_formulas({ rangeAddress: 'A1', formulas: values }), /二维数组/)
+    }
+  } finally { restore() }
+})
+
+test('invalid chart source does not leave a newly created empty chart', async () => {
+  let created = 0
+  const sheet = { Range() { throw new Error('bad source') }, ChartObjects() { return { Add() { created++; return {} } } } }
+  const restore = installWps({ ActiveWorkbook: { ActiveSheet: sheet } })
+  try {
+    await assert.rejects(WPS_ET_HANDLERS.excel_add_chart({ dataRangeAddress: 'bad', chartType: 'column' }), /bad source/)
+    assert.equal(created, 0)
+  } finally { restore() }
+})
+
+test('pivot destination resolves a separately quoted worksheet before creating a cache', async () => {
+  let destination, source
+  const target = {}
+  const sourceSheet = makeSheet("O'Brien", { Range(address) { assert.equal(address, 'A1:B4'); return { Columns: { Count: 2 }, Resize: () => ({ Rows: { Count: 1 }, Columns: { Count: 2 }, Value2: [['Category', 'Amount']] }) } } })
+  const destinationSheet = makeSheet('Report space', { Range(address) { assert.equal(address, 'A1'); return target } })
+  const pivot = { Name: 'P', PivotFields: () => ({}), AddDataField() {} }
+  const restore = installWps(makeApp({ workbook: {
+    ActiveSheet: sourceSheet, Worksheets: makeSheetsCollection([sourceSheet, destinationSheet]),
+    PivotCaches() { return { Create(type, address) { source = address; return { CreatePivotTable(range) { destination = range; return pivot } } } } }
+  } }))
+  try {
+    await WPS_ET_HANDLERS.excel_add_pivot_table({ sourceRangeAddress: 'A1:B4', destinationCellAddress: "'Report space'!A1", rowFields: ['Category'], valueFields: ['Amount'] })
+    assert.equal(destination, target)
+    assert.equal(source, "'O''Brien'!A1:B4")
+  } finally { restore() }
+})
+
+test('WPS validation maps decimal/time/textLength/custom and notBetween before replacing rules', async () => {
+  let calls = []
+  const { restore } = makeSingleSheetEnv({ Range: () => ({ Validation: { Delete() { calls.push('delete') }, Add(...args) { calls.push(args) } }, Address: () => 'A1' }) })
+  try {
+    for (const [type, number] of [['decimal', 2], ['time', 5], ['textLength', 6]]) {
+      calls = []
+      await WPS_ET_HANDLERS.excel_set_data_validation({ rangeAddress: 'A1', type, operator: 'notBetween', value1: '1', value2: '2' })
+      assert.deepEqual(calls, ['delete', [number, 1, 2, '1', '2']])
+    }
+    calls = []
+    await WPS_ET_HANDLERS.excel_set_data_validation({ rangeAddress: 'A1', type: 'custom', value1: '=A1>0' })
+    assert.deepEqual(calls, ['delete', [7, 1, 1, '=A1>0']])
+    calls = []
+    await assert.rejects(WPS_ET_HANDLERS.excel_set_data_validation({ rangeAddress: 'A1', type: 'decimal', operator: 'notBetween', value1: '1' }))
+    assert.deepEqual(calls, [])
+  } finally { restore() }
+})
+
+for(const command of ['excel_get_range','excel_search','excel_replace']) {
+  test(`WPS ${command} bounds huge column spans before reading host values`,async()=>{
+    const source=makeRange({Rows:{Count:5000},Columns:{Count:16384},Row:1,Column:1,Address:()=> 'A1:XFD5000',Resize(r,c){assert.deepEqual([r,c],[3,16384]);return makeRange({Rows:{Count:r},Columns:{Count:c},Value2:[['hit']],Formula:[['hit']]})}})
+    Object.defineProperty(source,'Value2',{get(){throw new Error('oversized read')}})
+    Object.defineProperty(source,'Formula',{get(){throw new Error('oversized formula read')}})
+    const {restore}=makeSingleSheetEnv({UsedRange:source,Range:()=>source})
+    try {
+      const args={rangeAddress:'A1:XFD5000',query:'hit',find:'hit',replace:'next'}
+      if(command==='excel_replace')await assert.rejects(WPS_ET_HANDLERS[command](args),e=>e.message===t('excelRangeTooLarge'))
+      else {const out=await WPS_ET_HANDLERS[command](args);assert.equal(out.truncated,true);assert.equal(out.returnedRows||out.scannedRows,3)}
+    }finally{restore()}
+  })
+}
+
+test('WPS chart setup failure deletes only the new object; failed deletion is explicit',async()=>{
+  for(const rollbackFails of [false,true]){
+    let deleted=0
+    const co={Chart:{SetSourceData(){throw new Error('setup failed')}},Delete(){deleted++;if(rollbackFails)throw new Error('delete failed')}}
+    const sheet={Range:()=>({}),ChartObjects:()=>({Add:()=>co})}
+    const restore=installWps({ActiveWorkbook:{ActiveSheet:sheet}})
+    try {
+      await assert.rejects(WPS_ET_HANDLERS.excel_add_chart({dataRangeAddress:'A1:B3',chartType:'column'}),rollbackFails ? /excelChartPartial|可能已创建|may have been created/ : /setup failed/)
+      assert.equal(deleted,1)
+    }finally{restore()}
+  }
 })
