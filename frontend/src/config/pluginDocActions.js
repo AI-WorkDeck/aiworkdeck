@@ -37,4 +37,5 @@ export const PLUGIN_DOC_ACTIONS = new Set([
   'slide_format_shape', 'slide_format_text', 'slide_read_notes', 'slide_write_notes', 'slide_set_layout',
   'slide_set_shape_text', 'slide_replace_text', 'slide_set_shape_geometry', 'slide_set_hyperlink',
   'slide_table_read', 'slide_table_set_cell', 'slide_table_set_style',
+  'slide_add_chart', 'slide_format_chart', 'slide_set_transition',
 ])
