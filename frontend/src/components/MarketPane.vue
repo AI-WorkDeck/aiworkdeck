@@ -95,6 +95,7 @@
 
           <view class="builtin-workflow-banner">
             <text>{{ $t('market.builtinWorkflowsMarketNotice') }}</text>
+            <text class="builtin-workflow-banner-link" @tap="openBuiltinWorkflowSettings">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</text>
           </view>
 
           <view v-if="marketError" class="empty">
@@ -333,6 +334,7 @@
           </view>
           <view class="builtin-workflow-banner">
             <text>{{ $t('market.builtinWorkflowsMarketNotice') }}</text>
+            <text class="builtin-workflow-banner-link" @tap="openBuiltinWorkflowSettings">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</text>
           </view>
           <view v-if="conversationSkills.length === 0" class="empty">
             <svg class="empty-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -447,6 +449,7 @@ const TRIGGER_PREVIEW = 3
 export default {
   name: 'MarketPane',
   components: { AwdSelect, AwdSwitch },
+  inject: { openWorkflowEditorTab: { default: null }, openSettingsTab: { default: null } },
   props: {
     /** true=独立页面（渲染返回按钮，返回走 uni.navigateBack）；false=嵌入 workbench 窗格 */
     standalone: {
@@ -532,6 +535,17 @@ export default {
     uni.$off('awd:market-changed', this.reloadAll)
   },
   methods: {
+    openBuiltinWorkflowSettings() {
+      if (this.openWorkflowEditorTab) {
+        this.openWorkflowEditorTab({ workflowId: 'contract-review', versionId: 'default' })
+        return
+      }
+      if (this.openSettingsTab) {
+        this.openSettingsTab({ nav: 'workflows' })
+        return
+      }
+      uni.navigateTo({ url: '/pages/admin/admin?nav=workflows' })
+    },
     reloadAll() {
       return Promise.all([this.loadPlugins(), this.loadSkills(), this.loadMarket(), this.loadPluginMarket()])
     },
@@ -1804,11 +1818,27 @@ $gray-light: var(--awd-surface-3);
   border-radius: var(--awd-radius-md);
   background: var(--awd-accent-wash);
   border: 1px solid var(--awd-accent-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 
   text {
     font-size: var(--awd-font-size-body);
     color: var(--awd-text-2);
     line-height: 1.5;
+  }
+
+  .builtin-workflow-banner-link {
+    color: var(--awd-accent-text);
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+
+    &:hover {
+      text-decoration: underline;
+    }
   }
 }
 </style>
