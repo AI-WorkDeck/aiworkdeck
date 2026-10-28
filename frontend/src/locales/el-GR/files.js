@@ -52,7 +52,7 @@ export default {
     "previewTimeout": "Λήξη χρόνου προετοιμασίας προεπισκόπησης ήχου. Κλείστε αυτήν την καρτέλα και ανοίξτε την ξανά.",
     "playFailed": "Αυτό το αρχείο δεν μπορεί να αναπαραχθεί. Ενδέχεται ο κωδικοποιητής να μην υποστηρίζεται.",
     "backToCurrent": "Επιστροφή στο τρέχον",
-    "speakerPrefix": "{name}: ",
+    "speakerPrefix": "{name} — ",
     "summary": "{count} τμήματα · {duration}"
   },
   "captions": {

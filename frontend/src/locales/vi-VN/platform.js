@@ -31,15 +31,15 @@ export default {
   "switchFailed": "Không thể chuyển đổi. Vui lòng thử lại sau.",
   "switched": "Đã chuyển đổi",
   "usageMonthLabel": "Tháng này",
-  "usageUnknown": "—",
-  "usageCredits": "{credits} Credits",
+  "usageUnknown": "–",
+  "usageCredits": "{credits} điểm Credits",
   "usageTotal": "{credits} Credits trong tháng này ({month})",
   "usageUnavailable": "Tạm thời không đọc được mức chi tiêu tháng này; điều này không có nghĩa là chi phí bằng 0.",
   "budgetTitle": "Cảnh báo chi tiêu",
   "budgetSubtitle": "Đặt một trong hai về 0 để tắt. Các ngưỡng này quyết định khi nào chúng tôi hỏi bạn, không phải giới hạn cứng.",
   "budgetLowBalanceLabel": "Cảnh báo khi số dư giảm xuống dưới",
   "budgetLowBalanceNote": "Hiển thị cảnh báo trên bảng này khi số dư giảm xuống dưới mức này, để phiên chuyển ngữ không bị cạn giữa chừng.",
-  "budgetUnit": "Credits",
+  "budgetUnit": "Điểm Credits",
   "budgetSave": "Lưu ngưỡng",
   "budgetSaved": "Đã lưu",
   "budgetSaveFailed": "Không thể lưu. Vui lòng thử lại sau.",
@@ -47,6 +47,6 @@ export default {
   "lowBalanceNotice": "Số dư tài khoản là {credits} Credits, thấp hơn mức {threshold} Credits bạn đã đặt.",
   "aiRowName": "Trò chuyện & Viết lách cùng AI",
   "aiRowDesc": "AI không sử dụng đường truyền này: yêu cầu mô hình đi thẳng từ thiết bị này đến nhà cung cấp bạn chọn và không bao giờ đi qua máy chủ AI WorkDeck. Nhà cung cấp, mô hình và số dư tài khoản được cấu hình trong Cài đặt AI.",
-  "goAiSettings": "Open AI Settings",
-  "localAsrPending": "The on-device transcription model has not been downloaded, so the \"On this device\" tier is not offered yet. Turn on \"Keep recordings on this device\" in the meeting panel to download it there (about 1.5GB), or download it under Components."
+  "goAiSettings": "Mở Cài đặt AI",
+  "localAsrPending": "Mô hình chuyển ngữ trên thiết bị chưa được tải xuống, nên tùy chọn \"Trên thiết bị này\" chưa khả dụng. Hãy bật \"Giữ bản ghi âm trên thiết bị này\" trong bảng cuộc họp để tải xuống tại đó (khoảng 1.5GB), hoặc tải xuống trong mục Thành phần."
 }

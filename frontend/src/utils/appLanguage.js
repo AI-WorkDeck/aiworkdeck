@@ -120,10 +120,19 @@ export function getAppLanguagePreference() {
   return isLanguageManuallyChosen() ? getAppLanguage() : SYSTEM_LANGUAGE_MODE
 }
 
+let _reactiveLocaleTracker = null
+
+export function registerReactiveLocaleTracker(fn) {
+  _reactiveLocaleTracker = typeof fn === 'function' ? fn : null
+}
+
 /**
  * 返回当前生效的规范语言代码（恒为 20 个 BCP-47 代码之一，不会返回 `'system'`）。
  */
 export function getAppLanguage() {
+  if (_reactiveLocaleTracker) {
+    try { _reactiveLocaleTracker() } catch (e) { /* ignore */ }
+  }
   const stored = readStorage(APP_LANGUAGE_KEY)
   const normalized = normalizeLanguageSetting(stored)
   if (normalized === SYSTEM_LANGUAGE_MODE) {

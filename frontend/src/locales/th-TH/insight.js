@@ -3,88 +3,88 @@
 
 export default {
   "title": "หลักฐานอ้างอิง",
-  "noDoc": "No document open",
-  "parse": "Full-document online verification (charges may apply)",
-  "reparse": "Repeat full-document online verification (charges may apply)",
-  "onlineHint": "Clicking saves this document, then verifies the saved version online. AI and external lookups may incur charges.",
-  "saveRequired": "This document could not be saved. Save it successfully before online verification.",
-  "running": "Verifying online…",
-  "done": "Online verification complete",
-  "failed": "Online verification failed",
+  "noDoc": "ไม่ได้เปิดเอกสาร",
+  "parse": "ตรวจสอบทั้งเอกสารออนไลน์ (อาจมีค่าใช้จ่าย)",
+  "reparse": "ตรวจสอบทั้งเอกสารออนไลน์อีกครั้ง (อาจมีค่าใช้จ่าย)",
+  "onlineHint": "เมื่อคลิก ระบบจะบันทึกเอกสารปัจจุบันก่อน แล้วจึงตรวจสอบเวอร์ชันที่บันทึกไว้ออนไลน์ การใช้ AI และการค้นหาภายนอกอาจมีค่าใช้จ่าย",
+  "saveRequired": "ไม่สามารถบันทึกเอกสารนี้ได้ โปรดบันทึกให้สำเร็จก่อนตรวจสอบออนไลน์",
+  "running": "กำลังตรวจสอบออนไลน์…",
+  "done": "ตรวจสอบออนไลน์เสร็จสิ้น",
+  "failed": "ตรวจสอบออนไลน์ไม่สำเร็จ",
   "loading": "กำลังโหลด…",
-  "loadingDetail": "Fetching lookup details…",
-  "noDetail": "No lookup details for this item",
-  "loadFailed": "Could not load online verification results",
-  "parseFailed": "Could not start online verification",
-  "detailFailed": "Could not load the lookup details",
-  "refreshFailed": "Could not re-run the lookup",
-  "retry": "ลองอีกครั้ง",
-  "goConnectAccount": "Connect account",
-  "goRecharge": "Add credits",
+  "loadingDetail": "กำลังดึงรายละเอียดการค้นหา…",
+  "noDetail": "ไม่มีรายละเอียดการค้นหาสำหรับรายการนี้",
+  "loadFailed": "ไม่สามารถโหลดผลการตรวจสอบออนไลน์ได้",
+  "parseFailed": "ไม่สามารถเริ่มการตรวจสอบออนไลน์ได้",
+  "detailFailed": "ไม่สามารถโหลดรายละเอียดการค้นหาได้",
+  "refreshFailed": "ไม่สามารถค้นหาซ้ำได้",
+  "retry": "ลองใหม่",
+  "goConnectAccount": "เชื่อมต่อบัญชี",
+  "goRecharge": "เติมเครดิต",
   "hint": {
-    "NO_CREDENTIAL": "This lookup channel needs a credential configured on the server by your administrator."
+    "NO_CREDENTIAL": "ช่องทางการค้นหานี้ต้องให้ผู้ดูแลระบบตั้งค่าข้อมูลรับรองบนเซิร์ฟเวอร์"
   },
   "tab": {
-    "retrieval": "Lookups",
-    "checks": "Consistency"
+    "retrieval": "การค้นหาภายนอก",
+    "checks": "ความสอดคล้อง"
   },
   "kind": {
-    "COMPANY": "Companies",
-    "LAW": "Statutes",
-    "CASE": "Cases",
-    "DOC": "Documents"
+    "COMPANY": "บริษัท",
+    "LAW": "กฎหมาย",
+    "CASE": "คดีตัวอย่าง",
+    "DOC": "เอกสาร"
   },
   "entityKind": {
-    "COMPANY": "Company",
-    "LAW": "Statute",
-    "CASE": "Case",
-    "DOC": "Document"
+    "COMPANY": "บริษัท",
+    "LAW": "กฎหมาย",
+    "CASE": "คดีตัวอย่าง",
+    "DOC": "เอกสาร"
   },
-  "openInNewTab": "Open in a new tab",
-  "openDocFile": "Open file",
-  "docNotFound": "No such file in this project",
-  "docMissing": "That file is no longer in this project",
+  "openInNewTab": "เปิดในแท็บใหม่",
+  "openDocFile": "เปิดไฟล์",
+  "docNotFound": "ไม่พบไฟล์ดังกล่าวในโปรเจกต์นี้",
+  "docMissing": "ไฟล์นั้นไม่อยู่ในโปรเจกต์นี้แล้ว",
   "source": {
-    "projectFile": "Project file",
-    "qichacha": "Qichacha"
+    "projectFile": "ไฟล์โปรเจกต์",
+    "qichacha": "Qichacha (ฉีฉาฉา)"
   },
-  "mentions": "{count} mention(s)",
-  "mentionsTitle": "Mentions in this document",
-  "shareholders": "Shareholders",
-  "moreCandidates": "Other candidates",
+  "mentions": "{count} จุด",
+  "mentionsTitle": "ตำแหน่งที่ปรากฏในเอกสาร",
+  "shareholders": "ผู้ถือหุ้น",
+  "moreCandidates": "ตัวเลือกอื่น",
   "caseSection": {
-    "ascertain": "Facts found",
-    "reason": "Reasoning",
-    "result": "Judgment",
-    "gist": "Key holding",
-    "fullText": "Full judgment"
+    "ascertain": "ข้อเท็จจริงที่รับฟังได้",
+    "reason": "เหตุผลแห่งคำวินิจฉัย",
+    "result": "คำพิพากษา",
+    "gist": "สาระสำคัญของคำพิพากษา",
+    "fullText": "คำพิพากษาฉบับเต็ม"
   },
-  "authoritative": "Authoritative text (Pkulaw)",
-  "implementDate": "In force from {date}",
-  "recognition": "Case number recognition",
-  "openInPkulaw": "Open in Pkulaw",
+  "authoritative": "ตัวบทมาตรฐาน (Pkulaw)",
+  "implementDate": "มีผลใช้บังคับตั้งแต่ {date}",
+  "recognition": "การระบุเลขคดี",
+  "openInPkulaw": "เปิดใน Pkulaw",
   "citation": {
-    "citedText": "Cited article",
-    "candidates": "Articles matched by content",
-    "article": "Article {n}"
+    "citedText": "มาตราที่อ้างถึง",
+    "candidates": "มาตราที่ตรงตามเนื้อหา",
+    "article": "มาตรา {n}"
   },
   "severity": {
-    "warn": "Questionable",
-    "error": "Error"
+    "warn": "น่าสงสัย",
+    "error": "ข้อผิดพลาด"
   },
-  "unifyTo": "Set all to {value}",
-  "cannotFix": "Cannot fix automatically: {reason}",
-  "fixNotUnique": "Could not locate a unique match — please edit manually.",
-  "fixPartial": "Fixed {done}; {failed} had no unique match — please edit those manually.",
-  "fixed": "Fixed",
-  "fixedHint": "Press Cmd+Z to undo; re-analyze to refresh the findings.",
-  "noEditor": "Activate a document editor window first",
+  "unifyTo": "ปรับให้เป็น {value} ทั้งหมด",
+  "cannotFix": "ไม่สามารถแก้ไขด้วยคลิกเดียว: {reason}",
+  "fixNotUnique": "ไม่สามารถระบุตำแหน่งที่ชัดเจนเพียงจุดเดียวได้ โปรดแก้ไขด้วยตนเอง",
+  "fixPartial": "แก้ไขแล้ว {done} จุด อีก {failed} จุดระบุตำแหน่งไม่ชัดเจน โปรดแก้ไขด้วยตนเอง",
+  "fixed": "แก้ไขแล้ว",
+  "fixedHint": "กด Cmd+Z เพื่อเลิกทำ และวิเคราะห์ใหม่เพื่อรีเฟรชผลลัพธ์",
+  "noEditor": "โปรดเปิดใช้งานหน้าต่างแก้ไขเอกสารก่อน",
   "empty": {
-    "noRun": "This document has not been verified online",
-    "noRunHint": "Everyday writing hints run locally. Only clicking online verification sends the saved document for AI extraction, external lookups and consistency checks.",
-    "noEntity": "No lookupable entities found",
-    "noEntityHint": "The document mentions no company name, statute article or case number.",
-    "noFinding": "No inconsistencies found",
-    "noFindingHint": "Quantity statements and unified social credit codes all check out."
+    "noRun": "เอกสารนี้ยังไม่ได้รับการตรวจสอบออนไลน์",
+    "noRunHint": "คำแนะนำการเขียนทั่วไปทำงานในเครื่อง เมื่อคลิกตรวจสอบออนไลน์ด้านบนเท่านั้น AI จึงจะอ่านเอกสารที่บันทึกไว้ ดึงข้อมูล ค้นหาแหล่งข้อมูลภายนอก และตรวจความสอดคล้อง",
+    "noEntity": "ไม่พบข้อมูลที่ค้นหาได้",
+    "noEntityHint": "ไม่พบชื่อบริษัท เลขมาตรากฎหมาย หรือเลขคดีในเอกสาร",
+    "noFinding": "ไม่พบความขัดแย้งกันในเอกสาร",
+    "noFindingHint": "ข้อความระบุจำนวนและรหัสเครดิตสังคมผ่านการตรวจสอบทั้งหมดแล้ว"
   }
 }

@@ -52,7 +52,7 @@ export default {
     "previewTimeout": "오디오 미리보기 준비 시간이 초과되었습니다. 이 탭을 닫았다가 다시 열어주세요.",
     "playFailed": "이 파일은 재생할 수 없습니다. 코덱이 지원되지 않을 수 있습니다.",
     "backToCurrent": "현재 위치로 돌아가기",
-    "speakerPrefix": "{name}: ",
+    "speakerPrefix": "{name} : ",
     "summary": "{count}개 구간 · {duration}"
   },
   "captions": {

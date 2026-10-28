@@ -2,21 +2,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "intro": "Sign in with your phone number or email and password. First time? Verify and create a password.",
+  "intro": "अपने फ़ोन नंबर या ईमेल और पासवर्ड से साइन इन करें। पहली बार आए हैं? सत्यापित करें और पासवर्ड बनाएँ।",
   "password": "पासवर्ड",
-  "confirm": "Confirm password",
-  "register": "First time / Create password",
+  "confirm": "पासवर्ड की पुष्टि करें",
+  "register": "पहली बार / पासवर्ड बनाएँ",
   "reset": "पासवर्ड भूल गए",
   "back": "पासवर्ड साइन-इन पर वापस जाएँ",
-  "setup": "Create password",
-  "resetTitle": "Reset password",
-  "verify": "Verify and continue",
+  "setup": "पासवर्ड बनाएँ",
+  "resetTitle": "पासवर्ड रीसेट करें",
+  "verify": "सत्यापित करें और जारी रखें",
   "signIn": "साइन इन करें",
-  "passwordHint": "8–72 characters. Use a unique password.",
-  "invalid": "Use a password with 8–72 characters",
-  "mismatch": "Passwords do not match",
+  "passwordHint": "8–72 वर्ण। एक अनूठा पासवर्ड उपयोग करें।",
+  "invalid": "8–72 वर्णों वाला पासवर्ड उपयोग करें",
+  "mismatch": "पासवर्ड मेल नहीं खाते",
   "required": "अपना पासवर्ड दर्ज करें",
-  "resetDone": "Password reset. Sign in with your new password.",
-  "setupHint": "Verified. Create a password to continue.",
-  "resetHint": "This code is only for resetting your password."
+  "resetDone": "पासवर्ड रीसेट हो गया। अपने नए पासवर्ड से साइन इन करें।",
+  "setupHint": "सत्यापित हो गया। जारी रखने के लिए पासवर्ड बनाएँ।",
+  "resetHint": "यह कोड केवल आपका पासवर्ड रीसेट करने के लिए है।"
 }

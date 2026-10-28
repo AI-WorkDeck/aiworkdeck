@@ -2,20 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "devTrustNotice": "Development plugins can send data to declared remote services and expose Agent tools. Review the source before approval. Manifest changes require approval again.",
-  "grantTrust": "Approve development services",
-  "revokeTrust": "Revoke service approval",
-  "connections": "Plugin service connections",
-  "credentialNotice": "Credentials are stored per user by the host and are not exposed to plugin pages.",
+  "devTrustNotice": "ปลั๊กอินสำหรับนักพัฒนาสามารถส่งข้อมูลไปยังบริการระยะไกลที่ประกาศไว้และเปิดใช้งานเครื่องมือ Agent ได้ โปรดตรวจสอบแหล่งที่มาก่อนอนุมัติ การแก้ไขไฟล์รายการประกาศต้องได้รับการอนุมัติอีกครั้ง",
+  "grantTrust": "อนุมัติบริการปลั๊กอินสำหรับนักพัฒนา",
+  "revokeTrust": "เพิกถอนการอนุมัติบริการ",
+  "connections": "การเชื่อมต่อบริการปลั๊กอิน",
+  "credentialNotice": "ข้อมูลรับรองจะถูกจัดเก็บแยกตามผู้ใช้โดยโปรแกรมหลัก และจะไม่ถูกเปิดเผยต่อหน้าปลั๊กอิน",
   "connected": "เชื่อมต่อแล้ว",
-  "disconnected": "Not connected",
-  "token": "Service access token",
-  "connect": "Connect service",
-  "disconnect": "Disconnect",
-  "refresh": "Refresh status",
-  "subscription": "Check subscription",
-  "active": "Subscription active",
-  "inactive": "No active subscription",
-  "bundled": "Included with the app",
-  "checkout": "Open checkout"
+  "disconnected": "ยังไม่ได้เชื่อมต่อ",
+  "token": "โทเคนการเข้าถึงบริการ",
+  "connect": "เชื่อมต่อบริการ",
+  "disconnect": "ยกเลิกการเชื่อมต่อ",
+  "refresh": "รีเฟรชสถานะ",
+  "subscription": "ตรวจสอบการสมัครสมาชิก",
+  "active": "การสมัครสมาชิกใช้งานอยู่",
+  "inactive": "ไม่มีการสมัครสมาชิกที่ใช้งานอยู่",
+  "bundled": "มาพร้อมกับแอป",
+  "checkout": "เปิดหน้าชำระเงิน"
 }

@@ -448,10 +448,11 @@ export default {
 
     formatPeriod(date) {
       if (!date) return ''
-      const isZh = getAppLanguage() === 'zh-CN'
+      const appLang = getAppLanguage() || 'zh-CN'
+      const isZh = appLang.startsWith('zh')
       const month = isZh
         ? date.getMonth() + 1
-        : date.toLocaleString('en-US', { month: 'long' })
+        : date.toLocaleString(appLang, { month: 'long' })
       return this.$t('calendar.monthTitle', { year: date.getFullYear(), month })
     },
 
@@ -652,7 +653,7 @@ export default {
       if (!arg.view || arg.view.type !== 'timeGridWeek') return true
       const mark = getDayMarkType(arg.date)
       // 「周一 21」：星期 + 日，比 locale 默认的「9/21周一」好扫
-      const lang = getAppLanguage() === 'zh-CN' ? 'zh-CN' : 'en-US'
+      const lang = getAppLanguage() || 'zh-CN'
       const weekday = arg.date.toLocaleDateString(lang, { weekday: 'short' })
       let html = `<span class="fc-dh-weekday">${escapeHtml(weekday)}</span><span class="fc-dh-day">${arg.date.getDate()}</span>`
       if (mark === 'holiday') {

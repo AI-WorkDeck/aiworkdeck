@@ -57,9 +57,11 @@ function installNativeDragHandle(record, { frame, rect }) {
   if (right - left < 24 || bottom - top < 24) return
   let isEn = false
   try {
-    if (win?.document?.documentElement?.lang === 'en-US') isEn = true
-    else if (win?.localStorage?.getItem('checkba_app_language') === 'en-US') isEn = true
-    else if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') isEn = true
+    const l = win?.document?.documentElement?.lang
+      || win?.localStorage?.getItem('checkba_app_language')
+      || (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language'))
+      || ''
+    if (l && !l.startsWith('zh')) isEn = true
   } catch (_) { /* ignore */ }
   const handle = win.document.createElement('button')
   handle.type = 'button'

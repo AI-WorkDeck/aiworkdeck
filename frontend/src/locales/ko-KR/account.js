@@ -379,7 +379,7 @@ export default {
   "caseDefaultDepartment": "분쟁 해결 부서",
   "caseOpenCloudWorkflowFailedToast": "로펌 협업을 열지 못했습니다",
   "caseStatusSubmittedFallback": "제출됨",
-  "caseAmountWanCurrency": "¥{amount}0k",
+  "caseAmountWanCurrency": "¥{amount}만",
   "casePreviewFailedToast": "충돌 미리보기 실패",
   "caseSubmitFailedToast": "제출 실패",
   "caseActionFailedToast": "작업 실패",

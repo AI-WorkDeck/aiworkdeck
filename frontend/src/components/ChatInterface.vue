@@ -418,6 +418,7 @@
                @message-action="$emit('message-action', $event)"
                @regenerate="openRegenerateDialog(index)"
                @stop-generation="handleAbort"
+               @reading-interaction="followLatest = false"
              />
              <!-- <span v-if="msg.timestamp" class="bubble-timestamp assistant">{{ msg.timestamp }}</span> -->
           </div>
@@ -1661,7 +1662,16 @@ export default {
     const modelPriceDisplay = ref(null)
 
     const currentModelId = ref('')
-    const currentModelName = ref(t('chat.selectModel'))
+    const currentModelName = computed(() => {
+      if (currentModelId.value === 'auto') {
+        const routedName = routedModelInfo.value?.effectiveModelName
+        return routedName
+          ? t('chat.autoModelRoutedLabel', { name: routedName })
+          : t('chat.autoModelName')
+      }
+      const hit = availableModels.value.find(m => m.id === currentModelId.value)
+      return hit ? hit.name : (currentModelId.value || t('chat.selectModel'))
+    })
 
     // 模型选择必须持久化：AI 面板挂在 v-if 上，关掉右栏再打开组件会重建，
     // 不落盘就会静默复位成清单第一条——这是有计费含义的选择，不能悄悄改。
@@ -1707,24 +1717,11 @@ export default {
     const applyModelSelection = (id) => {
       if (id === 'auto') {
         currentModelId.value = 'auto'
-        const routedName = routedModelInfo.value?.effectiveModelName
-        currentModelName.value = routedName
-          ? t('chat.autoModelRoutedLabel', { name: routedName })
-          : t('chat.autoModelName')
         return
       }
       const hit = availableModels.value.find(m => m.id === id)
       currentModelId.value = hit ? hit.id : (id || '')
-      currentModelName.value = hit ? hit.name : (id || t('chat.selectModel'))
     }
-
-    watch(routedModelInfo, (info) => {
-      if (currentModelId.value === 'auto') {
-        currentModelName.value = info?.effectiveModelName
-          ? t('chat.autoModelRoutedLabel', { name: info.effectiveModelName })
-          : t('chat.autoModelName')
-      }
-    })
 
     // 当前模型能不能直接读图。**三态**：true 支持 / false 不支持 / null 未知。
     // 「未知」不许并到 false：拉不到模型目录时 availableModels 是空数组而 currentModelId
@@ -1838,9 +1835,9 @@ export default {
     // Agent Mode Selection (Ask, Plan, Agent)
     const showModeDropdown = ref(false)
     const ALL_MODES = [
-      { id: 'AGENT', name: t('chat.modeAgentName'), icon: '', desc: t('chat.modeAgentDesc') },
-      { id: 'ASK', name: t('chat.modeAskName'), icon: '', desc: t('chat.modeAskDesc') },
-      { id: 'PLAN', name: t('chat.modePlanName'), icon: '', desc: t('chat.modePlanDesc') }
+      { id: 'AGENT', name: t('chat.modeAgentName'), nameKey: 'chat.modeAgentName', icon: '', desc: t('chat.modeAgentDesc'), descKey: 'chat.modeAgentDesc' },
+      { id: 'ASK', name: t('chat.modeAskName'), nameKey: 'chat.modeAskName', icon: '', desc: t('chat.modeAskDesc'), descKey: 'chat.modeAskDesc' },
+      { id: 'PLAN', name: t('chat.modePlanName'), nameKey: 'chat.modePlanName', icon: '', desc: t('chat.modePlanDesc'), descKey: 'chat.modePlanDesc' }
     ]
     // 当前供应商（GET /api/ai/config 的 activeProvider）：模型目录端点不回 provider，
     // 而模式可选范围是按供应商定的，只能另取这个信号
@@ -1848,21 +1845,24 @@ export default {
     // 本地 Ollama 只支持 ASK：langchain4j 0.36 的 OllamaStreamingChatModel 没有三参
     // generate，选 AGENT/PLAN 会在流式过程中抛英文异常，不如在选择器里就不给
     const isLocalOnlyProvider = computed(() => String(activeProvider.value).toUpperCase() === 'OLLAMA')
-    const availableModes = computed(() =>
-      isLocalOnlyProvider.value ? ALL_MODES.filter(m => m.id === 'ASK') : ALL_MODES
-    )
+    const availableModes = computed(() => {
+      const list = isLocalOnlyProvider.value ? ALL_MODES.filter(m => m.id === 'ASK') : ALL_MODES
+      return list.map(m => ({ ...m, name: t(m.nameKey), desc: t(m.descKey) }))
+    })
     const localModeNotice = computed(() =>
       isLocalOnlyProvider.value ? t('chat.localModeNotice') : ''
     )
 
     const currentModeId = ref(ALL_MODES[0].id)
-    const currentModeName = ref(ALL_MODES[0].name)
+    const currentModeName = computed(() => {
+      const hit = ALL_MODES.find(m => m.id === currentModeId.value) || ALL_MODES[0]
+      return hit ? t(hit.nameKey) : t('chat.modeAgentName')
+    })
     const currentModeIcon = ref(ALL_MODES[0].icon)
 
     const selectMode = (mode) => {
       console.log('Switching agent mode to:', mode.name)
       currentModeId.value = mode.id
-      currentModeName.value = mode.name
       currentModeIcon.value = mode.icon
       showModeDropdown.value = false
     }
@@ -1917,10 +1917,10 @@ export default {
     // 而不是让用户勾一堆东西然后什么都不发生。
     const skillDisabledByMode = computed(() => currentModeId.value === 'ASK')
 
-    // 英文界面优先 name_en：/api/skills/list 不做语言过滤，展示名要自己按语言挑
+    // 非中文界面优先 name_en：/api/skills/list 不做语言过滤，展示名要自己按语言挑
     const skillDisplayName = (s) => {
       if (!s) return ''
-      return (getAppLanguage() === 'en-US' && s.nameEn) || s.name || s.id
+      return (isEnglish() && s.nameEn) || s.name || s.id
     }
 
     const selectedSkills = computed(() =>
@@ -5009,6 +5009,7 @@ export default {
   flex: 1;
   min-height: 0;
   overflow-anchor: none;
+  scrollbar-gutter: stable both-edges;
   overflow-y: auto;
   overflow-x: hidden; /* Prevent horizontal overflow */
   padding: 12px;

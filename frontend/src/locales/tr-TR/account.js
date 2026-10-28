@@ -69,7 +69,7 @@ export default {
   "deleteTodoConfirm": "Bu görev silinsin mi?",
   "todoUpdateFailed": "Güncelleme başarısız, lütfen tekrar deneyin",
   "basicInfoGroupTitle": "Temel bilgiler",
-  "avatarLabel": "Avatar",
+  "avatarLabel": "Profil Resmi",
   "nicknameLabel": "Takma ad",
   "uploadingTitle": "Yükleniyor…",
   "avatarUpdateSuccess": "Avatar güncellendi",

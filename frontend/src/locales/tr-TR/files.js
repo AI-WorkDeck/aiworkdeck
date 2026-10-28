@@ -52,7 +52,7 @@ export default {
     "previewTimeout": "Ses önizlemesi hazırlığı zaman aşımına uğradı. Bu sekmeyi kapatıp yeniden açın.",
     "playFailed": "Bu dosya oynatılamıyor. Codec desteklenmiyor olabilir.",
     "backToCurrent": "Güncel olana dön",
-    "speakerPrefix": "{name}: ",
+    "speakerPrefix": "{name} — ",
     "summary": "{count} bölüm · {duration}"
   },
   "captions": {

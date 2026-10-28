@@ -5,8 +5,10 @@
 export async function saveSensitiveInput(fileId, libreRefs = {}, plainTextRefs = {}) {
   let isEn = false
   try {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') isEn = true
-    else if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') isEn = true
+    const l = (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language'))
+      || (typeof document !== 'undefined' && document.documentElement?.lang)
+      || ''
+    if (l && !l.startsWith('zh')) isEn = true
   } catch (_) { /* ignore */ }
   const matches = inst => inst?.file?.id != null && String(inst.file.id) === String(fileId)
   const office = Object.values(libreRefs).filter(matches)

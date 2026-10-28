@@ -29,7 +29,6 @@ $color-accent: var(--awd-mint); // Mint Green
 
   &.compact-mode {
     .project-header {
-      height: 44px;
       padding: 0 16px;
       /* 这两行必须跟着 padding 简写走。少了它们，窗口窄于 1360px（compact 的阈值）
          时简写就把顶栏让位整条吃掉，交通灯直接压在项目名上。 */
@@ -218,8 +217,17 @@ $color-accent: var(--awd-mint); // Mint Green
   &:hover { background: var(--awd-accent-wash); }
   &:focus-visible { outline: var(--awd-focus-width) solid var(--awd-accent-text); outline-offset: var(--awd-focus-offset); }
 }
-.project-name-edit { max-width: 320px; text-align: left; }
+.project-name-edit {
+  max-width: 320px;
+  height: var(--awd-panel-row-h);
+  box-sizing: border-box;
+  line-height: calc(var(--awd-panel-row-h) - 2px);
+  text-align: start;
+}
 .project-switcher {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   min-width: var(--awd-panel-row-h);
   color: var(--awd-accent-text);
@@ -339,6 +347,11 @@ $color-accent: var(--awd-mint); // Mint Green
 }
 
 .project-status-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--awd-panel-fs-sec);
+  line-height: var(--awd-line-height-ui);
   flex-shrink: 0;
   background-color: var(--awd-accent-soft);
   border: 1px solid transparent; // Cleaner look
@@ -2962,14 +2975,20 @@ $color-accent: var(--awd-mint); // Mint Green
 }
 
 @media (max-width: 768px) {
-  .project-header {
-    flex-direction: column;
-    align-items: flex-start;
+  .project-header { gap: 8px; }
+
+  .header-left { max-width: none; }
+
+  .header-center {
+    position: static;
+    transform: none;
+    flex-shrink: 0;
   }
 
+  .mode-switch-capsule .mode-switch-item { padding: 0 6px; }
+
   .header-right {
-    width: 100%;
-    justify-content: flex-end;
+    flex-shrink: 0;
     gap: 8px;
   }
 }

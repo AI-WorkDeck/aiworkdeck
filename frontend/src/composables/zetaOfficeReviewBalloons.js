@@ -14,7 +14,7 @@ export function positionReviewCards(items, gap = 12) {
 }
 
 export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh' }) {
-  const doc = canvas.ownerDocument, win = doc.defaultView, en = locale.startsWith('en')
+  const doc = canvas.ownerDocument, win = doc.defaultView, en = Boolean(locale && !String(locale).startsWith('zh'))
   const labels = en
     ? { title: 'Comments & changes', overview: 'Review list', moveFrom: 'Moved from', moveTo: 'Moved to', insert: 'Inserted', delete: 'Deleted', table: 'Table', comment: 'Comment', accept: 'Accept', reject: 'Reject', resolve: 'Resolve', reopen: 'Reopen', edit: 'Edit', remove: 'Delete', save: 'Save', cancel: 'Cancel', more: 'Some review items are not displayed.', failed: 'Could not update review. Try again.', empty: 'No comments or changes', other: 'Change', format: 'Formatting', paraFormat: 'Paragraph formatting', unknown: 'Unknown author' }
     : { title: '批注与修订', overview: '审阅列表', moveFrom: '移出', moveTo: '移入', insert: '插入', delete: '删除', table: '表格', comment: '批注', accept: '接受', reject: '拒绝', resolve: '解决', reopen: '重新打开', edit: '编辑', remove: '删除', save: '保存', cancel: '取消', more: '部分审阅条目暂未显示。', failed: '审阅更新失败，请重试。', empty: '暂无批注或修订', other: '更改', format: '格式', paraFormat: '段落格式', unknown: '未知作者' }

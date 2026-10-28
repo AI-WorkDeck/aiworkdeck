@@ -52,7 +52,7 @@ export default {
     "previewTimeout": "หมดเวลาในการเตรียมตัวอย่างเสียง โปรดปิดแท็บนี้แล้วเปิดใหม่อีกครั้ง",
     "playFailed": "ไม่สามารถเล่นไฟล์นี้ได้ codec อาจไม่รองรับ",
     "backToCurrent": "กลับไปที่ตำแหน่งปัจจุบัน",
-    "speakerPrefix": "{name}: ",
+    "speakerPrefix": "{name} : ",
     "summary": "{count} ส่วน · {duration}"
   },
   "captions": {

@@ -52,7 +52,7 @@ export default {
     "previewTimeout": "La preparación de la vista previa de audio agotó el tiempo de espera. Cierre esta pestaña y vuelva a abrirla.",
     "playFailed": "No se puede reproducir este archivo. Es posible que el códec no sea compatible.",
     "backToCurrent": "Volver al momento actual",
-    "speakerPrefix": "{name}: ",
+    "speakerPrefix": "{name} — ",
     "summary": "{count} segmentos · {duration}"
   },
   "captions": {
@@ -166,7 +166,7 @@ export default {
   "deleteTagTitle": "Eliminar etiqueta",
   "deleteTagConfirm": "¿Eliminar la etiqueta «{name}»?",
   "deleteFailed": "Error al eliminar",
-  "tagTypeNormal": "General",
+  "tagTypeNormal": "Normal",
   "tagTypeParty": "Parte",
   "tagTypeIssue": "Cuestión",
   "tagTypeLabel": "Tipo",

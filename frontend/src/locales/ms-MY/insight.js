@@ -3,88 +3,88 @@
 
 export default {
   "title": "Rujukan",
-  "noDoc": "No document open",
-  "parse": "Full-document online verification (charges may apply)",
-  "reparse": "Repeat full-document online verification (charges may apply)",
-  "onlineHint": "Clicking saves this document, then verifies the saved version online. AI and external lookups may incur charges.",
-  "saveRequired": "This document could not be saved. Save it successfully before online verification.",
-  "running": "Verifying online…",
-  "done": "Online verification complete",
-  "failed": "Online verification failed",
-  "loading": "Loading…",
-  "loadingDetail": "Fetching lookup details…",
-  "noDetail": "No lookup details for this item",
-  "loadFailed": "Could not load online verification results",
-  "parseFailed": "Could not start online verification",
-  "detailFailed": "Could not load the lookup details",
-  "refreshFailed": "Could not re-run the lookup",
+  "noDoc": "Tiada dokumen dibuka",
+  "parse": "Pengesahan dalam talian dokumen penuh (caj mungkin dikenakan)",
+  "reparse": "Ulang pengesahan dalam talian dokumen penuh (caj mungkin dikenakan)",
+  "onlineHint": "Mengklik akan menyimpan dokumen ini dahulu, kemudian mengesahkan versi yang disimpan secara dalam talian. Carian AI dan luaran mungkin dikenakan caj.",
+  "saveRequired": "Dokumen ini tidak dapat disimpan. Sila simpan dengan jayanya sebelum pengesahan dalam talian.",
+  "running": "Mengesahkan dalam talian…",
+  "done": "Pengesahan dalam talian selesai",
+  "failed": "Pengesahan dalam talian gagal",
+  "loading": "Memuatkan…",
+  "loadingDetail": "Mendapatkan butiran carian…",
+  "noDetail": "Tiada butiran carian untuk item ini",
+  "loadFailed": "Tidak dapat memuatkan hasil pengesahan dalam talian",
+  "parseFailed": "Tidak dapat memulakan pengesahan dalam talian",
+  "detailFailed": "Tidak dapat memuatkan butiran carian",
+  "refreshFailed": "Tidak dapat menjalankan semula carian",
   "retry": "Cuba lagi",
-  "goConnectAccount": "Connect account",
-  "goRecharge": "Add credits",
+  "goConnectAccount": "Sambung akaun",
+  "goRecharge": "Tambah kredit",
   "hint": {
-    "NO_CREDENTIAL": "This lookup channel needs a credential configured on the server by your administrator."
+    "NO_CREDENTIAL": "Saluran carian ini memerlukan bukti kelayakan yang dikonfigurasikan pada pelayan oleh pentadbir anda."
   },
   "tab": {
-    "retrieval": "Lookups",
-    "checks": "Consistency"
+    "retrieval": "Carian Luaran",
+    "checks": "Ketekalan"
   },
   "kind": {
-    "COMPANY": "Companies",
-    "LAW": "Statutes",
-    "CASE": "Cases",
-    "DOC": "Documents"
+    "COMPANY": "Syarikat",
+    "LAW": "Statut",
+    "CASE": "Kes",
+    "DOC": "Dokumen"
   },
   "entityKind": {
-    "COMPANY": "Company",
-    "LAW": "Statute",
-    "CASE": "Case",
-    "DOC": "Document"
+    "COMPANY": "Syarikat",
+    "LAW": "Statut",
+    "CASE": "Kes",
+    "DOC": "Dokumen"
   },
-  "openInNewTab": "Open in a new tab",
-  "openDocFile": "Open file",
-  "docNotFound": "No such file in this project",
-  "docMissing": "That file is no longer in this project",
+  "openInNewTab": "Buka dalam tab baharu",
+  "openDocFile": "Buka fail",
+  "docNotFound": "Tiada fail sedemikian dalam projek ini",
+  "docMissing": "Fail tersebut tidak lagi berada dalam projek ini",
   "source": {
-    "projectFile": "Project file",
+    "projectFile": "Fail projek",
     "qichacha": "Qichacha"
   },
-  "mentions": "{count} mention(s)",
-  "mentionsTitle": "Mentions in this document",
-  "shareholders": "Shareholders",
-  "moreCandidates": "Other candidates",
+  "mentions": "{count} sebutan",
+  "mentionsTitle": "Sebutan dalam dokumen ini",
+  "shareholders": "Pemegang saham",
+  "moreCandidates": "Calon lain",
   "caseSection": {
-    "ascertain": "Facts found",
-    "reason": "Reasoning",
-    "result": "Judgment",
-    "gist": "Key holding",
-    "fullText": "Full judgment"
+    "ascertain": "Fakta ditemui",
+    "reason": "Alasan penghakiman",
+    "result": "Keputusan",
+    "gist": "Intipati penghakiman",
+    "fullText": "Penghakiman penuh"
   },
-  "authoritative": "Authoritative text (Pkulaw)",
-  "implementDate": "In force from {date}",
-  "recognition": "Case number recognition",
-  "openInPkulaw": "Open in Pkulaw",
+  "authoritative": "Teks berwibawa (Pkulaw)",
+  "implementDate": "Berkuat kuasa mulai {date}",
+  "recognition": "Pengecaman nombor kes",
+  "openInPkulaw": "Buka dalam Pkulaw",
   "citation": {
-    "citedText": "Cited article",
-    "candidates": "Articles matched by content",
-    "article": "Article {n}"
+    "citedText": "Artikel yang dipetik",
+    "candidates": "Artikel yang dipadankan mengikut kandungan",
+    "article": "Artikel {n}"
   },
   "severity": {
-    "warn": "Questionable",
-    "error": "Error"
+    "warn": "Meragukan",
+    "error": "Ralat"
   },
-  "unifyTo": "Set all to {value}",
-  "cannotFix": "Cannot fix automatically: {reason}",
-  "fixNotUnique": "Could not locate a unique match — please edit manually.",
-  "fixPartial": "Fixed {done}; {failed} had no unique match — please edit those manually.",
-  "fixed": "Fixed",
-  "fixedHint": "Press Cmd+Z to undo; re-analyze to refresh the findings.",
-  "noEditor": "Activate a document editor window first",
+  "unifyTo": "Tetapkan semua kepada {value}",
+  "cannotFix": "Tidak dapat membetulkan secara automatik: {reason}",
+  "fixNotUnique": "Tidak dapat mencari padanan unik — sila edit secara manual.",
+  "fixPartial": "Dibetulkan {done}; {failed} tiada padanan unik — sila edit secara manual.",
+  "fixed": "Dibetulkan",
+  "fixedHint": "Tekan Cmd+Z untuk buat asal; analisis semula untuk memuat semula hasil.",
+  "noEditor": "Aktifkan tetingkap editor dokumen terlebih dahulu",
   "empty": {
-    "noRun": "This document has not been verified online",
-    "noRunHint": "Everyday writing hints run locally. Only clicking online verification sends the saved document for AI extraction, external lookups and consistency checks.",
-    "noEntity": "No lookupable entities found",
-    "noEntityHint": "The document mentions no company name, statute article or case number.",
-    "noFinding": "No inconsistencies found",
-    "noFindingHint": "Quantity statements and unified social credit codes all check out."
+    "noRun": "Dokumen ini belum disahkan secara dalam talian",
+    "noRunHint": "Petunjuk penulisan harian berjalan secara tempatan. Hanya apabila mengklik pengesahan dalam talian, dokumen yang disimpan akan dihantar untuk pengekstrakan AI, carian luaran dan semakan ketekalan.",
+    "noEntity": "Tiada entiti boleh cari ditemui",
+    "noEntityHint": "Dokumen ini tidak menyebut nama syarikat, artikel statut atau nombor kes.",
+    "noFinding": "Tiada percanggahan ditemui",
+    "noFindingHint": "Penyataan kuantiti dan kod kredit sosial bersepadu semuanya lulus semakan."
   }
 }

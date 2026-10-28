@@ -74,7 +74,7 @@ test('思考结束或内联变体不出副文案', () => {
 
 test('停止按钮只在 stoppable 时渲染，点击发 stop；RootBubble → ChatInterface 接到 handleAbort', () => {
   assert.match(CARD, /<button v-if="stoppable"[^>]*@click\.stop="emit\('stop'\)"/)
-  assert.match(CARD, /defineEmits\(\['stop'\]\)/)
+  assert.match(CARD, /defineEmits\(\[[^\]]*'stop'[^\]]*\]\)/)
   assert.match(ROOT, /:stoppable="!!\(isLatest && bubble\.isStreaming\)"/)
   assert.match(ROOT, /@stop="\$emit\('stop-generation'\)"/)
   assert.match(ROOT, /defineEmits\(\[[^\]]*'stop-generation'[^\]]*\]\)/)

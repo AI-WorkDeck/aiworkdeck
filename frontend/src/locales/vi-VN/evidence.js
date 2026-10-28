@@ -3,26 +3,26 @@
 
 export default {
   "view": {
-    "bySection": "Theo phần",
-    "byParty": "Theo bên liên quan"
+    "bySection": "Theo mục",
+    "byParty": "Theo chủ thể"
   },
   "filter": {
-    "allSections": "Tất cả các phần",
-    "allParties": "Tất cả các bên"
+    "allSections": "Tất cả các mục",
+    "allParties": "Tất cả chủ thể"
   },
   "stat": {
     "total": "Tổng cộng {count}"
   },
   "status": {
     "all": "Tất cả",
-    "active": "Đang hoạt động",
-    "unverified": "Chưa xác minh",
+    "active": "Hoạt động",
+    "unverified": "Chờ xác minh",
     "stale": "Đã thay đổi",
-    "orphan": "Bị mồ côi"
+    "orphan": "Mất liên kết"
   },
   "group": {
-    "none": "Chưa phân công",
-    "untitled": "(Không có phần)"
+    "none": "Chưa gán",
+    "untitled": "(Không có mục)"
   },
   "action": {
     "keep": "Giữ liên kết",
@@ -30,54 +30,54 @@ export default {
     "confirmRebind": "Xác nhận",
     "cancelRebind": "Hủy",
     "delete": "Xóa",
-    "removeTarget": "Xóa",
-    "open": "Xem nguồn",
+    "removeTarget": "Gỡ bỏ",
+    "open": "Xem tài liệu gốc",
     "ignore": "Bỏ qua",
     "expand": "Mở rộng",
     "collapse": "Thu gọn"
   },
   "method": {
-    "written_review": "Rà soát tài liệu",
-    "written_statement": "Bản lập luận",
-    "web_check": "Kiểm tra trực tuyến",
+    "written_review": "Rà soát văn bản",
+    "written_statement": "Giải trình bằng văn bản",
+    "web_check": "Tra cứu trực tuyến",
     "third_party": "Tài liệu bên thứ ba",
     "interview": "Phỏng vấn",
-    "none": "Không có phương thức"
+    "none": "Chưa gắn phương thức"
   },
   "relation": {
-    "supports": "Ủng hộ",
+    "supports": "Củng cố",
     "contradicts": "Mâu thuẫn",
-    "partial": "Một phần"
+    "partial": "Củng cố một phần"
   },
   "loc": {
     "wholeFile": "Toàn bộ tệp",
     "page": "Trang {page}",
-    "quote": "\"{quote}\"",
-    "region": "Vùng hình ảnh",
+    "quote": "«{quote}»",
+    "region": "Vùng trong ảnh",
     "time": "{time}",
     "web": "{host}",
     "cell": "{sheet}!{cell}"
   },
-  "empty": "Chưa có tệp nguồn nào được liên kết với tài liệu này",
-  "emptyHint": "Kéo một tệp từ trình khám phá thả vào văn bản đã chọn để liên kết",
+  "empty": "Chưa có tệp tài liệu gốc nào được liên kết với tài liệu này",
+  "emptyHint": "Kéo tệp từ cây thư mục bên trái thả vào đoạn văn bản đã chọn để liên kết",
   "emptyFiltered": "Không có liên kết nào khớp với bộ lọc hiện tại",
   "fileMissing": "(tệp không còn tồn tại)",
-  "fileDeleted": "(trong thùng rác)",
-  "targetsCount": "{count} nguồn",
-  "rebindHint": "Chọn văn bản mới trong tài liệu, sau đó nhấn Xác nhận",
-  "rebindNoSelection": "Hãy chọn văn bản trong tài liệu trước",
+  "fileDeleted": "(đã chuyển vào thùng rác)",
+  "targetsCount": "{count} tài liệu gốc",
+  "rebindHint": "Chọn đoạn văn bản mới trong tài liệu, sau đó nhấn Xác nhận",
+  "rebindNoSelection": "Vui lòng chọn văn bản trong tài liệu trước",
   "rebindFailed": "Gán lại thất bại",
-  "rebindRetryHint": "Đánh dấu mới đã có trong tài liệu; nhấn Xác nhận lần nữa để thử lại.",
-  "keepGone": "Văn bản này không còn trong tài liệu nên không thể giữ liên kết. Sử dụng Gán lại trong tab Nguồn.",
-  "orphanGoto": "Mỏ neo của văn bản này không còn trong tài liệu. Nhấn Gán lại để chọn văn bản mới.",
+  "rebindRetryHint": "Dấu trang mới đã có trong tài liệu; nhấn Xác nhận lần nữa để thử lại.",
+  "keepGone": "Đoạn văn bản này không còn trong tài liệu nên không thể giữ liên kết. Hãy dùng Gán lại trong thẻ Tài liệu gốc.",
+  "orphanGoto": "Điểm neo của đoạn văn bản này không còn trong tài liệu. Nhấn Gán lại để chọn văn bản mới.",
   "confidence": "Độ tin cậy {value}",
   "loading": "Đang tải…",
-  "loadFailed": "Không thể tải liên kết",
-  "fileTagsLoadFailed": "Không thể tải thẻ bên liên quan; chế độ xem \"Theo bên liên quan\" có thể không chính xác",
+  "loadFailed": "Không tải được liên kết",
+  "fileTagsLoadFailed": "Không tải được thẻ chủ thể; chế độ xem \"Theo chủ thể\" có thể không chính xác",
   "opFailed": "Thao tác thất bại",
-  "deleteConfirm": "Delete this link? The source file will not be deleted.",
-  "deleteTargetConfirm": "Remove this source?",
-  "staleOne": "This text has {count} linked sources and has been changed",
-  "staleMany": "{count} linked passages have been changed",
-  "stalePrefix": "Changed: "
+  "deleteConfirm": "Xóa liên kết này? Tệp tài liệu gốc sẽ không bị xóa.",
+  "deleteTargetConfirm": "Gỡ tài liệu gốc này?",
+  "staleOne": "Đoạn văn bản này có {count} tài liệu gốc liên kết và đã bị thay đổi",
+  "staleMany": "{count} đoạn văn bản liên kết đã bị thay đổi",
+  "stalePrefix": "Đã thay đổi: "
 }

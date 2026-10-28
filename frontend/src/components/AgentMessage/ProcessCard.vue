@@ -74,6 +74,7 @@
                    :content="item.content"
                    :duration="item.duration || 0"
                    :start-time="item.startTime"
+                   @reading-interaction="emit('reading-interaction')"
                 />
             </div>
 
@@ -166,6 +167,8 @@ import { copyToClipboard } from '@/utils/chatClipboard.js'
 import { isEnglish } from '@/utils/appLanguage.js'
 import { t } from '@/i18n'
 
+const emit = defineEmits(['reading-interaction'])
+
 const props = defineProps({
   process: { type: Object, required: true }
 })
@@ -211,6 +214,7 @@ const hasError = computed(() => {
 const userHasToggled = ref(false)
 
 const toggle = () => {
+  emit('reading-interaction')
   userHasToggled.value = true
   isExpanded.value = !isExpanded.value
 }
@@ -256,6 +260,7 @@ const copyOutput = (item) => copyToClipboard(outputText(item))
 const isOutputOpen = (idx) => !!openOutputs.value[idx]
 
 const toggleOutput = (idx) => {
+    emit('reading-interaction')
     openOutputs.value[idx] = !openOutputs.value[idx]
 }
 

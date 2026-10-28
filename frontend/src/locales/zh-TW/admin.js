@@ -158,6 +158,16 @@ export default {
   "tierColThreshold": "門檻（成長值）",
   "tierColBonus": "充值贈送",
   "tierBonusCell": "{permille}‰",
+  "membershipTiers": {
+    "paralegal": "律師助理",
+    "associate": "專職律師",
+    "lead": "主辦律師",
+    "senior": "資深律師",
+    "salaried-partner": "授薪合夥人",
+    "equity-partner": "權益合夥人",
+    "managing-partner": "管理合夥人",
+    "silver": "白銀會員"
+  },
   "rechargeTitle": "賬戶充值",
   "rechargeSubtitle": "充值到 Credits 錢包，支付成功後即時到賬",
   "rechargeAmountLabel": "充值金額",
