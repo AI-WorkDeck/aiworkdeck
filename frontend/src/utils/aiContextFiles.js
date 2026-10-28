@@ -29,7 +29,7 @@ export function countDescendantFiles(allFiles, folderId) {
       // eslint-disable-next-line eqeqeq
       if (f.parentId != pid) continue
       if (f.isFolder || f.isDir) count += countIn(f.id, depth + 1)
-      else count += 1
+      else if (![f.name, f.filePath, f.path].some(value => String(value || '').toLowerCase().endsWith('.awd-recovery'))) count += 1
     }
     return count
   }
