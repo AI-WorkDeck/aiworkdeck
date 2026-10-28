@@ -40,18 +40,10 @@ The contribution surface extends beyond core code. A developer can build an evid
 
 The project is company-stewarded, with published [governance](GOVERNANCE.md), [maintainers](MAINTAINERS.md), and a [contributor agreement](legal/CLA.md). The core is AGPL-3.0-or-later, with commercial licensing for the steward's code. Those terms should be clear before anyone commits substantial work.
 
-## How the business fits
-
-The commercial model combines usage-based platform services, commercial licensing and implementation support, and a marketplace for specialist Skills and plugins. The [licensing](legal/COMMERCIAL-LICENSE.md) and [marketplace](legal/MARKETPLACE-TERMS.md) documents set out the respective terms.
-
-The path begins with recurring work in a specific profession. A useful review workflow creates a reason to return to the workspace; supported deployment helps bring it into an organization; specialist extensions can introduce it to adjacent teams. Usage-based services support everyday work, while licensing and implementation serve organizations and builders with different deployment needs.
-
-We judge the next stage by repeat use on real matters, reliable deliverables, manageable support costs, and useful extensions created beyond the core team. These are the operating milestones we want to discuss with investors and partners, alongside the technical work visible in this repository.
-
 ## An invitation to build something consequential
 
 For developers, there are difficult, tangible problems here: document round-tripping, reviewable agent actions, sources that remain traceable through edits, and extensions that fit into a coherent work environment. A small improvement can become part of another professional's daily work.
 
-For investors and partners, the opportunity is to help a focused legal workspace grow into infrastructure that specialist builders can reuse across professional document work. The product, source, extension interfaces, and commercial framework are already available to examine. The next chapter is turning that foundation into a place professionals return to, and developers choose to build on.
+The project grew out of legal practice and feedback from colleagues. It is an open-source exploration undertaken outside working hours with team support. Practitioners can contribute questions and appropriately redacted cases, and work with developers to test and improve the tools.
 
-[Build an extension](docs/plugin-guide.md), [contribute a focused change](.github/CONTRIBUTING.md), or contact [hi@aiworkdeck.com](mailto:hi@aiworkdeck.com) about investment and partnerships.
+[Build an extension](docs/plugin-guide.md), [contribute a focused change](.github/CONTRIBUTING.md), or contact [hi@aiworkdeck.com](mailto:hi@aiworkdeck.com).

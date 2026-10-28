@@ -72,23 +72,23 @@ r/legaltech、r/electronjs。
 
 ### Show HN（维护者本人发，周二至周四，北京时间 20:00-21:00 = 美东早 8-9 点）
 
-标题（78 字符，HN 上限 80）：
+标题（HN 上限 80 字符）：
 
 ```
-Show HN: Open-source IDE for legal work, built by a lawyer (LibreOffice-in-WASM)
+Show HN: An open-source workspace for legal document work
 ```
 
-URL 填仓库地址（不是官网——HN 用户要看代码）。正文（发帖后立即作为第一条评论贴出）：
+URL 填仓库地址。正文（发布前核对功能与发行状态）：
 
 ```
-I'm a practicing lawyer in Beijing. I wrote this because my working day was
-copying text between Word, a PDF viewer, twenty browser tabs and an AI chat
-window, and saving the result as final_v15.docx. Developers got an IDE thirty
-years ago; document work never did.
+AI WorkDeck grew out of day-to-day legal work and feedback from colleagues.
+It is an open-source exploration developed outside working hours with team
+support, sharing practical tools with other practitioners and developers.
 
 What it is: a desktop workbench (Electron, Spring backend bundled) where a
 whole matter lives in one window — files, an agent panel, an evidence pane,
-a browser, version history. AGPL, files stay local.
+a browser, version history. AGPL-3.0-or-later. Desktop editing uses local storage by default; cloud AI
+and other online services have separate data flows described in the privacy policy.
 
 The two parts that were technically interesting to build:
 
@@ -109,10 +109,8 @@ Also: Office and WPS add-ins that talk to the same backend, an iOS companion
 that drops evidence photos into the case folder, and a plugin SDK with a
 marketplace (a few plugins exist; the due-diligence one is closed-source).
 
-Honest limitations: the UI was Chinese-first and English is newer; the
-Windows build isn't code-signed yet; the official desktop build routes AI
-through our platform on a usage meter, though the self-hosted stack takes
-your own providers including Ollama.
+Cloud AI and hosted services have separate configuration and data flows.
+Check the current release and privacy documentation before evaluating a workflow.
 
 I'd love feedback from anyone who has fought LibreOffice-in-the-browser, or
 who does document-heavy work and has opinions about what "IDE for documents"
@@ -122,7 +120,7 @@ should mean.
 ### 阮一峰周刊自荐（在 ruanyf/weekly 当期「自荐」issue 下回复）
 
 ```
-**AI WorkDeck**：一位执业律师写的开源「律师 IDE」。把整个案子装进一个窗口——
+**AI WorkDeck**：源于一线法律实践、得到团队支持的开源工作台。把整个案子装进一个窗口——
 文件、AI 对话、依据窗格、浏览器、版本记录；编辑器是编译成 WebAssembly 的
 LibreOffice，AI 的每处修改都以字符级修订留痕，由人逐条接受或拒绝。桌面端本地
 存储，AGPL 开源，另有 Office/WPS 加载项与 iOS 取证同步。
@@ -138,8 +136,8 @@ https://github.com/AI-WorkDeck/aiworkdeck
 - 一句话（限 100 字）：
 
 ```
-律师写的开源「律师 IDE」：把整个案子装进一个窗口。内嵌 WebAssembly 版
-LibreOffice，AI 修改全部以字符级修订留痕、由人接受或拒绝，文件留在本机。
+源于法律实践与同事反馈的开源工作台，汇集项目文件、文档与 AI。内嵌 WebAssembly 版
+LibreOffice，AI 修改全部以字符级修订留痕、由人接受或拒绝，桌面编辑默认本地存储，在线服务另有数据流。
 ```
 
 ### awesome 榜单目标（按各仓 CONTRIBUTING 格式；可由 hermes 批准后自动开 PR）
