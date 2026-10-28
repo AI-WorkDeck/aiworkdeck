@@ -98,4 +98,15 @@ class GeneratedFileLocationTest {
             assertNull(GeneratedFileLocation.createdId(invalid));
         f.setIsDeleted(true); assertNull(GeneratedFileLocation.createdFile(files, 1L, "write_docx", result));
     }
+    @Test void imageAssetIdentityNeverComesFromPendingReceiptOrChangesDocumentDestination() {
+        ProjectFile asset = file(43, 1, null, false);
+        String result = GeneratedFileLocation.createdResult(asset, null);
+        assertEquals(List.of(43L), GeneratedFileLocation.createdIds("image_get_generation", result));
+        assertEquals(asset, GeneratedFileLocation.createdFile(files, 1L, "image_get_generation", result));
+        assertNull(GeneratedFileLocation.createdFile(files, 2L, "image_get_generation", result));
+        assertTrue(GeneratedFileLocation.createdIds("image_get_generation", "{\"state\":\"PENDING\",\"generationId\":\"task\"}").isEmpty());
+        assertTrue(GeneratedFileLocation.createdIds("image_generate_asset", result).isEmpty());
+        assertNull(GeneratedFileLocation.parentParameter("image_get_generation", null));
+    }
+
 }

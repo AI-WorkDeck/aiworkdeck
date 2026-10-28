@@ -213,7 +213,7 @@ public class ToolDisclosurePolicy {
         // doc_* 里剩下的全是版式与排版：字符格式、段落格式、页面、页眉页脚、目录、脚注、图片、超链接……
         CATEGORIES.put("format", List.of("doc_"));
         CATEGORIES.put("spreadsheet", List.of("sheet_"));
-        CATEGORIES.put("slides", List.of("slide_", "pptx_"));
+        CATEGORIES.put("slides", List.of("slide_", "pptx_", "image_generate_asset", "image_get_generation"));
         CATEGORIES.put("office", List.of("office_"));
         CATEGORIES.put("pdf", List.of("pdf_"));
         CATEGORIES.put("litigation", List.of("litigation_"));
