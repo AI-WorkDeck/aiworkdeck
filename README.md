@@ -17,7 +17,7 @@
 
 <p align="center">
   <strong>English</strong> · <a href="README.zh-CN.md">简体中文</a><br>
-  <a href="WHY.md">Our thesis</a> · <a href="#build-with-us">Build with us</a> · <a href="docs/architecture.md">Architecture</a> · <a href="https://github.com/AI-WorkDeck/aiworkdeck/releases/latest">Download</a> · <a href="mailto:hi@aiworkdeck.com">Investment & partnerships</a>
+  <a href="WHY.md">Our thesis</a> · <a href="#build-with-us">Build with us</a> · <a href="docs/architecture.md">Architecture</a> · <a href="https://github.com/AI-WorkDeck/aiworkdeck/releases/latest">Download</a> · <a href="mailto:hi@aiworkdeck.com">Community contact</a>
 </p>
 
 A contract is ready when someone can stand behind it. That means checking its sources, negotiating changes, preserving the document's structure, and knowing which version was approved. Producing the first draft is only part of the job.
@@ -25,6 +25,8 @@ A contract is ready when someone can stand behind it. That means checking its so
 **AI WorkDeck brings those steps into one extensible workspace.** Agents work alongside the document editor, project files, source references, and version history. A lawyer can inspect an AI-authored change in the document, accept or reject it, and keep the work in the project's history. Developers can build on the same editor, agent tools, and plugin runtime.
 
 **We are building a shared foundation for professional AI:** start with demanding legal workflows, make the underlying document operations reusable, and enable specialists to build the next applications on top.
+
+AI WorkDeck is an open-source exploration rooted in day-to-day legal work, developed outside working hours with team support and feedback from colleagues. Its initiator, Zewei Han, is a practicing lawyer and a partner at Beijing Redsunny Law. He previously worked at King & Wood Mallesons, where he supported projects of the firm’s legal technology team, and co-authored 《大模型时代的法律科技》 (on legal technology in the era of large models). The project shares tools and methods from practice for fellow practitioners and developers to examine and improve.
 
 <p align="center">
   <img src="docs/images/marketing/01-workspace.png" alt="Project files, document editor, and AI conversation in one workspace" width="1000">
@@ -112,18 +114,6 @@ The next stage is about making this foundation easier to trust and easier to bui
 
 Bring a concrete use case to [Discussions](https://github.com/AI-WorkDeck/aiworkdeck/discussions) or propose a focused [issue](https://github.com/AI-WorkDeck/aiworkdeck/issues). Developers and practitioners can help define the work together.
 
-## Open source and the business
-
-The open-source workbench gives builders code they can inspect, adapt, and extend. The commercial model combines usage-based platform services, commercial licensing and implementation support, and a marketplace for specialist workflows. The growth thesis is to earn a place in recurring legal work, support organizations deploying it, and let specialist builders extend it into adjacent workflows. Each useful extension gives another team a reason to adopt the foundation; a shared runtime reduces what the next builder has to recreate.
-
-The steward is **北京京微资易科技有限公司 (Beijing Jingwei Ziyi Technology Co., Ltd.)**; **真善美承泽有限公司 (Zhen Shan Mei Grace Legacy Limited)** operates the international offering. Commercial licensing covers the steward's code; third-party components retain their own terms. See [commercial licensing](legal/COMMERCIAL-LICENSE.md), [third-party components](legal/THIRD-PARTY-COMPONENTS.md), and [trademarks](legal/TRADEMARKS.md).
-
-### Community Fund
-
-The steward's existing policy allocates **20% of net commercial-licensing revenue** to a community fund for bounties, Skill-creation grants, and community events. This is a public policy that may be adjusted prospectively, not an individual contractual entitlement. Governance roles carry technical authority; economic terms are set separately in the [bounty policy](BOUNTIES.md) and [marketplace terms](legal/MARKETPLACE-TERMS.md).
-
-**Interested in investing, building a vertical product, or becoming an implementation partner?** Contact [hi@aiworkdeck.com](mailto:hi@aiworkdeck.com) to discuss the product, technical foundation, and commercial direction. We want partners who care about the quality of the work delivered, and builders who want to shape how professional agents work.
-
 <a id="quick-start"></a>
 
 ## Evaluate the project
@@ -134,3 +124,11 @@ The steward's existing policy allocates **20% of net commercial-licensing revenu
 - **Understand the rights:** [AGPL-3.0-or-later](legal/LICENSE) · [CLA](legal/CLA.md) · [Commercial licensing](legal/COMMERCIAL-LICENSE.md).
 
 Follow [releases](https://github.com/AI-WorkDeck/aiworkdeck/releases), join a [discussion](https://github.com/AI-WorkDeck/aiworkdeck/discussions), or build a small extension. The most useful next step is something we can inspect and improve together.
+
+## Licensing and stewardship
+
+The steward is **北京京微资易科技有限公司 (Beijing Jingwei Ziyi Technology Co., Ltd.)**; **真善美承泽有限公司 (Zhen Shan Mei Grace Legacy Limited)** operates the international offering. Commercial licensing covers the steward's code; third-party components retain their own terms. See [commercial licensing](legal/COMMERCIAL-LICENSE.md), [third-party components](legal/THIRD-PARTY-COMPONENTS.md), and [trademarks](legal/TRADEMARKS.md).
+
+The steward's existing policy allocates **20% of net commercial-licensing revenue** to a community fund for bounties, Skill-creation grants, and community events. This is a public policy that may be adjusted prospectively, not an individual contractual entitlement. Governance roles carry technical authority; economic terms are set separately in the [bounty policy](BOUNTIES.md) and [marketplace terms](legal/MARKETPLACE-TERMS.md).
+
+For licensing needs outside AGPL, contact [hi@aiworkdeck.com](mailto:hi@aiworkdeck.com); the [commercial license](legal/COMMERCIAL-LICENSE.md) sets out the applicable terms.
