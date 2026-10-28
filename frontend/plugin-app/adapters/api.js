@@ -17,3 +17,5 @@ export const getLitigationKickoffPrompt = (_projectId, payload) => request('liti
 export const restyleLitigationDiagram = (_projectId, folderId, mode, confirmOverwrite) => request('litigation', 'restyle', { folderId, mode, confirmOverwrite })
 export const packStatus = () => request('litigation', 'packStatus', {})
 export const packInstall = () => request('litigation', 'packInstall', {})
+
+export const getSensitiveRecovery = payload => request('sensitive', 'recovery', payload)

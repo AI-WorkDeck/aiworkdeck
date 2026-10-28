@@ -45,7 +45,7 @@ class SensitiveControllerTest {
     @Test void allOperationsRequireAuthenticationBeforeStorageAccess() throws Exception {
         try (var auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession(null)).thenReturn(null);
-            for (String action : List.of("preview", "desensitize", "restore")) {
+            for (String action : List.of("preview", "desensitize", "restore", "recovery")) {
                 mvc().perform(post("/api/sensitive/" + action).contentType("application/json").content("{\"fileId\":1}"))
                         .andExpect(status().isUnauthorized());
             }
@@ -78,9 +78,86 @@ class SensitiveControllerTest {
             String body = json.writeValueAsString(Map.of("fileId", 1, "strategies", List.of("COMPANY", "PHONE"), "mode", "TOKEN", "password", "test-password-2026"));
             String output = mvc().perform(post("/api/sensitive/desensitize").header("X-Session-Id", "s").contentType("application/json").content(body))
                     .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
-                    .andExpect(jsonPath("$.file.id").value(3)).andReturn().getResponse().getContentAsString();
+                    .andExpect(jsonPath("$.file.id").value(3)).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
             assertFalse(output.contains("13800001111")); assertFalse(output.contains("星河")); assertFalse(output.contains("test-password"));
             assertTrue(json.readTree(output).get("recoveryKit").asText().startsWith("AWD-RECOVERY-1:"));
+        }
+    }
+
+    @Test void projectRecoveryPersistsAndReloadsWithShortPassword() throws Exception {
+        file(); when(members.hasReadPermission(2L, 9L)).thenReturn(true); when(members.hasWritePermission(2L, 9L)).thenReturn(true);
+        List<ProjectFile> registered = new ArrayList<>();
+        when(files.createFile(eq(2L), isNull(), anyString(), anyString(), anyLong(), anyString(), anyString(), eq(9L)))
+                .thenAnswer(call -> {
+                    var f = new ProjectFile(); f.setId(10L + registered.size()); f.setProjectId(2L);
+                    f.setName(call.getArgument(2)); f.setFileType(call.getArgument(3)); f.setFilePath(call.getArgument(5));
+                    registered.add(f); when(files.getFile(f.getId())).thenReturn(f);
+                    when(local.load(f.getFilePath())).thenReturn(new FileSystemResource(dir.resolve(f.getName())));
+                    return f;
+                });
+        when(files.getFilesByParent(2L, null)).thenAnswer(call -> registered);
+        try (var auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(9L);
+            String body = json.writeValueAsString(Map.of("fileId", 1, "strategies", List.of("PHONE"), "mode", "TOKEN", "password", "1"));
+            String output = mvc().perform(post("/api/sensitive/desensitize").header("X-Session-Id", "s").contentType("application/json").content(body))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+            assertEquals(2, registered.size());
+            var kit = registered.get(0); var redacted = registered.get(1);
+            assertEquals(redacted.getFilePath() + ".awd-recovery", kit.getFilePath());
+            String encrypted = Files.readString(dir.resolve(kit.getName()));
+            assertEquals(json.readTree(output).get("recoveryKit").asText(), encrypted);
+            assertFalse(encrypted.contains("13800001111"));
+            for (Long id : List.of(redacted.getId(), kit.getId())) {
+                mvc().perform(post("/api/sensitive/recovery").header("X-Session-Id", "s").contentType("application/json")
+                        .content(json.writeValueAsString(Map.of("fileId", id))))
+                        .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                        .andExpect(jsonPath("$.recoveryKit").value(encrypted));
+            }
+            String restored = mvc().perform(post("/api/sensitive/restore").header("X-Session-Id", "s").contentType("application/json")
+                    .content(json.writeValueAsString(Map.of("fileId", redacted.getId(), "recoveryKit", encrypted, "password", "1"))))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+            assertEquals(Files.readString(dir.resolve("input.txt")), Files.readString(dir.resolve(json.readTree(restored).get("file").get("name").asText())));
+        }
+    }
+
+    @Test void absentProjectRecoveryDoesNotPickUnrelatedMaterial() throws Exception {
+        file(); when(members.hasReadPermission(2L, 9L)).thenReturn(true);
+        var kit = new ProjectFile(); kit.setId(3L); kit.setProjectId(2L); kit.setFilePath("projects/2/other.txt.awd-recovery");
+        when(files.getFilesByParent(2L, null)).thenReturn(List.of(kit));
+        try (var auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(9L);
+            mvc().perform(post("/api/sensitive/recovery").header("X-Session-Id", "s").contentType("application/json").content("{\"fileId\":1}"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.recoveryKit").value(""));
+            verify(local, never()).load(kit.getFilePath());
+        }
+    }
+
+    @Test void failedDocumentRegistrationPurgesOnlyTheNewRecoveryMaterial() throws Exception {
+        file(); when(members.hasReadPermission(2L, 9L)).thenReturn(true); when(members.hasWritePermission(2L, 9L)).thenReturn(true);
+        var kit = new ProjectFile(); kit.setId(3L);
+        when(files.createFile(eq(2L), isNull(), anyString(), eq("awd-recovery"), anyLong(), anyString(), anyString(), eq(9L))).thenReturn(kit);
+        when(files.createFile(eq(2L), isNull(), anyString(), eq("txt"), anyLong(), anyString(), anyString(), eq(9L))).thenThrow(new RuntimeException("registration failed"));
+        try (var auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(9L);
+            mvc().perform(post("/api/sensitive/desensitize").header("X-Session-Id", "s").contentType("application/json")
+                    .content(json.writeValueAsString(Map.of("fileId", 1, "strategies", List.of("PHONE"), "mode", "TOKEN", "password", "1"))))
+                    .andExpect(status().isInternalServerError());
+            verify(files).permDelete(3L, 9L);
+            verify(files, never()).delete(anyLong(), anyLong());
+            try (var paths = Files.list(dir)) { assertEquals(List.of("input.txt"), paths.map(path -> path.getFileName().toString()).toList()); }
+        }
+    }
+
+    @Test void matchedRecoveryRequiresItsOwnReadPermission() throws Exception {
+        file(); when(members.hasReadPermission(2L, 9L)).thenReturn(true);
+        var kit = new ProjectFile(); kit.setId(3L); kit.setProjectId(2L); kit.setFilePath("projects/2/input.txt.awd-recovery");
+        when(files.getFilesByParent(2L, null)).thenReturn(List.of(kit));
+        doThrow(new ProjectFileAccessService.FileAccessDeniedException()).when(fileAccess).requireRead(kit, 9L);
+        try (var auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(9L);
+            mvc().perform(post("/api/sensitive/recovery").header("X-Session-Id", "s").contentType("application/json").content("{\"fileId\":1}"))
+                    .andExpect(status().isForbidden());
+            verify(local, never()).load(kit.getFilePath());
         }
     }
 

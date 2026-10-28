@@ -24,6 +24,21 @@ class SensitiveRecoveryTest {
     }
 
     @Test
+    void shortPasswordsRoundTripWithoutWeakeningEncryptionOrAcceptingBlank() throws Exception {
+        Path source = dir.resolve("short.txt");
+        Files.writeString(source, "电话13800001111");
+        for (String value : List.of("1", "中文", "123456")) {
+            var result = service.processFile(source.toString(), new SensitiveService.Options(
+                    List.of("PHONE"), "TOKEN", List.of(), List.of(), value));
+            assertEquals(Files.readString(source), Files.readString(Path.of(service.restoreFile(
+                    result.path(), result.recoveryKit(), value).path())));
+            assertThrows(IllegalArgumentException.class, () -> service.restoreFile(result.path(), result.recoveryKit(), value + "x"));
+        }
+        for (String value : List.of("", "   ")) assertThrows(IllegalArgumentException.class,
+                () -> com.checkba.service.sensitive.SensitiveRecoveryKit.validatePassword(value));
+    }
+
+    @Test
     void reversibleTextAndEditedOutputUseExactTokens() throws Exception {
         String text = "甲方：北京星河科技有限公司。联系人：张三。电话13800001111。\n张三代表星河签字。";
         Path source = dir.resolve("company.txt");

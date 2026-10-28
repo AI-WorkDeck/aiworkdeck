@@ -40,9 +40,10 @@ window.files=[{id:1,name:'合成材料.txt',fileType:'txt',filePath:'synthetic/�
 window.diagrams=[{folderId:60,name:'合成关系',drawioFileId:61,svgFileId:62,mapFileId:63,layout:'relation_tree',mode:'奇川风',formats:['drawio','svg','png']}];
 window.packState='not_installed';window.pickId=1;window.failPreview=false;window.changed=false;window.failRestyle=false;window.generation={phase:'idle'};window.failGenerationStatus=false;window.failGenerationStart=false;
 const uni={ $emit(name,data){events.push({name,data});if(name==='awd:open-evidence-target')opened.push(data.fileId)},showToast({title}){events.push({name:'toast',title})} };
+const getSensitiveRecovery=async p=>{calls.push({operation:'recovery',params:p});return {recoveryKit:'AWD-RECOVERY-1:synthetic-encrypted-map',name:'脱敏副本.txt.awd-recovery'}};
 const getSensitiveOptions=async()=>[{value:'CHINESE_NAME',label:'姓名'},{value:'PHONE',label:'电话'},{value:'ADDRESS',label:'地址'}];
 const previewSensitiveFile=async p=>{calls.push({operation:'preview',params:p});if(failPreview)throw Error('合成预览失败');return {text:'联系人 [[姓名1_demo]]，电话 [[电话1_demo]]',counts:{CHINESE_NAME:1,PHONE:1},suspects:{},warnings:[]}};
-const desensitizeFile=async p=>{calls.push({operation:'redact',params:p});const file={id:10,name:'脱敏副本.txt',fileType:'txt',filePath:'synthetic/redacted.txt'};files.push(file);return {file,recoveryKit:'AWD-RECOVERY-1:synthetic-encrypted-map',counts:{CHINESE_NAME:1,PHONE:1},warnings:[]}};
+const desensitizeFile=async p=>{calls.push({operation:'redact',params:p});const file={id:10,name:'脱敏副本.txt',fileType:'txt',filePath:'synthetic/redacted.txt'};files.push(file,{id:12,name:'脱敏副本.txt.awd-recovery',fileType:'awd-recovery',filePath:'synthetic/redacted.txt.awd-recovery'});return {file,recoveryKit:'AWD-RECOVERY-1:synthetic-encrypted-map',counts:{CHINESE_NAME:1,PHONE:1},warnings:[]}};
 const restoreSensitiveFile=async p=>{calls.push({operation:'restore',params:p});const file={id:11,name:'复敏副本.txt',fileType:'txt',filePath:'synthetic/restored.txt'};files.push(file);return {file,counts:{CHINESE_NAME:1,PHONE:1},warnings:[]}};
 const getLitigationVisualStatus=async()=>({available:packState==='ready',graphviz:true,timelineAvailable:true,reason:packState==='ready'?'':'合成引擎待安装'});
 const getLitigationDiagrams=async()=>diagrams;
@@ -149,32 +150,30 @@ try {
   await frame.waitForSelector('.preview-text')
   assert.match(await frame.$eval('.preview-text', el => el.textContent), /\[\[姓名1_demo\]\]/)
   assert.equal(await page.evaluate(() => calls.at(-1).params.password), undefined)
-  await frame.type('.password-input input', 'synthetic-password', { delay: 20 })
+  await frame.type('.password-input input', '1', { delay: 20 })
   await frame.waitForFunction(() => !Array.from(document.querySelectorAll('uni-button')).find(el => el.textContent.trim() === '生成脱敏文件')?.getAttribute('disabled'))
   await clickText(frame, 'uni-button', '生成脱敏文件')
   await page.waitForFunction(() => opened.includes(10))
-  let download
-  for (let attempt = 0; attempt < 100 && !download; attempt++) {
-    download = (await readdir(out)).find(name => name.endsWith('.awd-recovery'))
-    if (!download) await new Promise(resolve => setTimeout(resolve, 50))
-  }
-  assert.ok(download, 'recovery artifact downloads through the real host action')
-  assert.match(download, /^合成材料-复敏-/)
-  assert.equal(await readFile(resolve(out, download), 'utf8'), 'AWD-RECOVERY-1:synthetic-encrypted-map')
+  assert.equal((await readdir(out)).filter(name => name.endsWith('.awd-recovery')).length, 0, 'generation must not trigger a system download')
   assert.equal(await frame.$('.password-input'), null)
   await clickText(frame, 'uni-button', '复敏这份结果')
   await frame.waitForFunction(() => document.querySelector('.path-display')?.textContent === '脱敏副本.txt')
   assert.equal(await frame.$eval('.password-input input', el => el.value), '')
-  await frame.type('.password-input input', 'synthetic-password', { delay: 20 })
+  await frame.type('.password-input input', '1', { delay: 20 })
   await clickText(frame, 'uni-button', '生成复敏文件')
   await page.waitForFunction(() => opened.includes(11))
   assert.equal(await page.evaluate(() => calls.find(c => c.operation === 'restore').params.fileId), 10)
-  checks.push('picker cancel/select', 'preview/create/open', 'real recovery download bytes', 'restore selected output/password reset')
+  checks.push('picker cancel/select', 'preview/create/open', 'no system download', 'restore selected output/password reset')
   console.log('Passed redaction, recovery artifact and restoration')
-  const choosingKit = page.waitForFileChooser()
-  await clickText(frame, 'uni-button', '已使用本次生成的加密映射')
-  await (await choosingKit).accept([resolve(out, download)])
-  await frame.waitForFunction(name => Array.from(document.querySelectorAll('uni-button')).some(el => el.textContent.trim() === name), {}, download)
+  await clickText(frame, 'uni-button', '已关联本次恢复材料')
+  await page.waitForFunction(() => workspace.showFilePicker === true)
+  await page.click('#cancel')
+  await page.waitForFunction(() => workspace.showFilePicker === false)
+  await clickText(frame, 'uni-button', '已关联本次恢复材料')
+  await page.waitForFunction(() => workspace.showFilePicker === true)
+  await page.evaluate(() => { pickId = 12 })
+  await page.click('#pick')
+  await frame.waitForFunction(() => Array.from(document.querySelectorAll('uni-button')).some(el => el.textContent.trim() === '脱敏副本.txt.awd-recovery'))
   await frame.click('.operation-tabs uni-button:first-child')
   await page.evaluate(() => { failPreview = true })
   await clickText(frame, 'uni-button', '预览脱敏结果')
@@ -183,14 +182,14 @@ try {
   await page.evaluate(() => { failPreview = false })
   await clickText(frame, 'uni-button', '预览脱敏结果')
   await frame.waitForSelector('.preview-text')
-  await frame.type('.password-input input', 'synthetic-password', { delay: 20 })
+  await frame.type('.password-input input', '1', { delay: 20 })
   const redactions = await page.evaluate(() => calls.filter(c => c.operation === 'redact').length)
   await page.evaluate(() => { changed = true })
   await clickText(frame, 'uni-button', '生成脱敏文件')
   await frame.waitForFunction(() => document.querySelector('.error-text')?.textContent.includes('重新预览'))
   assert.equal(await frame.$('.preview-text'), null)
   assert.equal(await page.evaluate(() => calls.filter(c => c.operation === 'redact').length), redactions)
-  checks.push('real file chooser imports recovery artifact', 'preview failure/retry', 'editor save changes require fresh preview')
+  checks.push('project picker cancel and recovery selection', 'preview failure/retry', 'editor save changes require fresh preview')
   await (await page.$('#plugin')).screenshot({ path: resolve(out, 'sensitive.png') })
 
   frame = await goto('litigation-visual')

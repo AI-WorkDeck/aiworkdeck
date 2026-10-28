@@ -33,9 +33,9 @@ export function createPluginBusinessServices({ api, projectId, permissions, isCu
       }
       const operations = service === 'search' ? ['query', 'tags', 'open'] : service === 'litigation'
         ? ['status', 'list', 'scope', 'kickoff', 'restyle', 'packStatus', 'packInstall', 'open', 'generate', 'generation', 'answer', 'stop', 'continue']
-        : ['options', 'choose', 'active', 'prepare', 'preview', 'redact', 'restore', 'open', 'download']
+        : ['options', 'choose', 'active', 'prepare', 'preview', 'redact', 'restore', 'recovery', 'open', 'download']
       if (!delegate && !operations.includes(operation)) fail('unknown_operation', 'Unknown service operation')
-      if (service === 'sensitive' && !['options', 'choose', 'active', 'open'].includes(operation) && !permissions().includes('file_write')) fail('permission_denied', 'file_write is required')
+      if (service === 'sensitive' && !['options', 'choose', 'active', 'open', 'recovery'].includes(operation) && !permissions().includes('file_write')) fail('permission_denied', 'file_write is required')
       if (service === 'litigation' && ['restyle', 'packInstall'].includes(operation) && !permissions().includes('file_write')) fail('permission_denied', 'file_write is required')
       if (service === 'litigation' && ['generate', 'generation', 'answer', 'stop', 'continue'].includes(operation)
           && !['file_write', 'ai'].every(permission => permissions().includes(permission))) fail('permission_denied', 'panels.litTaskDisabled')
@@ -109,8 +109,9 @@ export function createPluginBusinessServices({ api, projectId, permissions, isCu
             const file = (await listFiles()).find(file => String(file.id) === String(params.fileId))
             if (controller.signal.aborted || !isCurrent()) fail('cancelled', 'Request cancelled')
             if (!file) fail('not_found', 'File not found in this project')
-            if (!actions.prepareFile) fail('unavailable', 'Document save service unavailable')
-            if (operation === 'prepare') result = await actions.prepareFile(file.id)
+            if (operation !== 'recovery' && !actions.prepareFile) fail('unavailable', 'Document save service unavailable')
+            if (operation === 'recovery') result = await api.getSensitiveRecovery({ fileId: file.id }, { signal: controller.signal })
+            else if (operation === 'prepare') result = await actions.prepareFile(file.id)
             else {
               // Recheck the latest editor state even when a plugin skips its UI's
               // prepare step. Never operate on an unsaved, stale disk copy.

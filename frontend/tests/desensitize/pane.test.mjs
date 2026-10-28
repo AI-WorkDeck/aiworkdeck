@@ -11,7 +11,7 @@ const script = sfc.match(/<script>([\s\S]*?)<\/script>/)[1]
   .replace(/^import .*$/m, '').replace('export default', 'const component =') + '\ncomponent'
 function pane(api = {}) {
   const events = []
-  const component = vm.runInNewContext(script, { ...api, URL, Blob, setTimeout })
+  const component = vm.runInNewContext(script, { getSensitiveRecovery: async () => ({ recoveryKit: '', name: '' }), ...api, URL, Blob, setTimeout })
   const state = { ...component.data(), projectId: 1, prepareFile: async () => false, $t: x => x, $emit: (...args) => events.push(args) }
   for (const [key, fn] of Object.entries(component.methods)) state[key] = fn.bind(state)
   for (const [key, fn] of Object.entries(component.computed)) Object.defineProperty(state, key, { get: fn.bind(state) })
@@ -31,12 +31,12 @@ test('preview sends rules and file id without the recovery password or map', asy
   assert.equal(state.totalMatches, 1)
 })
 
-test('new generation replaces the downloadable kit and clears preview tokens/password', async () => {
+test('new generation opens the project result without any download and clears preview tokens/password', async () => {
   const { state, events } = pane({ desensitizeFile: async () => ({ file: { id: 4 }, recoveryKit: 'AWD-RECOVERY-1:encrypted', counts: { PHONE: 2 } }) })
   state.fileId = 1; state.fileName = 'sample.txt'; state.preview = { text: 'preview' }; state.password = 'secret-password'
   let downloads = 0; state.downloadKit = () => { downloads++ }
   await state.handleGenerate()
-  assert.equal(downloads, 1)
+  assert.equal(downloads, 0)
   assert.equal(state.exportedKit, 'AWD-RECOVERY-1:encrypted')
   assert.equal(state.preview, null); assert.equal(state.password, '')
   assert.equal(events[0][0], 'open-file'); assert.equal(events[0][1].id, 4)
@@ -113,14 +113,38 @@ test('changes saved after preview require a fresh preview before generation', as
   assert.equal(calls, 0); assert.equal(state.preview, null)
 })
 
-test('download failure keeps the encrypted kit available and still opens the generated document', async () => {
-  const { state, events } = pane({ desensitizeFile: async () => ({ file: { id: 4 }, recoveryKit: 'encrypted' }) })
-  state.fileId = 1; state.preview = {}; state.password = 'secret-password'
-  state.downloadKit = () => { throw new Error('download failed') }
-  await state.handleGenerate()
-  assert.equal(state.exportedKit, 'encrypted'); assert.equal(state.password, '')
-  assert.equal(state.error, 'panels.deDownloadRetry')
-  assert.equal(events[0][0], 'open-file'); assert.equal(events[0][1].id, 4)
+test('switching to restore automatically associates the selected generated document', async () => {
+  const { state } = pane()
+  state.lastRedaction = { file: { id: 4 }, kit: 'encrypted' }
+  state.selectFile({ id: 4, name: 'redacted.txt', filePath: 'redacted.txt' })
+  state.chooseOperation('restore')
+  assert.equal(state.recoveryKit, 'encrypted')
+  state.password = '1'
+  assert.equal(state.restoreRequirement, '')
+})
+
+test('reopened pane loads project recovery materials; late results cannot cross file selections', async () => {
+  let resolveFirst
+  const { state } = pane({ getSensitiveRecovery: ({ fileId }) => fileId === 1
+    ? new Promise(resolve => { resolveFirst = resolve }) : Promise.resolve({ recoveryKit: 'second', name: 'second.awd-recovery' }) })
+  state.operation = 'restore'
+  state.selectFile({ id: 1, name: 'first.txt', filePath: 'first.txt' })
+  state.selectFile({ id: 2, name: 'second.txt', filePath: 'second.txt' })
+  await new Promise(resolve => setTimeout(resolve, 0))
+  resolveFirst({ recoveryKit: 'first', name: 'first.awd-recovery' })
+  await new Promise(resolve => setTimeout(resolve, 0))
+  assert.equal(state.recoveryKit, 'second')
+  assert.equal(state.loadingKit, false)
+})
+
+test('recovery material picker uses the project picker and rejects a document', async () => {
+  const { state, events } = pane()
+  state.$emit = (...event) => { events.push(event); event[2]?.() }
+  state.importKit()
+  assert.equal(events[0][0], 'request-file-select')
+  events[0][1]({ id: 2, name: 'redacted.docx' })
+  assert.equal(state.error, 'panels.deKitInvalid')
+  assert.equal(state.recoveryKit, '')
 })
 
 // Render the actual template: collapsed settings must retain values, and creation
@@ -150,11 +174,11 @@ test('initial sidebar exposes preview with collapsed settings and no premature p
   assert.doesNotMatch(html, />panels.deGenerate</)
 })
 
-test('review reveals password and disables generation until it is long enough', async () => {
+test('review reveals password and disables generation until it is nonempty', async () => {
   const html = await renderPane({ fileId: 1, preview: { text: 'review this' } })
   assert.match(html, /password-input/)
   assert.match(html, /<button[^>]*disabled[^>]*>panels.deGenerate<\/button>/)
-  const ready = await renderPane({ fileId: 1, preview: { text: 'review this' }, password: 'long-enough-password' })
+  const ready = await renderPane({ fileId: 1, preview: { text: 'review this' }, password: '1' })
   assert.match(ready, /<button(?![^>]*disabled)[^>]*>panels.deGenerate<\/button>/)
 })
 
