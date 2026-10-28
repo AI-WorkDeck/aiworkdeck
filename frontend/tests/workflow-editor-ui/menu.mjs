@@ -54,6 +54,14 @@ try {
   await page.keyboard.press('Escape')
   results.escapeDismisses = await page.$eval('.bw-context-mask', el => !el.checkVisibility()).catch(() => true)
   assert.equal(results.escapeDismisses, true, 'Escape must dismiss the menu')
+  await page.click('.builtin-workflow-card-actions')
+  await page.waitForSelector('.bw-context-menu', { visible: true })
+  const actionClickBounds = await page.$eval('.bw-context-menu', el => {
+    const r = el.getBoundingClientRect()
+    return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }
+  })
+  assert(actionClickBounds.left > 500, 'clicking version action in a 1000px viewport must anchor to the right-side chat panel, not jump to x=220')
+  await page.keyboard.press('Escape')
   const lastCard = await page.$('.builtin-workflow-card')
   const lastBox = await lastCard.boundingBox()
   await page.mouse.click(lastBox.x + lastBox.width - 4, lastBox.y + lastBox.height / 2, { button: 'right' })
