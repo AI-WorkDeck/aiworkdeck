@@ -175,6 +175,34 @@ class HarnessEvolutionServiceTest {
     }
 
     @Test
+    void anchorRecoveryIsIgnoredAndNeverPollutesMemory() {
+        HarnessDiagnosticService.HarnessAdaptation anchorRecovery = new HarnessDiagnosticService.HarnessAdaptation(
+                "ha-anchor-recovery",
+                HarnessDiagnosticService.TIER_INVARIANT,
+                HarnessDiagnosticService.ACTION_ANCHOR_PROBE_RECOVERY,
+                "doc_replace_at_anchor",
+                "Anchor probe recovery",
+                "Stale document anchor",
+                "Probe the current anchor before retrying",
+                List.of(),
+                null,
+                System.currentTimeMillis());
+
+        Optional<HarnessEvolutionService.HarnessEvolutionRecord> recordOpt =
+                evolutionService.evaluateTurnEvolution(
+                        "conv-ppt-1",
+                        7L,
+                        10L,
+                        "在合同第一条插入定义后，把违约金比例替换为 15%",
+                        null,
+                        List.of(),
+                        List.of(anchorRecovery));
+
+        assertTrue(recordOpt.isEmpty(), "Anchor recovery must remain within the turn and never persist as user memory");
+        verify(memoryDocumentService, never()).write(anyLong(), anyString(), anyString(), anyString(), anyLong());
+    }
+
+    @Test
     void autonomousJudgmentInfersUserScopeAndAutoPromotesDomainSkill() {
         Optional<HarnessEvolutionService.HarnessEvolutionRecord> recordOpt =
                 evolutionService.evaluateTurnEvolution(
