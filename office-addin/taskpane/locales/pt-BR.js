@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "Inserir imagem no slide",
+  cmdPptAddChart: "Inserir gráfico no slide",
+  cmdPptFormatChart: "Formatar gráfico do slide",
+  cmdPptSetTransition: "Definir transição do slide",
   wordStyleUnsupported: "Este aplicativo não pode aplicar completamente estes campos do perfil: {fields}. Nenhuma alteração foi iniciada.",
+  wordStyleNotApplied: "O aplicativo hospedeiro não aplicou o estilo de parágrafo solicitado. Verifique o documento antes de tentar novamente.",
 
   cmdGetParagraphs: "Ler parágrafos",
   cmdGetOutline: "Ler estrutura",

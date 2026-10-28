@@ -3,6 +3,10 @@
 
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "Inserisci immagine nella diapositiva",
+    "office_ppt_add_chart": "Inserisci grafico nella diapositiva",
+    "office_ppt_format_chart": "Formatta grafico della diapositiva",
+    "office_ppt_set_transition": "Imposta transizione della diapositiva",
     "office_file_create": "Crea file",
     "office_file_save": "Salva file corrente",
     "office_file_export_pdf": "Esporta PDF nel progetto",

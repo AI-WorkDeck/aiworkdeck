@@ -274,7 +274,8 @@ public class ClientCapabilityService {
                     || officeHostOf(conversationId) != OfficeHost.POWERPOINT
                     || officeFamilyOf(conversationId) == OfficeFamily.WPS;
         }
-        if (java.util.Set.of("office_ppt_read_notes", "office_ppt_write_notes").contains(toolName)) {
+        if (java.util.Set.of("office_ppt_read_notes", "office_ppt_write_notes",
+                "office_ppt_add_chart", "office_ppt_format_chart", "office_ppt_set_transition").contains(toolName)) {
             return capabilityOf(conversationId) == Capability.OFFICE
                     && officeHostOf(conversationId) == OfficeHost.POWERPOINT
                     && officeFamilyOf(conversationId) == OfficeFamily.WPS;

@@ -3,6 +3,10 @@
 
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "Sisipkan gambar pada slide",
+    "office_ppt_add_chart": "Sisipkan grafik pada slide",
+    "office_ppt_format_chart": "Format grafik slide",
+    "office_ppt_set_transition": "Atur transisi slide",
     "office_file_create": "Buat berkas baru",
     "office_file_save": "Simpan berkas saat ini",
     "office_file_export_pdf": "Ekspor PDF ke proyek",

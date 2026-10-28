@@ -3,6 +3,10 @@
 
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "Chèn hình ảnh vào trang chiếu",
+    "office_ppt_add_chart": "Chèn biểu đồ vào trang chiếu",
+    "office_ppt_format_chart": "Định dạng biểu đồ trang chiếu",
+    "office_ppt_set_transition": "Đặt hiệu ứng chuyển trang chiếu",
     "office_file_create": "Tạo tệp mới",
     "office_file_save": "Lưu tệp hiện tại",
     "office_file_export_pdf": "Xuất PDF vào dự án",

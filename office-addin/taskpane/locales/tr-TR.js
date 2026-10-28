@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "Slayda resim ekle",
+  cmdPptAddChart: "Slayda grafik ekle",
+  cmdPptFormatChart: "Slayt grafiğini biçimlendir",
+  cmdPptSetTransition: "Slayt geçişini ayarla",
   wordStyleUnsupported: "Bu uygulama şu profil alanlarını tam olarak uygulayamıyor: {fields}. Hiçbir değişiklik başlatılmadı.",
+  wordStyleNotApplied: "Ana uygulama istenen paragraf stilini uygulamadı. Yeniden denemeden önce belgeyi kontrol edin.",
 
   cmdGetParagraphs: "Paragrafları oku",
   cmdGetOutline: "Ana hatları oku",

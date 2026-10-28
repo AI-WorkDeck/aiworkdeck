@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "Εισαγωγή εικόνας στη διαφάνεια",
+  cmdPptAddChart: "Εισαγωγή γραφήματος στη διαφάνεια",
+  cmdPptFormatChart: "Μορφοποίηση γραφήματος διαφάνειας",
+  cmdPptSetTransition: "Ορισμός μετάβασης διαφάνειας",
   wordStyleUnsupported: "Η εφαρμογή δεν μπορεί να εφαρμόσει πλήρως αυτά τα πεδία προφίλ: {fields}. Δεν ξεκίνησαν αλλαγές.",
+  wordStyleNotApplied: "Η εφαρμογή υποδοχής δεν εφάρμοσε το ζητούμενο στυλ παραγράφου. Ελέγξτε το έγγραφο πριν δοκιμάσετε ξανά.",
 
   cmdGetParagraphs: "Ανάγνωση παραγράφων",
   cmdGetOutline: "Ανάγνωση διάρθρωσης",

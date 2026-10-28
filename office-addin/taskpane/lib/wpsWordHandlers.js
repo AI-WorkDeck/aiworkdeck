@@ -33,6 +33,7 @@
  */
 
 import { t } from './i18n.js'
+import { wpsNativeServices, createWpsTemporaryPath } from './wpsNativeServices.js'
 import { wordClauses, wordOutline, wordParagraphPage } from './wordStructure.js'
 import { applyWpsWordStyleProfile, validateWordStyleProfile } from './wordStyleProfile.js'
 import { minimalEdits } from './minimalEdit.js'
@@ -2258,10 +2259,10 @@ export const WPS_WORD_HANDLERS = {
       : binary.startsWith('\xff\xd8\xff') ? 'jpg'
       : /^GIF8[79]a/.test(binary) ? 'gif' : binary.startsWith('BM') ? 'bmp' : ''
     if (!extension || binary.length > limit) throw new Error(t('fileOperationInvalidBytes'))
-    const a = app(), doc = activeDoc(), fs = a.FileSystem
-    if (typeof doc.InlineShapes?.AddPicture !== 'function' || typeof a.Env?.GetTempPath !== 'function'
+    const a = app(), doc = activeDoc(), services = wpsNativeServices(), fs = services.fileSystem
+    if (typeof doc.InlineShapes?.AddPicture !== 'function'
         || typeof fs?.writeAsBinaryString !== 'function' || typeof fs?.readAsBinaryString !== 'function'
-        || typeof fs?.Remove !== 'function' || typeof globalThis.crypto?.randomUUID !== 'function') throw new Error(t('fileOperationUnavailable'))
+        || typeof fs?.Remove !== 'function') throw new Error(t('fileOperationUnavailable'))
     const anchorText = String(args.anchorText || '')
     let target
     if (anchorText) {
@@ -2270,9 +2271,7 @@ export const WPS_WORD_HANDLERS = {
       target = doc.Range(at, at)
     } else target = a.Selection?.Range
     if (!target) throw new Error(t('fileOperationUnavailable'))
-    const folder = a.Env.GetTempPath()
-    if (!folder) throw new Error(t('fileOperationUnavailable'))
-    const path = String(folder).replace(/[\\/]?$/, '/') + 'aiworkdeck-' + globalThis.crypto.randomUUID() + '.' + extension
+    const path = createWpsTemporaryPath(services, extension)
     try {
       fs.writeAsBinaryString(path, binary)
       if (fs.readAsBinaryString(path) !== binary) throw new Error(t('fileOperationInvalidBytes'))
@@ -2303,18 +2302,21 @@ export const WPS_WORD_HANDLERS = {
       const { offsets, needle, coords } = locateAnchorAll(doc, anchorText)
       const targetOffsets = args.applyToAll ? offsets : [offsets[0]]
       const paragraphs = targetOffsets.map((offset, k) => verifiedRange(doc, coords, offset, needle, k).Paragraphs.Item(1))
-      for (const p of paragraphs) {
-        try {
-          // Range.Style 接受本地化样式名/整数常量/样式对象（官方原文）
-          p.Range.Style = styleName
-        } catch (e) {
-          // 样式名不存在（常见：模型给英文名而文档是中文版）——按内置样式常量表垫底
-          const builtin = BUILTIN_STYLE_BY_NAME[styleName.trim().toLowerCase()]
-          if (builtin == null) {
-            throw new Error(`样式「${styleName}」不存在：请使用文档里已有的样式名（中文版内置样式如「标题 1」），或改用 set_paragraph_format 的 styleBuiltIn 参数`)
-          }
-          p.Range.Style = builtin
+      const styleId = BUILTIN_STYLE_BY_NAME[styleName.trim().toLowerCase()] ?? styleName
+      const expectedName = String(doc.Styles.Item(styleId).NameLocal || '')
+      if (!expectedName) throw new Error(t('wordStyleNotApplied'))
+      let applied = 0
+      try {
+        for (const p of paragraphs) {
+          // Localized WPS can silently ignore English built-in names; use their IDs.
+          p.Range.Style = styleId
+          const actual = p.Range.Style
+          if (String(actual?.NameLocal || actual || '') !== expectedName) throw new Error(t('wordStyleNotApplied'))
+          applied++
         }
+      } catch (error) {
+        error.partialResult = { applied, totalMatches: offsets.length, outcomeUnknown: true, retryable: false }
+        throw error
       }
       return { applied: paragraphs.length, totalMatches: offsets.length, styleName }
     })

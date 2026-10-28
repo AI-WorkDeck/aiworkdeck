@@ -345,9 +345,10 @@ for (const command of ['file_create', 'file_open', 'file_save', 'file_export_pdf
   })
 }
 
-test('PPT notes and table styles require their own pane; notes reading stays read-only', async () => {
+test('PPT notes, table styles and media require their own pane; notes reading stays read-only', async () => {
   let calls = 0
-  for (const command of ['ppt_write_notes', 'ppt_table_set_style']) {
+  for (const command of ['ppt_write_notes', 'ppt_table_set_style', 'ppt_add_image', 'ppt_add_chart',
+    'ppt_format_chart', 'ppt_set_transition']) {
     const result = await runCrossDocWrite({ command, args: {}, host: 'powerpoint', family: 'wps',
       exec: async () => { calls++; return { ok: true } } })
     assert.equal(result.result.ok, false)

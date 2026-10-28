@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "แทรกรูปภาพในสไลด์",
+  cmdPptAddChart: "แทรกแผนภูมิในสไลด์",
+  cmdPptFormatChart: "จัดรูปแบบแผนภูมิในสไลด์",
+  cmdPptSetTransition: "ตั้งค่าเอฟเฟ็กต์เปลี่ยนสไลด์",
   wordStyleUnsupported: "แอปนี้ไม่สามารถใช้ฟิลด์โปรไฟล์เหล่านี้ได้ครบถ้วน: {fields} ยังไม่ได้เริ่มเปลี่ยนแปลง",
+  wordStyleNotApplied: "แอปพลิเคชันโฮสต์ไม่ได้ใช้สไตล์ย่อหน้าที่ร้องขอ โปรดตรวจสอบเอกสารก่อนลองอีกครั้ง",
 
   cmdGetParagraphs: "อ่านย่อหน้า",
   cmdGetOutline: "อ่านเค้าร่าง",

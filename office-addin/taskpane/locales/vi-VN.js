@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "Chèn hình ảnh vào trang chiếu",
+  cmdPptAddChart: "Chèn biểu đồ vào trang chiếu",
+  cmdPptFormatChart: "Định dạng biểu đồ trang chiếu",
+  cmdPptSetTransition: "Đặt hiệu ứng chuyển trang chiếu",
   wordStyleUnsupported: "Ứng dụng này không thể áp dụng đầy đủ các trường hồ sơ sau: {fields}. Chưa bắt đầu thay đổi.",
+  wordStyleNotApplied: "Ứng dụng chủ chưa áp dụng kiểu đoạn văn được yêu cầu. Hãy kiểm tra tài liệu trước khi thử lại.",
 
   cmdGetParagraphs: "Đọc đoạn văn",
   cmdGetOutline: "Đọc dàn ý",

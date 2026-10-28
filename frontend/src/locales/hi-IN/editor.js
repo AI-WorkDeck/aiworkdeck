@@ -3,6 +3,10 @@
 
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "स्लाइड में चित्र डालें",
+    "office_ppt_add_chart": "स्लाइड में चार्ट डालें",
+    "office_ppt_format_chart": "स्लाइड चार्ट का स्वरूप सेट करें",
+    "office_ppt_set_transition": "स्लाइड ट्रांज़िशन सेट करें",
     "office_file_create": "नई फ़ाइल बनाएँ",
     "office_file_save": "वर्तमान फ़ाइल सहेजें",
     "office_file_export_pdf": "प्रोजेक्ट में PDF निर्यात करें",

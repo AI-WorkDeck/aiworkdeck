@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "Sisipkan imej pada slaid",
+  cmdPptAddChart: "Sisipkan carta pada slaid",
+  cmdPptFormatChart: "Format carta slaid",
+  cmdPptSetTransition: "Tetapkan peralihan slaid",
   wordStyleUnsupported: "Aplikasi ini tidak dapat menggunakan medan profil ini sepenuhnya: {fields}. Tiada perubahan telah dimulakan.",
+  wordStyleNotApplied: "Aplikasi hos tidak menggunakan gaya perenggan yang diminta. Periksa dokumen sebelum mencuba lagi.",
 
   cmdGetParagraphs: "Baca perenggan",
   cmdGetOutline: "Baca rangka",

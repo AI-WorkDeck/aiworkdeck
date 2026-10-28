@@ -4,6 +4,10 @@
 // DocDiffViewer / CompareDocDialog / VariablePanel / DrawioEditor.
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "Insert slide image",
+    "office_ppt_add_chart": "Insert slide chart",
+    "office_ppt_format_chart": "Format slide chart",
+    "office_ppt_set_transition": "Set slide transition",
     "office_file_create": "Create a new file",
     "office_file_save": "Save current file",
     "office_file_export_pdf": "Export PDF to project",

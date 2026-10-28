@@ -31,6 +31,8 @@ const msoShapeIsoscelesTriangle = 7
 const msoShapeOval = 9
 /** MsoShapeType（识别用） */
 import { t } from './i18n.js'
+import { wpsNativeServices, createWpsTemporaryPath } from './wpsNativeServices.js'
+import { imageOptions, preparePptImage, addWpsChart, formatWpsChart, setWpsTransition, mediaPartial } from './pptMedia.js'
 import { pptTarget, pptExpected, pptGeometry, pptShapeStyle, wpsPptShape, pptTableStyle, wpsNotesBody, pptParagraphFormat, applyWpsParagraphFormat } from './pptPrecision.js'
 import { findAllNormalized, describeAnchorFailure } from './textMatch.js'
 import { substringEdits } from './minimalEdit.js'
@@ -258,6 +260,28 @@ function applyHyperlink(textRange, url) {
 // ==================== HANDLERS ====================
 
 export const WPS_WPP_HANDLERS = {
+  async ppt_add_image(args) {
+    imageOptions(args)
+    const pres=activePresentation(), source=String(pres.FullName||pres.Name), slide=getSlideOrThrow(pres,args.slideNumber), slideId=slide.SlideID
+    const services=wpsNativeServices(),fs=services.fileSystem
+    if(typeof slide.Shapes.AddPicture!=='function'||typeof fs?.writeAsBinaryString!=='function'||typeof fs?.readAsBinaryString!=='function'||typeof fs?.Remove!=='function')throw new Error(t('pptCapabilityUnavailable'))
+    const image=await preparePptImage(args)
+    const now=activePresentation()
+    if(String(now.FullName||now.Name)!==source||getSlideOrThrow(now,args.slideNumber).SlideID!==slideId)throw new Error(t('fileOperationStale'))
+    const path=createWpsTemporaryPath(services,image.extension)
+    let shape
+    try{
+      const binary=atob(image.base64);fs.writeAsBinaryString(path,binary)
+      if(fs.readAsBinaryString(path)!==binary)throw new Error(t('fileOperationInvalidBytes'))
+      shape=slide.Shapes.AddPicture(path,0,-1,image.left,image.top,image.width,image.height)
+      if(args.sendToBack)shape.ZOrder(1)
+      return {slideNumber:args.slideNumber,shapeId:String(shape.Id),shapeName:String(shape.Name),created:true,fit:image.fit,cropped:image.cropped}
+    }catch(error){throw mediaPartial(error,args,shape)}finally{try{fs.Remove(path)}catch{}}
+  },
+  async ppt_add_chart(args) { return addWpsChart(getSlideOrThrow(activePresentation(),args.slideNumber),args) },
+  async ppt_format_chart(args) { return formatWpsChart(getSlideOrThrow(activePresentation(),args.slideNumber),args) },
+  async ppt_set_transition(args) { return setWpsTransition(getSlideOrThrow(activePresentation(),args.slideNumber),args,globalThis.wps?.Enum) },
+
   async ppt_get_slides() {
     const pres = activePresentation()
     const count = pres.Slides.Count
@@ -502,6 +526,7 @@ export const WPS_WPP_HANDLERS = {
       const sp = shapes.Item(j)
       const type = Number(sp.Type)
       result.push({
+        name: String(sp.Name || ''),
         id: String(sp.Id), // WPS 的 Id 是数值，统一 String 化保 shapeId 契约类型
         type: MSO_SHAPE_TYPE_NAMES[type] || `unknown(${type})`,
         left: sp.Left,

@@ -35,6 +35,7 @@ import { pageText } from './textPaging.js'
 import { wordClauses, wordOutline, wordParagraphPage } from './wordStructure.js'
 import { applyOfficeWordStyleProfile, validateWordStyleProfile } from './wordStyleProfile.js'
 import { t } from './i18n.js'
+import { preparePptImage } from './pptMedia.js'
 import { pptTarget, pptExpected, pptGeometry, pptShapeStyle, officePptShape, pptTableStyle, pptParagraphFormat } from './pptPrecision.js'
 // 律所标准格式（HOUSE）单源：backend/src/main/resources/style-profiles/house-default.json 的字节副本，
 // 由 frontend/scripts/sync-house-profile.mjs 同步（npm run build 前自动跑），构建时内联进产物；
@@ -861,6 +862,34 @@ async function readWordStructure(context, args) {
 }
 
 const HANDLERS = {
+  // Stable Common API image insertion; preview ShapeCollection.addPicture is not used.
+  async ppt_add_image(args) {
+    if(!pptApiSupported('1.4')||(args.sendToBack&&!pptApiSupported('1.8'))||!Office.context.requirements.isSetSupported('ImageCoercion','1.1'))throw new Error(t('pptCapabilityUnavailable'))
+    const source=Office.context.document.url
+    const image=await preparePptImage(args)
+    if(Office.context.document.url!==source)throw new Error(t('fileOperationStale'))
+    return PowerPoint.run(async context=>{
+      const slides=context.presentation.slides;slides.load('items/id');await context.sync()
+      const slide=getSlideOrThrow(slides,args.slideNumber);slide.shapes.load('items/id');await context.sync()
+      const before=new Set(slide.shapes.items.map(s=>s.id));context.presentation.setSelectedSlides([slide.id]);await context.sync()
+      const selected=context.presentation.getSelectedSlides();selected.load('items/id');await context.sync()
+      if(Office.context.document.url!==source||selected.items.length!==1||selected.items[0].id!==slide.id)throw new Error(t('fileOperationStale'))
+      let issued=false, createdShapeId
+      try{
+        issued=true
+        await new Promise((resolve,reject)=>Office.context.document.setSelectedDataAsync(image.base64,{coercionType:Office.CoercionType.Image,imageLeft:image.left,imageTop:image.top,imageWidth:image.width,imageHeight:image.height},r=>r.status===Office.AsyncResultStatus.Succeeded?resolve():reject(new Error(r.error?.message||t('pptCapabilityUnavailable')))))
+        if(Office.context.document.url!==source)throw new Error(t('fileOperationStale'))
+        slide.shapes.load('items/id,items/type');await context.sync()
+        const added=slide.shapes.items.filter(s=>!before.has(s.id));if(added.length!==1||String(added[0].type).toLowerCase()!=='image')throw new Error(t('pptInvalidTarget'))
+        const shape=added[0];createdShapeId=shape.id;if(args.sendToBack)shape.setZOrder('SendToBack');await context.sync()
+        return {slideNumber:args.slideNumber,shapeId:shape.id,created:true,fit:image.fit,cropped:image.cropped}
+      }catch(error){if(issued)error.partialResult={slideNumber:args.slideNumber,...(createdShapeId?{shapeId:createdShapeId,created:true}:{}),outcomeUnknown:true,retryable:false};throw error}
+    })
+  },
+  async ppt_add_chart() { throw new Error(t('pptCapabilityUnavailable')) },
+  async ppt_format_chart() { throw new Error(t('pptCapabilityUnavailable')) },
+  async ppt_set_transition() { throw new Error(t('pptCapabilityUnavailable')) },
+
   async apply_style_profile(args) {
     validateWordStyleProfile(args, 'office')
     return Word.run(context => withTracking(context, () => applyOfficeWordStyleProfile(context, args)))
@@ -4485,6 +4514,10 @@ export const COMMAND_DISPLAY_KEYS = {
   ppt_goto: 'cmdPptGoto',
   ppt_set_layout: 'cmdPptSetLayout',
   ppt_table_set_style: 'cmdPptTableSetStyle',
+  ppt_add_image: 'cmdPptAddImage',
+  ppt_add_chart: 'cmdPptAddChart',
+  ppt_format_chart: 'cmdPptFormatChart',
+  ppt_set_transition: 'cmdPptSetTransition',
   ppt_read_notes: 'cmdPptReadNotes',
   ppt_write_notes: 'cmdPptWriteNotes',
   ppt_get_slides: 'cmdPptGetSlides',
@@ -4589,6 +4622,10 @@ const COMMAND_HOSTS = {
   ppt_goto: 'powerpoint',
   ppt_set_layout: 'powerpoint',
   ppt_table_set_style: 'powerpoint',
+  ppt_add_image: 'powerpoint',
+  ppt_add_chart: 'powerpoint',
+  ppt_format_chart: 'powerpoint',
+  ppt_set_transition: 'powerpoint',
   ppt_read_notes: 'powerpoint',
   ppt_write_notes: 'powerpoint',
   ppt_get_slides: 'powerpoint',

@@ -33,7 +33,7 @@ function installWps(opts = {}) {
     calls: [], // {name, ...}
     findProps: {}, // Find 对象上被显式钉死的匹配宽松度属性
     paraRangeReads: 0, // Paragraph.Range 被取过几次（逐段扫描的跨桥代价代理指标）
-    selected: null
+    selected: null, styles: new Map()
   }
 
   // ---- 两套坐标系（真机实测，WPS 12.1.0.28043，2026-08-29）----
@@ -193,7 +193,9 @@ function installWps(opts = {}) {
       get ListFormat() {
         return listFormat
       },
+      get Style() { return { NameLocal: state.styles.get(s) || '正文' } },
       set Style(v) {
+        if (opts.nativeStyles && !opts.ignoreAllStyles && typeof v === 'number') state.styles.set(s, v === -2 ? '标题 1' : '正文')
         state.writes.push({ kind: 'range', prop: 'Style', value: v, start: s, end: e })
       },
       get Find() {
@@ -1172,25 +1174,25 @@ test('set_paragraph_format & format_text：支持行距倍数自动换算、首�
 
 for (const position of ['before','after']) test(`insert_image embeds verified temporary bytes ${position} a precise anchor and restores tracking`,async()=>{
   const {doc,state}=installWps({text:'prefix TARGET suffix\r'})
-  const a=globalThis.wps.WpsApplication(),binary='\x89PNG\r\n\x1a\nsynthetic',calls=[];let written,removed,picture={}
-  a.Env={GetTempPath:()=>'/tmp'}
-  a.FileSystem={writeAsBinaryString:(path,data)=>{written=data;calls.push(path)},readAsBinaryString:()=>written,Remove:path=>removed=path}
+  const binary='\x89PNG\r\n\x1a\nsynthetic',calls=[];let written,removed,picture={}
+  globalThis.wps.Env={GetTempPath:()=>'/tmp'}
+  globalThis.wps.FileSystem={Exists:()=>false,writeAsBinaryString:(path,data)=>{written=data;calls.push(path)},readAsBinaryString:()=>written,Remove:path=>removed=path}
   doc.InlineShapes={AddPicture:(path,link,save,range)=>{assert.equal(state.track,true);assert.equal(link,false);assert.equal(save,true);assert.equal(path,calls[0]);assert.equal(range.Start,position==='before'?7:13);assert.equal(range.End,range.Start);return picture}}
   const result=await H.insert_image({imageBase64:btoa(binary),anchorText:'TARGET',position,width:120})
   assert.equal(result.inserted,true);assert.equal(result.anchored,true);assert.equal(written,binary);assert.equal(removed,calls[0]);assert.equal(picture.Width,120);assert.equal(picture.LockAspectRatio,-1);assert.equal(state.track,false);assert.equal(state.text,'prefix TARGET suffix\r')
 })
 
 test('insert_image validates bytes, dimensions and native filesystem before inserting; partial failure is explicit',async()=>{
-  const {doc,state}=installWps({text:'TARGET\r'}),a=globalThis.wps.WpsApplication();let added=0,removed=0,written=''
+  const {doc,state}=installWps({text:'TARGET\r'});let added=0,removed=0,written=''
   const binary='GIF89asynthetic',base64=btoa(binary)
   doc.InlineShapes={AddPicture:()=>{added++;return {set Width(v){throw new Error('native dimension failure')}}}}
   await assert.rejects(H.insert_image({imageBase64:base64}));assert.equal(added,0)
-  a.Env={GetTempPath:()=>'/tmp'};a.FileSystem={writeAsBinaryString:(path,data)=>written=data,readAsBinaryString:()=>written,Remove:()=>removed++}
+  globalThis.wps.Env={GetTempPath:()=>'/tmp'};globalThis.wps.FileSystem={Exists:()=>false,writeAsBinaryString:(path,data)=>written=data,readAsBinaryString:()=>written,Remove:()=>removed++}
   for(const args of [{width:0},{width:Infinity},{position:'replace'}])await assert.rejects(H.insert_image({imageBase64:base64,anchorText:'TARGET',...args}))
   assert.equal(added,0);assert.equal(removed,0)
-  a.FileSystem.readAsBinaryString=()=> 'corrupt'
+  globalThis.wps.FileSystem.readAsBinaryString=()=> 'corrupt'
   await assert.rejects(H.insert_image({imageBase64:base64,anchorText:'TARGET'}));assert.equal(added,0);assert.equal(removed,1)
-  a.FileSystem.readAsBinaryString=()=>written
+  globalThis.wps.FileSystem.readAsBinaryString=()=>written
   await assert.rejects(H.insert_image({imageBase64:base64,anchorText:'TARGET',width:100}),e=>e.message===t('wordImagePartial'))
   assert.equal(added,1);assert.equal(removed,2);assert.equal(state.track,false)
 })
@@ -1198,10 +1200,10 @@ test('insert_image validates bytes, dimensions and native filesystem before inse
 
 test('insert_image uses the actual selection without an anchor and cleans up after native insertion errors', async () => {
   const { doc, state } = installWps({ text: 'selected text\r', selStart: 0, selEnd: 8 })
-  const a = globalThis.wps.WpsApplication()
   let written, removed = 0
-  a.Env = { GetTempPath: () => '/tmp' }
-  a.FileSystem = {
+  globalThis.wps.Env = { GetTempPath: () => '/tmp' }
+  globalThis.wps.FileSystem = {
+    Exists: () => false,
     writeAsBinaryString: (path, data) => { written = data },
     readAsBinaryString: () => written,
     Remove: () => { removed++ }
@@ -1268,3 +1270,16 @@ test('WPS paragraph paging reads only requested native paragraph objects', async
   assert.equal(result.totalParagraphs, 1000)
   assert.equal(result.nextStartParagraph, 502)
 })
+
+test('apply_style resolves builtin alias before silent ignored English assignment and verifies native style', async () => {
+  const {state,doc}=installWps({text:'Advanced QA\rNeighbor\r',nativeStyles:true});
+  doc.Styles={Item:id=>({NameLocal:id===-2?'标题 1':'正文'})};
+  const out=await H.apply_style({anchorText:'Advanced QA',styleName:'Heading 1'});
+  assert.equal(out.applied,1);assert.equal(state.styles.get(0),'标题 1');assert.equal(state.styles.size,1);
+  assert.equal(state.writes.find(w=>w.prop==='Style').value,-2);
+});
+test('apply_style detects host silently ignoring builtin assignment and reports partial outcome', async () => {
+  const {doc}=installWps({text:'Advanced QA\r',nativeStyles:true,ignoreAllStyles:true});
+  doc.Styles={Item:()=>({NameLocal:'标题 1'})};
+  await assert.rejects(H.apply_style({anchorText:'Advanced QA',styleName:'Heading 1'}),e=>e.partialResult?.retryable===false);
+});

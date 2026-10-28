@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Office/WPS PPT 精确编辑验收
 
-日期：2026-10-28。本记录只覆盖 PPT 子任务；后台注册、路由、跨文件执行和整轮语言检查由集成任务验收。以下自动化为模拟宿主行为测试，不是 Office/WPS 实机认证。
+日期：2026-10-28。本记录只覆盖 PPT 子任务；后台注册、路由、跨文件执行和整轮语言检查由集成任务验收。自动化为模拟宿主行为测试，实机证据在后文单独列出。当前Office新增图片已完成真实保存、关闭重开及XML/像素核验；WPS新增图片、原生图表、图表样式、过渡四项均未完成真机验收。用户已明确停止Windows虚拟机WPS测试，接受保留未验证项；允许尝试Mac WPS，不将停止测试记为通过。
 
 ## 已实现行为
 
@@ -90,3 +90,38 @@ Office/WPS公共执行器现在保留error.partialResult，hostBridge原样返�
 09:29:11主任务仅调用正式handler将42四边改为与前次实验不同的 **2pt/#345678**，原生保存、完全关闭、重新打开后09:29:35回执确认42四边及Value.bottom、Row.right六侧均正确。独立XML验证六侧w=25400、color=345678全部通过，证明不是之前直接探针残留。证据`ppt-shared-border-production.json`及`ppt-shared-border-production-reopened.pptx`位于`/tmp/excel-1576-product-evidence/`。源副本重开保真复测仍单列，尚未完成；合并单元格拒绝路径是自动化测试，未宣称合并表真机通过。
 
 修复后file_open副本进一步完成：09:33:16原生几何/逐格边框metadata比较通过，原生另存为后独立48/48严格包断言通过，只有保存时间/编辑时长元数据变化，其余部件字节一致。详见文件能力审计和`ppt-file-open-fixed-copy-verification.json`；原失败记录保留，不覆盖。
+
+## 主线合入后新增的图片、原生图表与过渡适配
+
+合入主线后新增4项桌面能力，本轮继续接入`office_ppt_add_image/add_chart/format_chart/set_transition`，没有用分类例外冒充已经完成。图片支持Office与WPS；其余三项在Microsoft Office面前置隐藏，直接调用也写前拒绝。WPS图表/过渡实现尚未真机运行，运行时要求其真实原生对象与成员，不以模拟接口宣称支持所有版本。
+
+- 图片：项目fileId读取上限12MiB，客户端识别PNG/JPEG/GIF/BMP、解码后上限4000万像素；cover按焦点裁剪并编码PNG保留alpha，contain居中保留比例，stretch按矩形伸展。**cover是嵌入裁剪后的图片，不保留原生可恢复裁剪外像素**；它与桌面UNO GraphicCrop的非破坏性裁剪存在明确差别。WPS通过已校验临时文件AddPicture嵌入后清理；异步图像处理前后核对源演示身份。Office使用稳定Common ImageCoercion1.1并精确选页/核验新增shape，置底另要求PowerPointApi1.8；不采用仍标preview的addPicture API。
+- 原生图表：WPS AddChart原生创建，支持column/bar/line/area/pie/doughnut/scatter，所有系列长度/数值、负饼图、散点X值先校验。删除的默认系列仅属于刚创建的图表。后续失败返回该shape身份及outcomeUnknown/retryable=false，不称未创建。
+- 图表样式：按exact shapeName定位；颜色/字号/系列或扇区色/图例/值轴网格逐项预检后写入。修改图表默认字体及已存在标题、图例、轴文字；无值轴的饼/环图请求网格明确拒绝。字体/填充/线色等原生成员缺失时不先改变其他属性。
+- 过渡：WPS真实SlideShowTransition及原生枚举存在、精确Duration可读才执行；none/fade/push/wipe，0.1–5秒。写后核对effect和duration；拒绝用coarse Speed冒充时长，不改变自动翻页。实际播放未验证，静态PDF不证明动画。
+
+官方来源：[Office稳定图片插入参数与示例](https://learn.microsoft.com/en-us/javascript/api/office/office.setselecteddataoptions?view=common-js-preview)、[Shape.setZOrder 1.8](https://learn.microsoft.com/en-us/javascript/api/powerpoint/powerpoint.shape?view=powerpoint-js-preview)、[ShapeCollection预览addPicture](https://learn.microsoft.com/en-us/javascript/api/powerpoint/powerpoint.shapecollection?view=powerpoint-js-preview)、[Office Slide公开成员](https://learn.microsoft.com/en-us/javascript/api/powerpoint/powerpoint.slide?view=powerpoint-js-preview)、[WPS AddChart签名](https://open.wps.cn/documents/app-integration-dev/wps365/client/wpsoffice/jsapi/wpp/Shapes/member/AddChart)、[WPS Chart对象](https://open.wps.cn/documents/app-integration-dev/wps365/client/wpsoffice/jsapi/wpp/Chart/obj)、[WPS Slide公开SlideShowTransition入口](https://open.wps.cn/documents/app-integration-dev/wps365/client/wpsoffice/jsapi/wpp/Slide/obj)。WPS对象入口文档不能替代本机成员或播放验收；确切Duration缺失时写前拒绝。
+
+初轮Node媒体专项10/10，JDK21 `OfficePptMediaTest`4/4与`ClientCapabilityServiceTest`13/13通过（`/tmp/ppt-media-node.log`、`/tmp/ppt-media-backend.log`）。原生Office图片验证由主任务使用独立合成文件`AWD-Native-PPT-Media-20261028.pptx`与`ppt-media-qa.js`执行，保留旧五对象；其正式保存重开证据见下节，不能从上述自动化结果推断WPS真机或完整图表/过渡验收。
+
+### 原生Office图片实际保存重开通过
+
+主任务实际操作Mac PowerPoint：10:09:21.865Z执行图片套件，原生CmdS保存、CmdW关闭至其他副本窗口、重新打开媒体文件，10:10:12.498Z只读检查通过。主任务目视第2页：cover为100×100蓝色焦点裁剪，contain为100×50红蓝图，stretch为100×100红蓝图，透明缺口保留；本代理未操作UI，只读取其回执与独立核验产物。
+
+`/tmp/excel-1576-product-evidence/ppt-media-reopened-verification.json`记录真实ZIP/XML与PNG像素检查通过：原第1页XML逐字节相同；3张图均内嵌，几何正确，PNG alpha保留，cover结果80×80像素且焦点裁剪正确，contain/stretch保持160×80原图；cover位于绘制顺序最底层。主任务核验脚本`verify-ppt-media.py`与产物`office-native-ppt-media-reopened.pptx`同目录，SHA256为`84bfb50ebaed5141f99db31f61d8d2c634b72b7e726166f67131e4ba4337caf2`。这关闭Office三种图片适配的本机保存重开验证；不扩展为WPS图片、WPS图表/过渡、所有图片编码或Office不存在的图表/过渡API通过。
+
+### 独立审查后的失败语义与样式回归
+
+独立代码审查发现并通过先红后绿回归修复三项图表样式缺口：调色板现在循环覆盖全部系列或扇区；同次开启图例并设置文字样式时按最终图例状态预检和格式化；全空样式请求在后端和加载项均写前拒绝。Office图片已创建但置底失败时保留确认过的shapeId和created=true，同时仍标记outcomeUnknown/retryable=false，便于定位而非重复插入。
+
+最终PPT专项34/34通过，其中媒体13/13；日志`/tmp/ppt-final-specialized.log`，失败复现日志`/tmp/ppt-media-review-red.log`保留。上述WPS对象回归是模拟宿主行为测试，不能替代Windows WPS真实插件运行、保存重开及过渡播放验收。
+
+JDK21最终补验：`OfficePptMediaTest`8/8、`ToolDisplayNameCoverageTest`4/4通过，注册工具与前端显示名339/339对账一致；日志`/tmp/ppt-media-permissions-final.log`。图片行为回归覆盖同项目字节准确转发、跨项目/软删/目录/缺失项目上下文/不存在拒绝且不读取存储或桥接；超限流实际仅消费12MiB+1字节后关闭，拒绝桥接。测试流最初对零长度读取违反InputStream契约导致失败，修正测试流后通过，未因此修改产品读取逻辑。
+
+媒体适配阶段加载项完整回归822/822通过，0失败、0跳过（`npm test --prefix office-addin`，日志`/tmp/ppt-media-final-addin-all-fixed.log`）。新增形状name返回采用真实Name测试夹具并保留严格对象断言，未通过放宽断言隐藏差异。
+
+## 用户停止Windows虚拟机测试后的边界
+
+用户后续明确停止Windows虚拟机WPS测试。此前Windows Word的基础保存或高级样式诊断不构成WPP四项新增媒体能力的验收。WPS图片、原生图表、图表格式、过渡仍未真机验证；图片文件服务入口修复及相关模拟回归通过也不改变该结论。最新样式/图片服务入口整合后的加载项自动化828/828通过（`/tmp/wps-word-style-full-final.log`），此数字与实机覆盖分开记录。
+
+Mac WPS仅完成只读可行性核查：本机安装`com.kingsoft.wpsoffice.mac`，版本`12.1.28496`、build `28496`，安装包包含wpsjscli的Word/ET/WPP桥及kwpsjsrunner；用户容器的jsaddons目录存在，但检查时没有publish.xml。WPS官方社区的[技术支持回复](https://bbs.wps.cn/topic/50515)明确Mac 6.13及以后支持JS加载项，需手工放置加载项配置，彼时不支持在线部署；[开发平台概述](https://open.wps.cn/documents/app-integration-dev/wps365/client/wpsoffice/wps-integration-mode/wps-addin-development/addin-overview)仍仅列Windows/Linux，因此不能仅凭概述否定Mac，也不能把运行时文件存在视为已加载成功。本次核查未安装、注册或启动加载项，未操作Mac WPS界面。相同JS加载项有尝试依据，具体API和保存重开仍须独立实测；若当前环境不能完成，保留未验项。

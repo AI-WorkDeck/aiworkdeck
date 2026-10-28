@@ -52,6 +52,7 @@ import {
 import { docKeyOf } from './revisionLog.js'
 import { t } from './i18n.js'
 import { executeFileOperation, FILE_OPERATION_COMMANDS } from './fileOperations.js'
+import { wpsNativeServices } from './wpsNativeServices.js'
 
 export { hashContent } from './wordDoc.js'
 
@@ -112,7 +113,8 @@ export async function executeCommand(command, args, executionContext = {}) {
         family, host: detectHost(), settings: executionContext.settings,
         projectId: executionContext.projectId, identity: documentIdentity(), readIdentity: documentIdentity,
         Office: globalThis.Office, Word: globalThis.Word, Excel: globalThis.Excel,
-        PowerPoint: globalThis.PowerPoint, application: family === 'wps' ? wpsApp() : null
+        PowerPoint: globalThis.PowerPoint, application: family === 'wps' ? wpsApp() : null,
+        nativeServices: family === 'wps' ? wpsNativeServices() : null
       })
       return { ok: true, data }
     } catch (error) {

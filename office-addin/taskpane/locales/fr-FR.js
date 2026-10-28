@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "Insérer une image dans la diapositive",
+  cmdPptAddChart: "Insérer un graphique dans la diapositive",
+  cmdPptFormatChart: "Mettre en forme le graphique de la diapositive",
+  cmdPptSetTransition: "Définir la transition de la diapositive",
   wordStyleUnsupported: "Cette application ne peut pas appliquer entièrement ces champs du profil : {fields}. Aucune modification n’a commencé.",
+  wordStyleNotApplied: "L’application hôte n’a pas appliqué le style de paragraphe demandé. Vérifiez le document avant de réessayer.",
 
   cmdGetParagraphs: "Lire les paragraphes",
   cmdGetOutline: "Lire le plan",

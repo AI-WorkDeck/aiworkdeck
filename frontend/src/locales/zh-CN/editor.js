@@ -4,6 +4,10 @@
 // CompareDocDialog / VariablePanel / DrawioEditor 的用户可见文案。
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "插入幻灯片图片",
+    "office_ppt_add_chart": "插入幻灯片图表",
+    "office_ppt_format_chart": "设置幻灯片图表格式",
+    "office_ppt_set_transition": "设置幻灯片切换效果",
     "office_file_create": "新建文件",
     "office_file_save": "保存当前文件",
     "office_file_export_pdf": "导出 PDF 到项目",

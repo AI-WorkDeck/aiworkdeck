@@ -111,3 +111,19 @@ Receipts reviewed: `/tmp/awd-native-excel-qa-20261028/native-excel-qa-first.json
 产品的保守处理现为：仅已调用原生save后的异常，保留原错误与 `ok:false`，并附结构化 `partialResult`，明确 `operation:save`、`outcomeUnknown:true`、`retryable:false` 与前后身份。版本/身份等写前拒绝不加“结果未知”。取消和成功后异常都不应无条件重放。专项先红后绿，文件操作、会话文件重绑与部分结果传递共35项通过。临时QA另提供新鲜文件属性查询和失败命令产物重开读回入口；这些是只读诊断，不改全局身份来源，也不篡改原始命令成功状态。
 
 09:46:39Z 主任务刷新窗格后只读取得原生文件路径，确认已保存身份；随后亲自关闭该测试文档，面对保存提示选择“不保存”以免第二次写入改变证据，再通过 Word 打开面板从磁盘重开同一文件。09:48:01Z 原生回读确认正文仍为空、路径完全一致，回执明确为 `artifactReadbackPassed:true, commandSuccess:false`。这补齐了报错后文件产物的实际关闭重开验证，仍不把首次命令报错改记为成功。临时测试页的 window.confirm 在 Mac Office 不支持，改为显式复选框确认实际重开动作，未修改产品功能。
+
+
+## Windows WPS 原生发现与停止验证时的状态（2026-10-28）
+
+本节区分原生执行、代码修复及未完成验收。用户随后明确停止 Windows VM WPS 测试；不能把停止前的局部证据扩展为 Excel/PPT 或全部文件能力通过。
+
+- **已验证：文字核心保存重开。** 10:28:30.668Z 核心套件通过真实 handler 完成文本写入、精确替换及 `file_save`；主任务通过原生 UI 关闭重开，10:29:54.792Z 读回通过。独立 ZIP 核验合成 `AWD-WPS-QA-20261028.docx` 为10967字节、正文仅 `QA NEW` / `NEIGHBOR KEEP`，SHA-256 为 `67149020ce6a5d741891c9d171444a513db5fee376434518041f9a9999780666`。真实关闭重开为主任务观察，独立审计只核对回执和落盘产物。
+- **已发现并修复，原生复测未完成：高级标题样式。** 高级文字套件在 `OUTLINE_HEADING` 断言失败；后续修复采用宿主实际支持的样式设置与读回检查，未生效则明确错误。该高级现场和失败记录保留；单元回归不等于高级套件重跑通过。
+- **原生能力探针已确认，文件链仍待验证：根服务。** 10:43:11Z 和10:46:37Z 探针确认文档模型没有 FileSystem/Env，而根 `Application` / `wps` 提供这些方法；同时 `crypto.randomUUID` 不存在、`crypto.getRandomValues` 存在。产品现由共享 `wpsNativeServices` 取根服务并经 hostBridge 注入，继续用独立文档模型执行 Open/Save。临时名采用安全128位随机 fallback，写前 Exists 必须严格为 false；不使用时间戳或 Math.random 替代。
+- **已修复字节安全风险，编码兼容未确认。** 10:55:44.483Z 测试页读取核心文件后调用 btoa 失败，说明原生“二进制字符串”包含超过255的码元；失败在 QA 构造参数阶段，产品 `file_open` 尚未调用。官方 readAsBinaryString 文档未规定这类码元的编码含义，不能猜测转换。生产 PDF 原有 `charCodeAt &255` 已移除，非byte字符串现在项目文件创建/上传前失败并清理临时PDF；真实 executeFileOperation 回归用 U+0100、欧元符号和代理对验证拒绝，先红后绿。打开文件及 Word/PPT 图片仍严格比较写入与读回字符串，不静默截断。
+
+**未验收范围：** WPS 项目文件打开新副本、PDF导出/上传/下载字节闭环、表格图表/公式/排序/验证/透视保存重开、演示文稿及新增媒体操作，以及修后高级文字全套。没有据此声称完整 AI 模型对话通过。Mac WPS 的支持性调查和验收另行记录，不以 Windows 探针推定 Mac 可用。
+
+证据为隔离 QA 的 `receipts.jsonl`、`word-core-artifact-verification.json`，以及本轮字节完整性 red/green 日志；这些仅包含合成文件结果，不含凭据。官方契约：[Application 根对象](https://open.wps.cn/documents/app-integration-dev/wps365/client/wpsoffice/jsapi/addin-api/Application/obj)、[FileSystem](https://open.wps.cn/documents/app-integration-dev/wps365/client/wpsoffice/jsapi/addin-api/FileSystem/obj)、[readAsBinaryString](https://open.wps.cn/documents/app-integration-dev/wps365/client/wpsoffice/jsapi/addin-api/FileSystem/member/readAsBinaryString)。
+
+修复后的交付自动化检查：`npm --prefix office-addin test` **840/840通过**；`npm --prefix frontend run check:locales`通过；`git diff --check`通过。日志为 `/tmp/wps-delivery-full-addin.log`、`/tmp/wps-delivery-locales.log`。这些检查不改变上述未完成的原生验收范围。

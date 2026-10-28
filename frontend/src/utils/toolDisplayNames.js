@@ -12,6 +12,10 @@ import { t } from '@/i18n'
 import { isEnglish } from '@/utils/appLanguage.js'
 
 const LOCALIZED_NAMES = {
+  "office_ppt_add_image": "editor.officeToolNames.office_ppt_add_image",
+  "office_ppt_add_chart": "editor.officeToolNames.office_ppt_add_chart",
+  "office_ppt_format_chart": "editor.officeToolNames.office_ppt_format_chart",
+  "office_ppt_set_transition": "editor.officeToolNames.office_ppt_set_transition",
   "office_file_create": "editor.officeToolNames.office_file_create",
   "office_file_save": "editor.officeToolNames.office_file_save",
   "office_file_export_pdf": "editor.officeToolNames.office_file_export_pdf",

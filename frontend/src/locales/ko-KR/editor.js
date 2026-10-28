@@ -3,6 +3,10 @@
 
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "슬라이드 이미지 삽입",
+    "office_ppt_add_chart": "슬라이드 차트 삽입",
+    "office_ppt_format_chart": "슬라이드 차트 서식 설정",
+    "office_ppt_set_transition": "슬라이드 전환 효과 설정",
     "office_file_create": "새 파일 만들기",
     "office_file_save": "현재 파일 저장",
     "office_file_export_pdf": "프로젝트로 PDF 내보내기",

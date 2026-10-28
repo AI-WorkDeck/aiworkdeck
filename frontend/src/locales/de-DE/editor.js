@@ -3,6 +3,10 @@
 
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "Bild in Folie einfügen",
+    "office_ppt_add_chart": "Diagramm in Folie einfügen",
+    "office_ppt_format_chart": "Foliendiagramm formatieren",
+    "office_ppt_set_transition": "Folienübergang festlegen",
     "office_file_create": "Neue Datei erstellen",
     "office_file_save": "Aktuelle Datei speichern",
     "office_file_export_pdf": "PDF ins Projekt exportieren",

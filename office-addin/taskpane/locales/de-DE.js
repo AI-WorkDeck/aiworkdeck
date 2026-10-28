@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "Bild in Folie einfügen",
+  cmdPptAddChart: "Diagramm in Folie einfügen",
+  cmdPptFormatChart: "Foliendiagramm formatieren",
+  cmdPptSetTransition: "Folienübergang festlegen",
   wordStyleUnsupported: "Dieser Host kann diese Profilfelder nicht vollständig anwenden: {fields}. Es wurden noch keine Änderungen begonnen.",
+  wordStyleNotApplied: "Die Hostanwendung hat den angeforderten Absatzstil nicht angewendet. Prüfen Sie das Dokument, bevor Sie es erneut versuchen.",
 
   cmdGetParagraphs: "Absätze lesen",
   cmdGetOutline: "Gliederung lesen",

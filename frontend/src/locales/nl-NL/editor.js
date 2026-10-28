@@ -3,6 +3,10 @@
 
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "Afbeelding in dia invoegen",
+    "office_ppt_add_chart": "Grafiek in dia invoegen",
+    "office_ppt_format_chart": "Diagrafiek opmaken",
+    "office_ppt_set_transition": "Diaovergang instellen",
     "office_file_create": "Nieuw bestand maken",
     "office_file_save": "Huidig bestand opslaan",
     "office_file_export_pdf": "PDF naar project exporteren",

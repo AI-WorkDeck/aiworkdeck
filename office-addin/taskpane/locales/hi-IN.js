@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "स्लाइड में चित्र डालें",
+  cmdPptAddChart: "स्लाइड में चार्ट डालें",
+  cmdPptFormatChart: "स्लाइड चार्ट का स्वरूप सेट करें",
+  cmdPptSetTransition: "स्लाइड ट्रांज़िशन सेट करें",
   wordStyleUnsupported: "यह होस्ट इन प्रोफ़ाइल फ़ील्ड को पूरी तरह लागू नहीं कर सकता: {fields}। कोई बदलाव शुरू नहीं हुआ है।",
+  wordStyleNotApplied: "होस्ट ने अनुरोधित अनुच्छेद शैली लागू नहीं की। दोबारा प्रयास करने से पहले दस्तावेज़ की जाँच करें।",
 
   cmdGetParagraphs: "अनुच्छेद पढ़ें",
   cmdGetOutline: "रूपरेखा पढ़ें",

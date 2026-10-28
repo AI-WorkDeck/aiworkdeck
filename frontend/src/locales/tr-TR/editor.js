@@ -3,6 +3,10 @@
 
 export default {
   officeToolNames: {
+    "office_ppt_add_image": "Slayda resim ekle",
+    "office_ppt_add_chart": "Slayda grafik ekle",
+    "office_ppt_format_chart": "Slayt grafiğini biçimlendir",
+    "office_ppt_set_transition": "Slayt geçişini ayarla",
     "office_file_create": "Yeni dosya oluştur",
     "office_file_save": "Geçerli dosyayı kaydet",
     "office_file_export_pdf": "PDF’yi projeye aktar",
