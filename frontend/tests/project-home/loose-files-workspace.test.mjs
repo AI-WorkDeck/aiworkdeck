@@ -125,9 +125,12 @@ test('独立文件禁止项目面板切换，即使菜单以外的调用方传�
   const src = readFileSync(new URL('../../src/pages/project-overview/panelSwitching.js', import.meta.url), 'utf8')
   const blocked = body('toggleLeftPane', src, 4).split('      // 埋点')[0]
   const checkCore = new Function('isPaneAllowedWithoutProject', 'migrateLeftPaneKey', 'isGlobalPlugin', 'key', blocked + '\nreturn true')
-  const check = function(allow, key) { return checkCore.call({ dynamicPlugins: [], ...this }, allow, value => value, () => false, key) }
-  const allow = key => key === 'projects'
+  const opened = []
+  const check = function(allow, key) { return checkCore.call({ dynamicPlugins: [], openProjectsPane() { opened.push('welcome-directory'); return 'welcome-directory' }, ...this }, allow, value => value, () => false, key) }
+  const allow = key => key === 'market'
   assert.equal(check.call({ hasProject: true, isLooseWorkspace: true }, allow, 'files'), undefined)
-  assert.equal(check.call({ hasProject: true, isLooseWorkspace: true }, allow, 'projects'), true)
+  assert.equal(check.call({ hasProject: true, isLooseWorkspace: true }, allow, 'projects'), 'welcome-directory')
+  assert.deepEqual(opened, ['welcome-directory'])
+  assert.equal(check.call({ hasProject: false }, allow, 'files'), undefined)
   assert.equal(check.call({ hasProject: true, isLooseWorkspace: false }, allow, 'files'), true)
 })

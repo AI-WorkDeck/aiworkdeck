@@ -651,3 +651,13 @@ IME 光标定位优先用 `XController.getViewData()` 的实时分号数据与 V
 加载中的 guest 容器用 `opacity:0;pointer-events:none` 隐藏独立合成层，保持真实尺寸与布局，不用 `display:none` 或固定延时。空白与备胎也先准备；备胎过继时重新确认新布局。已有工具栏的就地重载继续按 `reapplyChrome` 保留用户当前原生菜单逃生开关，首次确认不能把该开关强行关闭。工具栏字体/样式清单继续后台读取，不参与这一显示屏障。
 
 回归：`tests/toolbar/first-paint-chrome.test.mjs`（真实组件方法的延迟/失败/旧世代/备胎/逃生开关，`CHROME_EDITOR_SOURCE` 可还原旧源码负对照）；`tests/lowa-e2e/first-paint-chrome.mjs` 使用实际 Vue 显示门与 LOWA，覆盖四种冷启动、原生可见性读回、逐帧 CSS 状态及前后截图。后者是小宿主验证，不等同完整工作台、正式 Electron 或 Windows；实际运行结果以本卡落实记录为准。
+
+### Impress 进阶视觉验收（dev-board#1578/#1581）
+
+原生图片/图表/过渡入口与安全边界见 ai-doc-bridge 的同名章节。`slide_show_control` 为宿主只读动作（start/next/previous/end/state），不向AI注册；EditorToolbar 提供放映及退出，放映过程不触发文档changed/保存。工具栏只在播放时串行查询状态，卸载/切换executor清理，原生结束同步按钮状态。静态PDF不证明动画播放；UNO页码改变也不证明Qt/WASM画面已推进，须查看真实中间帧及退出后的可编辑状态。
+
+Qt/WASM 放映陷阱：UNO `activate/gotoNextSlide` 只改变状态，渲染循环可能仍暂停。`slide_show_control` 在 start/next/previous 且 running 后调用 **office worker** 的 `Module.resumeMainLoop()` 唤醒；主页面的 Module 无已注册 scheduler，不能调用。state 不唤醒，end 不手动 pause，Qt 空闲时自行暂停。mouse.move 能唤醒画面只是定位证据，产品不合成鼠标输入。
+
+原生放映启动前，PaneHider 会同步等侧栏资源配置（最长60秒），但WASM线程阻塞时配置无法完成。宿主动作先保存本次文档的 pane configuration、异步停用非 CenterPane 资源，唤醒Qt并等待请求完成后才调用原生 startWithArguments。end、启动失败和文档切换恢复原配置；异步边界核对模型身份与docSeq，旧请求不能结束新文档放映。真实引擎回归 `impress-playback.mjs` 验证中间帧、内容不变及退出后编辑；本次307ms启动仅为本机专项样本，不作为普遍性能承诺。状态轮询不占用编辑器保存空闲计时。
+
+图片cover裁剪不得把缺失Size100thMM的像素图固定按96DPI换算。Retina的原生输出设备为192DPI，固定换算会让裁剪百分比翻倍；使用Toolkit兼容设备的convertSizeToLogic(SizePixel, MM_100TH)，再按物理尺寸计算GraphicCrop。真实纹理图在DPR1/2均核对srcRect百分比及保存重开的像素画面；纯色块夹具可能掩盖错误裁剪。

@@ -10,16 +10,15 @@
 
 /**
  * 无项目态 rail 上允许出现（也就允许挂载）的左栏面板。
- * - projects：左栏「项目」面板（项目列表），两态都有；
  * - calendar：日程面板，无项目时读全局事项；
  * - market：插件中心（广场免费项不需要项目，也不需要账户）；
  * - clipboard：剪贴板是账户级数据，不挂在项目上（只在用户把它停到左栏时出现在 rail 上）。
  * 文件树、搜索、版本、成员、语音、脱敏、诉讼可视化、概览、依据、收藏、插件开发全都要项目，不在名单里。
  */
-export const NO_PROJECT_PANE_KEYS = ['projects', 'calendar', 'market', 'clipboard', 'dd-client']
+export const NO_PROJECT_PANE_KEYS = ['calendar', 'market', 'clipboard', 'dd-client']
 
-/** 无项目态左栏的默认面板 */
-export const NO_PROJECT_DEFAULT_PANE = 'projects'
+/** 无项目态由欢迎页提供目录入口，默认不展开其他面板。 */
+export const NO_PROJECT_DEFAULT_PANE = null
 
 export function isPaneAllowedWithoutProject(key) {
   return NO_PROJECT_PANE_KEYS.includes(key)

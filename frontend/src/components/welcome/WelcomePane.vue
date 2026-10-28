@@ -5,7 +5,7 @@
 
     品牌标题 + tagline / lead（文案全部取 design/copy/brand-copy.json 已有的 onboarding.unlock.brand.*，不自创）
     开始：新建项目文件夹 / 打开已有文件夹 / 从团队案件库取一份案卷 / 连接团队服务器 / 凭访问码进入案卷（客户）
-    最近：最多 8 条（最近打开优先，不足时按最近活动补齐，规则见 welcomeRecent.js）；「更多…」开左栏「项目」面板
+    最近：最多 8 条（最近打开优先，不足时按最近活动补齐，规则见 welcomeRecent.js）；「更多…」在本页展开全部目录
     上手指南：三张卡，指向官网现有页面，在工作台内置浏览器标签里打开
     底部：「启动时显示欢迎页」（本机记忆，默认开）+ 匿名使用统计的一行非阻塞提示（关掉后不再出现）
 
@@ -102,11 +102,11 @@
           </view>
 
           <view class="welcome-section welcome-recent">
-            <text class="welcome-section-title">{{ $t('welcome.recent') }}</text>
+            <text class="welcome-section-title">{{ $t(showAllFolders ? 'projects.allProjects' : 'welcome.recent') }}</text>
             <text v-if="recentState === 'loading'" class="welcome-muted">{{ $t('welcome.recentLoading') }}</text>
             <text v-else-if="recentState === 'error'" class="welcome-muted welcome-link" @tap="loadRecent">{{ $t('welcome.recentLoadFailed') }}</text>
             <text v-else-if="!recentProjects.length" class="welcome-muted welcome-recent-empty">{{ $t('welcome.recentEmpty') }}</text>
-            <template v-else>
+            <template v-else-if="!showAllFolders">
               <view
                 v-for="p in recentProjects"
                 :key="p.id"
@@ -118,7 +118,11 @@
                 <text class="welcome-recent-meta">{{ recentMeta(p) }}</text>
               </view>
             </template>
-            <text class="welcome-link welcome-more" @tap="$emit('open-projects-pane')">{{ $t('welcome.more') }}</text>
+            <text class="welcome-link welcome-more" @tap="showAllFolders = !showAllFolders">{{ $t(showAllFolders ? 'welcome.recent' : 'welcome.more') }}</text>
+            <view v-if="showAllFolders && recentState === 'ready'" class="welcome-all-folders">
+              <FolderCatalog :projects="allProjects" :client="isClientUser" :remove-project="deleteWorkspaceProject" @open-project="openProject" @renamed="onFolderRenamed" @deleted="onFolderDeleted" />
+            </view>
+            <AccountProjectCatalog v-if="isDesktop && !isClientUser" :local-projects="allProjects" :current-project-id="currentProjectId" @imported="onCatalogImported" @open-project="openProject({ id: $event })" />
           </view>
         </view>
 
@@ -172,27 +176,33 @@ import { setGlobalOverlay } from '@/utils/overlayState.js'
 import { ICONS } from '@/config/icons.js'
 import { buildRecentProjects } from './welcomeRecent.js'
 import { loadTelemetryNoticeDismissed, saveTelemetryNoticeDismissed } from '@/pages/project-overview/welcomeTab.js'
+import FolderCatalog from './FolderCatalog.vue'
+import AccountProjectCatalog from '@/components/project-list/AccountProjectCatalog.vue'
 import CloudAcceptDialog from '@/components/CloudAcceptDialog.vue'
 
 let overlaySeq = 0
 
 export default {
   name: 'WelcomePane',
-  components: { CloudAcceptDialog },
+  components: { CloudAcceptDialog, FolderCatalog, AccountProjectCatalog },
   inject: {
     leaveWorkbench: { default: null },
+    deleteWorkspaceProject: { default: null },
     openSettingsTab: { default: null },
   },
   props: {
     /** 工作台当前打开的项目（无项目态为 null）：Recent 里标「当前」，点它不重进 */
+    catalogRequest: { type: Number, default: 0 },
     currentProjectId: { type: [Number, String], default: null },
     /** 「启动时显示欢迎页」当前值（本机记忆由宿主持有） */
     showOnStartup: { type: Boolean, default: true },
   },
-  emits: ['new-project', 'open-folder', 'open-file', 'open-url', 'open-projects-pane', 'open-client-workspace', 'update:show-on-startup', 'create-project', 'open-local-folder', 'open-loose-files', 'open-project', 'start-chat', 'quick-create-doc'],
+  emits: ['new-project', 'open-folder', 'open-file', 'open-url', 'activate-current-project', 'project-renamed', 'open-client-workspace', 'update:show-on-startup', 'create-project', 'open-local-folder', 'open-loose-files', 'open-project', 'start-chat', 'quick-create-doc'],
   data() {
     return {
       quickPrompt: '',
+      allProjects: [],
+      showAllFolders: this.catalogRequest > 0,
       recentProjects: [],
       recentState: 'loading', // loading | ready | error
       showCloudAccept: false,
@@ -201,6 +211,7 @@ export default {
     }
   },
   computed: {
+    isDesktop() { return isDesktopHost() },
     ICONS() {
       return ICONS
     },
@@ -228,6 +239,7 @@ export default {
     },
   },
   watch: {
+    catalogRequest() { this.showAllFolders = true },
     // 全屏弹窗期间要让工作台把桌面端 BrowserView 藏起来（原生层会盖住 DOM 弹窗）
     anyDialogOpen(open) {
       setGlobalOverlay(!!open, this._overlayHolder)
@@ -256,6 +268,7 @@ export default {
       try {
         const res = await getMyProjects()
         const list = Array.isArray(res) ? res : (res && res.data) || []
+        this.allProjects = list
         this.recentProjects = buildRecentProjects(list, getRecentProjectIds())
         this.recentState = 'ready'
       } catch (e) {
@@ -287,14 +300,25 @@ export default {
     },
     // 进项目 = 离开当前工作台（带 id 重进），走注入的 leaveWorkbench 先落盘
     openProject(p) {
-      if (!p || this.isCurrent(p)) return
-      const url = `/pages/project-overview/project-overview?id=${p.id}`
+      if (!p) return
+      if (this.isCurrent(p)) { this.$emit('activate-current-project'); return }
+      const url = `/pages/project-overview/project-overview?id=${p.id}&pane=files`
       if (this.leaveWorkbench) {
         this.leaveWorkbench(url)
         return
       }
       uni.reLaunch({ url })
     },
+    onFolderRenamed({ id, name }) {
+      const project = this.allProjects.find(p => p.id === id)
+      if (project) project.name = name
+      this.$emit('project-renamed', { id, name })
+    },
+    onFolderDeleted(id) {
+      this.allProjects = this.allProjects.filter(p => p.id !== id)
+      this.recentProjects = buildRecentProjects(this.allProjects, getRecentProjectIds())
+    },
+    onCatalogImported(result) { if (result?.projectId) this.openProject({ id: result.projectId }) },
     onCloudAccepted(localProjectId) {
       if (localProjectId) this.openProject({ id: localProjectId })
       else this.loadRecent()
@@ -568,6 +592,8 @@ export default {
   white-space: nowrap;
   flex-shrink: 0;
 }
+
+.welcome-all-folders { margin-top: 16px; }
 
 .welcome-more {
   margin-top: 6px;

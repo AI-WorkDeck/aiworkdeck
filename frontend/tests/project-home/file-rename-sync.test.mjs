@@ -234,3 +234,55 @@ test('project-overview.vue 的 <FileTree> 接了 @file-renamed="handleFileRename
   const block = src.slice(start, end)
   assert.match(block, /@file-renamed="handleFileRenamed"/)
 })
+
+
+// dev-board#1587: exercise the actual action and workspace loader without a FileTree.
+const chatLoaderSource = extractBlock(page, 'async loadChatWorkspaceFiles()')
+const makeChatLoader = (getProjectFiles) => new Function('getProjectFiles', 'flattenProjectFileTree',
+  'return ({' + chatLoaderSource + '}).loadChatWorkspaceFiles')(
+    getProjectFiles, nodes => nodes.flatMap(node => [node, ...(node.children || [])]))
+
+test('scratch AI rename refreshes sidebar and both open panes for every file format', async () => {
+  for (const extension of ['docx', 'pptx', 'xlsx', 'pdf', 'md']) {
+    for (const treeMounted of [false, true]) {
+      const vm = Object.assign(workspace(), acaMethods, {
+        projectId: '7', hasProject: true, isChatMode: true, $t: key => key,
+        chatWorkspaceFiles: [{ id: 9, name: 'old.' + extension }],
+        leftFiles: [{ id: 9, name: 'old.' + extension }],
+        rightFiles: [{ id: 9, name: 'old.' + extension }],
+      })
+      if (treeMounted) vm.$refs.fileTree = { loadFiles: async () => {}, allFiles: [] }
+      const renamed = { id: 9, name: 'new.' + extension }
+      let load
+      vm.loadChatWorkspaceFiles = function () {
+        load = makeChatLoader(async id => { assert.equal(id, '7'); return [renamed] }).call(this)
+        return load
+      }
+      vm.handleClientAction({ action: 'refresh_files' })
+      assert.ok(load, 'the action must reload the independent chat sidebar')
+      await load
+      assert.equal(vm.chatWorkspaceFiles[0].name, renamed.name)
+      assert.equal(vm.leftFiles[0].name, renamed.name)
+      assert.equal(vm.rightFiles[0].name, renamed.name)
+    }
+  }
+})
+
+test('chat file reload ignores old requests and responses from another project', async () => {
+  const vm = Object.assign(workspace(), { projectId: '7', hasProject: true, chatWorkspaceFiles: [] })
+  const pending = []
+  const reload = makeChatLoader(() => new Promise(resolve => pending.push(resolve))).bind(vm)
+  const old = reload()
+  const latest = reload()
+  pending[1]([{ id: 9, name: 'new.docx' }])
+  await latest
+  pending[0]([{ id: 9, name: 'old.docx' }])
+  await old
+  assert.equal(vm.chatWorkspaceFiles[0].name, 'new.docx')
+  const otherProject = reload()
+  vm.projectId = '8'
+  vm.chatWorkspaceFiles = []
+  pending[2]([{ id: 9, name: 'old-project.docx' }])
+  await otherProject
+  assert.deepEqual(vm.chatWorkspaceFiles, [])
+})

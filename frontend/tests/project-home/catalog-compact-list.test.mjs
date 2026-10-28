@@ -16,8 +16,10 @@ test('sidebar has one compact list and never reads obsolete grid preferences',()
   assert.match(pane,/class="project-sort"/,'date sorting remains available when date columns are hidden')
   assert.doesNotMatch(catalog,/viewMode|catalog-grid/)
 })
-test('ProjectListPane is only mounted in sidebar; the former full-page route redirects there',()=>{
-  assert.match(read('pages/project-overview/project-overview.vue'),/<ProjectListPane/)
+test('project pane is removed and the former full-page route keeps its compatibility entry',()=>{
+  assert.doesNotMatch(read('pages/project-overview/project-overview.vue'),/<ProjectListPane/)
+  assert.match(read('components/welcome/WelcomePane.vue'), /<FolderCatalog/)
+  assert.match(read('components/welcome/WelcomePane.vue'), /<AccountProjectCatalog/)
   const route=read('pages/project-list/project-list.vue')
   assert.doesNotMatch(route,/<ProjectListPane/)
   assert.match(route,/project-overview\?pane=projects/)

@@ -104,7 +104,7 @@ public final class GeneratedFileLocation {
     public static boolean reportsCreatedFiles(String toolName) {
         return PARENTS.containsKey(toolName) || java.util.Set.of("doc_export_pdf", "pdf_merge", "pdf_split",
                 "pdf_extract_pages", "pdf_delete_pages", "pdf_rotate_pages", "pdf_add_page_numbers", "pdf_to_word",
-                "litigation_render", "litigation_timeline_render", "dd_export").contains(toolName);
+                "litigation_render", "litigation_timeline_render", "dd_export", "image_get_generation").contains(toolName);
     }
 
     public static java.util.List<Long> createdIds(String toolName, String output) {

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Harness² 对齐（dev-board#1481）：运行期自愈、独立核验报告、自进化卡片的前端接线断言。
-// 组件带 @/ 别名无法在 node:test 中直接挂载，这里核实源码层的事件接线与用户可控入口。
+// Harness² 对齐（dev-board#1481）：静默运行期自愈、静默自进化判定与独立核验报告的前端接线断言。
+// 自进化与运行期自愈全部由后端自动判定作用域与技能升格，严禁在对话流或过程卡里弹出打扰用户的三选一卡片。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -11,7 +11,7 @@ const read = (rel) => readFileSync(new URL('../../src/' + rel, import.meta.url),
 const stripComments = (s) =>
   s.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
-test('useAgentStream 接收三条 Harness SSE 事件，并在气泡守卫之前处理', () => {
+test('useAgentStream 接收三条 Harness SSE 事件，且静默自愈/自进化不把空回合撑成可见气泡', () => {
   const src = stripComments(read('composables/useAgentStream.js'))
   for (const evt of ['harness_adaptation', 'verification_report', 'harness_evolution']) {
     assert.ok(src.includes(`'${evt}'`), `缺少 ${evt} 事件处理`)
@@ -23,43 +23,32 @@ test('useAgentStream 接收三条 Harness SSE 事件，并在气泡守卫之前�
   assert.match(src, /verificationReport:\s*null/)
   assert.match(src, /harnessEvolution:\s*null/)
   assert.match(src, /\|\|\s*bubble\.verificationReport/, 'assistantHasOutput 需把核验报告算作产出')
+  assert.doesNotMatch(src, /\|\|\s*bubble\.harnessEvolution/, '静默自进化不渲染卡片，不应单独把空回合算作可见气泡')
 })
 
-test('ProcessCard 内联展示自愈「归因 → 处方」并按层级区分', () => {
-  const src = stripComments(read('components/AgentMessage/ProcessCard.vue'))
-  assert.match(src, /process\.harnessAdaptations/)
-  assert.match(src, /harnessAdaptationBadgeDomain/)
-  assert.match(src, /harnessAdaptationBadgeInvariant/)
-  assert.match(src, /item\.diagnosis/)
+test('ProcessCard 与 RootBubble 不渲染打扰用户的自愈诊断块或自进化三选一卡片', () => {
+  const procSrc = stripComments(read('components/AgentMessage/ProcessCard.vue'))
+  assert.doesNotMatch(procSrc, /data-harness-adaptation-list/, 'ProcessCard 不应内联渲染底层自愈归因块打扰用户')
+
+  const rootSrc = stripComments(read('components/AgentMessage/RootBubble.vue'))
+  assert.match(rootSrc, /import VerificationReportCard from '\.\/VerificationReportCard\.vue'/)
+  assert.match(rootSrc, /<VerificationReportCard[^>]*v-if="bubble\.verificationReport"/)
+  assert.doesNotMatch(rootSrc, /<HarnessEvolutionCard/, 'RootBubble 严禁在对话流挂载打扰用户的自进化选择卡')
 })
 
-test('RootBubble 挂载核验报告卡与自进化卡', () => {
-  const src = stripComments(read('components/AgentMessage/RootBubble.vue'))
-  assert.match(src, /import VerificationReportCard from '\.\/VerificationReportCard\.vue'/)
-  assert.match(src, /import HarnessEvolutionCard from '\.\/HarnessEvolutionCard\.vue'/)
-  assert.match(src, /<VerificationReportCard[^>]*v-if="bubble\.verificationReport"/)
-  assert.match(src, /<HarnessEvolutionCard[\s\S]*?v-if="bubble\.harnessEvolution"/)
-})
+test('核验报告卡展示有据/待核/冲突三类计数，且后台管理 API 保持完整', () => {
+  const src = stripComments(read('components/AgentMessage/VerificationReportCard.vue'))
+  assert.match(src, /verificationMetricSupported/)
+  assert.match(src, /verificationMetricUnverified/)
+  assert.match(src, /verificationMetricConflict/)
 
-test('自进化卡给用户三个掌舵入口：切换作用域、升格技能、撤销学习', () => {
-  const src = stripComments(read('components/AgentMessage/HarnessEvolutionCard.vue'))
-  for (const fn of ['switchHarnessEvolutionScope', 'promoteHarnessEvolutionToSkill', 'revertHarnessEvolution']) {
-    assert.ok(src.includes(fn), `HarnessEvolutionCard 未调用 ${fn}`)
-  }
   const api = stripComments(read('services/api.js'))
   for (const fn of ['getHarnessEvolutions', 'switchHarnessEvolutionScope', 'promoteHarnessEvolutionToSkill', 'revertHarnessEvolution']) {
     assert.ok(api.includes(fn), `api.js 缺少 ${fn}`)
   }
 })
 
-test('核验报告卡展示有据/待核/冲突三类计数', () => {
-  const src = stripComments(read('components/AgentMessage/VerificationReportCard.vue'))
-  assert.match(src, /verificationMetricSupported/)
-  assert.match(src, /verificationMetricUnverified/)
-  assert.match(src, /verificationMetricConflict/)
-})
-
-test('历史回放：attachEvolutionsToBubbles 按 assistantMessageId 精准把进化卡挂回对应气泡，且不覆盖当轮新卡', () => {
+test('attachEvolutionsToBubbles 纯函数保持按 assistantMessageId 归并能力', () => {
   const bubbles = [
     { id: 100, role: 'USER', content: '审查合同' },
     { id: 101, role: 'ASSISTANT', content: '已完成第一版', harnessEvolution: null },
@@ -72,9 +61,6 @@ test('历史回放：attachEvolutionsToBubbles 按 assistantMessageId 精准把�
   ]
   const count = attachEvolutionsToBubbles(bubbles, records)
   assert.equal(count, 1)
-  assert.equal(bubbles[1].harnessEvolution.id, 'evo-newer', '同一消息多条记录取最新一条')
-  assert.equal(bubbles[2].harnessEvolution.id, 'evo-live', '当轮已挂载的 SSE 卡片不被历史回放冲掉')
-
-  const chatSrc = stripComments(read('components/ChatInterface.vue'))
-  assert.match(chatSrc, /restoreHarnessEvolutions\(conversationId\)/, 'ChatInterface 加载历史时必须调用 restoreHarnessEvolutions')
+  assert.equal(bubbles[1].harnessEvolution.id, 'evo-newer')
+  assert.equal(bubbles[2].harnessEvolution.id, 'evo-live')
 })

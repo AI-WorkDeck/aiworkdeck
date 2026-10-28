@@ -558,6 +558,14 @@ html {
    Chromium 一旦看到 scrollbar-width，就整个忽略 ::-webkit-scrollbar 那套，4px 的
    确定高度会退化成 thin（约 8px），把按上面 4px 算好的居中偏移带歪。所以标准属性
    只留给没有 webkit 伪元素的浏览器。 */
+/* 由宿主变量驱动伪元素：直接滚动的容器在 Chromium 中仅改 :hover 伪元素
+   可能不刷新滑块；工具栏的内层滚动容器与侧栏本体都使用同一条路径。 */
+.awd-hairline-scroll {
+    --awd-scrollbar-thumb: transparent;
+}
+.awd-hairline-scroll:hover {
+    --awd-scrollbar-thumb: var(--awd-border-strong);
+}
 .awd-hairline-scroll::-webkit-scrollbar,
 .awd-hairline-scroll ::-webkit-scrollbar {
     width: 4px;
@@ -569,12 +577,8 @@ html {
 }
 .awd-hairline-scroll::-webkit-scrollbar-thumb,
 .awd-hairline-scroll ::-webkit-scrollbar-thumb {
-    background: transparent;
+    background: var(--awd-scrollbar-thumb);
     border-radius: 999px;
-}
-.awd-hairline-scroll:hover::-webkit-scrollbar-thumb,
-.awd-hairline-scroll:hover ::-webkit-scrollbar-thumb {
-    background: var(--awd-border-strong);
 }
 @supports not selector(::-webkit-scrollbar) {
     .awd-hairline-scroll,

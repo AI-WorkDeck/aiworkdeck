@@ -21,7 +21,7 @@ test('title edits inline with separate keyboard-accessible switcher; no menu ren
   assert.match(header, /@keydown="handleProjectTitleActivation\(\$event, 'rename'\)"/)
   assert.match(header, /@keydown="handleProjectTitleActivation\(\$event, 'switch'\)"/)
   assert.doesNotMatch(header, /switcher-rename|startRenameFromSwitcher/)
-  assert.match(header, /v-else-if="canRenameProject"/)
+  assert.match(header, /v-else-if="hasNamedProject && canRenameProject"/)
 })
 test('confirm uses live value, blur preserves pending draft and repeated Enter sends only once', async () => {
   let done; const calls=[]

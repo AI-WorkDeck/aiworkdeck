@@ -182,10 +182,10 @@ test('无项目态存储键落 global_*，不再写出 project_null_*', () => {
   assert.equal(workbenchStorageKey('12', 'leftPaneKey'), 'project_12_leftPaneKey')
 })
 
-test('无项目态 rail 只留全局面板：项目 / 日程 / 插件中心 / 剪贴板 / 客户协作', () => {
-  assert.deepEqual([...NO_PROJECT_PANE_KEYS].sort(), ['calendar', 'clipboard', 'dd-client', 'market', 'projects'])
-  assert.equal(NO_PROJECT_DEFAULT_PANE, 'projects')
-  for (const k of ['files', 'search', 'version', 'voice', 'desensitize', 'litigation-visual', 'home', 'insight', 'favorites', 'dev', 'staging', 'plugin-foo']) {
+test('无项目态默认不展开面板，rail 只留日程 / 插件中心 / 剪贴板 / 客户协作', () => {
+  assert.deepEqual([...NO_PROJECT_PANE_KEYS].sort(), ['calendar', 'clipboard', 'dd-client', 'market'])
+  assert.equal(NO_PROJECT_DEFAULT_PANE, null)
+  for (const k of ['projects', 'files', 'search', 'version', 'voice', 'desensitize', 'litigation-visual', 'home', 'insight', 'favorites', 'dev', 'staging', 'plugin-foo']) {
     assert.equal(isPaneAllowedWithoutProject(k), false, k + ' 要项目，无项目态不许挂载')
   }
 })
@@ -197,7 +197,7 @@ test('ProjectListPane 是面板不是页面：没有页面级生命周期，跳�
   assert.ok(!/\n  onLoad\(|\n  onShow\(/.test(pane), '组件里写 onLoad/onShow 不会被调用（那是页面钩子）')
   assert.match(pane, /inject:\s*\{\s*leaveWorkbench:\s*\{\s*default:\s*null\s*\}/)
   assert.match(pane, /\n  mounted\(\) \{[\s\S]*?this\.loadProjects\(\)/, '挂载即拉项目清单')
-  assert.match(pane, /class="project-list-pane"/)
+  assert.match(pane, /class="project-list-pane(?:\s[^"]*)?"/)
   // 当前项目只打开文件面板，不能重建仍有编辑器的工作台。
   const events = []
   const goToProject = new Function('uni', `return function(projectId) ${methodBody(pane, 'goToProject(projectId) {')}`)({

@@ -6,7 +6,8 @@ import vm from 'node:vm'
 import { readFileSync } from 'node:fs'
 const source = readFileSync(process.env.SLIDE_WORKER_SOURCE || new URL('../../src/zetaoffice/public/office_thread.js', import.meta.url), 'utf8')
 function method(name, realm) {
-  const start = source.indexOf(`  ${name}(p) {`)
+  const syncStart = source.indexOf(`  ${name}(p) {`)
+  const start = syncStart >= 0 ? syncStart : source.indexOf(`  async ${name}(p) {`)
   const end = source.indexOf('\n  },', start) + 5
   return vm.runInContext(`({${source.slice(start, end)}})`, realm)[name]
 }
@@ -45,7 +46,7 @@ function setup(shapes = []) {
   const collection = { getCount: () => pages.length, getByIndex: i => pages[i],
     insertNewByIndex(index) { const added = page(); added.shapes.push({ kind: 'placeholder' }); pages.splice(Math.min(index + 1, pages.length), 0, added); return added } }
   const realm = vm.createContext({
-    xModel: { getDrawPages: () => collection, createInstance: () => properties({}) },
+    xModel: { getDrawPages: () => collection, createInstance: () => properties({}), setModified() {} },
     isImpressDoc: () => true, ensureShapeNames: () => {}, shapeKind: s => s.kind || 'text',
     shapeText: s => s.getText?.().getString() || '', slideFail: error => ({ success: false, error, message: error }),
     errStr: e => e.message, locatePageIndex: page => pages.indexOf(page), movePageTo: () => -1,
@@ -361,4 +362,146 @@ test('legacy setter failures report partial outcome and forbid blind retry', () 
   assert.equal(result.retryable, false); assert.equal(result.outcomeUnknown, true)
   assert.equal(result.applied.headerBold.cellsFailed, 2)
   assert.equal(s.cells[0][0].values.FillColor, 0x183247)
+})
+
+test('native chart rejects mismatched, nonfinite and invalid pie data before creating shapes', () => {
+  const s = setup(), addChart = method('slide_add_chart', s.realm)
+  let created = 0
+  s.realm.xModel.createInstance = () => { created++; throw new Error('must not create') }
+  const good = { slideNumber: 1, chartType: 'column', categories: ['A', 'B'], series: [{ name: 'Value', values: [1, 2] }], left: 0, top: 0, width: 400, height: 200 }
+  for (const change of [
+    { series: [{ name: 'Value', values: [1] }] },
+    { series: [{ name: 'Value', values: [1, Infinity] }] },
+    { chartType: 'pie', series: [{ name: 'Value', values: [-1, 2] }] },
+    { chartType: 'pie', series: [{ name: 'Value', values: [0, 0] }] },
+    { chartType: 'scatter' }, ...['invented','toString','constructor','__proto__'].map(chartType=>({chartType})), { width: -1 }, { left: NaN }
+  ]) assert.equal(addChart({ ...good, ...change }).success, false)
+  assert.equal(created, 0)
+})
+
+test('slide transition validates before mutation and reports interrupted writes honestly', () => {
+  const s = setup(), transition = method('slide_set_transition', s.realm)
+  const values = { TransitionType: 0, TransitionSubtype: 0, TransitionDuration: 2 }
+  const writes = []
+  s.pages[0].setPropertyValue = (name, value) => { writes.push(name); values[name] = value }
+  s.pages[0].getPropertyValue = name => values[name]
+  for (const p of [...['unknown','toString','constructor','__proto__'].map(effect=>({effect})), { effect: 'fade', durationSeconds: NaN }, { effect: 'fade', durationSeconds: 6 }])
+    assert.equal(transition({ slideNumber: 1, ...p }).success, false)
+  assert.equal(writes.length, 0)
+  const result = transition({ slideNumber: 1, effect: 'fade', durationSeconds: 0.6 })
+  assert.equal(result.success, true); assert.equal(result.transition.type, 37); assert.equal(result.transition.subtype, 101)
+  assert.ok(!writes.includes('Change'), 'must preserve advancement mode')
+  s.pages[0].setPropertyValue = () => { throw new Error('setter failed') }
+  const failed = transition({ slideNumber: 1, effect: 'push' })
+  assert.equal(failed.success, false); assert.equal(failed.outcomeUnknown, true); assert.equal(failed.retryable, false)
+})
+
+test('image geometry validation allows intended bleed but rejects invalid rectangles before decoding', () => {
+  const s = setup(), addImage = method('slide_add_image', s.realm)
+  let decoded = 0
+  s.realm.atob = () => { decoded++; return '' }
+  const p = { slideNumber: 1, left: -30, top: -20, width: 900, height: 500, base64: '' }
+  assert.equal(addImage({ ...p, width: 0 }).success, false)
+  assert.equal(addImage({ ...p, fit: 'invented' }).success, false)
+  assert.equal(decoded, 0)
+  assert.equal(addImage(p).errorCode, 'SLIDE_INVALID_IMAGE')
+  assert.equal(decoded, 1, 'negative position is valid intentional bleed')
+})
+
+
+test('chart styling requires exact shape identity and typed nonempty changes', () => {
+  const s = setup(); const style = method('slide_format_chart', s.realm)
+  for (const p of [{fontSize:16}, {shapeName:'chart'}, {shapeName:'chart',showGrid:'false'}, {shapeName:'chart',showLegend:1}]) {
+    assert.equal(style(p).errorCode, 'SLIDE_INVALID_CHART_STYLE')
+  }
+})
+
+test('slideshow wakes the office render loop only for running navigation', async () => {
+  let running = false, index = 1, wakes = 0
+  const controller = {
+    activate() {}, gotoNextSlide() { index++ }, gotoPreviousSlide() { index-- },
+    getCurrentSlideIndex: () => index,
+  }
+  const presentation = { isRunning: () => running, getController: () => controller,
+    startWithArguments() { running = true }, end() { running = false } }
+  const realm = vm.createContext({
+    isImpressDoc: () => true, activeImpressContext: () => ({ slideNumber: 2 }),
+    resolvePage: () => ({ page: { getName: () => 'second' } }), mkProp: (name, value) => ({ name, value }),
+    docSeq: 1, slideShowViewState: null, restoreSlideShowView() {}, setTimeout,
+    ctrl: { getConfigurationController: () => ({
+      getRequestedConfiguration: () => ({ getResources: () => [] }),
+      update() {}, hasPendingRequests: () => false,
+    }) }, css: { drawing: { framework: { AnchorBindingMode: { DIRECT: 0 } } } },
+    Module: { resumeMainLoop() { wakes++ } },
+    xModel: { getPresentation: () => presentation, getDrawPages: () => ({ getCount: () => 5 }) },
+    slideError: errorCode => ({ success: false, errorCode }),
+  })
+  const show = method('slide_show_control', realm)
+  assert.equal((await show({ operation: 'state' })).running, false); assert.equal(wakes, 0)
+  assert.equal((await show({ operation: 'start' })).running, true); assert.equal(wakes, 3)
+  assert.equal((await show({ operation: 'next' })).slideNumber, 3); assert.equal(wakes, 4)
+  assert.equal((await show({ operation: 'previous' })).slideNumber, 2); assert.equal(wakes, 5)
+  assert.equal((await show({ operation: 'state' })).slideNumber, 2); assert.equal(wakes, 5)
+  assert.equal((await show({ operation: 'end' })).running, false); assert.equal(wakes, 5)
+  assert.equal((await show({ operation: 'next' })).errorCode, 'SLIDE_SHOW_NOT_RUNNING'); assert.equal(wakes, 5)
+})
+
+test('image cover uses native pixel-to-logic conversion on both standard and Retina devices', () => {
+  for (const dpi of [96, 192]) {
+    const s = setup(); const values = {}; let conversions = 0;
+    const shape = {setSize() {},setPosition() {},getName:()=> 'image',setPropertyValue:(k,v)=>{values[k]=v;}};
+    s.realm.xModel.createInstance = () => shape;
+    s.realm.atob = () => 'png'; s.realm.context = {}; s.realm.mkProp = (Name,Value)=>({Name,Value});
+    s.realm.ptToMm100 = p => Math.round(p*2540/72);
+    const Size = class {constructor(v){Object.assign(this,v);}};
+    Object.assign(s.realm.css.awt, {Size,Point:Size,Toolkit:{create:()=>({createScreenCompatibleDevice:()=>({
+      convertSizeToLogic:(pixels,unit)=>{conversions++;assert.equal(unit,0);return {Width:Math.round(pixels.Width*2540/dpi),Height:Math.round(pixels.Height*2540/dpi)};}
+    })})}});
+    s.realm.css.util = {MeasureUnit:{MM_100TH:0}};
+    s.realm.css.io = {SequenceInputStream:{createStreamFromSequence:()=>({})}};
+    s.realm.css.text = {GraphicCrop:Size};
+    s.realm.css.graphic = {GraphicProvider:{create:()=>({queryGraphic:()=>({getPropertyValue:name=>
+      name==='Size100thMM'?{Width:0,Height:0}:{Width:1672,Height:940}})})}};
+    const result=method('slide_add_image',s.realm)({slideNumber:1,base64:'png',left:-20,top:-20,width:580,height:660,fit:'cover'});
+    assert.equal(result.success,true,JSON.stringify(result));assert.equal(conversions,1);
+    const crop=values.GraphicCrop, naturalWidth=Math.round(1672*2540/dpi);
+    assert.ok(Math.abs((crop.Left+crop.Right)/naturalWidth-(1-(580/660)/(1672/940)))<0.0001);
+    assert.ok(crop.Left+crop.Right<naturalWidth);
+  }
+});
+
+
+test('shape text marks modified only after a real successful write and preserves newline bytes', () => {
+  for (const replacement of ['first\nsecond', String.raw`first\nsecond`]) {
+    let value = 'old', marked = 0
+    const text = { getString: () => value, setString: v => { value = v } }
+    const s = setup([shape('body', text)])
+    s.realm.xModel.setModified = flag => { assert.equal(flag, true); marked++ }
+    const setText = method('slide_set_shape_text', s.realm)
+    assert.equal(setText({ slideNumber: 1, shapeName: 'body', text: replacement }).success, true)
+    assert.equal(value, replacement); assert.equal(marked, 1)
+    assert.equal(setText({ slideNumber: 1, shapeName: 'body', text: replacement }).success, true)
+    assert.equal(marked, 1)
+    text.setString = () => { throw new Error('write failed') }
+    assert.equal(setText({ slideNumber: 1, shapeName: 'body', text: 'different' }).success, false)
+    assert.equal(marked, 1)
+  }
+})
+
+test('replacement marks each successful write, including before a later partial failure', () => {
+  const text = textObject('a a'), s = setup([shape('body', text)])
+  let marked = 0
+  s.realm.xModel.setModified = flag => { assert.equal(flag, true); marked++ }
+  assert.equal(s.replace({ searchText: 'missing', replaceText: 'b', all: true }).replaced, 0)
+  assert.equal(s.replace({ searchText: 'a', replaceText: 'a', all: true }).replaced, 0)
+  assert.equal(marked, 0)
+  const cursor = text.createTextCursor
+  let calls = 0
+  text.createTextCursor = () => {
+    if (++calls === 2) throw new Error('second replacement failed')
+    return cursor()
+  }
+  const result = s.replace({ searchText: 'a', replaceText: 'b', all: true })
+  assert.equal(result.success, false); assert.equal(result.outcomeUnknown, true)
+  assert.equal(text.getString(), 'a b'); assert.equal(marked, 1)
 })
