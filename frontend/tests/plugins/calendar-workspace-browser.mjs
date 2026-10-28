@@ -68,6 +68,25 @@ try {
   const sidebar=await (await page.$('#sidebar')).contentFrame(),workspace=await(await page.$('#workspace')).contentFrame()
   await sidebar.waitForSelector('.calendar-shortcuts .task-row');await workspace.waitForSelector('.fc-event')
   assert.equal(await sidebar.$('.fc'),null,'sidebar must not render any FullCalendar')
+  const verifySidebarAlignment = async (sidebar) => {
+    // Measure real uni-button text, including the native H5 wrapper and inherited line height.
+    for (const width of [220, 280, 340]) {
+      await page.$eval('#sidebar', (el, width) => { el.style.width = width + 'px' }, width)
+      const alignment = await sidebar.$$eval('.shortcut-primary, .shortcut-link, .shortcut-segments uni-button', buttons => buttons.map(button => {
+        const box = button.getBoundingClientRect(), range = document.createRange()
+        range.selectNodeContents(button)
+        const text = range.getBoundingClientRect()
+        return { text: button.textContent, dx: Math.abs((box.left + box.right - text.left - text.right) / 2), dy: Math.abs((box.top + box.bottom - text.top - text.bottom) / 2) }
+      }))
+      for (const item of alignment) {
+        assert.ok(item.dx < 2, `${width}px ${item.text}: horizontally centered (${item.dx})`)
+        assert.ok(item.dy < 2, `${width}px ${item.text}: vertically centered (${item.dy})`)
+      }
+    }
+    await page.$eval('#sidebar', el => { el.style.width = '280px' })
+  }
+  await verifySidebarAlignment(sidebar)
+
   assert.equal(await workspace.$('.calendar-sidebar'),null,'workspace must devote width to calendar')
   assert.equal(await sidebar.$eval('.calendar-shortcuts',el=>el.scrollWidth<=el.clientWidth),true)
   await page.screenshot({path:out+'/initial.png'})
@@ -136,15 +155,16 @@ try {
     assert.equal(await sidebar.$eval('.calendar-shortcuts',el=>el.scrollWidth<=el.clientWidth),true)
   }
   await page.screenshot({path:out+'/narrow.png'})
-  for (const [language, heading, year] of [['de-DE','Demnächst','Jahr'],['ar-SA','المهام القادمة','سنة']]) {
+  for (const [language, heading, year] of [['en-US','Coming up','Year'],['de-DE','Demnächst','Jahr'],['ar-SA','المهام القادمة','سنة']]) {
     await page.goto('http://127.0.0.1:'+server.address().port+'/?lang='+language)
     const translatedSidebar=await(await page.$('#sidebar')).contentFrame(),translatedWorkspace=await(await page.$('#workspace')).contentFrame()
     await translatedSidebar.waitForSelector('.calendar-shortcuts .task-row');await translatedWorkspace.waitForSelector('.fc-event')
+    await verifySidebarAlignment(translatedSidebar)
     assert.match(await translatedSidebar.$eval('.shortcut-upcoming-head',el=>el.textContent),new RegExp(heading))
     await clickText(translatedWorkspace,'.cal-seg-btn',year);await translatedWorkspace.waitForSelector('.cal-year')
     assert.equal(await translatedWorkspace.$eval('.calendar-pane',el=>el.getAttribute('dir')),language==='ar-SA'?'rtl':'ltr')
   }
   assert.deepEqual(errors,[])
-  const report={passed:true,checks:['separate sidebar/workspace','central multi-project selection labels sidebar then resets to all/single','project filter sync','3/5 day boundary','task focus and day view','12-month year and date navigation','sidebar create / complete and refresh','persistent failure and retry','associated file navigation and shared filter clear','220/260/320px sidebar','packaged German and Arabic strings and RTL'],screenshots:['initial.png','multiple-projects.png','year.png','narrow.png']}
+  const report={passed:true,checks:['separate sidebar/workspace','central multi-project selection labels sidebar then resets to all/single','project filter sync','3/5 day boundary','task focus and day view','12-month year and date navigation','sidebar create / complete and refresh','persistent failure and retry','associated file navigation and shared filter clear','220/260/320px sidebar','centered buttons at 220/280/340px in Chinese, English, German and Arabic','packaged translations and RTL'],screenshots:['initial.png','multiple-projects.png','year.png','narrow.png']}
   await writeFile(out+'/report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report))
 } finally { await browser?.close();await new Promise(done=>server.close(done)) }

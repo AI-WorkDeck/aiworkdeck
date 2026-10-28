@@ -3,6 +3,7 @@
 
 package com.checkba.service.ai.tools;
 
+import com.checkba.service.sensitive.SensitiveRecoveryKit;
 import com.checkba.model.entity.ProjectFile;
 import com.checkba.repository.ProjectFileRepository;
 import com.checkba.service.ProjectFileService;
@@ -194,6 +195,7 @@ public class FileTools implements AgentToolComponent {
             Path path = resolvePath(filePath);
             if (!Files.exists(path)) return "Error: File does not exist.";
             if (Files.isDirectory(path)) return "Error: Path is a directory.";
+            if (SensitiveRecoveryKit.isRecoveryFile(path.getFileName().toString())) return SensitiveRecoveryKit.aiReadNotice();
             if (Files.size(path) > 10 * 1024 * 1024) return "Error: File too large (>10MB).";
             
             // Use unified extractor：图片/PDF 走 OCR，纯文本直读，其余（docx/xlsx/pptx 等

@@ -56,6 +56,29 @@ class FileContextLoaderTest {
     }
 
     @Test
+    void recoveryMaterialIsSkippedWithoutUsingTheFolderBudget() throws Exception {
+        props.getFiles().setMaxFilesPerContext(1);
+        ProjectFile kit = readableFile(71L, "redacted.docx.AWD-RECOVERY", "AWD-RECOVERY-1:synthetic-ciphertext");
+        ProjectFile document = readableFile(72L, "redacted.txt", "safe redacted text");
+        when(projectFileService.getFilesByParent(1L, 200L)).thenReturn(List.of(kit, document));
+        when(projectFileService.getFileBytes(72L)).thenReturn("safe redacted text".getBytes(StandardCharsets.UTF_8));
+        when(extractor.extractText(any(File.class))).thenReturn("safe redacted text");
+
+        var result = loader.buildFolderContextCounted("200", "1", 0);
+        assertEquals(1, result.filesRead());
+        assertEquals(0, result.unreadableCount());
+        assertTrue(result.text().contains("Of 1 listed file(s), text preloaded from 1"));
+        assertTrue(result.text().contains("safe redacted text"));
+        assertFalse(result.text().contains("AWD-RECOVERY"));
+        assertFalse(result.text().contains("synthetic-ciphertext"));
+        String chat = loader.collectFolderContent(1L, 200L);
+        assertTrue(chat.contains("redacted.txt"));
+        assertFalse(chat.contains("AWD-RECOVERY"));
+        assertEquals(com.checkba.service.sensitive.SensitiveRecoveryKit.aiReadNotice(), loader.extractFileText(kit));
+        verify(projectFileService, never()).getFileBytes(71L);
+    }
+
+    @Test
     @DisplayName("单文件提取：OCR 支持的文件走 OCR 路径")
     void extractFileTextRoutesToOcr() throws Exception {
         ProjectFile pdf = file(1L, "contract.pdf", false);

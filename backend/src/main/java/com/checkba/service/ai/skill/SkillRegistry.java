@@ -284,6 +284,17 @@ public class SkillRegistry {
         if (skill != null && skill.isBuiltinWorkflow()) {
             return true;
         }
+        // The migrated Web plugin uses this host-provided skill, not a manifest.skills
+        // directory. Its visible switch owns enablement while installed; keep the
+        // legacy skill preference untouched for installations without the plugin.
+        if (skill != null && "litigation-visual".equals(skillId) && skill.getSourcePluginId() == null) {
+            PluginService.PluginMetadata plugin = pluginService.getPlugin(skillId);
+            if (plugin != null) {
+                return pluginService.isEnabled(skillId) && pluginService.revokedReason(skillId) == null
+                        && plugin.getPermissions() != null
+                        && plugin.getPermissions().containsAll(List.of("file_read", "file_write", "ai"));
+            }
+        }
         maybeRefreshDisabledState();
         return !disabledSkillIds.contains(skillId);
     }
