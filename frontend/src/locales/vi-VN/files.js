@@ -52,7 +52,7 @@ export default {
     "previewTimeout": "Chuẩn bị xem trước âm thanh đã hết thời gian chờ. Đóng tab này và mở lại.",
     "playFailed": "Không thể phát tệp này. Có thể codec không được hỗ trợ.",
     "backToCurrent": "Về hiện tại",
-    "speakerPrefix": "{name}: ",
+    "speakerPrefix": "{name} : ",
     "summary": "{count} đoạn · {duration}"
   },
   "captions": {

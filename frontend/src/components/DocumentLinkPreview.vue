@@ -34,7 +34,8 @@ export default {
   computed: {
     external() { return /^https?:\/\//i.test(this.preview.url) && !parseFileLinkUrl(this.preview.url) },
     words() {
-      return String(this.$i18n.locale).startsWith('en')
+      const loc = String((this.$i18n && this.$i18n.locale) || 'zh-CN')
+      return !loc.startsWith('zh')
         ? { title: 'Link preview', close: 'Close', unavailable: 'This reference cannot be previewed. Your reading position is unchanged.', truncated: 'Excerpt truncated', document: 'Linked document', noExcerpt: 'No saved excerpt. Open alongside to read the source.', aside: 'Open alongside', loading: 'Loading…', noWebPreview: 'Web content is not loaded in this preview. Open alongside to read it.' }
         : { title: '链接预览', close: '关闭', unavailable: '暂不能预览此引用，已保留原文位置。', truncated: '摘录已截断', document: '关联文档', noExcerpt: '没有保存的摘录，可分屏查看原文。', aside: '分屏打开', loading: '正在读取…', noWebPreview: '此处仅预览链接地址，可分屏查看网页内容。' }
     },

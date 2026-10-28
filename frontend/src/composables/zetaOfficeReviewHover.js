@@ -45,7 +45,8 @@ const TYPE_LABELS = {
   en: { Insert: 'Inserted', Delete: 'Deleted', Format: 'Formatting', ParagraphFormat: 'Paragraph formatting', TextTable: 'Table', other: 'Change' },
 }
 export function revisionTypeLabel(type, locale = 'zh') {
-  const labels = TYPE_LABELS[String(locale).startsWith('en') ? 'en' : 'zh']
+  const loc = String(locale || 'zh')
+  const labels = TYPE_LABELS[loc && !loc.startsWith('zh') ? 'en' : 'zh']
   const t = String(type || '')
   return labels[t] || t || labels.other
 }
@@ -56,9 +57,11 @@ export function revisionHoverCard(item, selfAuthor, locale = 'zh') {
   const author = String(d.author || '')
   const mine = !!author && author === selfAuthor && author !== 'AI WorkDeck'
   const text = String(d.text || d.description || '')
+  const loc = String(locale || 'zh')
+  const en = Boolean(loc && !loc.startsWith('zh'))
   return {
     type: revisionTypeLabel(d.type, locale),
-    author: author ? (mine ? author + '（我）' : author) : (locale.startsWith('en') ? 'Unknown author' : '未知作者'),
+    author: author ? (mine ? author + (en ? ' (Me)' : '（我）') : author) : (en ? 'Unknown author' : '未知作者'),
     date: String(d.date || ''),
     text: text.length > 80 ? text.slice(0, 80) + '…' : text,
   }

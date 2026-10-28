@@ -52,7 +52,7 @@ export default {
     "previewTimeout": "ऑडियो प्रीव्यू तैयारी का समय समाप्त हो गया। इस टैब को बंद करके दोबारा खोलें।",
     "playFailed": "यह फ़ाइल नहीं चलाई जा सकती। संभवतः कोडेक समर्थित नहीं है।",
     "backToCurrent": "वर्तमान पर वापस जाएँ",
-    "speakerPrefix": "{name}: ",
+    "speakerPrefix": "{name} - ",
     "summary": "{count} खंड · {duration}"
   },
   "captions": {

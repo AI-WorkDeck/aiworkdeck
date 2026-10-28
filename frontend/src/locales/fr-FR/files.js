@@ -28,15 +28,15 @@ export default {
   "videoLoading": "Chargement de la vidéo…",
   "audioLoading": "Chargement de l'audio…",
   "audioPlay": "Lire",
-  "audioPause": "Pause",
+  "audioPause": "Mettre en pause",
   "audioRate": "Vitesse de lecture",
   "audioMute": "Couper le son",
   "player": {
     "play": "Lire",
-    "pause": "Pause",
+    "pause": "Mettre en pause",
     "mute": "Couper le son",
     "unmute": "Réactiver le son",
-    "volume": "Volume",
+    "volume": "Niveau sonore",
     "progress": "Défilement",
     "speed": "Vitesse de lecture",
     "fullscreen": "Plein écran",
@@ -53,7 +53,7 @@ export default {
     "playFailed": "Ce fichier ne peut pas être lu. Le codec n'est peut-être pas pris en charge.",
     "backToCurrent": "Retour à l'actuel",
     "speakerPrefix": "{name} : ",
-    "summary": "{count} segments · {duration}"
+    "summary": "{count} extraits · {duration}"
   },
   "captions": {
     "generate": "Générer les sous-titres",
@@ -169,7 +169,7 @@ export default {
   "tagTypeNormal": "Général",
   "tagTypeParty": "Partie",
   "tagTypeIssue": "Point litigieux",
-  "tagTypeLabel": "Type",
+  "tagTypeLabel": "Catégorie",
   "tagGroupParty": "Partie",
   "tagGroupIssue": "Point litigieux",
   "tagGroupNormal": "Étiquettes",

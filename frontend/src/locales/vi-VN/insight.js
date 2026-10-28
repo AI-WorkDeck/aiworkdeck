@@ -3,88 +3,88 @@
 
 export default {
   "title": "Căn cứ",
-  "noDoc": "No document open",
-  "parse": "Full-document online verification (charges may apply)",
-  "reparse": "Repeat full-document online verification (charges may apply)",
-  "onlineHint": "Clicking saves this document, then verifies the saved version online. AI and external lookups may incur charges.",
-  "saveRequired": "This document could not be saved. Save it successfully before online verification.",
-  "running": "Verifying online…",
-  "done": "Online verification complete",
-  "failed": "Online verification failed",
+  "noDoc": "Chưa mở tài liệu",
+  "parse": "Xác minh trực tuyến toàn văn (có thể phát sinh phí)",
+  "reparse": "Xác minh lại trực tuyến toàn văn (có thể phát sinh phí)",
+  "onlineHint": "Nhấn vào sẽ lưu tài liệu hiện tại trước, sau đó xác minh phiên bản đã lưu trực tuyến. AI và tra cứu bên ngoài có thể phát sinh phí.",
+  "saveRequired": "Không thể lưu tài liệu hiện tại. Vui lòng lưu thành công trước khi xác minh trực tuyến.",
+  "running": "Đang xác minh trực tuyến…",
+  "done": "Đã hoàn tất xác minh trực tuyến",
+  "failed": "Xác minh trực tuyến thất bại",
   "loading": "Đang tải…",
-  "loadingDetail": "Fetching lookup details…",
-  "noDetail": "No lookup details for this item",
-  "loadFailed": "Could not load online verification results",
-  "parseFailed": "Could not start online verification",
-  "detailFailed": "Could not load the lookup details",
-  "refreshFailed": "Could not re-run the lookup",
+  "loadingDetail": "Đang lấy chi tiết tra cứu…",
+  "noDetail": "Mục này không có chi tiết tra cứu",
+  "loadFailed": "Không thể tải kết quả xác minh trực tuyến",
+  "parseFailed": "Không thể bắt đầu xác minh trực tuyến",
+  "detailFailed": "Không thể tải chi tiết tra cứu",
+  "refreshFailed": "Không thể chạy lại tra cứu",
   "retry": "Thử lại",
-  "goConnectAccount": "Connect account",
-  "goRecharge": "Add credits",
+  "goConnectAccount": "Kết nối tài khoản",
+  "goRecharge": "Nạp thêm tín dụng",
   "hint": {
-    "NO_CREDENTIAL": "This lookup channel needs a credential configured on the server by your administrator."
+    "NO_CREDENTIAL": "Kênh tra cứu này cần được quản trị viên cấu hình thông tin xác thực trên máy chủ."
   },
   "tab": {
-    "retrieval": "Lookups",
-    "checks": "Consistency"
+    "retrieval": "Tra cứu ngoài",
+    "checks": "Kiểm tra nhất quán"
   },
   "kind": {
-    "COMPANY": "Companies",
-    "LAW": "Statutes",
-    "CASE": "Cases",
-    "DOC": "Documents"
+    "COMPANY": "Công ty",
+    "LAW": "Văn bản pháp luật",
+    "CASE": "Án lệ / Bản án",
+    "DOC": "Tài liệu"
   },
   "entityKind": {
-    "COMPANY": "Company",
-    "LAW": "Statute",
-    "CASE": "Case",
-    "DOC": "Document"
+    "COMPANY": "Công ty",
+    "LAW": "Văn bản pháp luật",
+    "CASE": "Bản án",
+    "DOC": "Tài liệu"
   },
-  "openInNewTab": "Open in a new tab",
-  "openDocFile": "Open file",
-  "docNotFound": "No such file in this project",
-  "docMissing": "That file is no longer in this project",
+  "openInNewTab": "Mở trong thẻ mới",
+  "openDocFile": "Mở tệp",
+  "docNotFound": "Không tìm thấy tệp này trong dự án",
+  "docMissing": "Tệp đó không còn trong dự án này",
   "source": {
-    "projectFile": "Project file",
+    "projectFile": "Tệp dự án",
     "qichacha": "Qichacha"
   },
-  "mentions": "{count} mention(s)",
-  "mentionsTitle": "Mentions in this document",
-  "shareholders": "Shareholders",
-  "moreCandidates": "Other candidates",
+  "mentions": "{count} vị trí",
+  "mentionsTitle": "Vị trí xuất hiện trong văn bản",
+  "shareholders": "Cổ đông góp vốn",
+  "moreCandidates": "Ứng viên khác",
   "caseSection": {
-    "ascertain": "Facts found",
-    "reason": "Reasoning",
-    "result": "Judgment",
-    "gist": "Key holding",
-    "fullText": "Full judgment"
+    "ascertain": "Tình tiết xác minh",
+    "reason": "Lập luận xét xử",
+    "result": "Kết quả phán quyết",
+    "gist": "Tóm tắt bản án",
+    "fullText": "Toàn văn bản án"
   },
-  "authoritative": "Authoritative text (Pkulaw)",
-  "implementDate": "In force from {date}",
-  "recognition": "Case number recognition",
-  "openInPkulaw": "Open in Pkulaw",
+  "authoritative": "Văn bản chuẩn (Pkulaw)",
+  "implementDate": "Hiệu lực từ {date}",
+  "recognition": "Nhận diện số hiệu bản án",
+  "openInPkulaw": "Mở trong Pkulaw",
   "citation": {
-    "citedText": "Cited article",
-    "candidates": "Articles matched by content",
-    "article": "Article {n}"
+    "citedText": "Điều khoản trích dẫn",
+    "candidates": "Điều khoản khớp theo nội dung",
+    "article": "Điều {n}"
   },
   "severity": {
-    "warn": "Questionable",
-    "error": "Error"
+    "warn": "Nghi vấn",
+    "error": "Lỗi"
   },
-  "unifyTo": "Set all to {value}",
-  "cannotFix": "Cannot fix automatically: {reason}",
-  "fixNotUnique": "Could not locate a unique match — please edit manually.",
-  "fixPartial": "Fixed {done}; {failed} had no unique match — please edit those manually.",
-  "fixed": "Fixed",
-  "fixedHint": "Press Cmd+Z to undo; re-analyze to refresh the findings.",
-  "noEditor": "Activate a document editor window first",
+  "unifyTo": "Thống nhất thành {value}",
+  "cannotFix": "Không thể sửa tự động: {reason}",
+  "fixNotUnique": "Không thể định vị duy nhất — vui lòng chỉnh sửa thủ công.",
+  "fixPartial": "Đã sửa {done} chỗ; còn {failed} chỗ không định vị duy nhất được — vui lòng sửa thủ công.",
+  "fixed": "Đã sửa",
+  "fixedHint": "Nhấn Cmd+Z để hoàn tác; phân tích lại để làm mới kết luận.",
+  "noEditor": "Vui lòng kích hoạt một cửa sổ soạn thảo tài liệu trước",
   "empty": {
-    "noRun": "This document has not been verified online",
-    "noRunHint": "Everyday writing hints run locally. Only clicking online verification sends the saved document for AI extraction, external lookups and consistency checks.",
-    "noEntity": "No lookupable entities found",
-    "noEntityHint": "The document mentions no company name, statute article or case number.",
-    "noFinding": "No inconsistencies found",
-    "noFindingHint": "Quantity statements and unified social credit codes all check out."
+    "noRun": "Tài liệu này chưa được xác minh trực tuyến",
+    "noRunHint": "Gợi ý viết hằng ngày chạy cục bộ. Chỉ khi nhấn xác minh trực tuyến ở trên, tài liệu đã lưu mới được gửi để AI trích xuất thực thể, tra cứu bên ngoài và kiểm tra tính nhất quán.",
+    "noEntity": "Không tìm thấy thực thể nào để tra cứu",
+    "noEntityHint": "Tài liệu không đề cập đến tên công ty, điều khoản pháp luật hoặc số hiệu bản án.",
+    "noFinding": "Không phát hiện mâu thuẫn",
+    "noFindingHint": "Các số liệu và mã số tín dụng xã hội thống nhất đều khớp."
   }
 }

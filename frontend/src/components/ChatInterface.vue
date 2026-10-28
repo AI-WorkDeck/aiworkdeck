@@ -1657,7 +1657,16 @@ export default {
     const modelPriceDisplay = ref(null)
 
     const currentModelId = ref('')
-    const currentModelName = ref(t('chat.selectModel'))
+    const currentModelName = computed(() => {
+      if (currentModelId.value === 'auto') {
+        const routedName = routedModelInfo.value?.effectiveModelName
+        return routedName
+          ? t('chat.autoModelRoutedLabel', { name: routedName })
+          : t('chat.autoModelName')
+      }
+      const hit = availableModels.value.find(m => m.id === currentModelId.value)
+      return hit ? hit.name : (currentModelId.value || t('chat.selectModel'))
+    })
 
     // 模型选择必须持久化：AI 面板挂在 v-if 上，关掉右栏再打开组件会重建，
     // 不落盘就会静默复位成清单第一条——这是有计费含义的选择，不能悄悄改。
@@ -1703,24 +1712,11 @@ export default {
     const applyModelSelection = (id) => {
       if (id === 'auto') {
         currentModelId.value = 'auto'
-        const routedName = routedModelInfo.value?.effectiveModelName
-        currentModelName.value = routedName
-          ? t('chat.autoModelRoutedLabel', { name: routedName })
-          : t('chat.autoModelName')
         return
       }
       const hit = availableModels.value.find(m => m.id === id)
       currentModelId.value = hit ? hit.id : (id || '')
-      currentModelName.value = hit ? hit.name : (id || t('chat.selectModel'))
     }
-
-    watch(routedModelInfo, (info) => {
-      if (currentModelId.value === 'auto') {
-        currentModelName.value = info?.effectiveModelName
-          ? t('chat.autoModelRoutedLabel', { name: info.effectiveModelName })
-          : t('chat.autoModelName')
-      }
-    })
 
     // 当前模型能不能直接读图。**三态**：true 支持 / false 不支持 / null 未知。
     // 「未知」不许并到 false：拉不到模型目录时 availableModels 是空数组而 currentModelId
@@ -1834,9 +1830,9 @@ export default {
     // Agent Mode Selection (Ask, Plan, Agent)
     const showModeDropdown = ref(false)
     const ALL_MODES = [
-      { id: 'AGENT', name: t('chat.modeAgentName'), icon: '', desc: t('chat.modeAgentDesc') },
-      { id: 'ASK', name: t('chat.modeAskName'), icon: '', desc: t('chat.modeAskDesc') },
-      { id: 'PLAN', name: t('chat.modePlanName'), icon: '', desc: t('chat.modePlanDesc') }
+      { id: 'AGENT', get name() { return t('chat.modeAgentName') }, icon: '', get desc() { return t('chat.modeAgentDesc') } },
+      { id: 'ASK', get name() { return t('chat.modeAskName') }, icon: '', get desc() { return t('chat.modeAskDesc') } },
+      { id: 'PLAN', get name() { return t('chat.modePlanName') }, icon: '', get desc() { return t('chat.modePlanDesc') } }
     ]
     // 当前供应商（GET /api/ai/config 的 activeProvider）：模型目录端点不回 provider，
     // 而模式可选范围是按供应商定的，只能另取这个信号
@@ -1852,13 +1848,15 @@ export default {
     )
 
     const currentModeId = ref(ALL_MODES[0].id)
-    const currentModeName = ref(ALL_MODES[0].name)
+    const currentModeName = computed(() => {
+      const hit = ALL_MODES.find(m => m.id === currentModeId.value) || ALL_MODES[0]
+      return hit ? hit.name : t('chat.modeAgentName')
+    })
     const currentModeIcon = ref(ALL_MODES[0].icon)
 
     const selectMode = (mode) => {
       console.log('Switching agent mode to:', mode.name)
       currentModeId.value = mode.id
-      currentModeName.value = mode.name
       currentModeIcon.value = mode.icon
       showModeDropdown.value = false
     }
@@ -1913,10 +1911,10 @@ export default {
     // 而不是让用户勾一堆东西然后什么都不发生。
     const skillDisabledByMode = computed(() => currentModeId.value === 'ASK')
 
-    // 英文界面优先 name_en：/api/skills/list 不做语言过滤，展示名要自己按语言挑
+    // 非中文界面优先 name_en：/api/skills/list 不做语言过滤，展示名要自己按语言挑
     const skillDisplayName = (s) => {
       if (!s) return ''
-      return (getAppLanguage() === 'en-US' && s.nameEn) || s.name || s.id
+      return (isEnglish() && s.nameEn) || s.name || s.id
     }
 
     const selectedSkills = computed(() =>

@@ -3,81 +3,81 @@
 
 export default {
   "view": {
-    "bySection": "By Section",
-    "byParty": "By Party"
+    "bySection": "Mengikut Bahagian",
+    "byParty": "Mengikut Pihak"
   },
   "filter": {
-    "allSections": "All sections",
-    "allParties": "All parties"
+    "allSections": "Semua bahagian",
+    "allParties": "Semua pihak"
   },
   "stat": {
-    "total": "{count} total"
+    "total": "{count} jumlah"
   },
   "status": {
     "all": "Semua",
     "active": "Aktif",
-    "unverified": "Unverified",
-    "stale": "Changed",
-    "orphan": "Orphaned"
+    "unverified": "Belum disahkan",
+    "stale": "Berubah",
+    "orphan": "Terputus"
   },
   "group": {
-    "none": "Unassigned",
-    "untitled": "(No section)"
+    "none": "Belum ditetapkan",
+    "untitled": "(Tiada bahagian)"
   },
   "action": {
-    "keep": "Keep Link",
-    "rebind": "Reassign",
-    "confirmRebind": "Confirm",
+    "keep": "Kekalkan Pautan",
+    "rebind": "Tetapkan Semula",
+    "confirmRebind": "Sahkan",
     "cancelRebind": "Batal",
     "delete": "Padam",
-    "removeTarget": "Buang",
-    "open": "View Source",
-    "ignore": "Ignore",
-    "expand": "Expand",
-    "collapse": "Collapse"
+    "removeTarget": "Alih keluar",
+    "open": "Lihat Sumber",
+    "ignore": "Abaikan",
+    "expand": "Kembangkan",
+    "collapse": "Runtuhkan"
   },
   "method": {
-    "written_review": "Document Review",
-    "written_statement": "Written Statement",
-    "web_check": "Online Check",
-    "third_party": "Third-Party Material",
-    "interview": "Interview",
-    "none": "No method"
+    "written_review": "Semakan Dokumen",
+    "written_statement": "Kenyataan Bertulis",
+    "web_check": "Semakan Dalam Talian",
+    "third_party": "Bahan Pihak Ketiga",
+    "interview": "Temu Bual",
+    "none": "Tiada kaedah"
   },
   "relation": {
-    "supports": "Supports",
-    "contradicts": "Contradicts",
-    "partial": "Partial"
+    "supports": "Menyokong",
+    "contradicts": "Bercanggah",
+    "partial": "Sokongan Sebahagian"
   },
   "loc": {
-    "wholeFile": "Whole file",
-    "page": "Page {page}",
-    "quote": "\"{quote}\"",
-    "region": "Image region",
+    "wholeFile": "Keseluruhan fail",
+    "page": "Halaman {page}",
+    "quote": "«{quote}»",
+    "region": "Kawasan imej",
     "time": "{time}",
     "web": "{host}",
     "cell": "{sheet}!{cell}"
   },
-  "empty": "No source files linked to this document yet",
-  "emptyHint": "Drag a file from the explorer onto selected text to link it",
-  "emptyFiltered": "No links match the current filter",
-  "fileMissing": "(file no longer exists)",
-  "fileDeleted": "(in recycle bin)",
-  "targetsCount": "{count} sources",
-  "rebindHint": "Select the new text in the document, then tap Confirm",
-  "rebindNoSelection": "Select text in the document first",
-  "rebindFailed": "Reassign failed",
-  "rebindRetryHint": "The new bookmark is already in the document; tap Confirm again to retry.",
-  "keepGone": "This text is no longer in the document, so the link cannot be kept. Use Reassign in the Sources tab.",
-  "orphanGoto": "The anchor for this text is no longer in the document. Tap Reassign to pick new text.",
-  "confidence": "Confidence {value}",
-  "loading": "Loading…",
-  "loadFailed": "Failed to load links",
-  "fileTagsLoadFailed": "Failed to load party tags; the \"By Party\" view may be inaccurate",
-  "opFailed": "Operation failed",
-  "deleteConfirm": "Delete this link? The source file will not be deleted.",
-  "deleteTargetConfirm": "Remove this source?",
-  "staleOne": "This text has {count} linked sources and has been changed",
-  "staleMany": "{count} linked passages have been changed",
-  "stalePrefix": "Changed: "
+  "empty": "Tiada fail sumber dipautkan ke dokumen ini lagi",
+  "emptyHint": "Seret fail dari penjelajah ke teks yang dipilih untuk memautkannya",
+  "emptyFiltered": "Tiada pautan sepadan dengan penapis semasa",
+  "fileMissing": "(fail tidak wujud lagi)",
+  "fileDeleted": "(dalam tong kitar semula)",
+  "targetsCount": "{count} sumber",
+  "rebindHint": "Pilih teks baharu dalam dokumen, kemudian ketik Sahkan",
+  "rebindNoSelection": "Pilih teks dalam dokumen terlebih dahulu",
+  "rebindFailed": "Gagal menetapkan semula",
+  "rebindRetryHint": "Penanda buku baharu sudah ada dalam dokumen; ketik Sahkan sekali lagi untuk mencuba semula.",
+  "keepGone": "Teks ini tidak lagi berada dalam dokumen, jadi pautan tidak dapat dikekalkan. Gunakan Tetapkan Semula dalam tab Sumber.",
+  "orphanGoto": "Sauh bagi teks ini tidak lagi berada dalam dokumen. Ketik Tetapkan Semula untuk memilih teks baharu.",
+  "confidence": "Keyakinan {value}",
+  "loading": "Memuatkan…",
+  "loadFailed": "Gagal memuatkan pautan",
+  "fileTagsLoadFailed": "Gagal memuatkan tag pihak; paparan \"Mengikut Pihak\" mungkin tidak tepat",
+  "opFailed": "Operasi gagal",
+  "deleteConfirm": "Padamkan pautan ini? Fail sumber tidak akan dipadamkan.",
+  "deleteTargetConfirm": "Alih keluar sumber ini?",
+  "staleOne": "Teks ini mempunyai {count} sumber terpaut dan telah diubah",
+  "staleMany": "{count} petikan terpaut telah diubah",
+  "stalePrefix": "Diubah: "
 }

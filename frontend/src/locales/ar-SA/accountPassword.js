@@ -2,20 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "intro": "Sign in with your phone number or email and password. First time? Verify and create a password.",
+  "intro": "سجّل الدخول باستخدام رقم هاتفك أو بريدك الإلكتروني وكلمة المرور. هل هذه أول مرة؟ تحقّق وأنشئ كلمة مرور.",
   "password": "كلمة المرور",
   "confirm": "تأكيد كلمة المرور",
   "register": "المرة الأولى / إنشاء كلمة مرور",
   "reset": "نسيت كلمة المرور",
-  "back": "Back to password sign-in",
+  "back": "العودة إلى تسجيل الدخول بكلمة المرور",
   "setup": "إنشاء كلمة مرور",
   "resetTitle": "إعادة تعيين كلمة المرور",
   "verify": "التحقق والمتابعة",
   "signIn": "تسجيل الدخول",
   "passwordHint": "من 8 إلى 72 حرفًا. استخدم كلمة مرور فريدة.",
-  "invalid": "Use a password with 8–72 characters",
+  "invalid": "استخدم كلمة مرور مكوّنة من 8 إلى 72 حرفًا",
   "mismatch": "كلمتا المرور غير متطابقتين",
-  "required": "Enter your password",
+  "required": "أدخل كلمة المرور",
   "resetDone": "تمت إعادة تعيين كلمة المرور. سجّل الدخول باستخدام كلمة المرور الجديدة.",
   "setupHint": "تم التحقق. أنشئ كلمة مرور للمتابعة.",
   "resetHint": "هذا الرمز مخصص لإعادة تعيين كلمة المرور فقط."

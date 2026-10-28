@@ -2,20 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "devTrustNotice": "Development plugins can send data to declared remote services and expose Agent tools. Review the source before approval. Manifest changes require approval again.",
-  "grantTrust": "Approve development services",
-  "revokeTrust": "Revoke service approval",
-  "connections": "Plugin service connections",
-  "credentialNotice": "Credentials are stored per user by the host and are not exposed to plugin pages.",
-  "connected": "Connected",
-  "disconnected": "Not connected",
-  "token": "Service access token",
-  "connect": "Connect service",
-  "disconnect": "Disconnect",
-  "refresh": "Refresh status",
-  "subscription": "Check subscription",
-  "active": "Subscription active",
-  "inactive": "No active subscription",
-  "bundled": "Included with the app",
-  "checkout": "Open checkout"
+  "devTrustNotice": "Τα πρόσθετα ανάπτυξης μπορούν να στέλνουν δεδομένα σε δηλωμένες απομακρυσμένες υπηρεσίες και να εκθέτουν εργαλεία Agent. Ελέγξτε την πηγή πριν από την έγκριση. Οι αλλαγές στο manifest απαιτούν εκ νέου έγκριση.",
+  "grantTrust": "Έγκριση υπηρεσιών ανάπτυξης",
+  "revokeTrust": "Ανάκληση έγκρισης υπηρεσίας",
+  "connections": "Συνδέσεις υπηρεσιών προσθέτων",
+  "credentialNotice": "Τα διαπιστευτήρια αποθηκεύονται ανά χρήστη από την κύρια εφαρμογή και δεν εκτίθενται στις σελίδες των προσθέτων.",
+  "connected": "Συνδεδεμένο",
+  "disconnected": "Μη συνδεδεμένο",
+  "token": "Διακριτικό πρόσβασης υπηρεσίας",
+  "connect": "Σύνδεση υπηρεσίας",
+  "disconnect": "Αποσύνδεση",
+  "refresh": "Ανανέωση κατάστασης",
+  "subscription": "Έλεγχος συνδρομής",
+  "active": "Συνδρομή ενεργή",
+  "inactive": "Δεν υπάρχει ενεργή συνδρομή",
+  "bundled": "Περιλαμβάνεται στην εφαρμογή",
+  "checkout": "Άνοιγμα σελίδας πληρωμής"
 }

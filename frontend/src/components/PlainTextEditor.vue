@@ -665,7 +665,8 @@ export default {
         const text = this.getText()
         const diff = lineDiff(this.reviewRecord.baselineText || '', text)
         const comments = this.reviewComments.map((c) => ({ ...c, ...reanchorComment(c, text) }))
-        const lang = String((this.$i18n && this.$i18n.locale) || '').startsWith('en') ? 'en' : 'zh'
+        const loc = String((this.$i18n && this.$i18n.locale) || 'zh-CN')
+        const lang = loc.startsWith('zh') ? 'zh' : 'en'
         const { message, displayText } = buildPlanReviewPrompt({ lang, currentText: text, diff, comments })
         const conversationId = this.reviewRecord.conversationId || (this.review && this.review.conversationId) || null
         const sent = await new Promise((resolve) => {

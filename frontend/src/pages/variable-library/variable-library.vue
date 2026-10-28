@@ -29,7 +29,7 @@
       <input
         class="search-input"
         v-model="searchKeyword"
-        :placeholder="VARIABLE_LIBRARY_SEARCH_PLACEHOLDER"
+        :placeholder="$t('config.variables.searchPlaceholder')"
         confirm-type="search"
       />
       <view v-if="searchKeyword" class="search-clear" @tap="searchKeyword = ''">×</view>

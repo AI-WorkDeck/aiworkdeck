@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "confirm": "OK",
+  "confirm": "Xác nhận",
   "cancel": "Hủy",
   "save": "Lưu",
   "close": "Đóng",
@@ -43,7 +43,7 @@ export default {
   "openFile": "Mở Tệp",
   "open": "Mở",
   "cannotResolveParentFolder": "Không thể xác định thư mục chứa tệp này",
-  "dateTimeMdHm": "{year}-{month}-{day} {time}",
+  "dateTimeMdHm": "{day}/{month}/{year} {time}",
   "registeredItems": "Đã đăng ký {count} mục",
   "filesCount": "{count} tệp",
   "statusRunning": "Đang chạy",

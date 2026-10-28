@@ -2,27 +2,27 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "title": "المراجع",
-  "noDoc": "No document open",
-  "parse": "Full-document online verification (charges may apply)",
-  "reparse": "Repeat full-document online verification (charges may apply)",
-  "onlineHint": "Clicking saves this document, then verifies the saved version online. AI and external lookups may incur charges.",
-  "saveRequired": "This document could not be saved. Save it successfully before online verification.",
-  "running": "Verifying online…",
-  "done": "Online verification complete",
-  "failed": "Online verification failed",
-  "loading": "Loading…",
-  "loadingDetail": "Fetching lookup details…",
-  "noDetail": "No lookup details for this item",
+  "title": "المراجع والأسانيد",
+  "noDoc": "لا يوجد مستند مفتوح",
+  "parse": "تحقق عبر الإنترنت لكامل المستند (قد تُطبّق رسوم)",
+  "reparse": "إعادة التحقق عبر الإنترنت لكامل المستند (قد تُطبّق رسوم)",
+  "onlineHint": "يؤدي النقر إلى حفظ هذا المستند أولاً ثم التحقق من النسخة المحفوظة عبر الإنترنت. قد يترتب على الذكاء الاصطناعي وعمليات البحث الخارجية رسوم.",
+  "saveRequired": "تعذر حفظ هذا المستند. احفظه بنجاح قبل التحقق عبر الإنترنت.",
+  "running": "جارٍ التحقق عبر الإنترنت…",
+  "done": "اكتمل التحقق عبر الإنترنت",
+  "failed": "فشل التحقق عبر الإنترنت",
+  "loading": "جارٍ التحميل…",
+  "loadingDetail": "جارٍ جلب تفاصيل البحث…",
+  "noDetail": "لا توجد تفاصيل بحث لهذا العنصر",
   "loadFailed": "تعذر تحميل نتائج التحقق عبر الإنترنت",
   "parseFailed": "تعذر بدء التحقق عبر الإنترنت",
   "detailFailed": "تعذر تحميل تفاصيل البحث",
   "refreshFailed": "تعذر إعادة تشغيل البحث",
   "retry": "إعادة المحاولة",
   "goConnectAccount": "ربط الحساب",
-  "goRecharge": "إضافة Credits",
+  "goRecharge": "إضافة رصيد",
   "hint": {
-    "NO_CREDENTIAL": "تحتاج قناة البحث هذه إلى بيانات اعتماد يهيئها المسؤول على الخادم."
+    "NO_CREDENTIAL": "تحتاج قناة البحث هذه إلى بيانات اعتماد يضبطها المسؤول على الخادم."
   },
   "tab": {
     "retrieval": "عمليات البحث",
@@ -30,61 +30,61 @@ export default {
   },
   "kind": {
     "COMPANY": "الشركات",
-    "LAW": "القوانين",
+    "LAW": "التشريعات",
     "CASE": "القضايا",
     "DOC": "المستندات"
   },
   "entityKind": {
     "COMPANY": "شركة",
-    "LAW": "قانون",
+    "LAW": "تشريع",
     "CASE": "قضية",
     "DOC": "مستند"
   },
   "openInNewTab": "فتح في علامة تبويب جديدة",
   "openDocFile": "فتح الملف",
-  "docNotFound": "لا يوجد ملف بهذا الاسم في المشروع",
-  "docMissing": "لم يعد هذا الملف موجودًا في المشروع",
+  "docNotFound": "لا يوجد مثل هذا الملف في هذا المشروع",
+  "docMissing": "لم يعد هذا الملف موجودًا في هذا المشروع",
   "source": {
     "projectFile": "ملف المشروع",
-    "qichacha": "Qichacha"
+    "qichacha": "Qichacha (تشيتشاتشا)"
   },
-  "mentions": "{count} إشارة/إشارات",
-  "mentionsTitle": "الإشارات في هذا المستند",
+  "mentions": "{count} إشارة",
+  "mentionsTitle": "المواضع الواردة في المستند",
   "shareholders": "المساهمون",
   "moreCandidates": "مرشحون آخرون",
   "caseSection": {
-    "ascertain": "الوقائع المكتشفة",
-    "reason": "الاستدلال",
-    "result": "الحكم",
-    "gist": "مضمون الحكم الأساسي",
-    "fullText": "نص الحكم الكامل"
+    "ascertain": "الوقائع الثابتة",
+    "reason": "الأسباب والتسبيب",
+    "result": "منطوق الحكم",
+    "gist": "المبدأ القضائي",
+    "fullText": "النص الكامل للحكم"
   },
-  "authoritative": "النص الرسمي (Pkulaw)",
-  "implementDate": "سارٍ من {date}",
-  "recognition": "التعرف على أرقام القضايا",
+  "authoritative": "النص المعتمد (Pkulaw)",
+  "implementDate": "ساري المفعول منذ {date}",
+  "recognition": "التعرف على رقم القضية",
   "openInPkulaw": "فتح في Pkulaw",
   "citation": {
-    "citedText": "المادة المُستشهد بها",
-    "candidates": "المطابقة للمواد بناءً على المحتوى",
+    "citedText": "المادة المستشهد بها",
+    "candidates": "المواد المطابقة حسب المضمون",
     "article": "المادة {n}"
   },
   "severity": {
-    "warn": "مشكوك فيه",
+    "warn": "محل شك",
     "error": "خطأ"
   },
-  "unifyTo": "تعيين الكل إلى {value}",
+  "unifyTo": "توحيد الكل إلى {value}",
   "cannotFix": "لا يمكن الإصلاح تلقائيًا: {reason}",
-  "fixNotUnique": "تعذر العثور على مطابقة فريدة — يرجى التعديل يدويًا.",
-  "fixPartial": "تم إصلاح {done}؛ و{failed} بدون مطابقة فريدة — يرجى تعديلها يدويًا.",
+  "fixNotUnique": "تعذر تحديد تطابق فريد — يرجى التعديل يدويًا.",
+  "fixPartial": "تم إصلاح {done}؛ وتعذر تحديد تطابق فريد لـ {failed} — يرجى تعديلها يدويًا.",
   "fixed": "تم الإصلاح",
   "fixedHint": "اضغط Cmd+Z للتراجع؛ وأعد التحليل لتحديث النتائج.",
-  "noEditor": "فعّل نافذة محرر مستندات أولًا",
+  "noEditor": "يرجى تنشيط نافذة محرر مستندات أولاً",
   "empty": {
-    "noRun": "لم يتم التحقق من هذا المستند عبر الإنترنت",
-    "noRunHint": "تعمل تلميحات الكتابة اليومية محليًا. فقط عند النقر على التحقق عبر الإنترنت يُرسل المستند المحفوظ لاستخراج بواسطة AI، وعمليات بحث خارجية، وفحوصات الاتساق.",
+    "noRun": "لم يتم التحقق من هذا المستند عبر الإنترنت بعد",
+    "noRunHint": "تعمل تلميحات الكتابة اليومية محليًا. فقط عند النقر على التحقق عبر الإنترنت يتم إرسال المستند المحفوظ لاستخراج الكيانات بالذكاء الاصطناعي والبحث الخارجي وفحص الاتساق.",
     "noEntity": "لم يتم العثور على كيانات قابلة للبحث",
-    "noEntityHint": "لا يذكر المستند أي اسم شركة أو مادة قانونية أو رقم قضية.",
-    "noFinding": "لم يتم العثور على تناقضات",
-    "noFindingHint": "جميع عبارات الكميات ورموز الائتمان الاجتماعي الموحدة سليمة."
+    "noEntityHint": "لا يذكر المستند اسم شركة أو مادة قانونية أو رقم قضية.",
+    "noFinding": "لم يتم العثور على أي تعارض",
+    "noFindingHint": "بيانات الكميات ورموز الائتمان الاجتماعي الموحد كلها متطابقة."
   }
 }
