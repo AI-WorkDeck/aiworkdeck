@@ -104,7 +104,11 @@ class AiConfigContextLimitsTest {
         when(regionService.mode()).thenReturn("auto");
         when(regionService.detectionBasis()).thenReturn("测试固定值");
         ChatModelFactory factory = mock(ChatModelFactory.class);
-        when(factory.resolveProvider()).thenReturn(provider);
+        when(factory.resolveTarget(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.eq(false)))
+                .thenAnswer(inv -> new ChatModelFactory.ResolvedTarget(provider, inv.getArgument(0)));
+        when(factory.effectiveModelSupportsVision(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(inv -> provider != AiModelProperties.Provider.OLLAMA
+                        && AllowedModels.supportsVision(inv.getArgument(0)));
         when(factory.resolveDefaultModel()).thenReturn(AllowedModels.DEEPSEEK_V4_FLASH.getModelId());
 
         try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
