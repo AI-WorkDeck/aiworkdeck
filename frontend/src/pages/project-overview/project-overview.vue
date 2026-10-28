@@ -8556,8 +8556,12 @@ export default {
         this.historyActionBusy = true
         try {
             await deleteAiConversation(chat.conversationId)
-            const wasCurrent = this.currentConversationId === chat.conversationId
-            await this.fetchChatHistory(true)
+            // 新建对话的 ID 由 ChatInterface 持有，宿主只在加载历史时更新自己的 ID。
+            // 删除成功后立即读取当前面板，先清理再刷新列表，避免刷新期间切换的新会话被清空。
+            const activeId = this.$refs.chatInterface
+                ? this.$refs.chatInterface.currentConversationId
+                : this.currentConversationId
+            const wasCurrent = activeId === chat.conversationId
             // 删掉的正是面板里开着的那条：留在原地会是一个指向已不存在会话的空壳，
             // 再发一条消息还会把它复活。回到空会话。
             if (wasCurrent) {
@@ -8566,6 +8570,7 @@ export default {
                     this.$refs.chatInterface.startNewChat()
                 }
             }
+            await this.fetchChatHistory(true)
         } catch (e) {
             console.error('Delete conversation failed', e)
             uni.showToast({ title: (e && e.message) || this.$t('workbench.conversationDeleteFailed'), icon: 'none' })
