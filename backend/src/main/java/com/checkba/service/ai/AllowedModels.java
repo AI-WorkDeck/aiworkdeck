@@ -89,7 +89,7 @@ public enum AllowedModels {
 
     GLM_5_2("z-ai/glm-5.2", "GLM-5.2",
             Vendor.ZHIPU, Region.GLOBAL, 1_048_576,
-            tier(0, 0.0068, 7.0)),
+            tier(0, 0.006, 7.0)),
 
     KIMI_K2_6("moonshotai/kimi-k2.6", "Kimi K2.6",
             Vendor.MOONSHOT, Region.GLOBAL, 262_144,
