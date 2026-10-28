@@ -77,6 +77,8 @@ public class EvalCase {
     public List<Turn> turns = new ArrayList<>();
     /** 工具桩输出：resolvedName -> 回放给模型的工具输出（缺省 "OK (eval stub)"） */
     public Map<String, String> toolStubs = new HashMap<>();
+    /** Explicit database records for file identity and project-boundary validation. */
+    public List<com.checkba.model.entity.ProjectFile> projectFiles = new ArrayList<>();
     /** 断言 */
     public Expect expect = new Expect();
 
