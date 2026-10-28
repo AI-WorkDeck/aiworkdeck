@@ -616,15 +616,6 @@ $color-accent: var(--awd-mint); // Mint Green
   overscroll-behavior-y: contain;
   scrollbar-gutter: stable both-edges;
 
-  &::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--awd-border-strong);
-    border-radius: 4px;
-  }
-
   &:focus-visible {
     outline: 1px solid var(--awd-accent);
     outline-offset: -1px;

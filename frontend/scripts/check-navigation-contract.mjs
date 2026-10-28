@@ -228,7 +228,7 @@ check('项目列表页薄壳根节点带 e2e 锚点类名，「项目」面板�
   const src = readVue('src/pages/project-list/project-list.vue')
   if (!src.includes('class="page-project-list"')) return '薄壳页根节点必须是 .page-project-list（e2e 锚点）'
   const pane = readVue(LIST_PANE)
-  return /class="project-list-pane"/.test(pane) ? null : '「项目」面板根节点必须是 .project-list-pane'
+  return /class="project-list-pane(?:\s[^"]*)?"/.test(pane) ? null : '「项目」面板根节点必须是 .project-list-pane'
 })
 
 check('项目列表页是直链薄壳：redirectTo 工作台外壳并打开「项目」面板', () => {
