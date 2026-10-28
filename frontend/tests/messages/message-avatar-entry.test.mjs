@@ -54,10 +54,10 @@ test('avatar unread and unavailable-source states stay distinct and retain the a
   assert.equal(vm.showMessageBadge, false)
 })
 
-test('message center leaves the rail and old preferences recover a usable sidebar', () => {
+test('message center leaves the rail and stale preferences leave no empty panel without a project', () => {
   assert.equal(LEFT_SIDEBAR_PLUGINS.some(plugin => plugin.key === 'messages'), false)
   assert.equal(migrateLeftPaneKey('messages'), 'files')
-  assert.equal(isPaneAllowedWithoutProject('messages') ? 'messages' : NO_PROJECT_DEFAULT_PANE, 'projects')
+  assert.equal(isPaneAllowedWithoutProject('messages') ? 'messages' : NO_PROJECT_DEFAULT_PANE, null)
   const host = read('pages/project-overview/project-overview.vue')
   const start = host.indexOf('<AccountEntry'), tag = host.slice(start, host.indexOf('/>', start))
   assert.match(tag, /:message-unread="messageCenterUnread"/)
