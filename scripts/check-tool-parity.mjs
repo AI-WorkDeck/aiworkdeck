@@ -152,7 +152,7 @@ const LOWA_ONLY = {
     'sheet_set_row_col'
   ],
   '演示细项：插件面尚未提供对等工具（形状几何、版式、表格样式、备注、跳页）': [
-    'slide_format_shape', 'slide_set_shape_geometry', 'slide_set_layout', 'slide_set_shape_text',
+    'slide_create_file', 'slide_format_shape', 'slide_set_shape_geometry', 'slide_set_layout', 'slide_set_shape_text',
     'slide_table_set_style', 'slide_write_notes', 'slide_read_notes', 'slide_goto'
   ]
 }

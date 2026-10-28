@@ -152,8 +152,8 @@ public class ToolDisclosurePolicy {
             // sheet_create_file 在 docx 会话里同样可见（新建一份表格，不依赖活跃文档类型）。
             "sheet_create_file", "sheet_get_overview", "sheet_read_range", "sheet_write_cells", "sheet_find_replace",
 
-            // ==================== LOWA 演示（pptx）段：5 个 ====================
-            "slide_get_overview", "slide_get_page", "slide_set_shape_text", "slide_replace_text", "slide_add_page",
+            // ==================== LOWA 演示（pptx）段：6 个 ====================
+            "slide_create_file", "slide_get_overview", "slide_get_page", "slide_set_shape_text", "slide_replace_text", "slide_add_page",
 
             // ==================== Office 任务窗格·Word 段：7 个（T-18）====================
             // office_pass_step 是 Word 窗格整篇大改的入口（分段过卷，dev-board#422）；office_add_comment 是审查的交付物。

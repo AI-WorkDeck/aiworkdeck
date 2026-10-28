@@ -65,4 +65,41 @@ class ToolDiscoveryToolsIndexTest {
         assertTrue(new ToolDiscoveryTools(new ToolDisclosurePolicy(true, false)).isAvailable());
         assertFalse(new ToolDiscoveryTools(new ToolDisclosurePolicy(false, false)).isAvailable());
     }
+    @Test
+    void everyCatalogModeExplainsHowToEnterPresentationEditing() {
+        ToolContextHolder.set(new ToolContext(1L, "conv", 7L, null,
+                List.of(spec("slide_create_file"), spec("doc_open_file"), spec("list_tools"))));
+        var tools = new ToolDiscoveryTools(new ToolDisclosurePolicy(false, true));
+        for (String[] args : List.of(new String[]{null, null, null},
+                new String[]{"slides", null, null}, new String[]{null, "slide_get_page", null},
+                new String[]{null, null, "slide_get_page"}, new String[]{"invalid-category", null, null})) {
+            for (String locale : List.of("zh-CN", "en-US")) {
+                String out = com.checkba.service.AppLanguageScope.call(locale,
+                        () -> tools.list_tools(args[0], args[1], args[2], "conv"));
+                assertTrue(out.contains("slide_create_file"), out);
+                assertTrue(out.contains("doc_open_file"), out);
+                assertTrue(out.contains(locale.equals("zh-CN") ? "不要在切换前反复搜索" : "Do not repeatedly search"), out);
+                assertFalse(out.contains("- slide_get_page("), "The hint must not disclose an unavailable tool signature");
+            }
+        }
+    }
+
+    @Test
+    void presentationHintDoesNotLeakIntoOtherHostsOrAlreadyActivePpt() {
+        var tools = new ToolDiscoveryTools(new ToolDisclosurePolicy(false, true));
+        for (List<ToolSpecification> candidates : List.of(
+                List.of(spec("read_document"), spec("list_tools")),
+                List.of(spec("office_ppt_get_slides"), spec("list_tools")),
+                List.of(spec("slide_create_file"), spec("slide_get_page"), spec("list_tools")))) {
+            ToolContextHolder.set(new ToolContext(1L, "conv", 7L, null, candidates));
+            String out = com.checkba.service.AppLanguageScope.call("en-US",
+                    () -> tools.list_tools(null, null, "missing", "conv"));
+            assertFalse(out.contains("current document type hides"), out);
+            assertFalse(out.contains("slide_create_file"), out);
+        }
+        ToolContextHolder.set(new ToolContext(1L, "conv", 7L, null, List.of(spec("slide_create_file"))));
+        String out = tools.list_tools(null, null, null, "conv");
+        assertFalse(out.contains("doc_open_file"), "Do not name a tool absent from this session");
+    }
+
 }

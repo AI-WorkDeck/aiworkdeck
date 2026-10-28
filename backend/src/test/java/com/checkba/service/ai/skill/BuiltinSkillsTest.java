@@ -240,6 +240,7 @@ class BuiltinSkillsTest {
         // Map.of 最多 10 对，第 11 个起逐个 put
         expected.put("evidence-linked-report", SkillDefinition.ToolPolicy.PASSTHROUGH);
         expected.put("file-organization", SkillDefinition.ToolPolicy.PASSTHROUGH);
+        expected.put("presentation-design", SkillDefinition.ToolPolicy.PASSTHROUGH);
         Map<String, SkillDefinition.ToolPolicy> actual = new TreeMap<>();
         for (SkillDefinition skill : registry.getSkills()) {
             actual.put(skill.getId(), skill.getToolPolicy());
@@ -495,7 +496,8 @@ class BuiltinSkillsTest {
                 "contract-review",
                 "legal-opinion-review",
                 "evidence-linked-report",
-                "file-organization"
+                "file-organization",
+                "presentation-design"
         );
         for (SkillDefinition skill : registry.getSkills()) {
             assertEquals(expectedBuiltins.contains(skill.getId()), skill.isBuiltinWorkflow(),

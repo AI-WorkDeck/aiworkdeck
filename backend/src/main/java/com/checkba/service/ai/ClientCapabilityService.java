@@ -169,7 +169,9 @@ public class ClientCapabilityService {
             "doc_open_file",
             "doc_search_related_docs",
             "doc_restore_checkpoint",
+            "doc_export_pdf",
             "sheet_create_file",
+            "slide_create_file",
             "doc_start_stream");
 
     /**

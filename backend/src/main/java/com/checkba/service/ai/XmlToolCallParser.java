@@ -328,6 +328,9 @@ public class XmlToolCallParser {
             List<String> params = tool.get().method() == null
                     ? new ArrayList<>(tool.get().spec().parameters().properties().keySet())
                     : java.util.Arrays.stream(tool.get().method().getParameters()).map(java.lang.reflect.Parameter::getName).toList();
+            if (!code.contains("<ctrl46>")) {
+                return parseRegisteredArguments(code, toolName, tool.get(), params);
+            }
             for (String paramName : params) {
                 String value = extractNullableStringArg(code, paramName);
                 if (value == null) {
@@ -358,6 +361,55 @@ public class XmlToolCallParser {
         } else {
             // 未注册工具（可能是插件或幻觉调用）：通用 key=value 提取，交由分发层判定
             args = cn.hutool.json.JSONUtil.parseObj(extractArgsAsJson(code));
+        }
+        return new ParsedCall(toolName, args.toString(), code);
+    }
+
+    /** Read named values only at argument boundaries, never inside another value. */
+    private ParsedCall parseRegisteredArguments(String code, String toolName,
+            ToolRegistry.RegisteredTool tool, List<String> params) {
+        var names = new java.util.HashSet<>(params);
+        for (String param : params) names.addAll(ToolRegistry.aliasesFor(param));
+        var named = new java.util.LinkedHashMap<String, String>();
+        List<String> positional = new ArrayList<>();
+        String bareName = null;
+        for (String token : splitTopLevelArgs(code, toolName)) {
+            String trimmed = token.stripLeading();
+            Matcher match = NAMED_ARG_TOKEN_PATTERN.matcher(trimmed);
+            if (match.find()) {
+                String key = trimmed.substring(0, trimmed.indexOf('=')).strip();
+                if (!names.contains(key) || named.containsKey(key)) {
+                    return new ParsedCall(toolName, null, code, com.checkba.service.LangText.of(
+                            "Error: 工具参数名未知或重复；请用带引号的字符串或 JSON 对象明确正文与参数边界，未执行操作。",
+                            "Error: unknown or duplicate tool argument; use quoted strings or a JSON object to separate text from arguments. No operation was executed."));
+                }
+                String value = trimmed.substring(match.end()).stripLeading();
+                named.put(key, value);
+                // Bare prose can contain commas, spaces and line breaks. Its continuation
+                // must never be rebound to an omitted positional argument (e.g. page/layout).
+                bareName = !value.isEmpty() && value.charAt(0) != '\"' && value.charAt(0) != '\''
+                        && value.charAt(0) != '[' && value.charAt(0) != '{' ? key : null;
+            } else if (bareName != null) {
+                named.put(bareName, named.get(bareName) + "," + token);
+            } else if (!trimmed.isEmpty()) {
+                positional.add(unquote(trimmed.strip()));
+            }
+        }
+        cn.hutool.json.JSONObject args = new cn.hutool.json.JSONObject();
+        for (String param : params) {
+            String value = named.get(param);
+            if (value == null) {
+                for (String alias : ToolRegistry.aliasesFor(param)) {
+                    if (named.containsKey(alias)) { value = named.get(alias); break; }
+                }
+            }
+            if (value != null) args.set(param, schemaArgument(tool, param, unquote(value.strip())));
+        }
+        int index = 0;
+        for (String param : params) {
+            if (index >= positional.size()) break;
+            if ((tool.method() != null && ToolRegistry.isServerContextParam(param)) || args.containsKey(param)) continue;
+            args.set(param, schemaArgument(tool, param, positional.get(index++)));
         }
         return new ParsedCall(toolName, args.toString(), code);
     }
@@ -483,6 +535,14 @@ public class XmlToolCallParser {
         StringBuilder cur = new StringBuilder();
         for (int i = start; i < code.length(); i++) {
             char c = code.charAt(i);
+            if (quote == 0 && (code.startsWith("\"\"\"", i) || code.startsWith("'''", i))) {
+                String marker = code.substring(i, i + 3);
+                int end = code.indexOf(marker, i + 3);
+                if (end < 0) { cur.append(code.substring(i)); break; }
+                cur.append(code, i, end + 3);
+                i = end + 2;
+                continue;
+            }
             if (quote != 0) {
                 cur.append(c);
                 if (escaped) {
