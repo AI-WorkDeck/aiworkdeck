@@ -36,8 +36,10 @@ export function bytesToBase64(bytes) {
 export function agentPdfExportResult(res, sourceFileId) {
   let isEn = false
   try {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') isEn = true
-    else if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') isEn = true
+    const l = (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language'))
+      || (typeof document !== 'undefined' && document.documentElement?.lang)
+      || ''
+    if (l && !l.startsWith('zh')) isEn = true
   } catch (_) { /* ignore */ }
   if (!res || res.success === false) {
     const error = (res && (res.error || res.message)) || (isEn ? 'PDF export failed' : 'PDF 导出失败')

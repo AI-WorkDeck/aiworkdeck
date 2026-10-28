@@ -3,49 +3,49 @@
 
 export default {
   "title": "Referensi",
-  "noDoc": "No document open",
-  "parse": "Full-document online verification (charges may apply)",
-  "reparse": "Repeat full-document online verification (charges may apply)",
-  "onlineHint": "Clicking saves this document, then verifies the saved version online. AI and external lookups may incur charges.",
-  "saveRequired": "This document could not be saved. Save it successfully before online verification.",
-  "running": "Verifying online…",
-  "done": "Online verification complete",
-  "failed": "Online verification failed",
+  "noDoc": "Tidak ada dokumen yang dibuka",
+  "parse": "Verifikasi online seluruh dokumen (mungkin dikenakan biaya)",
+  "reparse": "Ulangi verifikasi online seluruh dokumen (mungkin dikenakan biaya)",
+  "onlineHint": "Mengklik akan menyimpan dokumen ini terlebih dahulu, lalu memverifikasi versi tersimpan secara online. Pencarian AI dan eksternal mungkin dikenakan biaya.",
+  "saveRequired": "Dokumen ini tidak dapat disimpan. Simpan terlebih dahulu sebelum verifikasi online.",
+  "running": "Memverifikasi secara online…",
+  "done": "Verifikasi online selesai",
+  "failed": "Verifikasi online gagal",
   "loading": "Memuat…",
-  "loadingDetail": "Fetching lookup details…",
-  "noDetail": "No lookup details for this item",
-  "loadFailed": "Could not load online verification results",
-  "parseFailed": "Could not start online verification",
-  "detailFailed": "Could not load the lookup details",
-  "refreshFailed": "Could not re-run the lookup",
+  "loadingDetail": "Mengambil detail pencarian…",
+  "noDetail": "Tidak ada detail pencarian untuk item ini",
+  "loadFailed": "Tidak dapat memuat hasil verifikasi online",
+  "parseFailed": "Tidak dapat memulai verifikasi online",
+  "detailFailed": "Tidak dapat memuat detail pencarian",
+  "refreshFailed": "Tidak dapat menjalankan ulang pencarian",
   "retry": "Coba lagi",
-  "goConnectAccount": "Connect account",
-  "goRecharge": "Add credits",
+  "goConnectAccount": "Hubungkan akun",
+  "goRecharge": "Tambah kredit",
   "hint": {
-    "NO_CREDENTIAL": "This lookup channel needs a credential configured on the server by your administrator."
+    "NO_CREDENTIAL": "Saluran pencarian ini memerlukan kredensial yang dikonfigurasi di server oleh administrator Anda."
   },
   "tab": {
-    "retrieval": "Lookups",
-    "checks": "Consistency"
+    "retrieval": "Pencarian",
+    "checks": "Konsistensi"
   },
   "kind": {
-    "COMPANY": "Companies",
-    "LAW": "Statutes",
-    "CASE": "Cases",
-    "DOC": "Documents"
+    "COMPANY": "Perusahaan",
+    "LAW": "Peraturan",
+    "CASE": "Putusan",
+    "DOC": "Dokumen"
   },
   "entityKind": {
-    "COMPANY": "Company",
-    "LAW": "Statute",
-    "CASE": "Case",
-    "DOC": "Document"
+    "COMPANY": "Perusahaan",
+    "LAW": "Peraturan",
+    "CASE": "Putusan",
+    "DOC": "Dokumen"
   },
-  "openInNewTab": "Open in a new tab",
-  "openDocFile": "Open file",
-  "docNotFound": "No such file in this project",
-  "docMissing": "That file is no longer in this project",
+  "openInNewTab": "Buka di tab baru",
+  "openDocFile": "Buka file",
+  "docNotFound": "File tersebut tidak ditemukan di proyek ini",
+  "docMissing": "File tersebut sudah tidak ada di proyek ini",
   "source": {
-    "projectFile": "Berkas proyek",
+    "projectFile": "File proyek",
     "qichacha": "Qichacha"
   },
   "mentions": "{count} penyebutan",
@@ -53,11 +53,11 @@ export default {
   "shareholders": "Pemegang saham",
   "moreCandidates": "Kandidat lainnya",
   "caseSection": {
-    "ascertain": "Fakta yang ditemukan",
-    "reason": "Penalaran",
-    "result": "Putusan",
-    "gist": "Pokok putusan",
-    "fullText": "Teks putusan lengkap"
+    "ascertain": "Fakta hukum",
+    "reason": "Pertimbangan hukum",
+    "result": "Amar putusan",
+    "gist": "Kaidah putusan",
+    "fullText": "Putusan lengkap"
   },
   "authoritative": "Teks resmi (Pkulaw)",
   "implementDate": "Berlaku sejak {date}",
@@ -65,26 +65,26 @@ export default {
   "openInPkulaw": "Buka di Pkulaw",
   "citation": {
     "citedText": "Pasal yang dikutip",
-    "candidates": "Pasal yang dicocokkan berdasarkan isi",
+    "candidates": "Pasal yang cocok menurut isi",
     "article": "Pasal {n}"
   },
   "severity": {
-    "warn": "Diragukan",
+    "warn": "Meragukan",
     "error": "Kesalahan"
   },
-  "unifyTo": "Atur semua ke {value}",
-  "cannotFix": "Tidak dapat diperbaiki otomatis: {reason}",
-  "fixNotUnique": "Tidak dapat menemukan satu kecocokan unik — silakan edit secara manual.",
+  "unifyTo": "Samakan semua menjadi {value}",
+  "cannotFix": "Tidak dapat memperbaiki otomatis: {reason}",
+  "fixNotUnique": "Tidak dapat menemukan kecocokan unik — silakan edit secara manual.",
   "fixPartial": "{done} diperbaiki; {failed} tidak memiliki kecocokan unik — silakan edit secara manual.",
   "fixed": "Diperbaiki",
-  "fixedHint": "Tekan Cmd+Z untuk membatalkan; analisis ulang untuk menyegarkan temuan.",
+  "fixedHint": "Tekan Cmd+Z untuk membatalkan; analisis ulang untuk memperbarui temuan.",
   "noEditor": "Aktifkan jendela editor dokumen terlebih dahulu",
   "empty": {
-    "noRun": "Dokumen ini belum diverifikasi secara daring",
-    "noRunHint": "Petunjuk penulisan sehari-hari dijalankan secara lokal. Hanya dengan mengeklik verifikasi daring, dokumen yang tersimpan akan dikirim untuk ekstraksi AI, pencarian eksternal, dan pemeriksaan konsistensi.",
+    "noRun": "Dokumen ini belum diverifikasi secara online",
+    "noRunHint": "Petunjuk penulisan sehari-hari berjalan secara lokal. Hanya dengan mengklik verifikasi online dokumen tersimpan akan dikirim untuk ekstraksi AI, pencarian eksternal, dan pemeriksaan konsistensi.",
     "noEntity": "Tidak ditemukan entitas yang dapat dicari",
     "noEntityHint": "Dokumen tidak menyebutkan nama perusahaan, pasal peraturan, atau nomor perkara.",
     "noFinding": "Tidak ditemukan inkonsistensi",
-    "noFindingHint": "Pernyataan kuantitas dan kode kredit sosial terpadu semuanya terverifikasi."
+    "noFindingHint": "Pernyataan jumlah dan kode kredit sosial terpadu semuanya telah sesuai."
   }
 }

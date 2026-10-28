@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "confirm": "OK",
+  "confirm": "Bestätigen",
   "cancel": "Abbrechen",
   "save": "Speichern",
   "close": "Schließen",
@@ -43,7 +43,7 @@ export default {
   "openFile": "Datei öffnen",
   "open": "Öffnen",
   "cannotResolveParentFolder": "Der Ordner, der diese Datei enthält, kann nicht ermittelt werden",
-  "dateTimeMdHm": "{year}-{month}-{day} {time}",
+  "dateTimeMdHm": "{day}.{month}.{year} {time}",
   "registeredItems": "{count} Elemente registriert",
   "filesCount": "{count} Dateien",
   "statusRunning": "Wird ausgeführt",
@@ -57,10 +57,10 @@ export default {
   "sourceChannelOfficeWord": "Word-Add-in",
   "sourceChannelOfficeExcel": "Excel-Add-in",
   "sourceChannelOfficePowerpoint": "PowerPoint-Add-in",
-  "sourceChannelWpsWord": "WPS Writer",
-  "sourceChannelWpsExcel": "WPS Spreadsheets",
-  "sourceChannelWpsPowerpoint": "WPS Presentation",
-  "sourceChannelPlugin": "Add-in",
+  "sourceChannelWpsWord": "WPS Writer-Add-in",
+  "sourceChannelWpsExcel": "WPS Spreadsheets-Add-in",
+  "sourceChannelWpsPowerpoint": "WPS Presentation-Add-in",
+  "sourceChannelPlugin": "Erweiterung",
   "languagePickerLabel": "Sprache auswählen",
   "languageFollowSystem": "System folgen",
   "languageSearchPlaceholder": "Sprachen suchen…",

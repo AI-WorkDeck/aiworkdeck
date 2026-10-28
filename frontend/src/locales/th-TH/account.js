@@ -379,7 +379,7 @@ export default {
   "caseDefaultDepartment": "ฝ่ายแก้ไขข้อพิพาท",
   "caseOpenCloudWorkflowFailedToast": "เปิดการทำงานร่วมกันของสำนักงานกฎหมายไม่สำเร็จ",
   "caseStatusSubmittedFallback": "ส่งแล้ว",
-  "caseAmountWanCurrency": "¥{amount}0k",
+  "caseAmountWanCurrency": "¥{amount} หมื่น",
   "casePreviewFailedToast": "แสดงตัวอย่างความขัดแย้งไม่สำเร็จ",
   "caseSubmitFailedToast": "การส่งล้มเหลว",
   "caseActionFailedToast": "การดำเนินการไม่สำเร็จ",

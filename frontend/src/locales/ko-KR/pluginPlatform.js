@@ -2,20 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "devTrustNotice": "Development plugins can send data to declared remote services and expose Agent tools. Review the source before approval. Manifest changes require approval again.",
-  "grantTrust": "Approve development services",
-  "revokeTrust": "Revoke service approval",
-  "connections": "Plugin service connections",
-  "credentialNotice": "Credentials are stored per user by the host and are not exposed to plugin pages.",
+  "devTrustNotice": "개발용 플러그인은 선언된 원격 서비스로 데이터를 전송하고 Agent 도구를 노출할 수 있습니다. 승인 전에 출처를 확인해 주세요. 매니페스트를 변경하면 다시 승인해야 합니다.",
+  "grantTrust": "개발 플러그인 서비스 승인",
+  "revokeTrust": "서비스 승인 취소",
+  "connections": "플러그인 서비스 연결",
+  "credentialNotice": "자격 증명은 호스트 프로그램에서 사용자별로 저장하며 플러그인 페이지에는 노출되지 않습니다.",
   "connected": "연결됨",
-  "disconnected": "Not connected",
-  "token": "Service access token",
-  "connect": "Connect service",
-  "disconnect": "Disconnect",
-  "refresh": "Refresh status",
-  "subscription": "Check subscription",
-  "active": "Subscription active",
-  "inactive": "No active subscription",
-  "bundled": "Included with the app",
-  "checkout": "Open checkout"
+  "disconnected": "연결되지 않음",
+  "token": "서비스 액세스 토큰",
+  "connect": "서비스 연결",
+  "disconnect": "연결 해제",
+  "refresh": "상태 새로고침",
+  "subscription": "구독 확인",
+  "active": "구독 활성",
+  "inactive": "활성 구독 없음",
+  "bundled": "앱 기본 포함",
+  "checkout": "결제 페이지 열기"
 }

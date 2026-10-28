@@ -67,7 +67,7 @@ export default {
     "openWebsite": "前往官網",
     "useKeyLink": "使用賬戶 Key",
     "codeTitle": "使用試用碼或賬戶 Key",
-    "back": "回傳",
+    "back": "返回",
     "codePlaceholder": "粘貼試用碼或賬戶 Key",
     "rescueSwitching": "正在切換站點並重試",
     "unlocking": "正在解鎖",
@@ -112,7 +112,7 @@ export default {
   },
   "identity": {
     "title": "選擇本機工作區",
-    "subtitle": "檢測到本機有多個歷史賬號，請選擇要繼續使用的工作區。選定後不會再問，之後可在「設置 - 賬戶與用量」里更改。",
+    "subtitle": "檢測到本機有多個歷史賬號，請選擇要繼續使用的工作區。選定後不會再問，之後可在「設置 - 賬戶與用量」裡更改。",
     "reading": "正在讀取本機賬號",
     "retry": "重試",
     "itemMeta": "{projects} 個項目 · {files} 個文件",

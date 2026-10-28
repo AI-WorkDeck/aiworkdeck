@@ -22,7 +22,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   const view = doc.defaultView
   const viewport = () => bounds?.() || { left: 0, top: 0, right: view.innerWidth, bottom: view.innerHeight, width: view.innerWidth, height: view.innerHeight }
   const queryRoot = overlayContainer || doc
-  const t = LABELS[language.startsWith('en') ? 'en' : 'zh']
+  const t = LABELS[language && !String(language).startsWith('zh') ? 'en' : 'zh']
   let config = { enabled: false, learning: false, hints: true, writable: false, session: '', items: [] }
   let items = [], current = null, choices = [], active = 0, generation = 0, timer = 0, learningTimer = 0
   let preferredText = '', panelPoint

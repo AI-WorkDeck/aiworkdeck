@@ -176,6 +176,16 @@ export default {
   tierColThreshold: '门槛（成长值）',
   tierColBonus: '充值赠送',
   tierBonusCell: '{permille}‰',
+  membershipTiers: {
+    paralegal: '律师助理',
+    associate: '专职律师',
+    lead: '主办律师',
+    senior: '资深律师',
+    'salaried-partner': '授薪合伙人',
+    'equity-partner': '权益合伙人',
+    'managing-partner': '管理合伙人',
+    silver: '白银会员',
+  },
   // 充值弹窗（dev-board#184）
   rechargeTitle: '账户充值',
   rechargeSubtitle: '充值到 Credits 钱包，支付成功后即时到账',

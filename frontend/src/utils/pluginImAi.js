@@ -4,8 +4,10 @@
 export async function addPluginImFileToAi(workbench, request) {
   let isEn = false
   try {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') isEn = true
-    else if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') isEn = true
+    const l = (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language'))
+      || (typeof document !== 'undefined' && document.documentElement?.lang)
+      || ''
+    if (l && !l.startsWith('zh')) isEn = true
   } catch (_) { /* ignore */ }
   const switchedMsg = isEn ? 'Project or account switched. Please try again' : '项目或账户已切换，请重试'
   const unavailableMsg = isEn ? 'AI chat is currently unavailable. Please try again' : 'AI 对话暂不可用，请重试'

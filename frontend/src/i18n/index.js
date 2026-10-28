@@ -7,6 +7,7 @@ import {
   SUPPORTED_LOCALES,
   normalizeLocaleCode,
   APP_LANGUAGE_EVENT,
+  registerReactiveLocaleTracker,
 } from '../utils/appLanguage.js'
 
 /**
@@ -57,6 +58,12 @@ export const i18n = createI18n({
   silentTranslationWarn: true,
   messages: buildMessages(localeModules),
 })
+
+registerReactiveLocaleTracker(() => (
+  i18n.global.locale && typeof i18n.global.locale === 'object' && 'value' in i18n.global.locale
+    ? i18n.global.locale.value
+    : i18n.global.locale
+))
 
 /**
  * 供纯 JS 模块（services/api.js、utils/*、config/*）在组件树外取词。

@@ -7,7 +7,7 @@ export default {
   "installSelected": "立即下載所選",
   "installOne": "下載此組件",
   "later": "稍後再說",
-  "laterHint": "隨時可以在「設置 → 組件管理」里下載。",
+  "laterHint": "隨時可以在「設置 → 組件管理」裡下載。",
   "alreadyReady": "已安裝：{names}。",
   "nameSeparator": "、",
   "manageTitle": "組件管理",

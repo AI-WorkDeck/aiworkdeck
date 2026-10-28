@@ -3,81 +3,81 @@
 
 export default {
   "view": {
-    "bySection": "By Section",
-    "byParty": "By Party"
+    "bySection": "Nach Abschnitt",
+    "byParty": "Nach Partei"
   },
   "filter": {
-    "allSections": "All sections",
-    "allParties": "All parties"
+    "allSections": "Alle Abschnitte",
+    "allParties": "Alle Parteien"
   },
   "stat": {
-    "total": "{count} total"
+    "total": "{count} gesamt"
   },
   "status": {
     "all": "Alle",
-    "active": "Active",
-    "unverified": "Unverified",
-    "stale": "Changed",
-    "orphan": "Orphaned"
+    "active": "Aktiv",
+    "unverified": "Ungeprüft",
+    "stale": "Geändert",
+    "orphan": "Verwaist"
   },
   "group": {
     "none": "Nicht zugewiesen",
-    "untitled": "(No section)"
+    "untitled": "(Kein Abschnitt)"
   },
   "action": {
-    "keep": "Keep Link",
-    "rebind": "Reassign",
-    "confirmRebind": "Confirm",
+    "keep": "Verknüpfung behalten",
+    "rebind": "Neu zuordnen",
+    "confirmRebind": "Bestätigen",
     "cancelRebind": "Abbrechen",
     "delete": "Löschen",
     "removeTarget": "Entfernen",
-    "open": "View Source",
-    "ignore": "Ignore",
-    "expand": "Expand",
-    "collapse": "Collapse"
+    "open": "Beleg öffnen",
+    "ignore": "Ignorieren",
+    "expand": "Ausklappen",
+    "collapse": "Einklappen"
   },
   "method": {
-    "written_review": "Document Review",
-    "written_statement": "Written Statement",
-    "web_check": "Online Check",
-    "third_party": "Third-Party Material",
-    "interview": "Interview",
-    "none": "No method"
+    "written_review": "Dokumentenprüfung",
+    "written_statement": "Schriftliche Stellungnahme",
+    "web_check": "Online-Prüfung",
+    "third_party": "Drittunterlagen",
+    "interview": "Befragung",
+    "none": "Keine Methode"
   },
   "relation": {
-    "supports": "Supports",
-    "contradicts": "Contradicts",
-    "partial": "Partial"
+    "supports": "Stützt",
+    "contradicts": "Widerspricht",
+    "partial": "Stützt teilweise"
   },
   "loc": {
-    "wholeFile": "Whole file",
-    "page": "Page {page}",
-    "quote": "\"{quote}\"",
-    "region": "Image region",
+    "wholeFile": "Gesamte Datei",
+    "page": "Seite {page}",
+    "quote": "„{quote}“",
+    "region": "Bildbereich",
     "time": "{time}",
     "web": "{host}",
     "cell": "{sheet}!{cell}"
   },
-  "empty": "No source files linked to this document yet",
-  "emptyHint": "Drag a file from the explorer onto selected text to link it",
-  "emptyFiltered": "No links match the current filter",
-  "fileMissing": "(file no longer exists)",
-  "fileDeleted": "(in recycle bin)",
-  "targetsCount": "{count} sources",
-  "rebindHint": "Select the new text in the document, then tap Confirm",
-  "rebindNoSelection": "Select text in the document first",
-  "rebindFailed": "Reassign failed",
-  "rebindRetryHint": "The new bookmark is already in the document; tap Confirm again to retry.",
-  "keepGone": "This text is no longer in the document, so the link cannot be kept. Use Reassign in the Sources tab.",
-  "orphanGoto": "The anchor for this text is no longer in the document. Tap Reassign to pick new text.",
-  "confidence": "Confidence {value}",
+  "empty": "Mit diesem Dokument sind noch keine Belege verknüpft",
+  "emptyHint": "Ziehen Sie eine Datei aus dem Explorer auf den markierten Text, um sie zu verknüpfen",
+  "emptyFiltered": "Keine Verknüpfungen entsprechen dem aktuellen Filter",
+  "fileMissing": "(Datei existiert nicht mehr)",
+  "fileDeleted": "(im Papierkorb)",
+  "targetsCount": "{count} Belege",
+  "rebindHint": "Markieren Sie den neuen Text im Dokument und klicken Sie dann auf Bestätigen",
+  "rebindNoSelection": "Bitte markieren Sie zuerst Text im Dokument",
+  "rebindFailed": "Neuzuordnung fehlgeschlagen",
+  "rebindRetryHint": "Das neue Lesezeichen befindet sich bereits im Dokument; klicken Sie erneut auf Bestätigen, um es noch einmal zu versuchen.",
+  "keepGone": "Dieser Text ist nicht mehr im Dokument enthalten, daher kann die Verknüpfung nicht beibehalten werden. Verwenden Sie im Reiter Belege die Option Neu zuordnen.",
+  "orphanGoto": "Der Anker für diesen Text ist nicht mehr im Dokument vorhanden. Klicken Sie auf Neu zuordnen, um neuen Text auszuwählen.",
+  "confidence": "Konfidenz {value}",
   "loading": "Wird geladen…",
-  "loadFailed": "Failed to load links",
-  "fileTagsLoadFailed": "Failed to load party tags; the \"By Party\" view may be inaccurate",
-  "opFailed": "Operation failed",
-  "deleteConfirm": "Delete this link? The source file will not be deleted.",
-  "deleteTargetConfirm": "Remove this source?",
-  "staleOne": "This text has {count} linked sources and has been changed",
-  "staleMany": "{count} linked passages have been changed",
-  "stalePrefix": "Changed: "
+  "loadFailed": "Verknüpfungen konnten nicht geladen werden",
+  "fileTagsLoadFailed": "Partei-Tags konnten nicht geladen werden; die Ansicht „Nach Partei“ ist möglicherweise ungenau",
+  "opFailed": "Vorgang fehlgeschlagen",
+  "deleteConfirm": "Diese Verknüpfung löschen? Die Quelldatei wird nicht gelöscht.",
+  "deleteTargetConfirm": "Diesen Beleg entfernen?",
+  "staleOne": "Dieser Text hat {count} verknüpfte Belege und wurde geändert",
+  "staleMany": "{count} verknüpfte Textstellen wurden geändert",
+  "stalePrefix": "Geändert: "
 }

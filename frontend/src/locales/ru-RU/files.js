@@ -52,7 +52,7 @@ export default {
     "previewTimeout": "Истекло время ожидания подготовки аудио для просмотра. Закройте эту вкладку и откройте её снова.",
     "playFailed": "Этот файл нельзя воспроизвести. Возможно, кодек не поддерживается.",
     "backToCurrent": "Вернуться к текущему",
-    "speakerPrefix": "{name}: ",
+    "speakerPrefix": "{name} — ",
     "summary": "{count} сегментов · {duration}"
   },
   "captions": {

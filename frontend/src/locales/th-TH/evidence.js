@@ -3,81 +3,81 @@
 
 export default {
   "view": {
-    "bySection": "By Section",
-    "byParty": "By Party"
+    "bySection": "ตามหัวข้อ",
+    "byParty": "ตามคู่สัญญา"
   },
   "filter": {
-    "allSections": "All sections",
-    "allParties": "All parties"
+    "allSections": "ทุกหัวข้อ",
+    "allParties": "ทุกคู่สัญญา"
   },
   "stat": {
-    "total": "{count} total"
+    "total": "ทั้งหมด {count} รายการ"
   },
   "status": {
     "all": "ทั้งหมด",
-    "active": "Active",
-    "unverified": "Unverified",
-    "stale": "Changed",
-    "orphan": "Orphaned"
+    "active": "ปกติ",
+    "unverified": "รอตรวจสอบ",
+    "stale": "มีการแก้ไข",
+    "orphan": "ขาดการเชื่อมโยง"
   },
   "group": {
-    "none": "ยังไม่ได้มอบหมาย",
-    "untitled": "(No section)"
+    "none": "ยังไม่ระบุ",
+    "untitled": "(ไม่มีหัวข้อ)"
   },
   "action": {
-    "keep": "Keep Link",
-    "rebind": "Reassign",
-    "confirmRebind": "Confirm",
+    "keep": "คงการเชื่อมโยง",
+    "rebind": "ระบุใหม่",
+    "confirmRebind": "ยืนยัน",
     "cancelRebind": "ยกเลิก",
     "delete": "ลบ",
-    "removeTarget": "ลบ",
-    "open": "View Source",
-    "ignore": "Ignore",
-    "expand": "Expand",
-    "collapse": "Collapse"
+    "removeTarget": "นำออก",
+    "open": "ดูเอกสารอ้างอิง",
+    "ignore": "ข้าม",
+    "expand": "ขยาย",
+    "collapse": "ย่อ"
   },
   "method": {
-    "written_review": "Document Review",
-    "written_statement": "Written Statement",
-    "web_check": "Online Check",
-    "third_party": "Third-Party Material",
-    "interview": "Interview",
-    "none": "No method"
+    "written_review": "ตรวจเอกสาร",
+    "written_statement": "คำชี้แจงเป็นลายลักษณ์อักษร",
+    "web_check": "ตรวจสอบออนไลน์",
+    "third_party": "เอกสารบุคคลที่สาม",
+    "interview": "สัมภาษณ์",
+    "none": "ไม่ระบุวิธี"
   },
   "relation": {
-    "supports": "Supports",
-    "contradicts": "Contradicts",
-    "partial": "Partial"
+    "supports": "สนับสนุน",
+    "contradicts": "ขัดแย้ง",
+    "partial": "สนับสนุนบางส่วน"
   },
   "loc": {
-    "wholeFile": "Whole file",
-    "page": "Page {page}",
-    "quote": "\"{quote}\"",
-    "region": "Image region",
+    "wholeFile": "ทั้งไฟล์",
+    "page": "หน้า {page}",
+    "quote": "“{quote}”",
+    "region": "บริเวณในภาพ",
     "time": "{time}",
     "web": "{host}",
     "cell": "{sheet}!{cell}"
   },
-  "empty": "No source files linked to this document yet",
-  "emptyHint": "Drag a file from the explorer onto selected text to link it",
-  "emptyFiltered": "No links match the current filter",
-  "fileMissing": "(file no longer exists)",
-  "fileDeleted": "(in recycle bin)",
-  "targetsCount": "{count} sources",
-  "rebindHint": "Select the new text in the document, then tap Confirm",
-  "rebindNoSelection": "Select text in the document first",
-  "rebindFailed": "Reassign failed",
-  "rebindRetryHint": "The new bookmark is already in the document; tap Confirm again to retry.",
-  "keepGone": "This text is no longer in the document, so the link cannot be kept. Use Reassign in the Sources tab.",
-  "orphanGoto": "The anchor for this text is no longer in the document. Tap Reassign to pick new text.",
-  "confidence": "Confidence {value}",
+  "empty": "ยังไม่มีไฟล์อ้างอิงที่เชื่อมโยงกับเอกสารนี้",
+  "emptyHint": "ลากไฟล์จากรายการด้านซ้ายมาวางบนข้อความที่เลือกเพื่อสร้างการเชื่อมโยง",
+  "emptyFiltered": "ไม่มีการเชื่อมโยงที่ตรงกับตัวกรองปัจจุบัน",
+  "fileMissing": "(ไม่พบไฟล์แล้ว)",
+  "fileDeleted": "(อยู่ในถังขยะ)",
+  "targetsCount": "เอกสารอ้างอิง {count} รายการ",
+  "rebindHint": "เลือกข้อความใหม่ในเอกสาร แล้วแตะยืนยัน",
+  "rebindNoSelection": "กรุณาเลือกข้อความในเอกสารก่อน",
+  "rebindFailed": "ระบุใหม่ไม่สำเร็จ",
+  "rebindRetryHint": "บุ๊กมาร์กใหม่อยู่ในเอกสารแล้ว แตะยืนยันอีกครั้งเพื่อลองใหม่",
+  "keepGone": "ข้อความนี้ไม่อยู่ในเอกสารแล้ว จึงไม่สามารถคงการเชื่อมโยงได้ โปรดใช้ \"ระบุใหม่\" ในแท็บเอกสารอ้างอิง",
+  "orphanGoto": "จุดยึดของข้อความนี้ไม่อยู่ในเอกสารแล้ว แตะ \"ระบุใหม่\" เพื่อเลือกข้อความใหม่",
+  "confidence": "ความเชื่อมั่น {value}",
   "loading": "กำลังโหลด…",
-  "loadFailed": "Failed to load links",
-  "fileTagsLoadFailed": "Failed to load party tags; the \"By Party\" view may be inaccurate",
-  "opFailed": "Operation failed",
-  "deleteConfirm": "Delete this link? The source file will not be deleted.",
-  "deleteTargetConfirm": "Remove this source?",
-  "staleOne": "This text has {count} linked sources and has been changed",
-  "staleMany": "{count} linked passages have been changed",
-  "stalePrefix": "Changed: "
+  "loadFailed": "โหลดการเชื่อมโยงไม่สำเร็จ",
+  "fileTagsLoadFailed": "โหลดแท็กคู่สัญญาไม่สำเร็จ มุมมอง \"ตามคู่สัญญา\" อาจไม่ถูกต้อง",
+  "opFailed": "ดำเนินการไม่สำเร็จ",
+  "deleteConfirm": "ลบการเชื่อมโยงนี้หรือไม่? ไฟล์เอกสารอ้างอิงจะไม่ถูกลบ",
+  "deleteTargetConfirm": "นำเอกสารอ้างอิงนี้ออกหรือไม่?",
+  "staleOne": "ข้อความนี้มีเอกสารอ้างอิง {count} รายการ และเนื้อหาถูกแก้ไขแล้ว",
+  "staleMany": "ข้อความที่เชื่อมโยง {count} รายการถูกแก้ไขแล้ว",
+  "stalePrefix": "แก้ไขแล้ว: "
 }

@@ -2,89 +2,89 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "title": "Ссылки",
+  "title": "Источники и проверка",
   "noDoc": "Документ не открыт",
   "parse": "Онлайн-проверка всего документа (может взиматься плата)",
-  "reparse": "Повторная онлайн-проверка всего документа (может взиматься плата)",
-  "onlineHint": "При нажатии документ будет сохранён, после чего сохранённая версия будет проверена онлайн. За использование AI и внешних запросов может взиматься плата.",
-  "saveRequired": "Не удалось сохранить этот документ. Успешно сохраните его перед онлайн-проверкой.",
+  "reparse": "Повторить онлайн-проверку документа (может взиматься плата)",
+  "onlineHint": "При нажатии текущий документ сохраняется, после чего сохранённая версия проверяется онлайн. Использование ИИ и внешних баз может тарифицироваться.",
+  "saveRequired": "Не удалось сохранить документ. Сначала сохраните его перед онлайн-проверкой.",
   "running": "Выполняется онлайн-проверка…",
   "done": "Онлайн-проверка завершена",
-  "failed": "Онлайн-проверка не удалась",
+  "failed": "Ошибка онлайн-проверки",
   "loading": "Загрузка…",
-  "loadingDetail": "Получение сведений о проверке…",
-  "noDetail": "Сведения о проверке для этого элемента отсутствуют",
-  "loadFailed": "Could not load online verification results",
-  "parseFailed": "Could not start online verification",
-  "detailFailed": "Could not load the lookup details",
-  "refreshFailed": "Could not re-run the lookup",
+  "loadingDetail": "Загрузка подробностей запроса…",
+  "noDetail": "Для этой записи нет подробностей запроса",
+  "loadFailed": "Не удалось загрузить результаты онлайн-проверки",
+  "parseFailed": "Не удалось запустить онлайн-проверку",
+  "detailFailed": "Не удалось загрузить подробности запроса",
+  "refreshFailed": "Не удалось повторить запрос",
   "retry": "Повторить",
-  "goConnectAccount": "Connect account",
-  "goRecharge": "Add credits",
+  "goConnectAccount": "Подключить аккаунт",
+  "goRecharge": "Пополнить баланс",
   "hint": {
-    "NO_CREDENTIAL": "This lookup channel needs a credential configured on the server by your administrator."
+    "NO_CREDENTIAL": "Для этого канала поиска учётные данные должны быть настроены администратором на сервере."
   },
   "tab": {
-    "retrieval": "Lookups",
-    "checks": "Consistency"
+    "retrieval": "Внешний поиск",
+    "checks": "Согласованность"
   },
   "kind": {
-    "COMPANY": "Companies",
-    "LAW": "Statutes",
-    "CASE": "Cases",
-    "DOC": "Documents"
+    "COMPANY": "Компании",
+    "LAW": "Нормативные акты",
+    "CASE": "Судебные дела",
+    "DOC": "Документы"
   },
   "entityKind": {
-    "COMPANY": "Company",
-    "LAW": "Statute",
-    "CASE": "Case",
-    "DOC": "Document"
+    "COMPANY": "Компания",
+    "LAW": "Нормативный акт",
+    "CASE": "Дело",
+    "DOC": "Документ"
   },
-  "openInNewTab": "Open in a new tab",
-  "openDocFile": "Open file",
-  "docNotFound": "No such file in this project",
-  "docMissing": "That file is no longer in this project",
+  "openInNewTab": "Открыть в новой вкладке",
+  "openDocFile": "Открыть файл",
+  "docNotFound": "Такой файл не найден в проекте",
+  "docMissing": "Этого файла больше нет в проекте",
   "source": {
-    "projectFile": "Project file",
-    "qichacha": "Qichacha"
+    "projectFile": "Файл проекта",
+    "qichacha": "Qichacha (Цичача)"
   },
-  "mentions": "{count} mention(s)",
-  "mentionsTitle": "Mentions in this document",
-  "shareholders": "Shareholders",
-  "moreCandidates": "Other candidates",
+  "mentions": "Упоминаний: {count}",
+  "mentionsTitle": "Упоминания в документе",
+  "shareholders": "Участники и акционеры",
+  "moreCandidates": "Другие варианты",
   "caseSection": {
-    "ascertain": "Facts found",
-    "reason": "Reasoning",
-    "result": "Judgment",
-    "gist": "Key holding",
-    "fullText": "Full judgment"
+    "ascertain": "Установленные обстоятельства",
+    "reason": "Мотивировочная часть",
+    "result": "Резолютивная часть",
+    "gist": "Правовая позиция",
+    "fullText": "Полный текст решения"
   },
-  "authoritative": "Authoritative text (Pkulaw)",
-  "implementDate": "In force from {date}",
-  "recognition": "Case number recognition",
-  "openInPkulaw": "Open in Pkulaw",
+  "authoritative": "Официальный текст (Pkulaw)",
+  "implementDate": "В силе с {date}",
+  "recognition": "Распознавание номера дела",
+  "openInPkulaw": "Открыть в Pkulaw",
   "citation": {
-    "citedText": "Cited article",
-    "candidates": "Articles matched by content",
-    "article": "Article {n}"
+    "citedText": "Цитируемая статья",
+    "candidates": "Статьи, подобранные по содержанию",
+    "article": "Статья {n}"
   },
   "severity": {
-    "warn": "Questionable",
-    "error": "Error"
+    "warn": "Сомнительно",
+    "error": "Ошибка"
   },
-  "unifyTo": "Set all to {value}",
-  "cannotFix": "Cannot fix automatically: {reason}",
-  "fixNotUnique": "Could not locate a unique match — please edit manually.",
-  "fixPartial": "Fixed {done}; {failed} had no unique match — please edit those manually.",
-  "fixed": "Fixed",
-  "fixedHint": "Press Cmd+Z to undo; re-analyze to refresh the findings.",
-  "noEditor": "Activate a document editor window first",
+  "unifyTo": "Привести все к «{value}»",
+  "cannotFix": "Невозможно исправить автоматически: {reason}",
+  "fixNotUnique": "Не удалось однозначно определить место в тексте — исправьте вручную.",
+  "fixPartial": "Исправлено: {done}; не удалось однозначно сопоставить: {failed} — исправьте их вручную.",
+  "fixed": "Исправлено",
+  "fixedHint": "Нажмите Cmd+Z для отмены; запустите проверку заново, чтобы обновить выводы.",
+  "noEditor": "Сначала активируйте окно редактора документа",
   "empty": {
-    "noRun": "This document has not been verified online",
-    "noRunHint": "Everyday writing hints run locally. Only clicking online verification sends the saved document for AI extraction, external lookups and consistency checks.",
-    "noEntity": "No lookupable entities found",
-    "noEntityHint": "The document mentions no company name, statute article or case number.",
-    "noFinding": "No inconsistencies found",
-    "noFindingHint": "Quantity statements and unified social credit codes all check out."
+    "noRun": "Этот документ ещё не проверялся онлайн",
+    "noRunHint": "Обычные подсказки при письме работают локально. Только при нажатии на онлайн-проверку сохранённый документ отправляется для извлечения сущностей ИИ, внешних запросов и проверки согласованности.",
+    "noEntity": "Сущности для проверки не найдены",
+    "noEntityHint": "В документе не упоминаются названия компаний, статьи законов или номера дел.",
+    "noFinding": "Противоречий не обнаружено",
+    "noFindingHint": "Количественные данные и единые коды общественного кредита прошли проверку."
   }
 }

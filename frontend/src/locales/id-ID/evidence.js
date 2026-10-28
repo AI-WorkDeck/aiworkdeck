@@ -3,81 +3,81 @@
 
 export default {
   "view": {
-    "bySection": "By Section",
-    "byParty": "By Party"
+    "bySection": "Menurut Bagian",
+    "byParty": "Menurut Pihak"
   },
   "filter": {
-    "allSections": "All sections",
-    "allParties": "All parties"
+    "allSections": "Semua bagian",
+    "allParties": "Semua pihak"
   },
   "stat": {
-    "total": "{count} total"
+    "total": "Total {count}"
   },
   "status": {
-    "all": "All",
-    "active": "Active",
-    "unverified": "Unverified",
-    "stale": "Changed",
-    "orphan": "Orphaned"
+    "all": "Semua",
+    "active": "Aktif",
+    "unverified": "Belum diverifikasi",
+    "stale": "Berubah",
+    "orphan": "Terlepas"
   },
   "group": {
-    "none": "Unassigned",
-    "untitled": "(No section)"
+    "none": "Belum ditetapkan",
+    "untitled": "(Tanpa bagian)"
   },
   "action": {
-    "keep": "Keep Link",
-    "rebind": "Reassign",
-    "confirmRebind": "Confirm",
+    "keep": "Pertahankan Tautan",
+    "rebind": "Tetapkan Ulang",
+    "confirmRebind": "Konfirmasi",
     "cancelRebind": "Batal",
     "delete": "Hapus",
-    "removeTarget": "Remove",
-    "open": "View Source",
-    "ignore": "Ignore",
-    "expand": "Expand",
-    "collapse": "Collapse"
+    "removeTarget": "Hapus sumber",
+    "open": "Lihat Sumber",
+    "ignore": "Abaikan",
+    "expand": "Perluas",
+    "collapse": "Ciutkan"
   },
   "method": {
-    "written_review": "Document Review",
-    "written_statement": "Written Statement",
-    "web_check": "Online Check",
-    "third_party": "Third-Party Material",
-    "interview": "Interview",
-    "none": "No method"
+    "written_review": "Tinjauan Dokumen",
+    "written_statement": "Pernyataan Tertulis",
+    "web_check": "Pemeriksaan Online",
+    "third_party": "Materi Pihak Ketiga",
+    "interview": "Wawancara",
+    "none": "Tanpa metode"
   },
   "relation": {
-    "supports": "Supports",
-    "contradicts": "Contradicts",
-    "partial": "Partial"
+    "supports": "Mendukung",
+    "contradicts": "Bertentangan",
+    "partial": "Mendukung Sebagian"
   },
   "loc": {
-    "wholeFile": "Whole file",
-    "page": "Page {page}",
-    "quote": "\"{quote}\"",
-    "region": "Image region",
+    "wholeFile": "Seluruh file",
+    "page": "Halaman {page}",
+    "quote": "«{quote}»",
+    "region": "Area gambar",
     "time": "{time}",
     "web": "{host}",
     "cell": "{sheet}!{cell}"
   },
-  "empty": "No source files linked to this document yet",
-  "emptyHint": "Drag a file from the explorer onto selected text to link it",
-  "emptyFiltered": "No links match the current filter",
-  "fileMissing": "(file no longer exists)",
-  "fileDeleted": "(in recycle bin)",
-  "targetsCount": "{count} sources",
-  "rebindHint": "Select the new text in the document, then tap Confirm",
-  "rebindNoSelection": "Select text in the document first",
-  "rebindFailed": "Reassign failed",
-  "rebindRetryHint": "The new bookmark is already in the document; tap Confirm again to retry.",
-  "keepGone": "This text is no longer in the document, so the link cannot be kept. Use Reassign in the Sources tab.",
-  "orphanGoto": "The anchor for this text is no longer in the document. Tap Reassign to pick new text.",
-  "confidence": "Confidence {value}",
+  "empty": "Belum ada file sumber yang ditautkan ke dokumen ini",
+  "emptyHint": "Seret file dari penjelajah ke teks yang dipilih untuk menautkannya",
+  "emptyFiltered": "Tidak ada tautan yang cocok dengan filter saat ini",
+  "fileMissing": "(file tidak ada lagi)",
+  "fileDeleted": "(di tempat sampah)",
+  "targetsCount": "{count} sumber",
+  "rebindHint": "Pilih teks baru di dokumen, lalu ketuk Konfirmasi",
+  "rebindNoSelection": "Pilih teks di dokumen terlebih dahulu",
+  "rebindFailed": "Gagal menetapkan ulang",
+  "rebindRetryHint": "Bookmark baru sudah ada di dokumen; ketuk Konfirmasi lagi untuk mencoba ulang.",
+  "keepGone": "Teks ini tidak ada lagi di dokumen sehingga tautan tidak dapat dipertahankan. Gunakan Tetapkan Ulang di tab Sumber.",
+  "orphanGoto": "Jangkar untuk teks ini tidak ada lagi di dokumen. Ketuk Tetapkan Ulang untuk memilih teks baru.",
+  "confidence": "Keyakinan {value}",
   "loading": "Memuat…",
-  "loadFailed": "Failed to load links",
-  "fileTagsLoadFailed": "Failed to load party tags; the \"By Party\" view may be inaccurate",
-  "opFailed": "Operation failed",
-  "deleteConfirm": "Delete this link? The source file will not be deleted.",
-  "deleteTargetConfirm": "Remove this source?",
-  "staleOne": "This text has {count} linked sources and has been changed",
-  "staleMany": "{count} linked passages have been changed",
-  "stalePrefix": "Changed: "
+  "loadFailed": "Gagal memuat tautan",
+  "fileTagsLoadFailed": "Gagal memuat tag pihak; tampilan \"Menurut Pihak\" mungkin tidak akurat",
+  "opFailed": "Operasi gagal",
+  "deleteConfirm": "Hapus tautan ini? File sumber tidak akan dihapus.",
+  "deleteTargetConfirm": "Hapus sumber ini dari tautan?",
+  "staleOne": "Teks ini memiliki {count} sumber tertaut dan telah diubah",
+  "staleMany": "{count} bagian teks tertaut telah diubah",
+  "stalePrefix": "Diubah: "
 }

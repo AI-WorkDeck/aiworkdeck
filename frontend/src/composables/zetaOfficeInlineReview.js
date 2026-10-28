@@ -47,7 +47,7 @@ export function attachInlineReview({ canvas, input, execute, transport, language
   const doc = canvas.ownerDocument, view = doc.defaultView
   const viewportBounds = () => bounds?.() || { left: 0, top: 0, right: view.innerWidth, bottom: view.innerHeight, width: view.innerWidth, height: view.innerHeight }
   const queryRoot = overlayContainer || doc
-  const english = language.startsWith('en')
+  const english = Boolean(language && !String(language).startsWith('zh'))
   const t = LABELS[english ? 'en' : 'zh']
   let autocomplete = { session: '', available: false, enabled: false, error: '' }
   let state = { session: '', ai: true, hidden: false, revision: null, status: 'disabled', findings: [], deepStatus: 'idle', autoBlocked: '' }

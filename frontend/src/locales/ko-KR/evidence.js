@@ -3,81 +3,81 @@
 
 export default {
   "view": {
-    "bySection": "By Section",
-    "byParty": "By Party"
+    "bySection": "섹션별",
+    "byParty": "당사자별"
   },
   "filter": {
-    "allSections": "All sections",
-    "allParties": "All parties"
+    "allSections": "모든 섹션",
+    "allParties": "모든 당사자"
   },
   "stat": {
-    "total": "{count} total"
+    "total": "총 {count}건"
   },
   "status": {
     "all": "전체",
-    "active": "활성",
-    "unverified": "Unverified",
-    "stale": "Changed",
-    "orphan": "Orphaned"
+    "active": "정상",
+    "unverified": "미확인",
+    "stale": "변경됨",
+    "orphan": "연결 끊김"
   },
   "group": {
-    "none": "미할당",
-    "untitled": "(No section)"
+    "none": "미지정",
+    "untitled": "(섹션 없음)"
   },
   "action": {
-    "keep": "Keep Link",
-    "rebind": "Reassign",
-    "confirmRebind": "Confirm",
+    "keep": "연결 유지",
+    "rebind": "다시 지정",
+    "confirmRebind": "지정 확인",
     "cancelRebind": "취소",
     "delete": "삭제",
-    "removeTarget": "Remove",
-    "open": "View Source",
-    "ignore": "Ignore",
-    "expand": "Expand",
-    "collapse": "Collapse"
+    "removeTarget": "제거",
+    "open": "원본 자료 보기",
+    "ignore": "무시",
+    "expand": "펼치기",
+    "collapse": "접기"
   },
   "method": {
-    "written_review": "Document Review",
-    "written_statement": "Written Statement",
-    "web_check": "Online Check",
-    "third_party": "Third-Party Material",
-    "interview": "Interview",
-    "none": "No method"
+    "written_review": "서면 검토",
+    "written_statement": "서면 설명",
+    "web_check": "온라인 확인",
+    "third_party": "제3자 자료",
+    "interview": "인터뷰",
+    "none": "방법 미지정"
   },
   "relation": {
-    "supports": "Supports",
-    "contradicts": "Contradicts",
-    "partial": "Partial"
+    "supports": "뒷받침",
+    "contradicts": "상충",
+    "partial": "부분 뒷받침"
   },
   "loc": {
-    "wholeFile": "Whole file",
-    "page": "Page {page}",
-    "quote": "\"{quote}\"",
+    "wholeFile": "전체 파일",
+    "page": "{page}페이지",
+    "quote": "“{quote}”",
     "region": "이미지 영역",
     "time": "{time}",
     "web": "{host}",
     "cell": "{sheet}!{cell}"
   },
-  "empty": "이 문서에 연결된 원본 파일이 아직 없습니다",
-  "emptyHint": "탐색기에서 파일을 선택한 텍스트 위로 드래그하여 연결하세요",
-  "emptyFiltered": "현재 필터와 일치하는 링크가 없습니다",
+  "empty": "이 문서에 연결된 원본 자료가 아직 없습니다",
+  "emptyHint": "탐색기에서 선택한 텍스트로 파일을 끌어다 놓으면 연결됩니다",
+  "emptyFiltered": "현재 필터와 일치하는 연결이 없습니다",
   "fileMissing": "(파일이 더 이상 존재하지 않음)",
   "fileDeleted": "(휴지통에 있음)",
-  "targetsCount": "출처 {count}개",
+  "targetsCount": "원본 자료 {count}건",
   "rebindHint": "문서에서 새 텍스트를 선택한 후 확인을 누르세요",
   "rebindNoSelection": "먼저 문서에서 텍스트를 선택하세요",
-  "rebindFailed": "재지정 실패",
-  "rebindRetryHint": "새 책갈피가 이미 문서에 있습니다. 다시 확인을 눌러 재시도하세요.",
-  "keepGone": "이 텍스트는 더 이상 문서에 없어 링크를 유지할 수 없습니다. 출처 탭에서 재지정을 사용하세요.",
-  "orphanGoto": "이 텍스트의 앵커가 더 이상 문서에 없습니다. 재지정을 눌러 새 텍스트를 선택하세요.",
+  "rebindFailed": "다시 지정하지 못했습니다",
+  "rebindRetryHint": "새 북마크가 이미 문서에 있습니다. 확인을 다시 눌러 재시도하세요.",
+  "keepGone": "이 텍스트가 문서에 더 이상 없으므로 연결을 유지할 수 없습니다. 원본 자료 탭에서 다시 지정을 사용하세요.",
+  "orphanGoto": "이 텍스트의 앵커가 문서에 더 이상 없습니다. 다시 지정을 눌러 새 텍스트를 선택하세요.",
   "confidence": "신뢰도 {value}",
   "loading": "불러오는 중…",
-  "loadFailed": "링크를 불러오지 못했습니다",
-  "fileTagsLoadFailed": "태그를 불러오지 못했습니다. \"파티별\" 보기가 정확하지 않을 수 있습니다",
+  "loadFailed": "연결을 불러오지 못했습니다",
+  "fileTagsLoadFailed": "당사자 태그를 불러오지 못했습니다. \"당사자별\" 보기가 정확하지 않을 수 있습니다",
   "opFailed": "작업 실패",
-  "deleteConfirm": "이 링크를 삭제할까요? 원본 파일은 삭제되지 않습니다.",
-  "deleteTargetConfirm": "이 출처를 제거할까요?",
-  "staleOne": "이 텍스트에는 연결된 출처 {count}개가 있으며 변경되었습니다",
+  "deleteConfirm": "이 연결을 삭제하시겠습니까? 원본 파일은 삭제되지 않습니다.",
+  "deleteTargetConfirm": "이 원본 자료를 제거하시겠습니까?",
+  "staleOne": "이 텍스트에 {count}개의 연결된 원본 자료가 있으며 내용이 변경되었습니다",
   "staleMany": "연결된 구절 {count}개가 변경되었습니다",
   "stalePrefix": "변경됨: "
 }

@@ -163,8 +163,10 @@ export function templateProfileLine(summary) {
   const { font, size, levels, tables } = summary
   let isEn = false
   try {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') isEn = true
-    else if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') isEn = true
+    const l = (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language'))
+      || (typeof document !== 'undefined' && document.documentElement?.lang)
+      || ''
+    if (l && !l.startsWith('zh')) isEn = true
   } catch (_) { /* ignore */ }
   const fallback = isEn
     ? `Learned template: ${font} ${size}pt / ${levels} heading levels / ${tables} table styles`

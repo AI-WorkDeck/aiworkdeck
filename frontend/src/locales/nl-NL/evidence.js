@@ -3,80 +3,80 @@
 
 export default {
   "view": {
-    "bySection": "By Section",
-    "byParty": "By Party"
+    "bySection": "Per sectie",
+    "byParty": "Per partij"
   },
   "filter": {
-    "allSections": "All sections",
-    "allParties": "All parties"
+    "allSections": "Alle secties",
+    "allParties": "Alle partijen"
   },
   "stat": {
-    "total": "{count} total"
+    "total": "{count} totaal"
   },
   "status": {
     "all": "Alle",
-    "active": "Active",
-    "unverified": "Unverified",
-    "stale": "Changed",
-    "orphan": "Orphaned"
+    "active": "Actief",
+    "unverified": "Ongeverifieerd",
+    "stale": "Gewijzigd",
+    "orphan": "Verweesd"
   },
   "group": {
-    "none": "Unassigned",
-    "untitled": "(No section)"
+    "none": "Niet toegewezen",
+    "untitled": "(Geen sectie)"
   },
   "action": {
-    "keep": "Keep Link",
-    "rebind": "Reassign",
-    "confirmRebind": "Confirm",
+    "keep": "Koppeling behouden",
+    "rebind": "Opnieuw toewijzen",
+    "confirmRebind": "Bevestigen",
     "cancelRebind": "Annuleren",
     "delete": "Verwijderen",
-    "removeTarget": "Verwijderen",
-    "open": "View Source",
-    "ignore": "Ignore",
-    "expand": "Expand",
-    "collapse": "Collapse"
+    "removeTarget": "Loskoppelen",
+    "open": "Bron bekijken",
+    "ignore": "Negeren",
+    "expand": "Uitklappen",
+    "collapse": "Inklappen"
   },
   "method": {
-    "written_review": "Document Review",
-    "written_statement": "Written Statement",
-    "web_check": "Online Check",
-    "third_party": "Third-Party Material",
-    "interview": "Interview",
-    "none": "No method"
+    "written_review": "Documentcontrole",
+    "written_statement": "Schriftelijke verklaring",
+    "web_check": "Online controle",
+    "third_party": "Materiaal van derden",
+    "interview": "Gesprek",
+    "none": "Geen methode"
   },
   "relation": {
-    "supports": "Supports",
-    "contradicts": "Contradicts",
-    "partial": "Partial"
+    "supports": "Ondersteunt",
+    "contradicts": "Spreekt tegen",
+    "partial": "Ondersteunt gedeeltelijk"
   },
   "loc": {
-    "wholeFile": "Whole file",
-    "page": "Page {page}",
-    "quote": "\"{quote}\"",
-    "region": "Image region",
+    "wholeFile": "Volledig bestand",
+    "page": "Pagina {page}",
+    "quote": "„{quote}”",
+    "region": "Afbeeldingsgebied",
     "time": "{time}",
     "web": "{host}",
     "cell": "{sheet}!{cell}"
   },
-  "empty": "Er zijn nog geen bronbestanden aan dit document gekoppeld",
-  "emptyHint": "Sleep een bestand vanuit de verkenner op geselecteerde tekst om het te koppelen",
-  "emptyFiltered": "Er komen geen koppelingen overeen met de huidige filter",
+  "empty": "Nog geen bronbestanden gekoppeld aan dit document",
+  "emptyHint": "Sleep een bestand vanuit de verkenner naar geselecteerde tekst om het te koppelen",
+  "emptyFiltered": "Geen koppelingen komen overeen met het huidige filter",
   "fileMissing": "(bestand bestaat niet meer)",
-  "fileDeleted": "(in de prullenbak)",
+  "fileDeleted": "(in prullenbak)",
   "targetsCount": "{count} bronnen",
-  "rebindHint": "Selecteer de nieuwe tekst in het document en tik vervolgens op Bevestigen",
+  "rebindHint": "Selecteer de nieuwe tekst in het document en tik op Bevestigen",
   "rebindNoSelection": "Selecteer eerst tekst in het document",
   "rebindFailed": "Opnieuw toewijzen mislukt",
-  "rebindRetryHint": "De nieuwe bladwijzer staat al in het document; tik opnieuw op Bevestigen om het opnieuw te proberen.",
-  "keepGone": "Deze tekst staat niet meer in het document, dus de koppeling kan niet behouden blijven. Gebruik Opnieuw toewijzen in het tabblad Bronnen.",
+  "rebindRetryHint": "De nieuwe bladwijzer staat al in het document; tik nogmaals op Bevestigen om het opnieuw te proberen.",
+  "keepGone": "Deze tekst staat niet meer in het document, dus de koppeling kan niet behouden blijven. Gebruik Opnieuw toewijzen op het tabblad Bronnen.",
   "orphanGoto": "Het anker voor deze tekst staat niet meer in het document. Tik op Opnieuw toewijzen om nieuwe tekst te kiezen.",
-  "confidence": "Zekerheid {value}",
+  "confidence": "Betrouwbaarheid {value}",
   "loading": "Laden…",
   "loadFailed": "Koppelingen laden mislukt",
-  "fileTagsLoadFailed": "Partijlabels laden mislukt; de weergave \"Per Partij\" kan onjuist zijn",
+  "fileTagsLoadFailed": "Partijlabels laden mislukt; de weergave \"Per partij\" kan onnauwkeurig zijn",
   "opFailed": "Bewerking mislukt",
   "deleteConfirm": "Deze koppeling verwijderen? Het bronbestand wordt niet verwijderd.",
-  "deleteTargetConfirm": "Deze bron verwijderen?",
+  "deleteTargetConfirm": "Deze bron loskoppelen?",
   "staleOne": "Deze tekst heeft {count} gekoppelde bronnen en is gewijzigd",
   "staleMany": "{count} gekoppelde passages zijn gewijzigd",
   "stalePrefix": "Gewijzigd: "

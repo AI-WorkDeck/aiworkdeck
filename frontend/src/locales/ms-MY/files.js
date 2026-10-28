@@ -52,7 +52,7 @@ export default {
     "previewTimeout": "Persiapan pratonton audio telah tamat masa. Tutup tab ini dan bukanya semula.",
     "playFailed": "Fail ini tidak dapat dimainkan. Kod mungkin tidak disokong.",
     "backToCurrent": "Kembali ke semasa",
-    "speakerPrefix": "{name}: ",
+    "speakerPrefix": "{name} : ",
     "summary": "{count} segmen · {duration}"
   },
   "captions": {
@@ -107,7 +107,7 @@ export default {
   "pickerDefaultTitle": "Pilih Dokumen untuk Diimport",
   "selectedLabel": "Dipilih:",
   "selectedFolderLabel": "Folder dipilih:",
-  "confirmImport": "Import",
+  "confirmImport": "Sahkan Import",
   "onlyTypesSupported": "Hanya fail {types} yang disokong",
   "stagingTitle": "Kawasan Penstagingan Fail",
   "clear": "Kosongkan",

@@ -3,81 +3,81 @@
 
 export default {
   "view": {
-    "bySection": "By Section",
-    "byParty": "By Party"
+    "bySection": "По разделам",
+    "byParty": "По сторонам"
   },
   "filter": {
-    "allSections": "All sections",
-    "allParties": "All parties"
+    "allSections": "Все разделы",
+    "allParties": "Все стороны"
   },
   "stat": {
-    "total": "{count} total"
+    "total": "Всего: {count}"
   },
   "status": {
-    "all": "All",
-    "active": "Активна",
-    "unverified": "Unverified",
-    "stale": "Changed",
-    "orphan": "Orphaned"
+    "all": "Все",
+    "active": "Активно",
+    "unverified": "Не проверено",
+    "stale": "Изменено",
+    "orphan": "Без привязки"
   },
   "group": {
-    "none": "Unassigned",
-    "untitled": "(No section)"
+    "none": "Без категории",
+    "untitled": "(Без раздела)"
   },
   "action": {
-    "keep": "Keep Link",
-    "rebind": "Reassign",
-    "confirmRebind": "Confirm",
+    "keep": "Сохранить связь",
+    "rebind": "Переназначить",
+    "confirmRebind": "Подтвердить",
     "cancelRebind": "Отмена",
     "delete": "Удалить",
-    "removeTarget": "Удалить",
-    "open": "View Source",
-    "ignore": "Ignore",
-    "expand": "Expand",
-    "collapse": "Collapse"
+    "removeTarget": "Убрать",
+    "open": "Открыть источник",
+    "ignore": "Игнорировать",
+    "expand": "Развернуть",
+    "collapse": "Свернуть"
   },
   "method": {
-    "written_review": "Document Review",
-    "written_statement": "Written Statement",
-    "web_check": "Online Check",
-    "third_party": "Third-Party Material",
-    "interview": "Interview",
-    "none": "No method"
+    "written_review": "Проверка документов",
+    "written_statement": "Письменное пояснение",
+    "web_check": "Проверка онлайн",
+    "third_party": "Материалы третьих лиц",
+    "interview": "Интервью",
+    "none": "Без метода"
   },
   "relation": {
-    "supports": "Supports",
-    "contradicts": "Contradicts",
-    "partial": "Partial"
+    "supports": "Подтверждает",
+    "contradicts": "Противоречит",
+    "partial": "Частично подтверждает"
   },
   "loc": {
-    "wholeFile": "Whole file",
-    "page": "Page {page}",
-    "quote": "\"{quote}\"",
-    "region": "Image region",
+    "wholeFile": "Весь файл",
+    "page": "Стр. {page}",
+    "quote": "«{quote}»",
+    "region": "Область изображения",
     "time": "{time}",
     "web": "{host}",
     "cell": "{sheet}!{cell}"
   },
-  "empty": "No source files linked to this document yet",
-  "emptyHint": "Drag a file from the explorer onto selected text to link it",
-  "emptyFiltered": "No links match the current filter",
-  "fileMissing": "(file no longer exists)",
-  "fileDeleted": "(in recycle bin)",
-  "targetsCount": "{count} sources",
-  "rebindHint": "Select the new text in the document, then tap Confirm",
-  "rebindNoSelection": "Select text in the document first",
-  "rebindFailed": "Reassign failed",
-  "rebindRetryHint": "The new bookmark is already in the document; tap Confirm again to retry.",
-  "keepGone": "This text is no longer in the document, so the link cannot be kept. Use Reassign in the Sources tab.",
-  "orphanGoto": "The anchor for this text is no longer in the document. Tap Reassign to pick new text.",
-  "confidence": "Confidence {value}",
+  "empty": "К этому документу ещё не привязаны исходные файлы",
+  "emptyHint": "Перетащите файл из проводника на выделенный текст, чтобы связать его",
+  "emptyFiltered": "Нет связей, соответствующих текущему фильтру",
+  "fileMissing": "(файл больше не существует)",
+  "fileDeleted": "(в корзине)",
+  "targetsCount": "Источников: {count}",
+  "rebindHint": "Выделите новый текст в документе и нажмите «Подтвердить»",
+  "rebindNoSelection": "Сначала выделите текст в документе",
+  "rebindFailed": "Не удалось переназначить",
+  "rebindRetryHint": "Новая закладка уже создана в документе; нажмите «Подтвердить» ещё раз для повтора.",
+  "keepGone": "Этого текста больше нет в документе, поэтому связь нельзя сохранить. Используйте «Переназначить» на вкладке «Источники».",
+  "orphanGoto": "Якорь для этого текста больше не найден в документе. Нажмите «Переназначить», чтобы выбрать новый текст.",
+  "confidence": "Достоверность {value}",
   "loading": "Загрузка…",
-  "loadFailed": "Failed to load links",
-  "fileTagsLoadFailed": "Failed to load party tags; the \"By Party\" view may be inaccurate",
-  "opFailed": "Operation failed",
-  "deleteConfirm": "Delete this link? The source file will not be deleted.",
-  "deleteTargetConfirm": "Remove this source?",
-  "staleOne": "This text has {count} linked sources and has been changed",
-  "staleMany": "{count} linked passages have been changed",
-  "stalePrefix": "Changed: "
+  "loadFailed": "Не удалось загрузить связи",
+  "fileTagsLoadFailed": "Не удалось загрузить теги сторон; вид «По сторонам» может быть неточным",
+  "opFailed": "Операция не выполнена",
+  "deleteConfirm": "Удалить эту связь? Исходный файл удалён не будет.",
+  "deleteTargetConfirm": "Убрать этот источник?",
+  "staleOne": "У этого фрагмента {count} связанных источников, и текст был изменён",
+  "staleMany": "Изменено связанных фрагментов: {count}",
+  "stalePrefix": "Изменено: "
 }

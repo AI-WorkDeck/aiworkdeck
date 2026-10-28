@@ -2,21 +2,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "intro": "Sign in with your phone number or email and password. First time? Verify and create a password.",
-  "password": "Password",
-  "confirm": "Confirm password",
+  "intro": "Войдите по номеру телефона или эл. почте и паролю. Впервые здесь? Подтвердите данные и создайте пароль.",
+  "password": "Пароль",
+  "confirm": "Подтвердите пароль",
   "register": "Первый вход / Создать пароль",
   "reset": "Забыли пароль",
-  "back": "Back to password sign-in",
+  "back": "Назад ко входу по паролю",
   "setup": "Создать пароль",
   "resetTitle": "Сброс пароля",
   "verify": "Подтвердить и продолжить",
   "signIn": "Войти",
   "passwordHint": "8–72 символа. Используйте уникальный пароль.",
-  "invalid": "Use a password with 8–72 characters",
-  "mismatch": "Passwords do not match",
-  "required": "Enter your password",
-  "resetDone": "Password reset. Sign in with your new password.",
+  "invalid": "Используйте пароль длиной от 8 до 72 символов",
+  "mismatch": "Пароли не совпадают",
+  "required": "Введите пароль",
+  "resetDone": "Пароль сброшен. Войдите с новым паролем.",
   "setupHint": "Подтверждено. Создайте пароль, чтобы продолжить.",
   "resetHint": "Этот код предназначен только для сброса пароля."
 }

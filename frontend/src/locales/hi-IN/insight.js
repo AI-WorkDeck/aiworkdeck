@@ -2,89 +2,89 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "title": "संदर्भ",
-  "noDoc": "No document open",
-  "parse": "Full-document online verification (charges may apply)",
-  "reparse": "Repeat full-document online verification (charges may apply)",
-  "onlineHint": "Clicking saves this document, then verifies the saved version online. AI and external lookups may incur charges.",
-  "saveRequired": "This document could not be saved. Save it successfully before online verification.",
-  "running": "Verifying online…",
-  "done": "Online verification complete",
-  "failed": "Online verification failed",
+  "title": "संदर्भ और आधार",
+  "noDoc": "कोई दस्तावेज़ खुला नहीं है",
+  "parse": "पूर्ण-दस्तावेज़ ऑनलाइन सत्यापन (शुल्क लागू हो सकता है)",
+  "reparse": "पूर्ण-दस्तावेज़ ऑनलाइन सत्यापन दोहराएँ (शुल्क लागू हो सकता है)",
+  "onlineHint": "क्लिक करने पर पहले यह दस्तावेज़ सहेजा जाता है, फिर सहेजे गए संस्करण का ऑनलाइन सत्यापन किया जाता है। AI और बाहरी खोज पर शुल्क लग सकता है।",
+  "saveRequired": "यह दस्तावेज़ सहेजा नहीं जा सका। ऑनलाइन सत्यापन से पहले इसे सफलतापूर्वक सहेजें।",
+  "running": "ऑनलाइन सत्यापन हो रहा है…",
+  "done": "ऑनलाइन सत्यापन पूर्ण",
+  "failed": "ऑनलाइन सत्यापन विफल",
   "loading": "लोड हो रहा है…",
-  "loadingDetail": "Fetching lookup details…",
-  "noDetail": "No lookup details for this item",
-  "loadFailed": "Could not load online verification results",
-  "parseFailed": "Could not start online verification",
-  "detailFailed": "Could not load the lookup details",
-  "refreshFailed": "Could not re-run the lookup",
-  "retry": "Retry",
-  "goConnectAccount": "खाता कनेक्ट करें",
-  "goRecharge": "Credits जोड़ें",
+  "loadingDetail": "खोज विवरण प्राप्त किया जा रहा है…",
+  "noDetail": "इस आइटम के लिए कोई खोज विवरण नहीं है",
+  "loadFailed": "ऑनलाइन सत्यापन परिणाम लोड नहीं किए जा सके",
+  "parseFailed": "ऑनलाइन सत्यापन शुरू नहीं किया जा सका",
+  "detailFailed": "खोज विवरण लोड नहीं किया जा सका",
+  "refreshFailed": "खोज पुनः नहीं चलाई जा सकी",
+  "retry": "पुनः प्रयास करें",
+  "goConnectAccount": "खाता जोड़ें",
+  "goRecharge": "क्रेडिट जोड़ें",
   "hint": {
-    "NO_CREDENTIAL": "इस लुकअप चैनल के लिए आपके एडमिनिस्ट्रेटर द्वारा सर्वर पर कॉन्फ़िगर किया गया क्रेडेंशियल आवश्यक है।"
+    "NO_CREDENTIAL": "इस खोज चैनल के लिए आपके व्यवस्थापक द्वारा सर्वर पर क्रेडेंशियल कॉन्फ़िगर किया जाना आवश्यक है।"
   },
   "tab": {
-    "retrieval": "लुकअप",
-    "checks": "संगति"
+    "retrieval": "बाहरी खोज",
+    "checks": "सुसंगतता जाँच"
   },
   "kind": {
     "COMPANY": "कंपनियाँ",
-    "LAW": "अधिनियम",
+    "LAW": "कानून / अधिनियम",
     "CASE": "मामले",
     "DOC": "दस्तावेज़"
   },
   "entityKind": {
     "COMPANY": "कंपनी",
-    "LAW": "अधिनियम",
+    "LAW": "कानून",
     "CASE": "मामला",
     "DOC": "दस्तावेज़"
   },
   "openInNewTab": "नए टैब में खोलें",
   "openDocFile": "फ़ाइल खोलें",
-  "docNotFound": "इस प्रोजेक्ट में ऐसी कोई फ़ाइल नहीं है",
+  "docNotFound": "इस प्रोजेक्ट में ऐसी कोई फ़ाइल नहीं मिली",
   "docMissing": "वह फ़ाइल अब इस प्रोजेक्ट में नहीं है",
   "source": {
     "projectFile": "प्रोजेक्ट फ़ाइल",
-    "qichacha": "Qichacha"
+    "qichacha": "Qichacha (चीचाचा)"
   },
   "mentions": "{count} उल्लेख",
   "mentionsTitle": "इस दस्तावेज़ में उल्लेख",
   "shareholders": "शेयरधारक",
-  "moreCandidates": "अन्य उम्मीदवार",
+  "moreCandidates": "अन्य विकल्प",
   "caseSection": {
-    "ascertain": "पाए गए तथ्य",
-    "reason": "तर्क",
+    "ascertain": "स्थापित तथ्य",
+    "reason": "तर्क और आधार",
     "result": "निर्णय",
-    "gist": "मुख्य निर्णय बिंदु",
+    "gist": "मुख्य सिद्धांत",
     "fullText": "पूर्ण निर्णय"
   },
-  "authoritative": "आधिकारिक पाठ (Pkulaw)",
-  "implementDate": "{date} से प्रभावी",
-  "recognition": "मामला संख्या पहचान",
+  "authoritative": "प्रामाणिक पाठ (Pkulaw)",
+  "implementDate": "प्रभावी तिथि {date}",
+  "recognition": "केस संख्या पहचान",
   "openInPkulaw": "Pkulaw में खोलें",
   "citation": {
-    "citedText": "उद्धृत अनुच्छेद",
-    "candidates": "सामग्री से मेल खाते अनुच्छेद",
-    "article": "अनुच्छेद {n}"
+    "citedText": "उद्धृत धारा",
+    "candidates": "सामग्री से मेल खाती धाराएँ",
+    "article": "धारा {n}"
   },
   "severity": {
     "warn": "संदिग्ध",
     "error": "त्रुटि"
   },
   "unifyTo": "सभी को {value} पर सेट करें",
-  "cannotFix": "स्वतः ठीक नहीं किया जा सका: {reason}",
-  "fixNotUnique": "कोई अद्वितीय मिलान नहीं मिला — कृपया मैन्युअल रूप से संपादित करें।",
-  "fixPartial": "{done} ठीक किए गए; {failed} का कोई अद्वितीय मिलान नहीं मिला — कृपया उन्हें मैन्युअल रूप से संपादित करें।",
+  "cannotFix": "स्वचालित रूप से ठीक नहीं किया जा सकता: {reason}",
+  "fixNotUnique": "अद्वितीय मिलान नहीं मिला — कृपया मैन्युअल रूप से संपादित करें।",
+  "fixPartial": "{done} ठीक किए गए; {failed} का अद्वितीय मिलान नहीं मिला — कृपया उन्हें मैन्युअल रूप से संपादित करें।",
   "fixed": "ठीक किया गया",
   "fixedHint": "पूर्ववत करने के लिए Cmd+Z दबाएँ; निष्कर्ष ताज़ा करने के लिए पुनः विश्लेषण करें।",
-  "noEditor": "पहले किसी दस्तावेज़ एडिटर विंडो को सक्रिय करें",
+  "noEditor": "पहले कोई दस्तावेज़ संपादक विंडो सक्रिय करें",
   "empty": {
-    "noRun": "यह दस्तावेज़ ऑनलाइन सत्यापित नहीं किया गया है",
-    "noRunHint": "सामान्य लेखन संकेत स्थानीय रूप से चलते हैं। केवल ऑनलाइन सत्यापन पर क्लिक करने से सहेजा गया दस्तावेज़ AI निष्कर्षण, बाहरी लुकअप और संगति जाँच के लिए भेजा जाता है।",
-    "noEntity": "कोई लुकअप योग्य एंटिटी नहीं मिली",
-    "noEntityHint": "दस्तावेज़ में कोई कंपनी नाम, अधिनियम अनुच्छेद या मामला संख्या का उल्लेख नहीं है।",
+    "noRun": "इस दस्तावेज़ का अभी ऑनलाइन सत्यापन नहीं हुआ है",
+    "noRunHint": "दैनिक लेखन संकेत स्थानीय रूप से चलते हैं। केवल ऑनलाइन सत्यापन पर क्लिक करने से सहेजा गया दस्तावेज़ AI निष्कर्षण, बाहरी खोज और सुसंगतता जाँच के लिए भेजा जाता है।",
+    "noEntity": "खोजने योग्य कोई इकाई नहीं मिली",
+    "noEntityHint": "दस्तावेज़ में किसी कंपनी का नाम, कानून की धारा या केस संख्या का उल्लेख नहीं है।",
     "noFinding": "कोई असंगति नहीं मिली",
-    "noFindingHint": "मात्रा संबंधी कथन और एकीकृत सामाजिक क्रेडिट कोड सभी सही हैं।"
+    "noFindingHint": "मात्रा कथन और एकीकृत सामाजिक क्रेडिट कोड सभी सही पाए गए।"
   }
 }
