@@ -1790,8 +1790,11 @@ export default {
           : list[0].id
 
         const saved = readPersistedModelId()
-        if (saved === 'auto' || (saved && list.some(m => m.id === saved))) {
-          applyModelSelection(saved)
+        const savedModel = saved && list.find(m => m.id === saved || (Array.isArray(m.aliases) && m.aliases.includes(saved)))
+        if (saved === 'auto' || savedModel) {
+          const restoredId = saved === 'auto' ? saved : savedModel.id
+          applyModelSelection(restoredId)
+          if (restoredId !== saved) persistModelId(restoredId)
           return
         }
 
