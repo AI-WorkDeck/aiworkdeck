@@ -170,6 +170,10 @@ export const agentClientActionMethods = {
         }
 
         if (action.action === 'refresh_files') {
+            // 对话侧栏使用独立清单，不会随 FileTree.loadFiles 更新。
+            if (this.isChatMode) {
+                this.loadChatWorkspaceFiles().catch(error => console.warn('[ProjectOverview] Chat files refresh failed', error))
+            }
             if (this.$refs.fileTree && this.$refs.fileTree.loadFiles) {
                 console.log('[ProjectOverview] Refreshing File Tree...')
                 // refresh_files 不带"谁被改成了什么"（AI 改名/移动/新建都走这一条通用
