@@ -17,6 +17,7 @@
               :stoppable="!!(isLatest && bubble.isStreaming)"
               variant="ghost"
               @stop="$emit('stop-generation')"
+              @reading-interaction="emit('reading-interaction')"
             />
             <div v-else-if="entry.type === 'title'" class="stream-title">{{ bubble.title }}</div>
             <section v-else-if="entry.type === 'execution' || entry.type === 'plan'" class="activity-entry">
@@ -27,7 +28,7 @@
               </button>
               <div v-if="isExpanded(entry, index)" class="activity-details">
                 <TodoProgressCard v-if="entry.type === 'plan'" :todos="entry.data" :live="bubble.isStreaming" />
-                <ProcessCard v-else v-for="(proc, pi) in entry.procs" :key="pi" :process="proc" />
+                <ProcessCard v-else v-for="(proc, pi) in entry.procs" :key="pi" :process="proc" @reading-interaction="emit('reading-interaction')" />
               </div>
             </section>
             <template v-else-if="entry.type === 'artifact'">
@@ -195,7 +196,7 @@ const props = defineProps({
   reviewStates: { type: Object, default: () => ({}) }
 })
 
-const emit = defineEmits(['open-artifact-tab', 'approve', 'message-action', 'answer-question', 'regenerate', 'open-review', 'stop-generation', 'open-file'])
+const emit = defineEmits(['open-artifact-tab', 'approve', 'message-action', 'answer-question', 'regenerate', 'open-review', 'stop-generation', 'open-file', 'reading-interaction'])
 
 // 计划文件的相对路径：历史回放没有 saved 事件，计划卡靠它反查 fileId。流式中不算（正文还在长）。
 const savedPath = computed(() => (props.bubble.isStreaming ? '' : resolveSavedPath(props.bubble.content) || ''))
@@ -267,6 +268,7 @@ const isExpanded = (entry, index) => {
   return override && override.active === active ? override.expanded : active
 }
 const toggleEntry = (entry, index) => {
+  emit('reading-interaction')
   entryToggles.value = { ...entryToggles.value, [entry.key]: { active: isActive(entry, index), expanded: !isExpanded(entry, index) } }
 }
 const hasError = entry => entry.type === 'execution' && entry.procs.some(proc => (proc.items || []).some(item => item.status === 'error'))

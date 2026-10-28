@@ -418,6 +418,7 @@
                @message-action="$emit('message-action', $event)"
                @regenerate="openRegenerateDialog(index)"
                @stop-generation="handleAbort"
+               @reading-interaction="followLatest = false"
              />
              <!-- <span v-if="msg.timestamp" class="bubble-timestamp assistant">{{ msg.timestamp }}</span> -->
           </div>
@@ -5009,6 +5010,7 @@ export default {
   flex: 1;
   min-height: 0;
   overflow-anchor: none;
+  scrollbar-gutter: stable both-edges;
   overflow-y: auto;
   overflow-x: hidden; /* Prevent horizontal overflow */
   padding: 12px;
