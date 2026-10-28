@@ -1094,7 +1094,7 @@ public class PptxTools implements AgentToolComponent {
 
         // 文本模型：会话选定的模型优先；空或非白名单一律回落统一默认模型（同 ChatModelFactory）
         String textModel = (StringUtils.hasText(modelId) && AllowedModels.isAllowed(modelId))
-                ? modelId
+                ? AllowedModels.canonicalModelId(modelId)
                 : chatModelFactory.resolveDefaultModel();
 
         String apiKey;

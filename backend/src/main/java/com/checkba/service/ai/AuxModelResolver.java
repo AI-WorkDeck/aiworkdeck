@@ -55,7 +55,7 @@ public class AuxModelResolver {
     /** 当前生效的辅助模型 ID（保证非空）。 */
     public String auxModelId() {
         String resolved = firstNonBlank(setting(SETTING_AUX_MODEL), ymlAuxModel);
-        return resolved != null ? resolved : AllowedModels.QWEN_3_7_FLASH.getModelId();
+        return resolved != null ? AllowedModels.canonicalModelId(resolved) : AllowedModels.QWEN_3_7_FLASH.getModelId();
     }
 
     /**
@@ -65,7 +65,7 @@ public class AuxModelResolver {
      */
     public String subAgentModelId(String ymlSubAgentModel) {
         String configured = firstNonBlank(setting(SETTING_SUBAGENT_MODEL), ymlSubAgentModel);
-        return configured != null ? configured : auxModelId();
+        return configured != null ? AllowedModels.canonicalModelId(configured) : auxModelId();
     }
 
     private String setting(String key) {

@@ -113,7 +113,7 @@ class ChatModelFactoryTest {
         assertEquals("medium", factory.getAutomaticWritingModel(timeout).reasoningEffort());
         assertEquals(expected, factory.getAutomaticWritingReviewModel(timeout, 0).providerRouting());
         assertNull(factory.getAutomaticWritingReviewModel(timeout, 1).providerRouting());
-        reasoning.setModels(java.util.List.of("moonshotai/kimi-k3", "qwen/qwen3.8-max"));
+        reasoning.setModels(java.util.List.of("moonshotai/kimi-k3", AllowedModels.QWEN_3_8_MAX.getModelId()));
         assertEquals(expected, factory.getAutomaticWritingReviewModel(timeout, 1).providerRouting());
         assertEquals("low", factory.getAutomaticWritingReviewModel(timeout, 1).reasoningEffort());
         assertNull(factory.getWritingModel(timeout).providerRouting(), "Manual writing retains its existing route policy");
@@ -900,6 +900,40 @@ class ChatModelFactoryTest {
                     "BYOK 未配置的文案不得含「" + forbidden + "」，否则会被当成掉线：" + message);
         }
         assertTrue(message.contains("API Key"), "文案要点名缺的是什么：" + message);
+    }
+
+    @Test
+    void retiredQwenIdKeepsPersistedAndIncomingSelectionsOnTheDatedRelease() {
+        String oldId = "qwen/qwen3.8-max";
+        String currentId = AllowedModels.QWEN_3_8_MAX.getModelId();
+        when(systemSettingService.get(eq("ai.defaultModel"), any())).thenReturn(oldId);
+        when(systemSettingService.get(eq("ai.auxModel"), any())).thenReturn(oldId);
+        when(systemSettingService.get(eq("ai.subagentModel"), any())).thenReturn(oldId);
+        AuxModelResolver resolver = new AuxModelResolver(systemSettingService, "unused");
+        assertEquals(currentId, factory.resolveDefaultModel());
+        assertEquals(currentId, resolver.auxModelId());
+        assertEquals(currentId, resolver.subAgentModelId(null));
+        assertSame(AllowedModels.QWEN_3_8_MAX, AllowedModels.fromId(oldId));
+        for (String provider : java.util.List.of("OPENROUTER", "AWD_CLOUD")) {
+            setDbProvider(provider);
+            assertEquals(currentId, factory.resolveEffectiveModelId(oldId));
+            assertEquals(currentId, factory.resolveEffectiveModelId("default"));
+            assertTrue(factory.effectiveModelSupportsVision(oldId));
+        }
+        setDbProvider("OLLAMA");
+        assertEquals(AiModelProperties.Provider.OLLAMA, factory.resolveTarget(oldId, false).channel());
+        assertFalse(factory.effectiveModelSupportsVision(oldId));
+        assertEquals("qwen/unrecognised-model", AllowedModels.canonicalModelId("qwen/unrecognised-model"));
+        assertNull(AllowedModels.fromId("qwen/unrecognised-model"));
+    }
+
+    @Test
+    void retiredQwenIdInYamlIsCanonicalizedForAuxiliaryAndSubagentCalls() {
+        String currentId = AllowedModels.QWEN_3_8_MAX.getModelId();
+        AuxModelResolver resolver = new AuxModelResolver(systemSettingService, "qwen/qwen3.8-max");
+        assertEquals(currentId, resolver.auxModelId());
+        assertEquals(currentId, resolver.subAgentModelId("qwen/qwen3.8-max"));
+        assertEquals(currentId, resolver.subAgentModelId(null));
     }
 
 }
