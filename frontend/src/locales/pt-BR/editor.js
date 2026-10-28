@@ -2,6 +2,35 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  officeToolNames: {
+    "office_file_create": "Criar arquivo",
+    "office_file_save": "Salvar arquivo atual",
+    "office_file_export_pdf": "Exportar PDF para o projeto",
+    "office_file_open": "Abrir cópia do arquivo do projeto",
+    "office_ppt_goto": "Ir para slide ou forma",
+    "office_ppt_set_layout": "Definir layout ou plano de fundo do slide",
+    "office_get_paragraphs": "Ler parágrafos",
+    "office_get_outline": "Ler estrutura",
+    "office_get_clauses": "Identificar cláusulas",
+    "office_replace_nth_match": "Substituir correspondência indicada",
+    "office_apply_style_profile": "Aplicar perfil de estilos",
+    "office_ppt_table_set_style": "Formatar tabela do slide",
+    "office_ppt_read_notes": "Ler notas do apresentador",
+    "office_ppt_write_notes": "Escrever notas do apresentador",
+    "office_audit_structure": "Verificar estrutura do documento"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "O intervalo de classificação contém células mescladas. Desfaça a mesclagem antes de classificar.",
+    "SHEET_SORT_FAILED": "Falha ao ordenar. Leia e confira a planilha antes de tentar novamente.",
+    "SHEET_PROTECTED_CELL": "Há células protegidas; nada foi escrito.",
+    "SHEET_INVALID_RANGE": "Intervalo inválido. Leia a planilha novamente e selecione um intervalo válido.",
+    "SHEET_INVALID_START_CELL": "Selecione uma célula inicial válida.",
+    "SHEET_INVALID_ROWS": "Forneça uma matriz bidimensional de células válida.",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "O intervalo de escrita excede os limites da planilha.",
+    "SHEET_RANGE_CHECK_FAILED": "Não foi possível verificar o intervalo; nada foi escrito.",
+    "SHEET_WRITE_PARTIAL": "A escrita foi interrompida; algumas células podem ter mudado. Leia e corrija os dados sem repetir o lote inteiro.",
+    "SHEET_CHART_PARTIAL": "O gráfico foi criado, mas a configuração está incompleta. Verifique e corrija o gráfico existente sem criar outro."
+},
   "navigation": {
     "slides": "Diapositivos",
     "sheets": "Planilhas",

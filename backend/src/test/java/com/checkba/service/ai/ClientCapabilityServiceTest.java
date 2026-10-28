@@ -185,4 +185,33 @@ class ClientCapabilityServiceTest {
             assertTrue(capabilities.isToolVisible("probe_null", conv));
         }
     }
+    @Test
+    void nativeFileToolsFollowHostAndFamilyCapabilities() {
+        capabilities.record("office-ppt", "office", "powerpoint", "office");
+        for (String tool : new String[]{"office_file_create", "office_file_export_pdf"}) {
+            for (String conv : new String[]{"conv-office", "conv-office-excel", "conv-office-ppt", "office-ppt"})
+                assertTrue(capabilities.isToolVisible(tool, conv));
+            assertFalse(capabilities.isToolVisible(tool, "conv-lowa"));
+            assertFalse(capabilities.isToolVisible(tool, "conv-none"));
+        }
+        assertFalse(capabilities.isToolVisible("office_file_save", "office-ppt"));
+        assertTrue(capabilities.isToolVisible("office_file_save", "conv-office-ppt"));
+        assertTrue(capabilities.isToolVisible("office_file_open", "conv-office-excel"));
+        assertTrue(capabilities.isToolVisible("office_file_open", "conv-office-ppt"));
+        assertFalse(capabilities.isToolVisible("office_file_open", "conv-lowa"));
+    }
+
+    @Test
+    void speakerNotesAreOnlyOfferedToWpsPresentation() {
+        capabilities.record("microsoft-ppt", "office", "powerpoint", "office");
+        for (String tool : new String[]{"office_ppt_read_notes", "office_ppt_write_notes"}) {
+            assertTrue(capabilities.isToolVisible(tool, "conv-office-ppt"));
+            for (String conv : new String[]{"microsoft-ppt", "conv-office", "conv-office-excel", "conv-lowa", "conv-none"})
+                assertFalse(capabilities.isToolVisible(tool, conv));
+        }
+        assertTrue(capabilities.isToolVisible("office_ppt_table_set_style", "microsoft-ppt"));
+        assertTrue(capabilities.isToolVisible("office_ppt_table_set_style", "conv-office-ppt"));
+        assertFalse(capabilities.isToolVisible("office_ppt_table_set_style", "conv-office-excel"));
+    }
+
 }

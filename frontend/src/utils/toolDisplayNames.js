@@ -7,7 +7,27 @@
 // 后端新增工具时同步补一行；未收录的代号按 snake_case → 空格分词兜底展示。
 // wps_* 是 doc_* 的灰度别名（PR#87），查表前先归一化。
 
+import { t } from '@/i18n'
+
 import { isEnglish } from '@/utils/appLanguage.js'
+
+const LOCALIZED_NAMES = {
+  "office_file_create": "editor.officeToolNames.office_file_create",
+  "office_file_save": "editor.officeToolNames.office_file_save",
+  "office_file_export_pdf": "editor.officeToolNames.office_file_export_pdf",
+  "office_file_open": "editor.officeToolNames.office_file_open",
+  "office_ppt_goto": "editor.officeToolNames.office_ppt_goto",
+  "office_ppt_set_layout": "editor.officeToolNames.office_ppt_set_layout",
+  "office_get_paragraphs": "editor.officeToolNames.office_get_paragraphs",
+  "office_get_outline": "editor.officeToolNames.office_get_outline",
+  "office_get_clauses": "editor.officeToolNames.office_get_clauses",
+  "office_replace_nth_match": "editor.officeToolNames.office_replace_nth_match",
+  "office_apply_style_profile": "editor.officeToolNames.office_apply_style_profile",
+  "office_ppt_table_set_style": "editor.officeToolNames.office_ppt_table_set_style",
+  "office_ppt_read_notes": "editor.officeToolNames.office_ppt_read_notes",
+  "office_ppt_write_notes": "editor.officeToolNames.office_ppt_write_notes",
+  "office_audit_structure": "editor.officeToolNames.office_audit_structure"
+}
 
 const NAMES = {
   // 计划 / 项目
@@ -263,6 +283,9 @@ const NAMES = {
   office_excel_set_autofilter: { zh: '设置自动筛选', en: 'Set autofilter' },
   office_excel_conditional_format: { zh: '设置条件格式', en: 'Conditional format' },
   // Office 插件（PowerPoint 任务窗格）office_ppt_* 工具桥（批次7；含此前遗漏的基础两项）
+  office_ppt_set_shape_text: { zh: '设置形状文字', en: 'Set shape text' },
+  office_ppt_set_shape_geometry: { zh: '设置形状位置尺寸', en: 'Set shape geometry' },
+  office_ppt_format_shape: { zh: '设置形状样式', en: 'Format shape' },
   office_ppt_get_slides: { zh: '读取幻灯片', en: 'Read slides' },
   office_ppt_replace_text: { zh: '替换幻灯片文本', en: 'Replace slide text' },
   office_ppt_format_text: { zh: '设置幻灯片文字格式', en: 'Format slide text' },
@@ -368,6 +391,7 @@ export function toolDisplayName(code) {
   const m = String(code).match(/^\s*([\w.]+)\s*\(/)
   let name = m ? m[1] : String(code).trim()
   if (name.startsWith('wps_')) name = 'doc_' + name.slice(4) // 灰度别名归一
+  if (LOCALIZED_NAMES[name]) return t(LOCALIZED_NAMES[name])
   const entry = NAMES[name]
   if (entry) return isEnglish() ? entry.en : entry.zh
   // 兜底：未收录的代号按 snake_case 分词，至少可读

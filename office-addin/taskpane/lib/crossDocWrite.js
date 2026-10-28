@@ -45,7 +45,7 @@ export const WORD_UNTRACKABLE_COMMANDS = new Set([
   'table_delete_row', 'table_delete_col', 'accept_revision', 'reject_revision', 'set_document_properties',
   'add_comment', 'reply_comment', 'resolve_comment',
   // dev-board#806：删批注同理（批注不是修订）；页面设置 Word 根本不记修订
-  'delete_comment', 'set_page_setup'
+  'delete_comment', 'set_page_setup', 'apply_style_profile'
 ])
 
 /** 不在只读名单里、但不改文档内容的命令：不留条目、不弹横幅 */
@@ -206,8 +206,15 @@ export async function runCrossDocWrite({
   const cmd = String(command || '')
   const a = args || {}
 
+  // File lifecycle commands belong to the source pane's own document and project.
+  if (cmd.startsWith('file_')) return { result: { ok: false, error: t('fileOperationUnavailable') }, entry: null }
+
   if (isReadOnlyCommand(cmd) || NO_TRACE_COMMANDS.has(cmd)) {
     return { result: await safeExec(exec, cmd, a), entry: null }
+  }
+
+  if (['ppt_write_notes', 'ppt_table_set_style'].includes(cmd)) {
+    return { result: { ok: false, error: untrackableError(cmd) }, entry: null }
   }
 
   if (host === 'word') {

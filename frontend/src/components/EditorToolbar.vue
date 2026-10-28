@@ -943,7 +943,7 @@
            @focus="calcAddressFocused = true" @blur="calcAddressFocused = false"
            @confirm="submitCalcAddress" />
     <text class="etb-calc-fx">fx</text>
-    <text class="etb-calc-fx-btn ok" :title="$t('editor.toolbar.apply')" @tap.stop="submitCalcFormula">✓</text>
+    <text class="etb-calc-fx-btn ok" :title="$t('common.confirm')" @tap.stop="submitCalcFormula">✓</text>
     <text class="etb-calc-fx-btn" :title="$t('editor.toolbar.cancel')" @tap.stop="cancelCalcFormula">✕</text>
     <input ref="calcFormula" class="etb-calc-formula-input" v-model="calcFormulaInput" :placeholder="$t('editor.toolbar.calcFormulaPh')"
            @focus="calcFormulaFocused = true" @blur="calcFormulaFocused = false"
@@ -2102,7 +2102,12 @@ export default {
       this.calcErr = ''
       const res = await this.call(action, params || {})
       if (!res || res.success !== true) {
-        const msg = (res && (res.message || res.error)) || this.$t('editor.toolbar.opFailed')
+        const code = res && (res.errorCode || res.error || res.message)
+        const sheetErrors = ['SHEET_PROTECTED_CELL', 'SHEET_INVALID_RANGE', 'SHEET_INVALID_START_CELL',
+          'SHEET_INVALID_ROWS', 'SHEET_RANGE_OUT_OF_BOUNDS', 'SHEET_RANGE_CHECK_FAILED',
+          'SHEET_WRITE_PARTIAL', 'SHEET_CHART_PARTIAL', 'SHEET_SORT_FAILED', 'SHEET_SORT_MERGED_RANGE']
+        const msg = sheetErrors.includes(code) ? this.$t('editor.sheetErrors.' + code)
+          : (res && (res.message || res.error)) || this.$t('editor.toolbar.opFailed')
         this.calcErr = msg
         if (!this.menu) {
           try { uni.showToast({ title: msg, icon: 'none' }) } catch (e) {}

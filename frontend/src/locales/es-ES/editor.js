@@ -2,6 +2,35 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  officeToolNames: {
+    "office_file_create": "Crear archivo",
+    "office_file_save": "Guardar archivo actual",
+    "office_file_export_pdf": "Exportar PDF al proyecto",
+    "office_file_open": "Abrir copia del archivo del proyecto",
+    "office_ppt_goto": "Ir a la diapositiva o forma",
+    "office_ppt_set_layout": "Establecer diseño o fondo de la diapositiva",
+    "office_get_paragraphs": "Leer párrafos",
+    "office_get_outline": "Leer esquema",
+    "office_get_clauses": "Identificar cláusulas",
+    "office_replace_nth_match": "Reemplazar coincidencia indicada",
+    "office_apply_style_profile": "Aplicar perfil de estilos",
+    "office_ppt_table_set_style": "Dar formato a la tabla de la diapositiva",
+    "office_ppt_read_notes": "Leer notas del orador",
+    "office_ppt_write_notes": "Escribir notas del orador",
+    "office_audit_structure": "Revisar estructura del documento"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "El rango de ordenación contiene celdas combinadas. Sepárelas antes de ordenar.",
+    "SHEET_SORT_FAILED": "Error al ordenar. Vuelva a leer y revisar la hoja antes de reintentarlo.",
+    "SHEET_PROTECTED_CELL": "Hay celdas protegidas; no se escribió nada.",
+    "SHEET_INVALID_RANGE": "Rango no válido. Vuelva a leer la hoja y seleccione un rango válido.",
+    "SHEET_INVALID_START_CELL": "Seleccione una celda inicial válida.",
+    "SHEET_INVALID_ROWS": "Proporcione una matriz de celdas bidimensional válida.",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "El rango de escritura supera los límites de la hoja.",
+    "SHEET_RANGE_CHECK_FAILED": "No se pudo verificar el rango; no se escribió nada.",
+    "SHEET_WRITE_PARTIAL": "La escritura se interrumpió; algunas celdas pueden haber cambiado. Lea y corrija los datos sin repetir todo el lote.",
+    "SHEET_CHART_PARTIAL": "El gráfico se creó, pero su configuración está incompleta. Revise y corrija el gráfico existente sin crear otro."
+},
   "navigation": {
     "slides": "Diapositivas",
     "sheets": "Hojas",

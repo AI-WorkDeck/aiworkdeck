@@ -2,6 +2,35 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  officeToolNames: {
+    "office_file_create": "新增檔案",
+    "office_file_save": "儲存目前檔案",
+    "office_file_export_pdf": "匯出 PDF 至專案",
+    "office_file_open": "開啟專案檔案副本",
+    "office_ppt_goto": "跳至投影片或圖案",
+    "office_ppt_set_layout": "設定投影片版面配置或背景",
+    "office_get_paragraphs": "讀取段落",
+    "office_get_outline": "讀取大綱",
+    "office_get_clauses": "識別條款",
+    "office_replace_nth_match": "取代指定符合項目",
+    "office_apply_style_profile": "套用樣式設定",
+    "office_ppt_table_set_style": "設定投影片表格格式",
+    "office_ppt_read_notes": "讀取演講者備註",
+    "office_ppt_write_notes": "寫入演講者備註",
+    "office_audit_structure": "稽核文件結構"
+},
+  sheetErrors: {
+    "SHEET_SORT_MERGED_RANGE": "排序範圍包含合併儲存格，請先取消合併後再排序。",
+    "SHEET_SORT_FAILED": "排序失敗，請重新讀取並核對工作表後再試。",
+    "SHEET_PROTECTED_CELL": "目標包含受保護儲存格，本次未寫入。",
+    "SHEET_INVALID_RANGE": "範圍位址無效，請重新讀取工作表後指定範圍。",
+    "SHEET_INVALID_START_CELL": "請指定有效的起始儲存格。",
+    "SHEET_INVALID_ROWS": "寫入內容須為有效的二維儲存格陣列。",
+    "SHEET_RANGE_OUT_OF_BOUNDS": "寫入範圍超過工作表邊界。",
+    "SHEET_RANGE_CHECK_FAILED": "無法核對寫入範圍，本次未寫入。",
+    "SHEET_WRITE_PARTIAL": "寫入中斷，部分儲存格可能已變更。請重新讀取核對後修復，勿整批重試。",
+    "SHEET_CHART_PARTIAL": "圖表已建立但設定未完成。請檢查現有圖表後修復，勿重複建立。"
+},
   "navigation": {
     "slides": "幻燈片",
     "sheets": "工作表",

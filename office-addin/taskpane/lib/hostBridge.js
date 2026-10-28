@@ -38,7 +38,7 @@ import {
   readWpsActiveDocument,
   readWpsDocumentMeta,
   hideWpsTaskPane,
-  wpsDocumentPath
+  wpsDocumentPath, wpsApp
 } from './wpsDoc.js'
 import {
   executeWpsCommand,
@@ -51,6 +51,7 @@ import {
 } from './wpsExecutor.js'
 import { docKeyOf } from './revisionLog.js'
 import { t } from './i18n.js'
+import { executeFileOperation, FILE_OPERATION_COMMANDS } from './fileOperations.js'
 
 export { hashContent } from './wordDoc.js'
 
@@ -103,8 +104,22 @@ export function readDocumentMeta() {
  * 执行一条 office_command。与两个家族的执行器同契约：永不 throw，
  * 一律返回 {ok:true, data} 或 {ok:false, error}。
  */
-export async function executeCommand(command, args) {
+export async function executeCommand(command, args, executionContext = {}) {
   const family = hostFamily()
+  if (FILE_OPERATION_COMMANDS.includes(command)) {
+    try {
+      const data = await executeFileOperation(command, args, {
+        family, host: detectHost(), settings: executionContext.settings,
+        projectId: executionContext.projectId, identity: documentIdentity(), readIdentity: documentIdentity,
+        Office: globalThis.Office, Word: globalThis.Word, Excel: globalThis.Excel,
+        PowerPoint: globalThis.PowerPoint, application: family === 'wps' ? wpsApp() : null
+      })
+      return { ok: true, data }
+    } catch (error) {
+      return { ok: false, error: error.message || String(error),
+        ...(error.partialResult ? { partialResult: error.partialResult } : {}) }
+    }
+  }
   if (family === 'office') return executeOfficeCommand(command, args)
   if (family === 'wps') return executeWpsCommand(command, args)
   return { ok: false, error: t('hostEnvUnavailable') }
@@ -205,7 +220,7 @@ const UNSAVED_DOC_SCOPE = 'u' + Date.now().toString(36) + Math.random().toString
  * 于是两份新建的 Word 算出同一个键 → 同一条 conversationId → 跨窗格下发按会话走，
  * 命令落到另一份文档上，沿途无人报错。所以再补一维「本窗格实例」：两份新文档绝不会撞在一起。
  *
- * **未保存时用的是固定串 'unsaved'，不是文档名**（dev-board#768）：那个通称自
+ * **Office 未保存时用的是固定串 'unsaved'，不是文档名**（dev-board#768）：那个通称自
  * 2026-09-21 起跟着界面语言走（「当前 Word 文档」/ "Current Word document"），
  * 拿它拼键等于用户切一次语言就换一条 conversationId、会话历史与修订记录凭空消失。
  * 这条退路本来就靠「宿主 + 本窗格实例」区分，名字一个字都不该参与。
@@ -218,9 +233,20 @@ export function documentIdentity() {
   const family = hostFamily()
   const path = family === 'office' ? officeDocumentPath()
     : family === 'wps' ? wpsDocumentPath() : ''
-  if (path) return { key: docKeyOf({ path, host }), saved: true }
-  // 名字只在「没有路径」这条退路上要，取到路径时不必再跨一次桥问宿主
-  const meta = readDocumentMeta()
+  // WPS 未保存时 FullName 可能只是 Book1，不能把它当作已保存路径。
+  if (path && (family !== 'wps' || /[\\/]/.test(path))) return { key: docKeyOf({ path, host }), saved: true }
+  if (family === 'wps') {
+    try {
+      const app = wpsApp()
+      const doc = host === 'word' ? app.ActiveDocument
+        : host === 'excel' ? app.ActiveWorkbook : app.ActivePresentation
+      // 原生 Name 在同一宿主内区分打开的未保存文档，不使用随界面语言变化的通称，
+      // 也不使用每次过桥可能重新创建的 JS wrapper 引用。切回原文档复用本次身份。
+      const name = doc && typeof doc.Name === 'string' ? doc.Name : ''
+      if (!name) return { key: '', saved: false }
+      return { key: `${host}:unsaved:${encodeURIComponent(name)}#${UNSAVED_DOC_SCOPE}`, saved: false }
+    } catch (_) { return { key: '', saved: false } }
+  }
   const base = docKeyOf({ path: '', host, docName: UNSAVED_DOC_NAME })
   return base ? { key: `${base}#${UNSAVED_DOC_SCOPE}`, saved: false } : { key: '', saved: false }
 }

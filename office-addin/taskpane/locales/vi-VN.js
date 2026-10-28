@@ -2,6 +2,53 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  wordStyleUnsupported: "Ứng dụng này không thể áp dụng đầy đủ các trường hồ sơ sau: {fields}. Chưa bắt đầu thay đổi.",
+
+  cmdGetParagraphs: "Đọc đoạn văn",
+  cmdGetOutline: "Đọc dàn ý",
+  cmdGetClauses: "Nhận diện điều khoản",
+  cmdReplaceNthMatch: "Thay thế kết quả khớp được chỉ định",
+  cmdApplyStyleProfile: "Áp dụng hồ sơ kiểu",
+
+  wordStructureTooLarge: "Cấu trúc tài liệu quá lớn để đọc đầy đủ trong một thao tác an toàn. Hãy giảm kích thước tài liệu rồi thử lại.",
+  wordStructurePartial: "Một số định dạng có thể đã được áp dụng. Hãy kiểm tra tài liệu hiện tại trước; không lặp lại thao tác khi chưa kiểm tra.",
+
+  cmdPptTableSetStyle: "Định dạng bảng trang chiếu",
+  cmdPptReadNotes: "Đọc ghi chú diễn giả",
+  cmdPptWriteNotes: "Viết ghi chú diễn giả",
+
+  excelConditionalActionInvalid: "Thao tác định dạng có điều kiện phải là apply hoặc clearAll.",
+  wordImagePartial: "Hình ảnh có thể đã được chèn nhưng thiết lập chưa hoàn tất. Hãy kiểm tra hình ảnh hiện có; không chèn thêm bản sao.",
+
+  excelRangeTooLarge: "Phạm vi vượt quá 50.000 ô. Hãy chọn phạm vi nhỏ hơn rồi thử lại; chưa có thay đổi nào.",
+
+  fileOperationUnavailable: "Không thể thực hiện hoặc xác nhận thao tác tệp này.",
+  fileOperationStale: "Tài liệu đã thay đổi. Hãy đọc tài liệu hiện tại trước khi thử lại.",
+  fileOperationInvalidArguments: "Tham số thao tác tệp không hợp lệ.",
+  fileOperationInvalidBytes: "Không nhận được dữ liệu tệp hợp lệ và đầy đủ.",
+  cmdFileCreate: "Tạo tệp mới",
+  cmdFileSave: "Lưu tệp hiện tại",
+  cmdFileExportPdf: "Xuất PDF vào dự án",
+  cmdFileOpen: "Mở tệp hoặc nhập bản sao",
+  excelChartPartial: "Biểu đồ “{name}” có thể đã được tạo, nhưng thiết lập thất bại và không thể xác nhận việc hoàn tác. Hãy kiểm tra biểu đồ hiện có trước khi thử lại; không tạo bản trùng.",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "Trang chiếu hoặc hình đích không hợp lệ.",
+  pptStaleTarget: "Văn bản đích đã thay đổi. Hãy đọc lại trước khi chỉnh sửa.",
+  pptInvalidArguments: "Tham số chỉnh sửa bản trình bày không hợp lệ.",
+  pptCapabilityUnavailable: "Tính năng này không có trong ứng dụng trình bày hiện tại.",
+  cmdPptSetShapeText: "Đặt văn bản của hình",
+  cmdPptSetShapeGeometry: "Đặt vị trí và kích thước hình",
+  cmdPptFormatShape: "Định dạng hình",
+  cmdPptGoto: "Đi đến trang chiếu hoặc hình",
+  cmdPptSetLayout: "Đặt bố cục hoặc nền trang chiếu",
+  excelValidationCustomRequired: "Xác thực tùy chỉnh cần có công thức.",
+  excelValidationTypeInvalid: "Loại xác thực dữ liệu không được hỗ trợ.",
+  excelPivotFieldsMissing: "Không tìm thấy trường bảng tổng hợp: {fields}",
+  excelValidationActionInvalid: "Thao tác xác thực dữ liệu phải là apply hoặc clear.",
+  excelValidationValueRequired: "Quy tắc xác thực này cần một giá trị so sánh.",
+  excelValidationBoundsRequired: "Xác thực khoảng cần cả hai giá trị giới hạn.",
+
   "dictate": "Voice input",
   "dictateRecording": "Recording, click to finish",
   "dictateTranscribing": "Transcribing...",

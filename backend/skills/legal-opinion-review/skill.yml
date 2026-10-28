@@ -17,9 +17,11 @@ allowed_tools:
   - doc_get_document_text
   - doc_get_paragraph
   - doc_get_outline
+  - office_get_outline
   - doc_get_comments
   - doc_list_revisions
   - doc_audit_structure
+  - office_audit_structure
   - doc_table_read
   - doc_find_text
   - doc_replace_at_anchor

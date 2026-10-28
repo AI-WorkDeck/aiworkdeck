@@ -69,6 +69,10 @@ public class OfficeBridgeService {
     static final Map<String, Integer> ACTION_TIMEOUT_SECONDS = Map.ofEntries(
             // 大文档读取 / 检索；read_for_reference 来自 OpenDocSource 的跨窗格读取。
             Map.entry("get_text", 120),
+            Map.entry("get_paragraphs", 120),
+            Map.entry("get_outline", 120),
+            Map.entry("get_clauses", 120),
+            Map.entry("apply_style_profile", 180),
             Map.entry("get_selection", 120),
             Map.entry("search", 120),
             Map.entry("get_formatting", 120),
@@ -96,6 +100,11 @@ public class OfficeBridgeService {
             Map.entry("format_table", 120),
             // 单图上限 2MB，经 base64 过桥后体积再膨胀约三分之一
             Map.entry("insert_image", 120),
+            // Native open/save dialogs and PDF rendering/upload need a bounded longer budget.
+            Map.entry("file_create", 120),
+            Map.entry("file_open", 180),
+            Map.entry("file_save", 180),
+            Map.entry("file_export_pdf", 180),
             // ===== Excel 面 =====
             // 上限 2000 格一次写入
             Map.entry("excel_set_values", 120),
@@ -175,6 +184,12 @@ public class OfficeBridgeService {
      */
     public String executeOnPane(PaneRegistry.PaneInfo target, String command,
                                 Map<String, Object> args, CrossPaneOrigin origin) {
+        if ("apply_style_profile".equals(command)) {
+            return errorJson(com.checkba.service.ai.tools.OfficeToolMessages.text("crossPaneStyleDenied"));
+        }
+        if (command != null && command.startsWith("file_")) {
+            return errorJson(com.checkba.service.ai.tools.OfficeToolMessages.text("crossPaneFileDenied"));
+        }
         if (target == null || target.conversationId() == null || target.conversationId().isBlank()) {
             String name = target == null || target.docName() == null || target.docName().isBlank()
                     ? "目标文档" : "《" + target.docName() + "》";
@@ -219,7 +234,7 @@ public class OfficeBridgeService {
             }
             String error = result.error() != null && !result.error().isBlank()
                     ? result.error() : "插件执行失败（未提供错误信息）";
-            return errorJson(error);
+            return errorJson(error, result.data());
 
         } catch (TimeoutException e) {
             log.warn("Office command timed out: command={}, requestId={}", command, requestId);
@@ -289,8 +304,16 @@ public class OfficeBridgeService {
 
     /** 统一的失败 JSON（ToolResult.success() 依赖 {"error" 前缀识别失败）。 */
     private String errorJson(String message) {
+        return errorJson(message, null);
+    }
+
+    private String errorJson(String message, Object partialResult) {
         try {
-            return objectMapper.writeValueAsString(Map.of("error", message == null ? "未知错误" : message));
+            // Preserve the error-first contract used by ToolResult.success().
+            Map<String, Object> result = new java.util.LinkedHashMap<>();
+            result.put("error", message == null ? "未知错误" : message);
+            if (partialResult != null) result.put("partialResult", partialResult);
+            return objectMapper.writeValueAsString(result);
         } catch (Exception e) {
             // message 已经过 Jackson 失败才会走到这里，保底手拼一个无特殊字符的错误
             return "{\"error\": \"Office 桥接序列化失败\"}";

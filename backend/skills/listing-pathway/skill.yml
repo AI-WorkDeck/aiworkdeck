@@ -83,6 +83,7 @@ allowed_tools:
   # 写进用户正打开的那份文档：先看结构再定落点
   - doc_get_document_text
   - doc_get_outline
+  - office_get_outline
   - doc_find_text
   - doc_get_cursor_context
   # 改

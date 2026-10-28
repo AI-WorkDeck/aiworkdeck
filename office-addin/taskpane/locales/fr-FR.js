@@ -2,6 +2,53 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  wordStyleUnsupported: "Cette application ne peut pas appliquer entièrement ces champs du profil : {fields}. Aucune modification n’a commencé.",
+
+  cmdGetParagraphs: "Lire les paragraphes",
+  cmdGetOutline: "Lire le plan",
+  cmdGetClauses: "Identifier les clauses",
+  cmdReplaceNthMatch: "Remplacer la correspondance indiquée",
+  cmdApplyStyleProfile: "Appliquer le profil de styles",
+
+  wordStructureTooLarge: "La structure du document est trop volumineuse pour être lue entièrement en une seule opération sûre. Réduisez la taille du document et réessayez.",
+  wordStructurePartial: "Une partie de la mise en forme a peut-être déjà été appliquée. Vérifiez d’abord le document actuel ; ne répétez pas l’opération sans vérification.",
+
+  cmdPptTableSetStyle: "Mettre en forme le tableau de la diapositive",
+  cmdPptReadNotes: "Lire les notes du présentateur",
+  cmdPptWriteNotes: "Écrire les notes du présentateur",
+
+  excelConditionalActionInvalid: "L’action de mise en forme conditionnelle doit être apply ou clearAll.",
+  wordImagePartial: "L’image a peut-être été insérée, mais sa configuration est incomplète. Vérifiez l’image existante ; n’insérez pas une autre copie.",
+
+  excelRangeTooLarge: "La plage dépasse 50 000 cellules. Réduisez-la et réessayez ; aucune modification n’a été effectuée.",
+
+  fileOperationUnavailable: "Cette opération de fichier est indisponible ou son résultat ne peut être confirmé.",
+  fileOperationStale: "Le document a changé. Relisez le document actuel avant de réessayer.",
+  fileOperationInvalidArguments: "Paramètres d’opération de fichier invalides.",
+  fileOperationInvalidBytes: "Aucune donnée de fichier valide et complète n’a été renvoyée.",
+  cmdFileCreate: "Créer un fichier",
+  cmdFileSave: "Enregistrer le fichier actuel",
+  cmdFileExportPdf: "Exporter le PDF vers le projet",
+  cmdFileOpen: "Ouvrir un fichier ou importer une copie",
+  excelChartPartial: "Le graphique « {name} » a peut-être été créé, mais sa configuration a échoué et son annulation ne peut être confirmée. Vérifiez le graphique existant avant de réessayer ; ne créez pas de doublon.",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "Cible de diapositive ou de forme invalide.",
+  pptStaleTarget: "Le texte cible a changé. Relisez-le avant de le modifier.",
+  pptInvalidArguments: "Paramètres de modification de présentation invalides.",
+  pptCapabilityUnavailable: "Cette fonction est indisponible dans cette application de présentation.",
+  cmdPptSetShapeText: "Définir le texte de la forme",
+  cmdPptSetShapeGeometry: "Définir la position et la taille de la forme",
+  cmdPptFormatShape: "Mettre en forme la forme",
+  cmdPptGoto: "Aller à la diapositive ou à la forme",
+  cmdPptSetLayout: "Définir la disposition ou le fond de la diapositive",
+  excelValidationCustomRequired: "La validation personnalisée nécessite une formule.",
+  excelValidationTypeInvalid: "Type de validation des données non pris en charge.",
+  excelPivotFieldsMissing: "Champs du tableau croisé dynamique introuvables : {fields}",
+  excelValidationActionInvalid: "L’action de validation doit être apply ou clear.",
+  excelValidationValueRequired: "Cette règle de validation nécessite une valeur de comparaison.",
+  excelValidationBoundsRequired: "La validation par intervalle nécessite les deux bornes.",
+
   "dictate": "Saisie vocale",
   "dictateRecording": "Enregistrement en cours, cliquez pour terminer",
   "dictateTranscribing": "Transcription...",

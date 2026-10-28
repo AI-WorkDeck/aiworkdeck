@@ -167,4 +167,14 @@ class OfficeBridgeCrossPaneTest {
 
         assertThat(om.readTree(sent.get(0)).has("origin")).isFalse();
     }
+    @Test
+    void fileOperationsCannotBypassDocumentIdentityViaOriginBridge() throws Exception {
+        for (String command : List.of("file_create", "file_open", "file_save", "file_export_pdf", "apply_style_profile")) {
+            String out = bridge.executeOnPane(target, command, Map.of(), origin);
+            assertThat(om.readTree(out).has("error")).isTrue();
+            assertThat(new ToolRegistry.ToolResult(out, null, true).success()).isFalse();
+        }
+        verify(sse, never()).send(anyString(), anyString(), any());
+    }
+
 }

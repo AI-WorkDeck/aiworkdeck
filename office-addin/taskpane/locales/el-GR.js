@@ -2,6 +2,53 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  wordStyleUnsupported: "Η εφαρμογή δεν μπορεί να εφαρμόσει πλήρως αυτά τα πεδία προφίλ: {fields}. Δεν ξεκίνησαν αλλαγές.",
+
+  cmdGetParagraphs: "Ανάγνωση παραγράφων",
+  cmdGetOutline: "Ανάγνωση διάρθρωσης",
+  cmdGetClauses: "Αναγνώριση ρητρών",
+  cmdReplaceNthMatch: "Αντικατάσταση συγκεκριμένης αντιστοιχίας",
+  cmdApplyStyleProfile: "Εφαρμογή προφίλ στυλ",
+
+  wordStructureTooLarge: "Η δομή του εγγράφου είναι πολύ μεγάλη για πλήρη ανάγνωση σε μία ασφαλή λειτουργία. Μειώστε το μέγεθος του εγγράφου και δοκιμάστε ξανά.",
+  wordStructurePartial: "Κάποια μορφοποίηση μπορεί να έχει ήδη εφαρμοστεί. Ελέγξτε πρώτα το τρέχον έγγραφο και μην επαναλάβετε τη λειτουργία χωρίς έλεγχο.",
+
+  cmdPptTableSetStyle: "Μορφοποίηση πίνακα διαφάνειας",
+  cmdPptReadNotes: "Ανάγνωση σημειώσεων ομιλητή",
+  cmdPptWriteNotes: "Εγγραφή σημειώσεων ομιλητή",
+
+  excelConditionalActionInvalid: "Η ενέργεια μορφοποίησης υπό όρους πρέπει να είναι apply ή clearAll.",
+  wordImagePartial: "Η εικόνα μπορεί να έχει εισαχθεί, αλλά η ρύθμιση δεν ολοκληρώθηκε. Ελέγξτε την υπάρχουσα εικόνα και μην εισαγάγετε άλλο αντίγραφο.",
+
+  excelRangeTooLarge: "Το εύρος υπερβαίνει τα 50.000 κελιά. Επιλέξτε μικρότερο εύρος και δοκιμάστε ξανά· δεν έγινε καμία αλλαγή.",
+
+  fileOperationUnavailable: "Αυτή η λειτουργία αρχείου δεν είναι διαθέσιμη ή δεν επιβεβαιώθηκε.",
+  fileOperationStale: "Το έγγραφο άλλαξε. Διαβάστε το τρέχον έγγραφο πριν δοκιμάσετε ξανά.",
+  fileOperationInvalidArguments: "Μη έγκυρες παράμετροι λειτουργίας αρχείου.",
+  fileOperationInvalidBytes: "Δεν επιστράφηκαν έγκυρα και πλήρη δεδομένα αρχείου.",
+  cmdFileCreate: "Δημιουργία αρχείου",
+  cmdFileSave: "Αποθήκευση τρέχοντος αρχείου",
+  cmdFileExportPdf: "Εξαγωγή PDF στο έργο",
+  cmdFileOpen: "Άνοιγμα αρχείου ή εισαγωγή αντιγράφου",
+  excelChartPartial: "Το γράφημα «{name}» ενδέχεται να δημιουργήθηκε, αλλά η ρύθμιση απέτυχε και η αναίρεση δεν επιβεβαιώθηκε. Ελέγξτε το υπάρχον γράφημα πριν δοκιμάσετε ξανά· μη δημιουργήσετε διπλότυπο.",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "Μη έγκυρος στόχος διαφάνειας ή σχήματος.",
+  pptStaleTarget: "Το κείμενο στόχου άλλαξε. Διαβάστε το ξανά πριν το επεξεργαστείτε.",
+  pptInvalidArguments: "Μη έγκυρες παράμετροι επεξεργασίας παρουσίασης.",
+  pptCapabilityUnavailable: "Αυτή η λειτουργία δεν είναι διαθέσιμη στην τρέχουσα εφαρμογή παρουσίασης.",
+  cmdPptSetShapeText: "Ορισμός κειμένου σχήματος",
+  cmdPptSetShapeGeometry: "Ορισμός θέσης και μεγέθους σχήματος",
+  cmdPptFormatShape: "Μορφοποίηση σχήματος",
+  cmdPptGoto: "Μετάβαση σε διαφάνεια ή σχήμα",
+  cmdPptSetLayout: "Ορισμός διάταξης ή φόντου διαφάνειας",
+  excelValidationCustomRequired: "Η προσαρμοσμένη επικύρωση απαιτεί τύπο.",
+  excelValidationTypeInvalid: "Μη υποστηριζόμενος τύπος επικύρωσης δεδομένων.",
+  excelPivotFieldsMissing: "Δεν βρέθηκαν πεδία συγκεντρωτικού πίνακα: {fields}",
+  excelValidationActionInvalid: "Η ενέργεια επικύρωσης πρέπει να είναι apply ή clear.",
+  excelValidationValueRequired: "Αυτός ο κανόνας επικύρωσης απαιτεί τιμή σύγκρισης.",
+  excelValidationBoundsRequired: "Η επικύρωση εύρους απαιτεί και τα δύο όρια.",
+
   "dictate": "Είσοδος φωνής",
   "dictateRecording": "Γίνεται εγγραφή, κάντε κλικ για ολοκλήρωση",
   "dictateTranscribing": "Μεταγραφή...",

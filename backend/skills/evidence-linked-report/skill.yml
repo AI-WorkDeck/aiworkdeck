@@ -60,6 +60,7 @@ tool_policy: passthrough
 allowed_tools:
   - write_docx
   - doc_open_file
+  - office_file_open
   - doc_get_document_text
   - doc_find_text
   # doc_* / office_* 两族同时列出：ClientCapabilityService 按客户端只放行一族

@@ -5,6 +5,50 @@ description: Microsoft Office 与 WPS 插件领域。任务涉及 Word/Excel/PPT
 
 # Office 插件 领域地图
 
+
+## 2026-10-28 Excel 原生验证补充（dev-board#1576）
+
+Mac Excel 16.114.1 的隔离 QA 任务窗格已跑实际 `hostBridge.executeCommand` → Office.js。原生首轮暴露 pivot 回执读取未加载 `Worksheet.name`，第二轮暴露日期序列值直接作为 validation bound 导致 `InvalidArgument`；分别补 `sheet.load('name')` 后 sync、将日期/时间纯数值转为常量公式（保留日期字符串/已有公式，不做 epoch/locale 换算），两条专项回归通过。
+
+08:11:22Z 基础套件完成并 `file_save`；主任务目视四图表后通过 Excel UI 关闭重开，08:13:03Z native readback 再次通过。独立审计读取回执及 `/tmp/excel-1576-product-evidence/office-native-reopened.xlsx`，确认四个图表部件、一个透视表、七类验证规则、D2:D5 公式与 8/16/22/15 缓存值持久化；关闭重开和图表目视本身是主任务观察，非审计者独立 UI 复现。详见 `doc/verification/2026-10-28-excel-addin-matrix.md`。
+
+该证据只覆盖真实任务窗格基础命令与既有路径保存，不等于完整模型 AI 对话、项目文件新建/打开/PDF 上传或 WPS/Word/PPT 通过。高级套件 08:18:13Z 在 merge readback 断言失败，尚不计全套通过。
+
+## 原生文件生命周期与身份边界（2026-10-28，dev-board#1576/#1577）
+
+`fileOperations.js` 是四条原生命令的共用实现，`hostBridge.executeCommand` 负责传宿主、家族、
+文档身份、当前项目与连接设置：`file_create`、`file_open`、`file_save`、`file_export_pdf`。
+后端对应 `OfficeEditTools.office_file_*`，注册与可见性经 `ToolRegistry` /
+`ClientCapabilityService`。不要把文件命令放进 Word 专属前缀分流。
+
+- create 创建当前宿主的空白原生文件，不是项目文件。open 的模型入参只有项目 fileId；
+  后端校验当前项目归属、docx/xlsx/pptx 格式、50 MB 有界读取及 ZIP 签名后传 base64。
+  必须匹配当前宿主。Office 用 createDocument/createWorkbook/createPresentation 打开新副本；
+  WPS 写随机临时文件、逐字节读回核对后 Open，成功保留临时文件供延迟读取，明确返回
+  `openedAs:'copy'`、`temporary:true`、`requiresSaveAs:true`。都不回写原项目文件。
+- save 保存原生文件。Office Word 用基本 save（WordApi 1.1），Excel 用 save('Prompt')
+  （ExcelApi 1.11）；Microsoft PowerPoint 没有本实现可用的保存API，工具隐藏且执行器拒绝。
+  WPS三宿主支持Save，但ET/WPP无保存路径的新文件在写前拒绝，须用户先在宿主另存为。
+  WPS核对Saved及FullName；临时副本保存仍返回temporary/requiresSaveAs，不冒充长期文件。
+- PDF 使用 Office PdfFile 1.1 + 平台检查或 WPS ExportAsFixedFormat，经项目 create/upload
+  完成后返回真实fileId。Office逐片读取前校验File.size并finally关闭File；WPS删除临时PDF。
+  WPS二进制读取之后才校验50 MB，不得声称已经具备同等的预读内存限制。
+  上传失败保留 `partialResult`（含未完整上传的fileId）；hostBridge → chatSession data →
+  OfficeBridgeService error-first JSON的partialResult全链保留，整体仍为失败。
+
+本地命令串行执行，文件命令带会话缓存的 `expectedDocumentKey`。先向原会话POST回执，
+待挂起回执结束才重绑。create/open成功必须锁住当前轮后续命令，**即使新文件开在另一窗口，
+原窗格的URL没有改变**；不能只靠URL变化判定，否则后续编辑会落回源文档。
+首次保存未保存文档可保留原会话；真正新副本不得套用首次保存分支。跨文档origin路径前后端
+均拒绝全部 `file_*`，不能用跨窗格桥绕过文档与项目身份检查。
+桥超时：create 120秒；open/save/export 180秒。超时不等于没有执行，不得盲目重放。
+
+验证入口：`fileOperations.test.js`、`chatSessionFileRebind.test.js`、`crossDocWrite.test.js`；
+后端 `OfficeEditToolsTest`、`ClientCapabilityServiceTest`、`OfficeBridgeServiceTest` /
+`OfficeBridgeCrossPaneTest` / `OfficeBridgeTimeoutCoverageTest`。当前自动化测试不证明真机通过；
+Office/WPS原生加载、真实取消、保存重开及PDF项目字节仍须单独验收。
+完整差异和审计状态见 `doc/verification/2026-10-28-file-parity-audit.md`。
+
 ## 插件后端隐私与正文可靠性（dev-board#1316–1324，2026-10-16）
 
 此节取代后文历史「内联全文一字不动」「缓存未命中静默兜底」口径。
