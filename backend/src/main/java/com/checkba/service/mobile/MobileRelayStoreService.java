@@ -73,6 +73,7 @@ public class MobileRelayStoreService {
     static final Duration ONLINE_WINDOW = Duration.ofSeconds(180);
 
     private final MobileProjectDirRepository dirRepository;
+    @Autowired(required=false) private MobileMediaMoveService mediaMoves;
     @Autowired
     private CloudStorageQuotaService cloudStorageQuota;
 
@@ -401,11 +402,17 @@ public class MobileRelayStoreService {
                     "Media type must be image, video, audio or document"));
         }
 
+        if (mediaMoves != null) content = mediaMoves.checkedUpload(userId, deviceId, projectKey, clientMediaId, declaredSize, content);
         Optional<MobileMediaInbox> existing = inboxRepository.findByUserIdAndClientMediaId(userId, clientMediaId);
         if (existing.isPresent()) {
             // 幂等：弱网重传、进程被杀重启都不产生重复件（spec 不变式 2）。
             // 幂等命中必须先于配额检查——重传不占新空间，配额满也不能把重传拒成失败。
             return existing.get();
+        }
+
+        if (mediaMoves != null) {
+            MobileMediaInbox receipt = mediaMoves.deliveredReplay(userId, deviceId, projectKey, clientMediaId);
+            if (receipt != null) return receipt;
         }
 
         // 配额检查在写盘之前、按声明大小做（controller 传 MultipartFile.getSize()，就是实际
@@ -421,6 +428,8 @@ public class MobileRelayStoreService {
         MobileRelayBlobStore.StoredBlob stored;
         try {
             stored = blobStore.put(userId, clientMediaId, content, declaredSize);
+            try { MobileMediaMoveService.finishUpload(content); }
+            catch (IOException invalid) { blobStore.deleteQuietly(stored.locator()); throw invalid; }
         } catch (Exception e) {
             throw new IllegalStateException(LangText.of("影像暂存失败", "Failed to store media"), e);
         }
@@ -474,6 +483,7 @@ public class MobileRelayStoreService {
         if (item.getDeliveredAt() == null) {
             item.setDeliveredAt(LocalDateTime.now());
         }
+        if (mediaMoves != null) mediaMoves.rememberRelay(item);
         inboxRepository.save(item);
     }
 
@@ -492,6 +502,11 @@ public class MobileRelayStoreService {
                 m.put("expiresAt", item.getCreatedAt().plus(TTL).toString());
             }
             out.add(m);
+        }
+        if (mediaMoves != null) {
+            java.util.Set<Object> included = new java.util.HashSet<>();
+            for (Map<String,Object> row : out) included.add(row.get("clientMediaId"));
+            out.addAll(mediaMoves.deliveredStatus(userId, clientMediaIds.stream().filter(id -> !included.contains(id)).toList()));
         }
         return out;
     }
@@ -513,6 +528,8 @@ public class MobileRelayStoreService {
     public void cleanupExpired() {
         List<MobileMediaInbox> expired = inboxRepository.findByCreatedAtBefore(LocalDateTime.now().minus(TTL));
         for (MobileMediaInbox item : expired) {
+            // Migrate existing delivered captures before TTL drops their last server-side identity.
+            if (mediaMoves != null && item.getDeliveredAt() != null) mediaMoves.rememberRelay(item);
             if (item.getStoragePath() != null) {
                 blobStore.deleteQuietly(item.getStoragePath());
             }
