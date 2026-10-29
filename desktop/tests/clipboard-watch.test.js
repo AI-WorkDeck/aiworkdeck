@@ -49,7 +49,7 @@ function setup({ withCounter = true } = {}) {
   })
   let primed = false
   const tick = async () => { const priming = !primed; primed = true; await poller.tick(priming) }
-  return { counts, board, pushed, tick, poller, clipboard }
+  return { counts, board, pushed, tick, poller, clipboard, getFingerprint: () => fp, setFingerprint: value => { fp = value } }
 }
 
 test('同一张图连续轮询：只在首 tick 读一次整图，之后不再 readImage/toBitmap', async () => {
@@ -292,3 +292,37 @@ test('主进程停止会取消读取；忙碌或失败不会耗掉重启后的�
   assert.deepStrictEqual(priming, [true, true, true, true])
   assert.strictEqual(context.clipboardPrimed, true)
 })
+
+for (const type of ['image/png', 'text/plain', 'text/uri-list']) {
+  test(`迟到 ${type} Blob 不覆盖复制监听已推进的指纹，也不消耗预读`, async () => {
+    for (const priming of [false, true]) {
+      const { clipboard, board, pushed, tick, poller, getFingerprint, setFingerprint } = setup()
+      await tick()
+      board.seq++
+      const originalRead = clipboard.read
+      const pending = deferred()
+      clipboard.read = async () => [{ types: [type], getType: async () => ({
+        arrayBuffer: () => pending.promise,
+        text: () => pending.promise,
+      }) }]
+      const stale = poller.tick(priming)
+      await new Promise(resolve => setImmediate(resolve))
+      // 与 main.js 的 emitClipboard 一致：键盘复制先推进共享指纹并通知前端。
+      setFingerprint('TXT_new copy')
+      pushed.push({ type: 'TEXT', t: 'new copy' })
+      pending.resolve(type === 'image/png' ? Buffer.from('data:image/png;base64,OLD') :
+        type === 'text/uri-list' ? 'file:///tmp/old.docx' : 'old text')
+      assert.strictEqual(await stale, false, '过期结果不是一次完成的预读')
+      assert.strictEqual(getFingerprint(), 'TXT_new copy')
+      assert.deepStrictEqual(pushed, [{ type: 'TEXT', t: 'new copy' }])
+      clipboard.read = originalRead
+      board.formats = ['text/plain']
+      board.text = 'new copy'
+      await poller.tick(priming)
+      assert.strictEqual(pushed.length, 1, '下一轮不能重复推送已经复制过的新文本')
+      board.text = 'later copy'
+      await poller.tick(false)
+      assert.deepStrictEqual(pushed.map(p => p.t), ['new copy', 'later copy'])
+    }
+  })
+}

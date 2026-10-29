@@ -215,12 +215,15 @@ jobs:
         working-directory: desktop
         timeout-minutes: 2
         run: npm run test:backend-request-gate-e2e
-      - name: Upload clipboard compatibility evidence
+      - name: Upload runtime compatibility evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: clipboard-compat-${{ runner.os }}
-          path: ${{ runner.temp }}/awd-clipboard-compat-*/result.json
+          name: runtime-compat-${{ runner.os }}
+          path: |
+            ${{ runner.temp }}/awd-clipboard-compat-*/result.json
+            ${{ runner.temp }}/awd-runtime-compat-*/result.json
+            ${{ runner.temp }}/awd-runtime-compat-*/browser-view.png
           if-no-files-found: ignore
           retention-days: 7
       - name: Bundle backend (macOS arm64)
