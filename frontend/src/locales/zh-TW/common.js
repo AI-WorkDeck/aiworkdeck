@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "無法恢復工作區工作階段",
   "confirm": "確定",
   "cancel": "取消",
   "save": "保存",

@@ -76,6 +76,7 @@ public class PlatformGatewayClient {
      *                   重试就是扣两次。
      */
     public JsonNode postJson(String path, Map<String, Object> params, boolean idempotent, int timeoutSeconds) {
+        long requestVersion = accountService.connectionVersion();
         String key = requireKey();
         String body;
         try {
@@ -95,18 +96,19 @@ public class PlatformGatewayClient {
         if (reply.networkFailure() && !Thread.currentThread().isInterrupted()) {
             reply = transport.send("POST", siteProfileService.baseUrl() + path, key, idempotencyKey, body, timeoutSeconds);
         }
-        return handle(reply);
+        return handle(reply, key, requestVersion);
     }
 
     /** 只读 GET。不扣费，所以不占幂等键。 */
     public JsonNode getJson(String path, int timeoutSeconds) {
+        long requestVersion = accountService.connectionVersion();
         String key = requireKey();
         PlatformGatewayTransport.Reply reply =
                 transport.send("GET", siteProfileService.baseUrl() + path, key, null, null, timeoutSeconds);
         if (reply.networkFailure() && !Thread.currentThread().isInterrupted()) {
             reply = transport.send("GET", siteProfileService.baseUrl() + path, key, null, null, timeoutSeconds);
         }
-        return handle(reply);
+        return handle(reply, key, requestVersion);
     }
 
     /** 不扣费的只读调用（当前只有单价表）。不带幂等键。 */
@@ -149,12 +151,14 @@ public class PlatformGatewayClient {
         return key;
     }
 
-    private JsonNode handle(PlatformGatewayTransport.Reply reply) {
+    private JsonNode handle(PlatformGatewayTransport.Reply reply, String key, long requestVersion) {
         if (reply.networkFailure()) {
             throw new GatewayException(GatewayException.Kind.GATEWAY_UNREACHABLE, unreachableMessage());
         }
         if (reply.status() != 200) {
-            throw mapError(reply);
+            GatewayException error = mapError(reply);
+            if (error.getKind() == GatewayException.Kind.UNAUTHORIZED) accountService.markUnauthorized(key, requestVersion);
+            throw error;
         }
         return parse(reply.body());
     }

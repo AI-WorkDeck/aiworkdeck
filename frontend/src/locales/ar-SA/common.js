@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "تعذّرت استعادة جلسة مساحة العمل",
   "confirm": "موافق",
   "cancel": "إلغاء",
   "save": "حفظ",

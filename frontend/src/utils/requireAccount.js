@@ -21,10 +21,11 @@ import { createApp } from 'vue'
 import AccountLoginDialog from '@/components/account/AccountLoginDialog.vue'
 import RechargeDialog from '@/components/RechargeDialog.vue'
 import { i18n } from '@/i18n/index.js'
-import { getAccountStatus } from '@/services/api.js'
+import { getAccountStatus, getCloudAccountGeneration } from '@/services/api.js'
 import { isDesktopHost } from '@/services/host.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 import { refreshEntitlements } from '@/composables/useEntitlement.js'
+import { showDialog } from '@/utils/dialog.js'
 import { createAccountGate, reasonFromBackend } from './requireAccountCore.js'
 
 export { isAccountLoginRetry, REASONS } from './requireAccountCore.js'
@@ -34,6 +35,8 @@ export const ACCOUNT_CHANGED_EVENT = 'awd:account-changed'
 
 const CONTAINER_ID = 'awd-account-login-host'
 const OVERLAY_HOLDER = 'awd-account-login'
+let sessionExpired = false
+export function isAccountSessionExpired() { return sessionExpired }
 
 function openDialog({ reason }) {
   return new Promise((resolve) => {
@@ -91,6 +94,7 @@ const gate = createAccountGate({
  *   （契约见 licensing-billing.md「SKU 解锁的前端刷新契约」）。
  */
 export function broadcastAccountChanged(payload) {
+  if (typeof payload?.connected === 'boolean') sessionExpired = payload.authExpired === true
   try { uni.$emit(ACCOUNT_CHANGED_EVENT, payload || {}) } catch (e) { /* ignore */ }
   try {
     uni.$emit('awd:market-changed')
@@ -120,12 +124,52 @@ try {
 export function requireAccount(opts = {}) {
   // 浏览器端（团队服务器）没有「本机连官网账户」这回事：账户在服务端按人桥接，这里不拦
   if (!isDesktopHost()) return Promise.resolve(true)
-  return gate.requireAccount(opts)
+  return gate.requireAccount(sessionExpired ? { ...opts, force: true, reason: 'expired' } : opts)
+}
+
+/** Confirmed expiry is sticky until an explicit account change; cancelling keeps a visible recovery entry. */
+export function handleAccountExpired({ prompt = true } = {}) {
+  if (!isDesktopHost()) return
+  const newlyExpired = !sessionExpired
+  if (newlyExpired) {
+    sessionExpired = true
+    gate.noteConnected(false)
+    broadcastAccountChanged({ connected: false, authExpired: true })
+  }
+  if (prompt && newlyExpired) void requireAccount({ reason: 'expired', force: true, auto: true }).catch(() => {})
 }
 
 /** services/api.js 收到 4011 时调用：reason 取后端回包里的那个。 */
-export function requireAccountFor4011(backend) {
+export async function requireAccountFor4011(backend) {
+  if (isDesktopHost() && (backend?.kind === 'UNAUTHORIZED' || backend?.gatewayKind === 'UNAUTHORIZED')) {
+    const generation = getCloudAccountGeneration()
+    // A runtime provider key can also be rejected; verify the account rather than guessing.
+    try {
+      const status = await getAccountStatus({ accountPrompt: false })
+      if (generation !== getCloudAccountGeneration()) return false
+      if (status?.authExpired) handleAccountExpired({ prompt: false })
+      else if (status?.connected) return false
+    } catch (e) { return false }
+  }
   return requireAccount({ reason: reasonFromBackend(backend && backend.reason), force: true, auto: true })
+}
+
+// An unrecoverable local session is a workspace error, not evidence that the cloud key expired.
+let workspaceRecovery = null
+let workspaceRecoverySuppressedUntil = 0
+export function handleWorkspaceSessionFailure() {
+  if (workspaceRecovery) return workspaceRecovery
+  if (Date.now() < workspaceRecoverySuppressedUntil) return Promise.resolve(false)
+  workspaceRecovery = showDialog({
+    title: i18n.global.t('common.workspaceSessionUnavailable'),
+    content: i18n.global.t('common.serviceErrorRetryLater'),
+    confirmText: i18n.global.t('common.retry'),
+    cancelText: i18n.global.t('common.close'),
+  }).then(result => {
+    if (!result.confirm) workspaceRecoverySuppressedUntil = Date.now() + 60000
+    return !!result.confirm
+  }).finally(() => { workspaceRecovery = null })
+  return workspaceRecovery
 }
 
 /** 退出登录 / 在别处连上账户之后，让下一次判定重新问后端。 */
