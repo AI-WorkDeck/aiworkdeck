@@ -49,6 +49,12 @@
               </svg>
               <text>{{ $t('workbench.welcome.quickNewMd') }}</text>
             </view>
+            <view v-if="canStartRecording" class="welcome-quick-tool" data-quick="start-recording" role="button" tabindex="0" @tap="$emit('start-recording')" @keydown.enter.prevent="$emit('start-recording')" @keydown.space.prevent="$emit('start-recording')">
+              <svg class="welcome-quick-tool-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path v-for="(d, gi) in ICONS.record" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <text>{{ $t('meeting.startRecording') }}</text>
+            </view>
           </view>
           <view class="welcome-quick-send" data-quick="send" @tap="submitQuickChat">
             <text>{{ quickPrompt.trim() ? $t('workbench.welcome.quickChatSend') : $t('workbench.welcome.enterChatMode') }}</text>
@@ -194,10 +200,11 @@ export default {
     /** 工作台当前打开的项目（无项目态为 null）：Recent 里标「当前」，点它不重进 */
     catalogRequest: { type: Number, default: 0 },
     currentProjectId: { type: [Number, String], default: null },
+    canStartRecording: { type: Boolean, default: true },
     /** 「启动时显示欢迎页」当前值（本机记忆由宿主持有） */
     showOnStartup: { type: Boolean, default: true },
   },
-  emits: ['new-project', 'open-folder', 'open-file', 'open-url', 'activate-current-project', 'project-renamed', 'open-client-workspace', 'update:show-on-startup', 'create-project', 'open-local-folder', 'open-loose-files', 'open-project', 'start-chat', 'quick-create-doc'],
+  emits: ['new-project', 'open-folder', 'open-file', 'open-url', 'activate-current-project', 'project-renamed', 'open-client-workspace', 'update:show-on-startup', 'create-project', 'open-local-folder', 'open-loose-files', 'open-project', 'start-chat', 'quick-create-doc', 'start-recording'],
   data() {
     return {
       quickPrompt: '',
@@ -440,6 +447,7 @@ export default {
 
 .welcome-quick-chat-tools {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   min-width: 0;
@@ -461,6 +469,11 @@ export default {
 .welcome-quick-tool:hover {
   background: var(--awd-surface-2);
   color: var(--awd-text);
+}
+
+.welcome-quick-tool:focus-visible {
+  outline: 2px solid var(--awd-accent);
+  outline-offset: 2px;
 }
 
 .welcome-quick-tool-icon {

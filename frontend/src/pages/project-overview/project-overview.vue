@@ -1344,6 +1344,8 @@
                       @update:show-on-startup="setShowWelcomeOnStartup"
                       @start-chat="handleWelcomeStartChat"
                       @quick-create-doc="handleWelcomeQuickCreateDoc"
+                      :can-start-recording="permissionUserLoaded && !isClientView && (!hasProject || canWriteProject)"
+                      @start-recording="onWelcomeStartRecording"
                     />
                     <!-- 「日程」标签（dev-board#1048）：单例，全局视图（projectId 恒传 null，跨项目事项，
                          筛选里可按项目收窄）。宿主 .pane-content 是定高 flex 列，FullCalendar 不会塌成 0；
@@ -1620,6 +1622,8 @@
                       @update:show-on-startup="setShowWelcomeOnStartup"
                       @start-chat="handleWelcomeStartChat"
                       @quick-create-doc="handleWelcomeQuickCreateDoc"
+                      :can-start-recording="permissionUserLoaded && !isClientView && (!hasProject || canWriteProject)"
+                      @start-recording="onWelcomeStartRecording"
                     />
                     <!-- 「日程」标签：见左窗格同名注释 -->
 
