@@ -183,7 +183,7 @@ try {
   if (process.env.AWD_BASELINE_ELECTRON) assert.equal(await page.evaluate(() => localStorage.getItem('electron-upgrade-persistence')), 'baseline-profile-retained')
   for (const ext of ['docx', 'xlsx', 'pptx']) {
     const frame = await open(ext)
-    const marker = `ELECTRON_COMPAT_${ext.toUpperCase()}`
+    const marker = `兼容验证_ELECTRON_COMPAT_${ext.toUpperCase()}`
     if (ext === 'docx') await exec(ext, 'goto', { type: 'end' })
     if (ext === 'xlsx') await exec(ext, 'sheet_select_range', { range: 'B2' })
     if (ext === 'pptx') {
@@ -204,7 +204,8 @@ try {
     if (ext === 'pptx') await frame.keyboard.press('Escape')
     console.log(JSON.stringify({ stage: 'input', ext }))
     const started = Date.now()
-    await until(async () => (await savedXml(ext)).includes(marker), 90000)
+    // The synthetic marker contains no XML entities; CJK/Latin text may use separate OOXML runs.
+    await until(async () => (await savedXml(ext)).replace(/<[^>]*>/g, '').includes(marker), 90000)
     const xml = await savedXml(ext)
     assert.notEqual(hash(files[ext]), originalHashes[ext])
     if (ext === 'docx') { assert.ok(xml.includes('ORIGINAL WORD CONTENT')); assert.ok(xml.includes('Preserved second paragraph.')); assert.ok(/<w:b\b/.test(xml)) }
