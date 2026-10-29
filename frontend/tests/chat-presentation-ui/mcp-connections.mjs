@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Real chat, marketplace and settings components with synthetic MCP HTTP responses.
 import assert from 'node:assert/strict'
+import { advancedMcpCases } from './mcp-advanced-cases.mjs'
 import { readFileSync, mkdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
@@ -11,11 +12,14 @@ const root = fileURLToPath(new URL('../../', import.meta.url))
 const output = '/tmp/awd-mcp-ui-1598'; mkdirSync(output, { recursive: true })
 const source = readFileSync(`${root}src/App.vue`, 'utf8')
 const tokens = source.slice(source.indexOf("html,\nhtml[data-theme='light']"), source.indexOf('</style>', source.indexOf("html,\nhtml[data-theme='light']")))
-const server = await createServer({ configFile: false, root: fileURLToPath(new URL('./', import.meta.url)), plugins: [vue()], resolve: { alias: { '@': `${root}src` }, dedupe: ['vue'] }, server: { host: '127.0.0.1', port: 5243, strictPort: true, fs: { allow: [root] } } })
+const server = await createServer({ configFile: false, cacheDir: output + '/vite-cache', root: fileURLToPath(new URL('./', import.meta.url)), plugins: [vue()], resolve: { alias: { '@': `${root}src` }, dedupe: ['vue'] }, server: { host: '127.0.0.1', port: 5243, strictPort: true, fs: { allow: [root] } } })
 await server.listen()
 const browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true })
-const page = await browser.newPage(), errors = [], blocked = [], logs = []
-page.on('console', message => logs.push(message.text()))
+const page = await browser.newPage(), errors = [], blocked = [], logs = [], consoleReads = []
+page.on('console', message => {
+  logs.push(message.text())
+  consoleReads.push(Promise.all(message.args().map(arg => arg.jsonValue().catch(() => undefined))).then(values => logs.push(JSON.stringify(values))))
+})
 page.on('pageerror', error => errors.push(error.message))
 await page.setRequestInterception(true)
 page.on('request', request => {
@@ -100,6 +104,7 @@ try {
   await page.waitForSelector('#admin-test .mcp-card')
   assert.equal(await page.evaluate(() => window.openedSettings.nav), 'mcp')
   await clickText('#admin-test button', '配置')
+  await page.select('#admin-test select[name=mcp-auth]', 'bearer')
   await page.waitForSelector('#admin-test input[type=password]')
   await page.type('#admin-test input[type=password]', 'synthetic-token')
   await clickText('#admin-test button', '保存')
@@ -136,12 +141,14 @@ try {
   await clickText('#admin-test button', '测试连接')
   await page.waitForFunction(() => window.mcpRow.tested)
   await clickText('#admin-test button', '配置')
+  await page.select('#admin-test select[name=mcp-auth]', 'bearer')
   await page.waitForSelector('#admin-test input[type=password]')
   await page.type('#admin-test input[type=password]', 'unsaved-account-token')
   await page.evaluate(() => { window.fixtureStorage.checkba_user = { id: 2002 }; window.mcpRow.revision = 0 })
   await page.waitForFunction(() => !document.querySelector('.mcp-editor'))
   assert.equal(await page.evaluate(() => window.mcpCalls.filter(c => c.data?.token === 'unsaved-account-token').length), 0)
   await clickText('#admin-test button', '配置')
+  await page.select('#admin-test select[name=mcp-auth]', 'bearer')
   await page.waitForSelector('#admin-test input[type=password]')
   await page.type('#admin-test input[type=password]', 'delayed-account-token')
   await page.evaluate(() => { window.delayMcpSave = true })
@@ -154,8 +161,11 @@ try {
   await clickText('#admin-test button', '删除')
   await page.waitForFunction(() => !document.querySelector('#admin-test .mcp-card'))
   assert.equal(await page.evaluate(() => window.mcpCalls.some(c => c.method === 'DELETE')), true)
+  const advancedChecks = await advancedMcpCases(page, output, clickText)
+  await Promise.all(consoleReads)
   assert.deepEqual(errors, []); assert.deepEqual(blocked, [])
   assert.ok(!logs.some(line => line.includes('synthetic-token') || line.includes('unsaved-account-token') || line.includes('delayed-account-token')), 'credentials never enter console output')
-  console.log(JSON.stringify({ passed: true, output, checks: ['three marketplace categories', 'real settings nav=mcp', 'save/test/enable/official switch', 'no-auth saved connection test', 'persistent failure', 'skill classification', 'account switch clears draft', 'German narrow dark layout', 'scope-bound delayed save', 'credential-free console', 'delete connection'] }))
+  assert.ok(!logs.some(line => /synthetic-(header|environment|import|oauth).*secret/.test(line)), 'advanced credentials never enter console output')
+  console.log(JSON.stringify({ passed: true, output, advancedChecks, checks: ['three marketplace categories', 'real settings nav=mcp', 'save/test/enable/official switch', 'no-auth saved connection test', 'persistent failure', 'skill classification', 'account switch clears draft', 'German narrow dark layout', 'scope-bound delayed save', 'credential-free console', 'delete connection'] }))
 } catch (e) { await page.screenshot({ path: output + '/failure.png', fullPage: true }); console.error(errors); throw e }
 finally { await browser.close(); await server.close() }

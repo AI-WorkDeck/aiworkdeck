@@ -51,17 +51,17 @@ class UserMcpConnectionServiceTest {
     ToolContext context(String name, Long user) { return new ToolContext(7L, "conversation", user, null, List.of(), Set.of(name)); }
 
     @Test void offlineCrudAndWriteOnlyEncryptionAndUserAccountIsolation() {
-        assertEquals(5, service.list(8L).size()); verifyNoInteractions(http);
+        assertEquals(6, service.list(8L).size()); verifyNoInteractions(http);
         assertThrows(PluginMcpException.class, () -> service.save(8L, "custom-forged", new UserMcpConnectionService.Update("forged", "https://example.com", null, null)));
         String id = custom();
         assertFalse(store.values().stream().anyMatch(s -> s.contains("alice-token")));
         assertFalse(new ObjectMapper().valueToTree(service.list(8L)).toString().contains("alice-token"));
         assertFalse((boolean) row(id, 8L).get("enabled"));
-        assertEquals(5, service.list(9L).size());
+        assertEquals(6, service.list(9L).size());
         when(account.accountFingerprintOrNull()).thenReturn("account-B");
-        assertEquals(5, service.list(8L).size());
+        assertEquals(6, service.list(8L).size());
         when(account.accountFingerprintOrNull()).thenReturn("account-A");
-        service.delete(8L, id); assertEquals(5, service.list(8L).size());
+        service.delete(8L, id); assertEquals(6, service.list(8L).size());
         verifyNoInteractions(http);
     }
     @Test void queuedMutationsFromAnOldAccountAreRejectedBeforeWriting() {
@@ -80,7 +80,7 @@ class UserMcpConnectionServiceTest {
             assertEquals(409, failure.status()); assertEquals("account_changed", failure.code());
         }
         assertEquals(before, store);
-        assertEquals(5, service.list(8L).size());
+        assertEquals(6, service.list(8L).size());
         when(account.accountFingerprintOrNull()).thenReturn("account-A");
         assertEquals(true, row(id, 8L).get("enabled"));
     }

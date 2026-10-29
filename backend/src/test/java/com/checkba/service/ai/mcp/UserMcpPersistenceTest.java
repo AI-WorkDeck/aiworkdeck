@@ -61,6 +61,20 @@ class UserMcpPersistenceTest {
         assertThrows(IllegalStateException.class, () -> service.delete(8L, "qichacha"));
         assertEquals(before, snapshot(), "failed credential deletion must restore the connection metadata too");
     }
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void batchImportMetadataFailureRollsBackAllSelectedSecretsAndRows() {
+        when(account.accountFingerprintOrNull()).thenReturn("batch-import-account");
+        String scope = (String) service.snapshot(8L).get("scopeToken");
+        Map<String, String> before = snapshot();
+        String config = """
+            {"mcpServers":{"A":{"url":"https://example.com/a","token":"first-secret"},
+            "B":{"command":"python3","env":{"KEY":"second-secret"}}}}
+            """;
+        doThrow(new IllegalStateException("synthetic import metadata failure")).when(settings).set(startsWith("mcp.user."), anyString());
+        assertThrows(IllegalStateException.class, () -> service.importConnections(8L, config, List.of(0, 1), scope));
+        assertEquals(before, snapshot(), "all imported metadata and encrypted secrets must roll back atomically");
+    }
     private Map<String, String> snapshot() {
         Map<String, String> result = new TreeMap<>();
         repository.findAll().forEach(row -> result.put(row.getKey(), row.getValue()));
