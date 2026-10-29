@@ -221,8 +221,10 @@ test('主进程复制监听等待 readText Promise，读取失败不发送，销
   const body = source.slice(source.indexOf('function attachCopyListener('), source.indexOf('// 官网头像'))
   const pending = deferred()
   const sent = [], timers = []
+  let cancels = 0
   const context = {
     clipboard: { readText: () => pending.promise },
+    clipboardPoller: { cancel: () => { cancels++ } },
     emitClipboard: (text) => sent.push(text),
     setTimeout: (fn) => timers.push(fn),
   }
@@ -238,6 +240,7 @@ test('主进程复制监听等待 readText Promise，读取失败不发送，销
   pending.resolve('合成文本')
   await copy
   assert.deepStrictEqual(sent, ['合成文本'])
+  assert.strictEqual(cancels, 1)
   const late = deferred()
   context.clipboard.readText = () => late.promise
   wc.emit('before-input-event', {}, { type: 'keyDown', key: 'x', meta: true })
@@ -251,6 +254,7 @@ test('主进程复制监听等待 readText Promise，读取失败不发送，销
   wc.emit('before-input-event', {}, { type: 'keyDown', key: 'c', control: true })
   await timers.shift()()
   assert.deepStrictEqual(sent, ['合成文本'])
+  assert.strictEqual(cancels, 1, '销毁或读取失败不能取消有效轮询')
 })
 
 
@@ -326,3 +330,37 @@ for (const type of ['image/png', 'text/plain', 'text/uri-list']) {
     }
   })
 }
+
+test('真实快捷键入口再次复制相同文本，也取消尚未完成的旧图片读取', async () => {
+  const fs = require('node:fs')
+  const vm = require('node:vm')
+  const source = fs.readFileSync(require.resolve('../main/main.js'), 'utf8')
+  const body = source.slice(source.indexOf('function attachCopyListener('), source.indexOf('// 官网头像'))
+  const { clipboard, poller, pushed, getFingerprint, setFingerprint } = setup()
+  setFingerprint('TXT_A')
+  const pending = deferred()
+  clipboard.read = async () => [{ types: ['image/png'], getType: () => pending.promise }]
+  clipboard.readText = async () => 'A'
+  const timers = []
+  const context = {
+    clipboard, clipboardPoller: poller,
+    emitClipboard: text => { setFingerprint('TXT_' + text); pushed.push({ type: 'TEXT', t: text }) },
+    setTimeout: fn => timers.push(fn),
+  }
+  vm.runInNewContext(body + '; this.attach = attachCopyListener', context)
+  const wc = new EventEmitter()
+  wc.isDestroyed = () => false
+  context.attach(wc, 'test')
+  const stale = poller.tick(false)
+  await new Promise(resolve => setImmediate(resolve))
+  wc.emit('before-input-event', {}, { type: 'keyDown', key: 'c', control: true })
+  await timers.shift()()
+  assert.strictEqual(getFingerprint(), 'TXT_A', '相同内容不改变指纹值')
+  pending.resolve(new Blob(['data:image/png;base64,OLD']))
+  assert.strictEqual(await stale, false, '同值复制仍须使旧轮询失效')
+  assert.deepStrictEqual(pushed, [{ type: 'TEXT', t: 'A' }])
+  assert.strictEqual(getFingerprint(), 'TXT_A')
+  clipboard.read = async () => [{ types: ['text/plain'], getType: async () => new Blob(['B']) }]
+  assert.strictEqual(await poller.tick(false), true, '后续轮询自身发送文本不能自取消')
+  assert.deepStrictEqual(pushed, [{ type: 'TEXT', t: 'A' }, { type: 'TEXT', t: 'B' }])
+})

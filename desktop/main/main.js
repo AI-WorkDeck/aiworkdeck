@@ -342,6 +342,8 @@ function attachCopyListener(webContents, sourceLabel) {
         try {
           const text = await clipboard.readText()
           if (webContents.isDestroyed()) return
+          // 同值复制也须使迟到的轮询结果失效；轮询自己的 onText 不走此入口。
+          clipboardPoller.cancel()
           emitClipboard(text, sourceLabel || (isCopy ? 'copy' : 'cut'))
         } catch (e) {
           // ignore
