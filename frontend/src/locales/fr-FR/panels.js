@@ -159,7 +159,7 @@ export default {
   "deResultEditing": "La copie anonymisée est ouverte en modification. La sélection ici ne suit pas automatiquement les changements d'onglets de documents.",
   "dePdfResult": "Le PDF anonymisé est ouvert en consultation. Cette copie rastérisée ne peut pas être directement modifiée ni restaurée.",
   "deRestoreResult": "Restaurer ce résultat",
-  "deCurrentKit": "Fichier de restauration associé à ce résultat",
+  deCurrentKit: 'Données de restauration associées automatiquement',
   "dePreviewChanged": "Les modifications du document viennent d'être enregistrées. Vérifiez à nouveau l'aperçu avant de générer.",
   "deDownloadRetry": "Le résultat a été créé, mais le téléchargement de restauration a échoué. Utilisez le bouton de téléchargement ci-dessous.",
   "deAiWorkflowNotice": "Les outils IA se trouvent dans l'assistant à droite. Ce panneau n'envoie jamais de fichiers automatiquement. Les conversations normales peuvent inclure l'historique et le contexte du projet ; elles ne sont pas isolées. Vérifiez le contexte et excluez les originaux, les mappages de restauration et les fichiers restaurés.",
@@ -179,9 +179,10 @@ export default {
   "deExcludedTerms": "Conserver ces valeurs",
   "deExcludedPlaceholder": "Une valeur détectée complète par ligne pour exclure les faux positifs.",
   "dePreview": "Aperçu de l'anonymisation",
+  deSelectOriginal: 'Sélectionner et anonymiser à nouveau l’original',
   "dePassword": "Mot de passe de récupération",
   "dePasswordHint": "Saisissez le mot de passe de restauration",
-  "deRestoreNotice": "Sélectionnez ci-dessus le document expurgé à restaurer. Son fichier de restauration sera associé automatiquement. Si aucun fichier n’est trouvé, sélectionnez le fichier correspondant dans le projet, puis saisissez le mot de passe. Seuls les marqueurs conservés peuvent être restaurés, pas les astérisques ni les zones noires des PDF.",
+  deRestoreNotice: 'Sélectionnez le document anonymisé et saisissez son mot de passe. Les données de restauration sont associées automatiquement. Seuls les jetons conservés sont restaurables, pas les astérisques ni les rectangles noirs des PDF.',
   "deImportKit": "Choisir le fichier de restauration dans le projet",
   "deRestoreGenerate": "Générer le fichier restauré",
   "deMatchCount": "{count} occurrence(s) correspondante(s) / restaurée(s)",
@@ -620,6 +621,6 @@ export default {
   "pwsDdAiRiskMatrixPrompt": "Veuillez résumer les principaux risques juridiques de due diligence identifiés dans le projet en cours sous forme de synthèse structurée couvrant les risques majeurs, les risques généraux et les recommandations de remédiation.",
   "pwsTmAiSummaryBtn": "IA : extraire les comptes rendus de réunion et les actions à suivre",
   "pwsTmAiSummaryPrompt": "Veuillez examiner les transcriptions des réunions Tencent Meeting du projet en cours et extraire les positions des parties prenantes clés, les points litigieux et les actions à suivre après la réunion.",
-  "deRecoveryMissing": "Aucun fichier de restauration trouvé. Sélectionnez le fichier .awd-recovery correspondant dans le projet.",
+  deRecoveryMissing: 'Données de restauration introuvables : restauration impossible. Anonymisez à nouveau le fichier original.',
   "deRestoreDocument": "Document expurgé à restaurer"
 }

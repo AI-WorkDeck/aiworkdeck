@@ -159,7 +159,7 @@ export default {
   "deResultEditing": "La copia anonimizada está abierta para su edición. El archivo seleccionado aquí no cambia automáticamente al cambiar de pestaña de documento.",
   "dePdfResult": "El PDF anonimizado está abierto para su revisión. Esta copia rasterizada no se puede editar ni restaurar directamente.",
   "deRestoreResult": "Restaurar este resultado",
-  "deCurrentKit": "Archivo de restauración vinculado a este resultado",
+  deCurrentKit: 'Datos de restauración vinculados automáticamente',
   "dePreviewChanged": "Los cambios del documento se acaban de guardar. Vuelva a previsualizar antes de generar.",
   "deDownloadRetry": "El resultado se ha generado, pero falló la descarga del archivo de restauración. Utilice el botón de descarga de abajo.",
   "deAiWorkflowNotice": "Las herramientas de IA están en el asistente de la derecha. Este panel nunca envía archivos automáticamente. Las conversaciones normales pueden incluir el historial y el contexto del proyecto; no están aisladas. Revise el contexto y excluya los originales, los mapeos de restauración y los archivos restaurados.",
@@ -179,9 +179,10 @@ export default {
   "deExcludedTerms": "Conservar estos valores",
   "deExcludedPlaceholder": "Un valor detectado por línea para excluir falsos positivos.",
   "dePreview": "Vista previa de la anonimización",
+  deSelectOriginal: 'Seleccionar el original y anonimizar de nuevo',
   "dePassword": "Contraseña de recuperación",
   "dePasswordHint": "Introduzca la contraseña de restauración",
-  "deRestoreNotice": "Seleccione arriba el documento anonimizado que desea restaurar. Su archivo de restauración se asociará automáticamente; si no se encuentra, seleccione el archivo correspondiente del proyecto e introduzca la contraseña. Solo se pueden restaurar los marcadores conservados, no los asteriscos ni los recuadros negros de los PDF.",
+  deRestoreNotice: 'Seleccione el documento anonimizado e introduzca su contraseña. Los datos de restauración se vinculan automáticamente. Solo se restauran los identificadores conservados, no los asteriscos ni los cuadros negros de PDF.',
   "deImportKit": "Seleccionar archivo de restauración del proyecto",
   "deRestoreGenerate": "Generar archivo restaurado",
   "deMatchCount": "{count} coincidencias / restauraciones en esta ejecución",
@@ -620,6 +621,6 @@ export default {
   "pwsDdAiRiskMatrixPrompt": "Resuma los principales riesgos legales de debida diligencia identificados en el proyecto actual en un resumen estructurado que abarque riesgos materiales, riesgos generales y recomendaciones de subsanación.",
   "pwsTmAiSummaryBtn": "IA: Extraer actas de reuniones y acciones",
   "pwsTmAiSummaryPrompt": "Revise las transcripciones de Tencent Meeting del proyecto actual y extraiga las posiciones de las partes interesadas clave, las cuestiones en disputa y las acciones posteriores a la reunión.",
-  "deRecoveryMissing": "No se ha encontrado el archivo de restauración. Seleccione el archivo .awd-recovery correspondiente del proyecto.",
+  deRecoveryMissing: 'No se encontraron datos de restauración; no es posible restaurar. Anonimice de nuevo el archivo original.',
   "deRestoreDocument": "Documento anonimizado que se restaurará"
 }
