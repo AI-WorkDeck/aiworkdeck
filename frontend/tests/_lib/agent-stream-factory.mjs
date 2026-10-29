@@ -3,6 +3,7 @@
 // useAgentStream.js 带 @/ 别名与 uni 全局，node 直接 import 不进来：
 // 读源码、剥掉全部 import、用 new Function 按形参名注入依赖，再整段跑真实 composable。
 // 源码新增 import 时只需在下面 DEPS 表加一行（名字 + 默认实现），各用例不用动。
+import { fetchAgentConnection } from '../../src/composables/sharedAgentConnection.mjs'
 import { readFileSync } from 'node:fs'
 import { ref, reactive, nextTick } from 'vue'
 import { createProtocolTagRegex, decodeProtocolTags, decodeProtocolTagsIncremental } from '../../src/composables/agentTagProtocol.mjs'
@@ -23,6 +24,7 @@ const SOURCE = readFileSync(new URL('../../src/composables/useAgentStream.js', i
 
 // 依赖清单：形参名 -> 默认实现。用例可用同名 overrides 覆盖。
 const DEPS = {
+  fetchAgentConnection,
   ref,
   reactive,
   nextTick,
@@ -69,6 +71,9 @@ export function buildAgentStreamFactory(overrides = {}) {
     .replace('export function useAgentStream()', 'function useAgentStream()')
   if (expose) body = body.replace('        bubbles,\n', `        bubbles, ${expose},\n`)
   const deps = { ...DEPS, ...depOverrides }
+  if (depOverrides.fetch && !depOverrides.fetchAgentConnection) {
+    deps.fetchAgentConnection = (url, init) => fetchAgentConnection(url, init, depOverrides.fetch)
+  }
   const names = Object.keys(deps)
   const factory = new Function(...names, body + '\nreturn useAgentStream()')
   return factory(...names.map((n) => deps[n]))
