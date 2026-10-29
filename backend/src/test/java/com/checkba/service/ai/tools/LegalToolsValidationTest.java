@@ -111,4 +111,30 @@ class LegalToolsValidationTest {
         assertTrue(result.startsWith("Error"), result);
         verifyNoInteractions(mcpClientService);
     }
+    @Test
+    void caseSearchRejectsMissingQueryWithoutCallingProvider() {
+        for (String query : new String[] {null, "", "  "}) {
+            assertTrue(tools.case_search(query).startsWith("Error:"));
+        }
+        verifyNoInteractions(mcpClientService);
+    }
+
+    @Test
+    void caseSearchPreservesProviderRecordsAndUsesExistingChannel() {
+        String result = "[{\"title\":\"甲乙合同纠纷\",\"case_number\":\"（2025）京01民终1号\"}]";
+        when(mcpClientService.callTool("pkulaw-case-semantic", "search_case", Map.of("text", "合同解除")))
+                .thenReturn(result);
+        assertEquals(result, tools.case_search("  合同解除  "));
+        verify(mcpClientService).callTool("pkulaw-case-semantic", "search_case", Map.of("text", "合同解除"));
+    }
+
+    @Test
+    void caseSearchIsHiddenWhenPkulawIsUnavailable() {
+        var availability = mock(com.checkba.service.platform.ExternalServiceAvailability.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(tools, "externalServiceAvailability", availability);
+        assertTrue(tools.currentlyUnusableTools().contains("case_search"));
+        when(availability.usable(com.checkba.service.platform.ExternalServiceProvider.PKULAW)).thenReturn(true);
+        assertTrue(tools.currentlyUnusableTools().isEmpty());
+    }
+
 }

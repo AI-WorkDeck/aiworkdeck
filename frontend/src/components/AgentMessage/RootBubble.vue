@@ -59,9 +59,18 @@
                </div>
             </template>
             <div v-else-if="entry.type === 'text'" class="main-content" data-chat-answer>
-              <MarkdownPreview :content="bubble.content.slice(entry.start, entry.end)" />
+              <template v-for="(part, pi) in legalMessageParts(bubble.content.slice(entry.start, entry.end), bubble.isStreaming)" :key="pi">
+                <LegalReferenceCard v-if="part.type === 'reference'" :reference="part.reference" @open="openReference" />
+                <MarkdownPreview v-else :content="part.text" />
+              </template>
             </div>
           </template>
+
+            <LegalReferenceCard v-for="reference in toolReferences" :key="reference.id" :reference="reference" @open="openReference" />
+            <details v-if="inlineReference" open class="legal-inline-reader">
+              <summary>{{ inlineReference.title }}</summary>
+              <LegalReferencePane :reference="inlineReference" />
+            </details>
 
             <!-- 5b. 气泡底部操作条。
                  「复制」与「重新生成」刻意<b>不</b>挂在 showUseInDocument 那条判据上：
@@ -165,13 +174,16 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch, inject } from 'vue'
 import ThinkingCard from './ThinkingCard.vue'
 import TodoProgressCard from './TodoProgressCard.vue'
 import ProcessCard from './ProcessCard.vue'
 import ArtifactCard from '../ArtifactCard.vue'
 import QuestionCard from './QuestionCard.vue'
 import VerificationReportCard from './VerificationReportCard.vue'
+import LegalReferenceCard from '../legal/LegalReferenceCard.vue'
+import LegalReferencePane from '../legal/LegalReferencePane.vue'
+import { legalMessageParts, referencesFromTools, legalReadableText } from '@/utils/legalReferences.js'
 import MarkdownPreview from '../MarkdownPreview.vue'
 import { t } from '@/i18n'
 import { visibleChatTimeline, isTimelineEntryActive } from './chatTimeline.mjs'
@@ -197,9 +209,17 @@ const savedPath = computed(() => (props.bubble.isStreaming ? '' : resolveSavedPa
 
 // 载荷形状对齐 project-overview.handleChatInterfaceAction({ type, msg })，msg 只需 content
 function sendAction(type) {
-  emit('message-action', { type, msg: { content: props.bubble.content } })
+  emit('message-action', { type, msg: { content: legalReadableText(props.bubble.content, t) } })
 }
 
+const openLegalReferenceTab = inject('openLegalReferenceTab', null)
+const inlineReference = ref(null)
+const toolReferences = computed(() => referencesFromTools(props.bubble.processes || []))
+function openReference(reference) {
+  emit('reading-interaction')
+  if (openLegalReferenceTab) openLegalReferenceTab(reference)
+  else inlineReference.value = reference
+}
 const showActions = ref(false)
 // 「用到文档」那组操作的可见性。判定整体在纯函数里（可单测），这里只做响应式包装。
 const showUseInDocument = computed(() => shouldShowUseInDocument(props.bubble))
@@ -212,7 +232,7 @@ function pickAction(type) {
 // 复制拿的是纯文本化之后的正文：粘进邮件里的不该是 **加粗** 与 <final>（见 utils/chatClipboard.js）。
 // 这里同时当作可见性判据——纯文本化后为空（整条只有工具执行、没有一个字的回答）就不出按钮，
 // 出一颗点下去什么都没复制走的按钮比没有按钮更糟。
-const copyableText = computed(() => (props.bubble.isStreaming ? '' : answerPlainText(props.bubble.content)))
+const copyableText = computed(() => (props.bubble.isStreaming ? '' : answerPlainText(legalReadableText(props.bubble.content, t))))
 const showCopy = computed(() => !!copyableText.value)
 const showRegenerate = computed(() => props.isLatest && !props.bubble.isStreaming && !!props.bubble.content)
 function copyAnswer() {

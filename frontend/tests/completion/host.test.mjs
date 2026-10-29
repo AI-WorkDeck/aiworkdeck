@@ -405,3 +405,56 @@ test('public autocomplete preference preserves an explicit off state, syncs host
   assert.equal(a.states.at(-1).enabled, false)
   assert.equal(a.states.at(-1).error, '')
 })
+
+test('legal readers use retained query records, not guest payloads, and expire across document activation', async t => {
+  const opened = [], sent = []
+  const entity = { kind: 'LAW', name: 'Synthetic Regulation', retrievalStatus: 'OK', retrievalSource: 'pkulaw',
+    detail: { result: [{ title: 'Synthetic Regulation', article: '第一条 Synthetic legal text.', url: 'https://example.org/law' }] } }
+  const api = { lookup: async () => entity, detail: async () => entity }
+  const host = createWritingAssistanceHost({ projectId: 11, fileId: 22, userId: 33, writable: true,
+    send: m => sent.push(m), api, storage: { get() {} }, execute: async () => ({}),
+    openLegalReference: reference => opened.push(reference), translate: key => `translated:${key}` })
+  t.after(() => host.destroy())
+  const request = (action, data) => host.handle({ type: 'writing-request', session: host.session, id: 1, action, data })
+  await request('lookup', { kind: 'LAW', text: 'Synthetic Regulation' })
+  const payload = sent.at(-1).result.legalReferences
+  assert.equal(opened.length, 0, 'retrieval itself never opens a reader')
+  assert.equal(payload.items[0].title, entity.name)
+  assert.equal(payload.openLabel, 'translated:legalReference.openTab')
+  await request('openLegalReference', { ticket: 'forged', index: 0, reference: { title: 'forged' } })
+  await request('openLegalReference', { ticket: payload.ticket, index: -1 })
+  assert.equal(opened.length, 0)
+  await request('openLegalReference', { ticket: payload.ticket, index: 0, reference: { title: 'forged' } })
+  assert.equal(opened[0].title, entity.name)
+  assert.equal(opened[0].sections[0].text.includes('Synthetic legal text.'), true)
+  host.setActive(false); host.setActive(true)
+  await request('openLegalReference', { ticket: payload.ticket, index: 0 })
+  assert.equal(opened.length, 1, 'reactivation does not revive an old popup ticket')
+  await request('detail', { entityId: 5 })
+  const cached = sent.at(-1).result.legalReferences
+  await request('openLegalReference', { ticket: cached.ticket, index: 0 })
+  assert.equal(opened.length, 2, 'saved information uses the same reader path')
+})
+
+test('late legal lookup cannot replace a newer query or become usable after leaving its document', async t => {
+  const opened = [], sent = [], resolve = []
+  const api = { lookup: () => new Promise(done => resolve.push(done)) }
+  const host = createWritingAssistanceHost({ projectId: 11, fileId: 22, userId: 33, writable: true,
+    send: m => sent.push(m), api, storage: { get() {} }, execute: async () => ({}),
+    openLegalReference: reference => opened.push(reference), translate: key => key })
+  t.after(() => host.destroy())
+  const request = (action, data) => host.handle({ type: 'writing-request', session: host.session, id: 1, action, data })
+  const entity = title => ({ kind: 'CASE', name: title, retrievalStatus: 'OK', retrievalSource: 'pkulaw', detail: { result: { title, content: 'Synthetic judgment' } } })
+  const first = request('lookup', { kind: 'CASE', text: 'first' })
+  const second = request('lookup', { kind: 'CASE', text: 'second' })
+  resolve[1](entity('second')); await second
+  const current = sent.at(-1).result.legalReferences
+  resolve[0](entity('first')); await first
+  assert.equal(sent.at(-1).result.legalReferences, undefined)
+  await request('openLegalReference', { ticket: current.ticket, index: 0 })
+  assert.equal(opened[0].title, 'second')
+  const third = request('lookup', { kind: 'CASE', text: 'third' })
+  host.setActive(false); host.setActive(true)
+  resolve[2](entity('third')); await third
+  assert.equal(sent.at(-1).result.legalReferences, undefined)
+})

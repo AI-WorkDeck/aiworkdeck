@@ -153,6 +153,7 @@ public class ToolRegistry {
             Map.entry("qichacha_ipr", "Company IP lookup"),
             Map.entry("tushare_query", "Financial data lookup"),
             Map.entry("law_search", "Search regulations"),
+            Map.entry("case_search", "Search judicial cases"),
             Map.entry("law_search_keyword", "Keyword law search"),
             Map.entry("law_recognition", "Identify citations"),
             Map.entry("get_law_article", "Look up article"),

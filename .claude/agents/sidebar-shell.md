@@ -1627,3 +1627,7 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 ## 随手工作区文件改名刷新（dev-board#1587）
 
 `ChatModeSidebar` 的文件列表来自独立 `chatWorkspaceFiles`，不依赖 `FileTree.allFiles`。AI 的 `refresh_files` 在对话模式同时调用 `loadChatWorkspaceFiles`；加载器按请求序号与项目 ID 丢弃迟到结果，并沿 `handleFileRenamed` 更新左右已开标签、窗口标题与当前文档上下文。不能只刷新 FileTree，否则 AI 已改名但左侧仍显示旧名。回归 `file-rename-sync.test.mjs` 覆盖文件树挂载/未挂载、Word/PPT/Excel/PDF/Markdown 名称同步与跨项目迟到响应；这是合成清单的真实方法执行测试，不替代正式客户端模型调用与编辑器保存重开验收。
+
+## 法律资料阅读页（dev-board#1611）
+
+`legalReferenceTab.js` 方法组由工作台 provide `openLegalReferenceTab`，接 AI 聊天和 Writer 快捷查询的资料卡。`tabType:'legal-reference'` 左右两条渲染链均挂 `LegalReferencePane`；首次打开右侧分屏，重复打开相同资料快照只激活，隐藏的右侧会恢复分屏。`fileKind.NON_FILE_TAB_TYPES` 排除其文档上下文，`tabSnapshot` 保存完整资料快照，不触发重新查询/扣费。资料快照身份包含来源与日期/警告，不能用同标题旧资料覆盖新查询结果。

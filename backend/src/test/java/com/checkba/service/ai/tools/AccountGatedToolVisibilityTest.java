@@ -59,13 +59,13 @@ class AccountGatedToolVisibilityTest {
     }
 
     @Test
-    @DisplayName("LegalTools：未连接时藏四个 law_*，read_document 绝不连坐")
+    @DisplayName("LegalTools：未连接时隐藏法规与案例检索，read_document 绝不连坐")
     void legalToolsHidesOnlyPkulaw() {
         LegalTools tools = new LegalTools(null, null, null);
         inject(tools, "externalServiceAvailability", availability(false));
 
         Set<String> hidden = tools.currentlyUnusableTools();
-        assertEquals(Set.of("law_search", "law_search_keyword", "law_recognition", "get_law_article"), hidden);
+        assertEquals(Set.of("law_search", "law_search_keyword", "law_recognition", "get_law_article", "case_search"), hidden);
         assertFalse(hidden.contains("read_document"),
                 "read_document 读的是项目里已有的文件、全程不出网，藏了等于告诉模型它连文件都读不了");
 
