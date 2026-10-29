@@ -311,6 +311,85 @@ try {
   }
   console.log('PASS: international charged USD, zh/en, empty/chat, K3 and K3.1 image support and text-only distinction')
 
+  // Retained scratch chat: a local-provider snapshot must refresh without remounting.
+  const refreshHooks = await page.evaluateOnNewDocument(() => {
+    const listeners = new Map()
+    let uniInstance
+    window.refreshRequests = []
+    window.heldRefreshResponses = []
+    window.refreshProvider = 'OLLAMA'
+    Object.defineProperty(window, 'uni', {
+      configurable: true,
+      get: () => uniInstance,
+      set(value) {
+        uniInstance = value
+        value.$on = (name, fn) => {
+          if (!listeners.has(name)) listeners.set(name, new Set())
+          listeners.get(name).add(fn)
+        }
+        value.$off = (name, fn) => listeners.get(name)?.delete(fn)
+        value.$emit = (name, payload) => listeners.get(name)?.forEach(fn => fn(payload))
+        const request = value.request
+        value.request = options => {
+          const kind = String(options.url).includes('/api/ai/models') ? 'models'
+            : String(options.url).includes('/api/ai/config') ? 'config' : null
+          if (!kind) return request(options)
+          window.refreshRequests.push(kind)
+          const data = structuredClone(kind === 'models' ? window.__modelsFixture : { activeProvider: window.refreshProvider })
+          const reply = () => options.success?.({ statusCode: 200, data })
+          if (window.holdRefreshResponses) window.heldRefreshResponses.push(reply)
+          else reply()
+        }
+      },
+    })
+  })
+  const localCatalog = catalog(LIST_PLATFORM)
+  localCatalog.models.forEach(model => { model.vision = false })
+  await open(localCatalog, { lang: 'en-US', empty: true })
+  await page.evaluate(() => {
+    window.retainedChat = window.chat
+    const option = [...document.querySelectorAll('.model-option')].find(el => el.querySelector('.model-option-name').textContent.trim() === 'Kimi K3')
+    option.dispatchEvent(new CustomEvent('tap', { bubbles: true }))
+  })
+  assert.equal(await page.evaluate(() => window.chatState.currentModelVision), false)
+  assert.deepEqual(await page.evaluate(() => window.chatState.availableModes.map(mode => mode.id)), ['ASK'])
+  await page.evaluate(body => { window.__modelsFixture = body; window.refreshProvider = 'AWD_CLOUD' }, catalog(CHARGED_USD))
+  await page.$eval('.model-selector', el => el.dispatchEvent(new CustomEvent('tap', { bubbles: true })))
+  await page.waitForFunction(() => window.chatState.currentModelVision === true && window.chatState.availableModes.length === 3, { timeout: 5000 })
+  assert.equal(await page.evaluate(() => window.chat === window.retainedChat), true)
+  assert.equal(await page.evaluate(() => window.chatState.currentModelId), 'moonshotai/kimi-k3')
+  assert.equal(await page.evaluate(() => window.chatState.modelPriceDisplay.basis), 'charged')
+  assert.equal(await page.evaluate(() => window.chatState.modelPriceDisplay.currency), 'USD')
+  assert.equal(await page.$$eval('.model-option', els => els.find(el => el.querySelector('.model-option-name').textContent.trim() === 'Kimi K3').querySelector('.model-novision-tag') !== null), false)
+  // Hold an obsolete local response, change the account, then dismiss while a fresh request is queued.
+  await page.$eval('.model-selector', el => el.dispatchEvent(new CustomEvent('tap', { bubbles: true })))
+  await page.evaluate(body => { window.__modelsFixture = body; window.refreshProvider = 'OLLAMA'; window.holdRefreshResponses = true }, localCatalog)
+  await page.$eval('.model-selector', el => el.dispatchEvent(new CustomEvent('tap', { bubbles: true })))
+  await page.waitForFunction(() => window.heldRefreshResponses.length === 2)
+  await page.$eval('.model-selector', el => el.dispatchEvent(new CustomEvent('tap', { bubbles: true })))
+  await page.$eval('.model-selector', el => el.dispatchEvent(new CustomEvent('tap', { bubbles: true })))
+  assert.equal(await page.evaluate(() => window.heldRefreshResponses.length), 2, 'repeated opens share the in-flight request pair')
+  await page.evaluate(body => {
+    window.__modelsFixture = body
+    window.refreshProvider = 'AWD_CLOUD'
+    uni.$emit('awd:account-changed', { connected: true })
+    uni.$emit('awd:ai-config-changed')
+    const option = [...document.querySelectorAll('.model-option')].find(el => el.querySelector('.model-option-name').textContent.trim() === 'Kimi K3.1 Pro')
+    option.dispatchEvent(new CustomEvent('tap', { bubbles: true }))
+    window.heldRefreshResponses.splice(0).forEach(reply => reply())
+  }, catalog(CHARGED_CNY))
+  await page.waitForFunction(() => window.heldRefreshResponses.length === 2)
+  assert.equal(await page.evaluate(() => window.chatState.currentModelVision), true, 'invalidated local response cannot overwrite current capability')
+  assert.equal(await page.evaluate(() => window.chatState.availableModes.length), 3, 'invalidated local config cannot force Ask-only')
+  await page.evaluate(() => window.heldRefreshResponses.splice(0).forEach(reply => reply()))
+  await page.waitForFunction(() => window.chatState.modelPriceDisplay.currency === 'CNY')
+  assert.equal(await page.evaluate(() => window.chatState.currentModelId), 'moonshotai/kimi-k3.1-pro', 'selection made during refresh is preserved')
+  assert.equal(await page.evaluate(() => window.chatState.currentModelVision), true)
+  assert.equal(await page.$('.model-dropdown'), null, 'late refresh must not reopen a dismissed picker')
+  assert.equal(await page.evaluate(() => window.refreshRequests.length), 8, 'mount, open, obsolete pair, one queued fresh pair')
+  await page.removeScriptToEvaluateOnNewDocument(refreshHooks.identifier)
+  console.log('PASS: retained local-to-platform refresh, current prices/provider, event coalescing, stale-response rejection and dismissal')
+
   assert.deepEqual(errors, [])
   console.log(`PASS: charged CNY / list USD, both placements, alignment, 4 tiers, footnote, en-US, select. Shots in ${shots}`)
 } finally {

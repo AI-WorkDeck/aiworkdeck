@@ -2902,6 +2902,7 @@ export default {
       this.saving = true
       try {
         await saveAdminConfig(this.form)
+        uni.$emit?.('awd:ai-config-changed')
         uni.showToast({ title: this.$t('admin.saveSuccess'), icon: 'success' })
         // 区域一改，可用模型清单跟着变；默认模型也可能因此落到清单外，
         // 保存后重新拉一次目录，让页面上显示的就是新口径

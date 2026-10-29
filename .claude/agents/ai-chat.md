@@ -279,6 +279,8 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
 
 2026-10-29 更新（dev-board#1593/#1594）：目录为15条（GLOBAL10/INTERNATIONAL5），新增 Kimi K3.1 Pro，Qwen3.8 Max 使用当前 `qwen/qwen3.8-max-0902`；旧保存ID由 `AllowedModels.canonicalModelId` 精确映射到该版本，覆盖请求及默认/辅助/子模型设置，发送前规范化；目录下发aliases供前端保留旧选择，PPT直传路径也须规范化；不改写无关模型、不改数据库原设置。图片标记必须调用 `ChatModelFactory.effectiveModelSupportsVision(id)`，与实际消息路由一致；不能用原始 `resolveProvider()==OLLAMA` 覆盖整表，因为未显式选择本地时白名单模型仍可能走云端。显式本地选择保持无图片直送。国际平台USD与图片能力独立；计费渠道同样按目录模型实际路由解析，隐式本地默认但实际云端的请求不得提示免费。
 
+随手工作区与项目聊天共用保活的 `ChatInterface`（宿主 `v-show`，并非每次打开重建）。目录/供应商须在挂载、模型选择器打开、`awd:account-changed`、`awd:ai-config-changed` 后刷新；AdminPane 只在配置保存成功后发配置事件。刷新合并重复请求，变化事件淘汰旧响应并补拉，保留当前模型选择与下拉关闭状态，卸载移除监听。真实Chrome回归复现旧组件本地→平台切换后K3仍false，并验证同实例刷新、USD/CNY、迟到响应和保存成功/失败通知。用户截图确证错误标签，但该机具体触发过程尚未独立验证。
+
 `.github/workflows/model-catalogue-audit.yml` 每日及目录PR运行联网检查：在线、tools、image、上下文与全部价格档位。离线测试仍默认跳过；显式联网检查遇网络/响应错误必须失败，不能伪装通过。价格是上游当时的路由报价快照，供应商变动可导致快速漂移；失败须核对新数据，不能放宽容差。Codex本会话另设每周一10:00（Asia/Singapore）复查新模型与审计结果、测试并合并修正；不自动发版。合并只更新源码，已安装桌面目录随后端组件版本更新，不能声称远端Mac即时生效。
 
 - `service/ai/AllowedModels.java` 是**模型目录的唯一事实来源**（15 条：GLOBAL 10 + INTERNATIONAL 5）。枚举带元数据：displayName（中文）/ Vendor（中文厂商名，前端按它分组）/ Region / contextLength / **vision（是否支持图像输入）** / priceTiers。前端**不许再硬编码任何模型清单**——历史上有三份互不同步的副本（本枚举、ChatInterface.vue 硬编码数组、project-overview.vue 死代码），后果是「后端加模型用户看不到、前端加模型被工厂静默回落默认模型」。
