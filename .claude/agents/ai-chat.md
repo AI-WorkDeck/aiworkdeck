@@ -45,6 +45,15 @@ AI 自动合并续步也用同一操作的 `/merge`、`/merge-file` 与独立 `s
 - `HarnessEvolutionEntry.payloadJson` 必须使用 `@JdbcTypeCode(SqlTypes.LONGVARCHAR)` + `TEXT`，不能加 `@Lob`：PostgreSQL 会将其绑定为 CLOB/OID，DDL 的 `TEXT` 不会覆盖 JDBC 读写类型（dev-board#1522）。`HarnessEvolutionJdbcMappingTest` 验证 PostgreSQL/H2 双方言实际映射及 `setString/getString`，持久化测试另覆盖超过 64K 的 Unicode JSON 落盘回读。
 - 回归：`HarnessDiagnosticServiceTest`、`VerificationHarnessTest`、`HarnessEvolutionServiceTest`、`HarnessEvolutionPersistenceTest`、`EnvHarnessPerturbationEvalTest`、`frontend/tests/project-home/harness-evolution-ui.test.mjs`、真浏览器+隔离真后端端到端 `frontend/tests/ai-alignment-e2e/harness-self-evolving-e2e.mjs`。
 
+## 同页后台出图与聊天共用 SSE（dev-board#1595）
+
+`useAgentStream` 的 `X-Client-Instance` 是页面身份，后端同会话只有一个 emitter。
+同页的诉讼出图和右侧聊天必须通过 `sharedAgentConnection.mjs` 共用传输，否则两者切入同一会话会互踢并无限重连。
+共享层按后端 URL、会话 URL、会话认证与页面实例隔离，按完整 SSE 帧分发；每个消费者仍独立维护气泡和状态。
+新订阅者加入时轮换一次底层连接，保持既有消费者流不关闭，带已交付游标请求服务端补发与 state_recovery；各解析器沿既有事件 ID 去重，不在共享层自造历史快照。最后一个消费者退出才中止底层请求。
+诉讼面板继续仅捕获文件交付编号，不把编辑器指令转发到活动文档。
+回归：`frontend/tests/project-home/shared-agent-connection.test.mjs` 包含真实双 composable、完整帧、中文、游标、断开与完成状态验证。
+
 ## 智能模型路由（Smart Mode / Auto，2026-10-22，dev-board#1434）
 
 - 前端 `ModelSelectorDropdown.vue` 顶部置顶「智能模式（Auto）」（`.model-auto-option`，`modelId = 'auto'`）；本地存储未显式持久化有效具体模型时默认选中 `'auto'`，用户在下拉中显式选定任意具体模型后持久化该模型。当处于 `'auto'` 模式且可用清单中存在任一 `vision: true` 模型时，`currentModelVision` 为 `true`，允许直接上传图片并由后端路由到视觉模型。

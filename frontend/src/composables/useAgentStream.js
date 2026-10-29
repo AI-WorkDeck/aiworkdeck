@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { fetchAgentConnection } from './sharedAgentConnection.mjs'
 import { isCreditsRequired, isAccountRequired } from '@/utils/requireAccountCore.js'
 import { ref, reactive, nextTick, onUnmounted, getCurrentInstance } from 'vue'
 import { deleteAgentInboxItem, getAgentInbox, getApiBaseUrl, getConversationMetadata, updateAgentInboxItem } from '@/services/api.js'
@@ -640,7 +641,7 @@ export function useAgentStream() {
                 if (lastSseEventId && lastSseEventConversationId === conversationId) {
                     headers['Last-Event-ID'] = lastSseEventId
                 }
-                const response = await fetch(url, {
+                const response = await fetchAgentConnection(url, {
                     method: 'GET',
                     headers,
                     signal: myController.signal
