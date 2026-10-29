@@ -86,6 +86,166 @@ class MobileApiContractTest {
 
     @MockBean private com.checkba.service.account.AwdkLoginService accountBridge;
 
+    @Autowired private com.checkba.service.mobile.MobileMediaMoveService mediaMoves;
+    @Autowired private com.checkba.repository.MobileMediaMoveRepository mediaMoveRepository;
+    @Autowired private com.checkba.repository.MobileMediaInboxRepository mediaInboxRepository;
+
+    @Test
+    void archiveMovesRequireVerifiedTargetThenOriginalAckAndFenceRetries() throws Exception {
+        String sid=register("move_contract_"+System.nanoTime());
+        Long user=com.checkba.controller.AuthController.getUserIdFromSession(sid);
+        mvc.perform(get("/api/auth/me").header("X-Session-Id",sid)).andExpect(jsonPath("$.data.id").value(user)).andExpect(openApi().isValid(validator));
+        mvc.perform(get("/api/auth/me")).andExpect(jsonPath("$.code").value(4010)).andExpect(openApi().isValid(validator));
+        String source=java.util.UUID.randomUUID().toString(), target=java.util.UUID.randomUUID().toString(), id=java.util.UUID.randomUUID().toString();
+        byte[] bytes="move capture bytes".getBytes(StandardCharsets.UTF_8);
+        String hash=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        relayStore.replaceDirectory(user,"source-device","Source",List.of(new MobileRelayStoreService.DirEntry("1","Source")));
+        relayStore.replaceDirectory(user,"target-device","Target",List.of(new MobileRelayStoreService.DirEntry("2","Target")));
+        var original=relayStore.storeMedia(user,"source-device","1",source,"capture.jpg","image",LocalDateTime.now(),bytes.length,new java.io.ByteArrayInputStream(bytes));
+        var request=new com.checkba.service.mobile.MobileMediaMoveService.Request(id,source,target,"source-device","1","target-device","2",hash,bytes.length);
+        String endpoint="/api/mobile/media/moves";
+        mvc.perform(post(endpoint).header("X-Session-Id",sid).contentType(APPLICATION_JSON).content(om.writeValueAsString(request)))
+                .andExpect(jsonPath("$.data.status").value("WAITING_TARGET")).andExpect(openApi().isValid(validator));
+        mvc.perform(post(endpoint).header("X-Session-Id",sid).contentType(APPLICATION_JSON).content(om.writeValueAsString(request)))
+                .andExpect(jsonPath("$.data.requestId").value(id)).andExpect(openApi().isValid(validator));
+        var hijacked=new com.checkba.service.mobile.MobileMediaMoveService.Request(id,source,java.util.UUID.randomUUID().toString(),"source-device","1","target-device","2",hash,bytes.length);
+        mvc.perform(post(endpoint).header("X-Session-Id",sid).contentType(APPLICATION_JSON).content(om.writeValueAsString(hijacked)))
+                .andExpect(jsonPath("$.code").value(1)).andExpect(jsonPath("$.kind").doesNotExist()).andExpect(openApi().isValid(validator));
+        mvc.perform(get(endpoint+"/"+id).header("X-Session-Id",sid)).andExpect(jsonPath("$.data.status").value("WAITING_TARGET")).andExpect(openApi().isValid(validator));
+        mvc.perform(get(endpoint+"/commands").header("X-Session-Id",sid).param("deviceId","source-device"))
+                .andExpect(jsonPath("$.commands").isEmpty()).andExpect(openApi().isValid(validator));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,()->relayStore.storeMedia(user,"other-device","2",target,"capture.jpg","image",LocalDateTime.now(),bytes.length,new java.io.ByteArrayInputStream(bytes)));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,()->relayStore.storeMedia(user,"target-device","2",target,"capture.jpg","image",LocalDateTime.now(),bytes.length,new java.io.ByteArrayInputStream(new byte[bytes.length])));
+        assertTrue(mediaInboxRepository.findByUserIdAndClientMediaId(user,target).isEmpty());
+        assertFalse(java.nio.file.Files.exists(java.nio.file.Path.of(System.getProperty("java.io.tmpdir"),"mobile-api-contract-store","mobile-relay",user.toString(),target)),
+                "Hash rejection must remove unaccounted staging bytes");
+        var uploaded=relayStore.storeMedia(user,"target-device","2",target,"capture.jpg","image",LocalDateTime.now(),bytes.length,new java.io.ByteArrayInputStream(bytes));
+        relayStore.ack(user,uploaded.getId());
+        mvc.perform(get(endpoint+"/commands").header("X-Session-Id",sid).param("deviceId","target-device"))
+                .andExpect(jsonPath("$.commands[0].action").value("VERIFY_TARGET")).andExpect(openApi().isValid(validator));
+        var verify=mediaMoves.commands(user,"target-device").get(0);
+        String fileUid=java.util.UUID.randomUUID().toString();
+        var verified=new com.checkba.service.mobile.MobileMediaMoveService.Result(verify.commandId(),"target-device","VERIFY_TARGET",true,hash,8L,fileUid,null);
+        mvc.perform(post(endpoint+"/"+id+"/result").header("X-Session-Id",sid).contentType(APPLICATION_JSON).content(om.writeValueAsString(verified)))
+                .andExpect(jsonPath("$.data.status").value("WAITING_SOURCE")).andExpect(openApi().isValid(validator));
+        var chained=new com.checkba.service.mobile.MobileMediaMoveService.Request(java.util.UUID.randomUUID().toString(),target,
+                java.util.UUID.randomUUID().toString(),"target-device","2","source-device","1",hash,bytes.length);
+        org.junit.jupiter.api.Assertions.assertThrows(com.checkba.service.mobile.MobileMediaMoveService.NotRegistered.class,()->mediaMoves.register(user,chained),
+                "An in-flight destination cannot become another move's source");
+        assertTrue(mediaMoves.commands(user,"source-device").isEmpty(),"Pending original must land and ACK before removal");
+        relayStore.ack(user,original.getId());
+        var remove=mediaMoves.commands(user,"source-device").get(0);
+        var failed=new com.checkba.service.mobile.MobileMediaMoveService.Result(remove.commandId(),"source-device","REMOVE_SOURCE",false,null,null,null,"disk unavailable");
+        mediaMoves.result(user,id,failed);
+        mvc.perform(post(endpoint+"/"+id+"/retry").header("X-Session-Id",sid)).andExpect(jsonPath("$.data.status").value("WAITING_TARGET")).andExpect(openApi().isValid(validator));
+        org.junit.jupiter.api.Assertions.assertEquals("WAITING_TARGET",mediaMoves.result(user,id,verified).status(),"Old verification nonce cannot authorize removal after retry");
+        verify=mediaMoves.commands(user,"target-device").get(0);
+        mediaMoves.result(user,id,new com.checkba.service.mobile.MobileMediaMoveService.Result(verify.commandId(),"target-device","VERIFY_TARGET",true,hash,8L,fileUid,null));
+        remove=mediaMoves.commands(user,"source-device").get(0);
+        var removed=new com.checkba.service.mobile.MobileMediaMoveService.Result(remove.commandId(),"source-device","REMOVE_SOURCE",true,hash,9L,java.util.UUID.randomUUID().toString(),null);
+        mediaMoves.result(user,id,removed);
+        org.junit.jupiter.api.Assertions.assertEquals("DONE",mediaMoves.result(user,id,failed).status(),"Late failure cannot regress DONE");
+        org.junit.jupiter.api.Assertions.assertEquals("DONE",mediaMoves.retry(user,id).status());
+        org.junit.jupiter.api.Assertions.assertEquals("WAITING_TARGET",mediaMoves.register(user,chained).status(),"A completed move's target can be moved again");
+        String stranger=register("move_other_"+System.nanoTime());
+        mvc.perform(get(endpoint+"/"+id).header("X-Session-Id",stranger)).andExpect(jsonPath("$.code").value(1)).andExpect(openApi().isValid(validator));
+        // Durable ACK identity prevents resurrecting a moved capture after inbox TTL cleanup.
+        mediaInboxRepository.deleteById(uploaded.getId());
+        var replay=relayStore.storeMedia(user,"target-device","2",target,"capture.jpg","image",LocalDateTime.now(),bytes.length,new java.io.ByteArrayInputStream(bytes));
+        org.junit.jupiter.api.Assertions.assertEquals(uploaded.getId(),replay.getId());assertTrue(mediaInboxRepository.findByUserIdAndClientMediaId(user,target).isEmpty());
+        mvc.perform(get("/api/mobile/media/status").header("X-Session-Id",sid).param("clientMediaIds",target))
+                .andExpect(jsonPath("$[0].delivered").value(true)).andExpect(jsonPath("$[0].waitingSeconds").value(0)).andExpect(openApi().isValid(validator));
+    }
+
+    @Test
+    void moveRegistrationSerializesSourcesAndRejectsUnknownOrAmbiguousLegacyReceipts() throws Exception {
+        String sid=register("move_registration_"+System.nanoTime());Long user=com.checkba.controller.AuthController.getUserIdFromSession(sid);
+        relayStore.replaceDirectory(user,"target","Target",List.of(new MobileRelayStoreService.DirEntry("2","Target")));
+        String source=java.util.UUID.randomUUID().toString(); byte[] bytes={1,2,3};
+        String hash=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        java.util.function.Supplier<com.checkba.service.mobile.MobileMediaMoveService.Request> request=()->new com.checkba.service.mobile.MobileMediaMoveService.Request(
+                java.util.UUID.randomUUID().toString(),source,java.util.UUID.randomUUID().toString(),"source","1","target","2",hash,3);
+        mvc.perform(post("/api/mobile/media/moves").header("X-Session-Id",sid).contentType(APPLICATION_JSON).content(om.writeValueAsString(request.get())))
+                .andExpect(jsonPath("$.kind").value("MOVE_NOT_REGISTERED")).andExpect(openApi().isValid(validator));
+        LocalDateTime captured=LocalDateTime.of(2026,10,29,12,0);
+        var original=relayStore.storeMedia(user,"source","1",source,"same.jpg","image",captured,3,new java.io.ByteArrayInputStream(bytes));
+        java.util.concurrent.ExecutorService pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        java.util.concurrent.CountDownLatch start=new java.util.concurrent.CountDownLatch(1);
+        try {
+            java.util.concurrent.Callable<Boolean> attempt=()->{start.await();try{mediaMoves.register(user,request.get());return true;}
+                catch(com.checkba.service.mobile.MobileMediaMoveService.NotRegistered rejected){return false;}};
+            var first=pool.submit(attempt);var second=pool.submit(attempt);start.countDown();
+            org.junit.jupiter.api.Assertions.assertNotEquals(first.get(10,java.util.concurrent.TimeUnit.SECONDS),second.get(10,java.util.concurrent.TimeUnit.SECONDS));
+        } finally {pool.shutdownNow();}
+        var move=mediaMoveRepository.findByUserIdAndSourceClientMediaId(user,source).orElseThrow();
+        move.setStatus("WAITING_SOURCE");move.setCommandExpiresAt(0L);mediaMoveRepository.saveAndFlush(move);
+        org.junit.jupiter.api.Assertions.assertEquals("WAITING_TARGET",mediaMoves.get(user,move.getRequestId()).status());
+        // Two complete UUIDs with the same historical eight-character marker are not one identity.
+        String freshSource=java.util.UUID.randomUUID().toString();
+        relayStore.storeMedia(user,"source","1",freshSource,"another.jpg","image",captured,3,new java.io.ByteArrayInputStream(bytes));
+        var reusedTarget=new com.checkba.service.mobile.MobileMediaMoveService.Request(java.util.UUID.randomUUID().toString(),freshSource,move.getTargetClientMediaId(),"source","1","target","2",hash,3);
+        org.junit.jupiter.api.Assertions.assertThrows(com.checkba.service.mobile.MobileMediaMoveService.NotRegistered.class,()->mediaMoves.register(user,reusedTarget));
+        var caseAlias=new com.checkba.service.mobile.MobileMediaMoveService.Request(java.util.UUID.randomUUID().toString(),freshSource,freshSource.toUpperCase(java.util.Locale.ROOT),"source","1","target","2",hash,3);
+        org.junit.jupiter.api.Assertions.assertThrows(com.checkba.service.mobile.MobileMediaMoveService.NotRegistered.class,()->mediaMoves.register(user,caseAlias),"UUID case changes do not create a new transfer identity");
+        String collision=source.substring(0,8)+"-0000-4000-8000-000000000001";
+        relayStore.storeMedia(user,"source","1",collision,"same.jpg","image",captured,3,new java.io.ByteArrayInputStream(bytes));
+        var ambiguous=new com.checkba.service.mobile.MobileMediaMoveService.Request(java.util.UUID.randomUUID().toString(),collision,java.util.UUID.randomUUID().toString(),"source","1","target","2",hash,3);
+        org.junit.jupiter.api.Assertions.assertThrows(com.checkba.service.mobile.MobileMediaMoveService.NotRegistered.class,()->mediaMoves.register(user,ambiguous));
+        var sameProject=new com.checkba.service.mobile.MobileMediaMoveService.Request(java.util.UUID.randomUUID().toString(),collision,java.util.UUID.randomUUID().toString(),"source","1","source","1",hash,3);
+        org.junit.jupiter.api.Assertions.assertThrows(com.checkba.service.mobile.MobileMediaMoveService.NotRegistered.class,()->mediaMoves.register(user,sameProject));
+    }
+
+    @Autowired private com.checkba.repository.ProjectFileRepository moveFiles;
+    @Autowired private com.checkba.repository.MobileCaptureRemovalRepository moveRemovals;
+    @Autowired private com.checkba.storage.StorageServiceFactory moveStorage;
+
+    @Test
+    void cloudArchiveMovePersistsRemovalTombstoneAndRemovesActualOriginal() throws Exception {
+        String sid=register("cloud_move_"+System.nanoTime());Long user=com.checkba.controller.AuthController.getUserIdFromSession(sid);
+        AccountBinding binding=new AccountBinding();binding.setUserId(user);binding.setExternalAccountId("move-account-"+user);
+        binding.setCreatedAt(LocalDateTime.now());accountBindingRepository.save(binding);
+        when(billing.balance(anyString())).thenReturn(new MobileBillingClient.BalanceResult(0L,"CNY","paid",
+                Map.of("active",true,"expiresAt","2030-01-01T00:00:00Z","cloudStorageBytes",3L*1024*1024*1024)));
+        long[] projectIds=new long[2];
+        for(int i=0;i<2;i++) {
+            var response=mvc.perform(post("/api/projects").header("X-Session-Id",sid).contentType(APPLICATION_JSON)
+                    .content("{\"projectType\":\"BLANK\",\"name\":\"Move fixture "+i+"\"}")).andReturn();
+            projectIds[i]=om.readTree(response.getResponse().getContentAsString()).path("id").asLong();assertTrue(projectIds[i]>0);
+        }
+        byte[] bytes="a cloud original".getBytes(StandardCharsets.UTF_8);
+        String hash=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        String source=java.util.UUID.randomUUID().toString(),target=java.util.UUID.randomUUID().toString(),id=java.util.UUID.randomUUID().toString();
+        var sourceUpload=mvc.perform(multipart("/api/mobile/media").file(new MockMultipartFile("file","photo.jpg","image/jpeg",bytes))
+                .param("deviceId","cloud").param("projectKey",Long.toString(projectIds[0])).param("clientMediaId",source)
+                .param("fileName","photo.jpg").param("mediaType","image").header("X-Session-Id",sid))
+                .andExpect(jsonPath("$.delivered").value(true)).andReturn();
+        long sourceFileId=om.readTree(sourceUpload.getResponse().getContentAsString()).path("fileId").asLong();
+        String originalPath=moveFiles.findById(sourceFileId).orElseThrow().getFilePath();
+        mediaMoves.register(user,new com.checkba.service.mobile.MobileMediaMoveService.Request(id,source,target,"cloud",Long.toString(projectIds[0]),"cloud",Long.toString(projectIds[1]),hash,bytes.length));
+        org.junit.jupiter.api.Assertions.assertEquals("WAITING_TARGET",mediaMoves.get(user,id).status());
+        assertTrue(moveStorage.getStorageService().exists(originalPath));
+        var targetUpload=mvc.perform(multipart("/api/mobile/media").file(new MockMultipartFile("file","photo.jpg","image/jpeg",bytes))
+                .param("deviceId","cloud").param("projectKey",Long.toString(projectIds[1])).param("clientMediaId",target)
+                .param("fileName","photo.jpg").param("mediaType","image").header("X-Session-Id",sid))
+                .andExpect(jsonPath("$.delivered").value(true)).andReturn();
+        long targetFileId=om.readTree(targetUpload.getResponse().getContentAsString()).path("fileId").asLong();
+        var command=mediaMoves.commands(user,"cloud").get(0);
+        var wrongId=new com.checkba.service.mobile.MobileMediaMoveService.Result(command.commandId(),"cloud","VERIFY_TARGET",true,hash,targetFileId+1000,command.fileUid(),null);
+        var wrongUid=new com.checkba.service.mobile.MobileMediaMoveService.Result(command.commandId(),"cloud","VERIFY_TARGET",true,hash,targetFileId,java.util.UUID.randomUUID().toString(),null);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,()->mediaMoves.result(user,id,wrongId));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,()->mediaMoves.result(user,id,wrongUid));
+        assertTrue(moveStorage.getStorageService().exists(originalPath));
+        org.junit.jupiter.api.Assertions.assertEquals("DONE",mediaMoves.get(user,id).status());
+        assertFalse(moveStorage.getStorageService().exists(originalPath));assertTrue(moveFiles.findById(sourceFileId).isEmpty());
+        String targetPath=moveFiles.findById(targetFileId).orElseThrow().getFilePath();
+        try(var in=moveStorage.getStorageService().load(targetPath).getInputStream()) {org.junit.jupiter.api.Assertions.assertArrayEquals(bytes,in.readAllBytes());}
+        var tombstone=moveRemovals.findByAccountScopeAndRequestId("cloud:"+user,id).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals("DONE",tombstone.getState());assertFalse(moveStorage.getStorageService().exists(tombstone.getQuarantinePath()));
+        moveStorage.getStorageService().save(originalPath,new java.io.ByteArrayInputStream("replacement".getBytes(StandardCharsets.UTF_8)));
+        org.junit.jupiter.api.Assertions.assertEquals("DONE",mediaMoves.get(user,id).status());
+        assertTrue(moveStorage.getStorageService().exists(originalPath),"A repeated completed request must not delete later same-path bytes");
+    }
+
     @Test
     void passwordBridgeAndRestrictedChallengeMatchSpec() throws Exception {
         String sid = register("password_bridge_" + System.nanoTime());
@@ -126,10 +286,14 @@ class MobileApiContractTest {
                 .build();
     }
 
+    private static final java.util.concurrent.atomic.AtomicInteger registrationIp=new java.util.concurrent.atomic.AtomicInteger(1);
+
     private String register(String username) throws Exception {
         String body = om.writeValueAsString(Map.of(
                 "username", username, "password", "pw123456", "displayName", username));
-        MvcResult r = mvc.perform(post("/api/auth/register").contentType(APPLICATION_JSON).content(body))
+        // Each fixture represents an independent client; API contract volume must not trip signup throttling.
+        MvcResult r = mvc.perform(post("/api/auth/register").contentType(APPLICATION_JSON).content(body)
+                .with(request->{request.setRemoteAddr("192.0.2."+registrationIp.getAndIncrement());return request;}))
                 .andExpect(status().isOk()).andReturn();
         JsonNode json = om.readTree(r.getResponse().getContentAsString());
         String sid = json.path("data").path("sessionId").asText();
