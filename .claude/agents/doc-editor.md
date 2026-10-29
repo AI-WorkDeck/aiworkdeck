@@ -27,6 +27,10 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 
 独立 `frontend/tests/lowa-unit/sheet-sort.test.mjs` 5项通过；`frontend/tests/lowa-e2e/sheet-sort.mjs` 真实Calc覆盖非A1范围、表头、升序/无表头降序、公式结果与文本、字体底色随行、保存重开及单格不扩大目标。默认读取当前worker源码并经测试服务内存替换；`SHEET_SORT_WORKER`可指定旧源码负对照。详细命令、日志及临时产物见 `doc/verification/2026-10-28-excel-desktop-quality.md`。该专项不是完整AI编排，也不证明Office/WPS实机通过。
 
+## 输入法中间态光标（dev-board#1597）
+
+LOWA 与原生候选在组合期间显示同一个持有焦点的真实 input，保留浏览器的中间选区与长串水平滚动；测量节点保持隐藏，不再用纯文本预览冒充输入过程。LOWA 将可见输入框放在正文光标上方，结束恢复透明锚点，避免 #606 正文下划线重叠。原生候选在撤权、暂停、离开视口时隐藏。Word/Calc/Impress共用 LOWA 路径；PDF 的 FilePreview 浏览器 iframe 不经过它。验证含 ime-composition、document-input 与真实 LOWA ime-underline 像素回归；搜狗真机与原生候选完整保存重开仍需另验。
+
 ## Calc 标题与输入时钟候选（dev-board#1509 / #1511）
 
 当前正式基线是 **24.2.8-zhcn-r6**（2026-10-20 PR#1164，四个产物SHA见 `desktop/lowa-build/RECIPE.md`）；下文历史段落的 r5/r6 描述不能当作当前未完成清单。本轮候选范围与近期内核限制复核在 `desktop/lowa-build/REBUILD-2026-10-26.md`，候选已于2026-10-26编译，哈希与真实验收边界见 `RECIPE.md`；默认下载地址仍为r6，未发布或升级客户端。
