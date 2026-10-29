@@ -4279,7 +4279,9 @@ public class AgentOrchestrator {
                     // 而他自己并不知道模型这两次挑了不同的工具（审计 A14）
                     "read_document",
                     // 结构审计报告本身就是给用户核对的成果（编号/引用/算术/修订清单），砍到 4000 用户看不到后半
-                    "doc_audit_structure");
+                    "doc_audit_structure",
+                    // 法源结构化结果供用户在资料卡核对；仍保留有界截断与前端截断提示。
+                    "law_search", "law_search_keyword", "law_recognition", "get_law_article", "case_search");
 
     /** 该工具的面板展示上限。前端截断提示按 {@code ...(截断)} 后缀判定，不要在文案里写死字数。 */
     static int toolOutputDisplayLimit(String toolName) {

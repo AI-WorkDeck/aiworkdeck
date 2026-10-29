@@ -31,7 +31,7 @@ export const TAB_SNAPSHOT_SUFFIX = 'tabs'
 export const TAB_SNAPSHOT_THROTTLE_MS = 300
 
 /** 全局单例标签：一个工作台里至多一个，恢复时跨两窗格按 id 去重 */
-export const SINGLETON_TAB_TYPES = ['message-center', 'dd-client', 'welcome', 'calendar', 'admin-settings', 'market-detail', 'commit-history', 'insight-entity', 'plugin']
+export const SINGLETON_TAB_TYPES = ['message-center', 'dd-client', 'welcome', 'calendar', 'admin-settings', 'market-detail', 'commit-history', 'insight-entity', 'legal-reference', 'plugin']
 
 /** 只在有项目时才有意义的标签（文件标签另判） */
 const PROJECT_ONLY_KINDS = ['file', 'dd-request', 'diff', 'version-compare', 'version-text-diff', 'commit-history', 'insight-entity', 'plugin']
@@ -91,6 +91,11 @@ const SERIALIZERS = {
   'market-detail': (t) => {
     const spec = plain(t.marketSpec)
     return spec ? { id: t.id, tabType: 'market-detail', name: str(t.name), marketSpec: spec } : null
+  },
+  'legal-reference': (t) => {
+    const reference = plain(t.legalReference)
+    return reference && ['LAW', 'CASE', 'PENALTY'].includes(reference.kind) && reference.title
+      ? { id: t.id, tabType: 'legal-reference', name: str(t.name), legalReference: reference } : null
   },
   'insight-entity': (t) => {
     const spec = plain(t.entitySpec)

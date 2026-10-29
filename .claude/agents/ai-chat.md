@@ -7,6 +7,13 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 职责边界：AI 对话功能本身（编排循环、工具注册分发、记忆、SSE、前端聊天 UI、评测）。AI→编辑器指令链路属 ai-doc-bridge 领域；skill 机制属 plugin-system 领域（但 SkillRouter 在编排循环里有两处旁路接入点）。
 
+## 法律资料卡与案例检索（2026-10-29，dev-board#1611）
+
+- `LegalTools.case_search(query)` 通过既有 `PkulawChannel` 调用 `pkulaw-case-semantic/search_case`（参数 `text`），平台与自备渠道继续由原通道分流，未接入处罚专用接口。`case_search` 属 `legal` 类目，案例/判例/判决书及英文 case law/judgment 触发披露；法宝不可用时与法规工具共同隐藏。
+- 中英基底提示约定聊天正文的 `legal-reference` JSON 围栏（单个对象或数组）：`kind: LAW|CASE|PENALTY`、`title`，可选 `documentNumber/authority/date/effectiveDate/validity/source/url/summary/excerpt`。`summary` 是 AI 整理、`excerpt` 是读取到的原文节选；模型卡固定待核对，忽略自报 verified，不因卡片展示额外要求付费查询，也不能把协议写进文档。`ContextAssemblerService.spliceToolGuidance` 按 OFFICE 能力删除卡片提示段（插件暂未支持此渲染），保留正常检索与案例工具说明。处罚与其他法域沿 `search_web/browse_url` 查公开来源。
+- 五个法宝工具的 UI/历史显示上限采用现有结果型 16,000 字符，模型上下文仍保留原始结果。不解析截断 JSON 来伪造资料卡，不把检索成功或来源字段当作真实性、现行效力或适用性认证。前端原始工具输出继续展示截断提示。
+- 回归：`LegalToolsValidationTest`、`ExternalServiceDualTierRoutingTest`、`ToolDisclosurePolicyTest`、`ContextAssemblerServiceTest`、`SystemPromptToolVisibilityContractTest`、`AgentOrchestratorQuestionStopTest`、`ToolDisplayNameCoverageTest`、`ToolChoiceSurfaceTest`。合成通道测试不代表供应商实查、模型遵循率或正式客户端验收。
+
 ## 独立 MCP 连接（dev-board#1599）
 
 `UserMcpConnectionService` 与 `/api/mcp/{presets,connections}` 独立于 Plugin 启停，按本地 userId + 当前平台账户指纹隔离配置。`PluginCredentialStore` 加密保存 Bearer，API 只写不回显；GET 离线列预置和保存状态，显式 test 才 initialize/tools-list，显式 enable 才向 AI 提供工具。仅支持公网 HTTPS Streamable HTTP，复用 `PluginMcpEndpointPolicy` 与 `PluginMcpHttpClient` 的 DNS/重定向/取消边界，不启动 stdio 命令。

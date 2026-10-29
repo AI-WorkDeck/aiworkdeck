@@ -46,6 +46,17 @@ export const WRITING_ASSISTANCE_CSS = `
 .awd-writing-assistance .awd-wa-panel[data-mode="context"] .awd-wa-heading strong {
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
+.awd-writing-assistance .awd-wa-legal-card {
+  margin-block:10px; padding:12px; border:1px solid var(--wa-border); border-inline-start:3px solid var(--wa-accent);
+  border-radius:6px; background:var(--wa-muted-surface); overflow-wrap:anywhere; text-align:start;
+}
+.awd-writing-assistance .awd-wa-legal-head { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.awd-writing-assistance .awd-wa-legal-head button { font-size:18px; padding:0 6px; flex:none; }
+.awd-writing-assistance .awd-wa-legal-kind { color:var(--wa-accent); font-size:11px; font-weight:600; }
+.awd-writing-assistance .awd-wa-legal-title { display:block; margin-block:7px; font-family:Georgia,"Songti SC",serif; font-size:16px; line-height:1.6; }
+.awd-writing-assistance .awd-wa-legal-card dl { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr); gap:5px 10px; font-size:12px; }
+.awd-writing-assistance .awd-wa-legal-card dt { color:var(--wa-muted); }
+.awd-writing-assistance .awd-wa-legal-card dd { margin:0; }
 .awd-writing-assistance .awd-wa-query { display:block; width:100%; margin-top:3px; }
 .awd-writing-assistance .awd-wa-query-primary { color:var(--wa-accent); font-weight:600; }
 .awd-writing-assistance .awd-wa-query-more { color:var(--wa-muted); }

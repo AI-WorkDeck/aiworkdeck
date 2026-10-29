@@ -3,18 +3,40 @@
 import { extractCompletionEntries } from '../utils/completionLexicon.js'
 import { isCreditsRequired } from '../utils/requireAccountCore.js'
 import { completionDetails } from '../utils/completionDetails.js'
+import { referencesFromEntity } from '../utils/legalReferences.js'
 
 const preferenceListeners = new Map()
 
 /** Host-scoped vocabulary and explicit lookup. Dependencies stay injectable for isolation tests. */
 export function createWritingAssistanceHost({ projectId, fileId, userId, execute, send, api, storage, writable, language, active = true,
-  openSettings = null, openAccount = null, openRecharge = null, onRevise = null, semantic = null, onState = null,
+  openSettings = null, openAccount = null, openRecharge = null, openLegalReference = null, translate = null, onRevise = null, semantic = null, onState = null,
   timers = { set: (fn, ms) => setTimeout(fn, ms), clear: id => clearTimeout(id) } }) {
   const session = `${projectId}:${fileId}:${Date.now()}:${Math.random().toString(36).slice(2)}`
   semantic?.bindSession(session)
   const key = `awd_writing_preferences_${userId}`
   let disposed = false, items = [], documentItems = [], loadSequence = 0, seedSequence = 0
   const seededTexts = new Set()
+  let referenceSequence = 0, referenceTicket = '', references = []
+  function clearReferences() { referenceSequence++; referenceTicket = ''; references = [] }
+  async function detailWithReferences(load) {
+    clearReferences()
+    const sequence = referenceSequence
+    const entity = await load()
+    const detail = completionDetails(entity)
+    if (disposed || !active || sequence !== referenceSequence || !openLegalReference || !translate) return detail
+    references = referencesFromEntity(entity)
+    if (!references.length) return detail
+    referenceTicket = `${session}:${sequence}`
+    return { ...detail, legalReferences: { ticket: referenceTicket, openLabel: translate('legalReference.openTab'),
+      items: references.map((reference) => ({
+        title: reference.title, kind: translate(`legalReference.kind.${reference.kind}`),
+        status: translate(`legalReference.status.${reference.status}`),
+        source: reference.source, sourceLabel: translate('legalReference.source'),
+        retrievedAt: reference.retrievedAt, retrievedAtLabel: translate('legalReference.retrievedAt'),
+        metadata: reference.metadata.map((row) => ({ label: translate(row.labelKey), value: row.value })),
+      })),
+    } }
+  }
   let seedComplete = false, seedTimer = null
   let preferences = { enabled: true, learning: true, hints: true }
   try { const stored = storage.get(key); for (const name of Object.keys(preferences)) if (typeof stored?.[name] === 'boolean') preferences[name] = stored[name] } catch { /* defaults */ }
@@ -142,7 +164,13 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
       case 'clear': {
         const result = await api.clear(projectId, data.scope); await refresh(); return result
       }
-      case 'detail': return completionDetails(await (data.entityId ? api.detail(projectId, data.entityId) : api.learnedDetail(projectId, data.id)))
+      case 'detail': return detailWithReferences(() => data.entityId ? api.detail(projectId, data.entityId) : api.learnedDetail(projectId, data.id))
+      case 'openLegalReference': {
+        // Only host-retained retrieval data can open a reader; guest payloads are not evidence.
+        if (!active || !referenceTicket || data.ticket !== referenceTicket || !Number.isInteger(data.index) || !references[data.index]) return {}
+        openLegalReference?.(references[data.index])
+        return {}
+      }
       case 'settings':
         // Configuration-class lookup failures are a standing state; the card offers the
         // settings route instead of a retry. The guest cannot navigate, so the host does.
@@ -157,7 +185,7 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
       case 'lookup':
         if (!writable) throw new Error('Read-only document')
         // This branch is only reached by the selected-text context menu's explicit action.
-        return completionDetails(await api.lookup(projectId, { kind: data.kind, text: data.text }))
+        return detailWithReferences(() => api.lookup(projectId, { kind: data.kind, text: data.text }))
       case 'revise': {
         if (!writable) throw new Error('Read-only document')
         const text = String(data?.text || '').trim()
@@ -173,6 +201,7 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
     session,
     setActive(next) {
       active = !!next; semantic?.setActive?.(active)
+      if (!active) clearReferences()
       if (!active && !disposed) send({ __lo: 'lo-relay', type: 'writing-invalidate' })
     },
     setEnabled(next) { return writePreferences({ enabled: !!next }) },
@@ -205,7 +234,7 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
     },
     destroy() {
       if (disposed) return
-      disposed = true; loadSequence++; seedSequence++
+      disposed = true; loadSequence++; seedSequence++; clearReferences()
       reportState()
       semantic?.destroy()
       if (seedTimer != null) timers.clear(seedTimer)
