@@ -3,7 +3,7 @@
 import { getMeetingRecordings, getMeetingAsrNotice } from '@/services/api.js'
 import { recorderState, isRecordingActive, startRecording } from '@/utils/meetingRecorder.js'
 
-// The explorer click is a host-owned recording action. Plugin-initiated starts
+// Explorer and welcome clicks are host-owned recording actions. Plugin-initiated starts
 // still go through their existing permission checks and confirmation dialog.
 export default {
   onHide() {
@@ -43,15 +43,28 @@ export default {
         uni.showToast({ title: this.$t('meeting.otherProjectRecording'), icon: 'none' })
       }
     },
-    async onCreateRecording() {
+    onWelcomeStartRecording() {
+      return this.onCreateRecording({ ensureWorkspace: true })
+    },
+    async onCreateRecording({ ensureWorkspace = false } = {}) {
       if (isRecordingActive()) return this.focusExplorerRecording()
-      if (!this.projectId || !this.canWriteProject || this._explorerRecordingRequest) return
-      const projectId = this.projectId
+      if (this._explorerRecordingRequest) return
+      if (!ensureWorkspace && (!this.projectId || !this.canWriteProject)) return
+      let projectId = this.projectId
       const controller = new AbortController()
       this._explorerRecordingRequest = controller
       const isCurrent = () => !controller.signal.aborted
         && String(this.projectId) === String(projectId) && this.isActiveOverviewInstance()
       try {
+        if (ensureWorkspace && !this.hasProject) {
+          try {
+            await this.ensureScratchWorkspaceLoaded()
+          } finally {
+            projectId = this.projectId
+          }
+          if (controller.signal.aborted || !this.isActiveOverviewInstance()) return
+        }
+        if (!this.projectId || !this.canWriteProject) return
         if (!(await this.openExplorerRecordingPanel(isCurrent))) return
         // Resolve the project's actual tier before asking for the microphone.
         // Keep the same cloud notice gate as pluginVoiceServices.start.
