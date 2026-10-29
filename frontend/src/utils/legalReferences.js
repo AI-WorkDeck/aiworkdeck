@@ -59,7 +59,7 @@ export function referencesFromEntity(entity = {}) {
   return records.map(record => {
     const url = safeLegalUrl(pick(record, ['url', 'Url', 'URL', 'link', 'Link', '链接', 'sourceUrl']))
     const metadata = [field('documentNumber', pick(record, ['DocumentNO', 'documentNumber', 'doc_no', 'documentNo', '文号'])),
-      field('authority', pick(record, ['IssueDepartment', 'issueDepartment', 'authority', '发布部门', '处罚机关'])),
+      field(kind === 'PENALTY' ? 'penaltyAuthority' : 'authority', pick(record, ['IssueDepartment', 'issueDepartment', 'authority', '发布部门', '处罚机关'])),
       field('publishedDate', pick(record, ['IssueDate', 'issueDate', 'issue_date', '发布日期']))]
     let title = pick(record, ['title', 'Title', 'name', '标题']) || scalar(entity.name)
     let sections = []
@@ -77,7 +77,7 @@ export function referencesFromEntity(entity = {}) {
     } else if (kind === 'CASE') {
       const item = caseRecord({ result: record })
       title = item.title || title
-      metadata.push(field('caseNumber', item.caseNumber), field('court', item.court), field('decisionDate', item.date), field('cause', pick(record, ['cause', 'causeOfAction', '案由'])))
+      metadata.push(field('caseNumber', item.caseNumber), field('court', item.court), field('judgmentDate', item.date), field('cause', pick(record, ['cause', 'causeOfAction', '案由'])))
       const labels = { ascertain: 'facts', reason: 'reasoning', result: 'decision', gist: 'summary', fullText: 'body' }
       sections = item.sections.map(item => section(labels[item.key], item.text))
     } else {
@@ -95,8 +95,10 @@ export function referenceFromModel(value) {
   if (!value || typeof value !== 'object' || !KINDS.has(value.kind) || !scalar(value.title)) return null
   return finish({ kind: value.kind, title: scalar(value.title), source: scalar(value.source), url: safeLegalUrl(value.url),
     retrievedAt: '', status: 'unverified', note: '',
-    metadata: ['documentNumber', 'authority', 'effectiveDate', 'validity', 'caseNumber', 'court', 'parties'].map(key => field(key, scalar(value[key])))
-      .concat(field(value.kind === 'LAW' ? 'publishedDate' : 'decisionDate', scalar(value.date))),
+    metadata: [field(value.kind === 'CASE' ? 'caseNumber' : 'documentNumber', scalar(value.caseNumber || value.documentNumber)),
+      field(value.kind === 'CASE' ? 'court' : value.kind === 'PENALTY' ? 'penaltyAuthority' : 'authority', scalar(value.court || value.authority)),
+      ...['effectiveDate', 'validity', 'parties'].map(key => field(key, scalar(value[key]))),
+      field(value.kind === 'LAW' ? 'publishedDate' : value.kind === 'CASE' ? 'judgmentDate' : 'decisionDate', scalar(value.date))],
     sections: [section('aiSummary', scalar(value.summary)), section('excerpt', scalar(value.excerpt || value.content))] })
 }
 

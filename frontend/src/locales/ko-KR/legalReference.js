@@ -50,5 +50,7 @@ export default {
   "caseSearch": "판례 검색",
   "aiSummary": "AI 정리",
   "excerpt": "인용 발췌",
-  "unverifiedNote": "이 자료는 AI가 정리했습니다. 출처와 원문은 아직 확인되지 않았습니다. 출처 원문과 대조해 확인하세요."
+  "unverifiedNote": "이 자료는 AI가 정리했습니다. 출처와 원문은 아직 확인되지 않았습니다. 출처 원문과 대조해 확인하세요.",
+  "judgmentDate": "재판일",
+  "penaltyAuthority": "처분 기관"
 }

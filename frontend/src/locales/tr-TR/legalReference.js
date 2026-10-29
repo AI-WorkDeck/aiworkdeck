@@ -50,5 +50,7 @@ export default {
   "caseSearch": "İçtihat Ara",
   "aiSummary": "Yapay Zekâ Özeti",
   "excerpt": "Alıntı",
-  "unverifiedNote": "Bu içerik yapay zekâ tarafından derlenmiştir. Kaynağı ve asıl metni doğrulanmamıştır. Asıl kaynakla karşılaştırarak kontrol edin."
+  "unverifiedNote": "Bu içerik yapay zekâ tarafından derlenmiştir. Kaynağı ve asıl metni doğrulanmamıştır. Asıl kaynakla karşılaştırarak kontrol edin.",
+  "judgmentDate": "Hüküm Tarihi",
+  "penaltyAuthority": "Yaptırım Uygulayan Makam"
 }

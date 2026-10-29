@@ -50,5 +50,7 @@ export default {
   "caseSearch": "Rechtsprechung suchen",
   "aiSummary": "KI-Zusammenstellung",
   "excerpt": "Zitierter Auszug",
-  "unverifiedNote": "Dieses Material wurde von KI zusammengestellt. Quelle und Originaltext wurden nicht geprüft. Gleichen Sie es mit der Originalquelle ab."
+  "unverifiedNote": "Dieses Material wurde von KI zusammengestellt. Quelle und Originaltext wurden nicht geprüft. Gleichen Sie es mit der Originalquelle ab.",
+  "judgmentDate": "Urteilsdatum",
+  "penaltyAuthority": "Sanktionsbehörde"
 }

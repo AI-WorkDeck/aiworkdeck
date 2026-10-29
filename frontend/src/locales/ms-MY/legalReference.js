@@ -50,5 +50,7 @@ export default {
   "caseSearch": "Cari Kes Kehakiman",
   "aiSummary": "Ringkasan AI",
   "excerpt": "Petikan",
-  "unverifiedNote": "Bahan ini disusun oleh AI. Sumber dan teks asalnya belum disahkan. Semak dengan sumber asal."
+  "unverifiedNote": "Bahan ini disusun oleh AI. Sumber dan teks asalnya belum disahkan. Semak dengan sumber asal.",
+  "judgmentDate": "Tarikh Penghakiman",
+  "penaltyAuthority": "Pihak Berkuasa yang Mengenakan Penalti"
 }

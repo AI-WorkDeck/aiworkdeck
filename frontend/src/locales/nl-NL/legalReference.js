@@ -50,5 +50,7 @@ export default {
   "caseSearch": "Rechtspraak zoeken",
   "aiSummary": "AI-samenvatting",
   "excerpt": "Geciteerd fragment",
-  "unverifiedNote": "Dit materiaal is samengesteld door AI. De bron en de oorspronkelijke tekst zijn niet geverifieerd. Vergelijk het met de oorspronkelijke bron."
+  "unverifiedNote": "Dit materiaal is samengesteld door AI. De bron en de oorspronkelijke tekst zijn niet geverifieerd. Vergelijk het met de oorspronkelijke bron.",
+  "judgmentDate": "Datum van het vonnis",
+  "penaltyAuthority": "Sanctionerende instantie"
 }

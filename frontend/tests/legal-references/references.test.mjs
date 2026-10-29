@@ -4,7 +4,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { referencesFromEntity, referenceFromModel, legalMessageParts, referencesFromTools, safeLegalUrl, legalReadableText } from '../../src/utils/legalReferences.js'
 import { legalReferenceTabMethods } from '../../src/pages/project-overview/legalReferenceTab.js'
-import { serializeTab, restore } from '../../src/pages/project-overview/tabSnapshot.js'
+import { serializeTab } from '../../src/pages/project-overview/tabSnapshot.js'
 import { isContextEligibleTab } from '../../src/pages/project-overview/activeTabContext.js'
 const model = { kind: 'PENALTY', title: 'Synthetic decision', documentNumber: 'TEST-1', summary: 'AI summary', excerpt: 'Source excerpt', url: 'https://example.org/decision', status: 'verified' }
 const fence = value => '```legal-reference\n' + JSON.stringify(value) + '\n```\n'
@@ -95,4 +95,15 @@ test('streaming hides unfinished card data; nested fenced examples stay ordinary
   assert.equal(legalMessageParts(incomplete)[0].text, incomplete)
   const nested = '````markdown\n' + fence(model) + '````\n'
   assert.equal(legalMessageParts(nested)[0].text, nested)
+})
+
+test('source field aliases and legal category labels preserve their meaning', () => {
+  const [law] = referencesFromEntity({ kind: 'LAW', detail: { authoritative: { title: 'Act', original_text: 'Text', implement_date: '2024-07-01' } } })
+  assert.equal(law.metadata.find(x => x.labelKey.endsWith('effectiveDate')).value, '2024-07-01')
+  const [caseRef] = referencesFromEntity({ kind: 'CASE', detail: { recognition: { title: 'Case', caseFlag: 'TEST-CASE', court: 'Court' } } })
+  assert.equal(caseRef.metadata.find(x => x.labelKey.endsWith('caseNumber')).value, 'TEST-CASE')
+  const [procedure] = referencesFromEntity({ kind: 'CASE', detail: { result: { title: 'Case', court: 'Court', trial_procedure: '二审' } } })
+  assert.ok(!procedure.metadata.some(x => x.labelKey.endsWith('cause')))
+  const modelCase = referenceFromModel({ kind: 'CASE', title: 'Case', authority: 'Court', documentNumber: 'TEST-CASE', date: '2026-10-29' })
+  assert.deepEqual(modelCase.metadata.map(x => x.labelKey), ['legalReference.caseNumber', 'legalReference.court', 'legalReference.judgmentDate'])
 })

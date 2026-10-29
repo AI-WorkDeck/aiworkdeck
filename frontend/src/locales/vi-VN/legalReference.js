@@ -50,5 +50,7 @@ export default {
   "caseSearch": "Tìm vụ án xét xử",
   "aiSummary": "Tổng hợp bằng AI",
   "excerpt": "Đoạn trích dẫn",
-  "unverifiedNote": "Tài liệu này do AI tổng hợp. Nguồn và văn bản gốc chưa được xác minh. Hãy đối chiếu với nguồn gốc."
+  "unverifiedNote": "Tài liệu này do AI tổng hợp. Nguồn và văn bản gốc chưa được xác minh. Hãy đối chiếu với nguồn gốc.",
+  "judgmentDate": "Ngày phán quyết",
+  "penaltyAuthority": "Cơ quan xử phạt"
 }

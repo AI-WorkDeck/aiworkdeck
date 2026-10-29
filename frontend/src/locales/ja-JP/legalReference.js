@@ -50,5 +50,7 @@ export default {
   "caseSearch": "判例を検索",
   "aiSummary": "AI による整理",
   "excerpt": "引用抜粋",
-  "unverifiedNote": "この資料は AI が整理したものです。出典と原文は未確認です。原典と照合してください。"
+  "unverifiedNote": "この資料は AI が整理したものです。出典と原文は未確認です。原典と照合してください。",
+  "judgmentDate": "裁判日",
+  "penaltyAuthority": "処分庁"
 }
