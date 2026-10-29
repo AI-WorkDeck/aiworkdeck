@@ -24,6 +24,8 @@ public class MobileCloudCaptureService {
     private final ProjectCatalogService catalog;
     @org.springframework.beans.factory.annotation.Autowired
     private MobileMediaInboxRepository relayItems;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private MobileMediaMoveService mediaMoves;
 
     public List<Map<String,Object>> status(Long userId, List<String> ids) {
         List<Map<String,Object>> result = new ArrayList<>();
@@ -46,6 +48,7 @@ public class MobileCloudCaptureService {
         Project project=projects.findById(projectId).filter(p->userId.equals(p.getUserId()))
                 .orElseThrow(()->new IllegalArgumentException(LangText.of("项目不存在", "Project not found")));
         users.lockStorageOwner(userId).orElseThrow(()->new IllegalArgumentException("User not found"));
+        if (mediaMoves != null) content=mediaMoves.checkedUpload(userId,"cloud",projectKey,clientId,size,content);
         if (relayItems.findByUserIdAndClientMediaId(userId,clientId).isPresent()) throw new IllegalArgumentException(
                 LangText.of("这份采集已发送至设备", "This capture was already sent to a device"));
         Optional<MobileCloudReceipt> prior=receipts.findByUserIdAndClientMediaId(userId,clientId);
@@ -77,6 +80,7 @@ public class MobileCloudCaptureService {
             SizedInput input=new SizedInput(content,size);
             store.save(temp,input);
             if(input.count!=size) throw new IOException("Capture length does not match declared size");
+            MobileMediaMoveService.finishUpload(content);
             store.move(temp,path); moved=true;
             // Filesystem writes are not rolled back by JPA. Remove this new blob on a failed commit too.
             if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {

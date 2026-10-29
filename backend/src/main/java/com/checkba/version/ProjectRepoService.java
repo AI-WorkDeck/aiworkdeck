@@ -235,6 +235,7 @@ public class ProjectRepoService {
     private static final List<String> DEFAULT_EXCLUDE_RULES = List.of(
             EXCLUDE_RULE_OFFICE_LOCK,
             EXCLUDE_RULE_NESTED_METADATA,
+            ".mobile-moves/", // Recoverable mobile-move originals are not version content.
             "node_modules/",
             "bower_components/",
             "__pycache__/",
