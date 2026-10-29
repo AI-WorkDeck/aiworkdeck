@@ -13,7 +13,7 @@ function setup(fetch, { lastEventId = '', cursorConversation = 'conv', onReconne
   const connected = { value: false }
   const streaming = { value: true }
   const bubble = { value: { content: '', isStreaming: true } }
-  const build = new Function('fetch', 'setTimeout', 'clearTimeout', 'isConnected', 'isStreaming', 'currentAssistantBubble', 'lastSseEventId', 'lastSseEventConversationId', 'scheduleReconnect', `
+  const build = new Function('fetchAgentConnection', 'setTimeout', 'clearTimeout', 'isConnected', 'isStreaming', 'currentAssistantBubble', 'lastSseEventId', 'lastSseEventConversationId', 'scheduleReconnect', `
     let sseAbortController, reconnectAttempts, lastSseActivityAt, myNetworkRecoveryHook,
       disconnectedBubble, supersededByOtherClient;
     const activeNetworkRecoveryHooks = new Set();
