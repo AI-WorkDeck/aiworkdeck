@@ -191,7 +191,7 @@ class SystemPromptSizeReportTest {
 
         String stem = ContextAssemblerService.toolGuidanceStem(
                 capabilities.capabilityOf(conv), capabilities.officeHostOf(conv));
-        List<Row> rows = segment(assembler, system, english, stem, active);
+        List<Row> rows = segment(assembler, system, english, stem, active, conv);
 
         int sum = rows.stream().mapToInt(Row::chars).sum();
         StringBuilder joined = new StringBuilder();
@@ -226,18 +226,26 @@ class SystemPromptSizeReportTest {
 
     /** 按生产拼装顺序切段。每一段都在 system 里定位并断言相接，最后由调用方校验和号。 */
     private List<Row> segment(ContextAssemblerService assembler, String s, boolean english, String stem,
-                              AiAgentController.ContextItem active) throws Exception {
+                              AiAgentController.ContextItem active, String conversationId) throws Exception {
         List<Row> rows = new ArrayList<>();
 
-        // 1) 基底 + 能力片段（spliceToolGuidance：占位标记整个被片段替换）
+        // 1) 基底 + 能力片段。沿生产拼接器处理能力相关区段（含 Office 的法律资料卡裁剪），
+        // 然后按原始能力片段切开，保留逐字节首段、顺序重组及总长度断言。
         String base = resource(english ? "prompts/system_prompt.en.md" : "prompts/system_prompt.md");
         String fragment = english ? resource("prompts/" + stem + ".en.md") : resource("prompts/" + stem + ".md");
         int ph = base.indexOf(PLACEHOLDER);
         assertTrue(ph >= 0 && ph == base.lastIndexOf(PLACEHOLDER), "基底里的工具指引占位标记应恰好一处");
-        String pre = base.substring(0, ph);
-        String post = base.substring(ph + PLACEHOLDER.length());
-        String spliced = pre + fragment + post;
-        assertTrue(s.startsWith(spliced), "system 应以「基底（占位处换成片段）」开头");
+        String spliced = (String) invoke(assembler, "spliceToolGuidance",
+                new Class<?>[] {String.class, String.class, boolean.class, AgentMode.class},
+                base, conversationId, english, AgentMode.AGENT);
+        assertFalse(spliced.contains(PLACEHOLDER), "拼接后不得留下工具指引占位标记");
+        assertFalse(spliced.contains("LEGAL_REFERENCE_CARDS_"), "拼接后不得留下法律资料卡区段标记");
+        int fragmentAt = spliced.indexOf(fragment);
+        assertTrue(!fragment.isEmpty() && fragmentAt >= 0 && fragmentAt == spliced.lastIndexOf(fragment),
+                "原始能力片段应完整且恰好出现一次");
+        String pre = spliced.substring(0, fragmentAt);
+        String post = spliced.substring(fragmentAt + fragment.length());
+        assertTrue(s.startsWith(spliced), "system 应以「基底（按能力裁剪并拼入片段）」开头");
         splitByHeading(rows, pre, "# ", "基底 / ", "基底 / 文件头（首个 # 之前）");
         splitByHeading(rows, fragment, "## ", "片段 " + stem + " / ", "片段 " + stem + " / 抬头（注释 + 一级标题）");
         splitByHeading(rows, post, "# ", "基底 / ", "基底 / Tool Usage Guidelines（占位处之后的尾巴）");
