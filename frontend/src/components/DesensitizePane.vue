@@ -72,12 +72,14 @@
     </template>
 
     <view v-else class="section">
-      <text class="help-text">{{ $t('panels.deRestoreNotice') }}</text>
-      <button class="workdeck-btn full-width" :disabled="processing" @tap="importKit">{{ kitName || $t('panels.deImportKit') }}</button>
+      <text v-if="!isPdf" class="help-text">{{ $t('panels.deRestoreNotice') }}</text>
+      <text v-if="recoveryKit && !loadingKit" class="help-text" role="status">{{ $t('panels.deCurrentKit') }}</text>
       <view class="section-title">{{ $t('panels.dePassword') }}</view>
       <input v-model="password" :disabled="processing" class="text-input password-input" password :maxlength="1024" :placeholder="$t('panels.dePasswordHint')" />
       <text v-if="restoreRequirement" class="help-text" role="status">{{ restoreRequirement }}</text>
-      <button class="workdeck-btn workdeck-btn-primary full-width" :loading="processing" :disabled="processing || loadingKit || !!restoreRequirement" @tap="handleRestore">{{ $t('panels.deRestoreGenerate') }}</button>
+      <button v-if="fileId && !isPdf && !loadingKit && !recoveryKit && error" class="workdeck-btn full-width" :disabled="processing" @tap="loadRecovery">{{ $t('common.retry') }}</button>
+      <button v-if="fileId && !isPdf && !loadingKit && !recoveryKit && !error" class="workdeck-btn full-width" :disabled="processing" @tap="selectOriginalForRedaction">{{ $t('panels.deSelectOriginal') }}</button>
+      <button class="workdeck-btn workdeck-btn-primary full-width" :loading="processing" :disabled="processing || loadingKit || !recoveryKit || !!restoreRequirement" @tap="handleRestore">{{ $t('panels.deRestoreGenerate') }}</button>
     </view>
 
     <view v-if="preview || result" class="section">
@@ -112,7 +114,7 @@ export default {
     return {
       operation: 'redact', mode: 'TOKEN', filePath: '', fileName: '', fileId: null,
       availableStrategies: [], selectedStrategies: [], customTerms: '', excludedTerms: '',
-      password: '', recoveryKit: '', kitName: '', exportedKit: '', processing: false,
+      password: '', recoveryKit: '', exportedKit: '', processing: false,
       loadingKit: false, kitLoadSequence: 0, preview: null, result: null, error: '', lastRedaction: null, settingsOpen: false, customWordsOpen: false,
     }
   },
@@ -121,7 +123,7 @@ export default {
       if (!this.fileId) return this.$t('panels.deSelectValidFile')
       if (this.isPdf) return this.$t('panels.dePdfNotice')
       if (this.loadingKit) return this.$t('panels.deProcessing')
-      if (!this.recoveryKit) return this.$t('panels.deRecoveryMissing')
+      if (!this.recoveryKit) return this.error ? '' : this.$t('panels.deRecoveryMissing')
       if (!this.password.trim()) return this.$t('panels.dePasswordHint')
       return ''
     },
@@ -139,7 +141,7 @@ export default {
     projectId() {
       this.kitLoadSequence++; this.loadingKit = false
       this.fileId = null; this.filePath = ''; this.fileName = ''; this.password = ''
-      this.recoveryKit = ''; this.exportedKit = ''; this.kitName = ''
+      this.recoveryKit = ''; this.exportedKit = ''
       this.preview = null; this.result = null
       this.customTerms = ''; this.excludedTerms = ''; this.lastRedaction = null
     },
@@ -167,7 +169,6 @@ export default {
       this.selectFile(this.lastRedaction.file)
       this.kitLoadSequence++; this.loadingKit = false
       this.recoveryKit = this.lastRedaction.kit
-      this.kitName = this.$t('panels.deCurrentKit')
     },
     toggleStrategy(value) {
       if (this.processing) return
@@ -181,7 +182,7 @@ export default {
       }
       this.preview = null; this.result = null; this.error = ''
       this.filePath = file.filePath || file.path; this.fileName = file.name; this.fileId = file.id
-      this.recoveryKit = ''; this.kitName = ''
+      this.recoveryKit = ''
       if (this.operation === 'restore') this.loadRecovery()
     },
     // 「浏览」自己没有文件树，要工作台把项目文件选择器打开。工作台必须**同步**
@@ -231,39 +232,33 @@ export default {
       } catch (e) { this.error = e.message }
       finally { this.processing = false }
     },
-    async loadRecovery(kitFile = null) {
+    async loadRecovery() {
       const sequence = ++this.kitLoadSequence
       const projectId = this.projectId, fileId = this.fileId
-      this.recoveryKit = ''; this.kitName = ''
+      this.recoveryKit = ''; this.error = ''
       if (!fileId || this.isPdf) { this.loadingKit = false; return }
-      if (!kitFile && String(this.lastRedaction?.file?.id) === String(fileId)) {
+      if (String(this.lastRedaction?.file?.id) === String(fileId)) {
         this.recoveryKit = this.lastRedaction.kit
-        this.kitName = this.$t('panels.deCurrentKit')
         this.loadingKit = false
         return
       }
       this.loadingKit = true
       try {
-        const result = await getSensitiveRecovery({ fileId: kitFile?.id || fileId })
+        const result = await getSensitiveRecovery({ fileId })
         if (sequence !== this.kitLoadSequence || projectId !== this.projectId || fileId !== this.fileId) return
-        this.recoveryKit = result.recoveryKit || ''; this.kitName = result.name || ''; this.error = ''
+        this.recoveryKit = result.recoveryKit || ''; this.error = ''
       } catch (e) {
         if (sequence === this.kitLoadSequence && projectId === this.projectId) this.error = e.message
       } finally {
         if (sequence === this.kitLoadSequence) this.loadingKit = false
       }
     },
-    importKit() {
+    selectOriginalForRedaction() {
       if (this.processing) return
-      let opened = false
-      this.$emit('request-file-select', file => {
-        if (!file) return
-        if (!String(file.name || '').toLowerCase().endsWith('.awd-recovery')) {
-          this.error = this.$t('panels.deKitInvalid'); return
-        }
-        this.loadRecovery(file)
-      }, () => { opened = true })
-      if (!opened) this.error = this.$t('panels.deBrowseUnavailable')
+      this.chooseOperation('redact')
+      this.fileId = null; this.filePath = ''; this.fileName = ''
+      this.recoveryKit = ''; this.exportedKit = ''; this.lastRedaction = null
+      this.triggerFileSelect()
     },
     async handleRestore() {
       if (this.processing || !this.fileId || !this.recoveryKit) return
