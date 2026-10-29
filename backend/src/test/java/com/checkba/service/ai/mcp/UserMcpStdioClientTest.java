@@ -163,14 +163,49 @@ class UserMcpStdioClientTest {
     }
     @Test void pathResolutionAndArgumentBoundariesAvoidShellParsing() throws Exception {
         var c = config("normal"); var arguments = new ArrayList<>(c.args());
+        // Windows' Java launcher converts argv to its ANSI code page. Unicode argv is
+        // checked with Node below; the Java fixture still tests UTF-8 protocol messages.
         List<String> values = List.of("space ; & $(do-not-run) ' \" %PATH% !value!", "", "\"quoted\"",
-                "C:\\path with spaces\\", "slash\\\"quote", "\\\\", "line\nbreak", "中文 😀");
+                "C:\\path with spaces\\", "slash\\\"quote", "\\\\", "line\nbreak");
         arguments.addAll(values);
         c = new UserMcpStdioClient.Config(Path.of(c.command()).getFileName().toString(), arguments,
                 Map.of("PATH", Path.of(c.command()).getParent().toString()), c.cwd(), c.timeoutSeconds());
         var result = client.call(c, "echo", UserMcpStdioFixture.SCHEMA, Map.of("query", "x"), () -> true);
         var payload = JSON.readTree((String) ((Map<?, ?>) ((List<?>) result.get("content")).get(0)).get("text"));
         assertEquals(JSON.valueToTree(values), payload.path("argv")); assertStopped();
+    }
+    @Test void nodeServerPreservesUnicodeArgumentsAndProtocol() throws Exception {
+        // Node is installed by the backend/desktop CI workflows and reads Windows' wide argv.
+        String script = """
+                const readline = require('node:readline');
+                readline.createInterface({ input: process.stdin }).on('line', line => {
+                  const request = JSON.parse(line);
+                  let result;
+                  if (request.method === 'initialize') result = {
+                    protocolVersion: '2025-11-25', capabilities: { tools: {} },
+                    serverInfo: { name: 'synthetic-node', version: '1' }
+                  };
+                  else if (request.method === 'tools/list') result = {
+                    tools: [{ name: 'echo', inputSchema: %s }]
+                  };
+                  else if (request.method === 'tools/call') result = {
+                    content: [{ type: 'text', text: JSON.stringify({
+                      argv: process.argv.slice(1), query: request.params.arguments.query
+                    }) }], isError: false
+                  };
+                  else return;
+                  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result }) + '\\n');
+                });
+                """.formatted(JSON.writeValueAsString(UserMcpStdioFixture.SCHEMA));
+        List<String> values = List.of("中文 😀", "space ; & $(do-not-run) ' \" %PATH% !value!", "", "\"quoted\"",
+                "C:\\path with spaces\\", "slash\\\"quote", "line\nbreak");
+        List<String> arguments = new ArrayList<>(List.of("-e", script, "--"));
+        arguments.addAll(values);
+        var config = new UserMcpStdioClient.Config("node", arguments, Map.of(), temp.toString(), 5);
+        var result = client.call(config, "echo", UserMcpStdioFixture.SCHEMA, Map.of("query", "中文 😀"), () -> true);
+        var payload = JSON.readTree((String) ((Map<?, ?>) ((List<?>) result.get("content")).get(0)).get("text"));
+        assertEquals(JSON.valueToTree(values), payload.path("argv"));
+        assertEquals("中文 😀", payload.path("query").asText());
     }
     @Test void windowsNpxShimUsesNodeDirectlyAndNeverCmdExe() throws Exception {
         Path node = Files.createFile(temp.resolve("node.exe")); Path shim = Files.createFile(temp.resolve("npx.cmd"));
