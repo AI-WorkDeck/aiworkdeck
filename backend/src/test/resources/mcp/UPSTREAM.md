@@ -1,7 +1,8 @@
 # Public MCP tool metadata fixtures
 
 `official-tool-schemas.json` preserves public tool names, descriptions and JSON
-schemas returned by the providers' `tools/list` on 2026-10-29. Collected by the
+input schemas returned by the providers' `tools/list` on 2026-10-29.
+Unused output schemas, display titles and annotations are omitted. Collected by the
 parent task using the user's existing configured connection; no tokens,
 credentials, business queries, or business responses are included.
 
