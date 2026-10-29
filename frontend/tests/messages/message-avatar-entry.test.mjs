@@ -26,7 +26,7 @@ const { LEFT_SIDEBAR_PLUGINS, migrateLeftPaneKey } = new Function('t', sidebar +
 const tabs = read('pages/project-overview/messageCenterTab.js').replace(/^import .*$/gm, '').replace('export const messageCenterTabMethods =', 'const messageCenterTabMethods =')
 
 function entry(props = {}) {
-  const component = new Function('ICONS', 'ACCOUNT_CHANGED_EVENT', 'setGlobalOverlay', script)(ICONS, 'account-changed', () => {})
+  const component = new Function('ICONS', 'ACCOUNT_CHANGED_EVENT', 'setGlobalOverlay', 'isAccountSessionExpired', script)(ICONS, 'account-changed', () => {}, () => false)
   const emitted = [], vm = { ...component.data(), clientView: false, messageUnread: null, messagePartial: false, ...props, $t: (key, args) => (zh[key.split('.').at(-1)] || key).replace('{count}', args?.count), $emit: event => emitted.push(event) }
   for (const [name, compute] of Object.entries(component.computed)) Object.defineProperty(vm, name, { get: () => compute.call(vm) })
   for (const [name, method] of Object.entries(component.methods)) vm[name] = method.bind(vm)
@@ -74,7 +74,7 @@ test('Chrome avatar and signed-out entries open the singleton with mouse and key
   // The isolated harness maps uni's tap event to the browser click event used by H5.
   const template = descriptor.template.content.replace(/@tap/g, '@click')
   const html = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><style>${theme}${css}body{margin:0;font:13px sans-serif;background:var(--awd-bg);color:var(--awd-text)}#app{padding:18px;display:flex;justify-content:flex-end}view{display:block}#workspace{margin-top:50px;position:absolute;left:24px}button{color:inherit}</style><div id="app"></div><script src="/vue.js"></script><script>
-  const ICONS=${JSON.stringify(ICONS)},ACCOUNT_CHANGED_EVENT='account-changed',setGlobalOverlay=()=>{},uni={$on(){},$off(){}};
+  const ICONS=${JSON.stringify(ICONS)},ACCOUNT_CHANGED_EVENT='account-changed',setGlobalOverlay=()=>{},isAccountSessionExpired=()=>false,uni={$on(){},$off(){}};
   const AccountEntry={...(()=>{${script}})(),template:${JSON.stringify(template)},__scopeId:'data-v-account'};
   ${tabs}
   const state=Vue.reactive({loggedIn:true,clientView:false,messageUnread:7,messagePartial:false,walletLow:true,leftFiles:[],rightFiles:[],focusedPane:'left',splitMode:false,leftPaneKey:'files',sidebarCollapsed:true});window.state=state;

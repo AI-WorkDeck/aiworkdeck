@@ -83,14 +83,15 @@ class AccountTeamPermissionTest {
 
     @Test
     void genuineTeamCredentialFailuresRemainUnauthorized() {
-        AccountService service = connected();
         for (String body : new String[] {"{\"error\":\"unauthorized\"}",
                 "{\"error\":\"invalid_key\"}", "{\"error\":\"key_revoked\"}", "<html>Forbidden</html>"}) {
+            AccountService service = connected();
             replies.add(new AccountTransport.Reply(403, body));
             AccountException denied = assertThrows(AccountException.class,
                     () -> service.updateTeam(Map.of("name", "QA team")));
             assertEquals(AccountException.Kind.UNAUTHORIZED, denied.getKind(), body);
         }
+        AccountService service = connected();
         replies.add(new AccountTransport.Reply(401, "{\"error\":\"forbidden\"}"));
         assertEquals(AccountException.Kind.UNAUTHORIZED,
                 assertThrows(AccountException.class, service::fetchTeam).getKind());

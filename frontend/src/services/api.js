@@ -193,7 +193,8 @@ function isOnLoginPage() {
 // 调用方主动取消不是网络故障，不打「网络请求失败」那一大串诊断日志（v0.49.0 BUG-12：
 // 搜索面板每次新查询都要取消上一次在途请求，否则连续输入会在后端叠成一长队）。
 function request(options) {
-  const { signal, ...uniOptions } = options;
+  const { signal, accountAuthAttempt, sessionRecoveryAttempt, ...uniOptions } = options;
+  const accountGeneration = getCloudAccountGeneration();
   const abortError = () => {
     const e = new Error('aborted');
     e.name = 'AbortError';
@@ -240,13 +241,66 @@ function request(options) {
       // uni.request expects query params in 'data' for GET requests
       data: (options.method === 'GET' && options.params) ? { ...options.data, ...options.params } : options.data,
       header: headers,
-      success(res) {
+      async success(res) {
         const status = res.statusCode || 0;
 
         // 204 No Content 是「没有」的正常回答（如计划审阅 GET review 无记录），静默回 null
         if (status === 204) {
           resolve(null);
           return;
+        }
+
+        // 以 arraybuffer 接收却实际返回 JSON 时（如 TTS 未配置 → {code:4001}），
+        // 按 content-type 解码为对象，让下面的统一 {code} 逻辑能识别（#18 T5/T7）。
+        if (options.responseType === 'arraybuffer' && res.data && typeof res.data.byteLength === 'number') {
+          const h = res.header || {};
+          const ct = h['content-type'] || h['Content-Type'] || '';
+          if (ct.indexOf('application/json') !== -1) {
+            try {
+              res.data = JSON.parse(new TextDecoder('utf-8').decode(new Uint8Array(res.data)));
+            } catch (e) {
+              console.warn('arraybuffer JSON 解码失败:', e);
+            }
+          }
+        }
+
+        // A stale browser/device session must not poison the independent desktop account.
+        const sessionRejected = res.data?.code === 4010 || (status === 401 && !accountAuthAttempt);
+        if (sessionRejected && isDesktopHost() && accountGeneration === getCloudAccountGeneration()) {
+          const sentSession = headers['X-Session-Id'];
+          const sameSession = () => (sentSession || '') === (getSessionId() || '');
+          const localRequest = ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(url).hostname)
+            && url.startsWith(`${baseUrl.replace(/\/$/, '')}/api/`);
+          if (localRequest && sentSession && sameSession()
+              && !options.header?.['X-Session-Id'] && !sessionRecoveryAttempt) {
+            clearSession();
+            // Authentication was rejected before the operation ran. Retry once without the stale header.
+            request({ ...options, sessionRecoveryAttempt: true }).then(resolve, reject);
+            return;
+          }
+          if (localRequest && sameSession() && options.accountPrompt !== false) {
+            try {
+              const accountUi = await import('@/utils/requireAccount.js');
+              if (accountGeneration === getCloudAccountGeneration() && sameSession()) {
+                const retry = await accountUi.handleWorkspaceSessionFailure();
+                if (retry && accountGeneration === getCloudAccountGeneration() && sameSession()) {
+                  request({ ...options, sessionRecoveryAttempt: true }).then(resolve, reject);
+                  return;
+                }
+              }
+            } catch (e) { console.warn('[api] Session recovery notification failed:', e); }
+          }
+        }
+        // Only the backend's confirmed account state can invalidate the cloud identity.
+        // Provider-key errors and incorrect credentials entered in a login form are separate.
+        if (res.data?.data?.authExpired === true && !accountAuthAttempt && isDesktopHost()
+            && accountGeneration === getCloudAccountGeneration()) {
+          try {
+            const accountUi = await import('@/utils/requireAccount.js');
+            if (accountGeneration === getCloudAccountGeneration()) {
+              accountUi.handleAccountExpired({ prompt: options.accountPrompt !== false });
+            }
+          } catch (e) { console.warn('[api] Account expiry notification failed:', e); }
         }
 
         // 首先检查HTTP状态码，如果不是200则直接拒绝（网络级别错误）
@@ -267,20 +321,6 @@ function request(options) {
           return;
         }
 
-        // 以 arraybuffer 接收却实际返回 JSON 时（如 TTS 未配置 → {code:4001}），
-        // 按 content-type 解码为对象，让下面的统一 {code} 逻辑能识别（#18 T5/T7）。
-        if (options.responseType === 'arraybuffer' && res.data && typeof res.data.byteLength === 'number') {
-          const h = res.header || {};
-          const ct = h['content-type'] || h['Content-Type'] || '';
-          if (ct.indexOf('application/json') !== -1) {
-            try {
-              res.data = JSON.parse(new TextDecoder('utf-8').decode(new Uint8Array(res.data)));
-            } catch (e) {
-              console.warn('arraybuffer JSON 解码失败:', e);
-            }
-          }
-        }
-
         // 统一处理后端返回的 { code: 0, data: ... } 或 { code: 1, message: ... } 格式
         if (res.data && typeof res.data.code !== 'undefined') {
           if (res.data.code === 0 || res.data.code === 200) {
@@ -293,10 +333,10 @@ function request(options) {
             err.smsRequired = true;
             err.data = res.data.data || {};
             reject(err);
-          } else if (res.data.code === 4011 || (options.accountPrompt !== false && isAccountRequired(res.data))) {
+          } else if (res.data.code === 4011 || (!accountAuthAttempt && isAccountRequired(res.data))) {
             // 需要账户（登录后置，dev-board#1046；后端 AccountRequired）：这台电脑还没登录
             // AI WorkDeck 账户，而这项功能要账户（平台 AI、平台服务、广场付费项、官方案件库、
-            // 会议云端转写、听写）。**这不是会话失效**——不清会话、不跳页，下面的 4010 分支一字未动。
+            // 会议云端转写、听写）。**这不是会话失效**——不清会话、不跳页；真正失效由前面的分支同步账户状态。
             // 就地弹登录层，关掉之后一律 reject（err.accountRequired=true；登录成功时
             // err.loggedIn=true，isAccountLoginRetry(err) 为真，调用方自行决定要不要重试）。
             // 刻意不 resolve：刚才那次请求没有执行，resolve 出一个「成功」形状，不认识它的调用方
@@ -308,12 +348,16 @@ function request(options) {
               if (!err.message) err.message = t('common.serviceErrorRetryLater')
               reject(err)
             }
-            if (options.accountPrompt === false) {
+            if (options.accountPrompt === false || accountGeneration !== getCloudAccountGeneration()) {
+              if (!accountAuthAttempt && options.url !== '/api/account/status' && isAccountRequired(backend) && backend.code !== 4011
+                  && isDesktopHost() && accountGeneration === getCloudAccountGeneration()) {
+                void getAccountStatus({ accountPrompt: false }).catch(() => {})
+              }
               failAccountRequired(false)
             } else {
               // 动态引入：requireAccount.js 依赖本文件（读账户状态），静态互引会在模块初始化时成环
               import('@/utils/requireAccount.js')
-                .then((m) => m.requireAccountFor4011(backend))
+                .then((m) => accountGeneration === getCloudAccountGeneration() ? m.requireAccountFor4011(backend) : false)
                 .catch((e) => {
                   console.warn('[api] 登录弹层不可用:', e)
                   return false
@@ -353,24 +397,10 @@ function request(options) {
             // 特殊处理：未登录错误（PR4-0：后端统一回 code=4010，只认 code 不再做
             // 「登录/未授权/请先」中文子串匹配——子串会误伤含「请先」的业务文案，
             // 且后端文案英文化后整条判定失效）
-            if (res.data.code === 4010) {
-              // 清除本地存储的 session 信息（真实 key 是 checkba_session_id / checkba_user，
-              // 统一走 auth.js 的 clearSession，避免再清错 key）
-              try {
-                clearSession();
-              } catch (e) {
-                console.warn('清除登录信息失败:', e);
-              }
-
-              // 桌面端（local-mode 免登录）没有登录页可去：只提示，不打断当前页面
-              const isDesktop = isDesktopHost();
-              if (isDesktop) {
-                uni.showToast({
-                  title: errorMessage,
-                  icon: 'none',
-                  duration: 2000
-                });
-              } else if (isOnLoginPage()) {
+            if (res.data.code === 4010 && !isDesktopHost()
+                && accountGeneration === getCloudAccountGeneration()) {
+              clearSession();
+              if (isOnLoginPage()) {
                 // 已经在登录页：会话清掉即可，再 reLaunch 一次只会重挂本页并重跑
                 // onLoad 的请求，构成自激循环（见 isOnLoginPage 上方注释）
                 console.warn('未登录，且已在登录页，跳过跳转');
@@ -1345,6 +1375,7 @@ export function getLicenseStatus() {
 export function activateLicense(code) {
   return request({
     url: '/api/license/activate',
+    accountAuthAttempt: true,
     method: 'POST',
     data: { code },
     header: {
@@ -1470,12 +1501,13 @@ function unwrapEnvelope(res) {
 
 // 账户连接状态：{ connected, username, displayName, connectedAt, lastSyncAt, keyMasked, platformAiAvailable }
 // 未连接时只有 { connected: false, platformAiAvailable: false }。
-// 刻意**不含余额与套餐**：这是纯本地读盘的轻端点（顶栏 chip 每次 onShow 都调），
-// 带上余额就意味着每次都要打一次官网。余额在 getAccountUsage() 的 platform 段。
-export function getAccountStatus() {
+// 档案刷新会复核官网凭据（服务端缓存60秒）；已明确失效时回 authExpired:true。
+// 不含余额与套餐，余额在 getAccountUsage() 的 platform 段。
+export function getAccountStatus({ accountPrompt = true } = {}) {
   return request({
     url: '/api/account/status',
     method: 'GET',
+    accountPrompt,
   }).then(unwrapEnvelope);
 }
 
@@ -1484,6 +1516,7 @@ export function connectAccount(key) {
   return request({
     url: '/api/account/connect',
     accountPrompt: false, // Authentication failures belong in this form, not another login dialog.
+    accountAuthAttempt: true,
     method: 'POST',
     data: { key },
     header: {
@@ -1500,6 +1533,7 @@ export function sendAccountLoginCode(identifier, captchaToken, isPhone = true) {
   return request({
     url: '/api/account/login/send-code',
     accountPrompt: false, // Authentication failures belong in this form, not another login dialog.
+    accountAuthAttempt: true,
     method: 'POST',
     // captchaToken 必须一路传到官网：官网启用人机验证后不带就是 403，
     // 而它无法区分「桌面端转发」与「攻击者直接 POST」，所以不存在「桌面端豁免」这条路。
@@ -1516,7 +1550,7 @@ export function sendAccountLoginCode(identifier, captchaToken, isPhone = true) {
 // 官网人机验证的公开配置（只有公开参数，没有密钥）。未启用时 provider 为空，
 // 调用方据此跳过控件直接发码——与官网此刻确实不校验是同一个判断。
 export function getAccountCaptchaChallenge(payload) {
-  return request({ url: '/api/account/captcha-challenge', method: 'POST', accountPrompt: false, data: payload }).then(unwrapEnvelope);
+  return request({ url: '/api/account/captcha-challenge', method: 'POST', accountPrompt: false, accountAuthAttempt: true, data: payload }).then(unwrapEnvelope);
 }
 
 export function getAccountCaptchaConfig() {
@@ -1529,6 +1563,7 @@ export function loginAccount(payload) {
   return request({
     url: '/api/account/login',
     accountPrompt: false, // Authentication failures belong in this form, not another login dialog.
+    accountAuthAttempt: true,
     method: 'POST',
     data: payload,
     header: {
@@ -1540,7 +1575,7 @@ export function loginAccount(payload) {
 // Password lifecycle calls never imply a connected account.
 export function accountPasswordOperation(operation, payload) {
   if (!['setup', 'reset/send-code', 'reset'].includes(operation)) throw new Error('Unknown password operation')
-  return request({ url: `/api/account/password/${operation}`, accountPrompt: false,
+  return request({ url: `/api/account/password/${operation}`, accountPrompt: false, accountAuthAttempt: true,
     method: 'POST', data: payload, header: { 'Content-Type': 'application/json' },
   }).then(unwrapEnvelope)
 }
@@ -3429,6 +3464,13 @@ export function getMeetingRecording(meetingId) {
   return request({
     url: `/api/meetings/${meetingId}`,
     method: 'GET'
+  }).then(recording => {
+    // Submission and poll failures can happen in background jobs, outside this request.
+    // The same host facade serves the built-in panel, media player and voice plugin bridge.
+    if (isDesktopHost() && ['TRANSCRIBING', 'FAILED'].includes(recording?.status)) {
+      void getAccountStatus().catch(() => {})
+    }
+    return recording
   })
 }
 

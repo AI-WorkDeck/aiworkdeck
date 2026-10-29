@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "ワークスペースのセッションを復元できません",
   "confirm": "確認",
   "cancel": "キャンセル",
   "save": "保存",
