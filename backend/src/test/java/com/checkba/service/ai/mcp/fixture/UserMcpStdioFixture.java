@@ -69,5 +69,9 @@ public final class UserMcpStdioFixture {
             }
         }
     }
-    private static void emit(Object value) throws Exception { System.out.println(JSON.writeValueAsString(value)); System.out.flush(); }
+    private static void emit(Object value) throws Exception {
+        System.out.write(JSON.writeValueAsBytes(value));
+        System.out.write('\n');
+        System.out.flush();
+    }
 }
