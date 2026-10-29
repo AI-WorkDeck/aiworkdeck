@@ -29,7 +29,7 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 
 ## 输入法中间态光标（dev-board#1597）
 
-LOWA 与原生候选在组合期间显示同一个持有焦点的真实 input，保留浏览器的中间选区与长串水平滚动；测量节点保持隐藏，不再用纯文本预览冒充输入过程。LOWA 将可见输入框放在正文光标上方，结束恢复透明锚点，避免 #606 正文下划线重叠。原生候选在撤权、暂停、离开视口时隐藏。Word/Calc/Impress共用 LOWA 路径；PDF 的 FilePreview 浏览器 iframe 不经过它。验证含 ime-composition、document-input 与真实 LOWA ime-underline 像素回归；搜狗真机与原生候选完整保存重开仍需另验。
+LOWA 与原生候选在组合期间显示同一个持有焦点的真实 input，保留浏览器的中间选区与长串水平滚动；测量节点保持隐藏，不再用纯文本预览冒充输入过程。LOWA 将可见输入框放在正文光标上方，结束恢复透明锚点，避免 #606 正文下划线重叠。原生候选在撤权、暂停、离开视口时隐藏。Word/Calc/Impress共用 LOWA 路径；PDF 的 FilePreview 浏览器 iframe 不经过它。验证含 ime-composition、document-input 与真实 LOWA ime-underline 像素回归；真实 Calc 单元格与 Impress 文本框的中间光标、取消、中文提交及 XLSX/PPTX 显式导出重开分别由 ime-calc-preedit、ime-impress-preedit 验证；这不代替产品自动保存。搜狗真机与原生候选完整保存重开仍需另验。
 
 ## Calc 标题与输入时钟候选（dev-board#1509 / #1511）
 
