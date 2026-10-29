@@ -12,8 +12,8 @@ function mount(bubble) {
   // watch / onBeforeUnmount 只喂空实现：这份夹具验的是时间线分组与展开逻辑，
   // 而 setup 里那两句是运行状态条的秒表（dev-board#792）。喂真的 watch 会让
   // immediate 回调起一个 setInterval，node:test 进程就再也退不出去了。
-  return new Function('computed', 'ref', 'watch', 'onBeforeUnmount', 't', 'defineProps', 'defineEmits', 'visibleChatTimeline', 'isTimelineEntryActive', body + '\nreturn { timeline, isExpanded, toggleEntry }')(
-    computed, ref, () => {}, () => {}, k => k, () => ({ bubble }), () => () => {}, visibleChatTimeline, isTimelineEntryActive)
+  return new Function('inject', 'computed', 'ref', 'watch', 'onBeforeUnmount', 't', 'defineProps', 'defineEmits', 'visibleChatTimeline', 'isTimelineEntryActive', body + '\nreturn { timeline, isExpanded, toggleEntry }')(
+    () => null, computed, ref, () => {}, () => {}, k => k, () => ({ bubble }), () => () => {}, visibleChatTimeline, isTimelineEntryActive)
 }
 const base = () => ({ thinking: { status: 'idle', content: '' }, content: '', processes: [], artifacts: [], isStreaming: true })
 const proc = (id, status = 'loading') => ({ id, stepIndex: 0, items: [{ type: 'tool', status, code: 'read_file({})' }] })

@@ -1547,6 +1547,30 @@ class ContextAssemblerServiceTest {
                 "标记之前只要差一个字节，Anthropic/Qwen 就整段重新写缓存");
     }
 
+    @Test
+    void legalReferenceCardsHaveASeparateSummaryExcerptAndNoSelfCertificationInBothLanguages() {
+        for (boolean english : new boolean[] {false, true}) {
+            when(appLanguageService.isEnglish()).thenReturn(english);
+            capabilityService.record("conv-1", "lowa");
+            String system = assembleSystemText(null);
+            for (String token : List.of("legal-reference", "LAW", "CASE", "PENALTY", "case_search",
+                    "summary", "excerpt", "validity", "HTTP(S)")) {
+                assertTrue(system.contains(token), token);
+            }
+            assertTrue(system.contains(english ? "always AI synthesis awaiting verification" : "统一为 AI 整理、待核对"));
+            assertTrue(system.contains(english ? "do not themselves require an additional paid search" : "不为展示卡片额外要求付费查询"));
+            assertTrue(system.contains(english ? "Never write this card protocol into the user's document" : "不把资料卡协议写进用户文档"));
+            assertFalse(system.contains("LEGAL_REFERENCE_CARDS_"));
+            for (String officeHost : List.of("word", "excel", "powerpoint")) {
+                capabilityService.record("conv-1", "office", officeHost);
+                String office = assembleSystemText(null);
+                assertFalse(office.contains("legal-reference"), officeHost);
+                assertFalse(office.contains("LEGAL_REFERENCE_CARDS_"));
+                assertTrue(office.contains("case_search"));
+            }
+        }
+    }
+
     // ==== 系统提示按客户端能力分段（dev-board#809 / K29）====
     // 基底 prompt 只留与能力无关的通用规则，文档工具指引按能力拼片段。
     // 「片段里的工具在那一档真的可见」由 SystemPromptToolVisibilityContractTest 逐名钉住；

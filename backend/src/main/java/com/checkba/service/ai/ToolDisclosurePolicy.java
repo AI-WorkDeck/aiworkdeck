@@ -227,7 +227,7 @@ public class ToolDisclosurePolicy {
         CATEGORIES.put("enterprise-data", List.of("qichacha_", "name:tushare_query"));
         // law_search / law_search_keyword / get_law_article 在核心集，这里收的是剩下的 law_recognition：
         // 归进 legal 比落 misc 好找——模型要的是「法规这一族还有什么」，不是「杂项里翻翻看」。
-        CATEGORIES.put("legal", List.of("law_"));
+        CATEGORIES.put("legal", List.of("law_", "name:case_search"));
         CATEGORIES.put("meeting", List.of("meeting_", "tmeet_"));
         CATEGORIES.put("task", List.of("task_"));
         // 文件标签不是事项（T-19）：tag_list / tag_file / tag_remove_from_file 原先挂在 task 下
@@ -317,7 +317,8 @@ public class ToolDisclosurePolicy {
                 "rename", "move", "folder", "organize files", "file organization"));
         // 「法》」「条例》」：用户一写书名号引一部法（《公司法》《劳动合同法》《著作权法实施条例》）就是在查法条，
         // 比「法规」「法条」这类泛称命中得准。
-        CATEGORY_KEYWORDS.put("legal", List.of("法规", "法条", "条文", "司法解释", "法》", "条例》"));
+        CATEGORY_KEYWORDS.put("legal", List.of("法规", "法条", "条文", "司法解释", "法》", "条例》",
+                "案例", "判例", "查询案号", "检索案号", "判决书", "case law", "judgment"));
         // memory 类目里是 memory_write / memory_edit / memory_delete 三个写入工具（只读三个编排器每轮都补，
         // dev-board#1073）；「记下」「忘掉」是要改记忆文件的说法。不收「别忘」「forget」：
         // 「别忘了加页码」是叮嘱不是记忆。

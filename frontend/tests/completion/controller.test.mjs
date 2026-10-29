@@ -845,3 +845,39 @@ test('右键菜单融入「AI 修订选中内容…」：默认收起不抢焦�
     { text: '违约金按合同总额百分之三十计算', instruction: '改为百分之十', fileId: 42, projectId: 9 },
   ])
 })
+
+test('legal lookup displays translated cards and opens the selected retained reference without inserting text', async t => {
+  const h = harness(t)
+  h.setContext({ available: false, hasSelection: true, selectedText: '《示例管理办法》', token: 'selection-legal' })
+  h.canvas.dispatchEvent(new h.dom.window.MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 20, clientY: 30 })); await tick()
+  h.button('查询法规与条款').click()
+  h.respond('lookup', { title: 'Synthetic law', variants: [{ text: 'Preserved insertion text' }], legalReferences: {
+    ticket: 'host-ticket', openLabel: 'Lire dans un nouvel onglet', items: [
+      { title: 'Synthetic law <script>', kind: 'Texte législatif', status: 'Contenu retrouvé', source: 'Synthetic source', sourceLabel: 'Source', metadata: [{ label: 'Autorité', value: 'Synthetic authority' }] },
+      { title: 'Another law', kind: 'Texte législatif', status: 'Notice uniquement', metadata: [] },
+    ],
+  } }); await tick()
+  const cards = h.doc.querySelectorAll('.awd-wa-legal-card')
+  assert.equal(cards.length, 2)
+  assert.equal(cards[0].querySelector('strong').textContent, 'Synthetic law <script>')
+  assert.equal(cards[0].querySelector('script'), null, 'upstream text is never executable markup')
+  assert.equal(cards[0].querySelector('dt').textContent, 'Autorité')
+  assert.ok(h.button('插入以上内容'), 'existing insertion remains an explicit separate action')
+  cards[1].querySelector('button').click(); await tick()
+  const request = h.messages.findLast(m => m.action === 'openLegalReference')
+  assert.deepEqual(request.data, { ticket: 'host-ticket', index: 1 })
+  assert.equal(h.calls.some(c => c.action === 'insert_completion_content'), false)
+  h.respond('openLegalReference', {}); await tick()
+  assert.equal(h.panel().hidden, true)
+})
+
+test('metadata-only lookup remains readable even when no insertable body was returned', async t => {
+  const h = harness(t)
+  h.setContext({ available: false, hasSelection: true, selectedText: '《示例管理办法》', token: 'selection-legal' })
+  h.canvas.dispatchEvent(new h.dom.window.MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 20, clientY: 30 })); await tick()
+  h.button('查询法规与条款').click()
+  h.respond('lookup', { title: 'Index entry', variants: [], legalReferences: { ticket: 'metadata-ticket', openLabel: 'Open reader', items: [{ title: 'Index entry', kind: 'Law', status: 'Metadata only', metadata: [] }] } }); await tick()
+  assert.equal(h.doc.querySelectorAll('.awd-wa-legal-card button').length, 1)
+  assert.equal(h.panel().textContent.includes('暂无可插入的资料'), false)
+  assert.equal(h.button('插入以上内容'), undefined)
+})

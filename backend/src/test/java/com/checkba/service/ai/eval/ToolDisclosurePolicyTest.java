@@ -520,6 +520,9 @@ class ToolDisclosurePolicyTest {
                 "单独的「目录」多半是文件夹，不许把整个 format 类目放回");
         assertEquals(Set.of("files"), TRIM.categoriesHintedBy("把这几份文件移动到「往来函件」文件夹"));
         assertEquals(Set.of("legal"), TRIM.categoriesHintedBy("这段话引用了哪条司法解释？"));
+        assertEquals("legal", POLICY.categoryOf("case_search"));
+        assertEquals(Set.of("legal"), TRIM.categoriesHintedBy("查询类似案例"));
+        assertEquals(Set.of("legal"), TRIM.categoriesHintedBy("find relevant case law"));
         assertEquals(Set.of("legal"), TRIM.categoriesHintedBy("《劳动合同法》里经济补偿的标准在哪一条？"));
         assertEquals(Set.of("meeting"), TRIM.categoriesHintedBy("把昨天的录音整理一下"), "「整理」不许把文件整理类放回");
         assertEquals(Set.of("memory"), TRIM.categoriesHintedBy("记住我喜欢用仿宋"));

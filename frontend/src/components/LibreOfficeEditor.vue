@@ -258,7 +258,7 @@ export default {
   emits: ['close', 'ready', 'engine-failed', 'open-url', 'menu-state', 'evidence-drop', 'locator-consumed', 'open-evidence-target', 'command-progress', 'open-insight', 'cursor-context', 'open-history'],
   // 写作辅助卡片遇到配置类检索失败时要指一条真路（dev-board#688 D3）。设置在工作台里是
   // 一个标签（dev-board#582），组件拿不到页面实例，只能靠宿主注入——与 MarketDetailPane 同口径。
-  inject: { openSettingsTab: { default: null } },
+  inject: { openSettingsTab: { default: null }, openLegalReferenceTab: { default: null } },
   props: {
     // Track D: the Office file to load into the editor ({ id, name, fileType,
     // wpsFileId }). When set, the editor fetches its bytes (authed) and loads the
@@ -1687,6 +1687,8 @@ export default {
         api: { list: listWritingCompletions, learn: learnWritingCompletions, remove: deleteWritingCompletion,
           clear: clearWritingCompletions, lookup: lookupWritingSelection, detail: getDocInsightEntity, learnedDetail: getWritingCompletionDetail },
         openSettings: (opts) => { if (this.openSettingsTab) this.openSettingsTab(opts || {}) },
+        openLegalReference: this.openLegalReferenceTab ? (reference) => this.openLegalReferenceTab(reference) : null,
+        translate: (key) => this.$t(key),
         openAccount: () => requireAccount({ reason: 'gateway', force: true }),
         openRecharge: () => requireRecharge(),
         onRevise: (payload) => this.onWritingRevise(payload),
