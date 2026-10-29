@@ -7,6 +7,8 @@ description: 辅助小工具领域。任务涉及浏览器面板、截图/OCR、
 
 职责边界：工作台各辅助面板与桌面能力（浏览器/截图/剪贴板/收藏/搜索/语音/预览插入/OCR）。不含编辑器（doc-editor）、不含左栏布局本身（sidebar-shell）。剪贴板与文件缓存区的**免费额度**在本文档里讲执行方式，权益判定、entitlement 命名与账户连接见 `.claude/agents/licensing-billing.md`。
 
+**Electron 45 剪贴板（dev-board#1624）**：`clipboard.read()` / `readText()` 为异步 API，读取内容为 ClipboardItem/Blob；轮询器必须串行等待并在停用时取消旧代结果，首轮读取完成后才能解除 priming，防止迟到读操作在重启监听后发出旧内容。PNG Blob 经 nativeImage 解码，macOS 文件列表读取 `text/uri-list` 并仅接受本地 file URL；保留原有图片优先、去重与 Windows 不捕获文件的边界。单测在 `desktop/tests/clipboard-watch.test.js`；真实系统剪贴板验证 `test:clipboard-compat` 只允许 GitHub 托管临时 runner，不能在用户桌面绕过环境保护。
+
 ## 分组清单（前端组件 / desktop 宿主 / 后端 API 三层）
 
 **浏览器**：`frontend/src/components/BrowserPane.vue`；desktop `desktop/main/browser-views.js`（BrowserView 注册表）+ `desktop/main/main.js`（`makeBrowserView` 建 view 并接事件、window.open 拦截转工作区新 tab → 事件 `checkba:browser-open-new-tab`、全屏/黑屏兜底恢复、IPC handlers）；后端 `controller/BrowserProxyController.java`（GET /api/browser/proxy）。
