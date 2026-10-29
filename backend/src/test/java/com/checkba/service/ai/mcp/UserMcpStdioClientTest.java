@@ -163,12 +163,14 @@ class UserMcpStdioClientTest {
     }
     @Test void pathResolutionAndArgumentBoundariesAvoidShellParsing() throws Exception {
         var c = config("normal"); var arguments = new ArrayList<>(c.args());
-        String text = "space ; & $(do-not-run) ' \" %PATH% !value!"; arguments.add(text);
+        List<String> values = List.of("space ; & $(do-not-run) ' \" %PATH% !value!", "", "\"quoted\"",
+                "C:\\path with spaces\\", "slash\\\"quote", "\\\\", "line\nbreak", "中文 😀");
+        arguments.addAll(values);
         c = new UserMcpStdioClient.Config(Path.of(c.command()).getFileName().toString(), arguments,
                 Map.of("PATH", Path.of(c.command()).getParent().toString()), c.cwd(), c.timeoutSeconds());
         var result = client.call(c, "echo", UserMcpStdioFixture.SCHEMA, Map.of("query", "x"), () -> true);
         var payload = JSON.readTree((String) ((Map<?, ?>) ((List<?>) result.get("content")).get(0)).get("text"));
-        assertEquals(text, payload.path("argv").get(0).asText()); assertStopped();
+        assertEquals(JSON.valueToTree(values), payload.path("argv")); assertStopped();
     }
     @Test void windowsNpxShimUsesNodeDirectlyAndNeverCmdExe() throws Exception {
         Path node = Files.createFile(temp.resolve("node.exe")); Path shim = Files.createFile(temp.resolve("npx.cmd"));

@@ -148,6 +148,34 @@ public class UserMcpStdioClient {
 
     private static boolean isWindows() { return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("windows"); }
 
+    private static List<String> processArguments(List<String> command) {
+        if (!isWindows()) return command;
+        List<String> result = new ArrayList<>(command);
+        // OpenJDK 17/21's default Windows ProcessImpl preserves prequoted arguments, but
+        // does not escape embedded quotes in raw arguments. Encode each argv using CRT rules.
+        // https://learn.microsoft.com/en-us/cpp/c-language/parsing-c-command-line-arguments
+        boolean legacy = !"false".equalsIgnoreCase(System.getProperty("jdk.lang.Process.allowAmbiguousCommands"));
+        for (int i = 1; i < result.size(); i++) {
+            String arg = result.get(i);
+            if (!legacy) {
+                // Strict ProcessImpl handles raw quotes itself, except outer quotes which it
+                // treats as user-supplied quoting. Reject those rather than silently alter argv.
+                if (arg.length() >= 2 && arg.startsWith("\"") && arg.endsWith("\"")) throw invalidConfig();
+                continue;
+            }
+            StringBuilder quoted = new StringBuilder("\"");
+            int slashes = 0;
+            for (int j = 0; j < arg.length(); j++) {
+                char ch = arg.charAt(j);
+                if (ch == '\\') { slashes++; continue; }
+                quoted.append("\\".repeat(ch == '"' ? slashes * 2 + 1 : slashes)).append(ch);
+                slashes = 0;
+            }
+            result.set(i, quoted.append("\\".repeat(slashes * 2)).append('"').toString());
+        }
+        return result;
+    }
+
     private static final class Session implements AutoCloseable {
         private final BooleanSupplier allowed;
         private final long deadline;
@@ -164,7 +192,7 @@ public class UserMcpStdioClient {
             ProcessBuilder builder = new ProcessBuilder();
             Map<String, String> env = environment(System.getenv(), config.env());
             builder.environment().clear(); builder.environment().putAll(env);
-            builder.command(command(config, env, isWindows()));
+            builder.command(processArguments(command(config, env, isWindows())));
             if (config.cwd() != null) builder.directory(Path.of(config.cwd()).toFile());
             guard();
             try { process = builder.start(); }
