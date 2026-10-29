@@ -9,6 +9,7 @@ import com.checkba.service.ai.mcp.UserMcpConnectionService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/mcp")
@@ -40,10 +41,12 @@ public class UserMcpController {
             @RequestHeader(value="X-MCP-Scope", required=false) String expectedScope) {
         service.delete(user(session), id, expectedScope); return Map.of("code", 0);
     }
+    public record TestOptions(boolean allowLocalExecution, Long expectedRevision) {}
     @PostMapping("/connections/{id}/test")
     public Map<String, Object> test(@RequestHeader(value="X-Session-Id", required=false) String session, @PathVariable String id,
-            @RequestHeader(value="X-MCP-Scope", required=false) String expectedScope) {
-        return Map.of("code", 0, "connection", service.test(user(session), id, expectedScope));
+            @RequestHeader(value="X-MCP-Scope", required=false) String expectedScope,
+            @RequestBody(required=false) TestOptions options) {
+        return Map.of("code", 0, "connection", service.test(user(session), id, expectedScope, options != null && options.allowLocalExecution(), options == null ? null : options.expectedRevision()));
     }
     public record Enabled(boolean enabled) {}
     @PostMapping("/connections/{id}/enable")
@@ -51,6 +54,28 @@ public class UserMcpController {
             @PathVariable String id, @RequestBody Enabled body,
             @RequestHeader(value="X-MCP-Scope", required=false) String expectedScope) {
         return Map.of("code", 0, "connection", service.enable(user(session), id, body.enabled(), expectedScope));
+    }
+    public record ImportRequest(String json, List<Integer> selectedIndices) {}
+    @PostMapping("/import/preview")
+    public Map<String, Object> preview(@RequestHeader(value="X-Session-Id", required=false) String session,
+            @RequestHeader(value="X-MCP-Scope", required=false) String scope, @RequestBody ImportRequest input) {
+        return service.previewImport(user(session), input.json(), scope);
+    }
+    @PostMapping("/import")
+    public Map<String, Object> importConnections(@RequestHeader(value="X-Session-Id", required=false) String session,
+            @RequestHeader(value="X-MCP-Scope", required=false) String scope, @RequestBody ImportRequest input) {
+        return service.importConnections(user(session), input.json(), input.selectedIndices(), scope);
+    }
+    @PostMapping("/connections/{id}/oauth/authorize")
+    public Map<String, Object> authorize(@RequestHeader(value="X-Session-Id", required=false) String session, @PathVariable String id,
+            @RequestHeader(value="X-MCP-Scope", required=false) String scope) {
+        Map<String, Object> result = new java.util.LinkedHashMap<>(service.authorize(user(session), id, scope));
+        result.put("code", 0); return result;
+    }
+    @DeleteMapping("/connections/{id}/oauth")
+    public Map<String, Object> disconnectOAuth(@RequestHeader(value="X-Session-Id", required=false) String session, @PathVariable String id,
+            @RequestHeader(value="X-MCP-Scope", required=false) String scope) {
+        service.disconnectOAuth(user(session), id, scope); return Map.of("code", 0);
     }
     private Long user(String session) {
         Long user = AuthController.getUserIdFromSession(session);
@@ -61,7 +86,7 @@ public class UserMcpController {
     public ResponseEntity<?> error(PluginMcpException e) {
         String message = switch (e.code()) {
             case "invalid_endpoint" -> LangText.of("仅支持不含凭据、查询参数或片段的公网 HTTPS 地址。", "Use a public HTTPS URL without credentials, query parameters or a fragment.");
-            case "authentication_required", "invalid_credential" -> LangText.of("请检查此服务的 Bearer 密钥并重新测试。", "Check this service's Bearer token and test again.");
+            case "authentication_required", "invalid_credential" -> LangText.of("请检查此服务的凭据或重新授权，然后测试连接。", "Check this service's credentials or authorize again, then test the connection.");
             case "transport_error" -> LangText.of("MCP 连接失败或超时，请检查地址及网络。", "The MCP connection failed or timed out. Check its URL and network.");
             case "protocol_error", "remote_error", "session_expired", "response_too_large" -> LangText.of("MCP 服务未返回有效响应，请检查服务状态后重试。", "The MCP service did not return a valid response. Check its status and retry.");
             case "schema_mismatch", "invalid_schema" -> LangText.of("MCP 工具定义已变化或不受支持，请重新测试连接。", "The MCP tool schema changed or is unsupported. Test the connection again.");

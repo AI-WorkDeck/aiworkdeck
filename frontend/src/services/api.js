@@ -4732,6 +4732,11 @@ export const revertHarnessEvolution = (id) => request({
 // Independent user-scoped MCP connections. Credentials are write-only.
 export const getMcpConnections = () => request({ logBody: false, url: '/api/mcp/connections' })
 export const saveMcpConnection = (id, data, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: '/api/mcp/connections' + (id ? '/' + encodeURIComponent(id) : ''), method: id ? 'PUT' : 'POST', data })
-export const testMcpConnection = (id, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: `/api/mcp/connections/${encodeURIComponent(id)}/test`, method: 'POST' })
+export const testMcpConnection = (id, scopeToken, data = {}) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: `/api/mcp/connections/${encodeURIComponent(id)}/test`, method: 'POST', data, timeout: 200000 })
 export const setMcpConnectionEnabled = (id, enabled, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: `/api/mcp/connections/${encodeURIComponent(id)}/enable`, method: 'POST', data: { enabled } })
 export const deleteMcpConnection = (id, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: `/api/mcp/connections/${encodeURIComponent(id)}`, method: 'DELETE' })
+
+export const previewMcpImport = (json, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: '/api/mcp/import/preview', method: 'POST', data: { json } })
+export const importMcpConnections = (json, selectedIndices, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: '/api/mcp/import', method: 'POST', data: { json, selectedIndices } })
+export const authorizeMcpConnection = (id, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: `/api/mcp/connections/${encodeURIComponent(id)}/oauth/authorize`, method: 'POST', timeout: 75000 })
+export const disconnectMcpOAuth = (id, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: `/api/mcp/connections/${encodeURIComponent(id)}/oauth`, method: 'DELETE' })
