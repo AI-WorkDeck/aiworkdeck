@@ -234,3 +234,23 @@ test('the overlay input is opacity 0, not merely transparent text (dev-board#606
   assert.notEqual(f.input.style.visibility, 'hidden', 'hiding it that way would drop focus and the IME with it')
   assert.notEqual(f.input.style.display, 'none')
 })
+
+test('preedit exposes the focused native input and preserves a middle selection until commit', t => {
+  const f = fixture(t); f.start()
+  assert.equal(f.input.style.opacity, '1')
+  assert.equal(f.input.style.caretColor, 'var(--awd-text)')
+  assert.equal(f.input.style.pointerEvents, 'auto')
+  assert.equal(document.activeElement, f.input)
+  f.input.setSelectionRange(3, 3)
+  f.composition('compositionupdate', 'zhongwen')
+  assert.equal(f.input.selectionStart, 3, 'rendering must not reset the native preedit cursor')
+  for (const key of ['ArrowLeft', 'ArrowRight', 'Backspace', 'Delete']) {
+    assert.equal(f.key({ key, isComposing: true }).defaultPrevented, false)
+  }
+  assert.deepEqual(f.commands, [])
+  assert.deepEqual(f.commits, [])
+  f.composition('compositionend', '中文')
+  assert.equal(f.input.style.opacity, '0')
+  assert.equal(f.input.style.pointerEvents, 'none')
+  assert.deepEqual(f.commits, ['中文'])
+})

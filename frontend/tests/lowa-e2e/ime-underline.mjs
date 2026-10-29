@@ -1,11 +1,7 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// dev-board#606: 中文组合期间，压在画布上的 IME 输入框不许画出任何东西。
-// 字设成 transparent 只让字看不见——浏览器给组合文字画的输入法标记（真机上是
-// 输入法指定颜色的下划线，无头 Chrome 是一条高亮底）用的不是 color，于是用户看到
-// 正文光标后面多出一根线。判据：组合期间光标右侧那一条（输入框所在区域）的像素
-// 与组合前一模一样；同时输入框仍持有焦点、几何不变（系统候选窗按它定位）、
-// 组合中的拼音仍由独立预览条显示。
+// #606/#1597: preedit uses a visible native input above the document caret;
+// document pixels below it must stay unchanged.
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { PNG } from 'pngjs'
@@ -86,11 +82,10 @@ try {
   // 不是空跑：确实处在组合态，框里确实有拼音。
   assert.ok(during.value.length > 0, '组合期间输入框里必须有文字（否则这一轮什么都没测）: ' + JSON.stringify(during))
   assert.equal(during.focused, true, '组合期间输入框必须仍持有焦点')
-  // 系统候选窗按输入框的几何定位——改了绘制方式不许把它挪走。
-  assert.ok(Math.abs(during.rect.left - box.left) < 1 && Math.abs(during.rect.top - box.top) < 1
-    && Math.abs(during.rect.height - box.height) < 1, '组合期间输入框几何必须保持在光标处: ' + JSON.stringify(during.rect) + ' vs ' + JSON.stringify(box))
-  assert.ok(during.preview && during.preview.shown && during.preview.text.includes(PINYIN), '组合中的拼音仍由预览条显示: ' + JSON.stringify(during.preview))
-  assert.ok(during.preview.bottom <= clip.y + 1, '预览条应在取样区之上（否则下面那条断言测的是预览条，不是输入框）: ' + JSON.stringify(during.preview))
+  assert.ok(during.rect.top + during.rect.height <= clip.y + 1, 'native preedit must remain above document pixels')
+  assert.equal(await page.$eval('[data-lo-ime]', e => getComputedStyle(e).opacity), '1')
+  await cdp.send('Input.imeSetComposition', { text: PINYIN, selectionStart: 2, selectionEnd: 2 })
+  assert.equal(await page.$eval('[data-lo-ime]', e => e.selectionStart), 2, 'native middle caret survives rendering')
 
   const after = PNG.sync.read(await page.screenshot({ clip }))
   save('after', after)
@@ -98,5 +93,5 @@ try {
   const changed = diffPixels(idle, after)
   assert.equal(changed, 0, '组合期间光标右侧不许多出任何像素（输入法下划线/高亮）：多出 ' + changed + ' 个像素')
 
-  console.log('PASS IME 组合期间输入框零绘制：取样区 ' + JSON.stringify(clip) + '，组合串「' + during.value + '」，预览条底边 ' + Math.round(during.preview.bottom) + ' ≤ 取样区顶边 ' + clip.y)
+  console.log('PASS IME 正文零叠加、原生中间光标：取样区 ' + JSON.stringify(clip) + '，组合串「' + during.value + '」，预览条底边 ' + Math.round(during.preview.bottom) + ' ≤ 取样区顶边 ' + clip.y)
 } catch (error) { console.error(error); throw error } finally { await browser.close(); await new Promise(r => server.close(r)) }

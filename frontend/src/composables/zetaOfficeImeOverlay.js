@@ -21,10 +21,8 @@
 // LO view cursor's pixel rect so the native candidate window appears AT the
 // cursor.
 //
-// 组合中的文字（"输入过程"）由一个独立的不透明预览条显示，贴在光标框上方——
-// 输入框本身必须 opacity 0（它压在画布上，任何绘制都会叠在正文上：字靠 color
-// transparent，输入法给组合文字画的下划线只有 opacity 管得住），而预览条不依赖
-// 光标映射，Phase A 下照样可见。
+// 组合期间将原生输入框移到正文光标上方显示，保留输入法真实光标、选区与滚动。
+// 非组合期间保持透明，避免输入法下划线覆盖正文（#606）。
 //
 // Native mapping uses the live Writer controller caret/visible-area twips and
 // the native editing window origin. It follows scrolling, zoom, keyboard moves
@@ -143,6 +141,7 @@ export function attachImeOverlay({ canvas, commit, getCursorRaw, onEnter, sendCo
 
   const input = document.createElement('input')
   input.setAttribute('autocomplete', 'off')
+  input.setAttribute('spellcheck', 'false')
   input.setAttribute('data-lo-ime', '')
   input.setAttribute('aria-hidden', 'true')
   Object.assign(input.style, {
@@ -166,10 +165,8 @@ export function attachImeOverlay({ canvas, commit, getCursorRaw, onEnter, sendCo
   if (getComputedStyle(host).position === 'static') host.style.position = 'relative'
   host.appendChild(input)
 
-  // 组合预览条。输入法的候选窗只显示候选，正在拼的那串字（"输入过程"）是画在
-  // 输入框里的——而这个框必须全透明（它压在画布上，显字会和正文叠在一起）。所以
-  // 单独挂一个不透明小条来显示组合中的文字：它独立于映射是否可用，未点过画布、
-  // 光标映射失败时照样看得见（真机反馈：看不到输入过程）。
+  // Hidden preedit sizing element; the same focused input remains the native
+  // IME owner and paints above the document during composition.
   const preview = document.createElement('div')
   preview.setAttribute('aria-hidden', 'true')
   Object.assign(preview.style, {
@@ -184,6 +181,8 @@ export function attachImeOverlay({ canvas, commit, getCursorRaw, onEnter, sendCo
     textDecoration: 'underline', textDecorationColor: 'var(--awd-text-3)',
     pointerEvents: 'none',
   })
+  // This element measures preedit only; the focused input paints the real caret.
+  preview.style.visibility = 'hidden'
   host.appendChild(preview)
 
   function applyCover() {
@@ -209,16 +208,35 @@ export function attachImeOverlay({ canvas, commit, getCursorRaw, onEnter, sendCo
     const box = lastBox
       || (lastClick ? { left: lastClick.x, top: Math.max(0, lastClick.y - 9), height: 18 } : { left: 8, top: 24, height: 18 })
     const above = box.top - preview.offsetHeight - 4
-    preview.style.left = Math.max(4, Math.round(box.left)) + 'px'
+    const hostWidth = host.clientWidth || host.getBoundingClientRect().width || document.defaultView.innerWidth
+    const availableWidth = Math.max(40, hostWidth - 8)
+    const width = Math.min(availableWidth, Math.max(40, preview.offsetWidth))
+    preview.style.left = Math.max(4, Math.min(Math.round(box.left), hostWidth - width - 4)) + 'px'
     preview.style.top = Math.round(above >= 2 ? above : box.top + box.height + 4) + 'px'
+    Object.assign(input.style, {
+      left: preview.style.left, top: preview.style.top,
+      width: width + 'px', height: Math.max(26, preview.offsetHeight) + 'px',
+      boxSizing: 'border-box', padding: '2px 7px',
+      border: preview.style.border, borderRadius: preview.style.borderRadius,
+      background: 'var(--awd-surface)', color: 'var(--awd-text)', caretColor: 'var(--awd-text)',
+      opacity: '1', font: preview.style.font, lineHeight: '1.45', pointerEvents: 'auto',
+    })
   }
   function showPreview(text) {
-    if (!text) { preview.style.display = 'none'; return }
+    if (!text) { hidePreview(); return }
     preview.textContent = text
     preview.style.display = 'block'
     positionPreview()
   }
-  function hidePreview() { preview.style.display = 'none' }
+  function hidePreview() {
+    preview.style.display = 'none'
+    Object.assign(input.style, {
+      opacity: '0', color: 'transparent', caretColor: 'transparent', background: 'transparent',
+      padding: '0', border: '0', borderRadius: '0', font: 'inherit', lineHeight: '1', pointerEvents: 'none',
+    })
+    if (lastBox) applyCursorBox(lastBox)
+    else applyCover()
+  }
 
   applyCover()
 
