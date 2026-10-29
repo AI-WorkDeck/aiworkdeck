@@ -9,7 +9,7 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 ## 独立 MCP 连接（dev-board#1599）
 
-`UserMcpConnectionService` 与 `/api/mcp/{presets,connections}` 独立于 Plugin 启停，按本地 userId + 当前平台账户指纹隔离配置。`PluginCredentialStore` 加密保存 Bearer，API 只写不回显；GET 离线列预置和保存状态，显式 test 才 initialize/tools-list，显式 enable 才向 AI 提供工具。仅支持公网 HTTPS Streamable HTTP，复用 `PluginMcpEndpointPolicy` 与 `PluginMcpHttpClient` 的 DNS/重定向/取消边界，不启动 stdio 命令。
+`UserMcpConnectionService` 与 `/api/mcp/{presets,connections}` 独立于 Plugin 启停，按本地 userId + 当前平台账户指纹隔离配置。`PluginCredentialStore` 加密保存 Bearer、请求头、env 及 OAuth 凭据；API 不回显秘密。GET 离线列预置/状态，显式 test 才 initialize/tools-list，显式 enable 才向 AI 提供工具。公网 HTTPS Streamable HTTP 复用 `PluginMcpEndpointPolicy`/`PluginMcpHttpClient`；桌面 stdio 经版本绑定确认后由 `UserMcpStdioClient` 启动；OAuth 由 `UserMcpOAuthService` 标准发现、PKCE、加密刷新，测试和业务调用都使用同一解析入口。新增配置导入/授权契约见 plugin-marketplace.md 的 MCP 高级连接节（#1601–1603）。
 
 GET 返回非密 `scopeToken`，所有 mutation 必须发送加载表单时的 `X-MCP-Scope`（同步加入 `CorsConfig` 的预检头白名单，桌面跨端口请求必需）；服务层同次捕获当前 scope 并核对，旧账户排队请求返回 409。修改端点省略 token 会清旧密钥，端点/密钥变化使测试结果失效，但保留用户已选自配状态；只有显式禁用/删除才使企查查、法宝恢复官方通道。重新测试不调用业务工具、不自行启用新连接，旧异步结果按 revision 与账户守卫丢弃。
 
