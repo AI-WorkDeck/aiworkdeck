@@ -1109,7 +1109,7 @@ import {
 import { attachmentRecord, attachmentsFromHistory, fileListFromBubble } from '@/utils/chatAttachments.js'
 import { formatAskUserAnswer, parseAskUserAnswer } from '@/utils/askUserAnswer.mjs'
 import { isEnglish } from '@/utils/appLanguage.js'
-import { requireAccount } from '@/utils/requireAccount.js'
+import { requireAccount, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { requiresAiAccount } from '@/utils/requireAccountCore.js'
 import {
   AI_CONTEXT_FOLDER_FILE_LIMIT,
@@ -1667,8 +1667,8 @@ export default {
       return hit ? hit.name : (currentModelId.value || t('chat.selectModel'))
     })
 
-    // 模型选择必须持久化：AI 面板挂在 v-if 上，关掉右栏再打开组件会重建，
-    // 不落盘就会静默复位成清单第一条——这是有计费含义的选择，不能悄悄改。
+    // 模型选择持久化以供组件重建恢复；工作台也会通过 v-show 保留聊天实例，
+    // 此时刷新目录须保留当前选择，不能因重新读取清单而悄悄改计价对象。
     const MODEL_STORAGE_KEY = 'ai_selected_model'
 
     const readPersistedModelId = () => {
@@ -1768,9 +1768,15 @@ export default {
       noticeIfNoVision(m)
     }
 
-    const loadModelCatalog = async () => {
+    let aiRefreshGeneration = 0
+    let aiRefreshPromise = null
+    let aiRefreshQueued = false
+    let aiRefreshDisposed = false
+
+    const loadModelCatalog = async (generation) => {
       try {
         const res = await fetchAiModels()
+        if (generation !== aiRefreshGeneration || aiRefreshDisposed) return
         const list = Array.isArray(res?.models) ? res.models : []
         availableModels.value = list
         defaultModelId.value = res?.defaultModel || ''
@@ -1789,7 +1795,7 @@ export default {
           ? defaultModelId.value
           : list[0].id
 
-        const saved = readPersistedModelId()
+        const saved = currentModelId.value || readPersistedModelId()
         const savedModel = saved && list.find(m => m.id === saved || (Array.isArray(m.aliases) && m.aliases.includes(saved)))
         if (saved === 'auto' || savedModel) {
           const restoredId = saved === 'auto' ? saved : savedModel.id
@@ -1823,6 +1829,7 @@ export default {
         }
       } catch (e) {
         // 拉不到目录不该让面板不可用：保留上次选择（可能为空），由发送时的后端校验兜底
+        if (generation !== aiRefreshGeneration || aiRefreshDisposed) return
         console.warn('[ChatInterface] 加载模型目录失败:', e)
         const saved = readPersistedModelId()
         if (saved && !currentModelId.value) applyModelSelection(saved)
@@ -1864,15 +1871,17 @@ export default {
       showModeDropdown.value = false
     }
 
-    const loadAiProvider = async () => {
+    const loadAiProvider = async (generation) => {
       try {
         const res = await getAiConfig()
+        if (generation !== aiRefreshGeneration || aiRefreshDisposed) return
         activeProvider.value = res?.activeProvider || ''
         // 上下文上限随同一条配置下发（dev-board#801 K21 ⑧）：前端拦截用的数字
         // 与后端真正执行的必须是同一份，各写一份的表现是「界面说还能加、后端已经在丢」
         contextLimits.value = normalizeContextLimits(res?.contextLimits)
       } catch (e) {
         // 取不到供应商时按云端处理（不缩减模式），避免误把云端用户锁成只能 Ask
+        if (generation !== aiRefreshGeneration || aiRefreshDisposed) return
         console.warn('[ChatInterface] 加载 AI 供应商配置失败:', e)
         activeProvider.value = ''
         contextLimits.value = { ...DEFAULT_CONTEXT_LIMITS }
@@ -1882,6 +1891,28 @@ export default {
         selectMode(ALL_MODES.find(m => m.id === 'ASK'))
       }
     }
+
+    // Persistent chats survive settings/account changes. Coalesce opens; invalidate old
+    // responses on change events and follow them with one fresh pair of requests.
+    const refreshAiState = (invalidate = false) => {
+      if (aiRefreshDisposed) return
+      if (aiRefreshPromise) {
+        if (invalidate) {
+          aiRefreshGeneration++
+          aiRefreshQueued = true
+        }
+        return aiRefreshPromise
+      }
+      aiRefreshPromise = (async () => {
+        do {
+          aiRefreshQueued = false
+          const generation = ++aiRefreshGeneration
+          await Promise.all([loadModelCatalog(generation), loadAiProvider(generation)])
+        } while (aiRefreshQueued && !aiRefreshDisposed)
+      })().finally(() => { aiRefreshPromise = null })
+      return aiRefreshPromise
+    }
+    const refreshChangedAiState = () => refreshAiState(true)
 
     // All external AI requires an account, including legacy OPENROUTER settings.
     // Only explicit local Ollama can run without an account.
@@ -2304,12 +2335,18 @@ export default {
         showNewPopup.value = false
     }
 
-    // 模型目录与供应商在组件挂载时拉一次：面板挂在 v-if 上，每次打开都会重建，
-    // 这也正是恢复持久化模型选择的时机
+    // v-show 保留的聊天不会重新挂载，因此还需账户/配置事件与打开选择器时刷新。
     onMounted(() => {
-      loadModelCatalog()
-      loadAiProvider()
+      uni.$on(ACCOUNT_CHANGED_EVENT, refreshChangedAiState)
+      uni.$on('awd:ai-config-changed', refreshChangedAiState)
+      refreshAiState()
       restoreRunningPluginJobs()
+    })
+    onBeforeUnmount(() => {
+      aiRefreshDisposed = true
+      aiRefreshGeneration++
+      uni.$off(ACCOUNT_CHANGED_EVENT, refreshChangedAiState)
+      uni.$off('awd:ai-config-changed', refreshChangedAiState)
     })
 
     // 插件后台任务跨页面/跨重连仍在跑：SSE 只在进度变化时推一次，刷新页面或切回工作台的用户
@@ -4662,7 +4699,10 @@ export default {
        currentModelName,
        toggleModelDropdown: () => {
          showModelDropdown.value = !showModelDropdown.value
-         if (showModelDropdown.value) showModeDropdown.value = false
+         if (showModelDropdown.value) {
+           showModeDropdown.value = false
+           refreshAiState()
+         }
        },
        selectModel,
        showModelDropdown,

@@ -57,3 +57,54 @@ test('late pre-login response cannot overwrite a newer authenticated response', 
   assert.equal(vm.account.connected, true)
   assert.equal(vm.account.displayName, 'New')
 })
+
+function configSaver(saveAdminConfig, events) {
+  const start = source.indexOf('async handleSave() {')
+  const method = source.slice(start, source.indexOf('\n    },', start) + 6)
+  const uni = { $emit: event => events.push(event), showToast() {} }
+  return new Function('saveAdminConfig', 'uni', 'console', `return ({${method}}).handleSave`)(saveAdminConfig, uni, { error() {} })
+}
+function configState() {
+  return { saving: false, form: { ai: { activeProvider: 'AWD_CLOUD' } }, $t: key => key, loadModelCatalog() {} }
+}
+test('AI configuration change is broadcast only after persistence succeeds', async () => {
+  const events = []
+  let complete
+  const vm = configState()
+  const save = configSaver(form => {
+    assert.equal(form, vm.form)
+    return new Promise(resolve => { complete = resolve })
+  }, events)
+  const pending = save.call(vm)
+  assert.equal(vm.saving, true)
+  assert.deepEqual(events, [])
+  complete()
+  assert.equal(await pending, true)
+  assert.deepEqual(events, ['awd:ai-config-changed'])
+  assert.equal(vm.saving, false)
+})
+test('failed AI configuration save does not broadcast a change', async () => {
+  const events = []
+  const vm = configState()
+  const save = configSaver(async () => { throw new Error('persistence failed') }, events)
+  assert.equal(await save.call(vm), false)
+  assert.deepEqual(events, [])
+  assert.equal(vm.saving, false)
+})
+test('repeated save during persistence does not duplicate writes or change broadcasts', async () => {
+  const events = []
+  let complete, writes = 0
+  const vm = configState()
+  const save = configSaver(() => {
+    writes++
+    return new Promise(resolve => { complete = resolve })
+  }, events)
+  const pending = save.call(vm)
+  assert.equal(await save.call(vm), false)
+  assert.equal(writes, 1)
+  assert.deepEqual(events, [])
+  complete()
+  assert.equal(await pending, true)
+  assert.deepEqual(events, ['awd:ai-config-changed'])
+  assert.equal(vm.saving, false)
+})
