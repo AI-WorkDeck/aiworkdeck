@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "Sesi ruang kerja tidak dapat dipulihkan",
   "confirm": "Konfirmasi",
   "cancel": "Batal",
   "save": "Simpan",

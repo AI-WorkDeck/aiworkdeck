@@ -197,3 +197,18 @@ test('接线：解锁页是登录卡组件的薄壳，协议同意不再夹带 s
   assert.match(comp, /agreementChecked: false/)
   assert.match(comp, /crossBorderChecked: false/)
 })
+
+
+test('late status cannot replace a newer successful login or logout', async () => {
+  for (const connected of [true, false]) {
+    let reply, prompts = 0
+    const gate = createAccountGate({ getStatus: () => new Promise(resolve => { reply = resolve }),
+      openDialog: async () => { prompts++; return { ok: false } }, onLoggedIn() {} })
+    const pending = gate.isConnected()
+    gate.noteConnected(connected)
+    reply({ connected: !connected })
+    assert.equal(await pending, connected)
+    assert.equal(await gate.isConnected(), connected)
+    assert.equal(prompts, 0)
+  }
+})

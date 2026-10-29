@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "Çalışma alanı oturumu geri yüklenemedi",
   "confirm": "Tamam",
   "cancel": "İptal",
   "save": "Kaydet",

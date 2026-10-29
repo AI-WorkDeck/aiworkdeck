@@ -2485,6 +2485,7 @@ import {
   getMyProjects, // 目录切换器
   deleteProject,
   bindShareholderMeetingConversation, // 股东大会核查：会话绑定
+  getAccountStatus,
   getLicenseStatus, // 试用版/正式版标识（含 accountConnected 组合口径）
   getTrialBalance, // 试用余额（试用计量 v0.1.1，权威在账户站）
   getAccountBalance, // Credits 余额 chip（dev-board#187，后端带 TTL 缓存的轻端点）
@@ -4721,20 +4722,21 @@ export default {
     // （已连接账户 → 不显示 chip；未连接且 mode=trial → 「试用版」chip；dev-board#221）
     async loadLicenseMode() {
       if (!isDesktopHost()) return
+      const requestId = this._accountStateRequest = (this._accountStateRequest || 0) + 1
+      const generation = getCloudAccountGeneration()
       try {
-        // 授权状态里已带 accountConnected（后端组合口径），不必再打一次账户端点
-        const status = await getLicenseStatus()
+        // 账户状态会复核官网凭据；授权票据与已验证登录不是同一种状态。
+        const [status, account] = await Promise.all([getLicenseStatus(), getAccountStatus()])
+        if (requestId !== this._accountStateRequest || generation !== getCloudAccountGeneration()) return
         this.licenseMode = (status && status.mode) || ''
-        // 旧后端没有该字段：按未连接处理，与改动前查不到账户状态时的行为一致
-        this.accountConnected = !!(status && status.accountConnected)
+        // 只有账户状态决定是否已登录，不能用尚在宽限期的授权票据代替。
+        this.accountConnected = !!account?.connected
         // 宽限预警：后端只在真的需要提醒时才下发这两个字段（存量试用倒计时 /
         // 账户离线复验剩 ≤7 天），不需要提醒时形状与过去一模一样。
         this.graceKind = (status && status.graceKind) || ''
         this.graceDays = Number((status && status.daysRemaining) || 0)
       } catch (e) {
-        // 服务器模式/旧后端没有该端点：静默忽略
-        this.accountConnected = false
-        this.graceKind = ''
+        // 网络故障不等于登录失效；保留最后一次确认的状态。
       }
     },
     // Credits 余额 chip 数据（dev-board#187）。轻端点（后端 TTL 缓存），随 onShow /

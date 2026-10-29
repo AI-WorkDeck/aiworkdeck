@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "Δεν ήταν δυνατή η επαναφορά της συνεδρίας του χώρου εργασίας",
   "confirm": "ΟΚ",
   "cancel": "Ακύρωση",
   "save": "Αποθήκευση",
