@@ -143,3 +143,57 @@ test('read-only projects and a stale project never create a recording', async ()
   await stale.vm.onCreateRecording()
   assert.deepEqual(stale.calls, [])
 })
+
+test('welcome prepares the scratch workspace once before starting the existing recorder', async () => {
+  const ready = deferred()
+  let prepared = 0
+  const { vm, calls } = fixture({ vm: { projectId: null, hasProject: false } })
+  vm.ensureScratchWorkspaceLoaded = async () => {
+    prepared++
+    await ready.promise
+    vm.projectId = 34
+    vm.hasProject = true
+  }
+  const first = vm.onWelcomeStartRecording()
+  const second = vm.onWelcomeStartRecording()
+  assert.equal(calls.length, 0)
+  ready.resolve()
+  await Promise.all([first, second])
+  assert.equal(prepared, 1)
+  assert.deepEqual(calls.filter(c => c[0] === 'start').map(c => c[1]), [34])
+})
+
+test('welcome navigation during scratch preparation prevents a late microphone start', async () => {
+  const ready = deferred()
+  const { vm, calls, mixin } = fixture({ vm: { projectId: null, hasProject: false } })
+  vm.ensureScratchWorkspaceLoaded = async () => { await ready.promise; vm.projectId = 34 }
+  const pending = vm.onWelcomeStartRecording()
+  mixin.onUnload.call(vm)
+  ready.resolve()
+  await pending
+  assert.deepEqual(calls, [])
+  assert.equal(vm._explorerRecordingRequest, null)
+})
+
+test('welcome keeps the current project, respects read-only access and reports preparation errors', async () => {
+  const existing = fixture({ vm: { hasProject: true } })
+  await existing.vm.onWelcomeStartRecording()
+  assert.equal(existing.calls.find(c => c[0] === 'start')[1], 12)
+  const readonly = fixture({ vm: { hasProject: true, canWriteProject: false } })
+  await readonly.vm.onWelcomeStartRecording()
+  assert.deepEqual(readonly.calls, [])
+  const failed = fixture({ vm: { projectId: null, hasProject: false } })
+  failed.vm.ensureScratchWorkspaceLoaded = async () => { throw new Error('Workspace unavailable') }
+  await failed.vm.onWelcomeStartRecording()
+  assert.deepEqual(failed.calls, [['toast', 'Workspace unavailable']])
+  assert.equal(failed.vm._explorerRecordingRequest, null)
+})
+
+
+test('welcome reports scratch file-loading failure even after the project ID was assigned', async () => {
+  const { vm, calls } = fixture({ vm: { projectId: null, hasProject: false } })
+  vm.ensureScratchWorkspaceLoaded = async () => { vm.projectId = 34; throw new Error('Files unavailable') }
+  await vm.onWelcomeStartRecording()
+  assert.deepEqual(calls, [['toast', 'Files unavailable']])
+  assert.equal(vm._explorerRecordingRequest, null)
+})
