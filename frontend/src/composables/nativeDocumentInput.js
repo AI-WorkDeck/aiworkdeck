@@ -46,7 +46,7 @@
     const caret = make('div', { position: 'absolute', width: '1px', background: 'var(--awd-text, #152d40)', display: 'none' }, layer);
     caret.dataset.documentCaret = '';
     const preview = make('span', { position: 'absolute', background: 'var(--awd-surface, white)', color: 'var(--awd-text, #152d40)',
-      borderBottom: '1px solid var(--awd-text, #152d40)', fontFamily: 'var(--awd-font-sans, inherit)', whiteSpace: 'pre', display: 'none' }, layer);
+      borderBottom: '1px solid var(--awd-text, #152d40)', fontFamily: 'var(--awd-font-sans, inherit)', whiteSpace: 'pre', visibility: 'hidden', display: 'none' }, layer);
     preview.dataset.documentPreedit = '';
     const input = make('input', { position: 'absolute', width: '2px', padding: '0', margin: '0', border: '0',
       opacity: '0', pointerEvents: 'none', background: 'transparent', outline: 'none' }, layer);
@@ -70,6 +70,7 @@
     function fail(error, owner) {
       if (disposed || owner !== model || failure) return;
       failure = error instanceof Error ? error : new Error(String(error)); input.disabled = true;
+      input.style.opacity = '0'; input.style.pointerEvents = 'none';
       notify(); onError(failure);
     }
     function enqueue(action, params = {}, isInput = false, changed = false) {
@@ -139,11 +140,23 @@
           left: box.left + 'px', top: box.top + 'px', width: box.width + 'px', height: box.height + 'px' }, selection);
         node.dataset.selectionRect = '';
       }
-      if (!caretRect) { input.disabled = true; caret.style.display = 'none'; return; }
+      if (!caretRect) { input.disabled = true; input.style.opacity = '0'; input.style.pointerEvents = 'none'; caret.style.display = 'none'; return; }
       const box = css(caretRect), visible = box.left >= 0 && box.left <= v.cssWidth && box.top >= 0 && box.top + box.height <= v.cssHeight;
       for (const node of [input, caret, preview]) Object.assign(node.style, { left: box.left + 'px', top: box.top + 'px', height: box.height + 'px' });
       input.style.fontSize = preview.style.fontSize = Math.max(10, box.height * 0.8) + 'px';
       preview.style.lineHeight = box.height + 'px';
+      // Keep the browser's own marked-text selection and horizontal scrolling.
+      // The hidden span measures only; a copied string cannot render an IME caret.
+      const preedit = visible && !suspended && preview.style.display !== 'none' && composing && !compositionCancelled && !model.readOnly && !permissionPending && !failure;
+      const preeditLeft = Math.max(0, Math.min(box.left, v.cssWidth - 40));
+      Object.assign(input.style, {
+        left: (preedit ? preeditLeft : box.left) + 'px',
+        opacity: preedit ? '1' : '0', pointerEvents: preedit ? 'auto' : 'none',
+        color: 'var(--awd-text, #152d40)', caretColor: 'var(--awd-text, #152d40)',
+        background: preedit ? 'var(--awd-surface, white)' : 'transparent',
+        width: preedit ? Math.max(2, Math.min(Math.max(40, preview.offsetWidth + 8), v.cssWidth - preeditLeft)) + 'px' : '2px',
+        fontFamily: 'var(--awd-font-sans, inherit)',
+      });
       input.disabled = suspended || permissionPending || !!failure;
       caret.style.display = cursorVisible && visible && !composing ? 'block' : 'none';
       if (requestedFocus && visible && !input.disabled && document.activeElement !== input) input.focus({ preventScroll: true });
@@ -165,7 +178,7 @@
     }
     function showPreview(text) {
       preview.textContent = text; preview.style.display = text ? 'block' : 'none';
-      caret.style.display = text ? 'none' : caret.style.display;
+      layout();
     }
     function commit(text) {
       if (!composing) input.value = '';

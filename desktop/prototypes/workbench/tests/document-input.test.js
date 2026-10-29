@@ -244,3 +244,46 @@ test('failed guarded undo blocks later queued text and saving instead of repeati
  assert.equal(h.calls.filter(c=>c.action==='command').length,1);assert.deepEqual(texts(h),[]);
  assert.equal(h.component.getState().failed,true);h.close();
 });
+
+test('preedit exposes the real caret and preserves a middle selection across geometry updates', async () => {
+  const h = harness();
+  try {
+    h.composition('compositionstart');
+    h.text("women'shi'pengyou", 'insertCompositionText', true);
+    h.input.setSelectionRange(6, 9);
+    h.input.scrollLeft = 12;
+    h.callback(1, '140, 260, 0, 40');
+    assert.equal(h.input.style.opacity, '1');
+    assert.equal(h.input.style.pointerEvents, 'auto');
+    assert.notEqual(h.input.style.caretColor, 'transparent');
+    assert.equal(h.input.selectionStart, 6);
+    assert.equal(h.input.selectionEnd, 9);
+    assert.equal(h.input.scrollLeft, 12);
+    assert.equal(h.canvas.parentElement.querySelector('[data-document-preedit]').style.visibility, 'hidden');
+    assert.equal(h.key('ArrowLeft', { isComposing: true }).defaultPrevented, false);
+    assert.equal(h.key('Backspace', { isComposing: true }).defaultPrevented, false);
+    assert.deepEqual(texts(h), []);
+    h.callback(1, '1090, 260, 0, 40');
+    assert.equal(h.input.style.left, '460px');
+    assert.equal(h.input.style.width, '40px');
+    assert.equal(h.input.selectionStart, 6);
+    h.composition('compositionend', '我们是朋友');
+    await h.component.flush();
+    assert.deepEqual(texts(h), ['我们是朋友']);
+    assert.equal(h.input.style.opacity, '0');
+    assert.equal(h.input.style.width, '2px');
+  } finally { h.close(); }
+});
+
+test('revoking permission hides active preedit and prevents its late commit', async () => {
+  const h = harness();
+  try {
+    h.composition('compositionstart'); h.text('zhong', 'insertCompositionText', true);
+    assert.equal(h.input.style.opacity, '1');
+    h.component.setReadOnly(true);
+    assert.equal(h.input.style.opacity, '0');
+    h.composition('compositionend', '中');
+    await h.component.flush();
+    assert.deepEqual(texts(h), []);
+  } finally { h.close(); }
+});
