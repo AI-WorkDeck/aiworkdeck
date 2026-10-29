@@ -7,6 +7,18 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 职责边界：AI 对话功能本身（编排循环、工具注册分发、记忆、SSE、前端聊天 UI、评测）。AI→编辑器指令链路属 ai-doc-bridge 领域；skill 机制属 plugin-system 领域（但 SkillRouter 在编排循环里有两处旁路接入点）。
 
+## 独立 MCP 连接（dev-board#1599）
+
+`UserMcpConnectionService` 与 `/api/mcp/{presets,connections}` 独立于 Plugin 启停，按本地 userId + 当前平台账户指纹隔离配置。`PluginCredentialStore` 加密保存 Bearer，API 只写不回显；GET 离线列预置和保存状态，显式 test 才 initialize/tools-list，显式 enable 才向 AI 提供工具。仅支持公网 HTTPS Streamable HTTP，复用 `PluginMcpEndpointPolicy` 与 `PluginMcpHttpClient` 的 DNS/重定向/取消边界，不启动 stdio 命令。
+
+GET 返回非密 `scopeToken`，所有 mutation 必须发送加载表单时的 `X-MCP-Scope`（同步加入 `CorsConfig` 的预检头白名单，桌面跨端口请求必需）；服务层同次捕获当前 scope 并核对，旧账户排队请求返回 409。修改端点省略 token 会清旧密钥，端点/密钥变化使测试结果失效，但保留用户已选自配状态；只有显式禁用/删除才使企查查、法宝恢复官方通道。重新测试不调用业务工具、不自行启用新连接，旧异步结果按 revision 与账户守卫丢弃。
+
+工具输入完整保留远端 JSON Schema，以固定 networknt 1.5.7 在本地校验；拒绝外部引用/未知 meta-schema，不通过网络加载定义。单工具 schema 上限 24 Ki 字符、单连接发现清单上限 256 Ki 字符 / 256 工具。现有 LangChain4j 无 raw/union schema，AI 入参包装为 `argumentsJson`，描述包含完整 schema，执行时严格解析并验证，不删除 nullable、范围、required 等约束。`ToolRegistry` 按当前身份动态绑定，`mcp` 类目走渐进披露；名称含配置 revision，更新后旧轮工具名失效。ASK 不开放这些工具，远端 readOnlyHint 不授予权限，执行再核项目权限与本轮 offeredTools。
+
+企查查 / 法宝自配覆盖接在既有 `QichachaService`、`McpClientService`、`PkulawChannel`；配置失败、缺工具、凭据更新或 schema 失效均不回落平台收费。企查查旧工商工具固定映射公开 `get_company_registration_info(searchKey)`；company server 不含 IPR 工具时明确不可用，不暗用平台。`ExternalController` 与 `DocInsightService` 补身份作用域；依据窗格自配失败不再回落收费网页搜索。自配免的是平台数据工具费用，AI 模型费用沿原计费。
+
+回归：`UserMcpConnectionServiceTest`、`PluginMcpHttpClientTest`、`PluginMcpServiceTest`、`ToolDisclosurePolicyTest`、`DocInsightServiceTest`。真实 QCC 16 / PKULaw 18 工具定义来自只读 tools/list，保存在 `backend/src/test/resources/mcp/`（来源见其 UPSTREAM.md）；本地测试不等于真实业务付费查询或正式客户端发布验收。新增依赖的跨平台打包仍须在发版流水线验证。主任务以产品 `PluginMcpHttpClient` + `UserMcpSchema` 仅读真实 QCC/PKU initialize/tools-list，16/18 工具均成功，零业务 tools/call。本机代理 DNS 给出 198.18 假地址时被公网安全策略正确拒绝；隔离探测进程临时使用经 DoH 核对的公开 A 记录才完成验证，产品及系统 DNS/TLS 未改，不得以兼容代理为由放开保留地址。
+
 ## PPT 生成与设计流程（2026-10-28，dev-board#1570/#1571/#1572）
 
 内置 `presentation-design` workflow skill 使用 `tool_policy: passthrough`，不锁死原子工具组合。中英文 LOWA 提示共同要求：先明确读者与结论、把证据和结论组织在同页、学习参考的结构与视觉、形成一致配色/字级/网格、编辑后逐页视觉复核。不能为了增加页数拆散可放在一页的内容，也不能用缩小正文掩盖拥挤；修复后重查受影响页。仅完成结构回读不得声称“已视觉验收”。

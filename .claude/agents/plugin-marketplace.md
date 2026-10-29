@@ -204,3 +204,11 @@ description: 插件市场领域。任务涉及插件广场页、在线 Skill 广
 ## 可安装业务面板与服务设置（#1340/#1341，待发版）
 
 搜索/语音/脱敏/诉讼可视化/日历/收藏/剪贴板/洞察改为official-plugins中的真实Web包；MarketSidebarPanel/MarketDetailPane将/api/plugins/bundled的随应用目录与在线广场合并，断网仍可装随包项。PluginBundledInstaller首次复制、保留禁用和卸载意愿，不覆盖独立同名包；desktop extraResources提供只读来源。旧voice skill合成项仅用于旧实现兼容，实际新入口按voice插件启停。PluginConnectionSettings为可信宿主设置面板，负责开发服务授权、令牌输入、OAuth与连接状态；iframe没有授权写接口。主产品插件权益与开发者SaaS付费是两条通道。
+
+## Skill / Plugin / MCP 分类与个人连接（dev-board#1598–1599）
+
+- 市场按对象分类：插件注册表提供 Plugin；真实 AI 方法仍属 Skill，即便由桌面面板发起。`utils/chatSelectableSkills.mjs` 排除 `text-to-speech`、`desensitize` 两个纯面板引导，并在已安装可用的腾讯会议插件工作流存在时去掉重复旧技能；不按 `sourcePluginId` 一律过滤。对话给插件提供的 Skill 标注来源。
+- 左栏已安装和 Marketplace 均有 MCP 页签，条目打开设置 `nav=mcp`；整页市场的 MCP 页签与个人设置复用 `components/admin/McpConnectionsPanel.vue`。个人组对普通用户可见；设置受当前用户/账户隔离，不能改成安装级配置。
+- `GET /api/mcp/connections` 同时返回脱敏连接与预置目录；保存、测试、启用分步操作。启用的自配优先，失败不回收费平台；企查查/法宝停用或删除自配会恢复官方通道，UI 必须明确确认后续平台积分。其他 MCP 停用后无调用。免除数据调用平台积分不等于 AI 模型免费。
+- 凭据只写不回显；无 token 的公共连接用 `revision/saved` 判定已保存，不能用 `configured` 决定能否测试。身份切换清除草稿并丢弃旧响应；所有写请求附带加载时的 `X-MCP-Scope`，由后端拒绝跨账户排队写入；请求禁用正文日志。载入/测试失败持续显示。当前只支持公网 HTTPS Streamable HTTP、可选 Bearer，不展示 stdio/OAuth 假入口。
+- 验证：`node --test frontend/tests/project-home/chat-selectable-skills.test.mjs frontend/tests/project-home/market-*.test.mjs`；`cd frontend && node tests/chat-presentation-ui/mcp-connections.mjs` 使用真实 ChatInterface、市场和 AdminPane 加合成 HTTP，覆盖分类、设置直达、保存/测试/启用/官方切换、失败、匿名连接、账户切换及窄宽暗色。它不证明真实供应商或正式客户端已验收。

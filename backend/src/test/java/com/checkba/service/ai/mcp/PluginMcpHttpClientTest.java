@@ -78,6 +78,14 @@ class PluginMcpHttpClientTest {
     private PluginMcpHttpClient client() { return new PluginMcpHttpClient(new PluginMcpEndpointPolicy(true)); }
     private Map<String, Object> call(String token) { return client().call(url(), token, "echo", SCHEMA, Map.of("query", "synthetic"), () -> true); }
 
+    @Test void explicitDiscoveryListsToolsWithoutExecutingAnyTool() {
+        var tools = client().listTools(url(), "synthetic-token", () -> true);
+        assertEquals(1, tools.size());
+        assertEquals("echo", tools.get(0).get("name"));
+        assertEquals(List.of("initialize", "notifications/initialized", "tools/list", "DELETE"), methods);
+        assertFalse(methods.contains("tools/call"));
+    }
+
     @Test void publicServerLifecycleAndCleanup() {
         assertEquals(false, call("").get("isError"));
         assertEquals(List.of("initialize", "notifications/initialized", "tools/list", "tools/call", "DELETE"), methods);

@@ -7,7 +7,7 @@
       <svg class="msb-search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path v-for="(d, gi) in ICONS.search" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
-      <input class="msb-search-input" v-model="searchText" :placeholder="$t('market.searchPlaceholder')" />
+      <input class="msb-search-input" v-model="searchText" :placeholder="$t('common.search') + ' · ' + $t('market.sectionSkillTitle') + ' / ' + $t('market.sectionPluginTitle') + ' / ' + $t('mcp.label')" />
       <view v-if="searchText" class="msb-search-clear" @tap="searchText = ''">×</view>
     </view>
 
@@ -17,7 +17,7 @@
       <view class="msb-sec-head" @tap="toggleSection('installed')">
         <text class="msb-sec-chevron" :class="{ open: sections.installed }">›</text>
         <text class="msb-sec-title">{{ $t('market.tabInstalled') }}</text>
-        <text class="msb-sec-count">{{ installedRows.length }}</text>
+        <text class="msb-sec-count">{{ installedRows.length + installedMcpRows.length }}</text>
         <view class="msb-sec-spacer"></view>
         <view class="msb-sec-action" :title="$t('market.rescanTooltip')" @tap.stop="rescan">
           <svg class="msb-sec-action-icon" :class="{ spinning: rescanning }" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -47,7 +47,7 @@
           <text class="msb-builtin-action" @tap.stop="openBuiltinWorkflowSettings">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</text>
         </view>
         <view v-if="!activeInstalledRows.length" class="msb-empty">
-          <text>{{ searchText ? activeInstalledEmptyText : $t('market.noInstalledYet') }}</text>
+          <text>{{ installedTab === 'mcp' ? $t('common.noData') : searchText ? activeInstalledEmptyText : $t('market.noInstalledYet') }}</text>
         </view>
         <view
           v-for="row in activeInstalledRows"
@@ -80,7 +80,7 @@
       <view class="msb-sec-head" @tap="toggleSection('market')">
         <text class="msb-sec-chevron" :class="{ open: sections.market }">›</text>
         <text class="msb-sec-title">{{ $t('market.tabMarketplace') }}</text>
-        <text class="msb-sec-count">{{ skillRows.length + pluginRows.length }}</text>
+        <text class="msb-sec-count">{{ skillRows.length + pluginRows.length + mcpRows.length }}</text>
         <text v-if="pluginUpdateState.count" class="msb-update-count" :title="$t('market.updateAvailableCount', { count: pluginUpdateState.count })">{{ pluginUpdateState.count }}</text>
         <view class="msb-sec-spacer"></view>
         <component :is="'button'" type="button" class="msb-sec-action msb-check-updates" :title="$t('market.checkForUpdates')" :aria-label="$t('market.checkForUpdates')" :disabled="marketPluginLoading" @click.stop="checkForUpdates">
@@ -102,10 +102,21 @@
             <text>{{ $t('market.sectionPluginTitle') }}</text>
             <text class="msb-tab-count">{{ pluginRows.length }}</text>
           </view>
+          <view class="msb-tab" :class="{ active: marketTab === 'mcp' }" @tap="marketTab = 'mcp'">
+            <text>{{ $t('mcp.label') }}</text><text class="msb-tab-count">{{ mcpRows.length }}</text>
+          </view>
         </view>
 
         <scroll-view scroll-y class="msb-list">
-        <template v-if="marketTab === 'skill'">
+        <template v-if="marketTab === 'mcp'">
+          <view class="msb-builtin-note"><text>{{ $t('mcp.description') }}</text><text class="msb-builtin-action" @tap="openMcpSettings">{{ $t('mcp.add') }}</text></view>
+          <view v-if="mcpError" class="msb-empty msb-error" role="alert">{{ mcpError }}</view>
+          <view v-for="row in mcpRows" :key="row.id" class="msb-row" @tap="openMcpSettings">
+            <view class="msb-row-main"><text class="msb-row-name">{{ row.name }}</text><text class="msb-row-desc">{{ row.meta }}</text></view>
+            <text class="msb-row-state">{{ $t('mcp.configure') }}</text>
+          </view>
+        </template>
+        <template v-else-if="marketTab === 'skill'">
           <view class="msb-builtin-note">
             <text>{{ $t('market.builtinWorkflowsMarketNotice') }}</text>
             <text class="msb-builtin-action" @tap.stop="openBuiltinWorkflowSettings">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</text>
@@ -205,12 +216,13 @@
 // 插件广场左栏面板（VS Code 扩展栏形态）：搜索 + 已安装/Skill 广场/插件广场
 // 两个独立滚动分组的紧凑列表；点行在中栏开详情 tab（emit open-detail），行内快捷安装。
 // 数据与安装链路复用 MarketPane 同一组 services/api.js 封装。
-import { installBundledPlugin, getPlugins, getSkills, getSkillMarket, installMarketSkill, installMarketPlugin, rescanPlugins, rescanSkills } from '@/services/api.js'
+import { getApiBaseUrl, getCloudAccountGeneration, getMcpConnections, installBundledPlugin, getPlugins, getSkills, getSkillMarket, installMarketSkill, installMarketPlugin, rescanPlugins, rescanSkills } from '@/services/api.js'
 import { pluginUpdates, refreshPluginUpdates } from '@/composables/usePluginUpdates.js'
 import { isPluginUpdateAvailable } from '@/utils/marketUpdates.js'
 import { ICONS } from '@/config/icons.js'
 import { getPluginAvatarUrl, getPluginGlyphPaths } from '@/config/pluginIcons.js'
-import { isPanelSkill, isVoiceGroupMember } from '@/config/leftSidebarPlugins.js'
+import { getCurrentUser } from '@/utils/auth.js'
+import { isAiWorkflowSkill } from '@/utils/chatSelectableSkills.mjs'
 import { canInstall, paidState, priceLabel, purchaseUrl } from '@/utils/marketPricing.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { requireAccount, isAccountLoginRetry } from '@/utils/requireAccount.js'
@@ -261,6 +273,8 @@ export default {
       // 「已安装」与 Marketplace 组内的横向标签（dev-board#67）
       installedTab: 'plugin',
       marketTab: 'skill',
+      mcpConnections: [],
+      mcpError: '',
       plugins: [],
       skills: [],
       marketSkills: [],
@@ -286,36 +300,24 @@ export default {
       const rows = []
       // Voice UI is an installed plugin. Its legacy AI skills stay in the Skill tab.
       for (const s of this.skills) {
-        if (s.builtinWorkflow) continue
+        if (s.builtinWorkflow || !isAiWorkflowSkill(s)) continue
+        if (s.id === 'tencent-meeting' && this.skills.some(item => item.sourcePluginId === 'tencent-meeting')) continue
         const mode = s.activationMode || (s.enabled ? 'auto' : 'disabled')
-        // 面板型（背后挂着左栏面板）在列表里也按插件标注：用户看到的是一个面板，
-        // 说它是「Skill · 自动触发」只会让人对不上号。判据见 leftSidebarPlugins.js。
-        const panel = isPanelSkill(s.id) && !isVoiceGroupMember(s.id) && !s.sourcePluginId
-        // 「面板插件/Skill」标签不再在行内重复——子分组标题（installedGroups）已经
-        // 表明了这一行属于哪一类，见下方 installedSkillRows/installedPluginRows。
         const metaParts = []
         if (s.version) metaParts.push('v' + s.version)
         if (s.author) metaParts.push(s.author)
         if (s.sourcePluginId) metaParts.push(this.$t('market.fromPluginTag'))
-        // 挂着原生资源包的面板型 skill：已启用但包还没就绪（老版本升级后端自动
-        // 补下载的过渡态，见 docs/NATIVE_PACK_DISTRIBUTION.md §5）——如实标「下载中」，
-        // 不能显示「已启用」误导用户以为功能已经能用。装未装的初始态不受影响，
-        // 那条走 MarketDetailPane 的安装按钮，本行列表不加轮询。
-        const packPending = panel && s.packId && s.enabled && s.packReady === false
+        const packPending = s.packId && s.enabled && s.packReady === false
         rows.push({
           kind: 'skill',
           id: s.id,
           name: s.name || s.id,
           desc: s.description || '',
-          glyph: panel ? ICONS.panelLeft : (CATEGORY_GLYPHS[s.category] || ICONS.skill),
+          glyph: CATEGORY_GLYPHS[s.category] || ICONS.skill,
           meta: metaParts.join(' · '),
-          // 子分组归属：面板型进「插件」组，其余进「Skill」组。见 installedGroups。
-          panel,
           stateLabel: packPending
             ? this.$t('market.packDownloadingShort')
-            : panel
-              ? (s.enabled ? this.$t('market.enabledTag') : this.$t('market.disabledTag'))
-              : this.$t(ACTIVATION_STATE[mode] || 'market.activationStateAuto'),
+            : this.$t(ACTIVATION_STATE[mode] || 'market.activationStateAuto'),
           stateClass: packPending ? 'downloading' : (mode === 'disabled' ? 'off' : 'ok'),
           raw: s,
         })
@@ -338,33 +340,44 @@ export default {
       }
       return kw ? rows.filter(r => (r.name + ' ' + r.id + ' ' + r.desc).toLowerCase().includes(kw)) : rows
     },
-    /** 「已安装」子分组：插件 = 面板型 skill + JAR/Web 插件；Skill = 纯对话型。 */
+    /** 「已安装」子分组：插件由插件注册表提供；Skill 是 AI 工作方法。 */
     installedPluginRows() {
-      return this.installedRows.filter(r => r.kind === 'plugin' || r.panel)
+      return this.installedRows.filter(r => r.kind === 'plugin')
     },
     installedSkillRows() {
-      return this.installedRows.filter(r => r.kind === 'skill' && !r.panel)
+      return this.installedRows.filter(r => r.kind === 'skill')
     },
     /** 标签顺序：插件在前、Skill 在后，与 MarketPane.vue 已安装 tab 一致。 */
+    installedMcpRows() {
+      return this.mcpRows.filter(r => Number(r.raw.revision) > 0 || r.raw.saved || r.raw.configured)
+    },
     installedGroups() {
       return [
         { key: 'plugin', title: this.$t('market.sectionPluginTitle'), rows: this.installedPluginRows },
         { key: 'skill', title: this.$t('market.sectionSkillTitle'), rows: this.installedSkillRows },
+        { key: 'mcp', title: this.$t('mcp.label'), rows: this.installedMcpRows },
       ]
     },
     activeInstalledRows() {
-      return this.installedTab === 'skill' ? this.installedSkillRows : this.installedPluginRows
+      return this.installedTab === 'mcp' ? this.installedMcpRows : this.installedTab === 'skill' ? this.installedSkillRows : this.installedPluginRows
     },
     /** dev-board BUG-51：已安装分组的空搜索文案原来永远是笼统的「没有匹配的
      * 已安装项」，跟在线广场里「没有匹配的 Skill」/「没有匹配的插件」这种
      * 按当前子分组具体命名的措辞不一致。改成跟随 installedTab 复用同一套
      * noMatchingSkill/noMatchingPlugin 文案，两边说法统一。 */
     activeInstalledEmptyText() {
-      return this.installedTab === 'skill' ? this.$t('market.noMatchingSkill') : this.$t('market.noMatchingPlugin')
+      return this.installedTab === 'mcp' ? this.$t('common.noData') : this.installedTab === 'skill' ? this.$t('market.noMatchingSkill') : this.$t('market.noMatchingPlugin')
+    },
+    mcpRows() {
+      const keyword = this.searchText.trim().toLowerCase()
+      return this.mcpConnections.filter(c => (c.name + ' ' + c.id).toLowerCase().includes(keyword)).map(c => ({
+        id: c.id, kind: 'mcp', name: c.name, desc: this.$t('mcp.description'), meta: this.$t('mcp.' + c.source),
+        glyph: ICONS.blocks, stateLabel: this.$t('mcp.configure'), stateClass: c.enabled ? 'ok' : '', raw: c,
+      }))
     },
     skillRows() {
       const kw = this.searchText.trim().toLowerCase()
-      const rows = this.marketSkills.map(m => {
+      const rows = this.marketSkills.filter(m => isAiWorkflowSkill(m)).map(m => {
         const cat = m.category || 'other'
         const metaParts = []
         if (m.version) metaParts.push('v' + m.version)
@@ -424,12 +437,19 @@ export default {
     },
   },
   mounted() {
+    this._mcpAlive = true
+    this._mcpOwner = this.mcpIdentity()
+    this._mcpIdentityTimer = setInterval(this.checkMcpIdentity, 1000)
     this.reloadAll()
     // 详情 tab 里装/卸/启停后广播回来刷新列表（组件级订阅，卸载即清理）
     uni.$on('awd:market-changed', this.reloadAll)
+    uni.$on('awd:mcp-changed', this.loadMcp)
   },
   beforeUnmount() {
+    this._mcpAlive = false
+    clearInterval(this._mcpIdentityTimer)
     uni.$off('awd:market-changed', this.reloadAll)
+    uni.$off('awd:mcp-changed', this.loadMcp)
   },
   methods: {
     toggleSection(key) {
@@ -438,6 +458,7 @@ export default {
     openDetail(row) {
       // group: 「语音」合并插件条目——详情页据此按本机成员 skill 合成视图，
       // 不去在线广场按这个 id 查（'voice' 不是 registry 里的条目）
+      if (row.kind === 'mcp') { this.openMcpSettings(); return }
       this.$emit('open-detail', { kind: row.kind, id: row.id, name: row.name, group: !!row.group })
     },
     // 购买走系统浏览器：支付要用用户已登录的浏览器会话，内嵌 tab 里付不了
@@ -461,8 +482,25 @@ export default {
       if (fresh.kind === 'skill') await this.installSkillRow(fresh)
       else await this.installPluginRow(fresh)
     },
+    openMcpSettings() {
+      if (this.openSettingsTab) this.openSettingsTab({ nav: 'mcp' })
+      else uni.navigateTo({ url: '/pages/admin/admin?nav=mcp' })
+    },
+    mcpIdentity() { return JSON.stringify([getApiBaseUrl(), getCurrentUser()?.id, getCloudAccountGeneration()]) },
+    checkMcpIdentity() {
+      if (this._mcpAlive && this._mcpOwner !== this.mcpIdentity()) {
+        this._mcpOwner = this.mcpIdentity(); this.mcpConnections = []; this.mcpError = ''; this.loadMcp()
+      }
+    },
+    async loadMcp() {
+      if (!this._mcpAlive) return
+      const owner = this._mcpOwner
+      const current = () => this._mcpAlive && this._mcpOwner === owner && this.mcpIdentity() === owner
+      try { const res = await getMcpConnections(); if (!current()) return; this.mcpConnections = res.connections || []; this.mcpError = '' }
+      catch (e) { if (current()) this.mcpError = e.message || this.$t('common.failed') }
+    },
     async reloadAll() {
-      await Promise.all([this.loadInstalled(), this.loadMarketSkills(), this.loadMarketPlugins()])
+      await Promise.all([this.loadInstalled(), this.loadMarketSkills(), this.loadMarketPlugins(), this.loadMcp()])
     },
     async loadInstalled() {
       try {
