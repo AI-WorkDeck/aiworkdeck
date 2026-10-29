@@ -101,6 +101,8 @@ flushDirtyEditors），单测见 `frontend/tests/project-home/flush-dirty-editor
 
 录音由 `explorerRecording.js` 接收可信宿主点击，打开 voice 插件录音 tab、检查原有转写告知并调用全局 recorder。沿用 `recording-focus` 排队消息，不引用已经移出工作台的旧面板 ref；插件自行发起的录音仍走原有确认。插件未启用引导现有详情页；已有录音只定位，启动中离页通过 signal 取消，真正开始后切面板不断录。用户首次麦克风授权仍由系统处理。
 
+欢迎页快捷栏的“开始录音”同样走 `explorerRecording.onWelcomeStartRecording`（dev-board#1618）：无项目时先准备既有随手工作区，准备期间复用启动锁和离页取消；已有项目沿用当前写权限。左右欢迎标签均接线，文案复用 `meeting.startRecording`。
+
 空白 PPTX/XLSX 在 `LocalFileStorageService.createFromTemplate` 按扩展名生成一张幻灯片／一个工作表，不能复用 Word 模板。`BlankOfficeTemplateTest` 实际重新解析文件。前端回归：`file-tree-new-file-naming`、`file-tree-create-target`、`menu-aim`、`meeting-recorder/explorer-recording`；`tests/project-home/explorer-create-ui.mjs` 用隔离浏览器和合成 HTTP 验实际工作台入口、三格式创建、目录编号、子菜单斜向路径和键盘操作，不代表正式客户端与真实麦克风权限已验。
 
 ## 文档标签与左栏独立（2026-09-10，dev-board#555/#556）
