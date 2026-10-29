@@ -87,6 +87,15 @@ public class ProjectFile {
     public String getExternalPath() { return externalPath; }
     public void setExternalPath(String externalPath) { this.externalPath = externalPath; }
 
+    /** Encrypted recovery material associated with this generated document, independent of its name. */
+    @Column
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private Long sensitiveRecoveryFileId;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public Long getSensitiveRecoveryFileId() { return sensitiveRecoveryFileId; }
+    public void setSensitiveRecoveryFileId(Long id) { this.sensitiveRecoveryFileId = id; }
+
     /**
      * WPS 文件 ID（仅文件有效，用于 WPS 在线编辑）
      * 例如：project_1_doc_1_v1234567890

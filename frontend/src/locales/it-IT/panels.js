@@ -159,7 +159,7 @@ export default {
   "deResultEditing": "La copia oscurata è aperta per la modifica. Il file selezionato qui non segue automaticamente il cambio di scheda documento.",
   "dePdfResult": "Il PDF oscurato è aperto per la revisione. Questa copia rasterizzata non può essere modificata o ripristinata direttamente.",
   "deRestoreResult": "Ripristina questo risultato",
-  "deCurrentKit": "File di ripristino collegato a questo risultato",
+  deCurrentKit: 'Dati di ripristino associati automaticamente',
   "dePreviewChanged": "Le modifiche al documento sono state appena salvate. Visualizza di nuovo l'anteprima prima di generare.",
   "deDownloadRetry": "Il risultato è stato creato, ma il download del file di ripristino non è riuscito. Usa il pulsante di download qui sotto.",
   "deAiWorkflowNotice": "Gli strumenti IA si trovano nell'assistente a destra. Questo pannello non invia mai file automaticamente. Le chat normali possono includere cronologia e contesto del progetto; non sono isolate. Verifica il contesto ed escludi originali, mappature di ripristino e file ripristinati.",
@@ -179,9 +179,10 @@ export default {
   "deExcludedTerms": "Mantieni questi valori",
   "deExcludedPlaceholder": "Un valore rilevato per riga per escludere i falsi positivi.",
   "dePreview": "Anteprima oscuramento",
+  deSelectOriginal: 'Seleziona l’originale e anonimizza di nuovo',
   "dePassword": "Password di ripristino",
   "dePasswordHint": "Inserisci la password di ripristino",
-  "deRestoreNotice": "Seleziona sopra il documento anonimizzato da ripristinare. Il file di ripristino verrà associato automaticamente; se non viene trovato, seleziona il file corrispondente dal progetto e inserisci la password. È possibile ripristinare solo i segnaposto conservati, non gli asterischi né i riquadri neri dei PDF.",
+  deRestoreNotice: 'Seleziona il documento anonimizzato e inserisci la password. I dati di ripristino vengono associati automaticamente. Si ripristinano solo i segnaposto conservati, non gli asterischi né i riquadri neri dei PDF.',
   "deImportKit": "Seleziona il file di ripristino dal progetto",
   "deRestoreGenerate": "Genera file ripristinato",
   "deMatchCount": "{count} occorrenze trovate / ripristinate",
@@ -620,6 +621,6 @@ export default {
   "pwsDdAiRiskMatrixPrompt": "Riepiloghi i principali rischi legali di due diligence individuati nel progetto corrente in un riepilogo strutturato che copra i rischi materiali, i rischi generali e le raccomandazioni di rimedio.",
   "pwsTmAiSummaryBtn": "IA: Estrai verbali di riunione e azioni",
   "pwsTmAiSummaryPrompt": "Esamini le trascrizioni di Tencent Meeting nel progetto corrente ed estragga le posizioni dei principali stakeholder, le questioni controverse e le azioni successive alla riunione.",
-  "deRecoveryMissing": "File di ripristino non ancora trovato. Seleziona il file .awd-recovery corrispondente dal progetto.",
+  deRecoveryMissing: 'Dati di ripristino non trovati: ripristino impossibile. Anonimizza di nuovo il file originale.',
   "deRestoreDocument": "Documento anonimizzato da ripristinare"
 }

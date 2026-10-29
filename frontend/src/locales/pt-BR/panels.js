@@ -159,7 +159,7 @@ export default {
   "deResultEditing": "A cópia anonimizada está aberta para edição. O arquivo selecionado aqui não acompanha automaticamente a troca de abas de documento.",
   "dePdfResult": "O PDF anonimizado está aberto para revisão. Esta cópia rasterizada não pode ser editada ou restaurada diretamente.",
   "deRestoreResult": "Restaurar este resultado",
-  "deCurrentKit": "Arquivo de restauração vinculado a este resultado",
+  deCurrentKit: 'Dados de restauração associados automaticamente',
   "dePreviewChanged": "As alterações do documento acabaram de ser salvas. Pré-visualize novamente antes de gerar.",
   "deDownloadRetry": "O resultado foi gerado, mas o download do arquivo de recuperação falhou. Use o botão de download abaixo.",
   "deAiWorkflowNotice": "As ferramentas de IA ficam no assistente à direita. Este painel nunca envia arquivos automaticamente. Conversas normais podem incluir histórico e contexto do projeto; elas não são isoladas. Verifique o contexto e exclua originais, mapeamentos de recuperação e arquivos restaurados.",
@@ -179,9 +179,10 @@ export default {
   "deExcludedTerms": "Manter estes valores",
   "deExcludedPlaceholder": "Um valor completo detectado por linha para excluir falsos positivos.",
   "dePreview": "Pré-visualizar anonimização",
+  deSelectOriginal: 'Selecionar o original e anonimizar novamente',
   "dePassword": "Senha de recuperação",
   "dePasswordHint": "Digite a senha de restauração",
-  "deRestoreNotice": "Selecione acima o documento anonimizado que deseja restaurar. O arquivo de restauração será associado automaticamente; se não for encontrado, selecione o arquivo correspondente no projeto e digite a senha. Apenas os marcadores preservados podem ser restaurados, não os asteriscos nem os retângulos pretos dos PDFs.",
+  deRestoreNotice: 'Selecione o documento anonimizado e informe a senha. Os dados de restauração são associados automaticamente. Apenas os identificadores preservados podem ser restaurados, não os asteriscos nem as tarjas de PDF.',
   "deImportKit": "Selecionar arquivo de restauração do projeto",
   "deRestoreGenerate": "Gerar arquivo restaurado",
   "deMatchCount": "{count} ocorrências correspondidas / restauradas",
@@ -620,6 +621,6 @@ export default {
   "pwsDdAiRiskMatrixPrompt": "Resuma os principais riscos jurídicos de due diligence identificados no projeto atual em um resumo estruturado abrangendo riscos materiais, riscos gerais e recomendações de remediação.",
   "pwsTmAiSummaryBtn": "IA: Extrair atas de reuniões e itens de ação",
   "pwsTmAiSummaryPrompt": "Revise as transcrições do Tencent Meeting no projeto atual e extraia as posições das partes interessadas principais, as questões em disputa e os itens de ação pós-reunião.",
-  "deRecoveryMissing": "Nenhum arquivo de restauração encontrado. Selecione o arquivo .awd-recovery correspondente no projeto.",
+  deRecoveryMissing: 'Dados de restauração não encontrados; não é possível restaurar. Anonimize novamente o arquivo original.',
   "deRestoreDocument": "Documento anonimizado a restaurar"
 }
