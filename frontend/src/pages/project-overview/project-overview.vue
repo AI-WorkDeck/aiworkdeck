@@ -1290,6 +1290,12 @@
                     />
                     <!-- 实体详情标签（dev-board#541）：浮窗上「在新标签页打开」的落点。
                          照 market-detail 那套 tab 形制（单例 id、直接 push 进列表）。 -->
+                    <LegalReferencePane
+                      v-else-if="activeFileLeft.tabType === 'legal-reference'"
+                      :key="activeFileLeft.id"
+                      :reference="activeFileLeft.legalReference"
+                      @open-url="openBrowserTab($event)"
+                    />
                     <InsightEntityDetailPane
                       v-else-if="activeFileLeft.tabType === 'insight-entity'"
                       :key="activeFileLeft.id"
@@ -1563,6 +1569,12 @@
                     />
                     <!-- 实体详情标签（dev-board#541）：浮窗上「在新标签页打开」的落点。
                          照 market-detail 那套 tab 形制（单例 id、直接 push 进列表）。 -->
+                    <LegalReferencePane
+                      v-else-if="activeFileRight.tabType === 'legal-reference'"
+                      :key="activeFileRight.id"
+                      :reference="activeFileRight.legalReference"
+                      @open-url="openBrowserTab($event)"
+                    />
                     <InsightEntityDetailPane
                       v-else-if="activeFileRight.tabType === 'insight-entity'"
                       :key="activeFileRight.id"
@@ -2406,6 +2418,7 @@ import AdminPane from '@/components/admin/AdminPane.vue'
 // 正文 Cmd/Ctrl 点中实体后的浮窗 + 它的「在新标签页打开」落点（dev-board#541）。
 // 浮窗必须挂在页面根节点才叠得上编辑器 <webview>，所以宿主持有它而不是面板。
 import InsightHoverCard from '@/components/InsightHoverCard.vue'
+import LegalReferencePane from '@/components/legal/LegalReferencePane.vue'
 import InsightEntityDetailPane from '@/components/InsightEntityDetailPane.vue'
 import VersionPanel from '@/components/version/VersionPanel.vue'
 import CommitHistoryTab from '@/components/version/CommitHistoryTab.vue'
@@ -2575,6 +2588,7 @@ import { fetchMergeInputs, buildMergeDraft } from '@/services/mergeDraft.js'
 import { clipboardBridgeMethods } from './clipboardBridge.js'
 import { ocrActionMethods } from './ocrActions.js'
 import { ocrCaptureMethods } from './ocrCapture.js'
+import { legalReferenceTabMethods } from './legalReferenceTab.js'
 import { insightEntityTabMethods } from './insightEntityTab.js'
 import { welcomeTabMethods, WELCOME_TAB_ID, loadShowWelcomeOnStartup, saveShowWelcomeOnStartup } from './welcomeTab.js'
 import { calendarTabMethods } from './calendarTab.js'
@@ -2616,6 +2630,7 @@ export default {
   // 要去的是设置页时不用离开：工作台里设置是一个标签（dev-board#582），组件走 openSettingsTab。
   provide() {
     return {
+      openLegalReferenceTab: (reference) => this.openLegalReferenceTab(reference),
       leaveWorkbench: (url) => this.leaveWorkbench(url),
       deleteWorkspaceProject: (id) => this.deleteWorkspaceProject(id),
       openSettingsTab: (opts) => this.openSettingsTab(opts || {}),
@@ -2644,6 +2659,7 @@ export default {
     InsightHoverCard,
     DocumentLinkPreview,
     InsightEntityDetailPane,
+    LegalReferencePane,
     DdFilesPanel,
     ShareholderMeetingPanel,
     DdRequestEditor,
@@ -4790,6 +4806,7 @@ export default {
     ...ocrCaptureMethods,
     // 「依据」实体详情标签（dev-board#541）
     ...insightEntityTabMethods,
+    ...legalReferenceTabMethods,
     ...welcomeTabMethods,
     ...ddClientTabMethods,
     ...messageCenterTabMethods,

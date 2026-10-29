@@ -325,7 +325,7 @@ class ExternalServiceDualTierRoutingTest {
         }
 
         @Test
-        @DisplayName("四个工具各自打到正确的 op")
+        @DisplayName("法规与案例工具各自打到正确的 op")
         void everyToolMapsToItsOp() {
             McpClientService mcp = mock(McpClientService.class);
             PlatformGatewayClient gateway = gatewayReturning("{\"raw\":\"{}\"}");
@@ -335,8 +335,9 @@ class ExternalServiceDualTierRoutingTest {
             t.law_search_keyword("民法典", null);
             t.law_recognition("依据合同法");
             t.get_law_article("民法典", "509");
+            t.case_search("合同解除");
 
-            for (String op : List.of("search_article", "get_law_list", "law_recognition", "get_article")) {
+            for (String op : List.of("search_article", "get_law_list", "law_recognition", "get_article", "search_case")) {
                 verify(gateway).call(eq("pkulaw"), eq(op), anyMap(), anyInt());
             }
         }

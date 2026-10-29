@@ -120,11 +120,20 @@ class ToolDisplayNameCoverageTest {
             Map<String, String> translations = stringObject(
                     Files.readString(locale.resolve("editor.js"), StandardCharsets.UTF_8),
                     "officeToolNames\\s*:", locale.toString());
+            com.fasterxml.jackson.databind.JsonNode legalTranslations = null;
+            if (tokens.values().stream().anyMatch(t -> t.startsWith("legalReference."))) {
+                String source = Files.readString(locale.resolve("legalReference.js"), StandardCharsets.UTF_8);
+                Matcher exported = Pattern.compile("export\\s+default\\s*(\\{.*})\\s*;?\\s*$", Pattern.DOTALL).matcher(source);
+                assertTrue(exported.find(), "找不到法律资料语言表：" + locale);
+                legalTranslations = new ObjectMapper().readTree(exported.group(1));
+            }
             for (var token : tokens.entrySet()) {
-                assertTrue(token.getValue().startsWith("editor.officeToolNames."),
+                boolean legal = token.getValue().startsWith("legalReference.");
+                assertTrue(legal || token.getValue().startsWith("editor.officeToolNames."),
                         "未知令牌路径，需要显式增加解析支持：" + token);
-                String key = token.getValue().substring("editor.officeToolNames.".length());
-                String value = translations.get(key);
+                String prefix = legal ? "legalReference." : "editor.officeToolNames.";
+                String key = token.getValue().substring(prefix.length());
+                String value = legal ? legalTranslations.path(key).asText(null) : translations.get(key);
                 assertTrue(value != null && !value.isBlank()
                                 && !value.equals(token.getValue()) && !value.equals(token.getKey()),
                         locale.getFileName() + " 缺少真实译文：" + token);

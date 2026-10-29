@@ -314,6 +314,9 @@ class AgentOrchestratorQuestionStopTest {
         assertEquals(16000, AgentOrchestrator.toolOutputDisplayLimit("pdf_inspect"));
         assertEquals(16000, AgentOrchestrator.toolOutputDisplayLimit("doc_audit_structure"),
                 "结构审计报告是给用户核对的成果，面板不能只显示前 4000 字");
+        for (String name : List.of("law_search", "law_search_keyword", "law_recognition", "get_law_article", "case_search")) {
+            assertEquals(16000, AgentOrchestrator.toolOutputDisplayLimit(name), name);
+        }
         assertEquals(4000, AgentOrchestrator.toolOutputDisplayLimit("doc_replace_text"));
         assertEquals(4000, AgentOrchestrator.toolOutputDisplayLimit(null));
     }

@@ -2107,6 +2107,15 @@ public class ContextAssemblerService {
      */
     private String spliceToolGuidance(String basePrompt, String conversationId, boolean english,
                                       AgentMode agentMode) {
+        // Office/WPS has its own renderer and does not support workbench reference cards.
+        String cardsStart = "<!-- LEGAL_REFERENCE_CARDS_START -->";
+        String cardsEnd = "<!-- LEGAL_REFERENCE_CARDS_END -->";
+        int start = basePrompt.indexOf(cardsStart), end = basePrompt.indexOf(cardsEnd);
+        if (clientCapabilityService.capabilityOf(conversationId) == ClientCapabilityService.Capability.OFFICE
+                && start >= 0 && end >= start) {
+            basePrompt = basePrompt.substring(0, start) + basePrompt.substring(end + cardsEnd.length());
+        }
+        basePrompt = basePrompt.replace(cardsStart, "").replace(cardsEnd, "");
         if (agentMode == AgentMode.ASK) {
             return basePrompt.replace(TOOL_GUIDANCE_PLACEHOLDER, "");
         }
