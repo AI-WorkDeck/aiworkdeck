@@ -50,7 +50,7 @@ function buildComponent() {
     .replace(/^import[\s\S]*?from\s*'[^']*'\s*$/gm, '')
     .replace(/export\s+default/, 'return')
   // eslint-disable-next-line no-new-func
-  const options = new Function('ICONS', 'ACCOUNT_CHANGED_EVENT', 'setGlobalOverlay', script)(ICONS, ACCOUNT_CHANGED_EVENT, setGlobalOverlay)
+  const options = new Function('ICONS', 'ACCOUNT_CHANGED_EVENT', 'setGlobalOverlay', 'isAccountSessionExpired', script)(ICONS, ACCOUNT_CHANGED_EVENT, setGlobalOverlay, () => false)
   return { ...options, ssrRender }
 }
 
@@ -243,4 +243,20 @@ test('account dropdown holds native browser overlay through open/close, sign-out
   } finally {
     first.unmount(); second.unmount(); setGlobalOverlay(false, 'test-other-dialog')
   }
+})
+
+
+test('confirmed expiry hides a cached avatar, survives stale props, and resets only on login', async () => {
+  installBus()
+  const { vm } = await mountEntry({ loggedIn: true })
+  vm.menuOpen = true
+  uni.$emit(ACCOUNT_CHANGED_EVENT, { connected: false, authExpired: true })
+  assert.equal(vm.signedIn, false)
+  assert.equal(vm.authExpired, true)
+  assert.equal(vm.menuOpen, false)
+  Entry.watch.loggedIn.call(vm)
+  assert.equal(vm.signedIn, false, 'stale connected prop must not restore the avatar')
+  uni.$emit(ACCOUNT_CHANGED_EVENT, { connected: true })
+  assert.equal(vm.signedIn, true)
+  assert.equal(vm.authExpired, false)
 })

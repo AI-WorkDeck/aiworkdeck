@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "कार्यस्थान का सत्र बहाल नहीं किया जा सका",
   "confirm": "ठीक है",
   "cancel": "रद्द करें",
   "save": "सहेजें",

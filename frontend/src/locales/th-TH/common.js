@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "ไม่สามารถกู้คืนเซสชันพื้นที่ทำงานได้",
   "confirm": "ตกลง",
   "cancel": "ยกเลิก",
   "save": "บันทึก",

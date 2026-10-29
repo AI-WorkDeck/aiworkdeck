@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "Không thể khôi phục phiên làm việc",
   "confirm": "Xác nhận",
   "cancel": "Hủy",
   "save": "Lưu",

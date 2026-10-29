@@ -34,7 +34,7 @@
       <img class="unlock-logo awd-brand-logo" src="/static/logo_full_v2.png" alt="AI WorkDeck" />
 
       <!-- 弹层形态：顶部一句说明是哪个功能要账户 -->
-      <div v-if="variant === 'dialog'" class="awd-login-reason">{{ reasonText }}</div>
+      <div v-if="variant === 'dialog'" class="awd-login-reason" :role="reason === 'expired' ? 'alert' : undefined">{{ reasonText }}</div>
 
       <!-- 站点分段控件（2026-09-23 §2.2）。单站形态（multiSite=false）整个不渲染；被配置钉定时渲染但不可点。 -->
       <div
@@ -317,6 +317,7 @@ export default {
       return this.uiLang === 'en-US' || !String(this.uiLang || 'zh-CN').startsWith('zh')
     },
     reasonText() {
+      if (this.reason === 'expired') return this.$t('common.loginExpired')
       const key = `account.loginDialog.reason.${this.reason || 'generic'}`
       const text = this.$t(key)
       return text === key ? this.$t('account.loginDialog.reason.generic') : text
