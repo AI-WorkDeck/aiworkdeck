@@ -15,7 +15,7 @@
     onUnload()    → beforeUnmount()
 -->
 <template>
-  <view class="page-admin" :class="{ 'is-embedded': embedded }">
+  <view class="page-admin" :class="{ 'is-embedded': embedded, 'mcp-settings': activeNav === 'mcp' }">
     <view class="admin-container">
       <!-- Sidebar -->
       <view class="admin-sidebar">
@@ -210,6 +210,10 @@
               {{ $t('admin.saveConfigButton') }}
             </button>
           </view>
+        </scroll-view>
+
+        <scroll-view v-else-if="activeNav === 'mcp'" scroll-y class="config-scroll">
+          <McpConnectionsPanel />
         </scroll-view>
 
         <!-- 账户与用量（仅桌面端：连接 AI WorkDeck 账户、余额） -->
@@ -1081,6 +1085,7 @@ import PersonalSettingsPanel from '@/components/userprofile/PersonalSettingsPane
 import TeamPanel from '@/components/admin/TeamPanel.vue'
 import OcrRoutingSettings from '@/components/admin/OcrRoutingSettings.vue'
 import OptionalComponentCard from '@/components/OptionalComponentCard.vue'
+import McpConnectionsPanel from '@/components/admin/McpConnectionsPanel.vue'
 import ExternalDependenciesPanel from '@/components/admin/ExternalDependenciesPanel.vue'
 import MemoryBrowser from '@/components/MemoryBrowser.vue'
 import BuiltinWorkflowEditor from '@/components/BuiltinWorkflowEditor.vue'
@@ -1100,6 +1105,7 @@ const NAV_LABEL_KEYS = {
   team: 'team.navTeam',
   memory: 'chat.memoryButton',
   workflows: 'chat.builtinWorkflowsFoldEntry',
+  mcp: 'mcp.title',
   account: 'admin.navAccount',
   ai: 'admin.navAi',
   updates: 'admin.navUpdates',
@@ -1145,7 +1151,7 @@ export default {
     OcrRoutingSettings,
     UnlockHint, RechargeDialog, AwdSelect, AwdSwitch,
     PersonalWorkLogPanel, PersonalCaseIntakePanel, PersonalFavoritesPanel, PersonalTodosPanel, PersonalSettingsPanel,
-    TeamPanel, OptionalComponentCard, MemoryBrowser, BuiltinWorkflowEditor, ExternalDependenciesPanel,
+    McpConnectionsPanel, TeamPanel, OptionalComponentCard, MemoryBrowser, BuiltinWorkflowEditor, ExternalDependenciesPanel,
     LanguagePicker, SettingsSection, SettingsRow,
   },
   /**
@@ -1199,6 +1205,7 @@ export default {
         // 团队（dev-board#496）：挂「个人」组而不是「系统」组——团队是每个人自己的归属，
         // 普通成员也要看得到自己的统计与那个数据共享开关，而「系统」组对非管理员整组收起
         { key: 'team', label: this.$t('team.navTeam'), group: 'personal' },
+        { key: 'mcp', label: this.$t('mcp.title'), group: 'personal' },
         { key: 'memory', label: this.$t('chat.memoryButton'), group: 'personal' },
         { key: 'workflows', label: this.$t('chat.builtinWorkflowsFoldEntry'), group: 'personal' },
         // 「系统」组：'config'（系统配置）已撤，内容分别并入 'ai' 与「账户与安全」；
@@ -2953,6 +2960,9 @@ $brand-accent: $brand-mint;
   overflow-y: auto;
   padding: 20px 16px;
 }
+
+.mcp-settings .admin-container { flex-wrap: wrap; }
+.mcp-settings .admin-main { flex-basis: 320px; }
 
 .admin-container {
   max-width: 1200px;

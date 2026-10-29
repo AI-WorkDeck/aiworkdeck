@@ -40,6 +40,7 @@ function harness() {
     getCurrentUser: () => ({ role: 'ADMIN' }), getPluginsForUser: () => [{ key: 'files' }],
     filterPluginsByEnabledSkills: rows => rows,
     rescanPlugins: async () => ({ pluginCount: response.length }), rescanSkills: async () => ({ skillCount: 0 }),
+    getMcpConnections: async () => ({ connections: [] }),
     getSkillMarket: async () => ({ skills: [] }), getPluginMarket: async () => ({ plugins: [] }),
     refreshPluginUpdates: async () => ({ accountConnected: false }),
     installMarketPlugin: async () => { response = [plugin({ enabled: false })] },
@@ -61,7 +62,7 @@ function harness() {
   new Function('uni', page.slice(start, end)).call(vm, uni)
 
   const market = { rescanning: false, pluginBusyId: '', $t: key => key }
-  for (const name of ['rescan', 'reloadAll', 'loadInstalled', 'loadMarketSkills', 'loadMarketPlugins', 'installPluginRow']) {
+  for (const name of ['rescan', 'reloadAll', 'loadInstalled', 'loadMcp', 'loadMarketSkills', 'loadMarketPlugins', 'installPluginRow']) {
     market[name] = method(sidebar, name, deps).bind(market)
   }
   return { vm, market, events, setResponse(value) { response = value }, setTransport(fn) { get = fn }, async emit(event) { uni.$emit(event); await flush() } }

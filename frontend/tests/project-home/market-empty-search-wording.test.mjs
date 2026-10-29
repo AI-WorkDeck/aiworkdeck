@@ -12,7 +12,7 @@ const ZH = readFileSync(new URL('../../src/locales/zh-CN/market.js', import.meta
 const EN = readFileSync(new URL('../../src/locales/en-US/market.js', import.meta.url), 'utf8')
 
 test('已安装分组空搜索文案跟随当前子分组复用 noMatchingSkill/noMatchingPlugin', () => {
-  assert.match(SRC, /activeInstalledEmptyText\(\)\s*{\s*return this\.installedTab === 'skill' \? this\.\$t\('market\.noMatchingSkill'\) : this\.\$t\('market\.noMatchingPlugin'\)/)
+  assert.match(SRC, /activeInstalledEmptyText\(\)\s*{\s*return this\.installedTab === 'mcp' \? this\.\$t\('common\.noData'\) : this\.installedTab === 'skill' \? this\.\$t\('market\.noMatchingSkill'\) : this\.\$t\('market\.noMatchingPlugin'\)/)
   assert.match(SRC, /searchText \? activeInstalledEmptyText : \$t\('market\.noInstalledYet'\)/)
 })
 

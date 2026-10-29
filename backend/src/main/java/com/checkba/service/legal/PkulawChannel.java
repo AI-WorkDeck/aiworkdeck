@@ -45,6 +45,9 @@ public class PkulawChannel {
     private final ExternalProviderResolver externalProviderResolver;
     private final PlatformGatewayClient platformGatewayClient;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ai.mcp.UserMcpConnectionService userMcp;
+
     /**
      * 打一次法宝工具。
      *
@@ -53,6 +56,9 @@ public class PkulawChannel {
      * @throws GatewayException 平台档下网关的分类失败（余额不足 / 未开放 / 不可达），带 kind
      */
     public String callTool(String server, String tool, Map<String, Object> args) {
+        if (server != null && server.startsWith(PKULAW_SERVER_PREFIX) && userMcp != null && userMcp.hasOverride("pkulaw")) {
+            return userMcp.callPreset("pkulaw", tool, args);
+        }
         if (!viaPlatform(server)) {
             return mcpClientService.callTool(server, tool, args);
         }
@@ -64,7 +70,8 @@ public class PkulawChannel {
 
     /** 这个 server 这次走不走平台网关。 */
     public boolean viaPlatform(String server) {
-        return server != null && server.startsWith(PKULAW_SERVER_PREFIX)
+        return !(userMcp != null && userMcp.hasOverride("pkulaw"))
+                && server != null && server.startsWith(PKULAW_SERVER_PREFIX)
                 && externalProviderResolver.resolve(ExternalServiceProvider.PKULAW)
                         == ExternalServiceProvider.PLATFORM;
     }
