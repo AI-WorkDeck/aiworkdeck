@@ -50,5 +50,7 @@ export default {
   "caseSearch": "檢索司法案例",
   "aiSummary": "AI 整理",
   "excerpt": "引用節選",
-  "unverifiedNote": "本資料由 AI 整理，來源與原文尚未核驗。請透過來源原文核對。"
+  "unverifiedNote": "本資料由 AI 整理，來源與原文尚未核驗。請透過來源原文核對。",
+  "judgmentDate": "裁判日期",
+  "penaltyAuthority": "處罰機關"
 }

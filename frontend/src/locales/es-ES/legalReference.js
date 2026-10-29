@@ -50,5 +50,7 @@ export default {
   "caseSearch": "Buscar jurisprudencia",
   "aiSummary": "Síntesis de IA",
   "excerpt": "Extracto citado",
-  "unverifiedNote": "Este material fue recopilado por IA. Su fuente y su texto original no se han verificado. Contrástelo con la fuente original."
+  "unverifiedNote": "Este material fue recopilado por IA. Su fuente y su texto original no se han verificado. Contrástelo con la fuente original.",
+  "judgmentDate": "Fecha de la sentencia",
+  "penaltyAuthority": "Autoridad sancionadora"
 }

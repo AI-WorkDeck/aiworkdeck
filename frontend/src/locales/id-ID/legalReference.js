@@ -50,5 +50,7 @@ export default {
   "caseSearch": "Cari Putusan Pengadilan",
   "aiSummary": "Ringkasan AI",
   "excerpt": "Kutipan",
-  "unverifiedNote": "Materi ini disusun oleh AI. Sumber dan teks aslinya belum diverifikasi. Periksa dengan sumber aslinya."
+  "unverifiedNote": "Materi ini disusun oleh AI. Sumber dan teks aslinya belum diverifikasi. Periksa dengan sumber aslinya.",
+  "judgmentDate": "Tanggal Putusan Pengadilan",
+  "penaltyAuthority": "Instansi Pemberi Sanksi"
 }

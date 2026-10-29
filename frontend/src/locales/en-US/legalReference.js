@@ -50,5 +50,7 @@ export default {
   "caseSearch": "Search Judicial Cases",
   "aiSummary": "AI Summary",
   "excerpt": "Quoted Excerpt",
-  "unverifiedNote": "This material was compiled by AI. Its source and original text have not been verified. Check it against the original source."
+  "unverifiedNote": "This material was compiled by AI. Its source and original text have not been verified. Check it against the original source.",
+  "judgmentDate": "Judgment Date",
+  "penaltyAuthority": "Penalty Authority"
 }

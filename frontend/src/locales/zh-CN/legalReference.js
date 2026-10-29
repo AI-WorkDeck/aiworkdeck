@@ -50,5 +50,7 @@ export default {
   "caseSearch": "检索司法案例",
   "aiSummary": "AI 整理",
   "excerpt": "引用节选",
-  "unverifiedNote": "本资料由 AI 整理，来源与原文尚未核验。请通过来源原文核对。"
+  "unverifiedNote": "本资料由 AI 整理，来源与原文尚未核验。请通过来源原文核对。",
+  "judgmentDate": "裁判日期",
+  "penaltyAuthority": "处罚机关"
 }
