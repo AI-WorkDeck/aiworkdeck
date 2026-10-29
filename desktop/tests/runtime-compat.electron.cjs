@@ -10,7 +10,7 @@ const http = require('node:http')
 const { once } = require('node:events')
 const { createBrowserViewRegistry } = require('../main/browser-views')
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'awd-runtime-compat-'))
+const root = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), 'awd-runtime-compat-'))
 const paths = {}
 for (const key of ['home', 'appData', 'userData', 'sessionData', 'documents', 'downloads', 'desktop', 'music', 'pictures', 'videos', 'logs', 'crashDumps', 'temp']) {
   const folder = path.join(root, key)
@@ -82,11 +82,14 @@ app.whenReady().then(async () => {
     assert.deepEqual(bridge, { api: base, memory: 8589934592, node: 'undefined', process: 'undefined', reply: { ok: true, marker: 'synthetic-confirm' } })
     assert.equal(win.webContents.getLastWebPreferences().sandbox, true)
     mark('production sandboxed preload, context bridge and invoke/reply')
-    await win.webContents.executeJavaScript('window.events=[];window.unsubscribe=checkbaDesktop.chrome.onState(value=>events.push(value));void 0')
+    await win.webContents.executeJavaScript('window.events=[];window.received=new Promise(resolve=>{window.unsubscribe=checkbaDesktop.chrome.onState(value=>{events.push(value);resolve()})});void 0')
     win.webContents.send('checkba:chrome-state', { fullscreen: true })
+    await win.webContents.executeJavaScript('received')
     assert.deepEqual(await win.webContents.executeJavaScript('events'), [{ fullscreen: true }])
-    await win.webContents.executeJavaScript('unsubscribe()')
+    await win.webContents.executeJavaScript('unsubscribe();window.barrier=new Promise(resolve=>{window.stopBarrier=checkbaDesktop.chrome.onState(resolve)});void 0')
     win.webContents.send('checkba:chrome-state', { fullscreen: false })
+    await win.webContents.executeJavaScript('barrier')
+    await win.webContents.executeJavaScript('stopBarrier()')
     assert.equal(await win.webContents.executeJavaScript('events.length'), 1)
     mark('production IPC subscription and unsubscribe')
 

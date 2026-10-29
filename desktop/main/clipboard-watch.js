@@ -96,8 +96,11 @@ function createClipboardPoller({ clipboard, platform = process.platform, getChan
     busy = true
     const current = generation
     try {
+      const initialFingerprint = fingerprint.get()
+      // copy/cut 监听也会推进共享指纹；异步读取不能用旧结果覆盖它。
+      const isCurrent = () => current === generation && fingerprint.get() === initialFingerprint
       const items = await clipboard.read()
-      if (current !== generation) return false
+      if (!isCurrent()) return false
       const formats = [...new Set(items.flatMap(item => item.types))]
       const formatsKey = formats.join('\n')
       const formatsChanged = formatsKey !== lastFormatsKey
@@ -111,9 +114,9 @@ function createClipboardPoller({ clipboard, platform = process.platform, getChan
         if (seq != null && seq === imageSeq) return true
         if (seq == null && lastImageNonEmpty && !formatsChanged && ticksSinceImageRead < IMAGE_RECHECK_TICKS) return true
         const blob = await itemFor(imageType).getType(imageType)
-        if (current !== generation) return false
+        if (!isCurrent()) return false
         const bytes = Buffer.from(await blob.arrayBuffer())
-        if (current !== generation) return false
+        if (!isCurrent()) return false
         const img = decodeImage(bytes)
         ticksSinceImageRead = 0
         lastImageNonEmpty = !!(img && !img.isEmpty())
@@ -137,12 +140,12 @@ function createClipboardPoller({ clipboard, platform = process.platform, getChan
       // Electron 44+ 将 macOS 原生文件引用映射为标准 URI 列表。
       if (platform === 'darwin' && itemFor('text/uri-list')) {
         const blob = await itemFor('text/uri-list').getType('text/uri-list')
-        if (current !== generation) return false
+        if (!isCurrent()) return false
         const text = await blob.text()
-        if (current !== generation) return false
+        if (!isCurrent()) return false
         const uri = text.split(/\r?\n/).map(line => line.trim()).find(line => line && !line.startsWith('#'))
         let filePath = ''
-        try { if (uri) filePath = fileURLToPath(uri) } catch (e) { /* not a local file reference */ }
+        try { if (uri) filePath = fileURLToPath(uri, { windows: false }) } catch (e) { /* not a local macOS file reference */ }
         if (filePath) {
           const fp = 'FILE_' + filePath
           if (fp !== fingerprint.get()) {
@@ -155,9 +158,9 @@ function createClipboardPoller({ clipboard, platform = process.platform, getChan
 
       if (itemFor('text/plain')) {
         const blob = await itemFor('text/plain').getType('text/plain')
-        if (current !== generation) return false
+        if (!isCurrent()) return false
         const text = (await blob.text()).trim()
-        if (current !== generation) return false
+        if (!isCurrent()) return false
         if (!text) return true
         const fp = 'TXT_' + text
         if (fp !== fingerprint.get()) {
