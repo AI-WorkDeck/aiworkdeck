@@ -4728,3 +4728,10 @@ export const revertHarnessEvolution = (id) => request({
   method: 'DELETE',
 })
 
+
+// Independent user-scoped MCP connections. Credentials are write-only.
+export const getMcpConnections = () => request({ logBody: false, url: '/api/mcp/connections' })
+export const saveMcpConnection = (id, data, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: '/api/mcp/connections' + (id ? '/' + encodeURIComponent(id) : ''), method: id ? 'PUT' : 'POST', data })
+export const testMcpConnection = (id, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: `/api/mcp/connections/${encodeURIComponent(id)}/test`, method: 'POST' })
+export const setMcpConnectionEnabled = (id, enabled, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: `/api/mcp/connections/${encodeURIComponent(id)}/enable`, method: 'POST', data: { enabled } })
+export const deleteMcpConnection = (id, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: `/api/mcp/connections/${encodeURIComponent(id)}`, method: 'DELETE' })

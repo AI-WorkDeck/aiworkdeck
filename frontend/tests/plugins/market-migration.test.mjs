@@ -3,16 +3,18 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { isAiWorkflowSkill } from '../../src/utils/chatSelectableSkills.mjs'
 import { isPluginUpdateAvailable } from '../../src/utils/marketUpdates.js'
 const source = readFileSync(new URL('../../src/components/MarketSidebarPanel.vue', import.meta.url), 'utf8')
 const start = source.indexOf('    installedRows() {') + '    installedRows() {'.length
 const end = source.indexOf('\n    },', start)
-const compute = new Function('isPluginUpdateAvailable', `return function(isPanelSkill, isVoiceGroupMember, ICONS, CATEGORY_GLYPHS, ACTIVATION_STATE) {${source.slice(start, end)}}`)(isPluginUpdateAvailable)
-test('voice has only one plugin switch; AI skills stay separate after uninstall too', () => {
+const compute = new Function('isAiWorkflowSkill', 'isPluginUpdateAvailable', `return function(isPanelSkill, isVoiceGroupMember, ICONS, CATEGORY_GLYPHS, ACTIVATION_STATE) {${source.slice(start, end)}}`)(isAiWorkflowSkill, isPluginUpdateAvailable)
+test('voice has one plugin switch; only its real meeting workflow appears as a Skill', () => {
   for (const plugins of [[{ id: 'voice', name: 'Voice', enabled: false }], []]) {
     const rows = compute.call({ plugins, skills: [{ id: 'text-to-speech', enabled: true }, { id: 'meeting-recorder', enabled: true }], searchText: '', $t: value => value }, () => true, id => ['text-to-speech', 'meeting-recorder'].includes(id), {}, {}, {})
     assert.equal(rows.filter(row => row.kind === 'plugin' || row.panel).length, plugins.length)
-    assert.equal(rows.filter(row => row.kind === 'skill' && !row.panel).length, 2)
+    assert.equal(rows.filter(row => row.kind === 'skill' && !row.panel).length, 1)
+    assert.equal(rows.some(row => row.id === 'text-to-speech'), false)
     assert.equal(rows.some(row => row.group), false)
   }
 })

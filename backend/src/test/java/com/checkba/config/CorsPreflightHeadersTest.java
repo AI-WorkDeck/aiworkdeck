@@ -47,6 +47,7 @@ class CorsPreflightHeadersTest {
         // 顺序无关，名字必须在。大小写按 HTTP 语义忽略。
         for (String header : List.of(
                 "x-session-id",      // 全站鉴权
+                "x-mcp-scope",       // MCP 写请求绑定打开配置时的账户
                 "x-app-language",    // 界面语言（AppLanguageRequestFilter）
                 "x-client-instance", // SSE 窗口身份（dev-board#803）
                 "last-event-id",     // SSE 断点续传游标（dev-board#803）

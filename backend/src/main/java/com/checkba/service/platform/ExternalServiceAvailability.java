@@ -33,7 +33,12 @@ public class ExternalServiceAvailability {
      * @param service {@link ExternalServiceProvider} 里的服务名常量（search / pkulaw / qichacha …）
      * @return false 只在「这个服务当前走平台网关，而本机没连账户」时出现；其余一律 true
      */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ai.mcp.UserMcpConnectionService userMcp;
+
     public boolean usable(String service) {
+        if (userMcp != null && (ExternalServiceProvider.QICHACHA.equals(service) || ExternalServiceProvider.PKULAW.equals(service))
+                && userMcp.hasOverride(service)) return true;
         try {
             if (externalProviderResolver.resolve(service) != ExternalServiceProvider.PLATFORM) {
                 return true;

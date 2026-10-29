@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package com.checkba.service.ai.mcp;
 
+import com.checkba.service.LangText;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -55,6 +56,31 @@ public class PluginMcpHttpClient {
             if (!result.isObject() || !result.path("content").isArray())
                 throw error("protocol_error", "The MCP tool returned an invalid result.");
             return JSON.convertValue(result, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+        } finally { session.close(); }
+    }
+
+    /** Explicit discovery only; listing saved connections never makes an outbound request. */
+    public List<Map<String, Object>> listTools(String url, String token, BooleanSupplier allowed) {
+        policy.validate(url);
+        if (token != null && (token.contains("\r") || token.contains("\n")))
+            throw error("invalid_credential", LangText.of("MCP 凭据无效。", "The MCP credential is invalid."));
+        Session session = new Session(url, token, allowed);
+        try {
+            session.initialize();
+            List<Map<String, Object>> tools = new ArrayList<>();
+            String cursor = null;
+            Set<String> cursors = new HashSet<>();
+            for (int page = 0; page < 16; page++) {
+                JsonNode result = session.rpc("tools/list", cursor == null ? Map.of() : Map.of("cursor", cursor));
+                JsonNode rows = result.path("tools");
+                if (!rows.isArray() || tools.size() + rows.size() > 256)
+                    throw error("protocol_error", LangText.of("MCP 工具清单无效或超过大小限制。", "Invalid or oversized MCP tool list."));
+                for (JsonNode row : rows) tools.add(JSON.convertValue(row, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}));
+                cursor = result.path("nextCursor").asText(null);
+                if (cursor == null || cursor.isBlank()) return tools;
+                if (!cursors.add(cursor)) throw error("protocol_error", LangText.of("MCP 工具清单返回了重复分页游标。", "MCP tools pagination repeated a cursor."));
+            }
+            throw error("protocol_error", LangText.of("MCP 工具清单页数超过限制。", "MCP tools pagination exceeded the limit."));
         } finally { session.close(); }
     }
 

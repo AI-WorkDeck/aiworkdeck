@@ -166,6 +166,8 @@ public class DocInsightService {
     private final PkulawChannel pkulawChannel;
     private final ExternalProviderResolver externalProviderResolver;
     private final PlatformGatewayClient platformGatewayClient;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ai.mcp.UserMcpConnectionService userMcp;
     private final InsightProperties props;
     private final ObjectMapper om;
     private final ProjectFileAccessService fileAccess;
@@ -962,6 +964,7 @@ public class DocInsightService {
      * 再从多个候选里挑与文中写法最接近的全称（随后由调用方再打一次企查查精确核验）。
      */
     String resolveFullNameViaMcp(String name) {
+        boolean ownConnection = userMcp != null && userMcp.hasOverride("qichacha");
         String raw = null;
         try {
             raw = mcpClientService.callTool(QICHACHA_MCP_SERVER, QICHACHA_MCP_TOOL, Map.of("searchKey", name));
@@ -975,7 +978,8 @@ public class DocInsightService {
         }
         // 平台档桌面端未配置本机 QICHACHA_MCP_TOKEN 时，走平台网关 search/web 检索候选全称，
         // 命中的候选随后仍由 qichachaService.queryEciInfoJson 做权威工商核验。
-        if (externalProviderResolver != null
+        if (!ownConnection && !(userMcp != null && userMcp.hasOverride("qichacha"))
+                && externalProviderResolver != null
                 && externalProviderResolver.resolve(ExternalServiceProvider.QICHACHA) == ExternalServiceProvider.PLATFORM
                 && platformGatewayClient != null) {
             try {
@@ -1748,7 +1752,7 @@ public class DocInsightService {
     public EntityView refreshEntity(Long userId, Long projectId, Long entityId) {
         requireWrite(projectId, userId);
         DocInsightEntity row = requireEntity(projectId, entityId);
-        ensureLookupAccount(row.getKind());
+        ensureLookupAccount(userId, row.getKind());
         // 检索本身可能打网络，同样包进身份作用域：控制器线程没有它
         PlatformAiUserScope.run(userId, () -> {
             try {
@@ -1759,7 +1763,7 @@ public class DocInsightService {
                 row.setFetchedAt(LocalDateTime.now());
             }
         });
-        throwLookupAccountFailure(row);
+        throwLookupAccountFailure(userId, row);
         return view(entities.save(row), true);
     }
 
@@ -1773,7 +1777,7 @@ public class DocInsightService {
         if (name.length() < 2 || name.length() > 160 || name.codePoints().anyMatch(Character::isISOControl)) {
             throw new IllegalArgumentException(LangText.of("查询文本须为 2 至 160 字的单行文字", "Lookup text must be a single line between 2 and 160 characters"));
         }
-        ensureLookupAccount(kind);
+        ensureLookupAccount(userId, kind);
         DocInsightExtraction.RawEntity raw;
         if ("COMPANY".equals(kind)) raw = DocInsightExtraction.company(name, name);
         else if ("CASE".equals(kind)) raw = DocInsightExtraction.caseRef(name, "", name);
@@ -1795,20 +1799,23 @@ public class DocInsightService {
                 row.setFetchedAt(LocalDateTime.now());
             }
         });
-        throwLookupAccountFailure(row);
+        throwLookupAccountFailure(userId, row);
         return view(row, true);
     }
 
-    private void ensureLookupAccount(String kind) {
+    private void ensureLookupAccount(Long userId, String kind) {
         if ("DOC".equals(kind)) return;
         String service = "COMPANY".equals(kind) ? ExternalServiceProvider.QICHACHA : ExternalServiceProvider.PKULAW;
+        if (userMcp != null && PlatformAiUserScope.call(userId, () -> userMcp.hasOverride(service))) return;
         if (externalProviderResolver.resolve(service) == ExternalServiceProvider.PLATFORM) {
             platformGatewayClient.ensureConnected();
         }
     }
 
     /** Explicit lookups must open the login/top-up flow rather than return a configuration note. */
-    private void throwLookupAccountFailure(DocInsightEntity row) {
+    private void throwLookupAccountFailure(Long userId, DocInsightEntity row) {
+        String provider = "COMPANY".equals(row.getKind()) ? ExternalServiceProvider.QICHACHA : ExternalServiceProvider.PKULAW;
+        if (userMcp != null && PlatformAiUserScope.call(userId, () -> userMcp.hasOverride(provider))) return;
         String hint = row.getRetrievalHint();
         GatewayException.Kind kind = DocInsightEntity.HINT_NOT_CONNECTED.equals(hint)
                 ? GatewayException.Kind.NOT_CONNECTED

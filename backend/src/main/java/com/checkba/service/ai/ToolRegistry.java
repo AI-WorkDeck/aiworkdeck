@@ -559,6 +559,10 @@ public class ToolRegistry {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.checkba.service.ai.mcp.PluginMcpService pluginMcpService;
+    private com.checkba.service.ai.mcp.UserMcpConnectionService userMcpService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setUserMcpService(com.checkba.service.ai.mcp.UserMcpConnectionService service) { this.userMcpService = service; }
+
 
     public void setPluginMcpService(com.checkba.service.ai.mcp.PluginMcpService service) { this.pluginMcpService = service; }
 
@@ -783,6 +787,7 @@ public class ToolRegistry {
                     || availability.computeIfAbsent(component, this::componentAvailable)) all.add(spec);
         }
         if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> all.add(b.specification()));
+        if (userMcpService != null) userMcpService.bindings().forEach(b -> all.add(b.specification()));
         for (ToolSpecification spec : pluginService.getToolSpecifications()) {
             if (pluginToolEnabled(spec.name())) {
                 all.add(offerable(spec));
@@ -887,6 +892,7 @@ public class ToolRegistry {
             }
         }
         if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> names.add(b.specification().name()));
+        if (userMcpService != null) userMcpService.bindings().forEach(b -> names.add(b.specification().name()));
         names.sort(Comparator.comparingInt(String::length).reversed());
         return names;
     }
@@ -909,6 +915,10 @@ public class ToolRegistry {
         RegisteredTool tool = builtinTools.get(name);
         if (tool != null) {
             return Optional.of(tool);
+        }
+        if (userMcpService != null) {
+            var binding = userMcpService.find(name, com.checkba.service.ai.mcp.UserMcpConnectionService.currentUser());
+            if (binding != null) return Optional.of(new RegisteredTool(userMcpService, null, binding.specification(), null, false));
         }
         if (pluginMcpService != null) {
             var binding = pluginMcpService.find(name);
@@ -951,6 +961,19 @@ public class ToolRegistry {
      */
     public ToolResult execute(String name, String argsJson, ToolContext ctx) {
         String resolvedName = TOOL_NAME_ALIASES.getOrDefault(name, name);
+        if (userMcpService != null && resolvedName.startsWith("user_mcp_")) {
+            var binding = userMcpService.find(resolvedName, ctx == null ? null : ctx.userId());
+            if (binding == null || !clientCapabilityService.isToolVisible(resolvedName, ctx == null ? null : ctx.conversationId()))
+                return new ToolResult(unknownToolMessage(resolvedName), null, false);
+            RegisteredTool registered = new RegisteredTool(userMcpService, null, binding.specification(), null, false);
+            try {
+                return new ToolResult(userMcpService.callAgent(resolvedName, new java.util.LinkedHashMap<>(parseArgs(argsJson)), ctx), registered, true);
+            } catch (com.checkba.service.ai.mcp.PluginMcpException e) {
+                return new ToolResult("Error: " + e.code() + ": " + e.getMessage(), registered, true);
+            } catch (IllegalArgumentException e) {
+                return new ToolResult("Error: " + LangText.of("MCP 参数无效。", "Invalid MCP arguments."), registered, true);
+            }
+        }
         // 会话能力过滤：能力档位下不可见的工具按"不存在"拒绝（模型收到与未知工具一致的反馈）
         Optional<RegisteredTool> toolOpt = resolve(resolvedName, ctx != null ? ctx.conversationId() : null);
         if (toolOpt.isEmpty()) {
