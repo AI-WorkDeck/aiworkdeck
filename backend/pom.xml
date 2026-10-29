@@ -21,6 +21,12 @@
         <commons-lang3.version>3.14.0</commons-lang3.version>
     </properties>
     <dependencies>
+        <!-- Validate standalone MCP schemas locally, including nullable/union constraints. -->
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>1.5.7</version>
+        </dependency>
         <!-- 插件宿主 SPI（backend/plugin-api 独立工程，先 mvn -f backend/plugin-api/pom.xml install）。
              版本独立于桌面端，只加不破；插件以 provided 依赖同一坐标。 -->
         <dependency>

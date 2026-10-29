@@ -241,6 +241,7 @@
         </template>
 
         <!-- ============ 已安装 ============ -->
+        <template v-else-if="activeTab === 'mcp'"><McpConnectionsPanel /></template>
         <template v-else>
           <view class="section-head">
             <text class="section-title">{{ $t('market.sectionPluginTitle') }}</text>
@@ -250,7 +251,7 @@
           <view v-if="loading" class="empty">
             <text class="empty-title">{{ $t('market.loadingLocalPlugins') }}</text>
           </view>
-          <view v-else-if="plugins.length === 0 && panelSkills.length === 0" class="empty">
+          <view v-else-if="plugins.length === 0" class="empty">
             <svg class="empty-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, i) in ICONS.blocks" :key="i" :d="d" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
@@ -294,36 +295,6 @@
                   <text class="tool-desc">{{ t.description }}</text>
                 </view>
               </view>
-            </view>
-          </view>
-
-          <!-- 面板型 skill：装完是左栏一个图标 + 一整个面板，用户认知里就是插件，
-               所以放在插件区、只给启用/停用（判据是 leftSidebarPlugins 的 requiresSkill）。
-               技术上它仍是 skills/ 下的一份，启停照样走 setSkillActivation。 -->
-          <view v-if="panelSkills.length" class="card-grid">
-            <view v-for="s in panelSkills" :key="s.id" class="ed-card" :class="{ off: !s.enabled }">
-              <view class="card-head">
-                <view class="head-text">
-                  <view class="kicker">
-                    <svg class="kicker-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path v-for="(d, i) in ICONS.panelLeft" :key="i" :d="d" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                    <text>{{ $t('market.panelPluginLabel') }}</text>
-                    <text class="kicker-sep"></text>
-                    <text :class="s.enabled ? 'kicker-on' : 'kicker-off'">{{ s.enabled ? $t('market.enabledTag') : $t('market.disabledTag') }}</text>
-                  </view>
-                  <text class="card-title">{{ s.name || s.id }}</text>
-                  <text class="card-note">{{ $t('market.panelPluginHint') }}</text>
-                </view>
-                <AwdSwitch
-                  class="plugin-switch"
-                  :checked="s.enabled"
-                  :disabled="switching"
-                  @change="onPanelSkillToggle(s, $event)"
-                />
-              </view>
-
-              <text class="card-desc">{{ s.description || $t('market.noDescription') }}</text>
             </view>
           </view>
 
@@ -391,9 +362,10 @@ import { requireAccount, isAccountLoginRetry } from '@/utils/requireAccount.js'
 import { refreshEntitlements } from '@/composables/useEntitlement.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { ICONS } from '@/config/icons.js'
-import { isPanelSkill, isVoiceGroupMember } from '@/config/leftSidebarPlugins.js'
+import { isAiWorkflowSkill } from '@/utils/chatSelectableSkills.mjs'
 import { t } from '@/i18n'
 import AwdSelect from '@/components/AwdSelect.vue'
+import McpConnectionsPanel from '@/components/admin/McpConnectionsPanel.vue'
 import AwdSwitch from '@/components/AwdSwitch.vue'
 
 const PERMISSION_LABELS = {
@@ -436,6 +408,7 @@ const CATEGORY_GLYPHS = {
 const TABS = [
   { key: 'skill', label: t('market.tabSkillMarket') },
   { key: 'plugin', label: t('market.tabPluginMarket') },
+  { key: 'mcp', label: t('mcp.label') },
   { key: 'installed', label: t('market.tabInstalled') },
 ]
 
@@ -448,7 +421,7 @@ const TRIGGER_PREVIEW = 3
 
 export default {
   name: 'MarketPane',
-  components: { AwdSelect, AwdSwitch },
+  components: { AwdSelect, AwdSwitch, McpConnectionsPanel },
   inject: { openWorkflowEditorTab: { default: null }, openSettingsTab: { default: null } },
   props: {
     /** true=独立页面（渲染返回按钮，返回走 uni.navigateBack）；false=嵌入 workbench 窗格 */
@@ -491,12 +464,8 @@ export default {
     ICONS() {
       return ICONS
     },
-    /** The voice panel has a real plugin lifecycle; AI skills retain their own activation mode. */
-    panelSkills() {
-      return this.skills.filter(s => !s.builtinWorkflow && isPanelSkill(s.id) && !isVoiceGroupMember(s.id) && !s.sourcePluginId)
-    },
     conversationSkills() {
-      return this.skills.filter(s => !s.builtinWorkflow && (!isPanelSkill(s.id) || isVoiceGroupMember(s.id) || s.sourcePluginId))
+      return this.skills.filter(s => !s.builtinWorkflow && isAiWorkflowSkill(s) && !(s.id === 'tencent-meeting' && this.skills.some(row => row.sourcePluginId === 'tencent-meeting')))
     },
     installedCount() {
       return this.plugins.length + this.skills.filter(s => !s.builtinWorkflow).length
@@ -515,6 +484,7 @@ export default {
     filteredMarketSkills() {
       const kw = this.searchText.trim().toLowerCase()
       return this.marketSkills.filter(m => {
+        if (!isAiWorkflowSkill(m)) return false
         if (this.activeCategory !== 'all' && (m.category || 'other') !== this.activeCategory) return false
         if (!kw) return true
         const haystack = [m.name, m.id, m.description, ...(m.triggers || [])]
@@ -782,38 +752,6 @@ export default {
       } catch (e) {
         console.error('加载 Skill 列表失败:', e)
         uni.showToast({ title: this.$t('market.loadSkillListFailed'), icon: 'none' })
-      }
-    },
-    // 面板型只有启用/停用两态：开 = auto（面板的 kick-off prompt 要靠触发词命中，
-    // manual 会让「生成纪要」按钮点了没反应），关 = disabled（左栏图标随之消失）
-    async onPanelSkillToggle(skill, enabled) {
-      const mode = enabled ? 'auto' : 'disabled'
-      this.switching = true
-      try {
-        // 「语音」合并插件：一次作用于全部成员 skill（启停一体，dev-board#66）
-        const ids = skill.groupMemberIds || [skill.id]
-        for (const id of ids) {
-          await setSkillActivation(id, mode)
-        }
-        if (skill.groupMemberIds) {
-          // 合并卡是 computed 里合成的非响应式对象，乐观更新要写回底层成员
-          // （this.skills 的元素）才会触发重算重渲染
-          for (const s of this.skills) {
-            if (ids.includes(s.id)) {
-              s.activationMode = mode
-              s.enabled = enabled
-            }
-          }
-        }
-        skill.activationMode = mode
-        skill.enabled = enabled
-        uni.showToast({ title: enabled ? this.$t('market.enabledToast') : this.$t('market.disabledToggleToast'), icon: 'none' })
-        this.notifyMarketChanged()
-      } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('market.operationFailedNeedAdmin'), icon: 'none' })
-        await this.loadSkills()
-      } finally {
-        this.switching = false
       }
     },
     // 装/卸/启停改的是全局安装状态：面板型 skill 的启停决定左栏有没有那个图标，

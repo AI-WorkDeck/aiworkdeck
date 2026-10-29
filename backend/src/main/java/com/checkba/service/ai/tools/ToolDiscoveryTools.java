@@ -107,7 +107,7 @@ public class ToolDiscoveryTools implements AgentToolComponent {
             + "edit (cursor/selection, delete, rewrite a paragraph, insert under a heading), "
             + "files (incl. export to PDF), format (fonts/paragraphs/page setup/TOC/footnotes/images), "
             + "spreadsheet, slides, office, pdf, litigation (diagrams), reference, memory, enterprise-data, legal, "
-            + "version (Git status/history/changed paths, commit, pull latest, restore history), meeting, task, tag (file tags), plugin, python, plugin-tools (tools from installed plugins), misc. "
+            + "version (Git status/history/changed paths, commit, pull latest, restore history), meeting, task, tag (file tags), plugin, python, plugin-tools (tools from installed plugins), mcp (user-configured remote MCP connections), misc. "
             + "With no argument you get every category with the tool names in it, plus the skills (cheap, do this first). "
             + "With query you search tool names and descriptions by keywords (every word must match, up to 15 hits); "
             + "with names you get exactly those tools; with a category (comma-separate several) you get the whole category. "

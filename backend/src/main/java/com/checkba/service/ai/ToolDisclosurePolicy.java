@@ -232,6 +232,7 @@ public class ToolDisclosurePolicy {
         CATEGORIES.put("task", List.of("task_"));
         // 文件标签不是事项（T-19）：tag_list / tag_file / tag_remove_from_file 原先挂在 task 下
         CATEGORIES.put("tag", List.of("tag_"));
+        CATEGORIES.put("mcp", List.of("user_mcp_"));
         CATEGORIES.put("plugin", List.of("plugin_dev_", "capability_"));
         CATEGORIES.put("python", List.of("name:run_python"));
     }
@@ -288,6 +289,7 @@ public class ToolDisclosurePolicy {
         CATEGORY_KEYWORDS.put("litigation", List.of("时间轴", "关系图", "流程图", "可视化",
                 "timeline", "diagram", "relationship graph"));
         CATEGORY_KEYWORDS.put("slides", List.of("ppt", "pptx", "幻灯片", "演示文稿", "slides", "presentation"));
+        CATEGORY_KEYWORDS.put("mcp", List.of("mcp", "MCP", "外部连接", "自配连接", "GitHub", "Tavily", "元典"));
         CATEGORY_KEYWORDS.put("enterprise-data", List.of("工商", "企业信息", "企查查", "股东", "注册资本",
                 "公司背景", "tushare", "股票", "上市公司"));
         CATEGORY_KEYWORDS.put("plugin", List.of("插件", "plugin", "能力安装", "capability"));

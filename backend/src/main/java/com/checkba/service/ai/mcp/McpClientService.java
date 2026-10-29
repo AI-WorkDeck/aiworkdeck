@@ -26,6 +26,9 @@ public class McpClientService {
 
     private static final Logger log = LoggerFactory.getLogger(McpClientService.class);
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private UserMcpConnectionService userMcp;
+
     private final McpProperties mcpProperties;
     private final SystemSettingService systemSettingService;
     private final Map<String, McpProvider> providersByTransport;
@@ -49,6 +52,8 @@ public class McpClientService {
      */
     public String callTool(String serverName, String toolName, Map<String, Object> args) {
         log.debug("MCP callTool: server={}, tool={}", serverName, toolName);
+        if ("qichacha-company".equals(serverName) && userMcp != null && userMcp.hasOverride("qichacha"))
+            return userMcp.callPreset("qichacha", toolName, args);
 
         McpProperties.ServerConfig server = mcpProperties.findByName(serverName);
         if (server == null) {

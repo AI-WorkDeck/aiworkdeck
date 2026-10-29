@@ -88,7 +88,9 @@ public class ExternalController {
             }
 
             if (dto == null) {
-                dto = qichachaService.searchCompany(searchKey, request.getRole());
+                String lookupKey = searchKey;
+                dto = com.checkba.service.ai.PlatformAiUserScope.call(AuthController.getUserIdFromSession(sessionId),
+                        () -> qichachaService.searchCompany(lookupKey, request.getRole()));
             }
             // 二次判空：searchCompany 可能返回 null，后续解引用会 NPE→500
             if (dto == null) {

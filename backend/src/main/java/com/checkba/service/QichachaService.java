@@ -49,6 +49,9 @@ public class QichachaService {
     @Autowired
     private com.checkba.service.platform.PlatformGatewayClient platformGatewayClient;
 
+    @Autowired(required = false)
+    private com.checkba.service.ai.mcp.UserMcpConnectionService userMcp;
+
     @Value("${external.qichacha.key:}")
     private String defaultAppKey;
 
@@ -71,6 +74,7 @@ public class QichachaService {
      * <p>给 AI 侧的一等工具用：DTO 是按界面字段裁过的，模型要的是全量事实。
      */
     public String queryEciInfoJson(String searchKey) {
+        if (userMcp != null && userMcp.hasOverride("qichacha")) return userMcp.callCompany(searchKey);
         return fetchEciInfoResult(searchKey).toString();
     }
 
@@ -87,6 +91,7 @@ public class QichachaService {
      * 企查查不支持签发受限子凭证——见 licensing-billing 领域文档 D5 一节）。
      */
     public String queryIprJson(String mcpTool, String searchKey) {
+        if (userMcp != null && userMcp.hasOverride("qichacha")) return userMcp.callPreset("qichacha", mcpTool, Map.of("searchKey", searchKey));
         if (externalProviderResolver.resolve(
                 com.checkba.service.platform.ExternalServiceProvider.QICHACHA)
                 != com.checkba.service.platform.ExternalServiceProvider.PLATFORM) {
@@ -104,6 +109,17 @@ public class QichachaService {
 
     /** 取一次工商详情的 {@code Result}。两档在这里分，上面两个方法都不关心谁出的钱。 */
     private JSONObject fetchEciInfoResult(String searchKey) {
+        if (userMcp != null && userMcp.hasOverride("qichacha")) {
+            String raw = userMcp.callCompany(searchKey);
+            // The MCP may return prose rather than the REST DTO shape. Never
+            // silently fall back to a billable platform request to fill the DTO.
+            JSONObject record;
+            try { record = JSONUtil.parseObj(raw); }
+            catch (Exception invalid) { throw new IllegalStateException(LangText.of("自配企查查已返回资料，请在对话中查看；该返回格式不能填入公司表单。", "The configured Qichacha returned data for chat, but its format cannot populate the company form.")); }
+            if (record.containsKey("Result")) record = record.getJSONObject("Result");
+            if (record == null || !record.containsKey("Name")) throw new IllegalStateException(LangText.of("自配企查查返回格式不能填入公司表单，未使用官方收费通道。", "The configured Qichacha result cannot populate the company form. The paid official channel was not used."));
+            return record;
+        }
         if (externalProviderResolver.resolve(
                 com.checkba.service.platform.ExternalServiceProvider.QICHACHA)
                 == com.checkba.service.platform.ExternalServiceProvider.PLATFORM) {

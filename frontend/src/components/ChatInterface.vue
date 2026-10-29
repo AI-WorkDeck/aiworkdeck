@@ -576,12 +576,14 @@
                              <text class="skill-check">{{ selectedSkillIds.includes(s.id) ? '✓' : '' }}</text>
                              <view class="skill-option-text">
                                 <text class="skill-option-name">{{ skillDisplayName(s) }}</text>
+                                <text v-if="s.sourcePluginId" class="skill-option-desc">{{ $t('market.fromPluginTag') }}</text>
                                 <text class="skill-option-desc">{{ s.activationMode === 'manual' ? $t('chat.skillManualOnly') : (s.triggers || []).join(' / ') || $t('chat.skillNoTriggers') }}</text>
                              </view>
                           </view>
                           <view v-if="!availableSkills.length" class="skill-empty">{{ $t('chat.skillNoneInstalled') }}</view>
                           <view class="skill-divider"></view>
                           <view class="skill-manage" @tap.stop="goToSkillManagement">{{ $t('chat.skillManage') }}</view>
+                          <view class="skill-manage" @tap.stop="goToMcpManagement">{{ $t('mcp.title') }}</view>
                        </view>
                     </view>
                  </view>
@@ -906,12 +908,14 @@
                          <text class="skill-check">{{ selectedSkillIds.includes(s.id) ? '✓' : '' }}</text>
                          <view class="skill-option-text">
                             <text class="skill-option-name">{{ skillDisplayName(s) }}</text>
+                            <text v-if="s.sourcePluginId" class="skill-option-desc">{{ $t('market.fromPluginTag') }}</text>
                             <text class="skill-option-desc">{{ s.activationMode === 'manual' ? $t('chat.skillManualOnly') : (s.triggers || []).join(' / ') || $t('chat.skillNoTriggers') }}</text>
                          </view>
                       </view>
                       <view v-if="!availableSkills.length" class="skill-empty">{{ $t('chat.skillNoneInstalled') }}</view>
                       <view class="skill-divider"></view>
                       <view class="skill-manage" @tap.stop="goToSkillManagement">{{ $t('chat.skillManage') }}</view>
+                      <view class="skill-manage" @tap.stop="goToMcpManagement">{{ $t('mcp.title') }}</view>
                    </view>
                 </view>
              </view>
@@ -1058,6 +1062,7 @@
 </template>
 
 <script>
+import { selectableChatSkills } from '@/utils/chatSelectableSkills.mjs'
 import { getPendingAgentRestarts, resumeAgentRestart, getCloudAccountGeneration } from '@/services/api.js'
 import { fileChangesForBubble, summarizeFileChanges } from '@/utils/chatFileChange.js'
 import RootBubble from './AgentMessage/RootBubble.vue'
@@ -1975,9 +1980,7 @@ export default {
       try {
         const res = await getSkills()
         const list = Array.isArray(res) ? res : (res?.data || [])
-        availableSkills.value = list.filter(
-          s => !s.builtinWorkflow && s.activationMode !== 'disabled' && s.enabled !== false && s.available !== false
-        )
+        availableSkills.value = selectableChatSkills(list)
         // 列表变了（管理员停用/卸载）就把选不中的清掉，别留一个永远不生效的 chip
         selectedSkillIds.value = selectedSkillIds.value.filter(
           id => availableSkills.value.some(s => s.id === id)
@@ -2183,6 +2186,12 @@ export default {
       } catch (e) { /* toast 失败不影响对话 */ }
     })
 
+    const openMcpSettingsTab = inject('openSettingsTab', null)
+    const goToMcpManagement = () => {
+      showSkillDropdown.value = false
+      if (openMcpSettingsTab) openMcpSettingsTab({ nav: 'mcp' })
+      else uni.navigateTo({ url: '/pages/admin/admin?nav=mcp' })
+    }
     const goToSkillManagement = () => {
       showSkillDropdown.value = false
       emit('manage-skills')
@@ -4731,6 +4740,7 @@ export default {
        toggleSkillSelection,
        removeSelectedSkill,
        goToSkillManagement,
+       goToMcpManagement,
        builtinQuickWorkflows,
        builtinCustomActiveCount,
        applyBuiltinWorkflow,
