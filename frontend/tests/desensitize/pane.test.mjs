@@ -137,14 +137,42 @@ test('reopened pane loads project recovery materials; late results cannot cross 
   assert.equal(state.loadingKit, false)
 })
 
-test('recovery material picker uses the project picker and rejects a document', async () => {
+test('restore uses only the selected document to load recovery data, without a material picker', async () => {
+  const calls = []
+  const { state } = pane({ getSensitiveRecovery: async value => { calls.push(value); return { recoveryKit: 'linked' } } })
+  state.fileId = 42; state.fileName = 'redacted.docx'
+  await state.loadRecovery()
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [{ fileId: 42 }])
+  assert.equal(state.recoveryKit, 'linked')
+  assert.equal(state.importKit, undefined)
+})
+
+test('missing recovery directs the user to select an original and clears the tokenized target even on cancel', async () => {
   const { state, events } = pane()
+  state.operation = 'restore'; state.fileId = 42; state.fileName = 'redacted.docx'; state.filePath = 'redacted.docx'
+  state.password = 'secret'; state.lastRedaction = { file: { id: 42 }, kit: 'old' }
   state.$emit = (...event) => { events.push(event); event[2]?.() }
-  state.importKit()
+  assert.equal(state.restoreRequirement, 'panels.deRecoveryMissing')
+  state.selectOriginalForRedaction()
+  assert.equal(state.operation, 'redact')
+  assert.equal(state.fileId, null); assert.equal(state.fileName, ''); assert.equal(state.filePath, '')
+  assert.equal(state.password, ''); assert.equal(state.lastRedaction, null)
   assert.equal(events[0][0], 'request-file-select')
-  events[0][1]({ id: 2, name: 'redacted.docx' })
-  assert.equal(state.error, 'panels.deKitInvalid')
-  assert.equal(state.recoveryKit, '')
+  events[0][1](null)
+  assert.equal(state.fileId, null)
+  events[0][1]({ id: 3, name: 'original.docx', filePath: 'original.docx' })
+  assert.equal(state.fileId, 3)
+})
+
+test('late recovery response cannot repopulate data after returning to select an original', async () => {
+  let resolveRecovery
+  const { state } = pane({ getSensitiveRecovery: () => new Promise(resolve => { resolveRecovery = resolve }) })
+  state.operation = 'restore'; state.fileId = 42; state.fileName = 'redacted.docx'
+  const pending = state.loadRecovery()
+  state.selectOriginalForRedaction()
+  resolveRecovery({ recoveryKit: 'stale' })
+  await pending
+  assert.equal(state.fileId, null); assert.equal(state.recoveryKit, ''); assert.equal(state.loadingKit, false)
 })
 
 // Render the actual template: collapsed settings must retain values, and creation
@@ -252,8 +280,66 @@ test('rendered redact workflow follows file, action, terms, types, replacement a
 
 test('restore workflow keeps file and operation first, then shows recovery controls only', async () => {
   const html = await renderPane({ operation: 'restore', fileId: 8, fileName: 'selected.docx' })
-  assert.ok(html.indexOf('panels.deSectionFileSelect') < html.indexOf('panels.deOperationTitle'))
-  assert.ok(html.indexOf('panels.deOperationTitle') < html.indexOf('panels.deImportKit'))
-  assert.doesNotMatch(html, /panels.deCustomWordsTitle|panels.deStrategiesTitle|panels.deModeTitle/)
+  assert.ok(html.indexOf('panels.deRestoreDocument') < html.indexOf('panels.deOperationTitle'))
+  assert.ok(html.indexOf('panels.deOperationTitle') < html.indexOf('panels.dePassword'))
+  assert.doesNotMatch(html, /panels.deCustomWordsTitle|panels.deStrategiesTitle|panels.deModeTitle|panels.deImportKit/)
+  assert.match(html, /panels.deRecoveryMissing/)
+  assert.match(html, /panels.deSelectOriginal/)
   assert.match(html, /<button[^>]*disabled[^>]*>panels.deRestoreGenerate<\/button>/)
+})
+
+test('automatically matched recovery shows a simple status and needs only a password', async () => {
+  const html = await renderPane({ operation: 'restore', fileId: 8, fileName: 'selected.docx', recoveryKit: 'linked', password: 'secret' })
+  assert.match(html, /panels.deCurrentKit/)
+  assert.doesNotMatch(html, /panels.deImportKit|panels.deSelectOriginal|panels.deRecoveryMissing/)
+  assert.doesNotMatch(html, /<button[^>]*disabled[^>]*>panels.deRestoreGenerate<\/button>/)
+})
+
+test('loading recovery does not prematurely offer re-redaction', async () => {
+  const html = await renderPane({ operation: 'restore', fileId: 8, fileName: 'selected.docx', loadingKit: true })
+  assert.doesNotMatch(html, /panels.deSelectOriginal|panels.deRecoveryMissing/)
+  assert.match(html, /<button[^>]*disabled[^>]*>panels.deRestoreGenerate<\/button>/)
+})
+
+test('load failure offers retry without claiming missing materials or enabling restoration', async () => {
+  const html = await renderPane({ operation: 'restore', fileId: 8, fileName: 'selected.docx', error: 'network unavailable' })
+  assert.match(html, /network unavailable/)
+  assert.match(html, /common.retry/)
+  assert.doesNotMatch(html, /panels.deSelectOriginal|panels.deRecoveryMissing/)
+  assert.match(html, /<button[^>]*disabled[^>]*>panels.deRestoreGenerate<\/button>/)
+  let calls = 0
+  const { state } = pane({ getSensitiveRecovery: async () => { if (++calls === 1) throw new Error('network unavailable'); return { recoveryKit: 'linked' } } })
+  state.operation = 'restore'; state.fileId = 8; state.fileName = 'selected.docx'
+  await state.loadRecovery()
+  assert.equal(state.error, 'network unavailable'); assert.equal(state.restoreRequirement, '')
+  const pending = state.loadRecovery()
+  assert.equal(state.error, ''); assert.equal(state.loadingKit, true)
+  await pending
+  assert.equal(state.recoveryKit, 'linked'); assert.equal(state.loadingKit, false)
+  assert.equal(state.restoreRequirement, 'panels.dePasswordHint')
+})
+
+test('PDF restoration never invites recovery lookup or selecting an original', async () => {
+  const html = await renderPane({ operation: 'restore', fileId: 8, fileName: 'selected.PDF' })
+  assert.match(html, /panels.dePdfNotice/)
+  assert.doesNotMatch(html, /panels.deRestoreNotice|panels.deRecoveryMissing|panels.deSelectOriginal|common.retry/)
+  let calls = 0
+  const { state } = pane({ getSensitiveRecovery: async () => { calls++; return {} } })
+  state.fileId = 8; state.fileName = 'selected.PDF'
+  await state.loadRecovery()
+  assert.equal(calls, 0)
+})
+
+test('automatic recovery copy is explicitly translated in all 20 locales', async () => {
+  const { readdirSync } = await import('node:fs')
+  const root = new URL('../../src/locales/', import.meta.url)
+  const locales = readdirSync(root, { withFileTypes: true }).filter(entry => entry.isDirectory())
+  assert.equal(locales.length, 20)
+  for (const { name } of locales) {
+    const source = readFileSync(new URL(`${name}/panels.js`, root), 'utf8')
+    const messages = vm.runInNewContext(source.replace('export default', 'const messages =') + '\nmessages')
+    for (const key of ['deCurrentKit', 'deRestoreNotice', 'deRecoveryMissing', 'deSelectOriginal']) {
+      assert.ok(typeof messages[key] === 'string' && messages[key].trim(), `${name} must explicitly translate ${key}`)
+    }
+  }
 })

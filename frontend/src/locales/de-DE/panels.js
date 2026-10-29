@@ -159,7 +159,7 @@ export default {
   "deResultEditing": "Die geschwärzte Kopie ist zur Bearbeitung geöffnet. Die hier gewählte Datei folgt einem Wechsel der Dokument-Tabs nicht automatisch.",
   "dePdfResult": "Das geschwärzte PDF ist zur Prüfung geöffnet. Diese gerasterte Kopie kann nicht direkt bearbeitet oder wiederhergestellt werden.",
   "deRestoreResult": "Dieses Ergebnis wiederherstellen",
-  "deCurrentKit": "Wiederherstellungsdatei für dieses Ergebnis verknüpft",
+  deCurrentKit: 'Wiederherstellungsdaten automatisch zugeordnet',
   "dePreviewChanged": "Dokumentänderungen wurden gerade gespeichert. Bitte vor dem Erstellen erneut in der Vorschau prüfen.",
   "deDownloadRetry": "Das Ergebnis wurde erstellt, aber der Download der Wiederherstellungsdatei ist fehlgeschlagen. Nutzen Sie die Download-Schaltfläche unten.",
   "deAiWorkflowNotice": "KI-Funktionen befinden sich im Assistenten rechts. Dieses Panel sendet niemals automatisch Dateien. Normale Chats können Verlauf und Projektkontext enthalten; sie sind nicht isoliert. Prüfen Sie den Kontext und schließen Sie Originale, Wiederherstellungszuordnungen und wiederhergestellte Dateien aus.",
@@ -179,9 +179,10 @@ export default {
   "deExcludedTerms": "Diese Werte beibehalten",
   "deExcludedPlaceholder": "Ein erkannter Wert pro Zeile, um Fehlalarme auszuschließen.",
   "dePreview": "Schwärzungsvorschau",
+  deSelectOriginal: 'Original wählen und erneut anonymisieren',
   "dePassword": "Wiederherstellungspasswort",
   "dePasswordHint": "Wiederherstellungspasswort eingeben",
-  "deRestoreNotice": "Wählen Sie oben das geschwärzte Dokument zur Wiederherstellung aus. Die Wiederherstellungsdatei wird automatisch zugeordnet. Wird keine gefunden, wählen Sie die zugehörige Datei aus dem Projekt und geben Sie das Passwort ein. Nur erhaltene Platzhalter können wiederhergestellt werden; Sternchen und schwarze PDF-Flächen nicht.",
+  deRestoreNotice: 'Wählen Sie das anonymisierte Dokument und geben Sie das Passwort ein. Die Wiederherstellungsdaten werden automatisch zugeordnet. Nur erhaltene Platzhalter lassen sich wiederherstellen, keine Sternchen oder PDF-Schwärzungen.',
   "deImportKit": "Wiederherstellungsdatei aus dem Projekt wählen",
   "deRestoreGenerate": "Wiederhergestellte Datei erstellen",
   "deMatchCount": "{count} Vorkommen abgeglichen / wiederhergestellt",
@@ -620,6 +621,6 @@ export default {
   "pwsDdAiRiskMatrixPrompt": "Bitte fassen Sie die im aktuellen Projekt identifizierten zentralen rechtlichen Due-Diligence-Risiken in einer strukturierten Zusammenfassung zusammen, die wesentliche Risiken, allgemeine Risiken und Empfehlungen zur Behebung umfasst.",
   "pwsTmAiSummaryBtn": "KI: Besprechungsprotokolle & Maßnahmen extrahieren",
   "pwsTmAiSummaryPrompt": "Bitte prüfen Sie die Tencent Meeting-Transkripte im aktuellen Projekt und extrahieren Sie die Positionen wichtiger Stakeholder, strittige Punkte sowie die Maßnahmen nach der Besprechung.",
-  "deRecoveryMissing": "Noch keine Wiederherstellungsdatei gefunden. Wählen Sie die zugehörige .awd-recovery-Datei aus dem Projekt.",
+  deRecoveryMissing: 'Keine Wiederherstellungsdaten gefunden. Eine Wiederherstellung ist nicht möglich. Anonymisieren Sie die Originaldatei erneut.',
   "deRestoreDocument": "Geschwärztes Dokument zur Wiederherstellung"
 }
