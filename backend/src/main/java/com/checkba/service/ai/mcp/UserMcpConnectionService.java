@@ -36,38 +36,64 @@ public class UserMcpConnectionService {
         this.settings = settings; this.credentials = credentials; this.account = account;
         this.members = members; this.client = client;
     }
-    public record Preset(String id, String name, String url, String documentationUrl, boolean supportsOfficial) {}
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private UserMcpStdioClient stdio;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private UserMcpOAuthService oauth;
+
+    public record Preset(String id, String name, String url, String documentationUrl, boolean supportsOfficial, String authType) {
+        Preset(String id, String name, String url, String documentationUrl, boolean official) {
+            this(id, name, url, documentationUrl, official, "bearer");
+        }
+    }
     public List<Preset> presets() {
         return List.of(
             new Preset("qichacha", LangText.of("企查查", "Qichacha"), "https://agent.qcc.com/mcp/company/stream", "https://agent.qcc.com/guide", true),
             new Preset("pkulaw", LangText.of("北大法宝", "PKULaw"), "https://apim-gateway.pkulaw.com/mcp-law-agg/mcp", "https://mcp.pkulaw.com/docs", true),
             new Preset("yuandian", LangText.of("元典", "Yuandian"), "https://open.chineselaw.com/mcp/law/stream", "https://open.chineselaw.com/llms-full.txt", false),
             new Preset("tavily", "Tavily", "https://mcp.tavily.com/mcp/", "https://github.com/tavily-ai/tavily-mcp", false),
-            new Preset("github", "GitHub", "https://api.githubcopilot.com/mcp/", "https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp-in-your-ide/set-up-the-github-mcp-server", false));
+            new Preset("github", "GitHub", "https://api.githubcopilot.com/mcp/", "https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp-in-your-ide/set-up-the-github-mcp-server", false),
+            new Preset("notion", "Notion", "https://mcp.notion.com/mcp", "https://developers.notion.com/docs/get-started-with-mcp", false, "oauth2"));
     }
     public record RemoteTool(String name, String description, Map<String, Object> inputSchema) {}
+    public record Options(String authType, String command, List<String> args, String cwd, Integer timeoutSeconds,
+            String oauthClientId, List<String> oauthScopes, boolean localApproved) {}
     public record Connection(String id, String presetId, String name, String url, String transport,
-            boolean enabled, boolean configured, boolean tested, long revision, List<RemoteTool> tools) {}
+            boolean enabled, boolean configured, boolean tested, long revision, List<RemoteTool> tools, Options options) {}
     public record Binding(Connection connection, RemoteTool tool, ToolSpecification specification) {}
-    public record Update(String name, String url, String transport, String token) {}
+    public record Update(String name, String url, String transport, String token, String authType,
+            String command, List<String> args, Map<String, String> env, String cwd, Integer timeoutSeconds,
+            Map<String, String> headers, String oauthClientId, String oauthClientSecret, List<String> oauthScopes) {
+        public Update(String name, String url, String transport, String token) {
+            this(name, url, transport, token, null, null, null, null, null, null, null, null, null, null);
+        }
+        @Override public String toString() { return "Update[redacted]"; }
+    }
+    private record Secrets(String token, Map<String, String> env, Map<String, String> headers, String oauthClientSecret) {
+        @Override public String toString() { return "Secrets[redacted]"; }
+    }
+    private Options options(Connection c) {
+        return c.options() == null ? new Options(preset(c.id()).map(Preset::authType).orElse(c.configured() ? "bearer" : "none"),
+                "", List.of(), "", 60, "", List.of(), false) : c.options();
+    }
 
     private Optional<Preset> preset(String id) { return presets().stream().filter(p -> p.id().equals(id)).findFirst(); }
     private Connection defaults(Preset p) {
-        return new Connection(p.id(), p.id(), p.name(), p.url(), "streamable-http", false, false, false, 0, List.of());
+        return new Connection(p.id(), p.id(), p.name(), p.url(), "streamable-http", false, false, false, 0, List.of(), new Options(p.authType(), "", List.of(), "", 60, "", List.of(), false));
     }
     public synchronized Map<String, Object> snapshot(Long userId) {
         String scope = scope(userId);
-        return Map.of("code", 0, "scopeToken", scope, "connections", listScope(scope), "presets", presets());
+        return Map.of("code", 0, "scopeToken", scope, "connections", listScope(scope), "presets", presets(), "stdioAvailable", stdio != null && stdio.available());
     }
     public synchronized List<Map<String, Object>> list(Long userId) { return listScope(scope(userId)); }
     private List<Map<String, Object>> listScope(String scope) {
         Map<String, Connection> rows = load(scope);
         List<Map<String, Object>> out = new ArrayList<>();
-        for (Preset p : presets()) out.add(view(rows.getOrDefault(p.id(), defaults(p))));
-        rows.values().stream().filter(c -> c.presetId() == null).map(this::view).forEach(out::add);
+        for (Preset p : presets()) out.add(view(scope, rows.getOrDefault(p.id(), defaults(p))));
+        rows.values().stream().filter(c -> c.presetId() == null).map(c -> view(scope, c)).forEach(out::add);
         return out;
     }
-    private Map<String, Object> view(Connection c) {
+    private Map<String, Object> view(String scope, Connection c) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", c.id()); row.put("presetId", c.presetId()); row.put("name", c.name());
         row.put("url", c.url()); row.put("transport", c.transport()); row.put("enabled", c.enabled());
@@ -76,7 +102,18 @@ public class UserMcpConnectionService {
         row.put("supportsOfficial", official);
         row.put("source", c.enabled() ? "custom" : official ? "official" : "disabled");
         row.put("billingMode", c.enabled() || !official ? "provider" : "platform");
+        Options o = options(c); Secrets secret = secrets(scope, c);
+        row.put("authType", o.authType()); row.put("command", o.command()); row.put("args", o.args());
+        row.put("cwd", o.cwd()); row.put("timeoutSeconds", o.timeoutSeconds()); row.put("localApproved", o.localApproved());
+        row.put("environmentKeys", secret.env().keySet()); row.put("headerNames", secret.headers().keySet());
+        row.put("oauthClientId", o.oauthClientId()); row.put("oauthScopes", o.oauthScopes());
+        row.put("oauthStatus", oauth != null && c.revision() > 0 && "oauth2".equals(o.authType())
+                ? oauth.status(oauthKey(scope, c), c.url(), oauthConfig(c, secret), guardView(scope, c)) : Map.of("connected", false, "pending", false, "needsReconnect", false));
         return row;
+    }
+    // Status is local-only; do not trigger discovery or token refresh while listing settings.
+    private BooleanSupplier guardView(String scope, Connection c) {
+        return () -> { synchronized (this) { Connection live = load(scope).get(c.id()); return live != null && live.revision() == c.revision(); } };
     }
     @org.springframework.transaction.annotation.Transactional
     public synchronized Map<String, Object> save(Long userId, String id, Update input) { return save(userId, id, input, scope(userId)); }
@@ -92,25 +129,82 @@ public class UserMcpConnectionService {
         Connection previous = rows.get(id);
         if (previous == null) previous = preset(id).map(this::defaults).orElse(null);
         if (previous == null && !creating) throw missing();
-        String name = input.name() == null && previous != null ? previous.name() : input.name();
-        String url = input.url() == null && previous != null ? previous.url() : input.url();
-        String transport = input.transport() == null ? "streamable-http" : input.transport();
-        if (name == null || name.isBlank() || name.length() > 100 || !"streamable-http".equals(transport))
-            throw fail("invalid_configuration", "请填写名称；当前仅支持 HTTP MCP。", "Provide a name. Only HTTP MCP is supported.");
-        PluginMcpEndpointPolicy.validateUrl(url);
-        if (input.token() != null && (input.token().isBlank() || input.token().length() > 8192 || input.token().contains("\r") || input.token().contains("\n")))
-            throw fail("invalid_credential", "请输入有效的 Bearer 密钥。", "Provide a valid Bearer token.");
-        boolean changed = previous == null || !url.equals(previous.url()) || input.token() != null;
-        // Endpoint changes must not silently forward the old endpoint's credential to a new host.
-        boolean keepToken = previous != null && url.equals(previous.url()) && previous.configured();
-        if (input.token() != null) credentials.put(secretKey(scope, id), input.token().trim());
-        else if (!keepToken) credentials.remove(secretKey(scope, id));
-        Connection next = new Connection(id, preset(id).map(Preset::id).orElse(null), name.trim(), url, transport,
-                previous != null && previous.enabled(), input.token() != null || keepToken,
-                !changed && previous.tested(), REVISIONS.incrementAndGet(),
-                changed ? List.of() : previous.tools());
+        Connection next = prepare(scope, id, previous, input);
+        Secrets nextSecrets = prepareSecrets(scope, previous, next, input);
+        credentials.put(secretKey(scope, id) + ".settings", json(nextSecrets));
+        credentials.remove(secretKey(scope, id));
         rows.put(id, next); persist(scope, rows);
-        return view(next);
+        if (oauth != null && previous != null) {
+            if (!Objects.equals(previous.url(), next.url()) || !Objects.equals(options(previous).authType(), options(next).authType())
+                    || !Objects.equals(options(previous).oauthClientId(), options(next).oauthClientId()) || input.oauthClientSecret() != null
+                    || !Objects.equals(options(previous).oauthScopes(), options(next).oauthScopes())) oauth.disconnect(oauthKey(scope, previous));
+            else oauth.invalidate(oauthKey(scope, previous));
+        }
+        return view(scope, next);
+    }
+    private Connection prepare(String scope, String id, Connection previous, Update in) {
+        Options old = previous == null ? new Options("none", "", List.of(), "", 60, "", List.of(), false) : options(previous);
+        String name = pick(in.name(), previous == null ? null : previous.name());
+        String transport = pick(in.transport(), previous == null ? "streamable-http" : previous.transport());
+        if (name == null || name.isBlank() || name.length() > 100 || !Set.of("streamable-http", "stdio").contains(transport))
+            throw fail("invalid_configuration", "请填写有效名称和连接方式。", "Provide a valid name and transport.");
+        boolean local = "stdio".equals(transport);
+        String url = local ? "" : pick(in.url(), previous == null ? null : previous.url());
+        if (!local) {
+            if (url == null || url.length() > 8192) throw fail("invalid_endpoint", "服务地址无效或过长。", "The service URL is invalid or too long.");
+            PluginMcpEndpointPolicy.validateUrl(url);
+        }
+        String auth = local ? "none" : pick(in.authType(), in.token() != null ? "bearer" : old.authType());
+        if (!Set.of("none", "bearer", "oauth2").contains(auth)) throw fail("invalid_configuration", "不支持此授权方式。", "Unsupported authorization type.");
+        Options o = new Options(auth, local ? pick(in.command(), old.command()) : "", local ? pick(in.args(), old.args()) : List.of(),
+                local ? pick(in.cwd(), old.cwd()) : "", pick(in.timeoutSeconds(), old.timeoutSeconds()),
+                "oauth2".equals(auth) ? pick(in.oauthClientId(), old.oauthClientId()) : "",
+                "oauth2".equals(auth) ? pick(in.oauthScopes(), old.oauthScopes()) : List.of(), false);
+        if (o.oauthClientId().length() > 2048 || o.oauthScopes().size() > 32 || o.oauthScopes().stream().anyMatch(v -> v == null || !v.matches("[\\x21\\x23-\\x5b\\x5d-\\x7e]{1,256}")))
+            throw fail("invalid_configuration", "OAuth 客户端或权限范围无效。", "Invalid OAuth client or scopes.");
+        Connection draft = new Connection(id, preset(id).map(Preset::id).orElse(null), name.trim(), url, transport,
+                previous != null && previous.enabled(), false, false, REVISIONS.incrementAndGet(), List.of(), o);
+        Secrets secret = prepareSecrets(scope, previous, draft, in);
+        if (local) UserMcpStdioClient.validate(stdioConfig(draft, secret));
+        if ("oauth2".equals(auth)) oauthConfig(draft, secret);
+        boolean same = previous != null && previous.url().equals(url) && previous.transport().equals(transport)
+                && old.authType().equals(auth) && old.command().equals(o.command()) && old.args().equals(o.args()) && old.cwd().equals(o.cwd())
+                && Objects.equals(old.timeoutSeconds(), o.timeoutSeconds()) && old.oauthClientId().equals(o.oauthClientId())
+                && old.oauthScopes().equals(o.oauthScopes()) && secrets(scope, previous).equals(secret);
+        Options approved = new Options(o.authType(), o.command(), o.args(), o.cwd(), o.timeoutSeconds(), o.oauthClientId(), o.oauthScopes(), same && old.localApproved());
+        return new Connection(id, draft.presetId(), draft.name(), url, transport, draft.enabled(),
+                !secret.token().isEmpty() || !secret.env().isEmpty() || !secret.headers().isEmpty() || !secret.oauthClientSecret().isEmpty(),
+                same && previous.tested(), draft.revision(), same ? previous.tools() : List.of(), approved);
+    }
+    private Secrets prepareSecrets(String scope, Connection previous, Connection next, Update in) {
+        boolean sameEndpoint = previous != null && previous.url().equals(next.url()) && previous.transport().equals(next.transport());
+        Secrets old = sameEndpoint ? secrets(scope, previous) : new Secrets("", Map.of(), Map.of(), "");
+        String token = "bearer".equals(options(next).authType()) ? pick(in.token(), old.token()) : "";
+        String clientSecret = "oauth2".equals(options(next).authType()) ? pick(in.oauthClientSecret(), previous != null
+                && options(previous).oauthClientId().equals(options(next).oauthClientId()) ? old.oauthClientSecret() : "") : "";
+        for (String value : List.of(token, clientSecret)) if (value.length() > 8192 || value.codePoints().anyMatch(c -> c < 32 || c == 127))
+            throw fail("invalid_credential", "凭据格式无效。", "Invalid credential format.");
+        if (in.token() != null && in.token().isBlank()) throw fail("invalid_credential", "请输入有效的 Bearer 密钥。", "Provide a valid Bearer token.");
+        Map<String, String> env = "stdio".equals(next.transport()) ? merge(old.env(), in.env(), false) : Map.of();
+        Map<String, String> headers = "stdio".equals(next.transport()) ? Map.of() : merge(old.headers(), in.headers(), true);
+        PluginMcpHttpClient.validateHeaders(headers);
+        if (!"none".equals(options(next).authType()) && headers.containsKey("authorization"))
+            throw fail("invalid_configuration", "Authorization 请求头与所选授权方式重复。", "The Authorization header conflicts with the selected authorization type.");
+        return new Secrets(token, env, headers, clientSecret);
+    }
+    private static <T> T pick(T value, T fallback) { return value == null ? fallback : value; }
+    private Map<String, String> merge(Map<String, String> old, Map<String, String> patch, boolean headers) {
+        Map<String, String> result = new LinkedHashMap<>(old);
+        if (patch != null) {
+            Set<String> seen = new HashSet<>();
+            patch.forEach((key, value) -> {
+                if (key == null) throw fail("invalid_configuration", "配置键名无效。", "Invalid configuration key.");
+                String normalized = headers ? key.toLowerCase(Locale.ROOT) : key;
+                if (!seen.add(normalized)) throw fail("invalid_configuration", "配置键名重复。", "Duplicate configuration key.");
+                if (value == null) result.remove(normalized); else result.put(normalized, value);
+            });
+        }
+        return Collections.unmodifiableMap(result);
     }
     @org.springframework.transaction.annotation.Transactional
     public synchronized void delete(Long userId, String id) { delete(userId, id, scope(userId)); }
@@ -118,7 +212,8 @@ public class UserMcpConnectionService {
     public synchronized void delete(Long userId, String id, String expectedScope) {
         String scope = checkedScope(userId, expectedScope);
         Map<String, Connection> rows = load(scope);
-        rows.remove(id); persist(scope, rows); credentials.remove(secretKey(scope, id));
+        rows.remove(id); persist(scope, rows); credentials.remove(secretKey(scope, id)); credentials.remove(secretKey(scope, id) + ".settings");
+        if (oauth != null) oauth.disconnect(secretKey(scope, id) + ".oauth");
     }
     public synchronized Map<String, Object> enable(Long userId, String id, boolean enabled) { return enable(userId, id, enabled, scope(userId)); }
     public synchronized Map<String, Object> enable(Long userId, String id, boolean enabled, String expectedScope) {
@@ -126,24 +221,111 @@ public class UserMcpConnectionService {
         Map<String, Connection> rows = load(scope);
         Connection c = require(rows, id);
         if (enabled && !c.tested()) throw fail("test_required", "请先测试连接并读取工具清单。", "Test the connection and load its tools first.");
-        Connection next = new Connection(c.id(), c.presetId(), c.name(), c.url(), c.transport(), enabled, c.configured(), c.tested(), REVISIONS.incrementAndGet(), c.tools());
-        rows.put(id, next); persist(scope, rows); return view(next);
+        if (enabled && "stdio".equals(c.transport())) requireLocal(c);
+        Connection next = new Connection(c.id(), c.presetId(), c.name(), c.url(), c.transport(), enabled, c.configured(), c.tested(), REVISIONS.incrementAndGet(), c.tools(), options(c));
+        rows.put(id, next); persist(scope, rows);
+        if (!enabled && oauth != null) oauth.invalidate(oauthKey(scope, c));
+        return view(scope, next);
     }
     public Map<String, Object> test(Long userId, String id) { return test(userId, id, scope(userId)); }
-    public Map<String, Object> test(Long userId, String id, String expectedScope) {
+    public Map<String, Object> test(Long userId, String id, String expectedScope) { return test(userId, id, expectedScope, false, null); }
+    public Map<String, Object> test(Long userId, String id, String expectedScope, boolean allowLocalExecution, Long expectedRevision) {
         String scope = checkedScope(userId, expectedScope);
-        Connection captured;
-        String token;
-        synchronized (this) { captured = require(load(scope), id); token = token(scope, captured); }
-        List<Map<String, Object>> discovered = client.listTools(captured.url(), token, guard(userId, scope, captured, false));
+        Connection captured; Secrets secret;
+        synchronized (this) {
+            captured = require(load(scope), id);
+            if ("stdio".equals(captured.transport()) && allowLocalExecution) {
+                if (stdio == null || !stdio.available()) throw fail("stdio_unavailable", "本地服务仅可在桌面端运行。", "Local services can run only in the desktop app.");
+                if (expectedRevision == null || expectedRevision != captured.revision()) throw fail("connection_changed", "配置已改变，请重新检查并确认本地命令。", "The configuration changed. Review and confirm the local command again.");
+            }
+            if ("stdio".equals(captured.transport()) && allowLocalExecution && !options(captured).localApproved()) {
+                Options o = options(captured);
+                captured = new Connection(captured.id(), captured.presetId(), captured.name(), captured.url(), captured.transport(), captured.enabled(), captured.configured(), false,
+                        REVISIONS.incrementAndGet(), List.of(), new Options(o.authType(), o.command(), o.args(), o.cwd(), o.timeoutSeconds(), o.oauthClientId(), o.oauthScopes(), true));
+                Map<String, Connection> rows = load(scope); rows.put(id, captured); persist(scope, rows);
+            }
+            secret = secrets(scope, captured);
+        }
+        BooleanSupplier current = guard(userId, scope, captured, false);
+        List<Map<String, Object>> discovered;
+        if ("stdio".equals(captured.transport())) {
+            requireLocal(captured); discovered = stdio.listTools(stdioConfig(captured, secret), current);
+        } else {
+            String token = accessToken(scope, captured, secret, current);
+            try { discovered = secret.headers().isEmpty() ? client.listTools(captured.url(), token, current)
+                    : client.listTools(captured.url(), token, secret.headers(), current); }
+            catch (PluginMcpException e) { authenticationFailure(scope, captured, current, e); throw e; }
+        }
         List<RemoteTool> tools = validateTools(discovered);
         synchronized (this) {
             checkCurrent(userId, scope, captured, false);
             Map<String, Connection> rows = load(scope);
             Connection next = new Connection(captured.id(), captured.presetId(), captured.name(), captured.url(), captured.transport(),
-                    captured.enabled(), captured.configured(), true, REVISIONS.incrementAndGet(), tools);
-            rows.put(id, next); persist(scope, rows); return view(next);
+                    captured.enabled(), captured.configured(), true, REVISIONS.incrementAndGet(), tools, options(captured));
+            rows.put(id, next); persist(scope, rows); return view(scope, next);
         }
+    }
+    public Map<String, Object> authorize(Long userId, String id, String expectedScope) {
+        String scope = checkedScope(userId, expectedScope); Connection c; Secrets secret;
+        synchronized (this) { c = require(load(scope), id); secret = secrets(scope, c); }
+        if (oauth == null || !"oauth2".equals(options(c).authType())) throw fail("invalid_configuration", "请先保存 OAuth 连接配置。", "Save an OAuth connection first.");
+        return oauth.authorize(oauthKey(scope, c), c.url(), oauthConfig(c, secret), guard(userId, scope, c, false));
+    }
+    public synchronized void disconnectOAuth(Long userId, String id, String expectedScope) {
+        String scope = checkedScope(userId, expectedScope); Map<String, Connection> rows = load(scope); Connection c = require(rows, id);
+        if (oauth != null) oauth.disconnect(oauthKey(scope, c));
+        rows.put(id, new Connection(c.id(), c.presetId(), c.name(), c.url(), c.transport(), c.enabled(), c.configured(), false, REVISIONS.incrementAndGet(), List.of(), options(c)));
+        persist(scope, rows);
+    }
+    private void requireLocal(Connection c) {
+        if (stdio == null || !stdio.available()) throw fail("stdio_unavailable", "本地服务仅可在桌面端运行。", "Local services can run only in the desktop app.");
+        if (!options(c).localApproved()) throw fail("local_approval_required", "请先确认并测试此本地命令。", "Confirm and test this local command first.");
+    }
+    private UserMcpStdioClient.Config stdioConfig(Connection c, Secrets s) {
+        Options o = options(c); return new UserMcpStdioClient.Config(o.command(), o.args(), s.env(), o.cwd(), o.timeoutSeconds());
+    }
+    private UserMcpOAuthService.Config oauthConfig(Connection c, Secrets s) {
+        return new UserMcpOAuthService.Config(options(c).oauthClientId(), s.oauthClientSecret(), options(c).oauthScopes());
+    }
+    private String oauthKey(String scope, Connection c) { return secretKey(scope, c.id()) + ".oauth"; }
+    private String accessToken(String scope, Connection c, Secrets s, BooleanSupplier current) {
+        if (!"oauth2".equals(options(c).authType())) return s.token();
+        if (oauth == null) throw fail("authentication_required", "请重新授权此服务。", "Authorize this service again.");
+        return oauth.accessToken(oauthKey(scope, c), c.url(), oauthConfig(c, s), current);
+    }
+    private void authenticationFailure(String scope, Connection c, BooleanSupplier current, PluginMcpException e) {
+        if (oauth != null && current.getAsBoolean() && "oauth2".equals(options(c).authType()) && "authentication_required".equals(e.code())) oauth.needsReconnect(oauthKey(scope, c));
+    }
+    public synchronized Map<String, Object> previewImport(Long userId, String text, String expectedScope) {
+        String scope = checkedScope(userId, expectedScope);
+        UserMcpConfigImport.Parsed parsed = UserMcpConfigImport.parse(text);
+        List<Map<String, Object>> entries = new ArrayList<>(), errors = new ArrayList<>(parsed.errors());
+        for (var entry : parsed.entries()) {
+            try { prepare(scope, "preview", null, entry.update()); entries.add(entry.preview()); }
+            catch (PluginMcpException e) { errors.add(Map.of("index", entry.index(), "name", entry.name(), "message", e.getMessage())); }
+        }
+        return Map.of("code", 0, "entries", entries, "errors", errors);
+    }
+    @org.springframework.transaction.annotation.Transactional
+    public synchronized Map<String, Object> importConnections(Long userId, String text, List<Integer> selected, String expectedScope) {
+        String scope = checkedScope(userId, expectedScope);
+        UserMcpConfigImport.Parsed parsed = UserMcpConfigImport.parse(text);
+        if (selected == null || selected.isEmpty() || selected.size() > 32 || new HashSet<>(selected).size() != selected.size())
+            throw fail("invalid_import", "请选择有效的配置项。", "Select valid configuration entries.");
+        Map<Integer, UserMcpConfigImport.Entry> entries = new HashMap<>(); parsed.entries().forEach(e -> entries.put(e.index(), e));
+        Map<String, Connection> rows = load(scope);
+        if (rows.size() + selected.size() > 32) throw fail("limit_exceeded", "最多配置 32 个 MCP 连接。", "At most 32 MCP connections are supported.");
+        Map<Connection, Secrets> prepared = new LinkedHashMap<>();
+        for (Integer index : selected) {
+            var entry = entries.get(index);
+            if (entry == null) throw fail("invalid_import", "所选配置项无效，请重新预览。", "A selected entry is invalid. Preview the import again.");
+            Connection c = prepare(scope, "custom-" + UUID.randomUUID(), null, entry.update());
+            prepared.put(c, prepareSecrets(scope, null, c, entry.update()));
+        }
+        // Validate every selected entry before writing any; the transaction also covers encrypted secrets.
+        prepared.forEach((c, secret) -> { credentials.put(secretKey(scope, c.id()) + ".settings", json(secret)); rows.put(c.id(), c); });
+        persist(scope, rows);
+        return Map.of("code", 0, "connections", prepared.keySet().stream().map(c -> view(scope, c)).toList());
     }
     private List<RemoteTool> validateTools(List<Map<String, Object>> rows) {
         if (json(rows).length() > 256 * 1024 || rows.size() > 256) throw fail("invalid_tools", "工具清单超过限制。", "The tool list exceeds the limit.");
@@ -212,14 +394,22 @@ public class UserMcpConnectionService {
     }
 
     private Map<String, Object> call(Long user, Connection c, RemoteTool tool, Map<String, Object> args, BooleanSupplier allowed) {
-        String scope = scope(user); String token;
-        synchronized (this) { checkCurrent(user, scope, c, true); token = token(scope, c); }
+        String scope = scope(user); Secrets secret;
+        synchronized (this) { checkCurrent(user, scope, c, true); secret = secrets(scope, c); }
         if (args == null) args = Map.of();
         if (json(args).getBytes(StandardCharsets.UTF_8).length > 128 * 1024) throw fail("invalid_arguments", "MCP 参数超过限制。", "MCP arguments exceed the limit.");
         UserMcpSchema.validate(tool.inputSchema(), args);
         BooleanSupplier current = guard(user, scope, c, true);
-        Map<String, Object> result = client.call(c.url(), token, tool.name(), tool.inputSchema(), args,
-                () -> allowed.getAsBoolean() && current.getAsBoolean());
+        BooleanSupplier permitted = () -> allowed.getAsBoolean() && current.getAsBoolean();
+        Map<String, Object> result;
+        if ("stdio".equals(c.transport())) {
+            requireLocal(c); result = stdio.call(stdioConfig(c, secret), tool.name(), tool.inputSchema(), args, permitted);
+        } else {
+            String token = accessToken(scope, c, secret, permitted);
+            try { result = secret.headers().isEmpty() ? client.call(c.url(), token, tool.name(), tool.inputSchema(), args, permitted)
+                    : client.call(c.url(), token, secret.headers(), tool.name(), tool.inputSchema(), args, permitted); }
+            catch (PluginMcpException e) { authenticationFailure(scope, c, permitted, e); throw e; }
+        }
         if (!allowed.getAsBoolean() || !current.getAsBoolean())
             throw fail("connection_changed", "连接已改变，已丢弃过期结果。", "The connection changed; the stale result was discarded.");
         return result;
@@ -235,7 +425,14 @@ public class UserMcpConnectionService {
         if (!scope.equals(scope(user)) || live == null || live.revision() != c.revision() || enabled && !live.enabled())
             throw fail("connection_changed", "连接已改变，请重试。", "The connection changed. Please retry.");
     }
-    private String token(String scope, Connection c) { return c.configured() ? credentials.get(secretKey(scope, c.id())) : ""; }
+    private Secrets secrets(String scope, Connection c) {
+        String stored = credentials.get(secretKey(scope, c.id()) + ".settings");
+        if (stored != null && !stored.isBlank()) {
+            try { return JSON.readValue(stored, Secrets.class); }
+            catch (Exception e) { throw fail("configuration_unavailable", "无法读取加密配置。", "Encrypted configuration is unavailable."); }
+        }
+        return new Secrets(c.configured() ? Objects.toString(credentials.get(secretKey(scope, c.id())), "") : "", Map.of(), Map.of(), "");
+    }
     private Connection require(Map<String, Connection> rows, String id) { Connection c = rows.get(id); if (c == null) throw missing(); return c; }
     private String checkedScope(Long user, String expectedScope) {
         String captured = scope(user);

@@ -210,5 +210,13 @@ description: 插件市场领域。任务涉及插件广场页、在线 Skill 广
 - 市场按对象分类：插件注册表提供 Plugin；真实 AI 方法仍属 Skill，即便由桌面面板发起。`utils/chatSelectableSkills.mjs` 排除 `text-to-speech`、`desensitize` 两个纯面板引导，并在已安装可用的腾讯会议插件工作流存在时去掉重复旧技能；不按 `sourcePluginId` 一律过滤。对话给插件提供的 Skill 标注来源。
 - 左栏已安装和 Marketplace 均有 MCP 页签，条目打开设置 `nav=mcp`；整页市场的 MCP 页签与个人设置复用 `components/admin/McpConnectionsPanel.vue`。个人组对普通用户可见；设置受当前用户/账户隔离，不能改成安装级配置。
 - `GET /api/mcp/connections` 同时返回脱敏连接与预置目录；保存、测试、启用分步操作。启用的自配优先，失败不回收费平台；企查查/法宝停用或删除自配会恢复官方通道，UI 必须明确确认后续平台积分。其他 MCP 停用后无调用。免除数据调用平台积分不等于 AI 模型免费。
-- 凭据只写不回显；无 token 的公共连接用 `revision/saved` 判定已保存，不能用 `configured` 决定能否测试。身份切换清除草稿并丢弃旧响应；所有写请求附带加载时的 `X-MCP-Scope`，由后端拒绝跨账户排队写入；请求禁用正文日志。载入/测试失败持续显示。当前只支持公网 HTTPS Streamable HTTP、可选 Bearer，不展示 stdio/OAuth 假入口。
+- 凭据只写不回显；无 token 的公共连接用 `revision/saved` 判定已保存，不能用 `configured` 决定能否测试。身份切换清除草稿并丢弃旧响应；所有写请求附带加载时的 `X-MCP-Scope`，由后端拒绝跨账户排队写入；请求禁用正文日志。载入/测试失败持续显示。支持公网 HTTPS Streamable HTTP（无认证、Bearer、自定义请求头、OAuth）及桌面 stdio；高级连接契约见下。
 - 验证：`node --test frontend/tests/project-home/chat-selectable-skills.test.mjs frontend/tests/project-home/market-*.test.mjs`；`cd frontend && node tests/chat-presentation-ui/mcp-connections.mjs` 使用真实 ChatInterface、市场和 AdminPane 加合成 HTTP，覆盖分类、设置直达、保存/测试/启用/官方切换、失败、匿名连接、账户切换及窄宽暗色。它不证明真实供应商或正式客户端已验收。
+
+### MCP 高级连接（dev-board#1601–1603）
+
+`UserMcpConnectionService` 统一保存/测试/调用，`UserMcpConfigImport` 解析 `mcpServers`/`servers`；`UserMcpStdioClient` 管子进程，`UserMcpOAuthService` 管标准发现、PKCE、加密令牌、刷新和撤销。原 Bearer 连接延迟迁移，`Connection.options` 缺失兼容。秘密存入隔离的 `.settings` 密文；env/headers 部分更新空对象保留、null 值删除。JSON preview/apply 均要求 `X-MCP-Scope`，apply 先全量验证再事务写入，不覆盖同名配置、不执行命令或网络。
+
+stdio 测试首用或配置改变须 `allowLocalExecution=true` 加 `expectedRevision`，确认绑定确切版本；后端只有 `security.local-mode=true` 可运行。每次操作建立并清理一个进程，默认60/max180秒；账号/配置/权限guard贯穿阻塞读写。OAuth authorize/accessToken 在主服务锁外，status 不走网络；disconnect 立即本地撤权，供应商撤销在事务提交后异步执行。实际后端端口决定桌面 callback，服务器需 `ai.mcp.oauth-redirect-uri`。业务401/403不重放、不回平台收费。
+
+验证新增：`UserMcpAdvancedConnectionTest`、`UserMcpPersistenceTest`、`UserMcpStdioClientTest`（真实进程）、`UserMcpOAuthServiceTest`（真实HTTP）与 `UserMcpOAuthControllerTest`；前端fixture覆盖JSON选择导入、命令版本确认、OAuth轮询/取消/断开与账户切换。Notion加入预置，默认oauth2；预置数量不可写死为5。

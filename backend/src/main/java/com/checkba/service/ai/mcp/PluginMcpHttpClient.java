@@ -36,10 +36,16 @@ public class PluginMcpHttpClient {
 
     public Map<String, Object> call(String url, String token, String name, Map<String, Object> schema,
                                     Map<String, Object> args, BooleanSupplier allowed) {
+        return call(url, token, Map.of(), name, schema, args, allowed);
+    }
+
+    public Map<String, Object> call(String url, String token, Map<String, String> headers, String name,
+            Map<String, Object> schema, Map<String, Object> args, BooleanSupplier allowed) {
         policy.validate(url);
+        validateHeaders(headers);
         if (token != null && (token.contains("\r") || token.contains("\n")))
             throw error("invalid_credential", "The MCP credential is invalid.");
-        Session session = new Session(url, token, allowed);
+        Session session = new Session(url, token, headers, allowed);
         try {
             session.initialize();
             JsonNode tools;
@@ -61,10 +67,15 @@ public class PluginMcpHttpClient {
 
     /** Explicit discovery only; listing saved connections never makes an outbound request. */
     public List<Map<String, Object>> listTools(String url, String token, BooleanSupplier allowed) {
+        return listTools(url, token, Map.of(), allowed);
+    }
+
+    public List<Map<String, Object>> listTools(String url, String token, Map<String, String> headers, BooleanSupplier allowed) {
         policy.validate(url);
+        validateHeaders(headers);
         if (token != null && (token.contains("\r") || token.contains("\n")))
             throw error("invalid_credential", LangText.of("MCP 凭据无效。", "The MCP credential is invalid."));
-        Session session = new Session(url, token, allowed);
+        Session session = new Session(url, token, headers, allowed);
         try {
             session.initialize();
             List<Map<String, Object>> tools = new ArrayList<>();
@@ -84,11 +95,30 @@ public class PluginMcpHttpClient {
         } finally { session.close(); }
     }
 
+    public static void validateHeaders(Map<String, String> headers) {
+        if (headers == null || headers.size() > 32) throw invalidHeaders();
+        Set<String> names = new HashSet<>();
+        Set<String> reserved = Set.of("host", "content-length", "transfer-encoding", "connection", "proxy-authorization",
+                "cookie", "origin", "accept", "content-type", "mcp-session-id", "mcp-protocol-version");
+        for (var entry : headers.entrySet()) {
+            String key = entry.getKey(), value = entry.getValue();
+            if (key == null || !key.matches("[A-Za-z0-9!#$%&'*+.^_`|~-]{1,100}") || value == null
+                    || value.length() > 8192 || value.codePoints().anyMatch(c -> c < 32 || c == 127)
+                    || reserved.contains(key.toLowerCase(Locale.ROOT)) || !names.add(key.toLowerCase(Locale.ROOT))) throw invalidHeaders();
+        }
+    }
+    private static PluginMcpException invalidHeaders() {
+        return new PluginMcpException("invalid_configuration", 400, LangText.of("MCP 请求头无效或使用了保留名称。", "MCP headers are invalid or use a reserved name."));
+    }
+
     private final class Session {
         final String url, token;
         final BooleanSupplier allowed;
+        final Map<String, String> customHeaders;
         String id, version;
-        Session(String url, String token, BooleanSupplier allowed) { this.url = url; this.token = token; this.allowed = allowed; }
+        Session(String url, String token, Map<String, String> headers, BooleanSupplier allowed) {
+            this.url = url; this.token = token; this.customHeaders = Map.copyOf(headers); this.allowed = allowed;
+        }
         void guard() {
             if (Thread.currentThread().isInterrupted() || !allowed.getAsBoolean())
                 throw new PluginMcpException("cancelled", 409, "MCP call cancelled or plugin access changed.");
@@ -168,6 +198,7 @@ public class PluginMcpHttpClient {
         }
         Request.Builder headers() {
             Request.Builder builder = new Request.Builder().url(url).header("Accept", "application/json, text/event-stream");
+            customHeaders.forEach(builder::header);
             if (token != null && !token.isBlank()) builder.header("Authorization", "Bearer " + token);
             if (id != null) builder.header("MCP-Session-Id", id);
             if (version != null) builder.header("MCP-Protocol-Version", version);

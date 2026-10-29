@@ -69,11 +69,11 @@ class UserMcpControllerTest {
             mvc.perform(put(path).header("X-Session-Id", "test-session").header("X-MCP-Scope", scope)
                     .contentType("application/json").content(body)).andExpect(status().isConflict())
                     .andExpect(jsonPath("$.errorCode").value("account_changed"));
-            assertEquals(5, service.list(8L).size());
+            assertEquals(6, service.list(8L).size());
             when(account.accountFingerprintOrNull()).thenReturn("account-A");
             mvc.perform(delete(path).header("X-Session-Id", "test-session").header("X-MCP-Scope", scope))
                     .andExpect(status().isOk());
-            assertEquals(5, service.list(8L).size());
+            assertEquals(6, service.list(8L).size());
         }
     }
 }
