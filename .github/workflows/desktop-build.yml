@@ -104,7 +104,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
       - uses: actions/setup-java@v4
         id: jdk
         with:
@@ -203,6 +203,26 @@ jobs:
         # 正常全量 ≤5 分钟，给 3 倍预算快挂，别再拖到 job 默认 6 小时上限。
         timeout-minutes: 15
         run: npm test
+      - name: Electron runtime compatibility
+        working-directory: desktop
+        timeout-minutes: 5
+        run: npm run test:runtime-compat
+      - name: System clipboard compatibility
+        working-directory: desktop
+        timeout-minutes: 2
+        run: npm run test:clipboard-compat
+      - name: Backend request cancellation compatibility
+        working-directory: desktop
+        timeout-minutes: 2
+        run: npm run test:backend-request-gate-e2e
+      - name: Upload clipboard compatibility evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clipboard-compat-${{ runner.os }}
+          path: ${{ runner.temp }}/awd-clipboard-compat-*/result.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Bundle backend (macOS arm64)
         if: runner.os == 'macOS'
         env:

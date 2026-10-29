@@ -7,6 +7,14 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
 
 职责边界：构建/发版/CI/测试/本地开发。各领域自己的业务测试内容见对应领域文档。
 
+## Electron 45 运行时（dev-board#1624）
+
+桌面壳固定 Electron **45.1.0**（Chromium 156 / Node 24），应用版本号与运行时版本独立。开发安装要求 Node >=22.12.0；桌面 CI/打包使用 Node 24。Electron 42 起不再通过包自身 postinstall 自动下载二进制，项目 postinstall 必须先执行 `install-electron`，再执行既有 DMG/NSIS 补丁；不得用跳过安装脚本掩盖缺少运行时。保留 electron-builder 24.13.3 及其已验证补丁。
+
+Electron 44 起最低 macOS **13 Ventura**，`build.mac.minimumSystemVersion` 与此一致；本项目仍仅构建 Mac ARM64。BrowserView 和旧导航方法在 45 中仍可用但已弃用，本轮保留现有生命周期。浏览器面板 UA 从当前运行时取得并去掉 Electron 标记，不再伪装成固定 Chrome 120/macOS。
+
+验证命令：`npm --prefix desktop test`；`npm --prefix desktop run test:runtime-compat`（独立临时 profile，生产 preload/BrowserView、文件路径、下载、WASM/shared-memory/worker）；`npm --prefix desktop run test:backend-request-gate-e2e`。`test:clipboard-compat` 会替换系统剪贴板，仅允许 GitHub 托管 runner，禁止本机绕过保护。desktop-build 在两平台构建前运行以上冒烟并保留剪贴板结果。手动 workflow_dispatch 仅构建测试产物，release/sync-mirror 仍只允许版本 tag；本轮升级不代表获准发版。
+
 ## CI（.github/workflows/）
 
 - **ci.yml**（push master + 所有 PR）：三并行 job——backend（temurin **21**，`mvn -B test`）、frontend（node 20，`check:emits` + `check:locales` + `check:nav:full` + `test:project-home` + `test:commands` + `build:h5`）、desktop（仅 `npm ci`）。不打安装包。
