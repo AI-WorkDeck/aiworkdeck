@@ -51,7 +51,14 @@ function harness(platform = 'darwin', engine = '', prepare = async () => {}) {
   }
   const app = new EventEmitter()
   app.isPackaged = false
-  const clipboard = { text: 'already copied before launch', availableFormats: () => ['text/plain'], readText() { return this.text } }
+  const clipboard = {
+    text: 'already copied before launch',
+    async read() {
+      const text = this.text
+      return [{ types: ['text/plain'], getType: async () => new Blob([text]) }]
+    },
+    async readText() { return this.text },
+  }
   const context = vm.createContext({
     app, BrowserWindow: Window, clipboard, path, console, prepareRendererForQuit: prepare,
     // createMainWindow 用 nativeTheme 决定窗口的 backgroundColor（首屏白闪兜底，dev-board#731）。
@@ -120,22 +127,22 @@ test('dev-board#726: mac window never touches menu bar visibility (real system m
   assert.deepEqual(h.windows[0].menuBarCalls, [])
 })
 
-test('repeated creation keeps the current window and its clipboard destination', () => {
+test('repeated creation keeps the current window and its clipboard destination', async () => {
   const h = harness()
   h.context.finishStartup()
   const active = h.context.current()
   h.context.create()
   assert.equal(h.windows.length, 1)
   assert.equal(h.context.current(), active)
-  h.intervals[0]() // prime, without replaying the pre-launch clipboard
+  await h.intervals[0]() // prime, without replaying the pre-launch clipboard
   assert.equal(active.sent.length, 0)
   h.clipboard.text = 'new copy after restart'
-  h.intervals[0]()
+  await h.intervals[0]()
   assert.equal(active.sent[0][0], 'checkba:clipboard-copied')
   assert.equal(active.sent[0][1].text, 'new copy after restart')
 })
 
-test('late closed event from an old window cannot disconnect the replacement', () => {
+test('late closed event from an old window cannot disconnect the replacement', async () => {
   const h = harness()
   h.context.finishStartup()
   const old = h.context.current()
@@ -144,9 +151,9 @@ test('late closed event from an old window cannot disconnect the replacement', (
   const active = h.context.current()
   old.emit('closed')
   assert.equal(h.context.current(), active)
-  h.intervals[0]()
+  await h.intervals[0]()
   h.clipboard.text = 'copy after old window closed'
-  h.intervals[0]()
+  await h.intervals[0]()
   assert.equal(active.sent[0][1].text, 'copy after old window closed')
   assert.equal(old.sent.length, 0)
 })
