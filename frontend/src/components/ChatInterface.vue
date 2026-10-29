@@ -1134,6 +1134,14 @@ import {
 export default {
   name: 'ChatInterface',
   components: { OcrRoutingCard, ChatSuggestionControl, DecisionAssistControl, ModelSelectorDropdown, RootBubble, ChatTurnRail, MentionPicker, BackgroundTaskIndicator, AgentInbox, OptionalComponentCard },
+  inject: { openSettingsTab: { default: null } },
+  methods: {
+    goToMcpManagement() {
+      this.showSkillDropdown = false
+      if (this.openSettingsTab) this.openSettingsTab({ nav: 'mcp' })
+      else uni.navigateTo({ url: '/pages/admin/admin?nav=mcp' })
+    },
+  },
   props: {
     visible: { type: Boolean, default: true },
     projectId: String,
@@ -2186,12 +2194,6 @@ export default {
       } catch (e) { /* toast 失败不影响对话 */ }
     })
 
-    const openMcpSettingsTab = inject('openSettingsTab', null)
-    const goToMcpManagement = () => {
-      showSkillDropdown.value = false
-      if (openMcpSettingsTab) openMcpSettingsTab({ nav: 'mcp' })
-      else uni.navigateTo({ url: '/pages/admin/admin?nav=mcp' })
-    }
     const goToSkillManagement = () => {
       showSkillDropdown.value = false
       emit('manage-skills')
@@ -4740,7 +4742,6 @@ export default {
        toggleSkillSelection,
        removeSelectedSkill,
        goToSkillManagement,
-       goToMcpManagement,
        builtinQuickWorkflows,
        builtinCustomActiveCount,
        applyBuiltinWorkflow,
