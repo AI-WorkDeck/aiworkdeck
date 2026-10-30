@@ -6,6 +6,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import http from 'node:http'
 import crypto from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 async function until(read, label, timeout = 30000) {
@@ -45,6 +46,21 @@ export async function checkDesktopInteractions({ page, browser, mainRpc, run }) 
   const ids = []
   let clipboardTouched = false
   const capture = async name => {
+    // BrowserWindow.capturePage captures the host WebContents, not every native
+    // child view. Preserve the real disposable desktop for visual review too.
+    const screenshot = path.join(run, name + '-desktop.png')
+    if (process.platform === 'darwin') {
+      execFileSync('/usr/sbin/screencapture', ['-x', screenshot], { timeout: 15000 })
+    } else {
+      const script = `Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing
+$bounds = [Windows.Forms.SystemInformation]::VirtualScreen
+$bitmap = New-Object Drawing.Bitmap($bounds.Width, $bounds.Height)
+$graphics = [Drawing.Graphics]::FromImage($bitmap)
+try { $graphics.CopyFromScreen($bounds.Location, [Drawing.Point]::Empty, $bounds.Size); $bitmap.Save($env:AWD_SCREENSHOT_PATH, [Drawing.Imaging.ImageFormat]::Png) }
+finally { $graphics.Dispose(); $bitmap.Dispose() }`
+      execFileSync('pwsh.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { timeout: 20000, env: { ...process.env, AWD_SCREENSHOT_PATH: screenshot } })
+    }
+    assert(fs.statSync(screenshot).size > 0, 'Desktop screenshot must exist for visual review')
     const encoded = await mainRpc(`(async()=>{const w=process.mainModule.require('electron').BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes('/h5/index.html'));return (await w.capturePage()).toPNG().toString('base64')})()`)
     fs.writeFileSync(path.join(run, name + '.png'), Buffer.from(encoded, 'base64'))
   }
