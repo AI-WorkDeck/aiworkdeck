@@ -148,7 +148,8 @@ app.whenReady().then(async () => {
     await loaded
     assert.equal(await view.webContents.executeJavaScript('document.querySelector("h1").textContent'), 'Second page')
     // A completed navigation does not guarantee that Viz has drawn its surface.
-    // Observe a new fixture frame before exercising the separate capturePage path.
+    // Observe the subscription startup frame before injecting the new fixture marker.
+    // An early DOM update can otherwise precede delivery of the initial stale snapshot.
     const hasFrameMarker = image => {
       if (image.isEmpty()) return false
       const marker = image.crop({ x: 8, y: 8, width: 1, height: 1 }).toBitmap()
@@ -205,21 +206,6 @@ app.whenReady().then(async () => {
         fs.writeFileSync(path.join(root, 'failure-before-interventions.json'), JSON.stringify({ ...evidence, passed: false, error: error.stack }, null, 2))
         if (firstFrame) fs.writeFileSync(path.join(root, 'subscription-first.png'), firstFrame.toPNG())
         if (lastFrame) fs.writeFileSync(path.join(root, 'subscription-last.png'), lastFrame.toPNG())
-        // Diagnostic-only post-failure interventions never turn the original assertion green.
-        if (process.env.AWD_CAPTURE_DIAGNOSTICS === '1' && process.env.GITHUB_ACTIONS === 'true' && process.env.RUNNER_OS === 'macOS' && process.env.RUNNER_ENVIRONMENT === 'github-hosted' && process.env.RUNNER_TEMP && path.isAbsolute(process.env.RUNNER_TEMP)) {
-          const screen = require('node:child_process').spawnSync('/usr/sbin/screencapture', ['-x', path.join(root, 'native-before-capture-probe.png')], { timeout: 5000, encoding: 'utf8' })
-          observation.nativeScreen = { status: screen.status, error: screen.error?.message, stderr: screen.stderr }
-          let probeDeadline
-          try {
-            const probe = await Promise.race([
-              view.webContents.capturePage(),
-              new Promise((_, reject) => { probeDeadline = setTimeout(() => reject(new Error('Post-failure capture timed out')), 3000) }),
-            ])
-            observation.postFailureCapture = { ...sample(probe), markerMatches: hasFrameMarker(probe) }
-            fs.writeFileSync(path.join(root, 'post-failure-capture.png'), probe.toPNG())
-          } catch (probeError) { observation.postFailureCapture = { error: probeError.message } }
-          finally { clearTimeout(probeDeadline) }
-        }
       } catch (diagnosticError) { observation.failureDiagnosticError = diagnosticError.message }
       throw error
     } finally {
