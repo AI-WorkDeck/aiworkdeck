@@ -22,7 +22,7 @@ async function until(fn, label, seconds = 180) {
   const end = Date.now() + seconds * 1000
   let last
   while (Date.now() < end) {
-    try { const result = await fn(); if (result) return result } catch (error) { last = error.message }
+    try { const result = await fn(); if (result) return result; last = undefined } catch (error) { last = error.message }
     await sleep(250)
   }
   throw new Error(`Timed out: ${label}${last ? ': ' + last : ''}`)
@@ -106,7 +106,8 @@ export async function launchInstalledElectron({ outDir, backendPort = 19566, cdp
     if (child?.exitCode === null && child.signalCode === null) {
       try {
         save('installed-debug-targets.json', await (await fetch(`http://127.0.0.1:${cdpPort}/json/list`, { signal: AbortSignal.timeout(3000) })).json())
-        save('installed-window-state.json', await helper.mainRpc(`process.mainModule.require('electron').BrowserWindow.getAllWindows().map(w=>({id:w.id,visible:w.isVisible(),title:w.getTitle(),url:w.webContents.getURL(),loading:w.webContents.isLoading()}))`))
+        save('installed-window-state.json', await helper.mainRpc(`Promise.all(process.mainModule.require('electron').BrowserWindow.getAllWindows().map(async w=>{const p=w.webContents.getLastWebPreferences();return {id:w.id,visible:w.isVisible(),title:w.getTitle(),url:w.webContents.getURL(),loading:w.webContents.isLoading(),preferences:{preload:p.preload,sandbox:p.sandbox,contextIsolation:p.contextIsolation,nodeIntegration:p.nodeIntegration},renderer:await w.webContents.executeJavaScript('({bridge:typeof window.checkbaDesktop,keys:Object.keys(window.checkbaDesktop||{}),apiBase:window.checkbaDesktop?.apiBaseUrl,hasOverview:!!window.__checkbaActiveOverviewVm,body:document.body?.innerText.slice(0,800)})').catch(e=>({error:e.message}))}}))`))
+        save('installed-renderer-events.json', await helper.mainRpc('globalThis.__installedRendererEvents || []'))
         const shots = await helper.mainRpc(`Promise.all(process.mainModule.require('electron').BrowserWindow.getAllWindows().filter(w=>w.isVisible()).map(async w=>({id:w.id,png:(await w.capturePage()).toPNG().toString('base64')})))`)
         for (const shot of shots) fs.writeFileSync(path.join(outDir, `installed-window-${shot.id}.png`), Buffer.from(shot.png, 'base64'))
       } catch (error) { errors.push(error.message) }
@@ -181,6 +182,7 @@ export async function launchInstalledElectron({ outDir, backendPort = 19566, cdp
     assert.equal(identity.packaged, true)
     assert.equal(identity.sandboxDisabled, false)
     assert.equal(identity.versions.electron, provenance.expectedElectron)
+    await helper.mainRpc(`(()=>{const e=process.mainModule.require('electron');globalThis.__installedRendererEvents=[];const observe=wc=>{wc.on('preload-error',(_event,file,error)=>globalThis.__installedRendererEvents.push({type:'preload-error',file,error:error.stack}));wc.on('did-fail-load',(_event,code,description,url)=>globalThis.__installedRendererEvents.push({type:'did-fail-load',code,description,url}));wc.on('render-process-gone',(_event,details)=>globalThis.__installedRendererEvents.push({type:'render-process-gone',details}))};e.webContents.getAllWebContents().forEach(observe);e.app.on('web-contents-created',(_event,wc)=>observe(wc));return true})()`)
     helper.identity = identity
     provenance.launches.push({ ...identity })
     const jar = fs.statSync(path.join(resourcesPath, 'backend/app.jar'))
