@@ -4,7 +4,7 @@
 
 ## 被测对象与证据边界
 
-- 真实签名候选：desktop-build run [40868894223](https://github.com/AI-WorkDeck/aiworkdeck/actions/runs/40868894223)，源码 `ab8317c5a125f695aee58271adb22ee63f787f93`，应用 0.74.0 / Electron 45.1.0。与正式旧 0.74.0 的运行时不同，不能只凭应用版本号辨认。
+- 真实签名候选：desktop-build run [40979426877](https://github.com/AI-WorkDeck/aiworkdeck/actions/runs/40979426877)，源码 `99d1de556aed9ade66b548e8804edf684b82554d`，应用 0.74.0 / Electron 45.1.0。与正式旧 0.74.0 的运行时不同，不能只凭应用版本号辨认。
 - 本轮在 GitHub hosted Windows Server 2025 x64 / macOS 15 ARM64 的一次性用户中安装候选。不是本机客户端，也不是浏览器模拟界面。安装件验签、源码来源、运行进程、随包 JRE/JAR/H5/LOWA 均核对；不改动签名包。
 - 测试工具来自本 PR，产品来自上述固定构建。不能将通过结果扩展为任意后续 master 产物已验证。
 - 无发布标签、Release、部署或用户客户端升级。所有测试文件均为合成材料；不登录用户账号，不调用付费模型。
@@ -42,7 +42,17 @@
 | 关于窗口 | 真实应用菜单动作打开，许可/版本/三个链接存在，Escape 可关闭。 |
 | 退出重启 | 普通 app.quit 返回 0，无强杀，相关后台进程消失、端口释放；重启后偏好和三类文档内容仍在。 |
 
-运行记录与逐项结果将在云端运行完成、截图审阅后填入；脚本存在、语法通过或 ready 事件不能代替完成。
+## 已取得的运行证据（排查中）
+
+当前不能给出“双平台全部通过”的结论。以下均针对上述最终主线签名包：
+
+- [完整安装版回归 40982432098](https://github.com/AI-WorkDeck/aiworkdeck/actions/runs/40982432098)：Windows 成功；macOS 首次启动失败。
+- Windows `result.json` 为 `passed:true`、`forcedSaveUsed:false`，三格式均 `normalAutosave:true`、`appRestartRetained:true`；两轮普通退出均返回 0、进程与端口释放，未强杀。浏览器、文本/PNG 剪贴板、关于窗口、原生全屏进入/退出全部断言通过。主任务实际查看了三格式整应用重启后的截图以及 PDF 第二页截图；中文、Word 粗体原文、PPT 原标题/正文和 PDF 第二页均可见。Excel 公式及单元格内容另由模型回读断言验证。
+- Windows 安装件 SHA-256：`8a2d7df57ce750a4a2a9d2fa519099a25dfe60a789cb63c5caba6caf9972cb03`；签名、时间戳、运行 Electron 45.1.0、随包 Java 均核验通过。
+- [Windows 原生 Restart 升级 40982441616](https://github.com/AI-WorkDeck/aiworkdeck/actions/runs/40982441616) 成功：0.73.0 → 本次 0.74.0 候选。macOS 原生升级仍在运行，完成后补记。
+- macOS 实际窗口进入网页登录页，`window.checkbaDesktop` 未暴露；后端身份验证正常。真实主窗口 preload 路径正确、文件存在，SHA-256 与源码一致（`3934ea0cabd95ca94f709010e1b19070be597ec59427cb3ee0a339dea293e92e`）。失败后隐藏诊断窗以同一脚本加载 `data:` 页面可获得 bridge；这只用于缩小问题范围，不能替代实际启动通过。已排除“脚本漏打包”和“提前连接主进程 inspector”两项假设，正式主窗口加载差异尚在定位。
+
+截图中的 Update incomplete 来自测试将更新源指向本地不可用端点，避免访问/安装正式更新；不作为升级功能通过证据。原生升级另用一次性测试源独立验证。
 
 ## 仍需实体环境 / 特定系统验证
 
