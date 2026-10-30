@@ -72,6 +72,10 @@ workspace.requestLitigationGeneration=async(operation,params)=>{
     if(params.taskId!==generation.taskId||params.questionKey!==generation.question?.key)throw Error('Unexpected question answer');
     generation={...generation,phase:'running',question:null,message:'正在根据你的选择生成图表'};
   }
+  if(operation==='message'){
+    if(params.taskId!==generation.taskId)throw Error('Unexpected follow-up task');
+    generation={...generation,phase:'running',messages:[...(generation.messages||[]),{role:'USER',content:params.message}]};
+  }
   if(operation==='stop')generation={...generation,phase:'stopping',message:'已发送停止请求，正在等待确认'};
   if(operation==='continue')generation={...generation,phase:'running'};
   return structuredClone(generation);
@@ -80,7 +84,7 @@ window.finishDrawing=async()=>{
   files.push({id:81,name:'已生成合成图.drawio',filePath:'synthetic/generated.drawio'});
   diagrams.push({folderId:80,name:'已生成合成图',drawioFileId:81,layout:'graphviz_relation',formats:['drawio','svg','png']});
   await workspace.handleLitigationOpenFile({fileId:81});
-  generation={...generation,phase:'completed',question:null,resultFileId:81,message:'图表已写入项目'};
+  generation={...generation,phase:'completed',question:null,resultFileId:81,message:'图表已写入项目',messages:[{role:'USER',content:'生成合成图'},{role:'ASSISTANT',content:'合成图表已经保存，可继续调整。'}]};
 };
 const hostMethods={${['businessServices','handleCall'].map(n=>method(pluginSource,n)).join(',')}};
 window.mounted={sessionGeneration:1,projectId:42,businessActions:workspace.pluginBusinessActions(),activeEditor:()=>null,
@@ -109,10 +113,10 @@ const server = createServer(async (req, res) => {
   } catch { res.statusCode = 404; res.end() }
 })
 await new Promise(done => server.listen(0, '127.0.0.1', done))
-let browser, page
+let browser, page, report
 const checks = []
 try {
-  browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true, args: ['--no-sandbox'] })
+  browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true, userDataDir: resolve(out, 'chrome-profile'), args: ['--no-sandbox'] })
   page = await browser.newPage()
   await page.setViewport({ width: 1000, height: 1200 })
   const errors = []
@@ -272,6 +276,15 @@ try {
     frame.style.width='260px';
   })
   await frame.waitForSelector('.lv-question-option')
+  const shortQuestion = await frame.$eval('.lv-question-text', el => el.textContent)
+  await page.evaluate(() => { generation.question.text=Array.from({length:46},(_,i)=>'合成材料 '+(i+1)+'：请核对这一项事实。').join('\n') })
+  await frame.waitForFunction(() => document.querySelector('.lv-question-text')?.textContent.includes('合成材料 46'))
+  const questionScroll = await frame.$eval('.lv-question-text', el=>({height:el.clientHeight,full:el.scrollHeight,overflow:getComputedStyle(el).overflowY}))
+  assert.ok(questionScroll.height <= 240 && questionScroll.full > questionScroll.height, 'long confirmation remains fully available in a bounded region')
+  assert.equal(questionScroll.overflow,'auto')
+  await page.evaluate(text => { generation.question.text=text },shortQuestion)
+  await frame.waitForFunction(text => document.querySelector('.lv-question-text')?.textContent===text,{},shortQuestion)
+  checks.push('long confirmation preserves all items without pushing the answer below a huge material dump')
   const assertQuestionFits = async theme => {
     const metrics = await frame.evaluate(() => ({
       width:innerWidth, scrollWidth:document.documentElement.scrollWidth,
@@ -324,6 +337,23 @@ try {
   assert.equal(await page.evaluate(() => opened.includes(81)),true)
   checks.push('visible no-file failure and retry', 'successful status refreshes gallery and opens generated file through workbench handler')
 
+  await frame.waitForSelector('.lv-follow-up')
+  assert.equal(await frame.$eval('.lv-history',el=>el.open),false,'own conversation starts collapsed')
+  assert.equal(await frame.$eval('.lv-reply',el=>el.textContent),'合成图表已经保存，可继续调整。')
+  await frame.click('.lv-history-toggle')
+  assert.equal(await frame.$eval('.lv-history',el=>el.open),true)
+  assert.match(await frame.$eval('.lv-history-messages',el=>el.textContent),/生成合成图/)
+  await frame.type('.lv-follow-up textarea','请解释第二个节点')
+  await clickText(frame,'.lv-follow-up .lv-btn','发送')
+  await page.waitForFunction(()=>calls.some(c=>c.operation==='message'))
+  assert.equal(await page.evaluate(()=>calls.find(c=>c.operation==='message').params.message),'请解释第二个节点')
+  await page.evaluate(()=>{generation={...generation,phase:'completed',messages:[...generation.messages,{role:'ASSISTANT',content:'第二个节点对应合成材料中的立案日期。'}]}})
+  await frame.waitForFunction(()=>document.querySelector('.lv-reply')?.textContent.includes('立案日期'))
+  assert.equal(await frame.$eval('.lv-follow-up textarea',el=>el.value),'')
+  assert.deepEqual(await page.evaluate(() => ({ prompts, show:workspace.showAiPanel, id:workspace.chatId })),{prompts:[],show:false,id:'existing-chat'})
+  await (await page.$('#plugin')).screenshot({path:resolve(out,'litigation-follow-up-dark-260.png')})
+  checks.push('collapsed dedicated conversation history', 'follow-up question and response stay inside the left panel')
+
   await page.evaluate(() => { failGenerationStart=true })
   await frame.click('.lv-btn.primary')
   await frame.waitForFunction(() => document.querySelector('.lv-generation-error')?.textContent.includes('合成启动失败，请重试'))
@@ -341,8 +371,18 @@ try {
   checks.push('persistent start rejection and retry', 'stop stays pending until confirmed', 'AI panel unchanged across complete journey')
   await (await page.$('#plugin')).screenshot({ path: resolve(out, 'litigation-cancelled-dark-260.png') })
   assert.deepEqual(errors, [])
-  console.log(JSON.stringify({ passed: true, checks, output: out, limitations: ['synthetic task runner, backend and file picker; real business bridge and workspace actions', 'no real drawing engine or paid AI', 'no installed Electron client'] }))
+  report = { passed: true, checks, output: out, limitations: ['synthetic task runner, backend and file picker; real business bridge and workspace actions', 'no real drawing engine or paid AI', 'no installed Electron client'] }
 } catch (error) {
   await page?.screenshot({ path: resolve(out, 'failure.png'), fullPage: true }).catch(() => {})
   throw error
-} finally { await browser?.close(); server.closeAllConnections(); await new Promise(done => server.close(done)) }
+} finally {
+  console.log('Closing owned browser:', browser?.process()?.pid)
+  await browser?.close()
+  console.log('Owned browser closed; closing test server')
+  await new Promise((done, reject) => {
+    server.close(error => error ? reject(error) : done())
+    server.closeAllConnections()
+  })
+  console.log('Test server closed')
+}
+console.log(JSON.stringify(report))

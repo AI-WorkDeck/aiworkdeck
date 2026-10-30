@@ -50,7 +50,7 @@ export function useLitigationGeneration() {
         changed: () => uni.$emit('awd:files-changed', { projectId }),
         api: { projectId, authorize, inbox: getAgentInbox,
           kickoff: input => getLitigationKickoffPrompt(projectId, input),
-          issue: () => issueAgentConversation(projectId),
+          issue: conversationId => issueAgentConversation(projectId, 'litigation-visual', conversationId),
           diagrams: () => getLitigationDiagrams(projectId),
           history: async conversationId => {
             const response = await getAiHistory({ projectId, conversationId, limit: 50 })

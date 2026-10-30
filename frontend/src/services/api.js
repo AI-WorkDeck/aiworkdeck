@@ -561,8 +561,8 @@ export function getAiHistory(params) {
   });
 }
 
-export const issueAgentConversation = projectId => request({
-  url: '/api/agent/conversations', method: 'POST', data: { projectId },
+export const issueAgentConversation = (projectId, conversationScope, conversationId) => request({
+  url: '/api/agent/conversations', method: 'POST', data: { projectId, conversationScope, conversationId },
 })
 
 export function getAiConversations(projectId) {
