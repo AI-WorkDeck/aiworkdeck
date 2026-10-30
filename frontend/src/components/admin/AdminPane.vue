@@ -1630,6 +1630,7 @@ export default {
     }
   },
   beforeUnmount() {
+    this._modelCatalogDisposed = true
     if (this._permissionsUnsub) {
       this._permissionsUnsub()
       this._permissionsUnsub = null
@@ -2302,10 +2303,14 @@ export default {
     },
     // ---------- 模型目录与区域 ----------
     async loadModelCatalog() {
+      if (this._modelCatalogDisposed) return
       try {
-        this.modelCatalog = await fetchAiModels({ accountPrompt: false })
+        const catalog = await fetchAiModels({ accountPrompt: false })
+        if (this._modelCatalogDisposed) return
+        this.modelCatalog = catalog
         this.modelCatalogError = ''
       } catch (e) {
+        if (this._modelCatalogDisposed) return
         this.modelCatalog = null
         // 拿不到清单时下拉只剩「跟随内置默认」与已保存的值：宁可少给选项，
         // 也不要在这里塞一份硬编码清单当兜底（那正是三份清单互不同步的来源）

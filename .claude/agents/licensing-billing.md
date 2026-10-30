@@ -37,6 +37,8 @@ TRANSCRIBING/FAILED 时异步复核账户，覆盖内置面板、播放器和 vo
 
 ## 设置账户状态（dev-board#1415，2026-10-21）
 
+设置页模型目录（dev-board#1647）：`loadModelCatalog` 保留 `accountPrompt:false`，后台失败只在当前面板内显示提示。切换文档会卸载 `AdminPane`，vue-i18n 的卸载钩子会删除实例 `$t`／`$i18n`；所以 `beforeUnmount` 标记目录请求已失效，迟到的成功与失败均不得更新状态或再取翻译，也不再发起新目录请求。不能仅提前捕获 `$t` 函数，或吞掉全局异常来规避。`tests/account/admin-catalog-lifecycle.test.mjs` 挂真实 Vue／vue-i18n 生命周期并调用原方法，覆盖迟到成功、迟到失败与正常失败后刷新；正式安装包的验证另记。
+
 `AdminPane` 的账户状态区分 loading / ready / error：只有成功取得明确的 `connected:false` 才显示登录入口；请求失败保留已确认身份并给重试，不当作退出登录。并发状态请求按代次接收，旧未连接回包不能盖过登录后的新状态。账户/钱包块必须显式按 connected 显示，不能用紧跟手机同步 `v-if=isDesktop` 的 `v-else`（这会在桌面隐藏整个账户块）。
 验证：`tests/account/admin-account-state.test.mjs` 真模板 SSR 与加载方法；`admin-account-ui.mjs` 实际设置路由、合成 API 的初始等待/连接/账户事件失败/重试/退出。用户截图发生时的请求失败原因无法仅凭截图还原；模板错误与失败误判路径各自有回归，不混为一个根因。
 
