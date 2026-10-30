@@ -152,13 +152,24 @@ export async function checkDesktopInteractions({ page, browser, mainRpc, run }) 
     }, { text, oldImageIds }), 'production clipboard bridge persists text and image')
     evidence.clipboardRecords = records.map(i => ({ id: i.id, type: i.type, text: i.type === 'TEXT' ? i.text : undefined }))
     await page.evaluate(() => window.__checkbaActiveOverviewVm.openPanelInItsDock('clipboard'))
-    // Clipboard is now a bundled plugin iframe. Inspect the real frame, never inject a card.
+    // Read the mounted plugin frame directly. innerText can include layout line breaks;
+    // the text node plus visible card bounds establish content and actual UI rendering.
     const clipFrame = await until(async () => {
-      for (const frame of page.frames()) {
-        if (await frame.evaluate(text => document.body?.innerText.includes(text), text).catch(() => false)) return frame
+      for (const element of await page.$$('.plugin-iframe')) {
+        if (!await element.isVisible()) continue
+        const frame = await element.contentFrame()
+        if (!frame) continue
+        const shown = await frame.evaluate(text => Array.from(document.querySelectorAll('.clip-card .content-text')).some(el => {
+          const rect = el.getBoundingClientRect(), style = getComputedStyle(el)
+          return el.textContent === text && rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none'
+        }), text)
+        if (shown) return frame
       }
     }, 'clipboard text visible in product panel', 45000)
-    await clipFrame.waitForFunction(() => Array.from(document.querySelectorAll('.clip-card img')).some(img => img.complete && img.naturalWidth === 2 && img.naturalHeight === 2))
+    await clipFrame.waitForFunction(() => Array.from(document.querySelectorAll('.clip-card img')).some(img => {
+      const rect = img.getBoundingClientRect(), style = getComputedStyle(img)
+      return img.complete && img.naturalWidth === 2 && img.naturalHeight === 2 && rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none'
+    }))
     await capture('installed-clipboard-cards')
     evidence.checks.push('Production clipboard bridge persisted records and displayed text/image cards')
     await mainRpc(`(()=>{const {Menu}=process.mainModule.require('electron');const item=Menu.getApplicationMenu().items[0].submenu.items[0];if(!item.label.includes('AI WorkDeck'))throw Error('About menu missing');item.click();return true})()`)
@@ -176,6 +187,16 @@ export async function checkDesktopInteractions({ page, browser, mainRpc, run }) 
   } catch (error) {
     evidence.passed = false
     evidence.error = error.stack || String(error)
+    const frameDiagnostics = []
+    for (const frame of page.frames()) {
+      try {
+        frameDiagnostics.push({ url: frame.url(), ...await frame.evaluate(() => ({
+          bodyText: document.body?.innerText?.slice(0, 5000),
+          cards: Array.from(document.querySelectorAll('.clip-card .content-text')).map(el => ({ text: el.textContent, bounds: el.getBoundingClientRect().toJSON() })),
+        })) })
+      } catch (readError) { frameDiagnostics.push({ url: frame.url(), error: String(readError) }) }
+    }
+    fs.writeFileSync(path.join(run, 'installed-interaction-frames.json'), JSON.stringify(frameDiagnostics, null, 2))
     await capture('installed-interactions-failure').catch(() => {})
     throw error
   } finally {
