@@ -43,12 +43,12 @@
     </view>
     <view
       class="account-entry-btn"
-      :class="signedIn ? { 'avatar-btn': true, 'is-open': menuOpen } : { 'header-login-btn': true, 'is-signed-out': true }"
+      :class="signedIn ? { 'avatar-btn': true, 'is-open': menuOpen } : { 'header-login-btn': true, 'is-signed-out': true, 'is-expired': authExpired }"
       role="button"
       tabindex="0"
       :aria-expanded="signedIn ? menuOpen : undefined"
-      :title="signedIn ? (messageHint || $t('workbench.accountMenu')) : $t('welcome.signInTitle')"
-      :aria-label="signedIn ? (messageHint || $t('workbench.accountMenu')) : $t('welcome.signInTitle')"
+      :title="signedIn ? (messageHint || $t('workbench.accountMenu')) : $t(authExpired ? 'common.loginExpired' : 'welcome.signInTitle')"
+      :aria-label="signedIn ? (messageHint || $t('workbench.accountMenu')) : $t(authExpired ? 'common.loginExpired' : 'welcome.signInTitle')"
       @tap.stop="onTap"
       @keydown.enter.stop.prevent="onTap"
       @keydown.space.stop.prevent="onTap"
@@ -65,7 +65,7 @@
         <svg class="account-entry-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path v-for="(d, gi) in ICONS.logIn" :key="gi" :d="d" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
-        <text class="account-entry-label">{{ $t('welcome.signIn') }}</text>
+        <text class="account-entry-label">{{ $t(authExpired ? 'common.loginExpired' : 'welcome.signIn') }}</text>
       </template>
     </view>
 
@@ -111,7 +111,7 @@
 
 <script>
 import { ICONS } from '@/config/icons.js'
-import { ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
+import { ACCOUNT_CHANGED_EVENT, isAccountSessionExpired } from '@/utils/requireAccount.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 
 let accountEntrySequence = 0
@@ -140,6 +140,7 @@ export default {
       menuOpen: false,
       // awd:account-changed 带来的连接状态；null = 以宿主 prop 为准
       connectedOverride: null,
+      authExpired: isAccountSessionExpired(),
     }
   },
   computed: {
@@ -147,6 +148,7 @@ export default {
       return ICONS
     },
     signedIn() {
+      if (this.authExpired) return false
       return this.connectedOverride == null ? !!this.loggedIn : this.connectedOverride
     },
     initial() {
@@ -206,6 +208,7 @@ export default {
       this.menuOpen = !this.menuOpen
     },
     onAccountChanged(payload) {
+      if (typeof payload?.connected === 'boolean') this.authExpired = payload.authExpired === true
       if (payload && typeof payload.connected === 'boolean') this.connectedOverride = payload.connected
       // 退出登录后下拉若还开着，里面的余额与动作都已不成立
       if (!this.signedIn) this.menuOpen = false
@@ -311,6 +314,13 @@ export default {
     border-color: var(--awd-accent);
     background-color: var(--awd-surface-2);
   }
+}
+
+.header-login-btn.is-expired {
+  color: var(--awd-warning-text);
+  border-color: var(--awd-warning-text);
+  background: var(--awd-surface-2);
+  .account-entry-label { max-inline-size: 260px; overflow: hidden; text-overflow: ellipsis; }
 }
 
 .account-entry-icon {

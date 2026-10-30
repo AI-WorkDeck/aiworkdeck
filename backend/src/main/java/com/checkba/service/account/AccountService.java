@@ -49,6 +49,7 @@ public class AccountService {
      */
     private final com.checkba.service.LicenseService licenseService;
     private final ObjectMapper objectMapper = stateMapper();
+    private long connectionVersion;
 
     public AccountService(
             com.checkba.service.site.SiteProfileService siteProfileService,
@@ -83,6 +84,7 @@ public class AccountService {
         public String displayName;
         public String connectedAt;
         public String lastSyncAt;
+        public boolean authExpired;
     }
 
     // ==================== 连接生命周期 ====================
@@ -113,6 +115,8 @@ public class AccountService {
         state.connectedAt = Instant.now().toString();
         state.lastSyncAt = state.connectedAt;
         saveState(state);
+        connectionVersion++;
+        clearBalanceCache();
         // 账户连上了就要一并落解锁票据：解锁状态的唯一数据源是 LicenseService 的票据，
         // 而这里只写账户状态。不落的话「登录成功」但 status().unlocked 仍为 false，
         // launch 页会把人原地弹回解锁页——表现为「弹了个已解锁的提示，然后什么都没发生」。
@@ -129,6 +133,7 @@ public class AccountService {
     public synchronized Map<String, Object> disconnect() {
         try {
             Files.deleteIfExists(accountFile);
+            connectionVersion++;
         } catch (Exception e) {
             throw new AccountException(AccountException.Kind.MALFORMED,
                     LangText.of("断开连接失败：本地凭据文件无法删除", "Failed to disconnect: could not delete the local credential file"));
@@ -140,8 +145,9 @@ public class AccountService {
     public synchronized Map<String, Object> status() {
         State state = loadState();
         Map<String, Object> result = new HashMap<>();
-        boolean connected = state.key != null && !state.key.isBlank();
+        boolean connected = !state.authExpired && state.key != null && !state.key.isBlank();
         result.put("connected", connected);
+        if (state.authExpired) result.put("authExpired", true);
         if (connected) {
             result.put("username", state.username);
             result.put("accountId", state.accountId);
@@ -155,7 +161,7 @@ public class AccountService {
 
     public synchronized boolean isConnected() {
         State state = loadState();
-        return state.key != null && !state.key.isBlank();
+        return !state.authExpired && state.key != null && !state.key.isBlank();
     }
 
     /**
@@ -170,7 +176,7 @@ public class AccountService {
      */
     public synchronized String currentKeyOrNull() {
         State state = loadState();
-        return state.key == null || state.key.isBlank() ? null : state.key;
+        return state.authExpired || state.key == null || state.key.isBlank() ? null : state.key;
     }
 
     /**
@@ -183,7 +189,7 @@ public class AccountService {
      */
     public synchronized String currentAccountIdOrNull() {
         State state = loadState();
-        if (state.key == null || state.key.isBlank()) return null;
+        if (state.authExpired || state.key == null || state.key.isBlank()) return null;
         return state.accountId == null || state.accountId.isBlank() ? null : state.accountId;
     }
 
@@ -196,7 +202,7 @@ public class AccountService {
      */
     public synchronized String currentDisplayNameOrNull() {
         State state = loadState();
-        if (state.key == null || state.key.isBlank()) return null;
+        if (state.authExpired || state.key == null || state.key.isBlank()) return null;
         return state.displayName == null || state.displayName.isBlank() ? null : state.displayName;
     }
 
@@ -225,7 +231,7 @@ public class AccountService {
 
     /** GET /api/account/me —— 余额与账户档案（余额单位是整数分）。 */
     public Map<String, Object> fetchProfile() {
-        return getJson("/api/account/me", requireKey());
+        return getCurrentJson("/api/account/me");
     }
 
     /**
@@ -243,7 +249,7 @@ public class AccountService {
      * 契约返回 {@code {"entitlements":[{feature, purchasedAt, orderId}]}}。
      */
     public List<Map<String, Object>> fetchEntitlements() {
-        Map<String, Object> body = getJson("/api/account/entitlements", requireKey());
+        Map<String, Object> body = getCurrentJson("/api/account/entitlements");
         touchLastSync();
         return listOf(body.get("entitlements"));
     }
@@ -253,7 +259,7 @@ public class AccountService {
      * 契约返回 {@code {"entries":[...]}}（**不是**总 Spec 字面写的裸数组，以官网契约文档为准）。
      */
     public List<Map<String, Object>> fetchLedger() {
-        Map<String, Object> body = getJson("/api/account/ledger?limit=50", requireKey());
+        Map<String, Object> body = getCurrentJson("/api/account/ledger?limit=50");
         return listOf(body.get("entries"));
     }
 
@@ -269,7 +275,7 @@ public class AccountService {
      * runtime key（未分配额度的账户根本没有），而这里恰恰要能回答「还没分配」。
      */
     public Map<String, Object> fetchAiUsage() {
-        return getJson("/api/account/ai-usage", requireKey());
+        return getCurrentJson("/api/account/ai-usage");
     }
 
     /**
@@ -282,7 +288,8 @@ public class AccountService {
      * 所以旧的 no_allocation 分支不会再出现。留着只为兼容尚未升级的官网。
      */
     public Map<String, Object> fetchAiKey() {
-        return fetchAiKeyWith(requireKey());
+        long requestVersion = connectionVersion();
+        return fetchAiKeyWith(requireKey(), true, requestVersion);
     }
 
     /**
@@ -292,7 +299,10 @@ public class AccountService {
      * 换回属于他自己的 runtime key，Key 本身用完即弃（见 {@code PlatformAiKeyService}）。
      */
     public Map<String, Object> fetchAiKeyWith(String awdkKey) {
-        String key = awdkKey;
+        return fetchAiKeyWith(awdkKey, false, 0);
+    }
+
+    private Map<String, Object> fetchAiKeyWith(String key, boolean currentAccount, long requestVersion) {
         AccountTransport.Reply reply = transport.send("POST", baseUrl() + "/api/account/ai-key", key, "{}");
         if (reply.networkFailure()) {
             throw networkError();
@@ -320,7 +330,7 @@ public class AccountService {
             throw new AccountException(AccountException.Kind.NETWORK,
                     LangText.of("官网 AI 额度服务暂不可用，请稍后重试", "The website's AI Credits service is temporarily unavailable, please retry shortly"));
         }
-        Map<String, Object> body = handle(reply);
+        Map<String, Object> body = currentAccount ? handleCurrent(reply, "", key, requestVersion) : handle(reply);
         if (str(body.get("openrouterKey")) == null && str(body.get("apiKey")) == null) {
             throw new AccountException(AccountException.Kind.MALFORMED,
                     LangText.of("官网返回的 AI 通道密钥为空，请稍后重试", "The website returned an empty AI channel key, please retry shortly"));
@@ -378,6 +388,7 @@ public class AccountService {
      * 省得前端为了一个地址再拉一趟 /me。2MB 上限与格式判据都在官网（{@code too_large} 等）。
      */
     public Map<String, Object> uploadAvatar(byte[] content, String filename, String contentType) {
+        long requestVersion = connectionVersion();
         String key = requireKey();
         AccountTransport.Reply reply = transport.sendMultipart(
                 "POST", baseUrl() + "/api/account/avatar", key,
@@ -385,7 +396,7 @@ public class AccountService {
         if (reply.networkFailure()) {
             throw networkError();
         }
-        Map<String, Object> body = handle(reply);
+        Map<String, Object> body = handleCurrent(reply, "", key, requestVersion);
         String updatedAt = str(body.get("avatarUpdatedAt"));
         String url = avatarUrl(accountIdOrFetch(), updatedAt);
         if (url == null) {
@@ -502,7 +513,7 @@ public class AccountService {
      * 高频轮询走 {@link #balanceSnapshot()}，那边有 TTL 缓存。
      */
     public Map<String, Object> fetchMembership() {
-        return getJson("/api/account/membership", requireKey());
+        return getCurrentJson("/api/account/membership");
     }
 
     /**
@@ -513,6 +524,7 @@ public class AccountService {
      * {@code present:'redirect'}（+redirectUrl）；两种形状原样透传，不在桌面端分叉。
      */
     public Map<String, Object> createRecharge(long amountCents, String idempotencyKey) {
+        long requestVersion = connectionVersion();
         String key = requireKey();
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("amount", amountCents);
@@ -528,13 +540,13 @@ public class AccountService {
         if (reply.networkFailure()) {
             throw networkError();
         }
-        return handle(reply);
+        return handleCurrent(reply, "", key, requestVersion);
     }
 
     /** GET /api/payment/query?outTradeNo=xxx —— 订单支付状态透传，字段以官网为准。 */
     public Map<String, Object> queryRecharge(String outTradeNo) {
         String encoded = java.net.URLEncoder.encode(outTradeNo, StandardCharsets.UTF_8);
-        Map<String, Object> body = getJson("/api/payment/query?outTradeNo=" + encoded, requireKey());
+        Map<String, Object> body = getCurrentJson("/api/payment/query?outTradeNo=" + encoded);
         // 查到「已支付」就作废余额缓存：充值弹窗确认到账后立刻 emit wallet-refresh，
         // 顶栏 chip / 会员卡随手重拉，不能让它们再吃 60 秒 TTL 里的旧余额。
         if (body.get("order") instanceof Map<?, ?> order && "paid".equals(order.get("status"))) {
@@ -551,6 +563,7 @@ public class AccountService {
      * skuId 白名单在调用方（AccountController）把关，这里只管转发与失败分类。
      */
     public Map<String, Object> purchaseSku(String skuId) {
+        long requestVersion = connectionVersion();
         String key = requireKey();
         String json;
         try {
@@ -585,7 +598,7 @@ public class AccountService {
                             + (code == null ? LangText.of("未知原因", "unknown reason") : code)
                             + LangText.of("），请稍后重试", "), please retry shortly"));
         }
-        return handle(reply);
+        return handleCurrent(reply, "", key, requestVersion);
     }
 
     /** profile 缓存保鲜期：顶栏高频轮询用，够短到充值后很快看见新余额。 */
@@ -613,7 +626,7 @@ public class AccountService {
      */
     public synchronized Map<String, Object> balanceSnapshot() {
         if (!isConnected()) {
-            return Map.of("connected", false);
+            return status();
         }
         // accountFingerprintOrNull() 只在 SHA-256 不可用（不会真的发生）时才返回 null；
         // 兜个哨兵值而不是让 Cached.fresh() 里的 owner.equals(null) 抛 NPE
@@ -625,6 +638,7 @@ public class AccountService {
         try {
             profile = cachedProfile(owner);
         } catch (AccountException e) {
+            if (!isConnected()) return status();
             result.put("available", false);
             return result;
         }
@@ -637,6 +651,7 @@ public class AccountService {
         } catch (AccountException e) {
             log.debug("balance 端点：membership 摘要拿不到，本次降级为 null: {}", e.getMessage());
         }
+        if (!isConnected()) return status();
         if (membership != null && membership.get("tier") instanceof Map<?, ?> tier) {
             Map<String, Object> summary = new LinkedHashMap<>();
             summary.put("level", tier.get("level"));
@@ -683,7 +698,7 @@ public class AccountService {
      * 字段契约见官网 doc/desktop-contract.md「试用计量」节（本仓 docs/trial-metering-account-contract.md）。
      */
     public Map<String, Object> fetchTrialBalance() {
-        return getJson("/api/account/trial", requireKey());
+        return getCurrentJson("/api/account/trial");
     }
 
     /**
@@ -703,7 +718,7 @@ public class AccountService {
      */
     public synchronized Map<String, Object> trialSnapshot() {
         if (!isConnected()) {
-            return Map.of("connected", false);
+            return status();
         }
         String owner = accountFingerprintOrNull();
         Map<String, Object> result = new LinkedHashMap<>();
@@ -717,6 +732,7 @@ public class AccountService {
             try {
                 trial = fetchTrialBalance();
             } catch (AccountException e) {
+                if (!isConnected()) return status();
                 result.put("available", false);
                 return result;
             }
@@ -752,7 +768,7 @@ public class AccountService {
 
     /** GET /api/account/team —— 我的团队；无团队时官网回 {@code {team:null, invites:[...]}}。 */
     public Map<String, Object> fetchTeam() {
-        return getJson("/api/account/team", requireKey());
+        return getCurrentJson("/api/account/team");
     }
 
     /** POST /api/account/team —— 创建团队（已有团队时官网回 409）。 */
@@ -806,7 +822,7 @@ public class AccountService {
      */
     public Map<String, Object> fetchTeamSummary(int range, String scope) {
         String s = (scope == null || scope.isBlank()) ? "team" : scope.trim();
-        return getJson("/api/account/team/summary?range=" + range + "&scope=" + s, requireKey());
+        return getCurrentJson("/api/account/team/summary?range=" + range + "&scope=" + s);
     }
 
     // ---- 层级与加入流程（设计 §10.3） ----
@@ -865,13 +881,14 @@ public class AccountService {
      * 让它把成品交过来，这一层就没有再往里塞字段的机会。
      */
     public Map<String, Object> uploadTeamUsage(String payloadJson) {
+        long requestVersion = connectionVersion();
         String key = requireKey();
         AccountTransport.Reply reply = transport.send(
                 "POST", baseUrl() + "/api/account/team/usage", key, payloadJson);
         if (reply.networkFailure()) {
             throw networkError();
         }
-        return handle(reply, "/api/account/team/usage");
+        return handleCurrent(reply, "/api/account/team/usage", key, requestVersion);
     }
 
     /**
@@ -879,6 +896,7 @@ public class AccountService {
      * body 为 null 表示无请求体——DELETE 带体在部分反代上会被丢掉，不值得冒这个险。
      */
     private Map<String, Object> sendJson(String method, String path, Map<String, Object> body) {
+        long requestVersion = connectionVersion();
         String key = requireKey();
         String json = null;
         if (body != null) {
@@ -892,7 +910,7 @@ public class AccountService {
         if (reply.networkFailure()) {
             throw networkError();
         }
-        return handle(reply, path);
+        return handleCurrent(reply, path, key, requestVersion);
     }
 
     /**
@@ -918,7 +936,7 @@ public class AccountService {
      */
     private String requireKey() {
         State state = loadState();
-        if (state.key == null || state.key.isBlank()) {
+        if (state.authExpired || state.key == null || state.key.isBlank()) {
             throw new AccountException(AccountException.Kind.NOT_CONNECTED,
                     LangText.of("尚未连接 AI WorkDeck 账户，可在设置页「账户与用量」粘贴账户 Key",
                             "No AI WorkDeck account connected yet. Paste your account key on the Settings page under \"Account & Usage\""));
@@ -1055,6 +1073,38 @@ public class AccountService {
 
     private Map<String, Object> postLogin(String path, Map<String, Object> body) {
         return AccountLoginExchange.post(transport, objectMapper, baseUrl(), path, body);
+    }
+
+    /** Read before the request key: a reconnect between those reads must leave the older generation. */
+    public synchronized long connectionVersion() {
+        return connectionVersion;
+    }
+
+    /** Only a definitive rejection of the current connection may expire it. */
+    public synchronized void markUnauthorized(String rejectedKey, long requestVersion) {
+        State state = loadState();
+        if (requestVersion != connectionVersion || rejectedKey == null || state.authExpired
+                || !rejectedKey.equals(state.key)) return;
+        state.authExpired = true;
+        saveState(state);
+        clearBalanceCache();
+    }
+
+    private Map<String, Object> handleCurrent(AccountTransport.Reply reply, String path, String key, long requestVersion) {
+        try {
+            return handle(reply, path);
+        } catch (AccountException e) {
+            if (e.getKind() == AccountException.Kind.UNAUTHORIZED) markUnauthorized(key, requestVersion);
+            throw e;
+        }
+    }
+
+    private Map<String, Object> getCurrentJson(String path) {
+        long requestVersion = connectionVersion();
+        String key = requireKey();
+        AccountTransport.Reply reply = transport.send("GET", baseUrl() + path, key, null);
+        if (reply.networkFailure()) throw networkError();
+        return handleCurrent(reply, path, key, requestVersion);
     }
 
     private Map<String, Object> getJson(String path, String key) {

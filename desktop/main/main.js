@@ -305,11 +305,11 @@ function startClipboardWatcher() {
   if (!clipboardChangeCounter) clipboardChangeCounter = startChangeCounter()
 
   // 系统级：轮询剪贴板内容变化
-  clipboardWatchTimer = setInterval(() => {
-    const priming = !clipboardPrimed
-    clipboardPrimed = true
+  clipboardWatchTimer = setInterval(async () => {
+    const timer = clipboardWatchTimer
     try {
-      clipboardPoller.tick(priming)
+      const completed = await clipboardPoller.tick(!clipboardPrimed)
+      if (completed && clipboardWatchTimer === timer) clipboardPrimed = true
     } catch (e) {
       // ignore
     }
@@ -317,6 +317,7 @@ function startClipboardWatcher() {
 }
 
 function stopClipboardWatcher() {
+  clipboardPoller.cancel()
   if (clipboardChangeCounter) {
     clipboardChangeCounter.stop()
     clipboardChangeCounter = null
@@ -337,9 +338,12 @@ function attachCopyListener(webContents, sourceLabel) {
       const isCut = key === 'x' && (input.control || input.meta)
       if (!isCopy && !isCut) return
       // 等系统完成 copy/cut 后再读剪贴板（避免读取到旧值）
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
-          const text = clipboard.readText() || ''
+          const text = await clipboard.readText()
+          if (webContents.isDestroyed()) return
+          // 同值复制也须使迟到的轮询结果失效；轮询自己的 onText 不走此入口。
+          clipboardPoller.cancel()
           emitClipboard(text, sourceLabel || (isCopy ? 'copy' : 'cut'))
         } catch (e) {
           // ignore
@@ -937,8 +941,7 @@ function makeBrowserView(id) {
   // 许多站点会针对 Electron UA 直接断开连接（表现为 SSL handshake failed / ERR_CONNECTION_CLOSED 等）
   // 这里统一使用一个更“正常”的 Chrome UA
   try {
-    const chromeUA =
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    const chromeUA = view.webContents.getUserAgent().replace(/\sElectron\/\S+/, '')
     view.webContents.setUserAgent(chromeUA)
   } catch (e) {
     // ignore

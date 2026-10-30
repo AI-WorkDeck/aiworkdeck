@@ -9,6 +9,30 @@ description: 授权与计费领域。任务涉及解锁门（试用码/账户 Ke
 
 POST ai-key发送 X-AWD-AI-Protocol:2。国内返回限权 awdai_ runtime token（不含百炼共享Key或awdk账户Key），baseUrl必须严格匹配当前账户站点 /api/account/ai/v1。server只加密保存runtime token及provider/baseUrl/defaultModel，awdk仍用完即弃。旧国内OpenRouter机器缓存丢弃重取；已有server用户需重新连接/刷新以换取国内runtime token，不允许退回机器额度。PlatformUsageAccountant对国内调用同站 /usage，读累计usageUsd作观测，不二次扣费；实际扣费在官网网关。国际仍OpenRouter /key。新账本不覆盖旧token_usage或余额。
 
+## 已确认的账户失效与本机会话恢复（dev-board#1623，2026-10-29）
+
+`account.json` 有 Key 不等于登录仍有效。`AccountService` 当前账户请求及 `PlatformGatewayClient`
+收到明确凭据拒绝后持久化 `authExpired:true`，`status/balance/trial` 回 `connected:false`，有效 Key、
+账户 ID、展示名、指纹出口均停止使用该身份。网络失败、团队角色不足、候选 Key/错误密码不作失效处理。
+请求先取连接代次再读 Key，拒绝时同时比较代次与 Key；成功 connect 清失效标志及旧缓存，旧请求
+不能覆盖新登录（含同 Key 重新验证）。原本 `refreshQuietly` 吞异常后仍报告 connected 的路径已修。
+
+桌面前端只凭后端 `authExpired` 判官网账户失效，广播同一 `awd:account-changed`，头像立即改为
+持续可见的过期登录入口，首次发现就地弹登录框；取消不恢复头像，后台状态不反复弹框，成功登录才恢复。
+启动工作台显式查 `getAccountStatus`，不把授权票据当登录；账户缓存与页面刷新均防旧回包覆盖新登录。
+供应商 runtime key 的 `UNAUTHORIZED` 先复核账户，不能直接判官网 Key 已撤销。
+
+`4010` / HTTP 401 是另一层本机会话：仅对当前本机 API、同一会话快照、默认认证头，清掉旧 Session
+后重试一次。无会话仍失败则显示可重试/关闭的工作区恢复对话框，关闭后自动提示冷却60秒；不放宽后端
+设备令牌优先级，不清官网账户、不跳页，换身份后的旧请求也不能重放。网络错误和一般403不重试。
+转写后台提交/轮询拒绝可只落字符串，甚至继续 TRANSCRIBING；因此共用 `getMeetingRecording` 在
+TRANSCRIBING/FAILED 时异步复核账户，覆盖内置面板、播放器和 voice 插件宿主桥，不重交付费转写。
+
+验证：`AccountSessionExpiryTest` 与账户/网关/转写7类144项；前端 `tests/account/*.test.mjs`、
+`tests/project-home/*.test.mjs`、`tests/messages/*.test.mjs`；`tests/account/session-expiry-ui.mjs`
+使用实际工作台、请求拦截器和登录卡及合成API，覆盖旧会话恢复、转写两个状态、取消、错误密码及重登。
+源码和合成API验证不等于Mac mini本次故障日志或正式客户端验收；未核实该机器为何收到首次拒绝。
+
 ## 设置账户状态（dev-board#1415，2026-10-21）
 
 `AdminPane` 的账户状态区分 loading / ready / error：只有成功取得明确的 `connected:false` 才显示登录入口；请求失败保留已确认身份并给重试，不当作退出登录。并发状态请求按代次接收，旧未连接回包不能盖过登录后的新状态。账户/钱包块必须显式按 connected 显示，不能用紧跟手机同步 `v-if=isDesktop` 的 `v-else`（这会在桌面隐藏整个账户块）。
@@ -515,7 +539,7 @@ identitySync、平台Key申请或令牌签发。完成 setup 后再单独 exchan
   （`isAccountLoginRetry(err)` 为真，message 换成「已登录，请再操作一次」），调用方自行决定要不要重试。
   **刻意不 resolve**：4011 意味着那次请求没执行，resolve 一个「成功」形状出去，不认识它的调用方会弹
   「安装成功」这类假成功。后台轮询这类不该打扰人的请求传 `accountPrompt:false`，直接 reject 不弹层。
-  **4010 分支一字未动**——4011 不清会话、不跳页。
+  **4011 不清会话、不跳页**；4010 桌面恢复现按上方 #1623 契约，浏览器仍回登录页。
 
 **登录成功 / 退出登录的广播只有一个出口** `broadcastAccountChanged(payload)`（`requireAccount.js`）：
 发 `awd:account-changed`（payload `{connected, previousAccountDiffers?, aiProviderFallback?}`）、
