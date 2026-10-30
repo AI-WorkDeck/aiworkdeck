@@ -290,7 +290,7 @@ function formattingReader(selectedShape) {
   }
   return new Function(...Object.keys(env),
     source('function shapeCharFormat(', '// Calc 当前活动工作表') + '\nreturn ({' +
-    source('  get_ui_state() {', '  // 段落样式清单') +
+    source('  get_ui_state(p = {}) {', '  // 段落样式清单') +
     source('  get_formatting(p) {', '  // [格式] 全文应用标准格式') + '});')(...Object.values(env))
 }
 

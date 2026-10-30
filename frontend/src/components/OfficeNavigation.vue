@@ -45,6 +45,8 @@ export default {
   },
   watch: {
     executor() {
+      clearTimeout(this._contentRefreshTimer)
+      this._contentRefreshTimer = null
       this._readSeq++
       this._activationSeq = (this._activationSeq || 0) + 1
       this._switching = false
@@ -70,7 +72,8 @@ export default {
         .filter(id => id != null)
       if (ids.length && ids.every(id => this.items.some(item => item.id === id))) ids.forEach(id => this.invalidateItem(id))
       else this.invalidateThumbnails()
-      this.scheduleRefresh()
+      if (this.kind === 'impress') this.scheduleContentRefresh()
+      else this.scheduleRefresh()
     },
     active(value) { if (value) this.scheduleRefresh() },
   },
@@ -86,6 +89,7 @@ export default {
     this._disposed = true
     this._readSeq++
     clearTimeout(this._refreshTimer)
+    clearTimeout(this._contentRefreshTimer)
     clearTimeout(this._thumbRetryTimer)
     this.clearThumbnails()
     window.removeEventListener('resize', this.loadVisibleThumbnails)
@@ -95,6 +99,21 @@ export default {
     scheduleRefresh() {
       clearTimeout(this._refreshTimer)
       if (this.active) this._refreshTimer = setTimeout(() => this.refresh(), 120)
+    },
+    scheduleContentRefresh() {
+      clearTimeout(this._contentRefreshTimer)
+      if (this.active) this._contentRefreshTimer = setTimeout(() => this.refreshContent(), 120)
+    },
+    refreshContent() {
+      this._contentRefreshTimer = null
+      if (!this.active || this._disposed) return
+      // Typing already invalidated its thumbnail. The document-wide manifest
+      // can wait for the same idle window as background thumbnail work.
+      if (this._refreshRunning || (this.canBackgroundWork && !this.canBackgroundWork())) {
+        this._contentRefreshTimer = setTimeout(() => this.refreshContent(), 250)
+        return
+      }
+      this.refresh()
     },
     invalidateThumbnails() {
       this._generation++
@@ -121,6 +140,10 @@ export default {
       if (!this.executor || !this.active || this._disposed) return
       const readSeq = ++this._readSeq
       const contentRevision = this._contentRevision || 0
+      // A structural/explicit read also covers preceding edits. Edits arriving
+      // after this snapshot schedule their own later read, retaining freshness.
+      clearTimeout(this._contentRefreshTimer)
+      this._contentRefreshTimer = null
       try {
         const result = await this.executor.executeCommand('office_get_navigation', {})
         if (readSeq !== this._readSeq || this._disposed) return

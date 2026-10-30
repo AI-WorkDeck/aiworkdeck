@@ -1364,6 +1364,9 @@ export default {
           this.inputError = String(msg.message || '')
         } else if (msg.type === 'modified') {
           this.onDocModified()
+        } else if (msg.type === 'structure-changed') {
+          if (this.ready && this.docKind === 'impress' && msg.documentSeq != null
+              && msg.documentSeq === this.$refs.toolbar?.state?.documentSeq) this.navigationStructureKey++
         } else if (msg.type === 'save-snapshot') {
           this.onSaveSnapshot(msg)
         } else if (msg.type === 'comment-request') {

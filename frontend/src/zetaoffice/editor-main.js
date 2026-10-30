@@ -238,6 +238,10 @@ function relayCommentRequest(documentSeq) {
 }
 function relayModified(d) {
   if (!d || !d.cmd) return
+  if (d.cmd === 'structure_changed') {
+    try { hostTransport.send({ __lo: 'lo-relay', type: 'structure-changed', documentSeq: d.documentSeq }) } catch (e) { /* ignore */ }
+    return
+  }
   if (d.cmd === 'save-snapshot') {
     // The first edit after this export must reach the host even if the previous
     // edit was within the ordinary 500 ms throttle window.
