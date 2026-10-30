@@ -7,6 +7,8 @@ import path from 'node:path'
 import http from 'node:http'
 import crypto from 'node:crypto'
 import { execFileSync } from 'node:child_process'
+import zhAccount from '../../src/locales/zh-CN/account.js'
+import enAccount from '../../src/locales/en-US/account.js'
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 async function until(read, label, timeout = 30000) {
@@ -80,9 +82,85 @@ finally { $graphics.Dispose(); $bitmap.Dispose() }`
     await page.focus(selector)
     await page.keyboard.press('Enter')
   }
+  const menuAction = (id, accelerator, checked = null) => mainRpc(`(()=>{
+    const menu=process.mainModule.require('electron').Menu.getApplicationMenu();
+    const all=[];const walk=m=>{for(const item of m.items){all.push(item);if(item.submenu)walk(item.submenu)}};walk(menu);
+    const byId=menu.getMenuItemById(${JSON.stringify(id)});
+    const matches=byId?[byId]:all.filter(item=>item.accelerator===${JSON.stringify(accelerator)});
+    if(matches.length!==1||!matches[0].enabled)throw Error('Expected one enabled native menu item');
+    const item=matches[0],desired=${JSON.stringify(checked)};
+    if(desired!==null&&item.type!=='checkbox')throw Error('Expected checkbox menu item');
+    const result={id:${JSON.stringify(id)},locatedBy:byId?'id':'unique accelerator',label:item.label,accelerator:item.accelerator,wasChecked:item.checked,clicked:desired===null||item.checked!==desired};
+    if(result.clicked)item.click();return result;
+  })()`)
+  const assertNoLogin = async () => {
+    // Let the renderer handle the completed response and paint its outcome.
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    assert.equal(await page.$('.awd-login-mask'), null, 'Passive settings/local actions must not open login')
+  }
+  const workLog = async () => {
+    const matches = []
+    for (const item of await page.$$('.page-admin .admin-sidebar .nav-item')) {
+      if (await item.isVisible() && [zhAccount.tabWorkLog, enAccount.tabWorkLog].includes(await item.evaluate(el => el.textContent.trim()))) matches.push(item)
+    }
+    assert.equal(matches.length, 1, 'Expected one visible Activity Log navigation item')
+    await matches[0].click()
+    await page.waitForSelector('.page-admin .panel-work-log', { visible: true })
+    await assertNoLogin()
+  }
   try {
     const dismiss = await page.$('.ocd-mask .ocd-actions .ocd-btn:not(.primary)')
     if (dismiss) await dismiss.click()
+    evidence.settings = { account: await page.evaluate(async () => {
+      const response = await fetch(window.checkbaDesktop.apiBaseUrl + '/api/account/status')
+      const body = await response.json()
+      return { status: response.status, connected: (body.data || body).connected }
+    }) }
+    assert.equal(evidence.settings.account.connected, false, 'Settings regression requires an anonymous local workspace')
+    const [catalog] = await Promise.all([
+      page.waitForResponse(response => new URL(response.url()).pathname === '/api/ai/models', { timeout: 30000 }),
+      menuAction('app.settings', 'CmdOrCtrl+,').then(menu => { evidence.settings.menu = menu }),
+    ])
+    const catalogBody = await catalog.json()
+    evidence.settings.catalog = { httpStatus: catalog.status(), businessCode: catalogBody.code ?? null }
+    await page.waitForSelector('.page-admin', { visible: true })
+    await assertNoLogin()
+    await capture('installed-settings-background-catalog')
+    await workLog()
+    await capture('installed-settings-work-log')
+    evidence.settings.aiPanelMenu = await menuAction('view.aiPanel', 'Alt+CmdOrCtrl+I', true)
+    const input = await until(async () => {
+      for (const el of await page.$$('.chat-input-rich')) if (await el.isVisible()) return el
+    }, 'visible AI input after settings')
+    await assertNoLogin()
+    const prompt = `Anonymous settings regression ${token}`
+    await input.click()
+    await input.type(prompt)
+    const send = await until(async () => {
+      for (const el of await page.$$('.send-btn:not(.disabled)')) if (await el.isVisible()) return el
+    }, 'enabled AI send button')
+    await send.click()
+    await page.waitForSelector('.awd-login-mask', { visible: true })
+    await capture('installed-settings-active-ai-login')
+    await page.click('.awd-login-close')
+    await page.waitForSelector('.awd-login-mask', { hidden: true })
+    assert.ok((await input.evaluate(el => el.textContent)).includes(prompt), 'Cancelling login preserves the AI draft')
+    await input.click()
+    await page.keyboard.down(process.platform === 'darwin' ? 'Meta' : 'Control')
+    await page.keyboard.press('KeyA')
+    await page.keyboard.up(process.platform === 'darwin' ? 'Meta' : 'Control')
+    await page.keyboard.press('Backspace')
+    await workLog()
+    const filters = await page.$$('.panel-work-log .filter-input input, .panel-work-log input.filter-input')
+    assert.equal(filters.length, 2)
+    await filters[1].click()
+    await filters[1].type(token)
+    assert.equal(await filters[1].evaluate(el => el.value), token, 'Local input remains usable after cancelling login')
+    await assertNoLogin()
+    await capture('installed-settings-login-cancelled')
+    if (evidence.settings.aiPanelMenu.clicked) await menuAction('view.aiPanel', 'Alt+CmdOrCtrl+I', false)
+    evidence.settings.passed = true
+    evidence.checks.push('Native Settings menu completed real model catalog request without login; Activity Log remains usable; explicit AI opens login and cancellation preserves local interaction')
     await page.evaluate(() => {
       window.__installedInteractionEvents = { clipboard: [], urls: [], newTabs: [] }
       const api = window.checkbaDesktop
