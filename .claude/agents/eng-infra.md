@@ -17,6 +17,8 @@ Electron 44 起最低 macOS **13 Ventura**，`build.mac.minimumSystemVersion` �
 
 四格式 macOS 源码验收：完成 H5、zetaoffice、LOWA 资源及后端 JAR 构建后，用 JDK 21 执行 `node frontend/tests/desktop-e2e/electron-upgrade.mjs`。可用 `AWD_BASELINE_ELECTRON` 指定旧版 Electron 可执行文件，只用于生成全新合成 profile；不传用户配置目录。脚本生成 Word/Excel/PPT/PDF、隔离并回读所有应用路径与 Java home/H2/storage/端口，实际 IME 输入后等待正常自动保存落盘再关闭重开。PDF 当前 FilePreview 为 Chromium iframe，查看/翻页须人工复核截图；不能把 source-hash 不变当成视觉通过，也不能将该测试称为 PDF 批注保存验证。CDP 虚拟 viewport 与原生 webview 坐标可不一致，保留原生窗口大小；只收到 ready 不算正文显示。签名原生升级另用全新托管用户的 full-upgrade 工作流。
 
+安装包云端回归：`.github/workflows/electron-cloud-regression.yml` 在全新 GitHub hosted macOS ARM64 / Windows x64 上运行同一四格式脚本（`AWD_TEST_INSTALLED=1`），通过候选构建 run/SHA/版本锁定并验签真实安装包，使用随包 JRE/JAR、H5 和 LOWA，不替换源码或签名包。`installed-electron-helper.mjs` 负责安装/身份/普通退出重开，`installed-desktop-interactions.mjs` 检查生产 BrowserView、下载、剪贴板采集及卡片、关于窗口。它会操作系统剪贴板，只能在一次性托管用户运行；证据根目录必须在 RUNNER_TEMP 内。四格式文件先正常自动保存再关闭重开，并再核对整应用重启后内容；PDF 截图仍需人工复核。CDP IME 合成输入不代表系统候选窗，DownloadItem.setSavePath 不代表原生文件选择框；硬件权限、macOS 13 最低系统及 Windows ARM64 单列未验证。工作流仅手动触发，必须明确输入被测安装包 run/SHA/版本；不以历史固定包的绿灯代表新 PR 产品已通过。
+
 ## CI（.github/workflows/）
 
 - **ci.yml**（push master + 所有 PR）：三并行 job——backend（temurin **21**，`mvn -B test`）、frontend（node 20，`check:emits` + `check:locales` + `check:nav:full` + `test:project-home` + `test:commands` + `build:h5`）、desktop（仅 `npm ci`）。不打安装包。

@@ -107,6 +107,8 @@ const mounts = new Set()
 async function ready(version) {
   const jar = fs.statSync(path.join(app, 'Contents/Resources/backend/app.jar'))
   await until(async () => (await api('/admin/wizard')).build === `${jar.size}-${Math.round(jar.mtimeMs)}`, 'bundled backend JAR identity', 240)
+  // Observe navigation from main before asking CDP to create a renderer context.
+  await until(() => main("process.mainModule.require('electron').BrowserWindow.getAllWindows().some(w=>/index\\.html/.test(w.webContents.getURL())&&!w.webContents.isLoadingMainFrame())"), 'native main document loaded', 180)
   await until(() => renderer('!!window.checkbaDesktop?.update && !!document.querySelector(".page-project-overview") && document.readyState === "complete"'), 'installed workbench renderer', 180)
   check((await renderer('window.checkbaDesktop.update.status()')).appVersion === version, `Running shell version ${version}`)
   const identity = await main(`({pid:process.pid,execPath:process.execPath,version:process.mainModule.require('electron').app.getVersion(),visible:process.mainModule.require('electron').BrowserWindow.getAllWindows().some(w=>w.isVisible())})`)
@@ -210,6 +212,30 @@ try {
 } finally {
   // Evidence first; only this disposable runner and owned child are eligible for cleanup.
   evidence.diagnosticErrors = []
+  evidence.cleanupErrors = []
+  evidence.cleanup = { startedAt: new Date().toISOString(), signals: [], children: {} }
+  const cleanupFailure = error => {
+    evidence.cleanupErrors.push(error.message)
+    evidence.result = 'FAIL'
+    process.exitCode = 1
+    console.error(error)
+  }
+  // Leave this unref'ed timer armed after cleanup: a lingering debugger socket
+  // must fail the standalone test, rather than keep the runner alive indefinitely.
+  setTimeout(() => {
+    cleanupFailure(Error('Cleanup deadline exceeded or resources remain after cleanup'))
+    evidence.cleanup.activeResources = process.getActiveResourcesInfo()
+    for (const [label, current] of [['app', child], ['feed', feed]]) {
+      if (current) evidence.cleanup.children[label] = { pid: current.pid, exitCode: current.exitCode, signalCode: current.signalCode }
+      if (current?.exitCode === null && current.signalCode === null) {
+        try { current.kill('SIGKILL') } catch (error) { cleanupFailure(error) }
+      }
+    }
+    try {
+      try { save('processes-after-cleanup.txt', run('/bin/ps', ['-axo', 'pid,ppid,command'], { timeout: 5000 })) } catch (error) { cleanupFailure(error) }
+      save('result.json', evidence)
+    } finally { process.exit(1) }
+  }, 300000).unref()
   if (evidence.result !== 'PASS') { try { await screenshot('failure') } catch (error) { evidence.diagnosticErrors.push(error.message) } }
   for (const [label, dir] of [['shipit', shipDir], ['desktop', path.join(dataDir, 'logs')]]) {
     try {
@@ -219,11 +245,29 @@ try {
       }
     } catch (error) { evidence.diagnosticErrors.push(error.message) }
   }
-  try { save('processes.txt', run('/bin/ps', ['-axo', 'pid,ppid,command'])) } catch (error) { evidence.diagnosticErrors.push(error.message) }
-  save('result.json', evidence)
+  try { save('processes.txt', run('/bin/ps', ['-axo', 'pid,ppid,command'], { timeout: 5000 })) } catch (error) { evidence.diagnosticErrors.push(error.message) }
+  save('result.json', evidence) // Preserve the original failure even if the runner cancels cleanup.
   if (child?.exitCode === null && child.signalCode === null) {
-    try { await quit() } catch { child.kill('SIGTERM') }
+    try { await quit() } catch (error) { cleanupFailure(error) }
   }
-  if (feed?.exitCode === null) feed.kill('SIGTERM')
-  for (const dir of mounts) { try { detach(dir) } catch { /* preserve original failure */ } }
+  for (const [label, current] of [['app', child], ['feed', feed]]) {
+    if (!current) continue
+    for (const signal of ['SIGTERM', 'SIGKILL']) {
+      if (current.exitCode !== null || current.signalCode !== null) break
+      if (label === 'app' || signal === 'SIGKILL') cleanupFailure(Error(`${label} requires ${signal} during failure cleanup`))
+      evidence.cleanup.signals.push({ label, pid: current.pid, signal })
+      try {
+        current.kill(signal)
+        await until(() => current.exitCode !== null || current.signalCode !== null, `${label} exit after ${signal}`, 15)
+      } catch (error) { cleanupFailure(error) }
+    }
+    evidence.cleanup.children[label] = { pid: current.pid, exitCode: current.exitCode, signalCode: current.signalCode }
+  }
+  for (const dir of mounts) {
+    try { run('/usr/bin/hdiutil', ['detach', dir], { timeout: 10000 }); mounts.delete(dir) } catch (error) { cleanupFailure(error) }
+  }
+  evidence.cleanup.completedAt = new Date().toISOString()
+  evidence.cleanup.activeResources = process.getActiveResourcesInfo()
+  try { save('processes-after-cleanup.txt', run('/bin/ps', ['-axo', 'pid,ppid,command'], { timeout: 5000 })) } catch (error) { evidence.diagnosticErrors.push(error.message) }
+  save('result.json', evidence)
 }
