@@ -231,6 +231,7 @@ try {
       assert.equal((await exec(ext, 'get_ui_state')).calc.cellName, 'B2')
     }
     if (ext === 'pptx') {
+      await frame.click('#qtcanvas')
       const info = await exec(ext, 'slide_get_page', { slideNumber: 1 })
       const shape = info.shapes.find(s => (s.text || '').includes('普通文本框内容'))
       assert.ok(shape, 'fixture text shape')
@@ -256,10 +257,10 @@ try {
     if (ext === 'xlsx') await frame.keyboard.press('Enter')
     if (ext === 'pptx') await frame.keyboard.press('Escape')
     write(`${ext}-input-after-confirm.json`, await inputState())
-    if (ext === 'xlsx') {
-      let cell = null
-      try { await until(async () => { cell = await exec(ext, 'sheet_read_range', { range: 'B2' }); return JSON.stringify(cell).includes(marker) }, 30000) }
-      finally { write('xlsx-model-after-input.json', cell) }
+    if (ext !== 'docx') {
+      let content = null
+      try { await until(async () => { content = ext === 'xlsx' ? await exec(ext, 'sheet_read_range', { range: 'B2' }) : await exec(ext, 'slide_get_page', { slideNumber: 1 }); return JSON.stringify(content).includes(marker) }, 30000) }
+      finally { write(`${ext}-model-after-input.json`, content) }
     }
     console.log(JSON.stringify({ stage: 'input', ext }))
     const started = Date.now()
