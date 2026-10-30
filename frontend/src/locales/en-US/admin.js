@@ -113,7 +113,7 @@ export default {
   inheritAux: 'Inherit auxiliary model',
   followBuiltIn: 'Follow built-in default',
   modelOption: '{name} ({vendor})',
-  modelPrice: ' · ${in}/${out} per 1M tokens',
+  modelPrice: ' · {currency}{in}/{currency}{out} per 1M tokens',
   tieredSuffix: ' · Tiered pricing',
   noVisionSuffix: ' · No image input (images processed via OCR)',
   modelUnavailableInRegion: '{model} (unavailable in the current network region)',

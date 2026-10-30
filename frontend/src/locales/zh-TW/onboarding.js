@@ -89,7 +89,7 @@ export default {
     "crossBorderLabel": "單獨同意：將送入 AI 的內容跨境傳輸至境外模型服務商處理",
     "crossBorderView": "查看告知",
     "crossBorderNoticeTitle": "向境外提供個人信息的單獨同意",
-    "crossBorderNoticeBody": "「AI WorkDeck 雲端」會把你送入 AI 的內容（文本與相關文件片段）發送至 OpenRouter, Inc.（美國）處理，用於模型推理與用量計費，這屬於向境外提供個人信息。進入產品後可隨時在「設置 → AI 功能設置」撤回同意，撤回後雲端通道不再可用。",
+    "crossBorderNoticeBody": "國內站透過 AI WorkDeck 伺服器接入阿里雲百煉，國際站使用 OpenRouter。提交給 AI 的文字與相關檔案片段用於模型推論和計費；所選模型可能在境外處理這些內容。你可以在設定中撤回同意，撤回後平台 AI 通道停用。",
     "agreementRequired": "需勾選同意《服務條款》與《隱私政策》後繼續",
     "crossBorderRequired": "需勾選跨境傳輸的單獨同意後繼續",
     "switchSiteTitle": "切換站點",

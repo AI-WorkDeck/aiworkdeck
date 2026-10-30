@@ -22,13 +22,9 @@ import java.util.Base64;
 /**
  * 语音听写（dev-board#153，Office 插件麦克风输入）。
  *
- * <h3>为什么走 OpenRouter 音频多模态而不是网关 asr</h3>
- * 网关 asr 是会议级离线链路（OSS 直传 + 听悟异步任务，分钟级延迟），听写等不起。
- * 而云后端已经为每个已桥接用户握着一把 per-user OpenRouter runtime key
- * （{@link PlatformAiChannel}），音频丢给收音频输入的模型转写：
- * 秒级返回、按用户自己的 Credits 计费（key 额度由官网签发时按人闸住）、
- * 不新增任何凭据设施——这正是地雷 24「server 没有可打网关的用户凭据」的合法绕行：
- * 听写不打网关，打的是已有 per-user 凭据的 AI 通道。
+ * <h3>按账户站点选择平台通道</h3>
+ * 国内使用受限平台凭据经官网调用百炼音频模型，国际保留 OpenRouter。
+ * 服务端按请求用户解析凭据与额度，不保存全账户 awdk，也不回退至个人 BYOK。
  *
  * <h3>音频契约</h3>
  * 客户端上送 16kHz 单声道 WAV 的 base64（OpenRouter 的 input_audio 只收 wav/mp3；
@@ -168,8 +164,11 @@ public class VoiceDictationService {
 
         if (capture) usageAccountant.ensureBaselineAsync(userId);
         ObjectNode body = objectMapper.createObjectNode();
-        body.put("model", dictationModel);
+        String effectiveModel = resolved.bailian() ? "qwen3.8-omni-flash" : dictationModel;
+        body.put("model", effectiveModel);
         if (maxOutputTokens != null) body.put("max_tokens", maxOutputTokens);
+        else if (resolved.bailian()) body.put("max_tokens", 4096);
+        if (resolved.bailian()) body.put("enable_thinking", false);
         ArrayNode messages = body.putArray("messages");
         ObjectNode msg = messages.addObject();
         msg.put("role", "user");
@@ -186,10 +185,11 @@ public class VoiceDictationService {
         HttpRequest request;
         try {
             request = HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + "/chat/completions"))
+                    .uri(URI.create((resolved.bailian() ? resolved.baseUrl() : baseUrl) + "/chat/completions"))
                     .timeout(Duration.ofNanos(Math.max(1, timeout.toNanos() - (System.nanoTime() - started))))
                     .header("Authorization", "Bearer " + resolved.apiKey())
                     .header("Content-Type", "application/json")
+                    .header("X-Request-Id", java.util.UUID.randomUUID().toString())
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
                     .build();
         } catch (Exception e) {
@@ -208,7 +208,7 @@ public class VoiceDictationService {
 
         if (response.statusCode() == 401 || response.statusCode() == 403) {
             // 与 AI 通道同口径：上游明确拒绝 = key 已吊销，立即作废本地缓存
-            platformAiChannel.onKeyRejected(userId);
+            platformAiChannel.onKeyRejected(userId, resolved.fingerprint());
             throw new com.checkba.service.account.AccountException(
                     com.checkba.service.account.AccountException.Kind.UNAUTHORIZED, LangText.of(
                     "账户登录已失效，请重新登录", "Your account session has expired. Please sign in again"));
@@ -237,13 +237,13 @@ public class VoiceDictationService {
                 text = text.substring(1, text.length() - 1).trim();
             }
             text = scrubPromptEcho(text);
-            platformAiChannel.onKeyVerified(userId);
+            platformAiChannel.onKeyVerified(userId, resolved.fingerprint());
             JsonNode tokens = root.path("usage");
             dev.langchain4j.model.output.TokenUsage tokenUsage = tokens.path("prompt_tokens").canConvertToInt()
                     && tokens.path("completion_tokens").canConvertToInt()
                     ? new dev.langchain4j.model.output.TokenUsage(Math.max(0, tokens.path("prompt_tokens").asInt()),
                             Math.max(0, tokens.path("completion_tokens").asInt())) : null;
-            return new SampleDictation(text, dictationModel, tokenUsage);
+            return new SampleDictation(text, effectiveModel, tokenUsage);
         } catch (Exception e) {
             throw new IllegalStateException(LangText.of("听写响应无法解析", "Dictation response could not be parsed"));
         }

@@ -36,6 +36,8 @@ public class ConversationIssuanceController {
 
     private final ConversationIssuanceService conversationIssuanceService;
     private final ProjectMemberService projectMemberService;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.service.ProjectAiMessageService messageService;
 
     @PostMapping
     public ResponseEntity<Map<String, String>> issue(@RequestBody IssueRequest request,
@@ -48,12 +50,28 @@ public class ConversationIssuanceController {
         if (projectId == null || !projectMemberService.hasReadPermission(projectId, userId)) {
             return ResponseEntity.status(403).body(Map.of("error", LangText.of("无权访问该项目", "You do not have access to this project")));
         }
-        String conversationId = conversationIssuanceService.issue(userId, projectId);
+        String scope;
+        try {
+            scope = ConversationIssuanceService.normalizeScope(request.getConversationScope());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+        if (request.getConversationId() != null) {
+            if (!messageService.adoptConversationScope(request.getConversationId(), userId, projectId, scope)) {
+                return ResponseEntity.status(403).body(Map.of("error", LangText.of(
+                        "无法将此会话归入诉讼可视化", "This conversation cannot be assigned to Litigation Visualization")));
+            }
+            return ResponseEntity.ok(Map.of("conversationId", request.getConversationId()));
+        }
+        String conversationId = scope == null ? conversationIssuanceService.issue(userId, projectId)
+                : conversationIssuanceService.issue(userId, projectId, scope);
         return ResponseEntity.ok(Map.of("conversationId", conversationId));
     }
 
     @Data
     public static class IssueRequest {
         private Long projectId;
+        private String conversationScope;
+        private String conversationId;
     }
 }

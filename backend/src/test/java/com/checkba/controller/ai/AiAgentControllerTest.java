@@ -83,6 +83,30 @@ class AiAgentControllerTest {
     }
 
     @Test
+    void dedicatedConversationRejectsGenericSendAndConnectBeforeReplacingStream() {
+        var req = new AiAgentController.AgentChatRequest();
+        req.setProjectId(42L); req.setConversationId("litigation"); req.setMessage("answer");
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(true);
+            when(messageService.canUseConversation("litigation", 7L)).thenReturn(true);
+            when(messageService.conversationScopeOf("litigation")).thenReturn("litigation-visual");
+            assertEquals(409, controller.startSession(req, "s", null).getStatusCode().value());
+            assertEquals(409, controller.connect("litigation", "s", null, null,
+                    new org.springframework.mock.web.MockHttpServletResponse()).getStatusCode().value());
+            org.mockito.Mockito.verifyNoInteractions(sse, inboxService, agentOrchestrator, chatModelFactory);
+            req.setConversationScope("litigation-visual");
+            var item = new com.checkba.model.entity.AgentInboxItem(); item.setId("scoped-item");
+            when(inboxService.submit(req, 7L)).thenReturn(item);
+            assertEquals(200, controller.startSession(req, "s", null).getStatusCode().value());
+            assertEquals(200, controller.connect("litigation", "s", null, null,
+                    new org.springframework.mock.web.MockHttpServletResponse(), "litigation-visual").getStatusCode().value());
+            verify(sse).createConnection("litigation", null, null);
+            verify(inboxService).submit(req, 7L);
+        }
+    }
+
+    @Test
     void cacheMissRejectsBeforeInboxOrModelAndFullRetryIsAcceptedOnce() {
         var cache = new com.checkba.service.ai.InlineContentCache();
         org.springframework.test.util.ReflectionTestUtils.setField(controller, "inlineContentCache", cache);

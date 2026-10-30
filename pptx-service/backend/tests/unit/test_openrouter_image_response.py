@@ -96,3 +96,24 @@ def test_upstream_exception_body_is_not_in_formatted_traceback():
         assert 'Image generation failed: RuntimeError' in rendered
     else:
         pytest.fail('expected sanitized failure')
+
+
+def test_domestic_platform_uses_image_config_and_inline_results_only():
+    cls, scope = provider_type()
+    provider = cls('awdai_synthetic', 'https://www.aiworkdeck.com/api/account/ai/v1', 'qwen-image-3.0')
+    provider.client.chat.completions.create.return_value = fixture_response()
+    image = provider.generate_image('a synthetic slide', [Image.new('RGB', (3, 2), 'blue')])
+    assert image.size == (3, 2)
+    call = provider.client.chat.completions.create.call_args.kwargs
+    assert call['model'] == 'qwen-image-3.0'
+    assert call['extra_body'] == {'image_config': {'aspect_ratio': '16:9', 'image_size': '2K'}}
+    assert call['messages'][1]['content'][0]['image_url']['url'].startswith('data:image/jpeg;base64,')
+    scope['requests'].get.assert_not_called()
+    assert scope['OpenAI'].call_args.kwargs['max_retries'] == 0
+    response = fixture_response()
+    response['choices'][0]['message']['images'] = []
+    response['choices'][0]['message']['content'] = '![image](http://127.0.0.1/private.png)'
+    provider.client.chat.completions.create.return_value = response
+    with pytest.raises(Exception):
+        provider.generate_image('a synthetic slide')
+    scope['requests'].get.assert_not_called()

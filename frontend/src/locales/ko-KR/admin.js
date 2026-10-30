@@ -100,7 +100,7 @@ export default {
   "inheritAux": "보조 모델 상속",
   "followBuiltIn": "내장 기본값 따르기",
   "modelOption": "{name} ({vendor})",
-  "modelPrice": " · 100만 토큰당 ${in}/${out}",
+  "modelPrice": " · 100만 토큰당 {currency}{in}/{currency}{out}",
   "tieredSuffix": " · 단계별 요금",
   "noVisionSuffix": " · 이미지 입력 불가 (이미지는 OCR로 처리)",
   "modelUnavailableInRegion": "{model} (현재 네트워크 지역에서 사용 불가)",

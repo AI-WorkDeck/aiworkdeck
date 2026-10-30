@@ -100,7 +100,7 @@ export default {
   "inheritAux": "Κληρονόμηση βοηθητικού μοντέλου",
   "followBuiltIn": "Χρήση ενσωματωμένης προεπιλογής",
   "modelOption": "{name} ({vendor})",
-  "modelPrice": " · ${in}/${out} ανά 1M tokens",
+  "modelPrice": " · {currency}{in}/{currency}{out} ανά 1M tokens",
   "tieredSuffix": " · Κλιμακωτή τιμολόγηση",
   "noVisionSuffix": " · Χωρίς εισαγωγή εικόνων (οι εικόνες επεξεργάζονται μέσω OCR)",
   "modelUnavailableInRegion": "{model} (μη διαθέσιμο στην τρέχουσα περιοχή δικτύου)",

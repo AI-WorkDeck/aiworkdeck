@@ -127,6 +127,7 @@ export function useAgentStream() {
     const tokenUsage = ref({ promptTokens: 0, completionTokens: 0, totalTokens: 0 })
 
     // STATE: File Changes Tracking (Current Turn)
+    let conversationScope = null
     const fileChanges = ref([]) // Array of { fileName, changeType, fileId? }
 
     // STATE: Background task tracking for long-running operations
@@ -611,7 +612,7 @@ export function useAgentStream() {
         // 只允许作用于"自己还是当前连接"的情况，否则会把新连接的状态清掉（切换会话竞态）
         const myController = sseAbortController
         const baseUrl = getApiBaseUrl()
-        const url = `${baseUrl}/api/agent/connect/${conversationId}`
+        const url = `${baseUrl}/api/agent/connect/${conversationId}${conversationScope ? '?conversationScope=' + encodeURIComponent(conversationScope) : ''}`
         const sessionId = getSessionId()
 
         return new Promise(async (resolve, reject) => {
@@ -940,6 +941,7 @@ export function useAgentStream() {
             const payload = {
                 projectId: typeof projectId === 'string' ? parseInt(projectId) : projectId,
                 conversationId,
+                ...(conversationScope ? { conversationScope } : {}),
                 message: prompt,
                 // 只有真给了才带字段：null/缺省在后端就是 displayContent 为空、回退 content
                 displayText: displayText || null,
@@ -2902,6 +2904,7 @@ export function useAgentStream() {
         sendMessage,
         abort,
         setConversationId: setConversationIdWithReset,
+        setConversationScope: value => { conversationScope = value || null },
         resetSSE,
         clearBubbles,
         parseAssistantHistory,

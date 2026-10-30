@@ -396,6 +396,56 @@ class AgentOrchestratorFileChangeTargetTest {
         verify(checkpointService).ensureCheckpoint("conv-not-created-active", 42L);
     }
 
+    @ToolMeta(displayName = "Generate litigation diagram", category = "litigation-visual",
+            fileEffect = "ADDED", fileArg = "diagramName", refreshFiles = true)
+    public void fakeLitigationRender() {}
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"litigation_render", "litigation_timeline_render"})
+    void litigationWithoutVerifiedFilesCannotReportAnAddedPlaceholder(String toolName) throws Exception {
+        when(toolRegistry.execute(any(), any(), any())).thenReturn(new ToolRegistry.ToolResult(
+                "出图被拦下：尚未完成确认。", tool("fakeLitigationRender", toolName), true));
+        run("conv-litigation-unverified", null, null, call(toolName, "{}"), AiMessage.from("请先确认"));
+        assertTrue(eventDataAll("file_change").isEmpty(), "No current-document placeholder may be created");
+        org.mockito.Mockito.verifyNoInteractions(fileChangeService);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"litigation_render", "litigation_timeline_render"})
+    void litigationNameAloneCannotReportANewFile(String toolName) throws Exception {
+        when(toolRegistry.execute(any(), any(), any())).thenReturn(new ToolRegistry.ToolResult(
+                "{\"status\":\"success\",\"files\":[]}", tool("fakeLitigationRender", toolName), true));
+        run("conv-litigation-name", "42", "reference.docx",
+                call(toolName, "{\"diagramName\":\"Timeline\"}"), AiMessage.from("完成"));
+        assertTrue(eventDataAll("file_change").isEmpty(), "A diagram name is not a registered project file");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"litigation_render", "litigation_timeline_render"})
+    void litigationReportsEveryVerifiedArtifactByItsRealIdentity(String toolName) throws Exception {
+        var files = new ArrayList<com.checkba.model.entity.ProjectFile>();
+        for (int index = 0; index < 3; index++) {
+            var file = new com.checkba.model.entity.ProjectFile();
+            file.setId(99L + index); file.setProjectId(1L);
+            file.setName("Timeline (1)." + List.of("drawio", "svg", "png").get(index));
+            files.add(file);
+            when(projectFileService.findFile(file.getId())).thenReturn(java.util.Optional.of(file));
+        }
+        when(toolRegistry.execute(any(), any(), any())).thenReturn(new ToolRegistry.ToolResult(
+                com.checkba.service.ai.tools.GeneratedFileLocation.createdResults(files, "Saved"),
+                tool("fakeLitigationRender", toolName), true));
+        run("conv-litigation-files", null, null,
+                call(toolName, "{\"diagramName\":\"Timeline\"}"), AiMessage.from("完成"));
+        var changes = eventDataAll("file_change");
+        assertEquals(3, changes.size());
+        for (int index = 0; index < 3; index++) {
+            var change = json(changes.get(index));
+            assertEquals(files.get(index).getId(), change.path("fileId").asLong());
+            assertEquals(files.get(index).getName(), change.path("fileName").asText());
+            assertEquals("ADDED", change.path("changeType").asText());
+        }
+    }
+
     @ToolMeta(displayName = "导出 PDF", category = "files", refreshFiles = true)
     public void fakePdfExport() {}
 

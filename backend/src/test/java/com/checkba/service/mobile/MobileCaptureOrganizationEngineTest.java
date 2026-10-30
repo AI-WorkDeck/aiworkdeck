@@ -253,15 +253,16 @@ class MobileCaptureOrganizationEngineTest {
         var accountant=mock(PlatformUsageAccountant.class);var auxiliary=mock(AuxModelResolver.class);
         var factory=new ChatModelFactory(properties,settings,channel,credits,accountant,auxiliary,mock(TelemetryService.class));
         when(auxiliary.auxModelId()).thenReturn(AllowedModels.QWEN_3_7_FLASH.getModelId());
-        when(channel.apiKey()).thenAnswer(call->{assertEquals(42L,PlatformAiUserScope.current());return "test-platform-key";});
+        when(channel.connection()).thenAnswer(call->{assertEquals(42L,PlatformAiUserScope.current());
+            return new com.checkba.service.ai.PlatformAiKeyService.Resolved("test-platform-key", "test-snapshot", null);});
         assertThrows(RuntimeException.class,()->factory.getPlatformAuxChatModel(Duration.ofSeconds(2),700,true));
         var selected=PlatformAiUserScope.call(42L,()->factory.getPlatformAuxChatModel(Duration.ofSeconds(2),700,true));
         assertEquals(AllowedModels.QWEN_3_7_FLASH.getModelId(),selected.modelId());
         assertEquals(selected.modelId(),((OpenAiChatModel)selected.model()).modelName());
-        verify(credits).ensureCredits(42L);verify(channel).apiKey();
+        verify(credits).ensureCredits(42L);verify(channel).connection();
         when(auxiliary.auxModelId()).thenReturn("deepseek/deepseek-v4-flash");
         assertThrows(RuntimeException.class,()->PlatformAiUserScope.call(42L,()->factory.getPlatformAuxChatModel(Duration.ofSeconds(2),700,true)));
-        verify(channel,times(1)).apiKey();
+        verify(channel,times(2)).connection();verify(channel,never()).apiKey();
         when(channel.usesMachineKey(43L)).thenReturn(true);
         assertThrows(RuntimeException.class,()->PlatformAiUserScope.call(43L,()->factory.getPlatformAuxChatModel(Duration.ofSeconds(2),700,false)));
     }
