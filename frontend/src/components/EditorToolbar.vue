@@ -1259,6 +1259,7 @@ export default {
     },
     impressState() { return (this.state && this.state.impress) || {} },
     impressShape() {
+      if (this.state.scope === 'selection') return this.impressState.selectedShape || null
       const shapes = (this.impressState && this.impressState.shapes) || []
       if (this.selectedShapeIndexOverride != null) {
         const hit = shapes.find((s) => s.index === this.selectedShapeIndexOverride)
@@ -1346,7 +1347,7 @@ export default {
   },
   watch: {
     executor: { handler() { this.disposeSlideshow(); this.bootstrap() }, immediate: true },
-    refreshKey() { this.refresh() },
+    refreshKey() { this.refresh(!this.menu.startsWith('impress')) },
     docKind() {
       this.disposeSlideshow()
       this.closeMenus()
@@ -1513,30 +1514,45 @@ export default {
       return !this._toolbarDisposed && owner === this._uiRefreshOwner
         && owner.executor === this.executor && owner.docKind === this.docKind
     },
-    refresh() {
+    refresh(selectionOnly = false) {
       if (this._toolbarDisposed) return Promise.resolve()
       const owner = this.uiRefreshOwner()
+      if (!selectionOnly) owner.fullPending = true
       if (owner.queued) return owner.queued
       if (owner.flight) {
         // A caller after a write must wait for a read started after its request.
         // Coalesce only the trailing requests, never return the older in-flight state.
         const next = () => {
           owner.queued = null
-          if (this.uiRefreshCurrent(owner)) return this.refresh()
+          if (this.uiRefreshCurrent(owner)) return this.refresh(true)
         }
         return (owner.queued = owner.flight.then(next, next))
       }
-      const flight = this.readUiState(owner).finally(() => {
+      const lightweight = this.docKind === 'impress' && !owner.fullPending
+      owner.fullPending = false
+      const flight = this.readUiState(owner, lightweight).finally(() => {
         if (owner.flight === flight) owner.flight = null
       })
       owner.flight = flight
       return flight
     },
-    async readUiState(owner) {
-      const r = await this.call('get_ui_state', {})
+    async readUiState(owner, lightweight = false) {
+      const r = await this.call('get_ui_state', lightweight ? { scope: 'selection' } : {})
       if (!this.uiRefreshCurrent(owner)) return
       if (r && r.success) {
-        this.state = r
+        const partial = r.scope === 'selection' && r.impress
+        const previous = this.state.impress
+        const samePage = partial && previous && this.state.documentSeq === r.documentSeq
+          && previous.slideNumber === r.impress.slideNumber
+        // A caret update must not enumerate the slide or erase the menu snapshot.
+        // On a different page, discard the old snapshot before requesting details.
+        this.state = partial
+          ? { ...r, impress: { ...(samePage ? previous : {}), ...r.impress } }
+          : r
+        if (partial) this.selectedShapeIndexOverride = null
+        if (partial && !samePage) {
+          void this.refresh()
+        }
         if (r.calc) {
           if (!this.calcAddressFocused) this.calcAddressInput = r.calc.address || 'A1'
           if (!this.calcFormulaFocused) this.calcFormulaInput = r.calc.formula != null ? String(r.calc.formula) : ''
@@ -1544,12 +1560,12 @@ export default {
           if (r.calc.colWidthPt > 0) this.calcSizeForm.colWidthPt = r.calc.colWidthPt
         }
         if (r.impress) {
-          if (!this.impressNotesFocused) this.impressNotesInput = r.impress.notesText != null ? String(r.impress.notesText) : ''
+          if (!this.impressNotesFocused && !partial) this.impressNotesInput = r.impress.notesText != null ? String(r.impress.notesText) : ''
           const shapes = Array.isArray(r.impress.shapes) ? r.impress.shapes : []
           const overrideHit = this.selectedShapeIndexOverride != null
             ? shapes.find((s) => s.index === this.selectedShapeIndexOverride)
             : null
-          const sh = overrideHit || r.impress.selectedShape || shapes[0]
+          const sh = partial ? r.impress.selectedShape : overrideHit || r.impress.selectedShape || shapes[0]
           if (sh) {
             this.shapeGeomForm = {
               left: sh.left != null ? sh.left : 50,
@@ -1565,7 +1581,7 @@ export default {
       }
       // 激活态变了要通知宿主：菜单栏的「修订模式」勾选读的就是这里的
       // state.view.recordChanges，不广播的话菜单会停在上一次的状态。
-      this.$emit('ui-state', r)
+      this.$emit('ui-state', r && r.success ? this.state : r)
     },
     // 命令跑完必须刷新两件事：工具栏自己的激活态，以及宿主的自动保存（改了文档）
     async after(res, changed) {
