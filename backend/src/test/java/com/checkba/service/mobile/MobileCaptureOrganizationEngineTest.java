@@ -88,6 +88,26 @@ class MobileCaptureOrganizationEngineTest {
                 "capture.jpg","image",captured,null,"image");
         assertEquals("现场照片_仓库门口_2026-10-30_10-11-12.jpg",field.fileName());
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"field_photo", "field_video", "field_audio", "note", "other"})
+    void fieldCapturesWithoutAClearCleanTopicRetainOriginalName(String type) throws Exception {
+        String media = "field_audio".equals(type) ? "audio" : "image";
+        var data = new LinkedHashMap<String,Object>();
+        data.put("type", type); data.put("needsReview", false);
+        for (String description : List.of("", "   ", "6222021234567890123")) {
+            data.put("description", description);
+            var result = engine.parse(json.writeValueAsString(data), "original.wav", media, captured, null, "sample");
+            assertEquals("needs_review", result.state());
+            assertEquals("original.wav", result.fileName());
+            assertTrue(result.tags().isEmpty());
+        }
+        data.remove("description");
+        assertEquals("needs_review", engine.parse(json.writeValueAsString(data), "original.wav", media, captured, null, "sample").state());
+        data.put("description", "仓库盘点");
+        var clear = engine.parse(json.writeValueAsString(data), "original.wav", media, captured, null, "sample");
+        assertEquals("ready", clear.state());
+        assertTrue(clear.fileName().contains("_仓库盘点_2026-10-30_10-11-12.wav"));
+    }
     @Test void uncertainOrUncorroboratedNumbersRetainOriginalName() throws Exception {
         String input="{\"type\":\"contract\",\"identifier\":\"CN-44\",\"identifierKind\":\"contract_number\","
                 +"\"identifierLabel\":\"合同编号\",\"identifierCertain\":true,\"needsReview\":false}";
@@ -139,7 +159,7 @@ class MobileCaptureOrganizationEngineTest {
         when(model.generate(anyList())).thenAnswer(call->{
             List<ChatMessage> messages=call.getArgument(0);
             var user=(UserMessage)messages.get(1);assertTrue(user.contents().stream().anyMatch(ImageContent.class::isInstance));
-            return Response.from(AiMessage.from(extraction("field_photo","")));
+            return Response.from(AiMessage.from(json.writeValueAsString(Map.of("type","field_photo","description","仓库门口","needsReview",false))));
         });
         assertEquals("ready",engine.analyze(1L,new MockMultipartFile("file",out.toByteArray()),"capture.jpg","image",captured).state());
         clearInvocations(models);
@@ -175,7 +195,7 @@ class MobileCaptureOrganizationEngineTest {
                 List<ChatMessage> messages=call.getArgument(0);
                 var user=(UserMessage)messages.get(1);
                 assertEquals(3,user.contents().stream().filter(ImageContent.class::isInstance).count());
-                return Response.from(AiMessage.from(extraction("field_video","")));
+                return Response.from(AiMessage.from(json.writeValueAsString(Map.of("type","field_video","description","仓库巡查","needsReview",false))));
             });
             var result=engine.analyze(1L,new MockMultipartFile("file",java.nio.file.Files.readAllBytes(video)),"clip.mp4","video",captured);
             assertEquals("ready",result.state());assertEquals("sampled_frames:3",result.fields().get("coverage"));
