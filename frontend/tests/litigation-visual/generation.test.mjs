@@ -129,6 +129,8 @@ test('legacy checkpoint prose recovers the original confirmation block without i
   assert.equal(waiting.phase, 'waiting')
   assert.equal(waiting.question.text, '1. 确认结构？\n2. 选择风格？\n3. 是否强调？')
   assert.doesNotMatch(waiting.question.text, /AI|内部工具/)
+  assert.ok(waiting.messages.some(message => message.content.includes(waiting.question.text)))
+  assert.ok(waiting.messages.every(message => !message.content.includes('调用内部工具继续')))
   assert.equal(f.posts.length, 1, 'no automatic confirmation is submitted')
 })
 
@@ -347,6 +349,7 @@ test('approval shows the implementation plan and only continues after an explici
   const waiting = await f.generation.observe()
   assert.equal(waiting.phase, 'waiting')
   assert.equal(waiting.question.text, '1. 核对材料\n2. 生成关系图')
+  assert.ok(waiting.messages.some(message => message.content.includes(waiting.question.text)))
   assert.equal(f.posts.length, 1, 'no automatic approval is submitted')
   await f.generation.request('answer', { taskId: waiting.taskId, questionKey: waiting.question.key, answer: { selected: [], other: '按此计划继续' } })
   await flush()
