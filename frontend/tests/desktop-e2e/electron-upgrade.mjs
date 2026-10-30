@@ -231,7 +231,10 @@ try {
     page = await until(async () => (await browser.pages()).find(p => p.url().includes('/h5/index.html')), 60000)
     await page.waitForFunction(() => !!window.__checkbaActiveOverviewVm, { timeout: 120000 })
     await installed.mainRpc(`(()=>{const w=process.mainModule.require('electron').BrowserWindow.getAllWindows().find(w=>w.isVisible());w.setContentSize(1440,1000);w.focus();return true})()`)
-    page.on('pageerror', error => { evidence.pageErrors ||= []; evidence.pageErrors.push(error.message) })
+    page.on('pageerror', error => {
+      evidence.pageErrors ||= []; evidence.pageErrors.push(error.message)
+      evidence.pageErrorDetails ||= []; evidence.pageErrorDetails.push({ message: error.message, stack: error.stack })
+    })
     // Dismiss the actual optional-pack dialog via its close button, not a hidden VM flag.
     const dismiss = await page.$('.ocd-mask .ocd-actions .ocd-btn:not(.primary)')
     if (dismiss) await dismiss.click()
@@ -354,6 +357,7 @@ try {
     evidence.restartPreferenceRetained = true
   }
   await quit()
+  if (installedMode) assert.deepEqual(evidence.pageErrors || [], [], 'Installed shell must have no unhandled page errors')
   evidence.passed = true
 } catch (error) {
   evidence.error = error.stack
