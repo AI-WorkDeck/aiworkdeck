@@ -142,8 +142,30 @@ app.whenReady().then(async () => {
     view.webContents.goForward()
     await loaded
     assert.equal(await view.webContents.executeJavaScript('document.querySelector("h1").textContent'), 'Second page')
+    // A completed navigation does not guarantee that Viz has drawn its surface.
+    // Observe a new fixture frame before exercising the separate capturePage path.
+    const hasFrameMarker = image => {
+      if (image.isEmpty()) return false
+      const marker = image.crop({ x: 8, y: 8, width: 1, height: 1 }).toBitmap()
+      const background = image.crop({ x: 80, y: 8, width: 1, height: 1 }).toBitmap()
+      return marker.equals(Buffer.from([0, 0, 0, 255])) && background.length === 4 &&
+        background[1] > background[0] && background[1] > background[2] && background[3] === 255
+    }
+    let frameDeadline
+    try {
+      await new Promise((resolve, reject) => {
+        frameDeadline = setTimeout(() => reject(new Error('BrowserView fixture frame was not drawn')), 10000)
+        view.webContents.beginFrameSubscription(false, image => { if (hasFrameMarker(image)) resolve() })
+        view.webContents.executeJavaScript(`(()=>{const marker=document.createElement('div');marker.style.cssText='position:fixed;left:0;top:0;width:24px;height:24px;background:black;z-index:2147483647';document.body.append(marker)})()`).catch(reject)
+      })
+      evidence.browserViewFrameObserved = true
+    } finally {
+      clearTimeout(frameDeadline)
+      view.webContents.endFrameSubscription()
+    }
     const screenshot = await view.webContents.capturePage()
     assert.equal(screenshot.isEmpty(), false)
+    assert.ok(hasFrameMarker(screenshot), 'capturePage must include the newly drawn fixture marker and page background')
     fs.writeFileSync(path.join(root, 'browser-view.png'), screenshot.toPNG())
     mark('production BrowserView registry attach, hide, restore, retained state and history')
 
