@@ -165,7 +165,7 @@ export default {
     "senior": "Avvocato senior",
     "salaried-partner": "Socio salariato",
     "equity-partner": "Socio di capitale",
-    "managing-partner": "Managing Partner",
+    "managing-partner": "Socio gerente",
     "silver": "Membro Argento"
   },
   "rechargeTitle": "Ricarica conto",

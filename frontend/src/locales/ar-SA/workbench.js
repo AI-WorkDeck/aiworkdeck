@@ -338,7 +338,7 @@ export default {
     "chatTitle": "محادثة",
     "scratchTitle": "مساحة عمل سريعة",
     "scratchBadge": "مساحة عمل سريعة",
-    "promoteAction": "Convert to project ↗",
+    "promoteAction": "تحويل إلى مشروع رسمي",
     "promoteTitle": "تحويل إلى مشروع رسمي",
     "promotePlaceholder": "أدخل اسم المشروع",
     "promoteSuccess": "تم التحويل إلى مشروع رسمي",

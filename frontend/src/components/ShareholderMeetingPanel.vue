@@ -121,11 +121,11 @@ import FilePickerDialog from '@/components/FilePickerDialog.vue'
 import { t } from '@/i18n'
 
 const SLOT_DEFS = [
-  { key: 'notice', label: t('panels.smSlotNotice'), field: 'noticeFileId', multi: false, optional: false, accept: ['pdf', 'docx', 'doc'] },
-  { key: 'resolution', label: t('panels.smSlotResolution'), field: 'resolutionFileId', multi: false, optional: false, accept: ['pdf', 'docx', 'doc'] },
-  { key: 'voteResult', label: t('panels.smSlotVoteResult'), field: 'voteResultFileIds', multi: true, optional: false, accept: ['xlsx', 'xls', 'csv', 'pdf', 'docx', 'doc'] },
-  { key: 'template', label: t('panels.smSlotTemplate'), field: 'templateFileId', multi: false, optional: true, accept: ['docx', 'doc'] },
-  { key: 'other', label: t('panels.smSlotOther'), field: 'otherFileIds', multi: true, optional: true, accept: [] }
+  { key: 'notice', get label() { return t('panels.smSlotNotice') }, field: 'noticeFileId', multi: false, optional: false, accept: ['pdf', 'docx', 'doc'] },
+  { key: 'resolution', get label() { return t('panels.smSlotResolution') }, field: 'resolutionFileId', multi: false, optional: false, accept: ['pdf', 'docx', 'doc'] },
+  { key: 'voteResult', get label() { return t('panels.smSlotVoteResult') }, field: 'voteResultFileIds', multi: true, optional: false, accept: ['xlsx', 'xls', 'csv', 'pdf', 'docx', 'doc'] },
+  { key: 'template', get label() { return t('panels.smSlotTemplate') }, field: 'templateFileId', multi: false, optional: true, accept: ['docx', 'doc'] },
+  { key: 'other', get label() { return t('panels.smSlotOther') }, field: 'otherFileIds', multi: true, optional: true, accept: [] }
 ]
 
 export default {

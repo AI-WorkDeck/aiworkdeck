@@ -12,11 +12,11 @@ export default {
     "voice": "Голос",
     "meetingRecorder": "Запись встреч",
     "litigationVisual": "Визуализация судебных процессов",
-    "tmeet": "Tencent Meeting",
+    "tmeet": "Встреча Tencent",
     "search": "Поиск",
     "tts": "Текст в речь",
     "desensitize": "Редактирование файлов",
-    "version": "Version History",
+    "version": "Система контроля версий",
     "calendar": "Календарь"
   },
   "tools": {

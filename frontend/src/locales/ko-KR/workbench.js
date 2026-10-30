@@ -338,7 +338,7 @@ export default {
     "chatTitle": "채팅",
     "scratchTitle": "임시 작업 공간",
     "scratchBadge": "임시 작업 공간",
-    "promoteAction": "Convert to project ↗",
+    "promoteAction": "정식 프로젝트로 전환",
     "promoteTitle": "정식 프로젝트로 변환",
     "promotePlaceholder": "프로젝트 이름을 입력하세요",
     "promoteSuccess": "정식 프로젝트로 변환됨",

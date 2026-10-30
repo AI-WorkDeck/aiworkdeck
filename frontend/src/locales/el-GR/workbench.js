@@ -338,7 +338,7 @@ export default {
     "chatTitle": "Συνομιλία",
     "scratchTitle": "Πρόχειρος χώρος εργασίας",
     "scratchBadge": "Πρόχειρος χώρος εργασίας",
-    "promoteAction": "Convert to project ↗",
+    "promoteAction": "Μετατροπή σε έργο",
     "promoteTitle": "Μετατροπή σε επίσημο έργο",
     "promotePlaceholder": "Εισαγάγετε όνομα έργου",
     "promoteSuccess": "Μετατράπηκε σε επίσημο έργο",

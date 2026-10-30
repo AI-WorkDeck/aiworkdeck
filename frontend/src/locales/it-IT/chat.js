@@ -170,7 +170,7 @@ export default {
   "builtinWorkflowsScope": "Contratto · Prove · File · Parere",
   "builtinWorkflowsCustomCount": "{count} personalizzati",
   "composerAdvancedSettings": "Impostazioni avanzate",
-  "builtinWorkflowsAdvancedBtn": "Advanced",
+  "builtinWorkflowsAdvancedBtn": "Modifica regole",
   "builtinWorkflowsSub": "Revisione dei contratti, organizzazione delle prove, organizzazione dei file e verifica dei pareri legali sono integrati e si attivano automaticamente in base alla tua richiesta.",
   "builtinWorkflowBadge": "Integrato",
   "builtinWorkflowAutoToast": "Workflow integrato attivato automaticamente: {name}",

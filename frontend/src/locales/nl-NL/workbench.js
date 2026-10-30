@@ -338,7 +338,7 @@ export default {
     "chatTitle": "Gesprek",
     "scratchTitle": "Voorlopige werkruimte",
     "scratchBadge": "Voorlopige werkruimte",
-    "promoteAction": "Convert to project ↗",
+    "promoteAction": "Omzetten naar project",
     "promoteTitle": "Converteren naar formeel project",
     "promotePlaceholder": "Voer een projectnaam in",
     "promoteSuccess": "Geconverteerd naar formeel project",

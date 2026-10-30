@@ -12,11 +12,11 @@ export default {
     "voice": "वॉइस",
     "meetingRecorder": "मीटिंग रिकॉर्डिंग",
     "litigationVisual": "मुकदमा विज़ुअलाइज़ेशन",
-    "tmeet": "Tencent Meeting",
+    "tmeet": "Tencent मीटिंग",
     "search": "खोज",
     "tts": "टेक्स्ट से स्पीच",
     "desensitize": "फ़ाइल रिडैक्शन",
-    "version": "Version History",
+    "version": "स्रोत नियंत्रण",
     "calendar": "कैलेंडर"
   },
   "tools": {

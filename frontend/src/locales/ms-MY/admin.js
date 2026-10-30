@@ -159,7 +159,7 @@ export default {
   "tierColBonus": "Bonus tambah nilai",
   "tierBonusCell": "{permille}‰",
   "membershipTiers": {
-    "paralegal": "Paralegal",
+    "paralegal": "Pembantu Undang-undang",
     "associate": "Peguam Bersekutu",
     "lead": "Peguam Utama",
     "senior": "Peguam Kanan",

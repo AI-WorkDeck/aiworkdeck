@@ -170,7 +170,7 @@ export default {
   "builtinWorkflowsScope": "Договоры · Доказательства · Файлы · Заключения",
   "builtinWorkflowsCustomCount": "{count} настроено",
   "composerAdvancedSettings": "Дополнительные настройки",
-  "builtinWorkflowsAdvancedBtn": "Advanced",
+  "builtinWorkflowsAdvancedBtn": "Изменить правила",
   "builtinWorkflowsSub": "Проверка договоров, систематизация доказательств, организация файлов и проверка правовых заключений встроены и активируются автоматически по вашему запросу.",
   "builtinWorkflowBadge": "Встроенный",
   "builtinWorkflowAutoToast": "Автоматически активирован встроенный рабочий процесс: {name}",

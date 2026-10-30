@@ -338,7 +338,7 @@ export default {
     "chatTitle": "Trò chuyện",
     "scratchTitle": "Không gian làm việc tạm thời",
     "scratchBadge": "Không gian làm việc tạm thời",
-    "promoteAction": "Convert to project ↗",
+    "promoteAction": "Chuyển thành dự án",
     "promoteTitle": "Chuyển đổi thành dự án chính thức",
     "promotePlaceholder": "Nhập tên dự án",
     "promoteSuccess": "Đã chuyển đổi thành dự án chính thức",

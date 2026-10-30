@@ -35,7 +35,7 @@ export default {
   "submitFailed": "Senden fehlgeschlagen",
   "headDefaultTitle": "Was können wir verbessern?",
   "contextCurrentPage": "Aktuelle Seite",
-  "contextVersionSystem": "Version & System",
+  "contextVersionSystem": "Version und System",
   "contextFrontendErrors": "Frontend-Fehler ({count})",
   "contextBackendLogs": "Backend-Log-Auszug",
   "statusPrOpened": "Behoben, wartet auf Release",

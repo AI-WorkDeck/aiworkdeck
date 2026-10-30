@@ -338,7 +338,7 @@ export default {
     "chatTitle": "Unterhaltung",
     "scratchTitle": "Temporärer Arbeitsbereich",
     "scratchBadge": "Temporärer Arbeitsbereich",
-    "promoteAction": "Convert to project ↗",
+    "promoteAction": "In Projekt umwandeln",
     "promoteTitle": "In ein formelles Projekt umwandeln",
     "promotePlaceholder": "Projektnamen eingeben",
     "promoteSuccess": "In ein formelles Projekt umgewandelt",
