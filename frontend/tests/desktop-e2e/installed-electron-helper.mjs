@@ -82,7 +82,7 @@ export async function launchInstalledElectron({ outDir, backendPort = 19566, cdp
   const home = os.homedir()
   const dataDir = path.join(home, '.aiworkdeck')
   assert(!fs.existsSync(dataDir), 'Refusing preexisting application data')
-  const chromeProfile = mac ? path.join(home, 'Library/Application Support/AI WorkDeck') : path.join(process.env.APPDATA, 'AI WorkDeck')
+  const chromeProfile = mac ? path.join(home, 'Library/Application Support/aiworkdeck-desktop') : path.join(process.env.APPDATA, 'aiworkdeck-desktop')
   assert(!fs.existsSync(chromeProfile), 'Refusing preexisting Chromium profile')
   const initialProcesses = processList()
   assert(mac ? !initialProcesses.includes('/AI WorkDeck.app/Contents/MacOS/') : !/"Name"\s*:\s*"AI WorkDeck.exe"/i.test(initialProcesses), 'Another installed app is running')
@@ -103,6 +103,14 @@ export async function launchInstalledElectron({ outDir, backendPort = 19566, cdp
     rendererRpc: (expression, timeout) => rpc(cdpPort, expression, false, timeout) }
   helper.collectDiagnostics = async () => {
     const errors = []
+    if (child?.exitCode === null && child.signalCode === null) {
+      try {
+        save('installed-debug-targets.json', await (await fetch(`http://127.0.0.1:${cdpPort}/json/list`, { signal: AbortSignal.timeout(3000) })).json())
+        save('installed-window-state.json', await helper.mainRpc(`process.mainModule.require('electron').BrowserWindow.getAllWindows().map(w=>({id:w.id,visible:w.isVisible(),title:w.getTitle(),url:w.webContents.getURL(),loading:w.webContents.isLoading()}))`))
+        const shots = await helper.mainRpc(`Promise.all(process.mainModule.require('electron').BrowserWindow.getAllWindows().filter(w=>w.isVisible()).map(async w=>({id:w.id,png:(await w.capturePage()).toPNG().toString('base64')})))`)
+        for (const shot of shots) fs.writeFileSync(path.join(outDir, `installed-window-${shot.id}.png`), Buffer.from(shot.png, 'base64'))
+      } catch (error) { errors.push(error.message) }
+    }
     try { save('installed-processes.txt', processList()) } catch (error) { errors.push(error.message) }
     try {
       const dir = path.join(dataDir, 'logs')
@@ -225,7 +233,9 @@ export async function launchInstalledElectron({ outDir, backendPort = 19566, cdp
     } else {
       const signature = file => JSON.parse(powershell(`$ErrorActionPreference='Stop'; $s=Get-AuthenticodeSignature -LiteralPath $env:AWD_TEST_FILE; if($s.Status -ne 'Valid' -or -not $s.TimeStamperCertificate -or $s.SignerCertificate.Subject -notmatch 'Zhen Shan Mei Grace Legacy US Limited'){throw 'Invalid Authenticode identity'}; @{status=[string]$s.Status;publisher=$s.SignerCertificate.Subject;thumbprint=$s.SignerCertificate.Thumbprint;timestamp=$s.TimeStamperCertificate.Subject} | ConvertTo-Json`, { AWD_TEST_FILE: file }))
       provenance.installer.signature = signature(installer)
-      powershell(`$ErrorActionPreference='Stop'; $p=Start-Process -FilePath $env:AWD_TEST_INSTALLER -ArgumentList ('/S /D='+$env:AWD_TEST_INSTALLDIR) -PassThru; if(-not $p.WaitForExit(300000)){throw 'NSIS timed out'}; $p.Refresh(); if($p.ExitCode -ne 0){throw ('NSIS exit '+$p.ExitCode)}`, { AWD_TEST_INSTALLER: installer, AWD_TEST_INSTALLDIR: app })
+      // electron-builder's StdUtils.GetParameter reparses /D; preserve its quoted
+      // space-containing path contract, as exercised by test-full-upgrade.ps1.
+      powershell(`$ErrorActionPreference='Stop'; $p=Start-Process -FilePath $env:AWD_TEST_INSTALLER -ArgumentList ('/S /D="'+$env:AWD_TEST_INSTALLDIR+'"') -PassThru; if(-not $p.WaitForExit(300000)){throw 'NSIS timed out'}; $p.Refresh(); if($p.ExitCode -ne 0){throw ('NSIS exit '+$p.ExitCode)}`, { AWD_TEST_INSTALLER: installer, AWD_TEST_INSTALLDIR: app })
       assert(fs.existsSync(executable), 'NSIS did not install the expected executable')
       provenance.executableSignature = signature(executable)
       const version = powershell('(Get-Item -LiteralPath $env:AWD_TEST_FILE).VersionInfo.ProductVersion', { AWD_TEST_FILE: executable })
@@ -239,6 +249,7 @@ export async function launchInstalledElectron({ outDir, backendPort = 19566, cdp
     return helper
   } catch (error) {
     provenance.error = error.stack
+    await helper.collectDiagnostics()
     try { await helper.close() } catch (cleanupError) { provenance.cleanupError = cleanupError.message }
     save('installed-helper.json', provenance)
     throw error
