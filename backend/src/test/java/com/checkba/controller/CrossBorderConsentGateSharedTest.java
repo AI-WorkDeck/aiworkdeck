@@ -32,7 +32,7 @@ class CrossBorderConsentGateSharedTest {
 
     private static final String KEY_AT = "ai.crossBorder.consentAt";
     private static final String KEY_VERSION = "ai.crossBorder.consentVersion";
-    private static final String CURRENT_VERSION = "2026-08-08";
+    private static final String CURRENT_VERSION = "2026-10-29";
 
     private SystemSettingService settingsWith(Map<String, String> stored) {
         SystemSettingService settings = mock(SystemSettingService.class);

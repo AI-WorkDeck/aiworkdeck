@@ -88,7 +88,7 @@ export default {
     "crossBorderLabel": "Ayrı onay: Yapay zekaya gönderilen içeriğin işlenmek üzere yurt dışındaki model sağlayıcılarına aktarılması",
     "crossBorderView": "Bildirimi görüntüle",
     "crossBorderNoticeTitle": "Yurt dışına veri aktarımı bildirimi",
-    "crossBorderNoticeBody": "AI WorkDeck Cloud, model çıkarımı ve kullanım ücretlendirmesi amacıyla yapay zekaya gönderdiğiniz içeriği (metin ve ilgili dosya parçaları) işlenmek üzere OpenRouter, Inc. (Amerika Birleşik Devletleri) şirketine gönderir; bu işlem kişisel verilerin yurt dışındaki bir alıcıya sağlanması niteliğindedir. Ürüne girdikten sonra Ayarlar → Yapay Zeka Ayarları bölümünden onayınızı istediğiniz zaman geri çekebilirsiniz; onay geri çekildiğinde bulut kanalı artık kullanılamaz.",
+    "crossBorderNoticeBody": "Çin sitesi, AI WorkDeck sunucuları üzerinden Alibaba Cloud Bailian’a bağlanır; uluslararası site OpenRouter kullanır. Yapay zekâya gönderilen metinler ve dosya alıntıları çıkarım ve faturalandırma için kullanılır. Seçilen modele göre işlem Çin ana karası dışında yapılabilir. Ayarlardan onayınızı geri çekmeniz platformun yapay zekâ kanalını devre dışı bırakır.",
     "agreementRequired": "Devam etmek için Hizmet Şartları ve Gizlilik Politikası onay kutusunu işaretleyin",
     "crossBorderRequired": "Devam etmek için ayrı yurt dışı veri aktarımı onay kutusunu işaretleyin",
     "switchSiteTitle": "Site Değiştir",

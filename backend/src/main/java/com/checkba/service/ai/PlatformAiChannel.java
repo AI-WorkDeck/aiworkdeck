@@ -22,9 +22,8 @@ import java.util.Map;
 /**
  * 平台 AI 通道「AI WorkDeck 云端」（Spec §3）。
  *
- * 用户不必自备 OpenRouter key：连接账户后由官网 provision 一把带额度上限的 runtime key
- * （POST /api/account/ai-key），桌面端拿来直连 OpenRouter。额度强制在 OpenRouter 侧执行
- * （key 自带 limit，超限 402），桌面端不做也做不了额度校验。
+ * 用户连接账户后由官网 provision 限权 runtime key（POST /api/account/ai-key）。
+ * 国内只连接本站百炼网关；国际直连 OpenRouter。实际额度分别由网关和 OpenRouter 强制执行。
  *
  * key 缓存在 {@code ~/.aiworkdeck/platform-ai-key.json}（0600）。官网端点是幂等的，
  * 缓存只是省一次往返；官网撤销重发后本地 clearCache 即可重新拉取。
@@ -68,6 +67,9 @@ public class PlatformAiChannel {
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class Cached {
         public String openrouterKey;
+        public String provider;
+        public String baseUrl;
+        public String defaultModel;
         public Double limitUsd;
         public String fetchedAt;
         /**
@@ -96,6 +98,17 @@ public class PlatformAiChannel {
      *
      * @throws AccountException NOT_CONNECTED / CONFLICT（未分配额度、未直连、缺身份）/ NETWORK
      */
+    public PlatformAiKeyService.Resolved connection() {
+        return resolveOrThrow(PlatformAiUserScope.current());
+    }
+
+    public boolean isBailian() { return accountService.domesticAiPlatform(); }
+
+    public String baseUrl(String openRouterBase) {
+        PlatformAiKeyService.Resolved resolved = connection();
+        return resolved.bailian() ? resolved.baseUrl() : openRouterBase;
+    }
+
     public String apiKey() {
         return resolveOrThrow(PlatformAiUserScope.current()).apiKey();
     }
@@ -136,17 +149,19 @@ public class PlatformAiChannel {
      * OpenRouter 明确拒绝（401/403）：这把 key 已被官网侧吊销或重发，本地这份立刻作废。
      * 与「官网明确拒绝 → 立刻清缓存、不吃宽限」同源；网络不可达绝不走这条。
      */
-    public void onKeyRejected(Long userId) {
+    public synchronized void onKeyRejected(Long userId, String expectedFingerprint) {
+        if (expectedFingerprint == null || expectedFingerprint.isBlank()) return;
         if (perUserApplies(userId)) {
-            perUser.evict(userId);
+            perUser.evict(userId, expectedFingerprint);
             return;
         }
-        clearCache();
+        Cached cached = current();
+        if (cached != null && expectedFingerprint.equals(fingerprint(cached.openrouterKey))) clearCache();
     }
 
     /** 探针成功：刷新 30 天宽限的计时起点。 */
-    public void onKeyVerified(Long userId) {
-        if (perUserApplies(userId)) perUser.markVerified(userId);
+    public void onKeyVerified(Long userId, String expectedFingerprint) {
+        if (perUserApplies(userId)) perUser.markVerified(userId, expectedFingerprint);
     }
 
     /** 本实例上是否存在按用户的平台通道密钥（断开机器级账户时的降级判据）。 */
@@ -204,7 +219,8 @@ public class PlatformAiChannel {
         Cached cached = current();
         if (cached == null) cached = fetch();
         return new PlatformAiKeyService.Resolved(
-                cached.openrouterKey, machineFingerprint(), cached.limitUsd);
+                cached.openrouterKey, fingerprint(cached.openrouterKey), cached.limitUsd,
+                cached.provider == null ? "openrouter" : cached.provider, cached.baseUrl, cached.defaultModel);
     }
 
     private String machineFingerprint() {
@@ -268,7 +284,11 @@ public class PlatformAiChannel {
     }
 
     private boolean ownedByCurrentAccount(Cached cached) {
-        return java.util.Objects.equals(cached.owner, accountService.accountFingerprintOrNull());
+        return cached.owner != null && !cached.owner.isBlank()
+                && java.util.Objects.equals(cached.owner, accountService.accountFingerprintOrNull())
+                && accountService.domesticAiPlatform() == "bailian".equals(cached.provider)
+                && (!"bailian".equals(cached.provider)
+                || java.util.Objects.equals(accountService.platformAiBaseUrl(), cached.baseUrl));
     }
 
     private Cached discard() {
@@ -278,22 +298,38 @@ public class PlatformAiChannel {
     }
 
     private synchronized Cached fetch() {
+        long version = accountService.connectionVersion();
+        String owner = accountService.accountFingerprintOrNull();
+        if (owner == null || owner.isBlank()) throw accountChanged();
         Map<String, Object> body = accountService.fetchAiKey();
         Cached cached = new Cached();
-        cached.openrouterKey = String.valueOf(body.get("openrouterKey"));
-        Object limit = body.get("limitUsd");
-        cached.limitUsd = limit instanceof Number n ? n.doubleValue() : null;
+        PlatformAiKeyService.Resolved connection = PlatformAiKeyService.parseConnection(body, accountService);
+        cached.openrouterKey = connection.apiKey();
+        cached.provider = connection.provider();
+        cached.baseUrl = connection.baseUrl();
+        cached.defaultModel = connection.defaultModel();
+        cached.limitUsd = connection.limitUsd();
         cached.fetchedAt = Instant.now().toString();
-        cached.owner = accountService.accountFingerprintOrNull();
-        try {
-            Files.createDirectories(keyFile.getParent());
-            Files.write(keyFile, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(cached));
-            AccountService.restrictPermissions(keyFile);
-        } catch (Exception e) {
-            // 落盘失败不致命：本次进程内仍可用，下次重启再拉一次
-            log.warn("平台 AI 通道密钥缓存写入失败: {}", e.getMessage());
+        cached.owner = owner;
+        // Serialize validation/publication with reconnect, including a reconnect using the same key.
+        synchronized (accountService) {
+            if (version != accountService.connectionVersion()
+                    || !owner.equals(accountService.accountFingerprintOrNull())) throw accountChanged();
+            try {
+                Files.createDirectories(keyFile.getParent());
+                Files.write(keyFile, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(cached));
+                AccountService.restrictPermissions(keyFile);
+            } catch (Exception e) {
+                // 落盘失败不致命：本次进程内仍可用，下次重启再拉一次
+                log.warn("平台 AI 通道密钥缓存写入失败: {}", e.getMessage());
+            }
+            memory = cached;
+            return cached;
         }
-        memory = cached;
-        return cached;
+    }
+
+    private AccountException accountChanged() {
+        return new AccountException(AccountException.Kind.CONFLICT,
+                LangText.of("账户连接已变化，请重试", "The account connection changed. Please retry"));
     }
 }

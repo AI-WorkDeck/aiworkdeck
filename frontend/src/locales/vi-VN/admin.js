@@ -100,7 +100,7 @@ export default {
   "inheritAux": "Kế thừa mô hình hỗ trợ",
   "followBuiltIn": "Theo mặc định tích hợp sẵn",
   "modelOption": "{name} ({vendor})",
-  "modelPrice": " · ${in}/${out} mỗi 1 triệu token",
+  "modelPrice": " · {currency}{in}/{currency}{out} mỗi 1 triệu token",
   "tieredSuffix": " · Giá theo bậc",
   "noVisionSuffix": " · Không hỗ trợ đầu vào hình ảnh (hình ảnh được xử lý qua OCR)",
   "modelUnavailableInRegion": "{model} (không khả dụng trong vùng mạng hiện tại)",

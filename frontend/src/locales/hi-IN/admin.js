@@ -100,7 +100,7 @@ export default {
   "inheritAux": "सहायक मॉडल विरासत में लें",
   "followBuiltIn": "अंतर्निहित डिफ़ॉल्ट का पालन करें",
   "modelOption": "{name} ({vendor})",
-  "modelPrice": " · 1 मिलियन टोकन पर $${in}/${out}",
+  "modelPrice": " · 1 मिलियन टोकन पर {currency}{currency}{in}/{currency}{out}",
   "tieredSuffix": " · स्तरित मूल्य निर्धारण",
   "noVisionSuffix": " · इमेज इनपुट नहीं (इमेज OCR से प्रोसेस होती हैं)",
   "modelUnavailableInRegion": "{model} (वर्तमान नेटवर्क क्षेत्र में अनुपलब्ध)",
