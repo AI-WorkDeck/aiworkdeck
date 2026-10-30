@@ -310,7 +310,6 @@ export default {
   "selectReplaceContentFirst": "문서에서 바꿀 내용을 먼저 선택하세요",
   "selectionReplaced": "선택 항목이 교체되었습니다",
   "replaceFailed": "교체 실패",
-  "folderTooManyFiles": "폴더에 {count}개의 파일이 있습니다(10개 제한 초과). 일부 파일을 제거해 주세요",
   "fileAdded": "추가됨: {name}",
   "filesAdded": "{count}개의 파일이 추가되었습니다",
   "dragUnsupported": "이 콘텐츠는 여기에 놓을 수 없습니다. 파일, 편집기 탭 또는 컴퓨터의 파일을 놓아 주세요",

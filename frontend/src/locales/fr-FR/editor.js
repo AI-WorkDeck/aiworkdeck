@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "listAttachedFiles": "Lister les pièces jointes du tour",
     "office_ppt_add_image": "Insérer une image dans la diapositive",
     "office_ppt_add_chart": "Insérer un graphique dans la diapositive",
     "office_ppt_format_chart": "Mettre en forme le graphique de la diapositive",

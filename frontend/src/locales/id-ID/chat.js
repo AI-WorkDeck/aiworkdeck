@@ -2,6 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  attachmentImportPartial: "Impor folder sebagian: {count} file diimpor, {skipped} item dilewati. Periksa pohon file, izin sumber, tautan simbolis atau file khusus. Seluruh folder tidak akan diimpor ulang otomatis.",
+  attachmentScanIncomplete: "Pemindaian folder belum selesai: {count} file ditemukan, belum ada yang diimpor. Pilih atau jatuhkan seluruh folder lagi; daftar parsial ini tidak dapat dipakai untuk melanjutkan impor.",
+  attachmentsRequireTools: "Lampiran ini perlu dibaca bertahap. Pilih model yang mendukung pemanggilan alat untuk melanjutkan. Lampiran Anda disimpan.",
+  attachmentReaderBusy: "Tugas sebelumnya masih memakai layanan baca; pembacaan ini belum dimulai. Tunggu lalu coba lagi. Jika tetap tidak merespons, simpan pekerjaan dan mulai ulang aplikasi.",
+  attachmentBatchHint: "Lampiran tanpa batas; kumpulan besar dapat memakan waktu dan dibaca bertahap sesuai kebutuhan.",
+  attachmentScanning: "Memindai folder: {count} file ditemukan",
+  attachmentImportProgress: "{completed}/{total} item diimpor",
+  attachmentImportUncertain: "Hasil operasi berjalan belum dikonfirmasi dan mungkin selesai di latar belakang. Periksa pohon file sebelum mengimpor ulang. Item yang selesai tetap disimpan.",
+  attachmentImportPaused: "Impor dijeda atau sebagian gagal. Item selesai disimpan; coba ulang sisanya.",
+  attachmentRetryRemaining: "Coba ulang {count} item tersisa",
+  contextPreparingProgress: "Menyiapkan lampiran: {completed}/{total} terdaftar (belum tentu dibaca)",
+  contextNoticeDeferred: "{count} item lain disimpan untuk dibaca bertahap sesuai kebutuhan; ini dapat memakan waktu.",
+  contextPreparationTimeout: "Persiapan melewati batas waktu dan giliran ini dihentikan. Lampiran disimpan. Tentukan file prioritas, persempit cakupan, atau coba ulang secara manual nanti.",
+
   "earlierFiles": "Berkas percakapan sebelumnya",
   "fileCreated": "Dibuat",
   "fileModified": "Dimodifikasi",
@@ -287,7 +301,6 @@ export default {
   "activeSelectionChipTitle": "Kutipan terpilih: {text} (dikirim ke AI bersama pesan Anda agar revisi berfokus pada kutipan ini terlebih dahulu; klik x untuk menghilangkannya pada giliran ini)",
   "carriedAttachmentTitle": "{name} (dibawa dari giliran sebelumnya dan masih terlampir; klik untuk mempertahankannya, klik x untuk menghapus)",
   "carriedAttachmentHint": "Tag putus-putus adalah lampiran dari pesan terakhir Anda dan akan dikirim lagi bersama pesan berikutnya. Klik x untuk menghapus.",
-  "contextFileCapReached": "Hingga {max} item (termasuk gambar) per giliran. Hapus beberapa sebelum menambahkan lagi.",
   "imageCountCapToast": "Hingga {max} gambar dikirim langsung per giliran; sisanya diproses sebagai teks hasil pengenalan (OCR).",
   "imageTooLargeToast": "Gambar ini melebihi {size} dan akan diproses sebagai teks hasil pengenalan (OCR). Kompres dan kirim ulang.",
   "contextNoticeThisFile": "Item ini",

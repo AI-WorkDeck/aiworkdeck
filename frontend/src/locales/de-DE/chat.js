@@ -2,6 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  attachmentImportPartial: "Ordner teilweise importiert: {count} Dateien importiert, {skipped} Elemente übersprungen. Dateibaum sowie Quellrechte, symbolische Links oder Spezialdateien prüfen. Der gesamte Ordner wird nicht automatisch erneut importiert.",
+  attachmentScanIncomplete: "Ordnersuche unvollständig: {count} Dateien gefunden, keine importiert. Den gesamten Ordner erneut auswählen oder ablegen; diese Teilliste kann nicht zum Fortsetzen verwendet werden.",
+  attachmentsRequireTools: "Diese Anhänge müssen gruppenweise gelesen werden. Zum Fortfahren ein Modell mit Werkzeugaufrufen wählen. Ihre Anhänge bleiben erhalten.",
+  attachmentReaderBusy: "Frühere Aufgaben belegen den Lesedienst; dieser Lesevorgang hat nicht begonnen. Warten und erneut versuchen. Reagiert er weiterhin nicht, Arbeit speichern und die App neu starten.",
+  attachmentBatchHint: "Unbegrenzte Anhänge; große Sammlungen können länger dauern und werden bei Bedarf schrittweise gelesen.",
+  attachmentScanning: "Ordner werden durchsucht: {count} Dateien gefunden",
+  attachmentImportProgress: "{completed}/{total} Elemente importiert",
+  attachmentImportUncertain: "Das laufende Ergebnis ist unbestätigt und kann noch im Hintergrund fertig werden. Vor erneutem Import den Dateibaum prüfen. Abgeschlossene Elemente bleiben erhalten.",
+  attachmentImportPaused: "Import pausiert oder teilweise fehlgeschlagen. Abgeschlossene Elemente bleiben erhalten; übrige können erneut versucht werden.",
+  attachmentRetryRemaining: "{count} übrige Elemente erneut versuchen",
+  contextPreparingProgress: "Anhänge vorbereiten: {completed}/{total} registriert (nicht zwingend gelesen)",
+  contextNoticeDeferred: "{count} weitere Elemente bleiben zum bedarfsweisen Lesen in Gruppen erhalten; dies kann länger dauern.",
+  contextPreparationTimeout: "Die Vorbereitung ist abgelaufen und dieser Durchlauf wurde beendet. Anhänge bleiben erhalten. Prioritätsdateien angeben, Umfang verringern oder später manuell erneut versuchen.",
+
   "earlierFiles": "Frühere Konversationsdateien",
   "fileCreated": "Erstellt",
   "fileModified": "Geändert",
@@ -287,7 +301,6 @@ export default {
   "activeSelectionChipTitle": "Ausgewählter Auszug: {text} (wird mit Ihrer Nachricht an die KI gesendet, damit Überarbeitungen zuerst diesen Auszug berücksichtigen; klicken Sie auf x, um ihn für diese Runde auszulassen)",
   "carriedAttachmentTitle": "{name} (aus der vorherigen Runde übernommen und weiterhin angehängt; klicken Sie, um es zu behalten, klicken Sie auf x, um es zu entfernen)",
   "carriedAttachmentHint": "Gestrichelte Tags sind Anhänge aus Ihrer letzten Nachricht und werden mit der nächsten erneut gesendet. Klicken Sie auf x, um sie zu entfernen.",
-  "contextFileCapReached": "Bis zu {max} Elemente (einschließlich Bilder) pro Runde. Entfernen Sie einige, bevor Sie weitere hinzufügen.",
   "imageCountCapToast": "Bis zu {max} Bilder werden pro Runde direkt gesendet; der Rest wird als erkannter Text (OCR) verarbeitet.",
   "imageTooLargeToast": "Dieses Bild überschreitet {size} und wird als erkannter Text (OCR) verarbeitet. Komprimieren Sie es und senden Sie es erneut.",
   "contextNoticeThisFile": "Dieses Element",

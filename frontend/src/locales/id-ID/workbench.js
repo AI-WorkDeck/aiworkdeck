@@ -310,7 +310,6 @@ export default {
   "selectReplaceContentFirst": "Pilih konten yang akan diganti dalam dokumen terlebih dahulu",
   "selectionReplaced": "Pilihan telah diganti",
   "replaceFailed": "Gagal mengganti",
-  "folderTooManyFiles": "Folder berisi {count} file (melebihi batas 10 file), silakan hapus beberapa file",
   "fileAdded": "Ditambahkan: {name}",
   "filesAdded": "Menambahkan {count} berkas",
   "dragUnsupported": "Konten ini tidak dapat dijatuhkan di sini; jatuhkan berkas, tab editor, atau berkas dari komputer Anda",

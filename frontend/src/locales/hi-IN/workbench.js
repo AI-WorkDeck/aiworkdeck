@@ -310,7 +310,6 @@ export default {
   "selectReplaceContentFirst": "पहले दस्तावेज़ में बदलने के लिए सामग्री चुनें",
   "selectionReplaced": "चयनित सामग्री बदल दी गई",
   "replaceFailed": "बदलने में विफल",
-  "folderTooManyFiles": "फ़ोल्डर में {count} फ़ाइलें हैं (10-फ़ाइल सीमा से अधिक), कृपया कुछ हटाएँ",
   "fileAdded": "जोड़ा गया: {name}",
   "filesAdded": "{count} फ़ाइलें जोड़ी गईं",
   "dragUnsupported": "यह सामग्री यहाँ नहीं डाली जा सकती; कोई फ़ाइल, एडिटर टैब, या अपने कंप्यूटर से कोई फ़ाइल छोड़ें",

@@ -317,7 +317,7 @@ public class AiContextProperties {
         /** 单文件大小上限（字节），超过则跳过提取 */
         private long maxFileSizeBytes = 10 * 1024 * 1024;
 
-        /** 一次上下文注入的最大文件数量（跨文件夹共享配额） */
+        /** 首轮最多预读的独立附件数量；其余保留引用按需读取，文件夹始终按需分页读取。 */
         private int maxFilesPerContext = 10;
 
         /** 单文件注入的最大字符数（超出截断） */

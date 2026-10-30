@@ -116,7 +116,7 @@ public class ToolDisclosurePolicy {
             // doc_list_project_files 自 dev-board#1065 T-01 起三档会话都可见（纯后端清单），
             // 所以纯对话与 Office 任务窗格会话也不必为「这是什么文件」先查一次目录（#1064 实测病灶）。
             // read_document 已只登记不下发（T-05），入口统一是 extract_file_text。
-            "doc_list_project_files", "search_project_files", "search_project_content", "extract_file_text",
+            "doc_list_project_files", "search_project_files", "search_project_content", "extract_file_text", "list_attached_files",
             "write_docx", "create_folder", "move_files_batch", "move_to_trash",
             // 跨文件硬规则要求先列后读；reference 没有关键词预放回，不能再让模型先查目录。
             "ref_list", "ref_read",

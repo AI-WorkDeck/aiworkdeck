@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "listAttachedFiles": "Liệt kê tệp đính kèm lượt này",
     "office_ppt_add_image": "Chèn hình ảnh vào trang chiếu",
     "office_ppt_add_chart": "Chèn biểu đồ vào trang chiếu",
     "office_ppt_format_chart": "Định dạng biểu đồ trang chiếu",

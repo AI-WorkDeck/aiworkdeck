@@ -310,7 +310,6 @@ export default {
   "selectReplaceContentFirst": "Hãy chọn nội dung cần thay thế trong tài liệu trước",
   "selectionReplaced": "Đã thay thế nội dung đã chọn",
   "replaceFailed": "Thay thế không thành công",
-  "folderTooManyFiles": "Thư mục chứa {count} tệp (vượt giới hạn 10 tệp), vui lòng xóa bớt một số tệp",
   "fileAdded": "Đã thêm: {name}",
   "filesAdded": "Đã thêm {count} tệp",
   "dragUnsupported": "Không thể thả nội dung này vào đây; hãy thả tệp, tab trình soạn thảo hoặc tệp từ máy tính của bạn",

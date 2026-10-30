@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "listAttachedFiles": "Bijlagen van deze beurt tonen",
     "office_ppt_add_image": "Afbeelding in dia invoegen",
     "office_ppt_add_chart": "Grafiek in dia invoegen",
     "office_ppt_format_chart": "Diagrafiek opmaken",

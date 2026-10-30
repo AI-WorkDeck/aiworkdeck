@@ -310,7 +310,6 @@ export default {
   "selectReplaceContentFirst": "Selecteer eerst de inhoud die in het document moet worden vervangen",
   "selectionReplaced": "Selectie vervangen",
   "replaceFailed": "Vervangen mislukt",
-  "folderTooManyFiles": "De map bevat {count} bestanden (boven de limiet van 10 bestanden), verwijder er enkele",
   "fileAdded": "Toegevoegd: {name}",
   "filesAdded": "{count} bestanden toegevoegd",
   "dragUnsupported": "Deze inhoud kan hier niet worden neergezet; zet een bestand, een editor-tabblad of een bestand vanaf uw computer neer",

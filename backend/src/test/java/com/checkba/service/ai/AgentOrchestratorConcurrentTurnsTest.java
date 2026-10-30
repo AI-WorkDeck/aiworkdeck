@@ -568,9 +568,10 @@ class AgentOrchestratorConcurrentTurnsTest {
         return sb.toString();
     }
 
-    @Test
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"read_document", "read_file"})
     @DisplayName("OkHttp 回调线程触发 onComplete 时切回 turnExecutor 执行工具，不占住 OkHttp Dispatcher 槽位")
-    void okHttpCallbackThreadHopsOntoTurnExecutorForToolExecution() throws Exception {
+    void okHttpCallbackThreadHopsOntoTurnExecutorForToolExecution(String toolName) throws Exception {
         java.util.concurrent.atomic.AtomicReference<String> toolThreadName = new java.util.concurrent.atomic.AtomicReference<>();
         CountDownLatch finished = new CountDownLatch(1);
         orchestrator.setTurnExecutor(task -> {
@@ -580,10 +581,10 @@ class AgentOrchestratorConcurrentTurnsTest {
 
         ToolExecutionRequest toolReq = ToolExecutionRequest.builder()
                 .id("call-1")
-                .name("read_document")
+                .name(toolName)
                 .arguments("{}")
                 .build();
-        when(toolRegistry.execute(org.mockito.ArgumentMatchers.eq("read_document"), any(), any())).thenAnswer(inv -> {
+        when(toolRegistry.execute(org.mockito.ArgumentMatchers.eq(toolName), any(), any())).thenAnswer(inv -> {
             toolThreadName.set(Thread.currentThread().getName());
             return new ToolRegistry.ToolResult("doc content", null, true);
         });
@@ -614,8 +615,8 @@ class AgentOrchestratorConcurrentTurnsTest {
 
         orchestrator.handleUserMessage(request("读一下文档"), 7L);
         assertTrue(finished.await(10, TimeUnit.SECONDS), "轮次应在 10 秒内完成");
-        assertEquals("taskExecutor-worker-1", toolThreadName.get(),
-                "工具执行必须从 OkHttp 回调线程切回 turnExecutor，不能占住 OkHttp 线程");
+        assertEquals("read_document".equals(toolName) ? "attachment-read" : "taskExecutor-worker-1", toolThreadName.get(),
+                "普通工具在 turnExecutor 执行，受限附件读取在独立读取池执行；两者都不能占住 OkHttp 线程");
     }
 
     @Test

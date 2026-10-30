@@ -134,3 +134,26 @@ test('WeChat macOS sandbox container path surfaces importDropPermissionDenied wh
   )
 })
 
+
+test('unknown first import outcome never stages or retries a sandbox source', async () => {
+  const fs = desktop()
+  fs.getPathForFile = () => '/Users/tester/Library/Containers/com.tencent.xinWeChat/Data/file.txt'
+  const file = new File(['bytes'], 'file.txt')
+  captureDroppedFiles({ files: [file] }, fs)
+  const paths = []
+  const failure = Object.assign(new Error('timed out'), { uncertain: true, dropCode: 'original' })
+  await assert.rejects(importDroppedFile(file, fs, async path => { paths.push(path); throw failure }), error => error === failure && error.dropCode === 'original')
+  assert.equal(paths.length, 1)
+  assert.deepEqual(fs.calls, [])
+})
+
+test('unclassified sandbox import failures do not trigger a second mutation', async () => {
+  const fs = desktop()
+  fs.getPathForFile = () => '/Users/tester/Library/Containers/com.tencent.xinWeChat/Data/file.txt'
+  const file = new File(['bytes'], 'file.txt')
+  captureDroppedFiles({ files: [file] }, fs)
+  let attempts = 0
+  await assert.rejects(importDroppedFile(file, fs, async () => { attempts++; throw new Error('database unavailable') }))
+  assert.equal(attempts, 1)
+  assert.deepEqual(fs.calls, [])
+})

@@ -105,4 +105,155 @@ class ExtractFileTextFolderTest {
         assertTrue(out.startsWith("Error"), "跨项目必须拒绝：" + out);
         assertFalse(out.contains("别人的卷宗"), "拒绝时不该回显他人项目的文件夹名");
     }
+    @Test
+    void everyChildAfterTwoHundredRemainsReachableInStableOrder() {
+        ProjectContextHolder.setProjectId("7");
+        ProjectFileRepository repo = Mockito.mock(ProjectFileRepository.class);
+        Mockito.when(repo.findById(100L)).thenReturn(Optional.of(folder(100L, 7L, "商标证")));
+        java.util.ArrayList<ProjectFile> children = new java.util.ArrayList<>();
+        for (long id = 1_000; id < 1_451; id++) {
+            ProjectFile child = file(id, 7L, "证书-" + id + ".pdf", "pdf");
+            child.setSortOrder((int) (id % 3));
+            children.add(child);
+        }
+        java.util.Collections.reverse(children);
+        Mockito.when(repo.findByProjectIdAndParentIdAndIsDeletedFalseOrderBySortOrderAsc(7L, 100L))
+                .thenReturn(children);
+        FileTools tools = toolsWith(repo);
+        java.util.List<Long> listed = new java.util.ArrayList<>();
+        int offset = 0;
+        int calls = 0;
+        while (true) {
+            String page = tools.extract_file_text(100L, offset, 80_000);
+            assertTrue(page.length() <= 80_000);
+            assertTrue(page.contains("total=451"));
+            java.util.regex.Matcher rows = java.util.regex.Pattern.compile("(?m)^- .*?id=(\\d+)").matcher(page);
+            int count = 0;
+            while (rows.find()) { listed.add(Long.valueOf(rows.group(1))); count++; }
+            assertTrue(count > 0 && count <= 200);
+            calls++;
+            java.util.regex.Matcher next = java.util.regex.Pattern.compile("nextOffset=(\\d+)").matcher(page);
+            if (!next.find()) break;
+            int nextOffset = Integer.parseInt(next.group(1));
+            assertTrue(nextOffset > offset);
+            assertTrue(page.contains("extract_file_text(fileId=100, offset=" + nextOffset + ", maxChars=80000)"));
+            offset = nextOffset;
+            assertTrue(calls < 5);
+        }
+        java.util.List<Long> expected = children.stream()
+                .sorted(java.util.Comparator.comparing(ProjectFile::getSortOrder).thenComparing(ProjectFile::getId))
+                .map(ProjectFile::getId).toList();
+        assertEquals(expected, listed, "逐页清单必须覆盖每个ID，不能漏项或重复");
+        assertEquals(3, calls);
+    }
+
+    @Test
+    void characterBudgetBoundsLongNamesWithoutLosingTheirIds() {
+        ProjectContextHolder.setProjectId("7");
+        ProjectFileRepository repo = Mockito.mock(ProjectFileRepository.class);
+        Mockito.when(repo.findById(100L)).thenReturn(Optional.of(folder(100L, 7L, "长".repeat(4_000))));
+        java.util.List<ProjectFile> children = java.util.stream.LongStream.range(201, 221)
+                .mapToObj(id -> file(id, 7L, "证📄".repeat(4_000), "t".repeat(400))).toList();
+        Mockito.when(repo.findByProjectIdAndParentIdAndIsDeletedFalseOrderBySortOrderAsc(7L, 100L))
+                .thenReturn(children);
+        FileTools tools = toolsWith(repo);
+        for (String language : List.of("zh-CN", "en-US")) {
+            int offset = 0;
+            java.util.Set<Long> seen = new java.util.HashSet<>();
+            while (offset < children.size()) {
+                final int current = offset;
+                String page = com.checkba.service.AppLanguageScope.call(language,
+                        () -> tools.extract_file_text(100L, current, 1024));
+                assertTrue(page.length() <= 1024, "full response exceeds maxChars: " + page.length());
+                java.util.regex.Matcher rows = java.util.regex.Pattern.compile("(?m)^- .*?id=(\\d+)").matcher(page);
+                int count = 0;
+                while (rows.find()) { assertTrue(seen.add(Long.valueOf(rows.group(1)))); count++; }
+                assertTrue(count > 0, "每页至少必须给出一个可读取ID");
+                offset += count;
+                if (offset < children.size()) assertTrue(page.contains("nextOffset=" + offset));
+                if (language.equals("en-US")) assertTrue(page.contains("contents have not been read"));
+                for (int j = 0; j < page.length(); j++) {
+                    if (Character.isHighSurrogate(page.charAt(j))) {
+                        assertTrue(j + 1 < page.length() && Character.isLowSurrogate(page.charAt(++j)));
+                    } else assertFalse(Character.isLowSurrogate(page.charAt(j)));
+                }
+            }
+            assertEquals(20, seen.size());
+        }
+    }
+
+    @Test
+    void filteringDoesNotExposeDeletedRecoveryOrForeignChildren() {
+        ProjectContextHolder.setProjectId("7");
+        ProjectFileRepository repo = Mockito.mock(ProjectFileRepository.class);
+        Mockito.when(repo.findById(100L)).thenReturn(Optional.of(folder(100L, 7L, "材料")));
+        ProjectFile deleted = file(202L, 7L, "deleted.pdf", "pdf"); deleted.setIsDeleted(true);
+        ProjectFile recoveryPath = file(203L, 7L, "masked.pdf", "pdf");
+        recoveryPath.setFilePath("safe.awd-recovery");
+        Mockito.when(repo.findByProjectIdAndParentIdAndIsDeletedFalseOrderBySortOrderAsc(7L, 100L))
+                .thenReturn(List.of(file(201L, 7L, "visible.pdf", "pdf"), deleted, recoveryPath,
+                        file(204L, 7L, "secret.awd-recovery", "awd-recovery"),
+                        file(205L, 999L, "foreign.pdf", "pdf"), folder(206L, 7L, "子目录")));
+        String page = toolsWith(repo).extract_file_text(100L, 0, 1024);
+        assertTrue(page.contains("total=2"));
+        assertTrue(page.contains("id=201"));
+        assertTrue(page.contains("[文件夹] id=206"));
+        for (long id = 202; id < 206; id++) assertFalse(page.contains("id=" + id));
+    }
+
+    @Test
+    void crossProjectReadPermissionIsCheckedAgainForContinuation() {
+        ProjectContextHolder.setProjectId("1");
+        ProjectContextHolder.setUserId(9L);
+        ProjectFileRepository repo = Mockito.mock(ProjectFileRepository.class);
+        Mockito.when(repo.findById(100L)).thenReturn(Optional.of(folder(100L, 7L, "材料")));
+        Mockito.when(repo.findByProjectIdAndParentIdAndIsDeletedFalseOrderBySortOrderAsc(7L, 100L))
+                .thenReturn(List.of(file(201L, 7L, "certificate.pdf", "pdf")));
+        com.checkba.service.ProjectMemberService members = Mockito.mock(com.checkba.service.ProjectMemberService.class);
+        Mockito.when(members.hasReadPermission(7L, 9L)).thenReturn(true, false);
+        FileTools tools = toolsWith(repo); tools.setProjectMemberService(members);
+        assertTrue(tools.extract_file_text(100L, 0, null).contains("certificate.pdf"));
+        assertTrue(tools.extract_file_text(100L, 0, null).startsWith("Error:"));
+        Mockito.verify(repo, Mockito.times(1))
+                .findByProjectIdAndParentIdAndIsDeletedFalseOrderBySortOrderAsc(7L, 100L);
+    }
+
+    @Test
+    void offsetBeyondDirectoryGivesAnExecutableRestart() {
+        ProjectContextHolder.setProjectId("7");
+        ProjectFileRepository repo = Mockito.mock(ProjectFileRepository.class);
+        Mockito.when(repo.findById(100L)).thenReturn(Optional.of(folder(100L, 7L, "材料")));
+        Mockito.when(repo.findByProjectIdAndParentIdAndIsDeletedFalseOrderBySortOrderAsc(7L, 100L))
+                .thenReturn(List.of(file(201L, 7L, "certificate.pdf", "pdf")));
+        String page = toolsWith(repo).extract_file_text(100L, Integer.MAX_VALUE, null);
+        assertTrue(page.startsWith("Error:"));
+        assertTrue(page.contains("offset=0"));
+    }
+
+    @Test
+    void cancelledListingDoesNotStartTheChildQuery() {
+        ProjectContextHolder.setProjectId("7");
+        ProjectFileRepository repo = Mockito.mock(ProjectFileRepository.class);
+        Mockito.when(repo.findById(100L)).thenReturn(Optional.of(folder(100L, 7L, "材料")));
+        Thread.currentThread().interrupt();
+        try {
+            assertTrue(toolsWith(repo).extract_file_text(100L).startsWith("Error:"));
+            Mockito.verify(repo, Mockito.never())
+                    .findByProjectIdAndParentIdAndIsDeletedFalseOrderBySortOrderAsc(Mockito.anyLong(), Mockito.anyLong());
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
+    void deletedFolderDoesNotExposeChildren() {
+        ProjectContextHolder.setProjectId("7");
+        ProjectFileRepository repo = Mockito.mock(ProjectFileRepository.class);
+        ProjectFile deleted = folder(100L, 7L, "deleted"); deleted.setIsDeleted(true);
+        Mockito.when(repo.findById(100L)).thenReturn(Optional.of(deleted));
+        assertTrue(toolsWith(repo).extract_file_text(100L).startsWith("Error:"));
+        Mockito.verify(repo, Mockito.never())
+                .findByProjectIdAndParentIdAndIsDeletedFalseOrderBySortOrderAsc(Mockito.anyLong(), Mockito.anyLong());
+    }
+
 }
