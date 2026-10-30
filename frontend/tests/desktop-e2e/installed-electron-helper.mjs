@@ -182,9 +182,10 @@ export async function launchInstalledElectron({ outDir, backendPort = 19566, cdp
       [JSON.parse(processes)].flat().filter(p => p.ExecutablePath?.toLowerCase() === javaPath.toLowerCase() && p.CommandLine?.includes('com.checkba.CheckbaApplication'))
     assert.equal(bundledBackend.length, 1, 'Backend must run the installed bundled JRE, without system-Java fallback')
     provenance.launches[provenance.launches.length - 1].backendProcess = bundledBackend[0]
+    // Read native loading state before evaluating any renderer JavaScript. Early
+    // Runtime.evaluate can create a context on the initial empty document.
+    await until(() => helper.mainRpc("process.mainModule.require('electron').BrowserWindow.getAllWindows().some(w=>/index\\.html/.test(w.webContents.getURL())&&!w.webContents.isLoadingMainFrame())"), 'native main document loaded', 180)
     await until(() => helper.rendererRpc('!!window.__checkbaActiveOverviewVm && !!window.checkbaDesktop?.update && document.readyState === "complete"'), 'installed workbench', 180)
-    // Match ordinary startup: do not evaluate main-process modules before the first
-    // real workbench has loaded. Identity is still checked before any test mutation.
     const identity = await until(async () => {
       if (spawnError) throw spawnError
       if (child.exitCode !== null || child.signalCode !== null) throw new Error('Installed process exited during startup')

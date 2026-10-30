@@ -7,20 +7,12 @@ on:
       candidate_run_id:
         description: Successful signed desktop-build run
         required: true
-        default: '40868894223'
       candidate_sha:
         description: Exact signed build source SHA
         required: true
-        default: 'ab8317c5a125f695aee58271adb22ee63f787f93'
       candidate_version:
         description: Application version (not Electron version)
         required: true
-        default: '0.74.0'
-  pull_request:
-    paths:
-      - .github/workflows/electron-cloud-regression.yml
-      - frontend/tests/desktop-e2e/electron-upgrade.mjs
-      - frontend/tests/desktop-e2e/installed-*.mjs
 permissions:
   contents: read
   actions: read
@@ -45,9 +37,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           AWD_TEST_INSTALLED: '1'
-          CANDIDATE_RUN: ${{ inputs.candidate_run_id || '40868894223' }}
-          CANDIDATE_SHA: ${{ inputs.candidate_sha || 'ab8317c5a125f695aee58271adb22ee63f787f93' }}
-          CANDIDATE_VERSION: ${{ inputs.candidate_version || '0.74.0' }}
+          CANDIDATE_RUN: ${{ inputs.candidate_run_id }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          CANDIDATE_VERSION: ${{ inputs.candidate_version }}
         run: node frontend/tests/desktop-e2e/electron-upgrade.mjs
       - name: Preserve assertions, provenance, screenshots and application diagnostics
         if: always()
