@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 name: Runtime capture diagnostic (no publishing)
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - desktop/tests/runtime-compat.electron.cjs
