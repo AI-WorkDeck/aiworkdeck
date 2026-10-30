@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
-name: Runtime frame observation (no publishing)
+name: Runtime frame handshake (no publishing)
 on:
   push:
     branches: [codex/runtime-frame-observe-1643]
@@ -57,7 +57,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: runtime-frame-observation-${{ matrix.probe }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: runtime-frame-handshake-${{ matrix.probe }}-${{ github.run_id }}-${{ github.run_attempt }}
           retention-days: 14
           if-no-files-found: error
           path: |

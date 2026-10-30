@@ -176,7 +176,7 @@ app.whenReady().then(async () => {
       })),
       webContentsFocused: view.webContents.isFocused(), loading: view.webContents.isLoading(),
       url: view.webContents.getURL(), zoomFactor: view.webContents.getZoomFactor(),
-      backgroundThrottling: { window: win.webContents.getLastWebPreferences().backgroundThrottling, view: view.webContents.getLastWebPreferences().backgroundThrottling },
+      backgroundThrottling: { window: win.webContents.getBackgroundThrottling(), view: view.webContents.getBackgroundThrottling() },
       gpuFeatures: app.getGPUFeatureStatus(),
     }))
     observation.beforeSubscription = windowState()
@@ -191,10 +191,12 @@ app.whenReady().then(async () => {
           lastFrame = image
           observation.lastSample = { ...sample(image), dirtyRect, elapsedMs: Date.now() - observedAt }
           if (observation.firstSamples.length < 3) observation.firstSamples.push(observation.lastSample)
-          if (hasFrameMarker(image)) resolve()
+          if (observation.injection === 'pending' && !image.isEmpty()) {
+            observation.injection = 'started'
+            view.webContents.executeJavaScript(`(()=>{const marker=document.createElement('div');marker.style.cssText='position:fixed;left:0;top:0;width:24px;height:24px;background:black;z-index:2147483647';document.body.append(marker);return {rect:marker.getBoundingClientRect().toJSON(),dpr:devicePixelRatio,visibility:document.visibilityState,focused:document.hasFocus(),url:location.href}})()`)
+              .then(value => { observation.injection = 'completed'; observation.injectionElapsedMs = Date.now() - observedAt; observation.injectedDocument = value }, error => { observation.injection = 'failed'; observation.injectionError = error.message; reject(error) })
+          } else if (hasFrameMarker(image)) resolve()
         })
-        view.webContents.executeJavaScript(`(()=>{const marker=document.createElement('div');marker.style.cssText='position:fixed;left:0;top:0;width:24px;height:24px;background:black;z-index:2147483647';document.body.append(marker);return {rect:marker.getBoundingClientRect().toJSON(),dpr:devicePixelRatio,visibility:document.visibilityState,focused:document.hasFocus(),url:location.href}})()`)
-          .then(value => { observation.injection = 'completed'; observation.injectionElapsedMs = Date.now() - observedAt; observation.injectedDocument = value }, error => { observation.injection = 'failed'; observation.injectionError = error.message; reject(error) })
       })
       evidence.browserViewFrameObserved = true
     } catch (error) {
