@@ -117,10 +117,13 @@ finally { $graphics.Dispose(); $bitmap.Dispose() }`
       return { status: response.status, connected: (body.data || body).connected }
     }) }
     assert.equal(evidence.settings.account.connected, false, 'Settings regression requires an anonymous local workspace')
-    const [catalog] = await Promise.all([
-      page.waitForResponse(response => new URL(response.url()).pathname === '/api/ai/models', { timeout: 30000 }),
+    // Observe a newly created request, not a late response from ChatInterface's
+    // earlier preload. Keep its exact identity through response/body completion.
+    const [catalogRequest] = await Promise.all([
+      page.waitForRequest(request => new URL(request.url()).pathname === '/api/ai/models', { timeout: 30000 }),
       menuAction('app.settings', 'CmdOrCtrl+,').then(menu => { evidence.settings.menu = menu }),
     ])
+    const catalog = await until(() => catalogRequest.response(), 'new settings model catalog response')
     const catalogBody = await catalog.json()
     evidence.settings.catalog = { httpStatus: catalog.status(), businessCode: catalogBody.code ?? null }
     await page.waitForSelector('.page-admin', { visible: true })
