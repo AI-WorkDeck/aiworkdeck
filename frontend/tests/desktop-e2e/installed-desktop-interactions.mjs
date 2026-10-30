@@ -179,7 +179,9 @@ export async function checkDesktopInteractions({ page, browser, mainRpc, run }) 
     assert.ok(evidence.about.text.includes('AI WorkDeck'))
     assert.equal(evidence.about.links.length, 3)
     await about.screenshot({ path: path.join(run, 'installed-about.png') })
-    await about.keyboard.press('Escape')
+    // Electron before-input-event runs through native webContents input; CDP
+    // dispatch alone is not evidence that this native accelerator path ran.
+    await mainRpc(`(()=>{const w=process.mainModule.require('electron').BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().startsWith('data:text/html'));w.focus();w.webContents.focus();w.webContents.sendInputEvent({type:'keyDown',keyCode:'Escape'});return true})()`)
     await until(() => about.isClosed(), 'About window closes with Escape')
     evidence.checks.push('Production About menu opens licensed/versioned window and Escape closes it')
     evidence.passed = true
@@ -189,6 +191,7 @@ export async function checkDesktopInteractions({ page, browser, mainRpc, run }) 
     evidence.error = error.stack || String(error)
     const frameDiagnostics = []
     for (const frame of page.frames()) {
+      if (frame.url() === 'about:blank') { frameDiagnostics.push({ url: frame.url(), inactiveBlankFrame: true }); continue }
       try {
         frameDiagnostics.push({ url: frame.url(), ...await frame.evaluate(() => ({
           bodyText: document.body?.innerText?.slice(0, 5000),

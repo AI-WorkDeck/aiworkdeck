@@ -5,7 +5,7 @@
 ## 被测对象与证据边界
 
 - 真实签名候选：desktop-build run [40868894223](https://github.com/AI-WorkDeck/aiworkdeck/actions/runs/40868894223)，源码 `ab8317c5a125f695aee58271adb22ee63f787f93`，应用 0.74.0 / Electron 45.1.0。与正式旧 0.74.0 的运行时不同，不能只凭应用版本号辨认。
-- 本轮在 GitHub hosted Windows x64 / macOS ARM64 的一次性用户中安装候选。不是本机客户端，也不是浏览器模拟界面。安装件验签、源码来源、运行进程、随包 JRE/JAR/H5/LOWA 均核对；不改动签名包。
+- 本轮在 GitHub hosted Windows Server 2025 x64 / macOS 15 ARM64 的一次性用户中安装候选。不是本机客户端，也不是浏览器模拟界面。安装件验签、源码来源、运行进程、随包 JRE/JAR/H5/LOWA 均核对；不改动签名包。
 - 测试工具来自本 PR，产品来自上述固定构建。不能将通过结果扩展为任意后续 master 产物已验证。
 - 无发布标签、Release、部署或用户客户端升级。所有测试文件均为合成材料；不登录用户账号，不调用付费模型。
 
@@ -48,5 +48,5 @@
 
 - 当前脚本用 CDP composition 走真实编辑器输入链，但不驱动 macOS/Windows 的真实中文输入法候选窗。
 - 下载通过 DownloadItem.setSavePath 自动选择目的地，不覆盖系统保存框取消/覆盖交互。
-- macOS 13 最低系统、Windows ARM64 实际设备、多屏/DPI、休眠唤醒、打印机、系统权限拒绝后授予、麦克风与摄像头设备。
+- macOS 13 最低系统、Windows 10/11 实体环境、Windows ARM64 实际设备、多屏/DPI、休眠唤醒、打印机、系统权限拒绝后授予、麦克风与摄像头设备。
 - 无需账号的桌面能力是本轮范围；真实登录、付费模型、可选服务包全部业务能力不能因 Electron 核心回归通过而一并宣称已通过。
