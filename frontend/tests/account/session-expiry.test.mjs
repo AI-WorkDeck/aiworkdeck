@@ -58,6 +58,28 @@ test('explicit catalogue requests retain account prompting and reject the unexec
   await assert.rejects(p, e => e.accountRequired && !e.loggedIn)
   assert.deepEqual(h.calls, ['login'])
 })
+test('passive admin catalogue preload reports failure without login and recovers on refresh', async () => {
+  const admin = readFileSync(new URL('../../src/components/admin/AdminPane.vue', import.meta.url), 'utf8')
+  const start = admin.indexOf('    async loadModelCatalog() {')
+  const method = admin.slice(start, admin.indexOf('\n    },', start) + '\n    }'.length)
+  const h = harness()
+  const load = new Function('fetchAiModels', `return ({ ${method} }).loadModelCatalog`)(h.fetchAiModels)
+  const vm = { modelCatalog: null, modelCatalogError: '', $t: key => key }
+  const preload = load.call(vm)
+  await h.reply({ code: 4011, kind: 'NOT_CONNECTED', reason: 'platform_ai', message: 'Synthetic disconnected account' })
+  await preload
+  assert.deepEqual(h.calls, [], 'Opening settings or work records must not trigger the account UI')
+  assert.equal(vm.modelCatalog, null)
+  assert.equal(vm.modelCatalogError, 'admin.catalogLoadFailedWithMsg')
+  h.login()
+  const refresh = load.call(vm)
+  const catalog = { models: [{ id: 'synthetic-model', name: 'Synthetic model' }], defaultModel: 'synthetic-model' }
+  await h.reply(catalog)
+  await refresh
+  assert.deepEqual(vm.modelCatalog, catalog)
+  assert.equal(vm.modelCatalogError, '')
+  assert.deepEqual(h.calls, [])
+})
 test('stale local session is cleared and the rejected operation retries once without invalidating the cloud account', async () => {
   const h = harness({ session: 'synthetic-old-session' })
   const p = h.request({ url: '/api/projects/open-local' })

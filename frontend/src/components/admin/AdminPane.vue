@@ -2303,7 +2303,7 @@ export default {
     // ---------- 模型目录与区域 ----------
     async loadModelCatalog() {
       try {
-        this.modelCatalog = await fetchAiModels()
+        this.modelCatalog = await fetchAiModels({ accountPrompt: false })
         this.modelCatalogError = ''
       } catch (e) {
         this.modelCatalog = null
