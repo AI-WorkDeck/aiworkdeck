@@ -31,7 +31,9 @@ function setup(initial, overrides = {}) {
       imports.push(...bindings.replace(/[{}]/g, '').split(',').map(name => name.trim().split(/\s+as\s+/).at(-1)))
       return ''
     }).replace('export default {', 'return {')
-  const options = new Function(...imports, script)(...imports.map(name => dependencies[name] ?? (() => {})))
+  // Large file-list logs can corrupt Node 20 test-runner IPC; keep diagnostics local to this fixture.
+  const fixtureConsole = { ...console, log() {} }
+  const options = new Function('console', ...imports, script)(fixtureConsole, ...imports.map(name => dependencies[name] ?? (() => {})))
   const vm = { ...options.data(), projectId: 42, parentId: null, showTree: true, enableTagView: true,
     hiddenFileIds: [], $t: key => key, $emit() {}, $nextTick: callback => callback?.(),
     $el: { querySelector: selector => {
