@@ -120,6 +120,45 @@ class VoiceDictationServiceTest {
         }
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    void dictationRoutesCredentialsAndAudioToTheSelectedPlatform(boolean domestic) throws Exception {
+        var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        var observed = new java.util.concurrent.atomic.AtomicReference<com.fasterxml.jackson.databind.JsonNode>();
+        var bearer = new java.util.concurrent.atomic.AtomicReference<String>();
+        server.createContext("/chat/completions", exchange -> {
+            bearer.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            observed.set(new com.fasterxml.jackson.databind.ObjectMapper().readTree(exchange.getRequestBody()));
+            byte[] bytes = "{\"choices\":[{\"message\":{\"content\":\"Meeting at nine.\"}}]}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.close();
+        });
+        server.start();
+        try {
+            String endpoint = "http://127.0.0.1:" + server.getAddress().getPort();
+            PlatformAiChannel channel = mock(PlatformAiChannel.class);
+            when(channel.resolveFor(1L)).thenReturn(new PlatformAiKeyService.Resolved(
+                    "limited-runtime-token", "fingerprint", 1.0,
+                    domestic ? "bailian" : "openrouter", domestic ? endpoint : null, null));
+            var service = new VoiceDictationService(channel, mock(PlatformCreditsGate.class),
+                    domestic ? "https://must-not-receive-token.invalid/api/v1" : endpoint, "xiaomi/mimo-v2.5");
+            String audio = Base64.getEncoder().encodeToString(new byte[16]);
+            assertEquals("Meeting at nine.", service.transcribe(1L, audio, "wav", 1000).text());
+            assertEquals("Bearer limited-runtime-token", bearer.get());
+            assertEquals(domestic ? "qwen3.8-omni-flash" : "xiaomi/mimo-v2.5", observed.get().path("model").asText());
+            assertEquals(audio, observed.get().path("messages").path(0).path("content").path(0).path("input_audio").path("data").asText());
+            if (domestic) {
+                assertEquals(4096, observed.get().path("max_tokens").asInt());
+                assertFalse(observed.get().path("enable_thinking").asBoolean());
+            }
+            verify(channel).onKeyVerified(1L);
+        } finally {
+            server.stop(0);
+        }
+    }
+
     // ==================== 提示词回显剥离（dev-board#175） ====================
 
     @Test

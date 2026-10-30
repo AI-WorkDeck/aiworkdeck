@@ -100,7 +100,7 @@ export default {
   "inheritAux": "Hulpmodel overnemen",
   "followBuiltIn": "Ingebouwde standaard volgen",
   "modelOption": "{name} ({vendor})",
-  "modelPrice": " · ${in}/${out} per 1 miljoen tokens",
+  "modelPrice": " · {currency}{in}/{currency}{out} per 1 miljoen tokens",
   "tieredSuffix": " · Gelaagde prijzen",
   "noVisionSuffix": " · Geen beeldinvoer (afbeeldingen verwerkt via OCR)",
   "modelUnavailableInRegion": "{model} (niet beschikbaar in de huidige netwerkregio)",

@@ -203,7 +203,12 @@ public class PlatformUsageAccountant {
      */
     private BigDecimal probeCumulativeUsage(Long userId, String apiKey) {
         if (apiKey == null) return null;
-        AccountTransport.Reply reply = transport.send("GET", openRouterBaseUrl + "/key", apiKey, null);
+        PlatformAiKeyService.Resolved resolved = platformAiChannel.resolveFor(userId);
+        // Never send a domestic runtime credential to OpenRouter, including a queued old-account probe.
+        boolean bailian = apiKey.startsWith("awdai_");
+        if (bailian && (resolved == null || !resolved.bailian() || !apiKey.equals(resolved.apiKey()))) return null;
+        String endpoint = bailian ? resolved.baseUrl() + "/usage" : openRouterBaseUrl + "/key";
+        AccountTransport.Reply reply = transport.send("GET", endpoint, apiKey, null);
         if (reply.networkFailure()) return null;
         if (reply.status() == 401 || reply.status() == 403) {
             String fingerprint = PlatformAiKeyCipher.fingerprint(apiKey);
@@ -217,9 +222,9 @@ public class PlatformUsageAccountant {
         }
         try {
             Map<?, ?> parsed = objectMapper.readValue(reply.body(), Map.class);
-            Object data = parsed.get("data");
+            Object data = bailian ? parsed : parsed.get("data");
             if (!(data instanceof Map<?, ?> map)) return null;
-            Object usage = map.get("usage");
+            Object usage = map.get(bailian ? "usageUsd" : "usage");
             if (!(usage instanceof Number n)) return null;
             platformAiChannel.onKeyVerified(userId);
             return new BigDecimal(n.toString());

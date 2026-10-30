@@ -89,7 +89,7 @@ export default {
     "crossBorderLabel": "個別同意：AI に送信するコンテンツを海外のモデル提供事業者に越境転送して処理すること",
     "crossBorderView": "通知を表示",
     "crossBorderNoticeTitle": "越境データ転送に関する通知",
-    "crossBorderNoticeBody": "AI WorkDeck Cloud は、モデルの推論および利用量の課金のため、AI に送信されたコンテンツ（テキストおよび関連するファイル断片）を米国の OpenRouter, Inc. に送信して処理します。これは海外の受領者への個人情報の提供に該当します。製品に入った後、いつでも「設定 → AI 設定」から同意を撤回でき、撤回後はクラウドチャネルを利用できなくなります。",
+    "crossBorderNoticeBody": "中国サイトは AI WorkDeck のサーバー経由で Alibaba Cloud Bailian に接続し、国際サイトは OpenRouter を使用します。AI に送信するテキストやファイルの抜粋は推論と課金に使用され、選択したモデルによっては中国本土外で処理されます。設定で同意を撤回すると、プラットフォームの AI が無効になります。",
     "agreementRequired": "続行するには利用規約とプライバシーポリシーへの同意にチェックを入れてください",
     "crossBorderRequired": "続行するには越境転送に関する個別同意にチェックを入れてください",
     "switchSiteTitle": "サイトを切り替え",

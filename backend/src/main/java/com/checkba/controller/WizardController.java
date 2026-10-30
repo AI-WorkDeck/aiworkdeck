@@ -113,7 +113,8 @@ public class WizardController {
 
         Map<String, String> updates;
         try {
-            updates = AdminConfigController.toSettingsUpdates(request, objectMapper);
+            updates = com.checkba.service.ai.PlatformAiUserScope.call(AuthController.getUserIdFromSession(sessionId),
+                    () -> AdminConfigController.toSettingsUpdates(request, objectMapper, chatModelFactory.usesProviderCatalog() ? chatModelFactory::isAvailableModel : com.checkba.service.ai.AllowedModels::isAllowed));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(error(e.getMessage()));
         }

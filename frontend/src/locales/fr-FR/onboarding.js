@@ -88,7 +88,7 @@ export default {
     "crossBorderLabel": "Consentement distinct : transfert du contenu soumis à l'IA vers des fournisseurs de modèles à l'étranger pour traitement",
     "crossBorderView": "Consulter l'avis",
     "crossBorderNoticeTitle": "Avis de transfert transfrontalier",
-    "crossBorderNoticeBody": "AI WorkDeck Cloud transmet le contenu que vous soumettez à l'IA (texte et fragments de fichiers associés) à OpenRouter, Inc. (États-Unis) pour traitement, à des fins d'inférence de modèle et de facturation d'utilisation ; cela constitue une fourniture d'informations personnelles à un destinataire situé à l'étranger. Après être entré dans le produit, vous pouvez retirer votre consentement à tout moment dans Paramètres → Paramètres IA ; une fois retiré, le canal cloud ne sera plus disponible.",
+    "crossBorderNoticeBody": "Le site chinois utilise Alibaba Cloud Bailian via les serveurs AI WorkDeck ; le site international utilise OpenRouter. Les textes et extraits de fichiers envoyés à l’IA servent à l’inférence et à la facturation. Selon le modèle choisi, leur traitement peut avoir lieu hors de Chine continentale. Le retrait du consentement dans les paramètres désactive le canal IA de la plateforme.",
     "agreementRequired": "Cochez la case pour accepter les Conditions d'utilisation et la Politique de confidentialité afin de continuer",
     "crossBorderRequired": "Cochez le consentement distinct relatif au transfert transfrontalier pour continuer",
     "switchSiteTitle": "Changer de site",

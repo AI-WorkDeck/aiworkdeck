@@ -5,6 +5,10 @@ description: 授权与计费领域。任务涉及解锁门（试用码/账户 Ke
 
 # 授权与计费 领域地图
 
+## 百炼平台凭据与计量（2026-10-29，dev-board#1625）
+
+POST ai-key发送 X-AWD-AI-Protocol:2。国内返回限权 awdai_ runtime token（不含百炼共享Key或awdk账户Key），baseUrl必须严格匹配当前账户站点 /api/account/ai/v1。server只加密保存runtime token及provider/baseUrl/defaultModel，awdk仍用完即弃。旧国内OpenRouter机器缓存丢弃重取；已有server用户需重新连接/刷新以换取国内runtime token，不允许退回机器额度。PlatformUsageAccountant对国内调用同站 /usage，读累计usageUsd作观测，不二次扣费；实际扣费在官网网关。国际仍OpenRouter /key。新账本不覆盖旧token_usage或余额。
+
 ## 设置账户状态（dev-board#1415，2026-10-21）
 
 `AdminPane` 的账户状态区分 loading / ready / error：只有成功取得明确的 `connected:false` 才显示登录入口；请求失败保留已确认身份并给重试，不当作退出登录。并发状态请求按代次接收，旧未连接回包不能盖过登录后的新状态。账户/钱包块必须显式按 connected 显示，不能用紧跟手机同步 `v-if=isDesktop` 的 `v-else`（这会在桌面隐藏整个账户块）。

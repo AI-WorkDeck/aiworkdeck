@@ -28,7 +28,6 @@
     <view v-for="g in groups" :key="g.key" class="model-group">
       <view class="model-group-head">
         <text class="model-group-vendor">{{ g.vendor }}</text>
-        <text v-if="g.region === 'INTERNATIONAL'" class="model-region-tag">{{ $t('chat.intlNetworkRequired') }}</text>
       </view>
       <view v-for="m in g.models" :key="m.id"
             class="model-option"
@@ -241,13 +240,7 @@ export default {
   color: var(--awd-text-3);
   letter-spacing: 0.5px;
 }
-.model-region-tag {
-  font-size: 10px;
-  color: var(--awd-warning-text);
-  background: var(--awd-warning-soft);
-  border-radius: 3px;
-  padding: 1px 4px;
-}
+
 
 .model-option {
   padding: 6px 14px;

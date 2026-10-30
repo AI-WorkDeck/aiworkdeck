@@ -24,12 +24,12 @@ import java.util.Optional;
  *
  * <h3>凭据模型</h3>
  * awdk_ 账户 Key 明文<b>永不落库</b>。server 只在两个时刻短暂持有它——桥接登录、显式刷新——
- * 用它向官网换一把该账户的 provisioned OpenRouter runtime key，加密存本表，awdk_ 用完即弃。
- * 因此本库被拖走的后果被限定为「各 key 上的剩余额度」（额度由 OpenRouter 侧 limit 强制），
+ * 用它向官网换一把该账户的限权平台 runtime key，加密存本表，awdk_ 用完即弃。
+ * 因此本库被拖走的后果被限定为「各 key 上的剩余额度」（额度由本站网关或 OpenRouter 强制），
  * 拿不到官网账户本身：读余额、同步权益、买广场付费项、签发新 key 全都要 awdk_。
  *
  * <h3>吊销与过期</h3>
- * 用户在官网禁用/重发 runtime key → OpenRouter 侧立即失效 → 对账探针拿到 401/403 即
+ * 用户在官网禁用/重发 runtime key → 对应平台立即失效 → 对账探针拿到 401/403 即
  * {@link #evict} 删行（与「官网明确拒绝 → 立刻清缓存、不吃宽限」同源）。
  * 网络不可达一律保留（服务器故障不等于凭据失效）。外层再由 {@link #OFFLINE_GRACE}
  * 封顶：30 天没有一次成功验证即判过期，需走刷新——永久离线不能等于永久可用。
@@ -64,7 +64,32 @@ public class PlatformAiKeyService {
     }
 
     /** 解出来的可用密钥。 */
-    public record Resolved(String apiKey, String fingerprint, Double limitUsd) {}
+    public record Resolved(String apiKey, String fingerprint, Double limitUsd,
+                           String provider, String baseUrl, String defaultModel) {
+        public Resolved(String apiKey, String fingerprint, Double limitUsd) {
+            this(apiKey, fingerprint, limitUsd, "openrouter", null, null);
+        }
+        public boolean bailian() { return "bailian".equals(provider); }
+        @Override public String toString() { return "Resolved[redacted]"; }
+    }
+
+    static Resolved parseConnection(Map<String, Object> body, AccountService accountService) {
+        String provider = String.valueOf(body.getOrDefault("provider", "openrouter"));
+        boolean bailian = "bailian".equals(provider);
+        String key = body.get(bailian ? "apiKey" : "openrouterKey") instanceof String value ? value : null;
+        String base = bailian ? accountService.platformAiBaseUrl() : null;
+        if ((!bailian && !"openrouter".equals(provider)) || key == null || key.isBlank()
+                || bailian && (!key.startsWith("awdai_") || !java.util.Objects.equals(base, body.get("baseUrl")))
+                || accountService.domesticAiPlatform() != bailian) {
+            throw new AccountException(AccountException.Kind.MALFORMED,
+                    LangText.of("平台 AI 通道配置与当前站点不符，请刷新账户连接",
+                            "The platform AI connection does not match this site. Refresh the account connection"));
+        }
+        Object limit = body.get("limitUsd");
+        return new Resolved(key, PlatformAiKeyCipher.fingerprint(key),
+                limit instanceof Number n ? n.doubleValue() : null, provider, base,
+                body.get("defaultModel") instanceof String model ? model : null);
+    }
 
     // ==================== 判据 ====================
 
@@ -96,7 +121,9 @@ public class PlatformAiKeyService {
         Optional<PlatformAiKey> row = keyRepository.findByUserId(userId);
         if (row.isEmpty()) return Optional.empty();
         PlatformAiKey entity = row.get();
-        if (isStale(entity)) return Optional.empty();
+        if (isStale(entity) || accountService.domesticAiPlatform() != "bailian".equals(entity.getProvider())
+                || "bailian".equals(entity.getProvider())
+                && !java.util.Objects.equals(accountService.platformAiBaseUrl(), entity.getBaseUrl())) return Optional.empty();
         String plaintext;
         try {
             plaintext = cipher.decrypt(entity.getKeyEnc());
@@ -106,7 +133,8 @@ public class PlatformAiKeyService {
             log.warn("用户 {} 的平台 AI 通道密钥无法解密，按不可用处理: {}", userId, e.getMessage());
             return Optional.empty();
         }
-        return Optional.of(new Resolved(plaintext, entity.getKeyFingerprint(), entity.getLimitUsd()));
+        return Optional.of(new Resolved(plaintext, entity.getKeyFingerprint(), entity.getLimitUsd(),
+                entity.getProvider() == null ? "openrouter" : entity.getProvider(), entity.getBaseUrl(), entity.getDefaultModel()));
     }
 
     /** 仅取指纹（对账分桶用），不解密。过期同样视为没有。 */
@@ -150,14 +178,17 @@ public class PlatformAiKeyService {
                             "This server has no storage secret configured for the platform AI channel key; this channel cannot be enabled yet"));
         }
         Map<String, Object> body = accountService.fetchAiKeyWith(awdkKey);
-        String plaintext = String.valueOf(body.get("openrouterKey"));
-        Object limit = body.get("limitUsd");
+        Resolved connection = parseConnection(body, accountService);
+        String plaintext = connection.apiKey();
 
         PlatformAiKey entity = keyRepository.findByUserId(userId).orElseGet(PlatformAiKey::new);
         entity.setUserId(userId);
         entity.setKeyEnc(cipher.encrypt(plaintext));
         entity.setKeyFingerprint(PlatformAiKeyCipher.fingerprint(plaintext));
-        entity.setLimitUsd(limit instanceof Number n ? n.doubleValue() : null);
+        entity.setLimitUsd(connection.limitUsd());
+        entity.setProvider(connection.provider());
+        entity.setBaseUrl(connection.baseUrl());
+        entity.setDefaultModel(connection.defaultModel());
         LocalDateTime now = LocalDateTime.now();
         entity.setFetchedAt(now);
         entity.setLastVerifiedAt(now);
@@ -232,7 +263,7 @@ public class PlatformAiKeyService {
         result.put("stale", row.map(this::isStale).orElse(false));
         result.put("limitUsd", row.map(PlatformAiKey::getLimitUsd).orElse(null));
         result.put("lastVerifiedAt", row.map(e -> e.getLastVerifiedAt().toString()).orElse(null));
-        result.put("keyMasked", row.map(e -> "sk-or-****" + e.getKeyFingerprint()).orElse(null));
+        result.put("keyMasked", row.map(e -> ("bailian".equals(e.getProvider()) ? "awdai_****" : "sk-or-****") + e.getKeyFingerprint()).orElse(null));
 
         Optional<Resolved> resolved = resolve(userId);
         result.put("available", resolved.isPresent());

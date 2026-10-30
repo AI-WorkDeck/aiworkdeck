@@ -35,7 +35,7 @@ class CrossBorderConsentTest {
 
     private static final String KEY_AT = "ai.crossBorder.consentAt";
     private static final String KEY_VERSION = "ai.crossBorder.consentVersion";
-    private static final String CURRENT_VERSION = "2026-08-08";
+    private static final String CURRENT_VERSION = "2026-10-29";
 
     /** 反射调私有的 hasCrossBorderConsent，避免为测试把方法放宽成 public */
     private boolean hasConsent(AdminConfigController controller, AdminConfigController.AiConfig ai)

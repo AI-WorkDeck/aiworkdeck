@@ -772,6 +772,82 @@ class ChatModelFactoryTest {
     }
 
     @Test
+    void explicitDomesticPlatformUsesCatalogueEvenWhenDefaultIsByokAndDoesNotRetry() throws Exception {
+        setDbProvider("OPENROUTER");
+        when(platformAiChannel.availableFor(72L)).thenReturn(true);
+        when(platformAiChannel.isBailian()).thenReturn(true);
+        when(platformAiChannel.apiKey()).thenReturn("awdai_synthetic-user-72");
+        var catalogue = mock(PlatformModelCatalog.class);
+        when(catalogue.resolve(anyString())).thenReturn("qwen3.8-flash");
+        org.springframework.test.util.ReflectionTestUtils.setField(factory, "platformModelCatalog", catalogue);
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        var authorization = new java.util.concurrent.atomic.AtomicReference<String>();
+        var request = new java.util.concurrent.atomic.AtomicReference<String>();
+        var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/api/account/ai/v1/chat/completions", exchange -> {
+            calls.incrementAndGet();
+            authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            request.set(new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            byte[] body = "{\"error\":{\"message\":\"unavailable\"}}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(503, body.length);
+            exchange.getResponseBody().write(body); exchange.close();
+        });
+        server.start();
+        try {
+            properties.getOpenRouter().setBaseUrl("http://127.0.0.1:1/forbidden-openrouter");
+            when(platformAiChannel.baseUrl(anyString())).thenReturn(
+                    "http://127.0.0.1:" + server.getAddress().getPort() + "/api/account/ai/v1");
+            var target = PlatformAiUserScope.call(72L, () -> factory.getPlatformChatModel(java.time.Duration.ofSeconds(2), 1800));
+            assertEquals("qwen3.8-flash", target.modelId());
+            assertThrows(RuntimeException.class, () -> target.model().generate("synthetic prompt"));
+            assertEquals(1, calls.get());
+            assertEquals("Bearer awdai_synthetic-user-72", authorization.get());
+            assertTrue(request.get().contains("qwen3.8-flash"));
+            assertFalse(request.get().contains("synthetic-machine-key"));
+            assertEquals(AiModelProperties.Provider.OPENROUTER, factory.resolveProvider());
+            verify(systemSettingService, never()).get(eq("external.openrouter.apiKey"), any());
+        } finally { server.stop(0); }
+    }
+
+    @Test
+    void domesticExplicitTextModelDoesNotSilentlyBecomeToolModelAndReviewersDiffer() {
+        setDbProvider("AWD_CLOUD");
+        when(platformAiChannel.availableFor(any())).thenReturn(true);
+        when(platformAiChannel.isBailian()).thenReturn(true);
+        when(platformAiChannel.apiKey()).thenReturn("awdai_synthetic");
+        when(platformAiChannel.baseUrl(anyString())).thenReturn("https://www.aiworkdeck.com/api/account/ai/v1");
+        var catalogue = mock(PlatformModelCatalog.class);
+        when(catalogue.resolve(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        when(catalogue.model("text-model")).thenReturn(new PlatformModelCatalog.Model(
+                "text-model", "Text", "Provider", 1000, 100, false, false, 1, 2, false));
+        when(catalogue.contains("qwen3.8-max")).thenReturn(true);
+        when(catalogue.contains("qwen3.8-flash")).thenReturn(true);
+        org.springframework.test.util.ReflectionTestUtils.setField(factory, "platformModelCatalog", catalogue);
+        assertEquals("text-model", factory.resolveEffectiveModelId("text-model"));
+        assertFalse(factory.effectiveModelSupportsTools("text-model"));
+        assertEquals(850, factory.platformContextBudget("text-model", 100000, .85));
+        assertEquals(500, factory.platformContextBudget("text-model", 500, .85));
+        assertThrows(com.checkba.service.account.AccountException.class, () -> factory.platformContextBudget("unknown", 100000, .85));
+        assertThrows(com.checkba.service.account.AccountException.class, () -> factory.ensureToolCapableModel("text-model"));
+        var timeout = java.time.Duration.ofSeconds(2);
+        assertEquals("qwen3.8-max", factory.getAutomaticWritingReviewModel(timeout, 0).modelName());
+        assertEquals("qwen3.8-flash", factory.getAutomaticWritingReviewModel(timeout, 1).modelName());
+    }
+
+    @Test
+    void oldDomesticSavedSelectionCanStillBeSavedWithoutAcceptingUnknownModels() {
+        setDbProvider("AWD_CLOUD");
+        when(platformAiChannel.isBailian()).thenReturn(true);
+        var catalogue = mock(PlatformModelCatalog.class);
+        when(catalogue.resolve("qwen/qwen3.8-max")).thenReturn("qwen3.8-flash");
+        when(catalogue.model("qwen3.8-flash")).thenReturn(new PlatformModelCatalog.Model(
+                "qwen3.8-flash", "Flash", "Alibaba", 1000, 100, true, true, 1, 2, false));
+        org.springframework.test.util.ReflectionTestUtils.setField(factory, "platformModelCatalog", catalogue);
+        assertTrue(factory.isAvailableModel("qwen/qwen3.8-max"));
+        assertFalse(factory.isAvailableModel("unavailable/new-model"));
+    }
+
+    @Test
     void explicitPlatformModelRejectsMissingIdentityAndMachineKeyFallback() {
         setDbProvider("OPENROUTER");
         assertThrows(com.checkba.service.account.AccountException.class,

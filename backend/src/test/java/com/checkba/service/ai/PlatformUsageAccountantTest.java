@@ -73,6 +73,28 @@ class PlatformUsageAccountantTest {
         accountant.setPollIntervalMsForTest(1L);
     }
 
+    @Test
+    void domesticUsageUsesOnlyMatchingAccountGatewayAndRootUsdObservation() {
+        var domestic = new PlatformAiKeyService.Resolved("awdai_a", "domestic-a", null, "bailian",
+                "https://www.aiworkdeck.com/api/account/ai/v1", "qwen3.8-flash");
+        when(channel.resolveFor(1L)).thenReturn(domestic);
+        var calls = new java.util.ArrayList<String>();
+        var observer = new PlatformUsageAccountant(repository, channel, (method,url,bearer,body) -> {
+            calls.add(url);
+            assertEquals("awdai_a", bearer);
+            return new AccountTransport.Reply(200, "{\"usageUsd\":1.28}");
+        }, "https://openrouter.ai/api/v1");
+        try {
+            observer.setBaselineForTest(domestic.fingerprint(), new BigDecimal("1.25"));
+            observer.reconcile(7L, 1L, domestic);
+            assertEquals(new BigDecimal("0.03"), row.getCost());
+            assertEquals(java.util.List.of(domestic.baseUrl() + "/usage"), calls);
+            when(channel.resolveFor(1L)).thenReturn(KEY_B);
+            assertNull(observer.probeUsageForDisplay(1L, domestic.apiKey()));
+            assertEquals(1, calls.size(), "Queued old-account domestic token must never reach OpenRouter or another account");
+        } finally { observer.shutdown(); }
+    }
+
     private void usage(PlatformAiKeyService.Resolved key, double cumulative) {
         replies.computeIfAbsent(key.apiKey(), k -> new ArrayDeque<>())
                 .add(new AccountTransport.Reply(200,
