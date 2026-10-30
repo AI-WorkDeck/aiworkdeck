@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: Installed pageerror observation (no publishing)
+on:
+  push:
+    branches: [codex/installed-pageerror-observe-1643]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  observe:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install test driver dependencies
+        run: npm ci --prefix frontend
+      - name: Observe the same signed 0756 installed client
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AWD_TEST_INSTALLED: '1'
+          AWD_OBSERVE_PAGEERROR: '1'
+          CANDIDATE_RUN: '41118896868'
+          CANDIDATE_SHA: 8b669bd44bcdfdf0ec79de8f741db38193a23bd6
+          CANDIDATE_VERSION: '0.75.6'
+        run: node frontend/tests/desktop-e2e/electron-upgrade.mjs
+      - name: Preserve original assertions and added exception observations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installed-pageerror-Windows-${{ github.run_id }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/awd-electron-upgrade-*/*.json
+            ${{ runner.temp }}/awd-electron-upgrade-*/*.png
+            ${{ runner.temp }}/awd-electron-upgrade-*/*.log
+            ${{ runner.temp }}/awd-electron-upgrade-*/*.txt
+            ${{ runner.temp }}/awd-electron-upgrade-*/installed-logs/*.log
+            ${{ runner.temp }}/awd-electron-upgrade-*/home/*
