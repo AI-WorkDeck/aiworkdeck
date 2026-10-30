@@ -33,6 +33,8 @@ description: 侧边栏与工作台外壳领域。任务涉及左侧 rail/左栏�
 
 回归：`ai-panel-default-open`、`sidebar-collapse`、`account-entry-account-changed`。`tests/project-home/shell-native-ui.mjs` 使用临时 profile、真实账户组件/浮层 watcher/BrowserView 注册表和合成原生网页验证遮挡、恢复与并存浮层，并保留 OS 窗口截图；不连接产品后端，也不等于正式客户端或 Windows 验收。`SHELL_UI_BASELINE=1` 从修复前基线 `9121174e1`（可用 `SHELL_UI_BASELINE_REF` 覆盖）读取旧账户组件作病灶对照。
 
+诉讼可视化（dev-board#1627）选择 `plugin-litigation-visual` 时收起右侧普通 AI 面板，保留已挂载的 ChatInterface 和原会话；右侧其他插件不受影响。确认、后续提问及专属记录在左侧完成，通用历史不能接管专属实时连接；普通项目的 AI 首开规则不变。回归见 `ai-panel-default-open.test.mjs` 与诉讼领域文档。
+
 ## 更新状态与项目打开入口（dev-board#1401/#1403）
 
 工作台顶栏右侧工具组左边挂 `components/DesktopUpdateIndicator.vue`，直接消费 `host.update` 的 `{type,state}` 事件，挂载先订阅后取快照，旧快照不得覆盖更新的事件。检查/下载/原生准备持续显示；下载百分比只取真实字节，`preparing` 不显示虚构进度，`ready` 才允许点击原有 `host.update.restart()` 保存退出链。失败保留详情和重试；退出取消后恢复可点击。详情浮层用独立 holder 接入 `overlayState`，避免被 BrowserView 盖住，卸载必须退订及释放。菜单检查完成、后台就绪、工作台重挂载都不自动弹重启框；旧 `appUpdate` 底栏与自动提示已移除。
