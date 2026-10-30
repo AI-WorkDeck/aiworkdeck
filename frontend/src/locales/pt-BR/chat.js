@@ -2,6 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  attachmentImportPartial: "Importação parcial: {count} arquivos importados, {skipped} itens ignorados. Confira a árvore, permissões de origem, links simbólicos ou arquivos especiais. A pasta inteira não será reimportada automaticamente.",
+  attachmentScanIncomplete: "Verificação incompleta: {count} arquivos encontrados, nenhum importado. Selecione ou arraste a pasta inteira novamente; não é possível continuar com esta lista parcial.",
+  attachmentsRequireTools: "Estes anexos precisam ser lidos em lotes. Selecione um modelo com suporte a chamadas de ferramentas para continuar. Seus anexos foram mantidos.",
+  attachmentReaderBusy: "Tarefas anteriores ainda ocupam o serviço de leitura; esta leitura não começou. Aguarde e tente novamente. Se continuar sem responder, salve seu trabalho e reinicie o aplicativo.",
+  attachmentBatchHint: "Anexos ilimitados; grandes conjuntos podem demorar mais e são lidos em lotes conforme necessário.",
+  attachmentScanning: "Verificando pastas: {count} arquivos encontrados",
+  attachmentImportProgress: "{completed}/{total} itens importados",
+  attachmentImportUncertain: "O resultado em andamento não foi confirmado e ainda pode terminar em segundo plano. Confira a árvore de arquivos antes de importar novamente. Itens concluídos são mantidos.",
+  attachmentImportPaused: "Importação pausada ou com falhas parciais. Itens concluídos são mantidos; tente os restantes novamente.",
+  attachmentRetryRemaining: "Tentar novamente {count} itens restantes",
+  contextPreparingProgress: "Preparando anexos: {completed}/{total} registrados (não necessariamente lidos)",
+  contextNoticeDeferred: "Mais {count} itens foram mantidos para leitura em lotes conforme necessário; isso pode demorar.",
+  contextPreparationTimeout: "A preparação excedeu o tempo e esta rodada foi interrompida. Os anexos foram mantidos. Indique arquivos prioritários, reduza o escopo ou tente novamente manualmente mais tarde.",
+
   "earlierFiles": "Arquivos de conversas anteriores",
   "fileCreated": "Criado",
   "fileModified": "Modificado",
@@ -287,7 +301,6 @@ export default {
   "activeSelectionChipTitle": "Trecho selecionado: {text} (enviado à IA com sua mensagem para que as revisões priorizem este trecho; clique em x para omiti-lo nesta rodada)",
   "carriedAttachmentTitle": "{name} (herdado da rodada anterior e ainda anexado; clique para mantê-lo, clique em x para remover)",
   "carriedAttachmentHint": "As tags tracejadas são anexos da sua última mensagem e serão enviados novamente com a próxima. Clique em x para removê-los.",
-  "contextFileCapReached": "Até {max} itens (imagens incluídas) por rodada. Remova alguns antes de adicionar mais.",
   "imageCountCapToast": "Até {max} imagens são enviadas diretamente por rodada; as demais são processadas como texto reconhecido (OCR).",
   "imageTooLargeToast": "Esta imagem excede {size} e será processada como texto reconhecido (OCR). Compacte-a e envie novamente.",
   "contextNoticeThisFile": "Este item",

@@ -233,6 +233,16 @@ public class FileContextLoader {
         return new FolderContext(text, counters[0], counters[1]);
     }
 
+    /** Agent preparation keeps folders lazy; the file tool supplies bounded, resumable pages. */
+    public String buildFolderReference(String folderId) {
+        return "[Path base: all listing paths are relative to the attached folder (ID: " + folderId
+                + "), NOT the project root. Resolve its full project-relative path using list_project_folders "
+                + "before path-based moves.]\n"
+                + "[Folder contents have not been listed or read. Call extract_file_text with fileId="
+                + folderId + ", offset=0, maxChars=12000. Follow nextOffset to enumerate remaining children; "
+                + "recurse into child folder IDs and read each required file separately. A listing is not document content.]\n";
+    }
+
     /** 老签名保留：只要文本、不关心配额的调用方（三个既有测试）一行不用改。 */
     public String buildFolderContext(String folderIdStr, String projectIdStr, int currentTotalCount) {
         return buildFolderContextInternal(folderIdStr, projectIdStr, currentTotalCount, new int[2]);

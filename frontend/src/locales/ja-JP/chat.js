@@ -2,6 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  attachmentImportPartial: "フォルダーの取り込みは一部のみです：{count} ファイルを取り込み、{skipped} 件をスキップしました。ファイルツリー、元の権限、リンクや特殊ファイルを確認してください。フォルダー全体の自動再取り込みは行いません。",
+  attachmentScanIncomplete: "フォルダーの検索が未完了です。{count} ファイルを検出しましたが未取り込みです。フォルダー全体を再選択またはドロップしてください。この一部の一覧では続行できません。",
+  attachmentsRequireTools: "これらの添付は分割して読み取る必要があります。ツール呼び出し対応モデルを選択して続行してください。添付は保持されています。",
+  attachmentReaderBusy: "以前の処理が読み取りサービスを使用中のため、今回はまだ開始していません。しばらく待って再試行してください。応答しない場合は作業を保存してアプリを再起動してください。",
+  attachmentBatchHint: "添付数は無制限です。大量の資料は必要に応じて分割して読み取り、時間がかかる場合があります。",
+  attachmentScanning: "フォルダーを検索中：{count} ファイルを検出",
+  attachmentImportProgress: "{completed}/{total} 件を取り込み済み",
+  attachmentImportUncertain: "処理結果は未確認で、バックグラウンドで完了する可能性があります。再取り込み前にファイルツリーを確認してください。完了分は保持されます。",
+  attachmentImportPaused: "取り込みが一時停止または一部失敗しました。完了分を保持し、残りを再試行できます。",
+  attachmentRetryRemaining: "残り {count} 件を再試行",
+  contextPreparingProgress: "添付を準備中：{completed}/{total} 件を登録（本文の読了ではありません）",
+  contextNoticeDeferred: "残り {count} 件は必要に応じて分割して読み取ります。時間がかかる場合があります。",
+  contextPreparationTimeout: "添付の準備がタイムアウトし、この処理を停止しました。添付は保持されています。優先ファイルや対象範囲を指定するか、後で手動で再試行してください。",
+
   "earlierFiles": "以前の会話ファイル",
   "fileCreated": "作成日時",
   "fileModified": "更新日時",
@@ -287,7 +301,6 @@ export default {
   "activeSelectionChipTitle": "選択した引用: {text}（あなたのメッセージと一緒にAIへ送信され、修正時はまずこの部分が対象になります。x をクリックするとこのターンでは除外されます）",
   "carriedAttachmentTitle": "{name}（前のターンから引き継がれ、まだ添付されています。クリックで保持、x で削除）",
   "carriedAttachmentHint": "破線のタグは前回のメッセージの添付ファイルで、次のメッセージと一緒に再度送信されます。x をクリックすると削除できます。",
-  "contextFileCapReached": "1ターンあたり最大 {max} 件（画像を含む）です。追加する前に一部を削除してください。",
   "imageCountCapToast": "1ターンあたり最大 {max} 枚の画像が直接送信され、残りは認識されたテキスト（OCR）として処理されます。",
   "imageTooLargeToast": "この画像は {size} を超えているため、認識されたテキスト（OCR）として処理されます。圧縮してから再送信してください。",
   "contextNoticeThisFile": "この項目",

@@ -4,6 +4,7 @@
 // CompareDocDialog / VariablePanel / DrawioEditor 的用户可见文案。
 export default {
   officeToolNames: {
+    "listAttachedFiles": "列出本轮附件",
     "office_ppt_add_image": "插入幻灯片图片",
     "office_ppt_add_chart": "插入幻灯片图表",
     "office_ppt_format_chart": "设置幻灯片图表格式",

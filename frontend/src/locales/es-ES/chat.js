@@ -2,6 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  attachmentImportPartial: "Importación parcial: {count} archivos importados y {skipped} elementos omitidos. Revise el árbol, los permisos de origen, enlaces simbólicos o archivos especiales. No se reimportará automáticamente toda la carpeta.",
+  attachmentScanIncomplete: "Exploración incompleta: {count} archivos encontrados, ninguno importado. Seleccione o arrastre la carpeta completa de nuevo; no se puede continuar con esta lista parcial.",
+  attachmentsRequireTools: "Estos adjuntos deben leerse por lotes. Seleccione un modelo que admita llamadas a herramientas para continuar. Los adjuntos se conservan.",
+  attachmentReaderBusy: "Tareas anteriores siguen ocupando el servicio de lectura; esta lectura no comenzó. Espere y reintente. Si sigue sin responder, guarde su trabajo y reinicie la aplicación.",
+  attachmentBatchHint: "Adjuntos ilimitados; las colecciones grandes pueden tardar más y se leen por lotes según sea necesario.",
+  attachmentScanning: "Explorando carpetas: {count} archivos encontrados",
+  attachmentImportProgress: "{completed}/{total} elementos importados",
+  attachmentImportUncertain: "El resultado en curso no está confirmado y puede finalizar en segundo plano. Revise el árbol de archivos antes de volver a importar. Se conservan los elementos completados.",
+  attachmentImportPaused: "Importación pausada o parcialmente fallida. Se conserva lo completado; puede reintentar lo restante.",
+  attachmentRetryRemaining: "Reintentar {count} elementos restantes",
+  contextPreparingProgress: "Preparando adjuntos: {completed}/{total} registrados (no necesariamente leídos)",
+  contextNoticeDeferred: "Se conservan {count} elementos más para leerlos por lotes según sea necesario; puede tardar más.",
+  contextPreparationTimeout: "La preparación agotó el tiempo y este turno se detuvo. Se conservan los adjuntos. Indique archivos prioritarios, reduzca el alcance o reintente manualmente más tarde.",
+
   "earlierFiles": "Archivos de conversación anteriores",
   "fileCreated": "Creado",
   "fileModified": "Modificado",
@@ -287,7 +301,6 @@ export default {
   "activeSelectionChipTitle": "Fragmento seleccionado: {text} (se envía a la IA con su mensaje para que las revisiones se centren primero en este fragmento; haga clic en x para omitirlo en esta ronda)",
   "carriedAttachmentTitle": "{name} (arrastrado de la ronda anterior y todavía adjunto; haga clic para conservarlo, haga clic en x para quitarlo)",
   "carriedAttachmentHint": "Las etiquetas discontinuas son adjuntos de su último mensaje y se volverán a enviar con el siguiente. Haga clic en x para quitarlos.",
-  "contextFileCapReached": "Hasta {max} elementos (imágenes incluidas) por ronda. Quite algunos antes de añadir más.",
   "imageCountCapToast": "Hasta {max} imágenes se envían directamente por ronda; el resto se procesa como texto reconocido (OCR).",
   "imageTooLargeToast": "Esta imagen supera {size} y se procesará como texto reconocido (OCR). Comprímala y envíela de nuevo.",
   "contextNoticeThisFile": "Este elemento",

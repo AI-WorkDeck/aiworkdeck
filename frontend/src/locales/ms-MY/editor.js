@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "listAttachedFiles": "Senaraikan lampiran giliran ini",
     "office_ppt_add_image": "Sisipkan imej pada slaid",
     "office_ppt_add_chart": "Sisipkan carta pada slaid",
     "office_ppt_format_chart": "Format carta slaid",

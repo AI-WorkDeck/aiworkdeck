@@ -310,7 +310,6 @@ export default {
   "selectReplaceContentFirst": "حدد المحتوى المراد استبداله في المستند أولاً",
   "selectionReplaced": "تم استبدال التحديد",
   "replaceFailed": "فشل الاستبدال",
-  "folderTooManyFiles": "يحتوي المجلد على {count} ملفات (يتجاوز الحد البالغ 10 ملفات)، يرجى إزالة بعضها",
   "fileAdded": "تمت الإضافة: {name}",
   "filesAdded": "تمت إضافة {count} ملفات",
   "dragUnsupported": "لا يمكن إفلات هذا المحتوى هنا؛ أفلت ملفاً أو علامة تبويب محرر أو ملفاً من جهازك",

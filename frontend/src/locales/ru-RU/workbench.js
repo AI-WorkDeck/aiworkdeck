@@ -310,7 +310,6 @@ export default {
   "selectReplaceContentFirst": "Сначала выделите в документе текст для замены",
   "selectionReplaced": "Выделенный фрагмент заменён",
   "replaceFailed": "Ошибка замены",
-  "folderTooManyFiles": "В папке {count} файлов (превышен лимит в 10 файлов), уменьшите количество",
   "fileAdded": "Добавлено: {name}",
   "filesAdded": "Добавлено файлов: {count}",
   "dragUnsupported": "Такой контент нельзя перетащить сюда; перетащите файл, вкладку редактора или файл с компьютера",

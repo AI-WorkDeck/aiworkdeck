@@ -310,7 +310,6 @@ export default {
   "selectReplaceContentFirst": "Önce belgede değiştirilecek içeriği seçin",
   "selectionReplaced": "Seçim değiştirildi",
   "replaceFailed": "Değiştirme başarısız oldu",
-  "folderTooManyFiles": "Klasör {count} dosya içeriyor (10 dosya sınırını aşıyor), lütfen bazılarını kaldırın",
   "fileAdded": "Eklendi: {name}",
   "filesAdded": "{count} dosya eklendi",
   "dragUnsupported": "Bu içerik buraya bırakılamaz; bir dosya, bir düzenleyici sekmesi veya bilgisayarınızdan bir dosya bırakın",

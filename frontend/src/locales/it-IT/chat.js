@@ -2,6 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  attachmentImportPartial: "Importazione parziale: {count} file importati, {skipped} elementi saltati. Controlla l’albero, i permessi sorgente, i collegamenti simbolici o i file speciali. L’intera cartella non verrà reimportata automaticamente.",
+  attachmentScanIncomplete: "Scansione incompleta: {count} file trovati, nessuno importato. Seleziona o trascina di nuovo l’intera cartella; non è possibile continuare con questo elenco parziale.",
+  attachmentsRequireTools: "Questi allegati vanno letti in gruppi. Scegli un modello che supporti le chiamate agli strumenti per continuare. Gli allegati sono conservati.",
+  attachmentReaderBusy: "Le attività precedenti occupano ancora il servizio di lettura; questa lettura non è iniziata. Attendi e riprova. Se non risponde ancora, salva il lavoro e riavvia l’app.",
+  attachmentBatchHint: "Allegati illimitati; raccolte grandi richiedono più tempo e vengono lette in gruppi secondo necessità.",
+  attachmentScanning: "Scansione cartelle: {count} file trovati",
+  attachmentImportProgress: "{completed}/{total} elementi importati",
+  attachmentImportUncertain: "L’esito in corso non è confermato e potrebbe completarsi in background. Controlla l’albero dei file prima di reimportare. Gli elementi completati sono conservati.",
+  attachmentImportPaused: "Importazione sospesa o parzialmente fallita. Gli elementi completati restano; riprova i rimanenti.",
+  attachmentRetryRemaining: "Riprova {count} elementi rimanenti",
+  contextPreparingProgress: "Preparazione allegati: {completed}/{total} registrati (non necessariamente letti)",
+  contextNoticeDeferred: "Altri {count} elementi sono conservati per la lettura a gruppi secondo necessità; potrebbe richiedere tempo.",
+  contextPreparationTimeout: "La preparazione è scaduta e questo turno è terminato. Gli allegati restano. Indica i file prioritari, riduci l’ambito o riprova manualmente più tardi.",
+
   "earlierFiles": "File di conversazione precedenti",
   "fileCreated": "Creato",
   "fileModified": "Modificato",
@@ -287,7 +301,6 @@ export default {
   "activeSelectionChipTitle": "Brano selezionato: {text} (inviato all'IA con il tuo messaggio affinché le revisioni Riguardino prima questo brano; fai clic su x per escluderlo per questo turno)",
   "carriedAttachmentTitle": "{name} (riportato dal turno precedente e ancora allegato; fai clic per conservarlo, fai clic su x per rimuoverlo)",
   "carriedAttachmentHint": "I tag tratteggiati sono allegati del tuo ultimo messaggio e verranno inviati nuovamente con il prossimo. Fai clic su x per rimuoverli.",
-  "contextFileCapReached": "Fino a {max} elementi ( immagini incluse) per turno. Rimuovine alcuni prima di aggiungerne altri.",
   "imageCountCapToast": "Fino a {max} immagini vengono inviate direttamente per turno; le restanti vengono elaborate come testo riconosciuto (OCR).",
   "imageTooLargeToast": "Questa immagine supera {size} e verrà elaborata come testo riconosciuto (OCR). Comprimila e inviala di nuovo.",
   "contextNoticeThisFile": "Questo elemento",

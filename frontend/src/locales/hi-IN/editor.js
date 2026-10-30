@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "listAttachedFiles": "इस चरण के संलग्नक सूचीबद्ध करें",
     "office_ppt_add_image": "स्लाइड में चित्र डालें",
     "office_ppt_add_chart": "स्लाइड में चार्ट डालें",
     "office_ppt_format_chart": "स्लाइड चार्ट का स्वरूप सेट करें",

@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "listAttachedFiles": "이번 첨부 목록",
     "office_ppt_add_image": "슬라이드 이미지 삽입",
     "office_ppt_add_chart": "슬라이드 차트 삽입",
     "office_ppt_format_chart": "슬라이드 차트 서식 설정",

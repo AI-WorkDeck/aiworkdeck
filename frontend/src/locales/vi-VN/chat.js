@@ -2,6 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  attachmentImportPartial: "Thư mục chỉ được nhập một phần: {count} tệp đã nhập, bỏ qua {skipped} mục. Kiểm tra cây tệp, quyền nguồn, liên kết tượng trưng hoặc tệp đặc biệt. Sẽ không tự động nhập lại toàn bộ thư mục.",
+  attachmentScanIncomplete: "Quét thư mục chưa hoàn tất: tìm thấy {count} tệp, chưa nhập tệp nào. Chọn hoặc kéo lại toàn bộ thư mục; không thể tiếp tục nhập từ danh sách chưa đầy đủ này.",
+  attachmentsRequireTools: "Các tệp đính kèm này cần được đọc theo đợt. Chọn mô hình hỗ trợ gọi công cụ để tiếp tục. Tệp đính kèm được giữ lại.",
+  attachmentReaderBusy: "Tác vụ trước vẫn chiếm dịch vụ đọc; lần đọc này chưa bắt đầu. Hãy chờ rồi thử lại. Nếu vẫn không phản hồi, lưu công việc và khởi động lại ứng dụng.",
+  attachmentBatchHint: "Không giới hạn số tệp đính kèm; bộ tài liệu lớn có thể mất nhiều thời gian và được đọc theo đợt khi cần.",
+  attachmentScanning: "Đang quét thư mục: tìm thấy {count} tệp",
+  attachmentImportProgress: "Đã nhập {completed}/{total} mục",
+  attachmentImportUncertain: "Chưa xác nhận kết quả thao tác đang chạy; có thể vẫn hoàn tất trong nền. Kiểm tra cây tệp trước khi nhập lại. Các mục đã xong được giữ lại.",
+  attachmentImportPaused: "Đã tạm dừng nhập hoặc có lỗi một phần. Giữ lại mục đã xong; có thể thử lại phần còn lại.",
+  attachmentRetryRemaining: "Thử lại {count} mục còn lại",
+  contextPreparingProgress: "Đang chuẩn bị: đã đăng ký {completed}/{total} mục (chưa chắc đã đọc nội dung)",
+  contextNoticeDeferred: "Giữ lại {count} mục nữa để đọc theo đợt khi cần; có thể mất thêm thời gian.",
+  contextPreparationTimeout: "Chuẩn bị quá thời gian và lượt này đã dừng. Tệp đính kèm được giữ lại. Chọn tệp ưu tiên, thu hẹp phạm vi hoặc thử lại thủ công sau.",
+
   "earlierFiles": "Tệp từ các cuộc hội thoại trước",
   "fileCreated": "Đã tạo",
   "fileModified": "Đã sửa đổi",
@@ -287,7 +301,6 @@ export default {
   "activeSelectionChipTitle": "Đoạn trích đã chọn: {text} (được gửi đến AI cùng tin nhắn của bạn để các chỉnh sửa ưu tiên đoạn trích này trước; nhấn x để bỏ qua trong lượt này)",
   "carriedAttachmentTitle": "{name} (được chuyển từ lượt trước và vẫn đang đính kèm; nhấn để giữ lại, nhấn x để xóa)",
   "carriedAttachmentHint": "Thẻ nét đứt là tệp đính kèm từ tin nhắn gần nhất của bạn và sẽ được gửi lại cùng tin nhắn tiếp theo. Nhấn x để xóa.",
-  "contextFileCapReached": "Tối đa {max} mục (bao gồm hình ảnh) mỗi lượt. Hãy xóa bớt trước khi thêm mục mới.",
   "imageCountCapToast": "Tối đa {max} hình ảnh được gửi trực tiếp mỗi lượt; phần còn lại được xử lý dưới dạng văn bản nhận dạng (OCR).",
   "imageTooLargeToast": "Hình ảnh này vượt quá {size} và sẽ được xử lý dưới dạng văn bản nhận dạng (OCR). Hãy nén và gửi lại.",
   "contextNoticeThisFile": "Mục này",

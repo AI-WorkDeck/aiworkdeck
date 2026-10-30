@@ -1141,13 +1141,15 @@ ChatInterface.handleSubmit（~:927）→ useAgentStream.sendMessage（确保 SSE
 
 ## SSE 事件名清单
 
+**context_progress**：附件准备登记进度，`{stage:"preparing",completed,total,name,done}`。登记完成不代表正文已读，终态由既有error/cancelled/bubble_end处理（dev-board#1634）。
+
 **account_action_required**：付费工具或异步 PPT 任务需要登录/充值的非终态通知，JSON 包含 `code`、`message` 与 `reason`，并带 `kind` 或 `gatewayKind`。前端打开相应弹框，不据此结束聊天流；模型自身的账户失败仍走终态 `error`。
 
 connected / bubble_start / **model_routed**（智能模式 Auto 下后端 0ms 路由器完成档位/模型分派后立即发出的非终态通知，`{"requestedModel":"auto","modelId":"…","modelName":"…","tier":"FAST|BALANCED|DEEP","reason":"…"}`，前端据此在气泡头部/思考卡展示本次实际命中模型，dev-board#1434）/ text_delta / **reasoning_delta**（思考型模型的 reasoning 增量，`{"content":"…"}`，只进思考卡、不进正文；随消息落 `reasoning` 列，state_recovery 的 `events` 里按序带着它，重连/切回后原样重放，见「思考记录的持久化与断线恢复」）/ artifact / token_usage / bubble_end（status: finished|paused|awaiting_approval|awaiting_input；外加 **documentEdited**，见下）/ error / cancelled / **file_change**（见下）/ client_action / title_update / doc_stream_data（旧名 wps_stream_data 已于 dev-board#816 摘除，出站单名）/ doc_stream_end（编辑器流式写入收尾，前端据此落盘并报失败）/ state_recovery（断线重连快照）/ run_state / plan_update / **skill_update** / background_task_start / background_task_complete / task_progress / heartbeat / subtask_progress / **pass_progress**（整篇分段过卷进度，dev-board#422）/ **context_notice**（附件降级/截断/丢弃 + 上下文超窗，见下）/ inbox_updated / input_applied / **superseded**（本连接已被同会话的另一个客户端实例接管，见下）/ **provider_retry**（首字节前只收到保活、后端已换一家供应商重发，`{"from":"<供应商显示名或 unknown>"}`，只驱动思考卡副文案，dev-board#1061）/ **ask_user**（ask_user 工具的结构化提问，带版本号 `v`，紧跟在同一问题的 `<question kind="ask_user">` 标记之后、`bubble_end status=awaiting_input` 之前，见上文「向用户提问 ask_user 工具」） / **harness_adaptation**（Harness² 运行时自愈动作通知，`{"layer":"INVARIANT|DOMAIN","action":"EXPAND_TOOL_CATEGORY|ANCHOR_PROBE_RECOVERY|MOUNT_DOMAIN_SKILL|CLARIFY_WITH_USER","target","failedTool","diagnosis","recoveryAction"}`，dev-board#1481） / **verification_report**（VeriHarness 声明式收尾证据挑战结构化报告，`{"skillId","status":"VERIFIED_CLEAN|GAPS_FOUND|UNVERIFIED","supportedCount","unverifiedCount","conflictCount","totalChecked","items","summary"}`，dev-board#1481） / **harness_evolution**（对比式用户自进化记忆沉淀通知，`{"id","triggerType","layer","scope","spaceId","topicPath","title","ruleSummary","contrastSummary","promotedSkillId"}`，dev-board#1481）。前端分派均在 useAgentStream.handleEvent。超限 paused 契约见 PR#172。
 
 **`error` 事件有两种载荷**（2026-09-29，dev-board#1046 登录后置）：编排器捕获 `AccountException` 的两处
 （主循环 catch、故障转移取模型失败）发 JSON `{message, code, kind, reason?}`（`AgentOrchestrator.accountErrorPayload`，
-`NOT_CONNECTED` → `code:4011` + `reason`（缺省 `platform_ai`），其余 kind → `code:1`）；**其余所有 error 路径仍是字符串**
+`NOT_CONNECTED` → `code:4011` + `reason`（缺省 `platform_ai`），其余 kind → `code:1`）；附件等待失败另发 JSON `{code,messageKey,message}`：`CONTEXT_PREPARATION_TIMEOUT`、`ATTACHMENT_READER_BUSY`、`ATTACHMENTS_REQUIRE_TOOLS`；前端按已知code映射20语令牌，历史保存请求语言文案。**其余 error 路径仍是字符串**
 （`LlmErrorClassifier` 那几个 `AI_*` 标记照旧 includes 判定）。桌面 `useAgentStream` 在 `const errMsg = dataStr` 锚点之前
 用 `parseAccountErrorPayload` 先试 JSON——`tests/project-home/network-unreachable-notice.test.mjs` 按这个锚点把分支抠出来真跑，
 改这段要连同那里的 `accountPayload` 参数一起改。插件 `chatSession.js` 本来就 `JSON.parse(data).message`，不用动。
@@ -1848,3 +1850,12 @@ SSE query 都显式携带范围；不匹配的普通面板连接在替换 emitte
 不是按技能触发词自动隐藏普通聊天。保存、fork/rollback 继续保留范围，进程重启从持久消息回读。
 新增文件事件方面，litigation_render/timeline_render 没有结构化真实产物时不走“当前文档”兜底；
 已登记 drawio/svg/png 仍沿实际 ID 逐项发事件。详细 UI/恢复与验证边界见 litigation-visual.md。
+
+## 多文件与目录按需读取（2026-10-30，dev-board#1634）
+
+- 附件数量不再以10份拒收；`maxFilesPerContext`仅是准备阶段预读额度，正文总字符预算仍保留，且预算检查在读盘/OCR之前。所有附件登记到原用户消息，超预算发一次`deferred`汇总。目录准备阶段仅注入目录引用，不递归扫盘或批量触发OCR；上文深度5/预读统计仅描述仍保留的legacy loader。
+- `extract_file_text`读取目录时，`offset`是直接子项起点，`nextOffset`续页；每页最多200项且受字符预算约束。子目录按ID递归，文件逐个读取，列出不等于读过。当前仍一次查直接子项元数据；列表变更后应从0重新核对，不能将偏移量当稳定快照。
+- 超过100个独立附件时，组装只展示前100个引用，其余通过`list_attached_files(messageId,afterId)`读取持久化清单；每页100项/约12k字符，逐页验证消息用户、项目、会话及当前项目读权限。新工具不授予文件写权限；原文件读取继续走文件权限校验。ASK及skill裁剪后保留这两个只读工具。无工具能力模型遇延后读取附件会明确要求换模型，不发送无法执行的读取任务。
+- 准备等待120秒、单次文件读取180秒；这是单步等待上限，不是整项任务时长。只读工作池有界，不可中断解析器不能无限增线程；取消会结束等待，迟到附件回执封口，不启动后续预读。上游在途OCR不保证已取消计费，禁止自动重放。池占满单独提示尚未开始读取及等待/保存后重启方案。
+- `context_progress`报告附件准备数量，不代表正文全部读取。导入独立显示真实进度；成功项保留，明确失败与未开始项可重试，取消/网络超时等结果未知项不自动重传。扫描不完整不能拿部分清单冒充完整目录；桌面目录导入须展示后端`skippedCount`。
+- 回归入口：`ContextLimitsAndNoticesTest`、`AttachmentToolsTest`、`ExtractFileTextFolderTest`、`BoundedAttachmentReadTest`、`AgentOrchestratorAttachmentWaitTest`；前端`chat-import-batch.test.mjs`及`tests/chat-presentation-ui/multifile.mjs`。浏览器夹具仅使用合成项目与请求桩，不等于真实供应商逐份识别准确率或正式客户端验收。

@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "listAttachedFiles": "このターンの添付一覧",
     "office_ppt_add_image": "スライドに画像を挿入",
     "office_ppt_add_chart": "スライドにグラフを挿入",
     "office_ppt_format_chart": "スライドのグラフを書式設定",

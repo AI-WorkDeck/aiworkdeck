@@ -2,6 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  attachmentImportPartial: "Klasör kısmen aktarıldı: {count} dosya aktarıldı, {skipped} öğe atlandı. Dosya ağacını, kaynak izinlerini, sembolik bağlantıları veya özel dosyaları kontrol edin. Klasörün tamamı otomatik olarak yeniden aktarılmaz.",
+  attachmentScanIncomplete: "Klasör taraması tamamlanmadı: {count} dosya bulundu, hiçbiri aktarılmadı. Klasörün tamamını yeniden seçin veya bırakın; bu kısmi listeyle içe aktarmaya devam edilemez.",
+  attachmentsRequireTools: "Bu ekler gruplar halinde okunmalıdır. Devam etmek için araç çağrılarını destekleyen bir model seçin. Ekleriniz korundu.",
+  attachmentReaderBusy: "Önceki görevler okuma hizmetini kullanıyor; bu okuma başlamadı. Bekleyip yeniden deneyin. Yanıt vermemeye devam ederse çalışmanızı kaydedip uygulamayı yeniden başlatın.",
+  attachmentBatchHint: "Sınırsız ek; büyük koleksiyonlar daha uzun sürebilir ve gerektiğinde gruplar halinde okunur.",
+  attachmentScanning: "Klasörler taranıyor: {count} dosya bulundu",
+  attachmentImportProgress: "{completed}/{total} öğe içe aktarıldı",
+  attachmentImportUncertain: "Devam eden işlemin sonucu doğrulanmadı; arka planda tamamlanabilir. Yeniden aktarmadan önce dosya ağacını kontrol edin. Tamamlanan öğeler korunur.",
+  attachmentImportPaused: "İçe aktarma duraklatıldı veya kısmen başarısız oldu. Tamamlananlar korunur; kalanları yeniden deneyebilirsiniz.",
+  attachmentRetryRemaining: "Kalan {count} öğeyi yeniden dene",
+  contextPreparingProgress: "Ekler hazırlanıyor: {completed}/{total} kaydedildi (okunduğu anlamına gelmez)",
+  contextNoticeDeferred: "{count} ek öğe gerektiğinde gruplar halinde okunmak üzere korundu; daha uzun sürebilir.",
+  contextPreparationTimeout: "Hazırlık zaman aşımına uğradı ve bu tur durduruldu. Ekler korunur. Öncelikli dosyaları belirtin, kapsamı daraltın veya sonra elle yeniden deneyin.",
+
   "earlierFiles": "Önceki sohbet dosyaları",
   "fileCreated": "Oluşturuldu",
   "fileModified": "Değiştirildi",
@@ -287,7 +301,6 @@ export default {
   "activeSelectionChipTitle": "Seçilen alıntı: {text} (mesajınızla birlikte yapay zekâya gönderilir; böylece düzeltmeler önce bu alıntıya odaklanır; bu turda hariç tutmak için x'e tıklayın)",
   "carriedAttachmentTitle": "{name} (önceki turdan devredildi ve hâlâ ekli; tutmak için tıklayın, kaldırmak için x'e tıklayın)",
   "carriedAttachmentHint": "Kesikli etiketler son mesajınızdaki eklerdir ve bir sonrakiyle birlikte yeniden gönderilir. Kaldırmak için x'e tıklayın.",
-  "contextFileCapReached": "Tur başına en fazla {max} öğe (görseller dahil). Başka eklemek için önce bazılarını kaldırın.",
   "imageCountCapToast": "Tur başına en fazla {max} görsel doğrudan gönderilir; geri kalanlar tanınan metin (OCR) olarak işlenir.",
   "imageTooLargeToast": "Bu görsel {size} sınırını aşıyor ve tanınan metin (OCR) olarak işlenecek. Sıkıştırıp yeniden gönderin.",
   "contextNoticeThisFile": "Bu öğe",

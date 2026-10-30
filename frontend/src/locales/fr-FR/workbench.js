@@ -310,7 +310,6 @@ export default {
   "selectReplaceContentFirst": "Sélectionnez d'abord le contenu à remplacer dans le document",
   "selectionReplaced": "Sélection remplacée",
   "replaceFailed": "Échec du remplacement",
-  "folderTooManyFiles": "Le dossier contient {count} fichiers (au-delà de la limite de 10 fichiers), veuillez en supprimer quelques-uns",
   "fileAdded": "Ajouté : {name}",
   "filesAdded": "{count} fichiers ajoutés",
   "dragUnsupported": "Ce contenu ne peut pas être déposé ici ; déposez un fichier, un onglet d'éditeur ou un fichier depuis votre ordinateur",

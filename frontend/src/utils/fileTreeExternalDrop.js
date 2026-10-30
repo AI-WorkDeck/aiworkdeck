@@ -109,6 +109,11 @@ export function isPermissionDeniedImportError(err) {
   return /EPERM|EACCES|Operation not permitted|Permission denied|无权读取|完全磁盘访问权限|Full Disk Access/i.test(msg)
 }
 
+// These errors are raised before a source can be copied; only they permit byte fallback.
+export function isPreImportReadError(error) {
+  return isPermissionDeniedImportError(error) || /源文件不存在或不是普通文件|Source file does not exist or is not a regular file/i.test(String(error?.message || ''))
+}
+
 function notifyPermissionRequiredForDrop(payload) {
   try {
     if (typeof uni !== 'undefined' && uni && typeof uni.$emit === 'function') {
@@ -166,7 +171,8 @@ export async function importDroppedFile(file, fs, importPath) {
       try {
         return await importPath(source.path)
       } catch (pathErr) {
-        if (source.bytes) {
+        if (pathErr?.uncertain) throw pathErr
+        if (source.bytes && isPreImportReadError(pathErr)) {
           const read = await source.bytes
           if (read && !read.error && (read.bytes instanceof ArrayBuffer) && read.bytes.byteLength === file.size) {
             try { staged = await fs.stageDroppedFile({ name: file.name, bytes: read.bytes }) }

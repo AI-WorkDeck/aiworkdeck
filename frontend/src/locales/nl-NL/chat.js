@@ -2,6 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  attachmentImportPartial: "Map deels geïmporteerd: {count} bestanden geïmporteerd, {skipped} items overgeslagen. Controleer de bestandsboom, bronrechten, symbolische links of speciale bestanden. De hele map wordt niet automatisch opnieuw geïmporteerd.",
+  attachmentScanIncomplete: "Mappenscan onvolledig: {count} bestanden gevonden, geen geïmporteerd. Selecteer of sleep de volledige map opnieuw; deze gedeeltelijke lijst kan niet worden gebruikt om verder te gaan.",
+  attachmentsRequireTools: "Deze bijlagen moeten in groepen worden gelezen. Kies een model dat gereedschapsaanroepen ondersteunt om door te gaan. Uw bijlagen blijven behouden.",
+  attachmentReaderBusy: "Eerdere taken bezetten de leesdienst nog; deze leesopdracht is niet gestart. Wacht en probeer opnieuw. Blijft de dienst niet reageren, sla uw werk op en herstart de app.",
+  attachmentBatchHint: "Onbeperkte bijlagen; grote verzamelingen kosten mogelijk meer tijd en worden naar behoefte in groepen gelezen.",
+  attachmentScanning: "Mappen scannen: {count} bestanden gevonden",
+  attachmentImportProgress: "{completed}/{total} items geïmporteerd",
+  attachmentImportUncertain: "Het lopende resultaat is onbevestigd en kan op de achtergrond nog afronden. Controleer de bestandsboom vóór opnieuw importeren. Voltooide items blijven behouden.",
+  attachmentImportPaused: "Import gepauzeerd of deels mislukt. Voltooide items blijven behouden; probeer de overige opnieuw.",
+  attachmentRetryRemaining: "{count} overige items opnieuw proberen",
+  contextPreparingProgress: "Bijlagen voorbereiden: {completed}/{total} geregistreerd (niet noodzakelijk gelezen)",
+  contextNoticeDeferred: "{count} extra items blijven bewaard om naar behoefte in groepen te lezen; dit kan langer duren.",
+  contextPreparationTimeout: "De voorbereiding duurde te lang en deze beurt is gestopt. Bijlagen blijven behouden. Geef prioriteitsbestanden op, beperk de scope of probeer later handmatig opnieuw.",
+
   "earlierFiles": "Eerdere gespreksbestanden",
   "fileCreated": "Gemaakt",
   "fileModified": "Gewijzigd",
@@ -287,7 +301,6 @@ export default {
   "activeSelectionChipTitle": "Geselecteerd fragment: {text} (wordt met uw bericht naar de AI gestuurd zodat revisies zich eerst op dit fragment richten; klik op x om het voor deze beurt weg te laten)",
   "carriedAttachmentTitle": "{name} (overgenomen van de vorige beurt en nog steeds bijgevoegd; klik om het te behouden, klik op x om het te verwijderen)",
   "carriedAttachmentHint": "Gestippelde tags zijn bijlagen van uw laatste bericht en worden opnieuw meegestuurd met het volgende. Klik op x om ze te verwijderen.",
-  "contextFileCapReached": "Maximaal {max} items (afbeeldingen inbegrepen) per beurt. Verwijder er enkele voordat u er meer toevoegt.",
   "imageCountCapToast": "Maximaal {max} afbeeldingen worden per beurt rechtstreeks verzonden; de rest wordt verwerkt als herkende tekst (OCR).",
   "imageTooLargeToast": "Deze afbeelding overschrijdt {size} en wordt verwerkt als herkende tekst (OCR). Comprimeer deze en verzend opnieuw.",
   "contextNoticeThisFile": "Dit item",

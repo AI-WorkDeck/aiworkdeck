@@ -310,7 +310,6 @@ export default {
   "selectReplaceContentFirst": "Pilih kandungan yang akan digantikan dalam dokumen terlebih dahulu",
   "selectionReplaced": "Pilihan telah digantikan",
   "replaceFailed": "Gagal menggantikan",
-  "folderTooManyFiles": "Folder mengandungi {count} fail (melebihi had 10 fail), sila buang beberapa fail",
   "fileAdded": "Ditambah: {name}",
   "filesAdded": "Menambah {count} fail",
   "dragUnsupported": "Kandungan ini tidak boleh dilepaskan di sini; lepaskan fail, tab penyunting atau fail dari komputer anda",

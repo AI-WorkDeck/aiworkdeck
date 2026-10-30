@@ -2,6 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // AI chat panel (ChatInterface + AgentMessage cards + ArtifactCard + BackgroundTaskIndicator)
 export default {
+  attachmentImportPartial: "Folder import is partial: {count} files imported, {skipped} items skipped. Check the file tree and source permissions, symlinks or special files. The entire folder will not be imported again automatically.",
+  attachmentScanIncomplete: "Folder scanning is incomplete: {count} files found, none imported. Select or drop the full folder again; this partial list cannot be used to continue importing.",
+  attachmentsRequireTools: "These attachments need to be read in batches. Select a model that supports tool calls to continue. Your attachments are retained.",
+  attachmentReaderBusy: "Earlier tasks still occupy the reading service; this read has not started. Wait and retry. If it remains unresponsive, save your work and restart the app.",
+  attachmentBatchHint: "Unlimited attachments; large collections may take longer and are read in batches as needed.",
+  attachmentScanning: "Scanning folders: {count} files found",
+  attachmentImportProgress: "Imported {completed}/{total} items",
+  attachmentImportUncertain: "The pending operation is unconfirmed and may still finish in the background. Check the file tree before importing it again. Completed items are kept.",
+  attachmentImportPaused: "Import paused or partly failed. Completed items are kept; retry the remaining items.",
+  attachmentRetryRemaining: "Retry {count} remaining items",
+  contextPreparingProgress: "Preparing attachments: {completed}/{total} registered (not necessarily read)",
+  contextNoticeDeferred: "{count} more items are retained for reading in batches as needed; this may take longer.",
+  contextPreparationTimeout: "Attachment preparation timed out and this turn has stopped. Attachments are retained. Specify priority files, narrow the scope, or retry manually later.",
+
   earlierFiles: 'Earlier conversation files',
   fileCreated: 'Created',
   fileModified: 'Modified',
@@ -307,7 +321,6 @@ export default {
   activeSelectionChipTitle: 'Selected excerpt: {text} (sent to the AI with your message so revisions target this excerpt first; click x to omit it for this turn)',
   carriedAttachmentTitle: '{name} (carried over from the previous turn and still attached; click to keep it, click x to remove)',
   carriedAttachmentHint: 'Dashed tags are attachments from your last message and will be sent again with the next one. Click x to remove.',
-  contextFileCapReached: 'Up to {max} items (images included) per turn. Remove some before adding more.',
   imageCountCapToast: 'Up to {max} images are sent directly per turn; the rest are processed as recognized text (OCR).',
   imageTooLargeToast: 'This image is over {size} and will be processed as recognized text (OCR). Compress it and send again.',
   contextNoticeThisFile: 'This item',

@@ -3,6 +3,28 @@
 <template>
   <view class="chat-interface" :class="{ 'is-empty': bubbles.length === 0 && !isStreaming }">
 
+    <view v-if="contextFiles.length > 10 || contextFiles.some(file => file.isDir)" class="attachment-status" role="status">
+      <text>{{ $t('chat.attachmentBatchHint') }}</text>
+    </view>
+    <view v-if="contextProgress && isStreaming" class="attachment-status" role="status" aria-live="polite">
+      <text>{{ $t('chat.contextPreparingProgress', contextProgress) }}</text>
+      <text v-if="contextProgress.name">{{ contextProgress.name }}</text>
+      <button type="button" @click="handleAbort">{{ $t('chat.cancel') }}</button>
+    </view>
+    <view v-if="importBatch" class="attachment-status" role="status" aria-live="polite">
+      <text v-if="importBatch.running || importScanning">{{ $t('chat.attachmentBatchHint') }}</text>
+      <text v-if="importScanning">{{ $t('chat.attachmentScanning', { count: importBatch.items.length }) }}</text>
+      <text v-else-if="importBatch.scanIncomplete">{{ $t('chat.attachmentScanIncomplete', { count: importBatch.items.length }) }}</text>
+      <text v-else-if="importSkipped > 0">{{ $t('chat.attachmentImportPartial', { count: importFileCount, skipped: importSkipped }) }}</text>
+      <text v-else>{{ $t('chat.attachmentImportProgress', { completed: importBatch.completed, total: importBatch.items.length }) }}</text>
+      <text v-if="importBatch.current">{{ importBatch.current }}</text>
+      <text v-if="importBatch.uncertain">{{ $t('chat.attachmentImportUncertain') }}</text>
+      <text v-for="item in importBatch.items.filter(item => item.state === 'failed' && item.dropCode)" :key="item.relativePath || item.name">{{ item.name }}: {{ $t('fileTree.' + item.dropCode) }}</text>
+      <text v-if="!importBatch.uncertain && !importBatch.scanIncomplete && (importFailed || importBatch.cancelled)">{{ $t('chat.attachmentImportPaused') }}</text>
+      <button v-if="importBatch.running || importScanning" type="button" @click="cancelImport">{{ $t('chat.cancel') }}</button>
+      <button v-else-if="importRemaining" type="button" @click="runPendingImports">{{ $t('chat.attachmentRetryRemaining', { count: importRemaining }) }}</button>
+      <button v-if="!importBatch.running && !importScanning" type="button" @click="importBatch = null">{{ $t('common.close') }}</button>
+    </view>
     <!-- Upload File Modal (reused from FileTree pattern) -->
     <view v-if="showUploadDialog" class="awd-dialog-mask" @tap="cancelUpload">
       <view class="awd-dialog awd-dialog-large" @tap.stop>
@@ -1076,11 +1098,11 @@ import { useAgentStream } from '@/composables/useAgentStream.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 import { useBuiltinWorkflows, notifyBuiltinWorkflowsChanged } from '@/composables/useBuiltinWorkflows.js'
 import { ref, watch, onMounted, onBeforeUnmount, nextTick, getCurrentInstance, computed, inject } from 'vue'
-import { createFile, importLocalFile, getProjectFiles, getApiBaseUrl, getAiHistory, rollbackConversation, performPptGeneration, getSkills, selectBuiltinWorkflowVersion, getCurrentUser as getCurrentUserApi, fetchAiModels, getAiConfig, cancelBackgroundTask, listPluginJobs, cancelPluginJob, getMeetingRecordings, resolveProjectFileByPath } from '@/services/api.js'
+import { createFolder, createFile, importLocalFile, getProjectFiles, getApiBaseUrl, getAiHistory, rollbackConversation, performPptGeneration, getSkills, selectBuiltinWorkflowVersion, getCurrentUser as getCurrentUserApi, fetchAiModels, getAiConfig, cancelBackgroundTask, listPluginJobs, cancelPluginJob, getMeetingRecordings, resolveProjectFileByPath } from '@/services/api.js'
 import { audioNeedingTranscription, isTranscribableMedia, transcribedAudioFileIds } from '@/utils/audioAttachment.js'
 import { getAuthHeaders, getCurrentUser, getSessionId } from '@/utils/auth.js'
 import { host } from '@/services/host.js'
-import { captureDroppedFiles, importDroppedFile } from '@/utils/fileTreeExternalDrop.js'
+import { captureDroppedFiles, importDroppedFile, isPreImportReadError } from '@/utils/fileTreeExternalDrop.js'
 import DecisionAssistControl from './DecisionAssistControl.vue'
 import ChatSuggestionControl from './ChatSuggestionControl.vue'
 import { useChatSuggestions } from '@/composables/useChatSuggestions.js'
@@ -1111,14 +1133,13 @@ import {
   admitPastedImage,
   formatBytes,
 } from '@/utils/chatContextLimits.js'
+import { createImportBatch, runImportBatch, captureDropEntries, walkDropEntries } from '@/utils/chatImportBatch.js'
 import { attachmentRecord, attachmentsFromHistory, fileListFromBubble } from '@/utils/chatAttachments.js'
 import { formatAskUserAnswer, parseAskUserAnswer } from '@/utils/askUserAnswer.mjs'
 import { isEnglish } from '@/utils/appLanguage.js'
 import { requireAccount, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { requiresAiAccount } from '@/utils/requireAccountCore.js'
 import {
-  AI_CONTEXT_FOLDER_FILE_LIMIT,
-  countDescendantFiles,
   dirLabelOf,
   excludeSystemFolders,
   matchProjectFiles,
@@ -1197,6 +1218,7 @@ export default {
   setup(props, { emit, expose }) {
     const {
       bubbles,
+      contextProgress,
       isStreaming,
       sendMessage: sendAgentMessage,
       abort,
@@ -1637,6 +1659,7 @@ export default {
     const contextNoticeText = (n) => {
       const name = n && n.name ? n.name : t('chat.contextNoticeThisFile')
       switch (n && n.kind) {
+        case 'deferred': return t('chat.contextNoticeDeferred', { count: n.detail || '' })
         case 'truncated': return t('chat.contextNoticeTruncated', { name, chars: n.detail || '' })
         case 'dropped': return t('chat.contextNoticeDropped', { name, max: n.detail || '' })
         case 'ocr_fallback': return t('chat.contextNoticeOcrFallback', { name })
@@ -2655,6 +2678,9 @@ export default {
      * 「该附件内容暂不可读」，而他压根不知道自己带了这份东西。
      */
     const clearAttachmentDraft = () => {
+      cancelImport()
+      importBatch.value = null
+      isUploading.value = false
       contextFiles.value = []
       carriedFileIds.value = []
       pastedImages.value = []
@@ -2680,7 +2706,7 @@ export default {
       // 插件镜像会话只读（dev-board#298）：输入区已换成说明条，这里再拦一道
       // 兜住空态输入框等旁路（后端对镜像会话追加也会拒，这是省一次报错）
       if (props.externalReadOnly) return
-      if (isUploadingPasted.value) return
+      if (isUploadingPasted.value || isUploading.value || importScanning.value) return
       // Create a clone to safely manipulate and extract text without tags
       let text = ''
       let contentHtml = ''
@@ -3412,9 +3438,7 @@ export default {
                   uni.showToast({
                     title: verdict.reason === 'imageBytes'
                       ? t('chat.imageTooLargeToast', { size: formatBytes(verdict.max) })
-                      : verdict.reason === 'imageCount'
-                        ? t('chat.imageCountCapToast', { max: verdict.max })
-                        : t('chat.contextFileCapReached', { max: verdict.max }),
+                      : t('chat.imageCountCapToast', { max: verdict.max }),
                     icon: 'none',
                     duration: 3000,
                   })
@@ -3542,19 +3566,9 @@ export default {
       }
     }
 
-    // 文件夹整体挂进来时的后代文件数上限：与文件树拖拽那条路同一个判据
-    //（utils/aiContextFiles.js），不然同一个文件夹在两个入口给出两种结论。
     const addFileWithLimit = (file) => {
       if (!file || file.id == null) return false
-      if (file.isDir) {
-        const total = countDescendantFiles(allProjectFiles.value, file.id)
-        if (total > AI_CONTEXT_FOLDER_FILE_LIMIT) {
-          uni.showToast({ title: t('workbench.folderTooManyFiles', { count: total }), icon: 'none' })
-          return false
-        }
-      }
-      addFile(file)
-      return true
+      return addFile(file)
     }
 
     const chooseMentionFile = (file) => {
@@ -3767,12 +3781,6 @@ export default {
 
     // --- File Context Methods ---
     const addFile = (file) => {
-      // 上限在**加进来的那一刻**就拦住（dev-board#801 K21 ⑧，审查 E-14）。
-      //
-      // 病灶：前端对 contextFiles 的长度没有任何检查，后端超过 maxFilesPerContext 就 break
-      // 并在 prompt 里写一句英文 System Note。用户拖了 15 份材料、界面上 15 个标签都在，
-      // 模型只看到前 10 份，而且是按顺序静默砍掉后面的——对「把这批合同交叉比对一下」
-      // 这种诉求是直接的错误输出。上限值随 /api/ai/config 下发，不写死。
       const verdict = admitFileToContext({
         file,
         contextFiles: contextFiles.value,
@@ -3780,15 +3788,8 @@ export default {
         limits: contextLimits.value,
       })
       if (!verdict.ok) {
-        if (verdict.reason === 'cap' && typeof uni !== 'undefined') {
-          uni.showToast({
-            title: t('chat.contextFileCapReached', { max: verdict.max }),
-            icon: 'none',
-            duration: 3000,
-          })
-        }
         // duplicate 静默：同一份拖两遍是常见误操作，弹提示只是噪音
-        return
+        return false
       }
       const fileData = normalizeContextItem(file)
       contextFiles.value.push(fileData)
@@ -3798,7 +3799,7 @@ export default {
       // Insert inline tag into rich input
       insertContextTagToInput(fileData)
 
-      console.log('[ChatInterface] File added as context:', file.name)
+      return true
     }
 
     // --- Insert inline tag into contenteditable ---
@@ -3840,10 +3841,10 @@ export default {
           range.insertNode(fragment)
           range.collapse(false)
         } else {
-          richInput.value.innerHTML += tagHtml
+          richInput.value.insertAdjacentHTML('beforeend', tagHtml)
         }
       } else {
-        richInput.value.innerHTML += tagHtml
+        richInput.value.insertAdjacentHTML('beforeend', tagHtml)
       }
 
       // Update text model
@@ -3993,9 +3994,20 @@ export default {
     }
 
     const selectFilesForUpload = () => {
+      // #ifdef H5
+      const picker = document.createElement('input')
+      picker.type = 'file'
+      picker.multiple = true
+      picker.onchange = () => {
+        isFolderUpload.value = false
+        uploadSelectedFiles.value = Array.from(picker.files || []).map(fileObject => ({ name: fileObject.name, size: fileObject.size, relativePath: fileObject.name, fileObject }))
+      }
+      picker.click()
+      return
+      // #endif
       // H5/uni-app file selection
       uni.chooseFile({
-        count: 9,
+        count: Number.MAX_SAFE_INTEGER,
         success: (res) => {
           isFolderUpload.value = false
           uploadSelectedFiles.value = res.tempFiles.map(file => ({
@@ -4029,7 +4041,6 @@ export default {
         uploadSelectedFiles.value = files.map(f => ({
           name: f.name,
           size: f.size,
-          path: URL.createObjectURL(f),
           fileObject: f,
           relativePath: f.webkitRelativePath || f.name
         }))
@@ -4194,113 +4205,86 @@ export default {
      * 入参形状 { name, size, fileObject }——上传对话框与「本机文件拖进对话区」
      * （dev-board#779 K6 ③）共用这一条路，不另起一套。
      */
-    const uploadFilesAndAttach = async (filesToUpload, parentId) => {
-      if (!filesToUpload || filesToUpload.length === 0) return
+    const importBatch = ref(null)
+    const importScanning = ref(false)
+    let importController = null
+    const importRemaining = computed(() => (importBatch.value?.directoryUncertain || importBatch.value?.scanIncomplete) ? 0 : (importBatch.value?.items.filter(item => item.state === 'pending' || item.state === 'failed').length || 0))
+    const importSkipped = computed(() => importBatch.value?.items.reduce((sum, item) => sum + (item.skippedCount || 0), 0) || 0)
+    const importFileCount = computed(() => importBatch.value?.items.reduce((sum, item) => sum + (item.importedFileCount || 0), 0) || 0)
+    const importFailed = computed(() => importBatch.value?.items.filter(item => item.state === 'failed').length || 0)
+    const cancelImport = () => importController?.abort()
+    onBeforeUnmount(cancelImport)
 
+    const runPendingImports = async () => {
+      const batch = importBatch.value
+      if (!batch || batch.running || batch.directoryUncertain || batch.scanIncomplete || importScanning.value) return
+      importController = new AbortController()
+      const signal = importController.signal
+      isUploading.value = true
+      const active = (item) => !signal.aborted && importBatch.value === batch && item.state === 'working'
+      const ensureActive = (item) => {
+        if (!active(item)) throw Object.assign(new Error('importUncertain'), { uncertain: true })
+      }
+      const importFailure = (error) => {
+        const status = Number(error?.status ?? error?.statusCode)
+        if ((!status || status >= 500) && !isPreImportReadError(error)) error.uncertain = true
+        if (!error.uncertain) batch.creatingFolder = null
+        throw error
+      }
+      try {
+        await runImportBatch(batch, async (item) => {
+          let parentId = batch.parentId
+          const parts = (item.relativePath || item.name).split('/').filter(Boolean)
+          let path = ''
+          for (const name of parts.slice(0, -1)) {
+            ensureActive(item)
+            path += '/' + name
+            if (!batch.folders.has(path)) {
+              batch.creatingFolder = path
+              const folder = await createFolder(batch.projectId, parentId, name).catch(importFailure)
+              ensureActive(item)
+              batch.folders.set(path, folder.id)
+              batch.creatingFolder = null
+            }
+            parentId = batch.folders.get(path)
+          }
+          ensureActive(item)
+          let imported
+          if (host.fs) {
+            const result = await importDroppedFile(item.fileObject, host.fs, path => {
+              ensureActive(item)
+              return importLocalFile(batch.projectId, path, parentId).catch(importFailure)
+            })
+            ensureActive(item)
+            item.importedFileCount = Number(result?.importedFileCount) || 0
+            item.skippedCount = Number(result?.skippedCount) || 0
+            imported = result?.data
+            if (!imported?.id) throw new Error('importFailed')
+          } else {
+            // Reuse a created row on explicit retry; never create a duplicate after upload failure.
+            if (!item.created) item.created = await createFile(batch.projectId, parentId, item.name, getFileTypeFromName(item.name), item.size, null).catch(importFailure)
+            ensureActive(item)
+            imported = item.created
+            await uploadFileContent(imported.id, item.fileObject, item.size, signal)
+          }
+          ensureActive(item)
+          addFile({ id: imported.id, name: imported.name, fileType: imported.fileType, wpsFileId: imported.wpsFileId, isDir: !!imported.isFolder })
+        }, { signal })
+      } finally {
+        if (batch.uncertain && batch.creatingFolder) batch.directoryUncertain = true
+        if (importBatch.value === batch) isUploading.value = false
+      }
+    }
+
+    const uploadFilesAndAttach = async (filesToUpload, parentId) => {
+      if (!filesToUpload?.length || isUploading.value || importScanning.value) return
       if (!props.projectId) {
         uni.showToast({ title: t('chat.projectIdMissing'), icon: 'none' })
         return
       }
-
-      isUploading.value = true
-      const projectId = typeof props.projectId === 'string' ? Number(props.projectId) : props.projectId
-
-      // 字节上传失败的文件名：这些不并入附件，收尾时要点名告诉用户
-      const failedUploads = []
-      const failedImports = []
-      let dropFailureCode = ''
-      let addedCount = 0
-
       captureDroppedFiles({ files: filesToUpload.map(file => file.fileObject).filter(Boolean) }, host.fs)
-      try {
-        for (const file of filesToUpload) {
-          // 桌面壳：本机文件交给 import-local，由后端从磁盘复制进项目，一步到位（dev-board#1034）。
-          // 老路「createFile 建空行再传字节」会在字节失效时留下空白文件（dev-board#409）。
-          if (host.fs) {
-            try {
-              const res = await importDroppedFile(file.fileObject, host.fs, path => importLocalFile(projectId, path, parentId))
-              const imported = res && res.data
-              if (!imported || !imported.id) throw new Error('import-local returned no file')
-              addFile({
-                id: imported.id,
-                name: imported.name,
-                fileType: imported.fileType,
-                wpsFileId: imported.wpsFileId,
-                isDir: false
-              })
-              addedCount++
-            } catch (importErr) {
-              failedImports.push(file.name)
-              if (importErr?.dropCode) dropFailureCode = importErr.dropCode
-            }
-            continue
-          }
-
-          // 纯浏览器（拿不到本机路径）：建行 + 字节直传
-          const fileType = getFileTypeFromName(file.name)
-
-          // Create file record in backend
-          const createdFile = await createFile(
-            projectId,
-            parentId,
-            file.name,
-            fileType,
-            file.size,
-            null
-          )
-
-          if (createdFile && createdFile.id) {
-            console.log('[ChatInterface] File created:', createdFile.name, createdFile.id)
-
-            // Upload file content if available (H5)
-            if (file.fileObject) {
-              try {
-                await uploadFileContent(createdFile.id, file.fileObject, file.size)
-              } catch (uploadErr) {
-                // 字节没传上去就**不并入附件**。原来这里只 console.warn 然后照样 addFile，
-                // 结果是 contextItems 里挂着一个服务器上没有内容的 id：模型收到的是
-                // 「文件在这儿但里面什么都没有」，只会回一句「我看不到这份文件」，
-                // 而用户以为自己已经把文件发过去了。图片接上视觉直送后这条更要命——
-                // 一张没有字节的图既走不了直送也走不了 OCR。
-                console.warn('[ChatInterface] File content upload failed, not attaching:', uploadErr)
-                failedUploads.push(file.name)
-                continue
-              }
-            }
-
-            // Add to context (same as drag-drop)
-            addFile({
-              id: createdFile.id,
-              name: createdFile.name,
-              fileType: createdFile.fileType,
-              wpsFileId: createdFile.wpsFileId,
-              isDir: false
-            })
-            addedCount++
-          }
-        }
-
-        if (failedImports.length) {
-          uni.showToast({
-            title: dropFailureCode ? t('fileTree.' + dropFailureCode) : t('chat.importContentFailed', { names: failedImports.join('、') }),
-            icon: 'none',
-            duration: 3000
-          })
-        } else if (failedUploads.length) {
-          uni.showToast({
-            title: t('chat.uploadContentFailed', { names: failedUploads.join('、') }),
-            icon: 'none',
-            duration: 3000
-          })
-        } else {
-          uni.showToast({ title: t('chat.filesAdded', { count: addedCount }), icon: 'success' })
-        }
-      } catch (error) {
-        console.error('[ChatInterface] Upload failed:', error)
-        uni.showToast({ title: error.message || t('chat.uploadFailed'), icon: 'none' })
-      } finally {
-        isUploading.value = false
-      }
+      importBatch.value = createImportBatch(filesToUpload, parentId, Number(props.projectId))
+      await runPendingImports()
     }
 
     /**
@@ -4313,16 +4297,37 @@ export default {
      * 标签走，是一份文件不是一个目录），跟着它走会把拖进来的材料随机塞到某份文档旁边。
      * 根目录是上传对话框的默认值，也是用户一眼能找到的地方；toast 里点名落点。
      */
-    const uploadLocalFilesAndAddContext = async (fileList) => {
-      const files = Array.from(fileList || [])
-        .filter(f => f && f.name)
+    const uploadLocalFilesAndAddContext = async (fileList, dataTransfer) => {
+      if (isUploading.value || importScanning.value) return
+      const entries = captureDropEntries(dataTransfer)
+      // Desktop directory imports reuse the atomic backend path and attach the root.
+      // Browser handles require enumeration; retain relative paths for destination folders.
+      if (!host.fs && entries.some(entry => entry.isDirectory)) {
+        importController = new AbortController()
+        const signal = importController.signal
+        importBatch.value = createImportBatch([], null, Number(props.projectId))
+        const batch = importBatch.value
+        batch.scanIncomplete = true
+        importScanning.value = true
+        try {
+          for await (const file of walkDropEntries(entries, signal)) {
+            if (signal.aborted || importBatch.value !== batch) break
+            batch.items.push({ ...file, state: 'pending' })
+          }
+        } catch (_) { batch.cancelled = true; return }
+        finally { importScanning.value = false }
+        if (signal.aborted || importBatch.value !== batch) { batch.cancelled = true; return }
+        batch.scanIncomplete = false
+        await runPendingImports()
+        return
+      }
+      const files = Array.from(fileList || []).filter(f => f && f.name)
         .map(f => ({ name: f.name, size: f.size, fileObject: f }))
-      if (!files.length) return
       await uploadFilesAndAttach(files, null)
     }
 
     // Upload file content to storage（纯浏览器与粘贴图片用；URL 一律用数字主键）
-    const uploadFileContent = async (fileId, fileObject, totalSize) => {
+    const uploadFileContent = async (fileId, fileObject, totalSize, signal) => {
       return new Promise((resolve, reject) => {
         // #ifdef H5
         const xhr = new XMLHttpRequest()
@@ -4343,7 +4348,14 @@ export default {
             reject(new Error(`HTTP ${xhr.status}`))
           }
         }
+        xhr.timeout = 60000
+        const stop = () => xhr.abort()
+        xhr.onloadend = () => signal?.removeEventListener('abort', stop)
         xhr.onerror = () => reject(new Error('Network error'))
+        xhr.ontimeout = () => reject(Object.assign(new Error('importUncertain'), { uncertain: true }))
+        xhr.onabort = () => reject(Object.assign(new Error('importUncertain'), { uncertain: true }))
+        if (signal?.aborted) { reject(Object.assign(new Error('importUncertain'), { uncertain: true })); return }
+        signal?.addEventListener('abort', stop, { once: true })
         xhr.send(fileObject)
         // #endif
 
@@ -4840,6 +4852,7 @@ export default {
        tempSelectedParent,
        folderTree,
        isUploading,
+       importSkipped, importFileCount, contextProgress, importBatch, importScanning, importRemaining, importFailed, cancelImport, runPendingImports,
        triggerFileSelect,
        selectFilesForUpload,
        triggerFolderUploadInput,
@@ -5885,6 +5898,18 @@ export default {
 
 /* 本轮附件的降级/截断/丢弃（K21 ⑦）：一行小字挂在用户气泡下方。
    刻意不做成警告色——降级是后端自动完成的正常路径，用户只是有权知道。 */
+.attachment-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--awd-border-subtle);
+  background: var(--awd-surface);
+  color: var(--awd-text-2);
+  font-size: var(--awd-panel-fs-meta);
+  overflow-wrap: anywhere;
+}
+.attachment-status button { font-size: inherit; color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border-subtle); border-radius: var(--awd-radius-sm); cursor: pointer; }
 .context-notices {
   display: flex;
   flex-direction: column;

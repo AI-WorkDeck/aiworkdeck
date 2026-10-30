@@ -2,6 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // AI 对话面板（ChatInterface + AgentMessage 卡片族 + ArtifactCard + BackgroundTaskIndicator）
 export default {
+  attachmentImportPartial: "文件夹仅部分导入：已导入 {count} 个文件，跳过 {skipped} 项。请在文件树核对，并检查源目录权限、符号链接或特殊文件；不会自动重新导入整个目录。",
+  attachmentScanIncomplete: "文件夹扫描未完成，已发现 {count} 个文件，尚未导入。请重新选择或拖入完整文件夹；不能用此部分清单继续导入。",
+  attachmentsRequireTools: "这些附件需要分批读取，请选择支持工具调用的模型后继续。原附件已保留。",
+  attachmentReaderBusy: "读取服务仍被之前的任务占用，本次未开始读取。请等待后再试；若持续无响应，请保存工作后重启应用。",
+  attachmentBatchHint: "附件数量不限；大量材料可能耗时较长，将按需分批读取。",
+  attachmentScanning: "正在扫描文件夹，已发现 {count} 个文件",
+  attachmentImportProgress: "已导入 {completed}/{total} 项",
+  attachmentImportUncertain: "在途操作的结果尚未确认，可能仍在后台完成。请先在文件树核对，避免重复导入；已完成项保留。",
+  attachmentImportPaused: "导入已暂停或部分失败。已完成项保留，可重试剩余项。",
+  attachmentRetryRemaining: "重试剩余 {count} 项",
+  contextPreparingProgress: "正在准备附件：已登记 {completed}/{total} 项（不代表已读正文）",
+  contextNoticeDeferred: "另有 {count} 项已保留，将按需分批读取，可能耗时较长。",
+  contextPreparationTimeout: "附件准备超时，本轮已退出。附件仍保留；请指定优先文件、缩小本轮处理范围，或稍后手动重试。",
+
   earlierFiles: '早期会话文件',
   fileCreated: '已新增',
   fileModified: '已修改',
@@ -309,7 +323,6 @@ export default {
   activeSelectionChipTitle: '已选中片段：{text}（随本条消息传给 AI，优先修订该片段；点 × 本轮忽略选区）',
   carriedAttachmentTitle: '{name}（上一轮带过，本轮仍会带上；点一下确认沿用，点 × 移除）',
   carriedAttachmentHint: '虚线标签是上轮附件，下一条继续使用，点 × 移除',
-  contextFileCapReached: '本轮最多带 {max} 份材料（含图片），请先移除一些再添加',
   imageCountCapToast: '本轮最多直送 {max} 张图，多出来的会按文字识别（OCR）处理',
   imageTooLargeToast: '这张图超过 {size}，会按文字识别（OCR）处理，建议压缩后重发',
   contextNoticeThisFile: '这份材料',

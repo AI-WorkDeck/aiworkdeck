@@ -2,6 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  attachmentImportPartial: "폴더를 일부만 가져왔습니다: 파일 {count}개 가져옴, {skipped}개 건너뜀. 파일 트리와 원본 권한, 심볼릭 링크 또는 특수 파일을 확인하세요. 전체 폴더를 자동으로 다시 가져오지 않습니다.",
+  attachmentScanIncomplete: "폴더 검색이 완료되지 않았습니다. 파일 {count}개를 찾았으며 아직 가져오지 않았습니다. 전체 폴더를 다시 선택하거나 끌어 놓으세요. 일부 목록으로 가져오기를 계속할 수 없습니다.",
+  attachmentsRequireTools: "이 첨부 파일은 나누어 읽어야 합니다. 도구 호출을 지원하는 모델을 선택한 후 계속하세요. 원본 첨부는 유지됩니다.",
+  attachmentReaderBusy: "이전 작업이 읽기 서비스를 사용 중이므로 이번 읽기는 시작되지 않았습니다. 기다린 후 다시 시도하세요. 계속 응답하지 않으면 작업을 저장하고 앱을 재시작하세요.",
+  attachmentBatchHint: "첨부 개수는 제한이 없습니다. 자료가 많으면 시간이 더 걸리며 필요에 따라 나누어 읽습니다.",
+  attachmentScanning: "폴더 검색 중: 파일 {count}개 발견",
+  attachmentImportProgress: "{completed}/{total}개 가져옴",
+  attachmentImportUncertain: "진행 중인 작업 결과를 확인하지 못했습니다. 백그라운드에서 완료될 수 있으니 다시 가져오기 전에 파일 트리를 확인하세요. 완료 항목은 유지됩니다.",
+  attachmentImportPaused: "가져오기가 중지되었거나 일부 실패했습니다. 완료 항목은 유지되며 나머지를 다시 시도할 수 있습니다.",
+  attachmentRetryRemaining: "나머지 {count}개 다시 시도",
+  contextPreparingProgress: "첨부 준비 중: {completed}/{total}개 등록 (본문을 읽었다는 뜻은 아님)",
+  contextNoticeDeferred: "{count}개 항목은 유지되며 필요에 따라 나누어 읽습니다. 시간이 더 걸릴 수 있습니다.",
+  contextPreparationTimeout: "첨부 준비 시간이 초과되어 이번 처리를 중지했습니다. 첨부는 유지됩니다. 우선 파일을 지정하거나 범위를 줄이거나 나중에 수동으로 다시 시도하세요.",
+
   "earlierFiles": "이전 대화 파일",
   "fileCreated": "생성됨",
   "fileModified": "수정됨",
@@ -287,7 +301,6 @@ export default {
   "activeSelectionChipTitle": "선택한 발췌: {text} (메시지와 함께 AI에 전송되어 수정 시 이 발췌를 우선 반영합니다. 이번 턴에서 제외하려면 x를 클릭하세요.)",
   "carriedAttachmentTitle": "{name} (이전 턴에서 이어져 아직 첨부되어 있습니다. 유지하려면 클릭하고, 제거하려면 x를 클릭하세요.)",
   "carriedAttachmentHint": "점선 태그는 이전 메시지의 첨부 파일이며 다음 메시지와 함께 다시 전송됩니다. 제거하려면 x를 클릭하세요.",
-  "contextFileCapReached": "턴당 최대 {max}개 항목(이미지 포함)까지 가능합니다. 더 추가하려면 일부를 제거해 주세요.",
   "imageCountCapToast": "턴당 최대 {max}개의 이미지가 직접 전송되며, 나머지는 인식된 텍스트(OCR)로 처리됩니다.",
   "imageTooLargeToast": "이 이미지는 {size}를 초과하여 인식된 텍스트(OCR)로 처리됩니다. 압축한 후 다시 전송해 주세요.",
   "contextNoticeThisFile": "이 항목",
