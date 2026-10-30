@@ -114,6 +114,28 @@ class OpenRouterStreamingChatModelTest {
     }
 
     @Test
+    void bailianStreamsToolsAndReasoningWithoutOpenRouterExtensions() throws Exception {
+        serveStream(chunk("{\"reasoning_content\":\"consider\"}", null)
+                + chunk("{\"tool_calls\":[{\"index\":0,\"id\":\"call_bailian\",\"type\":\"function\",\"function\":{\"name\":\"read_file\",\"arguments\":\"{}\"}}]}", null)
+                + chunk("{}", "tool_calls") + "data: [DONE]\n\n");
+        OpenRouterStreamingChatModel model = new OpenRouterStreamingChatModel(
+                "awdai_synthetic", baseUrl(), "qwen3.8-flash", Duration.ofSeconds(5), 5, "high",
+                new OpenRouterStreamingChatModel.ProviderRouting("price", List.of("bf16"), true, 5));
+        Collector collector = new Collector();
+        model.generate(List.of(UserMessage.from("read")),
+                List.of(ToolSpecification.builder().name("read_file").description("read").build()), collector);
+        collector.await();
+        assertNull(collector.error.get());
+        assertEquals("consider", collector.reasoning.toString());
+        assertEquals("read_file", collector.done.get().content().toolExecutionRequests().get(0).name());
+        assertEquals("Bearer awdai_synthetic", lastAuthHeader);
+        assertTrue(lastRequestBody.contains("\"model\":\"qwen3.8-flash\""));
+        for (String field : List.of("provider", "reasoning", "cache_control")) {
+            assertFalse(lastRequestBody.contains("\"" + field + "\":"), lastRequestBody);
+        }
+    }
+
+    @Test
     @DisplayName("思考增量走 onReasoning、正文走 onNext、保活注释走 onKeepAlive，三条通道互不串")
     void reasoningContentAndKeepAliveAreSeparated() throws Exception {
         serveStream(""

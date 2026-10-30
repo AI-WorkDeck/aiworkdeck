@@ -89,7 +89,7 @@ export default {
     "crossBorderLabel": "Đồng ý riêng: chuyển nội dung gửi cho AI tới nhà cung cấp mô hình ở nước ngoài để xử lý",
     "crossBorderView": "Xem thông báo",
     "crossBorderNoticeTitle": "Thông báo chuyển dữ liệu xuyên biên giới",
-    "crossBorderNoticeBody": "AI WorkDeck Cloud sẽ gửi nội dung bạn gửi cho AI (văn bản và các đoạn tệp liên quan) đến OpenRouter, Inc. (Hoa Kỳ) để xử lý, phục vụ việc suy luận mô hình và tính phí sử dụng; đây là hành vi cung cấp thông tin cá nhân cho bên nhận ở nước ngoài. Sau khi vào sản phẩm, bạn có thể rút lại sự đồng ý bất cứ lúc nào trong Cài đặt → Cài đặt AI; sau khi rút, kênh đám mây sẽ không còn khả dụng.",
+    "crossBorderNoticeBody": "Trang Trung Quốc kết nối Alibaba Cloud Bailian qua máy chủ AI WorkDeck; trang quốc tế dùng OpenRouter. Văn bản và trích đoạn tệp gửi cho AI được dùng để suy luận và tính phí. Tùy mô hình, dữ liệu có thể được xử lý ngoài Trung Quốc đại lục. Việc rút lại sự đồng ý trong Cài đặt sẽ tắt kênh AI của nền tảng.",
     "agreementRequired": "Tick vào ô để chấp nhận Điều khoản Dịch vụ và Chính sách Quyền riêng tư để tiếp tục",
     "crossBorderRequired": "Tick vào ô đồng ý chuyển dữ liệu xuyên biên giới để tiếp tục",
     "switchSiteTitle": "Chuyển trang web",

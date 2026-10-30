@@ -34,6 +34,8 @@ public class ContextCompressor {
     private final LegalInfoProtector legalInfoProtector;
     private final ConversationSummarizer conversationSummarizer;
     private final AiContextProperties contextProperties;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ai.ChatModelFactory chatModelFactory;
 
     /**
      * 压缩消息历史
@@ -407,10 +409,14 @@ public class ContextCompressor {
      * 获取可用于历史的 token 预算（按模型解析总预算后扣除各项预留）
      */
     public int getAvailableTokensForHistory(String modelKey) {
-        return contextProperties.maxContextTokensFor(modelKey)
+        int budget = contextProperties.maxContextTokensFor(modelKey);
+        if (chatModelFactory != null && chatModelFactory.usesProviderCatalog()) {
+            budget = chatModelFactory.platformContextBudget(modelKey, budget, contextProperties.getModelBudgetHeadroom());
+        }
+        return Math.max(0, budget
                 - contextProperties.getSystemPromptReserve()
                 - contextProperties.getMemoryReserve()
-                - contextProperties.getResponseReserve();
+                - contextProperties.getResponseReserve());
     }
 
     /**

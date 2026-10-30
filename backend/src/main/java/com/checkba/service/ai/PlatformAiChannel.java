@@ -22,9 +22,8 @@ import java.util.Map;
 /**
  * 平台 AI 通道「AI WorkDeck 云端」（Spec §3）。
  *
- * 用户不必自备 OpenRouter key：连接账户后由官网 provision 一把带额度上限的 runtime key
- * （POST /api/account/ai-key），桌面端拿来直连 OpenRouter。额度强制在 OpenRouter 侧执行
- * （key 自带 limit，超限 402），桌面端不做也做不了额度校验。
+ * 用户连接账户后由官网 provision 限权 runtime key（POST /api/account/ai-key）。
+ * 国内只连接本站百炼网关；国际直连 OpenRouter。实际额度分别由网关和 OpenRouter 强制执行。
  *
  * key 缓存在 {@code ~/.aiworkdeck/platform-ai-key.json}（0600）。官网端点是幂等的，
  * 缓存只是省一次往返；官网撤销重发后本地 clearCache 即可重新拉取。
@@ -68,6 +67,9 @@ public class PlatformAiChannel {
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class Cached {
         public String openrouterKey;
+        public String provider;
+        public String baseUrl;
+        public String defaultModel;
         public Double limitUsd;
         public String fetchedAt;
         /**
@@ -96,6 +98,17 @@ public class PlatformAiChannel {
      *
      * @throws AccountException NOT_CONNECTED / CONFLICT（未分配额度、未直连、缺身份）/ NETWORK
      */
+    public PlatformAiKeyService.Resolved connection() {
+        return resolveOrThrow(PlatformAiUserScope.current());
+    }
+
+    public boolean isBailian() { return accountService.domesticAiPlatform(); }
+
+    public String baseUrl(String openRouterBase) {
+        PlatformAiKeyService.Resolved resolved = connection();
+        return resolved.bailian() ? resolved.baseUrl() : openRouterBase;
+    }
+
     public String apiKey() {
         return resolveOrThrow(PlatformAiUserScope.current()).apiKey();
     }
@@ -204,7 +217,8 @@ public class PlatformAiChannel {
         Cached cached = current();
         if (cached == null) cached = fetch();
         return new PlatformAiKeyService.Resolved(
-                cached.openrouterKey, machineFingerprint(), cached.limitUsd);
+                cached.openrouterKey, machineFingerprint(), cached.limitUsd,
+                cached.provider == null ? "openrouter" : cached.provider, cached.baseUrl, cached.defaultModel);
     }
 
     private String machineFingerprint() {
@@ -268,7 +282,10 @@ public class PlatformAiChannel {
     }
 
     private boolean ownedByCurrentAccount(Cached cached) {
-        return java.util.Objects.equals(cached.owner, accountService.accountFingerprintOrNull());
+        return java.util.Objects.equals(cached.owner, accountService.accountFingerprintOrNull())
+                && accountService.domesticAiPlatform() == "bailian".equals(cached.provider)
+                && (!"bailian".equals(cached.provider)
+                || java.util.Objects.equals(accountService.platformAiBaseUrl(), cached.baseUrl));
     }
 
     private Cached discard() {
@@ -280,9 +297,12 @@ public class PlatformAiChannel {
     private synchronized Cached fetch() {
         Map<String, Object> body = accountService.fetchAiKey();
         Cached cached = new Cached();
-        cached.openrouterKey = String.valueOf(body.get("openrouterKey"));
-        Object limit = body.get("limitUsd");
-        cached.limitUsd = limit instanceof Number n ? n.doubleValue() : null;
+        PlatformAiKeyService.Resolved connection = PlatformAiKeyService.parseConnection(body, accountService);
+        cached.openrouterKey = connection.apiKey();
+        cached.provider = connection.provider();
+        cached.baseUrl = connection.baseUrl();
+        cached.defaultModel = connection.defaultModel();
+        cached.limitUsd = connection.limitUsd();
         cached.fetchedAt = Instant.now().toString();
         cached.owner = accountService.accountFingerprintOrNull();
         try {

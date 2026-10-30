@@ -42,6 +42,9 @@ public class HttpAccountTransport implements AccountTransport {
                     .uri(URI.create(url))
                     .timeout(TIMEOUT)
                     .method(method, body);
+            if (URI.create(url).getPath().equals("/api/account/ai-key")) {
+                builder.header("X-AWD-AI-Protocol", "2");
+            }
             if (jsonBody != null) {
                 builder.header("Content-Type", "application/json");
             }

@@ -15,9 +15,9 @@ import java.time.LocalDateTime;
  * <p>为什么不挂在 {@link AccountBinding} 上：那张表是纯身份映射、每次桥接登录都要读，
  * 把密文塞进去会改变它的安全等级；分表还让「吊销即删行」不碰身份数据。
  *
- * <p>{@code keyEnc} 是 OpenRouter runtime key 明文的 AES-256-GCM 密文
+ * <p>{@code keyEnc} 是限权平台 runtime key 明文的 AES-256-GCM 密文
  * （{@link com.checkba.service.ai.PlatformAiKeyCipher}）。awdk_ 账户 Key 明文
- * <b>永不落库</b>——本表存的是它换来的、额度受 OpenRouter 侧 limit 强制的 runtime key。
+ * <b>永不落库</b>——本表存的是它换来的、额度受本站网关（百炼）或 OpenRouter 强制的 runtime key。
  */
 @Entity
 @Table(name = "platform_ai_key",
@@ -45,11 +45,20 @@ public class PlatformAiKey {
     /** 官网返回的额度上限（美元），展示用；官网未给时为 null。 */
     private Double limitUsd;
 
+    @Column(length = 20)
+    private String provider;
+
+    @Column(length = 512)
+    private String baseUrl;
+
+    @Column(length = 200)
+    private String defaultModel;
+
     @Column(nullable = false)
     private LocalDateTime fetchedAt;
 
     /**
-     * 最近一次向 OpenRouter 验证成功的时间。超过 30 天未成功验证即判为过期
+     * 最近一次向对应平台验证成功的时间。超过 30 天未成功验证即判为过期
      * （与 EntitlementService/LicenseService 的 OFFLINE_GRACE 同口径：
      * 永久离线不能等于永久可用）。
      */

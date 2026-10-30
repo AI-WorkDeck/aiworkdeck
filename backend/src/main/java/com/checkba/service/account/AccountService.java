@@ -65,6 +65,10 @@ public class AccountService {
     }
 
     /** 当前站点的账户服务基址。切站后当场改指向。 */
+    public String platformAiBaseUrl() { return baseUrl() + "/api/account/ai/v1"; }
+
+    public boolean domesticAiPlatform() { return "cn".equals(siteProfileService.currentSite()); }
+
     private String baseUrl() {
         return siteProfileService.baseUrl();
     }
@@ -317,7 +321,7 @@ public class AccountService {
                     LangText.of("官网 AI 额度服务暂不可用，请稍后重试", "The website's AI Credits service is temporarily unavailable, please retry shortly"));
         }
         Map<String, Object> body = handle(reply);
-        if (str(body.get("openrouterKey")) == null) {
+        if (str(body.get("openrouterKey")) == null && str(body.get("apiKey")) == null) {
             throw new AccountException(AccountException.Kind.MALFORMED,
                     LangText.of("官网返回的 AI 通道密钥为空，请稍后重试", "The website returned an empty AI channel key, please retry shortly"));
         }
