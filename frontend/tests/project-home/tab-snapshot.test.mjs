@@ -10,6 +10,9 @@ import {
   TAB_SNAPSHOT_VERSION,
   TAB_SNAPSHOT_THROTTLE_MS,
   SINGLETON_TAB_TYPES,
+  LOCALIZED_NAME_KEYS,
+  BUILTIN_PLUGIN_LABEL_KEYS,
+  resolveLocalizedTabName,
   serialize,
   serializeTab,
   restore,
@@ -257,4 +260,37 @@ test('snapshotFileIds: only valid file references, both diff sides, deduplicated
   assert.deepEqual(snapshotFileIds(snap), ['1', '2', '3'])
   assert.deepEqual(snapshotFileIds(null), [])
   assert.deepEqual(snapshotFileIds({ left: [welcome, calendar] }), [])
+})
+
+test('resolveLocalizedTabName：覆盖所有内置标签类型与插件标签，切换语言或从快照恢复时重取当前语言文案', async () => {
+  const tr = (k, p) => (p ? `T:${k}:${JSON.stringify(p)}` : `T:${k}`)
+  for (const [tabType, key] of Object.entries(LOCALIZED_NAME_KEYS)) {
+    assert.equal(resolveLocalizedTabName({ id: tabType, tabType, name: '旧文案' }, tr), `T:${key}`)
+  }
+  for (const [pluginId, key] of Object.entries(BUILTIN_PLUGIN_LABEL_KEYS)) {
+    assert.equal(resolveLocalizedTabName({ id: `plugin-${pluginId}`, tabType: 'plugin', pluginId, name: '旧名' }, tr), `T:${key}`)
+    assert.equal(resolveLocalizedTabName({ id: `market-detail_plugin_${pluginId}`, tabType: 'market-detail', marketSpec: { kind: 'plugin', id: pluginId } }, tr), `T:${key}`)
+  }
+  assert.equal(
+    resolveLocalizedTabName({ id: 'vc-1', tabType: 'version-compare', compareSpec: { path: 'a/b/合同.docx' } }, tr),
+    'T:workbenchOps.versionCompareTabName:{"name":"合同.docx"}'
+  )
+  assert.equal(
+    resolveLocalizedTabName({ id: 'vtd-1', tabType: 'version-text-diff', versionSpec: { name: '协议.md', path: '协议.md' } }, tr),
+    'T:workbenchOps.versionCompareTabName:{"name":"协议.md"}'
+  )
+  assert.equal(
+    resolveLocalizedTabName({ id: 'mr-1', tabType: 'merge-review', mergeSpec: { name: '章程.docx' } }, tr),
+    'T:version.mergeTabName:{"name":"章程.docx"}'
+  )
+  assert.equal(
+    resolveLocalizedTabName({ id: 'tm-1', tabType: 'tmeet-transcript', meetingSpec: { subject: '' } }, tr),
+    'T:tmeet.defaultTranscriptTabName'
+  )
+  assert.equal(
+    resolveLocalizedTabName({ id: 'tm-2', tabType: 'tmeet-transcript', name: '周会纪要', meetingSpec: { subject: '周会纪要' } }, tr),
+    null,
+    '有自定义会议主题时不覆盖'
+  )
+  assert.equal(resolveLocalizedTabName(doc(1), tr), null, '用户文档标签保持文件名')
 })

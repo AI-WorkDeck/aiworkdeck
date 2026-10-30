@@ -348,27 +348,27 @@ const CATEGORY_GLYPHS = {
 }
 
 const CATEGORY_LABELS = {
-  contract: t('market.catContract'),
-  litigation: t('market.catLitigation'),
-  compliance: t('market.catCompliance'),
-  research: t('market.catResearch'),
-  corporate: t('market.catCorporate'),
-  office: t('market.catOffice'),
-  other: t('market.catOther'),
+  get contract() { return t('market.catContract') },
+  get litigation() { return t('market.catLitigation') },
+  get compliance() { return t('market.catCompliance') },
+  get research() { return t('market.catResearch') },
+  get corporate() { return t('market.catCorporate') },
+  get office() { return t('market.catOffice') },
+  get other() { return t('market.catOther') },
 }
 
 const PERMISSION_LABELS = {
-  file_read: t('market.permFileRead'),
-  file_write: t('market.permFileWrite'),
-  network: t('market.permNetwork'),
-  im: t('market.permIm'),
-  notifications: t('market.permNotifications'),
-  editor: t('market.permEditor'),
-  ai: t('market.permAi'),
-  speech: t('market.permSpeech'),
-  tasks: t('market.permTasks'),
-  clipboard: t('market.permClipboard'),
-  lawfirm: t('market.permLawfirm'),
+  get file_read() { return t('market.permFileRead') },
+  get file_write() { return t('market.permFileWrite') },
+  get network() { return t('market.permNetwork') },
+  get im() { return t('market.permIm') },
+  get notifications() { return t('market.permNotifications') },
+  get editor() { return t('market.permEditor') },
+  get ai() { return t('market.permAi') },
+  get speech() { return t('market.permSpeech') },
+  get tasks() { return t('market.permTasks') },
+  get clipboard() { return t('market.permClipboard') },
+  get lawfirm() { return t('market.permLawfirm') },
 }
 
 /**
@@ -388,7 +388,21 @@ function compareVersions(a, b) {
 }
 
 const ACTIVATION_MODES = ['auto', 'manual', 'disabled']
-const ACTIVATION_LABELS = [t('market.activationAuto'), t('market.activationManual'), t('market.activationDisabled')]
+const BUILTIN_PLUGIN_NAME_KEYS = {
+  search: 'config.sidebar.search',
+  voice: 'config.sidebar.voice',
+  desensitize: 'config.sidebar.desensitize',
+  'litigation-visual': 'config.sidebar.litigationVisual',
+  calendar: 'calendar.railSchedule',
+  favorites: 'config.tools.favorites',
+  clipboard: 'config.tools.clipboard',
+  insight: 'insight.title',
+  'tencent-meeting': 'workbench.pluginLabels.tencentMeeting',
+  baoqingtian: 'workbench.pluginLabels.baoqingtian',
+  'dpia-workbench': 'workbench.pluginLabels.dpiaWorkbench',
+  'lawfirm-management': 'workbench.pluginLabels.lawfirmManagement',
+  'project-im': 'workbench.pluginLabels.projectIm',
+}
 
 export default {
   name: 'MarketDetailPane',
@@ -399,7 +413,7 @@ export default {
       required: true,
     },
   },
-  emits: ['open-url'],
+  emits: ['open-url', 'title-change'],
   // 工作台 provide 的设置标签入口；宿主不是工作台时为 null
   inject: { openSettingsTab: { default: null } },
   data() {
@@ -430,7 +444,11 @@ export default {
   },
   computed: {
     ACTIVATION_LABELS() {
-      return ACTIVATION_LABELS
+      return [
+        this.$t('market.activationAuto'),
+        this.$t('market.activationManual'),
+        this.$t('market.activationDisabled'),
+      ]
     },
     isPaidItem() {
       return isPaid(this.marketInfo)
@@ -485,8 +503,12 @@ export default {
       const i = this.installedInfo || {}
       const downloads = m.downloads
       const cat = m.category || i.category
+      const builtinKey = this.spec && this.spec.kind === 'plugin' && this.spec.id
+        ? BUILTIN_PLUGIN_NAME_KEYS[this.spec.id]
+        : ''
+      const builtinName = builtinKey ? this.$t(builtinKey) : ''
       return {
-        name: m.name || i.name || this.spec.name || this.spec.id,
+        name: (builtinName && builtinName !== builtinKey ? builtinName : '') || m.name || i.name || this.spec.name || this.spec.id,
         description: (this.isBuiltinRedaction ? i.description : m.description) || i.description || '',
         author: m.authorDisplayName || m.author || i.author || '',
         version: this.installedInfo ? (i.version || '') : (m.version || ''),
@@ -628,7 +650,7 @@ export default {
   },
   mounted() {
     uni.$on(APP_THEME_EVENT, this.pushThemePreview)
-    uni.$on(APP_LANGUAGE_EVENT, this.pushThemePreview)
+    uni.$on(APP_LANGUAGE_EVENT, this.onLanguageChanged)
     uni.$on('awd:account-changed', this.loadContribution)
     this.reload()
     uni.$on('awd:market-changed-from-sidebar', this.reload)
@@ -638,13 +660,17 @@ export default {
     this.reloadGeneration++
     this.contributionGeneration++
     uni.$off(APP_THEME_EVENT, this.pushThemePreview)
-    uni.$off(APP_LANGUAGE_EVENT, this.pushThemePreview)
+    uni.$off(APP_LANGUAGE_EVENT, this.onLanguageChanged)
     uni.$off('awd:account-changed', this.loadContribution)
     uni.$off('awd:market-changed-from-sidebar', this.reload)
     uni.$off('awd:market-update-checked', this.onUpdatesChecked)
     this.stopPackPoll()
   },
   methods: {
+    onLanguageChanged() {
+      this.pushThemePreview()
+      this.reload(false)
+    },
     pushThemePreview() {
       this.$refs.themePreview?.contentWindow?.postMessage({
         awd: 1, type: 'theme', theme: getResolvedTheme(), tokens: collectThemeTokens(), language: getAppLanguage(),
@@ -707,6 +733,9 @@ export default {
         if (generation === this.reloadGeneration) this.loading = false
       }
       if (generation !== this.reloadGeneration) return
+      if (this.display && this.display.name) {
+        this.$emit('title-change', this.display.name)
+      }
       // 声明式贡献点（规范 v2.9）：设置表单与画像清单随详情一起拉
       if (refreshContributions) await this.loadContribution()
       // 挂着资源包的面板型 skill：拉一次现状——可能是用户上次没装完，也可能是

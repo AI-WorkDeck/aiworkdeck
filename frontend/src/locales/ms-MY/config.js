@@ -16,7 +16,7 @@ export default {
     "search": "Cari",
     "tts": "Teks kepada Pertuturan",
     "desensitize": "Penyuraian Fail",
-    "version": "Version History",
+    "version": "Kawalan Versi",
     "calendar": "Kalendar"
   },
   "tools": {

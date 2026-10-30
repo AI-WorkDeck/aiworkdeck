@@ -338,7 +338,7 @@ export default {
     "chatTitle": "Sembang",
     "scratchTitle": "Ruang kerja sementara",
     "scratchBadge": "Ruang kerja sementara",
-    "promoteAction": "Convert to project ↗",
+    "promoteAction": "Tukar kepada projek",
     "promoteTitle": "Tukar kepada projek formal",
     "promotePlaceholder": "Masukkan nama projek",
     "promoteSuccess": "Ditukar kepada projek rasmi",

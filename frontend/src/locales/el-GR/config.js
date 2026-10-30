@@ -12,11 +12,11 @@ export default {
     "voice": "Φωνή",
     "meetingRecorder": "Ηχογράφηση συνάντησης",
     "litigationVisual": "Οπτικοποίηση δικαστικής υπόθεσης",
-    "tmeet": "Tencent Meeting",
+    "tmeet": "Συνάντηση Tencent",
     "search": "Αναζήτηση",
     "tts": "Μετατροπή κειμένου σε ομιλία",
     "desensitize": "Απόκρυψη στοιχείων αρχείου",
-    "version": "Version History",
+    "version": "Έλεγχος εκδόσεων",
     "calendar": "Ημερολόγιο"
   },
   "tools": {

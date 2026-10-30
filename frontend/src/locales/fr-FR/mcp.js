@@ -39,7 +39,7 @@ export default {
   "importReview": "Sélectionnez les entrées valides pour créer des connexions. Les noms existants ne sont pas écrasés. L’import n’exécute rien et n’autorise ni n’active les connexions.",
   "secretNames": "Champs d’identifiants : {names}",
   "importSelected": "Importer la sélection ({count})",
-  "transportLabel": "Transport",
+  "transportLabel": "Mode de connexion",
   "http": "HTTPS distant (Streamable HTTP)",
   "stdio": "Commande locale (stdio)",
   "stdioUnavailable": "Ce serveur ne peut pas exécuter de commandes locales. Utilisez le mode local de bureau pour les tester et les activer.",

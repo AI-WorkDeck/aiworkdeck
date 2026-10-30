@@ -121,9 +121,14 @@ export function getAppLanguagePreference() {
 }
 
 let _reactiveLocaleTracker = null
+let _localeChangeHandler = null
 
 export function registerReactiveLocaleTracker(fn) {
   _reactiveLocaleTracker = typeof fn === 'function' ? fn : null
+}
+
+export function registerLocaleChangeHandler(fn) {
+  _localeChangeHandler = typeof fn === 'function' ? fn : null
 }
 
 /**
@@ -172,8 +177,11 @@ export function setAppLanguage(lang, opts = {}) {
   if (!opts.auto) writeStorage(APP_LANGUAGE_MANUAL_KEY, '1')
   const resolved = normalized === SYSTEM_LANGUAGE_MODE ? detectSystemLocale() : normalized
   syncDocumentLang(resolved)
+  if (_localeChangeHandler) {
+    try { _localeChangeHandler(resolved) } catch (e) { /* ignore */ }
+  }
   try {
-    if (typeof uni !== 'undefined' && typeof uni.$emit === 'function') {
+    if (typeof uni !== 'undefined') {
       uni.$emit(APP_LANGUAGE_EVENT, resolved)
     }
   } catch (e) { /* ignore */ }

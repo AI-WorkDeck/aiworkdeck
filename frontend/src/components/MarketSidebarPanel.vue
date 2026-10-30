@@ -227,7 +227,24 @@ import { canInstall, paidState, priceLabel, purchaseUrl } from '@/utils/marketPr
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { requireAccount, isAccountLoginRetry } from '@/utils/requireAccount.js'
 import { refreshEntitlements } from '@/composables/useEntitlement.js'
+import { APP_LANGUAGE_EVENT } from '@/utils/appLanguage.js'
 import { t } from '@/i18n'
+
+const BUILTIN_PLUGIN_NAME_KEYS = {
+  search: 'config.sidebar.search',
+  voice: 'config.sidebar.voice',
+  desensitize: 'config.sidebar.desensitize',
+  'litigation-visual': 'config.sidebar.litigationVisual',
+  calendar: 'calendar.railSchedule',
+  favorites: 'config.tools.favorites',
+  clipboard: 'config.tools.clipboard',
+  insight: 'insight.title',
+  'tencent-meeting': 'workbench.pluginLabels.tencentMeeting',
+  baoqingtian: 'workbench.pluginLabels.baoqingtian',
+  'dpia-workbench': 'workbench.pluginLabels.dpiaWorkbench',
+  'lawfirm-management': 'workbench.pluginLabels.lawfirmManagement',
+  'project-im': 'workbench.pluginLabels.projectIm',
+}
 
 const CATEGORY_GLYPHS = {
   contract: ICONS.catContract,
@@ -325,10 +342,12 @@ export default {
       for (const p of this.plugins) {
         const latest = (this.marketPlugins || []).find(item => item.id === p.id)
         const updatable = isPluginUpdateAvailable(latest, p)
+        const labelKey = BUILTIN_PLUGIN_NAME_KEYS[p.id]
+        const localizedName = labelKey ? this.$t(labelKey) : ''
         rows.push({
           kind: 'plugin',
           id: p.id,
-          name: p.name || p.id,
+          name: (localizedName && localizedName !== labelKey ? localizedName : '') || p.name || p.id,
           desc: p.description || '',
           avatarUrl: typeof getPluginAvatarUrl === 'function' ? getPluginAvatarUrl(p.id) : null,
           glyph: typeof getPluginGlyphPaths === 'function' ? getPluginGlyphPaths(p.id) : ICONS.blocks,
@@ -418,10 +437,12 @@ export default {
         if (author) metaParts.push(author)
         metaParts.push(priceLabel(m))
         const state = paidState(m, this.accountConnected)
+        const labelKey = BUILTIN_PLUGIN_NAME_KEYS[m.id]
+        const localizedName = labelKey ? this.$t(labelKey) : ''
         return {
           kind: 'plugin',
           id: m.id,
-          name: m.name || m.id,
+          name: (localizedName && localizedName !== labelKey ? localizedName : '') || m.name || m.id,
           desc: m.description || '',
           avatarUrl: typeof getPluginAvatarUrl === 'function' ? getPluginAvatarUrl(m.id) : null,
           glyph: typeof getPluginGlyphPaths === 'function' ? getPluginGlyphPaths(m.id) : ICONS.blocks,
@@ -444,12 +465,14 @@ export default {
     // 详情 tab 里装/卸/启停后广播回来刷新列表（组件级订阅，卸载即清理）
     uni.$on('awd:market-changed', this.reloadAll)
     uni.$on('awd:mcp-changed', this.loadMcp)
+    uni.$on(APP_LANGUAGE_EVENT, this.reloadAll)
   },
   beforeUnmount() {
     this._mcpAlive = false
     clearInterval(this._mcpIdentityTimer)
     uni.$off('awd:market-changed', this.reloadAll)
     uni.$off('awd:mcp-changed', this.loadMcp)
+    uni.$off(APP_LANGUAGE_EVENT, this.reloadAll)
   },
   methods: {
     toggleSection(key) {

@@ -170,7 +170,7 @@ export default {
   "builtinWorkflowsScope": "Kontrak · Bukti · Fail · Pandangan",
   "builtinWorkflowsCustomCount": "{count} disesuaikan",
   "composerAdvancedSettings": "Tetapan lanjutan",
-  "builtinWorkflowsAdvancedBtn": "Advanced",
+  "builtinWorkflowsAdvancedBtn": "Edit peraturan",
   "builtinWorkflowsSub": "Semakan kontrak, penyusunan bukti, penyusunan fail, dan pengesahan pendapat undang-undang adalah terbina dalam dan diaktifkan secara automatik daripada permintaan anda.",
   "builtinWorkflowBadge": "Terbina Dalam",
   "builtinWorkflowAutoToast": "Aliran kerja terbina dalam diaktifkan secara automatik: {name}",

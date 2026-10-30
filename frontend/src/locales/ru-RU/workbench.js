@@ -338,7 +338,7 @@ export default {
     "chatTitle": "Чат",
     "scratchTitle": "Быстрая рабочая область",
     "scratchBadge": "Быстрая рабочая область",
-    "promoteAction": "Convert to project ↗",
+    "promoteAction": "Преобразовать в проект",
     "promoteTitle": "Преобразовать в полноценный проект",
     "promotePlaceholder": "Введите название проекта",
     "promoteSuccess": "Преобразовано в полноценный проект",

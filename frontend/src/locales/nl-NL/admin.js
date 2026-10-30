@@ -159,7 +159,7 @@ export default {
   "tierColBonus": "Opwaardeerbonus",
   "tierBonusCell": "{permille}‰",
   "membershipTiers": {
-    "paralegal": "Paralegal",
+    "paralegal": "Juridisch medewerker",
     "associate": "Medewerker",
     "lead": "Hoofdadvocaat",
     "senior": "Senior advocaat",

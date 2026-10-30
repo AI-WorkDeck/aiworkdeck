@@ -363,35 +363,36 @@ import { refreshEntitlements } from '@/composables/useEntitlement.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { ICONS } from '@/config/icons.js'
 import { isAiWorkflowSkill } from '@/utils/chatSelectableSkills.mjs'
+import { APP_LANGUAGE_EVENT } from '@/utils/appLanguage.js'
 import { t } from '@/i18n'
 import AwdSelect from '@/components/AwdSelect.vue'
 import McpConnectionsPanel from '@/components/admin/McpConnectionsPanel.vue'
 import AwdSwitch from '@/components/AwdSwitch.vue'
 
 const PERMISSION_LABELS = {
-  file_read: t('market.permFileRead'),
-  file_write: t('market.permFileWrite'),
-  network: t('market.permNetwork'),
-  im: t('market.permIm'),
-  notifications: t('market.permNotifications'),
-  editor: t('market.permEditor'),
-  ai: t('market.permAi'),
-  speech: t('market.permSpeech'),
-  tasks: t('market.permTasks'),
-  clipboard: t('market.permClipboard'),
-  lawfirm: t('market.permLawfirm'),
+  get file_read() { return t('market.permFileRead') },
+  get file_write() { return t('market.permFileWrite') },
+  get network() { return t('market.permNetwork') },
+  get im() { return t('market.permIm') },
+  get notifications() { return t('market.permNotifications') },
+  get editor() { return t('market.permEditor') },
+  get ai() { return t('market.permAi') },
+  get speech() { return t('market.permSpeech') },
+  get tasks() { return t('market.permTasks') },
+  get clipboard() { return t('market.permClipboard') },
+  get lawfirm() { return t('market.permLawfirm') },
 }
 
 // 分类沿用官网 SKILL_CATEGORIES（aiworkdeckweb lib/skill-categories）；registry 未返回 category 时归入"其他"
 const SKILL_CATEGORIES = [
-  { id: 'all', label: t('market.catAll') },
-  { id: 'contract', label: t('market.catContract') },
-  { id: 'litigation', label: t('market.catLitigation') },
-  { id: 'compliance', label: t('market.catCompliance') },
-  { id: 'research', label: t('market.catResearch') },
-  { id: 'corporate', label: t('market.catCorporate') },
-  { id: 'office', label: t('market.catOffice') },
-  { id: 'other', label: t('market.catOther') },
+  { id: 'all', get label() { return t('market.catAll') } },
+  { id: 'contract', get label() { return t('market.catContract') } },
+  { id: 'litigation', get label() { return t('market.catLitigation') } },
+  { id: 'compliance', get label() { return t('market.catCompliance') } },
+  { id: 'research', get label() { return t('market.catResearch') } },
+  { id: 'corporate', get label() { return t('market.catCorporate') } },
+  { id: 'office', get label() { return t('market.catOffice') } },
+  { id: 'other', get label() { return t('market.catOther') } },
 ]
 
 // 分类 → 线性图标，与官网 CategoryIcon.tsx 同一套映射
@@ -406,15 +407,14 @@ const CATEGORY_GLYPHS = {
 }
 
 const TABS = [
-  { key: 'skill', label: t('market.tabSkillMarket') },
-  { key: 'plugin', label: t('market.tabPluginMarket') },
-  { key: 'mcp', label: t('mcp.label') },
-  { key: 'installed', label: t('market.tabInstalled') },
+  { key: 'skill', get label() { return t('market.tabSkillMarket') } },
+  { key: 'plugin', get label() { return t('market.tabPluginMarket') } },
+  { key: 'mcp', get label() { return t('mcp.label') } },
+  { key: 'installed', get label() { return t('market.tabInstalled') } },
 ]
 
 // Skill 生效方式三档，顺序与 picker 下标一一对应
 const ACTIVATION_MODES = ['auto', 'manual', 'disabled']
-const ACTIVATION_LABELS = [t('market.activationAuto'), t('market.activationManual'), t('market.activationDisabled')]
 
 // 卡片上最多平铺 3 个触发词，其余折成 +N
 const TRIGGER_PREVIEW = 3
@@ -456,10 +456,14 @@ export default {
   },
   computed: {
     TABS() {
-      return TABS
+      return TABS.map(tab => ({ key: tab.key, label: tab.label }))
     },
     ACTIVATION_LABELS() {
-      return ACTIVATION_LABELS
+      return [
+        this.$t('market.activationAuto'),
+        this.$t('market.activationManual'),
+        this.$t('market.activationDisabled'),
+      ]
     },
     ICONS() {
       return ICONS
@@ -474,7 +478,8 @@ export default {
     visibleCategories() {
       return SKILL_CATEGORIES
         .map(c => ({
-          ...c,
+          id: c.id,
+          label: c.label,
           count: c.id === 'all'
             ? this.marketSkills.length
             : this.marketSkills.filter(m => (m.category || 'other') === c.id).length,
@@ -500,9 +505,11 @@ export default {
     // 设置页连接/断开账户后广播回来：付费项的按钮形态跟着账户状态变，
     // 而设置页是 navigateTo 打开的、本页并不销毁，不订阅就会停在旧状态转不出去
     uni.$on('awd:market-changed', this.reloadAll)
+    uni.$on(APP_LANGUAGE_EVENT, this.reloadAll)
   },
   beforeUnmount() {
     uni.$off('awd:market-changed', this.reloadAll)
+    uni.$off(APP_LANGUAGE_EVENT, this.reloadAll)
   },
   methods: {
     openBuiltinWorkflowSettings() {

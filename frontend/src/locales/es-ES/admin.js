@@ -159,7 +159,7 @@ export default {
   "tierColBonus": "Bonus de recarga",
   "tierBonusCell": "{permille}‰",
   "membershipTiers": {
-    "paralegal": "Paralegal",
+    "paralegal": "Asistente jurídico",
     "associate": "Asociado",
     "lead": "Abogado principal",
     "senior": "Abogado sénior",
