@@ -183,7 +183,8 @@ public class MobileCaptureOrganizationEngine {
         parts.add(LangText.of(TYPES.get(type), TYPES_EN.get(type)));
         boolean field = Set.of("field_photo", "field_video", "field_audio", "note", "other").contains(type);
         if (field) {
-            if (!description.isBlank()) parts.add(description);
+            if (description.isBlank()) return unchanged("needs_review", original);
+            parts.add(description);
             if (capturedAt != null) parts.add(capturedAt.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")));
         } else {
             if (!number.isBlank()) parts.add(number);
