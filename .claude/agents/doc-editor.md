@@ -31,6 +31,16 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 
 LOWA 与原生候选在组合期间显示同一个持有焦点的真实 input，保留浏览器的中间选区与长串水平滚动；测量节点保持隐藏，不再用纯文本预览冒充输入过程。LOWA 将可见输入框放在正文光标上方，结束恢复透明锚点，避免 #606 正文下划线重叠。原生候选在撤权、暂停、离开视口时隐藏。Word/Calc/Impress共用 LOWA 路径；PDF 的 FilePreview 浏览器 iframe 不经过它。验证含 ime-composition、document-input 与真实 LOWA ime-underline 像素回归；真实 Calc 单元格与 Impress 文本框的中间光标、取消、中文提交及 XLSX/PPTX 显式导出重开分别由 ime-calc-preedit、ime-impress-preedit 验证；这不代替产品自动保存。搜狗真机与原生候选完整保存重开仍需另验。
 
+## PPT 交互状态读取（dev-board#1629）
+
+`EditorToolbar` 的画布选区/修改刷新对 Impress 使用 `get_ui_state({scope:'selection'})`：只读当前页计数、实际选中对象及字符/几何/撤销状态，不枚举全页、不命名对象、不读备注和母版。完整无参接口继续供初始化、切页、显式菜单和插件使用；打开 PPT 属性菜单后仍完整刷新。不要把高频读取改回 `activeImpressContext()`，该函数含整页形状服务类型、文字与几何扫描。
+
+局部回包按 `documentSeq + slideNumber` 合并同页菜单快照，换页先丢弃旧快照再补完整读取；显式完整请求可升级已排队的局部读取。真实画布选区撤销旧菜单对象 override，不能在重开菜单后又编辑旧对象。局部结果的未知下标为 -1，空选区不回退首个对象，完整接口保留既有契约。新增页的原有标题保留检查仅查询 TitleTextShape 服务；实际写入期间暂停修改监听，并在 finally 恢复与补发一次修改通知，仍保留标题捕获、恢复和部分失败保护。不要对逐键原生事件照搬此同步批处理。 每批 PPT 原生按键投递后和新增页恢复监听后，在 Office pthread 显式唤醒 Qt 空闲循环；回包只是按键已投递，不能替代画布已更新。仅沿用既有 Module.resumeMainLoop 契约，不引入轮询、强制 resize 或原生 chrome。
+
+PPT 内容修改立即失效缩略图，但全篇导航清单等宿主允许后台工作时才读；Calc 保留原即时更新，防止同数量工作表重命名在保存失败时停留旧名。页增删、移动和撤销/重做由 worker 完成后发带 documentSeq 的结构事件，覆盖宿主按钮及 guest IME 快捷键，宿主只接受当前已就绪文档。结构刷新不受内容空闲门限制。
+
+回归：`tests/lowa-unit/ppt-interaction-read.test.mjs`、`slide-precision.test.mjs`、`tests/toolbar/ui-state-refresh.test.mjs`。完整桌面性能入口 `tests/desktop-e2e/ppt-interaction-latency.mjs` 使用合成文件、隔离路径/端口、正常自动保存与关闭重开；基线模式只恢复完整状态读取，非完整历史版本。计时用 compositor 帧匹配稳定后的实际画面，排除光标闪烁；首个变化像素可能只是形状边框，不能当作文字已经出现。须审阅匹配帧及新页连续帧、核验实际文字与原生 chrome 隐藏，不能用接口耗时替代画布体验。PPT_LATENCY_SOURCE_ROOT 可指定另一个完整旧源码构建作全链路基线；详见 doc/verification/2026-10-30-ppt-edit-latency.md。Word/Calc 保持原状态路径，PDF 使用 Chromium 预览，不经过本路径；四格式联查继续用 `tests/desktop-e2e/electron-upgrade.mjs`。
+
 ## Calc 标题与输入时钟候选（dev-board#1509 / #1511）
 
 当前正式基线是 **24.2.8-zhcn-r6**（2026-10-20 PR#1164，四个产物SHA见 `desktop/lowa-build/RECIPE.md`）；下文历史段落的 r5/r6 描述不能当作当前未完成清单。本轮候选范围与近期内核限制复核在 `desktop/lowa-build/REBUILD-2026-10-26.md`，候选已于2026-10-26编译，哈希与真实验收边界见 `RECIPE.md`；默认下载地址仍为r6，未发布或升级客户端。

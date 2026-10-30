@@ -173,3 +173,72 @@ test('focused Calc input is preserved while unfocused state tracks the newest se
   const next = vm.refresh(); reads[1].resolve(state('C3')); await next
   assert.equal(vm.calcFormulaInput, '=C3')
 })
+
+const pptState = (slide = 1, partial = false) => ({ ...state('slide-' + slide, 'impress'), documentSeq: 8,
+  ...(partial ? { scope: 'selection' } : {}), selection: { hasShape: false },
+  impress: { slideNumber: slide, slideCount: 2, selectedShape: null,
+    ...(!partial ? { notesText: 'notes-' + slide, shapes: [{ index: 1, name: 'shape-' + slide }], masterPages: ['Master'] } : {}) } })
+
+test('PPT caret events use lightweight reads and preserve the current page menu snapshot', async () => {
+  const { options, vm, reads } = harness('impress'), params = []
+  const execute = vm.executor.executeCommand
+  vm.executor.executeCommand = (action, p) => { params.push(p); return execute(action, p) }
+  vm.state = pptState(); vm.impressNotesInput = 'notes-1'
+  options.watch.refreshKey.call(vm)
+  assert.deepEqual(params, [{ scope: 'selection' }])
+  reads[0].resolve(pptState(1, true)); await vm._uiRefreshOwner.flight
+  assert.equal(vm.state.impress.notesText, 'notes-1')
+  assert.equal(vm.impressNotesInput, 'notes-1')
+  assert.equal(vm.state.impress.shapes[0].name, 'shape-1')
+  assert.equal(options.computed.impressShape.call({ state: vm.state, impressState: vm.state.impress }), null,
+    'a cleared real selection must not become the first cached object')
+})
+
+test('PPT page changes discard the old details and request one complete snapshot', async () => {
+  const { vm, reads } = harness('impress'), params = []
+  const execute = vm.executor.executeCommand
+  vm.executor.executeCommand = (a, p) => { params.push(p); return execute(a, p) }
+  vm.state = pptState(); vm.selectedShapeIndexOverride = 1
+  const pending = vm.refresh(true)
+  reads[0].resolve(pptState(2, true)); await pending; await tick()
+  assert.equal(vm.state.impress.shapes, undefined)
+  assert.equal(vm.state.impress.notesText, undefined)
+  assert.equal(vm.selectedShapeIndexOverride, null)
+  assert.deepEqual(params, [{ scope: 'selection' }, {}])
+  reads[1].resolve(pptState(2)); await vm._uiRefreshOwner.flight
+  assert.equal(vm.state.impress.notesText, 'notes-2')
+})
+
+test('an explicit PPT menu read upgrades a queued caret read without duplicating the queue', async () => {
+  const { vm, reads } = harness('impress'), params = []
+  const execute = vm.executor.executeCommand
+  vm.executor.executeCommand = (a, p) => { params.push(p); return execute(a, p) }
+  vm.state = pptState()
+  const first = vm.refresh(true), caret = vm.refresh(true), full = vm.refresh(), more = vm.refresh(true)
+  reads[0].resolve(pptState(1, true)); await first; await tick()
+  assert.deepEqual(params, [{ scope: 'selection' }, {}])
+  reads[1].resolve(pptState()); await Promise.all([caret, full, more])
+  assert.equal(reads.length, 2)
+})
+
+test('PPT menus retain full state refresh while editing their shape and notes fields', async () => {
+  const { options, vm, reads } = harness('impress'), params = []
+  const execute = vm.executor.executeCommand
+  vm.executor.executeCommand = (a, p) => { params.push(p); return execute(a, p) }
+  vm.menu = 'impressNotes'
+  options.watch.refreshKey.call(vm)
+  assert.deepEqual(params, [{}])
+  reads[0].resolve(pptState()); await vm._uiRefreshOwner.flight
+})
+
+test('a canvas selection replaces the previous menu target when the menu is reopened', async () => {
+  const { options, vm, reads } = harness('impress')
+  const a = { index: 1, name: 'A' }, b = { index: 2, name: 'B' }
+  vm.state = pptState(); vm.state.impress.shapes = [a, b]; vm.selectedShapeIndexOverride = 1
+  const partial = pptState(1, true); partial.impress.selectedShape = { ...b, index: undefined }
+  const first = vm.refresh(true); reads[0].resolve(partial); await first
+  assert.equal(vm.selectedShapeIndexOverride, null)
+  const full = pptState(); full.impress.shapes = [a, b]; full.impress.selectedShape = b
+  const menu = vm.refresh(); reads[1].resolve(full); await menu
+  assert.equal(options.computed.impressShape.call({ ...vm, impressState: vm.state.impress }).name, 'B')
+})
