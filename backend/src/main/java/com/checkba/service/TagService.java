@@ -120,6 +120,12 @@ public class TagService {
                 });
     }
 
+    /** Automatic capture tags use the same design default as other normal tags. */
+    @Transactional
+    public Tag getOrCreateSystemTag(Long projectId,String name) {
+        return getOrCreateSystemTag(projectId,name,DEFAULT_COLOR_NORMAL);
+    }
+
     /**
      * 更新标签
      */

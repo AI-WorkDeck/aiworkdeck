@@ -300,6 +300,30 @@ public class ChatModelFactory {
         return new PlatformChatModel(model, modelId);
     }
 
+    /** Optional capture organization: exact auxiliary model, account credits, no provider/model fallback. */
+    public PlatformChatModel getPlatformAuxChatModel(java.time.Duration timeout, Integer maxOutputTokens,
+                                                    boolean requiresVision) {
+        if (timeout == null || timeout.isZero() || timeout.isNegative())
+            throw new IllegalArgumentException("Platform auxiliary request deadline expired");
+        long started = System.nanoTime();
+        Long userId = PlatformAiUserScope.current();
+        if (userId == null || (!localMode && platformAiChannel.usesMachineKey(userId)))
+            throw new com.checkba.service.account.AccountException(
+                    com.checkba.service.account.AccountException.Kind.CONFLICT,
+                    com.checkba.service.LangText.of("请连接账户后使用采集整理", "Connect your account to organize captures"));
+        String modelId = AllowedModels.canonicalModelId(validatedAuxModelId()).trim();
+        if (requiresVision && !AllowedModels.supportsVision(modelId))
+            throw new com.checkba.exception.FeatureNotConfiguredException("ai-aux-model",
+                    com.checkba.service.LangText.of("当前辅助模型不支持图像", "The auxiliary model does not support images"));
+        String key = platformApiKey();
+        ChatLanguageModel model = OpenAiChatModel.builder().apiKey(key)
+                .baseUrl(aiModelProperties.getOpenRouter().getBaseUrl()).modelName(modelId)
+                .timeout(remainingTimeout(timeout, started)).maxRetries(0).maxTokens(maxOutputTokens)
+                .logRequests(false).logResponses(false).build();
+        recordModelUse(AiModelProperties.Provider.AWD_CLOUD.name(), modelId, false);
+        return new PlatformChatModel(model, modelId);
+    }
+
     public record PlatformChatModel(ChatLanguageModel model, String modelId) {}
 
     /** One explicit writing request: bounded transport, no cache, no provider fallback. */

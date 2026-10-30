@@ -1825,3 +1825,12 @@ cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='Refe
   3. **对话流零打扰**：`RootBubble.vue` 不挂载 `HarnessEvolutionCard`，不在对话流弹出让用户三选一的卡片；用户可随时在「我的记忆 / 项目记忆」面板或 `/api/agent/harness/evolutions` 查看与回滚。
 - **收尾 Challenger 独立核验（`service/ai/harness/VerificationHarness`）**：仅对声明 `verification_policy: slot_evidence_challenger` 的高风险技能（如 `legal-opinion`）在 `<final>` 前执行独立证据核对，未核实主张自动触发 1 次自我修正闭环。
 - **回归**：`HarnessDiagnosticServiceTest`、`VerificationHarnessTest`、`HarnessEvolutionServiceTest`、`HarnessEvolutionPersistenceTest`、`frontend/tests/project-home/harness-evolution-ui.test.mjs`、`frontend/tests/ai-alignment-e2e/harness-self-evolving-e2e.mjs`。
+
+## 可选采集预读（dev-board#1630，2026-10-30）
+
+- `MobileCaptureOrganizationEngine` 只处理用户开启的照片、视频和录音。图像有界解码缩放；视频仅取0/5/10秒的最多3帧；录音仅取开头至多30秒的16kHz单声道WAV，交 `VoiceDictationService.transcribeSample` 再用辅助模型归类。覆盖范围写入结果，不当作全视频理解或完整转写，转写稿只留内存。
+- `ChatModelFactory.getPlatformAuxChatModel(timeout,maxOutputTokens,requiresVision)` 强制当前用户平台额度和已配置辅助模型，视觉能力不符即拒绝，不跟随服务器BYOK设置、不自动升级主模型。新增语音sample方法保留原听写API，限制输出与超时、禁止机器key，返回实际modelId/tokenUsage，由调用方 `recordPlatformUsage`；调用前建立平台用量基线。
+- 2线程无排队执行器、图片/视频30秒与录音60秒总预算、单次无自动模型重试。持久幂等和关闭默认由 `MobileCaptureOrganizationService` 负责；引擎失败不得阻断原件上传。
+- FFmpeg仅使用固定本机可执行文件、参数数组与临时目录，限制file/pipe协议和实际容器format_whitelist，排除HLS/concat外部读取。未安装可执行文件或无法采样即如实skipped，不把未解码影像称为已读。
+- 模型只抽字段，规则拼接文件名和有限标签；软著登记号与证书号分开，缺号/日期不补猜，低可靠保留原名待确认。自动名称不成为原件身份。请求语言在跨线程前捕获，再建立 `AppLanguageScope`，类别名称走 `LangText`。
+- 回归入口：`MobileCaptureOrganizationEngineTest` 与 `VoiceDictationServiceTest`，覆盖合成音视频真实本地抽样、模型HTTP替身、账户与用量、语种和恶意播放列表；这些不是付费模型识别质量或生产FFmpeg可用性验证。
