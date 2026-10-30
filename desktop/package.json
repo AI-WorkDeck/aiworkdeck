@@ -1,7 +1,7 @@
 {
   "name": "aiworkdeck-desktop",
   "private": true,
-  "version": "0.75.6",
+  "version": "0.75.7",
   "description": "AI WorkDeck",
   "author": "AI WorkDeck contributors",
   "main": "main/main.js",
