@@ -149,17 +149,19 @@ public class PlatformAiChannel {
      * OpenRouter 明确拒绝（401/403）：这把 key 已被官网侧吊销或重发，本地这份立刻作废。
      * 与「官网明确拒绝 → 立刻清缓存、不吃宽限」同源；网络不可达绝不走这条。
      */
-    public void onKeyRejected(Long userId) {
+    public synchronized void onKeyRejected(Long userId, String expectedFingerprint) {
+        if (expectedFingerprint == null || expectedFingerprint.isBlank()) return;
         if (perUserApplies(userId)) {
-            perUser.evict(userId);
+            perUser.evict(userId, expectedFingerprint);
             return;
         }
-        clearCache();
+        Cached cached = current();
+        if (cached != null && expectedFingerprint.equals(fingerprint(cached.openrouterKey))) clearCache();
     }
 
     /** 探针成功：刷新 30 天宽限的计时起点。 */
-    public void onKeyVerified(Long userId) {
-        if (perUserApplies(userId)) perUser.markVerified(userId);
+    public void onKeyVerified(Long userId, String expectedFingerprint) {
+        if (perUserApplies(userId)) perUser.markVerified(userId, expectedFingerprint);
     }
 
     /** 本实例上是否存在按用户的平台通道密钥（断开机器级账户时的降级判据）。 */
@@ -217,7 +219,7 @@ public class PlatformAiChannel {
         Cached cached = current();
         if (cached == null) cached = fetch();
         return new PlatformAiKeyService.Resolved(
-                cached.openrouterKey, machineFingerprint(), cached.limitUsd,
+                cached.openrouterKey, fingerprint(cached.openrouterKey), cached.limitUsd,
                 cached.provider == null ? "openrouter" : cached.provider, cached.baseUrl, cached.defaultModel);
     }
 
@@ -282,7 +284,8 @@ public class PlatformAiChannel {
     }
 
     private boolean ownedByCurrentAccount(Cached cached) {
-        return java.util.Objects.equals(cached.owner, accountService.accountFingerprintOrNull())
+        return cached.owner != null && !cached.owner.isBlank()
+                && java.util.Objects.equals(cached.owner, accountService.accountFingerprintOrNull())
                 && accountService.domesticAiPlatform() == "bailian".equals(cached.provider)
                 && (!"bailian".equals(cached.provider)
                 || java.util.Objects.equals(accountService.platformAiBaseUrl(), cached.baseUrl));
@@ -295,6 +298,9 @@ public class PlatformAiChannel {
     }
 
     private synchronized Cached fetch() {
+        long version = accountService.connectionVersion();
+        String owner = accountService.accountFingerprintOrNull();
+        if (owner == null || owner.isBlank()) throw accountChanged();
         Map<String, Object> body = accountService.fetchAiKey();
         Cached cached = new Cached();
         PlatformAiKeyService.Resolved connection = PlatformAiKeyService.parseConnection(body, accountService);
@@ -304,16 +310,26 @@ public class PlatformAiChannel {
         cached.defaultModel = connection.defaultModel();
         cached.limitUsd = connection.limitUsd();
         cached.fetchedAt = Instant.now().toString();
-        cached.owner = accountService.accountFingerprintOrNull();
-        try {
-            Files.createDirectories(keyFile.getParent());
-            Files.write(keyFile, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(cached));
-            AccountService.restrictPermissions(keyFile);
-        } catch (Exception e) {
-            // 落盘失败不致命：本次进程内仍可用，下次重启再拉一次
-            log.warn("平台 AI 通道密钥缓存写入失败: {}", e.getMessage());
+        cached.owner = owner;
+        // Serialize validation/publication with reconnect, including a reconnect using the same key.
+        synchronized (accountService) {
+            if (version != accountService.connectionVersion()
+                    || !owner.equals(accountService.accountFingerprintOrNull())) throw accountChanged();
+            try {
+                Files.createDirectories(keyFile.getParent());
+                Files.write(keyFile, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(cached));
+                AccountService.restrictPermissions(keyFile);
+            } catch (Exception e) {
+                // 落盘失败不致命：本次进程内仍可用，下次重启再拉一次
+                log.warn("平台 AI 通道密钥缓存写入失败: {}", e.getMessage());
+            }
+            memory = cached;
+            return cached;
         }
-        memory = cached;
-        return cached;
+    }
+
+    private AccountException accountChanged() {
+        return new AccountException(AccountException.Kind.CONFLICT,
+                LangText.of("账户连接已变化，请重试", "The account connection changed. Please retry"));
     }
 }

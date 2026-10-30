@@ -213,7 +213,7 @@ public class PlatformUsageAccountant {
         if (reply.status() == 401 || reply.status() == 403) {
             String fingerprint = PlatformAiKeyCipher.fingerprint(apiKey);
             log.info("平台通道密钥已被拒绝（HTTP {}），作废本地记录 userId={}", reply.status(), userId);
-            platformAiChannel.onKeyRejected(userId);
+            platformAiChannel.onKeyRejected(userId, fingerprint);
             forget(fingerprint);
             return null;
         }
@@ -226,7 +226,7 @@ public class PlatformUsageAccountant {
             if (!(data instanceof Map<?, ?> map)) return null;
             Object usage = map.get(bailian ? "usageUsd" : "usage");
             if (!(usage instanceof Number n)) return null;
-            platformAiChannel.onKeyVerified(userId);
+            platformAiChannel.onKeyVerified(userId, PlatformAiKeyCipher.fingerprint(apiKey));
             return new BigDecimal(n.toString());
         } catch (Exception e) {
             return null;

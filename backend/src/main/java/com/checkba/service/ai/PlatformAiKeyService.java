@@ -228,22 +228,18 @@ public class PlatformAiKeyService {
         provision(userId, key);
     }
 
-    /** 官网明确拒绝（OpenRouter 401/403）时调用：密钥已被吊销或重发，本地这份立刻作废。 */
-    public void evict(Long userId) {
-        if (userId == null) return;
-        keyRepository.findByUserId(userId).ifPresent(entity -> {
-            keyRepository.delete(entity);
+    /** Apply delayed runtime responses only to the exact key that produced them. */
+    public void evict(Long userId, String expectedFingerprint) {
+        if (userId == null || expectedFingerprint == null || expectedFingerprint.isBlank()) return;
+        if (keyRepository.deleteMatchingKey(userId, expectedFingerprint) > 0) {
             log.info("用户 {} 的平台 AI 通道密钥已被官网侧吊销，本地记录已清除", userId);
-        });
+        }
     }
 
-    /** 探针成功即刷新验证时间（30 天宽限的计时起点）。 */
-    public void markVerified(Long userId) {
-        if (userId == null) return;
-        keyRepository.findByUserId(userId).ifPresent(entity -> {
-            entity.setLastVerifiedAt(LocalDateTime.now());
-            keyRepository.save(entity);
-        });
+    /** The WHERE predicate and timestamp update execute atomically in the database. */
+    public void markVerified(Long userId, String expectedFingerprint) {
+        if (userId == null || expectedFingerprint == null || expectedFingerprint.isBlank()) return;
+        keyRepository.verifyMatchingKey(userId, expectedFingerprint, LocalDateTime.now());
     }
 
     // ==================== 展示 ====================

@@ -95,6 +95,22 @@ class PlatformUsageAccountantTest {
         } finally { observer.shutdown(); }
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {200, 401})
+    void delayedUsageResponseAlwaysTargetsTheRequestedRuntime(int status) {
+        var observer = new PlatformUsageAccountant(repository, channel, (method,url,bearer,body) -> {
+            when(channel.resolveFor(1L)).thenReturn(KEY_B); // Rotation while the upstream request is in flight.
+            return new AccountTransport.Reply(status, "{\"data\":{\"usage\":1.5}}");
+        }, "https://openrouter.ai/api/v1");
+        try {
+            observer.probeUsageForDisplay(1L, KEY_A.apiKey());
+            if (status == 401) verify(channel).onKeyRejected(1L, PlatformAiKeyCipher.fingerprint(KEY_A.apiKey()));
+            else verify(channel).onKeyVerified(1L, PlatformAiKeyCipher.fingerprint(KEY_A.apiKey()));
+            verify(channel, never()).onKeyRejected(1L, KEY_B.fingerprint());
+            verify(channel, never()).onKeyVerified(1L, KEY_B.fingerprint());
+        } finally { observer.shutdown(); }
+    }
+
     private void usage(PlatformAiKeyService.Resolved key, double cumulative) {
         replies.computeIfAbsent(key.apiKey(), k -> new ArrayDeque<>())
                 .add(new AccountTransport.Reply(200,
@@ -224,7 +240,7 @@ class PlatformUsageAccountantTest {
 
         accountant.reconcile(7L, 1L, KEY_A);
 
-        verify(channel).onKeyRejected(1L);
+        verify(channel).onKeyRejected(1L, PlatformAiKeyCipher.fingerprint(KEY_A.apiKey()));
         verify(repository, never()).save(any());
     }
 
@@ -234,7 +250,7 @@ class PlatformUsageAccountantTest {
         accountant.setBaselineForTest(KEY_A.fingerprint(), new BigDecimal("1.00"));
         accountant.reconcile(7L, 1L, KEY_A); // 队列为空 → NETWORK_FAILURE
 
-        verify(channel, never()).onKeyRejected(any());
+        verify(channel, never()).onKeyRejected(any(), any());
     }
 
     @Test
@@ -242,6 +258,6 @@ class PlatformUsageAccountantTest {
     void successfulProbeMarksVerified() {
         usage(1.00);
         accountant.reconcile(7L, 1L, KEY_A);
-        verify(channel).onKeyVerified(1L);
+        verify(channel).onKeyVerified(1L, PlatformAiKeyCipher.fingerprint(KEY_A.apiKey()));
     }
 }

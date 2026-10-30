@@ -9,6 +9,8 @@ description: 授权与计费领域。任务涉及解锁门（试用码/账户 Ke
 
 POST ai-key发送 X-AWD-AI-Protocol:2。国内返回限权 awdai_ runtime token（不含百炼共享Key或awdk账户Key），baseUrl必须严格匹配当前账户站点 /api/account/ai/v1。server只加密保存runtime token及provider/baseUrl/defaultModel，awdk仍用完即弃。旧国内OpenRouter机器缓存丢弃重取；已有server用户需重新连接/刷新以换取国内runtime token，不允许退回机器额度。PlatformUsageAccountant对国内调用同站 /usage，读累计usageUsd作观测，不二次扣费；实际扣费在官网网关。国际仍OpenRouter /key。新账本不覆盖旧token_usage或余额。
 
+平台 runtime 缓存须在取 Key 前捕获账户连接代次与归属，回包后与账户锁内当前值核对；换账号或同 Key 重连均不得把旧回包发布为新缓存。用量/听写的密钥验证和拒绝回调携带原请求指纹，机器缓存条件清除，per-user 以 userId + keyFingerprint 原子更新/删除，防止迟到回包误清或续验新密钥。构造模型时的密钥、地址、供应商和缓存指纹从同一 Resolved 快照派生，不分别回读连接。回归见 PlatformAiKeyOwnershipTest、PlatformAiKeyRepositoryTest 与 ChatModelFactoryTest。
+
 ## 已确认的账户失效与本机会话恢复（dev-board#1623，2026-10-29）
 
 `account.json` 有 Key 不等于登录仍有效。`AccountService` 当前账户请求及 `PlatformGatewayClient`

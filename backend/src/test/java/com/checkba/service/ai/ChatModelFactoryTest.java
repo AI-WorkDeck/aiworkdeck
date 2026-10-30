@@ -47,6 +47,12 @@ class ChatModelFactoryTest {
                 .thenAnswer(inv -> inv.getArgument(1));
         platformAiChannel = mock(PlatformAiChannel.class);
         usageAccountant = mock(PlatformUsageAccountant.class);
+        when(platformAiChannel.connection()).thenAnswer(inv -> {
+            String key = platformAiChannel.apiKey();
+            return new PlatformAiKeyService.Resolved(key, key == null ? "none" : PlatformAiKeyCipher.fingerprint(key), null,
+                    platformAiChannel.isBailian() ? "bailian" : "openrouter",
+                    platformAiChannel.baseUrl(properties.getOpenRouter().getBaseUrl()), null);
+        });
         // 余额闸默认放行：本类测的是路由，闸门自身的判据在 PlatformCreditsGateTest
         creditsGate = mock(PlatformCreditsGate.class);
         // AuxModelResolver 用真实实例（无状态的两依赖纯类）：辅助模型 ID 的解析
@@ -59,6 +65,99 @@ class ChatModelFactoryTest {
                         new com.checkba.service.telemetry.InstallIdentityService(
                                 System.getProperty("java.io.tmpdir")),
                         "test"));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"sync", "stream", "bounded", "aux", "writing", "automatic-writing", "review", "explicit-platform"})
+    void platformConsumersFreezeCredentialEndpointAndCacheIdentityTogether(String consumer) throws Exception {
+        setDbProvider("AWD_CLOUD");
+        var domesticAuth = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var internationalAuth = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var domestic = snapshotServer(domesticAuth);
+        var international = snapshotServer(internationalAuth);
+        try {
+            String cnBase = "http://127.0.0.1:" + domestic.getAddress().getPort() + "/v1";
+            String intlBase = "http://127.0.0.1:" + international.getAddress().getPort() + "/v1";
+            properties.getOpenRouter().setBaseUrl(intlBase);
+            var first = new PlatformAiKeyService.Resolved("awdai_account-a", "snapshot-a", null, "bailian", cnBase, null);
+            var second = new PlatformAiKeyService.Resolved("sk-or-account-b", "snapshot-b", null);
+            // Separate legacy getters already see B. The first atomic snapshot still belongs to A.
+            when(platformAiChannel.apiKey()).thenReturn(second.apiKey());
+            when(platformAiChannel.baseUrl(anyString())).thenReturn(intlBase);
+            when(platformAiChannel.keyFingerprint()).thenReturn(second.fingerprint());
+            doReturn(first, second, second).when(platformAiChannel).connection();
+            clearInvocations(platformAiChannel);
+            java.util.function.Supplier<Object> create = () -> PlatformAiUserScope.call(72L, () -> switch (consumer) {
+                case "sync" -> factory.getChatModel("anthropic/claude-sonnet-5");
+                case "stream" -> factory.getStreamingChatModel("anthropic/claude-sonnet-5");
+                case "bounded" -> factory.getChatModel("anthropic/claude-sonnet-5", java.time.Duration.ofSeconds(3));
+                case "aux" -> factory.getAuxChatModel();
+                case "writing" -> factory.getWritingModel(java.time.Duration.ofSeconds(3));
+                case "automatic-writing" -> factory.getAutomaticWritingModel(java.time.Duration.ofSeconds(3));
+                case "review" -> factory.getAutomaticWritingReviewModel(java.time.Duration.ofSeconds(3), 0);
+                case "explicit-platform" -> factory.getPlatformChatModel(java.time.Duration.ofSeconds(3), 100).model();
+                default -> throw new AssertionError(consumer);
+            });
+            Object a = create.get(); Object b = create.get();
+            assertNotSame(a, b, "Account A's model must not be cached under account B's fingerprint");
+            if (java.util.Set.of("sync", "stream", "aux").contains(consumer)) assertSame(b, create.get());
+            invokeSnapshotModel(a); invokeSnapshotModel(b);
+            assertEquals(java.util.List.of("Bearer awdai_account-a"), domesticAuth);
+            assertEquals(java.util.List.of("Bearer sk-or-account-b"), internationalAuth);
+            verify(platformAiChannel, never()).apiKey();
+            verify(platformAiChannel, never()).baseUrl(anyString());
+            verify(platformAiChannel, never()).keyFingerprint();
+            verify(creditsGate, atLeast(2)).ensureCredits(72L);
+            verify(usageAccountant, atLeast(2)).ensureBaselineAsync(72L);
+        } finally { domestic.stop(0); international.stop(0); }
+    }
+
+    @Test
+    void decisionUsesSnapshotProviderEvenIfTheCurrentSiteHasChanged() {
+        setDbProvider("AWD_CLOUD");
+        var domestic = new PlatformAiKeyService.Resolved("awdai_account-a", "a", null, "bailian", "https://www.aiworkdeck.com/api/account/ai/v1", null);
+        var international = new PlatformAiKeyService.Resolved("sk-or-account-b", "b", null);
+        doReturn(domestic, international).when(platformAiChannel).connection();
+        clearInvocations(platformAiChannel);
+        assertNull(factory.decisionCredentials("anthropic/claude-sonnet-5", AiModelProperties.Provider.AWD_CLOUD));
+        var next = factory.decisionCredentials("anthropic/claude-sonnet-5", AiModelProperties.Provider.AWD_CLOUD);
+        assertEquals(international.apiKey(), next.apiKey());
+        assertEquals(properties.getOpenRouter().getBaseUrl(), next.baseUrl());
+        verify(platformAiChannel, never()).apiKey();
+        verify(platformAiChannel, never()).baseUrl(anyString());
+    }
+
+    private static com.sun.net.httpserver.HttpServer snapshotServer(java.util.List<String> authorization) throws Exception {
+        var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/chat/completions", exchange -> {
+            authorization.add(exchange.getRequestHeaders().getFirst("Authorization"));
+            var request = new com.fasterxml.jackson.databind.ObjectMapper().readTree(exchange.getRequestBody());
+            boolean stream = request.path("stream").asBoolean();
+            String response = stream
+                    ? "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ok\"},\"finish_reason\":null}]}\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+                    : "{\"id\":\"snapshot\",\"object\":\"chat.completion\",\"created\":1,\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}";
+            byte[] bytes = response.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", stream ? "text/event-stream" : "application/json");
+            exchange.sendResponseHeaders(200, bytes.length); exchange.getResponseBody().write(bytes); exchange.close();
+        });
+        server.start(); return server;
+    }
+
+    private static void invokeSnapshotModel(Object model) throws Exception {
+        if (model instanceof ChatLanguageModel synchronous) {
+            assertEquals("ok", synchronous.generate("synthetic")); return;
+        }
+        var done = new java.util.concurrent.CountDownLatch(1);
+        var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        var text = new StringBuilder();
+        ((StreamingChatLanguageModel) model).generate(java.util.List.of(dev.langchain4j.data.message.UserMessage.from("synthetic")),
+                new dev.langchain4j.model.StreamingResponseHandler<dev.langchain4j.data.message.AiMessage>() {
+                    public void onNext(String token) { text.append(token); }
+                    public void onComplete(dev.langchain4j.model.output.Response<dev.langchain4j.data.message.AiMessage> response) { done.countDown(); }
+                    public void onError(Throwable error) { failure.set(error); done.countDown(); }
+                });
+        assertTrue(done.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        assertNull(failure.get()); assertEquals("ok", text.toString());
     }
 
     @Test
