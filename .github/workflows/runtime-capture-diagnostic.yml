@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: Runtime capture diagnostic (no publishing)
+on:
+  pull_request:
+    paths:
+      - desktop/tests/runtime-compat.electron.cjs
+      - .github/workflows/runtime-capture-diagnostic.yml
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install the pinned Electron runtime
+        run: npm ci --prefix desktop
+      - name: Preserve the original capture and probe foreground/frame readiness
+        env:
+          AWD_RUNTIME_CAPTURE_DIAGNOSTIC: '1'
+        run: npm --prefix desktop run test:runtime-compat
+      - name: Preserve all original and diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-capture-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/awd-runtime-compat-*/*.json
+            ${{ runner.temp }}/awd-runtime-compat-*/*.png
