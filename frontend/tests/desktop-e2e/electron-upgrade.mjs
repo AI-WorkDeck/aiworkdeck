@@ -138,16 +138,36 @@ async function open(ext) {
   await page.waitForFunction(name => window.__checkbaActiveOverviewVm?.activeFileLeft?.name === name, { timeout: 60000 }, path.basename(files[ext]))
   if (ext === 'pdf') { await page.waitForSelector('.preview-pdf iframe', { timeout: 30000 }); return null }
   await page.waitForFunction(name => Object.values(window.__checkbaActiveOverviewVm?._libreRefs || {}).some(e => e.file?.name === name && e.ready && e.statusKey === 'ready' && !e.docLoadFailed), { timeout: 180000 }, path.basename(files[ext]))
-  await page.evaluate(async name => {
+  const openToken = crypto.randomUUID()
+  await page.evaluate(async (name, token) => {
     const editor = Object.values(window.__checkbaActiveOverviewVm._libreRefs || {}).find(e => e.file?.name === name)
-    await editor.webviewEl.executeJavaScript('window.__electronCompatTarget=' + JSON.stringify(name))
-  }, path.basename(files[ext]))
-  const guest = await until(async () => {
-    for (const target of browser.targets().filter(t => t.type() === 'webview')) {
-      const candidate = await target.page()
-      try { if (await candidate.evaluate(name => window.__electronCompatTarget === name, path.basename(files[ext]))) return candidate } catch { /* Navigating guest. */ }
-    }
-  })
+    await editor.webviewEl.executeJavaScript('window.__electronCompatTarget=' + JSON.stringify(token))
+  }, path.basename(files[ext]), openToken)
+  let guest
+  if (installedMode) {
+    const webContentsId = await page.evaluate(name => Object.values(window.__checkbaActiveOverviewVm._libreRefs).find(e => e.file?.name === name).webviewEl.getWebContentsId(), path.basename(files[ext]))
+    const targetId = await installed.mainRpc(`process.mainModule.require('electron').webContents.fromId(${webContentsId}).getOrCreateDevToolsTargetId()`)
+    assert.equal(typeof targetId, 'string')
+    // Puppeteer 22 exposes this CDP ID on CdpTarget. Do not initialize stale or
+    // spare webviews while looking for the actual editor being tested.
+    const target = await until(() => {
+      const targets = browser.targets().filter(t => t.type() === 'webview')
+      assert(targets.every(t => typeof t._targetId === 'string'), 'Pinned Puppeteer must expose CDP target IDs')
+      return targets.find(t => t._targetId === targetId)
+    })
+    evidence.guestTargets ||= []
+    evidence.guestTargets.push({ ext, openToken, webContentsId, targetId, puppeteerVersion: JSON.parse(fs.readFileSync(path.join(root, 'frontend/node_modules/puppeteer-core/package.json'))).version, targets: browser.targets().map(t => ({ id: t._targetId, type: t.type(), url: t.url() })) })
+    write('guest-targets.json', evidence.guestTargets)
+    guest = await target.page()
+    assert.equal(await guest.evaluate(name => window.__electronCompatTarget === name, openToken), true, 'Attached guest must be the current editor')
+  } else {
+    guest = await until(async () => {
+      for (const target of browser.targets().filter(t => t.type() === 'webview')) {
+        const candidate = await target.page()
+        try { if (await candidate.evaluate(name => window.__electronCompatTarget === name, openToken)) return candidate } catch { /* Navigating guest. */ }
+      }
+    })
+  }
   const cdp = await guest.createCDPSession()
   await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: true })
   guest.__compatFocus = cdp
