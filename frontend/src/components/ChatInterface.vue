@@ -5905,7 +5905,7 @@ export default {
   padding: 8px 12px;
   border-bottom: 1px solid var(--awd-border-subtle);
   background: var(--awd-surface);
-  color: var(--awd-text-secondary);
+  color: var(--awd-text-2);
   font-size: var(--awd-panel-fs-meta);
   overflow-wrap: anywhere;
 }
