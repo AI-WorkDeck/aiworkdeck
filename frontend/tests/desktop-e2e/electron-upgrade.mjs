@@ -136,8 +136,13 @@ async function open(ext) {
       : `process.mainModule.require('electron').app.emit('second-instance',{},[process.execPath,${file}],process.cwd())`)
   } else fs.writeFileSync(commandFile, JSON.stringify({ path: files[ext], nonce: Date.now() }))
   await page.waitForFunction(name => window.__checkbaActiveOverviewVm?.activeFileLeft?.name === name, { timeout: 60000 }, path.basename(files[ext]))
-  if (ext === 'pdf') { await page.waitForSelector('.preview-pdf iframe', { timeout: 30000 }); return null }
+  if (ext === 'pdf') {
+    await page.waitForSelector('.preview-pdf iframe', { timeout: 30000 })
+    await assertLocalWorkspaceUnobstructed()
+    return null
+  }
   await page.waitForFunction(name => Object.values(window.__checkbaActiveOverviewVm?._libreRefs || {}).some(e => e.file?.name === name && e.ready && e.statusKey === 'ready' && !e.docLoadFailed), { timeout: 180000 }, path.basename(files[ext]))
+  await assertLocalWorkspaceUnobstructed()
   const openToken = crypto.randomUUID()
   await page.evaluate(async (name, token) => {
     const editor = Object.values(window.__checkbaActiveOverviewVm._libreRefs || {}).find(e => e.file?.name === name)
@@ -181,6 +186,10 @@ async function exec(ext, action, params = {}) {
   }, path.basename(files[ext]), action, params)
   assert.equal(result.success, true, `${action}: ${JSON.stringify(result)}`)
   return result
+}
+async function assertLocalWorkspaceUnobstructed() {
+  assert.equal(await page.evaluate(() => !!document.querySelector('.awd-login-mask')), false,
+    'Local document interaction must not be obscured by an unsolicited account dialog')
 }
 async function savedXml(ext) {
   const zip = await JSZip.loadAsync(fs.readFileSync(files[ext]))
@@ -258,6 +267,7 @@ try {
       await exec(ext, 'slide_goto', { slideNumber: 1, shapeName: shape.name })
     }
     await sleep(2000) // Ready precedes the first composited canvas frame.
+    await assertLocalWorkspaceUnobstructed()
     await page.screenshot({ path: path.join(run, `${ext}-opened.png`) })
     await page.evaluate(name => Object.values(window.__checkbaActiveOverviewVm._libreRefs).find(e => e.file?.name === name).webviewEl.focus(), path.basename(files[ext]))
     await frame.focus('[data-lo-ime]')
@@ -311,6 +321,7 @@ try {
   }
   await open('pdf')
   await sleep(2000)
+  await assertLocalWorkspaceUnobstructed()
   await page.screenshot({ path: path.join(run, 'pdf-opened.png') })
   const bounds = await page.$eval('.preview-pdf iframe', el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height } })
   await page.mouse.click(bounds.x + bounds.width * 0.7, bounds.y + bounds.height * 0.5)
@@ -324,6 +335,7 @@ try {
   if (installedMode) {
     await page.evaluate(() => localStorage.setItem('electron-cloud-restart', 'retained'))
     await close('pdf')
+    await assertLocalWorkspaceUnobstructed()
     const { checkDesktopInteractions } = await import('./installed-desktop-interactions.mjs')
     evidence.desktop = await checkDesktopInteractions({ page, browser, mainRpc: installed.mainRpc, run })
     await quit()
