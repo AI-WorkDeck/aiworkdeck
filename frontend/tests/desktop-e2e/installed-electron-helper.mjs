@@ -261,6 +261,28 @@ export async function launchInstalledElectron({ outDir, backendPort = 19566, cdp
       try {
         save('failed-startup-preload-probe.json', await helper.mainRpc(`(async()=>{const e=process.mainModule.require('electron'),path=process.mainModule.require('node:path');const errors=[];const w=new e.BrowserWindow({show:false,webPreferences:{preload:path.join(process.resourcesPath,'app.asar/preload/preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false}});w.webContents.on('preload-error',(_event,file,error)=>errors.push({file,error:error.stack}));try{await w.loadURL('data:text/html,<title>Failed startup diagnostic only</title>');return {diagnosticOnly:true,errors,bridge:await w.webContents.executeJavaScript('typeof window.checkbaDesktop'),preload:typeof w.webContents._getPreloadScript==='function'?w.webContents._getPreloadScript():null}}finally{w.destroy()}})()`))
       } catch (probeError) { save('failed-startup-preload-probe.json', { diagnosticOnly: true, error: probeError.message }) }
+      try {
+        save('failed-startup-window-probes.json', await helper.mainRpc(`(async()=>{
+          const e=process.mainModule.require('electron'),path=process.mainModule.require('node:path');
+          const original=e.BrowserWindow.getAllWindows().find(w=>w.isVisible());
+          const prefs=original.webContents.getLastWebPreferences();
+          const preload=path.join(process.resourcesPath,'app.asar/preload/preload.js');
+          const file=path.join(process.resourcesPath,'frontend/dist/build/h5/index.html');
+          const results=[];
+          for(const webviewTag of [true,false]){
+            const errors=[];
+            const w=new e.BrowserWindow({show:false,webPreferences:{preload,sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:false,webviewTag,additionalArguments:prefs.additionalArguments}});
+            w.webContents.on('preload-error',(_event,file,error)=>errors.push({file,error:error.stack}));
+            w.webContents.on('console-message',(_event,details)=>{if(details.level==='error')errors.push({console:details.message})});
+            try{await w.loadFile(file);results.push({webviewTag,errors,state:await w.webContents.executeJavaScript('({bridge:typeof window.checkbaDesktop,url:location.href,ready:document.readyState})')})}finally{w.destroy()}
+          }
+          const errors=[];
+          original.webContents.on('preload-error',(_event,file,error)=>errors.push({file,error:error.stack}));
+          await original.loadFile(file);
+          results.push({originalReload:true,errors,state:await original.webContents.executeJavaScript('({bridge:typeof window.checkbaDesktop,url:location.href,ready:document.readyState})')});
+          return {diagnosticOnly:true,results};
+        })()`, 60000))
+      } catch (probeError) { save('failed-startup-window-probes.json', { diagnosticOnly: true, error: probeError.message }) }
     }
     try { await helper.close() } catch (cleanupError) { provenance.cleanupError = cleanupError.message }
     save('installed-helper.json', provenance)
