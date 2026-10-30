@@ -12,7 +12,7 @@ import { downloadBuild } from '../../../desktop/scripts/download-upgrade-build.m
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 const run = (file, args, options = {}) => execFileSync(file, args, { encoding: 'utf8', timeout: 120000, ...options }).trim()
-const powershell = (script, env = {}) => run('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { env: { ...process.env, ...env }, timeout: 360000 })
+const powershell = (script, env = {}) => run('pwsh.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { env: { ...process.env, ...env }, timeout: 360000 })
 const hash = async file => {
   const h = createHash('sha256')
   for await (const bytes of fs.createReadStream(file)) h.update(bytes)
@@ -121,7 +121,15 @@ export async function launchInstalledElectron({ outDir, backendPort = 19566, cdp
     await helper.mainRpc("setTimeout(()=>process.mainModule.require('electron').app.quit(),250);true")
     await until(() => current.exitCode !== null || current.signalCode !== null, 'normal app exit', 120)
     assert(current.exitCode === 0 && current.signalCode === null, 'Ordinary quit must exit zero without a signal')
-    provenance.launches[provenance.launches.length - 1].quit = { code: current.exitCode, signal: current.signalCode }
+    await until(async () => {
+      const processes = processList()
+      const owned = mac ? processes.split('\n').filter(line => line.includes(app + '/')) :
+        [JSON.parse(processes)].flat().filter(p => p.ExecutablePath?.toLowerCase().startsWith(app.toLowerCase() + path.sep))
+      if (owned.length) return false
+      for (const port of Object.values(ports)) await assertPortFree(port)
+      return true
+    }, 'all installed app processes exit and test ports are released', 45)
+    provenance.launches[provenance.launches.length - 1].quit = { code: current.exitCode, signal: current.signalCode, ownedProcessesGone: true, portsReleased: true }
     child = null
   }
   helper.close = async () => {
