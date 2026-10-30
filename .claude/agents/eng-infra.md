@@ -21,7 +21,7 @@ Electron 44 起最低 macOS **13 Ventura**，`build.mac.minimumSystemVersion` �
 
 ## CI（.github/workflows/）
 
-`runtime-compat.electron.cjs` 在 BrowserView 历史导航后先观察真实 Viz 位图中的新合成标记，再调用独立 `capturePage` 并核对标记及页面背景；`did-finish-load` / DOM / rAF 不等于画面已绘制。不得用固定等待、重试截图、强制前台或关闭 GPU/sandbox 代替此门禁。#1643 在正式前置链复现原 `UnknownVizError`，尚未证明唯一底层成因；等待实际帧用于补齐测试就绪条件，不宣称修复产品原生遮挡。
+`runtime-compat.electron.cjs` 在 BrowserView 历史导航后先等订阅交付首张非空帧，再只插入一次合成标记，要求后续真实帧含标记和页面背景；最后独立 `capturePage` 再核对。10 秒总期限覆盖这两个阶段，不重置；失败保留回调、窗口状态和首末图。`did-finish-load` / DOM / rAF 不等于画面已绘制，不得用固定等待、重试截图、强制前台或关闭 GPU/sandbox 代替门禁。#1643 两台全新 Mac 复现过早注入后只交付一张旧帧，屏幕和失败后的独立截图实际已有标记；改为首帧后注入的另两台全新 Mac 通过。该证据支持测试捕获启动时序修正，不证明唯一底层原因或产品原生遮挡修复。
 
 Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child PID 只由父进程写完后原子发布；子进程不能再写同一路径，否则撤权可能打断截断后的写入。撤权前取得完整正数 PID，仍须核父子进程及读取线程退出（#1644）；不能重跑碰绿或删除进程退出断言代替修复测试握手。
 
