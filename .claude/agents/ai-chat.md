@@ -1825,3 +1825,14 @@ cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='Refe
   3. **对话流零打扰**：`RootBubble.vue` 不挂载 `HarnessEvolutionCard`，不在对话流弹出让用户三选一的卡片；用户可随时在「我的记忆 / 项目记忆」面板或 `/api/agent/harness/evolutions` 查看与回滚。
 - **收尾 Challenger 独立核验（`service/ai/harness/VerificationHarness`）**：仅对声明 `verification_policy: slot_evidence_challenger` 的高风险技能（如 `legal-opinion`）在 `<final>` 前执行独立证据核对，未核实主张自动触发 1 次自我修正闭环。
 - **回归**：`HarnessDiagnosticServiceTest`、`VerificationHarnessTest`、`HarnessEvolutionServiceTest`、`HarnessEvolutionPersistenceTest`、`frontend/tests/project-home/harness-evolution-ui.test.mjs`、`frontend/tests/ai-alignment-e2e/harness-self-evolving-e2e.mjs`。
+
+
+## 诉讼可视化独立会话边界（2026-10-30，dev-board#1627/#1628）
+
+`ProjectAiMessage.conversationScope` 可空，当前只支持 `litigation-visual`。原生签发/聊天请求与
+SSE query 都显式携带范围；不匹配的普通面板连接在替换 emitter 前返回409，聊天同样拒绝。
+普通 user-scoped/project-scoped 历史排除专属会话，按 conversationId 的授权历史读取仍可用于左侧恢复。
+显式旧任务归类通过签发接口的 conversationId 完成，必须核对原 owner/project 且不可为镜像会话；
+不是按技能触发词自动隐藏普通聊天。保存、fork/rollback 继续保留范围，进程重启从持久消息回读。
+新增文件事件方面，litigation_render/timeline_render 没有结构化真实产物时不走“当前文档”兜底；
+已登记 drawio/svg/png 仍沿实际 ID 逐项发事件。详细 UI/恢复与验证边界见 litigation-visual.md。

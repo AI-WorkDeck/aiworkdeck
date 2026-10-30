@@ -32,6 +32,9 @@ class ConversationIssuanceControllerTest {
     @Mock
     private ProjectMemberService projectMemberService;
 
+    @Mock
+    private com.checkba.service.ProjectAiMessageService messageService;
+
     @InjectMocks
     private ConversationIssuanceController controller;
 
@@ -39,6 +42,35 @@ class ConversationIssuanceControllerTest {
         ConversationIssuanceController.IssueRequest r = new ConversationIssuanceController.IssueRequest();
         r.setProjectId(projectId);
         return r;
+    }
+
+    @Test
+    void scopedIssueAndExplicitAdoptionKeepTheirScopeAndOriginalConversation() {
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "messageService", messageService);
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(7L);
+            when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(true);
+            var request = request(42L); request.setConversationScope("litigation-visual");
+            when(issuanceService.issue(7L, 42L, "litigation-visual")).thenReturn("new-scoped");
+            assertEquals("new-scoped", controller.issue(request, "sess").getBody().get("conversationId"));
+            request.setConversationId("legacy");
+            when(messageService.adoptConversationScope("legacy", 7L, 42L, "litigation-visual")).thenReturn(true);
+            assertEquals("legacy", controller.issue(request, "sess").getBody().get("conversationId"));
+            verify(issuanceService, times(1)).issue(any(), any(), any());
+            request.setConversationId("other-owner");
+            assertEquals(403, controller.issue(request, "sess").getStatusCode().value());
+        }
+    }
+
+    @Test
+    void unsupportedScopeIsRejectedBeforeIssuance() {
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(7L);
+            when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(true);
+            var request = request(42L); request.setConversationScope("unrecognized");
+            assertEquals(400, controller.issue(request, "sess").getStatusCode().value());
+            verifyNoInteractions(issuanceService, messageService);
+        }
     }
 
     @Test
