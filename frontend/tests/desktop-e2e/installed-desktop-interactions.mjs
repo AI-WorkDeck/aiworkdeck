@@ -109,6 +109,15 @@ export async function checkDesktopInteractions({ page, browser, mainRpc, run }) 
     assert.equal(await page.evaluate(url => window.__installedInteractionEvents.newTabs.some(e => e.url === url), base + '/popup'), true)
     evidence.browserEvents = await page.evaluate(() => ({ urls: window.__installedInteractionEvents.urls, newTabs: window.__installedInteractionEvents.newTabs }))
     evidence.checks.push('Real window.open handled by production handler and rendered in a new workbench tab')
+    for (const fullscreen of [true, false]) {
+      await mainRpc(`(()=>{const w=process.mainModule.require('electron').BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes('/h5/index.html'));w.setFullScreen(${fullscreen});return true})()`)
+      await page.waitForFunction(value => document.documentElement.classList.contains('is-fullscreen') === value, { timeout: 20000 }, fullscreen)
+      assert.equal(await mainRpc(`process.mainModule.require('electron').BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes('/h5/index.html')).isFullScreen()`), fullscreen)
+      await state(popupId, base + '/popup')
+      await capture(fullscreen ? 'installed-browser-fullscreen' : 'installed-browser-restored')
+    }
+    evidence.checks.push('Native full-screen enter/leave updated production chrome state and retained BrowserView content')
+
 
     // Only select a destination; the production listener, HTTP transfer and file writes stay real.
     await mainRpc(`(()=>{const {session}=process.mainModule.require('electron');globalThis.__installedDownload={};globalThis.__installedDownloadListener=(_event,item)=>{if(item.getURL()!==${JSON.stringify(base + '/download')})return;item.setSavePath(${JSON.stringify(downloadPath)});item.once('done',(_e,state)=>{globalThis.__installedDownload={state,path:item.getSavePath(),filename:item.getFilename(),received:item.getReceivedBytes(),total:item.getTotalBytes()}})};session.defaultSession.on('will-download',globalThis.__installedDownloadListener);return true})()`)

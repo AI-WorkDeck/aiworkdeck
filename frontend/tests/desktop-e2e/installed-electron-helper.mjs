@@ -108,6 +108,8 @@ export async function launchInstalledElectron({ outDir, backendPort = 19566, cdp
         save('installed-debug-targets.json', await (await fetch(`http://127.0.0.1:${cdpPort}/json/list`, { signal: AbortSignal.timeout(3000) })).json())
         save('installed-window-state.json', await helper.mainRpc(`Promise.all(process.mainModule.require('electron').BrowserWindow.getAllWindows().map(async w=>{const p=w.webContents.getLastWebPreferences();return {id:w.id,visible:w.isVisible(),title:w.getTitle(),url:w.webContents.getURL(),loading:w.webContents.isLoading(),preferences:{preload:p.preload,sandbox:p.sandbox,contextIsolation:p.contextIsolation,nodeIntegration:p.nodeIntegration},renderer:await w.webContents.executeJavaScript('({bridge:typeof window.checkbaDesktop,keys:Object.keys(window.checkbaDesktop||{}),apiBase:window.checkbaDesktop?.apiBaseUrl,hasOverview:!!window.__checkbaActiveOverviewVm,body:document.body?.innerText.slice(0,800)})').catch(e=>({error:e.message}))}}))`))
         save('installed-renderer-events.json', await helper.mainRpc('globalThis.__installedRendererEvents || []'))
+        save('installed-preload-state.json', await helper.mainRpc(`(()=>{const e=process.mainModule.require('electron'),fs=process.mainModule.require('node:fs'),path=process.mainModule.require('node:path'),crypto=process.mainModule.require('node:crypto');const expected=path.join(process.resourcesPath,'app.asar/preload/preload.js');const actual=e.webContents.getAllWebContents().map(w=>({id:w.id,url:w.getURL(),preload:typeof w._getPreloadScript==='function'?w._getPreloadScript():null}));return {expected,exists:fs.existsSync(expected),hash:fs.existsSync(expected)?crypto.createHash('sha256').update(fs.readFileSync(expected)).digest('hex'):null,actual,argv:process.argv}})()`))
+
         const shots = await helper.mainRpc(`Promise.all(process.mainModule.require('electron').BrowserWindow.getAllWindows().filter(w=>w.isVisible()).map(async w=>({id:w.id,png:(await w.capturePage()).toPNG().toString('base64')})))`)
         for (const shot of shots) fs.writeFileSync(path.join(outDir, `installed-window-${shot.id}.png`), Buffer.from(shot.png, 'base64'))
       } catch (error) { errors.push(error.message) }
@@ -255,6 +257,11 @@ export async function launchInstalledElectron({ outDir, backendPort = 19566, cdp
   } catch (error) {
     provenance.error = error.stack
     await helper.collectDiagnostics()
+    if (child?.exitCode === null && child.signalCode === null) {
+      try {
+        save('failed-startup-preload-probe.json', await helper.mainRpc(`(async()=>{const e=process.mainModule.require('electron'),path=process.mainModule.require('node:path');const errors=[];const w=new e.BrowserWindow({show:false,webPreferences:{preload:path.join(process.resourcesPath,'app.asar/preload/preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false}});w.webContents.on('preload-error',(_event,file,error)=>errors.push({file,error:error.stack}));try{await w.loadURL('data:text/html,<title>Failed startup diagnostic only</title>');return {diagnosticOnly:true,errors,bridge:await w.webContents.executeJavaScript('typeof window.checkbaDesktop'),preload:typeof w.webContents._getPreloadScript==='function'?w.webContents._getPreloadScript():null}}finally{w.destroy()}})()`))
+      } catch (probeError) { save('failed-startup-preload-probe.json', { diagnosticOnly: true, error: probeError.message }) }
+    }
     try { await helper.close() } catch (cleanupError) { provenance.cleanupError = cleanupError.message }
     save('installed-helper.json', provenance)
     throw error
