@@ -11,7 +11,9 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -33,7 +35,7 @@ class PackAutoInstallerTest {
         NativePackService packs = mock(NativePackService.class);
         SkillRegistry skills = mock(SkillRegistry.class);
         when(packs.resourceReady(anyString())).thenReturn(false);
-        when(skills.isEnabled(anyString())).thenReturn(true);
+        when(skills.isPackAutoInstallEnabled(anyString())).thenReturn(true);
         when(skills.getSkills()).thenReturn(List.of(
                 skill("text-to-speech", "kokoro-runtime"),
                 skill("litigation-visual", "litigation-visual")));
@@ -41,7 +43,7 @@ class PackAutoInstallerTest {
         List<String> triggered = new PackAutoInstaller(props, packs, skills).checkAndInstall();
 
         assertEquals(List.of("litigation-visual"), triggered);
-        verify(packs, never()).installAsync("kokoro-runtime");
-        verify(packs).installAsync("litigation-visual");
+        verify(packs, never()).installAsync(eq("kokoro-runtime"), any());
+        verify(packs).installAsync(eq("litigation-visual"), any());
     }
 }
