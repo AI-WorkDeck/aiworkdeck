@@ -571,3 +571,7 @@ body 为 `{phone|email,purpose:'login'|'reset'}`，返回 `{id,image,expiresAt}`
 只访问自有站点的备用验证入口与第三方组件独立，不等待第三方 SDK 加载成功。
 验证：`taskpane/lib/api.test.js` 与主仓 `frontend/tests/account/compatible-addin-ui.mjs`
 （实际任务窗格、主动阻断第三方域名、合成账号接口，无真实短信）。
+
+### Mac 安装器瞬态失败（dev-board#1639）
+
+`installer/build-installers.mjs` 使用独立临时构建目录；已有同名挂载点时拒绝，不强制卸载。仅 hdiutil create/detach 的 Resource busy 和 stapler staple 的 NSURLError -1001/-1005 最多重试3次（2/5/10秒），保留每次输出及最终失败；公证拒绝、其它错误不重试，装订后仍必须validate。原run41005659222三次失败分别为detach忙、已Accepted后CloudKit断连、create忙；未确认具体占用进程。验证：`node --test office-addin/scripts/installer-transient.test.mjs`；真实签名/公证和双地区安装包另以固定SHA CI产物验收。

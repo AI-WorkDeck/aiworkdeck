@@ -243,8 +243,8 @@ jobs:
       - name: Confirmed contract review standards and results
         working-directory: frontend
         run: node --test tests/contract-review/*.test.mjs
-      - name: Office compatible verification API
-        run: node --test office-addin/taskpane/lib/api.test.js
+      - name: Office verification API and installer build guards
+        run: node --test office-addin/taskpane/lib/api.test.js office-addin/scripts/*.test.mjs
       - name: Inline review contracts (dev-board#547)
         working-directory: frontend
         run: npm run test:inline-review
