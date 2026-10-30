@@ -325,9 +325,21 @@ try {
   evidence.passed = true
 } catch (error) {
   evidence.error = error.stack
+  write('result.json', evidence) // Preserve the original failure before screenshot/cleanup work.
   if (page && browser) await page.screenshot({ path: path.join(run, 'failure.png') }).catch(() => {})
   throw error
 } finally {
+  write('result.json', evidence)
+  // A failed cleanup or residual socket must not consume the entire hosted job.
+  // Leave this unref'ed timer armed: a clean event loop exits without firing it.
+  const cleanupWatchdog = setTimeout(() => {
+    evidence.passed = false
+    evidence.cleanupTimeout = true
+    evidence.activeResources = process.getActiveResourcesInfo()
+    write('result.json', evidence)
+    process.exit(1)
+  }, 300000)
+  cleanupWatchdog.unref()
   if (child) await quit().catch(error => { evidence.quitError = error.message })
   if (java) {
     java.kill('SIGTERM')

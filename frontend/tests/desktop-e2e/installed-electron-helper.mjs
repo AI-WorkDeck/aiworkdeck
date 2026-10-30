@@ -47,21 +47,34 @@ async function rpc(port, expression, main, timeout = 30000) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(url)
     let settled = false
-    const finish = (error, value) => {
+    let reply, closeTimer
+    const settle = (error, value) => {
       if (settled) return
-      settled = true; clearTimeout(timer); ws.close()
+      settled = true; clearTimeout(timer); clearTimeout(closeTimer)
       if (error) reject(error); else resolve(value)
+    }
+    const finish = (error, value) => {
+      if (settled || reply) return
+      reply = { error, value }; clearTimeout(timer)
+      if (ws.readyState === WebSocket.CLOSED) { settle(error, value); return }
+      // close() starts a handshake; it does not release the underlying socket yet.
+      // Native WebSocket has no terminate(). The outer runner's failure watchdog
+      // bounds any socket left behind after this explicit close failure.
+      closeTimer = setTimeout(() => settle(new Error('Debugger close timed out')), 5000)
+      ws.close()
     }
     const timer = setTimeout(() => finish(new Error('Debugger request timed out')), timeout)
     ws.onopen = () => ws.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression, awaitPromise: true, returnByValue: true } }))
     ws.onmessage = event => {
-      const response = JSON.parse(event.data)
-      if (response.id !== 1) return
-      if (response.error || response.result?.exceptionDetails) finish(new Error(JSON.stringify(response)))
-      else finish(null, response.result.result.value)
+      try {
+        const response = JSON.parse(event.data)
+        if (response.id !== 1) return
+        if (response.error || response.result?.exceptionDetails) finish(new Error(JSON.stringify(response)))
+        else finish(null, response.result.result.value)
+      } catch (error) { finish(error) }
     }
     ws.onerror = () => finish(new Error('Debugger socket failed'))
-    ws.onclose = () => finish(new Error('Debugger closed before reply'))
+    ws.onclose = () => reply ? settle(reply.error, reply.value) : settle(new Error('Debugger closed before reply'))
   })
 }
 
@@ -145,16 +158,34 @@ export async function launchInstalledElectron({ outDir, backendPort = 19566, cdp
   }
   helper.close = async () => {
     let failure
+    provenance.cleanupStartedAt = new Date().toISOString()
+    save('installed-helper.json', provenance)
     try { await helper.quit() } catch (error) {
       failure = error; provenance.cleanupError = error.message
+      save('installed-helper.json', provenance)
       if (child?.exitCode === null && child.signalCode === null) {
         provenance.forced = true
-        child.kill('SIGTERM') // Failure cleanup only; never turns a failed quit into success.
+        const current = child
+        provenance.cleanupSignals = []
+        for (const signal of ['SIGTERM', 'SIGKILL']) {
+          if (current.exitCode !== null || current.signalCode !== null) break
+          provenance.cleanupSignals.push(signal)
+          save('installed-helper.json', provenance)
+          try {
+            current.kill(signal) // Failure cleanup only; never satisfies ordinary quit.
+            await until(() => current.exitCode !== null || current.signalCode !== null, `owned app exit after ${signal}`, 15)
+          } catch (cleanupError) {
+            provenance.cleanupSignalErrors ||= []
+            provenance.cleanupSignalErrors.push(cleanupError.message)
+          }
+        }
+        provenance.cleanupChild = { pid: current.pid, exitCode: current.exitCode, signalCode: current.signalCode }
       }
     }
     if (mounted) {
       try { run('/usr/bin/hdiutil', ['detach', mounted]); mounted = null } catch (error) { failure ||= error }
     }
+    provenance.cleanupCompletedAt = new Date().toISOString()
     await helper.collectDiagnostics()
     if (failure) throw failure
   }
@@ -257,6 +288,7 @@ export async function launchInstalledElectron({ outDir, backendPort = 19566, cdp
     return helper
   } catch (error) {
     provenance.error = error.stack
+    save('installed-helper.json', provenance)
     await helper.collectDiagnostics()
     if (child?.exitCode === null && child.signalCode === null) {
       try {
