@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "listAttachedFiles": "Elenca allegati del turno",
     "office_ppt_add_image": "Inserisci immagine nella diapositiva",
     "office_ppt_add_chart": "Inserisci grafico nella diapositiva",
     "office_ppt_format_chart": "Formatta grafico della diapositiva",

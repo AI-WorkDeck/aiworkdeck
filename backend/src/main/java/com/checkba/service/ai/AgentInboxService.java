@@ -348,6 +348,50 @@ public class AgentInboxService implements org.springframework.boot.ApplicationRu
         }
     }
 
+    /** Return only claimed steering inputs whose preparation has not started; never replay the active input. */
+    public void releaseUnstartedSteering(String conversationId, String runId, List<String> remainingIds) {
+        if (remainingIds == null || remainingIds.isEmpty() || runId == null) return;
+        synchronized (conversationLock(conversationId)) {
+            boolean changed = inTransaction(() -> {
+                List<AgentInboxItem> released = new ArrayList<>();
+                for (String id : new LinkedHashSet<>(remainingIds)) {
+                    AgentInboxItem row = repository.findById(id).orElse(null);
+                    if (row != null && Objects.equals(conversationId, row.getConversationId())
+                            && Objects.equals(runId, row.getRunId()) && APPLIED.equals(row.getState())
+                            && STEER.equals(row.getSubmissionMode())) released.add(row);
+                }
+                if (released.isEmpty()) return false;
+                released.sort(Comparator.comparing(AgentInboxItem::getAppliedSequence,
+                        Comparator.nullsLast(Long::compareTo)));
+                List<AgentInboxItem> pending = repository
+                        .findByConversationIdAndStateOrderByPositionAscCreatedAtAsc(conversationId, PENDING);
+                LocalDateTime now = LocalDateTime.now();
+                for (int i = 0; i < released.size(); i++) {
+                    AgentInboxItem row = released.get(i);
+                    row.setState(PENDING);
+                    row.setRunId(null);
+                    row.setAppliedSequence(null);
+                    row.setPosition((long) i);
+                    row.setRevision(row.getRevision() + 1);
+                    row.setUpdatedAt(now);
+                    repository.save(row);
+                }
+                // These were already ahead of newly submitted follow-ups before being claimed.
+                for (int i = 0; i < pending.size(); i++) {
+                    AgentInboxItem row = pending.get(i);
+                    long position = released.size() + (long) i;
+                    if (Objects.equals(row.getPosition(), position)) continue;
+                    row.setPosition(position);
+                    row.setRevision(row.getRevision() + 1);
+                    row.setUpdatedAt(now);
+                    repository.save(row);
+                }
+                return true;
+            });
+            if (changed) emitSnapshot(conversationId);
+        }
+    }
+
     public Optional<AgentInboxItem> nextQueued(String conversationId) {
         return repository.findByConversationIdAndStateOrderByPositionAscCreatedAtAsc(conversationId, PENDING)
                 .stream().filter(i -> QUEUE.equals(i.getSubmissionMode())).findFirst();

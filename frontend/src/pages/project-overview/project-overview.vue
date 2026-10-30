@@ -2389,7 +2389,6 @@ import { readActiveSelection } from './activeSelectionContext.js'
 import { nativeDataTransfer, captureDroppedFiles, isExternalFileDrag, compatibleDropEffect } from '@/utils/fileTreeExternalDrop.js'
 import { consumePluginImDrag } from '@/utils/pluginImDrag.js'
 import { addPluginImFileToAi } from '@/utils/pluginImAi.js'
-import { AI_CONTEXT_FOLDER_FILE_LIMIT, countDescendantFiles } from '@/utils/aiContextFiles.js'
 import { saveSensitiveInput } from './sensitiveWorkflow.js'
 import LibreOfficeEditor from '@/components/LibreOfficeEditor.vue'
 import { host, isDesktopHost } from '@/services/host.js'
@@ -7825,16 +7824,10 @@ export default {
         //    （uni-h5 重建 <view> 事件对象时把 drag 系字段全丢了，utils/fileTreeExternalDrop.js）。
         const dropped = captureDroppedFiles(dt, host.fs)
         if (dropped.length) {
-             // 文件夹在 dataTransfer.files 里是一个 0 字节、无类型的条目，照上传会在项目里
-             // 建出一份空壳文件。资源管理器有整套目录导入（import-local），这里只收文件。
-             if (this.droppedEntriesHaveDirectory(dt)) {
-                 uni.showToast({ title: this.$t('workbench.dragFolderUnsupported'), icon: 'none' })
-                 return
-             }
              if (this.$refs.chatInterface && this.$refs.chatInterface.uploadLocalFilesAndAddContext) {
                  // 落点固定项目根目录（工作台没有「当前文件夹」这个概念），先把落点说清楚
                  uni.showToast({ title: this.$t('workbench.dragUploadingToRoot'), icon: 'none' })
-                 this.$refs.chatInterface.uploadLocalFilesAndAddContext(dropped)
+                 this.$refs.chatInterface.uploadLocalFilesAndAddContext(dropped, dt)
              }
              return
         }
@@ -7845,18 +7838,8 @@ export default {
     addDraggedFileToAiContext(file, opts = {}) {
         if (!file || !file.id) return false
 
-        // 文件夹整体挂进来时的后代文件数上限：判据在 utils/aiContextFiles.js，
-        // 与 ChatInterface 那三个入口（@ 引用 / 从项目选择 / 右键）同一份
-        if (file.isDir && this.$refs.fileTree && Array.isArray(this.$refs.fileTree.allFiles)) {
-            const totalFiles = countDescendantFiles(this.$refs.fileTree.allFiles, file.id)
-            if (totalFiles > AI_CONTEXT_FOLDER_FILE_LIMIT) {
-                uni.showToast({ title: this.$t('workbench.folderTooManyFiles', { count: totalFiles }), icon: 'none' })
-                return false
-            }
-        }
-
         if (this.$refs.chatInterface) {
-            this.$refs.chatInterface.addFile(file)
+            if (this.$refs.chatInterface.addFile(file) === false) return false
         }
 
         // Note: Visual tag display is now handled within ChatInterface

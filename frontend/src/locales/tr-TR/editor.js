@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "listAttachedFiles": "Bu turun eklerini listele",
     "office_ppt_add_image": "Slayda resim ekle",
     "office_ppt_add_chart": "Slayda grafik ekle",
     "office_ppt_format_chart": "Slayt grafiğini biçimlendir",

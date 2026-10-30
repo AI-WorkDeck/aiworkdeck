@@ -659,7 +659,18 @@ public class ContextAssemblerService {
 
             int maxFiles = contextProperties.getFiles().getMaxFilesPerContext();
             int maxCharsPerFile = contextProperties.getFiles().getMaxCharsPerFile();
-            int totalFileCount = 0; // Limit files max across all items
+            int totalFileCount = 0; // Bounded eager reads, never an attachment admission limit
+            int deferredCount = 0;
+            int referenceCount = 0;
+            boolean pagedManifest = contextItems.size() > 100 && ledger.attachmentMessageId() != null;
+            if (pagedManifest) {
+                systemText.append("\nAttachment manifest: ").append(contextItems.size())
+                          .append(" references; only the first 100 are included below. To enumerate the complete "
+                                  + "scope, call list_attached_files(messageId=")
+                          .append(ledger.attachmentMessageId())
+                          .append(", afterId=0), then follow nextAfterId until complete. "
+                                  + "Do not substitute the whole project for this explicitly attached set.\n");
+            }
             // 本轮附件正文的**合计**额度（dev-board#812 K32 ⑦）：按 contextItems 的顺序发放。
             // 单文件闸 × 文件数闸没有总闸，十份长合同 = 50 万字符全部进 system，
             // 而 system 在压缩的保护区里——一旦它自己超窗，这个会话此后每条消息都必死。
@@ -669,38 +680,30 @@ public class ContextAssemblerService {
                 log.info("[Context] Processing item: id={}, name={}, isDir={}, fileType={}",
                          item.getId(), item.getName(), item.isDir(), item.getFileType());
 
-                if (totalFileCount >= maxFiles) {
-                    systemText.append("\n[System Note: Context limit reached (").append(maxFiles)
-                              .append(" files max). Remaining items ignored.]\n");
-                    // 被丢掉的**每一条**都点名报出去：只报第一条的话，用户拖了 15 份材料、
-                    // 界面上 15 个标签都在，他仍然不知道自己关心的那份在不在被砍掉的 5 份里。
-                    ledger.notice(ContextTurnSink.DROPPED, item.getId(), item.getName(),
-                            String.valueOf(maxFiles));
+                if (ledger.cancelled() || Thread.currentThread().isInterrupted()) {
+                    throw new java.util.concurrent.CancellationException("Attachment preparation cancelled");
+                }
+                if (pagedManifest && referenceCount++ >= 100) {
+                    ledger.attachment(item.getId(), item.getName(), item.getFileType(),
+                            item.isDir() ? "folder" : isVisionCandidate(item) ? "image" : "file", false);
+                    deferredCount++;
                     continue;
                 }
-
                 if (item.isDir()) {
-                    // Folder Logic
+                    // A folder is a lazy scope, not a request to extract every descendant before the first token.
                     systemText.append("\n## Folder: ").append(item.getName())
                               .append(" (ID: ").append(item.getId()).append(")\n");
-
-                    // 配额必须真的扣掉：老实现只把 totalFileCount 传进去算余额、回来从不递增，
-                    // 于是每个文件夹都拿到满额（拖 3 个 = 一次注入最多 30 份正文）。
-                    FileContextLoader.FolderContext folder =
-                            fileContextLoader.buildFolderContextCounted(item.getId(), projectId, totalFileCount);
-                    systemText.append(folder.text());
-                    totalFileCount += folder.filesRead();
-                    // 文件夹正文同样计入本轮合计额度（它已有自己的 folderFileMaxChars 逐文件闸，
-                    // 这里只扣账，不二次截断——文件夹的文本是 FileContextLoader 整段拼好的，
-                    // 从中间切一刀会把某份文件的 <file> 标签拦腰截断）
-                    attachmentCharBudget -= folder.text() == null ? 0 : folder.text().length();
+                    systemText.append(fileContextLoader.buildFolderReference(item.getId()));
                     ledger.attachment(item.getId(), item.getName(), item.getFileType(), "folder", false);
-                    if (folder.unreadableCount() > 0) {
-                        // 文件夹里的扫描件/图片抽不出正文是常态（批量路径不逐张 OCR），
-                        // 静默的话用户看到的是「标签正常」、模型收到的是一串文件名
-                        ledger.notice(ContextTurnSink.UNREADABLE, item.getId(), item.getName(),
-                                String.valueOf(folder.unreadableCount()));
-                    }
+                    deferredCount++;
+                } else if (totalFileCount >= maxFiles || attachmentCharBudget <= 0) {
+                    // Keep the ID even when no body fits; skip IO/OCR before spending anything.
+                    systemText.append("<file id=\"").append(item.getId())
+                              .append("\" name=\"").append(attrSafe(item.getName())).append("\"")
+                              .append(extraFileAttrs(item)).append(" deferred=\"true\"/>\n");
+                    ledger.attachment(item.getId(), item.getName(), item.getFileType(),
+                            isVisionCandidate(item) ? "image" : "file", false);
+                    deferredCount++;
                 } else if (isVisionCandidate(item)) {
                     // 图片：能直送就直送，直送不了（模型不支持 / 超张数或体积上限 / 读盘失败）
                     // 一律落回 OCR，绝不静默丢弃——用户挂了附件却什么都没发生是最坏的形态。
@@ -712,6 +715,9 @@ public class ContextAssemblerService {
                     VisionAttachment attachment = (visionCapable && !overPerTurnLimit)
                             ? loadVisionAttachment(item, tooLarge)
                             : null;
+                    if (ledger.cancelled() || Thread.currentThread().isInterrupted()) {
+                        throw new java.util.concurrent.CancellationException("Attachment preparation cancelled");
+                    }
                     if (attachment != null) {
                         visionAttachments.add(attachment);
                         // 让模型知道这张图确实随本条消息发了、以及它叫什么名字（图像块本身不带文件名）。
@@ -772,27 +778,7 @@ public class ContextAssemblerService {
                         totalFileCount++;
                         continue;
                     }
-                    // 两道闸：单文件上限，以及本轮正文的合计上限（先到先得，见 attachmentCharBudget）。
-                    // 合计额度已经用完时一个字都不注入，但**仍然留下 <file> 壳**——
-                    // 模型据此知道这份材料存在、可以主动 extract_file_text 去读，
-                    // 比整条消失好（消失的那份在界面上标签还在，模型却从不提它）。
-                    int effectiveCap = Math.min(maxCharsPerFile, Math.max(0, attachmentCharBudget));
-                    if (effectiveCap <= 0) {
-                        systemText.append("<file id=\"").append(item.getId())
-                                  .append("\" name=\"").append(attrSafe(item.getName())).append("\"")
-                                  .append(extraFileAttrs(item)).append(">")
-                                  .append(english
-                                          ? "Body omitted: this turn's combined attachment budget is used up. "
-                                            + "Call extract_file_text with this id if you need its content."
-                                          : "正文未注入：本轮材料正文的合计字数已用完。"
-                                            + "需要它的内容时用这个 id 调 extract_file_text。")
-                                  .append("</file>\n");
-                        ledger.attachment(item.getId(), item.getName(), item.getFileType(), "file", false);
-                        ledger.notice(ContextTurnSink.BUDGET_EXHAUSTED, item.getId(), item.getName(),
-                                String.valueOf(contextProperties.getFiles().getMaxTotalAttachmentChars()));
-                        totalFileCount++;
-                        continue;
-                    }
+                    int effectiveCap = Math.min(maxCharsPerFile, attachmentCharBudget);
                     if (content.length() > effectiveCap) {
                         content = truncateAtCharBoundary(content, effectiveCap) + "\n... [TRUNCATED - File too long]";
                         ledger.notice(ContextTurnSink.TRUNCATED, item.getId(), item.getName(),
@@ -808,8 +794,24 @@ public class ContextAssemblerService {
                     totalFileCount++;
                 }
             }
+            if (deferredCount > 0) {
+                systemText.append(english
+                        ? "\nDeferred attachments are retained, not read. Use extract_file_text with each file ID; "
+                          + "for folders, begin at offset=0 and follow nextOffset until the listing is complete, "
+                          + "then recurse into child folder IDs. Read files sequentially in bounded pages. "
+                          + "For an all-files task, track completed, failed and pending IDs; never claim completion "
+                          + "from a listing or a partial batch. Save intermediate results and report remaining files if stopped.\n"
+                        : "\n延后读取的附件已保留，但正文尚未读取。用各文件 ID 调用 extract_file_text；"
+                          + "目录从 offset=0 开始，持续按 nextOffset 续页直到清单完整，再按子目录 ID 逐层读取。"
+                          + "按文件逐个、按页分批读取。任务要求处理全部文件时，记录已完成、失败和待处理 ID；"
+                          + "不能把列出清单或处理部分文件称为全部完成。及时保存阶段结果，中止时明确剩余文件。\n");
+                ledger.notice(ContextTurnSink.DEFERRED, null, null, String.valueOf(deferredCount));
+            }
         }
 
+        if (ledger.cancelled() || Thread.currentThread().isInterrupted()) {
+            throw new java.util.concurrent.CancellationException("Attachment preparation cancelled");
+        }
         timings.mark("files", contextItems == null ? 0 : contextItems.size());
 
         // [Injection] Active Document Context (auto-detected current tab)
@@ -1221,6 +1223,16 @@ public class ContextAssemblerService {
                 + templateProfileFact(activeContext, clientCapabilityService.capabilityOf(conversationId), projectId)
                 + clarificationReminder(agentMode, userPrompt, english)
                 + questionPresentationReminder(agentMode, english);
+
+        // Steering keeps the newest user message but not the newly assembled system prompt.
+        // Keep its complete, persisted attachment scope reachable in that user message as well.
+        if (contextItems != null && !contextItems.isEmpty() && ledger.attachmentMessageId() != null) {
+            userText += "\n[Attachment scope: " + contextItems.size() + " references attached to messageId="
+                    + ledger.attachmentMessageId() + ". Call list_attached_files(messageId="
+                    + ledger.attachmentMessageId() + ", afterId=0) and follow nextAfterId to discover all references. "
+                    + "Read required files/folders with extract_file_text. Do not infer contents from filenames "
+                    + "or claim all files processed without checking every page.]";
+        }
 
         // Limit the actual active-document injection after history compression. The reserve
         // covers tools added by the orchestrator; this is a conservative estimate, not a
@@ -2225,12 +2237,13 @@ public class ContextAssemblerService {
 1. **FORBIDDEN ACTIONS** - 以下操作在 Ask 模式下完全禁止：
    - DO NOT output `<artifact>` tags - 不生成任何计划或任务清单
    - DO NOT output `<process>` tags - 不执行任何操作流程
-   - 除 memory_list、memory_read、memory_search、version_status、version_history、version_changes 外，不允许调用任何工具
+   - 除 memory_list、memory_read、memory_search、version_status、version_history、version_changes、list_attached_files、extract_file_text 外，不允许调用任何工具
    - memory_write、memory_edit、memory_delete、save_memory 等写操作严格禁止
 
 2. **ALLOWED ACTIONS** - 在 Ask 模式下你只能：
    - 直接回答用户问题（使用 `<thinking>` + 纯文本或 `<final>` 标签）
    - 基于已有上下文（文件内容、历史记录）进行分析和解答
+   - 可用 list_attached_files 分页列出本轮附件，用 extract_file_text 按需读取文件、目录清单及后续分页；不得声称未读材料已处理
    - 可用 memory_list、memory_read、memory_search 只读查询当前用户有权访问的长期记忆
    - 可用 version_status、version_history、version_changes 只读检查项目版本；禁止提交、取回、恢复或合并
    - 提供建议和意见，但不执行任何操作
@@ -2243,8 +2256,8 @@ public class ContextAssemblerService {
    直接回答用户问题的内容...
    </final>
 
-4. **IMPORTANT**: 只读 Markdown 记忆是上述限制的唯一工具例外，且不受 skill 是否启用影响。
-   如果用户询问需要查询法规、搜索网络、读取普通文档或创建文件的问题，
+4. **IMPORTANT**: 上述只读工具不受 skill 是否启用影响；目录和大量附件要按需分页读取。
+   如果用户询问需要查询法规、搜索网络或创建文件的问题，
    你应该基于你的知识库回答，或者建议用户切换到 Agent 模式以获取实时信息。
 """;
             case PLAN -> """
@@ -2383,12 +2396,13 @@ public class ContextAssemblerService {
 1. **FORBIDDEN ACTIONS** - the following are completely prohibited in Ask mode:
    - DO NOT output `<artifact>` tags - no plans or task lists
    - DO NOT output `<process>` tags - no operation flows
-   - Do not call any tool except memory_list, memory_read, memory_search, version_status, version_history, and version_changes
+   - Do not call any tool except memory_list, memory_read, memory_search, version_status, version_history, version_changes, list_attached_files, and extract_file_text
    - memory_write, memory_edit, memory_delete, save_memory, and all other writes are prohibited
 
 2. **ALLOWED ACTIONS** - in Ask mode you may ONLY:
    - Answer the user's question directly (using `<thinking>` + plain text or the `<final>` tag)
    - Analyze and explain based on context you already have (file contents, conversation history)
+   - Use list_attached_files to page through the attached set and extract_file_text to read files, folders and subsequent pages; never claim unread materials were processed
    - Use memory_list, memory_read, and memory_search to read long-term memory the current user may access
    - Use version_status, version_history, and version_changes to inspect project versions; commits, pulls, restores, and merges are prohibited
    - Offer advice and opinions, without performing any operation
@@ -2401,9 +2415,9 @@ public class ContextAssemblerService {
    The direct answer to the user's question...
    </final>
 
-4. **IMPORTANT**: Read-only Markdown memory is the sole tool exception above and is independent
-   of whether a skill is active. If the user asks something that would require statutory research, web
-   search, reading a document, or creating a file, answer from your own knowledge, or
+4. **IMPORTANT**: The read-only tools above are independent of whether a skill is active.
+   Read folders and large attachment sets in pages. If the user asks something that requires statutory research,
+   web search, or creating a file, answer from your own knowledge, or
    suggest that the user switch to Agent mode to get real-time information.
 """;
             case PLAN -> """

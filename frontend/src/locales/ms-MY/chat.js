@@ -2,6 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  attachmentImportPartial: "Import folder separa: {count} fail diimport, {skipped} item dilangkau. Semak pepohon fail, kebenaran sumber, pautan simbolik atau fail khas. Seluruh folder tidak akan diimport semula secara automatik.",
+  attachmentScanIncomplete: "Imbasan folder tidak lengkap: {count} fail ditemui, tiada yang diimport. Pilih atau seret seluruh folder semula; senarai separa ini tidak boleh digunakan untuk meneruskan import.",
+  attachmentsRequireTools: "Lampiran ini perlu dibaca secara berkelompok. Pilih model yang menyokong panggilan alat untuk meneruskan. Lampiran anda dikekalkan.",
+  attachmentReaderBusy: "Tugas terdahulu masih menggunakan perkhidmatan bacaan; bacaan ini belum bermula. Tunggu dan cuba lagi. Jika masih tidak bertindak balas, simpan kerja dan mulakan semula aplikasi.",
+  attachmentBatchHint: "Lampiran tanpa had; koleksi besar mungkin mengambil masa dan dibaca secara berkelompok mengikut keperluan.",
+  attachmentScanning: "Mengimbas folder: {count} fail ditemui",
+  attachmentImportProgress: "{completed}/{total} item diimport",
+  attachmentImportUncertain: "Hasil operasi semasa belum disahkan dan mungkin selesai di latar belakang. Semak pepohon fail sebelum mengimport semula. Item selesai dikekalkan.",
+  attachmentImportPaused: "Import dijeda atau sebahagiannya gagal. Item selesai dikekalkan; cuba semula baki item.",
+  attachmentRetryRemaining: "Cuba semula {count} baki item",
+  contextPreparingProgress: "Menyediakan lampiran: {completed}/{total} didaftarkan (belum semestinya dibaca)",
+  contextNoticeDeferred: "{count} item lagi dikekalkan untuk bacaan berkelompok apabila perlu; ini mungkin mengambil masa.",
+  contextPreparationTimeout: "Penyediaan tamat masa dan giliran ini dihentikan. Lampiran dikekalkan. Nyatakan fail keutamaan, kecilkan skop atau cuba semula secara manual kemudian.",
+
   "earlierFiles": "Fail perbualan terdahulu",
   "fileCreated": "Dicipta",
   "fileModified": "Diubah suai",
@@ -287,7 +301,6 @@ export default {
   "activeSelectionChipTitle": "Petikan dipilih: {text} (dihantar kepada AI bersama mesej anda supaya semakan mengutamakan petikan ini; klik x untuk mengecualikannya dalam giliran ini)",
   "carriedAttachmentTitle": "{name} (dibawa dari giliran sebelumnya dan masih dilampirkan; klik untuk mengekalkannya, klik x untuk membuangnya)",
   "carriedAttachmentHint": "Tag bertitik ialah lampiran dari mesej terakhir anda dan akan dihantar semula dengan mesej seterusnya. Klik x untuk membuang.",
-  "contextFileCapReached": "Hingga {max} item (termasuk imej) bagi setiap giliran. Buang beberapa sebelum menambah lagi.",
   "imageCountCapToast": "Hingga {max} imej dihantar secara langsung bagi setiap giliran; yang lain diproses sebagai teks yang dikenali (OCR).",
   "imageTooLargeToast": "Imej ini melebihi {size} dan akan diproses sebagai teks yang dikenali (OCR). Mampatkannya dan hantar semula.",
   "contextNoticeThisFile": "Item ini",

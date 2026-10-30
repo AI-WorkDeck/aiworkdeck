@@ -162,6 +162,7 @@ public class ToolRegistry {
             Map.entry("search_project_content", "Search file contents"),
             Map.entry("read_file", "Read file"),
             Map.entry("extract_file_text", "Extract document text"),
+            Map.entry("list_attached_files", "List turn attachments"),
             Map.entry("list_files", "List files"),
             Map.entry("list_contributed_templates", "List contributed templates"),
             Map.entry("create_file_from_template", "Create file from template"),
@@ -497,6 +498,9 @@ public class ToolRegistry {
          * 英文会话里唯一冒中文的那一处。
          */
         public String displayName() {
+            if (spec != null && "list_attached_files".equals(spec.name())) {
+                return com.checkba.service.ai.tools.AttachmentMessages.text("listAttachedFiles");
+            }
             if (LangText.isEnglish()) {
                 String toolName = spec != null ? spec.name() : (method != null ? method.getName() : null);
                 if (toolName != null && !toolName.isBlank()) {

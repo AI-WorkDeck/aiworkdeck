@@ -114,6 +114,7 @@ final class RealToolBeans {
                 EnterpriseDataTools.class,
                 EvidenceTools.class,
                 FileTools.class,
+                com.checkba.service.ai.tools.AttachmentTools.class,
                 LegalTools.class,
                 LitigationTimelineTools.class,
                 LitigationVisualTools.class,

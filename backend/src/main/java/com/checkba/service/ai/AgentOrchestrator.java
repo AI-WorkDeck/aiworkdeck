@@ -53,7 +53,7 @@ public class AgentOrchestrator {
     /** ASK remains read-only but can inspect the user's durable memory. */
     static final Set<String> ASK_MEMORY_TOOLS = Set.of("memory_list", "memory_read", "memory_search");
     static final Set<String> ASK_READ_TOOLS = Set.of("memory_list", "memory_read", "memory_search",
-            "version_status", "version_history", "version_changes");
+            "version_status", "version_history", "version_changes", "extract_file_text", "list_attached_files");
     /**
      * Agent/Plan 回合里 skill 收窄时仍补回的 Markdown 记忆工具（dev-board#798 的原始语义：
      * skill 白名单不许把记忆能力藏掉）。没被 skill 收窄的回合只补只读的三个（{@link #ASK_MEMORY_TOOLS}，
@@ -79,6 +79,65 @@ public class AgentOrchestrator {
     // 首字节时限：一个 token 都没到过时用这条（短得多）。停滞时限要照顾"生成长工具参数时中途静默"，
     // 但"从头到尾零字节"没有这种正当理由，让用户干等满 180s 纯粹是白等
     private static final int STREAM_FIRST_TOKEN_TIMEOUT_SECONDS = 60;
+    // Package visibility permits deterministic stalled-parser tests without waiting minutes.
+    java.time.Duration attachmentPreparationTimeout = java.time.Duration.ofSeconds(120);
+    java.time.Duration attachmentReadTimeout = java.time.Duration.ofSeconds(180);
+
+    private <T> T boundedAttachmentRead(RunGuard guard, java.util.function.Supplier<T> read,
+                                      java.time.Duration timeout) {
+        String language = guard.originalRequest != null && guard.originalRequest.getAppLanguage() != null
+                ? guard.originalRequest.getAppLanguage() : com.checkba.service.AppLanguageScope.current();
+        Long scopedUser = PlatformAiUserScope.current();
+        return BoundedAttachmentRead.await(() -> com.checkba.service.AppLanguageScope.call(language,
+                () -> PlatformAiUserScope.call(scopedUser, () -> {
+                    java.util.concurrent.atomic.AtomicReference<T> result = new java.util.concurrent.atomic.AtomicReference<>();
+                    try {
+                        com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed, () -> result.set(read.get()));
+                        return result.get();
+                    } finally {
+                        com.checkba.service.ai.context.ProjectContextHolder.clear();
+                        editorBridgeService.clearCurrentConversationId();
+                    }
+                })), () -> guard.isCancelled() || !isCurrentRun(guard), timeout);
+    }
+
+    private String attachmentMessage(RunGuard guard, String key) {
+        String language = guard.originalRequest == null ? null : guard.originalRequest.getAppLanguage();
+        return com.checkba.service.AppLanguageScope.call(language,
+                () -> com.checkba.service.ai.tools.AttachmentMessages.text(key));
+    }
+
+    private void attachmentReadFailed(RunGuard guard, String projectId, Long userId,
+                                      StringBuilder executionLog, BoundedAttachmentRead.Unavailable failure) {
+        String message = attachmentMessage(guard, failure.busy() ? "attachmentReaderBusy" : "contextPreparationTimeout");
+        if (executionLog == null) saveAssistantMessageQuietly(guard, projectId, userId, message);
+        else {
+            if (guard.pendingAttachmentRead != null) appendBoundedExecutionLog(executionLog, guard.pendingAttachmentRead);
+            appendBoundedExecutionLog(executionLog, "\n" + message);
+        }
+        String code = failure.busy() ? "ATTACHMENT_READER_BUSY" : "CONTEXT_PREPARATION_TIMEOUT";
+        String key = failure.busy() ? "chat.attachmentReaderBusy" : "chat.contextPreparationTimeout";
+        finishWithError(guard, projectId, userId,
+                "{\"code\":\"" + code + "\",\"messageKey\":\"" + key + "\",\"message\":\""
+                        + jsonEscape(message) + "\"}", executionLog);
+    }
+
+    private static final class AttachmentsRequireTools extends RuntimeException {}
+
+    private void requireAttachmentTools(TurnContextLedger ledger, String modelId) {
+        if (ledger.deferred && chatModelFactory.usesProviderCatalog()
+                && !chatModelFactory.effectiveModelSupportsTools(modelId)) throw new AttachmentsRequireTools();
+    }
+
+    private void attachmentToolsRequired(RunGuard guard, String projectId, Long userId, StringBuilder executionLog) {
+        String message = attachmentMessage(guard, "attachmentsRequireTools");
+        if (executionLog == null) saveAssistantMessageQuietly(guard, projectId, userId, message);
+        else appendBoundedExecutionLog(executionLog, "\n" + message);
+        finishWithError(guard, projectId, userId,
+                "{\"code\":\"ATTACHMENTS_REQUIRE_TOOLS\",\"messageKey\":\"chat.attachmentsRequireTools\",\"message\":\""
+                        + jsonEscape(message) + "\"}", executionLog);
+    }
+
     private static final java.util.concurrent.ScheduledExecutorService LLM_RETRY_SCHEDULER =
             java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
                 Thread t = new Thread(r, "llm-retry-scheduler");
@@ -171,6 +230,7 @@ public class AgentOrchestrator {
          * 工具分发跑在流式回调线程、读取在收尾线程，故 volatile。
          */
         private volatile boolean documentEdited;
+        private volatile String pendingAttachmentRead;
 
         /** 试用计量：本轮是否调用过云端平台通道（{@link com.checkba.service.trial.TrialTurnScope}）。 */
         final java.util.concurrent.atomic.AtomicBoolean platformUsed =
@@ -683,20 +743,62 @@ public class AgentOrchestrator {
      */
     private final class TurnContextLedger implements ContextTurnSink {
         private final RunGuard guard;
-        private final java.util.List<ProjectAiMessageService.AttachmentRecord> records =
-                new java.util.ArrayList<>();
+        private final Long messageId;
+        private final java.util.Map<String, ProjectAiMessageService.AttachmentRecord> records =
+                new java.util.LinkedHashMap<>();
+        private int completed;
+        private int total;
+        private volatile boolean sealed;
+        private volatile boolean deferred;
 
-        TurnContextLedger(RunGuard guard) {
+        void seed(List<AiAgentController.ContextItem> items) {
+            if (items == null) return;
+            total = items.size();
+            for (var item : items) records.put(item.getId(), new ProjectAiMessageService.AttachmentRecord(
+                    item.getId(), item.getName(), item.getFileType(), item.isDir() ? "folder" : "file", false));
+            progress(null, false);
+        }
+
+        private void progress(String name, boolean done) {
+            if (total == 0 || cancelled()) return;
+            try {
+                sendRunEvent(guard, "context_progress", "{\"stage\":\"preparing\",\"completed\":" + completed
+                        + ",\"total\":" + total + ",\"name\":\"" + jsonEscape(name == null ? "" : name)
+                        + "\",\"done\":" + done + "}");
+            } catch (Exception e) {
+                log.warn("Failed to report attachment preparation progress", e);
+            }
+        }
+
+        TurnContextLedger(RunGuard guard, Long messageId) {
             this.guard = guard;
+            this.messageId = messageId;
+        }
+
+        @Override
+        public Long attachmentMessageId() { return messageId; }
+
+        @Override
+        public synchronized boolean cancelled() {
+            return sealed || guard.isCancelled() || !isCurrentRun(guard);
         }
 
         @Override
         public void attachment(String fileId, String name, String fileType, String kind, boolean visionUsed) {
-            records.add(new ProjectAiMessageService.AttachmentRecord(fileId, name, fileType, kind, visionUsed));
+            int count;
+            synchronized (this) {
+                if (cancelled()) return;
+                records.put(fileId, new ProjectAiMessageService.AttachmentRecord(fileId, name, fileType, kind, visionUsed));
+                count = ++completed;
+            }
+            // Never hold the ledger lock while writing to a potentially slow SSE connection.
+            if (count <= 10 || count % 50 == 0 || count == total) progress(name, count == total);
         }
 
         @Override
         public void notice(String kind, String fileId, String name, String detail) {
+            if (cancelled()) return;
+            if (ContextTurnSink.DEFERRED.equals(kind)) deferred = true;
             try {
                 StringBuilder json = new StringBuilder("{\"kind\":\"").append(kind).append('"');
                 if (fileId != null) json.append(",\"fileId\":\"").append(jsonEscape(fileId)).append('"');
@@ -710,8 +812,13 @@ public class AgentOrchestrator {
         }
 
         void persistTo(Long messageId) {
+            List<ProjectAiMessageService.AttachmentRecord> snapshot;
+            synchronized (this) {
+                sealed = true;
+                snapshot = new java.util.ArrayList<>(records.values());
+            }
             try {
-                messageService.recordAttachments(messageId, records);
+                messageService.recordAttachments(messageId, snapshot);
             } catch (Exception e) {
                 log.warn("Failed to persist {} attachment(s) for message {}", records.size(), messageId, e);
             }
@@ -798,6 +905,7 @@ public class AgentOrchestrator {
         // 已生成的部分正文 + 本轮的工具过程卡
         String partialContent = guard.streamSnapshot();
         String logText = executionLog != null ? executionLog.toString() : "";
+        if (guard.pendingAttachmentRead != null) logText += guard.pendingAttachmentRead;
 
         if (!partialContent.isEmpty() || !logText.isEmpty()) {
             String contentToSave = logText + partialContent
@@ -868,7 +976,8 @@ public class AgentOrchestrator {
         guard.startAssistantSegment();
         executionLog.setLength(0);
 
-        for (com.checkba.model.entity.AgentInboxItem input : inputs) {
+        for (int inputIndex = 0; inputIndex < inputs.size(); inputIndex++) {
+            com.checkba.model.entity.AgentInboxItem input = inputs.get(inputIndex);
             guard.clientRequestId = input.getClientRequestId();
             AiAgentController.AgentChatRequest request = inbox.requestOf(input);
             // clientRequestId 一起落库：它是「回退到这条消息」的定位键，而主键要到这一刻才生成、
@@ -880,20 +989,34 @@ public class AgentOrchestrator {
             try {
                 // 插话也带附件，账本同一条路——两个落库口少一个，刷新之后插话那条消息
                 // 就变成「什么都没带」，而它恰恰是最容易带材料的一条
-                TurnContextLedger ledger = new TurnContextLedger(guard);
-                java.util.List<dev.langchain4j.data.message.ChatMessage> assembled = contextAssemblerService.assemble(
-                        guard.conversationId, guard.runId, input.getMessage(),
-                        request.getContextItems() != null ? request.getContextItems()
-                                : convertFileIdsToContextItems(request.getFileIds()),
-                        request.getActiveContext(), null, null, projectId,
-                        agentMode, userId, modelId, ledger);
-                ledger.persistTo(steeredMessageId);
+                TurnContextLedger ledger = new TurnContextLedger(guard, steeredMessageId);
+                var contextItems = request.getContextItems() != null ? request.getContextItems()
+                        : convertFileIdsToContextItems(request.getFileIds());
+                ledger.seed(contextItems);
+                java.util.List<dev.langchain4j.data.message.ChatMessage> assembled;
+                try {
+                    assembled = boundedAttachmentRead(guard, () -> contextAssemblerService.assemble(
+                            guard.conversationId, guard.runId, input.getMessage(), contextItems,
+                            request.getActiveContext(), null, null, projectId,
+                            agentMode, userId, modelId, ledger), attachmentPreparationTimeout);
+                } finally {
+                    ledger.persistTo(steeredMessageId);
+                }
+                requireAttachmentTools(ledger, modelId);
                 for (int i = assembled.size() - 1; i >= 0; i--) {
                     if (assembled.get(i) instanceof dev.langchain4j.data.message.UserMessage) {
                         augmented = assembled.get(i);
                         break;
                     }
                 }
+            } catch (java.util.concurrent.CancellationException | BoundedAttachmentRead.Unavailable | AttachmentsRequireTools e) {
+                // Only the current input started preparation. Later claimed inputs must remain actionable.
+                inbox.releaseUnstartedSteering(guard.conversationId, guard.runId,
+                        inputs.subList(inputIndex + 1, inputs.size()).stream()
+                                .map(com.checkba.model.entity.AgentInboxItem::getId).toList());
+                inbox.interruptRun(guard.runId);
+                inbox.emitSnapshot(guard.conversationId);
+                throw e;
             } catch (Exception e) {
                 log.warn("Failed to augment steering input {}, using its durable text", input.getId(), e);
             }
@@ -1058,7 +1181,18 @@ public class AgentOrchestrator {
                     (id, kind) -> notifyVerifiedFile(conversationId, id, kind, projectId, effectTurn));
         }
         long toolStartMs = System.currentTimeMillis();
-        ToolRegistry.ToolResult result = toolRegistry.execute(toolName, argsJson, ctx);
+        final com.checkba.service.ai.tools.ToolContext readContext = ctx;
+        ToolRegistry.ToolResult result;
+        if (guard != null && ("extract_file_text".equals(toolName) || "read_document".equals(toolName)
+                || "list_attached_files".equals(toolName))) {
+            // Preserve the started read, even when no result has returned at cancellation/timeout.
+            guard.pendingAttachmentRead = "<process name=\"" + toolName + "\"><tool_code>" + toolName
+                    + "(" + AgentTagProtocol.escape(truncate(argsJson, 200)) + ")</tool_code></process>\n";
+            result = boundedAttachmentRead(guard, () -> toolRegistry.execute(toolName, argsJson, readContext), attachmentReadTimeout);
+            guard.pendingAttachmentRead = null;
+        } else {
+            result = toolRegistry.execute(toolName, argsJson, ctx);
+        }
         // A failed/unknown editor or external effect is not evidence of non-execution.
         // Do not manufacture a safely resumable snapshot after an ambiguous tool outcome.
         if (guard != null && !result.success()) guard.restartUnsafe = true;
@@ -2181,22 +2315,19 @@ public class AgentOrchestrator {
             String taskListId = null; 
             String planId = null;
             
-            TurnContextLedger ledger = new TurnContextLedger(guard);
-            java.util.List<dev.langchain4j.data.message.ChatMessage> messages = contextAssemblerService.assemble(
-                conversationId,
-                guard.runId,
-                request.getMessage(),
-                resolvedContextItems,
-                request.getActiveContext(), // NEW: Pass active document context
-                taskListId,
-                planId,
-                projectId,
-                agentMode,
-                userId,
-                effectiveModelId,
-                ledger
-            );
-            ledger.persistTo(userMessageId);
+            TurnContextLedger ledger = new TurnContextLedger(guard, userMessageId);
+            ledger.seed(resolvedContextItems);
+            java.util.List<dev.langchain4j.data.message.ChatMessage> messages;
+            try {
+                messages = boundedAttachmentRead(guard, () -> contextAssemblerService.assemble(
+                        conversationId, guard.runId, request.getMessage(), resolvedContextItems,
+                        request.getActiveContext(), taskListId, planId, projectId, agentMode,
+                        userId, effectiveModelId, ledger), attachmentPreparationTimeout);
+            } finally {
+                // Retain every original attachment even if preparation times out or is cancelled.
+                ledger.persistTo(userMessageId);
+            }
+            requireAttachmentTools(ledger, effectiveModelId);
 
             timings.mark("assemble", messages.size());
             log.info("Message assembly complete. Total messages: {}", messages.size());
@@ -2260,6 +2391,12 @@ public class AgentOrchestrator {
             }
             runLoop(model, messages, conversationId, projectId, userId, effectiveModelId, 0, executionLog, agentMode, guard);
 
+        } catch (AttachmentsRequireTools e) {
+            attachmentToolsRequired(guard, projectId, userId, null);
+        } catch (java.util.concurrent.CancellationException e) {
+            handleCancellation(guard, projectId, userId, new StringBuilder());
+        } catch (BoundedAttachmentRead.Unavailable e) {
+            attachmentReadFailed(guard, projectId, userId, null, e);
         } catch (com.checkba.service.account.AccountException e) {
             // 账户/额度类失败不是「内部错误」，而是用户可自行处理的状态
             // （如「请先在官网账户页分配 AI 额度」）。原样透出中文文案，不加英文前缀，
@@ -2308,7 +2445,18 @@ public class AgentOrchestrator {
         // compaction and the observation-aware no-progress detector remain the terminating guards.
 
         // A steer received after the preceding boundary is inserted before this model call.
-        applyPendingSteering(guard, messages, projectId, userId, modelId, agentMode, executionLog);
+        try {
+            applyPendingSteering(guard, messages, projectId, userId, modelId, agentMode, executionLog);
+        } catch (AttachmentsRequireTools e) {
+            attachmentToolsRequired(guard, projectId, userId, executionLog);
+            return;
+        } catch (java.util.concurrent.CancellationException e) {
+            handleCancellation(guard, projectId, userId, executionLog);
+            return;
+        } catch (BoundedAttachmentRead.Unavailable e) {
+            attachmentReadFailed(guard, projectId, userId, executionLog, e);
+            return;
+        }
         
         // 设置当前会话 ID 到 EditorBridgeService，以便文档编辑工具可以发送 SSE 事件
         editorBridgeService.setCurrentConversationId(conversationId);
@@ -2525,7 +2673,7 @@ public class AgentOrchestrator {
                     String result;
                     boolean success;
                     if (agentMode == AgentMode.ASK && !ASK_READ_TOOLS.contains(req.name())) {
-                        result = "Error: ASK mode permits only read-only memory and version inspection tools.";
+                        result = "Error: ASK mode permits only read-only attachment, memory and version inspection tools.";
                         success = false;
                     } else {
                         ToolRegistry.ToolResult toolResult = dispatchTool(req.name(), req.arguments(),
@@ -2696,7 +2844,7 @@ public class AgentOrchestrator {
                         result = call.parseError();
                         xmlToolSuccess = false;
                     } else if (agentMode == AgentMode.ASK && !ASK_READ_TOOLS.contains(call.toolName())) {
-                        result = "Error: ASK mode permits only read-only memory and version inspection tools.";
+                        result = "Error: ASK mode permits only read-only attachment, memory and version inspection tools.";
                         xmlToolSuccess = false;
                     } else {
                         toolResult = dispatchTool(call.toolName(), call.argsJson(),
@@ -3074,6 +3222,12 @@ public class AgentOrchestrator {
             sendRunEvent(guard, "bubble_end", bubbleEndPayload(guard, "finished"));
             // 清理本轮登记；队列跑空才关流（见 endRunAndDrain）
             endRunAndDrain(guard);
+          } catch (AttachmentsRequireTools e) {
+            attachmentToolsRequired(guard, projectId, userId, executionLog);
+          } catch (java.util.concurrent.CancellationException e) {
+            handleCancellation(guard, projectId, userId, executionLog);
+          } catch (BoundedAttachmentRead.Unavailable e) {
+            attachmentReadFailed(guard, projectId, userId, executionLog, e);
           } catch (Throwable e) {
             // 确保异常/Error 时也能正确结束 bubble，避免前端一直显示加载状态且 activeRuns 永久残留。
             //
@@ -3282,6 +3436,7 @@ public class AgentOrchestrator {
             for (ToolSpecification spec : registered) {
                 String name = spec.name();
                 boolean keep = ASK_MEMORY_TOOLS.contains(name)
+                        || "extract_file_text".equals(name) || "list_attached_files".equals(name)
                         || (MEMORY_TOOLS.contains(name) && (narrowedBySkill || offeredBefore.contains(name)));
                 if (keep && visible.stream().noneMatch(v -> v.name().equals(name))) {
                     visible.add(spec);

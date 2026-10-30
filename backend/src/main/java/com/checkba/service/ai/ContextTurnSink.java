@@ -28,6 +28,8 @@ public interface ContextTurnSink {
     String TRUNCATED = "truncated";
     /** 超出 max-files-per-context 总闸，这一条整个没进上下文。 */
     String DROPPED = "dropped";
+    /** References retained for lazy reading; detail is the number of deferred attachments. */
+    String DEFERRED = "deferred";
     /** 图片降级走 OCR，原因是当前模型读不了图。 */
     String OCR_FALLBACK = "ocr_fallback";
     /** 图片降级走 OCR，原因是超出本轮直送张数上限。 */
@@ -73,6 +75,12 @@ public interface ContextTurnSink {
      */
     default void notice(String kind, String fileId, String name, String detail) {
     }
+
+    /** Persisted USER message whose complete attachment manifest can be paged by the model. */
+    default Long attachmentMessageId() { return null; }
+
+    /** Persistent cancellation gate; parsers may consume a thread interruption. */
+    default boolean cancelled() { return false; }
 
     /** 不关心账本的调用方（既有测试、回放评测、以及不带 sink 的旧重载）用它。 */
     ContextTurnSink NOOP = new ContextTurnSink() {

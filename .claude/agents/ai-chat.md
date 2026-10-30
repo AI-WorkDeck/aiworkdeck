@@ -1848,3 +1848,12 @@ SSE query 都显式携带范围；不匹配的普通面板连接在替换 emitte
 不是按技能触发词自动隐藏普通聊天。保存、fork/rollback 继续保留范围，进程重启从持久消息回读。
 新增文件事件方面，litigation_render/timeline_render 没有结构化真实产物时不走“当前文档”兜底；
 已登记 drawio/svg/png 仍沿实际 ID 逐项发事件。详细 UI/恢复与验证边界见 litigation-visual.md。
+
+## 多文件与目录按需读取（2026-10-30，dev-board#1634）
+
+- 附件数量不再以10份拒收；`maxFilesPerContext`仅是准备阶段预读额度，正文总字符预算仍保留，且预算检查在读盘/OCR之前。所有附件登记到原用户消息，超预算发一次`deferred`汇总。目录准备阶段仅注入目录引用，不递归扫盘或批量触发OCR；上文深度5/预读统计仅描述仍保留的legacy loader。
+- `extract_file_text`读取目录时，`offset`是直接子项起点，`nextOffset`续页；每页最多200项且受字符预算约束。子目录按ID递归，文件逐个读取，列出不等于读过。当前仍一次查直接子项元数据；列表变更后应从0重新核对，不能将偏移量当稳定快照。
+- 超过100个独立附件时，组装只展示前100个引用，其余通过`list_attached_files(messageId,afterId)`读取持久化清单；每页100项/约12k字符，逐页验证消息用户、项目、会话及当前项目读权限。新工具不授予文件写权限；原文件读取继续走文件权限校验。ASK及skill裁剪后保留这两个只读工具。无工具能力模型遇延后读取附件会明确要求换模型，不发送无法执行的读取任务。
+- 准备等待120秒、单次文件读取180秒；这是单步等待上限，不是整项任务时长。只读工作池有界，不可中断解析器不能无限增线程；取消会结束等待，迟到附件回执封口，不启动后续预读。上游在途OCR不保证已取消计费，禁止自动重放。池占满单独提示尚未开始读取及等待/保存后重启方案。
+- `context_progress`报告附件准备数量，不代表正文全部读取。导入独立显示真实进度；成功项保留，明确失败与未开始项可重试，取消/网络超时等结果未知项不自动重传。扫描不完整不能拿部分清单冒充完整目录；桌面目录导入须展示后端`skippedCount`。
+- 回归入口：`ContextLimitsAndNoticesTest`、`AttachmentToolsTest`、`ExtractFileTextFolderTest`、`BoundedAttachmentReadTest`、`AgentOrchestratorAttachmentWaitTest`；前端`chat-import-batch.test.mjs`及`tests/chat-presentation-ui/multifile.mjs`。浏览器夹具仅使用合成项目与请求桩，不等于真实供应商逐份识别准确率或正式客户端验收。

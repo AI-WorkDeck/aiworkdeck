@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "listAttachedFiles": "Λίστα συνημμένων αυτού του γύρου",
     "office_ppt_add_image": "Εισαγωγή εικόνας στη διαφάνεια",
     "office_ppt_add_chart": "Εισαγωγή γραφήματος στη διαφάνεια",
     "office_ppt_format_chart": "Μορφοποίηση γραφήματος διαφάνειας",

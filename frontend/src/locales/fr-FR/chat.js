@@ -2,6 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  attachmentImportPartial: "Importation partielle : {count} fichiers importés, {skipped} éléments ignorés. Vérifiez l’arborescence, les autorisations source, les liens symboliques ou fichiers spéciaux. Le dossier entier ne sera pas réimporté automatiquement.",
+  attachmentScanIncomplete: "Analyse du dossier incomplète : {count} fichiers trouvés, aucun importé. Sélectionnez ou déposez à nouveau le dossier entier ; cette liste partielle ne permet pas de continuer.",
+  attachmentsRequireTools: "Ces pièces jointes doivent être lues par lots. Choisissez un modèle prenant en charge les appels d’outils pour continuer. Vos pièces jointes sont conservées.",
+  attachmentReaderBusy: "Des tâches précédentes occupent encore le service de lecture ; cette lecture n’a pas commencé. Attendez puis réessayez. Si le service reste bloqué, enregistrez votre travail et redémarrez l’application.",
+  attachmentBatchHint: "Pièces jointes illimitées ; les grands ensembles peuvent prendre plus de temps et sont lus par lots selon les besoins.",
+  attachmentScanning: "Analyse des dossiers : {count} fichiers trouvés",
+  attachmentImportProgress: "{completed}/{total} éléments importés",
+  attachmentImportUncertain: "Le résultat en cours est inconnu et peut encore aboutir en arrière-plan. Vérifiez l’arborescence avant de réimporter. Les éléments terminés sont conservés.",
+  attachmentImportPaused: "Importation suspendue ou partiellement échouée. Les éléments terminés sont conservés ; réessayez les autres.",
+  attachmentRetryRemaining: "Réessayer les {count} éléments restants",
+  contextPreparingProgress: "Préparation : {completed}/{total} pièces enregistrées (pas nécessairement lues)",
+  contextNoticeDeferred: "{count} éléments supplémentaires sont conservés pour une lecture par lots à la demande, qui peut prendre du temps.",
+  contextPreparationTimeout: "La préparation a expiré et ce tour est arrêté. Les pièces sont conservées. Précisez les fichiers prioritaires, réduisez le périmètre ou réessayez manuellement plus tard.",
+
   "earlierFiles": "Fichiers de conversation antérieurs",
   "fileCreated": "Créé le",
   "fileModified": "Modifié le",
@@ -287,7 +301,6 @@ export default {
   "activeSelectionChipTitle": "Extrait sélectionné : {text} (envoyé à l'IA avec votre message afin que les révisions ciblent d'abord cet extrait ; cliquez sur x pour l'omettre pour ce tour)",
   "carriedAttachmentTitle": "{name} (reporté du tour précédent et toujours joint ; cliquez pour le conserver, cliquez sur x pour le retirer)",
   "carriedAttachmentHint": "Les tags en pointillés sont des pièces jointes de votre dernier message et seront renvoyés avec le suivant. Cliquez sur x pour les retirer.",
-  "contextFileCapReached": "Jusqu'à {max} éléments (images comprises) par tour. Retirez-en certains avant d'en ajouter d'autres.",
   "imageCountCapToast": "Jusqu'à {max} images sont envoyées directement par tour ; les autres sont traitées comme du texte reconnu (OCR).",
   "imageTooLargeToast": "Cette image dépasse {size} et sera traitée comme du texte reconnu (OCR). Compressez-la et renvoyez-la.",
   "contextNoticeThisFile": "Cet élément",
