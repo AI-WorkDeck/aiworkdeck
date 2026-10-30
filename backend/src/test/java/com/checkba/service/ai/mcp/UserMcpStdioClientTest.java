@@ -126,13 +126,15 @@ class UserMcpStdioClientTest {
         ExecutorService worker = Executors.newSingleThreadExecutor();
         try {
             Future<?> task = worker.submit(() -> client.listTools(config("tree"), allowed::get));
-            assertTimeoutPreemptively(Duration.ofSeconds(4), () -> {
-                while (!Files.exists(Path.of(trace() + ".child.pid"))) Thread.sleep(20);
+            long child = assertTimeoutPreemptively(Duration.ofSeconds(4), () -> {
+                Path childPid = Path.of(trace() + ".child.pid");
+                while (!Files.exists(childPid)) Thread.sleep(20);
+                return Long.parseLong(Files.readString(childPid));
             });
+            assertTrue(child > 0);
             allowed.set(false);
             var failure = assertThrows(ExecutionException.class, () -> task.get(2, TimeUnit.SECONDS));
             assertEquals("cancelled", ((PluginMcpException) failure.getCause()).code()); assertStopped();
-            long child = Long.parseLong(Files.readString(Path.of(trace() + ".child.pid")));
             assertTimeoutPreemptively(Duration.ofSeconds(2), () -> { while (ProcessHandle.of(child).map(ProcessHandle::isAlive).orElse(false)) Thread.sleep(20); });
         } finally { worker.shutdownNow(); }
     }
