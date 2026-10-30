@@ -219,7 +219,17 @@ try {
     frame.on('console', message => { if (message.type() === 'error') { evidence.guestErrors ||= []; evidence.guestErrors.push({ ext, message: message.text() }) } })
     const marker = `兼容验证_ELECTRON_COMPAT_${ext.toUpperCase()}`
     if (ext === 'docx') await exec(ext, 'goto', { type: 'end' })
-    if (ext === 'xlsx') await exec(ext, 'sheet_select_range', { range: 'B2' })
+    if (ext === 'xlsx') {
+      // Enter the native Calc canvas as a user does before typing. DOM focus on
+      // the IME overlay alone does not establish the engine's internal focus.
+      const before = (await exec(ext, 'get_ui_state')).calc.cellName
+      await frame.click('#qtcanvas')
+      let after
+      await until(async () => { after = (await exec(ext, 'get_ui_state')).calc.cellName; return after && after !== before }, 10000)
+      write('xlsx-pointer-focus.json', { before, after, changedByCanvasClick: true })
+      await exec(ext, 'sheet_select_range', { range: 'B2' })
+      assert.equal((await exec(ext, 'get_ui_state')).calc.cellName, 'B2')
+    }
     if (ext === 'pptx') {
       const info = await exec(ext, 'slide_get_page', { slideNumber: 1 })
       const shape = info.shapes.find(s => (s.text || '').includes('普通文本框内容'))
