@@ -1811,7 +1811,8 @@ export default {
 
     const loadModelCatalog = async (generation) => {
       try {
-        const res = await fetchAiModels()
+        // Mount/account/settings refreshes are passive; only an explicit AI action asks for login.
+        const res = await fetchAiModels({ accountPrompt: false })
         if (generation !== aiRefreshGeneration || aiRefreshDisposed) return
         const list = Array.isArray(res?.models) ? res.models : []
         availableModels.value = list
