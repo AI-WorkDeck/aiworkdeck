@@ -212,6 +212,21 @@ class AgentOrchestratorFailoverFlowTest {
     }
 
     @Test
+    void domesticUncertainFailureAndEmptyResponseNeverAutomaticallyReplayPaidRequest() {
+        when(chatModelFactory.isDomesticPlatform()).thenReturn(true);
+        when(chatModelFactory.getStreamingChatModel(PRIMARY)).thenReturn(
+                new FailingModel(new RuntimeException("status code: 502 - upstream outcome unknown")));
+        run("conv-domestic-502");
+        assertEquals(AgentRunStateService.RunStatus.ERROR, runState.get("conv-domestic-502").status());
+        assertFalse(allText().contains("retrying"));
+        verify(chatModelFactory, never()).getStreamingChatModel(BACKUP);
+        when(chatModelFactory.getStreamingChatModel(PRIMARY)).thenReturn(new HealthyModel(""));
+        run("conv-domestic-empty");
+        assertEquals(AgentRunStateService.RunStatus.ERROR, runState.get("conv-domestic-empty").status());
+        verify(chatModelFactory, never()).getStreamingChatModel(BACKUP);
+    }
+
+    @Test
     void upstreamCloudQuotaErrorRequestsRechargeWithoutFailover() {
         when(chatModelFactory.resolveProvider()).thenReturn(com.checkba.config.AiModelProperties.Provider.AWD_CLOUD);
         when(chatModelFactory.getStreamingChatModel(PRIMARY)).thenReturn(

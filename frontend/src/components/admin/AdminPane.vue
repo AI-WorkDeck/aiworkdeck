@@ -98,7 +98,7 @@
           scroll-y
           class="config-scroll"
         >
-          <SettingsSection :title="$t('admin.aiSectionTitle')" :description="$t('admin.aiSectionSubtitle')">
+          <SettingsSection :title="$t('admin.aiSectionTitle')" >
               <!-- 2026-08-21 起产品只有官方版：AI 一律走平台 Credits 通道（AWD_CLOUD），
                    供应商单选、OpenRouter 自备 Key、本地 Ollama 三块都不再在界面上出现
                    （后端三档枚举与设置键原样保留）。老用户以前切过别的档位时，
@@ -113,7 +113,7 @@
                    所以它恒显示。绝不预勾选——预勾选的同意是无效的。 -->
               <view class="consent-box">
                 <text class="consent-title">{{ $t('admin.consentTitle') }}</text>
-                <text class="consent-body">{{ $t('admin.consentBodyPrefix') }}<text class="consent-em">{{ $t('admin.consentEntity') }}</text>{{ $t('admin.consentBodySuffix') }}</text>
+                <text class="consent-body">{{ $t('onboarding.unlock.crossBorderNoticeBody') }}</text>
                 <view class="consent-check" @tap="toggleCrossBorderConsent">
                   <view class="consent-box-mark" :class="{ checked: crossBorderConsented }"></view>
                   <text class="consent-check-label">{{ $t('admin.consentCheckLabel') }}</text>
@@ -132,9 +132,6 @@
               <view class="section-header-inline">
                   <text class="section-title-sm">{{ $t('admin.modelSelectionTitle') }}</text>
               </view>
-              <text class="field-note">
-                {{ $t('admin.modelSelectionNote') }}
-              </text>
               <text v-if="modelCatalogError" class="field-note field-note-warn">{{ modelCatalogError }}</text>
               <SettingsRow :label="$t('admin.defaultModelLabel')" :hint="catalogDefaultModel ? $t('admin.effectiveDefaultModel', { model: catalogDefaultModel }) : ''">
                 <AwdSelect
@@ -160,31 +157,6 @@
                   @change="onModelPick('subagentModel', $event)"
                 />
               </SettingsRow>
-
-              <!-- 网络区域。手动覆盖是一等设置不是隐藏兜底：本地判定（系统国家 + 时区）
-                   对出差、挂代理、公司专线出境的用户必然判错，手动指定是唯一出路。 -->
-              <view class="section-divider"></view>
-              <view class="section-header-inline">
-                  <text class="section-title-sm">{{ $t('admin.networkRegionTitle') }}</text>
-              </view>
-              <text class="field-note">
-                {{ $t('admin.networkRegionNote') }}
-              </text>
-              <SettingsRow :label="$t('admin.regionModeLabel')">
-                <view class="provider-radio-group">
-                  <view
-                    v-for="opt in networkRegionOptions"
-                    :key="opt.value"
-                    class="radio-item"
-                    :class="{ checked: form.ai.networkRegion === opt.value }"
-                    @tap="form.ai.networkRegion = opt.value"
-                  >
-                    <view class="radio-dot"></view>
-                    <text class="radio-label">{{ opt.label }}</text>
-                  </view>
-                </view>
-              </SettingsRow>
-              <text class="field-note region-summary-note">{{ networkRegionSummary }}</text>
 
               <view class="section-divider"></view>
               <view class="section-header-inline">
@@ -1573,33 +1545,12 @@ export default {
         { key: 'FAILED', label: this.$t('admin.filterFailed') },
       ]
     },
-    networkRegionOptions() {
-      return [
-        { value: 'auto', label: this.$t('admin.regionAuto') },
-        { value: 'domestic', label: this.$t('admin.regionDomestic') },
-        { value: 'international', label: this.$t('admin.regionInternational') },
-      ]
-    },
     // 后端解析出的「当前真正会用的默认模型」（DB 的 ai.defaultModel 优先于 yml）。
     // 展示它是为了让「跟随内置默认」这个选项有可核对的落点。
     catalogDefaultModel() {
       return (this.modelCatalog && this.modelCatalog.defaultModel) || ''
     },
-    // 区域判定的结果与依据都要摆出来：用户要能看懂「国际模型为什么不见了」
-    networkRegionSummary() {
-      const c = this.modelCatalog
-      if (!c) return this.$t('admin.catalogNotLoaded')
-      const region = c.networkRegion === 'INTERNATIONAL'
-        ? this.$t('admin.regionIntlDesc')
-        : this.$t('admin.regionDomesticDesc')
-      const mode = c.networkRegionMode === 'auto' ? this.$t('admin.regionAuto') : this.$t('admin.regionManualDesc')
-      return this.$t('admin.regionSummary', {
-        region,
-        mode,
-        basis: c.networkRegionBasis || '—',
-        count: this.catalogModels.length,
-      })
-    },
+
   },
   watch: {
     /*
@@ -2373,7 +2324,7 @@ export default {
       }]
       this.catalogModels.forEach((m) => {
         const price = (m.inputPricePerM != null && m.outputPricePerM != null)
-          ? this.$t('admin.modelPrice', { in: m.inputPricePerM, out: m.outputPricePerM })
+          ? this.$t('admin.modelPrice', { currency: this.modelCatalog?.priceDisplay?.currency === 'CNY' ? '¥' : '$', in: m.displayInputPerM ?? m.inputPricePerM, out: m.displayOutputPerM ?? m.outputPricePerM })
           : ''
         options.push({
           value: m.id,
@@ -2390,9 +2341,7 @@ export default {
         // 清单没读到时不要说成「区域不可用」，那是两回事
         options.push({
           value: current,
-          label: this.modelCatalog
-            ? this.$t('admin.modelUnavailableInRegion', { model: current })
-            : this.$t('admin.modelSaved', { model: current }),
+          label: this.$t('admin.modelSaved', { model: current }),
         })
       }
       return options

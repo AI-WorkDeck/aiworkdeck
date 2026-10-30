@@ -100,7 +100,7 @@ export default {
   "inheritAux": "Warisi model tambahan",
   "followBuiltIn": "Ikuti bawaan bawaan",
   "modelOption": "{name} ({vendor})",
-  "modelPrice": " · $${in}/${out} per 1 juta token",
+  "modelPrice": " · {currency}{currency}{in}/{currency}{out} per 1 juta token",
   "tieredSuffix": " · Harga bertingkat",
   "noVisionSuffix": " · Tidak mendukung input gambar (gambar diproses melalui OCR)",
   "modelUnavailableInRegion": "{model} (tidak tersedia di wilayah jaringan saat ini)",

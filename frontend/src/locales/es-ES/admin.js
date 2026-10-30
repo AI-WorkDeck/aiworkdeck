@@ -100,7 +100,7 @@ export default {
   "inheritAux": "Heredar modelo auxiliar",
   "followBuiltIn": "Seguir el valor predeterminado integrado",
   "modelOption": "{name} ({vendor})",
-  "modelPrice": " · ${in}/${out} por 1M de tokens",
+  "modelPrice": " · {currency}{in}/{currency}{out} por 1M de tokens",
   "tieredSuffix": " · Precios por niveles",
   "noVisionSuffix": " · Sin entrada de imagen (imágenes procesadas mediante OCR)",
   "modelUnavailableInRegion": "{model} (no disponible en la región de red actual)",

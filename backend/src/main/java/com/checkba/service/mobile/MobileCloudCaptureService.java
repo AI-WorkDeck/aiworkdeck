@@ -26,6 +26,8 @@ public class MobileCloudCaptureService {
     private MobileMediaInboxRepository relayItems;
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private MobileMediaMoveService mediaMoves;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private MobileCaptureOrganizationService captureOrganization;
 
     public List<Map<String,Object>> status(Long userId, List<String> ids) {
         List<Map<String,Object>> result = new ArrayList<>();
@@ -98,6 +100,7 @@ public class MobileCloudCaptureService {
             ProjectFile folder=folder(projectId,null,rootName,userId);
             ProjectFile date=folder(projectId,folder.getId(),day,userId);
             ProjectFile file=files.createFile(projectId,date.getId(),landed,ext,size,path,null,userId);
+            if(captureOrganization!=null) captureOrganization.attach(userId,projectId,file.getId(),captureOrganization.result(userId,clientId));
             MobileCloudReceipt receipt=new MobileCloudReceipt();
             receipt.setUserId(userId); receipt.setClientMediaId(clientId); receipt.setProjectId(projectId);
             receipt.setProjectUid(catalog.cloudProjectUid(userId,projectId));

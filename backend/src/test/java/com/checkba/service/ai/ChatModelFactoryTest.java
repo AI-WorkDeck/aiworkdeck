@@ -47,6 +47,12 @@ class ChatModelFactoryTest {
                 .thenAnswer(inv -> inv.getArgument(1));
         platformAiChannel = mock(PlatformAiChannel.class);
         usageAccountant = mock(PlatformUsageAccountant.class);
+        when(platformAiChannel.connection()).thenAnswer(inv -> {
+            String key = platformAiChannel.apiKey();
+            return new PlatformAiKeyService.Resolved(key, key == null ? "none" : PlatformAiKeyCipher.fingerprint(key), null,
+                    platformAiChannel.isBailian() ? "bailian" : "openrouter",
+                    platformAiChannel.baseUrl(properties.getOpenRouter().getBaseUrl()), null);
+        });
         // 余额闸默认放行：本类测的是路由，闸门自身的判据在 PlatformCreditsGateTest
         creditsGate = mock(PlatformCreditsGate.class);
         // AuxModelResolver 用真实实例（无状态的两依赖纯类）：辅助模型 ID 的解析
@@ -59,6 +65,170 @@ class ChatModelFactoryTest {
                         new com.checkba.service.telemetry.InstallIdentityService(
                                 System.getProperty("java.io.tmpdir")),
                         "test"));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"sync", "stream", "bounded", "aux", "writing", "automatic-writing", "review", "explicit-platform"})
+    void platformConsumersFreezeCredentialEndpointAndCacheIdentityTogether(String consumer) throws Exception {
+        setDbProvider("AWD_CLOUD");
+        var domesticAuth = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var internationalAuth = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var domestic = snapshotServer(domesticAuth);
+        var international = snapshotServer(internationalAuth);
+        try {
+            String cnBase = "http://127.0.0.1:" + domestic.getAddress().getPort() + "/v1";
+            String intlBase = "http://127.0.0.1:" + international.getAddress().getPort() + "/v1";
+            properties.getOpenRouter().setBaseUrl(intlBase);
+            var first = new PlatformAiKeyService.Resolved("awdai_account-a", "snapshot-a", null, "bailian", cnBase, null);
+            var second = new PlatformAiKeyService.Resolved("sk-or-account-b", "snapshot-b", null);
+            // Separate legacy getters already see B. The first atomic snapshot still belongs to A.
+            when(platformAiChannel.apiKey()).thenReturn(second.apiKey());
+            when(platformAiChannel.baseUrl(anyString())).thenReturn(intlBase);
+            when(platformAiChannel.keyFingerprint()).thenReturn(second.fingerprint());
+            doReturn(first, second, second).when(platformAiChannel).connection();
+            clearInvocations(platformAiChannel);
+            java.util.function.Supplier<Object> create = () -> PlatformAiUserScope.call(72L, () -> switch (consumer) {
+                case "sync" -> factory.getChatModel("anthropic/claude-sonnet-5");
+                case "stream" -> factory.getStreamingChatModel("anthropic/claude-sonnet-5");
+                case "bounded" -> factory.getChatModel("anthropic/claude-sonnet-5", java.time.Duration.ofSeconds(3));
+                case "aux" -> factory.getAuxChatModel();
+                case "writing" -> factory.getWritingModel(java.time.Duration.ofSeconds(3));
+                case "automatic-writing" -> factory.getAutomaticWritingModel(java.time.Duration.ofSeconds(3));
+                case "review" -> factory.getAutomaticWritingReviewModel(java.time.Duration.ofSeconds(3), 0);
+                case "explicit-platform" -> factory.getPlatformChatModel(java.time.Duration.ofSeconds(3), 100).model();
+                default -> throw new AssertionError(consumer);
+            });
+            Object a = create.get(); Object b = create.get();
+            assertNotSame(a, b, "Account A's model must not be cached under account B's fingerprint");
+            if (java.util.Set.of("sync", "stream", "aux").contains(consumer)) assertSame(b, create.get());
+            invokeSnapshotModel(a); invokeSnapshotModel(b);
+            assertEquals(java.util.List.of("Bearer awdai_account-a"), domesticAuth);
+            assertEquals(java.util.List.of("Bearer sk-or-account-b"), internationalAuth);
+            verify(platformAiChannel, never()).apiKey();
+            verify(platformAiChannel, never()).baseUrl(anyString());
+            verify(platformAiChannel, never()).keyFingerprint();
+            verify(creditsGate, atLeast(2)).ensureCredits(72L);
+            verify(usageAccountant, atLeast(2)).ensureBaselineAsync(72L);
+        } finally { domestic.stop(0); international.stop(0); }
+    }
+
+    @Test
+    void decisionUsesSnapshotProviderEvenIfTheCurrentSiteHasChanged() {
+        setDbProvider("AWD_CLOUD");
+        var domestic = new PlatformAiKeyService.Resolved("awdai_account-a", "a", null, "bailian", "https://www.aiworkdeck.com/api/account/ai/v1", null);
+        var international = new PlatformAiKeyService.Resolved("sk-or-account-b", "b", null);
+        doReturn(domestic, international).when(platformAiChannel).connection();
+        clearInvocations(platformAiChannel);
+        assertNull(factory.decisionCredentials("anthropic/claude-sonnet-5", AiModelProperties.Provider.AWD_CLOUD));
+        var next = factory.decisionCredentials("anthropic/claude-sonnet-5", AiModelProperties.Provider.AWD_CLOUD);
+        assertEquals(international.apiKey(), next.apiKey());
+        assertEquals(properties.getOpenRouter().getBaseUrl(), next.baseUrl());
+        verify(platformAiChannel, never()).apiKey();
+        verify(platformAiChannel, never()).baseUrl(anyString());
+    }
+
+    private static com.sun.net.httpserver.HttpServer snapshotServer(java.util.List<String> authorization) throws Exception {
+        var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/chat/completions", exchange -> {
+            authorization.add(exchange.getRequestHeaders().getFirst("Authorization"));
+            var request = new com.fasterxml.jackson.databind.ObjectMapper().readTree(exchange.getRequestBody());
+            boolean stream = request.path("stream").asBoolean();
+            String response = stream
+                    ? "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ok\"},\"finish_reason\":null}]}\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+                    : "{\"id\":\"snapshot\",\"object\":\"chat.completion\",\"created\":1,\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}";
+            byte[] bytes = response.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", stream ? "text/event-stream" : "application/json");
+            exchange.sendResponseHeaders(200, bytes.length); exchange.getResponseBody().write(bytes); exchange.close();
+        });
+        server.start(); return server;
+    }
+
+    private static void invokeSnapshotModel(Object model) throws Exception {
+        if (model instanceof ChatLanguageModel synchronous) {
+            assertEquals("ok", synchronous.generate("synthetic")); return;
+        }
+        var done = new java.util.concurrent.CountDownLatch(1);
+        var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        var text = new StringBuilder();
+        ((StreamingChatLanguageModel) model).generate(java.util.List.of(dev.langchain4j.data.message.UserMessage.from("synthetic")),
+                new dev.langchain4j.model.StreamingResponseHandler<dev.langchain4j.data.message.AiMessage>() {
+                    public void onNext(String token) { text.append(token); }
+                    public void onComplete(dev.langchain4j.model.output.Response<dev.langchain4j.data.message.AiMessage> response) { done.countDown(); }
+                    public void onError(Throwable error) { failure.set(error); done.countDown(); }
+                });
+        assertTrue(done.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        assertNull(failure.get()); assertEquals("ok", text.toString());
+    }
+
+    @Test
+    void captureAuxiliaryUsesAccountPlatformAndExactAuxiliaryEvenWithLocalChat() {
+        setDbProvider("OLLAMA");
+        when(platformAiChannel.apiKey()).thenReturn("synthetic-per-user-key");
+        var chosen=PlatformAiUserScope.call(7L,()->factory.getPlatformAuxChatModel(java.time.Duration.ofSeconds(3),700,true));
+        assertEquals(AllowedModels.QWEN_3_7_FLASH.getModelId(),chosen.modelId());
+        assertInstanceOf(OpenAiChatModel.class,chosen.model());
+        assertEquals(chosen.modelId(),((OpenAiChatModel)chosen.model()).modelName());
+        verify(creditsGate).ensureCredits(7L);verify(usageAccountant).ensureBaselineAsync(7L);
+        assertNull(PlatformAiUserScope.current());
+    }
+
+    @Test
+    void captureAuxiliaryRejectsMissingIdentityMachineKeyAndUnsupportedVisionWithoutFallback() {
+        var timeout=java.time.Duration.ofSeconds(3);
+        assertThrows(com.checkba.service.account.AccountException.class,()->factory.getPlatformAuxChatModel(timeout,700,true));
+        when(platformAiChannel.usesMachineKey(7L)).thenReturn(true);
+        assertThrows(com.checkba.service.account.AccountException.class,()->PlatformAiUserScope.call(7L,()->factory.getPlatformAuxChatModel(timeout,700,true)));
+        when(platformAiChannel.usesMachineKey(7L)).thenReturn(false);
+        when(systemSettingService.get(eq("ai.auxModel"),any())).thenReturn("deepseek/deepseek-v4-flash");
+        assertThrows(com.checkba.exception.FeatureNotConfiguredException.class,()->PlatformAiUserScope.call(7L,()->factory.getPlatformAuxChatModel(timeout,700,true)));
+        verify(creditsGate).ensureCredits(7L);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    void captureAuxiliaryUsesSiteCatalogueAndFrozenEndpointWithoutRetryOrMainModelFallback(boolean domestic) throws Exception {
+        setDbProvider("OLLAMA");
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        var request = new java.util.concurrent.atomic.AtomicReference<com.fasterxml.jackson.databind.JsonNode>();
+        var bearer = new java.util.concurrent.atomic.AtomicReference<String>();
+        var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/chat/completions", exchange -> {
+            calls.incrementAndGet();
+            bearer.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            request.set(new com.fasterxml.jackson.databind.ObjectMapper().readTree(exchange.getRequestBody()));
+            byte[] body = "{\"error\":{\"message\":\"synthetic unavailable\"}}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(503, body.length);
+            exchange.getResponseBody().write(body); exchange.close();
+        });
+        server.start();
+        try {
+            String endpoint = "http://127.0.0.1:" + server.getAddress().getPort();
+            properties.getOpenRouter().setBaseUrl(domestic ? "http://127.0.0.1:1/forbidden" : endpoint);
+            doReturn(new PlatformAiKeyService.Resolved("synthetic-account-72", "snapshot", null,
+                    domestic ? "bailian" : "openrouter", domestic ? endpoint : null, null)).when(platformAiChannel).connection();
+            String modelId = domestic ? "qwen3.8-flash" : AllowedModels.QWEN_3_7_FLASH.getModelId();
+            var catalogue = mock(PlatformModelCatalog.class);
+            when(catalogue.model(modelId)).thenReturn(new PlatformModelCatalog.Model(
+                    modelId, "Flash", "Provider", 100000, 4000, true, true, 0.1, 0.2, false));
+            org.springframework.test.util.ReflectionTestUtils.setField(factory, "platformModelCatalog", catalogue);
+            var selected = PlatformAiUserScope.call(72L, () -> factory.getPlatformAuxChatModel(java.time.Duration.ofSeconds(2), 700, true));
+            assertEquals(modelId, selected.modelId());
+            assertThrows(RuntimeException.class, () -> selected.model().generate("synthetic"));
+            assertEquals(1, calls.get());
+            assertEquals("Bearer synthetic-account-72", bearer.get());
+            assertEquals(modelId, request.get().path("model").asText());
+            assertEquals(700, request.get().path("max_tokens").asInt());
+            verify(catalogue, never()).resolve(anyString());
+            verify(platformAiChannel, never()).apiKey();
+            when(catalogue.model(modelId)).thenReturn(new PlatformModelCatalog.Model(
+                    modelId, "Flash", "Provider", 100000, 4000, true, false, 0.1, 0.2, false));
+            assertThrows(com.checkba.exception.FeatureNotConfiguredException.class, () -> PlatformAiUserScope.call(72L,
+                    () -> factory.getPlatformAuxChatModel(java.time.Duration.ofSeconds(2), 700, true)));
+            when(systemSettingService.get(eq("ai.auxModel"), any())).thenReturn("unavailable/explicit-aux");
+            assertThrows(com.checkba.exception.FeatureNotConfiguredException.class, () -> PlatformAiUserScope.call(72L,
+                    () -> factory.getPlatformAuxChatModel(java.time.Duration.ofSeconds(2), 700, false)));
+            assertEquals(1, calls.get());
+        } finally { server.stop(0); }
     }
 
     @Test
@@ -769,6 +939,82 @@ class ChatModelFactoryTest {
             verify(systemSettingService, never()).get(eq("external.openrouter.apiKey"), any());
             verify(systemSettingService, never()).set(anyString(), anyString());
         } finally { server.stop(0); }
+    }
+
+    @Test
+    void explicitDomesticPlatformUsesCatalogueEvenWhenDefaultIsByokAndDoesNotRetry() throws Exception {
+        setDbProvider("OPENROUTER");
+        when(platformAiChannel.availableFor(72L)).thenReturn(true);
+        when(platformAiChannel.isBailian()).thenReturn(true);
+        when(platformAiChannel.apiKey()).thenReturn("awdai_synthetic-user-72");
+        var catalogue = mock(PlatformModelCatalog.class);
+        when(catalogue.resolve(anyString())).thenReturn("qwen3.8-flash");
+        org.springframework.test.util.ReflectionTestUtils.setField(factory, "platformModelCatalog", catalogue);
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        var authorization = new java.util.concurrent.atomic.AtomicReference<String>();
+        var request = new java.util.concurrent.atomic.AtomicReference<String>();
+        var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/api/account/ai/v1/chat/completions", exchange -> {
+            calls.incrementAndGet();
+            authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            request.set(new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            byte[] body = "{\"error\":{\"message\":\"unavailable\"}}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(503, body.length);
+            exchange.getResponseBody().write(body); exchange.close();
+        });
+        server.start();
+        try {
+            properties.getOpenRouter().setBaseUrl("http://127.0.0.1:1/forbidden-openrouter");
+            when(platformAiChannel.baseUrl(anyString())).thenReturn(
+                    "http://127.0.0.1:" + server.getAddress().getPort() + "/api/account/ai/v1");
+            var target = PlatformAiUserScope.call(72L, () -> factory.getPlatformChatModel(java.time.Duration.ofSeconds(2), 1800));
+            assertEquals("qwen3.8-flash", target.modelId());
+            assertThrows(RuntimeException.class, () -> target.model().generate("synthetic prompt"));
+            assertEquals(1, calls.get());
+            assertEquals("Bearer awdai_synthetic-user-72", authorization.get());
+            assertTrue(request.get().contains("qwen3.8-flash"));
+            assertFalse(request.get().contains("synthetic-machine-key"));
+            assertEquals(AiModelProperties.Provider.OPENROUTER, factory.resolveProvider());
+            verify(systemSettingService, never()).get(eq("external.openrouter.apiKey"), any());
+        } finally { server.stop(0); }
+    }
+
+    @Test
+    void domesticExplicitTextModelDoesNotSilentlyBecomeToolModelAndReviewersDiffer() {
+        setDbProvider("AWD_CLOUD");
+        when(platformAiChannel.availableFor(any())).thenReturn(true);
+        when(platformAiChannel.isBailian()).thenReturn(true);
+        when(platformAiChannel.apiKey()).thenReturn("awdai_synthetic");
+        when(platformAiChannel.baseUrl(anyString())).thenReturn("https://www.aiworkdeck.com/api/account/ai/v1");
+        var catalogue = mock(PlatformModelCatalog.class);
+        when(catalogue.resolve(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        when(catalogue.model("text-model")).thenReturn(new PlatformModelCatalog.Model(
+                "text-model", "Text", "Provider", 1000, 100, false, false, 1, 2, false));
+        when(catalogue.contains("qwen3.8-max")).thenReturn(true);
+        when(catalogue.contains("qwen3.8-flash")).thenReturn(true);
+        org.springframework.test.util.ReflectionTestUtils.setField(factory, "platformModelCatalog", catalogue);
+        assertEquals("text-model", factory.resolveEffectiveModelId("text-model"));
+        assertFalse(factory.effectiveModelSupportsTools("text-model"));
+        assertEquals(850, factory.platformContextBudget("text-model", 100000, .85));
+        assertEquals(500, factory.platformContextBudget("text-model", 500, .85));
+        assertThrows(com.checkba.service.account.AccountException.class, () -> factory.platformContextBudget("unknown", 100000, .85));
+        assertThrows(com.checkba.service.account.AccountException.class, () -> factory.ensureToolCapableModel("text-model"));
+        var timeout = java.time.Duration.ofSeconds(2);
+        assertEquals("qwen3.8-max", factory.getAutomaticWritingReviewModel(timeout, 0).modelName());
+        assertEquals("qwen3.8-flash", factory.getAutomaticWritingReviewModel(timeout, 1).modelName());
+    }
+
+    @Test
+    void oldDomesticSavedSelectionCanStillBeSavedWithoutAcceptingUnknownModels() {
+        setDbProvider("AWD_CLOUD");
+        when(platformAiChannel.isBailian()).thenReturn(true);
+        var catalogue = mock(PlatformModelCatalog.class);
+        when(catalogue.resolve("qwen/qwen3.8-max")).thenReturn("qwen3.8-flash");
+        when(catalogue.model("qwen3.8-flash")).thenReturn(new PlatformModelCatalog.Model(
+                "qwen3.8-flash", "Flash", "Alibaba", 1000, 100, true, true, 1, 2, false));
+        org.springframework.test.util.ReflectionTestUtils.setField(factory, "platformModelCatalog", catalogue);
+        assertTrue(factory.isAvailableModel("qwen/qwen3.8-max"));
+        assertFalse(factory.isAvailableModel("unavailable/new-model"));
     }
 
     @Test

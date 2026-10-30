@@ -80,6 +80,10 @@ public class ProjectAiMessage {
     @Column(length = 64)
     private String conversationId;
 
+    /** Dedicated workflow history; null retains ordinary chat history. */
+    @Column(name = "conversation_scope", length = 32)
+    private String conversationScope;
+
     /**
      * 对话的标题（由 LLM 生成，基于第一条消息）
      */
@@ -178,6 +182,8 @@ public class ProjectAiMessage {
     public void setDisplayContent(String displayContent) { this.displayContent = displayContent; }
     public String getReasoning() { return reasoning; }
     public void setReasoning(String reasoning) { this.reasoning = reasoning; }
+    public String getConversationScope() { return conversationScope; }
+    public void setConversationScope(String conversationScope) { this.conversationScope = conversationScope; }
     public String getConversationId() { return conversationId; }
     public void setConversationId(String conversationId) { this.conversationId = conversationId; }
     public String getConversationTitle() { return conversationTitle; }

@@ -8,7 +8,6 @@ import com.checkba.model.ai.TaskInfo;
 import com.checkba.model.entity.ProjectFile;
 import com.checkba.repository.ProjectFileRepository;
 import com.checkba.service.ProjectFileService;
-import com.checkba.service.ai.AllowedModels;
 import com.checkba.service.ai.BackgroundTaskService;
 import com.checkba.service.ai.ChatModelFactory;
 import com.checkba.service.ai.PlatformAiChannel;
@@ -1092,10 +1091,9 @@ public class PptxTools implements AgentToolComponent {
         AiModelProperties.OpenRouter orConfig = aiModelProperties.getOpenRouter();
         AiModelProperties.Provider provider = chatModelFactory.resolveProvider();
 
-        // 文本模型：会话选定的模型优先；空或非白名单一律回落统一默认模型（同 ChatModelFactory）
-        String textModel = (StringUtils.hasText(modelId) && AllowedModels.isAllowed(modelId))
-                ? AllowedModels.canonicalModelId(modelId)
-                : chatModelFactory.resolveDefaultModel();
+        // 文本模型与对话使用相同的供应商目录和旧模型迁移规则。
+        String textModel = chatModelFactory.resolveEffectiveModelId(modelId);
+        String imageModel = PptxServiceClient.IMAGE_MODEL;
 
         String apiKey;
         String apiBase;
@@ -1103,10 +1101,12 @@ public class PptxTools implements AgentToolComponent {
             // 平台通道：密钥由官网按账户 provision。取不到时原样抛业务异常——静默回退用户自己的
             // BYOK key 等于拿用户的钱去跑，还会掩盖「额度未就绪」这类需要去官网处理的状态。
             chatModelFactory.ensurePaidAccess(com.checkba.service.ai.PlatformAiUserScope.current());
+            if (platformAiChannel.isBailian()) {
+                imageModel = "qwen-image-3.0";
+            }
             apiKey = platformAiChannel.apiKey();
-            // baseUrl 只认 yml：DB 那份是用户 BYOK 的自定义地址，把 provision 出来的凭据发过去
-            // 等于把平台密钥交出去（与 ChatModelFactory 平台通道同规矩）
-            apiBase = orConfig.getBaseUrl();
+            // 平台凭据只发送到官方通道地址，不使用用户 BYOK 的自定义地址。
+            apiBase = platformAiChannel.baseUrl(orConfig.getBaseUrl());
         } else if (provider == AiModelProperties.Provider.OPENROUTER) {
             // 走工厂的解析入口，不在这里复制一份「读 DB、空白回退 yml」——
             // 密钥解析有两处口径是本仓反复踩过的坑（改了一处、另一处继续读旧键）
@@ -1124,14 +1124,14 @@ public class PptxTools implements AgentToolComponent {
         }
 
         log.info("Building PPT model config: provider={}, textModel={} (requested={}), imageModel={}",
-                provider, textModel, modelId, PptxServiceClient.IMAGE_MODEL);
+                provider, textModel, modelId, imageModel);
 
         return PptxServiceClient.ModelConfig.builder()
                 .provider("openai")  // pptx-service 侧的 SDK 格式：OpenRouter 与平台通道都是 OpenAI 兼容
                 .apiKey(apiKey)
                 .apiBase(apiBase)
                 .textModel(textModel)
-                .imageModel(PptxServiceClient.IMAGE_MODEL)
+                .imageModel(imageModel)
                 .build();
     }
 

@@ -36,6 +36,44 @@ public class ChatModelFactory {
     private final AiModelProperties aiModelProperties;
     private final com.checkba.service.SystemSettingService systemSettingService;
     private final PlatformAiChannel platformAiChannel;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private PlatformModelCatalog platformModelCatalog;
+
+    public boolean isDomesticPlatform() {
+        return resolveProvider() == AiModelProperties.Provider.AWD_CLOUD && platformAiChannel.isBailian();
+    }
+
+    public boolean usesProviderCatalog() {
+        return platformModelCatalog != null && resolveProvider() == AiModelProperties.Provider.AWD_CLOUD;
+    }
+
+    public PlatformModelCatalog.Catalog platformCatalog() { return platformModelCatalog.current(); }
+    public boolean isAvailableModel(String id) {
+        if (!usesProviderCatalog()) return AllowedModels.isAllowed(id);
+        // Existing legal OpenRouter selections remain saveable during domestic migration.
+        if (isDomesticPlatform() && AllowedModels.isAllowed(id)) {
+            return platformModelCatalog.model(platformModelCatalog.resolve(id)) != null;
+        }
+        return platformModelCatalog.contains(id);
+    }
+    private boolean canResolvePlatformCatalog() {
+        return usesProviderCatalog() && platformAiChannel.availableFor(PlatformAiUserScope.current());
+    }
+    private String platformBaseUrl(PlatformAiKeyService.Resolved connection) {
+        return connection.bailian() ? connection.baseUrl() : aiModelProperties.getOpenRouter().getBaseUrl();
+    }
+    public String platformFailover(java.util.List<String> candidates, String current, java.util.Set<String> tried, boolean vision) {
+        return platformModelCatalog.failover(candidates, current, tried, vision);
+    }
+    public SmartModelRouter.RouteDecision adaptPlatformRoute(SmartModelRouter.RouteDecision route, boolean vision) {
+        if (!usesProviderCatalog()) return route;
+        if (route.routed()) return platformModelCatalog.adapt(route, vision);
+        String resolved = platformModelCatalog.resolve(route.effectiveModelId());
+        var model = platformModelCatalog.model(resolved);
+        return new SmartModelRouter.RouteDecision(route.requestedModel(), resolved, model.name(),
+                route.tier(), route.reasoningEffort(), false);
+    }
+
     /** 平台通道的余额闸：登录且确认正余额才可发起外部付费调用。 */
     private final PlatformCreditsGate platformCreditsGate;
     private final PlatformUsageAccountant usageAccountant;
@@ -190,8 +228,12 @@ public class ChatModelFactory {
         ResolvedTarget target = resolveTarget(selectedModel, false);
         if (target.channel() != expectedChannel) return null;
         boolean platform = target.channel() == AiModelProperties.Provider.AWD_CLOUD;
-        return new DecisionCredentials(platform ? platformApiKey() : resolveOpenRouterApiKey(),
-                platform ? aiModelProperties.getOpenRouter().getBaseUrl() : resolveOpenRouterBaseUrl(), platform);
+        if (platform) {
+            PlatformAiKeyService.Resolved connection = platformConnection();
+            if (connection.bailian()) return null;
+            return new DecisionCredentials(connection.apiKey(), platformBaseUrl(connection), true);
+        }
+        return new DecisionCredentials(resolveOpenRouterApiKey(), resolveOpenRouterBaseUrl(), false);
     }
 
     /** Deliberately redacted: credentials must never appear in record-generated toString/logging. */
@@ -217,7 +259,8 @@ public class ChatModelFactory {
      * 只有前端下拉的默认选项变了、后端回落路径还钉在 yml 上（两份口径的老毛病）。
      */
     public String resolveDefaultModel() {
-        return AllowedModels.canonicalModelId(getSetting("ai.defaultModel", aiModelProperties.getOpenRouter().getDefaultModel()));
+        String configured = AllowedModels.canonicalModelId(getSetting("ai.defaultModel", aiModelProperties.getOpenRouter().getDefaultModel()));
+        return canResolvePlatformCatalog() ? platformModelCatalog.resolve(configured) : configured;
     }
 
     /**
@@ -240,6 +283,7 @@ public class ChatModelFactory {
 
     private String validatedAuxModelId() {
         String auxModel = auxModelResolver.auxModelId();
+        if (usesProviderCatalog()) return platformModelCatalog.resolve(auxModel);
         if (!AllowedModels.isAllowed(auxModel)) {
             throw new com.checkba.exception.FeatureNotConfiguredException("ai-aux-model",
                     "辅助模型「" + auxModel + "」不在可用模型清单内，"
@@ -271,8 +315,9 @@ public class ChatModelFactory {
                     .timeout(remainingTimeout(timeout, started)).maxRetries(0).build();
         }
         boolean platform = target.channel() == AiModelProperties.Provider.AWD_CLOUD;
-        String key = platform ? platformApiKey() : resolveOpenRouterApiKey();
-        String baseUrl = platform ? aiModelProperties.getOpenRouter().getBaseUrl() : resolveOpenRouterBaseUrl();
+        PlatformAiKeyService.Resolved connection = platform ? platformConnection() : null;
+        String key = platform ? connection.apiKey() : resolveOpenRouterApiKey();
+        String baseUrl = platform ? platformBaseUrl(connection) : resolveOpenRouterBaseUrl();
         return OpenAiChatModel.builder().apiKey(key).baseUrl(baseUrl).modelName(target.modelId())
                 .timeout(remainingTimeout(timeout, started)).maxRetries(0)
                 .maxTokens(maxOutputTokens).logRequests(false).logResponses(false).build();
@@ -291,9 +336,40 @@ public class ChatModelFactory {
         }
         long started = System.nanoTime();
         String modelId = resolvePlatformModel("default", true);
-        String key = platformApiKey(); // Per-user credits, identity and usage baseline; failure is terminal.
-        ChatLanguageModel model = OpenAiChatModel.builder().apiKey(key)
-                .baseUrl(aiModelProperties.getOpenRouter().getBaseUrl()).modelName(modelId)
+        PlatformAiKeyService.Resolved connection = platformConnection(); // Per-user credits, identity and usage baseline; failure is terminal.
+        ChatLanguageModel model = OpenAiChatModel.builder().apiKey(connection.apiKey())
+                .baseUrl(platformBaseUrl(connection)).modelName(modelId)
+                .timeout(remainingTimeout(timeout, started)).maxRetries(0).maxTokens(maxOutputTokens)
+                .logRequests(false).logResponses(false).build();
+        recordModelUse(AiModelProperties.Provider.AWD_CLOUD.name(), modelId, false);
+        return new PlatformChatModel(model, modelId);
+    }
+
+    /** Optional capture organization: exact auxiliary model, account credits, no provider/model fallback. */
+    public PlatformChatModel getPlatformAuxChatModel(java.time.Duration timeout, Integer maxOutputTokens,
+                                                    boolean requiresVision) {
+        if (timeout == null || timeout.isZero() || timeout.isNegative())
+            throw new IllegalArgumentException("Platform auxiliary request deadline expired");
+        long started = System.nanoTime();
+        Long userId = PlatformAiUserScope.current();
+        if (userId == null || (!localMode && platformAiChannel.usesMachineKey(userId)))
+            throw new com.checkba.service.account.AccountException(
+                    com.checkba.service.account.AccountException.Kind.CONFLICT,
+                    com.checkba.service.LangText.of("请连接账户后使用采集整理", "Connect your account to organize captures"));
+        PlatformAiKeyService.Resolved connection = platformConnection();
+        String modelId = AllowedModels.canonicalModelId(auxModelResolver.auxModelId()).trim();
+        // Migrate only the former low-cost default; never let catalogue.resolve upgrade to a main model.
+        if (connection.bailian() && AllowedModels.QWEN_3_7_FLASH.getModelId().equals(modelId))
+            modelId = "qwen3.8-flash";
+        PlatformModelCatalog.Model catalogModel = platformModelCatalog == null ? null : platformModelCatalog.model(modelId);
+        boolean available = platformModelCatalog != null ? catalogModel != null
+                : !connection.bailian() && AllowedModels.isAllowed(modelId);
+        boolean vision = catalogModel != null ? catalogModel.supportsVision() : AllowedModels.supportsVision(modelId);
+        if (!available || requiresVision && !vision)
+            throw new com.checkba.exception.FeatureNotConfiguredException("ai-aux-model",
+                    com.checkba.service.LangText.of("当前辅助模型不可用或不支持所需输入", "The auxiliary model is unavailable or does not support this input"));
+        ChatLanguageModel model = OpenAiChatModel.builder().apiKey(connection.apiKey())
+                .baseUrl(platformBaseUrl(connection)).modelName(modelId)
                 .timeout(remainingTimeout(timeout, started)).maxRetries(0).maxTokens(maxOutputTokens)
                 .logRequests(false).logResponses(false).build();
         recordModelUse(AiModelProperties.Provider.AWD_CLOUD.name(), modelId, false);
@@ -319,6 +395,15 @@ public class ChatModelFactory {
             case 1 -> AllowedModels.QWEN_3_8_MAX.getModelId();
             default -> throw new IllegalArgumentException("Unknown automatic writing reviewer");
         };
+        if (usesProviderCatalog() && platformAiChannel.isBailian()) {
+            model = reviewer == 0 ? "qwen3.8-max" : "qwen3.8-flash";
+            if (!platformModelCatalog.contains(model)) {
+                throw new com.checkba.service.account.AccountException(
+                        com.checkba.service.account.AccountException.Kind.CONFLICT,
+                        com.checkba.service.LangText.of("当前平台缺少自动补全审读模型，请稍后重试",
+                                "An autocomplete review model is unavailable on this platform. Retry later"));
+            }
+        }
         return createWritingModel(timeout, true, model);
     }
 
@@ -328,7 +413,8 @@ public class ChatModelFactory {
         }
         long started = System.nanoTime();
         String requestedModel = reviewModel != null ? reviewModel : automatic ? resolveDefaultModel() : validatedAuxModelId();
-        if (automatic && !AllowedModels.isAllowed(requestedModel)) {
+        if (usesProviderCatalog()) requestedModel = platformModelCatalog.resolve(requestedModel);
+        if (automatic && !isAvailableModel(requestedModel)) {
             throw new com.checkba.exception.FeatureNotConfiguredException("ai-default-model",
                     "当前主模型不在可用模型清单内，请在设置中重新选择；未改用辅助模型");
         }
@@ -337,17 +423,18 @@ public class ChatModelFactory {
             throw new com.checkba.exception.FeatureNotConfiguredException("writing-model",
                     "当前本地模型通道暂不支持可取消的写作续写；未改用云端模型");
         }
-        if (automatic && AllowedModels.fromId(requestedModel) != AllowedModels.fromId(target.modelId())) {
+        if (automatic && !java.util.Objects.equals(requestedModel, target.modelId())) {
             throw new com.checkba.exception.FeatureNotConfiguredException("ai-default-model",
                     "当前通道无法使用所选写作模型；未改用其他模型");
         }
         boolean platform = target.channel() == AiModelProperties.Provider.AWD_CLOUD;
-        String key = platform ? platformApiKey() : resolveOpenRouterApiKey();
-        String baseUrl = platform ? aiModelProperties.getOpenRouter().getBaseUrl() : resolveOpenRouterBaseUrl();
+        PlatformAiKeyService.Resolved connection = platform ? platformConnection() : null;
+        String key = platform ? connection.apiKey() : resolveOpenRouterApiKey();
+        String baseUrl = platform ? platformBaseUrl(connection) : resolveOpenRouterBaseUrl();
         recordModelUse(target.channel().name(), target.modelId(), true);
         return new OpenRouterStreamingChatModel(key, baseUrl, target.modelId(), remainingTimeout(timeout, started),
                 aiModelProperties.getOpenRouter().getMaxRequestsPerHost(), reviewModel != null ? (AllowedModels.KIMI_K3.getModelId().equals(reviewModel) ? "high" : "low") : automatic ? reasoningEffortFor(target.modelId()) : null,
-                automatic ? providerRoutingFor(target.modelId()) : null);
+                automatic && !(platform && connection.bailian()) ? providerRoutingFor(target.modelId()) : null);
     }
 
     private static java.time.Duration remainingTimeout(java.time.Duration budget, long started) {
@@ -434,8 +521,38 @@ public class ChatModelFactory {
      */
     public boolean effectiveModelSupportsVision(String modelId) {
         ResolvedTarget target = resolveTarget(modelId, false);
-        return target.channel() != AiModelProperties.Provider.OLLAMA
-                && AllowedModels.supportsVision(target.modelId());
+        if (target.channel() == AiModelProperties.Provider.AWD_CLOUD && platformModelCatalog != null) {
+            PlatformModelCatalog.Model model = platformModelCatalog.model(target.modelId());
+            return model != null && model.supportsVision();
+        }
+        return target.channel() != AiModelProperties.Provider.OLLAMA && AllowedModels.supportsVision(target.modelId());
+    }
+
+    public int platformContextBudget(String modelId, int configuredBudget, double headroom) {
+        if (!usesProviderCatalog()) return configuredBudget;
+        var model = platformModelCatalog.model(resolveEffectiveModelId(modelId));
+        if (model == null || model.contextLength() <= 0) {
+            throw new com.checkba.service.account.AccountException(
+                    com.checkba.service.account.AccountException.Kind.MALFORMED,
+                    com.checkba.service.LangText.of("模型目录缺少上下文容量，请稍后重试",
+                            "The model catalogue is missing context capacity. Retry later"));
+        }
+        return Math.min(configuredBudget, Math.max(1, (int) Math.floor(model.contextLength() * headroom)));
+    }
+
+    public boolean effectiveModelSupportsTools(String modelId) {
+        if (!usesProviderCatalog()) return true;
+        PlatformModelCatalog.Model model = platformModelCatalog.model(resolveEffectiveModelId(modelId));
+        return model != null && model.supportsTools();
+    }
+
+    public void ensureToolCapableModel(String modelId) {
+        if (!effectiveModelSupportsTools(modelId)) {
+            throw new com.checkba.service.account.AccountException(
+                    com.checkba.service.account.AccountException.Kind.CONFLICT,
+                    com.checkba.service.LangText.of("所选模型不支持工具，请改用问答模式或选择支持工具的模型",
+                            "This model does not support tools. Use Ask mode or choose a tool-capable model"));
+        }
     }
 
     /** 解析结果：本轮走哪个通道、用哪个模型 id。 */
@@ -473,7 +590,7 @@ public class ChatModelFactory {
                     .timeout(config.getTimeout())
                     // logRequests 必须为 false，理由见 streamingModel 的 javadoc（请求体物化）
                     .logRequests(false)
-                    .logResponses(true)
+                    .logResponses(false)
                     // Custom Headers for OpenRouter
                     // .defaultRequestProperties(Map.of(
                     //         "HTTP-Referer", "https://checkba.com", // Replace with actual URL
@@ -485,8 +602,13 @@ public class ChatModelFactory {
 
     // ==================== 平台通道「AI WorkDeck 云端」 ====================
 
-    /** 平台通道仍是 OpenRouter 后端，模型口径与 BYOK 一致：非白名单一律回落默认模型。 */
+    /** Explicit platform consumers also use the site catalogue when the desktop default is BYOK/local. */
     private String resolvePlatformModel(String targetModel, boolean logFallback) {
+        if (platformModelCatalog != null && platformAiChannel.availableFor(PlatformAiUserScope.current())) {
+            String requested = "default".equals(targetModel)
+                    ? getSetting("ai.defaultModel", aiModelProperties.getOpenRouter().getDefaultModel()) : targetModel;
+            return platformModelCatalog.resolve(requested);
+        }
         if (AllowedModels.isAllowed(targetModel)) return targetModel;
         String defaultModel = resolveDefaultModel();
         if (logFallback && !"default".equals(targetModel)) {
@@ -498,8 +620,8 @@ public class ChatModelFactory {
 
     /** Check before starting asynchronous paid work so callers receive the account error directly. */
     public void ensurePaidAccess(Long userId) {
-        if (resolveTarget(null, false).channel() == AiModelProperties.Provider.AWD_CLOUD) {
-            PlatformAiUserScope.run(userId, () -> platformApiKey());
+        if (resolveProvider() == AiModelProperties.Provider.AWD_CLOUD) {
+            PlatformAiUserScope.run(userId, () -> platformConnection());
         }
     }
 
@@ -511,23 +633,23 @@ public class ChatModelFactory {
      * <p>server 模式多租户下密钥是 per-user 的，身份取自 {@link PlatformAiUserScope}；
      * 缺身份同样抛业务错误，**绝不回落机器级 key**（那等于拿别人的额度花钱）。
      */
-    private String platformApiKey() {
+    private PlatformAiKeyService.Resolved platformConnection() {
         Long userId = PlatformAiUserScope.current();
         // 余额闸排在取 key 之前：本地已经缓存过 key 时 apiKey() 根本不联网，
         // 「没充值就不能用」不能只靠取 key 那一刻的 409（见 PlatformCreditsGate）
         platformCreditsGate.ensureCredits(userId);
         // 试用计量：标记本轮真的走了云端平台通道（纯本地/BYOK 回合不计次，规格 §1.4）
         com.checkba.service.trial.TrialTurnScope.markPlatformUse();
-        String key = platformAiChannel.apiKey();
+        PlatformAiKeyService.Resolved connection = platformAiChannel.connection();
         // 请求发出前先把用量基线建起来，否则重启后第一条消息只够建基线、cost 永远留空
         usageAccountant.ensureBaselineAsync(userId);
-        return key;
+        return connection;
     }
 
     /**
      * 断开账户后把 activeProvider 从平台通道摘下来，返回切换到的供应商（本来就不是平台通道时返回 null）。
      *
-     * 不做这一步的话：platformAiChannel 不可用 → 每条消息都在 {@link #platformApiKey()} 抛
+     * 不做这一步的话：platformAiChannel 不可用 → 每条消息都在 {@link #platformConnection()} 抛
      * NOT_CONNECTED，而设置页仍把「AI WorkDeck 云端」渲染成正常选中（不可选标记刻意豁免当前选项），
      * 用户看不出问题出在哪。落点按「哪个还能用」挑，避免一律摔回本地 Ollama（多数人没装）。
      */
@@ -564,21 +686,24 @@ public class ChatModelFactory {
     /** 缓存 key 带密钥指纹：官网撤销重发后指纹变化，旧实例自然作废。 */
     private ChatLanguageModel getOrCreatePlatformModel(String modelId) {
         recordModelUse("AWD_CLOUD", modelId, false);
-        String apiKey = platformApiKey();
-        String cacheKey = "awd_cloud:" + platformAiChannel.keyFingerprint() + ":" + modelId;
+        PlatformAiKeyService.Resolved connection = platformConnection();
+        String apiKey = connection.apiKey();
+        String baseUrl = platformBaseUrl(connection);
+        String cacheKey = "awd_cloud:" + baseUrl + ":" + connection.fingerprint() + ":" + modelId;
         return modelCache.computeIfAbsent(cacheKey, k -> {
             log.info("Creating new AWD Cloud ChatModel instance for: {}", modelId);
             AiModelProperties.OpenRouter config = aiModelProperties.getOpenRouter();
             return OpenAiChatModel.builder()
                     .apiKey(apiKey)
-                    // 平台通道的 baseUrl 只认 yml 配置，不读 DB：DB 那份是用户 BYOK 的自定义地址，
-                    // 把 provision 出来的 key 发到用户指定的地址等于把平台凭据交出去
-                    .baseUrl(config.getBaseUrl())
+                    .maxRetries(0)
+                    // 国内只走可信本站网关；国际只走配置中的 OpenRouter 地址。
+                    // BYOK 的用户自定义地址永远不能接收平台凭据。
+                    .baseUrl(baseUrl)
                     .modelName(modelId)
                     .timeout(config.getTimeout())
                     // logRequests 必须为 false，理由见 streamingModel 的 javadoc（请求体物化）
                     .logRequests(false)
-                    .logResponses(true)
+                    .logResponses(false)
                     .build();
         });
     }
@@ -683,15 +808,17 @@ public class ChatModelFactory {
     private dev.langchain4j.model.chat.StreamingChatLanguageModel getOrCreatePlatformStreamingModel(
             String modelId, String reasoningEffortOverride) {
         recordModelUse("AWD_CLOUD", modelId, true);
-        String apiKey = platformApiKey();
-        String effort = reasoningEffortFor(modelId, reasoningEffortOverride);
-        String cacheKey = "awd_cloud_stream:" + platformAiChannel.keyFingerprint() + ":" + modelId
+        PlatformAiKeyService.Resolved connection = platformConnection();
+        String apiKey = connection.apiKey();
+        String effort = connection.bailian() ? null : reasoningEffortFor(modelId, reasoningEffortOverride);
+        String baseUrl = platformBaseUrl(connection);
+        String cacheKey = "awd_cloud_stream:" + baseUrl + ":" + connection.fingerprint() + ":" + modelId
                 + (effort != null ? ":" + effort : "");
         return streamingModelCache.computeIfAbsent(cacheKey, k -> {
             log.info("Creating new AWD Cloud StreamingChatModel for: {} (effort={})", modelId, effort);
             AiModelProperties.OpenRouter config = aiModelProperties.getOpenRouter();
-            return streamingModel(apiKey, config.getBaseUrl(), modelId, config.getTimeout(),
-                    config.getMaxRequestsPerHost(), effort, providerRoutingFor(modelId));
+            return streamingModel(apiKey, baseUrl, modelId, config.getTimeout(),
+                    config.getMaxRequestsPerHost(), effort, connection.bailian() ? null : providerRoutingFor(modelId));
         });
     }
 

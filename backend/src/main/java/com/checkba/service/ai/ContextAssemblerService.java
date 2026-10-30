@@ -1233,7 +1233,11 @@ public class ContextAssemblerService {
                 if (history instanceof dev.langchain4j.data.message.UserMessage u) historyTokens += conservativeTokens(u.singleText());
                 else if (history instanceof dev.langchain4j.data.message.AiMessage a) historyTokens += conservativeTokens(a.text());
             }
-            long remaining = Math.max(0L, (long) contextProperties.maxContextTokensFor(modelKey)
+            int modelBudget = contextProperties.maxContextTokensFor(modelKey);
+            if (chatModelFactory != null && chatModelFactory.usesProviderCatalog()) {
+                modelBudget = chatModelFactory.platformContextBudget(modelKey, modelBudget, contextProperties.getModelBudgetHeadroom());
+            }
+            long remaining = Math.max(0L, (long) modelBudget
                     - fixedTokens - historyTokens - conservativeTokens(userText)
                     - contextProperties.getMemoryReserve() - contextProperties.getResponseReserve()
                     - (long) visionAttachments.size() * contextProperties.getVision().getTokenEstimatePerImage() - 256L);

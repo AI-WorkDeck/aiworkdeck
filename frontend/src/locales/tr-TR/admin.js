@@ -100,7 +100,7 @@ export default {
   "inheritAux": "Yardımcı modeli devral",
   "followBuiltIn": "Yerleşik varsayılanı izle",
   "modelOption": "{name} ({vendor})",
-  "modelPrice": " · 1 milyon token başına $${in}/${out}",
+  "modelPrice": " · 1 milyon token başına {currency}{currency}{in}/{currency}{out}",
   "tieredSuffix": " · Kademeli fiyatlandırma",
   "noVisionSuffix": " · Görüntü girişi yok (görüntüler OCR ile işlenir)",
   "modelUnavailableInRegion": "{model} (geçerli ağ bölgesinde kullanılamıyor)",

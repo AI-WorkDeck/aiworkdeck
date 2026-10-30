@@ -113,7 +113,7 @@ export default {
   inheritAux: '继承辅助模型',
   followBuiltIn: '跟随内置默认',
   modelOption: '{name}（{vendor}）',
-  modelPrice: ' · ${in}/${out} 每 1M token',
+  modelPrice: ' · {currency}{in}/{currency}{out} 每 1M token',
   tieredSuffix: ' · 分档计价',
   noVisionSuffix: ' · 不支持读图（图片按 OCR 处理）',
   modelUnavailableInRegion: '{model}（当前网络区域不可用）',
