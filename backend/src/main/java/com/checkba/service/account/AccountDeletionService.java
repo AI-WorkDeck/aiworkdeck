@@ -107,6 +107,8 @@ public class AccountDeletionService {
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private com.checkba.repository.MobileMediaMoveRepository mediaMoves;
     @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.repository.MobileCaptureOrganizationRepository captureOrganizations;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
     private com.checkba.repository.MobileCaptureReceiptRepository captureReceipts;
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private com.checkba.repository.MobileCaptureRemovalRepository captureRemovals;
@@ -180,6 +182,7 @@ public class AccountDeletionService {
         }
         if (captureRemovals != null) captureRemovals.deleteByAccountScope("cloud:"+userId);
         if (mediaMoves != null) mediaMoves.deleteByUserId(userId);
+        if (captureOrganizations != null) captureOrganizations.deleteByUserId(userId);
         if (captureReceipts != null) captureReceipts.deleteByUserId(userId);
         long media = inboxRepository.deleteByUserId(userId);
         long projects = dirRepository.deleteByUserId(userId);

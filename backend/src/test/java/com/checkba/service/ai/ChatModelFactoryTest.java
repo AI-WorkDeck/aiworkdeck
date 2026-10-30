@@ -161,6 +161,77 @@ class ChatModelFactoryTest {
     }
 
     @Test
+    void captureAuxiliaryUsesAccountPlatformAndExactAuxiliaryEvenWithLocalChat() {
+        setDbProvider("OLLAMA");
+        when(platformAiChannel.apiKey()).thenReturn("synthetic-per-user-key");
+        var chosen=PlatformAiUserScope.call(7L,()->factory.getPlatformAuxChatModel(java.time.Duration.ofSeconds(3),700,true));
+        assertEquals(AllowedModels.QWEN_3_7_FLASH.getModelId(),chosen.modelId());
+        assertInstanceOf(OpenAiChatModel.class,chosen.model());
+        assertEquals(chosen.modelId(),((OpenAiChatModel)chosen.model()).modelName());
+        verify(creditsGate).ensureCredits(7L);verify(usageAccountant).ensureBaselineAsync(7L);
+        assertNull(PlatformAiUserScope.current());
+    }
+
+    @Test
+    void captureAuxiliaryRejectsMissingIdentityMachineKeyAndUnsupportedVisionWithoutFallback() {
+        var timeout=java.time.Duration.ofSeconds(3);
+        assertThrows(com.checkba.service.account.AccountException.class,()->factory.getPlatformAuxChatModel(timeout,700,true));
+        when(platformAiChannel.usesMachineKey(7L)).thenReturn(true);
+        assertThrows(com.checkba.service.account.AccountException.class,()->PlatformAiUserScope.call(7L,()->factory.getPlatformAuxChatModel(timeout,700,true)));
+        when(platformAiChannel.usesMachineKey(7L)).thenReturn(false);
+        when(systemSettingService.get(eq("ai.auxModel"),any())).thenReturn("deepseek/deepseek-v4-flash");
+        assertThrows(com.checkba.exception.FeatureNotConfiguredException.class,()->PlatformAiUserScope.call(7L,()->factory.getPlatformAuxChatModel(timeout,700,true)));
+        verify(creditsGate).ensureCredits(7L);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    void captureAuxiliaryUsesSiteCatalogueAndFrozenEndpointWithoutRetryOrMainModelFallback(boolean domestic) throws Exception {
+        setDbProvider("OLLAMA");
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        var request = new java.util.concurrent.atomic.AtomicReference<com.fasterxml.jackson.databind.JsonNode>();
+        var bearer = new java.util.concurrent.atomic.AtomicReference<String>();
+        var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/chat/completions", exchange -> {
+            calls.incrementAndGet();
+            bearer.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            request.set(new com.fasterxml.jackson.databind.ObjectMapper().readTree(exchange.getRequestBody()));
+            byte[] body = "{\"error\":{\"message\":\"synthetic unavailable\"}}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(503, body.length);
+            exchange.getResponseBody().write(body); exchange.close();
+        });
+        server.start();
+        try {
+            String endpoint = "http://127.0.0.1:" + server.getAddress().getPort();
+            properties.getOpenRouter().setBaseUrl(domestic ? "http://127.0.0.1:1/forbidden" : endpoint);
+            doReturn(new PlatformAiKeyService.Resolved("synthetic-account-72", "snapshot", null,
+                    domestic ? "bailian" : "openrouter", domestic ? endpoint : null, null)).when(platformAiChannel).connection();
+            String modelId = domestic ? "qwen3.8-flash" : AllowedModels.QWEN_3_7_FLASH.getModelId();
+            var catalogue = mock(PlatformModelCatalog.class);
+            when(catalogue.model(modelId)).thenReturn(new PlatformModelCatalog.Model(
+                    modelId, "Flash", "Provider", 100000, 4000, true, true, 0.1, 0.2, false));
+            org.springframework.test.util.ReflectionTestUtils.setField(factory, "platformModelCatalog", catalogue);
+            var selected = PlatformAiUserScope.call(72L, () -> factory.getPlatformAuxChatModel(java.time.Duration.ofSeconds(2), 700, true));
+            assertEquals(modelId, selected.modelId());
+            assertThrows(RuntimeException.class, () -> selected.model().generate("synthetic"));
+            assertEquals(1, calls.get());
+            assertEquals("Bearer synthetic-account-72", bearer.get());
+            assertEquals(modelId, request.get().path("model").asText());
+            assertEquals(700, request.get().path("max_tokens").asInt());
+            verify(catalogue, never()).resolve(anyString());
+            verify(platformAiChannel, never()).apiKey();
+            when(catalogue.model(modelId)).thenReturn(new PlatformModelCatalog.Model(
+                    modelId, "Flash", "Provider", 100000, 4000, true, false, 0.1, 0.2, false));
+            assertThrows(com.checkba.exception.FeatureNotConfiguredException.class, () -> PlatformAiUserScope.call(72L,
+                    () -> factory.getPlatformAuxChatModel(java.time.Duration.ofSeconds(2), 700, true)));
+            when(systemSettingService.get(eq("ai.auxModel"), any())).thenReturn("unavailable/explicit-aux");
+            assertThrows(com.checkba.exception.FeatureNotConfiguredException.class, () -> PlatformAiUserScope.call(72L,
+                    () -> factory.getPlatformAuxChatModel(java.time.Duration.ofSeconds(2), 700, false)));
+            assertEquals(1, calls.get());
+        } finally { server.stop(0); }
+    }
+
+    @Test
     void automaticWritingUsesDefaultModelWhileManualWritingKeepsAuxiliary() {
         setDbProvider("OPENROUTER");
         when(systemSettingService.get(eq("ai.defaultModel"), any())).thenReturn("deepseek/deepseek-v4-flash");

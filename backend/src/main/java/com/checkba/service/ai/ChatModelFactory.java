@@ -345,6 +345,37 @@ public class ChatModelFactory {
         return new PlatformChatModel(model, modelId);
     }
 
+    /** Optional capture organization: exact auxiliary model, account credits, no provider/model fallback. */
+    public PlatformChatModel getPlatformAuxChatModel(java.time.Duration timeout, Integer maxOutputTokens,
+                                                    boolean requiresVision) {
+        if (timeout == null || timeout.isZero() || timeout.isNegative())
+            throw new IllegalArgumentException("Platform auxiliary request deadline expired");
+        long started = System.nanoTime();
+        Long userId = PlatformAiUserScope.current();
+        if (userId == null || (!localMode && platformAiChannel.usesMachineKey(userId)))
+            throw new com.checkba.service.account.AccountException(
+                    com.checkba.service.account.AccountException.Kind.CONFLICT,
+                    com.checkba.service.LangText.of("请连接账户后使用采集整理", "Connect your account to organize captures"));
+        PlatformAiKeyService.Resolved connection = platformConnection();
+        String modelId = AllowedModels.canonicalModelId(auxModelResolver.auxModelId()).trim();
+        // Migrate only the former low-cost default; never let catalogue.resolve upgrade to a main model.
+        if (connection.bailian() && AllowedModels.QWEN_3_7_FLASH.getModelId().equals(modelId))
+            modelId = "qwen3.8-flash";
+        PlatformModelCatalog.Model catalogModel = platformModelCatalog == null ? null : platformModelCatalog.model(modelId);
+        boolean available = platformModelCatalog != null ? catalogModel != null
+                : !connection.bailian() && AllowedModels.isAllowed(modelId);
+        boolean vision = catalogModel != null ? catalogModel.supportsVision() : AllowedModels.supportsVision(modelId);
+        if (!available || requiresVision && !vision)
+            throw new com.checkba.exception.FeatureNotConfiguredException("ai-aux-model",
+                    com.checkba.service.LangText.of("当前辅助模型不可用或不支持所需输入", "The auxiliary model is unavailable or does not support this input"));
+        ChatLanguageModel model = OpenAiChatModel.builder().apiKey(connection.apiKey())
+                .baseUrl(platformBaseUrl(connection)).modelName(modelId)
+                .timeout(remainingTimeout(timeout, started)).maxRetries(0).maxTokens(maxOutputTokens)
+                .logRequests(false).logResponses(false).build();
+        recordModelUse(AiModelProperties.Provider.AWD_CLOUD.name(), modelId, false);
+        return new PlatformChatModel(model, modelId);
+    }
+
     public record PlatformChatModel(ChatLanguageModel model, String modelId) {}
 
     /** One explicit writing request: bounded transport, no cache, no provider fallback. */

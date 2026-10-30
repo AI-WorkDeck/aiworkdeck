@@ -152,6 +152,75 @@ class VoiceDictationServiceTest {
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    void boundedCaptureSampleSendsAudioWithBudgetAndReturnsActualUsage(boolean domestic) throws Exception {
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        var received = new java.util.concurrent.atomic.AtomicReference<com.fasterxml.jackson.databind.JsonNode>();
+        var authorization = new java.util.concurrent.atomic.AtomicReference<String>();
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/chat/completions", exchange -> {
+            calls.incrementAndGet(); authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            received.set(mapper.readTree(exchange.getRequestBody()));
+            byte[] body = "{\"choices\":[{\"message\":{\"content\":\"仓库盘点\"}}],\"usage\":{\"prompt_tokens\":102,\"completion_tokens\":8}}"
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, body.length); exchange.getResponseBody().write(body); exchange.close();
+        });
+        server.start();
+        try {
+            var channel = mock(PlatformAiChannel.class); var gate = mock(PlatformCreditsGate.class);
+            var accountant = mock(PlatformUsageAccountant.class);
+            String endpoint = "http://127.0.0.1:" + server.getAddress().getPort();
+            when(channel.resolveFor(47L)).thenReturn(new PlatformAiKeyService.Resolved("test-user-47", "test", 1.0,
+                    domestic ? "bailian" : "openrouter", domestic ? endpoint : null, null));
+            var service = new VoiceDictationService(channel, gate, domestic ? "http://127.0.0.1:1/forbidden" : endpoint,
+                    "xiaomi/mimo-v2.5", accountant);
+            var result = service.transcribeSample(47L, Base64.getEncoder().encodeToString(new byte[16]), "wav", 30000,
+                    java.time.Duration.ofSeconds(2), 1200);
+            assertEquals("仓库盘点", result.text());
+            assertEquals(domestic ? "qwen3.8-omni-flash" : "xiaomi/mimo-v2.5", result.modelId());
+            assertEquals(result.modelId(), received.get().path("model").asText());
+            if (domestic) assertFalse(received.get().path("enable_thinking").asBoolean());
+            verify(channel).onKeyVerified(47L, "test");
+            assertEquals(102, result.tokenUsage().inputTokenCount()); assertEquals(8, result.tokenUsage().outputTokenCount());
+            assertEquals(1,calls.get()); assertEquals("Bearer test-user-47",authorization.get());
+            assertEquals(1200,received.get().path("max_tokens").asInt());
+            assertEquals("input_audio",received.get().path("messages").get(0).path("content").get(0).path("type").asText());
+            verify(gate).ensureCredits(47L); verify(accountant).ensureBaselineAsync(47L);
+            when(channel.usesMachineKey(48L)).thenReturn(true);
+            assertThrows(IllegalStateException.class,()->service.transcribeSample(48L,"AA==","wav",1,
+                    java.time.Duration.ofSeconds(2),1200));
+            assertEquals(1,calls.get()); verify(channel,never()).resolveFor(48L);
+        } finally { server.stop(0); }
+    }
+
+    @Test
+    void captureProviderFailureLogsStatusWithoutResponseContentAndDoesNotRetry() throws Exception {
+        var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(VoiceDictationService.class);
+        var events=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        events.start();logger.addAppender(events);
+        var calls=new java.util.concurrent.atomic.AtomicInteger();
+        var server=com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1",0),0);
+        server.createContext("/chat/completions",exchange->{
+            calls.incrementAndGet();exchange.getRequestBody().readAllBytes();
+            byte[] body="SENSITIVE_CAPTURE_PROVIDER_RESPONSE".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(500,body.length);exchange.getResponseBody().write(body);exchange.close();
+        });server.start();
+        try {
+            var channel=mock(PlatformAiChannel.class);
+            when(channel.resolveFor(47L)).thenReturn(new PlatformAiKeyService.Resolved("test-key","test",1.0));
+            var service=new VoiceDictationService(channel,mock(PlatformCreditsGate.class),
+                    "http://127.0.0.1:"+server.getAddress().getPort(),"xiaomi/mimo-v2.5",mock(PlatformUsageAccountant.class));
+            assertThrows(IllegalStateException.class,()->service.transcribeSample(47L,"AA==","wav",1000,
+                    java.time.Duration.ofSeconds(2),1200));
+            assertEquals(1,calls.get());
+            assertTrue(events.list.stream().anyMatch(event->event.getFormattedMessage().contains("status=500")));
+            assertFalse(events.list.stream().anyMatch(event->event.getFormattedMessage().contains("SENSITIVE_CAPTURE")));
+        } finally {server.stop(0);logger.detachAppender(events);events.stop();}
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
     void dictationRoutesCredentialsAndAudioToTheSelectedPlatform(boolean domestic) throws Exception {
         var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
         var observed = new java.util.concurrent.atomic.AtomicReference<com.fasterxml.jackson.databind.JsonNode>();
