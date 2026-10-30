@@ -48,16 +48,7 @@ jobs:
         working-directory: desktop
         timeout-minutes: 15
         run: npm test
-      - name: Run the exact formal-source control in a fresh profile
-        shell: bash
-        run: |
-          git show 1205dd1feb472d47c4cedde9faae1dc671c58ce5:desktop/tests/runtime-compat.electron.cjs > desktop/tests/runtime-capture-baseline.electron.cjs
-          mkdir "$RUNNER_TEMP/awd-runtime-control"
-          RUNNER_TEMP="$RUNNER_TEMP/awd-runtime-control" desktop/node_modules/.bin/electron desktop/tests/runtime-capture-baseline.electron.cjs
-      - name: Preserve the original capture and probe foreground/frame readiness
-        if: always() && steps.desktop-tests.outcome == 'success'
-        env:
-          AWD_RUNTIME_CAPTURE_DIAGNOSTIC: '1'
+      - name: Verify the fixed runtime probe as the first Electron process
         run: npm --prefix desktop run test:runtime-compat
       - name: Preserve all original and diagnostic evidence
         if: always()
@@ -69,5 +60,3 @@ jobs:
           path: |
             ${{ runner.temp }}/awd-runtime-compat-*/*.json
             ${{ runner.temp }}/awd-runtime-compat-*/*.png
-            ${{ runner.temp }}/awd-runtime-control/awd-runtime-compat-*/*.json
-            ${{ runner.temp }}/awd-runtime-control/awd-runtime-compat-*/*.png

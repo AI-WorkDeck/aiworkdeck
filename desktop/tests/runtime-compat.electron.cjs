@@ -1,19 +1,15 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Run with Electron. Uses only synthetic content and a fresh profile; no backend, account or clipboard.
-const { app, BrowserWindow, BrowserView, ipcMain, systemPreferences } = require('electron')
+const { app, BrowserWindow, BrowserView, ipcMain } = require('electron')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const http = require('node:http')
 const { once } = require('node:events')
-const { execFileSync } = require('node:child_process')
 const { createBrowserViewRegistry } = require('../main/browser-views')
 
-const captureDiagnostic = process.env.AWD_RUNTIME_CAPTURE_DIAGNOSTIC === '1'
-if (captureDiagnostic) assert.equal(process.platform, 'darwin', 'Capture diagnostics currently cover macOS only')
-const hostedDesktopCapture = process.env.GITHUB_ACTIONS === 'true' && process.env.RUNNER_ENVIRONMENT === 'github-hosted' && !!process.env.RUNNER_TEMP
 const root = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), 'awd-runtime-compat-'))
 const paths = {}
 for (const key of ['home', 'appData', 'userData', 'sessionData', 'documents', 'downloads', 'desktop', 'music', 'pictures', 'videos', 'logs', 'crashDumps', 'temp']) {
@@ -26,77 +22,6 @@ for (const key of ['home', 'appData', 'userData', 'sessionData', 'documents', 'd
 const failures = []
 const versions = { ...process.versions }
 const evidence = { root, versions, paths, checks: [] }
-const trace = (event, detail = {}) => {
-  if (captureDiagnostic) (evidence.captureEvents ||= []).push({ event, at: Date.now(), ...detail })
-}
-async function diagnoseCapture(win, view) {
-  const attempts = evidence.captureDiagnostics = []
-  const snapshot = () => {
-    const nativeView = win.contentView.children.find(child => child.webContents === view.webContents)
-    return {
-      window: { visible: win.isVisible(), focused: win.isFocused(), minimized: win.isMinimized(), bounds: win.getBounds() },
-      view: { attached: win.getBrowserViews().includes(view), nativeChild: !!nativeView, visible: nativeView?.getVisible() ?? null,
-        focused: view.webContents.isFocused(), bounds: view.getBounds(), url: view.webContents.getURL() },
-    }
-  }
-  const desktop = stage => {
-    if (!hostedDesktopCapture) { evidence.desktopCapture = 'Not run: full desktop screenshots require a disposable hosted runner'; return }
-    try { execFileSync('/usr/sbin/screencapture', ['-x', path.join(root, `capture-${stage}-desktop.png`)], { timeout: 10000 }) }
-    catch (error) { (evidence.desktopCaptureErrors ||= []).push({ stage, error: error.message }) }
-  }
-  const capture = async stage => {
-    const result = { stage, at: Date.now() }
-    attempts.push(result)
-    try {
-      // No renderer request or frame wait may precede the original capture.
-      const image = await view.webContents.capturePage()
-      assert.equal(image.isEmpty(), false)
-      fs.writeFileSync(path.join(root, `browser-view-${stage}.png`), image.toPNG())
-      result.size = image.getSize(); result.passed = true
-      return image
-    } catch (error) { result.error = error.stack || String(error); result.passed = false }
-    finally { result.completedAt = Date.now(); result.state = snapshot() }
-  }
-  const original = await capture('immediate')
-  // Preserve the desktop and state before any focus or repaint intervention.
-  fs.writeFileSync(path.join(root, 'capture-baseline.json'), JSON.stringify(attempts, null, 2))
-  desktop('baseline')
-  evidence.captureContext = { gpuFeatures: app.getGPUFeatureStatus(), screenPermission: systemPreferences.getMediaAccessStatus('screen'),
-    renderer: await view.webContents.executeJavaScript('({visibility:document.visibilityState,focused:document.hasFocus(),readyState:document.readyState,time:performance.now()})') }
-  try { evidence.captureContext.gpu = await app.getGPUInfo('basic') }
-  catch (error) { evidence.captureContext.gpuError = error.message }
-
-  win.show(); win.focus(); view.webContents.focus()
-  trace('foreground-intervention')
-  await capture('foreground')
-  desktop('foreground')
-  // A renderer rAF is not a compositor barrier. Require a real Viz frame whose
-  // pixels include a newly painted fixture marker, so an old frame cannot pass.
-  try {
-    await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('No captured frame with the new marker')), 10000)
-      view.webContents.beginFrameSubscription(false, image => {
-        const pixel = image.crop({ x: 8, y: 8, width: 1, height: 1 }).toBitmap()
-        trace('captured-frame', { size: image.getSize(), pixel: [...pixel.subarray(0, 4)] })
-        if (pixel.length < 4 || pixel[0] !== 0 || pixel[1] !== 0 || pixel[2] !== 0 || pixel[3] !== 255) return
-        clearTimeout(timer)
-        fs.writeFileSync(path.join(root, 'capture-frame-marker.png'), image.toPNG())
-        resolve()
-      })
-      view.webContents.executeJavaScript(`(()=>{const marker=document.createElement('div');marker.id='capture-marker';marker.style.cssText='position:fixed;left:0;top:0;width:24px;height:24px;background:rgb(0,0,0);z-index:2147483647';document.body.append(marker)})()`).catch(error => { clearTimeout(timer); reject(error) })
-    })
-    evidence.frameMarkerObserved = true
-    await capture('after-frame')
-    desktop('after-frame')
-  } catch (error) { evidence.frameProbeError = error.stack || String(error) }
-  finally { view.webContents.endFrameSubscription() }
-  evidence.diagnosticOnly = true
-  // A recovered diagnostic capture must never turn the original failure green.
-  assert.ok(original, 'Original immediate capture failed; later captures are diagnostic only')
-  assert.equal(evidence.frameMarkerObserved, true, 'Diagnostic frame marker was not captured')
-  assert.ok(attempts.every(result => result.passed), 'A diagnostic capture failed')
-  return original
-}
 const fail = error => {
   evidence.passed = false
   evidence.error = error.stack || String(error)
@@ -108,7 +33,6 @@ const fail = error => {
 process.on('uncaughtException', fail)
 process.on('unhandledRejection', fail)
 app.on('render-process-gone', (_event, contents, details) => failures.push({ url: contents.getURL(), ...details }))
-app.on('child-process-gone', (_event, details) => trace('child-process-gone', details))
 app.on('web-contents-created', (_event, contents) => {
   contents.on('preload-error', (_event, preloadPath, error) => failures.push({ preloadPath, error: error.message }))
 })
@@ -141,8 +65,6 @@ app.whenReady().then(async () => {
   const win = new BrowserWindow({ show: true, width: 700, height: 500,
     webPreferences: { preload: path.resolve(__dirname, '../preload/preload.js'), sandbox: true, contextIsolation: true,
       nodeIntegration: false, backgroundThrottling: false, additionalArguments: [`--checkba-api-base=${base}`, '--checkba-system-memory=8589934592'] } })
-  for (const event of ['ready-to-show', 'show', 'focus', 'blur']) win.on(event, () => trace(`window-${event}`))
-  win.webContents.on('did-finish-load', () => trace('window-did-finish-load'))
   const views = createBrowserViewRegistry({ getWindow: () => win,
     createView: () => new BrowserView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } }) })
   ipcMain.handle('checkba:ui-confirm', (event, payload) => {
@@ -196,7 +118,6 @@ app.whenReady().then(async () => {
     mark('cross-origin isolation, WebAssembly and shared-memory worker')
 
     const { view } = views.ensure('smoke')
-    view.webContents.on('did-finish-load', () => trace('view-did-finish-load', { url: view.webContents.getURL() }))
     views.setBounds('smoke', { x: 20, y: 20, width: 620, height: 380 })
     assert.equal(views.attach('smoke'), true)
     assert.ok(win.getBrowserViews().includes(view))
@@ -221,8 +142,30 @@ app.whenReady().then(async () => {
     view.webContents.goForward()
     await loaded
     assert.equal(await view.webContents.executeJavaScript('document.querySelector("h1").textContent'), 'Second page')
-    const screenshot = captureDiagnostic ? await diagnoseCapture(win, view) : await view.webContents.capturePage()
+    // A completed navigation does not guarantee that Viz has drawn its surface.
+    // Observe a new fixture frame before exercising the separate capturePage path.
+    const hasFrameMarker = image => {
+      if (image.isEmpty()) return false
+      const marker = image.crop({ x: 8, y: 8, width: 1, height: 1 }).toBitmap()
+      const background = image.crop({ x: 80, y: 8, width: 1, height: 1 }).toBitmap()
+      return marker.equals(Buffer.from([0, 0, 0, 255])) && background.length === 4 &&
+        background[1] > background[0] && background[1] > background[2] && background[3] === 255
+    }
+    let frameDeadline
+    try {
+      await new Promise((resolve, reject) => {
+        frameDeadline = setTimeout(() => reject(new Error('BrowserView fixture frame was not drawn')), 10000)
+        view.webContents.beginFrameSubscription(false, image => { if (hasFrameMarker(image)) resolve() })
+        view.webContents.executeJavaScript(`(()=>{const marker=document.createElement('div');marker.style.cssText='position:fixed;left:0;top:0;width:24px;height:24px;background:black;z-index:2147483647';document.body.append(marker)})()`).catch(reject)
+      })
+      evidence.browserViewFrameObserved = true
+    } finally {
+      clearTimeout(frameDeadline)
+      view.webContents.endFrameSubscription()
+    }
+    const screenshot = await view.webContents.capturePage()
     assert.equal(screenshot.isEmpty(), false)
+    assert.ok(hasFrameMarker(screenshot), 'capturePage must include the newly drawn fixture marker and page background')
     fs.writeFileSync(path.join(root, 'browser-view.png'), screenshot.toPNG())
     mark('production BrowserView registry attach, hide, restore, retained state and history')
 
