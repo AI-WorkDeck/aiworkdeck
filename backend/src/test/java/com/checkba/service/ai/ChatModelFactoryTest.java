@@ -62,6 +62,30 @@ class ChatModelFactoryTest {
     }
 
     @Test
+    void captureAuxiliaryUsesAccountPlatformAndExactAuxiliaryEvenWithLocalChat() {
+        setDbProvider("OLLAMA");
+        when(platformAiChannel.apiKey()).thenReturn("synthetic-per-user-key");
+        var chosen=PlatformAiUserScope.call(7L,()->factory.getPlatformAuxChatModel(java.time.Duration.ofSeconds(3),700,true));
+        assertEquals(AllowedModels.QWEN_3_7_FLASH.getModelId(),chosen.modelId());
+        assertInstanceOf(OpenAiChatModel.class,chosen.model());
+        assertEquals(chosen.modelId(),((OpenAiChatModel)chosen.model()).modelName());
+        verify(creditsGate).ensureCredits(7L);verify(usageAccountant).ensureBaselineAsync(7L);
+        assertNull(PlatformAiUserScope.current());
+    }
+
+    @Test
+    void captureAuxiliaryRejectsMissingIdentityMachineKeyAndUnsupportedVisionWithoutFallback() {
+        var timeout=java.time.Duration.ofSeconds(3);
+        assertThrows(com.checkba.service.account.AccountException.class,()->factory.getPlatformAuxChatModel(timeout,700,true));
+        when(platformAiChannel.usesMachineKey(7L)).thenReturn(true);
+        assertThrows(com.checkba.service.account.AccountException.class,()->PlatformAiUserScope.call(7L,()->factory.getPlatformAuxChatModel(timeout,700,true)));
+        when(platformAiChannel.usesMachineKey(7L)).thenReturn(false);
+        when(systemSettingService.get(eq("ai.auxModel"),any())).thenReturn("deepseek/deepseek-v4-flash");
+        assertThrows(com.checkba.exception.FeatureNotConfiguredException.class,()->PlatformAiUserScope.call(7L,()->factory.getPlatformAuxChatModel(timeout,700,true)));
+        verify(platformAiChannel,never()).apiKey();verifyNoInteractions(creditsGate);
+    }
+
+    @Test
     void automaticWritingUsesDefaultModelWhileManualWritingKeepsAuxiliary() {
         setDbProvider("OPENROUTER");
         when(systemSettingService.get(eq("ai.defaultModel"), any())).thenReturn("deepseek/deepseek-v4-flash");

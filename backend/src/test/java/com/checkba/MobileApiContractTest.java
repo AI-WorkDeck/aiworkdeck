@@ -89,6 +89,135 @@ class MobileApiContractTest {
     @Autowired private com.checkba.service.mobile.MobileMediaMoveService mediaMoves;
     @Autowired private com.checkba.repository.MobileMediaMoveRepository mediaMoveRepository;
     @Autowired private com.checkba.repository.MobileMediaInboxRepository mediaInboxRepository;
+    @MockBean private com.checkba.service.mobile.MobileCaptureOrganizationEngine captureEngine;
+    @Autowired private com.checkba.service.mobile.MobileCaptureOrganizationService captureOrganization;
+    @Autowired private com.checkba.repository.MobileCaptureOrganizationRepository organizationRecords;
+    @Autowired private com.checkba.repository.ProjectFileRepository projectFiles;
+    @Autowired private com.checkba.service.FileTagService fileTags;
+
+    @Test
+    void captureOrganizationIsOptInOwnedAndStableAcrossRetriesAndStatus() throws Exception {
+        String sid=register("organize_"+System.nanoTime());
+        Long user=com.checkba.controller.AuthController.getUserIdFromSession(sid);
+        String id=java.util.UUID.randomUUID().toString();
+        byte[] bytes="unaltered source image".getBytes(StandardCharsets.UTF_8);
+        relayStore.replaceDirectory(user,"organize-device","Device",List.of(new MobileRelayStoreService.DirEntry("42","Fixture")));
+        var disabled=multipart("/api/mobile/media").file(new MockMultipartFile("file","original.jpg","image/jpeg",bytes))
+                .param("deviceId","organize-device").param("projectKey","42").param("clientMediaId",java.util.UUID.randomUUID().toString())
+                .param("fileName","original.jpg").param("mediaType","image").header("X-Session-Id",sid);
+        mvc.perform(disabled).andExpect(jsonPath("$.code").value(0)).andExpect(jsonPath("$.organization").doesNotExist()).andExpect(openApi().isValid(validator));
+        org.mockito.Mockito.verifyNoInteractions(captureEngine);
+        when(captureEngine.analyze(eq(user),any(),eq("original.jpg"),eq("image"),any())).thenReturn(
+                new com.checkba.service.mobile.MobileCaptureOrganizationEngine.Result("ready","营业执照_AB123_示例公司.jpg",List.of("营业执照"),Map.of("identifier","AB123","identifierKind","registration_number")));
+        var enabled=multipart("/api/mobile/media").file(new MockMultipartFile("file","original.jpg","image/jpeg",bytes))
+                .param("deviceId","organize-device").param("projectKey","42").param("clientMediaId",id)
+                .param("fileName","original.jpg").param("mediaType","image").param("organize","true").header("X-Session-Id",sid);
+        var reply=mvc.perform(enabled).andExpect(jsonPath("$.organization.state").value("ready"))
+                .andExpect(jsonPath("$.organization.originalName").value("original.jpg"))
+                .andExpect(jsonPath("$.organization.tags[0]").value("营业执照")).andExpect(openApi().isValid(validator)).andReturn();
+        long inboxId=om.readTree(reply.getResponse().getContentAsString()).path("id").asLong();
+        mvc.perform(enabled).andExpect(jsonPath("$.id").value(inboxId)).andExpect(openApi().isValid(validator));
+        org.mockito.Mockito.verify(captureEngine,org.mockito.Mockito.times(1)).analyze(eq(user),any(),eq("original.jpg"),eq("image"),any());
+        mvc.perform(get("/api/mobile/inbox").param("deviceId","organize-device").header("X-Session-Id",sid))
+                .andExpect(openApi().isValid(validator)).andExpect(jsonPath("$[1].organization.state").value("ready"));
+        mvc.perform(get("/api/mobile/inbox/"+inboxId+"/content").header("X-Session-Id",sid)).andExpect(content().bytes(bytes));
+        mvc.perform(get("/api/mobile/media/status").param("clientMediaIds",id).header("X-Session-Id",sid))
+                .andExpect(jsonPath("$[0].organization.archiveName").value("营业执照_AB123_示例公司-"+id.substring(0,8)+".jpg"))
+                .andExpect(openApi().isValid(validator));
+        String other=register("organize_other_"+System.nanoTime());
+        mvc.perform(multipart("/api/mobile/media").file(new MockMultipartFile("file","original.jpg","image/jpeg",bytes))
+                .param("deviceId","organize-device").param("projectKey","42").param("clientMediaId",java.util.UUID.randomUUID().toString())
+                .param("fileName","original.jpg").param("mediaType","image").param("organize","true").header("X-Session-Id",other))
+                .andExpect(jsonPath("$.code").value(1)).andExpect(openApi().isValid(validator));
+        org.mockito.Mockito.verify(captureEngine,org.mockito.Mockito.times(1)).analyze(any(),any(),any(),any(),any());
+    }
+
+    @Test
+    void captureOrganizationConcurrentAndInterruptedAttemptsNeverBuyAnotherCall() throws Exception {
+        String sid=register("organize_race_"+System.nanoTime());Long user=com.checkba.controller.AuthController.getUserIdFromSession(sid);
+        relayStore.replaceDirectory(user,"device","Device",List.of(new MobileRelayStoreService.DirEntry("42","Fixture")));
+        String id=java.util.UUID.randomUUID().toString();
+        var file=new MockMultipartFile("file","source.m4a","audio/mp4",new byte[]{1,2,3});
+        var entered=new java.util.concurrent.CountDownLatch(1);var release=new java.util.concurrent.CountDownLatch(1);
+        when(captureEngine.analyze(eq(user),any(),any(),any(),any())).thenAnswer(call->{
+            entered.countDown();release.await(5,java.util.concurrent.TimeUnit.SECONDS);
+            return new com.checkba.service.mobile.MobileCaptureOrganizationEngine.Result("failed","source.m4a",List.of(),Map.of());
+        });
+        var first=java.util.concurrent.CompletableFuture.supplyAsync(()->captureOrganization.prepare(user,"device","42",id,"source.m4a","audio",null,file,true));
+        try {
+            assertTrue(entered.await(5,java.util.concurrent.TimeUnit.SECONDS));
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,()->captureOrganization.prepare(user,"device","42",id,"source.m4a","audio",null,file,false));
+        } finally { release.countDown(); }
+        org.junit.jupiter.api.Assertions.assertEquals("failed",first.get(5,java.util.concurrent.TimeUnit.SECONDS).get("state"));
+        org.junit.jupiter.api.Assertions.assertEquals("failed",captureOrganization.prepare(user,"device","42",id,"source.m4a","audio",null,file,true).get("state"));
+        var renamedRetry=captureOrganization.prepare(user,"device","42",id,"现场录音.m4a","audio",null,file,true);
+        org.junit.jupiter.api.Assertions.assertEquals("source.m4a",renamedRetry.get("originalName"),"语言切换不是采集身份变化，保留首次原名");
+        org.mockito.Mockito.verify(captureEngine,org.mockito.Mockito.times(1)).analyze(any(),any(),any(),any(),any());
+        String interrupted=java.util.UUID.randomUUID().toString();
+        var row=new com.checkba.model.entity.MobileCaptureOrganization();row.setUserId(user);row.setClientMediaId(interrupted);
+        row.setDeviceId("device");row.setProjectKey("42");row.setOriginalName("source.m4a");row.setFileName("source.m4a");row.setMediaType("audio");row.setFileSize(3);
+        row.setState("processing");row.setRuleVersion("2026-10-30");row.setStartedAt(LocalDateTime.now().minusMinutes(5));organizationRecords.saveAndFlush(row);
+        org.junit.jupiter.api.Assertions.assertEquals("failed",captureOrganization.prepare(user,"device","42",interrupted,"source.m4a","audio",null,file,true).get("state"));
+        org.mockito.Mockito.verify(captureEngine,org.mockito.Mockito.times(1)).analyze(any(),any(),any(),any(),any());
+        // Legacy plugin mirroring does not acquire a decision row or impose new UUID/name/size rules.
+        org.junit.jupiter.api.Assertions.assertNull(captureOrganization.prepare(user,"device","42","legacy-document-id","draft.docx","document",null,file,true));
+    }
+
+    @Test
+    void organizedCloudAudioKeepsBytesAndAttachesExistingTagsAndOriginalName() throws Exception {
+        String sid=register("organize_cloud_"+System.nanoTime());Long user=com.checkba.controller.AuthController.getUserIdFromSession(sid);
+        AccountBinding binding=new AccountBinding();binding.setUserId(user);binding.setExternalAccountId("organize-cloud-"+user);binding.setCreatedAt(LocalDateTime.now());accountBindingRepository.save(binding);
+        when(billing.balance(anyString())).thenReturn(new MobileBillingClient.BalanceResult(0L,"CNY","paid",
+                Map.of("active",true,"expiresAt","2030-01-01T00:00:00Z","cloudStorageBytes",3L*1024*1024*1024)));
+        var project=mvc.perform(post("/api/projects").header("X-Session-Id",sid).contentType(APPLICATION_JSON)
+                .content("{\"projectType\":\"BLANK\",\"name\":\"Organized cloud fixture\"}")).andReturn();
+        long projectId=om.readTree(project.getResponse().getContentAsString()).path("id").asLong();
+        String id=java.util.UUID.randomUUID().toString();byte[] bytes="original unmodified recording".getBytes(StandardCharsets.UTF_8);
+        when(captureEngine.analyze(eq(user),any(),any(),eq("audio"),any())).thenReturn(new com.checkba.service.mobile.MobileCaptureOrganizationEngine.Result(
+                "ready","设备交接_2026-10-30.m4a",List.of("录音","设备交接"),Map.of("coverage","audio_prefix_30s")));
+        var upload=multipart("/api/mobile/media").file(new MockMultipartFile("file","recording.m4a","audio/mp4",bytes))
+                .param("deviceId","cloud").param("projectKey",String.valueOf(projectId)).param("clientMediaId",id)
+                .param("fileName","recording.m4a").param("mediaType","audio").param("organize","true").header("X-Session-Id",sid);
+        var response=mvc.perform(upload).andExpect(jsonPath("$.organization.state").value("ready")).andExpect(openApi().isValid(validator)).andReturn();
+        var body=om.readTree(response.getResponse().getContentAsString(StandardCharsets.UTF_8));long fileId=body.path("fileId").asLong();
+        var archived=projectFiles.findById(fileId).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals(archived.getName(),body.path("organization").path("archiveName").asText());
+        org.junit.jupiter.api.Assertions.assertEquals("recording.m4a",om.readTree(archived.getMetaJson()).path("captureOrganization").path("originalName").asText());
+        org.junit.jupiter.api.Assertions.assertEquals(2,fileTags.getTagsByFileId(fileId).size());
+        mvc.perform(upload).andExpect(jsonPath("$.fileId").value(fileId));
+        org.junit.jupiter.api.Assertions.assertEquals(2,fileTags.getTagsByFileId(fileId).size());
+        mvc.perform(get("/api/mobile/catalog/"+body.path("projectUid").asText()+"/files/"+body.path("fileUid").asText()+"/content")
+                .header("X-Session-Id",sid)).andExpect(content().bytes(bytes));
+        org.mockito.Mockito.verify(captureEngine,org.mockito.Mockito.times(1)).analyze(any(),any(),any(),any(),any());
+    }
+
+    @Test
+    void movingOrganizedCaptureCopiesFrozenMetadataWithoutAnotherPaidRequest() throws Exception {
+        String sid=register("organize_move_"+System.nanoTime());Long user=com.checkba.controller.AuthController.getUserIdFromSession(sid);
+        relayStore.replaceDirectory(user,"source","Source",List.of(new MobileRelayStoreService.DirEntry("41","Source")));
+        relayStore.replaceDirectory(user,"target","Target",List.of(new MobileRelayStoreService.DirEntry("42","Target")));
+        byte[] bytes="organized move bytes".getBytes(StandardCharsets.UTF_8);
+        String source=java.util.UUID.randomUUID().toString(),target=java.util.UUID.randomUUID().toString();
+        var file=new MockMultipartFile("file","source.jpg","image/jpeg",bytes);
+        when(captureEngine.analyze(eq(user),any(),any(),any(),any())).thenReturn(new com.checkba.service.mobile.MobileCaptureOrganizationEngine.Result(
+                "ready","现场照片_设备.jpg",List.of("现场照片"),Map.of("coverage","image")));
+        var organized=captureOrganization.prepare(user,"source","41",source,"source.jpg","image",null,file,true);
+        relayStore.storeMedia(user,"source","41",source,String.valueOf(organized.get("fileName")),"image",LocalDateTime.now(),bytes.length,new java.io.ByteArrayInputStream(bytes));
+        String sha=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        mediaMoves.register(user,new com.checkba.service.mobile.MobileMediaMoveService.Request(java.util.UUID.randomUUID().toString(),
+                source,target,"source","41","target","42",sha,bytes.length));
+        var upload=multipart("/api/mobile/media").file(file).param("deviceId","target").param("projectKey","42").param("clientMediaId",target)
+                .param("fileName","Site photo.jpg").param("mediaType","image").param("organize","false").header("X-Session-Id",sid);
+        mvc.perform(upload).andExpect(jsonPath("$.organization.state").value("ready"))
+                .andExpect(jsonPath("$.organization.originalName").value("source.jpg"))
+                .andExpect(jsonPath("$.organization.tags[0]").value("现场照片"))
+                .andExpect(jsonPath("$.organization.archiveName").value("现场照片_设备-"+target.substring(0,8)+".jpg"))
+                .andExpect(openApi().isValid(validator));
+        mvc.perform(upload).andExpect(jsonPath("$.organization.state").value("ready"));
+        org.mockito.Mockito.verify(captureEngine,org.mockito.Mockito.times(1)).analyze(any(),any(),any(),any(),any());
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,()->captureOrganization.prepare(user,"target","42",target,
+                "Site photo.jpg","image",null,new MockMultipartFile("file","source.jpg","image/jpeg",new byte[bytes.length]),false));
+    }
 
     @Test
     void archiveMovesRequireVerifiedTargetThenOriginalAckAndFenceRetries() throws Exception {

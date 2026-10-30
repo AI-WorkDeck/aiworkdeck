@@ -52,7 +52,8 @@ public class OpenEntityManagerInViewConfig implements WebMvcConfigurer {
             // Synchronous model calls can hold a request for minutes; do not pin a pooled JDBC
             // connection through chat or summary generation. Repository calls use their own transactions.
             "/api/mobile/assistant/chat",
-            "/api/mobile/assistant/snapshots"
+            "/api/mobile/assistant/snapshots",
+            "/api/mobile/media"
     };
 
     @Bean

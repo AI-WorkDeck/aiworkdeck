@@ -117,6 +117,8 @@ class AccountDeletionServiceTest {
     @DisplayName("该删的一样不落：blob、四张手机端表、会话、绑定、令牌、账号本身")
     void deletesEverythingOwnedByTheUser() {
         Fixture f = fixture(List.of(item("relay/a.bin"), item("relay/b.bin")));
+        var organized=mock(com.checkba.repository.MobileCaptureOrganizationRepository.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(f.svc(),"captureOrganizations",organized);
 
         f.svc().deleteAccount(7L);
 
@@ -132,6 +134,7 @@ class AccountDeletionServiceTest {
         verify(f.completions()).deleteByScopeKey("u:7");
         verify(f.completions(), never()).deleteByScopeKey("p:7");
         verify(f.users()).deleteById(7L);
+        verify(organized).deleteByUserId(7L);
         InOrder cleanupOrder = inOrder(f.entityManager(), f.completions(), f.users());
         cleanupOrder.verify(f.entityManager()).find(User.class, 7L, LockModeType.PESSIMISTIC_WRITE);
         cleanupOrder.verify(f.completions()).deleteByScopeKey("u:7");
