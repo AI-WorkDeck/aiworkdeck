@@ -54,8 +54,35 @@ class PptxToolsTest {
 
     @Test
     void retiredQwenSelectionUsesCurrentProviderId() {
+        when(chatModelFactory.resolveEffectiveModelId("qwen/qwen3.8-max")).thenReturn("qwen/qwen3.8-max-0902");
         org.junit.jupiter.api.Assertions.assertEquals("qwen/qwen3.8-max-0902",
                 pptxTools.buildModelConfig("qwen/qwen3.8-max").getTextModel());
+    }
+
+    @Test
+    void domesticPptUsesScopedGatewayAndBailianImageModel() {
+        when(chatModelFactory.resolveProvider()).thenReturn(AiModelProperties.Provider.AWD_CLOUD);
+        when(chatModelFactory.resolveEffectiveModelId("qwen3.8-flash")).thenReturn("qwen3.8-flash");
+        when(platformAiChannel.apiKey()).thenReturn("awdai_synthetic");
+        when(platformAiChannel.isBailian()).thenReturn(true);
+        when(platformAiChannel.baseUrl(anyString())).thenReturn("https://www.aiworkdeck.com/api/account/ai/v1");
+        var config = pptxTools.buildModelConfig("qwen3.8-flash");
+        org.junit.jupiter.api.Assertions.assertEquals("qwen3.8-flash", config.getTextModel());
+        org.junit.jupiter.api.Assertions.assertEquals("qwen-image-3.0", config.getImageModel());
+        org.junit.jupiter.api.Assertions.assertEquals("https://www.aiworkdeck.com/api/account/ai/v1", config.getApiBase());
+        org.junit.jupiter.api.Assertions.assertEquals("awdai_synthetic", config.getApiKey());
+        verify(chatModelFactory, never()).resolveOpenRouterApiKey();
+    }
+
+    @Test
+    void internationalPptKeepsExistingImageProvider() {
+        when(chatModelFactory.resolveProvider()).thenReturn(AiModelProperties.Provider.AWD_CLOUD);
+        when(chatModelFactory.resolveEffectiveModelId(null)).thenReturn("deepseek/deepseek-v4");
+        when(platformAiChannel.apiKey()).thenReturn("synthetic-openrouter-key");
+        when(platformAiChannel.baseUrl(anyString())).thenReturn("https://openrouter.ai/api/v1");
+        var config = pptxTools.buildModelConfig(null);
+        org.junit.jupiter.api.Assertions.assertEquals(PptxServiceClient.IMAGE_MODEL, config.getImageModel());
+        org.junit.jupiter.api.Assertions.assertEquals("https://openrouter.ai/api/v1", config.getApiBase());
     }
 
     @TempDir
@@ -71,6 +98,7 @@ class PptxToolsTest {
         EditorBridgeService editorBridgeService = mock(EditorBridgeService.class);
         StorageServiceFactory storageServiceFactory = mock(StorageServiceFactory.class);
         com.checkba.config.AiModelProperties aiModelProperties = mock(AiModelProperties.class);
+        when(aiModelProperties.getOpenRouter()).thenReturn(new AiModelProperties.OpenRouter());
         backgroundTaskService = mock(BackgroundTaskService.class);
         chatModelFactory = mock(ChatModelFactory.class);
         when(chatModelFactory.resolveProvider()).thenReturn(AiModelProperties.Provider.OPENROUTER);

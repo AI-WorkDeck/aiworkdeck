@@ -78,7 +78,10 @@ public class AiModelCatalogController {
             return ResponseEntity.status(401).body(com.checkba.service.LangText.of("请先登录", "Please sign in first"));
         }
 
-        AllowedModels.Region region = networkRegionService.effectiveRegion();
+        if (chatModelFactory.usesProviderCatalog()) {
+            return com.checkba.service.ai.PlatformAiUserScope.call(userId, () -> providerModels());
+        }
+        AllowedModels.Region region = AllowedModels.Region.INTERNATIONAL;
 
         // Billing and image support follow the actual route for this cloud catalogue.
         // An implicit Ollama default still permits cloud selections through BYOK.
@@ -131,12 +134,46 @@ public class AiModelCatalogController {
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("networkRegion", region.name());
-        body.put("networkRegionMode", networkRegionService.mode());
-        body.put("networkRegionBasis", networkRegionService.detectionBasis());
+        body.put("networkRegionMode", "provider");
+        body.put("networkRegionBasis", "");
         // 默认模型必须由工厂解析：DB 的 ai.defaultModel 优先于 yml，
         // 前端自己挑「清单第一条」会和实际发出去的模型不一致
         body.put("defaultModel", chatModelFactory.resolveDefaultModel());
         body.put("priceDisplay", priceDisplay(provider, rate));
+        body.put("models", models);
+        return ResponseEntity.ok(body);
+    }
+
+    private ResponseEntity<?> providerModels() {
+        com.checkba.service.ai.PlatformModelCatalog.Catalog catalog = chatModelFactory.platformCatalog();
+        boolean domestic = "bailian".equals(catalog.provider());
+        ModelPriceDisplayService.ChargedRate rate = domestic || priceDisplayService == null ? null : priceDisplayService.currentRate();
+        double factor = domestic ? catalog.marginMultiplier() : rate == null ? 1 : rate.factor();
+        List<Map<String, Object>> models = new ArrayList<>();
+        for (var m : catalog.models()) {
+            Map<String, Object> dto = new LinkedHashMap<>();
+            dto.put("id", m.id()); dto.put("name", m.name()); dto.put("vendor", m.vendor());
+            dto.put("aliases", List.of()); dto.put("region", "GLOBAL");
+            dto.put("contextLength", m.contextLength()); dto.put("maxOutputTokens", m.maxOutputTokens());
+            dto.put("vision", m.supportsVision()); dto.put("tools", m.supportsTools());
+            dto.put("inputPricePerM", m.inputPricePerMillion()); dto.put("outputPricePerM", m.outputPricePerMillion());
+            dto.put("tiered", m.tiered());
+            dto.put("displayInputPerM", roundPrice(m.inputPricePerMillion() * factor));
+            dto.put("displayOutputPerM", roundPrice(m.outputPricePerMillion() * factor));
+            double weighted = (m.inputPricePerMillion() * .8 + m.outputPricePerMillion() * .2);
+            dto.put("priceLevel", domestic ? (weighted <= 2 ? 1 : weighted <= 7 ? 2 : weighted <= 21 ? 3 : 4)
+                    : (weighted <= .3 ? 1 : weighted <= 1 ? 2 : weighted <= 3 ? 3 : 4));
+            models.add(dto);
+        }
+        Map<String, Object> display = new LinkedHashMap<>(priceDisplay(AiModelProperties.Provider.AWD_CLOUD, rate));
+        if (domestic) {
+            display.put("currency", "CNY"); display.put("basis", "charged"); display.put("factor", factor);
+            display.put("exchangeRate", 1); display.put("marginMultiplier", factor);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("provider", catalog.provider()); body.put("networkRegion", "GLOBAL");
+        body.put("networkRegionMode", "provider"); body.put("networkRegionBasis", "");
+        body.put("defaultModel", chatModelFactory.resolveDefaultModel()); body.put("priceDisplay", display);
         body.put("models", models);
         return ResponseEntity.ok(body);
     }

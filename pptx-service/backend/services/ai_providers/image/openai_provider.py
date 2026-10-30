@@ -51,6 +51,7 @@ class OpenAIImageProvider(ImageProvider):
             max_retries=0  # Never automatically repeat a potentially billed image request.
         )
         self.api_base = api_base or ""
+        self.is_platform = api_key.startswith("awdai_")
         self.model = model
     
     def _encode_image_to_base64(self, image: Image.Image) -> str:
@@ -90,7 +91,7 @@ class OpenAIImageProvider(ImageProvider):
         # OpenRouter uses image_config, not the legacy proxy generationConfig.
         from urllib.parse import urlparse
         endpoint = urlparse(self.api_base)
-        if endpoint.hostname == "openrouter.ai" or (
+        if self.is_platform or endpoint.hostname == "openrouter.ai" or (
             endpoint.hostname == "addin.workdeck.ai"
             and endpoint.path.rstrip('/') == "/openrouter-relay/api/v1"
         ):
@@ -190,7 +191,7 @@ class OpenAIImageProvider(ImageProvider):
             message = field(field(response, 'choices')[0], 'message')
             from urllib.parse import urlparse
             endpoint = urlparse(self.api_base)
-            is_openrouter = endpoint.hostname == "openrouter.ai" or (
+            is_openrouter = self.is_platform or endpoint.hostname == "openrouter.ai" or (
                 endpoint.hostname == "addin.workdeck.ai"
                 and endpoint.path.rstrip('/') == "/openrouter-relay/api/v1"
             )
