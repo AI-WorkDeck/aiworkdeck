@@ -38,7 +38,9 @@ export function createLitigationGeneration({ stream, api, storage, isCurrent, op
   const requireCurrent = () => { if (!current()) throw new Error(text('contextChanged')) }
   const transcript = () => stream.bubbles.value.map(bubble => ({ role: bubble.role,
     content: bubble.role === 'USER' ? bubble.displayContent || ''
-      : [bubble.content, bubble.question?.text].filter(Boolean).join('\n\n').trim()
+      : [bubble.content, bubble.question?.text || checkpointQuestion(bubble)?.text,
+        ...(bubble.artifacts || []).filter(artifact => ['implementation_plan', 'plan'].includes(artifact.type))
+          .map(artifact => artifact.data?.content)].filter(Boolean).join('\n\n').trim()
   })).filter(message => message.content)
   const view = () => task ? copy({ messages: transcript(), taskId: task.id, phase: task.phase, message: task.message || '',
     question: task.question || null, startedAt: task.startedAt, resultFileId: task.resultFileId || null }) : { phase: 'idle' }
