@@ -15,14 +15,13 @@
 //       （打包版常驻即可）；冷启动联调可用新 jar 在 9797 顶班
 //       （SPRING_PROFILES_ACTIVE=desktop + 隔离 user.home/H2/cwd）。
 //
-//       **裸 jar 顶班时必须补两样内置资源，否则会打出两条像回归的假失败**
-//       （2026-08-29 发 v0.27.3 时踩到，排查了一轮才发现是跑法缺件）：
-//         AI_SKILLS_BUILTIN_DIR=<repo>/backend/skills   # 内置 skill（脱敏/语音合成/会议录音…）
-//         cp -R <repo>/backend/plugins <cwd>/plugins    # ai.plugins.dir 是相对 cwd 的
-//       这两样在打包态由安装包的 Resources/ 提供，裸 jar 不带。缺了的话
-//       `/api/skills/list` 返回 `[]`，于是「广场安装（启用）脱敏后入口出现」与
-//       「语音面板里是两个 tab」必然超时失败——**症状长得像 UI 回归，其实是环境缺件**。
-//       判断方法：先 `curl <backend>/api/skills/list`，空数组就是这个坑。
+//       **裸 jar 顶班必须与桌面启动环境一样提供内置资源及宿主版本**：
+//         AI_SKILLS_BUILTIN_DIR=<repo>/backend/skills
+//         AI_PLUGINS_BUNDLED_DIR=<repo>/official-plugins
+//         AWD_APP_VERSION=<desktop/package.json 的 version>
+//       缺资源会让 skill 列表或插件入口缺失；缺宿主版本可能让插件被判不兼容。
+//       先检查 `/api/skills/list` 与 `/api/plugins/list`，后者应包含兼容的
+//       search、voice、desensitize、clipboard。不要复制已不存在的 backend/plugins。
 //
 //       **冷启动的新后端不需要任何解锁起点**（dev-board#1027 登录后置之后）：
 //       全新 user.home 起来的后端是 mode=none、未连账户、ai.activeProvider=AWD_CLOUD
@@ -1137,7 +1136,7 @@ try {
     try {
       await mouseClickSel('[title="插件中心"]')
       const row = await page.waitForFunction(() => [...document.querySelectorAll('.msb .msb-row-name')]
-        .find(el => el.innerText.trim() === '脱敏'), { timeout: 15000 })
+        .find(el => el.innerText.trim() === '文件脱敏'), { timeout: 15000 })
       await row.asElement().click()
       await page.waitForSelector('.mdp .awd-switch', { visible: true, timeout: 15000 })
       if (!original.enabled) {
