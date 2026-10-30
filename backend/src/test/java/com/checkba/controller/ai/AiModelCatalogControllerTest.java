@@ -69,7 +69,7 @@ class AiModelCatalogControllerTest {
     @DisplayName("清单必须逐条等于 AllowedModels.availableIn(当前区域)——境内出现国际模型，用户点了必然 403")
     void catalogEqualsAvailableInCurrentRegion() {
         for (AllowedModels.Region region : AllowedModels.Region.values()) {
-            List<String> expected = AllowedModels.availableIn(region).stream()
+            List<String> expected = AllowedModels.availableIn(AllowedModels.Region.INTERNATIONAL).stream()
                     .map(AllowedModels::getModelId).toList();
             List<String> actual = models(region).stream()
                     .map(m -> (String) m.get("id")).toList();

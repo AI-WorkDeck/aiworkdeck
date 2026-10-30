@@ -185,12 +185,12 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
     public OpenRouterStreamingChatModel(String apiKey, String baseUrl, String modelName, Duration timeout,
                                         int maxRequestsPerHost, String reasoningEffort,
                                         ProviderRouting providerRouting) {
-        this.reasoningEffort = reasoningEffort == null || reasoningEffort.isBlank() ? null : reasoningEffort.trim();
-        this.providerRouting = providerRouting;
+        this.reasoningEffort = apiKey != null && apiKey.startsWith("awdai_") || reasoningEffort == null || reasoningEffort.isBlank() ? null : reasoningEffort.trim();
+        this.providerRouting = apiKey != null && apiKey.startsWith("awdai_") ? null : providerRouting;
         this.apiKey = apiKey;
         this.modelName = modelName;
-        this.explicitPromptCache = requiresExplicitPromptCache(modelName);
-        this.splitVolatile = splitsVolatileSystem(modelName);
+        this.explicitPromptCache = !(apiKey != null && apiKey.startsWith("awdai_")) && requiresExplicitPromptCache(modelName);
+        this.splitVolatile = !(apiKey != null && apiKey.startsWith("awdai_")) && splitsVolatileSystem(modelName);
         String base = baseUrl == null ? "" : baseUrl;
         this.endpoint = (base.endsWith("/") ? base.substring(0, base.length() - 1) : base) + "/chat/completions";
         Duration t = timeout == null ? Duration.ofSeconds(60) : timeout;
@@ -348,8 +348,9 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
 
         StreamSession session = new StreamSession(handler, maxOutputTokens != null);
         // Explicit paid writing requests do not transparently retry a failed connection.
-        // The existing general chat transport retains its original OkHttp policy.
-        OkHttpClient transport = maxOutputTokens == null ? client : client.newBuilder().retryOnConnectionFailure(false).build();
+        // International general chat retains its original policy; domestic requests never replay uncertain charges.
+        OkHttpClient transport = maxOutputTokens == null && !(apiKey != null && apiKey.startsWith("awdai_"))
+                ? client : client.newBuilder().retryOnConnectionFailure(false).build();
         Inflight inflight = new Inflight(enqueue(transport, body, session), session);
 
         // 首字节前排队换家（dev-board#1061）：判定交给 handler 的看门狗（它手里有「保活 vs 真字节」

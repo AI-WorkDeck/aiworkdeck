@@ -208,8 +208,10 @@ public class SubAgentService {
         // 模型在提交线程解析，非白名单在起跑前就拒绝：ChatModelFactory 对非白名单的处置是
         // 静默回落默认模型——failover 链踩过的同一个坑（看着「配了便宜模型」，实际跑的是主模型，
         // 账单要到月底才看得出来）。这里给出可读提示，让模型与面板都能看到原因。
-        String modelId = auxModelResolver.subAgentModelId(props.getModel());
-        if (!AllowedModels.isAllowed(modelId)) {
+        String configuredModel = auxModelResolver.subAgentModelId(props.getModel());
+        String modelId = chatModelFactory.usesProviderCatalog()
+                ? chatModelFactory.resolveEffectiveModelId(configuredModel) : configuredModel;
+        if (!(chatModelFactory.usesProviderCatalog() ? chatModelFactory.isAvailableModel(modelId) : AllowedModels.isAllowed(modelId))) {
             log.warn("子 Agent 模型 '{}' 不在可用模型清单内，子任务 {} 未派发", modelId, subtaskId);
             SubAgentResult rejected = SubAgentResult.failure(subtaskId,
                     com.checkba.service.LangText.of(

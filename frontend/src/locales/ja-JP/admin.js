@@ -100,7 +100,7 @@ export default {
   "inheritAux": "補助モデルを継承",
   "followBuiltIn": "内蔵デフォルトに従う",
   "modelOption": "{name} ({vendor})",
-  "modelPrice": " · ${in}/${out}（100万トークンあたり）",
+  "modelPrice": " · {currency}{in}/{currency}{out}（100万トークンあたり）",
   "tieredSuffix": " · 段階的料金",
   "noVisionSuffix": " · 画像入力非対応（画像はOCRで処理）",
   "modelUnavailableInRegion": "{model}（現在のネットワーク地域では利用不可）",

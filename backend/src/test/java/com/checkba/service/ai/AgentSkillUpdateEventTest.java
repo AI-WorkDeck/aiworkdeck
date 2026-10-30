@@ -434,10 +434,13 @@ class AgentSkillUpdateEventTest {
     @Test
     @DisplayName("智能模式（auto）：按轮确定性路由模型与思考强度，并推送 SSE model_routed 事件")
     void autoModelEmitsModelRoutedEventAndUsesRoutedModelAndEffort() {
+        NetworkRegionService network = mock(NetworkRegionService.class);
+        when(network.effectiveRegion()).thenReturn(AllowedModels.Region.GLOBAL);
+        org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "networkRegionService", network);
         when(skillRouter.activeSkills(anyString())).thenReturn(List.of(
                 new SkillRouter.ActiveSkill(skill("legal-opinion-review", "法律意见书审查"),
                         "法律意见书审查", SkillRouter.SOURCE_AUTO)));
-        when(chatModelFactory.getStreamingChatModel("moonshotai/kimi-k3", "high"))
+        when(chatModelFactory.getStreamingChatModel("anthropic/claude-sonnet-5", "medium"))
                 .thenReturn(new OneShotModel());
 
         AiAgentController.AgentChatRequest request = new AiAgentController.AgentChatRequest();
@@ -448,7 +451,8 @@ class AgentSkillUpdateEventTest {
         request.setMode(AgentMode.AGENT.name());
         orchestrator.handleUserMessage(request, 7L);
 
-        verify(chatModelFactory).getStreamingChatModel("moonshotai/kimi-k3", "high");
+        verify(chatModelFactory).getStreamingChatModel("anthropic/claude-sonnet-5", "medium");
+        verify(network, never()).effectiveRegion(); // Model routing no longer depends on the user network.
         String routedPayload = null;
         for (int i = 0; i < sseEvents.size(); i++) {
             if ("model_routed".equals(sseEvents.get(i))) {
@@ -458,8 +462,8 @@ class AgentSkillUpdateEventTest {
         }
         assertNotNull(routedPayload, "智能模式必须推送 model_routed 事件：" + sseEvents);
         assertTrue(routedPayload.contains("\"requestedModel\":\"auto\""), routedPayload);
-        assertTrue(routedPayload.contains("\"effectiveModel\":\"moonshotai/kimi-k3\""), routedPayload);
-        assertTrue(routedPayload.contains("\"effectiveModelName\":\"Kimi K3\""), routedPayload);
+        assertTrue(routedPayload.contains("\"effectiveModel\":\"anthropic/claude-sonnet-5\""), routedPayload);
+        assertTrue(routedPayload.contains("\"effectiveModelName\":\"Claude Sonnet 5\""), routedPayload);
         assertTrue(routedPayload.contains("\"tier\":\"DEEP\""), routedPayload);
     }
 }

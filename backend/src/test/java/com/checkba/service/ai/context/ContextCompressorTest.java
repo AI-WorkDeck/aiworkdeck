@@ -43,6 +43,24 @@ class ContextCompressorTest {
     }
 
     @Test
+    void platformSmallWindowTriggersCompressionAndCatalogueFailureDoesNotWidenBudget() {
+        var properties = new com.checkba.config.AiContextProperties();
+        properties.setSystemPromptReserve(100); properties.setMemoryReserve(100); properties.setResponseReserve(100);
+        var scoped = new ContextCompressor(legalInfoProtector, conversationSummarizer, properties);
+        var factory = mock(com.checkba.service.ai.ChatModelFactory.class);
+        when(factory.usesProviderCatalog()).thenReturn(true);
+        when(factory.platformContextBudget(eq("small"), anyInt(), anyDouble())).thenReturn(1000);
+        org.springframework.test.util.ReflectionTestUtils.setField(scoped, "chatModelFactory", factory);
+        assertEquals(700, scoped.getAvailableTokensForHistory("small"));
+        assertTrue(scoped.needsCompression(List.of(UserMessage.from("正文".repeat(2000))), "small"));
+        when(factory.platformContextBudget(eq("small"), anyInt(), anyDouble())).thenThrow(
+                new com.checkba.service.account.AccountException(com.checkba.service.account.AccountException.Kind.NETWORK, "unavailable"));
+        assertThrows(com.checkba.service.account.AccountException.class, () -> scoped.getAvailableTokensForHistory("small"));
+        when(factory.usesProviderCatalog()).thenReturn(false);
+        assertEquals(properties.maxContextTokensFor("small") - 300, scoped.getAvailableTokensForHistory("small"));
+    }
+
+    @Test
     @DisplayName("应该正确估算Token数量")
     void shouldEstimateTokensCorrectly() {
         List<ChatMessage> messages = new ArrayList<>();

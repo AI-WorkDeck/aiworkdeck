@@ -146,7 +146,7 @@ public class AdminConfigController {
     private static final String KEY_AI_CROSS_BORDER_CONSENT_AT = "ai.crossBorder.consentAt";
     private static final String KEY_AI_CROSS_BORDER_CONSENT_VERSION = "ai.crossBorder.consentVersion";
     /** 当前告知文本的版本号；改了跨境告知的实质内容就要 +1，让旧同意失效并重新征求 */
-    private static final String CROSS_BORDER_NOTICE_VERSION = "2026-08-08";
+    private static final String CROSS_BORDER_NOTICE_VERSION = "2026-10-29";
     // ai.systemPrompt.OLLAMA / ai.systemPrompt.GEMINI 两个键已随 v1 /api/ai/chat 一起移除：
     // 唯一读者是已删的 AiChatService，且它按模型名字符串而非 provider 选 key，
     // 对四条通道本来就全部失效。今天真正生效的 system prompt 由 ContextAssemblerService 拼装，
@@ -361,7 +361,8 @@ public class AdminConfigController {
 
         Map<String, String> updates;
         try {
-            updates = toSettingsUpdates(request, objectMapper);
+            updates = com.checkba.service.ai.PlatformAiUserScope.call(admin.getId(),
+                    () -> toSettingsUpdates(request, objectMapper, chatModelFactory.usesProviderCatalog() ? chatModelFactory::isAvailableModel : com.checkba.service.ai.AllowedModels::isAllowed));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(error(e.getMessage()));
         }
@@ -432,6 +433,11 @@ public class AdminConfigController {
      */
     static Map<String, String> toSettingsUpdates(AdminConfigUpdateRequest request,
                                                  com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
+        return toSettingsUpdates(request, objectMapper, com.checkba.service.ai.AllowedModels::isAllowed);
+    }
+
+    static Map<String, String> toSettingsUpdates(AdminConfigUpdateRequest request,
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper, java.util.function.Predicate<String> modelAllowed) {
         Map<String, String> updates = new HashMap<>();
 
         if (request.getExternal() != null) {
@@ -501,9 +507,9 @@ public class AdminConfigController {
             // 三个模型选择键：空串是合法值（= 跟随内置默认），非空必须在白名单内。
             // 不校验的话一个手改/陈旧的 id 会被工厂静默回落默认模型，
             // 设置页显示的与实际发出去的模型不一致——正是本次改造要修的老毛病。
-            putModelSetting(updates, KEY_AI_DEFAULT_MODEL, ai.getDefaultModel(), LangText.of("默认模型", "Default model"));
-            putModelSetting(updates, KEY_AI_AUX_MODEL, ai.getAuxModel(), LangText.of("辅助模型", "Auxiliary model"));
-            putModelSetting(updates, KEY_AI_SUBAGENT_MODEL, ai.getSubagentModel(), LangText.of("子 Agent 模型", "Sub-agent model"));
+            putModelSetting(updates, KEY_AI_DEFAULT_MODEL, ai.getDefaultModel(), LangText.of("默认模型", "Default model"), modelAllowed);
+            putModelSetting(updates, KEY_AI_AUX_MODEL, ai.getAuxModel(), LangText.of("辅助模型", "Auxiliary model"), modelAllowed);
+            putModelSetting(updates, KEY_AI_SUBAGENT_MODEL, ai.getSubagentModel(), LangText.of("子 Agent 模型", "Sub-agent model"), modelAllowed);
             if (ai.getNetworkRegion() != null) {
                 String region = ai.getNetworkRegion().trim().toLowerCase(java.util.Locale.ROOT);
                 boolean legal = region.isEmpty()
@@ -565,12 +571,12 @@ public class AdminConfigController {
      * 模型选择键的写入：空串放行（跟随内置默认），非空必须在 {@link com.checkba.service.ai.AllowedModels}
      * 白名单内，否则报 400 而不是让工厂静默回落。
      */
-    private static void putModelSetting(Map<String, String> updates, String key, String value, String label) {
+    private static void putModelSetting(Map<String, String> updates, String key, String value, String label, java.util.function.Predicate<String> modelAllowed) {
         if (value == null) {
             return;
         }
         String model = value.trim();
-        if (!model.isEmpty() && !com.checkba.service.ai.AllowedModels.isAllowed(model)) {
+        if (!model.isEmpty() && !modelAllowed.test(model)) {
             throw new IllegalArgumentException(label + LangText.of(
                     "「" + model + "」不在可用模型清单内，从设置页的模型下拉中重新选一个（留空表示跟随内置默认）",
                     " \"" + model + "\" is not in the available models list. Pick one from the model dropdown in Settings (leave blank to follow the built-in default)."));

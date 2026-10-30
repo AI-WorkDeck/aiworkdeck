@@ -88,7 +88,7 @@ export default {
     "crossBorderLabel": "Persetujuan berasingan: pindahkan kandungan yang diserahkan kepada AI ke penyedia model luar negara untuk diproses",
     "crossBorderView": "Lihat notis",
     "crossBorderNoticeTitle": "Notis pemindahan rentas sempadan",
-    "crossBorderNoticeBody": "AI WorkDeck Cloud menghantar kandungan yang anda serahkan kepada AI (teks dan serpihan fail berkaitan) kepada OpenRouter, Inc. (Amerika Syarikat) untuk diproses bagi inferens model dan pengebilan penggunaan; ini merupakan pemberian maklumat peribadi kepada penerima di luar negara. Selepas memasuki produk, anda boleh menarik balik persetujuan pada bila-bila masa dalam Tetapan → Tetapan AI; sebaik sahaja ditarik balik, saluran awan tidak lagi tersedia.",
+    "crossBorderNoticeBody": "Laman China menyambung ke Alibaba Cloud Bailian melalui pelayan AI WorkDeck; laman antarabangsa menggunakan OpenRouter. Teks dan petikan fail yang dihantar kepada AI digunakan untuk inferens dan pengebilan. Bergantung pada model, pemprosesan mungkin berlaku di luar tanah besar China. Penarikan persetujuan dalam Tetapan melumpuhkan saluran AI platform.",
     "agreementRequired": "Tandakan kotak untuk menerima Terma Perkhidmatan dan Dasar Privasi bagi meneruskan",
     "crossBorderRequired": "Tandakan persetujuan pemindahan rentas sempadan yang berasingan bagi meneruskan",
     "switchSiteTitle": "Tukar Tapak",

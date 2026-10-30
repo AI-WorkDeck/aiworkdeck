@@ -7,6 +7,10 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 职责边界：AI 对话功能本身（编排循环、工具注册分发、记忆、SSE、前端聊天 UI、评测）。AI→编辑器指令链路属 ai-doc-bridge 领域；skill 机制属 plugin-system 领域（但 SkillRouter 在编排循环里有两处旁路接入点）。
 
+## 国内百炼与国际 OpenRouter（2026-10-29，dev-board#1625）
+
+平台目录改由 PlatformModelCatalog 从实际供应商读取，并按站点与用户runtime凭据缓存。国内通过官网AI网关到百炼；国际保留OpenRouter。ChatModelFactory 的平台默认/辅助/选模与视觉能力遵循目录，旧合法OpenRouter设置迁移到国内默认。智能选模在目录支持时使用 qwen3.8-flash / qwen3.8-max；不再按JVM国家、时区或IP过滤目录。BYOK/本地保留旧路径；Jev在百炼平台不外发。设置页移除网络区域控制，定价单位按供应商/本站币种下发。国内听写通过同站网关调用 qwen3.8-omni-flash；国际保留原语音模型，两者均不得混用凭据或地址。
+
 ## 法律资料卡与案例检索（2026-10-29，dev-board#1611）
 
 - `LegalTools.case_search(query)` 通过既有 `PkulawChannel` 调用 `pkulaw-case-semantic/search_case`（参数 `text`），平台与自备渠道继续由原通道分流，未接入处罚专用接口。`case_search` 属 `legal` 类目，案例/判例/判决书及英文 case law/judgment 触发披露；法宝不可用时与法规工具共同隐藏。

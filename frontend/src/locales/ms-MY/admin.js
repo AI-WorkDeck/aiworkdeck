@@ -100,7 +100,7 @@ export default {
   "inheritAux": "Warisi model tambahan",
   "followBuiltIn": "Ikut lalai terbina dalam",
   "modelOption": "{name} ({vendor})",
-  "modelPrice": " · $${in}/${out} setiap 1J token",
+  "modelPrice": " · {currency}{currency}{in}/{currency}{out} setiap 1J token",
   "tieredSuffix": " · Harga berperingkat",
   "noVisionSuffix": " · Tiada input imej (imej diproses melalui OCR)",
   "modelUnavailableInRegion": "{model} (tidak tersedia dalam rantau rangkaian semasa)",

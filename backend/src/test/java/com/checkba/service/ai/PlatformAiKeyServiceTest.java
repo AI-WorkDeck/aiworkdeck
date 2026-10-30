@@ -58,8 +58,16 @@ class PlatformAiKeyServiceTest {
             rows.put(e.getUserId(), e);
             return e;
         });
-        doAnswer(inv -> rows.remove(inv.getArgument(0, PlatformAiKey.class).getUserId()))
-                .when(keyRepository).delete(any(PlatformAiKey.class));
+        when(keyRepository.deleteMatchingKey(any(), anyString())).thenAnswer(inv -> {
+            PlatformAiKey row = rows.get(inv.getArgument(0, Long.class));
+            if (row == null || !row.getKeyFingerprint().equals(inv.getArgument(1))) return 0;
+            rows.remove(row.getUserId()); return 1;
+        });
+        when(keyRepository.verifyMatchingKey(any(), anyString(), any())).thenAnswer(inv -> {
+            PlatformAiKey row = rows.get(inv.getArgument(0, Long.class));
+            if (row == null || !row.getKeyFingerprint().equals(inv.getArgument(1))) return 0;
+            row.setLastVerifiedAt(inv.getArgument(2)); return 1;
+        });
         when(keyRepository.count()).thenAnswer(inv -> (long) rows.size());
 
         bindingRepository = mock(AccountBindingRepository.class);
@@ -190,7 +198,7 @@ class PlatformAiKeyServiceTest {
         rows.get(1L).setLastVerifiedAt(LocalDateTime.now().minusDays(31));
         assertTrue(service.resolve(1L).isEmpty());
 
-        service.markVerified(1L);
+        service.markVerified(1L, PlatformAiKeyCipher.fingerprint(RUNTIME_KEY));
         assertTrue(service.resolve(1L).isPresent());
     }
 
@@ -199,7 +207,7 @@ class PlatformAiKeyServiceTest {
     void evictDeletesRow() {
         websiteReturnsKey(RUNTIME_KEY, 10.0);
         service.provision(1L, AWDK);
-        service.evict(1L);
+        service.evict(1L, PlatformAiKeyCipher.fingerprint(RUNTIME_KEY));
 
         assertTrue(rows.isEmpty());
         assertTrue(service.resolve(1L).isEmpty());

@@ -128,6 +128,10 @@ class WritingModelTransportTest {
         when(settings.get(anyString(), any())).thenAnswer(i -> i.getArgument(1));
         when(settings.get(eq("ai.activeProvider"), any())).thenReturn(provider);
         when(settings.get(eq(ChatModelFactory.SETTING_OPENROUTER_BASE_URL), any())).thenReturn(byokUrl);
+        doAnswer(inv -> {
+            String key = platform.apiKey();
+            return new PlatformAiKeyService.Resolved(key, key == null ? "none" : PlatformAiKeyCipher.fingerprint(key), null);
+        }).when(platform).connection();
         return new ChatModelFactory(props, settings, platform, mock(PlatformCreditsGate.class), mock(PlatformUsageAccountant.class),
                 new AuxModelResolver(settings, AllowedModels.QWEN_3_7_FLASH.getModelId()), mock(TelemetryService.class));
     }
