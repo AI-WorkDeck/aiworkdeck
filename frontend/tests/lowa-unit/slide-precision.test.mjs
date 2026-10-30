@@ -39,7 +39,11 @@ function properties(values) {
 function setup(shapes = []) {
   const pages = []
   const page = () => Object.assign(properties({ Width: 25400, Height: 19050, Layout: 20 }), {
-    shapes: [], getCount() { return this.shapes.length }, getByIndex(i) { return this.shapes[i] },
+    shapes: [], getCount() { return this.shapes.length }, getByIndex(i) {
+      const shape = this.shapes[i]
+      shape.supportsService ||= service => service === 'com.sun.star.presentation.TitleTextShape' && shape.kind === 'title'
+      return shape
+    },
     getMasterPage: () => ({ getName: () => 'master' }), add(shape) { this.shapes.push(shape) }
   })
   pages.push(page()); pages[0].shapes = shapes
@@ -50,6 +54,8 @@ function setup(shapes = []) {
     isImpressDoc: () => true, ensureShapeNames: () => {}, shapeKind: s => s.kind || 'text',
     shapeText: s => s.getText?.().getString() || '', slideFail: error => ({ success: false, error, message: error }),
     errStr: e => e.message, locatePageIndex: page => pages.indexOf(page), movePageTo: () => -1,
+    suspendModifyListener() {}, resumeModifyListener() {},
+    Module: { resumeMainLoop() {} },
     ctrl: null, shortAny: n => n, layoutNameOf: () => 'blank',
     css: { drawing: { FillStyle: { NONE: { value: 0 }, SOLID: { value: 1 } }, LineStyle: { NONE: { value: 0 }, SOLID: { value: 1 } } },
       awt: { FontSlant: { NONE: { value: 0 }, ITALIC: { value: 2 } } },
@@ -505,3 +511,117 @@ test('replacement marks each successful write, including before a later partial 
   assert.equal(result.success, false); assert.equal(result.outcomeUnknown, true)
   assert.equal(text.getString(), 'a b'); assert.equal(marked, 1)
 })
+
+
+test('adding a page checks only title identity on existing objects while retaining title protection', () => {
+  const calls = []
+  const shapes = Array.from({ length: 24 }, (_, i) => ({
+    supportsService(service) { calls.push([i, service]); assert.equal(service, 'com.sun.star.presentation.TitleTextShape'); return false },
+    getPropertyValue() { throw Error('unrelated model/geometry reads must not run') }
+  }))
+  const h = setup(shapes)
+  assert.equal(h.add({}).success, true)
+  assert.equal(calls.length, shapes.length)
+  assert.equal(h.pages.length, 2)
+})
+
+
+function observeInsertListener(h) {
+  const calls = { removed: 0, added: 0, notifications: 0, modified: false, attached: true, wakes: 0 };
+  h.realm.Module.resumeMainLoop = () => {
+    assert.equal(calls.attached, true, 'restore the modify listener before waking Qt');
+    assert.equal(calls.added, 1);
+    assert.equal(calls.notifications, calls.modified ? 1 : 0, 'finish modification reporting before waking Qt');
+    calls.wakes++;
+  };
+  Object.assign(h.realm, { modifyListener: {}, exportInFlight: false, invalidateParaIndex() {},
+    post: cmd => { if (cmd === 'modified') calls.notifications++ } });
+  Object.assign(h.realm.xModel, {
+    removeModifyListener() { calls.removed++; calls.attached = false },
+    addModifyListener() { calls.added++; calls.attached = true },
+    isModified: () => calls.modified,
+    lockControllers() { throw Error('must not lock the view controller') },
+  });
+  vm.runInContext(source.slice(source.indexOf('let modifySuspended = 0;'), source.indexOf('// ---- 自建工具栏：选区变化上报')), h.realm);
+  const insert = h.collection.insertNewByIndex;
+  h.collection.insertNewByIndex = index => {
+    assert.equal(calls.attached, false, 'pause before the first native mutation');
+    calls.modified = true;
+    return insert(index);
+  };
+  return calls;
+}
+test('page insertion restores the real modify listener once and preserves prior title and page identity', () => {
+  let title = 'Original title';
+  const oldTitle = { kind: 'title', getText: () => ({ getString: () => title, setString: value => { title = value } }) };
+  const h = setup([oldTitle]), calls = observeInsertListener(h);
+  const oldPage = h.pages[0], insert = h.collection.insertNewByIndex;
+  h.collection.insertNewByIndex = index => { const page = insert(index); title = ''; return page };
+  const result = h.add({ layout: 1 });
+  assert.equal(result.success, true); assert.equal(result.slideNumber, 2);
+  assert.equal(h.pages[0], oldPage); assert.equal(title, 'Original title');
+  assert.equal(calls.wakes, 1);
+  assert.equal(calls.attached, true); assert.equal(calls.removed, 1); assert.equal(calls.added, 1); assert.equal(calls.notifications, 1);
+});
+test('uncertain insertion and partial initialization both restore listener and announce possible edits', () => {
+  for (const failure of ['insert', 'layout', 'locate', 'name']) {
+    const h = setup(), calls = observeInsertListener(h), insert = h.collection.insertNewByIndex;
+    if (failure === 'insert') h.collection.insertNewByIndex = index => { insert(index); throw Error('insert failed after mutation') };
+    if (failure === 'layout') h.collection.insertNewByIndex = index => { const page = insert(index); page.setPropertyValue = () => { throw Error('layout failed') }; return page };
+    if (failure === 'locate') h.realm.locatePageIndex = () => -1;
+    if (failure === 'name') h.realm.ensureShapeNames = () => { throw Error('naming failed') };
+    const result = h.add({ layout: 1 });
+    assert.equal(result.success, false); assert.equal(result.retryable, false);
+    assert.equal(result.errorCode, failure === 'insert' ? 'SLIDE_INSERT_UNCERTAIN' : 'SLIDE_INSERT_PARTIAL');
+    assert.equal(h.pages.length, 2); assert.equal(calls.attached, true);
+    assert.equal(calls.wakes, 1, failure + ' must wake the possibly changed view');
+    assert.equal(calls.removed, 1); assert.equal(calls.added, 1); assert.equal(calls.notifications, 1);
+  }
+});
+test('rejected page position does not suspend listeners or emit a modification', () => {
+  const h = setup(), calls = observeInsertListener(h);
+  assert.equal(h.add({ position: 99 }).success, false);
+  assert.equal(calls.removed, 0); assert.equal(calls.added, 0); assert.equal(calls.notifications, 0);
+  assert.equal(calls.wakes, 0, 'parameter rejection never enters the native mutation batch');
+});
+test('failure before a native insertion leaves clean state clean and restores the listener', () => {
+  const h = setup(), calls = observeInsertListener(h);
+  h.collection.insertNewByIndex = () => { assert.equal(calls.attached, false); throw Error('no insertion') };
+  const result = h.add({});
+  assert.equal(result.errorCode, 'SLIDE_INSERT_UNCERTAIN'); assert.equal(h.pages.length, 1);
+  assert.equal(calls.attached, true); assert.equal(calls.removed, 1); assert.equal(calls.added, 1);
+  assert.equal(calls.notifications, 0);
+  assert.equal(calls.wakes, 1, 'an attempted insertion still completes the Qt batch');
+});
+test('a title placeholder removed by insertion is rebuilt on the original retained page', () => {
+  const oldTitle = { kind: 'title', getText: () => ({ getString: () => 'Retained title' }) };
+  const h = setup([oldTitle]), calls = observeInsertListener(h), originalPage = h.pages[0];
+  const insert = h.collection.insertNewByIndex;
+  h.collection.insertNewByIndex = index => { const added = insert(index); originalPage.shapes = []; return added };
+  let restoredText = '', restoredPosition, restoredSize;
+  const restored = { kind: 'title',
+    setPosition: value => { restoredPosition = value }, setSize: value => { restoredSize = value },
+    getText: () => ({ getString: () => restoredText, setString: value => { restoredText = value } }) };
+  h.realm.css.awt.Point = function (value) { Object.assign(this, value) };
+  h.realm.css.awt.Size = function (value) { Object.assign(this, value) };
+  h.realm.xModel.createInstance = service => { assert.equal(service, 'com.sun.star.presentation.TitleTextShape'); return restored };
+  const result = h.add({});
+  assert.equal(result.success, true); assert.equal(result.slideNumber, 2);
+  assert.equal(h.pages[0], originalPage); assert.equal(originalPage.shapes[0], restored);
+  assert.equal(restoredText, 'Retained title'); assert.ok(restoredPosition.X > 0); assert.ok(restoredSize.Width > 0);
+  assert.equal(calls.wakes, 1);
+  assert.equal(calls.attached, true); assert.equal(calls.removed, 1); assert.equal(calls.added, 1); assert.equal(calls.notifications, 1);
+});
+test('title restoration failure reports the inserted page and restores modification reporting', () => {
+  const oldTitle = { kind: 'title', getText: () => ({ getString: () => 'Retained title' }) };
+  const h = setup([oldTitle]), calls = observeInsertListener(h), originalPage = h.pages[0];
+  const insert = h.collection.insertNewByIndex;
+  h.collection.insertNewByIndex = index => { const added = insert(index); originalPage.shapes = []; return added };
+  h.realm.xModel.createInstance = () => { throw Error('cannot reconstruct title') };
+  const result = h.add({});
+  assert.equal(result.success, false); assert.equal(result.errorCode, 'SLIDE_INSERT_PARTIAL');
+  assert.equal(result.stage, 'restore-title'); assert.equal(result.created, true); assert.equal(result.retryable, false);
+  assert.equal(result.slideNumber, 2); assert.equal(h.pages.length, 2); assert.equal(h.pages[0], originalPage);
+  assert.equal(calls.wakes, 1);
+  assert.equal(calls.attached, true); assert.equal(calls.removed, 1); assert.equal(calls.added, 1); assert.equal(calls.notifications, 1);
+});

@@ -2499,6 +2499,8 @@ function postNativeKeys(keys) {
     keyRobot.keyRelease(ev);
   }
   scheduleNativeKeySelectionRefresh();
+  // Wake Qt's idle queue so Impress paints the posted input promptly.
+  if (isImpressDoc()) Module.resumeMainLoop();
   return { success: true, native: true, keys: keys.length };
 }
 // 全屏标志在引擎处理完投递的 Esc 之后才翻（异步，时点不定），所以 1.5 秒内每
@@ -3094,6 +3096,27 @@ function calcClipboardSelection() {
 // Impress 当前幻灯片、选中形状与形状列表解析（供 get_ui_state / format_selection / set_paragraph_format / ui_command 共用）
 function slidePages() {
   try { return xModel.getDrawPages(); } catch (e) { return null; }
+}
+// Interaction reads must not enumerate or name every object on the slide.
+// Indices are deliberately unknown: resolving them would require that scan.
+function activeImpressSelection() {
+  const page = ctrl.getCurrentPage();
+  const pages = xModel.getDrawPages();
+  const slideNumber = Number(page.getPropertyValue('Number'));
+  let shape = null, textRange = null;
+  const selection = ctrl.getSelection();
+  if (selection && typeof selection.getString === 'function' && typeof selection.getShapeType !== 'function') {
+    textRange = selection;
+  } else {
+    const candidate = selection && typeof selection.getByIndex === 'function'
+      ? (selection.getCount() > 0 ? selection.getByIndex(0) : null) : selection;
+    if (candidate && typeof candidate.getPosition === 'function' && typeof candidate.getSize === 'function'
+      && !unoSameDrawPage(candidate, page)) shape = candidate;
+  }
+  let name = '';
+  try { if (shape && shape.getName) name = String(shape.getName() || ''); } catch (e) {}
+  return { slideNumber: slideNumber, currentSlideIndex: slideNumber - 1, slideCount: pages.getCount(),
+    shapeCount: page.getCount(), selectedShape: shape, selectedShapeIndex: -1, selectedShapeName: name, textRange: textRange };
 }
 function activeImpressContext(wantShapeName) {
   let page = null, pageShapes = null;
@@ -5789,9 +5812,9 @@ const EXEC = {
   },
   // ---- [P1 自建工具栏] 状态回读 / 样式清单 / chrome 开关 -------------------
   // 工具栏的激活态（B 是否高亮、当前字体字号样式对齐、能不能撤销）一次拿全。
-  // 高频调用（选区事件 + 400ms 聚焦轮询），实测整套读一遍约 6ms——每个字段各自
-  // try/catch，缺一个不影响其余，绝不因为某个属性在当前上下文不存在就整体失败。
-  get_ui_state() {
+  // PPT 交互刷新显式使用 selection 范围，避免每次按键扫描整页形状。
+  // 无参保留完整状态，供工具栏页面菜单与既有插件使用。
+  get_ui_state(p = {}) {
     const out = { success: true, documentSeq: docSeq, docKind: docKindOf() };
     const readUndo = function () {
       try {
@@ -5893,7 +5916,8 @@ const EXEC = {
       return out;
     }
     if (isImpressDoc()) {
-      const ctx = activeImpressContext();
+      const selectionOnly = p.scope === 'selection';
+      const ctx = selectionOnly ? activeImpressSelection() : activeImpressContext();
       const shape = ctx.selectedShape;
       const sf = (shape ? shapeCharFormat(shape) : null) || {};
       out.character = {
@@ -5920,14 +5944,18 @@ const EXEC = {
       try { view.zoom = Number(ctrl.getPropertyValue('ZoomValue')) || 100; } catch (e) {}
       out.view = view;
       const detail = shape ? impressShapeDetail(shape, ctx.selectedShapeIndex) : null;
+      if (selectionOnly && detail) { delete detail.index; detail.shapeIndex = -1; }
       out.selection = {
-        collapsed: !shape,
+        collapsed: ctx.textRange ? !String(ctx.textRange.getString() || '').length : !shape,
         inTable: !!(detail && detail.isTable),
         hasShape: !!shape,
         shapeIndex: ctx.selectedShapeIndex,
         shapeName: ctx.selectedShapeName || '',
       };
-      out.impress = {
+      out.impress = selectionOnly ? {
+        slideNumber: ctx.slideNumber, currentSlideIndex: ctx.currentSlideIndex, slideCount: ctx.slideCount,
+        shapeCount: ctx.shapeCount, selectedShapeIndex: -1, selectedShapeName: ctx.selectedShapeName, selectedShape: detail,
+      } : {
         slideNumber: ctx.slideNumber,
         currentSlideIndex: ctx.currentSlideIndex,
         slideCount: ctx.slideCount,
@@ -5946,6 +5974,7 @@ const EXEC = {
         selectedShape: detail,
         shapes: ctx.shapes || [],
       };
+      if (selectionOnly) out.scope = 'selection';
       readUndo();
       return out;
     }
@@ -11211,113 +11240,128 @@ const EXEC = {
     }
     // Keep the XDrawPage returned by insertNewByIndex. A new page may contain
     // inherited placeholders: looking for an empty page can select an old page.
+    // Only title identity is needed for the retention safeguard. Do not run
+    // the full table/image/geometry classification for every existing object.
+    const isTitle = shape => {
+      try { return shape.supportsService('com.sun.star.presentation.TitleTextShape'); }
+      catch (e) { return false; }
+    };
     const beforeTitles = [];
     for (let i = 0; i < count; i++) {
       const pg = pages.getByIndex(i);
       for (let si = 0; si < pg.getCount(); si++) {
         const shape = pg.getByIndex(si);
-        if (shapeKind(shape) === 'title') {
+        if (isTitle(shape)) {
           beforeTitles.push({ page: pg, text: shapeText(shape) });
           break;
         }
       }
     }
-    let page;
-    // LO 24.2 InsertSdPage inserts AFTER the supplied 0-based predecessor,
-    // despite the XDrawPages method name. Passing the destination shifts it one
-    // page too far and needlessly relies on a separate UI selection to move it.
-    // Source: LibreOffice/core libreoffice-24-2 sd/source/ui/unoidl/unomodel.cxx.
-    try { page = pages.insertNewByIndex(Math.max(0, insertIndex - 1)); }
-    catch (e) {
-      return slideError('SLIDE_INSERT_UNCERTAIN', { detail: errStr(e), outcomeUnknown: true, retryable: false });
-    }
-    const partial = (stage, detail) => {
-      const actual = page ? locatePageIndex(page) : -1;
-      return slideError('SLIDE_INSERT_PARTIAL',
-        { created: true, stage: stage, detail: detail || null, slideNumber: actual >= 0 ? actual + 1 : null, retryable: false });
-    };
+    // Coalesce synchronous structural changes without locking the view controller.
+    // Partial insertions must restore the listener and still reach autosave.
+    suspendModifyListener();
     try {
-      if (!page) return partial('identity');
-      let newIndex = locatePageIndex(page);
-      if (newIndex < 0) return partial('locate');
-      if (newIndex !== insertIndex) {
-        newIndex = movePageTo(page, insertIndex);
-        if (newIndex !== insertIndex) return partial('move');
+      let page;
+      // LO 24.2 InsertSdPage inserts AFTER the supplied 0-based predecessor,
+      // despite the XDrawPages method name. Passing the destination shifts it one
+      // page too far and needlessly relies on a separate UI selection to move it.
+      // Source: LibreOffice/core libreoffice-24-2 sd/source/ui/unoidl/unomodel.cxx.
+      try { page = pages.insertNewByIndex(Math.max(0, insertIndex - 1)); }
+      catch (e) {
+        return slideError('SLIDE_INSERT_UNCERTAIN', { detail: errStr(e), outcomeUnknown: true, retryable: false });
       }
-      // Check retained page identities, never positional arithmetic after reordering.
-      // r4 can remove an existing title placeholder while inserting another page.
-      for (const previous of beforeTitles) {
-        let title = null;
-        try {
-          for (let si = 0; si < previous.page.getCount(); si++) {
-            const shape = previous.page.getByIndex(si);
-            if (shapeKind(shape) === 'title') { title = shape; break; }
-          }
-          if (title && shapeText(title) === previous.text) continue;
-          if (title) title.getText().setString(previous.text);
-          else {
-            const restored = xModel.createInstance('com.sun.star.presentation.TitleTextShape');
-            previous.page.add(restored);
-            const width = Number(previous.page.getPropertyValue('Width'));
-            const height = Number(previous.page.getPropertyValue('Height'));
-            restored.setPosition(new css.awt.Point({ X: Math.round(width * 0.08), Y: Math.round(height * 0.05) }));
-            restored.setSize(new css.awt.Size({ Width: Math.round(width * 0.84), Height: Math.round(height * 0.15) }));
-            restored.getText().setString(previous.text);
-          }
-        } catch (e) { return partial('restore-title', errStr(e)); }
-      }
-      // layout 只在调用方显式给出时才碰这个属性。title/body 走手工 createInstance
-      // 真占位符服务类型（presentation.TitleTextShape / OutlineTextShape）直接
-      // page.add()，**不经过 Layout 属性**——保留 slide_get_page/slide_get_overview
-      // 靠 shapeKind() 识别 'title'/'placeholder' 的既有读取路径不用改；createInstance
-      // 失败（真机未核实这两个服务在未设 Layout 时能否独立
-      // 创建）时回退普通文本框，保证功能不因服务名不可用而整体失败。
-      const layoutIn = p && p.layout != null ? Number(p.layout) : null;
-      if (layoutIn != null) { try { page.setPropertyValue('Layout', shortAny(layoutIn)); } catch (e) { return partial('layout', errStr(e)); } }
-      const wantTitle = p && p.title != null ? String(p.title) : null;
-      const wantBody = p && p.body != null ? String(p.body) : null;
-      let pw = 25400, ph = 19050; // 10 × 7.5 inches in 1/100 mm
-      try { pw = Number(page.getPropertyValue('Width')); ph = Number(page.getPropertyValue('Height')); } catch (e) {}
-      function createPlaceholderShape(service) {
-        try { const s = xModel.createInstance(service); page.add(s); return s; }
-        catch (e) {
-          try { const s2 = xModel.createInstance('com.sun.star.drawing.TextShape'); page.add(s2); return s2; }
-          catch (e2) { return null; }
+      const partial = (stage, detail) => {
+        const actual = page ? locatePageIndex(page) : -1;
+        return slideError('SLIDE_INSERT_PARTIAL',
+          { created: true, stage: stage, detail: detail || null, slideNumber: actual >= 0 ? actual + 1 : null, retryable: false });
+      };
+      try {
+        if (!page) return partial('identity');
+        let newIndex = locatePageIndex(page);
+        if (newIndex < 0) return partial('locate');
+        if (newIndex !== insertIndex) {
+          newIndex = movePageTo(page, insertIndex);
+          if (newIndex !== insertIndex) return partial('move');
         }
-      }
-      if (wantTitle != null) {
-        try {
-          const titleShape = createPlaceholderShape('com.sun.star.presentation.TitleTextShape');
-          if (!titleShape) return partial('create-title');
-          if (titleShape) {
-            titleShape.setPosition(new css.awt.Point({ X: Math.round(pw * 0.08), Y: Math.round(ph * 0.05) }));
-            titleShape.setSize(new css.awt.Size({ Width: Math.round(pw * 0.84), Height: Math.round(ph * 0.15) }));
-            titleShape.getText().setString(wantTitle);
-            try {
-              const cur = titleShape.getText().createTextCursor();
-              cur.gotoStart(false); cur.gotoEnd(true);
-              setCharProp(cur, 'CharHeight', 28);
-              setCharProp(cur, 'CharWeight', css.awt.FontWeight.BOLD);
-            } catch (e) {}
+        // Check retained page identities, never positional arithmetic after reordering.
+        // r4 can remove an existing title placeholder while inserting another page.
+        for (const previous of beforeTitles) {
+          let title = null;
+          try {
+            for (let si = 0; si < previous.page.getCount(); si++) {
+              const shape = previous.page.getByIndex(si);
+              if (isTitle(shape)) { title = shape; break; }
+            }
+            if (title && shapeText(title) === previous.text) continue;
+            if (title) title.getText().setString(previous.text);
+            else {
+              const restored = xModel.createInstance('com.sun.star.presentation.TitleTextShape');
+              previous.page.add(restored);
+              const width = Number(previous.page.getPropertyValue('Width'));
+              const height = Number(previous.page.getPropertyValue('Height'));
+              restored.setPosition(new css.awt.Point({ X: Math.round(width * 0.08), Y: Math.round(height * 0.05) }));
+              restored.setSize(new css.awt.Size({ Width: Math.round(width * 0.84), Height: Math.round(height * 0.15) }));
+              restored.getText().setString(previous.text);
+            }
+          } catch (e) { return partial('restore-title', errStr(e)); }
+        }
+        // layout 只在调用方显式给出时才碰这个属性。title/body 走手工 createInstance
+        // 真占位符服务类型（presentation.TitleTextShape / OutlineTextShape）直接
+        // page.add()，**不经过 Layout 属性**——保留 slide_get_page/slide_get_overview
+        // 靠 shapeKind() 识别 'title'/'placeholder' 的既有读取路径不用改；createInstance
+        // 失败（真机未核实这两个服务在未设 Layout 时能否独立
+        // 创建）时回退普通文本框，保证功能不因服务名不可用而整体失败。
+        const layoutIn = p && p.layout != null ? Number(p.layout) : null;
+        if (layoutIn != null) { try { page.setPropertyValue('Layout', shortAny(layoutIn)); } catch (e) { return partial('layout', errStr(e)); } }
+        const wantTitle = p && p.title != null ? String(p.title) : null;
+        const wantBody = p && p.body != null ? String(p.body) : null;
+        let pw = 25400, ph = 19050; // 10 × 7.5 inches in 1/100 mm
+        try { pw = Number(page.getPropertyValue('Width')); ph = Number(page.getPropertyValue('Height')); } catch (e) {}
+        function createPlaceholderShape(service) {
+          try { const s = xModel.createInstance(service); page.add(s); return s; }
+          catch (e) {
+            try { const s2 = xModel.createInstance('com.sun.star.drawing.TextShape'); page.add(s2); return s2; }
+            catch (e2) { return null; }
           }
-        } catch (e) { return partial('write-title', errStr(e)); }
-      }
-      if (wantBody != null) {
-        try {
-          const bodyShape = createPlaceholderShape('com.sun.star.presentation.OutlineTextShape');
-          if (!bodyShape) return partial('create-body');
-          if (bodyShape) {
-            bodyShape.setPosition(new css.awt.Point({ X: Math.round(pw * 0.08), Y: Math.round(ph * 0.25) }));
-            bodyShape.setSize(new css.awt.Size({ Width: Math.round(pw * 0.84), Height: Math.round(ph * 0.65) }));
-            bodyShape.getText().setString(wantBody);
-          }
-        } catch (e) { return partial('write-body', errStr(e)); }
-      }
-      ensureShapeNames(page);
-      try { if (ctrl && ctrl.setCurrentPage) ctrl.setCurrentPage(page); } catch (e) {}
-      let layoutOut = null; try { layoutOut = page.getPropertyValue('Layout'); } catch (e) {}
-      return { success: true, slideNumber: insertIndex + 1, layout: layoutOut };
-    } catch (e) { return partial('initialize', errStr(e)); }
+        }
+        if (wantTitle != null) {
+          try {
+            const titleShape = createPlaceholderShape('com.sun.star.presentation.TitleTextShape');
+            if (!titleShape) return partial('create-title');
+            if (titleShape) {
+              titleShape.setPosition(new css.awt.Point({ X: Math.round(pw * 0.08), Y: Math.round(ph * 0.05) }));
+              titleShape.setSize(new css.awt.Size({ Width: Math.round(pw * 0.84), Height: Math.round(ph * 0.15) }));
+              titleShape.getText().setString(wantTitle);
+              try {
+                const cur = titleShape.getText().createTextCursor();
+                cur.gotoStart(false); cur.gotoEnd(true);
+                setCharProp(cur, 'CharHeight', 28);
+                setCharProp(cur, 'CharWeight', css.awt.FontWeight.BOLD);
+              } catch (e) {}
+            }
+          } catch (e) { return partial('write-title', errStr(e)); }
+        }
+        if (wantBody != null) {
+          try {
+            const bodyShape = createPlaceholderShape('com.sun.star.presentation.OutlineTextShape');
+            if (!bodyShape) return partial('create-body');
+            if (bodyShape) {
+              bodyShape.setPosition(new css.awt.Point({ X: Math.round(pw * 0.08), Y: Math.round(ph * 0.25) }));
+              bodyShape.setSize(new css.awt.Size({ Width: Math.round(pw * 0.84), Height: Math.round(ph * 0.65) }));
+              bodyShape.getText().setString(wantBody);
+            }
+          } catch (e) { return partial('write-body', errStr(e)); }
+        }
+        ensureShapeNames(page);
+        try { if (ctrl && ctrl.setCurrentPage) ctrl.setCurrentPage(page); } catch (e) {}
+        let layoutOut = null; try { layoutOut = page.getPropertyValue('Layout'); } catch (e) {}
+        return { success: true, slideNumber: insertIndex + 1, layout: layoutOut };
+      } catch (e) { return partial('initialize', errStr(e)); }
+    } finally {
+      resumeModifyListener();
+      // Wake Qt's idle queue after restoring modification reporting.
+      Module.resumeMainLoop();
+    }
   },
   // [幻灯片·写] 删除指定页。拒绝删到 0 页（至少保留一页）。
   slide_delete_page(p) {
@@ -12188,10 +12232,15 @@ function runRevisionResolution(fn, p, action) {
 function execCommand(reqId, action, params) {
   // 原语可以是 async（分批的 find_replace / apply_house_style）：返回 Promise 就等它，
   // 期间 worker 事件循环继续处理别的命令；同步原语路径与从前完全一样。
+  const commandDocSeq = docSeq;
   const finish = function (result) {
     delete CANCELLED[reqId];
     delete INFLIGHT[reqId];
     if (action === 'get_review_context' && result && result.success) result.cursorRectRaw = EXEC.get_cursor_rect();
+    // Host toolbar and guest IME undo/redo share this completion path. Page
+    // order can change without a count change, independently of save/typing.
+    if (result && result.success && ['slide_add_page', 'slide_delete_page', 'slide_move_page', 'undo', 'redo'].includes(action)
+        && commandDocSeq === docSeq && isImpressDoc()) post('structure_changed', { documentSeq: docSeq });
     post('result', { reqId: reqId, result: result });
   };
   // Early cursor/zoom queries must not touch UNO model/controller before the
