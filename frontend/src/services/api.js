@@ -729,10 +729,11 @@ export function getAiConfig() {
  * 前端不需要拦截，但必须在选模型的那一刻就把降级说清楚。**缺字段要当「未知」处理**：
  * 旧后端与拉取失败都会让它是 undefined，当成 false 会对所有模型误报「不支持读图」。
  */
-export function fetchAiModels() {
+export function fetchAiModels({ accountPrompt = true } = {}) {
   return request({
     url: '/api/ai/models',
-    method: 'GET'
+    method: 'GET',
+    accountPrompt
   });
 }
 

@@ -21,8 +21,43 @@ function harness({ desktop = true, session = null, recover = async () => false }
   }
   const request = new Function(...Object.keys(deps), source + '\nreturn request')(...Object.values(deps))
   const reply = (body, statusCode = 200) => pending.shift().success({ statusCode, data: body })
-  return { request, reply, calls, login: () => { generation++ }, changeSession: value => { session = value } }
+  const catalogSource = api.slice(api.indexOf('export function fetchAiModels('), api.indexOf('/**\n * 本机 Ollama'))
+    .replace('export function', 'function')
+  const fetchAiModels = new Function('request', catalogSource + '\nreturn fetchAiModels')(request)
+  return { request, fetchAiModels, reply, calls, login: () => { generation++ }, changeSession: value => { session = value } }
 }
+test('passive chat catalogue preload cannot open login; a later catalogue refresh still succeeds', async () => {
+  const chat = readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
+  const loadSource = chat.slice(chat.indexOf('    const loadModelCatalog ='), chat.indexOf('    // Agent Mode Selection'))
+  const h = harness()
+  const currentModelId = { value: 'auto' }, availableModels = { value: [] }
+  const deps = {
+    fetchAiModels: h.fetchAiModels, aiRefreshGeneration: 0, aiRefreshDisposed: false,
+    currentModelId, availableModels, defaultModelId: { value: '' }, networkRegionBasis: { value: '' }, modelPriceDisplay: { value: null },
+    readPersistedModelId: () => currentModelId.value, applyModelSelection: id => { currentModelId.value = id },
+    console,
+  }
+  const load = new Function(...Object.keys(deps), loadSource + '\nreturn loadModelCatalog')(...Object.values(deps))
+  const preload = load(0)
+  await h.reply({ code: 4011, kind: 'NOT_CONNECTED', reason: 'platform_ai', message: 'Synthetic disconnected account' })
+  await preload
+  assert.deepEqual(h.calls, [], 'Opening a local document must not trigger the account UI')
+  assert.equal(currentModelId.value, 'auto')
+  h.login()
+  const refresh = load(0)
+  const models = [{ id: 'synthetic-model', name: 'Synthetic model' }]
+  await h.reply({ models, defaultModel: 'synthetic-model' })
+  await refresh
+  assert.deepEqual(availableModels.value, models)
+  assert.deepEqual(h.calls, [])
+})
+test('explicit catalogue requests retain account prompting and reject the unexecuted request', async () => {
+  const h = harness()
+  const p = h.fetchAiModels()
+  await h.reply({ code: 4011, kind: 'NOT_CONNECTED', reason: 'platform_ai' })
+  await assert.rejects(p, e => e.accountRequired && !e.loggedIn)
+  assert.deepEqual(h.calls, ['login'])
+})
 test('stale local session is cleared and the rejected operation retries once without invalidating the cloud account', async () => {
   const h = harness({ session: 'synthetic-old-session' })
   const p = h.request({ url: '/api/projects/open-local' })
