@@ -63,6 +63,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -242,6 +243,33 @@ class DocInsightServiceTest {
         verify(runs, never()).save(any());
         verify(docText, never()).extractText(any());
         verify(model, never()).generate(anyList());
+    }
+
+    @Test
+    void personalMcpLookupDoesNotRequirePlatformAccountAndScopesIdentity() {
+        var personal = mock(com.checkba.service.ai.mcp.UserMcpConnectionService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(svc, "userMcp", personal);
+        when(personal.hasOverride("qichacha")).thenAnswer(i -> {
+            assertEquals(UID, PlatformAiUserScope.current()); return true;
+        });
+        when(providerResolver.resolve(ExternalServiceProvider.QICHACHA)).thenReturn(ExternalServiceProvider.PLATFORM);
+        when(qichacha.queryEciInfoJson(anyString())).thenReturn("{\"Name\":\"测试有限公司\"}");
+        EntityView result = svc.lookupSelection(UID, PID, "COMPANY", "测试有限公司");
+        assertEquals(DocInsightEntity.RETRIEVAL_OK, result.retrievalStatus());
+        verifyNoInteractions(gateway);
+    }
+
+    @Test
+    void personalMcpMissingCandidateOrFailureNeverFallsBackToPaidWebSearch() {
+        var personal = mock(com.checkba.service.ai.mcp.UserMcpConnectionService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(svc, "userMcp", personal);
+        when(personal.hasOverride("qichacha")).thenReturn(true);
+        when(providerResolver.resolve(ExternalServiceProvider.QICHACHA)).thenReturn(ExternalServiceProvider.PLATFORM);
+        when(mcp.callTool(anyString(), anyString(), anyMap())).thenReturn("[]");
+        PlatformAiUserScope.run(UID, () -> assertNull(svc.resolveFullNameViaMcp("测试")));
+        when(mcp.callTool(anyString(), anyString(), anyMap())).thenThrow(new IllegalStateException("synthetic failure"));
+        PlatformAiUserScope.run(UID, () -> assertNull(svc.resolveFullNameViaMcp("测试")));
+        verifyNoInteractions(gateway);
     }
 
     @Test

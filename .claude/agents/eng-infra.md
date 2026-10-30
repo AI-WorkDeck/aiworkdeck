@@ -7,6 +7,16 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
 
 职责边界：构建/发版/CI/测试/本地开发。各领域自己的业务测试内容见对应领域文档。
 
+## Electron 45 运行时（dev-board#1624）
+
+桌面壳固定 Electron **45.1.0**（Chromium 156 / Node 24），应用版本号与运行时版本独立。开发安装要求 Node >=22.12.0；桌面 CI/打包使用 Node 24。Electron 42 起不再通过包自身 postinstall 自动下载二进制，项目 postinstall 必须先执行 `install-electron`，再执行既有 DMG/NSIS 补丁；不得用跳过安装脚本掩盖缺少运行时。保留 electron-builder 24.13.3 及其已验证补丁。
+
+Electron 44 起最低 macOS **13 Ventura**，`build.mac.minimumSystemVersion` 与此一致；本项目仍仅构建 Mac ARM64。BrowserView 和旧导航方法在 45 中仍可用但已弃用，本轮保留现有生命周期。浏览器面板 UA 从当前运行时取得并去掉 Electron 标记，不再伪装成固定 Chrome 120/macOS。
+
+验证命令：`npm --prefix desktop test`；`npm --prefix desktop run test:runtime-compat`（独立临时 profile，生产 preload/BrowserView、文件路径、下载、WASM/shared-memory/worker）；`npm --prefix desktop run test:backend-request-gate-e2e`。`test:clipboard-compat` 会替换系统剪贴板，仅允许 GitHub 托管 runner，禁止本机绕过保护。desktop-build 在两平台构建前运行以上冒烟并保留剪贴板结果。手动 workflow_dispatch 仅构建测试产物，release/sync-mirror 仍只允许版本 tag；本轮升级不代表获准发版。
+
+四格式 macOS 源码验收：完成 H5、zetaoffice、LOWA 资源及后端 JAR 构建后，用 JDK 21 执行 `node frontend/tests/desktop-e2e/electron-upgrade.mjs`。可用 `AWD_BASELINE_ELECTRON` 指定旧版 Electron 可执行文件，只用于生成全新合成 profile；不传用户配置目录。脚本生成 Word/Excel/PPT/PDF、隔离并回读所有应用路径与 Java home/H2/storage/端口，实际 IME 输入后等待正常自动保存落盘再关闭重开。PDF 当前 FilePreview 为 Chromium iframe，查看/翻页须人工复核截图；不能把 source-hash 不变当成视觉通过，也不能将该测试称为 PDF 批注保存验证。CDP 虚拟 viewport 与原生 webview 坐标可不一致，保留原生窗口大小；只收到 ready 不算正文显示。签名原生升级另用全新托管用户的 full-upgrade 工作流。
+
 ## CI（.github/workflows/）
 
 - **ci.yml**（push master + 所有 PR）：三并行 job——backend（temurin **21**，`mvn -B test`）、frontend（node 20，`check:emits` + `check:locales` + `check:nav:full` + `test:project-home` + `test:commands` + `build:h5`）、desktop（仅 `npm ci`）。不打安装包。

@@ -258,7 +258,7 @@ export default {
   emits: ['close', 'ready', 'engine-failed', 'open-url', 'menu-state', 'evidence-drop', 'locator-consumed', 'open-evidence-target', 'command-progress', 'open-insight', 'cursor-context', 'open-history'],
   // 写作辅助卡片遇到配置类检索失败时要指一条真路（dev-board#688 D3）。设置在工作台里是
   // 一个标签（dev-board#582），组件拿不到页面实例，只能靠宿主注入——与 MarketDetailPane 同口径。
-  inject: { openSettingsTab: { default: null } },
+  inject: { openSettingsTab: { default: null }, openLegalReferenceTab: { default: null } },
   props: {
     // Track D: the Office file to load into the editor ({ id, name, fileType,
     // wpsFileId }). When set, the editor fetches its bytes (authed) and loads the
@@ -1420,7 +1420,7 @@ export default {
         this._lastCmdAt = 0
         const innerExec = this.executor.executeCommand.bind(this.executor)
         this.executor.executeCommand = async (action, params, callOpts) => {
-          if (action === 'export_document' || ['get_ui_state', 'office_get_navigation', 'slide_get_thumbnail', 'list_fonts', 'list_styles'].includes(action) || (callOpts && callOpts.background)) return innerExec(action, params, callOpts) // 保存自身与后台只读溯源不算「活跃编辑」
+          if ((action === 'slide_show_control' && params?.operation === 'state') || action === 'export_document' || ['get_ui_state', 'office_get_navigation', 'slide_get_thumbnail', 'list_fonts', 'list_styles'].includes(action) || (callOpts && callOpts.background)) return innerExec(action, params, callOpts) // 保存自身与后台只读溯源不算「活跃编辑」
           this._cmdBusy++
           this._lastCmdAt = Date.now()
           try { return await innerExec(action, params, callOpts) }
@@ -1687,6 +1687,8 @@ export default {
         api: { list: listWritingCompletions, learn: learnWritingCompletions, remove: deleteWritingCompletion,
           clear: clearWritingCompletions, lookup: lookupWritingSelection, detail: getDocInsightEntity, learnedDetail: getWritingCompletionDetail },
         openSettings: (opts) => { if (this.openSettingsTab) this.openSettingsTab(opts || {}) },
+        openLegalReference: this.openLegalReferenceTab ? (reference) => this.openLegalReferenceTab(reference) : null,
+        translate: (key) => this.$t(key),
         openAccount: () => requireAccount({ reason: 'gateway', force: true }),
         openRecharge: () => requireRecharge(),
         onRevise: (payload) => this.onWritingRevise(payload),

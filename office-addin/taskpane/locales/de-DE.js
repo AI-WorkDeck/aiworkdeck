@@ -2,6 +2,58 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "Bild in Folie einfügen",
+  cmdPptAddChart: "Diagramm in Folie einfügen",
+  cmdPptFormatChart: "Foliendiagramm formatieren",
+  cmdPptSetTransition: "Folienübergang festlegen",
+  wordStyleUnsupported: "Dieser Host kann diese Profilfelder nicht vollständig anwenden: {fields}. Es wurden noch keine Änderungen begonnen.",
+  wordStyleNotApplied: "Die Hostanwendung hat den angeforderten Absatzstil nicht angewendet. Prüfen Sie das Dokument, bevor Sie es erneut versuchen.",
+
+  cmdGetParagraphs: "Absätze lesen",
+  cmdGetOutline: "Gliederung lesen",
+  cmdGetClauses: "Klauseln erkennen",
+  cmdReplaceNthMatch: "Bestimmten Treffer ersetzen",
+  cmdApplyStyleProfile: "Stilprofil anwenden",
+
+  wordStructureTooLarge: "Die Dokumentstruktur ist zu groß, um sie in einem sicheren Vorgang vollständig zu lesen. Verkleinern Sie das Dokument und versuchen Sie es erneut.",
+  wordStructurePartial: "Einige Formatierungen wurden möglicherweise bereits angewendet. Prüfen Sie zuerst das aktuelle Dokument; wiederholen Sie den Vorgang nicht ungeprüft.",
+
+  cmdPptTableSetStyle: "Folientabelle formatieren",
+  cmdPptReadNotes: "Sprechernotizen lesen",
+  cmdPptWriteNotes: "Sprechernotizen schreiben",
+
+  excelConditionalActionInvalid: "Die Aktion für die bedingte Formatierung muss apply oder clearAll sein.",
+  wordImagePartial: "Das Bild wurde möglicherweise eingefügt, aber die Einrichtung ist unvollständig. Prüfen Sie das vorhandene Bild; fügen Sie keine weitere Kopie ein.",
+
+  excelRangeTooLarge: "Der Bereich umfasst mehr als 50.000 Zellen. Wählen Sie einen kleineren Bereich und versuchen Sie es erneut; es wurde nichts geändert.",
+
+  fileOperationUnavailable: "Dieser Dateivorgang ist nicht verfügbar oder konnte nicht bestätigt werden.",
+  fileOperationStale: "Das Dokument wurde gewechselt. Lesen Sie das aktuelle Dokument vor einem erneuten Versuch.",
+  fileOperationInvalidArguments: "Ungültige Parameter für den Dateivorgang.",
+  fileOperationInvalidBytes: "Es wurden keine gültigen vollständigen Dateidaten zurückgegeben.",
+  cmdFileCreate: "Neue Datei erstellen",
+  cmdFileSave: "Aktuelle Datei speichern",
+  cmdFileExportPdf: "PDF ins Projekt exportieren",
+  cmdFileOpen: "Datei öffnen oder Kopie importieren",
+  excelChartPartial: "Das Diagramm „{name}“ wurde möglicherweise erstellt, aber die Einrichtung ist fehlgeschlagen und das Zurücksetzen konnte nicht bestätigt werden. Prüfen Sie vor einem erneuten Versuch das vorhandene Diagramm, um Duplikate zu vermeiden.",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "Ungültiges Folien- oder Formziel.",
+  pptStaleTarget: "Der Zieltext wurde geändert. Lesen Sie ihn vor der Bearbeitung erneut.",
+  pptInvalidArguments: "Ungültige Parameter zur Präsentationsbearbeitung.",
+  pptCapabilityUnavailable: "Diese Funktion ist in der aktuellen Präsentationsanwendung nicht verfügbar.",
+  cmdPptSetShapeText: "Formtext festlegen",
+  cmdPptSetShapeGeometry: "Position und Größe der Form festlegen",
+  cmdPptFormatShape: "Form formatieren",
+  cmdPptGoto: "Zu Folie oder Form wechseln",
+  cmdPptSetLayout: "Folienlayout oder Hintergrund festlegen",
+  excelValidationCustomRequired: "Die benutzerdefinierte Validierung erfordert eine Formel.",
+  excelValidationTypeInvalid: "Nicht unterstützter Datenvalidierungstyp.",
+  excelPivotFieldsMissing: "Pivot-Felder nicht gefunden: {fields}",
+  excelValidationActionInvalid: "Die Datenvalidierungsaktion muss apply oder clear sein.",
+  excelValidationValueRequired: "Diese Datenvalidierungsregel erfordert einen Vergleichswert.",
+  excelValidationBoundsRequired: "Die Bereichsvalidierung erfordert beide Grenzwerte.",
+
   "dictate": "Spracheingabe",
   "dictateRecording": "Aufnahme läuft, klicken zum Beenden",
   "dictateTranscribing": "Wird transkribiert...",

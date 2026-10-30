@@ -11,11 +11,11 @@ export default {
   "disconnected": "Bağlı değil",
   "token": "Hizmet erişim tokenı",
   "connect": "Hizmete bağlan",
-  "disconnect": "Disconnect",
-  "refresh": "Refresh status",
-  "subscription": "Check subscription",
-  "active": "Subscription active",
-  "inactive": "No active subscription",
-  "bundled": "Included with the app",
-  "checkout": "Open checkout"
+  "disconnect": "Bağlantıyı kes",
+  "refresh": "Durumu yenile",
+  "subscription": "Aboneliği kontrol et",
+  "active": "Abonelik aktif",
+  "inactive": "Aktif abonelik yok",
+  "bundled": "Uygulamaya dahil",
+  "checkout": "Ödeme sayfasını aç"
 }

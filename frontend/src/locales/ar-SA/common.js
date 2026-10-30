@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "تعذّرت استعادة جلسة مساحة العمل",
   "confirm": "موافق",
   "cancel": "إلغاء",
   "save": "حفظ",
@@ -43,7 +44,7 @@ export default {
   "openFile": "فتح ملف",
   "open": "فتح",
   "cannotResolveParentFolder": "تعذّر تحديد المجلد الذي يحتوي على هذا الملف",
-  "dateTimeMdHm": "{year}-{month}-{day} {time}",
+  "dateTimeMdHm": "{year}/{month}/{day} {time}",
   "registeredItems": "تم تسجيل {count} عنصر",
   "filesCount": "{count} ملف",
   "statusRunning": "قيد التشغيل",
@@ -57,9 +58,9 @@ export default {
   "sourceChannelOfficeWord": "الوظيفة الإضافية لـ Word",
   "sourceChannelOfficeExcel": "الوظيفة الإضافية لـ Excel",
   "sourceChannelOfficePowerpoint": "الوظيفة الإضافية لـ PowerPoint",
-  "sourceChannelWpsWord": "WPS Writer",
-  "sourceChannelWpsExcel": "WPS Spreadsheets",
-  "sourceChannelWpsPowerpoint": "WPS Presentation",
+  "sourceChannelWpsWord": "الوظيفة الإضافية لـ WPS Writer",
+  "sourceChannelWpsExcel": "الوظيفة الإضافية لـ WPS Spreadsheets",
+  "sourceChannelWpsPowerpoint": "الوظيفة الإضافية لـ WPS Presentation",
   "sourceChannelPlugin": "وظيفة إضافية",
   "languagePickerLabel": "اختيار اللغة",
   "languageFollowSystem": "اتباع النظام",

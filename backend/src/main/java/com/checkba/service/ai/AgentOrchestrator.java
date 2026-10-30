@@ -1101,8 +1101,17 @@ public class AgentOrchestrator {
         // 还被裁着——模型第一步做成了、第二步没有工具可用，这是最坏的一种半途而废。
         if (guard != null && result.success()) {
             String createdKind = NEW_DOCUMENT_TOOL_KINDS.get(toolName);
-            if (createdKind != null) {
-                widenDocKindAfterDocumentSwitch(guard, createdKind, toolName, conversationId);
+            if (createdKind != null && com.checkba.service.ai.tools.GeneratedFileLocation
+                    .parentParameter(toolName, extractArg(argsJson, "fileId")) != null) {
+                var created = com.checkba.service.ai.tools.GeneratedFileLocation
+                        .createdFile(projectFileService, projectId, toolName, result.output());
+                if (created != null) {
+                    // The following edit and checkpoint belong to the newly opened file,
+                    // not the reference document that was active when this run started.
+                    guard.activeFileId = created.getId();
+                    guard.activeFileName = created.getName();
+                    widenDocKindAfterDocumentSwitch(guard, createdKind, toolName, conversationId);
+                }
             }
         }
         return result;
@@ -1121,12 +1130,13 @@ public class AgentOrchestrator {
     /**
      * 「新建并打开一份新文档」的工具 → 它建出来的文档类型（dev-board#729 ①）。
      *
-     * <p>这两个是 {@code ClientCapabilityService.KIND_AGNOSTIC_LOWA_TOOLS} 里的「新建」那一类：
+     * <p>这些是 {@code ClientCapabilityService.KIND_AGNOSTIC_LOWA_TOOLS} 里的「新建」那一类：
      * 跨类型新建流程的第一步。第二步（往新文档里写）需要的是另一套原语，
      * 所以它们一旦成功就要把工具集放回全集。
      */
     private static final Map<String, String> NEW_DOCUMENT_TOOL_KINDS = Map.of(
             "sheet_create_file", ClientCapabilityService.DOC_KIND_SHEET,
+            "slide_create_file", ClientCapabilityService.DOC_KIND_SLIDE,
             "doc_start_stream", ClientCapabilityService.DOC_KIND_WRITER);
 
     /** 新建并打开的文档与本轮裁剪用的类型不一致时放回全集；一致时什么都不做。 */
@@ -1266,9 +1276,11 @@ public class AgentOrchestrator {
             for (Long id : generatedIds) notifyVerifiedFile(conversationId, id, "ADDED", projectId, guard);
             return;
         }
-        // PDF derivatives never count the input/source as newly created, including
-        // a download prompt or malformed/failed result with no confirmed identity.
-        if (toolName.startsWith("pdf_") && "ADDED".equals(meta.fileEffect())) return;
+        // Derived files and litigation diagrams require confirmed output identities.
+        // A render rejection or diagram name is not an added "current document".
+        if ((toolName.startsWith("pdf_") || "image_get_generation".equals(toolName)
+                || "litigation_render".equals(toolName) || "litigation_timeline_render".equals(toolName))
+                && "ADDED".equals(meta.fileEffect())) return;
         // 「执行成功」不等于「改过文件」：查找替换一次都没命中时照发 MODIFIED，
         // 用户会被告知本轮改了这个文件，去找却找不到任何改动。
         if (!meta.fileEffect().isEmpty() && result.fileChanged()) {
@@ -2128,9 +2140,7 @@ public class AgentOrchestrator {
             java.util.List<AiAgentController.ContextItem> resolvedContextItems = request.getContextItems() != null
                     ? request.getContextItems()
                     : convertFileIdsToContextItems(request.getFileIds());
-            AllowedModels.Region networkRegion = networkRegionService != null
-                    ? networkRegionService.effectiveRegion()
-                    : AllowedModels.Region.GLOBAL;
+            AllowedModels.Region networkRegion = AllowedModels.Region.INTERNATIONAL;
             SmartModelRouter.RouteDecision routeDecision =
                     (smartModelRouter != null ? smartModelRouter : new SmartModelRouter()).route(
                             request.getModel(),
@@ -2140,7 +2150,14 @@ public class AgentOrchestrator {
                             request.getActiveContext(),
                             effectiveSkills,
                             networkRegion);
+            if (chatModelFactory.usesProviderCatalog()) {
+                routeDecision = chatModelFactory.adaptPlatformRoute(routeDecision,
+                        SmartModelRouter.hasImageInput(resolvedContextItems, request.getActiveContext()));
+            }
             String effectiveModelId = routeDecision.effectiveModelId();
+            if (chatModelFactory.usesProviderCatalog() && agentMode != AgentMode.ASK) {
+                chatModelFactory.ensureToolCapableModel(effectiveModelId);
+            }
             guard.reasoningEffortOverride = routeDecision.reasoningEffort();
             if (routeDecision.routed()) {
                 log.info("[SmartRouter] conv={} routed '{}' -> model={} (tier={}, effort={}, region={})",
@@ -3120,7 +3137,7 @@ public class AgentOrchestrator {
                         "Document text was sent to the editor, but the change summary failed. Please check the current document."), executionLog);
                 return;
             }
-            boolean replayable = !handler.hasStreamedTokens();
+            boolean replayable = !chatModelFactory.isDomesticPlatform() && !handler.hasStreamedTokens();
             // 同模型退避重放还要求「思考也没流出过」（dev-board#1061）：思考型模型（Kimi K3）一轮纯思考
             // 可以跑到 OkHttp callTimeout（600s），这时正文一个字没出、按上面的判据「可重放」——
             // 原样重放 3 次就是从头再想 3 遍、按输出单价再付 3 遍，而同一家供应商多半还在同一个队里。
@@ -3201,7 +3218,10 @@ public class AgentOrchestrator {
                 // 备用模型会把 image 块原样重发，换来一个上游 400，而第一个模型的图像 token
                 // 已经花掉了；更坏的是这个 400 会被当成新一轮错误继续往下切，一次烧完整条链。
                 // 收窄后一个候选都不剩就走终态处置——比白花几次请求诚实。
-                String next = nextFailoverModel(failoverProperties.getModels(), modelId, guard.triedModels,
+                String next = chatModelFactory.usesProviderCatalog()
+                        ? chatModelFactory.platformFailover(failoverProperties.getModels(), modelId, guard.triedModels,
+                                com.checkba.service.ai.context.ChatMessageText.containsImage(messages))
+                        : nextFailoverModel(failoverProperties.getModels(), modelId, guard.triedModels,
                         kind.requiresRegionAgnosticFailover(),
                         com.checkba.service.ai.context.ChatMessageText.containsImage(messages));
                 if (next != null && switchToFailoverModel(next, kind, err, messages, conversationId,
@@ -3243,7 +3263,8 @@ public class AgentOrchestrator {
             guard.roundTrimmed = 0;
         }
         if (agentMode == AgentMode.ASK) {
-            visible = registered.stream().filter(s -> ASK_READ_TOOLS.contains(s.name())).toList();
+            visible = chatModelFactory.usesProviderCatalog() && !chatModelFactory.effectiveModelSupportsTools(modelId)
+                    ? List.of() : registered.stream().filter(s -> ASK_READ_TOOLS.contains(s.name())).toList();
             log.info("Ask mode: generating with {} read-only tools", visible.size());
         } else {
             List<ToolSpecification> afterSkill = skillRouter.visibleTools(guard.runId, registered);
@@ -3977,7 +3998,7 @@ public class AgentOrchestrator {
                                      int depth, StringBuilder executionLog, AgentMode agentMode, RunGuard guard) {
         // conversationId 与 guard.conversationId 恒等，保留形参只为不动调用方的实参顺序
         LlmErrorClassifier.Kind kind = LlmErrorClassifier.Kind.TRANSIENT;
-        if (guard.llmRetries < kind.maxRetries()) {
+        if (!chatModelFactory.isDomesticPlatform() && guard.llmRetries < kind.maxRetries()) {
             int attempt = ++guard.llmRetries;
             long delaySec = kind.retryDelaySeconds(attempt);
             log.warn("Empty LLM response for {} (attempt {}/{}), retrying in {}s",
@@ -4268,7 +4289,9 @@ public class AgentOrchestrator {
                     // 而他自己并不知道模型这两次挑了不同的工具（审计 A14）
                     "read_document",
                     // 结构审计报告本身就是给用户核对的成果（编号/引用/算术/修订清单），砍到 4000 用户看不到后半
-                    "doc_audit_structure");
+                    "doc_audit_structure",
+                    // 法源结构化结果供用户在资料卡核对；仍保留有界截断与前端截断提示。
+                    "law_search", "law_search_keyword", "law_recognition", "get_law_article", "case_search");
 
     /** 该工具的面板展示上限。前端截断提示按 {@code ...(截断)} 后缀判定，不要在文案里写死字数。 */
     static int toolOutputDisplayLimit(String toolName) {

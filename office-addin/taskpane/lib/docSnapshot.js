@@ -24,12 +24,13 @@ export const SNAPSHOT_MAX_BYTES = 50 * 1024 * 1024
  * （宁多拍一张——内容哈希不变时上传会被跳过，多拍无害，漏拍才是丢归档）。
  */
 const READ_ONLY_COMMANDS = new Set([
+  'get_paragraphs', 'get_outline', 'get_clauses',
   'get_text', 'get_selection', 'search', 'get_formatting', 'get_comments', 'get_revisions',
   'table_read',
   'excel_get_range', 'excel_search', 'excel_get_overview', 'excel_get_comments',
-  'ppt_get_slides', 'ppt_get_slide_details', 'ppt_table_read',
+  'ppt_get_slides', 'ppt_get_slide_details', 'ppt_table_read', 'ppt_goto', 'ppt_read_notes',
   // 别的窗格按 locator 读本文档（dev-board#717），只读
-  'read_for_reference'
+  'read_for_reference', 'file_save', 'file_export_pdf', 'file_create', 'file_open'
 ])
 
 export function isReadOnlyCommand(command) {

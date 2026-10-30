@@ -114,3 +114,19 @@ test('三个「挑一份文件」的入口都过同一道剔除', () => {
   assert.ok(chat.includes('excludeSystemFolders('), '@ 引用与「从项目选择」共用的候选集要剔除暂存区')
   assert.ok(quickOpen.includes('excludeSystemFolders('), 'Cmd+P 同理')
 })
+
+
+test('encrypted restoration materials do not consume the AI folder file limit', () => {
+  const files = [
+    { id: 1, isFolder: true },
+    { id: 2, parentId: 1, name: 'redacted.docx' },
+    { id: 3, parentId: 1, name: 'redacted.docx.awd-recovery' },
+    { id: 4, parentId: 1, name: 'renamed', filePath: 'project/kit.AWD-RECOVERY' },
+    { id: 5, parentId: 1, name: 'nested', isFolder: true },
+    { id: 6, parentId: 5, name: 'second.txt' },
+    { id: 7, parentId: 5, name: 'second.txt.awd-recovery' },
+  ]
+  assert.equal(countDescendantFiles(files, 1), 2)
+  // Project selection must still offer the material to the restoration panel.
+  assert.equal(excludeSystemFolders(files).length, files.length)
+})

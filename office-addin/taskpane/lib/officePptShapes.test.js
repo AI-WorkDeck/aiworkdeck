@@ -162,3 +162,19 @@ test('ppt_replace_text：全角半角差异也要命中（锚点归一化）', a
     assert.equal(shape._state.text, '违约责任由甲方承担')
   } finally { restore() }
 })
+
+test('precision target changes one occurrence and rejects stale expectedText', async () => {
+  const first = textShape('cost 100 and 100'), second = textShape('cost 100 and 100')
+  first.id = 'a'; second.id = 'b'
+  const restore = install({ supports18: true, slides: [[first, second]] })
+  try {
+    const args = {slideNumber: 1, shapeId: 'b', expectedText: 'cost 100 and 100', searchText: '100', replaceText: '200', all: false}
+    const result = await executeOfficeCommand('ppt_replace_text', args)
+    assert.equal(result.ok, true, result.error)
+    assert.equal(first._state.text, 'cost 100 and 100')
+    assert.equal(second._state.text, 'cost 200 and 100')
+    assert.equal(second._state.wholeWrites, 0)
+    assert.equal((await executeOfficeCommand('ppt_replace_text', args)).ok, false)
+    assert.equal(second._state.text, 'cost 200 and 100')
+  } finally { restore() }
+})

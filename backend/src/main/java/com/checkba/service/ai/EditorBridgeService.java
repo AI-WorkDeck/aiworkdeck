@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -210,6 +211,10 @@ public class EditorBridgeService {
             Map.entry("sheet_protect_sheet", 120),
             Map.entry("sheet_group_rows_cols", 120),
             Map.entry("sheet_add_pivot_table", 120),
+            Map.entry("slide_add_image", 120),
+            Map.entry("slide_add_chart", 120),
+            Map.entry("slide_format_chart", 120),
+            Map.entry("slide_set_transition", 120),
             Map.entry("slide_add_page", 120),
             Map.entry("slide_delete_page", 120),
             Map.entry("slide_move_page", 120),
@@ -755,7 +760,7 @@ public class EditorBridgeService {
                 recordBridge(action, "error", conversationId, bridgeStartMs);
                 // 编辑器明确报错 = 这段确实没写进去，撤掉去重登记（超时不撤，结局未知）
                 forgetBulkInsert(conversationId, action, params);
-                return errorJson(result.getError());
+                return errorJson(result.getError(), action != null && action.startsWith("slide_") ? result.getData() : null);
             }
 
         } catch (TimeoutException e) {
@@ -870,8 +875,48 @@ public class EditorBridgeService {
     }
 
     private String errorJson(String message) {
-        return objectMapper.valueToTree(Map.of("error",
-                message == null || message.isBlank() ? "编辑器未返回具体错误，请检查文档状态" : message)).toString();
+        return errorJson(message, null);
+    }
+
+    /** Partial slide writes must remain distinguishable from operations that never ran. */
+    private String errorJson(String message, Object receipt) {
+        var result = objectMapper.createObjectNode().put("error",
+                message == null || message.isBlank() ? LangText.of("编辑器未返回具体错误，请检查文档状态", "The editor returned no error details; check the document state") : message);
+        if (receipt instanceof Map<?, ?> data) {
+            for (String key : List.of("created", "retryable", "outcomeUnknown")) {
+                if (data.get(key) instanceof Boolean value) result.put(key, value);
+            }
+            for (String key : List.of("errorCode", "stage")) {
+                if (data.get(key) instanceof String value && value.length() <= 128) result.put(key, value);
+            }
+            for (String key : List.of("slideNumber", "replaced", "row", "col", "cellsOk")) {
+                copyReceiptInteger(result, data, key);
+            }
+            if (data.get("shapeName") instanceof String name && name.length() <= 1024) result.put("shapeName", name);
+            if (data.get("hits") instanceof List<?> hits) {
+                var output = result.putArray("hits");
+                for (Object entry : hits.subList(0, Math.min(50, hits.size()))) {
+                    if (!(entry instanceof Map<?, ?> hit)) continue;
+                    var item = output.addObject();
+                    for (String key : List.of("slideNumber", "row", "col", "replaced")) {
+                        copyReceiptInteger(item, hit, key);
+                    }
+                    if (hit.get("shapeName") instanceof String name && name.length() <= 1024) item.put("shapeName", name);
+                }
+                if (hits.size() > 50) result.put("hitsTruncated", true);
+            }
+        }
+        return result.toString();
+    }
+
+    private static void copyReceiptInteger(com.fasterxml.jackson.databind.node.ObjectNode target,
+            Map<?, ?> data, String key) {
+        if (data.get(key) instanceof Number value && value.doubleValue() >= 0
+                && value.doubleValue() <= Integer.MAX_VALUE && value.doubleValue() == value.intValue()) {
+            target.put(key, value.intValue());
+        } else if (data.containsKey(key) && data.get(key) == null) {
+            target.putNull(key);
+        }
     }
 
     /**

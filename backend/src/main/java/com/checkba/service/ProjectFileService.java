@@ -1714,6 +1714,21 @@ public class ProjectFileService {
                 .orElseThrow(() -> new IllegalArgumentException(LangText.of("文件不存在: ", "File not found: ") + fileId));
     }
 
+    /** Persist only server-created recovery associations; ordinary file metadata does not expose them. */
+    @Transactional
+    public void linkSensitiveRecovery(ProjectFile document, ProjectFile recovery) {
+        if (document.getId() == null || recovery.getId() == null
+                || Objects.equals(document.getId(), recovery.getId())
+                || !Objects.equals(document.getProjectId(), recovery.getProjectId())
+                || Boolean.TRUE.equals(document.getIsDeleted()) || Boolean.TRUE.equals(recovery.getIsDeleted())
+                || Boolean.TRUE.equals(document.getIsFolder()) || Boolean.TRUE.equals(recovery.getIsFolder())
+                || !"awd-recovery".equals(recovery.getFileType())) {
+            throw new IllegalArgumentException(LangText.of("恢复材料无法与该文件关联", "Recovery material cannot be associated with this file"));
+        }
+        document.setSensitiveRecoveryFileId(recovery.getId());
+        projectFileRepository.saveAndFlush(document);
+    }
+
     /** 按 id 查行（含回收站里的）；不存在时回空，不抛错。 */
     public Optional<ProjectFile> findFile(Long fileId) {
         return fileId == null ? Optional.empty() : projectFileRepository.findById(fileId);

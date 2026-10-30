@@ -7,13 +7,13 @@ import { readFileSync } from 'node:fs'
 const source = readFileSync(new URL('../../src/composables/useAgentStream.js', import.meta.url), 'utf8')
 const code = source.slice(source.indexOf('    const connectSSE ='), source.indexOf('    // displayText（可选'))
 
-function setup(fetch, { lastEventId = '', cursorConversation = 'conv', onReconnect = () => {} } = {}) {
+function setup(fetch, { lastEventId = '', cursorConversation = 'conv', conversationScope = null, onReconnect = () => {} } = {}) {
   let timer
   let cleared = false
   const connected = { value: false }
   const streaming = { value: true }
   const bubble = { value: { content: '', isStreaming: true } }
-  const build = new Function('fetch', 'setTimeout', 'clearTimeout', 'isConnected', 'isStreaming', 'currentAssistantBubble', 'lastSseEventId', 'lastSseEventConversationId', 'scheduleReconnect', `
+  const build = new Function('fetchAgentConnection', 'setTimeout', 'clearTimeout', 'isConnected', 'isStreaming', 'currentAssistantBubble', 'lastSseEventId', 'lastSseEventConversationId', 'scheduleReconnect', 'conversationScope', `
     let sseAbortController, reconnectAttempts, lastSseActivityAt, myNetworkRecoveryHook,
       disconnectedBubble, supersededByOtherClient;
     const activeNetworkRecoveryHooks = new Set();
@@ -31,7 +31,7 @@ function setup(fetch, { lastEventId = '', cursorConversation = 'conv', onReconne
     assert.equal(ms, 15000)
     timer = callback
     return 12
-  }, id => { assert.equal(id, 12); cleared = true }, connected, streaming, bubble, lastEventId, cursorConversation, onReconnect)
+  }, id => { assert.equal(id, 12); cleared = true }, connected, streaming, bubble, lastEventId, cursorConversation, onReconnect, conversationScope)
   return { connect, connected, streaming, expire: () => timer(), cleared: () => cleared }
 }
 

@@ -121,6 +121,7 @@ final class RealToolBeans {
                 MemoryTools.class,
                 OfficeEditTools.class,
                 PdfTools.class,
+                com.checkba.service.ai.tools.PdfVisualTools.class,
                 PluginDevTools.class,
                 PptxTools.class,
                 PythonTools.class,
@@ -130,6 +131,8 @@ final class RealToolBeans {
                 // 要真跑它的用例由 EvalHarness 换成接了真 skill 登记簿的实例
                 SkillTools.class,
                 SlideEditTools.class,
+                com.checkba.service.ai.tools.SlideMediaTools.class,
+                com.checkba.service.ai.tools.ImageAssetTools.class,
                 SubAgentTools.class,
                 TextFileEditTools.class,
                 // TodoTools 长期漏列：todo_write 在整个回放评测里根本没注册，

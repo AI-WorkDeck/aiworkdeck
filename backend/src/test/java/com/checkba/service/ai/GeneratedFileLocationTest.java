@@ -30,6 +30,7 @@ class GeneratedFileLocationTest {
         @Tool("create docx") public String write_docx(Long parentFolderId) { return "" + parentFolderId; }
         @Tool("stream") public String doc_start_stream(Long fileId, Long parentFolderId) { return fileId + ":" + parentFolderId; }
         @Tool("sheet") public String sheet_create_file(Long parentFolderId) { return "" + parentFolderId; }
+        @Tool("slide") public String slide_create_file(Long parentFolderId) { return "" + parentFolderId; }
         @Tool("pptx config") public String pptx_generate(Long parentId) { return "" + parentId; }
         @Tool("move") public String move_project_file(Long parentFolderId) { return "" + parentFolderId; }
         @Tool("pdf derivative") public String pdf_to_word(Long parentId) { return "" + parentId; }
@@ -69,7 +70,7 @@ class GeneratedFileLocationTest {
     }
     @Test void whiteListDoesNotRedirectExistingEditsMovesOrPdfDerivatives() {
         file(7, 1, null, true); var r = registry();
-        for (String tool : List.of("write_docx", "sheet_create_file", "pptx_generate"))
+        for (String tool : List.of("write_docx", "sheet_create_file", "slide_create_file", "pptx_generate"))
             assertEquals("7", r.execute(tool, "{}", context(7L)).output(), tool);
         assertEquals("null:7", r.execute("doc_start_stream", "{}", context(7L)).output());
         assertEquals("42:null", r.execute("doc_start_stream", "{\"fileId\":42}", context(7L)).output());
@@ -97,4 +98,15 @@ class GeneratedFileLocationTest {
             assertNull(GeneratedFileLocation.createdId(invalid));
         f.setIsDeleted(true); assertNull(GeneratedFileLocation.createdFile(files, 1L, "write_docx", result));
     }
+    @Test void imageAssetIdentityNeverComesFromPendingReceiptOrChangesDocumentDestination() {
+        ProjectFile asset = file(43, 1, null, false);
+        String result = GeneratedFileLocation.createdResult(asset, null);
+        assertEquals(List.of(43L), GeneratedFileLocation.createdIds("image_get_generation", result));
+        assertEquals(asset, GeneratedFileLocation.createdFile(files, 1L, "image_get_generation", result));
+        assertNull(GeneratedFileLocation.createdFile(files, 2L, "image_get_generation", result));
+        assertTrue(GeneratedFileLocation.createdIds("image_get_generation", "{\"state\":\"PENDING\",\"generationId\":\"task\"}").isEmpty());
+        assertTrue(GeneratedFileLocation.createdIds("image_generate_asset", result).isEmpty());
+        assertNull(GeneratedFileLocation.parentParameter("image_get_generation", null));
+    }
+
 }

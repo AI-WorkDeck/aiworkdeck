@@ -3,6 +3,7 @@
 
 package com.checkba.service.ai.tools;
 
+import com.checkba.service.LangText;
 import com.checkba.service.ai.ToolDisclosurePolicy;
 import com.checkba.service.ai.skill.SkillDefinition;
 import com.checkba.service.ai.skill.SkillRouter;
@@ -106,7 +107,7 @@ public class ToolDiscoveryTools implements AgentToolComponent {
             + "edit (cursor/selection, delete, rewrite a paragraph, insert under a heading), "
             + "files (incl. export to PDF), format (fonts/paragraphs/page setup/TOC/footnotes/images), "
             + "spreadsheet, slides, office, pdf, litigation (diagrams), reference, memory, enterprise-data, legal, "
-            + "version (Git status/history/changed paths, commit, pull latest, restore history), meeting, task, tag (file tags), plugin, python, plugin-tools (tools from installed plugins), misc. "
+            + "version (Git status/history/changed paths, commit, pull latest, restore history), meeting, task, tag (file tags), plugin, python, plugin-tools (tools from installed plugins), mcp (user-configured remote MCP connections), misc. "
             + "With no argument you get every category with the tool names in it, plus the skills (cheap, do this first). "
             + "With query you search tool names and descriptions by keywords (every word must match, up to 15 hits); "
             + "with names you get exactly those tools; with a category (comma-separate several) you get the whole category. "
@@ -133,26 +134,41 @@ public class ToolDiscoveryTools implements AgentToolComponent {
         }
         if (names != null && !names.isBlank()) {
             log.info("Tool: list_tools conv={} names={} candidates={}", conversationId, names, candidates.size());
-            return renderNames(candidates, names, ctx);
+            return withPresentationContext(renderNames(candidates, names, ctx), candidates);
         }
         if (query != null && !query.isBlank()) {
             log.info("Tool: list_tools conv={} query=({} chars) candidates={}",
                     conversationId, query.length(), candidates.size());
-            return renderQuery(candidates, query, ctx);
+            return withPresentationContext(renderQuery(candidates, query, ctx), candidates);
         }
         Set<String> requested = policy.parseCategories(category);
         if (category != null && !category.isBlank() && requested.isEmpty()) {
-            return "Error: unknown category '" + category + "'. Known categories: "
+            return withPresentationContext("Error: unknown category '" + category + "'. Known categories: "
                     + String.join(", ", policy.categoryNames())
-                    + ". Call list_tools with no argument to see what is in each.";
+                    + ". Call list_tools with no argument to see what is in each.", candidates);
         }
         log.info("Tool: list_tools conv={} category={} candidates={}",
                 conversationId, requested.isEmpty() ? "(all)" : requested, candidates.size());
         if (requested.isEmpty()) {
-            return renderIndex(candidates, offered, ctx == null ? null : ctx.runId());
+            return withPresentationContext(renderIndex(candidates, offered, ctx == null ? null : ctx.runId()), candidates);
         }
         record(ctx, requested);
-        return renderCategories(candidates, requested);
+        return withPresentationContext(renderCategories(candidates, requested), candidates);
+    }
+
+    private static String withPresentationContext(String output, List<ToolSpecification> candidates) {
+        Set<String> names = candidates.stream().map(ToolSpecification::name).collect(java.util.stream.Collectors.toSet());
+        if (!names.contains("slide_create_file") || names.contains("slide_get_page")) return output;
+        String hint = LangText.of(
+                "当前文档类型隐藏了 PPT 专属编辑工具，不代表没有 PPT 制作能力。新建 PPT 请先调用 slide_create_file。",
+                "The current document type hides PPT-specific editing tools; this does not mean presentation creation is unavailable. For a new PPT, call slide_create_file first.");
+        if (names.contains("doc_open_file")) {
+            hint += LangText.of("已有 PPT 则先用 doc_open_file 打开。",
+                    " For an existing PPT, open it with doc_open_file first.");
+        }
+        return output + "\n\n" + hint + LangText.of(
+                "成功切换到 PPT 后再用 list_tools 搜索编辑工具，不要在切换前反复搜索。",
+                " After successfully switching to the PPT, use list_tools to find its editing tools. Do not repeatedly search before switching documents.");
     }
 
     /**

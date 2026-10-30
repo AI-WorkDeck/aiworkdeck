@@ -147,13 +147,16 @@ public class ToolDisclosurePolicy {
             // doc_restore_checkpoint 回到核心集：Impress 上 doc_undo 是空操作（引擎不记撤销栈，
             // lowa-e2e undo-redo-kinds 实测），pptx 会话里它是唯一的后悔药，约 300 字符。
             "doc_add_comment", "doc_undo", "doc_restore_checkpoint",
+            // LOWA Word/Calc/Impress visual verification needs export without a files discovery round.
+            // Upstream capability gates still exclude this command from Office add-ins and none sessions.
+            "doc_export_pdf",
 
             // ==================== LOWA 表格（xlsx）段：5 个 ====================
             // sheet_create_file 在 docx 会话里同样可见（新建一份表格，不依赖活跃文档类型）。
             "sheet_create_file", "sheet_get_overview", "sheet_read_range", "sheet_write_cells", "sheet_find_replace",
 
-            // ==================== LOWA 演示（pptx）段：5 个 ====================
-            "slide_get_overview", "slide_get_page", "slide_set_shape_text", "slide_replace_text", "slide_add_page",
+            // ==================== LOWA 演示（pptx）段：6 个 ====================
+            "slide_create_file", "slide_get_overview", "slide_get_page", "slide_set_shape_text", "slide_replace_text", "slide_add_page",
 
             // ==================== Office 任务窗格·Word 段：7 个（T-18）====================
             // office_pass_step 是 Word 窗格整篇大改的入口（分段过卷，dev-board#422）；office_add_comment 是审查的交付物。
@@ -213,7 +216,7 @@ public class ToolDisclosurePolicy {
         // doc_* 里剩下的全是版式与排版：字符格式、段落格式、页面、页眉页脚、目录、脚注、图片、超链接……
         CATEGORIES.put("format", List.of("doc_"));
         CATEGORIES.put("spreadsheet", List.of("sheet_"));
-        CATEGORIES.put("slides", List.of("slide_", "pptx_"));
+        CATEGORIES.put("slides", List.of("slide_", "pptx_", "image_generate_asset", "image_get_generation"));
         CATEGORIES.put("office", List.of("office_"));
         CATEGORIES.put("pdf", List.of("pdf_"));
         CATEGORIES.put("litigation", List.of("litigation_"));
@@ -224,11 +227,12 @@ public class ToolDisclosurePolicy {
         CATEGORIES.put("enterprise-data", List.of("qichacha_", "name:tushare_query"));
         // law_search / law_search_keyword / get_law_article 在核心集，这里收的是剩下的 law_recognition：
         // 归进 legal 比落 misc 好找——模型要的是「法规这一族还有什么」，不是「杂项里翻翻看」。
-        CATEGORIES.put("legal", List.of("law_"));
+        CATEGORIES.put("legal", List.of("law_", "name:case_search"));
         CATEGORIES.put("meeting", List.of("meeting_", "tmeet_"));
         CATEGORIES.put("task", List.of("task_"));
         // 文件标签不是事项（T-19）：tag_list / tag_file / tag_remove_from_file 原先挂在 task 下
         CATEGORIES.put("tag", List.of("tag_"));
+        CATEGORIES.put("mcp", List.of("user_mcp_"));
         CATEGORIES.put("plugin", List.of("plugin_dev_", "capability_"));
         CATEGORIES.put("python", List.of("name:run_python"));
     }
@@ -285,6 +289,7 @@ public class ToolDisclosurePolicy {
         CATEGORY_KEYWORDS.put("litigation", List.of("时间轴", "关系图", "流程图", "可视化",
                 "timeline", "diagram", "relationship graph"));
         CATEGORY_KEYWORDS.put("slides", List.of("ppt", "pptx", "幻灯片", "演示文稿", "slides", "presentation"));
+        CATEGORY_KEYWORDS.put("mcp", List.of("mcp", "MCP", "外部连接", "自配连接", "GitHub", "Tavily", "元典"));
         CATEGORY_KEYWORDS.put("enterprise-data", List.of("工商", "企业信息", "企查查", "股东", "注册资本",
                 "公司背景", "tushare", "股票", "上市公司"));
         CATEGORY_KEYWORDS.put("plugin", List.of("插件", "plugin", "能力安装", "capability"));
@@ -312,7 +317,8 @@ public class ToolDisclosurePolicy {
                 "rename", "move", "folder", "organize files", "file organization"));
         // 「法》」「条例》」：用户一写书名号引一部法（《公司法》《劳动合同法》《著作权法实施条例》）就是在查法条，
         // 比「法规」「法条」这类泛称命中得准。
-        CATEGORY_KEYWORDS.put("legal", List.of("法规", "法条", "条文", "司法解释", "法》", "条例》"));
+        CATEGORY_KEYWORDS.put("legal", List.of("法规", "法条", "条文", "司法解释", "法》", "条例》",
+                "案例", "判例", "查询案号", "检索案号", "判决书", "case law", "judgment"));
         // memory 类目里是 memory_write / memory_edit / memory_delete 三个写入工具（只读三个编排器每轮都补，
         // dev-board#1073）；「记下」「忘掉」是要改记忆文件的说法。不收「别忘」「forget」：
         // 「别忘了加页码」是叮嘱不是记忆。

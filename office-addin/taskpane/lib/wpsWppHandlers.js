@@ -30,6 +30,10 @@ const msoShapeRectangle = 1
 const msoShapeIsoscelesTriangle = 7
 const msoShapeOval = 9
 /** MsoShapeType（识别用） */
+import { t } from './i18n.js'
+import { wpsNativeServices, createWpsTemporaryPath } from './wpsNativeServices.js'
+import { imageOptions, preparePptImage, addWpsChart, formatWpsChart, setWpsTransition, mediaPartial } from './pptMedia.js'
+import { pptTarget, pptExpected, pptGeometry, pptShapeStyle, wpsPptShape, pptTableStyle, wpsNotesBody, pptParagraphFormat, applyWpsParagraphFormat } from './pptPrecision.js'
 import { findAllNormalized, describeAnchorFailure } from './textMatch.js'
 import { substringEdits } from './minimalEdit.js'
 import { readWppSlides } from './wpsDoc.js'
@@ -69,9 +73,6 @@ const PPT_UNDERLINE_STYLES = ['none', 'single', 'double', 'dotted', 'wave']
 
 /** 新增文本框/形状的默认位置尺寸（磅），与 officeExecutor.PPT_SHAPE_DEFAULTS 同值 */
 const PPT_SHAPE_DEFAULTS = { left: 50, top: 50, width: 400, height: 100 }
-
-/** ppt_replace_text 续查上限：防 replaceText 再含 searchText 时死循环 */
-const MAX_REPLACE_PER_FRAME = 1000
 
 // ==================== 颜色转换（导出的纯函数） ====================
 
@@ -259,6 +260,28 @@ function applyHyperlink(textRange, url) {
 // ==================== HANDLERS ====================
 
 export const WPS_WPP_HANDLERS = {
+  async ppt_add_image(args) {
+    imageOptions(args)
+    const pres=activePresentation(), source=String(pres.FullName||pres.Name), slide=getSlideOrThrow(pres,args.slideNumber), slideId=slide.SlideID
+    const services=wpsNativeServices(),fs=services.fileSystem
+    if(typeof slide.Shapes.AddPicture!=='function'||typeof fs?.writeAsBinaryString!=='function'||typeof fs?.readAsBinaryString!=='function'||typeof fs?.Remove!=='function')throw new Error(t('pptCapabilityUnavailable'))
+    const image=await preparePptImage(args)
+    const now=activePresentation()
+    if(String(now.FullName||now.Name)!==source||getSlideOrThrow(now,args.slideNumber).SlideID!==slideId)throw new Error(t('fileOperationStale'))
+    const path=createWpsTemporaryPath(services,image.extension)
+    let shape
+    try{
+      const binary=atob(image.base64);fs.writeAsBinaryString(path,binary)
+      if(fs.readAsBinaryString(path)!==binary)throw new Error(t('fileOperationInvalidBytes'))
+      shape=slide.Shapes.AddPicture(path,0,-1,image.left,image.top,image.width,image.height)
+      if(args.sendToBack)shape.ZOrder(1)
+      return {slideNumber:args.slideNumber,shapeId:String(shape.Id),shapeName:String(shape.Name),created:true,fit:image.fit,cropped:image.cropped}
+    }catch(error){throw mediaPartial(error,args,shape)}finally{try{fs.Remove(path)}catch{}}
+  },
+  async ppt_add_chart(args) { return addWpsChart(getSlideOrThrow(activePresentation(),args.slideNumber),args) },
+  async ppt_format_chart(args) { return formatWpsChart(getSlideOrThrow(activePresentation(),args.slideNumber),args) },
+  async ppt_set_transition(args) { return setWpsTransition(getSlideOrThrow(activePresentation(),args.slideNumber),args,globalThis.wps?.Enum) },
+
   async ppt_get_slides() {
     const pres = activePresentation()
     const count = pres.Slides.Count
@@ -278,42 +301,37 @@ export const WPS_WPP_HANDLERS = {
 
   async ppt_replace_text(args) {
     const searchText = String(args.searchText || '')
-    const replaceText = args.replaceText == null ? '' : String(args.replaceText)
     if (!searchText) throw new Error('查找文本不能为空')
+    if (args.replaceText == null) throw new Error(t('pptInvalidArguments'))
+    const replaceText = String(args.replaceText)
     const pres = activePresentation()
+    if (args.slideNumber != null) pptTarget(args, false)
+    if (args.expectedText != null && args.shapeId == null) throw new Error(t('pptInvalidTarget'))
+    const targets = []
+    const first = args.slideNumber == null ? 1 : Number(args.slideNumber)
+    const last = args.slideNumber == null ? pres.Slides.Count : first
+    if (last > pres.Slides.Count) throw new Error(t('pptInvalidTarget'))
+    for (let i = first; i <= last; i++) {
+      const shapes = args.shapeId != null ? [{ shape: wpsPptShape(pres, args) }] : textBearingShapes(pres.Slides.Item(i).Shapes)
+      for (const { shape } of shapes) {
+        if (!shapeHasText(shape)) continue
+        const text = shapeText(shape)
+        pptExpected(text, args)
+        const hits = findAllNormalized(text, searchText)
+        if (args.all === false) { if (targets.length) continue; hits.splice(1) }
+        if (hits.length) targets.push({ shape, hits, slide: i })
+      }
+    }
     let replaced = 0
     const touchedSlides = []
-    const slideCount = pres.Slides.Count // 循环条件里重取 Count 是白跑跨桥调用
-    for (let i = 1; i <= slideCount; i++) {
-      let slideTouched = false
-      for (const { shape: sp } of textBearingShapes(pres.Slides.Item(i).Shapes)) {
-        // TextRange.Replace 原生保留其余文字格式（优于整串回写 .Text）；
-        // 找不到返回 null 而非抛错。MatchCase 传 msoTrue 对齐 Office 面的区分大小写口径。
-        //
-        // 续查必须用**形状内绝对游标**，不能照官方示例那样拿上一次的命中去切子区间：
-        // `TextRange.Start` 是相对形状首字符的绝对位置，而 `Characters(start, len)` 的
-        // start 是相对被调用区间的。第一轮两者恰好相等所以看不出来，第二轮起就串坐标系
-        // ——真机实测第三处直接抛 COM E_FAIL（2026-08-29，WPS 12.1.0.28043）。
-        // 「把甲方改成乙方」这种全篇替换，同一个文本框里第三处起就漏替而工具报成功，
-        // 靠肉眼根本发现不了。
-        const frame = sp.TextFrame
-        let cursor = 1
-        for (let guard = 0; guard < MAX_REPLACE_PER_FRAME; guard++) {
-          const full = frame.TextRange
-          const total = Number(full.Length)
-          if (!Number.isFinite(total) || cursor > total) break
-          const rest = full.Characters(cursor, total - cursor + 1)
-          const hit = rest.Replace(searchText, replaceText, 0, msoTrue, msoFalse)
-          if (hit == null) break
-          replaced++
-          slideTouched = true
-          // 游标跳到刚写进去的内容之后：replaceText 里再含 searchText 时（「甲」→「甲方」
-          // 这类改写）才不会反复替换自己刚生成的文本
-          const next = Number(hit.Start) + replaceText.length
-          cursor = Number.isFinite(next) && next > cursor ? next : cursor + 1
-        }
+    for (const { shape, hits, slide } of targets) {
+      const full = shape.TextFrame.TextRange
+      for (let k = hits.length - 1; k >= 0; k--) {
+        const hit = hits[k]
+        full.Characters(hit.start + 1, hit.end - hit.start).Text = replaceText
+        replaced++
       }
-      if (slideTouched) touchedSlides.push(i)
+      if (!touchedSlides.includes(slide)) touchedSlides.push(slide)
     }
     if (!replaced) {
       throw new Error('未找到目标文本，请确认 searchText 与幻灯片文本精确一致（可先用 ppt_get_slides 核对）')
@@ -322,8 +340,9 @@ export const WPS_WPP_HANDLERS = {
   },
 
   async ppt_format_text(args) {
+    const paragraph = pptParagraphFormat(args.paragraphFormat, 'wps')
     const searchText = String(args.searchText || '')
-    if (!searchText) throw new Error('查找文本不能为空')
+    if (!searchText && args.shapeId == null) throw new Error(t('pptInvalidTarget'))
     const applied = {}
     if (args.fontName) applied.name = String(args.fontName)
     if (args.fontSize != null) applied.size = Number(args.fontSize)
@@ -338,7 +357,7 @@ export const WPS_WPP_HANDLERS = {
       applied.underline = underlineStyle
     }
     if (args.color) applied.color = String(args.color)
-    if (!Object.keys(applied).length) {
+    if (!Object.keys(applied).length && !Object.keys(paragraph).length) {
       throw new Error('未给出任何格式参数（fontName/fontSize/bold/italic/underline/color 至少给一个）')
     }
     const colorRgb = args.color ? hexToComRgb(args.color) : null
@@ -347,20 +366,23 @@ export const WPS_WPP_HANDLERS = {
     // JS 侧在整串文本上找偏移，宿主侧只做 Characters 切片（每次属性访问都是跨进程
     // RPC，别在宿主对象上逐字符遍历）。格式不改文本长度，多目标无须从右到左应用。
     const targets = []
-    const slideTotal = pres.Slides.Count
+    if (args.slideNumber != null) pptTarget(args, false)
+    if (args.expectedText != null && args.shapeId == null) throw new Error(t('pptInvalidTarget'))
+    const first = args.slideNumber == null ? 1 : Number(args.slideNumber)
+    const last = args.slideNumber == null ? pres.Slides.Count : first
+    if (last > pres.Slides.Count) throw new Error(t('pptInvalidTarget'))
     outer:
-    for (let i = 1; i <= slideTotal; i++) {
-      const shapes = pres.Slides.Item(i).Shapes
-      const shapeTotal = shapes.Count
-      for (let j = 1; j <= shapeTotal; j++) {
-        const sp = shapes.Item(j)
+    for (let i = first; i <= last; i++) {
+      const shapes = args.shapeId != null ? [{ shape: wpsPptShape(pres, args) }] : textBearingShapes(pres.Slides.Item(i).Shapes)
+      for (const { shape: sp } of shapes) {
         if (!shapeHasText(sp)) continue
         const text = shapeText(sp)
+        pptExpected(text, args)
         // 归一化定位（dev-board#286）：模型抄的是我们拼给它的正文（页码行、' | ' 分隔、
         // 段内 \r 已被换成空格），逐字 indexOf 必然失配。命中区间是**原文坐标**，
         // 长度按命中原文算而不是按 searchText 算——两者可能不等长（全角 vs 半角）。
-        for (const h of findAllNormalized(text, searchText)) {
-          targets.push({ slide: i, shape: j, start: h.start + 1, len: h.end - h.start }) // Characters 的 Start 是 1 基
+        for (const h of (searchText ? findAllNormalized(text, searchText) : [{ start: 0, end: text.length }])) {
+          targets.push({ shape: sp, start: h.start + 1, len: h.end - h.start }) // Characters 的 Start 是 1 基
           if (!args.applyToAll) break outer
         }
       }
@@ -369,9 +391,9 @@ export const WPS_WPP_HANDLERS = {
       throw new Error('未找到目标文本，请确认 searchText 与幻灯片文本精确一致（可先用 ppt_get_slides 核对）')
     }
     for (const t of targets) {
-      const sub = pres.Slides.Item(t.slide).Shapes.Item(t.shape)
-        .TextFrame.TextRange.Characters(t.start, t.len)
+      const sub = t.shape.TextFrame.TextRange.Characters(t.start, t.len)
       const font = sub.Font
+      if (Object.keys(paragraph).length) applyWpsParagraphFormat(sub.ParagraphFormat, paragraph)
       if (applied.name) {
         font.Name = applied.name
         font.NameFarEast = applied.name // 中文字体名两处都设，只设 Name 可能不生效
@@ -382,7 +404,7 @@ export const WPS_WPP_HANDLERS = {
       if (underlineStyle != null) font.Underline = underlineStyle === 'none' ? msoFalse : msoTrue
       if (colorRgb != null) font.Color.RGB = colorRgb
     }
-    const result = { formatted: targets.length, applied }
+    const result = { formatted: targets.length, applied, paragraphFormat: paragraph }
     if (underlineStyle && underlineStyle !== 'none' && underlineStyle !== 'single') {
       result.note = `WPS 演示的下划线只有开/关线型，${underlineStyle} 已降级为普通下划线`
     }
@@ -504,16 +526,80 @@ export const WPS_WPP_HANDLERS = {
       const sp = shapes.Item(j)
       const type = Number(sp.Type)
       result.push({
+        name: String(sp.Name || ''),
         id: String(sp.Id), // WPS 的 Id 是数值，统一 String 化保 shapeId 契约类型
         type: MSO_SHAPE_TYPE_NAMES[type] || `unknown(${type})`,
         left: sp.Left,
         top: sp.Top,
         width: sp.Width,
         height: sp.Height,
-        text: shapeHasText(sp) ? shapeText(sp).slice(0, 500) : ''
+        text: shapeHasText(sp) ? shapeText(sp) : '',
+        textLength: shapeHasText(sp) ? shapeText(sp).length : 0,
+        textTruncated: false
       })
     }
     return { slideNumber, shapeCount: result.length, shapes: result }
+  },
+
+  async ppt_goto(args) {
+    const { slideNumber } = pptTarget(args, false)
+    const pres = activePresentation()
+    getSlideOrThrow(pres, slideNumber)
+    const shape = args.shapeId != null ? wpsPptShape(pres, args) : null
+    app().ActiveWindow.View.GotoSlide(slideNumber)
+    if (shape) shape.Select()
+    return { slideNumber, shapeId: args.shapeId == null ? null : String(args.shapeId) }
+  },
+
+  async ppt_set_layout(args) {
+    const { slideNumber } = pptTarget(args, false)
+    if (args.layoutId == null && args.backgroundColor == null) throw new Error(t('pptInvalidArguments'))
+    const color = args.backgroundColor == null ? null : hexToComRgb(args.backgroundColor)
+    const slide = getSlideOrThrow(activePresentation(), slideNumber)
+    let layout
+    if (args.layoutId != null) {
+      const layouts = slide.Design.SlideMaster.CustomLayouts
+      for (let i = 1; i <= layouts.Count; i++) {
+        const candidate = layouts.Item(i)
+        if (String(candidate.Index) === String(args.layoutId)) layout = candidate
+      }
+      if (!layout) throw new Error(t('pptInvalidTarget'))
+    }
+    if (layout) slide.CustomLayout = layout
+    if (color != null) { slide.FollowMasterBackground = msoFalse; slide.Background.Fill.Solid(); slide.Background.Fill.ForeColor.RGB = color }
+    return { slideNumber, layoutId: args.layoutId, backgroundColor: args.backgroundColor }
+  },
+
+  async ppt_set_shape_text(args) {
+    if (args.text == null) throw new Error(t('pptInvalidArguments'))
+    const shape = wpsPptShape(activePresentation(), args)
+    if (!shape.HasTextFrame) throw new Error(t('officeTargetTextFrameMissing'))
+    const range = shape.TextFrame.TextRange
+    pptExpected(String(range.Text || ''), args)
+    range.Text = String(args.text)
+    return { slideNumber: Number(args.slideNumber), shapeId: String(args.shapeId), text: String(range.Text || '') }
+  },
+
+  async ppt_set_shape_geometry(args) {
+    const geometry = pptGeometry(args)
+    const shape = wpsPptShape(activePresentation(), args)
+    const before = {}, after = {}
+    for (const key of Object.keys(geometry)) before[key] = shape[key[0].toUpperCase() + key.slice(1)]
+    for (const key of Object.keys(geometry)) shape[key[0].toUpperCase() + key.slice(1)] = geometry[key]
+    for (const key of Object.keys(geometry)) after[key] = shape[key[0].toUpperCase() + key.slice(1)]
+    return { slideNumber: Number(args.slideNumber), shapeId: String(args.shapeId), before, after }
+  },
+
+  async ppt_format_shape(args) {
+    const style = pptShapeStyle(args)
+    const shape = wpsPptShape(activePresentation(), args)
+    if (style.noFill === true) shape.Fill.Visible = msoFalse
+    else if (style.fillColor) { shape.Fill.Visible = msoTrue; shape.Fill.Solid(); shape.Fill.ForeColor.RGB = hexToComRgb(style.fillColor) }
+    if (style.transparency != null) shape.Fill.Transparency = style.transparency / 100
+    if (style.noLine != null) shape.Line.Visible = style.noLine ? msoFalse : msoTrue
+    if (style.lineColor) shape.Line.ForeColor.RGB = hexToComRgb(style.lineColor)
+    if (style.lineWidth != null) shape.Line.Weight = style.lineWidth
+    return { slideNumber: Number(args.slideNumber), shapeId: String(args.shapeId), applied: style }
   },
 
   async ppt_delete_shape(args) {
@@ -543,6 +629,72 @@ export const WPS_WPP_HANDLERS = {
     const deletedId = String(target.Id)
     target.Delete()
     return { deleted: true, slideNumber, shapeId: deletedId }
+  },
+
+  async ppt_read_notes(args = {}) {
+    const pres = activePresentation()
+    const first = args.slideNumber == null ? 1 : pptTarget(args, false).slideNumber
+    if (first > pres.Slides.Count) throw new Error(t('pptInvalidTarget'))
+    const last = args.slideNumber == null ? pres.Slides.Count : first
+    const notes = []
+    for (let i = first; i <= last; i++) {
+      const text = String(wpsNotesBody(pres.Slides.Item(i)).Text || '')
+      notes.push({ slideNumber: i, text, textLength: text.length, textTruncated: false })
+    }
+    return { notes }
+  },
+
+  async ppt_write_notes(args) {
+    const { slideNumber } = pptTarget(args, false)
+    if (args.text == null) throw new Error(t('pptInvalidArguments'))
+    const pres = activePresentation()
+    if (slideNumber > pres.Slides.Count) throw new Error(t('pptInvalidTarget'))
+    const range = wpsNotesBody(pres.Slides.Item(slideNumber)), previousText = String(range.Text || '')
+    pptExpected(previousText, args)
+    range.Text = String(args.text)
+    return { slideNumber, previousText, text: String(range.Text || ''), updated: true }
+  },
+
+  async ppt_table_set_style(args) {
+    const target = pptTarget(args), shape = wpsPptShape(activePresentation(), args)
+    if (!shapeIsTable(shape)) throw new Error(t('pptInvalidTarget'))
+    const table = shape.Table, rows = table.Rows.Count, cols = table.Columns.Count
+    const { row, col, endRow, endCol, style: s } = pptTableStyle(args, rows, cols)
+    // Resolve every requested target before mutating any of them.
+    const actions = []
+    const applyCell = (r, c, format) => {
+      const cell = table.Cell(r + 1, c + 1), cellShape = cell.Shape
+      if (format.fillColor != null) {
+        const fill = cellShape.Fill
+        if (!fill || typeof fill.Solid !== 'function') throw new Error(t('pptCapabilityUnavailable'))
+        actions.push(() => { if (format.fillColor === 'none') fill.Visible = msoFalse; else { fill.Solid(); fill.Visible = msoTrue; fill.ForeColor.RGB = hexToComRgb(format.fillColor) } })
+      }
+      if (['fontName', 'fontSize', 'bold', 'color', 'alignment'].some(k => format[k] != null)) {
+        const range = cellShape.TextFrame.TextRange, font = range.Font
+        actions.push(() => {
+          if (format.fontName != null) { font.Name = format.fontName; font.NameFarEast = format.fontName }
+          if (format.fontSize != null) font.Size = format.fontSize
+          if (format.bold != null) font.Bold = format.bold ? msoTrue : msoFalse
+          if (format.color != null) font.Color.RGB = hexToComRgb(format.color)
+          if (format.alignment != null) range.ParagraphFormat.Alignment = { left: 1, center: 2, right: 3, justify: 4 }[format.alignment]
+        })
+      }
+      if (format.borderColor != null || format.borderWidthPt != null) {
+        const borders = [1, 2, 3, 4].map(index => cell.Borders.Item(index))
+        actions.push(() => { for (const border of borders) { border.Visible = format.borderWidthPt === 0 ? msoFalse : msoTrue; if (format.borderColor != null) border.ForeColor.RGB = hexToComRgb(format.borderColor); if (format.borderWidthPt != null) border.Weight = format.borderWidthPt } })
+      }
+    }
+    for (let r = row; r <= endRow; r++) for (let c = col; c <= endCol; c++) applyCell(r, c, s)
+    if (s.headerBold != null || s.headerFill != null) for (let c = 0; c < cols; c++) applyCell(0, c, { bold: s.headerBold, fillColor: s.headerFill })
+    if (s.columnWidthsPt) s.columnWidthsPt.forEach((width, i) => { const column = table.Columns.Item(i + 1); actions.push(() => { column.Width = width }) })
+    if (s.rowHeightsPt) s.rowHeightsPt.forEach((height, i) => { const row = table.Rows.Item(i + 1); actions.push(() => { row.Height = height }) })
+    let operationsApplied = 0
+    try {
+    for (const action of actions) { action(); operationsApplied++ }
+    return { ...target, updated: true, row, col, endRow, endCol, operationsApplied,
+      ...(s.rowHeightsPt ? { rowHeightsPt: s.rowHeightsPt.map((_, i) => table.Rows.Item(i + 1).Height) } : {}),
+      ...(s.columnWidthsPt ? { columnWidthsPt: s.columnWidthsPt.map((_, i) => table.Columns.Item(i + 1).Width) } : {}) }
+    } catch (error) { error.partialResult = { ...target, operationsApplied, outcomeUnknown: true, retryable: false }; throw error }
   },
 
   async ppt_add_table(args) {

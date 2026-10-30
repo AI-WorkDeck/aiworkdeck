@@ -104,7 +104,20 @@ const MATRIX = [
   ['表格读批注', 'sheet_get_comments', 'office_excel_get_comments'],
   ['表格删批注', 'sheet_delete_comment', 'office_excel_delete_comment'],
 
+  ['文档大纲', 'doc_get_outline', 'office_get_outline'],
+  ['文档条款', 'doc_get_clauses', 'office_get_clauses'],
+  ['第N处精确替换', 'doc_replace_nth_match', 'office_replace_nth_match'],
+  ['结构审计', 'doc_audit_structure', 'office_audit_structure'],
+  ['应用样式模板', 'doc_apply_style_profile', 'office_apply_style_profile'],
   // ---- 演示（slide_ ↔ office_ppt_）----
+  ['设置形状文字', 'slide_set_shape_text', 'office_ppt_set_shape_text'],
+  ['设置形状位置尺寸', 'slide_set_shape_geometry', 'office_ppt_set_shape_geometry'],
+  ['设置形状样式', 'slide_format_shape', 'office_ppt_format_shape'],
+  ['跳转幻灯片', 'slide_goto', 'office_ppt_goto'],
+  ['设置幻灯片版式', 'slide_set_layout', 'office_ppt_set_layout'],
+  ['新建表格（桌面项目文件；插件当前宿主空白文档）', 'sheet_create_file', 'office_file_create'],
+  ['打开文件（插件从项目打开新副本）', 'doc_open_file', 'office_file_open'],
+  ['PDF导出到项目', 'doc_export_pdf', 'office_file_export_pdf'],
   ['演示概览', 'slide_get_overview', 'office_ppt_get_slides'],
   ['读取单页', 'slide_get_page', 'office_ppt_get_slide_details'],
   ['演示查找替换', 'slide_replace_text', 'office_ppt_replace_text'],
@@ -114,10 +127,17 @@ const MATRIX = [
   ['移动幻灯片', 'slide_move_page', 'office_ppt_move_slide'],
   ['插入文本框', 'slide_add_text_box', 'office_ppt_add_text_box'],
   ['插入形状', 'slide_add_shape', 'office_ppt_add_shape'],
+  ['插入图片（插件cover预裁剪；桌面原生裁剪）', 'slide_add_image', 'office_ppt_add_image'],
+  ['新增图表（仅WPS；Office无稳定公开API）', 'slide_add_chart', 'office_ppt_add_chart'],
+  ['图表样式（仅WPS；Office无稳定公开API）', 'slide_format_chart', 'office_ppt_format_chart'],
+  ['过渡效果（仅WPS；Office无稳定公开API）', 'slide_set_transition', 'office_ppt_set_transition'],
   ['删除形状', 'slide_delete_shape', 'office_ppt_delete_shape'],
   ['演示插表格', 'slide_add_table', 'office_ppt_add_table'],
   ['演示读表格', 'slide_table_read', 'office_ppt_table_read'],
   ['演示写单元格', 'slide_table_set_cell', 'office_ppt_table_set_cell'],
+  ['演示表格样式（Office PowerPointApi 1.9/WPS）', 'slide_table_set_style', 'office_ppt_table_set_style'],
+  ['读取备注（仅WPS；Office无公开API）', 'slide_read_notes', 'office_ppt_read_notes'],
+  ['写入备注（仅WPS；Office无公开API）', 'slide_write_notes', 'office_ppt_write_notes'],
   ['演示超链接', 'slide_set_hyperlink', 'office_ppt_set_hyperlink']
 ]
 
@@ -126,34 +146,29 @@ const MATRIX = [
  * 插件面补不了这些**不是缺口**——理由必须说清为什么补不了或不该补。
  */
 const LOWA_ONLY = {
-  '编辑器宿主专属：插件直接改用户打开的 Word/Excel/PPT，没有 worker、没有服务端文档检查点，也没有可编程的撤销栈（Office.js 不提供）': [
-    'doc_undo', 'doc_redo', 'doc_restore_checkpoint', 'doc_open_file', 'doc_start_stream',
-    'doc_debug_revisions', 'doc_accept_all_revisions', 'doc_reject_all_revisions'
+  '演示新建由上表office_file_create在PowerPoint/WPS演示宿主覆盖；插件返回未保存文稿，桌面创建项目PPTX': ['slide_create_file'],
+  '桌面引擎历史/检查点/流式调试机制；Office无公开撤销栈，WPS未在本桥暴露对应命令；不与接受/拒绝修订混同': [
+    'doc_undo', 'doc_redo', 'doc_restore_checkpoint', 'doc_start_stream', 'doc_debug_revisions'
+  ],
+  '全量修订动作并入既有office_accept_revision(acceptAll=true)/office_reject_revision(rejectAll=true)，不是插件缺失；宿主版本门槛与原生验收仍独立': [
+    'doc_accept_all_revisions', 'doc_reject_all_revisions'
   ],
   '光标/选区定位面：LOWA 的编辑是「先选中再改」，插件面一律按锚点文本定位，没有独立的选区原语': [
     'doc_select_anchor', 'doc_select_paragraph', 'doc_set_selection', 'doc_collapse_cursor',
     'doc_goto', 'doc_get_cursor_context', 'doc_replace_selection', 'doc_delete_selection'
   ],
-  '按段落号取数/改数：插件面没有稳定的段落号（Office.js 的段落集合随编辑漂移），对应能力由 office_get_text 分页 + 锚点定位承担': [
-    'doc_get_paragraph', 'doc_modify_paragraph', 'doc_get_outline', 'doc_get_clauses',
-    'doc_insert_under_heading', 'doc_audit_structure', 'doc_apply_style_profile'
+  'office_get_paragraphs提供当前快照段落序号（编辑后可漂移，非稳定ID）；读取可分页，按旧序号写入/标题下插入仍需重新定位，不宣称字符分页等价': [
+    'doc_get_paragraph', 'doc_modify_paragraph',
+    'doc_insert_under_heading'
   ],
-  '按第 N 处/按匹配删改：插件面由 office_replace_text(replaceAll) 与 office_replace_batch 覆盖': [
-    'doc_replace_nth_match', 'doc_replace_at_anchor', 'doc_delete_match', 'doc_delete_text'
-  ],
+  '桌面anchorId不可移植到插件文字锚点；须重新读取核验目标，replaceAll不是单处锚点替代': ['doc_replace_at_anchor'],
+  '第N处删除由office_replace_nth_match(matchIndex为1基,replaceText为空)表达；不能改用replaceAll扩大范围': ['doc_delete_match'],
+  '按文本删除由office_replace_text空替换表达，严格保持首处/全部选择；不是任意定位等价': ['doc_delete_text'],
   '项目文件面，不属于文档编辑基本面（插件会话用 read_file / search_project_files 等通用工具）': [
-    'doc_list_project_files', 'doc_search_related_docs', 'doc_link_evidence', 'doc_list_evidence',
-    'sheet_create_file'
-  ],
-  '导出 PDF：LOWA 引擎导出字节再存进项目；任务窗格里用户开的是 Word/WPS 本身，「另存为 PDF」是宿主自带的，插件面不需要对等工具': [
-    'doc_export_pdf'
+    'doc_list_project_files', 'doc_search_related_docs', 'doc_link_evidence', 'doc_list_evidence'
   ],
   '表格行高列宽：插件面并进了 office_excel_edit_rows_cols 的 set_width / set_height 两个 action': [
     'sheet_set_row_col'
-  ],
-  '演示细项：插件面尚未提供对等工具（形状几何、版式、表格样式、备注、跳页）': [
-    'slide_format_shape', 'slide_set_shape_geometry', 'slide_set_layout', 'slide_set_shape_text',
-    'slide_table_set_style', 'slide_write_notes', 'slide_read_notes', 'slide_goto'
   ]
 }
 
@@ -161,6 +176,8 @@ const LOWA_ONLY = {
  * 只有插件侧有的工具，按理由分组。
  */
 const OFFICE_ONLY = {
+  '段落结构分页读取，保留原office_get_text字符分页': ['office_get_paragraphs'],
+  '显式保存宿主当前文档；桌面使用正常自动保存；Microsoft PPT无公开原位保存API': ['office_file_save'],
   '批量/过卷原语：Office.js 每处改动都要一次 Word.run 往返，几十处就会撞上单轮步数上限；LOWA 侧一次 find_replace 就是引擎原生全文替换，不需要成批提交': [
     'office_replace_batch', 'office_pass_step'
   ],

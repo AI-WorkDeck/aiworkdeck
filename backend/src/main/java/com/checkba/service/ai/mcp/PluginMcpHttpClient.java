@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package com.checkba.service.ai.mcp;
 
+import com.checkba.service.LangText;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -35,10 +36,16 @@ public class PluginMcpHttpClient {
 
     public Map<String, Object> call(String url, String token, String name, Map<String, Object> schema,
                                     Map<String, Object> args, BooleanSupplier allowed) {
+        return call(url, token, Map.of(), name, schema, args, allowed);
+    }
+
+    public Map<String, Object> call(String url, String token, Map<String, String> headers, String name,
+            Map<String, Object> schema, Map<String, Object> args, BooleanSupplier allowed) {
         policy.validate(url);
+        validateHeaders(headers);
         if (token != null && (token.contains("\r") || token.contains("\n")))
             throw error("invalid_credential", "The MCP credential is invalid.");
-        Session session = new Session(url, token, allowed);
+        Session session = new Session(url, token, headers, allowed);
         try {
             session.initialize();
             JsonNode tools;
@@ -58,11 +65,60 @@ public class PluginMcpHttpClient {
         } finally { session.close(); }
     }
 
+    /** Explicit discovery only; listing saved connections never makes an outbound request. */
+    public List<Map<String, Object>> listTools(String url, String token, BooleanSupplier allowed) {
+        return listTools(url, token, Map.of(), allowed);
+    }
+
+    public List<Map<String, Object>> listTools(String url, String token, Map<String, String> headers, BooleanSupplier allowed) {
+        policy.validate(url);
+        validateHeaders(headers);
+        if (token != null && (token.contains("\r") || token.contains("\n")))
+            throw error("invalid_credential", LangText.of("MCP 凭据无效。", "The MCP credential is invalid."));
+        Session session = new Session(url, token, headers, allowed);
+        try {
+            session.initialize();
+            List<Map<String, Object>> tools = new ArrayList<>();
+            String cursor = null;
+            Set<String> cursors = new HashSet<>();
+            for (int page = 0; page < 16; page++) {
+                JsonNode result = session.rpc("tools/list", cursor == null ? Map.of() : Map.of("cursor", cursor));
+                JsonNode rows = result.path("tools");
+                if (!rows.isArray() || tools.size() + rows.size() > 256)
+                    throw error("protocol_error", LangText.of("MCP 工具清单无效或超过大小限制。", "Invalid or oversized MCP tool list."));
+                for (JsonNode row : rows) tools.add(JSON.convertValue(row, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}));
+                cursor = result.path("nextCursor").asText(null);
+                if (cursor == null || cursor.isBlank()) return tools;
+                if (!cursors.add(cursor)) throw error("protocol_error", LangText.of("MCP 工具清单返回了重复分页游标。", "MCP tools pagination repeated a cursor."));
+            }
+            throw error("protocol_error", LangText.of("MCP 工具清单页数超过限制。", "MCP tools pagination exceeded the limit."));
+        } finally { session.close(); }
+    }
+
+    public static void validateHeaders(Map<String, String> headers) {
+        if (headers == null || headers.size() > 32) throw invalidHeaders();
+        Set<String> names = new HashSet<>();
+        Set<String> reserved = Set.of("host", "content-length", "transfer-encoding", "connection", "proxy-authorization",
+                "cookie", "origin", "accept", "content-type", "mcp-session-id", "mcp-protocol-version");
+        for (var entry : headers.entrySet()) {
+            String key = entry.getKey(), value = entry.getValue();
+            if (key == null || !key.matches("[A-Za-z0-9!#$%&'*+.^_`|~-]{1,100}") || value == null
+                    || value.length() > 8192 || value.codePoints().anyMatch(c -> c < 32 || c == 127)
+                    || reserved.contains(key.toLowerCase(Locale.ROOT)) || !names.add(key.toLowerCase(Locale.ROOT))) throw invalidHeaders();
+        }
+    }
+    private static PluginMcpException invalidHeaders() {
+        return new PluginMcpException("invalid_configuration", 400, LangText.of("MCP 请求头无效或使用了保留名称。", "MCP headers are invalid or use a reserved name."));
+    }
+
     private final class Session {
         final String url, token;
         final BooleanSupplier allowed;
+        final Map<String, String> customHeaders;
         String id, version;
-        Session(String url, String token, BooleanSupplier allowed) { this.url = url; this.token = token; this.allowed = allowed; }
+        Session(String url, String token, Map<String, String> headers, BooleanSupplier allowed) {
+            this.url = url; this.token = token; this.customHeaders = Map.copyOf(headers); this.allowed = allowed;
+        }
         void guard() {
             if (Thread.currentThread().isInterrupted() || !allowed.getAsBoolean())
                 throw new PluginMcpException("cancelled", 409, "MCP call cancelled or plugin access changed.");
@@ -142,6 +198,7 @@ public class PluginMcpHttpClient {
         }
         Request.Builder headers() {
             Request.Builder builder = new Request.Builder().url(url).header("Accept", "application/json, text/event-stream");
+            customHeaders.forEach(builder::header);
             if (token != null && !token.isBlank()) builder.header("Authorization", "Bearer " + token);
             if (id != null) builder.header("MCP-Session-Id", id);
             if (version != null) builder.header("MCP-Protocol-Version", version);

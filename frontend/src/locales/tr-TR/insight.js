@@ -3,88 +3,88 @@
 
 export default {
   "title": "Dayanaklar",
-  "noDoc": "No document open",
-  "parse": "Full-document online verification (charges may apply)",
-  "reparse": "Repeat full-document online verification (charges may apply)",
-  "onlineHint": "Clicking saves this document, then verifies the saved version online. AI and external lookups may incur charges.",
-  "saveRequired": "This document could not be saved. Save it successfully before online verification.",
-  "running": "Verifying online…",
-  "done": "Online verification complete",
-  "failed": "Online verification failed",
-  "loading": "Loading…",
-  "loadingDetail": "Fetching lookup details…",
-  "noDetail": "No lookup details for this item",
-  "loadFailed": "Could not load online verification results",
-  "parseFailed": "Could not start online verification",
-  "detailFailed": "Could not load the lookup details",
-  "refreshFailed": "Could not re-run the lookup",
+  "noDoc": "Açık belge yok",
+  "parse": "Tam belge çevrimiçi doğrulama (ücret uygulanabilir)",
+  "reparse": "Tam belge çevrimiçi doğrulamayı tekrarla (ücret uygulanabilir)",
+  "onlineHint": "Tıklandığında bu belge kaydedilir ve kaydedilen sürüm çevrimiçi olarak doğrulanır. AI ve dış sorgulamalar ücrete tabi olabilir.",
+  "saveRequired": "Bu belge kaydedilemedi. Çevrimiçi doğrulamadan önce başarıyla kaydedin.",
+  "running": "Çevrimiçi doğrulanıyor…",
+  "done": "Çevrimiçi doğrulama tamamlandı",
+  "failed": "Çevrimiçi doğrulama başarısız oldu",
+  "loading": "Yükleniyor…",
+  "loadingDetail": "Sorgu ayrıntıları alınıyor…",
+  "noDetail": "Bu öğe için sorgu ayrıntısı yok",
+  "loadFailed": "Çevrimiçi doğrulama sonuçları yüklenemedi",
+  "parseFailed": "Çevrimiçi doğrulama başlatılamadı",
+  "detailFailed": "Sorgu ayrıntıları yüklenemedi",
+  "refreshFailed": "Sorgu yeniden çalıştırılamadı",
   "retry": "Tekrar dene",
-  "goConnectAccount": "Connect account",
-  "goRecharge": "Add credits",
+  "goConnectAccount": "Hesap bağla",
+  "goRecharge": "Kredi ekle",
   "hint": {
-    "NO_CREDENTIAL": "This lookup channel needs a credential configured on the server by your administrator."
+    "NO_CREDENTIAL": "Bu sorgu kanalı için yöneticiniz tarafından sunucuda kimlik bilgisi yapılandırılmalıdır."
   },
   "tab": {
-    "retrieval": "Lookups",
-    "checks": "Consistency"
+    "retrieval": "Dış Sorgular",
+    "checks": "Tutarlılık"
   },
   "kind": {
-    "COMPANY": "Companies",
-    "LAW": "Statutes",
-    "CASE": "Cases",
-    "DOC": "Documents"
+    "COMPANY": "Şirketler",
+    "LAW": "Mevzuat",
+    "CASE": "Kararlar",
+    "DOC": "Belgeler"
   },
   "entityKind": {
-    "COMPANY": "Company",
-    "LAW": "Statute",
-    "CASE": "Case",
-    "DOC": "Document"
+    "COMPANY": "Şirket",
+    "LAW": "Mevzuat",
+    "CASE": "Karar",
+    "DOC": "Belge"
   },
-  "openInNewTab": "Open in a new tab",
-  "openDocFile": "Open file",
-  "docNotFound": "No such file in this project",
-  "docMissing": "That file is no longer in this project",
+  "openInNewTab": "Yeni sekmede aç",
+  "openDocFile": "Dosyayı aç",
+  "docNotFound": "Bu projede böyle bir dosya bulunamadı",
+  "docMissing": "Bu dosya artık projede değil",
   "source": {
-    "projectFile": "Project file",
+    "projectFile": "Proje dosyası",
     "qichacha": "Qichacha"
   },
-  "mentions": "{count} mention(s)",
-  "mentionsTitle": "Mentions in this document",
-  "shareholders": "Shareholders",
-  "moreCandidates": "Other candidates",
+  "mentions": "{count} geçiş",
+  "mentionsTitle": "Belgedeki geçişler",
+  "shareholders": "Ortaklar ve paydaşlar",
+  "moreCandidates": "Diğer adaylar",
   "caseSection": {
-    "ascertain": "Facts found",
-    "reason": "Reasoning",
-    "result": "Judgment",
-    "gist": "Key holding",
-    "fullText": "Full judgment"
+    "ascertain": "Tespit edilen vakıalar",
+    "reason": "Gerekçe",
+    "result": "Hüküm",
+    "gist": "Karar özeti",
+    "fullText": "Kararın tam metni"
   },
-  "authoritative": "Authoritative text (Pkulaw)",
-  "implementDate": "In force from {date}",
-  "recognition": "Case number recognition",
-  "openInPkulaw": "Open in Pkulaw",
+  "authoritative": "Resmî metin (Pkulaw)",
+  "implementDate": "Yürürlük tarihi: {date}",
+  "recognition": "Dosya numarası tanıma",
+  "openInPkulaw": "Pkulaw’da aç",
   "citation": {
-    "citedText": "Cited article",
-    "candidates": "Articles matched by content",
-    "article": "Article {n}"
+    "citedText": "Atıf yapılan madde",
+    "candidates": "İçeriğe göre eşleşen maddeler",
+    "article": "Madde {n}"
   },
   "severity": {
-    "warn": "Questionable",
-    "error": "Error"
+    "warn": "Şüpheli",
+    "error": "Hata"
   },
-  "unifyTo": "Set all to {value}",
-  "cannotFix": "Cannot fix automatically: {reason}",
-  "fixNotUnique": "Could not locate a unique match — please edit manually.",
-  "fixPartial": "Fixed {done}; {failed} had no unique match — please edit those manually.",
-  "fixed": "Fixed",
-  "fixedHint": "Press Cmd+Z to undo; re-analyze to refresh the findings.",
-  "noEditor": "Activate a document editor window first",
+  "unifyTo": "Tümünü {value} olarak birleştir",
+  "cannotFix": "Otomatik düzeltilemiyor: {reason}",
+  "fixNotUnique": "Tekil bir eşleşme bulunamadı — lütfen elle düzenleyin.",
+  "fixPartial": "{done} düzeltildi; {failed} tekil eşleşmeye sahip değil — lütfen bunları elle düzenleyin.",
+  "fixed": "Düzeltildi",
+  "fixedHint": "Geri almak için Cmd+Z tuşlarına basın; bulguları yenilemek için yeniden analiz edin.",
+  "noEditor": "Önce bir belge düzenleyici penceresini etkinleştirin",
   "empty": {
-    "noRun": "This document has not been verified online",
-    "noRunHint": "Everyday writing hints run locally. Only clicking online verification sends the saved document for AI extraction, external lookups and consistency checks.",
-    "noEntity": "No lookupable entities found",
-    "noEntityHint": "The document mentions no company name, statute article or case number.",
-    "noFinding": "No inconsistencies found",
-    "noFindingHint": "Quantity statements and unified social credit codes all check out."
+    "noRun": "Bu belge henüz çevrimiçi doğrulanmadı",
+    "noRunHint": "Günlük yazım ipuçları yerel olarak çalışır. Yalnızca çevrimiçi doğrulamaya tıklandığında kaydedilen belge AI çıkarımı, dış sorgular ve tutarlılık kontrolleri için gönderilir.",
+    "noEntity": "Sorgulanabilir varlık bulunamadı",
+    "noEntityHint": "Belgede şirket adı, kanun maddesi veya dosya numarası geçmiyor.",
+    "noFinding": "Tutarsızlık bulunamadı",
+    "noFindingHint": "Miktar ifadeleri ve birleşik sosyal kredi kodları doğrulamadan geçti."
   }
 }

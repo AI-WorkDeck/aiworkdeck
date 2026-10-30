@@ -46,6 +46,8 @@ class AiModelCatalogControllerTest {
         when(regionService.detectionBasis()).thenReturn("测试固定值");
 
         ChatModelFactory factory = mock(ChatModelFactory.class);
+        when(factory.effectiveModelSupportsVision(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(inv -> AllowedModels.supportsVision(inv.getArgument(0)));
         when(factory.resolveDefaultModel()).thenReturn(AllowedModels.DEEPSEEK_V4_FLASH.getModelId());
 
         // 鉴权是静态入口（AuthController.getUserIdFromSession），单测里桩掉它是本仓既有做法
@@ -67,7 +69,7 @@ class AiModelCatalogControllerTest {
     @DisplayName("清单必须逐条等于 AllowedModels.availableIn(当前区域)——境内出现国际模型，用户点了必然 403")
     void catalogEqualsAvailableInCurrentRegion() {
         for (AllowedModels.Region region : AllowedModels.Region.values()) {
-            List<String> expected = AllowedModels.availableIn(region).stream()
+            List<String> expected = AllowedModels.availableIn(AllowedModels.Region.INTERNATIONAL).stream()
                     .map(AllowedModels::getModelId).toList();
             List<String> actual = models(region).stream()
                     .map(m -> (String) m.get("id")).toList();
@@ -109,6 +111,8 @@ class AiModelCatalogControllerTest {
     void unauthenticatedIsRejected() {
         NetworkRegionService regionService = mock(NetworkRegionService.class);
         ChatModelFactory factory = mock(ChatModelFactory.class);
+        when(factory.effectiveModelSupportsVision(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(inv -> AllowedModels.supportsVision(inv.getArgument(0)));
         try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession(null)).thenReturn(null);
             ResponseEntity<?> response = new AiModelCatalogController(regionService, factory)
@@ -129,8 +133,11 @@ class AiModelCatalogControllerTest {
         when(regionService.mode()).thenReturn("auto");
         when(regionService.detectionBasis()).thenReturn("测试固定值");
         ChatModelFactory factory = mock(ChatModelFactory.class);
+        when(factory.effectiveModelSupportsVision(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(inv -> AllowedModels.supportsVision(inv.getArgument(0)));
         when(factory.resolveDefaultModel()).thenReturn(AllowedModels.DEEPSEEK_V4_FLASH.getModelId());
-        when(factory.resolveProvider()).thenReturn(provider);
+        when(factory.resolveTarget(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.eq(false)))
+                .thenAnswer(inv -> new ChatModelFactory.ResolvedTarget(provider, inv.getArgument(0)));
         try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession("session-ok")).thenReturn(1L);
             ResponseEntity<?> response = new AiModelCatalogController(regionService, factory, priceService)
@@ -212,4 +219,87 @@ class AiModelCatalogControllerTest {
                     dto.get("id") + " 的 priceLevel 越界: " + level);
         }
     }
+    @Test
+    @SuppressWarnings("unchecked")
+    void unresolvedBillingRouteDoesNotClaimLocalFreeUsage() {
+        NetworkRegionService region = mock(NetworkRegionService.class);
+        when(region.effectiveRegion()).thenReturn(AllowedModels.Region.INTERNATIONAL);
+        ChatModelFactory factory = mock(ChatModelFactory.class);
+        when(factory.resolveTarget(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.eq(false)))
+                .thenThrow(new IllegalStateException("route unavailable"));
+        ModelPriceDisplayService price = rateService(CNY_RATE);
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("session-ok")).thenReturn(1L);
+            Map<String, Object> response = (Map<String, Object>) new AiModelCatalogController(region, factory, price)
+                    .listModels("session-ok").getBody();
+            Map<String, Object> display = (Map<String, Object>) response.get("priceDisplay");
+            assertEquals("unknown", display.get("channel"));
+            assertEquals("list", display.get("basis"));
+            verify(price, never()).currentRate();
+        }
+    }
+
+    @Test
+    void implicitLocalDefaultDoesNotDisableCloudModelVision() {
+        assertRoutedCatalogVision(false, false);
+    }
+
+    @Test
+    void explicitLocalChoiceKeepsImagesLocal() {
+        assertRoutedCatalogVision(true, false);
+    }
+
+    @Test
+    void freshInternationalDesktopShowsUsdAndKimiVision() {
+        assertRoutedCatalogVision(false, true);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void assertRoutedCatalogVision(boolean explicitLocal, boolean desktop) {
+        AiModelProperties properties = new AiModelProperties();
+        properties.setProvider(AiModelProperties.Provider.OLLAMA);
+        com.checkba.service.SystemSettingService settings = mock(com.checkba.service.SystemSettingService.class);
+        when(settings.get(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(inv -> inv.getArgument(1));
+        if (explicitLocal) when(settings.get("ai.activeProvider", null)).thenReturn("OLLAMA");
+        ChatModelFactory factory = new ChatModelFactory(properties, settings, null, null, null,
+                new com.checkba.service.ai.AuxModelResolver(settings, AllowedModels.QWEN_3_7_FLASH.getModelId()), null);
+        org.springframework.test.util.ReflectionTestUtils.setField(factory, "localMode", desktop);
+        NetworkRegionService region = mock(NetworkRegionService.class);
+        when(region.effectiveRegion()).thenReturn(AllowedModels.Region.INTERNATIONAL);
+        ModelPriceDisplayService price = rateService(new ModelPriceDisplayService.ChargedRate(
+                "USD", 1, 1.2, "reported", "live", "2026-10-29T00:00:00Z"));
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("session-ok")).thenReturn(1L);
+            Map<String, Object> response = (Map<String, Object>) new AiModelCatalogController(region, factory, price)
+                    .listModels("session-ok").getBody();
+            List<Map<String, Object>> rows = (List<Map<String, Object>>) response.get("models");
+            for (Map<String, Object> row : rows) {
+                String id = (String) row.get("id");
+                assertEquals(factory.effectiveModelSupportsVision(id), row.get("vision"), id);
+            }
+            Map<String, Object> qwen = rows.stream()
+                    .filter(row -> AllowedModels.QWEN_3_8_MAX.getModelId().equals(row.get("id")))
+                    .findFirst().orElseThrow();
+            assertEquals(List.of("qwen/qwen3.8-max"), qwen.get("aliases"));
+            Map<String, Object> kimi = rows.stream().filter(row -> "moonshotai/kimi-k3".equals(row.get("id")))
+                    .findFirst().orElseThrow();
+            assertEquals(!explicitLocal, kimi.get("vision"));
+            Map<String, Object> latestKimi = rows.stream()
+                    .filter(row -> "moonshotai/kimi-k3.1-pro".equals(row.get("id"))).findFirst().orElseThrow();
+            assertEquals(!explicitLocal, latestKimi.get("vision"));
+            if (desktop) {
+                Map<String, Object> display = (Map<String, Object>) response.get("priceDisplay");
+                assertEquals("USD", display.get("currency"));
+                assertEquals("charged", display.get("basis"));
+                assertEquals("platform", display.get("channel"));
+            } else {
+                Map<String, Object> display = (Map<String, Object>) response.get("priceDisplay");
+                assertEquals(explicitLocal ? "local" : "byok", display.get("channel"));
+                assertEquals("list", display.get("basis"));
+                verify(price, never()).currentRate();
+            }
+        }
+    }
+
 }

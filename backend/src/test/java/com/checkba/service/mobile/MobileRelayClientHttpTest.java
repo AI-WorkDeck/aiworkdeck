@@ -282,6 +282,42 @@ class MobileRelayClientHttpTest {
         ex.close();
     }
 
+    @Test
+    void archiveMoveWorkerUsesFrozenSessionAndReportsActualFileProof() throws Exception {
+        MobileRelayClientService svc=service();
+        MobileCaptureMoveFiles helper=mock(MobileCaptureMoveFiles.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(svc,"captureMoveFiles",helper);
+        String request=java.util.UUID.randomUUID().toString(),commandId=java.util.UUID.randomUUID().toString(),fileUid=java.util.UUID.randomUUID().toString();
+        var command=new MobileMediaMoveService.Command(request,commandId,System.currentTimeMillis()+300000,"REMOVE_SOURCE",svc.deviceId(),"42",MEDIA_ID,"a".repeat(64),3,"exact/path.jpg",8L,fileUid);
+        var mapper=new com.fasterxml.jackson.databind.ObjectMapper();List<String> proofs=new CopyOnWriteArrayList<>();List<String> tokens=new CopyOnWriteArrayList<>();
+        server.createContext("/api/mobile/media/moves",ex->{
+            tokens.add(ex.getRequestHeaders().getFirst("X-Session-Id"));
+            if(ex.getRequestURI().getPath().endsWith("/commands")) respond(ex,200,mapper.writeValueAsString(Map.of("code",0,"commands",List.of(command))));
+            else {proofs.add(readBody(ex.getRequestBody()));respond(ex,200,"{\"code\":0}");}
+        });
+        when(helper.execute(anyString(),eq(7L),any(),any())).thenAnswer(i->{i.getArgument(3,Runnable.class).run();return new MobileCaptureMoveFiles.Verified(8L,fileUid,"a".repeat(64));});
+        svc.pollInbox(); // Empty inbox must not starve move commands.
+        assertEquals(1,proofs.size());var proof=mapper.readTree(proofs.get(0));
+        assertEquals(commandId,proof.path("commandId").asText());assertEquals(fileUid,proof.path("fileUid").asText());assertTrue(proof.path("success").asBoolean());
+        assertEquals(List.of("awdt_test_token","awdt_test_token"),tokens);
+    }
+
+    @Test
+    void archiveMoveWorkerNeverDeletesOrAcknowledgesAfterAccountSwitch() throws Exception {
+        MobileRelayClientService svc=service();MobileCaptureMoveFiles helper=mock(MobileCaptureMoveFiles.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(svc,"captureMoveFiles",helper);
+        var command=new MobileMediaMoveService.Command(java.util.UUID.randomUUID().toString(),java.util.UUID.randomUUID().toString(),System.currentTimeMillis()+300000,
+                "REMOVE_SOURCE",svc.deviceId(),"42",MEDIA_ID,"a".repeat(64),3,"exact/path.jpg",null,null);
+        var mapper=new com.fasterxml.jackson.databind.ObjectMapper();AtomicInteger proofs=new AtomicInteger();
+        server.createContext("/api/mobile/media/moves",ex->{
+            if(ex.getRequestURI().getPath().endsWith("/commands")) {
+                when(accountService.accountFingerprintOrNull()).thenReturn("another-account");
+                respond(ex,200,mapper.writeValueAsString(Map.of("code",0,"commands",List.of(command))));
+            } else {proofs.incrementAndGet();respond(ex,200,"{\"code\":0}");}
+        });
+        svc.pollMediaMoves();verifyNoInteractions(helper);assertEquals(0,proofs.get());
+    }
+
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings = {"cloud", "backup"})
     void catalogImportDownloadsOriginalBeforeMetadataAndNeverAcknowledgesCloudCopies(String source) throws Exception {
@@ -546,6 +582,24 @@ class MobileRelayClientHttpTest {
         svc.pollInbox();
         assertEquals("saved", firstReceipt(svc).get("phase"));
         assertEquals(1, savedBytes.size(), "确认重试不重复落盘");
+    }
+
+    @Test
+    void organizedCaptureUsesFrozenNameAndRepairsTagsBeforeAckWithoutDuplicateBytes() {
+        statusFixture("42");
+        inboxJson=inboxJson.replace("\"fileName\":\"", "\"fileName\":\"整理_");
+        // Include the metadata delivered by the server, never invoke a model on the receiving desktop.
+        inboxJson=inboxJson.replace("\"mediaType\":", "\"organization\":{\"state\":\"ready\",\"originalName\":\"capture.jpg\",\"fileName\":\"整理_capture.jpg\",\"tags\":[\"营业执照\"]},\"mediaType\":");
+        var organizer=mock(MobileCaptureOrganizationService.class);
+        var svc=service();
+        org.springframework.test.util.ReflectionTestUtils.setField(svc,"captureOrganization",organizer);
+        doThrow(new IllegalStateException("temporary tag storage failure")).doNothing().when(organizer).attach(any(),any(),any(),any());
+        svc.pollInbox();
+        assertEquals(1,savedBytes.size());assertTrue(acked.isEmpty(),"标签/来源元数据失败应重试同件，尚不ACK");
+        svc.pollInbox();
+        assertEquals(1,savedBytes.size(),"稳定生成名使重试只补标签和ACK，不重复原件");
+        assertEquals(1,acked.size());
+        verify(organizer,times(2)).attach(eq(7L),eq(42L),any(),argThat(result->"ready".equals(result.get("state"))));
     }
 
     @Test

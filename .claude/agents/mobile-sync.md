@@ -5,6 +5,27 @@ description: 手机端同步领域。任务涉及手机端项目目录镜像、�
 
 # 手机端同步（项目目录镜像 + 现场影像/录音云中转）
 
+## 可选采集整理（dev-board#1630，2026-10-30）
+
+- `POST /api/mobile/media` 新增可选 multipart `organize=true`，缺省关闭；仅照片、视频、录音参与。`document` 插件镜像协议完全不变。手机必须在用户明确开启后发送，提示按账户额度计费、录音仅抽样预读。
+- `MobileCaptureOrganizationService` 在存储前按 `(userId,clientMediaId)` 固定一次结果，权限/大小/当前接收回执先于模型；不在数据库事务里等待模型。`processing` 并发请求要求使用同UUID稍后重试；超过120秒的中断记录冻结为 `failed` 原名，不自动再次花费。成功、失败与跳过都保留原字节；已存储/移动的回执优先于旧整理目标。
+- 新表 `mobile_capture_organization` 保存原名、基础名、类型、规则版本、内容SHA256、状态、客观字段与标签；账户注销删除派生记录。`ready/needs_review/skipped/failed` 随 upload/status/inbox 的 `organization` 返回，`fileName` 是规则基础名，`archiveName` 是附防重标记后的实际归档名，手机展示以后者为准。旧服务器无字段不能当作整理成功。
+- `MobileCaptureOrganizationEngine` 只抽字段，固定规则拼名，不猜号码、不判真实性/效力；区分登记号、证书号等编号种类，文件日期不拿采集日替代。照片缩图，视频最多三张抽样帧；录音FFmpeg仅前30秒转WAV，经现有账户平台语音输入接口识别，再辅助模型归类。录音总预算60秒，其余30秒；缺解码器/不可读为 `skipped`，故障/超时为 `failed`，覆盖范围在 `fields.coverage` 明示。不读取播放列表的远程或本机引用。
+- 生成名在首次上传落库前冻结，桌面继续按稳定名+UUID marker防重，禁止收取后再rename。云/桌面首次归档将结果保存到 `ProjectFile.metaJson.captureOrganization` 并接既有系统标签；标签存储失败的桌面件不ACK，重试只补元数据/标签，不重存原件。完成后不自动恢复被用户删除的标签。
+- 既有移动协议的新目标UUID会在校验移动意图、尺寸与SHA256后继承源的整理快照，即使目标上传 `organize=false` 也不丢原生成名/标签、不再调用模型；新归档后缀按目标UUID生成。源字节已变化时不复制旧分析。这里继承的是服务端冻结的AI结果，不代表桌面后续人工改名/手动标签已能跨端同步。
+- 回归入口：`MobileApiContractTest`（开关、账户隔离、并发、中断恢复、真实云归档标签与字节），`MobileRelayClientHttpTest`（标签失败后ACK重试），`MobileCaptureOrganizationEngineTest` / `VoiceDictationServiceTest`（有界多模态与本机HTTP替身），`AccountDeletionServiceTest`（派生记录清理）。合成模型响应不代表真实模型识别质量或正式手机包验收。
+
+## 手机全局队列归档移动（dev-board#1607，2026-10-29）
+
+- `POST /api/mobile/media/moves` 先登记不可变 `{requestId,sourceClientMediaId,targetClientMediaId,sourceDeviceId,sourceProjectKey,targetDeviceId,targetProjectKey,sha256,fileSize}`。手机在首次请求前按账户持久化两个新 UUID，登记确认后才以 `targetClientMediaId` 走既有媒体上传。不能重写旧 clientMediaId 的目标，也不使用会收费的 PULL/PUSH。手机须保留原件，直到 `DONE` 才更新队列归属。
+- `GET /moves/{requestId}` 恢复未知网络结果；`POST /moves/{requestId}/retry` 复用原登记，FAILED 回 WAITING_TARGET 重新核验。WAITING_TARGET / WAITING_SOURCE / DONE 的 retry 幂等。确定未登记且未提交任何任务的注册拒绝专用 `kind=MOVE_NOT_REGISTERED`；已有请求参数冲突、数据库异常和未知网络结果不能带这个标记。手机不得把任意 code 非零当成“可重新选目标”。
+- 同项目/设备移动拒绝。源 ID 只能拥有一个移动，目标 ID 必须未被任何上传或移动使用；活动移动的目标不能成为另一个移动的源，完成后允许继续移动。注册与上传持同一用户行锁，目标上传再次核账户/设备/项目/字节数/完整 SHA256，跨账号或复用目标 ID 不落盘。
+- `MobileMediaMove` 是云端持久意图；`MobileCaptureReceipt` 保存 relay 完整 UUID、设备+项目、服务端推导的精确归档相对路径与 ACK，不随 30 天 inbox TTL 消失。旧版仍在 inbox 的完整记录可登记，使用原完整文件名、日期目录和全部 SHA256 复验，不能靠 8 位文件名标记猜源。已过 TTL 且无持久映射的旧记录明确拒绝；同精确路径对应多个 UUID 也拒绝。新的桌面入库把完整 UUID 写入 ProjectFile.metaJson.mobileCaptureId，之后改名仍可辨认。
+- 桌面 `/moves/commands` → `/moves/{requestId}/result` 使用 `commandId` 与 epoch 毫秒 `expiresAt`（五分钟），拒迟到回执；到期重新 VERIFY_TARGET。目标必须真实落盘、大小和 SHA256 一致，再下发 REMOVE_SOURCE。源上传尚未被桌面收取时不撤 relay，等待原 ACK；旧桌面不支持命令时维持等待，升级后继续。worker 冻结 CatalogSession，在本地变更前与发送回执前复核账户。
+- `MobileCaptureMoveFiles` 共用于云端/桌面，通过项目存储解析器与版本写锁读取真实字节，核项目所有权、文件 UID/完整采集 ID、大小、SHA256；保留尽调原件保护。源清理先保存 `MobileCaptureRemoval` 本地日志，再无覆盖移到独立隐藏 `.mobile-moves/` 隔离位置（不属于关闭版本会删除的 `.awd/`，Git info/exclude 排除本目录），确认原路径没有新文件才清理原行，最后删隔离字节并提交 DONE 墓碑。回执丢失或进程重启只续原日志，不能重新解析同名文件并误删后来文件。失败允许目标副本保留；部分清理暂存隔离原件，重试接续。filewatcher 不持版本写锁，日志容忍它删去已失效元数据；原路径被后来文件占用时停止，不删除替代件。
+- 这是“目标本次真实核验后移除源”的流程，不承诺跨机文件系统原子事务。用户/Finder 在目标核验后主动删改目标、或多个旧进程共享同一桌面 deviceId 并同时收件，无法由本协议阻止；手机原件保留。任务未完成前不要清理本地删除日志。新服务上线与桌面升级另需发版授权，本次代码合并不等于部署。
+- 验证入口：`MobileApiContractTest.archiveMovesRequireVerifiedTargetThenOriginalAckAndFenceRetries`、`moveRegistrationSerializesSourcesAndRejectsUnknownOrAmbiguousLegacyReceipts`（真实 H2 并发与 API）、`MobileCaptureMoveFilesTest`（真实临时磁盘、丢 ACK/重启/替换同名）、`MobileRelayClientHttpTest.archiveMove*`（真实回环 HTTP、冻结账户）。
+
 ## 个人助理、日程镜像与提醒（dev-board#1539–1541，2026-10-27）
 
 - 手机个人助理直接从账户全部可用项目检索，不要求先选择项目。独立云端分析同意、既有文件备份同意、有效持久云存储订阅同时满足后启用；不新增收费档位。详细模型/工具/来源复验契约见 `ai-chat.md` 的手机个人助理段。

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "कार्यस्थान का सत्र बहाल नहीं किया जा सका",
   "confirm": "ठीक है",
   "cancel": "रद्द करें",
   "save": "सहेजें",
@@ -43,7 +44,7 @@ export default {
   "openFile": "फ़ाइल खोलें",
   "open": "खोलें",
   "cannotResolveParentFolder": "इस फ़ाइल वाला फ़ोल्डर निर्धारित नहीं किया जा सका",
-  "dateTimeMdHm": "{year}-{month}-{day} {time}",
+  "dateTimeMdHm": "{day}-{month}-{year} {time}",
   "registeredItems": "{count} आइटम पंजीकृत",
   "filesCount": "{count} फ़ाइलें",
   "statusRunning": "चल रहा है",
@@ -57,9 +58,9 @@ export default {
   "sourceChannelOfficeWord": "Word ऐड-इन",
   "sourceChannelOfficeExcel": "Excel ऐड-इन",
   "sourceChannelOfficePowerpoint": "PowerPoint ऐड-इन",
-  "sourceChannelWpsWord": "WPS Writer",
-  "sourceChannelWpsExcel": "WPS Spreadsheets",
-  "sourceChannelWpsPowerpoint": "WPS Presentation",
+  "sourceChannelWpsWord": "WPS Writer ऐड-इन",
+  "sourceChannelWpsExcel": "WPS Spreadsheets ऐड-इन",
+  "sourceChannelWpsPowerpoint": "WPS Presentation ऐड-इन",
   "sourceChannelPlugin": "ऐड-इन",
   "languagePickerLabel": "भाषा चुनें",
   "languageFollowSystem": "सिस्टम के अनुसार",

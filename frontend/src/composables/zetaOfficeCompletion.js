@@ -22,7 +22,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   const view = doc.defaultView
   const viewport = () => bounds?.() || { left: 0, top: 0, right: view.innerWidth, bottom: view.innerHeight, width: view.innerWidth, height: view.innerHeight }
   const queryRoot = overlayContainer || doc
-  const t = LABELS[language.startsWith('en') ? 'en' : 'zh']
+  const t = LABELS[language && !String(language).startsWith('zh') ? 'en' : 'zh']
   let config = { enabled: false, learning: false, hints: true, writable: false, session: '', items: [] }
   let items = [], current = null, choices = [], active = 0, generation = 0, timer = 0, learningTimer = 0
   let preferredText = '', panelPoint
@@ -277,8 +277,33 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
       show('detail', result.title || data.text || t.title)
       if (result.note) note(result.note)
       hintAction(result.hint)
+      const legal = result.legalReferences
+      if (legal?.ticket && Array.isArray(legal.items)) {
+        for (const [index, reference] of legal.items.entries()) {
+          const card = doc.createElement('section'); card.className = 'awd-wa-legal-card'; panel.appendChild(card)
+          const head = doc.createElement('div'); head.className = 'awd-wa-legal-head'; card.appendChild(head)
+          const kind = doc.createElement('span'); kind.className = 'awd-wa-legal-kind'; kind.textContent = reference.kind; head.appendChild(kind)
+          const open = button('↗', async () => {
+            if (gen !== generation) return
+            await rpc('openLegalReference', { ticket: legal.ticket, index })
+            if (!disposed && gen === generation) invalidate({ flush: false })
+          }, head)
+          open.setAttribute('aria-label', legal.openLabel); open.title = legal.openLabel
+          const title = doc.createElement('strong'); title.className = 'awd-wa-legal-title'; title.textContent = reference.title; card.appendChild(title)
+          const state = doc.createElement('small'); state.textContent = reference.status; card.appendChild(state)
+          if (reference.metadata?.length) {
+            const metadata = doc.createElement('dl'); card.appendChild(metadata)
+            for (const row of reference.metadata.slice(0, 4)) {
+              const term = doc.createElement('dt'); term.textContent = row.label; metadata.appendChild(term)
+              const value = doc.createElement('dd'); value.textContent = row.value; metadata.appendChild(value)
+            }
+          }
+          if (reference.source) { const source = doc.createElement('small'); source.textContent = `${reference.sourceLabel}: ${reference.source}`; card.appendChild(source) }
+          if (reference.retrievedAt) { const date = doc.createElement('small'); date.textContent = `${reference.retrievedAtLabel}: ${reference.retrievedAt}`; card.appendChild(date) }
+        }
+      }
       const variants = result.variants || []
-      if (!variants.length) { note(t.noDetail); return }
+      if (!variants.length) { if (!legal?.items?.length) note(t.noDetail); position(); return }
       const body = doc.createElement('div'); panel.appendChild(body)
       let chosen = 0
       const render = () => {

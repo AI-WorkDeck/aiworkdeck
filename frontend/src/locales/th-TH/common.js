@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "ไม่สามารถกู้คืนเซสชันพื้นที่ทำงานได้",
   "confirm": "ตกลง",
   "cancel": "ยกเลิก",
   "save": "บันทึก",
@@ -43,7 +44,7 @@ export default {
   "openFile": "เปิดไฟล์",
   "open": "เปิด",
   "cannotResolveParentFolder": "ไม่สามารถระบุโฟลเดอร์ที่มีไฟล์นี้ได้",
-  "dateTimeMdHm": "{year}-{month}-{day} {time}",
+  "dateTimeMdHm": "{day}/{month}/{year} {time}",
   "registeredItems": "ลงทะเบียนแล้ว {count} รายการ",
   "filesCount": "{count} ไฟล์",
   "statusRunning": "กำลังทำงาน",
@@ -57,9 +58,9 @@ export default {
   "sourceChannelOfficeWord": "ส่วนเสริม Word",
   "sourceChannelOfficeExcel": "ส่วนเสริม Excel",
   "sourceChannelOfficePowerpoint": "ส่วนเสริม PowerPoint",
-  "sourceChannelWpsWord": "WPS Writer",
-  "sourceChannelWpsExcel": "WPS Spreadsheets",
-  "sourceChannelWpsPowerpoint": "WPS Presentation",
+  "sourceChannelWpsWord": "WPS เอกสาร",
+  "sourceChannelWpsExcel": "WPS สเปรดชีต",
+  "sourceChannelWpsPowerpoint": "WPS งานนำเสนอ",
   "sourceChannelPlugin": "ส่วนเสริม",
   "languagePickerLabel": "เลือกภาษา",
   "languageFollowSystem": "ตามระบบ",

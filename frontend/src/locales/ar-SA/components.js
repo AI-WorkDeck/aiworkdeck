@@ -1,13 +1,12 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
 export default {
-  "panelTitle": "Optional components",
-  "panelSubtitle": "These components are not bundled with the installer. Download only what you use — everything runs on this computer and nothing leaves it.",
-  "installSelected": "Download selected",
-  "installOne": "Download this component",
-  "later": "Not now",
-  "laterHint": "You can download them any time from Settings → Components.",
+  "panelTitle": "مكونات اختيارية",
+  "panelSubtitle": "هذه المكونات غير مضمّنة مع برنامج التثبيت. نزّل فقط ما تستخدمه — كل شيء يعمل على هذا الكمبيوتر ولا يغادره أي شيء.",
+  "installSelected": "تنزيل المحدد",
+  "installOne": "تنزيل هذا المكوّن",
+  "later": "ليس الآن",
+  "laterHint": "يمكنك تنزيلها في أي وقت من الإعدادات ← المكونات.",
   "alreadyReady": "تم التثبيت مسبقًا: {names}.",
   "nameSeparator": "، ",
   "manageTitle": "المكونات",
@@ -73,19 +72,19 @@ export default {
     "impact": "توليد الكلام غير متاح"
   },
   "asrRuntime": {
-    "name": "On-device speech recognition",
-    "unlocks": "the \"recordings never leave this computer\" transcription tier",
-    "impact": "only the two cloud transcription tiers remain"
+    "name": "التعرف على الكلام على الجهاز",
+    "unlocks": "مستوى التفريغ الصوتي \"التسجيلات لا تغادر هذا الكمبيوتر أبدًا\"",
+    "impact": "يبقى مستويا التفريغ الصوتي السحابيان فقط"
   },
   "features": {
-    "pptxGenerate": "AI slide generation",
-    "pptxFormat": "PPTX read/edit formatting",
-    "pdfToWordLayout": "PDF to Word (layout-preserving)",
-    "scannedOcrEntry": "scanned-document OCR entry (also needs the OCR engine)",
-    "scannedPdfToWord": "scanned PDF to Word",
-    "ocrParse": "OCR layout parsing",
-    "pptxEditableExport": "editable PPT export",
-    "ttsPanel": "speech synthesis panel",
-    "localTranscription": "on-device transcription"
+    "pptxGenerate": "إنشاء العروض التقديمية بالذكاء الاصطناعي",
+    "pptxFormat": "قراءة/تحرير تنسيق PPTX",
+    "pdfToWordLayout": "تحويل PDF إلى Word (مع الحفاظ على التنسيق)",
+    "scannedOcrEntry": "مدخل OCR للمستندات الممسوحة ضوئيًا (يتطلب أيضًا محرك OCR)",
+    "scannedPdfToWord": "تحويل PDF الممسوح ضوئيًا إلى Word",
+    "ocrParse": "تحليل التنسيق بـ OCR",
+    "pptxEditableExport": "تصدير PPT قابل للتحرير",
+    "ttsPanel": "لوحة توليد الكلام",
+    "localTranscription": "التفريغ الصوتي على الجهاز"
   }
 }

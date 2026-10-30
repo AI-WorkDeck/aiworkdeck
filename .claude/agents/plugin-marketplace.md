@@ -76,6 +76,7 @@ description: 插件市场领域。任务涉及插件广场页、在线 Skill 广
 - 下载**不经官网应用层**：镜像静态直出 `https://{www.aiworkdeck.com|workdeck.ai}/plugin-packs/<id>/…`（`ai.packs.base-urls`），断点续传（.part + Range）+ 压缩包哈希 + 包内 `contents.sha256` 逐文件复核 + 原子指针切换。
 - 前端：MarketSidebarPanel / MarketDetailPane 对 `packId` 非空且 `packReady:false` 的面板 skill 显示「需下载资源包」与字节级进度；LitigationVisualPanel 顶部有下载状态条。
   已就绪且 registry 版本更高时，MarketDetailPane 多一行「有新版本 x.y.z」+「立即升级」（`packUpgrade`）。
+- **轮询响应不得覆盖更新后的状态（2026-10-28，发版门禁 #1589）**：`MarketDetailPane.refreshPackStatus` 发请求时记录 `reloadGeneration`，响应返回时只接受当前轮次；用户确认卸载后，必须先递增轮次并停止轮询，再停用 Skill、删除资源包。仅清除定时器不会取消已经发出的请求：迟到的 `ready` 曾能把卸载后的 `packReady:false` 覆盖成 `true`，甚至再次启用 Skill。正常当前轮次的 `ready` 仍须保留自动启用行为。回归入口：`node --test frontend/tests/litigation-visual/market-pack-state.test.mjs frontend/tests/litigation-visual/packUpdate.test.mjs frontend/tests/plugin-sdk/market-update-detail.test.mjs`；延迟响应行为测试先红后绿，修复后 39/39 通过。本次证据为 `/tmp/office-market-pack-race-red.log`、`/tmp/office-market-pack-race-green.log`。真实浏览器 app-e2e 的 J13 首轮出现卸载后详情仍显示已启用；后续全量 176/176 通过并读回 `packReady:false`，说明异步时序可影响复现，不能仅凭重跑绿判无问题。176 项全量在修复前完成，39 项针对回归在修复后完成；两者不冒称同一代码快照。
 - **版本追新**（dev-board#499，规范 §5.1）：`service/pack/PackUpdater` 启动后 45s + 每 24h
   对「已装好且未被封禁、且不是所有引用它的 skill 都被停用」的 pack 比对 registry 版本，
   有新版就走完整安装事务换上（失败静默 WARN 保持旧版），开关 `ai.packs.auto-upgrade`（默认 true）。
@@ -203,3 +204,19 @@ description: 插件市场领域。任务涉及插件广场页、在线 Skill 广
 ## 可安装业务面板与服务设置（#1340/#1341，待发版）
 
 搜索/语音/脱敏/诉讼可视化/日历/收藏/剪贴板/洞察改为official-plugins中的真实Web包；MarketSidebarPanel/MarketDetailPane将/api/plugins/bundled的随应用目录与在线广场合并，断网仍可装随包项。PluginBundledInstaller首次复制、保留禁用和卸载意愿，不覆盖独立同名包；desktop extraResources提供只读来源。旧voice skill合成项仅用于旧实现兼容，实际新入口按voice插件启停。PluginConnectionSettings为可信宿主设置面板，负责开发服务授权、令牌输入、OAuth与连接状态；iframe没有授权写接口。主产品插件权益与开发者SaaS付费是两条通道。
+
+## Skill / Plugin / MCP 分类与个人连接（dev-board#1598–1599）
+
+- 市场按对象分类：插件注册表提供 Plugin；真实 AI 方法仍属 Skill，即便由桌面面板发起。`utils/chatSelectableSkills.mjs` 排除 `text-to-speech`、`desensitize` 两个纯面板引导，并在已安装可用的腾讯会议插件工作流存在时去掉重复旧技能；不按 `sourcePluginId` 一律过滤。对话给插件提供的 Skill 标注来源。
+- 左栏已安装和 Marketplace 均有 MCP 页签，条目打开设置 `nav=mcp`；整页市场的 MCP 页签与个人设置复用 `components/admin/McpConnectionsPanel.vue`。个人组对普通用户可见；设置受当前用户/账户隔离，不能改成安装级配置。
+- `GET /api/mcp/connections` 同时返回脱敏连接与预置目录；保存、测试、启用分步操作。启用的自配优先，失败不回收费平台；企查查/法宝停用或删除自配会恢复官方通道，UI 必须明确确认后续平台积分。其他 MCP 停用后无调用。免除数据调用平台积分不等于 AI 模型免费。
+- 凭据只写不回显；无 token 的公共连接用 `revision/saved` 判定已保存，不能用 `configured` 决定能否测试。身份切换清除草稿并丢弃旧响应；所有写请求附带加载时的 `X-MCP-Scope`，由后端拒绝跨账户排队写入；请求禁用正文日志。载入/测试失败持续显示。支持公网 HTTPS Streamable HTTP（无认证、Bearer、自定义请求头、OAuth）及桌面 stdio；高级连接契约见下。
+- 验证：`node --test frontend/tests/project-home/chat-selectable-skills.test.mjs frontend/tests/project-home/market-*.test.mjs`；`cd frontend && node tests/chat-presentation-ui/mcp-connections.mjs` 使用真实 ChatInterface、市场和 AdminPane 加合成 HTTP，覆盖分类、设置直达、保存/测试/启用/官方切换、失败、匿名连接、账户切换及窄宽暗色。它不证明真实供应商或正式客户端已验收。
+
+### MCP 高级连接（dev-board#1601–1603）
+
+`UserMcpConnectionService` 统一保存/测试/调用，`UserMcpConfigImport` 解析 `mcpServers`/`servers`；`UserMcpStdioClient` 管子进程，`UserMcpOAuthService` 管标准发现、PKCE、加密令牌、刷新和撤销。原 Bearer 连接延迟迁移，`Connection.options` 缺失兼容。秘密存入隔离的 `.settings` 密文；env/headers 部分更新空对象保留、null 值删除。JSON preview/apply 均要求 `X-MCP-Scope`，apply 先全量验证再事务写入，不覆盖同名配置、不执行命令或网络。
+
+stdio 测试首用或配置改变须 `allowLocalExecution=true` 加 `expectedRevision`，确认绑定确切版本；后端只有 `security.local-mode=true` 可运行。每次操作建立并清理一个进程，默认60/max180秒；账号/配置/权限guard贯穿阻塞读写。OAuth authorize/accessToken 在主服务锁外，status 不走网络；disconnect 立即本地撤权，供应商撤销在事务提交后异步执行。实际后端端口决定桌面 callback，服务器需 `ai.mcp.oauth-redirect-uri`。业务401/403不重放、不回平台收费。
+
+验证新增：`UserMcpAdvancedConnectionTest`、`UserMcpPersistenceTest`、`UserMcpStdioClientTest`（真实进程）、`UserMcpOAuthServiceTest`（真实HTTP）与 `UserMcpOAuthControllerTest`；前端fixture覆盖JSON选择导入、命令版本确认、OAuth轮询/取消/断开与账户切换。Notion加入预置，默认oauth2；预置数量不可写死为5。

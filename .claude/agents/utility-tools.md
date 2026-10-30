@@ -7,6 +7,8 @@ description: 辅助小工具领域。任务涉及浏览器面板、截图/OCR、
 
 职责边界：工作台各辅助面板与桌面能力（浏览器/截图/剪贴板/收藏/搜索/语音/预览插入/OCR）。不含编辑器（doc-editor）、不含左栏布局本身（sidebar-shell）。剪贴板与文件缓存区的**免费额度**在本文档里讲执行方式，权益判定、entitlement 命名与账户连接见 `.claude/agents/licensing-billing.md`。
 
+**Electron 45 剪贴板（dev-board#1624）**：`clipboard.read()` / `readText()` 为异步 API，读取内容为 ClipboardItem/Blob；轮询器必须串行等待并在停用时取消旧代结果，首轮读取完成后才能解除 priming，防止迟到读操作在重启监听后发出旧内容。PNG Blob 经 nativeImage 解码，macOS 文件列表读取 `text/uri-list` 并仅接受本地 file URL；保留原有图片优先、去重与 Windows 不捕获文件的边界。单测在 `desktop/tests/clipboard-watch.test.js`；真实系统剪贴板验证 `test:clipboard-compat` 只允许 GitHub 托管临时 runner，不能在用户桌面绕过环境保护。
+
 ## 分组清单（前端组件 / desktop 宿主 / 后端 API 三层）
 
 **浏览器**：`frontend/src/components/BrowserPane.vue`；desktop `desktop/main/browser-views.js`（BrowserView 注册表）+ `desktop/main/main.js`（`makeBrowserView` 建 view 并接事件、window.open 拦截转工作区新 tab → 事件 `checkba:browser-open-new-tab`、全屏/黑屏兜底恢复、IPC handlers）；后端 `controller/BrowserProxyController.java`（GET /api/browser/proxy）。
@@ -250,6 +252,11 @@ NORMAL `#3B82F6`，`tagTypes.js` 与 TagService 两处同值）。分组展示�
 
 **朗读面板与键盘（dev-board#1339）**：音色使用共享 `AwdSelect` 的可选 `searchable/searchLabel/searchPlaceholder/emptyText`，过滤后仍发出原始 `range` 下标；当前朗读使用启动时的音色快照，更换音色在下次朗读生效。播放速度0.5–2x，方向键每次0.05、PageUp/Down每次0.25、Home/End到边界，恢复原速不重合成。Uni H5 的按钮和滑杆不是原生 HTML 控件，Enter/Space、焦点、禁用态和 slider ARIA 须显式接通；正文通过真实 textarea 的原生 input 监听同步（卸载时解除），避免 Uni 的100ms输入节流截尾，也不要在开始时无条件将DOM值反灌模型（导入后的DOM可能尚未更新）。真正聚焦的 textarea/search input 还须设置可访问名称，不能只标 Uni 外壳。错误提示持久显示，面板遵守 `doc/sidebar-ui-standard.md` 和跨平台设计令牌。真实 Uni 编译的隔离浏览器回归见 `frontend/tests/tts-panel-ui/README.md`，其服务与音频为合成夹具，不等同于已安装 Electron、完整工作台或正式发版验收。
 
+
+账户失效补充（dev-board#1623）：云转写提交或后台轮询的凭据拒绝会持久化账户 `authExpired`。
+`services/api.js:getMeetingRecording` 在 TRANSCRIBING/FAILED 时异步复核账户，内置面板、播放器、
+`pluginVoiceServices` 宿主桥共用；不可只在 FAILED 查，因为轮询拒绝可能仍保持 TRANSCRIBING。
+该通知不重交付费任务、不改变本地转写与录音文件，细节见 licensing-billing.md #1623。
 
 **录音（ASR 方向）**：会议录音插件的录音单例 `frontend/src/utils/meetingRecorder.js`（getUserMedia+MediaRecorder 配方源自 FeedbackWidget；分片追加上传走 /api/files/{id}/upload 的 X-File-Offset 协议；轨道必须 stop 否则 macOS 录音灯常亮）；转写三档 platform / byok / local，详见 `.claude/agents/licensing-billing.md`「平台服务网关」与 `.claude/agents/plugin-system.md` 会议录音条目。反馈浮窗的 `VoiceTranscriptionService`（OpenAI 兼容接口位）与它无关、各管各的。macOS 麦克风 entitlement 与 NSMicrophoneUsageDescription 已覆盖两个用途（desktop/package.json:103），**权限问题只在签名包暴露，dev 态测不出**。
   **`recorderState.projectId` 必须与 `status='starting'` 同步写入**（`startRecording()`）：不能等 `getUserMedia`+`createMeetingRecording` 两个 await 都过了才赋值——`MeetingRecordingPanel.vue` 的 `recordingHere` 计算属性同时判 `isRecordingActive()` 与 `recState.projectId === this.projectId`，projectId 还是 null 的窗口期会被误判成"别的项目在录音"（新机首次要等系统麦克风授权弹窗，窗口被拉长到必现；e2e 的假麦克风走 `--use-fake-device-for-media-stream` 秒过，覆盖不到这段）。`MeetingRecordingIndicator.vue` 的 `visible()` 也不许手写状态枚举，统一复用 `isRecordingActive()`——之前它漏了 `'starting'`，会出现"面板让你去顶部胶囊停止，胶囊却还没出现"的假象。

@@ -148,6 +148,30 @@ class ToolDisclosurePolicyTest {
         }
     }
 
+    @Test
+    void lowaVisualExportRemainsAvailableWithoutExpandingFiles() {
+        RecordingToolRegistry registry = registry();
+        for (String kind : List.of(ClientCapabilityService.DOC_KIND_WRITER,
+                ClientCapabilityService.DOC_KIND_SHEET, ClientCapabilityService.DOC_KIND_SLIDE)) {
+            var candidates = registry.getAllSpecifications("export-lowa", kind);
+            for (Set<String> expanded : List.of(Set.<String>of(), Set.of("slides", "spreadsheet", "table", "revision"))) {
+                Set<String> offered = names(POLICY.narrow(candidates, expanded));
+                assertTrue(offered.contains("doc_export_pdf"), kind + ": export must remain callable");
+                assertFalse(offered.contains("delete_file"), "Export must not expose the files category");
+                assertFalse(offered.contains("copy_files"), "Export must not expose the files category");
+            }
+        }
+        for (String host : List.of("word", "excel", "powerpoint")) {
+            String conv = "export-office-" + host;
+            registry.capabilities().record(conv, "office", host);
+            assertFalse(names(POLICY.narrow(registry.getAllSpecifications(conv, null), Set.of("files")))
+                    .contains("doc_export_pdf"), host + ": LOWA export must not bypass the host gate");
+        }
+        registry.capabilities().record("export-none", "none", null);
+        assertFalse(names(POLICY.narrow(registry.getAllSpecifications("export-none", null), Set.of("files")))
+                .contains("doc_export_pdf"));
+    }
+
     /**
      * 核心集逐会话的实数（dev-board#1064 第二步）。打印出来，是为了让「核心集到底多大」在每次改动后
      * 都看得见；断言只卡两条：每一类会话都够小（否则收窄没意义），每一类会话都有自己那一份「读 + 找 + 写」
@@ -199,10 +223,11 @@ class ToolDisclosurePolicyTest {
                 "office_excel_search", "office_excel_replace", "office_excel_set_values")), "Excel 窗格：" + core.get("Excel 窗格"));
         assertTrue(core.get("PPT 窗格").containsAll(List.of("office_ppt_get_slides", "office_ppt_replace_text",
                 "office_ppt_format_text", "office_ppt_add_slide")), "PPT 窗格：" + core.get("PPT 窗格"));
+        assertTrue(core.get("docx").contains("slide_create_file"), "Word 参考生成 PPT 必须可见新建入口");
         // 反向：别家宿主的段不会漏进来（能力闸在上游裁，核心集是扁平的）
         assertFalse(core.get("Excel 窗格").contains("office_replace_text"), "Word 面工具漏进了 Excel 窗格");
-        assertFalse(core.get("docx").stream().anyMatch(n -> n.startsWith("office_") || n.startsWith("slide_")),
-                "docx 会话里不该有 office_* / slide_*：" + core.get("docx"));
+        assertFalse(core.get("docx").stream().anyMatch(n -> n.startsWith("office_") || (n.startsWith("slide_") && !n.equals("slide_create_file"))),
+                "docx 会话里只允许跨类型新建 PPT，不应泄漏其他宿主编辑工具：" + core.get("docx"));
     }
 
     @Test
@@ -349,7 +374,7 @@ class ToolDisclosurePolicyTest {
                 "doc_set_page_setup", "doc_insert_image")) {
             assertEquals("format", POLICY.categoryOf(name), name);
         }
-        assertEquals("files", POLICY.categoryOf("doc_export_pdf"), "排在 format 通配之前才不会被吃掉");
+        assertEquals("core", POLICY.categoryOf("doc_export_pdf"), "LOWA视觉核验出口无需先展开files");
         assertEquals("core", POLICY.categoryOf("doc_restore_checkpoint"),
                 "#1064 第二步回到核心集：Impress 上 doc_undo 是空操作，pptx 会话里它是唯一的后悔药");
         assertEquals("core", POLICY.categoryOf("doc_undo"), "常规纠错留在核心集");
@@ -495,6 +520,9 @@ class ToolDisclosurePolicyTest {
                 "单独的「目录」多半是文件夹，不许把整个 format 类目放回");
         assertEquals(Set.of("files"), TRIM.categoriesHintedBy("把这几份文件移动到「往来函件」文件夹"));
         assertEquals(Set.of("legal"), TRIM.categoriesHintedBy("这段话引用了哪条司法解释？"));
+        assertEquals("legal", POLICY.categoryOf("case_search"));
+        assertEquals(Set.of("legal"), TRIM.categoriesHintedBy("查询类似案例"));
+        assertEquals(Set.of("legal"), TRIM.categoriesHintedBy("find relevant case law"));
         assertEquals(Set.of("legal"), TRIM.categoriesHintedBy("《劳动合同法》里经济补偿的标准在哪一条？"));
         assertEquals(Set.of("meeting"), TRIM.categoriesHintedBy("把昨天的录音整理一下"), "「整理」不许把文件整理类放回");
         assertEquals(Set.of("memory"), TRIM.categoriesHintedBy("记住我喜欢用仿宋"));

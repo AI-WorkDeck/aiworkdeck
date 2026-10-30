@@ -2365,6 +2365,30 @@ public class DocumentEditTools implements AgentToolComponent {
         }
     }
 
+    private String executeSheetCommand(String action, java.util.Map<String, Object> params) {
+        String response = editorBridgeService.executeEditorCommand(action, params);
+        try {
+            var result = cn.hutool.json.JSONUtil.parseObj(response);
+            String code = result.getStr("errorCode", result.getStr("error"));
+            if (code == null) return response;
+            String message = switch (code) {
+                case "SHEET_SORT_MERGED_RANGE" -> com.checkba.service.LangText.of("排序区域包含合并单元格，请先取消合并后再排序", "The sort range contains merged cells. Unmerge them before sorting.");
+                case "SHEET_SORT_FAILED" -> com.checkba.service.LangText.of("排序失败，请重新读取并核对工作表后再试", "Sorting failed. Read and check the worksheet before retrying");
+                case "SHEET_PROTECTED_CELL" -> com.checkba.service.LangText.of("目标包含受保护单元格，本次未写入", "The target contains protected cells; nothing was written");
+                case "SHEET_INVALID_RANGE" -> com.checkba.service.LangText.of("区域地址无效，请重新读取工作表后指定区域", "Invalid range; inspect the worksheet and specify a valid range");
+                case "SHEET_INVALID_START_CELL" -> com.checkba.service.LangText.of("请指定有效的起始单元格", "Specify a valid start cell");
+                case "SHEET_INVALID_ROWS" -> com.checkba.service.LangText.of("写入内容须为有效的二维单元格数组", "Provide a valid two-dimensional cell array");
+                case "SHEET_RANGE_OUT_OF_BOUNDS" -> com.checkba.service.LangText.of("写入范围超过工作表边界", "The write range exceeds worksheet bounds");
+                case "SHEET_RANGE_CHECK_FAILED" -> com.checkba.service.LangText.of("无法核对写入范围，本次未写入", "Could not validate the target range; nothing was written");
+                case "SHEET_WRITE_PARTIAL" -> com.checkba.service.LangText.of("写入中断，部分单元格可能已改变，请回读核对后修复，勿整批重试", "Writing was interrupted; some cells may have changed. Read back and repair instead of retrying the entire batch");
+                case "SHEET_CHART_PARTIAL" -> com.checkba.service.LangText.of("图表已创建但配置未完成，请检查现有图表后修复，勿重复创建", "The chart was created but configuration is incomplete. Inspect and repair it instead of creating another chart");
+                default -> null;
+            };
+            if (message != null) { result.set("errorCode", code); result.set("error", message); result.set("message", message); return result.toString(); }
+        } catch (RuntimeException ignored) { }
+        return response;
+    }
+
     // ==================== 电子表格（Calc / xlsx）sheet_* 原语 ====================
     // 打开的 xlsx 由同一 LibreOffice 引擎的 Calc 模块承载；doc_* 的 Writer 原语
     // （getText 一族）在表格文档上必然失败，表格操作一律走本节 sheet_* 工具。
@@ -2377,7 +2401,7 @@ public class DocumentEditTools implements AgentToolComponent {
     public String sheet_get_overview() {
         log.info("Tool: sheet_get_overview called");
         try {
-            return editorBridgeService.executeEditorCommand("sheet_get_overview", null);
+            return executeSheetCommand("sheet_get_overview", null);
         } catch (Exception e) {
             log.error("Failed to get sheet overview", e);
             return "Error: " + e.getMessage();
@@ -2392,8 +2416,8 @@ public class DocumentEditTools implements AgentToolComponent {
           "键名与 sheet_format_cells 参数同名，可原样套回去；borders 为 all/none 或 t/b/l/r 子集），上限 400 格。" +
           "新增行列或往表里插内容前，用它看清相邻格式，再用 sheet_format_cells/sheet_set_borders 对齐。")
     public String sheet_read_range(
-            @P("区域，如 'A1:D20' 或单个单元格 'B3'；不传则读整个已用区域") String range,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet,
+            @P(value = "区域，如 'A1:D20' 或单个单元格 'B3'；不传则读整个已用区域", required = false) String range,
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet,
             @P(value = "是否同时返回格式摘要（字体/字号/对齐/数字格式/边框/底色等），默认 false", required = false) Boolean withFormat
     ) {
         log.info("Tool: sheet_read_range called range={}, sheet={}, withFormat={}", range, sheet, withFormat);
@@ -2402,7 +2426,7 @@ public class DocumentEditTools implements AgentToolComponent {
             if (range != null && !range.isBlank()) params.put("range", range);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
             if (Boolean.TRUE.equals(withFormat)) params.put("withFormat", true);
-            return editorBridgeService.executeEditorCommand("sheet_read_range", params);
+            return executeSheetCommand("sheet_read_range", params);
         } catch (Exception e) {
             log.error("Failed to read sheet range", e);
             return "Error: " + e.getMessage();
@@ -2424,7 +2448,7 @@ public class DocumentEditTools implements AgentToolComponent {
     public String sheet_write_cells(
             @P("起始单元格，如 'A1'") String startCell,
             @P("写入内容，JSON 二维数组") String rowsJson,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet,
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet,
             @P(value = "追加到表格下方时是否沿用上一行格式，默认 true；只有明确不要沿用时才传 false", required = false) Boolean inheritFormat
     ) {
         log.info("Tool: sheet_write_cells called startCell={}, json length={}, inheritFormat={}",
@@ -2447,7 +2471,7 @@ public class DocumentEditTools implements AgentToolComponent {
             params.put("rows", rows);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
             if (Boolean.FALSE.equals(inheritFormat)) params.put("inheritFormat", false);
-            return editorBridgeService.executeEditorCommand("sheet_write_cells", params);
+            return executeSheetCommand("sheet_write_cells", params);
         } catch (com.fasterxml.jackson.core.JacksonException je) {
             return "Error: rowsJson 不是合法的 JSON 二维数组: " + je.getOriginalMessage();
         } catch (Exception e) {
@@ -2461,14 +2485,14 @@ public class DocumentEditTools implements AgentToolComponent {
           "选中后可接 sheet_format_cells / sheet_set_borders 等格式操作。")
     public String sheet_select_range(
             @P("区域，如 'A1:D20' 或单个单元格 'B3'") String range,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_select_range called range={}, sheet={}", range, sheet);
         try {
             java.util.Map<String, Object> params = new java.util.HashMap<>();
             params.put("range", range != null ? range : "");
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_select_range", params);
+            return executeSheetCommand("sheet_select_range", params);
         } catch (Exception e) {
             log.error("Failed to select sheet range", e);
             return "Error: " + e.getMessage();
@@ -2481,18 +2505,18 @@ public class DocumentEditTools implements AgentToolComponent {
           "数字格式 numberFormat（LibreOffice 格式码，如 '#,##0.00'、'0.00%'、'yyyy-mm-dd'、'@'=文本）。")
     public String sheet_format_cells(
             @P("区域，如 'A1:D1'") String range,
-            @P("加粗 true/false，不改则不传") Boolean bold,
-            @P("斜体 true/false，不改则不传") Boolean italic,
-            @P("下划线 true/false，不改则不传") Boolean underline,
-            @P("字号（磅），不改则不传") Double fontSize,
-            @P("字体名，不改则不传") String fontName,
-            @P("文字颜色：#RRGGBB 或 auto，不改则不传") String color,
-            @P("单元格底色：#RRGGBB 或 none，不改则不传") String background,
-            @P("水平对齐：left/center/right/standard，不改则不传") String hAlign,
-            @P("垂直对齐：top/center/bottom/standard，不改则不传") String vAlign,
-            @P("自动换行 true/false，不改则不传") Boolean wrap,
-            @P("数字格式码，如 '#,##0.00'、'0.00%'、'yyyy-mm-dd'，不改则不传") String numberFormat,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "加粗 true/false，不改则不传", required = false) Boolean bold,
+            @P(value = "斜体 true/false，不改则不传", required = false) Boolean italic,
+            @P(value = "下划线 true/false，不改则不传", required = false) Boolean underline,
+            @P(value = "字号（磅），不改则不传", required = false) Double fontSize,
+            @P(value = "字体名，不改则不传", required = false) String fontName,
+            @P(value = "文字颜色：#RRGGBB 或 auto，不改则不传", required = false) String color,
+            @P(value = "单元格底色：#RRGGBB 或 none，不改则不传", required = false) String background,
+            @P(value = "水平对齐：left/center/right/standard，不改则不传", required = false) String hAlign,
+            @P(value = "垂直对齐：top/center/bottom/standard，不改则不传", required = false) String vAlign,
+            @P(value = "自动换行 true/false，不改则不传", required = false) Boolean wrap,
+            @P(value = "数字格式码，如 '#,##0.00'、'0.00%'、'yyyy-mm-dd'，不改则不传", required = false) String numberFormat,
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_format_cells called range={}", range);
         try {
@@ -2510,7 +2534,7 @@ public class DocumentEditTools implements AgentToolComponent {
             if (wrap != null) params.put("wrap", wrap);
             if (numberFormat != null && !numberFormat.isBlank()) params.put("numberFormat", numberFormat);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_format_cells", params);
+            return executeSheetCommand("sheet_format_cells", params);
         } catch (Exception e) {
             log.error("Failed to format sheet cells", e);
             return "Error: " + e.getMessage();
@@ -2522,10 +2546,10 @@ public class DocumentEditTools implements AgentToolComponent {
           "widthPt 线宽磅数（默认 0.75），color 边框颜色（默认黑色）。")
     public String sheet_set_borders(
             @P("区域，如 'A1:D20'") String range,
-            @P("边框样式：all/outer/none，默认 all") String preset,
-            @P("线宽（磅，如 0.75、1.5），默认 0.75") Double widthPt,
-            @P("边框颜色 #RRGGBB，默认黑色") String color,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "边框样式：all/outer/none，默认 all", required = false) String preset,
+            @P(value = "线宽（磅，如 0.75、1.5），默认 0.75", required = false) Double widthPt,
+            @P(value = "边框颜色 #RRGGBB，默认黑色", required = false) String color,
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_set_borders called range={}, preset={}", range, preset);
         try {
@@ -2535,7 +2559,7 @@ public class DocumentEditTools implements AgentToolComponent {
             if (widthPt != null) params.put("widthPt", widthPt);
             if (color != null && !color.isBlank()) params.put("color", color);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_set_borders", params);
+            return executeSheetCommand("sheet_set_borders", params);
         } catch (Exception e) {
             log.error("Failed to set sheet borders", e);
             return "Error: " + e.getMessage();
@@ -2547,11 +2571,11 @@ public class DocumentEditTools implements AgentToolComponent {
           "rowHeightPt/colWidthPt 按磅设定值；autoFitRows/autoFitCols=true 按内容自动适应（优先于定值）。只传需要改的参数。")
     public String sheet_set_row_col(
             @P("区域，如 'A1:D1'（其覆盖的整行/整列生效）") String range,
-            @P("行高（磅），不改则不传") Double rowHeightPt,
-            @P("列宽（磅），不改则不传") Double colWidthPt,
-            @P("行高自动适应内容 true，不改则不传") Boolean autoFitRows,
-            @P("列宽自动适应内容 true，不改则不传") Boolean autoFitCols,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "行高（磅），不改则不传", required = false) Double rowHeightPt,
+            @P(value = "列宽（磅），不改则不传", required = false) Double colWidthPt,
+            @P(value = "行高自动适应内容 true，不改则不传", required = false) Boolean autoFitRows,
+            @P(value = "列宽自动适应内容 true，不改则不传", required = false) Boolean autoFitCols,
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_set_row_col called range={}", range);
         try {
@@ -2562,11 +2586,41 @@ public class DocumentEditTools implements AgentToolComponent {
             if (autoFitRows != null) params.put("autoFitRows", autoFitRows);
             if (autoFitCols != null) params.put("autoFitCols", autoFitCols);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_set_row_col", params);
+            return executeSheetCommand("sheet_set_row_col", params);
         } catch (Exception e) {
             log.error("Failed to set sheet row/col size", e);
             return "Error: " + e.getMessage();
         }
+    }
+
+    @ToolMeta(displayName = "新建演示文稿", category = "slides", fileEffect = "ADDED")
+    @Tool("Start a new PPT here, including when a Word reference is active: create a native editable 16:9 PPTX with one blank slide and open it. If a reference is supplied, inspect its structure AND actual rendered pages first (doc_export_pdf then pdf_inspect_visual purpose=reference); structured text alone does not establish its appearance. Other slide_* tools may be hidden until this succeeds; do not wait to discover them before creating. "
+            + "Use slide_* primitives to compose content, backgrounds and formatting. No image-generation service is required. "
+            + "When a destination folder is specified, first resolve its ID with list_project_folders. Existing files are not overwritten. Omitted parentFolderId follows the source document folder; 0 selects the root.")
+    public String slide_create_file(
+            @P("File name, with optional .pptx suffix") String fileName,
+            @P("Project ID") Long projectId,
+            @P(value = "Optional destination folder database ID; resolve with list_project_folders", required = false) Long parentFolderId) {
+        if (fileName == null || fileName.isBlank() || projectId == null)
+            return "Error: " + com.checkba.service.LangText.of("请提供文件名与项目", "File name and project are required");
+        try {
+            String name = fileName.trim();
+            if (!name.toLowerCase(java.util.Locale.ROOT).endsWith(".pptx")) name += ".pptx";
+            ProjectFile file = createAgentFile(projectId, parentFolderId, name, "pptx", "slide", target -> {
+                try (var presentation = new org.apache.poi.xslf.usermodel.XMLSlideShow();
+                     var out = java.nio.file.Files.newOutputStream(target)) {
+                    presentation.setPageSize(new java.awt.Dimension(960, 540));
+                    presentation.createSlide();
+                    com.checkba.util.DocumentGeneratorStamp.apply(presentation, documentGeneratorSettings);
+                    presentation.write(out);
+                }
+            });
+            editorBridgeService.sendRefreshFilesAction();
+            editorBridgeService.sendOpenFileAction(file);
+            return GeneratedFileLocation.createdResult(file, com.checkba.service.LangText.of(
+                    "已创建可编辑演示文稿，含1张空白页。打开后先读取页面尺寸，再组合幻灯片工具制作。",
+                    "Created an editable presentation with one blank slide. Read its dimensions after opening, then compose it with slide tools."));
+        } catch (Exception e) { return "Error: " + e.getMessage(); }
     }
 
     @ToolMeta(displayName = "新建表格文件", category = "document", fileEffect = "ADDED")
@@ -2622,8 +2676,8 @@ public class DocumentEditTools implements AgentToolComponent {
     public String sheet_manage_sheets(
             @P("操作：add/rename/delete/move") String op,
             @P("工作表名（add 时为新表名）") String name,
-            @P("新名称，仅 rename 需要") String newName,
-            @P("工作表序号，**0 开始**（第一张表 = 0），add/move 用；add 不传则加在最后") Integer position
+            @P(value = "新名称，仅 rename 需要", required = false) String newName,
+            @P(value = "工作表序号，**0 开始**（第一张表 = 0），add/move 用；add 不传则加在最后", required = false) Integer position
     ) {
         log.info("Tool: sheet_manage_sheets called op={}, name={}", op, name);
         try {
@@ -2632,7 +2686,7 @@ public class DocumentEditTools implements AgentToolComponent {
             if (name != null && !name.isBlank()) params.put("name", name);
             if (newName != null && !newName.isBlank()) params.put("newName", newName);
             if (position != null) params.put("position", position);
-            return editorBridgeService.executeEditorCommand("sheet_manage_sheets", params);
+            return executeSheetCommand("sheet_manage_sheets", params);
         } catch (Exception e) {
             log.error("Failed to manage sheets", e);
             return "Error: " + e.getMessage();
@@ -2645,8 +2699,8 @@ public class DocumentEditTools implements AgentToolComponent {
     public String sheet_edit_rows_cols(
             @P("操作：insert_rows/delete_rows/insert_cols/delete_cols") String op,
             @P("起始位置：行号（1 开始，如 '3'）或列标（如 'B'）") String start,
-            @P("行/列数，默认 1") Integer count,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "行/列数，默认 1", required = false) Integer count,
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_edit_rows_cols called op={}, start={}, count={}", op, start, count);
         try {
@@ -2655,7 +2709,7 @@ public class DocumentEditTools implements AgentToolComponent {
             params.put("start", start != null ? start : "");
             if (count != null) params.put("count", count);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_edit_rows_cols", params);
+            return executeSheetCommand("sheet_edit_rows_cols", params);
         } catch (Exception e) {
             log.error("Failed to edit rows/cols", e);
             return "Error: " + e.getMessage();
@@ -2666,8 +2720,8 @@ public class DocumentEditTools implements AgentToolComponent {
     @Tool("【表格·结构】合并或取消合并单元格区域。merge=true 合并（内容以左上格为准），false 取消合并。")
     public String sheet_merge_cells(
             @P("区域，如 'A1:C1'") String range,
-            @P("true=合并（默认），false=取消合并") Boolean merge,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "true=合并（默认），false=取消合并", required = false) Boolean merge,
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_merge_cells called range={}, merge={}", range, merge);
         try {
@@ -2675,7 +2729,7 @@ public class DocumentEditTools implements AgentToolComponent {
             params.put("range", range != null ? range : "");
             if (merge != null) params.put("merge", merge);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_merge_cells", params);
+            return executeSheetCommand("sheet_merge_cells", params);
         } catch (Exception e) {
             log.error("Failed to merge cells", e);
             return "Error: " + e.getMessage();
@@ -2688,10 +2742,10 @@ public class DocumentEditTools implements AgentToolComponent {
           "注意：值与公式随行整体移动，但单元格格式（底色等）不随行移动——先排序后做格式。")
     public String sheet_sort_range(
             @P("区域，如 'A1:D10'") String range,
-            @P("排序依据列的列标（如 'B'），不传用区域第一列") String byColumn,
-            @P("升序 true（默认）/降序 false") Boolean ascending,
-            @P("首行是表头 true（默认）/false") Boolean hasHeader,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "排序依据列的列标（如 'B'），不传用区域第一列", required = false) String byColumn,
+            @P(value = "升序 true（默认）/降序 false", required = false) Boolean ascending,
+            @P(value = "首行是表头 true（默认）/false", required = false) Boolean hasHeader,
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_sort_range called range={}, byColumn={}, asc={}", range, byColumn, ascending);
         try {
@@ -2701,7 +2755,7 @@ public class DocumentEditTools implements AgentToolComponent {
             if (ascending != null) params.put("ascending", ascending);
             if (hasHeader != null) params.put("hasHeader", hasHeader);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_sort_range", params);
+            return executeSheetCommand("sheet_sort_range", params);
         } catch (Exception e) {
             log.error("Failed to sort range", e);
             return "Error: " + e.getMessage();
@@ -2711,9 +2765,9 @@ public class DocumentEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "设置自动筛选", category = "document", fileEffect = "MODIFIED")
     @Tool("【表格·结构】给区域加/去自动筛选（表头出现筛选下拉按钮）。enabled 默认 true；range 不传用整个已用区域。")
     public String sheet_set_autofilter(
-            @P("区域，如 'A1:D10'；不传用整个已用区域") String range,
-            @P("true=开启（默认），false=关闭") Boolean enabled,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "区域，如 'A1:D10'；不传用整个已用区域", required = false) String range,
+            @P(value = "true=开启（默认），false=关闭", required = false) Boolean enabled,
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_set_autofilter called range={}, enabled={}", range, enabled);
         try {
@@ -2721,7 +2775,7 @@ public class DocumentEditTools implements AgentToolComponent {
             if (range != null && !range.isBlank()) params.put("range", range);
             if (enabled != null) params.put("enabled", enabled);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_set_autofilter", params);
+            return executeSheetCommand("sheet_set_autofilter", params);
         } catch (Exception e) {
             log.error("Failed to set autofilter", e);
             return "Error: " + e.getMessage();
@@ -2733,7 +2787,7 @@ public class DocumentEditTools implements AgentToolComponent {
     public String sheet_freeze_panes(
             @P("冻结前几行（0=不冻结行）") Integer rows,
             @P("冻结前几列（0=不冻结列）") Integer cols,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_freeze_panes called rows={}, cols={}", rows, cols);
         try {
@@ -2741,7 +2795,7 @@ public class DocumentEditTools implements AgentToolComponent {
             params.put("rows", rows != null ? rows : 0);
             params.put("cols", cols != null ? cols : 0);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_freeze_panes", params);
+            return executeSheetCommand("sheet_freeze_panes", params);
         } catch (Exception e) {
             log.error("Failed to freeze panes", e);
             return "Error: " + e.getMessage();
@@ -2758,11 +2812,11 @@ public class DocumentEditTools implements AgentToolComponent {
             @P("规则：greater/greaterEqual/less/lessEqual/equal/notEqual/between/notBetween/formula") String rule,
             @P("比较值 1（数值或公式，如 '5000'）") String value1,
             @P("比较值 2，仅 between/notBetween 需要") String value2,
-            @P("命中时底色 #RRGGBB，不设则不传") String background,
-            @P("命中时字色 #RRGGBB，不设则不传") String color,
-            @P("命中时加粗 true，不设则不传") Boolean bold,
+            @P(value = "命中时底色 #RRGGBB，不设则不传", required = false) String background,
+            @P(value = "命中时字色 #RRGGBB，不设则不传", required = false) String color,
+            @P(value = "命中时加粗 true，不设则不传", required = false) Boolean bold,
             @P("true=清除该区域全部条件格式（忽略其他参数）") Boolean clear,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_conditional_format called range={}, rule={}", range, rule);
         try {
@@ -2776,7 +2830,7 @@ public class DocumentEditTools implements AgentToolComponent {
             if (bold != null) params.put("bold", bold);
             if (clear != null) params.put("clear", clear);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_conditional_format", params);
+            return executeSheetCommand("sheet_conditional_format", params);
         } catch (Exception e) {
             log.error("Failed to set conditional format", e);
             return "Error: " + e.getMessage();
@@ -2794,7 +2848,7 @@ public class DocumentEditTools implements AgentToolComponent {
     public String sheet_add_comment(
             @P("单元格，如 'B2'") String cell,
             @P("批注内容") String text,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_add_comment called cell={}", cell);
         if (cell == null || cell.isBlank()) {
@@ -2808,7 +2862,7 @@ public class DocumentEditTools implements AgentToolComponent {
             params.put("cell", cell);
             params.put("text", text);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_add_comment", params);
+            return executeSheetCommand("sheet_add_comment", params);
         } catch (Exception e) {
             log.error("Failed to add sheet comment", e);
             return "Error: " + e.getMessage();
@@ -2819,13 +2873,13 @@ public class DocumentEditTools implements AgentToolComponent {
     @Tool("【表格·批注】列出当前工作表的全部单元格批注（单元格地址/作者/日期/内容）。" +
           "Calc 批注无解决/未解决状态，返回值不含 resolved 字段。")
     public String sheet_get_comments(
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_get_comments called sheet={}", sheet);
         try {
             java.util.Map<String, Object> params = new java.util.HashMap<>();
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_get_comments", params);
+            return executeSheetCommand("sheet_get_comments", params);
         } catch (Exception e) {
             log.error("Failed to get sheet comments", e);
             return "Error: " + e.getMessage();
@@ -2836,7 +2890,7 @@ public class DocumentEditTools implements AgentToolComponent {
     @Tool("【表格·批注】删除指定单元格上的批注。一个单元格最多一条批注，按单元格地址定位删除。")
     public String sheet_delete_comment(
             @P("单元格，如 'B2'") String cell,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_delete_comment called cell={}", cell);
         if (cell == null || cell.isBlank()) {
@@ -2846,7 +2900,7 @@ public class DocumentEditTools implements AgentToolComponent {
             java.util.Map<String, Object> params = new java.util.HashMap<>();
             params.put("cell", cell);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_delete_comment", params);
+            return executeSheetCommand("sheet_delete_comment", params);
         } catch (Exception e) {
             log.error("Failed to delete sheet comment", e);
             return "Error: " + e.getMessage();
@@ -2866,13 +2920,13 @@ public class DocumentEditTools implements AgentToolComponent {
             @P("运算符（list/custom 不需要）：greater/greaterEqual/less/lessEqual/equal/notEqual/between/notBetween") String operator,
             @P("list=逗号分隔候选值；custom=校验公式；其余=比较值1") String value1,
             @P("比较值2，仅 between/notBetween 需要") String value2,
-            @P("是否显示输入提示，不传则不显示") Boolean showInputMessage,
+            @P(value = "是否显示输入提示，不传则不显示", required = false) Boolean showInputMessage,
             @P("输入提示标题") String inputTitle,
             @P("输入提示内容") String inputMessage,
             @P("校验失败提示标题") String errorTitle,
             @P("校验失败提示内容（传了即视为需要显示错误提示）") String errorMessage,
             @P("true=清除该区域数据验证，忽略其他参数") Boolean clear,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_set_data_validation called range={}, type={}", range, type);
         try {
@@ -2892,7 +2946,7 @@ public class DocumentEditTools implements AgentToolComponent {
                 if (errorMessage != null && !errorMessage.isBlank()) params.put("errorMessage", errorMessage);
             }
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_set_data_validation", params);
+            return executeSheetCommand("sheet_set_data_validation", params);
         } catch (Exception e) {
             log.error("Failed to set data validation", e);
             return "Error: " + e.getMessage();
@@ -2905,9 +2959,9 @@ public class DocumentEditTools implements AgentToolComponent {
     public String sheet_add_chart(
             @P("数据区域，如 'A1:B10'（含表头）") String range,
             @P("图表类型：column/bar/line/pie") String chartType,
-            @P("图表标题，不设则不传") String title,
-            @P("图表名称，不传自动生成") String name,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "图表标题，不设则不传", required = false) String title,
+            @P(value = "图表名称，不传自动生成", required = false) String name,
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_add_chart called range={}, chartType={}", range, chartType);
         if (range == null || range.isBlank()) {
@@ -2920,7 +2974,7 @@ public class DocumentEditTools implements AgentToolComponent {
             if (title != null && !title.isBlank()) params.put("title", title);
             if (name != null && !name.isBlank()) params.put("name", name);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_add_chart", params);
+            return executeSheetCommand("sheet_add_chart", params);
         } catch (Exception e) {
             log.error("Failed to add chart", e);
             return "Error: " + e.getMessage();
@@ -2934,9 +2988,9 @@ public class DocumentEditTools implements AgentToolComponent {
           "——后者按矩形区域写，会把区域内不该动的格子一起覆盖掉。")
     public String sheet_search(
             @P("查找内容") String query,
-            @P("区域，如 'A1:D100'；不传用整个已用区域") String range,
-            @P("区分大小写，默认不区分") Boolean matchCase,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "区域，如 'A1:D100'；不传用整个已用区域", required = false) String range,
+            @P(value = "区分大小写，默认不区分", required = false) Boolean matchCase,
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_search called query={}", query);
         if (query == null || query.isBlank()) {
@@ -2948,7 +3002,7 @@ public class DocumentEditTools implements AgentToolComponent {
             if (range != null && !range.isBlank()) params.put("range", range);
             if (matchCase != null) params.put("matchCase", matchCase);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_search", params);
+            return executeSheetCommand("sheet_search", params);
         } catch (Exception e) {
             log.error("Failed to search sheet", e);
             return "Error: " + e.getMessage();
@@ -2976,11 +3030,11 @@ public class DocumentEditTools implements AgentToolComponent {
     public String sheet_find_replace(
             @P("查找内容（字面量，不是正则）") String find,
             @P("替换成什么；传空字符串表示删除命中的文本。不能省略") String replace,
-            @P("区域，如 'A1:D100'；不传用整个已用区域") String range,
-            @P("区分大小写，默认不区分") Boolean matchCase,
-            @P("整格匹配：true 时要求整格内容与 find 完全相等才替换，默认 false（包含匹配）") Boolean wholeCell,
-            @P("最多替换多少格，不传按上限；命中更多时提前停下并在返回值里标 truncated") Integer maxReplacements,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "区域，如 'A1:D100'；不传用整个已用区域", required = false) String range,
+            @P(value = "区分大小写，默认不区分", required = false) Boolean matchCase,
+            @P(value = "整格匹配：true 时要求整格内容与 find 完全相等才替换，默认 false（包含匹配）", required = false) Boolean wholeCell,
+            @P(value = "最多替换多少格，不传按上限；命中更多时提前停下并在返回值里标 truncated", required = false) Integer maxReplacements,
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_find_replace called find={}, maxReplacements={}", find, maxReplacements);
         if (find == null || find.isBlank()) {
@@ -3006,7 +3060,7 @@ public class DocumentEditTools implements AgentToolComponent {
             if (wholeCell != null) params.put("wholeCell", wholeCell);
             if (maxReplacements != null) params.put("maxReplacements", maxReplacements);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_find_replace", params);
+            return executeSheetCommand("sheet_find_replace", params);
         } catch (Exception e) {
             log.error("Failed to find and replace in sheet", e);
             return "Error: " + e.getMessage();
@@ -3017,10 +3071,10 @@ public class DocumentEditTools implements AgentToolComponent {
     @Tool("【表格·结构】工作簿级命名区域管理。op=add 新建（name+range，range 所在工作表决定绑定表）、" +
           "remove 删除（name）、list 列出全部（默认）。命名后可在公式里直接用该名字代替单元格地址。")
     public String sheet_define_name(
-            @P("操作：add/remove/list，默认 list") String op,
+            @P(value = "操作：add/remove/list，默认 list", required = false) String op,
             @P("命名区域名（add/remove 需要）") String name,
             @P("区域，如 'A1:C10'，仅 add 需要") String range,
-            @P("工作表名称或序号（0 开始），仅 add 需要；不传用当前活动工作表") String sheet
+            @P(value = "工作表名称或序号（0 开始），仅 add 需要；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_define_name called op={}, name={}", op, name);
         try {
@@ -3029,7 +3083,7 @@ public class DocumentEditTools implements AgentToolComponent {
             if (name != null && !name.isBlank()) params.put("name", name);
             if (range != null && !range.isBlank()) params.put("range", range);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_define_name", params);
+            return executeSheetCommand("sheet_define_name", params);
         } catch (Exception e) {
             log.error("Failed to manage named range", e);
             return "Error: " + e.getMessage();
@@ -3040,8 +3094,8 @@ public class DocumentEditTools implements AgentToolComponent {
     @Tool("【表格·结构】保护或取消保护当前工作表（防止误改）。密码可选，不传即无密码保护/取消。")
     public String sheet_protect_sheet(
             @P("操作：protect/unprotect") String action,
-            @P("密码，可选") String password,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "密码，可选", required = false) String password,
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_protect_sheet called action={}", action);
         if (action == null || action.isBlank()) {
@@ -3052,7 +3106,7 @@ public class DocumentEditTools implements AgentToolComponent {
             params.put("action", action);
             if (password != null) params.put("password", password);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_protect_sheet", params);
+            return executeSheetCommand("sheet_protect_sheet", params);
         } catch (Exception e) {
             log.error("Failed to protect/unprotect sheet", e);
             return "Error: " + e.getMessage();
@@ -3065,8 +3119,8 @@ public class DocumentEditTools implements AgentToolComponent {
     public String sheet_group_rows_cols(
             @P("操作：group/ungroup/show/hide") String op,
             @P("区域，如 'A2:A10'（覆盖到的整行/整列生效）") String range,
-            @P("方向：rows（默认）/cols，仅 group/ungroup 需要") String orient,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "方向：rows（默认）/cols，仅 group/ungroup 需要", required = false) String orient,
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_group_rows_cols called op={}, range={}", op, range);
         if (range == null || range.isBlank()) {
@@ -3078,7 +3132,7 @@ public class DocumentEditTools implements AgentToolComponent {
             params.put("range", range);
             if (orient != null && !orient.isBlank()) params.put("orient", orient);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_group_rows_cols", params);
+            return executeSheetCommand("sheet_group_rows_cols", params);
         } catch (Exception e) {
             log.error("Failed to group rows/cols", e);
             return "Error: " + e.getMessage();
@@ -3094,9 +3148,9 @@ public class DocumentEditTools implements AgentToolComponent {
             @P("源数据区域（含表头），如 'A1:D100'") String sourceRange,
             @P("逗号分隔的行分组字段名（须为源区域表头文字），如 '部门,状态'") String rowFields,
             @P("求和字段名（须为源区域表头文字）") String dataField,
-            @P("透视表放置起点单元格，不传默认放在源区域右侧") String outputCell,
-            @P("透视表名称，不传自动生成") String name,
-            @P("工作表名称或序号（0 开始）；不传用当前活动工作表") String sheet
+            @P(value = "透视表放置起点单元格，不传默认放在源区域右侧", required = false) String outputCell,
+            @P(value = "透视表名称，不传自动生成", required = false) String name,
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
     ) {
         log.info("Tool: sheet_add_pivot_table called sourceRange={}, rowFields={}, dataField={}", sourceRange, rowFields, dataField);
         if (sourceRange == null || sourceRange.isBlank()) {
@@ -3116,7 +3170,7 @@ public class DocumentEditTools implements AgentToolComponent {
             if (outputCell != null && !outputCell.isBlank()) params.put("outputCell", outputCell);
             if (name != null && !name.isBlank()) params.put("name", name);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
-            return editorBridgeService.executeEditorCommand("sheet_add_pivot_table", params);
+            return executeSheetCommand("sheet_add_pivot_table", params);
         } catch (Exception e) {
             log.error("Failed to add pivot table", e);
             return "Error: " + e.getMessage();

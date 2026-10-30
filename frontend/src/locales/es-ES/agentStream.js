@@ -15,10 +15,10 @@ export default {
   "stopAlreadyFinished": "Esta ejecución ya había terminado; no había nada que detener",
   "alreadyStreamingToast": "La IA sigue en ejecución. Espera a que termine o haz clic en Detener.",
   "chatRequestFailed": "Error en la solicitud de chat: HTTP {status}",
-  "errorWithMessage": "**Error**: {message}",
+  "errorWithMessage": "**Fallo**: {message}",
   "executionInterrupted": "> **Ejecución interrumpida**: {message}",
   "regionBlockedNotice": "> **Este modelo no está disponible en tu región de red actual**: los proveedores bloquean el acceso a los modelos alojados en el extranjero desde redes de China continental. Cambia al canal AI WorkDeck Cloud en Ajustes, o elige un modelo marcado como disponible en ambas regiones y reenvía.",
-  "quotaExhaustedNotice": "> **Créditos del servicio de IA agotados**: el saldo o la cuota del canal actual se han agotado. Con tu propia clave, recarga con tu proveedor (como OpenRouter); con el canal AI WorkDeck Cloud, consulta tu asignación de Credits en la página de cuenta.",
+  "quotaExhaustedNotice": "> **Créditos del servicio de IA agotados**: el saldo o la cuota del canal actual se han agotado. Con tu propia clave, recarga con tu proveedor (como OpenRouter); con el canal AI WorkDeck Cloud, consulta tu asignación de créditos en la página de cuenta.",
   "contextOverflowNotice": "> **La conversación supera la ventana de contexto del modelo**: se intentó la compresión automática, pero aún no cabe. Inicia una nueva conversación o adjunta menos archivos o más cortos.",
   "networkUnreachableNotice": "> **Fallo de conexión de red**: esta máquina no pudo alcanzar el servicio de IA (la red puede estar caída, el DNS puede haber fallado o un proxy puede estar bloqueándolo). Comprueba tu conexión y envía el mensaje de nuevo.",
   "interruptedRunEndedNotice": "> **La conexión se interrumpió**: esta ejecución terminó en segundo plano mientras la conexión estaba caída, por lo que el texto anterior puede estar incompleto. Actualiza la página o vuelve a abrir esta conversación para ver el registro completo.",
@@ -55,8 +55,8 @@ export default {
   "checkpointRestoringStepSkippedError": "La restauración del punto de control está en curso; este paso no se ejecutó. Espere a que finalice la restauración",
   "pdfExportFailedError": "Error al exportar a PDF",
   "pdfExportEmptyError": "El resultado de la exportación a PDF está vacío",
-  "pdfExportTooLargeError": "El PDF exportado supera los {mb}MB y no puede guardarse en el proyecto mediante AI; use en su lugar \"Archivo -> Exportar como PDF\"",
+  "pdfExportTooLargeError": "El PDF exportado supera los {mb}MB y no puede guardarse en el proyecto mediante IA; use en su lugar \"Archivo -> Exportar como PDF\"",
   "systemOperation": "Acciones del sistema",
   "taskListArtifact": "Lista de tareas",
-  "planArtifact": "Plan"
+  "planArtifact": "Plan de trabajo"
 }

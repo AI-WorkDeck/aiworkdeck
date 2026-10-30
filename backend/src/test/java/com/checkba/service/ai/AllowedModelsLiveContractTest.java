@@ -17,6 +17,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
@@ -111,6 +114,23 @@ class AllowedModelsLiveContractTest {
                     + "），我们还标着不支持——用户的图片被白白降级成 OCR 文本。把 vision 位改成 true。");
         }
 
+        assertEquals(model.getContextLength(), entry.path("context_length").asInt(),
+                model.getModelId() + " context length drift");
+
+        List<JsonNode> overrides = new ArrayList<>();
+        entry.path("pricing").path("overrides").forEach(overrides::add);
+        overrides.sort(Comparator.comparingInt(n -> n.path("min_prompt_tokens").asInt()));
+        assertEquals(1 + overrides.size(), model.getPriceTiers().size(),
+                model.getModelId() + " price tier count drift");
+        for (int i = 0; i < overrides.size(); i++) {
+            JsonNode override = overrides.get(i);
+            AllowedModels.PriceTier tier = model.getPriceTiers().get(i + 1);
+            assertEquals(override.path("min_prompt_tokens").asInt(), tier.minPromptTokens(),
+                    model.getModelId() + " tier boundary drift");
+            assertPriceClose(model, "tier input", tier.inputPricePerM(), override.path("prompt"));
+            assertPriceClose(model, "tier output", tier.outputPricePerM(), override.path("completion"));
+        }
+
         // OpenRouter 的 pricing 是「每 token 的美元数」字符串，我们记的是 $/1M tokens
         AllowedModels.PriceTier first = model.getPriceTiers().get(0);
         assertPriceClose(model, "输入", first.inputPricePerM(), entry.path("pricing").path("prompt"));
@@ -151,13 +171,12 @@ class AllowedModelsLiveContractTest {
                     .GET()
                     .build();
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            // 网络不通 / 上游 5xx 时 assume 掉而不是失败：这条测试要抓的是价格漂移，
-            // 不是给 openrouter.ai 的可用性当探针
-            Assumptions.assumeTrue(response.statusCode() == 200,
-                    "拉取 OpenRouter 目录失败，HTTP " + response.statusCode() + "，跳过对拍");
+            // Explicit live checks must fail when unavailable; a skipped audit is not a successful audit.
+            assertTrue(response.statusCode() == 200,
+                    "拉取 OpenRouter 目录失败，HTTP " + response.statusCode() + "，无法完成对拍");
 
             JsonNode data = new ObjectMapper().readTree(response.body()).path("data");
-            Assumptions.assumeTrue(data.isArray() && data.size() > 0, "OpenRouter 目录为空，跳过对拍");
+            assertTrue(data.isArray() && data.size() > 0, "OpenRouter 目录为空，无法完成对拍");
 
             Map<String, JsonNode> byId = new HashMap<>();
             for (JsonNode entry : data) {
@@ -165,10 +184,10 @@ class AllowedModelsLiveContractTest {
             }
             return byId;
         } catch (java.io.IOException e) {
-            throw Assumptions.<RuntimeException>abort("拉取 OpenRouter 目录出错，跳过对拍：" + e);
+            throw new AssertionError("拉取 OpenRouter 目录出错，无法完成对拍：" + e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw Assumptions.<RuntimeException>abort("拉取 OpenRouter 目录被中断，跳过对拍");
+            throw new AssertionError("拉取 OpenRouter 目录被中断，无法完成对拍");
         }
     }
 }

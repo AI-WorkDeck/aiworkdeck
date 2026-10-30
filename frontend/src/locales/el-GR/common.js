@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "Δεν ήταν δυνατή η επαναφορά της συνεδρίας του χώρου εργασίας",
   "confirm": "ΟΚ",
   "cancel": "Ακύρωση",
   "save": "Αποθήκευση",
@@ -43,7 +44,7 @@ export default {
   "openFile": "Άνοιγμα αρχείου",
   "open": "Άνοιγμα",
   "cannotResolveParentFolder": "Αδύνατος ο προσδιορισμός του φακέλου που περιέχει αυτό το αρχείο",
-  "dateTimeMdHm": "{year}-{month}-{day} {time}",
+  "dateTimeMdHm": "{day}/{month}/{year} {time}",
   "registeredItems": "{count} στοιχεία καταχωρήθηκαν",
   "filesCount": "{count} αρχεία",
   "statusRunning": "Εκτελείται",
@@ -57,9 +58,9 @@ export default {
   "sourceChannelOfficeWord": "Πρόσθετο Word",
   "sourceChannelOfficeExcel": "Πρόσθετο Excel",
   "sourceChannelOfficePowerpoint": "Πρόσθετο για PowerPoint",
-  "sourceChannelWpsWord": "WPS Writer",
-  "sourceChannelWpsExcel": "WPS Spreadsheets",
-  "sourceChannelWpsPowerpoint": "WPS Presentation",
+  "sourceChannelWpsWord": "Πρόσθετο WPS Writer",
+  "sourceChannelWpsExcel": "Πρόσθετο WPS Spreadsheets",
+  "sourceChannelWpsPowerpoint": "Πρόσθετο WPS Presentation",
   "sourceChannelPlugin": "Πρόσθετο",
   "languagePickerLabel": "Επιλογή γλώσσας",
   "languageFollowSystem": "Ως στο σύστημα",

@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "confirm": "OK",
+  workspaceSessionUnavailable: "Não foi possível restaurar a sessão do espaço de trabalho",
+  "confirm": "Confirmar",
   "cancel": "Cancelar",
   "save": "Salvar",
   "close": "Fechar",
@@ -43,7 +44,7 @@ export default {
   "openFile": "Abrir Arquivo",
   "open": "Abrir",
   "cannotResolveParentFolder": "Não é possível determinar a pasta que contém este arquivo",
-  "dateTimeMdHm": "{year}-{month}-{day} {time}",
+  "dateTimeMdHm": "{day}/{month}/{year} {time}",
   "registeredItems": "{count} itens registrados",
   "filesCount": "{count} arquivos",
   "statusRunning": "Em execução",
@@ -57,9 +58,9 @@ export default {
   "sourceChannelOfficeWord": "Complemento do Word",
   "sourceChannelOfficeExcel": "Complemento do Excel",
   "sourceChannelOfficePowerpoint": "Complemento do PowerPoint",
-  "sourceChannelWpsWord": "WPS Writer",
-  "sourceChannelWpsExcel": "WPS Spreadsheets",
-  "sourceChannelWpsPowerpoint": "WPS Presentation",
+  "sourceChannelWpsWord": "WPS Texto",
+  "sourceChannelWpsExcel": "WPS Planilhas",
+  "sourceChannelWpsPowerpoint": "WPS Apresentações",
   "sourceChannelPlugin": "Complemento",
   "languagePickerLabel": "Selecionar idioma",
   "languageFollowSystem": "Seguir o sistema",

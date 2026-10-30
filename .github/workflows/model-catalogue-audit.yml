@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: Model catalogue audit
+on:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'backend/src/main/java/com/checkba/service/ai/AllowedModels.java'
+      - 'backend/src/test/java/com/checkba/service/ai/AllowedModelsLiveContractTest.java'
+      - '.github/workflows/model-catalogue-audit.yml'
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - run: mvn -B -q -f backend/plugin-api/pom.xml install -DskipTests
+      - name: Verify availability, images, tools, context and every price tier
+        working-directory: backend
+        env:
+          RUN_LIVE_MODEL_CHECK: '1'
+        run: mvn -B test -Dtest=AllowedModelsLiveContractTest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: model-catalogue-audit
+          path: backend/target/surefire-reports/*AllowedModelsLiveContractTest*
+          retention-days: 14

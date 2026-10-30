@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "작업 공간 세션을 복원할 수 없습니다",
   "confirm": "확인",
   "cancel": "취소",
   "save": "저장",
@@ -43,7 +44,7 @@ export default {
   "openFile": "파일 열기",
   "open": "열기",
   "cannotResolveParentFolder": "이 파일이 포함된 폴더를 확인할 수 없습니다",
-  "dateTimeMdHm": "{year}-{month}-{day} {time}",
+  "dateTimeMdHm": "{year}. {month}. {day}. {time}",
   "registeredItems": "{count}개 항목 등록됨",
   "filesCount": "{count}개 파일",
   "statusRunning": "실행 중",
@@ -57,9 +58,9 @@ export default {
   "sourceChannelOfficeWord": "Word 추가 기능",
   "sourceChannelOfficeExcel": "Excel 추가 기능",
   "sourceChannelOfficePowerpoint": "PowerPoint 추가 기능",
-  "sourceChannelWpsWord": "WPS Writer",
-  "sourceChannelWpsExcel": "WPS Spreadsheets",
-  "sourceChannelWpsPowerpoint": "WPS Presentation",
+  "sourceChannelWpsWord": "WPS 워드",
+  "sourceChannelWpsExcel": "WPS 스프레드시트",
+  "sourceChannelWpsPowerpoint": "WPS 프레젠테이션",
   "sourceChannelPlugin": "추가 기능",
   "languagePickerLabel": "언어 선택",
   "languageFollowSystem": "시스템 설정 따르기",

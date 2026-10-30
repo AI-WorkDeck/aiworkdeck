@@ -104,6 +104,14 @@ public class AccountDeletionService {
     private com.checkba.repository.MobileCalendarPushDeviceRepository calendarPushDevices;
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private com.checkba.repository.MobileCalendarDeliveryRepository calendarDeliveries;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.repository.MobileMediaMoveRepository mediaMoves;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.repository.MobileCaptureOrganizationRepository captureOrganizations;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.repository.MobileCaptureReceiptRepository captureReceipts;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.repository.MobileCaptureRemovalRepository captureRemovals;
     private final MobileRelayBlobStore blobStore;
     /** 官网统一账户的内部记账口，注销传导用（dev-board#434）。 */
     private final MobileBillingClient billing;
@@ -172,6 +180,10 @@ public class AccountDeletionService {
                 blobStore.deleteQuietly(item.getStoragePath());
             }
         }
+        if (captureRemovals != null) captureRemovals.deleteByAccountScope("cloud:"+userId);
+        if (mediaMoves != null) mediaMoves.deleteByUserId(userId);
+        if (captureOrganizations != null) captureOrganizations.deleteByUserId(userId);
+        if (captureReceipts != null) captureReceipts.deleteByUserId(userId);
         long media = inboxRepository.deleteByUserId(userId);
         long projects = dirRepository.deleteByUserId(userId);
         long devices = deviceStateRepository.deleteByUserId(userId);

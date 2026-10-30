@@ -7,6 +7,30 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 
 职责边界：编辑器内核与宿主集成。AI 发编辑指令的链路属 ai-doc-bridge 领域。引擎 = LibreOffice 24.2.8 自建 zh-CN 版（LO core 分支 distro/allotropia/zeta-24-2）。
 
+## PPT 局部格式与视觉复核（2026-10-28，dev-board#1570/#1571/#1572）
+
+`office_thread.js` 的 PPT 替换按具体页/形状和可选完整原文校验后，用文字范围游标局部写入，保留其余混合字形；插页按 LO 24.2 前驱页索引语义定位，并在后续填充失败时报告已创建页，不能让上层盲目重试。段落读取增加 runs 与背景/几何信息；段距、行距、首行/左缩进写入共用 Impress 专属处理。非零右缩进当前导出 PPTX 不保留，因此在任何其他格式写入前拒绝；不以运行时成功回包代替保存重开验证。
+
+表格创建必须先扩充行列再设整表尺寸，否则第一行会占满传入高度。真实 LOWA 已核对 5×3 表格总高 220 pt 时每行 44 pt，随后显式行高 36/38/38/38/38 pt、深蓝表头白字及白底深字可导出重开；回读 pt 值允许引擎单位换算造成的舍入。单元格样式写入由 `slide_table_set_style` 承担，整形状填充不能替代单元格色彩。专项证据见 `/tmp/ppt-precision-table.log`。
+
+新增 AI 工具 `PdfVisualTools.pdf_inspect_visual` 与工具栏 `DocumentVisualReviewService` 分属两条入口：AI 工具接收已导出的 PDF 文件，实际渲染目标页与可选参考页交给支持视觉的辅助模型；工具栏仍沿用用户发起、revision 守卫与当前编辑器导出流程。两者均不能用结构数据冒充像素核验，也不自动修改文档。参考 Word/PPT 须先读格式再导出对照，精确字号/缩进以结构为准，视觉判断覆盖布局、密度、颜色与裁切。
+
+专项 `frontend/tests/lowa-e2e/ppt-precision.mjs` 覆盖真实引擎插页、局部替换、陈旧目标拒绝、背景、段距/行距/缩进及导出重开；`frontend/tests/lowa-unit/slide-precision.test.mjs` 覆盖部分失败与无副作用拒绝。全套 LOWA 回归、专项结果与真实 AI 验收边界见 `doc/verification/2026-10-28-ppt-quality.md`，不能用 PPT 结果替代 Word/Excel/PDF 对应路径的验证。
+
+## Calc 排序的原生契约（2026-10-28，dev-board#1576）
+
+`office_thread.js` 的 `sheet_sort_range` 已移除“读单元格→JS排序→逐格写回”路径。旧路径移动了公式文本，却不重定位相对引用，且字体/底色不随记录移动；真实引擎负对照中，应为200/600/300的结果变成400/900/100，不能再将此作为可接受的功能边界。
+
+当前WASM的 `XSortable.createSortDescriptor()` 会因未绑定的 `TableSortField` 序列报 `unregistered UNO type`。改走同一Calc原生排序的 `.uno:DataSort` 标量调度：选定目标sheet和range，`ByRows=true`，显式 `HasHeader`/`Ascending1`，`IncludeAttribs/IncludeComments/IncludeImages=true`，`Col1`为工作表绝对列号（1开始，UNO long），`Col2/Col3=0`，`UserDefIndex=0`，不继承旧的多字段或自定义顺序。依据为 [scalc.sdi 的 DataSort](https://github.com/LibreOffice/core/blob/master/sc/sdi/scalc.sdi) 和 [ScCellShell 的 SID_SORT](https://github.com/LibreOffice/core/blob/master/sc/source/ui/view/cellsh2.cxx)，不是猜测的dispatch参数。
+
+排序仍先拒绝受保护表、无效/越界排序列和超过5000格的范围；单行/单格明确no-op，防止Calc自动扩大单格选区。原生排序负责移动单元格内容、随行样式和行内相对公式引用，不覆盖用户的外部引用策略。本轮默认配置下，范围外 `H1=D2` 保持指向D2坐标，排序后跟随D2当前值；不能承诺外部公式自动跟随原记录。错误回执为 `SHEET_SORT_FAILED`，detail保留宿主异常。
+
+独立 `frontend/tests/lowa-unit/sheet-sort.test.mjs` 5项通过；`frontend/tests/lowa-e2e/sheet-sort.mjs` 真实Calc覆盖非A1范围、表头、升序/无表头降序、公式结果与文本、字体底色随行、保存重开及单格不扩大目标。默认读取当前worker源码并经测试服务内存替换；`SHEET_SORT_WORKER`可指定旧源码负对照。详细命令、日志及临时产物见 `doc/verification/2026-10-28-excel-desktop-quality.md`。该专项不是完整AI编排，也不证明Office/WPS实机通过。
+
+## 输入法中间态光标（dev-board#1597）
+
+LOWA 与原生候选在组合期间显示同一个持有焦点的真实 input，保留浏览器的中间选区与长串水平滚动；测量节点保持隐藏，不再用纯文本预览冒充输入过程。LOWA 将可见输入框放在正文光标上方，结束恢复透明锚点，避免 #606 正文下划线重叠。原生候选在撤权、暂停、离开视口时隐藏。Word/Calc/Impress共用 LOWA 路径；PDF 的 FilePreview 浏览器 iframe 不经过它。验证含 ime-composition、document-input 与真实 LOWA ime-underline 像素回归；真实 Calc 单元格与 Impress 文本框的中间光标、取消、中文提交及 XLSX/PPTX 显式导出重开分别由 ime-calc-preedit、ime-impress-preedit 验证；这不代替产品自动保存。搜狗真机与原生候选完整保存重开仍需另验。
+
 ## Calc 标题与输入时钟候选（dev-board#1509 / #1511）
 
 当前正式基线是 **24.2.8-zhcn-r6**（2026-10-20 PR#1164，四个产物SHA见 `desktop/lowa-build/RECIPE.md`）；下文历史段落的 r5/r6 描述不能当作当前未完成清单。本轮候选范围与近期内核限制复核在 `desktop/lowa-build/REBUILD-2026-10-26.md`，候选已于2026-10-26编译，哈希与真实验收边界见 `RECIPE.md`；默认下载地址仍为r6，未发布或升级客户端。
@@ -631,3 +655,13 @@ IME 光标定位优先用 `XController.getViewData()` 的实时分号数据与 V
 加载中的 guest 容器用 `opacity:0;pointer-events:none` 隐藏独立合成层，保持真实尺寸与布局，不用 `display:none` 或固定延时。空白与备胎也先准备；备胎过继时重新确认新布局。已有工具栏的就地重载继续按 `reapplyChrome` 保留用户当前原生菜单逃生开关，首次确认不能把该开关强行关闭。工具栏字体/样式清单继续后台读取，不参与这一显示屏障。
 
 回归：`tests/toolbar/first-paint-chrome.test.mjs`（真实组件方法的延迟/失败/旧世代/备胎/逃生开关，`CHROME_EDITOR_SOURCE` 可还原旧源码负对照）；`tests/lowa-e2e/first-paint-chrome.mjs` 使用实际 Vue 显示门与 LOWA，覆盖四种冷启动、原生可见性读回、逐帧 CSS 状态及前后截图。后者是小宿主验证，不等同完整工作台、正式 Electron 或 Windows；实际运行结果以本卡落实记录为准。
+
+### Impress 进阶视觉验收（dev-board#1578/#1581）
+
+原生图片/图表/过渡入口与安全边界见 ai-doc-bridge 的同名章节。`slide_show_control` 为宿主只读动作（start/next/previous/end/state），不向AI注册；EditorToolbar 提供放映及退出，放映过程不触发文档changed/保存。工具栏只在播放时串行查询状态，卸载/切换executor清理，原生结束同步按钮状态。静态PDF不证明动画播放；UNO页码改变也不证明Qt/WASM画面已推进，须查看真实中间帧及退出后的可编辑状态。
+
+Qt/WASM 放映陷阱：UNO `activate/gotoNextSlide` 只改变状态，渲染循环可能仍暂停。`slide_show_control` 在 start/next/previous 且 running 后调用 **office worker** 的 `Module.resumeMainLoop()` 唤醒；主页面的 Module 无已注册 scheduler，不能调用。state 不唤醒，end 不手动 pause，Qt 空闲时自行暂停。mouse.move 能唤醒画面只是定位证据，产品不合成鼠标输入。
+
+原生放映启动前，PaneHider 会同步等侧栏资源配置（最长60秒），但WASM线程阻塞时配置无法完成。宿主动作先保存本次文档的 pane configuration、异步停用非 CenterPane 资源，唤醒Qt并等待请求完成后才调用原生 startWithArguments。end、启动失败和文档切换恢复原配置；异步边界核对模型身份与docSeq，旧请求不能结束新文档放映。真实引擎回归 `impress-playback.mjs` 验证中间帧、内容不变及退出后编辑；本次307ms启动仅为本机专项样本，不作为普遍性能承诺。状态轮询不占用编辑器保存空闲计时。
+
+图片cover裁剪不得把缺失Size100thMM的像素图固定按96DPI换算。Retina的原生输出设备为192DPI，固定换算会让裁剪百分比翻倍；使用Toolkit兼容设备的convertSizeToLogic(SizePixel, MM_100TH)，再按物理尺寸计算GraphicCrop。真实纹理图在DPR1/2均核对srcRect百分比及保存重开的像素画面；纯色块夹具可能掩盖错误裁剪。

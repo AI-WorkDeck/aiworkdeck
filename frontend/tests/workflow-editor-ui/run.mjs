@@ -134,17 +134,26 @@ try {
   await load(1000, 'light');
   assert.equal(await page.$eval('.bw-input input', el => el.value), '系统默认版');
   await page.click('.bw-sidebar-new-btn');
+  assert.ok(await page.$('.bw-sidebar-list .bw-sidebar-item.is-new-draft'), 'clicking + 新建版本 must show a new draft item in the version list');
+  const btnStyle = await page.$eval('.bw-footer-right .awd-btn-primary', el => {
+    const cs = getComputedStyle(el);
+    return { height: parseFloat(cs.height), bg: cs.backgroundColor };
+  });
+  assert(btnStyle.height >= 30 && btnStyle.bg !== 'rgba(0, 0, 0, 0)', 'save button must have primary button styling');
   const cdp = await page.createCDPSession();
   await page.click('.bw-input input');
   await page.$eval('.bw-input input', el => el.select());
   await cdp.send('Input.insertText', {
     text: '即时保存测试'
   });
+  await page.screenshot({ path: join(output, '1000-new-draft.png') });
   await page.click('.bw-footer-right .awd-btn-primary');
   await page.waitForFunction(() => window.__workflowFixtures.calls.some(c => c[0] === 'save'));
   const saved = await page.evaluate(() => window.__workflowFixtures.calls.find(c => c[0] === 'save')[2]);
   assert.equal(saved.name, '即时保存测试');
   assert.equal(saved.projectId, 1);
+  const versionsAfterSave = await page.$$eval('.bw-sidebar-item-name', els => els.map(e => e.textContent));
+  assert(versionsAfterSave.includes('即时保存测试'), 'saved version must appear in the sidebar version list');
   results.checks.push({
     name: 'immediate native name input then save',
     payload: saved

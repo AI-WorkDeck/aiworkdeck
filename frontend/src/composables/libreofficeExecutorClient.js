@@ -175,6 +175,7 @@ export const EDITOR_ACTIONS = [
   // 表格整体样式（表头加粗/边框/列宽，能做多少做多少）/ 超链接。设计依据同上 §4.2
   // （原语表 16-20；slide_format_shape/slide_table_set_style 不在原表里，是任务方
   // 直接点名要补的两项）。
+  'slide_show_control', 'slide_add_image', 'slide_add_chart', 'slide_format_chart', 'slide_set_transition',
   'slide_format_text', 'slide_format_shape', 'slide_add_table', 'slide_table_read',
   'slide_table_set_cell', 'slide_table_set_style', 'slide_set_hyperlink',
   // [诊断] 当前文档内核类型（writer/calc/impress/unknown）——审阅按钮等 UI 按 kind
@@ -233,6 +234,7 @@ export const ACTION_BUDGET_MS = {
   slide_set_layout: 120000, slide_add_text_box: 120000, slide_set_shape_text: 120000,
   slide_format_text: 120000, slide_format_shape: 120000, slide_add_shape: 120000,
   slide_delete_shape: 120000, slide_set_shape_geometry: 120000, slide_replace_text: 120000,
+  slide_add_image: 120000, slide_add_chart: 120000, slide_format_chart: 120000, slide_set_transition: 120000,
   slide_add_table: 120000, slide_table_set_cell: 120000, slide_table_set_style: 120000,
   slide_set_hyperlink: 120000, slide_write_notes: 120000,
 }
@@ -309,8 +311,10 @@ export function createLibreOfficeExecutor(opts = {}) {
           pending.delete(reqId)
           let isEn = false
           try {
-            if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') isEn = true
-            else if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') isEn = true
+            const l = (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language'))
+              || (typeof document !== 'undefined' && document.documentElement?.lang)
+              || ''
+            if (l && !l.startsWith('zh')) isEn = true
           } catch (_) { /* ignore */ }
           const timeoutMsg = isEn
             ? 'Editor result timed out; the operation may still be running. Check the document and tracked changes before repeating any write.'

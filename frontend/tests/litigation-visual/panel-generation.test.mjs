@@ -217,3 +217,43 @@ test('the packaged panel delegates the named service without opening a chat pane
   assert.match(source, /class="lv-generation-status" role="status" aria-live="polite"/)
   assert.match(source, /class="lv-generation-error" role="alert"/)
 })
+
+test('follow-up stays in the same diagram task and double submission is blocked', async () => {
+  const receipt = deferred()
+  const p = panel(() => receipt.promise)
+  p.vm.applyGeneration({ ...running, phase: 'completed', messages: [{ role: 'ASSISTANT', content: '合成图表已保存' }] })
+  assert.equal(p.vm.latestReply, '合成图表已保存')
+  p.vm.generationFollowUp = '  将第二个节点移到下方  '
+  const sending = p.vm.sendFollowUp()
+  await p.vm.sendFollowUp()
+  assert.deepEqual(p.calls, [{ operation: 'message', params: { taskId: 'task-1', message: '将第二个节点移到下方' } }])
+  receipt.resolve(running)
+  await sending
+  assert.equal(p.vm.generationFollowUp, '')
+  assert.equal(p.events.length, 0)
+})
+
+test('follow-up failures retain the draft; unresolved questions and lost status block follow-up', async () => {
+  const p = panel(async () => { throw Error('合成发送失败') })
+  p.vm.applyGeneration({ ...running, phase: 'completed' })
+  p.vm.generationFollowUp = '保留我的修改要求'
+  await p.vm.sendFollowUp()
+  assert.equal(p.vm.generationFollowUp, '保留我的修改要求')
+  assert.equal(p.vm.generationError, '合成发送失败')
+  p.vm.generationSyncError = '连接中断'
+  await p.vm.sendFollowUp()
+  p.vm.generationSyncError = ''
+  p.vm.applyGeneration(waiting)
+  await p.vm.sendFollowUp()
+  assert.equal(p.calls.length, 1)
+})
+
+test('switching diagram task discards the old follow-up draft but polling retains it', () => {
+  const p = panel(async () => running)
+  p.vm.applyGeneration({ ...running, phase: 'completed' })
+  p.vm.generationFollowUp = '原图的修改'
+  p.vm.applyGeneration({ ...running, phase: 'completed' })
+  assert.equal(p.vm.generationFollowUp, '原图的修改')
+  p.vm.applyGeneration({ ...running, taskId: 'task-2' })
+  assert.equal(p.vm.generationFollowUp, '')
+})

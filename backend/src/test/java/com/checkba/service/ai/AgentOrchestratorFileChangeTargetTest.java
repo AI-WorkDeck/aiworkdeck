@@ -71,6 +71,7 @@ class AgentOrchestratorFileChangeTargetTest {
     private AgentOrchestrator orchestrator;
     private ProjectFileService projectFileService;
     private ConversationFileChangeService fileChangeService;
+    private DocumentCheckpointService checkpointService;
 
     /** 按脚本逐轮吐内容的模型，同时留下最后一轮收到的完整消息栈 */
     private static final class ScriptModel implements StreamingChatLanguageModel {
@@ -142,12 +143,13 @@ class AgentOrchestratorFileChangeTargetTest {
                 mock(com.checkba.repository.AgentRunRecordRepository.class),
                 mock(com.checkba.service.telemetry.TelemetryTurnTracker.class));
         fileChangeService = mock(ConversationFileChangeService.class);
+        checkpointService = mock(DocumentCheckpointService.class);
         orchestrator = new AgentOrchestrator(
                 chatModelFactory, messageService, sse, mock(TokenUsageService.class), assembler,
                 toolRegistry, skillRouter, parser, mock(MemoryPipelineService.class),
                 projectFileService, mock(EditorBridgeService.class),
                 fileChangeService, todoListService,
-                mock(DocumentCheckpointService.class), runState,
+                checkpointService, runState,
                 mock(com.checkba.version.WorkSessionService.class), new AiFailoverProperties(),
                 new RunLoopCompactor(contextProperties, new ContextCompressor(null, null, contextProperties)),
                 mock(com.checkba.service.telemetry.TelemetryService.class),
@@ -324,6 +326,124 @@ class AgentOrchestratorFileChangeTargetTest {
         assertEquals("费用明细表 (1).xlsx", d.path("fileName").asText());
         org.mockito.Mockito.verify(fileChangeService).saveFileChange(
                 "conv-1181-id", "费用明细表 (1).xlsx", "ADDED", 99L, 1L, 1L);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"slide_create_file", "sheet_create_file", "doc_start_stream"})
+    void editsAfterCreatingAndOpeningAFileFollowItsVerifiedIdentity(String createTool) throws Exception {
+        String extension = createTool.startsWith("slide") ? "pptx" : createTool.startsWith("sheet") ? "xlsx" : "docx";
+        String editTool = createTool.startsWith("slide") ? "slide_set_shape_text"
+                : createTool.startsWith("sheet") ? "sheet_write_cells" : "doc_modify_paragraph";
+        var created = new com.checkba.model.entity.ProjectFile();
+        created.setId(99L); created.setProjectId(1L); created.setName("新成果 (1)." + extension);
+        when(projectFileService.findFile(99L)).thenReturn(java.util.Optional.of(created));
+        var edit = tool("fakeSheetWriteCells", editTool);
+        when(toolRegistry.resolve(editTool)).thenReturn(java.util.Optional.of(edit));
+        var contexts = new ArrayList<com.checkba.service.ai.tools.ToolContext>();
+        when(toolRegistry.execute(any(), any(), any())).thenAnswer(inv -> {
+            contexts.add(inv.getArgument(2));
+            return createTool.equals(inv.getArgument(0))
+                    ? new ToolRegistry.ToolResult("{\"status\":\"success\",\"db_id\":99}",
+                            tool("fakeSheetCreateFile", createTool), true)
+                    : new ToolRegistry.ToolResult("已修改", edit, true);
+        });
+        run("conv-created-active", "42", "reference.docx", call(createTool, "{}"),
+                call(editTool, "{}"), AiMessage.from("完成"));
+        assertEquals(42L, contexts.get(0).activeFileId());
+        assertEquals(99L, contexts.get(1).activeFileId());
+        var changes = eventDataAll("file_change");
+        assertEquals(2, changes.size());
+        assertEquals("ADDED", json(changes.get(0)).path("changeType").asText());
+        assertEquals("MODIFIED", json(changes.get(1)).path("changeType").asText());
+        for (String change : changes) {
+            assertEquals(99L, json(change).path("fileId").asLong());
+            assertEquals(created.getName(), json(change).path("fileName").asText());
+        }
+        verify(checkpointService).ensureCheckpoint("conv-created-active", 99L);
+        org.mockito.Mockito.verify(checkpointService, org.mockito.Mockito.never())
+                .ensureCheckpoint(anyString(), org.mockito.ArgumentMatchers.eq(42L));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"foreign", "deleted", "folder", "missing", "failed", "existing-stream"})
+    void unverifiedOrExistingFileCreationCannotRebindTheActiveDocument(String scenario) throws Exception {
+        var created = new com.checkba.model.entity.ProjectFile();
+        created.setId(99L); created.setProjectId("foreign".equals(scenario) ? 2L : 1L);
+        created.setName("未验证成果.pptx"); created.setIsDeleted("deleted".equals(scenario));
+        created.setIsFolder("folder".equals(scenario));
+        when(projectFileService.findFile(99L)).thenReturn(java.util.Optional.of(created));
+        String createTool = "existing-stream".equals(scenario) ? "doc_start_stream" : "slide_create_file";
+        String output = "missing".equals(scenario) ? "已创建"
+                : "failed".equals(scenario) ? "{\"error\":\"failed\"}"
+                : "{\"status\":\"success\",\"db_id\":99}";
+        var contexts = new ArrayList<com.checkba.service.ai.tools.ToolContext>();
+        var edit = tool("fakeSheetWriteCells", "doc_modify_paragraph");
+        when(toolRegistry.resolve("doc_modify_paragraph")).thenReturn(java.util.Optional.of(edit));
+        when(toolRegistry.execute(any(), any(), any())).thenAnswer(inv -> {
+            contexts.add(inv.getArgument(2));
+            return createTool.equals(inv.getArgument(0))
+                    ? new ToolRegistry.ToolResult(output, tool("fakeSheetCreateFile", createTool), true)
+                    : new ToolRegistry.ToolResult("已修改", edit, true);
+        });
+        run("conv-not-created-active", "42", "reference.docx",
+                call(createTool, "existing-stream".equals(scenario) ? "{\"fileId\":42}" : "{}"),
+                call("doc_modify_paragraph", "{}"), AiMessage.from("完成"));
+        assertEquals(42L, contexts.get(1).activeFileId());
+        var changes = eventDataAll("file_change");
+        var last = json(changes.get(changes.size() - 1));
+        assertEquals(42L, last.path("fileId").asLong());
+        assertEquals("reference.docx", last.path("fileName").asText());
+        verify(checkpointService).ensureCheckpoint("conv-not-created-active", 42L);
+    }
+
+    @ToolMeta(displayName = "Generate litigation diagram", category = "litigation-visual",
+            fileEffect = "ADDED", fileArg = "diagramName", refreshFiles = true)
+    public void fakeLitigationRender() {}
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"litigation_render", "litigation_timeline_render"})
+    void litigationWithoutVerifiedFilesCannotReportAnAddedPlaceholder(String toolName) throws Exception {
+        when(toolRegistry.execute(any(), any(), any())).thenReturn(new ToolRegistry.ToolResult(
+                "出图被拦下：尚未完成确认。", tool("fakeLitigationRender", toolName), true));
+        run("conv-litigation-unverified", null, null, call(toolName, "{}"), AiMessage.from("请先确认"));
+        assertTrue(eventDataAll("file_change").isEmpty(), "No current-document placeholder may be created");
+        org.mockito.Mockito.verifyNoInteractions(fileChangeService);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"litigation_render", "litigation_timeline_render"})
+    void litigationNameAloneCannotReportANewFile(String toolName) throws Exception {
+        when(toolRegistry.execute(any(), any(), any())).thenReturn(new ToolRegistry.ToolResult(
+                "{\"status\":\"success\",\"files\":[]}", tool("fakeLitigationRender", toolName), true));
+        run("conv-litigation-name", "42", "reference.docx",
+                call(toolName, "{\"diagramName\":\"Timeline\"}"), AiMessage.from("完成"));
+        assertTrue(eventDataAll("file_change").isEmpty(), "A diagram name is not a registered project file");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"litigation_render", "litigation_timeline_render"})
+    void litigationReportsEveryVerifiedArtifactByItsRealIdentity(String toolName) throws Exception {
+        var files = new ArrayList<com.checkba.model.entity.ProjectFile>();
+        for (int index = 0; index < 3; index++) {
+            var file = new com.checkba.model.entity.ProjectFile();
+            file.setId(99L + index); file.setProjectId(1L);
+            file.setName("Timeline (1)." + List.of("drawio", "svg", "png").get(index));
+            files.add(file);
+            when(projectFileService.findFile(file.getId())).thenReturn(java.util.Optional.of(file));
+        }
+        when(toolRegistry.execute(any(), any(), any())).thenReturn(new ToolRegistry.ToolResult(
+                com.checkba.service.ai.tools.GeneratedFileLocation.createdResults(files, "Saved"),
+                tool("fakeLitigationRender", toolName), true));
+        run("conv-litigation-files", null, null,
+                call(toolName, "{\"diagramName\":\"Timeline\"}"), AiMessage.from("完成"));
+        var changes = eventDataAll("file_change");
+        assertEquals(3, changes.size());
+        for (int index = 0; index < 3; index++) {
+            var change = json(changes.get(index));
+            assertEquals(files.get(index).getId(), change.path("fileId").asLong());
+            assertEquals(files.get(index).getName(), change.path("fileName").asText());
+            assertEquals("ADDED", change.path("changeType").asText());
+        }
     }
 
     @ToolMeta(displayName = "导出 PDF", category = "files", refreshFiles = true)

@@ -15,7 +15,7 @@ export default {
   "archivePrepareDrag": "Menyiapkan berkas. Seret keluar setelah pratinjau dimuat.",
   "templateFolderHint": "Folder templat: letakkan templat laporan firma Anda di sini; setelah dipelajari, AI akan menyusun draf dengan font, penomoran, dan gaya tabelnya",
   "selectFilePrompt": "Pilih berkas di sebelah kiri untuk pratinjau",
-  "edit": "Edit",
+  "edit": "Sunting",
   "typeLabel": "Tipe: {type}",
   "sizeLabel": "Ukuran: {size}",
   "renderingDoc": "Merender dokumen…",
@@ -36,7 +36,7 @@ export default {
     "pause": "Jeda",
     "mute": "Bisukan",
     "unmute": "Suarakan",
-    "volume": "Volume",
+    "volume": "Suara",
     "progress": "Cari posisi",
     "speed": "Kecepatan pemutaran",
     "fullscreen": "Layar penuh",
@@ -52,7 +52,7 @@ export default {
     "previewTimeout": "Persiapan pratinjau audio melebihi batas waktu. Tutup tab ini dan buka kembali.",
     "playFailed": "File ini tidak dapat diputar. Codec mungkin tidak didukung.",
     "backToCurrent": "Kembali ke saat ini",
-    "speakerPrefix": "{name}: ",
+    "speakerPrefix": "{name} : ",
     "summary": "{count} segmen · {duration}"
   },
   "captions": {

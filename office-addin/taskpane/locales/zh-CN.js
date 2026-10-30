@@ -1,6 +1,58 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export const ZH = {
+  cmdPptAddImage: "插入幻灯片图片",
+  cmdPptAddChart: "插入幻灯片图表",
+  cmdPptFormatChart: "设置幻灯片图表格式",
+  cmdPptSetTransition: "设置幻灯片切换效果",
+  wordStyleUnsupported: "当前宿主无法完整应用这些画像字段：{fields}。未开始修改。",
+  wordStyleNotApplied: "宿主未应用请求的段落样式，请检查文档后再重试。",
+
+  cmdGetParagraphs: "读取段落",
+  cmdGetOutline: "读取大纲",
+  cmdGetClauses: "识别条款",
+  cmdReplaceNthMatch: "替换指定匹配",
+  cmdApplyStyleProfile: "应用样式画像",
+
+  wordStructureTooLarge: "文档结构过大，无法在单次安全处理范围内完整读取。请缩小文档后重试。",
+  wordStructurePartial: "部分格式可能已应用。请先检查当前文档，不要重复执行。",
+
+  cmdPptTableSetStyle: "设置幻灯片表格格式",
+  cmdPptReadNotes: "读取演讲者备注",
+  cmdPptWriteNotes: "写入演讲者备注",
+
+  excelConditionalActionInvalid: "条件格式操作必须为 apply 或 clearAll。",
+  wordImagePartial: "图片可能已插入，但后续设置未完成。请检查现有图片，不要重复插入。",
+
+  excelRangeTooLarge: "区域超过 50,000 个单元格，请缩小范围后重试；本次未修改。",
+
+  fileOperationUnavailable: "当前无法执行或确认此文件操作。",
+  fileOperationStale: "文档已切换，请重新读取当前文档后重试。",
+  fileOperationInvalidArguments: "文件操作参数无效。",
+  fileOperationInvalidBytes: "未返回有效且完整的文件字节。",
+  cmdFileCreate: "新建文件",
+  cmdFileSave: "保存当前文件",
+  cmdFileExportPdf: "导出 PDF 到项目",
+  cmdFileOpen: "打开文件或导入副本",
+  excelChartPartial: "图表“{name}”可能已创建，但配置失败且无法确认回滚。请先检查现有图表，不要重复创建。",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "幻灯片或形状目标无效。",
+  pptStaleTarget: "目标文本已变化，请重新读取后再修改。",
+  pptInvalidArguments: "演示文稿编辑参数无效。",
+  pptCapabilityUnavailable: "当前演示文稿宿主不支持此能力。",
+  cmdPptSetShapeText: "设置形状文本",
+  cmdPptSetShapeGeometry: "设置形状位置和大小",
+  cmdPptFormatShape: "设置形状格式",
+  cmdPptGoto: "跳转到幻灯片或形状",
+  cmdPptSetLayout: "设置幻灯片布局或背景",
+  excelValidationCustomRequired: "自定义验证需要公式。",
+  excelValidationTypeInvalid: "不支持的数据验证类型。",
+  excelPivotFieldsMissing: "透视表字段不存在：{fields}",
+  excelValidationActionInvalid: "数据验证操作必须为 apply 或 clear。",
+  excelValidationValueRequired: "此数据验证规则需要比较值。",
+  excelValidationBoundsRequired: "区间验证需要两个边界值。",
+
   // ---- App.vue ----
   // ---- 语音听写（dev-board#153）----
   dictate: '语音输入',

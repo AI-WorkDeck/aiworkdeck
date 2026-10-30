@@ -2,20 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "devTrustNotice": "Development plugins can send data to declared remote services and expose Agent tools. Review the source before approval. Manifest changes require approval again.",
-  "grantTrust": "Approve development services",
-  "revokeTrust": "Revoke service approval",
-  "connections": "Plugin service connections",
-  "credentialNotice": "Credentials are stored per user by the host and are not exposed to plugin pages.",
+  "devTrustNotice": "Plugins de desenvolvimento podem enviar dados para serviços remotos declarados e expor ferramentas de Agent. Revise a origem antes de aprovar. Alterações no manifesto exigem nova aprovação.",
+  "grantTrust": "Aprovar serviços de desenvolvimento",
+  "revokeTrust": "Revogar aprovação do serviço",
+  "connections": "Conexões de serviço do plugin",
+  "credentialNotice": "As credenciais são armazenadas por usuário pelo aplicativo principal e não são expostas às páginas do plugin.",
   "connected": "Conectado",
   "disconnected": "Não conectado",
-  "token": "Service access token",
-  "connect": "Connect service",
-  "disconnect": "Disconnect",
-  "refresh": "Refresh status",
-  "subscription": "Check subscription",
-  "active": "Subscription active",
-  "inactive": "No active subscription",
-  "bundled": "Included with the app",
-  "checkout": "Open checkout"
+  "token": "Token de acesso ao serviço",
+  "connect": "Conectar serviço",
+  "disconnect": "Desconectar",
+  "refresh": "Atualizar status",
+  "subscription": "Verificar assinatura",
+  "active": "Assinatura ativa",
+  "inactive": "Nenhuma assinatura ativa",
+  "bundled": "Incluído no aplicativo",
+  "checkout": "Abrir página de pagamento"
 }

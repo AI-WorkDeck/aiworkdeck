@@ -7,6 +7,26 @@ description: AI↔文档编辑桥接领域。任务涉及 doc_*/sheet_*/slide_* 
 
 职责边界：AI 侧发出编辑指令 → 编辑器执行 的整条链路。不含编辑器内核本身（那是 doc-editor 领域），不含对话编排（ai-chat 领域）。
 
+## PPT 精确编辑与参考复核（2026-10-28，dev-board#1570/#1571/#1572）
+
+`DocumentEditTools.slide_create_file` 创建原生可编辑的单页空白 PPTX（960×540 pt），沿用项目/目录权限、文件位置回包和打开刷新链；无需图片生成服务。随后自由组合 `slide_*` 原语，不把新建演示文稿等同于图片型生成。
+
+`slide_replace_text` 可追加 `shapeName`、`expectedText`，须先用 `slide_get_page` 取得页号、形状名及完整当前文字；有定位/原文约束时不得退回全稿替换。同名形状歧义、过期原文、缺失替换值均拒绝，显式空字符串才是删除。范围游标只替换命中字符，保留外部格式；`all=false` 只替换第一处，`all=true` 从后向前替换。中断返回 `SLIDE_REPLACE_INTERRUPTED` 及已完成命中、`outcomeUnknown:true/retryable:false`，先回读核实。
+
+插页使用引擎返回的真实页对象；LO 24.2 的插入索引按前驱页语义换算。插入后填内容失败返回 `SLIDE_INSERT_PARTIAL`（`created:true`、`stage`、可确认的 `slideNumber`、`retryable:false`），最初插入结果不明返回 `SLIDE_INSERT_UNCERTAIN`；不得直接重复插页。桥层只对 `slide_*` 保留有界、经过白名单过滤的部分完成字段，其他格式错误回包不变。
+
+`slide_get_page` 返回背景、形状几何及段落/run 的 `textDetails`，须注意 `available/truncated` 与格式作用范围；单个快捷 `format` 不能代表混合文字。`slide_set_layout(backgroundColor=...)` 可单独改背景。`slide_format_text` 和 Impress 的 `set_paragraph_format` 支持段前/后、行距、首行与左缩进；字符单位优先于 pt，段距 pt 优先于行。非零右缩进因当前 PPTX 导出不保留而在任何格式写入前拒绝，不能宣称已支持；Writer 标题/段落样式参数也不能套用到 Impress。
+
+参考 Word 用 `docx_inspect_template(..., options={"saveProfile":false})` 只读学习，默认保存画像行为保持兼容；参考 PPT 用 `pptx_inspect_format` 获取页面尺寸、形状几何、背景来源、母版/布局、主题字体/颜色及段落格式。离线读取明确标记直接值、继承/未知及主题引用，不伪造最终生效字体或颜色。参考文档仅学习，不改正文、不替换项目 Word 默认模板。
+
+`PdfVisualTools.pdf_inspect_visual` 是独立的实际图像复核工具：先导出当前文档 PDF，再检查连续 1–6 页，可带参考 PDF 起始页（最多 3 页）。PDFBox 实际渲染图片，模型请求同时标明参考/目标及页号，回包说明 `checkedPages/totalPages/complete`。每文件上限 12 MB；读权限沿用现有跨项目 ACL，不能把可猜的文件 ID 当授权。辅助模型无视觉能力时不调用模型；工具不改文档。精确字体/间距来自结构工具，视觉工具用于检查观感、重叠、裁切、密度与参考风格，二者不能互相冒充。
+
+真实 Agent 回放补出的契约：工具目录须能在 Word 参考场景发现 PPT 创建/编辑工具，可选参数必须在实际工具 schema 中标为 optional，不能只在描述中说可选。创建新 PPT 后的编辑回执必须切换到目标文件身份，不能沿用参考 Word 的 `guard.id`；参考 hash 不变也不能掩盖回执归属错误。
+
+`slide_add_table` 完成行列创建后再设置目标尺寸，避免第一行占满原定整表高度；返回实际表格尺寸与行高列宽。`slide_table_set_style` 支持单元格范围的字体/字号/粗体、文字色、填充色、对齐及行高；`slide_table_read` 回读行高列宽。表头深底白字等必须使用单元格格式，不能用整形状背景冒充。行高有引擎单位舍入，保存重开按实际 pt 核对。
+
+验证入口与未验范围见 `doc/verification/2026-10-28-ppt-quality.md`。
+
 ## 项目版本操作的保存与回执（2026-10-26，dev-board#1498）
 
 `project_version_action` 在 `agentClientActions` 的项目路由先处理，无需活动文档，不能落入普通 executor 等待。`projectVersionAction.js` 先保存、核对一次性操作，再执行与重载；`projectVersionEditors.js` 复用 `checkpointSaveBarrier` 暂停 LOWA/纯文本旧实例保存，覆盖双栏及已卸载但仍在途的保存。普通检查点 prepare 会丢弃脏态，因此版本操作必须先 flush 成功，不能反过来调用。活动流程图未接入此保存契约时拒绝，并说明先保存关闭。
@@ -486,3 +506,11 @@ txt/md/markdown 自 dev-board#37 起不进 LOWA（前端走 PlainTextEditor.vue�
 - **Word 自动编号定位、连续多段选区与六项常用格式对齐（dev-board#1372）**：
   - `office_thread.js` 新增 `readParagraphListLabel(el)` / `readParagraphDisplayText(el)` 读取 `ListLabelString`，使 `get_clauses`、`find_text_locations`、`insert_under_heading`、`writingSectionOf` 能同时识别自动编号与手打编号条款（如 `第一条`、`一、`、`1.1`），并在 `find_text_locations` / `get_clauses` / `get_formatting` 中返回 `listLabel` 与 `isListItem`。
   - `select_paragraph`、`format_selection`、`set_paragraph_format`、`office_format_text`、`office_set_paragraph_format` 支持 `paragraphCount`（按起止段或锚点向后连续扩展 $N$ 段）、`fontNameAsian` / `fontNameWestern` 中西文字体分设、`firstLineIndentChars`（按段落当前字号自动换算 `mm100` / `pt`，且自动编号段落默认不叠加首行缩进以免二次缩进），并对 `lineSpacing <= 5` 自动按倍数（`MULTIPLE` / `×12pt`）处理，修复 `1.5` 倍行距被误设为固定值或 `1.5pt` 的问题。
+
+### PPT 进阶素材与原生图表（dev-board#1578/#1581）
+
+`SlideMediaTools.slide_add_image` 从有读取权限的项目图片插入精确页码/形状矩形，单位 pt；合法负坐标用于出血，cover/contain/stretch 与 focalX/focalY 控制裁切，sendToBack 用于背景。先验目标项目写权限、源读权限、参数与12MB限制；部分完成回执须读回后继续。
+
+`SlideEditTools` 新增 `slide_add_chart`（column/bar/line/area/pie/doughnut/scatter）、`slide_format_chart`（精确shapeName、配色、字号、图例/网格）、`slide_set_transition`（none/fade/push/wipe）。chart2 散点显式配对 X/Y sequence；不把横轴列当数据系列。样式取真实 chart2 series；标记用完整 `css.chart2.Symbol`，不能只修改返回结构的字段。UNO `CharHeight` 必须用 float Any；普通整数看似设置成功，却会导致 PPTX 导出失败。过渡 Type/Subtype 用 short Any，fade CROSSFADE=101。
+
+图片生成与插入独立：`image_generate_asset` 创建带请求键的任务，`image_get_generation` 查询并幂等导入，返回 `db_id` 给 `slide_add_image.fileId`。生成图片不切换当前PPT身份；未完成回执不发虚假新增文件事件。权限/下载/导入测试见 ImageAssetToolsTest、ImageAssetClientTest、SlideMediaToolsTest；真实引擎测试见 `ppt-advanced-design.mjs`、`ppt-image-layout.mjs`。设置回读、保存重开、实际图片和放映四种证据不能互相替代。

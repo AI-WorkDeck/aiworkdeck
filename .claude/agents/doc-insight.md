@@ -530,3 +530,13 @@ cd backend && mvn clean test                      # 全量（跨类常量内联�
 - `ContractReviewStandard` 和 `ContractReviewRun` 落库保存规则版本及确认时间、文档文本哈希和每规则的原文/理由/建议快照。未覆盖、输出截断、无效引文统一保留为 UNREVIEWED/PARTIAL；PASS 只表示模型判断符合该规则，不代表已经外部核实法源。建议仅展示，不自动修改原文。正文变化会使旧结果标记过期；定位仍通过既有只读 `find_navigate`，不新增书签或修改正文。
 - 删除项目时 `ProjectService.PROJECT_SCOPED_ENTITIES` 同时清理两张审查表；完成运行落库前重查权限并锁项目父行，避免删项目后重建审查残留。
 - 验证：后端 `ContractReviewServiceTest,ContractReviewOutputTest,ContractReviewPersistenceTest,ProjectDeleteCascadeTest`；前端 `tests/contract-review/*.test.mjs` 与 `tests/insight/insightPane.test.mjs`。测试桩通过不等于真实模型法律判断准确率或正式客户端已发布。
+
+## 法律资料卡与阅读标签（dev-board#1611）
+
+`utils/legalReferences.js` 复用 insightDetail 的法条/裁判/案号字段整形，区分目录与真实返回的正文，不把合成元数据当正文。`writingAssistanceHost` 将快捷查询或已有资料的 REST 结果保留在宿主，以会话票据和索引回应客体；客体右上角阅读按钮只传票据，不提交任意资料对象。查询更新、失活、销毁均废止旧票据，原有内容插入与失效保护保留。新文案通过宿主翻译后传给客体。
+
+宿主注入 `openLegalReferenceTab`，右侧分屏开 `legal-reference` 标签，不替换原编辑器；身份包含类别、正文、版本字段、来源、查询时间和提示。LAW/CASE/PENALTY 复用 `components/legal/LegalReferencePane.vue` 三种正式阅读样式，来源外链沿 `openBrowserTab`，只允许无凭据 HTTP(S)。REST 检索返回不等于法律适用性已核验；AI 整理与引用节选单列，模型不能授予自己“已核验”。
+
+现有快捷查询入口只有 Writer：`LibreOfficeEditor.initWritingAssistance` 明确限制 `docKind==='writer'`。Calc/Impress 同宿主但无该菜单，PDF 独立预览路径，不因此新增这些格式的编辑能力。四格式的共享标签方法保留左侧文档并排打开资料，资料标签不进入活跃文档/AI文档上下文。
+
+验证：`npm run test:completion`、`npm run test:insight`（含资料解析/标签回归）、`tests/legal-references/chat.mjs`（真实 ChatInterface/SSE 与标签方法，合成 HTTP/资料）、`tests/legal-reference-ui/run.mjs`（三类双主题、窄屏RTL/键盘/来源URL）。真实LOWA操作、四格式保存重开、正式Electron与真实供应商/模型另验。

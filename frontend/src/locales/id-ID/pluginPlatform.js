@@ -2,20 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "devTrustNotice": "Development plugins can send data to declared remote services and expose Agent tools. Review the source before approval. Manifest changes require approval again.",
-  "grantTrust": "Approve development services",
-  "revokeTrust": "Revoke service approval",
-  "connections": "Plugin service connections",
-  "credentialNotice": "Credentials are stored per user by the host and are not exposed to plugin pages.",
+  "devTrustNotice": "Plugin pengembangan dapat mengirim data ke layanan jarak jauh yang dideklarasikan dan mengekspos alat Agent. Tinjau sumbernya sebelum menyetujui. Perubahan manifes memerlukan persetujuan ulang.",
+  "grantTrust": "Setujui layanan pengembangan",
+  "revokeTrust": "Cabut persetujuan layanan",
+  "connections": "Koneksi layanan plugin",
+  "credentialNotice": "Kredensial disimpan per pengguna oleh aplikasi utama dan tidak diekspos ke halaman plugin.",
   "connected": "Terhubung",
-  "disconnected": "Not connected",
-  "token": "Service access token",
-  "connect": "Connect service",
-  "disconnect": "Disconnect",
-  "refresh": "Refresh status",
-  "subscription": "Check subscription",
-  "active": "Subscription active",
-  "inactive": "No active subscription",
-  "bundled": "Included with the app",
-  "checkout": "Open checkout"
+  "disconnected": "Tidak terhubung",
+  "token": "Token akses layanan",
+  "connect": "Hubungkan layanan",
+  "disconnect": "Putuskan sambungan",
+  "refresh": "Segarkan status",
+  "subscription": "Periksa langganan",
+  "active": "Langganan aktif",
+  "inactive": "Belum ada langganan aktif",
+  "bundled": "Disertakan bersama aplikasi",
+  "checkout": "Buka halaman pembayaran"
 }

@@ -7,6 +7,45 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 职责边界：AI 对话功能本身（编排循环、工具注册分发、记忆、SSE、前端聊天 UI、评测）。AI→编辑器指令链路属 ai-doc-bridge 领域；skill 机制属 plugin-system 领域（但 SkillRouter 在编排循环里有两处旁路接入点）。
 
+## 国内百炼与国际 OpenRouter（2026-10-29，dev-board#1625）
+
+平台目录改由 PlatformModelCatalog 从实际供应商读取，并按站点与用户runtime凭据缓存。国内通过官网AI网关到百炼；国际保留OpenRouter。ChatModelFactory 的平台默认/辅助/选模与视觉能力遵循目录，旧合法OpenRouter设置迁移到国内默认。智能选模在目录支持时使用 qwen3.8-flash / qwen3.8-max；不再按JVM国家、时区或IP过滤目录。BYOK/本地保留旧路径；Jev在百炼平台不外发。设置页移除网络区域控制，定价单位按供应商/本站币种下发。国内听写通过同站网关调用 qwen3.8-omni-flash；国际保留原语音模型，两者均不得混用凭据或地址。
+
+## 法律资料卡与案例检索（2026-10-29，dev-board#1611）
+
+- `LegalTools.case_search(query)` 通过既有 `PkulawChannel` 调用 `pkulaw-case-semantic/search_case`（参数 `text`），平台与自备渠道继续由原通道分流，未接入处罚专用接口。`case_search` 属 `legal` 类目，案例/判例/判决书及英文 case law/judgment 触发披露；法宝不可用时与法规工具共同隐藏。
+- 中英基底提示约定聊天正文的 `legal-reference` JSON 围栏（单个对象或数组）：`kind: LAW|CASE|PENALTY`、`title`，可选 `documentNumber/authority/date/effectiveDate/validity/source/url/summary/excerpt`。`summary` 是 AI 整理、`excerpt` 是读取到的原文节选；模型卡固定待核对，忽略自报 verified，不因卡片展示额外要求付费查询，也不能把协议写进文档。`ContextAssemblerService.spliceToolGuidance` 按 OFFICE 能力删除卡片提示段（插件暂未支持此渲染），保留正常检索与案例工具说明。处罚与其他法域沿 `search_web/browse_url` 查公开来源。
+- 五个法宝工具的 UI/历史显示上限采用现有结果型 16,000 字符，模型上下文仍保留原始结果。不解析截断 JSON 来伪造资料卡，不把检索成功或来源字段当作真实性、现行效力或适用性认证。前端原始工具输出继续展示截断提示。
+- 回归：`LegalToolsValidationTest`、`ExternalServiceDualTierRoutingTest`、`ToolDisclosurePolicyTest`、`ContextAssemblerServiceTest`、`SystemPromptToolVisibilityContractTest`、`AgentOrchestratorQuestionStopTest`、`ToolDisplayNameCoverageTest`、`ToolChoiceSurfaceTest`。合成通道测试不代表供应商实查、模型遵循率或正式客户端验收。
+
+## 独立 MCP 连接（dev-board#1599）
+
+`UserMcpConnectionService` 与 `/api/mcp/{presets,connections}` 独立于 Plugin 启停，按本地 userId + 当前平台账户指纹隔离配置。`PluginCredentialStore` 加密保存 Bearer、请求头、env 及 OAuth 凭据；API 不回显秘密。GET 离线列预置/状态，显式 test 才 initialize/tools-list，显式 enable 才向 AI 提供工具。公网 HTTPS Streamable HTTP 复用 `PluginMcpEndpointPolicy`/`PluginMcpHttpClient`；桌面 stdio 经版本绑定确认后由 `UserMcpStdioClient` 启动；OAuth 由 `UserMcpOAuthService` 标准发现、PKCE、加密刷新，测试和业务调用都使用同一解析入口。新增配置导入/授权契约见 plugin-marketplace.md 的 MCP 高级连接节（#1601–1603）。
+
+GET 返回非密 `scopeToken`，所有 mutation 必须发送加载表单时的 `X-MCP-Scope`（同步加入 `CorsConfig` 的预检头白名单，桌面跨端口请求必需）；服务层同次捕获当前 scope 并核对，旧账户排队请求返回 409。修改端点省略 token 会清旧密钥，端点/密钥变化使测试结果失效，但保留用户已选自配状态；只有显式禁用/删除才使企查查、法宝恢复官方通道。重新测试不调用业务工具、不自行启用新连接，旧异步结果按 revision 与账户守卫丢弃。
+
+工具输入完整保留远端 JSON Schema，以固定 networknt 1.5.7 在本地校验；拒绝外部引用/未知 meta-schema，不通过网络加载定义。单工具 schema 上限 24 Ki 字符、单连接发现清单上限 256 Ki 字符 / 256 工具。现有 LangChain4j 无 raw/union schema，AI 入参包装为 `argumentsJson`，描述包含完整 schema，执行时严格解析并验证，不删除 nullable、范围、required 等约束。`ToolRegistry` 按当前身份动态绑定，`mcp` 类目走渐进披露；名称含配置 revision，更新后旧轮工具名失效。ASK 不开放这些工具，远端 readOnlyHint 不授予权限，执行再核项目权限与本轮 offeredTools。
+
+企查查 / 法宝自配覆盖接在既有 `QichachaService`、`McpClientService`、`PkulawChannel`；配置失败、缺工具、凭据更新或 schema 失效均不回落平台收费。企查查旧工商工具固定映射公开 `get_company_registration_info(searchKey)`；company server 不含 IPR 工具时明确不可用，不暗用平台。`ExternalController` 与 `DocInsightService` 补身份作用域；依据窗格自配失败不再回落收费网页搜索。自配免的是平台数据工具费用，AI 模型费用沿原计费。
+
+回归：`UserMcpConnectionServiceTest`、`PluginMcpHttpClientTest`、`PluginMcpServiceTest`、`ToolDisclosurePolicyTest`、`DocInsightServiceTest`。真实 QCC 16 / PKULaw 18 工具定义来自只读 tools/list，保存在 `backend/src/test/resources/mcp/`（来源见其 UPSTREAM.md）；本地测试不等于真实业务付费查询或正式客户端发布验收。新增依赖的跨平台打包仍须在发版流水线验证。主任务以产品 `PluginMcpHttpClient` + `UserMcpSchema` 仅读真实 QCC/PKU initialize/tools-list，16/18 工具均成功，零业务 tools/call。本机代理 DNS 给出 198.18 假地址时被公网安全策略正确拒绝；隔离探测进程临时使用经 DoH 核对的公开 A 记录才完成验证，产品及系统 DNS/TLS 未改，不得以兼容代理为由放开保留地址。
+
+## PPT 生成与设计流程（2026-10-28，dev-board#1570/#1571/#1572）
+
+内置 `presentation-design` workflow skill 使用 `tool_policy: passthrough`，不锁死原子工具组合。中英文 LOWA 提示共同要求：先明确读者与结论、把证据和结论组织在同页、学习参考的结构与视觉、形成一致配色/字级/网格、编辑后逐页视觉复核。不能为了增加页数拆散可放在一页的内容，也不能用缩小正文掩盖拥挤；修复后重查受影响页。仅完成结构回读不得声称“已视觉验收”。
+
+`slide_create_file` 已纳入工具注册、客户端能力与披露策略，支持直接创建可编辑 PPTX 后组合 `slide_*`。`PdfVisualTools.pdf_inspect_visual` 通过现有辅助模型、权限、计费及用量链路传入真实 PDF 页面图片；参考和目标有分别标注，不是仅给模型文本描述。字体/段落精确值仍由结构读取负责，参考只读选项与部分失败处理见 ai-doc-bridge。
+
+图片型生成仍由 `PptxServiceClient` 接入附属服务：`createProject(topic, templateStyle)` 将风格实际写入请求 `template_style`，旧单参数签名保留；两个同步生成入口都传递该值。质量约束与用户风格共同传入，无用户风格时才加入默认深蓝、浅蓝灰与青绿配色。不能只在客户端配置里保存风格却漏传服务端；这会令无参考图片的图片生成接口拒绝请求。
+
+真实 Word→PPT 与 PPT→PPT 各生成三页，已逐页视觉检查及正常保存重开。Word 场景曾因可选润色反复检查而用自然语言引导收尾；PPT 场景在补强新建入口的参考像素学习要求后，模型自行修复换行/重叠/低对比并结束，一次视觉超时重试成功。两类原稿 hash 未变；失败轮与最终快照范围详见验收记录，不将首稿或纯工具通过称为成品通过。
+
+真实 AI 验收须使用产品 Agent/工具/编辑器完整链，隔离数据与专用 QA 账户；后端 BYOK 可执行条件不等于前端模型选择免登录。模型接口请求成功、技能存在或模拟模型单测通过，都不能替代参考 Word/PPT 的成品逐页视觉验收。当前实测及待验记录见 `doc/verification/2026-10-28-ppt-quality.md`。
+
+## 手动展开与阅读位置（dev-board#1568）
+
+`ChatInterface.message-list` 使用 `scrollbar-gutter: stable both-edges`，经典滚动条出现/消失时保持正文宽度与居中轴稳定。`RootBubble`、`ProcessCard`、`ThinkingCard` 在用户手动展开/收起前逐层发出 `reading-interaction`，由聊天宿主暂停 `followLatest`，避免内容高度变化触发 ResizeObserver 把读者拉到底部；自动展开和流式更新不发此事件，回到最新仍恢复跟随。回归 `tests/chat-presentation-ui/scrollbar-stability.mjs`；无头浏览器默认隐藏滚动条，需要关闭该默认参数才能复现经典滚动条造成的横移。
+
 ## AI 项目版本操作（2026-10-26，dev-board#1498）
 
 `VersionTools` 提供 `version_status/history/changes/commit/pull/restore`，独立 `version` 类目，均要求工作台 LOWA 宿主，不要求打开某份文档；Office/none 不可调用，ASK 仅放行状态、历史和变更清单。身份取 `ProjectContextHolder`，不可由模型指定另一项目或用户；客户不可读取版本历史，写动作仍经过既有成员权限与版本接口。`version_changes` 返回路径及增删改类型，不是正文差异；磁盘清单不代表编辑器未保存缓冲。历史可选 `includeAuto`，让 AI 找回恢复前自动保留的工作。
@@ -28,6 +67,15 @@ AI 自动合并续步也用同一操作的 `/merge`、`/merge-file` 与独立 `s
 - **三维环境扰动回放**（`test/.../eval/EnvPerturbation` + `EvalHarness.run(EvalCase, EnvPerturbation...)`）：支持 `Setup`、`Rule`、`Link` 三类扰动注入，验证编排器在工具隐藏、锚点漂移、跨步恢复下的鲁棒性。
 - `HarnessEvolutionEntry.payloadJson` 必须使用 `@JdbcTypeCode(SqlTypes.LONGVARCHAR)` + `TEXT`，不能加 `@Lob`：PostgreSQL 会将其绑定为 CLOB/OID，DDL 的 `TEXT` 不会覆盖 JDBC 读写类型（dev-board#1522）。`HarnessEvolutionJdbcMappingTest` 验证 PostgreSQL/H2 双方言实际映射及 `setString/getString`，持久化测试另覆盖超过 64K 的 Unicode JSON 落盘回读。
 - 回归：`HarnessDiagnosticServiceTest`、`VerificationHarnessTest`、`HarnessEvolutionServiceTest`、`HarnessEvolutionPersistenceTest`、`EnvHarnessPerturbationEvalTest`、`frontend/tests/project-home/harness-evolution-ui.test.mjs`、真浏览器+隔离真后端端到端 `frontend/tests/ai-alignment-e2e/harness-self-evolving-e2e.mjs`。
+
+## 同页后台出图与聊天共用 SSE（dev-board#1595）
+
+`useAgentStream` 的 `X-Client-Instance` 是页面身份，后端同会话只有一个 emitter。
+同页的诉讼出图和右侧聊天必须通过 `sharedAgentConnection.mjs` 共用传输，否则两者切入同一会话会互踢并无限重连。
+共享层按后端 URL、会话 URL、会话认证与页面实例隔离，按完整 SSE 帧分发；每个消费者仍独立维护气泡和状态。
+新订阅者加入时轮换一次底层连接，保持既有消费者流不关闭，带已交付游标请求服务端补发与 state_recovery；各解析器沿既有事件 ID 去重，不在共享层自造历史快照。最后一个消费者退出才中止底层请求。
+诉讼面板继续仅捕获文件交付编号，不把编辑器指令转发到活动文档。
+回归：`frontend/tests/project-home/shared-agent-connection.test.mjs` 包含真实双 composable、完整帧、中文、游标、断开与完成状态验证。
 
 ## 智能模型路由（Smart Mode / Auto，2026-10-22，dev-board#1434）
 
@@ -260,7 +308,14 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
 - `ProjectMemoryExtractor` 与 `project_memory` **保持现状不动**，概览页只是不读它。
 
 **模型目录与区域判定（2026-08 供应商三档改造）**
-- `service/ai/AllowedModels.java` 是**模型目录的唯一事实来源**（14 条：GLOBAL 9 + INTERNATIONAL 5）。枚举带元数据：displayName（中文）/ Vendor（中文厂商名，前端按它分组）/ Region / contextLength / **vision（是否支持图像输入）** / priceTiers。前端**不许再硬编码任何模型清单**——历史上有三份互不同步的副本（本枚举、ChatInterface.vue 硬编码数组、project-overview.vue 死代码），后果是「后端加模型用户看不到、前端加模型被工厂静默回落默认模型」。
+
+2026-10-29 更新（dev-board#1593/#1594）：目录为15条（GLOBAL10/INTERNATIONAL5），新增 Kimi K3.1 Pro，Qwen3.8 Max 使用当前 `qwen/qwen3.8-max-0902`；旧保存ID由 `AllowedModels.canonicalModelId` 精确映射到该版本，覆盖请求及默认/辅助/子模型设置，发送前规范化；目录下发aliases供前端保留旧选择，PPT直传路径也须规范化；不改写无关模型、不改数据库原设置。图片标记必须调用 `ChatModelFactory.effectiveModelSupportsVision(id)`，与实际消息路由一致；不能用原始 `resolveProvider()==OLLAMA` 覆盖整表，因为未显式选择本地时白名单模型仍可能走云端。显式本地选择保持无图片直送。国际平台USD与图片能力独立；计费渠道同样按目录模型实际路由解析，隐式本地默认但实际云端的请求不得提示免费。
+
+随手工作区与项目聊天共用保活的 `ChatInterface`（宿主 `v-show`，并非每次打开重建）。目录/供应商须在挂载、模型选择器打开、`awd:account-changed`、`awd:ai-config-changed` 后刷新；AdminPane 只在配置保存成功后发配置事件。刷新合并重复请求，变化事件淘汰旧响应并补拉，保留当前模型选择与下拉关闭状态，卸载移除监听。真实Chrome回归复现旧组件本地→平台切换后K3仍false，并验证同实例刷新、USD/CNY、迟到响应和保存成功/失败通知。用户截图确证错误标签，但该机具体触发过程尚未独立验证。
+
+`.github/workflows/model-catalogue-audit.yml` 每日及目录PR运行联网检查：在线、tools、image、上下文与全部价格档位。离线测试仍默认跳过；显式联网检查遇网络/响应错误必须失败，不能伪装通过。价格是上游当时的路由报价快照，供应商变动可导致快速漂移；失败须核对新数据，不能放宽容差。Codex本会话另设每周一10:00（Asia/Singapore）复查新模型与审计结果、测试并合并修正；不自动发版。合并只更新源码，已安装桌面目录随后端组件版本更新，不能声称远端Mac即时生效。
+
+- `service/ai/AllowedModels.java` 是**模型目录的唯一事实来源**（15 条：GLOBAL 10 + INTERNATIONAL 5）。枚举带元数据：displayName（中文）/ Vendor（中文厂商名，前端按它分组）/ Region / contextLength / **vision（是否支持图像输入）** / priceTiers。前端**不许再硬编码任何模型清单**——历史上有三份互不同步的副本（本枚举、ChatInterface.vue 硬编码数组、project-overview.vue 死代码），后果是「后端加模型用户看不到、前端加模型被工厂静默回落默认模型」。
 - **分档计价**：OpenRouter 对部分模型按输入长度分档涨价，白名单里 4 个模型有档（qwen3.7-flash 三档，seed-2.0-lite / gpt-5.6-terra / grok-4.5 两档）。价格是 `PriceTier(minPromptTokens, inputPricePerM, outputPricePerM)` 列表，按 minPromptTokens 升序、首档下限恒为 0，取档用 `priceTierFor(promptTokens)`（负数/0 回落首档，取档不许抛异常——记账抛异常会把整条流式对话带崩）。`TokenUsageService.calculateCost` 已按档计价；**只读首档会在长上下文下系统性低报**。刻意不建模提示缓存命中价（langchain4j 0.36 的 TokenUsage 只回 input/output，拿不到命中 token 数），因此估算值对命中缓存的轮次偏高——**已知偏差不是 bug**，真花的钱以 PlatformUsageAccountant 对账为准。
 - **价格漂移唯一护栏**：`AllowedModelsLiveContractTest`（联网对拍 `GET https://openrouter.ai/api/v1/models`，断言在线 + supported_parameters 含 tools + 单价一致，容差 1%）。门控 `RUN_LIVE_MODEL_CHECK=1`，默认跳过——mvn test 默认离线可跑是硬要求。首次对拍就抓到 5 条价格错，其中 kimi-k2.6 的输入/输出价分别对用户超收 14% 与 40%。**2026-08-10 第二次对拍又抓到两条**：glm-5.2 与 kimi-k2.6 的上游单价分别涨了 3.0 倍与 1.6 倍，而枚举还是旧值——方向是低报，BYOK 估算系统性偏低且没有任何东西会报警（平台通道走真实扣费，看不出来）。**因为这条护栏是 env 门控、不进 CI，漂移只会在有人手动跑的时候被发现**，所以改动模型相关的 PR 顺手跑一次 `RUN_LIVE_MODEL_CHECK=1 mvn test -Dtest=AllowedModelsLiveContractTest`。**测试红了不许放宽容差**，先核对线上再改枚举。结构性前提（首档为 0、严格升序）与区域集合大小由离线的 `AllowedModelsTest` 守。
   - **同一条护栏现在也对拍 vision 位**（2026-08-29）：判据是 `architecture.input_modalities` 含 `"image"`。两个方向严重性不同——我们标 true 而上游没有 = 图片块发给读不了图的模型换来必然的 400，必须红；我们标 false 而上游有 = 只是把用户的图白白降级成 OCR，也断言但错误信息说清是「漏标」。vision 位与单价一样是**人手抄的、会在我们背后变**，而这条护栏同样 env 门控不进 CI。
@@ -282,7 +337,7 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
 **图片多模态（视觉直送，2026-08-29 dev-board#266）**
 
 - **一句话**：模型支持视觉 → 图片附件作为 `ImageContent` 内容块直送模型；不支持 → 降级走既有 OCR，并在选模型时就告诉用户。降级全自动，前端不做任何拦截。
-- **能力判据只有一处**：`AllowedModels.vision` 位（14 条里 11 条 true，纯文本的是 deepseek-v4-flash / deepseek-v4-pro / glm-5.2）。经 `GET /api/ai/models` 下发，**前端不许自建「哪些模型能看图」的表**。境内 GLOBAL 9 条里有 6 条支持视觉，所以这条路在境内是通的。
+- **能力判据只有一处**：`AllowedModels.vision` 位（15 条里 12 条 true，纯文本的是 deepseek-v4-flash / deepseek-v4-pro / glm-5.2）。经 `GET /api/ai/models` 下发，**前端不许自建「哪些模型能看图」的表**。境内 GLOBAL 10 条里有 7 条支持视觉，所以这条路在境内是通的。
 - **默认模型是纯文本的**（`ai.model.open-router.default-model` = deepseek/deepseek-v4-flash），所以降级是常态而不是边缘情况。前端提示必须覆盖「用户从没手动选过模型」这一档，否则绝大多数用户静默无提示。
 - **判定必须落在「真正生效的模型」上**：`ChatModelFactory.resolveTarget(modelId, logFallback)` 是通道+模型 id 的**唯一解析口径**，`getChatModel` / `getStreamingChatModel` 都改成调它再分派（两份会漂移，漂移的表现是同步路与流式路发给不同模型）。能力判定走 `effectiveModelSupportsVision(modelId)`：请求里的 modelId 有三条静默改写路径（非白名单回落默认模型 / 显式本地档忽略云端模型 / 平台通道回落），按请求 id 判就会把 image 块发给读不了图的模型。**OLLAMA 档恒 false**（langchain4j-ollama 是另一套图片编组，本次不接）。
 - **组装点**：`ContextAssemblerService`。图片项在 contextItems 循环里分叉——直送时**不调 read_document、不注入 `<file>` 正文**，只在 system 里留一条 `<image id name note=.../>` 标识（告诉模型图随消息发了、别再调读取工具），字节收进 `visionAttachments`，在**末位用户消息**里以 `UserMessage.from(List<Content>)` 组装（`TextContent` 必须排第一——末位提醒的注意力位置是真机日志换来的结论）。**同一张图绝不许既进视觉又进 OCR**：那会既付图像 token 又付 OCR 的钱，还给模型两份可能打架的输入。
@@ -324,7 +379,7 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
 - **`GET /api/ai/config` 新增 `contextLimits`**：`maxFilesPerContext / maxCharsPerFile / maxCharsActiveDocument / maxImagesPerTurn / maxImageBytes / visionCountsTowardFileQuota`。前端 `chatContextLimits.js` 的 `DEFAULT_CONTEXT_LIMITS` 只是拉不到时的兜底，**必须与后端默认值一致**；`normalizeContextLimits` 对 0/负数/NaN/缺字段一律退回兜底（拿 0 去拦截会让用户一份都加不进来）。
 - **前端前置拦截**：`addFile` 走 `admitFileToContext`（到顶 toast `chat.contextFileCapReached`，重复添加静默），粘贴/拖图走 `admitPastedImage`（张数 / 体积两种理由分开报）。**判据都在 `src/utils/chatContextLimits.js`**，不许在组件里再写一份。
 - **「模型看不了图」改成常驻提示（K21 ⑨，审查 E-6）**：`visionNoticeKey` 的判据是 `modelVision === false && (有粘贴图 || contextFiles 里有图)`，图片判据 `isImageAttachment` 取 fileType 与文件名后缀的**并集**（桌面端那张映射表没有 bmp，项目树里是 'other'），与插件 `chatSession.js` 同口径。提示从 `v-if="pastedImages.length > 0"` 的缩略图块里挪到输入卡片底部——原来从文件树拖进来的项目图片（走 contextFiles）完全不触发，用户拖一张现场照片进去、模型读不了图时界面上没有任何线索。**`currentModelVision` 仍是三态，未知一律不提示。**
-- **Ollama 档 vision 位在模型目录端点归一为 false**（K21 ⑨，审查 E-15）：`AiModelCatalogController` 按 `chatModelFactory.resolveProvider()` 判，与 `effectiveModelSupportsVision` 对 OLLAMA 恒 false 对齐。provider 探测抛异常时**不改写**能力位（宁可维持白名单原值，也不要凭一次异常把全体云端用户的模型都标成读不了图）。
+- **Ollama 档 vision 位在模型目录端点归一为 false**（K21 ⑨，审查 E-15）：`AiModelCatalogController` 按 `chatModelFactory.effectiveModelSupportsVision(id)` 判，与实际消息路由对齐（原始供应商默认值不能代替实际路由）。provider 探测抛异常时**不改写**能力位（宁可维持白名单原值，也不要凭一次异常把全体云端用户的模型都标成读不了图）。
 - **三种图片降级各说各的原因**（真机实测发现）：原来三条降级路共用一句「这一张图未能直送（超出本轮张数或单张体积上限，或读取失败）」，模型据此告诉用户「因超出**单张体积**限制」，而真实原因是这一轮的**张数**上限——用户会去压缩一张其实不大的图。现在 `OCR_FALLBACK_COUNT/SIZE/READ/NO_VISION` 四句各写各的，**写进 prompt 的原因与 notice 的 kind 一一对应**。前端 `contextNoticeOcrFallback` 的文案刻意**不断言原因**（那条通道也覆盖「读盘失败后改走 OCR」），「模型看不了图」由输入框上方的常驻提示负责。
 - **OCR 系统提示不再被当正文**（审查 E-7）：`appendOcrFallbackFile` 现在认 `[System:` 开头并按「读不出来」处理，同时回传 readable 供 sink 发 `unreadable`。原来 `[System: 文件超过大小限制]` 非空、也不带 Error/Warning 前缀，顶着「以下正文由 OCR 从图片转写而来」的横幅进 CDATA。
 - **读不出正文的单个附件不再注入空 CDATA**：与 K8 的失败回执同款，改成一句 `该附件内容暂不可读：…` 的说明（中英各一份）。
@@ -1764,3 +1819,32 @@ cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='Refe
 - 本机私聊走 `ImScopedAgentHost` 的项目身份核验，再由 `ImPrivateProjectContext` 按当前/已打开真实文档候选与问题题名相关性读取最多4份、每份6000字。宿主 `messageContextFileIds` 仅提供最多两个真实文件 ID，PluginPane 覆盖插件自给候选；文件仍须属于当前项目并通过 ACL。不能把文件目录当作已读取正文。
 - 云项目群经 `ImSharedProjectContext` 只读向客户开放、全部当前有权成员可读的材料；提取后、模型生成后及提交前复核。团队/律所助手仅读对应共享记忆，最多尝试3份；不注入本机私聊材料。
 - 验证：66项后端合成数据测试，包括排序第7的起诉状命中、正文进入模型请求、跨项目 ID 拒读；前端默认入口与真实 iframe 沙箱验证。没有调用真实付费模型或将用户截图中的案件材料发送给测试服务。
+
+### 2026-10-28 Harness² 运行期自愈、独立核验与零打扰自动自进化（dev-board#1481）
+
+- **运行期双层归因与静默自愈（`service/ai/harness/HarnessDiagnosticService`）**：区分 `INVARIANT`（`EXPAND_TOOL_CATEGORY` 动态展开工具类目、`ANCHOR_PROBE_RECOVERY` 强制回读探针）与 `DOMAIN`（`MOUNT_DOMAIN_SKILL` 动态挂载领域技能、`CLARIFY_WITH_USER` 事实缺失澄清）。自愈处方在后台注入编排循环，**不在 `ProcessCard.vue` 内联渲染底层归因诊断块**，避免向用户暴露内部工具名与工程术语。
+- **零打扰自动判断自进化（`service/ai/harness/HarnessEvolutionService`）**：
+  1. **过滤底层运行期噪音**：`EXPAND_TOOL_CATEGORY` 与 `ANCHOR_PROBE_RECOVERY` 属于单轮内部工具调度机制，`isEvolvableSelfHealing` 一律跳过，绝不写入 `topics/harness-evo-*.md` 污染用户记忆。
+  2. **自动判定作用域（`inferOptimalScope`）与自动升格技能（`shouldAutoPromoteToSkill`）**：绑定本案具体材料（`《…》`、`这份`、`本案`、`补充协议`等）的规则自动写入 `project` 记忆；跨项目通用规范或显式「…专项规范」自动写入 `user` 全局记忆，并在属于 `DOMAIN` 领域规范时自动升格注册为 `user-evo-*` Skill（无需人工点击）。
+  3. **对话流零打扰**：`RootBubble.vue` 不挂载 `HarnessEvolutionCard`，不在对话流弹出让用户三选一的卡片；用户可随时在「我的记忆 / 项目记忆」面板或 `/api/agent/harness/evolutions` 查看与回滚。
+- **收尾 Challenger 独立核验（`service/ai/harness/VerificationHarness`）**：仅对声明 `verification_policy: slot_evidence_challenger` 的高风险技能（如 `legal-opinion`）在 `<final>` 前执行独立证据核对，未核实主张自动触发 1 次自我修正闭环。
+- **回归**：`HarnessDiagnosticServiceTest`、`VerificationHarnessTest`、`HarnessEvolutionServiceTest`、`HarnessEvolutionPersistenceTest`、`frontend/tests/project-home/harness-evolution-ui.test.mjs`、`frontend/tests/ai-alignment-e2e/harness-self-evolving-e2e.mjs`。
+
+## 可选采集预读（dev-board#1630，2026-10-30）
+
+- `MobileCaptureOrganizationEngine` 只处理用户开启的照片、视频和录音。图像有界解码缩放；视频仅取0/5/10秒的最多3帧；录音仅取开头至多30秒的16kHz单声道WAV，交 `VoiceDictationService.transcribeSample` 再用辅助模型归类。覆盖范围写入结果，不当作全视频理解或完整转写，转写稿只留内存。
+- `ChatModelFactory.getPlatformAuxChatModel(timeout,maxOutputTokens,requiresVision)` 强制当前用户平台额度，按凭据快照选择站点端点；国内默认低价辅助模型为 `qwen3.8-flash`，国际保留 `qwen/qwen3.7-flash`。仅迁移旧默认辅助模型，其他显式配置须在当前目录中存在；视觉能力不符即拒绝，不跟随服务器BYOK设置、不自动升级主模型。新增语音sample方法保留原听写API，限制输出与超时、禁止机器key，国内录音使用 `qwen3.8-omni-flash`、国际保留已配听写模型，返回实际modelId/tokenUsage，由调用方 `recordPlatformUsage`；调用前建立平台用量基线。
+- 2线程无排队执行器、图片/视频30秒与录音60秒总预算、单次无自动模型重试。持久幂等和关闭默认由 `MobileCaptureOrganizationService` 负责；引擎失败不得阻断原件上传。
+- FFmpeg仅使用固定本机可执行文件、参数数组与临时目录，限制file/pipe协议和实际容器format_whitelist，排除HLS/concat外部读取。未安装可执行文件或无法采样即如实skipped，不把未解码影像称为已读。
+- 模型只抽字段，规则拼接文件名和有限标签；软著登记号与证书号分开，缺号/日期不补猜，低可靠保留原名待确认。自动名称不成为原件身份。请求语言在跨线程前捕获，再建立 `AppLanguageScope`，类别名称走 `LangText`。
+- 回归入口：`MobileCaptureOrganizationEngineTest` 与 `VoiceDictationServiceTest`，覆盖合成音视频真实本地抽样、模型HTTP替身、账户与用量、语种和恶意播放列表；这些不是付费模型识别质量或生产FFmpeg可用性验证。
+
+## 诉讼可视化独立会话边界（2026-10-30，dev-board#1627/#1628）
+
+`ProjectAiMessage.conversationScope` 可空，当前只支持 `litigation-visual`。原生签发/聊天请求与
+SSE query 都显式携带范围；不匹配的普通面板连接在替换 emitter 前返回409，聊天同样拒绝。
+普通 user-scoped/project-scoped 历史排除专属会话，按 conversationId 的授权历史读取仍可用于左侧恢复。
+显式旧任务归类通过签发接口的 conversationId 完成，必须核对原 owner/project 且不可为镜像会话；
+不是按技能触发词自动隐藏普通聊天。保存、fork/rollback 继续保留范围，进程重启从持久消息回读。
+新增文件事件方面，litigation_render/timeline_render 没有结构化真实产物时不走“当前文档”兜底；
+已登记 drawio/svg/png 仍沿实际 ID 逐项发事件。详细 UI/恢复与验证边界见 litigation-visual.md。

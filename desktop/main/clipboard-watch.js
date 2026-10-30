@@ -13,12 +13,13 @@
 // 只在变化时写一行到 stdout；父进程没了它自己退出。
 //
 // 其余平台（Windows 的 GetClipboardSequenceNumber 同样没暴露）与 helper 起不来/中途退出时，
-// getChangeCount() 返回 null，走廉价兜底：每 tick 先看 availableFormats()（便宜），
+// getChangeCount() 返回 null，走廉价兜底：每 tick 先看 clipboard.read() 的类型清单（延迟取 Blob），
 // 格式集与上一 tick 完全相同时整图只每 IMAGE_RECHECK_TICKS 个 tick 重读一次；格式集一变
 // （复制了文本/文件/格式不同的新图）当 tick 立刻重读。文本与文件分支照旧每 tick。
 // 取舍：「图换图且格式集不变」（例如连截两张图）的检测最多晚 IMAGE_RECHECK_TICKS 秒，
 // 换来图躺在剪贴板里时整图解码的次数降到五分之一。
 const { spawn } = require('child_process')
+const { fileURLToPath } = require('node:url')
 
 // 无变更序号时，格式集不变的情况下每几个 tick 才整图重读一次（tick 间隔 1 秒）
 const IMAGE_RECHECK_TICKS = 5
@@ -81,82 +82,107 @@ function startChangeCounter({ platform = process.platform, spawnFn = spawn } = {
  * 一次轮询的逻辑（不含定时器）。fingerprint 与 main.js 的 emitClipboard 共用，
  * 由调用方以 get/set 传入。
  */
-function createClipboardPoller({ clipboard, platform = process.platform, getChangeCount = () => null, fingerprint, onImage, onFile, onText }) {
-  // 上一次真正读过整图时的变更序号；序号未变 = 剪贴板还是那次复制，不必再读图
+function createClipboardPoller({ clipboard, platform = process.platform, getChangeCount = () => null, fingerprint, onImage, onFile, onText,
+  decodeImage = bytes => require('electron').nativeImage.createFromBuffer(bytes) }) {
   let imageSeq = null
-  // 兜底用：上一 tick 的格式集、上次整图读取后过了几个 tick、上次读到的是否是非空图
   let lastFormatsKey = null
   let ticksSinceImageRead = Infinity
   let lastImageNonEmpty = false
+  let busy = false
+  let generation = 0
 
-  function tick(priming) {
-    const formats = clipboard.availableFormats()
-    const formatsKey = formats.join('\n')
-    const formatsChanged = formatsKey !== lastFormatsKey
-    lastFormatsKey = formatsKey
-    ticksSinceImageRead++
+  async function tick(priming) {
+    if (busy) return false
+    busy = true
+    const current = generation
+    try {
+      const initialFingerprint = fingerprint.get()
+      // copy/cut 监听也会推进共享指纹；异步读取不能用旧结果覆盖它。
+      const isCurrent = () => current === generation && fingerprint.get() === initialFingerprint
+      const items = await clipboard.read()
+      if (!isCurrent()) return false
+      const formats = [...new Set(items.flatMap(item => item.types))]
+      const formatsKey = formats.join('\n')
+      const formatsChanged = formatsKey !== lastFormatsKey
+      lastFormatsKey = formatsKey
+      ticksSinceImageRead++
+      const itemFor = type => items.find(item => item.types.includes(type))
+      const imageType = formats.includes('image/png') ? 'image/png' : formats.find(type => type.startsWith('image/'))
 
-    const hasImage = formats.some(f => f.includes('image'))
-    const hasText = formats.includes('text/plain')
+      if (imageType) {
+        const seq = getChangeCount()
+        if (seq != null && seq === imageSeq) return true
+        if (seq == null && lastImageNonEmpty && !formatsChanged && ticksSinceImageRead < IMAGE_RECHECK_TICKS) return true
+        const blob = await itemFor(imageType).getType(imageType)
+        if (!isCurrent()) return false
+        const bytes = Buffer.from(await blob.arrayBuffer())
+        if (!isCurrent()) return false
+        const img = decodeImage(bytes)
+        ticksSinceImageRead = 0
+        lastImageNonEmpty = !!(img && !img.isEmpty())
+        if (lastImageNonEmpty) {
+          imageSeq = seq
+          const bitmap = img.toBitmap()
+          const size = img.getSize()
+          const sample = bitmap.length > 64
+            ? bitmap.subarray(0, 32).toString('hex') + bitmap.subarray(bitmap.length - 32).toString('hex')
+            : bitmap.toString('hex')
+          const fp = 'IMG_' + size.width + 'x' + size.height + '_' + bitmap.length + '_' + sample
+          if (fp !== fingerprint.get()) {
+            fingerprint.set(fp)
+            if (!priming) onImage(img.toDataURL())
+          }
+          // 图文混合时优先图；未变化的图不解码、不重复推送。
+          return true
+        }
+      }
 
-    if (hasImage) {
-      const seq = getChangeCount()
-      if (seq != null && seq === imageSeq) return
-      if (seq == null && lastImageNonEmpty && !formatsChanged && ticksSinceImageRead < IMAGE_RECHECK_TICKS) return
-      const img = clipboard.readImage()
-      ticksSinceImageRead = 0
-      lastImageNonEmpty = !!(img && !img.isEmpty())
-      if (lastImageNonEmpty) {
-        imageSeq = seq
-        // 用原始 bitmap 算指纹，仅当指纹变化（新图）时才做一次昂贵的 toDataURL。
-        const bitmap = img.toBitmap()
-        const size = img.getSize()
-        const sample = bitmap.length > 64
-          ? bitmap.subarray(0, 32).toString('hex') + bitmap.subarray(bitmap.length - 32).toString('hex')
-          : bitmap.toString('hex')
-        const fp = 'IMG_' + size.width + 'x' + size.height + '_' + bitmap.length + '_' + sample
+      // Electron 44+ 将 macOS 原生文件引用映射为标准 URI 列表。
+      if (platform === 'darwin' && itemFor('text/uri-list')) {
+        const blob = await itemFor('text/uri-list').getType('text/uri-list')
+        if (!isCurrent()) return false
+        const text = await blob.text()
+        if (!isCurrent()) return false
+        const uri = text.split(/\r?\n/).map(line => line.trim()).find(line => line && !line.startsWith('#'))
+        let filePath = ''
+        try { if (uri) filePath = fileURLToPath(uri, { windows: false }) } catch (e) { /* not a local macOS file reference */ }
+        if (filePath) {
+          const fp = 'FILE_' + filePath
+          if (fp !== fingerprint.get()) {
+            fingerprint.set(fp)
+            if (!priming) onFile(filePath)
+          }
+          return true
+        }
+      }
+
+      if (itemFor('text/plain')) {
+        const blob = await itemFor('text/plain').getType('text/plain')
+        if (!isCurrent()) return false
+        const text = (await blob.text()).trim()
+        if (!isCurrent()) return false
+        if (!text) return true
+        const fp = 'TXT_' + text
         if (fp !== fingerprint.get()) {
           fingerprint.set(fp)
-          if (priming) return
-          onImage(img.toDataURL())
+          if (!priming) onText(text)
         }
-        // 图文混合时优先图
-        return
       }
-    }
-
-    // macOS 的文件复制（public.file-url）
-    if (platform === 'darwin' && formats.includes('public.file-url')) {
-      const filePath = clipboard.read('public.file-url')
-      if (filePath) {
-        let cleanPath = filePath
-        try { cleanPath = decodeURIComponent(filePath.replace('file://', '')) } catch (e) { }
-
-        const fp = 'FILE_' + cleanPath
-        if (fp !== fingerprint.get()) {
-          fingerprint.set(fp)
-          if (priming) return
-          onFile(cleanPath)
-        }
-        return
-      }
-    }
-
-    if (hasText) {
-      const t = clipboard.readText() || ''
-      // trim 与 emitClipboard 保持一致，否则两处指纹对不上会反复推送
-      const tt = String(t || '').trim()
-      if (!tt) return
-      const fp = 'TXT_' + tt
-      if (fp !== fingerprint.get()) {
-        fingerprint.set(fp)
-        if (priming) return
-        onText(tt)
-      }
+      return true
+    } finally {
+      busy = false
     }
   }
 
-  return { tick }
+  function cancel() {
+    generation++
+    imageSeq = null
+    lastFormatsKey = null
+    ticksSinceImageRead = Infinity
+    lastImageNonEmpty = false
+  }
+
+  return { tick, cancel }
 }
 
 module.exports = { createClipboardPoller, startChangeCounter, DARWIN_CHANGE_COUNT_SCRIPT, IMAGE_RECHECK_TICKS }

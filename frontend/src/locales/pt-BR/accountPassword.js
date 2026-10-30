@@ -2,21 +2,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "intro": "Sign in with your phone number or email and password. First time? Verify and create a password.",
+  "intro": "Entre com seu número de telefone ou e-mail e senha. Primeira vez? Verifique e crie uma senha.",
   "password": "Senha",
-  "confirm": "Confirm password",
-  "register": "First time / Create password",
+  "confirm": "Confirmar senha",
+  "register": "Primeira vez / Criar senha",
   "reset": "Esqueci a senha",
   "back": "Voltar para entrada por senha",
-  "setup": "Create password",
-  "resetTitle": "Reset password",
-  "verify": "Verify and continue",
+  "setup": "Criar senha",
+  "resetTitle": "Redefinir senha",
+  "verify": "Verificar e continuar",
   "signIn": "Entrar",
-  "passwordHint": "8–72 characters. Use a unique password.",
-  "invalid": "Use a password with 8–72 characters",
-  "mismatch": "Passwords do not match",
+  "passwordHint": "8–72 caracteres. Use uma senha exclusiva.",
+  "invalid": "Use uma senha com 8 a 72 caracteres",
+  "mismatch": "As senhas não coincidem",
   "required": "Digite sua senha",
-  "resetDone": "Password reset. Sign in with your new password.",
-  "setupHint": "Verified. Create a password to continue.",
-  "resetHint": "This code is only for resetting your password."
+  "resetDone": "Senha redefinida. Entre com sua nova senha.",
+  "setupHint": "Verificado. Crie uma senha para continuar.",
+  "resetHint": "Este código serve apenas para redefinir sua senha."
 }

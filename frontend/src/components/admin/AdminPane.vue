@@ -15,7 +15,7 @@
     onUnload()    → beforeUnmount()
 -->
 <template>
-  <view class="page-admin" :class="{ 'is-embedded': embedded }">
+  <view class="page-admin" :class="{ 'is-embedded': embedded, 'mcp-settings': activeNav === 'mcp' }">
     <view class="admin-container">
       <!-- Sidebar -->
       <view class="admin-sidebar">
@@ -98,7 +98,7 @@
           scroll-y
           class="config-scroll"
         >
-          <SettingsSection :title="$t('admin.aiSectionTitle')" :description="$t('admin.aiSectionSubtitle')">
+          <SettingsSection :title="$t('admin.aiSectionTitle')" >
               <!-- 2026-08-21 起产品只有官方版：AI 一律走平台 Credits 通道（AWD_CLOUD），
                    供应商单选、OpenRouter 自备 Key、本地 Ollama 三块都不再在界面上出现
                    （后端三档枚举与设置键原样保留）。老用户以前切过别的档位时，
@@ -113,7 +113,7 @@
                    所以它恒显示。绝不预勾选——预勾选的同意是无效的。 -->
               <view class="consent-box">
                 <text class="consent-title">{{ $t('admin.consentTitle') }}</text>
-                <text class="consent-body">{{ $t('admin.consentBodyPrefix') }}<text class="consent-em">{{ $t('admin.consentEntity') }}</text>{{ $t('admin.consentBodySuffix') }}</text>
+                <text class="consent-body">{{ $t('onboarding.unlock.crossBorderNoticeBody') }}</text>
                 <view class="consent-check" @tap="toggleCrossBorderConsent">
                   <view class="consent-box-mark" :class="{ checked: crossBorderConsented }"></view>
                   <text class="consent-check-label">{{ $t('admin.consentCheckLabel') }}</text>
@@ -132,9 +132,6 @@
               <view class="section-header-inline">
                   <text class="section-title-sm">{{ $t('admin.modelSelectionTitle') }}</text>
               </view>
-              <text class="field-note">
-                {{ $t('admin.modelSelectionNote') }}
-              </text>
               <text v-if="modelCatalogError" class="field-note field-note-warn">{{ modelCatalogError }}</text>
               <SettingsRow :label="$t('admin.defaultModelLabel')" :hint="catalogDefaultModel ? $t('admin.effectiveDefaultModel', { model: catalogDefaultModel }) : ''">
                 <AwdSelect
@@ -161,30 +158,16 @@
                 />
               </SettingsRow>
 
-              <!-- 网络区域。手动覆盖是一等设置不是隐藏兜底：本地判定（系统国家 + 时区）
-                   对出差、挂代理、公司专线出境的用户必然判错，手动指定是唯一出路。 -->
               <view class="section-divider"></view>
               <view class="section-header-inline">
-                  <text class="section-title-sm">{{ $t('admin.networkRegionTitle') }}</text>
+                  <text class="section-title-sm">{{ $t('chat.builtinWorkflowsFoldEntry') }}</text>
               </view>
               <text class="field-note">
-                {{ $t('admin.networkRegionNote') }}
+                {{ $t('chat.builtinWorkflowsSub') }}
               </text>
-              <SettingsRow :label="$t('admin.regionModeLabel')">
-                <view class="provider-radio-group">
-                  <view
-                    v-for="opt in networkRegionOptions"
-                    :key="opt.value"
-                    class="radio-item"
-                    :class="{ checked: form.ai.networkRegion === opt.value }"
-                    @tap="form.ai.networkRegion = opt.value"
-                  >
-                    <view class="radio-dot"></view>
-                    <text class="radio-label">{{ opt.label }}</text>
-                  </view>
-                </view>
+              <SettingsRow :label="$t('chat.builtinWorkflowsHeader')" :hint="$t('chat.builtinWorkflowsScope')">
+                <button type="button" class="comp-btn" @tap="onNavTap({ key: 'workflows' })">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</button>
               </SettingsRow>
-              <text class="field-note region-summary-note">{{ networkRegionSummary }}</text>
           </SettingsSection>
 
           <!-- 保存按钮 -->
@@ -199,6 +182,10 @@
               {{ $t('admin.saveConfigButton') }}
             </button>
           </view>
+        </scroll-view>
+
+        <scroll-view v-else-if="activeNav === 'mcp'" scroll-y class="config-scroll">
+          <McpConnectionsPanel />
         </scroll-view>
 
         <!-- 账户与用量（仅桌面端：连接 AI WorkDeck 账户、余额） -->
@@ -973,6 +960,13 @@
               <MemoryBrowser inline :open="true" :project-id="projectId" />
           </SettingsSection>
         </scroll-view>
+        <scroll-view v-else-if="activeNav === 'workflows'" scroll-y class="config-scroll">
+          <SettingsSection :title="$t('chat.builtinWorkflowsFoldEntry')" :description="$t('chat.builtinWorkflowModalSubtitle')">
+            <view class="admin-builtin-workflow-wrap">
+              <BuiltinWorkflowEditor :project-id="projectId || ''" :embedded-in-settings="true" />
+            </view>
+          </SettingsSection>
+        </scroll-view>
         <scroll-view v-else-if="activeNav === 'permissions'" scroll-y class="config-scroll">
           <SettingsSection :title="$t('admin.permissionsSectionTitle')" :description="$t('admin.permissionsSectionSubtitle')">
             <template #actions>
@@ -1063,8 +1057,10 @@ import PersonalSettingsPanel from '@/components/userprofile/PersonalSettingsPane
 import TeamPanel from '@/components/admin/TeamPanel.vue'
 import OcrRoutingSettings from '@/components/admin/OcrRoutingSettings.vue'
 import OptionalComponentCard from '@/components/OptionalComponentCard.vue'
+import McpConnectionsPanel from '@/components/admin/McpConnectionsPanel.vue'
 import ExternalDependenciesPanel from '@/components/admin/ExternalDependenciesPanel.vue'
 import MemoryBrowser from '@/components/MemoryBrowser.vue'
+import BuiltinWorkflowEditor from '@/components/BuiltinWorkflowEditor.vue'
 import LanguagePicker from '@/components/LanguagePicker.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
@@ -1080,6 +1076,8 @@ const NAV_LABEL_KEYS = {
   personal_settings: 'admin.navPersonalSettings',
   team: 'team.navTeam',
   memory: 'chat.memoryButton',
+  workflows: 'chat.builtinWorkflowsFoldEntry',
+  mcp: 'mcp.title',
   account: 'admin.navAccount',
   ai: 'admin.navAi',
   updates: 'admin.navUpdates',
@@ -1112,6 +1110,9 @@ export function resolveAdminNavKey(key) {
     personal_settings: 'personal_settings',
     lang: 'language',
     language: 'language',
+    workflow: 'workflows',
+    workflows: 'workflows',
+    'builtin-workflows': 'workflows',
   }
   return map[k] || k
 }
@@ -1122,7 +1123,7 @@ export default {
     OcrRoutingSettings,
     UnlockHint, RechargeDialog, AwdSelect, AwdSwitch,
     PersonalWorkLogPanel, PersonalCaseIntakePanel, PersonalFavoritesPanel, PersonalTodosPanel, PersonalSettingsPanel,
-    TeamPanel, OptionalComponentCard, MemoryBrowser, ExternalDependenciesPanel,
+    McpConnectionsPanel, TeamPanel, OptionalComponentCard, MemoryBrowser, BuiltinWorkflowEditor, ExternalDependenciesPanel,
     LanguagePicker, SettingsSection, SettingsRow,
   },
   /**
@@ -1176,7 +1177,9 @@ export default {
         // 团队（dev-board#496）：挂「个人」组而不是「系统」组——团队是每个人自己的归属，
         // 普通成员也要看得到自己的统计与那个数据共享开关，而「系统」组对非管理员整组收起
         { key: 'team', label: this.$t('team.navTeam'), group: 'personal' },
+        { key: 'mcp', label: this.$t('mcp.title'), group: 'personal' },
         { key: 'memory', label: this.$t('chat.memoryButton'), group: 'personal' },
+        { key: 'workflows', label: this.$t('chat.builtinWorkflowsFoldEntry'), group: 'personal' },
         // 「系统」组：'config'（系统配置）已撤，内容分别并入 'ai' 与「账户与安全」；
         // 'platform'（平台服务）2026-08-27 已撤——官方版外部服务统一平台代采，档位
         // 下拉全是单选项，分区已无实际作用（花费闸门/预扣提醒搬进了 'account' 末尾）。
@@ -1210,13 +1213,6 @@ export default {
       feedbackLoading: false,
       feedbackListSeq: 0, // 请求代次：切筛选档太快时，只认"此刻最新一次"发出的列表响应
       feedbackFilter: '',
-      feedbackFilters: [
-        { key: '', label: this.$t('admin.filterAll') },
-        { key: 'NEW', label: this.$t('admin.pendingLabel') },
-        { key: 'PR_OPENED', label: this.$t('admin.prOpened') },
-        { key: 'EMAILED', label: this.$t('admin.emailed') },
-        { key: 'FAILED', label: this.$t('admin.filterFailed') },
-      ],
       optimizer: {
         enabled: false,
         running: false,
@@ -1263,11 +1259,6 @@ export default {
       // 前端不许再自己硬编码任何模型清单。
       modelCatalog: null,
       modelCatalogError: '',
-      networkRegionOptions: [
-        { value: 'auto', label: this.$t('admin.regionAuto') },
-        { value: 'domestic', label: this.$t('admin.regionDomestic') },
-        { value: 'international', label: this.$t('admin.regionInternational') },
-      ],
       // 平台 AI 通道是否可选（= 是否已连接账户），来自 /api/account/status
       platformAiAvailable: false,
       // 花费闸门 + 预扣/低余额提醒的数据源（GET /api/platform-services 与其 /remote 端点）。
@@ -1545,26 +1536,21 @@ export default {
       const models = this.modelCatalog && this.modelCatalog.models
       return Array.isArray(models) ? models : []
     },
+    feedbackFilters() {
+      return [
+        { key: '', label: this.$t('admin.filterAll') },
+        { key: 'NEW', label: this.$t('admin.pendingLabel') },
+        { key: 'PR_OPENED', label: this.$t('admin.prOpened') },
+        { key: 'EMAILED', label: this.$t('admin.emailed') },
+        { key: 'FAILED', label: this.$t('admin.filterFailed') },
+      ]
+    },
     // 后端解析出的「当前真正会用的默认模型」（DB 的 ai.defaultModel 优先于 yml）。
     // 展示它是为了让「跟随内置默认」这个选项有可核对的落点。
     catalogDefaultModel() {
       return (this.modelCatalog && this.modelCatalog.defaultModel) || ''
     },
-    // 区域判定的结果与依据都要摆出来：用户要能看懂「国际模型为什么不见了」
-    networkRegionSummary() {
-      const c = this.modelCatalog
-      if (!c) return this.$t('admin.catalogNotLoaded')
-      const region = c.networkRegion === 'INTERNATIONAL'
-        ? this.$t('admin.regionIntlDesc')
-        : this.$t('admin.regionDomesticDesc')
-      const mode = c.networkRegionMode === 'auto' ? this.$t('admin.regionAuto') : this.$t('admin.regionManualDesc')
-      return this.$t('admin.regionSummary', {
-        region,
-        mode,
-        basis: c.networkRegionBasis || '—',
-        count: this.catalogModels.length,
-      })
-    },
+
   },
   watch: {
     /*
@@ -2338,7 +2324,7 @@ export default {
       }]
       this.catalogModels.forEach((m) => {
         const price = (m.inputPricePerM != null && m.outputPricePerM != null)
-          ? this.$t('admin.modelPrice', { in: m.inputPricePerM, out: m.outputPricePerM })
+          ? this.$t('admin.modelPrice', { currency: this.modelCatalog?.priceDisplay?.currency === 'CNY' ? '¥' : '$', in: m.displayInputPerM ?? m.inputPricePerM, out: m.displayOutputPerM ?? m.outputPricePerM })
           : ''
         options.push({
           value: m.id,
@@ -2355,9 +2341,7 @@ export default {
         // 清单没读到时不要说成「区域不可用」，那是两回事
         options.push({
           value: current,
-          label: this.modelCatalog
-            ? this.$t('admin.modelUnavailableInRegion', { model: current })
-            : this.$t('admin.modelSaved', { model: current }),
+          label: this.$t('admin.modelSaved', { model: current }),
         })
       }
       return options
@@ -2544,15 +2528,22 @@ export default {
         this.membershipData = null
       }
     },
-    /** 七档表里一档的展示名，按当前语言取 nameZh/nameEn。 */
+    /** 七档表里一档的展示名，优先按 tier.key 取当前语言词条，兜底按语言取 nameZh/nameEn。 */
     tierDisplayName(tier) {
       if (!tier) return ''
-      const en = this.$i18n && this.$i18n.locale === 'en-US'
-      return (en ? tier.nameEn : tier.nameZh) || tier.nameZh || tier.nameEn || tier.key || ''
+      if (tier.key && typeof this.$t === 'function') {
+        const i18nKey = 'admin.membershipTiers.' + tier.key
+        const translated = this.$t(i18nKey)
+        if (translated && translated !== i18nKey) return translated
+      }
+      const locale = (this.$i18n && this.$i18n.locale) || ''
+      const zh = !locale || locale.startsWith('zh')
+      return (zh ? tier.nameZh : tier.nameEn) || tier.nameEn || tier.nameZh || tier.key || ''
     },
     /** 官网会员规则页，语言按当前 locale。 */
     openMembershipRules() {
-      const lang = this.$i18n && this.$i18n.locale === 'en-US' ? 'en' : 'zh'
+      const locale = (this.$i18n && this.$i18n.locale) || 'zh-CN'
+      const lang = locale.startsWith('zh') ? 'zh' : 'en'
       openExternalUrl(siteBaseUrl() + '/' + lang + '/membership')
     },
     // 官网账户页：生成账户 Key 与充值都在这里。
@@ -2867,6 +2858,7 @@ export default {
       this.saving = true
       try {
         await saveAdminConfig(this.form)
+        uni.$emit?.('awd:ai-config-changed')
         uni.showToast({ title: this.$t('admin.saveSuccess'), icon: 'success' })
         // 区域一改，可用模型清单跟着变；默认模型也可能因此落到清单外，
         // 保存后重新拉一次目录，让页面上显示的就是新口径
@@ -2917,6 +2909,9 @@ $brand-accent: $brand-mint;
   overflow-y: auto;
   padding: 20px 16px;
 }
+
+.mcp-settings .admin-container { flex-wrap: wrap; }
+.mcp-settings .admin-main { flex-basis: 320px; }
 
 .admin-container {
   max-width: 1200px;
@@ -4296,6 +4291,15 @@ $brand-accent: $brand-mint;
   font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
   text-decoration: underline;
+}
+.admin-builtin-workflow-wrap {
+  border: 1px solid var(--awd-border-subtle);
+  border-radius: var(--awd-radius-lg);
+  overflow: hidden;
+  min-height: 560px;
+  height: 620px;
+  display: flex;
+  flex-direction: column;
 }
 
 </style>

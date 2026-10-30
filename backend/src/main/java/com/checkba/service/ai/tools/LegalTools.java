@@ -49,9 +49,9 @@ public class LegalTools implements AgentToolComponent {
         this.projectMemberService = projectMemberService;
     }
 
-    /** 平台档下法宝检索必须经网关，没连账户时四个 law_* 工具每次都只会回一句「不可用」。 */
+    /** 平台档下法宝检索必须经网关，没连账户时法规与案例工具每次都只会回一句「不可用」。 */
     private static final java.util.Set<String> PKULAW_TOOLS =
-            java.util.Set.of("law_search", "law_search_keyword", "law_recognition", "get_law_article");
+            java.util.Set.of("law_search", "law_search_keyword", "law_recognition", "get_law_article", "case_search");
 
     /**
      * 没连账户时不把法宝检索下发给模型（dev-board#750）。{@code read_document} 读的是项目里
@@ -162,6 +162,18 @@ public class LegalTools implements AgentToolComponent {
         // search_case 同口径）；传 query 会触发上游 FastMCP/Pydantic 校验错误：
         // "1 validation error for call[search_article] text Missing required argument"。
         return callPkulaw("pkulaw-semantic", "search_article", Map.of("text", query.trim()));
+    }
+
+    @ToolMeta(displayName = "检索司法案例", category = "legal")
+    @Tool("Search PRC judicial cases by facts, legal issue or case number using the existing PKULaw case database. "
+            + "Returns source records, which may be excerpts or candidate matches; check the actual source before citing. "
+            + "For administrative penalties or other jurisdictions use search_web and browse_url against the issuing authority.")
+    public String case_search(@P("案例事实、法律问题或案号 / Case facts, legal issue or case number") String query) {
+        if (!StringUtils.hasText(query)) {
+            return com.checkba.service.LangText.of(
+                    "Error: 请输入案例检索内容（query）。", "Error: query is required for case search.");
+        }
+        return callPkulaw("pkulaw-case-semantic", "search_case", Map.of("text", query.trim()));
     }
 
     @ToolMeta(displayName = "关键词搜索法规", category = "legal")

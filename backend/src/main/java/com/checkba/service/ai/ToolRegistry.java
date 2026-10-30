@@ -153,6 +153,7 @@ public class ToolRegistry {
             Map.entry("qichacha_ipr", "Company IP lookup"),
             Map.entry("tushare_query", "Financial data lookup"),
             Map.entry("law_search", "Search regulations"),
+            Map.entry("case_search", "Search judicial cases"),
             Map.entry("law_search_keyword", "Keyword law search"),
             Map.entry("law_recognition", "Identify citations"),
             Map.entry("get_law_article", "Look up article"),
@@ -223,6 +224,7 @@ public class ToolRegistry {
             Map.entry("doc_modify_paragraph", "Edit paragraph"),
             Map.entry("doc_insert_under_heading", "Insert under heading"),
             Map.entry("doc_export_pdf", "Export to PDF"),
+            Map.entry("pdf_inspect_visual", "Inspect page design"),
             Map.entry("doc_search_related_docs", "Find related docs"),
             Map.entry("doc_select_anchor", "Select anchor"),
             Map.entry("doc_select_paragraph", "Select paragraph"),
@@ -303,6 +305,7 @@ public class ToolRegistry {
             Map.entry("sheet_protect_sheet", "Protect sheet"),
             Map.entry("sheet_group_rows_cols", "Group rows/columns"),
             Map.entry("sheet_add_pivot_table", "Add pivot table"),
+            Map.entry("slide_create_file", "Create presentation"),
             Map.entry("slide_get_overview", "Slide overview"),
             Map.entry("slide_get_page", "Read slide details"),
             Map.entry("slide_read_notes", "Read notes"),
@@ -320,6 +323,12 @@ public class ToolRegistry {
             Map.entry("slide_set_shape_geometry", "Resize/move shape"),
             Map.entry("slide_format_text", "Format slide text"),
             Map.entry("slide_format_shape", "Format shape"),
+            Map.entry("image_generate_asset", "Generate image asset"),
+            Map.entry("image_get_generation", "Check image generation"),
+            Map.entry("slide_add_image", "Insert slide image"),
+            Map.entry("slide_format_chart", "Format native chart"),
+            Map.entry("slide_add_chart", "Add native chart"),
+            Map.entry("slide_set_transition", "Set slide transition"),
             Map.entry("slide_add_table", "Add table"),
             Map.entry("slide_table_read", "Read table"),
             Map.entry("slide_table_set_cell", "Set table cell"),
@@ -329,7 +338,17 @@ public class ToolRegistry {
             Map.entry("ref_read", "Read reference file"),
             Map.entry("ref_edit", "Edit another document"),
             Map.entry("ref_open", "Open project file"),
+            Map.entry("office_file_open", "Open project file copy"),
+            Map.entry("office_file_create", "Create host file"),
+            Map.entry("office_file_save", "Save host file"),
+            Map.entry("office_file_export_pdf", "Export host PDF"),
             Map.entry("office_get_text", "Read document"),
+            Map.entry("office_get_paragraphs", "Read document paragraphs"),
+            Map.entry("office_get_outline", "Read document outline"),
+            Map.entry("office_get_clauses", "Read document clauses"),
+            Map.entry("office_replace_nth_match", "Replace numbered match"),
+            Map.entry("office_audit_structure", "Audit document structure"),
+            Map.entry("office_apply_style_profile", "Apply document style profile"),
             Map.entry("office_get_selection", "Read selection"),
             Map.entry("office_search", "Find in document"),
             Map.entry("office_replace_text", "Replace text (tracked)"),
@@ -359,6 +378,14 @@ public class ToolRegistry {
             Map.entry("office_excel_select_range", "Select range"),
             Map.entry("office_excel_set_autofilter", "Set autofilter"),
             Map.entry("office_excel_conditional_format", "Conditional format"),
+            Map.entry("office_ppt_set_shape_text", "Set shape text"),
+            Map.entry("office_ppt_set_shape_geometry", "Set shape geometry"),
+            Map.entry("office_ppt_format_shape", "Format shape"),
+            Map.entry("office_ppt_goto", "Go to slide"),
+            Map.entry("office_ppt_set_layout", "Set slide layout"),
+            Map.entry("office_ppt_read_notes", "Read speaker notes"),
+            Map.entry("office_ppt_write_notes", "Update speaker notes"),
+            Map.entry("office_ppt_table_set_style", "Format slide table"),
             Map.entry("office_ppt_get_slides", "Read slides"),
             Map.entry("office_ppt_replace_text", "Replace slide text"),
             Map.entry("office_ppt_format_text", "Format slide text"),
@@ -367,6 +394,10 @@ public class ToolRegistry {
             Map.entry("office_ppt_add_text_box", "Insert text box"),
             Map.entry("office_ppt_move_slide", "Move slide"),
             Map.entry("office_ppt_add_shape", "Insert shape"),
+            Map.entry("office_ppt_add_image", "Insert slide image"),
+            Map.entry("office_ppt_add_chart", "Insert slide chart"),
+            Map.entry("office_ppt_format_chart", "Format slide chart"),
+            Map.entry("office_ppt_set_transition", "Set slide transition"),
             Map.entry("office_ppt_get_slide_details", "Read slide details"),
             Map.entry("office_ppt_delete_shape", "Delete shape"),
             Map.entry("office_insert_table", "Insert table"),
@@ -529,6 +560,10 @@ public class ToolRegistry {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.checkba.service.ai.mcp.PluginMcpService pluginMcpService;
+    private com.checkba.service.ai.mcp.UserMcpConnectionService userMcpService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setUserMcpService(com.checkba.service.ai.mcp.UserMcpConnectionService service) { this.userMcpService = service; }
+
 
     public void setPluginMcpService(com.checkba.service.ai.mcp.PluginMcpService service) { this.pluginMcpService = service; }
 
@@ -753,6 +788,7 @@ public class ToolRegistry {
                     || availability.computeIfAbsent(component, this::componentAvailable)) all.add(spec);
         }
         if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> all.add(b.specification()));
+        if (userMcpService != null) userMcpService.bindings().forEach(b -> all.add(b.specification()));
         for (ToolSpecification spec : pluginService.getToolSpecifications()) {
             if (pluginToolEnabled(spec.name())) {
                 all.add(offerable(spec));
@@ -857,6 +893,7 @@ public class ToolRegistry {
             }
         }
         if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> names.add(b.specification().name()));
+        if (userMcpService != null) userMcpService.bindings().forEach(b -> names.add(b.specification().name()));
         names.sort(Comparator.comparingInt(String::length).reversed());
         return names;
     }
@@ -879,6 +916,10 @@ public class ToolRegistry {
         RegisteredTool tool = builtinTools.get(name);
         if (tool != null) {
             return Optional.of(tool);
+        }
+        if (userMcpService != null) {
+            var binding = userMcpService.find(name, com.checkba.service.ai.mcp.UserMcpConnectionService.currentUser());
+            if (binding != null) return Optional.of(new RegisteredTool(userMcpService, null, binding.specification(), null, false));
         }
         if (pluginMcpService != null) {
             var binding = pluginMcpService.find(name);
@@ -921,6 +962,19 @@ public class ToolRegistry {
      */
     public ToolResult execute(String name, String argsJson, ToolContext ctx) {
         String resolvedName = TOOL_NAME_ALIASES.getOrDefault(name, name);
+        if (userMcpService != null && resolvedName.startsWith("user_mcp_")) {
+            var binding = userMcpService.find(resolvedName, ctx == null ? null : ctx.userId());
+            if (binding == null || !clientCapabilityService.isToolVisible(resolvedName, ctx == null ? null : ctx.conversationId()))
+                return new ToolResult(unknownToolMessage(resolvedName), null, false);
+            RegisteredTool registered = new RegisteredTool(userMcpService, null, binding.specification(), null, false);
+            try {
+                return new ToolResult(userMcpService.callAgent(resolvedName, new java.util.LinkedHashMap<>(parseArgs(argsJson)), ctx), registered, true);
+            } catch (com.checkba.service.ai.mcp.PluginMcpException e) {
+                return new ToolResult("Error: " + e.code() + ": " + e.getMessage(), registered, true);
+            } catch (IllegalArgumentException e) {
+                return new ToolResult("Error: " + LangText.of("MCP 参数无效。", "Invalid MCP arguments."), registered, true);
+            }
+        }
         // 会话能力过滤：能力档位下不可见的工具按"不存在"拒绝（模型收到与未知工具一致的反馈）
         Optional<RegisteredTool> toolOpt = resolve(resolvedName, ctx != null ? ctx.conversationId() : null);
         if (toolOpt.isEmpty()) {

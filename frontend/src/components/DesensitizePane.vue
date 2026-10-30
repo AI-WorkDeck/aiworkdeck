@@ -3,7 +3,7 @@
 <template>
   <scroll-view scroll-y class="desensitize-pane">
     <view class="section">
-      <view class="section-title">{{ $t('panels.deSectionFileSelect') }}</view>
+      <view class="section-title">{{ $t(operation === 'restore' ? 'panels.deRestoreDocument' : 'panels.deSectionFileSelect') }}</view>
       <view class="path-display" :class="{ empty: !filePath }" @tap="triggerFileSelect">{{ fileName || $t('panels.deFilePlaceholder') }}</view>
       <view class="actions-row file-actions">
         <button class="mini-btn" :disabled="processing" @tap="importFromActiveTab">{{ $t('panels.deImportCurrent') }}</button>
@@ -66,17 +66,20 @@
           <view class="section-title">{{ $t('panels.dePassword') }}</view>
           <input v-model="password" :disabled="processing" class="text-input password-input" password :maxlength="1024" :placeholder="$t('panels.dePasswordHint')" />
         </template>
-        <button class="workdeck-btn workdeck-btn-primary full-width" :loading="processing" :disabled="processing || !preview || (effectiveMode === 'TOKEN' && password.length < 10)" @tap="handleGenerate">{{ $t('panels.deGenerate') }}</button>
+        <button class="workdeck-btn workdeck-btn-primary full-width" :loading="processing" :disabled="processing || !preview || (effectiveMode === 'TOKEN' && !password.trim())" @tap="handleGenerate">{{ $t('panels.deGenerate') }}</button>
         </template>
       </view>
     </template>
 
     <view v-else class="section">
-      <text class="help-text">{{ $t('panels.deRestoreNotice') }}</text>
-      <button class="workdeck-btn full-width" :disabled="processing" @tap="importKit">{{ kitName || $t('panels.deImportKit') }}</button>
+      <text v-if="!isPdf" class="help-text">{{ $t('panels.deRestoreNotice') }}</text>
+      <text v-if="recoveryKit && !loadingKit" class="help-text" role="status">{{ $t('panels.deCurrentKit') }}</text>
       <view class="section-title">{{ $t('panels.dePassword') }}</view>
       <input v-model="password" :disabled="processing" class="text-input password-input" password :maxlength="1024" :placeholder="$t('panels.dePasswordHint')" />
-      <button class="workdeck-btn workdeck-btn-primary full-width" :loading="processing" :disabled="processing || !fileId || isPdf || !recoveryKit || password.length < 10" @tap="handleRestore">{{ $t('panels.deRestoreGenerate') }}</button>
+      <text v-if="restoreRequirement" class="help-text" role="status">{{ restoreRequirement }}</text>
+      <button v-if="fileId && !isPdf && !loadingKit && !recoveryKit && error" class="workdeck-btn full-width" :disabled="processing" @tap="loadRecovery">{{ $t('common.retry') }}</button>
+      <button v-if="fileId && !isPdf && !loadingKit && !recoveryKit && !error" class="workdeck-btn full-width" :disabled="processing" @tap="selectOriginalForRedaction">{{ $t('panels.deSelectOriginal') }}</button>
+      <button class="workdeck-btn workdeck-btn-primary full-width" :loading="processing" :disabled="processing || loadingKit || !recoveryKit || !!restoreRequirement" @tap="handleRestore">{{ $t('panels.deRestoreGenerate') }}</button>
     </view>
 
     <view v-if="preview || result" class="section">
@@ -92,14 +95,13 @@
       <text class="help-text">{{ $t('panels.deAiWorkflowNotice') }}</text>
     </view>
     <view v-if="exportedKit" class="section">
-      <button class="workdeck-btn full-width" @tap="downloadKit">{{ $t('panels.deDownloadKit') }}</button>
       <text class="help-text">{{ $t('panels.deSaveKitNotice') }}</text>
     </view>
   </scroll-view>
 </template>
 
 <script>
-import { desensitizeFile, getSensitiveOptions, previewSensitiveFile, restoreSensitiveFile } from '@/services/api.js'
+import { desensitizeFile, getSensitiveOptions, previewSensitiveFile, restoreSensitiveFile, getSensitiveRecovery } from '@/services/api.js'
 
 export default {
   name: 'DesensitizePane',
@@ -107,17 +109,24 @@ export default {
   props: {
     projectId: { type: [String, Number], required: true },
     prepareFile: { type: Function, required: true },
-    downloadArtifact: { type: Function, default: null },
   },
   data() {
     return {
       operation: 'redact', mode: 'TOKEN', filePath: '', fileName: '', fileId: null,
       availableStrategies: [], selectedStrategies: [], customTerms: '', excludedTerms: '',
-      password: '', recoveryKit: '', kitName: '', exportedKit: '', exportedKitName: '', processing: false,
-      preview: null, result: null, error: '', lastRedaction: null, settingsOpen: false, customWordsOpen: false,
+      password: '', recoveryKit: '', exportedKit: '', processing: false,
+      loadingKit: false, kitLoadSequence: 0, preview: null, result: null, error: '', lastRedaction: null, settingsOpen: false, customWordsOpen: false,
     }
   },
   computed: {
+    restoreRequirement() {
+      if (!this.fileId) return this.$t('panels.deSelectValidFile')
+      if (this.isPdf) return this.$t('panels.dePdfNotice')
+      if (this.loadingKit) return this.$t('panels.deProcessing')
+      if (!this.recoveryKit) return this.error ? '' : this.$t('panels.deRecoveryMissing')
+      if (!this.password.trim()) return this.$t('panels.dePasswordHint')
+      return ''
+    },
     isPdf() { return this.fileName.toLowerCase().endsWith('.pdf') },
     effectiveMode() { return this.isPdf ? 'MASK' : this.mode },
     requestSignature() {
@@ -130,8 +139,9 @@ export default {
     requestSignature() { this.preview = null; this.result = null; this.error = '' },
     operation() { this.result = null; this.error = '' },
     projectId() {
+      this.kitLoadSequence++; this.loadingKit = false
       this.fileId = null; this.filePath = ''; this.fileName = ''; this.password = ''
-      this.recoveryKit = ''; this.exportedKit = ''; this.exportedKitName = ''; this.kitName = ''
+      this.recoveryKit = ''; this.exportedKit = ''
       this.preview = null; this.result = null
       this.customTerms = ''; this.excludedTerms = ''; this.lastRedaction = null
     },
@@ -150,13 +160,15 @@ export default {
       if (this.processing || this.operation === operation) return
       this.operation = operation
       this.preview = null; this.result = null; this.error = ''; this.password = ''
+      if (operation === 'restore') this.loadRecovery()
+      else { this.kitLoadSequence++; this.loadingKit = false }
     },
     restoreLastResult() {
       if (this.processing || !this.lastRedaction?.kit) return
       this.chooseOperation('restore')
       this.selectFile(this.lastRedaction.file)
+      this.kitLoadSequence++; this.loadingKit = false
       this.recoveryKit = this.lastRedaction.kit
-      this.kitName = this.$t('panels.deCurrentKit')
     },
     toggleStrategy(value) {
       if (this.processing) return
@@ -170,6 +182,8 @@ export default {
       }
       this.preview = null; this.result = null; this.error = ''
       this.filePath = file.filePath || file.path; this.fileName = file.name; this.fileId = file.id
+      this.recoveryKit = ''
+      if (this.operation === 'restore') this.loadRecovery()
     },
     // 「浏览」自己没有文件树，要工作台把项目文件选择器打开。工作台必须**同步**
     // 回执一次（第二个参数），否则这一步就是断的：真机上表现为点了「浏览」毫无
@@ -212,49 +226,39 @@ export default {
         const res = await desensitizeFile({ ...this.payload(), password: this.password })
         this.result = res
         this.exportedKit = res.recoveryKit || ''; this.preview = null
-        // 映射文件名带上原文件名：一个项目里可能先后脱敏好几份，光靠时间戳
-        // 分不出哪个映射配哪份副本，复敏时只能一个个试（dev-board C3）。
-        this.exportedKitName = this.kitFileName(source.name)
         this.lastRedaction = res.recoveryKit ? { source, file: res.file, kit: res.recoveryKit } : null
-        if (this.exportedKit) {
-          try { await this.downloadKit() }
-          catch (e) { this.error = this.$t('panels.deDownloadRetry') }
-        }
         this.password = ''
         if (res.file?.id) this.$emit('open-file', res.file)
       } catch (e) { this.error = e.message }
       finally { this.processing = false }
     },
-    /** `<原文件名去扩展名>-复敏-<时间戳>.awd-recovery`；扩展名在桌面端决定另存目录，不能改。 */
-    kitFileName(sourceName) {
-      const base = String(sourceName || '').replace(/\.[^.]+$/, '').trim() || this.$t('panels.deKitFallbackName')
-      return `${base}-${this.$t('panels.deKitFileTag')}-${Date.now()}.awd-recovery`
-    },
-    async downloadKit() {
-      if (!this.exportedKit) return
-      if (this.downloadArtifact) return this.downloadArtifact({ content: this.exportedKit, name: this.exportedKitName || this.kitFileName('') })
-      const url = URL.createObjectURL(new Blob([this.exportedKit], { type: 'application/octet-stream' }))
-      const link = document.createElement('a')
-      link.href = url
-      link.download = this.exportedKitName || this.kitFileName('')
-      document.body.appendChild(link); link.click(); link.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 1000)
-    },
-    importKit() {
-      if (this.processing) return
-      const input = document.createElement('input')
-      input.type = 'file'; input.accept = '.awd-recovery'
-      input.onchange = async () => {
-        const file = input.files?.[0]
-        if (!file) return
-        if (file.size > 8000000) { this.error = this.$t('panels.deKitInvalid'); return }
-        try {
-          const kit = (await file.text()).trim()
-          if (!kit.startsWith('AWD-RECOVERY-1:')) throw new Error(this.$t('panels.deKitInvalid'))
-          this.recoveryKit = kit; this.kitName = file.name; this.error = ''
-        } catch (e) { this.error = e.message }
+    async loadRecovery() {
+      const sequence = ++this.kitLoadSequence
+      const projectId = this.projectId, fileId = this.fileId
+      this.recoveryKit = ''; this.error = ''
+      if (!fileId || this.isPdf) { this.loadingKit = false; return }
+      if (String(this.lastRedaction?.file?.id) === String(fileId)) {
+        this.recoveryKit = this.lastRedaction.kit
+        this.loadingKit = false
+        return
       }
-      input.click()
+      this.loadingKit = true
+      try {
+        const result = await getSensitiveRecovery({ fileId })
+        if (sequence !== this.kitLoadSequence || projectId !== this.projectId || fileId !== this.fileId) return
+        this.recoveryKit = result.recoveryKit || ''; this.error = ''
+      } catch (e) {
+        if (sequence === this.kitLoadSequence && projectId === this.projectId) this.error = e.message
+      } finally {
+        if (sequence === this.kitLoadSequence) this.loadingKit = false
+      }
+    },
+    selectOriginalForRedaction() {
+      if (this.processing) return
+      this.chooseOperation('redact')
+      this.fileId = null; this.filePath = ''; this.fileName = ''
+      this.recoveryKit = ''; this.exportedKit = ''; this.lastRedaction = null
+      this.triggerFileSelect()
     },
     async handleRestore() {
       if (this.processing || !this.fileId || !this.recoveryKit) return

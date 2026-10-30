@@ -3,88 +3,88 @@
 
 export default {
   "title": "Riferimenti",
-  "noDoc": "No document open",
-  "parse": "Full-document online verification (charges may apply)",
-  "reparse": "Repeat full-document online verification (charges may apply)",
-  "onlineHint": "Clicking saves this document, then verifies the saved version online. AI and external lookups may incur charges.",
-  "saveRequired": "This document could not be saved. Save it successfully before online verification.",
-  "running": "Verifying online…",
-  "done": "Online verification complete",
-  "failed": "Online verification failed",
-  "loading": "Loading…",
-  "loadingDetail": "Fetching lookup details…",
-  "noDetail": "No lookup details for this item",
-  "loadFailed": "Could not load online verification results",
-  "parseFailed": "Could not start online verification",
-  "detailFailed": "Could not load the lookup details",
-  "refreshFailed": "Could not re-run the lookup",
-  "retry": "Retry",
-  "goConnectAccount": "Connect account",
-  "goRecharge": "Add credits",
+  "noDoc": "Nessun documento aperto",
+  "parse": "Verifica online dell’intero documento (potrebbero applicarsi costi)",
+  "reparse": "Ripeti verifica online dell’intero documento (potrebbero applicarsi costi)",
+  "onlineHint": "Facendo clic si salva il documento corrente e poi si verifica online la versione salvata. L’IA e le ricerche esterne possono comportare costi.",
+  "saveRequired": "Impossibile salvare questo documento. Salvalo correttamente prima della verifica online.",
+  "running": "Verifica online in corso…",
+  "done": "Verifica online completata",
+  "failed": "Verifica online non riuscita",
+  "loading": "Caricamento…",
+  "loadingDetail": "Recupero dei dettagli della ricerca…",
+  "noDetail": "Nessun dettaglio di ricerca per questo elemento",
+  "loadFailed": "Impossibile caricare i risultati della verifica online",
+  "parseFailed": "Impossibile avviare la verifica online",
+  "detailFailed": "Impossibile caricare i dettagli della ricerca",
+  "refreshFailed": "Impossibile ripetere la ricerca",
+  "retry": "Riprova",
+  "goConnectAccount": "Collega account",
+  "goRecharge": "Aggiungi crediti",
   "hint": {
-    "NO_CREDENTIAL": "This lookup channel needs a credential configured on the server by your administrator."
+    "NO_CREDENTIAL": "Questo canale di ricerca richiede credenziali configurate sul server dall’amministratore."
   },
   "tab": {
-    "retrieval": "Lookups",
-    "checks": "Consistency"
+    "retrieval": "Ricerche esterne",
+    "checks": "Coerenza"
   },
   "kind": {
-    "COMPANY": "Companies",
-    "LAW": "Statutes",
-    "CASE": "Cases",
-    "DOC": "Documents"
+    "COMPANY": "Società",
+    "LAW": "Norme",
+    "CASE": "Casi",
+    "DOC": "Documenti"
   },
   "entityKind": {
-    "COMPANY": "Company",
-    "LAW": "Statute",
-    "CASE": "Case",
-    "DOC": "Document"
+    "COMPANY": "Società",
+    "LAW": "Norma",
+    "CASE": "Caso",
+    "DOC": "Documento"
   },
-  "openInNewTab": "Open in a new tab",
-  "openDocFile": "Open file",
-  "docNotFound": "No such file in this project",
-  "docMissing": "That file is no longer in this project",
+  "openInNewTab": "Apri in una nuova scheda",
+  "openDocFile": "Apri file",
+  "docNotFound": "File non trovato in questo progetto",
+  "docMissing": "Quel file non è più presente in questo progetto",
   "source": {
-    "projectFile": "Project file",
+    "projectFile": "File del progetto",
     "qichacha": "Qichacha"
   },
-  "mentions": "{count} mention(s)",
-  "mentionsTitle": "Mentions in this document",
-  "shareholders": "Shareholders",
-  "moreCandidates": "Other candidates",
+  "mentions": "{count} occorrenza/e",
+  "mentionsTitle": "Occorrenze nel documento",
+  "shareholders": "Soci e azionisti",
+  "moreCandidates": "Altri candidati",
   "caseSection": {
-    "ascertain": "Facts found",
-    "reason": "Reasoning",
-    "result": "Judgment",
-    "gist": "Key holding",
-    "fullText": "Full judgment"
+    "ascertain": "Fatti accertati",
+    "reason": "Motivazione",
+    "result": "Dispositivo",
+    "gist": "Massima",
+    "fullText": "Testo integrale della sentenza"
   },
-  "authoritative": "Authoritative text (Pkulaw)",
-  "implementDate": "In force from {date}",
-  "recognition": "Case number recognition",
-  "openInPkulaw": "Open in Pkulaw",
+  "authoritative": "Testo ufficiale (Pkulaw)",
+  "implementDate": "In vigore dal {date}",
+  "recognition": "Riconoscimento numero di causa",
+  "openInPkulaw": "Apri in Pkulaw",
   "citation": {
-    "citedText": "Cited article",
-    "candidates": "Articles matched by content",
-    "article": "Article {n}"
+    "citedText": "Articolo citato",
+    "candidates": "Articoli individuati per contenuto",
+    "article": "Articolo {n}"
   },
   "severity": {
-    "warn": "Questionable",
-    "error": "Error"
+    "warn": "Dubbio",
+    "error": "Errore"
   },
-  "unifyTo": "Set all to {value}",
-  "cannotFix": "Cannot fix automatically: {reason}",
-  "fixNotUnique": "Could not locate a unique match — please edit manually.",
-  "fixPartial": "Fixed {done}; {failed} had no unique match — please edit those manually.",
-  "fixed": "Fixed",
-  "fixedHint": "Press Cmd+Z to undo; re-analyze to refresh the findings.",
-  "noEditor": "Activate a document editor window first",
+  "unifyTo": "Uniforma tutto a {value}",
+  "cannotFix": "Impossibile correggere automaticamente: {reason}",
+  "fixNotUnique": "Impossibile individuare una corrispondenza univoca — modifica manualmente.",
+  "fixPartial": "Corretti {done}; {failed} senza corrispondenza univoca — modificali manualmente.",
+  "fixed": "Corretto",
+  "fixedHint": "Premi Cmd+Z per annullare; ripeti l’analisi per aggiornare i risultati.",
+  "noEditor": "Attiva prima una finestra dell’editor di documenti",
   "empty": {
-    "noRun": "This document has not been verified online",
-    "noRunHint": "Everyday writing hints run locally. Only clicking online verification sends the saved document for AI extraction, external lookups and consistency checks.",
-    "noEntity": "No lookupable entities found",
-    "noEntityHint": "The document mentions no company name, statute article or case number.",
-    "noFinding": "No inconsistencies found",
-    "noFindingHint": "Quantity statements and unified social credit codes all check out."
+    "noRun": "Questo documento non è ancora stato verificato online",
+    "noRunHint": "I suggerimenti di scrittura quotidiana vengono eseguiti in locale. Solo facendo clic sulla verifica online il documento salvato viene inviato per l’estrazione IA, le ricerche esterne e i controlli di coerenza.",
+    "noEntity": "Nessuna entità ricercabile trovata",
+    "noEntityHint": "Il documento non menziona nomi di società, articoli di legge o numeri di causa.",
+    "noFinding": "Nessuna incoerenza trovata",
+    "noFindingHint": "Le indicazioni sulle quantità e i codici di credito sociale unificato risultano tutti coerenti."
   }
 }

@@ -74,6 +74,7 @@
                    :content="item.content"
                    :duration="item.duration || 0"
                    :start-time="item.startTime"
+                   @reading-interaction="emit('reading-interaction')"
                 />
             </div>
 
@@ -140,14 +141,6 @@
             <span class="step-text">{{ step.text }}</span>
          </div>
       </div>
-      <!-- Harness 运行期自愈（dev-board#1481）：失败步骤的「归因 → 处方」，让用户看见系统如何自己纠偏 -->
-      <div v-if="process.harnessAdaptations && process.harnessAdaptations.length" class="harness-adaptation-list" data-harness-adaptation-list>
-        <div v-for="item in process.harnessAdaptations" :key="item.id" class="harness-adaptation-item" :class="`tier-${String(item.tier || '').toLowerCase()}`">
-          <span class="ha-badge">{{ item.tier === 'DOMAIN' ? $t('chat.harnessAdaptationBadgeDomain') : $t('chat.harnessAdaptationBadgeInvariant') }}</span>
-          <div class="ha-title">{{ item.title }}</div>
-          <div v-if="item.diagnosis" class="ha-diagnosis">{{ item.diagnosis }}</div>
-        </div>
-      </div>
       <div class="process-divider"></div>
 
 
@@ -165,6 +158,8 @@ import { humanizeToolOutput, isInternalToolOutput } from '@/utils/toolOutputHuma
 import { copyToClipboard } from '@/utils/chatClipboard.js'
 import { isEnglish } from '@/utils/appLanguage.js'
 import { t } from '@/i18n'
+
+const emit = defineEmits(['reading-interaction'])
 
 const props = defineProps({
   process: { type: Object, required: true }
@@ -211,6 +206,7 @@ const hasError = computed(() => {
 const userHasToggled = ref(false)
 
 const toggle = () => {
+  emit('reading-interaction')
   userHasToggled.value = true
   isExpanded.value = !isExpanded.value
 }
@@ -256,6 +252,7 @@ const copyOutput = (item) => copyToClipboard(outputText(item))
 const isOutputOpen = (idx) => !!openOutputs.value[idx]
 
 const toggleOutput = (idx) => {
+    emit('reading-interaction')
     openOutputs.value[idx] = !openOutputs.value[idx]
 }
 
@@ -372,36 +369,6 @@ const renderItems = computed(() => {
 </script>
 
 <style scoped>
-.harness-adaptation-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--awd-space-1);
-  margin: var(--awd-space-1) 0 2px;
-}
-.harness-adaptation-item {
-  border-left: 2px solid var(--awd-accent);
-  background: var(--awd-accent-soft);
-  border-radius: var(--awd-radius-sm);
-  padding: var(--awd-space-1) var(--awd-space-2);
-  font-size: var(--awd-panel-fs);
-  line-height: 1.5;
-}
-.harness-adaptation-item.tier-domain {
-  border-left-color: var(--awd-gold);
-  background: var(--awd-gold-soft);
-}
-.ha-badge {
-  display: inline-block;
-  font-size: var(--awd-panel-fs-meta);
-  color: var(--awd-text-2);
-  margin-bottom: 2px;
-}
-.ha-title {
-  font-weight: 600;
-}
-.ha-diagnosis {
-  color: var(--awd-text-2);
-}
 .process-divider { width: 100%; border-bottom: 1px solid var(--awd-border-subtle); margin-top: var(--awd-space-1); }
 .process-card {
   background: var(--awd-surface);

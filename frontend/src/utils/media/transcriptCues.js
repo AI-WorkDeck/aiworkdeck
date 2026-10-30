@@ -58,7 +58,7 @@ function hasSpeaker(sp) {
  */
 export function buildSpeakerLabels(segments, speakerNamesJson, locale) {
   const names = parseNames(speakerNamesJson)
-  const en = typeof locale === 'string' && locale.toLowerCase().startsWith('en')
+  const en = typeof locale === 'string' && Boolean(locale.trim() && !locale.toLowerCase().startsWith('zh'))
   const labels = {}
   let count = 0
   for (const seg of Array.isArray(segments) ? segments : []) {

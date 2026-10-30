@@ -38,7 +38,7 @@ components:
         reason: { type: string, description: 账户密码操作的机器错误码 }
         kind:
           type: string
-          enum: [DISABLED, UNAVAILABLE, NOT_CONNECTED, NOT_FOUND, REJECTED, REVIEW_ACCOUNT, ALREADY_PAID, IDEMPOTENCY_CONFLICT, password_login_required]
+          enum: [DISABLED, UNAVAILABLE, NOT_CONNECTED, NOT_FOUND, REJECTED, REVIEW_ACCOUNT, ALREADY_PAID, IDEMPOTENCY_CONFLICT, password_login_required, MOVE_NOT_REGISTERED]
           description: |
             code=1 时 /api/mobile/billing/* 附带的**机器可读判别位**（dev-board#425）。
             **四端一律按它分支，禁止匹配 message 措辞**——message 经服务端 LangText 在英文部署下
@@ -184,6 +184,74 @@ components:
         deviceName: { type: string, nullable: true }
         key: { type: string, description: 桌面机本地库项目 id；跨机同号不同物，必须连 deviceId }
         name: { type: string }
+    MediaMoveRequest:
+      type: object
+      required: [requestId, sourceClientMediaId, targetClientMediaId, sourceDeviceId, sourceProjectKey, targetDeviceId, targetProjectKey, sha256, fileSize]
+      properties:
+        requestId: { type: string, format: uuid }
+        sourceClientMediaId: { type: string, format: uuid }
+        targetClientMediaId: { type: string, format: uuid }
+        sourceDeviceId: { type: string, minLength: 1, maxLength: 64 }
+        sourceProjectKey: { type: string, minLength: 1, maxLength: 64 }
+        targetDeviceId: { type: string, minLength: 1, maxLength: 64 }
+        targetProjectKey: { type: string, minLength: 1, maxLength: 64 }
+        sha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+        fileSize: { type: integer, format: int64, minimum: 1, maximum: 209715200 }
+    MediaMove:
+      type: object
+      required: [requestId, targetClientMediaId, status, error]
+      properties:
+        requestId: { type: string, format: uuid }
+        targetClientMediaId: { type: string, format: uuid }
+        status: { type: string, enum: [WAITING_TARGET, WAITING_SOURCE, DONE, FAILED] }
+        error: { type: string }
+    MediaMoveResponse:
+      type: object
+      required: [code, data]
+      properties:
+        code: { type: integer, enum: [0] }
+        data: { $ref: '#/components/schemas/MediaMove' }
+    MediaMoveCommand:
+      description: commandId fences stale acknowledgements; retry rotates it.
+      type: object
+      required: [requestId, commandId, expiresAt, action, deviceId, projectKey, clientMediaId, sha256, fileSize, relativePath]
+      properties:
+        expiresAt: { type: integer, format: int64, description: Unix epoch milliseconds; do not execute after expiry }
+        commandId: { type: string, format: uuid }
+        requestId: { type: string, format: uuid }
+        action: { type: string, enum: [VERIFY_TARGET, REMOVE_SOURCE] }
+        deviceId: { type: string }
+        projectKey: { type: string }
+        clientMediaId: { type: string, format: uuid }
+        sha256: { type: string }
+        fileSize: { type: integer, format: int64 }
+        relativePath: { type: string }
+        fileUid: { type: string, nullable: true }
+        fileId: { type: integer, format: int64, nullable: true }
+    MediaMoveResult:
+      type: object
+      required: [commandId, deviceId, action, success]
+      properties:
+        commandId: { type: string, format: uuid }
+        deviceId: { type: string }
+        action: { type: string, enum: [VERIFY_TARGET, REMOVE_SOURCE] }
+        success: { type: boolean }
+        sha256: { type: string }
+        fileId: { type: integer, format: int64 }
+        fileUid: { type: string }
+        error: { type: string }
+    CaptureOrganization:
+      type: object
+      description: 按账户与采集UUID冻结的整理结果。原件不变；fileName为生成基础名，archiveName为包含防重标记的实际归档名。fields只保存可读到的客观字段，非真实性或法律效力鉴定。
+      required: [state, originalName, fileName, tags, ruleVersion, fields]
+      properties:
+        state: { type: string, enum: [disabled, processing, ready, needs_review, skipped, failed] }
+        originalName: { type: string }
+        fileName: { type: string }
+        archiveName: { type: string }
+        tags: { type: array, items: { type: string }, maxItems: 5 }
+        ruleVersion: { type: string }
+        fields: { type: object, additionalProperties: { type: string } }
     MediaStatus:
       type: object
       required: [clientMediaId, delivered, waitingSeconds]
@@ -195,6 +263,7 @@ components:
         delivered: { type: boolean, description: 桌面端已 ACK 落盘（中转区已删） }
         waitingSeconds: { type: integer, format: int64, description: 已投递为 0 }
         expiresAt: { type: string, description: 中转区到期时刻（ISO 本地时间），仅未投递件带 }
+        organization: { $ref: '#/components/schemas/CaptureOrganization' }
     MediaUsage:
       type: object
       required: [usedBytes, quotaBytes]
@@ -218,6 +287,7 @@ components:
         fileUid: { type: string, format: uuid, description: cloud 持久归档返回 }
         clientMediaId: { type: string }
         delivered: { type: boolean, description: 幂等重传命中已投递记录时为 true }
+        organization: { $ref: '#/components/schemas/CaptureOrganization' }
     AccountUser:
       type: object
       required: [id, username, displayName]
@@ -790,6 +860,25 @@ components:
             - sandbox
             - production
 paths:
+  /api/auth/me:
+    get:
+      summary: 查询当前登录账户，供旧会话补齐稳定账户身份
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+      responses:
+        '200':
+          description: 登录账户或未登录信封
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required: [code, data]
+                    properties:
+                      code: { type: integer, enum: [0] }
+                      data: { $ref: '#/components/schemas/AccountBridgeUser' }
+                  - { $ref: '#/components/schemas/Envelope' }
+
   "/api/mobile/assistant/requests/{id}":
     get:
       summary: 查询本账户请求状态；网络超时后用原requestId恢复，已完成不重复调用模型
@@ -1684,7 +1773,7 @@ paths:
   /api/mobile/media:
     post:
       summary: 手机采集归档（幂等键 clientMediaId）
-      description: deviceId=cloud 时 projectKey 为目录返回的云项目编号，保存至订阅持久云空间并立即 delivered；其他设备走 ACK 即删的临时中转。
+      description: deviceId=cloud 时 projectKey 为目录返回的云项目编号，保存至订阅持久云空间并立即 delivered；其他设备走 ACK 即删的临时中转。organize=true 明确同意按账户现有额度调用低成本辅助模型预读（照片/视频30秒、录音60秒有界；录音仅前30秒抽样），按固定规则命名并打标签；不改变原字节。结果按账户和采集UUID持久化，重试不再次调用模型；失败/跳过保留原名上传，未知结果先重试同UUID，不承诺失败无费用。处理中并发重试返回业务错误，需稍后使用同UUID重试。
       parameters: [{ $ref: '#/components/parameters/SessionId' }]
       requestBody:
         required: true
@@ -1699,8 +1788,9 @@ paths:
                 projectKey: { type: string }
                 clientMediaId: { type: string }
                 fileName: { type: string }
-                mediaType: { type: string, enum: [image, video, audio] }
+                mediaType: { type: string, enum: [image, video, audio, document] }
                 capturedAt: { type: string, description: ISO-8601，可选 }
+                organize: { type: boolean, default: false, description: 明确开启本件照片、视频或录音的AI命名与标签；关闭不调用模型。document为既有插件镜像，不参与自动整理。 }
       responses:
         "200":
           description: 成功 UploadResult；未登录 Envelope(4010)
@@ -1710,6 +1800,110 @@ paths:
                 oneOf:
                   - $ref: '#/components/schemas/UploadResult'
                   - $ref: '#/components/schemas/Envelope'
+  /api/mobile/media/moves:
+    post:
+      summary: 注册跨项目移动；必须成功注册后才上传新 targetClientMediaId
+      description: |
+        同 requestId 必须绑定完全相同的请求。源回执不存在、来源或目标无权访问、相同项目均拒绝，
+        不修改原上传去向。目标原字节继续通过 POST /media 上传；只有目标完整校验落盘后才清理源。
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MediaMoveRequest' }
+      responses:
+        "200":
+          description: 持久移动状态；业务或身份错误用 Envelope。DONE 只在目标校验落盘且源原件移除后返回。
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - { $ref: '#/components/schemas/MediaMoveResponse' }
+                  - { $ref: '#/components/schemas/Envelope' }
+  /api/mobile/media/moves/{requestId}:
+    get:
+      summary: 查询当前账户移动；离线或重连继续查询同一请求
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 持久移动状态；业务或身份错误用 Envelope。DONE 只在目标校验落盘且源原件移除后返回。
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - { $ref: '#/components/schemas/MediaMoveResponse' }
+                  - { $ref: '#/components/schemas/Envelope' }
+  /api/mobile/media/moves/{requestId}/retry:
+    post:
+      summary: 重试原移动请求，保留目标身份和源清理收据，重新验证目标
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 持久移动状态；业务或身份错误用 Envelope。DONE 只在目标校验落盘且源原件移除后返回。
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - { $ref: '#/components/schemas/MediaMoveResponse' }
+                  - { $ref: '#/components/schemas/Envelope' }
+  /api/mobile/media/moves/commands:
+    get:
+      summary: 桌面读取本设备待验证目标或待移除源命令
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - name: deviceId
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: 当前账户和设备的命令；旧桌面无需消费，不会被误判完成
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required: [code, commands]
+                    properties:
+                      code: { type: integer, enum: [0] }
+                      commands:
+                        type: array
+                        items: { $ref: '#/components/schemas/MediaMoveCommand' }
+                  - { $ref: '#/components/schemas/Envelope' }
+  /api/mobile/media/moves/{requestId}/result:
+    post:
+      summary: 桌面提交目标校验或源清理结果
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MediaMoveResult' }
+      responses:
+        "200":
+          description: 持久移动状态；业务或身份错误用 Envelope。DONE 只在目标校验落盘且源原件移除后返回。
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - { $ref: '#/components/schemas/MediaMoveResponse' }
+                  - { $ref: '#/components/schemas/Envelope' }
   /api/mobile/media/status:
     get:
       summary: 手机端：查询影像投递状态（裸数组）
@@ -1796,6 +1990,7 @@ paths:
                         fileSize: { type: integer, format: int64 }
                         capturedAt: { type: string, nullable: true }
                         createdAt: { type: string }
+                        organization: { $ref: '#/components/schemas/CaptureOrganization' }
                   - $ref: '#/components/schemas/Envelope'
   /api/mobile/inbox/{id}/content:
     get:

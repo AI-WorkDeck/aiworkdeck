@@ -18,6 +18,7 @@ class PluginMcpHttpClientTest {
     private HttpServer server;
     private final List<String> methods = new CopyOnWriteArrayList<>();
     private final List<String> auth = new CopyOnWriteArrayList<>();
+    private final List<String> customHeaders = new CopyOnWriteArrayList<>();
     private final List<String> sessions = new CopyOnWriteArrayList<>();
     private final AtomicInteger sequence = new AtomicInteger();
     private volatile String mode = "normal";
@@ -29,6 +30,7 @@ class PluginMcpHttpClientTest {
         server.createContext("/mcp", exchange -> {
             try {
                 auth.add(String.valueOf(exchange.getRequestHeaders().getFirst("Authorization")));
+                customHeaders.add(String.valueOf(exchange.getRequestHeaders().getFirst("X-Test-Key")));
                 if ("DELETE".equals(exchange.getRequestMethod())) { methods.add("DELETE"); exchange.sendResponseHeaders(204, -1); return; }
                 var body = JSON.readTree(exchange.getRequestBody());
                 String method = body.path("method").asText(); methods.add(method);
@@ -78,6 +80,23 @@ class PluginMcpHttpClientTest {
     private PluginMcpHttpClient client() { return new PluginMcpHttpClient(new PluginMcpEndpointPolicy(true)); }
     private Map<String, Object> call(String token) { return client().call(url(), token, "echo", SCHEMA, Map.of("query", "synthetic"), () -> true); }
 
+    @Test void explicitDiscoveryListsToolsWithoutExecutingAnyTool() {
+        var tools = client().listTools(url(), "synthetic-token", () -> true);
+        assertEquals(1, tools.size());
+        assertEquals("echo", tools.get(0).get("name"));
+        assertEquals(List.of("initialize", "notifications/initialized", "tools/list", "DELETE"), methods);
+        assertFalse(methods.contains("tools/call"));
+    }
+
+    @Test void customHeadersReachOnlyTheConfiguredServerAndPreserveProtocolHeaders() {
+        client().call(url(), "bearer", Map.of("X-Test-Key", "private-value"), "echo", SCHEMA, Map.of("query", "x"), () -> true);
+        assertEquals(5, customHeaders.stream().filter("private-value"::equals).count());
+        assertTrue(auth.stream().allMatch("Bearer bearer"::equals));
+        mode = "redirect";
+        assertThrows(PluginMcpException.class, () -> client().listTools(url(), "", Map.of("X-Test-Key", "private-value"), () -> true));
+        assertFalse(methods.contains("TRAP"));
+        assertThrows(PluginMcpException.class, () -> client().listTools(url(), "", Map.of("MCP-Session-Id", "forged"), () -> true));
+    }
     @Test void publicServerLifecycleAndCleanup() {
         assertEquals(false, call("").get("isError"));
         assertEquals(List.of("initialize", "notifications/initialized", "tools/list", "tools/call", "DELETE"), methods);

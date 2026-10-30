@@ -2,21 +2,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "intro": "Sign in with your phone number or email and password. First time? Verify and create a password.",
+  "intro": "Melden Sie sich mit Ihrer Telefonnummer oder E-Mail-Adresse und Ihrem Passwort an. Zum ersten Mal hier? Verifizieren Sie sich und erstellen Sie ein Passwort.",
   "password": "Passwort",
-  "confirm": "Confirm password",
-  "register": "First time / Create password",
+  "confirm": "Passwort bestätigen",
+  "register": "Erste Nutzung / Passwort erstellen",
   "reset": "Passwort vergessen",
   "back": "Zurück zur Passwortanmeldung",
-  "setup": "Create password",
-  "resetTitle": "Reset password",
-  "verify": "Verify and continue",
+  "setup": "Passwort erstellen",
+  "resetTitle": "Passwort zurücksetzen",
+  "verify": "Verifizieren und fortfahren",
   "signIn": "Anmelden",
-  "passwordHint": "8–72 characters. Use a unique password.",
-  "invalid": "Use a password with 8–72 characters",
-  "mismatch": "Passwords do not match",
+  "passwordHint": "8–72 Zeichen. Verwenden Sie ein einzigartiges Passwort.",
+  "invalid": "Verwenden Sie ein Passwort mit 8–72 Zeichen",
+  "mismatch": "Die Passwörter stimmen nicht überein",
   "required": "Geben Sie Ihr Passwort ein",
-  "resetDone": "Password reset. Sign in with your new password.",
-  "setupHint": "Verified. Create a password to continue.",
-  "resetHint": "This code is only for resetting your password."
+  "resetDone": "Passwort zurückgesetzt. Melden Sie sich mit Ihrem neuen Passwort an.",
+  "setupHint": "Verifiziert. Erstellen Sie ein Passwort, um fortzufahren.",
+  "resetHint": "Dieser Code dient nur zum Zurücksetzen Ihres Passworts."
 }

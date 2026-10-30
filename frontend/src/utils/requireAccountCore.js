@@ -46,21 +46,27 @@ export function createAccountGate(deps) {
   let cache = null // { connected, at }
   let inflight = null // 同一时刻只开一个弹层，并发的调用方共用同一个结果
   let autoSuppressedUntil = 0
+  let revision = 0
 
   function noteConnected(connected) {
+    revision++
     cache = { connected: !!connected, at: now() }
   }
 
   function invalidate() {
+    revision++
     cache = null
   }
 
   async function isConnected() {
     if (cache && now() - cache.at < ttlMs) return cache.connected
+    const requestRevision = revision
     try {
       const st = await deps.getStatus()
+      if (requestRevision !== revision) return cache?.connected ?? null
       noteConnected(!!(st && st.connected))
     } catch (e) {
+      if (requestRevision !== revision) return cache?.connected ?? null
       // 查不到状态：不拿「未登录」吓人，按未知处理——交给弹层之外的原路径去报真错
       return null
     }

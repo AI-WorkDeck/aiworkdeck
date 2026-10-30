@@ -4,6 +4,8 @@
 package com.checkba.service.ai;
 
 import com.checkba.service.ai.tools.AgentToolComponent;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.agent.tool.Tool;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,10 +20,12 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -31,7 +35,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * 都得有一行。
  *
  * <p><b>为什么需要这条护栏</b>：用户在过程卡上看到的工具名<b>不是</b>后端
- * {@code @ToolMeta(displayName)}——工具元数据不随 SSE 下发，前端只能自备一份 zh/en 映射，
+ * {@code @ToolMeta(displayName)}——工具元数据不随 SSE 下发，前端维护 zh/en 映射或多语言令牌映射，
  * 按工具代号查。漏一行的后果不是报错，而是律师用户看到 {@code doc get outline} 这种
  * snake_case 兜底串（前端 toolDisplayName 的降级路径）。而后端加工具是最日常的动作，
  * 「记得去前端补一行」这种约定靠注释留不住——所以在这里钉死。
@@ -68,7 +72,7 @@ class ToolDisplayNameCoverageTest {
         List<String> missing = backend.stream().filter(name -> !frontend.contains(name)).sorted().toList();
         assertTrue(missing.isEmpty(),
                 "这些工具在 frontend/src/utils/toolDisplayNames.js 里没有名字，过程卡会显示 "
-                        + "snake_case 兜底串。补上 zh/en 两列即可：" + missing);
+                        + "snake_case 兜底串。请补齐多语言令牌及其译文：" + missing);
     }
 
     /**
@@ -96,6 +100,59 @@ class ToolDisplayNameCoverageTest {
         assertTrue(broken.isEmpty(),
                 "这些行缺语言列，界面上会显示 undefined（toolDisplayName 直接取 entry.en/entry.zh）："
                         + broken);
+    }
+
+    @Test
+    @DisplayName("多语言工具名称令牌在全部 20 种语言中均有真实非空译文")
+    void everyLocalizedEntryResolvesInAllLanguages() throws IOException {
+        assumeTrue(Files.isRegularFile(FRONTEND_MAP), "找不到前端映射，跳过");
+        Map<String, String> tokens = localizedNames();
+        assertFalse(tokens.isEmpty(), "未解析到 LOCALIZED_NAMES，检查前端映射形态");
+        Path locales = FRONTEND_MAP.getParent().getParent().resolve("locales");
+        List<Path> directories;
+        try (var entries = Files.list(locales)) {
+            directories = entries.filter(Files::isDirectory)
+                    .filter(path -> path.getFileName().toString().matches("[a-z]{2}-[A-Z]{2}"))
+                    .sorted().toList();
+        }
+        assertEquals(20, directories.size(), "必须检查全部受支持语言，不能漏掉目录");
+        for (Path locale : directories) {
+            Map<String, String> translations = stringObject(
+                    Files.readString(locale.resolve("editor.js"), StandardCharsets.UTF_8),
+                    "officeToolNames\\s*:", locale.toString());
+            com.fasterxml.jackson.databind.JsonNode legalTranslations = null;
+            if (tokens.values().stream().anyMatch(t -> t.startsWith("legalReference."))) {
+                String source = Files.readString(locale.resolve("legalReference.js"), StandardCharsets.UTF_8);
+                Matcher exported = Pattern.compile("export\\s+default\\s*(\\{.*})\\s*;?\\s*$", Pattern.DOTALL).matcher(source);
+                assertTrue(exported.find(), "找不到法律资料语言表：" + locale);
+                legalTranslations = new ObjectMapper().readTree(exported.group(1));
+            }
+            for (var token : tokens.entrySet()) {
+                boolean legal = token.getValue().startsWith("legalReference.");
+                assertTrue(legal || token.getValue().startsWith("editor.officeToolNames."),
+                        "未知令牌路径，需要显式增加解析支持：" + token);
+                String prefix = legal ? "legalReference." : "editor.officeToolNames.";
+                String key = token.getValue().substring(prefix.length());
+                String value = legal ? legalTranslations.path(key).asText(null) : translations.get(key);
+                assertTrue(value != null && !value.isBlank()
+                                && !value.equals(token.getValue()) && !value.equals(token.getKey()),
+                        locale.getFileName() + " 缺少真实译文：" + token);
+            }
+        }
+    }
+
+    private static Map<String, String> localizedNames() throws IOException {
+        return stringObject(Files.readString(FRONTEND_MAP, StandardCharsets.UTF_8),
+                "const\\s+LOCALIZED_NAMES\\s*=", FRONTEND_MAP.toString());
+    }
+
+    /** These flat string maps use JSON-compatible quoted keys and values in the actual frontend. */
+    private static Map<String, String> stringObject(String source, String prefix, String location)
+            throws IOException {
+        Matcher object = Pattern.compile(prefix + "\\s*\\{([^}]+)}", Pattern.DOTALL).matcher(source);
+        assertTrue(object.find(), "找不到令牌表：" + location);
+        return new ObjectMapper().readValue("{" + object.group(1) + "}",
+                new TypeReference<Map<String, String>>() {});
     }
 
     @Test
@@ -165,6 +222,7 @@ class ToolDisplayNameCoverageTest {
             all.add(m.group(1));
         }
         names.addAll(all);
+        names.addAll(localizedNames().keySet());
         return names;
     }
 }

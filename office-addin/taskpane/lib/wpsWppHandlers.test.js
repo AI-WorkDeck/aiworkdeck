@@ -92,6 +92,7 @@ function makeShape(spec, parentArr) {
   const ctx = { log: [], subActionThrows: !!spec.subActionThrows }
   const shape = {
     Id: spec.id != null ? spec.id : nextId(),
+    Name: spec.name ?? '',
     Type: spec.type != null ? spec.type : 17,
     Left: spec.left != null ? spec.left : 10,
     Top: spec.top != null ? spec.top : 20,
@@ -441,16 +442,16 @@ test('ppt_add_shape：ellipse 映射 msoShapeOval=9，填充先 Solid 再 RGB', 
 
 // ==================== ppt_get_slide_details ====================
 
-test('ppt_get_slide_details：Type 数值转可读名、Id 转字符串、文本截断 500', async () => {
+test('ppt_get_slide_details：Type 数值转可读名、Id 转字符串、完整返回超过 500 字的文本', async () => {
   install(makeDeck([[
-    { id: 5, type: 17, text: '长'.repeat(600), left: 1, top: 2, width: 3, height: 4 },
+    { id: 5, name: 'QA 长文本框', type: 17, text: '长'.repeat(600), left: 1, top: 2, width: 3, height: 4 },
     { id: 6, table: [['x']] },
     { id: 7, type: 42 }
   ]]))
   const out = await H.ppt_get_slide_details({ slideNumber: 1 })
   assert.equal(out.shapeCount, 3)
   assert.deepEqual(out.shapes[0], {
-    id: '5', type: 'textBox', left: 1, top: 2, width: 3, height: 4, text: '长'.repeat(500)
+    id: '5', name: 'QA 长文本框', type: 'textBox', left: 1, top: 2, width: 3, height: 4, text: '长'.repeat(600), textLength: 600, textTruncated: false
   })
   assert.equal(out.shapes[1].type, 'table')
   assert.equal(out.shapes[2].type, 'unknown(42)')
@@ -554,4 +555,42 @@ test('ppt_set_hyperlink：未命中与空参报错', async () => {
   await assert.rejects(H.ppt_set_hyperlink({ slideNumber: 1, searchText: '', url: 'https://x.cn' }),
     /查找文本不能为空/)
   await assert.rejects(H.ppt_set_hyperlink({ slideNumber: 1, searchText: '正文', url: '' }), /url 不能为空/)
+})
+
+ test('precision target affects one shape and one occurrence; stale text leaves content unchanged', async () => {
+   const pres = install(makeDeck([[{ id: 10, text: 'cost 100 and 100' }, { id: 11, text: 'cost 100 and 100' }]]))
+   await H.ppt_replace_text({slideNumber: 1, shapeId: '11', expectedText: 'cost 100 and 100', searchText: '100', replaceText: '200', all: false})
+   assert.equal(pres.Slides.Item(1).Shapes.Item(1)._state.text, 'cost 100 and 100')
+   assert.equal(pres.Slides.Item(1).Shapes.Item(2)._state.text, 'cost 200 and 100')
+   await assert.rejects(H.ppt_replace_text({slideNumber: 1, shapeId: '11', expectedText: 'cost 100 and 100', searchText: '100', replaceText: '300'}))
+   assert.equal(pres.Slides.Item(1).Shapes.Item(2)._state.text, 'cost 200 and 100')
+ })
+ test('geometry preflight rejects invalid sizes before moving a shape', async () => {
+   const pres = install(makeDeck([[{ id: 10, text: 'x', left: 10 }]]))
+   await assert.rejects(H.ppt_set_shape_geometry({slideNumber: 1, shapeId: '10', left: 50, width: -1}))
+   assert.equal(pres.Slides.Item(1).Shapes.Item(1).Left, 10)
+   const out = await H.ppt_set_shape_geometry({slideNumber: 1, shapeId: '10', left: 50, width: 300})
+   assert.deepEqual(out.after, {left: 50, width: 300})
+ })
+ test('explicit empty shape text clears; missing text does not clear', async () => {
+   const pres = install(makeDeck([[{ id: 10, text: 'keep' }]]))
+   await assert.rejects(H.ppt_set_shape_text({slideNumber: 1, shapeId: '10'}))
+   assert.equal(pres.Slides.Item(1).Shapes.Item(1)._state.text, 'keep')
+   const out = await H.ppt_set_shape_text({slideNumber: 1, shapeId: '10', expectedText: 'keep', text: ''})
+   assert.equal(out.text, '')
+ })
+
+test('ppt_add_image uses root file services with getRandomValues fallback and cleans embedded temporary bytes', async () => {
+  const originals=Object.fromEntries(['Application','Image','document','crypto'].map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]))
+  const pres=install(makeDeck([[]]));pres.Name='Synthetic.pptx';let written,removed,created=0,collision=false
+  globalThis.wps.Env={GetTempPath:()=>'/qa'}
+  globalThis.wps.FileSystem={Exists:()=>collision,writeAsBinaryString:(path,data)=>{written={path,data}},readAsBinaryString:()=>written.data,Remove:path=>removed=path}
+  pres.Slides.Item(1).Shapes.AddPicture=(path,link,save,left,top,width,height)=>{created++;assert.equal(path,written.path);assert.equal(link,0);assert.equal(save,-1);assert.equal(width,100);return {Id:91,Name:'QA image'}}
+  Object.defineProperty(globalThis,'crypto',{configurable:true,value:{getRandomValues:bytes=>bytes.fill(7)}})
+  globalThis.document={};globalThis.Image=class {naturalWidth=100;naturalHeight=100;set src(_){this.onload()}}
+  try{
+    const args={slideNumber:1,left:0,top:0,width:100,height:100,fit:'contain',base64:btoa('\x89PNG\r\n\x1a\nsynthetic')}
+    const out=await H.ppt_add_image(args);assert.equal(out.shapeId,'91');assert.equal(created,1);assert.equal(removed,written.path);assert.match(written.path,/aiworkdeck-0707.*\.png$/)
+    collision=true;await assert.rejects(H.ppt_add_image(args));assert.equal(created,1)
+  }finally{for(const [k,d]of Object.entries(originals)){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k]}}
 })

@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class NewFileFolderContractTest {
 
     /** 会在项目里新建文件的工具：每一个都必须能指定目标文件夹。 */
-    private static final List<String> FILE_CREATING_TOOLS = List.of("doc_start_stream", "sheet_create_file");
+    private static final List<String> FILE_CREATING_TOOLS = List.of("doc_start_stream", "sheet_create_file", "slide_create_file");
 
     private static Method tool(String name) {
         for (Method m : DocumentEditTools.class.getDeclaredMethods()) {

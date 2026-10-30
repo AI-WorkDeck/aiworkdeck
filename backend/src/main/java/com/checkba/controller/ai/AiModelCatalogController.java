@@ -78,25 +78,20 @@ public class AiModelCatalogController {
             return ResponseEntity.status(401).body(com.checkba.service.LangText.of("请先登录", "Please sign in first"));
         }
 
-        AllowedModels.Region region = networkRegionService.effectiveRegion();
+        if (chatModelFactory.usesProviderCatalog()) {
+            return com.checkba.service.ai.PlatformAiUserScope.call(userId, () -> providerModels());
+        }
+        AllowedModels.Region region = AllowedModels.Region.INTERNATIONAL;
 
-        // 本地 Ollama 档下 vision 位一律归一为 false（dev-board#801 K21 ⑨，审查 E-15）。
-        //
-        // 病灶：这个端点只按区域过滤白名单、不感知当前 provider，而
-        // ChatModelFactory.effectiveModelSupportsVision 对 OLLAMA 档**恒返回 false**
-        // （langchain4j-ollama 是另一套图片编组，本仓没接）。于是用户把供应商切到本地
-        // Ollama 后，模型下拉里仍是云端白名单，选中一个 vision:true 的条目时前端认为
-        // 「能读图」——既不弹提示也不显示 OCR 降级说明，而后端实际一律降级走 OCR。
-        // 「显示与实际不一致」正是本仓治理过一轮的老毛病，判据收敛在后端这一处。
+        // Billing and image support follow the actual route for this cloud catalogue.
+        // An implicit Ollama default still permits cloud selections through BYOK.
         AiModelProperties.Provider provider = null;
         try {
-            provider = chatModelFactory.resolveProvider();
+            provider = chatModelFactory.resolveTarget(AllowedModels.availableIn(region).get(0).getModelId(), false).channel();
         } catch (Exception e) {
-            // 供应商解析不出来时不改写能力位：宁可维持白名单原值，也不要凭一次异常
-            // 把所有模型都标成读不了图（那是对全体云端用户的误报）
-            log.warn("[Models] Provider probe failed; keeping AllowedModels vision flags as-is", e);
+            // Without a resolved billing channel, do not invent a charged-price conversion.
+            log.warn("[Models] Provider probe failed; using list prices", e);
         }
-        boolean visionDisabledByProvider = provider == AiModelProperties.Provider.OLLAMA;
 
         // 价格显示口径（dev-board#853）。只有平台通道才有「实付价」：那条路按官网扣费汇率 × 毛利乘数
         // 从 Credits 里扣钱；自备 Key 的用户直接按厂商美元标价付给 OpenRouter，本地 Ollama 不计费——
@@ -117,13 +112,14 @@ public class AiModelCatalogController {
 
             Map<String, Object> dto = new LinkedHashMap<>();
             dto.put("id", m.getModelId());
+            dto.put("aliases", m.getAliases());
             dto.put("name", m.getDisplayName());
             dto.put("vendor", m.getVendor().getDisplayName());
             dto.put("region", m.getRegion().name());
             dto.put("contextLength", m.getContextLength());
             // 视觉能力：前端在「选模型的那一刻」就据此提示「这个模型看不了图，图片会按 OCR 文本处理」。
             // 不下发这个字段，前端只能自己维护一张模型 → 支持视觉的表，正好踩回上面那条历史债。
-            dto.put("vision", !visionDisabledByProvider && m.isVision());
+            dto.put("vision", chatModelFactory.effectiveModelSupportsVision(m.getModelId()));
             dto.put("inputPricePerM", first.inputPricePerM());
             dto.put("outputPricePerM", first.outputPricePerM());
             dto.put("tiered", m.getPriceTiers().size() > 1);
@@ -138,12 +134,46 @@ public class AiModelCatalogController {
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("networkRegion", region.name());
-        body.put("networkRegionMode", networkRegionService.mode());
-        body.put("networkRegionBasis", networkRegionService.detectionBasis());
+        body.put("networkRegionMode", "provider");
+        body.put("networkRegionBasis", "");
         // 默认模型必须由工厂解析：DB 的 ai.defaultModel 优先于 yml，
         // 前端自己挑「清单第一条」会和实际发出去的模型不一致
         body.put("defaultModel", chatModelFactory.resolveDefaultModel());
         body.put("priceDisplay", priceDisplay(provider, rate));
+        body.put("models", models);
+        return ResponseEntity.ok(body);
+    }
+
+    private ResponseEntity<?> providerModels() {
+        com.checkba.service.ai.PlatformModelCatalog.Catalog catalog = chatModelFactory.platformCatalog();
+        boolean domestic = "bailian".equals(catalog.provider());
+        ModelPriceDisplayService.ChargedRate rate = domestic || priceDisplayService == null ? null : priceDisplayService.currentRate();
+        double factor = domestic ? catalog.marginMultiplier() : rate == null ? 1 : rate.factor();
+        List<Map<String, Object>> models = new ArrayList<>();
+        for (var m : catalog.models()) {
+            Map<String, Object> dto = new LinkedHashMap<>();
+            dto.put("id", m.id()); dto.put("name", m.name()); dto.put("vendor", m.vendor());
+            dto.put("aliases", List.of()); dto.put("region", "GLOBAL");
+            dto.put("contextLength", m.contextLength()); dto.put("maxOutputTokens", m.maxOutputTokens());
+            dto.put("vision", m.supportsVision()); dto.put("tools", m.supportsTools());
+            dto.put("inputPricePerM", m.inputPricePerMillion()); dto.put("outputPricePerM", m.outputPricePerMillion());
+            dto.put("tiered", m.tiered());
+            dto.put("displayInputPerM", roundPrice(m.inputPricePerMillion() * factor));
+            dto.put("displayOutputPerM", roundPrice(m.outputPricePerMillion() * factor));
+            double weighted = (m.inputPricePerMillion() * .8 + m.outputPricePerMillion() * .2);
+            dto.put("priceLevel", domestic ? (weighted <= 2 ? 1 : weighted <= 7 ? 2 : weighted <= 21 ? 3 : 4)
+                    : (weighted <= .3 ? 1 : weighted <= 1 ? 2 : weighted <= 3 ? 3 : 4));
+            models.add(dto);
+        }
+        Map<String, Object> display = new LinkedHashMap<>(priceDisplay(AiModelProperties.Provider.AWD_CLOUD, rate));
+        if (domestic) {
+            display.put("currency", "CNY"); display.put("basis", "charged"); display.put("factor", factor);
+            display.put("exchangeRate", 1); display.put("marginMultiplier", factor);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("provider", catalog.provider()); body.put("networkRegion", "GLOBAL");
+        body.put("networkRegionMode", "provider"); body.put("networkRegionBasis", "");
+        body.put("defaultModel", chatModelFactory.resolveDefaultModel()); body.put("priceDisplay", display);
         body.put("models", models);
         return ResponseEntity.ok(body);
     }

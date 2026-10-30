@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "confirm": "OK",
+  workspaceSessionUnavailable: "ワークスペースのセッションを復元できません",
+  "confirm": "確認",
   "cancel": "キャンセル",
   "save": "保存",
   "close": "閉じる",
@@ -43,7 +44,7 @@ export default {
   "openFile": "ファイルを開く",
   "open": "開く",
   "cannotResolveParentFolder": "このファイルを含むフォルダを特定できません",
-  "dateTimeMdHm": "{year}-{month}-{day} {time}",
+  "dateTimeMdHm": "{year}/{month}/{day} {time}",
   "registeredItems": "{count} 件が登録されました",
   "filesCount": "{count} ファイル",
   "statusRunning": "実行中",
@@ -57,9 +58,9 @@ export default {
   "sourceChannelOfficeWord": "Wordアドイン",
   "sourceChannelOfficeExcel": "Excelアドイン",
   "sourceChannelOfficePowerpoint": "PowerPointアドイン",
-  "sourceChannelWpsWord": "WPS Writer",
-  "sourceChannelWpsExcel": "WPS Spreadsheets",
-  "sourceChannelWpsPowerpoint": "WPS Presentation",
+  "sourceChannelWpsWord": "WPS 文書",
+  "sourceChannelWpsExcel": "WPS 表計算",
+  "sourceChannelWpsPowerpoint": "WPS プレゼンテーション",
   "sourceChannelPlugin": "アドイン",
   "languagePickerLabel": "言語を選択",
   "languageFollowSystem": "システムに従う",

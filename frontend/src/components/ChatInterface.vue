@@ -3,8 +3,6 @@
 <template>
   <view class="chat-interface" :class="{ 'is-empty': bubbles.length === 0 && !isStreaming }">
 
-    <MemoryBrowser :open="showMemoryBrowser" :project-id="projectId" @close="showMemoryBrowser = false" />
-
     <!-- Upload File Modal (reused from FileTree pattern) -->
     <view v-if="showUploadDialog" class="awd-dialog-mask" @tap="cancelUpload">
       <view class="awd-dialog awd-dialog-large" @tap.stop>
@@ -270,7 +268,7 @@
           <text class="project-name-display" :title="projectName">{{ projectName }}</text>
        </view>
        <view class="header-actions">
-          <view class="memory-header-btn" @tap="showMemoryBrowser = true">{{ $t('chat.memoryButton') }}</view>
+          <view class="memory-header-btn" @tap="$emit('open-settings', { nav: 'memory' })">{{ $t('chat.memoryButton') }}</view>
           <view class="icon-btn" @tap="$emit('toggle-history')" title="History">
              <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                <circle cx="12" cy="12" r="9" />
@@ -331,7 +329,8 @@
           :class="msg.role.toLowerCase()"
         >
           <!-- User Message -->
-          <div v-if="msg.role === 'USER'" class="user-bubble" :class="{ 'is-unread': msg.receiptState === 'pending' }">
+          <template v-if="msg.role === 'USER'">
+          <div class="user-bubble" :class="{ 'is-unread': msg.receiptState === 'pending' }">
             <!-- Image Thumbnails (above message) -->
             <view v-if="msg.images && msg.images.length > 0" class="user-bubble-images">
                <image v-for="(img, idx) in msg.images" :key="idx" :src="img.path" mode="aspectFill" class="bubble-image-thumb" />
@@ -357,6 +356,7 @@
             <view v-if="msg.contextNotices && msg.contextNotices.length" class="context-notices">
               <text v-for="(n, ni) in msg.contextNotices" :key="ni" class="context-notice">{{ contextNoticeText(n) }}</text>
             </view>
+          </div>
             <div class="bubble-footer">
               <!-- 从此分叉（dev-board#779 K18，审查 D-06/F4）：非破坏。原对话一个字不动，
                    只把「到这条为止」复制成一条新对话并切过去。可用性判据与回退同源
@@ -399,7 +399,7 @@
               <span v-if="receiptLabel(msg)" class="bubble-receipt" :class="{ 'is-pending': msg.receiptState === 'pending' }">{{ receiptLabel(msg) }}</span>
               <span v-if="msg.timestamp" class="bubble-timestamp user">{{ msg.timestamp }}</span>
             </div>
-          </div>
+          </template>
 
           <!-- Assistant Message (Root Bubble) -->
           <div v-else-if="msg.role === 'ASSISTANT'" class="assistant-root-wrapper">
@@ -416,6 +416,7 @@
                @message-action="$emit('message-action', $event)"
                @regenerate="openRegenerateDialog(index)"
                @stop-generation="handleAbort"
+               @reading-interaction="followLatest = false"
              />
              <!-- <span v-if="msg.timestamp" class="bubble-timestamp assistant">{{ msg.timestamp }}</span> -->
           </div>
@@ -549,13 +550,13 @@
                              <text class="skill-builtin-sub">{{ $t('chat.builtinWorkflowsSub') }}</text>
                              <view class="skill-builtin-pills">
                                 <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
-                                      class="skill-builtin-pill"
+                                      class="skill-builtin-pill" :data-bw-pill="bw.id"
                                       :class="{ 'is-custom': !bw.activeIsSystemDefault }"
                                       :title="$t('chat.builtinWorkflowRightClickHint')"
                                       @tap.stop="applyBuiltinWorkflow(bw)"
                                       @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
                                    <text class="skill-builtin-pill-label">{{ bw.activeIsSystemDefault ? bw.title : `${bw.title} · ${bw.activeVersionName}` }}</text>
-                                   <text class="skill-builtin-pill-more" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
+                                   <text class="skill-builtin-pill-more" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
                                 </view>
                              </view>
                           </view>
@@ -575,12 +576,14 @@
                              <text class="skill-check">{{ selectedSkillIds.includes(s.id) ? '✓' : '' }}</text>
                              <view class="skill-option-text">
                                 <text class="skill-option-name">{{ skillDisplayName(s) }}</text>
+                                <text v-if="s.sourcePluginId" class="skill-option-desc">{{ $t('market.fromPluginTag') }}</text>
                                 <text class="skill-option-desc">{{ s.activationMode === 'manual' ? $t('chat.skillManualOnly') : (s.triggers || []).join(' / ') || $t('chat.skillNoTriggers') }}</text>
                              </view>
                           </view>
                           <view v-if="!availableSkills.length" class="skill-empty">{{ $t('chat.skillNoneInstalled') }}</view>
                           <view class="skill-divider"></view>
                           <view class="skill-manage" @tap.stop="goToSkillManagement">{{ $t('chat.skillManage') }}</view>
+                          <view class="skill-manage" @tap.stop="goToMcpManagement">{{ $t('mcp.title') }}</view>
                        </view>
                     </view>
                  </view>
@@ -624,14 +627,14 @@
              <view class="builtin-workflows-body">
                 <view class="builtin-workflows-grid">
                    <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
-                         class="builtin-workflow-card"
+                         class="builtin-workflow-card" :data-bw-card="bw.id"
                          :class="{ 'is-custom-version': !bw.activeIsSystemDefault }"
                          :title="$t('chat.builtinWorkflowRightClickHint')"
                          @tap="applyBuiltinWorkflow(bw)"
                          @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
                       <view class="builtin-workflow-card-top">
                          <text class="builtin-workflow-name">{{ bw.title }}</text>
-                         <view class="builtin-workflow-card-actions" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                         <view class="builtin-workflow-card-actions" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">
                             <text class="builtin-workflow-ver-tag" :class="{ custom: !bw.activeIsSystemDefault }">{{ bw.activeVersionName }}</text>
                             <text class="builtin-workflow-more-btn">⋯</text>
                          </view>
@@ -879,13 +882,13 @@
                          <text class="skill-builtin-sub">{{ $t('chat.builtinWorkflowsSub') }}</text>
                          <view class="skill-builtin-pills">
                             <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
-                                  class="skill-builtin-pill"
+                                  class="skill-builtin-pill" :data-bw-pill="bw.id"
                                   :class="{ 'is-custom': !bw.activeIsSystemDefault }"
                                   :title="$t('chat.builtinWorkflowRightClickHint')"
                                   @tap.stop="applyBuiltinWorkflow(bw)"
                                   @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
                                <text class="skill-builtin-pill-label">{{ bw.activeIsSystemDefault ? bw.title : `${bw.title} · ${bw.activeVersionName}` }}</text>
-                               <text class="skill-builtin-pill-more" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
+                               <text class="skill-builtin-pill-more" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
                             </view>
                          </view>
                       </view>
@@ -905,12 +908,14 @@
                          <text class="skill-check">{{ selectedSkillIds.includes(s.id) ? '✓' : '' }}</text>
                          <view class="skill-option-text">
                             <text class="skill-option-name">{{ skillDisplayName(s) }}</text>
+                            <text v-if="s.sourcePluginId" class="skill-option-desc">{{ $t('market.fromPluginTag') }}</text>
                             <text class="skill-option-desc">{{ s.activationMode === 'manual' ? $t('chat.skillManualOnly') : (s.triggers || []).join(' / ') || $t('chat.skillNoTriggers') }}</text>
                          </view>
                       </view>
                       <view v-if="!availableSkills.length" class="skill-empty">{{ $t('chat.skillNoneInstalled') }}</view>
                       <view class="skill-divider"></view>
                       <view class="skill-manage" @tap.stop="goToSkillManagement">{{ $t('chat.skillManage') }}</view>
+                      <view class="skill-manage" @tap.stop="goToMcpManagement">{{ $t('mcp.title') }}</view>
                    </view>
                 </view>
              </view>
@@ -955,14 +960,14 @@
              <view class="builtin-workflows-body">
                 <view class="builtin-workflows-grid">
                    <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
-                         class="builtin-workflow-card"
+                         class="builtin-workflow-card" :data-bw-card="bw.id"
                          :class="{ 'is-custom-version': !bw.activeIsSystemDefault }"
                          :title="$t('chat.builtinWorkflowRightClickHint')"
                          @tap="applyBuiltinWorkflow(bw)"
                          @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
                       <view class="builtin-workflow-card-top">
                          <text class="builtin-workflow-name">{{ bw.title }}</text>
-                         <view class="builtin-workflow-card-actions" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                         <view class="builtin-workflow-card-actions" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">
                             <text class="builtin-workflow-ver-tag" :class="{ custom: !bw.activeIsSystemDefault }">{{ bw.activeVersionName }}</text>
                             <text class="builtin-workflow-more-btn">⋯</text>
                          </view>
@@ -1018,7 +1023,9 @@
           @tap="closeBuiltinWorkflowContextMenu"
           @contextmenu.prevent="closeBuiltinWorkflowContextMenu">
       <view class="bw-context-menu"
-            :style="{ left: `${builtinWorkflowMenu.x}px`, top: `${builtinWorkflowMenu.y}px`, maxHeight: `calc(100vh - ${builtinWorkflowMenu.y + 12}px)` }"
+            :style="builtinWorkflowMenu.bottom
+              ? { left: `${builtinWorkflowMenu.x}px`, bottom: `${builtinWorkflowMenu.bottom}px`, maxHeight: `calc(100vh - ${builtinWorkflowMenu.bottom + 12}px)` }
+              : { left: `${builtinWorkflowMenu.x}px`, top: `${builtinWorkflowMenu.y}px`, maxHeight: `calc(100vh - ${builtinWorkflowMenu.y + 12}px)` }"
             @tap.stop>
         <view class="bw-menu-head">
           <text class="bw-menu-title">{{ activeMenuWorkflow.title }}</text>
@@ -1035,7 +1042,7 @@
               <text v-if="ver.systemDefault" class="bw-menu-version-tag">{{ $t('chat.builtinWorkflowReadOnlyTag') }}</text>
             </view>
             <text class="bw-menu-version-edit"
-                  @tap.stop="openBuiltinWorkflowEditor(activeMenuWorkflow, ver.id)">{{ ver.systemDefault ? '查看' : '编辑' }}</text>
+                  @tap.stop="openBuiltinWorkflowEditor(activeMenuWorkflow, ver.id)">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</text>
           </view>
         </view>
         <view class="skill-divider"></view>
@@ -1055,6 +1062,7 @@
 </template>
 
 <script>
+import { selectableChatSkills } from '@/utils/chatSelectableSkills.mjs'
 import { getPendingAgentRestarts, resumeAgentRestart, getCloudAccountGeneration } from '@/services/api.js'
 import { fileChangesForBubble, summarizeFileChanges } from '@/utils/chatFileChange.js'
 import RootBubble from './AgentMessage/RootBubble.vue'
@@ -1064,7 +1072,6 @@ import { buildChatTurns, isPlanSnapshotCall, pendingAttention, recoverPlanTodos 
 import { useChatReadingPosition } from '@/composables/useChatReadingPosition.js'
 import BackgroundTaskIndicator from './BackgroundTaskIndicator.vue'
 import AgentInbox from './AgentInbox.vue'
-import MemoryBrowser from './MemoryBrowser.vue'
 import { useAgentStream } from '@/composables/useAgentStream.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 import { useBuiltinWorkflows, notifyBuiltinWorkflowsChanged } from '@/composables/useBuiltinWorkflows.js'
@@ -1085,8 +1092,6 @@ import { ICONS } from '@/config/icons.js'
 import OcrRoutingCard from '@/components/OcrRoutingCard.vue'
 import { createOcrRoutingHandler } from '@/composables/useOcrRouting.js'
 import { chooseOcrRouting, cancelOcrRouting } from '@/services/api.js'
-import { getHarnessEvolutions } from '@/services/api.js'
-import { attachEvolutionsToBubbles } from '@/utils/harnessEvolutionHistory.mjs'
 import OptionalComponentCard from '@/components/OptionalComponentCard.vue'
 import { componentDownloads } from '@/services/componentDownloads.js'
 import { createComponentRequiredHandler, shouldAutoResend } from '@/composables/useComponentRequired.js'
@@ -1109,7 +1114,7 @@ import {
 import { attachmentRecord, attachmentsFromHistory, fileListFromBubble } from '@/utils/chatAttachments.js'
 import { formatAskUserAnswer, parseAskUserAnswer } from '@/utils/askUserAnswer.mjs'
 import { isEnglish } from '@/utils/appLanguage.js'
-import { requireAccount } from '@/utils/requireAccount.js'
+import { requireAccount, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { requiresAiAccount } from '@/utils/requireAccountCore.js'
 import {
   AI_CONTEXT_FOLDER_FILE_LIMIT,
@@ -1128,7 +1133,15 @@ import {
 
 export default {
   name: 'ChatInterface',
-  components: { OcrRoutingCard, ChatSuggestionControl, DecisionAssistControl, ModelSelectorDropdown, RootBubble, ChatTurnRail, MentionPicker, BackgroundTaskIndicator, AgentInbox, MemoryBrowser, OptionalComponentCard },
+  components: { OcrRoutingCard, ChatSuggestionControl, DecisionAssistControl, ModelSelectorDropdown, RootBubble, ChatTurnRail, MentionPicker, BackgroundTaskIndicator, AgentInbox, OptionalComponentCard },
+  inject: { openSettingsTab: { default: null } },
+  methods: {
+    goToMcpManagement() {
+      this.showSkillDropdown = false
+      if (this.openSettingsTab) this.openSettingsTab({ nav: 'mcp' })
+      else uni.navigateTo({ url: '/pages/admin/admin?nav=mcp' })
+    },
+  },
   props: {
     visible: { type: Boolean, default: true },
     projectId: String,
@@ -1435,7 +1448,6 @@ export default {
 
     const inputPrompt = ref('')
     const richInput = ref(null)
-    const showMemoryBrowser = ref(false)
     const submissionTracker = { failed: null, inflight: {} }
     const followUpMode = ref('steer')
     try {
@@ -1657,10 +1669,19 @@ export default {
     const modelPriceDisplay = ref(null)
 
     const currentModelId = ref('')
-    const currentModelName = ref(t('chat.selectModel'))
+    const currentModelName = computed(() => {
+      if (currentModelId.value === 'auto') {
+        const routedName = routedModelInfo.value?.effectiveModelName
+        return routedName
+          ? t('chat.autoModelRoutedLabel', { name: routedName })
+          : t('chat.autoModelName')
+      }
+      const hit = availableModels.value.find(m => m.id === currentModelId.value)
+      return hit ? hit.name : (currentModelId.value || t('chat.selectModel'))
+    })
 
-    // 模型选择必须持久化：AI 面板挂在 v-if 上，关掉右栏再打开组件会重建，
-    // 不落盘就会静默复位成清单第一条——这是有计费含义的选择，不能悄悄改。
+    // 模型选择持久化以供组件重建恢复；工作台也会通过 v-show 保留聊天实例，
+    // 此时刷新目录须保留当前选择，不能因重新读取清单而悄悄改计价对象。
     const MODEL_STORAGE_KEY = 'ai_selected_model'
 
     const readPersistedModelId = () => {
@@ -1703,24 +1724,11 @@ export default {
     const applyModelSelection = (id) => {
       if (id === 'auto') {
         currentModelId.value = 'auto'
-        const routedName = routedModelInfo.value?.effectiveModelName
-        currentModelName.value = routedName
-          ? t('chat.autoModelRoutedLabel', { name: routedName })
-          : t('chat.autoModelName')
         return
       }
       const hit = availableModels.value.find(m => m.id === id)
       currentModelId.value = hit ? hit.id : (id || '')
-      currentModelName.value = hit ? hit.name : (id || t('chat.selectModel'))
     }
-
-    watch(routedModelInfo, (info) => {
-      if (currentModelId.value === 'auto') {
-        currentModelName.value = info?.effectiveModelName
-          ? t('chat.autoModelRoutedLabel', { name: info.effectiveModelName })
-          : t('chat.autoModelName')
-      }
-    })
 
     // 当前模型能不能直接读图。**三态**：true 支持 / false 不支持 / null 未知。
     // 「未知」不许并到 false：拉不到模型目录时 availableModels 是空数组而 currentModelId
@@ -1773,9 +1781,15 @@ export default {
       noticeIfNoVision(m)
     }
 
-    const loadModelCatalog = async () => {
+    let aiRefreshGeneration = 0
+    let aiRefreshPromise = null
+    let aiRefreshQueued = false
+    let aiRefreshDisposed = false
+
+    const loadModelCatalog = async (generation) => {
       try {
         const res = await fetchAiModels()
+        if (generation !== aiRefreshGeneration || aiRefreshDisposed) return
         const list = Array.isArray(res?.models) ? res.models : []
         availableModels.value = list
         defaultModelId.value = res?.defaultModel || ''
@@ -1794,9 +1808,12 @@ export default {
           ? defaultModelId.value
           : list[0].id
 
-        const saved = readPersistedModelId()
-        if (saved === 'auto' || (saved && list.some(m => m.id === saved))) {
-          applyModelSelection(saved)
+        const saved = currentModelId.value || readPersistedModelId()
+        const savedModel = saved && list.find(m => m.id === saved || (Array.isArray(m.aliases) && m.aliases.includes(saved)))
+        if (saved === 'auto' || savedModel) {
+          const restoredId = saved === 'auto' ? saved : savedModel.id
+          applyModelSelection(restoredId)
+          if (restoredId !== saved) persistModelId(restoredId)
           return
         }
 
@@ -1825,6 +1842,7 @@ export default {
         }
       } catch (e) {
         // 拉不到目录不该让面板不可用：保留上次选择（可能为空），由发送时的后端校验兜底
+        if (generation !== aiRefreshGeneration || aiRefreshDisposed) return
         console.warn('[ChatInterface] 加载模型目录失败:', e)
         const saved = readPersistedModelId()
         if (saved && !currentModelId.value) applyModelSelection(saved)
@@ -1834,9 +1852,9 @@ export default {
     // Agent Mode Selection (Ask, Plan, Agent)
     const showModeDropdown = ref(false)
     const ALL_MODES = [
-      { id: 'AGENT', name: t('chat.modeAgentName'), icon: '', desc: t('chat.modeAgentDesc') },
-      { id: 'ASK', name: t('chat.modeAskName'), icon: '', desc: t('chat.modeAskDesc') },
-      { id: 'PLAN', name: t('chat.modePlanName'), icon: '', desc: t('chat.modePlanDesc') }
+      { id: 'AGENT', name: t('chat.modeAgentName'), nameKey: 'chat.modeAgentName', icon: '', desc: t('chat.modeAgentDesc'), descKey: 'chat.modeAgentDesc' },
+      { id: 'ASK', name: t('chat.modeAskName'), nameKey: 'chat.modeAskName', icon: '', desc: t('chat.modeAskDesc'), descKey: 'chat.modeAskDesc' },
+      { id: 'PLAN', name: t('chat.modePlanName'), nameKey: 'chat.modePlanName', icon: '', desc: t('chat.modePlanDesc'), descKey: 'chat.modePlanDesc' }
     ]
     // 当前供应商（GET /api/ai/config 的 activeProvider）：模型目录端点不回 provider，
     // 而模式可选范围是按供应商定的，只能另取这个信号
@@ -1844,34 +1862,39 @@ export default {
     // 本地 Ollama 只支持 ASK：langchain4j 0.36 的 OllamaStreamingChatModel 没有三参
     // generate，选 AGENT/PLAN 会在流式过程中抛英文异常，不如在选择器里就不给
     const isLocalOnlyProvider = computed(() => String(activeProvider.value).toUpperCase() === 'OLLAMA')
-    const availableModes = computed(() =>
-      isLocalOnlyProvider.value ? ALL_MODES.filter(m => m.id === 'ASK') : ALL_MODES
-    )
+    const availableModes = computed(() => {
+      const list = isLocalOnlyProvider.value ? ALL_MODES.filter(m => m.id === 'ASK') : ALL_MODES
+      return list.map(m => ({ ...m, name: t(m.nameKey), desc: t(m.descKey) }))
+    })
     const localModeNotice = computed(() =>
       isLocalOnlyProvider.value ? t('chat.localModeNotice') : ''
     )
 
     const currentModeId = ref(ALL_MODES[0].id)
-    const currentModeName = ref(ALL_MODES[0].name)
+    const currentModeName = computed(() => {
+      const hit = ALL_MODES.find(m => m.id === currentModeId.value) || ALL_MODES[0]
+      return hit ? t(hit.nameKey) : t('chat.modeAgentName')
+    })
     const currentModeIcon = ref(ALL_MODES[0].icon)
 
     const selectMode = (mode) => {
       console.log('Switching agent mode to:', mode.name)
       currentModeId.value = mode.id
-      currentModeName.value = mode.name
       currentModeIcon.value = mode.icon
       showModeDropdown.value = false
     }
 
-    const loadAiProvider = async () => {
+    const loadAiProvider = async (generation) => {
       try {
         const res = await getAiConfig()
+        if (generation !== aiRefreshGeneration || aiRefreshDisposed) return
         activeProvider.value = res?.activeProvider || ''
         // 上下文上限随同一条配置下发（dev-board#801 K21 ⑧）：前端拦截用的数字
         // 与后端真正执行的必须是同一份，各写一份的表现是「界面说还能加、后端已经在丢」
         contextLimits.value = normalizeContextLimits(res?.contextLimits)
       } catch (e) {
         // 取不到供应商时按云端处理（不缩减模式），避免误把云端用户锁成只能 Ask
+        if (generation !== aiRefreshGeneration || aiRefreshDisposed) return
         console.warn('[ChatInterface] 加载 AI 供应商配置失败:', e)
         activeProvider.value = ''
         contextLimits.value = { ...DEFAULT_CONTEXT_LIMITS }
@@ -1881,6 +1904,28 @@ export default {
         selectMode(ALL_MODES.find(m => m.id === 'ASK'))
       }
     }
+
+    // Persistent chats survive settings/account changes. Coalesce opens; invalidate old
+    // responses on change events and follow them with one fresh pair of requests.
+    const refreshAiState = (invalidate = false) => {
+      if (aiRefreshDisposed) return
+      if (aiRefreshPromise) {
+        if (invalidate) {
+          aiRefreshGeneration++
+          aiRefreshQueued = true
+        }
+        return aiRefreshPromise
+      }
+      aiRefreshPromise = (async () => {
+        do {
+          aiRefreshQueued = false
+          const generation = ++aiRefreshGeneration
+          await Promise.all([loadModelCatalog(generation), loadAiProvider(generation)])
+        } while (aiRefreshQueued && !aiRefreshDisposed)
+      })().finally(() => { aiRefreshPromise = null })
+      return aiRefreshPromise
+    }
+    const refreshChangedAiState = () => refreshAiState(true)
 
     // All external AI requires an account, including legacy OPENROUTER settings.
     // Only explicit local Ollama can run without an account.
@@ -1913,10 +1958,10 @@ export default {
     // 而不是让用户勾一堆东西然后什么都不发生。
     const skillDisabledByMode = computed(() => currentModeId.value === 'ASK')
 
-    // 英文界面优先 name_en：/api/skills/list 不做语言过滤，展示名要自己按语言挑
+    // 非中文界面优先 name_en：/api/skills/list 不做语言过滤，展示名要自己按语言挑
     const skillDisplayName = (s) => {
       if (!s) return ''
-      return (getAppLanguage() === 'en-US' && s.nameEn) || s.name || s.id
+      return (isEnglish() && s.nameEn) || s.name || s.id
     }
 
     const selectedSkills = computed(() =>
@@ -1943,9 +1988,7 @@ export default {
       try {
         const res = await getSkills()
         const list = Array.isArray(res) ? res : (res?.data || [])
-        availableSkills.value = list.filter(
-          s => !s.builtinWorkflow && s.activationMode !== 'disabled' && s.enabled !== false && s.available !== false
-        )
+        availableSkills.value = selectableChatSkills(list)
         // 列表变了（管理员停用/卸载）就把选不中的清掉，别留一个永远不生效的 chip
         selectedSkillIds.value = selectedSkillIds.value.filter(
           id => availableSkills.value.some(s => s.id === id)
@@ -1959,7 +2002,7 @@ export default {
 
     // ---- 内置常驻工作流（懒人模式，dev-board#1438）：多版本与按项目切换偏好 ----
     const { builtinWorkflowStates, builtinQuickWorkflows, loadBuiltinWorkflowStates } = useBuiltinWorkflows(props)
-    const builtinWorkflowMenu = ref({ visible: false, x: 0, y: 0, workflowId: '' })
+    const builtinWorkflowMenu = ref({ visible: false, x: 0, y: 0, bottom: null, workflowId: '' })
     const openWorkflowEditorTab = inject('openWorkflowEditorTab', null)
 
     const builtinCustomActiveCount = computed(() =>
@@ -1971,26 +2014,68 @@ export default {
     )
     const openBuiltinWorkflowContextMenu = (event, bw) => {
       if (!bw) return
+      const rawEv = (event && typeof event.clientX === 'number')
+        ? event
+        : ((typeof window !== 'undefined' && window.event) || event?.$orig || event)
+      const domTarget = [
+        rawEv?.currentTarget,
+        rawEv?.target,
+        event?.currentTarget,
+        event?.target,
+        event?.currentTarget?.$el,
+        event?.target?.$el,
+      ].find(el => el && typeof el.getBoundingClientRect === 'function')
+      let anchorEl = domTarget?.closest?.('.builtin-workflow-card-actions, .skill-builtin-pill, .builtin-workflow-card') || domTarget
+      if (!anchorEl && typeof document !== 'undefined') {
+        const candidates = document.querySelectorAll(`[data-bw-actions="${bw.id}"], [data-bw-card="${bw.id}"], [data-bw-pill="${bw.id}"]`)
+        anchorEl = Array.from(candidates).find(el => {
+          const r = el.getBoundingClientRect()
+          return r.width > 0 && r.height > 0
+        }) || null
+      }
+      const rect = anchorEl?.getBoundingClientRect?.() || null
+      const pointerX = (typeof rawEv?.clientX === 'number' && rawEv.clientX > 0)
+        ? rawEv.clientX
+        : (event?.detail?.x || rawEv?.changedTouches?.[0]?.clientX || rawEv?.touches?.[0]?.clientX || event?.changedTouches?.[0]?.clientX || 0)
+      const pointerY = (typeof rawEv?.clientY === 'number' && rawEv.clientY > 0)
+        ? rawEv.clientY
+        : (event?.detail?.y || rawEv?.changedTouches?.[0]?.clientY || rawEv?.touches?.[0]?.clientY || event?.changedTouches?.[0]?.clientY || 0)
+
+      const maxW = (typeof window !== 'undefined' && window.innerWidth) || 1024
+      const maxH = (typeof window !== 'undefined' && window.innerHeight) || 768
+      const menuW = Math.min(260, maxW - 24)
+      const menuEstH = 236
+
       let x = 220
       let y = 260
-      if (event && typeof event.clientX === 'number' && event.clientX > 0) {
-        x = event.clientX
-        y = event.clientY
-      } else if (event?.currentTarget?.getBoundingClientRect) {
-        const rect = event.currentTarget.getBoundingClientRect()
-        x = rect.left + Math.min(rect.width - 20, 80)
-        y = rect.bottom + 4
+      let bottom = null
+
+      if (rawEv?.type === 'contextmenu' && pointerX > 0 && pointerY > 0) {
+        x = pointerX
+        y = pointerY
+        if (y + menuEstH > maxH - 12 && rect && rect.top > menuEstH) {
+          bottom = Math.max(12, maxH - rect.top + 6)
+        }
+      } else if (rect && (rect.width > 0 || rect.height > 0)) {
+        x = rect.width < 140 ? Math.max(12, rect.right - menuW) : rect.left
+        if (rect.bottom + menuEstH > maxH - 12 && rect.top > menuEstH) {
+          bottom = Math.max(12, maxH - rect.top + 6)
+        } else {
+          y = rect.bottom + 6
+        }
+      } else if (pointerX > 0 || pointerY > 0) {
+        x = pointerX
+        y = pointerY
       }
-      if (typeof window !== 'undefined') {
-        const maxW = window.innerWidth || 1024
-        const maxH = window.innerHeight || 768
-        x = Math.max(12, Math.min(x, maxW - 272))
-        y = Math.max(12, Math.min(y, maxH - 280))
-      }
+
+      x = Math.max(12, Math.min(x, maxW - menuW - 12))
+      y = Math.max(12, Math.min(y, maxH - menuEstH))
+
       builtinWorkflowMenu.value = {
         visible: true,
         x,
         y,
+        bottom,
         workflowId: bw.id
       }
       loadBuiltinWorkflowStates()
@@ -2111,7 +2196,7 @@ export default {
 
     const goToSkillManagement = () => {
       showSkillDropdown.value = false
-      uni.navigateTo({ url: '/pages/plugin-market/plugin-market' })
+      emit('manage-skills')
     }
 
     // Rollback Dialog State
@@ -2261,12 +2346,18 @@ export default {
         showNewPopup.value = false
     }
 
-    // 模型目录与供应商在组件挂载时拉一次：面板挂在 v-if 上，每次打开都会重建，
-    // 这也正是恢复持久化模型选择的时机
+    // v-show 保留的聊天不会重新挂载，因此还需账户/配置事件与打开选择器时刷新。
     onMounted(() => {
-      loadModelCatalog()
-      loadAiProvider()
+      uni.$on(ACCOUNT_CHANGED_EVENT, refreshChangedAiState)
+      uni.$on('awd:ai-config-changed', refreshChangedAiState)
+      refreshAiState()
       restoreRunningPluginJobs()
+    })
+    onBeforeUnmount(() => {
+      aiRefreshDisposed = true
+      aiRefreshGeneration++
+      uni.$off(ACCOUNT_CHANGED_EVENT, refreshChangedAiState)
+      uni.$off('awd:ai-config-changed', refreshChangedAiState)
     })
 
     // 插件后台任务跨页面/跨重连仍在跑：SSE 只在进度变化时推一次，刷新页面或切回工作台的用户
@@ -3081,20 +3172,6 @@ export default {
        }
     }
 
-    // Harness 自进化卡片的历史回放（dev-board#1481）：卡片原本只随当轮 SSE 出现，刷新后要按
-    // assistantMessageId 从持久化记录挂回原气泡，否则「撤销这次学习」的入口随刷新消失而规则仍在生效。
-    // 失败静默：这是附加信息，拿不到也不该影响历史本身的展示。
-    const restoreHarnessEvolutions = async (conversationId) => {
-       if (!conversationId) return
-       try {
-          const records = await getHarnessEvolutions({ conversationId })
-          if (currentConversationId.value !== conversationId) return
-          attachEvolutionsToBubbles(bubbles.value, Array.isArray(records) ? records : (records?.data || []))
-       } catch (e) {
-          console.warn('[ChatInterface] restore harness evolutions failed', e)
-       }
-    }
-
     // 历史分页（dev-board#811 K31，审查 C-12）。首屏只取最近一页，向上滚再补更早的。
     // hasMore 为假时这三个状态恒定，翻页那条链整条不参与——旧后端（不认 limit，回裸数组）
     // 与夹具直接传数组的调用一样落在这一档。
@@ -3125,7 +3202,6 @@ export default {
 
        bubbles.value.push(...historyBubbles(loadedMsgs))
        markAnsweredQuestions()
-       restoreHarnessEvolutions(conversationId)
 
        // 后台续跑关键一步：切回会话时重连 SSE。后端 connect 会推 run_state
        // （运行中还会推 state_recovery 全量续流 + plan_update 恢复任务清单），
@@ -3166,7 +3242,6 @@ export default {
           if (older.length) {
              bubbles.value.unshift(...historyBubbles(older))
              markAnsweredQuestions()
-             restoreHarnessEvolutions(conversationId)
           }
           historyHasMore.value = !!(page && page.hasMore)
           historyBefore.value = (page && page.nextBefore) ?? historyBefore.value
@@ -4561,7 +4636,6 @@ export default {
        backgroundComponentGate,
        inputPrompt,
        richInput,
-       showMemoryBrowser,
        decisionAssistEnabled, toggleDecisionAssist, isLocalOnlyProvider,
        chatSuggestions, suggestionEnabled, visibleSuggestion,
        followUpMode,
@@ -4636,7 +4710,10 @@ export default {
        currentModelName,
        toggleModelDropdown: () => {
          showModelDropdown.value = !showModelDropdown.value
-         if (showModelDropdown.value) showModeDropdown.value = false
+         if (showModelDropdown.value) {
+           showModeDropdown.value = false
+           refreshAiState()
+         }
        },
        selectModel,
        showModelDropdown,
@@ -4963,6 +5040,7 @@ export default {
   flex: 1;
   min-height: 0;
   overflow-anchor: none;
+  scrollbar-gutter: stable both-edges;
   overflow-y: auto;
   overflow-x: hidden; /* Prevent horizontal overflow */
   padding: 12px;
@@ -5070,7 +5148,7 @@ export default {
   color: var(--awd-text-3);
   /* margin-top: 4px; */
 }
-.user-bubble .bubble-timestamp { text-align: right; }
+.bubble-footer .bubble-timestamp { text-align: end; white-space: nowrap; }
 
 /* 送达状态（dev-board#779 K7②）：模型还没读到的插话先淡一档，让它和已经被读过的
    消息一眼分得开；一行小字说明它在等什么。浅色外壳不变，只降不透明度。 */
@@ -7417,18 +7495,18 @@ export default {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  width: 100%;
   margin-top: 4px;
-  position: absolute;
-  bottom: -24px;
-  right: 0px;
-  min-width: 134px;
 }
 
 .rollback-btn,
 .branch-btn {
   display: flex;
   align-items: center;
-  margin-left: 8px;
+  flex: none;
+  white-space: nowrap;
   opacity: 0;
   transition: all 0.2s ease;
   cursor: pointer;
@@ -7438,8 +7516,8 @@ export default {
   /* border: 1px solid rgba(46, 90, 80, 0.1); */
 }
 
-.user-bubble:hover .rollback-btn,
-.user-bubble:hover .branch-btn {
+.message-row.user:hover .rollback-btn,
+.message-row.user:hover .branch-btn {
   opacity: 1;
 }
 
@@ -7450,8 +7528,8 @@ export default {
   cursor: not-allowed;
 }
 
-.user-bubble:hover .rollback-btn.is-disabled,
-.user-bubble:hover .branch-btn.is-disabled {
+.message-row.user:hover .rollback-btn.is-disabled,
+.message-row.user:hover .branch-btn.is-disabled {
   opacity: 0.4;
 }
 
@@ -7464,7 +7542,8 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 4px;
+  margin-inline-end: 4px;
+  flex: none;
   color: var(--awd-accent-text); /* Forest Green */
 }
 

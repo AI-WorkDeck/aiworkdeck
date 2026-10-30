@@ -572,6 +572,8 @@ public class MobileRelayClientService {
     private final LocalIdentityService localIdentityService;
     private final ProjectRepository projectRepository;
     private final ProjectFileService projectFileService;
+    @Autowired(required=false) private MobileCaptureMoveFiles captureMoveFiles;
+    @Autowired(required=false) private MobileCaptureOrganizationService captureOrganization;
     private final StorageServiceFactory storageServiceFactory;
     private final com.checkba.service.ProjectAiMessageService projectAiMessageService;
     private final DesktopRefHandler desktopRefHandler;
@@ -1003,6 +1005,7 @@ public class MobileRelayClientService {
                 // 有好几处 return（空收件箱/响应异常），那些 return 会直接跳出整个方法，
                 // 不放 finally 的话大多数轮次（收件箱通常是空的）根本轮不到这一句。
                 pollTransferCommands();
+                pollMediaMoves();
                 // 插件对话镜像（dev-board#298）同理挂在 finally：早 return 不能把它饿死。
                 pollConversationSync();
                 // 参考读取（dev-board#718）：门铃是「快一点」，这一轮才是兜底——门铃断线、
@@ -1012,6 +1015,37 @@ public class MobileRelayClientService {
                 inboxRunning.set(false);
             }
         }
+    }
+
+    /** Frozen account/token and per-request local tombstones fence replay after reconnect or account switching. */
+    void pollMediaMoves() {
+        if(captureMoveFiles==null || !active()) return;
+        try {
+            CatalogSession session=beginCatalogSession(catalogAccountScope());
+            String device=deviceId();
+            HttpResponse<String> response=catalogExchange(session,"GET","/api/mobile/media/moves/commands?deviceId="+device,null);
+            if(!okEnvelope(response)) return;
+            JsonNode commands=mapper.readTree(response.body()).path("commands");
+            if(!commands.isArray()) return;
+            for(JsonNode node:commands) {
+                requireCatalogAccountScope(session.scope());
+                var command=mapper.treeToValue(node,MobileMediaMoveService.Command.class);
+                if(!device.equals(command.deviceId()) || command.expiresAt()<System.currentTimeMillis()) continue;
+                MobileMediaMoveService.Result result;
+                try {
+                    var verified=captureMoveFiles.execute(session.scope(),localIdentityService.localUserId(),command,
+                            ()->requireCatalogAccountScope(session.scope()));
+                    result=new MobileMediaMoveService.Result(command.commandId(),device,command.action(),true,
+                            verified.sha256(),verified.fileId(),verified.fileUid(),null);
+                } catch(RuntimeException failure) {
+                    requireCatalogAccountScope(session.scope());
+                    result=new MobileMediaMoveService.Result(command.commandId(),device,command.action(),false,null,null,null,
+                            failure instanceof IllegalArgumentException?"ARCHIVE_CHANGED":null);
+                }
+                requireCatalogAccountScope(session.scope());
+                catalogExchange(session,"POST","/api/mobile/media/moves/"+command.requestId()+"/result",mapper.writeValueAsString(result));
+            }
+        } catch(Exception failure) { log.debug("Capture move polling deferred: {}",failure.getClass().getSimpleName()); }
     }
 
     // ==================== 落盘 ====================
@@ -1121,6 +1155,14 @@ public class MobileRelayClientService {
             }
             log.info("手机同步：影像 {} 已落盘 项目={} 文件={}/{}/{}",
                     itemId, projectId, rootFolderName, dateStr, landedName);
+        }
+        if(captureMoveFiles!=null) captureMoveFiles.rememberCapture(projectId,
+                String.format("projects/%d/%s/%s/%s",projectId,rootFolderName,dateStr,landedName),item.path("clientMediaId").asText());
+        if(captureOrganization!=null && item.path("organization").isObject()) {
+            var archived=projectFileService.getFilesByParent(projectId,day.getId()).stream()
+                    .filter(f->!Boolean.TRUE.equals(f.getIsFolder()) && landedName.equals(f.getName())).findFirst().orElseThrow();
+            captureOrganization.attach(userId,projectId,archived.getId(),mapper.convertValue(item.path("organization"),
+                    new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>(){}));
         }
         HttpResponse<String> ack = authed("POST", "/api/mobile/inbox/" + itemId + "/ack", "{}");
         receipt(item, okEnvelope(ack) ? "saved" : "savedPendingAck", "");

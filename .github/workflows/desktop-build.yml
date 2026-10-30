@@ -104,7 +104,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
       - uses: actions/setup-java@v4
         id: jdk
         with:
@@ -203,6 +203,29 @@ jobs:
         # 正常全量 ≤5 分钟，给 3 倍预算快挂，别再拖到 job 默认 6 小时上限。
         timeout-minutes: 15
         run: npm test
+      - name: Electron runtime compatibility
+        working-directory: desktop
+        timeout-minutes: 5
+        run: npm run test:runtime-compat
+      - name: System clipboard compatibility
+        working-directory: desktop
+        timeout-minutes: 2
+        run: npm run test:clipboard-compat
+      - name: Backend request cancellation compatibility
+        working-directory: desktop
+        timeout-minutes: 2
+        run: npm run test:backend-request-gate-e2e
+      - name: Upload runtime compatibility evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-compat-${{ runner.os }}
+          path: |
+            ${{ runner.temp }}/awd-clipboard-compat-*/result.json
+            ${{ runner.temp }}/awd-runtime-compat-*/result.json
+            ${{ runner.temp }}/awd-runtime-compat-*/browser-view.png
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Bundle backend (macOS arm64)
         if: runner.os == 'macOS'
         env:
@@ -211,7 +234,7 @@ jobs:
           # 插件宿主 SPI 是本仓独立工程，不在远端仓库：先 install 再打 backend
           mvn -B -q -f backend/plugin-api/pom.xml install
           # Apple Silicon only（2026-07-03 决策放弃 Intel Mac）：单 arm64 jar + arm64 JRE
-          mvn -B -q -Dtest=MeetingAudioTranscoderVideoTest,MeetingAudioTranscoderQtaTest -Djavacpp.platform=macosx-arm64 -f backend/pom.xml package
+          mvn -B -q -Dtest=MeetingAudioTranscoderVideoTest,MeetingAudioTranscoderQtaTest,UserMcpStdioClientTest -Djavacpp.platform=macosx-arm64 -f backend/pom.xml package
           node desktop/scripts/prepare-backend.js \
             --jar backend/target/backend-0.0.1-SNAPSHOT.jar \
             --out desktop/bundled/mac-arm64 --native-platform macosx-arm64
@@ -253,7 +276,7 @@ jobs:
           JAVA_HOME: ${{ steps.jdk.outputs.path }}
         run: |
           mvn -B -q -f backend/plugin-api/pom.xml install
-          mvn -B -q -Dtest=MeetingAudioTranscoderVideoTest,MeetingAudioTranscoderQtaTest -Djavacpp.platform=windows-x86_64 -f backend/pom.xml package
+          mvn -B -q -Dtest=MeetingAudioTranscoderVideoTest,MeetingAudioTranscoderQtaTest,UserMcpStdioClientTest -Djavacpp.platform=windows-x86_64 -f backend/pom.xml package
           node desktop/scripts/prepare-backend.js \
             --jar backend/target/backend-0.0.1-SNAPSHOT.jar \
             --out desktop/bundled/win-x64 --native-platform windows-x86_64

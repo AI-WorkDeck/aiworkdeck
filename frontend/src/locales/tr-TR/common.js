@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "Çalışma alanı oturumu geri yüklenemedi",
   "confirm": "Tamam",
   "cancel": "İptal",
   "save": "Kaydet",
@@ -43,7 +44,7 @@ export default {
   "openFile": "Dosyayı Aç",
   "open": "Aç",
   "cannotResolveParentFolder": "Bu dosyayı içeren klasör belirlenemiyor",
-  "dateTimeMdHm": "{year}-{month}-{day} {time}",
+  "dateTimeMdHm": "{day}.{month}.{year} {time}",
   "registeredItems": "{count} öğe kayıtlı",
   "filesCount": "{count} dosya",
   "statusRunning": "Çalışıyor",
@@ -57,9 +58,9 @@ export default {
   "sourceChannelOfficeWord": "Word eklentisi",
   "sourceChannelOfficeExcel": "Excel eklentisi",
   "sourceChannelOfficePowerpoint": "PowerPoint eklentisi",
-  "sourceChannelWpsWord": "WPS Writer",
-  "sourceChannelWpsExcel": "WPS Spreadsheets",
-  "sourceChannelWpsPowerpoint": "WPS Presentation",
+  "sourceChannelWpsWord": "WPS Writer eklentisi",
+  "sourceChannelWpsExcel": "WPS Spreadsheets eklentisi",
+  "sourceChannelWpsPowerpoint": "WPS Presentation eklentisi",
   "sourceChannelPlugin": "Eklenti",
   "languagePickerLabel": "Dil seçin",
   "languageFollowSystem": "Sistemi takip et",

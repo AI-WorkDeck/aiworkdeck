@@ -2,7 +2,17 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
   <view class="etb-wrap">
-  <view class="etb" @tap="closeMenus">
+  <view v-if="slideshowRunning || slideshowBusy" class="etb" role="toolbar" :aria-label="$t('editor.toolbar.impressStartShow')">
+    <view class="etb-row">
+      <button class="etb-btn etb-show-btn" :disabled="slideshowBusy || slideshowNumber <= 1" :title="$t('editor.toolbar.impressPrevSlide')" :aria-label="$t('editor.toolbar.impressPrevSlide')" @click="controlSlideshow('previous')">‹</button>
+      <text class="etb-tx sm">{{ $t('editor.toolbar.impressSlideCounter', { n: slideshowNumber, total: slideshowCount }) }}</text>
+      <button class="etb-btn etb-show-btn" :disabled="slideshowBusy || slideshowNumber >= slideshowCount" :title="$t('editor.toolbar.impressNextSlide')" :aria-label="$t('editor.toolbar.impressNextSlide')" @click="controlSlideshow('next')">›</button>
+      <button class="etb-btn wide etb-show-btn" :disabled="slideshowBusy" @click="controlSlideshow('end')">{{ $t('editor.toolbar.impressEndShow') }}</button>
+      <text v-if="slideshowBusy" role="status" class="etb-tx sm">{{ $t('editor.toolbar.impressShowBusy') }}</text>
+      <text v-if="slideshowError" role="alert" class="etb-err">{{ slideshowError }}</text>
+    </view>
+  </view>
+  <view v-show="!slideshowRunning && !slideshowBusy" class="etb" @tap="closeMenus">
     <!-- 主命令区：窄了就横向滚动，不换行（换行会把画布挤下去）。
          原生横向滚动条有 15px 高，会把这一段撑到 41px、在 38px 的行里被
          align-items:center 顶得比右侧常驻区高半格（dev-board#502），但整条藏掉
@@ -26,6 +36,7 @@
 
         <!-- PPT (impress) 幻灯片导航与新建（ElyOffice slides.rs） -->
         <template v-if="isImpress">
+          <button class="etb-btn wide etb-show-btn" :disabled="!executor" @click.stop="controlSlideshow('start')">{{ $t('editor.toolbar.impressStartShow') }}</button>
           <view class="etb-btn" :class="{ off: (impressState.slideNumber || 1) <= 1 }" :title="$t('editor.toolbar.impressPrevSlide')" @tap.stop="prevSlide">
             <text class="etb-tx b">‹</text>
           </view>
@@ -943,7 +954,7 @@
            @focus="calcAddressFocused = true" @blur="calcAddressFocused = false"
            @confirm="submitCalcAddress" />
     <text class="etb-calc-fx">fx</text>
-    <text class="etb-calc-fx-btn ok" :title="$t('editor.toolbar.apply')" @tap.stop="submitCalcFormula">✓</text>
+    <text class="etb-calc-fx-btn ok" :title="$t('common.confirm')" @tap.stop="submitCalcFormula">✓</text>
     <text class="etb-calc-fx-btn" :title="$t('editor.toolbar.cancel')" @tap.stop="cancelCalcFormula">✕</text>
     <input ref="calcFormula" class="etb-calc-formula-input" v-model="calcFormulaInput" :placeholder="$t('editor.toolbar.calcFormulaPh')"
            @focus="calcFormulaFocused = true" @blur="calcFormulaFocused = false"
@@ -1207,6 +1218,8 @@ export default {
       calcRenameText: '',
       // PPT (impress) 状态与表单
       impressErr: '',
+      slideshowRunning: false, slideshowBusy: false, slideshowError: '',
+      slideshowNumber: 1, slideshowCount: 1,
       impressNotesInput: '', impressNotesFocused: false,
       impressShapeTextInput: '', impressShapeTextFocused: false,
       impressTableCellForm: { row: 1, col: 1, text: '' },
@@ -1332,9 +1345,10 @@ export default {
     },
   },
   watch: {
-    executor: { handler() { this.bootstrap() }, immediate: true },
+    executor: { handler() { this.disposeSlideshow(); this.bootstrap() }, immediate: true },
     refreshKey() { this.refresh() },
     docKind() {
+      this.disposeSlideshow()
       this.closeMenus()
       this.bootstrap()
     },
@@ -1366,6 +1380,7 @@ export default {
   },
 
   beforeUnmount() {
+    this.disposeSlideshow()
     this._toolbarDisposed = true
     this._uiRefreshOwner = null
     if (this._toolbarWheelOff) { this._toolbarWheelOff(); this._toolbarWheelOff = null }
@@ -1378,6 +1393,74 @@ export default {
   },
 
   methods: {
+    disposeSlideshow() {
+      clearTimeout(this._slideshowTimer)
+      const owner = this._slideshowOwner
+      this._slideshowOwner = null
+      this.slideshowRunning = false
+      this.slideshowBusy = false
+      this.slideshowError = ''
+      if (owner) {
+        try { Promise.resolve(owner.executor.executeCommand('slide_show_control', { operation: 'end' })).catch(() => {}) } catch (_) { /* executor already disposed */ }
+      }
+    },
+    scheduleSlideshowPoll(owner) {
+      clearTimeout(this._slideshowTimer)
+      if (!this.slideshowRunning || this._slideshowOwner !== owner) return
+      this._slideshowTimer = setTimeout(() => this.controlSlideshow('state'), 1000)
+    },
+    async controlSlideshow(operation) {
+      if (!this.isImpress || !this.executor || this._toolbarDisposed) return
+      if (this._slideshowOwner?.flight || this.slideshowBusy) {
+        if (operation === 'end' && this._slideshowOwner) this._slideshowOwner.endRequested = true
+        else if (['next', 'previous'].includes(operation) && this._slideshowOwner && !this.slideshowBusy) this._slideshowOwner.navigationRequested = operation
+        return
+      }
+      if (operation !== 'start' && !this._slideshowOwner) return
+      if (operation === 'start') {
+        if (this.slideshowRunning) return
+        this.closeMenus()
+        this.findOpen = false
+        this.slideshowNumber = this.impressState.slideNumber || 1
+        this.slideshowCount = this.impressState.slideCount || 1
+        this._slideshowOwner = { executor: this.executor }
+      }
+      const owner = this._slideshowOwner
+      owner.flight = true
+      clearTimeout(this._slideshowTimer)
+      if (operation !== 'state') this.slideshowBusy = true
+      this.slideshowError = ''
+      let result
+      try {
+        result = await owner.executor.executeCommand('slide_show_control', {
+          operation, ...(operation === 'start' ? { slideNumber: this.slideshowNumber } : {}),
+        })
+      } catch (_) { result = { success: false } }
+      if (this._slideshowOwner !== owner || this.executor !== owner.executor || this._toolbarDisposed) return
+      owner.flight = false
+      this.slideshowBusy = false
+      if (!result?.success) {
+        this.slideshowError = this.$t('editor.toolbar.opFailed')
+        if (operation === 'start') {
+          this.disposeSlideshow()
+          uni.showToast({ title: this.$t('editor.toolbar.opFailed'), icon: 'none' })
+          return
+        }
+      } else {
+        this.slideshowRunning = result.running
+        this.slideshowNumber = result.slideNumber || this.slideshowNumber
+        this.slideshowCount = result.slideCount || this.slideshowCount
+        if (!result.running) {
+          this._slideshowOwner = null
+          await this.refresh()
+          return
+        }
+        if (operation !== 'state') this.$emit('focus-editor')
+      }
+      if (owner.endRequested) { owner.endRequested = false; return this.controlSlideshow('end') }
+      if (owner.navigationRequested) { const requested = owner.navigationRequested; owner.navigationRequested = null; return this.controlSlideshow(requested) }
+      this.scheduleSlideshowPoll(owner)
+    },
     submittedInputValue(event, refName, fallback) {
       if (!event) return fallback
       // UniInput 的 v-model 有 100 ms 节流；确认事件与真实输入框才是提交时的新值。
@@ -1536,6 +1619,7 @@ export default {
       this.closeMenus()
     },
     onDocKeydown(e) {
+      if (e.key === 'Escape' && this.slideshowRunning) { e.preventDefault(); this.controlSlideshow('end'); return }
       if (e.key === 'Escape' && this.menu) this.closeMenus()
     },
     // 纵向滚轮映射成横向滚动，否则窄窗口下右半截命令只能靠拖那条 4px 细滑轨
@@ -2102,7 +2186,12 @@ export default {
       this.calcErr = ''
       const res = await this.call(action, params || {})
       if (!res || res.success !== true) {
-        const msg = (res && (res.message || res.error)) || this.$t('editor.toolbar.opFailed')
+        const code = res && (res.errorCode || res.error || res.message)
+        const sheetErrors = ['SHEET_PROTECTED_CELL', 'SHEET_INVALID_RANGE', 'SHEET_INVALID_START_CELL',
+          'SHEET_INVALID_ROWS', 'SHEET_RANGE_OUT_OF_BOUNDS', 'SHEET_RANGE_CHECK_FAILED',
+          'SHEET_WRITE_PARTIAL', 'SHEET_CHART_PARTIAL', 'SHEET_SORT_FAILED', 'SHEET_SORT_MERGED_RANGE']
+        const msg = sheetErrors.includes(code) ? this.$t('editor.sheetErrors.' + code)
+          : (res && (res.message || res.error)) || this.$t('editor.toolbar.opFailed')
         this.calcErr = msg
         if (!this.menu) {
           try { uni.showToast({ title: msg, icon: 'none' }) } catch (e) {}
@@ -2570,6 +2659,10 @@ export default {
 
 .etb-btn { position: relative; display: flex; align-items: center; justify-content: center; gap: 3px;
   min-width: 26px; height: 26px; padding: 0 5px; border-radius: var(--awd-radius-sm); color: var(--awd-text-2); flex-shrink: 0; }
+.etb-show-btn { margin: 0; border: 0; background: transparent; font: inherit; line-height: normal; }
+.etb-show-btn::after { border: 0; }
+.etb-show-btn:disabled { opacity: .45; }
+.etb-show-btn:focus-visible { outline: 2px solid var(--awd-accent-text); outline-offset: 1px; }
 .etb-btn:hover { background: var(--awd-surface-2); }
 .etb-btn.on { background: var(--awd-accent-soft); color: var(--awd-accent-text); }
 .etb-btn.off { color: var(--awd-text-3); }

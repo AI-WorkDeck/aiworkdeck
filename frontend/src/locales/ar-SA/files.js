@@ -52,7 +52,7 @@ export default {
     "previewTimeout": "انتهت مهلة تحضير معاينة الصوت. أغلق علامة التبويب هذه وافتحها مرة أخرى.",
     "playFailed": "لا يمكن تشغيل هذا الملف. قد يكون الترميز غير مدعوم.",
     "backToCurrent": "العودة إلى الحالي",
-    "speakerPrefix": "{name}: ",
+    "speakerPrefix": "{name} : ",
     "summary": "{count} مقاطع · {duration}"
   },
   "captions": {

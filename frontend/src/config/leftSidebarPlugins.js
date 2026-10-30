@@ -67,18 +67,6 @@ export const LEFT_SIDEBAR_PLUGINS = [
     ]
   },
   {
-    // 项目（dev-board#1047）：全部案卷的列表（原 pages/project-list 整页，内容组件
-    // components/project-list/ProjectListPane.vue）。启动落工作台外壳之后，「换一个项目 /
-    // 打开一个项目」就是这里。有无项目两态都在 rail 上；无项目态下 rail 只剩它与几个全局项
-    // （见 pages/project-overview/noProjectShell.js 的 NO_PROJECT_PANE_KEYS）。
-    key: 'projects',
-    get label() { return t('config.sidebar.projects') },
-    svgPaths: [
-      { d: 'M20 17a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2Z' },
-      { d: 'M2 8v11a2 2 0 0 0 2 2h14' }
-    ]
-  },
-  {
     key: 'dd-client',
     get label() { return t('ddWorkflow.clientWorkspace') },
     svgPaths: [{ d: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' }, { d: 'M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0' }, { d: 'M16 11l2 2 4-4' }]
@@ -167,6 +155,7 @@ export function getPluginsForUser(role, { cloudTrack = false } = {}) {
  * 判不出这份案卷有没有放进案件库，宁可落在资源管理器也不落在一个可能不存在的面板上。
  */
 const LEFT_PANE_KEY_ALIASES = {
+  projects: 'files', // 目录入口已移至欢迎页；存量项目侧栏回到资源管理器（dev-board#1582）。
   messages: 'files', // 消息入口已迁至右上角头像，不再占左栏（dev-board#1490）。
   search: 'plugin-search', voice: 'plugin-voice', calendar: 'plugin-calendar', favorites: 'plugin-favorites', clipboard: 'plugin-clipboard', insight: 'plugin-insight', tmeet: 'plugin-tencent-meeting',
   desensitize: 'plugin-desensitize',

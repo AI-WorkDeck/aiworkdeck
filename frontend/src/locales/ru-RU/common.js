@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "Не удалось восстановить сеанс рабочего пространства",
   "confirm": "ОК",
   "cancel": "Отмена",
   "save": "Сохранить",
@@ -43,7 +44,7 @@ export default {
   "openFile": "Открыть файл",
   "open": "Открыть",
   "cannotResolveParentFolder": "Не удалось определить папку, содержащую этот файл",
-  "dateTimeMdHm": "{year}-{month}-{day} {time}",
+  "dateTimeMdHm": "{day}.{month}.{year} {time}",
   "registeredItems": "Зарегистрировано элементов: {count}",
   "filesCount": "{count} файлов",
   "statusRunning": "Выполняется",
@@ -57,9 +58,9 @@ export default {
   "sourceChannelOfficeWord": "Надстройка Word",
   "sourceChannelOfficeExcel": "Надстройка Excel",
   "sourceChannelOfficePowerpoint": "Надстройка для PowerPoint",
-  "sourceChannelWpsWord": "WPS Writer",
-  "sourceChannelWpsExcel": "WPS Spreadsheets",
-  "sourceChannelWpsPowerpoint": "WPS Presentation",
+  "sourceChannelWpsWord": "Надстройка WPS Writer",
+  "sourceChannelWpsExcel": "Надстройка WPS Spreadsheets",
+  "sourceChannelWpsPowerpoint": "Надстройка WPS Presentation",
   "sourceChannelPlugin": "Надстройка",
   "languagePickerLabel": "Выбрать язык",
   "languageFollowSystem": "Как в системе",

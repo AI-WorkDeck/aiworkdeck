@@ -2201,16 +2201,35 @@ let cfStyleSeq = 0; // 条件格式的"命中样式"（CellStyle）命名序号
 // 必须是分号（逗号 Err:508），跨表引用必须是 Sheet.A1（Sheet!A1 报 #NAME?
 // Err:525）。AI 与用户都按 Excel 习惯写逗号和 '!'，在此归一化——只动双引号
 // 字符串字面量之外的字符（Calc 转义引号是成对 ""，相邻翻转两次天然兼容）。
-// 代价：Excel 数组字面量的逗号列分隔与 Calc 交集操作符 '!' 会被误转，两者在
-// AI 生成的公式里出现率趋近于零，换取最高频的多参数函数全部可用。
-function normalizeFormula(f) {
+// 单引号包裹的工作表名同样必须保持字面值，包括其中的逗号、感叹号和双引号。
+// Incoming formulas use Excel array constants. Readback converts native array
+// separators back, so both the formula bar and AI read/edit/write retain shape.
+function normalizeFormula(f, toExcelArray = false) {
+  if (toExcelArray && f.charAt(0) !== '=') return f;
   let out = '';
-  let inStr = false;
+  let quote = '';
+  let arrayDepth = 0;
   for (let i = 0; i < f.length; i++) {
     const ch = f.charAt(i);
-    if (ch === '"') { inStr = !inStr; out += ch; continue; }
-    if (!inStr && ch === ',') { out += ';'; continue; }
-    if (!inStr && ch === '!') { out += '.'; continue; }
+    if (quote) {
+      out += ch;
+      if (ch === quote) {
+        if (f.charAt(i + 1) === quote) { out += f.charAt(++i); }
+        else quote = '';
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'") { quote = ch; out += ch; continue; }
+    if (ch === '{') arrayDepth++;
+    else if (ch === '}') arrayDepth = Math.max(0, arrayDepth - 1);
+    if (toExcelArray) {
+      if (arrayDepth && ch === ';') { out += ','; continue; }
+      if (arrayDepth && ch === '|') { out += ';'; continue; }
+    } else {
+      if (arrayDepth && ch === ';') { out += '|'; continue; }
+      if (ch === ',') { out += ';'; continue; }
+      if (ch === '!') { out += '.'; continue; }
+    }
     out += ch;
   }
   return out;
@@ -2591,6 +2610,7 @@ function movePageTo(page, toIndex, maxSteps) {
   const loc0 = {}; const curIndex = locatePageIndex(page, loc0);
   if (curIndex === -1) return -1;
   const total = loc0.total;
+  if (curIndex === toIndex) return curIndex;
   if (toIndex < 0 || toIndex >= total) return curIndex;
   if (toIndex !== total - 1) return movePageStepwise(page, toIndex, maxSteps);
   const nearLast = total - 2;
@@ -2685,12 +2705,15 @@ function resolveShape(page, p) {
   const wantName = p && p.shapeName != null && String(p.shapeName).trim() !== '' ? String(p.shapeName).trim() : null;
   const wantText = p && p.matchText != null && String(p.matchText).trim() !== '' ? String(p.matchText).trim() : null;
   if (wantName) {
+    let match = null;
     for (let i = 0; i < n; i++) {
       let shape; try { shape = page.getByIndex(i); } catch (e) { continue; }
       let name = ''; try { name = shape.getName(); } catch (e) {}
-      if (name === wantName) return { shape: shape, index: i, name: name };
+      if (name !== wantName) continue;
+      if (match) return { error: 'SLIDE_AMBIGUOUS_SHAPE', shapeName: wantName };
+      match = { shape: shape, index: i, name: name };
     }
-    return { error: '形状不存在: ' + wantName + '（该页共 ' + n + ' 个形状，可用 slide_get_page 查看）' };
+    return match || { error: '形状不存在: ' + wantName + '（该页共 ' + n + ' 个形状，可用 slide_get_page 查看）' };
   }
   if (wantText) {
     for (let i = 0; i < n; i++) {
@@ -2795,6 +2818,134 @@ function shapeCharFormat(shape) {
       : (enumEq(a, A.BLOCK) || enumEq(a, A.STRETCH)) ? 'justify' : 'left';
   } catch (e) {}
   return out;
+}
+
+// Pane configuration is view-only and belongs to one loaded document.
+let slideShowViewState = null;
+function restoreSlideShowView() {
+  const saved = slideShowViewState;
+  slideShowViewState = null;
+  if (!saved || saved.documentSeq !== docSeq) return;
+  saved.controller.restoreConfiguration(saved.configuration);
+  saved.controller.update();
+  Module.resumeMainLoop();
+}
+
+function slideError(code, details) {
+  return Object.assign({ success: false, error: code, message: code, errorCode: code }, details || {});
+}
+
+// Replace only the selected characters; whole-frame setString destroys mixed formatting.
+function slideReplaceTextRange(text, search, replacement, all) {
+  if (search === replacement) return 0;
+  const full = String(text.getString() || '');
+  const offsets = [];
+  for (let at = full.indexOf(search); at !== -1; at = full.indexOf(search, at + search.length)) {
+    offsets.push(at);
+    if (!all) break;
+  }
+  for (let i = offsets.length - 1; i >= 0; i--) {
+    const cur = text.createTextCursor();
+    cur.gotoStart(false);
+    if (offsets[i] && !cur.goRight(offsets[i], false)) throw new Error('Cannot locate replacement start');
+    if (!cur.goRight(search.length, true) || cur.getString() !== search) throw new Error('Replacement text changed');
+    cur.setString(replacement);
+    // Impress text UNO writes do not set the model dirty or emit modify events.
+    // Mark each completed edit so a later failed replacement still gets saved.
+    xModel.setModified(true);
+  }
+  return offsets.length;
+}
+
+// Probe optional UNO properties before reading: unsupported access can poison WASM.
+function slideProperty(source, name) {
+  if (!source || !source.getPropertySetInfo) return null;
+  try {
+    if (!source.getPropertySetInfo().hasPropertyByName(name)) return null;
+    return source.getPropertyValue(name);
+  } catch (e) { return null; }
+}
+function slideEnumName(value, family, names) {
+  for (const name of names) {
+    if (family && family[name] != null && enumEq(value, family[name])) return name.toLowerCase();
+  }
+  return 'unknown';
+}
+function slidePaintFormat(source) {
+  const out = {};
+  for (const prop of ['FillStyle', 'FillColor', 'FillTransparence', 'LineStyle', 'LineColor', 'LineWidth']) {
+    const value = slideProperty(source, prop);
+    if (value == null) continue;
+    if (prop === 'FillStyle' || prop === 'LineStyle') {
+      const family = css.drawing && css.drawing[prop];
+      out[prop] = slideEnumName(value, family, prop === 'FillStyle'
+        ? ['NONE', 'SOLID', 'GRADIENT', 'HATCH', 'BITMAP'] : ['NONE', 'SOLID', 'DASH']);
+      continue;
+    }
+    out[prop] = /Color$/.test(prop) ? '#' + ('000000' + (Number(value) >>> 0).toString(16)).slice(-6)
+      : prop === 'LineWidth' ? hmmToPt(value) : (typeof value === 'object' && typeof value.value === 'number' ? value.value : value);
+  }
+  return out;
+}
+function slideBackground(page) {
+  const own = slideProperty(page, 'Background');
+  if (own) return { source: 'page', format: slidePaintFormat(own) };
+  let master = null; try { master = page.getMasterPage(); } catch (e) {}
+  const inherited = slideProperty(master, 'Background');
+  return { source: inherited ? 'master' : 'unavailable', format: inherited ? slidePaintFormat(inherited) : null };
+}
+function slideTextStyle(source) {
+  const out = {};
+  const props = { fontName: 'CharFontName', fontNameAsian: 'CharFontNameAsian', fontSize: 'CharHeight',
+    fontSizeAsian: 'CharHeightAsian', weight: 'CharWeight', weightAsian: 'CharWeightAsian',
+    italic: 'CharPosture', underline: 'CharUnderline', color: 'CharColor', alignment: 'ParaAdjust',
+    spaceBeforePt: 'ParaTopMargin', spaceAfterPt: 'ParaBottomMargin',
+    leftIndentPt: 'ParaLeftMargin', rightIndentPt: 'ParaRightMargin', firstLineIndentPt: 'ParaFirstLineIndent' };
+  for (const [key, prop] of Object.entries(props)) {
+    const value = slideProperty(source, prop);
+    if (value == null) continue;
+    if (key === 'italic') {
+      const slant = slideEnumName(value, css.awt && css.awt.FontSlant,
+        ['NONE', 'OBLIQUE', 'ITALIC', 'DONTKNOW', 'REVERSE_OBLIQUE', 'REVERSE_ITALIC']);
+      out.fontSlant = slant;
+      out.italic = slant === 'unknown' || slant === 'dontknow' ? null : slant !== 'none';
+      continue;
+    }
+    if (key === 'alignment') {
+      out.alignment = slideEnumName(value, css.style && css.style.ParagraphAdjust, ['LEFT', 'RIGHT', 'BLOCK', 'CENTER', 'STRETCH']);
+      continue;
+    }
+    out[key] = key.endsWith('Pt') ? hmmToPt(value)
+      : key === 'color' ? (Number(value) === -1 ? 'auto' : '#' + ('000000' + (Number(value) >>> 0).toString(16)).slice(-6))
+      : typeof value === 'object' ? (typeof value.value === 'number' ? value.value : String(value)) : value;
+  }
+  const spacing = slideProperty(source, 'ParaLineSpacing');
+  if (spacing != null) out.lineSpacing = { mode: Number(spacing.Mode), height: Number(spacing.Height) };
+  return out;
+}
+function slideTextDetails(shape) {
+  const paragraphs = [];
+  let chars = 0, runs = 0;
+  try {
+    const en = shape.getText().createEnumeration();
+    while (en.hasMoreElements()) {
+      if (paragraphs.length >= 50 || runs >= 200 || chars >= 12000) return { paragraphs: paragraphs, truncated: true, available: true };
+      const para = en.nextElement();
+      const text = String(para.getString() || '');
+      const item = { text: text.slice(0, 12000 - chars), formatScope: 'paragraph-defaults', format: slideTextStyle(para), runs: [] };
+      paragraphs.push(item);
+      chars += text.length;
+      if (chars > 12000) return { paragraphs: paragraphs, truncated: true, available: true };
+      const pen = para.createEnumeration();
+      while (pen.hasMoreElements()) {
+        if (runs >= 200) return { paragraphs: paragraphs, truncated: true, available: true };
+        const run = pen.nextElement();
+        item.runs.push({ text: String(run.getString() || ''), formatScope: 'text-run', format: slideTextStyle(run) });
+        runs++;
+      }
+    }
+    return { paragraphs: paragraphs, truncated: false, available: true };
+  } catch (e) { return { paragraphs: paragraphs, truncated: true, available: false }; }
 }
 
 // Calc 当前活动工作表、单元格与选区解析（供 get_ui_state / format_selection / set_paragraph_format / ui_command 共用）
@@ -5689,12 +5840,12 @@ const EXEC = {
         try { cellVal = readCellOut(selInfo.cell); } catch (e) {}
         try {
           if (enumEq(selInfo.cell.getType(), css.table.CellContentType.FORMULA)) {
-            cellFormula = String(selInfo.cell.getFormula() || '');
+            cellFormula = normalizeFormula(String(selInfo.cell.getFormula() || ''), true);
           } else {
             cellFormula = cellVal != null ? String(cellVal) : cellText;
           }
         } catch (e) {
-          try { cellFormula = String(selInfo.cell.getFormula() || cellText || ''); } catch (e2) {}
+          try { cellFormula = normalizeFormula(String(selInfo.cell.getFormula() || cellText || ''), true); } catch (e2) {}
         }
       }
       out.selection = {
@@ -6376,6 +6527,10 @@ const EXEC = {
     // the shape of RESULTS only, and only in some zetajs builds.)
     const bytes = Array.from(new Int8Array(u8.buffer, u8.byteOffset, u8.byteLength));
 
+    if(slideShowViewState) {
+      try{if(isImpressDoc() && xModel.getPresentation().isRunning())xModel.getPresentation().end();}catch(_){}
+      try{restoreSlideShowView();}catch(_){}
+    }
     // Retarget the worker's model/controller onto a freshly-loaded component.
     const retarget = (loaded) => {
       const previous = xModel;
@@ -6832,7 +6987,12 @@ const EXEC = {
         slideNumber: (p && p.slideNumber != null) ? Number(p.slideNumber) : ctx.slideNumber,
         shapeName: targetShapeName,
       };
-      if (p && p.alignment != null) sp.alignment = String(p.alignment).toLowerCase();
+      if (p && (p.styleName != null || p.headingLevel != null)) return slideError('SLIDE_UNSUPPORTED_PARAGRAPH_STYLE');
+      for (const key of ['alignment', 'anchorText', 'lineSpacingMode', 'lineSpacingValue',
+        'spaceBeforePt', 'spaceAfterPt', 'spaceBeforeLines', 'spaceAfterLines',
+        'firstLineIndentPt', 'firstLineIndentChars', 'leftIndentPt', 'leftIndentChars', 'rightIndentPt']) {
+        if (p && p[key] != null) sp[key] = p[key];
+      }
       return EXEC.slide_format_text(sp);
     }
     const tgt = resolveFormatTargets(p);
@@ -9469,8 +9629,8 @@ const EXEC = {
         const cell = range.getCellByPosition(c, r);
         row.push(readCellOut(cell));
         try {
-          if (enumEq(cell.getType(), css.table.CellContentType.FORMULA) && formulas.length < 100) {
-            formulas.push({ cell: colLetterOf(addr.StartColumn + c) + (addr.StartRow + r + 1), formula: cell.getFormula() });
+          if (enumEq(cell.getType(), css.table.CellContentType.FORMULA)) {
+            formulas.push({ cell: colLetterOf(addr.StartColumn + c) + (addr.StartRow + r + 1), formula: normalizeFormula(cell.getFormula(), true) });
           }
         } catch (e) {}
       }
@@ -9533,18 +9693,32 @@ const EXEC = {
     const rows = p && p.rows;
     if (!Array.isArray(rows) || !rows.length) return { success: false, message: 'sheet_write_cells requires {rows: any[][]}' };
     if (rows.length > 500) return { success: false, message: '一次最多写 500 行，请分批写入' };
-    const anchor = sheetRange(sheet, String(p.startCell || 'A1'));
+    if (!p.startCell || !/^\$?[A-Za-z]+\$?[1-9]\d*$/.test(String(p.startCell))) return tableFail('SHEET_INVALID_START_CELL');
+    for (const line of rows) {
+      if (!Array.isArray(line) || !line.length || line.some(v => v != null && !['string', 'number', 'boolean'].includes(typeof v)) || line.some(v => typeof v === 'number' && !Number.isFinite(v))) return tableFail('SHEET_INVALID_ROWS');
+    }
+    const anchor = sheetRange(sheet, String(p.startCell));
     if (!anchor) return { success: false, message: '无效的起始单元格: ' + p.startCell };
     const a0 = anchor.getRangeAddress();
     let nCols = 1;
     for (let i = 0; i < rows.length; i++) if (Array.isArray(rows[i])) nCols = Math.max(nCols, rows[i].length);
     if (nCols > 100) return { success: false, message: '一次最多写 100 列，请分批写入' };
+    try {
+      if (a0.StartRow + rows.length > sheet.getRows().getCount() || a0.StartColumn + nCols > sheet.getColumns().getCount()) return tableFail('SHEET_RANGE_OUT_OF_BOUNDS');
+    } catch (e) { return tableFail('SHEET_RANGE_CHECK_FAILED'); }
+    if (sheet.isProtected()) {
+      for (let r = 0; r < rows.length; r++) {
+        for (let c = 0; c < rows[r].length; c++) {
+          if (rows[r][c] != null && sheet.getCellByPosition(a0.StartColumn + c, a0.StartRow + r).getPropertyValue('CellProtection').IsLocked) return tableFail('SHEET_PROTECTED_CELL');
+        }
+      }
+    }
     let written = 0;
     const formulaCells = []; // 写完统一验错：解析失败/求值出错的公式要报给 AI 自纠
     // 追加到表格下方时沿用上一行格式（dev-board#844，判定见 shouldInheritRowFormat）。
     // inheritFormat 缺省开，显式 false 才关。逐行判定、逐行级联：多行追加时第 2 行
     // 看的「上一行」就是刚写好的第 1 行。
-    const inherit = !(p && p.inheritFormat === false);
+    const inherit = !sheet.isProtected() && !(p && p.inheritFormat === false);
     const formatInherited = [];
     // 抄格式是一串属性写入：摘下修改监听器（每条写入一次 35ms 回调，见
     // suspendModifyListener），并把值和格式收进同一个撤销组——撤销一次，新行连同
@@ -9584,6 +9758,8 @@ const EXEC = {
         written++;
       }
     }
+    } catch (e) {
+      return { ...tableFail('SHEET_WRITE_PARTIAL'), cellsWritten: written, retryable: false, sheet: sheet.getName(), startCell: String(p.startCell) };
     } finally {
       unlockModel();
       if (um) { try { um.leaveUndoContext(); } catch (e) {} }
@@ -9624,8 +9800,14 @@ const EXEC = {
     if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
     try { ctrl.select(range); } catch (e) { return { success: false, message: '选中失败: ' + errStr(e) }; }
     const addr = range.getRangeAddress();
+    let visibleRange = null;
+    try {
+      ctrl.setFirstVisibleRow(addr.StartRow);
+      ctrl.setFirstVisibleColumn(addr.StartColumn);
+      visibleRange = sheetRangeName(ctrl.getVisibleRange());
+    } catch (_) { /* Selection remains valid even if the host cannot reveal it. */ }
     return {
-      success: true, sheet: r0.sheet.getName(), range: sheetRangeName(addr),
+      success: true, sheet: r0.sheet.getName(), range: sheetRangeName(addr), visibleRange,
       topLeftText: String(range.getCellByPosition(0, 0).getString() || ''),
     };
   },
@@ -9634,6 +9816,7 @@ const EXEC = {
   sheet_format_cells(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
     const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
@@ -9692,6 +9875,7 @@ const EXEC = {
   sheet_set_borders(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
     const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
@@ -9730,6 +9914,7 @@ const EXEC = {
   sheet_set_row_col(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
     const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
@@ -9805,6 +9990,7 @@ const EXEC = {
   sheet_edit_rows_cols(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
     const op = String((p && (p.op || p.action)) || '').toLowerCase();
     const count = Math.max(1, Math.min(Number(p && p.count) || 1, 100));
@@ -9837,6 +10023,7 @@ const EXEC = {
   sheet_merge_cells(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
     const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
@@ -9850,14 +10037,13 @@ const EXEC = {
   },
   // [表格·结构] 区域排序。byColumn 是列标（'B'，须在区域内），ascending 默认
   // true，hasHeader 默认 true（首行不参与排序）。
-  // 为什么不走 XSortable.sort()：SortFields 需要 sequence<TableSortField>，而
-  // 引擎 WASM 没为该类型预编 embind 序列构造器（getEmbindSequenceCtor 直接抛，
-  // 裸 Array 又被猜成 sequence<any> 被 Calc 静默忽略——组 19 真机实证两条路都
-  // 死）。改为 worker 内读值 → JS 排 → 回写：值与公式文本随行整体移动；代价是
-  // 单元格格式不随行移动、公式相对引用不重定位（数值表主流场景无影响）。
+  // Native Calc sorting preserves row formats and relocates formula references.
+  // XSortable's TableSortField sequence is not bound in this WASM build; use the
+  // equivalent scalar UNO dispatch contract (sc/sdi/scalc.sdi: DataSort).
   sheet_sort_range(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     let range;
     if (p && p.range) {
       range = sheetRange(r0.sheet, String(p.range));
@@ -9881,52 +10067,30 @@ const EXEC = {
     const asc = p.ascending !== false;
     const headerOfs = p.hasHeader !== false ? 1 : 0;
     const keyOfs = byCol - addr.StartColumn;
-    const T = css.table.CellContentType;
-    // 读出待排行（每格记类型，回写时保真：公式回 setFormula、数值回 setValue）
-    const dataRows = [];
-    for (let r = headerOfs; r < nRows; r++) {
-      const line = [];
-      for (let c = 0; c < nCols; c++) {
-        const cell = range.getCellByPosition(c, r);
-        const t = cell.getType();
-        if (enumEq(t, T.EMPTY)) line.push({ k: 'e' });
-        else if (enumEq(t, T.FORMULA)) line.push({ k: 'f', f: cell.getFormula(), sort: readCellOut(cell) });
-        else if (enumEq(t, T.VALUE)) line.push({ k: 'v', v: cell.getValue() });
-        else line.push({ k: 's', s: cell.getString() });
-      }
-      dataRows.push(line);
-    }
-    const keyOf = function (line) {
-      const it = line[keyOfs];
-      if (!it || it.k === 'e') return null; // 空值恒排最后（Calc 口径）
-      if (it.k === 'v') return it.v;
-      if (it.k === 'f') return it.sort;
-      return it.s;
-    };
-    dataRows.sort(function (a, b) {
-      const ka = keyOf(a), kb = keyOf(b);
-      if (ka === null && kb === null) return 0;
-      if (ka === null) return 1;
-      if (kb === null) return -1;
-      const na = typeof ka === 'number', nb = typeof kb === 'number';
-      let cmp;
-      if (na && nb) cmp = ka - kb;
-      else if (na !== nb) cmp = na ? -1 : 1; // 数值排在文本前（Calc 升序口径）
-      else cmp = String(ka).localeCompare(String(kb), 'zh');
-      return asc ? cmp : -cmp;
-    });
+    // A one-row selection has nothing to sort. Dispatching a single cell would
+    // let Calc expand it to the surrounding data region.
+    if (nRows <= 1) return { success: true, range: sheetRangeName(addr), byColumn: colLetterOf(byCol), ascending: asc, sortedSample: [] };
     try {
-      for (let r = 0; r < dataRows.length; r++) {
-        for (let c = 0; c < nCols; c++) {
-          const cell = range.getCellByPosition(c, headerOfs + r);
-          const it = dataRows[r][c];
-          if (it.k === 'v') cell.setValue(it.v);
-          else if (it.k === 'f') cell.setFormula(it.f);
-          else if (it.k === 's') cell.setString(it.s);
-          else cell.setString('');
-        }
-      }
-    } catch (e) { return { success: false, message: '排序回写失败: ' + errStr(e) }; }
+      // Expand the target once to catch a merged anchor outside its boundaries.
+      const cursor = r0.sheet.createCursorByRange(range);
+      cursor.collapseToMergedArea();
+      const expanded = cursor.getRangeAddress();
+      if (expanded.StartRow !== addr.StartRow || expanded.EndRow !== addr.EndRow
+          || expanded.StartColumn !== addr.StartColumn || expanded.EndColumn !== addr.EndColumn) return tableFail('SHEET_SORT_MERGED_RANGE');
+      if (range.getIsMerged()) return tableFail('SHEET_SORT_MERGED_RANGE');
+      ctrl.setActiveSheet(r0.sheet);
+      ctrl.select(range);
+      const dispatcher = context.getServiceManager().createInstanceWithContext('com.sun.star.frame.DispatchHelper', context);
+      dispatcher.executeDispatch(ctrl.getFrame(), '.uno:DataSort', '', 0, [
+        mkProp('ByRows', true), mkProp('HasHeader', headerOfs === 1),
+        mkProp('CaseSensitive', false), mkProp('NaturalSort', false),
+        mkProp('IncludeAttribs', true), mkProp('IncludeComments', true), mkProp('IncludeImages', true),
+        mkProp('UserDefIndex', new zetajs.Any(zetajs.type.unsigned_short, 0)),
+        mkProp('Col1', new zetajs.Any(zetajs.type.long, byCol + 1)), mkProp('Ascending1', asc),
+        mkProp('Col2', new zetajs.Any(zetajs.type.long, 0)), mkProp('Col3', new zetajs.Any(zetajs.type.long, 0))
+      ]);
+    } catch (e) { return { success: false, error: 'SHEET_SORT_FAILED', message: 'SHEET_SORT_FAILED', detail: errStr(e) }; }
+
     try { ctrl.select(range); } catch (e) {}
     // 验证回路：回读排序列前几个值
     const sample = [];
@@ -9942,6 +10106,7 @@ const EXEC = {
   sheet_set_autofilter(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
     let addr;
     if (p.range) {
@@ -9989,6 +10154,7 @@ const EXEC = {
   sheet_conditional_format(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return { success: false, message: r0.error };
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
     const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return { success: false, message: '无效的区域: ' + (p.range || '(空)') };
@@ -10063,6 +10229,7 @@ const EXEC = {
   sheet_add_comment(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return tableFail(r0.error);
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
     const cellStr = p && p.cell ? String(p.cell).trim() : '';
     const text = p && p.text != null ? String(p.text) : '';
@@ -10102,7 +10269,14 @@ const EXEC = {
         const item = { index: i, cell: colLetterOf(pos.Column) + (pos.Row + 1) };
         try { item.author = String(anno.getAuthor() || ''); } catch (e) {}
         try { item.date = String(anno.getDate() || ''); } catch (e) {}
-        try { item.text = String(anno.getString() || '').slice(0, 500); } catch (e) {}
+        try {
+          // Imported XLSX notes keep lazy caption text until the annotation shape is materialized.
+          let text = String(anno.getString() || '');
+          if (!text) text = String(anno.getAnnotationShape().getString() || '');
+          item.text = text.slice(0, 500);
+          item.textLength = text.length;
+          item.textTruncated = text.length > item.text.length;
+        } catch (e) { item.textUnavailable = true; }
         out.push(item);
       }
     } catch (e) { return tableFail(errStr(e)); }
@@ -10111,6 +10285,7 @@ const EXEC = {
   sheet_delete_comment(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return tableFail(r0.error);
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
     const cellStr = p && p.cell ? String(p.cell).trim() : '';
     if (!cellStr) return tableFail('sheet_delete_comment requires {cell}（如 "B2"）');
@@ -10140,6 +10315,7 @@ const EXEC = {
   sheet_set_data_validation(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return tableFail(r0.error);
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
     const range = sheetRange(r0.sheet, rangeRef);
     if (!range) return tableFail('无效的区域: ' + (p.range || '(空)'));
@@ -10182,9 +10358,9 @@ const EXEC = {
     try {
       const v = range.getPropertyValue('Validation');
       v.setPropertyValue('Type', css.sheet.ValidationType[typeKey]);
-      if (operatorKey) v.setPropertyValue('Operator', css.sheet.ConditionOperator[operatorKey]);
-      v.setPropertyValue('Formula1', formula1);
-      if (formula2) v.setPropertyValue('Formula2', formula2);
+      if (operatorKey) v.setOperator(css.sheet.ConditionOperator[operatorKey]);
+      v.setFormula1(formula1);
+      v.setFormula2(formula2);
       v.setPropertyValue('IgnoreBlankCells', (p && p.allowBlank) !== false);
       if (p && p.showInputMessage) {
         v.setPropertyValue('ShowInputMessage', true);
@@ -10211,11 +10387,12 @@ const EXEC = {
   sheet_add_chart(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return tableFail(r0.error);
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
     const range = sheetRange(sheet, String((p && p.range) || ''));
     if (!range) return tableFail('无效的数据区域: ' + ((p && p.range) || '(空)'));
     const addr = range.getRangeAddress();
-    const TYPE_MAP = { column: { cls: 'Bar', vertical: true }, bar: { cls: 'Bar', vertical: false }, line: { cls: 'Line' }, pie: { cls: 'Pie' } };
+    const TYPE_MAP = { column: { cls: 'Bar', vertical: false }, bar: { cls: 'Bar', vertical: true }, line: { cls: 'Line' }, pie: { cls: 'Pie' } };
     const chartTypeRaw = (p && (p.chartType != null ? p.chartType : p.type)) || 'column';
     const typeInfo = TYPE_MAP[String(chartTypeRaw).toLowerCase()];
     if (!typeInfo) return tableFail('bad chartType: ' + chartTypeRaw + ' (column/bar/line/pie)');
@@ -10244,16 +10421,16 @@ const EXEC = {
       if (p && p.title) {
         try {
           embedded.setPropertyValue('HasMainTitle', true);
-          embedded.getTitle().setString(String(p.title));
+          embedded.getTitle().setPropertyValue('String', String(p.title));
         } catch (e) { note.push('标题设置失败'); }
       }
     } catch (e) { note.push('图表类型/标题设置失败: ' + errStr(e)); }
     const res = {
-      success: true, name: name, chartType: String((p && p.chartType) || 'column').toLowerCase(),
+      success: true, name: name, chartType: String(chartTypeRaw).toLowerCase(),
       range: sheetRangeName(addr), sheet: sheet.getName(),
     };
     if (p && p.title) res.title = String(p.title);
-    if (note.length) res.note = note.join('；');
+    if (note.length) return { ...res, ...tableFail('SHEET_CHART_PARTIAL'), created: true, retryable: false };
     return res;
   },
   // [表格·看] Excel 专用查找：遍历区域（缺省=已用区域）逐格比对字符串，不区分
@@ -10270,6 +10447,7 @@ const EXEC = {
     let addr;
     try {
       const range = (p && p.range) ? sheetRange(sheet, p.range) : null;
+      if (p && p.range && !range) return tableFail('SHEET_INVALID_RANGE');
       addr = range ? range.getRangeAddress() : usedRangeAddress(sheet);
     } catch (e) { return tableFail('读取搜索区域失败: ' + errStr(e)); }
     const nRows = addr.EndRow - addr.StartRow + 1;
@@ -10308,6 +10486,7 @@ const EXEC = {
   sheet_find_replace(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return tableFail(r0.error);
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
     const find = (p && p.find != null) ? String(p.find) : '';
     if (!find) return tableFail('sheet_find_replace requires {find}');
@@ -10424,7 +10603,7 @@ const EXEC = {
       const range = sheetRange(r0.sheet, String((p && p.range) || ''));
       if (!range) return tableFail('无效的区域: ' + ((p && p.range) || '(空)'));
       const addr = range.getRangeAddress();
-      const content = '$' + r0.sheet.getName() + '.' + absCellRef(addr.StartColumn, addr.StartRow)
+      const content = "$'" + r0.sheet.getName().replace(/'/g, "''") + "'." + absCellRef(addr.StartColumn, addr.StartRow)
         + ((addr.StartColumn !== addr.EndColumn || addr.StartRow !== addr.EndRow) ? ':' + absCellRef(addr.EndColumn, addr.EndRow) : '');
       try {
         nr.addNewByName(name, content, new css.table.CellAddress({ Sheet: addr.Sheet, Column: addr.StartColumn, Row: addr.StartRow }), 0);
@@ -10455,6 +10634,7 @@ const EXEC = {
   sheet_group_rows_cols(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return tableFail(r0.error);
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
     const rangeRef = (p && p.range) ? String(p.range) : activeCalcRangeName();
     const range = sheetRange(sheet, rangeRef);
@@ -10482,6 +10662,7 @@ const EXEC = {
   sheet_add_pivot_table(p) {
     const r0 = resolveSheet(p);
     if (r0.error) return tableFail(r0.error);
+    if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
     const source = sheetRange(sheet, String((p && p.sourceRange) || ''));
     if (!source) return tableFail('无效的源数据区域: ' + ((p && p.sourceRange) || '(空)'));
@@ -10542,6 +10723,233 @@ const EXEC = {
   // 机制，写入即生效；安全网是 doc_undo 与后端文档检查点（fileEffect=MODIFIED）。
   // [幻灯片·看] 每页页码/名称/版式/母版/标题/形状数/是否有备注/是否含表格。
   // 打开演示文稿后的第一步。
+  // Native chart data is embedded in the document, never rasterized.
+  slide_add_image(p) {
+    const r0 = resolvePage(p);
+    if (r0.error) return slideFail(r0.error);
+    const fit = p.fit || 'cover';
+    if (!['cover', 'contain', 'stretch'].includes(fit) || [p.left,p.top,p.width,p.height].some(v => typeof v !== 'number' || !Number.isFinite(v)) || p.width <= 0 || p.height <= 0)
+      return slideError('SLIDE_INVALID_GEOMETRY');
+    const focalX=p.focalX==null?0.5:p.focalX,focalY=p.focalY==null?0.5:p.focalY;
+    if([focalX,focalY].some(v=>typeof v!=='number'||!Number.isFinite(v)||v<0||v>1))return slideError('SLIDE_INVALID_GEOMETRY');
+    let shape, added = false;
+    try {
+      const bin = atob(String(p.base64 || ''));
+      if (!bin.length) return slideError('SLIDE_INVALID_IMAGE');
+      const bytes = Array.from(bin, c => { const n=c.charCodeAt(0); return n>127?n-256:n; });
+      const stream = css.io.SequenceInputStream.createStreamFromSequence(context, bytes);
+      const graphic = css.graphic.GraphicProvider.create(context).queryGraphic([mkProp('InputStream', stream)]);
+      if (!graphic) return slideError('SLIDE_INVALID_IMAGE');
+      let natural = graphic.getPropertyValue('Size100thMM');
+      if (!natural.Width || !natural.Height) {
+        // Images without density metadata use the native output device's pixel scale.
+        // A fixed 96 DPI doubles crop distances on a 192 DPI/Retina canvas.
+        const pixels = graphic.getPropertyValue('SizePixel');
+        const device = css.awt.Toolkit.create(context).createScreenCompatibleDevice(1,1);
+        natural = device.convertSizeToLogic(pixels,css.util.MeasureUnit.MM_100TH);
+      }
+      if (!Number.isFinite(natural.Width) || !Number.isFinite(natural.Height) || natural.Width <= 0 || natural.Height <= 0)
+        return slideError('SLIDE_INVALID_IMAGE');
+      let w=ptToMm100(p.width), h=ptToMm100(p.height), x=ptToMm100(p.left), y=ptToMm100(p.top);
+      const targetW=w,targetH=h;
+      if (fit === 'contain') { const scale=Math.min(w/natural.Width,h/natural.Height);w=Math.round(natural.Width*scale);h=Math.round(natural.Height*scale);x+=Math.round((targetW-w)/2);y+=Math.round((targetH-h)/2); }
+      shape=xModel.createInstance('com.sun.star.drawing.GraphicObjectShape');
+      shape.setSize(new css.awt.Size({Width:w,Height:h}));shape.setPosition(new css.awt.Point({X:x,Y:y}));
+      r0.page.add(shape);added=true;ensureShapeNames(r0.page);shape.setPropertyValue('Graphic',graphic);
+      if (fit === 'cover') {
+        // GraphicCrop is expressed in the graphic's natural 1/100 mm units.
+        const physical=natural;
+        const scale=Math.max(w/physical.Width,h/physical.Height);
+        const excessX=Math.max(0,Math.round(physical.Width-w/scale)),excessY=Math.max(0,Math.round(physical.Height-h/scale));
+        const cropX=Math.round(excessX*focalX),cropY=Math.round(excessY*focalY);
+        shape.setPropertyValue('GraphicCrop',new css.text.GraphicCrop({Left:cropX,Right:excessX-cropX,Top:cropY,Bottom:excessY-cropY}));
+      }
+      if (p.sendToBack === true) shape.setPropertyValue('ZOrder',0);
+      return {success:true,slideNumber:r0.index+1,shapeName:String(shape.getName()),fit,left:hmmToPt(x),top:hmmToPt(y),width:hmmToPt(w),height:hmmToPt(h)};
+    } catch(e) {
+      let name='';try{name=String(shape.getName());}catch(_){}
+      return {...slideError(added?'SLIDE_IMAGE_PARTIAL':'SLIDE_INVALID_IMAGE'),created:added,outcomeUnknown:added,retryable:false,slideNumber:r0.index+1,shapeName:name};
+    }
+  },
+  slide_add_chart(p) {
+    const r0 = resolvePage(p);
+    if (r0.error) return slideFail(r0.error);
+    const types = { column: 'Bar', bar: 'Bar', line: 'Line', area: 'Area', pie: 'Pie', doughnut: 'Donut', scatter: 'XY' };
+    const type = p.chartType;
+    const categories = p.categories, series = p.series;
+    if (!Object.hasOwn(types,type) || !Array.isArray(categories) || !categories.length || categories.length > 100 ||
+        categories.some(v => typeof v !== 'string') || !Array.isArray(series) || !series.length || series.length > 12 ||
+        series.some(s => !s || typeof s.name !== 'string' || !Array.isArray(s.values) || s.values.length !== categories.length || s.values.some(v => typeof v !== 'number' || !Number.isFinite(v))) ||
+        (['pie', 'doughnut'].includes(type) && (series.length !== 1 || series[0].values.some(v => v < 0) || !series[0].values.some(v => v > 0))))
+      return slideError('SLIDE_INVALID_CHART_DATA');
+    const geometry = [p.left, p.top, p.width, p.height];
+    if (geometry.some(v => typeof v !== 'number' || !Number.isFinite(v)) || p.width <= 0 || p.height <= 0)
+      return slideError('SLIDE_INVALID_GEOMETRY');
+    if (type === 'scatter' && categories.some(v => !v.trim() || !Number.isFinite(Number(v)))) return slideError('SLIDE_INVALID_CHART_DATA');
+    let shape, added = false;
+    try {
+      shape = xModel.createInstance('com.sun.star.drawing.OLE2Shape');
+      shape.setPropertyValue('CLSID', '12DCAE26-281F-416F-A234-C3086127382E');
+      shape.setSize(new css.awt.Size({ Width: ptToMm100(p.width), Height: ptToMm100(p.height) }));
+      shape.setPosition(new css.awt.Point({ X: ptToMm100(p.left), Y: ptToMm100(p.top) }));
+      r0.page.add(shape); added = true;
+      ensureShapeNames(r0.page);
+      const model = shape.getPropertyValue('Model');
+      const diagram = model.createInstance('com.sun.star.chart.' + types[type] + 'Diagram');
+      model.setDiagram(diagram);
+      if (type === 'column' || type === 'bar') diagram.setPropertyValue('Vertical', type === 'bar');
+      const data = model.getData();
+      data.setData(categories.map((label, index) => type === 'scatter' ? [Number(label), ...series.map(s => s.values[index])] : series.map(s => s.values[index])));
+      data.setRowDescriptions(categories);
+      data.setColumnDescriptions(type === 'scatter' ? ['X', ...series.map(s => s.name)] : series.map(s => s.name));
+      if (type === 'scatter') {
+        const provider=model.getDataProvider(), chartType=model.getFirstDiagram().getCoordinateSystems()[0].getChartTypes()[0];
+        const chartSeries=series.map((s,i)=>{
+          const item=context.getServiceManager().createInstanceWithContext('com.sun.star.chart2.DataSeries',context);
+          const x=context.getServiceManager().createInstanceWithContext('com.sun.star.chart2.data.LabeledDataSequence',context), y=context.getServiceManager().createInstanceWithContext('com.sun.star.chart2.data.LabeledDataSequence',context);
+          const xValues=provider.createDataSequenceByRangeRepresentation('0');xValues.setPropertyValue('Role','values-x');x.setValues(xValues);
+          const yValues=provider.createDataSequenceByRangeRepresentation(String(i+1));yValues.setPropertyValue('Role','values-y');y.setValues(yValues);
+          y.setLabel(provider.createDataSequenceByRangeRepresentation('label '+(i+1)));
+          item.setData([x,y]);
+          item.setPropertyValue('LineStyle',css.drawing.LineStyle.NONE);
+          return item;
+        });
+        chartType.setDataSeries(chartSeries);
+        diagram.setPropertyValue('SymbolType', -2);
+        diagram.setPropertyValue('SymbolSize',new css.awt.Size({Width:250,Height:250}));
+      }
+      if (p.title) { model.setPropertyValue('HasMainTitle', true); model.getTitle().setPropertyValue('String', String(p.title)); }
+      model.setPropertyValue('HasLegend', series.length > 1 || type === 'pie' || type === 'doughnut');
+      return { success: true, slideNumber: r0.index + 1, shapeName: String(shape.getName()), chartType: type, categories, series };
+    } catch (e) {
+      let name = ''; try { name = String(shape.getName()); } catch (_) {}
+      return { ...slideError('SLIDE_CHART_PARTIAL'), created: added, outcomeUnknown: true, retryable: false, slideNumber: r0.index + 1, shapeName: name };
+    }
+  },
+  slide_format_chart(p) {
+    if (typeof p.shapeName !== 'string' || !p.shapeName.trim() ||
+        (p.showLegend != null && typeof p.showLegend !== 'boolean') ||
+        (p.showGrid != null && typeof p.showGrid !== 'boolean') ||
+        !['backgroundColor', 'textColor', 'fontSize', 'seriesColors', 'showLegend', 'showGrid'].some(key => p[key] != null)) return slideError('SLIDE_INVALID_CHART_STYLE');
+    const r0=resolvePage(p);if(r0.error)return slideFail(r0.error);
+    ensureShapeNames(r0.page);const rs=resolveShape(r0.page,p);if(rs.error)return slideFail(rs.error);
+    if ((p.backgroundColor != null && parseColor(p.backgroundColor)==null) || (p.textColor != null && parseColor(p.textColor)==null) ||
+        (p.fontSize != null && (typeof p.fontSize!=='number'||!Number.isFinite(p.fontSize)||p.fontSize<8||p.fontSize>72)) ||
+        (p.seriesColors != null && (!Array.isArray(p.seriesColors)||!p.seriesColors.length||p.seriesColors.length>12||p.seriesColors.some(c=>parseColor(c)==null)))) return slideError('SLIDE_INVALID_CHART_STYLE');
+    let model;try{model=rs.shape.getPropertyValue('Model');if(!model.supportsService('com.sun.star.chart.ChartDocument'))return slideError('SLIDE_NOT_CHART');}catch(e){return slideError('SLIDE_NOT_CHART');}
+    try {
+      const diagram=model.getDiagram(), diagramType=String(diagram.getDiagramType());
+      const circular=/PieDiagram|DonutDiagram/.test(diagramType), scatter=/XYDiagram/.test(diagramType);
+      if(p.backgroundColor!=null){
+        for(const target of (circular ? [model.getArea()] : [model.getArea(),diagram.getWall()])){
+          target.setPropertyValue('FillStyle',css.drawing.FillStyle.SOLID);target.setPropertyValue('FillColor',parseColor(p.backgroundColor));target.setPropertyValue('LineStyle',css.drawing.LineStyle.NONE);
+        }
+      }
+      const legend=model.getLegend();
+      legend.setPropertyValue('FillStyle',css.drawing.FillStyle.NONE);
+      legend.setPropertyValue('LineStyle',css.drawing.LineStyle.NONE);
+      if(p.showLegend!=null)model.setPropertyValue('HasLegend',p.showLegend===true);
+      if(p.showGrid!=null && !circular)diagram.setPropertyValue('HasYAxisGrid',p.showGrid===true);
+      if(p.fontSize!=null||p.textColor!=null){
+        const targets=[model.getTitle(),model.getLegend()];
+        if(!circular && diagram.getPropertyValue('HasXAxis'))targets.push(diagram.getXAxis());
+        if(!circular && diagram.getPropertyValue('HasYAxis'))targets.push(diagram.getYAxis());
+        for(const target of targets){if(p.fontSize!=null)target.setPropertyValue('CharHeight',new zetajs.Any(zetajs.type.float,p.fontSize));if(p.textColor!=null)target.setPropertyValue('CharColor',parseColor(p.textColor));}
+      }
+      if(p.seriesColors!=null){
+        const nativeSeries=model.getFirstDiagram().getCoordinateSystems().flatMap(system=>system.getChartTypes().flatMap(type=>type.getDataSeries()));
+        const count=circular ? model.getData().getRowDescriptions().length : nativeSeries.length;
+        for(let i=0;i<count;i++) {
+          const target=circular ? diagram.getDataPointProperties(i,0) : nativeSeries[i];
+          const color=parseColor(p.seriesColors[i%p.seriesColors.length]);
+          target.setPropertyValue('FillColor',color);
+          target.setPropertyValue('LineColor',color);
+          if(scatter){
+            target.setPropertyValue('Color',color);
+            target.setPropertyValue('Symbol',new css.chart2.Symbol({Style:css.chart2.SymbolStyle.STANDARD,StandardSymbol:i%8,Size:new css.awt.Size({Width:250,Height:250}),FillColor:color,BorderColor:color}));
+          }
+        }
+      }
+      return {success:true,slideNumber:r0.index+1,shapeName:rs.name};
+    }catch(e){return {...slideError('SLIDE_CHART_STYLE_PARTIAL'),outcomeUnknown:true,retryable:false,slideNumber:r0.index+1,shapeName:rs.name};}
+  },
+  // View-only native slideshow. UNO navigation must also wake the Qt worker render loop.
+  async slide_show_control(p) {
+    if (!isImpressDoc()) return slideFail(NOT_PRESENTATION_MSG);
+    const operation=p.operation || 'state';
+    const ownerModel=xModel, ownerDocumentSeq=docSeq;
+    if (!['start','next','previous','end','state'].includes(operation)) return slideError('SLIDE_INVALID_SHOW_OPERATION');
+    try {
+      const presentation=xModel.getPresentation();
+      if(operation==='start'){
+        const active=activeImpressContext();
+        const target=resolvePage({slideNumber:p.slideNumber==null?active.slideNumber:p.slideNumber});
+        if(target.error)return slideFail(target.error);
+        if(presentation.isRunning())presentation.end();
+        restoreSlideShowView();
+        const configurationController=ctrl.getConfigurationController();
+        const configuration=configurationController.getRequestedConfiguration();
+        slideShowViewState={documentSeq:docSeq,controller:configurationController,configuration};
+        // PaneHider waits synchronously up to 60s for these requests inside native
+        // startShow. Complete them while this JS action can still yield to Qt.
+        for(const resource of configuration.getResources(null,'private:resource/pane/',css.drawing.framework.AnchorBindingMode.DIRECT)) {
+          if(resource.getResourceURL()!=='private:resource/pane/CenterPane')configurationController.requestResourceDeactivation(resource);
+        }
+        configurationController.update();
+        Module.resumeMainLoop();
+        for(let attempt=0;attempt<30 && configurationController.hasPendingRequests();attempt++) {
+          await new Promise(resolve=>setTimeout(resolve,50));
+          css.awt.Toolkit.create(context).reschedule();
+        }
+        if(configurationController.hasPendingRequests() || slideShowViewState?.documentSeq!==docSeq)throw new Error('Slideshow view not ready');
+        Module.resumeMainLoop();
+        await new Promise(resolve=>setTimeout(resolve,0));
+        if(xModel!==ownerModel || docSeq!==ownerDocumentSeq)throw new Error('Slideshow document changed');
+        presentation.startWithArguments([mkProp('IsFullScreen',false),mkProp('FirstPage',target.page.getName())]);
+        const controller=presentation.getController();
+        if(!controller)throw new Error('Slideshow controller unavailable');
+        controller.activate();
+      }else if(operation==='end'){
+        if(presentation.isRunning())presentation.end();
+        restoreSlideShowView();
+      }else if(operation==='next'||operation==='previous'){
+        if(!presentation.isRunning())return slideError('SLIDE_SHOW_NOT_RUNNING');
+        const controller=presentation.getController();controller.activate();
+        if(operation==='next')controller.gotoNextSlide();else controller.gotoPreviousSlide();
+      }
+      const running=presentation.isRunning();
+      if(!running)restoreSlideShowView();
+      if(running && ['start','next','previous'].includes(operation)) Module.resumeMainLoop();
+      const controller=running?presentation.getController():null;
+      return {success:true,running,slideNumber:controller?controller.getCurrentSlideIndex()+1:null,slideCount:xModel.getDrawPages().getCount()};
+    }catch(e){
+      log('slide_show_control failed: '+errStr(e));
+      if((operation==='start' || operation==='end') && xModel===ownerModel && docSeq===ownerDocumentSeq) {
+        try{if(ownerModel.getPresentation().isRunning())ownerModel.getPresentation().end();}catch(_){}
+        try{restoreSlideShowView();}catch(_){}
+      }
+      return slideError('SLIDE_SHOW_UNAVAILABLE');
+    }
+  },
+  slide_set_transition(p) {
+    const r0 = resolvePage(p);
+    if (r0.error) return slideFail(r0.error);
+    // LibreOffice animations TransitionType / TransitionSubType IDL constants.
+    const effects = { none: [0, 0], fade: [37, 101], push: [35, 97], wipe: [1, 1] };
+    const effect = Object.hasOwn(effects,p.effect) ? effects[p.effect] : null;
+    const seconds = p.durationSeconds == null ? 0.6 : p.durationSeconds;
+    if (!effect || typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0.1 || seconds > 5)
+      return slideError('SLIDE_INVALID_TRANSITION');
+    try {
+      r0.page.setPropertyValue('TransitionType', shortAny(effect[0]));
+      r0.page.setPropertyValue('TransitionSubtype', shortAny(effect[1]));
+      r0.page.setPropertyValue('TransitionDirection', true);
+      r0.page.setPropertyValue('TransitionDuration', seconds);
+      return { success: true, slideNumber: r0.index + 1, transition: {
+        type: r0.page.getPropertyValue('TransitionType'), subtype: r0.page.getPropertyValue('TransitionSubtype'),
+        durationSeconds: r0.page.getPropertyValue('TransitionDuration') } };
+    } catch (e) { return { ...slideError('SLIDE_TRANSITION_PARTIAL'), outcomeUnknown: true, retryable: false, slideNumber: r0.index + 1 }; }
+  },
   slide_get_overview() {
     if (!isImpressDoc()) return slideFail(NOT_PRESENTATION_MSG);
     let pages;
@@ -10594,7 +11002,8 @@ const EXEC = {
       try { pos = shape.getPosition(); } catch (e) {}
       try { size = shape.getSize(); } catch (e) {}
       const item = {
-        name: name, kind: kind,
+        name: name, shapeName: name, kind: kind,
+        style: slidePaintFormat(shape),
         left: pos ? hmmToPt(pos.X) : null, top: pos ? hmmToPt(pos.Y) : null,
         width: size ? hmmToPt(size.Width) : null, height: size ? hmmToPt(size.Height) : null,
         text: shapeText(shape), isTable: kind === 'table',
@@ -10610,13 +11019,36 @@ const EXEC = {
         // 真实生效值（而非只信 setter 返回的 applied 回声）。表格形状不适用
         // （每格文字可各自不同，读整格没有意义），保持 null。
         item.format = shapeCharFormat(shape);
+        item.textDetails = slideTextDetails(shape);
       }
+      try {
+        const model = shape.getPropertyValue('Model');
+        if (model && model.supportsService('com.sun.star.chart.ChartDocument')) {
+          item.isChart = true;
+          const data = model.getData();
+          const values = data.getData(), labels = data.getColumnDescriptions(), categories = data.getRowDescriptions();
+          const plots=model.getFirstDiagram().getCoordinateSystems().flatMap(system=>system.getChartTypes().flatMap(type=>type.getDataSeries().map(series=>({
+            sequences:series.getDataSequences().map(sequence=>({
+              role:String(sequence.getValues().getPropertyValue('Role')),
+              values:sequence.getValues().getData().slice(0,100).map(value=>zetajs.fromAny(value)),
+              label:sequence.getLabel()?sequence.getLabel().getData().map(value=>zetajs.fromAny(value)):[]
+            }))
+          }))));
+          item.chart = { plots, diagramType: model.getDiagram().getDiagramType(),
+            categories: categories.slice(0, 100), seriesNames: labels.slice(0, 12),
+            values: values.slice(0, 100).map(row => row.slice(0, 12)),
+            truncated: values.length > 100 || labels.length > 12 || values.some(row => row.length > 12) };
+        }
+      } catch (e) {}
       shapes.push(item);
     }
     return {
       success: true, number: r0.index + 1, width: width, height: height,
       layout: layout, layoutName: layoutNameOf(layout), masterName: masterName,
-      notesText: notesText, shapes: shapes,
+      notesText: notesText, background: slideBackground(page), shapes: shapes,
+      transition: (() => { try { return { type: page.getPropertyValue('TransitionType'),
+        subtype: page.getPropertyValue('TransitionSubtype'), durationSeconds: page.getPropertyValue('TransitionDuration') }; }
+        catch (e) { return { available: false }; } })(),
     };
   },
   // [幻灯片·看] 备注页（Speaker Notes）文字。不传 slideNumber 读取全篇。
@@ -10681,7 +11113,13 @@ const EXEC = {
     if (rs.error) return slideFail(rs.error);
     const text = p && p.text != null ? String(p.text) : '';
     let previousText = ''; try { previousText = shapeText(rs.shape); } catch (e) {}
-    try { rs.shape.getText().setString(text); } catch (e) { return slideFail('写入形状文字失败: ' + errStr(e)); }
+    try {
+      if (previousText !== text) {
+        rs.shape.getText().setString(text);
+        // Impress setString alone leaves isModified false; trigger the normal autosave listener.
+        xModel.setModified(true);
+      }
+    } catch (e) { return slideFail('写入形状文字失败: ' + errStr(e)); }
     return { success: true, previousText: previousText };
   },
   // [幻灯片·写] 跨页（或限定单页）查找替换文字，覆盖普通文本框与表格单元格。
@@ -10690,58 +11128,64 @@ const EXEC = {
     if (!isImpressDoc()) return slideFail(NOT_PRESENTATION_MSG);
     const searchText = p && p.searchText != null ? String(p.searchText) : '';
     if (!searchText) return slideFail('缺少 searchText 参数');
-    const replaceText = p && p.replaceText != null ? String(p.replaceText) : '';
-    const all = !!(p && p.all);
+    if (p.replaceText == null) return slideError('SLIDE_MISSING_REPLACE_TEXT');
+    const replaceText = String(p.replaceText);
+    const all = p.all === true;
+    if ((p.shapeName != null || p.expectedText != null) && p.slideNumber == null) {
+      return slideError('SLIDE_TARGET_REQUIRED');
+    }
+    if (p.expectedText != null && !p.shapeName) return slideError('SLIDE_EXPECTED_TARGET_REQUIRED');
     let pages;
     try { pages = xModel.getDrawPages(); } catch (e) { return slideFail('读取幻灯片列表失败: ' + errStr(e)); }
     const count = pages.getCount();
     let from = 0, to = count - 1;
-    if (p && p.slideNumber != null) {
+    if (p.slideNumber != null) {
       const want = Number(p.slideNumber);
-      if (!Number.isFinite(want) || want < 1 || want > count) {
-        return slideFail('页码越界: ' + p.slideNumber + '（共 ' + count + ' 页，1 开始）');
-      }
+      if (!Number.isInteger(want) || want < 1 || want > count) return slideError('SLIDE_INVALID_NUMBER');
       from = to = want - 1;
     }
     let replaced = 0;
     const hits = [];
-    for (let pi = from; pi <= to; pi++) {
-      let page; try { page = pages.getByIndex(pi); } catch (e) { continue; }
-      ensureShapeNames(page);
-      const n = page.getCount();
-      for (let si = 0; si < n; si++) {
-        let shape; try { shape = page.getByIndex(si); } catch (e) { continue; }
-        const kind = shapeKind(shape);
-        if (kind === 'table') {
-          let table; try { table = shape.getPropertyValue('Model'); } catch (e) { continue; }
-          let rows = 0, cols = 0;
-          try { rows = table.getRows().getCount(); cols = table.getColumns().getCount(); } catch (e) { continue; }
-          for (let r = 0; r < rows; r++) {
-            for (let c = 0; c < cols; c++) {
-              let cell; try { cell = table.getCellByPosition(c, r); } catch (e) { continue; }
-              let cellText = ''; try { cellText = cell.getString() || ''; } catch (e) {}
-              if (!cellText || cellText.indexOf(searchText) === -1) continue;
-              const hitCount = cellText.split(searchText).length - 1;
-              const newText = cellText.split(searchText).join(replaceText);
-              try { cell.setString(newText); } catch (e) { continue; }
-              replaced += hitCount;
-              let name = ''; try { name = shape.getName(); } catch (e) {}
-              hits.push({ slideNumber: pi + 1, shapeName: name });
-              if (!all) return { success: true, replaced: replaced, hits: hits };
-            }
+    try {
+      for (let pi = from; pi <= to; pi++) {
+        const page = pages.getByIndex(pi);
+        ensureShapeNames(page);
+        let target = null;
+        if (p.shapeName) {
+          target = resolveShape(page, p);
+          if (target.error) return slideFail(target.error);
+          if (p.expectedText != null && shapeText(target.shape) !== String(p.expectedText)) {
+            return slideError('SLIDE_STALE_TEXT');
           }
-          continue;
         }
-        const text = shapeText(shape);
-        if (!text || text.indexOf(searchText) === -1) continue;
-        const hitCount = text.split(searchText).length - 1;
-        const newText = text.split(searchText).join(replaceText);
-        try { shape.getText().setString(newText); } catch (e) { continue; }
-        replaced += hitCount;
-        let name = ''; try { name = shape.getName(); } catch (e) {}
-        hits.push({ slideNumber: pi + 1, shapeName: name });
-        if (!all) return { success: true, replaced: replaced, hits: hits };
+        for (let si = 0; si < page.getCount(); si++) {
+          if (target && si !== target.index) continue;
+          const shape = target ? target.shape : page.getByIndex(si);
+          const name = shape.getName();
+          const replaceIn = (text, row, col) => {
+            const changed = slideReplaceTextRange(text, searchText, replaceText, all);
+            if (changed) {
+              replaced += changed;
+              hits.push({ slideNumber: pi + 1, shapeName: name, row: row, col: col, replaced: changed });
+            }
+          };
+          if (shapeKind(shape) === 'table') {
+            const table = shape.getPropertyValue('Model');
+            for (let row = 0; row < table.getRows().getCount(); row++) {
+              for (let col = 0; col < table.getColumns().getCount(); col++) {
+                replaceIn(table.getCellByPosition(col, row), row, col);
+                if (!all && replaced) return { success: true, replaced: replaced, hits: hits };
+              }
+            }
+          } else if (shapeText(shape).includes(searchText)) {
+            replaceIn(shape.getText(), null, null);
+            if (!all && replaced) return { success: true, replaced: replaced, hits: hits };
+          }
+        }
       }
+    } catch (e) {
+      return slideError('SLIDE_REPLACE_INTERRUPTED',
+        { detail: errStr(e), replaced: replaced, hits: hits, outcomeUnknown: true, retryable: false });
     }
     return { success: true, replaced: replaced, hits: hits };
   },
@@ -10765,135 +11209,115 @@ const EXEC = {
     } else {
       insertIndex = count; // 缺省末尾
     }
-    // 真机实测（r4）：XDrawPages.insertNewByIndex(nIndex) 的落点在这个引擎构建上
-    // 不总是 nIndex 本身——边界情形（nIndex===当前页数）与看似正常的中间索引都
-    // 观察到过偏差（debug_impress_bare_append 探针 + e2e 组 22 实测均复现），死信
-    // 任何具体传入索引都不可靠。改用唯一没有歧义的调用方式：永远插在最前面
-    // （index 0，不存在"边界"这回事），定位到它后再用已验证可靠的 .uno:MovePage*
-    // 挪到真正目标位置（与 slide_move_page 同一套实现，已过多组真机断言）。
-    // 另外，文档已经历过一次插入后，同一文档上再插入可能连带清空某个"仅标题"
-    // 版式（无内容占位符）既有页的标题占位符——与我们往新页里塞了什么完全无关
-    // （裸调、不加任何内容也一样复现），疑似 r4 引擎对 AutoLayout 占位符的重算
-    // 逻辑本身有 bug，规避不了触发条件；用"插入前拍全篇标题快照、插入后逐页核对
-    // 补回"的自愈兜底，保证"新增一页"这个操作的净效果里不会有别的页丢内容。
+    // Keep the XDrawPage returned by insertNewByIndex. A new page may contain
+    // inherited placeholders: looking for an empty page can select an old page.
     const beforeTitles = [];
     for (let i = 0; i < count; i++) {
-      let pg; try { pg = pages.getByIndex(i); } catch (e) { beforeTitles.push(null); continue; }
-      let t = null;
-      for (let s = 0; s < pg.getCount(); s++) {
-        let sh; try { sh = pg.getByIndex(s); } catch (e) { continue; }
-        if (shapeKind(sh) === 'title') { try { t = shapeText(sh); } catch (e) {} break; }
-      }
-      beforeTitles.push(t);
-    }
-    try { pages.insertNewByIndex(0); } catch (e) { return slideFail('插入幻灯片失败: ' + errStr(e)); }
-    let pages2;
-    try { pages2 = xModel.getDrawPages(); } catch (e) { return slideFail('重新读取幻灯片列表失败: ' + errStr(e)); }
-    const newCount = pages2.getCount();
-    if (newCount !== count + 1) return slideFail('插入幻灯片后页数未增加，疑似失败');
-    // 鲁棒定位新页：index 0 应当就是刚创建的空白页（形状数=0）；万一这个假设也不
-    // 成立（引擎行为超出预期），退化为全篇扫描找空白页，找不到就明确报错，不要
-    // 悄悄操作错的页。
-    let newIndex = -1;
-    try { if (pages2.getByIndex(0).getCount() === 0) newIndex = 0; } catch (e) {}
-    if (newIndex === -1) {
-      for (let i = 0; i < newCount; i++) {
-        let cand; try { cand = pages2.getByIndex(i); } catch (e) { continue; }
-        let n = -1; try { n = cand.getCount(); } catch (e) {}
-        if (n === 0) { newIndex = i; break; }
+      const pg = pages.getByIndex(i);
+      for (let si = 0; si < pg.getCount(); si++) {
+        const shape = pg.getByIndex(si);
+        if (shapeKind(shape) === 'title') {
+          beforeTitles.push({ page: pg, text: shapeText(shape) });
+          break;
+        }
       }
     }
-    if (newIndex === -1) return slideFail('插入幻灯片后无法定位新页（未找到空白页）');
     let page;
-    try { page = pages2.getByIndex(newIndex); } catch (e) { return slideFail('定位新页失败: ' + errStr(e)); }
-    // 挪位放在自愈之前：自愈是在既有页上补形状，不改变页顺序，先做后做都不影响
-    // movePageTo 的落点判定（它每步都重新核对 page 的实际位置，不依赖顺序假设）。
-    if (newIndex !== insertIndex) {
-      const finalIndex = movePageTo(page, insertIndex);
-      if (finalIndex !== insertIndex) {
-        return slideFail('新页未能挪到预期位置: 目标第 ' + (insertIndex + 1) + ' 页，实际落在第 ' + (finalIndex + 1) + ' 页');
-      }
+    // LO 24.2 InsertSdPage inserts AFTER the supplied 0-based predecessor,
+    // despite the XDrawPages method name. Passing the destination shifts it one
+    // page too far and needlessly relies on a separate UI selection to move it.
+    // Source: LibreOffice/core libreoffice-24-2 sd/source/ui/unoidl/unomodel.cxx.
+    try { page = pages.insertNewByIndex(Math.max(0, insertIndex - 1)); }
+    catch (e) {
+      return slideError('SLIDE_INSERT_UNCERTAIN', { detail: errStr(e), outcomeUnknown: true, retryable: false });
     }
-    // 自愈核对：此刻新页已确定落在 insertIndex（要么本来就是，要么挪位已复核通过）。
-    // "index i（i!==insertIndex）对应插入前 index：i<insertIndex 时是 i 本身，
-    // 否则是 i-1"——因为其余既有页彼此之间的相对顺序全程不变，只是被新页插入的
-    // 那个位置隔开，这条位置算术与新页具体经过几次挪位无关，只看它最终停在哪。
+    const partial = (stage, detail) => {
+      const actual = page ? locatePageIndex(page) : -1;
+      return slideError('SLIDE_INSERT_PARTIAL',
+        { created: true, stage: stage, detail: detail || null, slideNumber: actual >= 0 ? actual + 1 : null, retryable: false });
+    };
     try {
-      const pagesFinal = xModel.getDrawPages();
-      const finalCount = pagesFinal.getCount();
-      for (let i = 0; i < finalCount; i++) {
-        if (i === insertIndex) continue;
-        const preIdx = i < insertIndex ? i : i - 1;
-        if (preIdx < 0 || preIdx >= beforeTitles.length) continue;
-        const expected = beforeTitles[preIdx];
-        if (expected == null) continue; // 该页原本就没有标题占位符，不用管
-        let pg; try { pg = pagesFinal.getByIndex(i); } catch (e) { continue; }
-        let curTitle = null;
-        for (let s = 0; s < pg.getCount(); s++) {
-          let sh; try { sh = pg.getByIndex(s); } catch (e) { continue; }
-          if (shapeKind(sh) === 'title') { try { curTitle = shapeText(sh); } catch (e) {} break; }
-        }
-        if (curTitle === expected) continue; // 完好
+      if (!page) return partial('identity');
+      let newIndex = locatePageIndex(page);
+      if (newIndex < 0) return partial('locate');
+      if (newIndex !== insertIndex) {
+        newIndex = movePageTo(page, insertIndex);
+        if (newIndex !== insertIndex) return partial('move');
+      }
+      // Check retained page identities, never positional arithmetic after reordering.
+      // r4 can remove an existing title placeholder while inserting another page.
+      for (const previous of beforeTitles) {
+        let title = null;
         try {
-          const repairShape = xModel.createInstance('com.sun.star.presentation.TitleTextShape');
-          pg.add(repairShape);
-          let rpw = 720, rph = 540;
-          try { rpw = Number(pg.getPropertyValue('Width')); rph = Number(pg.getPropertyValue('Height')); } catch (e) {}
-          repairShape.setPosition(new css.awt.Point({ X: Math.round(rpw * 0.08), Y: Math.round(rph * 0.05) }));
-          repairShape.setSize(new css.awt.Size({ Width: Math.round(rpw * 0.84), Height: Math.round(rph * 0.15) }));
-          repairShape.getText().setString(expected);
-        } catch (e) { /* 自愈失败不阻断主流程，已尽力保留原内容 */ }
+          for (let si = 0; si < previous.page.getCount(); si++) {
+            const shape = previous.page.getByIndex(si);
+            if (shapeKind(shape) === 'title') { title = shape; break; }
+          }
+          if (title && shapeText(title) === previous.text) continue;
+          if (title) title.getText().setString(previous.text);
+          else {
+            const restored = xModel.createInstance('com.sun.star.presentation.TitleTextShape');
+            previous.page.add(restored);
+            const width = Number(previous.page.getPropertyValue('Width'));
+            const height = Number(previous.page.getPropertyValue('Height'));
+            restored.setPosition(new css.awt.Point({ X: Math.round(width * 0.08), Y: Math.round(height * 0.05) }));
+            restored.setSize(new css.awt.Size({ Width: Math.round(width * 0.84), Height: Math.round(height * 0.15) }));
+            restored.getText().setString(previous.text);
+          }
+        } catch (e) { return partial('restore-title', errStr(e)); }
       }
-    } catch (e) { /* 自愈整体失败不阻断主流程 */ }
-    // layout 只在调用方显式给出时才碰这个属性。title/body 走手工 createInstance
-    // 真占位符服务类型（presentation.TitleTextShape / OutlineTextShape）直接
-    // page.add()，**不经过 Layout 属性**——保留 slide_get_page/slide_get_overview
-    // 靠 shapeKind() 识别 'title'/'placeholder' 的既有读取路径不用改；createInstance
-    // 失败（真机未核实这两个服务在未设 Layout 时能否独立
-    // 创建）时回退普通文本框，保证功能不因服务名不可用而整体失败。
-    const layoutIn = p && p.layout != null ? Number(p.layout) : null;
-    if (layoutIn != null) { try { page.setPropertyValue('Layout', shortAny(layoutIn)); } catch (e) {} }
-    const wantTitle = p && p.title != null ? String(p.title) : null;
-    const wantBody = p && p.body != null ? String(p.body) : null;
-    let pw = 720, ph = 540; // 缺省 fallback（1/100mm），读不到页面尺寸时仍能给出合理位置
-    try { pw = Number(page.getPropertyValue('Width')); ph = Number(page.getPropertyValue('Height')); } catch (e) {}
-    function createPlaceholderShape(service) {
-      try { const s = xModel.createInstance(service); page.add(s); return s; }
-      catch (e) {
-        try { const s2 = xModel.createInstance('com.sun.star.drawing.TextShape'); page.add(s2); return s2; }
-        catch (e2) { return null; }
+      // layout 只在调用方显式给出时才碰这个属性。title/body 走手工 createInstance
+      // 真占位符服务类型（presentation.TitleTextShape / OutlineTextShape）直接
+      // page.add()，**不经过 Layout 属性**——保留 slide_get_page/slide_get_overview
+      // 靠 shapeKind() 识别 'title'/'placeholder' 的既有读取路径不用改；createInstance
+      // 失败（真机未核实这两个服务在未设 Layout 时能否独立
+      // 创建）时回退普通文本框，保证功能不因服务名不可用而整体失败。
+      const layoutIn = p && p.layout != null ? Number(p.layout) : null;
+      if (layoutIn != null) { try { page.setPropertyValue('Layout', shortAny(layoutIn)); } catch (e) { return partial('layout', errStr(e)); } }
+      const wantTitle = p && p.title != null ? String(p.title) : null;
+      const wantBody = p && p.body != null ? String(p.body) : null;
+      let pw = 25400, ph = 19050; // 10 × 7.5 inches in 1/100 mm
+      try { pw = Number(page.getPropertyValue('Width')); ph = Number(page.getPropertyValue('Height')); } catch (e) {}
+      function createPlaceholderShape(service) {
+        try { const s = xModel.createInstance(service); page.add(s); return s; }
+        catch (e) {
+          try { const s2 = xModel.createInstance('com.sun.star.drawing.TextShape'); page.add(s2); return s2; }
+          catch (e2) { return null; }
+        }
       }
-    }
-    if (wantTitle != null) {
-      try {
-        const titleShape = createPlaceholderShape('com.sun.star.presentation.TitleTextShape');
-        if (titleShape) {
-          titleShape.setPosition(new css.awt.Point({ X: Math.round(pw * 0.08), Y: Math.round(ph * 0.05) }));
-          titleShape.setSize(new css.awt.Size({ Width: Math.round(pw * 0.84), Height: Math.round(ph * 0.15) }));
-          titleShape.getText().setString(wantTitle);
-          try {
-            const cur = titleShape.getText().createTextCursor();
-            cur.gotoStart(false); cur.gotoEnd(true);
-            setCharProp(cur, 'CharHeight', 28);
-            setCharProp(cur, 'CharWeight', css.awt.FontWeight.BOLD);
-          } catch (e) {}
-        }
-      } catch (e) { /* 标题框创建失败不阻断整体插页 */ }
-    }
-    if (wantBody != null) {
-      try {
-        const bodyShape = createPlaceholderShape('com.sun.star.presentation.OutlineTextShape');
-        if (bodyShape) {
-          bodyShape.setPosition(new css.awt.Point({ X: Math.round(pw * 0.08), Y: Math.round(ph * 0.25) }));
-          bodyShape.setSize(new css.awt.Size({ Width: Math.round(pw * 0.84), Height: Math.round(ph * 0.65) }));
-          bodyShape.getText().setString(wantBody);
-        }
-      } catch (e) { /* 正文框创建失败不阻断整体插页 */ }
-    }
-    ensureShapeNames(page);
-    try { if (ctrl && ctrl.setCurrentPage) ctrl.setCurrentPage(page); } catch (e) {}
-    let layoutOut = null; try { layoutOut = page.getPropertyValue('Layout'); } catch (e) {}
-    return { success: true, slideNumber: insertIndex + 1, layout: layoutOut };
+      if (wantTitle != null) {
+        try {
+          const titleShape = createPlaceholderShape('com.sun.star.presentation.TitleTextShape');
+          if (!titleShape) return partial('create-title');
+          if (titleShape) {
+            titleShape.setPosition(new css.awt.Point({ X: Math.round(pw * 0.08), Y: Math.round(ph * 0.05) }));
+            titleShape.setSize(new css.awt.Size({ Width: Math.round(pw * 0.84), Height: Math.round(ph * 0.15) }));
+            titleShape.getText().setString(wantTitle);
+            try {
+              const cur = titleShape.getText().createTextCursor();
+              cur.gotoStart(false); cur.gotoEnd(true);
+              setCharProp(cur, 'CharHeight', 28);
+              setCharProp(cur, 'CharWeight', css.awt.FontWeight.BOLD);
+            } catch (e) {}
+          }
+        } catch (e) { return partial('write-title', errStr(e)); }
+      }
+      if (wantBody != null) {
+        try {
+          const bodyShape = createPlaceholderShape('com.sun.star.presentation.OutlineTextShape');
+          if (!bodyShape) return partial('create-body');
+          if (bodyShape) {
+            bodyShape.setPosition(new css.awt.Point({ X: Math.round(pw * 0.08), Y: Math.round(ph * 0.25) }));
+            bodyShape.setSize(new css.awt.Size({ Width: Math.round(pw * 0.84), Height: Math.round(ph * 0.65) }));
+            bodyShape.getText().setString(wantBody);
+          }
+        } catch (e) { return partial('write-body', errStr(e)); }
+      }
+      ensureShapeNames(page);
+      try { if (ctrl && ctrl.setCurrentPage) ctrl.setCurrentPage(page); } catch (e) {}
+      let layoutOut = null; try { layoutOut = page.getPropertyValue('Layout'); } catch (e) {}
+      return { success: true, slideNumber: insertIndex + 1, layout: layoutOut };
+    } catch (e) { return partial('initialize', errStr(e)); }
   },
   // [幻灯片·写] 删除指定页。拒绝删到 0 页（至少保留一页）。
   slide_delete_page(p) {
@@ -10934,10 +11358,12 @@ const EXEC = {
   slide_set_layout(p) {
     const r0 = resolvePage(p);
     if (r0.error) return slideFail(r0.error);
-    if (!p || (p.layout == null && (p.masterName == null || String(p.masterName).trim() === ''))) {
-      return slideFail('缺少 layout 或 masterName 参数（至少给一个）');
+    if (!p || (p.layout == null && p.backgroundColor == null && (p.masterName == null || String(p.masterName).trim() === ''))) {
+      return slideError('SLIDE_LAYOUT_REQUIRED');
     }
     const page = r0.page;
+    const backgroundColor = p.backgroundColor != null ? parseColor(p.backgroundColor) : null;
+    if (p.backgroundColor != null && backgroundColor == null) return slideError('SLIDE_INVALID_BACKGROUND');
     if (p.layout != null) {
       const layoutNum = Number(p.layout);
       if (!Number.isFinite(layoutNum)) return slideFail('layout 必须是数字（AutoLayout 常量）');
@@ -10955,9 +11381,18 @@ const EXEC = {
       if (!found) return slideFail('母版不存在: ' + wantMaster);
       try { page.setMasterPage(found); } catch (e) { return slideFail('设置母版失败: ' + errStr(e)); }
     }
+    if (p.backgroundColor != null) {
+      try {
+        // XDrawPage.Background is a property set; assign it back after editing.
+        const background = xModel.createInstance('com.sun.star.drawing.Background');
+        background.setPropertyValue('FillStyle', css.drawing.FillStyle.SOLID);
+        background.setPropertyValue('FillColor', backgroundColor);
+        page.setPropertyValue('Background', background);
+      } catch (e) { return slideError('SLIDE_BACKGROUND_FAILED', { detail: errStr(e) }); }
+    }
     let layoutOut = null; try { layoutOut = page.getPropertyValue('Layout'); } catch (e) {}
     let masterOut = ''; try { masterOut = page.getMasterPage().getName(); } catch (e) {}
-    return { success: true, layout: layoutOut, layoutName: layoutNameOf(layoutOut), masterName: masterOut };
+    return { success: true, layout: layoutOut, layoutName: layoutNameOf(layoutOut), masterName: masterOut, background: slideBackground(page) };
   },
   // [幻灯片·写] 插入文本框。位置尺寸缺省值（磅）：left/top=100, width=300, height=80。
   slide_add_text_box(p) {
@@ -11091,6 +11526,7 @@ const EXEC = {
     ensureShapeNames(r0.page);
     const rs = resolveShape(r0.page, p);
     if (rs.error) return slideFail(rs.error);
+    if (shapeKind(rs.shape) === 'table') return slideError('SLIDE_TABLE_TEXT_TOOL_REQUIRED');
     let xText; try { xText = rs.shape.getText(); } catch (e) { return slideFail('该形状不支持文字: ' + errStr(e)); }
     const anchorText = p && p.anchorText != null && String(p.anchorText) !== '' ? String(p.anchorText) : null;
     let cur;
@@ -11112,6 +11548,25 @@ const EXEC = {
         else return slideFail('该形状没有文字，无法格式化');
       }
     }
+    // Validate all paragraph inputs before any character or paragraph mutation.
+    const numericParagraphKeys = ['lineSpacingValue', 'spaceBeforePt', 'spaceAfterPt',
+      'spaceBeforeLines', 'spaceAfterLines', 'firstLineIndentPt', 'firstLineIndentChars',
+      'leftIndentPt', 'leftIndentChars', 'rightIndentPt'];
+    for (const key of numericParagraphKeys) {
+      if (p[key] != null && (!Number.isFinite(Number(p[key])) ||
+        (key.startsWith('space') && Number(p[key]) < 0))) {
+        return slideError('SLIDE_INVALID_PARAGRAPH_FORMAT', { parameter: key });
+      }
+    }
+    // LOWA's PPTX export drops nonzero ParaRightMargin; do not report an edit
+    // that disappears when the presentation is saved and reopened.
+    if (p.rightIndentPt != null && Number(p.rightIndentPt) !== 0)
+      return slideError('SLIDE_RIGHT_INDENT_UNSUPPORTED', { parameter: 'rightIndentPt' });
+    if (p.lineSpacingValue != null && p.lineSpacingMode == null)
+      return slideError('SLIDE_INVALID_PARAGRAPH_FORMAT', { parameter: 'lineSpacingMode' });
+    const parsedSpacing = p.lineSpacingMode != null ? parseLineSpacingSpec(p.lineSpacingMode, p.lineSpacingValue) : null;
+    if (parsedSpacing && (parsedSpacing.error || !Number.isFinite(parsedSpacing.ls.Height) || parsedSpacing.ls.Height > 32767))
+      return slideError('SLIDE_INVALID_PARAGRAPH_FORMAT', { parameter: 'lineSpacingMode' });
     const applied = {};
     if (p.fontName != null) { setCharProp(cur, 'CharFontName', String(p.fontName)); applied.fontName = String(p.fontName); }
     if (p.fontSize != null) { setCharProp(cur, 'CharHeight', Number(p.fontSize)); applied.fontSize = Number(p.fontSize); }
@@ -11144,6 +11599,27 @@ const EXEC = {
       try { cur.setPropertyValue('ParaAdjust', v2); applied.alignment = String(p.alignment).toLowerCase(); }
       catch (e) { return slideFail('设置对齐失败: ' + errStr(e)); }
     }
+    try {
+      if (parsedSpacing) {
+        cur.setPropertyValue('ParaLineSpacing', new css.style.LineSpacing(parsedSpacing.ls));
+        applied.lineSpacing = parsedSpacing.label;
+      }
+      const needsRelativeUnit = [p.spaceBeforeLines, p.spaceAfterLines, p.firstLineIndentChars, p.leftIndentChars].some(v => v != null);
+      const charPt = needsRelativeUnit ? effectiveCharHeightPt(cur, cur) : 1;
+      for (const [ptKey, relativeKey, property, factor, relativeFirst] of [
+        ['spaceBeforePt', 'spaceBeforeLines', 'ParaTopMargin', charPt * 1.2, false],
+        ['spaceAfterPt', 'spaceAfterLines', 'ParaBottomMargin', charPt * 1.2, false],
+        ['firstLineIndentPt', 'firstLineIndentChars', 'ParaFirstLineIndent', charPt, true],
+        ['leftIndentPt', 'leftIndentChars', 'ParaLeftMargin', charPt, true],
+        ['rightIndentPt', null, 'ParaRightMargin', 1, false]
+      ]) {
+        const key = relativeFirst && p[relativeKey] != null ? relativeKey : p[ptKey] != null ? ptKey : relativeKey;
+        if (key && p[key] != null) {
+          cur.setPropertyValue(property, ptToMm100(Number(p[key]) * (key === ptKey ? 1 : factor)));
+          applied[key] = Number(p[key]);
+        }
+      }
+    } catch (e) { return slideError('SLIDE_PARAGRAPH_FORMAT_FAILED', { detail: errStr(e), applied }); }
     if (Object.keys(applied).length === 0) return slideFail('未给出任何格式参数');
     return { success: true, shapeName: rs.name, applied: applied };
   },
@@ -11201,8 +11677,9 @@ const EXEC = {
     const r0 = resolvePage(p);
     if (r0.error) return slideFail(r0.error);
     const rowsData = p && Array.isArray(p.rowsJson) ? p.rowsJson : null;
-    if (rowsData != null && (!rowsData.length || !Array.isArray(rowsData[0]))) {
-      return slideFail('rowsJson 必须是非空二维数组');
+    if (rowsData != null && (!rowsData.length || rowsData.some(row =>
+      !Array.isArray(row) || !row.length || row.length !== rowsData[0].length))) {
+      return slideError('SLIDE_INVALID_TABLE_DATA');
     }
     let rowCount, colCount;
     if (rowsData) { rowCount = rowsData.length; colCount = rowsData[0].length; }
@@ -11238,18 +11715,31 @@ const EXEC = {
     if (afterRows !== rowCount || afterCols !== colCount) {
       return slideFail('表格行列数调整未生效（目标 ' + rowCount + '×' + colCount + '，实际 ' + afterRows + '×' + afterCols + '）');
     }
+    ensureShapeNames(r0.page);
+    let name = ''; try { name = shape.getName(); } catch (e) {}
     if (rowsData) {
       for (let rIdx = 0; rIdx < rowCount; rIdx++) {
         for (let cIdx = 0; cIdx < colCount; cIdx++) {
           const v = rowsData[rIdx][cIdx];
-          try { table.getCellByPosition(cIdx, rIdx).setString(v == null ? '' : String(v)); } catch (e) {}
+          try { table.getCellByPosition(cIdx, rIdx).setString(v == null ? '' : String(v)); }
+          catch (e) { return slideError('SLIDE_TABLE_WRITE_PARTIAL', { created: true, retryable: false, shapeName: name, row: rIdx, col: cIdx, detail: errStr(e) }); }
         }
       }
     }
-    ensureShapeNames(r0.page);
-    let name = ''; try { name = shape.getName(); } catch (e) {}
+    try {
+      // Inserted rows inherit the original full-table height. Normalize only after
+      // all rows, columns and content exist; text may impose a larger minimum.
+      for (let c = 0; c < colCount; c++) table.getColumns().getByIndex(c).setPropertyValue('Width', ptToMm100(widthPt / colCount));
+      for (let r = 0; r < rowCount; r++) table.getRows().getByIndex(r).setPropertyValue('Height', ptToMm100(heightPt / rowCount));
+    const actualSize = shape.getSize();
+    const actualWidth = hmmToPt(actualSize.Width), actualHeight = hmmToPt(actualSize.Height);
+    const rowHeightsPt = Array.from({ length: rowCount }, (_, r) => hmmToPt(table.getRows().getByIndex(r).getPropertyValue('Height')));
+    const columnWidthsPt = Array.from({ length: colCount }, (_, c) => hmmToPt(table.getColumns().getByIndex(c).getPropertyValue('Width')));
     try { if (ctrl && ctrl.select) ctrl.select(shape); } catch (e) {}
-    return { success: true, shapeName: name, rows: rowCount, cols: colCount };
+    return { success: true, shapeName: name, rows: rowCount, cols: colCount,
+      width: actualWidth, height: actualHeight, rowHeightsPt, columnWidthsPt,
+      exceedsRequestedSize: actualWidth > widthPt + 0.1 || actualHeight > heightPt + 0.1 };
+    } catch (e) { return slideError('SLIDE_TABLE_SIZE_PARTIAL', { created: true, retryable: false, shapeName: name, detail: errStr(e) }); }
   },
   // [幻灯片·看] 读一张表格形状为二维数组。不传 shapeName 要求该页只有一张表格。
   slide_table_read(p) {
@@ -11271,8 +11761,12 @@ const EXEC = {
       }
       cells.push(line);
     }
+    let rowHeightsPt = null, columnWidthsPt = null;
+    try { rowHeightsPt = Array.from({ length: rows }, (_, r) => hmmToPt(rt.table.getRows().getByIndex(r).getPropertyValue('Height'))); } catch (e) {}
+    try { columnWidthsPt = Array.from({ length: cols }, (_, c) => hmmToPt(rt.table.getColumns().getByIndex(c).getPropertyValue('Width'))); } catch (e) {}
     return {
       success: true, shapeName: rt.shapeName, rows: rows, cols: cols, cells: cells,
+      rowHeightsPt, columnWidthsPt,
       truncated: maxRows < rows || maxCols < cols,
     };
   },
@@ -11310,8 +11804,62 @@ const EXEC = {
     let rows = 0, cols = 0;
     try { rows = table.getRows().getCount(); cols = table.getColumns().getCount(); }
     catch (e) { return slideFail('读取表格行列数失败: ' + errStr(e)); }
+    const firstRow = p.row == null ? 0 : Number(p.row), firstCol = p.col == null ? 0 : Number(p.col);
+    const lastRow = p.endRow == null ? (p.row == null ? rows - 1 : firstRow) : Number(p.endRow);
+    const lastCol = p.endCol == null ? (p.col == null ? cols - 1 : firstCol) : Number(p.endCol);
+    const cellFormatKeys = ['fontName', 'fontSize', 'bold', 'color', 'fillColor', 'alignment'];
+    const hasCellFormat = cellFormatKeys.some(key => p[key] != null);
+    const color = p.color == null ? null : parseColor(p.color);
+    const fill = p.fillColor == null ? null : parseColor(p.fillColor);
+    const alignment = p.alignment == null ? null : ({ left: css.style.ParagraphAdjust.LEFT,
+      center: css.style.ParagraphAdjust.CENTER, right: css.style.ParagraphAdjust.RIGHT,
+      justify: css.style.ParagraphAdjust.BLOCK })[String(p.alignment).toLowerCase()];
+    if (![firstRow, firstCol, lastRow, lastCol].every(Number.isInteger) || firstRow < 0 || firstCol < 0 ||
+      lastRow < firstRow || lastCol < firstCol || lastRow >= rows || lastCol >= cols ||
+      (p.fontName != null && !String(p.fontName).trim()) ||
+      (p.fontSize != null && (!Number.isFinite(Number(p.fontSize)) || Number(p.fontSize) <= 0)) ||
+      (p.color != null && color == null) || (p.fillColor != null && fill == null) ||
+      (p.alignment != null && alignment == null)) return slideError('SLIDE_INVALID_CELL_FORMAT');
+    if (p.rowHeightsPt != null && (!Array.isArray(p.rowHeightsPt) || !p.rowHeightsPt.length ||
+      p.rowHeightsPt.some(h => h == null || !Number.isFinite(Number(h)) || Number(h) <= 0)))
+      return slideError('SLIDE_INVALID_CELL_FORMAT');
+    // Validate legacy options too before any cell formatting can mutate the table.
+    if ((p.borderColor != null && parseColor(p.borderColor, { black: 0 }) == null) ||
+      (p.borderWidthPt != null && (!Number.isFinite(Number(p.borderWidthPt)) || Number(p.borderWidthPt) < 0)) ||
+      (p.headerFill != null && String(p.headerFill).toLowerCase() !== 'none' && parseColor(p.headerFill) == null) ||
+      (p.columnWidthsPt != null && (!Array.isArray(p.columnWidthsPt) || !p.columnWidthsPt.length ||
+        p.columnWidthsPt.some(w => w == null || !Number.isFinite(Number(w)) || Number(w) <= 0))))
+      return slideError('SLIDE_INVALID_CELL_FORMAT');
     const result = { success: true, shapeName: rt.shapeName };
     let didAnything = false;
+
+    if (hasCellFormat) {
+      didAnything = true;
+      let cellsOk = 0;
+      for (let r = firstRow; r <= lastRow; r++) {
+        for (let c = firstCol; c <= lastCol; c++) {
+          try {
+            const cell = table.getCellByPosition(c, r);
+            if (fill != null) {
+              cell.setPropertyValue('FillStyle', css.drawing.FillStyle.SOLID);
+              cell.setPropertyValue('FillColor', fill);
+            }
+            if (cellFormatKeys.some(key => key !== 'fillColor' && p[key] != null)) {
+              let cur;
+              try { cur = cell.createTextCursor(); } catch (e) { cur = cell.getText().createTextCursor(); }
+              cur.gotoStart(false); cur.gotoEnd(true);
+              if (p.fontName != null) setCharProp(cur, 'CharFontName', String(p.fontName));
+              if (p.fontSize != null) setCharProp(cur, 'CharHeight', Number(p.fontSize));
+              if (p.bold != null) setCharProp(cur, 'CharWeight', p.bold ? css.awt.FontWeight.BOLD : css.awt.FontWeight.NORMAL);
+              if (color != null) cur.setPropertyValue('CharColor', color);
+              if (alignment != null) cur.setPropertyValue('ParaAdjust', alignment);
+            }
+            cellsOk++;
+          } catch (e) { return slideError('SLIDE_CELL_FORMAT_PARTIAL', { cellsOk, row: r, col: c, shapeName: rt.shapeName, outcomeUnknown: true, retryable: false, detail: errStr(e) }); }
+        }
+      }
+      result.cells = { row: firstRow, col: firstCol, endRow: lastRow, endCol: lastCol, cellsOk };
+    }
 
     if (p && p.headerBold != null) {
       didAnything = true;
@@ -11336,11 +11884,10 @@ const EXEC = {
       didAnything = true;
       const widthMm = p.borderWidthPt != null ? ptToMm100(Number(p.borderWidthPt)) : ptToMm100(1);
       const colorNum = p.borderColor != null ? parseColor(p.borderColor, { black: 0 }) : 0;
-      if (p.borderColor != null && colorNum == null) return slideFail('borderColor 格式非法: ' + p.borderColor + '（用 #RRGGBB）');
       const solid = (css.table.BorderLineStyle && css.table.BorderLineStyle.SOLID != null) ? css.table.BorderLineStyle.SOLID : 0;
       let bl;
       try { bl = new css.table.BorderLine2({ Color: colorNum == null ? 0 : colorNum, LineWidth: widthMm, LineStyle: solid }); }
-      catch (e) { return slideFail('构建边框样式失败: ' + errStr(e)); }
+      catch (e) { return slideError('SLIDE_CELL_FORMAT_PARTIAL', { shapeName: rt.shapeName, outcomeUnknown: true, retryable: false, detail: errStr(e) }); }
       let ok = 0, fail = 0;
       for (let rIdx = 0; rIdx < rows; rIdx++) {
         for (let cIdx = 0; cIdx < cols; cIdx++) {
@@ -11361,7 +11908,6 @@ const EXEC = {
     if (p && p.headerFill != null) {
       didAnything = true;
       const fillVal = String(p.headerFill).toLowerCase() === 'none' ? -1 : parseColor(p.headerFill);
-      if (fillVal == null) return slideFail('headerFill 格式非法: ' + p.headerFill + '（用 #RRGGBB 或 none）');
       const FILL_STYLE = (css.drawing && css.drawing.FillStyle) || { NONE: 0, SOLID: 1 };
       let ok = 0, fail = 0;
       for (let c = 0; c < cols; c++) {
@@ -11381,7 +11927,6 @@ const EXEC = {
       const n = Math.min(p.columnWidthsPt.length, cols);
       for (let i = 0; i < n; i++) {
         const wPt = Number(p.columnWidthsPt[i]);
-        if (!Number.isFinite(wPt) || wPt <= 0) { fail++; continue; }
         try { table.getColumns().getByIndex(i).setPropertyValue('Width', ptToMm100(wPt)); ok++; }
         catch (e) { fail++; }
       }
@@ -11389,7 +11934,25 @@ const EXEC = {
       if (ok === 0) result.columnWidths.note = 'Impress 表格列未暴露可写的 Width 属性（引擎不支持），列宽设置未生效';
     }
 
+    if (Array.isArray(p.rowHeightsPt)) {
+      didAnything = true;
+      let rowsOk = 0;
+      try {
+        for (let r = 0; r < Math.min(rows, p.rowHeightsPt.length); r++) {
+          table.getRows().getByIndex(r).setPropertyValue('Height', ptToMm100(p.rowHeightsPt[r]));
+          rowsOk++;
+        }
+        result.rowHeights = { rowsOk, actualPt: Array.from({ length: rows }, (_, r) =>
+          hmmToPt(table.getRows().getByIndex(r).getPropertyValue('Height'))) };
+      } catch (e) { return slideError('SLIDE_ROW_HEIGHT_FAILED', { rowsOk, shapeName: rt.shapeName, outcomeUnknown: true, retryable: false, detail: errStr(e) }); }
+    }
+
     if (!didAnything) return slideFail('未给出任何样式参数（headerBold / borderWidthPt+borderColor / columnWidthsPt 至少给一个）');
+    if ([result.headerBold, result.borders, result.headerFill, result.columnWidths]
+      .some(receipt => receipt && (receipt.cellsFailed > 0 || receipt.colsFailed > 0))) {
+      return slideError('SLIDE_CELL_FORMAT_PARTIAL', { shapeName: rt.shapeName,
+        outcomeUnknown: true, retryable: false, applied: result });
+    }
     return result;
   },
   // [幻灯片·写] 在指定页查找文字并加超链接。优先走与 Writer 的

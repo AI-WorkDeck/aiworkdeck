@@ -325,7 +325,8 @@ import { APP_LANGUAGE_EVENT, getAppLanguage } from '@/utils/appLanguage.js'
 import { setActiveSkin, getResolvedTheme, collectThemeTokens, APP_THEME_EVENT } from '@/utils/appTheme.js'
 import { ICONS } from '@/config/icons.js'
 import { getPluginAvatarUrl, getPluginGlyphPaths } from '@/config/pluginIcons.js'
-import { isPanelSkill, buildVoiceGroupSkill } from '@/config/leftSidebarPlugins.js'
+import { buildVoiceGroupSkill } from '@/config/leftSidebarPlugins.js'
+import { isAiWorkflowSkill } from '@/utils/chatSelectableSkills.mjs'
 import { formatPrice, isPaid, paidState, priceCentsOf, priceLabel, purchaseUrl } from '@/utils/marketPricing.js'
 import { mergePluginCatalog, isPluginUpdateAvailable } from '@/utils/marketUpdates.js'
 import PluginConnectionSettings from '@/components/PluginConnectionSettings.vue'
@@ -547,7 +548,7 @@ export default {
     /** 背后挂着左栏面板的 skill：详情页也按插件呈现（开关，而不是生效方式三档）。
         「语音」合并插件条目（spec.group）同理——它就是一个面板。 */
     isPanel() {
-      return this.spec && this.spec.kind === 'skill' && (this.spec.group || isPanelSkill(this.spec.id))
+      return this.spec && this.spec.kind === 'skill' && (this.spec.group || !isAiWorkflowSkill(this.spec))
     },
     /** 该 skill 挂着的原生资源包 id；来自 /api/skills/list 的 packId 字段，没有就是普通 skill */
     packId() {
@@ -836,8 +837,10 @@ export default {
     },
     async refreshPackStatus() {
       if (!this.packId) return
+      const generation = this.reloadGeneration
       try {
         const res = await packStatus(this.packId)
+        if (generation !== this.reloadGeneration) return
         this.packStatusInfo = (res && res.status) || null
       } catch (e) {
         // 轮询途中网络抖动很常见，不中止——下一拍再试
@@ -917,6 +920,9 @@ export default {
       })
       if (!ok) return
       this.busy = true
+      // Invalidate pending ready responses before uninstall can change native state.
+      this.reloadGeneration++
+      this.stopPackPoll()
       try {
         // 先走现有停用流程，再删资源包目录（§6：卸载 = 停用 + 删 packs/<id>/）
         await setSkillActivation(this.spec.id, 'disabled')

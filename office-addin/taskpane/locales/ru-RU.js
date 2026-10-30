@@ -2,6 +2,58 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cmdPptAddImage: "Вставить изображение на слайд",
+  cmdPptAddChart: "Вставить диаграмму на слайд",
+  cmdPptFormatChart: "Форматировать диаграмму слайда",
+  cmdPptSetTransition: "Настроить переход слайда",
+  wordStyleUnsupported: "Это приложение не может полностью применить поля профиля: {fields}. Изменения не начаты.",
+  wordStyleNotApplied: "Приложение не применило запрошенный стиль абзаца. Проверьте документ перед повторной попыткой.",
+
+  cmdGetParagraphs: "Прочитать абзацы",
+  cmdGetOutline: "Прочитать структуру",
+  cmdGetClauses: "Определить положения",
+  cmdReplaceNthMatch: "Заменить указанное совпадение",
+  cmdApplyStyleProfile: "Применить профиль стилей",
+
+  wordStructureTooLarge: "Структура документа слишком велика для полного чтения за одну безопасную операцию. Уменьшите размер документа и повторите попытку.",
+  wordStructurePartial: "Часть форматирования уже могла быть применена. Сначала проверьте текущий документ; не повторяйте операцию без проверки.",
+
+  cmdPptTableSetStyle: "Форматировать таблицу слайда",
+  cmdPptReadNotes: "Прочитать заметки докладчика",
+  cmdPptWriteNotes: "Записать заметки докладчика",
+
+  excelConditionalActionInvalid: "Действие условного форматирования должно быть apply или clearAll.",
+  wordImagePartial: "Изображение могло быть вставлено, но настройка не завершена. Проверьте существующее изображение; не вставляйте ещё одну копию.",
+
+  excelRangeTooLarge: "Диапазон превышает 50 000 ячеек. Уменьшите диапазон и повторите попытку; ничего не изменено.",
+
+  fileOperationUnavailable: "Эта операция с файлом недоступна или её результат не подтверждён.",
+  fileOperationStale: "Документ переключён. Прочитайте текущий документ перед повторной попыткой.",
+  fileOperationInvalidArguments: "Недопустимые параметры операции с файлом.",
+  fileOperationInvalidBytes: "Не получены корректные полные данные файла.",
+  cmdFileCreate: "Создать файл",
+  cmdFileSave: "Сохранить текущий файл",
+  cmdFileExportPdf: "Экспортировать PDF в проект",
+  cmdFileOpen: "Открыть файл или импортировать копию",
+  excelChartPartial: "Диаграмма «{name}», возможно, создана, но настройка не удалась и отмена не подтверждена. Проверьте существующую диаграмму перед повторной попыткой; не создавайте дубликат.",
+
+  // Spreadsheet and presentation parity (dev-board#1576)
+  pptInvalidTarget: "Недопустимый слайд или фигура.",
+  pptStaleTarget: "Целевой текст изменился. Прочитайте его заново перед редактированием.",
+  pptInvalidArguments: "Недопустимые параметры редактирования презентации.",
+  pptCapabilityUnavailable: "Эта функция недоступна в текущем приложении для презентаций.",
+  cmdPptSetShapeText: "Задать текст фигуры",
+  cmdPptSetShapeGeometry: "Задать положение и размер фигуры",
+  cmdPptFormatShape: "Форматировать фигуру",
+  cmdPptGoto: "Перейти к слайду или фигуре",
+  cmdPptSetLayout: "Задать макет или фон слайда",
+  excelValidationCustomRequired: "Для пользовательской проверки нужна формула.",
+  excelValidationTypeInvalid: "Неподдерживаемый тип проверки данных.",
+  excelPivotFieldsMissing: "Поля сводной таблицы не найдены: {fields}",
+  excelValidationActionInvalid: "Действие проверки данных должно быть apply или clear.",
+  excelValidationValueRequired: "Для этого правила проверки нужно значение сравнения.",
+  excelValidationBoundsRequired: "Для проверки диапазона нужны обе границы.",
+
   "dictate": "Голосовой ввод",
   "dictateRecording": "Идет запись, нажмите для завершения",
   "dictateTranscribing": "Транскрибация...",

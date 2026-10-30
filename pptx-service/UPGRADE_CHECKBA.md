@@ -180,3 +180,7 @@ a9a5c36 这一版新进来的）。本项目自己的 CLA 在 `legal/CLA.md`、�
 ### 本地 OCR 资源包升级边界（dev-board#1387）
 
 Java 客户端只请求 `POST /api/pdf/ocr-markdown-local`。原 `ocr-markdown` 在旧包可能转云，因此新端点404时必须停止并提示组件版本不支持可靠本地OCR，不请求旧端点、不自动循环安装同版本。2026-10-21核验的线上 `pptx-runtime` 1.0.1 不含新端点；本修复需后续构建并签名发布包含这些Python源码的 `pptx-runtime` 新版本（最早计划1.0.2），再实际更新组件。**本文不是已发布记录**；可用性以新端点和本地路由能力为准，不凭版本字符串假定安全。仅更新Java应用而未更新资源包时，本地扫描PDF转Word会明确暂不可用，不以旧接口继续；工具层可按用户明确选择走现有阿里云OCR服务完成内容级转换。
+
+## 独立图片素材生成（2026-10-28，dev-board#1578）
+
+`material_controller.py` 的素材生成接受现有 `model_config`，通过 `get_ai_service` 使用调用方模型配置；比例/分辨率先校验。Java `PptxServiceClient` 以独立任务调用并按任务身份获取项目素材，不把整页图片当可编辑PPT。`OpenAIImageProvider` 为 OpenRouter及官方relay传 `image_config`，解析 `message.images[].image_url.url` 的内联图片；这两种入口不跟随模型返回的远程URL。图片SDK关闭自动重试，异常不记录完整响应或上游异常链。升级时保留这些边界，并运行 `test_openrouter_image_response.py`、`test_material_image_options.py`；模拟响应通过不能宣称真实供应商生图成功。
