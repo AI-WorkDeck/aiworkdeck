@@ -5,7 +5,7 @@
 ## 被测对象与证据边界
 
 - 真实签名候选：desktop-build run [40979426877](https://github.com/AI-WorkDeck/aiworkdeck/actions/runs/40979426877)，源码 `99d1de556aed9ade66b548e8804edf684b82554d`，应用 0.74.0 / Electron 45.1.0。与正式旧 0.74.0 的运行时不同，不能只凭应用版本号辨认。
-- 本轮在 GitHub hosted Windows Server 2025 x64 / macOS 15 ARM64 的一次性用户中安装候选。不是本机客户端，也不是浏览器模拟界面。安装件验签、源码来源、运行进程、随包 JRE/JAR/H5/LOWA 均核对；不改动签名包。
+- 本轮在 GitHub hosted Windows Server 2025 x64 / macOS 15 / 26 ARM64 的一次性用户中安装候选。不是本机客户端，也不是浏览器模拟界面。安装件验签、源码来源、运行进程、随包 JRE/JAR/H5/LOWA 均核对；不改动签名包。
 - 测试工具来自本 PR，产品来自上述固定构建。不能将通过结果扩展为任意后续 master 产物已验证。
 - 无发布标签、Release、部署或用户客户端升级。所有测试文件均为合成材料；不登录用户账号，不调用付费模型。
 
@@ -49,8 +49,16 @@
 - [完整安装版回归 40982432098](https://github.com/AI-WorkDeck/aiworkdeck/actions/runs/40982432098)：Windows 成功；macOS 首次启动失败。
 - Windows `result.json` 为 `passed:true`、`forcedSaveUsed:false`，三格式均 `normalAutosave:true`、`appRestartRetained:true`；两轮普通退出均返回 0、进程与端口释放，未强杀。浏览器、文本/PNG 剪贴板、关于窗口、原生全屏进入/退出全部断言通过。主任务实际查看了三格式整应用重启后的截图以及 PDF 第二页截图；中文、Word 粗体原文、PPT 原标题/正文和 PDF 第二页均可见。Excel 公式及单元格内容另由模型回读断言验证。
 - Windows 安装件 SHA-256：`8a2d7df57ce750a4a2a9d2fa519099a25dfe60a789cb63c5caba6caf9972cb03`；签名、时间戳、运行 Electron 45.1.0、随包 Java 均核验通过。
-- [Windows 原生 Restart 升级 40982441616](https://github.com/AI-WorkDeck/aiworkdeck/actions/runs/40982441616) 成功：0.73.0 → 本次 0.74.0 候选。macOS 原生升级仍在运行，完成后补记。
+- [Windows 原生 Restart 升级 40982441616](https://github.com/AI-WorkDeck/aiworkdeck/actions/runs/40982441616) 成功：0.73.0 → 本次 0.74.0 候选。[Windows 原生 Quit 升级 40986308883](https://github.com/AI-WorkDeck/aiworkdeck/actions/runs/40986308883) 亦成功，核对原项目/文档标识、原文件哈希及偏好保留。
 - macOS 实际窗口进入网页登录页，`window.checkbaDesktop` 未暴露；后端身份验证正常。真实主窗口 preload 路径正确、文件存在，SHA-256 与源码一致（`3934ea0cabd95ca94f709010e1b19070be597ec59427cb3ee0a339dea293e92e`）。失败后隐藏诊断窗以同一脚本加载 `data:` 页面可获得 bridge；这只用于缩小问题范围，不能替代实际启动通过。已排除“脚本漏打包”和“提前连接主进程 inspector”两项假设，正式主窗口加载差异尚在定位。
+
+后续定位证据：
+
+- [40985737867](https://github.com/AI-WorkDeck/aiworkdeck/actions/runs/40985737867) 增加了输入事件及 Calc 模型阶段断言；Windows 再次完整通过。客体 console 另记录了 Qt 的 `QObject::connect ... invalid nullptr parameter` 与几何输出，不能声称 console 完全无错误；本轮保存/重开/退出断言均成功。
+- 同轮 macOS 15，以及 [macOS 26 对照 40987354542](https://github.com/AI-WorkDeck/aiworkdeck/actions/runs/40987354542)，都正常启动并通过 Word 普通自动保存/重开，但 Calc 的 B2 模型仍为空。输入前后 DOM 焦点存在，composition/input/Enter 事件与成功的 Windows 同形。问题发生在写入单元格之前，不能定性为自动保存失败。正在追加正常画布点击、验证选区真正变化后的输入对照；不采用直接写值或强制保存。
+- 以上两轮在首次读取页面 JavaScript 前等待原生导航完成；尚不能仅凭启动通过证明早期 CDP 求值就是此前缺桥的唯一原因。本机的 file/data、webview 开关、窗口可见性、后台参数、延迟建窗、请求拦截与早期 CDP 最小对照均未复现；这些结果不能覆盖签名包云端失败。
+- [macOS 原生升级 40982437060](https://github.com/AI-WorkDeck/aiworkdeck/actions/runs/40982437060)：旧版 0.73.0 启动、准备更新、普通退出、ShipIt 换件、候选签名公证均成功；候选重开进入登录页面，工作台验收失败。清理阶段最终触发 40 分钟任务取消，不计作正常退出通过；结果 JSON 在超时前已明确为 FAIL。
+- 单独的 Electron 44.10.0 对照分支 `codex/electron-44-compat-1624` 只改运行时版本和锁文件，源自同一 master 99d1de556，应用版本仍 0.74.0。本机 703 项通过、5 项跳过；运行时探针两次在 BrowserView 截图报 UnknownVizError，保留失败。签名包对照构建 40987918299 进行中，未据此选定 44 或认定 45 为根因。
 
 截图中的 Update incomplete 来自测试将更新源指向本地不可用端点，避免访问/安装正式更新；不作为升级功能通过证据。原生升级另用一次性测试源独立验证。
 
