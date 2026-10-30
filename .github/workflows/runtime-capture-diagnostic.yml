@@ -1,0 +1,86 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: Runtime capture contract (no publishing)
+on:
+  push:
+    branches: [codex/runtime-capture-contract-1643]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  capture:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+        mode: [control, capture]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Build frontend (formal build preconditions)
+        working-directory: frontend
+        shell: bash
+        run: |
+          npm ci || npm install
+          npm run build:h5
+          test -s dist/build/h5/index.html
+          npm run build:zetaoffice
+      - name: Bake LOWA runtime and CJK font (formal build preconditions)
+        shell: bash
+        env:
+          LOWA_BASE_URL: https://www.aiworkdeck.com/lowa-engine/24.2.8-zhcn-r7/
+        run: |
+          node desktop/scripts/fetch-lowa-assets.js
+          ls -la frontend/dist/zetaoffice/lowa frontend/dist/zetaoffice/cjk.ttc
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm ci
+      - name: Exclude runner Temp from Defender (formal Windows precondition)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          try {
+            Add-MpPreference -ExclusionPath $env:RUNNER_TEMP -ErrorAction Stop
+            Add-MpPreference -ExclusionPath $env:TEMP -ErrorAction Stop
+          } catch { Write-Host "Defender exclusion not applied: $($_.Exception.Message)" }
+      - name: Desktop unit tests (full formal suite)
+        working-directory: desktop
+        timeout-minutes: 15
+        run: npm test
+      - name: Restore exact 0754 test for the control
+        if: matrix.mode == 'control'
+        shell: bash
+        run: git show 6703c03e7da585a6b0243fcbc2f4327c2e5c3eda:desktop/tests/runtime-compat.electron.cjs > desktop/tests/runtime-compat.electron.cjs
+      - name: Record the actual runtime fixture hash
+        env:
+          AWD_CAPTURE_CONTRACT_MODE: ${{ matrix.mode }}
+        run: node -e "const f=require('fs'),c=require('crypto');f.writeFileSync('runtime-fixture-source.json',JSON.stringify({mode:process.env.AWD_CAPTURE_CONTRACT_MODE,workflowSource:process.env.GITHUB_SHA,controlSource:'6703c03e7da585a6b0243fcbc2f4327c2e5c3eda',fixtureSha256:c.createHash('sha256').update(f.readFileSync('desktop/tests/runtime-compat.electron.cjs')).digest('hex')}))"
+      - name: First Electron process (cold environment)
+        run: npm --prefix desktop run test:runtime-compat
+      - name: Two additional fresh profiles (warm environment, no retries)
+        if: matrix.mode == 'capture'
+        shell: bash
+        run: npm --prefix desktop run test:runtime-compat && npm --prefix desktop run test:runtime-compat
+      - name: Preserve results and failed images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capture-contract-${{ matrix.os }}-${{ matrix.mode }}-${{ github.run_id }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            runtime-fixture-source.json
+            ${{ runner.temp }}/awd-runtime-compat-*/*.json
+            ${{ runner.temp }}/awd-runtime-compat-*/*.png
