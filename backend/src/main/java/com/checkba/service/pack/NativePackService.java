@@ -268,6 +268,8 @@ public class NativePackService {
      * {@code volatile} 仍是一个真实、独立成立的内存可见性隐患，顺手补上。
      */
     public static class PackStatus {
+        /** 本次排队任务收到过显式安装请求；提升与取消在 inFlight 锁内仲裁，不持久化。 */
+        private volatile boolean explicitInstallRequested;
         private volatile String id;
         private volatile String state = STATE_NOT_INSTALLED;
         private volatile String installedVersion;
@@ -544,18 +546,28 @@ public class NativePackService {
      * 异步安装（幂等）：同一 pack 已在队列里就直接返回，前端轮询 status 看进度。
      */
     public void installAsync(String packId) {
+        installAsync(packId, null);
+    }
+
+    /** 自动补装在执行时复核资格；null 表示显式安装，不受自动补装偏好限制。 */
+    void installAsync(String packId, BooleanSupplier stillAllowed) {
         requireValidId(packId);
         requireEnabled();
         final PackStatus st;
         synchronized (inFlight) {
             PackStatus pending = inFlight.get(packId);
-            if (pending != null && !STATE_FAILED.equals(pending.getState())) {
+            if (pending != null && isInFlight(pending.getState())) {
+                if (stillAllowed == null) {
+                    pending.explicitInstallRequested = true;
+                    statuses.put(packId, pending);
+                }
                 log.info("Pack {} install already in flight, ignoring duplicate request", packId);
                 return;
             }
-            // failed 已对外可见时，即便旧任务尚在 catch/finally 中，也必须接受重试。
+            // ready/failed 已对外可见时，即便旧任务尚在 catch/finally 中，也必须接受新请求。
             // 每次任务独占状态对象，旧任务的迟到错误与清理不能影响新任务。
             st = new PackStatus();
+            st.explicitInstallRequested = stillAllowed == null;
             st.setId(packId);
             st.setInstalledVersion(liveStatus(packId).getInstalledVersion());
             st.setState(STATE_DOWNLOADING);
@@ -565,7 +577,18 @@ public class NativePackService {
         }
         installer.submit(() -> {
             try {
-                install(packId);
+                synchronized (packLock(packId)) {
+                    boolean allowed = stillAllowed == null || stillAllowed.getAsBoolean();
+                    synchronized (inFlight) {
+                        if (!st.explicitInstallRequested && !allowed) {
+                            statuses.remove(packId, st);
+                            // 与显式请求的提升共用锁：取消之后到达的手装必须能另建任务。
+                            inFlight.remove(packId, st);
+                            return;
+                        }
+                    }
+                    install(packId);
+                }
             } catch (Throwable t) {
                 // 兜住 Throwable：install() 自己已把状态落到 failed；这里再兜一层，防止
                 // 锁外的前置检查（如开关在排队期间被关）抛出后状态永远停在「下载中」
