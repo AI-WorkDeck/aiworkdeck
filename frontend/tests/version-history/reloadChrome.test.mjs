@@ -54,7 +54,7 @@ function toolbarHost(chromeHidden) {
   const sent = []
   // 顺序要紧：先铺组件自己的 methods，再用桩覆盖（call/loadDocument 这些同名方法
   // 组件里本来就有，反过来会把桩顶掉、真去发 XMLHttpRequest）。
-  const host = Object.assign({}, toolbar.methods, {
+  const host = Object.assign({}, toolbar.data(), toolbar.methods, {
     chromeHidden,
     viewPrefs: { formattingMarks: true, ruler: true },
     $emit() {},
