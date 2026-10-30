@@ -503,12 +503,9 @@ export default {
       const i = this.installedInfo || {}
       const downloads = m.downloads
       const cat = m.category || i.category
-      const builtinKey = this.spec && this.spec.kind === 'plugin' && this.spec.id
-        ? BUILTIN_PLUGIN_NAME_KEYS[this.spec.id]
-        : ''
-      const builtinName = builtinKey ? this.$t(builtinKey) : ''
+      const builtinName = typeof this.builtinPluginName === 'function' ? this.builtinPluginName() : ''
       return {
-        name: (builtinName && builtinName !== builtinKey ? builtinName : '') || m.name || i.name || this.spec.name || this.spec.id,
+        name: builtinName || m.name || i.name || this.spec.name || this.spec.id,
         description: (this.isBuiltinRedaction ? i.description : m.description) || i.description || '',
         author: m.authorDisplayName || m.author || i.author || '',
         version: this.installedInfo ? (i.version || '') : (m.version || ''),
@@ -647,10 +644,15 @@ export default {
   },
   watch: {
     'spec.projectId'() { this.loadContribution() },
+    '$i18n.locale'() {
+      if (typeof this.$emit === 'function' && this.display && this.display.name) {
+        this.$emit('title-change', this.display.name)
+      }
+    },
   },
   mounted() {
     uni.$on(APP_THEME_EVENT, this.pushThemePreview)
-    uni.$on(APP_LANGUAGE_EVENT, this.onLanguageChanged)
+    uni.$on(APP_LANGUAGE_EVENT, this.pushThemePreview)
     uni.$on('awd:account-changed', this.loadContribution)
     this.reload()
     uni.$on('awd:market-changed-from-sidebar', this.reload)
@@ -660,16 +662,20 @@ export default {
     this.reloadGeneration++
     this.contributionGeneration++
     uni.$off(APP_THEME_EVENT, this.pushThemePreview)
-    uni.$off(APP_LANGUAGE_EVENT, this.onLanguageChanged)
+    uni.$off(APP_LANGUAGE_EVENT, this.pushThemePreview)
     uni.$off('awd:account-changed', this.loadContribution)
     uni.$off('awd:market-changed-from-sidebar', this.reload)
     uni.$off('awd:market-update-checked', this.onUpdatesChecked)
     this.stopPackPoll()
   },
   methods: {
-    onLanguageChanged() {
-      this.pushThemePreview()
-      this.reload(false)
+    builtinPluginName() {
+      const builtinKey = this.spec && this.spec.kind === 'plugin' && this.spec.id
+        ? BUILTIN_PLUGIN_NAME_KEYS[this.spec.id]
+        : ''
+      if (!builtinKey || typeof this.$t !== 'function') return ''
+      const val = this.$t(builtinKey)
+      return val && val !== builtinKey ? val : ''
     },
     pushThemePreview() {
       this.$refs.themePreview?.contentWindow?.postMessage({
@@ -733,7 +739,7 @@ export default {
         if (generation === this.reloadGeneration) this.loading = false
       }
       if (generation !== this.reloadGeneration) return
-      if (this.display && this.display.name) {
+      if (typeof this.$emit === 'function' && this.display && this.display.name) {
         this.$emit('title-change', this.display.name)
       }
       // 声明式贡献点（规范 v2.9）：设置表单与画像清单随详情一起拉
