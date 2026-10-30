@@ -89,6 +89,23 @@
           {{ $t('panels.litGenerationAnswer') }}
         </component>
       </view>
+      <text v-if="generation.phase === 'completed' && latestReply" class="lv-reply">{{ latestReply }}</text>
+      <component :is="'details'" v-if="generation.messages && generation.messages.length" :key="generation.taskId" class="lv-history">
+        <component :is="'summary'" class="lv-history-toggle">{{ $t('panels.litGenerationHistory') }}</component>
+        <view class="lv-history-messages">
+          <view v-for="(message, index) in generation.messages" :key="index" class="lv-history-message">
+            <text class="lv-history-role">{{ $t(message.role === 'USER' ? 'panels.litGenerationUser' : 'panels.litGenerationAssistant') }}</text>
+            <text class="lv-history-content">{{ message.content }}</text>
+          </view>
+        </view>
+      </component>
+      <view v-if="generation.phase === 'completed'" class="lv-follow-up">
+        <component :is="'textarea'" class="lv-answer-input" :value="generationFollowUp" :disabled="starting || generationLoading || !!generationSyncError" maxlength="4000" rows="3"
+          :aria-label="$t('panels.litGenerationFollowUp')" :placeholder="$t('panels.litGenerationFollowUp')" @input="generationFollowUp = $event.target.value" />
+        <component :is="'button'" type="button" class="lv-btn primary lv-native-button" :disabled="!canSendFollowUp" @click.stop="sendFollowUp">
+          {{ $t('panels.litGenerationSend') }}
+        </component>
+      </view>
       <component :is="'button'" v-if="generation.phase === 'paused'" type="button" class="lv-btn primary lv-native-button" :disabled="starting" @click.stop="continueGeneration">
         {{ $t('panels.litGenerationContinue') }}
       </component>
@@ -225,6 +242,7 @@ export default {
       generationSyncError: '',
       generationSelected: [],
       generationOther: '',
+      generationFollowUp: '',
       generationTimer: null,
       generationEpoch: 0,
       generationRevision: 0,
@@ -265,6 +283,15 @@ export default {
     canAnswerGeneration() {
       return this.generationSelected.length > 0 || this.generationOther.trim().length > 0
     },
+    latestReply() {
+      const messages = this.generation.messages || []
+      const latest = messages[messages.length - 1]
+      return latest?.role === 'ASSISTANT' ? latest.content : ''
+    },
+    canSendFollowUp() {
+      return this.generation.phase === 'completed' && !this.starting && !this.generationLoading
+        && !this.generationSyncError && !!this.generationFollowUp.trim()
+    },
     scopeLabel() {
       return this.scope ? this.scope.label : ''
     },
@@ -297,6 +324,7 @@ export default {
         this.generationEpoch++
         this.generation = { phase: 'idle' }
         this.generationSubmission = null
+        this.generationFollowUp = ''
         this.generationError = ''
         this.generationSyncError = ''
         this.generationLoading = true
@@ -424,6 +452,7 @@ export default {
         this.generationSelected = []
         this.generationOther = ''
       }
+      if (previous.taskId !== snapshot.taskId) this.generationFollowUp = ''
       this.generation = snapshot
       this.generationNow = Date.now()
       if (snapshot.phase === 'completed' && (previous.taskId !== snapshot.taskId || previous.phase !== 'completed')) this.reload()
@@ -457,9 +486,14 @@ export default {
       try {
         if (!this.generationRequest) throw new Error(this.$t('panels.litGenerationUnavailable'))
         const snapshot = await this.generationRequest(operation, params)
-        if (this.generationAlive && epoch === this.generationEpoch) this.applyGeneration(snapshot)
+        if (this.generationAlive && epoch === this.generationEpoch) {
+          this.applyGeneration(snapshot)
+          return true
+        }
+        return false
       } catch (e) {
         if (this.generationAlive && epoch === this.generationEpoch) this.generationError = e?.message || this.$t('panels.litStartFailedFallback')
+        return false
       } finally {
         if (epoch === this.generationEpoch) this.starting = false
       }
@@ -498,6 +532,13 @@ export default {
         questionKey: this.generation.question.key,
         answer: { selected: [...this.generationSelected], other: this.generationOther.trim() }
       })
+    },
+
+    async sendFollowUp() {
+      if (!this.canSendFollowUp) return
+      if (await this.generationCommand('message', { taskId: this.generation.taskId, message: this.generationFollowUp.trim() })) {
+        this.generationFollowUp = ''
+      }
     },
 
     async stopGeneration() {
@@ -709,15 +750,24 @@ export default {
 .lv-generation-title { font-size: var(--awd-panel-fs); font-weight: 600; color: var(--awd-panel-text); }
 .lv-generation-message, .lv-question-text { margin-top: 4px; white-space: pre-wrap; font-size: var(--awd-panel-fs); color: var(--awd-panel-text-2); }
 .lv-generation-meta, .lv-option-description { margin-top: 4px; font-size: var(--awd-panel-fs-meta); color: var(--awd-panel-text-3); }
+.lv-question-text { max-height: min(240px, 32vh); overflow-y: auto; }
 .lv-question { margin-top: var(--awd-panel-gap); }
 .lv-question-options { display: flex; flex-direction: column; gap: 4px; margin-top: var(--awd-panel-gap); }
-.lv-question-option { width: 100%; box-sizing: border-box; padding: 6px 8px; text-align: left; border: 1px solid var(--awd-panel-border); border-radius: var(--awd-panel-radius); background: var(--awd-surface); color: var(--awd-panel-text); font-size: var(--awd-panel-fs); white-space: normal; overflow-wrap: anywhere; cursor: pointer; }
+.lv-question-option { width: 100%; box-sizing: border-box; padding: 6px 8px; text-align: start; border: 1px solid var(--awd-panel-border); border-radius: var(--awd-panel-radius); background: var(--awd-surface); color: var(--awd-panel-text); font-size: var(--awd-panel-fs); white-space: normal; overflow-wrap: anywhere; cursor: pointer; }
 .lv-question-option.selected { border-color: var(--awd-panel-accent); background: var(--awd-accent-wash); }
 .lv-question-option:hover:not(:disabled) { border-color: var(--awd-panel-accent); }
 .lv-answer-input { display: block; box-sizing: border-box; width: 100%; margin: var(--awd-panel-gap) 0; padding: 6px 8px; min-height: 64px; resize: vertical; font: inherit; font-size: var(--awd-panel-fs); line-height: 1.55; color: var(--awd-panel-text); background: var(--awd-surface); border: 1px solid var(--awd-panel-border); border-radius: var(--awd-panel-radius); }
-.lv-generation-stop { margin-top: var(--awd-panel-gap); padding: 4px 0; color: var(--awd-panel-accent); background: transparent; font-size: var(--awd-panel-fs); text-align: left; cursor: pointer; }
+.lv-generation-stop { margin-top: var(--awd-panel-gap); padding: 4px 0; color: var(--awd-panel-accent); background: transparent; font-size: var(--awd-panel-fs); text-align: start; cursor: pointer; }
 .lv-generation-error { margin-top: var(--awd-panel-gap); padding: 6px 8px; background: var(--awd-danger-soft); border: 1px solid var(--awd-danger); border-radius: var(--awd-panel-radius); font-size: var(--awd-panel-fs); line-height: 1.55; color: var(--awd-text); overflow-wrap: anywhere; }
 .lv-generation-error text { display: block; }
+.lv-reply, .lv-history-content { display: block; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--awd-panel-fs); line-height: 1.55; color: var(--awd-panel-text-2); }
+.lv-reply { margin-top: var(--awd-panel-gap); max-height: 240px; overflow-y: auto; }
+.lv-history { margin-top: var(--awd-panel-gap); }
+.lv-history-toggle { color: var(--awd-panel-text-2); font-size: var(--awd-panel-fs-meta); cursor: pointer; }
+.lv-history-toggle:focus-visible { outline: 2px solid var(--awd-panel-accent); outline-offset: 2px; }
+.lv-history-messages { max-height: 280px; overflow-y: auto; }
+.lv-history-message { margin-top: var(--awd-panel-gap); }
+.lv-history-role { display: block; font-size: var(--awd-panel-fs-meta); font-weight: 600; color: var(--awd-panel-text); }
 
 .lv-empty { padding: 14px var(--awd-panel-pad-x); text-align: center; }
 .lv-empty-text { font-size: var(--awd-panel-fs-meta); color: var(--awd-panel-text-4); line-height: 1.6; }

@@ -4650,7 +4650,12 @@ export default {
       }
     },
     activeToolKey() { this.pushMenuState() },
-    leftPaneKey() { this.pushMenuState() },
+    leftPaneKey(key) {
+      // Visualization owns its questions and transcript in the left pane.
+      // Keep the unrelated chat mounted, but remove the competing input surface.
+      if (key === 'plugin-litigation-visual' && this.showAiPanel && this.rightPaneKey === 'ai') this.toggleAiPanel()
+      this.pushMenuState()
+    },
     isRecording() { this.pushMenuState() },
     LEFT_SIDEBAR_PLUGINS() { this.pushMenuState() },
     '$i18n.locale'() { this.refreshLocalizedLabels() },
