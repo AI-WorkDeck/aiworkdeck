@@ -20,7 +20,7 @@ const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex')
 
 // mainRpc evaluates an expression in the installed app's Node inspector, awaits promises,
 // and returns its JSON value. The launcher verifies the installer and installed signature.
-export async function checkDesktopInteractions({ page, browser, mainRpc, run }) {
+export async function checkDesktopInteractions({ page, browser, mainRpc, run, observeStage = () => {} }) {
   assert.equal(process.env.GITHUB_ACTIONS, 'true', 'Disposable GitHub Actions runner required')
   assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted', 'User desktops are forbidden')
   assert.equal(process.env.AWD_TEST_INSTALLED, '1', 'Signed installed-app harness required')
@@ -109,6 +109,7 @@ finally { $graphics.Dispose(); $bitmap.Dispose() }`
     await assertNoLogin()
   }
   try {
+    observeStage('settings-open')
     const dismiss = await page.$('.ocd-mask .ocd-actions .ocd-btn:not(.primary)')
     if (dismiss) await dismiss.click()
     evidence.settings = { account: await page.evaluate(async () => {
@@ -129,6 +130,7 @@ finally { $graphics.Dispose(); $bitmap.Dispose() }`
     await page.waitForSelector('.page-admin', { visible: true })
     await assertNoLogin()
     await capture('installed-settings-background-catalog')
+    observeStage('settings-work-log')
     await workLog()
     await capture('installed-settings-work-log')
     evidence.settings.aiPanelMenu = await menuAction('view.aiPanel', 'Alt+CmdOrCtrl+I', true)
@@ -142,9 +144,11 @@ finally { $graphics.Dispose(); $bitmap.Dispose() }`
     const send = await until(async () => {
       for (const el of await page.$$('.send-btn:not(.disabled)')) if (await el.isVisible()) return el
     }, 'enabled AI send button')
+    observeStage('settings-active-ai-send')
     await send.click()
     await page.waitForSelector('.awd-login-mask', { visible: true })
     await capture('installed-settings-active-ai-login')
+    observeStage('settings-login-cancel')
     await page.click('.awd-login-close')
     await page.waitForSelector('.awd-login-mask', { hidden: true })
     assert.ok((await input.evaluate(el => el.textContent)).includes(prompt), 'Cancelling login preserves the AI draft')
@@ -173,6 +177,7 @@ finally { $graphics.Dispose(); $bitmap.Dispose() }`
         api.browser.onOpenNewTab(data => window.__installedInteractionEvents.newTabs.push(data)),
       ]
     })
+    observeStage('browser-navigation')
     const id = await page.evaluate(url => {
       const vm = window.__checkbaActiveOverviewVm
       vm.openBrowserTab(url, 'left')
@@ -194,6 +199,7 @@ finally { $graphics.Dispose(); $bitmap.Dispose() }`
     await capture('installed-browser-navigation')
     evidence.checks.push('Production BrowserView link navigation, DOM toolbar back/forward/reload and preload URL events')
 
+    observeStage('browser-popup')
     await (await browserPage(base + '/two')).click('#popup')
     const popupId = await until(() => page.evaluate(url => {
       const vm = window.__checkbaActiveOverviewVm
@@ -207,6 +213,7 @@ finally { $graphics.Dispose(); $bitmap.Dispose() }`
     evidence.browserEvents = await page.evaluate(() => ({ urls: window.__installedInteractionEvents.urls, newTabs: window.__installedInteractionEvents.newTabs }))
     evidence.checks.push('Real window.open handled by production handler and rendered in a new workbench tab')
     for (const fullscreen of [true, false]) {
+      observeStage(fullscreen ? 'browser-enter-fullscreen' : 'browser-leave-fullscreen')
       await mainRpc(`(()=>{const w=process.mainModule.require('electron').BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes('/h5/index.html'));w.setFullScreen(${fullscreen});return true})()`)
       await page.waitForFunction(value => document.documentElement.classList.contains('is-fullscreen') === value, { timeout: 20000 }, fullscreen)
       assert.equal(await mainRpc(`process.mainModule.require('electron').BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes('/h5/index.html')).isFullScreen()`), fullscreen)
@@ -233,6 +240,7 @@ finally { $graphics.Dispose(); $bitmap.Dispose() }`
 
 
     // Only select a destination; the production listener, HTTP transfer and file writes stay real.
+    observeStage('browser-download')
     await mainRpc(`(()=>{const {session}=process.mainModule.require('electron');globalThis.__installedDownload={};globalThis.__installedDownloadListener=(_event,item)=>{if(item.getURL()!==${JSON.stringify(base + '/download')})return;item.setSavePath(${JSON.stringify(downloadPath)});item.once('done',(_e,state)=>{globalThis.__installedDownload={state,path:item.getSavePath(),filename:item.getFilename(),received:item.getReceivedBytes(),total:item.getTotalBytes()}})};session.defaultSession.on('will-download',globalThis.__installedDownloadListener);return true})()`)
     await (await browserPage(base + '/popup')).click('#download')
     evidence.download = await until(async () => {
@@ -245,6 +253,7 @@ finally { $graphics.Dispose(); $bitmap.Dispose() }`
     evidence.checks.push('Real fixture HTTP download completed and exact UTF-8 bytes matched')
     for (const tabId of ids) await page.evaluate(id => window.__checkbaActiveOverviewVm.closeFile(id, 'left'), tabId)
 
+    observeStage('clipboard-text-and-image')
     const oldImageIds = await page.evaluate(async () => {
       const response = await fetch(window.checkbaDesktop.apiBaseUrl + '/api/clipboard?limit=50')
       const result = await response.json()
@@ -273,6 +282,7 @@ finally { $graphics.Dispose(); $bitmap.Dispose() }`
       return items.some(i => i.type === 'TEXT' && i.text === text) && items.some(i => i.type === 'IMAGE' && !oldImageIds.includes(i.id)) ? items : null
     }, { text, oldImageIds }), 'production clipboard bridge persists text and image')
     evidence.clipboardRecords = records.map(i => ({ id: i.id, type: i.type, text: i.type === 'TEXT' ? i.text : undefined }))
+    observeStage('clipboard-panel')
     await page.evaluate(() => window.__checkbaActiveOverviewVm.openPanelInItsDock('clipboard'))
     // Read the mounted plugin frame directly. innerText can include layout line breaks;
     // the text node plus visible card bounds establish content and actual UI rendering.
@@ -294,6 +304,7 @@ finally { $graphics.Dispose(); $bitmap.Dispose() }`
     }))
     await capture('installed-clipboard-cards')
     evidence.checks.push('Production clipboard bridge persisted records and displayed text/image cards')
+    observeStage('about-open-and-escape')
     await mainRpc(`(()=>{const {Menu}=process.mainModule.require('electron');const item=Menu.getApplicationMenu().items[0].submenu.items[0];if(!item.label.includes('AI WorkDeck'))throw Error('About menu missing');item.click();return true})()`)
     const about = await until(async () => (await browser.pages()).find(p => p.url().startsWith('data:text/html') && p !== page), 'About window')
     await about.waitForFunction(() => document.body.innerText.includes('GNU AGPL v3.0'))

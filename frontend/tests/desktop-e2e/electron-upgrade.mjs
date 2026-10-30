@@ -99,6 +99,19 @@ const java = installedMode ? null : spawn(path.join(env.JAVA_HOME, 'bin/java'), 
 let child, browser, page, installed
 let forced = false
 const evidence = { passed: false, run, backendPort, cdpPort, backendPid: java?.pid, productionBefore, originalHashes, formats: {}, forcedSaveUsed: false }
+const observePageError = process.env.AWD_OBSERVE_PAGEERROR === '1'
+const observations = { startedAt: new Date().toISOString(), events: [] }
+const observedAt = Date.now()
+let observedPhase = 'bootstrap', observedLaunch = 0
+function observe(kind, detail = {}) {
+  if (!observePageError) return
+  observations.events.push({ kind, phase: observedPhase, launch: observedLaunch, at: new Date().toISOString(), elapsedMs: Date.now() - observedAt, ...detail })
+  write('installed-exception-observations.json', observations)
+}
+function observeStage(phase, detail = {}) {
+  observedPhase = phase
+  observe('stage', detail)
+}
 console.log(JSON.stringify({ run, backendPid: java?.pid, backendPort, cdpPort }))
 async function start(executable, phase) {
   fs.writeFileSync(commandFile, '{}')
@@ -119,6 +132,7 @@ async function start(executable, phase) {
   return paths
 }
 async function quit() {
+  observeStage('quit-request')
   if (installedMode) { browser?.disconnect(); browser = null; await installed.quit(); child = null; return }
   browser?.disconnect(); browser = null
   fs.writeFileSync(commandFile, JSON.stringify({ quit: true, nonce: Date.now() }))
@@ -129,6 +143,7 @@ async function quit() {
   await sleep(1000)
 }
 async function open(ext) {
+  observe('action', { action: 'open-file', ext })
   if (installedMode) {
     const file = JSON.stringify(files[ext])
     await installed.mainRpc(process.platform === 'darwin'
@@ -180,6 +195,7 @@ async function open(ext) {
   return guest
 }
 async function exec(ext, action, params = {}) {
+  observe('action', { action: 'editor-command', ext, command: action })
   const result = await page.evaluate(async (name, action, params) => {
     const editor = Object.values(window.__checkbaActiveOverviewVm._libreRefs || {}).find(e => e.file?.name === name)
     return editor.executor.executeCommand(action, params)
@@ -208,6 +224,7 @@ try {
   if (installedMode) {
     assert(!process.env.AWD_BASELINE_ELECTRON, 'Installed tests pin their own build')
     const { launchInstalledElectron } = await import('./installed-electron-helper.mjs')
+    observeStage('installed-startup')
     installed = await launchInstalledElectron({ outDir: run, backendPort, cdpPort })
     child = installed.child
   } else {
@@ -226,15 +243,28 @@ try {
   }
   const executable = process.env.AWD_ELECTRON_BINARY || path.join(root, 'desktop/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron')
   async function connectInstalled() {
+    observedLaunch++
+    observeStage('connect-installed')
     const version = await (await fetch(`http://127.0.0.1:${cdpPort}/json/version`)).json()
     browser = await puppeteer.connect({ browserWSEndpoint: version.webSocketDebuggerUrl, defaultViewport: null })
     page = await until(async () => (await browser.pages()).find(p => p.url().includes('/h5/index.html')), 60000)
     await page.waitForFunction(() => !!window.__checkbaActiveOverviewVm, { timeout: 120000 })
     await installed.mainRpc(`(()=>{const w=process.mainModule.require('electron').BrowserWindow.getAllWindows().find(w=>w.isVisible());w.setContentSize(1440,1000);w.focus();return true})()`)
-    page.on('pageerror', error => { evidence.pageErrors ||= []; evidence.pageErrors.push(error.message) })
+    const observedPage = page, launch = observedLaunch
+    page.on('pageerror', error => {
+      evidence.pageErrors ||= []; evidence.pageErrors.push(error.message)
+      observe('pageerror', { launch, name: error.name, message: error.message, stack: error.stack, url: observedPage.url() })
+    })
+    if (observePageError) {
+      const diagnostics = await page.createCDPSession()
+      diagnostics.on('Runtime.exceptionThrown', ({ exceptionDetails }) => observe('cdp-exception', { launch, url: observedPage.url(), exceptionDetails }))
+      await diagnostics.send('Runtime.enable')
+    }
     // Dismiss the actual optional-pack dialog via its close button, not a hidden VM flag.
+    observeStage('dismiss-optional-components')
     const dismiss = await page.$('.ocd-mask .ocd-actions .ocd-btn:not(.primary)')
     if (dismiss) await dismiss.click()
+    observeStage('installed-ready')
   }
   if (installedMode) {
     await connectInstalled()
@@ -243,6 +273,7 @@ try {
   } else evidence.runtime = (await start(executable, 'candidate')).versions
   if (process.env.AWD_BASELINE_ELECTRON) assert.equal(await page.evaluate(() => localStorage.getItem('electron-upgrade-persistence')), 'baseline-profile-retained')
   for (const ext of ['docx', 'xlsx', 'pptx']) {
+    observeStage('format-open', { ext })
     const frame = await open(ext)
     frame.on('pageerror', error => { evidence.guestErrors ||= []; evidence.guestErrors.push({ ext, message: error.message }) })
     frame.on('console', message => { if (message.type() === 'error') { evidence.guestErrors ||= []; evidence.guestErrors.push({ ext, message: message.text() }) } })
@@ -279,6 +310,7 @@ try {
       }
     })
     const inputState = () => frame.$eval('[data-lo-ime]', el => ({ value: el.value, focused: document.activeElement === el, active: document.activeElement?.tagName, events: window.__compatInputEvents }))
+    observeStage('format-input', { ext })
     await frame.__compatFocus.send('Input.imeSetComposition', { text: marker, selectionStart: marker.length, selectionEnd: marker.length })
     await frame.__compatFocus.send('Input.insertText', { text: marker })
     await sleep(1500) // Let the worker commit IME text before Enter/Escape ends editing.
@@ -294,6 +326,7 @@ try {
     }
     console.log(JSON.stringify({ stage: 'input', ext }))
     const started = Date.now()
+    observeStage('format-autosave', { ext })
     // The synthetic marker contains no XML entities; CJK/Latin text may use separate OOXML runs.
     await until(async () => (await savedXml(ext)).replace(/<[^>]*>/g, '').includes(marker), 90000)
     const xml = await savedXml(ext)
@@ -306,6 +339,7 @@ try {
     }
     evidence.formats[ext] = { route: 'LOWA WASM Electron webview', guestURL: frame.url(), marker, autosaveMs: Date.now() - started, sha256: hash(files[ext]), normalAutosave: true }
     await page.screenshot({ path: path.join(run, `${ext}-edited.png`) })
+    observeStage('format-reopen', { ext })
     await close(ext)
     await open(ext)
     const result = ext === 'docx' ? await exec(ext, 'get_document_text') : ext === 'xlsx' ? await exec(ext, 'sheet_read_range', { range: 'A1:C2' }) : await exec(ext, 'slide_get_page', { slideNumber: 1 })
@@ -319,15 +353,18 @@ try {
     await page.screenshot({ path: path.join(run, `${ext}-reopened.png`) })
     await close(ext)
   }
+  observeStage('pdf-open')
   await open('pdf')
   await sleep(2000)
   await assertLocalWorkspaceUnobstructed()
   await page.screenshot({ path: path.join(run, 'pdf-opened.png') })
   const bounds = await page.$eval('.preview-pdf iframe', el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height } })
   await page.mouse.click(bounds.x + bounds.width * 0.7, bounds.y + bounds.height * 0.5)
+  observeStage('pdf-scroll')
   await page.mouse.wheel({ deltaY: 850 })
   await sleep(1000)
   await page.screenshot({ path: path.join(run, 'pdf-scrolled.png') })
+  observeStage('pdf-reopen')
   await close('pdf'); await open('pdf'); await sleep(1500)
   await page.screenshot({ path: path.join(run, 'pdf-reopened.png') })
   assert.equal(hash(files.pdf), originalHashes.pdf)
@@ -337,12 +374,15 @@ try {
     await close('pdf')
     await assertLocalWorkspaceUnobstructed()
     const { checkDesktopInteractions } = await import('./installed-desktop-interactions.mjs')
-    evidence.desktop = await checkDesktopInteractions({ page, browser, mainRpc: installed.mainRpc, run })
+    observeStage('desktop-interactions')
+    evidence.desktop = await checkDesktopInteractions({ page, browser, mainRpc: installed.mainRpc, run, observeStage })
+    observeStage('restart-client')
     await quit()
     await installed.start(); child = installed.child
     await connectInstalled()
     assert.equal(await page.evaluate(() => localStorage.getItem('electron-cloud-restart')), 'retained')
     for (const ext of ['docx', 'xlsx', 'pptx']) {
+      observeStage('restart-reopen', { ext })
       await open(ext)
       const content = ext === 'docx' ? await exec(ext, 'get_document_text') : ext === 'xlsx' ? await exec(ext, 'sheet_read_range', { range: 'A1:C2' }) : await exec(ext, 'slide_get_page', { slideNumber: 1 })
       assert.ok(JSON.stringify(content).includes(evidence.formats[ext].marker), `App restart preserves ${ext}`)
