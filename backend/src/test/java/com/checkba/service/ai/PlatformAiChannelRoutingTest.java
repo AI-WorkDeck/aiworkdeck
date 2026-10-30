@@ -49,6 +49,7 @@ class PlatformAiChannelRoutingTest {
 
     private void machineKeyAvailable() {
         when(accountService.isConnected()).thenReturn(true);
+        when(accountService.accountFingerprintOrNull()).thenReturn("machine-account");
         when(accountService.fetchAiKey()).thenReturn(Map.of(
                 "openrouterKey", "sk-or-machine", "limitUsd", 10.0));
     }
@@ -158,12 +159,12 @@ class PlatformAiChannelRoutingTest {
         bound(1L, "sk-or-alice");
         PlatformAiChannel channel = channel(false);
 
-        channel.onKeyRejected(1L);
-        verify(perUser).evict(1L);
+        channel.onKeyRejected(1L, "fp-1");
+        verify(perUser).evict(1L, "fp-1");
 
         when(perUser.isBound(3L)).thenReturn(false);
-        channel.onKeyRejected(3L);
-        verify(perUser, never()).evict(3L);
+        channel.onKeyRejected(3L, "fp-3");
+        verify(perUser, never()).evict(3L, "fp-3");
     }
 
     private static void assertNotMistakenForLogout(String message) {

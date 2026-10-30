@@ -178,7 +178,7 @@ public class VoiceDictationService {
 
         if (response.statusCode() == 401 || response.statusCode() == 403) {
             // 与 AI 通道同口径：上游明确拒绝 = key 已吊销，立即作废本地缓存
-            platformAiChannel.onKeyRejected(userId);
+            platformAiChannel.onKeyRejected(userId, resolved.fingerprint());
             throw new com.checkba.service.account.AccountException(
                     com.checkba.service.account.AccountException.Kind.UNAUTHORIZED, LangText.of(
                     "账户登录已失效，请重新登录", "Your account session has expired. Please sign in again"));
@@ -206,7 +206,7 @@ public class VoiceDictationService {
                 text = text.substring(1, text.length() - 1).trim();
             }
             text = scrubPromptEcho(text);
-            platformAiChannel.onKeyVerified(userId);
+            platformAiChannel.onKeyVerified(userId, resolved.fingerprint());
             return new Dictation(text);
         } catch (Exception e) {
             throw new IllegalStateException(LangText.of("听写响应无法解析", "Dictation response could not be parsed"));

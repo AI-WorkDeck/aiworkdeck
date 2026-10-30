@@ -92,6 +92,36 @@ class VoiceDictationServiceTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {200, 401})
+    void delayedDictationResponseKeepsOriginalRuntimeFingerprint(int status) throws Exception {
+        var channel = mock(PlatformAiChannel.class);
+        var original = new PlatformAiKeyService.Resolved("old-key", "old-fingerprint", 1.0);
+        when(channel.resolveFor(1L)).thenReturn(original);
+        var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/chat/completions", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            when(channel.resolveFor(1L)).thenReturn(new PlatformAiKeyService.Resolved("new-key", "new-fingerprint", 1.0));
+            byte[] body = "{\"choices\":[{\"message\":{\"content\":\"words\"}}]}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status, body.length); exchange.getResponseBody().write(body); exchange.close();
+        });
+        server.start();
+        try {
+            var service = new VoiceDictationService(channel, mock(PlatformCreditsGate.class),
+                    "http://127.0.0.1:" + server.getAddress().getPort(), "xiaomi/mimo-v2.5");
+            String audio = Base64.getEncoder().encodeToString(new byte[16]);
+            if (status == 401) {
+                assertThrows(com.checkba.service.account.AccountException.class, () -> service.transcribe(1L, audio, "wav", 1000));
+                verify(channel).onKeyRejected(1L, original.fingerprint());
+            } else {
+                service.transcribe(1L, audio, "wav", 1000);
+                verify(channel).onKeyVerified(1L, original.fingerprint());
+            }
+            verify(channel, never()).onKeyRejected(1L, "new-fingerprint");
+            verify(channel, never()).onKeyVerified(1L, "new-fingerprint");
+        } finally { server.stop(0); }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(ints = {401, 403, 402})
     void upstreamAccountRejectionPreservesLoginOrRechargeAction(int status) throws Exception {
         var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
@@ -113,7 +143,7 @@ class VoiceDictationServiceTest {
             assertEquals(status == 402 ? com.checkba.service.account.AccountException.Kind.CONFLICT
                     : com.checkba.service.account.AccountException.Kind.UNAUTHORIZED, error.getKind());
             if (status == 402) assertEquals("no_credits", error.getReason());
-            else verify(channel).onKeyRejected(1L);
+            else verify(channel).onKeyRejected(1L, "fingerprint");
             verify(gate).ensureCredits(1L);
         } finally {
             server.stop(0);
@@ -153,7 +183,7 @@ class VoiceDictationServiceTest {
                 assertEquals(4096, observed.get().path("max_tokens").asInt());
                 assertFalse(observed.get().path("enable_thinking").asBoolean());
             }
-            verify(channel).onKeyVerified(1L);
+            verify(channel).onKeyVerified(1L, "fingerprint");
         } finally {
             server.stop(0);
         }

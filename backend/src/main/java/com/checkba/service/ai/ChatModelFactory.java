@@ -59,9 +59,8 @@ public class ChatModelFactory {
     private boolean canResolvePlatformCatalog() {
         return usesProviderCatalog() && platformAiChannel.availableFor(PlatformAiUserScope.current());
     }
-    private String platformBaseUrl() {
-        String base = platformAiChannel.baseUrl(aiModelProperties.getOpenRouter().getBaseUrl());
-        return base == null && !platformAiChannel.isBailian() ? aiModelProperties.getOpenRouter().getBaseUrl() : base;
+    private String platformBaseUrl(PlatformAiKeyService.Resolved connection) {
+        return connection.bailian() ? connection.baseUrl() : aiModelProperties.getOpenRouter().getBaseUrl();
     }
     public String platformFailover(java.util.List<String> candidates, String current, java.util.Set<String> tried, boolean vision) {
         return platformModelCatalog.failover(candidates, current, tried, vision);
@@ -229,9 +228,12 @@ public class ChatModelFactory {
         ResolvedTarget target = resolveTarget(selectedModel, false);
         if (target.channel() != expectedChannel) return null;
         boolean platform = target.channel() == AiModelProperties.Provider.AWD_CLOUD;
-        if (platform && platformAiChannel.isBailian()) return null;
-        return new DecisionCredentials(platform ? platformApiKey() : resolveOpenRouterApiKey(),
-                platform ? platformBaseUrl() : resolveOpenRouterBaseUrl(), platform);
+        if (platform) {
+            PlatformAiKeyService.Resolved connection = platformConnection();
+            if (connection.bailian()) return null;
+            return new DecisionCredentials(connection.apiKey(), platformBaseUrl(connection), true);
+        }
+        return new DecisionCredentials(resolveOpenRouterApiKey(), resolveOpenRouterBaseUrl(), false);
     }
 
     /** Deliberately redacted: credentials must never appear in record-generated toString/logging. */
@@ -313,8 +315,9 @@ public class ChatModelFactory {
                     .timeout(remainingTimeout(timeout, started)).maxRetries(0).build();
         }
         boolean platform = target.channel() == AiModelProperties.Provider.AWD_CLOUD;
-        String key = platform ? platformApiKey() : resolveOpenRouterApiKey();
-        String baseUrl = platform ? platformBaseUrl() : resolveOpenRouterBaseUrl();
+        PlatformAiKeyService.Resolved connection = platform ? platformConnection() : null;
+        String key = platform ? connection.apiKey() : resolveOpenRouterApiKey();
+        String baseUrl = platform ? platformBaseUrl(connection) : resolveOpenRouterBaseUrl();
         return OpenAiChatModel.builder().apiKey(key).baseUrl(baseUrl).modelName(target.modelId())
                 .timeout(remainingTimeout(timeout, started)).maxRetries(0)
                 .maxTokens(maxOutputTokens).logRequests(false).logResponses(false).build();
@@ -333,9 +336,9 @@ public class ChatModelFactory {
         }
         long started = System.nanoTime();
         String modelId = resolvePlatformModel("default", true);
-        String key = platformApiKey(); // Per-user credits, identity and usage baseline; failure is terminal.
-        ChatLanguageModel model = OpenAiChatModel.builder().apiKey(key)
-                .baseUrl(platformBaseUrl()).modelName(modelId)
+        PlatformAiKeyService.Resolved connection = platformConnection(); // Per-user credits, identity and usage baseline; failure is terminal.
+        ChatLanguageModel model = OpenAiChatModel.builder().apiKey(connection.apiKey())
+                .baseUrl(platformBaseUrl(connection)).modelName(modelId)
                 .timeout(remainingTimeout(timeout, started)).maxRetries(0).maxTokens(maxOutputTokens)
                 .logRequests(false).logResponses(false).build();
         recordModelUse(AiModelProperties.Provider.AWD_CLOUD.name(), modelId, false);
@@ -394,12 +397,13 @@ public class ChatModelFactory {
                     "当前通道无法使用所选写作模型；未改用其他模型");
         }
         boolean platform = target.channel() == AiModelProperties.Provider.AWD_CLOUD;
-        String key = platform ? platformApiKey() : resolveOpenRouterApiKey();
-        String baseUrl = platform ? platformBaseUrl() : resolveOpenRouterBaseUrl();
+        PlatformAiKeyService.Resolved connection = platform ? platformConnection() : null;
+        String key = platform ? connection.apiKey() : resolveOpenRouterApiKey();
+        String baseUrl = platform ? platformBaseUrl(connection) : resolveOpenRouterBaseUrl();
         recordModelUse(target.channel().name(), target.modelId(), true);
         return new OpenRouterStreamingChatModel(key, baseUrl, target.modelId(), remainingTimeout(timeout, started),
                 aiModelProperties.getOpenRouter().getMaxRequestsPerHost(), reviewModel != null ? (AllowedModels.KIMI_K3.getModelId().equals(reviewModel) ? "high" : "low") : automatic ? reasoningEffortFor(target.modelId()) : null,
-                automatic && !(platform && platformAiChannel.isBailian()) ? providerRoutingFor(target.modelId()) : null);
+                automatic && !(platform && connection.bailian()) ? providerRoutingFor(target.modelId()) : null);
     }
 
     private static java.time.Duration remainingTimeout(java.time.Duration budget, long started) {
@@ -586,7 +590,7 @@ public class ChatModelFactory {
     /** Check before starting asynchronous paid work so callers receive the account error directly. */
     public void ensurePaidAccess(Long userId) {
         if (resolveProvider() == AiModelProperties.Provider.AWD_CLOUD) {
-            PlatformAiUserScope.run(userId, () -> platformApiKey());
+            PlatformAiUserScope.run(userId, () -> platformConnection());
         }
     }
 
@@ -598,23 +602,23 @@ public class ChatModelFactory {
      * <p>server 模式多租户下密钥是 per-user 的，身份取自 {@link PlatformAiUserScope}；
      * 缺身份同样抛业务错误，**绝不回落机器级 key**（那等于拿别人的额度花钱）。
      */
-    private String platformApiKey() {
+    private PlatformAiKeyService.Resolved platformConnection() {
         Long userId = PlatformAiUserScope.current();
         // 余额闸排在取 key 之前：本地已经缓存过 key 时 apiKey() 根本不联网，
         // 「没充值就不能用」不能只靠取 key 那一刻的 409（见 PlatformCreditsGate）
         platformCreditsGate.ensureCredits(userId);
         // 试用计量：标记本轮真的走了云端平台通道（纯本地/BYOK 回合不计次，规格 §1.4）
         com.checkba.service.trial.TrialTurnScope.markPlatformUse();
-        String key = platformAiChannel.apiKey();
+        PlatformAiKeyService.Resolved connection = platformAiChannel.connection();
         // 请求发出前先把用量基线建起来，否则重启后第一条消息只够建基线、cost 永远留空
         usageAccountant.ensureBaselineAsync(userId);
-        return key;
+        return connection;
     }
 
     /**
      * 断开账户后把 activeProvider 从平台通道摘下来，返回切换到的供应商（本来就不是平台通道时返回 null）。
      *
-     * 不做这一步的话：platformAiChannel 不可用 → 每条消息都在 {@link #platformApiKey()} 抛
+     * 不做这一步的话：platformAiChannel 不可用 → 每条消息都在 {@link #platformConnection()} 抛
      * NOT_CONNECTED，而设置页仍把「AI WorkDeck 云端」渲染成正常选中（不可选标记刻意豁免当前选项），
      * 用户看不出问题出在哪。落点按「哪个还能用」挑，避免一律摔回本地 Ollama（多数人没装）。
      */
@@ -651,9 +655,10 @@ public class ChatModelFactory {
     /** 缓存 key 带密钥指纹：官网撤销重发后指纹变化，旧实例自然作废。 */
     private ChatLanguageModel getOrCreatePlatformModel(String modelId) {
         recordModelUse("AWD_CLOUD", modelId, false);
-        String apiKey = platformApiKey();
-        String baseUrl = platformBaseUrl();
-        String cacheKey = "awd_cloud:" + baseUrl + ":" + platformAiChannel.keyFingerprint() + ":" + modelId;
+        PlatformAiKeyService.Resolved connection = platformConnection();
+        String apiKey = connection.apiKey();
+        String baseUrl = platformBaseUrl(connection);
+        String cacheKey = "awd_cloud:" + baseUrl + ":" + connection.fingerprint() + ":" + modelId;
         return modelCache.computeIfAbsent(cacheKey, k -> {
             log.info("Creating new AWD Cloud ChatModel instance for: {}", modelId);
             AiModelProperties.OpenRouter config = aiModelProperties.getOpenRouter();
@@ -772,16 +777,17 @@ public class ChatModelFactory {
     private dev.langchain4j.model.chat.StreamingChatLanguageModel getOrCreatePlatformStreamingModel(
             String modelId, String reasoningEffortOverride) {
         recordModelUse("AWD_CLOUD", modelId, true);
-        String apiKey = platformApiKey();
-        String effort = platformAiChannel.isBailian() ? null : reasoningEffortFor(modelId, reasoningEffortOverride);
-        String baseUrl = platformBaseUrl();
-        String cacheKey = "awd_cloud_stream:" + baseUrl + ":" + platformAiChannel.keyFingerprint() + ":" + modelId
+        PlatformAiKeyService.Resolved connection = platformConnection();
+        String apiKey = connection.apiKey();
+        String effort = connection.bailian() ? null : reasoningEffortFor(modelId, reasoningEffortOverride);
+        String baseUrl = platformBaseUrl(connection);
+        String cacheKey = "awd_cloud_stream:" + baseUrl + ":" + connection.fingerprint() + ":" + modelId
                 + (effort != null ? ":" + effort : "");
         return streamingModelCache.computeIfAbsent(cacheKey, k -> {
             log.info("Creating new AWD Cloud StreamingChatModel for: {} (effort={})", modelId, effort);
             AiModelProperties.OpenRouter config = aiModelProperties.getOpenRouter();
             return streamingModel(apiKey, baseUrl, modelId, config.getTimeout(),
-                    config.getMaxRequestsPerHost(), effort, platformAiChannel.isBailian() ? null : providerRoutingFor(modelId));
+                    config.getMaxRequestsPerHost(), effort, connection.bailian() ? null : providerRoutingFor(modelId));
         });
     }
 
