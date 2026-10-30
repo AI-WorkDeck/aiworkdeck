@@ -342,12 +342,11 @@ export default {
       for (const p of this.plugins) {
         const latest = (this.marketPlugins || []).find(item => item.id === p.id)
         const updatable = isPluginUpdateAvailable(latest, p)
-        const labelKey = BUILTIN_PLUGIN_NAME_KEYS[p.id]
-        const localizedName = labelKey ? this.$t(labelKey) : ''
+        const localizedName = typeof this.builtinPluginName === 'function' ? this.builtinPluginName(p.id) : ''
         rows.push({
           kind: 'plugin',
           id: p.id,
-          name: (localizedName && localizedName !== labelKey ? localizedName : '') || p.name || p.id,
+          name: localizedName || p.name || p.id,
           desc: p.description || '',
           avatarUrl: typeof getPluginAvatarUrl === 'function' ? getPluginAvatarUrl(p.id) : null,
           glyph: typeof getPluginGlyphPaths === 'function' ? getPluginGlyphPaths(p.id) : ICONS.blocks,
@@ -437,12 +436,11 @@ export default {
         if (author) metaParts.push(author)
         metaParts.push(priceLabel(m))
         const state = paidState(m, this.accountConnected)
-        const labelKey = BUILTIN_PLUGIN_NAME_KEYS[m.id]
-        const localizedName = labelKey ? this.$t(labelKey) : ''
+        const localizedName = typeof this.builtinPluginName === 'function' ? this.builtinPluginName(m.id) : ''
         return {
           kind: 'plugin',
           id: m.id,
-          name: (localizedName && localizedName !== labelKey ? localizedName : '') || m.name || m.id,
+          name: localizedName || m.name || m.id,
           desc: m.description || '',
           avatarUrl: typeof getPluginAvatarUrl === 'function' ? getPluginAvatarUrl(m.id) : null,
           glyph: typeof getPluginGlyphPaths === 'function' ? getPluginGlyphPaths(m.id) : ICONS.blocks,
@@ -475,6 +473,12 @@ export default {
     uni.$off(APP_LANGUAGE_EVENT, this.reloadAll)
   },
   methods: {
+    builtinPluginName(id) {
+      const labelKey = id ? BUILTIN_PLUGIN_NAME_KEYS[id] : ''
+      if (!labelKey || typeof this.$t !== 'function') return ''
+      const val = this.$t(labelKey)
+      return val && val !== labelKey ? val : ''
+    },
     toggleSection(key) {
       this.sections[key] = !this.sections[key]
     },

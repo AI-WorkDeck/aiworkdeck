@@ -4160,7 +4160,7 @@ export default {
     this.scheduleLibreSpare()
     // 菜单栏：重新接管（页面栈里可能有别的实例刚交出去）
     this.registerMenuCommands()
-    this.refreshLocalizedLabels()
+    this.refreshLocalizedLabels?.()
 
     // 从设置页返回时刷新授权/账户 chip（用户可能刚连接或断开账户）
     this.loadLicenseMode()
@@ -4301,7 +4301,7 @@ export default {
     }
     uni.$on('awd:entitlements-changed', this._onEntitlementsChanged)
     this._onAppLanguageChanged = () => {
-      this.refreshLocalizedLabels()
+      this.refreshLocalizedLabels?.()
     }
     uni.$on(APP_LANGUAGE_EVENT, this._onAppLanguageChanged)
     // 设置页/侧栏用户卡改了头像或昵称（dev-board#603）：顶栏那颗头像与参与人堆叠
@@ -6823,8 +6823,7 @@ export default {
     openMarketDetail(spec) {
       spec = { ...spec, projectId: Object.prototype.hasOwnProperty.call(spec, 'projectId') ? spec.projectId : (this.projectId || null) }
       const tabId = `market-detail_${spec.kind}_${spec.id}`
-      const builtinKey = spec.kind === 'plugin' && spec.id ? BUILTIN_PLUGIN_LABEL_KEYS[spec.id] : ''
-      const resolvedName = (builtinKey && typeof this.$t === 'function' ? this.$t(builtinKey) : '') || spec.name || spec.id
+      const resolvedName = (spec.kind === 'plugin' && typeof this.resolveBuiltinPluginName === 'function' ? this.resolveBuiltinPluginName(spec.id) : '') || spec.name || spec.id
       for (const pane of ['left', 'right']) {
         const list = pane === 'left' ? this.leftFiles : this.rightFiles
         const existing = list.find(f => f.id === tabId)
@@ -6850,17 +6849,6 @@ export default {
       this[idProp] = tabId
       this.focusedPane = targetPane
       this.$nextTick(() => this.triggerWorkbenchResize())
-    },
-    onMarketDetailTitleChange(tab, nextTitle) {
-      if (!tab || !nextTitle) return
-      const trimmed = String(nextTitle).trim()
-      if (!trimmed || tab.name === trimmed) return
-      tab.name = trimmed
-      if (tab.marketSpec && typeof tab.marketSpec === 'object') {
-        tab.marketSpec = { ...tab.marketSpec, name: trimmed }
-      }
-      this.updateWindowTitle()
-      this.scheduleTabSnapshotSave?.()
     },
     formatTime(timeStr) {
   if (!timeStr) return '-'
@@ -8149,6 +8137,25 @@ export default {
         if (localized) return localized
       }
       return file.name || ''
+    },
+
+    resolveBuiltinPluginName(pluginId) {
+      const key = pluginId ? BUILTIN_PLUGIN_LABEL_KEYS[pluginId] : ''
+      if (!key || typeof this.$t !== 'function') return ''
+      const val = this.$t(key)
+      return val && val !== key ? val : ''
+    },
+
+    onMarketDetailTitleChange(tab, nextTitle) {
+      if (!tab || !nextTitle) return
+      const trimmed = String(nextTitle).trim()
+      if (!trimmed || tab.name === trimmed) return
+      tab.name = trimmed
+      if (tab.marketSpec && typeof tab.marketSpec === 'object') {
+        tab.marketSpec = { ...tab.marketSpec, name: trimmed }
+      }
+      this.updateWindowTitle()
+      this.scheduleTabSnapshotSave?.()
     },
 
     refreshLocalizedLabels() {

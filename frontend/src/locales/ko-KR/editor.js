@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "officeToolNames": {
+  officeToolNames: {
     "office_ppt_add_image": "슬라이드 이미지 삽입",
     "office_ppt_add_chart": "슬라이드 차트 삽입",
     "office_ppt_format_chart": "슬라이드 차트 서식 설정",
@@ -23,7 +23,7 @@ export default {
     "office_ppt_write_notes": "발표자 노트 쓰기",
     "office_audit_structure": "문서 구조 검토"
   },
-  "sheetErrors": {
+  sheetErrors: {
     "SHEET_SORT_MERGED_RANGE": "정렬 범위에 병합된 셀이 있습니다. 병합을 해제한 후 정렬하세요.",
     "SHEET_SORT_FAILED": "정렬하지 못했습니다. 시트를 다시 읽고 확인한 후 재시도하세요.",
     "SHEET_PROTECTED_CELL": "보호된 셀이 포함되어 있어 쓰지 않았습니다.",
