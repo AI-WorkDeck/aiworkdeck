@@ -10,9 +10,14 @@ import java.util.List;
 
 public interface ProjectAiMessageRepository extends JpaRepository<ProjectAiMessage, Long> {
 
-    List<ProjectAiMessage> findByProjectIdOrderByCreatedAtAsc(Long projectId);
+    @org.springframework.data.jpa.repository.Query("SELECT m FROM ProjectAiMessage m WHERE m.projectId = :projectId "
+            + "AND NOT EXISTS (SELECT s.id FROM ProjectAiMessage s WHERE s.conversationId = m.conversationId AND s.conversationScope IS NOT NULL) ORDER BY m.createdAt ASC")
+    List<ProjectAiMessage> findByProjectIdOrderByCreatedAtAsc(@org.springframework.data.repository.query.Param("projectId") Long projectId);
 
-    List<ProjectAiMessage> findByProjectIdAndUserIdOrderByCreatedAtAsc(Long projectId, Long userId);
+    @org.springframework.data.jpa.repository.Query("SELECT m FROM ProjectAiMessage m WHERE m.projectId = :projectId AND m.userId = :userId "
+            + "AND NOT EXISTS (SELECT s.id FROM ProjectAiMessage s WHERE s.conversationId = m.conversationId AND s.conversationScope IS NOT NULL) ORDER BY m.createdAt ASC")
+    List<ProjectAiMessage> findByProjectIdAndUserIdOrderByCreatedAtAsc(@org.springframework.data.repository.query.Param("projectId") Long projectId,
+            @org.springframework.data.repository.query.Param("userId") Long userId);
 
     List<ProjectAiMessage> findByConversationIdOrderByCreatedAtAsc(String conversationId);
 
@@ -74,6 +79,10 @@ public interface ProjectAiMessageRepository extends JpaRepository<ProjectAiMessa
      * 「从此分叉」的产物才非空，前端据此渲染「分支自 …」角标（dev-board#779 K18）。
      * <b>加列只许追加在尾部</b>：服务层按下标取值。
      */
+    default List<Object[]> findConversationSummaries(Long projectId, Long userId) {
+        return findScopedConversationSummaries(projectId, userId, null);
+    }
+
     @org.springframework.data.jpa.repository.Query(
         "SELECT m.conversationId, MAX(m.createdAt), " +
         "(SELECT m2.content FROM ProjectAiMessage m2 WHERE m2.conversationId = m.conversationId ORDER BY m2.createdAt DESC LIMIT 1), " +
@@ -83,8 +92,11 @@ public interface ProjectAiMessageRepository extends JpaRepository<ProjectAiMessa
         "(SELECT m7.conversationPinned FROM ProjectAiMessage m7 WHERE m7.conversationId = m.conversationId AND m7.conversationPinned IS NOT NULL ORDER BY m7.createdAt ASC LIMIT 1), " +
         "(SELECT m8.parentConversationId FROM ProjectAiMessage m8 WHERE m8.conversationId = m.conversationId ORDER BY m8.createdAt ASC LIMIT 1) " +
         "FROM ProjectAiMessage m WHERE m.projectId = :projectId AND m.userId = :userId " +
+        "AND ((:scope IS NULL AND NOT EXISTS (SELECT s.id FROM ProjectAiMessage s WHERE s.conversationId = m.conversationId AND s.conversationScope IS NOT NULL)) " +
+        "OR (:scope IS NOT NULL AND EXISTS (SELECT s.id FROM ProjectAiMessage s WHERE s.conversationId = m.conversationId AND s.conversationScope = :scope))) " +
         "GROUP BY m.conversationId ORDER BY MAX(m.createdAt) DESC")
-    List<Object[]> findConversationSummaries(@org.springframework.data.repository.query.Param("projectId") Long projectId, @org.springframework.data.repository.query.Param("userId") Long userId);
+    List<Object[]> findScopedConversationSummaries(@org.springframework.data.repository.query.Param("projectId") Long projectId, @org.springframework.data.repository.query.Param("userId") Long userId,
+            @org.springframework.data.repository.query.Param("scope") String scope);
 
     /**
      * 一批会话的标题素材（dev-board#779 K18）：给「分支自 &lt;父标题&gt;」角标解析父会话的标题。
@@ -128,6 +140,7 @@ public interface ProjectAiMessageRepository extends JpaRepository<ProjectAiMessa
         "(SELECT m5.userId FROM ProjectAiMessage m5 WHERE m5.conversationId = m.conversationId ORDER BY m5.createdAt ASC LIMIT 1), " +
         "(SELECT m6.sourceChannel FROM ProjectAiMessage m6 WHERE m6.conversationId = m.conversationId ORDER BY m6.createdAt ASC LIMIT 1) " +
         "FROM ProjectAiMessage m WHERE m.projectId = :projectId " +
+        "AND NOT EXISTS (SELECT s.id FROM ProjectAiMessage s WHERE s.conversationId = m.conversationId AND s.conversationScope IS NOT NULL) " +
         "GROUP BY m.conversationId " +
         "HAVING (:before IS NULL OR MAX(m.createdAt) < :before " +
         "        OR (MAX(m.createdAt) = :before AND m.conversationId < :beforeId)) " +

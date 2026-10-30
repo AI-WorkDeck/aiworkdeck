@@ -129,6 +129,7 @@ public class ProjectAiMessageService {
         userMsg.setRole("USER");
         userMsg.setContent(userContent);
         userMsg.setConversationId(conversationId);
+        userMsg.setConversationScope(conversationScopeOf(conversationId));
         userMsg.setCreatedAt(now);
         repository.save(userMsg);
 
@@ -138,6 +139,7 @@ public class ProjectAiMessageService {
         aiMsg.setRole("ASSISTANT");
         aiMsg.setContent(assistantContent);
         aiMsg.setConversationId(conversationId);
+        aiMsg.setConversationScope(conversationScopeOf(conversationId));
         aiMsg.setCreatedAt(LocalDateTime.now());
         repository.save(aiMsg);
         mirror(userMsg);
@@ -208,6 +210,7 @@ public class ProjectAiMessageService {
                 : "ASSISTANT".equalsIgnoreCase(role) ? assistantStorage(conversationId, displayContent) : displayContent);
         msg.setClientRequestId(clientRequestId == null || clientRequestId.isBlank() ? null : clientRequestId.trim());
         msg.setConversationId(conversationId);
+        msg.setConversationScope(conversationScopeOf(conversationId));
         msg.setCreatedAt(java.time.LocalDateTime.now());
         repository.save(msg);
         mirror(msg);
@@ -264,6 +267,7 @@ public class ProjectAiMessageService {
         msg.setContent(content);
         msg.setReasoning(reasoning);
         msg.setConversationId(conversationId);
+        msg.setConversationScope(conversationScopeOf(conversationId));
         msg.setCreatedAt(java.time.LocalDateTime.now());
         repository.save(msg);
         mirror(msg);
@@ -361,6 +365,32 @@ public class ProjectAiMessageService {
         return repository.countByConversationId(conversationId);
     }
 
+    /** Reclassify only the explicit, owned workflow conversation; never infer it from its title. */
+    @org.springframework.transaction.annotation.Transactional
+    public boolean adoptConversationScope(String conversationId, Long userId, Long projectId, String scope) {
+        scope = com.checkba.service.ai.ConversationIssuanceService.normalizeScope(scope);
+        if (scope == null || !canUseConversation(conversationId, userId)) return false;
+        var first = repository.findFirstByConversationId(conversationId);
+        Long ownerProject = first.map(ProjectAiMessage::getProjectId)
+                .orElseGet(() -> conversationIssuanceService.projectOf(conversationId));
+        if (!java.util.Objects.equals(projectId, ownerProject)) return false;
+        if (isMirroredConversation(conversationId)) return false;
+        String existingScope = conversationScopeOf(conversationId);
+        if (existingScope != null && !existingScope.equals(scope)) return false;
+        var messages = repository.findByConversationIdOrderByCreatedAtAsc(conversationId);
+        for (var message : messages) message.setConversationScope(scope);
+        repository.saveAll(messages);
+        conversationIssuanceService.registerScope(conversationId, userId, projectId, scope);
+        return true;
+    }
+
+    public String conversationScopeOf(String conversationId) {
+        if (conversationId == null) return null;
+        String registered = conversationIssuanceService.scopeOf(conversationId);
+        return registered != null ? registered : repository.findFirstByConversationId(conversationId)
+                .map(ProjectAiMessage::getConversationScope).orElse(null);
+    }
+
     /**
      * 是否为插件镜像会话（dev-board#298）：首条消息带 sourceChannel。
      * 镜像会话在桌面端只读——插件那头还在续写同一条时间线，桌面直接续写会双头交错；
@@ -410,7 +440,13 @@ public class ProjectAiMessageService {
      * 仓储给的「最后活跃时间倒序」。置顶只影响这一个顺序，不影响任何别的行为。
      */
     public List<java.util.Map<String, Object>> listConversations(Long projectId, Long userId) {
-        List<Object[]> results = repository.findConversationSummaries(projectId, userId);
+        return listConversations(projectId, userId, null);
+    }
+
+    public List<java.util.Map<String, Object>> listConversations(Long projectId, Long userId, String scope) {
+        scope = com.checkba.service.ai.ConversationIssuanceService.normalizeScope(scope);
+        List<Object[]> results = scope == null ? repository.findConversationSummaries(projectId, userId)
+                : repository.findScopedConversationSummaries(projectId, userId, scope);
         // 「分支自 <父标题>」角标的素材（dev-board#779 K18）：父会话不一定在这一页里，
         // 逐条查是 N+1，所以先把这一页引用到的父会话 id 收齐，一次查回标题。
         java.util.Set<String> parentIds = results.stream()
@@ -526,6 +562,7 @@ public class ProjectAiMessageService {
         msg.setContent(content);
         msg.setDisplayContent(displayContent == null || displayContent.isBlank() ? null : displayContent);
         msg.setConversationId(conversationId);
+        msg.setConversationScope(conversationScopeOf(conversationId));
         msg.setSourceChannel(sourceChannel);
         msg.setSourceMessageId(sourceMessageId);
         msg.setCreatedAt(createdAt);
@@ -621,6 +658,7 @@ public class ProjectAiMessageService {
             copy.setReasoning(m.getReasoning());
             copy.setClientRequestId(m.getClientRequestId());
             copy.setConversationId(newConversationId);
+            copy.setConversationScope(source.get(0).getConversationScope());
             copy.setCreatedAt(m.getCreatedAt());
             if (first) {
                 copy.setConversationTitle(forkTitle);

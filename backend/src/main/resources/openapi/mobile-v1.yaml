@@ -240,6 +240,18 @@ components:
         fileId: { type: integer, format: int64 }
         fileUid: { type: string }
         error: { type: string }
+    CaptureOrganization:
+      type: object
+      description: 按账户与采集UUID冻结的整理结果。原件不变；fileName为生成基础名，archiveName为包含防重标记的实际归档名。fields只保存可读到的客观字段，非真实性或法律效力鉴定。
+      required: [state, originalName, fileName, tags, ruleVersion, fields]
+      properties:
+        state: { type: string, enum: [disabled, processing, ready, needs_review, skipped, failed] }
+        originalName: { type: string }
+        fileName: { type: string }
+        archiveName: { type: string }
+        tags: { type: array, items: { type: string }, maxItems: 5 }
+        ruleVersion: { type: string }
+        fields: { type: object, additionalProperties: { type: string } }
     MediaStatus:
       type: object
       required: [clientMediaId, delivered, waitingSeconds]
@@ -251,6 +263,7 @@ components:
         delivered: { type: boolean, description: 桌面端已 ACK 落盘（中转区已删） }
         waitingSeconds: { type: integer, format: int64, description: 已投递为 0 }
         expiresAt: { type: string, description: 中转区到期时刻（ISO 本地时间），仅未投递件带 }
+        organization: { $ref: '#/components/schemas/CaptureOrganization' }
     MediaUsage:
       type: object
       required: [usedBytes, quotaBytes]
@@ -274,6 +287,7 @@ components:
         fileUid: { type: string, format: uuid, description: cloud 持久归档返回 }
         clientMediaId: { type: string }
         delivered: { type: boolean, description: 幂等重传命中已投递记录时为 true }
+        organization: { $ref: '#/components/schemas/CaptureOrganization' }
     AccountUser:
       type: object
       required: [id, username, displayName]
@@ -1759,7 +1773,7 @@ paths:
   /api/mobile/media:
     post:
       summary: 手机采集归档（幂等键 clientMediaId）
-      description: deviceId=cloud 时 projectKey 为目录返回的云项目编号，保存至订阅持久云空间并立即 delivered；其他设备走 ACK 即删的临时中转。
+      description: deviceId=cloud 时 projectKey 为目录返回的云项目编号，保存至订阅持久云空间并立即 delivered；其他设备走 ACK 即删的临时中转。organize=true 明确同意按账户现有额度调用低成本辅助模型预读（照片/视频30秒、录音60秒有界；录音仅前30秒抽样），按固定规则命名并打标签；不改变原字节。结果按账户和采集UUID持久化，重试不再次调用模型；失败/跳过保留原名上传，未知结果先重试同UUID，不承诺失败无费用。处理中并发重试返回业务错误，需稍后使用同UUID重试。
       parameters: [{ $ref: '#/components/parameters/SessionId' }]
       requestBody:
         required: true
@@ -1774,8 +1788,9 @@ paths:
                 projectKey: { type: string }
                 clientMediaId: { type: string }
                 fileName: { type: string }
-                mediaType: { type: string, enum: [image, video, audio] }
+                mediaType: { type: string, enum: [image, video, audio, document] }
                 capturedAt: { type: string, description: ISO-8601，可选 }
+                organize: { type: boolean, default: false, description: 明确开启本件照片、视频或录音的AI命名与标签；关闭不调用模型。document为既有插件镜像，不参与自动整理。 }
       responses:
         "200":
           description: 成功 UploadResult；未登录 Envelope(4010)
@@ -1975,6 +1990,7 @@ paths:
                         fileSize: { type: integer, format: int64 }
                         capturedAt: { type: string, nullable: true }
                         createdAt: { type: string }
+                        organization: { $ref: '#/components/schemas/CaptureOrganization' }
                   - $ref: '#/components/schemas/Envelope'
   /api/mobile/inbox/{id}/content:
     get:

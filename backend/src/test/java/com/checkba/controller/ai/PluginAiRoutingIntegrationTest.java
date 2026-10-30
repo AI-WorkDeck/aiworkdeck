@@ -67,6 +67,8 @@ class PluginAiRoutingIntegrationTest {
             return "synthetic-shared-" + PlatformAiUserScope.current();
         });
         when(channel.keyFingerprint()).thenAnswer(i -> "fixture-fingerprint-" + PlatformAiUserScope.current());
+        when(channel.connection()).thenAnswer(inv -> new com.checkba.service.ai.PlatformAiKeyService.Resolved(
+                channel.apiKey(), channel.keyFingerprint(), null));
         factory = new ChatModelFactory(properties, settings, channel, credits, accountant, resolver, mock(TelemetryService.class));
         var members = mock(ProjectMemberService.class); when(members.hasWritePermission(7L, 8L)).thenReturn(true); when(members.hasWritePermission(7L, 9L)).thenReturn(true);
         var controller = new PluginController(plugins, mock(PluginMarketService.class), mock(PluginRevocationService.class),

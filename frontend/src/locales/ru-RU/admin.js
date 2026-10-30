@@ -100,7 +100,7 @@ export default {
   "inheritAux": "Унаследовать вспомогательную модель",
   "followBuiltIn": "Следовать встроенному значению по умолчанию",
   "modelOption": "{name} ({vendor})",
-  "modelPrice": " · $${in}/${out} за 1 млн токенов",
+  "modelPrice": " · {currency}{currency}{in}/{currency}{out} за 1 млн токенов",
   "tieredSuffix": " · Дифференцированные цены",
   "noVisionSuffix": " · Нет входа изображений (изображения обрабатываются через OCR)",
   "modelUnavailableInRegion": "{model} (недоступно в текущем сетевом регионе)",

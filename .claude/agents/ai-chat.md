@@ -7,6 +7,10 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 职责边界：AI 对话功能本身（编排循环、工具注册分发、记忆、SSE、前端聊天 UI、评测）。AI→编辑器指令链路属 ai-doc-bridge 领域；skill 机制属 plugin-system 领域（但 SkillRouter 在编排循环里有两处旁路接入点）。
 
+## 国内百炼与国际 OpenRouter（2026-10-29，dev-board#1625）
+
+平台目录改由 PlatformModelCatalog 从实际供应商读取，并按站点与用户runtime凭据缓存。国内通过官网AI网关到百炼；国际保留OpenRouter。ChatModelFactory 的平台默认/辅助/选模与视觉能力遵循目录，旧合法OpenRouter设置迁移到国内默认。智能选模在目录支持时使用 qwen3.8-flash / qwen3.8-max；不再按JVM国家、时区或IP过滤目录。BYOK/本地保留旧路径；Jev在百炼平台不外发。设置页移除网络区域控制，定价单位按供应商/本站币种下发。国内听写通过同站网关调用 qwen3.8-omni-flash；国际保留原语音模型，两者均不得混用凭据或地址。
+
 ## 法律资料卡与案例检索（2026-10-29，dev-board#1611）
 
 - `LegalTools.case_search(query)` 通过既有 `PkulawChannel` 调用 `pkulaw-case-semantic/search_case`（参数 `text`），平台与自备渠道继续由原通道分流，未接入处罚专用接口。`case_search` 属 `legal` 类目，案例/判例/判决书及英文 case law/judgment 触发披露；法宝不可用时与法规工具共同隐藏。
@@ -1825,3 +1829,22 @@ cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='Refe
   3. **对话流零打扰**：`RootBubble.vue` 不挂载 `HarnessEvolutionCard`，不在对话流弹出让用户三选一的卡片；用户可随时在「我的记忆 / 项目记忆」面板或 `/api/agent/harness/evolutions` 查看与回滚。
 - **收尾 Challenger 独立核验（`service/ai/harness/VerificationHarness`）**：仅对声明 `verification_policy: slot_evidence_challenger` 的高风险技能（如 `legal-opinion`）在 `<final>` 前执行独立证据核对，未核实主张自动触发 1 次自我修正闭环。
 - **回归**：`HarnessDiagnosticServiceTest`、`VerificationHarnessTest`、`HarnessEvolutionServiceTest`、`HarnessEvolutionPersistenceTest`、`frontend/tests/project-home/harness-evolution-ui.test.mjs`、`frontend/tests/ai-alignment-e2e/harness-self-evolving-e2e.mjs`。
+
+## 可选采集预读（dev-board#1630，2026-10-30）
+
+- `MobileCaptureOrganizationEngine` 只处理用户开启的照片、视频和录音。图像有界解码缩放；视频仅取0/5/10秒的最多3帧；录音仅取开头至多30秒的16kHz单声道WAV，交 `VoiceDictationService.transcribeSample` 再用辅助模型归类。覆盖范围写入结果，不当作全视频理解或完整转写，转写稿只留内存。
+- `ChatModelFactory.getPlatformAuxChatModel(timeout,maxOutputTokens,requiresVision)` 强制当前用户平台额度，按凭据快照选择站点端点；国内默认低价辅助模型为 `qwen3.8-flash`，国际保留 `qwen/qwen3.7-flash`。仅迁移旧默认辅助模型，其他显式配置须在当前目录中存在；视觉能力不符即拒绝，不跟随服务器BYOK设置、不自动升级主模型。新增语音sample方法保留原听写API，限制输出与超时、禁止机器key，国内录音使用 `qwen3.8-omni-flash`、国际保留已配听写模型，返回实际modelId/tokenUsage，由调用方 `recordPlatformUsage`；调用前建立平台用量基线。
+- 2线程无排队执行器、图片/视频30秒与录音60秒总预算、单次无自动模型重试。持久幂等和关闭默认由 `MobileCaptureOrganizationService` 负责；引擎失败不得阻断原件上传。
+- FFmpeg仅使用固定本机可执行文件、参数数组与临时目录，限制file/pipe协议和实际容器format_whitelist，排除HLS/concat外部读取。未安装可执行文件或无法采样即如实skipped，不把未解码影像称为已读。
+- 模型只抽字段，规则拼接文件名和有限标签；软著登记号与证书号分开，缺号/日期不补猜，低可靠保留原名待确认。自动名称不成为原件身份。请求语言在跨线程前捕获，再建立 `AppLanguageScope`，类别名称走 `LangText`。
+- 回归入口：`MobileCaptureOrganizationEngineTest` 与 `VoiceDictationServiceTest`，覆盖合成音视频真实本地抽样、模型HTTP替身、账户与用量、语种和恶意播放列表；这些不是付费模型识别质量或生产FFmpeg可用性验证。
+
+## 诉讼可视化独立会话边界（2026-10-30，dev-board#1627/#1628）
+
+`ProjectAiMessage.conversationScope` 可空，当前只支持 `litigation-visual`。原生签发/聊天请求与
+SSE query 都显式携带范围；不匹配的普通面板连接在替换 emitter 前返回409，聊天同样拒绝。
+普通 user-scoped/project-scoped 历史排除专属会话，按 conversationId 的授权历史读取仍可用于左侧恢复。
+显式旧任务归类通过签发接口的 conversationId 完成，必须核对原 owner/project 且不可为镜像会话；
+不是按技能触发词自动隐藏普通聊天。保存、fork/rollback 继续保留范围，进程重启从持久消息回读。
+新增文件事件方面，litigation_render/timeline_render 没有结构化真实产物时不走“当前文档”兜底；
+已登记 drawio/svg/png 仍沿实际 ID 逐项发事件。详细 UI/恢复与验证边界见 litigation-visual.md。

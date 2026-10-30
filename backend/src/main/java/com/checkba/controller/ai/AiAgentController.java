@@ -108,17 +108,33 @@ public class AiAgentController {
      * 建立 SSE 连接。
      * 前端应在进入聊天界面时调用此接口。
      */
+    public ResponseEntity<SseEmitter> connect(String conversationId, String sessionId,
+            String clientInstance, String lastEventId, HttpServletResponse response) {
+        return connect(conversationId, sessionId, clientInstance, lastEventId, response, null);
+    }
+
     @GetMapping(value = "/connect/{conversationId}", produces = "text/event-stream")
     public ResponseEntity<SseEmitter> connect(@PathVariable String conversationId,
                               @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
                               @RequestHeader(value = "X-Client-Instance", required = false) String clientInstance,
                               @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId,
-                              HttpServletResponse response) {
+                              HttpServletResponse response,
+                              @RequestParam(required = false) String conversationScope) {
         // 归属校验：emitter 表只按 conversationId 索引且新连接直接覆盖旧连接，
         // 此前 userId 仅用于打日志，任何人猜到会话 ID 即可劫持他人的整条输出流
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (!canUseConversation(conversationId, userId)) {
             return ResponseEntity.status(403).build();
+        }
+
+        String scope;
+        try {
+            scope = com.checkba.service.ai.ConversationIssuanceService.normalizeScope(conversationScope);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (!java.util.Objects.equals(scope, messageService.conversationScopeOf(conversationId))) {
+            return ResponseEntity.status(409).build();
         }
 
         // 添加响应头禁用缓冲，确保流式响应实时到达客户端
@@ -195,6 +211,16 @@ public class AiAgentController {
         }
         if (!canUseConversation(request.getConversationId(), userId)) {
             return chatError(403, LangText.of("无权操作该会话", "You do not have permission for this conversation"));
+        }
+        String scope;
+        try {
+            scope = com.checkba.service.ai.ConversationIssuanceService.normalizeScope(request.getConversationScope());
+        } catch (IllegalArgumentException e) {
+            return chatError(400, e.getMessage());
+        }
+        if (!java.util.Objects.equals(scope, messageService.conversationScopeOf(request.getConversationId()))) {
+            return chatError(409, LangText.of("请在诉讼可视化中继续此对话",
+                    "Continue this conversation in Litigation Visualization"));
         }
         // 插件镜像会话只读（dev-board#298）：镜像那头（插件端）还在续写同一条时间线，
         // 桌面端直接续写会双头交错。前端已把输入区换成「另起分支继续」，这里是防旁路的
@@ -586,6 +612,7 @@ public class AiAgentController {
     public static class AgentChatRequest {
         private Long projectId;
         private String conversationId;
+        private String conversationScope;
         private String message;
         /**
          * 可选：这条消息在用户气泡里显示的文本（契约 D「发送内容 ≠ 显示内容」）。
@@ -652,6 +679,8 @@ public class AiAgentController {
 
         public Long getProjectId() { return projectId; }
         public void setProjectId(Long projectId) { this.projectId = projectId; }
+        public String getConversationScope() { return conversationScope; }
+        public void setConversationScope(String conversationScope) { this.conversationScope = conversationScope; }
         public String getConversationId() { return conversationId; }
         public void setConversationId(String conversationId) { this.conversationId = conversationId; }
         public String getMessage() { return message; }

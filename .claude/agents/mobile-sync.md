@@ -5,6 +5,16 @@ description: 手机端同步领域。任务涉及手机端项目目录镜像、�
 
 # 手机端同步（项目目录镜像 + 现场影像/录音云中转）
 
+## 可选采集整理（dev-board#1630，2026-10-30）
+
+- `POST /api/mobile/media` 新增可选 multipart `organize=true`，缺省关闭；仅照片、视频、录音参与。`document` 插件镜像协议完全不变。手机必须在用户明确开启后发送，提示按账户额度计费、录音仅抽样预读。
+- `MobileCaptureOrganizationService` 在存储前按 `(userId,clientMediaId)` 固定一次结果，权限/大小/当前接收回执先于模型；不在数据库事务里等待模型。`processing` 并发请求要求使用同UUID稍后重试；超过120秒的中断记录冻结为 `failed` 原名，不自动再次花费。成功、失败与跳过都保留原字节；已存储/移动的回执优先于旧整理目标。
+- 新表 `mobile_capture_organization` 保存原名、基础名、类型、规则版本、内容SHA256、状态、客观字段与标签；账户注销删除派生记录。`ready/needs_review/skipped/failed` 随 upload/status/inbox 的 `organization` 返回，`fileName` 是规则基础名，`archiveName` 是附防重标记后的实际归档名，手机展示以后者为准。旧服务器无字段不能当作整理成功。
+- `MobileCaptureOrganizationEngine` 只抽字段，固定规则拼名，不猜号码、不判真实性/效力；区分登记号、证书号等编号种类，文件日期不拿采集日替代。照片缩图，视频最多三张抽样帧；录音FFmpeg仅前30秒转WAV，经现有账户平台语音输入接口识别，再辅助模型归类。录音总预算60秒，其余30秒；缺解码器/不可读为 `skipped`，故障/超时为 `failed`，覆盖范围在 `fields.coverage` 明示。不读取播放列表的远程或本机引用。
+- 生成名在首次上传落库前冻结，桌面继续按稳定名+UUID marker防重，禁止收取后再rename。云/桌面首次归档将结果保存到 `ProjectFile.metaJson.captureOrganization` 并接既有系统标签；标签存储失败的桌面件不ACK，重试只补元数据/标签，不重存原件。完成后不自动恢复被用户删除的标签。
+- 既有移动协议的新目标UUID会在校验移动意图、尺寸与SHA256后继承源的整理快照，即使目标上传 `organize=false` 也不丢原生成名/标签、不再调用模型；新归档后缀按目标UUID生成。源字节已变化时不复制旧分析。这里继承的是服务端冻结的AI结果，不代表桌面后续人工改名/手动标签已能跨端同步。
+- 回归入口：`MobileApiContractTest`（开关、账户隔离、并发、中断恢复、真实云归档标签与字节），`MobileRelayClientHttpTest`（标签失败后ACK重试），`MobileCaptureOrganizationEngineTest` / `VoiceDictationServiceTest`（有界多模态与本机HTTP替身），`AccountDeletionServiceTest`（派生记录清理）。合成模型响应不代表真实模型识别质量或正式手机包验收。
+
 ## 手机全局队列归档移动（dev-board#1607，2026-10-29）
 
 - `POST /api/mobile/media/moves` 先登记不可变 `{requestId,sourceClientMediaId,targetClientMediaId,sourceDeviceId,sourceProjectKey,targetDeviceId,targetProjectKey,sha256,fileSize}`。手机在首次请求前按账户持久化两个新 UUID，登记确认后才以 `targetClientMediaId` 走既有媒体上传。不能重写旧 clientMediaId 的目标，也不使用会收费的 PULL/PUSH。手机须保留原件，直到 `DONE` 才更新队列归属。

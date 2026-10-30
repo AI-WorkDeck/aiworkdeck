@@ -50,3 +50,22 @@ test('default open belongs to initial project entry, never focus/account refresh
   const refresh = source.slice(source.indexOf('    refreshAccountState() {'), source.indexOf('    refreshAccountState() {') + 400)
   assert.doesNotMatch(refresh, /toggleAiPanel\(/)
 })
+
+
+test('entering litigation visualization closes only the competing AI surface without unmounting it', () => {
+  const start = source.indexOf('    leftPaneKey(key) {')
+  const end = source.indexOf('\n    },', start)
+  const handler = new Function(`return ({${source.slice(start, end)}\n}}).leftPaneKey`)()
+  const vm = openProject(1)
+  vm.pushMenuState = () => {}
+  handler.call(vm, 'plugin-litigation-visual')
+  assert.equal(vm.showAiPanel, false)
+  assert.equal(vm.aiPanelMounted, true)
+  vm.showAiPanel = true
+  vm.rightPaneKey = 'plugin-insight'
+  handler.call(vm, 'plugin-litigation-visual')
+  assert.equal(vm.showAiPanel, true)
+  vm.rightPaneKey = 'ai'
+  handler.call(vm, 'files')
+  assert.equal(vm.showAiPanel, true)
+})

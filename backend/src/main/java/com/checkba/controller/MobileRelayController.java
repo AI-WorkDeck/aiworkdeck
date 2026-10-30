@@ -42,6 +42,8 @@ public class MobileRelayController {
     private com.checkba.service.mobile.MobileVersionObjectService versionObjects;
     @org.springframework.beans.factory.annotation.Autowired
     private com.checkba.service.mobile.MobileCloudCaptureService cloudCaptures;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.service.mobile.MobileCaptureOrganizationService captureOrganization;
 
     public MobileRelayController(MobileRelayStoreService store) {
         this.store = store;
@@ -151,25 +153,32 @@ public class MobileRelayController {
             @RequestParam("fileName") String fileName,
             @RequestParam("mediaType") String mediaType,
             @RequestParam(value = "capturedAt", required = false) String capturedAt,
+            @RequestParam(value = "organize", required = false, defaultValue = "false") boolean organize,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = requireUser(sessionId);
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException(LangText.of("未找到文件", "No file provided"));
         }
         LocalDateTime captured = parseCapturedAt(capturedAt);
+        Map<String,Object> organization=captureOrganization.prepare(userId,deviceId,projectKey,clientMediaId,
+                fileName,mediaType,captured,file,organize);
+        String storedName=organization==null || "disabled".equals(organization.get("state")) ? fileName : String.valueOf(organization.get("fileName"));
         try (InputStream in = file.getInputStream()) {
             if ("cloud".equals(deviceId)) {
-                return cloudCaptures.store(userId, projectKey, clientMediaId, fileName, mediaType,
-                        captured, file.getSize(), in);
+                Map<String,Object> response=new LinkedHashMap<>(cloudCaptures.store(userId, projectKey, clientMediaId, storedName, mediaType,
+                        captured, file.getSize(), in));
+                if(organization!=null) response.put("organization",organization);
+                return response;
             }
             MobileMediaInbox item = store.storeMedia(
-                    userId, deviceId, projectKey, clientMediaId, fileName, mediaType, captured,
+                    userId, deviceId, projectKey, clientMediaId, storedName, mediaType, captured,
                     file.getSize(), in);
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("code", 0);
             out.put("id", item.getId());
             out.put("clientMediaId", item.getClientMediaId());
             out.put("delivered", item.getDeliveredAt() != null);
+            if(organization!=null) out.put("organization",organization);
             return out;
         } catch (IOException e) {
             throw new IllegalStateException(LangText.of("影像暂存失败", "Failed to store media"), e);
@@ -195,6 +204,7 @@ public class MobileRelayController {
         }
         List<Map<String, Object>> status = new ArrayList<>(store.status(userId, ids));
         if (cloudCaptures != null) status.addAll(cloudCaptures.status(userId, ids));
+        for(Map<String,Object> item:status) captureOrganization.addResult(userId,String.valueOf(item.get("clientMediaId")),item);
         return status;
     }
 
@@ -217,6 +227,7 @@ public class MobileRelayController {
             m.put("fileSize", item.getFileSize());
             m.put("capturedAt", item.getCapturedAt() != null ? item.getCapturedAt().toString() : null);
             m.put("createdAt", item.getCreatedAt().toString());
+            captureOrganization.addResult(userId,item.getClientMediaId(),m);
             out.add(m);
         }
         return out;

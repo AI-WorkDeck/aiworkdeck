@@ -25,7 +25,8 @@ class OpenAITextProvider(TextProvider):
             api_key=api_key,
             base_url=api_base,
             timeout=get_config().OPENAI_TIMEOUT,  # set timeout from config
-            max_retries=get_config().OPENAI_MAX_RETRIES  # set max retries from config
+            # Domestic gateway may still be settling a failed delivery; never repeat that paid request.
+            max_retries=0 if api_key.startswith("awdai_") else get_config().OPENAI_MAX_RETRIES
         )
         self.model = model
     

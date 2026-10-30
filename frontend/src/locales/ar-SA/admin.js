@@ -100,7 +100,7 @@ export default {
   "inheritAux": "وراثة النموذج المساعد",
   "followBuiltIn": "اتباع الافتراضي المدمج",
   "modelOption": "{name} ({vendor})",
-  "modelPrice": " · ${in}/${out} دولار لكل مليون رمز",
+  "modelPrice": " · {currency}{in}/{currency}{out} دولار لكل مليون رمز",
   "tieredSuffix": " · تسعير متدرج",
   "noVisionSuffix": " · لا يوجد إدخال صور (تُعالج الصور عبر OCR)",
   "modelUnavailableInRegion": "{model} (غير متوفر في منطقة الشبكة الحالية)",

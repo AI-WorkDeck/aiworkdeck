@@ -100,7 +100,7 @@ export default {
   "inheritAux": "繼承輔助模型",
   "followBuiltIn": "跟隨內建預設",
   "modelOption": "{name}（{vendor}）",
-  "modelPrice": " · ${in}/${out} 每 1M token",
+  "modelPrice": " · {currency}{in}/{currency}{out} 每 1M token",
   "tieredSuffix": " · 分檔計價",
   "noVisionSuffix": " · 不支援讀圖（圖片按 OCR 處理）",
   "modelUnavailableInRegion": "{model}（目前網路區域不可用）",

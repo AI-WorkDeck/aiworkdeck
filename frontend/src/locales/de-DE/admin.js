@@ -100,7 +100,7 @@ export default {
   "inheritAux": "Hilfsmodell übernehmen",
   "followBuiltIn": "Integriertem Standard folgen",
   "modelOption": "{name} ({vendor})",
-  "modelPrice": " · ${in}/${out} pro 1M Token",
+  "modelPrice": " · {currency}{in}/{currency}{out} pro 1M Token",
   "tieredSuffix": " · Gestaffelte Preise",
   "noVisionSuffix": " · Keine Bildeingabe (Bilder werden per OCR verarbeitet)",
   "modelUnavailableInRegion": "{model} (in der aktuellen Netzwerkregion nicht verfügbar)",

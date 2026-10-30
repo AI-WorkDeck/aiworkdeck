@@ -81,6 +81,8 @@ test('start uses its own native stream and stays busy after the inbox ACK; repea
   assert.equal(f.posts[0].conversationId, f.saved().conversationId)
   assert.equal(f.posts[0].model, 'chosen-model')
   assert.deepEqual(f.posts[0].skillIds, ['litigation-visual'])
+  assert.equal(f.posts[0].conversationScope, 'litigation-visual')
+  assert.match(f.connections[0], /[?]conversationScope=litigation-visual$/)
   assert.equal(f.opened.length, 0)
 })
 
@@ -127,6 +129,8 @@ test('legacy checkpoint prose recovers the original confirmation block without i
   assert.equal(waiting.phase, 'waiting')
   assert.equal(waiting.question.text, '1. 确认结构？\n2. 选择风格？\n3. 是否强调？')
   assert.doesNotMatch(waiting.question.text, /AI|内部工具/)
+  assert.ok(waiting.messages.some(message => message.content.includes(waiting.question.text)))
+  assert.ok(waiting.messages.every(message => !message.content.includes('调用内部工具继续')))
   assert.equal(f.posts.length, 1, 'no automatic confirmation is submitted')
 })
 
@@ -345,9 +349,91 @@ test('approval shows the implementation plan and only continues after an explici
   const waiting = await f.generation.observe()
   assert.equal(waiting.phase, 'waiting')
   assert.equal(waiting.question.text, '1. 核对材料\n2. 生成关系图')
+  assert.ok(waiting.messages.some(message => message.content.includes(waiting.question.text)))
   assert.equal(f.posts.length, 1, 'no automatic approval is submitted')
   await f.generation.request('answer', { taskId: waiting.taskId, questionKey: waiting.question.key, answer: { selected: [], other: '按此计划继续' } })
   await flush()
   assert.equal(f.posts.length, 2)
   assert.match(f.posts[1].message, /按此计划继续/)
+})
+
+
+test('question stays concise while the full reply remains in the dedicated transcript', async t => {
+  const f = fixture(t)
+  await f.start()
+  f.event('text_delta', '<final>Material inventory with many rows.</final><question>Which style?<option>Outline</option></question>')
+  f.event('bubble_end', { status: 'awaiting_input' })
+  const view = await f.generation.observe()
+  assert.equal(view.question.text, 'Which style?')
+  assert.ok(view.messages.some(message => message.content.includes('Material inventory')))
+  assert.ok(view.messages.every(message => !message.content.includes('questionProtocol')))
+})
+
+test('plain follow-up stays in the dedicated conversation and does not reopen an old diagram', async t => {
+  const f = fixture(t)
+  await f.start()
+  f.event('client_action', { action: 'doc_open_file', fileId: 71 })
+  f.set({ diagrams: [{ folderId: 70, name: 'Synthetic', drawioFileId: 71 }] })
+  f.event('bubble_end', { status: 'finished' })
+  const done = await f.generation.observe()
+  await f.generation.request('message', { taskId: done.taskId, message: 'Explain the first event' })
+  await flush()
+  assert.equal(f.posts.length, 2)
+  assert.equal(f.posts[1].conversationId, f.posts[0].conversationId)
+  assert.equal(f.posts[1].conversationScope, 'litigation-visual')
+  assert.equal(f.posts[1].displayText, 'Explain the first event')
+  f.event('text_delta', '<final>The first event is the signing.</final>')
+  f.event('bubble_end', { status: 'finished' })
+  const answered = await f.generation.observe()
+  assert.equal(answered.phase, 'completed')
+  assert.ok(answered.messages.some(message => message.content === 'The first event is the signing.'))
+  assert.deepEqual(f.opened, [71])
+})
+
+test('a new diagram uses the same dedicated history but cannot count the previous result as new', async t => {
+  const f = fixture(t)
+  await f.start()
+  f.event('client_action', { action: 'doc_open_file', fileId: 71 })
+  f.set({ diagrams: [{ folderId: 70, name: 'Synthetic', drawioFileId: 71 }] })
+  f.event('bubble_end', { status: 'finished' })
+  await f.generation.observe()
+  await f.start()
+  assert.equal(f.posts[1].conversationId, f.posts[0].conversationId)
+  f.event('bubble_end', { status: 'finished' })
+  assert.equal((await f.generation.observe()).phase, 'failed')
+  assert.deepEqual(f.opened, [71])
+})
+
+test('completed task restores its own transcript without reopening or sending again', async t => {
+  const f = fixture(t)
+  await f.start()
+  f.event('client_action', { action: 'doc_open_file', fileId: 71 })
+  f.set({ diagrams: [{ folderId: 70, name: 'Synthetic', drawioFileId: 71 }] })
+  f.event('bubble_end', { status: 'finished' })
+  await f.generation.observe()
+  const restored = fixture(t, f.saved())
+  restored.set({ history: [{ role: 'USER', content: 'hidden kickoff', displayContent: 'Create a diagram' },
+    { role: 'ASSISTANT', id: 10, content: '<final>Diagram saved.</final>' }] })
+  const view = await restored.generation.observe()
+  assert.equal(view.phase, 'completed')
+  assert.deepEqual(view.messages, [{ role: 'USER', content: 'Create a diagram' }, { role: 'ASSISTANT', content: 'Diagram saved.' }])
+  assert.deepEqual(restored.opened, [])
+  assert.equal(restored.posts.length, 0)
+})
+
+
+test('restored later round excludes prior artifact metadata even if it is still in the gallery', async t => {
+  const f = fixture(t)
+  await f.start()
+  const saved = { ...f.saved(), round: 3, accepted: true, pending: { clientRequestId: 'new-round', prompt: 'new diagram' } }
+  const restored = fixture(t, saved)
+  restored.set({ inbox: { status: 'FINISHED', items: [{ clientRequestId: 'new-round', state: 'applied' }] },
+    history: [{ role: 'USER', clientRequestId: 'old-round', content: 'old' },
+      { role: 'ASSISTANT', id: 11, content: '<final>Old diagram</final>' },
+      { role: 'USER', clientRequestId: 'new-round', content: 'new' },
+      { role: 'ASSISTANT', id: 12, content: '<final>No diagram created</final>' }],
+    metadata: { fileChanges: [{ assistantMessageId: 11, fileId: 71, fileName: 'Synthetic', changeType: 'ADDED' }] },
+    diagrams: [{ folderId: 70, name: 'Synthetic', drawioFileId: 71 }] })
+  assert.equal((await restored.generation.observe()).phase, 'failed')
+  assert.deepEqual(restored.opened, [])
 })

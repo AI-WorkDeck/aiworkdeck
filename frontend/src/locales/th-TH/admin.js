@@ -100,7 +100,7 @@ export default {
   "inheritAux": "ใช้โมเดลเสริม",
   "followBuiltIn": "ใช้ค่าเริ่มต้นในตัว",
   "modelOption": "{name} ({vendor})",
-  "modelPrice": " · $${in}/${out} ต่อ 1M โทเคน",
+  "modelPrice": " · {currency}{currency}{in}/{currency}{out} ต่อ 1M โทเคน",
   "tieredSuffix": " · ราคาแบบขั้นบันได",
   "noVisionSuffix": " · ไม่รองรับอินพุตรูปภาพ (ประมวลผลรูปภาพผ่าน OCR)",
   "modelUnavailableInRegion": "{model} (ใช้งานไม่ได้ในภูมิภาคเครือข่ายปัจจุบัน)",

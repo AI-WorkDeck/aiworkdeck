@@ -88,7 +88,7 @@ export default {
     "crossBorderLabel": "Gesonderte Einwilligung: Übermittlung der an die KI gesendeten Inhalte an Modellanbieter im Ausland zur Verarbeitung",
     "crossBorderView": "Hinweis anzeigen",
     "crossBorderNoticeTitle": "Hinweis zur grenzüberschreitenden Datenübermittlung",
-    "crossBorderNoticeBody": "AI WorkDeck Cloud sendet die Inhalte, die Sie an die KI übermitteln (Texte und zugehörige Dateiausschnitte), zur Modellinferenz und Nutzungsabrechnung an OpenRouter, Inc. (USA); dies stellt eine Bereitstellung personenbezogener Daten an einen Empfänger im Ausland dar. Nach dem Öffnen des Produkts können Sie Ihre Einwilligung jederzeit unter Einstellungen → KI-Einstellungen widerrufen; nach dem Widerruf steht der Cloud-Kanal nicht mehr zur Verfügung.",
+    "crossBorderNoticeBody": "Die chinesische Website verbindet sich über AI WorkDeck-Server mit Alibaba Cloud Bailian; die internationale Website nutzt OpenRouter. An die KI übermittelte Texte und Dateiauszüge dienen der Inferenz und Abrechnung. Je nach Modell kann die Verarbeitung außerhalb Festlandchinas erfolgen. Sie können Ihre Einwilligung in den Einstellungen widerrufen; dadurch wird der Plattform-KI-Zugang deaktiviert.",
     "agreementRequired": "Aktivieren Sie das Kontrollkästchen, um den Nutzungsbedingungen und der Datenschutzerklärung zuzustimmen und fortzufahren",
     "crossBorderRequired": "Aktivieren Sie die gesonderte Einwilligung zur grenzüberschreitenden Datenübermittlung, um fortzufahren",
     "switchSiteTitle": "Standort wechseln",

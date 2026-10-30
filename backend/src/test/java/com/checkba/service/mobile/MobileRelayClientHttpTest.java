@@ -585,6 +585,24 @@ class MobileRelayClientHttpTest {
     }
 
     @Test
+    void organizedCaptureUsesFrozenNameAndRepairsTagsBeforeAckWithoutDuplicateBytes() {
+        statusFixture("42");
+        inboxJson=inboxJson.replace("\"fileName\":\"", "\"fileName\":\"整理_");
+        // Include the metadata delivered by the server, never invoke a model on the receiving desktop.
+        inboxJson=inboxJson.replace("\"mediaType\":", "\"organization\":{\"state\":\"ready\",\"originalName\":\"capture.jpg\",\"fileName\":\"整理_capture.jpg\",\"tags\":[\"营业执照\"]},\"mediaType\":");
+        var organizer=mock(MobileCaptureOrganizationService.class);
+        var svc=service();
+        org.springframework.test.util.ReflectionTestUtils.setField(svc,"captureOrganization",organizer);
+        doThrow(new IllegalStateException("temporary tag storage failure")).doNothing().when(organizer).attach(any(),any(),any(),any());
+        svc.pollInbox();
+        assertEquals(1,savedBytes.size());assertTrue(acked.isEmpty(),"标签/来源元数据失败应重试同件，尚不ACK");
+        svc.pollInbox();
+        assertEquals(1,savedBytes.size(),"稳定生成名使重试只补标签和ACK，不重复原件");
+        assertEquals(1,acked.size());
+        verify(organizer,times(2)).attach(eq(7L),eq(42L),any(),argThat(result->"ready".equals(result.get("state"))));
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void receiveStatusIdentifiesSameNamedProjectsByKeyAndPath() {
         Project other = new Project();

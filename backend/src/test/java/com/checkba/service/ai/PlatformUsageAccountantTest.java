@@ -73,6 +73,44 @@ class PlatformUsageAccountantTest {
         accountant.setPollIntervalMsForTest(1L);
     }
 
+    @Test
+    void domesticUsageUsesOnlyMatchingAccountGatewayAndRootUsdObservation() {
+        var domestic = new PlatformAiKeyService.Resolved("awdai_a", "domestic-a", null, "bailian",
+                "https://www.aiworkdeck.com/api/account/ai/v1", "qwen3.8-flash");
+        when(channel.resolveFor(1L)).thenReturn(domestic);
+        var calls = new java.util.ArrayList<String>();
+        var observer = new PlatformUsageAccountant(repository, channel, (method,url,bearer,body) -> {
+            calls.add(url);
+            assertEquals("awdai_a", bearer);
+            return new AccountTransport.Reply(200, "{\"usageUsd\":1.28}");
+        }, "https://openrouter.ai/api/v1");
+        try {
+            observer.setBaselineForTest(domestic.fingerprint(), new BigDecimal("1.25"));
+            observer.reconcile(7L, 1L, domestic);
+            assertEquals(new BigDecimal("0.03"), row.getCost());
+            assertEquals(java.util.List.of(domestic.baseUrl() + "/usage"), calls);
+            when(channel.resolveFor(1L)).thenReturn(KEY_B);
+            assertNull(observer.probeUsageForDisplay(1L, domestic.apiKey()));
+            assertEquals(1, calls.size(), "Queued old-account domestic token must never reach OpenRouter or another account");
+        } finally { observer.shutdown(); }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {200, 401})
+    void delayedUsageResponseAlwaysTargetsTheRequestedRuntime(int status) {
+        var observer = new PlatformUsageAccountant(repository, channel, (method,url,bearer,body) -> {
+            when(channel.resolveFor(1L)).thenReturn(KEY_B); // Rotation while the upstream request is in flight.
+            return new AccountTransport.Reply(status, "{\"data\":{\"usage\":1.5}}");
+        }, "https://openrouter.ai/api/v1");
+        try {
+            observer.probeUsageForDisplay(1L, KEY_A.apiKey());
+            if (status == 401) verify(channel).onKeyRejected(1L, PlatformAiKeyCipher.fingerprint(KEY_A.apiKey()));
+            else verify(channel).onKeyVerified(1L, PlatformAiKeyCipher.fingerprint(KEY_A.apiKey()));
+            verify(channel, never()).onKeyRejected(1L, KEY_B.fingerprint());
+            verify(channel, never()).onKeyVerified(1L, KEY_B.fingerprint());
+        } finally { observer.shutdown(); }
+    }
+
     private void usage(PlatformAiKeyService.Resolved key, double cumulative) {
         replies.computeIfAbsent(key.apiKey(), k -> new ArrayDeque<>())
                 .add(new AccountTransport.Reply(200,
@@ -202,7 +240,7 @@ class PlatformUsageAccountantTest {
 
         accountant.reconcile(7L, 1L, KEY_A);
 
-        verify(channel).onKeyRejected(1L);
+        verify(channel).onKeyRejected(1L, PlatformAiKeyCipher.fingerprint(KEY_A.apiKey()));
         verify(repository, never()).save(any());
     }
 
@@ -212,7 +250,7 @@ class PlatformUsageAccountantTest {
         accountant.setBaselineForTest(KEY_A.fingerprint(), new BigDecimal("1.00"));
         accountant.reconcile(7L, 1L, KEY_A); // 队列为空 → NETWORK_FAILURE
 
-        verify(channel, never()).onKeyRejected(any());
+        verify(channel, never()).onKeyRejected(any(), any());
     }
 
     @Test
@@ -220,6 +258,6 @@ class PlatformUsageAccountantTest {
     void successfulProbeMarksVerified() {
         usage(1.00);
         accountant.reconcile(7L, 1L, KEY_A);
-        verify(channel).onKeyVerified(1L);
+        verify(channel).onKeyVerified(1L, PlatformAiKeyCipher.fingerprint(KEY_A.apiKey()));
     }
 }
