@@ -170,7 +170,7 @@ export default {
   "builtinWorkflowsScope": "العقود · الأدلة · الملفات · الرأي القانوني",
   "builtinWorkflowsCustomCount": "{count} مخصص",
   "composerAdvancedSettings": "الإعدادات المتقدمة",
-  "builtinWorkflowsAdvancedBtn": "Advanced",
+  "builtinWorkflowsAdvancedBtn": "تعديل القواعد",
   "builtinWorkflowsSub": "مراجعة العقود وتنظيم الأدلة وتنظيم الملفات والتحقق من آراء legal مدمجة وتُفعَّل تلقائيًا بناءً على طلبك.",
   "builtinWorkflowBadge": "مدمج",
   "builtinWorkflowAutoToast": "تم التفعيل التلقائي لمسار العمل المدمج: {name}",

@@ -868,7 +868,7 @@ export const fileOpenTabsMethods = {
         tabType: 'version-compare',
         fileType: 'version-compare',
         compareSpec: {
-          projectId: spec.projectId, path: spec.path,
+          projectId: spec.projectId, path: spec.path, name: spec.name,
           newRef: spec.newRef, oldRef: spec.oldRef,
         },
         createdAt: Date.now(),
@@ -910,7 +910,8 @@ export const fileOpenTabsMethods = {
       const tab = {
         id, name: this.$t('workbenchOps.versionCompareTabName', { name: spec.name }), tabType: 'version-text-diff', fileType: 'version-text-diff',
         versionSpec: {
-          projectId: spec.projectId, path: spec.path, oldRef: spec.oldRef, newRef: spec.newRef,
+          projectId: spec.projectId, path: spec.path, name: spec.name, oldRef: spec.oldRef, newRef: spec.newRef,
+          customLabels: !!(spec.oldLabel || spec.newLabel),
           oldLabel: spec.oldLabel || this.$t('workbenchOps.previousVersion'), newLabel: spec.newLabel || this.$t('workbenchOps.currentVersion'),
         },
         createdAt: Date.now(),

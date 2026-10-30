@@ -8,6 +8,7 @@ import {
   normalizeLocaleCode,
   APP_LANGUAGE_EVENT,
   registerReactiveLocaleTracker,
+  registerLocaleChangeHandler,
 } from '../utils/appLanguage.js'
 
 /**
@@ -88,8 +89,12 @@ export function applyI18nLocale(lang) {
   return target
 }
 
+registerLocaleChangeHandler((lang) => {
+  applyI18nLocale(lang)
+})
+
 try {
-  if (typeof uni !== 'undefined' && typeof uni.$on === 'function') {
+  if (typeof uni !== 'undefined') {
     uni.$on(APP_LANGUAGE_EVENT, (lang) => {
       applyI18nLocale(lang)
     })

@@ -12,11 +12,11 @@ export default {
     "voice": "Ses",
     "meetingRecorder": "Toplantı Kaydı",
     "litigationVisual": "Dava Görselleştirme",
-    "tmeet": "Tencent Meeting",
+    "tmeet": "Tencent Toplantısı",
     "search": "Arama",
     "tts": "Metinden Sese",
     "desensitize": "Dosya Karartma",
-    "version": "Version History",
+    "version": "Kaynak Kontrolü",
     "calendar": "Takvim"
   },
   "tools": {

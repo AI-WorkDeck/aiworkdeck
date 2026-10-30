@@ -299,13 +299,69 @@ function storageOf(vm) {
 }
 
 // 名字随语言走的单例标签：恢复时按当前语言重取，不用快照里存的旧语言文案
-const LOCALIZED_NAME_KEYS = {
+export const LOCALIZED_NAME_KEYS = {
   'message-center': 'messageCenter.title',
   'dd-client': 'ddWorkflow.clientWorkspace',
   welcome: 'welcome.tabName',
   calendar: 'calendar.tabName',
   'admin-settings': 'workbench.settingsTabName',
   'commit-history': 'version.historyTabName',
+  'builtin-workflow-settings': 'chat.builtinWorkflowsHeader',
+}
+
+export const BUILTIN_PLUGIN_LABEL_KEYS = {
+  search: 'config.sidebar.search',
+  voice: 'config.sidebar.voice',
+  desensitize: 'config.sidebar.desensitize',
+  'litigation-visual': 'config.sidebar.litigationVisual',
+  calendar: 'calendar.railSchedule',
+  favorites: 'config.tools.favorites',
+  clipboard: 'config.tools.clipboard',
+  insight: 'insight.title',
+  'tencent-meeting': 'workbench.pluginLabels.tencentMeeting',
+  baoqingtian: 'workbench.pluginLabels.baoqingtian',
+  'dpia-workbench': 'workbench.pluginLabels.dpiaWorkbench',
+  'lawfirm-management': 'workbench.pluginLabels.lawfirmManagement',
+  'project-im': 'workbench.pluginLabels.projectIm',
+}
+
+export function resolveLocalizedTabName(tab, translate, pluginLabelById = null) {
+  if (!tab || typeof tab !== 'object' || typeof translate !== 'function') return null
+  const type = tab.tabType
+  if (!type) return null
+  if (LOCALIZED_NAME_KEYS[type]) {
+    return translate(LOCALIZED_NAME_KEYS[type])
+  }
+  if (type === 'plugin' && tab.pluginId) {
+    if (pluginLabelById && pluginLabelById.has(tab.pluginId)) {
+      return pluginLabelById.get(tab.pluginId)
+    }
+    const key = BUILTIN_PLUGIN_LABEL_KEYS[tab.pluginId]
+    return key ? translate(key) : null
+  }
+  if (type === 'market-detail' && tab.marketSpec && tab.marketSpec.kind === 'plugin' && tab.marketSpec.id) {
+    if (pluginLabelById && pluginLabelById.has(tab.marketSpec.id)) {
+      return pluginLabelById.get(tab.marketSpec.id)
+    }
+    const key = BUILTIN_PLUGIN_LABEL_KEYS[tab.marketSpec.id]
+    return key ? translate(key) : null
+  }
+  if (type === 'merge-review' && tab.mergeSpec) {
+    const fileName = tab.mergeSpec.name || (tab.mergeSpec.path ? String(tab.mergeSpec.path).split('/').pop() : '')
+    return fileName ? translate('version.mergeTabName', { name: fileName }) : null
+  }
+  if (type === 'version-compare' && tab.compareSpec) {
+    const fileName = tab.compareSpec.name || (tab.compareSpec.path ? String(tab.compareSpec.path).split('/').pop() : '')
+    return fileName ? translate('workbenchOps.versionCompareTabName', { name: fileName }) : null
+  }
+  if (type === 'version-text-diff' && tab.versionSpec) {
+    const fileName = tab.versionSpec.name || (tab.versionSpec.path ? String(tab.versionSpec.path).split('/').pop() : '')
+    return fileName ? translate('workbenchOps.versionCompareTabName', { name: fileName }) : null
+  }
+  if (type === 'tmeet-transcript' && (!tab.meetingSpec || !tab.meetingSpec.subject)) {
+    return translate('tmeet.defaultTranscriptTabName')
+  }
+  return null
 }
 
 export const tabSnapshotMethods = {
@@ -381,9 +437,12 @@ export const tabSnapshotMethods = {
     }
     const any = !!(restored && (restored.leftFiles.length || restored.rightFiles.length))
     if (any) {
+      const translate = typeof this.$t === 'function'
+        ? (k, p) => (p === undefined ? this.$t(k) : this.$t(k, p))
+        : null
       for (const t of [].concat(restored.leftFiles, restored.rightFiles)) {
-        const key = t.tabType && LOCALIZED_NAME_KEYS[t.tabType]
-        if (key && typeof this.$t === 'function') t.name = this.$t(key)
+        const localized = resolveLocalizedTabName(t, translate)
+        if (localized) t.name = localized
       }
       const merged = mergeRestored(restored, {
         leftFiles: this.leftFiles,

@@ -170,7 +170,7 @@ export default {
   "builtinWorkflowsScope": "Vertrag · Beweis · Dateien · Gutachten",
   "builtinWorkflowsCustomCount": "{count} angepasst",
   "composerAdvancedSettings": "Erweiterte Einstellungen",
-  "builtinWorkflowsAdvancedBtn": "Advanced",
+  "builtinWorkflowsAdvancedBtn": "Regeln bearbeiten",
   "builtinWorkflowsSub": "Vertragsprüfung, Beweismittelsortierung, Dateiorganisation und Prüfung von Rechtsgutachten sind integriert und werden automatisch auf Grundlage Ihrer Anfrage aktiviert.",
   "builtinWorkflowBadge": "Integriert",
   "builtinWorkflowAutoToast": "Integrierter Workflow automatisch aktiviert: {name}",

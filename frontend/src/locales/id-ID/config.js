@@ -12,11 +12,11 @@ export default {
     "voice": "Suara",
     "meetingRecorder": "Rekaman Rapat",
     "litigationVisual": "Visualisasi Litigasi",
-    "tmeet": "Tencent Meeting",
+    "tmeet": "Rapat Tencent",
     "search": "Cari",
     "tts": "Teks ke Suara",
     "desensitize": "Penyuntingan Berkas",
-    "version": "Version History",
+    "version": "Kontrol Versi",
     "calendar": "Kalender"
   },
   "tools": {

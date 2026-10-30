@@ -4,7 +4,7 @@
 export default {
   "tabName": "Welkom",
   "start": "Starten",
-  "recent": "Recent",
+  "recent": "Onlangs geopend",
   "guides": "Instructievideo's",
   "openFile": "Bestand openen…",
   "connectTeamServer": "Verbinden met een teamserver",

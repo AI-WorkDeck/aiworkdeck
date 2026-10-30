@@ -338,7 +338,7 @@ export default {
     "chatTitle": "Sohbet",
     "scratchTitle": "Hızlı Çalışma Alanı",
     "scratchBadge": "Hızlı Çalışma Alanı",
-    "promoteAction": "Convert to project ↗",
+    "promoteAction": "Projeye dönüştür",
     "promoteTitle": "Resmi projeye dönüştür",
     "promotePlaceholder": "Bir proje adı girin",
     "promoteSuccess": "Resmi projeye dönüştürüldü",

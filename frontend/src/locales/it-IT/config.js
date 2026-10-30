@@ -16,7 +16,7 @@ export default {
     "search": "Ricerca",
     "tts": "Testo in voce",
     "desensitize": "Oscuramento dei file",
-    "version": "Version History",
+    "version": "Controllo versione",
     "calendar": "Calendario"
   },
   "tools": {

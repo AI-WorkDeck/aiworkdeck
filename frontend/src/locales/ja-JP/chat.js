@@ -170,7 +170,7 @@ export default {
   "builtinWorkflowsScope": "契約 · 証拠 · ファイル · 意見",
   "builtinWorkflowsCustomCount": "{count} 件をカスタマイズ済み",
   "composerAdvancedSettings": "詳細設定",
-  "builtinWorkflowsAdvancedBtn": "Advanced",
+  "builtinWorkflowsAdvancedBtn": "ルールを編集",
   "builtinWorkflowsSub": "契約書レビュー、証拠整理、ファイル整理、法律意見書検証が内蔵されており、リクエストに応じて自動的に有効化されます。",
   "builtinWorkflowBadge": "内蔵",
   "builtinWorkflowAutoToast": "内蔵ワークフローを自動有効化:{name}",
