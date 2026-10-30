@@ -215,6 +215,8 @@ try {
   if (process.env.AWD_BASELINE_ELECTRON) assert.equal(await page.evaluate(() => localStorage.getItem('electron-upgrade-persistence')), 'baseline-profile-retained')
   for (const ext of ['docx', 'xlsx', 'pptx']) {
     const frame = await open(ext)
+    frame.on('pageerror', error => { evidence.guestErrors ||= []; evidence.guestErrors.push({ ext, message: error.message }) })
+    frame.on('console', message => { if (message.type() === 'error') { evidence.guestErrors ||= []; evidence.guestErrors.push({ ext, message: message.text() }) } })
     const marker = `兼容验证_ELECTRON_COMPAT_${ext.toUpperCase()}`
     if (ext === 'docx') await exec(ext, 'goto', { type: 'end' })
     if (ext === 'xlsx') await exec(ext, 'sheet_select_range', { range: 'B2' })
@@ -229,11 +231,26 @@ try {
     await page.evaluate(name => Object.values(window.__checkbaActiveOverviewVm._libreRefs).find(e => e.file?.name === name).webviewEl.focus(), path.basename(files[ext]))
     await frame.focus('[data-lo-ime]')
     assert.equal(await frame.$eval('[data-lo-ime]', el => document.activeElement === el), true)
+    await frame.evaluate(() => {
+      window.__compatInputEvents = []
+      for (const type of ['compositionstart', 'compositionupdate', 'compositionend', 'beforeinput', 'input', 'keydown', 'keyup', 'focus', 'blur']) {
+        document.querySelector('[data-lo-ime]').addEventListener(type, event => window.__compatInputEvents.push({ type, data: event.data, key: event.key, inputType: event.inputType, composing: event.isComposing, trusted: event.isTrusted }), { passive: true })
+      }
+    })
+    const inputState = () => frame.$eval('[data-lo-ime]', el => ({ value: el.value, focused: document.activeElement === el, active: document.activeElement?.tagName, events: window.__compatInputEvents }))
     await frame.__compatFocus.send('Input.imeSetComposition', { text: marker, selectionStart: marker.length, selectionEnd: marker.length })
     await frame.__compatFocus.send('Input.insertText', { text: marker })
     await sleep(1500) // Let the worker commit IME text before Enter/Escape ends editing.
+    write(`${ext}-input-before-confirm.json`, await inputState())
+    assert.equal(await frame.$eval('[data-lo-ime]', el => document.activeElement === el), true, `${ext} input must retain focus before confirmation`)
     if (ext === 'xlsx') await frame.keyboard.press('Enter')
     if (ext === 'pptx') await frame.keyboard.press('Escape')
+    write(`${ext}-input-after-confirm.json`, await inputState())
+    if (ext === 'xlsx') {
+      let cell = null
+      try { await until(async () => { cell = await exec(ext, 'sheet_read_range', { range: 'B2' }); return JSON.stringify(cell).includes(marker) }, 30000) }
+      finally { write('xlsx-model-after-input.json', cell) }
+    }
     console.log(JSON.stringify({ stage: 'input', ext }))
     const started = Date.now()
     // The synthetic marker contains no XML entities; CJK/Latin text may use separate OOXML runs.
