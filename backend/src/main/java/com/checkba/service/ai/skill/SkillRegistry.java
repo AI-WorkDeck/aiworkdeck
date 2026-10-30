@@ -299,6 +299,12 @@ public class SkillRegistry {
         return !disabledSkillIds.contains(skillId);
     }
 
+    /** 自动补装仍尊重持久化的停用偏好；迁移后的插件可见开关不受此偏好影响。 */
+    public boolean isPackAutoInstallEnabled(String skillId) {
+        maybeRefreshDisabledState();
+        return !disabledSkillIds.contains(skillId) && isEnabled(skillId);
+    }
+
     /**
      * 启用 / 禁用 skill 并持久化。
      * @throws IllegalArgumentException skillId 不在已注册列表中

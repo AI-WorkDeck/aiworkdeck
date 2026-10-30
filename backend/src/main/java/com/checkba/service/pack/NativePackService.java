@@ -544,6 +544,11 @@ public class NativePackService {
      * 异步安装（幂等）：同一 pack 已在队列里就直接返回，前端轮询 status 看进度。
      */
     public void installAsync(String packId) {
+        installAsync(packId, () -> true);
+    }
+
+    /** 自动补装在执行时复核资格，与卸载共用同一把锁；显式安装不受偏好限制。 */
+    void installAsync(String packId, BooleanSupplier stillAllowed) {
         requireValidId(packId);
         requireEnabled();
         final PackStatus st;
@@ -565,7 +570,13 @@ public class NativePackService {
         }
         installer.submit(() -> {
             try {
-                install(packId);
+                synchronized (packLock(packId)) {
+                    if (!stillAllowed.getAsBoolean()) {
+                        statuses.remove(packId, st);
+                        return;
+                    }
+                    install(packId);
+                }
             } catch (Throwable t) {
                 // 兜住 Throwable：install() 自己已把状态落到 failed；这里再兜一层，防止
                 // 锁外的前置检查（如开关在排队期间被关）抛出后状态永远停在「下载中」
