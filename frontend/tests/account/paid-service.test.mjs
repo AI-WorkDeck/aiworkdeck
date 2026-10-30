@@ -10,12 +10,12 @@ const requestSource = api.slice(api.indexOf('function request(options)'), api.in
   .replaceAll("import('@/utils/requireAccount.js')", 'loadAccountUi()')
 function harness(backend, loggedIn = false) {
   const prompts = []
-  const request = new Function('uni', 'getApiBaseUrl', 'getAuthHeaders', 't', 'accountRequiredError', 'isCreditsRequired', 'isAccountRequired', 'loadAccountUi', 'console',
+  const request = new Function('uni', 'getApiBaseUrl', 'getAuthHeaders', 't', 'accountRequiredError', 'isCreditsRequired', 'isAccountRequired', 'loadAccountUi', 'getCloudAccountGeneration', 'isDesktopHost', 'console',
     requestSource + '\nreturn request')(
     { request: options => { options.success({ statusCode: 200, data: backend }); return {} } },
     () => 'https://synthetic.invalid', () => ({}), key => key, accountRequiredError, isCreditsRequired, isAccountRequired,
-    async () => ({ requireAccountFor4011: async () => { prompts.push('login'); return loggedIn }, requireRecharge: async () => { prompts.push('recharge') } }),
-    { log() {}, warn() {}, error() {} })
+    async () => ({ handleAccountExpired() {}, requireAccountFor4011: async () => { prompts.push('login'); return loggedIn }, requireRecharge: async () => { prompts.push('recharge') } }),
+    () => 0, () => true, { log() {}, warn() {}, error() {} })
   return { request, prompts }
 }
 

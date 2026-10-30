@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "Die Arbeitsbereichssitzung konnte nicht wiederhergestellt werden",
   "confirm": "Bestätigen",
   "cancel": "Abbrechen",
   "save": "Speichern",

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  workspaceSessionUnavailable: "Impossibile ripristinare la sessione dello spazio di lavoro",
   "confirm": "Conferma",
   "cancel": "Annulla",
   "save": "Salva",

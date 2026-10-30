@@ -487,6 +487,9 @@ class AccountServiceTest {
         AccountException plain = assertThrows(AccountException.class, service::fetchTeam);
         assertEquals(AccountException.Kind.UNAUTHORIZED, plain.getKind());
 
+        // 失效后重新连接，独立验证 409 的业务分类。
+        transport.enqueue(200, ME);
+        service.connect(KEY);
         // 409 already_in_team 同样带码回来
         transport.enqueue(409, "{\"error\":\"already_in_team\"}");
         AccountException conflict = assertThrows(AccountException.class, service::fetchTeam);

@@ -168,6 +168,7 @@ function loadRequest(uniStub) {
   const src = API.slice(start, end + 2)
   const deps = {
     getApiBaseUrl: () => 'http://127.0.0.1:1',
+    getCloudAccountGeneration: () => 0,
     getAuthHeaders: () => ({}),
     t: (k) => k,
     uni: uniStub,
