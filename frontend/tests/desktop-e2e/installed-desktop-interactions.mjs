@@ -130,6 +130,22 @@ finally { $graphics.Dispose(); $bitmap.Dispose() }`
       await page.waitForFunction(value => document.documentElement.classList.contains('is-fullscreen') === value, { timeout: 20000 }, fullscreen)
       assert.equal(await mainRpc(`process.mainModule.require('electron').BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes('/h5/index.html')).isFullScreen()`), fullscreen)
       await state(popupId, base + '/popup')
+      // Chrome state arrives before the header's 0.3s padding transition ends.
+      // Wait for the real layout, without focusing or reattaching native views.
+      await page.waitForFunction(value => {
+        const root = document.documentElement
+        const header = [...document.querySelectorAll('.project-header')].find(el => el.getClientRects().length)
+        if (!header || header.getAnimations().some(a => a.playState === 'running' || a.pending)) return false
+        if (!root.classList.contains('is-mac')) return true
+        const safeStart = parseFloat(getComputedStyle(root).getPropertyValue('--awd-titlebar-safe-inline-start'))
+        const name = header.querySelector('.project-name')
+        return safeStart === (value ? 0 : 88) && (value || (parseFloat(getComputedStyle(header).paddingLeft) >= 87.5 && name?.getBoundingClientRect().left - header.getBoundingClientRect().left >= 87.5))
+      }, { polling: 'raf', timeout: 10000 }, fullscreen)
+      evidence.chromeLayout ||= []
+      evidence.chromeLayout.push(await page.evaluate(() => {
+        const header = [...document.querySelectorAll('.project-header')].find(el => el.getClientRects().length)
+        return { classes: document.documentElement.className, paddingLeft: getComputedStyle(header).paddingLeft, header: header.getBoundingClientRect().toJSON(), name: header.querySelector('.project-name')?.getBoundingClientRect().toJSON() }
+      }))
       await capture(fullscreen ? 'installed-browser-fullscreen' : 'installed-browser-restored')
     }
     evidence.checks.push('Native full-screen enter/leave updated production chrome state and retained BrowserView content')
