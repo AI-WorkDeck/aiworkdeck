@@ -573,6 +573,7 @@ public class MobileRelayClientService {
     private final ProjectRepository projectRepository;
     private final ProjectFileService projectFileService;
     @Autowired(required=false) private MobileCaptureMoveFiles captureMoveFiles;
+    @Autowired(required=false) private MobileCaptureOrganizationService captureOrganization;
     private final StorageServiceFactory storageServiceFactory;
     private final com.checkba.service.ProjectAiMessageService projectAiMessageService;
     private final DesktopRefHandler desktopRefHandler;
@@ -1157,6 +1158,12 @@ public class MobileRelayClientService {
         }
         if(captureMoveFiles!=null) captureMoveFiles.rememberCapture(projectId,
                 String.format("projects/%d/%s/%s/%s",projectId,rootFolderName,dateStr,landedName),item.path("clientMediaId").asText());
+        if(captureOrganization!=null && item.path("organization").isObject()) {
+            var archived=projectFileService.getFilesByParent(projectId,day.getId()).stream()
+                    .filter(f->!Boolean.TRUE.equals(f.getIsFolder()) && landedName.equals(f.getName())).findFirst().orElseThrow();
+            captureOrganization.attach(userId,projectId,archived.getId(),mapper.convertValue(item.path("organization"),
+                    new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>(){}));
+        }
         HttpResponse<String> ack = authed("POST", "/api/mobile/inbox/" + itemId + "/ack", "{}");
         receipt(item, okEnvelope(ack) ? "saved" : "savedPendingAck", "");
         if (!okEnvelope(ack)) {

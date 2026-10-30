@@ -78,15 +78,24 @@ public class VoiceDictationService {
             .build();
 
     private final String dictationModel;
+    private final PlatformUsageAccountant usageAccountant;
 
+    public VoiceDictationService(PlatformAiChannel platformAiChannel, PlatformCreditsGate platformCreditsGate,
+                                 String baseUrl, String dictationModel) {
+        this(platformAiChannel, platformCreditsGate, baseUrl, dictationModel, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
     public VoiceDictationService(PlatformAiChannel platformAiChannel,
                                  PlatformCreditsGate platformCreditsGate,
                                  @Value("${ai.providers.openrouter.base-url:https://openrouter.ai/api/v1}") String baseUrl,
-                                 @Value("${ai.dictation.model:xiaomi/mimo-v2.5}") String dictationModel) {
+                                 @Value("${ai.dictation.model:xiaomi/mimo-v2.5}") String dictationModel,
+                                 PlatformUsageAccountant usageAccountant) {
         this.platformAiChannel = platformAiChannel;
         this.platformCreditsGate = platformCreditsGate;
         this.baseUrl = baseUrl;
         this.dictationModel = dictationModel;
+        this.usageAccountant = usageAccountant;
     }
 
     public record Dictation(String text) {}
@@ -97,6 +106,26 @@ public class VoiceDictationService {
      * @throws IllegalStateException    通道不可用/上游失败，文案可直接给用户
      */
     public Dictation transcribe(Long userId, String audioBase64, String format, long durationMs) {
+        return new Dictation(transcribeBounded(userId, audioBase64, format, durationMs,
+                Duration.ofSeconds(60), null, false).text());
+    }
+
+    public record SampleDictation(String text, String modelId, dev.langchain4j.model.output.TokenUsage tokenUsage) {}
+
+    /** Explicit short capture sampling; caller owns persistent deduplication and recording this usage receipt. */
+    public SampleDictation transcribeSample(Long userId, String audioBase64, String format, long durationMs,
+                                            Duration timeout, int maxOutputTokens) {
+        if (timeout == null || timeout.isZero() || timeout.isNegative() || timeout.compareTo(Duration.ofSeconds(60)) > 0
+                || maxOutputTokens < 1 || maxOutputTokens > 2000)
+            throw new IllegalArgumentException("Invalid capture dictation budget");
+        if (userId == null || platformAiChannel.usesMachineKey(userId) || usageAccountant == null)
+            throw new IllegalStateException(LangText.of("采集预读需要账户平台通道", "Capture preview needs an account platform channel"));
+        return transcribeBounded(userId, audioBase64, format, durationMs, timeout, maxOutputTokens, true);
+    }
+
+    private SampleDictation transcribeBounded(Long userId, String audioBase64, String format, long durationMs,
+                                               Duration timeout, Integer maxOutputTokens, boolean capture) {
+        long started = System.nanoTime();
         if (audioBase64 == null || audioBase64.isBlank()) {
             throw new IllegalArgumentException(LangText.of("没有收到音频数据", "No audio data received"));
         }
@@ -133,12 +162,13 @@ public class VoiceDictationService {
                     "Dictation can't reach the platform channel right now (AI Credits may not be allocated yet, or the website is unreachable); please retry shortly"));
         }
 
+        if (capture) usageAccountant.ensureBaselineAsync(userId);
         ObjectNode body = objectMapper.createObjectNode();
-        body.put("model", resolved.bailian() ? "qwen3.8-omni-flash" : dictationModel);
-        if (resolved.bailian()) {
-            body.put("max_tokens", 4096);
-            body.put("enable_thinking", false);
-        }
+        String effectiveModel = resolved.bailian() ? "qwen3.8-omni-flash" : dictationModel;
+        body.put("model", effectiveModel);
+        if (maxOutputTokens != null) body.put("max_tokens", maxOutputTokens);
+        else if (resolved.bailian()) body.put("max_tokens", 4096);
+        if (resolved.bailian()) body.put("enable_thinking", false);
         ArrayNode messages = body.putArray("messages");
         ObjectNode msg = messages.addObject();
         msg.put("role", "user");
@@ -156,7 +186,7 @@ public class VoiceDictationService {
         try {
             request = HttpRequest.newBuilder()
                     .uri(URI.create((resolved.bailian() ? resolved.baseUrl() : baseUrl) + "/chat/completions"))
-                    .timeout(Duration.ofSeconds(60))
+                    .timeout(Duration.ofNanos(Math.max(1, timeout.toNanos() - (System.nanoTime() - started))))
                     .header("Authorization", "Bearer " + resolved.apiKey())
                     .header("Content-Type", "application/json")
                     .header("X-Request-Id", java.util.UUID.randomUUID().toString())
@@ -193,7 +223,8 @@ public class VoiceDictationService {
             throw new IllegalStateException(LangText.of("听写请求过于频繁，请稍候几秒再试", "Too many dictation requests; wait a few seconds and retry"));
         }
         if (response.statusCode() >= 400) {
-            log.warn("听写上游返回 {}: {}", response.statusCode(), brief(response.body()));
+            if (capture) log.warn("Capture audio provider failed: status={}", response.statusCode());
+            else log.warn("听写上游返回 {}: {}", response.statusCode(), brief(response.body()));
             throw new IllegalStateException(LangText.of("听写失败（上游 " + response.statusCode() + "），请重试",
                     "Dictation failed (upstream " + response.statusCode() + "), please retry"));
         }
@@ -207,7 +238,12 @@ public class VoiceDictationService {
             }
             text = scrubPromptEcho(text);
             platformAiChannel.onKeyVerified(userId, resolved.fingerprint());
-            return new Dictation(text);
+            JsonNode tokens = root.path("usage");
+            dev.langchain4j.model.output.TokenUsage tokenUsage = tokens.path("prompt_tokens").canConvertToInt()
+                    && tokens.path("completion_tokens").canConvertToInt()
+                    ? new dev.langchain4j.model.output.TokenUsage(Math.max(0, tokens.path("prompt_tokens").asInt()),
+                            Math.max(0, tokens.path("completion_tokens").asInt())) : null;
+            return new SampleDictation(text, effectiveModel, tokenUsage);
         } catch (Exception e) {
             throw new IllegalStateException(LangText.of("听写响应无法解析", "Dictation response could not be parsed"));
         }
