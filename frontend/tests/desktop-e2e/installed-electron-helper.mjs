@@ -167,6 +167,22 @@ export async function launchInstalledElectron({ outDir, backendPort = 19566, cdp
     fs.closeSync(log)
     let spawnError
     child.on('error', error => { spawnError = error })
+    provenance.launches.push({ pid: child.pid })
+    const jar = fs.statSync(path.join(resourcesPath, 'backend/app.jar'))
+    await until(async () => {
+      const response = await fetch(`http://127.0.0.1:${backendPort}/api/admin/wizard`, { signal: AbortSignal.timeout(3000) })
+      const result = await response.json()
+      return response.ok && typeof result.initialized === 'boolean' && result.build === `${jar.size}-${Math.round(jar.mtimeMs)}`
+    }, 'installed bundled backend identity', 240)
+    const javaPath = path.join(resourcesPath, 'jre/bin', mac ? 'java' : 'java.exe')
+    const processes = processList()
+    const bundledBackend = mac ? processes.split('\n').filter(line => line.includes(javaPath) && line.includes('com.checkba.CheckbaApplication')) :
+      [JSON.parse(processes)].flat().filter(p => p.ExecutablePath?.toLowerCase() === javaPath.toLowerCase() && p.CommandLine?.includes('com.checkba.CheckbaApplication'))
+    assert.equal(bundledBackend.length, 1, 'Backend must run the installed bundled JRE, without system-Java fallback')
+    provenance.launches[provenance.launches.length - 1].backendProcess = bundledBackend[0]
+    await until(() => helper.rendererRpc('!!window.__checkbaActiveOverviewVm && !!window.checkbaDesktop?.update && document.readyState === "complete"'), 'installed workbench', 180)
+    // Match ordinary startup: do not evaluate main-process modules before the first
+    // real workbench has loaded. Identity is still checked before any test mutation.
     const identity = await until(async () => {
       if (spawnError) throw spawnError
       if (child.exitCode !== null || child.signalCode !== null) throw new Error('Installed process exited during startup')
@@ -184,20 +200,7 @@ export async function launchInstalledElectron({ outDir, backendPort = 19566, cdp
     assert.equal(identity.versions.electron, provenance.expectedElectron)
     await helper.mainRpc(`(()=>{const e=process.mainModule.require('electron');globalThis.__installedRendererEvents=[];const observe=wc=>{wc.on('preload-error',(_event,file,error)=>globalThis.__installedRendererEvents.push({type:'preload-error',file,error:error.stack}));wc.on('did-fail-load',(_event,code,description,url)=>globalThis.__installedRendererEvents.push({type:'did-fail-load',code,description,url}));wc.on('render-process-gone',(_event,details)=>globalThis.__installedRendererEvents.push({type:'render-process-gone',details}))};e.webContents.getAllWebContents().forEach(observe);e.app.on('web-contents-created',(_event,wc)=>observe(wc));return true})()`)
     helper.identity = identity
-    provenance.launches.push({ ...identity })
-    const jar = fs.statSync(path.join(resourcesPath, 'backend/app.jar'))
-    await until(async () => {
-      const response = await fetch(`http://127.0.0.1:${backendPort}/api/admin/wizard`, { signal: AbortSignal.timeout(3000) })
-      const result = await response.json()
-      return response.ok && typeof result.initialized === 'boolean' && result.build === `${jar.size}-${Math.round(jar.mtimeMs)}`
-    }, 'installed bundled backend identity', 240)
-    const javaPath = path.join(resourcesPath, 'jre/bin', mac ? 'java' : 'java.exe')
-    const processes = processList()
-    const bundledBackend = mac ? processes.split('\n').filter(line => line.includes(javaPath) && line.includes('com.checkba.CheckbaApplication')) :
-      [JSON.parse(processes)].flat().filter(p => p.ExecutablePath?.toLowerCase() === javaPath.toLowerCase() && p.CommandLine?.includes('com.checkba.CheckbaApplication'))
-    assert.equal(bundledBackend.length, 1, 'Backend must run the installed bundled JRE, without system-Java fallback')
-    provenance.launches[provenance.launches.length - 1].backendProcess = bundledBackend[0]
-    await until(() => helper.rendererRpc('!!window.__checkbaActiveOverviewVm && !!window.checkbaDesktop?.update && document.readyState === "complete"'), 'installed workbench', 180)
+    Object.assign(provenance.launches[provenance.launches.length - 1], identity)
     assert.equal((await helper.rendererRpc('window.checkbaDesktop.update.status()')).appVersion, process.env.CANDIDATE_VERSION)
     assert(await helper.mainRpc("process.mainModule.require('electron').BrowserWindow.getAllWindows().some(w=>w.isVisible())"), 'Native workbench window must be visible')
     save(`installed-identity-${launchIndex}.json`, identity)

@@ -98,7 +98,7 @@ const log = fs.openSync(path.join(run, 'runtime.log'), 'w')
 const java = installedMode ? null : spawn(path.join(env.JAVA_HOME, 'bin/java'), ['-jar', jar, `--server.port=${backendPort}`, '--network.proxy.auto-refresh=false'], { cwd: run, env, stdio: ['ignore', log, log] })
 let child, browser, page, installed
 let forced = false
-const evidence = { run, backendPort, cdpPort, backendPid: java?.pid, productionBefore, originalHashes, formats: {}, forcedSaveUsed: false }
+const evidence = { passed: false, run, backendPort, cdpPort, backendPid: java?.pid, productionBefore, originalHashes, formats: {}, forcedSaveUsed: false }
 console.log(JSON.stringify({ run, backendPid: java?.pid, backendPort, cdpPort }))
 async function start(executable, phase) {
   fs.writeFileSync(commandFile, '{}')
@@ -252,6 +252,10 @@ try {
     await open(ext)
     const result = ext === 'docx' ? await exec(ext, 'get_document_text') : ext === 'xlsx' ? await exec(ext, 'sheet_read_range', { range: 'A1:C2' }) : await exec(ext, 'slide_get_page', { slideNumber: 1 })
     assert.ok(JSON.stringify(result).includes(marker), `Reopened ${ext} must contain marker`)
+    if (ext === 'xlsx') {
+      assert.deepEqual(result.rows[0], ['ORIGINAL CELL', 21, 42])
+      assert.ok(result.formulas.some(f => f.cell === 'C1' && f.formula === '=B1*2'))
+    }
     write(`${ext}-reopened.json`, result)
     await sleep(2000) // Model reload can finish before the compositor paints.
     await page.screenshot({ path: path.join(run, `${ext}-reopened.png`) })
