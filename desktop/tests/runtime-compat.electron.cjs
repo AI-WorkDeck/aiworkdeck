@@ -148,8 +148,8 @@ app.whenReady().then(async () => {
     await loaded
     assert.equal(await view.webContents.executeJavaScript('document.querySelector("h1").textContent'), 'Second page')
     // A completed navigation does not guarantee that Viz has drawn its surface.
-    // Observe the subscription startup frame before injecting the new fixture marker.
-    // An early DOM update can otherwise precede delivery of the initial stale snapshot.
+    // Observe one startup frame, then verify a new marker through the production capture API.
+    // Continuous video-frame delivery is not a dependency of the product screenshot path.
     const hasFrameMarker = image => {
       if (image.isEmpty()) return false
       const marker = image.crop({ x: 8, y: 8, width: 1, height: 1 }).toBitmap()
@@ -183,23 +183,42 @@ app.whenReady().then(async () => {
     observation.beforeSubscription = windowState()
     let firstFrame, lastFrame
     let frameDeadline
+    let frameExpired = false
+    const assertPending = () => { if (frameExpired) throw new Error('BrowserView capture readiness timed out') }
     try {
-      await new Promise((resolve, reject) => {
-        frameDeadline = setTimeout(() => reject(new Error('BrowserView fixture frame was not drawn')), 10000)
-        view.webContents.beginFrameSubscription(false, (image, dirtyRect) => {
-          observation.callbackCount++
-          firstFrame ||= image
-          lastFrame = image
-          observation.lastSample = { ...sample(image), dirtyRect, elapsedMs: Date.now() - observedAt }
-          if (observation.firstSamples.length < 3) observation.firstSamples.push(observation.lastSample)
-          if (observation.injection === 'pending' && !image.isEmpty()) {
-            observation.injection = 'started'
-            view.webContents.executeJavaScript(`(()=>{const marker=document.createElement('div');marker.style.cssText='position:fixed;left:0;top:0;width:24px;height:24px;background:black;z-index:2147483647';document.body.append(marker);return {rect:marker.getBoundingClientRect().toJSON(),dpr:devicePixelRatio,visibility:document.visibilityState,focused:document.hasFocus(),url:location.href}})()`)
-              .then(value => { observation.injection = 'completed'; observation.injectionElapsedMs = Date.now() - observedAt; observation.injectedDocument = value }, error => { observation.injection = 'failed'; observation.injectionError = error.message; reject(error) })
-          } else if (hasFrameMarker(image)) resolve()
+      const capture = async () => {
+        await new Promise(resolve => {
+          view.webContents.beginFrameSubscription(false, (image, dirtyRect) => {
+            observation.callbackCount++
+            firstFrame ||= image
+            lastFrame = image
+            observation.lastSample = { ...sample(image), dirtyRect, elapsedMs: Date.now() - observedAt }
+            if (observation.firstSamples.length < 3) observation.firstSamples.push(observation.lastSample)
+            if (!image.isEmpty()) resolve()
+          })
         })
-      })
-      evidence.browserViewFrameObserved = true
+        assertPending()
+        evidence.browserViewStartupFrameObserved = true
+        view.webContents.endFrameSubscription()
+        observation.injection = 'started'
+        observation.injectedDocument = await view.webContents.executeJavaScript(`(async()=>{const marker=document.createElement('div');marker.style.cssText='position:fixed;left:0;top:0;width:24px;height:24px;background:black;z-index:2147483647';document.body.append(marker);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));return {rect:marker.getBoundingClientRect().toJSON(),dpr:devicePixelRatio,visibility:document.visibilityState,focused:document.hasFocus(),url:location.href}})()`)
+        assertPending()
+        observation.injection = 'completed'
+        observation.injectionElapsedMs = Date.now() - observedAt
+        // Animation callbacks only schedule the mutation; this bitmap is the pixel evidence.
+        const screenshot = await view.webContents.capturePage()
+        assertPending()
+        observation.capture = { ...sample(screenshot), elapsedMs: Date.now() - observedAt }
+        assert.equal(screenshot.isEmpty(), false)
+        fs.writeFileSync(path.join(root, 'browser-view.png'), screenshot.toPNG())
+        assert.ok(hasFrameMarker(screenshot), 'capturePage must include the newly drawn fixture marker and page background')
+        evidence.browserViewFrameObserved = true
+        evidence.browserViewMarkerEvidence = 'single-capturePage'
+      }
+      await Promise.race([
+        new Promise((_, reject) => { frameDeadline = setTimeout(() => { frameExpired = true; reject(new Error('BrowserView capture readiness timed out')) }, 10000) }),
+        capture(),
+      ])
     } catch (error) {
       try {
         observation.atFailure = windowState()
@@ -212,10 +231,6 @@ app.whenReady().then(async () => {
       clearTimeout(frameDeadline)
       view.webContents.endFrameSubscription()
     }
-    const screenshot = await view.webContents.capturePage()
-    assert.equal(screenshot.isEmpty(), false)
-    assert.ok(hasFrameMarker(screenshot), 'capturePage must include the newly drawn fixture marker and page background')
-    fs.writeFileSync(path.join(root, 'browser-view.png'), screenshot.toPNG())
     mark('production BrowserView registry attach, hide, restore, retained state and history')
 
     const target = path.join(paths.downloads, 'compat.txt')
