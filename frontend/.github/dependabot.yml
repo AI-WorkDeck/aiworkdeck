@@ -1,0 +1,26 @@
+version: 2
+updates:
+  # Enable version updates for npm dependencies
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "zewei"
+    labels:
+      - "dependencies"
+      - "security"
+    ignore:
+      # Ignore @dcloudio framework updates to avoid breaking changes
+      - dependency-name: "@dcloudio/*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # Ignore major updates for vite
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: "deps"
+      prefix-development: "chore(deps-dev)"
+      include: "scope"
