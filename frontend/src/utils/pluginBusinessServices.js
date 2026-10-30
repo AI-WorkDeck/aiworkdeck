@@ -32,12 +32,12 @@ export function createPluginBusinessServices({ api, projectId, permissions, isCu
         return { cancelled: !!pending }
       }
       const operations = service === 'search' ? ['query', 'tags', 'open'] : service === 'litigation'
-        ? ['status', 'list', 'scope', 'kickoff', 'restyle', 'packStatus', 'packInstall', 'open', 'generate', 'generation', 'answer', 'stop', 'continue']
+        ? ['status', 'list', 'scope', 'kickoff', 'restyle', 'packStatus', 'packInstall', 'open', 'generate', 'generation', 'answer', 'message', 'stop', 'continue']
         : ['options', 'choose', 'active', 'prepare', 'preview', 'redact', 'restore', 'recovery', 'open', 'download']
       if (!delegate && !operations.includes(operation)) fail('unknown_operation', 'Unknown service operation')
       if (service === 'sensitive' && !['options', 'choose', 'active', 'open', 'recovery'].includes(operation) && !permissions().includes('file_write')) fail('permission_denied', 'file_write is required')
       if (service === 'litigation' && ['restyle', 'packInstall'].includes(operation) && !permissions().includes('file_write')) fail('permission_denied', 'file_write is required')
-      if (service === 'litigation' && ['generate', 'generation', 'answer', 'stop', 'continue'].includes(operation)
+      if (service === 'litigation' && ['generate', 'generation', 'answer', 'message', 'stop', 'continue'].includes(operation)
           && !['file_write', 'ai'].every(permission => permissions().includes(permission))) fail('permission_denied', 'panels.litTaskDisabled')
       if (id != null && (typeof id !== 'string' || !id || id.length > 128 || requests.has(id))) fail('invalid_params', 'Invalid or duplicate requestId')
       if (operation === 'query' && (typeof params.query !== 'string' || params.query.length > 10000)) fail('invalid_params', 'Invalid search query')
@@ -59,7 +59,7 @@ export function createPluginBusinessServices({ api, projectId, permissions, isCu
         }
         if (service === 'litigation') {
           let result
-          if (['generate', 'generation', 'answer', 'stop', 'continue'].includes(operation)) {
+          if (['generate', 'generation', 'answer', 'message', 'stop', 'continue'].includes(operation)) {
             if (!actions.litigationGeneration) fail('unavailable', 'panels.litGenerationUnavailable')
             result = await actions.litigationGeneration(operation, params)
           }

@@ -115,10 +115,23 @@ public class AiChatController {
         return ResponseEntity.ok(java.util.Collections.emptyList());
     }
 
+    public java.util.List<Map<String, Object>> getConversations(Long projectId, String sessionId) {
+        return getConversations(projectId, sessionId, null);
+    }
+
     @GetMapping("/conversations")
-    public java.util.List<Map<String, Object>> getConversations(@RequestParam Long projectId, @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+    public java.util.List<Map<String, Object>> getConversations(@RequestParam Long projectId, @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
+            @RequestParam(required = false) String conversationScope) {
         Long userId = AuthController.getUserIdFromSession(sessionId);
-        java.util.List<Map<String, Object>> conversations = projectAiMessageService.listConversations(projectId, userId);
+        String scope;
+        try {
+            scope = com.checkba.service.ai.ConversationIssuanceService.normalizeScope(conversationScope);
+        } catch (IllegalArgumentException e) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+        java.util.List<Map<String, Object>> conversations = scope == null
+                ? projectAiMessageService.listConversations(projectId, userId)
+                : projectAiMessageService.listConversations(projectId, userId, scope);
         // 合并 Agent 运行状态（RUNNING/PAUSED/AWAITING_APPROVAL/…，null=本进程内没跑过），
         // 历史列表的状态提示点靠它；在控制层合并，持久层不感知 AI 运行时。
         for (Map<String, Object> conv : conversations) {

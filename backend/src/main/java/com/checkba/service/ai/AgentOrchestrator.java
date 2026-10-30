@@ -1276,9 +1276,10 @@ public class AgentOrchestrator {
             for (Long id : generatedIds) notifyVerifiedFile(conversationId, id, "ADDED", projectId, guard);
             return;
         }
-        // PDF derivatives never count the input/source as newly created, including
-        // a download prompt or malformed/failed result with no confirmed identity.
-        if ((toolName.startsWith("pdf_") || "image_get_generation".equals(toolName))
+        // Derived files and litigation diagrams require confirmed output identities.
+        // A render rejection or diagram name is not an added "current document".
+        if ((toolName.startsWith("pdf_") || "image_get_generation".equals(toolName)
+                || "litigation_render".equals(toolName) || "litigation_timeline_render".equals(toolName))
                 && "ADDED".equals(meta.fileEffect())) return;
         // 「执行成功」不等于「改过文件」：查找替换一次都没命中时照发 MODIFIED，
         // 用户会被告知本轮改了这个文件，去找却找不到任何改动。

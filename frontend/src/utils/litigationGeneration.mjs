@@ -24,6 +24,7 @@ function checkpointQuestion(bubble) {
 // the existing inbox idempotency boundary, not by starting another conversation.
 export function createLitigationGeneration({ stream, api, storage, isCurrent, openFile, changed,
   text, uuid = () => crypto.randomUUID(), now = () => Date.now() }) {
+  stream.setConversationScope('litigation-visual')
   let task = null
   let disposed = false
   let submitting = false
@@ -33,9 +34,13 @@ export function createLitigationGeneration({ stream, api, storage, isCurrent, op
   const persist = () => { if (current() && task) storage.save(copy(task)) }
   const last = () => stream.bubbles.value.at(-1)
   const pending = (prompt, clientRequestId = uuid(), extra = {}) => ({ ...extra, clientRequestId,
-    prompt: `${prompt}\n\n${text('questionProtocol')}` })
+    displayText: extra.displayText || prompt, prompt: `${prompt}\n\n${text('questionProtocol')}` })
   const requireCurrent = () => { if (!current()) throw new Error(text('contextChanged')) }
-  const view = () => task ? copy({ taskId: task.id, phase: task.phase, message: task.message || '',
+  const transcript = () => stream.bubbles.value.map(bubble => ({ role: bubble.role,
+    content: bubble.role === 'USER' ? bubble.displayContent || ''
+      : [bubble.content, bubble.question?.text].filter(Boolean).join('\n\n').trim()
+  })).filter(message => message.content)
+  const view = () => task ? copy({ messages: transcript(), taskId: task.id, phase: task.phase, message: task.message || '',
     question: task.question || null, startedAt: task.startedAt, resultFileId: task.resultFileId || null }) : { phase: 'idle' }
   const setPhase = (phase, message = '') => { task.phase = phase; task.message = message; persist() }
 
@@ -49,9 +54,15 @@ export function createLitigationGeneration({ stream, api, storage, isCurrent, op
     }
   })
 
-  async function recover() {
+  async function recover({ terminal = false } = {}) {
     if (restoring) return restoring
     restoring = (async () => {
+      if (!task.scoped) {
+        await api.issue(task.conversationId)
+        requireCurrent()
+        task.scoped = true
+        persist()
+      }
       const [inbox, history] = await Promise.all([api.inbox(task.conversationId), api.history(task.conversationId)])
       requireCurrent()
       const entry = inbox.items?.find(item => item.clientRequestId === task.pending?.clientRequestId)
@@ -59,17 +70,34 @@ export function createLitigationGeneration({ stream, api, storage, isCurrent, op
       stream.resetSSE()
       stream.setConversationId(task.conversationId)
       stream.clearBubbles()
+      let userRequestId = null
+      let userCount = 0
       for (const message of history) {
         if (message.role?.toUpperCase() === 'ASSISTANT') {
-          stream.bubbles.value.push(stream.parseAssistantHistory(message.content || '', message.reasoning))
+          const bubble = stream.parseAssistantHistory(message.content || '', message.reasoning)
+          if (message.id != null) bubble.id = message.id
+          bubble.dbMessageId = message.id
+          bubble.originClientRequestId = message.clientRequestId || userRequestId
+          stream.bubbles.value.push(bubble)
         } else {
           const previous = last()
           if (previous?.question) previous.question.answered = true
-          stream.bubbles.value.push({ role: 'USER', content: message.content, clientRequestId: message.clientRequestId })
+          userRequestId = message.clientRequestId
+          userCount++
+          const displayContent = message.displayContent || (userCount === 1 ? text('startPrompt')
+            : String(message.content || '').split(`\n\n${text('questionProtocol')}`)[0])
+          stream.bubbles.value.push({ role: 'USER', content: message.content, displayContent, clientRequestId: message.clientRequestId })
         }
       }
       await stream.loadConversationMetadata(task.conversationId)
       requireCurrent()
+      // Metadata spans the conversation; only this round may certify a new result.
+      const latest = last()
+      const currentRound = latest?.originClientRequestId === task.pending?.clientRequestId || (task.round || 1) === 1
+      stream.fileChanges.value = stream.fileChanges.value.filter(change => currentRound && (
+        change.assistantMessageId != null ? latest?.dbMessageId != null && String(change.assistantMessageId) === String(latest.dbMessageId)
+          : (task.round || 1) === 1))
+      if (terminal) return
       stream.agentRunStatus.value = inbox.status || null
       stream.isStreaming.value = inbox.status === 'RUNNING'
       stream.agentAwaitingInput.value = inbox.status === 'AWAITING_INPUT'
@@ -98,8 +126,7 @@ export function createLitigationGeneration({ stream, api, storage, isCurrent, op
     if (!saved?.id || !saved.conversationId) return
     task = saved
     stream.setConversationId(task.conversationId)
-    if (!ACTIVE.has(task.phase) && task.phase !== 'failed') return
-    try { await recover() }
+    try { await recover({ terminal: !ACTIVE.has(task.phase) && task.phase !== 'failed' }) }
     catch (error) { if (current()) setPhase('failed', error.message) }
   }
 
@@ -118,6 +145,11 @@ export function createLitigationGeneration({ stream, api, storage, isCurrent, op
         const diagram = diagrams.find(d => [d.drawioFileId, d.svgFileId, d.pngFileId].some(id => id && ids.has(String(id)))
           || (!task.baselineFolders?.includes(String(d.folderId)) && changedNames.some(name => name === d.name || name.startsWith(d.name + '.'))))
         if (!diagram) {
+          if (task.intent === 'message' && last()?.content?.trim()) {
+            task.question = null
+            setPhase('completed')
+            return
+          }
           setPhase('failed', text('noDiagram'))
           return
         }
@@ -167,7 +199,7 @@ export function createLitigationGeneration({ stream, api, storage, isCurrent, op
       const q = question
       if (!q || q.answered) setPhase('failed', text('missingQuestion'))
       else {
-        task.question = { ...copy(q), text: [bubble?.question ? bubble.content : '', q.text].filter(Boolean).join('\n\n'),
+        task.question = { ...copy(q), text: q.text,
           key: `${task.pending.clientRequestId}:${q.id || q.text}` }
         setPhase('waiting')
       }
@@ -217,14 +249,16 @@ export function createLitigationGeneration({ stream, api, storage, isCurrent, op
       try { await recover(); await observe() }
       catch (error) { setPhase('failed', error.message); return view() }
       if (ACTIVE.has(task.phase) || task.phase === 'completed') return view()
-      if (task.accepted) { task.pending = pending(text('continuePrompt')); task.accepted = false }
+      if (task.accepted) { task.pending = pending(text('continuePrompt'), uuid(), { displayText: text('continueDisplay') }); task.accepted = false }
       task.question = null
       persist()
       void submit()
       return view()
     }
+    const previous = task
     task = { id: uuid(), projectId: api.projectId, phase: 'starting', input, startedAt: now(),
-      outputIds: [], pending: null, accepted: false }
+      conversationId: previous?.conversationId, scoped: previous?.scoped, round: (previous?.round || 0) + 1,
+      intent: 'generate', outputIds: [], pending: null, accepted: false }
     const captured = task
     // Return the acknowledgement immediately; the work is owned by the workbench,
     // so hiding/recreating the plugin iframe does not lose progress or errors.
@@ -238,14 +272,17 @@ export function createLitigationGeneration({ stream, api, storage, isCurrent, op
         const kickoff = await api.kickoff(input)
         requireCurrent()
         if (!kickoff?.prompt) throw new Error(text('failed'))
-        const issued = await api.issue()
+        const issued = task.conversationId ? { conversationId: task.conversationId } : await api.issue()
         requireCurrent()
         if (!issued?.conversationId) throw new Error(text('failed'))
         task.conversationId = issued.conversationId
+        task.scoped = true
         task.modelId = await api.model()
         requireCurrent()
-        task.pending = pending(kickoff.prompt, params.clientRequestId || uuid())
-        stream.clearBubbles()
+        task.pending = pending(kickoff.prompt, params.clientRequestId || uuid(), {
+          displayText: [text('startPrompt'), input.diagramHint, input.scope].filter(Boolean).join(' · ') })
+        if (!previous?.conversationId) stream.clearBubbles()
+        stream.fileChanges.value = []
         stream.setConversationId(task.conversationId)
         stream.agentRunStatus.value = null
         stream.agentAwaitingInput.value = false
@@ -280,7 +317,15 @@ export function createLitigationGeneration({ stream, api, storage, isCurrent, op
         else if (!submitting) setPhase('cancelled')
         return view()
       }
-      if (operation === 'answer') {
+      if (operation === 'message') {
+        if (task.phase !== 'completed') throw new Error(text('staleQuestion'))
+        const message = String(params.message || '').trim().slice(0, 4000)
+        if (!message) throw new Error(text('emptyAnswer'))
+        task.pending = pending(message)
+        task.intent = 'message'
+        task.accepted = false
+        task.question = null
+      } else if (operation === 'answer') {
         if (task.phase !== 'waiting' || params.questionKey !== task.question?.key) throw new Error(text('staleQuestion'))
         const q = task.question
         const answer = params.answer || {}
@@ -294,9 +339,13 @@ export function createLitigationGeneration({ stream, api, storage, isCurrent, op
       } else if (operation === 'continue') {
         if (!['failed', 'paused'].includes(task.phase)) return view()
         if (task.phase === 'failed') return generate(task.input)
-        if (task.accepted) { task.pending = pending(text('continuePrompt')); task.accepted = false }
+        if (task.accepted) { task.pending = pending(text('continuePrompt'), uuid(), { displayText: text('continueDisplay') }); task.accepted = false }
         if (!task.pending) return generate(task.input)
       } else throw new Error('Unknown litigation operation')
+      task.outputIds = []
+      task.opened = false
+      task.round = (task.round || 1) + 1
+      stream.fileChanges.value = []
       persist()
       void submit()
       return view()

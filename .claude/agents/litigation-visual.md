@@ -100,7 +100,21 @@ JSON 对不对，不取决于模型对像素多聪明——这是上游的核心
 - `tests/litigation-visual/*.test.mjs` — 真实 native stream/controller 的合成网络回归及面板状态。
   `tests/plugins/sensitive-litigation-browser.mjs` — 打包 iframe/SDK/业务桥的鼠标键盘验收；
   runner、后端和选择器是替身，不能据此宣称真实模型或正式客户端端到端已验证。
-  插件 1.0.3 要求宿主 >=0.72.2；宿主与插件需一起发布，合并本身不等于发版。
+  插件 1.0.4 要求宿主 >=0.74.1；宿主与插件需一起发布，合并本身不等于发版。
+
+**左侧独立问答（dev-board#1627/#1628）**：原生会话签发、聊天与 SSE 连接明确带
+`conversationScope: litigation-visual`（连接使用同名 query）；存入 `ProjectAiMessage.conversationScope`。
+通用用户历史及项目历史排除这些会话，普通 AI 面板不能接管它的 SSE 或续写。不能只过滤前端列表：
+同一会话只保留一个 SSE emitter，通用历史打开会挤掉左侧连接。恢复本机保存的旧出图任务时，
+签发接口可携带原 conversationId 显式归类；服务端核对原用户/项目，不按标题猜测或批量改历史。
+后续新图与追问沿用本项目已保存的独立会话，左侧默认只呈现当前问题；完整问答在可展开区域回看，
+确认原文与审批内容限高滚动而非截断。`message` 操作只在完成态接受追问，仍逐轮授权并显式挂技能。
+完成态恢复也读取服务端历史；展示使用 displayContent，不能泄露 kickoff/确认协议提示。
+每轮重置产物信号，历史 fileChanges 按最新请求及助手消息归属核对，不能把上一张图当新成果。
+普通追问有文本回复即可结束，不虚构新增图；实际新图仍须在图廊按文件 ID 验证后打开。
+两种 render 工具只对返回的已登记产物 ID 发新增文件事件，无文件的文本结果不能退回“当前文档”卡。
+验证含真实 stream 合成网络、H2 scope/重启/归类/历史隔离，以及打包 Uni/SDK/业务桥浏览器；
+这些不代表真实付费模型或正式客户端已验证。
 
 **打包与分发（2026-08 起转原生资源包，规范 docs/NATIVE_PACK_DISTRIBUTION.md）**
 - litviz / graphviz / drawio 三类重资源改走 native pack 运行时下载

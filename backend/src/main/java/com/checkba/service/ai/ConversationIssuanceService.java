@@ -37,7 +37,7 @@ public class ConversationIssuanceService {
     private final SecureRandom random = new SecureRandom();
     private final ConcurrentHashMap<String, Registration> registrations = new ConcurrentHashMap<>();
 
-    record Registration(Long ownerUserId, Long projectId, long issuedAtMillis) {}
+    record Registration(Long ownerUserId, Long projectId, long issuedAtMillis, String conversationScope) {}
 
     @Autowired
     public ConversationIssuanceService(
@@ -58,6 +58,32 @@ public class ConversationIssuanceService {
      * 随机段 12 字节（96 bit）不可猜。
      */
     public String issue(Long userId, Long projectId) {
+        return issue(userId, projectId, null);
+    }
+
+    public static String normalizeScope(String scope) {
+        if (scope == null || scope.isBlank()) return null;
+        if ("litigation-visual".equals(scope)) return scope;
+        throw new IllegalArgumentException(com.checkba.service.LangText.of(
+                "不支持的会话类型", "Unsupported conversation scope"));
+    }
+
+    public Long projectOf(String conversationId) {
+        Registration reg = liveRegistration(conversationId);
+        return reg == null ? null : reg.projectId();
+    }
+
+    public void registerScope(String conversationId, Long userId, Long projectId, String scope) {
+        registrations.put(conversationId, new Registration(userId, projectId, clock.millis(), normalizeScope(scope)));
+    }
+
+    public String scopeOf(String conversationId) {
+        Registration reg = liveRegistration(conversationId);
+        return reg == null ? null : reg.conversationScope();
+    }
+
+    public String issue(Long userId, Long projectId, String scope) {
+        scope = normalizeScope(scope);
         if (userId == null) {
             throw new IllegalArgumentException("签发会话必须有归属用户");
         }
@@ -66,7 +92,7 @@ public class ConversationIssuanceService {
         random.nextBytes(bytes);
         String conversationId = "conv-" + clock.millis() + "-"
                 + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        registrations.put(conversationId, new Registration(userId, projectId, clock.millis()));
+        registrations.put(conversationId, new Registration(userId, projectId, clock.millis(), scope));
         return conversationId;
     }
 
