@@ -26,7 +26,7 @@
  * makensis 缺失时提示 brew install makensis。签名：.app 需 Developer ID Application 证书，
  * 本机没有则产出未签名 app（下载后需右键打开/系统设置放行）。
  */
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -51,15 +51,37 @@ function parseArgs(argv) {
   return args
 }
 
+// Retry only observed transient failures. Signing and notarization rejection are never retried here.
+export function runMacCommand(command, argv, {
+  execute = spawnSync,
+  wait = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms),
+  report = text => process.stderr.write(text),
+} = {}) {
+  const delays = [2000, 5000, 10000]
+  for (let attempt = 0; ; attempt++) {
+    const result = execute(command, argv, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 })
+    const detail = String(result.stdout || '') + String(result.stderr || '')
+    if (detail) report(detail)
+    if (!result.error && result.status === 0) return
+    const busy = command === 'hdiutil' && ['create', 'detach'].includes(argv[0]) && /Resource busy/i.test(detail)
+    const network = command === 'xcrun' && argv[0] === 'stapler' && argv[1] === 'staple'
+      && /NSURLErrorDomain Code=-(1001|1005)\b/.test(detail)
+    if (result.error || (!busy && !network) || attempt === delays.length) {
+      throw result.error || new Error(`${command} ${argv[0]} failed (status ${result.status}, attempt ${attempt + 1})`)
+    }
+    report(`[installer] ${command} ${argv[0]} transient failure; retry ${attempt + 1}/${delays.length} in ${delays[attempt]}ms\n`)
+    wait(delays[attempt])
+  }
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
 const args = parseArgs(process.argv.slice(2))
 const version = JSON.parse(fs.readFileSync(path.join(repoDir, 'desktop', 'package.json'), 'utf8')).version
 // 构建区必须在仓库外：仓库坐在 ~/Documents（iCloud 同步范围），FileProvider 会在签名后
 // 异步给 .app 重新挂 FinderInfo 等 xattr，hdiutil 封进 DMG 后严格校验必挂、
 // LaunchServices 拒启（-10810）。系统临时目录不受 iCloud 管
-const buildDir = path.join(os.tmpdir(), 'awd-office-addin-installer-build')
+const buildDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awd-office-addin-installer-build-'))
 const distDir = args.dist ? path.resolve(repoDir, args.dist) : path.join(addinDir, 'installer', 'dist')
-fs.rmSync(buildDir, { recursive: true, force: true })
-fs.mkdirSync(buildDir, { recursive: true })
 fs.mkdirSync(distDir, { recursive: true })
 
 // 1. 生产 manifest：复用 build-manifest.mjs 的 URL 替换（不需要 dist/，只要 manifest）
@@ -171,11 +193,12 @@ if (!args.skipMac) {
   execFileSync('xattr', ['-cr', stageDir], { stdio: 'inherit' })
   if (identity) execFileSync('codesign', ['-v', '--strict', '--deep', appDir], { stdio: 'inherit' })
 
+  const mountPath = `/Volumes/${volName}`
+  if (fs.existsSync(mountPath)) throw new Error(`[installer] Mount path is already in use: ${mountPath}`)
   const rwDmg = path.join(buildDir, 'addin-rw.dmg')
-  execFileSync('hdiutil', ['create', '-volname', volName,
-    '-srcfolder', stageDir, '-ov', '-format', 'UDRW', rwDmg], { stdio: 'inherit' })
-  try { execFileSync('hdiutil', ['detach', `/Volumes/${volName}`, '-force'], { stdio: 'ignore' }) } catch { /* 没挂载 */ }
-  execFileSync('hdiutil', ['attach', rwDmg, '-readwrite', '-noverify', '-noautoopen'], { stdio: 'inherit' })
+  runMacCommand('hdiutil', ['create', '-volname', volName,
+    '-srcfolder', stageDir, '-ov', '-format', 'UDRW', rwDmg])
+  execFileSync('hdiutil', ['attach', rwDmg, '-mountpoint', mountPath, '-readwrite', '-noverify', '-noautoopen'], { stdio: 'inherit' })
   try {
     // 窗口 660x442（内容区 660x420 = 背景图设计主体尺寸 + 22 标题栏；背景图本身更大，
     // 是给用户拉大窗口时用的延展区，dev-board#580）；图标中心与
@@ -224,7 +247,7 @@ if (!args.skipMac) {
     console.warn(`[installer] Finder 排版失败（自动化权限/锁屏？），降级为朴素 DMG：${err.message}`)
   }
   execFileSync('sync')
-  execFileSync('hdiutil', ['detach', `/Volumes/${volName}`], { stdio: 'inherit' })
+  runMacCommand('hdiutil', ['detach', mountPath])
   execFileSync('hdiutil', ['convert', rwDmg, '-format', 'UDZO', '-o', dmgOut], { stdio: 'inherit' })
   fs.rmSync(rwDmg, { force: true })
 
@@ -235,7 +258,8 @@ if (!args.skipMac) {
     execFileSync('xcrun', ['notarytool', 'submit', dmgOut,
       '--key', NOTARY_KEY_PATH, '--key-id', NOTARY_KEY_ID, '--issuer', NOTARY_ISSUER_ID,
       '--wait'], { stdio: 'inherit' })
-    execFileSync('xcrun', ['stapler', 'staple', dmgOut], { stdio: 'inherit' })
+    runMacCommand('xcrun', ['stapler', 'staple', dmgOut])
+    execFileSync('xcrun', ['stapler', 'validate', dmgOut], { stdio: 'inherit' })
     console.log('[installer] dmg 已签名并公证装订')
   } else if (identity) {
     console.warn('[installer] app 已签名但未公证（缺 NOTARY_KEY_PATH/NOTARY_KEY_ID/NOTARY_ISSUER_ID）')
@@ -277,5 +301,7 @@ if (!args.skipWin) {
   }
 }
 
+fs.rmSync(buildDir, { recursive: true, force: true })
 console.log('\n[installer] 完成：')
 for (const f of made) console.log('  ' + path.relative(addinDir, f))
+}
