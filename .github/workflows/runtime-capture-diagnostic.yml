@@ -11,17 +11,50 @@ permissions:
 jobs:
   capture:
     runs-on: macos-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: npm
-          cache-dependency-path: desktop/package-lock.json
-      - name: Install the pinned Electron runtime
-        run: npm ci --prefix desktop
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Build frontend (formal build preconditions)
+        working-directory: frontend
+        shell: bash
+        run: |
+          npm ci || npm install
+          npm run build:h5
+          test -s dist/build/h5/index.html
+          npm run build:zetaoffice
+      - name: Bake LOWA runtime and CJK font (formal build preconditions)
+        shell: bash
+        env:
+          LOWA_BASE_URL: https://www.aiworkdeck.com/lowa-engine/24.2.8-zhcn-r7/
+        run: |
+          node desktop/scripts/fetch-lowa-assets.js
+          ls -la frontend/dist/zetaoffice/lowa frontend/dist/zetaoffice/cjk.ttc
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm ci
+      - name: Desktop unit tests (full suite as on the release tag)
+        id: desktop-tests
+        working-directory: desktop
+        timeout-minutes: 15
+        run: npm test
+      - name: Run the exact formal-source control in a fresh profile
+        shell: bash
+        run: |
+          git show 1205dd1feb472d47c4cedde9faae1dc671c58ce5:desktop/tests/runtime-compat.electron.cjs > desktop/tests/runtime-capture-baseline.electron.cjs
+          mkdir "$RUNNER_TEMP/awd-runtime-control"
+          RUNNER_TEMP="$RUNNER_TEMP/awd-runtime-control" desktop/node_modules/.bin/electron desktop/tests/runtime-capture-baseline.electron.cjs
       - name: Preserve the original capture and probe foreground/frame readiness
+        if: always() && steps.desktop-tests.outcome == 'success'
         env:
           AWD_RUNTIME_CAPTURE_DIAGNOSTIC: '1'
         run: npm --prefix desktop run test:runtime-compat
@@ -35,3 +68,5 @@ jobs:
           path: |
             ${{ runner.temp }}/awd-runtime-compat-*/*.json
             ${{ runner.temp }}/awd-runtime-compat-*/*.png
+            ${{ runner.temp }}/awd-runtime-control/awd-runtime-compat-*/*.json
+            ${{ runner.temp }}/awd-runtime-control/awd-runtime-compat-*/*.png
