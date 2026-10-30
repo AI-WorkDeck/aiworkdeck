@@ -441,6 +441,57 @@ class NativePackServiceTest {
     }
 
     @Test
+    void queuedAutomaticInstallRespectsUninstallButManualInstallStillWorks() throws Exception {
+        byte[] archive = tarGzWithContents(Map.of("cli.py", "manual-reinstall".getBytes(StandardCharsets.UTF_8)));
+        publish(primary, archive, "litviz", List.of("*"), true);
+        NativePackService svc = service(publicKeyPem, primary.baseUrl());
+        SkillRegistry skills = org.mockito.Mockito.mock(SkillRegistry.class);
+        SkillDefinition skill = new SkillDefinition();
+        skill.setId(PACK_ID);
+        skill.setRequiresPack(PACK_ID);
+        org.mockito.Mockito.when(skills.getSkills()).thenReturn(List.of(skill));
+        AtomicBoolean enabled = new AtomicBoolean(true);
+        AtomicInteger eligibilityChecks = new AtomicInteger();
+        org.mockito.Mockito.when(skills.isPackAutoInstallEnabled(PACK_ID)).thenAnswer(call -> {
+            if (eligibilityChecks.incrementAndGet() > 1) {
+                assertTrue(Thread.holdsLock(svc.packLock(PACK_ID)), "execution eligibility must be checked under the uninstall lock");
+            }
+            return enabled.get();
+        });
+        PackAutoInstaller automatic = new PackAutoInstaller(props(primary.baseUrl()), svc, skills);
+        ExecutorService installer = (ExecutorService) ReflectionTestUtils.getField(svc, "installer");
+        CountDownLatch queueBlocked = new CountDownLatch(1);
+        CountDownLatch releaseQueue = new CountDownLatch(1);
+        try {
+            installer.submit(() -> {
+                queueBlocked.countDown();
+                awaitGate(releaseQueue);
+            });
+            assertTrue(queueBlocked.await(10, TimeUnit.SECONDS));
+            assertEquals(List.of(PACK_ID), automatic.checkAndInstall());
+            assertEquals(NativePackService.STATE_DOWNLOADING, svc.status(PACK_ID).getState());
+            enabled.set(false);
+            svc.uninstall(PACK_ID);
+            releaseQueue.countDown();
+            installer.submit(() -> {}).get(10, TimeUnit.SECONDS);
+            assertFalse(Files.exists(packsRoot().resolve(PACK_ID)), "the stale automatic task must not recreate files");
+            assertEquals(NativePackService.STATE_NOT_INSTALLED, svc.status(PACK_ID).getState());
+            assertEquals(2, eligibilityChecks.get(), "a queued automatic task must recheck the current preference");
+
+            // The explicit entry point still performs the real signed download while automatic repair is disabled.
+            svc.installAsync(PACK_ID);
+            installer.submit(() -> {}).get(10, TimeUnit.SECONDS);
+            assertEquals(NativePackService.STATE_READY, svc.status(PACK_ID).getState());
+            assertEquals("manual-reinstall", Files.readString(svc.componentDir(PACK_ID, "litviz").orElseThrow().resolve("cli.py")));
+        } finally {
+            releaseQueue.countDown();
+            automatic.shutdown();
+            svc.shutdown();
+            assertTrue(installer.awaitTermination(10, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
     @DisplayName("安装线程里冒出 Error（如 OOM）也落到 failed，不会永久停在进行中")
     void errorInInstallThreadEndsInFailed() throws Exception {
         byte[] archive = tarGzWithContents(Map.of("cli.py", "x".getBytes(StandardCharsets.UTF_8)));

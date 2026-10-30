@@ -76,6 +76,8 @@ description: 插件市场领域。任务涉及插件广场页、在线 Skill 广
 - 下载**不经官网应用层**：镜像静态直出 `https://{www.aiworkdeck.com|workdeck.ai}/plugin-packs/<id>/…`（`ai.packs.base-urls`），断点续传（.part + Range）+ 压缩包哈希 + 包内 `contents.sha256` 逐文件复核 + 原子指针切换。
 - 前端：MarketSidebarPanel / MarketDetailPane 对 `packId` 非空且 `packReady:false` 的面板 skill 显示「需下载资源包」与字节级进度；LitigationVisualPanel 顶部有下载状态条。
   已就绪且 registry 版本更高时，MarketDetailPane 多一行「有新版本 x.y.z」+「立即升级」（`packUpgrade`）。
+- **卸载意图与自动补装（2026-10-30，dev-board#1642）**：`PackAutoInstaller` 使用 `SkillRegistry.isPackAutoInstallEnabled`，同时检查既有 `ai.skills.disabled` 偏好与实际启用状态。诉讼 Web 插件的可见开关仍由插件控制，不改变 `isEnabled`；资源卸载先写入的 disabled 偏好只阻止后台重新下载，重启后仍生效，插件入口与显式安装 API 保留。`enabled_by_default:false` 的首次 seed 也会阻止后台补装；只有偏好被显式改回 AUTO/MANUAL，才恢复自动修复缺失资源。显式安装 API 不读取该自动补装门禁，也不自行改写偏好。
+  自动任务入队后，`NativePackService` 还会在实际执行时、持有卸载共用的 per-pack 锁时复核资格；若已停用则撤掉该次待安装状态，不下载、不写资源。已开始的安装与卸载仍由原有锁串行完成，后续卸载最终删除资源，不另加启停状态或重试。
 - **轮询响应不得覆盖更新后的状态（2026-10-28，发版门禁 #1589）**：`MarketDetailPane.refreshPackStatus` 发请求时记录 `reloadGeneration`，响应返回时只接受当前轮次；用户确认卸载后，必须先递增轮次并停止轮询，再停用 Skill、删除资源包。仅清除定时器不会取消已经发出的请求：迟到的 `ready` 曾能把卸载后的 `packReady:false` 覆盖成 `true`，甚至再次启用 Skill。正常当前轮次的 `ready` 仍须保留自动启用行为。回归入口：`node --test frontend/tests/litigation-visual/market-pack-state.test.mjs frontend/tests/litigation-visual/packUpdate.test.mjs frontend/tests/plugin-sdk/market-update-detail.test.mjs`；延迟响应行为测试先红后绿，修复后 39/39 通过。本次证据为 `/tmp/office-market-pack-race-red.log`、`/tmp/office-market-pack-race-green.log`。真实浏览器 app-e2e 的 J13 首轮出现卸载后详情仍显示已启用；后续全量 176/176 通过并读回 `packReady:false`，说明异步时序可影响复现，不能仅凭重跑绿判无问题。176 项全量在修复前完成，39 项针对回归在修复后完成；两者不冒称同一代码快照。
 - **版本追新**（dev-board#499，规范 §5.1）：`service/pack/PackUpdater` 启动后 45s + 每 24h
   对「已装好且未被封禁、且不是所有引用它的 skill 都被停用」的 pack 比对 registry 版本，

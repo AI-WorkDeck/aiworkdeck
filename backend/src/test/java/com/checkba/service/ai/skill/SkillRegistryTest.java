@@ -339,6 +339,47 @@ class SkillRegistryTest {
     }
 
     @Test
+    void uninstalledPackPreferenceSurvivesRegistryRestartWithoutDisablingTheWebPlugin() throws IOException {
+        Path skillsDir = tempDir.resolve("skills");
+        writeSkill(skillsDir.resolve("litigation-visual"), "litigation-visual", "requires_pack: litigation-visual\n");
+        Path pluginsDir = tempDir.resolve("plugins");
+        Path pluginDir = pluginsDir.resolve("litigation-visual");
+        Files.createDirectories(pluginDir);
+        Files.writeString(pluginDir.resolve("manifest.json"), """
+                {"id":"litigation-visual","name":"Litigation","version":"1.0.3",
+                 "permissions":["file_read","file_write","ai"]}
+                """);
+        InMemorySystemSettingService settings = new InMemorySystemSettingService();
+        PluginService plugins = new PluginService(settings, pluginsDir.toString());
+        plugins.init();
+        SkillProperties props = new SkillProperties();
+        props.setDir(skillsDir.toString());
+        SkillRegistry registry = new SkillRegistry(props, settings, plugins, null);
+        registry.init();
+        var packs = org.mockito.Mockito.mock(com.checkba.service.pack.NativePackService.class);
+        var packProps = new com.checkba.service.pack.PackProperties();
+        var automatic = new com.checkba.service.pack.PackAutoInstaller(packProps, packs, registry);
+        assertEquals(List.of("litigation-visual"), automatic.checkAndInstall(), "ordinary enabled missing resource is repaired");
+        org.mockito.Mockito.clearInvocations(packs);
+
+        registry.setActivationMode("litigation-visual", SkillRegistry.ActivationMode.DISABLED);
+        assertTrue(registry.isEnabled("litigation-visual"), "the plugin remains available for manual reinstall");
+        assertEquals(List.of(), automatic.checkAndInstall(), "resource uninstall preference prevents automatic reinstall");
+        var restarted = new SkillRegistry(props, settings, plugins, null);
+        restarted.init();
+        assertTrue(restarted.isEnabled("litigation-visual"));
+        var afterRestart = new com.checkba.service.pack.PackAutoInstaller(packProps, packs, restarted);
+        assertEquals(List.of(), afterRestart.checkAndInstall(), "persisted preference also protects startup after restart");
+        org.mockito.Mockito.verifyNoInteractions(packs);
+        restarted.setActivationMode("litigation-visual", SkillRegistry.ActivationMode.AUTO);
+        assertEquals(List.of("litigation-visual"), afterRestart.checkAndInstall());
+        plugins.setEnabled("litigation-visual", false);
+        assertEquals(List.of(), afterRestart.checkAndInstall(), "the visible plugin switch still controls availability");
+        automatic.shutdown();
+        afterRestart.shutdown();
+    }
+
+    @Test
     void litigationWebPluginOwnsHostSkillEnablementWithoutChangingLegacyPreference() throws IOException {
         Path skillsDir = tempDir.resolve("skills");
         writeSkill(skillsDir.resolve("litigation-visual"), "litigation-visual", "enabled_by_default: false\n");
@@ -361,6 +402,7 @@ class SkillRegistryTest {
         assertNull(skill.getSourcePluginId(), "Web plugin consumes the host skill, not a bundled skill directory");
         assertTrue(settings.get(SkillRegistry.DISABLED_KEY, "").contains("litigation-visual"));
         assertTrue(registry.isEnabled(skill.getId()), "visible enabled plugin must not be blocked by the hidden legacy switch");
+        assertFalse(registry.isPackAutoInstallEnabled(skill.getId()), "default-disabled seed also opts out of background resource downloads");
         assertTrue(registry.isAvailable(skill));
         assertEquals(SkillRegistry.ActivationMode.AUTO, registry.activationMode(skill.getId()));
         var controller = new com.checkba.controller.ai.SkillController(registry, null, null, null, null, null);
