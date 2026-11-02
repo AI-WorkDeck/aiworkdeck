@@ -563,7 +563,7 @@ public class ProjectRepoService {
                 }
             }
             if (pre.isClean() && !trackedNestedMetadata) return null;
-            stageAll(git);
+            stageAll(git, pre);
             StringBuilder msg = new StringBuilder(message).append("\n\n")
                     .append(KIND_TRAILER).append(kind).append('\n').append(OBJECT_FORMAT_TRAILER);
             if (note != null && !note.isBlank()) msg.append('\n').append(NOTE_TRAILER).append(note);
@@ -601,6 +601,17 @@ public class ProjectRepoService {
     }
 
     private void stageAll(Git git) throws Exception {
+        stageAll(git, null);
+    }
+
+    private void stageAll(Git git, Status changes) throws Exception {
+        Set<String> paths = changes == null ? null : new java.util.TreeSet<>();
+        if (paths != null) {
+            paths.addAll(changes.getModified());
+            paths.addAll(changes.getMissing());
+            paths.addAll(changes.getUntracked());
+            paths.addAll(changes.getConflicting());
+        }
         // A legacy user file may literally contain the pointer magic. Force it through clean once
         // before this commit declares the new format, including raw files imported by a mixed-format merge.
         Repository repo = git.getRepository();
@@ -616,6 +627,7 @@ public class ProjectRepoService {
                 Path file = repo.getWorkTree().toPath().resolve(entry.getPathString());
                 if (VersionObjectPointer.parse(bytes) != null && Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)
                         && Files.size(file) == bytes.length && java.util.Arrays.equals(bytes, Files.readAllBytes(file))) {
+                    if (paths != null) paths.add(entry.getPathString());
                     editor.add(new org.eclipse.jgit.dircache.DirCacheEditor.PathEdit(entry.getPathString()) {
                         @Override public void apply(org.eclipse.jgit.dircache.DirCacheEntry e) {
                             e.setLength(0); e.setLastModified(java.time.Instant.EPOCH);
@@ -626,8 +638,18 @@ public class ProjectRepoService {
             editor.commit();
         } finally { index.unlock(); }
         VersionObjectFilters.staging(() -> {
-            git.add().addFilepattern(".").call();
-            git.add().addFilepattern(".").setUpdate(true).call();
+            if (paths == null) {
+                git.add().addFilepattern(".").call();
+                git.add().addFilepattern(".").setUpdate(true).call();
+            } else if (!paths.isEmpty()) {
+                // Re-adding unchanged filtered blobs recompresses the entire project while
+                // holding the save lock. Preserve their existing index entries instead.
+                var add = git.add();
+                var update = git.add().setUpdate(true);
+                for (String path : paths) { add.addFilepattern(path); update.addFilepattern(path); }
+                add.call();
+                update.call();
+            }
             removeNestedMetadataFromIndex(repo);
             return null;
         });
