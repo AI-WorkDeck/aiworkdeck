@@ -11,6 +11,8 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 平台目录改由 PlatformModelCatalog 从实际供应商读取，并按站点与用户runtime凭据缓存。国内通过官网AI网关到百炼；国际保留OpenRouter。ChatModelFactory 的平台默认/辅助/选模与视觉能力遵循目录，旧合法OpenRouter设置迁移到国内默认。智能选模在目录支持时使用 qwen3.8-flash / qwen3.8-max；不再按JVM国家、时区或IP过滤目录。BYOK/本地保留旧路径；Jev在百炼平台不外发。设置页移除网络区域控制，定价单位按供应商/本站币种下发。国内听写通过同站网关调用 qwen3.8-omni-flash；国际保留原语音模型，两者均不得混用凭据或地址。
 
+2026-11-02 巡检（dev-board#1651/#1652）：`AllowedModels` 的精选静态价格仍用于 BYOK，需继续每日对拍；不能拿它替代动态平台目录。OpenRouter 长上下文档位在 `pricing.overrides`，非空即表示基础档之外还有档位，不能读不存在的顶层 `pricing_tiers` 或要求两条 override 才标分档。`BailianPlatformConnectionTest` 覆盖单条/空/缺省 override、USD基础价与图片/工具能力；国内仍按网关 `tiered`。聚合 `/models` 报价与模型网页展示的某一家端点报价可能不同，静态对拍跟随聚合 API，不承诺实际选中供应商费用固定。
+
 未连接账户时动态目录会返回 4011（dev-board#1640）。ChatInterface 挂载及账户/设置变动后的目录预载、AdminPane 初始化及保存设置后的目录刷新都必须传 `accountPrompt:false`，仍 reject 并保留读取失败记录，不可让后台预载遮住本地文档或设置页。用户主动使用 AI 继续走 `ensureAiAccount`；诉讼生成的主动选模请求保留默认账户提示；登录成功后的账户事件继续刷新聊天目录。正式安装包回归检查每种文档路径和全应用设置入口是否出现非预期登录遮罩，不得绕过遮罩在后台注入内容后声称交互通过。
 
 ## 法律资料卡与案例检索（2026-10-29，dev-board#1611）

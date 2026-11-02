@@ -80,7 +80,7 @@ public class PlatformModelCatalog {
                 Map<?, ?> top = row.get("top_provider") instanceof Map<?, ?> map ? map : Map.of();
                 models.add(new Model(id, name, id.contains("/") ? id.substring(0, id.indexOf('/')) : "OpenRouter",
                         integer(row.get("context_length")), integer(top.get("max_completion_tokens")), tools, vision,
-                        number(price.get("prompt")) * 1_000_000, number(price.get("completion")) * 1_000_000, row.get("pricing_tiers") instanceof List<?> tiers && tiers.size() > 1));
+                        number(price.get("prompt")) * 1_000_000, number(price.get("completion")) * 1_000_000, price.get("overrides") instanceof List<?> tiers && !tiers.isEmpty()));
             }
         }
         if (models.isEmpty()) throw new IllegalArgumentException("empty catalogue");
