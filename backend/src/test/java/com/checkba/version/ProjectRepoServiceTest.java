@@ -25,6 +25,86 @@ class ProjectRepoServiceTest {
     }
 
     @Test
+    void smallSaveDoesNotRestageUnchangedFilteredBlob(@TempDir Path root) throws Exception {
+        StorageProperties props = new StorageProperties();
+        props.getLocal().setRootPath(root.toString());
+        var stagedLarge = new java.util.concurrent.atomic.AtomicInteger();
+        String filter = "jgit://test/unchanged-blob-" + java.util.UUID.randomUUID();
+        org.eclipse.jgit.attributes.FilterCommandRegistry.register(filter, (repo, input, output) ->
+                new org.eclipse.jgit.attributes.FilterCommand(input, output) {
+                    @Override public int run() throws java.io.IOException {
+                        byte[] bytes = in.readAllBytes();
+                        if (bytes.length > 1024 * 1024 && StackWalker.getInstance().walk(frames ->
+                                frames.anyMatch(f -> f.getClassName().equals("org.eclipse.jgit.api.AddCommand")))) {
+                            stagedLarge.incrementAndGet();
+                        }
+                        out.write(bytes);
+                        in.close(); out.close();
+                        return -1;
+                    }
+                });
+        try {
+            ProjectRepoService service = new ProjectRepoService(new com.checkba.storage.ProjectStorageResolver(props, null)) {
+                @Override public Repository open(long projectId) {
+                    Repository repo = super.open(projectId);
+                    for (String name : repo.getConfig().getSubsections("filter")) {
+                        repo.getConfig().setString("filter", name, "clean", filter);
+                    }
+                    return repo;
+                }
+            };
+            Path work = root.resolve("projects/7");
+            Files.createDirectories(work);
+            byte[] original = new byte[2 * 1024 * 1024];
+            new java.util.Random(7).nextBytes(original);
+            Files.write(work.resolve("large.dat"), original);
+            Files.writeString(work.resolve("note.md"), "before");
+            Files.writeString(work.resolve("remove.txt"), "remove");
+            service.init(7, "Tester", "tester@example.test");
+            stagedLarge.set(0);
+            Files.writeString(work.resolve("note.md"), "after");
+            Files.delete(work.resolve("remove.txt"));
+            Files.writeString(work.resolve("new.txt"), "new");
+            String commit = service.commitAll(7, "save", "auto", null, "Tester", "tester@example.test");
+            assertNotNull(commit);
+            assertEquals(0, stagedLarge.get(), "Unchanged filtered blobs must not be read by AddCommand");
+            assertArrayEquals(original, service.readBlobAtCommit(7, commit, "large.dat"));
+            assertEquals("after", new String(service.readBlobAtCommit(7, commit, "note.md")));
+            assertEquals("new", new String(service.readBlobAtCommit(7, commit, "new.txt")));
+            assertTrue(service.pendingChanges(7).isEmpty());
+        } finally {
+            org.eclipse.jgit.attributes.FilterCommandRegistry.unregister(filter);
+        }
+    }
+
+    @Test
+    void incrementalStageHandlesFileDirectoryReplacementAndStagedEdits(@TempDir Path root) throws Exception {
+        ProjectRepoService service = svc(root);
+        Path work = root.resolve("projects/7");
+        Files.createDirectories(work.resolve("目录 [1]"));
+        Files.writeString(work.resolve("目录 [1]/child.md"), "child");
+        Files.writeString(work.resolve("file"), "old file");
+        Files.writeString(work.resolve("staged.md"), "original");
+        service.init(7, "Tester", "tester@example.test");
+        Files.writeString(work.resolve("staged.md"), "staged");
+        try (Repository repo = service.open(7); var git = new org.eclipse.jgit.api.Git(repo)) {
+            git.add().addFilepattern("staged.md").call();
+        }
+        Files.writeString(work.resolve("staged.md"), "edited after staging");
+        Files.delete(work.resolve("目录 [1]/child.md"));
+        Files.delete(work.resolve("目录 [1]"));
+        Files.writeString(work.resolve("目录 [1]"), "now a file");
+        Files.delete(work.resolve("file"));
+        Files.createDirectory(work.resolve("file"));
+        Files.writeString(work.resolve("file/新稿.md"), "now a directory");
+        String sha = service.commitAll(7, "save", "auto", null, "Tester", "tester@example.test");
+        assertEquals("edited after staging", new String(service.readBlobAtCommit(7, sha, "staged.md")));
+        assertEquals("now a file", new String(service.readBlobAtCommit(7, sha, "目录 [1]")));
+        assertEquals("now a directory", new String(service.readBlobAtCommit(7, sha, "file/新稿.md")));
+        assertTrue(service.pendingChanges(7).isEmpty());
+    }
+
+    @Test
     void initCreatesRepoWithSeparateGitDirAndWorkTree(@TempDir Path root) throws Exception {
         Files.createDirectories(root.resolve("projects/7"));
         Files.writeString(root.resolve("projects/7/合同.txt"), "初稿");
