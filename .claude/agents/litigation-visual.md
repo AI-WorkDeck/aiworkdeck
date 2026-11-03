@@ -374,3 +374,5 @@ cd frontend && npm run check:emits && npm run build:h5
 ## 安装引导修复（dev-board#1666）
 
 官方插件 manifest 声明 packs: [litigation-visual]，通过已有市场安装流程安装原生资源。插件构建的语言白名单须含 market（安装按钮使用 market.install）。资源未就绪时面板展示安装/下载/失败状态，避免重复展示开发者目录诊断；ready 但引擎不可用仍展示诊断。不要取消默认关闭技能的后台下载保护。
+
+发布版本边界（dev-board#1671）：独立插件 1.0.4 已于 2026-10-30 在两区签名上架。PR#1316 的 packs 依赖及翻译资源修复使用 1.0.5 交付，禁止同版本覆盖，避免已安装用户按同版保留而漏更；原生资源 pack 的独立版本不随插件递增。
