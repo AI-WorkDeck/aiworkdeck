@@ -176,7 +176,14 @@ async function open(ext) {
     })()`)
     const renderer = await page.evaluate(() => {
       const vm = window.__checkbaActiveOverviewVm
+      let pages = []
+      try {
+        if (typeof getCurrentPages === 'function') pages = getCurrentPages().slice(-10).map(p => ({
+          route: p.route || p.$page?.route, projectId: p.$vm?.projectId ?? p.projectId,
+        }))
+      } catch (_) {}
       return { url: location.href, workbenchPresent: !!vm, projectId: vm?.projectId,
+        readyState: document.readyState, pages,
         activeFile: vm?.activeFileLeft && { id: vm.activeFileLeft.id, name: vm.activeFileLeft.name },
         visibleMessages: [...document.querySelectorAll('uni-toast, .uni-toast, .uni-modal')].map(e => e.textContent) }
     })
@@ -301,6 +308,32 @@ try {
     page.on('pageerror', error => {
       evidence.pageErrors ||= []; evidence.pageErrors.push(error.message)
       evidence.pageErrorDetails ||= []; evidence.pageErrorDetails.push({ message: error.message, stack: error.stack })
+    })
+    const safeUrl = value => {
+      try { const u = new URL(value); return `${u.protocol}//${u.host}${u.pathname}` } catch (_) { return '' }
+    }
+    const recordRenderer = record => {
+      evidence.rendererDiagnostics ||= []
+      if (evidence.rendererDiagnostics.length >= 50) return
+      evidence.rendererDiagnostics.push(record)
+      write('renderer-diagnostics.json', evidence.rendererDiagnostics)
+    }
+    page.on('console', message => {
+      if (!['warn', 'error'].includes(message.type())) return
+      const location = message.location()
+      recordRenderer({ kind: 'console', type: message.type(),
+        text: message.text().replace(/(?:https?|file):\/\/[^\s"'<>]+/g, safeUrl).slice(0, 4096),
+        location: { url: safeUrl(location.url), line: location.lineNumber, column: location.columnNumber } })
+    })
+    page.on('requestfailed', request => {
+      if (!['document', 'script'].includes(request.resourceType())) return
+      const u = new URL(request.url())
+      if (u.protocol !== 'file:' && !['127.0.0.1', 'localhost'].includes(u.hostname)) return
+      recordRenderer({ kind: 'requestfailed', resourceType: request.resourceType(),
+        url: safeUrl(request.url()), error: request.failure()?.errorText })
+    })
+    page.on('framenavigated', frame => {
+      if (frame === page.mainFrame()) recordRenderer({ kind: 'navigation', url: safeUrl(frame.url()) })
     })
     // Dismiss the actual optional-pack dialog via its close button, not a hidden VM flag.
     const dismiss = await page.$('.ocd-mask .ocd-actions .ocd-btn:not(.primary)')
