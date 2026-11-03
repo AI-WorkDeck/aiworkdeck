@@ -25,7 +25,7 @@ export default {
   "exitCancel": "Annuleren",
   "exitConflict": "Wijzigingen vereisen conflictoplossing. Los ze op in Versiebeheer voordat u afsluit.",
   "exitNewChanges": "Er zijn nieuwe wijzigingen die wachten om te worden vastgelegd. Controleer ze voordat u afsluit.",
-  "exitCheckFailed": "Kon projectwijzigingen niet controleren of vastleggen. Het afsluiten is geannuleerd; probeer het opnieuw.",
+  "exitCheckFailed": "Projectwijzigingen konden niet worden gecontroleerd of vastgelegd. Probeer opnieuw of sluit af zonder vast te leggen.",
   "controlEntry": "Versiebeheer",
   "entryUnavailable": "Status niet beschikbaar. Klik om opnieuw te proberen",
   "pendingFileCount": "{count} bestanden wachten op vastleggen",

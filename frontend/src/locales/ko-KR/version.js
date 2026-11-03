@@ -25,7 +25,7 @@ export default {
   "exitCancel": "취소",
   "exitConflict": "해결해야 할 충돌이 있습니다. 나가기 전에 버전 관리에서 충돌을 해결해 주세요.",
   "exitNewChanges": "커밋 대기 중인 새 변경 사항이 있습니다. 나가기 전에 확인해 주세요.",
-  "exitCheckFailed": "프로젝트 변경 사항을 확인하거나 커밋할 수 없습니다. 나가기가 취소되었으니 다시 시도해 주세요.",
+  "exitCheckFailed": "프로젝트 변경 사항을 확인하거나 커밋할 수 없습니다. 다시 시도하거나 커밋하지 않고 종료하세요.",
   "controlEntry": "버전 관리",
   "entryUnavailable": "상태를 사용할 수 없습니다. 클릭하여 다시 시도",
   "pendingFileCount": "커밋 대기 중인 파일 {count}개",
