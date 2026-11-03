@@ -627,7 +627,7 @@ export default {
       }
     },
     async pollBqtOnce() {
-      if (this.bqtPolling || this.done || this.mode !== 'bqt' || !this.bqtSession || !this.bqtSession.qrid) return
+      if (this.bqtPolling || this.done || this.mode !== 'bqt' || !this.bqtSession || !this.bqtSession.qrid || !this.bqtSession.pollToken) return
       const session = this.bqtSession
       this.bqtPolling = true
       try {
