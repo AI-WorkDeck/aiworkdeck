@@ -48,3 +48,19 @@ for (const [label, platform, root] of [['Windows', win32, 'D:\\a\\AI WorkDeck\\f
     }
   })
 }
+
+test('litigation plugin includes the install translation namespace and declares its native pack', async () => {
+  const root = (await import('node:url')).fileURLToPath(new URL('../../', import.meta.url))
+  // Use the real loader; substitute only compilation to retain readable messages.
+  const compiledSource = source.replace('baseCompile(value, { mode: \'normal\' }).code', 'JSON.stringify(value)')
+  const readable = new Function('__dirname', 'resolve', 'process', 'defineConfig', 'uni',
+    'SUPPORTED_LOCALE_CODES', 'pathToFileURL', compiledSource)(
+    root, posix.resolve, { env: { AWD_BUSINESS_PLUGIN: 'litigation-visual' } }, value => value, () => ({}),
+    ['zh-CN', 'en-US'], (await import('node:url')).pathToFileURL)
+  const output = await readable.plugins[0].load('\0business-messages')
+  const messages = new Function(output.replace('export default', 'return'))()
+  assert.equal(messages['zh-CN'].market.install, '安装')
+  assert.equal(messages['en-US'].market.install, 'Install')
+  const manifest = JSON.parse(readFileSync(new URL('../../../official-plugins/litigation-visual/manifest.json', import.meta.url)))
+  assert.deepEqual(manifest.packs, ['litigation-visual'])
+})

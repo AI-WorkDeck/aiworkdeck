@@ -370,3 +370,7 @@ cd frontend && npm run check:emits && npm run build:h5
 `node desktop/scripts/fetch-lowa-assets.js`，或从已安装的发行版
 `Resources/frontend/dist/zetaoffice/` 拷 `cjk-serif.otf` 与 `cjk.ttc` 过去。
 没有字体时那两组自动 skip，其余照跑。
+
+## 安装引导修复（dev-board#1666）
+
+官方插件 manifest 声明 packs: [litigation-visual]，通过已有市场安装流程安装原生资源。插件构建的语言白名单须含 market（安装按钮使用 market.install）。资源未就绪时面板展示安装/下载/失败状态，避免重复展示开发者目录诊断；ready 但引擎不可用仍展示诊断。不要取消默认关闭技能的后台下载保护。

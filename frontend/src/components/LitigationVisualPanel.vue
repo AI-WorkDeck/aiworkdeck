@@ -21,10 +21,10 @@
   </view>
 
   <!-- 环境降级提示。graphviz 缺失只挡流程图一种布局，不能说成整体不可用 -->
-  <view class="lv-notice" v-if="status && !status.available">
+  <view class="lv-notice" v-if="status && !status.available && !showPackBar">
     <text class="lv-notice-text">{{ status.reason }}</text>
   </view>
-  <view class="lv-notice subtle" v-else-if="status && !status.graphviz">
+  <view class="lv-notice subtle" v-else-if="status && status.available && !status.graphviz">
     <text class="lv-notice-text">{{ $t('panels.litNoGraphvizNotice') }}</text>
   </view>
   <view class="lv-notice" v-if="status && status.available && status.timelineAvailable === false">
