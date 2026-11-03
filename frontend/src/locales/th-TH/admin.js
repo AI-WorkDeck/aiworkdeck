@@ -445,5 +445,17 @@ export default {
   "ocrSettingsReload": "โหลดใหม่",
   "ocrSettingsSaved": "บันทึกแล้ว",
   "ocrSettingsLoadFailed": "โหลดไม่สำเร็จ",
-  "ocrSettingsSaveFailed": "บันทึกไม่สำเร็จ"
+  "ocrSettingsSaveFailed": "บันทึกไม่สำเร็จ",
+  "walletRedeemTitle": "รหัสของขวัญ / รหัสเชิญสำนักงาน Circle",
+  "walletRedeemPlaceholder": "ป้อนรหัสของขวัญหรือรหัสสำนักงาน Circle (เช่น KW-ABNR-2026)",
+  "walletRedeemBtn": "แลกรับ / ผูก",
+  "walletRedeemSubmitting": "กำลังดำเนินการ…",
+  "walletRedeemSuccessGift": "แลกรับ {amount} สำเร็จ",
+  "walletRedeemSuccessFeature": "ปลดล็อกฟีเจอร์สำเร็จ",
+  "walletRedeemSuccessCircle": "ผูกกับ {firm} (คำต่อท้าย: {suffix}) แล้ว ได้รับ {amount} โควตา DeepSeek เฉพาะ",
+  "walletRedeemFailed": "รหัสของขวัญหรือรหัสเชิญไม่ถูกต้อง",
+  "walletCircleBadge": "สำนักงาน Circle Alliance: {firm} (คำต่อท้าย: {suffix}) · ไม่มีส่วนเพิ่ม",
+  "walletQingtianTitle": "Baoqingtian · เหรียญ Qingtian รายเดือน",
+  "walletQingtianBalance": "เหลือ {remaining} / {monthly} เหรียญ Qingtian เดือนนี้",
+  "walletQingtianRatio": "อัตราแลกเปลี่ยน: เหรียญ Qingtian 1 เหรียญ = {creditsPerCoin} เครดิต (ใช้ได้เฉพาะเดือนปัจจุบัน)",
 }

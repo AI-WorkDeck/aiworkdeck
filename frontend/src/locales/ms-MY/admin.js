@@ -445,5 +445,17 @@ export default {
   "ocrSettingsReload": "Muat semula",
   "ocrSettingsSaved": "Disimpan",
   "ocrSettingsLoadFailed": "Gagal dimuat",
-  "ocrSettingsSaveFailed": "Simpan gagal"
+  "ocrSettingsSaveFailed": "Simpan gagal",
+  "walletRedeemTitle": "Kod hadiah / Kod jemputan firma Circle",
+  "walletRedeemPlaceholder": "Masukkan kod hadiah atau kod firma Circle (cth. KW-ABNR-2026)",
+  "walletRedeemBtn": "Tebus / Ikat",
+  "walletRedeemSubmitting": "Sedang diproses…",
+  "walletRedeemSuccessGift": "{amount} berjaya ditebus",
+  "walletRedeemSuccessFeature": "Ciri berjaya dibuka",
+  "walletRedeemSuccessCircle": "Terikat kepada {firm} (akhiran: {suffix}), diberikan {amount} kuota DeepSeek khusus",
+  "walletRedeemFailed": "Kod hadiah atau jemputan tidak sah",
+  "walletCircleBadge": "Firma Circle Alliance: {firm} (akhiran: {suffix}) · markup 0%",
+  "walletQingtianTitle": "Baoqingtian · Qingtian Coins bulanan",
+  "walletQingtianBalance": "{remaining} / {monthly} Qingtian Coins berbaki bulan ini",
+  "walletQingtianRatio": "Kadar penukaran: 1 Qingtian Coin = {creditsPerCoin} kredit (sah untuk bulan semasa)",
 }

@@ -80,7 +80,7 @@ public class PlatformModelCatalog {
                 Map<?, ?> top = row.get("top_provider") instanceof Map<?, ?> map ? map : Map.of();
                 models.add(new Model(id, name, id.contains("/") ? id.substring(0, id.indexOf('/')) : "OpenRouter",
                         integer(row.get("context_length")), integer(top.get("max_completion_tokens")), tools, vision,
-                        number(price.get("prompt")) * 1_000_000, number(price.get("completion")) * 1_000_000, row.get("pricing_tiers") instanceof List<?> tiers && tiers.size() > 1));
+                        number(price.get("prompt")) * 1_000_000, number(price.get("completion")) * 1_000_000, price.get("overrides") instanceof List<?> tiers && !tiers.isEmpty()));
             }
         }
         if (models.isEmpty()) throw new IllegalArgumentException("empty catalogue");
@@ -89,7 +89,8 @@ public class PlatformModelCatalog {
                 .map(Model::id).findFirst().orElseGet(() -> models.stream().filter(Model::supportsTools)
                         .map(Model::id).findFirst().orElse(models.get(0).id()));
         double margin = validPrice(body.get("marginMultiplier")) ? number(body.get("marginMultiplier")) : 1;
-        return new Catalog(bailian ? "bailian" : "openrouter", bailian ? "CNY" : "USD", defaultModel, margin, List.copyOf(models));
+        String currency = body.get("currency") instanceof String c && !c.isBlank() ? c : (bailian ? "CNY" : "USD");
+        return new Catalog(bailian ? "bailian" : "openrouter", currency, defaultModel, margin, List.copyOf(models));
     }
 
     public boolean contains(String id) { return current().models().stream().anyMatch(m -> m.id().equals(id)); }

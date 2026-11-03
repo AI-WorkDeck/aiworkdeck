@@ -24,7 +24,7 @@ class EnvironmentTests(TestCase):
                 patch.object(module.importlib.metadata, 'version', side_effect=versions.get):
             checks = {item['id']: item for item in module.check()['checks']}
         self.assertIn('原生批注', checks['python-docx']['message'])
-        self.assertIn('6.1.1', checks['pypdf']['message'])
+        self.assertIn('6.21.4', checks['pypdf']['message'])
         self.assertEqual(checks['pypdf']['status'], 'needs_attention')
 
     def test_missing_font_never_claims_coverage(self):

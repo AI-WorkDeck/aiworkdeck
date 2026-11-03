@@ -389,5 +389,17 @@ export default {
   "caseRecordCollectionFailedToast": "Gagal merekodkan kutipan",
   "caseSyncErpFailedToast": "Penyegerakan kewangan gagal",
   "caseSeedDemoFailedToast": "Gagal memuatkan data demo",
-  "caseOpenPluginFailedToast": "Gagal membuka pemalam"
+  "caseOpenPluginFailedToast": "Gagal membuka pemalam",
+  "circleInviteLabel": "Kod jemputan Circle Alliance (pilihan)",
+  "circleInvitePlaceholder": "cth. KW-ABNR-2026",
+  "circleInviteHint": "Masukkan kod jemputan firma anda untuk melampirkan akhiran firma dan membuka kuota DeepSeek khusus",
+  "bqtScanSwitch": "Log masuk QR Peguam Baoqingtian",
+  "bqtScanTitle": "Imbas dengan aplikasi Peguam Baoqingtian untuk log masuk",
+  "bqtScanHint": "Hanya untuk peguam Baoqingtian disahkan. Qingtian Coins bulanan diberikan secara automatik.",
+  "bqtScanExpired": "Kod QR tamat tempoh",
+  "bqtScanRefresh": "Muat semula kod QR",
+  "bqtScanBack": "Kembali ke log masuk akaun",
+  "errInvalidInviteCode": "Kod jemputan tidak sah atau tidak aktif",
+  "errInviteAlreadyBound": "Akaun ini telah mengikat kod jemputan firma Circle",
+  "errBqtNotLawyer": "Hanya akaun peguam Baoqingtian disahkan boleh log masuk melalui kod QR",
 }

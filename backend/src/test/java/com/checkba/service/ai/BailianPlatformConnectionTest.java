@@ -77,11 +77,57 @@ class BailianPlatformConnectionTest {
         assertNull(catalog.failover(List.of("anthropic/claude-sonnet-5"), "qwen/old", Set.of("anthropic/claude-sonnet-5"), true));
     }
 
+    @Test void internationalCatalogueRecognizesPromptLengthOverrides() throws Exception {
+        PlatformModelCatalog service = new PlatformModelCatalog(mock(PlatformAiChannel.class),
+                mock(AccountTransport.class), "https://openrouter.ai/api/v1");
+        for (String overrides : List.of("", ",\"overrides\":[]",
+                ",\"overrides\":[{\"min_prompt_tokens\":272000,\"prompt\":\"0.000004\",\"completion\":\"0.000018\"}]")) {
+            var catalog = service.parse("""
+                    {"data":[{"id":"openai/gpt-5.6-terra","context_length":1050000,
+                    "architecture":{"input_modalities":["text","image"],"output_modalities":["text"]},
+                    "supported_parameters":["tools"],
+                    "pricing":{"prompt":"0.000002","completion":"0.000012"%s}}]}
+                    """.formatted(overrides), false, "openai/gpt-5.6-terra");
+            var model = catalog.models().get(0);
+            assertEquals(overrides.contains("min_prompt_tokens"), model.tiered());
+            assertEquals("USD", catalog.currency());
+            assertEquals(2.0, model.inputPricePerMillion());
+            assertEquals(12.0, model.outputPricePerMillion());
+            assertTrue(model.supportsVision());
+            assertTrue(model.supportsTools());
+        }
+    }
+
     @Test void unavailableCatalogueCannotBecomeEmptyFreeOrOpenRouterFallback() {
         PlatformAiChannel channel = mock(PlatformAiChannel.class);
         when(channel.connection()).thenReturn(new PlatformAiKeyService.Resolved("awdai_a", "a", null, "bailian", BASE, "qwen3.8-flash"));
         PlatformModelCatalog catalog = new PlatformModelCatalog(channel,
                 (method,url,key,body) -> new AccountTransport.Reply(503, "{}"), "https://openrouter.ai/api/v1");
         assertThrows(AccountException.class, catalog::current);
+    }
+
+    @Test void internationalCircleGatewayAcceptsRestrictedGatewayTokenAndUsdCatalog() {
+        String intlBase = "https://www.workdeck.ai/api/account/ai/v1";
+        AccountService intlAccount = mock(AccountService.class);
+        when(intlAccount.domesticAiPlatform()).thenReturn(false);
+        when(intlAccount.platformAiBaseUrl()).thenReturn(intlBase);
+        Map<String, Object> circleGatewayBody = Map.of(
+                "provider", "bailian",
+                "apiKey", "awdai_circle_abnr",
+                "baseUrl", intlBase,
+                "defaultModel", "deepseek/deepseek-chat");
+        PlatformAiKeyService.Resolved resolved = PlatformAiKeyService.parseConnection(circleGatewayBody, intlAccount);
+        assertTrue(resolved.bailian());
+        assertEquals(intlBase, resolved.baseUrl());
+
+        PlatformAiChannel channel = mock(PlatformAiChannel.class);
+        when(channel.connection()).thenReturn(resolved);
+        PlatformModelCatalog catalog = new PlatformModelCatalog(channel, (method, url, key, body) ->
+                new AccountTransport.Reply(200, "{\"currency\":\"USD\",\"marginMultiplier\":1.0,\"defaultModel\":\"deepseek/deepseek-chat\",\"models\":[{\"id\":\"deepseek/deepseek-chat\",\"name\":\"DeepSeek V3\",\"vendor\":\"DeepSeek\",\"supportsTools\":true,\"supportsVision\":false,\"contextLength\":64000,\"inputPricePerMillion\":0.27,\"outputPricePerMillion\":1.10,\"tiered\":false}]}"),
+                "https://openrouter.ai/api/v1");
+        PlatformModelCatalog.Catalog current = catalog.current();
+        assertEquals("USD", current.currency());
+        assertEquals(1.0, current.marginMultiplier());
+        assertEquals("deepseek/deepseek-chat", current.defaultModel());
     }
 }
