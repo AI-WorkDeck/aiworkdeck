@@ -64,3 +64,17 @@ test('unmount invalidates pending prompt and export completions', async () => {
     assert.deepEqual(ctx.events, [])
   }
 })
+test('recording actions render only in an opted-in audio host with a ready transcript', async () => {
+  const { createSSRApp } = await import('vue')
+  const { renderToString } = await import('vue/server-renderer')
+  const Player = await loadSfc('components/media/MediaPlayer.vue')
+  for (const [enabled, kind, state, visible] of [[false, 'audio', 'ready', false], [true, 'video', 'ready', false], [true, 'audio', 'transcribing', false], [true, 'audio', 'ready', true]]) {
+    const app = createSSRApp({ extends: Player, ssrRender: Player.ssrRender,
+      data: () => ({ captionState: state, meeting: { id: 14, status: 'TRANSCRIBED' } }) },
+      { kind, recordingActionsEnabled: enabled })
+    app.config.globalProperties.$t = k => k
+    app.config.warnHandler = () => {}
+    const html = await renderToString(app)
+    assert.equal(html.includes('meeting.fileTodos'), visible, `${enabled}/${kind}/${state}`)
+  }
+})
