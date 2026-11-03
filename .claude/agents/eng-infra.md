@@ -616,7 +616,7 @@ stash 误 pop 之类）之后，5174 上的页面可能变成**整页无样式**
 
 mac 的 `build.mac.fileAssociations` 用 `rank: Alternate`；Windows 在 `build/win/file-associations.nsh` 仅写本应用 ProgID、OpenWithProgids 和 Capabilities。**不要改成 electron-builder 24 的顶层 fileAssociations**：该版本 NSIS 内置宏会写扩展名默认值。安装/升级只登记候选，默认打开程序由用户选择；卸载只移除本应用登记。关联名单须与真实文件预览类型一致。
 
-Windows 实机门：`desktop/scripts/test-file-associations.ps1` 在一次性 Actions runner 上执行安装→改默认→重装→卸载，验证 17 类候选、已有默认与 UserChoice 保留。electron-builder 24 用 StdUtils 重读 `/D`，带空格路径必须给值加引号。其捆绑 NSIS 3.0.4.1 的 `DeleteRegKey /ifempty` 只检查子键，不检查命名值；**不得用它清理共享 OpenWithProgids 键**，只删本应用的值。该错误由真实重装门发现；模拟器须覆盖卸载后重装，不能把 `/ifempty` 当作无操作。
+Windows 实机门：`desktop/scripts/test-file-associations.ps1` 在一次性 Actions runner 上执行安装→改默认→重装→卸载，验证 17 类候选、已有默认与 UserChoice 保留。electron-builder 26 用 NSIS `GetDParameter` 读取 `/D=` 至命令行末尾，带空格路径也必须不加引号且 `/D=` 放最后；候选首装工具 `installed-electron-helper.mjs` 与 `test-file-associations.ps1` 遵守该规则。旧 0.75.7（electron-builder 24）升级基线仍用 StdUtils 重读 `/D`，`test-full-upgrade.ps1` 给旧包安装路径加引号，不可套用到新候选。其捆绑 NSIS 3.0.4.1 的 `DeleteRegKey /ifempty` 只检查子键，不检查命名值；**不得用它清理共享 OpenWithProgids 键**，只删本应用的值。该错误由真实重装门发现；模拟器须覆盖卸载后重装，不能把 `/ifempty` 当作无操作。
 
 回归：`desktop/tests/open-paths.test.js`、`file-associations.test.js`。`frontend/tests/desktop-e2e/local-files.mjs` 用全新 home/profile/H2/storage/端口测试源码 Electron 的冷启动队列、同名异目录、原位保存、PDF/Word；先构建 H5/editor/backend 并准备本地 LOWA 资源，`JAVA_HOME=<JDK21> node frontend/tests/desktop-e2e/local-files.mjs`。它注入原生打开事件，不能替代正式安装包的 Finder/Windows 打开方式验收。
 
@@ -691,3 +691,9 @@ Windows 下从 pwsh→Node 再启动 powershell.exe 会继承不兼容 PSModuleP
 回归：`desktop/tests/model-manager.test.js`、`model-fetch.test.py`（真实 SDK 需安装包 Python/lib；普通环境可显式 skip 该项，不把 skip 算通过）。
 
 **真实 ASR 词表格式（2026-10-21，dev-board#1395）**：官方 `Systran/faster-whisper-medium` 实际下载包含 `vocabulary.txt`；不能强制要求 `vocabulary.json`。桌面清单和后端 `ModelPresence` 同步按 CTranslate2 的 JSON 优先、文本备用规则校验；存在但格式错误的 JSON 不静默回退。真实 Mac ARM64 中英 Kokoro→Whisper 推理、缺模型409后同进程恢复已由子代理与主任务分别运行；脚本 `asr-service/tests/real_inference.py` 只接受准备好的运行时/缓存和合成短句。隔离 HOME/临时目录，HF offline+死代理不等于操作系统断网；不据此声称 Windows 或完整 Electron 用户流程通过。
+
+### uni H5 动态插槽兼容（dev-board#1679）
+
+锁定的 `@dcloudio/uni-h5-vue` 3.4.21 内置运行时使用三参数 `def(children, "_", type)`，根 `@vue/shared` 3.5 的 helper 则显式将第四参数默认设为 `false`。这会把原本可写的插槽标记变成只读，正式 Windows 验收捕获 `Object.assign` 插槽更新错误，随后工作台导航无法完成；尚未将具体触发组件归因到自绘菜单。保留现有依赖安全升级；`frontend/scripts/patch-uni-h5-slots.mjs` 在 postinstall 对普通 H5 的 ESM/CJS 精确补第四参数 `true`，恢复旧契约。补丁必须唯一匹配、幂等，依赖结构改变时拒绝继续，不能笼统替换所有 `def` 或回退整个 Vue 依赖树。
+
+回归：`cd frontend && node --test tests/build/uni-h5-slots.test.mjs`，以及干净安装后的 H5 构建、Windows 正式安装客户端文件打开/自动保存/重开。未补运行时配新 shared 的失败对照必须保留；源代码单测不替代正式包回归。
