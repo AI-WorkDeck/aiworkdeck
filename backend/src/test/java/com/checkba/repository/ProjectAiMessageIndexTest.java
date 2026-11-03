@@ -41,6 +41,32 @@ class ProjectAiMessageIndexTest {
     @Autowired
     private TestEntityManager em;
 
+    @Autowired
+    private ProjectAiMessageRepository repository;
+
+    @Test
+    void historyProjectionCountsAttachmentsWithoutLoadingTheirContents() {
+        var message = new com.checkba.model.entity.ProjectAiMessage();
+        message.setConversationId("attachment-history");
+        message.setProjectId(88L);
+        message.setUserId(1L);
+        message.setRole("USER");
+        message.setContent("Original task");
+        em.persistAndFlush(message);
+        var attachment = new com.checkba.model.entity.ProjectAiMessageAttachment();
+        attachment.setMessageId(message.getId());
+        attachment.setFileId("72");
+        attachment.setKind("folder");
+        em.persistAndFlush(attachment);
+        em.clear();
+        var rows = repository.findHistoryForAssembly("attachment-history");
+        org.junit.jupiter.api.Assertions.assertEquals(1, rows.size());
+        org.junit.jupiter.api.Assertions.assertEquals(message.getId(), rows.get(0).id());
+        org.junit.jupiter.api.Assertions.assertEquals(1L, rows.get(0).attachmentCount());
+        org.junit.jupiter.api.Assertions.assertEquals("Original task", rows.get(0).content());
+        org.junit.jupiter.api.Assertions.assertTrue(repository.findHistoryForAssembly("other-conversation").isEmpty());
+    }
+
     @SuppressWarnings("unchecked")
     private List<String> indexNames() {
         List<Object> rows = em.getEntityManager().createNativeQuery(

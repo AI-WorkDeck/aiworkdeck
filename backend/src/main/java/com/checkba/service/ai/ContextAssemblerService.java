@@ -1147,8 +1147,8 @@ public class ContextAssemblerService {
         timings.mark("systemPrompt", systemText.length());
 
         // 3. 加载对话历史并进行智能压缩
-        // 只读 role + content 两列、不查附件（dev-board#811 K31，审查 C-12）：这一段就卡在
-        // 用户等待首 token 的关键路径上，而 displayContent / conversationTitle / 附件
+        // 轻量读取正文、消息 ID 与附件数量，不加载附件实体（dev-board#811/#1668）：这一段就卡在
+        // 用户等待首 token 的关键路径上，而 displayContent / conversationTitle / 附件正文
         // 一个都不参与组装。**条数一条不少**——压缩器读的是整条历史，砍行会静默改掉摘要。
         // 查询本身在 assemble 开头就已经发出去了（K32 ①），这里只是等它（多半已经好了）。
         List<com.checkba.repository.ProjectAiMessageRepository.HistoryLine> historyEntities =
@@ -1157,6 +1157,8 @@ public class ContextAssemblerService {
 
         // 转换为 ChatMessage 列表
         java.util.List<dev.langchain4j.data.message.ChatMessage> historyMessages = new java.util.ArrayList<>();
+        dev.langchain4j.data.message.UserMessage continuationTask = null;
+        boolean continuing = isContinuationPrompt(userPrompt);
         for (com.checkba.repository.ProjectAiMessageRepository.HistoryLine entity : historyEntities) {
             String content = entity.content();
             if (content == null || content.isBlank()) {
@@ -1171,7 +1173,15 @@ public class ContextAssemblerService {
                 continue;
             }
             if ("USER".equalsIgnoreCase(entity.role())) {
-                historyMessages.add(dev.langchain4j.data.message.UserMessage.from(content));
+                if (entity.id() != null && entity.attachmentCount() != null && entity.attachmentCount() > 0) {
+                    content += "\n[Historical attachments: " + entity.attachmentCount()
+                            + " references attached to this message. Call list_attached_files(messageId="
+                            + entity.id() + ", afterId=0) and follow nextAfterId, then use extract_file_text for required contents. "
+                            + "This is a reference inventory, not evidence that files have been read.]";
+                }
+                var historicalUser = dev.langchain4j.data.message.UserMessage.from(content);
+                historyMessages.add(historicalUser);
+                if (continuing && !isContinuationPrompt(entity.content())) continuationTask = historicalUser;
             } else if ("ASSISTANT".equalsIgnoreCase(entity.role())) {
                 historyMessages.add(dev.langchain4j.data.message.AiMessage.from(content));
             }
@@ -1209,6 +1219,14 @@ public class ContextAssemblerService {
         }
         
         timings.mark("historyCompress", historyMessages.size());
+        // Restore the latest substantive user instruction verbatim if compression removed it.
+        // Keep its USER role; this is context recovery, never automatic tool replay.
+        if (continuationTask != null && !historyMessages.contains(continuationTask)) {
+            historyMessages = new java.util.ArrayList<>(historyMessages);
+            historyMessages.add(0, dev.langchain4j.data.message.UserMessage.from(
+                    "[Recovered historical user instruction, not a new request. Continue from recorded progress; "
+                    + "do not repeat completed side effects.]\n" + continuationTask.singleText()));
+        }
         messages.addAll(historyMessages);
 
         // 4. Add Current User Prompt
@@ -1348,6 +1366,33 @@ public class ContextAssemblerService {
             return false;
         }
         return contextItems == null || contextItems.isEmpty();
+    }
+
+    // Exact values of chat.continuePrompt across the supported locales, not intent inference.
+    static boolean isContinuationPrompt(String prompt) {
+        if (prompt == null) return false;
+        var matcher = java.util.regex.Pattern.compile("@\\{(?:[^\\\"{}]|\\\"(?:\\\\.|[^\\\"\\\\])*\\\")*\\}").matcher(prompt);
+        StringBuffer plain = new StringBuffer();
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        while (matcher.find()) {
+            boolean reference = false;
+            try {
+                var node = mapper.readTree(matcher.group().substring(1));
+                reference = node.isObject() && node.path("name").isTextual()
+                        && (node.has("fileId") ^ node.has("folderId"))
+                        && node.path(node.has("fileId") ? "fileId" : "folderId").isTextual();
+                var fields = node.fieldNames();
+                while (fields.hasNext()) {
+                    if (!java.util.Set.of("fileId", "folderId", "name", "projectId").contains(fields.next())) reference = false;
+                }
+            } catch (Exception ignored) { }
+            matcher.appendReplacement(plain, reference ? " " : java.util.regex.Matcher.quoteReplacement(matcher.group()));
+        }
+        matcher.appendTail(plain);
+        String value = plain.toString().replace('\u00a0', ' ').trim().replaceFirst("[.!。！]$", "").trim().toLowerCase(java.util.Locale.ROOT);
+        return java.util.Set.of("继续", "繼續", "continue", "continuar", "continuer", "続行", "продолжить",
+                "devam et", "fortfahren", "tiếp tục", "ดำเนินการต่อ", "συνέχεια", "متابعة", "teruskan",
+                "जारी रखें", "continua", "lanjutkan", "doorgaan", "계속").contains(value);
     }
 
     /**
