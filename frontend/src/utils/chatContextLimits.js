@@ -1,32 +1,12 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// 上下文层的上限与降级判据（dev-board#801 K21 ⑧⑨、#793 K14）。
-//
-// 病灶（审查 E-6 / E-7 / E-14）：这些上限原来全是**事后**生效的——
-//   · 用户拖 15 份材料进去、界面上 15 个标签都在，后端静默只读前 10 份；
-//   · 贴第 5 张图，那一张悄悄变成 OCR 文本；贴一张 12MB 的扫描件，
-//     模型拿到的「正文」是一句 `[System: 文件超过大小限制]`；
-//   · 「模型看不了图」的提示嵌在粘贴缩略图块里，从文件树拖进来的项目图片零提示。
-// 长期原则 2 要求：任何上限在**触发前**拦截并明示，任何降级在界面上有对应表达。
-//
-// 零依赖纯函数（不 import Vue / uni / '@/' 别名），node --test 可直接导入；
-// 单测在 frontend/tests/project-home/chat-context-layer.test.mjs。
-
-/**
- * 拉不到 `GET /api/ai/config` 时的兜底上限。
- *
- * **必须与后端 application.yml 的 ai.context 默认值一致**：这里写小了会误拦，
- * 写成 Infinity 等于这道闸不存在。真值以服务端下发的为准（单一事实来源），
- * 这份只是网络抖动时的最后一道兜底。
- */
+// Attachment references are unlimited; vision payloads retain their resource limits.
 export const DEFAULT_CONTEXT_LIMITS = Object.freeze({
-  maxFilesPerContext: 10,
+  maxFilesPerContext: Infinity,
   maxCharsPerFile: 50000,
   maxCharsActiveDocument: 200000,
   maxImagesPerTurn: 4,
   maxImageBytes: 10 * 1024 * 1024,
-  // 后端口径：视觉直送的图片**也占** maxFilesPerContext 的配额。
-  // 分开算会与后端差出 maxImagesPerTurn 份。
   visionCountsTowardFileQuota: true,
 })
 
@@ -40,7 +20,7 @@ function positive(value, fallback) {
 export function normalizeContextLimits(raw) {
   const src = raw && typeof raw === 'object' ? raw : {}
   return {
-    maxFilesPerContext: positive(src.maxFilesPerContext, DEFAULT_CONTEXT_LIMITS.maxFilesPerContext),
+    maxFilesPerContext: Infinity,
     maxCharsPerFile: positive(src.maxCharsPerFile, DEFAULT_CONTEXT_LIMITS.maxCharsPerFile),
     maxCharsActiveDocument: positive(src.maxCharsActiveDocument, DEFAULT_CONTEXT_LIMITS.maxCharsActiveDocument),
     maxImagesPerTurn: positive(src.maxImagesPerTurn, DEFAULT_CONTEXT_LIMITS.maxImagesPerTurn),
@@ -102,25 +82,19 @@ export function visionNoticeKey({ modelVision, pastedImages, contextFiles, activ
   return hasPasted || hasDragged || hasActiveDocImage ? 'chat.imageOcrFallbackNote' : ''
 }
 
-/**
- * 本轮已经占掉多少份配额。
- *
- * <p>文件与图片算在一起：后端 `maxFilesPerContext` 是跨类型共享的总闸，
- * 直送的图片也递增它。分开算的话前端按 10 拦、后端按 10 砍，
- * 中间差出 maxImagesPerTurn 份——用户看到的就是「明明没到 10」却被丢了。
- */
+/** Reference counts for callers; admission no longer has a numerical cap. */
 export function contextQuotaState({ contextFiles, pastedImages, limits }) {
   const lim = limits || DEFAULT_CONTEXT_LIMITS
   const files = Array.isArray(contextFiles) ? contextFiles.length : 0
   const images = Array.isArray(pastedImages) ? pastedImages.length : 0
   const used = lim.visionCountsTowardFileQuota ? files + images : files
-  return { used, max: lim.maxFilesPerContext, atCap: used >= lim.maxFilesPerContext }
+  return { used, max: lim.maxFilesPerContext, atCap: false }
 }
 
 /**
  * 这个文件能不能加进上下文。
  *
- * @returns `{ ok: true }` 或 `{ ok: false, reason: 'cap' | 'duplicate', max }`
+ * @returns `{ ok: true }` 或 `{ ok: false, reason: 'duplicate' }`
  */
 export function admitFileToContext({ file, contextFiles, pastedImages, limits }) {
   const list = Array.isArray(contextFiles) ? contextFiles : []
@@ -130,8 +104,6 @@ export function admitFileToContext({ file, contextFiles, pastedImages, limits })
     // 已经在里面了：不占新额度，也不该报「到顶」——那会让用户以为自己删错了东西
     return { ok: false, reason: 'duplicate' }
   }
-  const quota = contextQuotaState({ contextFiles: list, pastedImages, limits })
-  if (quota.atCap) return { ok: false, reason: 'cap', max: quota.max }
   return { ok: true }
 }
 
@@ -151,8 +123,6 @@ export function admitPastedImage({ size, pastedImages, contextFiles, limits }) {
   if (Number.isFinite(bytes) && bytes > 0 && bytes > lim.maxImageBytes) {
     return { ok: false, reason: 'imageBytes', max: lim.maxImageBytes }
   }
-  const quota = contextQuotaState({ contextFiles, pastedImages, limits: lim })
-  if (quota.atCap) return { ok: false, reason: 'cap', max: quota.max }
   return { ok: true }
 }
 

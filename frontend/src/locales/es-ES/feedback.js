@@ -7,7 +7,7 @@ export default {
   "back": "Atrás",
   "close": "Cerrar",
   "kindBug": "Error",
-  "kindIdea": "Idea",
+  "kindIdea": "Sugerencia",
   "placeholderBug": "¿Qué salió mal? ¿Qué estabas haciendo? (Puedes pegar una captura de pantalla directamente).",
   "placeholderIdea": "¿Cómo te gustaría que fuera? (Puedes pegar una captura de pantalla directamente).",
   "capturingScreenshot": "Seleccionando…",

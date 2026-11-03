@@ -4,6 +4,7 @@
 package com.checkba.service.ai.tools;
 
 import com.checkba.service.sensitive.SensitiveRecoveryKit;
+import com.checkba.service.LangText;
 import com.checkba.model.entity.ProjectFile;
 import com.checkba.repository.ProjectFileRepository;
 import com.checkba.service.ProjectFileService;
@@ -310,15 +311,18 @@ public class FileTools implements AgentToolComponent {
             + "Returns at most " + ToolFileGuard.MAX_TOOL_TEXT_CHARS + " characters per call: when the reply says "
             + "there is more ('还有 N 字符未读', nextStart=N), call again with offset=N to continue - "
             + "do not re-read from the start. To find where a phrase appears, use search_project_content first. "
-            + "If the ID is a FOLDER, returns a listing of its direct children (id + name + type) instead of an error. "
+            + "If the ID is a FOLDER, returns a paged listing of its direct children (id + name + type), not their text. "
+            + "For folders offset is a child index; follow nextOffset until complete, and recurse into each subfolder by ID. "
+            + "Read each required file separately; listing a name does not mean its contents were read. "
+            + "Folder pages contain up to 200 items; maxChars bounds the response (default 12000, minimum 1024). "
             + "This is the fileId entry point; read_file is the same extraction addressed BY PATH, "
             + "for files that have no database id yet.")
     public String extract_file_text(
             @P("Project file database ID (from doc_list_project_files / material list). May also be a folder ID — you get its contents listed.") Long fileId,
             @P(value = "Optional: character offset to start from (0-based, default 0). "
-                    + "To continue a long file, pass the nextStart of the previous reply.", required = false) Integer offset,
+                    + "For a long file pass nextStart; for a folder pass nextOffset (child index).", required = false) Integer offset,
             @P(value = "Optional: max characters to return this call (default and upper limit "
-                    + ToolFileGuard.MAX_TOOL_TEXT_CHARS + ")", required = false) Integer maxChars
+                    + ToolFileGuard.MAX_TOOL_TEXT_CHARS + "); folder pages default to 12000, minimum 1024", required = false) Integer maxChars
     ) {
         log.info("Tool: extract_file_text called for fileId={}, offset={}, maxChars={}", fileId, offset, maxChars);
         if (fileId == null) {
@@ -340,7 +344,7 @@ public class FileTools implements AgentToolComponent {
             // 「可编辑文档」，PDF 和图片全漏，答不了"这个文件夹里有什么"。
             // 模型问的是"这东西的内容"，回"这是文件夹，里面是这些"才是真答案，
             // 还省掉一轮往返。
-            return describeFolder(pf);
+            return describeFolder(pf, offset, maxChars);
         }
         try {
             String name = pf.getName();
@@ -429,32 +433,77 @@ public class FileTools implements AgentToolComponent {
      * <p>只列一层：卷宗嵌套通常不深，而递归展开一个大文件夹会把上下文吃光。
      * 子文件夹带着 id 返回，模型想深入就再调一次。
      */
-    private String describeFolder(ProjectFile folder) {
+    private String describeFolder(ProjectFile folder, Integer offset, Integer maxChars) {
+        if (Boolean.TRUE.equals(folder.getIsDeleted())) {
+            return "Error: " + AttachmentMessages.text("folderDeleted");
+        }
+        if (Thread.currentThread().isInterrupted()) return folderReadInterrupted();
         List<ProjectFile> children = projectFileRepository
                 .findByProjectIdAndParentIdAndIsDeletedFalseOrderBySortOrderAsc(
-                        folder.getProjectId(), folder.getId());
-        if (children.isEmpty()) {
-            return "[文件夹 " + folder.getName() + "（id=" + folder.getId() + "）] 是空的，里面没有文件。";
+                        folder.getProjectId(), folder.getId()).stream()
+                .filter(child -> folder.getProjectId().equals(child.getProjectId()))
+                .filter(child -> !Boolean.TRUE.equals(child.getIsDeleted()))
+                .filter(child -> !SensitiveRecoveryKit.isRecoveryFile(child.getName())
+                        && !SensitiveRecoveryKit.isRecoveryFile(child.getFilePath()))
+                // sortOrder is not unique. The ID tie-breaker makes subsequent offset pages stable.
+                .sorted(java.util.Comparator.comparing(ProjectFile::getSortOrder,
+                                java.util.Comparator.nullsFirst(Integer::compareTo))
+                        .thenComparing(ProjectFile::getId))
+                .toList();
+        int start = offset == null ? 0 : Math.max(0, offset);
+        int budget = maxChars == null || maxChars <= 0 ? 12_000
+                : Math.max(1024, Math.min(maxChars, ToolFileGuard.MAX_TOOL_TEXT_CHARS));
+        if (children.isEmpty() && start == 0) {
+            return "[" + AttachmentMessages.text("folder") + " " + folderLabel(folder.getName(), 160)
+                    + " (id=" + folder.getId() + ")] "
+                    + AttachmentMessages.text("folderEmpty");
         }
-        final int maxItems = 200;
-        StringBuilder sb = new StringBuilder();
-        sb.append("[文件夹 ").append(folder.getName()).append("（id=").append(folder.getId())
-                .append("）] 这是一个文件夹，不是文件。它直接包含 ").append(children.size()).append(" 项")
-                .append("；对其中的每个文件调用 extract_file_text 读正文，子文件夹可再次对其 id 调用本工具。\n");
-        int shown = 0;
-        for (ProjectFile c : children) {
-            if (shown >= maxItems) {
-                sb.append("- …（还有 ").append(children.size() - shown).append(" 项未列出）\n");
-                break;
-            }
-            boolean isDir = "folder".equalsIgnoreCase(c.getFileType()) || Boolean.TRUE.equals(c.getIsFolder());
-            sb.append("- ").append(isDir ? "[文件夹] " : "").append("id=").append(c.getId())
-                    .append("，名称：").append(c.getName());
-            if (!isDir && c.getFileType() != null) sb.append("，类型：").append(c.getFileType());
-            sb.append('\n');
-            shown++;
+        if (start >= children.size()) {
+            return "Error: " + AttachmentMessages.text("folderOffsetInvalid");
+        }
+        StringBuilder sb = new StringBuilder("[" + AttachmentMessages.text("folder") + " ")
+                .append(folderLabel(folder.getName(), 160)).append(" (id=").append(folder.getId())
+                .append(")] total=").append(children.size()).append(", offset=").append(start).append('\n')
+                .append(AttachmentMessages.text("folderInstructions"));
+        int next = start;
+        // Reserve enough space for the continuation call, even with 19-digit database IDs.
+        int entriesEnd = budget - 240;
+        while (next < children.size() && next - start < 200) {
+            if (Thread.currentThread().isInterrupted()) return folderReadInterrupted();
+            ProjectFile child = children.get(next);
+            boolean isDir = "folder".equalsIgnoreCase(child.getFileType()) || Boolean.TRUE.equals(child.getIsFolder());
+            String line = "- " + (isDir ? "[" + AttachmentMessages.text("folder") + "] " : "")
+                    + "id=" + child.getId() + ", " + AttachmentMessages.text("folderName")
+                    + folderLabel(child.getName(), 160)
+                    + (isDir || child.getFileType() == null ? "" : ", "
+                    + AttachmentMessages.text("folderType") + folderLabel(child.getFileType(), 32)) + "\n";
+            if (sb.length() + line.length() > entriesEnd && next > start) break;
+            sb.append(line);
+            next++;
+        }
+        sb.append("[returned=").append(next - start).append(", total=").append(children.size());
+        if (next < children.size()) {
+            sb.append(", nextOffset=").append(next).append("]\n")
+                    .append(AttachmentMessages.text("folderContinue"))
+                    .append("extract_file_text(fileId=").append(folder.getId())
+                    .append(", offset=").append(next).append(", maxChars=").append(budget).append(")\n");
+        } else {
+            sb.append("] ").append(AttachmentMessages.text("folderEnd"));
         }
         return sb.toString();
+    }
+
+    private static String folderReadInterrupted() {
+        return "Error: " + AttachmentMessages.text("folderCancelled");
+    }
+
+    /** Keep a single display line bounded; the full file remains addressable by its ID. */
+    private static String folderLabel(String value, int maxChars) {
+        String label = value == null ? "" : value.replace('\n', ' ').replace('\r', ' ');
+        if (label.length() <= maxChars) return label;
+        int end = maxChars - 1;
+        if (Character.isHighSurrogate(label.charAt(end - 1))) end--;
+        return label.substring(0, end) + "…";
     }
 
     @ToolMeta(displayName = "写入文件", category = "file", fileEffect = "ADDED", fileArg = "fileName", refreshFiles = true)

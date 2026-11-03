@@ -961,7 +961,8 @@ class ContextAssemblerServiceTest {
                 String system = ((SystemMessage) messages.get(0)).text();
                 assertTrue(system.contains("## Folder: 待整理资料 (ID: 200)"), system);
                 assertTrue(system.contains("relative to the attached folder (ID: 200), NOT the project root"));
-                assertTrue(system.contains("[FILE] 协议.txt (ID: 201)"));
+                assertTrue(system.contains("extract_file_text with fileId=200, offset=0"));
+                assertFalse(system.contains("[FILE] 协议.txt (ID: 201)"), "目录准备阶段不枚举或抽取后代");
                 String stable = system.substring(0, system.indexOf(ContextAssemblerService.SYSTEM_VOLATILE_SEPARATOR));
                 String guidance = stable.substring(stable.lastIndexOf(english ? "**When organising" : "**整理文件夹"));
                 assertTrue(guidance.contains(english ? "inside the specified folder and preserve that folder itself" : "在指定目录内部整理并保留该目录本身"), guidance);

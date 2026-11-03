@@ -22,15 +22,15 @@ const UAS = readFileSync(new URL('../../src/composables/useAgentStream.js', impo
 
 // ---------- 上限的单一事实来源 ----------
 
-test('拉不到 /api/ai/config 时用与后端一致的兜底值，不是写死 0 或 Infinity', () => {
-  assert.equal(DEFAULT_CONTEXT_LIMITS.maxFilesPerContext, 10)
+test('拉不到 /api/ai/config 时用与后端一致的无限引用配置，视觉资源仍有限', () => {
+  assert.equal(DEFAULT_CONTEXT_LIMITS.maxFilesPerContext, Infinity)
   assert.equal(DEFAULT_CONTEXT_LIMITS.maxImagesPerTurn, 4)
   assert.equal(DEFAULT_CONTEXT_LIMITS.maxImageBytes, 10 * 1024 * 1024)
 })
 
 test('服务端下发的值覆盖兜底值', () => {
   const limits = normalizeContextLimits({ maxFilesPerContext: 3, maxImagesPerTurn: 1, maxImageBytes: 999 })
-  assert.equal(limits.maxFilesPerContext, 3)
+  assert.equal(limits.maxFilesPerContext, Infinity)
   assert.equal(limits.maxImagesPerTurn, 1)
   assert.equal(limits.maxImageBytes, 999)
 })
@@ -38,7 +38,7 @@ test('服务端下发的值覆盖兜底值', () => {
 test('下发了垃圾值（0/负数/字符串/缺字段）一律退回兜底，绝不拿 0 去拦截', () => {
   for (const bad of [null, undefined, {}, { maxFilesPerContext: 0 }, { maxFilesPerContext: -1 },
     { maxFilesPerContext: 'many' }, { maxFilesPerContext: NaN }]) {
-    assert.equal(normalizeContextLimits(bad).maxFilesPerContext, 10,
+    assert.equal(normalizeContextLimits(bad).maxFilesPerContext, Infinity,
       `${JSON.stringify(bad)} 不该把上限变成 0——那会让用户一份文件都加不进来`)
   }
 })
@@ -108,17 +108,17 @@ test('配额把文件与图片算在一起（后端口径：直送的图也占 m
     limits,
   })
   assert.equal(state.used, 4)
-  assert.equal(state.max, 10)
+  assert.equal(state.max, Infinity)
   assert.equal(state.atCap, false)
 })
 
-test('到顶就是到顶', () => {
+test('旧服务端数字上限不再拒收附件', () => {
   const limits = normalizeContextLimits({ maxFilesPerContext: 2 })
   const state = contextQuotaState({ contextFiles: [{ id: 1 }, { id: 2 }], pastedImages: [], limits })
-  assert.equal(state.atCap, true)
+  assert.equal(state.atCap, false)
 })
 
-test('addFile 到顶时拒绝并给出可行动的原因，不是静默砍尾', () => {
+test('超过旧单轮配额仍接受全部引用', () => {
   const limits = normalizeContextLimits({ maxFilesPerContext: 2 })
   const ok = admitFileToContext({ file: { id: 3 }, contextFiles: [{ id: 1 }], pastedImages: [], limits })
   assert.equal(ok.ok, true)
@@ -126,9 +126,7 @@ test('addFile 到顶时拒绝并给出可行动的原因，不是静默砍尾', 
   const full = admitFileToContext({
     file: { id: 3 }, contextFiles: [{ id: 1 }, { id: 2 }], pastedImages: [], limits,
   })
-  assert.equal(full.ok, false)
-  assert.equal(full.reason, 'cap')
-  assert.equal(full.max, 2, '提示里要写清上限是几，用户才知道该删掉几份')
+  assert.equal(full.ok, true)
 })
 
 test('重复添加同一个文件不占额度也不报「到顶」', () => {

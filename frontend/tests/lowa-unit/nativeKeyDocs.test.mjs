@@ -47,7 +47,7 @@ const KEY = { DOWN: 1024, UP: 1025, LEFT: 1026, RIGHT: 1027, HOME: 1028, END: 10
 const SERVICE = { writer: 'com.sun.star.text.TextDocument', calc: 'com.sun.star.sheet.SpreadsheetDocument', impress: 'com.sun.star.presentation.PresentationDocument' }
 
 function build(kind, opts = {}) {
-  const seen = { posted: [], dispatched: [], writerInserts: [], timers: [], fullScreen: true, refreshScheduled: 0 }
+  const seen = { posted: [], dispatched: [], writerInserts: [], timers: [], fullScreen: true, refreshScheduled: 0, wakes: 0 }
   const componentWindow = { name: 'component-window' }
   const container = {}
   Object.defineProperty(container, 'FullScreen', { get: () => seen.fullScreen, set: (v) => { seen.fullScreen = v } })
@@ -85,6 +85,10 @@ function build(kind, opts = {}) {
     deselect: () => ({ success: true, name: 'escape', writer: true }),
     ensureFullScreen: () => { seen.fullScreen = true },
     scheduleNativeKeySelectionRefresh: () => { seen.refreshScheduled++ },
+    Module: { resumeMainLoop() {
+      assert.equal(seen.refreshScheduled, seen.wakes + 1, 'wake once after scheduling each complete input batch')
+      seen.wakes++
+    } },
     setTimeout: (fn) => { seen.timers.push(fn) },
   }
   const body = consts + '\nlet keyRobot = null;\n' + HELPERS.map(topLevel).join('\n')
@@ -101,6 +105,7 @@ for (const kind of ['calc', 'impress']) {
     assert.deepEqual(seen.posted.map((k) => k.ch), ['x', 'c', '5', '中'])
     assert.ok(seen.posted.every((k) => k.source === componentWindow && k.code === 0 && k.mod === 0))
     assert.deepEqual(seen.writerInserts, [])
+    assert.equal(seen.wakes, kind === 'impress' ? 1 : 0, 'a multi-character batch wakes Impress once, never Calc')
   })
 
   test(kind + '：文本里的换行投递回车键，不当字符插入（否则被引擎静默吞掉，success:true 但内容少一段）', () => {
@@ -128,6 +133,7 @@ for (const kind of ['calc', 'impress']) {
     assert.deepEqual(seen.posted.map((k) => [k.code, k.mod]), [[KEY.BACKSPACE, 0], [KEY.DELETE, 0], [KEY.RIGHT, 0], [KEY.UP, 1], [KEY.TAB, 1]])
     assert.deepEqual(seen.dispatched, [], '.uno:SwBackspace 在表格里是哑弹，.uno:Delete 在 Calc 是「删除内容」对话框')
     assert.equal(EXEC.move_cursor({ dir: 'sideways' }).success, false)
+    assert.equal(seen.wakes, kind === 'impress' ? 5 : 0, 'each accepted input batch wakes once; invalid input does not wake')
   })
 
   test(kind + '：Home/End/PageDown 与 Esc 走原生按键，加粗之类的格式命令照旧派发', () => {
@@ -169,6 +175,7 @@ test('writer：原语照旧走视图光标，一个按键都不投递', () => {
   assert.deepEqual(seen.posted, [])
   assert.deepEqual(seen.writerInserts, ['甲乙', '<para>', 'left+'])
   assert.deepEqual(seen.dispatched, ['.uno:SwBackspace', '.uno:Delete', '.uno:GoToStartOfLine'])
+  assert.equal(seen.wakes, 0, 'Writer retains its existing scheduling')
 })
 
 test('writer：手打带 replaceSelection 时先删选区再插（Word 覆盖语义），同一撤销组；不带标记照旧追加', () => {

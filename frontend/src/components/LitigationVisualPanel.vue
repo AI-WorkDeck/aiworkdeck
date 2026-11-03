@@ -203,11 +203,11 @@ const MODES = ['奇川风', '歸藏风', '白描']
 // 摆在这里会让这排按钮看起来像一份需要先学习的分类表。
 // value 是发给服务端拼 prompt 的触发词（必须原样中文，不翻译）；label 是面板按钮展示文案
 const KINDS = [
-  { value: '事实经过时间轴', label: t('panels.litKindTimeline') },
-  { value: '诉讼时效/保证期间甘特图', label: t('panels.litKindPeriod') },
-  { value: '案件流程图', label: t('panels.litKindFlowchart') },
-  { value: '当事人法律关系图', label: t('panels.litKindRelation') },
-  { value: '股权控制结构树', label: t('panels.litKindEquity') }
+  { value: '事实经过时间轴', get label() { return t('panels.litKindTimeline') } },
+  { value: '诉讼时效/保证期间甘特图', get label() { return t('panels.litKindPeriod') } },
+  { value: '案件流程图', get label() { return t('panels.litKindFlowchart') } },
+  { value: '当事人法律关系图', get label() { return t('panels.litKindRelation') } },
+  { value: '股权控制结构树', get label() { return t('panels.litKindEquity') } }
 ]
 
 // key 为引擎输出的布局标识符（数据，不翻译），value 走 i18n 键名（下方 layoutLabel() 里取值）

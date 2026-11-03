@@ -852,6 +852,70 @@ class AgentOrchestratorInboxTest {
         assertTrue(modelRequests.isEmpty());
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"timeout", "cancel"})
+    void interruptedFirstSteeringPreparationReturnsUnstartedAttachmentsToPending(String stop) throws Exception {
+        orchestrator.attachmentPreparationTimeout = java.time.Duration.ofMillis(300);
+        CountDownLatch originalTool = new CountDownLatch(1), releaseTool = new CountDownLatch(1);
+        CountDownLatch reading = new CountDownLatch(1), releaseRead = new CountDownLatch(1), readDone = new CountDownLatch(1);
+        when(tools.execute(eq("read"), any(), any())).thenAnswer(inv -> {
+            originalTool.countDown();
+            assertTrue(releaseTool.await(5, TimeUnit.SECONDS));
+            return new ToolRegistry.ToolResult("original result retained", null, true);
+        });
+        doAnswer(inv -> {
+            String prompt = inv.getArgument(2);
+            if ("blocking steering".equals(prompt)) {
+                reading.countDown();
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                try {
+                    while (releaseRead.getCount() > 0 && System.nanoTime() < deadline) {
+                        try { releaseRead.await(20, TimeUnit.MILLISECONDS); } catch (InterruptedException ignored) { }
+                    }
+                    Thread.interrupted();
+                } finally { readDone.countDown(); }
+            }
+            return new ArrayList<ChatMessage>(List.of(SystemMessage.from("system"), UserMessage.from(prompt)));
+        }).when(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        when(modelFactory.getStreamingChatModel(MODEL)).thenReturn(scripted(
+                AiMessage.from(List.of(tool("read", "first-read"))), AiMessage.from("must not continue")));
+        var initial = inbox.submit(request("original", "release-initial", "steer"), 7L);
+        Thread run = new Thread(() -> orchestrator.acceptInboxSubmission(initial.getId(), false));
+        run.start();
+        try {
+            assertTrue(originalTool.await(3, TimeUnit.SECONDS));
+            var first = inbox.submit(request("blocking steering", "release-blocking", "steer"), 7L);
+            var secondRequest = request("unstarted attachment steering", "release-unstarted", "steer");
+            var attached = new AiAgentController.ContextItem(); attached.setId("88"); attached.setName("certificate.pdf");
+            secondRequest.setContextItems(List.of(attached));
+            var second = inbox.submit(secondRequest, 7L);
+            releaseTool.countDown();
+            assertTrue(reading.await(3, TimeUnit.SECONDS));
+            var later = inbox.submit(request("later queued", "release-later", "queue"), 7L);
+            if ("cancel".equals(stop)) assertTrue(orchestrator.setCancelled(CONV));
+            run.join(3_000);
+            assertFalse(run.isAlive());
+            assertNull(orchestrator.activeRunId(CONV));
+            assertEquals(AgentInboxService.INTERRUPTED, rows.get(first.getId()).getState(),
+                    "the started input must not be replayed automatically");
+            assertEquals(AgentInboxService.PENDING, rows.get(second.getId()).getState());
+            assertNull(rows.get(second.getId()).getRunId());
+            assertNull(rows.get(second.getId()).getAppliedSequence());
+            assertEquals(List.of(second.getId(), later.getId()), list(CONV, AgentInboxService.PENDING)
+                    .stream().map(AgentInboxItem::getId).toList());
+            assertEquals("88", inbox.requestOf(rows.get(second.getId())).getContextItems().get(0).getId());
+            verify(messageService, never()).saveMessage(any(), any(), eq(CONV), eq("USER"),
+                    eq("unstarted attachment steering"), any(), any());
+            assertEquals(1, modelRequests.size());
+            assertTrue(sseEvents.stream().anyMatch(event -> "cancel".equals(stop)
+                    ? event.startsWith("cancelled:") : event.startsWith("error:") && event.contains("CONTEXT_PREPARATION_TIMEOUT")));
+        } finally {
+            releaseTool.countDown(); releaseRead.countDown();
+            assertTrue(readDone.await(3, TimeUnit.SECONDS));
+            run.join(3_000);
+        }
+    }
+
     private StreamingChatLanguageModel scripted(AiMessage... script) {
         AtomicInteger call = new AtomicInteger();
         return new StreamingChatLanguageModel() {

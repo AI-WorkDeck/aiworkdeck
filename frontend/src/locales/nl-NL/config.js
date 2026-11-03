@@ -12,7 +12,7 @@ export default {
     "voice": "Spraak",
     "meetingRecorder": "Vergaderopname",
     "litigationVisual": "Procesvisualisatie",
-    "tmeet": "Tencent Meeting",
+    "tmeet": "Tencent-vergadering",
     "search": "Zoeken",
     "tts": "Tekst naar spraak",
     "desensitize": "Bestandsredactie",

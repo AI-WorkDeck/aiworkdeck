@@ -423,11 +423,11 @@ test('new revision events and actual edits are never suppressed by a view-read p
   assert.equal(events.filter(e=>e.type==='review-changed').length,1)
 })
 
-test('view proofs are bounded, yield to queued input and cannot publish into another model',async()=>{
+test('view proofs are bounded, yield to queued input and cannot publish into another model',{timeout:2000},async()=>{
   const {session,events}=opened(true)
   const items=Array.from({length:60},(_,index)=>({revisionId:String(index),identifier:'uno-'+index,author:'A',type:'Delete',dateTime:'date',description:'summary',text:'full '+index,textAvailable:true}))
   session.review={revision:0,items,hydratedCount:60}
-  const batches=[],order=[]
+  const batches=[],order=[],completed=latch()
   session.engine.call=async()=>({documentEpoch:7,items})
   session.unoCall=async(method,params)=>{
     if(method==='capture_view_read')return {token:'proof'}
@@ -436,11 +436,12 @@ test('view proofs are bounded, yield to queued input and cannot publish into ano
       return {success:true}
     }
     batches.push(params.targets.length);order.push('proof')
+    if(batches.length===3)completed.resolve()
     return {total:60,entries:params.targets.map(({index})=>({...items[index],index}))}
   }
   const read=session.execute('get_document_text',{__agent:true})
   const queued=session.task(()=>order.push('input-ready'))
-  await read;await queued;await new Promise(resolve=>setTimeout(resolve,15));await session.queue
+  await read;await queued;await completed.promise;await session.queue
   assert.deepEqual(batches,[25,25,10]);assert.deepEqual(order.slice(0,2),['proof','input-ready'])
   const old=session.viewReadGuard
   old.pending.add(0);session.model={...session.model,documentEpoch:8}

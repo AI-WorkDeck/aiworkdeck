@@ -12,11 +12,11 @@ export default {
     "voice": "Giọng nói",
     "meetingRecorder": "Ghi âm cuộc họp",
     "litigationVisual": "Trực quan hóa tranh chấp",
-    "tmeet": "Tencent Meeting",
+    "tmeet": "Cuộc họp Tencent",
     "search": "Tìm kiếm",
     "tts": "Chuyển văn bản thành giọng nói",
     "desensitize": "Che giấu thông tin tệp",
-    "version": "Version History",
+    "version": "Quản lý phiên bản",
     "calendar": "Lịch"
   },
   "tools": {

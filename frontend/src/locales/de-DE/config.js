@@ -5,18 +5,18 @@ export default {
   "sidebar": {
     "projectHome": "Projektübersicht",
     "projects": "Projekte",
-    "files": "Explorer",
+    "files": "Datei-Explorer",
     "ddFiles": "Due-Diligence-Dateien",
     "market": "Erweiterungen",
     "dev": "Plugin-Entwicklung",
     "voice": "Sprache",
     "meetingRecorder": "Besprechungsaufzeichnung",
     "litigationVisual": "Prozessvisualisierung",
-    "tmeet": "Tencent Meeting",
+    "tmeet": "Tencent-Meeting",
     "search": "Suche",
     "tts": "Text zu Sprache",
     "desensitize": "Dateischwärzung",
-    "version": "Version History",
+    "version": "Versionsverwaltung",
     "calendar": "Kalender"
   },
   "tools": {

@@ -12,6 +12,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.ByteArrayOutputStream;
@@ -438,6 +440,104 @@ class NativePackServiceTest {
                 () -> svc.install(PACK_ID));
         assertEquals(List.of("bytes=" + half + "-"), secondary.rangeServed, "第二个源应从断点续传");
         assertTrue(svc.isReady(PACK_ID));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void queuedAutomaticInstallRespectsUninstallButManualInstallStillWorks(boolean manualWhileQueued) throws Exception {
+        byte[] archive = tarGzWithContents(Map.of("cli.py", "manual-reinstall".getBytes(StandardCharsets.UTF_8)));
+        publish(primary, archive, "litviz", List.of("*"), true);
+        NativePackService svc = service(publicKeyPem, primary.baseUrl());
+        SkillRegistry skills = org.mockito.Mockito.mock(SkillRegistry.class);
+        SkillDefinition skill = new SkillDefinition();
+        skill.setId(PACK_ID);
+        skill.setRequiresPack(PACK_ID);
+        org.mockito.Mockito.when(skills.getSkills()).thenReturn(List.of(skill));
+        AtomicBoolean enabled = new AtomicBoolean(true);
+        AtomicInteger eligibilityChecks = new AtomicInteger();
+        org.mockito.Mockito.when(skills.isPackAutoInstallEnabled(PACK_ID)).thenAnswer(call -> {
+            if (eligibilityChecks.incrementAndGet() > 1) {
+                assertTrue(Thread.holdsLock(svc.packLock(PACK_ID)), "execution eligibility must be checked under the uninstall lock");
+            }
+            return enabled.get();
+        });
+        PackAutoInstaller automatic = new PackAutoInstaller(props(primary.baseUrl()), svc, skills);
+        ExecutorService installer = (ExecutorService) ReflectionTestUtils.getField(svc, "installer");
+        CountDownLatch queueBlocked = new CountDownLatch(1);
+        CountDownLatch releaseQueue = new CountDownLatch(1);
+        try {
+            installer.submit(() -> {
+                queueBlocked.countDown();
+                awaitGate(releaseQueue);
+            });
+            assertTrue(queueBlocked.await(10, TimeUnit.SECONDS));
+            assertEquals(List.of(PACK_ID), automatic.checkAndInstall());
+            assertEquals(NativePackService.STATE_DOWNLOADING, svc.status(PACK_ID).getState());
+            enabled.set(false);
+            svc.uninstall(PACK_ID);
+            if (manualWhileQueued) {
+                svc.installAsync(PACK_ID);
+                assertEquals(NativePackService.STATE_DOWNLOADING, svc.status(PACK_ID).getState(),
+                        "manual promotion must immediately restore progress for the polling panel");
+            }
+            releaseQueue.countDown();
+            installer.submit(() -> {}).get(10, TimeUnit.SECONDS);
+            if (!manualWhileQueued) {
+                assertFalse(Files.exists(packsRoot().resolve(PACK_ID)), "the stale automatic task must not recreate files");
+                assertEquals(NativePackService.STATE_NOT_INSTALLED, svc.status(PACK_ID).getState());
+                assertEquals(2, eligibilityChecks.get(), "a queued automatic task must recheck the current preference");
+
+                // After cancellation the explicit entry point must also accept a fresh request.
+                svc.installAsync(PACK_ID);
+                installer.submit(() -> {}).get(10, TimeUnit.SECONDS);
+            }
+            assertEquals(NativePackService.STATE_READY, svc.status(PACK_ID).getState());
+            assertEquals("manual-reinstall", Files.readString(svc.componentDir(PACK_ID, "litviz").orElseThrow().resolve("cli.py")));
+        } finally {
+            releaseQueue.countDown();
+            automatic.shutdown();
+            svc.shutdown();
+            assertTrue(installer.awaitTermination(10, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void readyTaskAwaitingCleanupDoesNotSwallowManualReinstall() throws Exception {
+        byte[] archive = tarGzWithContents(Map.of("cli.py", "ready-reinstall".getBytes(StandardCharsets.UTF_8)));
+        publish(primary, archive, "litviz", List.of("*"), true);
+        NativePackService svc = service(publicKeyPem, primary.baseUrl());
+        CountDownLatch cleanupEntered = new CountDownLatch(1);
+        CountDownLatch releaseCleanup = new CountDownLatch(1);
+        AtomicBoolean firstCleanup = new AtomicBoolean(true);
+        Map<String, NativePackService.PackStatus> tasks = new java.util.concurrent.ConcurrentHashMap<>() {
+            @Override
+            public boolean remove(Object key, Object value) {
+                if (firstCleanup.compareAndSet(true, false)) {
+                    cleanupEntered.countDown();
+                    awaitGate(releaseCleanup);
+                }
+                return super.remove(key, value);
+            }
+        };
+        ReflectionTestUtils.setField(svc, "inFlight", tasks);
+        ExecutorService installer = (ExecutorService) ReflectionTestUtils.getField(svc, "installer");
+        try {
+            svc.installAsync(PACK_ID);
+            assertTrue(cleanupEntered.await(10, TimeUnit.SECONDS));
+            assertEquals(NativePackService.STATE_READY, svc.status(PACK_ID).getState());
+            svc.uninstall(PACK_ID);
+            svc.installAsync(PACK_ID);
+            assertEquals(NativePackService.STATE_DOWNLOADING, svc.status(PACK_ID).getState(),
+                    "a completed task waiting for cleanup must not absorb the new manual request");
+            releaseCleanup.countDown();
+            installer.submit(() -> {}).get(10, TimeUnit.SECONDS);
+            assertEquals(NativePackService.STATE_READY, svc.status(PACK_ID).getState());
+            assertEquals("ready-reinstall", Files.readString(svc.componentDir(PACK_ID, "litviz").orElseThrow().resolve("cli.py")));
+        } finally {
+            releaseCleanup.countDown();
+            svc.shutdown();
+            assertTrue(installer.awaitTermination(10, TimeUnit.SECONDS));
+        }
     }
 
     @Test

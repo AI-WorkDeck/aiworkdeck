@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "listAttachedFiles": "列出本輪附件",
     "office_ppt_add_image": "插入投影片圖片",
     "office_ppt_add_chart": "插入投影片圖表",
     "office_ppt_format_chart": "設定投影片圖表格式",

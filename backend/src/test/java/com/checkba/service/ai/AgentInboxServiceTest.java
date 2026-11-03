@@ -367,4 +367,52 @@ class AgentInboxServiceTest {
                 "<ask_user_answer id=\"ask-review\">Selected:\n- 继续</ask_user_answer>", "5"));
     }
 
+    @Test
+    void unstartedSteeringReturnsAheadOfNewInputsWithoutReplayingTheStartedOne() {
+        var active = service.submit(request("first", "release-first", "steer"), 7L);
+        var secondRequest = request("second", "release-second", "steer");
+        var attachment = new AiAgentController.ContextItem(); attachment.setId("88"); attachment.setName("certificate.pdf");
+        secondRequest.setContextItems(List.of(attachment));
+        var second = service.submit(secondRequest, 7L);
+        var third = service.submit(request("third", "release-third", "steer"), 7L);
+        service.claimPendingSteering("conv-1", "interrupted-run");
+        var later = service.submit(request("later queued", "release-later", "queue"), 7L);
+        long secondRevision = second.getRevision(), laterRevision = later.getRevision();
+        String payload = second.getRequestJson();
+        clearInvocations(sse);
+
+        service.releaseUnstartedSteering("conv-1", "interrupted-run", List.of(third.getId(), second.getId(), second.getId()));
+
+        assertEquals(AgentInboxService.APPLIED, active.getState());
+        assertEquals(List.of(second.getId(), third.getId(), later.getId()), rows("conv-1", AgentInboxService.PENDING)
+                .stream().map(AgentInboxItem::getId).toList());
+        assertNull(second.getRunId()); assertNull(second.getAppliedSequence());
+        assertEquals(secondRevision + 1, second.getRevision());
+        assertEquals(laterRevision + 1, later.getRevision());
+        assertEquals(payload, second.getRequestJson());
+        assertEquals("88", service.requestOf(second).getContextItems().get(0).getId());
+        verify(sse).send(eq("conv-1"), eq("inbox_updated"), any());
+        verify(sse, never()).send(any(), eq("input_applied"), any());
+        service.interruptRun("interrupted-run");
+        assertEquals(AgentInboxService.INTERRUPTED, active.getState());
+        assertEquals(AgentInboxService.PENDING, second.getState());
+        assertEquals(second.getId(), service.nextPending("conv-1").orElseThrow().getId());
+    }
+
+    @Test
+    void staleReleaseCannotMoveAnotherRunConversationOrAlreadyPendingInput() {
+        var old = service.submit(request("old", "stale-old", "steer"), 7L);
+        service.claim(old.getId(), "new-run");
+        var foreignRequest = request("foreign", "stale-foreign", "steer"); foreignRequest.setConversationId("other");
+        var foreign = service.submit(foreignRequest, 7L); service.claim(foreign.getId(), "old-run");
+        var pending = service.submit(request("pending", "stale-pending", "steer"), 7L);
+        long revision = pending.getRevision();
+        clearInvocations(sse);
+        service.releaseUnstartedSteering("conv-1", "old-run", List.of(old.getId(), foreign.getId(), pending.getId(), "missing"));
+        assertEquals(AgentInboxService.APPLIED, old.getState()); assertEquals("new-run", old.getRunId());
+        assertEquals(AgentInboxService.APPLIED, foreign.getState());
+        assertEquals(AgentInboxService.PENDING, pending.getState()); assertEquals(revision, pending.getRevision());
+        verifyNoInteractions(sse);
+    }
+
 }

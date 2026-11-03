@@ -159,13 +159,13 @@ export default {
   "tierColBonus": "Bonus isi ulang",
   "tierBonusCell": "{permille}‰",
   "membershipTiers": {
-    "paralegal": "Paralegal",
+    "paralegal": "Asisten Hukum",
     "associate": "Advokat Asosiat",
     "lead": "Advokat Utama",
     "senior": "Advokat Senior",
     "salaried-partner": "Partner Bergaji",
     "equity-partner": "Partner Ekuitas",
-    "managing-partner": "Managing Partner",
+    "managing-partner": "Mitra Pengelola",
     "silver": "Anggota Perak"
   },
   "rechargeTitle": "Isi Ulang Akun",

@@ -2,6 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  attachmentImportPartial: "資料夾僅部分匯入：已匯入 {count} 個檔案，略過 {skipped} 項。請在檔案樹核對，並檢查來源資料夾權限、符號連結或特殊檔案；不會自動重新匯入整個資料夾。",
+  attachmentScanIncomplete: "資料夾掃描未完成，已找到 {count} 個檔案，尚未匯入。請重新選擇或拖入完整資料夾；不能以這份部分清單繼續匯入。",
+  attachmentsRequireTools: "這些附件需要分批讀取，請選擇支援工具呼叫的模型後繼續。原附件已保留。",
+  attachmentReaderBusy: "讀取服務仍被之前的工作佔用，本次尚未開始讀取。請稍後再試；若持續無回應，請儲存工作後重新啟動應用程式。",
+  attachmentBatchHint: "附件數量不限；大量資料可能耗時較長，將按需分批讀取。",
+  attachmentScanning: "正在掃描資料夾，已找到 {count} 個檔案",
+  attachmentImportProgress: "已匯入 {completed}/{total} 項",
+  attachmentImportUncertain: "進行中操作的結果尚未確認，可能仍在背景完成。請先在檔案樹核對，避免重複匯入；已完成項保留。",
+  attachmentImportPaused: "匯入已暫停或部分失敗。已完成項保留，可重試剩餘項目。",
+  attachmentRetryRemaining: "重試剩餘 {count} 項",
+  contextPreparingProgress: "正在準備附件：已登記 {completed}/{total} 項（不代表已讀內文）",
+  contextNoticeDeferred: "另有 {count} 項已保留，將按需分批讀取，可能耗時較長。",
+  contextPreparationTimeout: "附件準備逾時，本輪已停止。附件仍保留；請指定優先檔案、縮小本輪範圍，或稍後手動重試。",
+
   "earlierFiles": "早期會話文件",
   "fileCreated": "已新增",
   "fileModified": "已修改",
@@ -287,7 +301,6 @@ export default {
   "activeSelectionChipTitle": "已選中片段：{text}（隨本條消息傳給 AI，優先修訂該片段；點 × 本輪忽略選區）",
   "carriedAttachmentTitle": "{name}（上一輪帶過，本輪仍會帶上；點一下確認沿用，點 × 移除）",
   "carriedAttachmentHint": "虛線標籤是上輪附件，下一條繼續使用，點 × 移除",
-  "contextFileCapReached": "本輪最多帶 {max} 份材料（含圖片），請先移除一些再添加",
   "imageCountCapToast": "本輪最多直送 {max} 張圖，多出來的會按文字識別（OCR）處理",
   "imageTooLargeToast": "這張圖超過 {size}，會按文字識別（OCR）處理，建議壓縮後重發",
   "contextNoticeThisFile": "這份材料",

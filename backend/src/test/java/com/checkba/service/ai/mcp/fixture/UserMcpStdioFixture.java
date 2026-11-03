@@ -18,12 +18,15 @@ public final class UserMcpStdioFixture {
     public static void main(String[] args) throws Exception {
         String mode = args[0];
         Path trace = Path.of(args[1]);
-        Files.writeString(Path.of(trace + ".pid"), Long.toString(ProcessHandle.current().pid()));
         if (mode.equals("child")) { Thread.sleep(60000); return; }
+        Files.writeString(Path.of(trace + ".pid"), Long.toString(ProcessHandle.current().pid()));
         if (mode.equals("tree")) {
             Process child = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java").toString(), "-cp",
                     System.getProperty("java.class.path"), UserMcpStdioFixture.class.getName(), "child", trace + ".child").start();
-            Files.writeString(Path.of(trace + ".child.pid"), Long.toString(child.pid()));
+            // Only the parent publishes this PID; cancellation must never observe a partial write.
+            Path pendingPid = Path.of(trace + ".child.pid.tmp");
+            Files.writeString(pendingPid, Long.toString(child.pid()));
+            Files.move(pendingPid, Path.of(trace + ".child.pid"), StandardCopyOption.ATOMIC_MOVE);
             Thread.sleep(60000); return;
         }
         if (mode.equals("stdout-log")) { System.out.println("secret stdout log"); Thread.sleep(60000); return; }

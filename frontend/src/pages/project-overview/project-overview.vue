@@ -952,7 +952,7 @@
                       <svg v-else class="tab-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path v-for="(d, gi) in getFileIconPaths(file.fileType, file.tabType, file.pluginId || (file.marketSpec && file.marketSpec.id))" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
                       </svg>
-                      <text class="tab-name">{{ file.name }}</text>
+                      <text class="tab-name">{{ getTabDisplayName(file) }}</text>
                       <text class="tab-close" @tap.stop="closeFile(file.id, 'left')">×</text>
                     </view>
                   </view>
@@ -995,7 +995,7 @@
                       <svg v-else class="tab-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path v-for="(d, gi) in getFileIconPaths(file.fileType, file.tabType, file.pluginId || (file.marketSpec && file.marketSpec.id))" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
                       </svg>
-                      <text class="tab-name">{{ file.name }}</text>
+                      <text class="tab-name">{{ getTabDisplayName(file) }}</text>
                       <text class="tab-close" @tap.stop="closeFile(file.id, 'right')">×</text>
                     </view>
                   </view>
@@ -1287,6 +1287,7 @@
                       :key="activeFileLeft.id"
                       :spec="activeFileLeft.marketSpec"
                       @open-url="openBrowserTab($event)"
+                      @title-change="onMarketDetailTitleChange(activeFileLeft, $event)"
                     />
                     <!-- 实体详情标签（dev-board#541）：浮窗上「在新标签页打开」的落点。
                          照 market-detail 那套 tab 形制（单例 id、直接 push 进列表）。 -->
@@ -1568,6 +1569,7 @@
                       :key="activeFileRight.id"
                       :spec="activeFileRight.marketSpec"
                       @open-url="openBrowserTab($event)"
+                      @title-change="onMarketDetailTitleChange(activeFileRight, $event)"
                     />
                     <!-- 实体详情标签（dev-board#541）：浮窗上「在新标签页打开」的落点。
                          照 market-detail 那套 tab 形制（单例 id、直接 push 进列表）。 -->
@@ -2358,7 +2360,7 @@
       <MobileReceiveStatus v-if="isDesktopApp" :project-id="hasNamedProject ? projectId : null" @received="$refs.fileTree && $refs.fileTree.loadFiles()" />
       <view class="status-spacer"></view>
       <view v-if="activeFileLeft" class="status-item status-file">
-        <text>{{ activeFileLeft.name }}</text>
+        <text>{{ getTabDisplayName(activeFileLeft) }}</text>
       </view>
       <view v-if="splitMode" class="status-item">
         <text>{{ $t('workbench.splitBadge') }}</text>
@@ -2387,7 +2389,6 @@ import { readActiveSelection } from './activeSelectionContext.js'
 import { nativeDataTransfer, captureDroppedFiles, isExternalFileDrag, compatibleDropEffect } from '@/utils/fileTreeExternalDrop.js'
 import { consumePluginImDrag } from '@/utils/pluginImDrag.js'
 import { addPluginImFileToAi } from '@/utils/pluginImAi.js'
-import { AI_CONTEXT_FOLDER_FILE_LIMIT, countDescendantFiles } from '@/utils/aiContextFiles.js'
 import { saveSensitiveInput } from './sensitiveWorkflow.js'
 import LibreOfficeEditor from '@/components/LibreOfficeEditor.vue'
 import { host, isDesktopHost } from '@/services/host.js'
@@ -2599,7 +2600,8 @@ import { welcomeTabMethods, WELCOME_TAB_ID, loadShowWelcomeOnStartup, saveShowWe
 import { calendarTabMethods } from './calendarTab.js'
 import { pluginWorkspaceTabMethods } from './pluginWorkspaceTabs.js'
 import { tmeetTabMethods } from './tmeetTab.js'
-import { tabSnapshotMethods } from './tabSnapshot.js'
+import { tabSnapshotMethods, resolveLocalizedTabName, BUILTIN_PLUGIN_LABEL_KEYS } from './tabSnapshot.js'
+import { APP_LANGUAGE_EVENT } from '@/utils/appLanguage.js'
 import { isPaneAllowedWithoutProject, NO_PROJECT_DEFAULT_PANE, NO_PROJECT_PANE_KEYS, workbenchStorageKey } from './noProjectShell.js'
 import WelcomePane from '@/components/welcome/WelcomePane.vue'
 import AccountEntry from '@/components/account/AccountEntry.vue'
@@ -3866,6 +3868,10 @@ export default {
       uni.$off('awd:entitlements-changed', this._onEntitlementsChanged)
       this._onEntitlementsChanged = null
     }
+    if (this._onAppLanguageChanged) {
+      uni.$off(APP_LANGUAGE_EVENT, this._onAppLanguageChanged)
+      this._onAppLanguageChanged = null
+    }
     // IDE 化聚焦刷新监听清理（本实例自己加的，直接摘）
     if (typeof window !== 'undefined' && this._localFocusRefresh) {
       window.removeEventListener('focus', this._localFocusRefresh)
@@ -4153,6 +4159,7 @@ export default {
     this.scheduleLibreSpare()
     // 菜单栏：重新接管（页面栈里可能有别的实例刚交出去）
     this.registerMenuCommands()
+    this.refreshLocalizedLabels?.()
 
     // 从设置页返回时刷新授权/账户 chip（用户可能刚连接或断开账户）
     this.loadLicenseMode()
@@ -4292,6 +4299,10 @@ export default {
       if (this.stagingFolderId) this.loadStagingUsage()
     }
     uni.$on('awd:entitlements-changed', this._onEntitlementsChanged)
+    this._onAppLanguageChanged = () => {
+      this.refreshLocalizedLabels?.()
+    }
+    uni.$on(APP_LANGUAGE_EVENT, this._onAppLanguageChanged)
     // 设置页/侧栏用户卡改了头像或昵称（dev-board#603）：顶栏那颗头像与参与人堆叠
     // 都是本页在画，本页不订阅就只能等下次重开工作台才跟上——用户看到的是
     // 「提示上传成功，但桌面端不显示」。刻意不加 isActiveOverviewInstance 守卫：
@@ -4907,7 +4918,10 @@ export default {
       try {
         const active = (this.leftFiles || []).find((f) => f.id === this.activeFileIdLeft)
         const parts = []
-        if (active && active.name) parts.push(active.name)
+        const activeTitle = active
+          ? (typeof this.getTabDisplayName === 'function' ? this.getTabDisplayName(active) : active.name)
+          : ''
+        if (activeTitle) parts.push(activeTitle)
         if (this.hasNamedProject && this.project && this.project.name) parts.push(this.project.name)
         parts.push('AI WorkDeck')
         document.title = parts.join(' — ')
@@ -6813,11 +6827,13 @@ export default {
     openMarketDetail(spec) {
       spec = { ...spec, projectId: Object.prototype.hasOwnProperty.call(spec, 'projectId') ? spec.projectId : (this.projectId || null) }
       const tabId = `market-detail_${spec.kind}_${spec.id}`
+      const resolvedName = (spec.kind === 'plugin' && typeof this.resolveBuiltinPluginName === 'function' ? this.resolveBuiltinPluginName(spec.id) : '') || spec.name || spec.id
       for (const pane of ['left', 'right']) {
         const list = pane === 'left' ? this.leftFiles : this.rightFiles
         const existing = list.find(f => f.id === tabId)
         if (existing) {
           existing.marketSpec = spec
+          existing.name = resolvedName
           const idProp = pane === 'left' ? 'activeFileIdLeft' : 'activeFileIdRight'
           this[idProp] = existing.id
           this.focusedPane = pane
@@ -6831,7 +6847,7 @@ export default {
       list.push({
         id: tabId,
         tabType: 'market-detail',
-        name: spec.name || spec.id,
+        name: resolvedName,
         marketSpec: spec
       })
       this[idProp] = tabId
@@ -7808,16 +7824,10 @@ export default {
         //    （uni-h5 重建 <view> 事件对象时把 drag 系字段全丢了，utils/fileTreeExternalDrop.js）。
         const dropped = captureDroppedFiles(dt, host.fs)
         if (dropped.length) {
-             // 文件夹在 dataTransfer.files 里是一个 0 字节、无类型的条目，照上传会在项目里
-             // 建出一份空壳文件。资源管理器有整套目录导入（import-local），这里只收文件。
-             if (this.droppedEntriesHaveDirectory(dt)) {
-                 uni.showToast({ title: this.$t('workbench.dragFolderUnsupported'), icon: 'none' })
-                 return
-             }
              if (this.$refs.chatInterface && this.$refs.chatInterface.uploadLocalFilesAndAddContext) {
                  // 落点固定项目根目录（工作台没有「当前文件夹」这个概念），先把落点说清楚
                  uni.showToast({ title: this.$t('workbench.dragUploadingToRoot'), icon: 'none' })
-                 this.$refs.chatInterface.uploadLocalFilesAndAddContext(dropped)
+                 this.$refs.chatInterface.uploadLocalFilesAndAddContext(dropped, dt)
              }
              return
         }
@@ -7828,18 +7838,8 @@ export default {
     addDraggedFileToAiContext(file, opts = {}) {
         if (!file || !file.id) return false
 
-        // 文件夹整体挂进来时的后代文件数上限：判据在 utils/aiContextFiles.js，
-        // 与 ChatInterface 那三个入口（@ 引用 / 从项目选择 / 右键）同一份
-        if (file.isDir && this.$refs.fileTree && Array.isArray(this.$refs.fileTree.allFiles)) {
-            const totalFiles = countDescendantFiles(this.$refs.fileTree.allFiles, file.id)
-            if (totalFiles > AI_CONTEXT_FOLDER_FILE_LIMIT) {
-                uni.showToast({ title: this.$t('workbench.folderTooManyFiles', { count: totalFiles }), icon: 'none' })
-                return false
-            }
-        }
-
         if (this.$refs.chatInterface) {
-            this.$refs.chatInterface.addFile(file)
+            if (this.$refs.chatInterface.addFile(file) === false) return false
         }
 
         // Note: Visual tag display is now handled within ChatInterface
@@ -8117,8 +8117,40 @@ export default {
       }
     },
 
+    getTabDisplayName(file) {
+      if (!file) return ''
+      if (typeof this.$t === 'function') {
+        const pluginLabelById = new Map((this.dynamicPlugins || []).map(p => [p.pluginId, (p.labelKey && this.$t(p.labelKey)) || p.label]))
+        const localized = resolveLocalizedTabName(file, (k, p) => (p === undefined ? this.$t(k) : this.$t(k, p)), pluginLabelById)
+        if (localized) return localized
+      }
+      return file.name || ''
+    },
+
+    resolveBuiltinPluginName(pluginId) {
+      const key = pluginId ? BUILTIN_PLUGIN_LABEL_KEYS[pluginId] : ''
+      if (!key || typeof this.$t !== 'function') return ''
+      const val = this.$t(key)
+      return val && val !== key ? val : ''
+    },
+
+    onMarketDetailTitleChange(tab, nextTitle) {
+      if (!tab || !nextTitle) return
+      const trimmed = String(nextTitle).trim()
+      if (!trimmed || tab.name === trimmed) return
+      tab.name = trimmed
+      if (tab.marketSpec && typeof tab.marketSpec === 'object') {
+        tab.marketSpec = { ...tab.marketSpec, name: trimmed }
+      }
+      this.updateWindowTitle()
+      this.scheduleTabSnapshotSave?.()
+    },
+
     refreshLocalizedLabels() {
       if (typeof this.$t !== 'function') return
+      if (!this.currentUser || !this.currentUser.displayName) {
+        this.userDisplayName = this.$t('workbench.defaultUserName')
+      }
       if (Array.isArray(this.dynamicPlugins) && this.dynamicPlugins.length) {
         this.dynamicPlugins = this.dynamicPlugins.map(p => {
           if (!p) return p
@@ -8129,23 +8161,23 @@ export default {
           return nextLabel === p.label ? p : { ...p, label: nextLabel }
         })
       }
-      const tabKeys = {
-        'message-center': 'messageCenter.title',
-        'dd-client': 'ddWorkflow.clientWorkspace',
-        welcome: 'welcome.tabName',
-        calendar: 'calendar.tabName',
-        'admin-settings': 'workbench.settingsTabName',
-        'commit-history': 'version.historyTabName',
-      }
       const pluginLabelById = new Map((this.dynamicPlugins || []).map(p => [p.pluginId, (p.labelKey && this.$t(p.labelKey)) || p.label]))
+      const translate = (k, p) => (p === undefined ? this.$t(k) : this.$t(k, p))
+      let changed = false
       for (const tab of [...(this.leftFiles || []), ...(this.rightFiles || [])]) {
         if (!tab || !tab.tabType) continue
-        if (tab.tabType === 'plugin' && tab.pluginId && pluginLabelById.has(tab.pluginId)) {
-          tab.name = pluginLabelById.get(tab.pluginId)
-        } else if (tabKeys[tab.tabType]) {
-          tab.name = this.$t(tabKeys[tab.tabType])
+        const nextName = resolveLocalizedTabName(tab, translate, pluginLabelById)
+        if (nextName && tab.name !== nextName) {
+          tab.name = nextName
+          changed = true
+        }
+        if (tab.tabType === 'version-text-diff' && tab.versionSpec && !tab.versionSpec.customLabels) {
+          tab.versionSpec.oldLabel = this.$t('workbenchOps.previousVersion')
+          tab.versionSpec.newLabel = this.$t('workbenchOps.currentVersion')
         }
       }
+      this.updateWindowTitle?.()
+      if (changed) this.scheduleTabSnapshotSave?.()
     },
 
     async handleOpenLawFirmPlugin(opts = {}) {

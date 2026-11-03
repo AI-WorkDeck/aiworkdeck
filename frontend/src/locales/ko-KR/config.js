@@ -16,7 +16,7 @@ export default {
     "search": "검색",
     "tts": "텍스트 음성 변환",
     "desensitize": "파일 삭제 처리(레닥션)",
-    "version": "Version History",
+    "version": "소스 제어",
     "calendar": "캘린더"
   },
   "tools": {

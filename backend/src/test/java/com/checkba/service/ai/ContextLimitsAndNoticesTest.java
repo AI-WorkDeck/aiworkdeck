@@ -32,6 +32,9 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 
 /**
  * 上下文层的上限与降级可见性（dev-board#793 K14 / #801 K21）。
@@ -51,7 +54,7 @@ class ContextLimitsAndNoticesTest {
     private ContextAssemblerService assembler;
 
     /** 收集本轮全部 notice / attachment，断言直接查它。 */
-    private static final class RecordingSink implements ContextTurnSink {
+    private static class RecordingSink implements ContextTurnSink {
         final List<String> notices = new ArrayList<>();
         final List<String> attachments = new ArrayList<>();
 
@@ -76,8 +79,8 @@ class ContextLimitsAndNoticesTest {
         ProjectAiMessageService messageService = mock(ProjectAiMessageService.class);
         when(messageService.listByConversationId(anyString())).thenReturn(Collections.emptyList());
         fileContextLoader = mock(FileContextLoader.class);
-        when(fileContextLoader.buildFolderContextCounted(anyString(), anyString(), anyInt()))
-                .thenReturn(new FileContextLoader.FolderContext("### Directory Content:\n", 0, 0));
+        when(fileContextLoader.buildFolderReference(anyString()))
+                .thenAnswer(inv -> "Lazy folder " + inv.getArgument(0));
         SkillRouter skillRouter = mock(SkillRouter.class);
         when(skillRouter.match(anyString())).thenReturn(Optional.empty());
         MemoryManager memoryManager = mock(MemoryManager.class);
@@ -203,54 +206,95 @@ class ContextLimitsAndNoticesTest {
     // ---------- E-14 + missed①：总闸真正生效 ----------
 
     @Test
-    @DisplayName("超过 max-files-per-context 的附件被丢弃时逐条报出来，不再静默砍尾")
-    void itemsBeyondTheFileLimitAreNamedNotSilentlyDropped() {
+    @DisplayName("500个附件全部保留引用，预读额度仅限制IO而不拒收")
+    void allAttachmentReferencesRemainReachableBeyondTheEagerReadBudget() {
         properties.getFiles().setMaxFilesPerContext(2);
         when(legalTools.read_document(anyString())).thenReturn("正文");
-
+        List<AiAgentController.ContextItem> items = new ArrayList<>();
+        for (int i = 1; i <= 500; i++) items.add(file(String.valueOf(i), "材料" + i + ".docx"));
         RecordingSink sink = new RecordingSink();
-        systemTextOf(List.of(file("1", "a.docx"), file("2", "b.docx"),
-                file("3", "c.docx"), file("4", "d.docx")), null, sink);
-
-        assertFalse(sink.hasNotice(ContextTurnSink.DROPPED, "1"));
-        assertFalse(sink.hasNotice(ContextTurnSink.DROPPED, "2"));
-        assertTrue(sink.hasNotice(ContextTurnSink.DROPPED, "3"), "第 3 份被丢了要说");
-        assertTrue(sink.hasNotice(ContextTurnSink.DROPPED, "4"), "第 4 份也要说，不能只报第一条");
+        String systemText = systemTextOf(items, null, sink);
+        for (int i = 1; i <= 500; i++) {
+            assertTrue(systemText.contains("<file id=\"" + i + "\""));
+        }
+        assertEquals(500, sink.attachments.size());
+        verify(legalTools, times(2)).read_document(anyString());
+        assertTrue(sink.hasNotice(ContextTurnSink.DEFERRED, null));
+        assertEquals(1, sink.notices.size(), "大量待读附件仅报告汇总，不刷500条提示");
     }
 
     @Test
-    @DisplayName("文件夹读掉的份数要计进总闸，三个文件夹不能各拿满额")
-    void foldersConsumeTheSharedQuota() {
-        properties.getFiles().setMaxFilesPerContext(10);
-        // 第一个文件夹读了 6 份，第二个只应拿到剩下的 4 份额度
-        when(fileContextLoader.buildFolderContextCounted("100", "88", 0))
-                .thenReturn(new FileContextLoader.FolderContext("folder-a", 6, 0));
-        when(fileContextLoader.buildFolderContextCounted("200", "88", 6))
-                .thenReturn(new FileContextLoader.FolderContext("folder-b", 4, 0));
+    void steeringUserMessageKeepsAttachmentScopeWhenItsSystemPromptIsNotForwarded() {
+        RecordingSink sink = new RecordingSink() {
+            @Override public Long attachmentMessageId() { return 77L; }
+        };
+        var messages = assembler.assemble("conv-1", "run-1", "read this folder",
+                List.of(folder("99", "certificates")), null, null, null, "88", AgentMode.AGENT, 1L, null, sink);
+        var user = (dev.langchain4j.data.message.UserMessage) messages.get(messages.size() - 1);
+        assertTrue(user.singleText().contains("list_attached_files(messageId=77, afterId=0)"));
+        assertTrue(user.singleText().contains("follow nextAfterId"));
+        verify(legalTools, never()).read_document(anyString());
+    }
 
+    @Test
+    void persistedLargeManifestIsPagedInsteadOfExpandingEveryReference() {
+        when(legalTools.read_document(anyString())).thenReturn("正文");
+        List<AiAgentController.ContextItem> items = new ArrayList<>();
+        for (int i = 1; i <= 1000; i++) items.add(file(String.valueOf(i), "材料" + i + ".docx"));
+        RecordingSink sink = new RecordingSink() {
+            @Override public Long attachmentMessageId() { return 77L; }
+        };
+        String system = systemTextOf(items, null, sink);
+        assertTrue(system.contains("list_attached_files(messageId=77, afterId=0)"));
+        assertTrue(system.contains("<file id=\"100\""));
+        assertFalse(system.contains("<file id=\"101\""));
+        assertEquals(1000, sink.attachments.size(), "完整集合仍要持久化，不能只保存首100");
+        verify(legalTools, times(10)).read_document(anyString());
+    }
+
+    @Test
+    @DisplayName("文件夹按需读取，准备阶段不枚举或预读扫描证书")
+    void foldersRemainLazyAndDoNotConsumeSingleFilePreloadBudget() {
+        when(legalTools.read_document("5")).thenReturn("独立文件正文");
         RecordingSink sink = new RecordingSink();
         String systemText = systemTextOf(
                 List.of(folder("100", "证据一"), folder("200", "证据二"), file("5", "e.docx")),
                 null, sink);
-
-        assertTrue(systemText.contains("folder-a"));
-        assertTrue(systemText.contains("folder-b"));
-        // 两个文件夹合计已经用掉 10 份额度，后面那份单文件必须被挡下并报出来
-        assertTrue(sink.hasNotice(ContextTurnSink.DROPPED, "5"),
-                "额度用完后的条目要被挡下——原来 totalFileCount 从不递增，"
-                        + "三个文件夹能一次注入 30 份正文");
+        assertTrue(systemText.contains("Lazy folder 100"));
+        assertTrue(systemText.contains("Lazy folder 200"));
+        assertTrue(systemText.contains("独立文件正文"));
+        verify(fileContextLoader, never()).buildFolderContextCounted(anyString(), anyString(), anyInt());
+        assertTrue(sink.hasNotice(ContextTurnSink.DEFERRED, null));
+        assertEquals(3, sink.attachments.size());
     }
 
     @Test
-    @DisplayName("文件夹里读不出正文的文件要报一条 unreadable")
-    void unreadableFilesInsideAFolderAreReported() {
-        when(fileContextLoader.buildFolderContextCounted("100", "88", 0))
-                .thenReturn(new FileContextLoader.FolderContext("folder-a", 2, 3));
+    void persistentCancellationStopsNextReadEvenIfExtractorClearsInterrupt() {
+        java.util.concurrent.atomic.AtomicBoolean cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+        when(legalTools.read_document("1")).thenAnswer(inv -> {
+            cancelled.set(true);
+            Thread.interrupted();
+            return "已读取";
+        });
+        RecordingSink sink = new RecordingSink() {
+            @Override public boolean cancelled() { return cancelled.get(); }
+        };
+        org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.CancellationException.class,
+                () -> systemTextOf(List.of(file("1", "第一份.txt"), file("2", "第二份.png")), null, sink));
+        verify(legalTools, never()).read_document("2");
+    }
 
-        RecordingSink sink = new RecordingSink();
-        systemTextOf(List.of(folder("100", "现场照片")), null, sink);
-
-        assertTrue(sink.hasNotice(ContextTurnSink.UNREADABLE, "100"));
+    @Test
+    @DisplayName("准备任务中断后不再读取下一份材料")
+    void interruptionStopsBeforeAnyAttachmentRead() {
+        Thread.currentThread().interrupt();
+        try {
+            org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.CancellationException.class,
+                    () -> systemTextOf(List.of(file("1", "材料.docx")), null, ContextTurnSink.NOOP));
+            verify(legalTools, never()).read_document(anyString());
+        } finally {
+            Thread.interrupted();
+        }
     }
 
     @Test
@@ -290,9 +334,9 @@ class ContextLimitsAndNoticesTest {
 
         assertTrue(sink.attachments.contains("image:11:现场1.png:true"));
         assertTrue(sink.attachments.contains("image:12:现场2.png:true"));
-        assertTrue(sink.hasNotice(ContextTurnSink.DROPPED, "13"),
-                "两张图已经吃掉 2 份配额，第三份必须被挡下——"
-                        + "原来直送分支不 totalFileCount++，实际可注入 4 张图 + 10 份文件");
+        assertTrue(sink.hasNotice(ContextTurnSink.DEFERRED, null));
+        assertTrue(sink.attachments.contains("file:13:合同.docx:false"));
+        verify(legalTools, never()).read_document("13");
     }
 
     @Test
@@ -394,8 +438,6 @@ class ContextLimitsAndNoticesTest {
     @Test
     @DisplayName("每个附件都登记一条，kind 分 file/image/folder")
     void everyAttachmentIsLedgered() throws Exception {
-        when(fileContextLoader.buildFolderContextCounted(anyString(), anyString(), anyInt()))
-                .thenReturn(new FileContextLoader.FolderContext("folder", 1, 0));
         when(legalTools.read_document(anyString())).thenReturn("正文");
         stubImageBytes(11L, 64);
 
@@ -432,8 +474,9 @@ class ContextLimitsAndNoticesTest {
         assertTrue(sink.hasNotice(ContextTurnSink.TRUNCATED, "2"),
                 "第二份应当因为总闸被截断并报出来，实际 notices=" + sink.notices);
         // 第三份一个字都进不去，但壳还在、且有专门的 notice
-        assertTrue(sink.hasNotice(ContextTurnSink.BUDGET_EXHAUSTED, "3"),
-                "第三份应当报 budget_exhausted，实际 notices=" + sink.notices);
+        assertTrue(sink.hasNotice(ContextTurnSink.DEFERRED, null),
+                "第三份应当报延后读取，实际 notices=" + sink.notices);
+        verify(legalTools, never()).read_document("3");
         assertTrue(systemText.contains("<file id=\"3\""), "第三份的 <file> 壳要留着，模型才知道它存在");
         assertFalse(systemText.contains("丙".repeat(100)), "第三份的正文一个字都不该进去");
 
@@ -450,6 +493,19 @@ class ContextLimitsAndNoticesTest {
         assertTrue(cdataChars <= 60000 + 200,
                 "附件正文合计应当不超过总闸（含少量截断标记），实际 " + cdataChars);
         assertTrue(cdataChars > 55000, "也不该压过头，实际 " + cdataChars);
+    }
+
+    @Test
+    @DisplayName("正文额度耗尽不继续OCR后续图片，引用和附件记录仍保留")
+    void exhaustedBudgetDefersImageBeforeOcr() {
+        properties.getFiles().setMaxTotalAttachmentChars(2);
+        when(legalTools.read_document("1")).thenReturn("正文");
+        RecordingSink sink = new RecordingSink();
+        String system = systemTextOf(List.of(file("1", "一.txt"), file("2", "商标证.png")), null, sink);
+        verify(legalTools, never()).read_document("2");
+        assertTrue(system.contains("<file id=\"2\""));
+        assertTrue(sink.attachments.contains("image:2:商标证.png:false"));
+        assertTrue(sink.hasNotice(ContextTurnSink.DEFERRED, null));
     }
 
     @Test

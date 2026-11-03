@@ -10,10 +10,10 @@ function harness(initial = 'all') {
   const results = []
   const switches = []
   const ctx = vm.createContext({
-    xModel: {}, INFLIGHT: {}, CANCELLED: {}, AI_AUTHOR: 'AI WorkDeck', humanAuthor: 'Editor',
+    xModel: {}, docSeq: 1, INFLIGHT: {}, CANCELLED: {}, AI_AUTHOR: 'AI WorkDeck', humanAuthor: 'Editor',
     setRedlineAuthor: value => { author = value }, log() {}, errStr: String,
     post: (kind, data) => { if (kind === 'result') results.push(data) },
-    isWriterDoc: () => true, revisionViewState: () => ({ mode }), hasAnyRedline: () => true,
+    isWriterDoc: () => true, isImpressDoc: () => false, revisionViewState: () => ({ mode }), hasAnyRedline: () => true,
     withViewOnlyChange: fn => fn(), applyRevisionView(next) { switches.push(next); mode = next; return { mode } },
     ctrl: { getViewCursor: () => ({}) }, paragraphTextOf: () => '',
     REVISION_VIEWS: ['all', 'balloons', 'margin', 'final'], supportsReviewGeometry: () => true,
@@ -23,7 +23,7 @@ function harness(initial = 'all') {
   const command = source.slice(source.indexOf('  set_revision_view(p) {'), source.indexOf('  // [spike] Phase B:', source.indexOf('  set_revision_view(p) {')))
   vm.runInContext(guard + '\nconst EXEC = {' + command + '};', ctx)
   vm.runInContext('const RESOLVE_REVISION_ACTIONS = new Set();\n' + source.slice(source.indexOf('function execCommand('), source.indexOf('// ---- message loop')), ctx)
-  return { switchDocument: () => { ctx.xModel = {}; mode = 'all' }, cancel: id => { ctx.CANCELLED[id] = true }, dispatch: vm.runInContext('execCommand', ctx), actions: vm.runInContext('EXEC', ctx), author: () => author, results, run: vm.runInContext('runAgentCommandInMarginView', ctx), set: vm.runInContext('EXEC.set_revision_view', ctx), mode: () => mode, switches }
+  return { switchDocument: () => { ctx.xModel = {}; ctx.docSeq++; mode = 'all' }, cancel: id => { ctx.CANCELLED[id] = true }, dispatch: vm.runInContext('execCommand', ctx), actions: vm.runInContext('EXEC', ctx), author: () => author, results, run: vm.runInContext('runAgentCommandInMarginView', ctx), set: vm.runInContext('EXEC.set_revision_view', ctx), mode: () => mode, switches }
 }
 for (const fail of [false, true]) test(`user view waits for async final-text edits and survives ${fail ? 'failure' : 'success'}`, async () => {
   const h = harness()

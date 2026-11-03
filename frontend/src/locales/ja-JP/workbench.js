@@ -310,7 +310,6 @@ export default {
   "selectReplaceContentFirst": "ドキュメント内で置換する内容を先に選択してください",
   "selectionReplaced": "選択範囲を置換しました",
   "replaceFailed": "置換に失敗しました",
-  "folderTooManyFiles": "フォルダには {count} 個のファイルが含まれています（上限の10ファイルを超過しています）。一部を削除してください",
   "fileAdded": "追加済み: {name}",
   "filesAdded": "{count} 個のファイルを追加しました",
   "dragUnsupported": "ここにはドロップできません。ファイル、エディタタブ、またはお使いのPC上のファイルをドロップしてください",

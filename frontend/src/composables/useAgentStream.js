@@ -112,6 +112,7 @@ export function useAgentStream() {
     const bubbles = ref([])
     const isConnected = ref(false)
     const isStreaming = ref(false)
+    const contextProgress = ref(null)
     // SSE 链路状态（dev-board#364）：'live' = 连接活着（心跳在跳，等模型是正常的）；
     // 'reconnecting' = 心跳超时/流断了，正在退避重连（attempt 是第几次）。
     // 之前断线重连只写 console.warn，用户看到的是计时器一直走、什么都不发生——
@@ -457,6 +458,7 @@ export function useAgentStream() {
 
     // --- SET CONVERSATION ID (with auto-reset) ---
     const setConversationIdWithReset = (id) => {
+        contextProgress.value = null
         // Only reset if actually changing conversations
         if (currentConversationId.value !== id) {
             console.log('[AgentStream] Conversation changing:', currentConversationId.value, '->', id)
@@ -1393,6 +1395,18 @@ export function useAgentStream() {
         // 挂在助手气泡上等于把「你的附件被丢了」说成模型的输出。
         // 历史回灌不重放（GET /api/ai/history 不带这些，气泡里就是空数组）：
         // 降级是「这一轮发生的事」，刷新之后再弹一次只是噪音。
+        if (evt === 'context_progress') {
+            try {
+                const d = JSON.parse(dataStr)
+                if (d.done) contextProgress.value = null
+                else if (Number.isFinite(d.completed) && Number.isFinite(d.total) && d.completed >= 0 && d.total >= d.completed) {
+                    contextProgress.value = { completed: d.completed, total: d.total, name: String(d.name || '') }
+                }
+            } catch (_) { /* malformed progress must not break the stream */ }
+            return
+        }
+        if (evt === 'bubble_end' || evt === 'error' || evt === 'cancelled') contextProgress.value = null
+
         if (evt === 'context_notice') {
             try {
                 const d = JSON.parse(dataStr)
@@ -1854,7 +1868,9 @@ export function useAgentStream() {
                 // 账户类失败的载荷是 JSON {message, code, kind, reason?}（登录后置 4011 契约，
                 // dev-board#1046）；其余错误仍是字符串。只加不改：解析不出来就按原串走
                 const accountPayload = parseAccountErrorPayload(dataStr)
-                const errMsg = dataStr && accountPayload ? (accountPayload.message || dataStr) : (dataStr || "Unknown Error")
+                let attachmentErrorKey = ''
+                try { const payload = JSON.parse(dataStr); attachmentErrorKey = ({ CONTEXT_PREPARATION_TIMEOUT: 'chat.contextPreparationTimeout', ATTACHMENT_READER_BUSY: 'chat.attachmentReaderBusy', ATTACHMENTS_REQUIRE_TOOLS: 'chat.attachmentsRequireTools' })[payload?.code] || '' } catch (_) { /* plain-text error */ }
+                const errMsg = attachmentErrorKey ? t(attachmentErrorKey) : dataStr && accountPayload ? (accountPayload.message || dataStr) : (dataStr || "Unknown Error")
                 if (isAccountRequired(accountPayload)) {
                     // 这台电脑还没登录账户：就地弹登录层（不是会话失效，不清会话）。
                     // 这一轮不自动重发——登录完用户重发即可。平时走不到这里：ChatInterface
@@ -2900,6 +2916,7 @@ export function useAgentStream() {
 
     return {
         bubbles,
+        contextProgress,
         isStreaming,
         sendMessage,
         abort,

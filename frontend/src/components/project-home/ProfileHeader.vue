@@ -63,13 +63,13 @@ import { isProfileEmpty, profileFieldHint } from '@/utils/projectHomeFormat.js'
 import { t } from '@/i18n'
 import AwdSelect from '@/components/AwdSelect.vue'
 
-// 语言切换 = 整页 reload，模块顶层调 t() 取到的静态文案是安全的（同 CONVENTIONS.md）
+// 用 getter 动态取词，确保热切换语言时立即生效
 const PLACEHOLDERS = {
-  client: t('projects.placeholderClient'),
-  matterType: t('projects.selectMatterType'),
-  openedAt: t('projects.placeholderOpenedAt'),
-  nextStep: t('projects.placeholderNextStep'),
-  counterparty: t('projects.placeholderCounterparty'),
+  get client() { return t('projects.placeholderClient') },
+  get matterType() { return t('projects.selectMatterType') },
+  get openedAt() { return t('projects.placeholderOpenedAt') },
+  get nextStep() { return t('projects.placeholderNextStep') },
+  get counterparty() { return t('projects.placeholderCounterparty') },
 }
 
 export default {

@@ -12,6 +12,7 @@ import { t } from '@/i18n'
 import { isEnglish } from '@/utils/appLanguage.js'
 
 const LOCALIZED_NAMES = {
+  "list_attached_files": "editor.officeToolNames.listAttachedFiles",
   "case_search": "legalReference.caseSearch",
   "office_ppt_add_image": "editor.officeToolNames.office_ppt_add_image",
   "office_ppt_add_chart": "editor.officeToolNames.office_ppt_add_chart",
