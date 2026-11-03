@@ -5,6 +5,11 @@ description: 授权与计费领域。任务涉及解锁门（试用码/账户 Ke
 
 # 授权与计费 领域地图
 
+## 切站后的官方案件库与消息中心（dev-board#1657）
+
+`OfficialCloudService` 在调用时从 `SiteProfileService` 解析当前账户站点，不得缓存启动站点；显式自建地址仍优先。国际站按现有契约不提供官方案件库，不得回落大陆。消息中心连接阶段的案件库业务异常与网络异常须进入既有云端不可用状态，保留本地来源；账户变化守卫仍拒绝旧账户结果。回归见 `OfficialCloudServiceTest` 与 `MessageCenterGatewayTest`。
+
+
 ## 百炼平台凭据与计量（2026-10-29，dev-board#1625）
 
 POST ai-key发送 X-AWD-AI-Protocol:2。国内返回限权 awdai_ runtime token（不含百炼共享Key或awdk账户Key），baseUrl必须严格匹配当前账户站点 /api/account/ai/v1。server只加密保存runtime token及provider/baseUrl/defaultModel，awdk仍用完即弃。旧国内OpenRouter机器缓存丢弃重取；已有server用户需重新连接/刷新以换取国内runtime token，不允许退回机器额度。PlatformUsageAccountant对国内调用同站 /usage，读累计usageUsd作观测，不二次扣费；实际扣费在官网网关。国际仍OpenRouter /key。新账本不覆盖旧token_usage或余额。
