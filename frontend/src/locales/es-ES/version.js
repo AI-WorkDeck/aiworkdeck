@@ -25,7 +25,7 @@ export default {
   "exitCancel": "Cancelar",
   "exitConflict": "Los cambios tienen conflictos pendientes. Resuélvalos en el Control de versiones antes de salir.",
   "exitNewChanges": "Hay nuevos cambios pendientes de confirmar. Revíselos antes de salir.",
-  "exitCheckFailed": "No se pudieron comprobar ni confirmar los cambios del proyecto. Se ha cancelado la salida; inténtelo de nuevo.",
+  "exitCheckFailed": "No se pudieron comprobar o confirmar los cambios. Reintenta o sal sin confirmar.",
   "controlEntry": "Control de versiones",
   "entryUnavailable": "Estado no disponible. Haga clic para reintentar",
   "pendingFileCount": "{count} archivo(s) pendientes de confirmar",

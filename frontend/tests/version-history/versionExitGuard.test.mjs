@@ -287,3 +287,54 @@ for (const operation of ['save', 'readStatus', 'choose', 'commit']) {
     assert.equal(h.calls.some(call => Array.isArray(call) && call[0] === 'commit'), false)
   })
 }
+
+test('failed status can retry and then leave after a successful save and read', async () => {
+  let reads = 0
+  const h = setup({
+    readStatus: async () => { if (++reads === 1) throw Error('unavailable'); return clean() },
+    chooseFailure: async reason => { assert.equal(reason, 'status-failed'); return 'retry' },
+  })
+  assert.equal(await h.confirm(), true)
+  assert.equal(reads, 2)
+})
+
+for (const saved of [true, false]) test(`direct exit after failed status still requires save: ${saved}`, async () => {
+  let saves = 0
+  const h = setup({
+    save: async () => ++saves === 1 || saved,
+    readStatus: async () => { throw Error('unavailable') },
+    chooseFailure: async () => 'skip',
+  })
+  assert.equal(await h.confirm(), saved)
+  assert.equal(saves, 2)
+})
+
+test('stale failure choice cannot authorize leaving', async () => {
+  let current = true
+  const h = setup({
+    readStatus: async () => { throw Error('unavailable') },
+    chooseFailure: async () => { current = false; return 'skip' },
+    isCurrent: () => current,
+  })
+  assert.equal(await h.confirm(), false)
+})
+
+for (const choice of ['retry', 'skip']) test(`commit failure supports ${choice}`, async () => {
+  let commits = 0
+  const h = setup({
+    commit: async () => { if (++commits === 1) throw Error('offline'); return {} },
+    chooseFailure: async reason => { assert.equal(reason, 'commit-failed'); return choice },
+  })
+  assert.equal(await h.confirm(), true)
+})
+
+test('direct exit save exception reports save failure', async () => {
+  let saves = 0
+  const h = setup({
+    save: async () => { if (++saves > 1) throw Error('save failed'); return true },
+    readStatus: async () => { throw Error('offline') },
+    chooseFailure: async () => 'skip',
+  })
+  assert.equal(await h.confirm(), false)
+  assert.deepEqual(h.blocked, ['save-failed'])
+})

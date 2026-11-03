@@ -25,7 +25,7 @@ export default {
   "exitCancel": "İptal",
   "exitConflict": "Değişiklikler çatışma çözümü gerektiriyor. Çıkmadan önce Kaynak Denetimi'nde bunları çözün.",
   "exitNewChanges": "Kaydedilmeyi bekleyen yeni değişiklikler var. Çıkmadan önce bunları gözden geçirin.",
-  "exitCheckFailed": "Proje değişiklikleri kontrol edilemedi veya kaydedilemedi. Çıkış iptal edildi; lütfen tekrar deneyin.",
+  "exitCheckFailed": "Proje değişiklikleri kontrol edilemedi veya kaydedilemedi. Yeniden deneyin veya kaydetmeden çıkın.",
   "controlEntry": "Kaynak Denetimi",
   "entryUnavailable": "Durum kullanılamıyor. Tekrar denemek için tıklayın",
   "pendingFileCount": "{count} dosya işlemeye hazır bekliyor",

@@ -25,7 +25,7 @@ export default {
   "exitCancel": "Hủy",
   "exitConflict": "Các thay đổi có xung đột cần giải quyết. Vui lòng xử lý trong Quản lý Phiên bản trước khi rời khỏi.",
   "exitNewChanges": "Vẫn còn thay đổi mới đang chờ commit. Vui lòng kiểm tra trước khi rời khỏi.",
-  "exitCheckFailed": "Không thể kiểm tra hoặc commit các thay đổi của dự án. Đã hủy thao tác rời khỏi; vui lòng thử lại.",
+  "exitCheckFailed": "Không thể kiểm tra hoặc ghi nhận thay đổi. Thử lại hoặc thoát mà không ghi nhận.",
   "controlEntry": "Quản lý Phiên bản",
   "entryUnavailable": "Không thể hiển thị trạng thái. Nhấp để thử lại",
   "pendingFileCount": "{count} tệp đang chờ commit",

@@ -5222,6 +5222,14 @@ export default {
             this.collabRefreshToken += 1
             return result?.data || {}
           },
+          chooseFailure: async () => {
+            const result = await showSheet({
+              title: this.$t('version.exitCheckFailed'),
+              itemList: [this.$t('common.retry'), this.$t('version.exitSkip')],
+              cancelText: this.$t('version.exitCancel'),
+            })
+            return result.tapIndex === 0 ? 'retry' : result.tapIndex === 1 ? 'skip' : 'cancel'
+          },
           onBlocked: (reason) => {
             if (reason === 'conflict' || reason === 'new-changes') this.openProjectVersionPanel()
             const key = reason === 'conflict' ? 'exitConflict'

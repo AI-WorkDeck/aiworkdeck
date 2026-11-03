@@ -25,7 +25,7 @@ export default {
   "exitCancel": "Annulla",
   "exitConflict": "Le modifiche richiedono la risoluzione dei conflitti. Risolvili nel Controllo versione prima di uscire.",
   "exitNewChanges": "Ci sono nuove modifiche in attesa di registrazione. Esaminale prima di uscire.",
-  "exitCheckFailed": "Impossibile verificare o registrare le modifiche del progetto. L'uscita è stata annullata; riprova.",
+  "exitCheckFailed": "Impossibile verificare o registrare le modifiche. Riprova o esci senza registrarle.",
   "controlEntry": "Controllo versione",
   "entryUnavailable": "Stato non disponibile. Fai clic per riprovare",
   "pendingFileCount": "{count} file in attesa di registrazione",

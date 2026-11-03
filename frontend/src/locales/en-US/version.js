@@ -27,7 +27,7 @@ export default {
   exitCancel: 'Cancel',
   exitConflict: 'Changes need conflict resolution. Resolve them in Source Control before leaving.',
   exitNewChanges: 'There are new changes awaiting commit. Review them before leaving.',
-  exitCheckFailed: 'Could not check or commit project changes. Leaving was cancelled; please retry.',
+  exitCheckFailed: "Could not check or commit project changes. Retry or exit without committing.",
   controlEntry: 'Source Control',
   entryUnavailable: 'Status unavailable. Click to retry',
   pendingFileCount: '{count} files awaiting commit',

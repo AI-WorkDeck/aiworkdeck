@@ -135,7 +135,7 @@ test('项目退出进度阻止底层键盘输入并持有原生浮层，失败�
     const confirm = parentMethod('confirmVersionBeforeLeaving', {
       createVersionExitGuard,
       getVersionStatus: async () => ({ data: state({ working: !committed, changedCount: committed ? 0 : 2 }) }),
-      showSheet: async () => ({ tapIndex: 0 }),
+      showSheet: async () => ({ tapIndex: enteredCommit && fail ? -1 : 0 }),
       endWorkSession: async () => { enteredCommit = true; await receipt.promise; if (fail) throw new Error('offline'); committed = true; return { data: {} } },
       setGlobalOverlay: (active, key) => active ? overlays.add(key) : overlays.delete(key),
       window: { addEventListener: (_, fn) => listeners.add(fn), removeEventListener: (_, fn) => listeners.delete(fn) },
