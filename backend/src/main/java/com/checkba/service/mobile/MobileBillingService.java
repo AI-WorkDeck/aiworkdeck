@@ -308,9 +308,17 @@ public class MobileBillingService {
         return status;
     }
 
-    public MobileBillingClient.SubscriptionCapability appstoreSubscriptionCapability() {
+    public MobileBillingClient.SubscriptionCapability appstoreSubscriptionCapability(Long userId) {
         if (!rechargeEnabled) return new MobileBillingClient.SubscriptionCapability(false, "pro.monthly.cny.149");
-        return billing.appstoreSubscriptionCapability();
+        String accountId;
+        try {
+            accountId = requireAccountId(userId);
+        } catch (MobileBillingFailureException e) {
+            if (e.getKind() != MobileBillingKind.NOT_CONNECTED) throw e;
+            // Capability reads never create accounts; new users retain the production offer.
+            accountId = null;
+        }
+        return billing.appstoreSubscriptionCapability(accountId);
     }
 
     public MobileBillingClient.SubscriptionPreparation prepareAppstoreSubscription(Long userId) {

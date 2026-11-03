@@ -1580,6 +1580,10 @@ return 404 兜底，云后端从 127.0.0.1 直连 Next。云侧唯一出口
 - 试用码本身可离线复验：base32 解码后应为 70 字节、`payload[0..1] == 0x01 0x01`，
   再用 `backend/src/main/resources/license/trial-public-key.pem` 验 Ed25519 签名。
 
+## Apple subscription review capability (dev-board#1671)
+
+The mobile capability endpoint passes the authenticated user through the existing read-only account resolution to the website. It never accepts a client-supplied account ID or creates an account; an unconnected user gets only the public production capability. This permits account-scoped review availability without changing the production sales flag. Sandbox receipt and ledger isolation remains website-owned; this identity plumbing alone does not validate a purchase.
+
 ## Circle 与包晴天扫码（dev-board#1665/#1671）
 
 国际 Circle 账户可取得本站受限网关通道；国内仍要求百炼。缓存同时核账户指纹、站点与网关 base URL。包晴天扫码入口仅在大陆且 captcha-config 的 bqtScanEnabled 严格为 true 时显示；服务端未配置时正常密码登录仍可用。二维码只含公开 qrid，create 回执的 pollToken 仅留当前会话内存；前端请求本机 X-Bqt-Poll-Token，Java 通过专用登录 GET 的 Authorization Bearer 转发官网。不得把 pollToken 放进 URL 或二维码。网站原子消费扫码会话，确认响应丢失需刷新二维码；前端轮询互斥且丢弃已替换会话回执。
