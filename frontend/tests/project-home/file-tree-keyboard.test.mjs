@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import { startExternalFileDrag } from '../../src/utils/fileLocalDrag.js'
 
 const source = readFileSync(new URL('../../src/components/FileTree.vue', import.meta.url), 'utf8')
-const body = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+const body = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
   .replace(/^import\s[\s\S]*?from\s+['"][^'"]+['"]\s*$/gm, '')
   .replace('export default {', 'return {')
 

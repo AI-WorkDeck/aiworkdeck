@@ -574,7 +574,7 @@
             var addonList = document.getElementById("addonList");
             var curList = PUBLISH_REPLACE_STRING;
             curList.forEach(function (element) {
-                var param = JSON.stringify(element).replace("\"", "\'");
+                var param = JSON.stringify(element).replace(/"/g, "\'");
                 UpdateElement(element, 'enable')
             });
         }

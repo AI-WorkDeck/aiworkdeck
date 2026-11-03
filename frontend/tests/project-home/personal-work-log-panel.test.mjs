@@ -105,7 +105,7 @@ test('BUG-04 复核缺口: 导出按钮保持 flex-shrink:0，折行后仍是完
 
 /** 把组件 <script> 抽出来，剥掉 import，当函数体跑；只测纯函数部分（不依赖 uni/网络）。 */
 function makeVm() {
-  const script = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
   const importRe = /import\s*\{([\s\S]*?)\}\s*from\s*'[^']+'\s*;?/g
   const defaultImportRe = /import\s+([A-Za-z_$][\w$]*)\s+from\s*'[^']+'\s*;?/g
   const locals = []

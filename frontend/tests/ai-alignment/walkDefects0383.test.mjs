@@ -59,9 +59,11 @@ test('D3: 「立即发送」恢复执行前，本地没有 SSE 就先重连，�
 // 把反馈入口从可拖动浮钮改成左栏 rail 底部的固定图标，浮钮连同让路机制一起撤掉，
 // 这类遮挡不可能再发生——守的点因此换成「浮钮不许回来」（回来了就得连让路一起恢复）。
 test('D4: 反馈入口不再是浮钮，队列面板/输入卡不会被它盖住', () => {
-  const root = INBOX.match(/<template>(?:\s|<!--[\s\S]*?-->)*(<view\b[^>]*>)/)
-  assert.ok(root, '找不到 AgentInbox 根节点')
-  assert.match(root[1], /class="agent-inbox"/)
+  const tplStart = INBOX.indexOf('<template>')
+  const viewStart = INBOX.indexOf('<view', tplStart)
+  const viewEnd = INBOX.indexOf('>', viewStart)
+  assert.ok(tplStart >= 0 && viewStart > tplStart && viewEnd > viewStart, '找不到 AgentInbox 根节点')
+  assert.match(INBOX.slice(viewStart, viewEnd + 1), /class="agent-inbox"/)
   const widget = read('../../src/components/FeedbackWidget.vue')
   assert.ok(!widget.includes('awdfb-launcher'), '反馈浮钮不许回来（dev-board#755）')
   assert.ok(!widget.includes('pointerdown'), '入口不许再可拖动')
@@ -79,7 +81,9 @@ test('D2: #798 新增的每个 textarea/input 都显式声明 maxlength（uni-h5
 
 // 真按键 e2e 抓到的同族缺陷：队列行内编辑打完字立刻点保存，v-model 还是旧值，改动整个丢掉
 function inboxVm(liveValue) {
-  const script = INBOX.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/export\s+default/, 'return')
+  const scriptOpen = '<' + 'script>'
+  const scriptClose = '</' + 'script>'
+  const script = INBOX.slice(INBOX.indexOf(scriptOpen) + scriptOpen.length, INBOX.indexOf(scriptClose)).replace(/export\s+default/, 'return')
   const options = new Function(script)()
   const emitted = []
   const vm = Object.assign({ $emit: (name, payload) => emitted.push([name, payload]) }, options.data())

@@ -10,7 +10,7 @@ import zh from '../../src/locales/zh-CN/meeting.js'
 import en from '../../src/locales/en-US/meeting.js'
 
 const source = readFileSync(new URL('../../src/components/MeetingRecordingPanel.vue', import.meta.url), 'utf8')
-const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
   .replace(/^import[\s\S]*?from ['"][^'"]+['"]\s*$/gm, '')
   .replace('export default', 'return')
 

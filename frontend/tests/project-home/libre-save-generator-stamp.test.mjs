@@ -14,7 +14,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const SRC = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8')
-const BODY = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+const BODY = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
   .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
   .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
 

@@ -15,7 +15,7 @@ const source = file => readFileSync(new URL(`../../src/${file}`, import.meta.url
 const files = ['components/dd/DdClientWorkspace.vue', 'components/dd/DdClientChecklist.vue', 'pages/client-portal/client-portal.vue']
 function component(file) {
   const s = source(file)
-  const body = s.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'return')
+  const body = s.slice(s.indexOf('<script>') + 8, s.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'return')
   const options = new Function('DdClientWorkspace', 'DdClientChecklist', 'ddNotificationPermission', body)({ render: () => null }, { render: () => null }, () => 'unavailable')
   const code = compile(s.match(/<template>([\s\S]*?)<\/template>/)[1], { mode: 'function', isCustomElement: tag => ['view', 'checkbox-group', 'checkbox', 'progress'].includes(tag) }).code
   options.render = new Function('Vue', code)(Vue)

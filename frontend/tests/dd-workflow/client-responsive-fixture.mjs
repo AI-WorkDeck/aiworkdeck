@@ -17,9 +17,12 @@ const compiled = await Promise.all(components.map(async name => {
   if (style.errors.length) throw style.errors[0]
   const script = descriptor.script.content.replace(/^import .*$/gm, '').replace('export default', `const ${name} =`)
   const render = compile(descriptor.template.content, { mode: 'function', prefixIdentifiers: true, isCustomElement: tag => ['checkbox', 'checkbox-group', 'progress'].includes(tag) }).code
-  return { style: style.code, script: `${script}\n${name}.render = new Function('Vue', ${JSON.stringify(render)})(Vue); ${name}.__scopeId = '${id}';` }
+  return { style: style.code, script: `${script}\n${name}.render = (()=>{${render}})(); ${name}.__scopeId = '${id}';` }
 }))
-const globalStyle = readFileSync(new URL('../../src/App.vue', import.meta.url), 'utf8').match(/<style>([\s\S]*?)<\/style>/)[1]
+const appVue = readFileSync(new URL('../../src/App.vue', import.meta.url), 'utf8')
+const styleOpen = '<' + 'style>'
+const styleClose = '</' + 'style>'
+const globalStyle = appVue.slice(appVue.indexOf(styleOpen) + styleOpen.length, appVue.indexOf(styleClose))
 const fixture = `
 const rows = [{ id: 7, title: '营业执照与完整登记信息', status: 'PENDING', exampleFileId: 1, description: Array.from({length: 12}, (_, i) => (i + 1) + '. 请提供清晰完整的材料，包含正本、副本及全部变更页。不得裁剪登记机关印章。').join('\\n') + '\\n要求末尾：请核对全部页码。' }, { id: 8, title: '财务报表', status: 'PENDING', description: '提供最近三个年度的报表。' }];
 window.fixture = { uploads: [], completed: false, finish: null };

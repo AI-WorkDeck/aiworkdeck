@@ -18,7 +18,7 @@ import { shouldAcceptResponse } from '../../src/utils/requestGeneration.js'
 const SRC = readFileSync(new URL('../../src/components/ClipboardPanel.vue', import.meta.url), 'utf8')
 
 function makePanel(deps) {
-  const script = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
   const names = [
     'listClipboard', 'deleteClipboardItem', 'getApiBaseUrl', 'getClipboardTypeMeta',

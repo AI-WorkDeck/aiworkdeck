@@ -41,7 +41,7 @@ test('稿态原有的三个动作一个都没丢', () => {
 })
 
 test('end() 把标题交给同一个端点，成功后关弹窗并报 ended', async () => {
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
   const names = []
   for (const m of script.matchAll(/^import\s+([\s\S]*?)\s+from\s+'[^']+'\s*;?\s*$/gm)) {
     const braced = m[1].match(/\{([\s\S]*?)\}/)

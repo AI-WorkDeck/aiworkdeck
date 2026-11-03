@@ -322,14 +322,15 @@ def _pptx_bytes(mod, m, mode=None):
         svg = _render.to_monochrome(svg)
     elif mode == "guizang":
         svg = _render.to_guizang(svg, m.get("layout"))
-    sp = tempfile.mktemp(suffix=".svg"); pp = tempfile.mktemp(suffix=".pptx")
+    d = tempfile.mkdtemp()
+    sp = _os.path.join(d, "f.svg"); pp = _os.path.join(d, "f.pptx")
     open(sp, "w", encoding="utf-8").write(svg)
     export_pptx.export(sp, pp)
     with zipfile.ZipFile(pp) as z:
         names = set(z.namelist())
         slide = z.read("ppt/slides/slide1.xml").decode("utf-8")
         pres = z.read("ppt/presentation.xml").decode("utf-8")
-    _os.unlink(sp); _os.unlink(pp)
+    _os.unlink(sp); _os.unlink(pp); _os.rmdir(d)
     return slide, pres, svg, names
 
 
@@ -424,11 +425,12 @@ def _():
                 import render as _r; svg = _r.to_monochrome(svg)
             elif mode == "guizang":
                 import render as _r; svg = _r.to_guizang(svg, load(fx).get("layout"))
-            sp = tempfile.mktemp(suffix=".svg"); pp = tempfile.mktemp(suffix=".pptx")
+            d = tempfile.mkdtemp()
+            sp = _os.path.join(d, "f.svg"); pp = _os.path.join(d, "f.pptx")
             open(sp, "w", encoding="utf-8").write(svg)
             export_pptx.export(sp, pp)
             problems = export_pptx.audit_deck(pp)
-            _os.unlink(sp); _os.unlink(pp)
+            _os.unlink(sp); _os.unlink(pp); _os.rmdir(d)
             assert not problems, f"{name}/{mode or 'qichuan'}: " + "; ".join(problems[:3])
 
 
@@ -539,11 +541,12 @@ def _():
                 svg = _r.to_guizang(svg, load(fx).get("layout"))   # the pattern-fill backdrop lives here
             elif mode == "mono":
                 svg = _r.to_monochrome(svg)
-            sp = tempfile.mktemp(suffix=".svg"); pp = tempfile.mktemp(suffix=".pptx")
+            d = tempfile.mkdtemp()
+            sp = _os.path.join(d, "f.svg"); pp = _os.path.join(d, "f.pptx")
             open(sp, "w", encoding="utf-8").write(svg)
             export_pptx.export(sp, pp, fonts="master")   # the sandbox has these faces
             problems = verify_pptx.verify(sp, pp)
-            _os.unlink(sp); _os.unlink(pp)
+            _os.unlink(sp); _os.unlink(pp); _os.rmdir(d)
             assert not problems, (f"{name}/{mode or 'qichuan'}: " + "; ".join(problems[:3])
                                   + "  (all text missing usually means the deck did not open)")
 
@@ -702,14 +705,15 @@ def _vsdx_page(mod, m, mode=None):
         svg = _r.to_monochrome(svg)
     elif mode == "guizang":
         svg = _r.to_guizang(svg, m.get("layout"))
-    sp = tempfile.mktemp(suffix=".svg"); vp = tempfile.mktemp(suffix=".vsdx")
+    d = tempfile.mkdtemp()
+    sp = _os.path.join(d, "f.svg"); vp = _os.path.join(d, "f.vsdx")
     open(sp, "w", encoding="utf-8").write(svg)
     export_vsdx.export(sp, vp)
     with zipfile.ZipFile(vp) as z:
         names = set(z.namelist())
         page = z.read("visio/pages/page1.xml").decode("utf-8")
         pages = z.read("visio/pages/pages.xml").decode("utf-8")
-    _os.unlink(sp); _os.unlink(vp)
+    _os.unlink(sp); _os.unlink(vp); _os.rmdir(d)
     return page, pages, svg, names
 
 
@@ -927,10 +931,11 @@ def _():
     import export_pptx, export_vsdx, tempfile, zipfile, os as _os
     svg, W, H = render_spans.render(load("ex_gantt.json"))
     assert 'stroke-dasharray' in svg, "fixture no longer has a dashed line"
-    sp = tempfile.mktemp(suffix=".svg")
+    d = tempfile.mkdtemp()
+    sp = _os.path.join(d, "f.svg")
     open(sp, "w", encoding="utf-8").write(svg)
 
-    vp = tempfile.mktemp(suffix=".vsdx")
+    vp = _os.path.join(d, "f.vsdx")
     export_vsdx.export(sp, vp)
     with zipfile.ZipFile(vp) as z:
         page = z.read("visio/pages/page1.xml").decode("utf-8")
@@ -940,11 +945,11 @@ def _():
     for bad, what in (("3", "dotted"), ("4", "dash-dot"), ("5", "dash-dot-dot")):
         assert bad not in pats, f".vsdx draws a {what} line where the master has a plain dash"
 
-    pp = tempfile.mktemp(suffix=".pptx")
+    pp = _os.path.join(d, "f.pptx")
     export_pptx.export(sp, pp)
     with zipfile.ZipFile(pp) as z:
         slide = z.read("ppt/slides/slide1.xml").decode("utf-8")
-    _os.unlink(pp); _os.unlink(sp)
+    _os.unlink(pp); _os.unlink(sp); _os.rmdir(d)
     vals = set(re.findall(r'<a:prstDash val="(\w+)"/>', slide))
     assert "dash" in vals, "no plain-dash line in the .pptx"
     for bad in ("dashDot", "lgDashDot", "lgDashDotDot", "sysDashDot", "sysDashDotDot", "dot"):
@@ -1058,16 +1063,17 @@ def _():
     error anywhere."""
     import export_pptx, tempfile, os as _os
     svg, W, H = render_flow.render(load("ex_flow.json"))
-    sp = tempfile.mktemp(suffix=".svg")
+    d = tempfile.mkdtemp()
+    sp = _os.path.join(d, "f.svg")
     open(sp, "w", encoding="utf-8").write(svg)
     before = dict(export_pptx._FONTS)
     for profile in ("safe", "master", "safe"):
-        pp = tempfile.mktemp(suffix=".pptx")
+        pp = _os.path.join(d, "f.pptx")
         export_pptx.export(sp, pp, fonts=profile)
         _os.unlink(pp)
         assert export_pptx._FONTS == before, \
             f"exporting with {profile!r} left the module's font profile changed"
-    _os.unlink(sp)
+    _os.unlink(sp); _os.rmdir(d)
 
 
 @check("raster · edge weights are symmetric in a rendered figure")

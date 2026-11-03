@@ -174,8 +174,15 @@ public final class LocalCoreGateway implements AutoCloseable {
 
     private void proxy(HttpServletRequest request, HttpServletResponse response, int target)
             throws IOException, InterruptedException {
+        String rawPath = request.getRequestURI();
+        if (rawPath == null || !rawPath.startsWith("/") || rawPath.startsWith("//")) {
+            throw new IllegalArgumentException("Invalid request URI");
+        }
         String query = request.getQueryString();
-        URI uri = URI.create("http://127.0.0.1:" + target + request.getRequestURI() + (query == null ? "" : "?" + query));
+        URI uri = URI.create("http://127.0.0.1:" + target + rawPath + (query == null ? "" : "?" + query));
+        if (!"127.0.0.1".equals(uri.getHost()) || uri.getPort() != target) {
+            throw new IllegalArgumentException("Invalid upstream target");
+        }
         Set<String> excluded = excludedHeaders(Collections.list(request.getHeaders("Connection")));
         var builder = HttpRequest.newBuilder(uri);
         for (String name : Collections.list(request.getHeaderNames())) {

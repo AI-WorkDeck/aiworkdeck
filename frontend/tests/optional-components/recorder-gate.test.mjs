@@ -10,7 +10,7 @@ import zh from '../../src/locales/zh-CN/meeting.js'
 import en from '../../src/locales/en-US/meeting.js'
 
 const source = readFileSync(new URL('../../src/components/MeetingRecordingPanel.vue', import.meta.url), 'utf8')
-const script0 = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+const script0 = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
 const script = script0.replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
 
 // 顶层 import 被剥掉之后，脚本引用到的名字要补回来。逐个列形参太脆（这个组件的

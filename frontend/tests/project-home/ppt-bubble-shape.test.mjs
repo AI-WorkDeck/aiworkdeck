@@ -7,8 +7,17 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const read = (rel) => readFileSync(new URL('../../src/' + rel, import.meta.url), 'utf8')
+const cutBetween = (str, open, close) => {
+  let out = str, i = out.indexOf(open)
+  while (i !== -1) {
+    const j = out.indexOf(close, i + open.length)
+    out = j === -1 ? out.slice(0, i) : out.slice(0, i) + out.slice(j + close.length)
+    i = out.indexOf(open)
+  }
+  return out
+}
 const stripComments = (s) =>
-  s.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  cutBetween(cutBetween(s, '<!--', '-->'), '/*', '*/').replace(/^\s*\/\/.*$/gm, '')
 
 // 原始病灶是 RootBubble 对这三个字段裸解引用、少一个就渲染时抛 TypeError。dev-board#646
 // 之后渲染走 chatTimeline.visibleChatTimeline，那条兜底分支全程 ?. / || []，缺字段不再抛。

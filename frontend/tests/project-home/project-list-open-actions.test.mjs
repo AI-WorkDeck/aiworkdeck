@@ -11,7 +11,7 @@ import en from '../../src/locales/en-US/projects.js'
 
 const source = readFileSync(new URL('../../src/components/project-list/ProjectListPane.vue', import.meta.url), 'utf8')
 const template = source.slice(source.indexOf('<template>') + 10, source.indexOf('\n<script>')).replace(/<\/template>\s*$/, '')
-const script = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*\n/gm, '').replace('export default', 'return')
+const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace(/^import .*\n/gm, '').replace('export default', 'return')
 const flowSource = readFileSync(new URL('../../src/utils/ideOpen.js', import.meta.url), 'utf8').replace(/^import .*\n/gm, '').replace(/^export /gm, '')
 const prop = (node, name, arg) => node.props?.find(p => p.name === name && (!arg || p.arg?.content === arg))
 const elements = (node) => [node, ...(node.children || []).flatMap(elements)].filter(node => node.type === 1)

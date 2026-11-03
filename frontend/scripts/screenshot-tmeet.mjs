@@ -29,12 +29,30 @@ const MIME_TYPES = {
   '.ttf': 'font/ttf',
 }
 
+function findSafeFile(rootDir, relPath) {
+  const parts = String(relPath || '').split('/').filter(Boolean)
+  if (!parts.length) return null
+  let cur = rootDir
+  for (const part of parts) {
+    let entries
+    try { entries = fs.readdirSync(cur) } catch { return null }
+    const name = entries.find((n) => n === part)
+    if (!name) return null
+    cur = path.join(cur, name)
+  }
+  try {
+    return fs.statSync(cur).isFile() ? cur : null
+  } catch {
+    return null
+  }
+}
+
 // 启动本地静态服务器
 const server = http.createServer((req, res) => {
   let reqPath = req.url.split('?')[0]
   if (reqPath === '/' || reqPath === '') reqPath = '/index.html'
-  const filePath = path.join(H5_DIR, reqPath)
-  if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+  const filePath = findSafeFile(H5_DIR, reqPath)
+  if (filePath) {
     const ext = path.extname(filePath).toLowerCase()
     res.writeHead(200, {
       'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',

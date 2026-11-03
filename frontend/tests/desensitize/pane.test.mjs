@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 
 const sfc = readFileSync(new URL('../../src/components/DesensitizePane.vue', import.meta.url), 'utf8')
-const script = sfc.match(/<script>([\s\S]*?)<\/script>/)[1]
+const script = sfc.slice(sfc.indexOf('<script>') + 8, sfc.indexOf('</script>'))
   .replace(/^import .*$/m, '').replace('export default', 'const component =') + '\ncomponent'
 function pane(api = {}) {
   const events = []

@@ -66,18 +66,27 @@ public class PluginBundledInstaller {
     }
 
     public synchronized void install(String id) {
+        if (id == null || !IDS.contains(id)) {
+            throw new IllegalArgumentException("Bundled plugin not available");
+        }
         Map<String, Object> meta = available().stream().filter(m -> id.equals(m.get("id"))).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Bundled plugin not available"));
-        Path target = destination.resolve(id);
+        Path destRoot = destination.toAbsolutePath().normalize();
+        Path target = destRoot.resolve(id).normalize();
+        if (!target.startsWith(destRoot) || !target.getParent().equals(destRoot)) {
+            throw new IllegalArgumentException("Invalid bundled plugin path");
+        }
         if (Files.exists(target) && !Files.isRegularFile(target.resolve(MARKER))) {
             throw new IllegalArgumentException("An independently installed plugin already uses this id");
         }
         Path staging = null, backup = null;
         boolean committed = false;
         try {
-            Files.createDirectories(destination);
-            staging = Files.createTempDirectory(destination.toAbsolutePath().getParent(), ".bundle-install-");
-            Path root = source.resolve(id).toRealPath();
+            Files.createDirectories(destRoot);
+            staging = Files.createTempDirectory(destRoot.getParent(), ".bundle-install-");
+            Path sourceRoot = source.toRealPath();
+            Path root = sourceRoot.resolve(id).toRealPath();
+            if (!root.startsWith(sourceRoot)) throw new IllegalArgumentException("Invalid bundled plugin source");
             // Source projects may include src/tests; only signed-distribution payload goes into an installation.
             List<Path> payload = new ArrayList<>(); payload.add(root.resolve("manifest.json"));
             for (String sub : List.of("web", "l10n", "skills", "themes", "templates", "profiles")) if (Files.isDirectory(root.resolve(sub))) {

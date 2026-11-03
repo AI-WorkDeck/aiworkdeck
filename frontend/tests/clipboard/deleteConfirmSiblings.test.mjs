@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs'
 
 function loadComponent(path, deps) {
   const src = readFileSync(new URL(`../../src/components/${path}`, import.meta.url), 'utf8')
-  const script = src.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = src.slice(src.indexOf('<script>') + 8, src.indexOf('</script>'))
     .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
   const names = Object.keys(deps)
   // eslint-disable-next-line no-new-func

@@ -35,9 +35,12 @@ def convert_mineru_path_to_local(mineru_path: str, project_root: Optional[Path] 
             project_root = backend_dir.parent
         
         # Construct full path: {project_root}/uploads/mineru_files/{rel_path}
-        local_path = project_root / 'uploads' / 'mineru_files' / rel_path
+        base_dir = os.path.realpath(os.path.join(str(project_root), 'uploads', 'mineru_files'))
+        resolved_path = os.path.realpath(os.path.join(base_dir, rel_path))
+        if not resolved_path.startswith(base_dir + os.sep):
+            return None
         
-        return local_path
+        return Path(resolved_path)
     except Exception as e:
         logger.warning(f"Failed to convert MinerU path to local: {mineru_path}, error: {str(e)}")
         return None
@@ -86,23 +89,31 @@ def find_file_with_prefix(file_path: Path) -> Optional[Path]:
     Returns:
         找到的文件路径（Path 对象），如果未找到则返回 None
     """
+    allowed_root = os.path.realpath(os.environ.get("PPTX_ALLOWED_ROOT") or os.path.abspath(os.sep))
+    resolved_file = os.path.realpath(os.path.abspath(str(file_path)))
+    if not resolved_file.startswith(allowed_root):
+        return None
+
     # Direct file matching
-    if file_path.exists() and file_path.is_file():
-        return file_path
+    if os.path.exists(resolved_file) and os.path.isfile(resolved_file):
+        return Path(resolved_file)
     
     # Try prefix match if not found and filename looks like a prefix with extension
-    filename = file_path.name
-    dirpath = file_path.parent
+    filename = os.path.basename(resolved_file)
+    dirpath = os.path.realpath(os.path.dirname(resolved_file))
+    if not dirpath.startswith(allowed_root):
+        return None
     
-    if '.' in filename and dirpath.exists() and dirpath.is_dir():
+    if '.' in filename and os.path.exists(dirpath) and os.path.isdir(dirpath):
         prefix, ext = os.path.splitext(filename)
         if len(prefix) >= 5:
             try:
                 for fname in os.listdir(dirpath):
                     fp, fe = os.path.splitext(fname)
                     if fp.lower().startswith(prefix.lower()) and fe.lower() == ext.lower():
-                        matched_path = dirpath / fname
-                        if matched_path.is_file():
+                        matched_str = os.path.realpath(os.path.join(dirpath, fname))
+                        if matched_str.startswith(dirpath + os.sep) and os.path.isfile(matched_str):
+                            matched_path = Path(matched_str)
                             logger.debug(f"Prefix match found: {file_path} -> {matched_path}")
                             return matched_path
             except OSError as e:

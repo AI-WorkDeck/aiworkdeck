@@ -12,7 +12,7 @@ import { createSerialQueue } from '../../src/utils/asyncSerialize.js'
 
 function loadEditor() {
   const source = readFileSync(new URL('../../src/components/DrawioEditor.vue', import.meta.url), 'utf8')
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
     .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
   const component = new Function('uni', 'createSerialQueue', script.replace('export default', 'return'))({}, createSerialQueue)
   const vm = { ...component.data(), projectId: 1, file: { id: 10, parentId: 2, name: '关系图.drawio' }, $t: k => k }
@@ -36,7 +36,7 @@ test('boot() 挂上的 iframe 地址带 pv=0', async () => {
   vm.loadXml = async () => '<mxfile/>'
   // boot() 读的 host / isDesktopHost 是被抠掉的 import，这里带上它们重新求值一次
   const source = readFileSync(new URL('../../src/components/DrawioEditor.vue', import.meta.url), 'utf8')
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
     .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
   const host = { drawio: { getEditor: async () => ({ available: true, url }) } }
   const component = new Function('uni', 'createSerialQueue', 'host', 'isDesktopHost', script.replace('export default', 'return'))(

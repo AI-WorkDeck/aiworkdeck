@@ -8,7 +8,7 @@ annotated-doc==0.0.4
     # via fastapi
 annotated-types==0.7.0
     # via pydantic
-anyio==4.12.0
+anyio==4.14.2
     # via
     #   google-genai
     #   httpx
@@ -21,7 +21,7 @@ audioop-lts==0.2.2 ; python_full_version >= '3.13'
     #   standard-aifc
 azure-ai-documentintelligence==1.0.2
     # via markitdown
-azure-core==1.36.0
+azure-core==1.41.0
     # via
     #   azure-ai-documentintelligence
     #   azure-identity
@@ -33,9 +33,11 @@ beautifulsoup4==4.14.3
     #   markitdown
 blinker==1.9.0
     # via flask
+cachebox==5.2.3
+    # via deepdiff
 cachetools==6.2.2
     # via google-auth
-certifi==2025.11.12
+certifi==2026.10.23
     # via
     #   httpcore
     #   httpx
@@ -65,14 +67,13 @@ colorama==0.4.6 ; sys_platform == 'win32'
     #   tqdm
 coloredlogs==15.0.1
     # via onnxruntime
-cryptography==46.0.3
+cryptography==50.0.2
     # via
     #   azure-identity
     #   msal
     #   pdfminer-six
-    #   pyjwt
     #   volcengine-python-sdk
-deepdiff==8.6.1
+deepdiff==9.1.0
     # via lazyllm
 defusedxml==0.7.1
     # via
@@ -86,15 +87,13 @@ docstring-parser==0.16
     # via lazyllm
 et-xmlfile==2.0.0
     # via openpyxl
-exceptiongroup==1.3.1 ; python_full_version < '3.11'
-    # via anyio
-fastapi==0.129.0
+fastapi==0.162.0
     # via lazyllm
-filelock==3.21.2
+filelock==4.2.7
     # via lazyllm
 fire==0.7.1
     # via pdf2docx
-flask==3.1.2
+flask==3.1.3
     # via
     #   banana-slides
     #   flask-cors
@@ -131,7 +130,7 @@ httpx==0.28.1
     #   volcengine-python-sdk
 humanfriendly==10.0
     # via coloredlogs
-idna==3.11
+idna==3.20
     # via
     #   anyio
     #   httpx
@@ -152,7 +151,7 @@ lazyllm==0.7.5
     # via banana-slides
 loguru==0.7.3
     # via lazyllm
-lxml==6.0.2
+lxml==6.1.3
     # via
     #   markitdown
     #   pikepdf
@@ -160,7 +159,7 @@ lxml==6.0.2
     #   python-pptx
 magika==0.6.3
     # via markitdown
-mako==1.3.10
+mako==1.4.3
     # via alembic
 mammoth==1.11.0
     # via markitdown
@@ -176,20 +175,13 @@ markupsafe==3.0.3
     #   werkzeug
 mpmath==1.3.0
     # via sympy
-msal==1.34.0
+msal==1.39.0
     # via
     #   azure-identity
     #   msal-extensions
 msal-extensions==1.3.1
     # via azure-identity
-numpy==2.2.6 ; python_full_version < '3.11'
-    # via
-    #   magika
-    #   onnxruntime
-    #   opencv-python-headless
-    #   pandas
-    #   pdf2docx
-numpy==2.3.5 ; python_full_version >= '3.11'
+numpy==2.3.5
     # via
     #   magika
     #   onnxruntime
@@ -208,6 +200,8 @@ opencv-python-headless==5.0.0.93
     # via pdf2docx
 openpyxl==3.1.5
     # via markitdown
+opentelemetry-api==1.45.2
+    # via fastapi
 orderly-set==5.5.0
     # via deepdiff
 packaging==25.0
@@ -223,18 +217,18 @@ pdfminer-six==20251107
     # via markitdown
 pikepdf==10.1.0
     # via img2pdf
-pillow==12.0.0
+pillow==13.0.0
     # via
     #   banana-slides
     #   img2pdf
     #   pikepdf
     #   python-pptx
     #   reportlab
-protobuf==6.33.2
+protobuf==7.36.2
     # via onnxruntime
 psutil==6.1.1
     # via lazyllm
-pyasn1==0.6.1
+pyasn1==0.6.5
     # via
     #   pyasn1-modules
     #   rsa
@@ -254,7 +248,7 @@ pydantic-core==2.41.5
     # via pydantic
 pydub==0.25.1
     # via markitdown
-pyjwt==2.8.0
+pyjwt==2.15.1
     # via
     #   lazyllm
     #   msal
@@ -262,7 +256,7 @@ pymupdf==1.27.1
     # via
     #   banana-slides
     #   pdf2docx
-pypdf2==3.0.1
+pypdf==6.21.4
     # via banana-slides
 pyreadline3==3.5.4 ; sys_platform == 'win32'
     # via humanfriendly
@@ -272,7 +266,7 @@ python-dateutil==2.9.0.post0
     #   volcengine-python-sdk
 python-docx==1.2.0
     # via pdf2docx
-python-dotenv==1.2.1
+python-dotenv==1.2.4
     # via
     #   banana-slides
     #   magika
@@ -286,7 +280,7 @@ pyyaml==6.0.3
     # via lazyllm
 reportlab==4.4.5
     # via banana-slides
-requests==2.32.5
+requests==2.34.2
     # via
     #   azure-core
     #   google-genai
@@ -303,7 +297,9 @@ six==1.17.0
     #   volcengine-python-sdk
 sniffio==1.3.1
     # via openai
-soupsieve==2.8
+soupsieve==2.10 ; python_full_version < '3.11.5'
+    # via beautifulsoup4
+soupsieve==3.0.4 ; python_full_version >= '3.11.5'
     # via beautifulsoup4
 speechrecognition==3.14.4
     # via markitdown
@@ -315,7 +311,7 @@ standard-aifc==3.13.0 ; python_full_version >= '3.13'
     # via speechrecognition
 standard-chunk==3.13.0 ; python_full_version >= '3.13'
     # via standard-aifc
-starlette==0.52.1
+starlette==1.10.0
     # via fastapi
 sympy==1.14.0
     # via onnxruntime
@@ -327,8 +323,6 @@ termcolor==3.3.0
     # via fire
 toml==0.10.2
     # via lazyllm
-tomli==2.3.0 ; python_full_version < '3.11'
-    # via alembic
 tqdm==4.67.1
     # via
     #   lazyllm
@@ -341,11 +335,10 @@ typing-extensions==4.15.0
     #   azure-core
     #   azure-identity
     #   beautifulsoup4
-    #   cryptography
-    #   exceptiongroup
     #   fastapi
     #   google-genai
     #   openai
+    #   opentelemetry-api
     #   pydantic
     #   pydantic-core
     #   python-docx
@@ -354,14 +347,13 @@ typing-extensions==4.15.0
     #   sqlalchemy
     #   starlette
     #   typing-inspection
-    #   uvicorn
 typing-inspection==0.4.2
     # via
     #   fastapi
     #   pydantic
 tzdata==2025.2
     # via pandas
-urllib3==2.5.0
+urllib3==2.8.0
     # via
     #   requests
     #   volcengine-python-sdk
@@ -371,7 +363,7 @@ volcengine-python-sdk==5.0.9
     # via banana-slides
 websockets==15.0.1
     # via google-genai
-werkzeug==3.1.4
+werkzeug==3.1.9
     # via
     #   banana-slides
     #   flask

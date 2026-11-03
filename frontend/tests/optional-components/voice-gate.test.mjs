@@ -10,7 +10,7 @@ import zh from '../../src/locales/zh-CN/panels.js'
 import en from '../../src/locales/en-US/panels.js'
 
 const source = readFileSync(new URL('../../src/components/EasyVoicePane.vue', import.meta.url), 'utf8')
-const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
   .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
 
 // 顶层 import 被剥掉之后，脚本里引用到的名字要靠形参补回来（与 recorder-gate 同型）。

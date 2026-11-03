@@ -12,7 +12,7 @@ const EDITOR = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue'
 const TOOLBAR = readFileSync(new URL('../../src/components/EditorToolbar.vue', import.meta.url), 'utf8')
 
 function makeVm() {
-  const body = EDITOR.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const body = EDITOR.slice(EDITOR.indexOf('<script>') + 8, EDITOR.indexOf('</script>'))
     .replace(/^import OfficeNavigation from .*$/m, 'const OfficeNavigation = {}')
     .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
   const options = new Function('ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar',

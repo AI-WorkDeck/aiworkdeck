@@ -137,7 +137,7 @@ export async function advancedMcpCases(page, output, clickText) {
   assert.equal(await page.$$eval('#admin-test .mcp-preview input[type=checkbox]', rows => rows.length), 2)
   const previewText = await page.$eval('#admin-test .mcp-preview', el => el.textContent)
   assert.ok(!previewText.includes('synthetic-import-secret'))
-  assert.ok(previewText.includes('https://example.invalid/import'))
+  assert.match(previewText, /https:\/\/example\.invalid\/import/)
   assert.ok(previewText.includes('node "test-server.mjs"'))
   assert.ok(previewText.includes('/tmp/synthetic-import'))
   assert.ok((await page.$eval('#admin-test .mcp-preview', el => el.textContent)).includes('Synthetic invalid entry'))

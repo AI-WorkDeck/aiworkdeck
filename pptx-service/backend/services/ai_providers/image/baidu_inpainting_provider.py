@@ -156,7 +156,7 @@ class BaiduInpaintingProvider:
             if 'error_code' in result:
                 error_msg = result.get('error_msg', 'Unknown error')
                 error_code = result.get('error_code')
-                logger.error(f"❌ 百度API错误: [{error_code}] {error_msg}")
+                logger.error("❌ 百度图像修复API返回错误响应")
                 raise Exception(f"Baidu API error [{error_code}]: {error_msg}")
             
             # 解析结果

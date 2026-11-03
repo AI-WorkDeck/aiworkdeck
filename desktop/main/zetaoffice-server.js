@@ -29,6 +29,13 @@ const { createReadStream, readFileSync } = require('node:fs')
 const { app } = require('electron')
 
 const LOWA_CDN = 'https://cdn.zetaoffice.net/zetaoffice_latest/'
+const LOWA_CDN_ASSETS = Object.freeze({
+  'soffice.js': 'soffice.js',
+  'soffice.wasm': 'soffice.wasm',
+  'soffice.data': 'soffice.data',
+  'soffice.data.js.metadata': 'soffice.data.js.metadata',
+  'soffice.worker.js': 'soffice.worker.js',
+})
 
 // Chromium keys both the HTTP disk cache and the V8 WASM code cache on
 // origin+URL. A random port (listen(0)) changes the origin every app launch,
@@ -95,11 +102,22 @@ function loadLowaEncodings(root) {
 // Proxy a full https URL to res, following up to 4 redirects. Streams the body
 // and forwards the headers that matter for WASM (content-type/encoding/length).
 function proxyUrl(url, res, redirects = 0) {
-  https.get(url, (up) => {
+  let parsedUrl
+  try {
+    parsedUrl = new URL(url)
+  } catch (e) {
+    res.writeHead(400).end('invalid proxy url')
+    return
+  }
+  if (parsedUrl.protocol !== 'https:' || parsedUrl.hostname !== 'cdn.zetaoffice.net') {
+    res.writeHead(403).end('forbidden proxy origin')
+    return
+  }
+  https.get(parsedUrl, (up) => {
     const sc = up.statusCode || 0
     if (sc >= 300 && sc < 400 && up.headers.location && redirects < 4) {
       up.resume()
-      const next = new URL(up.headers.location, url).toString()
+      const next = new URL(up.headers.location, parsedUrl).toString()
       return proxyUrl(next, res, redirects + 1)
     }
     const h = {}
@@ -132,9 +150,9 @@ function startEditorServer() {
         // cdn.zetaoffice.net.
         if (urlPath.startsWith('/lowa/')) {
           const rel = urlPath.slice('/lowa/'.length)
-          const lowaDir = path.join(root, 'lowa')
-          const localPath = path.normalize(path.join(lowaDir, rel))
-          if (localPath === lowaDir || localPath.startsWith(lowaDir + path.sep)) {
+          const lowaDir = path.resolve(root, 'lowa')
+          const localPath = path.resolve(lowaDir, '.' + '/' + rel)
+          if (localPath.startsWith(lowaDir + path.sep)) {
             try {
               const st = await stat(localPath)
               if (st.isFile()) {
@@ -163,7 +181,14 @@ function startEditorServer() {
               }
             } catch (e) { /* not bundled locally — fall through to the CDN proxy */ }
           }
-          return proxyUrl(LOWA_CDN + rel, res)
+          const safeAsset = Object.prototype.hasOwnProperty.call(LOWA_CDN_ASSETS, rel)
+            ? LOWA_CDN_ASSETS[rel]
+            : null
+          if (!safeAsset) {
+            res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('not found')
+            return
+          }
+          return proxyUrl(LOWA_CDN + safeAsset, res)
         }
         // 本机字体（desktop/main/system-fonts.js）：editor-main.js 启动前取启用清单，
         // bootZetaOffice 逐个 fetch 注入 MEMFS。只出「当前启用集」里的 id——路由按 id
@@ -201,8 +226,9 @@ function startEditorServer() {
         let body = null
         let served = null
         for (const r of roots) {
-          const filePath = path.normalize(path.join(r, urlPath))
-          if (filePath !== r && !filePath.startsWith(r + path.sep)) { res.writeHead(403).end('forbidden'); return }
+          const resolvedRoot = path.resolve(r)
+          const filePath = path.resolve(resolvedRoot, '.' + urlPath)
+          if (!filePath.startsWith(resolvedRoot + path.sep)) { res.writeHead(403).end('forbidden'); return }
           try {
             body = await readFile(filePath)
             served = filePath

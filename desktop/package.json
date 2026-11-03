@@ -23,6 +23,15 @@
     "electron": "45.1.0",
     "electron-builder": "^24.13.3"
   },
+  "overrides": {
+    "@xmldom/xmldom": "^0.8.15",
+    "brace-expansion": "^2.1.7",
+    "builder-util-runtime": "^9.7.0",
+    "glob": "^14.0.2",
+    "js-yaml": "^4.3.2",
+    "minimatch": "^11.0.1",
+    "tar": "^7.5.21"
+  },
   "engines": {
     "node": ">=22.12.0"
   },

@@ -39,7 +39,7 @@ function loadActionMethods(uni) {
 }
 
 function loadEditorMethods() {
-  const body = EDITOR_SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const body = EDITOR_SRC.slice(EDITOR_SRC.indexOf('<script>') + 8, EDITOR_SRC.indexOf('</script>'))
     .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
     .replace(/^import .*$/gm, '')
     .replace(/export default \{/, 'return {')

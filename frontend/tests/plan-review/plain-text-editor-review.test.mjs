@@ -93,7 +93,7 @@ test('deleteComment：204 视为成功，其它错误照抛', async () => {
 
 // ---- 修复轮 1：beforeUnmount 兜底上传必须让路给放弃修改 ----
 function loadOptions() {
-  const script = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
   const body = script.replace(/^import .*$/gm, '').replace('export default', 'return')
   // eslint-disable-next-line no-new-func
   return new Function('setTimeout', 'clearTimeout', 'beginDocumentSave', body)(() => 1, () => {}, beginDocumentSave)
@@ -127,7 +127,7 @@ test('回喂正文在落盘后、发 submit 前就取好', () => {
 
 // ---- 最终修复波：跑真实现的 submitPlanReview / loadReview / emitReviewState ----
 function loadOptionsWith(env) {
-  const script = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
   const body = script.replace(/^import .*$/gm, '').replace('export default', 'return')
   const names = Object.keys(env)
   // eslint-disable-next-line no-new-func

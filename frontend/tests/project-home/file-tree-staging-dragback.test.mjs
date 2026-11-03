@@ -42,7 +42,7 @@ const IMPORT_NAMES = [
 ]
 
 function loadOptions(stubs) {
-  const body = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const body = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/^import\s[\s\S]*?from\s+['"][^'"]+['"]\s*$/gm, '')
     .replace(/export default \{/, 'return {')
   const factory = new Function(...IMPORT_NAMES, body)
@@ -233,7 +233,7 @@ test('节点上 drop 但认不出拖的是哪份文件：提示而不是静默',
 
 const STAGING_SRC = readFileSync(new URL('../../src/components/FileStagingArea.vue', import.meta.url), 'utf8')
 function loadStagingOptions() {
-  const body = STAGING_SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const body = STAGING_SRC.slice(STAGING_SRC.indexOf('<script>') + 8, STAGING_SRC.indexOf('</script>'))
     .replace(/^import .*$/gm, '')
     .replace(/export default \{/, 'return {')
   return new Function('ICONS', 'UnlockHint', 'FileTypeIcon', 'warmDragImage', 'applyDragImage', body)({}, {}, {}, () => {}, () => {})

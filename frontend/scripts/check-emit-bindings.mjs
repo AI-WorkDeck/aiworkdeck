@@ -87,7 +87,7 @@ for (const f of vueFiles) {
     const tagPattern = new RegExp(`<(?:${tag}|${toKebab(tag)})\\b((?:"[^"]*"|'[^']*'|[^>])*)`, 'g')
     for (const m of code.matchAll(tagPattern)) {
       const attrs = m[1]
-      for (const ev of attrs.matchAll(/@([\w-]+(?::[\w-]+)?)(?:\.[\w.]+)*=/g)) {
+      for (const ev of attrs.matchAll(/@([\w-]+(?::[\w-]+)?)(?:\.[\w-]+)*=/g)) {
         const name = toKebab(ev[1])
         if (NATIVE_EVENTS.has(name)) continue
         if (name.startsWith('update:')) continue // v-model 族，另有机制

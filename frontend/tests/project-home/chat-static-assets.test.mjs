@@ -21,11 +21,19 @@ function walk(dir, out = []) {
   return out
 }
 
+const cutBetween = (str, open, close) => {
+  let out = str, i = out.indexOf(open)
+  while (i !== -1) {
+    const j = out.indexOf(close, i + open.length)
+    out = j === -1 ? out.slice(0, i) : out.slice(0, i) + out.slice(j + close.length)
+    i = out.indexOf(open)
+  }
+  return out
+}
+
 /** 去掉注释再扫：注释里提到「不存在的 /static/x」是在解释，不是引用 */
 function stripComments(code) {
-  return code
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
+  return cutBetween(cutBetween(code, '<!--', '-->'), '/*', '*/')
     .replace(/^\s*\/\/.*$/gm, '')
     .replace(/\s\/\/\s.*$/gm, '')
 }

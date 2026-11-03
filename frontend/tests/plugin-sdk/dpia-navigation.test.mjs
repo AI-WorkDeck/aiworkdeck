@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const source = readFileSync(new URL('../../src/components/PluginPane.vue', import.meta.url), 'utf8')
-const body = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+const body = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
   .replace(/^\s*import[\s\S]*?from\s*'[^']*'\s*$/gm, '').replace(/export\s+default/, 'return')
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r }); return { resolve, promise } }
 const conversation = { conversationId: 'conv-owned', title: 'DPIA · 合成评估', projectId: 5 }

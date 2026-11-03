@@ -38,14 +38,14 @@ fs.writeFileSync(path.join(out, 'index.html'), `<!doctype html><meta charset="ut
 <script src="./vue.js"></script><script>
 const {ref, computed, watch} = Vue;
 ${overlay}
-const ICONS = ${JSON.stringify(ICONS)}; const ACCOUNT_CHANGED_EVENT = 'awd:account-changed';
+const ICONS = ${JSON.stringify(ICONS)}; const TRANSLATIONS = ${JSON.stringify(translations)}; const ACCOUNT_CHANGED_EVENT = 'awd:account-changed';
 window.uni = {$on(){},$off(){}};
 const entry = (()=>{${options}})(); entry.render = (()=>{${render}})();
 const accountApp = Vue.createApp(entry, {loggedIn:true, displayName:'QA 合成账号',walletVisible:true,walletText:'¥100.00',walletTier:'测试'});
-accountApp.config.globalProperties.$t = k => (${JSON.stringify(translations)})[k] || k;
+accountApp.config.globalProperties.$t = k => TRANSLATIONS[k] || k;
 const account = accountApp.mount('#account');
 const saveSidebarCollapsed = () => {};
-const side = Vue.createApp({data:()=>({sidebarCollapsed:false}),methods:{${toggle},$t:k=>(${JSON.stringify(translations)})[k]||k,triggerWorkbenchResize(){}},render:(()=>{${tabRender}})()}).mount('#sidebar');
+const side = Vue.createApp({data:()=>({sidebarCollapsed:false}),methods:{${toggle},$t:k=>TRANSLATIONS[k]||k,triggerWorkbenchResize(){}},render:(()=>{${tabRender}})()}).mount('#sidebar');
 document.querySelector('#rail').onclick=()=>side.toggleSidebar();
 const host = {browser:{setViewsVisible:async({visible})=>window.nativeBridge.visible(visible)}};
 const desktopWatcher = ({${overlayWatcher}}).desktopOverlayActive;

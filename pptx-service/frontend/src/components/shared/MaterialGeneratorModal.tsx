@@ -345,7 +345,7 @@ export const MaterialGeneratorModal: React.FC<MaterialGeneratorModalProps> = ({
                   {refImage ? (
                     <>
                       <img
-                        src={refImageUrl.current || ''}
+                        src={refImageUrl.current?.startsWith('blob:') ? refImageUrl.current : ''}
                         alt={t('material.mainReference')}
                         className="w-full h-full object-cover rounded-xl"
                       />
@@ -383,7 +383,7 @@ export const MaterialGeneratorModal: React.FC<MaterialGeneratorModalProps> = ({
                   {extraImages.map((file, idx) => (
                     <div key={idx} className="relative group">
                       <img
-                        src={extraImageUrls.current[idx] || ''}
+                        src={extraImageUrls.current[idx]?.startsWith('blob:') ? extraImageUrls.current[idx] : ''}
                         alt={`extra-${idx + 1}`}
                         className="w-20 h-20 object-cover rounded-lg border-2 border-indigo-200/50 dark:border-indigo-500/30 shadow-sm group-hover:shadow-md transition-all duration-200"
                       />

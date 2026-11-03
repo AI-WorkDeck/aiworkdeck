@@ -21,7 +21,7 @@ function harness(t, startDrag = () => ({ ok: true })) {
     beginArchiveEntryDrag, endArchiveEntryDrag, installExternalDragCleanup, nativeEvent,
     applyDragImage() {}, uni: { $emit: name => events.push(name), showToast: value => toasts.push(value) },
   }
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
     .replace(/^import .+$/gm, '').replace('export default', 'return')
   const options = new Function(...Object.keys(stubs), script)(...Object.values(stubs))
   const entry = { path: '合成/说明.txt', name: '说明.txt', dir: false }

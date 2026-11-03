@@ -9,7 +9,7 @@ import en from '../../src/locales/en-US/ddWorkflow.js'
 const translate = (locale = 'zh-CN') => createI18n({ legacy: true, locale, messages: { 'zh-CN': { ddWorkflow: zh }, 'en-US': { ddWorkflow: en } } }).global.t
 const source = readFileSync(new URL('../../src/components/dd/DdClientChecklist.vue', import.meta.url), 'utf8')
 function fixture(api = {}, locale = 'zh-CN') {
-  const body = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'return')
+  const body = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'return')
   const options = new Function('ddClientRead', 'ddClientWrite', 'ddClientUpload', 'ddClientDownload', body)(api.read || (async () => []), api.write || (async () => {}), api.upload || (async () => {}), async () => {})
   const vm = { ...options.data(), $emit: () => {}, $t: translate(locale), requestId: 1, projectId: 2, connectionId: 'client-one' }
   for (const [key, fn] of Object.entries(options.methods)) vm[key] = fn.bind(vm)
@@ -45,7 +45,7 @@ test('a message opens its exact item once and polling does not override the next
 
 function navigationFixture(read) {
   const workspace = readFileSync(new URL('../../src/components/dd/DdClientWorkspace.vue', import.meta.url), 'utf8')
-  const body = workspace.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'return')
+  const body = workspace.slice(workspace.indexOf('<script>') + 8, workspace.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'return')
   const options = new Function('DdClientChecklist', 'ddNotificationPermission', 'ddClientRead', body)(null, () => 'unavailable', read)
   const vm = { ...options.data(), $t: translate(), navigationTarget: null }
   for (const [key, fn] of Object.entries(options.methods)) vm[key] = fn.bind(vm)
@@ -97,7 +97,7 @@ test('changing AI consent creates a new attempt and consent stays with each item
 
 test('the workspace reads registered case servers from the real API envelope', async () => {
   const workspace = readFileSync(new URL('../../src/components/dd/DdClientWorkspace.vue', import.meta.url), 'utf8')
-  const body = workspace.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'return')
+  const body = workspace.slice(workspace.indexOf('<script>') + 8, workspace.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'return')
   const rows = [{ id: 1, name: 'Case server' }]
   const options = new Function('DdClientChecklist', 'listCloudConnections', 'isClientPortalBuild', 'ddNotificationPermission', 'ddClientIdentity', body)(null, async () => ({ code: 0, data: { connections: rows } }), () => false, () => 'unavailable', () => 'local')
   const vm = { ...options.data(), load: () => {}, refreshNotifications: () => {} }

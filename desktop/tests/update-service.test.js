@@ -40,7 +40,8 @@ function extractTar(archive, destDir) {
 function serve(routes) {
   return new Promise((resolve) => {
     const s = http.createServer((req, res) => {
-      const body = routes[req.url]
+      const reqUrl = req.url || ''
+      const body = Object.prototype.hasOwnProperty.call(routes, reqUrl) ? routes[reqUrl] : undefined
       if (body === undefined) {
         res.writeHead(404).end()
         return

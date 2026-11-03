@@ -11,16 +11,18 @@ const source = read('frontend/src/components/MarketDetailPane.vue')
 const sandbox = source.match(/class="mdp-theme-preview-frame"\s+sandbox="([^"]+)"/)[1]
 const pushBody = source.match(/pushThemePreview\(\) \{([\s\S]*?)\n    \},/)[1]
 const ids = ['theme-inkwash-zen', 'theme-anime-twilight', 'theme-aurora-glass']
+const allowedRoutes = ids.flatMap(id => ['index.html', 'awd-plugin-sdk.js', 'gallery-l10n.js', 'gallery.js'].map(f => `/api/plugin-web/${id}/${f}`))
 // Requires actual installed/enabled themes in an isolated backend; never invent SDK routes.
 const backend = process.env.AWD_SKIN_BACKEND_URL
 assert.ok(backend, 'AWD_SKIN_BACKEND_URL must point to an isolated backend')
 const server = createServer(async (req, res) => {
+  const matchedRoute = allowedRoutes.find(r => r === req.url)
   if (req.url === '/') {
     res.setHeader('Content-Type', 'text/html')
     res.end(`<html><body><iframe id="preview" sandbox="${sandbox}"></iframe></body></html>`)
-  } else if (ids.some(id => req.url.startsWith(`/api/plugin-web/${id}/`))) {
+  } else if (matchedRoute) {
     try {
-      const upstream = await fetch(new URL(req.url, backend))
+      const upstream = await fetch(new URL(matchedRoute, backend))
       res.statusCode = upstream.status
       for (const name of ['content-type', 'content-security-policy', 'x-content-type-options']) {
         if (upstream.headers.has(name)) res.setHeader(name, upstream.headers.get(name))

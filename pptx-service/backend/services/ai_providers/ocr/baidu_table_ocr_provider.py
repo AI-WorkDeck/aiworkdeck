@@ -130,7 +130,7 @@ class BaiduTableOCRProvider:
             if 'error_code' in result:
                 error_msg = result.get('error_msg', 'Unknown error')
                 error_code = result.get('error_code')
-                logger.error(f"❌ 百度API错误: [{error_code}] {error_msg}")
+                logger.error("❌ 百度表格OCR API返回错误响应")
                 raise Exception(f"Baidu API error [{error_code}]: {error_msg}")
             
             # 解析结果
@@ -139,7 +139,7 @@ class BaiduTableOCRProvider:
             tables_result = result.get('tables_result', [])
             excel_file = result.get('excel_file', None)
             
-            logger.info(f"✅ 表格识别成功! log_id={log_id}, 识别到 {table_num} 个表格")
+            logger.info(f"✅ 表格识别成功! 识别到 {len(tables_result)} 个表格")
             
             # 解析单元格信息(扁平化)
             cells = []

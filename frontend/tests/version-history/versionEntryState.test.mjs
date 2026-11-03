@@ -105,7 +105,7 @@ test('提交前保存全部打开的编辑器，未保存成功时阻止提交',
 })
 
 test('提交按钮等保存完成后只提交一次；保存拒绝不关闭弹窗或发结束事件', async () => {
-  const source = read('../../src/components/version/WorkSessionBar.vue').match(/<script>([\s\S]*?)<\/script>/)[1]
+  const source = ((s) => s.slice(s.indexOf('<script>') + 8, s.indexOf('</script>')))(read('../../src/components/version/WorkSessionBar.vue'))
     .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '').replace('export default', 'globalThis.component =')
   const calls = []
   const context = { endWorkSession: async () => { calls.push('commit'); return { data: {} } }, uni: { showToast() {} } }

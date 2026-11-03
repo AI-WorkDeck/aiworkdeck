@@ -67,7 +67,7 @@ test('会话相同：不切换直接发', async () => {
 
 // ---- 最终修复波 I-1：同一文件被后续计划复用时，审阅态只认自己那张卡 ----
 function cardOptions() {
-  const script = CARD.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = CARD.slice(CARD.indexOf('<script>') + 8, CARD.indexOf('</script>'))
   const body = script.replace(/^import .*$/gm, '').replace('export default', 'return')
   // eslint-disable-next-line no-new-func
   return new Function('MarkdownPreview', 'lineDiffStats', 'APPROVAL_PLAN_TYPES', body)({}, () => ({ hunks: 0, added: 0, removed: 0 }), APPROVAL_PLAN_TYPES)

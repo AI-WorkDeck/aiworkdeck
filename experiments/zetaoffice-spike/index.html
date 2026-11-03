@@ -87,7 +87,7 @@
     // NOTE: named zlog, NOT `out` — emscripten/soffice.js defines a global `out`
     // (its stdout printer) that overwrites a global `out` after boot, which
     // silently swallowed all post-boot log lines until this was found.
-    function zlog(html, cls) { logEl.insertAdjacentHTML('beforeend', (cls ? '<span class="' + cls + '">' : '<span>') + html + '</span>\n'); logEl.scrollTop = logEl.scrollHeight; }
+    function zlog(text, cls) { const span = document.createElement('span'); if (cls) span.className = cls; span.textContent = String(text); logEl.append(span, '\n'); logEl.scrollTop = logEl.scrollHeight; }
 
     // ---- cross-origin isolation self-check (SharedArrayBuffer prerequisite) ----
     // COOP/COEP can ONLY come from HTTP response headers (no <meta> equivalent),

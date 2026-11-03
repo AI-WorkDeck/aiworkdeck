@@ -264,12 +264,14 @@ def _load_settings_to_config(app):
             import json
             try:
                 keys = json.loads(settings.lazyllm_api_keys)
+                loaded_count = 0
                 for vendor, key in keys.items():
                     if key and vendor.lower() in ALLOWED_LAZYLLM_VENDORS:
                         os.environ[f"{vendor.upper()}_API_KEY"] = key
+                        loaded_count += 1
                     elif key:
-                        logging.warning(f"Ignoring unknown lazyllm vendor: {vendor}")
-                logging.info(f"Loaded LazyLLM API keys for vendors: {[v for v, k in keys.items() if k and v.lower() in ALLOWED_LAZYLLM_VENDORS]}")
+                        logging.warning("Ignoring unknown lazyllm vendor in settings")
+                logging.info(f"Loaded LazyLLM API keys for {loaded_count} allowed vendor(s)")
             except (json.JSONDecodeError, TypeError):
                 logging.warning("Failed to parse lazyllm_api_keys from settings")
 

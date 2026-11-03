@@ -207,7 +207,7 @@ class BaiduAccurateOCRProvider:
             if 'error_code' in result:
                 error_msg = result.get('error_msg', 'Unknown error')
                 error_code = result.get('error_code')
-                logger.error(f"❌ 百度API错误: [{error_code}] {error_msg}")
+                logger.error("❌ 百度高精度OCR API返回错误响应")
                 raise Exception(f"Baidu API error [{error_code}]: {error_msg}")
             
             # 解析结果
@@ -218,7 +218,7 @@ class BaiduAccurateOCRProvider:
             paragraphs_result_num = result.get('paragraphs_result_num', 0)
             paragraphs_result = result.get('paragraphs_result', [])
             
-            logger.info(f"✅ 高精度OCR识别成功! log_id={log_id}, 识别到 {words_result_num} 行文字")
+            logger.info(f"✅ 高精度OCR识别成功! 识别到 {len(words_result)} 行文字")
             
             # 解析文字行信息
             text_lines = []

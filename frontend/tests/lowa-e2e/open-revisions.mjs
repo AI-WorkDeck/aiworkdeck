@@ -13,7 +13,7 @@ import { preflight, startServer, launchBrowser, loadPuppeteer, openEditor } from
 // Run the component's actual methods against the real executor. TOOLBAR_SOURCE
 // can point to the baseline .vue; neither command order is copied into this test.
 const toolbarSource = fs.readFileSync(process.env.TOOLBAR_SOURCE || new URL('../../src/components/EditorToolbar.vue', import.meta.url), 'utf8')
-const toolbarScript = toolbarSource.match(/<script>([\s\S]*?)<\/script>/)[1]
+const toolbarScript = toolbarSource.slice(toolbarSource.indexOf('<script>') + 8, toolbarSource.indexOf('</script>'))
 const toolbarOptions = new Function(
   'bindHorizontalWheel', 'watchScrollEdges', 'isEnglish', 'host',
   'CN_FONT_SIZES', 'PT_FONT_SIZES', 'ParagraphFormatPanel', 'SystemFontsPanel',

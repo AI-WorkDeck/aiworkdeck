@@ -188,7 +188,7 @@ for (const change of ['edit-saved-a', 'register-dirty-a']) {
 
 test('保存期间对话框不能反转比较方向或重复确认，仍可取消；失败后可重试', () => {
   const source = readFileSync(new URL('../../src/components/CompareDocDialog.vue', import.meta.url), 'utf8')
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
     .replace(/^import .*$/gm, '').replace('export default', 'return')
   const dialog = new Function(script)()
   const events = []
@@ -211,7 +211,7 @@ test('保存期间对话框不能反转比较方向或重复确认，仍可取�
 
 test('saving 阶段不能取消（防误导），reading/comparing 阶段仍可取消', () => {
   const source = readFileSync(new URL('../../src/components/CompareDocDialog.vue', import.meta.url), 'utf8')
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
     .replace(/^import .*$/gm, '').replace('export default', 'return')
   const dialog = new Function(script)()
   const events = []

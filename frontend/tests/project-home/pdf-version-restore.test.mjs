@@ -23,7 +23,7 @@ const readSource = file => process.env.PDF_TEST_BASELINE
   ? execFileSync('git', ['show', `7c9a5d2b1:${file}`], { cwd: path.resolve('.'), encoding: 'utf8' })
   : readFileSync(new URL('../../../' + file, import.meta.url), 'utf8')
 const sources = Object.fromEntries(Object.entries(paths).map(([key, file]) => [key, readSource(file)]))
-const scripts = Object.fromEntries(Object.entries(sources).map(([key, source]) => [key, source.match(/<script>([\s\S]*?)<\/script>/)?.[1] || source]))
+const scripts = Object.fromEntries(Object.entries(sources).map(([key, source]) => [key, source.includes("<script>") ? source.slice(source.indexOf("<script>") + 8, source.indexOf("</script>")) : source]))
 
 function method(key, name, values = {}) {
   const source = scripts[key]

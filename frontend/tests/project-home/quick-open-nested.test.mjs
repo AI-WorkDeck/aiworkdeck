@@ -42,7 +42,7 @@ function backendGetProjectFiles(projectId, parentId = null, tree = false) {
 }
 
 async function mountPanel() {
-  const script = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
   const names = ['getProjectFiles', ...Object.keys(ctx)]
   // eslint-disable-next-line no-new-func

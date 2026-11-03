@@ -4,7 +4,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 const source = readFileSync(new URL('../../src/components/PluginPane.vue', import.meta.url), 'utf8')
-const body = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^\s*import[\s\S]*?from\s*'[^']*'\s*$/gm, '').replace(/export\s+default/, 'return')
+const body = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace(/^\s*import[\s\S]*?from\s*'[^']*'\s*$/gm, '').replace(/export\s+default/, 'return')
 const record = () => ({ id: 'demo', enabled: true, permissions: ['file_read'], version: '1.0', devInstalled: true, frontendEntry: 'web/index.html' })
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r }); return { resolve, promise } }
 function harness() {

@@ -14,7 +14,7 @@ const TEMPLATE = TOOLBAR_SRC.slice(TOOLBAR_SRC.indexOf('<template>'), TOOLBAR_SR
 const WORKER_SRC = readFileSync(new URL('../../src/zetaoffice/public/office_thread.js', import.meta.url), 'utf8')
 
 function loadToolbarComponent() {
-  const script = TOOLBAR_SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = TOOLBAR_SRC.slice(TOOLBAR_SRC.indexOf('<script>') + 8, TOOLBAR_SRC.indexOf('</script>'))
   return new Function(
     'bindHorizontalWheel', 'watchScrollEdges', 'isEnglish', 'host',
     'CN_FONT_SIZES', 'PT_FONT_SIZES', 'ParagraphFormatPanel', 'SystemFontsPanel',

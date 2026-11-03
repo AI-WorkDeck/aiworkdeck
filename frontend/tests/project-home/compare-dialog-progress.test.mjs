@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs'
 
 const VUE_SRC = readFileSync(
   new URL('../../src/components/CompareDocDialog.vue', import.meta.url), 'utf8')
-const SCRIPT = VUE_SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+const SCRIPT = VUE_SRC.slice(VUE_SRC.indexOf('<script>') + 8, VUE_SRC.indexOf('</script>'))
   .replace("import { ICONS } from '@/config/icons.js'", '')
   .replace('export default', 'return')
 const getComponentOptions = new Function('ICONS', SCRIPT)

@@ -80,8 +80,7 @@ test('document candidates retain saved details for acceptance, completed-name hi
   assert.ok(items.some((item) => item.id === 'learned:5' && item.source === 'learned'), 'retain the original record for deletion in management')
 })
 
-const editorScript = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8')
-  .match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import OfficeNavigation from .*$/m, 'const OfficeNavigation = {}')
+const editorScript = ((s) => s.slice(s.indexOf('<script>') + 8, s.indexOf('</script>')))(readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8')).replace(/^import OfficeNavigation from .*$/m, 'const OfficeNavigation = {}')
     .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
 const editorMethods = new Function('ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', editorScript)(null, null, null).methods
 

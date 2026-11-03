@@ -19,7 +19,7 @@ const t = (key, params) => {
 
 /** 读 .vue 的 <script>、把 import 换成可注入的桩（形制同 provenanceRefresh.test.mjs）。 */
 function optionsOf(rel, stubs = {}) {
-  const script = read(rel).match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = ((s) => s.slice(s.indexOf('<script>') + 8, s.indexOf('</script>')))(read(rel))
   const names = []
   for (const m of script.matchAll(/^import\s+([\s\S]*?)\s+from\s+'[^']+'\s*;?\s*$/gm)) {
     const clause = m[1]

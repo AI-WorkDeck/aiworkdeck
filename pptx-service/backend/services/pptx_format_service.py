@@ -31,6 +31,18 @@ class PptxFormatError(Exception):
     """格式操作错误（带上下文信息，控制器直接回给调用方）"""
 
 
+def _sanitize_pptx_path(pptx_path: str) -> str:
+    if not pptx_path or not isinstance(pptx_path, str) or '\x00' in pptx_path:
+        raise PptxFormatError(f"文件不存在: {pptx_path}")
+    allowed_root = os.path.realpath(os.environ.get("PPTX_ALLOWED_ROOT") or os.path.abspath(os.sep))
+    resolved = os.path.realpath(os.path.abspath(pptx_path))
+    if not resolved.startswith(allowed_root):
+        raise PptxFormatError(f"文件路径不允许访问: {pptx_path}")
+    if not resolved.lower().endswith('.pptx'):
+        raise PptxFormatError(f"仅支持 .pptx 文件: {pptx_path}")
+    return resolved
+
+
 def _resolve_output_path(pptx_path: str, output_path: Optional[str]) -> str:
     """
     [checkba] output_path 只允许落在源文件所在目录内。
@@ -39,11 +51,12 @@ def _resolve_output_path(pptx_path: str, output_path: Optional[str]) -> str:
     （容器/桌面机上的配置、脚本、密钥），等同远程改文件。
     合法用法只有「改完写回原处或写到旁边」，因此按目录锁死即可，无需额外配置。
     """
+    safe_src = _sanitize_pptx_path(pptx_path)
     if not output_path:
-        return pptx_path
-    base_dir = os.path.realpath(os.path.dirname(os.path.abspath(pptx_path)))
+        return safe_src
+    base_dir = os.path.realpath(os.path.dirname(safe_src))
     resolved = os.path.realpath(os.path.abspath(output_path))
-    if os.path.dirname(resolved) != base_dir:
+    if os.path.dirname(resolved) != base_dir or not resolved.startswith(base_dir + os.sep):
         raise PptxFormatError('output_path 只能位于源文件所在目录内')
     if not resolved.lower().endswith('.pptx'):
         raise PptxFormatError('output_path 仅支持 .pptx 文件')
@@ -51,12 +64,11 @@ def _resolve_output_path(pptx_path: str, output_path: Optional[str]) -> str:
 
 
 def _load(pptx_path: str) -> Presentation:
-    if not pptx_path or not os.path.exists(pptx_path):
+    resolved = _sanitize_pptx_path(pptx_path)
+    if not os.path.exists(resolved) or not os.path.isfile(resolved):
         raise PptxFormatError(f"文件不存在: {pptx_path}")
-    if not pptx_path.lower().endswith('.pptx'):
-        raise PptxFormatError(f"仅支持 .pptx 文件: {pptx_path}")
     try:
-        return Presentation(pptx_path)
+        return Presentation(resolved)
     except Exception as e:
         raise PptxFormatError(f"无法解析 PPTX: {e}")
 

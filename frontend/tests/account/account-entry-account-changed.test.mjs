@@ -79,8 +79,17 @@ async function renderHtml(props, connectedOverride) {
   // SSR 实例也会跑 created 订阅、且永不卸载：渲染期间换一条空总线，别污染被测的那条
   const saved = globalThis.uni
   globalThis.uni = { $on() {}, $off() {}, $emit() {} }
+  const stripComments = (str) => {
+    let out = str, i = out.indexOf('<!--')
+    while (i !== -1) {
+      const j = out.indexOf('-->', i + 4)
+      out = j === -1 ? out.slice(0, i) : out.slice(0, i) + out.slice(j + 3)
+      i = out.indexOf('<!--')
+    }
+    return out
+  }
   try {
-    return (await renderToString(app)).replace(/<!--[\s\S]*?-->/g, '')
+    return stripComments(await renderToString(app))
   } finally {
     globalThis.uni = saved
   }
@@ -173,7 +182,13 @@ test('客户视角：下拉里不出「我的日程」（客户看不到事项�
     const saved = globalThis.uni
     globalThis.uni = { $on() {}, $off() {}, $emit() {} }
     try {
-      return (await renderToString(app)).replace(/<!--[\s\S]*?-->/g, '')
+      let out = await renderToString(app), i = out.indexOf('<!--')
+      while (i !== -1) {
+        const j = out.indexOf('-->', i + 4)
+        out = j === -1 ? out.slice(0, i) : out.slice(0, i) + out.slice(j + 3)
+        i = out.indexOf('<!--')
+      }
+      return out
     } finally {
       globalThis.uni = saved
     }

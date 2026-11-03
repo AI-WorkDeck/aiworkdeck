@@ -9,7 +9,7 @@ function fixture() {
   const calls = [], events = []
   let modal
   const context = { renameProject: async (...args) => calls.push(['rename', ...args]), uni: { showToast() {}, showModal(value) { modal = value } } }
-  const code = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'globalThis.component =')
+  const code = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'globalThis.component =')
   vm.runInNewContext(code, context)
   const component = context.component
   const state = { ...component.data(), removeProject: async id => { calls.push(['delete', id]); return true }, client: false, projects: [], $t: key => key, $emit: (...args) => events.push(args) }
@@ -44,7 +44,7 @@ test('CLIENT cannot invoke mutation methods even outside the hidden controls', a
 
 const welcomeSource = readFileSync(new URL('../../src/components/welcome/WelcomePane.vue', import.meta.url), 'utf8')
 function welcomeFixture() {
-  const code = welcomeSource.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'globalThis.component =')
+  const code = welcomeSource.slice(welcomeSource.indexOf('<script>') + 8, welcomeSource.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'globalThis.component =')
   const context = { CloudAcceptDialog: {}, FolderCatalog: {}, AccountProjectCatalog: {}, buildRecentProjects: list => list, getRecentProjectIds: () => [] }
   vm.runInNewContext(code, context)
   const state = { currentProjectId: 7, allProjects: [{id:7,name:'old'}], $emit: (...args) => events.push(args), leaveWorkbench: url => visits.push(url) }

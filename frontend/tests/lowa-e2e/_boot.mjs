@@ -56,16 +56,37 @@ const MIME = {
  *        被服务的资产（注入测试专用 worker 动作等）；源码与 dist 不动。
  * @param {Record<string,string>} [opts.extraFiles] 额外路由：url 路径 -> 磁盘文件。
  */
+function findSafeFile(rootDir, relPath) {
+  const parts = String(relPath || '').split('/').filter(Boolean)
+  if (!parts.length) return null
+  let cur = rootDir
+  for (const part of parts) {
+    let entries
+    try { entries = fs.readdirSync(cur) } catch { return null }
+    const name = entries.find((n) => n === part)
+    if (!name) return null
+    cur = path.join(cur, name)
+  }
+  try {
+    return fs.statSync(cur).isFile() ? cur : null
+  } catch {
+    return null
+  }
+}
+
 export async function startServer({ patchServed = (u, c) => c, extraFiles = {} } = {}) {
   const encPath = path.join(engineDir, '.encodings.json')
   const encodings = fs.existsSync(encPath) ? JSON.parse(fs.readFileSync(encPath, 'utf8')) : {}
   const server = http.createServer((req, res) => {
     const urlPath = decodeURIComponent(req.url.split('?')[0])
     const fromEngine = urlPath.startsWith('/lowa/')
-    const fp = extraFiles[urlPath] ? extraFiles[urlPath] : fromEngine
-      ? path.join(engineDir, urlPath.slice('/lowa/'.length))
-      : path.join(distDir, urlPath === '/' ? 'editor.html' : urlPath)
-    if (!fs.existsSync(fp) || fs.statSync(fp).isDirectory()) { res.writeHead(404); res.end(); return }
+    const extraEntry = Object.entries(extraFiles).find(([k]) => k === urlPath)
+    const fp = extraEntry
+      ? (fs.existsSync(extraEntry[1]) && !fs.statSync(extraEntry[1]).isDirectory() ? extraEntry[1] : null)
+      : fromEngine
+        ? findSafeFile(engineDir, urlPath.slice('/lowa/'.length))
+        : findSafeFile(distDir, urlPath === '/' ? 'editor.html' : urlPath)
+    if (!fp) { res.writeHead(404); res.end(); return }
     const headers = {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
