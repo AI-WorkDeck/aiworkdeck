@@ -34,10 +34,10 @@ public interface ProjectAiMessageRepository extends JpaRepository<ProjectAiMessa
     /**
      * 上下文组装专用的历史投影（dev-board#811 K31，审查 C-12）。
      *
-     * <p>{@code ContextAssemblerService} 每一轮都要把整条会话读一遍，而它只用到 role 与 content
-     * 两个字段（契约 D：模型永远只看 content）。走 {@code findByConversationIdOrderByCreatedAtAsc}
+     * <p>{@code ContextAssemblerService} 每一轮都要把整条会话读一遍，使用 id、role、content 与附件数量
+     * （契约 D：模型正文永远只看 content；附件仅提供分页引用）。走 {@code findByConversationIdOrderByCreatedAtAsc}
      * 会把 displayContent / conversationTitle / clientRequestId / sourceChannel 一起拖回来，
-     * 再由服务层顺手补一次附件查询——三样东西都不参与上下文组装，而这一整段就卡在用户等待
+     * 再由服务层顺手加载全部附件——这些额外数据不参与上下文组装，而这一整段就卡在用户等待
      * 首 token 的关键路径上。
      *
      * <p><b>刻意不加行数上限。</b> 看上去「只取最近 N 条」更省，但 {@code ContextCompressor} 的
@@ -46,12 +46,13 @@ public interface ProjectAiMessageRepository extends JpaRepository<ProjectAiMessa
      * 得先把压缩器改成按游标回溯，那是另一张卡。
      */
     @org.springframework.data.jpa.repository.Query(
-            "SELECT new com.checkba.repository.ProjectAiMessageRepository$HistoryLine(m.role, m.content) " +
+            "SELECT new com.checkba.repository.ProjectAiMessageRepository$HistoryLine(m.id, m.role, m.content, (SELECT COUNT(a.id) FROM ProjectAiMessageAttachment a WHERE a.messageId = m.id)) " +
             "FROM ProjectAiMessage m WHERE m.conversationId = :conversationId ORDER BY m.createdAt ASC, m.id ASC")
     List<HistoryLine> findHistoryForAssembly(@org.springframework.data.repository.query.Param("conversationId") String conversationId);
 
-    /** 上下文组装要的两列。 */
-    record HistoryLine(String role, String content) {
+    /** 历史正文与附件清单定位；不加载附件实体或正文。 */
+    record HistoryLine(Long id, String role, String content, Long attachmentCount) {
+        public HistoryLine(String role, String content) { this(null, role, content, 0L); }
     }
 
     /**

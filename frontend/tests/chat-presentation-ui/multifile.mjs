@@ -54,6 +54,17 @@ try {
   })
   assert.equal(await page.evaluate(() => window.chatPosts.length), sentCount, 'references must not bypass the image caption guard')
   assert.equal(await page.evaluate(() => window.captionWarnings), 1)
+  await page.evaluate(async () => {
+    document.querySelector('.chat-input-rich').append(' 继续')
+    await window.chatState.handleSubmit()
+  })
+  const continued = await page.evaluate(() => window.chatPosts.at(-1))
+  assert.match(continued.message, /继续/)
+  assert.deepEqual(continued.contextItems.map(f => [f.id, f.isDir]), [['71', false], ['72', true]])
+  assert.equal(await page.evaluate(() => window.chatPosts[0].message), referenceRequest.message, 'continuing must not overwrite the original instruction')
+  await page.evaluate(async () => { window.chatState.isStreaming = false; await window.chatState.handleContinue() })
+  assert.equal(await page.evaluate(() => window.chatPosts.at(-1).message), '继续')
+  assert.equal(await page.evaluate(() => window.chatPosts.at(-1).conversationId), referenceRequest.conversationId)
   await page.evaluate(() => window.chatState.startNewChat())
   assert.equal(await page.evaluate(async () => {
     for (let id = 100; id < 600; id++) window.chatState.addFile({ id, name: `file-${id}.txt` })
