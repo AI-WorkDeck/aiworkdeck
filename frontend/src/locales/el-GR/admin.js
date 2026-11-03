@@ -445,5 +445,17 @@ export default {
   "ocrSettingsReload": "Επαναφόρτωση",
   "ocrSettingsSaved": "Αποθηκεύτηκε",
   "ocrSettingsLoadFailed": "Αποτυχία φόρτωσης",
-  "ocrSettingsSaveFailed": "Αποτυχία αποθήκευσης"
+  "ocrSettingsSaveFailed": "Αποτυχία αποθήκευσης",
+  "walletRedeemTitle": "Κωδικός δώρου / Κωδικός πρόσκλησης Circle",
+  "walletRedeemPlaceholder": "Εισαγάγετε κωδικό δώρου ή κωδικό Circle (π.χ. KW-ABNR-2026)",
+  "walletRedeemBtn": "Εξαργήρωση / Σύνδεση",
+  "walletRedeemSubmitting": "Εφαρμογή…",
+  "walletRedeemSuccessGift": "Εξαργήρωση {amount} με επιτυχία",
+  "walletRedeemSuccessFeature": "Η λειτουργία ξεκλειδώθηκε με επιτυχία",
+  "walletRedeemSuccessCircle": "Συνδέθηκε με {firm} (επίθεμα: {suffix}), χορηγήθηκαν {amount} αποκλειστικής πίστωσης DeepSeek",
+  "walletRedeemFailed": "Μη έγκυρος κωδικός δώρου ή πρόσκλησης",
+  "walletCircleBadge": "Γραφείο Circle Alliance: {firm} (επίθεμα: {suffix}) · 0% επιφόρτιση",
+  "walletQingtianTitle": "Baoqingtian · Μηνιαία Qingtian Coins",
+  "walletQingtianBalance": "{remaining} / {monthly} Qingtian Coins απομένουν αυτόν τον μήνα",
+  "walletQingtianRatio": "Ισοτιμία: 1 Qingtian Coin = {creditsPerCoin} Credits (ισχύει για τον τρέχοντα μήνα)",
 }

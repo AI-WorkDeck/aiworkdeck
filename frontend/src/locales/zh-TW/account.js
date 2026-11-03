@@ -389,5 +389,17 @@ export default {
   "caseRecordCollectionFailedToast": "登錄收款失敗",
   "caseSyncErpFailedToast": "財務同步失敗",
   "caseSeedDemoFailedToast": "載入示範資料失敗",
-  "caseOpenPluginFailedToast": "開啟外掛程式失敗"
+  "caseOpenPluginFailedToast": "開啟外掛程式失敗",
+  "circleInviteLabel": "Circle 聯盟所邀請碼（選填）",
+  "circleInvitePlaceholder": "例如 KW-ABNR-2026",
+  "circleInviteHint": "輸入律所專屬邀請碼，自動帶出律所後綴並開通 DeepSeek 專線額度",
+  "bqtScanSwitch": "包晴天律師掃碼登入",
+  "bqtScanTitle": "請使用包晴天律師端 App 掃碼登入",
+  "bqtScanHint": "僅支援包晴天認證律師掃碼，登入後每月自動發放晴天幣額度",
+  "bqtScanExpired": "二維碼已過期",
+  "bqtScanRefresh": "重新整理二維碼",
+  "bqtScanBack": "返回帳號登入",
+  "errInvalidInviteCode": "邀請碼無效或已停用，請核對後重試",
+  "errInviteAlreadyBound": "目前帳號已綁定過聯盟所邀請碼",
+  "errBqtNotLawyer": "僅支援包晴天認證律師帳號掃碼登入",
 }

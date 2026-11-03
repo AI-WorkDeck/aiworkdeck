@@ -445,5 +445,17 @@ export default {
   "ocrSettingsReload": "Neu laden",
   "ocrSettingsSaved": "Gespeichert",
   "ocrSettingsLoadFailed": "Laden fehlgeschlagen",
-  "ocrSettingsSaveFailed": "Speichern fehlgeschlagen"
+  "ocrSettingsSaveFailed": "Speichern fehlgeschlagen",
+  "walletRedeemTitle": "Geschenkcode / Circle-Kanzlei-Einladungscode",
+  "walletRedeemPlaceholder": "Geschenkcode oder Circle-Kanzlei-Code eingeben (z. B. KW-ABNR-2026)",
+  "walletRedeemBtn": "Einlösen / Binden",
+  "walletRedeemSubmitting": "Wird angewendet…",
+  "walletRedeemSuccessGift": "{amount} erfolgreich eingelöst",
+  "walletRedeemSuccessFeature": "Funktion erfolgreich freigeschaltet",
+  "walletRedeemSuccessCircle": "An {firm} (Suffix: {suffix}) gebunden, {amount} dediziertes DeepSeek-Kontingent gewährt",
+  "walletRedeemFailed": "Ungültiger Geschenk- oder Einladungscode",
+  "walletCircleBadge": "Circle-Allianzkanzlei: {firm} (Suffix: {suffix}) · 0 % Aufschlag",
+  "walletQingtianTitle": "Baoqingtian · Monatliche Qingtian-Coins",
+  "walletQingtianBalance": "Diesen Monat noch {remaining} / {monthly} Qingtian-Coins übrig",
+  "walletQingtianRatio": "Umrechnungskurs: 1 Qingtian-Coin = {creditsPerCoin} Credits (gültig im laufenden Monat)",
 }

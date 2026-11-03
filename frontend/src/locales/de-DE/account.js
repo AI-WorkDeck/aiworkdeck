@@ -389,5 +389,17 @@ export default {
   "caseRecordCollectionFailedToast": "Zahlungseingang konnte nicht erfasst werden",
   "caseSyncErpFailedToast": "Finanzsynchronisierung fehlgeschlagen",
   "caseSeedDemoFailedToast": "Demo-Daten konnten nicht initialisiert werden",
-  "caseOpenPluginFailedToast": "Plugin konnte nicht geöffnet werden"
+  "caseOpenPluginFailedToast": "Plugin konnte nicht geöffnet werden",
+  "circleInviteLabel": "Circle-Allianz-Einladungscode (optional)",
+  "circleInvitePlaceholder": "z. B. KW-ABNR-2026",
+  "circleInviteHint": "Geben Sie den Einladungscode Ihrer Kanzlei ein, um das Kanzlei-Suffix anzuhängen und dediziertes DeepSeek-Kontingent freizuschalten",
+  "bqtScanSwitch": "Baoqingtian-Anwalt-QR-Login",
+  "bqtScanTitle": "Zum Anmelden mit der Baoqingtian-Anwalts-App scannen",
+  "bqtScanHint": "Nur für verifizierte Baoqingtian-Anwälte. Monatliche Qingtian-Coins werden automatisch gutgeschrieben.",
+  "bqtScanExpired": "QR-Code abgelaufen",
+  "bqtScanRefresh": "QR-Code neu laden",
+  "bqtScanBack": "Zurück zur Kontoanmeldung",
+  "errInvalidInviteCode": "Ungültiger oder deaktivierter Einladungscode",
+  "errInviteAlreadyBound": "Dieses Konto hat bereits einen Circle-Kanzlei-Einladungscode gebunden",
+  "errBqtNotLawyer": "Nur verifizierte Baoqingtian-Anwaltskonten können sich per QR-Code anmelden",
 }

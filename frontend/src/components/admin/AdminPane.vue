@@ -331,6 +331,34 @@
                       </text>
                     </view>
                   </view>
+                  <!-- Circle 联盟所徽章与包晴天晴天币月度额度（dev-board#1665） -->
+                  <view v-if="walletCircleFirm" style="margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: rgba(46, 90, 80, 0.08);">
+                    <text style="font-size: 13px; font-weight: 600; color: #256F46;">
+                      {{ $t('admin.walletCircleBadge', { firm: walletCircleFirm.name || walletCircleFirm.code, suffix: walletCircleFirm.suffix }) }}
+                    </text>
+                  </view>
+                  <view v-if="walletBqtQingtian" style="margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: rgba(184, 110, 20, 0.08); display: flex; flex-direction: column; gap: 4px;">
+                    <text style="font-size: 13px; font-weight: 600; color: #B86E14;">{{ $t('admin.walletQingtianTitle') }}</text>
+                    <text style="font-size: 13px;">{{ $t('admin.walletQingtianBalance', { remaining: walletBqtQingtian.remainingCoins, monthly: walletBqtQingtian.monthlyCoins }) }}</text>
+                    <text style="font-size: 12px; opacity: 0.75;">{{ $t('admin.walletQingtianRatio', { creditsPerCoin: walletBqtQingtian.creditsPerCoin }) }}</text>
+                  </view>
+                  <!-- 兑换码 / Circle 联盟所邀请码绑定入口 -->
+                  <view style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.06);">
+                    <text style="font-size: 12px; opacity: 0.75; display: block; margin-bottom: 6px;">{{ $t('admin.walletRedeemTitle') }}</text>
+                    <view style="display: flex; gap: 8px; align-items: center;">
+                      <input
+                        class="form-input"
+                        style="flex: 1;"
+                        v-model="redeemCodeInput"
+                        :disabled="redeemBusy"
+                        :placeholder="$t('admin.walletRedeemPlaceholder')"
+                        @confirm="onRedeemCode"
+                      />
+                      <button class="comp-btn" :disabled="redeemBusy || !redeemCodeInput.trim()" @tap="onRedeemCode">
+                        {{ redeemBusy ? $t('admin.walletRedeemSubmitting') : $t('admin.walletRedeemBtn') }}
+                      </button>
+                    </view>
+                  </view>
                   <!-- 等级规则：七档表全部来自 getAccountMembership 的 tiers，不在前端硬编码第二份 -->
                   <view class="wallet-rules">
                     <view class="wallet-rules-head">
@@ -1020,7 +1048,7 @@
 import {
   getAdminConfig, saveAdminConfig,
   getAccountStatus, connectAccount, getAccountUsage,
-  getAccountBalance, getAccountMembership, getTeam,
+  getAccountBalance, getAccountMembership, redeemAccountCode, getTeam,
   getStorageLocation, moveStorageLocation, resetStorageLocation,
   getLocalIdentityCandidates, selectLocalIdentity,
   getCurrentUser as fetchCurrentUser, uploadAvatar,
@@ -1295,8 +1323,10 @@ export default {
       accountUsage: null, // { local: {...}, platform: {...} }，形状见 api.js getAccountUsage
       // 会员钱包卡（dev-board#183）。walletData 来自轻端点 getAccountBalance（余额），
       // membershipData 来自 getAccountMembership（等级/成长值/七档表），分开取分开失败
-      walletData: { loaded: false, available: true, balanceCents: null },
+      walletData: { loaded: false, available: true, balanceCents: null, circleFirm: null, bqtQingtian: null },
       membershipData: null,
+      redeemCodeInput: '',
+      redeemBusy: false,
       // 账户卡里的「团队」一行（dev-board#496 设计 §10.4 第 2 条）。
       // loaded 只在真的问到了之后才置 true——问不到时整行不渲染，
       // 而不是显示「未加入」（那是在拿「不知道」冒充一个事实）
@@ -1549,6 +1579,16 @@ export default {
     // 展示它是为了让「跟随内置默认」这个选项有可核对的落点。
     catalogDefaultModel() {
       return (this.modelCatalog && this.modelCatalog.defaultModel) || ''
+    },
+    walletCircleFirm() {
+      return (this.walletData && this.walletData.circleFirm)
+        || (this.accountPlatform && this.accountPlatform.circleFirm)
+        || null
+    },
+    walletBqtQingtian() {
+      return (this.walletData && this.walletData.bqtQingtian)
+        || (this.accountPlatform && this.accountPlatform.bqtQingtian)
+        || null
     },
 
   },
@@ -2519,18 +2559,57 @@ export default {
             available: b.available !== false,
             balanceCents: b.balanceCents,
             subscription: b.subscription || null,
+            circleFirm: b.circleFirm || null,
+            bqtQingtian: b.bqtQingtian || null,
           }
         } else {
-          this.walletData = { loaded: false, available: true, balanceCents: null }
+          this.walletData = { loaded: false, available: true, balanceCents: null, circleFirm: null, bqtQingtian: null }
         }
       } catch (e) {
-        this.walletData = { loaded: false, available: true, balanceCents: null }
+        this.walletData = { loaded: false, available: true, balanceCents: null, circleFirm: null, bqtQingtian: null }
       }
       try {
         this.membershipData = await getAccountMembership()
       } catch (e) {
         // 旧后端/官网不可达：右半（等级/成长值）整块不渲染，余额与充值按钮不受影响
         this.membershipData = null
+      }
+    },
+    async onRedeemCode() {
+      const code = (this.redeemCodeInput || '').trim()
+      if (!code || this.redeemBusy) return
+      this.redeemBusy = true
+      try {
+        const res = await redeemAccountCode(code)
+        this.redeemCodeInput = ''
+        await this.loadAccount()
+        await this.loadWallet()
+        await this.loadUserInfo()
+        uni.$emit('awd:identity-updated')
+        if (res && res.kind === 'circle_firm') {
+          const amount = ((res.amountCents || 0) / 100).toFixed(2) + ' Credits'
+          uni.showToast({
+            title: this.$t('admin.walletRedeemSuccessCircle', {
+              firm: res.firmName || res.code,
+              suffix: res.suffix || '',
+              amount,
+            }),
+            icon: 'none',
+            duration: 2600,
+          })
+        } else if (res && res.kind === 'feature') {
+          uni.showToast({ title: this.$t('admin.walletRedeemSuccessFeature'), icon: 'none' })
+        } else {
+          const amount = ((res && res.amountCents ? res.amountCents : 0) / 100).toFixed(2) + ' Credits'
+          uni.showToast({ title: this.$t('admin.walletRedeemSuccessGift', { amount }), icon: 'none' })
+        }
+      } catch (e) {
+        uni.showToast({
+          title: (e && e.message) || this.$t('admin.walletRedeemFailed'),
+          icon: 'none',
+        })
+      } finally {
+        this.redeemBusy = false
       }
     },
     /** 七档表里一档的展示名，优先按 tier.key 取当前语言词条，兜底按语言取 nameZh/nameEn。 */

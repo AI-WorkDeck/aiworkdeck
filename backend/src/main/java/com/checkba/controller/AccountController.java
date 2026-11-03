@@ -212,19 +212,25 @@ public class AccountController {
         String phone = body == null ? null : body.get("phone");
         String email = body == null ? null : body.get("email");
         String code = body == null ? null : body.get("code");
+        String inviteCode = body == null ? null : body.get("inviteCode");
         // 三种凭据形状：手机号+码（cn）、邮箱+码（intl）、账号+口令（两站的存量口令账号）。
         // 邮箱那条不是可选项——intl 的验证码注册建出来的账号没有口令，
         // 少了它新用户在官网注册完就连不上桌面端。
+        boolean hasInvite = inviteCode != null && !inviteCode.isBlank();
         Map<String, Object> status;
         try {
         if (phone != null && !phone.isBlank()) {
             status = accountService.loginWithPhone(phone, code);
         } else if (email != null && !email.isBlank()) {
-            status = accountService.loginWithEmailCode(email, code);
+            status = hasInvite
+                    ? accountService.loginWithEmailCode(email, code, inviteCode)
+                    : accountService.loginWithEmailCode(email, code);
         } else {
-            status = accountService.loginWithPassword(
-                    body == null ? null : body.get("account"),
-                    body == null ? null : body.get("password"));
+            String account = body == null ? null : body.get("account");
+            String password = body == null ? null : body.get("password");
+            status = hasInvite
+                    ? accountService.loginWithPassword(account, password, inviteCode)
+                    : accountService.loginWithPassword(account, password);
         }
         } catch (com.checkba.service.account.PasswordSetupRequired pending) {
             return ok(pending.challenge());
@@ -236,6 +242,48 @@ public class AccountController {
         // 里就该是新账户的名字
         identitySync.refreshQuietly();
         return ok(withSwitchFlag(status, switched));
+    }
+
+    @PostMapping("/bqt-scan/create")
+    public Map<String, Object> createBqtScanSession(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        requireUser(sessionId);
+        return ok(accountService.createBqtScanSession());
+    }
+
+    @GetMapping("/bqt-scan/status")
+    public Map<String, Object> pollBqtScanStatus(
+            @RequestParam(value = "qrid", required = false) String qrid,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        requireUser(sessionId);
+        if (qrid == null || qrid.isBlank()) {
+            throw new IllegalArgumentException(LangText.of("qrid 不能为空", "qrid cannot be empty"));
+        }
+        Map<String, Object> res = accountService.pollBqtScanStatus(qrid);
+        if ("confirmed".equals(res.get("status"))) {
+            boolean switched = accountSwitchCleanup.afterConnect();
+            identitySync.refreshQuietly();
+            return ok(withSwitchFlag(res, switched));
+        }
+        return ok(res);
+    }
+
+    @PostMapping("/redeem")
+    public Map<String, Object> redeemCode(
+            @RequestBody(required = false) Map<String, String> body,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        requireUser(sessionId);
+        String code = body == null ? null : body.get("code");
+        if (code == null || code.trim().isEmpty()) {
+            throw new IllegalArgumentException(LangText.of("兑换码或邀请码不能为空", "Redeem code or invite code cannot be empty"));
+        }
+        Map<String, Object> redeemed = accountService.redeemCode(code);
+        if (redeemed.get("displayName") instanceof String nextName && !nextName.isBlank()) {
+            identitySync.applyDisplayName(nextName);
+        } else {
+            identitySync.refreshQuietly();
+        }
+        return ok(redeemed);
     }
 
     @PostMapping("/password/setup")
@@ -885,8 +933,14 @@ public class AccountController {
         try {
             Map<String, Object> profile = accountService.fetchProfile();
             platform.put("balanceCents", profile.get("balanceCents"));
-        platform.put("subscription", profile.get("subscription"));
+            platform.put("subscription", profile.get("subscription"));
             platform.put("plan", profile.get("plan"));
+            if (profile.get("circleFirm") != null) {
+                platform.put("circleFirm", profile.get("circleFirm"));
+            }
+            if (profile.get("bqtQingtian") != null) {
+                platform.put("bqtQingtian", profile.get("bqtQingtian"));
+            }
             platform.put("allocations", accountService.fetchLedger().stream()
                     .filter(entry -> "ai_alloc".equals(entry.get("kind")))
                     .toList());

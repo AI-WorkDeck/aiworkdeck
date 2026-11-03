@@ -389,5 +389,17 @@ export default {
   "caseRecordCollectionFailedToast": "บันทึกการเก็บเงินไม่สำเร็จ",
   "caseSyncErpFailedToast": "ซิงก์ข้อมูลการเงินไม่สำเร็จ",
   "caseSeedDemoFailedToast": "สร้างข้อมูลตัวอย่างไม่สำเร็จ",
-  "caseOpenPluginFailedToast": "เปิดปลั๊กอินไม่สำเร็จ"
+  "caseOpenPluginFailedToast": "เปิดปลั๊กอินไม่สำเร็จ",
+  "circleInviteLabel": "รหัสเชิญ Circle Alliance (ไม่บังคับ)",
+  "circleInvitePlaceholder": "เช่น KW-ABNR-2026",
+  "circleInviteHint": "ป้อนรหัสเชิญของสำนักงานเพื่อแนบคำต่อท้ายของสำนักงานและปลดล็อกโควตา DeepSeek เฉพาะ",
+  "bqtScanSwitch": "เข้าสู่ระบบทนาย Baoqingtian ด้วย QR",
+  "bqtScanTitle": "สแกนด้วยแอปทนาย Baoqingtian เพื่อเข้าสู่ระบบ",
+  "bqtScanHint": "สำหรับทนาย Baoqingtian ที่ผ่านการตรวจสอบเท่านั้น เหรียญ Qingtian รายเดือนจะได้รับโดยอัตโนมัติ",
+  "bqtScanExpired": "รหัส QR หมดอายุ",
+  "bqtScanRefresh": "รีเฟรชรหัส QR",
+  "bqtScanBack": "กลับไปที่การเข้าสู่ระบบด้วยบัญชี",
+  "errInvalidInviteCode": "รหัสเชิญไม่ถูกต้องหรือถูกปิดใช้งาน",
+  "errInviteAlreadyBound": "บัญชีนี้ได้ผูกรหัสเชิญของสำนักงาน Circle ไปแล้ว",
+  "errBqtNotLawyer": "เฉพาะบัญชีทนาย Baoqingtian ที่ผ่านการตรวจสอบเท่านั้นที่เข้าสู่ระบบด้วย QR ได้",
 }

@@ -677,6 +677,12 @@ public class AccountService {
         result.put("balanceCents", profile.get("balanceCents"));
         result.put("subscription", profile.get("subscription"));
         result.put("plan", profile.get("plan"));
+        if (profile.get("circleFirm") != null) {
+            result.put("circleFirm", profile.get("circleFirm"));
+        }
+        if (profile.get("bqtQingtian") != null) {
+            result.put("bqtQingtian", profile.get("bqtQingtian"));
+        }
         Map<String, Object> membership = null;
         try {
             membership = cachedMembershipSummary(owner);
@@ -1046,25 +1052,70 @@ public class AccountService {
     }
 
     /**
-     * 官网登录：邮箱 + 验证码换 Key 并连接（国际站主路径）。
-     *
-     * <p><b>这条不是可选项</b>：国际站的邮箱验证码注册建出来的账号没有口令
-     * （{@code passwordHash} 是空串），而口令注册已随邮箱验证码上线一起关掉。
-     * 少了这条，新国际站用户在官网注册完就再也连不上桌面端——下面那条口令路对他无效。
+     * POST /api/account/redeem —— 兑换储值码或绑定 Circle 联盟所邀请码（dev-board#1665）。
+     * 若绑定 Circle 邀请码后返回了新的带律所后缀的 displayName，同步写入 account.json 并清空余额缓存。
      */
+    public synchronized Map<String, Object> redeemCode(String code) {
+        Map<String, Object> body = Map.of("code", code == null ? "" : code.trim());
+        Map<String, Object> res = sendJson("POST", "/api/account/redeem", body);
+        if (res.get("displayName") instanceof String nextName && !nextName.isBlank()) {
+            rememberIdentity(null, nextName);
+        }
+        clearBalanceCache();
+        return res;
+    }
+
+    /** 官网登录：邮箱 + 验证码换 Key 并连接（国际站主路径）。 */
     public synchronized Map<String, Object> loginWithEmailCode(String email, String code) {
+        return loginWithEmailCode(email, code, null);
+    }
+
+    public synchronized Map<String, Object> loginWithEmailCode(String email, String code, String inviteCode) {
         Map<String, Object> credentials = new HashMap<>();
         credentials.put("email", email == null ? "" : email.trim());
         credentials.put("code", code == null ? "" : code.trim());
+        if (inviteCode != null && !inviteCode.isBlank()) {
+            credentials.put("inviteCode", inviteCode.trim());
+        }
         return exchangeAndConnect(credentials);
     }
 
     /** 官网登录：账号 + 口令换 Key 并连接（两站的存量口令账号）。 */
     public synchronized Map<String, Object> loginWithPassword(String account, String password) {
+        return loginWithPassword(account, password, null);
+    }
+
+    public synchronized Map<String, Object> loginWithPassword(String account, String password, String inviteCode) {
         Map<String, Object> credentials = new HashMap<>();
         credentials.put("account", account == null ? "" : account.trim());
         credentials.put("password", password == null ? "" : password);
+        if (inviteCode != null && !inviteCode.isBlank()) {
+            credentials.put("inviteCode", inviteCode.trim());
+        }
         return exchangeAndConnect(credentials);
+    }
+
+    /** 包晴天律师扫码：创建扫码会话（POST /api/auth/bqt-scan/create）。 */
+    public Map<String, Object> createBqtScanSession() {
+        return postLogin("/api/auth/bqt-scan/create", Map.of());
+    }
+
+    /** 包晴天律师扫码：轮询扫码状态，确认后换取 awdk_ Key 并落盘连接。 */
+    public synchronized Map<String, Object> pollBqtScanStatus(String qrid) {
+        String encodedQrid = java.net.URLEncoder.encode(qrid == null ? "" : qrid.trim(), StandardCharsets.UTF_8);
+        String encodedDevice = java.net.URLEncoder.encode(deviceName(), StandardCharsets.UTF_8);
+        String path = "/api/auth/bqt-scan/status?qrid=" + encodedQrid + "&issueKey=1&deviceName=" + encodedDevice;
+        Map<String, Object> payload = AccountLoginExchange.get(transport, objectMapper, baseUrl(), path);
+        if ("confirmed".equals(payload.get("status")) && payload.get("key") instanceof String key && !key.isBlank()) {
+            Map<String, Object> connected = new LinkedHashMap<>(connect(key));
+            connected.put("status", "confirmed");
+            if (payload.get("qingtian") != null) {
+                connected.put("qingtian", payload.get("qingtian"));
+            }
+            connected.put("isNewUser", Boolean.TRUE.equals(payload.get("isNewUser")));
+            return connected;
+        }
+        return payload;
     }
 
     private Map<String, Object> exchangeAndConnect(Map<String, Object> credentials) {
@@ -1207,6 +1258,13 @@ public class AccountService {
             case "invalid_image" -> LangText.of("这不是一张能识别的图片", "That file is not a readable image");
             case "unsupported_format" -> LangText.of("图片格式不支持，用 JPG / PNG / WebP", "That image format is not supported; use JPG, PNG or WebP");
             case "payload_too_large" -> LangText.of("上报数据过大", "The upload is too large");
+            case "invalid_code", "invalid_invite_code" -> LangText.of("兑换码或邀请码无效，核对后再试", "That redeem code or invite code is not valid");
+            case "disabled" -> LangText.of("该兑换码或邀请码已停用", "That code has been disabled");
+            case "expired" -> LangText.of("该兑换码或邀请码已过期", "That code has expired");
+            case "already_redeemed" -> LangText.of("你已经兑换过这个码了", "You have already redeemed this code");
+            case "exhausted" -> LangText.of("该兑换码已被领完", "That code has reached its redemption limit");
+            case "already_bound_same" -> LangText.of("当前账户已绑定该律所邀请码", "Your account is already bound to this firm's invite code");
+            case "already_bound_other" -> LangText.of("当前账户已绑定其他 Circle 联盟所邀请码，不可重复绑定", "Your account is already bound to another Circle firm's invite code");
             default -> LangText.of("官网拒绝了这次操作（", "The website rejected this request (") + code + LangText.of("）", ")");
         };
     }

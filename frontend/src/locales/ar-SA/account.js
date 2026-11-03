@@ -389,5 +389,17 @@ export default {
   "caseRecordCollectionFailedToast": "فشل تسجيل التحصيل",
   "caseSyncErpFailedToast": "فشلت مزامنة المالية",
   "caseSeedDemoFailedToast": "فشل تحميل البيانات التجريبية",
-  "caseOpenPluginFailedToast": "فشل فتح الإضافة"
+  "caseOpenPluginFailedToast": "فشل فتح الإضافة",
+  "circleInviteLabel": "كود دعوة Circle Alliance (اختياري)",
+  "circleInvitePlaceholder": "مثال: KW-ABNR-2026",
+  "circleInviteHint": "أدخل رمز الدعوة الخاص بمكتبك لإرفاق لاحقة المكتب والاستفادة من حصة DeepSeek المخصصة",
+  "bqtScanSwitch": "تسجيل دخول المحامي عبر رمز QR من باوتشينغتيان",
+  "bqtScanTitle": "امسح الرمز بتطبيق محامي باوتشينغتيان لتسجيل الدخول",
+  "bqtScanHint": "للمحامين المعتمدين من باوتشينغتيان فقط. تُمنح عملات تشينغتيان الشهرية تلقائيًا.",
+  "bqtScanExpired": "انتهت صلاحية رمز QR",
+  "bqtScanRefresh": "تحديث رمز QR",
+  "bqtScanBack": "العودة إلى تسجيل الدخول بالحساب",
+  "errInvalidInviteCode": "رمز الدعوة غير صالح أو موقوف، تحقق وأعد المحاولة",
+  "errInviteAlreadyBound": "ربط هذا الحساب رمز دعوة Circle مسبقًا",
+  "errBqtNotLawyer": "تسجيل الدخول عبر رمز QR متاح فقط لحسابات محامي باوتشينغتيان المعتمدة",
 }

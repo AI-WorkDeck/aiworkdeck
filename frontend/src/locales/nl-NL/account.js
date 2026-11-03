@@ -389,5 +389,17 @@ export default {
   "caseRecordCollectionFailedToast": "Kan incasso niet registreren",
   "caseSyncErpFailedToast": "Financiële synchronisatie mislukt",
   "caseSeedDemoFailedToast": "Kan demogegevens niet initialiseren",
-  "caseOpenPluginFailedToast": "Kan plugin niet openen"
+  "caseOpenPluginFailedToast": "Kan plugin niet openen",
+  "circleInviteLabel": "Circle-uitnodigingscode (optioneel)",
+  "circleInvitePlaceholder": "bijv. KW-ABNR-2026",
+  "circleInviteHint": "Voer de uitnodigingscode van uw kantoor in om het kantoor-achtervoegsel toe te voegen en toegewijd DeepSeek-quotum te ontgrendelen",
+  "bqtScanSwitch": "Baoqingtian-advocaat QR-login",
+  "bqtScanTitle": "Scan met de Baoqingtian-advocaat-app om in te loggen",
+  "bqtScanHint": "Alleen voor geverifieerde Baoqingtian-advocaten. Maandelijkse Qingtian Coins worden automatisch toegekend.",
+  "bqtScanExpired": "QR-code verlopen",
+  "bqtScanRefresh": "QR-code vernieuwen",
+  "bqtScanBack": "Terug naar accountlogin",
+  "errInvalidInviteCode": "Ongeldige of gedeactiveerde uitnodigingscode",
+  "errInviteAlreadyBound": "Dit account heeft al een Circle-kantooruitnodigingscode gekoppeld",
+  "errBqtNotLawyer": "Alleen geverifieerde Baoqingtian-advocaataccounts kunnen inloggen via QR-code",
 }

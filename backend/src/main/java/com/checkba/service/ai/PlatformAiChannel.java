@@ -286,7 +286,7 @@ public class PlatformAiChannel {
     private boolean ownedByCurrentAccount(Cached cached) {
         return cached.owner != null && !cached.owner.isBlank()
                 && java.util.Objects.equals(cached.owner, accountService.accountFingerprintOrNull())
-                && accountService.domesticAiPlatform() == "bailian".equals(cached.provider)
+                && (!accountService.domesticAiPlatform() || "bailian".equals(cached.provider))
                 && (!"bailian".equals(cached.provider)
                 || java.util.Objects.equals(accountService.platformAiBaseUrl(), cached.baseUrl));
     }
