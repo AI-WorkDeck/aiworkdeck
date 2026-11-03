@@ -136,6 +136,11 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
    `Started CheckbaApplication`，再断言 ERROR 为零；空日志不能判成功。失败 attempt 与最初回退件分别保留。
    新加坡实例 env 另有 `AI_ACCOUNT_BASE_URL=https://www.workdeck.ai`（代码默认值是国内站，
    漏了国际站账号登录整条断，2026-09-16 实测），换 env 文件或重建机器时别丢
+   **国际云必须同时设置 `AI_ACCOUNT_RESOLVED_SITE=intl`**（中国区对应 `cn`）。仅设置
+   `AI_ACCOUNT_BASE_URL` 不会改变非本地模式的站点默认值；#1674 实测新加坡账户地址为国际站，
+   但 `/api/site` 仍返回 `cn`。2026-11-03 已备份后修正并核新进程环境、公开 `/api/site`
+   的 `current=intl` / `pinned=true` 及 `sites[].baseUrl=https://www.workdeck.ai`。后续部署
+   要一起核对站点标识与账户地址；不能只凭国际域名或登录成功判断区域配置正确。
    不再与「不存在的端点」相同（后者恒为 `{"code":1,"message":"服务器内部错误"}` + 200，
    这也是判「接口没上」最快的探法）。表结构靠 `ddl-auto: update` 自动建，无手动迁移。
 4.7. **独立发布件逐项查、有更新随发版一起发（2026-09-11 维护者定，dev-board#592）**：
