@@ -5,6 +5,7 @@
   "minHostVersion": "0.74.1",
   "description": "选择案卷材料，生成并管理可编辑的诉讼图表。",
   "author": "AI WorkDeck",
+  "packs": ["litigation-visual"],
   "permissions": ["file_read", "file_write", "ai"],
   "frontendEntry": "web/index.html",
   "contributes": {
