@@ -118,6 +118,41 @@ test('automatic exposes only first checked advice, never running output or malfo
     assert.equal(result.view.status,status);assert.equal(result.view.advice.length,count)
   }
 })
+test('automatic terminal replies never cancel an unregistered or finished job, including late replies',async()=>{
+  for(const status of ['EMPTY','FAILED','CANCELLED']) {
+    for(const late of [false,true]) {
+      const f=automaticFixture();let resolve
+      f.api.suggest=()=>new Promise(r=>resolve=r)
+      const pending=f.auto();await tick()
+      if(late) f.host.destroy()
+      resolve({id:'terminal',status,advice:[]})
+      if(late) await assert.rejects(pending)
+      else { await pending;await f.host.perform('semantic-auto-cancel');f.host.destroy() }
+      assert.deepEqual(f.calls.filter(c=>c[0]==='cancel'),[],`${status}, late=${late}`)
+    }
+  }
+})
+test('automatic live jobs still cancel on edit, switch, close and late reply, including filtered READY',async()=>{
+  for(const view of [{id:'live',status:'RUNNING'}, {id:'live',status:'READY',advice:[{text:'候选'}]}, {id:'live',status:'READY',advice:[{text:' ' }]}]) {
+    for(const stop of [f=>f.host.modified(),f=>f.host.setActive(false),f=>f.host.destroy()]) {
+      for(const late of [false,true]) {
+        const f=automaticFixture();let resolve
+        f.api.suggest=()=>new Promise(r=>resolve=r)
+        const pending=f.auto();await tick()
+        if(late) { stop(f);resolve(view);await assert.rejects(pending) }
+        else { resolve(view);await pending;stop(f) }
+        assert.deepEqual(f.calls.filter(c=>c[0]==='cancel'),[['cancel',11,'live']])
+      }
+    }
+  }
+})
+test('automatic cancellation follows backend polling status rather than filtered display status',async()=>{
+  for(const view of [{id:'polled',status:'EMPTY'}, {id:'polled',status:'FAILED'}, {id:'polled',status:'READY',advice:[{text:' '}]}]) {
+    const f=automaticFixture();f.api.suggest=async()=>({id:'polled',status:'RUNNING'});await f.auto()
+    f.api.get=async()=>view;await f.host.perform('semantic-auto-poll');f.host.destroy()
+    assert.deepEqual(f.calls.filter(c=>c[0]==='cancel'),view.status==='READY'?[['cancel',11,'polled']]:[])
+  }
+})
 test('automatic polling keeps its lane, trims choices and rejects results after disable',async()=>{
   const f=automaticFixture();f.api.suggest=async()=>({id:'auto',status:'RUNNING'});await f.auto()
   f.api.get=async()=>({id:'auto',status:'READY',advice:[{text:'候选'},{text:'额外候选'}]})
