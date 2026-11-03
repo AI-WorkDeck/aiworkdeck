@@ -1203,11 +1203,13 @@ class AccountServiceTest {
         assertEquals("qr_123", created.get("qrid"));
         assertEquals("POST https://www.aiworkdeck.com/api/auth/bqt-scan/create", transport.calls.get(0));
 
-        Map<String, Object> pending = service.pollBqtScanStatus("qr_123");
+        Map<String, Object> pending = service.pollBqtScanStatus("qr_123", "private-poll-token");
         assertEquals("pending", pending.get("status"));
+        assertEquals("private-poll-token", transport.lastBearer);
+        assertThrows(IllegalArgumentException.class, () -> service.pollBqtScanStatus("qr_123", ""));
         assertFalse(service.isConnected());
 
-        Map<String, Object> confirmed = service.pollBqtScanStatus("qr_123");
+        Map<String, Object> confirmed = service.pollBqtScanStatus("qr_123", "private-poll-token");
         assertEquals("confirmed", confirmed.get("status"));
         assertTrue(service.isConnected());
         assertEquals("张律师", confirmed.get("displayName"));

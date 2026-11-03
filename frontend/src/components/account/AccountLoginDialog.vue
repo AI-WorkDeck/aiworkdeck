@@ -628,7 +628,7 @@ export default {
     async pollBqtOnce() {
       if (this.done || this.mode !== 'bqt' || !this.bqtSession || !this.bqtSession.qrid) return
       try {
-        const res = await pollBqtScanStatus(this.bqtSession.qrid)
+        const res = await pollBqtScanStatus(this.bqtSession.qrid, this.bqtSession.pollToken)
         if (this.done || this.mode !== 'bqt') return
         if (!res || res.status === 'pending') return
         if (res.status === 'expired') {

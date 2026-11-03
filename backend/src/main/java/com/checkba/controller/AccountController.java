@@ -254,12 +254,13 @@ public class AccountController {
     @GetMapping("/bqt-scan/status")
     public Map<String, Object> pollBqtScanStatus(
             @RequestParam(value = "qrid", required = false) String qrid,
+            @RequestHeader(value = "X-Bqt-Poll-Token", required = false) String pollToken,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         requireUser(sessionId);
         if (qrid == null || qrid.isBlank()) {
             throw new IllegalArgumentException(LangText.of("qrid 不能为空", "qrid cannot be empty"));
         }
-        Map<String, Object> res = accountService.pollBqtScanStatus(qrid);
+        Map<String, Object> res = accountService.pollBqtScanStatus(qrid, pollToken);
         if ("confirmed".equals(res.get("status"))) {
             boolean switched = accountSwitchCleanup.afterConnect();
             identitySync.refreshQuietly();

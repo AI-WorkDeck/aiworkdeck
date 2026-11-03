@@ -92,8 +92,8 @@ final class AccountLoginExchange {
     }
 
     static Map<String, Object> get(AccountTransport transport, ObjectMapper objectMapper,
-                                   String baseUrl, String path) {
-        AccountTransport.Reply reply = transport.send("GET", baseUrl + path, null, null);
+                                   String baseUrl, String path, String pollToken) {
+        AccountTransport.Reply reply = transport.send("GET", baseUrl + path, pollToken, null);
         if (reply.networkFailure()) {
             throw new AccountException(AccountException.Kind.NETWORK,
                     LangText.of("无法连接 AI WorkDeck 服务器，请检查网络后重试",
