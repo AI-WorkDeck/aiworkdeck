@@ -171,7 +171,7 @@
     "qs": "^6.16.1",
     "send": "^0.19.0",
     "uc.micro": "^2.1.0",
-    "vue": "^3.4.21",
+    "vue": "^3.5.42",
     "vue-i18n": "^11.4.14"
   },
   "uni-app": {
@@ -189,11 +189,11 @@
   },
   "devDependencies": {
     "@dcloudio/types": "^3.4.8",
-    "@dcloudio/uni-automator": "3.0.0-4080420251103001",
     "@dcloudio/uni-cli-shared": "3.0.0-4080420251103001",
     "@dcloudio/uni-stacktracey": "3.0.0-4080420251103001",
     "@dcloudio/vite-plugin-uni": "3.0.0-4080420251103001",
-    "@vue/runtime-core": "^3.4.21",
+    "@vue/runtime-core": "^3.5.42",
+    "jsdom": "^26.1.0",
     "puppeteer-core": "^25.16.0",
     "sass": "^1.94.2",
     "vite": "^6.4.4"
@@ -204,7 +204,15 @@
     "@intlify/message-resolver": "^9.1.11",
     "@intlify/shared": "^11.4.14",
     "@tootallnate/once": "^2.0.1",
+    "@vue/compiler-core": "3.4.38",
+    "@vue/compiler-dom": "3.4.38",
+    "@vue/compiler-sfc": "3.4.38",
+    "@vue/compiler-ssr": "3.4.38",
+    "@vue/reactivity": "^3.5.42",
+    "@vue/runtime-core": "^3.5.42",
+    "@vue/runtime-dom": "^3.5.42",
     "@vue/server-renderer": "^3.5.42",
+    "@vue/shared": "^3.5.42",
     "adm-zip": "^0.6.1",
     "basic-ftp": "^6.2.1",
     "body-parser": "^1.20.9",
@@ -216,7 +224,10 @@
     "jpeg-js": "^0.4.4",
     "js-yaml": "^4.3.2",
     "lodash": "^4.18.0",
-    "minimatch": "^11.0.1",
+    "minimatch": {
+      ".": "^11.0.1",
+      "brace-expansion": "^5.0.5"
+    },
     "nanoid": "^3.3.18",
     "path-to-regexp": "^0.1.13",
     "phin": "^3.7.1",

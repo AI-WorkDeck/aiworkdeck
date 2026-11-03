@@ -41,11 +41,12 @@ function serve(routes) {
   return new Promise((resolve) => {
     const s = http.createServer((req, res) => {
       const reqUrl = req.url || ''
-      const body = Object.prototype.hasOwnProperty.call(routes, reqUrl) ? routes[reqUrl] : undefined
-      if (body === undefined) {
+      const entry = Object.entries(routes).find(([k]) => k === reqUrl)
+      if (!entry) {
         res.writeHead(404).end()
         return
       }
+      const body = entry[1]
       res.writeHead(200)
       res.end(typeof body === 'function' ? body() : body)
     })
