@@ -85,7 +85,7 @@ with zipfile.ZipFile(sys.argv[1],'w') as z:
   const streamResponse = await fetch(base + `/api/agent/connect/${conversationId}`, { signal: abortStream.signal })
   const decoder = new TextDecoder()
   const streamTask = (async () => { try { for await (const part of streamResponse.body) streamText += decoder.decode(part, { stream: true }) } catch {} })()
-  const request = { projectId: String(project.id), conversationId, model: model.id, mode: 'AGENT', message: originalPrompt, contextItems: [{ id: String(reference.id), name: reference.name, fileType: 'docx', isDir: false }, { id: String(folder.id), name: folder.name, fileType: 'folder', isDir: true }] }
+  const request = { projectId: String(project.id), conversationId, model: model.id, mode: 'AGENT', clientCapability: 'lowa', activeContext: { id: String(reference.id), name: reference.name, fileType: 'docx' }, message: originalPrompt, contextItems: [{ id: String(reference.id), name: reference.name, fileType: 'docx', isDir: false }, { id: String(folder.id), name: folder.name, fileType: 'folder', isDir: true }] }
   await api('/api/agent/chat', request)
   await until(() => /event:\s*(?:bubble_end|error|agent_paused|question)/.test(streamText), 'single real model turn', 240000)
   fs.writeFileSync(path.join(out, 'sse.txt'), streamText)

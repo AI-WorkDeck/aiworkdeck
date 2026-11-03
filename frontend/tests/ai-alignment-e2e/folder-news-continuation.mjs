@@ -64,6 +64,7 @@ try {
     try {
       const messages = body.messages.map(m => typeof m.content === 'string' ? m.content : JSON.stringify(m.content)).join('\n')
       assert.ok(messages.includes('参考旧短讯'), 'Original task instruction must survive failure')
+      assert.ok(messages.includes(`<active_document id="${ids.reference}"`), 'Current old Word context must remain present during target-folder work')
       let content
       switch (phase) {
         case 3: {
@@ -143,7 +144,7 @@ with zipfile.ZipFile(sys.argv[1],'w') as z:
     streamTasks.push((async () => { try { for await (const part of response.body) streamText += decoder.decode(part, { stream: true }) } catch {} })())
   }
   await openStream()
-  const request = { projectId: String(project.id), conversationId, model: 'fixture', mode: 'AGENT', message: originalPrompt, contextItems: [{ id: String(reference.id), name: reference.name, fileType: 'docx', isDir: false }, { id: String(folder.id), name: folder.name, fileType: 'folder', isDir: true }] }
+  const request = { projectId: String(project.id), conversationId, model: 'fixture', mode: 'AGENT', clientCapability: 'lowa', activeContext: { id: String(reference.id), name: reference.name, fileType: 'docx' }, message: originalPrompt, contextItems: [{ id: String(reference.id), name: reference.name, fileType: 'docx', isDir: false }, { id: String(folder.id), name: folder.name, fileType: 'folder', isDir: true }] }
   await api('/api/agent/chat', request)
   await until(() => /event:\s*error/.test(streamText), 'first model failure', 30000)
   assert.equal(requests.length, 1, 'Failure must not automatically replay user work')
