@@ -76,7 +76,7 @@ import java.util.List;
  */
 public enum AllowedModels {
 
-    // Catalogue snapshot: https://openrouter.ai/api/v1/models, checked 2026-10-29.
+    // Aggregate catalogue snapshot: https://openrouter.ai/api/v1/models, checked 2026-11-02.
     // ==================== 国内直连（境内外均可用）====================
 
     DEEPSEEK_V4_FLASH("deepseek/deepseek-v4-flash", "DeepSeek V4 Flash",
@@ -85,11 +85,11 @@ public enum AllowedModels {
 
     DEEPSEEK_V4_PRO("deepseek/deepseek-v4-pro", "DeepSeek V4 Pro",
             Vendor.DEEPSEEK, Region.GLOBAL, 1_048_576,
-            tier(0, 0.888966, 1.777932)),
+            tier(0, 1.6, 3.2)),
 
     GLM_5_2("z-ai/glm-5.2", "GLM-5.2",
             Vendor.ZHIPU, Region.GLOBAL, 1_048_576,
-            tier(0, 0.006, 7.0)),
+            tier(0, 0.006, 6.8)),
 
     KIMI_K2_6("moonshotai/kimi-k2.6", "Kimi K2.6",
             Vendor.MOONSHOT, Region.GLOBAL, 262_144,
@@ -100,7 +100,7 @@ public enum AllowedModels {
     KIMI_K3("moonshotai/kimi-k3", "Kimi K3",
             Vendor.MOONSHOT, Region.GLOBAL, 1_048_576,
             true,
-            tier(0, 0.192, 20.0)),
+            tier(0, 0.192, 15.0)),
 
     KIMI_K3_1_PRO("moonshotai/kimi-k3.1-pro", "Kimi K3.1 Pro",
             Vendor.MOONSHOT, Region.GLOBAL, 1_048_576,
