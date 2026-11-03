@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * 三条分支各有各的理由，别合并成一句三目：
  * ① 显式配置优先——自建/私有部署靠它把「官方」指到自己的服务器上（能力保留是拍板项）；
- * ② 国际站（workdeck.ai）暂不提供，返回 null——国际站账户的案卷不该被默默送进大陆的服务器；
+ * ② 国际站（workdeck.ai）走 case.workdeck.ai，与大陆独立；
  * ③ 其余（大陆站）走 case.aiworkdeck.com。
  */
 class OfficialCloudEndpointTest {
@@ -26,9 +26,9 @@ class OfficialCloudEndpointTest {
     }
 
     @Test
-    void internationalAccountHasNoOfficialCaseLibraryYet() {
-        assertNull(OfficialCloudEndpoint.resolve("", "https://www.workdeck.ai"));
-        assertNull(OfficialCloudEndpoint.resolve(null, "https://workdeck.ai"));
+    void internationalAccountGetsItsOwnCaseLibrary() {
+        assertEquals("https://case.workdeck.ai", OfficialCloudEndpoint.resolve("", "https://www.workdeck.ai"));
+        assertEquals("https://case.workdeck.ai", OfficialCloudEndpoint.resolve(null, "https://workdeck.ai"));
     }
 
     /** 域名是否「workdeck.ai 系」按主机判定，不能用 contains——那会把 workdeck.ai.evil.com 也算进去。 */

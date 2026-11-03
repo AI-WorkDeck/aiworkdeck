@@ -101,8 +101,8 @@ class SiteSwitchServiceTest {
 
         assertEquals(false, result.get("licenseCleared"));
         assertEquals(false, result.get("accountCleared"));
-        // 未连接账户时不该多此一举地调 disconnect
-        verify(f.account(), never()).disconnect();
+        // 切站也清理已过期的旧站凭据，并推进连接代次。
+        verify(f.account()).disconnect();
         // 但权益/密钥/基线仍要清：它们可能是上一次连接留下的残留
         verify(f.entitlements()).clearAccountCache();
         verify(f.channel()).clearCache();

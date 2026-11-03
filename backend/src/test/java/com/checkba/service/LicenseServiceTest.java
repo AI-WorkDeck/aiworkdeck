@@ -48,6 +48,46 @@ class LicenseServiceTest {
     }
 
 
+    @Test void delayedStartupReverifyCannotClearOrRefreshReplacementLicense() throws Exception {
+        for (LicenseService.VerifyKeyOutcome outcome : new LicenseService.VerifyKeyOutcome[]{
+                LicenseService.VerifyKeyOutcome.INVALID, LicenseService.VerifyKeyOutcome.VALID}) {
+            var site = org.mockito.Mockito.mock(com.checkba.service.site.SiteProfileService.class);
+            org.mockito.Mockito.when(site.baseUrl()).thenReturn("https://www.aiworkdeck.com");
+            var entered = new java.util.concurrent.CountDownLatch(1);
+            var release = new java.util.concurrent.CountDownLatch(1);
+            var thread = new java.util.concurrent.atomic.AtomicReference<Thread>();
+            var observed = new java.util.concurrent.atomic.AtomicReference<String>();
+            var svc = new LicenseService(true, site, tempDir.toString(), true, "") {
+                @Override protected VerifyKeyOutcome callVerifyKey(String key, String base) {
+                    thread.set(Thread.currentThread());
+                    observed.set(base + "/" + key);
+                    entered.countDown();
+                    try { assertTrue(release.await(5, java.util.concurrent.TimeUnit.SECONDS)); }
+                    catch (InterruptedException e) { throw new AssertionError(e); }
+                    return outcome;
+                }
+            };
+            svc.markAccountUnlocked("old-key");
+            svc.reverifyOnStartup();
+            assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS));
+            synchronized (svc) {
+                org.mockito.Mockito.when(site.baseUrl()).thenReturn("https://www.workdeck.ai");
+                svc.markAccountUnlocked("new-key");
+                var replacement = svc.loadState();
+                replacement.lastVerifiedAt = "2026-01-01T00:00:00Z";
+                svc.saveState(replacement);
+            }
+            String expectedVerified = svc.loadState().lastVerifiedAt;
+            release.countDown();
+            thread.get().join(5000);
+            assertFalse(thread.get().isAlive());
+            assertEquals("https://www.aiworkdeck.com/old-key", observed.get());
+            assertEquals("account", svc.loadState().mode);
+            assertEquals("new-key", svc.loadState().code);
+            assertEquals(expectedVerified, svc.loadState().lastVerifiedAt);
+        }
+    }
+
     @Test
     void serverModeAlwaysUnlockedWithoutGate() {
         LicenseService svc = service(false);

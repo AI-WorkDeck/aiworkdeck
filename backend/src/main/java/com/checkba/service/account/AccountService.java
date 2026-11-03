@@ -216,7 +216,10 @@ public class AccountService {
      * 定义只此一处，比对两侧才不会漂。
      */
     public synchronized String accountFingerprintOrNull() {
-        String key = currentKeyOrNull();
+        return fingerprintOf(currentKeyOrNull());
+    }
+
+    private static String fingerprintOf(String key) {
         if (key == null) return null;
         try {
             byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
@@ -225,6 +228,32 @@ public class AccountService {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /** Credentials and destination are captured under the same lock used by site switching. */
+    public record ConnectionSnapshot(String baseUrl, String key, String fingerprint, long generation) {
+        @Override public String toString() { return "ConnectionSnapshot[baseUrl=" + baseUrl + ", generation=" + generation + "]"; }
+    }
+
+    public synchronized ConnectionSnapshot connectionSnapshot() {
+        long generation = connectionVersion;
+        String endpoint = baseUrl();
+        String key = currentKeyOrNull();
+        return new ConnectionSnapshot(endpoint, key, fingerprintOf(key), generation);
+    }
+
+    public synchronized boolean isCurrentConnection(ConnectionSnapshot snapshot) {
+        return snapshot != null && snapshot.generation() == connectionVersion
+                && java.util.Objects.equals(snapshot.baseUrl(), baseUrl())
+                && java.util.Objects.equals(snapshot.key(), currentKeyOrNull());
+    }
+
+    private synchronized ConnectionSnapshot requireConnectionSnapshot() {
+        ConnectionSnapshot connection = connectionSnapshot();
+        if (connection.key() == null) throw new AccountException(AccountException.Kind.NOT_CONNECTED,
+                LangText.of("尚未连接 AI WorkDeck 账户，可在设置页「账户与用量」粘贴账户 Key",
+                        "No AI WorkDeck account connected yet. Paste your account key on the Settings page under \"Account & Usage\""));
+        return connection;
     }
 
     // ==================== 官网数据拉取 ====================
@@ -288,8 +317,8 @@ public class AccountService {
      * 所以旧的 no_allocation 分支不会再出现。留着只为兼容尚未升级的官网。
      */
     public Map<String, Object> fetchAiKey() {
-        long requestVersion = connectionVersion();
-        return fetchAiKeyWith(requireKey(), true, requestVersion);
+        ConnectionSnapshot connection = requireConnectionSnapshot();
+        return fetchAiKeyWith(connection.key(), true, connection.generation(), connection.baseUrl());
     }
 
     /**
@@ -299,11 +328,11 @@ public class AccountService {
      * 换回属于他自己的 runtime key，Key 本身用完即弃（见 {@code PlatformAiKeyService}）。
      */
     public Map<String, Object> fetchAiKeyWith(String awdkKey) {
-        return fetchAiKeyWith(awdkKey, false, 0);
+        return fetchAiKeyWith(awdkKey, false, 0, baseUrl());
     }
 
-    private Map<String, Object> fetchAiKeyWith(String key, boolean currentAccount, long requestVersion) {
-        AccountTransport.Reply reply = transport.send("POST", baseUrl() + "/api/account/ai-key", key, "{}");
+    private Map<String, Object> fetchAiKeyWith(String key, boolean currentAccount, long requestVersion, String requestBaseUrl) {
+        AccountTransport.Reply reply = transport.send("POST", requestBaseUrl + "/api/account/ai-key", key, "{}");
         if (reply.networkFailure()) {
             throw networkError();
         }
@@ -371,7 +400,7 @@ public class AccountService {
      * 与团队那组同一处刻意偏差（护栏 {@code AccountServiceTest.teamHierarchyOutboundShape}）。
      * 长度/字符的判据在官网（400 {@code invalid_display_name}），这里不抄一份。
      */
-    public Map<String, Object> updateDisplayName(String displayName) {
+    public synchronized Map<String, Object> updateDisplayName(String displayName) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("displayName", displayName == null ? "" : displayName.trim());
         Map<String, Object> res = sendJson("PATCH", "/api/account/profile", body);
@@ -387,11 +416,12 @@ public class AccountService {
      * 回 {@code {avatarUpdatedAt, avatarUrl}}：官网只回版本号，地址在这里按 accountId 拼好，
      * 省得前端为了一个地址再拉一趟 /me。2MB 上限与格式判据都在官网（{@code too_large} 等）。
      */
-    public Map<String, Object> uploadAvatar(byte[] content, String filename, String contentType) {
-        long requestVersion = connectionVersion();
-        String key = requireKey();
+    public synchronized Map<String, Object> uploadAvatar(byte[] content, String filename, String contentType) {
+        ConnectionSnapshot connection = requireConnectionSnapshot();
+        long requestVersion = connection.generation();
+        String key = connection.key();
         AccountTransport.Reply reply = transport.sendMultipart(
-                "POST", baseUrl() + "/api/account/avatar", key,
+                "POST", connection.baseUrl() + "/api/account/avatar", key,
                 new AccountTransport.Multipart("file", filename, contentType, content));
         if (reply.networkFailure()) {
             throw networkError();
@@ -416,7 +446,7 @@ public class AccountService {
     }
 
     /** DELETE /api/account/avatar —— 删头像，回 {@code {avatarUpdatedAt:null, avatarUrl:null}}。 */
-    public Map<String, Object> deleteAvatar() {
+    public synchronized Map<String, Object> deleteAvatar() {
         sendJson("DELETE", "/api/account/avatar", null);
         seedAvatarVersion(null);
         Map<String, Object> result = new LinkedHashMap<>();
@@ -524,8 +554,9 @@ public class AccountService {
      * {@code present:'redirect'}（+redirectUrl）；两种形状原样透传，不在桌面端分叉。
      */
     public Map<String, Object> createRecharge(long amountCents, String idempotencyKey) {
-        long requestVersion = connectionVersion();
-        String key = requireKey();
+        ConnectionSnapshot connection = requireConnectionSnapshot();
+        long requestVersion = connection.generation();
+        String key = connection.key();
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("amount", amountCents);
         body.put("kind", "recharge");
@@ -536,7 +567,7 @@ public class AccountService {
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             throw new IllegalStateException(e); // 入参都是基本类型/String，序列化不会失败
         }
-        AccountTransport.Reply reply = transport.send("POST", baseUrl() + "/api/payment/create", key, json);
+        AccountTransport.Reply reply = transport.send("POST", connection.baseUrl() + "/api/payment/create", key, json);
         if (reply.networkFailure()) {
             throw networkError();
         }
@@ -563,15 +594,16 @@ public class AccountService {
      * skuId 白名单在调用方（AccountController）把关，这里只管转发与失败分类。
      */
     public Map<String, Object> purchaseSku(String skuId) {
-        long requestVersion = connectionVersion();
-        String key = requireKey();
+        ConnectionSnapshot connection = requireConnectionSnapshot();
+        long requestVersion = connection.generation();
+        String key = connection.key();
         String json;
         try {
             json = objectMapper.writeValueAsString(Map.of("skuId", skuId == null ? "" : skuId));
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             throw new IllegalStateException(e); // 入参是 String，序列化不会失败
         }
-        AccountTransport.Reply reply = transport.send("POST", baseUrl() + "/api/account/purchase", key, json);
+        AccountTransport.Reply reply = transport.send("POST", connection.baseUrl() + "/api/account/purchase", key, json);
         if (reply.networkFailure()) {
             throw networkError();
         }
@@ -881,10 +913,11 @@ public class AccountService {
      * 让它把成品交过来，这一层就没有再往里塞字段的机会。
      */
     public Map<String, Object> uploadTeamUsage(String payloadJson) {
-        long requestVersion = connectionVersion();
-        String key = requireKey();
+        ConnectionSnapshot connection = requireConnectionSnapshot();
+        long requestVersion = connection.generation();
+        String key = connection.key();
         AccountTransport.Reply reply = transport.send(
-                "POST", baseUrl() + "/api/account/team/usage", key, payloadJson);
+                "POST", connection.baseUrl() + "/api/account/team/usage", key, payloadJson);
         if (reply.networkFailure()) {
             throw networkError();
         }
@@ -896,8 +929,9 @@ public class AccountService {
      * body 为 null 表示无请求体——DELETE 带体在部分反代上会被丢掉，不值得冒这个险。
      */
     private Map<String, Object> sendJson(String method, String path, Map<String, Object> body) {
-        long requestVersion = connectionVersion();
-        String key = requireKey();
+        ConnectionSnapshot connection = requireConnectionSnapshot();
+        long requestVersion = connection.generation();
+        String key = connection.key();
         String json = null;
         if (body != null) {
             try {
@@ -906,7 +940,7 @@ public class AccountService {
                 throw new IllegalStateException(e); // 入参都是 String/Boolean，序列化不会失败
             }
         }
-        AccountTransport.Reply reply = transport.send(method, baseUrl() + path, key, json);
+        AccountTransport.Reply reply = transport.send(method, connection.baseUrl() + path, key, json);
         if (reply.networkFailure()) {
             throw networkError();
         }
@@ -1091,6 +1125,11 @@ public class AccountService {
     }
 
     private Map<String, Object> handleCurrent(AccountTransport.Reply reply, String path, String key, long requestVersion) {
+        synchronized (this) {
+            if (requestVersion != connectionVersion || !java.util.Objects.equals(key, currentKeyOrNull()))
+                throw new AccountException(AccountException.Kind.REJECTED,
+                        LangText.of("账户已变化，请重试", "Account changed; please try again"));
+        }
         try {
             return handle(reply, path);
         } catch (AccountException e) {
@@ -1100,9 +1139,10 @@ public class AccountService {
     }
 
     private Map<String, Object> getCurrentJson(String path) {
-        long requestVersion = connectionVersion();
-        String key = requireKey();
-        AccountTransport.Reply reply = transport.send("GET", baseUrl() + path, key, null);
+        ConnectionSnapshot connection = requireConnectionSnapshot();
+        long requestVersion = connection.generation();
+        String key = connection.key();
+        AccountTransport.Reply reply = transport.send("GET", connection.baseUrl() + path, key, null);
         if (reply.networkFailure()) throw networkError();
         return handleCurrent(reply, path, key, requestVersion);
     }

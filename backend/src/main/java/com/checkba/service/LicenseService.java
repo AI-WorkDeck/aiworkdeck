@@ -108,28 +108,31 @@ public class LicenseService {
 
     /** account 模式启动时机会性复验（后台线程，不阻塞启动，失败静默）。 */
     @PostConstruct
-    void reverifyOnStartup() {
+    synchronized void reverifyOnStartup() {
         if (!localMode) return;
         State state = loadState();
         if (!"account".equals(state.mode) || state.code == null) return;
+        String requestBaseUrl = siteProfileService.baseUrl();
         Thread thread = new Thread(() -> {
             try {
-                VerifyKeyOutcome outcome = callVerifyKey(state.code);
+                VerifyKeyOutcome outcome = callVerifyKey(state.code, requestBaseUrl);
                 if (outcome == VerifyKeyOutcome.VALID) {
                     synchronized (this) {
                         State latest = loadState();
-                        if ("account".equals(latest.mode)) {
+                        if ("account".equals(latest.mode) && java.util.Objects.equals(state.code, latest.code)
+                                && requestBaseUrl.equals(siteProfileService.baseUrl())) {
                             latest.lastVerifiedAt = Instant.now().toString();
                             saveState(latest);
-                        }
+                        } else return;
                     }
                     log.info("账户授权联网复验通过");
                 } else if (outcome == VerifyKeyOutcome.INVALID) {
                     synchronized (this) {
                         State latest = loadState();
-                        if ("account".equals(latest.mode)) {
+                        if ("account".equals(latest.mode) && java.util.Objects.equals(state.code, latest.code)
+                                && requestBaseUrl.equals(siteProfileService.baseUrl())) {
                             saveState(new State());
-                        }
+                        } else return;
                     }
                     log.warn("账户 Key 已失效（官网明确拒绝），授权状态已清除");
                 }
@@ -355,13 +358,17 @@ public class LicenseService {
     enum VerifyKeyOutcome { VALID, INVALID, UNREACHABLE }
 
     private VerifyKeyOutcome callVerifyKey(String key) {
+        return callVerifyKey(key, siteProfileService.baseUrl());
+    }
+
+    protected VerifyKeyOutcome callVerifyKey(String key, String requestBaseUrl) {
         try {
             HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(VERIFY_TIMEOUT)
                     .build();
             String body = objectMapper.writeValueAsString(Map.of("key", key));
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(siteProfileService.baseUrl() + "/api/license/verify-key"))
+                    .uri(URI.create(requestBaseUrl + "/api/license/verify-key"))
                     .timeout(VERIFY_TIMEOUT)
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
