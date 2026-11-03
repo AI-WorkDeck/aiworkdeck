@@ -7,7 +7,7 @@ import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 const { JSDOM } = require('jsdom')
 const dom = new JSDOM('<!doctype html><body></body>')
-for (const key of ['window', 'document', 'Element', 'Node', 'HTMLElement', 'SVGElement']) globalThis[key] = dom.window[key]
+for (const key of ['window', 'document', 'Document', 'Element', 'Node', 'HTMLElement', 'SVGElement']) globalThis[key] = dom.window[key]
 const Vue = require('vue/dist/vue.cjs.js')
 const { parse } = require('@vue/compiler-sfc')
 const source = readFileSync(new URL('../../src/components/PluginWorkspaceSummary.vue', import.meta.url), 'utf8')

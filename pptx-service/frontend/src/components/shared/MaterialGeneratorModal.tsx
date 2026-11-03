@@ -345,7 +345,7 @@ export const MaterialGeneratorModal: React.FC<MaterialGeneratorModalProps> = ({
                   {refImage ? (
                     <>
                       <img
-                        src={refImageUrl.current?.startsWith('blob:') ? `blob:${refImageUrl.current.slice(5)}` : ''}
+                        src={refImageUrl.current?.startsWith('blob:') ? encodeURI(`blob:${refImageUrl.current.slice(5)}`.replace(/[<>"']/g, '')) : ''}
                         alt={t('material.mainReference')}
                         className="w-full h-full object-cover rounded-xl"
                       />

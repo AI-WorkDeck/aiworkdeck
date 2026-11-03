@@ -9,7 +9,7 @@ import zh from '../../src/locales/zh-CN/messageCenter.js'
 const require = createRequire(import.meta.url)
 const { JSDOM } = require('jsdom'), { parse } = require('@vue/compiler-sfc')
 const dom = new JSDOM('<!doctype html><body></body>', { url: 'http://localhost' })
-for (const key of ['window','document','Element','Node','HTMLElement','SVGElement']) globalThis[key] = dom.window[key]
+for (const key of ['window','document','Document','Element','Node','HTMLElement','SVGElement']) globalThis[key] = dom.window[key]
 const Vue = require('vue/dist/vue.cjs.js')
 const child = parse(readFileSync(new URL('../../src/components/messages/MessageConversationPane.vue', import.meta.url), 'utf8')).descriptor
 const Child = { ...new Function(child.script.content.replace('export default', 'return'))(), template: child.template.content }
