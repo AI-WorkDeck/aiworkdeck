@@ -26,7 +26,7 @@ export default {
   exitCancel: '取消',
   exitConflict: '改动存在冲突，请在版本控制面板处理后再离开。',
   exitNewChanges: '还有新的改动尚未提交，请检查后再离开。',
-  exitCheckFailed: '暂时无法确认或提交项目改动，已取消离开。请重试。',
+  exitCheckFailed: "暂时无法检查或提交项目改动。请重试，或直接退出而不提交。",
   controlEntry: '版本控制',
   entryUnavailable: '状态暂时无法读取，点击重试',
   pendingFileCount: '{count} 个文件待提交',
