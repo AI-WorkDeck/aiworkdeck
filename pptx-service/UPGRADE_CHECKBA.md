@@ -30,8 +30,9 @@ a9a5c36 这一版新进来的）。本项目自己的 CLA 在 `legal/CLA.md`、�
 | `backend/app.py` | 四项：① `PPTX_DATA_DIR` 数据目录外置（桌面打包态 resources 只读，DB/uploads 必须写到注入目录）；配套测试 `backend/tests/test_data_dir.py`。**v0.7.0 tag 首次构建就是因 re-vendor 漏掉此项+下面端口语义变化而红**；② 注册 `pptx_edit_bp` / `pdf_convert_bp` 两个自有蓝图（见下方对应行）；③ `create_app()` 末尾调 `task_manager.reconcile_orphaned_tasks()` 做启动对账（见 task_manager 行）；④ 两处安全加固——`debug` 改成只认显式 `FLASK_ENV=development`（上游默认值就是 `development`，漏配等于开着 Werkzeug 交互式控制台），`app.run` 的 host 改成 `os.getenv('PPTX_BIND_HOST', '127.0.0.1')`（上游硬编码 `0.0.0.0`，本服务端点不做鉴权，桌面版绑 0.0.0.0 等于把按路径读写文件的能力开放给同一局域网；容器内由 compose 显式设 `PPTX_BIND_HOST=0.0.0.0`） |
 | `.env.example` | MinerU 本地服务段（`MINERU_LOCAL_URL` / `MINERU_FORCE_CLOUD=0`）+ `BACKEND_PORT=5001` + `MINERU_TOKEN` 默认置空（上游是占位串 `your-mineru-token`，历史版本非空会导致隐式云回退；现版本默认已禁止该回退） |
 | `docker-compose.yml` / `docker-compose.prod.yml` | 宿主机端口默认 `5001:5000`（对齐 PptxServiceClient 默认 base-url） |
-| `requirements.lock` | 桌面打包/CI 用（`desktop/scripts/prepare-python-service.js`、`.github/workflows/desktop-build.yml`）。再生成：`uv export --no-dev --no-hashes --no-emit-project -o requirements.lock` |
-| `uv.lock` | 上游文件，但要随 `pyproject.toml` 多出的 `pdf2docx` 重新解析。**不要手改**，`uv lock` / `uv export` 会顺带更新它 |
+| `pyproject.toml` `requires-python` | **checkba**：`>=3.11`。Pillow 13 不支持 3.10，桌面打包的 CPython 是 3.11.12。re-vendor 时不要改回 `>=3.10` |
+| `requirements.lock` | 桌面打包/CI 用（`desktop/scripts/prepare-python-service.js`、`.github/workflows/desktop-build.yml`）。再生成：`uv export --no-dev --no-hashes --no-emit-project -o requirements.lock`。安全下限写在 `pyproject.toml` 的 `[tool.uv] constraint-dependencies`（Pillow、certifi、PyJWT、lxml、urllib3、cryptography、pyasn1、anyio、aiohttp），re-vendor 后必须保留，否则 `uv lock` 会把传递依赖解回有洞的版本 |
+| `uv.lock` | 上游文件，但要随 `pyproject.toml` 多出的 `pdf2docx` 与上面的安全下限重新解析。**不要手改**，`uv lock` / `uv export` 会顺带更新它 |
 | `compat_smoke_test.sh` / 本文件 | checkba 侧新增，上游没有 |
 | `backend/utils/text_sanitizer.py` | **checkba 新增**：markdown 治理（行内标记转真格式、列表前缀转 bullet 语义、纯剥离），落字防线 |
 | `backend/utils/pptx_format_utils.py` | **checkba 新增**：run/段落格式读写（东亚字体 `<a:ea>`、删除线、高亮、buChar/buAutoNum 的 oxml 补齐；HOUSE 字体常量 楷体_GB2312/Arial，env `PPTX_HOUSE_EA_FONT`/`PPTX_HOUSE_LATIN_FONT` 可覆盖） |

@@ -3,7 +3,7 @@ name = "banana-slides"
 version = "0.3.0"
 description = "Banana Slides – AI native PPT generator"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "flask>=3.0.0",
     "flask-cors>=4.0.0",
@@ -11,7 +11,7 @@ dependencies = [
     "google-genai>=1.52.0",
     "openai>=1.0.0",
     "pydantic>=2.9.0",
-    "pillow>=12.0.0",
+    "pillow>=13.0.0",
     "python-pptx>=1.0.0",
     "python-dotenv>=1.0.1",
     "reportlab>=4.1.0",
@@ -51,6 +51,17 @@ sdk = [
 
 [tool.uv]
 index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+# [checkba] 安全下限。re-vendor 后必须保留，否则 uv lock 会把这些传递依赖解回有洞的版本。
+constraint-dependencies = [
+    "certifi>=2026.10.18",
+    "pyjwt>=2.14.0",
+    "lxml>=6.1.0",
+    "urllib3>=2.8.0",
+    "cryptography>=50.0.0",
+    "pyasn1>=0.6.5",
+    "anyio>=4.14.2",
+    "aiohttp>=3.14.4",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]
