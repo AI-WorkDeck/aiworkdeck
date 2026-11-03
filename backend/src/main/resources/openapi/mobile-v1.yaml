@@ -81,6 +81,9 @@ components:
         key: { type: string, description: 此来源的本地项目编号，必须连 deviceId 使用 }
         cloudProjectId: { type: integer, format: int64 }
         archiveOnly: { type: boolean, description: 插件影子容器，仅包含插件归档内容 }
+        projectUid: { type: string, format: uuid, nullable: true, description: 此设备实际项目UID；desktop转存使用它而非合并后的顶层UID }
+        projectType: { type: string, nullable: true }
+        owned: { type: boolean, nullable: true, description: 桌面发布的本人拥有标记；旧目录缺值不可用于对话转存 }
         online: { type: boolean }
     CatalogProject:
       type: object
@@ -861,6 +864,53 @@ components:
           enum:
             - sandbox
             - production
+    AssistantDesktopCopyRequest:
+      type: object
+      required: [requestId, targetProjectUid, targetDeviceId, targetProjectKey]
+      properties:
+        requestId: { type: string, format: uuid }
+        targetProjectUid: { type: string, format: uuid }
+        targetDeviceId: { type: string, maxLength: 64 }
+        targetProjectKey: { type: string, maxLength: 64 }
+    AssistantDesktopCopyReceipt:
+      type: object
+      required: [requestId, status, sourcePreserved, filesCopied, sourceConversationId, conversationId, targetProjectUid, targetDeviceId, targetProjectKey, messageCount, expiresAt]
+      properties:
+        requestId: { type: string, format: uuid }
+        status: { type: string, enum: [QUEUED, DELIVERED, FAILED, EXPIRED] }
+        sourcePreserved: { type: boolean, enum: [true] }
+        filesCopied: { type: boolean, enum: [false] }
+        sourceConversationId: { type: string, format: uuid }
+        conversationId: { type: string, format: uuid, description: 新的目标桌面对话ID }
+        targetProjectUid: { type: string, format: uuid }
+        targetDeviceId: { type: string }
+        targetProjectKey: { type: string }
+        messageCount: { type: integer }
+        expiresAt: { type: string, format: date-time }
+        deliveredAt: { type: string, format: date-time, nullable: true }
+        error: { type: string, nullable: true, description: 稳定错误码；前端按本地语言展示，不包含原始异常 }
+    AssistantDesktopCopyEnvelope:
+      type: object
+      required: [requestId, conversationId, targetProjectUid, targetDeviceId, targetProjectKey, snapshotJson, sha256, messageCount, expiresAt]
+      properties:
+        requestId: { type: string, format: uuid }
+        conversationId: { type: string, format: uuid }
+        targetProjectUid: { type: string, format: uuid }
+        targetDeviceId: { type: string }
+        targetProjectKey: { type: string }
+        snapshotJson: { type: string, description: UTF8最大16MiB完整JSON；version=1，绑定sourceConversationId/conversationId/targetProjectUid/targetDeviceId/targetProjectKey，messages数组为role/content/createdAt(ISO instant)。整单拒绝超限，不截断消息。 }
+        sha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+        messageCount: { type: integer }
+        expiresAt: { type: string, format: date-time }
+    AssistantDesktopCopyAck:
+      type: object
+      required: [deviceId, targetProjectUid, sha256, status]
+      properties:
+        deviceId: { type: string }
+        targetProjectUid: { type: string, format: uuid }
+        sha256: { type: string }
+        status: { type: string, enum: [DELIVERED, FAILED] }
+        error: { type: string, nullable: true }
 paths:
   /api/auth/me:
     get:
@@ -2450,3 +2500,103 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Envelope' }
+  /api/mobile/assistant/conversations/{id}/copy-to-desktop:
+    post:
+      summary: 按本人目录精确身份创建完整对话副本任务，原件保留；30天未送达过期。重复requestId绑定相同源目标，冲突拒绝。
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssistantDesktopCopyRequest' }
+      responses:
+        "200":
+          description: code 0成功；业务失败code 1，未登录code 4010。QUEUED仅为排队，DELIVERED由桌面事务导入后ACK。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code]
+                properties:
+                  code: { type: integer }
+                  message: { type: string, nullable: true }
+                  data: { $ref: '#/components/schemas/AssistantDesktopCopyReceipt' }
+  /api/mobile/assistant/conversations/{id}/desktop-copies:
+    get:
+      summary: 本人源对话最近20条转存回执，不含内容快照。
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: code 0成功；业务失败code 1，未登录code 4010。QUEUED仅为排队，DELIVERED由桌面事务导入后ACK。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code]
+                properties:
+                  code: { type: integer }
+                  message: { type: string, nullable: true }
+                  data: { type: array, items: { $ref: '#/components/schemas/AssistantDesktopCopyReceipt' } }
+  /api/mobile/assistant/desktop-copies/{id}:
+    get:
+      summary: 读取本人转存回执并刷新到期及授权状态。
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: code 0成功；业务失败code 1，未登录code 4010。QUEUED仅为排队，DELIVERED由桌面事务导入后ACK。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code]
+                properties:
+                  code: { type: integer }
+                  message: { type: string, nullable: true }
+                  data: { $ref: '#/components/schemas/AssistantDesktopCopyReceipt' }
+  /api/mobile/assistant/desktop-copies/pending:
+    get:
+      summary: 新桌面客户端领取最多10个完整对话，逐次重新验证冻结源授权；旧Office队列不参与。
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { name: deviceId, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: code 0成功；业务失败code 1，未登录code 4010。QUEUED仅为排队，DELIVERED由桌面事务导入后ACK。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code]
+                properties:
+                  code: { type: integer }
+                  message: { type: string, nullable: true }
+                  data: { type: array, items: { $ref: '#/components/schemas/AssistantDesktopCopyEnvelope' } }
+  /api/mobile/assistant/desktop-copies/{id}/ack:
+    post:
+      summary: 本人会话及目标设备/UID/hash匹配后登记回执；DELIVERED优先且重复幂等，临时DB或网络失败不得ACK。
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssistantDesktopCopyAck' }
+      responses:
+        "200":
+          description: code 0成功；业务失败code 1，未登录code 4010。QUEUED仅为排队，DELIVERED由桌面事务导入后ACK。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code]
+                properties:
+                  code: { type: integer }
+                  message: { type: string, nullable: true }
+                  data: { $ref: '#/components/schemas/AssistantDesktopCopyReceipt' }
