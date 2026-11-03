@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  fileTodos: "Создать задачи в календаре",
+  fileExportWord: "Экспортировать расшифровку в Word",
+  fileActionFailed: "Ошибка действия: {message}",
   "tierLabel": "Способ расшифровки",
   "tierPlatform": "Через платформу",
   "tierByok": "Собственный ключ",
