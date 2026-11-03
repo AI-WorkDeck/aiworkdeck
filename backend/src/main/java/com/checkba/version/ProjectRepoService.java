@@ -1936,7 +1936,9 @@ public class ProjectRepoService {
                 if (st == MergeResult.MergeStatus.ALREADY_UP_TO_DATE) {
                     mergeSha = r.getNewHead() == null ? null : r.getNewHead().getName();
                 } else if (commitOnClean) {
-                    stageAll(git);
+                    // Merge already populated the index. Re-adding the whole tree would
+                    // re-filter unchanged legacy blobs while holding the project save lock.
+                    stageAll(git, git.status().call());
                     RevCommit mergeCommit = git.commit()
                             .setMessage(fullMessage)
                             .setAuthor(authorName, authorEmail)
@@ -2097,20 +2099,21 @@ public class ProjectRepoService {
                 throw new VersionException("当前不在合并冲突状态: project=" + projectId);
             }
             // 这一次裁决动了哪些路径——要在 add 之前问，add 完索引就干净了。
-            // 只为后面的溯源预算用；读不到就算了，不为一个旁路让裁决提交多一条失败路径。
+            // 同时复用为增量暂存候选；读不到时保留原全量暂存兜底，不阻断裁决提交。
             Set<String> touched = new LinkedHashSet<>();
+            Status before = null;
             try {
-                Status before = git.status().call();
+                before = git.status().call();
                 touched.addAll(before.getConflicting());
                 touched.addAll(before.getModified());
                 touched.addAll(before.getChanged());
                 touched.addAll(before.getUntracked());
                 touched.addAll(before.getAdded());
             } catch (Exception e) {
-                log.debug("裁决提交前读工作区状态失败（只影响溯源预算）: project={}", projectId, e);
+                log.debug("裁决提交前读工作区状态失败（回退全量暂存，跳过溯源预算）: project={}", projectId, e);
             }
 
-            stageAll(git);
+            stageAll(git, before);
 
             String fullMessage = message + "\n\n" + KIND_TRAILER + "session\n" + OBJECT_FORMAT_TRAILER;
             String resolutionLine = resolutionsTrailerValue(resolutions);
