@@ -1579,3 +1579,7 @@ return 404 兜底，云后端从 127.0.0.1 直连 Next。云侧唯一出口
   恶意 Origin、带 `X-Forwarded-For` 四种形态的 POST，前两者应通过、后两者应 403。
 - 试用码本身可离线复验：base32 解码后应为 70 字节、`payload[0..1] == 0x01 0x01`，
   再用 `backend/src/main/resources/license/trial-public-key.pem` 验 Ed25519 签名。
+
+## Apple subscription review capability (dev-board#1671)
+
+The mobile capability endpoint passes the authenticated user through the existing read-only account resolution to the website. It never accepts a client-supplied account ID or creates an account; an unconnected user gets only the public production capability. This permits account-scoped review availability without changing the production sales flag. Sandbox receipt and ledger isolation remains website-owned; this identity plumbing alone does not validate a purchase.

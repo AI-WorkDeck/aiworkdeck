@@ -160,7 +160,7 @@ public interface MobileBillingClient {
 
     record SubscriptionCapability(boolean available, String productId) {}
 
-    default SubscriptionCapability appstoreSubscriptionCapability() { return new SubscriptionCapability(false, "pro.monthly.cny.149"); }
+    default SubscriptionCapability appstoreSubscriptionCapability(String accountId) { return new SubscriptionCapability(false, "pro.monthly.cny.149"); }
 
     record SubscriptionPreparation(String productId, String appAccountToken) {}
     record SubscriptionConfirmation(String status, Map<String, Object> subscription) {}
