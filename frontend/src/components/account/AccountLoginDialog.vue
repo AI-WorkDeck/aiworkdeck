@@ -322,6 +322,7 @@ export default {
       bqtLoading: false,
       bqtExpired: false,
       bqtPollTimer: null,
+      bqtPolling: false,
       sendingCode: false,
       loggingIn: false,
       cooldown: 0,
@@ -626,10 +627,12 @@ export default {
       }
     },
     async pollBqtOnce() {
-      if (this.done || this.mode !== 'bqt' || !this.bqtSession || !this.bqtSession.qrid) return
+      if (this.bqtPolling || this.done || this.mode !== 'bqt' || !this.bqtSession || !this.bqtSession.qrid) return
+      const session = this.bqtSession
+      this.bqtPolling = true
       try {
-        const res = await pollBqtScanStatus(this.bqtSession.qrid, this.bqtSession.pollToken)
-        if (this.done || this.mode !== 'bqt') return
+        const res = await pollBqtScanStatus(session.qrid, session.pollToken)
+        if (this.done || this.mode !== 'bqt' || this.bqtSession !== session) return
         if (!res || res.status === 'pending') return
         if (res.status === 'expired') {
           this.bqtExpired = true
@@ -652,6 +655,8 @@ export default {
         }
       } catch (e) {
         // 轮询期间瞬时网络抖动静默忽略，待下一轮重试
+      } finally {
+        this.bqtPolling = false
       }
     },
     async handleSendCode() {
