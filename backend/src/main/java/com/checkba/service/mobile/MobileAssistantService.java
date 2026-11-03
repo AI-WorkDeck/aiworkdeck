@@ -400,6 +400,20 @@ public class MobileAssistantService {
         for(var row:included) requireTurnSources(user,row);
         return Map.of("conversationId",id,"messages",messages);
     }
+    /** Complete, currently readable transcript for an explicit user-requested copy. Caller owns the transaction. */
+    public List<MobileAssistantTurn> readableConversationForCopy(Long user, String conversationId) {
+        long revision = requireEnabled(user);
+        checkConsent(consents.lockByUserId(user).orElseThrow(), revision);
+        var rows = turns.findByUserIdAndConversationIdOrderByCreatedAtAscIdAsc(user, uuid(conversationId));
+        if (rows.isEmpty()) throw bad("对话不存在", "Conversation not found");
+        for (var row : rows) {
+            if ("running".equals(row.getStatus())) throw bad("请等待回复完成后再转存", "Wait for the reply to finish before copying");
+            if ("completed".equals(row.getStatus())) requireTurnSources(user, row);
+        }
+        requireRevision(user, revision);
+        return rows;
+    }
+
     private Map<String,Object> reference(Long user,Map<String,Object> view) {
         var out=new LinkedHashMap<String,Object>();
         for(String key:List.of("id","deviceId","projectKey","projectName","sourceUpdatedAt","updatedAt","status")) out.put(key,view.get(key));

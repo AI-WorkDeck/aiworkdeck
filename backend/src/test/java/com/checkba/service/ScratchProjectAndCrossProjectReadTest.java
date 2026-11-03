@@ -38,6 +38,8 @@ class ScratchProjectAndCrossProjectReadTest {
     @Autowired ProjectRepository projects;
     @Autowired ProjectFileRepository files;
     @Autowired ProjectMemberRepository members;
+    @Autowired com.checkba.repository.UserRepository users;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
 
     ProjectService projectService;
     ProjectMemberService memberServiceAllow;
@@ -45,7 +47,9 @@ class ScratchProjectAndCrossProjectReadTest {
 
     @BeforeEach
     void setup() {
-        projectService = new ProjectService(projects, members, null, files, null, null, null, null,
+        var userLocks = mock(com.checkba.repository.UserRepository.class);
+        when(userLocks.lockStorageOwner(anyLong())).thenReturn(java.util.Optional.of(new com.checkba.model.entity.User()));
+        projectService = new ProjectService(projects, members, userLocks, files, null, null, null, null,
                 null, null, null, null, null, mock(org.springframework.context.ApplicationEventPublisher.class));
         memberServiceAllow = mock(ProjectMemberService.class);
         when(memberServiceAllow.hasReadPermission(anyLong(), anyLong())).thenReturn(true);
@@ -97,6 +101,39 @@ class ScratchProjectAndCrossProjectReadTest {
         persistProject(7L, "BLANK", "visible");
         assertTrue(projectService.getUserProjects(7L).stream().noneMatch(Project::isScratchWorkspace));
         assertTrue(projectService.getUserProjects(7L).stream().noneMatch(Project::isLooseFileWorkspace));
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void concurrentDefaultRequestsShareOneProjectAndMembership() throws Exception {
+        var tx = new org.springframework.transaction.support.TransactionTemplate(transactions);
+        Long userId = tx.execute(status -> {
+            var user = new com.checkba.model.entity.User();
+            user.setUsername("scratch-concurrent-" + java.util.UUID.randomUUID());
+            user.setDisplayName("Default test");
+            user.setPassword("test-only");
+            user.setRole("LAWYER");
+            return users.saveAndFlush(user).getId();
+        });
+        var service = new ProjectService(projects, members, users, files, null, null, null, null,
+                null, null, null, null, null, mock(org.springframework.context.ApplicationEventPublisher.class));
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(4);
+        try {
+            var tasks = new java.util.ArrayList<java.util.concurrent.Future<Long>>();
+            for (int n = 0; n < 4; n++) tasks.add(pool.submit(() -> {
+                start.await();
+                return tx.execute(status -> service.getOrCreateScratchProject(userId).getId());
+            }));
+            start.countDown();
+            var ids = new java.util.HashSet<Long>();
+            for (var task : tasks) ids.add(task.get(10, java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals(1, ids.size());
+            tx.executeWithoutResult(status -> {
+                assertEquals(1, projects.findByUserIdOrderByCreatedAtDesc(userId).size());
+                assertEquals(1, members.findByProjectId(ids.iterator().next()).size());
+            });
+        } finally { pool.shutdownNow(); }
     }
 
     @Test

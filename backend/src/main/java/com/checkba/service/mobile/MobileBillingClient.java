@@ -158,6 +158,21 @@ public interface MobileBillingClient {
      */
     RechargeStatus confirmAppstore(String accountId, String outTradeNo, String signedTransaction);
 
+    record SubscriptionCapability(boolean available, String productId) {}
+
+    default SubscriptionCapability appstoreSubscriptionCapability() { return new SubscriptionCapability(false, "pro.monthly.cny.149"); }
+
+    record SubscriptionPreparation(String productId, String appAccountToken) {}
+    record SubscriptionConfirmation(String status, Map<String, Object> subscription) {}
+
+    default SubscriptionPreparation prepareAppstoreSubscription(String accountId) {
+        throw new MobileBillingException(MobileBillingKind.DISABLED, com.checkba.service.LangText.of("订阅服务暂不可用", "Subscription unavailable"));
+    }
+
+    default SubscriptionConfirmation confirmAppstoreSubscription(String accountId, String signedTransaction) {
+        throw new MobileBillingException(MobileBillingKind.DISABLED, com.checkba.service.LangText.of("订阅服务暂不可用", "Subscription unavailable"));
+    }
+
     /**
      * 删除官网侧的统一账户（action=delete-account，dev-board#434）。
      *
