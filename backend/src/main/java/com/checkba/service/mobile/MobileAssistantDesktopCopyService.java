@@ -57,7 +57,8 @@ public class MobileAssistantDesktopCopyService {
         row.setConversationId(UUID.randomUUID().toString()); row.setTargetProjectUid(uid);
         row.setTargetDeviceId(device); row.setTargetProjectKey(key); row.setStatus("QUEUED");
         row.setConsentRevision(consents.accessState(user).orElseThrow().getRevision());
-        row.setCreatedAt(Instant.now()); row.setExpiresAt(row.getCreatedAt().plus(Duration.ofDays(30)));
+        // Persisted timestamps use microsecond precision; the first response must equal later retries.
+        row.setCreatedAt(Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS)); row.setExpiresAt(row.getCreatedAt().plus(Duration.ofDays(30)));
         row.setMessageCount(messages.size());
         try {
             String json=mapper.writeValueAsString(new Snapshot(1,sourceId,row.getConversationId(),uid,device,key,messages));
@@ -99,7 +100,7 @@ public class MobileAssistantDesktopCopyService {
         // even if the queue expired or consent was revoked after the desktop downloaded it.
         if("DELIVERED".equals(row.getStatus())) return receipt(row);
         if("DELIVERED".equals(ack.status())) {
-            row.setStatus("DELIVERED"); row.setDeliveredAt(Instant.now()); row.setError(null); row.setSnapshotJson(null);
+            row.setStatus("DELIVERED"); row.setDeliveredAt(Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS)); row.setError(null); row.setSnapshotJson(null);
         } else if("QUEUED".equals(row.getStatus())) {
             String error=Set.of("TARGET_UNAVAILABLE","TARGET_NOT_OWNED","TARGET_NOT_FORMAL","IDENTITY_MISMATCH","INVALID_SNAPSHOT","HASH_MISMATCH","CONVERSATION_CONFLICT")
                     .contains(Objects.toString(ack.error(),"")) ? ack.error() : "TARGET_UNAVAILABLE";
