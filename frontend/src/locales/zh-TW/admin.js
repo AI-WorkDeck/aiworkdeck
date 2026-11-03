@@ -445,5 +445,17 @@ export default {
   "ocrSettingsReload": "重新加載",
   "ocrSettingsSaved": "已保存",
   "ocrSettingsLoadFailed": "讀取失敗",
-  "ocrSettingsSaveFailed": "保存失敗"
+  "ocrSettingsSaveFailed": "保存失敗",
+  "walletRedeemTitle": "兌換碼 / 聯盟所邀請碼",
+  "walletRedeemPlaceholder": "輸入兌換碼或聯盟所邀請碼（如 KW-ABNR-2026）",
+  "walletRedeemBtn": "兌換 / 綁定",
+  "walletRedeemSubmitting": "處理中…",
+  "walletRedeemSuccessGift": "兌換成功，已入帳 {amount}",
+  "walletRedeemSuccessFeature": "兌換成功，已開通權益",
+  "walletRedeemSuccessCircle": "已綁定 {firm}（後綴：{suffix}），已入帳 {amount} DeepSeek 專線額度",
+  "walletRedeemFailed": "兌換碼或邀請碼無效，請核對後重試",
+  "walletCircleBadge": "Circle 聯盟律所：{firm}（後綴：{suffix}）· 0 加成計費",
+  "walletQingtianTitle": "包晴天 · 晴天幣月度額度",
+  "walletQingtianBalance": "本月剩餘 {remaining} / {monthly} 晴天幣",
+  "walletQingtianRatio": "換算比例：1 晴天幣 = {creditsPerCoin} Credits（當月有效，每月自動重新整理）",
 }

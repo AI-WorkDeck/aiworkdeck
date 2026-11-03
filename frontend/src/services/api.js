@@ -1581,6 +1581,38 @@ export function accountPasswordOperation(operation, payload) {
   }).then(unwrapEnvelope)
 }
 
+// 包晴天律师扫码登录：创建扫码会话 & 轮询扫码状态（dev-board#1665）
+export function createBqtScanSession() {
+  return request({
+    url: '/api/account/bqt-scan/create',
+    accountPrompt: false,
+    accountAuthAttempt: true,
+    method: 'POST',
+    data: {},
+    header: { 'Content-Type': 'application/json' },
+  }).then(unwrapEnvelope);
+}
+
+export function pollBqtScanStatus(qrid, pollToken) {
+  return request({
+    url: `/api/account/bqt-scan/status?qrid=${encodeURIComponent(qrid || '')}`,
+    header: { 'X-Bqt-Poll-Token': pollToken || '' },
+    accountPrompt: false,
+    accountAuthAttempt: true,
+    method: 'GET',
+  }).then(unwrapEnvelope).then(cloudAccountChanged);
+}
+
+// 兑换储值码或绑定 Circle 联盟所邀请码（dev-board#1665）
+export function redeemAccountCode(code) {
+  return request({
+    url: '/api/account/redeem',
+    method: 'POST',
+    data: { code },
+    header: { 'Content-Type': 'application/json' },
+  }).then(unwrapEnvelope);
+}
+
 // 断开账户连接：清除本机保存的账户 Key
 export function disconnectAccount() {
   return request({

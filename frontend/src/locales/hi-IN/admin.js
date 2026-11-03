@@ -445,5 +445,17 @@ export default {
   "ocrSettingsReload": "पुनः लोड करें",
   "ocrSettingsSaved": "सहेजा गया",
   "ocrSettingsLoadFailed": "लोड करने में विफल",
-  "ocrSettingsSaveFailed": "सहेजने में विफल"
+  "ocrSettingsSaveFailed": "सहेजने में विफल",
+  "walletRedeemTitle": "गिफ्ट कोड / Circle फ़र्म आमंत्रण कोड",
+  "walletRedeemPlaceholder": "गिफ्ट कोड या Circle फ़र्म कोड दर्ज करें (उदा. KW-ABNR-2026)",
+  "walletRedeemBtn": "रिडीम / बाइंड करें",
+  "walletRedeemSubmitting": "लागू किया जा रहा है…",
+  "walletRedeemSuccessGift": "{amount} सफलतापूर्वक रिडीम हुए",
+  "walletRedeemSuccessFeature": "सुविधा सफलतापूर्वक अनलॉक हुई",
+  "walletRedeemSuccessCircle": "{firm} (सफ़िक्स: {suffix}) से जुड़ गया, {amount} समर्पित DeepSeek कोटा प्रदान",
+  "walletRedeemFailed": "गिफ्ट या आमंत्रण कोड अमान्य है",
+  "walletCircleBadge": "Circle एलायंस फ़र्म: {firm} (सफ़िक्स: {suffix}) · 0% मार्कअप",
+  "walletQingtianTitle": "Baoqingtian · मासिक Qingtian Coins",
+  "walletQingtianBalance": "इस माह {remaining} / {monthly} Qingtian Coins शेष",
+  "walletQingtianRatio": "रूपांतरण दर: 1 Qingtian Coin = {creditsPerCoin} क्रेडिट (इस माह मान्य)",
 }

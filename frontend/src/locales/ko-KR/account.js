@@ -389,5 +389,17 @@ export default {
   "caseRecordCollectionFailedToast": "수금 기록 실패",
   "caseSyncErpFailedToast": "재무 동기화 실패",
   "caseSeedDemoFailedToast": "데모 데이터 생성 실패",
-  "caseOpenPluginFailedToast": "플러그인을 열지 못했습니다"
+  "caseOpenPluginFailedToast": "플러그인을 열지 못했습니다",
+  "circleInviteLabel": "Circle 얼라이언스 초대 코드 (선택)",
+  "circleInvitePlaceholder": "예: KW-ABNR-2026",
+  "circleInviteHint": "로펌 전용 초대 코드를 입력하면 로펌 접미사가 연결되고 전용 DeepSeek 할당량이 잠금 해제됩니다",
+  "bqtScanSwitch": "바오칭톈 변호사 QR 로그인",
+  "bqtScanTitle": "바오칭톈 변호사 앱으로 스캔하여 로그인",
+  "bqtScanHint": "인증된 바오칭톈 변호사만 이용할 수 있습니다. 매달 칭톈 코인이 자동 지급됩니다.",
+  "bqtScanExpired": "QR 코드 만료",
+  "bqtScanRefresh": "QR 코드 새로고침",
+  "bqtScanBack": "계정 로그인으로 돌아가기",
+  "errInvalidInviteCode": "초대 코드가 유효하지 않거나 비활성화되었습니다",
+  "errInviteAlreadyBound": "이 계정은 이미 Circle 로펌 초대 코드에 연결되어 있습니다",
+  "errBqtNotLawyer": "인증된 바오칭톈 변호사 계정만 QR 코드로 로그인할 수 있습니다",
 }

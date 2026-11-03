@@ -1171,4 +1171,48 @@ class AccountServiceTest {
         new AccountService(com.checkba.service.site.SiteProfileService.pinnedTo("https://www.aiworkdeck.com/"), tempDir.toString(), transport, null).connect(KEY);
         assertEquals("GET https://www.aiworkdeck.com/api/account/me", transport.calls.get(0));
     }
+
+    @Test
+    @DisplayName("Circle 联盟所邀请码登录与账户页绑定：透传 inviteCode 并同步带律所后缀的 displayName")
+    void circleFirmInviteCodeLoginAndRedeem() {
+        transport = new StubTransport()
+                .enqueue(200, "{\"key\":\"" + KEY + "\",\"isNewUser\":true}")
+                .enqueue(200, "{\"accountId\":\"acc_abnr\",\"username\":\"alice\",\"displayName\":\"Alice (ABNR)\",\"balanceCents\":2000,\"plan\":\"free\"}");
+        AccountService service = service();
+        Map<String, Object> loggedIn = service.loginWithEmailCode("alice@abnr.test", "123456", "KW-ABNR-2026");
+        assertTrue(transport.bodies.get(0).contains("\"inviteCode\":\"KW-ABNR-2026\""));
+        assertEquals("Alice (ABNR)", loggedIn.get("displayName"));
+
+        transport.enqueue(200, "{\"ok\":true,\"kind\":\"circle_firm\",\"code\":\"KW-KWMSG-2026\",\"firmName\":\"KWM SG\",\"suffix\":\"KWM SG\",\"amountCents\":2000,\"balanceCents\":4000,\"displayName\":\"Alice (KWM SG)\"}");
+        Map<String, Object> redeemed = service.redeemCode("KW-KWMSG-2026");
+        assertEquals("POST https://www.aiworkdeck.com/api/account/redeem", transport.calls.get(2));
+        assertEquals("Alice (KWM SG)", redeemed.get("displayName"));
+        assertEquals("Alice (KWM SG)", service.currentDisplayNameOrNull());
+    }
+
+    @Test
+    @DisplayName("包晴天律师扫码：创建会话并轮询确认后自动连接落盘")
+    void bqtLawyerScanCreateAndPollConnects() {
+        transport = new StubTransport()
+                .enqueue(200, "{\"qrid\":\"qr_123\",\"qrDataUrl\":\"data:image/png;base64,xxx\",\"expiresAt\":999999}")
+                .enqueue(200, "{\"status\":\"pending\"}")
+                .enqueue(200, "{\"status\":\"confirmed\",\"key\":\"" + KEY + "\",\"isNewUser\":true,\"qingtian\":{\"monthlyCoins\":1000,\"remainingCoins\":1000,\"centsPerCoin\":10}}")
+                .enqueue(200, "{\"accountId\":\"acc_bqt\",\"username\":\"bqt_lawyer\",\"displayName\":\"张律师\",\"balanceCents\":10000,\"plan\":\"free\"}");
+        AccountService service = service();
+        Map<String, Object> created = service.createBqtScanSession();
+        assertEquals("qr_123", created.get("qrid"));
+        assertEquals("POST https://www.aiworkdeck.com/api/auth/bqt-scan/create", transport.calls.get(0));
+
+        Map<String, Object> pending = service.pollBqtScanStatus("qr_123", "private-poll-token");
+        assertEquals("pending", pending.get("status"));
+        assertEquals("private-poll-token", transport.lastBearer);
+        assertThrows(IllegalArgumentException.class, () -> service.pollBqtScanStatus("qr_123", ""));
+        assertFalse(service.isConnected());
+
+        Map<String, Object> confirmed = service.pollBqtScanStatus("qr_123", "private-poll-token");
+        assertEquals("confirmed", confirmed.get("status"));
+        assertTrue(service.isConnected());
+        assertEquals("张律师", confirmed.get("displayName"));
+        assertNotNull(confirmed.get("qingtian"));
+    }
 }

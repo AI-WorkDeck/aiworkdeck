@@ -445,5 +445,17 @@ export default {
   "ocrSettingsReload": "Opnieuw laden",
   "ocrSettingsSaved": "Opgeslagen",
   "ocrSettingsLoadFailed": "Laden mislukt",
-  "ocrSettingsSaveFailed": "Opslaan mislukt"
+  "ocrSettingsSaveFailed": "Opslaan mislukt",
+  "walletRedeemTitle": "Cadeaucode / Circle-kantooruitnodigingscode",
+  "walletRedeemPlaceholder": "Voer cadeaucode of Circle-kantoorcode in (bijv. KW-ABNR-2026)",
+  "walletRedeemBtn": "Inwisselen / Koppelen",
+  "walletRedeemSubmitting": "Bezig met toepassen…",
+  "walletRedeemSuccessGift": "{amount} succesvol ingewisseld",
+  "walletRedeemSuccessFeature": "Functie succesvol ontgrendeld",
+  "walletRedeemSuccessCircle": "Gekoppeld aan {firm} (achtervoegsel: {suffix}), {amount} toegewijd DeepSeek-quotum verleend",
+  "walletRedeemFailed": "Ongeldige cadeaucode of uitnodigingscode",
+  "walletCircleBadge": "Circle Alliance-kantoor: {firm} (achtervoegsel: {suffix}) · 0% opslag",
+  "walletQingtianTitle": "Baoqingtian · Maandelijkse Qingtian Coins",
+  "walletQingtianBalance": "{remaining} / {monthly} Qingtian Coins resterend deze maand",
+  "walletQingtianRatio": "Wisselkoers: 1 Qingtian Coin = {creditsPerCoin} credits (geldig deze maand)",
 }

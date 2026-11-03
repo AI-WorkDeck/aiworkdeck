@@ -389,5 +389,17 @@ export default {
   "caseRecordCollectionFailedToast": "No se pudo registrar el cobro",
   "caseSyncErpFailedToast": "Error en la sincronización financiera",
   "caseSeedDemoFailedToast": "No se pudieron inicializar los datos de demostración",
-  "caseOpenPluginFailedToast": "No se pudo abrir el complemento"
+  "caseOpenPluginFailedToast": "No se pudo abrir el complemento",
+  "circleInviteLabel": "Código de invitación de Circle Alliance (opcional)",
+  "circleInvitePlaceholder": "p. ej., KW-ABNR-2026",
+  "circleInviteHint": "Introduce el código de invitación de tu despacho para añadir el sufijo del despacho y desbloquear cuota dedicada de DeepSeek",
+  "bqtScanSwitch": "Inicio de sesión por QR de abogado de Baoqingtian",
+  "bqtScanTitle": "Escanéalo con la app de abogado de Baoqingtian para iniciar sesión",
+  "bqtScanHint": "Solo para abogados verificados de Baoqingtian. Las monedas Qingtian mensuales se otorgan automáticamente.",
+  "bqtScanExpired": "El código QR caducó",
+  "bqtScanRefresh": "Actualizar código QR",
+  "bqtScanBack": "Volver al inicio de sesión con cuenta",
+  "errInvalidInviteCode": "Código de invitación no válido o inactivo",
+  "errInviteAlreadyBound": "Esta cuenta ya vinculó un código de invitación de Circle",
+  "errBqtNotLawyer": "Solo las cuentas verificadas de abogado de Baoqingtian pueden iniciar sesión por QR",
 }
