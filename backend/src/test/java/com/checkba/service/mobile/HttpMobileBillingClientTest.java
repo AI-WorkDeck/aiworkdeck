@@ -48,6 +48,16 @@ class HttpMobileBillingClientTest {
     private final AtomicBoolean stubDrop = new AtomicBoolean(false);
 
     @Test
+    void subscriptionCapabilityIncludesOnlyResolvedAccountWhenPresent() throws Exception {
+        var client = stubbed(200, "{\"available\":true,\"productId\":\"pro.monthly.cny.149\"}");
+        assertTrue(client.appstoreSubscriptionCapability("account-a").available());
+        assertEquals("account-a", om.readTree(lastRequest.get()).path("accountId").asText());
+        client.appstoreSubscriptionCapability(null);
+        assertFalse(om.readTree(lastRequest.get()).has("accountId"));
+        assertEquals("appstore-subscription-capability", om.readTree(lastRequest.get()).path("action").asText());
+    }
+
+    @Test
     void subscriptionPrepareAndConfirmUseAccountBoundActions() throws Exception {
         var client = stubbed(200, "{\"productId\":\"pro.monthly.cny.149\",\"appAccountToken\":\"f7331ede-341b-41db-bf3b-d6013b943e9c\"}");
         assertEquals("pro.monthly.cny.149", client.prepareAppstoreSubscription("account-a").productId());

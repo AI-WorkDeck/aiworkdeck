@@ -94,6 +94,32 @@ class MobileBillingServiceTest {
     }
 
     @Test
+    void subscriptionCapabilityUsesCurrentUsersBoundAccount() {
+        User user = phoneUser();
+        String account = "capability-" + user.getId();
+        bind(user.getId(), account);
+        when(billing.appstoreSubscriptionCapability(account)).thenReturn(
+                new MobileBillingClient.SubscriptionCapability(true, "pro.monthly.cny.149"));
+        assertTrue(service.appstoreSubscriptionCapability(user.getId()).available());
+        verify(billing).appstoreSubscriptionCapability(account);
+        verify(billing, never()).resolveAccountId(any(), any(), anyBoolean());
+    }
+
+    @Test
+    void subscriptionCapabilityWithoutAccountDoesNotCreateOne() {
+        User user = phoneUser();
+        when(billing.resolveAccountId(user.getPhone(), null, false)).thenThrow(
+                new MobileBillingException(MobileBillingKind.NOT_FOUND, "not found"));
+        when(billing.appstoreSubscriptionCapability(null)).thenReturn(
+                new MobileBillingClient.SubscriptionCapability(false, "pro.monthly.cny.149"));
+        assertFalse(service.appstoreSubscriptionCapability(user.getId()).available());
+        verify(billing).resolveAccountId(user.getPhone(), null, false);
+        verify(billing, never()).resolveAccountId(any(), any(), eq(true));
+        verify(billing).appstoreSubscriptionCapability(null);
+        assertTrue(accountBindingRepository.findByUserId(user.getId()).isEmpty());
+    }
+
+    @Test
     void subscriptionPrepareMayCreateButConfirmationOnlyUsesBoundAccount() {
         User user = phoneUser();
         String account = "subscription-" + user.getId();
