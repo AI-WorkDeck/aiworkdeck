@@ -332,7 +332,9 @@ public class ChatModelFactory {
         if (userId == null || (!localMode && platformAiChannel.usesMachineKey(userId))) {
             throw new com.checkba.service.account.AccountException(
                     com.checkba.service.account.AccountException.Kind.CONFLICT,
-                    "本次沟通助手未绑定可用的用户平台额度，请连接AI WorkDeck账户后重试");
+                    com.checkba.service.LangText.of(
+                            "本次沟通助手未绑定可用的用户平台额度，请连接AI WorkDeck账户后重试",
+                            "No usable platform credits are linked to this assistant session. Connect your AI WorkDeck account and try again."));
         }
         long started = System.nanoTime();
         String modelId = resolvePlatformModel("default", true);
