@@ -45,7 +45,9 @@ public class OfficialCloudService {
 
     private static final Logger log = LoggerFactory.getLogger(OfficialCloudService.class);
 
-    private final String officialBaseUrl;
+    private final String configuredBaseUrl;
+    private final String accountBaseUrl;
+    private com.checkba.service.site.SiteProfileService siteProfileService;
     private final AccountService accountService;
     private final CloudConnectionRepository connectionRepository;
     private final CloudSyncService cloudSyncService;
@@ -57,19 +59,31 @@ public class OfficialCloudService {
             CloudConnectionRepository connectionRepository,
             CloudSyncService cloudSyncService) {
         // 配错地址（明文 http）在启动期就炸掉，不静默降级——同 AwdkLoginService 的做法
-        this.officialBaseUrl = OfficialCloudEndpoint.resolve(configuredBaseUrl, accountBaseUrl);
+        OfficialCloudEndpoint.resolve(configuredBaseUrl, accountBaseUrl);
+        this.configuredBaseUrl = configuredBaseUrl;
+        this.accountBaseUrl = accountBaseUrl;
         this.accountService = accountService;
         this.connectionRepository = connectionRepository;
         this.cloudSyncService = cloudSyncService;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    public OfficialCloudService(
+            @Value("${cloud.collab.base-url:}") String configuredBaseUrl,
+            @Value("${ai.account.base-url:https://www.aiworkdeck.com}") String accountBaseUrl,
+            AccountService accountService, CloudConnectionRepository connectionRepository,
+            CloudSyncService cloudSyncService, com.checkba.service.site.SiteProfileService siteProfileService) {
+        this(configuredBaseUrl, accountBaseUrl, accountService, connectionRepository, cloudSyncService);
+        this.siteProfileService = siteProfileService;
+    }
+
     /** 官方案件库地址；null = 本站暂不提供（国际站）。 */
     public String officialBaseUrl() {
-        return officialBaseUrl;
+        return OfficialCloudEndpoint.resolve(configuredBaseUrl, siteProfileService == null ? accountBaseUrl : siteProfileService.baseUrl());
     }
 
     public boolean available() {
-        return officialBaseUrl != null;
+        return officialBaseUrl() != null;
     }
 
     /**
@@ -79,7 +93,7 @@ public class OfficialCloudService {
     public Map<String, Object> status(Long userId) {
         Map<String, Object> m = new HashMap<>();
         m.put("available", available());
-        m.put("serverUrl", officialBaseUrl);
+        m.put("serverUrl", officialBaseUrl());
         CloudConnection conn = existingOfficial(userId);
         m.put("connected", conn != null);
         m.put("username", conn == null ? null : conn.getUsername());
@@ -91,17 +105,18 @@ public class OfficialCloudService {
      * 不留下第二条连接（否则 CollabDialog 的案件库选择器会冒出一串同地址的死连接）。
      */
     public CloudConnection connectOfficial(Long userId) {
-        String base = requireAvailable();
+        AccountService.ConnectionSnapshot snapshot = accountService.connectionSnapshot();
+        String base = OfficialCloudEndpoint.resolve(configuredBaseUrl, snapshot.baseUrl());
         if (userId == null) {
             throw new VersionException("connectOfficial 缺少本机用户 id");
         }
-        String fingerprint = accountService.accountFingerprintOrNull();
-        CloudConnection existing = existingOfficial(userId);
+        String fingerprint = snapshot.fingerprint();
+        CloudConnection existing = connectionRepository.findFirstByUserIdAndServerUrl(userId, base).orElse(null);
         if (existing != null && fingerprint != null
                 && fingerprint.equals(existing.getAccountFingerprint())) {
             return existing;
         }
-        String key = accountService.currentKeyOrNull();
+        String key = snapshot.key();
         if (key == null) {
             // 文案不含「登录」「未授权」「请先」——那三个词会被读成掉线（licensing 地雷 1）。
             // 抛 AccountException(NOT_CONNECTED, reason=team)：全局处理器回 4011，
@@ -111,7 +126,7 @@ public class OfficialCloudService {
                     "这台电脑还没连上 AI WorkDeck 账户，连好账户就能用官方团队案件库了",
                     "This computer is not linked to an AI WorkDeck account yet — link one to use the official Team Case Library"));
         }
-        return bridge(base, userId, key, fingerprint, existing);
+        return bridge(base, userId, key, fingerprint, existing, snapshot);
     }
 
     /**
@@ -153,21 +168,30 @@ public class OfficialCloudService {
     synchronized void refreshDisplayName(Long userId, String displayName) {
         if (displayName == null || displayName.isBlank()) return;
         String name = displayName.trim();
-        CloudConnection existing = existingOfficial(userId);
+        AccountService.ConnectionSnapshot snapshot;
+        synchronized (accountService) {
+            if (!name.equals(accountService.currentDisplayNameOrNull())) return;
+            snapshot = accountService.connectionSnapshot();
+        }
+        String base = OfficialCloudEndpoint.resolve(configuredBaseUrl, snapshot.baseUrl());
+        CloudConnection existing = connectionRepository.findFirstByUserIdAndServerUrl(userId, base).orElse(null);
         if (existing == null || name.equals(existing.getDisplayName())) return;
-        String key = accountService.currentKeyOrNull();
+        String key = snapshot.key();
         if (key == null) return;
         Long oldTokenId = existing.getTokenId();
         try {
-            CloudConnection conn = bridge(officialBaseUrl, userId, key,
-                    accountService.accountFingerprintOrNull(), existing);
-            if (!name.equals(conn.getDisplayName())) {
-                conn.setDisplayName(name);
-                conn = connectionRepository.save(conn);
+            CloudConnection conn = bridge(existing.getServerUrl(), userId, key,
+                    snapshot.fingerprint(), existing, snapshot);
+            String revokeCredential = null;
+            synchronized (accountService) {
+                if (!accountService.isCurrentConnection(snapshot)) return;
+                if (!name.equals(conn.getDisplayName())) {
+                    conn.setDisplayName(name);
+                    conn = connectionRepository.save(conn);
+                }
+                if (oldTokenId != null && !oldTokenId.equals(conn.getTokenId())) revokeCredential = conn.getDeviceToken();
             }
-            if (oldTokenId != null && !oldTokenId.equals(conn.getTokenId())) {
-                cloudSyncService.revokeRemoteToken(officialBaseUrl, oldTokenId, conn.getDeviceToken());
-            }
+            if (revokeCredential != null) cloudSyncService.revokeRemoteToken(base, oldTokenId, revokeCredential);
         } catch (RuntimeException e) {
             log.warn("官方案件库展示名刷新跳过（下次同步再试）: user={} {}", userId, e.getMessage());
         }
@@ -175,22 +199,14 @@ public class OfficialCloudService {
 
     // ==================== 内部 ====================
 
-    private String requireAvailable() {
-        if (officialBaseUrl == null) {
-            throw VersionException.userFacing(LangText.of(
-                    "本站暂时没有官方团队案件库，这份案卷的版本记录只保存在本机",
-                    "There is no official Team Case Library on this site yet — this case file's version history stays on this computer only"));
-        }
-        return officialBaseUrl;
-    }
-
     private CloudConnection existingOfficial(Long userId) {
+        String officialBaseUrl = officialBaseUrl();
         if (officialBaseUrl == null || userId == null) return null;
         return connectionRepository.findFirstByUserIdAndServerUrl(userId, officialBaseUrl).orElse(null);
     }
 
     private CloudConnection bridge(String base, Long userId, String key,
-                                   String fingerprint, CloudConnection existing) {
+                                   String fingerprint, CloudConnection existing, AccountService.ConnectionSnapshot snapshot) {
         Map<String, String> bridgeBody = new java.util.LinkedHashMap<>();
         bridgeBody.put("key", key);
         // 设备名让协作事件行分得清「你在另一台电脑」是哪一台。取不到主机名就不传
@@ -204,22 +220,26 @@ public class OfficialCloudService {
                     "没能连上官方团队案件库：" + resp.getStr("message", "稍后再试一次"),
                     "Couldn't reach the official Team Case Library: " + resp.getStr("message", "please try again later")));
         }
-        JSONObject data = resp.getJSONObject("data");
-        CloudConnection conn = existing != null ? existing : new CloudConnection();
-        conn.setUserId(userId);
-        conn.setServerUrl(base);
-        conn.setUsername(data.getStr("username"));
-        conn.setDisplayName(data.getStr("displayName"));
-        conn.setDeviceToken(data.getStr("token"));
-        conn.setTokenId(data.getLong("tokenId", null));
-        // 案件库那一侧的 userId：协作事件行判「这条是不是我干的」只能靠它
-        conn.setRemoteUserId(data.getLong("userId", null));
-        conn.setAccountFingerprint(fingerprint);
-        if (conn.getCreatedAt() == null) {
-            conn.setCreatedAt(LocalDateTime.now());
+        synchronized (accountService) {
+            if (!accountService.isCurrentConnection(snapshot)) throw VersionException.userFacing(LangText.of(
+                    "账户已变化，请重试", "Account changed; please try again"));
+            JSONObject data = resp.getJSONObject("data");
+            CloudConnection conn = existing != null ? existing : new CloudConnection();
+            conn.setUserId(userId);
+            conn.setServerUrl(base);
+            conn.setUsername(data.getStr("username"));
+            conn.setDisplayName(data.getStr("displayName"));
+            conn.setDeviceToken(data.getStr("token"));
+            conn.setTokenId(data.getLong("tokenId", null));
+            // 案件库那一侧的 userId：协作事件行判「这条是不是我干的」只能靠它
+            conn.setRemoteUserId(data.getLong("userId", null));
+            conn.setAccountFingerprint(fingerprint);
+            if (conn.getCreatedAt() == null) {
+                conn.setCreatedAt(LocalDateTime.now());
+            }
+            log.info("已连上官方团队案件库: {} user={} as {}", base, userId, conn.getUsername());
+            return connectionRepository.save(conn);
         }
-        log.info("已连上官方团队案件库: {} user={} as {}", base, userId, conn.getUsername());
-        return connectionRepository.save(conn);
     }
 
     /** 本机主机名，取不到回 null（无网/无 DNS 的机器上 getLocalHost 会抛）。 */

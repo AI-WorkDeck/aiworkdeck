@@ -103,6 +103,46 @@ class PluginMarketServiceTest {
                 pluginService, gate);
     }
 
+    @Test void lateRevocationResponseIsRejectedAfterSiteSwitch() {
+        var account = mock(AccountService.class);
+        var snapshot = new AccountService.ConnectionSnapshot("https://www.workdeck.ai", "test-key", "test", 2L);
+        when(account.connectionSnapshot()).thenReturn(snapshot);
+        when(account.isCurrentConnection(snapshot)).thenReturn(true);
+        var scopedGate = new MarketPurchaseGate(account, mock(EntitlementService.class));
+        var service = new PluginMarketService("http://registry.test/plugins", publicKeyPem,
+                pluginsDir.toString(), pluginService, scopedGate) {
+            @Override protected String httpGet(String url) {
+                when(account.isCurrentConnection(snapshot)).thenReturn(false);
+                return "[]";
+            }
+        };
+        assertThrows(IllegalStateException.class, service::fetchRevoked);
+    }
+
+    @Test void switchedSiteDownloadsWithMatchingKeyAndRejectsLateBundle() {
+        var account = mock(AccountService.class);
+        var snapshot = new AccountService.ConnectionSnapshot("https://www.workdeck.ai", "intl-key", "intl", 2L);
+        when(account.connectionSnapshot()).thenReturn(snapshot);
+        when(account.currentKeyOrNull()).thenReturn("intl-key");
+        when(account.isCurrentConnection(snapshot)).thenReturn(true);
+        var scopedGate = new MarketPurchaseGate(account, mock(EntitlementService.class));
+        org.springframework.test.util.ReflectionTestUtils.setField(scopedGate, "sites",
+                com.checkba.service.site.SiteProfileService.pinnedTo("https://www.workdeck.ai"));
+        var service = new PluginMarketService("https://www.aiworkdeck.com/api/registry/plugins", publicKeyPem,
+                pluginsDir.toString(), pluginService, scopedGate) {
+            @Override protected RegistryReply httpGet(String url, String bearer) {
+                assertTrue(url.startsWith("https://www.workdeck.ai/api/registry/plugins"));
+                if (!url.endsWith("/bundle")) return new RegistryReply(200, "[{\"id\":\"demo\",\"priceCents\":100}]".getBytes(StandardCharsets.UTF_8));
+                assertEquals("intl-key", bearer);
+                when(account.isCurrentConnection(snapshot)).thenReturn(false);
+                return new RegistryReply(200, "{}".getBytes(StandardCharsets.UTF_8));
+            }
+        };
+        assertThrows(IllegalStateException.class, () -> service.install("demo"));
+        verify(account, atLeast(3)).isCurrentConnection(snapshot);
+        assertFalse(Files.exists(pluginsDir.resolve("demo")));
+    }
+
     @Test
     void staleRegistryListingHidesOnlyRetiredPlugin() {
         PluginMarketService svc = new PluginMarketService("http://registry.test/plugins", publicKeyPem,

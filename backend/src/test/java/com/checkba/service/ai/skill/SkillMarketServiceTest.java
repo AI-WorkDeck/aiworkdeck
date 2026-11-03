@@ -115,6 +115,30 @@ class SkillMarketServiceTest {
                 } }""".formatted(id, id);
     }
 
+    @Test void switchedSiteSkillDownloadUsesMatchingKeyAndRejectsLateResponse() {
+        var account = mock(AccountService.class);
+        var snapshot = new AccountService.ConnectionSnapshot("https://www.workdeck.ai", "intl-key", "intl", 2L);
+        when(account.connectionSnapshot()).thenReturn(snapshot);
+        when(account.currentKeyOrNull()).thenReturn("intl-key");
+        when(account.isCurrentConnection(snapshot)).thenReturn(true);
+        var scopedGate = new MarketPurchaseGate(account, mock(EntitlementService.class));
+        org.springframework.test.util.ReflectionTestUtils.setField(scopedGate, "sites",
+                com.checkba.service.site.SiteProfileService.pinnedTo("https://www.workdeck.ai"));
+        newService(tempDir, new PluginService(), scopedGate);
+        props.setRegistryUrl("https://www.aiworkdeck.com/api/registry/skills");
+        var service = new SkillMarketService(props, registry, scopedGate) {
+            @Override protected RegistryReply httpGet(String url, String bearer) {
+                assertTrue(url.startsWith("https://www.workdeck.ai/api/registry/skills"));
+                if (!url.endsWith("/bundle")) return new RegistryReply(200, "[{\"id\":\"demo\",\"priceCents\":100}]".getBytes(StandardCharsets.UTF_8));
+                assertEquals("intl-key", bearer);
+                when(account.isCurrentConnection(snapshot)).thenReturn(false);
+                return new RegistryReply(200, bundleJson("demo").getBytes(StandardCharsets.UTF_8));
+            }
+        };
+        assertThrows(IllegalStateException.class, () -> service.install("demo"));
+        assertFalse(Files.exists(tempDir.resolve("demo")));
+    }
+
     @Test
     @DisplayName("listMarket：解析注册表数组并标注 installed（本地已有同 id 的为 true）")
     void listMarketMarksInstalled() throws IOException {

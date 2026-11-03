@@ -25,7 +25,7 @@ export default {
   "exitCancel": "Abbrechen",
   "exitConflict": "Änderungen erfordern eine Konfliktlösung. Lösen Sie diese vor dem Verlassen in der Versionskontrolle.",
   "exitNewChanges": "Es liegen neue, noch nicht übertragene Änderungen vor. Prüfen Sie diese vor dem Verlassen.",
-  "exitCheckFailed": "Projektänderungen konnten nicht geprüft oder übertragen werden. Das Verlassen wurde abgebrochen; bitte versuchen Sie es erneut.",
+  "exitCheckFailed": "Projektänderungen konnten nicht geprüft oder gespeichert werden. Erneut versuchen oder ohne Commit verlassen.",
   "controlEntry": "Versionskontrolle",
   "entryUnavailable": "Status nicht verfügbar. Zum Wiederholen klicken",
   "pendingFileCount": "{count} Datei(en) warten auf Übertragung",

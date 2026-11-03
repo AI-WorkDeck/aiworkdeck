@@ -22,7 +22,9 @@ class RemoteMemoryOrganizationGatewayTest {
     @Test
     void desktopUsesConnectedAccountBearerAndReturnsCanonicalOrgIds() {
         AccountService account = mock(AccountService.class);
-        when(account.currentKeyOrNull()).thenReturn("awdk_secret");
+        var snapshot = new AccountService.ConnectionSnapshot("https://accounts.example", "awdk_secret", "scope", 1);
+        when(account.connectionSnapshot()).thenReturn(snapshot);
+        when(account.isCurrentConnection(snapshot)).thenReturn(true);
         SiteProfileService site = mock(SiteProfileService.class);
         when(site.baseUrl()).thenReturn("https://accounts.example");
         RecordingTransport transport = new RecordingTransport(200,
@@ -36,6 +38,44 @@ class RemoteMemoryOrganizationGatewayTest {
         assertEquals("Bearer awdk_secret", transport.headers.get("Authorization"));
         assertEquals("https://accounts.example/api/account/memory/spaces", transport.url);
         assertFalse(transport.headers.containsKey("X-Requester-Account-Id"));
+    }
+
+    @Test
+    void switchedAccountRejectsLateResponsesIncludingDownloads() {
+        for (boolean download : List.of(false, true)) {
+            AccountService account = mock(AccountService.class);
+            var snapshot = new AccountService.ConnectionSnapshot("https://old.example", "old-key", "old", 1);
+            when(account.connectionSnapshot()).thenReturn(snapshot);
+            when(account.isCurrentConnection(snapshot)).thenReturn(true);
+            SiteProfileService sites = mock(SiteProfileService.class);
+            when(sites.baseUrl()).thenReturn("https://new.example");
+            MemoryHttpTransport transport = (method, url, headers, body) -> {
+                assertTrue(url.startsWith("https://old.example/api/account/memory/"));
+                assertEquals("Bearer old-key", headers.get("Authorization"));
+                when(account.isCurrentConnection(snapshot)).thenReturn(false);
+                return new MemoryHttpTransport.Reply(200, download ? "old private content" : "{\"code\":200,\"data\":[]}");
+            };
+            var gateway = new RemoteMemoryOrganizationGateway(account, sites, mock(AccountBindingRepository.class),
+                    transport, new ObjectMapper(), true, "", "");
+            MemoryDocumentException failure = assertThrows(MemoryDocumentException.class, () -> {
+                if (download) gateway.download(8L, "team:t", "note.md");
+                else gateway.listFiles(8L, "team:t");
+            });
+            assertEquals(409, failure.status());
+        }
+    }
+
+    @Test
+    void switchedAccountBeforeDispatchDoesNotSendMemoryRequest() {
+        AccountService account = mock(AccountService.class);
+        var snapshot = new AccountService.ConnectionSnapshot("https://old.example", "old-key", "old", 1);
+        when(account.connectionSnapshot()).thenReturn(snapshot);
+        when(account.isCurrentConnection(snapshot)).thenReturn(false);
+        MemoryHttpTransport transport = mock(MemoryHttpTransport.class);
+        var gateway = new RemoteMemoryOrganizationGateway(account, mock(SiteProfileService.class),
+                mock(AccountBindingRepository.class), transport, new ObjectMapper(), true, "", "");
+        assertThrows(MemoryDocumentException.class, () -> gateway.download(8L, "team:t", "note.md"));
+        verifyNoInteractions(transport);
     }
 
     @Test

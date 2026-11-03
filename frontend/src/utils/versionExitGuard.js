@@ -10,12 +10,27 @@ const hasConflict = status => !!(status?.conflict || status?.adoptConflict || st
 // save must confirm durable completion with true; commit receives the latest
 // status so the caller can select the current work-session or draft operation.
 // progress reports real commit-flow stages only; idle releases the caller's UI.
-export function createVersionExitGuard({ save, readStatus, choose, commit, onBlocked = () => {}, isCurrent = () => true, progress = () => {} }) {
+export function createVersionExitGuard({ save, readStatus, choose, commit, onBlocked = () => {}, chooseFailure, isCurrent = () => true, progress = () => {} }) {
   let pending = null
   const reportProgress = stage => {
     try { Promise.resolve(progress(stage)).catch(() => {}) } catch {}
   }
   const blocked = async reason => {
+    if (chooseFailure && ['status-failed', 'commit-failed'].includes(reason) && isCurrent()) {
+      reportProgress('idle')
+      try {
+        const choice = await chooseFailure(reason)
+        if (!isCurrent()) return false
+        if (choice === 'retry') return run()
+        if (choice === 'skip') {
+          let saved
+          try { saved = await save() } catch { return blocked('save-failed') }
+          if (!isCurrent()) return false
+          return saved === true ? true : blocked('save-failed')
+        }
+        return false
+      } catch { return false }
+    }
     // A notification failure must not turn a blocked exit into an unhandled
     // rejection (or authorize closing the project).
     if (isCurrent()) { try { await onBlocked(reason) } catch {} }

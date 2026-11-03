@@ -69,6 +69,8 @@ beforeUnmount 兜底，Office 没有）。
 自己显式 flush 而不复用出口。
 
 2026-10-26（dev-board#1489）：这两条出口在保存后都调用 `confirmVersionBeforeLeaving`，使用最新项目状态提供“提交并退出 / 直接退出 / 取消”；提交成功并核验无新改动才继续导航/清除登录态。原生退出通过 `registerQuitSave` 第三个确认回调复用同一守卫，重启恢复内部导航除外。
+2026-11-03（dev-board#1658）：版本状态读取或提交异常时，离开守卫提供“重试 / 直接退出”；直接退出仍重新确认编辑器保存成功并检查当前项目有效性，保存失败不放行。重试重新走保存与最新状态检查。账户切换后亦复用该失败恢复，不因恢复选择绕过保存。
+
 
 **新增任何离开工作台的路径都要走 `leaveWorkbench`**；`npm run check:nav` 已把这条钉住
 （goAllProjects 允许直接 reLaunch 或走 leaveWorkbench，走出口时会连带校验出口里有

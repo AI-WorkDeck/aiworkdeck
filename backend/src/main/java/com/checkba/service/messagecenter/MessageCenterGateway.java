@@ -233,7 +233,14 @@ public class MessageCenterGateway {
     }
 
     protected Object remote(Long userId,String action,Map<String,Object> params) {
-        String scope=im.captureAccountScope(); var connection=cloud.connectOfficial(userId);
+        String scope=im.captureAccountScope();
+        com.checkba.model.entity.CloudConnection connection;
+        try { connection=cloud.connectOfficial(userId); }
+        catch (com.checkba.version.VersionException | IllegalStateException unavailable) {
+            im.assertAccountScope(scope);
+            throw new IllegalArgumentException(unavailable instanceof com.checkba.version.VersionException version && version.isUserFacing()?version.getMessage():
+                    com.checkba.service.LangText.of("云端消息中心暂不可用", "Cloud Message Center is temporarily unavailable"),unavailable);
+        }
         if (!scope.equals(connection.getAccountFingerprint())) throw bad(com.checkba.service.LangText.of("账户已变化，请重新打开消息中心", "Account has changed; please reopen the Message Center"));
         try {
             byte[] payload=json.writeValueAsBytes(Map.of("action",action,"params",params));

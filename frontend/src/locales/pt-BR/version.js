@@ -25,7 +25,7 @@ export default {
   "exitCancel": "Cancelar",
   "exitConflict": "As alterações exigem resolução de conflitos. Resolva-os no Controle de Versão antes de sair.",
   "exitNewChanges": "Há novas alterações aguardando registro. Revise-as antes de sair.",
-  "exitCheckFailed": "Não foi possível verificar ou registrar as alterações do projeto. A saída foi cancelada; tente novamente.",
+  "exitCheckFailed": "Não foi possível verificar ou confirmar as alterações. Tente novamente ou saia sem confirmar.",
   "controlEntry": "Controle de Versão",
   "entryUnavailable": "Status indisponível. Clique para tentar novamente",
   "pendingFileCount": "{count} arquivos aguardando registro",
