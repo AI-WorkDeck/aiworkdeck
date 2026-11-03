@@ -1101,11 +1101,12 @@ public class AccountService {
     }
 
     /** 包晴天律师扫码：轮询扫码状态，确认后换取 awdk_ Key 并落盘连接。 */
-    public synchronized Map<String, Object> pollBqtScanStatus(String qrid) {
+    public synchronized Map<String, Object> pollBqtScanStatus(String qrid, String pollToken) {
+        if (pollToken == null || pollToken.isBlank()) throw new IllegalArgumentException(LangText.of("扫码会话已失效，请重新获取二维码", "Scan session is invalid; request a new QR code"));
         String encodedQrid = java.net.URLEncoder.encode(qrid == null ? "" : qrid.trim(), StandardCharsets.UTF_8);
         String encodedDevice = java.net.URLEncoder.encode(deviceName(), StandardCharsets.UTF_8);
         String path = "/api/auth/bqt-scan/status?qrid=" + encodedQrid + "&issueKey=1&deviceName=" + encodedDevice;
-        Map<String, Object> payload = AccountLoginExchange.get(transport, objectMapper, baseUrl(), path);
+        Map<String, Object> payload = AccountLoginExchange.get(transport, objectMapper, baseUrl(), path, pollToken);
         if ("confirmed".equals(payload.get("status")) && payload.get("key") instanceof String key && !key.isBlank()) {
             Map<String, Object> connected = new LinkedHashMap<>(connect(key));
             connected.put("status", "confirmed");

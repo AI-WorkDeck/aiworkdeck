@@ -1593,9 +1593,10 @@ export function createBqtScanSession() {
   }).then(unwrapEnvelope);
 }
 
-export function pollBqtScanStatus(qrid) {
+export function pollBqtScanStatus(qrid, pollToken) {
   return request({
     url: `/api/account/bqt-scan/status?qrid=${encodeURIComponent(qrid || '')}`,
+    header: { 'X-Bqt-Poll-Token': pollToken || '' },
     accountPrompt: false,
     accountAuthAttempt: true,
     method: 'GET',
