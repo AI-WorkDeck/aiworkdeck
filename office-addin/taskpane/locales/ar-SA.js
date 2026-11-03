@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  defaultProjectName: "مشروع مؤقت",
   cmdPptAddImage: "إدراج صورة في الشريحة",
   cmdPptAddChart: "إدراج مخطط في الشريحة",
   cmdPptFormatChart: "تنسيق مخطط الشريحة",

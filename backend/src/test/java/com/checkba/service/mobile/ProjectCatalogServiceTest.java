@@ -26,6 +26,33 @@ class ProjectCatalogServiceTest {
         assertTrue(service.catalog(1L).isEmpty());
         verifyNoInteractions(files);
     }
+    @Test void defaultWorkspaceIsTypedAndAccountPrivateWithoutNameMatching() {
+        var scratch=cloud(21L,"Renamed workspace"); scratch.setProjectType(Project.SCRATCH);
+        var ordinary=cloud(22L,"插件临时项目"); ordinary.setProjectType("BLANK");
+        var projectService=mock(com.checkba.service.ProjectService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"projectService",projectService);
+        when(projectService.getOrCreateScratchProject(1L)).thenReturn(scratch);
+        when(projects.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(scratch,ordinary));
+        var result=service.defaultProject(1L);
+        assertEquals(scratch.getUid(),result.get("projectUid"));
+        assertEquals(true,result.get("isDefault"));
+        assertEquals(Project.SCRATCH,result.get("projectType"));
+        assertEquals(false,service.catalog(1L).get(1).get("isDefault"));
+        assertTrue(service.catalog(2L).isEmpty());
+        assertThrows(IllegalArgumentException.class,()->service.fileList(2L,scratch.getUid()));
+        verify(projectService).getOrCreateScratchProject(1L);
+    }
+
+    @Test void legacyDuplicateScratchRowsArePreservedButOnlyEarliestIsDefault() {
+        Project first=cloud(1L,"scratch"), duplicate=cloud(2L,"scratch");
+        first.setProjectType(Project.SCRATCH);duplicate.setProjectType(Project.SCRATCH);
+        when(projects.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(duplicate,first));
+        var catalog=service.catalog(1L);
+        assertEquals(2,catalog.size());
+        assertEquals(false,catalog.get(0).get("isDefault"));
+        assertEquals(true,catalog.get(1).get("isDefault"));
+    }
+
     Project cloud(long id,String name) { Project p=new Project();p.setId(id);p.setUserId(1L);p.setName(name);p.setUid(UUID.randomUUID().toString());return p; }
     MobileProjectDir desktop(String device,String key,String name,String uid,Long cloudId) {
         MobileProjectDir d=new MobileProjectDir();d.setUserId(1L);d.setDeviceId(device);d.setProjectKey(key);d.setName(name);d.setProjectUid(uid);d.setCloudProjectId(cloudId);return d;

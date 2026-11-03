@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 工作台（pages/project-overview/project-overview.vue）文案。
 export default {
+  scratchCopyTitle: "转存到正式项目",
+  scratchCopyHint: "复制所选对话和文件，保留原件；目标项目的成员可查看转存内容。",
   restartPending: '{count} 个任务可继续',
   restartContinue: '继续：{name}',
   restartRestoring: '正在恢复原会话与文档…',
@@ -365,8 +367,8 @@ export default {
     modeChat: '对话',
     modeIde: '工作台',
     chatTitle: '对话',
-    scratchTitle: '随手工作区',
-    scratchBadge: '随手工作区',
+    scratchTitle: "临时项目",
+    scratchBadge: "临时项目",
     promoteAction: '转为正式项目',
     promoteTitle: '转为正式项目',
     promotePlaceholder: '请输入正式项目名称',

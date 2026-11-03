@@ -28,6 +28,7 @@ public class ProjectCatalogService {
     private final ObjectMapper mapper = new ObjectMapper();
     @org.springframework.beans.factory.annotation.Autowired private MobileFileBackupRepository backups;
     @org.springframework.beans.factory.annotation.Autowired private UserRepository users;
+    @org.springframework.beans.factory.annotation.Autowired private com.checkba.service.ProjectService projectService;
     @org.springframework.beans.factory.annotation.Autowired private CloudStorageQuotaService quota;
 
     public ProjectCatalogService(ProjectRepository projects, ProjectFileRepository files,
@@ -49,7 +50,9 @@ public class ProjectCatalogService {
     @Transactional
     public List<Map<String, Object>> catalog(Long userId) {
         List<Project> owned = projects.findByUserIdOrderByCreatedAtDesc(userId).stream()
-                .filter(p -> !p.isLooseFileWorkspace() && !p.isScratchWorkspace()).toList();
+                .filter(p -> !p.isLooseFileWorkspace()).toList();
+        Long defaultId = owned.stream().filter(Project::isScratchWorkspace).map(Project::getId)
+                .min(Long::compareTo).orElse(null);
         Map<Long, Project> byId = new HashMap<>();
         for (Project p : owned) {
             ensureProjectUid(p);
@@ -83,9 +86,21 @@ public class ProjectCatalogService {
             location.put("online", true);
             if (shadow != null) location.put("archiveOnly", true);
             add(out, uid, project.getName(), location);
+            // Only an owned authoritative cloud row may declare a default workspace.
+            out.get(uid).put("projectType", project.getProjectType());
+            out.get(uid).put("isDefault", project.getId().equals(defaultId));
+            if (project.getId().equals(defaultId)) out.get(uid).put("name", LangText.of("临时项目", "Temporary project"));
         }
         return new ArrayList<>(out.values());
     }
+    @Transactional
+    public Map<String, Object> defaultProject(Long userId) {
+        Project project = projectService.getOrCreateScratchProject(userId);
+        String uid = ensureProjectUid(project);
+        return catalog(userId).stream().filter(p -> uid.equals(p.get("projectUid")))
+                .findFirst().orElseThrow(() -> new IllegalStateException("Default workspace unavailable"));
+    }
+
     @SuppressWarnings("unchecked")
     private static void add(Map<String, Map<String, Object>> out, String uid, String name, Map<String, Object> location) {
         Map<String, Object> item = out.computeIfAbsent(uid, ignored -> {

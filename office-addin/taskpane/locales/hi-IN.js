@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  defaultProjectName: "अस्थायी प्रोजेक्ट",
   cmdPptAddImage: "स्लाइड में चित्र डालें",
   cmdPptAddChart: "स्लाइड में चार्ट डालें",
   cmdPptFormatChart: "स्लाइड चार्ट का स्वरूप सेट करें",

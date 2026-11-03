@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyTitle: "Projeye kopyala",
+  scratchCopyHint: "Seçili konuşmaları ve dosyaları, asıllarını koruyarak kopyalayın. Hedef proje üyeleri kopyalara erişebilir.",
   "restartPending": "{count} görev devam ettirilebilir",
   "restartContinue": "Devam et: {name}",
   "restartRestoring": "Orijinal sohbet ve belge geri yükleniyor…",
@@ -335,8 +337,8 @@ export default {
     "modeChat": "Sohbet",
     "modeIde": "Çalışma Alanı",
     "chatTitle": "Sohbet",
-    "scratchTitle": "Hızlı Çalışma Alanı",
-    "scratchBadge": "Hızlı Çalışma Alanı",
+    "scratchTitle": "Geçici proje",
+    "scratchBadge": "Geçici proje",
     "promoteAction": "Projeye dönüştür",
     "promoteTitle": "Resmi projeye dönüştür",
     "promotePlaceholder": "Bir proje adı girin",

@@ -1637,3 +1637,7 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 ## 法律资料阅读页（dev-board#1611）
 
 `legalReferenceTab.js` 方法组由工作台 provide `openLegalReferenceTab`，接 AI 聊天和 Writer 快捷查询的资料卡。`tabType:'legal-reference'` 左右两条渲染链均挂 `LegalReferencePane`；首次打开右侧分屏，重复打开相同资料快照只激活，隐藏的右侧会恢复分屏。`fileKind.NON_FILE_TAB_TYPES` 排除其文档上下文，`tabSnapshot` 保存完整资料快照，不触发重新查询/扣费。资料快照身份包含来源与日期/警告，不能用同标题旧资料覆盖新查询结果。
+
+## 2026-11-03 临时项目转存（dev-board#1656）
+
+SCRATCH 展示统一为「临时项目」，复用既有对话模式身份。项目概览新增转存对话框，选择文件/对话及正式项目后复制，保留原件；成功后回执，失败保留选择以重试。原「转为正式项目」仍可用。Office 插件默认选择同账户 SCRATCH，不按名字迁移旧项目。前端项目主页套件 1981 条、插件 847 条及两者构建通过；复制服务接口与边界见 mobile-sync.md。

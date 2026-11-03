@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  defaultProjectName: "임시 프로젝트",
   cmdPptAddImage: "슬라이드 이미지 삽입",
   cmdPptAddChart: "슬라이드 차트 삽입",
   cmdPptFormatChart: "슬라이드 차트 서식 설정",

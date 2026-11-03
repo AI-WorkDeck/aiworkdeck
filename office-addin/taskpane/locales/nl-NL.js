@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  defaultProjectName: "Tijdelijk project",
   cmdPptAddImage: "Afbeelding in dia invoegen",
   cmdPptAddChart: "Grafiek in dia invoegen",
   cmdPptFormatChart: "Diagrafiek opmaken",
