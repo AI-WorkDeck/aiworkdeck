@@ -92,7 +92,7 @@ filelock==4.2.7
     # via lazyllm
 fire==0.7.1
     # via pdf2docx
-flask==3.1.2
+flask==3.1.3
     # via
     #   banana-slides
     #   flask-cors
@@ -263,7 +263,7 @@ python-dateutil==2.9.0.post0
     #   volcengine-python-sdk
 python-docx==1.2.0
     # via pdf2docx
-python-dotenv==1.2.1
+python-dotenv==1.2.4
     # via
     #   banana-slides
     #   magika
@@ -357,7 +357,7 @@ volcengine-python-sdk==5.0.9
     # via banana-slides
 websockets==15.0.1
     # via google-genai
-werkzeug==3.1.4
+werkzeug==3.1.9
     # via
     #   banana-slides
     #   flask
