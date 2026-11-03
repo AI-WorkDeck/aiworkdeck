@@ -18,7 +18,7 @@
         <option value="" disabled>{{ t('selectProject') }}</option>
         <!-- 名字过一层展示映射：后端懒建的「插件临时项目」按当时的界面语言取名并存进库，
              用户切语言后它不会跟着变（dev-board#713），这里按当前语言显示，不改数据 -->
-        <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ displayProjectName(p.name) }}</option>
+        <option v-for="p in projects" :key="p.id" :value="String(p.id)">{{ displayProjectName(p.name, p.projectType) }}</option>
         <!-- 远程设备项目（dev-board#250/#297）：选中 = 归档绑定——云端建影子容器项目，
              这里的对话与文档副本自动归档回那台桌面机的该项目（onProjectSelect 的 remote:: 分支） -->
         <optgroup v-for="d in remoteDevices" :key="d.deviceId" :label="deviceGroupLabel(d)">
@@ -351,7 +351,7 @@ const currentProjectName = computed(() => {
   const binding = archiveLinks.value[projectId.value]
   if (binding && binding.name) return binding.name
   const hit = projects.value.find(p => String(p.id) === projectId.value)
-  return hit ? displayProjectName(hit.name) : ''
+  return hit ? displayProjectName(hit.name, hit.projectType) : ''
 })
 
 /**
@@ -529,10 +529,13 @@ async function refreshProjects() {
     if (serverLinks.length) archiveLinks.value = mergeArchiveLinks(serverLinks)
 
     const list = await fetchMyProjects(settings)
+    const defaultProject = await ensureAddinDefaultProject(settings)
+    if (defaultProject && !list.some(p => String(p.id) === String(defaultProject.id))) list.unshift(defaultProject)
     const catalog = await fetchProjectCatalog(settings)
     if (catalog) {
       const options = catalogOptions(catalog, list)
       projects.value = options.projects
+      if (defaultProject && !projects.value.some(p => String(p.id) === String(defaultProject.id))) projects.value.unshift(defaultProject)
       remoteDevices.value = options.devices
     } else {
       projects.value = list
@@ -545,7 +548,8 @@ async function refreshProjects() {
       saveProjectId('')
     }
     if (list.length) {
-      if (!projectId.value && list.length === 1) onProjectChange(String(list[0].id))
+      if (!projectId.value && defaultProject) onProjectChange(String(defaultProject.id))
+      else if (!projectId.value && list.length === 1) onProjectChange(String(list[0].id))
       return
     }
 

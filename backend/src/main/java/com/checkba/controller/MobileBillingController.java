@@ -147,6 +147,27 @@ public class MobileBillingController {
         return out;
     }
 
+    @GetMapping("/subscription/appstore/capability")
+    public MobileBillingClient.SubscriptionCapability appstoreSubscriptionCapability(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        requireUser(sessionId);
+        return service.appstoreSubscriptionCapability();
+    }
+
+    @PostMapping("/subscription/appstore/prepare")
+    public MobileBillingClient.SubscriptionPreparation prepareAppstoreSubscription(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        return service.prepareAppstoreSubscription(requireUser(sessionId));
+    }
+
+    @PostMapping("/subscription/appstore/confirm")
+    public MobileBillingClient.SubscriptionConfirmation confirmAppstoreSubscription(
+            @RequestBody(required = false) RechargeConfirmRequest request,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        return service.confirmAppstoreSubscription(requireUser(sessionId),
+                request == null ? null : request.getSignedTransaction());
+    }
+
     private static void putIfPresent(Map<String, Object> out, String key, String value) {
         if (value != null && !value.isEmpty()) {
             out.put(key, value);

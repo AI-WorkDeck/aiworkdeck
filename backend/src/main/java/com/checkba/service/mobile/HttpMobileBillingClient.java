@@ -182,6 +182,37 @@ public class HttpMobileBillingClient implements MobileBillingClient {
                 json.path("amountCents").asLong(0));
     }
 
+    @Override
+    public SubscriptionCapability appstoreSubscriptionCapability() {
+        JsonNode json = call(Map.of("action", "appstore-subscription-capability"));
+        return new SubscriptionCapability(json.path("available").asBoolean(false), json.path("productId").asText(""));
+    }
+
+    @Override
+    public SubscriptionPreparation prepareAppstoreSubscription(String accountId) {
+        JsonNode json = call(Map.of("action", "prepare-appstore-subscription", "accountId", accountId));
+        String productId = json.path("productId").asText("");
+        String token = json.path("appAccountToken").asText("");
+        try {
+            java.util.UUID.fromString(token);
+            if (productId.isBlank()) throw new IllegalArgumentException();
+        } catch (IllegalArgumentException e) {
+            throw new MobileBillingException(MobileBillingKind.UNAVAILABLE,
+                    LangText.of("订阅服务暂不可用", "Subscription service is temporarily unavailable"));
+        }
+        return new SubscriptionPreparation(productId, token);
+    }
+
+    @Override
+    public SubscriptionConfirmation confirmAppstoreSubscription(String accountId, String signedTransaction) {
+        JsonNode json = call(Map.of("action", "confirm-appstore-subscription", "accountId", accountId,
+                "signedTransaction", signedTransaction));
+        return new SubscriptionConfirmation(json.path("status").asText(""),
+                json.path("subscription").isObject()
+                        ? om.convertValue(json.get("subscription"), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {})
+                        : Map.of());
+    }
+
     /**
      * confirm-appstore 的失败翻译，见 {@link #confirmAppstore}。认不出的失败原样抛回
      * （404 由 {@link #parse} 给的 NOT_FOUND 就是「查无此单」，不需要改判别位）。

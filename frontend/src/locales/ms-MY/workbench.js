@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyTitle: "Salin ke projek",
+  scratchCopyHint: "Salin perbualan dan fail terpilih sambil mengekalkan yang asal. Ahli projek destinasi boleh mengakses salinan.",
   "restartPending": "{count} tugas boleh disambung semula",
   "restartContinue": "Sambung semula: {name}",
   "restartRestoring": "Memulihkan perbualan dan dokumen asal…",
@@ -335,8 +337,8 @@ export default {
     "modeChat": "Sembang",
     "modeIde": "Meja Kerja",
     "chatTitle": "Sembang",
-    "scratchTitle": "Ruang kerja sementara",
-    "scratchBadge": "Ruang kerja sementara",
+    "scratchTitle": "Projek sementara",
+    "scratchBadge": "Projek sementara",
     "promoteAction": "Tukar kepada projek",
     "promoteTitle": "Tukar kepada projek formal",
     "promotePlaceholder": "Masukkan nama projek",

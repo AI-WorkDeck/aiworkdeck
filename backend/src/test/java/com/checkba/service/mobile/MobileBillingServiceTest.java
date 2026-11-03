@@ -93,6 +93,22 @@ class MobileBillingServiceTest {
         accountBindingRepository.save(row);
     }
 
+    @Test
+    void subscriptionPrepareMayCreateButConfirmationOnlyUsesBoundAccount() {
+        User user = phoneUser();
+        String account = "subscription-" + user.getId();
+        when(billing.resolveAccountId(user.getPhone(), null, true)).thenReturn(account);
+        when(billing.prepareAppstoreSubscription(account)).thenReturn(
+                new MobileBillingClient.SubscriptionPreparation("pro.monthly.cny.149", "token"));
+        assertEquals("token", service.prepareAppstoreSubscription(user.getId()).appAccountToken());
+        verify(billing).resolveAccountId(user.getPhone(), null, true);
+        when(billing.confirmAppstoreSubscription(account, "jws")).thenReturn(
+                new MobileBillingClient.SubscriptionConfirmation("CONFIRMED", java.util.Map.of("active", true)));
+        assertEquals("CONFIRMED", service.confirmAppstoreSubscription(user.getId(), "jws").status());
+        verify(billing).confirmAppstoreSubscription(account, "jws");
+        assertThrows(IllegalArgumentException.class, () -> service.confirmAppstoreSubscription(user.getId(), " "));
+    }
+
     // ==================== 桥接 ====================
 
     @Test

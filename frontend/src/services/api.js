@@ -2060,6 +2060,8 @@ export const ensureScratchProject = () => {
   })
 }
 
+export const copyScratchToProject = (data) => request({ url: '/api/projects/scratch/copy-to-project', method: 'POST', data })
+
 export const promoteScratchProject = (projectId, data = {}) => {
   return request({
     url: `/api/projects/${projectId}/promote`,

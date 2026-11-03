@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  defaultProjectName: "一時プロジェクト",
   cmdPptAddImage: "スライドに画像を挿入",
   cmdPptAddChart: "スライドにグラフを挿入",
   cmdPptFormatChart: "スライドのグラフを書式設定",

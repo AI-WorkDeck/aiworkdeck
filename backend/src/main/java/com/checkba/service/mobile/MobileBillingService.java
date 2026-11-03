@@ -308,6 +308,30 @@ public class MobileBillingService {
         return status;
     }
 
+    public MobileBillingClient.SubscriptionCapability appstoreSubscriptionCapability() {
+        if (!rechargeEnabled) return new MobileBillingClient.SubscriptionCapability(false, "pro.monthly.cny.149");
+        return billing.appstoreSubscriptionCapability();
+    }
+
+    public MobileBillingClient.SubscriptionPreparation prepareAppstoreSubscription(Long userId) {
+        requireRechargeEnabled();
+        // Only this explicit purchase action may create an account; restore/confirm never does.
+        return callWithAccount(userId, true, false, billing::prepareAppstoreSubscription);
+    }
+
+    public MobileBillingClient.SubscriptionConfirmation confirmAppstoreSubscription(Long userId, String signedTransaction) {
+        requireRechargeEnabled();
+        String jws = signedTransaction == null ? "" : signedTransaction.trim();
+        if (jws.isEmpty() || jws.length() > MAX_SIGNED_TRANSACTION_LENGTH) {
+            throw new IllegalArgumentException(LangText.of(
+                    "缺少或非法的交易凭证", "Missing or invalid transaction receipt"));
+        }
+        var result = callWithAccount(userId, false, false,
+                accountId -> billing.confirmAppstoreSubscription(accountId, jws));
+        if ("CONFIRMED".equals(result.status())) balanceCache.remove(userId);
+        return result;
+    }
+
     // ==================== 身份解析 ====================
 
     /**

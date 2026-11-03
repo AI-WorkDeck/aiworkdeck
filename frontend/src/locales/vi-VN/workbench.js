@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyTitle: "Sao chép vào dự án",
+  scratchCopyHint: "Sao chép hội thoại và tệp đã chọn, giữ lại bản gốc. Thành viên dự án đích có thể xem các bản sao.",
   "restartPending": "{count} tác vụ có thể tiếp tục",
   "restartContinue": "Tiếp tục: {name}",
   "restartRestoring": "Đang khôi phục cuộc trò chuyện và tài liệu gốc…",
@@ -335,8 +337,8 @@ export default {
     "modeChat": "Trò chuyện",
     "modeIde": "Bàn làm việc",
     "chatTitle": "Trò chuyện",
-    "scratchTitle": "Không gian làm việc tạm thời",
-    "scratchBadge": "Không gian làm việc tạm thời",
+    "scratchTitle": "Dự án tạm thời",
+    "scratchBadge": "Dự án tạm thời",
     "promoteAction": "Chuyển thành dự án",
     "promoteTitle": "Chuyển đổi thành dự án chính thức",
     "promotePlaceholder": "Nhập tên dự án",

@@ -64,7 +64,7 @@ export async function ensureAddinDefaultProject({ serverUrl, token }) {
     if (!resp.ok) return null
     const data = await resp.json()
     if (data && data.project && data.project.id != null) {
-      return { id: data.project.id, name: data.project.name }
+      return { id: data.project.id, name: data.project.name, projectType: data.project.projectType }
     }
   } catch (e) {
     // 静默降级：由调用方走「请选择项目」的现状路径

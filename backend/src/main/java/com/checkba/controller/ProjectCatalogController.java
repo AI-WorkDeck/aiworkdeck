@@ -19,6 +19,10 @@ public class ProjectCatalogController {
     @GetMapping public List<Map<String, Object>> list(@RequestHeader(value="X-Session-Id", required=false) String session) {
         return catalog.catalog(user(session));
     }
+    @PostMapping("/default") public Map<String, Object> defaultProject(
+            @RequestHeader(value="X-Session-Id", required=false) String session) {
+        return Map.of("code", 0, "data", catalog.defaultProject(user(session)));
+    }
     @GetMapping("/{uid}/files") public Map<String, Object> files(@PathVariable String uid,
             @RequestHeader(value="X-Session-Id", required=false) String session) {
         return catalog.fileList(user(session), uid);

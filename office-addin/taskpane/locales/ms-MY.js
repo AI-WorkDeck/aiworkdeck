@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  defaultProjectName: "Projek sementara",
   cmdPptAddImage: "Sisipkan imej pada slaid",
   cmdPptAddChart: "Sisipkan carta pada slaid",
   cmdPptFormatChart: "Format carta slaid",

@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyTitle: "Copia in un progetto",
+  scratchCopyHint: "Copia conversazioni e file selezionati mantenendo gli originali. I membri del progetto di destinazione potranno accedere alle copie.",
   "restartPending": "{count} attività possono essere riprese",
   "restartContinue": "Continua: {name}",
   "restartRestoring": "Ripristino della conversazione e del documento originali…",
@@ -335,8 +337,8 @@ export default {
     "modeChat": "Conversazione",
     "modeIde": "Banco di lavoro",
     "chatTitle": "Conversazione",
-    "scratchTitle": "Area di lavoro provvisoria",
-    "scratchBadge": "Area di lavoro provvisoria",
+    "scratchTitle": "Progetto temporaneo",
+    "scratchBadge": "Progetto temporaneo",
     "promoteAction": "Converti in progetto",
     "promoteTitle": "Converti in progetto formale",
     "promotePlaceholder": "Inserire un nome di progetto",
