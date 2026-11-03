@@ -183,8 +183,11 @@ public class HttpMobileBillingClient implements MobileBillingClient {
     }
 
     @Override
-    public SubscriptionCapability appstoreSubscriptionCapability() {
-        JsonNode json = call(Map.of("action", "appstore-subscription-capability"));
+    public SubscriptionCapability appstoreSubscriptionCapability(String accountId) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("action", "appstore-subscription-capability");
+        if (accountId != null && !accountId.isBlank()) body.put("accountId", accountId);
+        JsonNode json = call(body);
         return new SubscriptionCapability(json.path("available").asBoolean(false), json.path("productId").asText(""));
     }
 

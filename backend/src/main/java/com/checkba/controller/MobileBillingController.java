@@ -150,8 +150,7 @@ public class MobileBillingController {
     @GetMapping("/subscription/appstore/capability")
     public MobileBillingClient.SubscriptionCapability appstoreSubscriptionCapability(
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireUser(sessionId);
-        return service.appstoreSubscriptionCapability();
+        return service.appstoreSubscriptionCapability(requireUser(sessionId));
     }
 
     @PostMapping("/subscription/appstore/prepare")
