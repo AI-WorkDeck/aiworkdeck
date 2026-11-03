@@ -127,3 +127,7 @@ optimizer.*」——普通用户永远 enabled=false，只看得到下面的「�
 - `cd frontend && npm run test:feedback-e2e`：dev Electron + CDP 真截图真录音真提交真回读
   （入口选择器是 rail 上的 `[title="报告问题 / 提建议"]`，不再是 `.awdfb-launcher`）
 - 改面板样式/位置后顺带 `npm run check:emits`
+
+## AI 内容举报（dev-board#1671）
+
+`POST /api/feedback` 的 `clientContext.type=ai-content-report` 只保留字符串 `type/platform/conversationId`，不调用服务端上下文收集器（含版本、系统环境与日志），不自动附会话正文或文件。举报正文来自用户主动填写；Android 仅提交 payload，不带附件。未知及嵌套上下文字段丢弃。普通故障反馈保持现有 runtime、日志及附件逻辑；`FeedbackServiceTest` 覆盖白名单、收集器零调用与普通反馈日志回归。
