@@ -80,11 +80,14 @@ public class SiteSwitchService {
         }
 
         // 先落盘再清理：写盘失败就整个动作放弃，不该留下「凭据清了但站点没换」的中间态
-        siteProfileService.persistSelection(siteId);
-
-        boolean licenseCleared = licenseService.deactivateAccountMode();
-        boolean accountCleared = accountService.isConnected();
-        if (accountCleared) {
+        boolean licenseCleared;
+        boolean accountCleared;
+        synchronized (accountService) {
+            synchronized (licenseService) {
+                siteProfileService.persistSelection(siteId);
+                licenseCleared = licenseService.deactivateAccountMode();
+            }
+            accountCleared = accountService.isConnected();
             accountService.disconnect();
         }
         entitlementService.clearAccountCache();
@@ -105,7 +108,7 @@ public class SiteSwitchService {
         if (fallback != null) {
             result.put("aiProviderFallback", fallback);
         }
-        // 广场与统计上报的地址在属性层固化，下次启动才指向新站（见 SiteProfileService 类注释）
+        // 广场已即时切站；统计在重启前暂停，重启后按新站投递（见 SiteProfileService）。
         result.put("restartRecommended", true);
         return result;
     }

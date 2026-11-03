@@ -172,6 +172,13 @@ class MobileRelayClientHttpTest {
         baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
 
         accountService = mock(AccountService.class);
+        when(accountService.connectionSnapshot()).thenAnswer(i -> new AccountService.ConnectionSnapshot(
+                "https://www.aiworkdeck.com", accountService.currentKeyOrNull(), accountService.accountFingerprintOrNull(), accountService.connectionVersion()));
+        when(accountService.isCurrentConnection(any())).thenAnswer(i -> {
+            AccountService.ConnectionSnapshot snapshot = i.getArgument(0);
+            return java.util.Objects.equals(snapshot.key(), accountService.currentKeyOrNull())
+                    && java.util.Objects.equals(snapshot.fingerprint(), accountService.accountFingerprintOrNull());
+        });
         when(accountService.currentKeyOrNull()).thenReturn("awdk_test_key");
         when(accountService.accountFingerprintOrNull()).thenReturn("fp-1234");
 
@@ -280,6 +287,15 @@ class MobileRelayClientHttpTest {
             os.write(bytes);
         }
         ex.close();
+    }
+
+    @Test void relayDestinationFollowsCurrentAccountSiteAndRejectsLookalikeHost() {
+        var client = new MobileRelayClientService(true, true, "", "https://www.aiworkdeck.com",
+                stateDir.toString(), accountService, localIdentityService, projectRepository,
+                projectFileService, storageServiceFactory, projectAiMessageService, desktopRefHandler);
+        assertEquals("https://addin.aiworkdeck.com", org.springframework.test.util.ReflectionTestUtils.invokeMethod(client, "relayBaseUrl", "https://www.aiworkdeck.com"));
+        assertEquals("https://addin.workdeck.ai", org.springframework.test.util.ReflectionTestUtils.invokeMethod(client, "relayBaseUrl", "https://workdeck.ai"));
+        assertEquals("https://addin.aiworkdeck.com", org.springframework.test.util.ReflectionTestUtils.invokeMethod(client, "relayBaseUrl", "https://workdeck.ai.evil.test"));
     }
 
     @Test
@@ -769,7 +785,7 @@ class MobileRelayClientHttpTest {
     void staleTokenEnvelopeTriggersRebridge() throws Exception {
         // 预置一个「旧令牌」state：桥接过、指纹一致，authed 会直接带它出站
         java.nio.file.Files.writeString(stateDir.resolve("mobile-relay.json"),
-                "{\"deviceId\":\"dev-persisted\",\"token\":\"awdt_stale\",\"accountFingerprint\":\"fp-1234\"}");
+                "{\"deviceId\":\"dev-persisted\",\"token\":\"awdt_stale\",\"accountFingerprint\":\"fp-1234\",\"serverUrl\":\"" + baseUrl + "\"}");
 
         // 目录端点：旧令牌回 4010 信封（HTTP 200），新令牌才收下
         server.removeContext("/api/mobile/projects");

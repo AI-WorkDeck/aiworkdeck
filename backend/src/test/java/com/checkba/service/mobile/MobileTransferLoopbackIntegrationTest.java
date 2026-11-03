@@ -162,8 +162,15 @@ class MobileTransferLoopbackIntegrationTest {
         when(desktopStorage.getStorageService()).thenReturn(desktopBytes);when(desktopBytes.load("desktop-only.pdf")).thenReturn(new org.springframework.core.io.FileSystemResource(localFile));
         String device="backup-"+suffix;Path stateDirectory=ROOT.resolve(device);Files.createDirectories(stateDirectory);
         mapper.writeValue(stateDirectory.resolve("mobile-relay.json").toFile(),Map.of("deviceId",device,
-                "token",tokens.issue(userId,"Backup synthetic desktop").plaintext(),"accountFingerprint","backup-fixture"));
-        AccountService account=mock(AccountService.class);when(account.currentKeyOrNull()).thenReturn("awdk_synthetic_unused");
+                "token",tokens.issue(userId,"Backup synthetic desktop").plaintext(),"accountFingerprint","backup-fixture","serverUrl",baseURL()));
+        AccountService account=mock(AccountService.class);
+        when(account.connectionSnapshot()).thenAnswer(i -> new AccountService.ConnectionSnapshot(
+                "https://www.aiworkdeck.com", account.currentKeyOrNull(), account.accountFingerprintOrNull(), account.connectionVersion()));
+        when(account.isCurrentConnection(any())).thenAnswer(i -> {
+            AccountService.ConnectionSnapshot snapshot = i.getArgument(0);
+            return java.util.Objects.equals(snapshot.key(), account.currentKeyOrNull())
+                    && java.util.Objects.equals(snapshot.fingerprint(), account.accountFingerprintOrNull());
+        });when(account.currentKeyOrNull()).thenReturn("awdk_synthetic_unused");
         when(account.accountFingerprintOrNull()).thenReturn("backup-fixture");
         LocalIdentityService identity=mock(LocalIdentityService.class);when(identity.localUserId()).thenReturn(userId);
         MobileRelayClientService desktop=new MobileRelayClientService(true,true,baseURL(),baseURL(),stateDirectory.toString(),
@@ -234,8 +241,15 @@ class MobileTransferLoopbackIntegrationTest {
         Files.createDirectories(stateDirectory);
         mapper.writeValue(stateDirectory.resolve("mobile-relay.json").toFile(), Map.of(
                 "deviceId", deviceId, "token", tokens.issue(userId, "Synthetic desktop").plaintext(),
-                "accountFingerprint", "synthetic-fingerprint"));
+                "accountFingerprint", "synthetic-fingerprint", "serverUrl", baseURL()));
         AccountService account = mock(AccountService.class);
+        when(account.connectionSnapshot()).thenAnswer(i -> new AccountService.ConnectionSnapshot(
+                "https://www.aiworkdeck.com", account.currentKeyOrNull(), account.accountFingerprintOrNull(), account.connectionVersion()));
+        when(account.isCurrentConnection(any())).thenAnswer(i -> {
+            AccountService.ConnectionSnapshot snapshot = i.getArgument(0);
+            return java.util.Objects.equals(snapshot.key(), account.currentKeyOrNull())
+                    && java.util.Objects.equals(snapshot.fingerprint(), account.accountFingerprintOrNull());
+        });
         when(account.currentKeyOrNull()).thenReturn("awdk_synthetic_unused");
         when(account.accountFingerprintOrNull()).thenReturn("synthetic-fingerprint");
         LocalIdentityService identity = mock(LocalIdentityService.class);
