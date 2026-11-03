@@ -2708,8 +2708,10 @@ export default {
       // 兜住空态输入框等旁路（后端对镜像会话追加也会拒，这是省一次报错）
       if (props.externalReadOnly) return
       if (isUploadingPasted.value || isUploading.value || importScanning.value) return
-      // Create a clone to safely manipulate and extract text without tags
+      // Keep inline reference positions in the model prompt without mutating the editor.
       let text = ''
+      let hasAuthoredText = false
+      let displayText = ''
       let contentHtml = ''
       if (richInput.value) {
         // 1. First, capture the HTML with inline tags for display in bubble
@@ -2726,25 +2728,44 @@ export default {
         rawHtml = rawHtml.replace(/^<br\/?>/, '')
         contentHtml = rawHtml.trim()
 
-        // 2. Extract plain text (without tags) for sending to backend
+        // 2. Serialize references in place: removing chips loses source/target roles.
+        const authoredClone = richInput.value.cloneNode(true)
+        authoredClone.querySelectorAll('[data-file-id]').forEach(tag => tag.remove())
+        hasAuthoredText = Boolean(authoredClone.textContent.trim())
         const textClone = richInput.value.cloneNode(true)
-        // Remove file tags to avoid duplicating their name in the text
-        const tags = textClone.querySelectorAll('[data-file-id]')
-        tags.forEach(t => t.remove())
+        const filesById = new Map(contextFiles.value.map(file => [String(file.id), file]))
+        textClone.querySelectorAll('[data-file-id]').forEach(tag => {
+          const file = filesById.get(tag.getAttribute('data-file-id'))
+          // Only serialize admitted attachments, using full metadata rather than truncated UI labels.
+          if (!file) { tag.remove(); return }
+          const reference = JSON.stringify({
+            [file.isDir ? 'folderId' : 'fileId']: String(file.id), name: file.name,
+            ...(file.projectId ? { projectId: String(file.projectId) } : {}),
+          })
+          tag.replaceWith(document.createTextNode(` @${reference} `))
+        })
 
-        // Manual Text Extraction to preserve newlines
-        let html = textClone.innerHTML
-        // Replace <br> with newline
-        html = html.replace(/<br\s*\/?>/gi, '\n')
-        // Replace <div> and <p> with newline (start of block)
-        html = html.replace(/<(?:div|p)[^>]*>/gi, '\n')
-        // Remove closing tags (implicit newline separation handled by start tags)
-        html = html.replace(/<\/(?:div|p)>/gi, '')
+        displayClone.querySelectorAll('[data-file-id]').forEach(tag => {
+          const file = filesById.get(tag.getAttribute('data-file-id'))
+          tag.replaceWith(document.createTextNode(file ? ` @${file.name} ` : ''))
+        })
+        // Use the same newline/entity handling for model text and persisted display text.
+        const plainTextOf = (node) => {
+          let html = node.innerHTML
+          // Replace <br> with newline
+          html = html.replace(/<br\s*\/?>/gi, '\n')
+          // Replace <div> and <p> with newline (start of block)
+          html = html.replace(/<(?:div|p)[^>]*>/gi, '\n')
+          // Remove closing tags (implicit newline separation handled by start tags)
+          html = html.replace(/<\/(?:div|p)>/gi, '')
 
-        // Decode entities and strip remaining tags
-        const temp = document.createElement('div')
-        temp.innerHTML = html
-        text = temp.textContent.trim()
+          // Decode entities and strip remaining tags
+          const temp = document.createElement('div')
+          temp.innerHTML = html
+          return temp.textContent.trim()
+        }
+        text = plainTextOf(textClone)
+        displayText = plainTextOf(displayClone)
       }
 
       const hasImages = pastedImages.value.length > 0
@@ -2757,7 +2778,7 @@ export default {
         && contextFiles.value.every((f) => carriedFileIds.value.includes(String(f.id)))
 
       // 禁止发送纯空消息：必须有文本、图片或文件上下文至少其一
-      if (!text && !hasImages && (!hasFiles || onlyCarriedAttachments)) {
+      if (!hasAuthoredText && !hasImages && (!hasFiles || onlyCarriedAttachments)) {
         if (isStreaming.value) {
           // 如果正在流式传输，允许中断操作
           return
@@ -2772,7 +2793,7 @@ export default {
       // 只有图片、没有文字：图片本身现在会随消息真的发出去（模型支持读图就直送、
       // 不支持则降级 OCR），但 prompt 是空串——用户看着自己的图片气泡等回答，
       // 模型收到的是一条没说要做什么的空消息。先问清楚要干嘛。
-      if (!text && hasImages && typeof uni !== 'undefined') {
+      if (!hasAuthoredText && hasImages && typeof uni !== 'undefined') {
         uni.showModal({
           title: t('chat.imageNeedsCaptionTitle'),
           content: t('chat.imageNeedsCaptionContent'),
@@ -2914,6 +2935,7 @@ export default {
 
       const receipt = await submitChatAttempt(attempt, () => sendMessage({
         prompt,
+        displayText,
         contentHtml, // Pass HTML with inline tags for bubble display
         fileList: fileListToSend,
         projectId: props.projectId,

@@ -23,6 +23,38 @@ try {
   const source = readFileSync(`${root}src/App.vue`, 'utf8')
   const tokens = source.slice(source.indexOf("html,\nhtml[data-theme='light']"), source.indexOf('</style>', source.indexOf("html,\nhtml[data-theme='light']")))
   await page.addStyleTag({ content: `${tokens}\nhtml,body,#app{margin:0;height:100%;font-family:system-ui}view,scroll-view{display:block}text{display:inline}*{box-sizing:border-box}` })
+  // Inline references must keep their roles and full identities in the actual request.
+  await page.evaluate(async () => {
+    const input = document.querySelector('.chat-input-rich')
+    input.textContent = '参考 '
+    window.chatState.addFile({ id: 71, name: 'reference-long-name-&-<sample>.docx', fileType: 'docx' })
+    input.append(' 的格式，为 ')
+    window.chatState.addFile({ id: 72, name: 'target-activity-folder', isDir: true })
+    input.append(' 写短讯')
+    await window.chatState.handleSubmit()
+  })
+  const referenceRequest = await page.evaluate(() => window.chatPosts.at(-1))
+  assert.match(referenceRequest.message, /参考 .*71.*reference-long-name-&-<sample>\.docx.*的格式，为 .*72.*target-activity-folder.*写短讯/s)
+  assert.deepEqual(referenceRequest.contextItems.map(f => [f.id, f.isDir]), [['71', false], ['72', true]])
+  assert.doesNotMatch(referenceRequest.message, /tag-close|×|<span/)
+  assert.match(referenceRequest.displayText, /参考 .*@reference-long-name-&-<sample>\.docx.*的格式，为 .*@target-activity-folder.*写短讯/s)
+  assert.doesNotMatch(referenceRequest.displayText, /fileId|folderId|×|<span/)
+  await page.evaluate(() => { window.chatState.isStreaming = false })
+  const sentCount = await page.evaluate(() => window.chatPosts.length)
+  await page.evaluate(() => window.chatState.handleSubmit())
+  assert.equal(await page.evaluate(() => window.chatPosts.length), sentCount, 'carried attachments alone must not send another turn')
+  await page.evaluate(async () => {
+    window.captionWarnings = 0
+    const showModal = window.uni.showModal
+    window.uni.showModal = () => { window.captionWarnings++ }
+    window.chatState.pastedImages = [{ path: 'data:image/png;base64,AA==' }]
+    await window.chatState.handleSubmit()
+    window.chatState.pastedImages = []
+    window.uni.showModal = showModal
+  })
+  assert.equal(await page.evaluate(() => window.chatPosts.length), sentCount, 'references must not bypass the image caption guard')
+  assert.equal(await page.evaluate(() => window.captionWarnings), 1)
+  await page.evaluate(() => window.chatState.startNewChat())
   assert.equal(await page.evaluate(async () => {
     for (let id = 100; id < 600; id++) window.chatState.addFile({ id, name: `file-${id}.txt` })
     window.chatState.addFile({ id: 900, name: 'large-folder', isDir: true })
