@@ -23,6 +23,8 @@ export function createSemanticWritingHost({ projectId, fileId, title, writable, 
   const stale = () => new Error(sw('staleError'))
   const current = seq => !disposed && seq === generation
   const cancel = id => id && Promise.resolve(api.cancel(projectId, id)).catch(() => {})
+  // EMPTY admission replies can carry an id without registering a backend job.
+  const automaticCancelId = view => ['RUNNING', 'READY'].includes(view?.status) ? view.id : null
   function invalidate(state = 'STALE') {
     generation++; generating = false
     const old = active; active = null
@@ -32,7 +34,7 @@ export function createSemanticWritingHost({ projectId, fileId, title, writable, 
   function invalidateAutomatic(notify = false) {
     automaticGeneration++; automaticGenerating = false
     const old = automatic; automatic = null
-    cancel(old?.id)
+    cancel(old?.cancelId)
     if (notify && !disposed && session) send({ __lo: 'lo-relay', type: 'writing-config', config: { session, automatic: { state: 'STALE' } } })
   }
   const automaticCurrent = seq => !disposed && automaticEnabled && tabActive && seq === automaticGeneration
@@ -94,9 +96,9 @@ export function createSemanticWritingHost({ projectId, fileId, title, writable, 
         before: before.slice(-200), after: after.slice(0, 200), selection: '', title: title || '',
         section: snapshot.sectionTitle || '', documentType: lastDocumentType, sourceFileIds }
       const view = await api.suggest(projectId, { mode: 'autocomplete', context })
-      if (!automaticCurrent(seq)) { cancel(view?.id); throw stale() }
+      if (!automaticCurrent(seq)) { cancel(automaticCancelId(view)); throw stale() }
       const shown = automaticView(view)
-      automatic = { id: view.id, snapshot, selection: '', notices: [], view: shown, mode: 'autocomplete' }
+      automatic = { id: view.id, cancelId: automaticCancelId(view), snapshot, selection: '', notices: [], view: shown, mode: 'autocomplete' }
       return { view: shown, notices: [] }
     } finally { if (automaticCurrent(seq)) automaticGenerating = false }
   }
@@ -181,6 +183,7 @@ export function createSemanticWritingHost({ projectId, fileId, title, writable, 
         const seq = automaticGeneration, job = automatic
         if (action === 'semantic-auto-poll') {
           const view = await api.get(projectId, job.id); checkAutomatic(seq)
+          job.cancelId = automaticCancelId(view)
           job.view = automaticView(view)
           return { view: job.view, notices: [] }
         }
