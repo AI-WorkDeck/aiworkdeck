@@ -141,19 +141,24 @@ function startDrawioServer() {
         const roots = drawioRoots()
         let hit = null
         for (const root of roots) {
-          const filePath = path.normalize(path.join(root, urlPath))
-          // 路径穿越防护：URL 是不可信输入，normalize 之后必须仍在根下。
-          if (filePath !== root && !filePath.startsWith(root + path.sep)) {
+          const resolvedRoot = path.resolve(root)
+          const filePath = path.resolve(resolvedRoot, '.' + urlPath)
+          // 路径穿越防护：URL 是不可信输入，resolve 之后必须仍在根下。
+          if (!filePath.startsWith(resolvedRoot + path.sep)) {
             res.writeHead(403).end('forbidden')
             return
           }
           try {
             const st = await stat(filePath)
-            if (st.isFile()) { hit = { filePath, st }; break }
+            if (st.isFile()) { hit = { filePath, resolvedRoot, st }; break }
           } catch (e) { /* 该根没有此文件，试下一根 */ }
         }
         if (!hit) throw new Error('not found in any root')
-        const { filePath, st } = hit
+        const { filePath, resolvedRoot, st } = hit
+        if (!filePath.startsWith(resolvedRoot + path.sep)) {
+          res.writeHead(403).end('forbidden')
+          return
+        }
         // ETag + no-cache：draw.io 升级后文件名多数不变（app.min.js 等），
         // 必须让浏览器回源校验；本地 304 只要 1ms，命中后仍复用已缓存的正文。
         const etag = '"' + st.size + '-' + Math.round(st.mtimeMs) + '"'

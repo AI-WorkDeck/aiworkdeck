@@ -10,7 +10,7 @@ import { writableProjects } from '../../src/utils/personalCollections.js'
 
 function loadOptions(path, deps = {}) {
   const source = readFileSync(new URL(path, import.meta.url), 'utf8')
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
     .replace(/^import[\s\S]*?from\s*'[^']*'\s*$/gm, '')
     .replace(/export default/, 'return')
   return new Function(...Object.keys(deps), script)(...Object.values(deps))

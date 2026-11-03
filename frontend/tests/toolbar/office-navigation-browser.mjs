@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { readFile, writeFile, mkdir, symlink } from 'node:fs/promises'
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs'
 import { resolve, dirname, join, extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
@@ -61,7 +61,8 @@ zip.file('[Content_Types].xml',`<Types xmlns="http://schemas.openxmlformats.org/
 const xlsx=await zip.generateAsync({type:'nodebuffer'})
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript','.css':'text/css','.json':'application/json','.wasm':'application/wasm','.ttf':'font/ttf','.ttc':'font/collection','.otf':'font/otf'}
 const enc=existsSync(join(engine,'.encodings.json'))?JSON.parse(readFileSync(join(engine,'.encodings.json'),'utf8')):{}
-const server=createServer(async(req,res)=>{try{res.setHeader('Cross-Origin-Opener-Policy','same-origin');res.setHeader('Cross-Origin-Embedder-Policy','require-corp');res.setHeader('Cache-Control','no-store');const pathname=decodeURIComponent(req.url.split('?')[0]);if(pathname==='/fixture.xlsx'){res.end(xlsx);return}if(pathname==='/fixture.pptx'){res.end(await readFile(join(frontend,'tests/lowa-e2e/fixtures/impress-smoke.pptx')));return}const isEngine=pathname.startsWith('/lowa/');let file=isEngine?join(engine,pathname.slice(6)):pathname.startsWith('/engine/')?join(lowaDist,pathname.slice(8)):join(dist,pathname==='/'?'index.html':pathname.slice(1));if(pathname.startsWith('/engine/cjk')&&!existsSync(file))file=join(dirname(engine),pathname.slice(8));res.setHeader('Content-Type',mime[extname(file)]||'application/octet-stream');if(isEngine&&enc[file.split('/').at(-1)])res.setHeader('Content-Encoding',enc[file.split('/').at(-1)]);res.end(await readFile(file))}catch(e){res.statusCode=404;res.end('Not found')}})
+const findSafeFile=(rootDir,relPath)=>{const parts=String(relPath||'').split('/').filter(Boolean);if(!parts.length)return null;let cur=rootDir;for(const part of parts){let entries;try{entries=readdirSync(cur)}catch{return null}const name=entries.find(n=>n===part);if(!name)return null;cur=join(cur,name)}try{return statSync(cur).isFile()?cur:null}catch{return null}}
+const server=createServer(async(req,res)=>{try{res.setHeader('Cross-Origin-Opener-Policy','same-origin');res.setHeader('Cross-Origin-Embedder-Policy','require-corp');res.setHeader('Cache-Control','no-store');const pathname=decodeURIComponent(req.url.split('?')[0]);if(pathname==='/fixture.xlsx'){res.end(xlsx);return}if(pathname==='/fixture.pptx'){res.end(await readFile(join(frontend,'tests/lowa-e2e/fixtures/impress-smoke.pptx')));return}const isEngine=pathname.startsWith('/lowa/');let file=isEngine?findSafeFile(engine,pathname.slice(6)):pathname.startsWith('/engine/')?findSafeFile(lowaDist,pathname.slice(8)):findSafeFile(dist,pathname==='/'?'index.html':pathname.slice(1));if(pathname.startsWith('/engine/cjk')&&!file)file=findSafeFile(dirname(engine),pathname.slice(8));if(!file){res.statusCode=404;res.end('Not found');return}res.setHeader('Content-Type',mime[extname(file)]||'application/octet-stream');if(isEngine&&enc[file.split('/').at(-1)])res.setHeader('Content-Encoding',enc[file.split('/').at(-1)]);res.end(await readFile(file))}catch(e){res.statusCode=404;res.end('Not found')}})
 await new Promise(r=>server.listen(0,'127.0.0.1',r))
 const browser=await puppeteer.launch({executablePath:chrome,headless:true,defaultViewport:{width:1080,height:760},args:['--disable-dev-shm-usage']})
 const reports=[]

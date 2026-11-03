@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const source = readFileSync(new URL('../../src/components/DesktopUpdateIndicator.vue', import.meta.url), 'utf8')
-const script = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'return')
+const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'return')
 function fixture({ desktop = true, status = async () => ({ phase: 'idle' }), check, restart } = {}) {
   let event, cancel
   let unsubscribed = 0, restarts = 0, checks = 0

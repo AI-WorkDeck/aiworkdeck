@@ -26,7 +26,7 @@ function mountTree(t, { enabled, desktop = true, projectState } = {}) {
       return () => { call.stopped = true }
     },
   }
-  const script = tree.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = tree.slice(tree.indexOf('<script>') + 8, tree.indexOf('</script>'))
     .replace(/^import\s+([\s\S]*?)\s+from\s+['"][^'"]+['"]\s*$/gm, (_, binding) => {
       for (const name of binding.replace(/[{}]/g, '').split(',')) names.push(name.trim().split(/\s+as\s+/).at(-1))
       return ''

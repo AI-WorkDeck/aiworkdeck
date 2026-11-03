@@ -102,7 +102,13 @@ test('我的待办：读写走 taskStore，行用 TaskRow（显示项目），�
   const { readFileSync } = await import('node:fs')
   const src = readFileSync(
     new URL('../../src/components/userprofile/PersonalTodosPanel.vue', import.meta.url), 'utf8')
-  const code = src.replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '')
+  let raw = src, idx = raw.indexOf('<!--')
+  while (idx !== -1) {
+    const end = raw.indexOf('-->', idx + 4)
+    raw = end === -1 ? raw.slice(0, idx) : raw.slice(0, idx) + raw.slice(end + 3)
+    idx = raw.indexOf('<!--')
+  }
+  const code = raw.replace(/^\s*\/\/.*$/gm, '')
   assert.ok(code.includes('<view class="panel-todos">'), '.panel-todos 是 app-e2e 锚点（#872/#981）')
   assert.ok(code.includes("$t('account.todosSubtitle')"), '副标题保留')
   assert.ok(code.includes("from '@/utils/taskStore.js'"))

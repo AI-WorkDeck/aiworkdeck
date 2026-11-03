@@ -11,7 +11,7 @@ const SRC = readFileSync(new URL('../../src/components/ReviewPanel.vue', import.
 
 export function makeReviewComponent() {
   // 多行 import（花括号里列一串具名导出）也要整块剥掉，别只吃掉第一行。
-  const script = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
   const names = Object.keys(reviewGrouping)
   // eslint-disable-next-line no-new-func

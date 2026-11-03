@@ -170,7 +170,13 @@ try {
     for (const side of ['From', 'To']) {
       const range = xml.match(new RegExp('<w:move'+side+'RangeStart[^>]*>([\\s\\S]*?)<w:move'+side+'RangeEnd'))
       assert.ok(range, 'complete split move range '+side)
-      assert.equal(range[1].replace(/<[^>]*>/g, ''), '移动第一句。移动第二句。')
+      let plain = '', inTag = false
+      for (let i = 0; i < range[1].length; i++) {
+        if (range[1][i] === '<') inTag = true
+        else if (range[1][i] === '>') inTag = false
+        else if (!inTag) plain += range[1][i]
+      }
+      assert.equal(plain, '移动第一句。移动第二句。')
     }
     assert.ok(moved.length >= 2)
   }

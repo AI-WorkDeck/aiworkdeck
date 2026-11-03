@@ -6,8 +6,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 function component(name, overrides = {}) {
-  const script = readFileSync(new URL(`../../src/components/${name}.vue`, import.meta.url), 'utf8')
-    .match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = ((s) => s.slice(s.indexOf('<script>') + 8, s.indexOf('</script>')))(readFileSync(new URL(`../../src/components/${name}.vue`, import.meta.url), 'utf8'))
   const imports = [...script.matchAll(/^import\s+([\s\S]*?)\s+from\s+'[^']+'\s*;?\s*$/gm)]
   const names = imports.flatMap(([, clause]) => {
     const named = clause.match(/\{([\s\S]*?)\}/)?.[1].split(',').map(s => s.trim().split(/\s+as\s+/).at(-1)).filter(Boolean) || []

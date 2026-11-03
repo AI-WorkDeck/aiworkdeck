@@ -141,7 +141,7 @@ async function makeVm(links, tags, overrides = {}) {
   const { groupByParty } = await import('../../src/utils/evidenceGrouping.js')
   const deps = { ...DEPS, groupByParty, ...overrides }
   const src = readFileSync(new URL('../../src/components/EvidencePanel.vue', import.meta.url), 'utf8')
-  const script = src.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import [\s\S]*?from .*$/gm, '')
+  const script = src.slice(src.indexOf('<script>') + 8, src.indexOf('</script>')).replace(/^import [\s\S]*?from .*$/gm, '')
   const names = Object.keys(deps)
   // eslint-disable-next-line no-new-func
   const component = new Function(...names, script.replace('export default', 'return'))(...names.map((n) => deps[n]))

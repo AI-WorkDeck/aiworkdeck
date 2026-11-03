@@ -19,7 +19,7 @@ import { readFileSync } from 'node:fs'
 const SRC = readFileSync(new URL('../../src/components/AwdSelect.vue', import.meta.url), 'utf8')
 
 function loadMethods() {
-  const body = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const body = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/export default \{/, 'return {')
   const factory = new Function(body)
   return factory().methods

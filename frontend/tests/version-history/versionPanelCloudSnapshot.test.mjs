@@ -8,7 +8,7 @@ import vm from 'node:vm'
 const panel = fs.readFileSync(new URL('../../src/components/version/VersionPanel.vue', import.meta.url), 'utf8')
 const parent = fs.readFileSync(new URL('../../src/pages/project-overview/project-overview.vue', import.meta.url), 'utf8')
 function loadPanel(calls) {
-  const script = panel.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = panel.slice(panel.indexOf('<script>') + 8, panel.indexOf('</script>'))
     .replace(/import\s+[\s\S]*?\s+from\s+['"][^'"]+['"]\s*/g, '')
     .replace('export default', 'globalThis.component =')
   const ctx = {

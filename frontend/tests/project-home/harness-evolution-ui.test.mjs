@@ -8,8 +8,17 @@ import { readFileSync } from 'node:fs'
 import { attachEvolutionsToBubbles } from '../../src/utils/harnessEvolutionHistory.mjs'
 
 const read = (rel) => readFileSync(new URL('../../src/' + rel, import.meta.url), 'utf8')
+const cutBetween = (str, open, close) => {
+  let out = str, i = out.indexOf(open)
+  while (i !== -1) {
+    const j = out.indexOf(close, i + open.length)
+    out = j === -1 ? out.slice(0, i) : out.slice(0, i) + out.slice(j + close.length)
+    i = out.indexOf(open)
+  }
+  return out
+}
 const stripComments = (s) =>
-  s.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  cutBetween(cutBetween(s, '<!--', '-->'), '/*', '*/').replace(/^\s*\/\/.*$/gm, '')
 
 test('useAgentStream 接收三条 Harness SSE 事件，且静默自愈/自进化不把空回合撑成可见气泡', () => {
   const src = stripComments(read('composables/useAgentStream.js'))

@@ -3,7 +3,7 @@ name = "banana-slides"
 version = "0.3.0"
 description = "Banana Slides – AI native PPT generator"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "flask>=3.0.0",
     "flask-cors>=4.0.0",
@@ -11,7 +11,7 @@ dependencies = [
     "google-genai>=1.52.0",
     "openai>=1.0.0",
     "pydantic>=2.9.0",
-    "pillow>=12.0.0",
+    "pillow>=13.0.0",
     "python-pptx>=1.0.0",
     "python-dotenv>=1.0.1",
     "reportlab>=4.1.0",
@@ -23,7 +23,7 @@ dependencies = [
     "img2pdf>=0.5.1",
     "lazyllm>=0.7.3",
     "volcengine-python-sdk[ark]>=5.0.9",
-    "PyPDF2>=3.0.0",
+    "pypdf>=6.21.4",
     "PyMuPDF>=1.24.0",
     "pdf2docx>=0.5.13",  # [checkba] /api/pdf/to-docx；连带 pymupdf / opencv-python-headless
 ]
@@ -51,6 +51,9 @@ sdk = [
 
 [tool.uv]
 index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+override-dependencies = [
+    "pyjwt>=2.15.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]

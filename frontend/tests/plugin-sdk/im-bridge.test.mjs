@@ -9,7 +9,7 @@ import { nativeDataTransfer } from '../../src/utils/fileTreeExternalDrop.js'
 import workbench from '../../src/locales/zh-CN/workbench.js'
 
 const source = readFileSync(new URL('../../src/components/PluginPane.vue', import.meta.url), 'utf8')
-const body = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+const body = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
   .replace(/^\s*import[\s\S]*?from\s*'[^']*'\s*$/gm, '').replace(/export\s+default/, 'return')
 const files = [{ id: 7, name: '项目沟通', isFolder: true }, { id: 42, parentId: 7, name: '证据.pdf', fileType: 'pdf' }]
 const path = '项目沟通/证据.pdf'

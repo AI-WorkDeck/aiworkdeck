@@ -14,6 +14,9 @@ on:
       - '.github/workflows/desktop-build.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   warm:
     name: 暖缓存 (${{ matrix.plat }})

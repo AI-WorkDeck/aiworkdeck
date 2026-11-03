@@ -7,7 +7,7 @@ import { parse } from '@babel/parser'
 
 const host = readFileSync(new URL('../../src/pages/project-overview/project-overview.vue', import.meta.url), 'utf8')
 const chat = readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
-const script = host.match(/<script>([\s\S]*?)<\/script>/)[1]
+const script = host.slice(host.indexOf('<script>') + 8, host.indexOf('</script>'))
 const options = parse(script, { sourceType: 'module' }).program.body.find(n => n.type === 'ExportDefaultDeclaration').declaration
 const methods = options.properties.find(n => n.key?.name === 'methods').value.properties
 function method(name) {

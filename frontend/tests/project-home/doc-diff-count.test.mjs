@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const source = readFileSync(new URL('../../src/components/DocDiffViewer.vue', import.meta.url), 'utf8')
-const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
   .replace(/^import .*$/gm, '').replace('export default', 'return')
 const component = new Function('markRaw', script)(value => value)
 

@@ -15,8 +15,17 @@ import { flushDirtyEditors } from '../../src/pages/project-overview/flushDirtyEd
 const PAGE = readFileSync(
   new URL('../../src/pages/project-overview/project-overview.vue', import.meta.url), 'utf8')
 
+const cutBetween = (str, open, close) => {
+  let out = str, i = out.indexOf(open)
+  while (i !== -1) {
+    const j = out.indexOf(close, i + open.length)
+    out = j === -1 ? out.slice(0, i) : out.slice(0, i) + out.slice(j + close.length)
+    i = out.indexOf(open)
+  }
+  return out
+}
 const stripComments = (s) =>
-  s.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  cutBetween(cutBetween(s, '<!--', '-->'), '/*', '*/').replace(/^\s*\/\/.*$/gm, '')
 
 function libre({ dirty = false, saving = false, ready = true, isError = false, docLoadFailed = false, file = { id: 1 } } = {}) {
   const inst = { dirty, saving, ready, isError, docLoadFailed, file, flushed: 0 }

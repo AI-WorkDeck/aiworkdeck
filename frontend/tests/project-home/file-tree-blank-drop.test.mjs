@@ -40,7 +40,7 @@ const IMPORT_NAMES = [
 ]
 
 function loadOptions(stubs) {
-  const body = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const body = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/^import\s[\s\S]*?from\s+['"][^'"]+['"]\s*$/gm, '')
     .replace(/export default \{/, 'return {')
   const factory = new Function(...IMPORT_NAMES, body)

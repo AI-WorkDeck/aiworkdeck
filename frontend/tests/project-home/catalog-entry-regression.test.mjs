@@ -4,7 +4,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 const source = readFileSync(new URL('../../src/components/project-list/AccountProjectCatalog.vue', import.meta.url), 'utf8')
-const script = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'return')
+const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'return')
 const component = new Function('requestAccountCatalog', script)(() => {})
 function fixture(request) {
   const events = []

@@ -280,7 +280,10 @@ public class WebVerifyImportService {
     static String sanitizeName(String raw) {
         if (raw == null) return null;
         String s = raw.replaceAll(ILLEGAL_NAME_CHARS, "").trim();
-        s = s.replaceAll("^[.\\s]+", "").replaceAll("[.\\s]+$", "").trim();
+        int start = 0, end = s.length();
+        while (start < end && (s.charAt(start) == '.' || Character.isWhitespace(s.charAt(start)))) start++;
+        while (end > start && (s.charAt(end - 1) == '.' || Character.isWhitespace(s.charAt(end - 1)))) end--;
+        s = s.substring(start, end);
         if (s.length() > PARTY_NAME_MAX) s = s.substring(0, PARTY_NAME_MAX);
         return s;
     }

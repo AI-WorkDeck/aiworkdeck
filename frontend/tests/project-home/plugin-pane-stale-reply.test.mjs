@@ -15,7 +15,7 @@ const SRC = readFileSync(
   new URL('../../src/components/PluginPane.vue', import.meta.url), 'utf8')
 
 function loadOptions(deps) {
-  const body = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const body = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/^\s*import[\s\S]*?from\s*'[^']*'\s*$/gm, '')
     .replace(/export\s+default/, 'return')
   const factory = new Function(

@@ -37,7 +37,7 @@ function buildSsrRender() {
 
 const ssrRender = buildSsrRender()
 
-const componentScript = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+const componentScript = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
   .replace(/^import .*$/m, '').replace('export default', 'return')
 const component = new Function(componentScript)()
 const termsOf = text => component.methods.payload.call({ customTerms: text, excludedTerms: '' }).customTerms
@@ -82,7 +82,16 @@ async function render(state = {}) {
   }
 }
 
-const stripComments = (html) => html.replace(/<!--[\s\S]*?-->/g, '')
+const cutBetween = (str, open, close) => {
+  let out = str, i = out.indexOf(open)
+  while (i !== -1) {
+    const j = out.indexOf(close, i + open.length)
+    out = j === -1 ? out.slice(0, i) : out.slice(0, i) + out.slice(j + close.length)
+    i = out.indexOf(open)
+  }
+  return out
+}
+const stripComments = (html) => cutBetween(html, '<!--', '-->')
 
 // ==================== 可选补充词渐进展开 ====================
 

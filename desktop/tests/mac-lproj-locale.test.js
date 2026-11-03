@@ -36,7 +36,7 @@ test('金丝雀：app-builder-lib 仍按「平台段 || 顶层」取 electronLan
     return // 没装 devDependencies 的环境（只跑单测）跳过；打包机上一定在
   }
   assert.match(src, /platformSpecificBuildOptions\.electronLanguages \|\| config\.electronLanguages/)
-  assert.match(src, /wantedLanguages\.includes\(language\)/)
+  assert.match(src, /wantedLanguages\.(includes\(language\)|filter\(wanted => isLocaleMatch\(wanted, language\)\))/)
   assert.match(src, /langFileExt: "\.lproj"/)
 })
 

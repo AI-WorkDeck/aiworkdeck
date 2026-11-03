@@ -3,8 +3,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-const body = readFileSync(new URL('../../src/components/PluginPane.vue', import.meta.url), 'utf8')
-  .match(/<script>([\s\S]*?)<\/script>/)[1]
+const body = ((s) => s.slice(s.indexOf('<script>') + 8, s.indexOf('</script>')))(readFileSync(new URL('../../src/components/PluginPane.vue', import.meta.url), 'utf8'))
   .replace(/^\s*import[\s\S]*?from\s*'[^']*'\s*$/gm, '').replace(/export\s+default/, 'return')
 const options = new Function(body)()
 test('openWorkspace uses the authenticated caller, ignoring supplied plugin identity and URL', async () => {

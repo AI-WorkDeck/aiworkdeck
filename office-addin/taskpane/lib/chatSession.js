@@ -121,8 +121,13 @@ function recallConversation(pid) {
 function makePaneId() {
   try {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+      const buf = new Uint32Array(2)
+      crypto.getRandomValues(buf)
+      return 'pane-' + Date.now().toString(36) + '-' + buf[0].toString(36) + buf[1].toString(36)
+    }
   } catch (e) { /* 老内核没有 randomUUID */ }
-  return 'pane-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10)
+  return 'pane-' + Date.now().toString(36)
 }
 export const paneId = makePaneId()
 
@@ -202,7 +207,7 @@ export const crossDocBanner = ref(null)
 
 let ctx = { settings: null, projectId: '' }
 // 会话身份 = 服务器 + 令牌 + 项目：任一变化都视为换了会话，重置状态
-let sessionKey = null
+let activeSessionScope = null
 // 并发保护：activate 期间（拉历史/建连）身份又变了，旧流程的结果一律丢弃
 let generation = 0
 
@@ -383,9 +388,9 @@ export async function activateSession({ settings, projectId }) {
   ctx.settings = settings
   const pid = projectId || ''
   refreshDocScope()
-  const key = sessionIdentityKey(settings, pid)
-  if (key === sessionKey) return
-  sessionKey = key
+  const scopeId = sessionIdentityKey(settings, pid)
+  if (scopeId === activeSessionScope) return
+  activeSessionScope = scopeId
   documentChangedDuringTurn = false
   forceDocumentRebind = false
   ctx.projectId = pid
@@ -474,7 +479,7 @@ export async function syncActiveDocument() {
   // 真正的「另存为新名」（存过盘的 A → 另一条路径 B）不走这条，按维护者定的规矩当新文档处理。
   if (!forceDocumentRebind && !before.saved && after.saved && conversationId) {
     rememberConversation(conversationId)
-    sessionKey = sessionIdentityKey(ctx.settings, ctx.projectId)
+    activeSessionScope = sessionIdentityKey(ctx.settings, ctx.projectId)
     documentChangedDuringTurn = false
     return true
   }
@@ -928,7 +933,12 @@ function randomId() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
   } catch (e) { /* 老内核 */ }
   // 服务端 clientMediaId 只收 UUID 形态（路径穿越围栏），手工拼一个合规的
-  const hex = () => Math.floor(Math.random() * 0xffff).toString(16).padStart(4, '0')
+  const words = new Uint16Array(8)
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    crypto.getRandomValues(words)
+  }
+  let idx = 0
+  const hex = () => words[idx++].toString(16).padStart(4, '0')
   return `${hex()}${hex()}-${hex()}-4${hex().slice(1)}-8${hex().slice(1)}-${hex()}${hex()}${hex()}`
 }
 

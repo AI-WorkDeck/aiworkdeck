@@ -17,7 +17,7 @@ const SRC = readFileSync(
   new URL('../../src/components/project-home/ConversationList.vue', import.meta.url), 'utf8')
 
 function makeVm(props) {
-  const script = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/^\s*import[\s\S]*?from\s+'[^']*'\s*$/gm, '')
   // eslint-disable-next-line no-new-func
   const component = new Function(script.replace('export default', 'return'))()

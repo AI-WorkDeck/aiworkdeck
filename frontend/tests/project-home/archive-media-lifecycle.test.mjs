@@ -134,7 +134,7 @@ for (const nativeResult of ['success', 'throw', 'reject', 'not-ready']) {
       uni: { $emit: name => calls.events.push(name), showToast: value => calls.toasts.push(value) },
       URL: { revokeObjectURL: value => calls.revoked.push(value) },
     }
-    const body = ARCHIVE.match(/<script>([\s\S]*?)<\/script>/)[1]
+    const body = ARCHIVE.slice(ARCHIVE.indexOf('<script>') + 8, ARCHIVE.indexOf('</script>'))
       .replace(/^import\s[\s\S]*?from\s+['"][^'"]+['"]\s*$/gm, '')
       .replace('export default {', 'return {')
     const options = new Function(...Object.keys(stubs), body)(...Object.values(stubs))

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const source = readFileSync(new URL('../../src/components/EditorToolbar.vue', import.meta.url), 'utf8')
-const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
 const imports = [...script.matchAll(/^import\s+([\s\S]*?)\s+from\s+'[^']+'\s*;?\s*$/gm)].flatMap(m => m[1].replace(/[{},]/g, ' ').split(/\s+/).filter(Boolean))
 const body = script.replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '').replace('export default {', 'const toolbar = {') + '\n return { toolbar, hosts: VIEW_PREFS_HOSTS }'
 const prefsBody = readFileSync(new URL('../../src/utils/editorViewPrefs.js', import.meta.url), 'utf8')

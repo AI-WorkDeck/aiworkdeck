@@ -9,6 +9,9 @@ name: addin-installer
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   win:
     runs-on: windows-latest

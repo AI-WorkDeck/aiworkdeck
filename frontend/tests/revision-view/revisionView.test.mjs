@@ -53,7 +53,7 @@ test('executor 放行 set_revision_view 并原样把 mode 发给 worker', async 
 // ---------- 工具栏：三态 → 命令序列 ----------
 function loadToolbar() {
   const src = readFileSync(new URL('../../src/components/EditorToolbar.vue', import.meta.url), 'utf8')
-  const script = src.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = src.slice(src.indexOf('<script>') + 8, src.indexOf('</script>'))
   return new Function('bindHorizontalWheel', 'watchScrollEdges', 'isEnglish', 'host',
     'CN_FONT_SIZES', 'PT_FONT_SIZES', 'ParagraphFormatPanel', 'SystemFontsPanel',
     ...Object.keys(viewPrefs),

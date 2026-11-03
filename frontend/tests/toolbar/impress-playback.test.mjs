@@ -7,7 +7,7 @@ import { CN_FONT_SIZES, PT_FONT_SIZES } from '../../src/utils/paragraphFormat.js
 import * as viewPrefs from '../../src/utils/editorViewPrefs.js'
 const source = readFileSync(new URL('../../src/components/EditorToolbar.vue', import.meta.url), 'utf8')
 function vmFor(handler) {
-  const component = new Function('bindHorizontalWheel', 'watchScrollEdges', 'isEnglish', 'host', 'CN_FONT_SIZES', 'PT_FONT_SIZES', 'ParagraphFormatPanel', 'SystemFontsPanel', ...Object.keys(viewPrefs), source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'return'))(() => () => {}, () => () => {}, () => false, {}, CN_FONT_SIZES, PT_FONT_SIZES, {}, {}, ...Object.values(viewPrefs))
+  const component = new Function('bindHorizontalWheel', 'watchScrollEdges', 'isEnglish', 'host', 'CN_FONT_SIZES', 'PT_FONT_SIZES', 'ParagraphFormatPanel', 'SystemFontsPanel', ...Object.keys(viewPrefs), source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'return'))(() => () => {}, () => () => {}, () => false, {}, CN_FONT_SIZES, PT_FONT_SIZES, {}, {}, ...Object.values(viewPrefs))
   const events = [], calls = []
   const vm = { ...component.data(), isImpress: true, impressState: { slideNumber: 3, slideCount: 9 }, $t: k => k, $emit: e => events.push(e), executor: { executeCommand: async (action, params) => { calls.push({ action, params }); return handler(params) } } }
   for (const [name, method] of Object.entries(component.methods)) vm[name] = method.bind(vm)

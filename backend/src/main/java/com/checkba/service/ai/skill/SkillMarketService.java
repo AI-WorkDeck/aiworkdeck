@@ -194,10 +194,18 @@ public class SkillMarketService {
         }
         purchaseGate.assertConnection(connection);
         try {
-            File skillDir = new File(properties.getDir(), id);
-            Files.createDirectories(skillDir.toPath());
+            java.nio.file.Path rootDir = java.nio.file.Path.of(properties.getDir()).toAbsolutePath().normalize();
+            java.nio.file.Path skillDir = rootDir.resolve(id).normalize();
+            if (!skillDir.startsWith(rootDir) || !skillDir.getParent().equals(rootDir)) {
+                throw new IllegalArgumentException("Invalid skill id: " + id);
+            }
+            Files.createDirectories(skillDir);
             for (String name : BUNDLE_FILES) {
-                Files.writeString(new File(skillDir, name).toPath(), files.getStr(name), StandardCharsets.UTF_8);
+                java.nio.file.Path targetFile = skillDir.resolve(name).normalize();
+                if (!targetFile.startsWith(skillDir)) {
+                    throw new IllegalArgumentException("Invalid bundle file: " + name);
+                }
+                Files.writeString(targetFile, files.getStr(name), StandardCharsets.UTF_8);
             }
         } catch (Exception e) {
             throw new IllegalStateException(LangText.of("写入 skill 文件失败: ", "Failed to write skill files: ") + e.getMessage());

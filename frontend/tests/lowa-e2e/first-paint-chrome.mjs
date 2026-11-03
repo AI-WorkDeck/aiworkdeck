@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url)
 const out = process.env.CHROME_PAINT_OUT || fs.mkdtempSync(path.join(os.tmpdir(), 'awd-first-chrome-'))
 fs.mkdirSync(out, { recursive: true })
 const source = fs.readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8')
-const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
 const names = [...script.matchAll(/^import\s+([\s\S]*?)\s+from\s+'[^']+'\s*;?\s*$/gm)].flatMap(([, clause]) => {
   const named = clause.match(/\{([\s\S]*?)\}/)?.[1].split(',').map(s => s.trim().split(/\s+as\s+/).at(-1)).filter(Boolean) || []
   const name = clause.replace(/\{[\s\S]*?\}/, '').replace(/,/g, '').trim()

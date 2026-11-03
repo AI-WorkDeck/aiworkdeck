@@ -14,11 +14,30 @@
 
 import { createServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
+import { readdirSync, statSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url))
 const PORT = Number(process.argv[2]) || Number(process.env.PORT) || 8777
+
+function findSafeFile(rootDir, relPath) {
+  const parts = String(relPath || '').split('/').filter(Boolean)
+  if (!parts.length) return null
+  let cur = rootDir
+  for (const part of parts) {
+    let entries
+    try { entries = readdirSync(cur) } catch { return null }
+    const name = entries.find((n) => n === part)
+    if (!name) return null
+    cur = join(cur, name)
+  }
+  try {
+    return statSync(cur).isFile() ? cur : null
+  } catch {
+    return null
+  }
+}
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -47,12 +66,13 @@ const server = createServer(async (req, res) => {
   if (urlPath.startsWith('/shared/')) {
     const base = urlPath.slice('/shared/'.length).replace(/[^A-Za-z0-9._-]/g, '')
     const SHARED_ROOT = normalize(join(ROOT, '../../frontend/src/composables'))
-    filePath = normalize(join(SHARED_ROOT, base))
-    if (!filePath.startsWith(SHARED_ROOT)) { res.writeHead(403).end('forbidden'); return }
+    filePath = findSafeFile(SHARED_ROOT, base)
   } else {
-    // Contain path traversal to ROOT.
-    filePath = normalize(join(ROOT, urlPath))
-    if (!filePath.startsWith(ROOT)) { res.writeHead(403).end('forbidden'); return }
+    filePath = findSafeFile(ROOT, urlPath)
+  }
+  if (!filePath) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('not found')
+    return
   }
 
   try {
@@ -60,7 +80,7 @@ const server = createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': TYPES[extname(filePath)] || 'application/octet-stream' })
     res.end(body)
   } catch {
-    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('not found: ' + urlPath)
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('not found')
   }
 })
 

@@ -114,10 +114,11 @@ const brandUrl = (args.brandUrl || BRAND_SITE_BY_ADDIN_HOST[addinHost] || '').tr
 if (brandUrl) {
   if (!/^https:\/\/[^\s/]+/.test(brandUrl)) fail(`品牌站地址必须是 https origin：${brandUrl}`)
   if (brandUrl !== DEV_BRAND_URL) {
-    if (!manifestOut.includes(DEV_BRAND_URL)) {
+    const brandParts = manifestOut.split(DEV_BRAND_URL)
+    if (brandParts.length < 2) {
       fail(`manifest.xml 中未找到品牌站地址 ${DEV_BRAND_URL}，模板可能已被改动`)
     }
-    manifestOut = manifestOut.split(DEV_BRAND_URL).join(brandUrl)
+    manifestOut = brandParts.join(brandUrl)
   }
 } else {
   console.warn(`[build-manifest] 警告：${addinHost} 未登记品牌站，SupportUrl/LearnMoreUrl 保持 ${DEV_BRAND_URL}（需要的话用 --brand-url 指定）`)

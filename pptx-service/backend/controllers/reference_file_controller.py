@@ -125,17 +125,19 @@ def upload_reference_file():
         # Get filename - handle encoding issues with non-ASCII characters
         original_filename = file.filename
         if not original_filename or original_filename == '':
-            # Try to get filename from Content-Disposition header
+            # Try to get filename from Content-Disposition header without regex backtracking
             content_disposition = request.headers.get('Content-Disposition', '')
             if content_disposition:
-                filename_match = re.search(r'filename[^;=\n]*=(([\'"]).*?\2|[^;\n]*)', content_disposition)
-                if filename_match:
-                    original_filename = filename_match.group(1).strip('"\'')
-                    # Decode if URL encoded
-                    try:
-                        original_filename = unquote(original_filename)
-                    except:
-                        pass
+                for part in content_disposition.split(';'):
+                    part = part.strip()
+                    if part.lower().startswith('filename='):
+                        original_filename = part.split('=', 1)[1].strip().strip('"\'')
+                        # Decode if URL encoded
+                        try:
+                            original_filename = unquote(original_filename)
+                        except Exception:
+                            pass
+                        break
         
         if not original_filename or original_filename == '':
             return bad_request("No file selected or filename could not be determined")
@@ -165,32 +167,36 @@ def upload_reference_file():
         # If secure_filename removed everything (e.g., all Chinese chars), use a fallback
         if not filename or filename == '':
             # Extract extension from original filename
-            ext = _get_file_type(original_filename)
-            if ext == 'unknown':
+            ext = secure_filename(_get_file_type(original_filename))
+            if not ext or ext == 'unknown':
                 ext = 'file'
-            filename = f"file_{uuid.uuid4().hex[:8]}.{ext}"
+            filename = secure_filename(f"file_{uuid.uuid4().hex[:8]}.{ext}")
             logger.warning(f"Original filename '{original_filename}' was sanitized to '{filename}'")
         
         # Create upload directory structure
-        upload_folder = current_app.config['UPLOAD_FOLDER']
-        reference_files_dir = Path(upload_folder) / 'reference_files'
-        reference_files_dir.mkdir(parents=True, exist_ok=True)
+        upload_folder = os.path.realpath(os.path.abspath(current_app.config['UPLOAD_FOLDER']))
+        reference_files_dir_str = os.path.realpath(os.path.join(upload_folder, 'reference_files'))
+        if not reference_files_dir_str.startswith(upload_folder + os.sep):
+            return bad_request("Invalid upload directory")
+        os.makedirs(reference_files_dir_str, exist_ok=True)
         
         # Generate unique filename to avoid conflicts
         unique_id = str(uuid.uuid4())[:8]
         file_type = _get_file_type(original_filename)  # Use original filename for type detection
-        unique_filename = f"{unique_id}_{filename}"
-        file_path = reference_files_dir / unique_filename
+        unique_filename = secure_filename(f"{unique_id}_{filename}")
+        file_path_str = os.path.realpath(os.path.join(reference_files_dir_str, unique_filename))
+        if not file_path_str.startswith(reference_files_dir_str + os.sep):
+            return bad_request("Invalid file path")
         
         # Save file
-        file.save(str(file_path))
-        file_size = os.path.getsize(file_path)
+        file.save(file_path_str)
+        file_size = os.path.getsize(file_path_str)
         
         # Create database record
         reference_file = ReferenceFile(
             project_id=project_id,
             filename=original_filename,
-            file_path=str(file_path.relative_to(upload_folder)),
+            file_path=str(Path(file_path_str).relative_to(upload_folder)),
             file_size=file_size,
             file_type=file_type,
             parse_status='pending'

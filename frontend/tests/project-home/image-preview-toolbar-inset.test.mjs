@@ -19,7 +19,7 @@ const SRC = readFileSync(new URL('../../src/components/FilePreview.vue', import.
 const STYLE = SRC.slice(SRC.indexOf('<style'))
 
 function block(selector) {
-  const re = new RegExp(`\\n${selector.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`)
+  const re = new RegExp(`\\n${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)
   const m = STYLE.match(re)
   assert.ok(m, `找不到 ${selector} 规则`)
   return m[1]

@@ -47,7 +47,7 @@ async function fixture(initial = { id: 1, fileType: 'pdf', wpsFileId: 'a' }, ini
     window: { addEventListener() {}, removeEventListener() {} },
     uni: { showToast() {} },
   }
-  let script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  let script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
   script = script.replace(/\/\/ #ifndef H5[\s\S]*?\/\/ #endif/g, '')
   const names = [...script.matchAll(/^import ([\s\S]*?) from ['"][^'"]+['"]\s*$/gm)]
     .flatMap(m => m[1].replace(/[{}]/g, '').split(',').map(name => name.trim()).filter(Boolean))

@@ -1930,7 +1930,7 @@ export const SlidePreview: React.FC = () => {
                 {selectedContextImages.uploadedFiles.map((file, idx) => (
                   <div key={idx} className="relative group">
                     <img
-                      src={uploadedFileUrls.current[idx] || ''}
+                      src={uploadedFileUrls.current[idx]?.startsWith('blob:') ? encodeURI(`blob:${uploadedFileUrls.current[idx].slice(5)}`.replace(/[<>"']/g, '')) : ''}
                       alt={`Uploaded ${idx + 1}`}
                       className="w-20 h-20 object-cover rounded border border-gray-300 dark:border-border-primary"
                     />

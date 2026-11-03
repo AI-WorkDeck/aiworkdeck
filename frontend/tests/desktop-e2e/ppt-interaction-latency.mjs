@@ -71,7 +71,7 @@ for(const key of ['home','appData','userData','sessionData','documents','downloa
 fs.writeFileSync(path.join(run,'paths.json'),JSON.stringify({versions:process.versions,pid:process.pid,ready:app.isReady(),paths:Object.fromEntries(['home','appData','userData','sessionData','documents','logs','temp'].map(k=>[k,app.getPath(k)]))}));
 app.on('browser-window-created',(_,window)=>window.setContentSize(1440,1000));
 require(path.join(root,'desktop/main/main.js'));
-let last='';fs.watchFile(${JSON.stringify(commandFile)},{interval:100},()=>{const s=fs.readFileSync(${JSON.stringify(commandFile)},'utf8');if(s===last)return;last=s;const c=JSON.parse(s);if(c.quit){fs.unwatchFile(${JSON.stringify(commandFile)});app.quit()}else if(c.path)app.emit('open-file',{preventDefault(){}},c.path)});
+const cmdFile=path.join(run,'command.json');let last='';fs.watchFile(cmdFile,{interval:100},()=>{const s=fs.readFileSync(cmdFile,'utf8');if(s===last)return;last=s;const c=JSON.parse(s);if(c.quit){fs.unwatchFile(cmdFile);app.quit()}else if(c.path)app.emit('open-file',{preventDefault(){}},c.path)});
 `)
 const env = Object.fromEntries(['PATH', 'LANG', 'LC_ALL', 'JAVA_HOME', 'TMPDIR'].filter(k => process.env[k]).map(k => [k, process.env[k]]))
 Object.assign(env, { HOME: home, JAVA_TOOL_OPTIONS: `-Duser.home=${home}`, SPRING_PROFILES_ACTIVE: 'desktop', STORAGE_LOCAL_ROOT_PATH: path.join(home, 'storage'), SPRING_DATASOURCE_URL: `jdbc:h2:file:${home}/db;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=VALUE`, CHECKBA_BACKEND_PORT: String(backendPort), CHECKBA_PPTX_PORT: String(ports[0]), CHECKBA_MINERU_PORT: String(ports[1]), CHECKBA_KOKORO_PORT: String(ports[2]), CHECKBA_ASR_PORT: String(ports[3]), CHECKBA_UPDATE_MANIFEST_URL: `http://127.0.0.1:${cdpPort}/updates-disabled`, AIWORKDECK_DESKTOP_DEV: '0' })
@@ -267,7 +267,13 @@ async function waitSaved(marker, pageCount) {
   await until(async () => {
     const zip = await JSZip.loadAsync(fs.readFileSync(files.pptx))
     const names = Object.keys(zip.files).filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n))
-    const text = (await Promise.all(names.map(n => zip.file(n).async('string')))).join('').replace(/<[^>]*>/g, '')
+    const raw = (await Promise.all(names.map(n => zip.file(n).async('string')))).join('')
+    let text = '', inTag = false
+    for (let i = 0; i < raw.length; i++) {
+      if (raw[i] === '<') inTag = true
+      else if (raw[i] === '>') inTag = false
+      else if (!inTag) text += raw[i]
+    }
     return text.includes(marker) && names.length === pageCount
   }, 90000)
   // Read lifecycle state only after the disk predicate; never reset the save clock.

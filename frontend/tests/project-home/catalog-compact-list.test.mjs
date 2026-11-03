@@ -7,7 +7,7 @@ const read=p=>readFileSync(new URL('../../src/'+p,import.meta.url),'utf8')
 const pane=read('components/project-list/ProjectListPane.vue')
 const catalog=read('components/project-list/AccountProjectCatalog.vue')
 const styles=read('components/project-list/project-list-pane.scss')
-const script=catalog.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm,'').replace('export default','return')
+const script=catalog.slice(catalog.indexOf('<script>') + 8, catalog.indexOf('</script>')).replace(/^import .*$/gm,'').replace('export default','return')
 const component=new Function(script)()
 test('sidebar has one compact list and never reads obsolete grid preferences',()=>{
   assert.doesNotMatch(pane,/view-toggle|viewMode|VIEW_MODE_KEY|restoreViewMode|project-grid|project-item-card/)

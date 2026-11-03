@@ -8458,11 +8458,21 @@ export default {
           // Map to display format
           // Backend returns: [{conversationId, updatedAt, lastMessage, runStatus}, ...]
           // We map to: { id, title, date }
+          const stripHtmlTags = (s) => {
+              let out = '', inTag = false
+              for (let i = 0; i < s.length; i++) {
+                  const ch = s[i]
+                  if (ch === '<') inTag = true
+                  else if (ch === '>') inTag = false
+                  else if (!inTag) out += ch
+              }
+              return out
+          }
           this.chatHistoryList = (res || []).map(item => ({
               id: item.conversationId,
-              title: item.title ? item.title.replace(/<[^>]+>/g, '').trim() : (item.lastMessage ? (item.lastMessage.substring(0, 20) + (item.lastMessage.length > 20 ? '...' : '')) : this.$t('workbench.newConversation')),
+              title: item.title ? stripHtmlTags(item.title).trim() : (item.lastMessage ? (item.lastMessage.substring(0, 20) + (item.lastMessage.length > 20 ? '...' : '')) : this.$t('workbench.newConversation')),
               updatedAt: item.updatedAt,
-              lastMessage: item.lastMessage ? item.lastMessage.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').substring(0, 60) + (item.lastMessage.length > 60 ? '...' : '') : '',
+              lastMessage: item.lastMessage ? stripHtmlTags(item.lastMessage).replace(/\s+/g, ' ').substring(0, 60) + (item.lastMessage.length > 60 ? '...' : '') : '',
               conversationId: item.conversationId,
               runStatus: item.runStatus || null,
               // 插件镜像会话来源（dev-board#298）：null=本地会话，非空=office-word 等通道值

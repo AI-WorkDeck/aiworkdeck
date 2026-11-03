@@ -384,7 +384,11 @@ public class ImService {
     private String displayName(Long userId) { return users.findById(userId).map(User::getDisplayName).filter(s -> !s.isBlank()).orElse(com.checkba.service.LangText.of("用户", "User")); }
     static String safeName(String name) {
         String clean = name.replace('\\', '/'); clean = clean.substring(clean.lastIndexOf('/') + 1);
-        clean = clean.replaceAll("[\\p{Cntrl}<>:\"|?*]", "_").replaceAll("^[. ]+|[. ]+$", "");
+        clean = clean.replaceAll("[\\p{Cntrl}<>:\"|?*]", "_");
+        int start = 0, end = clean.length();
+        while (start < end && (clean.charAt(start) == '.' || clean.charAt(start) == ' ')) start++;
+        while (end > start && (clean.charAt(end - 1) == '.' || clean.charAt(end - 1) == ' ')) end--;
+        clean = clean.substring(start, end);
         if (clean.isBlank()) throw bad(com.checkba.service.LangText.of("文件名无效", "Invalid file name"));
         return clean.substring(0, Math.min(180, clean.length()));
     }

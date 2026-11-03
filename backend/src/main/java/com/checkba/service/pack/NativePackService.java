@@ -1488,8 +1488,10 @@ public class NativePackService {
     }
 
     private JSONObject readCurrent(String packId) {
-        Path f = packsRoot().resolve(packId).resolve(CURRENT_JSON);
-        if (!Files.isRegularFile(f)) return null;
+        if (packId == null || !PACK_ID.matcher(packId).matches()) return null;
+        Path root = packsRoot();
+        Path f = root.resolve(packId).resolve(CURRENT_JSON).normalize();
+        if (!f.startsWith(root) || !Files.isRegularFile(f)) return null;
         try {
             return JSONUtil.parseObj(Files.readString(f, StandardCharsets.UTF_8));
         } catch (Exception e) {

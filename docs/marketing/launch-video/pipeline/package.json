@@ -8,6 +8,11 @@
     "record:sample": "node run.mjs sample"
   },
   "dependencies": {
-    "puppeteer-core": "^22.15.0"
+    "puppeteer-core": "^25.16.0"
+  },
+  "overrides": {
+    "basic-ftp": ">=6.2.1",
+    "ip-address": ">=10.7.4",
+    "zod": ">=4.6.6"
   }
 }

@@ -9,7 +9,7 @@ import * as Vue from 'vue'
 const source = readFileSync(process.env.TOOLBAR_SOURCE || new URL('../../src/components/EditorToolbar.vue', import.meta.url), 'utf8')
 function fixture(kind = 'calc') {
   const document = { activeElement: null }
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
   const imports = [...script.matchAll(/^import\s+([\s\S]*?)\s+from\s+'[^']+'\s*;?\s*$/gm)].flatMap(([, clause]) => clause.replace(/[{},]/g, ' ').trim().split(/\s+/))
   const options = new Function(...imports, 'document', script.replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '').replace('export default', 'return'))(...imports.map(() => () => {}), document)
   const calls = [], emitted = []

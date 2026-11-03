@@ -56,7 +56,7 @@ fs.writeFileSync(path.join(run,'paths.json'),JSON.stringify(Object.fromEntries([
 require(path.join(root,'desktop/main/main.js'));
 app.emit('open-file',{preventDefault(){}},${JSON.stringify(first)});
 app.emit('open-file',{preventDefault(){}},${JSON.stringify(second)});
-let last='';fs.watchFile(${JSON.stringify(commandFile)},{interval:100},()=>{const s=fs.readFileSync(${JSON.stringify(commandFile)},'utf8');if(s===last)return;last=s;const c=JSON.parse(s);if(c.quit){fs.unwatchFile(${JSON.stringify(commandFile)});app.quit()}else if(c.path)app.emit('open-file',{preventDefault(){}},c.path)});
+const cmdFile=path.join(run,'command.json');let last='';fs.watchFile(cmdFile,{interval:100},()=>{const s=fs.readFileSync(cmdFile,'utf8');if(s===last)return;last=s;const c=JSON.parse(s);if(c.quit){fs.unwatchFile(cmdFile);app.quit()}else if(c.path)app.emit('open-file',{preventDefault(){}},c.path)});
 `)
 const log = fs.openSync(path.join(run, 'electron.log'), 'w')
 const electron = path.join(root, 'desktop/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron')

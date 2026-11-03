@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import * as barriers from '../../src/utils/checkpointSaveBarrier.js'
 import * as protocol from '../../src/utils/localContentProtocol.js'
-const body = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8').match(/<script>([\s\S]*?)<\/script>/)[1]
+const body = ((s) => s.slice(s.indexOf('<script>') + 8, s.indexOf('</script>')))(readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8'))
   .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
   .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
 const deferred = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve } }

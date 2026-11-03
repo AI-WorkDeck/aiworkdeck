@@ -8,7 +8,7 @@ import { installExternalDragCleanup } from '../../src/utils/fileLocalDrag.js'
 
 function component(stubs = {}) {
   const source = readFileSync(new URL('../../src/components/ArchiveEntriesPane.vue', import.meta.url), 'utf8')
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
   const names = [...script.matchAll(/^import (.+) from .+$/gm)].flatMap(m => m[1].replace(/[{}]/g, '').split(',').map(s => s.trim()))
   const values = { defineAsyncComponent: () => ({}), ICONS: {}, host: {}, getArchiveEntryUrl: (p, f, path) => path, getAuthHeaders: () => ({}), ...stubs }
   const options = new Function(...names, script.replace(/^import .+$/gm, '').replace('export default', 'return'))(...names.map(n => values[n]))

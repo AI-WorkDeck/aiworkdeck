@@ -10,8 +10,17 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const read = (rel) => readFileSync(new URL('../../src/' + rel, import.meta.url), 'utf8')
+const cutBetween = (str, open, close) => {
+  let out = str, i = out.indexOf(open)
+  while (i !== -1) {
+    const j = out.indexOf(close, i + open.length)
+    out = j === -1 ? out.slice(0, i) : out.slice(0, i) + out.slice(j + close.length)
+    i = out.indexOf(open)
+  }
+  return out
+}
 const stripComments = (s) =>
-  s.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  cutBetween(cutBetween(s, '<!--', '-->'), '/*', '*/').replace(/^\s*\/\/.*$/gm, '')
 
 // ======================================================================
 // 1. FileTree.vue：还原嵌套文件时连带检查祖先（接线核实，判定逻辑见

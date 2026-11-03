@@ -171,7 +171,7 @@ try {
     Signature $Installer
     $installDir = Join-Path $env:RUNNER_TEMP ('AI WorkDeck native drag '+[guid]::NewGuid().ToString('N'))
     $exe = Join-Path $installDir 'AI WorkDeck.exe'
-    $installed = Start-Process $Installer -ArgumentList "/S /D=`"$installDir`"" -PassThru
+    $installed = Start-Process $Installer -ArgumentList "/S /D=$installDir" -PassThru
     Assert-That ($installed.WaitForExit(300000)) 'Actual NSIS completed'
     $installed.Refresh()
     Assert-That ($installed.ExitCode -eq 0) 'Actual NSIS exit code zero'

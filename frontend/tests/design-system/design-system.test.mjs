@@ -44,7 +44,7 @@ test('collectThemeTokens sends resolved metrics to the existing SDK channel', as
 
 function component(name) {
   const source = read(`frontend/src/components/${name}.vue`)
-  return new Function(source.match(/<script>([\s\S]*?)<\/script>/)[1].replace('export default', 'return'))()
+  return new Function(source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace('export default', 'return'))()
 }
 test('switch respects disabled state and emits only the intended new boolean', () => {
   const { methods } = component('AwdSwitch')

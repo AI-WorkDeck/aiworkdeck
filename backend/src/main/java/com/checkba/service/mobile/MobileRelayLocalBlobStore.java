@@ -28,7 +28,11 @@ public final class MobileRelayLocalBlobStore implements MobileRelayBlobStore {
 
     @Override
     public StoredBlob put(Long userId, String clientMediaId, InputStream content, long declaredSize) {
-        Path blob = relayRoot.resolve(String.valueOf(userId)).resolve(clientMediaId);
+        Path userDir = relayRoot.resolve(String.valueOf(userId)).normalize();
+        Path blob = userDir.resolve(clientMediaId).normalize();
+        if (!blob.startsWith(userDir) || !blob.getParent().equals(userDir)) {
+            throw new IllegalArgumentException("Invalid clientMediaId");
+        }
         try {
             Files.createDirectories(blob.getParent());
             long size = Files.copy(content, blob, StandardCopyOption.REPLACE_EXISTING);
@@ -40,7 +44,12 @@ public final class MobileRelayLocalBlobStore implements MobileRelayBlobStore {
 
     @Override
     public StoredBlob putPersistent(Long userId, String blobId, InputStream content, long declaredSize) {
-        Path blob = relayRoot.resolveSibling("mobile-backup").resolve(String.valueOf(userId)).resolve(blobId);
+        Path backupRoot = relayRoot.resolveSibling("mobile-backup").toAbsolutePath().normalize();
+        Path userDir = backupRoot.resolve(String.valueOf(userId)).normalize();
+        Path blob = userDir.resolve(blobId).normalize();
+        if (!blob.startsWith(userDir) || !blob.getParent().equals(userDir)) {
+            throw new IllegalArgumentException("Invalid blobId");
+        }
         try {
             Files.createDirectories(blob.getParent());
             return new StoredBlob(blob.toString(), Files.copy(content, blob, StandardCopyOption.REPLACE_EXISTING));
@@ -52,20 +61,29 @@ public final class MobileRelayLocalBlobStore implements MobileRelayBlobStore {
 
     @Override
     public InputStream open(String locator) throws IOException {
-        return Files.newInputStream(Path.of(locator));
+        return Files.newInputStream(safeLocatorPath(locator));
     }
 
     @Override
     public boolean exists(String locator) {
-        return Files.exists(Path.of(locator));
+        return Files.exists(safeLocatorPath(locator));
     }
 
     @Override
     public void deleteQuietly(String locator) {
         try {
-            Files.deleteIfExists(Path.of(locator));
+            Files.deleteIfExists(safeLocatorPath(locator));
         } catch (IOException e) {
             log.warn("删除中转 blob 失败，留给 TTL/生命周期兜底: {}", locator, e);
         }
+    }
+
+    private Path safeLocatorPath(String locator) {
+        Path p = Path.of(locator).toAbsolutePath().normalize();
+        Path storageRoot = relayRoot.getParent() != null ? relayRoot.getParent() : relayRoot;
+        if (!p.startsWith(storageRoot)) {
+            throw new IllegalArgumentException("Invalid mobile relay locator");
+        }
+        return p;
     }
 }

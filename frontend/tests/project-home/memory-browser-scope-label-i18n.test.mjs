@@ -15,7 +15,7 @@ const SRC = readFileSync(
 const enChat = (await import('../../src/locales/en-US/chat.js')).default
 
 function loadOptions() {
-  const script = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/import\s*\{[\s\S]*?\}\s*from\s*'@\/services\/api\.js'\s*/, '')
     .replace(/import\s*\{\s*markdownFileLinks\s*\}\s*from\s*'@\/composables\/memoryBrowserState\.mjs'\s*/, '')
     .replace(/import\s*\{\s*setGlobalOverlay\s*\}\s*from\s*'@\/utils\/overlayState\.js'\s*/, '')

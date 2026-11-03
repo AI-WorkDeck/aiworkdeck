@@ -14,7 +14,7 @@ const SRC = readFileSync(
   new URL('../../src/components/userprofile/PersonalSettingsPanel.vue', import.meta.url), 'utf8')
 
 function makeVm(deps, uniStub) {
-  const script = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
   const importRe = /import\s*\{([\s\S]*?)\}\s*from\s*'[^']+'\s*;?/g
   // 默认导入（组件之类：import AwdSwitch from '@/components/AwdSwitch.vue'）也要剥掉，
   // 否则 new Function 里留一行 import 就是「Cannot use import statement outside a module」。

@@ -25,7 +25,7 @@ let projectSequence = 0
 let checkpointStateReader = async () => ({ mayWrite: false })
 function optionsOf(rel) {
   const source = readFileSync(new URL(rel, import.meta.url), 'utf8')
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
   const names = []
   for (const m of script.matchAll(/^import\s+([\s\S]*?)\s+from\s+'[^']+'\s*;?\s*$/gm)) {
     const clause = m[1]

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const source = readFileSync(new URL('../../src/components/AwdSelect.vue', import.meta.url), 'utf8')
-const component = new Function(source.match(/<script>([\s\S]*?)<\/script>/)[1].replace('export default', 'return'))()
+const component = new Function(source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace('export default', 'return'))()
 function select(overrides = {}) {
   const events = [], focus = []
   const defaults = Object.fromEntries(Object.entries(component.props).map(([name, prop]) => [name, typeof prop.default === 'function' ? prop.default() : prop.default]))

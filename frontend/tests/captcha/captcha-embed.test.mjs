@@ -195,7 +195,7 @@ test('disabled 与 destroy：在等的回空串，之后的 getToken 直接空�
 test('接线：turnstile 分支不再本页 render，走 iframe + 两道过滤 + targetOrigin', () => {
   const src = read('utils/captcha.js')
   assert.ok(!src.includes('turnstile.render'), 'file:// 下直接 render 必报 110200')
-  assert.ok(!src.includes('challenges.cloudflare.com'), '不再在本页加载 Turnstile 脚本')
+  assert.doesNotMatch(src, /challenges\.cloudflare\.com/, '不再在本页加载 Turnstile 脚本')
   assert.match(src, /createElement\('iframe'\)/)
   assert.match(src, /allow-scripts allow-same-origin allow-forms allow-popups/)
   assert.match(src, /expectedSource: iframe\.contentWindow/)

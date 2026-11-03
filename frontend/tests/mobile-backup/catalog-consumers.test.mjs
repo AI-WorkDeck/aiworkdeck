@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import { computed, ref } from 'vue'
 
 const catalogSource = readFileSync(new URL('../../src/components/project-list/AccountProjectCatalog.vue', import.meta.url), 'utf8')
-const catalogScript = catalogSource.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'return')
+const catalogScript = catalogSource.slice(catalogSource.indexOf('<script>') + 8, catalogSource.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'return')
 function catalogFixture() {
   const imports = [], requests = [], events = []
   const component = new Function('importAccountCatalogFile', 'uni', catalogScript)(
@@ -46,7 +46,7 @@ test('desktop live LIST replaces an old backup snapshot consistently with the se
 })
 
 const officeSource = readFileSync(new URL('../../../office-addin/taskpane/components/TransferPanel.vue', import.meta.url), 'utf8')
-const officeScript = officeSource.match(/<script setup>([\s\S]*?)<\/script>/)[1]
+const officeScript = officeSource.slice(officeSource.indexOf('<script setup>') + 14, officeSource.indexOf('</script>'))
   .replace(/^import[\s\S]*?from ['"][^'"]+['"]\s*\n/gm, '')
 function officeFixture(files) {
   const calls = { quote: 0, pull: 0 }

@@ -91,13 +91,17 @@ const SAFE_COPY = [
   "      Pop $1"
 ].join('\n')
 const FIXED_MACRO = LEGACY_MACRO.replace(UNSAFE_COPY, SAFE_COPY)
+const UPSTREAM_26_MACRO = FIXED_MACRO
+  .replace('      StrCpy $0 "$LocalAppData\\Programs"\n      Push $1', '      StrCpy $0 "$LocalAppData\\Programs"\n\n      Push $1')
+  .replace('      Pop $1\n      StrCpy $INSTDIR', '      Pop $1\n\n      StrCpy $INSTDIR')
+  .replace('    ${StdUtils.GetParameter} $R0 "D" ""', '    !insertmacro GetDParameter $R0')
 
 function patchNsisSource(source) {
   const normalized = source.replace(/\r\n/g, '\n')
   const macros = [...normalized.matchAll(/^  !macro setInstallModePerUser\n[\s\S]*?^  !macroend/gm)]
   if (macros.length !== 1) throw new Error('Expected exactly one setInstallModePerUser macro; review electron-builder before packaging')
   const current = macros[0][0]
-  if (current === FIXED_MACRO) return source
+  if (current === FIXED_MACRO || current === UPSTREAM_26_MACRO) return source
   if (current !== LEGACY_MACRO) throw new Error('Unknown setInstallModePerUser structure; review the upstream NSIS fix before packaging')
   const patched = normalized.replace(LEGACY_MACRO, FIXED_MACRO)
   return source.includes('\r\n') ? patched.replace(/\n/g, '\r\n') : patched

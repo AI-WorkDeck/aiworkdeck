@@ -19,7 +19,7 @@ function setup(overrides = {}) {
     ...overrides,
   }
   const source = readFileSync(new URL('../../src/components/ContractReviewPane.vue', import.meta.url), 'utf8')
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '')
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace(/^import .*$/gm, '')
   const component = new Function(...Object.keys(deps), script.replace('export default', 'return'))(...Object.values(deps))
   const vm = { projectId: 1, docFileId: 9, docName: 'contract.docx', canWrite: true,
     $t: (key) => key, $emit: (name, payload) => { calls.emitted = [name, payload] }, prepareDocument: async (did) => { calls.prepare.push(did); return true } }

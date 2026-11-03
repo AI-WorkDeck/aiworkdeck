@@ -65,7 +65,7 @@ for (const kind of ['report', 'materials']) test(`${kind} reuses lost-ack key af
 
 function importForm(services, api = {}) {
   const source = readFileSync(new URL('../../src/components/dd/DdImportForm.vue', import.meta.url), 'utf8')
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'return')
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'return')
   const deps = { api, waitForDdJob, ...services }
   const options = new Function(...Object.keys(deps), script)(...Object.values(deps))
   const vm = { ...options.data(), projectId: 7, emitted: [], $t: key => key }; vm.$emit = (...args) => vm.emitted.push(args)

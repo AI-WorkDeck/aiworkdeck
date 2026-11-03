@@ -7,7 +7,7 @@ import { createTtsReader } from '../../src/utils/ttsReader.js'
 import { hasTtsText } from '../../src/utils/ttsText.js'
 
 const source = readFileSync(new URL('../../src/components/EasyVoicePane.vue', import.meta.url), 'utf8')
-const script = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .+$/gm, '').replace('export default', 'return')
+const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace(/^import .+$/gm, '').replace('export default', 'return')
 const tick = () => new Promise(resolve => setImmediate(resolve))
 const wave = () => {
   const buffer = new ArrayBuffer(48), v = new DataView(buffer)
