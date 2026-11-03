@@ -129,13 +129,80 @@ async function quit() {
   await sleep(1000)
 }
 async function open(ext) {
+  const openRequests = []
+  const onOpenRequest = request => {
+    if (new URL(request.url()).pathname !== '/api/projects/open-local-file') return
+    let matchesFixture = false
+    try { matchesFixture = JSON.parse(request.postData()).path === files[ext] } catch (_) {}
+    openRequests.push({ stage: 'request', method: request.method(), matchesFixture })
+    write(`${ext}-open-network.json`, openRequests)
+  }
+  const onOpenRequestFailed = request => {
+    if (new URL(request.url()).pathname !== '/api/projects/open-local-file') return
+    openRequests.push({ stage: 'failed', error: request.failure()?.errorText })
+    write(`${ext}-open-network.json`, openRequests)
+  }
+  const onOpenResponse = async response => {
+    if (new URL(response.url()).pathname !== '/api/projects/open-local-file') return
+    const record = { status: response.status(), method: response.request().method() }
+    openRequests.push(record)
+    write(`${ext}-open-network.json`, openRequests)
+    try {
+      const body = await response.json()
+      record.body = { code: body.code, message: body.message, msg: body.msg,
+        projectId: body.data?.projectId, file: body.data?.file && { id: body.data.file.id, name: body.data.file.name } }
+    } catch (error) { record.readError = error.message }
+    write(`${ext}-open-network.json`, openRequests)
+  }
+  if (installedMode) {
+    page.on('request', onOpenRequest)
+    page.on('requestfailed', onOpenRequestFailed)
+    page.on('response', onOpenResponse)
+  }
+  const diagnose = async phase => {
+    if (!installedMode) return
+    const file = JSON.stringify(files[ext])
+    const main = await installed.mainRpc(`(() => {
+      const fs = process.mainModule.require('node:fs'), path = process.mainModule.require('node:path');
+      const app = process.mainModule.require('electron').app;
+      let stat, queue;
+      try { const s = fs.statSync(${file}); stat = { exists: true, isFile: s.isFile(), bytes: s.size }; }
+      catch (error) { stat = { exists: false, code: error.code }; }
+      try { queue = JSON.parse(fs.readFileSync(path.join(app.getPath('home'), '.aiworkdeck', 'restart-open-paths.json'), 'utf8')); }
+      catch (error) { queue = { code: error.code }; }
+      return { path: ${file}, stat, queue, platform: process.platform,
+        defaultApp: process.defaultApp === true, packaged: app.isPackaged,
+        openFileListeners: app.listenerCount('open-file'), secondInstanceListeners: app.listenerCount('second-instance') };
+    })()`)
+    const renderer = await page.evaluate(() => {
+      const vm = window.__checkbaActiveOverviewVm
+      return { url: location.href, workbenchPresent: !!vm, projectId: vm?.projectId,
+        activeFile: vm?.activeFileLeft && { id: vm.activeFileLeft.id, name: vm.activeFileLeft.name },
+        visibleMessages: [...document.querySelectorAll('uni-toast, .uni-toast, .uni-modal')].map(e => e.textContent) }
+    })
+    write(`${ext}-open-${phase}.json`, { main, renderer })
+  }
+  await diagnose('before')
   if (installedMode) {
     const file = JSON.stringify(files[ext])
     await installed.mainRpc(process.platform === 'darwin'
       ? `process.mainModule.require('electron').app.emit('open-file',{preventDefault(){}},${file})`
       : `process.mainModule.require('electron').app.emit('second-instance',{},[process.execPath,${file}],process.cwd())`)
   } else fs.writeFileSync(commandFile, JSON.stringify({ path: files[ext], nonce: Date.now() }))
-  await page.waitForFunction(name => window.__checkbaActiveOverviewVm?.activeFileLeft?.name === name, { timeout: 60000 }, path.basename(files[ext]))
+  await diagnose('dispatched')
+  try {
+    await page.waitForFunction(name => window.__checkbaActiveOverviewVm?.activeFileLeft?.name === name, { timeout: 60000 }, path.basename(files[ext]))
+  } catch (error) {
+    try { await diagnose('failed') } catch (diagnosticError) { write(`${ext}-open-diagnostic-error.json`, { message: diagnosticError.message }) }
+    throw error
+  } finally {
+    if (installedMode) {
+      page.off('request', onOpenRequest)
+      page.off('requestfailed', onOpenRequestFailed)
+      page.off('response', onOpenResponse)
+      write(`${ext}-open-network.json`, openRequests)
+    }
+  }
   if (ext === 'pdf') {
     await page.waitForSelector('.preview-pdf iframe', { timeout: 30000 })
     await assertLocalWorkspaceUnobstructed()
