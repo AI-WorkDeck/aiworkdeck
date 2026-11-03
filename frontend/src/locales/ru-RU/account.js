@@ -389,5 +389,17 @@ export default {
   "caseRecordCollectionFailedToast": "Не удалось зафиксировать получение оплаты",
   "caseSyncErpFailedToast": "Сбой синхронизации финансовых данных",
   "caseSeedDemoFailedToast": "Не удалось загрузить демо-данные",
-  "caseOpenPluginFailedToast": "Не удалось открыть плагин"
+  "caseOpenPluginFailedToast": "Не удалось открыть плагин",
+  "circleInviteLabel": "Код приглашения Circle Alliance (необязательно)",
+  "circleInvitePlaceholder": "например KW-ABNR-2026",
+  "circleInviteHint": "Введите приглашительный код вашей фирмы, чтобы добавить суффикс фирмы и разблокировать выделенную квоту DeepSeek",
+  "bqtScanSwitch": "Вход юриста Baoqingtian по QR-коду",
+  "bqtScanTitle": "Отсканируйте приложением юриста Baoqingtian, чтобы войти",
+  "bqtScanHint": "Только для верифицированных юристов Baoqingtian. Ежемесячные Qingtian Coins начисляются автоматически.",
+  "bqtScanExpired": "QR-код истёк",
+  "bqtScanRefresh": "Обновить QR-код",
+  "bqtScanBack": "Вернуться ко входу по аккаунту",
+  "errInvalidInviteCode": "Пригласительный код недействителен или отключён",
+  "errInviteAlreadyBound": "Этот аккаунт уже привязал пригласительный код фирмы Circle",
+  "errBqtNotLawyer": "Только верифицированные аккаунты юристов Baoqingtian могут входить по QR-коду",
 }

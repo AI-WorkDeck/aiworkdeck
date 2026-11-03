@@ -445,5 +445,17 @@ export default {
   "ocrSettingsReload": "再読み込み",
   "ocrSettingsSaved": "保存しました",
   "ocrSettingsLoadFailed": "読み込みに失敗しました",
-  "ocrSettingsSaveFailed": "保存に失敗しました"
+  "ocrSettingsSaveFailed": "保存に失敗しました",
+  "walletRedeemTitle": "ギフトコード / Circle 律所招待コード",
+  "walletRedeemPlaceholder": "ギフトコードまたは Circle 律所コードを入力（例：KW-ABNR-2026）",
+  "walletRedeemBtn": "引き換え / バインド",
+  "walletRedeemSubmitting": "処理中…",
+  "walletRedeemSuccessGift": "{amount} を引き換えました",
+  "walletRedeemSuccessFeature": "引き換えが完了し、特典を開通しました",
+  "walletRedeemSuccessCircle": "{firm}（サフィックス：{suffix}）にバインドし、{amount} の DeepSeek 専用枠を付与しました",
+  "walletRedeemFailed": "ギフトコードまたは招待コードが無効です",
+  "walletCircleBadge": "Circle アライアンス律所：{firm}（サフィックス：{suffix}）· 加算課金なし",
+  "walletQingtianTitle": "包晴天 · 晴天コイン月間枠",
+  "walletQingtianBalance": "今月の残り：{remaining} / {monthly} 晴天コイン",
+  "walletQingtianRatio": "換算レート：1 晴天コイン = {creditsPerCoin} クレジット（当月有効）",
 }

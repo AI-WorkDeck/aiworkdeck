@@ -445,5 +445,17 @@ export default {
   "ocrSettingsReload": "إعادة التحميل",
   "ocrSettingsSaved": "تم الحفظ",
   "ocrSettingsLoadFailed": "فشل التحميل",
-  "ocrSettingsSaveFailed": "فشل الحفظ"
+  "ocrSettingsSaveFailed": "فشل الحفظ",
+  "walletRedeemTitle": "رمز هدية / رمز دعوة مكتب Circle",
+  "walletRedeemPlaceholder": "أدخل رمز الهدية أو رمز دعوة Circle (مثل KW-ABNR-2026)",
+  "walletRedeemBtn": "استبدال / ربط",
+  "walletRedeemSubmitting": "جارٍ التنفيذ…",
+  "walletRedeemSuccessGift": "تم الاستبدال، أُضيف {amount} إلى رصيدك",
+  "walletRedeemSuccessFeature": "تم الاستبدال، تم تفعيل الميزة",
+  "walletRedeemSuccessCircle": "تم الربط بـ {firm} (اللاحقة: {suffix})، ومُنح {amount} من حصة DeepSeek المخصصة",
+  "walletRedeemFailed": "رمز الهدية أو الدعوة غير صالح، تحقق وأعد المحاولة",
+  "walletCircleBadge": "مكتب Circle Alliance: {firm} (اللاحقة: {suffix}) · تسعير بدون زيادة",
+  "walletQingtianTitle": "بوتشينغتيان · مخصص تشينغتيان الشهري",
+  "walletQingtianBalance": "المتبقي هذا الشهر {remaining} / {monthly} عملة تشينغتيان",
+  "walletQingtianRatio": "سعر التحويل: 1 عملة تشينغتيان = {creditsPerCoin} ائتمانات (صالحة للشهر الحالي)",
 }

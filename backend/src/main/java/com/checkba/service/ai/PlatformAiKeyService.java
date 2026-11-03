@@ -80,7 +80,7 @@ public class PlatformAiKeyService {
         String base = bailian ? accountService.platformAiBaseUrl() : null;
         if ((!bailian && !"openrouter".equals(provider)) || key == null || key.isBlank()
                 || bailian && (!key.startsWith("awdai_") || !java.util.Objects.equals(base, body.get("baseUrl")))
-                || accountService.domesticAiPlatform() != bailian) {
+                || (accountService.domesticAiPlatform() && !bailian)) {
             throw new AccountException(AccountException.Kind.MALFORMED,
                     LangText.of("平台 AI 通道配置与当前站点不符，请刷新账户连接",
                             "The platform AI connection does not match this site. Refresh the account connection"));
@@ -121,7 +121,7 @@ public class PlatformAiKeyService {
         Optional<PlatformAiKey> row = keyRepository.findByUserId(userId);
         if (row.isEmpty()) return Optional.empty();
         PlatformAiKey entity = row.get();
-        if (isStale(entity) || accountService.domesticAiPlatform() != "bailian".equals(entity.getProvider())
+        if (isStale(entity) || (accountService.domesticAiPlatform() && !"bailian".equals(entity.getProvider()))
                 || "bailian".equals(entity.getProvider())
                 && !java.util.Objects.equals(accountService.platformAiBaseUrl(), entity.getBaseUrl())) return Optional.empty();
         String plaintext;

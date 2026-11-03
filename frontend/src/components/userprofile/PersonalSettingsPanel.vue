@@ -46,7 +46,7 @@
             v-if="canEditProfile"
             class="bind-input"
             v-model="displayNameInput"
-            maxlength="24"
+            maxlength="48"
             :focus="displayNameFocus"
             :disabled="displayNameSaving"
             :placeholder="$t('account.nicknamePlaceholder')"

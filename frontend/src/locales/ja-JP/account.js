@@ -389,5 +389,17 @@ export default {
   "caseRecordCollectionFailedToast": "入金の記録に失敗しました",
   "caseSyncErpFailedToast": "財務同期に失敗しました",
   "caseSeedDemoFailedToast": "デモデータの作成に失敗しました",
-  "caseOpenPluginFailedToast": "プラグインを開けませんでした"
+  "caseOpenPluginFailedToast": "プラグインを開けませんでした",
+  "circleInviteLabel": "Circle アライアンス招待コード（任意）",
+  "circleInvitePlaceholder": "例：KW-ABNR-2026",
+  "circleInviteHint": "律所専用の招待コードを入力すると、律所サフィックスが付与され、DeepSeek 専用枠が解放されます",
+  "bqtScanSwitch": "包晴天弁護士QRログイン",
+  "bqtScanTitle": "包晴天弁護士アプリでスキャンしてログイン",
+  "bqtScanHint": "認証済みの包晴天弁護士のみ利用できます。毎月の晴天コインは自動的に付与されます。",
+  "bqtScanExpired": "QRコードの有効期限が切れました",
+  "bqtScanRefresh": "QRコードを更新",
+  "bqtScanBack": "アカウントログインに戻る",
+  "errInvalidInviteCode": "招待コードが無効または停止されています",
+  "errInviteAlreadyBound": "このアカウントはすでに Circle 律所招待コードをバインド済みです",
+  "errBqtNotLawyer": "認証済みの包晴天弁護士アカウントのみQRログインできます",
 }

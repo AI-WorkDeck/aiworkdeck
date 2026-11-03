@@ -84,4 +84,29 @@ class BailianPlatformConnectionTest {
                 (method,url,key,body) -> new AccountTransport.Reply(503, "{}"), "https://openrouter.ai/api/v1");
         assertThrows(AccountException.class, catalog::current);
     }
+
+    @Test void internationalCircleGatewayAcceptsRestrictedGatewayTokenAndUsdCatalog() {
+        String intlBase = "https://www.workdeck.ai/api/account/ai/v1";
+        AccountService intlAccount = mock(AccountService.class);
+        when(intlAccount.domesticAiPlatform()).thenReturn(false);
+        when(intlAccount.platformAiBaseUrl()).thenReturn(intlBase);
+        Map<String, Object> circleGatewayBody = Map.of(
+                "provider", "bailian",
+                "apiKey", "awdai_circle_abnr",
+                "baseUrl", intlBase,
+                "defaultModel", "deepseek/deepseek-chat");
+        PlatformAiKeyService.Resolved resolved = PlatformAiKeyService.parseConnection(circleGatewayBody, intlAccount);
+        assertTrue(resolved.bailian());
+        assertEquals(intlBase, resolved.baseUrl());
+
+        PlatformAiChannel channel = mock(PlatformAiChannel.class);
+        when(channel.connection()).thenReturn(resolved);
+        PlatformModelCatalog catalog = new PlatformModelCatalog(channel, (method, url, key, body) ->
+                new AccountTransport.Reply(200, "{\"currency\":\"USD\",\"marginMultiplier\":1.0,\"defaultModel\":\"deepseek/deepseek-chat\",\"models\":[{\"id\":\"deepseek/deepseek-chat\",\"name\":\"DeepSeek V3\",\"vendor\":\"DeepSeek\",\"supportsTools\":true,\"supportsVision\":false,\"contextLength\":64000,\"inputPricePerMillion\":0.27,\"outputPricePerMillion\":1.10,\"tiered\":false}]}"),
+                "https://openrouter.ai/api/v1");
+        PlatformModelCatalog.Catalog current = catalog.current();
+        assertEquals("USD", current.currency());
+        assertEquals(1.0, current.marginMultiplier());
+        assertEquals("deepseek/deepseek-chat", current.defaultModel());
+    }
 }
