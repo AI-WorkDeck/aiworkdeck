@@ -25,7 +25,7 @@ export default {
   "exitCancel": "取消",
   "exitConflict": "改動存在衝突，請在版本控制面板處理後再離開。",
   "exitNewChanges": "還有新的改動尚未提交，請檢查後再離開。",
-  "exitCheckFailed": "暫時無法確認或提交項目改動，已取消離開。請重試。",
+  "exitCheckFailed": "暫時無法檢查或提交項目改動。請重試，或直接退出而不提交。",
   "controlEntry": "版本控制",
   "entryUnavailable": "狀態暫時無法讀取，點擊重試",
   "pendingFileCount": "{count} 個文件待提交",

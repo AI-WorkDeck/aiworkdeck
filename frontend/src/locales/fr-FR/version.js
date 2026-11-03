@@ -25,7 +25,7 @@ export default {
   "exitCancel": "Annuler",
   "exitConflict": "Les modifications présentent des conflits. Résolvez-les dans le Contrôle de version avant de quitter.",
   "exitNewChanges": "De nouvelles modifications sont en attente de validation. Vérifiez-les avant de quitter.",
-  "exitCheckFailed": "Impossible de vérifier ou de valider les modifications du projet. La sortie a été annulée ; veuillez réessayer.",
+  "exitCheckFailed": "Impossible de vérifier ou de valider les modifications. Réessayez ou quittez sans valider.",
   "controlEntry": "Contrôle de version",
   "entryUnavailable": "État indisponible. Cliquez pour réessayer",
   "pendingFileCount": "{count} fichier(s) en attente de validation",
