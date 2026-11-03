@@ -588,3 +588,11 @@ find-or-create，影子项目从 `/api/projects/my` 滤掉）。绑定后两条�
 Apple 订阅桥接：GET `/api/mobile/billing/subscription/appstore/capability`（只读、不建账），POST 同路径 `/prepare` 返回稳定 appAccountToken，POST `/confirm` 将签名交易送账户中心验证。客户端确认 CONFIRMED 后再 finish；已有套餐余额语义不变，开关默认关闭。商品审核、真实沙盒扣费和发版另行完成，不因代码合并视为开通。
 
 验证：后端 9 类 131 测试通过，包括事务回滚/文件竞争、25轮完整个人助理导出、越权/运行中拒绝及 OpenAPI。
+
+### 个人助理对话转存到桌面正式项目（dev-board#1656）
+
+`POST /api/mobile/assistant/conversations/{id}/copy-to-desktop` 冻结完整文字历史及来源说明，使用独立的 desktop-copies 待送达队列；不进入旧 Office 镜像队列，不复制来源文件、附件或可执行操作。目标必须匹配目录中的 projectUid、deviceId、projectKey，并证明本人拥有且非 SCRATCH/LOOSE_FILES。旧桌面缺少元数据时提示升级并同步目录。
+
+请求 UUID 对同一来源及目标幂等。手机以当前账户范围保存请求后发送；网络失败沿用同一 UUID，并可从会话最近收据恢复。QUEUED 不等于已送达；30 天未完成为 EXPIRED。桌面通过独立 pending/ack 接口取件，复核 SHA256、目标身份、所有权和项目类型后，同一事务写普通可继续对话的消息及永久收据。消息 sourceChannel 留空，不能误标为只读 Office 镜像。去重范围为站点、官方账户、请求 UUID；凭据轮换不改变收据，用户删除已导入对话后重试也不重建。
+
+桌面导入先开启独立事务、取得项目锁，再按官方账户和当前本机身份顺序冻结身份，并在冻结期间完成实际提交，避免与现有项目 IM 操作形成锁反序；网络请求不持锁。数据库或网络暂时失败不 ACK，待下次重试；永久身份/完整性错误只 ACK FAILED。本地收据另存未确认 ACK 状态，电脑恢复联网时主动补确认，云任务过期或不再返回快照也不丢失真实送达状态。关闭个人助理时同一事务立即清除未送达快照；云端每次下发前复核授权修订、有效订阅、备份和冻结来源的可读权限，撤回后停止下发并删除快照。已经下载到桌面的字节无法撤回；晚到的实际成功 ACK 可更新为 DELIVERED，已送达状态不能被旧失败 ACK 覆盖。

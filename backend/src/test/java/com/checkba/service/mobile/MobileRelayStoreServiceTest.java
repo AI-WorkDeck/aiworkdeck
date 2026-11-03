@@ -87,6 +87,17 @@ class MobileRelayStoreServiceTest {
     }
 
     @Test
+    void desktopCopyMetadataIsExplicitAndOldPublishersCannotInheritOwnership() {
+        String uid=java.util.UUID.randomUUID().toString();
+        service.replaceDirectory(1L,"copy-device","Mac",List.of(new MobileRelayStoreService.DirEntry("7","Formal",uid,null,"BLANK",true)));
+        var first=dirRepository.findByUserIdAndDeviceId(1L,"copy-device").get(0);
+        assertEquals("BLANK",first.getProjectType());assertEquals(true,first.getOwned());
+        service.replaceDirectory(1L,"copy-device","Mac",List.of(new MobileRelayStoreService.DirEntry("7","Formal")));
+        var old=dirRepository.findByUserIdAndDeviceId(1L,"copy-device").get(0);
+        assertNull(old.getProjectType());assertNull(old.getOwned());
+    }
+
+    @Test
     @DisplayName("目录整批替换：同设备重推覆盖，跨设备并集保留")
     void directoryReplaceIsPerDevice() {
         service.replaceDirectory(1L, "dev-a", "Mac", List.of(
