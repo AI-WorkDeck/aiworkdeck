@@ -28,7 +28,7 @@ export default defineConfig({
       const pluginNamespaces = {
         search: ['common', 'files', 'account'],
         desensitize: ['common', 'panels', 'account'],
-        'litigation-visual': ['common', 'panels', 'account'],
+        'litigation-visual': ['common', 'panels', 'account', 'market'],
         insight: ['common', 'insight', 'contractReview', 'account'],
         voice: ['common', 'workbench', 'panels', 'components', 'account', 'meeting', 'onboarding', 'accountPassword', 'admin'],
         calendar: ['common', 'calendar', 'account', 'chat', 'files', 'config'],
