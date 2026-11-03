@@ -1387,7 +1387,7 @@ public class MobileRelayClientService {
         try {
             long generation=accountService.connectionVersion();
             CatalogSession session=beginCatalogSession(catalogAccountScope());
-            var frozen=new DesktopAssistantCopyImportService.Session(baseUrl,accountService.currentAccountIdOrNull(),
+            var frozen=new DesktopAssistantCopyImportService.Session(tokenBaseUrl(session.token()),accountService.currentAccountIdOrNull(),
                     accountService.accountFingerprintOrNull(),generation,deviceId(),localIdentityService.localUserId());
             requireAssistantSession(session,frozen);
             // Local committed receipts outlive cloud payload expiry and deleted local conversations.
@@ -1453,6 +1453,7 @@ public class MobileRelayClientService {
     private void requireAssistantSession(CatalogSession session,DesktopAssistantCopyImportService.Session frozen) {
         if(!active()||!frozen.deviceId().equals(deviceId()))throw new IllegalStateException("ASSISTANT_COPY_SESSION_CHANGED");
         requireCatalogAccountScope(session.scope());
+        if(!frozen.site().equals(tokenBaseUrl(session.token())))throw new IllegalStateException("ASSISTANT_COPY_SITE_CHANGED");
         assistantCopyImporter.requireSession(frozen);
     }
 

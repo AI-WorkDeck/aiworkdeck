@@ -40,6 +40,14 @@ class DesktopAssistantCopyImportServiceTest {
     @BeforeEach void setup(){
         receipts.deleteAll();messages.deleteAll();projects.deleteAll();
         accounts=mock(AccountService.class);identity=mock(LocalIdentityService.class);
+        when(accounts.connectionSnapshot()).thenAnswer(i -> new AccountService.ConnectionSnapshot(
+                "https://www.aiworkdeck.com",accounts.currentKeyOrNull(),accounts.accountFingerprintOrNull(),accounts.connectionVersion()));
+        when(accounts.isCurrentConnection(any())).thenAnswer(i -> {
+            AccountService.ConnectionSnapshot snapshot=i.getArgument(0);
+            return java.util.Objects.equals(snapshot.key(),accounts.currentKeyOrNull())
+                    && java.util.Objects.equals(snapshot.fingerprint(),accounts.accountFingerprintOrNull())
+                    && snapshot.generation()==accounts.connectionVersion();
+        });
         when(accounts.currentAccountIdOrNull()).thenReturn("website-user-a");when(accounts.accountFingerprintOrNull()).thenReturn("fingerprint-a");
         when(accounts.connectionVersion()).thenReturn(4L);when(identity.localUserId()).thenReturn(7L);
         service=new DesktopAssistantCopyImportService(accounts,identity,projects,messages,receipts,mapper,transactions);
@@ -224,7 +232,7 @@ class DesktopAssistantCopyImportServiceTest {
                 byte[] bytes=body.getBytes(java.nio.charset.StandardCharsets.UTF_8);exchange.sendResponseHeaders(status,bytes.length);exchange.getResponseBody().write(bytes);exchange.close();
             });server.start();
             when(accounts.currentKeyOrNull()).thenReturn("awdk_synthetic");
-            java.nio.file.Files.writeString(stateDir.resolve("mobile-relay.json"),"{\"deviceId\":\"device-a\",\"token\":\"awdt_synthetic\",\"accountFingerprint\":\"fingerprint-a\"}");
+            java.nio.file.Files.writeString(stateDir.resolve("mobile-relay.json"),"{\"deviceId\":\"device-a\",\"token\":\"awdt_synthetic\",\"accountFingerprint\":\"fingerprint-a\",\"serverUrl\":\""+("http://127.0.0.1:"+server.getAddress().getPort())+"\"}");
             client=new MobileRelayClientService(true,true,"http://127.0.0.1:"+server.getAddress().getPort(),"https://www.aiworkdeck.com",stateDir.toString(),
                     accounts,identity,projects,mock(com.checkba.service.ProjectFileService.class),mock(com.checkba.storage.StorageServiceFactory.class),
                     mock(com.checkba.service.ProjectAiMessageService.class),mock(DesktopRefHandler.class));
