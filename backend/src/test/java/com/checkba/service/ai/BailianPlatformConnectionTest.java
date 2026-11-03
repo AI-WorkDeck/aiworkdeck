@@ -77,6 +77,27 @@ class BailianPlatformConnectionTest {
         assertNull(catalog.failover(List.of("anthropic/claude-sonnet-5"), "qwen/old", Set.of("anthropic/claude-sonnet-5"), true));
     }
 
+    @Test void internationalCatalogueRecognizesPromptLengthOverrides() throws Exception {
+        PlatformModelCatalog service = new PlatformModelCatalog(mock(PlatformAiChannel.class),
+                mock(AccountTransport.class), "https://openrouter.ai/api/v1");
+        for (String overrides : List.of("", ",\"overrides\":[]",
+                ",\"overrides\":[{\"min_prompt_tokens\":272000,\"prompt\":\"0.000004\",\"completion\":\"0.000018\"}]")) {
+            var catalog = service.parse("""
+                    {"data":[{"id":"openai/gpt-5.6-terra","context_length":1050000,
+                    "architecture":{"input_modalities":["text","image"],"output_modalities":["text"]},
+                    "supported_parameters":["tools"],
+                    "pricing":{"prompt":"0.000002","completion":"0.000012"%s}}]}
+                    """.formatted(overrides), false, "openai/gpt-5.6-terra");
+            var model = catalog.models().get(0);
+            assertEquals(overrides.contains("min_prompt_tokens"), model.tiered());
+            assertEquals("USD", catalog.currency());
+            assertEquals(2.0, model.inputPricePerMillion());
+            assertEquals(12.0, model.outputPricePerMillion());
+            assertTrue(model.supportsVision());
+            assertTrue(model.supportsTools());
+        }
+    }
+
     @Test void unavailableCatalogueCannotBecomeEmptyFreeOrOpenRouterFallback() {
         PlatformAiChannel channel = mock(PlatformAiChannel.class);
         when(channel.connection()).thenReturn(new PlatformAiKeyService.Resolved("awdai_a", "a", null, "bailian", BASE, "qwen3.8-flash"));
