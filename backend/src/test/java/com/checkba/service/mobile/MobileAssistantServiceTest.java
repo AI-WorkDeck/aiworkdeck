@@ -112,6 +112,7 @@ class MobileAssistantServiceTest {
         var request=desktopRequest();var exporter=desktopExporter();
         var receipt=desktopTx(()->exporter.create(user,conversation,request));
         assertEquals("QUEUED",receipt.status());assertEquals(410,receipt.messageCount());
+        assertEquals(0,receipt.expiresAt().getNano()%1000);
         assertEquals(receipt,desktopTx(()->exporter.create(user,conversation,request)));
         var envelope=desktopTx(()->exporter.pending(user,device)).get(0);
         var json=new com.fasterxml.jackson.databind.ObjectMapper().readTree(envelope.snapshotJson());
@@ -121,6 +122,7 @@ class MobileAssistantServiceTest {
         var ack=new MobileAssistantDesktopCopyService.Ack(device,request.targetProjectUid(),envelope.sha256(),"DELIVERED",null);
         var delivered=desktopTx(()->exporter.ack(user,request.requestId(),ack));
         assertEquals("DELIVERED",delivered.status());assertNotNull(delivered.deliveredAt());
+        assertEquals(0,delivered.deliveredAt().getNano()%1000);
         assertEquals(delivered,desktopTx(()->exporter.ack(user,request.requestId(),ack)));
         assertTrue(desktopTx(()->exporter.pending(user,device)).isEmpty());
         assertNull(desktopCopies.findByUserIdAndRequestId(user,request.requestId()).orElseThrow().getSnapshotJson());
