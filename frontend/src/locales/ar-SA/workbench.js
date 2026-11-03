@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyTitle: "نسخ إلى مشروع",
+  scratchCopyHint: "انسخ المحادثات والملفات المحددة مع الاحتفاظ بالأصول. يمكن لأعضاء المشروع المستهدف الوصول إلى النسخ.",
   "restartPending": "يمكن استئناف {count} من المهام",
   "restartContinue": "متابعة: {name}",
   "restartRestoring": "جارٍ استعادة المحادثة والمستند الأصليين…",
@@ -335,8 +337,8 @@ export default {
     "modeChat": "محادثة",
     "modeIde": "مساحة العمل",
     "chatTitle": "محادثة",
-    "scratchTitle": "مساحة عمل سريعة",
-    "scratchBadge": "مساحة عمل سريعة",
+    "scratchTitle": "مشروع مؤقت",
+    "scratchBadge": "مشروع مؤقت",
     "promoteAction": "تحويل إلى مشروع رسمي",
     "promoteTitle": "تحويل إلى مشروع رسمي",
     "promotePlaceholder": "أدخل اسم المشروع",

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  defaultProjectName: "Temporäres Projekt",
   cmdPptAddImage: "Bild in Folie einfügen",
   cmdPptAddChart: "Diagramm in Folie einfügen",
   cmdPptFormatChart: "Foliendiagramm formatieren",

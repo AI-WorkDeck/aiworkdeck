@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyTitle: "คัดลอกไปยังโครงการ",
+  scratchCopyHint: "คัดลอกการสนทนาและไฟล์ที่เลือกโดยเก็บต้นฉบับไว้ สมาชิกโครงการปลายทางสามารถเข้าถึงสำเนาได้",
   "restartPending": "สามารถดำเนินงานต่อได้ {count} รายการ",
   "restartContinue": "ดำเนินการต่อ: {name}",
   "restartRestoring": "กำลังกู้คืนบทสนทนาและเอกสารต้นฉบับ…",
@@ -335,8 +337,8 @@ export default {
     "modeChat": "แชท",
     "modeIde": "เวิร์กเบนช์",
     "chatTitle": "แชท",
-    "scratchTitle": "พื้นที่ทำงานชั่วคราว",
-    "scratchBadge": "พื้นที่ทำงานชั่วคราว",
+    "scratchTitle": "โครงการชั่วคราว",
+    "scratchBadge": "โครงการชั่วคราว",
     "promoteAction": "แปลงเป็นโปรเจกต์ ↗",
     "promoteTitle": "แปลงเป็นโปรเจกต์จริง",
     "promotePlaceholder": "กรอกชื่อโปรเจกต์",

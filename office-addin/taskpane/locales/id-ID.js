@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  defaultProjectName: "Proyek sementara",
   cmdPptAddImage: "Sisipkan gambar pada slide",
   cmdPptAddChart: "Sisipkan grafik pada slide",
   cmdPptFormatChart: "Format grafik slide",

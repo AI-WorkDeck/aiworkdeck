@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyTitle: "프로젝트로 복사",
+  scratchCopyHint: "선택한 대화와 파일을 복사하고 원본을 유지합니다. 대상 프로젝트 구성원은 복사본을 볼 수 있습니다.",
   "restartPending": "{count}개의 작업을 재개할 수 있습니다",
   "restartContinue": "계속: {name}",
   "restartRestoring": "원본 대화 및 문서를 복원하는 중…",
@@ -335,8 +337,8 @@ export default {
     "modeChat": "채팅",
     "modeIde": "작업대",
     "chatTitle": "채팅",
-    "scratchTitle": "임시 작업 공간",
-    "scratchBadge": "임시 작업 공간",
+    "scratchTitle": "임시 프로젝트",
+    "scratchBadge": "임시 프로젝트",
     "promoteAction": "정식 프로젝트로 전환",
     "promoteTitle": "정식 프로젝트로 변환",
     "promotePlaceholder": "프로젝트 이름을 입력하세요",

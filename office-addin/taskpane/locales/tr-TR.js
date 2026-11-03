@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  defaultProjectName: "Geçici proje",
   cmdPptAddImage: "Slayda resim ekle",
   cmdPptAddChart: "Slayda grafik ekle",
   cmdPptFormatChart: "Slayt grafiğini biçimlendir",

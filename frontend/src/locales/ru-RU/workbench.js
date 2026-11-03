@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyTitle: "Копировать в проект",
+  scratchCopyHint: "Копирование выбранных диалогов и файлов с сохранением оригиналов. Участники целевого проекта получат доступ к копиям.",
   "restartPending": "Можно возобновить задач: {count}",
   "restartContinue": "Продолжить: {name}",
   "restartRestoring": "Восстановление исходного разговора и документа…",
@@ -335,8 +337,8 @@ export default {
     "modeChat": "Чат",
     "modeIde": "Рабочая область",
     "chatTitle": "Чат",
-    "scratchTitle": "Быстрая рабочая область",
-    "scratchBadge": "Быстрая рабочая область",
+    "scratchTitle": "Временный проект",
+    "scratchBadge": "Временный проект",
     "promoteAction": "Преобразовать в проект",
     "promoteTitle": "Преобразовать в полноценный проект",
     "promotePlaceholder": "Введите название проекта",

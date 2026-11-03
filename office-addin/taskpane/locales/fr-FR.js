@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  defaultProjectName: "Projet temporaire",
   cmdPptAddImage: "Insérer une image dans la diapositive",
   cmdPptAddChart: "Insérer un graphique dans la diapositive",
   cmdPptFormatChart: "Mettre en forme le graphique de la diapositive",

@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Workbench copy (pages/project-overview/project-overview.vue).
 export default {
+  scratchCopyTitle: "Copy to a project",
+  scratchCopyHint: "Copy selected conversations and files, keeping the originals. Members of the destination project can access the copies.",
   restartPending: '{count} tasks can be resumed',
   restartContinue: 'Continue: {name}',
   restartRestoring: 'Restoring the original conversation and document…',
@@ -366,8 +368,8 @@ export default {
     modeChat: 'Chat',
     modeIde: 'Workbench',
     chatTitle: 'Chat',
-    scratchTitle: 'Scratch workspace',
-    scratchBadge: 'Scratch workspace',
+    scratchTitle: "Temporary project",
+    scratchBadge: "Temporary project",
     promoteAction: 'Convert to project',
     promoteTitle: 'Convert to a formal project',
     promotePlaceholder: 'Enter a project name',

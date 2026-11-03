@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyTitle: "轉存到正式專案",
+  scratchCopyHint: "複製所選對話和檔案，保留原件；目標專案成員可查看轉存內容。",
   "restartPending": "{count} 個任務可繼續",
   "restartContinue": "繼續：{name}",
   "restartRestoring": "正在恢復原會話與文檔…",
@@ -335,8 +337,8 @@ export default {
     "modeChat": "對話",
     "modeIde": "工作台",
     "chatTitle": "對話",
-    "scratchTitle": "隨手工作區",
-    "scratchBadge": "隨手工作區",
+    "scratchTitle": "臨時專案",
+    "scratchBadge": "臨時專案",
     "promoteAction": "轉為正式項目 ↗",
     "promoteTitle": "轉為正式項目",
     "promotePlaceholder": "請輸入正式項目名稱",

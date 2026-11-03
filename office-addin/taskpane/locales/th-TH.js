@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  defaultProjectName: "โครงการชั่วคราว",
   cmdPptAddImage: "แทรกรูปภาพในสไลด์",
   cmdPptAddChart: "แทรกแผนภูมิในสไลด์",
   cmdPptFormatChart: "จัดรูปแบบแผนภูมิในสไลด์",

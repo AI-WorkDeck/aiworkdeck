@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export const ZH = {
+  defaultProjectName: "临时项目",
   cmdPptAddImage: "插入幻灯片图片",
   cmdPptAddChart: "插入幻灯片图表",
   cmdPptFormatChart: "设置幻灯片图表格式",
