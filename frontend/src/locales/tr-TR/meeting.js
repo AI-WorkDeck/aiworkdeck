@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  fileTodos: "Takvim görevleri oluştur",
+  fileExportWord: "Dökümü Word olarak dışa aktar",
+  fileActionFailed: "İşlem başarısız: {message}",
   "tierLabel": "Transkripsiyon yöntemi",
   "tierPlatform": "Platform kaynaklı",
   "tierByok": "Kendi anahtarınız",

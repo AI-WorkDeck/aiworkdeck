@@ -27,6 +27,9 @@ const STUBS = {
   '@/services/api.js': `
     export const getFileAudioPreviewUrl = (id) => '/api/files/' + id + '/audio-preview'
     export const getFileBytesUrl = (id) => '/api/files/' + id + '/download'
+    export const getMeetingMinutesPrompt = async (id) => globalThis.__recordingApi.minutes(id)
+    export const getMeetingTodosPrompt = async (id) => globalThis.__recordingApi.todos(id)
+    export const exportMeetingTranscript = async (id) => globalThis.__recordingApi.export(id)
     export const getMeetingByFile = async () => ({ meeting: null })
     export const getMeetingRecording = async () => null
     export const registerMeetingFromFile = async () => ({})

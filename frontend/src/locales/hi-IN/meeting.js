@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  fileTodos: "कैलेंडर में कार्य बनाएँ",
+  fileExportWord: "प्रतिलिपि Word में निर्यात करें",
+  fileActionFailed: "कार्रवाई विफल: {message}",
   "tierLabel": "ट्रांसक्रिप्शन का तरीका",
   "tierPlatform": "प्लेटफ़ॉर्म द्वारा प्रदत्त",
   "tierByok": "आपकी अपनी कुंजी",

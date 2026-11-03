@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  fileTodos: "إنشاء مهام في التقويم",
+  fileExportWord: "تصدير النص إلى Word",
+  fileActionFailed: "فشل الإجراء: {message}",
   "tierLabel": "طريقة التفريغ النصي",
   "tierPlatform": "موفَّر عبر المنصة",
   "tierByok": "مفتاحك الخاص",

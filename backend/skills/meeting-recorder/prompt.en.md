@@ -44,3 +44,6 @@ sent to the client, or circulated to the team as it stands.
   statements.
 - Tone: written, restrained, the register of a lawyer's work product. No emoji, no exclamation
   marks.
+
+
+When the user requests only recording action items, follow that request without generating a minutes document. Check task_list for duplicates, then persist with task_create(type=TODO). Ask about unclear dates or member identities. todo_write does not save calendar items.

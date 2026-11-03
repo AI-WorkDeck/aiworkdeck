@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  fileTodos: "Kalendertaken maken",
+  fileExportWord: "Transcript naar Word exporteren",
+  fileActionFailed: "Actie mislukt: {message}",
   "tierLabel": "Transcriptie",
   "tierPlatform": "Via het platform",
   "tierByok": "Eigen sleutel",

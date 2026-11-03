@@ -1380,6 +1380,8 @@
                       :project-id="projectId"
                     />
                     <FilePreview
+                      :recording-actions-enabled="true"
+                      @ai-prompt="handleMeetingMinutesStart"
                       v-else
                       :file="activeFileLeft"
                       :project-id="activeFileLeft.projectId || projectId"
@@ -1654,6 +1656,8 @@
                       :project-id="projectId"
                     />
                     <FilePreview
+                      :recording-actions-enabled="true"
+                      @ai-prompt="handleMeetingMinutesStart"
                       v-else
                       :file="activeFileRight"
                       :project-id="activeFileRight.projectId || projectId"

@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  fileTodos: "轉待辦並安排日曆",
+  fileExportWord: "逐字稿匯出 Word",
+  fileActionFailed: "操作失敗：{message}",
   "tierLabel": "轉寫方式",
   "tierPlatform": "平台代採",
   "tierByok": "自備 Key",

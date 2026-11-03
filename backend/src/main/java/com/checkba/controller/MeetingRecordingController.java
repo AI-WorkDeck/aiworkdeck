@@ -271,6 +271,25 @@ public class MeetingRecordingController {
         return result;
     }
 
+    @PostMapping("/{meetingId}/todos-prompt")
+    public Map<String, Object> todosPrompt(
+            @PathVariable Long meetingId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        requireMemberByMeeting(sessionId, meetingId);
+        requireWriterByMeeting(sessionId, meetingId);
+        MeetingRecording meeting = meetingService.get(meetingId);
+        if (!MeetingRecording.STATUS_TRANSCRIBED.equals(meeting.getStatus())) {
+            throw new IllegalArgumentException(LangText.of("转写完成后才能提取待办", "Action items require a completed transcription"));
+        }
+        var members = new java.util.LinkedHashMap<Long, String>();
+        var owner = projectMemberService.getProjectOwner(meeting.getProjectId());
+        if (owner != null) members.put(owner.getId(), owner.getDisplayName());
+        for (var user : projectMemberService.getMemberUsers(meeting.getProjectId())) {
+            members.put(user.getId(), user.getDisplayName());
+        }
+        return Map.of("prompt", meetingService.buildTodosKickoffPrompt(meeting, members));
+    }
+
     @DeleteMapping("/{meetingId}")
     public void delete(
             @PathVariable Long meetingId,
