@@ -46,6 +46,14 @@ class DesktopAssistantCopyAcknowledgementTest {
     @BeforeEach void setup()throws Exception {
         receipts.deleteAll();
         accounts=mock(AccountService.class);identity=mock(LocalIdentityService.class);
+        when(accounts.connectionSnapshot()).thenAnswer(i -> new AccountService.ConnectionSnapshot(
+                "https://www.aiworkdeck.com",accounts.currentKeyOrNull(),accounts.accountFingerprintOrNull(),accounts.connectionVersion()));
+        when(accounts.isCurrentConnection(any())).thenAnswer(i -> {
+            AccountService.ConnectionSnapshot snapshot=i.getArgument(0);
+            return java.util.Objects.equals(snapshot.key(),accounts.currentKeyOrNull())
+                    && java.util.Objects.equals(snapshot.fingerprint(),accounts.accountFingerprintOrNull())
+                    && snapshot.generation()==accounts.connectionVersion();
+        });
         when(accounts.currentKeyOrNull()).thenReturn("awdk_synthetic");
         when(accounts.currentAccountIdOrNull()).thenReturn("account-a");
         when(accounts.accountFingerprintOrNull()).thenReturn("fingerprint-a");
@@ -61,7 +69,7 @@ class DesktopAssistantCopyAcknowledgementTest {
             }
             byte[] bytes=body.getBytes(java.nio.charset.StandardCharsets.UTF_8);exchange.sendResponseHeaders(status,bytes.length);exchange.getResponseBody().write(bytes);exchange.close();
         });server.start();base="http://127.0.0.1:"+server.getAddress().getPort();
-        Files.writeString(stateDir.resolve("mobile-relay.json"),"{\"deviceId\":\"device-a\",\"token\":\"awdt_synthetic\",\"accountFingerprint\":\"fingerprint-a\"}");
+        Files.writeString(stateDir.resolve("mobile-relay.json"),"{\"deviceId\":\"device-a\",\"token\":\"awdt_synthetic\",\"accountFingerprint\":\"fingerprint-a\",\"serverUrl\":\""+base+"\"}");
         client=newClient();
     }
     private MobileRelayClientService newClient() {
