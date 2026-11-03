@@ -18,9 +18,8 @@ import java.util.Locale;
  * <ul>
  *   <li>{@code cloud.collab.base-url} 显式配置优先——自建与私有部署靠它把「官方」
  *       指到自己的服务器上（能力保留是拍板项，不做成写死的域名）；</li>
- *   <li>账户连的是国际站（{@code workdeck.ai} 系）时返回 {@code null}：官方案件库
- *       目前只有大陆一套，把国际站账户的案卷默默送进大陆服务器是数据跨境，宁可
- *       只留本地版本记录；</li>
+ *   <li>账户连的是国际站（{@code workdeck.ai} 系）时走国际独立案件库：
+ *       账户与案卷留在国际站，不回落大陆服务器；</li>
  *   <li>其余（大陆站）走 {@link #CN_OFFICIAL_BASE_URL}。</li>
  * </ul>
  *
@@ -32,13 +31,15 @@ public final class OfficialCloudEndpoint {
     /** 大陆站的官方团队案件库（与官网、插件云同一台 ECS 上的独立 case profile 实例）。 */
     public static final String CN_OFFICIAL_BASE_URL = "https://case.aiworkdeck.com";
 
+    public static final String INTL_OFFICIAL_BASE_URL = "https://case.workdeck.ai";
+
     private OfficialCloudEndpoint() {
     }
 
     /**
      * @param configuredBaseUrl {@code cloud.collab.base-url}，留空表示按账户站点派生
      * @param accountBaseUrl    {@code ai.account.base-url}（local-mode 下已由 site.json 决定）
-     * @return 官方案件库地址；{@code null} 表示本站暂不提供官方案件库
+     * @return 当前站点的官方案件库地址
      * @throws IllegalArgumentException 显式配置了非 https 且非回环的地址
      */
     public static String resolve(String configuredBaseUrl, String accountBaseUrl) {
@@ -46,7 +47,7 @@ public final class OfficialCloudEndpoint {
             return AccountEndpoint.requireSecure(configuredBaseUrl.trim());
         }
         if (isInternationalSite(accountBaseUrl)) {
-            return null;
+            return INTL_OFFICIAL_BASE_URL;
         }
         return CN_OFFICIAL_BASE_URL;
     }

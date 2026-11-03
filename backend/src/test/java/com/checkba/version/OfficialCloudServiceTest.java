@@ -39,9 +39,44 @@ class OfficialCloudServiceTest {
     private int httpCalls;
     private String canned;
 
+    @Test void followsLiveSiteSwitchWithoutReusingMainlandConnectionInternationally() {
+        var sites=mock(com.checkba.service.site.SiteProfileService.class);
+        when(sites.baseUrl()).thenReturn("https://www.aiworkdeck.com");
+        var service=new OfficialCloudService("", "https://www.aiworkdeck.com", accountService,
+                connectionRepository, cloudSyncService, sites);
+        CloudConnection mainland=new CloudConnection();mainland.setId(9L);mainland.setUserId(ME);
+        mainland.setServerUrl(OFFICIAL);mainland.setAccountFingerprint("scope");rows.put(9L,mainland);
+        when(accountService.accountFingerprintOrNull()).thenReturn("scope");
+        doAnswer(i -> new AccountService.ConnectionSnapshot(
+                sites.baseUrl(), null, "scope", 0)).when(accountService).connectionSnapshot();
+        assertSame(mainland,service.connectOfficial(ME));
+        when(sites.baseUrl()).thenReturn("https://workdeck.ai");
+        assertEquals("https://case.workdeck.ai",service.officialBaseUrl());assertTrue(service.available());
+        assertEquals(false,service.status(ME).get("connected"));
+        CloudConnection international=new CloudConnection();international.setId(10L);international.setUserId(ME);
+        international.setServerUrl("https://case.workdeck.ai");international.setAccountFingerprint("scope");rows.put(10L,international);
+        assertSame(international,service.connectOfficial(ME));
+        verify(accountService,never()).currentKeyOrNull();
+        when(sites.baseUrl()).thenReturn("https://www.aiworkdeck.com");
+        assertSame(mainland,service.connectOfficial(ME));
+    }
+
+    @Test void explicitCloudEndpointRemainsAuthoritativeAcrossSiteSwitches() {
+        var sites=mock(com.checkba.service.site.SiteProfileService.class);
+        when(sites.baseUrl()).thenReturn("https://www.aiworkdeck.com");
+        var service=new OfficialCloudService("https://private.example", "https://www.aiworkdeck.com",
+                accountService, connectionRepository, cloudSyncService, sites);
+        assertEquals("https://private.example",service.officialBaseUrl());
+        when(sites.baseUrl()).thenReturn("https://workdeck.ai");
+        assertEquals("https://private.example",service.officialBaseUrl());assertTrue(service.available());
+    }
+
     @BeforeEach
     void setUp() {
         accountService = mock(AccountService.class);
+        doAnswer(i -> new AccountService.ConnectionSnapshot(
+                "https://www.aiworkdeck.com", accountService.currentKeyOrNull(), accountService.accountFingerprintOrNull(), 0)).when(accountService).connectionSnapshot();
+        when(accountService.isCurrentConnection(any())).thenReturn(true);
         cloudSyncService = mock(CloudSyncService.class);
         rows = new HashMap<>();
         nextId = 1L;
@@ -65,6 +100,8 @@ class OfficialCloudServiceTest {
     }
 
     private OfficialCloudService service(String configured, String accountBaseUrl) {
+        doAnswer(i -> new AccountService.ConnectionSnapshot(
+                accountBaseUrl, accountService.currentKeyOrNull(), accountService.accountFingerprintOrNull(), 0)).when(accountService).connectionSnapshot();
         return new OfficialCloudService(configured, accountBaseUrl, accountService,
                 connectionRepository, cloudSyncService) {
             @Override
@@ -84,6 +121,26 @@ class OfficialCloudServiceTest {
     private void connectedAccount(String key, String fingerprint) {
         when(accountService.currentKeyOrNull()).thenReturn(key);
         when(accountService.accountFingerprintOrNull()).thenReturn(fingerprint);
+    }
+
+    @Test void queuedOldDisplayNameCannotOverwriteNewAccountConnection() {
+        connectedAccount("awdk_new", "new");
+        when(accountService.currentDisplayNameOrNull()).thenReturn("Current account");
+        var service = mainland();
+        var connection = service.connectOfficial(ME);
+        String before = connection.getDisplayName();
+        service.refreshDisplayName(ME, "Old account");
+        assertEquals(1, httpCalls);
+        assertEquals(before, connection.getDisplayName());
+    }
+
+    @Test void lateBridgeCannotPersistAfterAccountSwitch() {
+        connectedAccount("awdk_old", "old");
+        var service = mainland();
+        when(accountService.isCurrentConnection(any())).thenReturn(false);
+        assertThrows(VersionException.class, () -> service.connectOfficial(ME));
+        assertEquals(1, httpCalls);
+        assertTrue(rows.isEmpty());
     }
 
     // ---- 桥接 ---------------------------------------------------------
@@ -159,16 +216,19 @@ class OfficialCloudServiceTest {
         assertEquals(0, httpCalls);
     }
 
-    /** 国际站：官方案件库暂不提供，不能拿国际站账户往大陆的服务器上桥。 */
+    /** 国际桥接使用国际独立地址，绝不发给大陆。 */
     @Test
-    void internationalSiteHasNoOfficialCaseLibrary() {
+    void internationalSiteBridgesToItsOwnCaseLibrary() {
         OfficialCloudService svc = service("", "https://www.workdeck.ai");
 
-        assertFalse(svc.available());
-        assertNull(svc.officialBaseUrl());
-        VersionException ex = assertThrows(VersionException.class, () -> svc.connectOfficial(ME));
-        assertTrue(ex.isUserFacing());
-        assertEquals(0, httpCalls);
+        connectedAccount("awdk_intl", "fp-intl");
+        assertTrue(svc.available());
+        assertEquals("https://case.workdeck.ai", svc.officialBaseUrl());
+        CloudConnection connection = svc.connectOfficial(ME);
+        assertEquals("https://case.workdeck.ai/api/auth/awdk-login", lastUrl);
+        assertEquals("https://case.workdeck.ai", connection.getServerUrl());
+        assertEquals("fp-intl", connection.getAccountFingerprint());
+        assertEquals(1, httpCalls);
     }
 
     @Test
@@ -285,6 +345,7 @@ class OfficialCloudServiceTest {
         CloudConnection conn = svc.connectOfficial(ME);
         renamedOnCase("韩律师");
 
+        when(accountService.currentDisplayNameOrNull()).thenReturn("韩律师");
         svc.refreshDisplayName(ME, "韩律师");
 
         assertEquals(2, httpCalls, "展示名变了要重桥一次，案件库那边才会刷新");
@@ -300,6 +361,7 @@ class OfficialCloudServiceTest {
         OfficialCloudService svc = mainland();
         svc.connectOfficial(ME);
 
+        when(accountService.currentDisplayNameOrNull()).thenReturn("韩泽伟");
         svc.refreshDisplayName(ME, "韩泽伟");
 
         assertEquals(1, httpCalls);
@@ -314,7 +376,9 @@ class OfficialCloudServiceTest {
         CloudConnection conn = svc.connectOfficial(ME);
         renamedOnCase("韩泽伟");
 
+        when(accountService.currentDisplayNameOrNull()).thenReturn("韩律师");
         svc.refreshDisplayName(ME, "韩律师");
+        when(accountService.currentDisplayNameOrNull()).thenReturn("韩律师");
         svc.refreshDisplayName(ME, "韩律师");
 
         assertEquals(2, httpCalls);
@@ -335,6 +399,7 @@ class OfficialCloudServiceTest {
         CloudConnection conn = svc.connectOfficial(ME);
         canned = "{\"code\":1,\"message\":\"限速\"}";
 
+        when(accountService.currentDisplayNameOrNull()).thenReturn("韩律师");
         assertDoesNotThrow(() -> svc.refreshDisplayName(ME, "韩律师"));
         assertEquals("awdt_first", conn.getDeviceToken());
         assertEquals("韩泽伟", conn.getDisplayName());
@@ -348,6 +413,7 @@ class OfficialCloudServiceTest {
         svc.connectOfficial(ME);
         renamedOnCase("韩律师");
 
+        when(accountService.currentDisplayNameOrNull()).thenReturn("韩律师");
         svc.onDisplayNameSynced(
                 new com.checkba.service.account.AccountIdentitySync.DisplayNameSynced(ME, "韩律师"));
 

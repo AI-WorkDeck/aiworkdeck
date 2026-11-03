@@ -5,6 +5,11 @@ description: 插件市场领域。任务涉及插件广场页、在线 Skill 广
 
 # 插件市场（Marketplace）领域地图
 
+## 切站与在线安装（dev-board#1660）
+
+内置官方插件/Skill registry 随当前站点即时解析，显式自建地址保持不变。`MarketPurchaseGate` 复用 `AccountService.ConnectionSnapshot`：安装捕获站点与账户，取凭据后及落盘前校验连接代次；下载只用快照中的 Key，插件多文件下载逐次校验。旧账户的迟到结果不得安装。列表响应同样核对身份。测试：`MarketSiteRoutingTest`、`PluginMarketServiceTest`、`SkillMarketServiceTest`。
+
+
 职责边界：插件广场页面、在线广场 registry 同步与安装。skill 的解析/注入机制属 plugin-system 领域；官网仓库（website/）不在本仓库。
 
 ## 关键文件

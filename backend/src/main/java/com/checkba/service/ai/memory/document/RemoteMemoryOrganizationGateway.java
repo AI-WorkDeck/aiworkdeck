@@ -21,7 +21,6 @@ import java.util.*;
 @Component
 public class RemoteMemoryOrganizationGateway implements MemoryOrganizationGateway {
     private final AccountService accountService;
-    private final SiteProfileService siteProfileService;
     private final AccountBindingRepository bindings;
     private final MemoryHttpTransport transport;
     private final ObjectMapper mapper;
@@ -38,7 +37,6 @@ public class RemoteMemoryOrganizationGateway implements MemoryOrganizationGatewa
                                            @Value("${memory.shared.base-url:}") String sharedBaseUrl,
                                            @Value("${memory.shared.secret:}") String sharedSecret) {
         this.accountService = accountService;
-        this.siteProfileService = siteProfileService;
         this.bindings = bindings;
         this.transport = transport;
         this.mapper = mapper;
@@ -112,15 +110,19 @@ public class RemoteMemoryOrganizationGateway implements MemoryOrganizationGatewa
     @Override
     public String download(Long userId, String spaceId, String path) {
         Identity identity = requireIdentity(userId);
+        requireCurrent(identity);
         MemoryHttpTransport.Reply reply = transport.send("GET", identity.baseUrl() + "/download?spaceId="
                 + enc(spaceId) + "&path=" + enc(path), identity.headers(), null);
+        requireCurrent(identity);
         if (reply.status() < 200 || reply.status() >= 300) throw remoteError(reply);
         return reply.body();
     }
 
     private Object request(Identity identity, String method, String endpoint, String query, String body) {
         String url = identity.baseUrl() + endpoint + (query == null ? "" : "?" + query);
+        requireCurrent(identity);
         MemoryHttpTransport.Reply reply = transport.send(method, url, identity.headers(), body);
+        requireCurrent(identity);
         if (reply.status() < 200 || reply.status() >= 300) throw remoteError(reply);
         try {
             Map<String, Object> envelope = mapper.readValue(reply.body(), new TypeReference<>() {});
@@ -146,10 +148,11 @@ public class RemoteMemoryOrganizationGateway implements MemoryOrganizationGatewa
     private Identity identity(Long userId) {
         if (userId == null) return null;
         if (localMode) {
-            String key = accountService.currentKeyOrNull();
+            AccountService.ConnectionSnapshot snapshot = accountService.connectionSnapshot();
+            String key = snapshot.key();
             if (key == null || key.isBlank()) return null;
-            return new Identity(trim(siteProfileService.baseUrl()) + "/api/account/memory",
-                    Map.of("Authorization", "Bearer " + key));
+            return new Identity(trim(snapshot.baseUrl()) + "/api/account/memory",
+                    Map.of("Authorization", "Bearer " + key), snapshot);
         }
         if (sharedBaseUrl.isBlank() || sharedSecret.isBlank()) return null;
         Optional<AccountBinding> binding = bindings.findByUserId(userId);
@@ -158,7 +161,7 @@ public class RemoteMemoryOrganizationGateway implements MemoryOrganizationGatewa
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("X-Internal-Secret", sharedSecret);
         headers.put("X-Requester-Account-Id", binding.get().getExternalAccountId());
-        return new Identity(sharedBaseUrl + "/api/internal/memory", Map.copyOf(headers));
+        return new Identity(sharedBaseUrl + "/api/internal/memory", Map.copyOf(headers), null);
     }
 
     private String unavailableReason() {
@@ -212,5 +215,11 @@ public class RemoteMemoryOrganizationGateway implements MemoryOrganizationGatewa
         return v.endsWith("/") ? v.substring(0, v.length() - 1) : v;
     }
 
-    private record Identity(String baseUrl, Map<String, String> headers) {}
+    private void requireCurrent(Identity identity) {
+        if (identity.snapshot() != null && !accountService.isCurrentConnection(identity.snapshot()))
+            throw new MemoryDocumentException(409, LangText.of("账户已变化，请重试", "Account changed; please try again"));
+    }
+
+    private record Identity(String baseUrl, Map<String, String> headers,
+                            AccountService.ConnectionSnapshot snapshot) {}
 }

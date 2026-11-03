@@ -25,7 +25,7 @@ export default {
   "exitCancel": "Batal",
   "exitConflict": "Perubahan memerlukan penyelesaian konflik. Selesaikan di Kontrol Sumber sebelum keluar.",
   "exitNewChanges": "Ada perubahan baru yang menunggu commit. Tinjau perubahan tersebut sebelum keluar.",
-  "exitCheckFailed": "Tidak dapat memeriksa atau melakukan commit perubahan proyek. Tindakan keluar dibatalkan; silakan coba lagi.",
+  "exitCheckFailed": "Perubahan proyek tidak dapat diperiksa atau dikomit. Coba lagi atau keluar tanpa komit.",
   "controlEntry": "Kontrol Sumber",
   "entryUnavailable": "Status tidak tersedia. Klik untuk mencoba lagi",
   "pendingFileCount": "{count} berkas menunggu untuk di-commit",

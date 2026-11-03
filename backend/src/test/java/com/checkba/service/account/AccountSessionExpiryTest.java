@@ -51,6 +51,51 @@ class AccountSessionExpiryTest {
         assertFalse(service.status().containsKey("keyMasked"));
     }
 
+    @Test void siteSwitchCannotSplitCredentialAndEndpointSnapshot() throws Exception {
+        var endpoint = new java.util.concurrent.atomic.AtomicReference<>("https://www.aiworkdeck.com");
+        var profiles = mock(SiteProfileService.class);
+        var captureEntered = new CountDownLatch(1);
+        var releaseCapture = new CountDownLatch(1);
+        var switching = new CountDownLatch(1);
+        var switched = new CountDownLatch(1);
+        var block = new java.util.concurrent.atomic.AtomicBoolean();
+        when(profiles.baseUrl()).thenAnswer(i -> {
+            String value = endpoint.get();
+            if (block.compareAndSet(true, false)) {
+                captureEntered.countDown();
+                assertTrue(releaseCapture.await(5, TimeUnit.SECONDS));
+            }
+            return value;
+        });
+        var service = new AccountService(profiles, directory.toString(), new Transport(), null);
+        service.connect(KEY);
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            block.set(true);
+            var capture = pool.submit(service::connectionSnapshot);
+            assertTrue(captureEntered.await(5, TimeUnit.SECONDS));
+            var change = pool.submit(() -> {
+                switching.countDown();
+                synchronized (service) {
+                    endpoint.set("https://workdeck.ai");
+                    service.disconnect();
+                    service.connect(NEW_KEY);
+                    switched.countDown();
+                }
+            });
+            assertTrue(switching.await(5, TimeUnit.SECONDS));
+            assertFalse(switched.await(100, TimeUnit.MILLISECONDS));
+            releaseCapture.countDown();
+            var old = capture.get(5, TimeUnit.SECONDS);
+            change.get(5, TimeUnit.SECONDS);
+            assertEquals("https://www.aiworkdeck.com", old.baseUrl());assertEquals(KEY, old.key());
+            var current = service.connectionSnapshot();
+            assertEquals("https://workdeck.ai", current.baseUrl());assertEquals(NEW_KEY, current.key());
+            assertFalse(service.isCurrentConnection(old));
+            assertFalse(old.toString().contains(KEY));
+        } finally { releaseCapture.countDown(); pool.shutdownNow(); }
+    }
+
     @Test void statusCannotHideDefinitiveRejectionBehindQuietIdentitySync() {
         Transport transport = new Transport();
         AccountService service = connected(transport);

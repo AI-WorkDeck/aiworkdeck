@@ -76,8 +76,11 @@ public class PlatformGatewayClient {
      *                   重试就是扣两次。
      */
     public JsonNode postJson(String path, Map<String, Object> params, boolean idempotent, int timeoutSeconds) {
-        long requestVersion = accountService.connectionVersion();
-        String key = requireKey();
+        AccountService.ConnectionSnapshot connection = accountService.connectionSnapshot();
+        String key = connection.key();
+        if (key == null) throw new GatewayException(GatewayException.Kind.NOT_CONNECTED,
+                LangText.of("请登录 AI WorkDeck 账户后使用此功能", "Sign in to your AI WorkDeck account to use this feature"));
+        long requestVersion = connection.generation();
         String body;
         try {
             body = objectMapper.writeValueAsString(params == null ? Map.of() : params);
@@ -88,26 +91,33 @@ public class PlatformGatewayClient {
         String idempotencyKey = idempotent ? UUID.randomUUID().toString().replace("-", "") : null;
 
         PlatformGatewayTransport.Reply reply =
-                transport.send("POST", siteProfileService.baseUrl() + path, key, idempotencyKey, body, timeoutSeconds);
+                transport.send("POST", connection.baseUrl() + path, key, idempotencyKey, body, timeoutSeconds);
         // 中断与其它网络失败长得一模一样（transport 捕获 InterruptedException 后恢复中断标志、
         // 照样返回 NETWORK_FAILURE）；线程已经被要求停下时不该再发起一次最长可以再等
         // timeoutSeconds 的阻塞调用——那会拖慢优雅关闭。只 peek 不清，标志留给线程原本的
         // 所有者去处理。
+        requireCurrent(connection);
         if (reply.networkFailure() && !Thread.currentThread().isInterrupted()) {
-            reply = transport.send("POST", siteProfileService.baseUrl() + path, key, idempotencyKey, body, timeoutSeconds);
+            reply = transport.send("POST", connection.baseUrl() + path, key, idempotencyKey, body, timeoutSeconds);
         }
+        requireCurrent(connection);
         return handle(reply, key, requestVersion);
     }
 
     /** 只读 GET。不扣费，所以不占幂等键。 */
     public JsonNode getJson(String path, int timeoutSeconds) {
-        long requestVersion = accountService.connectionVersion();
-        String key = requireKey();
+        AccountService.ConnectionSnapshot connection = accountService.connectionSnapshot();
+        String key = connection.key();
+        if (key == null) throw new GatewayException(GatewayException.Kind.NOT_CONNECTED,
+                LangText.of("请登录 AI WorkDeck 账户后使用此功能", "Sign in to your AI WorkDeck account to use this feature"));
+        long requestVersion = connection.generation();
         PlatformGatewayTransport.Reply reply =
-                transport.send("GET", siteProfileService.baseUrl() + path, key, null, null, timeoutSeconds);
+                transport.send("GET", connection.baseUrl() + path, key, null, null, timeoutSeconds);
+        requireCurrent(connection);
         if (reply.networkFailure() && !Thread.currentThread().isInterrupted()) {
-            reply = transport.send("GET", siteProfileService.baseUrl() + path, key, null, null, timeoutSeconds);
+            reply = transport.send("GET", connection.baseUrl() + path, key, null, null, timeoutSeconds);
         }
+        requireCurrent(connection);
         return handle(reply, key, requestVersion);
     }
 
@@ -138,6 +148,11 @@ public class PlatformGatewayClient {
     /** Fail before starting an asynchronous job or swallowing lookup errors into a result. */
     public void ensureConnected() {
         requireKey();
+    }
+
+    private void requireCurrent(AccountService.ConnectionSnapshot connection) {
+        if (!accountService.isCurrentConnection(connection)) throw new GatewayException(GatewayException.Kind.BAD_REQUEST,
+                LangText.of("账户已变化，请重试", "Account changed; please try again"));
     }
 
     private String requireKey() {

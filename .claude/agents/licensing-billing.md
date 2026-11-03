@@ -5,6 +5,17 @@ description: 授权与计费领域。任务涉及解锁门（试用码/账户 Ke
 
 # 授权与计费 领域地图
 
+## 切站后的官方案件库与消息中心（dev-board#1657）
+
+`OfficialCloudService` 在调用时从 `SiteProfileService` 解析当前账户站点，不得缓存启动站点；显式自建地址仍优先。国际站派生 `https://case.workdeck.ai`，与大陆案件库独立，不得回落大陆；服务上线与客户端代码交付须分别验收（dev-board#1659）。消息中心连接阶段的案件库业务异常与网络异常须进入既有云端不可用状态，保留本地来源；账户变化守卫仍拒绝旧账户结果。回归见 `OfficialCloudServiceTest` 与 `MessageCenterGatewayTest`。
+
+
+## 切站请求归属（dev-board#1660）
+
+账户请求使用 `AccountService.ConnectionSnapshot` 同时捕获站点、凭据与连接代次；切站发布与断开旧账户共用账户锁。案件库、手机桥接、平台网关和付费广场不得分开读取当前 Key 与地址，旧回包发布前校验代次。平台网关重试仍使用原快照，发现切站即停止，不能把旧 Key 重试到新站。快照的日志表示不包含凭据。
+
+广场官方地址即时跟随站点，自建地址保留。匿名统计暂保留启动地址，离开启动站点后暂停发送且保留队列；跨重启的旧匿名队列没有站点归属，未作为本轮已解决项。头像/昵称更新等原子身份写入可能等待既有网络超时后才允许切站。验证范围与生产上线以 #1659/#1660 台账为准。
+
 ## 百炼平台凭据与计量（2026-10-29，dev-board#1625）
 
 POST ai-key发送 X-AWD-AI-Protocol:2。国内返回限权 awdai_ runtime token（不含百炼共享Key或awdk账户Key），baseUrl必须严格匹配当前账户站点 /api/account/ai/v1。server只加密保存runtime token及provider/baseUrl/defaultModel，awdk仍用完即弃。旧国内OpenRouter机器缓存丢弃重取；已有server用户需重新连接/刷新以换取国内runtime token，不允许退回机器额度。PlatformUsageAccountant对国内调用同站 /usage，读累计usageUsd作观测，不二次扣费；实际扣费在官网网关。国际仍OpenRouter /key。新账本不覆盖旧token_usage或余额。

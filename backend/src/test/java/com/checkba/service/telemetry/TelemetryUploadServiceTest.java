@@ -54,6 +54,51 @@ class TelemetryUploadServiceTest {
     }
 
     @Test
+    void siteSwitchPausesUploadsWithoutDiscardingPendingDataAndSwitchBackResumes() {
+        var sites = mock(com.checkba.service.site.SiteProfileService.class);
+        when(sites.currentSite()).thenReturn("cn");
+        when(settings.rollupEnabled()).thenReturn(true);
+        var pending = new TelemetryDailyRollup();
+        pending.setDate(LocalDate.now().minusDays(1));
+        pending.setPayload("{}");
+        when(rollupRepository.findByUploadedFalseAndDateAfter(any())).thenReturn(java.util.List.of(pending));
+        var sent = new java.util.ArrayList<String>();
+        service = new TelemetryUploadService(rollupRepository, eventRepository, rollupService,
+                settings, identity, "https://custom.invalid/telemetry", (url, body) -> {
+                    sent.add(url); return 200;
+                }, sites);
+        when(sites.currentSite()).thenReturn("intl");
+        service.sync();
+        assertEquals(java.util.List.of(), sent);
+        verify(rollupRepository, never()).save(any());
+        verify(eventRepository, never()).findByTsAfter(any());
+        when(sites.currentSite()).thenReturn("cn");
+        service.sync();
+        assertEquals(java.util.List.of("https://custom.invalid/telemetry/rollup"), sent);
+        verify(rollupRepository).save(pending);
+    }
+
+    @Test
+    void siteSwitchDuringBatchStopsRemainingUploads() {
+        var sites = mock(com.checkba.service.site.SiteProfileService.class);
+        when(sites.currentSite()).thenReturn("cn");
+        when(settings.rollupEnabled()).thenReturn(true);
+        when(settings.eventsEnabled()).thenReturn(true);
+        var first = new TelemetryDailyRollup();first.setPayload("{}");
+        var second = new TelemetryDailyRollup();second.setPayload("{}");
+        when(rollupRepository.findByUploadedFalseAndDateAfter(any())).thenReturn(java.util.List.of(first, second));
+        var sent = new java.util.ArrayList<String>();
+        service = new TelemetryUploadService(rollupRepository, eventRepository, rollupService,
+                settings, identity, "https://example.invalid/telemetry", (url, body) -> {
+                    sent.add(url);when(sites.currentSite()).thenReturn("intl");return 200;
+                }, sites);
+        service.sync();
+        assertEquals(1, sent.size());
+        verify(rollupRepository).save(first);
+        verify(rollupRepository, never()).save(second);
+    }
+
+    @Test
     @DisplayName("昨日无条件重算（late-arriving 事件在临近午夜才落库）")
     void yesterdayIsAlwaysRolledUpUnconditionally() {
         service.sync();

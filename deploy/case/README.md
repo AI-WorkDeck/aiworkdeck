@@ -1,4 +1,26 @@
-# 官方案件库部署（case.aiworkdeck.com）
+# 官方案件库部署（国内与国际独立实例）
+
+
+## 国际站部署与验收
+
+国际账户的官方端点为 `https://case.workdeck.ai`，使用新加坡既有机器上的独立 `case` 实例。不能指到 `addin.workdeck.ai`：插件云后端与案件库的数据库、用户 ID、存储根、服务账号及平台密钥必须分开。国际与国内也不共享数据库、设备令牌或案卷目录。此处是部署要求，不代表生产已经完成部署。
+
+容量门禁：2026-11-03 主任务只读实查，新加坡根盘约 69G、已用 62G、可用 4.3G（94%）；内存 available 约 5.4GB。当前磁盘不满足新增正式案卷存储条件，不能直接启用国际案件库接收现有用户资料。先扩容或挂载独立数据盘，按预期案卷量、Git 历史、临时打包和备份测算并验证空间告警/恢复余量，再部署开放；不得为腾空间删除现有 cloud 业务数据。实际剩余容量以部署前再次实测为准。
+
+沿用下文 case profile、systemd、数据目录和独立 PostgreSQL `aiworkdeck_case` 布局；新加坡现有 cloud 实例及其用户数据保持原状。部署前核实 9797 端口、内存和磁盘余量，再创建缺少的资源，不重建已有库。国际环境另设 `AI_ACCOUNT_BASE_URL=https://workdeck.ai`，避免默认大陆账户验证地址；名录的 `COLLAB_DIRECTORY_BASE_URL` 指向同机国际官网，`COLLAB_DIRECTORY_SECRET` 与该官网 `AWD_COLLAB_DIRECTORY_SECRET` 原位配对，不使用大陆值。
+
+国际直接使用 `nginx-case-intl.conf.example`，systemd 使用 `aiworkdeck-case-intl.service.example` 安装为 `aiworkdeck-case.service`（已核对新加坡 PostgreSQL 单元名是 `postgresql.service`，不要复制北京的 `postgresql@14-main.service` 依赖），DNS 指向已登记的新加坡主机，证书在该域名签发；保留 `/git/` 授权头、流式传输、`/api/internal/` 公网拒绝与客户门户路径。服务仅监听回环，新增 vhost 不覆盖现有 addin/官网配置。`AWD_PLATFORM_KEY_SECRET` 在国际案件库原位独立生成，备份和权限遵守下文迁移单元约定。
+
+若启用 Office/WPS 的案件库参考来源，国际 addin 与国际 case 配同一把独立 `AWD_REF_INTERNAL_SECRET`，addin 的 `AWD_REF_CASE_BASE_URL=http://127.0.0.1:9797`；只有 case 启用 `ref.internal.serve`。两个实例必须验证同一个国际官网账户 ID，不能拿实例内数字 userId 对接。客户门户按现有构建流程独立同步到国际 case。
+
+上线验收使用专用合成账号和样本文档：
+
+- 国际官网账户桥接成功，设备令牌仅存在国际 case；大陆凭据在国际 case 被拒，两个实例中同数字 ID 不构成权限。
+- 消息中心读取、新建会话、发送/读取消息、未读数与通知已读正常；第二个无关账户不能读取第一人的会话或附件。
+- 案卷上传、Git push/clone、取回内容、成员权限、客户访问码与门户上传均走国际域名；国际端故障不得自动回落大陆。
+- 同一客户端大陆→国际→大陆，无需重启即使用对应案件库；旧在途请求不能覆盖新账户状态或发送新账户凭据到旧站。
+- `/api/internal/ref/*` 公网访问为 404；addin 内部参考查询只返回该国际账户有权读取的文件。
+- 部署后复核既有国际官网、addin 登录与现有用户数据未受影响，并记录实际版本、回滚位置与尚未验证项。代码合并不等于这些生产验收已完成。
 
 dev-board#441。「案件库」= 团队服务器 = **另一个完整的 AI WorkDeck 后端实例**，
 跑的是同一份 `backend.jar`，只是换了 profile。它对外提供以下能力：
