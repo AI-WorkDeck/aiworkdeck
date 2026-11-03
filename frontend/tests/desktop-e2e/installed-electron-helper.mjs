@@ -1,0 +1,324 @@
+// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Disposable hosted-runner installation only. Never patch or replace signed application files.
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import net from 'node:net'
+import { createHash } from 'node:crypto'
+import { execFileSync, spawn } from 'node:child_process'
+import { downloadBuild } from '../../../desktop/scripts/download-upgrade-build.mjs'
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+const run = (file, args, options = {}) => execFileSync(file, args, { encoding: 'utf8', timeout: 120000, ...options }).trim()
+const powershell = (script, env = {}) => run('pwsh.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { env: { ...process.env, ...env }, timeout: 360000 })
+const hash = async file => {
+  const h = createHash('sha256')
+  for await (const bytes of fs.createReadStream(file)) h.update(bytes)
+  return h.digest('hex')
+}
+async function until(fn, label, seconds = 180) {
+  const end = Date.now() + seconds * 1000
+  let last
+  while (Date.now() < end) {
+    try { const result = await fn(); if (result) return result; last = undefined } catch (error) { last = error.message }
+    await sleep(250)
+  }
+  throw new Error(`Timed out: ${label}${last ? ': ' + last : ''}`)
+}
+async function assertPortFree(port) {
+  assert(Number.isSafeInteger(port) && port > 1024 && port < 65536, 'Invalid test port')
+  await new Promise((resolve, reject) => {
+    const server = net.createServer()
+    server.once('error', reject)
+    server.listen(port, '127.0.0.1', () => server.close(resolve))
+  })
+}
+function processList() {
+  return process.platform === 'darwin' ? run('/bin/ps', ['-axo', 'pid,ppid,command']) : powershell("Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine | ConvertTo-Json -Depth 3")
+}
+async function rpc(port, expression, main, timeout = 30000) {
+  const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(3000) })).json()
+  const target = targets.find(t => main ? t.type === 'node' : t.type === 'page' && /index\.html/.test(t.url))
+  assert(target, main ? 'Installed main inspector unavailable' : 'Installed renderer unavailable')
+  const url = new URL(target.webSocketDebuggerUrl)
+  assert(url.hostname === '127.0.0.1' && Number(url.port) === port, 'Foreign debugger endpoint')
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(url)
+    let settled = false
+    let reply, closeTimer
+    const settle = (error, value) => {
+      if (settled) return
+      settled = true; clearTimeout(timer); clearTimeout(closeTimer)
+      if (error) reject(error); else resolve(value)
+    }
+    const finish = (error, value) => {
+      if (settled || reply) return
+      reply = { error, value }; clearTimeout(timer)
+      if (ws.readyState === WebSocket.CLOSED) { settle(error, value); return }
+      // close() starts a handshake; it does not release the underlying socket yet.
+      // Native WebSocket has no terminate(). The outer runner's failure watchdog
+      // bounds any socket left behind after this explicit close failure.
+      closeTimer = setTimeout(() => settle(new Error('Debugger close timed out')), 5000)
+      ws.close()
+    }
+    const timer = setTimeout(() => finish(new Error('Debugger request timed out')), timeout)
+    ws.onopen = () => ws.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression, awaitPromise: true, returnByValue: true } }))
+    ws.onmessage = event => {
+      try {
+        const response = JSON.parse(event.data)
+        if (response.id !== 1) return
+        if (response.error || response.result?.exceptionDetails) finish(new Error(JSON.stringify(response)))
+        else finish(null, response.result.result.value)
+      } catch (error) { finish(error) }
+    }
+    ws.onerror = () => finish(new Error('Debugger socket failed'))
+    ws.onclose = () => reply ? settle(reply.error, reply.value) : settle(new Error('Debugger closed before reply'))
+  })
+}
+
+export async function launchInstalledElectron({ outDir, backendPort = 19566, cdpPort = 19567, inspectorPort = 19569 }) {
+  const mac = process.platform === 'darwin'
+  assert(process.env.GITHUB_ACTIONS === 'true' && process.env.RUNNER_ENVIRONMENT === 'github-hosted' &&
+    process.env.GITHUB_REPOSITORY === 'AI-WorkDeck/aiworkdeck' && process.env.RUNNER_TEMP &&
+    ((mac && process.arch === 'arm64' && process.env.RUNNER_OS === 'macOS') ||
+      (process.platform === 'win32' && process.arch === 'x64' && process.env.RUNNER_OS === 'Windows')),
+  'Requires a disposable matching GitHub-hosted Windows x64 / macOS ARM64 runner')
+  const temp = fs.realpathSync(process.env.RUNNER_TEMP)
+  fs.mkdirSync(outDir, { recursive: true })
+  outDir = fs.realpathSync(outDir)
+  const relative = path.relative(temp, outDir)
+  assert(relative && !relative.startsWith('..') && !path.isAbsolute(relative), 'Evidence/install root must be inside RUNNER_TEMP')
+  assert.equal(new Set([backendPort, cdpPort, inspectorPort]).size, 3, 'Test ports must differ')
+  const ports = { api: backendPort, renderer: cdpPort, inspector: inspectorPort }
+  const home = os.homedir()
+  const dataDir = path.join(home, '.aiworkdeck')
+  assert(!fs.existsSync(dataDir), 'Refusing preexisting application data')
+  const chromeProfile = mac ? path.join(home, 'Library/Application Support/aiworkdeck-desktop') : path.join(process.env.APPDATA, 'aiworkdeck-desktop')
+  assert(!fs.existsSync(chromeProfile), 'Refusing preexisting Chromium profile')
+  const initialProcesses = processList()
+  assert(mac ? !initialProcesses.includes('/AI WorkDeck.app/Contents/MacOS/') : !/"Name"\s*:\s*"AI WorkDeck.exe"/i.test(initialProcesses), 'Another installed app is running')
+  if (mac) {
+    assert(!fs.existsSync('/Applications/AI WorkDeck.app'), 'Refusing existing installed application')
+    run('/bin/launchctl', ['print', `gui/${process.getuid()}`])
+  }
+  const root = fs.mkdtempSync(path.join(outDir, 'installed-'))
+  const app = path.join(root, mac ? 'AI WorkDeck.app' : 'AI WorkDeck')
+  const executable = path.join(app, mac ? 'Contents/MacOS/AI WorkDeck' : 'AI WorkDeck.exe')
+  const resourcesPath = path.join(app, mac ? 'Contents/Resources' : 'resources')
+  const provenance = { root, outDir, home, dataDir, ports, assertions: [], launches: [], forced: false }
+  const save = (name, value) => fs.writeFileSync(path.join(outDir, name), typeof value === 'string' ? value : JSON.stringify(value, null, 2))
+  let child, launchIndex = 0, mounted
+  const helper = { executable, resourcesPath, home, dataDir, ports, provenance,
+    get child() { return child }, identity: null,
+    mainRpc: (expression, timeout) => rpc(inspectorPort, expression, true, timeout),
+    rendererRpc: (expression, timeout) => rpc(cdpPort, expression, false, timeout) }
+  helper.collectDiagnostics = async () => {
+    const errors = []
+    if (child?.exitCode === null && child.signalCode === null) {
+      try {
+        save('installed-debug-targets.json', await (await fetch(`http://127.0.0.1:${cdpPort}/json/list`, { signal: AbortSignal.timeout(3000) })).json())
+        save('installed-window-state.json', await helper.mainRpc(`Promise.all(process.mainModule.require('electron').BrowserWindow.getAllWindows().map(async w=>{const p=w.webContents.getLastWebPreferences();return {id:w.id,visible:w.isVisible(),title:w.getTitle(),url:w.webContents.getURL(),loading:w.webContents.isLoading(),preferences:{preload:p.preload,sandbox:p.sandbox,contextIsolation:p.contextIsolation,nodeIntegration:p.nodeIntegration},renderer:await w.webContents.executeJavaScript('({bridge:typeof window.checkbaDesktop,keys:Object.keys(window.checkbaDesktop||{}),apiBase:window.checkbaDesktop?.apiBaseUrl,hasOverview:!!window.__checkbaActiveOverviewVm,body:document.body?.innerText.slice(0,800)})').catch(e=>({error:e.message}))}}))`))
+        save('installed-renderer-events.json', await helper.mainRpc('globalThis.__installedRendererEvents || []'))
+        save('installed-preload-state.json', await helper.mainRpc(`(()=>{const e=process.mainModule.require('electron'),fs=process.mainModule.require('node:fs'),path=process.mainModule.require('node:path'),crypto=process.mainModule.require('node:crypto');const expected=path.join(process.resourcesPath,'app.asar/preload/preload.js');const actual=e.webContents.getAllWebContents().map(w=>({id:w.id,url:w.getURL(),preload:typeof w._getPreloadScript==='function'?w._getPreloadScript():null}));return {expected,exists:fs.existsSync(expected),hash:fs.existsSync(expected)?crypto.createHash('sha256').update(fs.readFileSync(expected)).digest('hex'):null,actual,argv:process.argv}})()`))
+
+        const shots = await helper.mainRpc(`Promise.all(process.mainModule.require('electron').BrowserWindow.getAllWindows().filter(w=>w.isVisible()).map(async w=>({id:w.id,png:(await w.capturePage()).toPNG().toString('base64')})))`)
+        for (const shot of shots) fs.writeFileSync(path.join(outDir, `installed-window-${shot.id}.png`), Buffer.from(shot.png, 'base64'))
+      } catch (error) { errors.push(error.message) }
+    }
+    try { save('installed-processes.txt', processList()) } catch (error) { errors.push(error.message) }
+    try {
+      const dir = path.join(dataDir, 'logs')
+      if (fs.existsSync(dir)) {
+        const dest = path.join(outDir, 'installed-logs'); fs.mkdirSync(dest, { recursive: true })
+        for (const name of fs.readdirSync(dir)) if (/\.log$/.test(name) && fs.statSync(path.join(dir, name)).isFile()) fs.copyFileSync(path.join(dir, name), path.join(dest, name))
+      }
+    } catch (error) { errors.push(error.message) }
+    provenance.diagnosticErrors = errors
+    save('installed-helper.json', provenance)
+  }
+  helper.quit = async () => {
+    if (!child) return
+    const current = child
+    assert(current.exitCode === null && current.signalCode === null, 'App exited before ordinary quit')
+    await helper.mainRpc("setTimeout(()=>process.mainModule.require('electron').app.quit(),250);true")
+    await until(() => current.exitCode !== null || current.signalCode !== null, 'normal app exit', 120)
+    assert(current.exitCode === 0 && current.signalCode === null, 'Ordinary quit must exit zero without a signal')
+    await until(async () => {
+      const processes = processList()
+      const owned = mac ? processes.split('\n').filter(line => line.includes(app + '/')) :
+        [JSON.parse(processes)].flat().filter(p => p.ExecutablePath?.toLowerCase().startsWith(app.toLowerCase() + path.sep))
+      if (owned.length) return false
+      for (const port of Object.values(ports)) await assertPortFree(port)
+      return true
+    }, 'all installed app processes exit and test ports are released', 45)
+    provenance.launches[provenance.launches.length - 1].quit = { code: current.exitCode, signal: current.signalCode, ownedProcessesGone: true, portsReleased: true }
+    child = null
+  }
+  helper.close = async () => {
+    let failure
+    provenance.cleanupStartedAt = new Date().toISOString()
+    save('installed-helper.json', provenance)
+    try { await helper.quit() } catch (error) {
+      failure = error; provenance.cleanupError = error.message
+      save('installed-helper.json', provenance)
+      if (child?.exitCode === null && child.signalCode === null) {
+        provenance.forced = true
+        const current = child
+        provenance.cleanupSignals = []
+        for (const signal of ['SIGTERM', 'SIGKILL']) {
+          if (current.exitCode !== null || current.signalCode !== null) break
+          provenance.cleanupSignals.push(signal)
+          save('installed-helper.json', provenance)
+          try {
+            current.kill(signal) // Failure cleanup only; never satisfies ordinary quit.
+            await until(() => current.exitCode !== null || current.signalCode !== null, `owned app exit after ${signal}`, 15)
+          } catch (cleanupError) {
+            provenance.cleanupSignalErrors ||= []
+            provenance.cleanupSignalErrors.push(cleanupError.message)
+          }
+        }
+        provenance.cleanupChild = { pid: current.pid, exitCode: current.exitCode, signalCode: current.signalCode }
+      }
+    }
+    if (mounted) {
+      try { run('/usr/bin/hdiutil', ['detach', mounted]); mounted = null } catch (error) { failure ||= error }
+    }
+    provenance.cleanupCompletedAt = new Date().toISOString()
+    await helper.collectDiagnostics()
+    if (failure) throw failure
+  }
+  helper.start = async () => {
+    assert(!child, 'Previous installed app must quit before reopening')
+    for (const port of Object.values(ports)) await assertPortFree(port)
+    const keys = mac ? ['PATH', 'HOME', 'TMPDIR', 'LANG'] : ['PATH', 'SystemRoot', 'WINDIR', 'COMSPEC', 'PATHEXT', 'TEMP', 'TMP', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'HOMEDRIVE', 'HOMEPATH', 'PROCESSOR_ARCHITECTURE']
+    const env = Object.fromEntries(keys.filter(key => process.env[key]).map(key => [key, process.env[key]]))
+    Object.assign(env, { CHECKBA_BACKEND_PORT: String(backendPort), CHECKBA_UPDATE_MANIFEST_URL: `http://127.0.0.1:${cdpPort}/updates-disabled`, AIWORKDECK_DESKTOP_DEV: '0' })
+    const log = fs.openSync(path.join(outDir, `installed-launch-${++launchIndex}.log`), 'w')
+    child = spawn(executable, [`--remote-debugging-port=${cdpPort}`, `--inspect=127.0.0.1:${inspectorPort}`, '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'], { cwd: root, env, stdio: ['ignore', log, log] })
+    fs.closeSync(log)
+    let spawnError
+    child.on('error', error => { spawnError = error })
+    provenance.launches.push({ pid: child.pid })
+    const jar = fs.statSync(path.join(resourcesPath, 'backend/app.jar'))
+    await until(async () => {
+      const response = await fetch(`http://127.0.0.1:${backendPort}/api/admin/wizard`, { signal: AbortSignal.timeout(3000) })
+      const result = await response.json()
+      return response.ok && typeof result.initialized === 'boolean' && result.build === `${jar.size}-${Math.round(jar.mtimeMs)}`
+    }, 'installed bundled backend identity', 240)
+    const javaPath = path.join(resourcesPath, 'jre/bin', mac ? 'java' : 'java.exe')
+    const processes = processList()
+    const bundledBackend = mac ? processes.split('\n').filter(line => line.includes(javaPath) && line.includes('com.checkba.CheckbaApplication')) :
+      [JSON.parse(processes)].flat().filter(p => p.ExecutablePath?.toLowerCase() === javaPath.toLowerCase() && p.CommandLine?.includes('com.checkba.CheckbaApplication'))
+    assert.equal(bundledBackend.length, 1, 'Backend must run the installed bundled JRE, without system-Java fallback')
+    provenance.launches[provenance.launches.length - 1].backendProcess = bundledBackend[0]
+    // Read native loading state before evaluating any renderer JavaScript. Early
+    // Runtime.evaluate can create a context on the initial empty document.
+    await until(() => helper.mainRpc("process.mainModule.require('electron').BrowserWindow.getAllWindows().some(w=>/index\\.html/.test(w.webContents.getURL())&&!w.webContents.isLoadingMainFrame())"), 'native main document loaded', 180)
+    await until(() => helper.rendererRpc('!!window.__checkbaActiveOverviewVm && !!window.checkbaDesktop?.update && document.readyState === "complete"'), 'installed workbench', 180)
+    const identity = await until(async () => {
+      if (spawnError) throw spawnError
+      if (child.exitCode !== null || child.signalCode !== null) throw new Error('Installed process exited during startup')
+      return helper.mainRpc("(()=>{const e=process.mainModule.require('electron');return {pid:process.pid,execPath:process.execPath,resourcesPath:process.resourcesPath,appVersion:e.app.getVersion(),packaged:e.app.isPackaged,versions:process.versions,arch:process.arch,platform:process.platform,home:e.app.getPath('home'),userData:e.app.getPath('userData'),sandboxDisabled:e.app.commandLine.hasSwitch('no-sandbox')}})()")
+    }, 'installed main process identity', 90)
+    assert.equal(identity.pid, child.pid)
+    assert.equal(fs.realpathSync(identity.execPath), fs.realpathSync(executable))
+    assert.equal(fs.realpathSync(identity.resourcesPath), fs.realpathSync(resourcesPath))
+    assert.equal(identity.appVersion, process.env.CANDIDATE_VERSION)
+    assert.equal(identity.home, home)
+    assert.equal(identity.platform, process.platform)
+    assert.equal(identity.arch, process.arch)
+    assert.equal(identity.packaged, true)
+    assert.equal(identity.sandboxDisabled, false)
+    assert.equal(identity.versions.electron, provenance.expectedElectron)
+    await helper.mainRpc(`(()=>{const e=process.mainModule.require('electron');globalThis.__installedRendererEvents=[];const observe=wc=>{wc.on('preload-error',(_event,file,error)=>globalThis.__installedRendererEvents.push({type:'preload-error',file,error:error.stack}));wc.on('did-fail-load',(_event,code,description,url)=>globalThis.__installedRendererEvents.push({type:'did-fail-load',code,description,url}));wc.on('render-process-gone',(_event,details)=>globalThis.__installedRendererEvents.push({type:'render-process-gone',details}))};e.webContents.getAllWebContents().forEach(observe);e.app.on('web-contents-created',(_event,wc)=>observe(wc));return true})()`)
+    helper.identity = identity
+    Object.assign(provenance.launches[provenance.launches.length - 1], identity)
+    assert.equal((await helper.rendererRpc('window.checkbaDesktop.update.status()')).appVersion, process.env.CANDIDATE_VERSION)
+    assert(await helper.mainRpc("process.mainModule.require('electron').BrowserWindow.getAllWindows().some(w=>w.isVisible())"), 'Native workbench window must be visible')
+    save(`installed-identity-${launchIndex}.json`, identity)
+    return identity
+  }
+  try {
+    const installer = await downloadBuild('candidate', mac ? 'darwin-arm64' : 'win32', root, outDir)
+    provenance.build = JSON.parse(fs.readFileSync(path.join(outDir, 'candidate-build.json')))
+    provenance.installer = { name: path.basename(installer), sha256: await hash(installer), size: fs.statSync(installer).size }
+    const source = JSON.parse(run('git', ['show', `${provenance.build.head_sha}:desktop/package.json`]))
+    provenance.expectedElectron = source.devDependencies.electron
+    if (mac) {
+      mounted = path.join(root, 'mount'); fs.mkdirSync(mounted)
+      run('/usr/bin/hdiutil', ['attach', installer, '-readonly', '-nobrowse', '-mountpoint', mounted], { timeout: 180000 })
+      const apps = fs.readdirSync(mounted).filter(name => name.endsWith('.app'))
+      assert.equal(apps.length, 1)
+      run('/usr/bin/ditto', [path.join(mounted, apps[0]), app], { timeout: 180000 })
+      run('/usr/bin/hdiutil', ['detach', mounted]); mounted = null
+      run('/usr/bin/codesign', ['--verify', '--deep', '--strict', app])
+      // These identity commands write reports to stderr; capture both streams without a shell.
+      const { spawnSync } = await import('node:child_process')
+      for (const [label, command, args] of [
+        ['codesign', '/usr/bin/codesign', ['-dv', '--verbose=4', app]],
+        ['gatekeeper', '/usr/sbin/spctl', ['--assess', '--type', 'execute', '--verbose=4', app]],
+      ]) {
+        const result = spawnSync(command, args, { encoding: 'utf8', timeout: 120000 })
+        const report = (result.stdout || '') + (result.stderr || '')
+        save(`installed-${label}.txt`, report)
+        assert.equal(result.status, 0, report)
+        assert(label === 'codesign' ? report.includes('TeamIdentifier=8WKHZVR2W8') && report.includes('Authority=Developer ID Application: Beijing Jingwei Zi Yi Technology Co Ltd') : report.includes('accepted') && report.includes('Notarized Developer ID'), 'Unexpected signing identity or notarization')
+      }
+      const plist = key => run('/usr/bin/plutil', ['-extract', key, 'raw', '-o', '-', path.join(app, 'Contents/Info.plist')])
+      assert.equal(plist('CFBundleIdentifier'), 'com.aiworkdeck.desktop')
+      assert.equal(plist('CFBundleShortVersionString'), process.env.CANDIDATE_VERSION)
+    } else {
+      const signature = file => JSON.parse(powershell(`$ErrorActionPreference='Stop'; $s=Get-AuthenticodeSignature -LiteralPath $env:AWD_TEST_FILE; if($s.Status -ne 'Valid' -or -not $s.TimeStamperCertificate -or $s.SignerCertificate.Subject -notmatch 'Zhen Shan Mei Grace Legacy US Limited'){throw 'Invalid Authenticode identity'}; @{status=[string]$s.Status;publisher=$s.SignerCertificate.Subject;thumbprint=$s.SignerCertificate.Thumbprint;timestamp=$s.TimeStamperCertificate.Subject} | ConvertTo-Json`, { AWD_TEST_FILE: file }))
+      provenance.installer.signature = signature(installer)
+      // electron-builder's StdUtils.GetParameter reparses /D; preserve its quoted
+      // space-containing path contract, as exercised by test-full-upgrade.ps1.
+      powershell(`$ErrorActionPreference='Stop'; $p=Start-Process -FilePath $env:AWD_TEST_INSTALLER -ArgumentList ('/S /D="'+$env:AWD_TEST_INSTALLDIR+'"') -PassThru; if(-not $p.WaitForExit(300000)){throw 'NSIS timed out'}; $p.Refresh(); if($p.ExitCode -ne 0){throw ('NSIS exit '+$p.ExitCode)}`, { AWD_TEST_INSTALLER: installer, AWD_TEST_INSTALLDIR: app })
+      assert(fs.existsSync(executable), 'NSIS did not install the expected executable')
+      provenance.executableSignature = signature(executable)
+      const version = powershell('(Get-Item -LiteralPath $env:AWD_TEST_FILE).VersionInfo.ProductVersion', { AWD_TEST_FILE: executable })
+      assert([process.env.CANDIDATE_VERSION, process.env.CANDIDATE_VERSION + '.0'].includes(version), 'Installed PE version mismatch')
+    }
+    for (const relativePath of ['app.asar', 'backend/app.jar', 'frontend/dist/build/h5/index.html', 'frontend/dist/zetaoffice/lowa/soffice.wasm', `jre/bin/${mac ? 'java' : 'java.exe'}`]) assert(fs.statSync(path.join(resourcesPath, relativePath)).size > 0, `Missing bundled resource: ${relativePath}`)
+    provenance.appAsarSha256 = await hash(path.join(resourcesPath, 'app.asar'))
+    provenance.backendJarSha256 = await hash(path.join(resourcesPath, 'backend/app.jar'))
+    await helper.start()
+    await helper.collectDiagnostics()
+    return helper
+  } catch (error) {
+    provenance.error = error.stack
+    save('installed-helper.json', provenance)
+    await helper.collectDiagnostics()
+    if (child?.exitCode === null && child.signalCode === null) {
+      try {
+        save('failed-startup-preload-probe.json', await helper.mainRpc(`(async()=>{const e=process.mainModule.require('electron'),path=process.mainModule.require('node:path');const errors=[];const w=new e.BrowserWindow({show:false,webPreferences:{preload:path.join(process.resourcesPath,'app.asar/preload/preload.js'),sandbox:true,contextIsolation:true,nodeIntegration:false}});w.webContents.on('preload-error',(_event,file,error)=>errors.push({file,error:error.stack}));try{await w.loadURL('data:text/html,<title>Failed startup diagnostic only</title>');return {diagnosticOnly:true,errors,bridge:await w.webContents.executeJavaScript('typeof window.checkbaDesktop'),preload:typeof w.webContents._getPreloadScript==='function'?w.webContents._getPreloadScript():null}}finally{w.destroy()}})()`))
+      } catch (probeError) { save('failed-startup-preload-probe.json', { diagnosticOnly: true, error: probeError.message }) }
+      try {
+        save('failed-startup-window-probes.json', await helper.mainRpc(`(async()=>{
+          const e=process.mainModule.require('electron'),path=process.mainModule.require('node:path');
+          const original=e.BrowserWindow.getAllWindows().find(w=>w.isVisible());
+          const prefs=original.webContents.getLastWebPreferences();
+          const preload=path.join(process.resourcesPath,'app.asar/preload/preload.js');
+          const file=path.join(process.resourcesPath,'frontend/dist/build/h5/index.html');
+          const results=[];
+          for(const webviewTag of [true,false]){
+            const errors=[];
+            const w=new e.BrowserWindow({show:false,webPreferences:{preload,sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:false,webviewTag,additionalArguments:prefs.additionalArguments}});
+            w.webContents.on('preload-error',(_event,file,error)=>errors.push({file,error:error.stack}));
+            w.webContents.on('console-message',(_event,details)=>{if(details.level==='error')errors.push({console:details.message})});
+            try{await w.loadFile(file);results.push({webviewTag,errors,state:await w.webContents.executeJavaScript('({bridge:typeof window.checkbaDesktop,url:location.href,ready:document.readyState})')})}finally{w.destroy()}
+          }
+          const errors=[];
+          original.webContents.on('preload-error',(_event,file,error)=>errors.push({file,error:error.stack}));
+          await original.loadFile(file);
+          results.push({originalReload:true,errors,state:await original.webContents.executeJavaScript('({bridge:typeof window.checkbaDesktop,url:location.href,ready:document.readyState})')});
+          return {diagnosticOnly:true,results};
+        })()`, 60000))
+      } catch (probeError) { save('failed-startup-window-probes.json', { diagnosticOnly: true, error: probeError.message }) }
+    }
+    try { await helper.close() } catch (cleanupError) { provenance.cleanupError = cleanupError.message }
+    save('installed-helper.json', provenance)
+    throw error
+  }
+}

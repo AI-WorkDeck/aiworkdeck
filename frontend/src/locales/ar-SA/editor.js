@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "listAttachedFiles": "عرض مرفقات هذه الجولة",
     "office_ppt_add_image": "إدراج صورة في الشريحة",
     "office_ppt_add_chart": "إدراج مخطط في الشريحة",
     "office_ppt_format_chart": "تنسيق مخطط الشريحة",

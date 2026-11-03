@@ -310,7 +310,6 @@ export default {
   "selectReplaceContentFirst": "請先在文件中選取要替換的內容",
   "selectionReplaced": "已替換選取範圍",
   "replaceFailed": "替換失敗",
-  "folderTooManyFiles": "資料夾含{count}個檔案(超過10個上限)，請減少數量",
   "fileAdded": "已新增: {name}",
   "filesAdded": "已加入 {count} 個檔案",
   "dragUnsupported": "不支援拖入這類內容，可拖入檔案、編輯器分頁或本機檔案",

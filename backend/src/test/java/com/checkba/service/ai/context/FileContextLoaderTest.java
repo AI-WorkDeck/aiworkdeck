@@ -56,6 +56,15 @@ class FileContextLoaderTest {
     }
 
     @Test
+    void lazyFolderReferenceDoesNotTouchStorageOrEnumerateChildren() {
+        String reference = loader.buildFolderReference("200");
+        assertTrue(reference.contains("extract_file_text with fileId=200, offset=0"));
+        assertTrue(reference.contains("Follow nextOffset"));
+        assertTrue(reference.contains("relative to the attached folder (ID: 200), NOT the project root"));
+        verifyNoInteractions(projectFileService, extractor);
+    }
+
+    @Test
     void recoveryMaterialIsSkippedWithoutUsingTheFolderBudget() throws Exception {
         props.getFiles().setMaxFilesPerContext(1);
         ProjectFile kit = readableFile(71L, "redacted.docx.AWD-RECOVERY", "AWD-RECOVERY-1:synthetic-ciphertext");

@@ -57,7 +57,7 @@ export default {
   "typeDeadline": "期限",
   "typeHearing": "口頭弁論",
   "typeMeeting": "会議",
-  "typeTodo": "ToDo",
+  "typeTodo": "タスク",
   "typeOther": "その他",
   "priorityHigh": "優先",
   "remindLabel": "リマインダー",

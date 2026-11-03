@@ -14,6 +14,13 @@ public interface ProjectAiMessageAttachmentRepository
     /** 历史回灌：一次把整条会话的附件取回来，绝不按消息逐条查（N+1）。 */
     List<ProjectAiMessageAttachment> findByMessageIdInOrderByIdAsc(List<Long> messageIds);
 
+    @org.springframework.data.jpa.repository.Query("SELECT a FROM ProjectAiMessageAttachment a "
+            + "WHERE a.messageId = :messageId AND a.id > :afterId ORDER BY a.id ASC")
+    List<ProjectAiMessageAttachment> findPageAfter(
+            @org.springframework.data.repository.query.Param("messageId") Long messageId,
+            @org.springframework.data.repository.query.Param("afterId") Long afterId,
+            org.springframework.data.domain.Pageable pageable);
+
     /** 会话被删除时一并清掉。 */
     void deleteByMessageIdIn(List<Long> messageIds);
 }

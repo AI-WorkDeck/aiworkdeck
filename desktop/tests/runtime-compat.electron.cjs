@@ -65,6 +65,11 @@ app.whenReady().then(async () => {
   const win = new BrowserWindow({ show: true, width: 700, height: 500,
     webPreferences: { preload: path.resolve(__dirname, '../preload/preload.js'), sandbox: true, contextIsolation: true,
       nodeIntegration: false, backgroundThrottling: false, additionalArguments: [`--checkba-api-base=${base}`, '--checkba-system-memory=8589934592'] } })
+  const observedAt = Date.now()
+  evidence.windowEvents = [{ event: 'constructed', elapsedMs: 0 }]
+  for (const event of ['show', 'hide', 'focus', 'blur', 'minimize', 'restore', 'ready-to-show']) {
+    win.on(event, () => evidence.windowEvents.push({ event, elapsedMs: Date.now() - observedAt }))
+  }
   const views = createBrowserViewRegistry({ getWindow: () => win,
     createView: () => new BrowserView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } }) })
   ipcMain.handle('checkba:ui-confirm', (event, payload) => {
@@ -142,9 +147,90 @@ app.whenReady().then(async () => {
     view.webContents.goForward()
     await loaded
     assert.equal(await view.webContents.executeJavaScript('document.querySelector("h1").textContent'), 'Second page')
-    const screenshot = await view.webContents.capturePage()
-    assert.equal(screenshot.isEmpty(), false)
-    fs.writeFileSync(path.join(root, 'browser-view.png'), screenshot.toPNG())
+    // A completed navigation does not guarantee that Viz has drawn its surface.
+    // Observe one startup frame, then verify a new marker through the production capture API.
+    // Continuous video-frame delivery is not a dependency of the product screenshot path.
+    const hasFrameMarker = image => {
+      if (image.isEmpty()) return false
+      const marker = image.crop({ x: 8, y: 8, width: 1, height: 1 }).toBitmap()
+      const background = image.crop({ x: 80, y: 8, width: 1, height: 1 }).toBitmap()
+      return marker.equals(Buffer.from([0, 0, 0, 255])) && background.length === 4 &&
+        background[1] > background[0] && background[1] > background[2] && background[3] === 255
+    }
+    const observation = evidence.browserViewFrameObservation = { callbackCount: 0, firstSamples: [], injection: 'pending' }
+    const observe = read => {
+      try { return read() } catch (error) { return { diagnosticError: error.message } }
+    }
+    const sample = image => observe(() => ({
+      empty: image.isEmpty(), size: image.getSize(), scaleFactors: image.getScaleFactors(),
+      marker: [...image.crop({ x: 8, y: 8, width: 1, height: 1 }).toBitmap()],
+      background: [...image.crop({ x: 80, y: 8, width: 1, height: 1 }).toBitmap()],
+    }))
+    const windowState = () => observe(() => ({
+      visible: win.isVisible(), focused: win.isFocused(), minimized: win.isMinimized(),
+      appHidden: process.platform === 'darwin' ? app.isHidden() : null,
+      bounds: win.getBounds(), contentBounds: win.getContentBounds(), viewBounds: view.getBounds(),
+      attached: win.getBrowserViews().includes(view), registry: views._state(),
+      nativeChildren: win.contentView.children.map(child => ({
+        type: child.constructor.name, target: child.webContents === view.webContents,
+        visible: child.getVisible(), bounds: child.getBounds(),
+      })),
+      webContentsFocused: view.webContents.isFocused(), loading: view.webContents.isLoading(),
+      url: view.webContents.getURL(), zoomFactor: view.webContents.getZoomFactor(),
+      backgroundThrottling: { window: win.webContents.getBackgroundThrottling(), view: view.webContents.getBackgroundThrottling() },
+      gpuFeatures: app.getGPUFeatureStatus(),
+    }))
+    observation.beforeSubscription = windowState()
+    let firstFrame, lastFrame
+    let frameDeadline
+    let frameExpired = false
+    const assertPending = () => { if (frameExpired) throw new Error('BrowserView capture readiness timed out') }
+    try {
+      const capture = async () => {
+        await new Promise(resolve => {
+          view.webContents.beginFrameSubscription(false, (image, dirtyRect) => {
+            observation.callbackCount++
+            firstFrame ||= image
+            lastFrame = image
+            observation.lastSample = { ...sample(image), dirtyRect, elapsedMs: Date.now() - observedAt }
+            if (observation.firstSamples.length < 3) observation.firstSamples.push(observation.lastSample)
+            if (!image.isEmpty()) resolve()
+          })
+        })
+        assertPending()
+        evidence.browserViewStartupFrameObserved = true
+        view.webContents.endFrameSubscription()
+        observation.injection = 'started'
+        observation.injectedDocument = await view.webContents.executeJavaScript(`(async()=>{const marker=document.createElement('div');marker.style.cssText='position:fixed;left:0;top:0;width:24px;height:24px;background:black;z-index:2147483647';document.body.append(marker);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));return {rect:marker.getBoundingClientRect().toJSON(),dpr:devicePixelRatio,visibility:document.visibilityState,focused:document.hasFocus(),url:location.href}})()`)
+        assertPending()
+        observation.injection = 'completed'
+        observation.injectionElapsedMs = Date.now() - observedAt
+        // Animation callbacks only schedule the mutation; this bitmap is the pixel evidence.
+        const screenshot = await view.webContents.capturePage()
+        assertPending()
+        observation.capture = { ...sample(screenshot), elapsedMs: Date.now() - observedAt }
+        assert.equal(screenshot.isEmpty(), false)
+        fs.writeFileSync(path.join(root, 'browser-view.png'), screenshot.toPNG())
+        assert.ok(hasFrameMarker(screenshot), 'capturePage must include the newly drawn fixture marker and page background')
+        evidence.browserViewFrameObserved = true
+        evidence.browserViewMarkerEvidence = 'single-capturePage'
+      }
+      await Promise.race([
+        new Promise((_, reject) => { frameDeadline = setTimeout(() => { frameExpired = true; reject(new Error('BrowserView capture readiness timed out')) }, 10000) }),
+        capture(),
+      ])
+    } catch (error) {
+      try {
+        observation.atFailure = windowState()
+        fs.writeFileSync(path.join(root, 'failure-before-interventions.json'), JSON.stringify({ ...evidence, passed: false, error: error.stack }, null, 2))
+        if (firstFrame) fs.writeFileSync(path.join(root, 'subscription-first.png'), firstFrame.toPNG())
+        if (lastFrame) fs.writeFileSync(path.join(root, 'subscription-last.png'), lastFrame.toPNG())
+      } catch (diagnosticError) { observation.failureDiagnosticError = diagnosticError.message }
+      throw error
+    } finally {
+      clearTimeout(frameDeadline)
+      view.webContents.endFrameSubscription()
+    }
     mark('production BrowserView registry attach, hide, restore, retained state and history')
 
     const target = path.join(paths.downloads, 'compat.txt')

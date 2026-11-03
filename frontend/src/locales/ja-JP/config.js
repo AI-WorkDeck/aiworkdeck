@@ -16,7 +16,7 @@ export default {
     "search": "検索",
     "tts": "テキスト読み上げ",
     "desensitize": "ファイル墨消し",
-    "version": "Version History",
+    "version": "ソース管理",
     "calendar": "カレンダー"
   },
   "tools": {

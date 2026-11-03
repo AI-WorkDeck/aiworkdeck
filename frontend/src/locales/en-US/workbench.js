@@ -340,7 +340,6 @@ export default {
   selectReplaceContentFirst: 'Select the content to replace in the document first',
   selectionReplaced: 'Selection replaced',
   replaceFailed: 'Replace failed',
-  folderTooManyFiles: 'Folder contains {count} files (over the 10-file limit), please remove some',
   fileAdded: 'Added: {name}',
   filesAdded: 'Added {count} files',
   // Dropping into the AI chat area (dev-board#779 K6 (5))

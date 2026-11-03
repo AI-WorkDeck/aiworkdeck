@@ -31,7 +31,7 @@ export default {
   "disableNotice": "Nyahaktifkan panggilan AI untuk sambungan ini?",
   "deleteNotice": "Padam sambungan dan bukti kelayakannya?",
   "refresh": "Muat semula sambungan",
-  "import": "Import JSON",
+  "import": "Import fail JSON",
   "importHint": "Tampal JSON mcpServers Claude/Cursor atau servers VS Code, atau pilih fail. Konfigurasi mungkin mengandungi kelayakan; jangan kongsi dalam sembang.",
   "importFile": "Pilih fail JSON",
   "importJson": "JSON konfigurasi",

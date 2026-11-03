@@ -1,0 +1,62 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: Electron installed cloud regression
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run_id:
+        description: Successful signed desktop-build run
+        required: true
+      candidate_sha:
+        description: Exact signed build source SHA
+        required: true
+      candidate_version:
+        description: Application version (not Electron version)
+        required: true
+      macos_runner:
+        description: Standard ARM64 Mac used for this regression
+        type: choice
+        options: [macos-15, macos-26]
+        default: macos-15
+permissions:
+  contents: read
+  actions: read
+jobs:
+  installed-client:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['${{ inputs.macos_runner }}', windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install test driver dependencies
+        run: npm ci --prefix frontend
+      - name: Exercise genuine installed client and bundled backend
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AWD_TEST_INSTALLED: '1'
+          CANDIDATE_RUN: ${{ inputs.candidate_run_id }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          CANDIDATE_VERSION: ${{ inputs.candidate_version }}
+        run: node frontend/tests/desktop-e2e/electron-upgrade.mjs
+      - name: Preserve assertions, provenance, screenshots and application diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-installed-${{ runner.os }}-${{ github.run_attempt }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/awd-electron-upgrade-*/*.json
+            ${{ runner.temp }}/awd-electron-upgrade-*/*.png
+            ${{ runner.temp }}/awd-electron-upgrade-*/*.log
+            ${{ runner.temp }}/awd-electron-upgrade-*/*.txt
+            ${{ runner.temp }}/awd-electron-upgrade-*/installed-logs/*.log
+            ${{ runner.temp }}/awd-electron-upgrade-*/home/*

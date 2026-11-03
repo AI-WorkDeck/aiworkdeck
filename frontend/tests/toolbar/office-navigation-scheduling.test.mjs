@@ -4,7 +4,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const source = readFileSync(new URL('../../src/components/OfficeNavigation.vue', import.meta.url), 'utf8')
+const source = readFileSync(process.env.OFFICE_NAVIGATION_SOURCE || new URL('../../src/components/OfficeNavigation.vue', import.meta.url), 'utf8')
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r }); return { promise, resolve } }
 function harness(kind = 'calc', handler = () => {}) {
   let url = 0
@@ -247,4 +247,140 @@ test('editing a page during its thumbnail render discards the stale image and re
   await new Promise(resolve => setTimeout(resolve, 20))
   assert.equal(draws, 2)
   assert.equal(h.vm.thumbnails[1], 'blob:1', 'the stale image must not allocate an object URL')
+})
+
+test('Impress content edits defer the manifest while busy and refresh the actual item once idle', async () => {
+  let busy = true
+  const h = harness('impress', () => impressNavigation(2))
+  h.vm.canBackgroundWork = () => !busy
+  h.vm.items = [{ id: 1 }, { id: 2 }]
+  h.vm.activeId = 1
+  h.vm.currentItem = { activeId: h.vm.activeId, itemCount: 2 }
+  h.vm.documentSeq = 1
+  h.vm._rendered = { [h.vm.activeId]: 0 }
+  try {
+    for (let i = 0; i < 6; i++) h.component.watch.contentKey.call(h.vm)
+    assert.equal(h.vm._rendered[h.vm.activeId], undefined, 'invalidate immediately without reading the model')
+    await new Promise(resolve => setTimeout(resolve, 170))
+    assert.equal(h.calls.length, 0, 'input/save activity must not enqueue a document-wide manifest')
+    assert.ok(h.vm._contentRefreshTimer != null, 'one pending idle retry remains')
+    busy = false
+    await new Promise(resolve => setTimeout(resolve, 300))
+    assert.deepEqual(h.calls.map(c => c.action), ['office_get_navigation'])
+    assert.equal(h.vm.activeId, 2, 'use the actual active item, not the stale toolbar snapshot')
+    assert.equal(h.vm._appliedContentRevision, 6)
+    assert.equal(h.vm._contentRefreshTimer, null)
+  } finally { h.vm._disposed = true; clearTimeout(h.vm._contentRefreshTimer) }
+})
+
+test('Calc rename with unchanged sheet count refreshes while busy without waiting for a save', async () => {
+  const renamed = { ...calcNavigation('Renamed'), items: [{ id: 'Sheet1', name: 'Sheet1' }, { id: 'Renamed', name: 'Renamed' }] }
+  const h = harness('calc', () => renamed)
+  h.vm.canBackgroundWork = () => false
+  h.vm.items = calcNavigation().items
+  h.vm.currentItem = { activeId: 'Sheet2', itemCount: 2 }
+  h.vm.activeId = 'Sheet2'
+  h.component.watch.contentKey.call(h.vm)
+  try {
+    await new Promise(resolve => setTimeout(resolve, 170))
+    assert.deepEqual(h.calls.map(c => c.action), ['office_get_navigation'])
+    assert.equal(h.vm.items[1].name, 'Renamed')
+    assert.equal(h.vm.activeId, 'Renamed')
+    assert.equal(h.vm._contentRefreshTimer, null)
+  } finally { h.vm._disposed = true; clearTimeout(h.vm._refreshTimer) }
+})
+
+test('structural refresh bypasses the content idle gate and absorbs preceding edits', async () => {
+  const h = harness('impress', () => impressNavigation(3, [1, 2, 3]))
+  h.vm.canBackgroundWork = () => false
+  h.vm.items = [{ id: 1 }, { id: 2 }]
+  h.vm.activeId = 1
+  h.vm.currentItem = { activeId: 1, itemCount: 2 }
+  h.component.watch.contentKey.call(h.vm)
+  h.component.watch.structureKey.call(h.vm)
+  try {
+    await new Promise(resolve => setTimeout(resolve, 170))
+    assert.deepEqual(h.calls.map(c => c.action), ['office_get_navigation'])
+    assert.equal(h.vm.items.length, 3)
+    assert.equal(h.vm.activeId, 3)
+    assert.equal(h.vm._contentRefreshTimer, null, 'structural read satisfies the pending content snapshot')
+    await new Promise(resolve => setTimeout(resolve, 300))
+    assert.equal(h.calls.length, 1, 'the absorbed content timer must not reread again')
+  } finally { h.vm._disposed = true; clearTimeout(h.vm._refreshTimer); clearTimeout(h.vm._contentRefreshTimer) }
+})
+
+test('page count and active-item notifications remain immediate during deferred content work', async () => {
+  const h = harness('impress', () => impressNavigation(2, [1, 2, 3]))
+  h.vm.canBackgroundWork = () => false
+  h.vm.items = [{ id: 1 }, { id: 2 }]
+  h.vm.activeId = 1
+  h.vm.currentItem = { activeId: 1, itemCount: 2 }
+  h.component.watch.contentKey.call(h.vm)
+  h.component.watch.currentItem.call(h.vm, { activeId: 2, itemCount: 2 }, h.vm.currentItem)
+  assert.equal(h.vm.activeId, 2, 'page selection does not wait for the idle timer')
+  h.component.watch.currentItem.call(h.vm, { activeId: 2, itemCount: 3 }, { activeId: 2, itemCount: 2 })
+  try {
+    await new Promise(resolve => setTimeout(resolve, 170))
+    assert.equal(h.calls.length, 1, 'new-page structure must be read despite the content idle gate')
+    assert.equal(h.vm.items.length, 3)
+    assert.equal(h.vm._contentRefreshTimer, null)
+  } finally { h.vm._disposed = true; clearTimeout(h.vm._refreshTimer); clearTimeout(h.vm._contentRefreshTimer) }
+})
+
+test('same-count slide moves refresh labels and invalidate old page thumbnails while busy', async () => {
+  const moved = { ...impressNavigation(2), items: [{ id: 1, title: 'B' }, { id: 2, title: 'A' }] }
+  const h = harness('impress', () => moved)
+  h.vm.canBackgroundWork = () => false
+  h.vm.items = [{ id: 1, title: 'A' }, { id: 2, title: 'B' }]
+  h.vm.documentSeq = 1
+  h.vm.thumbnails = { 1: 'blob:old1', 2: 'blob:old2' }
+  h.vm._rendered = { 1: h.vm._generation, 2: h.vm._generation }
+  const generation = h.vm._generation
+  h.component.watch.structureKey.call(h.vm)
+  assert.ok(h.vm._generation > generation, 'old page-index thumbnails become stale immediately')
+  try {
+    await new Promise(resolve => setTimeout(resolve, 170))
+    assert.deepEqual(h.calls.map(c => c.action), ['office_get_navigation'])
+    assert.deepEqual(h.vm.items, moved.items)
+    assert.equal(h.vm.activeId, 2)
+    assert.deepEqual(h.vm.thumbnails, {})
+  } finally { h.vm._disposed = true; clearTimeout(h.vm._refreshTimer) }
+})
+
+test('hidden content edits are read when the navigation becomes active again', async () => {
+  const h = harness('impress', () => impressNavigation(2))
+  h.vm.active = false
+  h.vm.canBackgroundWork = () => false
+  h.component.watch.contentKey.call(h.vm)
+  assert.equal(h.vm._contentRefreshTimer, undefined)
+  h.vm.active = true
+  h.component.watch.active.call(h.vm, true)
+  try {
+    await new Promise(resolve => setTimeout(resolve, 170))
+    assert.equal(h.calls.length, 1)
+    assert.equal(h.vm.activeId, 2)
+    assert.equal(h.vm._appliedContentRevision, 1)
+  } finally { h.vm._disposed = true; clearTimeout(h.vm._refreshTimer); clearTimeout(h.vm._contentRefreshTimer) }
+})
+
+test('content arriving during an in-flight manifest still waits if typing resumes before that read ends', async () => {
+  const pending = deferred()
+  let count = 0, busy = false
+  const h = harness('impress', () => ++count === 1 ? pending.promise : impressNavigation(2))
+  h.vm.canBackgroundWork = () => !busy
+  const first = h.vm.refresh()
+  h.component.watch.contentKey.call(h.vm)
+  try {
+    await new Promise(resolve => setTimeout(resolve, 170))
+    busy = true
+    pending.resolve(impressNavigation(1))
+    await first
+    await new Promise(resolve => setTimeout(resolve, 300))
+    assert.equal(h.calls.length, 1, 'an idle request must not turn into an unconditional trailing read during input')
+    busy = false
+    await new Promise(resolve => setTimeout(resolve, 300))
+    assert.equal(h.calls.length, 2)
+    assert.equal(h.vm.activeId, 2)
+    assert.equal(h.vm._appliedContentRevision, 1)
+  } finally { h.vm._disposed = true; clearTimeout(h.vm._refreshTimer); clearTimeout(h.vm._contentRefreshTimer) }
 })

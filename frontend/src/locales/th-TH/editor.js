@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "listAttachedFiles": "แสดงไฟล์แนบของรอบนี้",
     "office_ppt_add_image": "แทรกรูปภาพในสไลด์",
     "office_ppt_add_chart": "แทรกแผนภูมิในสไลด์",
     "office_ppt_format_chart": "จัดรูปแบบแผนภูมิในสไลด์",

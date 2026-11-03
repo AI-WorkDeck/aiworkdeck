@@ -20,7 +20,7 @@ const SRC = readFileSync(new URL('../../src/composables/useAgentStream.js', impo
 // 从 `const errMsg = dataStr || "Unknown Error"` 之后的 if 链起，按花括号配平截取
 // （遇到 `else` 继续往下吃，整条链才是一个完整语句）。
 function errorBranch(code) {
-  const anchor = code.indexOf('const errMsg = dataStr')
+  const anchor = code.indexOf('let attachmentErrorKey =')
   assert.ok(anchor >= 0, '找不到 error 分支的锚点，useAgentStream 的错误处置被改过了')
   const start = code.indexOf('if (errMsg.includes(', anchor)
   assert.ok(start >= 0, '找不到 error 载荷的标记判定链')
@@ -60,7 +60,7 @@ function renderError(dataStr) {
   const run = new Function('dataStr', 'currentAssistantBubble', 't', 'accountPayload',
     'isAccountRequired', 'isCreditsRequired', 'promptAccountAction', BRANCH)
   // This suite tests rendered error copy; the account dialog is verified in paid-service.mjs.
-  run(dataStr, bubble, (k) => k, parseAccountPayload(dataStr), isAccountRequired, isCreditsRequired, () => {})
+  run(dataStr, bubble, (k, args) => k + (args?.message ? ' ' + args.message : ''), parseAccountPayload(dataStr), isAccountRequired, isCreditsRequired, () => {})
   return bubble.value.content
 }
 
@@ -97,4 +97,10 @@ test('中英双语文案都在，且措辞说的是「检查网络」', () => {
   assert.ok(en.networkUnreachableNotice, 'en-US/agentStream.js 缺 networkUnreachableNotice')
   assert.match(zh.networkUnreachableNotice, /网络/)
   assert.match(en.networkUnreachableNotice, /[Nn]etwork/)
+})
+
+test('attachment timeout and occupied reader produce translated actionable errors', () => {
+  assert.match(renderError(JSON.stringify({ code: 'CONTEXT_PREPARATION_TIMEOUT', message: 'fallback' })), /chat\.contextPreparationTimeout/)
+  assert.match(renderError(JSON.stringify({ code: 'ATTACHMENTS_REQUIRE_TOOLS', message: 'fallback' })), /chat\.attachmentsRequireTools/)
+  assert.match(renderError(JSON.stringify({ code: 'ATTACHMENT_READER_BUSY', message: 'fallback' })), /chat\.attachmentReaderBusy/)
 })

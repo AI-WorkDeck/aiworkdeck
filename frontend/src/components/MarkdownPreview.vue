@@ -75,6 +75,9 @@ export default {
     sourceText() {
       this.scheduleRender()
     },
+    '$i18n.locale'() {
+      this.scheduleRender()
+    },
     file: {
       immediate: true,
       handler(newFile) {
