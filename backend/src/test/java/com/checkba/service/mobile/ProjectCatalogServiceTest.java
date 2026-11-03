@@ -20,6 +20,16 @@ class ProjectCatalogServiceTest {
     com.checkba.storage.StorageService bytes=mock(com.checkba.storage.StorageService.class);
     ProjectCatalogService service=new ProjectCatalogService(projects,files,dirs,links,manifests,relay,storage);
     @BeforeEach void storage(){when(storage.getStorageService()).thenReturn(bytes);}
+    @Test void desktopLocationPreservesItsOwnUidAndOwnershipWhenMergedWithCloud() {
+        var cloud=cloud(1L,"Formal");String desktopUid=UUID.randomUUID().toString();
+        var row=desktop("desktop","7","Formal",desktopUid,1L);row.setProjectType("BLANK");row.setOwned(true);
+        when(projects.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(cloud));
+        when(dirs.findByUserIdOrderByUpdatedAtDesc(1L)).thenReturn(List.of(row));
+        var item=service.catalog(1L).get(0);
+        assertEquals(cloud.getUid(),item.get("projectUid"));
+        var location=(Map<?,?>)((List<?>)item.get("locations")).get(0);
+        assertEquals(desktopUid,location.get("projectUid"));assertEquals("BLANK",location.get("projectType"));assertEquals(true,location.get("owned"));
+    }
     @Test void standaloneFilesAreNotPublishedToTheAccountCatalog() {
         Project loose=cloud(8L,"Standalone files");loose.setProjectType(Project.LOOSE_FILES);
         when(projects.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(loose));

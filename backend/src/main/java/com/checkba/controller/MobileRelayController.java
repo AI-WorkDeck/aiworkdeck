@@ -100,6 +100,8 @@ public class MobileRelayController {
             private String name;
             private String projectUid;
             private Long cloudProjectId;
+            private String projectType;
+            private Boolean owned;
         }
     }
 
@@ -115,7 +117,7 @@ public class MobileRelayController {
         List<MobileRelayStoreService.DirEntry> entries = new ArrayList<>();
         if (request.getProjects() != null) {
             for (DirectoryRequest.Entry e : request.getProjects()) {
-                if (e != null) entries.add(new MobileRelayStoreService.DirEntry(e.getKey(), e.getName(), e.getProjectUid(), e.getCloudProjectId()));
+                if (e != null) entries.add(new MobileRelayStoreService.DirEntry(e.getKey(), e.getName(), e.getProjectUid(), e.getCloudProjectId(), e.getProjectType(), e.getOwned()));
             }
         }
         MobileRelayStoreService.DirectoryReplaceResult result =

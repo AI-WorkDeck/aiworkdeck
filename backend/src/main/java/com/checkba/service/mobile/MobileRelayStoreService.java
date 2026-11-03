@@ -112,8 +112,9 @@ public class MobileRelayStoreService {
     @Autowired(required = false)
     private com.checkba.repository.MobileProjectManifestRepository directoryManifests;
 
-    public record DirEntry(String key, String name, String projectUid, Long cloudProjectId) {
-        public DirEntry(String key, String name) { this(key, name, null, null); }
+    public record DirEntry(String key, String name, String projectUid, Long cloudProjectId, String projectType, Boolean owned) {
+        public DirEntry(String key, String name, String projectUid, Long cloudProjectId) { this(key, name, projectUid, cloudProjectId, null, null); }
+        public DirEntry(String key, String name) { this(key, name, null, null, null, null); }
     }
 
     /**
@@ -182,6 +183,8 @@ public class MobileRelayStoreService {
                 directoryManifests.findByUserIdAndDeviceIdAndProjectKey(userId, deviceId, row.getProjectKey())
                         .ifPresent(directoryManifests::delete);
             }
+            row.setProjectType(entry.projectType() == null ? null : truncate(entry.projectType(), 32));
+            row.setOwned(entry.owned());
             row.setUpdatedAt(now);
             dirRepository.save(row);
             stored++;

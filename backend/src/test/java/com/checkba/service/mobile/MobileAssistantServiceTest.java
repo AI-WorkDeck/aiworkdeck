@@ -40,6 +40,7 @@ import static org.mockito.Mockito.*;
  "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect","spring.jpa.hibernate.ddl-auto=create-drop"})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class MobileAssistantServiceTest {
+    @Autowired MobileAssistantDesktopCopyRepository desktopCopies;
     @Autowired MobileAssistantConsentRepository consents;
     @Autowired MobileProjectSummaryRepository summaries;
     @Autowired MobileAssistantTurnRepository turns;
@@ -78,7 +79,7 @@ class MobileAssistantServiceTest {
         when(model.generate(any(ChatMessage[].class))).thenReturn(Response.from(AiMessage.from("合成摘要：甲方为原告，需于周五提交材料。来源：证据.txt；仅覆盖已读材料。")));
         when(model.generate(anyList(),anyList())).thenReturn(Response.from(AiMessage.from("基于已核对的资料回答。")));
         when(model.generate(anyList())).thenReturn(Response.from(AiMessage.from("基于已核对的资料回答。")));
-        service=new MobileAssistantService(consents,summaries,turns,directories,backup,quota,extractor,models,tools,usage,users,transactions);
+        service=new MobileAssistantService(consents,summaries,turns,directories,backup,quota,extractor,models,tools,usage,users,transactions,desktopCopies);
         var dir=new MobileProjectDir();dir.setUserId(user);dir.setDeviceId(device);dir.setProjectKey(key);dir.setName("合成案卷");dir.setUpdatedAt(LocalDateTime.now());directories.saveAndFlush(dir);
     }
     Long newUser() {
@@ -92,6 +93,105 @@ class MobileAssistantServiceTest {
         var row=new MobileFileBackup();row.setUserId(user);row.setDeviceId(device);row.setProjectKey(key);row.setFileId(UUID.randomUUID().toString());row.setUid(UUID.randomUUID().toString());
         row.setName("证据.txt");row.setPath("证据.txt");row.setSha256(HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8))));row.setSize((long)text.getBytes(StandardCharsets.UTF_8).length);row.setStoragePath("synthetic");row.setUpdatedAt(LocalDateTime.now());backups.saveAndFlush(row);
         when(backup.content(user,device,key,row.getUid())).thenAnswer(call -> new ProjectCatalogService.Content(new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8)),row.getSize()));return row;
+    }
+
+    MobileAssistantDesktopCopyService desktopExporter() {
+        return new MobileAssistantDesktopCopyService(desktopCopies,service,consents,directories,users,new com.fasterxml.jackson.databind.ObjectMapper());
+    }
+    MobileAssistantDesktopCopyService.Request desktopRequest() {
+        var target=directories.findByUserIdAndDeviceId(user,device).get(0);
+        target.setProjectUid(UUID.randomUUID().toString());target.setProjectType("BLANK");target.setOwned(true);directories.saveAndFlush(target);
+        return new MobileAssistantDesktopCopyService.Request(UUID.randomUUID().toString(),target.getProjectUid(),device,key);
+    }
+    <T> T desktopTx(java.util.function.Supplier<T> body) {
+        return new org.springframework.transaction.support.TransactionTemplate(transactions).execute(status->body.get());
+    }
+    @Test void desktopEnvelopeContainsCompleteHistoryAndIdentityBoundHashAndAckIsIdempotent() throws Exception {
+        enable();String conversation=UUID.randomUUID().toString();
+        for(int i=0;i<205;i++) persistCopyTurn(conversation,"completed",i);
+        var request=desktopRequest();var exporter=desktopExporter();
+        var receipt=desktopTx(()->exporter.create(user,conversation,request));
+        assertEquals("QUEUED",receipt.status());assertEquals(410,receipt.messageCount());
+        assertEquals(0,receipt.expiresAt().getNano()%1000);
+        assertEquals(receipt,desktopTx(()->exporter.create(user,conversation,request)));
+        var envelope=desktopTx(()->exporter.pending(user,device)).get(0);
+        var json=new com.fasterxml.jackson.databind.ObjectMapper().readTree(envelope.snapshotJson());
+        assertEquals(410,json.path("messages").size());assertEquals(request.targetProjectUid(),json.path("targetProjectUid").asText());
+        assertEquals(receipt.conversationId(),json.path("conversationId").asText());
+        assertEquals(envelope.sha256(),HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(envelope.snapshotJson().getBytes(StandardCharsets.UTF_8))));
+        var ack=new MobileAssistantDesktopCopyService.Ack(device,request.targetProjectUid(),envelope.sha256(),"DELIVERED",null);
+        var delivered=desktopTx(()->exporter.ack(user,request.requestId(),ack));
+        assertEquals("DELIVERED",delivered.status());assertNotNull(delivered.deliveredAt());
+        assertEquals(0,delivered.deliveredAt().getNano()%1000);
+        assertEquals(delivered,desktopTx(()->exporter.ack(user,request.requestId(),ack)));
+        assertTrue(desktopTx(()->exporter.pending(user,device)).isEmpty());
+        assertNull(desktopCopies.findByUserIdAndRequestId(user,request.requestId()).orElseThrow().getSnapshotJson());
+        assertEquals(205,turns.findByUserIdAndConversationIdOrderByCreatedAtAscIdAsc(user,conversation).size());
+    }
+    @Test void desktopRequestRejectsForeignUnknownLegacyAndTemporaryTargetsAndConflictingRetry() {
+        enable();String conversation=UUID.randomUUID().toString();persistCopyTurn(conversation,"completed",0);
+        var request=desktopRequest();var exporter=desktopExporter();
+        assertThrows(IllegalArgumentException.class,()->desktopTx(()->exporter.create(other,conversation,request)));
+        var target=directories.findByUserIdAndDeviceId(user,device).get(0);
+        for(String type:Arrays.asList(null,"SCRATCH","LOOSE_FILES")) {
+            target.setProjectType(type);directories.saveAndFlush(target);
+            assertThrows(IllegalArgumentException.class,()->desktopTx(()->exporter.create(user,conversation,request)));
+        }
+        target.setProjectType("BLANK");target.setOwned(false);directories.saveAndFlush(target);
+        assertThrows(IllegalArgumentException.class,()->desktopTx(()->exporter.create(user,conversation,request)));
+        target.setOwned(true);directories.saveAndFlush(target);
+        desktopTx(()->exporter.create(user,conversation,request));
+        var changed=new MobileAssistantDesktopCopyService.Request(request.requestId(),UUID.randomUUID().toString(),device,key);
+        assertThrows(IllegalArgumentException.class,()->desktopTx(()->exporter.create(user,conversation,changed)));
+        assertThrows(IllegalArgumentException.class,()->desktopTx(()->exporter.get(other,request.requestId())));
+    }
+    @Test void desktopPendingRechecksFrozenSourcesWithoutIncludingLaterRunningTurns() {
+        enable();String conversation=UUID.randomUUID().toString();var original=persistCopyTurn(conversation,"completed",0);
+        var request=desktopRequest();var exporter=desktopExporter();desktopTx(()->exporter.create(user,conversation,request));
+        persistCopyTurn(conversation,"running",1);
+        assertEquals(2,desktopTx(()->exporter.pending(user,device)).get(0).messageCount());
+        original.setSourcesJson("[{\"id\":\"999999\",\"updatedAt\":\"old\"}]");turns.saveAndFlush(original);
+        assertTrue(desktopTx(()->exporter.pending(user,device)).isEmpty());
+        assertEquals("SOURCE_UNAVAILABLE",desktopTx(()->exporter.get(user,request.requestId())).error());
+    }
+    @Test void desktopPendingCannotReviveAfterConsentRevocationOrSendExpiredSnapshot() {
+        enable();String conversation=UUID.randomUUID().toString();persistCopyTurn(conversation,"completed",0);
+        var request=desktopRequest();var exporter=desktopExporter();desktopTx(()->exporter.create(user,conversation,request));
+        service.settings(user,false,MobileAssistantService.CONSENT_VERSION);
+        assertNull(desktopCopies.findByUserIdAndRequestId(user,request.requestId()).orElseThrow().getSnapshotJson());
+        enable();
+        assertTrue(desktopTx(()->exporter.pending(user,device)).isEmpty());
+        assertEquals("FAILED",desktopTx(()->exporter.get(user,request.requestId())).status());
+        String second=UUID.randomUUID().toString();persistCopyTurn(second,"completed",0);var next=desktopRequest();
+        desktopTx(()->exporter.create(user,second,next));
+        var row=desktopCopies.findByUserIdAndRequestId(user,next.requestId()).orElseThrow();row.setExpiresAt(Instant.now().minusSeconds(1));desktopCopies.saveAndFlush(row);
+        assertTrue(desktopTx(()->exporter.pending(user,device)).isEmpty());
+        assertEquals("EXPIRED",desktopTx(()->exporter.get(user,next.requestId())).status());
+    }
+    @Test void desktopAckRequiresMatchingAccountDeviceIdentityAndHash() {
+        enable();String conversation=UUID.randomUUID().toString();persistCopyTurn(conversation,"completed",0);
+        var request=desktopRequest();var exporter=desktopExporter();desktopTx(()->exporter.create(user,conversation,request));
+        var envelope=desktopTx(()->exporter.pending(user,device)).get(0);
+        var wrong=new MobileAssistantDesktopCopyService.Ack("other-device",request.targetProjectUid(),envelope.sha256(),"DELIVERED",null);
+        assertThrows(IllegalArgumentException.class,()->desktopTx(()->exporter.ack(user,request.requestId(),wrong)));
+        var badHash=new MobileAssistantDesktopCopyService.Ack(device,request.targetProjectUid(),"bad","DELIVERED",null);
+        assertThrows(IllegalArgumentException.class,()->desktopTx(()->exporter.ack(user,request.requestId(),badHash)));
+        var rejected=new MobileAssistantDesktopCopyService.Ack(device,request.targetProjectUid(),envelope.sha256(),"FAILED","TARGET_NOT_OWNED");
+        assertEquals("FAILED",desktopTx(()->exporter.ack(user,request.requestId(),rejected)).status());
+        assertTrue(desktopTx(()->exporter.pending(user,device)).isEmpty());
+    }
+    @Test void desktopEnvelopeRollbackAndConcurrentRetriesDoNotProduceDuplicateCopies() throws Exception {
+        enable();String conversation=UUID.randomUUID().toString();persistCopyTurn(conversation,"completed",0);
+        var request=desktopRequest();var exporter=desktopExporter();
+        assertThrows(IllegalStateException.class,()->desktopTx(()->{exporter.create(user,conversation,request);throw new IllegalStateException("synthetic persistence failure");}));
+        assertTrue(desktopCopies.findByUserIdAndRequestId(user,request.requestId()).isEmpty());
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var a=pool.submit(()->desktopTx(()->exporter.create(user,conversation,request)));
+            var b=pool.submit(()->desktopTx(()->exporter.create(user,conversation,request)));
+            assertEquals(a.get(15,java.util.concurrent.TimeUnit.SECONDS).conversationId(),b.get(15,java.util.concurrent.TimeUnit.SECONDS).conversationId());
+        } finally {pool.shutdownNow();}
+        assertEquals(1,desktopTx(()->exporter.history(user,conversation)).size());
     }
 
     @Test void explicitCopyIncludesMoreThanTwentyTurnsAndPreservesOriginalHistory() {
