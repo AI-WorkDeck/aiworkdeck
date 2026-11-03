@@ -58,6 +58,46 @@ class MeetingRecordingControllerByFileTest {
     }
 
     @Test
+    void todosUsesOnlyAuthorizedProjectMemberIds() {
+        var m = new MeetingRecording();
+        m.setId(9L); m.setProjectId(1L); m.setStatus(MeetingRecording.STATUS_TRANSCRIBED);
+        when(meetingService.get(9L)).thenReturn(m);
+        when(meetingService.getProjectId(9L)).thenReturn(1L);
+        when(projectMemberService.hasReadPermission(eq(1L), anyLong())).thenReturn(true);
+        when(projectMemberService.hasWritePermission(eq(1L), anyLong())).thenReturn(true);
+        var owner = new com.checkba.model.entity.User(); owner.setId(7L); owner.setDisplayName("Owner");
+        var member = new com.checkba.model.entity.User(); member.setId(8L); member.setDisplayName("Member");
+        when(projectMemberService.getProjectOwner(1L)).thenReturn(owner);
+        when(projectMemberService.getMemberUsers(1L)).thenReturn(java.util.List.of(member));
+        when(meetingService.buildTodosKickoffPrompt(m, Map.of(7L, "Owner", 8L, "Member"))).thenReturn("prompt");
+        org.junit.jupiter.api.Assertions.assertEquals("prompt", controller.todosPrompt(9L, "sess").get("prompt"));
+    }
+
+    @Test
+    void todosRejectsReadersBeforeBuildingPrompt() {
+        var m = new MeetingRecording();
+        m.setId(9L); m.setProjectId(1L);
+        when(meetingService.get(9L)).thenReturn(m);
+        when(meetingService.getProjectId(9L)).thenReturn(1L);
+        when(projectMemberService.hasReadPermission(eq(1L), anyLong())).thenReturn(true);
+        when(projectMemberService.hasWritePermission(eq(1L), anyLong())).thenReturn(false);
+        assertThrows(com.checkba.service.ProjectFileAccessService.FileAccessDeniedException.class,
+                () -> controller.todosPrompt(9L, "sess"));
+        verify(meetingService, never()).buildTodosKickoffPrompt(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void todosRequiresCompletedTranscription() {
+        var m = new MeetingRecording();
+        m.setId(9L); m.setProjectId(1L); m.setStatus("TRANSCRIBING");
+        when(meetingService.get(9L)).thenReturn(m);
+        when(meetingService.getProjectId(9L)).thenReturn(1L);
+        when(projectMemberService.hasReadPermission(eq(1L), anyLong())).thenReturn(true);
+        when(projectMemberService.hasWritePermission(eq(1L), anyLong())).thenReturn(true);
+        assertThrows(IllegalArgumentException.class, () -> controller.todosPrompt(9L, "sess"));
+    }
+
+    @Test
     @DisplayName("有记录：返回该文件最新的会议记录（带进度）")
     void returnsMeetingForFile() {
         when(projectMemberService.hasReadPermission(eq(1L), anyLong())).thenReturn(true);

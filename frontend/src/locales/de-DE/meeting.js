@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  fileTodos: "Kalenderaufgaben erstellen",
+  fileExportWord: "Transkript als Word exportieren",
+  fileActionFailed: "Aktion fehlgeschlagen: {message}",
   "tierLabel": "Transkriptionsmodus",
   "tierPlatform": "Über die Plattform",
   "tierByok": "Eigener Schlüssel",

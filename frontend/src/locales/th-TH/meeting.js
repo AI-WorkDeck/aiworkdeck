@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  fileTodos: "สร้างงานในปฏิทิน",
+  fileExportWord: "ส่งออกข้อความถอดเสียงเป็น Word",
+  fileActionFailed: "ดำเนินการไม่สำเร็จ: {message}",
   "tierLabel": "การถอดความ",
   "tierPlatform": "ผ่านแพลตฟอร์ม",
   "tierByok": "ใช้คีย์ของคุณเอง",

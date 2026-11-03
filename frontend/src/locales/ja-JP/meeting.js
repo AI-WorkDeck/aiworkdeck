@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  fileTodos: "予定表にタスクを作成",
+  fileExportWord: "文字起こしを Word に出力",
+  fileActionFailed: "操作に失敗しました：{message}",
   "tierLabel": "文字起こし方式",
   "tierPlatform": "プラットフォーム提供",
   "tierByok": "自前キー（BYOK）",

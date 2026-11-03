@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  fileTodos: "Buat tugas kalender",
+  fileExportWord: "Ekspor transkrip ke Word",
+  fileActionFailed: "Tindakan gagal: {message}",
   "tierLabel": "Metode transkripsi",
   "tierPlatform": "Disediakan platform",
   "tierByok": "Kunci Anda sendiri",

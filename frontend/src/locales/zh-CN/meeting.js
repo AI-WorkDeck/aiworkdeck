@@ -15,6 +15,9 @@
 // 面板标题不在这里：#389 之后标题由外壳的 sidebar-header 统一出，文案走
 // config.sidebar.meetingRecorder（左栏图标的名字与标题必须是同一个事实）。
 export default {
+  fileTodos: "转待办并安排日历",
+  fileExportWord: "转写稿导出 Word",
+  fileActionFailed: "操作失败：{message}",
   // ---- 转写档位与「录音不出本机」 ----
   tierLabel: '转写方式',
   tierPlatform: '平台代采',

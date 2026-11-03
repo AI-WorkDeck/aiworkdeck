@@ -48,6 +48,21 @@ class MeetingRecordingServiceTest {
                 projectFileService, mock(StorageServiceFactory.class));
     }
 
+    @Test
+    void todoPromptUsesPersistentCalendarAndVerifiedMembers() {
+        var meeting = new MeetingRecording();
+        meeting.setId(91L);
+        meeting.setProjectId(7L);
+        meeting.setAudioFileId(42L);
+        String prompt = service.buildTodosKickoffPrompt(meeting, Map.of(3L, "Alice"));
+        assertTrue(prompt.contains("meeting_get_transcript"));
+        assertTrue(prompt.contains("meetingId=91"));
+        assertTrue(prompt.contains("audioFileId=42"));
+        assertTrue(prompt.contains("task_list"));
+        assertTrue(prompt.contains("task_create(type=TODO)"));
+        assertTrue(prompt.contains("\"3\":\"Alice\""));
+    }
+
     /** LangText 是静态指针，登记过就必须清掉，否则污染后面的测试类。 */
     @AfterEach
     void resetLanguage() {

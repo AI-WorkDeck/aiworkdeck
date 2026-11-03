@@ -145,7 +145,10 @@
             :file="file"
             :project-id="projectId"
             :locator-sec="mediaLocatorSec"
+            :recording-actions-enabled="recordingActionsEnabled"
             @locator-consumed="onMediaLocatorConsumed"
+            @ai-prompt="$emit('ai-prompt', $event)"
+            @files-changed="$emit('extracted', $event)"
             @error="onMediaError"
           />
         </view>
@@ -217,6 +220,7 @@ export default {
   name: 'FilePreview',
   components: { MediaPlayer, ArchiveEntriesPane },
   props: {
+    recordingActionsEnabled: { type: Boolean, default: false },
     // A read-only archive entry is supplied as a prepared blob, never as a project file ID.
     sourceUrl: { type: String, default: '' },
     file: {

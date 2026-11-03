@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  fileTodos: "캘린더 할 일 만들기",
+  fileExportWord: "전사 내용을 Word로 내보내기",
+  fileActionFailed: "작업 실패: {message}",
   "tierLabel": "전사 방식",
   "tierPlatform": "플랫폼 제공",
   "tierByok": "본인 키 사용",
