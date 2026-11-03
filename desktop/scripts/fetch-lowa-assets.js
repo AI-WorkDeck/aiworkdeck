@@ -110,7 +110,7 @@ const FONT_THAI_SANS_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@m
 const FONT_THAI_SERIF_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSerifThai/NotoSerifThai-Regular.ttf';
 // The legacy jsDelivr/googlefonts route returns 403; pin the canonical upstream revision.
 const FONT_KHMER_URL = 'https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSansKhmer/NotoSansKhmer-Regular.ttf';
-const FONT_LAO_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansLao/NotoSansLao-Regular.ttf';
+const FONT_LAO_URL = 'https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSansLao/NotoSansLao-Regular.ttf';
 const FONT_MYANMAR_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansMyanmar/NotoSansMyanmar-Regular.ttf';
 const FONT_ARABIC_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansArabic/NotoSansArabic-Regular.ttf';
 const FONT_DEVANAGARI_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Regular.ttf';
