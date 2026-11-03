@@ -445,5 +445,17 @@ export default {
   "ocrSettingsReload": "Recargar",
   "ocrSettingsSaved": "Guardado",
   "ocrSettingsLoadFailed": "Error al cargar",
-  "ocrSettingsSaveFailed": "Error al guardar"
+  "ocrSettingsSaveFailed": "Error al guardar",
+  "walletRedeemTitle": "Código de regalo / Código de invitación de Circle",
+  "walletRedeemPlaceholder": "Introduce el código de regalo o el código de Circle (p. ej., KW-ABNR-2026)",
+  "walletRedeemBtn": "Canjear / Vincular",
+  "walletRedeemSubmitting": "Aplicando…",
+  "walletRedeemSuccessGift": "{amount} canjeados correctamente",
+  "walletRedeemSuccessFeature": "Función desbloqueada correctamente",
+  "walletRedeemSuccessCircle": "Vinculado a {firm} (sufijo: {suffix}), se otorgaron {amount} de cuota dedicada de DeepSeek",
+  "walletRedeemFailed": "Código de regalo o invitación no válido",
+  "walletCircleBadge": "Despacho de Circle Alliance: {firm} (sufijo: {suffix}) · 0 % de recargo",
+  "walletQingtianTitle": "Baoqingtian · Monedas Qingtian mensuales",
+  "walletQingtianBalance": "Quedan {remaining} / {monthly} monedas Qingtian este mes",
+  "walletQingtianRatio": "Tasa de conversión: 1 moneda Qingtian = {creditsPerCoin} créditos (válido este mes)",
 }

@@ -389,5 +389,17 @@ export default {
   "caseRecordCollectionFailedToast": "Tahsilat kaydedilemedi",
   "caseSyncErpFailedToast": "Finans senkronizasyonu başarısız oldu",
   "caseSeedDemoFailedToast": "Demo verileri oluşturulamadı",
-  "caseOpenPluginFailedToast": "Eklenti açılamadı"
+  "caseOpenPluginFailedToast": "Eklenti açılamadı",
+  "circleInviteLabel": "Circle Alliance davet kodu (isteğe bağlı)",
+  "circleInvitePlaceholder": "örn. KW-ABNR-2026",
+  "circleInviteHint": "Büro davet kodunuzu girin; büro son eki eklenir ve özel DeepSeek kotası açılır",
+  "bqtScanSwitch": "Baoqingtian avukat QR girişi",
+  "bqtScanTitle": "Giriş yapmak için Baoqingtian avukat uygulamasıyla tarayın",
+  "bqtScanHint": "Yalnızca doğrulanmış Baoqingtian avukatları içindir. Aylık Qingtian Coins otomatik olarak verilir.",
+  "bqtScanExpired": "QR kodunun süresi doldu",
+  "bqtScanRefresh": "QR kodunu yenile",
+  "bqtScanBack": "Hesap girişine dön",
+  "errInvalidInviteCode": "Geçersiz veya devre dışı davet kodu",
+  "errInviteAlreadyBound": "Bu hesap zaten bir Circle büro davet koduna bağlı",
+  "errBqtNotLawyer": "Yalnızca doğrulanmış Baoqingtian avukat hesapları QR kod ile giriş yapabilir",
 }

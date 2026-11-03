@@ -445,5 +445,17 @@ export default {
   "ocrSettingsReload": "새로고침",
   "ocrSettingsSaved": "저장됨",
   "ocrSettingsLoadFailed": "로드 실패",
-  "ocrSettingsSaveFailed": "저장 실패"
+  "ocrSettingsSaveFailed": "저장 실패",
+  "walletRedeemTitle": "기프트 코드 / Circle 로펌 초대 코드",
+  "walletRedeemPlaceholder": "기프트 코드 또는 Circle 로펌 코드 입력 (예: KW-ABNR-2026)",
+  "walletRedeemBtn": "교환 / 연결",
+  "walletRedeemSubmitting": "처리 중…",
+  "walletRedeemSuccessGift": "{amount}이(가) 성공적으로 교환되었습니다",
+  "walletRedeemSuccessFeature": "기능이 성공적으로 잠금 해제되었습니다",
+  "walletRedeemSuccessCircle": "{firm}(접미사: {suffix})에 연결되었으며 {amount} 전용 DeepSeek 할당량이 지급되었습니다",
+  "walletRedeemFailed": "기프트 또는 초대 코드가 유효하지 않습니다",
+  "walletCircleBadge": "Circle 얼라이언스 로펌: {firm} (접미사: {suffix}) · 0% 마크업",
+  "walletQingtianTitle": "바오칭톈 · 월간 칭톈 코인",
+  "walletQingtianBalance": "이번 달 남은 칭톈 코인 {remaining} / {monthly}",
+  "walletQingtianRatio": "환율: 칭톈 코인 1개 = {creditsPerCoin} 크레딧 (당월 유효)",
 }

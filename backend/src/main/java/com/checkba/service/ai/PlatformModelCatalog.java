@@ -89,7 +89,8 @@ public class PlatformModelCatalog {
                 .map(Model::id).findFirst().orElseGet(() -> models.stream().filter(Model::supportsTools)
                         .map(Model::id).findFirst().orElse(models.get(0).id()));
         double margin = validPrice(body.get("marginMultiplier")) ? number(body.get("marginMultiplier")) : 1;
-        return new Catalog(bailian ? "bailian" : "openrouter", bailian ? "CNY" : "USD", defaultModel, margin, List.copyOf(models));
+        String currency = body.get("currency") instanceof String c && !c.isBlank() ? c : (bailian ? "CNY" : "USD");
+        return new Catalog(bailian ? "bailian" : "openrouter", currency, defaultModel, margin, List.copyOf(models));
     }
 
     public boolean contains(String id) { return current().models().stream().anyMatch(m -> m.id().equals(id)); }

@@ -445,5 +445,17 @@ export default {
   "ocrSettingsReload": "Перезагрузить",
   "ocrSettingsSaved": "Сохранено",
   "ocrSettingsLoadFailed": "Ошибка загрузки",
-  "ocrSettingsSaveFailed": "Ошибка сохранения"
+  "ocrSettingsSaveFailed": "Ошибка сохранения",
+  "walletRedeemTitle": "Подарочный код / Пригласительный код Circle",
+  "walletRedeemPlaceholder": "Введите подарочный код или код Circle (например KW-ABNR-2026)",
+  "walletRedeemBtn": "Активировать / Привязать",
+  "walletRedeemSubmitting": "Применение…",
+  "walletRedeemSuccessGift": "{amount} успешно активированы",
+  "walletRedeemSuccessFeature": "Функция успешно активирована",
+  "walletRedeemSuccessCircle": "Привязано к {firm} (суффикс: {suffix}), предоставлено {amount} выделенной квоты DeepSeek",
+  "walletRedeemFailed": "Недействительный подарочный или пригласительный код",
+  "walletCircleBadge": "Фирма Circle Alliance: {firm} (суффикс: {suffix}) · наценка 0%",
+  "walletQingtianTitle": "Baoqingtian · Ежемесячные Qingtian Coins",
+  "walletQingtianBalance": "Осталось {remaining} / {monthly} Qingtian Coins в этом месяце",
+  "walletQingtianRatio": "Курс обмена: 1 Qingtian Coin = {creditsPerCoin} кредитов (действует в текущем месяце)",
 }

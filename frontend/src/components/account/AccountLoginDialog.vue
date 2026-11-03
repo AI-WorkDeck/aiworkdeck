@@ -54,7 +54,7 @@
 
       <!-- 登录与注册是同一条链路（官网验证码端点「不存在即注册」）。用 v-show：
            人机验证控件挂在这块里，切到 Key 模式再切回来时 DOM 不能被销毁重建 -->
-      <div v-show="mode !== 'code'" class="unlock-main">
+      <div v-show="mode === 'login'" class="unlock-main">
         <div class="unlock-title">{{ $t('onboarding.unlock.title') }}</div>
         <div class="unlock-desc">{{ $t(authFlow === 'setup' ? 'accountPassword.setupHint' : authFlow === 'reset' ? 'accountPassword.resetHint' : 'accountPassword.intro') }}</div>
         <div v-if="promoActive" class="unlock-promo">{{ $t('onboarding.unlock.promoLine', { amount: promoAmount }) }}</div>
@@ -123,9 +123,28 @@
               @input="confirmPassword = $event.target.value" @keydown.enter="handlePrimary" />
           </div>
           <div v-if="authFlow === 'setup' || authFlow === 'reset'" class="unlock-desc">{{ $t('accountPassword.passwordHint') }}</div>
+          <!-- 国际站注册/设密：可选填 Circle 联盟所邀请码（dev-board#1665） -->
+          <div v-if="!isPhoneSite && (authFlow === 'register' || authFlow === 'setup')" class="unlock-circle-box">
+            <div class="unlock-desc" style="margin-bottom: 4px;">{{ $t('account.circleInviteLabel') }}</div>
+            <div class="unlock-field-box">
+              <component
+                :is="'input'"
+                class="unlock-field"
+                type="text"
+                autocomplete="off"
+                :disabled="submitBusy || sendingCode"
+                :value="inviteCode"
+                :placeholder="$t('account.circleInvitePlaceholder')"
+                @input="inviteCode = $event.target.value"
+                @keydown.enter="handlePrimary"
+              />
+            </div>
+            <div class="unlock-desc" style="margin-top: 4px; font-size: 12px;">{{ $t('account.circleInviteHint') }}</div>
+          </div>
           <div class="unlock-code-links">
             <component :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="switchAuthFlow(authFlow === 'password' ? 'register' : 'password')">{{ $t(authFlow === 'password' ? 'accountPassword.register' : 'accountPassword.back') }}</component>
             <component v-if="authFlow === 'password'" :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="switchAuthFlow('reset')">{{ $t('accountPassword.reset') }}</component>
+            <component v-if="isPhoneSite && bqtScanEnabled" :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="switchMode('bqt')">{{ $t('account.bqtScanSwitch') }}</component>
           </div>
           <div v-if="authFlow === 'register' || authFlow === 'reset'" class="unlock-compat-verification">
             <component :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="loadCompatChallenge">{{ $t(compatLoading ? 'onboarding.unlock.compatLoading' : compatVerification ? 'onboarding.unlock.compatRefresh' : 'onboarding.unlock.compatUse') }}</component>
@@ -145,6 +164,28 @@
             <div :id="captchaId"></div>
             <!-- 阿里云 SDK 要一个它能挂点击事件的元素；Turnstile 用不到但留着无害 -->
             <component :is="'button'" :id="captchaId + '-trigger'" class="unlock-captcha-trigger" type="button"></component>
+          </div>
+        </div>
+      </div>
+
+      <!-- 大陆站：包晴天律师端 App 扫码登录（dev-board#1665） -->
+      <div v-if="mode === 'bqt'" class="unlock-main">
+        <div class="unlock-title">{{ $t('account.bqtScanTitle') }}</div>
+        <div class="unlock-desc">{{ $t('account.bqtScanHint') }}</div>
+        <div class="unlock-form" style="align-items: center; display: flex; flex-direction: column; gap: 12px; padding: 12px 0;">
+          <div v-if="bqtSession && bqtSession.qrDataUrl && !bqtExpired" style="background: #fff; padding: 10px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.08);">
+            <img :src="bqtSession.qrDataUrl" width="180" height="180" alt="QR" style="display: block;" />
+          </div>
+          <div v-else-if="bqtExpired" class="unlock-desc" style="text-align: center;">
+            <div>{{ $t('account.bqtScanExpired') }}</div>
+            <component :is="'button'" type="button" class="unlock-link unlock-auth-link" style="margin-top: 8px;" @click="startBqtScan">
+              {{ $t('account.bqtScanRefresh') }}
+            </component>
+          </div>
+          <div class="unlock-code-links" style="width: 100%; justify-content: center;">
+            <component :is="'button'" type="button" class="unlock-link unlock-auth-link" @click="switchMode('login')">
+              {{ $t('account.bqtScanBack') }}
+            </component>
           </div>
         </div>
       </div>
@@ -173,6 +214,7 @@
            跨境传输是个保法第三十九条的「单独同意」，绝不能并进协议一揽子打包。 -->
       <div v-if="errorMsg" class="unlock-error">{{ errorMsg }}</div>
       <component
+        v-if="mode !== 'bqt'"
         :is="'button'"
         type="button"
         class="unlock-btn"
@@ -219,7 +261,7 @@
 </template>
 
 <script>
-import { activateLicense, getLicenseStatus, getSiteStatus, selectSite, sendAccountLoginCode, loginAccount, getAccountCaptchaConfig, getAccountCaptchaChallenge, accountPasswordOperation, getAppLanguageRemote, saveAppLanguageRemote } from '@/services/api.js'
+import { activateLicense, getLicenseStatus, getSiteStatus, selectSite, sendAccountLoginCode, loginAccount, getAccountCaptchaConfig, getAccountCaptchaChallenge, accountPasswordOperation, createBqtScanSession, pollBqtScanStatus, getAppLanguageRemote, saveAppLanguageRemote } from '@/services/api.js'
 import { setupCaptcha, teardownCaptcha } from '@/utils/captcha.js'
 import { captchaFailureNotice, toCaptchaFailure } from '@/utils/captchaFailure.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
@@ -275,6 +317,13 @@ export default {
       phone: '',
       email: '',
       smsCode: '',
+      inviteCode: '',
+      bqtSession: null,
+      bqtScanEnabled: false,
+      bqtLoading: false,
+      bqtExpired: false,
+      bqtPollTimer: null,
+      bqtPolling: false,
       sendingCode: false,
       loggingIn: false,
       cooldown: 0,
@@ -373,6 +422,7 @@ export default {
   beforeUnmount() {
     this.done = true
     this.clearLoginSecrets()
+    this.stopBqtPoll()
     if (this.cooldownTimer) clearInterval(this.cooldownTimer)
     // 托管页 iframe 的 message 监听挂在 window 上，走了也要摘
     teardownCaptcha()
@@ -451,6 +501,7 @@ export default {
     async runCaptchaSetup() {
       const gen = ++this.captchaGen
       this.captcha = null
+      this.bqtScanEnabled = false
       this.captchaFailure = null
       // #ifdef H5
       teardownCaptcha()
@@ -466,7 +517,8 @@ export default {
         console.warn('人机验证配置读取失败（按未启用处理）:', e && e.message)
         return
       }
-      if (gen !== this.captchaGen) return
+      if (gen !== this.captchaGen || this.done) return
+      this.bqtScanEnabled = config?.bqtScanEnabled === true
       try {
         const widget = await setupCaptcha(config, this.captchaId)
         if (gen === this.captchaGen) this.captcha = widget
@@ -542,9 +594,74 @@ export default {
     },
     switchMode(next) {
       if (this.mode === next) return
+      if (next === 'bqt') {
+        if (!this.bqtScanEnabled || !this.isPhoneSite) return
+        if (!this.consentGatePassed()) return
+        this.mode = 'bqt'
+        this.errorMsg = ''
+        this.startBqtScan()
+        return
+      }
+      this.stopBqtPoll()
       this.switchAuthFlow('password')
       this.mode = next
       this.errorMsg = ''
+    },
+    stopBqtPoll() {
+      if (this.bqtPollTimer) {
+        clearInterval(this.bqtPollTimer)
+        this.bqtPollTimer = null
+      }
+    },
+    async startBqtScan() {
+      this.stopBqtPoll()
+      this.bqtLoading = true
+      this.bqtExpired = false
+      this.errorMsg = ''
+      try {
+        await recordAccountConsents()
+        const session = await createBqtScanSession()
+        if (this.done || this.mode !== 'bqt') return
+        this.bqtSession = session
+        this.bqtPollTimer = setInterval(() => this.pollBqtOnce(), 2000)
+      } catch (e) {
+        this.errorMsg = (e && e.message) || this.$t('onboarding.unlock.accountNetworkFailed')
+      } finally {
+        this.bqtLoading = false
+      }
+    },
+    async pollBqtOnce() {
+      if (this.bqtPolling || this.done || this.mode !== 'bqt' || !this.bqtSession || !this.bqtSession.qrid || !this.bqtSession.pollToken) return
+      const session = this.bqtSession
+      this.bqtPolling = true
+      try {
+        const res = await pollBqtScanStatus(session.qrid, session.pollToken)
+        if (this.done || this.mode !== 'bqt' || this.bqtSession !== session) return
+        if (!res || res.status === 'pending') return
+        if (res.status === 'expired') {
+          this.bqtExpired = true
+          this.stopBqtPoll()
+          return
+        }
+        if (res.status === 'rejected') {
+          this.stopBqtPoll()
+          this.errorMsg = this.$t('account.errBqtNotLawyer')
+          this.bqtExpired = true
+          return
+        }
+        if (res.status === 'confirmed') {
+          this.stopBqtPoll()
+          await this.finishLogin(res, {
+            title: res.isNewUser
+              ? this.$t('onboarding.unlock.registered')
+              : this.$t('onboarding.unlock.loggedIn'),
+          })
+        }
+      } catch (e) {
+        // 轮询期间瞬时网络抖动静默忽略，待下一轮重试
+      } finally {
+        this.bqtPolling = false
+      }
     },
     async handleSendCode() {
       if (this.sendingCode || this.compatLoading || this.cooldown > 0) return
@@ -664,9 +781,10 @@ export default {
           this.errorMsg = this.$t('accountPassword.mismatch'); return
         }
       }
+      const trimmedInvite = !this.isPhoneSite ? (this.inviteCode || '').trim() : ''
       const payload = this.authFlow === 'password'
-        ? { account: identifier, password: this.password }
-        : { [this.isPhoneSite ? 'phone' : 'email']: identifier, code: smsCode }
+        ? { account: identifier, password: this.password, ...(trimmedInvite ? { inviteCode: trimmedInvite } : {}) }
+        : { [this.isPhoneSite ? 'phone' : 'email']: identifier, code: smsCode, ...(trimmedInvite ? { inviteCode: trimmedInvite } : {}) }
       this.errorMsg = ''
       this.loggingIn = true
       try {
@@ -682,12 +800,20 @@ export default {
         }
         let res
         if (this.authFlow === 'setup') {
-          await accountPasswordOperation('setup', { setupToken: this.setupToken, password: this.password })
+          await accountPasswordOperation('setup', {
+            setupToken: this.setupToken,
+            password: this.password,
+            ...(trimmedInvite ? { inviteCode: trimmedInvite } : {}),
+          })
           if (this.done) return
           // The setup ticket is consumed. If sign-in fails, retry using the saved password form.
           this.setupToken = ''
           this.authFlow = 'password'
-          res = await loginAccount({ account: this.setupAccount || identifier, password: this.password })
+          res = await loginAccount({
+            account: this.setupAccount || identifier,
+            password: this.password,
+            ...(trimmedInvite ? { inviteCode: trimmedInvite } : {}),
+          })
         } else res = await loginAccount(payload)
         if (res && res.passwordSetupRequired) {
           this.authFlow = 'setup'

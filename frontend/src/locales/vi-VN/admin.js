@@ -445,5 +445,17 @@ export default {
   "ocrSettingsReload": "Tải lại",
   "ocrSettingsSaved": "Đã lưu",
   "ocrSettingsLoadFailed": "Tải thất bại",
-  "ocrSettingsSaveFailed": "Lưu không thành công"
+  "ocrSettingsSaveFailed": "Lưu không thành công",
+  "walletRedeemTitle": "Mã quà tặng / Mã mời hãng luật Circle",
+  "walletRedeemPlaceholder": "Nhập mã quà tặng hoặc mã hãng luật Circle (vd: KW-ABNR-2026)",
+  "walletRedeemBtn": "Đổi / Liên kết",
+  "walletRedeemSubmitting": "Đang áp dụng…",
+  "walletRedeemSuccessGift": "Đã đổi thành công {amount}",
+  "walletRedeemSuccessFeature": "Đã mở khóa tính năng thành công",
+  "walletRedeemSuccessCircle": "Đã liên kết với {firm} (hậu tố: {suffix}), cấp {amount} hạn mức DeepSeek chuyên dụng",
+  "walletRedeemFailed": "Mã quà tặng hoặc mã mời không hợp lệ",
+  "walletCircleBadge": "Hãng luật Circle Alliance: {firm} (hậu tố: {suffix}) · phụ phí 0%",
+  "walletQingtianTitle": "Baoqingtian · Qingtian Coins hàng tháng",
+  "walletQingtianBalance": "Còn {remaining} / {monthly} Qingtian Coins trong tháng này",
+  "walletQingtianRatio": "Tỷ lệ quy đổi: 1 Qingtian Coin = {creditsPerCoin} Credits (áp dụng trong tháng hiện tại)",
 }
