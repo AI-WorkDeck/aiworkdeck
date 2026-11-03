@@ -72,8 +72,10 @@ public class FeedbackService {
         fb.setKind(UserFeedback.KIND_IDEA.equals(req.kind()) ? UserFeedback.KIND_IDEA : UserFeedback.KIND_BUG);
         fb.setText(text);
         fb.setPage(trim(req.page(), 256));
-        fb.setAppVersion(contextCollector.appVersion());
-        fb.setPlatform(trim(contextCollector.platform(), 128));
+        if (!isAiContentReport(req.clientContext())) {
+            fb.setAppVersion(contextCollector.appVersion());
+            fb.setPlatform(trim(contextCollector.platform(), 128));
+        }
         fb.setStatus(UserFeedback.STATUS_NEW);
         fb.setAttempts(0);
         fb.setSource(UserFeedback.SOURCE_LOCAL);
@@ -153,12 +155,24 @@ public class FeedbackService {
         return out;
     }
 
+    private boolean isAiContentReport(Map<String, Object> clientContext) {
+        return clientContext != null && "ai-content-report".equals(clientContext.get("type"));
+    }
+
     private String buildContextJson(Map<String, Object> clientContext) {
         Map<String, Object> ctx = new LinkedHashMap<>();
-        ctx.put("runtime", contextCollector.runtimeInfo());
-        ctx.put("client", clientContext == null ? Map.of() : clientContext);
-        String logTail = contextCollector.backendLogTail();
-        if (!logTail.isEmpty()) ctx.put("backendLogTail", logTail);
+        if (isAiContentReport(clientContext)) {
+            Map<String, Object> report = new LinkedHashMap<>();
+            for (String key : List.of("type", "platform", "conversationId")) {
+                if (clientContext.get(key) instanceof String value) report.put(key, value);
+            }
+            ctx.put("client", report);
+        } else {
+            ctx.put("runtime", contextCollector.runtimeInfo());
+            ctx.put("client", clientContext == null ? Map.of() : clientContext);
+            String logTail = contextCollector.backendLogTail();
+            if (!logTail.isEmpty()) ctx.put("backendLogTail", logTail);
+        }
         try {
             return mapper.writeValueAsString(ctx);
         } catch (Exception e) {

@@ -111,6 +111,39 @@ class FeedbackServiceTest {
     }
 
     @Test
+    void aiContentReportDoesNotCollectDiagnosticsOrImplicitContent() throws Exception {
+        FeedbackContextCollector collector = mock(FeedbackContextCollector.class);
+        ProjectStorageResolver resolver = mock(ProjectStorageResolver.class);
+        when(resolver.globalRoot()).thenReturn(root);
+        FeedbackService reports = new FeedbackService(feedbackRepo, attachmentRepo, resolver,
+                collector, new VoiceTranscriptionService(false, "", "", "", null));
+        Map<String, Object> client = Map.of("type", "ai-content-report", "platform", "android",
+                "conversationId", "conversation-1", "chatHistory", List.of("private chat"),
+                "files", List.of("private.docx"), "runtime", Map.of("secret", "private"),
+                "backendLogTail", "private log");
+        UserFeedback fb = reports.submit(7L, new FeedbackService.SubmitRequest("BUG",
+                "user supplied report", null, "mobile/personal/assistant", client), List.of());
+        assertEquals(Map.of("client", Map.of("type", "ai-content-report", "platform", "android",
+                "conversationId", "conversation-1")), mapper.readValue(fb.getContextJson(), Map.class));
+        assertEquals("user supplied report", fb.getText());
+        assertNull(fb.getAppVersion());
+        assertNull(fb.getPlatform());
+        assertNull(fb.getVoiceTranscript());
+        assertTrue(savedAttachments.isEmpty());
+        verifyNoInteractions(collector);
+        verify(attachmentRepo, never()).save(any());
+    }
+
+    @Test
+    void aiContentReportDoesNotAcceptNestedContentInAllowlistedFields() throws Exception {
+        UserFeedback fb = service.submit(7L, new FeedbackService.SubmitRequest("BUG", "report", null,
+                null, Map.of("type", "ai-content-report", "platform", Map.of("logs", "private"),
+                        "conversationId", List.of("chat"))), List.of());
+        assertEquals(Map.of("client", Map.of("type", "ai-content-report")),
+                mapper.readValue(fb.getContextJson(), Map.class));
+    }
+
+    @Test
     void clientFilenameNeverEscapesTheFeedbackDirectory() throws Exception {
         service.submit(7L, new FeedbackService.SubmitRequest("BUG", "x", null, null, null),
                 List.of(new MockMultipartFile("files", "../../evil.png", "image/png", new byte[]{1})));
