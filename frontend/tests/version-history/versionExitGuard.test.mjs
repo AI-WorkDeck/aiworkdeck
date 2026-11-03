@@ -318,3 +318,23 @@ test('stale failure choice cannot authorize leaving', async () => {
   })
   assert.equal(await h.confirm(), false)
 })
+
+for (const choice of ['retry', 'skip']) test(`commit failure supports ${choice}`, async () => {
+  let commits = 0
+  const h = setup({
+    commit: async () => { if (++commits === 1) throw Error('offline'); return {} },
+    chooseFailure: async reason => { assert.equal(reason, 'commit-failed'); return choice },
+  })
+  assert.equal(await h.confirm(), true)
+})
+
+test('direct exit save exception reports save failure', async () => {
+  let saves = 0
+  const h = setup({
+    save: async () => { if (++saves > 1) throw Error('save failed'); return true },
+    readStatus: async () => { throw Error('offline') },
+    chooseFailure: async () => 'skip',
+  })
+  assert.equal(await h.confirm(), false)
+  assert.deepEqual(h.blocked, ['save-failed'])
+})
