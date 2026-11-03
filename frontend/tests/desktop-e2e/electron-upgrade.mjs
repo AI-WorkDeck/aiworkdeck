@@ -15,6 +15,23 @@ import { fileURLToPath } from 'node:url'
 import puppeteer from 'puppeteer-core'
 import JSZip from 'jszip'
 
+function businessErrorFields(value) {
+  if (!value || typeof value !== 'object'
+      || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) return { status: 'unavailable' }
+  const result = { status: 'available' }
+  for (const key of ['code', 'message']) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)
+    if (!descriptor || !Object.hasOwn(descriptor, 'value')) {
+      result[key] = 'unavailable'
+    } else if (typeof descriptor.value === 'string') {
+      result[key] = descriptor.value.slice(0, key === 'code' ? 64 : 2048)
+    } else if (typeof descriptor.value === 'number' && Number.isFinite(descriptor.value)) {
+      result[key] = descriptor.value
+    } else result[key] = 'unavailable'
+  }
+  return result
+}
+
 const installedMode = process.env.AWD_TEST_INSTALLED === '1'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 if (installedMode) assert(process.env.GITHUB_ACTIONS === 'true' && process.env.RUNNER_ENVIRONMENT === 'github-hosted' && process.env.RUNNER_TEMP, 'Installed tests require a disposable hosted runner')
@@ -318,14 +335,28 @@ try {
       evidence.rendererDiagnostics.push(record)
       write('renderer-diagnostics.json', evidence.rendererDiagnostics)
     }
-    page.on('console', message => {
+    page.on('console', async message => {
       if (!['warn', 'error'].includes(message.type())) return
       const location = message.location()
       const safeText = value => String(value || '').replace(/(?:https?|file):\/\/[^\s"'<>]+/g, safeUrl).slice(0, 4096)
-      recordRenderer({ kind: 'console', type: message.type(),
+      const record = { kind: 'console', type: message.type(), capturedAt: new Date().toISOString(),
         text: safeText(message.text()),
         errors: message.args().map(arg => arg.remoteObject()).filter(arg => arg.subtype === 'error').map(arg => safeText(arg.description)),
-        location: { url: safeUrl(location.url), line: location.lineNumber, column: location.columnNumber } })
+        location: { url: safeUrl(location.url), line: location.lineNumber, column: location.columnNumber } }
+      if (message.type() === 'error' && message.text().startsWith('业务错误:')) {
+        record.businessError = { status: 'unavailable' }
+        try {
+          const argument = message.args()[1]
+          const remote = argument?.remoteObject()
+          if (remote?.type === 'object' && !remote.subtype && remote.className === 'Object') {
+            const fields = await argument.evaluate(businessErrorFields)
+            record.businessError = { ...fields,
+              ...(typeof fields.code === 'string' ? { code: safeText(fields.code) } : {}),
+              ...(typeof fields.message === 'string' ? { message: safeText(fields.message) } : {}) }
+          }
+        } catch (_) { /* Disposed context or unsupported object: retain unavailable. */ }
+      }
+      recordRenderer(record)
     })
     page.on('requestfailed', request => {
       if (!['document', 'script'].includes(request.resourceType())) return

@@ -697,3 +697,5 @@ Windows 下从 pwsh→Node 再启动 powershell.exe 会继承不兼容 PSModuleP
 锁定的 `@dcloudio/uni-h5-vue` 3.4.21 内置运行时使用三参数 `def(children, "_", type)`，根 `@vue/shared` 3.5 的 helper 则显式将第四参数默认设为 `false`。这会把原本可写的插槽标记变成只读，正式 Windows 验收捕获 `Object.assign` 插槽更新错误，随后工作台导航无法完成；尚未将具体触发组件归因到自绘菜单。保留现有依赖安全升级；`frontend/scripts/patch-uni-h5-slots.mjs` 在 postinstall 对普通 H5 的 ESM/CJS 精确补第四参数 `true`，恢复旧契约。补丁必须唯一匹配、幂等，依赖结构改变时拒绝继续，不能笼统替换所有 `def` 或回退整个 Vue 依赖树。
 
 回归：`cd frontend && node --test tests/build/uni-h5-slots.test.mjs`，以及干净安装后的 H5 构建、Windows 正式安装客户端文件打开/自动保存/重开。未补运行时配新 shared 的失败对照必须保留；源代码单测不替代正式包回归。
+
+正式安装验收的 renderer 诊断保留有界 warn/error 与 Error description。普通“业务错误”对象仅取第二参数的自有 `code`/`message` 标量数据属性，拒绝 getter、继承属性和对象强制转换；限制长度、移除 URL 查询串并记录捕获时间，不收集 `data`、`fullResponse` 或请求头。4011 走 API 的独立分支，不能把不明业务错误一律归为匿名账户提示；无法取值时明确记 unavailable，继续保留原业务断言与超时。
