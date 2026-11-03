@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 const source = readFileSync(new URL('../../src/components/project-home/ScratchTransferDialog.vue', import.meta.url), 'utf8')
 function component(copy) {
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/import[^\n]+\n/, '').replace('export default', 'result =')
+  const script = source.slice(source.indexOf('<script>') + '<script>'.length, source.indexOf('</script>')).replace(/import[^\n]+\n/, '').replace('export default', 'result =')
   const context = { result: null, getMyProjects: async () => [{ id: 1, projectType: 'SCRATCH' }, { id: 2, projectType: 'BLANK', myRole: 'OWNER' }, { id: 3, projectType: 'BLANK', myRole: 'MEMBER' }], copyScratchToProject: copy }
   vm.runInNewContext(script, context)
   return context.result
