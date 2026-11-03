@@ -21,7 +21,7 @@ audioop-lts==0.2.2 ; python_full_version >= '3.13'
     #   standard-aifc
 azure-ai-documentintelligence==1.0.2
     # via markitdown
-azure-core==1.36.0
+azure-core==1.41.0
     # via
     #   azure-ai-documentintelligence
     #   azure-identity
@@ -72,7 +72,7 @@ cryptography==50.0.2
     #   pdfminer-six
     #   pyjwt
     #   volcengine-python-sdk
-deepdiff==8.6.1
+deepdiff==8.6.2
     # via lazyllm
 defusedxml==0.7.1
     # via
@@ -88,7 +88,7 @@ et-xmlfile==2.0.0
     # via openpyxl
 fastapi==0.129.0
     # via lazyllm
-filelock==3.21.2
+filelock==4.2.7
     # via lazyllm
 fire==0.7.1
     # via pdf2docx
@@ -158,7 +158,7 @@ lxml==6.1.3
     #   python-pptx
 magika==0.6.3
     # via markitdown
-mako==1.3.10
+mako==1.4.3
     # via alembic
 mammoth==1.11.0
     # via markitdown
@@ -221,7 +221,7 @@ pillow==13.0.0
     #   pikepdf
     #   python-pptx
     #   reportlab
-protobuf==6.33.2
+protobuf==6.33.6
     # via onnxruntime
 psutil==6.1.1
     # via lazyllm
@@ -294,7 +294,7 @@ six==1.17.0
     #   volcengine-python-sdk
 sniffio==1.3.1
     # via openai
-soupsieve==2.8
+soupsieve==2.10
     # via beautifulsoup4
 speechrecognition==3.14.4
     # via markitdown

@@ -31,7 +31,7 @@ a9a5c36 这一版新进来的）。本项目自己的 CLA 在 `legal/CLA.md`、�
 | `.env.example` | MinerU 本地服务段（`MINERU_LOCAL_URL` / `MINERU_FORCE_CLOUD=0`）+ `BACKEND_PORT=5001` + `MINERU_TOKEN` 默认置空（上游是占位串 `your-mineru-token`，历史版本非空会导致隐式云回退；现版本默认已禁止该回退） |
 | `docker-compose.yml` / `docker-compose.prod.yml` | 宿主机端口默认 `5001:5000`（对齐 PptxServiceClient 默认 base-url） |
 | `pyproject.toml` `requires-python` | **checkba**：`>=3.11`。Pillow 13 不支持 3.10，桌面打包的 CPython 是 3.11.12。re-vendor 时不要改回 `>=3.10` |
-| `requirements.lock` | 桌面打包/CI 用（`desktop/scripts/prepare-python-service.js`、`.github/workflows/desktop-build.yml`）。再生成：`uv export --no-dev --no-hashes --no-emit-project -o requirements.lock`。安全下限写在 `pyproject.toml` 的 `[tool.uv] constraint-dependencies`（Pillow、certifi、PyJWT、lxml、urllib3、cryptography、pyasn1、anyio、aiohttp），re-vendor 后必须保留，否则 `uv lock` 会把传递依赖解回有洞的版本 |
+| `requirements.lock` | 桌面打包/CI 用（`desktop/scripts/prepare-python-service.js`、`.github/workflows/desktop-build.yml`）。再生成：`uv export --no-dev --no-hashes --no-emit-project -o requirements.lock`。安全下限写在 `pyproject.toml` 的 `[tool.uv] constraint-dependencies`（Pillow、certifi、PyJWT、lxml、urllib3、cryptography、pyasn1、anyio、aiohttp、azure-core、deepdiff、protobuf、soupsieve、Mako、filelock、black），re-vendor 后必须保留，否则 `uv lock` 会把传递依赖解回有洞的版本。starlette 的补丁在 1.x，fastapi 0.129 解不出，不要 override |
 | `uv.lock` | 上游文件，但要随 `pyproject.toml` 多出的 `pdf2docx` 与上面的安全下限重新解析。**不要手改**，`uv lock` / `uv export` 会顺带更新它 |
 | `compat_smoke_test.sh` / 本文件 | checkba 侧新增，上游没有 |
 | `backend/utils/text_sanitizer.py` | **checkba 新增**：markdown 治理（行内标记转真格式、列表前缀转 bullet 语义、纯剥离），落字防线 |
