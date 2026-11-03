@@ -57,7 +57,28 @@ class PlatformGatewayClientTest {
         siteProfileService = mock(SiteProfileService.class);
         when(accountService.currentKeyOrNull()).thenReturn("awdk_test");
         when(siteProfileService.baseUrl()).thenReturn("https://www.aiworkdeck.com");
+        doAnswer(i -> new AccountService.ConnectionSnapshot(
+                siteProfileService.baseUrl(), accountService.currentKeyOrNull(), "scope", accountService.connectionVersion())).when(accountService).connectionSnapshot();
+        when(accountService.isCurrentConnection(any())).thenReturn(true);
         client = new PlatformGatewayClient(transport, accountService, siteProfileService);
+    }
+
+    @Test void retryNeverSendsOldKeyToNewSite() {
+        RecordingTransport changing = new RecordingTransport() {
+            @Override public Reply send(String method, String url, String key, String idempotency, String body, int timeout) {
+                super.send(method, url, key, idempotency, body, timeout);
+                when(siteProfileService.baseUrl()).thenReturn("https://workdeck.ai");
+                when(accountService.currentKeyOrNull()).thenReturn("awdk_new");
+                when(accountService.isCurrentConnection(any())).thenReturn(false);
+                return calls.size() == 1 ? new Reply(Reply.NETWORK_FAILURE, null) : new Reply(200, "{}");
+            }
+        };
+        assertThrows(GatewayException.class, () -> new PlatformGatewayClient(changing, accountService, siteProfileService).getJson("/test", 5));
+        assertEquals(1, changing.calls.size());
+        for (var call : changing.calls) {
+            assertEquals("https://www.aiworkdeck.com/test", call.url());
+            assertEquals("awdk_test", call.bearer());
+        }
     }
 
     @Test
@@ -126,6 +147,8 @@ class PlatformGatewayClientTest {
             }
         };
         transport.reply(PlatformGatewayTransport.Reply.NETWORK_FAILURE, null);
+        doAnswer(i -> new AccountService.ConnectionSnapshot(
+                siteProfileService.baseUrl(), accountService.currentKeyOrNull(), "scope", accountService.connectionVersion())).when(accountService).connectionSnapshot();
         client = new PlatformGatewayClient(transport, accountService, siteProfileService);
 
         try {

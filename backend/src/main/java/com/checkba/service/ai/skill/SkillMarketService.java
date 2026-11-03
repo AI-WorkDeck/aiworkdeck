@@ -91,12 +91,19 @@ public class SkillMarketService {
         private boolean purchased;
     }
 
+    private String currentRegistryUrl() {
+        String resolved = purchaseGate.registryUrl(properties.getRegistryUrl(), "skills");
+        return resolved == null ? properties.getRegistryUrl() : resolved;
+    }
+
     /**
      * 拉取在线广场列表并标注安装 / 已购状态。
      * @throws IllegalStateException 注册表不可达或返回内容无法解析（调用方转 {code:1}，不阻断本地功能）
      */
     public List<MarketSkillView> listMarket() {
-        String body = httpGet(properties.getRegistryUrl());
+        var connection = purchaseGate.connectionSnapshot();
+        String body = httpGet(currentRegistryUrl());
+        purchaseGate.assertConnection(connection);
         List<MarketSkillView> list;
         try {
             list = JSONUtil.toList(JSONUtil.parseArray(body), MarketSkillView.class);
@@ -134,6 +141,7 @@ public class SkillMarketService {
             view.setPurchased(view.getPriceCents() > 0 && view.getId() != null
                     && purchaseGate.purchased(MarketPurchaseGate.skillFeature(view.getId())));
         }
+        purchaseGate.assertConnection(connection);
         return list;
     }
 
@@ -149,6 +157,9 @@ public class SkillMarketService {
      * @throws IllegalStateException 注册表不可达 / 付费项未连接账户或未购买 / bundle 缺必需文件 / 写盘失败
      */
     public synchronized String install(String id) {
+        var connection = purchaseGate.connectionSnapshot();
+        String registryUrl = currentRegistryUrl();
+        purchaseGate.assertConnection(connection);
         requireValidId(id);
         MarketSkillView entry = findRegistryEntry(id);
         int priceCents = entry == null ? 0 : MarketPurchaseGate.normalizePrice(entry.getPriceCents());
@@ -158,8 +169,11 @@ public class SkillMarketService {
         String bearer = entry == null
                 ? purchaseGate.bearerForUnknownPrice()
                 : purchaseGate.bearerFor(priceCents, itemName);
+        purchaseGate.assertConnection(connection);
+        if (bearer != null && connection != null) bearer = connection.key();
 
-        RegistryReply reply = httpGet(properties.getRegistryUrl() + "/" + id + "/bundle", bearer);
+        RegistryReply reply = httpGet(registryUrl + "/" + id + "/bundle", bearer);
+        purchaseGate.assertConnection(connection);
         if (reply.status() == 402) {
             throw purchaseGate.paymentRequired(reply.body(), itemName, priceCents);
         }
@@ -178,6 +192,7 @@ public class SkillMarketService {
                 throw new IllegalStateException(LangText.of("bundle 缺少必需文件: ", "Bundle is missing required file: ") + name);
             }
         }
+        purchaseGate.assertConnection(connection);
         try {
             File skillDir = new File(properties.getDir(), id);
             Files.createDirectories(skillDir.toPath());

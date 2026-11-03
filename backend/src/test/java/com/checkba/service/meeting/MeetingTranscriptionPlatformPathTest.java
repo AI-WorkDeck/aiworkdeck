@@ -143,6 +143,9 @@ class MeetingTranscriptionPlatformPathTest {
     private MeetingTranscriptionService service() {
         SiteProfileService site = mock(SiteProfileService.class);
         when(site.baseUrl()).thenReturn("https://www.aiworkdeck.com");
+        doAnswer(i -> new AccountService.ConnectionSnapshot(
+                site.baseUrl(), accountService.currentKeyOrNull(), "fixture", accountService.connectionVersion())).when(accountService).connectionSnapshot();
+        when(accountService.isCurrentConnection(any())).thenReturn(true);
         PlatformGatewayClient gateway = new PlatformGatewayClient(transport, accountService, site);
         return new MeetingTranscriptionService(
                 meetingRepository, projectFileRepository, storageResolver, settingService,
