@@ -389,5 +389,17 @@ export default {
   "caseRecordCollectionFailedToast": "Impossibile registrare l'incasso",
   "caseSyncErpFailedToast": "Sincronizzazione finanza non riuscita",
   "caseSeedDemoFailedToast": "Impossibile creare i dati demo",
-  "caseOpenPluginFailedToast": "Impossibile aprire il plugin"
+  "caseOpenPluginFailedToast": "Impossibile aprire il plugin",
+  "circleInviteLabel": "Codice invito Circle Alliance (facoltativo)",
+  "circleInvitePlaceholder": "es. KW-ABNR-2026",
+  "circleInviteHint": "Inserisci il codice invito del tuo studio per aggiungere il suffisso dello studio e sbloccare quota DeepSeek dedicata",
+  "bqtScanSwitch": "Accesso QR avvocato Baoqingtian",
+  "bqtScanTitle": "Esegui la scansione con l’app avvocato Baoqingtian per accedere",
+  "bqtScanHint": "Solo per avvocati Baoqingtian verificati. Le Qingtian Coins mensili vengono assegnate automaticamente.",
+  "bqtScanExpired": "Codice QR scaduto",
+  "bqtScanRefresh": "Aggiorna codice QR",
+  "bqtScanBack": "Torna all’accesso con account",
+  "errInvalidInviteCode": "Codice invito non valido o disattivato",
+  "errInviteAlreadyBound": "Questo account ha già associato un codice invito Circle",
+  "errBqtNotLawyer": "Solo gli account avvocato Baoqingtian verificati possono accedere tramite QR",
 }

@@ -445,5 +445,17 @@ export default {
   "ocrSettingsReload": "Yeniden yükle",
   "ocrSettingsSaved": "Kaydedildi",
   "ocrSettingsLoadFailed": "Yükleme başarısız",
-  "ocrSettingsSaveFailed": "Kaydetme başarısız"
+  "ocrSettingsSaveFailed": "Kaydetme başarısız",
+  "walletRedeemTitle": "Hediye kodu / Circle büro davet kodu",
+  "walletRedeemPlaceholder": "Hediye kodu veya Circle büro kodunu girin (örn. KW-ABNR-2026)",
+  "walletRedeemBtn": "Kullan / Bağla",
+  "walletRedeemSubmitting": "Uygulanıyor…",
+  "walletRedeemSuccessGift": "{amount} başarıyla kullanıldı",
+  "walletRedeemSuccessFeature": "Özellik başarıyla açıldı",
+  "walletRedeemSuccessCircle": "{firm} (son ek: {suffix}) ile bağlandı, {amount} özel DeepSeek kotası verildi",
+  "walletRedeemFailed": "Geçersiz hediye veya davet kodu",
+  "walletCircleBadge": "Circle Alliance bürosu: {firm} (son ek: {suffix}) · %0 kâr marjı",
+  "walletQingtianTitle": "Baoqingtian · Aylık Qingtian Coins",
+  "walletQingtianBalance": "Bu ay {remaining} / {monthly} Qingtian Coins kaldı",
+  "walletQingtianRatio": "Dönüşüm oranı: 1 Qingtian Coin = {creditsPerCoin} kredi (bu geçerli)",
 }

@@ -389,5 +389,17 @@ export default {
   "caseRecordCollectionFailedToast": "Ghi nhận thu tiền thất bại",
   "caseSyncErpFailedToast": "Đồng bộ tài chính thất bại",
   "caseSeedDemoFailedToast": "Tạo dữ liệu demo thất bại",
-  "caseOpenPluginFailedToast": "Không thể mở plugin"
+  "caseOpenPluginFailedToast": "Không thể mở plugin",
+  "circleInviteLabel": "Mã mời Circle Alliance (không bắt buộc)",
+  "circleInvitePlaceholder": "vd: KW-ABNR-2026",
+  "circleInviteHint": "Nhập mã mời của hãng luật để gắn hậu tố hãng luật và mở hạn mức DeepSeek chuyên dụng",
+  "bqtScanSwitch": "Đăng nhập QR luật sư Baoqingtian",
+  "bqtScanTitle": "Quét bằng ứng dụng luật sư Baoqingtian để đăng nhập",
+  "bqtScanHint": "Chỉ dành cho luật sư Baoqingtian đã xác minh. Qingtian Coins hàng tháng được cấp tự động.",
+  "bqtScanExpired": "Mã QR đã hết hạn",
+  "bqtScanRefresh": "Làm mới mã QR",
+  "bqtScanBack": "Quay lại đăng nhập bằng tài khoản",
+  "errInvalidInviteCode": "Mã mời không hợp lệ hoặc đã ngừng hoạt động",
+  "errInviteAlreadyBound": "Tài khoản này đã liên kết mã mời của hãng luật Circle",
+  "errBqtNotLawyer": "Chỉ tài khoản luật sư Baoqingtian đã xác minh mới có thể đăng nhập bằng mã QR",
 }

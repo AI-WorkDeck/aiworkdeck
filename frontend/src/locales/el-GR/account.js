@@ -389,5 +389,17 @@ export default {
   "caseRecordCollectionFailedToast": "Αποτυχία καταχώρησης είσπραξης",
   "caseSyncErpFailedToast": "Αποτυχία συγχρονισμού οικονομικών δεδομένων",
   "caseSeedDemoFailedToast": "Αποτυχία φόρτωσης δοκιμαστικών δεδομένων",
-  "caseOpenPluginFailedToast": "Αποτυχία ανοίγματος του plugin"
+  "caseOpenPluginFailedToast": "Αποτυχία ανοίγματος του plugin",
+  "circleInviteLabel": "Κωδικός πρόσκλησης Circle Alliance (προαιρετικό)",
+  "circleInvitePlaceholder": "π.χ. KW-ABNR-2026",
+  "circleInviteHint": "Εισαγάγετε τον κωδικό πρόσκλησης του γραφείου σας για να επισυναφθεί το επίθεμα του γραφείου και να ξεκλειδώσετε αποκλειστική πίστωση DeepSeek",
+  "bqtScanSwitch": "Σύνδεση δικηγόρου Baoqingtian μέσω QR",
+  "bqtScanTitle": "Σαρώστε με την εφαρμογή δικηγόρου Baoqingtian για σύνδεση",
+  "bqtScanHint": "Μόνο για πιστοποιημένους δικηγόρους Baoqingtian. Τα μηνιαία Qingtian Coins πιστώνονται αυτόματα.",
+  "bqtScanExpired": "Ο κωδικός QR έληξε",
+  "bqtScanRefresh": "Ανανέωση κωδικού QR",
+  "bqtScanBack": "Επιστροφή στη σύνδεση λογαριασμού",
+  "errInvalidInviteCode": "Μη έγκυρος ή ανενεργός κωδικός πρόσκλησης",
+  "errInviteAlreadyBound": "Αυτός ο λογαριασμός έχει ήδη συνδέσει κωδικό πρόσκλησης Circle",
+  "errBqtNotLawyer": "Μόνο πιστοποιημένοι λογαριασμοί δικηγόρων Baoqingtian μπορούν να συνδεθούν μέσω QR",
 }

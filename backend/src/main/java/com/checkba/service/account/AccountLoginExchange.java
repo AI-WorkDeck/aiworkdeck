@@ -82,10 +82,39 @@ final class AccountLoginExchange {
                 ("phone_binding_required".equals(code) || "captcha_failed".equals(code)
                         || "sms_send_failed".equals(code) || "mail_send_failed".equals(code) || "code_send_failed".equals(code)
                         || "too_many_requests".equals(code) || "password_login_required".equals(code)
-                        || "password_setup_required".equals(code) || "invalid_password".equals(code))
+                        || "password_setup_required".equals(code) || "invalid_password".equals(code)
+                        || "invalid_invite_code".equals(code) || "invite_code_expired".equals(code)
+                        || "already_bound_same".equals(code) || "already_bound_other".equals(code)
+                        || "bqt_not_lawyer".equals(code))
                         ? AccountException.Kind.CONFLICT
                         : AccountException.Kind.UNAUTHORIZED;
         throw new AccountException(kind, message, code);
+    }
+
+    static Map<String, Object> get(AccountTransport transport, ObjectMapper objectMapper,
+                                   String baseUrl, String path, String pollToken) {
+        AccountTransport.Reply reply = transport.send("GET", baseUrl + path, pollToken, null);
+        if (reply.networkFailure()) {
+            throw new AccountException(AccountException.Kind.NETWORK,
+                    LangText.of("无法连接 AI WorkDeck 服务器，请检查网络后重试",
+                            "Could not connect to the AI WorkDeck server, please check your network and retry"));
+        }
+        int status = reply.status();
+        if (status >= 500) {
+            throw new AccountException(AccountException.Kind.NETWORK,
+                    LangText.of("AI WorkDeck 服务器暂时不可用，请稍后重试",
+                            "The AI WorkDeck server is temporarily unavailable, please retry shortly"));
+        }
+        Map<String, Object> parsed = parse(objectMapper, reply.body());
+        if (status >= 200 && status < 300) {
+            return parsed;
+        }
+        String message = str(parsed.get("message"));
+        String code = str(parsed.get("error"));
+        if (message == null || message.isBlank() || LOCALIZED_OVER_UPSTREAM.contains(code)) {
+            message = errorMessage(code);
+        }
+        throw new AccountException(AccountException.Kind.CONFLICT, message, code);
     }
 
     /** 官网没给 message 时的兜底文案（按 error code 分，别一律「操作失败」）。 */
@@ -128,6 +157,11 @@ final class AccountLoginExchange {
             case "invalid_phone" -> LangText.of("请输入正确的手机号", "Enter a valid phone number");
             case "invalid_email" -> LangText.of("请输入正确的邮箱地址", "Enter a valid email address");
             case "missing_fields" -> LangText.of("请填写完整", "Please fill in all fields");
+            case "invalid_invite_code" -> LangText.of("Circle 联盟所邀请码无效或未启用", "Invalid or inactive Circle alliance invite code");
+            case "invite_code_expired" -> LangText.of("该邀请码已过期", "This invite code has expired");
+            case "already_bound_same" -> LangText.of("当前账户已绑定该律所邀请码", "Your account is already bound to this firm's invite code");
+            case "already_bound_other" -> LangText.of("当前账户已绑定其他 Circle 联盟所邀请码，不可重复绑定", "Your account is already bound to another Circle firm's invite code");
+            case "bqt_not_lawyer" -> LangText.of("仅支持包晴天认证律师扫码", "Only verified Baoqingtian lawyers can sign in via QR scan");
             default -> LangText.of("登录失败，请稍后重试", "Sign-in failed, please retry shortly");
         };
     }

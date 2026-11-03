@@ -389,5 +389,17 @@ export default {
   "caseRecordCollectionFailedToast": "Gagal mencatat penagihan",
   "caseSyncErpFailedToast": "Sinkronisasi keuangan gagal",
   "caseSeedDemoFailedToast": "Gagal membuat data demo",
-  "caseOpenPluginFailedToast": "Gagal membuka plugin"
+  "caseOpenPluginFailedToast": "Gagal membuka plugin",
+  "circleInviteLabel": "Kode undangan Circle Alliance (opsional)",
+  "circleInvitePlaceholder": "mis. KW-ABNR-2026",
+  "circleInviteHint": "Masukkan kode undangan firma Anda untuk melampirkan akhiran firma dan membuka kuota DeepSeek khusus",
+  "bqtScanSwitch": "Masuk QR Pengacara Baoqingtian",
+  "bqtScanTitle": "Pindai dengan aplikasi Pengacara Baoqingtian untuk masuk",
+  "bqtScanHint": "Hanya untuk pengacara Baoqingtian terverifikasi. Qingtian Coins bulanan diberikan otomatis.",
+  "bqtScanExpired": "Kode QR kedaluwarsa",
+  "bqtScanRefresh": "Muat ulang kode QR",
+  "bqtScanBack": "Kembali ke masuk akun",
+  "errInvalidInviteCode": "Kode undangan tidak valid atau tidak aktif",
+  "errInviteAlreadyBound": "Akun ini sudah mengikat kode undangan firma Circle",
+  "errBqtNotLawyer": "Hanya akun pengacara Baoqingtian terverifikasi yang dapat masuk via kode QR",
 }

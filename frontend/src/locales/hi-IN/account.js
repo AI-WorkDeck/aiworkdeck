@@ -389,5 +389,17 @@ export default {
   "caseRecordCollectionFailedToast": "वसूली दर्ज करने में विफल",
   "caseSyncErpFailedToast": "वित्त सिंक विफल",
   "caseSeedDemoFailedToast": "डेमो डेटा सीड करने में विफल",
-  "caseOpenPluginFailedToast": "प्लगइन खोलने में विफल"
+  "caseOpenPluginFailedToast": "प्लगइन खोलने में विफल",
+  "circleInviteLabel": "Circle एलायंस आमंत्रण कोड (वैकल्पिक)",
+  "circleInvitePlaceholder": "उदा. KW-ABNR-2026",
+  "circleInviteHint": "अपनी फ़र्म का आमंत्रण कोड दर्ज करें ताकि फ़र्म सफ़िक्स जुड़ सके और समर्पित DeepSeek कोटा अनलॉक हो सके",
+  "bqtScanSwitch": "Baoqingtian वकील QR साइन-इन",
+  "bqtScanTitle": "साइन इन करने के लिए Baoqingtian वकील ऐप से स्कैन करें",
+  "bqtScanHint": "केवल सत्यापित Baoqingtian वकीलों के लिए। मासिक Qingtian Coins स्वतः दिए जाते हैं।",
+  "bqtScanExpired": "QR कोड समाप्त",
+  "bqtScanRefresh": "QR कोड रीफ़्रेश करें",
+  "bqtScanBack": "अकाउंट साइन-इन पर वापस जाएँ",
+  "errInvalidInviteCode": "आमंत्रण कोड अमान्य या निष्क्रिय है",
+  "errInviteAlreadyBound": "इस अकाउंट ने पहले ही Circle फ़र्म आमंत्रण कोड जोड़ लिया है",
+  "errBqtNotLawyer": "केवल सत्यापित Baoqingtian वकील अकाउंट ही QR कोड से साइन इन कर सकते हैं",
 }
