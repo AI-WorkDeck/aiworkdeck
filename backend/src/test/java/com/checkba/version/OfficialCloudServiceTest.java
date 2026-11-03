@@ -39,6 +39,34 @@ class OfficialCloudServiceTest {
     private int httpCalls;
     private String canned;
 
+    @Test void followsLiveSiteSwitchWithoutReusingMainlandConnectionInternationally() {
+        var sites=mock(com.checkba.service.site.SiteProfileService.class);
+        when(sites.baseUrl()).thenReturn("https://www.aiworkdeck.com");
+        var service=new OfficialCloudService("", "https://www.aiworkdeck.com", accountService,
+                connectionRepository, cloudSyncService, sites);
+        CloudConnection mainland=new CloudConnection();mainland.setId(9L);mainland.setUserId(ME);
+        mainland.setServerUrl(OFFICIAL);mainland.setAccountFingerprint("scope");rows.put(9L,mainland);
+        when(accountService.accountFingerprintOrNull()).thenReturn("scope");
+        assertSame(mainland,service.connectOfficial(ME));
+        when(sites.baseUrl()).thenReturn("https://workdeck.ai");
+        assertNull(service.officialBaseUrl());assertFalse(service.available());
+        assertEquals(false,service.status(ME).get("connected"));
+        assertThrows(VersionException.class,()->service.connectOfficial(ME));
+        verify(accountService,never()).currentKeyOrNull();
+        when(sites.baseUrl()).thenReturn("https://www.aiworkdeck.com");
+        assertSame(mainland,service.connectOfficial(ME));
+    }
+
+    @Test void explicitCloudEndpointRemainsAuthoritativeAcrossSiteSwitches() {
+        var sites=mock(com.checkba.service.site.SiteProfileService.class);
+        when(sites.baseUrl()).thenReturn("https://www.aiworkdeck.com");
+        var service=new OfficialCloudService("https://private.example", "https://www.aiworkdeck.com",
+                accountService, connectionRepository, cloudSyncService, sites);
+        assertEquals("https://private.example",service.officialBaseUrl());
+        when(sites.baseUrl()).thenReturn("https://workdeck.ai");
+        assertEquals("https://private.example",service.officialBaseUrl());assertTrue(service.available());
+    }
+
     @BeforeEach
     void setUp() {
         accountService = mock(AccountService.class);
