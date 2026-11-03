@@ -87,6 +87,9 @@ public class MobileRelayClientService {
     @Autowired(required = false) private com.checkba.repository.CloudConnectionRepository cloudConnections;
     @Autowired(required = false) private com.checkba.service.task.ProjectTaskService mobileTasks;
     @Autowired(required = false) private com.checkba.service.ProjectProfileService mobileProfiles;
+    @Autowired(required=false) private DesktopAssistantCopyImportService assistantCopyImporter;
+    @Autowired(required=false) private com.checkba.repository.DesktopAssistantCopyReceiptRepository assistantCopyReceipts;
+    private final AtomicBoolean assistantCopyRunning = new AtomicBoolean();
     private final AtomicBoolean calendarSyncRunning = new AtomicBoolean();
     private final AtomicBoolean assistantSyncRunning = new AtomicBoolean();
 
@@ -874,7 +877,10 @@ public class MobileRelayClientService {
         ArrayNode entries = body.putArray("projects");
         for (Project p : projects) {
             ObjectNode entry = entries.addObject().put("key", p.getId().toString()).put("name", p.getName());
-            if (projectCatalog != null) entry.put("projectUid", projectCatalog.ensureProjectUid(p));
+            entry.put("projectType", p.getProjectType());
+            entry.put("owned", Objects.equals(localIdentityService.localUserId(), p.getUserId()));
+            String uid = projectCatalog != null ? projectCatalog.ensureProjectUid(p) : p.getUid();
+            if (uid != null) entry.put("projectUid", uid);
             Long cloudId = cloudProjectId(p);
             if (cloudId != null) entry.put("cloudProjectId", cloudId);
         }
@@ -923,7 +929,10 @@ public class MobileRelayClientService {
                 ObjectNode e = arr.addObject();
                 e.put("key", String.valueOf(p.getId()));
                 e.put("name", p.getName());
-                if (projectCatalog != null) e.put("projectUid", projectCatalog.ensureProjectUid(p));
+                e.put("projectType", p.getProjectType());
+                e.put("owned", Objects.equals(userId, p.getUserId()));
+                String uid = projectCatalog != null ? projectCatalog.ensureProjectUid(p) : p.getUid();
+                if (uid != null) e.put("projectUid", uid);
                 Long cloudId = cloudProjectId(p);
                 if (cloudId != null) e.put("cloudProjectId", cloudId);
             }
@@ -1008,6 +1017,7 @@ public class MobileRelayClientService {
                 pollMediaMoves();
                 // 插件对话镜像（dev-board#298）同理挂在 finally：早 return 不能把它饿死。
                 pollConversationSync();
+                pollAssistantCopies();
                 // 参考读取（dev-board#718）：门铃是「快一点」，这一轮才是兜底——门铃断线、
                 // 旧云端没有门铃流时，取件全靠这里。同样必须在 finally。
                 pollReferenceRequests();
@@ -1371,6 +1381,81 @@ public class MobileRelayClientService {
         } catch (Exception e) {
             log.warn("手机同步：对话镜像轮询异常（下轮重试）", e);
         }
+    }
+
+    /** Independent whole-conversation transport; old Office queues and old servers remain unaffected. */
+    void pollAssistantCopies() {
+        if(!active() || assistantCopyImporter==null || !assistantCopyRunning.compareAndSet(false,true))return;
+        try {
+            long generation=accountService.connectionVersion();
+            CatalogSession session=beginCatalogSession(catalogAccountScope());
+            var frozen=new DesktopAssistantCopyImportService.Session(baseUrl,accountService.currentAccountIdOrNull(),
+                    accountService.accountFingerprintOrNull(),generation,deviceId(),localIdentityService.localUserId());
+            requireAssistantSession(session,frozen);
+            // Local committed receipts outlive cloud payload expiry and deleted local conversations.
+            retryAssistantAcknowledgements(session,frozen);
+            HttpResponse<String> response=catalogExchange(session,"GET",
+                    "/api/mobile/assistant/desktop-copies/pending?deviceId="+frozen.deviceId(),null);
+            requireAssistantSession(session,frozen);
+            if(!okEnvelope(response))return; // Includes 404 while the new endpoint has not been deployed.
+            JsonNode pending=mapper.readTree(response.body()).path("data");
+            if(!pending.isArray())return;
+            for(JsonNode envelope:pending) {
+                try {
+                    requireAssistantSession(session,frozen);
+                    java.time.Instant expires=java.time.Instant.parse(envelope.path("expiresAt").asText());
+                    if(!expires.isAfter(java.time.Instant.now()))continue;
+                    String status="DELIVERED",error=null;
+                    com.checkba.model.entity.DesktopAssistantCopyReceipt imported=null;
+                    try { imported=assistantCopyImporter.importCopy(frozen,envelope); }
+                    catch(DesktopAssistantCopyImportService.Rejected rejected){status="FAILED";error=rejected.getMessage();}
+                    // Transient database/IO failures escape before this point, leaving the cloud item queued.
+                    requireAssistantSession(session,frozen);
+                    String requestId=envelope.path("requestId").asText();
+                    if(!UUID.fromString(requestId).toString().equals(requestId))continue;
+                    ObjectNode ack=mapper.createObjectNode().put("deviceId",frozen.deviceId())
+                            .put("targetProjectUid",envelope.path("targetProjectUid").asText())
+                            .put("sha256",envelope.path("sha256").asText()).put("status",status);
+                    if(error!=null)ack.put("error",error);
+                    HttpResponse<String> result=catalogExchange(session,"POST",
+                            "/api/mobile/assistant/desktop-copies/"+requestId+"/ack",mapper.writeValueAsString(ack));
+                    requireAssistantSession(session,frozen);
+                    if(!okEnvelope(result))log.debug("Assistant copy acknowledgement deferred");
+                    else if(imported!=null && assistantCopyReceipts!=null)
+                        assistantCopyReceipts.markAcknowledged(imported.getId(),java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
+                } catch(Exception failure) {
+                    log.debug("Assistant copy pending retry ({})",failure.getClass().getSimpleName());
+                }
+            }
+        } catch(Exception failure) {
+            log.debug("Assistant copy polling deferred ({})",failure.getClass().getSimpleName());
+        } finally { assistantCopyRunning.set(false); }
+    }
+
+    private void retryAssistantAcknowledgements(CatalogSession session,DesktopAssistantCopyImportService.Session frozen) {
+        if(assistantCopyReceipts==null)return;
+        String scope=DesktopAssistantCopyImportService.sha256(frozen.site()+"\n"+frozen.accountId());
+        for(var receipt:assistantCopyReceipts.findByAccountScopeAndTargetDeviceIdAndAcknowledgedAtIsNullOrderByImportedAtAsc(scope,frozen.deviceId())) {
+            try {
+                requireAssistantSession(session,frozen);
+                String requestId=receipt.getRequestId();
+                if(!UUID.fromString(requestId).toString().equals(requestId))continue;
+                ObjectNode ack=mapper.createObjectNode().put("deviceId",frozen.deviceId())
+                        .put("targetProjectUid",receipt.getProjectUid()).put("sha256",receipt.getSha256()).put("status","DELIVERED");
+                HttpResponse<String> result=catalogExchange(session,"POST",
+                        "/api/mobile/assistant/desktop-copies/"+requestId+"/ack",mapper.writeValueAsString(ack));
+                requireAssistantSession(session,frozen);
+                if(okEnvelope(result))assistantCopyReceipts.markAcknowledged(receipt.getId(),java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
+            } catch(Exception failure) {
+                log.debug("Assistant committed receipt acknowledgement deferred ({})",failure.getClass().getSimpleName());
+            }
+        }
+    }
+
+    private void requireAssistantSession(CatalogSession session,DesktopAssistantCopyImportService.Session frozen) {
+        if(!active()||!frozen.deviceId().equals(deviceId()))throw new IllegalStateException("ASSISTANT_COPY_SESSION_CHANGED");
+        requireCatalogAccountScope(session.scope());
+        assistantCopyImporter.requireSession(frozen);
     }
 
     // ==================== 跨设备文件传输（dev-board#251 B 侧） ====================

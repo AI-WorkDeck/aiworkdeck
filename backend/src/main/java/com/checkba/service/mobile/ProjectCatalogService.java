@@ -72,6 +72,9 @@ public class ProjectCatalogService {
             location.put("kind", "desktop"); location.put("deviceId", row.getDeviceId());
             location.put("deviceName", row.getDeviceName() == null ? "" : row.getDeviceName());
             location.put("key", row.getProjectKey()); location.put("online", relay.isDeviceOnline(userId, row.getDeviceId()));
+            location.put("projectUid", validUid(row.getProjectUid()));
+            location.put("projectType", row.getProjectType());
+            location.put("owned", row.getOwned());
             add(out, uid, cloud == null ? row.getName() : cloud.getName(), location);
         }
         for (Project project : owned) {

@@ -32,6 +32,7 @@ public class MobileAssistantService {
     private final MobileAssistantConsentRepository consents;
     private final MobileProjectSummaryRepository summaries;
     private final MobileAssistantTurnRepository turns;
+    private final MobileAssistantDesktopCopyRepository desktopCopies;
     private final MobileProjectDirRepository directories;
     private final MobileBackupService backupService;
     private final CloudStorageQuotaService quota;
@@ -48,10 +49,11 @@ public class MobileAssistantService {
             MobileAssistantTurnRepository turns, MobileProjectDirRepository directories,
             MobileBackupService backupService, CloudStorageQuotaService quota, ProjectFileTextExtractor extractor,
             ChatModelFactory models, ToolRegistry tools, TokenUsageService usage, UserRepository users,
-            PlatformTransactionManager transactions) {
+            PlatformTransactionManager transactions, MobileAssistantDesktopCopyRepository desktopCopies) {
         this.consents=consents; this.summaries=summaries; this.turns=turns; this.directories=directories;
         this.backupService=backupService; this.quota=quota; this.extractor=extractor;
         this.models=models; this.tools=tools; this.usage=usage; this.users=users; this.tx=new TransactionTemplate(transactions);
+        this.desktopCopies=desktopCopies;
     }
 
     public Map<String,Object> status(Long user) {
@@ -75,7 +77,7 @@ public class MobileAssistantService {
             var consent=consents.findById(user).orElseGet(MobileAssistantConsent::new);
             consent.setUserId(user); consent.setEnabled(enabled); consent.setConsentVersion(version);
             consent.setRevision(consent.getRevision()+1); consents.saveAndFlush(consent);
-            if (!enabled) { summaries.deleteByUserId(user); turns.deleteByUserId(user); }
+            if (!enabled) { summaries.deleteByUserId(user); turns.deleteByUserId(user); desktopCopies.revokePending(user); }
         });
         return status(user);
     }
@@ -402,9 +404,19 @@ public class MobileAssistantService {
     }
     /** Complete, currently readable transcript for an explicit user-requested copy. Caller owns the transaction. */
     public List<MobileAssistantTurn> readableConversationForCopy(Long user, String conversationId) {
+        return readableCopyTurns(user, conversationId, null, null);
+    }
+    /** Revalidate precisely the frozen source rows; later messages do not enlarge an existing transfer. */
+    public List<MobileAssistantTurn> readableCopyTurns(Long user, String conversationId, Long expectedRevision, List<Long> turnIds) {
         long revision = requireEnabled(user);
+        if (expectedRevision != null && revision != expectedRevision) throw bad("个人助理授权已改变", "Personal assistant consent changed");
         checkConsent(consents.lockByUserId(user).orElseThrow(), revision);
         var rows = turns.findByUserIdAndConversationIdOrderByCreatedAtAscIdAsc(user, uuid(conversationId));
+        if (turnIds != null) {
+            var frozenIds = new java.util.HashSet<>(turnIds);
+            rows = rows.stream().filter(row -> frozenIds.contains(row.getId())).toList();
+            if (rows.size() != turnIds.size()) throw bad("原始对话已改变", "Original conversation changed");
+        }
         if (rows.isEmpty()) throw bad("对话不存在", "Conversation not found");
         for (var row : rows) {
             if ("running".equals(row.getStatus())) throw bad("请等待回复完成后再转存", "Wait for the reply to finish before copying");
