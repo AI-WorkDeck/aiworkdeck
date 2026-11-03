@@ -45,7 +45,9 @@ public class OfficialCloudService {
 
     private static final Logger log = LoggerFactory.getLogger(OfficialCloudService.class);
 
-    private final String officialBaseUrl;
+    private final String configuredBaseUrl;
+    private final String accountBaseUrl;
+    private com.checkba.service.site.SiteProfileService siteProfileService;
     private final AccountService accountService;
     private final CloudConnectionRepository connectionRepository;
     private final CloudSyncService cloudSyncService;
@@ -57,19 +59,31 @@ public class OfficialCloudService {
             CloudConnectionRepository connectionRepository,
             CloudSyncService cloudSyncService) {
         // 配错地址（明文 http）在启动期就炸掉，不静默降级——同 AwdkLoginService 的做法
-        this.officialBaseUrl = OfficialCloudEndpoint.resolve(configuredBaseUrl, accountBaseUrl);
+        OfficialCloudEndpoint.resolve(configuredBaseUrl, accountBaseUrl);
+        this.configuredBaseUrl = configuredBaseUrl;
+        this.accountBaseUrl = accountBaseUrl;
         this.accountService = accountService;
         this.connectionRepository = connectionRepository;
         this.cloudSyncService = cloudSyncService;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    public OfficialCloudService(
+            @Value("${cloud.collab.base-url:}") String configuredBaseUrl,
+            @Value("${ai.account.base-url:https://www.aiworkdeck.com}") String accountBaseUrl,
+            AccountService accountService, CloudConnectionRepository connectionRepository,
+            CloudSyncService cloudSyncService, com.checkba.service.site.SiteProfileService siteProfileService) {
+        this(configuredBaseUrl, accountBaseUrl, accountService, connectionRepository, cloudSyncService);
+        this.siteProfileService = siteProfileService;
+    }
+
     /** 官方案件库地址；null = 本站暂不提供（国际站）。 */
     public String officialBaseUrl() {
-        return officialBaseUrl;
+        return OfficialCloudEndpoint.resolve(configuredBaseUrl, siteProfileService == null ? accountBaseUrl : siteProfileService.baseUrl());
     }
 
     public boolean available() {
-        return officialBaseUrl != null;
+        return officialBaseUrl() != null;
     }
 
     /**
@@ -79,7 +93,7 @@ public class OfficialCloudService {
     public Map<String, Object> status(Long userId) {
         Map<String, Object> m = new HashMap<>();
         m.put("available", available());
-        m.put("serverUrl", officialBaseUrl);
+        m.put("serverUrl", officialBaseUrl());
         CloudConnection conn = existingOfficial(userId);
         m.put("connected", conn != null);
         m.put("username", conn == null ? null : conn.getUsername());
@@ -159,14 +173,14 @@ public class OfficialCloudService {
         if (key == null) return;
         Long oldTokenId = existing.getTokenId();
         try {
-            CloudConnection conn = bridge(officialBaseUrl, userId, key,
+            CloudConnection conn = bridge(existing.getServerUrl(), userId, key,
                     accountService.accountFingerprintOrNull(), existing);
             if (!name.equals(conn.getDisplayName())) {
                 conn.setDisplayName(name);
                 conn = connectionRepository.save(conn);
             }
             if (oldTokenId != null && !oldTokenId.equals(conn.getTokenId())) {
-                cloudSyncService.revokeRemoteToken(officialBaseUrl, oldTokenId, conn.getDeviceToken());
+                cloudSyncService.revokeRemoteToken(existing.getServerUrl(), oldTokenId, conn.getDeviceToken());
             }
         } catch (RuntimeException e) {
             log.warn("官方案件库展示名刷新跳过（下次同步再试）: user={} {}", userId, e.getMessage());
@@ -176,6 +190,7 @@ public class OfficialCloudService {
     // ==================== 内部 ====================
 
     private String requireAvailable() {
+        String officialBaseUrl = officialBaseUrl();
         if (officialBaseUrl == null) {
             throw VersionException.userFacing(LangText.of(
                     "本站暂时没有官方团队案件库，这份案卷的版本记录只保存在本机",
@@ -185,6 +200,7 @@ public class OfficialCloudService {
     }
 
     private CloudConnection existingOfficial(Long userId) {
+        String officialBaseUrl = officialBaseUrl();
         if (officialBaseUrl == null || userId == null) return null;
         return connectionRepository.findFirstByUserIdAndServerUrl(userId, officialBaseUrl).orElse(null);
     }
