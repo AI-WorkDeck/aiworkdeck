@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  defaultProjectName: "Временный проект",
   cmdPptAddImage: "Вставить изображение на слайд",
   cmdPptAddChart: "Вставить диаграмму на слайд",
   cmdPptFormatChart: "Форматировать диаграмму слайда",

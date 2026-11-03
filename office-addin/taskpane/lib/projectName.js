@@ -24,7 +24,8 @@ export const ADDIN_DEFAULT_PROJECT_NAMES = ['插件临时项目', 'Plugin Tempor
 /**
  * 项目名的展示值：插件懒建的临时项目按当前界面语言取名，其余项目原样返回。
  */
-export function displayProjectName(name) {
+export function displayProjectName(name, projectType) {
+  if (projectType === 'SCRATCH') return t('defaultProjectName')
   const raw = name == null ? '' : String(name)
   if (ADDIN_DEFAULT_PROJECT_NAMES.includes(raw.trim())) {
     return t('addinDefaultProjectName')

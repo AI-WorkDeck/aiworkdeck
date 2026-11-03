@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  defaultProjectName: "臨時專案",
   cmdPptAddImage: "插入投影片圖片",
   cmdPptAddChart: "插入投影片圖表",
   cmdPptFormatChart: "設定投影片圖表格式",

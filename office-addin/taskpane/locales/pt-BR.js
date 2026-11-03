@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  defaultProjectName: "Projeto temporário",
   cmdPptAddImage: "Inserir imagem no slide",
   cmdPptAddChart: "Inserir gráfico no slide",
   cmdPptFormatChart: "Formatar gráfico do slide",

@@ -71,6 +71,7 @@
               </view>
             </view>
             <view v-if="isScratchWorkspace" class="scratch-promote-btn" @click="handlePromoteScratchWorkspace">{{ $t('workbench.chatMode.promoteAction') }}</view>
+            <view v-if="isScratchWorkspace" class="scratch-promote-btn" @click="openScratchTransfer">{{ $t('workbench.scratchCopyTitle') }}</view>
             <view v-else-if="hasNamedProject" class="project-status-badge">
               <text class="status-text">{{ $t('workbench.statusInProgress') }}</text>
             </view>
@@ -2371,10 +2372,12 @@
         <text>AI WorkDeck</text>
       </view>
     </view>
+    <ScratchTransferDialog v-if="showScratchTransfer && isScratchWorkspace" :key="projectId" :source-project-id="projectId" :before-copy="prepareScratchCopy" :files="chatWorkspaceFiles.filter(f => !f.isDirectory)" :conversations="chatHistoryList" @close="showScratchTransfer = false" @copied="handleScratchCopied" />
   </view>
 </template>
 
 <script>
+import ScratchTransferDialog from '@/components/project-home/ScratchTransferDialog.vue'
 import { defineAsyncComponent } from 'vue'
 import { registerOpenWorkbench, unregisterOpenWorkbench } from '@/utils/ideOpen.js'
 import { resolveLooseWorkspace } from './looseFiles.js'
@@ -2647,6 +2650,7 @@ export default {
     }
   },
   components: {
+    ScratchTransferDialog,
     BackendHealthStatus,
     MobileReceiveStatus,
     MobileBackupConsent,
@@ -2771,6 +2775,7 @@ export default {
       pendingQuickChatPrompt: '',
       showPromoteScratchModal: false,
       promoteScratchName: '',
+      showScratchTransfer: false,
       chatWorkspaceFiles: [],
       sidebarWidth: 260, // 侧边栏宽度
       sidebarCollapsed: true,
@@ -3215,6 +3220,7 @@ export default {
         // 面板拖拽期间也要藏：BrowserView 是原生层，光标滑进去父窗口就收不到
         // mousemove，拖拽会冻住（iframe/webview 由 is-resizing 的 CSS 放行）
         (this.resizing && this.resizing.active) ||
+        this.showScratchTransfer ||
         this.showOcrOverlay ||
         this.showScreenshotSaveDialog ||
         this.showExportDialog ||
@@ -8722,6 +8728,27 @@ export default {
         startupEntryMode: uni.getStorageSync(STARTUP_ENTRY_MODE_KEY),
         lastViewMode: uni.getStorageSync(VIEW_MODE_STORAGE_KEY),
       })
+    },
+
+    handleScratchCopied() {
+      this.showScratchTransfer = false
+      uni.showToast({ title: this.$t('common.copied'), icon: 'success' })
+    },
+
+    async prepareScratchCopy() {
+      const projectId = this.projectId
+      const result = await flushDirtyEditors(this._libreRefs, this._plainTextRefs, { timeoutMs: 0 })
+      if (result.failed || String(projectId) !== String(this.projectId) || !this.isScratchWorkspace) {
+        throw new Error(this.$t('version.saveBeforeCommitFailed'))
+      }
+    },
+
+    async openScratchTransfer() {
+      const projectId = this.projectId
+      try {
+        await Promise.all([this.loadChatWorkspaceFiles(), this.fetchChatHistory(true)])
+        if (String(projectId) === String(this.projectId) && this.isScratchWorkspace) this.showScratchTransfer = true
+      } catch (e) { uni.showToast({ title: e.message || this.$t('common.failed'), icon: 'none' }) }
     },
 
     async loadChatWorkspaceFiles() {

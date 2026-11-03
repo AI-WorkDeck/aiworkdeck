@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  defaultProjectName: "Προσωρινό έργο",
   cmdPptAddImage: "Εισαγωγή εικόνας στη διαφάνεια",
   cmdPptAddChart: "Εισαγωγή γραφήματος στη διαφάνεια",
   cmdPptFormatChart: "Μορφοποίηση γραφήματος διαφάνειας",

@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyTitle: "Naar project kopiëren",
+  scratchCopyHint: "Kopieer geselecteerde gesprekken en bestanden met behoud van de originelen. Leden van het doelproject hebben toegang tot de kopieën.",
   "restartPending": "{count} taken kunnen worden hervat",
   "restartContinue": "Doorgaan: {name}",
   "restartRestoring": "Oorspronkelijk gesprek en document worden hersteld…",
@@ -335,8 +337,8 @@ export default {
     "modeChat": "Gesprek",
     "modeIde": "Werkbank",
     "chatTitle": "Gesprek",
-    "scratchTitle": "Voorlopige werkruimte",
-    "scratchBadge": "Voorlopige werkruimte",
+    "scratchTitle": "Tijdelijk project",
+    "scratchBadge": "Tijdelijk project",
     "promoteAction": "Omzetten naar project",
     "promoteTitle": "Converteren naar formeel project",
     "promotePlaceholder": "Voer een projectnaam in",

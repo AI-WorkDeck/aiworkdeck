@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyTitle: "Αντιγραφή σε έργο",
+  scratchCopyHint: "Αντιγράψτε τις επιλεγμένες συνομιλίες και αρχεία διατηρώντας τα πρωτότυπα. Τα μέλη του έργου προορισμού μπορούν να δουν τα αντίγραφα.",
   "restartPending": "{count} εργασίες μπορούν να συνεχιστούν",
   "restartContinue": "Συνέχεια: {name}",
   "restartRestoring": "Επαναφορά της αρχικής συνομιλίας και εγγράφου…",
@@ -335,8 +337,8 @@ export default {
     "modeChat": "Συνομιλία",
     "modeIde": "Περιβάλλον εργασίας",
     "chatTitle": "Συνομιλία",
-    "scratchTitle": "Πρόχειρος χώρος εργασίας",
-    "scratchBadge": "Πρόχειρος χώρος εργασίας",
+    "scratchTitle": "Προσωρινό έργο",
+    "scratchBadge": "Προσωρινό έργο",
     "promoteAction": "Μετατροπή σε έργο",
     "promoteTitle": "Μετατροπή σε επίσημο έργο",
     "promotePlaceholder": "Εισαγάγετε όνομα έργου",

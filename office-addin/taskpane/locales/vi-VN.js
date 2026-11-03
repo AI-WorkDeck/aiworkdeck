@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  defaultProjectName: "Dự án tạm thời",
   cmdPptAddImage: "Chèn hình ảnh vào trang chiếu",
   cmdPptAddChart: "Chèn biểu đồ vào trang chiếu",
   cmdPptFormatChart: "Định dạng biểu đồ trang chiếu",
