@@ -7,6 +7,7 @@ import java.util.*;
 
 public interface MobileAssistantTurnRepository extends JpaRepository<MobileAssistantTurn,Long> {
     Optional<MobileAssistantTurn> findByUserIdAndRequestId(Long userId,String requestId);
+    List<MobileAssistantTurn> findByUserIdAndConversationIdOrderByCreatedAtAscIdAsc(Long userId,String conversationId);
     List<MobileAssistantTurn> findTop20ByUserIdAndConversationIdOrderByCreatedAtDesc(Long userId,String conversationId);
     List<MobileAssistantTurn> findByUserIdAndStatus(Long userId,String status);
     long countByUserIdAndCreatedAtAfter(Long userId,java.time.Instant since);

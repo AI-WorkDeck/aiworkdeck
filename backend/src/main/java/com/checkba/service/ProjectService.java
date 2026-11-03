@@ -289,30 +289,39 @@ public class ProjectService {
      * 随手工作区（dev-board#1479，Chat/Scratch Mode）：每用户至多一个的隐藏 SCRATCH 项目。
      * 幂等：已存在即复用，不存在才建。versionOptOut=true——聊天草稿不该被版本记录搅扰。
      */
+    public record ScratchResult(Project project, boolean created) {}
+
     @Transactional
     public Project getOrCreateScratchProject(Long userId) {
+        return ensureScratchProject(userId).project();
+    }
+
+    @Transactional
+    public ScratchResult ensureScratchProject(Long userId) {
         if (userId == null) {
             throw new IllegalArgumentException(LangText.of("请先登录", "Please sign in first"));
         }
-        return projectRepository.findFirstByUserIdAndProjectTypeOrderByIdAsc(userId, Project.SCRATCH)
-                .orElseGet(() -> {
-                    Project p = new Project();
-                    p.setName(LangText.of("随手工作区", "Scratch Workspace"));
-                    p.setProjectType(Project.SCRATCH);
-                    p.setListedCompanyName("");
-                    p.setTargetCompanyName("");
-                    p.setUserId(userId);
-                    p.setVersionOptOut(true);
-                    p.setCreatedAt(LocalDateTime.now());
-                    p.setUpdatedAt(p.getCreatedAt());
-                    Project saved = projectRepository.save(p);
-                    ProjectMember member = new ProjectMember();
-                    member.setProjectId(saved.getId());
-                    member.setUserId(userId);
-                    member.setRole("ADMIN");
-                    projectMemberRepository.save(member);
-                    return saved;
-                });
+        userRepository.lockStorageOwner(userId).orElseThrow(() ->
+                new IllegalArgumentException(LangText.of("用户不存在", "User not found")));
+        Project existing = projectRepository.findFirstByUserIdAndProjectTypeOrderByIdAsc(userId, Project.SCRATCH).orElse(null);
+        if (existing != null) return new ScratchResult(existing, false);
+
+        Project p = new Project();
+        p.setName(LangText.of("临时项目", "Temporary project"));
+        p.setProjectType(Project.SCRATCH);
+        p.setListedCompanyName("");
+        p.setTargetCompanyName("");
+        p.setUserId(userId);
+        p.setVersionOptOut(true);
+        p.setCreatedAt(LocalDateTime.now());
+        p.setUpdatedAt(p.getCreatedAt());
+        Project saved = projectRepository.save(p);
+        ProjectMember member = new ProjectMember();
+        member.setProjectId(saved.getId());
+        member.setUserId(userId);
+        member.setRole("ADMIN");
+        projectMemberRepository.save(member);
+        return new ScratchResult(saved, true);
     }
 
     /**
@@ -324,6 +333,8 @@ public class ProjectService {
         if (userId == null) {
             throw new IllegalArgumentException(LangText.of("请先登录", "Please sign in first"));
         }
+        userRepository.lockStorageOwner(userId).orElseThrow(() ->
+                new IllegalArgumentException(LangText.of("用户不存在", "User not found")));
         Project p = getProject(projectId);
         if (!userId.equals(p.getUserId())) {
             throw new IllegalArgumentException(LangText.of("无权操作此项目", "Permission denied"));

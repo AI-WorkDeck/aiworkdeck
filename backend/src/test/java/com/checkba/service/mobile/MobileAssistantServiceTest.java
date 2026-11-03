@@ -47,6 +47,8 @@ class MobileAssistantServiceTest {
     @Autowired MobileFileBackupRepository backups;
     @Autowired UserRepository users;
     @Autowired PlatformTransactionManager transactions;
+    @Autowired ProjectRepository projects;
+    @Autowired ProjectAiMessageRepository projectMessages;
     @Autowired jakarta.persistence.EntityManagerFactory entityManagerFactory;
     MobileBackupService backup;
     CloudStorageQuotaService quota;
@@ -90,6 +92,42 @@ class MobileAssistantServiceTest {
         var row=new MobileFileBackup();row.setUserId(user);row.setDeviceId(device);row.setProjectKey(key);row.setFileId(UUID.randomUUID().toString());row.setUid(UUID.randomUUID().toString());
         row.setName("证据.txt");row.setPath("证据.txt");row.setSha256(HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8))));row.setSize((long)text.getBytes(StandardCharsets.UTF_8).length);row.setStoragePath("synthetic");row.setUpdatedAt(LocalDateTime.now());backups.saveAndFlush(row);
         when(backup.content(user,device,key,row.getUid())).thenAnswer(call -> new ProjectCatalogService.Content(new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8)),row.getSize()));return row;
+    }
+
+    @Test void explicitCopyIncludesMoreThanTwentyTurnsAndPreservesOriginalHistory() {
+        enable();
+        String conversation=UUID.randomUUID().toString();
+        for(int n=0;n<25;n++) persistCopyTurn(conversation,"completed",n);
+        var target=copyTarget(user);
+        var members=mock(com.checkba.service.ProjectMemberService.class);
+        when(members.hasWritePermission(target.getId(),user)).thenReturn(true);
+        var copies=new MobileAssistantCopyService(service,projects,members,projectMessages);
+        var copied=new org.springframework.transaction.support.TransactionTemplate(transactions)
+                .execute(status->copies.copy(user,conversation,target.getId()));
+        assertEquals(50,copied.messageCount());assertFalse(copied.filesCopied());assertTrue(copied.sourcePreserved());
+        var messages=projectMessages.findByConversationIdOrderByCreatedAtAsc(copied.conversationId());
+        assertEquals(50,messages.size());assertEquals("question-0",messages.get(0).getContent());
+        assertEquals("answer-24",messages.get(49).getContent());
+        assertEquals(25,turns.findByUserIdAndConversationIdOrderByCreatedAtAscIdAsc(user,conversation).size());
+    }
+    @Test void copyRejectsRunningForeignAndRevokedSourceBeforeCreatingMessages() {
+        enable();service.settings(other,true,MobileAssistantService.CONSENT_VERSION);
+        String conversation=UUID.randomUUID().toString();var turn=persistCopyTurn(conversation,"running",0);
+        var tx=new org.springframework.transaction.support.TransactionTemplate(transactions);
+        assertThrows(IllegalArgumentException.class,()->tx.execute(status->service.readableConversationForCopy(user,conversation)));
+        turn.setStatus("completed");turns.saveAndFlush(turn);
+        assertThrows(IllegalArgumentException.class,()->tx.execute(status->service.readableConversationForCopy(other,conversation)));
+        turn.setSourcesJson("[{\"id\":\"999999\",\"updatedAt\":\"old\"}]");turns.saveAndFlush(turn);
+        assertThrows(IllegalArgumentException.class,()->tx.execute(status->service.readableConversationForCopy(user,conversation)));
+    }
+    Project copyTarget(Long owner) {
+        var p=new Project();p.setUserId(owner);p.setName("copy target");p.setProjectType("BLANK");p.setListedCompanyName("");p.setTargetCompanyName("");p.setCreatedAt(LocalDateTime.now());
+        return projects.saveAndFlush(p);
+    }
+    MobileAssistantTurn persistCopyTurn(String conversation,String status,int index) {
+        var turn=new MobileAssistantTurn();turn.setUserId(user);turn.setConversationId(conversation);turn.setRequestId(UUID.randomUUID().toString());
+        turn.setQuestion("question-"+index);turn.setAnswer("answer-"+index);turn.setStatus(status);turn.setSourcesJson("[]");turn.setCreatedAt(Instant.now().plusSeconds(index));
+        return turns.saveAndFlush(turn);
     }
 
     @Test void backupConsentDoesNotGrantAiProcessingAndExpiredPlanCannotStart() {

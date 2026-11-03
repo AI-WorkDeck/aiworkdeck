@@ -47,6 +47,30 @@ class HttpMobileBillingClientTest {
     /** 置 true 时桩服务读完请求体直接断开、不回任何响应，模拟「请求已到达但响应丢了」的网络失败。 */
     private final AtomicBoolean stubDrop = new AtomicBoolean(false);
 
+    @Test
+    void subscriptionPrepareAndConfirmUseAccountBoundActions() throws Exception {
+        var client = stubbed(200, "{\"productId\":\"pro.monthly.cny.149\",\"appAccountToken\":\"f7331ede-341b-41db-bf3b-d6013b943e9c\"}");
+        assertEquals("pro.monthly.cny.149", client.prepareAppstoreSubscription("account-a").productId());
+        var prepare = om.readTree(lastRequest.get());
+        assertEquals("prepare-appstore-subscription", prepare.path("action").asText());
+        assertEquals("account-a", prepare.path("accountId").asText());
+        stubBody.set("{\"status\":\"CONFIRMED\",\"subscription\":{\"active\":true}}");
+        var result = client.confirmAppstoreSubscription("account-a", "signed.receipt.bytes");
+        assertEquals("CONFIRMED", result.status());
+        assertEquals(true, result.subscription().get("active"));
+        var confirm = om.readTree(lastRequest.get());
+        assertEquals("confirm-appstore-subscription", confirm.path("action").asText());
+        assertEquals("signed.receipt.bytes", confirm.path("signedTransaction").asText());
+        assertEquals(2, hits.get());
+    }
+
+    @Test
+    void subscriptionPrepareRejectsMalformedToken() {
+        var client = stubbed(200, "{\"productId\":\"pro.monthly.cny.149\",\"appAccountToken\":\"not-a-uuid\"}");
+        assertThrows(MobileBillingClient.MobileBillingException.class,
+                () -> client.prepareAppstoreSubscription("account-a"));
+    }
+
     @BeforeEach
     void startStub() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);

@@ -88,6 +88,8 @@ components:
       properties:
         projectUid: { type: string, format: uuid }
         name: { type: string }
+        projectType: { type: string, description: 云端权威项目类型，桌面镜像可缺席 }
+        isDefault: { type: boolean, description: 当前账户的云端默认工作区 }
         locations:
           type: array
           items: { $ref: '#/components/schemas/CatalogLocation' }
@@ -1683,6 +1685,107 @@ paths:
                   - type: array
                     items: { $ref: '#/components/schemas/CatalogProject' }
                   - $ref: '#/components/schemas/Envelope'
+  /api/mobile/assistant/conversations/{id}/copy-to-project:
+    post:
+      summary: 将完整个人助理对话记录复制到本人正式云项目；保留原历史，不复制来源案卷文件
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetProjectId]
+              properties:
+                targetProjectId: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: 已复制的对话记录；原始历史保留
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code: { type: integer, enum: [0] }
+                  data:
+                    type: object
+                    required: [mode, sourcePreserved, sourceConversationId, conversationId, targetProjectId, messageCount, filesCopied]
+                    properties:
+                      mode: { type: string, enum: [copy] }
+                      sourcePreserved: { type: boolean, enum: [true] }
+                      sourceConversationId: { type: string }
+                      conversationId: { type: string }
+                      targetProjectId: { type: integer, format: int64 }
+                      messageCount: { type: integer }
+                      filesCopied: { type: boolean, enum: [false] }
+  /api/projects/scratch/copy-to-project:
+    post:
+      summary: 将默认工作区选定内容复制到同一服务的本人正式项目，保留原件与源对话
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sourceProjectId, targetProjectId]
+              properties:
+                sourceProjectId: { type: integer, format: int64 }
+                targetProjectId: { type: integer, format: int64 }
+                selectedFileIds:
+                  type: array
+                  maxItems: 500
+                  items: { type: integer, format: int64 }
+                conversationIds:
+                  type: array
+                  maxItems: 50
+                  items: { type: string }
+      responses:
+        "200":
+          description: 已复制；对话附件自动包含。目标项目的可见范围仍按原权限生效。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code: { type: integer, enum: [0] }
+                  data:
+                    type: object
+                    required: [mode, sourcePreserved, sourceProjectId, targetProjectId, fileIdMap, conversationIdMap]
+                    properties:
+                      mode: { type: string, enum: [copy] }
+                      sourcePreserved: { type: boolean, enum: [true] }
+                      sourceProjectId: { type: integer, format: int64 }
+                      targetProjectId: { type: integer, format: int64 }
+                      folderId: { type: integer, format: int64, nullable: true }
+                      fileIdMap:
+                        type: object
+                        additionalProperties: { type: integer, format: int64 }
+                      conversationIdMap:
+                        type: object
+                        additionalProperties: { type: string }
+  /api/mobile/catalog/default:
+    post:
+      summary: 幂等获取当前账户默认工作区；复用桌面对话与插件的 SCRATCH 类型
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      responses:
+        "200":
+          description: 默认项目或错误信封
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code: { type: integer, enum: [0] }
+                  data: { $ref: '#/components/schemas/CatalogProject' }
   /api/mobile/catalog/{uid}/files:
     get:
       summary: 持久云文件或最后成功的桌面清单；首次桌面清单仍需 LIST
@@ -2129,6 +2232,66 @@ paths:
               schema:
                 oneOf:
                   - $ref: '#/components/schemas/RechargeStatus'
+                  - $ref: '#/components/schemas/Envelope'
+  /api/mobile/billing/subscription/appstore/capability:
+    get:
+      summary: Read subscription purchase availability without resolving or creating an account
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      responses:
+        "200":
+          description: Raw capability object or error Envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [available, productId]
+                properties:
+                  available: { type: boolean }
+                  productId: { type: string }
+  /api/mobile/billing/subscription/appstore/prepare:
+    post:
+      summary: Prepare an account-bound monthly App Store subscription purchase
+      description: Explicit purchase only. Uses the recharge-enabled gate; only this action may resolve with create=true.
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      responses:
+        "200":
+          description: Raw preparation object or error Envelope
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [productId, appAccountToken]
+                    properties:
+                      productId: { type: string }
+                      appAccountToken: { type: string, format: uuid }
+                  - $ref: '#/components/schemas/Envelope'
+  /api/mobile/billing/subscription/appstore/confirm:
+    post:
+      summary: Verify or restore an account-bound monthly App Store subscription
+      description: Does not create accounts. Finish the StoreKit transaction only after CONFIRMED. Entitlements use the verified provider period, not a fixed 30-day extension.
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signedTransaction]
+              properties:
+                signedTransaction: { type: string, minLength: 1, maxLength: 16384 }
+      responses:
+        "200":
+          description: Raw confirmation object or error Envelope
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [status, subscription]
+                    properties:
+                      status: { type: string, enum: [CONFIRMED] }
+                      subscription: { type: object, additionalProperties: true }
                   - $ref: '#/components/schemas/Envelope'
   /api/mobile/billing/recharge/status:
     get:

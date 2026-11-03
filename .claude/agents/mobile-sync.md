@@ -578,3 +578,13 @@ find-or-create，影子项目从 `/api/projects/my` 滤掉）。绑定后两条�
   当前账户/本设备云项目目录→完整状态→分块下载到临时文件→`importObject` 整体验 hash/长度并原子发布；
   失败不覆盖现有对象、不更改工作区。没有保存/status自动下载；同名列表入口 GET
   `/backup/version-objects?deviceId=&projectKey=` 返回本范围完整对象 SHA/size，不能列其他账号。
+
+## 2026-11-03 临时项目、转存与订阅接口（dev-board#1655/#1656）
+
+`POST /api/mobile/catalog/default` 在用户行锁下复用同一 SCRATCH，返回 catalog project envelope；目录仅本人云项目可标 `isDefault/projectType`，不把桌面本地项目自动绑定云端。插件 ensure-addin-default 同样复用 SCRATCH，旧 BLANK 插件项目保留身份。
+
+`POST /api/projects/scratch/copy-to-project` 复制选定文件/对话到本人可写正式项目，原件保留，新文件/会话 ID 映射返回；对话附件一并复制，临时附件须先落为项目文件。会话锁、项目锁、额度锁与事务保护复制；字节经哈希验证，无覆盖发布，失败仅清理本次生成文件。最多 500 文件、50 对话。`POST /api/mobile/assistant/conversations/{id}/copy-to-project` 是个人助理完整历史的独立入口，校验授权及运行状态，只复制记录及来源说明，`filesCopied:false`，目标成员可看副本。
+
+Apple 订阅桥接：GET `/api/mobile/billing/subscription/appstore/capability`（只读、不建账），POST 同路径 `/prepare` 返回稳定 appAccountToken，POST `/confirm` 将签名交易送账户中心验证。客户端确认 CONFIRMED 后再 finish；已有套餐余额语义不变，开关默认关闭。商品审核、真实沙盒扣费和发版另行完成，不因代码合并视为开通。
+
+验证：后端 9 类 131 测试通过，包括事务回滚/文件竞争、25轮完整个人助理导出、越权/运行中拒绝及 OpenAPI。
