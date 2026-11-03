@@ -144,7 +144,7 @@
           <div class="unlock-code-links">
             <component :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="switchAuthFlow(authFlow === 'password' ? 'register' : 'password')">{{ $t(authFlow === 'password' ? 'accountPassword.register' : 'accountPassword.back') }}</component>
             <component v-if="authFlow === 'password'" :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="switchAuthFlow('reset')">{{ $t('accountPassword.reset') }}</component>
-            <component v-if="isPhoneSite" :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="switchMode('bqt')">{{ $t('account.bqtScanSwitch') }}</component>
+            <component v-if="isPhoneSite && bqtScanEnabled" :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="switchMode('bqt')">{{ $t('account.bqtScanSwitch') }}</component>
           </div>
           <div v-if="authFlow === 'register' || authFlow === 'reset'" class="unlock-compat-verification">
             <component :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="loadCompatChallenge">{{ $t(compatLoading ? 'onboarding.unlock.compatLoading' : compatVerification ? 'onboarding.unlock.compatRefresh' : 'onboarding.unlock.compatUse') }}</component>
@@ -319,6 +319,7 @@ export default {
       smsCode: '',
       inviteCode: '',
       bqtSession: null,
+      bqtScanEnabled: false,
       bqtLoading: false,
       bqtExpired: false,
       bqtPollTimer: null,
@@ -500,6 +501,7 @@ export default {
     async runCaptchaSetup() {
       const gen = ++this.captchaGen
       this.captcha = null
+      this.bqtScanEnabled = false
       this.captchaFailure = null
       // #ifdef H5
       teardownCaptcha()
@@ -515,7 +517,8 @@ export default {
         console.warn('人机验证配置读取失败（按未启用处理）:', e && e.message)
         return
       }
-      if (gen !== this.captchaGen) return
+      if (gen !== this.captchaGen || this.done) return
+      this.bqtScanEnabled = config?.bqtScanEnabled === true
       try {
         const widget = await setupCaptcha(config, this.captchaId)
         if (gen === this.captchaGen) this.captcha = widget
@@ -592,6 +595,7 @@ export default {
     switchMode(next) {
       if (this.mode === next) return
       if (next === 'bqt') {
+        if (!this.bqtScanEnabled || !this.isPhoneSite) return
         if (!this.consentGatePassed()) return
         this.mode = 'bqt'
         this.errorMsg = ''
