@@ -321,8 +321,10 @@ try {
     page.on('console', message => {
       if (!['warn', 'error'].includes(message.type())) return
       const location = message.location()
+      const safeText = value => String(value || '').replace(/(?:https?|file):\/\/[^\s"'<>]+/g, safeUrl).slice(0, 4096)
       recordRenderer({ kind: 'console', type: message.type(),
-        text: message.text().replace(/(?:https?|file):\/\/[^\s"'<>]+/g, safeUrl).slice(0, 4096),
+        text: safeText(message.text()),
+        errors: message.args().map(arg => arg.remoteObject()).filter(arg => arg.subtype === 'error').map(arg => safeText(arg.description)),
         location: { url: safeUrl(location.url), line: location.lineNumber, column: location.columnNumber } })
     })
     page.on('requestfailed', request => {
