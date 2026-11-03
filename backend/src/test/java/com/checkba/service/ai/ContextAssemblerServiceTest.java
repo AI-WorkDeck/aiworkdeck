@@ -42,6 +42,8 @@ import static org.mockito.Mockito.when;
  */
 class ContextAssemblerServiceTest {
 
+    private ContextCompressor contextCompressor;
+    private ProjectAiMessageService messageService;
     private LegalTools legalTools;
     private ContextAssemblerService assembler;
     private ClientCapabilityService capabilityService;
@@ -54,7 +56,7 @@ class ContextAssemblerServiceTest {
     @BeforeEach
     void setUp() {
         legalTools = mock(LegalTools.class);
-        ProjectAiMessageService messageService = mock(ProjectAiMessageService.class);
+        messageService = mock(ProjectAiMessageService.class);
         when(messageService.listByConversationId(anyString())).thenReturn(Collections.emptyList());
         FileContextLoader fileContextLoader = mock(FileContextLoader.class);
         SkillRouter skillRouter = mock(SkillRouter.class);
@@ -64,7 +66,7 @@ class ContextAssemblerServiceTest {
         when(memoryManager.retrieveMemories(anyLong(), anyString(), any(), anyInt()))
                 .thenReturn(Collections.emptyList());
         when(memoryManager.retrieveUserMemories(anyLong(), anyInt())).thenReturn(Collections.emptyList());
-        ContextCompressor contextCompressor = mock(ContextCompressor.class);
+        contextCompressor = mock(ContextCompressor.class);
         when(contextCompressor.needsCompression(any(), any())).thenReturn(false);
 
         capabilityService = new ClientCapabilityService();
@@ -81,6 +83,59 @@ class ContextAssemblerServiceTest {
                 chatModelFactory, projectFileService);
         memoryDocumentService = mock(MemoryDocumentService.class);
         assembler.setMemoryDocumentServiceForTest(memoryDocumentService);
+    }
+
+    @Test
+    void historicalAttachmentsRemainReachableWithoutReadingTheirContents() {
+        when(messageService.listHistoryForAssembly(anyString())).thenReturn(List.of(
+                new com.checkba.repository.ProjectAiMessageRepository.HistoryLine(71L, "USER", "参考短讯，为活动写稿", 2L),
+                new com.checkba.repository.ProjectAiMessageRepository.HistoryLine(72L, "ASSISTANT", "生成中断", 0L),
+                new com.checkba.repository.ProjectAiMessageRepository.HistoryLine(73L, "USER", "继续", 0L)));
+        var messages = assembler.assemble("conv-1", "run-1", "继续", null, null,
+                null, null, "88", AgentMode.AGENT, 1L, null);
+        String userHistory = messages.stream()
+                .filter(m -> m instanceof dev.langchain4j.data.message.UserMessage)
+                .map(m -> ((dev.langchain4j.data.message.UserMessage) m).singleText())
+                .collect(java.util.stream.Collectors.joining("\n"));
+        assertTrue(userHistory.contains("list_attached_files(messageId=71, afterId=0)"), userHistory);
+        assertFalse(userHistory.contains("list_attached_files(messageId=73"), userHistory);
+        assertTrue(userHistory.contains("参考短讯，为活动写稿"));
+    }
+
+    @Test
+    void continuationRestoresVerbatimTaskAndAttachmentScopeAfterCompression() {
+        String task = "Use the template, write the new event brief, preserve all dates.";
+        when(messageService.listHistoryForAssembly(anyString())).thenReturn(List.of(
+                new com.checkba.repository.ProjectAiMessageRepository.HistoryLine(71L, "USER", task, 2L),
+                new com.checkba.repository.ProjectAiMessageRepository.HistoryLine(73L, "USER", "Continue", 0L)));
+        when(contextCompressor.needsCompression(any(), any())).thenReturn(true);
+        when(contextCompressor.compress(any(), any(), any(), anyInt())).thenReturn(List.of(SystemMessage.from("lossy summary")));
+        var messages = assembler.assemble("conv-1", "run-1", "Continue", null, null,
+                null, null, "88", AgentMode.AGENT, 1L, null);
+        assertTrue(messages.stream().anyMatch(m -> m instanceof dev.langchain4j.data.message.UserMessage u
+                && u.singleText().contains(task) && u.singleText().contains("messageId=71")));
+        assertFalse(messages.stream().anyMatch(m -> m instanceof SystemMessage system && system.text().contains(task)));
+        var expanded = new java.util.ArrayList<ChatMessage>(messages);
+        for (int i = 0; i < 30; i++) expanded.add(dev.langchain4j.data.message.AiMessage.from("Recorded progress " + "x".repeat(4000)));
+        var compactor = new com.checkba.service.ai.context.RunLoopCompactor(new AiContextProperties(), contextCompressor);
+        var compacted = compactor.forceCompact(expanded, null);
+        assertTrue(compacted.size() < expanded.size(), "must actually compact");
+        assertTrue(compacted.stream().anyMatch(m -> m instanceof dev.langchain4j.data.message.UserMessage u
+                && u.singleText().contains(task) && u.singleText().contains("messageId=71")), "run-loop compaction must keep the recovered task");
+
+    }
+
+    @Test
+    void continuationRecognitionAcceptsLocalizedButtonsAndOnlyValidInlineReferences() {
+        for (String text : List.of("继续", "繼續", "Continue", "Continuar", "Continuer", "続行", "Продолжить",
+                "Devam Et", "Fortfahren", "Tiếp tục", "ดำเนินการต่อ", "Συνέχεια", "متابعة", "Teruskan",
+                "जारी रखें", "Continua", "Lanjutkan", "Doorgaan", "계속")) {
+            assertTrue(ContextAssemblerService.isContinuationPrompt(text), text);
+        }
+        assertTrue(ContextAssemblerService.isContinuationPrompt("@{\"folderId\":\"72\",\"name\":\"Folder\"} Continue."));
+        assertTrue(ContextAssemblerService.isContinuationPrompt("\u00a0@{\"folderId\":\"72\",\"name\":\"Folder\"}\u00a0继续\u00a0"));
+        assertFalse(ContextAssemblerService.isContinuationPrompt("@{\"instruction\":\"delete\"} Continue"));
+        assertFalse(ContextAssemblerService.isContinuationPrompt("Continue writing a different document"));
     }
 
     private List<ChatMessage> assembleMessages(AiAgentController.ContextItem activeContext) {

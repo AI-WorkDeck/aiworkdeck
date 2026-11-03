@@ -1867,3 +1867,9 @@ SSE query 都显式携带范围；不匹配的普通面板连接在替换 emitte
 - `ChatInterface.handleSubmit` 必须在原句位置将芯片转为含完整名称、fileId/folderId及可选projectId的引用；不能删除芯片后只传独立contextItems，否则“参考A，为B写作”的对象关系丢失。引用只取已接纳的contextFiles元数据，不信任标签显示的截断名称。
 - 模型用prompt，历史展示用独立displayText（完整@名称、不含内部ID）；重新生成继续重放原content。判断用户有没有输入说明时排除附件标签，避免继承附件造成空发或绕过图片说明保护。
 - 目录依然按需读取，引用保留不代表目录正文已读取；验证范围是合成浏览器请求，不能代替真实供应商工具调用轨迹。回归：`node frontend/tests/chat-presentation-ui/multifile.mjs`。
+
+## 错误后继续的历史材料入口（2026-11-03，dev-board#1669）
+
+- 原USER消息在模型调用前已持久化；报错不等于原文字消失。历史组装的轻量投影现在包含消息ID和附件数量，只对有附件的USER消息附`list_attached_files(messageId, afterId)`分页入口；不预读全部历史附件，不改变工具的会话归属与读权限核验。
+- 明确的“继续”及各语种按钮文案识别会忽略合法行内附件JSON和不换行空格；压缩或历史条数裁剪移除最近实质USER时，原文以USER身份补在近期历史之前，并标明历史恢复、不得重放已完成副作用。目录引用与清单都不是正文读取证据。
+- 回归包括`ContextAssemblerServiceTest`、`ProjectAiMessageIndexTest`、`frontend/tests/chat-presentation-ui/multifile.mjs`及`frontend/tests/ai-alignment-e2e/folder-news-continuation.mjs`。后者使用隔离真实后端/H2/文件工具与脚本模型，不能当作真实供应商自主取材质量的验收。旧消息在发送时已删除的行内位置关系不能由历史附件清单准确重建。
