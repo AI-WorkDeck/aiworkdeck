@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  fileTodos: "Δημιουργία εργασιών ημερολογίου",
+  fileExportWord: "Εξαγωγή απομαγνητοφώνησης σε Word",
+  fileActionFailed: "Η ενέργεια απέτυχε: {message}",
   "tierLabel": "Μέθοδος απομαγνητοφώνησης",
   "tierPlatform": "Μέσω πλατφόρμας",
   "tierByok": "Δικό σας κλειδί",

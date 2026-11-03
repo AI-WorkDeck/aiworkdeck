@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  fileTodos: "Crear tareas en el calendario",
+  fileExportWord: "Exportar transcripción a Word",
+  fileActionFailed: "Error en la acción: {message}",
   "tierLabel": "Transcripción",
   "tierPlatform": "Proporcionado por la plataforma",
   "tierByok": "Tu propia clave",

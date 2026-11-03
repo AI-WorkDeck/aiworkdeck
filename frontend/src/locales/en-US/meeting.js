@@ -11,6 +11,9 @@
 // The panel title is not here: since #389 the shell's sidebar-header renders it, and its copy
 // comes from config.sidebar.meetingRecorder (the rail icon and the title must be one fact).
 export default {
+  fileTodos: "Create calendar tasks",
+  fileExportWord: "Export transcript to Word",
+  fileActionFailed: "Action failed: {message}",
   // ---- Transcription tier and the "keep recordings on this device" toggle ----
   tierLabel: 'Transcription',
   tierPlatform: 'Platform-sourced',

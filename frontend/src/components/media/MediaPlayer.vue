@@ -28,6 +28,12 @@
     @mousemove="onPointerMove"
     @mouseleave="onPointerLeave"
   >
+    <RecordingActions
+      v-if="recordingActionsEnabled && kind === 'audio' && captionState === 'ready' && meeting"
+      :meeting="meeting"
+      @ai-prompt="$emit('ai-prompt', $event)"
+      @files-changed="$emit('files-changed', $event)"
+    />
     <!-- ==================== 视频：overlay 皮 ==================== -->
     <div v-if="kind === 'video'" class="mp-main" :class="{ 'is-side': transcriptShown && wide, 'is-below': transcriptShown && !wide }">
       <div class="mp-stage">
@@ -173,6 +179,7 @@
 
 <script>
 import MediaControls from './MediaControls.vue'
+import RecordingActions from './RecordingActions.vue'
 import MediaTranscript from './MediaTranscript.vue'
 import { ICONS } from '@/config/icons.js'
 import {
@@ -203,8 +210,9 @@ function readCaptionsOff() {
 
 export default {
   name: 'MediaPlayer',
-  components: { MediaControls, MediaTranscript },
+  components: { RecordingActions, MediaControls, MediaTranscript },
   props: {
+    recordingActionsEnabled: { type: Boolean, default: false },
     sourceUrl: { type: String, default: '' },
     kind: { type: String, default: 'video' }, // 'video' | 'audio'
     // 需要 id / wpsFileId / name / fileType / projectId
@@ -214,7 +222,7 @@ export default {
     // EvidenceLink 起播时刻（秒），来自 parseMediaStartSec；null = 没有定位
     locatorSec: { type: Number, default: null },
   },
-  emits: ['locator-consumed', 'error'],
+  emits: ['locator-consumed', 'error', 'ai-prompt', 'files-changed'],
   data() {
     return {
       playing: false,

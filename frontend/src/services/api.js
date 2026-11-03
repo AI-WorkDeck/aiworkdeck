@@ -3529,6 +3529,13 @@ export function exportMeetingTranscript(meetingId) {
   })
 }
 
+export function getMeetingTodosPrompt(meetingId) {
+  return request({
+    url: `/api/meetings/${meetingId}/todos-prompt`,
+    method: 'POST'
+  })
+}
+
 export function getMeetingMinutesPrompt(meetingId) {
   return request({
     url: `/api/meetings/${meetingId}/minutes-prompt`,

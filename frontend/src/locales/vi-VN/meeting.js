@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  fileTodos: "Tạo công việc trên lịch",
+  fileExportWord: "Xuất bản chép lời sang Word",
+  fileActionFailed: "Thao tác thất bại: {message}",
   "tierLabel": "Chép lời",
   "tierPlatform": "Do nền tảng cung cấp",
   "tierByok": "Khóa của riêng bạn",

@@ -652,3 +652,5 @@ FileTree 的节点/根/空白落点先认包内载荷，先同步快照与 claim
 H5 的项目 PDF 先用鉴权 HEAD 校验，再让内置查看器直连 `/api/files/{id}/download?inline=true`，复用媒体 URL 的 session 鉴权，不打印带 token 的 URL。Spring 与轻量 LocalCore 同时支持 PDF-only inline，原下载仍 attachment，Range 和每次权限校验不变。旧服务未支持 inline、查看器加载失败时回退鉴权 Blob；sourceUrl 与非 H5 保留 Blob 路径。iframe load 仅为导航接收确认，首屏性能必须另看正文像素。
 
 版本恢复按 affectedFileIds 处理 PDF，包括受保护的项目版本流程；AI 后端更新有新版本号时等待 watcher 的既有加载，无新版本号则显式重载，两者都须等待查看器接收结果，失败不得报更新成功；文件树同步同时更新 PDF 版本及大小。覆盖测试：`tests/project-home/pdf-version-restore.test.mjs`；后端 `FileControllerRangeTest`、`LocalCoreHttpReadsTest`。PDF 按真实阅读/AI修改/版本能力验收，不把 Word 的输入和保存结论外推。
+
+**录音文件页后处理（dev-board#1670）**：`media/MediaPlayer.vue` 仅在工作台两栏显式开启 recordingActionsEnabled 且音频转写 ready 时挂 `RecordingActions.vue`，通过 `FilePreview` 的 `ai-prompt` 事件接工作台两栏的 `handleMeetingMinutesStart`。纪要复用 minutes-prompt，待办使用 todos-prompt（writer + 源录音可读 + TRANSCRIBED 校验；真实 task_list/task_create，不是 todo_write；负责人沿用日历 @ 成员关联语义，不新增对外通知），导出复用会议 export 接口保存 DOCX 并发 files-changed→extracted 刷新资源树。请求期间互斥，切文件/卸载使迟到结果失效。音频播放与转写的计费流程未改变；视频、Word/PPT/Excel/PDF预览不挂此入口。回归：`node --test frontend/tests/media/*.test.mjs`。
