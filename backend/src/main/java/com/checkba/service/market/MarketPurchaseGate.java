@@ -33,6 +33,28 @@ import java.math.RoundingMode;
 @Service
 public class MarketPurchaseGate {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.service.site.SiteProfileService sites;
+
+    public String registryUrl(String configured, String kind) {
+        if (sites == null) return configured;
+        for (String host : java.util.List.of("www.aiworkdeck.com", "aiworkdeck.com", "www.workdeck.ai", "workdeck.ai")) {
+            if (("https://" + host + "/api/registry/" + kind).equals(configured))
+                return sites.profile().registryBaseUrl() + "/" + kind;
+        }
+        return configured;
+    }
+
+    public AccountService.ConnectionSnapshot connectionSnapshot() {
+        return accountService.connectionSnapshot();
+    }
+
+    public void assertConnection(AccountService.ConnectionSnapshot snapshot) {
+        if (snapshot != null && !accountService.isCurrentConnection(snapshot))
+            throw new IllegalStateException(com.checkba.service.LangText.of(
+                    "账户已变化，请重新打开广场", "Account has changed; please reopen the marketplace"));
+    }
+
     private final AccountService accountService;
     private final EntitlementService entitlementService;
 

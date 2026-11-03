@@ -25,6 +25,15 @@ class MobileWorkspaceSyncHttpTest {
     HttpServer server;
     MobileRelayClientService client;
     AccountService account=mock(AccountService.class);
+    {
+        when(account.connectionSnapshot()).thenAnswer(i -> new AccountService.ConnectionSnapshot(
+                "https://www.aiworkdeck.com", account.currentKeyOrNull(), account.accountFingerprintOrNull(), account.connectionVersion()));
+        when(account.isCurrentConnection(any())).thenAnswer(i -> {
+            AccountService.ConnectionSnapshot snapshot = i.getArgument(0);
+            return java.util.Objects.equals(snapshot.key(), account.currentKeyOrNull())
+                    && java.util.Objects.equals(snapshot.fingerprint(), account.accountFingerprintOrNull());
+        });
+    }
     ProjectRepository projects=mock(ProjectRepository.class);
     ProjectTaskService tasks=mock(ProjectTaskService.class);
     ProjectProfileService profiles=mock(ProjectProfileService.class);
@@ -42,7 +51,6 @@ class MobileWorkspaceSyncHttpTest {
         when(tasks.listByProject(42L,null,null)).thenReturn(List.of(Map.of("id",3L,"title","Review draft","dueDate",LocalDate.of(2026,11,2),
                 "dueTime",LocalTime.of(9,30),"status","OPEN","remindBefore",60,"files",List.of(Map.of("fileId",4L,"fileName","Draft.docx")))));
         when(profiles.getProfile(42L)).thenReturn(List.of(Map.of("key","client","value","Synthetic client")));
-        Files.writeString(home.resolve("mobile-relay.json"),"{\"deviceId\":\"fixture-device\",\"token\":\"awdt_fixture\",\"accountFingerprint\":\"fixture-owner\"}");
         server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
         server.createContext("/api/mobile",ex->{
             String path=ex.getRequestURI().getPath();
@@ -67,6 +75,9 @@ class MobileWorkspaceSyncHttpTest {
             ex.getResponseHeaders().set("Content-Type","application/json");ex.sendResponseHeaders(200,response.length);
             ex.getResponseBody().write(response);ex.close();
         });server.start();
+        Files.writeString(home.resolve("mobile-relay.json"), json.writeValueAsString(Map.of(
+                "deviceId", "fixture-device", "token", "awdt_fixture", "accountFingerprint", "fixture-owner",
+                "serverUrl", "http://127.0.0.1:" + server.getAddress().getPort())));
         client=new MobileRelayClientService(true,true,"http://127.0.0.1:"+server.getAddress().getPort(),"",home.toString(),
                 account,identity,projects,mock(ProjectFileService.class),mock(StorageServiceFactory.class),mock(ProjectAiMessageService.class),mock(DesktopRefHandler.class));
         ReflectionTestUtils.setField(client,"mobileTasks",tasks);ReflectionTestUtils.setField(client,"mobileProfiles",profiles);

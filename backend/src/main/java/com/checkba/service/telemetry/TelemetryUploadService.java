@@ -49,11 +49,22 @@ public class TelemetryUploadService {
     private final ObjectMapper mapper = new ObjectMapper();
     private final String ingestBaseUrl;
     private final HttpTransport transport;
+    private com.checkba.service.site.SiteProfileService siteProfileService;
+    private String startupSite;
 
     /** 可注入的传输层（测试替身用）；生产走 java.net.http */
     public interface HttpTransport {
         /** @return HTTP 状态码；网络异常直接抛 */
         int post(String url, String jsonBody) throws Exception;
+    }
+
+    public TelemetryUploadService(TelemetryDailyRollupRepository rollupRepository,
+                                  TelemetryEventRepository eventRepository,
+                                  TelemetryRollupService rollupService,
+                                  TelemetrySettings settings,
+                                  InstallIdentityService identity,
+                                  @Value("${telemetry.ingest-url:https://www.aiworkdeck.com/api/telemetry}") String ingestBaseUrl) {
+        this(rollupRepository, eventRepository, rollupService, settings, identity, ingestBaseUrl, (HttpTransport) null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -62,8 +73,23 @@ public class TelemetryUploadService {
                                   TelemetryRollupService rollupService,
                                   TelemetrySettings settings,
                                   InstallIdentityService identity,
-                                  @Value("${telemetry.ingest-url:https://www.aiworkdeck.com/api/telemetry}") String ingestBaseUrl) {
-        this(rollupRepository, eventRepository, rollupService, settings, identity, ingestBaseUrl, null);
+                                  @Value("${telemetry.ingest-url:https://www.aiworkdeck.com/api/telemetry}") String ingestBaseUrl,
+                                  com.checkba.service.site.SiteProfileService sites) {
+        this(rollupRepository, eventRepository, rollupService, settings, identity, ingestBaseUrl, null, sites);
+    }
+
+    TelemetryUploadService(TelemetryDailyRollupRepository rollupRepository,
+                           TelemetryEventRepository eventRepository,
+                           TelemetryRollupService rollupService, TelemetrySettings settings,
+                           InstallIdentityService identity, String ingestBaseUrl,
+                           HttpTransport transport, com.checkba.service.site.SiteProfileService sites) {
+        this(rollupRepository, eventRepository, rollupService, settings, identity, ingestBaseUrl, transport);
+        this.siteProfileService = sites;
+        this.startupSite = sites.currentSite();
+    }
+
+    private boolean uploadSiteUnchanged() {
+        return siteProfileService == null || java.util.Objects.equals(startupSite, siteProfileService.currentSite());
     }
 
     TelemetryUploadService(TelemetryDailyRollupRepository rollupRepository,
@@ -116,7 +142,7 @@ public class TelemetryUploadService {
     public void sync() {
         try {
             backfillMissingRollups();
-            if (!settings.rollupEnabled()) return;
+            if (!settings.rollupEnabled() || !uploadSiteUnchanged()) return;
             uploadPendingRollups();
             if (settings.eventsEnabled()) {
                 uploadRecentEvents();
@@ -151,6 +177,7 @@ public class TelemetryUploadService {
                 rollupRepository.findByUploadedFalseAndDateAfter(LocalDate.now().minusDays(30));
         for (TelemetryDailyRollup row : pending) {
             try {
+                if (!uploadSiteUnchanged()) return;
                 int status = transport.post(ingestBaseUrl + "/rollup", row.getPayload());
                 if (status >= 200 && status < 300) {
                     row.setUploaded(true);
@@ -184,6 +211,7 @@ public class TelemetryUploadService {
                 items.add(item);
             }
             Map<String, Object> body = Map.of("installId", identity.installId(), "events", items);
+            if (!uploadSiteUnchanged()) return;
             transport.post(ingestBaseUrl + "/events", mapper.writeValueAsString(body));
         } catch (Exception e) {
             log.debug("事件流上报失败（静默）: {}", e.toString());

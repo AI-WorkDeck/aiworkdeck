@@ -81,7 +81,7 @@ public class MobileRelayClientService {
 
     private final boolean enabled;
     private final boolean localMode;
-    private final String baseUrl;
+    private final String configuredBaseUrl;
     @Autowired(required = false) private ProjectCatalogService projectCatalog;
     @Autowired(required = false) private com.checkba.repository.ProjectRemoteRepository projectRemotes;
     @Autowired(required = false) private com.checkba.repository.CloudConnectionRepository cloudConnections;
@@ -146,7 +146,7 @@ public class MobileRelayClientService {
     /** A catalogue operation never rebinds credentials halfway through an account switch. */
     private HttpResponse<String> catalogExchange(CatalogSession session, String method, String path, String body) {
         requireCatalogAccountScope(session.scope());
-        HttpRequest.Builder builder = request(path).header("X-Session-Id", session.token()).header("Content-Type", "application/json");
+        HttpRequest.Builder builder = request(session.token(), path).header("X-Session-Id", session.token()).header("Content-Type", "application/json");
         builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
         try {
             HttpResponse<String> response = http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
@@ -235,7 +235,7 @@ public class MobileRelayClientService {
         ProjectFile landedFile;
         try {
             requireCatalogAccountScope(scope);
-            HttpRequest request = request(path, Duration.ofMinutes(10)).header("X-Session-Id", session.token()).GET().build();
+            HttpRequest request = request(session.token(), path, Duration.ofMinutes(10)).header("X-Session-Id", session.token()).GET().build();
             HttpResponse<InputStream> response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
             try (InputStream content = response.body()) {
                 if (response.statusCode() != 200 || !response.headers().firstValue("Content-Type").orElse("").startsWith("application/octet-stream")) throw new IOException("Invalid file response");
@@ -366,7 +366,7 @@ public class MobileRelayClientService {
                 byte[] buffer=new byte[65536];
                 for(int index=0;index<MobileVersionObjectService.partCount(ref.size());index++) {
                     requireCatalogAccountScope(session.scope());
-                    HttpRequest request=request(base+"/parts/"+index+query,Duration.ofMinutes(10))
+                    HttpRequest request=request(session.token(), base+"/parts/"+index+query,Duration.ofMinutes(10))
                             .header("X-Session-Id",session.token()).GET().build();
                     HttpResponse<InputStream> response;
                     try {response=http.send(request,HttpResponse.BodyHandlers.ofInputStream());}
@@ -434,7 +434,7 @@ public class MobileRelayClientService {
                             String hash=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
                             requireCatalogAccountScope(session.scope());
                             if(generation!=versionBackupGeneration.get()) throw new java.util.concurrent.CancellationException();
-                            HttpRequest request=request(base+"/parts/"+index+query+"&partSha="+hash,Duration.ofMinutes(10))
+                            HttpRequest request=request(session.token(), base+"/parts/"+index+query+"&partSha="+hash,Duration.ofMinutes(10))
                                     .header("X-Session-Id",session.token()).header("Content-Type","application/octet-stream")
                                     .PUT(HttpRequest.BodyPublishers.ofByteArray(bytes)).build();
                             JsonNode result=versionObjectResponse(http.send(request,HttpResponse.BodyHandlers.ofString()));
@@ -444,7 +444,7 @@ public class MobileRelayClientService {
                         }
                     }
                     requireVersionBackupActive(session,generation);
-                    HttpRequest finish=request(base+"/complete"+query,Duration.ofMinutes(10))
+                    HttpRequest finish=request(session.token(), base+"/complete"+query,Duration.ofMinutes(10))
                             .header("X-Session-Id",session.token()).POST(HttpRequest.BodyPublishers.noBody()).build();
                     JsonNode completed=versionObjectResponse(http.send(finish,HttpResponse.BodyHandlers.ofString()));
                     requireCatalogAccountScope(session.scope());
@@ -531,7 +531,7 @@ public class MobileRelayClientService {
                     requireCatalogAccountScope(session.scope());
                     String boundary = MultipartBody.newBoundary();
                     try (InputStream input = resource.getInputStream()) {
-                        HttpRequest req = request("/api/mobile/backup/files" + query, Duration.ofMinutes(10))
+                        HttpRequest req = request(session.token(), "/api/mobile/backup/files" + query, Duration.ofMinutes(10))
                                 .header("X-Session-Id", session.token())
                                 .header("Content-Type", "multipart/form-data; boundary=" + boundary)
                                 .PUT(MultipartBody.filePublisher(boundary, "file", file.getName(), input)).build();
@@ -565,7 +565,7 @@ public class MobileRelayClientService {
         return projectRemotes.findByProjectId(project.getId()).flatMap(remote ->
                 cloudConnections.findById(remote.getConnectionId()).filter(connection ->
                         project.getUserId().equals(connection.getUserId()) &&
-                        baseUrl.replaceAll("/+$", "").equals(connection.getServerUrl().replaceAll("/+$", "")))
+                        relayBaseUrl(accountService.connectionSnapshot().baseUrl()).equals(connection.getServerUrl().replaceAll("/+$", "")))
                         .map(connection -> parseLongOrNull(remote.getRemoteProjectId()))).orElse(null);
     }
     private final AccountService accountService;
@@ -716,6 +716,7 @@ public class MobileRelayClientService {
         public String deviceId;
         public String token;
         public String accountFingerprint;
+        public String serverUrl;
     }
 
     @Autowired
@@ -735,10 +736,7 @@ public class MobileRelayClientService {
         this.enabled = enabled;
         this.localMode = localMode;
         // 国际站账户连到国际中转，大陆站连大陆中转——跟着账户走，别让尽调影像跨境
-        this.baseUrl = configuredBaseUrl != null && !configuredBaseUrl.isBlank()
-                ? configuredBaseUrl.replaceAll("/+$", "")
-                : (accountBaseUrl != null && accountBaseUrl.contains("workdeck.ai")
-                        ? "https://addin.workdeck.ai" : "https://addin.aiworkdeck.com");
+        this.configuredBaseUrl = configuredBaseUrl == null ? "" : configuredBaseUrl.replaceAll("/+$", "");
         this.accountService = accountService;
         this.localIdentityService = localIdentityService;
         this.projectRepository = projectRepository;
@@ -894,7 +892,7 @@ public class MobileRelayClientService {
     private JsonNode workspaceJson(CatalogSession session, String method, String path, JsonNode body)
             throws IOException, InterruptedException {
         requireCatalogAccountScope(session.scope());
-        HttpRequest.Builder builder = request(path, Duration.ofMinutes(3))
+        HttpRequest.Builder builder = request(session.token(), path, Duration.ofMinutes(3))
                 .header("X-Session-Id", session.token()).header("Content-Type", "application/json");
         builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody()
                 : HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)));
@@ -1102,7 +1100,7 @@ public class MobileRelayClientService {
         if (!already) {
             String token = currentToken();
             if (token == null) { receipt(item, "failed", "connection"); return; }
-            HttpRequest req = request("/api/mobile/inbox/" + itemId + "/content")
+            HttpRequest req = request(token, "/api/mobile/inbox/" + itemId + "/content")
                     .header("X-Session-Id", token).GET().build();
             HttpResponse<InputStream> content = http.send(req, HttpResponse.BodyHandlers.ofInputStream());
             // 拒绝响应也是 HTTP 200（JSON 信封）——不验 Content-Type 就落盘，
@@ -1187,7 +1185,7 @@ public class MobileRelayClientService {
 
         String token = currentToken();
         if (token == null) { receipt(item, "failed", "connection"); return; }
-        HttpRequest req = request("/api/mobile/inbox/" + itemId + "/content")
+        HttpRequest req = request(token, "/api/mobile/inbox/" + itemId + "/content")
                 .header("X-Session-Id", token).GET().build();
         HttpResponse<InputStream> content = http.send(req, HttpResponse.BodyHandlers.ofInputStream());
         String contentType = content.headers().firstValue("Content-Type").orElse("");
@@ -1539,7 +1537,7 @@ public class MobileRelayClientService {
         String token = currentToken();
         if (token == null) return;
         String boundary = MultipartBody.newBoundary();
-        HttpRequest req = request("/api/mobile/transfer/" + id + "/upload", Duration.ofMinutes(10))
+        HttpRequest req = request(token, "/api/mobile/transfer/" + id + "/upload", Duration.ofMinutes(10))
                 .header("X-Session-Id", token)
                 .header("Content-Type", "multipart/form-data; boundary=" + boundary)
                 .POST(MultipartBody.filePublisher(boundary, "file", fileName, fileStream))
@@ -1573,7 +1571,7 @@ public class MobileRelayClientService {
         if (token == null) return;
         HttpResponse<InputStream> content;
         try {
-            HttpRequest req = request("/api/mobile/transfer/" + id + "/content", Duration.ofMinutes(10))
+            HttpRequest req = request(token, "/api/mobile/transfer/" + id + "/content", Duration.ofMinutes(10))
                     .header("X-Session-Id", token).GET().build();
             content = http.send(req, HttpResponse.BodyHandlers.ofInputStream());
         } catch (IOException e) {
@@ -1816,7 +1814,7 @@ public class MobileRelayClientService {
         if (token == null) return Doorbell.FAILED;
         String boundFingerprint = accountService.accountFingerprintOrNull();
         HttpRequest req = HttpRequest.newBuilder(
-                        URI.create(baseUrl + "/api/mobile/desktop/stream?deviceId=" + deviceId()))
+                        URI.create(tokenBaseUrl(token) + "/api/mobile/desktop/stream?deviceId=" + deviceId()))
                 .header("X-Session-Id", token)
                 .header("Accept", "text/event-stream")
                 .GET().build();
@@ -2081,7 +2079,7 @@ public class MobileRelayClientService {
 
     private HttpResponse<String> send(String method, String path, String jsonBody, String token)
             throws IOException, InterruptedException {
-        HttpRequest.Builder b = request(path);
+        HttpRequest.Builder b = request(token, path);
         b.header("X-Session-Id", token);
         if (jsonBody != null) {
             b.header("Content-Type", "application/json");
@@ -2092,24 +2090,44 @@ public class MobileRelayClientService {
         return http.send(b.build(), HttpResponse.BodyHandlers.ofString());
     }
 
-    private HttpRequest.Builder request(String path) {
-        return request(path, Duration.ofSeconds(60));
+    private HttpRequest.Builder request(String token, String path) {
+        return request(token, path, Duration.ofSeconds(60));
     }
 
     /** 自定义超时的重载：PULL 上传 / PUSH 内容下载最大 200MB，60 秒默认超时不够用。 */
-    private HttpRequest.Builder request(String path, Duration timeout) {
-        return HttpRequest.newBuilder(URI.create(baseUrl + path)).timeout(timeout);
+    private HttpRequest.Builder request(String token, String path, Duration timeout) {
+        return HttpRequest.newBuilder(URI.create(tokenBaseUrl(token) + path)).timeout(timeout);
+    }
+
+    private String relayBaseUrl(String accountBaseUrl) {
+        if (!configuredBaseUrl.isBlank()) return configuredBaseUrl;
+        return com.checkba.version.OfficialCloudEndpoint.isInternationalSite(accountBaseUrl)
+                ? "https://addin.workdeck.ai" : "https://addin.aiworkdeck.com";
+    }
+
+    private String tokenBaseUrl(String token) {
+        synchronized (stateLock) {
+            RelayState state = loadState();
+            AccountService.ConnectionSnapshot connection = accountService.connectionSnapshot();
+            if (!Objects.equals(token, state.token) || token == null
+                    || !Objects.equals(connection.fingerprint(), state.accountFingerprint)
+                    || !Objects.equals(relayBaseUrl(connection.baseUrl()), state.serverUrl))
+                throw new IllegalStateException(LangText.of("账户已变化，请重试", "Account changed; please try again"));
+            return state.serverUrl;
+        }
     }
 
     /** 取当前令牌；没有或账户已换人则（重新）桥接。 */
     private String currentToken() {
         synchronized (stateLock) {
             RelayState s = loadState();
-            String fingerprint = accountService.accountFingerprintOrNull();
-            if (s.token != null && fingerprint != null && fingerprint.equals(s.accountFingerprint)) {
+            AccountService.ConnectionSnapshot connection = accountService.connectionSnapshot();
+            String fingerprint = connection.fingerprint();
+            String baseUrl = relayBaseUrl(connection.baseUrl());
+            if (baseUrl.equals(s.serverUrl) && s.token != null && fingerprint != null && fingerprint.equals(s.accountFingerprint)) {
                 return s.token;
             }
-            return bridgeLocked(s, fingerprint);
+            return bridgeLocked(s, connection, baseUrl);
         }
     }
 
@@ -2122,8 +2140,9 @@ public class MobileRelayClientService {
         }
     }
 
-    private String bridgeLocked(RelayState s, String fingerprint) {
-        String key = accountService.currentKeyOrNull();
+    private String bridgeLocked(RelayState s, AccountService.ConnectionSnapshot connection, String baseUrl) {
+        String key = connection.key();
+        String fingerprint = connection.fingerprint();
         if (key == null) return null;
         try {
             ObjectNode body = mapper.createObjectNode();
@@ -2136,11 +2155,15 @@ public class MobileRelayClientService {
             HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
             JsonNode json = mapper.readTree(resp.body());
             if (resp.statusCode() >= 200 && resp.statusCode() < 300 && json.path("code").asInt(-1) == 0) {
+                synchronized (accountService) {
+                if (!accountService.isCurrentConnection(connection)) return null;
+                s.serverUrl = baseUrl;
                 s.token = json.path("data").path("token").asText(null);
                 s.accountFingerprint = fingerprint;
                 saveState(s);
                 log.info("手机同步：已桥接到 {}", baseUrl);
                 return s.token;
+                }
             }
             log.warn("手机同步：桥接失败 status={} message={}", resp.statusCode(),
                     json.path("message").asText(""));

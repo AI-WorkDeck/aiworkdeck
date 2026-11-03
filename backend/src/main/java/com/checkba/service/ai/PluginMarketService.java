@@ -137,12 +137,19 @@ public class PluginMarketService {
         private boolean purchased;
     }
 
+    private String currentRegistryUrl() {
+        String resolved = purchaseGate.registryUrl(registryUrl, "plugins");
+        return resolved == null ? registryUrl : resolved;
+    }
+
     /**
      * 拉取在线插件列表并标注安装 / 已购状态。
      * @throws IllegalStateException 注册表不可达或返回无法解析（调用方转 {code:1}，不阻断本地功能）
      */
     public List<MarketPluginView> listMarket() {
-        String body = httpGet(registryUrl);
+        var connection = purchaseGate.connectionSnapshot();
+        String body = httpGet(currentRegistryUrl());
+        purchaseGate.assertConnection(connection);
         List<MarketPluginView> list;
         try {
             list = JSONUtil.toList(JSONUtil.parseArray(body), MarketPluginView.class);
@@ -174,6 +181,7 @@ public class PluginMarketService {
                         view.setUpdatable(compareSemver(view.getVersion(), local.getVersion()) > 0);
                     });
         }
+        purchaseGate.assertConnection(connection);
         return list;
     }
 
@@ -193,6 +201,9 @@ public class PluginMarketService {
      * @throws IllegalStateException 未配置公钥 / 注册表不可达 / 付费项未连接账户或未购买 / 验签失败 / 哈希不匹配 / 落盘失败
      */
     public synchronized String install(String id) {
+        var connection = purchaseGate.connectionSnapshot();
+        String registryUrl = currentRegistryUrl();
+        purchaseGate.assertConnection(connection);
         requireValidId(id);
         if (PluginService.isRetired(id)) {
             throw new IllegalStateException(LangText.of("该插件已下架，无法安装", "This plugin has been retired and cannot be installed"));
@@ -211,10 +222,14 @@ public class PluginMarketService {
         String bearer = listing == null
                 ? purchaseGate.bearerForUnknownPrice()
                 : purchaseGate.bearerFor(priceCents, itemName);
+        purchaseGate.assertConnection(connection);
+        if (bearer != null && connection != null) bearer = connection.key();
 
         JSONObject bundle;
         try {
-            bundle = JSONUtil.parseObj(readText(registryUrl + "/" + id + "/bundle", bearer, itemName, priceCents));
+            String response = readText(registryUrl + "/" + id + "/bundle", bearer, itemName, priceCents);
+            purchaseGate.assertConnection(connection);
+            bundle = JSONUtil.parseObj(response);
         } catch (IllegalStateException | com.checkba.service.account.AccountException e) {
             // AccountException：付费项未连账户（402 降级路径），原样上抛成 4011，别裹成「清单无法解析」
             throw e;
@@ -257,6 +272,7 @@ public class PluginMarketService {
                 if (!isSafeRelPath(relPath)) {
                     throw new IllegalStateException(LangText.of("清单包含非法路径: ", "Manifest contains an invalid path: ") + relPath);
                 }
+                purchaseGate.assertConnection(connection);
                 byte[] data = readBinary(registryUrl + "/" + id + "/file?path=" + urlEncode(relPath),
                         bearer, itemName, priceCents);
                 String actual = sha256Hex(data);
@@ -281,6 +297,7 @@ public class PluginMarketService {
             // minHostVersion 闸（规范 v2.7 P0）：staging 落齐后、上位前校验——宁可装不上，不可装成半残
             checkMinHostVersion(staging);
 
+            purchaseGate.assertConnection(connection);
             replaceInstalledPlugin(staging, id, version);
         } catch (RuntimeException e) {
             FileUtil.del(staging.toFile());
@@ -426,7 +443,8 @@ public class PluginMarketService {
      * @throws IllegalStateException 注册表不可达（调用方应容忍，不影响本地功能）
      */
     public List<RevokedPlugin> fetchRevoked() {
-        String body = httpGet(registryUrl + "/revoked");
+        var connection = purchaseGate.connectionSnapshot();
+        String body = httpGet(currentRegistryUrl() + "/revoked");
         List<RevokedPlugin> result = new ArrayList<>();
         try {
             for (Object o : JSONUtil.parseArray(body)) {
@@ -437,6 +455,7 @@ public class PluginMarketService {
         } catch (Exception e) {
             throw new IllegalStateException(LangText.of("封禁列表无法解析: ", "Failed to parse the revocation list: ") + e.getMessage());
         }
+        purchaseGate.assertConnection(connection);
         return result;
     }
 

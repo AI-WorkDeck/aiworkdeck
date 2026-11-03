@@ -151,6 +151,13 @@ class MobileRelayClientDoorbellTest {
         baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
 
         accountService = mock(AccountService.class);
+        when(accountService.connectionSnapshot()).thenAnswer(i -> new AccountService.ConnectionSnapshot(
+                "https://www.aiworkdeck.com", accountService.currentKeyOrNull(), accountService.accountFingerprintOrNull(), accountService.connectionVersion()));
+        when(accountService.isCurrentConnection(any())).thenAnswer(i -> {
+            AccountService.ConnectionSnapshot snapshot = i.getArgument(0);
+            return java.util.Objects.equals(snapshot.key(), accountService.currentKeyOrNull())
+                    && java.util.Objects.equals(snapshot.fingerprint(), accountService.accountFingerprintOrNull());
+        });
         when(accountService.currentKeyOrNull()).thenReturn("awdk_key_1");
         when(accountService.accountFingerprintOrNull()).thenReturn("fp-1");
 
