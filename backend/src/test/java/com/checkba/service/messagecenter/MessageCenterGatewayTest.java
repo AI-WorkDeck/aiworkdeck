@@ -51,6 +51,32 @@ class MessageCenterGatewayTest {
         assertEquals("unavailable",result.get("cloudStatus"));assertEquals(1,((List<?>)result.get("conversations")).size());
         assertEquals(3L,MessageCenterGateway.map(result.get("counts")).get("unreadMessages"));
     }
+    @Test void bridgeFailureKeepsLocalMessagesAndPartialCountsWithoutLeakingTechnicalDetails() {
+        when(cloud.connectOfficial(7L)).thenThrow(new IllegalStateException("HTTP 503 internal bridge details"));
+        when(dd.conversations(7L)).thenReturn(List.of(Map.of("id","customer-chat","unreadCount",3)));
+        var gateway=new MessageCenterGateway(true,service,im,cloud,account,sources,handlers,mapper,remotes,members);
+        var result=MessageCenterGateway.map(gateway.execute(7L,"list",Map.of(),null));
+        assertEquals("unavailable",result.get("cloudStatus"));
+        assertEquals("customer-chat",MessageCenterGateway.map(((List<?>)result.get("conversations")).get(0)).get("id"));
+        assertFalse(result.get("cloudError").toString().contains("internal bridge details"));
+        var counts=MessageCenterGateway.map(gateway.execute(7L,"counts",Map.of(),null));
+        assertEquals(true,counts.get("partial"));assertEquals(3L,counts.get("unreadMessages"));
+    }
+    @Test void unavailableSiteKeepsExplicitUserFacingReason() {
+        when(cloud.connectOfficial(7L)).thenThrow(com.checkba.version.VersionException.userFacing("No official library on this site"));
+        var gateway=new MessageCenterGateway(true,service,im,cloud,account,sources,handlers,mapper,remotes,members);
+        var result=MessageCenterGateway.map(gateway.execute(7L,"list",Map.of(),null));
+        assertEquals("unavailable",result.get("cloudStatus"));
+        assertEquals("No official library on this site",result.get("cloudError"));
+    }
+    @Test void bridgeFailureAfterAccountSwitchCannotReturnOldMailbox() {
+        when(cloud.connectOfficial(7L)).thenAnswer(i->{
+            when(account.accountFingerprintOrNull()).thenReturn("scope-b");
+            throw new IllegalStateException("HTTP 503");
+        });
+        var gateway=new MessageCenterGateway(true,service,im,cloud,account,sources,handlers,mapper,remotes,members);
+        assertThrows(IllegalArgumentException.class,()->gateway.execute(7L,"list",Map.of(),null));
+    }
     @Test void customerMessagesUseSavedConnectionAndNeverOfficialIdentity() {
         when(account.accountFingerprintOrNull()).thenReturn(null);
         when(dd.im(7L,"self",Map.of("connectionId","saved"))).thenReturn(Map.of("id",22L));
