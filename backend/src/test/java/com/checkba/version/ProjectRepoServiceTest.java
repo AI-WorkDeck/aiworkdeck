@@ -77,6 +77,78 @@ class ProjectRepoServiceTest {
         }
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"single", "three-way", "resolution"})
+    void sessionMergeDoesNotRestageUnchangedFilteredBlob(String mode, @TempDir Path root) throws Exception {
+        StorageProperties props = new StorageProperties();
+        props.getLocal().setRootPath(root.toString());
+        var stagedLarge = new java.util.concurrent.atomic.AtomicInteger();
+        var storage = new com.checkba.storage.ProjectStorageResolver(props, null);
+        var objects = new com.checkba.version.objects.LocalVersionObjectStore(storage) {
+            @Override public ObjectRef put(long projectId, java.io.InputStream source) throws java.io.IOException {
+                ObjectRef result = super.put(projectId, source);
+                if (result.size() > 1024 * 1024 && StackWalker.getInstance().walk(frames ->
+                        frames.anyMatch(f -> f.getClassName().equals("org.eclipse.jgit.api.AddCommand")))) {
+                    stagedLarge.incrementAndGet();
+                }
+                return result;
+            }
+        };
+        ProjectRepoService service = new ProjectRepoService(storage) {
+            @Override public Repository open(long projectId) {
+                Repository repo = super.open(projectId);
+                try {
+                    com.checkba.version.objects.VersionObjectFilters.install(repo, objects, projectId, 1024 * 1024);
+                } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
+                return repo;
+            }
+        };
+        Path work = root.resolve("projects/7");
+        Files.createDirectories(work);
+        byte[] original = new byte[2 * 1024 * 1024];
+        new java.util.Random(7).nextBytes(original);
+        Files.write(work.resolve("large.dat"), original);
+        Files.writeString(work.resolve("note.md"), "before");
+        Files.writeString(work.resolve("remove.txt"), "remove");
+        service.init(7, "Tester", "tester@example.test");
+        service.createBranch(7, "work/large", "HEAD");
+        if (!mode.equals("single")) {
+            Files.writeString(work.resolve("main.txt"), "main change");
+            service.commitAll(7, "main", "auto", null, "Tester", "tester@example.test");
+        }
+        service.checkoutBranch(7, "work/large");
+        Files.writeString(work.resolve("note.md"), "after");
+        Files.delete(work.resolve("remove.txt"));
+        Files.writeString(work.resolve("new.txt"), "new");
+        String commit = service.commitAll(7, "save", "auto", null, "Tester", "tester@example.test");
+        service.checkoutBranch(7, service.mainBranch());
+        stagedLarge.set(0);
+        var outcome = mode.equals("resolution")
+                ? service.mergeNoCommit(7, "work/large", "Session", "Tester", "tester@example.test")
+                : service.merge(7, "work/large", "Session", "Tester", "tester@example.test");
+        assertTrue(outcome.success());
+        if (mode.equals("resolution")) Files.writeString(work.resolve("note.md"), "resolved");
+        commit = mode.equals("resolution")
+                ? service.commitMergeResolution(7, "Session", java.util.Map.of(), "Tester", "tester@example.test")
+                : outcome.mergeSha();
+        assertNotNull(commit);
+        var entry = service.log(7, "HEAD", 1).get(0);
+        assertEquals(2, entry.parents().size());
+        assertEquals("session", entry.kind());
+        assertEquals("Tester", entry.authorName());
+        assertEquals(0, stagedLarge.get(), "Unchanged filtered blobs must not be read by AddCommand");
+        assertArrayEquals(original, service.readBlobAtCommit(7, commit, "large.dat"));
+        assertEquals(mode.equals("resolution") ? "resolved" : "after", new String(service.readBlobAtCommit(7, commit, "note.md")));
+        assertEquals("new", new String(service.readBlobAtCommit(7, commit, "new.txt")));
+        assertFalse(Files.exists(work.resolve("remove.txt")));
+        try (Repository repo = service.open(7); var walk = new org.eclipse.jgit.revwalk.RevWalk(repo)) {
+            var tree = walk.parseCommit(repo.resolve(commit)).getTree();
+            assertNull(org.eclipse.jgit.treewalk.TreeWalk.forPath(repo, "remove.txt", tree));
+        }
+        if (!mode.equals("single")) assertEquals("main change", new String(service.readBlobAtCommit(7, commit, "main.txt")));
+        assertTrue(service.pendingChanges(7).isEmpty());
+    }
+
     @Test
     void incrementalStageHandlesFileDirectoryReplacementAndStagedEdits(@TempDir Path root) throws Exception {
         ProjectRepoService service = svc(root);
