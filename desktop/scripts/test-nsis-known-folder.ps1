@@ -33,7 +33,15 @@ if (-not $IsWindows -or $env:GITHUB_ACTIONS -ne 'true' -or -not $env:RUNNER_TEMP
     throw 'Run the deliberate crash fixture only in a disposable Windows Actions runner.'
 }
 if (-not $MakensisPath) {
-    $MakensisPath = Join-Path $env:LOCALAPPDATA 'electron-builder\Cache\nsis\nsis-3.0.4.1\Bin\makensis.exe'
+    $cacheRoot = Join-Path $env:LOCALAPPDATA 'electron-builder\Cache'
+    $candidate = Get-ChildItem -Path $cacheRoot -Recurse -Filter 'makensis.cmd' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $candidate) {
+        $candidate = Get-ChildItem -Path $cacheRoot -Recurse -Filter 'makensis.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+    }
+    if (-not $candidate) {
+        throw "Could not find makensis.cmd or makensis.exe under $cacheRoot"
+    }
+    $MakensisPath = $candidate.FullName
 }
 $makensis = (Resolve-Path -LiteralPath $MakensisPath).Path
 $template = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot '../node_modules/app-builder-lib/templates/nsis/multiUser.nsh')

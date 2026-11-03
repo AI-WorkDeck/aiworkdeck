@@ -35,12 +35,18 @@ public class LocalVersionObjectStore {
 
     public Path path(long projectId, String sha256) {
         new ObjectRef(sha256, 0);
-        return projectRoot(projectId).resolve("sha256").resolve(sha256.substring(0, 2)).resolve(sha256);
+        Path root = projectRoot(projectId);
+        Path resolved = root.resolve("sha256").resolve(sha256.substring(0, 2)).resolve(sha256).normalize();
+        if (!resolved.startsWith(root)) throw new IllegalArgumentException("Invalid version object path");
+        return resolved;
     }
 
     public Path projectRoot(long projectId) {
         if (projectId < 0) throw new IllegalArgumentException("Invalid project id");
-        return storage.globalRoot().resolve("version-objects").resolve("project-" + projectId);
+        Path base = storage.globalRoot().toAbsolutePath().normalize();
+        Path root = base.resolve("version-objects").resolve("project-" + projectId).normalize();
+        if (!root.startsWith(base)) throw new IllegalArgumentException("Invalid project id");
+        return root;
     }
 
     public InputStream open(long projectId, String sha256) throws IOException {

@@ -57,7 +57,7 @@ function makeVm({ desktop = true, diskPaths = {}, trashFailOn = [] } = {}) {
     collapseToTopmostSelected: (ids) => ({ roots: ids, coveredBy: new Map() }),
     ICONS: {},
   }
-  const body = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const body = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/^import\s[\s\S]*?from\s+['"][^'"]+['"]\s*$/gm, '')
     .replace(/export default \{/, 'return {')
   const options = new Function(...IMPORT_NAMES, body)(...IMPORT_NAMES.map(n => (n in stubs ? stubs[n] : (() => {}))))

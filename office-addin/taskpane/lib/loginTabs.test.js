@@ -145,8 +145,20 @@ test('SettingsView：口令入口常驻，不随站点隐藏', () => {
  * 统计 index 处还有几层未闭合的 `<template>`：SFC 根是 1 层，落进某个 v-if 分支就是 2 层。
  * 注释先抹掉（保留换行），免得注释里提到的标签把计数带偏。
  */
+function stripHtmlComments(s) {
+  let out = s
+  let start = out.indexOf('<!--')
+  while (start !== -1) {
+    const end = out.indexOf('-->', start + 4)
+    if (end === -1) return out.slice(0, start)
+    out = out.slice(0, start) + out.slice(end + 3)
+    start = out.indexOf('<!--')
+  }
+  return out
+}
+
 function branchDepthAt(template, index) {
-  const head = template.slice(0, index).replace(/<!--[\s\S]*?-->/g, '')
+  const head = stripHtmlComments(template.slice(0, index))
   const opens = (head.match(/<template[\s>]/g) || []).length
   const closes = (head.match(/<\/template>/g) || []).length
   return opens - closes

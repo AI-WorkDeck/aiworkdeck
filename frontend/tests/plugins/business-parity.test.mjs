@@ -15,7 +15,7 @@ function method(sfc, name, dependencies = {}) {
 }
 const panelSource = source('../../plugin-app/pages/panel.vue')
 function panel(services) {
-  const body = panelSource.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'return')
+  const body = panelSource.slice(panelSource.indexOf('<script>') + 8, panelSource.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'return')
   return new Function('window', 'BusinessPanel', body)({ awd: { services } }, {}).methods
 }
 

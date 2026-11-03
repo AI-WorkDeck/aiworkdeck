@@ -191,21 +191,30 @@ def _save_material_file(file, target_project_id: Optional[str]):
     if file_ext not in ALLOWED_MATERIAL_EXTENSIONS:
         return None, bad_request(f"Unsupported file type. Allowed: {', '.join(sorted(ALLOWED_MATERIAL_EXTENSIONS))}")
 
+    import os
     file_service = FileService(current_app.config['UPLOAD_FOLDER'])
+    base_upload_dir = os.path.realpath(str(file_service.upload_folder))
     if target_project_id:
-        materials_dir = file_service.upload_folder / file_service._get_materials_dir(target_project_id)
+        safe_project_id = secure_filename(str(target_project_id))
+        if not safe_project_id:
+            return None, bad_request("Invalid project_id")
+        materials_dir_str = os.path.realpath(os.path.join(base_upload_dir, safe_project_id, "materials"))
     else:
-        materials_dir = file_service.upload_folder / "materials"
-    materials_dir.mkdir(exist_ok=True, parents=True)
+        materials_dir_str = os.path.realpath(os.path.join(base_upload_dir, "materials"))
+    if not materials_dir_str.startswith(base_upload_dir + os.sep):
+        return None, bad_request("Invalid materials directory")
+    os.makedirs(materials_dir_str, exist_ok=True)
 
     timestamp = int(time.time() * 1000)
     base_name = Path(filename).stem
-    unique_filename = f"{base_name}_{timestamp}{file_ext}"
+    unique_filename = secure_filename(f"{base_name}_{timestamp}{file_ext}")
 
-    filepath = materials_dir / unique_filename
-    file.save(str(filepath))
+    filepath_str = os.path.realpath(os.path.join(materials_dir_str, unique_filename))
+    if not filepath_str.startswith(materials_dir_str + os.sep):
+        return None, bad_request("Invalid material file path")
+    file.save(filepath_str)
 
-    relative_path = str(filepath.relative_to(file_service.upload_folder))
+    relative_path = str(Path(filepath_str).relative_to(file_service.upload_folder))
     if target_project_id:
         image_url = file_service.get_file_url(target_project_id, 'materials', unique_filename)
     else:

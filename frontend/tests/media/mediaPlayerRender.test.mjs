@@ -15,6 +15,16 @@ const MediaControls = await loadSfc('components/media/MediaControls.vue')
 const MediaTranscript = await loadSfc('components/media/MediaTranscript.vue')
 const MediaPlayer = await loadSfc('components/media/MediaPlayer.vue')
 
+function stripHtmlComments(str) {
+  let out = str, i = out.indexOf('<!--')
+  while (i !== -1) {
+    const j = out.indexOf('-->', i + 4)
+    out = j === -1 ? out.slice(0, i) : out.slice(0, i) + out.slice(j + 3)
+    i = out.indexOf('<!--')
+  }
+  return out
+}
+
 async function render(component, props, dataOverrides) {
   // extends 不继承 ssrRender，要显式带上；data 由 Vue 的 mergeDataFn 与组件自己的合并（覆盖同名项）
   const comp = dataOverrides ? { extends: component, ssrRender: component.ssrRender, data: () => dataOverrides } : component
@@ -23,7 +33,7 @@ async function render(component, props, dataOverrides) {
   app.config.warnHandler = () => {}
   const html = await renderToString(app)
   // 模板里的中文注释会原样进 HTML：断言标签与属性前先剥掉，免得匹配到注释上（假绿）
-  return html.replace(/<!--[\s\S]*?-->/g, '').replace(/&quot;/g, '"')
+  return stripHtmlComments(html).replace(/&quot;/g, '"')
 }
 
 // SSR 把静态 class 与 :class 合并时顺序不固定（动态在前），按「含有这个类」找标签
@@ -192,7 +202,7 @@ test('逐字稿：暂停跟随时出现「回到当前」；单人无图例；�
 // ── MediaPlayer ─────────────────────────────────────────────────────────────
 
 test('模板里没有 <video>/<audio> 标签、没有 controls 属性（媒体元素一律命令式创建）', () => {
-  const tpl = readSfcTemplate('components/media/MediaPlayer.vue').replace(/<!--[\s\S]*?-->/g, '')
+  const tpl = stripHtmlComments(readSfcTemplate('components/media/MediaPlayer.vue'))
   assert.doesNotMatch(tpl, /<video\b/i)
   assert.doesNotMatch(tpl, /<audio\b/i)
   assert.doesNotMatch(tpl, /\scontrols[\s=>]/)

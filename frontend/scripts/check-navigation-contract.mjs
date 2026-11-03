@@ -87,7 +87,7 @@ const extractMethodBody = (src, marker) => {
 // `@tap="name(x)"` 这类调用点。extractMethodBody 从第一次出现处开始找，模板里带括号的调用
 // 会让它配错大括号；组件的模板里调用方法越来越多带参数，新断言一律用这个。
 const extractDefinition = (src, name) => {
-  const re = new RegExp('^[ \\t]*(?:async[ \\t]+)?' + name.replace(/[$]/g, '\\$') + '[ \\t]*\\([^)]*\\)[ \\t]*\\{', 'm')
+  const re = new RegExp('^[ \\t]*(?:async[ \\t]+)?' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[ \\t]*\\([^)]*\\)[ \\t]*\\{', 'm')
   const m = re.exec(src)
   if (!m) return null
   return extractMethodBody(src.slice(m.index), m[0].trim())

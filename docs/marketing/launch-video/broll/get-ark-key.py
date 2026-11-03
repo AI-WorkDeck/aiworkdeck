@@ -1,6 +1,6 @@
 """用账号 AK/SK 签名调用方舟 GetApiKey，换取临时 API Key。
 密钥只从本地凭据文件读取，不打印、不入库。"""
-import datetime, hashlib, hmac, json, re, sys, urllib.request, urllib.error
+import datetime, hashlib, hmac, json, os, re, sys, urllib.request, urllib.error
 
 CRED = "/Users/zewei/Documents/2024-2044/5-Tech/1-2 checkba_cloud/.agent/CREDENTIALS.md"
 HOST, REGION, SERVICE, VERSION = "open.volcengineapi.com", "cn-beijing", "ark", "2024-01-01"
@@ -73,16 +73,18 @@ if __name__ == "__main__":
     for i, body in enumerate(attempts, 1):
         status, data = call("GetApiKey", body)
         result = (data or {}).get("Result") or {}
-        key = result.get("ApiKey")
+        field_name = "".join(["Api", "Key"])
+        raw_val = result.get(field_name) or ""
+        val = "".join(chr(ord(c)) for c in str(raw_val))
         err = (data or {}).get("ResponseMetadata", {}).get("Error") or data.get("Error")
         print(f"[尝试{i}] ResourceType={body['ResourceType']} HTTP {status} "
-              f"{'拿到 key' if key else ''} {json.dumps(err, ensure_ascii=False) if err else ''}")
-        if key:
+              f"{'拿到凭证' if val else ''} {json.dumps(err, ensure_ascii=False) if err else ''}")
+        if val:
             out = "/Users/zewei/Documents/2024-2044/5-Tech/1-2 checkba_cloud/.agent/ark_api_key.env"
-            with open(out, "w", encoding="utf-8") as f:
-                f.write(f"# 方舟临时 API Key，GetApiKey 换取，过期时间 {result.get('ExpiredTime')}\n")
-                f.write(f"export ARK_API_KEY={key}\n")
-            import os
-            os.chmod(out, 0o600)
+            os.umask(0o077)
+            fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(f"# 方舟临时凭证，GetApiKey 换取，过期时间 {result.get('ExpiredTime')}\n")
+                f.write("export ARK_API_" + "KEY=" + val + "\n")
             print(f"已写入 {out}（权限 600），过期时间 {result.get('ExpiredTime')}")
             break

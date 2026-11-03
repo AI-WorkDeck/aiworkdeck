@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 
 // 执行组件本身的方法，设备清单与接口用替身，避免真实麦克风和云端扣费。
 const source = readFileSync(new URL('../../src/components/MeetingRecordingPanel.vue', import.meta.url), 'utf8')
-const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
   .replace(/^import[\s\S]*?from ['"][^'"]+['"]\s*$/gm, '')
   .replace('export default', 'return')
 function panel() {

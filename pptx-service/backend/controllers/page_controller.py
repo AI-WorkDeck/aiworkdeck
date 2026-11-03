@@ -757,12 +757,20 @@ def regenerate_renovation_page(project_id, page_id):
         keep_layout = data.get('keep_layout', False)
 
         # Find the split PDF for this page
-        project_dir = Path(current_app.config['UPLOAD_FOLDER']) / project_id
-        split_dir = project_dir / "split_pages"
-        page_pdf_path = split_dir / f"page_{page.order_index + 1}.pdf"
-
-        if not page_pdf_path.exists():
+        import os
+        from werkzeug.utils import secure_filename
+        safe_project_id = secure_filename(str(project_id))
+        if not safe_project_id:
+            return bad_request("Invalid project_id")
+        base_upload_dir = os.path.realpath(os.path.abspath(current_app.config['UPLOAD_FOLDER']))
+        split_dir_str = os.path.realpath(os.path.join(base_upload_dir, safe_project_id, "split_pages"))
+        if not split_dir_str.startswith(base_upload_dir + os.sep):
+            return bad_request("Invalid project directory")
+        page_filename = secure_filename(f"page_{int(page.order_index) + 1}.pdf")
+        page_pdf_path_str = os.path.realpath(os.path.join(split_dir_str, page_filename))
+        if not page_pdf_path_str.startswith(split_dir_str + os.sep) or not os.path.exists(page_pdf_path_str):
             return bad_request(f"Split PDF not found for page {page.order_index + 1}")
+        page_pdf_path = Path(page_pdf_path_str)
 
         # Initialize services
         ai_service = get_ai_service()

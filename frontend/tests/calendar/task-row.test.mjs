@@ -55,8 +55,13 @@ async function render(props) {
   const realWarn = console.warn
   console.warn = () => {}
   try {
-    const html = await renderToString(app)
-    return html.replace(/&quot;/g, '"').replace(/<!--[\s\S]*?-->/g, '')
+    let html = (await renderToString(app)).replace(/&quot;/g, '"'), i = html.indexOf('<!--')
+    while (i !== -1) {
+      const j = html.indexOf('-->', i + 4)
+      html = j === -1 ? html.slice(0, i) : html.slice(0, i) + html.slice(j + 3)
+      i = html.indexOf('<!--')
+    }
+    return html
   } finally {
     console.warn = realWarn
   }

@@ -36,7 +36,7 @@ function makeEnv() {
 }
 
 function makeVm(env) {
-  const script = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
   // eslint-disable-next-line no-new-func
   const component = new Function('getVersionChanges', 'createVersionActions', 'window', 'document', 'uni',

@@ -9,7 +9,7 @@ import * as grouping from '../../src/utils/inlineReviewGrouping.js'
 const SRC = readFileSync(new URL('../../src/components/InlineReviewPanel.vue', import.meta.url), 'utf8')
 
 export function makeInlineReviewComponent() {
-  const script = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
   const names = Object.keys(grouping)
   // eslint-disable-next-line no-new-func

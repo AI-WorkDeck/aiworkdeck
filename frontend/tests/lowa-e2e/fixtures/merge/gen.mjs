@@ -84,7 +84,7 @@ function zipBytes(entries) {
 // ---------- OOXML 片段 ----------
 const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 function esc(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
 function run(text, { bold = false } = {}) {
   const rPr = bold ? '<w:rPr><w:b/></w:rPr>' : ''

@@ -21,8 +21,17 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const read = (rel) => readFileSync(new URL('../../src/' + rel, import.meta.url), 'utf8')
+const cutBetween = (str, open, close) => {
+  let out = str, i = out.indexOf(open)
+  while (i !== -1) {
+    const j = out.indexOf(close, i + open.length)
+    out = j === -1 ? out.slice(0, i) : out.slice(0, i) + out.slice(j + close.length)
+    i = out.indexOf(open)
+  }
+  return out
+}
 const stripComments = (s) =>
-  s.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  cutBetween(cutBetween(s, '<!--', '-->'), '/*', '*/').replace(/^\s*\/\/.*$/gm, '')
 
 // agentClientActions.js 带 @/ 别名 import（services/api.js、utils/asyncSerialize.js），
 // 本仓 node:test 用例的一贯限制是这类文件 import 不进来（见 audit-b2-source-assertions

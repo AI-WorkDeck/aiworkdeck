@@ -10,7 +10,7 @@ const deferred = () => { let resolve; const promise = new Promise(r => { resolve
 function harness(kind = 'calc', handler = () => {}) {
   const revoked = [], calls = [], events = []
   let url = 0
-  const component = new Function('URL', source.match(/<script>([\s\S]*?)<\/script>/)[1].replace('export default', 'return'))({
+  const component = new Function('URL', source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace('export default', 'return'))({
     createObjectURL: () => 'blob:' + ++url, revokeObjectURL: value => revoked.push(value),
   })
   const vm = { ...component.data(), kind, active: true, _generation: 0, _readSeq: 0, _rendered: {}, _disposed: false,

@@ -68,38 +68,61 @@ class FileService:
     
     def __init__(self, upload_folder: str):
         """Initialize file service"""
-        self.upload_folder = Path(upload_folder)
+        self.upload_folder = Path(os.path.realpath(os.path.abspath(upload_folder)))
         self.upload_folder.mkdir(exist_ok=True, parents=True)
+
+    def _resolve_within_upload(self, *parts: str) -> str:
+        """Resolve path components and ensure containment within upload_folder."""
+        base_dir = os.path.realpath(str(self.upload_folder))
+        resolved = os.path.realpath(os.path.join(base_dir, *parts))
+        if not resolved.startswith(base_dir + os.sep):
+            raise ValueError("Path escapes upload folder")
+        return resolved
     
     def _get_project_dir(self, project_id: str) -> Path:
         """Get project directory"""
-        project_dir = self.upload_folder / project_id
-        project_dir.mkdir(exist_ok=True, parents=True)
-        return project_dir
+        safe_project_id = secure_filename(str(project_id))
+        if not safe_project_id:
+            raise ValueError("Invalid project_id")
+        project_dir_str = self._resolve_within_upload(safe_project_id)
+        os.makedirs(project_dir_str, exist_ok=True)
+        return Path(project_dir_str)
     
     def _get_template_dir(self, project_id: str) -> Path:
         """Get template directory for project"""
-        template_dir = self._get_project_dir(project_id) / "template"
-        template_dir.mkdir(exist_ok=True, parents=True)
-        return template_dir
+        safe_project_id = secure_filename(str(project_id))
+        if not safe_project_id:
+            raise ValueError("Invalid project_id")
+        template_dir_str = self._resolve_within_upload(safe_project_id, "template")
+        os.makedirs(template_dir_str, exist_ok=True)
+        return Path(template_dir_str)
     
     def _get_pages_dir(self, project_id: str) -> Path:
         """Get pages directory for project"""
-        pages_dir = self._get_project_dir(project_id) / "pages"
-        pages_dir.mkdir(exist_ok=True, parents=True)
-        return pages_dir
+        safe_project_id = secure_filename(str(project_id))
+        if not safe_project_id:
+            raise ValueError("Invalid project_id")
+        pages_dir_str = self._resolve_within_upload(safe_project_id, "pages")
+        os.makedirs(pages_dir_str, exist_ok=True)
+        return Path(pages_dir_str)
 
     def _get_exports_dir(self, project_id: str) -> Path:
         """Get exports directory for project (for generated PPT/PDF files)"""
-        exports_dir = self._get_project_dir(project_id) / "exports"
-        exports_dir.mkdir(exist_ok=True, parents=True)
-        return exports_dir
+        safe_project_id = secure_filename(str(project_id))
+        if not safe_project_id:
+            raise ValueError("Invalid project_id")
+        exports_dir_str = self._resolve_within_upload(safe_project_id, "exports")
+        os.makedirs(exports_dir_str, exist_ok=True)
+        return Path(exports_dir_str)
 
     def _get_materials_dir(self, project_id: str) -> Path:
         """Get materials directory for project (for standalone generated assets)"""
-        materials_dir = self._get_project_dir(project_id) / "materials"
-        materials_dir.mkdir(exist_ok=True, parents=True)
-        return materials_dir
+        safe_project_id = secure_filename(str(project_id))
+        if not safe_project_id:
+            raise ValueError("Invalid project_id")
+        materials_dir_str = self._resolve_within_upload(safe_project_id, "materials")
+        os.makedirs(materials_dir_str, exist_ok=True)
+        return Path(materials_dir_str)
     
     def save_template_image(self, file, project_id: str) -> str:
         """
@@ -115,15 +138,17 @@ class FileService:
         template_dir = self._get_template_dir(project_id)
         
         # Secure filename and add unique suffix
-        original_filename = secure_filename(file.filename)
-        ext = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else 'png'
-        filename = f"template.{ext}"
+        original_filename = secure_filename(file.filename or "template.png")
+        ext = secure_filename(original_filename.rsplit('.', 1)[1].lower()) if '.' in original_filename else 'png'
+        if not ext:
+            ext = 'png'
+        filename = secure_filename(f"template.{ext}")
         
-        filepath = template_dir / filename
-        file.save(str(filepath))
+        filepath_str = self._resolve_within_upload(str(template_dir.relative_to(self.upload_folder)), filename)
+        file.save(filepath_str)
         
         # Return relative path
-        return filepath.relative_to(self.upload_folder).as_posix()
+        return Path(filepath_str).relative_to(self.upload_folder).as_posix()
     
     def save_generated_image(self, image: Image.Image, project_id: str,
                            page_id: str, image_format: str = 'PNG',
@@ -264,18 +289,22 @@ class FileService:
         Returns:
             True if deleted successfully
         """
-        filepath = self.upload_folder / image_path.replace('\\', '/')
+        try:
+            filepath_str = self._resolve_within_upload(image_path.replace('\\', '/'))
+        except ValueError:
+            return False
+        filepath = Path(filepath_str)
         deleted = False
 
-        if filepath.exists() and filepath.is_file():
-            filepath.unlink()
+        if os.path.exists(filepath_str) and os.path.isfile(filepath_str):
+            os.unlink(filepath_str)
             deleted = True
 
         # Also delete corresponding cache file (_thumb.jpg)
         # e.g., xxx_v1.png -> xxx_v1_thumb.jpg
-        cache_filepath = filepath.parent / f"{filepath.stem}_thumb.jpg"
-        if cache_filepath.exists() and cache_filepath.is_file():
-            cache_filepath.unlink()
+        cache_filepath_str = os.path.realpath(os.path.join(os.path.dirname(filepath_str), f"{filepath.stem}_thumb.jpg"))
+        if cache_filepath_str.startswith(os.path.realpath(str(self.upload_folder)) + os.sep) and os.path.exists(cache_filepath_str) and os.path.isfile(cache_filepath_str):
+            os.unlink(cache_filepath_str)
 
         return deleted
     
@@ -306,7 +335,7 @@ class FileService:
         Returns:
             Absolute file path
         """
-        return str(self.upload_folder / relative_path.replace('\\', '/'))
+        return self._resolve_within_upload(relative_path.replace('\\', '/'))
     
     def delete_template(self, project_id: str) -> bool:
         """
@@ -338,13 +367,20 @@ class FileService:
         Returns:
             True if deleted successfully
         """
+        safe_page_id = secure_filename(str(page_id))
+        if not safe_page_id:
+            return False
         pages_dir = self._get_pages_dir(project_id)
+        pages_dir_str = os.path.realpath(str(pages_dir))
 
         # Find and delete all page image files (all versions and caches)
         # Pattern matches: {page_id}_v1.png, {page_id}_v1_thumb.jpg, etc.
-        for file in pages_dir.glob(f"{page_id}_*"):
-            if file.is_file():
-                file.unlink()
+        prefix = f"{safe_page_id}_"
+        for fname in os.listdir(pages_dir_str):
+            if fname.startswith(prefix):
+                full_file = os.path.realpath(os.path.join(pages_dir_str, secure_filename(fname)))
+                if full_file.startswith(pages_dir_str + os.sep) and os.path.isfile(full_file):
+                    os.unlink(full_file)
 
         return True
     
@@ -359,17 +395,23 @@ class FileService:
             True if deleted successfully
         """
         import shutil
-        project_dir = self._get_project_dir(project_id)
+        safe_project_id = secure_filename(str(project_id))
+        if not safe_project_id:
+            return False
+        project_dir_str = self._resolve_within_upload(safe_project_id)
         
-        if project_dir.exists():
-            shutil.rmtree(project_dir)
+        if os.path.exists(project_dir_str):
+            shutil.rmtree(project_dir_str)
         
         return True
     
     def file_exists(self, relative_path: str) -> bool:
         """Check if file exists"""
-        filepath = self.upload_folder / relative_path.replace('\\', '/')
-        return filepath.exists() and filepath.is_file()
+        try:
+            filepath_str = self._resolve_within_upload(relative_path.replace('\\', '/'))
+            return os.path.exists(filepath_str) and os.path.isfile(filepath_str)
+        except ValueError:
+            return False
     
     def get_template_path(self, project_id: str) -> Optional[str]:
         """
@@ -387,13 +429,20 @@ class FileService:
         project = Project.query.get(project_id)
         if project and project.template_image_path:
             # template_image_path 是相对路径，需要转换为绝对路径
-            template_path = self.upload_folder / project.template_image_path
-            if template_path.exists() and template_path.is_file():
-                return str(template_path)
+            try:
+                template_path_str = self._resolve_within_upload(project.template_image_path)
+                if os.path.exists(template_path_str) and os.path.isfile(template_path_str):
+                    return template_path_str
+            except ValueError:
+                pass
         
         # 如果数据库中没有，回退到目录查找（兼容旧数据）
-        template_dir = self._get_template_dir(project_id)
-        if template_dir.exists():
+        safe_project_id = secure_filename(str(project_id))
+        if not safe_project_id:
+            return None
+        template_dir_str = self._resolve_within_upload(safe_project_id, "template")
+        if os.path.exists(template_dir_str):
+            template_dir = Path(template_dir_str)
             # 按修改时间排序，返回最新的模板文件
             template_files = [
                 f for f in template_dir.iterdir() 
@@ -408,9 +457,9 @@ class FileService:
     
     def _get_user_templates_dir(self) -> Path:
         """Get user templates directory"""
-        templates_dir = self.upload_folder / "user-templates"
-        templates_dir.mkdir(exist_ok=True, parents=True)
-        return templates_dir
+        templates_dir_str = self._resolve_within_upload("user-templates")
+        os.makedirs(templates_dir_str, exist_ok=True)
+        return Path(templates_dir_str)
     
     def save_user_template(self, file, template_id: str) -> str:
         """
@@ -423,20 +472,24 @@ class FileService:
         Returns:
             Relative file path from upload folder
         """
-        templates_dir = self._get_user_templates_dir()
-        template_dir = templates_dir / template_id
-        template_dir.mkdir(exist_ok=True, parents=True)
+        safe_template_id = secure_filename(str(template_id))
+        if not safe_template_id:
+            raise ValueError("Invalid template_id")
+        template_dir_str = self._resolve_within_upload("user-templates", safe_template_id)
+        os.makedirs(template_dir_str, exist_ok=True)
         
         # Secure filename and preserve extension
-        original_filename = secure_filename(file.filename)
-        ext = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else 'png'
-        filename = f"template.{ext}"
+        original_filename = secure_filename(file.filename or "template.png")
+        ext = secure_filename(original_filename.rsplit('.', 1)[1].lower()) if '.' in original_filename else 'png'
+        if not ext:
+            ext = 'png'
+        filename = secure_filename(f"template.{ext}")
         
-        filepath = template_dir / filename
-        file.save(str(filepath))
+        filepath_str = self._resolve_within_upload("user-templates", safe_template_id, filename)
+        file.save(filepath_str)
         
         # Return relative path
-        return filepath.relative_to(self.upload_folder).as_posix()
+        return Path(filepath_str).relative_to(self.upload_folder).as_posix()
     
     def delete_user_template(self, template_id: str) -> bool:
         """
@@ -449,11 +502,13 @@ class FileService:
             True if deleted successfully
         """
         import shutil
-        templates_dir = self._get_user_templates_dir()
-        template_dir = templates_dir / template_id
+        safe_template_id = secure_filename(str(template_id))
+        if not safe_template_id:
+            return False
+        template_dir_str = self._resolve_within_upload("user-templates", safe_template_id)
 
-        if template_dir.exists():
-            shutil.rmtree(template_dir)
+        if os.path.exists(template_dir_str):
+            shutil.rmtree(template_dir_str)
 
         return True
 
@@ -472,14 +527,17 @@ class FileService:
             Relative file path to thumbnail, or None if failed
         """
         try:
+            safe_template_id = secure_filename(str(template_id))
+            if not safe_template_id:
+                return None
             # Get full path to original image
-            original_full_path = self.upload_folder / original_path.replace('\\', '/')
+            original_full_path_str = self._resolve_within_upload(original_path.replace('\\', '/'))
 
-            if not original_full_path.exists():
+            if not os.path.exists(original_full_path_str):
                 return None
 
             # Open and process image
-            image = Image.open(str(original_full_path))
+            image = Image.open(original_full_path_str)
 
             # Resize if needed
             image = resize_image_for_thumbnail(image, max_width)
@@ -488,17 +546,16 @@ class FileService:
             image = convert_image_to_rgb(image)
 
             # Save thumbnail
-            templates_dir = self._get_user_templates_dir()
-            template_dir = templates_dir / template_id
-            template_dir.mkdir(exist_ok=True, parents=True)
+            template_dir_str = self._resolve_within_upload("user-templates", safe_template_id)
+            os.makedirs(template_dir_str, exist_ok=True)
 
             thumb_filename = "template-thumb.webp"
-            thumb_filepath = template_dir / thumb_filename
+            thumb_filepath_str = self._resolve_within_upload("user-templates", safe_template_id, thumb_filename)
 
-            image.save(str(thumb_filepath), 'WEBP', quality=quality)
+            image.save(thumb_filepath_str, 'WEBP', quality=quality)
             image.close()
 
-            return thumb_filepath.relative_to(self.upload_folder).as_posix()
+            return Path(thumb_filepath_str).relative_to(self.upload_folder).as_posix()
         except Exception:
             return None
     

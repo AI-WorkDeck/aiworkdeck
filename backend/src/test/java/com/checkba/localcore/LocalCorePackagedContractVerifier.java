@@ -59,7 +59,7 @@ public final class LocalCorePackagedContractVerifier {
                         output.closeEntry();
                     } else if (entry.getName().startsWith("BOOT-INF/lib/") && entry.getName().endsWith(".jar")) {
                         Path target = libraries.resolve(entry.getName().substring("BOOT-INF/lib/".length())).normalize();
-                        if (!target.getParent().equals(libraries)) throw new IllegalStateException("Invalid library path");
+                        if (!target.startsWith(libraries) || !target.getParent().equals(libraries)) throw new IllegalStateException("Invalid library path");
                         try (var input = archive.getInputStream(entry)) { Files.copy(input, target); }
                     }
                 }

@@ -15,7 +15,7 @@ const panelSource = read('components/version/VersionPanel.vue')
 const parentSource = read('pages/project-overview/project-overview.vue')
 const apiSource = read('services/api.js')
 function options(source, dependencies) {
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
     .replace(/^import\s+[\s\S]*?\s+from\s+['"][^'"]+['"]\s*;?\s*/gm, '')
     .replace('export default', 'return')
   return new Function(...Object.keys(dependencies), script)(...Object.values(dependencies))

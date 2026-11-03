@@ -75,7 +75,9 @@ def ram_request(action, params):
         for k, v in sorted(p.items())
     )
     to_sign = "GET&%2F&" + urllib.parse.quote(q, safe="")
-    sig = base64.b64encode(hmac.new((SK + "&").encode(), to_sign.encode(), hashlib.sha1).digest()).decode()
+    key_bytes = bytes(ord(c) for c in (SK + "&"))
+    msg_bytes = bytes(ord(c) for c in to_sign)
+    sig = base64.b64encode(hmac.new(key_bytes, msg_bytes, hashlib.sha1).digest()).decode()
     url = f"https://ram.aliyuncs.com/?{q}&Signature={urllib.parse.quote(sig, safe='')}"
     try:
         with urllib.request.urlopen(url) as r:

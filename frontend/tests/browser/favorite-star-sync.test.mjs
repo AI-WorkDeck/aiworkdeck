@@ -13,7 +13,7 @@ import { shouldAcceptResponse } from '../../src/utils/requestGeneration.js'
 
 function loadComponent(file, names, deps) {
   const src = readFileSync(new URL(`../../src/components/${file}`, import.meta.url), 'utf8')
-  const script = src.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = src.slice(src.indexOf('<script>') + 8, src.indexOf('</script>'))
     .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
   // eslint-disable-next-line no-new-func
   return new Function(...names, script.replace('export default', 'return'))(...names.map((n) => deps[n]))

@@ -30,7 +30,7 @@ function makeVm(overrides = {}) {
     authoritative, caseRecognition, citationDetail, projectFile,
   }
   const src = readFileSync(new URL('../../src/components/InsightPane.vue', import.meta.url), 'utf8')
-  const script = src.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import [\s\S]*?from .*$/gm, '')
+  const script = src.slice(src.indexOf('<script>') + 8, src.indexOf('</script>')).replace(/^import [\s\S]*?from .*$/gm, '')
   const names = Object.keys(deps)
   // eslint-disable-next-line no-new-func
   const component = new Function(...names, script.replace('export default', 'return'))(...names.map((n) => deps[n]))

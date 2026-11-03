@@ -16,9 +16,17 @@ import { readFileSync } from 'node:fs'
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8')
 const SRC = read('../../src/components/ReviewPanel.vue')
-const STYLE = SRC.match(/<style scoped>([\s\S]*?)<\/style>/)[1]
-const HEAD = SRC.slice(SRC.indexOf('<view class="rp-head">'), SRC.indexOf('</view>', SRC.indexOf('rp-merge-title')))
-  .replace(/<!--[\s\S]*?-->/g, '')
+const STYLE = SRC.slice(SRC.indexOf('<style scoped>') + 14, SRC.indexOf('</style>'))
+const stripComments = (str) => {
+  let out = str, i = out.indexOf('<!--')
+  while (i !== -1) {
+    const j = out.indexOf('-->', i + 4)
+    out = j === -1 ? out.slice(0, i) : out.slice(0, i) + out.slice(j + 3)
+    i = out.indexOf('<!--')
+  }
+  return out
+}
+const HEAD = stripComments(SRC.slice(SRC.indexOf('<view class="rp-head">'), SRC.indexOf('</view>', SRC.indexOf('rp-merge-title'))))
 const rule = (selector) => {
   const esc = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const m = STYLE.match(new RegExp('(^|\\n)' + esc + '\\s*\\{([^}]*)\\}'))

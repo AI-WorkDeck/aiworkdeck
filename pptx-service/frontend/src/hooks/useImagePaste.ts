@@ -18,7 +18,7 @@ export const getUploadingPreviewUrl = (url: string) =>
 
 /** Escape markdown special characters in alt text to prevent injection */
 const escapeMarkdown = (text: string): string => {
-  return text.replace(/[[\]()]/g, '\\$&');
+  return text.replace(/[\\[\]()]/g, '\\$&');
 };
 
 /** Generate a placeholder markdown for a file (exported for MarkdownTextarea) */

@@ -15,7 +15,7 @@ import { DOC_MUTATED_EVENT, DOC_MUTATED_DEBOUNCE_MS, isDocMutatingAction } from 
 
 function loadComponent(name, bindings) {
   const source = readFileSync(new URL(`../../src/components/${name}.vue`, import.meta.url), 'utf8')
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
     .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
   return new Function(...Object.keys(bindings), script.replace('export default', 'return'))(...Object.values(bindings))
 }

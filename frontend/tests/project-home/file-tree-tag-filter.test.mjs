@@ -22,7 +22,7 @@ const fixture = () => [
 function setup(stubs = {}) {
   const deps = { groupByParent, buildTreeFromGroups, computeDisplayFiles, getProjectTags: async () => [tagA, tagB], addTagToFile: async () => {}, removeTagFromFile: async () => {}, ...stubs }
   const names = []
-  const body = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import\s+([\s\S]*?)\s+from\s+['"][^'"]+['"]\s*$/gm, (_, binding) => {
+  const body = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace(/^import\s+([\s\S]*?)\s+from\s+['"][^'"]+['"]\s*$/gm, (_, binding) => {
     for (const name of binding.replace(/[{}]/g, '').split(',')) names.push(name.trim().split(/\s+as\s+/).at(-1))
     return ''
   }).replace('export default {', 'return {')

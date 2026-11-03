@@ -19,7 +19,7 @@ const SRC = readFileSync(new URL('../../src/components/EditorToolbar.vue', impor
 const TEMPLATE = SRC.slice(SRC.indexOf('<template>'), SRC.lastIndexOf('</template>'))
 
 function makeToolbarVm(executor) {
-  const script = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
   // eslint-disable-next-line no-new-func
   const component = new Function('bindHorizontalWheel', 'watchScrollEdges', 'isEnglish', 'host',

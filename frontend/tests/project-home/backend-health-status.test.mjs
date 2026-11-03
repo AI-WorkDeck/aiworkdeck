@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const source = readFileSync(new URL('../../src/components/BackendHealthStatus.vue', import.meta.url), 'utf8')
-const body = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default {', 'return {')
+const body = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default {', 'return {')
 function makeVm(backend) {
   const options = new Function('host', body)({ backend })
   const vm = { ...options.data(), $t: key => key }

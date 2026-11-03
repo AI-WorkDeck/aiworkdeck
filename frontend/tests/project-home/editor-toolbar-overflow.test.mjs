@@ -25,7 +25,7 @@ const require = createRequire(import.meta.url)
 // ---- jsdom 全局（必须在 import vue 之前：runtime-dom 在模块求值时就取 document）----
 const dom = new JSDOM('<!doctype html><html><body><div id="app"></div><div id="outside"></div></body></html>',
   { pretendToBeVisual: true, url: 'http://localhost/' })
-for (const k of ['window', 'document', 'navigator', 'Node', 'Element', 'HTMLElement', 'SVGElement',
+for (const k of ['window', 'document', 'Document', 'navigator', 'Node', 'Element', 'HTMLElement', 'SVGElement',
   'Event', 'KeyboardEvent', 'MouseEvent', 'FocusEvent', 'MutationObserver', 'getComputedStyle']) {
   Object.defineProperty(globalThis, k, { configurable: true, writable: true, value: dom.window[k] })
 }

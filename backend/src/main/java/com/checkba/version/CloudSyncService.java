@@ -199,7 +199,9 @@ public class CloudSyncService {
     /** 用账号密码换一个长期设备令牌，本地存下来（服务端 `/api/auth/device-token`）。 */
     public CloudConnection connect(String serverUrl, String username,
                                     String password, String deviceName, Long userId) {
-        String base = serverUrl.replaceAll("/+$", "");
+        int end = serverUrl.length();
+        while (end > 0 && serverUrl.charAt(end - 1) == '/') end--;
+        String base = serverUrl.substring(0, end);
         String body = JSONUtil.toJsonStr(Map.of(
                 "username", username, "password", password, "name", deviceName));
         JSONObject resp = JSONUtil.parseObj(httpPost(base + "/api/auth/device-token", body));

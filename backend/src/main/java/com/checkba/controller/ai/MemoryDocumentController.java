@@ -57,10 +57,12 @@ public class MemoryDocumentController {
     public ResponseEntity<String> download(@RequestParam String spaceId, @RequestParam String path,
                                            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         String content = service.download(user(sessionId), spaceId, path);
-        String name = path.substring(path.lastIndexOf('/') + 1).replace("\"", "");
+        String name = org.springframework.web.util.HtmlUtils.htmlEscape(
+                path.substring(path.lastIndexOf('/') + 1).replace("\"", ""));
         return ResponseEntity.ok()
                 .contentType(new MediaType("text", "markdown", StandardCharsets.UTF_8))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + name + "\"")
+                .header("X-Content-Type-Options", "nosniff")
                 .body(content);
     }
 

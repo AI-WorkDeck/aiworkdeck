@@ -52,7 +52,7 @@ function loadModule(code, tail, overrides) {
 }
 
 const read = (p) => readFileSync(new URL('../../src/' + p, import.meta.url), 'utf8')
-const vueScript = (p) => read(p).match(/<script>([\s\S]*?)<\/script>/)[1].replace('export default', 'const __component =')
+const vueScript = (p) => ((s) => s.slice(s.indexOf('<script>') + 8, s.indexOf('</script>')))(read(p)).replace('export default', 'const __component =')
 
 test('handleOpenFileFromChat：对话卡片点开子文件夹里的文件，不再「未找到文件」', async () => {
   const methods = loadModule(read('pages/project-overview/fileOpenTabs.js').replace('export const fileOpenTabsMethods', 'const fileOpenTabsMethods'),

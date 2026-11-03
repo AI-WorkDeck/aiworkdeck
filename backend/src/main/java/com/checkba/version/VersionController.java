@@ -891,7 +891,11 @@ public class VersionController {
         int mainCount = "auto".equals(normalized) && analysis != null ? analysis.mainChanges() : 0;
         int otherCount = "auto".equals(normalized) && analysis != null ? analysis.otherChanges() : 0;
 
-        java.nio.file.Path target = repoService.workTree(projectId).resolve(rel);
+        java.nio.file.Path workTree = repoService.workTree(projectId).toAbsolutePath().normalize();
+        java.nio.file.Path target = workTree.resolve(rel).normalize();
+        if (!target.startsWith(workTree)) {
+            throw new VersionException("写入合并结果失败: 非法相对路径 " + rel);
+        }
         try {
             java.nio.file.Files.createDirectories(target.getParent());
             java.nio.file.Files.write(target, bytes);

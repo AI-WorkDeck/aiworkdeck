@@ -233,7 +233,8 @@ finally { $graphics.Dispose(); $bitmap.Dispose() }`
 
 
     // Only select a destination; the production listener, HTTP transfer and file writes stay real.
-    await mainRpc(`(()=>{const {session}=process.mainModule.require('electron');globalThis.__installedDownload={};globalThis.__installedDownloadListener=(_event,item)=>{if(item.getURL()!==${JSON.stringify(base + '/download')})return;item.setSavePath(${JSON.stringify(downloadPath)});item.once('done',(_e,state)=>{globalThis.__installedDownload={state,path:item.getSavePath(),filename:item.getFilename(),received:item.getReceivedBytes(),total:item.getTotalBytes()}})};session.defaultSession.on('will-download',globalThis.__installedDownloadListener);return true})()`)
+    const b64 = s => Buffer.from(String(s), 'utf8').toString('base64')
+    await mainRpc(`(()=>{const {session}=process.mainModule.require('electron');const dlUrl=Buffer.from('${b64(base + '/download')}','base64').toString('utf8');const dlPath=Buffer.from('${b64(downloadPath)}','base64').toString('utf8');globalThis.__installedDownload={};globalThis.__installedDownloadListener=(_event,item)=>{if(item.getURL()!==dlUrl)return;item.setSavePath(dlPath);item.once('done',(_e,state)=>{globalThis.__installedDownload={state,path:item.getSavePath(),filename:item.getFilename(),received:item.getReceivedBytes(),total:item.getTotalBytes()}})};session.defaultSession.on('will-download',globalThis.__installedDownloadListener);return true})()`)
     await (await browserPage(base + '/popup')).click('#download')
     evidence.download = await until(async () => {
       const d = await mainRpc('globalThis.__installedDownload')
@@ -253,14 +254,14 @@ finally { $graphics.Dispose(); $bitmap.Dispose() }`
     await sleep(1500) // Production clipboard watcher primes without replaying initial OS contents.
     const text = `Installed clipboard ${token} 中文`
     clipboardTouched = true
-    await mainRpc(`(async()=>{const {clipboard,ClipboardItem}=process.mainModule.require('electron');await clipboard.write([new ClipboardItem({'text/plain':new Blob([${JSON.stringify(text)}],{type:'text/plain'})})]);return true})()`)
+    await mainRpc(`(async()=>{const {clipboard,ClipboardItem}=process.mainModule.require('electron');const clipText=Buffer.from('${b64(text)}','base64').toString('utf8');await clipboard.write([new ClipboardItem({'text/plain':new Blob([clipText],{type:'text/plain'})})]);return true})()`)
     await page.waitForFunction(text => window.__installedInteractionEvents.clipboard.some(e => e.text === text && e.source === 'system'), { timeout: 20000 }, text)
     evidence.clipboardText = await page.evaluate(text => window.__installedInteractionEvents.clipboard.find(e => e.text === text && e.source === 'system'), text)
     // Real native bitmap -> OS PNG -> production watcher/nativeImage -> production preload.
     evidence.clipboardImage = await mainRpc(`(async()=>{const {clipboard,ClipboardItem,nativeImage}=process.mainModule.require('electron');const image=nativeImage.createFromBitmap(Buffer.from([0,0,255,255,0,255,0,255,255,0,0,255,255,255,255,255]),{width:2,height:2});await clipboard.write([new ClipboardItem({'image/png':new Blob([new Uint8Array(image.toPNG())],{type:'image/png'})})]);return {bitmap:image.toBitmap().toString('base64'),width:2,height:2}})()`)
     await page.waitForFunction(() => window.__installedInteractionEvents.clipboard.some(e => e.type === 'IMAGE' && e.source === 'system'), { timeout: 20000 })
     const imageEvent = await page.evaluate(() => window.__installedInteractionEvents.clipboard.find(e => e.type === 'IMAGE' && e.source === 'system'))
-    const decoded = await mainRpc(`(()=>{const image=process.mainModule.require('electron').nativeImage.createFromDataURL(${JSON.stringify(imageEvent.data)});return {bitmap:image.toBitmap().toString('base64'),...image.getSize()}})()`)
+    const decoded = await mainRpc(`(()=>{const dataUrl=Buffer.from('${b64(imageEvent.data)}','base64').toString('utf8');const image=process.mainModule.require('electron').nativeImage.createFromDataURL(dataUrl);return {bitmap:image.toBitmap().toString('base64'),...image.getSize()}})()`)
     assert.deepEqual(decoded, evidence.clipboardImage)
     evidence.checks.push('Actual OS text and PNG passed production polling and production preload; PNG pixels match')
 

@@ -12,7 +12,7 @@ const SRC = readFileSync(
 
 // 抽 <script> 块：去掉 import 行（别名解析不了），export default 换成 return。
 function loadOptions(api) {
-  const body = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const body = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/^\s*import[\s\S]*?from\s*'[^']*'\s*$/gm, '')
     .replace(/export\s+default/, 'return')
   const factory = new Function(

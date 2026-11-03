@@ -24,20 +24,38 @@ class PdfConvertError(Exception):
     """转换错误（带上下文信息，控制器直接回给调用方）"""
 
 
-def _validate(pdf_path: str):
-    if not pdf_path or not os.path.exists(pdf_path):
+def _validate(pdf_path: str) -> str:
+    if not pdf_path or not isinstance(pdf_path, str) or '\x00' in pdf_path:
         raise PdfConvertError(f"文件不存在: {pdf_path}")
-    if not pdf_path.lower().endswith('.pdf'):
+    allowed_root = os.path.realpath(os.environ.get("PPTX_ALLOWED_ROOT") or os.path.abspath(os.sep))
+    resolved = os.path.realpath(os.path.abspath(pdf_path))
+    if not resolved.startswith(allowed_root):
+        raise PdfConvertError(f"文件路径不允许访问: {pdf_path}")
+    if not resolved.lower().endswith('.pdf'):
         raise PdfConvertError(f"仅支持 .pdf 文件: {pdf_path}")
+    if not os.path.exists(resolved) or not os.path.isfile(resolved):
+        raise PdfConvertError(f"文件不存在: {pdf_path}")
+    return resolved
+
+
+def _validate_output_path(output_path: str) -> str:
+    if not output_path or not isinstance(output_path, str) or '\x00' in output_path:
+        raise PdfConvertError(f"output_path 必须是 .docx 路径: {output_path}")
+    allowed_root = os.path.realpath(os.environ.get("PPTX_ALLOWED_ROOT") or os.path.abspath(os.sep))
+    resolved = os.path.realpath(os.path.abspath(output_path))
+    if not resolved.startswith(allowed_root):
+        raise PdfConvertError(f"输出路径不允许访问: {output_path}")
+    if not resolved.lower().endswith('.docx'):
+        raise PdfConvertError(f"output_path 必须是 .docx 路径: {output_path}")
+    return resolved
 
 
 def to_docx(pdf_path: str, output_path: str) -> dict:
     """版式级 PDF→docx。仅适用于有文本层的未加密 PDF；扫描件请走 ocr_markdown。"""
-    _validate(pdf_path)
-    if not output_path or not output_path.lower().endswith('.docx'):
-        raise PdfConvertError(f"output_path 必须是 .docx 路径: {output_path}")
+    resolved_pdf = _validate(pdf_path)
+    resolved_out = _validate_output_path(output_path)
 
-    doc = fitz.open(pdf_path)
+    doc = fitz.open(resolved_pdf)
     try:
         if doc.needs_pass:
             raise PdfConvertError("PDF 已加密，无法转换")
@@ -49,25 +67,26 @@ def to_docx(pdf_path: str, output_path: str) -> dict:
     if text_chars < 20:
         raise PdfConvertError("该 PDF 没有文本层（扫描件），版式级转换不适用，请改用 /api/pdf/ocr-markdown")
 
-    parent = os.path.dirname(output_path)
-    if parent:
+    allowed_root = os.path.realpath(os.environ.get("PPTX_ALLOWED_ROOT") or os.path.abspath(os.sep))
+    parent = os.path.realpath(os.path.dirname(resolved_out))
+    if parent and parent.startswith(allowed_root):
         os.makedirs(parent, exist_ok=True)
 
-    logger.info(f"pdf2docx converting: {pdf_path} -> {output_path} ({pages} pages)")
-    cv = Converter(pdf_path)
+    logger.info(f"pdf2docx converting: {resolved_pdf} -> {resolved_out} ({pages} pages)")
+    cv = Converter(resolved_pdf)
     try:
-        cv.convert(output_path)
+        cv.convert(resolved_out)
     finally:
         cv.close()
 
-    if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+    if not os.path.exists(resolved_out) or os.path.getsize(resolved_out) == 0:
         raise PdfConvertError("pdf2docx 转换未产出有效文件")
-    return {'output_path': output_path, 'pages': pages}
+    return {'output_path': resolved_out, 'pages': pages}
 
 
 def ocr_markdown(pdf_path: str) -> dict:
     """扫描件 OCR：只使用本地 MinerU，不隐式上传或生成云端图片描述。"""
-    _validate(pdf_path)
+    resolved_pdf = _validate(pdf_path)
 
     parser = FileParserService(
         mineru_token="",
@@ -75,7 +94,7 @@ def ocr_markdown(pdf_path: str) -> dict:
     )
 
     _batch_id, markdown, _extract_id, error, _failed = parser.parse_file(
-        pdf_path, os.path.basename(pdf_path))
+        resolved_pdf, os.path.basename(resolved_pdf))
 
     if error or not markdown or not markdown.strip():
         raise PdfConvertError(

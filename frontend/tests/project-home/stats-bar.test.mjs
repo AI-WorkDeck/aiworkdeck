@@ -13,8 +13,17 @@ const ZH = readFileSync(new URL('../../src/locales/zh-CN/projects.js', import.me
 
 // 只在「实际代码」里做禁字断言：注释里必须能写清楚为什么不做某件事，
 // 那些说明性文字不该把断言判红。
+const cutBetween = (str, open, close) => {
+  let out = str, i = out.indexOf(open)
+  while (i !== -1) {
+    const j = out.indexOf(close, i + open.length)
+    out = j === -1 ? out.slice(0, i) : out.slice(0, i) + out.slice(j + close.length)
+    i = out.indexOf(open)
+  }
+  return out
+}
 const stripComments = (s) =>
-  s.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  cutBetween(cutBetween(s, '<!--', '-->'), '/*', '*/').replace(/^\s*\/\/.*$/gm, '')
 const CODE = stripComments(SRC)
 
 test('e2e 锚点：根节点类名是 overview-stats-bar', () => {

@@ -4,7 +4,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 const source = readFileSync(new URL('../../src/components/AwdDialog.vue', import.meta.url), 'utf8')
-const body = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*\n/gm, '').replace('export default', 'return')
+const body = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace(/^import .*\n/gm, '').replace('export default', 'return')
 
 test('dialog returns abandoned focus, but does not steal from a newly opened menu', async () => {
   const options = new Function(body)()

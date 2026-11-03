@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const source = readFileSync(new URL('../../src/components/tmeet/TencentMeetingPanel.vue', import.meta.url), 'utf8')
-const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
   .replace(/import[\s\S]*?from\s+['"][^'"]+['"]/g, '').replace('export default', 'return')
 function panel(api = {}) {
   const names = ['AwdSwitch', 'AwdSelect', 'getTmeetAuthStatus', 'loginTmeet', 'logoutTmeet', 'getTmeetSyncConfig', 'updateTmeetSyncConfig', 'syncTmeetMeetings', 'getTmeetMeetings', 'exportTmeetToDoc', 'getTmeetMinutesPrompt', 'getTmeetTodosPrompt', 'uni']

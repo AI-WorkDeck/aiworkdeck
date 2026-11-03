@@ -6,8 +6,17 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const src = readFileSync(new URL('../../src/components/MarketPane.vue', import.meta.url), 'utf8')
-  .replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+const cutBetween = (str, open, close) => {
+  let out = str, i = out.indexOf(open)
+  while (i !== -1) {
+    const j = out.indexOf(close, i + open.length)
+    out = j === -1 ? out.slice(0, i) : out.slice(0, i) + out.slice(j + close.length)
+    i = out.indexOf(open)
+  }
+  return out
+}
+const src = cutBetween(cutBetween(readFileSync(new URL('../../src/components/MarketPane.vue', import.meta.url), 'utf8'), '<!--', '-->'), '/*', '*/')
+  .replace(/^\s*\/\/.*$/gm, '')
 
 /** 取两个方法名之间的那段方法体 */
 const body = (from, to) => {

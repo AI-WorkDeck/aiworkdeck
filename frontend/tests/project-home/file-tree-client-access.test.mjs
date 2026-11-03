@@ -14,7 +14,7 @@ function setup(overrides = {}) {
     ICONS: {}, host: {}
   }
   const names = []
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
     .replace(/^import\s+([\s\S]*?)\s+from\s+['"][^'"]+['"]\s*$/gm, (_, binding) => {
       for (const name of binding.replace(/[{}]/g, '').split(',')) names.push(name.trim().split(/\s+as\s+/).at(-1))
       return ''

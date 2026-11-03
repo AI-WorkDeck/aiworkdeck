@@ -24,7 +24,7 @@ import { shouldAcceptResponse } from '../../src/utils/requestGeneration.js'
 const SRC = readFileSync(new URL('../../src/components/FilePreview.vue', import.meta.url), 'utf8')
 
 function loadMethods(getArchiveEntriesImpl) {
-  const body = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const body = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/^\s*import[\s\S]*?from\s*'[^']*'\s*$/gm, '')
     // uni-app 条件编译：H5/非 H5 两个分支都留着会撞名（IS_H5 declared twice）。
     // 本仓测试只跑 H5 分支的行为（loadArchiveEntries 与平台判定无关），丢非 H5 分支。
@@ -35,7 +35,7 @@ function loadMethods(getArchiveEntriesImpl) {
   // import 的符号从源码里读出来逐个当参数传：FilePreview 的依赖会变（媒体播放器那批
   // 加了 MediaPlayer / previewKindOf / shouldGrabMediaFocus），写死参数表会让整份
   // 测试因 ReferenceError 陪葬。本测试只关心 loadArchiveEntries，无关符号一律给空桩。
-  const script = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
   const imported = new Set()
   for (const m of script.matchAll(/^\s*import\s+([\s\S]*?)\s+from\s*'[^']*'\s*$/gm)) {
     const clause = m[1]

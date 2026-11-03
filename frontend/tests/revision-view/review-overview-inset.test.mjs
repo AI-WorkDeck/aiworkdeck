@@ -19,7 +19,7 @@ const template = EDITOR.match(/<template>([\s\S]*)<\/template>/)[1]
 const style = EDITOR.match(/<style scoped>([\s\S]*?)<\/style>/)[1]
 
 function editorComponent() {
-  const body = EDITOR.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const body = EDITOR.slice(EDITOR.indexOf('<script>') + 8, EDITOR.indexOf('</script>'))
     .replace(/^import OfficeNavigation from .*$/m, 'const OfficeNavigation = {}')
     .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
   return new Function('ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', body)(null, null, null)

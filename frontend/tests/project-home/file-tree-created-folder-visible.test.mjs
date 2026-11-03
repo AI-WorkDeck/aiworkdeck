@@ -26,7 +26,7 @@ function setup(initial, overrides = {}) {
     getProjectTags: async () => [], ...overrides,
   }
   const imports = []
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
     .replace(/^import\s+([\s\S]*?)\s+from\s+['"][^'"]+['"]\s*$/gm, (_, bindings) => {
       imports.push(...bindings.replace(/[{}]/g, '').split(',').map(name => name.trim().split(/\s+as\s+/).at(-1)))
       return ''

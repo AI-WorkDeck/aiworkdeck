@@ -4,7 +4,10 @@ PDF Service - PDF splitting utilities using PyPDF2
 import logging
 import os
 from typing import List
-from PyPDF2 import PdfReader, PdfWriter
+try:
+    from pypdf import PdfReader, PdfWriter
+except ImportError:
+    from PyPDF2 import PdfReader, PdfWriter
 
 logger = logging.getLogger(__name__)
 

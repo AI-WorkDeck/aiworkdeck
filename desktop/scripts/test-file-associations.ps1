@@ -128,14 +128,14 @@ try {
         Write-Value "$classes\.$ext" '' $otherHandler
         Write-Value "$classes\.$ext\OpenWithProgids" $otherHandler ''
     }
-    # electron-builder 24 re-parses /D using StdUtils.GetParameter (CRT argv),
-    # so quote its value to retain spaces; bare NSIS /D quoting rules do not apply here.
-    Run-Installer $installer "/S /D=`"$installDir`""
+    # electron-builder 26's GetDParameter parses /D= to the end of the command line
+    # per standard NSIS rules (must be the last parameter and unquoted).
+    Run-Installer $installer "/S /D=$installDir"
     Assert-Installed $otherHandler
     Write-Host 'PASS: real installer registers all 17 types without replacing existing defaults.'
 
     foreach ($ext in $extensions) { Write-Value "$classes\.$ext" '' $changedHandler }
-    Run-Installer $installer "/S /D=`"$installDir`""
+    Run-Installer $installer "/S /D=$installDir"
     Assert-Installed $changedHandler
     Write-Host 'PASS: reinstall preserves a default changed after the first installation.'
 

@@ -8,7 +8,7 @@ function component() {
   const source = process.env.TOOLBAR_SOURCE
     ? readFileSync(process.env.TOOLBAR_SOURCE, 'utf8')
     : readFileSync(new URL('../../src/components/EditorToolbar.vue', import.meta.url), 'utf8')
-  const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
   const names = [...script.matchAll(/^import\s+([\s\S]*?)\s+from\s+'[^']+'\s*;?\s*$/gm)].flatMap(([, clause]) => {
     const named = clause.match(/\{([\s\S]*?)\}/)?.[1].split(',').map(s => s.trim().split(/\s+as\s+/).at(-1)).filter(Boolean) || []
     const main = clause.replace(/\{[\s\S]*?\}/, '').replace(/,/g, '').trim()

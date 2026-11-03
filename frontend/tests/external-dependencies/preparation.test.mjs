@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 const src = readFileSync(new URL('../../src/components/admin/ExternalDependenciesPanel.vue', import.meta.url), 'utf8')
-const script = src.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'globalThis.component =')
+const script = src.slice(src.indexOf('<script>') + 8, src.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'globalThis.component =')
 function setup(check, open = async () => {}, uni = {}) {
   const sandbox = { uni, SettingsSection: {}, checkExternalDependencies: check, openExternalUrlChecked: open, window: { addEventListener() {}, removeEventListener() {} } }
   vm.runInNewContext(script, sandbox)

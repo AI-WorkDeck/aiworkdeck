@@ -79,7 +79,7 @@ test('copy and document actions receive readable references, including the unver
   const text = legalReadableText('Answer\n' + fence(model), key => key)
   assert.ok(text.includes('Synthetic decision'))
   assert.ok(text.includes('legalReference.status.unverified'))
-  assert.ok(text.includes('https://example.org/decision'))
+  assert.match(text, /https:\/\/example\.org\/decision/)
   assert.ok(!text.includes('```') && !text.includes('"kind"'))
 })
 test('different provenance snapshots never activate an old reader', () => {

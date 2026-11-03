@@ -14,10 +14,17 @@ import { fileURLToPath } from 'node:url'
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '../../src')
 const read = (p) => readFileSync(join(SRC, p), 'utf8')
 // 注释里说得出「撤掉了什么」是好事，断言只看真代码
-const stripComments = (s) => s
-  .replace(/<!--[\s\S]*?-->/g, '')
-  .replace(/\/\*[\s\S]*?\*\//g, '')
-  .replace(/^\s*\/\/.*$/gm, '')
+const cutBetween = (str, open, close) => {
+  let out = str, i = out.indexOf(open)
+  while (i !== -1) {
+    const j = out.indexOf(close, i + open.length)
+    out = j === -1 ? out.slice(0, i) : out.slice(0, i) + out.slice(j + close.length)
+    i = out.indexOf(open)
+  }
+  return out
+}
+const stripComments = (s) =>
+  cutBetween(cutBetween(s, '<!--', '-->'), '/*', '*/').replace(/^\s*\/\/.*$/gm, '')
 
 const WIDGET = read('components/FeedbackWidget.vue')
 const MOUNT = read('utils/feedbackWidget.js')

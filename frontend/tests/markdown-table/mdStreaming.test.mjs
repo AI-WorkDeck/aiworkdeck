@@ -36,7 +36,7 @@ function loadComponent(render = renderMarkdown) {
     copyToClipboard: () => true,
     nextStableLength,
   }
-  const script = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
   const names = Object.keys(deps)
   // eslint-disable-next-line no-new-func

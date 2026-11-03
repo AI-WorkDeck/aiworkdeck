@@ -16,7 +16,7 @@ const SFC = readFileSync(
   new URL('../../src/components/PlainTextEditor.vue', import.meta.url), 'utf8')
 
 function loadOptions(setTimeoutStub, clearTimeoutStub, emit) {
-  const script = SFC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = SFC.slice(SFC.indexOf('<script>') + 8, SFC.indexOf('</script>'))
   const body = script
     .replace(/^import .*$/gm, '')
     .replace('export default', 'return')

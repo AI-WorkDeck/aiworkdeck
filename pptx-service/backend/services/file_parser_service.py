@@ -20,6 +20,17 @@ from services.ai_providers.text import strip_think_tags
 logger = logging.getLogger(__name__)
 
 
+def _validate_local_file_path(file_path: str) -> str:
+    """Validate and canonicalize a local file path before opening it."""
+    if not file_path or not isinstance(file_path, str) or "\x00" in file_path:
+        raise ValueError("Invalid file path")
+    allowed_root = os.path.realpath(os.environ.get("PPTX_ALLOWED_ROOT") or os.path.abspath(os.sep))
+    resolved = os.path.realpath(os.path.abspath(file_path))
+    if not resolved.startswith(allowed_root):
+        raise ValueError("File path is outside allowed root")
+    return resolved
+
+
 # [checkba] 本地 MinerU 优先逻辑辅助函数 —— re-vendor 升级时需保留（见 UPGRADE_CHECKBA.md）
 def _truthy(value: str) -> bool:
     if value is None:
@@ -286,10 +297,11 @@ class FileParserService:
             Tuple of (batch_id, markdown_content, extract_id, error_message, failed_image_count)
         """
         try:
+            safe_file_path = _validate_local_file_path(file_path)
             logger.info(f"Uploading file to local MinerU service (mineru-api): {filename}")
 
             # Official mineru-api uses /file_parse endpoint with multipart form data
-            with open(file_path, 'rb') as f:
+            with open(safe_file_path, 'rb') as f:
                 files = {'files': (filename, f)}
                 data = {
                     'backend': 'pipeline',  # Use pipeline backend for CPU mode
@@ -520,8 +532,9 @@ class FileParserService:
             Tuple of (batch_id, markdown_content, extract_id, error_message, failed_image_count)
         """
         try:
+            safe_file_path = _validate_local_file_path(file_path)
             # Read file content
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(safe_file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
             logger.info(f"Text file read successfully: {len(content)} characters")
@@ -543,7 +556,8 @@ class FileParserService:
         except UnicodeDecodeError:
             # Try with different encoding
             try:
-                with open(file_path, 'r', encoding='gbk') as f:
+                safe_file_path = _validate_local_file_path(file_path)
+                with open(safe_file_path, 'r', encoding='gbk') as f:
                     content = f.read()
                 logger.info(f"Text file read successfully with GBK encoding: {len(content)} characters")
                 
@@ -632,7 +646,8 @@ class FileParserService:
     def _upload_file(self, file_path: str, upload_url: str) -> Optional[str]:
         """Upload file to MinerU"""
         try:
-            with open(file_path, 'rb') as f:
+            safe_file_path = _validate_local_file_path(file_path)
+            with open(safe_file_path, 'rb') as f:
                 response = requests.put(
                     upload_url,
                     data=f,

@@ -36,7 +36,7 @@ test('BUG-67：收藏夹卡片三图标固定顺序——插入 / 复制 / 删�
 })
 
 test('BUG-67：复制按钮真的存在对应方法，不是死绑定', () => {
-  const script = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const script = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
   assert.match(script, /copyFav\s*\(/, '应有 copyFav 方法')
   assert.match(TEMPLATE, /@tap\.stop="copyFav\(fav\)"/, '复制按钮应绑定 copyFav(fav)')
 })
