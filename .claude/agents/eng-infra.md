@@ -691,3 +691,9 @@ Windows 下从 pwsh→Node 再启动 powershell.exe 会继承不兼容 PSModuleP
 回归：`desktop/tests/model-manager.test.js`、`model-fetch.test.py`（真实 SDK 需安装包 Python/lib；普通环境可显式 skip 该项，不把 skip 算通过）。
 
 **真实 ASR 词表格式（2026-10-21，dev-board#1395）**：官方 `Systran/faster-whisper-medium` 实际下载包含 `vocabulary.txt`；不能强制要求 `vocabulary.json`。桌面清单和后端 `ModelPresence` 同步按 CTranslate2 的 JSON 优先、文本备用规则校验；存在但格式错误的 JSON 不静默回退。真实 Mac ARM64 中英 Kokoro→Whisper 推理、缺模型409后同进程恢复已由子代理与主任务分别运行；脚本 `asr-service/tests/real_inference.py` 只接受准备好的运行时/缓存和合成短句。隔离 HOME/临时目录，HF offline+死代理不等于操作系统断网；不据此声称 Windows 或完整 Electron 用户流程通过。
+
+### uni H5 动态插槽兼容（dev-board#1679）
+
+锁定的 `@dcloudio/uni-h5-vue` 3.4.21 内置运行时使用三参数 `def(children, "_", type)`，根 `@vue/shared` 3.5 的 helper 则显式将第四参数默认设为 `false`。这会把原本可写的插槽标记变成只读，正式 Windows 验收捕获 `Object.assign` 插槽更新错误，随后工作台导航无法完成；尚未将具体触发组件归因到自绘菜单。保留现有依赖安全升级；`frontend/scripts/patch-uni-h5-slots.mjs` 在 postinstall 对普通 H5 的 ESM/CJS 精确补第四参数 `true`，恢复旧契约。补丁必须唯一匹配、幂等，依赖结构改变时拒绝继续，不能笼统替换所有 `def` 或回退整个 Vue 依赖树。
+
+回归：`cd frontend && node --test tests/build/uni-h5-slots.test.mjs`，以及干净安装后的 H5 构建、Windows 正式安装客户端文件打开/自动保存/重开。未补运行时配新 shared 的失败对照必须保留；源代码单测不替代正式包回归。
