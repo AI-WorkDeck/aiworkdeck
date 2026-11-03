@@ -35,23 +35,8 @@ public class MobileAssistantCopyService {
         var turns = assistant.readableConversationForCopy(user, conversationId);
         String newId = "conv-" + UUID.randomUUID();
         int count = 0;
-        for (var turn : turns) {
-            count += save(user, targetProjectId, newId, "USER", turn.getQuestion(), turn.getCreatedAt());
-            if ("completed".equals(turn.getStatus())) {
-                String answer = turn.getAnswer();
-                if (turn.getSourcesJson() != null && !turn.getSourcesJson().isBlank()) {
-                    try {
-                        var sources = new com.fasterxml.jackson.databind.ObjectMapper().readTree(turn.getSourcesJson());
-                        StringBuilder notes = new StringBuilder();
-                        for (var source : sources) {
-                            notes.append("\n- ").append(source.path("projectName").asText())
-                                    .append(" · ").append(source.path("sourceUpdatedAt").asText());
-                        }
-                        if (!notes.isEmpty()) answer += LangText.of("\n\n来源项目（本次仅复制对话记录，未复制来源文件）：", "\n\nSource projects (transcript copied; source files were not copied):") + notes;
-                    } catch (java.io.IOException e) { throw new IllegalStateException("Unreadable assistant source records", e); }
-                }
-                count += save(user, targetProjectId, newId, "ASSISTANT", answer, turn.getCreatedAt());
-            }
+        for (var message : MobileAssistantTranscript.from(turns)) {
+            count += save(user, targetProjectId, newId, message.role(), message.content(), java.time.Instant.parse(message.createdAt()));
         }
         return new Result("copy", true, conversationId, newId, targetProjectId, count, false);
     }

@@ -48,6 +48,12 @@ public class MobileProjectDir {
     @Column(length = 36)
     private String projectUid;
 
+    /** Null for old publishers; only explicit ownership/type supports desktop transcript delivery. */
+    @Column(length = 32)
+    private String projectType;
+    @Column
+    private Boolean owned;
+
     /** Only trusted after matching this account's owned cloud project. */
     private Long cloudProjectId;
 

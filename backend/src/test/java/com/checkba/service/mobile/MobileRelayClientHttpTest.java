@@ -190,6 +190,7 @@ class MobileRelayClientHttpTest {
         p42.setId(42L);
         p42.setName("金冠纾困");
         p42.setUserId(7L);
+        p42.setProjectType("BLANK");p42.setUid("a6651eca-1111-4222-8333-444455556666");
         when(projectRepository.findByUserIdOrderByCreatedAtDesc(7L)).thenReturn(List.of(p42));
         when(projectRepository.findById(42L)).thenReturn(Optional.of(p42));
         when(projectRepository.findById(999L)).thenReturn(Optional.empty());
@@ -428,6 +429,9 @@ class MobileRelayClientHttpTest {
         assertEquals(1, dirBodies.size());
         assertTrue(dirBodies.get(0).contains("\"key\":\"42\""));
         assertTrue(dirBodies.get(0).contains("金冠纾困"));
+        assertTrue(dirBodies.get(0).contains("\"projectType\":\"BLANK\""));
+        assertTrue(dirBodies.get(0).contains("\"owned\":true"));
+        assertTrue(dirBodies.get(0).contains("a6651eca-1111-4222-8333-444455556666"));
         assertTrue(dirBodies.get(0).contains(svc.deviceId()));
 
         svc.pushDirectory();
