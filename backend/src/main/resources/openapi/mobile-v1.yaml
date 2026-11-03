@@ -401,6 +401,21 @@ components:
             walletFallbackEnabled: { type: boolean }
             cloudStorageBytes: { type: integer, format: int64 }
             relayBytes: { type: integer, format: int64 }
+            sandbox: { type: boolean, description: Present only for explicitly allowed subscription review accounts }
+            sandboxSubscription:
+              type: object
+              description: Isolated Apple Sandbox lifecycle; never grants real balance, service credits or storage
+              properties:
+                active: { type: boolean }
+                expiresAt: { type: string, nullable: true }
+                autoRenew:
+                  type: object
+                  nullable: true
+                  properties:
+                    provider: { type: string, enum: [appstore] }
+                    productId: { type: string }
+                    enabled: { type: boolean, nullable: true }
+                    expiresAt: { type: string, nullable: true }
         plan:
           type: string
           nullable: true
