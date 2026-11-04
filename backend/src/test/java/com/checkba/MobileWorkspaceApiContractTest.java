@@ -45,7 +45,10 @@ class MobileWorkspaceApiContractTest {
                 .withLevel("validation.request.path.missing",ValidationReport.Level.ERROR).build()).build();
     }
     @BeforeEach void setup() {
-        when(quota.persistentQuota(anyLong())).thenReturn(1000L);
+        when(quota.subscriptionQuota(anyLong())).thenReturn(1000L);
+        when(quota.canRead(anyLong())).thenReturn(true);
+        when(quota.canWrite(anyLong())).thenReturn(true);
+        when(quota.canUse(anyLong())).thenReturn(true);
         var model=mock(ChatLanguageModel.class);
         when(model.generate(anyList(),anyList())).thenReturn(Response.from(AiMessage.from("Synthetic response without external calls.")));
         when(model.generate(any(dev.langchain4j.data.message.ChatMessage[].class))).thenReturn(Response.from(AiMessage.from("Synthetic project summary.")));

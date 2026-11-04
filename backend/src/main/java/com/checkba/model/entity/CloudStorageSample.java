@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import java.time.Instant;
 @Entity @Data
-@Table(name="cloud_storage_sample", indexes=@Index(name="idx_cloud_storage_sample_owner",columnList="userId,observedAt"))
+@Table(name="cloud_storage_sample", indexes=@Index(name="idx_cloud_storage_sample_owner",columnList="user_id,observed_at"))
 public class CloudStorageSample {
     @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
     @Column(nullable=false) private Long userId;
