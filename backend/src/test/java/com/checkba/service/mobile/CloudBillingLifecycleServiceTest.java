@@ -50,6 +50,22 @@ class CloudBillingLifecycleServiceTest {
   assertArrayEquals(before,Files.readAllBytes(local));assertEquals("complete",stored.values().iterator().next().getState());
   service.process(1L);verify(blobs,times(1)).deleteQuietly("cloud/object");
  }
+ // #1710: a late notification acknowledgement must honor the account center's review decision.
+ @Test void reviewAfterNotificationAckStopsBeforeClaimOrCloudDeletion() {
+  var before=Map.<String,Object>of("billing",Map.of("remindAt",Instant.now().minusSeconds(1).toString(),"cleanupAt",Instant.now().minusSeconds(1).toString()),
+    "cloudAccess",Map.of("caseId","case-1","epoch",1L,"cleanupEligible",true,"cleanupState","none"));
+  var review=Map.<String,Object>of("billing",Map.of(),"cloudAccess",Map.of("caseId","case-1","epoch",1L,"cleanupEligible",false,"cleanupState","review"));
+  when(billing.cloudState(1L)).thenReturn(before,review);
+  service.process(1L);
+  var order=inOrder(messages,billing);
+  order.verify(billing).cloudState(1L);
+  order.verify(messages).publishAuthorizedBusiness(anyString(),anyString(),eq(1L),anyList(),isNull(),anyString(),anyString(),anyString(),anyString(),anyString(),anyMap());
+  order.verify(billing).cloudOperation(eq(1L),eq("notification-ack"),argThat(p->"notice-1".equals(p.get("receiptId"))));
+  order.verify(billing).cloudState(1L);
+  verify(billing,never()).cloudOperation(eq(1L),eq("cleanup-claim"),anyMap());
+  verifyNoInteractions(blobs,projects,backups,versions,consents,summaries,turns,calendar,jobs);
+  assertTrue(stored.isEmpty());
+ }
  @Test void paymentWinsBeforeFirstClaimAndNothingIsDeleted(){when(billing.cloudOperation(eq(1L),eq("cleanup-claim"),anyMap())).thenReturn(Map.of("allowed",false));service.process(1L);verify(blobs,never()).deleteQuietly(anyString());verify(summaries,never()).deleteByUserId(anyLong());}
  @Test void failedNotificationNeverAcknowledgesOrDeletes(){when(messages.publishAuthorizedBusiness(anyString(),anyString(),anyLong(),anyList(),isNull(),anyString(),anyString(),anyString(),anyString(),anyString(),anyMap())).thenThrow(new IllegalStateException("db unavailable"));assertThrows(IllegalStateException.class,()->service.process(1L));verify(billing,never()).cloudOperation(eq(1L),eq("notification-ack"),anyMap());verify(blobs,never()).deleteQuietly(anyString());}
  @Test void ambiguousOwnershipStopsBeforeAnyIrreversibleClaim(){when(projects.needsReview(1L)).thenReturn(true);service.process(1L);verify(billing,never()).cloudOperation(eq(1L),eq("cleanup-claim"),anyMap());assertEquals("review",stored.values().iterator().next().getState());}
