@@ -19,7 +19,7 @@ function harness({ prepare = async () => ({ ready: true }), flush = async () => 
     showModal: options => { events.push('modal'); modals.push(options) },
   }
   new Function('host', 'uni', 'window', 'createDesktopQuitGuard', 'prepareAgentRestart', 'abortAgentRestart',
-    'flushQuitWorkbenches', 'confirmQuitWorkbenches', 'setGlobalOverlay', 'openLocalRootPath', 'openLocalFilePath', block).call({ $t: key => key }, host, uni,
+    'flushQuitWorkbenches', 'confirmProjectExit', 'setGlobalOverlay', 'openLocalRootPath', 'openLocalFilePath', block).call({ $t: key => key }, host, uni,
     { addEventListener: (_, fn) => { handlers.key = fn } }, createDesktopQuitGuard,
     prepare, async () => { events.push('abort'); return await abort() }, flush, confirm,
     enabled => events.push(enabled ? 'blocked' : 'unblocked'), open, open)

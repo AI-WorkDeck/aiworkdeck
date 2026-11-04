@@ -3,6 +3,12 @@ name: version-control
 description: 项目级版本记录领域。任务涉及版本记录/工作段（work session）、时间线、退回版本、丢弃工作、另起一稿/多稿并行/采纳-放弃-冲突三选一、项目 Git 仓库（com.checkba.version 包）、文件树清单 .awd/tree.json 时，先读本文档再动代码。
 ---
 
+## 软件退出的统一项目提交选择（dev-board#1685 / #1687）
+
+`App.vue` 的 desktop quit guard 先暂停 AI 并 `flushQuitWorkbenches` 确认文件落盘，再调用全局 `projectExitDialog.js`；不依赖当前项目或页面实例。`ProjectExitDialog.vue` 立即显示，最多三路读取全部本地项目的 `/version/exit-status`（8 秒请求预算，失败保持可见且可重试），只展示有待提交内容、冲突或统计失败的项目，默认不勾选。全部干净时自动退出；直接退出保留未提交改动，最终仍经 quit guard 再次保存校验。选中项目逐个调用既有 `/session/end` 并核查轻量状态；成功回执先取消勾选，部分失败留在弹窗，重试不重复提交已成功项目。退出提交携带 receiptEpoch:UUID；网络失败或 RUNNING/UNKNOWN 回执作为未结提交跨弹窗保留，禁止直接退出及新增提交，重试复用原请求 ID。普通状态读取成功不能替代提交终态；SUCCEEDED/FAILED 才解除未结保护，旧进程 epoch 不重放。提交中禁止退出按钮；切项目仅保存文件，不再询问提交。退出登录沿用原有确认行为。
+
+独立弹窗沿既有 DOM createApp 宿主方式挂载（uni 会覆盖 App 模板），持有全局浮层隐藏原生 BrowserView；取消代次丢弃迟到结果。`projectExitState.js` 严格核对状态及提交回执，不能把读取失败当成零改动。四格式原有保存屏障未变：Word/PPT/Excel 共用 LibreOfficeEditor；PDF 的预览不新增伪保存路径，其他既有编辑实例仍由原注册表校验。回归 `project-exit.test.mjs`、`desktop-quit-app.test.mjs`、`flush-dirty-editors.test.mjs`。浏览器夹具 `tests/project-exit-ui/build.mjs` 生成真实组件+合成API页面，验证窄窗和部分失败；不等于正式客户端/真实文件退出实测。
+
 ## 本地项目保存与版本锁范围（dev-board#1529）
 
 `WorkSessionService.repoLock` 的本地项目使用 `PathScopedRepoLock`：每次外层获取按当前物理根目录（解析符号链接，包括尚不存在路径的最近已存在祖先）与活动范围比较，仅相同或祖先/后代目录互斥；独立目录与兄弟目录可并行。不能退回所有本地目录一把锁，也不能仅按首次打开时的父子分组：后来打开的父目录仍必须等待已活动子目录。根解析在注册表锁外，解析失败不作无冲突降级；同项目重入沿用外层范围。现有业务只在同项目嵌套；跨项目扩大范围遇到其他线程持锁直接失败，不能形成两方升级死锁。只读轮询不得插队到已等待的重叠保存之前。
@@ -1059,3 +1065,15 @@ cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='Inte
 `GET /api/projects/{projectId}/files/changes` 是本机项目专用 SSE（`LocalProjectFileChangeController`）：仅 local-mode，校验当前身份、项目读取权限、非 CLIENT 角色及 localRoot。事件 `ready` / `files_changed` / `ping` 只携带 projectId，不携带文件名或绝对路径；发事件前重查权限，撤权后关流；15 秒心跳，完成/异常/停止时释放订阅。`OpenEntityManagerInViewConfig` 的排除路径必须包含 `/api/projects/*/files/changes`，不得让长连接占住 JDBC 连接。
 
 前端 `projectFileChanges.js` 用 fetch 流携带既有认证头；ready 与变化重拉列表，ping 只续期，45 秒断流检测，短连接1–30秒退避，401/403/404停止。切项目/卸载abort；重连ready补读断线期间变化。文件树请求序号防止回焦时旧列表覆盖对账后的新列表。窗口focus刷新仍保留为补充，不再是外部移动后的唯一刷新来源。
+
+## 退出前轻量项目检查（dev-board#1685/#1687）
+
+`GET /api/projects/{id}/version/exit-status` 继续成员且非客户鉴权，返回 `enabled/working/changedCount/onDraft/conflict/canCommit`。`WorkSessionService.exitStatus` 在现有项目锁下用 `tryLock` 获取一致只读快照，忙时仍报 423；不触发 pending ingest、不遍历版本容量、不查询云端或解析冲突文档。冲突时 `conflict:true/canCommit:false`，不把省略细节误报为可提交。只读成员仍可读摘要，但 `canCommit:false`。
+
+普通工作段的 `changedCount` 合并工作区未存档路径与 merge-base→HEAD 已自动存档路径，去重并排除 `.awd/`；不能仅看工作区相对 HEAD，否则自动存档后会错误显示零改动。草稿沿 `endSessionOnDraft` 语义只算未存档路径，不暗中采纳整稿。工作段存在但用户可见净差异为零时仍可主动结束，沿既有 `endSession` 空段/元数据处理。只省非必要查询，不省磁盘改动核对；超大工作区仍可能因只读状态扫描耗时，不能承诺固定响应时限。
+
+回归：`VersionExitStatusTest`（权限、冲突、草稿、禁用、忙锁、无容量/后台调度）、`WorkSessionServiceTest`（真实 JGit 自动存档/未存档计数与结束后归零、4000 条合成历史目录六轮新旧端点比较）；合成性能数据不能代表用户现场保存失败已独立复现。
+
+退出提交的未知回执不能用一次状态快照推断已结束（旧 POST 可能尚未完成鉴权/入锁）。`exit-status` 附本进程 `receiptEpoch`；退出专用 `session/end` 可带 `requestId=epoch:UUID`。作用域前缀由本进程及用户/项目各自的安全随机 UUID 组成（不暴露身份数字），在登记前先核对；请求标识全局绑定首次用户/项目，异作用域即使先到也只回 `UNKNOWN`，不执行且不泄露回执。控制器原子登记后，重复请求只读 `RUNNING/SUCCEEDED/FAILED` 回执；成功保留原 `sha/notice/conflict`，失败保留本地化错误消息，均不再次提交。不同标题复用同一标识拒绝；不带标识的既有客户端保持原行为。旧进程标识返回 `UNKNOWN` 且不执行，不能自动换新 ID 重提。
+
+回执只在进程内保留，不落盘、不创建线程或任务队列、不淘汰终态（避免旧 ID 被再次执行）。因此重启后未知结果仍需人工核对，不能宣称跨重启 exactly-once。`VersionEndReceiptTest` 覆盖运行中并发重复、迟到重放、失败缓存、冲突回执、权限与身份/项目隔离、重启旧标识拒绝及旧客户端兼容。

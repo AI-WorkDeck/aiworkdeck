@@ -4251,7 +4251,7 @@ export default {
       const result = await flushDirtyEditors(this._libreRefs, this._plainTextRefs, { timeoutMs: 0 })
       this.flushTabSnapshot()
       return result
-    }, (options) => this.confirmVersionBeforeLeaving(options))
+    })
     // 多实例守卫：本页经 navigateTo 反复进入时页面栈里会有多个存活实例，每个都在
     // mounted 绑定了全局（ipcRenderer/window 级）监听；全局事件只让最近展示的实例
     // 处理，否则一次事件触发 N 份副作用（与 PR#148 剪贴板重复入库同源）
@@ -5045,8 +5045,6 @@ export default {
         uni.showToast({ title: this.$t('editor.saveBeforeLeaving'), icon: 'none', duration: 4000 })
         return false
       }
-      if (!canNavigate()) return false
-      if (!restartRecovery && !await this.confirmVersionBeforeLeaving()) return false
       if (!canNavigate()) return false
       if (beforeNavigate) await beforeNavigate()
       await new Promise((resolve, reject) => uni.reLaunch({ url, success: resolve, fail: reject }))

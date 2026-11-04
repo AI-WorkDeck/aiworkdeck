@@ -122,7 +122,7 @@ for (const name of ['leaveWorkbench', 'handleLogout']) {
         async () => { if (outcome === 'throws') throw new Error('offline'); return { failed: outcome === 'failed' ? 1 : 0 } },
         { showToast: () => calls.push('toast'), reLaunch: ({ success }) => { calls.push('navigate'); success?.() } },
         () => calls.push('clear'))
-      await methods[name].call({ $t: k => k, confirmVersionBeforeLeaving: async () => outcome !== 'cancelled' }, '/target')
+      await methods[name].call({ $t: k => k, confirmVersionBeforeLeaving: async () => outcome !== 'cancelled' }, '/target', { canNavigate: () => outcome !== 'cancelled' })
       if (outcome === 'saved') assert.deepEqual(calls, name === 'handleLogout' ? ['clear', 'navigate'] : ['navigate'])
       else if (outcome === 'cancelled') assert.deepEqual(calls, [], '取消后不导航也不清除会话')
       else assert.deepEqual(calls, ['toast'], '失败必须留在工作台并保留会话')
@@ -168,7 +168,7 @@ for (const name of ['leaveWorkbench', 'handleLogout']) {
       text.dirty = false
       return true
     }
-    await methods[name].call(vm, '/target')
+    await methods[name].call(vm, '/target', { canNavigate: () => outcome !== 'cancelled' })
     assert.deepEqual(calls, ['toast'])
     assert.equal(vm._libreRefs['right:2'].dirty, true)
   })

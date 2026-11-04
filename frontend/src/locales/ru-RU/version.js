@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitUnconfirmedProject: "Неподтверждённый проект",
+  exitCommitUnconfirmed: "Результат фиксации ещё не подтверждён. Повторите проверку перед выходом или отмените выход, чтобы вернуться в приложение.",
+  exitProjectsTitle: "Проверить изменения перед выходом",
+  exitProjectsHint: "Выберите проекты для фиксации. Невыбранные изменения останутся сохранёнными на этом компьютере.",
+  exitProjectsChecking: "Проверка изменений…",
+  exitProjectsCommit: "Зафиксировать выбранное и выйти",
+  exitProjectsCommitted: "Зафиксировано",
+
   "aiSaving": "Сохранение открытых файлов…",
   "aiExecuting": "Обновление версии проекта…",
   "aiMerging": "Слияние изменений без конфликтов…",
