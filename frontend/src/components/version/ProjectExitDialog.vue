@@ -115,7 +115,7 @@ export default {
 </script>
 <style scoped>
 .project-exit-mask { position: fixed; inset: 0; z-index: 10050; background: var(--awd-overlay); display: flex; align-items: center; justify-content: center; }
-section { width: min(640px, 90vw); max-height: 85vh; overflow: auto; padding: 24px; background: var(--awd-surface); color: var(--awd-text); border-radius: 12px; }
+section { box-sizing: border-box; width: min(640px, 90vw); max-height: 85vh; overflow: auto; padding: 24px; background: var(--awd-surface); color: var(--awd-text); border-radius: 12px; }
 h3 { margin-block: 0 12px; }
 p { font-size: 13px; line-height: 1.6; }
 .project-exit-list { max-height: 45vh; overflow: auto; }
