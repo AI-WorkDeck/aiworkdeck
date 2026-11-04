@@ -13,6 +13,29 @@ import { accountRequiredError, isCreditsRequired, isAccountRequired } from '@/ut
 import { createCloudConnectivity } from '@/utils/cloudConnectivity.js'
 import { subscribeProjectFileChanges } from '@/utils/projectFileChanges.js'
 
+import { createCloudEpochGate, needsCloudEpoch } from '../../../shared/cloud-epoch.mjs'
+
+const cloudEpochGate = createCloudEpochGate((origin, header) => new Promise((resolve, reject) => {
+  uni.request({ url: origin + '/api/mobile/billing/cloud-state', method: 'GET', header,
+    success(res) {
+      if (res.statusCode === 404) { resolve(null); return }
+      if (res.statusCode !== 200 || (res.data?.code != null && res.data.code !== 0)) { reject(new Error(t('common.networkError'))); return }
+      resolve(res.data?.data || res.data)
+    }, fail() { reject(new Error(t('common.networkError'))) },
+  })
+}))
+
+export async function getCloudWriteHeaders(url, method = 'POST', auth = getAuthHeaders()) {
+  const session = getSessionId()
+  const generation = getCloudAccountGeneration()
+  const base = getApiBaseUrl()
+  let epoch
+  try { epoch = await cloudEpochGate.headers(url, method, auth) }
+  catch { throw new Error(t('common.cloudAccessRefresh')) }
+  if (session !== getSessionId() || generation !== getCloudAccountGeneration() || base !== getApiBaseUrl()) throw new Error(t('common.cloudAccessRefresh'))
+  return { ...auth, ...epoch }
+}
+
 // Desktop account changes do not replace the local session. Invalidate only on
 // successful identity mutations, never on account-status polling.
 let cloudAccountGeneration = 0
@@ -20,6 +43,7 @@ export function getCloudAccountGeneration() {
   return cloudAccountGeneration
 }
 function cloudAccountChanged(result) {
+  cloudEpochGate.clear()
   cloudAccountGeneration++
   return result
 }
@@ -192,7 +216,7 @@ function isOnLoginPage() {
 // options.signal（AbortSignal，可选）：取消时断开底层 uni.request 并以 AbortError 拒绝。
 // 调用方主动取消不是网络故障，不打「网络请求失败」那一大串诊断日志（v0.49.0 BUG-12：
 // 搜索面板每次新查询都要取消上一次在途请求，否则连续输入会在后端叠成一长队）。
-function request(options) {
+async function request(options) {
   const { signal, accountAuthAttempt, sessionRecoveryAttempt, ...uniOptions } = options;
   const accountGeneration = getCloudAccountGeneration();
   const abortError = () => {
@@ -229,10 +253,11 @@ function request(options) {
   }
 
   // 合并请求头（确保自定义 header 优先级更高）
-  const headers = {
-    ...authHeaders,
-    ...(options.header || {}),
+  let headers = { ...authHeaders, ...(options.header || {}) }
+  if (needsCloudEpoch(url, options.method || 'GET', headers)) {
+    headers = await getCloudWriteHeaders(url, options.method || 'GET', headers)
   }
+  if (signal?.aborted) throw abortError()
 
   return new Promise((resolve, reject) => {
     const task = uni.request({
@@ -272,7 +297,7 @@ function request(options) {
           const localRequest = ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(url).hostname)
             && url.startsWith(`${baseUrl.replace(/\/$/, '')}/api/`);
           if (localRequest && sentSession && sameSession()
-              && !options.header?.['X-Session-Id'] && !sessionRecoveryAttempt) {
+              && !options.header?.['X-Session-Id'] && !sessionRecoveryAttempt && !headers['X-Cloud-Epoch']) {
             clearSession();
             // Authentication was rejected before the operation ran. Retry once without the stale header.
             request({ ...options, sessionRecoveryAttempt: true }).then(resolve, reject);
@@ -2798,11 +2823,12 @@ export function saveClipboardLocalFile(sourcePath) {
   })
 }
 
-export function saveClipboardFile(fileObj, type = 'FILE') {
+export async function saveClipboardFile(fileObj, type = 'FILE') {
   const baseUrl = getApiBaseUrl()
   const url = `${baseUrl}/api/clipboard/file`
   const sessionId = getSessionId()
 
+  const writeHeaders = await getCloudWriteHeaders(url, 'POST', { 'X-Session-Id': sessionId })
   return new Promise((resolve, reject) => {
     // Use native XMLHttpRequest or fetch to ensure Blob/File upload works reliably in H5/Electron
     const formData = new FormData()
@@ -2817,9 +2843,7 @@ export function saveClipboardFile(fileObj, type = 'FILE') {
 
     const xhr = new XMLHttpRequest()
     xhr.open('POST', url)
-    if (sessionId) {
-      xhr.setRequestHeader('X-Session-Id', sessionId)
-    }
+    Object.entries(writeHeaders).forEach(([key, value]) => xhr.setRequestHeader(key, value))
 
     xhr.onload = () => {
       if (xhr.status === 200) {
@@ -3597,15 +3621,16 @@ export function continueProjectVersionMerge(data) {
   return request({ url: '/api/ai/agent/version-action/merge', method: 'POST', data })
 }
 
-export function continueProjectVersionMergeFile({ operationId, conversationId, stepId, path, bytes, name }) {
+export async function continueProjectVersionMergeFile({ operationId, conversationId, stepId, path, bytes, name }) {
   const form = new FormData()
   for (const [key, value] of Object.entries({ operationId, conversationId, stepId, path })) form.append(key, value)
   form.append('file', bytes instanceof Blob ? bytes : new Blob([bytes], { type: 'application/octet-stream' }), name || String(path).split('/').pop())
+  const url = `${getApiBaseUrl().replace(/\/$/, '')}/api/ai/agent/version-action/merge-file`
+  const writeHeaders = await getCloudWriteHeaders(url)
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
-    xhr.open('POST', `${getApiBaseUrl().replace(/\/$/, '')}/api/ai/agent/version-action/merge-file`)
-    const sessionId = getSessionId()
-    if (sessionId) xhr.setRequestHeader('X-Session-Id', sessionId)
+    xhr.open('POST', url)
+    Object.entries(writeHeaders).forEach(([key, value]) => xhr.setRequestHeader(key, value))
     xhr.timeout = 180000
     xhr.onload = () => {
       try {
@@ -4212,7 +4237,7 @@ export function getMergeAnalysis(projectId, path) {
 // submitFeedback 已是同样的写法）。
 // bytes：Uint8Array（引擎 export_document 的出参）；decisions：Decision[] 数组，
 // 元素 {key, side: 'M'|'T'|'', action: 'A'|'R'|'X'|'F'}，mode=auto 时允许为空。
-export function postMergeResolveFile(projectId, { path, mode, decisions, bytes, name, ctx, mainRef, otherRef }) {
+export async function postMergeResolveFile(projectId, { path, mode, decisions, bytes, name, ctx, mainRef, otherRef }) {
   const baseUrl = getApiBaseUrl()
   const sessionId = getSessionId()
   const form = new FormData()
@@ -4226,10 +4251,11 @@ export function postMergeResolveFile(projectId, { path, mode, decisions, bytes, 
     const blob = bytes instanceof Blob ? bytes : new Blob([bytes], { type: 'application/octet-stream' })
     form.append('file', blob, name || (String(path).split('/').pop() || 'merged.bin'))
   }
+  const writeHeaders = await getCloudWriteHeaders(`${baseUrl.replace(/\/$/, '')}/api/projects/${projectId}/version/merge/resolve-file`, 'POST', { 'X-Session-Id': sessionId })
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('POST', `${baseUrl.replace(/\/$/, '')}/api/projects/${projectId}/version/merge/resolve-file`)
-    if (sessionId) xhr.setRequestHeader('X-Session-Id', sessionId)
+    Object.entries(writeHeaders).forEach(([key, value]) => xhr.setRequestHeader(key, value))
     xhr.onload = () => {
       if (xhr.status !== 200) {
         reject(new Error(t('common.submitFailedWithStatus', { status: xhr.status })))
@@ -4252,7 +4278,7 @@ export function postMergeResolveFile(projectId, { path, mode, decisions, bytes, 
 // SHA256。服务端负责最终命名（客户端只给建议名）、哈希守卫与原子落盘；响应与 createFile
 // 为直接 ProjectFile。裸 XHR 不手写 Content-Type（multipart 边界由
 // FormData 生成，手写会破坏 boundary）。
-export function createComparisonFile(projectId, { bytes, name, baseFileId, revisedFileId, baseSha256, revisedSha256 }, timeoutMs = 60000) {
+export async function createComparisonFile(projectId, { bytes, name, baseFileId, revisedFileId, baseSha256, revisedSha256 }, timeoutMs = 60000) {
   const baseUrl = getApiBaseUrl()
   const sessionId = getSessionId()
   const form = new FormData()
@@ -4262,10 +4288,11 @@ export function createComparisonFile(projectId, { bytes, name, baseFileId, revis
   form.append('revisedFileId', String(revisedFileId))
   form.append('baseSha256', baseSha256 || '')
   form.append('revisedSha256', revisedSha256 || '')
+  const writeHeaders = await getCloudWriteHeaders(`${baseUrl.replace(/\/$/, '')}/api/projects/${projectId}/files/comparison`, 'POST', { 'X-Session-Id': sessionId })
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('POST', `${baseUrl.replace(/\/$/, '')}/api/projects/${projectId}/files/comparison`)
-    if (sessionId) xhr.setRequestHeader('X-Session-Id', sessionId)
+    Object.entries(writeHeaders).forEach(([key, value]) => xhr.setRequestHeader(key, value))
     xhr.timeout = timeoutMs
     xhr.onload = () => {
       let data

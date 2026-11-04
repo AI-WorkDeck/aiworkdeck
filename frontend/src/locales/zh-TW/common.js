@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cloudAccessRefresh: "雲端權限已變更，請重新整理頁面或重新開啟應用程式後再操作。本機檔案不會刪除。",
   workspaceSessionUnavailable: "無法恢復工作區工作階段",
   "confirm": "確定",
   "cancel": "取消",

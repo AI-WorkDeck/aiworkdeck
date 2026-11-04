@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cloudAccessRefresh: "El acceso a la nube ha cambiado. Actualiza la página o vuelve a abrir la aplicación para continuar. No se eliminarán los archivos locales.",
   workspaceSessionUnavailable: "No se pudo restablecer la sesión del espacio de trabajo",
   "confirm": "Aceptar",
   "cancel": "Cancelar",

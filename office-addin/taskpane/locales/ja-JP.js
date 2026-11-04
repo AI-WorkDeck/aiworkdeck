@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  apiCloudAccessRefresh: "クラウドへのアクセス権が変更されました。ページを再読み込みするか、アプリを開き直してから操作してください。ローカルファイルは削除されません。",
   defaultProjectName: "一時プロジェクト",
   cmdPptAddImage: "スライドに画像を挿入",
   cmdPptAddChart: "スライドにグラフを挿入",

@@ -1098,7 +1098,7 @@ import { useAgentStream } from '@/composables/useAgentStream.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 import { useBuiltinWorkflows, notifyBuiltinWorkflowsChanged } from '@/composables/useBuiltinWorkflows.js'
 import { ref, watch, onMounted, onBeforeUnmount, nextTick, getCurrentInstance, computed, inject } from 'vue'
-import { createFolder, createFile, importLocalFile, getProjectFiles, getApiBaseUrl, getAiHistory, rollbackConversation, performPptGeneration, getSkills, selectBuiltinWorkflowVersion, getCurrentUser as getCurrentUserApi, fetchAiModels, getAiConfig, cancelBackgroundTask, listPluginJobs, cancelPluginJob, getMeetingRecordings, resolveProjectFileByPath } from '@/services/api.js'
+import { getCloudWriteHeaders, createFolder, createFile, importLocalFile, getProjectFiles, getApiBaseUrl, getAiHistory, rollbackConversation, performPptGeneration, getSkills, selectBuiltinWorkflowVersion, getCurrentUser as getCurrentUserApi, fetchAiModels, getAiConfig, cancelBackgroundTask, listPluginJobs, cancelPluginJob, getMeetingRecordings, resolveProjectFileByPath } from '@/services/api.js'
 import { audioNeedingTranscription, isTranscribableMedia, transcribedAudioFileIds } from '@/utils/audioAttachment.js'
 import { getAuthHeaders, getCurrentUser, getSessionId } from '@/utils/auth.js'
 import { host } from '@/services/host.js'
@@ -4356,12 +4356,12 @@ export default {
 
     // Upload file content to storage（纯浏览器与粘贴图片用；URL 一律用数字主键）
     const uploadFileContent = async (fileId, fileObject, totalSize, signal) => {
+      const url = `${getApiBaseUrl()}/api/files/${fileId}/upload`
+      const headers = await getCloudWriteHeaders(url)
       return new Promise((resolve, reject) => {
         // #ifdef H5
         const xhr = new XMLHttpRequest()
-        xhr.open('POST', `${getApiBaseUrl()}/api/files/${fileId}/upload`)
-
-        const headers = getAuthHeaders()
+        xhr.open('POST', url)
         for (const key in headers) {
           xhr.setRequestHeader(key, headers[key])
         }

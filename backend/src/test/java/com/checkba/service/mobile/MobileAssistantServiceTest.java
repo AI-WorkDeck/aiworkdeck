@@ -69,7 +69,7 @@ class MobileAssistantServiceTest {
         backup=mock(MobileBackupService.class);quota=mock(CloudStorageQuotaService.class);models=mock(ChatModelFactory.class);
         usage=mock(TokenUsageService.class);tools=mock(ToolRegistry.class);model=mock(ChatLanguageModel.class);
         extractor=new ProjectFileTextExtractor(null,null,null,null,null);
-        when(quota.persistentQuota(anyLong())).thenReturn(CloudStorageQuotaService.PRO_BYTES);
+        when(quota.subscriptionQuota(anyLong())).thenReturn(CloudStorageQuotaService.PRO_BYTES);when(quota.canRead(anyLong())).thenReturn(true);when(quota.canWrite(anyLong())).thenReturn(true);when(quota.canUse(anyLong())).thenReturn(true);
         when(backup.enabled(anyLong())).thenReturn(true);
         when(models.getPlatformChatModel(any(),any())).thenAnswer(call -> {
             assertEquals(user,PlatformAiUserScope.current());
@@ -235,7 +235,7 @@ class MobileAssistantServiceTest {
         assertThrows(IllegalArgumentException.class,()->service.snapshot(user,snapshot("摘要资料")));
         assertThrows(IllegalArgumentException.class,()->service.chat(user,chat("案件情况？")));
         assertThrows(IllegalArgumentException.class,()->service.settings(user,true,"old"));
-        when(quota.persistentQuota(user)).thenReturn(0L);
+        when(quota.subscriptionQuota(user)).thenReturn(0L);when(quota.canRead(user)).thenReturn(false);when(quota.canWrite(user)).thenReturn(false);when(quota.canUse(user)).thenReturn(false);
         assertThrows(IllegalArgumentException.class,()->service.settings(user,true,MobileAssistantService.CONSENT_VERSION));
         verifyNoInteractions(models);
     }
@@ -336,7 +336,7 @@ class MobileAssistantServiceTest {
 
     @Test void disablingStillDeletesWhenBillingIsUnavailable() {
         enable();service.snapshot(user,snapshot("专属资料"));
-        when(quota.persistentQuota(user)).thenThrow(new MobileBillingFailureException(MobileBillingKind.UNAVAILABLE,"synthetic outage"));
+        when(quota.subscriptionQuota(user)).thenThrow(new MobileBillingFailureException(MobileBillingKind.UNAVAILABLE,"synthetic outage"));when(quota.canRead(user)).thenThrow(new MobileBillingFailureException(MobileBillingKind.UNAVAILABLE,"synthetic outage"));
         var result=service.settings(user,false,MobileAssistantService.CONSENT_VERSION);
         assertFalse((Boolean)result.get("consentEnabled"));assertEquals("subscription_unavailable",result.get("reason"));
         assertTrue(summaries.findByUserIdOrderByUpdatedAtDesc(user).isEmpty());

@@ -188,6 +188,16 @@ public class MemorySyncService {
 
     // ==================== 同步主流程 ====================
 
+    /** Explicit user save only; automatic sync may never accept a newer permission generation. */
+    public void configureRemote(MemoryRealm realm,MemoryRemote remote) {
+        ReentrantLock lock=repoLock(realm.repoKey());lock.lock();
+        try {
+            repoService.init(realm.repoKey());
+            repoService.bindCloudEpoch(realm.repoKey(),remote.getUrl(),remote.getUsername(),remote.getSecret());
+            remoteRepository.save(remote);
+        } finally {lock.unlock();}
+    }
+
     /**
      * 立即同步一个领域。返回状态快照（configured/offline/pendingUpload/committed 等）。
      * 网络失败不抛（转 pendingUpload）；本地 Git/DB 异常抛 VersionException 由调用方处置
@@ -207,6 +217,7 @@ public class MemorySyncService {
                 return result;
             }
             repoService.init(repoKey);
+            if(cfg!=null)repoService.requireCloudBinding(repoKey,cfg.getUrl(),cfg.getUsername(),cfg.getSecret());
             resetWorkTreeToHead(repoKey);
 
             boolean offline = false;

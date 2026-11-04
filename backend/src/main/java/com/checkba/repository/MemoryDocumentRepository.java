@@ -22,5 +22,7 @@ public interface MemoryDocumentRepository extends JpaRepository<MemoryDocument, 
 
     List<MemoryDocument> findBySpaceIdAndDeletedFalseOrderByPathAsc(String spaceId);
 
+    List<MemoryDocument> findBySpaceIdOrderByPathAsc(String spaceId);
+
     Optional<MemoryDocument> findBySourceMemoryUid(String sourceMemoryUid);
 }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  apiCloudAccessRefresh: "สิทธิ์เข้าถึงคลาวด์เปลี่ยนแปลงแล้ว โปรดรีเฟรชหน้าหรือเปิดแอปใหม่ก่อนดำเนินการต่อ ไฟล์ในเครื่องจะไม่ถูกลบ",
   defaultProjectName: "โครงการชั่วคราว",
   cmdPptAddImage: "แทรกรูปภาพในสไลด์",
   cmdPptAddChart: "แทรกแผนภูมิในสไลด์",

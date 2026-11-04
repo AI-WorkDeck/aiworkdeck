@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 通用词汇：跨页面复用的动词/状态。页面专有文案放各自命名空间，不要都堆到这里。
 export default {
+  cloudAccessRefresh: "云端权限已变化，请刷新页面或重新打开应用后再操作。本机文件不会删除。",
   workspaceSessionUnavailable: "工作区会话无法恢复",
   confirm: '确定',
   cancel: '取消',

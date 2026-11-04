@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Shared vocabulary reused across pages. Page-specific copy lives in its own namespace.
 export default {
+  cloudAccessRefresh: "Cloud access has changed. Refresh the page or reopen the app before continuing. Local files will not be deleted.",
   workspaceSessionUnavailable: "Workspace session could not be restored",
   confirm: 'OK',
   cancel: 'Cancel',

@@ -16,6 +16,12 @@ servers:
     description: 国际版（新加坡）
 components:
   parameters:
+    CloudEpoch:
+      name: X-Cloud-Epoch
+      in: header
+      required: false
+      schema: { type: integer, format: int64 }
+      description: Required for accepted postpaid cloud writes. Use cloudAccess.epoch from the operation's initial snapshot; stale or missing epoch rejects publication.
     SessionId:
       name: X-Session-Id
       in: header
@@ -23,6 +29,44 @@ components:
       schema: { type: string }
       description: 登录会话或 awdt_ 设备令牌。缺失或失效 → 200 + Envelope(code 4010)。
   schemas:
+    CloudState:
+      type: object
+      required: [billing, cloudAccess]
+      properties:
+        billing: { $ref: '#/components/schemas/PostpaidBilling' }
+        cloudAccess: { $ref: '#/components/schemas/CloudAccess' }
+    PostpaidBilling:
+      type: object
+      additionalProperties: true
+      description: Account-centre authoritative snapshot. Amounts are integer credit_cent, not display Credits.
+      properties:
+        policyVersion: { type: string }
+        accepted: { type: boolean }
+        acceptEnabled: { type: boolean }
+        acceptedAt: { type: string, nullable: true }
+        unit: { type: string, enum: [credit_cent] }
+        cashCurrency: { type: string, enum: [CNY, USD] }
+        creditLimitCents: { type: integer, format: int64 }
+        debtCents: { type: integer, format: int64 }
+        availableCreditCents: { type: integer, format: int64 }
+        reservedCreditCents: { type: integer, format: int64 }
+        overLimitAt: { type: string, nullable: true }
+        remindAt: { type: string, nullable: true }
+        cleanupAt: { type: string, nullable: true }
+    CloudAccess:
+      type: object
+      properties:
+        canUse: { type: boolean }
+        canRead: { type: boolean }
+        canWrite: { type: boolean }
+        reason: { type: string }
+        epoch: { type: integer, format: int64 }
+        includedStorageBytes: { type: integer, format: int64 }
+        caseId: { type: string, nullable: true }
+        cleanupEligible: { type: boolean }
+        notificationStatus: { type: string, enum: [pending, delivered, none] }
+        frozen: { type: boolean }
+        cleanupState: { type: string, enum: [none, deleting, complete] }
     Envelope:
       type: object
       required: [code]
@@ -114,7 +158,10 @@ components:
       required: [enabled, decided, subscriptionActive, consentVersion, cleanupPending]
       properties:
         enabled: { type: boolean }
+        backupPaused: { type: boolean, description: 清理后备份暂停；原始同意及未删除文件读取保留 }
         decided: { type: boolean }
+        cloudAccess: { $ref: "#/components/schemas/CloudAccess" }
+        billing: { $ref: "#/components/schemas/PostpaidBilling" }
         subscriptionActive: { type: boolean }
         subscriptionAvailable: { type: boolean, description: false代表暂时无法核实订阅，不等于免费用户 }
         consentVersion: { type: string }
@@ -506,6 +553,8 @@ components:
         enabled:
           &a1
           type: boolean
+        cloudAccess: { $ref: "#/components/schemas/CloudAccess" }
+        billing: { $ref: "#/components/schemas/PostpaidBilling" }
         subscriptionActive: *a1
         subscriptionAvailable: *a1
         consentVersion:
@@ -578,6 +627,8 @@ components:
         - truncated
       properties:
         enabled: *a1
+        cloudAccess: { $ref: "#/components/schemas/CloudAccess" }
+        billing: { $ref: "#/components/schemas/PostpaidBilling" }
         subscriptionActive: *a1
         subscriptionAvailable: *a1
         consentVersion: *a2
@@ -612,6 +663,8 @@ components:
         - reason
       properties:
         enabled: *a1
+        cloudAccess: { $ref: "#/components/schemas/CloudAccess" }
+        billing: { $ref: "#/components/schemas/PostpaidBilling" }
         subscriptionActive: *a1
         subscriptionAvailable: *a1
         backupEnabled: *a1
@@ -927,6 +980,75 @@ components:
         status: { type: string, enum: [DELIVERED, FAILED] }
         error: { type: string, nullable: true }
 paths:
+  /api/mobile/billing/cloud-state:
+    get:
+      summary: cloud-state
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      responses:
+        '200':
+          description: Authoritative cloud billing state or error envelope
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: '#/components/schemas/CloudState' }
+                  - { $ref: '#/components/schemas/Envelope' }
+  /api/mobile/billing/postpaid-accept:
+    post:
+      summary: postpaid-accept
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [policyVersion]
+              properties:
+                policyVersion: { type: string, enum: ['2026-11-04'] }
+      responses:
+        '200':
+          description: Authoritative cloud billing state or error envelope
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: '#/components/schemas/CloudState' }
+                  - { $ref: '#/components/schemas/Envelope' }
+  /api/mobile/billing/resume-cloud:
+    post:
+      summary: resume-cloud
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      responses:
+        '200':
+          description: Authoritative cloud billing state or error envelope
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: '#/components/schemas/CloudState' }
+                  - { $ref: '#/components/schemas/Envelope' }
+  /api/mobile/preview/catalog/{uid}/files/{fileUid}/quote:
+    get:
+      summary: Cloud download quote from authoritative file size
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { name: uid, in: path, required: true, schema: { type: string } }
+        - { name: fileUid, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Estimate, actual delivered bytes are settled separately
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  credits: { type: integer }
+                  quoteCents: { type: integer, format: int64 }
+                  cashCurrency: { type: string }
+                  estimated: { type: boolean }
+                  resourceHash: { type: string }
   /api/auth/me:
     get:
       summary: 查询当前登录账户，供旧会话补齐稳定账户身份
@@ -1415,7 +1537,7 @@ paths:
                   - $ref: '#/components/schemas/BackupConsent'
                   - $ref: '#/components/schemas/Envelope'
     put:
-      summary: 明确同意或关闭账户文件备份，开启要求有效订阅
+      summary: 明确同意或关闭账户文件备份，开启要求可用云端计费能力
       parameters: [{ $ref: '#/components/parameters/SessionId' }]
       requestBody:
         required: true
@@ -1551,8 +1673,10 @@ paths:
                   - $ref: '#/components/schemas/Envelope'
   /api/mobile/preview/catalog/{uid}/files/{fileUid}/content:
     get:
-      summary: 手机下载持久云或备份文件，必须有效订阅并明确开启备份
+      summary: 手机下载持久云或备份文件，要求云读取权限及明确备份同意
       parameters:
+        - { name: requestId, in: query, required: false, schema: { type: string }, description: Unique persisted attempt ID; required when postpaid is enabled. Never replay a completed paid delivery. }
+        - { name: expectedHash, in: query, required: false, schema: { type: string }, description: Resource hash returned by quote; mismatches reject before reserving funds. }
         - { $ref: '#/components/parameters/SessionId' }
         - { name: uid, in: path, required: true, schema: { type: string } }
         - { name: fileUid, in: path, required: true, schema: { type: string } }
@@ -1873,6 +1997,8 @@ paths:
     get:
       summary: 下载持久云文件原件；不需要 ACK，也不删除云原件
       parameters:
+        - { name: requestId, in: query, required: false, schema: { type: string }, description: Unique persisted attempt ID; required when postpaid is enabled. Never replay a completed paid delivery. }
+        - { name: expectedHash, in: query, required: false, schema: { type: string }, description: Resource hash returned by quote; mismatches reject before reserving funds. }
         - $ref: '#/components/parameters/SessionId'
         - name: uid
           in: path

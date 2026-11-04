@@ -81,9 +81,12 @@ public class MobileRelayController {
     }
 
     @GetMapping("/backup/version-objects/{sha}/parts/{index}")
+    @com.checkba.service.mobile.CloudMeteredDownload
     public ResponseEntity<InputStreamResource> versionObjectContent(@RequestHeader(value="X-Session-Id",required=false) String session,
             @PathVariable String sha,@PathVariable int index,@RequestParam String deviceId,@RequestParam String projectKey) throws IOException {
-        var content=versionObjects.content(requireUser(session),deviceId,projectKey,sha,index);
+        Long user=requireUser(session);
+        var content=versionObjects.content(user,deviceId,projectKey,sha,index);
+        com.checkba.service.mobile.CloudDownloadContext.mark(user,"version-object:"+deviceId+":"+projectKey+":"+sha.toLowerCase(java.util.Locale.ROOT)+":"+index);
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).contentLength(content.size())
                 .body(new InputStreamResource(content.stream()));
     }
@@ -240,11 +243,13 @@ public class MobileRelayController {
      * 2xx + Content-Type application/octet-stream + 裸字节，不许 302 到签名 URL。
      */
     @GetMapping("/inbox/{id}/content")
+    @com.checkba.service.mobile.CloudMeteredDownload
     public ResponseEntity<InputStreamResource> content(
             @PathVariable("id") Long id,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = requireUser(sessionId);
         MobileRelayStoreService.ContentBlob blob = store.openContent(userId, id);
+        com.checkba.service.mobile.CloudDownloadContext.mark(userId,"media:"+id);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
                 .contentLength(blob.length())

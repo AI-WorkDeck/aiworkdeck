@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  apiCloudAccessRefresh: "Η πρόσβαση στο cloud άλλαξε. Ανανεώστε τη σελίδα ή ανοίξτε ξανά την εφαρμογή για να συνεχίσετε. Τα τοπικά αρχεία δεν θα διαγραφούν.",
   defaultProjectName: "Προσωρινό έργο",
   cmdPptAddImage: "Εισαγωγή εικόνας στη διαφάνεια",
   cmdPptAddChart: "Εισαγωγή γραφήματος στη διαφάνεια",

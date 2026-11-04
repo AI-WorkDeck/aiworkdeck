@@ -2252,6 +2252,18 @@ public class ProjectRepoService {
         }
     }
 
+    /** Called only by explicit share/clone, under the project repository lock. */
+    public void bindCloudEpoch(long projectId,String url,String username,String token) {
+        try(Repository repo=open(projectId)) {CloudGitEpochClient.bind(repo.getConfig(),url,username,token);}
+        catch(VersionException e){throw e;}
+        catch(IOException e){throw new VersionException("Bind cloud permission failed",e);}
+    }
+    public java.util.Map<String,String> cloudWriteHeaders(long projectId,String url,String username,String token) {
+        try(Repository repo=open(projectId)) {return CloudGitEpochClient.frozenHeaders(repo.getConfig(),url,username,token);}
+        catch(VersionException e){throw e;}
+        catch(IOException e){throw new VersionException("Verify cloud permission failed",e);}
+    }
+
     /** 读 origin URL；未配置返回 null。 */
     public String remoteOriginUrl(long projectId) {
         try (Repository repo = open(projectId)) {
@@ -2267,6 +2279,7 @@ public class ProjectRepoService {
         try (Repository repo = open(projectId); Git git = new Git(repo)) {
             git.fetch()
                     .setRemote(ORIGIN)
+                    .setTransportConfigCallback(CloudGitEpochClient.transport(repo.getConfig().getString("remote", ORIGIN, "url"),username,token))
                     .setCredentialsProvider(
                             new org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider(
                                     username == null ? "" : username, token == null ? "" : token))
@@ -2319,6 +2332,7 @@ public class ProjectRepoService {
         try (Repository repo = open(projectId); Git git = new Git(repo)) {
             Iterable<org.eclipse.jgit.transport.PushResult> results = git.push()
                     .setRemote(ORIGIN)
+                    .setTransportConfigCallback(CloudGitEpochClient.transport(repo.getConfig(),repo.getConfig().getString("remote", ORIGIN, "url"),username,token))
                     .setCredentialsProvider(
                             new org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider(
                                     username == null ? "" : username, token == null ? "" : token))
@@ -2341,6 +2355,7 @@ public class ProjectRepoService {
                 }
             }
             return new PushOutcome(!rejected, rejected, msg.toString().trim());
+        } catch (VersionException e) { throw e;
         } catch (Exception e) {
             throw new VersionException("上传到云端失败: project=" + projectId, e);
         }
@@ -2441,6 +2456,7 @@ public class ProjectRepoService {
             Files.createDirectories(workTree(projectId));
             Git.cloneRepository()
                     .setURI(url)
+                    .setTransportConfigCallback(CloudGitEpochClient.transport(url,username,token))
                     .setGitDir(gitDir(projectId).toFile())
                     .setDirectory(workTree(projectId).toFile())
                     .setBranch(MAIN_BRANCH)
@@ -2451,12 +2467,15 @@ public class ProjectRepoService {
                     .setTimeout(120)
                     .call()
                     .close();
+            bindCloudEpoch(projectId,url,username,token);
             try (Repository repo = open(projectId); Git git = new Git(repo)) {
                 beforeCheckout.run();
                 requireObjectsAt(repo, "HEAD");
                 VersionObjectFilters.materializing(repo, pointerPathsAt(repo, "HEAD"),
                         () -> git.checkout().setName(MAIN_BRANCH).call());
             }
+        } catch (VersionException e) {
+            throw e;
         } catch (Exception e) {
             throw new VersionException("从云端接入项目失败: project=" + projectId, e);
         }

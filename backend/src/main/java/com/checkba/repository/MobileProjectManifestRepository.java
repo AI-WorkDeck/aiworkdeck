@@ -5,5 +5,6 @@ import com.checkba.model.entity.MobileProjectManifest;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 public interface MobileProjectManifestRepository extends JpaRepository<MobileProjectManifest, Long> {
+    void deleteByUserId(Long userId);
     Optional<MobileProjectManifest> findByUserIdAndDeviceIdAndProjectKey(Long userId, String deviceId, String projectKey);
 }

@@ -23,6 +23,15 @@ import java.util.Objects;
 @Entity
 @Table(name = "app_users")
 public class User {
+    @Column
+    private Boolean cloudBackupPaused;
+    public boolean isCloudBackupPaused() { return Boolean.TRUE.equals(cloudBackupPaused); }
+    public void setCloudBackupPaused(boolean paused) { cloudBackupPaused=paused; }
+    @Column(length=16)
+    private String cloudBillingLocale;
+    public String getCloudBillingLocale() { return cloudBillingLocale; }
+    public void setCloudBillingLocale(String locale) { this.cloudBillingLocale=locale; }
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

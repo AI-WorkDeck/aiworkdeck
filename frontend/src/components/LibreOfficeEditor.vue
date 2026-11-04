@@ -199,7 +199,7 @@ import ReviewPanel from '@/components/ReviewPanel.vue'
 import OfficeNavigation from '@/components/OfficeNavigation.vue'
 import EditorToolbar from '@/components/EditorToolbar.vue'
 import EvidenceStaleBar from '@/components/EvidenceStaleBar.vue'
-import { getCheckpointRestoreWriteState, getFileBytesUrl, getFileWriteUrl, listEvidenceLinks, reportEvidenceAnchors, keepEvidenceAnchor, getCurrentUser as fetchAuthUser, getFileLocalPath } from '@/services/api.js'
+import { getCloudWriteHeaders, getCheckpointRestoreWriteState, getFileBytesUrl, getFileWriteUrl, listEvidenceLinks, reportEvidenceAnchors, keepEvidenceAnchor, getCurrentUser as fetchAuthUser, getFileLocalPath } from '@/services/api.js'
 import { getAuthHeaders, getCurrentUser } from '@/utils/auth.js'
 import { createAuthorNameResolver } from '@/utils/editorAuthor.js'
 import { host } from '@/services/host.js'
@@ -2746,9 +2746,12 @@ export default {
     },
     // Authed multipart POST — the upload twin of fetchArrayBuffer (backend
     // contract: POST /api/files/{fileId}/upload, part name "file").
-    uploadBytes(url, u8, filename) {
+    async uploadBytes(url, u8, filename) {
+      const fileId = this.file?.id
+      const projectId = this.projectId
+      const headers = await getCloudWriteHeaders(url)
+      if (this.file?.id !== fileId || this.projectId !== projectId || this._saveDiscarded || this._reloading) throw new Error(this.$t('editor.saveCancelled'))
       return new Promise((resolve, reject) => {
-        const headers = getAuthHeaders() || {}
         const form = new FormData()
         form.append('file', new Blob([u8]), filename)
         const xhr = new XMLHttpRequest()

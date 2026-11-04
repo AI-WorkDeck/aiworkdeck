@@ -24,7 +24,22 @@ class MobileBackupServiceTest {
         user.setId(1L);when(users.findById(1L)).thenReturn(Optional.of(user));when(users.lockStorageOwner(1L)).thenReturn(Optional.of(user));
         MobileProjectDir dir=new MobileProjectDir();dir.setDeviceId("desktop");dir.setProjectKey("42");
         when(dirs.findByUserIdOrderByUpdatedAtDesc(1L)).thenReturn(List.of(dir));
-        when(quota.persistentQuota(1L)).thenReturn(1000L);
+        when(quota.subscriptionQuota(1L)).thenReturn(1000L);when(quota.canRead(1L)).thenReturn(true);when(quota.canWrite(1L)).thenReturn(true);when(quota.canUse(1L)).thenReturn(true);
+    }
+    @Test void pausedBackupRetainsConsentButNeedsExplicitEnableAfterAccountResume() {
+        user.setFileCloudBackupEnabled(true);user.setCloudBackupPaused(true);
+        when(quota.postpaidEnabled()).thenReturn(true);when(quota.cloudAccess(1L)).thenReturn(Map.of("frozen",false));
+        assertEquals(false,service.consent(1L).get("enabled"));assertTrue(user.isFileCloudBackupEnabled());
+        assertTrue(service.eligible(1L),"after account resume remaining bytes can be read");
+        assertThrows(IllegalArgumentException.class,()->service.manifest(1L,"desktop","42",List.of(),0));
+        service.consent(1L,true,MobileBackupService.CONSENT_VERSION);assertFalse(user.isCloudBackupPaused());
+    }
+    @Test void failedResumeCannotClearPausedBackup() {
+        user.setFileCloudBackupEnabled(true);user.setCloudBackupPaused(true);
+        when(quota.postpaidEnabled()).thenReturn(true);when(quota.cloudAccess(1L)).thenReturn(Map.of("frozen",true));
+
+        assertThrows(IllegalArgumentException.class,()->service.consent(1L,true,MobileBackupService.CONSENT_VERSION));
+        assertTrue(user.isCloudBackupPaused());assertTrue(user.isFileCloudBackupEnabled());verify(quota,never()).resumeCloud(anyLong());
     }
     @Test void legacyUserIsUndecidedAndNeverEnabledBySubscription() {
         var state=service.consent(1L);assertEquals(false,state.get("enabled"));assertEquals(false,state.get("decided"));
@@ -33,7 +48,7 @@ class MobileBackupServiceTest {
     }
     @Test void enablingRequiresExplicitCurrentConsentAndSubscription() {
         assertThrows(IllegalArgumentException.class,()->service.consent(1L,true,null));
-        when(quota.persistentQuota(1L)).thenReturn(0L);
+        when(quota.subscriptionQuota(1L)).thenReturn(0L);when(quota.canRead(1L)).thenReturn(false);when(quota.canWrite(1L)).thenReturn(false);when(quota.canUse(1L)).thenReturn(false);
         assertThrows(IllegalArgumentException.class,()->service.consent(1L,true,MobileBackupService.CONSENT_VERSION));
         assertFalse(user.isFileCloudBackupEnabled());
         var declined=service.consent(1L,false,MobileBackupService.CONSENT_VERSION);
@@ -79,7 +94,7 @@ class MobileBackupServiceTest {
     }
     @Test void revocationSucceedsEvenWhenSubscriptionCannotBeVerified() {
         user.setFileCloudBackupEnabled(true);
-        when(quota.persistentQuota(1L)).thenThrow(new MobileBillingFailureException(MobileBillingKind.UNAVAILABLE,"offline"));
+        when(quota.subscriptionQuota(1L)).thenThrow(new MobileBillingFailureException(MobileBillingKind.UNAVAILABLE,"offline"));when(quota.canRead(1L)).thenThrow(new MobileBillingFailureException(MobileBillingKind.UNAVAILABLE,"offline"));
         var result=service.consent(1L,false,MobileBackupService.CONSENT_VERSION);
         assertEquals(false,result.get("enabled"));assertEquals(false,result.get("subscriptionAvailable"));
         verify(users).save(user);

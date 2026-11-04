@@ -19,9 +19,7 @@ import java.util.*;
 public class MobileBackupService {
     private static final org.slf4j.Logger log=org.slf4j.LoggerFactory.getLogger(MobileBackupService.class);
     public static final String CONSENT_VERSION = "2026-10-11";
-    public static String offlineMessage() { return com.checkba.service.LangText.of(
-            "仅当桌面端在线时才可调取；离线访问需要有效订阅并明确开启文件云端备份",
-            "Files are available while the desktop is online. Offline access requires an active subscription and explicit cloud backup consent"); }
+    public static String offlineMessage() { return CloudBillingText.get("backupOffline"); }
     private final UserRepository users;
     private final MobileFileBackupRepository backups;
     private final MobileProjectDirRepository directories;
@@ -41,13 +39,14 @@ public class MobileBackupService {
     }
     private User user(Long id) { return users.findById(id).orElseThrow(() -> new IllegalArgumentException(com.checkba.service.LangText.of("用户不存在", "User not found"))); }
     public boolean enabled(Long id) { return user(id).isFileCloudBackupEnabled(); }
-    public boolean eligible(Long id) { return enabled(id) && quota.persistentQuota(id)>0; }
+    public boolean eligible(Long id) { return enabled(id) && quota.canRead(id); }
     public Map<String,Object> consent(Long id) {
         User u=user(id);
         Map<String,Object> out=new LinkedHashMap<>();
-        out.put("enabled",u.isFileCloudBackupEnabled()); out.put("decided",u.getFileCloudBackupDecidedAt()!=null);
-        try { out.put("subscriptionActive",quota.persistentQuota(id)>0);out.put("subscriptionAvailable",true); }
+        out.put("enabled",u.isFileCloudBackupEnabled() && !u.isCloudBackupPaused()); out.put("backupPaused",u.isCloudBackupPaused()); out.put("decided",u.getFileCloudBackupDecidedAt()!=null);
+        try { out.put("subscriptionActive",quota.subscriptionQuota(id)>0);out.put("subscriptionAvailable",true); }
         catch (MobileBillingFailureException e) { out.put("subscriptionActive",false);out.put("subscriptionAvailable",false); }
+        quota.appendCloudState(id,out);
         out.put("consentVersion",CONSENT_VERSION);
         out.put("cleanupPending",backups.findByUserId(id).stream().anyMatch(MobileFileBackup::isPendingDeletion)
                 || (versionObjects!=null && versionObjects.cleanupPending(id)));
@@ -57,12 +56,20 @@ public class MobileBackupService {
     public Map<String,Object> consent(Long id, boolean enabled, String version) {
         if (!CONSENT_VERSION.equals(version)) throw new IllegalArgumentException(com.checkba.service.LangText.of("请阅读并确认当前文件云端备份说明", "Please review and confirm the current cloud backup notice"));
         User u=users.lockStorageOwner(id).orElseThrow(() -> new IllegalArgumentException(com.checkba.service.LangText.of("用户不存在", "User not found")));
-        if (enabled && quota.persistentQuota(id)<=0) throw new IllegalArgumentException(com.checkba.service.LangText.of("文件云端备份需要有效订阅", "Cloud file backup requires an active subscription"));
-        u.setFileCloudBackupEnabled(enabled); u.setFileCloudBackupDecidedAt(LocalDateTime.now());
+        if(enabled && quota.postpaidEnabled()) {
+            var state=quota.cloudAccess(id);
+            if(Boolean.TRUE.equals(state.get("frozen"))) throw new IllegalArgumentException(CloudBillingText.get("writesPaused"));
+        }
+        if (enabled && !quota.canWrite(id)) throw new IllegalArgumentException(CloudBillingText.get("backupEnableBilling"));
+        u.setFileCloudBackupEnabled(enabled); u.setCloudBackupPaused(false); u.setFileCloudBackupDecidedAt(LocalDateTime.now());
         u.setFileCloudBackupConsentVersion(version); users.save(u);
         if (!enabled) for (MobileFileBackup row:backups.findByUserId(id)) { row.setPendingDeletion(true); backups.save(row); }
         if (!enabled && versionObjects!=null) versionObjects.revoke(id);
         return consent(id);
+    }
+    private void requirePublication(Long id) {
+        quota.requireCloudWrite(id);
+        if(user(id).isCloudBackupPaused() || !enabled(id)) throw new IllegalArgumentException(CloudBillingText.get("backupEnableBilling"));
     }
     public void requireEligible(Long id) { if (!eligible(id)) throw new IllegalArgumentException(offlineMessage()); }
     private void requireProject(Long id,String device,String key) {
@@ -77,6 +84,7 @@ public class MobileBackupService {
     }
     @Transactional
     public void manifest(Long id,String device,String key,List<Map<String,Object>> entries,Integer totalCount) {
+        users.lockStorageOwner(id).orElseThrow();requirePublication(id);
         requireEligible(id);requireProject(id,device,key);
         List<Map<String,Object>> clean=new ArrayList<>();
         if (entries!=null) for (Map<String,Object> f:entries.stream().limit(2000).toList()) {
@@ -109,6 +117,7 @@ public class MobileBackupService {
     public Map<String,Object> put(Long id,String device,String key,String fileId,String uid,String name,String path,
             String parentId,String sha256,InputStream content,long size) throws IOException {
         users.lockStorageOwner(id).orElseThrow(() -> new IllegalArgumentException(com.checkba.service.LangText.of("用户不存在", "User not found")));
+        requirePublication(id);
         requireEligible(id);requireProject(id,device,key);MobilePreviewPolicy.requireSupported(name);
         if (fileId==null || fileId.isBlank() || fileId.length()>128 || ProjectCatalogService.validUid(uid)==null
                 || name.length()>512 || name.contains("/") || name.contains("\\") || path==null || path.isBlank() || path.length()>1024
@@ -148,6 +157,7 @@ public class MobileBackupService {
     @Transactional
     public void delete(Long id,String device,String key,String fileId) {
         users.lockStorageOwner(id).orElseThrow(() -> new IllegalArgumentException(com.checkba.service.LangText.of("用户不存在", "User not found")));
+        quota.storageChanging(id);
         backups.findByUserIdAndDeviceIdAndProjectKeyAndFileId(id,device,key,fileId).ifPresent(row -> {
             row.setPendingDeletion(true);backups.save(row);
         });
@@ -181,6 +191,7 @@ public class MobileBackupService {
             MobileFileBackup current=backups.findById(candidate.getId()).orElse(null);
             if (current!=null && entityManager!=null) entityManager.refresh(current);
             if (current==null || !current.isPendingDeletion()) return;
+            quota.storageChanging(current.getUserId());
             if (deleteConfirmed(current.getStoragePath())) backups.delete(current);
         });
     }

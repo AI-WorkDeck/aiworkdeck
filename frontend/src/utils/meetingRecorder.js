@@ -10,8 +10,7 @@
 // 与 FileTree 分片上传同一后端端点）——进程被杀最多丢最后 5 秒 + 未上传队列。
 // 录音配方（getUserMedia/pickAudioMime/轨道必须 stop）抄自 FeedbackWidget。
 import { reactive } from 'vue'
-import { getApiBaseUrl, createMeetingRecording, finishMeetingRecording, deleteMeetingRecording } from '@/services/api.js'
-import { getAuthHeaders } from '@/utils/auth.js'
+import { getCloudWriteHeaders, getApiBaseUrl, createMeetingRecording, finishMeetingRecording, deleteMeetingRecording } from '@/services/api.js'
 // 报错直接显示在会议录音面板里（recorderState.error 与 throw 出去的 message 都是），
 // 所以文案与面板同一个命名空间。非组件模块的翻译入口是 t()，且只能在函数体内取值。
 import { t } from '@/i18n'
@@ -318,13 +317,16 @@ async function uploadChunkWithRetry(blob, offset, isLast) {
   }
 }
 
-function uploadChunk(blob, offset, isLast) {
+async function uploadChunk(blob, offset, isLast) {
+  const fileId = recorderState.audioFileId
+  const url = `${getApiBaseUrl()}/api/files/${fileId}/upload`
+  const headers = await getCloudWriteHeaders(url)
+  if (fileId !== recorderState.audioFileId) throw new Error(t('meeting.uploadNetworkError'))
   return new Promise((resolve, reject) => {
     // #ifdef H5
     const xhr = new XMLHttpRequest()
     const timer = setTimeout(() => { try { xhr.abort() } catch (e) { /* ignore */ } }, UPLOAD_TIMEOUT_MS)
-    xhr.open('POST', `${getApiBaseUrl()}/api/files/${recorderState.audioFileId}/upload`)
-    const headers = getAuthHeaders()
+    xhr.open('POST', url)
     for (const key in headers) xhr.setRequestHeader(key, headers[key])
     xhr.setRequestHeader('Content-Type', 'application/octet-stream')
     xhr.setRequestHeader('X-File-Offset', String(offset))

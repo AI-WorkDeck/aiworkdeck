@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  apiCloudAccessRefresh: "Der Cloud-Zugriff hat sich geändert. Laden Sie die Seite neu oder öffnen Sie die App erneut. Lokale Dateien werden nicht gelöscht.",
   defaultProjectName: "Temporäres Projekt",
   cmdPptAddImage: "Bild in Folie einfügen",
   cmdPptAddChart: "Diagramm in Folie einfügen",

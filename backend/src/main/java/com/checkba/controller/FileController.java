@@ -53,6 +53,9 @@ public class FileController {
 
     @Autowired
     private ProjectFileRepository projectFileRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.service.mobile.ProjectCatalogService cloudCatalog;
     
     @Autowired
     private ProjectRagService projectRagService;
@@ -136,7 +139,11 @@ public class FileController {
         }
         String sid = StringUtils.hasText(sessionHeader) ? sessionHeader : token;
         Long userId = AuthController.getUserIdFromSession(sid);
-        return fileAccess.canRead(file, userId);
+        boolean allowed=fileAccess.canRead(file, userId);
+        if(allowed && cloudCatalog!=null) cloudCatalog.ensureFileUid(file);
+        if(allowed && file.getUid()!=null && !file.getUid().isBlank())
+            com.checkba.service.mobile.CloudDownloadContext.mark(userId,"file:"+file.getUid());
+        return allowed;
     }
 
     /**
@@ -170,6 +177,7 @@ public class FileController {
 
     /** QTA 只在本机转换为浏览器可播放的副本；原文件下载接口仍返回原件。 */
     @GetMapping("/{fileId}/audio-preview")
+    @com.checkba.service.mobile.CloudMeteredDownload
     public ResponseEntity<Resource> audioPreview(
             @PathVariable("fileId") Long fileId,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionHeader) {
@@ -271,6 +279,7 @@ public class FileController {
      * 实际下载接口
      */
     @GetMapping("/{fileId}/download")
+    @com.checkba.service.mobile.CloudMeteredDownload
     public ResponseEntity<Resource> downloadFile(
             @PathVariable("fileId") String fileId,
             @RequestParam(value = "token", required = false) String token,

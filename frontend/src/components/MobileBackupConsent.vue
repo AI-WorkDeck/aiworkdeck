@@ -9,25 +9,30 @@
           <h2 id="backup-title">{{ $t('workbench.mobileBackup.title') }}</h2>
           <template v-if="state.enabled">
             <p>{{ $t('workbench.mobileBackup.enabledIntro') }}</p>
-            <p v-if="state.subscriptionActive">{{ $t('workbench.mobileBackup.pending') }}</p>
-            <p v-else class="backup-notice">{{ $t('workbench.mobileBackup.subscriptionRequired') }}</p>
+            <p v-if="canWrite">{{ $t('workbench.mobileBackup.pending') }}</p>
+            <p v-else class="backup-notice">{{ $t('workbench.mobileBackup.accessRequired') }}</p>
             <p v-if="state.objectBackup?.state === 'pending'" role="status" class="backup-error">{{ $t('workbench.mobileBackup.objectPending') }} {{ state.objectBackup.lastError }}</p>
             <p v-else-if="state.objectBackup?.state === 'syncing'" role="status">{{ $t('workbench.mobileBackup.objectSyncing') }}</p>
             <p>{{ $t('workbench.mobileBackup.disableMessage') }}</p>
           </template>
-          <template v-else-if="state.subscriptionActive">
+          <template v-else-if="canWrite">
             <p>{{ $t('workbench.mobileBackup.message') }}</p>
           </template>
           <template v-else>
-            <p class="backup-notice">{{ $t('workbench.mobileBackup.subscriptionRequired') }}</p>
+            <p class="backup-notice">{{ $t('workbench.mobileBackup.accessRequired') }}</p>
             <p>{{ $t('workbench.mobileBackup.inactiveIntro') }}</p>
+          </template>
+          <template v-if="state.billing?.accepted">
+            <p>{{ $t('workbench.mobileBackup.billingSummary', { debt: money(state.billing.debtCents), available: money(state.billing.availableCreditCents) }) }}</p>
+            <p v-if="state.billing.cleanupAt" class="backup-notice" role="status">{{ $t('workbench.mobileBackup.cleanupDeadline', { time: deadline(state.billing.cleanupAt) }) }}</p>
+            <button v-if="state.enabled || canWrite" :disabled="saving" @click="openBilling">{{ $t('workbench.mobileBackup.manageBilling') }}</button>
           </template>
           <p v-if="error" role="alert" class="backup-error">{{ error }}</p>
           <div class="backup-actions">
             <button role="button" :tabindex="saving ? -1 : 0" :aria-disabled="saving" :disabled="saving" @keydown.enter.prevent="close" @keydown.space.prevent="close" @click="close">{{ $t('workbench.mobileBackup.' + (state.decided ? 'close' : 'decline')) }}</button>
             <button v-if="state.enabled" role="button" :tabindex="saving ? -1 : 0" :aria-disabled="saving" :disabled="saving" @keydown.enter.prevent="save(false)" @keydown.space.prevent="save(false)" @click="save(false)">{{ $t('workbench.mobileBackup.disable') }}</button>
-            <button v-else-if="state.subscriptionActive" class="backup-btn-primary" role="button" :tabindex="saving ? -1 : 0" :aria-disabled="saving" :disabled="saving" @keydown.enter.prevent="save(true)" @keydown.space.prevent="save(true)" @click="save(true)">{{ $t('workbench.mobileBackup.enable') }}</button>
-            <button v-else class="backup-btn-primary" role="button" :tabindex="saving ? -1 : 0" :aria-disabled="saving" :disabled="saving" @keydown.enter.prevent="openSubscription" @keydown.space.prevent="openSubscription" @click="openSubscription">{{ $t('workbench.mobileBackup.goSubscribe') }}</button>
+            <button v-else-if="canWrite" class="backup-btn-primary" role="button" :tabindex="saving ? -1 : 0" :aria-disabled="saving" :disabled="saving" @keydown.enter.prevent="save(true)" @keydown.space.prevent="save(true)" @click="save(true)">{{ $t('workbench.mobileBackup.enable') }}</button>
+            <button v-else class="backup-btn-primary" role="button" :tabindex="saving ? -1 : 0" :aria-disabled="saving" :disabled="saving" @keydown.enter.prevent="openBilling" @keydown.space.prevent="openBilling" @click="openBilling">{{ $t('workbench.mobileBackup.manageBilling') }}</button>
           </div>
         </section>
       </div>
@@ -42,6 +47,10 @@ import { openExternalUrl } from '@/utils/externalLink.js'
 export default {
   data: () => ({ state: null, open: false, saving: false, error: '', dismissedScope: '', epoch: 0, requestId: 0, stopped: false, timer: null }),
   computed: {
+    canWrite() {
+      if (this.state?.cloudAccess != null) return this.state.cloudAccess.canWrite === true
+      return this.state?.subscriptionActive === true
+    },
     backupLabel() {
       if (!this.state?.enabled) return 'disabled'
       if (this.state.objectBackup?.state === 'pending') return 'awaitingSync'
@@ -53,6 +62,16 @@ export default {
   mounted() { window.addEventListener(ACCOUNT_CHANGED_EVENT, this.accountChanged); this.refresh() },
   beforeUnmount() { this.stopped = true; this.epoch++; clearTimeout(this.timer); window.removeEventListener(ACCOUNT_CHANGED_EVENT, this.accountChanged) },
   methods: {
+    money(value) {
+      if (!Number.isFinite(value)) return '—'
+      const currency = this.state?.billing?.cashCurrency
+      if (!['CNY', 'USD'].includes(currency)) return '—'
+      return new Intl.NumberFormat(this.$i18n?.locale || 'en-US', { style: 'currency', currency }).format(value / 100)
+    },
+    deadline(value) {
+      const date = new Date(value)
+      return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat(this.$i18n?.locale || 'en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+    },
     trapFocus(event) {
       const buttons = [...this.$refs.dialog.querySelectorAll('[role="button"][tabindex="0"]:not([aria-disabled="true"])')]
       if (!buttons.length) { event.preventDefault(); return }
@@ -81,7 +100,7 @@ export default {
       if (this.error) { this.dismissedScope = this.state.accountScope; this.open = false; return }
       if (!this.state.decided) await this.save(false); else this.open = false
     },
-    openSubscription() {
+    openBilling() {
       openExternalUrl(accountPageUrl())
     },
     async save(enabled) {

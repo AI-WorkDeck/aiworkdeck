@@ -195,9 +195,10 @@ test('上传请求具备超时和中止终态，不会永远保持 saving', asyn
     constructor() { xhr = this }
     open() {} setRequestHeader() {} send() {}
   }
-  const opts = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'getAuthHeaders', 'XMLHttpRequest', body)(...Object.values(barriers), null, null, null, () => ({}), Xhr)
+  const opts = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'getCloudWriteHeaders', 'XMLHttpRequest', body)(...Object.values(barriers), null, null, null, async () => ({}), Xhr)
   const vm = { $t: k => k }
   const pending = opts.methods.uploadBytes.call(vm, '/upload/7', new Uint8Array([1]), 'a.docx')
+  await Promise.resolve() // cloud authorization completes before opening the upload
   assert.equal(xhr.timeout, 60000)
   xhr.ontimeout()
   await assert.rejects(pending, /saveTimeout/)
@@ -426,8 +427,9 @@ test('仅上传网络/超时/5xx有恢复资格，取消及4xx没有', async () 
   for (const outcome of ['error', 'timeout', 'abort', 500, 503, 404, 409, 403]) {
     let xhr
     class Xhr { constructor() { xhr = this } open() {} setRequestHeader() {} send() {} }
-    const opts = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'getAuthHeaders', 'XMLHttpRequest', body)(...Object.values(barriers), null, null, null, () => ({}), Xhr)
+    const opts = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'getCloudWriteHeaders', 'XMLHttpRequest', body)(...Object.values(barriers), null, null, null, async () => ({}), Xhr)
     const pending = opts.methods.uploadBytes.call({ $t: k => k }, '/upload/7', new Uint8Array([1]), 'a.docx')
+    await Promise.resolve()
     if (typeof outcome === 'number') { xhr.status = outcome; xhr.onload() } else xhr['on' + outcome]()
     await assert.rejects(pending, e => Boolean(e.backendUnavailable) === (outcome === 'error' || outcome === 'timeout' || outcome >= 500))
   }
@@ -473,8 +475,9 @@ test('版本忙碌只信任明确的未开始写入回执，其他HTTP错误保�
   ]) {
     let xhr
     class Xhr { constructor() { xhr = this } open() {} setRequestHeader() {} send() {} }
-    const opts = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'getAuthHeaders', 'XMLHttpRequest', body)(...Object.values(barriers), null, null, null, () => ({}), Xhr)
+    const opts = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'getCloudWriteHeaders', 'XMLHttpRequest', body)(...Object.values(barriers), null, null, null, async () => ({}), Xhr)
     const pending = opts.methods.uploadBytes.call({ $t: k => k }, '/upload/7', new Uint8Array([1]), 'a.docx')
+    await Promise.resolve()
     xhr.status = status
     xhr.response = typeof response === 'string' ? response : JSON.stringify(response)
     xhr.onload()

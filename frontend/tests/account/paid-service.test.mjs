@@ -1,17 +1,18 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test'
+import { needsCloudEpoch } from '../../../shared/cloud-epoch.mjs'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { accountRequiredError, isCreditsRequired, requiresAiAccount, isAccountRequired } from '../../src/utils/requireAccountCore.js'
 
 const api = readFileSync(new URL('../../src/services/api.js', import.meta.url), 'utf8')
-const requestSource = api.slice(api.indexOf('function request(options)'), api.indexOf('// 查询公司基础信息'))
+const requestSource = api.slice(api.indexOf('async function request(options)'), api.indexOf('// 查询公司基础信息'))
   .replaceAll("import('@/utils/requireAccount.js')", 'loadAccountUi()')
 function harness(backend, loggedIn = false) {
   const prompts = []
-  const request = new Function('uni', 'getApiBaseUrl', 'getAuthHeaders', 't', 'accountRequiredError', 'isCreditsRequired', 'isAccountRequired', 'loadAccountUi', 'getCloudAccountGeneration', 'isDesktopHost', 'console',
-    requestSource + '\nreturn request')(
+  const request = new Function('needsCloudEpoch', 'uni', 'getApiBaseUrl', 'getAuthHeaders', 't', 'accountRequiredError', 'isCreditsRequired', 'isAccountRequired', 'loadAccountUi', 'getCloudAccountGeneration', 'isDesktopHost', 'console',
+    requestSource + '\nreturn request')(needsCloudEpoch,
     { request: options => { options.success({ statusCode: 200, data: backend }); return {} } },
     () => 'https://synthetic.invalid', () => ({}), key => key, accountRequiredError, isCreditsRequired, isAccountRequired,
     async () => ({ handleAccountExpired() {}, requireAccountFor4011: async () => { prompts.push('login'); return loggedIn }, requireRecharge: async () => { prompts.push('recharge') } }),

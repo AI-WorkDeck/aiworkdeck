@@ -153,6 +153,28 @@ public class MobileBillingService {
 
     // ==================== 对外 ====================
 
+    /** No balance-cache reuse: write admission and deletion require current authoritative state. */
+    public Map<String, Object> cloudOperation(Long userId, String action, Map<String, Object> parameters) {
+        return callWithAccount(userId, false, false, account -> billing.cloudOperation(account, action, parameters));
+    }
+
+    public void rememberCloudBillingLanguage(Long userId) {
+        String locale=com.checkba.service.AppLanguageScope.current();
+        if(locale!=null) userRepository.updateCloudBillingLocale(userId,locale);
+    }
+    public Map<String, Object> cloudState(Long userId) {
+        return cloudOperation(userId, "cloud-state", Map.of());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired private org.springframework.beans.factory.ObjectProvider<CloudStorageMeterService> cloudMeters;
+    public Map<String, Object> acceptPostpaid(Long userId, String version) {
+        if (!"2026-11-04".equals(version)) throw new IllegalArgumentException(CloudBillingText.get("acceptPolicy"));
+        rememberCloudBillingLanguage(userId);
+        if(cloudMeters!=null) cloudMeters.getObject().initialize(userId);
+        return cloudOperation(userId, "postpaid-accept", Map.of("policyVersion", version));
+    }
+
+
     /**
      * 余额（带 30 秒 TTL 缓存，键为 userId）。
      *

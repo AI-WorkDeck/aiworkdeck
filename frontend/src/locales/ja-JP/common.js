@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cloudAccessRefresh: "クラウドへのアクセス権が変更されました。ページを再読み込みするか、アプリを開き直してから操作してください。ローカルファイルは削除されません。",
   workspaceSessionUnavailable: "ワークスペースのセッションを復元できません",
   "confirm": "確認",
   "cancel": "キャンセル",
