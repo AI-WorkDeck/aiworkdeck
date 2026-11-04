@@ -305,3 +305,9 @@ test('Windows真实helper：生产spawn完成握手，父进程退出后继续�
   assert.equal(fs.existsSync(file), false)
   assert.equal(fs.existsSync(file + '.job'), false)
 })
+
+
+test('Windows真实helper QA lock probe waits for complete live matching records', { skip: process.platform !== 'win32' }, () => {
+  const output = require('child_process').execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', path.join(__dirname, 'upgrade-test-lock.test.ps1')], { encoding: 'utf8', env: windowsPowerShellEnv(), timeout: 15000 })
+  assert.match(output, /accepted matching live records/)
+})
