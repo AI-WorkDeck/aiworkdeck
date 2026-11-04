@@ -170,11 +170,19 @@ export async function checkExitList({ page, installed, run, base }) {
   await page.waitForFunction(() => document.querySelectorAll('.project-exit-list input:not(:disabled)').length >= 2)
   const rows = await page.$$eval('.project-exit-list label', els => els.map(el => ({ name: el.querySelector('.project-exit-name')?.textContent, selected: el.querySelector('input').checked, text: el.textContent })))
   for (const project of projects) assert.ok(rows.some(r => r.name === project.name && !r.selected))
+  // Check actual packaged Uni CSS against the native dynamic label/button elements.
+  const layout = await page.evaluate(() => ({
+    rows: [...document.querySelectorAll('.project-exit-list label')].map(el => ({ display: getComputedStyle(el).display, top: el.getBoundingClientRect().top, bottom: el.getBoundingClientRect().bottom })),
+    buttons: [...document.querySelectorAll('.project-exit-mask footer button')].map(el => ({ paddingTop: getComputedStyle(el).paddingTop, paddingLeft: getComputedStyle(el).paddingLeft, borderRadius: getComputedStyle(el).borderRadius })),
+  }))
+  for (const row of layout.rows) assert.equal(row.display, 'flex', 'Compiled dialog row CSS must match the native label')
+  for (let i = 1; i < layout.rows.length; i++) assert.ok(layout.rows[i].top >= layout.rows[i - 1].bottom - 0.5, 'Projects must occupy separate non-overlapping rows')
+  for (const button of layout.buttons) assert.deepEqual(button, { paddingTop: '8px', paddingLeft: '12px', borderRadius: '6px' }, 'Compiled dialog button CSS must match the native button')
   await captureDesktop(run, 'release-native-close-project-list')
   await page.click('.project-exit-mask footer button:first-child')
   await page.waitForSelector('.project-exit-mask', { hidden: true })
   assert.equal(installed.child.exitCode, null, 'Cancel must keep the process alive')
   // Fixture cleanup uses the real commit API; interactive multi-project submission is separately covered by component tests.
   for (const project of projects) await api(`/api/projects/${project.id}/version/session/end`, { title: 'Installed QA fixture cleanup' })
-  return { method, projects, rows, cancelKeptProcessAlive: true, submissionCoverage: 'real API cleanup only; interactive selection/partial failure not covered here' }
+  return { method, projects, rows, layout, cancelKeptProcessAlive: true, submissionCoverage: 'real API cleanup only; interactive selection/partial failure not covered here' }
 }

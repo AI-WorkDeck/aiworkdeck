@@ -9,19 +9,19 @@
       <p v-if="hasUncertain" role="alert">{{ $t('version.exitCommitUnconfirmed') }}</p>
       <p v-else-if="listFailed || commitFailed" role="alert">{{ $t('version.exitCheckFailed') }}</p>
       <div class="project-exit-list">
-        <component :is="'label'" v-for="row in visibleRows" :key="row.id">
+        <component :is="'label'" class="project-exit-row" v-for="row in visibleRows" :key="row.id">
           <component :is="'input'" type="checkbox" :checked="row.selected" :disabled="busy || row.state !== 'ready'"
             @change="row.selected = $event.target.checked" />
           <span class="project-exit-name">{{ row.name || $t('version.exitUnconfirmedProject') }}</span>
-          <span>{{ rowText(row) }}</span>
+          <span class="project-exit-count">{{ rowText(row) }}</span>
         </component>
       </div>
       <p v-if="!loading && !listFailed && !visibleRows.length">{{ $t('version.noActiveSession') }}</p>
       <footer>
-        <component :is="'button'" type="button" :disabled="busy" @click="$emit('close', false)">{{ $t('common.cancel') }}</component>
-        <component :is="'button'" v-if="listFailed || rows.some(row => ['failed', 'conflict', 'uncertain'].includes(row.state))" type="button" :disabled="busy || loading" @click="retry">{{ $t('common.retry') }}</component>
-        <component :is="'button'" type="button" :disabled="busy || hasUncertain" @click="$emit('close', true)">{{ $t('version.exitSkip') }}</component>
-        <component :is="'button'" type="button" :disabled="loading || busy || hasUncertain || !hasSelection" @click="submit">{{ $t('version.exitProjectsCommit') }}</component>
+        <component :is="'button'" class="project-exit-button" type="button" :disabled="busy" @click="$emit('close', false)">{{ $t('common.cancel') }}</component>
+        <component :is="'button'" class="project-exit-button" v-if="listFailed || rows.some(row => ['failed', 'conflict', 'uncertain'].includes(row.state))" type="button" :disabled="busy || loading" @click="retry">{{ $t('common.retry') }}</component>
+        <component :is="'button'" class="project-exit-button" type="button" :disabled="busy || hasUncertain" @click="$emit('close', true)">{{ $t('version.exitSkip') }}</component>
+        <component :is="'button'" class="project-exit-button" type="button" :disabled="loading || busy || hasUncertain || !hasSelection" @click="submit">{{ $t('version.exitProjectsCommit') }}</component>
       </footer>
     </section>
   </div>
@@ -119,10 +119,10 @@ section { box-sizing: border-box; width: min(640px, 90vw); max-height: 85vh; ove
 h3 { margin-block: 0 12px; }
 p { font-size: 13px; line-height: 1.6; }
 .project-exit-list { max-height: 45vh; overflow: auto; }
-label { display: flex; align-items: center; gap: 10px; padding-block: 10px; border-bottom: 1px solid var(--awd-border); }
+.project-exit-row { display: flex; align-items: center; gap: 10px; padding-block: 10px; border-bottom: 1px solid var(--awd-border); }
 .project-exit-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-label span:last-child { max-width: 40%; font-size: 12px; }
+.project-exit-count { max-width: 40%; font-size: 12px; }
 footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
-button { padding: 8px 12px; border: 1px solid var(--awd-border); border-radius: 6px; background: var(--awd-surface); color: var(--awd-text); cursor: pointer; }
-button:disabled { opacity: .5; cursor: default; }
+.project-exit-button { padding: 8px 12px; border: 1px solid var(--awd-border); border-radius: 6px; background: var(--awd-surface); color: var(--awd-text); cursor: pointer; }
+.project-exit-button:disabled { opacity: .5; cursor: default; }
 </style>
