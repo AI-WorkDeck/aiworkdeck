@@ -51,6 +51,7 @@ function harness() {
     ...pluginWorkspaceTabMethods,
     applyPanelDocks: rows => rows, applyRailOrder: rows => rows, ttsEnabled: true }
   for (const name of ['loadDynamicPlugins', 'loadEnabledSkills']) vm[name] = method(page, name, deps).bind(vm)
+  Object.defineProperty(vm, 'documentAvailablePlugins', { get: method(page, 'documentAvailablePlugins', deps).bind(vm) })
   Object.defineProperty(vm, 'rail', { get: method(page, 'LEFT_SIDEBAR_PLUGINS', deps).bind(vm) })
   Object.defineProperty(vm, 'activeDynamicPlugin', { get: method(page, 'activeDynamicPlugin', deps).bind(vm) })
 
