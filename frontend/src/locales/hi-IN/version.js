@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitUnconfirmedProject: "अपुष्ट परियोजना",
   exitCommitUnconfirmed: "कमिट पूरा हुआ या नहीं, अभी पुष्टि नहीं हुई है। बाहर निकलने से पहले दोबारा जाँचें या ऐप पर लौटने के लिए रद्द करें।",
   exitProjectsTitle: "बाहर निकलने से पहले परियोजना के बदलाव जाँचें",
   exitProjectsHint: "कमिट करने के लिए परियोजनाएँ चुनें। नहीं चुने गए बदलाव इस कंप्यूटर पर सहेजे रहेंगे।",

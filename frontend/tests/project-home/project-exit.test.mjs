@@ -34,6 +34,8 @@ test('unknown receipt survives reopening and only the same request terminal rece
   assert.equal(await commitExitProjects([r], async (id, requestId) => { ids.push(requestId); throw Error('network') }, async () => clean), false)
   assert.equal(r.state, 'uncertain'); assert.equal(r.selected, false)
   const reopened = pendingExitProjects().find(row => row.id === 41)
+  assert.equal(reopened.name, undefined, 'pending receipts do not retain previous account names')
+  assert.equal(reopened.count, undefined, 'pending receipts do not retain previous account counts')
   await inspectExitProject(reopened, () => assert.fail('status snapshot is not a terminal receipt'))
   assert.equal(reopened.state, 'uncertain')
   assert.equal(await settleExitCommit(reopened, async (id, requestId) => { ids.push(requestId); return { receiptState: 'RUNNING' } }, async () => clean), false)
@@ -115,4 +117,19 @@ test('real Vue chooser loads asynchronously, starts unchecked and commits only c
   await new Promise(resolve => setTimeout(resolve, 0)); await Vue.nextTick()
   assert.deepEqual(committed, [2]); assert.equal(result, true)
   app.unmount(); root.remove(); dom.window.close()
+})
+
+test('logging out cannot bypass an unsettled receipt from a cancelled exit', async () => {
+  const source = readFileSync(new URL('../../src/utils/projectExitDialog.js', import.meta.url), 'utf8')
+  let pending = false, mounted = 0
+  const factory = new Function('getSessionId', 'pendingExitProjects', 'document', 'setGlobalOverlay', 'createApp', 'ProjectExitDialog', 't',
+    'return ' + source.slice(source.indexOf('export function')).replace('export ', ''))
+  const confirm = factory(() => null, () => pending ? [{ id: 41 }] : [], {
+    createElement: () => ({ remove() {} }), body: { appendChild() {} }, activeElement: null,
+  }, () => {}, (component, props) => ({ config: { globalProperties: {} }, mount() { mounted++; queueMicrotask(() => props.onClose(false)) }, unmount() {} }), {}, key => key)
+  assert.equal(await confirm(), true)
+  assert.equal(mounted, 0)
+  pending = true
+  assert.equal(await confirm(), false)
+  assert.equal(mounted, 1)
 })

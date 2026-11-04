@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitUnconfirmedProject: "待確認專案",
   exitCommitUnconfirmed: "尚未確認提交是否完成。請重試核對後再退出，或取消退出返回應用程式。",
   exitProjectsTitle: "退出前整理專案變更",
   exitProjectsHint: "勾選要提交的專案。未勾選專案的檔案和未提交變更仍保留在本機。",
