@@ -107,7 +107,7 @@ export async function launchInstalledElectron({ outDir, backendPort = 19566, cdp
   const app = path.join(root, mac ? 'AI WorkDeck.app' : 'AI WorkDeck')
   const executable = path.join(app, mac ? 'Contents/MacOS/AI WorkDeck' : 'AI WorkDeck.exe')
   const resourcesPath = path.join(app, mac ? 'Contents/Resources' : 'resources')
-  const provenance = { root, outDir, home, dataDir, ports, assertions: [], launches: [], forced: false }
+  const provenance = { testSource: run('git', ['rev-parse', 'HEAD']).trim(), root, outDir, home, dataDir, ports, assertions: [], launches: [], forced: false }
   const save = (name, value) => fs.writeFileSync(path.join(outDir, name), typeof value === 'string' ? value : JSON.stringify(value, null, 2))
   let child, launchIndex = 0, mounted
   const helper = { executable, resourcesPath, home, dataDir, ports, provenance,
