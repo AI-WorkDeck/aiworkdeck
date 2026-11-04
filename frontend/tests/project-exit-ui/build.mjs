@@ -13,12 +13,12 @@ const source = descriptor.script.content.replace(/import[^\n]+\n/g, '').replace(
 const render = compile(descriptor.template.content, { mode: 'module' }).code.replace('export function render', 'function render')
 await build({ stdin: { contents: `
 import { createApp } from 'vue';
-import { inspectExitProject, commitExitProjects } from './src/utils/projectExitState.js';
+import { inspectExitProject, commitExitProjects, pendingExitProjects, settleExitCommit } from './src/utils/projectExitState.js';
 import messages from './src/locales/zh-CN/version.js';
-const done = new Set(); window.commits = []; window.exitResult = null;
+const done = new Set(), started = new Set(); window.receiptChecks=[]; window.commits = []; window.exitResult = null;
 const getMyProjects = async () => ({data: [{id:1,name:'项目一：已经完成并保留历史的文件'}, {id:2,name:'项目二：这是一个非常长的项目名称用于确认窄窗口下不会挤掉勾选框和操作按钮以及状态说明'}]});
-const getVersionExitStatus = async id => ({data: {enabled:true,working:!done.has(id),changedCount:done.has(id)?0:id+2,canCommit:!done.has(id)}});
-const endWorkSession = async id => {window.commits.push(id); if(id===2 && !window.allowSecond) throw Error('synthetic failure'); done.add(id);return {data:{sha:'receipt',notice:''}}};
+const getVersionExitStatus = async id => ({data: {receiptEpoch:'test-epoch',enabled:true,working:!done.has(id),changedCount:done.has(id)?0:id+2,canCommit:!done.has(id)}});
+const endWorkSession = async (id,title,requestId) => {window.receiptChecks.push(requestId); const first=!started.has(requestId); if(first){started.add(requestId);window.commits.push(id)} if(id===2&&!window.allowSecond){if(first)throw Error('synthetic lost receipt');return {data:{receiptState:'RUNNING'}}} done.add(id);return {data:{receiptState:'SUCCEEDED',sha:'receipt',notice:''}}};
 ${source}
 ${render}
 component.render = render;

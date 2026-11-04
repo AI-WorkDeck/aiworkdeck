@@ -3,10 +3,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { inspectExitProject, commitExitProjects } from '../../src/utils/projectExitState.js'
-const pending = { enabled: true, canCommit: true, working: true, changedCount: 4 }
-const clean = { enabled: true, canCommit: false, working: false, changedCount: 0 }
-const row = id => ({ id, name: `Project ${id}`, state: 'ready', count: 4, selected: true })
+import { inspectExitProject, commitExitProjects, pendingExitProjects, settleExitCommit } from '../../src/utils/projectExitState.js'
+const pending = { receiptEpoch: 'test-epoch', enabled: true, canCommit: true, working: true, changedCount: 4 }
+const clean = { receiptEpoch: 'test-epoch', enabled: true, canCommit: false, working: false, changedCount: 0 }
+const row = id => ({ id, receiptEpoch: 'test-epoch', name: `Project ${id}`, state: 'ready', count: 4, selected: true })
 test('scan preserves failures, conflicts and working snapshots; filters clean/read-only projects', async () => {
   const r = row(1)
   await inspectExitProject(r, async () => pending)
@@ -22,24 +22,34 @@ test('scan preserves failures, conflicts and working snapshots; filters clean/re
 })
 test('partial failures do not repeat successful projects; retry requires an explicit new selection', async () => {
   const rows = [row(1), row(2), { ...row(3), selected: false }], calls = []
-  assert.equal(await commitExitProjects(rows, async id => { calls.push(id); if (id === 2) throw Error('failed'); return { sha: 'receipt', notice: '' } }, async id => id === 1 ? clean : pending), false)
+  assert.equal(await commitExitProjects(rows, async id => { calls.push(id); if (id === 2) return { receiptState: 'FAILED' }; return { receiptState: 'SUCCEEDED', sha: 'receipt', notice: '' } }, async id => id === 1 ? clean : pending), false)
   assert.deepEqual(calls, [1, 2]); assert.equal(rows[0].state, 'committed')
   assert.equal(rows[1].selected, false); assert.equal(rows[1].state, 'ready')
   rows[1].selected = true
-  assert.equal(await commitExitProjects(rows, async id => { calls.push(id); return { sha: 'receipt', notice: '' } }, async () => clean), true)
+  assert.equal(await commitExitProjects(rows, async id => { calls.push(id); return { receiptState: 'SUCCEEDED', sha: 'receipt', notice: '' } }, async () => clean), true)
   assert.deepEqual(calls, [1, 2, 2])
 })
-test('unknown commit receipt that actually completed is not resubmitted', async () => {
-  const r = row(1)
-  await commitExitProjects([r], async () => { throw Error('network') }, async () => clean)
-  assert.equal(r.state, 'empty'); assert.equal(r.selected, false)
+test('unknown receipt survives reopening and only the same request terminal receipt clears it', async () => {
+  const r = row(41), ids = []
+  assert.equal(await commitExitProjects([r], async (id, requestId) => { ids.push(requestId); throw Error('network') }, async () => clean), false)
+  assert.equal(r.state, 'uncertain'); assert.equal(r.selected, false)
+  const reopened = pendingExitProjects().find(row => row.id === 41)
+  await inspectExitProject(reopened, () => assert.fail('status snapshot is not a terminal receipt'))
+  assert.equal(reopened.state, 'uncertain')
+  assert.equal(await settleExitCommit(reopened, async (id, requestId) => { ids.push(requestId); return { receiptState: 'RUNNING' } }, async () => clean), false)
+  assert.equal(reopened.state, 'uncertain')
+  assert.equal(await settleExitCommit(reopened, async (id, requestId) => { ids.push(requestId); return { receiptState: 'UNKNOWN' } }, () => assert.fail('old backend epoch is not proof of completion')), false)
+  assert.equal(reopened.state, 'uncertain')
+  assert.equal(await settleExitCommit(reopened, async (id, requestId) => { ids.push(requestId); return { receiptState: 'SUCCEEDED', sha: 'receipt', notice: '' } }, async () => clean), true)
+  assert.equal(new Set(ids).size, 1)
+  assert.equal(pendingExitProjects().length, 0)
 })
 test('verification failures and new edits keep the dialog open, not falsely claiming success', async () => {
   const r = row(1)
-  assert.equal(await commitExitProjects([r], async () => ({ sha: 'receipt', notice: '' }), async () => { throw Error('offline') }), false)
+  assert.equal(await commitExitProjects([r], async () => ({ receiptState: 'SUCCEEDED', sha: 'receipt', notice: '' }), async () => { throw Error('offline') }), false)
   assert.equal(r.state, 'failed'); assert.equal(r.selected, false)
   const changed = row(2)
-  assert.equal(await commitExitProjects([changed], async () => ({ sha: 'receipt', notice: '' }), async () => pending), false)
+  assert.equal(await commitExitProjects([changed], async () => ({ receiptState: 'SUCCEEDED', sha: 'receipt', notice: '' }), async () => pending), false)
   assert.equal(changed.state, 'ready')
 })
 test('cancelled quit does not start another commit', async () => {
@@ -58,9 +68,10 @@ test('global quit uses one project chooser; project switching retains save barri
 test('malformed commit and status replies cannot authorize exit', async () => {
   const r = row(1)
   assert.equal(await commitExitProjects([r], async () => undefined, async () => pending), false)
-  assert.equal(r.state, 'ready')
+  assert.equal(r.state, 'uncertain')
+  await settleExitCommit(r, async () => ({ receiptState: 'FAILED' }), async () => pending)
   r.selected = true
-  assert.equal(await commitExitProjects([r], async () => ({ sha: 'receipt', notice: '' }), async () => ({})), false)
+  assert.equal(await commitExitProjects([r], async () => ({ receiptState: 'SUCCEEDED', sha: 'receipt', notice: '' }), async () => ({})), false)
   assert.equal(r.state, 'failed')
 })
 
@@ -75,11 +86,11 @@ test('real Vue chooser loads asynchronously, starts unchecked and commits only c
   const script = descriptor.script.content.replace(/import[^\n]+\n/g, '').replace('export default', 'return')
   let resolveProjects
   const committed = []
-  const component = new Function('getMyProjects', 'getVersionExitStatus', 'endWorkSession', 'inspectExitProject', 'commitExitProjects', script)(
+  const component = new Function('getMyProjects', 'getVersionExitStatus', 'endWorkSession', 'inspectExitProject', 'commitExitProjects', 'pendingExitProjects', 'settleExitCommit', script)(
     () => new Promise(resolve => { resolveProjects = resolve }),
     async id => ({ data: committed.includes(id) ? clean : pending }),
-    async id => { committed.push(id); return { data: { sha: 'receipt', notice: '' } } },
-    inspectExitProject, commitExitProjects,
+    async id => { committed.push(id); return { data: { receiptState: 'SUCCEEDED', sha: 'receipt', notice: '' } } },
+    inspectExitProject, commitExitProjects, pendingExitProjects, settleExitCommit,
   )
   component.render = new Function('Vue', compile(descriptor.template.content, { mode: 'function' }).code)(Vue)
   const root = document.createElement('div'); document.body.append(root)

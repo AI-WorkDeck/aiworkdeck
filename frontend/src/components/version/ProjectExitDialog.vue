@@ -6,7 +6,8 @@
       <h3>{{ $t('version.exitProjectsTitle') }}</h3>
       <p>{{ $t('version.exitProjectsHint') }}</p>
       <p v-if="loading">{{ $t('version.exitProjectsChecking') }}</p>
-      <p v-if="listFailed || commitFailed" role="alert">{{ $t('version.exitCheckFailed') }}</p>
+      <p v-if="hasUncertain" role="alert">{{ $t('version.exitCommitUnconfirmed') }}</p>
+      <p v-else-if="listFailed || commitFailed" role="alert">{{ $t('version.exitCheckFailed') }}</p>
       <div class="project-exit-list">
         <component :is="'label'" v-for="row in visibleRows" :key="row.id">
           <component :is="'input'" type="checkbox" :checked="row.selected" :disabled="busy || row.state !== 'ready'"
@@ -18,22 +19,23 @@
       <p v-if="!loading && !listFailed && !visibleRows.length">{{ $t('version.noActiveSession') }}</p>
       <footer>
         <component :is="'button'" type="button" :disabled="busy" @click="$emit('close', false)">{{ $t('common.cancel') }}</component>
-        <component :is="'button'" v-if="listFailed || rows.some(row => ['failed', 'conflict'].includes(row.state))" type="button" :disabled="busy || loading" @click="retry">{{ $t('common.retry') }}</component>
-        <component :is="'button'" type="button" :disabled="busy" @click="$emit('close', true)">{{ $t('version.exitSkip') }}</component>
-        <component :is="'button'" type="button" :disabled="loading || busy || !hasSelection" @click="submit">{{ $t('version.exitProjectsCommit') }}</component>
+        <component :is="'button'" v-if="listFailed || rows.some(row => ['failed', 'conflict', 'uncertain'].includes(row.state))" type="button" :disabled="busy || loading" @click="retry">{{ $t('common.retry') }}</component>
+        <component :is="'button'" type="button" :disabled="busy || hasUncertain" @click="$emit('close', true)">{{ $t('version.exitSkip') }}</component>
+        <component :is="'button'" type="button" :disabled="loading || busy || hasUncertain || !hasSelection" @click="submit">{{ $t('version.exitProjectsCommit') }}</component>
       </footer>
     </section>
   </div>
 </template>
 <script>
 import { getMyProjects, getVersionExitStatus, endWorkSession } from '@/services/api.js'
-import { inspectExitProject, commitExitProjects } from '@/utils/projectExitState.js'
+import { inspectExitProject, commitExitProjects, pendingExitProjects, settleExitCommit } from '@/utils/projectExitState.js'
 export default {
   props: { isCurrent: { type: Function, required: true } },
   emits: ['close'],
-  data: () => ({ rows: [], loading: true, busy: false, listFailed: false, commitFailed: false }),
+  data: () => ({ rows: pendingExitProjects(), loading: true, busy: false, listFailed: false, commitFailed: false }),
   computed: {
     visibleRows() { return this.rows.filter(row => row.state !== 'empty') },
+    hasUncertain() { return this.rows.some(row => row.state === 'uncertain') },
     hasSelection() { return this.rows.some(row => row.selected && row.state === 'ready') },
   },
   mounted() {
@@ -57,6 +59,7 @@ export default {
       if (row.state === 'checking') return this.$t('version.exitProjectsChecking')
       if (row.state === 'committing') return this.$t('version.committingChanges')
       if (row.state === 'committed') return this.$t('version.exitProjectsCommitted')
+      if (row.state === 'uncertain') return this.$t('version.entryUnavailable')
       if (row.state === 'failed') return this.$t('version.entryUnavailable')
       if (row.state === 'conflict') return this.$t('version.exitConflict')
       return this.$t('version.pendingFileCount', { count: row.count })
@@ -70,6 +73,11 @@ export default {
         if (!Array.isArray(projects)) throw new Error('invalid projects')
         this.rows = projects.filter(p => !['SCRATCH', 'LOOSE_FILES'].includes(p.projectType))
           .map(p => ({ id: p.id, name: p.name, selected: false, count: 0, state: 'checking' }))
+        for (const pending of pendingExitProjects()) {
+          const row = this.rows.find(row => String(row.id) === String(pending.id))
+          if (row) Object.assign(row, pending)
+          else this.rows.push(pending)
+        }
         // Bound the scan concurrency: never flood the local version locks.
         let index = 0
         await Promise.all(Array.from({ length: 3 }, async () => {
@@ -83,17 +91,21 @@ export default {
     },
     async retry() {
       if (this.listFailed) return this.load()
-      this.loading = true
-      for (const row of this.rows.filter(row => ['failed', 'conflict'].includes(row.state))) {
+      this.loading = true; this.busy = true; this.commitFailed = false
+      for (const row of this.rows.filter(row => ['failed', 'conflict', 'uncertain'].includes(row.state))) {
         if (this._disposed) break
-        await inspectExitProject(row, this.readStatus)
+        if (row.state === 'uncertain') {
+          if (!await settleExitCommit(row, this.commit, this.readStatus)) this.commitFailed = true
+        }
+        else await inspectExitProject(row, this.readStatus)
       }
-      this.loading = false
+      this.loading = false; this.busy = false
     },
+    commit: async (id, requestId) => (await endWorkSession(id, '', requestId))?.data,
     async submit() {
-      if (this.busy || this.loading || !this.hasSelection) return
+      if (this.busy || this.loading || this.hasUncertain || !this.hasSelection) return
       this.busy = true; this.commitFailed = false
-      const ok = await commitExitProjects(this.rows, async id => (await endWorkSession(id, ''))?.data, this.readStatus, this.isCurrent)
+      const ok = await commitExitProjects(this.rows, this.commit, this.readStatus, this.isCurrent)
       this.busy = false
       if (ok) this.$emit('close', true)
       else this.commitFailed = true
@@ -109,7 +121,7 @@ p { font-size: 13px; line-height: 1.6; }
 .project-exit-list { max-height: 45vh; overflow: auto; }
 label { display: flex; align-items: center; gap: 10px; padding-block: 10px; border-bottom: 1px solid var(--awd-border); }
 .project-exit-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-label span:last-child { font-size: 12px; }
+label span:last-child { max-width: 40%; font-size: 12px; }
 footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
 button { padding: 8px 12px; border: 1px solid var(--awd-border); border-radius: 6px; background: var(--awd-surface); color: var(--awd-text); cursor: pointer; }
 button:disabled { opacity: .5; cursor: default; }

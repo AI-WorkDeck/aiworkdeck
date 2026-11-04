@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitCommitUnconfirmed: "Das Ergebnis einer Übernahme ist noch unbestätigt. Prüfen Sie es vor dem Beenden erneut oder kehren Sie mit Abbrechen zur App zurück.",
   exitProjectsTitle: "Projektänderungen vor dem Beenden prüfen",
   exitProjectsHint: "Wählen Sie die zu übernehmenden Projekte. Nicht ausgewählte Änderungen bleiben auf diesem Computer gespeichert.",
   exitProjectsChecking: "Änderungen werden geprüft…",
