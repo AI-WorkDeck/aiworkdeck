@@ -5,10 +5,11 @@ import ProjectExitDialog from '@/components/version/ProjectExitDialog.vue'
 import { t } from '@/i18n'
 import { pendingExitProjects } from './projectExitState.js'
 import { getSessionId } from './auth.js'
+import { isDesktopHost } from '@/services/host.js'
 import { setGlobalOverlay } from './overlayState.js'
 
 export function confirmProjectExit({ isCurrent = () => true } = {}) {
-  if (!getSessionId() && !pendingExitProjects().length) return Promise.resolve(true)
+  if (!isDesktopHost() && !getSessionId() && !pendingExitProjects().length) return Promise.resolve(true)
   return new Promise(resolve => {
     const container = document.createElement('div')
     document.body.appendChild(container)
