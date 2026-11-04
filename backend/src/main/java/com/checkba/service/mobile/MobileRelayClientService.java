@@ -138,7 +138,29 @@ public class MobileRelayClientService {
                 LangText.of("账户已变化，请刷新项目目录", "Account changed; refresh the project catalogue"));
     }
 
-    private record CatalogSession(String scope, String token) {}
+    private record CloudEpochSnapshot(String token,long epoch) {}
+    private final java.util.concurrent.atomic.AtomicReference<CloudEpochSnapshot> cloudEpoch = new java.util.concurrent.atomic.AtomicReference<>();
+    private final class CatalogSession {
+        private final String scope, token;
+        private Long epoch;
+        CatalogSession(String scope,String token) { this.scope=scope;this.token=token; }
+        String scope() { return scope; }
+        String token() { return token; }
+        void captureEpoch(JsonNode data) {
+            JsonNode value=data.path("cloudAccess").path("epoch");
+            if(value.isIntegralNumber() && epoch==null) {
+                epoch=value.asLong();
+                cloudEpoch.updateAndGet(old->old!=null && token.equals(old.token()) && old.epoch()>epoch ? old:new CloudEpochSnapshot(token,epoch));
+            }
+        }
+        HttpRequest.Builder fence(HttpRequest.Builder builder) {
+            return epoch==null ? builder : builder.setHeader("X-Cloud-Epoch",Long.toString(epoch));
+        }
+    }
+    private static boolean cloudAllowed(JsonNode state,String capability) {
+        return state.path("cloudAccess").isObject() ? state.path("cloudAccess").path(capability).asBoolean()
+                : state.path("subscriptionActive").asBoolean();
+    }
     private CatalogSession beginCatalogSession(String scope) {
         requireCatalogAccountScope(scope);
         String token = currentToken();
@@ -149,7 +171,7 @@ public class MobileRelayClientService {
     /** A catalogue operation never rebinds credentials halfway through an account switch. */
     private HttpResponse<String> catalogExchange(CatalogSession session, String method, String path, String body) {
         requireCatalogAccountScope(session.scope());
-        HttpRequest.Builder builder = request(session.token(), path).header("X-Session-Id", session.token()).header("Content-Type", "application/json");
+        HttpRequest.Builder builder = session.fence(request(session.token(), path)).header("X-Session-Id", session.token()).header("Content-Type", "application/json");
         builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
         try {
             HttpResponse<String> response = http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
@@ -294,6 +316,7 @@ public class MobileRelayClientService {
             JsonNode data = mapper.readTree(response.body());
             if (!data.isObject() || data.path("code").asInt(0) != 0)
                 throw new IOException("Backup request failed");
+            session.captureEpoch(data);
             return data;
         } catch (IOException e) {
             throw new IllegalStateException(LangText.of("云备份暂不可用，请重试", "Cloud backup is unavailable; please retry"), e);
@@ -312,12 +335,10 @@ public class MobileRelayClientService {
     public void requireVersionObjectCloudConsent() {
         try {
             JsonNode consent=backupConsent();
-            if(!consent.path("enabled").asBoolean() || !consent.path("subscriptionActive").asBoolean())
+            if(!consent.path("enabled").asBoolean() || !cloudAllowed(consent,"canWrite"))
                 throw new IllegalStateException("consent");
         } catch(RuntimeException e) {
-            throw com.checkba.version.VersionException.userFacing(LangText.of(
-                    "大文件已保存在本地；请先开启文件云端备份并确认订阅有效，再同步到案件库",
-                    "Large files are saved locally. Enable cloud file backup with an active subscription before sharing"));
+            throw com.checkba.version.VersionException.userFacing(CloudBillingText.get("versionsBackupNeeded"));
         }
     }
 
@@ -348,7 +369,8 @@ public class MobileRelayClientService {
         requireCatalogAccountScope(session.scope());
         if(generation!=versionBackupGeneration.get()) throw new java.util.concurrent.CancellationException();
         JsonNode consent=backupJson(session,"GET","/api/mobile/backup-consent",null);
-        if(!consent.path("enabled").asBoolean() || !consent.path("subscriptionActive").asBoolean()
+        if(!consent.path("enabled").asBoolean() || !cloudAllowed(consent,"canWrite")
+                || (session.epoch!=null && consent.path("cloudAccess").path("epoch").asLong(-1)!=session.epoch)
                 || generation!=versionBackupGeneration.get()) throw new java.util.concurrent.CancellationException();
     }
 
@@ -404,7 +426,7 @@ public class MobileRelayClientService {
             CatalogSession session=beginCatalogSession(catalogAccountScope());
             versionBackupScope=session.scope();
             JsonNode consent=backupJson(session,"GET","/api/mobile/backup-consent",null);
-            if(!consent.path("enabled").asBoolean() || !consent.path("subscriptionActive").asBoolean()) {
+            if(!consent.path("enabled").asBoolean() || !cloudAllowed(consent,"canWrite")) {
                 versionBackupStatus=Map.of("state","disabled","pendingObjects",0,"lastError","");return;
             }
             pushDirectory();requireCatalogAccountScope(session.scope());
@@ -437,7 +459,7 @@ public class MobileRelayClientService {
                             String hash=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
                             requireCatalogAccountScope(session.scope());
                             if(generation!=versionBackupGeneration.get()) throw new java.util.concurrent.CancellationException();
-                            HttpRequest request=request(session.token(), base+"/parts/"+index+query+"&partSha="+hash,Duration.ofMinutes(10))
+                            HttpRequest request=session.fence(request(session.token(), base+"/parts/"+index+query+"&partSha="+hash,Duration.ofMinutes(10)))
                                     .header("X-Session-Id",session.token()).header("Content-Type","application/octet-stream")
                                     .PUT(HttpRequest.BodyPublishers.ofByteArray(bytes)).build();
                             JsonNode result=versionObjectResponse(http.send(request,HttpResponse.BodyHandlers.ofString()));
@@ -447,7 +469,7 @@ public class MobileRelayClientService {
                         }
                     }
                     requireVersionBackupActive(session,generation);
-                    HttpRequest finish=request(session.token(), base+"/complete"+query,Duration.ofMinutes(10))
+                    HttpRequest finish=session.fence(request(session.token(), base+"/complete"+query,Duration.ofMinutes(10)))
                             .header("X-Session-Id",session.token()).POST(HttpRequest.BodyPublishers.noBody()).build();
                     JsonNode completed=versionObjectResponse(http.send(finish,HttpResponse.BodyHandlers.ofString()));
                     requireCatalogAccountScope(session.scope());
@@ -479,7 +501,7 @@ public class MobileRelayClientService {
         try {
             CatalogSession session = beginCatalogSession(catalogAccountScope());
             JsonNode consent = backupJson(session, "GET", "/api/mobile/backup-consent", null);
-            if (!consent.path("enabled").asBoolean() || !consent.path("subscriptionActive").asBoolean()) return;
+            if (!consent.path("enabled").asBoolean() || !cloudAllowed(consent,"canWrite")) return;
             pushDirectory();
             requireCatalogAccountScope(session.scope());
             String device = deviceId();
@@ -534,7 +556,7 @@ public class MobileRelayClientService {
                     requireCatalogAccountScope(session.scope());
                     String boundary = MultipartBody.newBoundary();
                     try (InputStream input = resource.getInputStream()) {
-                        HttpRequest req = request(session.token(), "/api/mobile/backup/files" + query, Duration.ofMinutes(10))
+                        HttpRequest req = session.fence(request(session.token(), "/api/mobile/backup/files" + query, Duration.ofMinutes(10)))
                                 .header("X-Session-Id", session.token())
                                 .header("Content-Type", "multipart/form-data; boundary=" + boundary)
                                 .PUT(MultipartBody.filePublisher(boundary, "file", file.getName(), input)).build();
@@ -768,7 +790,7 @@ public class MobileRelayClientService {
         try {
             CatalogSession session = beginCatalogSession(catalogAccountScope());
             JsonNode settings = workspaceJson(session, "GET", "/api/mobile/calendar/settings", null);
-            if (!settings.path("enabled").asBoolean() || !settings.path("subscriptionActive").asBoolean()) return;
+            if (!settings.path("enabled").asBoolean() || !cloudAllowed(settings,"canWrite")) return;
             List<Project> projects = mobileWorkspaceProjects();
             if (projects.isEmpty()) return;
             projects = pushWorkspaceDirectory(session, projects);
@@ -825,7 +847,7 @@ public class MobileRelayClientService {
         try {
             CatalogSession session = beginCatalogSession(catalogAccountScope());
             JsonNode status = workspaceJson(session, "GET", "/api/mobile/assistant/status", null);
-            if (!status.path("enabled").asBoolean() || !status.path("subscriptionActive").asBoolean()
+            if (!status.path("enabled").asBoolean() || !cloudAllowed(status,"canWrite")
                     || !status.path("backupEnabled").asBoolean()) return;
             List<Project> projects = mobileWorkspaceProjects();
             if (projects.isEmpty()) return;
@@ -898,7 +920,7 @@ public class MobileRelayClientService {
     private JsonNode workspaceJson(CatalogSession session, String method, String path, JsonNode body)
             throws IOException, InterruptedException {
         requireCatalogAccountScope(session.scope());
-        HttpRequest.Builder builder = request(session.token(), path, Duration.ofMinutes(3))
+        HttpRequest.Builder builder = session.fence(request(session.token(), path, Duration.ofMinutes(3)))
                 .header("X-Session-Id", session.token()).header("Content-Type", "application/json");
         builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody()
                 : HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)));
@@ -908,6 +930,7 @@ public class MobileRelayClientService {
         JsonNode envelope = mapper.readTree(response.body());
         if (!envelope.has("code") || envelope.path("code").asInt(-1) != 0 || !envelope.has("data"))
             throw new IOException("Workspace sync failed");
+        session.captureEpoch(envelope.path("data"));
         return envelope.path("data");
     }
 
@@ -2182,7 +2205,10 @@ public class MobileRelayClientService {
 
     /** 自定义超时的重载：PULL 上传 / PUSH 内容下载最大 200MB，60 秒默认超时不够用。 */
     private HttpRequest.Builder request(String token, String path, Duration timeout) {
-        return HttpRequest.newBuilder(URI.create(tokenBaseUrl(token) + path)).timeout(timeout);
+        var builder=HttpRequest.newBuilder(URI.create(tokenBaseUrl(token) + path)).timeout(timeout);
+        var snapshot=cloudEpoch.get();
+        if(snapshot!=null && Objects.equals(token,snapshot.token())) builder.header("X-Cloud-Epoch",Long.toString(snapshot.epoch()));
+        return builder;
     }
 
     private String relayBaseUrl(String accountBaseUrl) {

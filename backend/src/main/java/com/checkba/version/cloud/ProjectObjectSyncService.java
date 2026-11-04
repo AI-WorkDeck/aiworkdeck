@@ -43,6 +43,7 @@ public class ProjectObjectSyncService {
                 "大文件已保存在本机，请开启文件云端备份后再交稿", "Large files are saved locally. Enable cloud file backup before submitting them."));
         String accountScope = client.catalogAccountScope();
         requireConsent(client, accountScope);
+        Map<String,String> frozenEpoch=repos.cloudWriteHeaders(project,remoteUrl,username,token);
         try {
             capabilities(remoteUrl, username, token);
             for (ObjectRef ref : refs) {
@@ -65,11 +66,11 @@ public class ProjectObjectSyncService {
                         try { return partStream(project, ref, index); }
                         catch (IOException e) { throw new UncheckedIOException(e); }
                     }), length);
-                    responseJson(request(base + "/parts/" + part + "?size=" + ref.size(), username, token)
+                    responseJson(writeRequest(base + "/parts/" + part + "?size=" + ref.size(), username, token,frozenEpoch)
                             .header("Content-Type", "application/octet-stream").header("X-AWD-Part-Sha256", hash).PUT(publisher).build());
                 }
                 requireConsent(client, accountScope);
-                responseJson(request(base + "/complete?size=" + ref.size(), username, token)
+                responseJson(writeRequest(base + "/complete?size=" + ref.size(), username, token,frozenEpoch)
                         .POST(HttpRequest.BodyPublishers.noBody()).build());
             }
         } catch (IOException | InterruptedException e) {
@@ -142,12 +143,17 @@ public class ProjectObjectSyncService {
         client.requireCatalogAccountScope(scope);
     }
 
-    private HttpRequest.Builder request(String url, String user, String token) {
+    private HttpRequest.Builder request(String url, String user, String token) throws IOException {
         URI uri = URI.create(url);
         if (!Set.of("http", "https").contains(uri.getScheme()) || uri.getUserInfo() != null)
             throw new IllegalArgumentException("Unsupported object endpoint");
         String credential = Base64.getEncoder().encodeToString(((user == null ? "" : user) + ":" + token).getBytes(StandardCharsets.UTF_8));
-        return HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(90)).header("Authorization", "Basic " + credential);
+        var builder=HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(90)).header("Authorization", "Basic " + credential);
+        return builder;
+    }
+
+    private HttpRequest.Builder writeRequest(String url,String user,String token,Map<String,String> frozenEpoch) throws IOException {
+        var builder=request(url,user,token);frozenEpoch.forEach(builder::header);return builder;
     }
 
     private JsonNode responseJson(HttpRequest request) throws IOException, InterruptedException {

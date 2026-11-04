@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  apiCloudAccessRefresh: "تغيّرت صلاحيات الوصول إلى السحابة. حدّث الصفحة أو أعد فتح التطبيق قبل المتابعة. لن تُحذف الملفات المحلية.",
   defaultProjectName: "مشروع مؤقت",
   cmdPptAddImage: "إدراج صورة في الشريحة",
   cmdPptAddChart: "إدراج مخطط في الشريحة",

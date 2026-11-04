@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  apiCloudAccessRefresh: "雲端權限已變更，請重新整理頁面或重新開啟應用程式後再操作。本機檔案不會刪除。",
   defaultProjectName: "臨時專案",
   cmdPptAddImage: "插入投影片圖片",
   cmdPptAddChart: "插入投影片圖表",

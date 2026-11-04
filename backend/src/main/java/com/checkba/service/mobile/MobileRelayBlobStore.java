@@ -43,6 +43,9 @@ public interface MobileRelayBlobStore {
 
     boolean exists(String locator);
 
+    /** Lifecycle cleanup must independently prove the locator belongs to this cloud account. */
+    default boolean ownedLocator(Long userId,String locator) { return false; }
+
     /** 删除失败只 warn 绝不抛——blob 删不掉不该挡住 ACK/TTL 的行级操作。 */
     void deleteQuietly(String locator);
 }

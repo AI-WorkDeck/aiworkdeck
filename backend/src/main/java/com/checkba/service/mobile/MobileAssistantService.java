@@ -26,7 +26,7 @@ import java.util.*;
 @Service
 public class MobileAssistantService {
     public static final String CONSENT_VERSION = "2026-10-27";
-    public static final String NOTICE = "开通后，云端会为已同意备份的项目生成摘要，并按您的问题读取必要材料。项目档案、待办及必要文件内容会发送至现有AI服务商处理，摘要和对话保存在本账户云端。需要有效云端订阅，AI与企查查、北大法宝查询按现有账户额度计费；关闭后删除摘要和个人助理对话，不删除原文件。";
+    public static final String NOTICE = "开通后，云端会为已同意备份的项目生成摘要，并按您的问题读取必要材料。项目档案、待办及必要文件内容会发送至现有AI服务商处理，摘要和对话保存在本账户云端。需同意按量计费，AI与企查查、北大法宝查询按现有账户额度计费；关闭后删除摘要和个人助理对话，不删除原文件。";
     private static final Set<String> EXTERNAL_TOOLS = Set.of("law_search", "law_search_keyword", "law_recognition", "get_law_article", "qichacha_query", "qichacha_ipr");
     private static final int SOURCE_LIMIT = 20;
     private final MobileAssistantConsentRepository consents;
@@ -58,20 +58,23 @@ public class MobileAssistantService {
 
     public Map<String,Object> status(Long user) {
         boolean subscribed=false, subscriptionAvailable=true, backed=Boolean.TRUE.equals(consents.backupEnabled(user));
-        try {subscribed=quota.persistentQuota(user)>0;} catch(MobileBillingFailureException unavailable) {subscriptionAvailable=false;}
+        try {subscribed=quota.subscriptionQuota(user)>0;} catch(MobileBillingFailureException unavailable) {subscriptionAvailable=false;}
         boolean accepted=consents.accessState(user).map(c -> c.getEnabled() && CONSENT_VERSION.equals(c.getConsentVersion())).orElse(false);
-        boolean enabled=subscribed && backed && accepted;
+        boolean allowed=false;
+        try { allowed=quota.canUse(user); } catch(MobileBillingFailureException unavailable) { subscriptionAvailable=false; }
+        boolean enabled=allowed && backed && accepted;
         Map<String,Object> out=new LinkedHashMap<>();
         out.put("enabled",enabled); out.put("subscriptionActive",subscribed); out.put("subscriptionAvailable",subscriptionAvailable); out.put("backupEnabled",backed);
-        out.put("consentEnabled",accepted); out.put("consentVersion",CONSENT_VERSION); out.put("notice",LangText.of(NOTICE,"Enabling this feature lets the cloud generate project summaries and read materials needed to answer your questions from files you have agreed to back up. Project profiles, tasks and necessary file contents are sent to existing AI providers; summaries and conversations are stored privately in your cloud account. An active cloud subscription is required. AI, Qichacha and PKULaw queries use your existing account billing. Disabling deletes summaries and personal assistant conversations, but not the original files."));
-        out.put("reason",!subscriptionAvailable ? "subscription_unavailable" : !subscribed ? "subscription_required" : !backed ? "backup_consent_required" : !accepted ? "assistant_consent_required" : "ready");
+        out.put("consentEnabled",accepted); out.put("consentVersion",CONSENT_VERSION); out.put("notice",CloudBillingText.get("assistantNotice"));
+        out.put("reason",!subscriptionAvailable ? "subscription_unavailable" : !allowed ? "billing_required" : !backed ? "backup_consent_required" : !accepted ? "assistant_consent_required" : "ready");
+        quota.appendCloudState(user,out);
         out.put("summaryCount",enabled ? visible(user).size() : 0);
         return out;
     }
 
     public Map<String,Object> settings(Long user, boolean enabled, String version) {
         if (!CONSENT_VERSION.equals(version)) throw bad("请阅读并确认最新个人助理说明","Please review and accept the latest personal assistant notice");
-        if (enabled && (quota.persistentQuota(user)<=0 || !Boolean.TRUE.equals(consents.backupEnabled(user)))) throw bad("请先开通云端订阅并同意文件云备份","Activate a cloud subscription and enable cloud file backup first");
+        if (enabled && (!quota.canUse(user) || !Boolean.TRUE.equals(consents.backupEnabled(user)))) throw new IllegalArgumentException(CloudBillingText.get("assistantEnableBilling"));
         tx.executeWithoutResult(s -> {
             users.lockStorageOwner(user).orElseThrow(() -> bad("账户不存在","Account not found"));
             var consent=consents.findById(user).orElseGet(MobileAssistantConsent::new);
@@ -83,7 +86,7 @@ public class MobileAssistantService {
     }
 
     private long requireEnabled(Long user) {
-        if (quota.persistentQuota(user)<=0 || !Boolean.TRUE.equals(consents.backupEnabled(user))) throw bad("个人助理需要有效云端订阅及文件备份授权","The personal assistant requires an active cloud subscription and file backup consent");
+        if (!quota.canRead(user) || !Boolean.TRUE.equals(consents.backupEnabled(user))) throw new IllegalArgumentException(CloudBillingText.get("assistantReadAccess"));
         var consent=consents.accessState(user).filter(c -> c.getEnabled() && CONSENT_VERSION.equals(c.getConsentVersion()))
                 .orElseThrow(() -> bad("请先阅读并开通云端个人助理","Please review the notice and enable the cloud personal assistant first"));
         return consent.getRevision();
@@ -114,7 +117,12 @@ public class MobileAssistantService {
         if(!generating.add(generationKey)) throw bad("此项目摘要正在生成，请稍后同步","This project summary is being generated; sync again later");
         try {return generateSnapshot(user,input);} finally {generating.remove(generationKey);}
     }
+    private void requireBillableUse(Long user) {
+        if(!quota.canUse(user)) throw new IllegalArgumentException(CloudBillingText.get("checkAllowance"));
+        quota.requireCloudWrite(user);
+    }
     private Map<String,Object> generateSnapshot(Long user,Snapshot input) {
+        requireBillableUse(user);
         long revision=requireEnabled(user);
         String device=required(input.deviceId(),64), key=required(input.projectKey(),64);
         String context=input.context()==null ? "" : bounded(input.context(),24000);
@@ -164,6 +172,7 @@ public class MobileAssistantService {
         if (!backupHash.equals(backupHash(sourceFiles(user,device,key)))) throw bad("云备份已变化，稍后重新生成摘要","Cloud backups changed; regenerate the summary later");
         String resultSummary=bounded(summary,16000);
         MobileProjectSummary row=tx.execute(s -> {
+            users.lockStorageOwner(user).orElseThrow();quota.requireCloudWrite(user);
             checkConsent(consents.lockByUserId(user).orElseThrow(),revision);
             var current=summaries.findByUserIdAndDeviceIdAndProjectKey(user,device,key).orElseGet(MobileProjectSummary::new);
             if(current.getSourceUpdatedAt()!=null && sourceTime.isBefore(Instant.parse(current.getSourceUpdatedAt()))) throw bad("已有较新的项目快照","A newer project snapshot is already available");
@@ -284,6 +293,7 @@ public class MobileAssistantService {
 
     public record ChatInput(String conversationId,String requestId,String message) {}
     public Map<String,Object> chat(Long user,ChatInput input) {
+        requireBillableUse(user);
         long revision=requireEnabled(user);
         String request=uuid(input.requestId()), question=required(input.message(),8000);
         String conversation=input.conversationId()==null || input.conversationId().isBlank() ? UUID.randomUUID().toString() : uuid(input.conversationId());
@@ -315,6 +325,7 @@ public class MobileAssistantService {
             // Revalidate every source before delivery, not only when the model started reading it.
             for (var reference:refs.values()) requireReference(user,reference);
             var completed=tx.execute(s -> {
+                users.lockStorageOwner(user).orElseThrow();quota.requireCloudWrite(user);
                 checkConsent(consents.lockByUserId(user).orElseThrow(),revision);
                 var row=requireAttempt(turn);
                 row.setAnswer(bounded(answer,24000));row.setStatus("completed");row.setSourcesJson(encode(refs.values()));return turns.saveAndFlush(row);

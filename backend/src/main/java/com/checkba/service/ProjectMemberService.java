@@ -122,6 +122,15 @@ public class ProjectMemberService {
         return null;
     }
 
+    /** Serialize every cloud membership addition with irreversible project cleanup. */
+    public void lockCloudMembership(Long projectId) {
+        Project billingProject = projectRepository.findById(projectId).orElse(null);
+        if (billingProject != null && billingProject.getCloudBillingOwnerId() != null) {
+            userRepository.lockStorageOwner(billingProject.getCloudBillingOwnerId()).orElseThrow();
+            projectRepository.lockForImWrite(projectId).orElseThrow();
+        }
+    }
+
     /**
      * 把一个人加进项目。
      *
@@ -130,6 +139,7 @@ public class ProjectMemberService {
      */
     @Transactional
     public void addMember(Long projectId, String identifier, String role, Long requesterId) {
+        lockCloudMembership(projectId);
         checkAdminPermission(projectId, requesterId);
 
         User user = resolveMemberUser(identifier, requesterId);

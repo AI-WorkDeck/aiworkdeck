@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cloudAccessRefresh: "Доступ к облаку изменился. Обновите страницу или заново откройте приложение. Локальные файлы не будут удалены.",
   workspaceSessionUnavailable: "Не удалось восстановить сеанс рабочего пространства",
   "confirm": "ОК",
   "cancel": "Отмена",

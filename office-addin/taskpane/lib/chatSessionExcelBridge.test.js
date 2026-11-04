@@ -215,6 +215,7 @@ function makeBackend({ issueGate }) {
   return {
     state,
     async fetch(url, options = {}) {
+      if (url.endsWith('/api/mobile/billing/cloud-state')) return jsonReply({ cloudAccess: { epoch: 1, canUse: true, canWrite: true, canRead: true } })
       if (url.includes('/api/ai/history')) return jsonReply([])
       if (url.includes('/api/ai/models')) return jsonReply({ models: [], defaultModel: '' })
       if (url.includes('/api/ai/skills')) return jsonReply([])

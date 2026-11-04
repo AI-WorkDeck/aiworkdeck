@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  apiCloudAccessRefresh: "क्लाउड की पहुँच बदल गई है। आगे बढ़ने से पहले पेज रीफ़्रेश करें या ऐप फिर से खोलें। स्थानीय फ़ाइलें नहीं हटाई जाएँगी।",
   defaultProjectName: "अस्थायी प्रोजेक्ट",
   cmdPptAddImage: "स्लाइड में चित्र डालें",
   cmdPptAddChart: "स्लाइड में चार्ट डालें",

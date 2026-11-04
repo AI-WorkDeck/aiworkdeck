@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  apiCloudAccessRefresh: "클라우드 접근 권한이 변경되었습니다. 계속하려면 페이지를 새로 고치거나 앱을 다시 여세요. 로컬 파일은 삭제되지 않습니다.",
   defaultProjectName: "임시 프로젝트",
   cmdPptAddImage: "슬라이드 이미지 삽입",
   cmdPptAddChart: "슬라이드 차트 삽입",

@@ -162,13 +162,14 @@ test('面板卸载时取消在途请求与待发的防抖', (t) => {
 // ---- services/api.js：request() 真正把 AbortSignal 接到 uni.request 的 RequestTask.abort ----
 
 function loadRequest(uniStub) {
-  const start = API.indexOf('function request(options) {')
+  const start = API.indexOf('async function request(options) {')
   assert.ok(start >= 0, '找不到 request()')
   const end = API.indexOf('\n}\n', start)
   const src = API.slice(start, end + 2)
   const deps = {
     getApiBaseUrl: () => 'http://127.0.0.1:1',
     getCloudAccountGeneration: () => 0,
+    needsCloudEpoch: () => false,
     getAuthHeaders: () => ({}),
     t: (k) => k,
     uni: uniStub,

@@ -69,6 +69,10 @@ ai:
     max-parallel: ${AI_SUBAGENT_MAX_PARALLEL:8}
 
 storage:
+  postpaid:
+    enabled: ${AWD_CLOUD_POSTPAID_ENABLED:false}
+    cleanup-enabled: ${AWD_CLOUD_CLEANUP_ENABLED:false}
+    safety-limit-bytes: ${AWD_CLOUD_SAFETY_LIMIT_BYTES:107374182400}
   subscription-quota:
     enabled: true
   type: local

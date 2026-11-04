@@ -61,6 +61,18 @@ public class ProjectService {
     @org.springframework.beans.factory.annotation.Autowired
     private com.checkba.version.WorkSessionService workSessions;
 
+    @org.springframework.beans.factory.annotation.Value("${security.local-mode:false}")
+    private boolean localMode;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.repository.ProjectRemoteRepository cloudProjectRemotes;
+
+    private void assignCloudBillingOwner(Project project, Long userId) {
+        if (!localMode && cloudStorageQuota != null && cloudStorageQuota.isEnabled()) {
+            project.setCloudBillingOwnerId(userId);
+            project.setCloudOwnership("PERSONAL");
+        }
+    }
+
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProjectService.class);
 
     /**
@@ -132,6 +144,7 @@ public class ProjectService {
         project.setListedCompanyName(request.getListedCompanyName() != null ? request.getListedCompanyName() : "");
         project.setTargetCompanyName(request.getTargetCompanyName() != null ? request.getTargetCompanyName() : "");
         project.setUserId(userId);
+        assignCloudBillingOwner(project, userId);
 
         if (request.getListedCompanyInfo() != null) {
             project.setListedCompanyInfoJson(JSONUtil.toJsonStr(request.getListedCompanyInfo()));
@@ -312,6 +325,7 @@ public class ProjectService {
         p.setListedCompanyName("");
         p.setTargetCompanyName("");
         p.setUserId(userId);
+        assignCloudBillingOwner(p, userId);
         p.setVersionOptOut(true);
         p.setCreatedAt(LocalDateTime.now());
         p.setUpdatedAt(p.getCreatedAt());
@@ -372,7 +386,51 @@ public class ProjectService {
         workSessions.runProjectDeletion(id, () -> deleteProjectLocked(id));
     }
 
-    private void deleteProjectLocked(Long id) {
+    /** Called only after the account authority granted an irreversible cleanup item. */
+    @Transactional
+    public void deleteOwnedCloudProject(Long id, Long ownerId, String expectedUid) {
+        deleteOwnedCloudProject(id, ownerId, expectedUid, false);
+    }
+
+    /** Reconciles a completed authority receipt without issuing any physical delete. */
+    @Transactional
+    public void reconcileCompletedCloudProject(Long id, Long ownerId, String expectedUid) {
+        deleteOwnedCloudProject(id, ownerId, expectedUid, true);
+    }
+
+    private void deleteOwnedCloudProject(Long id, Long ownerId, String expectedUid, boolean metadataOnly) {
+        if (localMode || cloudStorageQuota == null || !cloudStorageQuota.isEnabled())
+            throw new IllegalStateException("Cloud cleanup is unavailable on this deployment");
+        workSessions.runProjectDeletion(id, () -> {
+            userRepository.lockStorageOwner(ownerId).orElseThrow();
+            Project project = entityManager.find(Project.class, id, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+            if (project == null) return; // Retry after a completed deletion.
+            if (!java.util.Objects.equals(expectedUid, project.getUid())
+                    || !java.util.Objects.equals(ownerId, project.getUserId())
+                    || !java.util.Objects.equals(ownerId, project.getCloudBillingOwnerId())
+                    || !"PERSONAL".equals(project.getCloudOwnership())
+                    || StringUtils.hasText(project.getLocalRoot())
+                    || cloudProjectRemotes.findByProjectId(id).isPresent()
+                    || projectMemberRepository.findByProjectId(id).stream().anyMatch(m -> !ownerId.equals(m.getUserId())))
+                throw new IllegalStateException("Cloud ownership requires review");
+            requireCloudPath(storageResolver.projectRoot(id));
+            // Never follow a persisted storage key into another project or the local filesystem.
+            for (var file : projectFileRepository.findByProjectId(id)) {
+                if (Boolean.TRUE.equals(file.getIsFolder())) continue;
+                String key = StringUtils.hasText(file.getFilePath()) ? file.getFilePath() : file.getWpsFileId();
+                if (StringUtils.hasText(key) && (!key.startsWith("projects/" + id + "/")
+                        || java.util.Arrays.asList(key.split("/")).contains("..") || key.contains("\\")))
+                    throw new IllegalStateException("Cloud storage key requires review");
+                if (StringUtils.hasText(key)) requireCloudPath(storageResolver.globalRoot().resolve(key));
+            }
+            cloudStorageQuota.storageChanging(ownerId);
+            deleteProjectLocked(id, true, metadataOnly);
+        });
+    }
+
+    private void deleteProjectLocked(Long id) { deleteProjectLocked(id, false, false); }
+
+    private void deleteProjectLocked(Long id, boolean cloudCleanup, boolean metadataOnly) {
         boolean officialCloud = cloudStorageQuota != null && cloudStorageQuota.isEnabled();
         if (officialCloud) cloudStorageQuota.lockProjectForWrite(id);
         Project project = entityManager.find(Project.class, id, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
@@ -390,13 +448,32 @@ public class ProjectService {
         Path memoryGitDir = memoryRepoService.gitDir(memoryRepoKey);
         Path memoryWorkTree = memoryRepoService.workTree(memoryRepoKey);
 
+        if (cloudCleanup) {
+            requireCloudPath(projectDir);
+            requireCloudPath(gitDir);
+            requireCloudPath(memoryGitDir);
+            requireCloudPath(memoryWorkTree);
+            requireCloudPath(projectRepoService.objects().projectRoot(id));
+            if (metadataOnly) {
+                for (Path path : java.util.List.of(projectDir, gitDir, memoryGitDir, memoryWorkTree, projectRepoService.objects().projectRoot(id))) {
+                    if (Files.exists(path, java.nio.file.LinkOption.NOFOLLOW_LINKS))
+                        throw new IllegalStateException("Completed cleanup still has cloud bytes; requires review");
+                }
+                for (var file : projectFileRepository.findByProjectId(id)) {
+                    String key = StringUtils.hasText(file.getFilePath()) ? file.getFilePath() : file.getWpsFileId();
+                    if (StringUtils.hasText(key) && storageServiceFactory.getStorageService().exists(key))
+                        throw new IllegalStateException("Completed cleanup still has cloud objects; requires review");
+                }
+            }
+        }
+
         // Whole-project deletion is authorized by its existing controller. Remove evidence references
         // in this transaction before storage deletion; any failure rolls the references back too.
         entityManager.createQuery("delete from DdSubmission s where s.projectId = :pid")
                 .setParameter("pid", id).executeUpdate();
 
         // Cloud bytes must disappear before their accounting records. A failed deletion remains retryable.
-        if (officialCloud) {
+        if (officialCloud && !metadataOnly) {
             Set<String> keys = new HashSet<>();
             for (var file : projectFileRepository.findByProjectId(id)) {
                 if (Boolean.TRUE.equals(file.getIsFolder())) continue;
@@ -408,7 +485,7 @@ public class ProjectService {
         }
 
         try {
-            projectRepoService.objects().deleteProject(id);
+            if (!metadataOnly) projectRepoService.objects().deleteProject(id);
         } catch (IOException e) {
             throw new IllegalStateException(LangText.of("版本文件未能完整删除，请重试", "Version files could not be fully deleted; please retry"), e);
         }
@@ -439,6 +516,20 @@ public class ProjectService {
                     .setParameter("pid", id)
                     .executeUpdate();
         }
+        if (cloudCleanup) {
+            entityManager.createQuery("delete from MemoryDocument d where d.spaceId in (select s.id from MemoryDocumentSpace s where s.scope = 'project' and s.ownerKey = :owner)")
+                    .setParameter("owner",String.valueOf(id)).executeUpdate();
+            entityManager.createQuery("delete from MemoryDocumentSpace s where s.scope = 'project' and s.ownerKey = :owner")
+                    .setParameter("owner",String.valueOf(id)).executeUpdate();
+            entityManager.createQuery("delete from MemoryEntry e where e.projectId = :pid and (e.scope is null or e.scope in (\'project\', \'file\', \'conversation\'))")
+                    .setParameter("pid", id).executeUpdate();
+        }
+        if (cloudCleanup && !metadataOnly) {
+            // Strict before commit: failed physical cleanup keeps the project row for retry.
+            deleteDirectoryStrictly(gitDir);
+            deleteDirectoryStrictly(memoryGitDir);
+            deleteDirectoryStrictly(memoryWorkTree);
+        }
         // memory_remote 按 repoKey 建索引、没有 projectId 列，上面那套
         // 「delete from E where e.projectId = :pid」批量语句吃不到它。
         memoryRemoteRepository.findByRepoKey(memoryRepoKey).ifPresent(memoryRemoteRepository::delete);
@@ -450,6 +541,7 @@ public class ProjectService {
         // 为它报错反而会让用户以为项目没删掉。
         // 若当前在事务同步上下文中，放到 afterCommit 同步回调里执行，先把 Project/User 的悲观锁与数据库连接释放掉。
         Runnable cleanupDirs = () -> {
+            if (cloudCleanup) return; // No ordinary deletion event or desktop synchronization.
             try {
                 eventPublisher.publishEvent(new ProjectDeletedEvent(id));
             } catch (RuntimeException e) {
@@ -470,6 +562,17 @@ public class ProjectService {
                     });
         } else {
             cleanupDirs.run();
+        }
+    }
+
+    private void requireCloudPath(Path path) {
+        if (path == null) throw new IllegalStateException("Missing cloud storage path");
+        Path root = storageResolver.globalRoot().toAbsolutePath().normalize();
+        Path candidate = path.toAbsolutePath().normalize();
+        if (candidate.equals(root) || !candidate.startsWith(root))
+            throw new IllegalStateException("Cloud storage path escapes its root");
+        for (Path cursor = candidate; cursor != null && cursor.startsWith(root); cursor = cursor.getParent()) {
+            if (Files.isSymbolicLink(cursor)) throw new IllegalStateException("Cloud cleanup does not follow symbolic links");
         }
     }
 

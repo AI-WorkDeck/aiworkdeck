@@ -49,6 +49,25 @@ import java.util.regex.Pattern;
 @Service
 @Slf4j
 public class MobileTransferService {
+    @org.springframework.beans.factory.annotation.Autowired private org.springframework.transaction.PlatformTransactionManager cloudTransactions;
+    @org.springframework.beans.factory.annotation.Autowired private CloudStorageQuotaService postpaidQuota;
+    @org.springframework.beans.factory.annotation.Autowired private com.checkba.repository.UserRepository cloudUsers;
+    private void deleteMeteredBlob(String locator) {
+        blobStore.deleteQuietly(locator);
+        if(postpaidQuota!=null && postpaidQuota.postpaidEnabled() && blobStore.exists(locator))
+            throw new IllegalStateException(CloudBillingText.get("readUnavailable"));
+    }
+    private void meterStorageChange(Long userId) {
+        if(postpaidQuota!=null && postpaidQuota.postpaidEnabled()) {
+            cloudUsers.lockStorageOwner(userId).orElseThrow();postpaidQuota.storageChanging(userId);
+        }
+    }
+    private void requireCloudPublication(Long userId) {
+        if(postpaidQuota!=null && postpaidQuota.postpaidEnabled()) {
+            cloudUsers.lockStorageOwner(userId).orElseThrow(); postpaidQuota.requireCloudWrite(userId); postpaidQuota.storageChanging(userId);
+        }
+    }
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private ProjectCatalogService projectCatalog;
 
@@ -178,13 +197,17 @@ public class MobileTransferService {
      * 建 PULL 请求：在线检查 → 大小上限 → 扣费（幂等键 xfer-requestId）→ 建行。
      * requestId 撞既有行 = 幂等返回既有行（不重复扣费——既有行早已带着当初扣费的结果）。
      */
+    @org.springframework.transaction.annotation.Transactional
     public MobileTransferRequest pull(Long userId, String deviceId, String projectKey, String remoteFileId,
                                        String fileName, long fileSize, String requestId) {
+        requireCloudPublication(userId);
         return pull(userId, deviceId, projectKey, remoteFileId, fileName, fileSize, requestId, false);
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public MobileTransferRequest pull(Long userId, String deviceId, String projectKey, String remoteFileId,
             String fileName, long fileSize, String requestId, boolean previewOnly) {
+        requireCloudPublication(userId);
         requireRequestId(requestId);
         Optional<MobileTransferRequest> existing = repository.findByUserIdAndRequestId(userId, requestId);
         if (existing.isPresent()) {
@@ -235,7 +258,9 @@ public class MobileTransferService {
      * MobileRelayClientService.landAndAck），落 跨设备文件/YYYY-MM-DD/原名+requestId前8位。
      * 幂等：已 DELIVERED 再调，按同名文件查到即返回；STAGED 内部重试按同名文件跳过重复落盘。
      */
+    @Transactional
     public Map<String, Object> saveToProject(Long userId, Long id, Long projectId) {
+        requireCloudPublication(userId);
         MobileTransferRequest row = owned(userId, id);
         if (!KIND_PULL.equals(row.getKind())) {
             throw new IllegalArgumentException(LangText.of("该请求不是拉取类型", "This request is not a pull"));
@@ -266,6 +291,7 @@ public class MobileTransferService {
                     "该拉取尚未就绪，无法保存到项目", "This pull is not ready to be saved to a project yet"));
         }
 
+        if(postpaidQuota!=null)postpaidQuota.requireProjectCapacity(projectId,0);
         ProjectFile root = ensureFolder(projectId, null, TRANSFER_ROOT_FOLDER, userId);
         ProjectFile day = ensureFolder(projectId, root.getId(), dateStr, userId);
         ProjectFile record = projectFileService.getFilesByParent(projectId, day.getId()).stream()
@@ -278,6 +304,7 @@ public class MobileTransferService {
             }
             String storagePath = String.format("projects/%d/%s/%s/%s",
                     projectId, TRANSFER_ROOT_FOLDER, dateStr, landedName);
+            if(postpaidQuota!=null)postpaidQuota.requireProjectCapacity(projectId,row.getFileSize()==null?0:row.getFileSize());
             try (InputStream in = blobStore.open(row.getStoragePath())) {
                 storageServiceFactory.getStorageService().save(storagePath, in);
             } catch (IOException e) {
@@ -288,7 +315,7 @@ public class MobileTransferService {
         }
 
         if (row.getStoragePath() != null) {
-            blobStore.deleteQuietly(row.getStoragePath());
+            deleteMeteredBlob(row.getStoragePath());
             row.setStoragePath(null);
         }
         row.setStatus(STATUS_DELIVERED);
@@ -301,6 +328,7 @@ public class MobileTransferService {
     /** LIST PENDING 或 PULL PENDING 可取消：FAILED(用户取消) + 退款（如已扣）。 */
     @Transactional
     public void cancel(Long userId, Long id) {
+        meterStorageChange(userId);
         MobileTransferRequest row = owned(userId, id);
         boolean cancellable = STATUS_PENDING.equals(row.getStatus())
                 && (KIND_LIST.equals(row.getKind()) || KIND_PULL.equals(row.getKind()));
@@ -319,8 +347,10 @@ public class MobileTransferService {
      * 建 PUSH 请求：fileId 必须校验属于本用户项目 → 大小上限 → 扣费 → 配额检查（共池）→
      * 从项目存储复制字节入 blob → PUSH STAGED。requestId 幂等同 pull。
      */
+    @org.springframework.transaction.annotation.Transactional
     public MobileTransferRequest push(Long userId, String targetDeviceId, String projectKey,
                                        Long fileId, String requestId) {
+        requireCloudPublication(userId);
         requireRequestId(requestId);
         Optional<MobileTransferRequest> existing = repository.findByUserIdAndRequestId(userId, requestId);
         if (existing.isPresent()) return existing.get();
@@ -437,12 +467,14 @@ public class MobileTransferService {
     /** 兼容旧桌面：没有 totalCount，恰好 2000 条时不能断言清单完整。 */
     @Transactional
     public void submitFiles(Long userId, Long id, List<Map<String, Object>> files) {
+        requireCloudPublication(userId);
         submitFiles(userId, id, files, null);
     }
 
     /** POST /{id}/files：LIST 应答 → DONE，保留总数与截断标记，不静默省略文件。 */
     @Transactional
     public void submitFiles(Long userId, Long id, List<Map<String, Object>> files, Integer totalCount) {
+        requireCloudPublication(userId);
         MobileTransferRequest row = owned(userId, id);
         if (!KIND_LIST.equals(row.getKind())) {
             throw new IllegalArgumentException(LangText.of("该请求不是清单类型", "This request is not a list"));
@@ -486,7 +518,9 @@ public class MobileTransferService {
     }
 
     /** POST /{id}/upload：PULL PENDING → 配额检查（共池）→ blob put → 实际大小覆盖 → STAGED。 */
+    @org.springframework.transaction.annotation.Transactional
     public void upload(Long userId, Long id, InputStream content, long declaredSize) {
+        requireCloudPublication(userId);
         MobileTransferRequest row = owned(userId, id);
         if (!KIND_PULL.equals(row.getKind())) {
             throw new IllegalArgumentException(LangText.of("该请求不接受上传", "This request does not accept an upload"));
@@ -535,6 +569,7 @@ public class MobileTransferService {
     /** POST /{id}/ack：PUSH STAGED → DELIVERED + 删 blob（PULL STAGED 同语义，备用）。 */
     @Transactional
     public void ack(Long userId, Long id) {
+        meterStorageChange(userId);
         MobileTransferRequest row = owned(userId, id);
         if (STATUS_DELIVERED.equals(row.getStatus())) return; // 幂等
         boolean eligible = STATUS_STAGED.equals(row.getStatus())
@@ -543,7 +578,7 @@ public class MobileTransferService {
             throw new IllegalArgumentException(LangText.of("该请求当前状态不可确认", "This request cannot be acknowledged now"));
         }
         if (row.getStoragePath() != null) {
-            blobStore.deleteQuietly(row.getStoragePath());
+            deleteMeteredBlob(row.getStoragePath());
             row.setStoragePath(null);
         }
         row.setStatus(STATUS_DELIVERED);
@@ -557,11 +592,12 @@ public class MobileTransferService {
      */
     @Transactional
     public void fail(Long userId, Long id, String message) {
+        meterStorageChange(userId);
         MobileTransferRequest row = owned(userId, id);
         if (isTerminal(row.getStatus())) return; // 幂等：已经是终态
         row.setErrorMessage(truncate(message == null ? "" : message, 1024));
         if (row.getStoragePath() != null) {
-            blobStore.deleteQuietly(row.getStoragePath());
+            deleteMeteredBlob(row.getStoragePath());
             row.setStoragePath(null);
         }
         row.setStatus(STATUS_FAILED);
@@ -595,23 +631,26 @@ public class MobileTransferService {
         retryPendingRefunds();
     }
 
-    /**
-     * 不加 @Transactional：本类内 this.expireBatch(...) 是同类自调用，绕过 Spring AOP 代理，
-     * 类级注解不会生效（与 MobileRelayStoreService 需要 self 代理重试是同一个坑，这里干脆
-     * 不假装有事务）——每条 repository.save() 本身仍是 Spring Data 的独立原子操作，
-     * 批内多条 save 之间没有跨行原子性也没关系：清扫是幂等的，下一轮重跑即可补齐。
-     */
+    /** Each expiry holds one owner lock; storage samples and locator retirement commit together. */
     private int expireBatch(List<MobileTransferRequest> rows) {
-        for (MobileTransferRequest row : rows) {
-            if (row.getStoragePath() != null) {
-                blobStore.deleteQuietly(row.getStoragePath());
-                row.setStoragePath(null);
-            }
-            row.setStatus(STATUS_EXPIRED);
-            row.setUpdatedAt(LocalDateTime.now());
-            repository.save(row);
+        int count=0;
+        for(var candidate:rows) {
+            Runnable expire=()->{
+                meterStorageChange(candidate.getUserId());
+                var row=repository.findById(candidate.getId()).orElse(null);
+                if(row==null || !java.util.Objects.equals(row.getStatus(),candidate.getStatus()))return;
+                if(row.getStoragePath()!=null) {
+                    deleteMeteredBlob(row.getStoragePath());
+                    if(postpaidQuota!=null && postpaidQuota.postpaidEnabled() && blobStore.exists(row.getStoragePath()))return;
+                    row.setStoragePath(null);
+                }
+                row.setStatus(STATUS_EXPIRED);row.setUpdatedAt(LocalDateTime.now());repository.save(row);
+            };
+            if(cloudTransactions!=null)new org.springframework.transaction.support.TransactionTemplate(cloudTransactions).executeWithoutResult(status->expire.run());
+            else expire.run();
+            count++;
         }
-        return rows.size();
+        return count;
     }
 
     /** 已扣未退的行统一重试一次：覆盖 TTL 刚过期的行，也覆盖 fail/cancel 时退款失败留下的行。 */

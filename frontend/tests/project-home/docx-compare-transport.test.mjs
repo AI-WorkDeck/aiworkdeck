@@ -12,10 +12,14 @@ function harness(response, status = 200) {
     setRequestHeader(k, v) { this.headers[k] = this.headers[k] ? this.headers[k] + ', ' + v : v }
     send(body) { this.body = body; this.status = status; this.response = response; this.responseText = JSON.stringify(response); calls.push(this); queueMicrotask(() => this.onload()) }
   }
-  const block = (name, end) => source.slice(source.indexOf('export function ' + name), source.indexOf(end, source.indexOf('export function ' + name))).replace('export function', 'function')
+  const block = (name, end) => {
+    const match = new RegExp('export (?:async )?function ' + name + '\\(').exec(source)
+    assert.ok(match, `Missing API function: ${name}`)
+    return source.slice(match.index, source.indexOf(end, match.index)).replace('export ', '')
+  }
   const code = block('fetchProjectFileBytes', '// Web 插件面板') + block('createComparisonFile', '// xlsx / pptx：')
-  const api = new Function('XMLHttpRequest', 'getApiBaseUrl', 'getAuthHeaders', 'getSessionId', 't', code + ';return {fetchProjectFileBytes,createComparisonFile}')(
-    XHR, () => 'http://localhost:9696', () => ({ 'Content-Type': 'application/json', 'X-Session-Id': 'test-session' }), () => 'test-session', (k) => k)
+  const api = new Function('XMLHttpRequest', 'getApiBaseUrl', 'getAuthHeaders', 'getSessionId', 't', 'getCloudWriteHeaders', code + ';return {fetchProjectFileBytes,createComparisonFile}')(
+    XHR, () => 'http://localhost:9696', () => ({ 'Content-Type': 'application/json', 'X-Session-Id': 'test-session' }), () => 'test-session', (k) => k, async (_url, _method, headers) => headers)
   return { api, calls }
 }
 const payload = { bytes: new Uint8Array([80, 75, 3, 4]), name: 'comparison.docx', baseFileId: 1, revisedFileId: 2, baseSha256: 'a'.repeat(64), revisedSha256: 'b'.repeat(64) }

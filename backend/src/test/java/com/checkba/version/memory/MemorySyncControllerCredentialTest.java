@@ -89,7 +89,7 @@ class MemorySyncControllerCredentialTest {
                     "sess");
         }
         ArgumentCaptor<MemoryRemote> saved = ArgumentCaptor.forClass(MemoryRemote.class);
-        verify(remotes).save(saved.capture());
+        verify(syncService).configureRemote(any(MemoryRealm.class),saved.capture());
         assertEquals("old_token_value_1234", saved.getValue().getSecret(), "留空表示沿用已存令牌");
         assertEquals("https://new.example.com/repo.git", saved.getValue().getUrl());
     }
@@ -105,7 +105,7 @@ class MemorySyncControllerCredentialTest {
                     "sess");
         }
         ArgumentCaptor<MemoryRemote> saved = ArgumentCaptor.forClass(MemoryRemote.class);
-        verify(remotes).save(saved.capture());
+        verify(syncService).configureRemote(any(MemoryRealm.class),saved.capture());
         assertEquals("new_token_value_5678", saved.getValue().getSecret());
     }
 }

@@ -23,6 +23,12 @@ import java.util.Map;
  */
 public interface MobileBillingClient {
 
+    /** Narrow internal lifecycle operations; never accepts a caller-supplied account identity. */
+    default Map<String, Object> cloudOperation(String accountId, String action, Map<String, Object> parameters) {
+        throw new MobileBillingException(MobileBillingKind.DISABLED,
+                CloudBillingText.get("unavailable"), "cloud_billing_disabled");
+    }
+
     /**
      * 余额。
      *

@@ -17,6 +17,11 @@ import java.util.Map;
 @RestController
 @RequestMapping("/git/{projectId}.git/awd-objects")
 public class ProjectObjectController {
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.service.mobile.CloudProtocolDownloadService downloads;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private CloudGitWriteGuard cloudWrites;
+
     private final GitAccessService access;
     private final ProjectRepoService repos;
     private final WorkSessionService sessions;
@@ -58,7 +63,8 @@ public class ProjectObjectController {
         transfers.putPart(projectId, object, part, partSha, request.getInputStream(),
                 publish -> sessions.runLocked(projectId, () -> {
                     authorize(request, projectId, true);
-                    publish.run();
+                    if(cloudWrites==null)publish.run();
+                    else cloudWrites.write(projectId,null,publish);
                 }));
         return Map.of("ok", true);
     }
@@ -69,7 +75,8 @@ public class ProjectObjectController {
         authorize(request, projectId, true);
         locked(projectId, () -> {
             authorize(request, projectId, true);
-            transfers.complete(projectId, new ObjectRef(sha256, size));
+            Runnable publication=()->{try {transfers.complete(projectId,new ObjectRef(sha256,size));}catch(IOException e){throw new UncheckedIOException(e);}};
+            if(cloudWrites==null)publication.run();else cloudWrites.write(projectId,null,publication);
         });
         return Map.of("complete", true);
     }
@@ -95,6 +102,17 @@ public class ProjectObjectController {
             response.setContentType("application/octet-stream");
             response.setHeader("Cache-Control", "no-store");
             response.setContentLengthLong(length);
+            if(downloads!=null && downloads.enabled()) {
+                long account=access.authorize(request,projectId,false).userId();
+                final long partLength=length;
+                InputStream bounded=new FilterInputStream(in) {
+                    long left=partLength;
+                    public int read() throws IOException {if(left==0)return -1;int n=super.read();if(n>=0)left--;return n;}
+                    public int read(byte[] b,int off,int len) throws IOException {if(left==0)return -1;int n=super.read(b,off,(int)Math.min(left,len));if(n>0)left-=n;return n;}
+                };
+                downloads.deliver(account,"git-object:"+projectId+":"+sha256+":"+part,bounded,length,request,response);
+                return;
+            }
             byte[] buffer = new byte[64 * 1024];
             while (length > 0) {
                 int n = in.read(buffer, 0, (int)Math.min(buffer.length, length));

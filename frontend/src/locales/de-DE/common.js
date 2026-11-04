@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cloudAccessRefresh: "Der Cloud-Zugriff hat sich geändert. Laden Sie die Seite neu oder öffnen Sie die App erneut. Lokale Dateien werden nicht gelöscht.",
   workspaceSessionUnavailable: "Die Arbeitsbereichssitzung konnte nicht wiederhergestellt werden",
   "confirm": "Bestätigen",
   "cancel": "Abbrechen",

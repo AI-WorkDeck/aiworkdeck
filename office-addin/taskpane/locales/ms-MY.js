@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  apiCloudAccessRefresh: "Akses awan telah berubah. Muat semula halaman atau buka semula aplikasi sebelum meneruskan. Fail setempat tidak akan dipadamkan.",
   defaultProjectName: "Projek sementara",
   cmdPptAddImage: "Sisipkan imej pada slaid",
   cmdPptAddChart: "Sisipkan carta pada slaid",

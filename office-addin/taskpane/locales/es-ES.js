@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  apiCloudAccessRefresh: "El acceso a la nube ha cambiado. Actualiza la página o vuelve a abrir la aplicación para continuar. No se eliminarán los archivos locales.",
   defaultProjectName: "Proyecto temporal",
   cmdPptAddImage: "Insertar imagen en la diapositiva",
   cmdPptAddChart: "Insertar gráfico en la diapositiva",

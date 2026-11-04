@@ -30,6 +30,7 @@ import java.util.Map;
 public class MobileBillingController {
 
     private final MobileBillingService service;
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private com.checkba.service.mobile.CloudBillingLifecycleService lifecycle;
 
     public MobileBillingController(MobileBillingService service) {
         this.service = service;
@@ -46,6 +47,27 @@ public class MobileBillingController {
         out.put("plan", r.plan());
         out.put("subscription", r.subscription());
         return out;
+    }
+
+    @GetMapping("/cloud-state")
+    public Map<String, Object> cloudState(@RequestHeader(value="X-Session-Id", required=false) String sessionId) {
+        Long user=requireUser(sessionId);service.rememberCloudBillingLanguage(user);
+        return service.cloudState(user);
+    }
+
+    @PostMapping("/resume-cloud")
+    public Map<String,Object> resumeCloud(@RequestHeader(value="X-Session-Id",required=false) String sessionId) {
+        Long user=requireUser(sessionId);
+        try {if(lifecycle!=null)lifecycle.process(user);}catch(RuntimeException failure){
+            throw new IllegalArgumentException(com.checkba.service.mobile.CloudBillingText.get("writesPaused"),failure);
+        }
+        return service.cloudOperation(user,"resume-cloud",Map.of("policyVersion","2026-11-04"));
+    }
+    public record PostpaidAcceptance(String policyVersion) {}
+    @PostMapping("/postpaid-accept")
+    public Map<String, Object> acceptPostpaid(@RequestHeader(value="X-Session-Id", required=false) String sessionId,
+            @RequestBody PostpaidAcceptance request) {
+        return service.acceptPostpaid(requireUser(sessionId), request.policyVersion());
     }
 
     @Data

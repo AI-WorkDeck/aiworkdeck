@@ -191,7 +191,7 @@ public class ProjectCatalogService {
     }
     private boolean includeBackups(Long userId) {
         if (backups == null || !users.findById(userId).map(User::isFileCloudBackupEnabled).orElse(false)) return false;
-        try { return quota.persistentQuota(userId) > 0; }
+        try { return quota.canRead(userId); }
         catch (MobileBillingFailureException e) {
             // Subscription verification gates backup bytes, not independent catalogue metadata.
             return false;
