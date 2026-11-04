@@ -19,6 +19,10 @@ test('scan preserves failures, conflicts and working snapshots; filters clean/re
   assert.equal(r.state, 'empty')
   await inspectExitProject(r, async () => clean)
   assert.equal(r.state, 'empty')
+  await inspectExitProject(r, async () => ({ ...pending, changedCount: 0 }))
+  assert.equal(r.state, 'empty', 'an empty work session is not a file change')
+  await inspectExitProject(r, async () => ({ ...pending, changedCount: 0, conflict: true }))
+  assert.equal(r.state, 'conflict', 'conflicts remain visible even with no counted files')
 })
 test('partial failures do not repeat successful projects; retry requires an explicit new selection', async () => {
   const rows = [row(1), row(2), { ...row(3), selected: false }], calls = []
@@ -132,4 +136,11 @@ test('logging out cannot bypass an unsettled receipt from a cancelled exit', asy
   pending = true
   assert.equal(await confirm(), false)
   assert.equal(mounted, 1)
+})
+
+test('an empty work session after a terminal receipt does not prevent exit', async () => {
+  const r = row(91)
+  assert.equal(await commitExitProjects([r], async () => ({ receiptState: 'SUCCEEDED', sha: 'receipt', notice: '' }),
+    async () => ({ ...pending, changedCount: 0 })), true)
+  assert.equal(r.state, 'committed')
 })
