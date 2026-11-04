@@ -404,7 +404,7 @@ test('upgrade release gate verifies manifest signature, exact version, official 
 test('Mac upgrade fixture uses explicit 0.71 to 0.72 inputs and rejects absent/equal/older versions', async () => {
   const { validateVersions, signedManifest } = await import('../scripts/test-full-upgrade-mac-feed.mjs')
   const crypto = require('crypto')
-  for (const [baseline, candidate] of [[undefined, '0.72.0'], ['0.71.0', undefined], ['0.71.0', '0.71.0'], ['0.71.0', '0.70.9'], ['0.71.0', 'latest']]) {
+  for (const [baseline, candidate] of [[undefined, '0.72.0'], ['0.71.0', undefined], ['0.71.0', '0.71.0'], ['0.71.0', '0.70.9'], ['0.71.0', 'latest'], ['0.76.1', '0.76.2']]) {
     assert.throws(() => validateVersions(baseline, candidate))
   }
   const installer = { version: '0.72.0', size: 1, sha256: 'a'.repeat(64), urls: ['http://127.0.0.1/candidate.dmg'] }
@@ -423,4 +423,13 @@ test('Mac upgrade fixture uses explicit 0.71 to 0.72 inputs and rejects absent/e
     assert.equal(win.env[kind.toUpperCase() + '_SHA'], '${{ inputs.' + kind + '_sha }}')
     assert(win.run.includes(`download-upgrade-build.mjs ${kind} win32`))
   }
+})
+
+test('Native Windows baseline directory syntax is bound to known builder lockfile versions', async () => {
+  const { nsisDirectoryStyle } = await import('../scripts/download-upgrade-build.mjs')
+  const lock = version => ({ packages: { 'node_modules/electron-builder': { version } } })
+  assert.deepEqual(nsisDirectoryStyle(lock('24.13.3')), { version: '24.13.3', directoryStyle: 'quoted' })
+  assert.deepEqual(nsisDirectoryStyle(lock('26.5.4')), { version: '26.5.4', directoryStyle: 'unquoted' })
+  for (const version of ['25.0.0', '27.0.0', undefined]) assert.throws(() => nsisDirectoryStyle(lock(version)))
+  assert.throws(() => nsisDirectoryStyle({}))
 })
