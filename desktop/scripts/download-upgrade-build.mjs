@@ -19,6 +19,12 @@ export function validateBuild(build, { sha, version, tagSha, sourceVersion }) {
   assert(build.event === 'workflow_dispatch' || (build.event === 'push'
     && build.head_branch === `v${version}` && tagSha === sha), 'Requires manual build or exact matching release tag/commit')
 }
+export function nsisDirectoryStyle(lock) {
+  const version = lock.packages?.['node_modules/electron-builder']?.version
+  const major = Number(version?.split('.')[0])
+  assert([24, 26].includes(major), `Unsupported baseline electron-builder: ${version}`)
+  return { version, directoryStyle: major === 24 ? 'quoted' : 'unquoted' }
+}
 export function signedInstaller(bytes, signature, publicKey, version, platform) {
   assert(verify(null, bytes, publicKey, Buffer.from(signature.trim(), 'base64')), 'Release manifest signature invalid')
   const channel = JSON.parse(bytes).channels?.[version.split('.').slice(0, 2).join('.')]
@@ -63,6 +69,10 @@ export async function downloadBuild(kind, platform, root, evidenceDir) {
   run('git', ['fetch', 'origin', sha, '--depth=1'])
   const sourceVersion = JSON.parse(run('git', ['show', `${sha}:desktop/package.json`])).version
   validateBuild(build, { sha, version, tagSha, sourceVersion })
+  if (kind === 'baseline' && platform === 'win32') {
+    const lock = JSON.parse(run('git', ['show', `${sha}:desktop/package-lock.json`]))
+    save('baseline-installer-builder.json', { sourceSha: sha, ...nsisDirectoryStyle(lock) })
+  }
   save(`${kind}-build.json`, Object.fromEntries(['id', 'head_sha', 'head_branch', 'path', 'event', 'conclusion', 'html_url'].map(key => [key, build[key]])))
   const dir = path.join(root, kind)
   fs.mkdirSync(dir) // Refuse stale downloads from an earlier attempt.
