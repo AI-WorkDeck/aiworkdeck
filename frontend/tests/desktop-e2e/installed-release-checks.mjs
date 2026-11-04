@@ -27,7 +27,7 @@ async function capture(page, run, name) {
   return captureDesktop(run, name)
 }
 
-export function nativeClose(pid) {
+export function nativeClose(pid, target) {
   assert.ok(Number.isSafeInteger(pid) && pid > 0)
   assert.equal(process.env.GITHUB_ACTIONS, 'true')
   assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')
@@ -42,14 +42,42 @@ end tell`], { timeout: 15000 })
     return 'macOS System Events AXCloseButton click (accessibility action; not physical mouse)'
   }
   assert.equal(process.platform, 'win32')
-  const script = `Add-Type -AssemblyName UIAutomationClient; Add-Type -AssemblyName UIAutomationTypes
-$p = Get-Process -Id ${pid}
-$w = [Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)
-$c = $w.FindFirst([Windows.Automation.TreeScope]::Descendants, (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty, 'Close')))
-if ($null -eq $c) { throw 'Native Close button not exposed by UIAutomation' }
-$c.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()`
-  execFileSync('pwsh.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { timeout: 15000 })
-  return 'Windows native Close button UIAutomation InvokePattern (accessibility action; not physical mouse)'
+  const script = windowsCloseScript(pid, target)
+  const receipt = JSON.parse(execFileSync('pwsh.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { timeout: 15000, encoding: 'utf8' }).trim())
+  assert.equal(receipt.pid, pid)
+  assert.equal(receipt.hwnd, target.hwnd)
+  assert.equal(receipt.posted, true)
+  return { method: 'Windows Win32 WM_SYSCOMMAND/SC_CLOSE to verified H5 window (OS message; not physical click)', ...receipt }
+}
+
+export function isInstalledH5URL(url) {
+  try { return new URL(url).pathname.endsWith('/h5/index.html') } catch { return false }
+}
+
+export function windowsCloseScript(pid, target) {
+  assert.ok(Number.isSafeInteger(pid) && pid > 0)
+  assert.equal(target?.pid, pid, 'Native window must belong to the launched app')
+  assert.match(target.hwnd, /^[1-9][0-9]*$/)
+  assert.ok(BigInt(target.hwnd) <= 0x7fffffffffffffffn)
+  return `$ErrorActionPreference = 'Stop'
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class NativeCloseTarget {
+  [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll", SetLastError=true)] public static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
+}
+'@
+$h = [IntPtr]::new([long]::Parse('${target.hwnd}'))
+[uint32]$owner = 0
+[void][NativeCloseTarget]::GetWindowThreadProcessId($h, [ref]$owner)
+if (-not [NativeCloseTarget]::IsWindow($h) -or -not [NativeCloseTarget]::IsWindowVisible($h) -or $owner -ne ${pid}) { throw 'Native close target ownership/visibility mismatch' }
+# Post rather than Send: the real close handler may wait for the renderer dialog.
+if (-not [NativeCloseTarget]::PostMessage($h, 0x0112, [IntPtr]::new(0xF060), [IntPtr]::Zero)) { throw 'Native SC_CLOSE could not be posted' }
+@{ pid = [int]$owner; hwnd = '${target.hwnd}'; posted = $true } | ConvertTo-Json -Compress`
+
 }
 
 export async function checkWelcomeModel({ page, run }) {
@@ -97,7 +125,7 @@ export async function checkClosedDocument({ page, run, ext, prefix = 'release' }
     const v = window.__checkbaActiveOverviewVm
     return !v.insightDocFileId && v.rightPaneKey !== 'plugin-insight' && v.leftPaneKey !== 'plugin-insight'
   })
-  return captureDesktop(run, `${prefix}-${ext}-closed-evidence-hidden`)
+  return capture(page, run, `${prefix}-${ext}-closed-evidence-hidden`)
 }
 
 export function assertEvidenceEntryScope(state, entry) {
@@ -202,18 +230,36 @@ export async function checkExitList({ page, installed, run, base }) {
     assert.ok(status.canCommit && status.changedCount > 0, 'Synthetic project must have genuine committable changes')
     projects.push({ id: p.projectId, name: `Installed exit QA ${i}`, count: status.changedCount })
   }
-  const method = nativeClose(installed.child.pid)
+  const target = process.platform === 'win32' ? await installed.mainRpc(`(() => {
+    const windows = process.mainModule.require('electron').BrowserWindow.getAllWindows()
+      .filter(w => w.isVisible() && (${isInstalledH5URL.toString()})(w.webContents.getURL()));
+    if (windows.length !== 1) throw new Error('Expected one visible installed H5 window');
+    const handle = windows[0].getNativeWindowHandle();
+    return { pid: process.pid, browserWindowId: windows[0].id,
+      hwnd: (handle.length === 8 ? handle.readBigUInt64LE() : BigInt(handle.readUInt32LE())).toString() };
+  })()`) : undefined
+  fs.writeFileSync(path.join(run, 'native-close-target.json'), JSON.stringify(target ?? { pid: installed.child.pid, platform: process.platform }, null, 2))
+  const method = nativeClose(installed.child.pid, target)
+  fs.writeFileSync(path.join(run, 'native-close-receipt.json'), JSON.stringify(method, null, 2))
   await page.waitForSelector('.project-exit-mask', { visible: true, timeout: 30000 })
   await page.waitForFunction(() => document.querySelectorAll('.project-exit-list input:not(:disabled)').length >= 2)
   const rows = await page.$$eval('.project-exit-list label', els => els.map(el => ({ name: el.querySelector('.project-exit-name')?.textContent, selected: el.querySelector('input').checked, text: el.textContent })))
   for (const project of projects) assert.ok(rows.some(r => r.name === project.name && !r.selected))
+  // Check actual packaged Uni CSS against the native dynamic label/button elements.
+  const layout = await page.evaluate(() => ({
+    rows: [...document.querySelectorAll('.project-exit-list label')].map(el => ({ display: getComputedStyle(el).display, top: el.getBoundingClientRect().top, bottom: el.getBoundingClientRect().bottom })),
+    buttons: [...document.querySelectorAll('.project-exit-mask footer button')].map(el => ({ paddingTop: getComputedStyle(el).paddingTop, paddingLeft: getComputedStyle(el).paddingLeft, borderRadius: getComputedStyle(el).borderRadius })),
+  }))
+  for (const row of layout.rows) assert.equal(row.display, 'flex', 'Compiled dialog row CSS must match the native label')
+  for (let i = 1; i < layout.rows.length; i++) assert.ok(layout.rows[i].top >= layout.rows[i - 1].bottom - 0.5, 'Projects must occupy separate non-overlapping rows')
+  for (const button of layout.buttons) assert.deepEqual(button, { paddingTop: '8px', paddingLeft: '12px', borderRadius: '6px' }, 'Compiled dialog button CSS must match the native button')
   await capture(page, run, 'release-native-close-project-list')
   await page.click('.project-exit-mask footer button:first-child')
   await page.waitForSelector('.project-exit-mask', { hidden: true })
   assert.equal(installed.child.exitCode, null, 'Cancel must keep the process alive')
   // Fixture cleanup uses the real commit API; interactive multi-project submission is separately covered by component tests.
   for (const project of projects) await api(`/api/projects/${project.id}/version/session/end`, { title: 'Installed QA fixture cleanup' })
-  return { method, projects, rows, cancelKeptProcessAlive: true, submissionCoverage: 'real API cleanup only; interactive selection/partial failure not covered here' }
+  return { method, projects, rows, layout, cancelKeptProcessAlive: true, submissionCoverage: 'real API cleanup only; interactive selection/partial failure not covered here' }
 }
 
 export function looseWorkspaceURL(originalURL, projectId) {
