@@ -88,7 +88,7 @@ jobs:
                   problems.append('testcase counts differ: ' + name)
               for case in cases:
                   owner = case.get('classname', '')
-                  if owner != name and not owner.startswith(name + '$'):
+                  if owner != name and not owner.startswith(name + '$') and not name.startswith(owner + '$'):
                       problems.append('testcase assigned to another suite: ' + name + ' / ' + owner)
               reports.append({'suite': name, 'counts': counts, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
                   'cases': [{'class': c.get('classname'), 'name': c.get('name'),
