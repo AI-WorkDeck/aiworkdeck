@@ -14,7 +14,7 @@ import { spawn, execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import puppeteer from 'puppeteer-core'
 import JSZip from 'jszip'
-import { checkWelcomeModel, checkDocumentChrome, checkWriterReplacement, checkClosedDocument, checkExitList } from './installed-release-checks.mjs'
+import { checkWelcomeModel, checkDocumentChrome, checkNamedProjectEvidence, checkClosedDocument, checkExitList } from './installed-release-checks.mjs'
 
 function businessErrorFields(value) {
   if (!value || typeof value !== 'object'
@@ -471,17 +471,6 @@ try {
     await close(ext)
     if (installedMode) evidence.releaseDocuments[ext].closedScreenshot = await checkClosedDocument({ page, run, ext })
   }
-  if (installedMode) {
-    const originalDocx = files.docx
-    files.docx = path.join(home, 'Second Writer.docx')
-    fs.copyFileSync(originalDocx, files.docx)
-    try {
-      await open('docx')
-      await sleep(2000)
-      evidence.releaseSecondWriter = await checkWriterReplacement({ page, run, previousId: evidence.releaseDocuments.docx.fileId })
-      await close('docx')
-    } finally { files.docx = originalDocx }
-  }
   await open('pdf')
   await sleep(2000)
   await assertLocalWorkspaceUnobstructed()
@@ -499,6 +488,7 @@ try {
   if (installedMode) {
     await page.evaluate(() => localStorage.setItem('electron-cloud-restart', 'retained'))
     await close('pdf')
+    evidence.namedProjectEvidence = await checkNamedProjectEvidence({ page, run, base, files })
     await assertLocalWorkspaceUnobstructed()
     const { checkDesktopInteractions } = await import('./installed-desktop-interactions.mjs')
     evidence.desktop = await checkDesktopInteractions({ page, browser, mainRpc: installed.mainRpc, run })
