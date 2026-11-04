@@ -207,7 +207,7 @@ class MobileAssistantServiceTest {
         assertEquals(50,copied.messageCount());assertFalse(copied.filesCopied());assertTrue(copied.sourcePreserved());
         var messages=projectMessages.findByConversationIdOrderByCreatedAtAsc(copied.conversationId());
         assertEquals(50,messages.size());assertEquals("question-0",messages.get(0).getContent());
-        assertEquals("answer-24",messages.get(49).getContent());
+        assertEquals("AI 生成内容，请核实后使用。\n\nanswer-24",messages.get(49).getContent());
         assertEquals(25,turns.findByUserIdAndConversationIdOrderByCreatedAtAscIdAsc(user,conversation).size());
     }
     @Test void copyRejectsRunningForeignAndRevokedSourceBeforeCreatingMessages() {

@@ -596,3 +596,7 @@ Apple 订阅桥接：GET `/api/mobile/billing/subscription/appstore/capability`�
 请求 UUID 对同一来源及目标幂等。手机以当前账户范围保存请求后发送；网络失败沿用同一 UUID，并可从会话最近收据恢复。QUEUED 不等于已送达；30 天未完成为 EXPIRED。桌面通过独立 pending/ack 接口取件，复核 SHA256、目标身份、所有权和项目类型后，同一事务写普通可继续对话的消息及永久收据。消息 sourceChannel 留空，不能误标为只读 Office 镜像。去重范围为站点、官方账户、请求 UUID；凭据轮换不改变收据，用户删除已导入对话后重试也不重建。
 
 桌面导入先开启独立事务、取得项目锁，再按官方账户和当前本机身份顺序冻结身份，并在冻结期间完成实际提交，避免与现有项目 IM 操作形成锁反序；网络请求不持锁。数据库或网络暂时失败不 ACK，待下次重试；永久身份/完整性错误只 ACK FAILED。本地收据另存未确认 ACK 状态，电脑恢复联网时主动补确认，云任务过期或不再返回快照也不丢失真实送达状态。关闭个人助理时同一事务立即清除未送达快照；云端每次下发前复核授权修订、有效订阅、备份和冻结来源的可读权限，撤回后停止下发并删除快照。已经下载到桌面的字节无法撤回；晚到的实际成功 ACK 可更新为 DELIVERED，已送达状态不能被旧失败 ACK 覆盖。
+
+## 个人助理复制标识（dev-board#1690）
+
+`MobileAssistantTranscript.from` 是云端项目复制与电脑转存的共用文本出口：每条已完成assistant回答前增加LangText可见AI说明，用户问题不标，保留来源段与时间且不改原始turn。旧快照不回填；文本前缀不是文件标准隐式元数据。测试 `MobileAssistantTranscriptTest` 与 `MobileAssistantServiceTest`；其他客户端复制/导出另验。
