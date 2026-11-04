@@ -16,6 +16,10 @@ import puppeteer from 'puppeteer-core'
 import JSZip from 'jszip'
 import { checkWelcomeModel, checkDocumentChrome, checkNamedProjectEvidence, checkClosedDocument, checkExitList } from './installed-release-checks.mjs'
 
+function diagnosticUrl(value) {
+  try { const u = new URL(value); return `${u.protocol}//${u.host}${u.pathname}` } catch { return '' }
+}
+
 function businessErrorFields(value) {
   if (!value || typeof value !== 'object'
       || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) return { status: 'unavailable' }
@@ -327,19 +331,24 @@ try {
       evidence.pageErrors ||= []; evidence.pageErrors.push(error.message)
       evidence.pageErrorDetails ||= []; evidence.pageErrorDetails.push({ message: error.message, stack: error.stack })
     })
-    const safeUrl = value => {
-      try { const u = new URL(value); return `${u.protocol}//${u.host}${u.pathname}` } catch (_) { return '' }
-    }
+    const safeUrl = diagnosticUrl
     const recordRenderer = record => {
       evidence.rendererDiagnostics ||= []
       if (evidence.rendererDiagnostics.length >= 50) return
       evidence.rendererDiagnostics.push(record)
       write('renderer-diagnostics.json', evidence.rendererDiagnostics)
     }
+    const safeText = value => String(value || '').replace(/(?:https?|file):\/\/[^\s"'<>]+/g, safeUrl).slice(0, 4096)
     page.on('console', async message => {
+      // Production editor failures/logs are console.log, not warn/error. Preserve them before cleanup destroys the guest.
+      if (message.type() === 'log' && message.text().startsWith('[libre-editor]') && !message.text().includes('QRect(')) {
+        evidence.editorDiagnostics ||= []
+        evidence.editorDiagnostics.push({ capturedAt: new Date().toISOString(), text: safeText(message.text()) })
+        if (evidence.editorDiagnostics.length > 200) evidence.editorDiagnostics.shift()
+        write('editor-diagnostics.json', evidence.editorDiagnostics)
+      }
       if (!['warn', 'error'].includes(message.type())) return
       const location = message.location()
-      const safeText = value => String(value || '').replace(/(?:https?|file):\/\/[^\s"'<>]+/g, safeUrl).slice(0, 4096)
       const record = { kind: 'console', type: message.type(), capturedAt: new Date().toISOString(),
         text: safeText(message.text()),
         errors: message.args().map(arg => arg.remoteObject()).filter(arg => arg.subtype === 'error').map(arg => safeText(arg.description)),
@@ -385,6 +394,14 @@ try {
     frame.on('pageerror', error => { evidence.guestErrors ||= []; evidence.guestErrors.push({ ext, message: error.message }) })
     frame.on('console', message => { if (message.type() === 'error') { evidence.guestErrors ||= []; evidence.guestErrors.push({ ext, message: message.text() }) } })
     const marker = `兼容验证_ELECTRON_COMPAT_${ext.toUpperCase()}`
+    await sleep(2000) // Ready precedes the first composited canvas frame.
+    await assertLocalWorkspaceUnobstructed()
+    await page.screenshot({ path: path.join(run, `${ext}-opened.png`) })
+    if (installedMode) {
+      evidence.releaseDocuments ||= {}
+      evidence.releaseDocuments[ext] = await checkDocumentChrome({ page, run, ext })
+    }
+    // Chrome checks click outside the guest and resize its canvas. Establish engine selection AFTER those checks.
     if (ext === 'docx') await exec(ext, 'goto', { type: 'end' })
     if (ext === 'xlsx') {
       // Enter the native Calc canvas as a user does before typing. DOM focus on
@@ -402,15 +419,11 @@ try {
       const info = await exec(ext, 'slide_get_page', { slideNumber: 1 })
       const shape = info.shapes.find(s => (s.text || '').includes('普通文本框内容'))
       assert.ok(shape, 'fixture text shape')
-      await exec(ext, 'slide_goto', { slideNumber: 1, shapeName: shape.name })
+      const selection = await exec(ext, 'slide_goto', { slideNumber: 1, shapeName: shape.name })
+      assert.equal(selection.selected, shape.name)
+      write('pptx-input-target.json', selection)
     }
-    await sleep(2000) // Ready precedes the first composited canvas frame.
-    await assertLocalWorkspaceUnobstructed()
-    await page.screenshot({ path: path.join(run, `${ext}-opened.png`) })
-    if (installedMode) {
-      evidence.releaseDocuments ||= {}
-      evidence.releaseDocuments[ext] = await checkDocumentChrome({ page, run, ext })
-    }
+    write(`${ext}-ui-state-before-input.json`, await exec(ext, 'get_ui_state'))
     await page.evaluate(name => Object.values(window.__checkbaActiveOverviewVm._libreRefs).find(e => e.file?.name === name).webviewEl.focus(), path.basename(files[ext]))
     await frame.focus('[data-lo-ime]')
     assert.equal(await frame.$eval('[data-lo-ime]', el => document.activeElement === el), true)
@@ -514,6 +527,29 @@ try {
 } catch (error) {
   evidence.error = error.stack
   write('result.json', evidence) // Preserve the original failure before screenshot/cleanup work.
+  if (page && browser) {
+    try {
+      write('failure-editor-state.json', await page.evaluate(() => {
+        const v = window.__checkbaActiveOverviewVm
+        const safeUrl = value => { try { const u = new URL(value); return `${u.protocol}//${u.host}${u.pathname}` } catch { return '' } }
+        const safeText = value => String(value || '').replace(/(?:https?|file):\/\/[^\s"'<>]+/g, safeUrl).slice(0, 4096)
+        return { capturedAt: new Date().toISOString(), url: safeUrl(location.href), projectId: v?.projectId,
+          activeFile: v?.activeFileLeft && { id: v.activeFileLeft.id, name: v.activeFileLeft.name },
+          editors: Object.values(v?._libreRefs || {}).filter(Boolean).map(e => ({
+            file: e.file && { id: e.file.id, name: e.file.name, fileSize: e.file.fileSize, fileType: e.file.fileType },
+            ready: e.ready, statusKey: e.statusKey, docKind: e.docKind, docLoadFailed: e.docLoadFailed,
+            openFailCode: safeText(e.openFailCode), bootFailReason: safeText(e.bootFailReason), chromeInitialized: e.chromeInitialized,
+            docLoadSeq: e._docLoadSeq, loadGeneration: e._loadGen, loadGenAtFailure: e._loadGenAtFailure,
+            loadInFlight: e._loadInFlight ? { seq: e._loadInFlight.seq } : null, loadStartedAt: e._loadStartedAt, loadSelfHealed: e._loadSelfHealed,
+            adoptedSpare: !!e._adoptedSpare, initialDocument: typeof e._initialDocument === 'boolean' ? e._initialDocument : { type: typeof e._initialDocument },
+            downloadLoaded: e.dlLoaded, downloadTotal: e.dlTotal, log: String(e.log || '').split('\n').slice(-200).map(safeText),
+            guestURL: safeUrl(e.webviewEl?.getAttribute('src')),
+            guestId: (() => { try { return e.webviewEl?.getWebContentsId?.() } catch { return null } })(),
+          })) }
+      }))
+      write('failure-live-targets.json', browser.targets().map(t => ({ type: t.type(), url: diagnosticUrl(t.url()), targetId: t._targetId })))
+    } catch (diagnosticError) { write('failure-editor-diagnostic-error.json', { message: diagnosticError.message }) }
+  }
   if (page && browser) await page.screenshot({ path: path.join(run, 'failure.png') }).catch(() => {})
   throw error
 } finally {

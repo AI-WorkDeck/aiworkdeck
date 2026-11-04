@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { assertDocumentBinding, assertEvidenceEntryScope, looseWorkspaceURL, nativeClose } from './installed-release-checks.mjs'
+import { assertDocumentBinding, assertEvidenceEntryScope, looseWorkspaceURL, nativeClose, windowsCloseScript, isInstalledH5URL } from './installed-release-checks.mjs'
 
 test('release assertion rejects stale Writer binding and missing evidence entry', () => {
   const writer = { fileId: 42, insightDocFileId: 42, insightInstalled: true, insightAvailable: true }
@@ -35,4 +35,20 @@ test('named-project QA returns to the captured loose identity even when browser 
     assert.equal(looseWorkspaceURL(original, 7), `${base}#/pages/project-overview/project-overview?id=7&loose=1`)
   }
   for (const id of [undefined, 0, -1, '7']) assert.throws(() => looseWorkspaceURL(base, id))
+})
+
+
+test('Windows close command rejects foreign or malformed native targets before OS invocation', () => {
+  const valid = { pid: 123, hwnd: '456' }
+  assert.match(windowsCloseScript(123, valid), /GetWindowThreadProcessId/)
+  assert.match(windowsCloseScript(123, valid), /IsWindowVisible/)
+  assert.match(windowsCloseScript(123, valid), /PostMessage\(\$h, 0x0112/)
+  for (const target of [undefined, { ...valid, pid: 124 }, { ...valid, hwnd: '0' }, { ...valid, hwnd: '1; Stop-Process' }, { ...valid, hwnd: '9223372036854775808' }]) {
+    assert.throws(() => windowsCloseScript(123, target))
+  }
+})
+
+test('native close locates packaged file and loopback H5 URLs without selecting auxiliary windows', () => {
+  for (const url of ['file:///D:/a/_temp/app/resources/frontend/dist/build/h5/index.html#/pages/welcome', 'http://127.0.0.1:19566/h5/index.html']) assert.equal(isInstalledH5URL(url), true)
+  for (const url of ['about:blank', 'file:///D:/app/editor.html', 'http://127.0.0.1/about.html', 'invalid']) assert.equal(isInstalledH5URL(url), false)
 })
