@@ -126,9 +126,9 @@ test('real Vue chooser loads asynchronously, starts unchecked and commits only c
 test('logging out cannot bypass an unsettled receipt from a cancelled exit', async () => {
   const source = readFileSync(new URL('../../src/utils/projectExitDialog.js', import.meta.url), 'utf8')
   let pending = false, mounted = 0
-  const factory = new Function('getSessionId', 'pendingExitProjects', 'document', 'setGlobalOverlay', 'createApp', 'ProjectExitDialog', 't',
+  const factory = new Function('isDesktopHost', 'getSessionId', 'pendingExitProjects', 'document', 'setGlobalOverlay', 'createApp', 'ProjectExitDialog', 't',
     'return ' + source.slice(source.indexOf('export function')).replace('export ', ''))
-  const confirm = factory(() => null, () => pending ? [{ id: 41 }] : [], {
+  const confirm = factory(() => false, () => null, () => pending ? [{ id: 41 }] : [], {
     createElement: () => ({ remove() {} }), body: { appendChild() {} }, activeElement: null,
   }, () => {}, (component, props) => ({ config: { globalProperties: {} }, mount() { mounted++; queueMicrotask(() => props.onClose(false)) }, unmount() {} }), {}, key => key)
   assert.equal(await confirm(), true)
@@ -143,4 +143,35 @@ test('an empty work session after a terminal receipt does not prevent exit', asy
   assert.equal(await commitExitProjects([r], async () => ({ receiptState: 'SUCCEEDED', sha: 'receipt', notice: '' }),
     async () => ({ ...pending, changedCount: 0 })), true)
   assert.equal(r.state, 'committed')
+})
+
+
+test('anonymous desktop quit opens the chooser; only unauthenticated web can skip it', async () => {
+  const source = readFileSync(new URL('../../src/utils/projectExitDialog.js', import.meta.url), 'utf8')
+    .replace(/^import .*\n/gm, '').replace('export function', 'function')
+  for (const state of [
+    { desktop: true, session: '', receipts: [], expectedMounts: 1 },
+    { desktop: false, session: '', receipts: [], expectedMounts: 0 },
+    { desktop: false, session: 'signed-in', receipts: [], expectedMounts: 1 },
+    { desktop: false, session: '', receipts: [{ id: 1 }], expectedMounts: 1 },
+  ]) {
+    let mounts = 0, unmounts = 0, finish
+    const overlays = []
+    const container = { remove() {} }
+    const document = { createElement: () => container, body: { appendChild() {} }, activeElement: null }
+    const createApp = (_component, props) => {
+      finish = props.onClose
+      return { config: { globalProperties: {} }, mount() { mounts++ }, unmount() { unmounts++ } }
+    }
+    const confirm = new Function('createApp', 'ProjectExitDialog', 't', 'pendingExitProjects', 'getSessionId',
+      'isDesktopHost', 'setGlobalOverlay', 'document', source + '; return confirmProjectExit')(
+        createApp, {}, key => key, () => state.receipts, () => state.session,
+        () => state.desktop, open => overlays.push(open), document)
+    const result = confirm()
+    assert.equal(mounts, state.expectedMounts, JSON.stringify(state))
+    if (mounts) finish(false)
+    assert.equal(await result, !state.expectedMounts)
+    assert.equal(unmounts, mounts)
+    assert.deepEqual(overlays, mounts ? [true, false] : [])
+  }
 })
