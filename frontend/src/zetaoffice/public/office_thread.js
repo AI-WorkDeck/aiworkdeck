@@ -6211,6 +6211,10 @@ const EXEC = {
       }
       out.applied.rulers = r;
     }
+    // A replacement Qt window may retain its former title/frame margins even
+    // after FullScreen and LayoutManager report the correct state. Reconcile
+    // the native surface once after chrome changes, without changing its size.
+    post('ui_layout');
     return out;
   },
   // 纯视图开关（自建工具栏「¶ 格式标记」「标尺」，默认都开、开关落在用户偏好里）。

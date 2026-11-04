@@ -525,6 +525,7 @@ export function bootZetaOffice(options = {}) {
         log('UI ready')
         if (onReady) onReady()
       }
+      else if (d.cmd === 'ui_layout') resizeCanvas(true)
       if (onWorkerMessage) onWorkerMessage(d)
     }
 

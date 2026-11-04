@@ -108,7 +108,8 @@ test('set_chrome 显示侧不再把 fullscreenbar 拉出来，且放出菜单栏
     isElementVisible: (u) => visible.get(u) === true,
   }
   const ctrl = { getFrame: () => ({ getPropertyValue: () => lm }), getViewSettings: () => ({ setPropertyValue() {}, getPropertyValue: () => true }) }
-  const fns = new Function('ctrl', 'errStr', body + '\nreturn { set_chrome, prunedCount: () => pruned };')(ctrl, String)
+  const messages = []
+  const fns = new Function('ctrl', 'errStr', 'post', 'isCalcDoc', body + '\nreturn { set_chrome, prunedCount: () => pruned };')(ctrl, String, cmd => messages.push(cmd), () => false)
   const out = fns.set_chrome({ menubar: true, statusbar: true, toolbars: true, rulers: true })
   assert.equal(out.success, true)
   assert.equal(out.applied.toolbars.fullscreenbar, false, '「全屏」浮条不许被显示侧拉出来')
@@ -120,6 +121,9 @@ test('set_chrome 显示侧不再把 fullscreenbar 拉出来，且放出菜单栏
   // 藏的一侧不需要裁菜单
   fns.set_chrome({ menubar: false, toolbars: false })
   assert.equal(fns.prunedCount(), 1)
+  assert.deepEqual(messages, ['ui_layout', 'ui_layout'])
+  fns.set_chrome({})
+  assert.equal(messages.length, 2, 'read-only visibility checks never resize the surface')
 })
 
 test('派发层同样拦住这三条命令（Ctrl+Q 等快捷键、菜单没裁成功时的兜底）', () => {
