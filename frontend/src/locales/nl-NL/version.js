@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitUnconfirmedProject: "Onbevestigd project",
+  exitCommitUnconfirmed: "Het resultaat is nog niet bevestigd. Controleer opnieuw voordat u afsluit of annuleer om terug te gaan naar de app.",
+  exitProjectsTitle: "Projectwijzigingen controleren voor afsluiten",
+  exitProjectsHint: "Selecteer de projecten die u wilt vastleggen. Niet-geselecteerde wijzigingen blijven op deze computer opgeslagen.",
+  exitProjectsChecking: "Wijzigingen controleren…",
+  exitProjectsCommit: "Selectie vastleggen en afsluiten",
+  exitProjectsCommitted: "Vastgelegd",
+
   "aiSaving": "Geopende bestanden opslaan…",
   "aiExecuting": "Projectversie bijwerken…",
   "aiMerging": "Wijzigingen zonder conflicten samenvoegen…",

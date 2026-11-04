@@ -16,7 +16,8 @@ import { applyI18nLocale } from '@/i18n/index.js'
 import { initAppTheme } from '@/utils/appTheme.js'
 import { installModalFocusGuard } from '@/utils/modalFocusGuard.js'
 import { getAppLanguageRemote, saveAppLanguageRemote, prepareAgentRestart, abortAgentRestart } from '@/services/api.js'
-import { createDesktopQuitGuard, flushQuitWorkbenches, confirmQuitWorkbenches } from '@/utils/desktopQuitGuard.js'
+import { confirmProjectExit } from '@/utils/projectExitDialog.js'
+import { createDesktopQuitGuard, flushQuitWorkbenches } from '@/utils/desktopQuitGuard.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 
 export default {
@@ -106,7 +107,7 @@ export default {
         prepare: prepareAgentRestart,
         abort: abortAgentRestart,
         flush: flushQuitWorkbenches,
-        confirm: confirmQuitWorkbenches,
+        confirm: confirmProjectExit,
         progress: stage => {
           awaitingChoice = stage === 'confirming'
           if (awaitingChoice) uni.hideLoading()
@@ -698,6 +699,7 @@ html.is-desktop .project-header .avatar-menu {
    **新增全屏浮层要加进这张名单**；frontend/tests/window-chrome/titlebar-drag-region.test.mjs
    会扫出漏掉的那个。真不吃鼠标事件的层（pointer-events: none）才进那份 EXEMPT。 */
 html.is-desktop .scratch-copy-mask,
+html.is-desktop .project-exit-mask,
 html.is-desktop .account-entry-mask,
 html.is-desktop .awd-login-mask,
 html.is-desktop .amb-mask,
