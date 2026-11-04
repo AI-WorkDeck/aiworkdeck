@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitCommitUnconfirmed: "O resultado da confirmação ainda é desconhecido. Verifique novamente antes de sair ou cancele para voltar ao aplicativo.",
   exitProjectsTitle: "Revisar alterações antes de sair",
   exitProjectsHint: "Selecione os projetos para confirmar. As alterações não selecionadas permanecem salvas neste computador.",
   exitProjectsChecking: "Verificando alterações…",

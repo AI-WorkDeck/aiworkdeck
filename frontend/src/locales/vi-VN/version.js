@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitCommitUnconfirmed: "Chưa xác nhận việc ghi nhận đã hoàn tất. Kiểm tra lại trước khi thoát hoặc hủy để quay lại ứng dụng.",
   exitProjectsTitle: "Kiểm tra thay đổi dự án trước khi thoát",
   exitProjectsHint: "Chọn dự án để ghi nhận. Các thay đổi không được chọn vẫn được lưu trên máy tính này.",
   exitProjectsChecking: "Đang kiểm tra thay đổi…",

@@ -5,7 +5,7 @@ description: 项目级版本记录领域。任务涉及版本记录/工作段（
 
 ## 软件退出的统一项目提交选择（dev-board#1685 / #1687）
 
-`App.vue` 的 desktop quit guard 先暂停 AI 并 `flushQuitWorkbenches` 确认文件落盘，再调用全局 `projectExitDialog.js`；不依赖当前项目或页面实例。`ProjectExitDialog.vue` 立即显示，最多三路读取全部本地项目的 `/version/exit-status`（8 秒请求预算，失败保持可见且可重试），只展示有待提交内容、冲突或统计失败的项目，默认不勾选。全部干净时自动退出；直接退出保留未提交改动，最终仍经 quit guard 再次保存校验。选中项目逐个调用既有 `/session/end` 并核查轻量状态；成功回执先取消勾选，部分失败留在弹窗，重试不重复提交已成功项目。提交中禁止退出按钮；切项目仅保存文件，不再询问提交。退出登录沿用原有确认行为。
+`App.vue` 的 desktop quit guard 先暂停 AI 并 `flushQuitWorkbenches` 确认文件落盘，再调用全局 `projectExitDialog.js`；不依赖当前项目或页面实例。`ProjectExitDialog.vue` 立即显示，最多三路读取全部本地项目的 `/version/exit-status`（8 秒请求预算，失败保持可见且可重试），只展示有待提交内容、冲突或统计失败的项目，默认不勾选。全部干净时自动退出；直接退出保留未提交改动，最终仍经 quit guard 再次保存校验。选中项目逐个调用既有 `/session/end` 并核查轻量状态；成功回执先取消勾选，部分失败留在弹窗，重试不重复提交已成功项目。退出提交携带 receiptEpoch:UUID；网络失败或 RUNNING/UNKNOWN 回执作为未结提交跨弹窗保留，禁止直接退出及新增提交，重试复用原请求 ID。普通状态读取成功不能替代提交终态；SUCCEEDED/FAILED 才解除未结保护，旧进程 epoch 不重放。提交中禁止退出按钮；切项目仅保存文件，不再询问提交。退出登录沿用原有确认行为。
 
 独立弹窗沿既有 DOM createApp 宿主方式挂载（uni 会覆盖 App 模板），持有全局浮层隐藏原生 BrowserView；取消代次丢弃迟到结果。`projectExitState.js` 严格核对状态及提交回执，不能把读取失败当成零改动。四格式原有保存屏障未变：Word/PPT/Excel 共用 LibreOfficeEditor；PDF 的预览不新增伪保存路径，其他既有编辑实例仍由原注册表校验。回归 `project-exit.test.mjs`、`desktop-quit-app.test.mjs`、`flush-dirty-editors.test.mjs`。浏览器夹具 `tests/project-exit-ui/build.mjs` 生成真实组件+合成API页面，验证窄窗和部分失败；不等于正式客户端/真实文件退出实测。
 

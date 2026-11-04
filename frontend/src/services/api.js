@@ -4066,11 +4066,11 @@ export function getVersionCompare(projectId, from, to) {
   });
 }
 
-export function endWorkSession(projectId, title) {
+export function endWorkSession(projectId, title, requestId) {
   return request({
     url: `/api/projects/${projectId}/version/session/end`,
     method: 'POST',
-    data: { title: title || '' }
+    data: { title: title || '', ...(requestId ? { requestId } : {}) }
   });
 }
 

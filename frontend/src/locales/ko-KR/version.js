@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitCommitUnconfirmed: "커밋 완료 여부가 아직 확인되지 않았습니다. 다시 확인한 후 종료하거나 취소하여 앱으로 돌아가세요.",
   exitProjectsTitle: "종료 전 프로젝트 변경 확인",
   exitProjectsHint: "커밋할 프로젝트를 선택하세요. 선택하지 않은 변경 사항도 이 컴퓨터에 저장된 상태로 유지됩니다.",
   exitProjectsChecking: "변경 확인 중…",
