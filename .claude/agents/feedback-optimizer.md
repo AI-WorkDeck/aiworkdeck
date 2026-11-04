@@ -131,3 +131,9 @@ optimizer.*」——普通用户永远 enabled=false，只看得到下面的「�
 ## AI 内容举报（dev-board#1671）
 
 `POST /api/feedback` 的 `clientContext.type=ai-content-report` 只保留字符串 `type/platform/conversationId`，不调用服务端上下文收集器（含版本、系统环境与日志），不自动附会话正文或文件。举报正文来自用户主动填写；Android 仅提交 payload，不带附件。未知及嵌套上下文字段丢弃。普通故障反馈保持现有 runtime、日志及附件逻辑；`FeedbackServiceTest` 覆盖白名单、收集器零调用与普通反馈日志回归。
+
+## 手机 AI 内容举报人工分流（dev-board#1691）
+
+- `FeedbackService` 识别 `clientContext.type=ai-content-report`，仅保留 type/platform/conversationId，不采集诊断。conversationId是未验证的用户线索，不代表归属或访问授权。
+- `OptimizerAgentService` 在模型分诊之前直接转人工通知，跳过模型、代码修复与NOISE自动跳过；演练不发通知，失败保持原重试。EMAILED/handledAt仅证明通知环节，不代表投诉结案。
+- 既有控制台只读，resolution仅优化者密钥可写，无专用人工回复/结案UI。具体操作、证据和残余范围见 `docs/operations/mobile-ai-content-reports.md`；测试 `OptimizerAgentServiceTest` 的 aiReport/aiContentReport 用例。
