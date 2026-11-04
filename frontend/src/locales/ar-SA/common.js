@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cloudAccessRefresh: "تغيّرت صلاحيات الوصول إلى السحابة. حدّث الصفحة أو أعد فتح التطبيق قبل المتابعة. لن تُحذف الملفات المحلية.",
   workspaceSessionUnavailable: "تعذّرت استعادة جلسة مساحة العمل",
   "confirm": "موافق",
   "cancel": "إلغاء",

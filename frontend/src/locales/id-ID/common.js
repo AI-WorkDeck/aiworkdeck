@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cloudAccessRefresh: "Akses cloud telah berubah. Muat ulang halaman atau buka kembali aplikasi sebelum melanjutkan. File lokal tidak akan dihapus.",
   workspaceSessionUnavailable: "Sesi ruang kerja tidak dapat dipulihkan",
   "confirm": "Konfirmasi",
   "cancel": "Batal",

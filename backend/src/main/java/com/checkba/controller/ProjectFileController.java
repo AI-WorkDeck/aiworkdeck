@@ -293,6 +293,7 @@ public class ProjectFileController {
     }
 
     @GetMapping("/{fileId}/archive/entry")
+    @com.checkba.service.mobile.CloudMeteredDownload
     public ResponseEntity<byte[]> readArchiveEntry(
             @PathVariable Long projectId,
             @PathVariable Long fileId,
@@ -303,6 +304,7 @@ public class ProjectFileController {
         checkFileTreeAccess(projectId, userId);
         checkFileInProject(fileId, projectId);
         ProjectFileService.ArchiveEntryContent entry = projectFileService.readArchiveEntry(fileId, path);
+        com.checkba.service.mobile.CloudDownloadContext.mark(userId,"archive:"+projectId+":"+fileId+":"+java.nio.file.Path.of(path).normalize());
         String name = entry.name().toLowerCase(java.util.Locale.ROOT);
         // Use an explicit passive-media allowlist: HTML/SVG/XML must never execute at the API origin.
         String extension = name.substring(name.lastIndexOf('.') + 1);

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  apiCloudAccessRefresh: "Доступ к облаку изменился. Обновите страницу или заново откройте приложение. Локальные файлы не будут удалены.",
   defaultProjectName: "Временный проект",
   cmdPptAddImage: "Вставить изображение на слайд",
   cmdPptAddChart: "Вставить диаграмму на слайд",

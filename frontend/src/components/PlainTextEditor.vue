@@ -84,7 +84,7 @@ import { json } from '@codemirror/lang-json'
 import { html } from '@codemirror/lang-html'
 import { css } from '@codemirror/lang-css'
 import MarkdownIt from 'markdown-it'
-import { getFileBytesUrl, getFileWriteUrl } from '@/services/api.js'
+import { getFileBytesUrl, getFileWriteUrl, getCloudWriteHeaders } from '@/services/api.js'
 import { getAuthHeaders } from '@/utils/auth.js'
 import { toRaw } from 'vue'
 import * as fileReview from '@/services/fileReview.js'
@@ -407,17 +407,19 @@ export default {
       }
     },
 
-    uploadContent(content) {
+    async uploadContent(content) {
       const id = this.fileRef()
       if (!id) return Promise.reject(new Error('no file id'))
       const mime = this.isMarkdown ? 'text/markdown' : 'text/plain'
       const blob = new Blob([content], { type: mime + ';charset=utf-8' })
+      const url = getFileWriteUrl(id)
+      const headers = await getCloudWriteHeaders(url)
+      if (id !== this.fileRef()) throw new Error(this.$t('editor.saveCancelled'))
       return new Promise((resolve, reject) => {
-        const headers = getAuthHeaders() || {}
         const form = new FormData()
         form.append('file', blob, (this.file && this.file.name) || 'untitled.txt')
         const xhr = new XMLHttpRequest()
-        xhr.open('POST', getFileWriteUrl(id), true)
+        xhr.open('POST', url, true)
         xhr.timeout = 60000
         Object.keys(headers).forEach((k) => { if (k.toLowerCase() !== 'content-type') xhr.setRequestHeader(k, headers[k]) })
         xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve(xhr.response) : reject(new Error('HTTP ' + xhr.status)))

@@ -27,7 +27,7 @@ class MobileVersionObjectServiceTest {
     @BeforeEach void setup() {
         owner.setId(1L);owner.setFileCloudBackupEnabled(true);
         when(users.findById(1L)).thenReturn(Optional.of(owner));when(users.lockStorageOwner(1L)).thenReturn(Optional.of(owner));
-        when(quota.persistentQuota(1L)).thenReturn(CloudStorageQuotaService.PRO_BYTES);
+        when(quota.subscriptionQuota(1L)).thenReturn(CloudStorageQuotaService.PRO_BYTES);when(quota.canRead(1L)).thenReturn(true);when(quota.canWrite(1L)).thenReturn(true);when(quota.canUse(1L)).thenReturn(true);
         var dir=new MobileProjectDir();dir.setDeviceId("device");dir.setProjectKey("42");
         when(dirs.findByUserIdOrderByUpdatedAtDesc(1L)).thenReturn(List.of(dir));
         when(repo.save(any())).thenAnswer(inv->{MobileVersionObject r=inv.getArgument(0);if(r.getId()==null){r.setId(++seq);rows.add(r);}return r;});

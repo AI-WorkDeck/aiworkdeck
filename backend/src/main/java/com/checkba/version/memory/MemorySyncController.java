@@ -89,7 +89,7 @@ public class MemorySyncController {
         if (secret != null && !secret.isBlank()) {
             cfg.setSecret(secret);
         }
-        remoteRepository.save(cfg);
+        syncService.configureRemote(realm,cfg);
         Map<String, Object> sync = syncService.syncNow(realm);
         Map<String, Object> data = new HashMap<>();
         data.put("configured", true);

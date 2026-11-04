@@ -281,6 +281,11 @@ public class CloudSyncService {
      * 仓库不在合并窗口中（同上传/更新的既有纪律）。
      */
     public Map<String, Object> shareToCloud(long projectId, long connectionId, Long userId) {
+        CloudConnection connection=ownedConnection(connectionId,userId);
+        return explicitCloudOperation(connection,()->shareToCloudBound(projectId,connectionId,userId));
+    }
+
+    private Map<String,Object> shareToCloudBound(long projectId,long connectionId,Long userId) {
         ReentrantLock lock = sessionService.repoLock(projectId);
         lock.lock();
         try {
@@ -315,6 +320,7 @@ public class CloudSyncService {
                 }
 
                 repoService.setRemoteOrigin(projectId, conn.getServerUrl() + "/git/" + remoteProjectId + ".git");
+                repoService.bindCloudEpoch(projectId,conn.getServerUrl() + "/git/" + remoteProjectId + ".git",conn.getUsername(),conn.getDeviceToken());
                 uploadObjects(projectId, conn, String.valueOf(remoteProjectId));
                 ProjectRepoService.PushOutcome out = repoService.pushMainlineToOrigin(
                         projectId, conn.getUsername(), conn.getDeviceToken());
@@ -375,6 +381,17 @@ public class CloudSyncService {
      */
     public Map<String, Object> cloneFromCloud(long connectionId, long remoteProjectId, Long localUserId,
                                               String localRoot) {
+        CloudConnection connection=ownedConnection(connectionId,localUserId);
+        var alreadyHere=remoteRepository.findByConnectionIdAndRemoteProjectId(connectionId,String.valueOf(remoteProjectId));
+        if(alreadyHere.isPresent()) {
+            Map<String,Object> existing=new HashMap<>();
+            existing.put("localProjectId",alreadyHere.get().getProjectId());existing.put("alreadyLocal",true);
+            return existing;
+        }
+        return explicitCloudOperation(connection,()->cloneFromCloudBound(connectionId,remoteProjectId,localUserId,localRoot));
+    }
+
+    private Map<String,Object> cloneFromCloudBound(long connectionId,long remoteProjectId,Long localUserId,String localRoot) {
         CloudConnection conn = ownedConnection(connectionId, localUserId);
 
         // 换机器取回的查重：这份案卷本机已经有了就把既有的本机 id 还回去，不再造第二个
@@ -675,6 +692,7 @@ public class CloudSyncService {
                 if (background) {
                     return new UploadResult(UploadStatus.OFFLINE_PENDING, null);
                 }
+                if(e.isUserFacing())throw e;
                 throw VersionException.userFacing(LangText.of("这次没能交稿，改动已经记下，稍后还可以再交", "This submission didn't go through — your changes are saved and you can submit again later"));
             }
         } finally {
@@ -1078,8 +1096,8 @@ public class CloudSyncService {
             Map<String, Object> body = new HashMap<>();
             body.put("kind", "PULLED");
             body.put("toSha", repoService.resolveRef(projectId, repoService.mainBranch()));
-            httpPost(conn.getServerUrl() + "/api/projects/" + remote.getRemoteProjectId()
-                    + "/collab-events", JSONUtil.toJsonStr(body), conn.getDeviceToken());
+            withCloudEpoch(boundCloudEpoch(projectId,conn,remote),()->httpPost(conn.getServerUrl() + "/api/projects/" + remote.getRemoteProjectId()
+                    + "/collab-events", JSONUtil.toJsonStr(body), conn.getDeviceToken()));
         } catch (Exception e) {
             log.warn("上报取回记录失败（已吞）: project={}", projectId, e);
         }
@@ -1090,9 +1108,9 @@ public class CloudSyncService {
         ProjectRemote remote = requireRemoteBinding(projectId);
         CloudConnection conn = connectionOf(remote);
         String body = JSONUtil.toJsonStr(Map.of("username", username, "role", role));
-        JSONObject resp = JSONUtil.parseObj(httpPost(
+        JSONObject resp = JSONUtil.parseObj(withCloudEpoch(boundCloudEpoch(projectId,conn,remote),()->httpPost(
                 conn.getServerUrl() + "/api/projects/" + remote.getRemoteProjectId() + "/members",
-                body, conn.getDeviceToken()));
+                body, conn.getDeviceToken())));
         if (resp.getInt("code", 1) != 0) {
             throw VersionException.userFacing(LangText.of(
                     "没能把人加进来：" + resp.getStr("message", "请重试"),
@@ -1109,9 +1127,9 @@ public class CloudSyncService {
     public void proxyRemoveMember(long projectId, long remoteUserId) {
         ProjectRemote remote = requireRemoteBinding(projectId);
         CloudConnection conn = connectionOf(remote);
-        JSONObject resp = JSONUtil.parseObj(httpDelete(
+        JSONObject resp = JSONUtil.parseObj(withCloudEpoch(boundCloudEpoch(projectId,conn,remote),()->httpDelete(
                 conn.getServerUrl() + "/api/projects/" + remote.getRemoteProjectId() + "/members/" + remoteUserId,
-                conn.getDeviceToken()));
+                conn.getDeviceToken())));
         if (resp.getInt("code", 1) != 0) {
             throw VersionException.userFacing(LangText.of(
                     "没能移出：" + resp.getStr("message", "请重试"),
@@ -1132,9 +1150,9 @@ public class CloudSyncService {
         CloudConnection conn = connectionOf(remote);
         Map<String, Object> reqBody = new HashMap<>();
         if (clientName != null && !clientName.isBlank()) reqBody.put("clientName", clientName.trim());
-        JSONObject resp = JSONUtil.parseObj(httpPost(
+        JSONObject resp = JSONUtil.parseObj(withCloudEpoch(boundCloudEpoch(projectId,conn,remote),()->httpPost(
                 conn.getServerUrl() + "/api/projects/" + remote.getRemoteProjectId() + "/invite/client",
-                JSONUtil.toJsonStr(reqBody), conn.getDeviceToken()));
+                JSONUtil.toJsonStr(reqBody), conn.getDeviceToken())));
         JSONObject data = resp.getJSONObject("data");
         if (resp.getInt("code", 1) != 0 || data == null || data.getStr("accessCode") == null) {
             throw VersionException.userFacing(LangText.of(
@@ -1199,7 +1217,9 @@ public class CloudSyncService {
         }
         String url = conn.getServerUrl() + "/api/dd" + path
                 + (query == null || query.isBlank() ? "" : "?" + query);
-        return httpRaw(method, url, body, contentType, conn.getDeviceToken());
+        if ("GET".equalsIgnoreCase(method) || "HEAD".equalsIgnoreCase(method))
+            return httpRaw(method,url,body,contentType,conn.getDeviceToken());
+        return withCloudEpoch(boundCloudEpoch(projectId,conn,remote),()->httpRaw(method,url,body,contentType,conn.getDeviceToken()));
     }
 
     /** 结束工作 → 后台自动上传（spec 决策 3）。绝不能让上传异常反向影响已经结束的工作段。 */
@@ -1523,6 +1543,48 @@ public class CloudSyncService {
                 : VersionAuthorResolver.localEmail(userName);
     }
 
+    private Map<String,String> boundCloudEpoch(long projectId,CloudConnection conn,ProjectRemote remote) {
+        if(!officialCloudOrigin(conn.getServerUrl()))return Map.of();
+        return repoService.cloudWriteHeaders(projectId,conn.getServerUrl()+"/git/"+remote.getRemoteProjectId()+".git",conn.getUsername(),conn.getDeviceToken());
+    }
+
+    private <T> T explicitCloudOperation(CloudConnection conn,java.util.function.Supplier<T> action) {
+        return withCloudEpoch(accountCloudEpoch(conn.getServerUrl(),conn.getDeviceToken()),action);
+    }
+
+    <T> T withCloudEpoch(Map<String,String> epoch,java.util.function.Supplier<T> action) {
+        Map<String,String> prior=CloudGitEpochClient.explicitEpoch.get();
+        CloudGitEpochClient.explicitEpoch.set(epoch);
+        try{return action.get();}
+        finally{if(prior==null)CloudGitEpochClient.explicitEpoch.remove();else CloudGitEpochClient.explicitEpoch.set(prior);}
+    }
+
+    private boolean officialCloudOrigin(String server) {
+        java.net.URI origin=java.net.URI.create(server);
+        return "https".equalsIgnoreCase(origin.getScheme()) && origin.getUserInfo()==null
+                && (origin.getPort()==-1 || origin.getPort()==443) && origin.getHost()!=null
+                && java.util.Set.of("case.aiworkdeck.com","case.workdeck.ai").contains(origin.getHost().toLowerCase(java.util.Locale.ROOT));
+    }
+
+    /** Explicit connection starts one permission snapshot; only a real 404 enables old servers. */
+    protected Map<String,String> accountCloudEpoch(String server,String token) {
+        if(!officialCloudOrigin(server))return Map.of();
+        java.net.URI origin=java.net.URI.create(server);
+        String endpoint="https://"+origin.getHost()+"/api/mobile/billing/cloud-state";
+        try(HttpResponse response=HttpRequest.get(endpoint).header("X-Session-Id",token)
+                .setFollowRedirects(false).setConnectionTimeout(5000).setReadTimeout(15000).execute()) {
+            if(response.getStatus()==404)return Map.of();
+            if(response.getStatus()!=200)throw VersionException.userFacing(com.checkba.service.mobile.CloudBillingText.get("cloudReconnectRequired"));
+            com.fasterxml.jackson.databind.JsonNode state=new com.fasterxml.jackson.databind.ObjectMapper().readTree(response.body());
+            var epoch=state.path("cloudAccess").path("epoch");
+            if(!epoch.isIntegralNumber() || !epoch.canConvertToLong() || epoch.longValue()<0)
+                throw VersionException.userFacing(com.checkba.service.mobile.CloudBillingText.get("cloudReconnectRequired"));
+            return Map.of("X-Cloud-Epoch",epoch.asText());
+        } catch(java.io.IOException e) {
+            throw VersionException.userFacing(com.checkba.service.mobile.CloudBillingText.get("cloudReconnectRequired"));
+        }
+    }
+
     /** 无需认证头的调用，委托三参版本。 */
     protected String httpPost(String url, String jsonBody) {
         return httpPost(url, jsonBody, null);
@@ -1538,6 +1600,8 @@ public class CloudSyncService {
         if (sessionToken != null) {
             req.header("X-Session-Id", sessionToken);
         }
+        Map<String,String> frozen=CloudGitEpochClient.explicitEpoch.get();
+        if(frozen!=null)frozen.forEach(req::header);
         try (HttpResponse resp = req.execute()) {
             if (resp.getStatus() != 200) {
                 throw new IllegalStateException("云端请求失败 (HTTP " + resp.getStatus() + ")");
@@ -1587,6 +1651,8 @@ public class CloudSyncService {
             if (contentType != null) req.header("Content-Type", contentType);
             req.body(body);
         }
+        Map<String,String> frozen=CloudGitEpochClient.explicitEpoch.get();
+        if(frozen!=null)frozen.forEach(req::header);
         try (HttpResponse resp = req.execute()) {
             return new RawResponse(resp.getStatus(), resp.header("Content-Type"),
                     resp.header("Content-Disposition"), resp.bodyBytes());
@@ -1603,6 +1669,8 @@ public class CloudSyncService {
         if (sessionToken != null) {
             req.header("X-Session-Id", sessionToken);
         }
+        Map<String,String> frozen=CloudGitEpochClient.explicitEpoch.get();
+        if(frozen!=null)frozen.forEach(req::header);
         try (HttpResponse resp = req.execute()) {
             if (resp.getStatus() != 200) {
                 throw new IllegalStateException("云端请求失败 (HTTP " + resp.getStatus() + ")");

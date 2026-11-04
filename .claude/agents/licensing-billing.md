@@ -1589,3 +1589,23 @@ The mobile capability endpoint passes the authenticated user through the existin
 国际 Circle 账户可取得本站受限网关通道；国内仍要求百炼。缓存同时核账户指纹、站点与网关 base URL。包晴天扫码入口仅在大陆且 captcha-config 的 bqtScanEnabled 严格为 true 时显示；服务端未配置时正常密码登录仍可用。二维码只含公开 qrid，create 回执的 pollToken 仅留当前会话内存；前端请求本机 X-Bqt-Poll-Token，Java 通过专用登录 GET 的 Authorization Bearer 转发官网。不得把 pollToken 放进 URL 或二维码。网站原子消费扫码会话，确认响应丢失需刷新二维码；前端轮询互斥且丢弃已替换会话回执。
 
 验证：frontend/tests/account/bqt-poll.test.mjs 的缺 proof/串行/迟到结果保护；AccountServiceTest 校验 proof 透传、缺值拒绝。真实上游扫码需原位生产凭据和显式启用后另验。
+
+## 云按量账务与后付费（dev-board#1701/#1703，默认关闭）
+
+`CloudStorageQuotaService` 将订阅身份和云能力分开：`subscriptionQuota` 只回答真实订阅权益，`canUse/canRead/canWrite` 来自官网 cloud-state。HTTP新增云写入必须带当前 `X-Cloud-Epoch`；`lockProjectForWrite` 本身只加锁和记录容量变动，删除不能被新增写入闸挡住。新增用户可见计费文本统一 `CloudBillingText` 与 `resources/i18n/cloud-billing.json`（20语种）。
+
+`CloudStorageMeterService` 在容量变动事务前后记录样本，固定毫秒UTC水位，按恒定实际容量区间提交 `storedBytes`，官网按历史权益计算免费容量；缺失的历史只 baseline，不倒填收费。每tick最多500区间/5秒，各区间独立事务。media、transfer、backup、版本对象、项目文件/Git/记忆目录都计入实际占用。
+
+`CloudBillingLifecycleService` 先持久72小时通知再向官网确认送达；120小时精确manifest和首个冻结claim须在同owner事务。逐对象删除需有效60秒许可，项目/记忆repo锁必须先于owner锁。支付撤销尚未领取的清理机会，已领取许可不可假称撤回；远端complete成功而本地回滚只凭匹配completed receipt确认旧字节不存在后修metadata。付款使caseId为空时，持久未完成jobs用 `receiptOnly:true` 恢复回执，不重新领取删除许可。归属不明、共享、locator越界与通知未送达均不能执行破坏清理。
+
+清理仅云profile，禁止普通ProjectDeletedEvent、同步删除命令及撤销真实backup/assistant同意。`User.cloudBackupPaused` 暂停备份；账户resume成功后仍需用户重新开启备份。冻结时canRead为false；解冻后可读取剩余云文件。原本主动撤回备份同意的pendingDeletion语义不变。
+
+下载：mobile catalog/preview通过 `CloudEgressService` 快照报价/hash、预留和实际送出bytes结算；普通授权文件路由显式 `CloudMeteredDownload` + `CloudDownloadContext`，错误JSON不计费，Range仅预留选中区间。欠费case不允许Range；Git动态pack/awd parts不是稳定完整文件导出，欠费时拒绝协议下载，用户可用目录原文件导出。普通传输xfer沿用既有按量费用，避免重复扣费。
+
+验证：`Cloud*Test,MobileApiContractTest,MobileBackupServiceTest,MobileVersionObjectServiceTest,MobileTransferServiceTest,MobileRelayStoreServiceTest,MobileAssistantServiceTest,MobileCalendarServiceTest,ProjectCatalogServiceTest,GitHttp*Test,ProjectObject*Test`；必须JDK21。`CloudBillingLifecyclePersistenceTest` 使用真实H2 owner锁/回滚和本机hash，`CloudDownloadBillingAdviceTest` 使用真实MockMvc完整文件/Range/错误响应。新开关默认关闭，合并不等于上线。
+
+后付费容量的归属边界：旧project没有明确PERSONAL及一致billingOwner时，不擅向creator收费，该项目新增写冻结；明确个人备份等其他scope仍正常计量。MemoryDocument正文按UTF8长度（含尚存正文的soft-delete）计，`sourceMemoryUid`去重legacy MemoryEntry，迁移双存不重复收费。自动物化memory workTree成本平台承担，Git历史真实占用仍计。普通应用API元数据/抽取文本/对比JSON包含在服务内，不另收网络费，区别于显式文件/版本/协议导出。
+
+冻结后的恢复协议：网站case.executorReconciled是内部字段；cleanup-finish表示全量metadata已提交，或付清后执行器逐项receiptOnly核对（issued:false保留、cancelled保留、completed须确认旧字节不存在并修metadata、pending不得确认），本地修复commit后调用cleanup-reconciled(epoch/caseId/manifestHash)。网站仅在全部issued resolved且执行器确认后允许resume产生新epoch。resume-cloud先运行该恢复；backup consent不暗中resume。紧急关闭破坏清理开关仍允许只读回执核对，避免阻塞付清恢复。
+
+普通共享项目写入的代次与付费身份分离：登记owner承担费用并必须canWrite；原成员权限通过的X-Session-Id调用者使用自己的epoch，不能拿actor头与owner代次比较。quota再次校验成员写权限，并在owner锁后locking query确认项目未删除/归属未变。Git Basic仍用repo-specific owner epoch。未知项目不据creator自动认定付款归属。

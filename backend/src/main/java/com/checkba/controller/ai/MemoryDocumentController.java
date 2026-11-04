@@ -54,9 +54,11 @@ public class MemoryDocumentController {
     }
 
     @GetMapping("/download")
+    @com.checkba.service.mobile.CloudMeteredDownload
     public ResponseEntity<String> download(@RequestParam String spaceId, @RequestParam String path,
                                            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         String content = service.download(user(sessionId), spaceId, path);
+        com.checkba.service.mobile.CloudDownloadContext.mark(user(sessionId),"memory:"+spaceId+":"+java.nio.file.Path.of(path).normalize());
         String name = org.springframework.web.util.HtmlUtils.htmlEscape(
                 path.substring(path.lastIndexOf('/') + 1).replace("\"", ""));
         return ResponseEntity.ok()

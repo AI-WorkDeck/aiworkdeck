@@ -33,10 +33,12 @@ public class MobileCalendarService {
     public Map<String,Object> settings(Long user) {
         boolean enabled=consents.findById(user).map(MobileCalendarConsent::isEnabled).orElse(false);
         boolean active=false, available=true;
-        try { active=quota.persistentQuota(user)>0; }
+        try { active=quota.subscriptionQuota(user)>0; }
         catch (MobileBillingFailureException e) { available=false; }
-        return Map.of("enabled",enabled,"subscriptionActive",active,"subscriptionAvailable",available,
-                "consentVersion",CONSENT_VERSION);
+        Map<String,Object> result=new LinkedHashMap<>(Map.of("enabled",enabled,"subscriptionActive",active,"subscriptionAvailable",available,
+                "consentVersion",CONSENT_VERSION));
+        quota.appendCloudState(user,result);
+        return result;
     }
 
     @Transactional
@@ -44,8 +46,7 @@ public class MobileCalendarService {
         if (!CONSENT_VERSION.equals(version)) throw new IllegalArgumentException(LangText.of(
                 "请阅读并确认日程同步说明","Please review the calendar sync notice"));
         lock(user);
-        if (enabled && quota.persistentQuota(user)<=0) throw new IllegalArgumentException(LangText.of(
-                "手机日程同步需要有效云端订阅","Mobile calendar sync requires an active cloud subscription"));
+        if (enabled && !quota.canWrite(user)) throw new IllegalArgumentException(CloudBillingText.get("calendarBilling"));
         var row=consents.findById(user).orElseGet(MobileCalendarConsent::new);
         row.setUserId(user); row.setEnabled(enabled); row.setConsentVersion(version); row.setDecidedAt(Instant.now());
         consents.save(row);
@@ -58,7 +59,7 @@ public class MobileCalendarService {
     }
     private void requireEnabled(Long user) {
         if (!consents.findById(user).map(MobileCalendarConsent::isEnabled).orElse(false)
-                || quota.persistentQuota(user)<=0) throw new IllegalArgumentException(LangText.of(
+                || !quota.canRead(user)) throw new IllegalArgumentException(LangText.of(
                         "请先开启手机日程同步","Enable mobile calendar sync first"));
     }
 
@@ -71,7 +72,7 @@ public class MobileCalendarService {
     @Transactional
     public Map<String,Object> replace(Long user, String device, String timeZone, String sourceUpdatedAt,
             List<Map<String,Object>> incoming, boolean truncated) {
-        lock(user); requireEnabled(user);
+        lock(user); quota.requireCloudWrite(user); requireEnabled(user);
         text(device,64,"deviceId");
         ZoneId zone;
         Instant source;
@@ -146,7 +147,7 @@ public class MobileCalendarService {
         List<Map<String,Object>> events=new ArrayList<>();
         Instant synced=null;
         boolean truncated=false;
-        if(Boolean.TRUE.equals(result.get("enabled")) && Boolean.TRUE.equals(result.get("subscriptionActive"))) {
+        if(Boolean.TRUE.equals(result.get("enabled")) && quota.canRead(user)) {
             Set<String> known=new HashSet<>();
             for(var dir:directories.findByUserIdOrderByUpdatedAtDesc(user)) known.add(dir.getDeviceId()+"\n"+dir.getProjectKey());
             for(var row:snapshots.findByUserId(user)) {

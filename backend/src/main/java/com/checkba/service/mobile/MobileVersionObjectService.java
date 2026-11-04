@@ -35,7 +35,7 @@ public class MobileVersionObjectService {
         var owner=users.findById(user).orElseThrow(()->new IllegalArgumentException("User not found"));
         if(entityManager!=null && TransactionSynchronizationManager.isActualTransactionActive() && entityManager.contains(owner))
             entityManager.refresh(owner);
-        if (!owner.isFileCloudBackupEnabled() || quota.persistentQuota(user)<=0)
+        if (!owner.isFileCloudBackupEnabled() || !quota.canRead(user))
             throw new IllegalArgumentException(MobileBackupService.offlineMessage());
         if (device==null || device.isBlank() || device.length()>64 || project==null || project.isBlank() || project.length()>64
                 || directories.findByUserIdOrderByUpdatedAtDesc(user).stream().noneMatch(
@@ -49,6 +49,11 @@ public class MobileVersionObjectService {
     public static int partCount(long size) { return Math.toIntExact((size+PART_BYTES-1)/PART_BYTES); }
     private List<MobileVersionObject> rows(Long user,String device,String project,String sha) {
         return objects.findByUserIdAndDeviceIdAndProjectKeyAndObjectShaOrderByPartIndex(user,device,project,sha);
+    }
+    private void publication(Long user) {
+        var owner=users.findById(user).orElseThrow();
+        if(!owner.isFileCloudBackupEnabled() || owner.isCloudBackupPaused()) throw new IllegalArgumentException(CloudBillingText.get("backupEnableBilling"));
+        quota.requireCloudWrite(user);
     }
     private void lock(Long user) {
         users.lockStorageOwner(user).orElseThrow(()->new IllegalArgumentException("User not found"));
@@ -80,7 +85,7 @@ public class MobileVersionObjectService {
     @Transactional
     public Map<String,Object> put(Long user,String device,String project,String sha,long objectSize,
             int index,String partSha,InputStream content,long size) throws IOException {
-        lock(user);authorize(user,device,project);validate(sha,objectSize);validate(partSha,size);
+        lock(user);publication(user);authorize(user,device,project);validate(sha,objectSize);validate(partSha,size);
         long expected=index<0 || index>=partCount(objectSize) ? -1 : Math.min(PART_BYTES,objectSize-index*PART_BYTES);
         if(size!=expected) throw new IllegalArgumentException("Invalid version object part size");
         var old=objects.findByUserIdAndDeviceIdAndProjectKeyAndObjectShaAndPartIndex(user,device,project,sha,index);
@@ -145,7 +150,7 @@ public class MobileVersionObjectService {
             throw new IllegalArgumentException("Version object verification failed");
         }
         independent(()->{
-            lock(user);authorize(user,device,project);
+            lock(user);publication(user);authorize(user,device,project);
             List<MobileVersionObject> current=rows(user,device,project,sha);
             boolean published=false;int verified=0;
             for(var row:current) {
@@ -222,7 +227,8 @@ public class MobileVersionObjectService {
             users.lockStorageOwner(candidate.getUserId());
             var current=objects.findById(candidate.getId()).orElse(null);
             if(current!=null && entityManager!=null) entityManager.refresh(current);
-            if(current!=null && current.isPendingDeletion() && deleteConfirmed(current.getStoragePath())) objects.delete(current);
+            if(current!=null && current.isPendingDeletion()) { quota.storageChanging(current.getUserId());
+                if(deleteConfirmed(current.getStoragePath())) objects.delete(current); }
         });
     }
 }

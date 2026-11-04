@@ -100,7 +100,7 @@ class ProjectCatalogServiceTest {
         org.springframework.test.util.ReflectionTestUtils.setField(service,"quota",quota);
         User user=new User();user.setFileCloudBackupEnabled(true);
         when(users.findById(1L)).thenReturn(Optional.of(user));
-        when(quota.persistentQuota(1L)).thenThrow(new MobileBillingFailureException(MobileBillingKind.UNAVAILABLE,"billing unavailable"));
+        when(quota.subscriptionQuota(1L)).thenThrow(new MobileBillingFailureException(MobileBillingKind.UNAVAILABLE,"billing unavailable"));when(quota.canRead(1L)).thenThrow(new MobileBillingFailureException(MobileBillingKind.UNAVAILABLE,"billing unavailable"));
         Project cloud=cloud(8L,"case");
         when(projects.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(cloud));
         when(dirs.findByUserIdOrderByUpdatedAtDesc(1L)).thenReturn(List.of(desktop("a","1","case",null,8L)));

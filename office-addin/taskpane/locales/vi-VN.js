@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  apiCloudAccessRefresh: "Quyền truy cập đám mây đã thay đổi. Hãy tải lại trang hoặc mở lại ứng dụng trước khi tiếp tục. Tệp trên máy sẽ không bị xóa.",
   defaultProjectName: "Dự án tạm thời",
   cmdPptAddImage: "Chèn hình ảnh vào trang chiếu",
   cmdPptAddChart: "Chèn biểu đồ vào trang chiếu",

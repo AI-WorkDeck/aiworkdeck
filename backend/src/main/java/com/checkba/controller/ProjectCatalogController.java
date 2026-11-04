@@ -10,6 +10,7 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/mobile/catalog")
 public class ProjectCatalogController {
+    @org.springframework.beans.factory.annotation.Autowired private com.checkba.service.mobile.CloudEgressService egress;
     private final ProjectCatalogService catalog;
     public ProjectCatalogController(ProjectCatalogService catalog) { this.catalog = catalog; }
     private Long user(String session) {
@@ -27,11 +28,14 @@ public class ProjectCatalogController {
             @RequestHeader(value="X-Session-Id", required=false) String session) {
         return catalog.fileList(user(session), uid);
     }
-    @GetMapping("/{uid}/files/{fileUid}/content") public ResponseEntity<InputStreamResource> content(
-            @PathVariable String uid, @PathVariable String fileUid,
-            @RequestHeader(value="X-Session-Id", required=false) String session) {
-        var content = catalog.content(user(session), uid, fileUid);
-        return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).contentLength(content.size())
-                .body(new InputStreamResource(content.stream()));
+    @GetMapping("/{uid}/files/{fileUid}/content") public void content(
+            @PathVariable String uid,@PathVariable String fileUid,
+            @RequestHeader(value="X-Session-Id",required=false) String session,
+            @RequestParam(required=false) String requestId,@RequestParam(required=false) String expectedHash,jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        var output=response.getOutputStream();
+        var download=egress.prepare(user(session),uid,fileUid,requestId,expectedHash);
+        response.setContentType("application/octet-stream");response.setContentLengthLong(download.size());
+        response.setHeader("Cache-Control","no-store");
+        egress.write(download,output);
     }
 }

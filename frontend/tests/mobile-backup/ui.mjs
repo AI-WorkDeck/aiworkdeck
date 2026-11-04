@@ -91,6 +91,16 @@ try {
       assert.deepEqual(f.errors, [])
     } finally { await f.page.close() }
   })
+  await scenario('non-subscriber with authoritative cloud access can enable backup', async () => {
+    const f = await fixture({ subscriptionActive: false, cloudAccess: { canWrite: true } })
+    try {
+      await f.page.waitForSelector('.backup-dialog', { visible: true })
+      await clickButton(f.page, '同意并开启')
+      await f.page.waitForSelector('.backup-dialog', { hidden: true })
+      assert.equal(f.puts[0].enabled, true)
+      assert.equal(f.state.subscriptionActive, false)
+    } finally { await f.page.close() }
+  })
   await scenario('first explicit decline persists false and keeps local workbench usable', async () => {
     const f = await fixture()
     try {
@@ -119,12 +129,12 @@ try {
       assert.equal(f.state.enabled, false)
     } finally { await f.page.close() }
   })
-  await scenario('non-subscriber has explanation, subscribe link, and no direct enable action', async () => {
+  await scenario('account without write capability has billing guidance and no direct enable action', async () => {
     const f = await fixture({ subscriptionActive: false })
     try {
       const text = await f.page.$eval('.backup-dialog', el => el.textContent)
-      assert.match(text, /需要有效订阅/)
-      assert.match(text, /前往开通订阅/)
+      assert.match(text, /云功能无需订阅/)
+      assert.match(text, /账户与计费/)
       assert.doesNotMatch(text, /是否开启文件云端备份/)
       assert.doesNotMatch(text, /同意并开启/)
       await clickButton(f.page, '暂不开启')
@@ -174,7 +184,7 @@ try {
       f.holdGet(false)
       f.setState({ accountScope: 'synthetic-account-b', enabled: false, decided: false, subscriptionActive: false })
       await f.page.evaluate(() => window.dispatchEvent(new CustomEvent('awd:account-changed')))
-      await f.page.waitForFunction(() => document.querySelector('.backup-dialog')?.textContent.includes('需要有效订阅'))
+      await f.page.waitForFunction(() => document.querySelector('.backup-dialog')?.textContent.includes('云功能无需订阅'))
       await f.pendingGets.shift()()
       await new Promise(resolve => setTimeout(resolve, 100))
       await f.page.waitForFunction(() => document.querySelector('.backup-trigger')?.textContent.includes('未开启'))

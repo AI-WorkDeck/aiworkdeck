@@ -24,7 +24,7 @@ class MobileCalendarServiceTest {
         consent.setUserId(1L);consent.setEnabled(true);
         when(consents.findById(1L)).thenAnswer(i->Optional.of(consent));
         when(users.lockStorageOwner(1L)).thenReturn(Optional.of(new User()));
-        when(quota.persistentQuota(1L)).thenReturn(1000L);
+        when(quota.subscriptionQuota(1L)).thenReturn(1000L);when(quota.canRead(1L)).thenReturn(true);when(quota.canWrite(1L)).thenReturn(true);when(quota.canUse(1L)).thenReturn(true);
         var dir=new MobileProjectDir();dir.setUserId(1L);dir.setDeviceId("desktop");dir.setProjectKey("42");dir.setName("Project A");
         when(dirs.findByUserIdAndDeviceId(1L,"desktop")).thenReturn(List.of(dir));
         when(dirs.findByUserIdOrderByUpdatedAtDesc(1L)).thenReturn(List.of(dir));
@@ -42,7 +42,7 @@ class MobileCalendarServiceTest {
         consent.setEnabled(false);
         assertThrows(IllegalArgumentException.class,()->service.replace(1L,"desktop","Asia/Shanghai",source,List.of(task(null,"OPEN"))));
         assertEquals(List.of(),events());verify(snapshots,never()).save(any());
-        consent.setEnabled(true);when(quota.persistentQuota(1L)).thenReturn(0L);
+        consent.setEnabled(true);when(quota.subscriptionQuota(1L)).thenReturn(0L);when(quota.canRead(1L)).thenReturn(false);when(quota.canWrite(1L)).thenReturn(false);when(quota.canUse(1L)).thenReturn(false);
         assertThrows(IllegalArgumentException.class,()->service.replace(1L,"desktop","Asia/Shanghai",source,List.of(task(null,"OPEN"))));
         assertEquals(List.of(),events());
     }
@@ -81,7 +81,7 @@ class MobileCalendarServiceTest {
         assertEquals(1,events().size());
     }
     @Test void revocationWorksDuringBillingOutageAndDeletesSnapshots() {
-        when(quota.persistentQuota(1L)).thenThrow(new MobileBillingFailureException(MobileBillingKind.UNAVAILABLE,"offline"));
+        when(quota.subscriptionQuota(1L)).thenThrow(new MobileBillingFailureException(MobileBillingKind.UNAVAILABLE,"offline"));when(quota.canRead(1L)).thenThrow(new MobileBillingFailureException(MobileBillingKind.UNAVAILABLE,"offline"));
         var result=service.settings(1L,false,MobileCalendarService.CONSENT_VERSION);
         assertFalse(consent.isEnabled());assertEquals(false,result.get("subscriptionAvailable"));
         verify(snapshots).deleteByUserId(1L);

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cloudAccessRefresh: "Η πρόσβαση στο cloud άλλαξε. Ανανεώστε τη σελίδα ή ανοίξτε ξανά την εφαρμογή για να συνεχίσετε. Τα τοπικά αρχεία δεν θα διαγραφούν.",
   workspaceSessionUnavailable: "Δεν ήταν δυνατή η επαναφορά της συνεδρίας του χώρου εργασίας",
   "confirm": "ΟΚ",
   "cancel": "Ακύρωση",

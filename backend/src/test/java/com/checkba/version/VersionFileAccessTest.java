@@ -146,7 +146,7 @@ class VersionFileAccessTest {
             var response = controller.fileBytesAtRef(PROJECT_ID, REF, "a.txt", "sess");
 
             var output = new java.io.ByteArrayOutputStream();
-            response.getBody().writeTo(output);
+            try(var input=response.getBody().getInputStream()){input.transferTo(output);}
             assertArrayEquals(content, output.toByteArray());
             assertEquals(content.length, response.getHeaders().getContentLength());
             assertEquals(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM,
@@ -223,10 +223,10 @@ class VersionFileAccessTest {
                     .thenAnswer(call -> new java.io.ByteArrayInputStream(content));
             var response = controller.fileBytesAtRef(PROJECT_ID, "master", "a.txt", "sess");
             var output = new java.io.ByteArrayOutputStream();
-            response.getBody().writeTo(output);
+            try(var input=response.getBody().getInputStream()){input.transferTo(output);}
             assertArrayEquals(content, output.toByteArray());
             verify(repoService, times(1)).resolveRef(PROJECT_ID, "master^{commit}");
-            verify(repoService, times(2)).openBlobAtCommit(PROJECT_ID, REF, "a.txt");
+            verify(repoService, times(1)).openBlobAtCommit(PROJECT_ID, REF, "a.txt");
             verify(repoService, never()).requireObjectsAt(anyLong(), anyString());
         }
     }

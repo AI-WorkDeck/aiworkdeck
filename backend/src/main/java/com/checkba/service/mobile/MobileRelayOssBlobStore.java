@@ -72,6 +72,18 @@ public final class MobileRelayOssBlobStore implements MobileRelayBlobStore, Auto
     }
 
     @Override
+    public boolean ownedLocator(Long userId,String locator) {
+        if(userId==null || locator==null || locator.startsWith("/") || locator.contains("\\")) return false;
+        for(String prefix:java.util.List.of(keyPrefix+userId+"/","mobile-backup/"+userId+"/")) {
+            if(locator.startsWith(prefix)) {
+                String name=locator.substring(prefix.length());
+                if(!name.isBlank() && !name.contains("/") && !name.equals(".") && !name.equals("..")) return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
     public InputStream open(String locator) throws IOException {
         if (isLegacyLocalPath(locator)) {
             return Files.newInputStream(Path.of(locator));

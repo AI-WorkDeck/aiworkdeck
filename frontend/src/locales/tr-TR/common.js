@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cloudAccessRefresh: "Bulut erişimi değişti. Devam etmeden önce sayfayı yenileyin veya uygulamayı yeniden açın. Yerel dosyalar silinmeyecektir.",
   workspaceSessionUnavailable: "Çalışma alanı oturumu geri yüklenemedi",
   "confirm": "Tamam",
   "cancel": "İptal",

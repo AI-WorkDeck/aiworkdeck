@@ -80,6 +80,18 @@ public class Project {
     @Column(nullable = false)
     private Long userId;
 
+    /** Explicit cloud billing responsibility; null legacy rows require review before cleanup. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private Long cloudBillingOwnerId;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(length = 24)
+    private String cloudOwnership;
+    public Long getCloudBillingOwnerId() { return cloudBillingOwnerId; }
+    public void setCloudBillingOwnerId(Long value) { cloudBillingOwnerId = value; }
+    public String getCloudOwnership() { return cloudOwnership; }
+    public void setCloudOwnership(String value) { cloudOwnership = value; }
+
+
     /**
      * IDE 化本地文件夹项目的物理根目录（绝对路径）。
      * 为空 = 存量托管项目，文件在 {globalRoot}/projects/{id} 下（见 ProjectStorageResolver）。

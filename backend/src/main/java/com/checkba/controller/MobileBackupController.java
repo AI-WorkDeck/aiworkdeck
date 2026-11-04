@@ -14,6 +14,7 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/mobile")
 public class MobileBackupController {
+    @org.springframework.beans.factory.annotation.Autowired private com.checkba.service.mobile.CloudEgressService egress;
     private final MobileBackupService backups;
     private final ProjectCatalogService catalog;
     public MobileBackupController(MobileBackupService backups,ProjectCatalogService catalog) { this.backups=backups;this.catalog=catalog; }
@@ -57,18 +58,21 @@ public class MobileBackupController {
         var transfer=backups.pull(user(session),request.deviceId(),request.projectKey(),request.remoteFileId(),request.requestId());
         return Map.of("code",0,"id",transfer.getId(),"credits",transfer.getChargedCredits());
     }
-    @SuppressWarnings("unchecked")
-    @GetMapping("/preview/catalog/{uid}/files/{fileUid}/content") public ResponseEntity<InputStreamResource> content(
-            @RequestHeader(value="X-Session-Id",required=false) String session,@PathVariable String uid,@PathVariable String fileUid) throws IOException {
-        Long user=user(session);backups.requireEligible(user);
-        var selected=((List<Map<String,Object>>)catalog.fileList(user,uid).get("files")).stream()
-                .filter(file -> fileUid.equals(file.get("uid")) && !Boolean.TRUE.equals(file.get("isFolder"))).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException(com.checkba.service.LangText.of("文件不存在", "File not found")));
-        MobilePreviewPolicy.requireSupported((String)selected.get("name"));
-        ProjectCatalogService.Content content;
-        if ("cloud".equals(selected.get("source"))) content=catalog.content(user,uid,fileUid);
-        else content=backups.content(user,(String)selected.get("deviceId"),(String)selected.get("projectKey"),fileUid);
-        return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).contentLength(content.size())
-                .body(new InputStreamResource(content.stream()));
+    @GetMapping("/preview/catalog/{uid}/files/{fileUid}/quote")
+    public Map<String,Object> quote(@RequestHeader(value="X-Session-Id",required=false) String session,
+            @PathVariable String uid,@PathVariable String fileUid) throws IOException {
+        egress.requirePreview(user(session),uid,fileUid);
+        return egress.quote(user(session),uid,fileUid);
+    }
+    @GetMapping("/preview/catalog/{uid}/files/{fileUid}/content")
+    public void content(@RequestHeader(value="X-Session-Id",required=false) String session,
+            @PathVariable String uid,@PathVariable String fileUid,
+            @RequestParam(required=false) String requestId,@RequestParam(required=false) String expectedHash,jakarta.servlet.http.HttpServletResponse response) throws IOException {
+        egress.requirePreview(user(session),uid,fileUid);
+        var output=response.getOutputStream();
+        var download=egress.prepare(user(session),uid,fileUid,requestId,expectedHash);
+        response.setContentType("application/octet-stream");response.setContentLengthLong(download.size());
+        response.setHeader("Cache-Control","no-store");
+        egress.write(download,output);
     }
 }
