@@ -78,3 +78,33 @@ test('host applies selected model before sending, including entry without prompt
   await handle.call(vm, { model: models[1] })
   assert.deepEqual(calls, [['select', 'model-b']])
 })
+
+test('real Vue parent ref exposes production model selection before welcome send', async () => {
+  const source = readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
+  const exposeSource = source.match(/\/\/ Expose methods for parent ref access\s*(expose\(\{[\s\S]*?\}\))/)[1]
+  const selectSource = source.match(/const selectModel = \(m\) => \{([\s\S]*?)\n    \}/)[1]
+  const selected = Vue.ref('model-a'), persisted = [], calls = []
+  const selectModel = new Function('applyModelSelection', 'persistModelId', 'showModelDropdown', 'noticeIfNoVision', `return m => {${selectSource}}`)(
+    id => { selected.value = id }, id => persisted.push(id), Vue.ref(true), noop,
+  )
+  const bindings = Object.fromEntries(exposeSource.replace(/\/\/[^\n]*/g, '').match(/\b[a-zA-Z]\w*\b/g).filter(name => name !== 'expose').map(name => [name, noop]))
+  Object.assign(bindings, { selectModel, currentConversationId: Vue.ref(null), sendQuickPrompt: prompt => calls.push([selected.value, prompt]) })
+  const Child = { setup(_, { expose }) {
+    new Function('bindings', 'expose', `with (bindings) { ${exposeSource} }`)(bindings, expose)
+    return () => Vue.h('span', selected.value)
+  } }
+  const child = Vue.ref(), root = document.createElement('div'); document.body.append(root)
+  const app = Vue.createApp({ setup: () => () => Vue.h(Child, { ref: child }) })
+  app.mount(root)
+  try {
+    assert.equal(typeof child.value.selectModel, 'function', 'Production expose must make selectModel reachable through the real Vue parent ref')
+    const host = readFileSync(new URL('../../src/pages/project-overview/project-overview.vue', import.meta.url), 'utf8')
+    const body = host.match(/async handleWelcomeStartChat\(payload = \{\}\) \{([\s\S]*?)\n    \},/)[1]
+    const handle = new Function(`return async function(payload = {}) {${body}}`)()
+    await handle.call({ switchViewMode: async () => true, $nextTick: Vue.nextTick, $refs: { chatInterface: child.value } }, { prompt: 'hello', model: models[1] })
+    assert.deepEqual(calls, [['model-b', 'hello']])
+    assert.deepEqual(persisted, ['model-b'])
+    await Vue.nextTick()
+    assert.equal(root.textContent, 'model-b')
+  } finally { app.unmount(); root.remove() }
+})
