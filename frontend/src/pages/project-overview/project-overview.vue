@@ -3249,7 +3249,7 @@ export default {
       }
       const base = (user && user.role === 'CLIENT')
         ? getPluginsForUser('CLIENT')
-        : [...getPluginsForUser(user && user.role, { cloudTrack: this.ddCloudTrack }), ...this.dynamicPlugins.filter(p => hasPluginNavigation(p))]
+        : [...getPluginsForUser(user && user.role, { cloudTrack: this.ddCloudTrack }), ...this.documentAvailablePlugins.filter(p => hasPluginNavigation(p))]
       // 声明了 requiresSkill 的插件位（诉讼可视化）跟着 skill 启停走：默认不安装，
       // 用户在广场里装了才出现在左栏。
       //
@@ -3516,11 +3516,14 @@ export default {
         }),
       }
     },
-    activeRightDynamicPlugin() { return this.dynamicPlugins.find(p => p.key === this.rightPaneKey) || null },
+    documentAvailablePlugins() {
+      return this.dynamicPlugins.filter(p => p.pluginId !== 'insight' || this.insightDocFileId)
+    },
+    activeRightDynamicPlugin() { return this.documentAvailablePlugins.find(p => p.key === this.rightPaneKey) || null },
     activeBottomDynamicPlugin() { return this.dynamicPlugins.find(p => p.key === this.activeToolKey) || null },
     activeDynamicPlugin() {
       if (!this.leftPaneKey) return null
-      return this.dynamicPlugins.find(p => p.key === this.leftPaneKey && hasPluginPanel(p)) || null
+      return this.documentAvailablePlugins.find(p => p.key === this.leftPaneKey && hasPluginPanel(p)) || null
     },
     isExplorerPane() {
       return this.leftPaneKey === 'files' || this.leftPaneKey === 'plugin-search'
@@ -3585,9 +3588,11 @@ export default {
     // 窗格绑哪份文档：聚焦那一侧的活跃 writer 文档，聚焦侧没有就看另一侧。
     // 只认 Writer——解析的是正文，表格/演示文稿没有可通读的段落。
     insightDocFile() {
+      if (this.isChatMode && !this.chatCanvasVisible) return null
+      const right = this.splitMode ? this.activeFileRight : null
       const order = this.focusedPane === 'right'
-        ? [this.activeFileRight, this.activeFileLeft]
-        : [this.activeFileLeft, this.activeFileRight]
+        ? [right, this.activeFileLeft]
+        : [this.activeFileLeft, right]
       for (const f of order) if (this.isInsightDoc(f)) return f
       return null
     },
@@ -3735,7 +3740,7 @@ export default {
     // 三个 dock 的分配，唯一出处是 config/panelRegistry.js 的纯函数 resolveDocks
     dockPanels() {
       if (this.isClientView) return []
-      return this.dynamicPlugins.filter(plugin => plugin.sidebarView).map(plugin => ({
+      return this.documentAvailablePlugins.filter(plugin => plugin.sidebarView).map(plugin => ({
         ...plugin, defaultDock: plugin.sidebarView.defaultDock, allowedDocks: plugin.sidebarView.allowedDocks,
       }))
     },
@@ -4654,6 +4659,14 @@ export default {
     ddCloudTrack(on) {
       if (!on && this.leftPaneKey === 'dd-files' && !this.isClientView) this.leftPaneKey = 'files'
     },
+    insightDocFileId: {
+      immediate: true,
+      handler(id) {
+        if (id) return
+        if (this.rightPaneKey === 'plugin-insight') this.rightPaneKey = 'ai'
+        if (this.leftPaneKey === 'plugin-insight') this.leftPaneKey = 'files'
+      },
+    },
     activeFileIdRight() { this.pushMenuState(); this.ensureActiveTabVisible('right'); this.syncFileTreeSelectionWithActiveTab() },
     sidebarCollapsed() { this.pushMenuState() },
     showToolsPanel() { this.pushMenuState() },
@@ -4671,7 +4684,11 @@ export default {
       }
     },
     activeToolKey() { this.pushMenuState() },
+    rightPaneKey(key) {
+      if (key === 'plugin-insight' && !this.insightDocFileId) this.rightPaneKey = 'ai'
+    },
     leftPaneKey(key) {
+      if (key === 'plugin-insight' && !this.insightDocFileId) this.leftPaneKey = 'files'
       // Visualization owns its questions and transcript in the left pane.
       // Keep the unrelated chat mounted, but remove the competing input surface.
       if (key === 'plugin-litigation-visual' && this.showAiPanel && this.rightPaneKey === 'ai') this.toggleAiPanel()
