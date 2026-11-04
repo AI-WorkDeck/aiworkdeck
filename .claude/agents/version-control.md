@@ -1079,3 +1079,5 @@ cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='Inte
 回执只在进程内保留，不落盘、不创建线程或任务队列、不淘汰终态（避免旧 ID 被再次执行）。因此重启后未知结果仍需人工核对，不能宣称跨重启 exactly-once。`VersionEndReceiptTest` 覆盖运行中并发重复、迟到重放、失败缓存、冲突回执、权限与身份/项目隔离、重启旧标识拒绝及旧客户端兼容。
 
 - 桌面 local-mode 可无 session 创建和提交本机项目。全局退出清单必须以 `isDesktopHost()` 纳入匿名桌面，不能用缺少 session 跳过；只有未登录 Web 且无待确认提交回执才可略过（#1695）。
+
+- 退出清单通过动态 `component :is` 渲染原生 `label/input/button`，样式必须使用专用 class。Uni H5 会将 CSS 标签选择器 `label/button` 改写为 `uni-label/uni-button`，原生元素因此无法命中；脱离 Uni 的 SFC/esbuild 预览不能发现这一差异。#1695 在真实 H5 编译 CSS 中复现失配，已安装 QA 的 `checkExitList` 同时核对行 `display:flex`、行矩形不重叠和按钮 padding/radius，截图仍需人工复核。
