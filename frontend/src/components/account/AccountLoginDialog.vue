@@ -56,20 +56,25 @@
       <div
         v-if="isPhoneSite && bqtScanEnabled && (mode === 'login' || mode === 'bqt')"
         class="unlock-site-seg"
+        :class="{ 'is-busy': submitBusy || sendingCode }"
         style="margin-top: 8px; margin-bottom: 16px;"
       >
-        <span
+        <component
+          :is="'button'"
+          type="button"
+          :disabled="submitBusy || sendingCode"
           class="unlock-site-seg-item"
           :class="{ 'is-active': mode === 'login' }"
-          role="button"
           @click="switchMode('login')"
-        >{{ $t('account.bqtScanBack') }}</span>
-        <span
+        >{{ $t('account.bqtScanBack') }}</component>
+        <component
+          :is="'button'"
+          type="button"
+          :disabled="submitBusy || sendingCode"
           class="unlock-site-seg-item"
           :class="{ 'is-active': mode === 'bqt' }"
-          role="button"
           @click="switchMode('bqt')"
-        >{{ $t('account.bqtScanSwitch') }}</span>
+        >{{ $t('account.bqtScanSwitch') }}</component>
       </div>
 
       <!-- 登录与注册是同一条链路（官网验证码端点「不存在即注册」）。用 v-show：
@@ -613,7 +618,7 @@ export default {
       this.errorMsg = ''
     },
     switchMode(next) {
-      if (this.mode === next) return
+      if (this.submitBusy || this.sendingCode || this.mode === next) return
       if (next === 'bqt') {
         if (!this.bqtScanEnabled || !this.isPhoneSite) return
         if (!this.consentGatePassed()) return
@@ -1193,6 +1198,9 @@ export default {
 
 .unlock-site-seg-item {
   flex: 1;
+  padding: 0;
+  font-family: inherit;
+  background: transparent;
   text-align: center;
   white-space: nowrap;
   font-size: var(--awd-font-size-body);
