@@ -3,11 +3,12 @@
 import { createApp } from 'vue'
 import ProjectExitDialog from '@/components/version/ProjectExitDialog.vue'
 import { t } from '@/i18n'
+import { pendingExitProjects } from './projectExitState.js'
 import { getSessionId } from './auth.js'
 import { setGlobalOverlay } from './overlayState.js'
 
 export function confirmProjectExit({ isCurrent = () => true } = {}) {
-  if (!getSessionId()) return Promise.resolve(true)
+  if (!getSessionId() && !pendingExitProjects().length) return Promise.resolve(true)
   return new Promise(resolve => {
     const container = document.createElement('div')
     document.body.appendChild(container)

@@ -12,7 +12,7 @@
         <component :is="'label'" v-for="row in visibleRows" :key="row.id">
           <component :is="'input'" type="checkbox" :checked="row.selected" :disabled="busy || row.state !== 'ready'"
             @change="row.selected = $event.target.checked" />
-          <span class="project-exit-name">{{ row.name }}</span>
+          <span class="project-exit-name">{{ row.name || $t('version.exitUnconfirmedProject') }}</span>
           <span>{{ rowText(row) }}</span>
         </component>
       </div>

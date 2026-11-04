@@ -4,6 +4,7 @@
 // InviteMemberDialog.vue, CloudAcceptDialog.vue): work sessions, drafts, timeline,
 // three-context adopt conflict dialog, Team Case Library collaboration.
 export default {
+  exitUnconfirmedProject: "Unconfirmed project",
   exitCommitUnconfirmed: "A commit result is not yet confirmed. Recheck before exiting, or cancel to return to the app.",
   exitProjectsTitle: "Review project changes before exiting",
   exitProjectsHint: "Select projects to commit. Unselected changes remain saved on this computer.",

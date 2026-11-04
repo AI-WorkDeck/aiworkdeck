@@ -13,7 +13,7 @@ const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8')
 
 // #1488: the project-level action explicitly says commit and explains its result.
 // Keep implementation terms out of the rest of the history UI.
-const COMMIT_COPY = new Set(['exitProgressCommitting', 'exitProgressChecking', 'exitPrompt', 'exitCommit', 'exitSkip', 'exitNewChanges', 'exitCheckFailed', 'pendingFileCount', 'changesAutoRecorded', 'commitHistoryHelp',
+const COMMIT_COPY = new Set(['exitCommitUnconfirmed', 'exitProjectsHint', 'exitProjectsCommit', 'exitProjectsCommitted', 'exitProgressCommitting', 'exitProgressChecking', 'exitPrompt', 'exitCommit', 'exitSkip', 'exitNewChanges', 'exitCheckFailed', 'pendingFileCount', 'changesAutoRecorded', 'commitHistoryHelp',
   'commitLocalHelp', 'commitCloudHelp', 'committingChanges', 'saveBeforeCommitFailed',
   'cloudSubmitFirst', 'endSession', 'noActiveSession', 'nameSessionTitle', 'finish'])
 const ZH_BANNED = /主线|分支|哈希|git|commit/i

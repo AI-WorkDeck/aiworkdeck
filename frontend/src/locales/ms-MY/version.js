@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitUnconfirmedProject: "Projek belum disahkan",
   exitCommitUnconfirmed: "Hasil komit belum disahkan. Semak semula sebelum keluar, atau batalkan untuk kembali ke aplikasi.",
   exitProjectsTitle: "Semak perubahan projek sebelum keluar",
   exitProjectsHint: "Pilih projek untuk dikomit. Perubahan yang tidak dipilih kekal disimpan pada komputer ini.",

@@ -32,7 +32,7 @@ export async function inspectExitProject(row, readStatus) {
 export async function settleExitCommit(row, commit, readStatus) {
   row.state = 'committing'
   row.selected = false
-  unsettled.set(String(row.id), { ...row })
+  unsettled.set(String(row.id), { id: row.id, requestId: row.requestId, receiptEpoch: row.receiptEpoch })
   let result
   try { result = await commit(row.id, row.requestId) } catch { row.state = 'uncertain'; return false }
   if (result?.receiptState === 'FAILED') {
