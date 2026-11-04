@@ -112,7 +112,7 @@ test('落字前必须调用 shouldFlushDocStream 比对，不一致时不执行 
 
 test('doc_open_file_sync 建立流式会话时必须把目标 fileId 记下来，供 flush 前比对', () => {
   const src = stripComments(read('pages/project-overview/agentClientActions.js'))
-  const start = src.indexOf('async _handleEditorOpenFileSyncImpl(action)')
+  const start = src.indexOf('async _handleEditorOpenFileSyncImpl(action, entry = null)')
   assert.ok(start > 0, '找不到 _handleEditorOpenFileSyncImpl')
   const body = src.slice(start, src.indexOf('\n    },', start))
   assert.match(body, /this\._docStreamTargetFileId\s*=\s*file\.id/,
