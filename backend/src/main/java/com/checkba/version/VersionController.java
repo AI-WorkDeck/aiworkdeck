@@ -38,6 +38,17 @@ public class VersionController {
     private final com.checkba.service.telemetry.TelemetryService telemetryService;
     private final VersionLifecycleService lifecycleService;
 
+    // Exit-only receipts live for this process. Never evict and accidentally replay a timed-out write.
+    private final String receiptEpoch = java.util.UUID.randomUUID().toString();
+    private record EndReceiptKey(Long userId, Long projectId, String requestId) {}
+    private static final class EndReceipt {
+        final String title;
+        volatile Map<String, Object> result;
+        EndReceipt(String title) { this.title = title; }
+    }
+    private final java.util.concurrent.ConcurrentMap<EndReceiptKey, EndReceipt> endReceipts =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
     /**
      * 提交署名解析（spec 2026-09-14 §2.1）。字段注入：本类的构造器被
      * GlobalExceptionHandlerAuthCodeTest / VersionFileAccessTest 手工 new，加参数是纯 churn。
@@ -121,6 +132,7 @@ public class VersionController {
         Long userId = requireMember(projectId, sessionId);
         var status = sessionService.exitStatus(projectId);
         Map<String, Object> data = new HashMap<>();
+        data.put("receiptEpoch", receiptEpoch);
         data.put("enabled", status.enabled());
         data.put("working", status.working());
         data.put("changedCount", status.changedCount());
@@ -751,6 +763,38 @@ public class VersionController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = requireWriteMember(projectId, sessionId);
         String title = body == null ? null : body.get("title");
+        String requestId = body == null ? null : body.get("requestId");
+        if (requestId == null || requestId.isBlank()) return ok(endSessionData(projectId, userId, title));
+        // A retry from an earlier backend process is unknown, never a fresh request.
+        if (!requestId.startsWith(receiptEpoch + ":")) return ok(Map.of("receiptState", "UNKNOWN"));
+        try { java.util.UUID.fromString(requestId.substring(receiptEpoch.length() + 1)); }
+        catch (IllegalArgumentException error) {
+            throw VersionException.userFacing(LangText.of("提交标识无效，请重新检查项目", "Invalid submission identifier; please check the project again"));
+        }
+        String normalizedTitle = title == null ? "" : title.trim();
+        var key = new EndReceiptKey(userId, projectId, requestId);
+        var receipt = new EndReceipt(normalizedTitle);
+        var previous = endReceipts.putIfAbsent(key, receipt);
+        if (previous != null) {
+            if (!previous.title.equals(normalizedTitle)) throw VersionException.userFacing(LangText.of(
+                    "同一次提交不能更改标题，请重新检查项目", "The title of an existing submission cannot change; please check the project again"));
+            Map<String, Object> result = previous.result;
+            return ok(result == null ? Map.of("receiptState", "RUNNING") : result);
+        }
+        try {
+            Map<String, Object> data = endSessionData(projectId, userId, title);
+            data.put("receiptState", "SUCCEEDED");
+            receipt.result = data;
+        } catch (RuntimeException error) {
+            log.warn("Exit version submission failed: project={}", projectId, error);
+            String message = error instanceof VersionException version && version.isUserFacing()
+                    ? error.getMessage() : LangText.of("提交未完成，请检查项目后重试", "Submission did not complete; check the project before retrying");
+            receipt.result = Map.of("receiptState", "FAILED", "message", message);
+        }
+        return ok(receipt.result);
+    }
+
+    private Map<String, Object> endSessionData(Long projectId, Long userId, String title) {
         WorkSessionService.SessionEndResult r =
                 sessionService.endSession(projectId, userId, userName(userId), title);
         // notice 非空 = 结束成功但没生成版本（空工作段）。仍然是成功（code=0），
@@ -762,7 +806,7 @@ public class VersionController {
         data.put("notice", r.notice() == null ? "" : r.notice());
         if (r.conflict() != null) data.put("conflict", sessionEndConflictData(r.conflict()));
         trackOp("session_end");
-        return ok(data);
+        return data;
     }
 
     @PostMapping("/session/resolve-end")
