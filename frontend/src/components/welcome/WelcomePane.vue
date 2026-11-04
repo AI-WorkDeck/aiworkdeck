@@ -330,6 +330,7 @@ export default {
       const prompt = (this.quickPrompt || '').trim()
       this.showModelDropdown = false
       this.$emit('start-chat', { prompt, model: this.explicitModel })
+      this.explicitModel = null
       this.quickPrompt = ''
     },
     async loadRecent() {
