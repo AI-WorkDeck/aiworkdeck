@@ -291,13 +291,32 @@ export async function checkNamedProjectEvidence({ page, run, base, files }) {
   }
   const status = await api(`/api/projects/${project.projectId}/version/exit-status`)
   if (status.canCommit) await api(`/api/projects/${project.projectId}/version/session/end`, { title: 'Installed evidence fixture cleanup' })
-  // Native open-file changes workspace in-place, so the browser URL can still be the id-less startup shell.
-  // Use the normal localOpenCoordinator deep-link contract, then require server-loaded identity.
+  const navigation = []
+  const recordNavigation = async stage => {
+    navigation.push(await page.evaluate(stage => {
+      const v = window.__checkbaActiveOverviewVm
+      return { stage, url: location.href, projectId: v?.projectId, projectType: v?.project?.projectType,
+        projectInfoLoaded: v?.projectInfoLoaded, isLooseWorkspace: v?.isLooseWorkspace, looseWorkspaceHint: v?.looseWorkspaceHint }
+    }, stage))
+    fs.writeFileSync(path.join(run, 'named-project-return-navigation.json'), JSON.stringify(navigation, null, 2))
+  }
+  await recordNavigation('before-return')
+  // Uni's kept-alive route key excludes query: same-path hash changes can retain the old page's onLoad identity.
+  // Reload the genuine deep link so onLoad re-reads it; never inject project state or relax identity checks.
   await page.goto(returnURL, { waitUntil: 'domcontentloaded' })
-  await page.waitForFunction(id => {
-    const v = window.__checkbaActiveOverviewVm
-    return v?.projectInfoLoaded && v.isLooseWorkspace && v.projectId === id
-  }, {}, originalWorkspace.projectId)
+  await recordNavigation('after-hash-navigation')
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await recordNavigation('after-document-reload')
+  try {
+    await page.waitForFunction(id => {
+      const v = window.__checkbaActiveOverviewVm
+      return v?.projectInfoLoaded && v.isLooseWorkspace && v.projectId === id
+    }, {}, originalWorkspace.projectId)
+  } catch (error) {
+    await recordNavigation('identity-timeout')
+    throw error
+  }
+  await recordNavigation('identity-confirmed')
   result.returnedLooseProjectId = originalWorkspace.projectId
   return result
 }
