@@ -446,6 +446,18 @@ class AccountServiceTest {
     }
 
     @Test
+    @DisplayName("ai-key upgrade requirement prompts an update and preserves the account")
+    void aiKeyUpgradeRequiredGivesGuidance() {
+        AccountService service = connected();
+        transport.enqueue(409, "{\"error\":\"client_upgrade_required\"}");
+        AccountException e = assertThrows(AccountException.class, service::fetchAiKey);
+        assertEquals(AccountException.Kind.CONFLICT, e.getKind());
+        assertEquals("client_upgrade_required", e.getReason());
+        assertEquals("请更新客户端后重试", e.getMessage());
+        assertEquals(true, service.status().get("connected"));
+    }
+
+    @Test
     @DisplayName("ai-key 409 no_credits：引导去充值，且文案不得像掉线")
     void aiKeyNoCreditsGivesGuidance() {
         AccountService service = connected();
