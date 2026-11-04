@@ -4,7 +4,7 @@ package com.checkba.model.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 @Entity @Data
-@Table(name="cloud_cleanup_job",uniqueConstraints=@UniqueConstraint(columnNames={"userId","caseId"}))
+@Table(name="cloud_cleanup_job",uniqueConstraints=@UniqueConstraint(columnNames={"user_id","case_id"}))
 public class CloudCleanupJob {
  @Id @Column(length=64) private String id;
  @Column(nullable=false) private Long userId;
