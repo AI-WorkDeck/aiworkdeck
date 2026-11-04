@@ -216,10 +216,21 @@ export async function checkExitList({ page, installed, run, base }) {
   return { method, projects, rows, cancelKeptProcessAlive: true, submissionCoverage: 'real API cleanup only; interactive selection/partial failure not covered here' }
 }
 
+export function looseWorkspaceURL(originalURL, projectId) {
+  assert.ok(Number.isSafeInteger(projectId) && projectId > 0, 'Return navigation needs the real loose-file project id')
+  return `${originalURL.split('#')[0]}#/pages/project-overview/project-overview?id=${projectId}&loose=1`
+}
+
 // Project-scoped evidence is intentionally unavailable in the loose-files workspace.
 // Exercise it separately without replacing the four-format loose-file edit/save journey.
 export async function checkNamedProjectEvidence({ page, run, base, files }) {
   const originalURL = page.url()
+  const originalWorkspace = await page.evaluate(() => {
+    const v = window.__checkbaActiveOverviewVm
+    return { projectId: v.projectId, isLooseWorkspace: v.isLooseWorkspace }
+  })
+  assert.equal(originalWorkspace.isLooseWorkspace, true)
+  const returnURL = looseWorkspaceURL(originalURL, originalWorkspace.projectId)
   const localRoot = path.join(run, 'evidence-project')
   fs.mkdirSync(localRoot)
   for (const [ext, file] of Object.entries(files)) fs.copyFileSync(file, path.join(localRoot, `Evidence.${ext}`))
@@ -280,7 +291,13 @@ export async function checkNamedProjectEvidence({ page, run, base, files }) {
   }
   const status = await api(`/api/projects/${project.projectId}/version/exit-status`)
   if (status.canCommit) await api(`/api/projects/${project.projectId}/version/session/end`, { title: 'Installed evidence fixture cleanup' })
-  await page.goto(originalURL, { waitUntil: 'domcontentloaded' })
-  await page.waitForFunction(() => window.__checkbaActiveOverviewVm?.isLooseWorkspace)
+  // Native open-file changes workspace in-place, so the browser URL can still be the id-less startup shell.
+  // Use the normal localOpenCoordinator deep-link contract, then require server-loaded identity.
+  await page.goto(returnURL, { waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(id => {
+    const v = window.__checkbaActiveOverviewVm
+    return v?.projectInfoLoaded && v.isLooseWorkspace && v.projectId === id
+  }, {}, originalWorkspace.projectId)
+  result.returnedLooseProjectId = originalWorkspace.projectId
   return result
 }
