@@ -8,12 +8,12 @@
       <p v-if="loading">{{ $t('version.exitProjectsChecking') }}</p>
       <p v-if="listFailed || commitFailed" role="alert">{{ $t('version.exitCheckFailed') }}</p>
       <div class="project-exit-list">
-        <label v-for="row in visibleRows" :key="row.id">
+        <component :is="'label'" v-for="row in visibleRows" :key="row.id">
           <component :is="'input'" type="checkbox" :checked="row.selected" :disabled="busy || row.state !== 'ready'"
             @change="row.selected = $event.target.checked" />
           <span class="project-exit-name">{{ row.name }}</span>
           <span>{{ rowText(row) }}</span>
-        </label>
+        </component>
       </div>
       <p v-if="!loading && !listFailed && !visibleRows.length">{{ $t('version.noActiveSession') }}</p>
       <footer>
