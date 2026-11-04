@@ -722,6 +722,38 @@ public class WorkSessionService {
         return saved;
     }
 
+    /** Exit checks need one read-only snapshot, not disk usage or conflict document analysis. */
+    public record ExitStatus(boolean enabled, boolean working, long changedCount,
+                             WorkSession onDraft, boolean conflict) {}
+
+    public ExitStatus exitStatus(long projectId) {
+        ReentrantLock lock = repoLock(projectId);
+        if (!lock.tryLock()) throw VersionException.busy(LangText.of(
+                "正在整理版本，请稍后重试", "Version history is busy; please try again shortly"));
+        try {
+            if (!repoService.isInitialized(projectId)) return new ExitStatus(false, false, 0, null, false);
+            WorkSession draft = activeDraftOnBranch(projectId).orElse(null);
+            Optional<WorkSession> active = draft == null ? activeSession(projectId) : Optional.empty();
+            if (repoService.repositoryMerging(projectId)) {
+                return new ExitStatus(true, active.isPresent(), 0, draft, true);
+            }
+            // One working-tree scan; unlike pendingChangesLocked this must not schedule ingestion.
+            Set<String> paths = new HashSet<>();
+            repoService.pendingChanges(projectId).forEach(change -> paths.add(change.path()));
+            if (active.isPresent()) {
+                // Autosaved work already lives in HEAD, but still awaits the same endSession merge.
+                String base = repoService.mergeBase(projectId, repoService.mainBranch(), active.get().getBranchName());
+                if (base == null) throw VersionException.userFacing(LangText.of(
+                        "无法检查本次工作的版本基线，请稍后重试", "Unable to check the work session baseline; please try again shortly"));
+                repoService.diffNameStatus(projectId, base, "HEAD").forEach(change -> paths.add(change.path()));
+            }
+            long count = paths.stream().filter(path -> !path.startsWith(".awd/")).count();
+            return new ExitStatus(true, active.isPresent(), count, draft, false);
+        } finally {
+            lock.unlock();
+        }
+    }
+
     /** /status 不等待耗时提交，避免查询请求与数据库连接排队耗尽。 */
     public List<FileChange> pendingChangesLocked(long projectId) {
         ReentrantLock lock = repoLock(projectId);

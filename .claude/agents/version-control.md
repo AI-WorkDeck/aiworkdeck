@@ -1065,3 +1065,11 @@ cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='Inte
 `GET /api/projects/{projectId}/files/changes` 是本机项目专用 SSE（`LocalProjectFileChangeController`）：仅 local-mode，校验当前身份、项目读取权限、非 CLIENT 角色及 localRoot。事件 `ready` / `files_changed` / `ping` 只携带 projectId，不携带文件名或绝对路径；发事件前重查权限，撤权后关流；15 秒心跳，完成/异常/停止时释放订阅。`OpenEntityManagerInViewConfig` 的排除路径必须包含 `/api/projects/*/files/changes`，不得让长连接占住 JDBC 连接。
 
 前端 `projectFileChanges.js` 用 fetch 流携带既有认证头；ready 与变化重拉列表，ping 只续期，45 秒断流检测，短连接1–30秒退避，401/403/404停止。切项目/卸载abort；重连ready补读断线期间变化。文件树请求序号防止回焦时旧列表覆盖对账后的新列表。窗口focus刷新仍保留为补充，不再是外部移动后的唯一刷新来源。
+
+## 退出前轻量项目检查（dev-board#1685/#1687）
+
+`GET /api/projects/{id}/version/exit-status` 继续成员且非客户鉴权，返回 `enabled/working/changedCount/onDraft/conflict/canCommit`。`WorkSessionService.exitStatus` 在现有项目锁下用 `tryLock` 获取一致只读快照，忙时仍报 423；不触发 pending ingest、不遍历版本容量、不查询云端或解析冲突文档。冲突时 `conflict:true/canCommit:false`，不把省略细节误报为可提交。只读成员仍可读摘要，但 `canCommit:false`。
+
+普通工作段的 `changedCount` 合并工作区未存档路径与 merge-base→HEAD 已自动存档路径，去重并排除 `.awd/`；不能仅看工作区相对 HEAD，否则自动存档后会错误显示零改动。草稿沿 `endSessionOnDraft` 语义只算未存档路径，不暗中采纳整稿。工作段存在但用户可见净差异为零时仍可主动结束，沿既有 `endSession` 空段/元数据处理。只省非必要查询，不省磁盘改动核对；超大工作区仍可能因只读状态扫描耗时，不能承诺固定响应时限。
+
+回归：`VersionExitStatusTest`（权限、冲突、草稿、禁用、忙锁、无容量/后台调度）、`WorkSessionServiceTest`（真实 JGit 自动存档/未存档计数与结束后归零、4000 条合成历史目录六轮新旧端点比较）；合成性能数据不能代表用户现场保存失败已独立复现。
