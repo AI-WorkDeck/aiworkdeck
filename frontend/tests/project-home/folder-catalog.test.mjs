@@ -45,7 +45,7 @@ test('CLIENT cannot invoke mutation methods even outside the hidden controls', a
 const welcomeSource = readFileSync(new URL('../../src/components/welcome/WelcomePane.vue', import.meta.url), 'utf8')
 function welcomeFixture() {
   const code = welcomeSource.slice(welcomeSource.indexOf('<script>') + 8, welcomeSource.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'globalThis.component =')
-  const context = { CloudAcceptDialog: {}, FolderCatalog: {}, AccountProjectCatalog: {}, buildRecentProjects: list => list, getRecentProjectIds: () => [] }
+  const context = { ModelSelectorDropdown: {}, CloudAcceptDialog: {}, FolderCatalog: {}, AccountProjectCatalog: {}, buildRecentProjects: list => list, getRecentProjectIds: () => [] }
   vm.runInNewContext(code, context)
   const state = { currentProjectId: 7, allProjects: [{id:7,name:'old'}], $emit: (...args) => events.push(args), leaveWorkbench: url => visits.push(url) }
   const visits = [], events = []
