@@ -52,6 +52,26 @@
         >{{ siteSegLabel(s) }}</span>
       </div>
 
+      <!-- 大陆站：手机号/口令登录 与 包晴天律师扫码登录 顶部分段切换（dev-board#1665） -->
+      <div
+        v-if="isPhoneSite && bqtScanEnabled && (mode === 'login' || mode === 'bqt')"
+        class="unlock-site-seg"
+        style="margin-top: 8px; margin-bottom: 16px;"
+      >
+        <span
+          class="unlock-site-seg-item"
+          :class="{ 'is-active': mode === 'login' }"
+          role="button"
+          @click="switchMode('login')"
+        >{{ $t('account.bqtScanBack') }}</span>
+        <span
+          class="unlock-site-seg-item"
+          :class="{ 'is-active': mode === 'bqt' }"
+          role="button"
+          @click="switchMode('bqt')"
+        >{{ $t('account.bqtScanSwitch') }}</span>
+      </div>
+
       <!-- 登录与注册是同一条链路（官网验证码端点「不存在即注册」）。用 v-show：
            人机验证控件挂在这块里，切到 Key 模式再切回来时 DOM 不能被销毁重建 -->
       <div v-show="mode === 'login'" class="unlock-main">
