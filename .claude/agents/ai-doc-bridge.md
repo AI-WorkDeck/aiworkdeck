@@ -7,6 +7,12 @@ description: AI↔文档编辑桥接领域。任务涉及 doc_*/sheet_*/slide_* 
 
 职责边界：AI 侧发出编辑指令 → 编辑器执行 的整条链路。不含编辑器内核本身（那是 doc-editor 领域），不含对话编排（ai-chat 领域）。
 
+## 新建文档打开与下一步编辑（2026-11-04，dev-board#1707）
+
+`doc_open_file` 与 `editor_command` 携带工具上下文的 `editorRunId`，编辑命令另带可信 `targetFileId`，不能用模型参数中的 fileId 替代。打开事件附 conversationId；前端在读取文件详情之前登记目标屏障，等待对应 executor 就绪，不能借用仍活动的参考文档执行器。新轮次清退旧屏障，已观察且退休的轮次拒绝迟到命令；用户切换、打开失败及详情请求超时禁止迟到打开抢焦点。已打开但加载未完返回 `EDITOR_BOOTING` 可重试。实际执行前再次核对目标。同轮工具显式打开的目标优先于可能滞后的上下文 activeFileId（pptx_open_file/pdf_to_word 等）；命令开始时捕获该打开条目，不能执行前改派到后来打开的文件。同步 doc_open_file_sync 也须替换屏障并等待真实目标后才能初始化流。
+
+Word/PPT/Excel 共用此路由；PDF 不借用旧 Office executor。无上下文标识的旧调用保持兼容路径。该机制不是完整取消协议，不能保证识别从未观察过的迟到旧轮次。回归 `agent-open-target.test.mjs` 与 `EditorBridgeServiceTest` 为合成消息/路由测试，不代表用户安装包或真实编辑器自动保存重开验收。
+
 ## PPT 精确编辑与参考复核（2026-10-28，dev-board#1570/#1571/#1572）
 
 `DocumentEditTools.slide_create_file` 创建原生可编辑的单页空白 PPTX（960×540 pt），沿用项目/目录权限、文件位置回包和打开刷新链；无需图片生成服务。随后自由组合 `slide_*` 原语，不把新建演示文稿等同于图片型生成。

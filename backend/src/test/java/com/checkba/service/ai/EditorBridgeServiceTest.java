@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -38,6 +39,45 @@ class EditorBridgeServiceTest {
         Field f = EditorBridgeService.class.getDeclaredField("ACTION_TIMEOUT_SECONDS");
         f.setAccessible(true);
         return (Map<String, Integer>) f.get(null);
+    }
+
+    @Test
+    void editorActionsCarryTrustedRunAndTargetIdentity() throws Exception {
+        SseEmitterService sse = mock(SseEmitterService.class);
+        ObjectMapper mapper = new ObjectMapper();
+        EditorBridgeService bridge = new EditorBridgeService(sse, mapper,
+                mock(com.checkba.service.telemetry.TelemetryService.class));
+        bridge.setCurrentConversationId("conv-identity");
+        List<com.fasterxml.jackson.databind.JsonNode> sent = new ArrayList<>();
+        doAnswer(inv -> {
+            var payload = mapper.readTree((String) inv.getArgument(2));
+            sent.add(payload);
+            if (payload.has("requestId")) bridge.completeEditorAction(payload.path("requestId").asText(),
+                    "conv-identity", true, Map.of("done", true), null);
+            return null;
+        }).when(sse).send(anyString(), anyString(), anyString());
+        try {
+            com.checkba.service.ai.tools.ToolContextHolder.set(new com.checkba.service.ai.tools.ToolContext(
+                    1L, "conv-identity", 2L, null, List.of(), java.util.Set.of(), "run-identity",
+                    java.util.Set.of(), null, null, 42L));
+            var file = new com.checkba.model.entity.ProjectFile();
+            file.setId(42L);
+            file.setName("new.pptx");
+            bridge.sendOpenFileAction(file);
+            bridge.executeEditorCommand("slide_get_overview", Map.of("fileId", 999L));
+            assertEquals("conv-identity", sent.get(0).path("conversationId").asText());
+            assertEquals("run-identity", sent.get(0).path("editorRunId").asText());
+            assertEquals(42L, sent.get(0).path("fileId").asLong());
+            assertEquals("run-identity", sent.get(1).path("editorRunId").asText());
+            assertEquals(42L, sent.get(1).path("targetFileId").asLong());
+            com.checkba.service.ai.tools.ToolContextHolder.clear();
+            bridge.executeEditorCommand("get_selection", Map.of());
+            assertFalse(sent.get(2).has("editorRunId"));
+            assertFalse(sent.get(2).has("targetFileId"));
+        } finally {
+            com.checkba.service.ai.tools.ToolContextHolder.clear();
+            bridge.clearCurrentConversationId();
+        }
     }
 
     @Test

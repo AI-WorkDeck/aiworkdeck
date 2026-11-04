@@ -512,6 +512,7 @@ public class EditorBridgeService {
         try {
             Map<String, Object> fields = new java.util.HashMap<>();
             fields.put("fileId", file.getId());
+            attachEditorIdentity(fields, conversationId, false);
             fields.put("fileName", file.getName());
             fields.put("fileType", file.getFileType());
             fields.put("wpsFileId", file.getWpsFileId() != null ? file.getWpsFileId() : "");
@@ -595,6 +596,15 @@ public class EditorBridgeService {
         } catch (Exception e) {
             log.warn("Failed to send client_action {} to {}: {}", action, conversationId, e.getMessage());
         }
+    }
+
+    // Identity comes from the executing tool, never from a model-supplied parameter.
+    private void attachEditorIdentity(Map<String, Object> payload, String conversationId, boolean includeTarget) {
+        payload.put("conversationId", conversationId);
+        var context = com.checkba.service.ai.tools.ToolContextHolder.get();
+        if (context == null || !conversationId.equals(context.conversationId())) return;
+        if (context.runId() != null) payload.put("editorRunId", context.runId());
+        if (includeTarget && context.activeFileId() != null) payload.put("targetFileId", context.activeFileId());
     }
 
     /**
@@ -742,6 +752,7 @@ public class EditorBridgeService {
             payloadMap.put("requestId", requestId);
             payloadMap.put("conversationId", conversationId);
             payloadMap.put("tool", "editor_command");
+            attachEditorIdentity(payloadMap, conversationId, true);
             sseEmitterService.send(conversationId, "client_action", objectMapper.writeValueAsString(payloadMap));
             log.info("Sent editor command: action={}, requestId={}", action, requestId);
 
