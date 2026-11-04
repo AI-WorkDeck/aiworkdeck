@@ -119,6 +119,6 @@ test('接线核实：公开方法只是薄封装，真正的逻辑在 _handleEdi
   const end = src.indexOf('async _handleEditorOpenFileSyncImpl', start)
   const body = src.slice(start, end)
   assert.match(body, /createSerialQueue\(\)/, '必须用 createSerialQueue 建队列')
-  assert.match(body, /this\._docOpenSyncQueue\(\(\) => this\._handleEditorOpenFileSyncImpl\(action\)\)/,
+  assert.match(body, /this\._docOpenSyncQueue\(\(\) => this\._handleEditorOpenFileSyncImpl\(action, entry\)\)/,
     '必须把真正的实现接进队列，而不是直接跑')
 })

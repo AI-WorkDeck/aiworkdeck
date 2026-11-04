@@ -129,6 +129,14 @@ public class XmlToolCallParser {
                 cursor = end + 1 + fence.length();
                 continue;
             }
+            if (content.startsWith("<ask_user>", cursor)) {
+                BareAsk parsed = parameterAskArguments(content, cursor + 10);
+                if (parsed == null) return List.of();
+                calls.add(new LocatedCall(cursor, new ParsedCall("ask_user", parsed.argsJson(),
+                        content.substring(cursor, parsed.end()))));
+                cursor = parsed.end();
+                continue;
+            }
             if (content.startsWith("<ask_user", cursor)
                     && cursor + 9 < content.length()
                     && (Character.isWhitespace(content.charAt(cursor + 9)) || content.charAt(cursor + 9) == '/')) {
@@ -159,6 +167,36 @@ public class XmlToolCallParser {
             }
         }
         return processDepth == 0 ? calls : List.of();
+    }
+
+    // Only a complete parameter-style call at the same strict protocol boundary as
+    // the self-closing alias is recoverable. Never scan prose or opaque containers.
+    private BareAsk parameterAskArguments(String content, int cursor) {
+        var args = JSON.createObjectNode();
+        while (cursor < content.length()) {
+            while (cursor < content.length() && Character.isWhitespace(content.charAt(cursor))) cursor++;
+            if (content.startsWith("</ask_user>", cursor)) {
+                return args.has("question") && !args.path("question").asText().isBlank()
+                        ? new BareAsk(cursor + 11, args.toString()) : null;
+            }
+            if (!content.startsWith("<parameter=", cursor)) return null;
+            int headEnd = content.indexOf('>', cursor);
+            int end = content.indexOf("</parameter>", headEnd + 1);
+            if (headEnd < 0 || end < 0) return null;
+            String key = content.substring(cursor + 11, headEnd);
+            if (!java.util.Set.of("question", "options", "header", "multi_select").contains(key)
+                    || args.has(key)) return null;
+            String value = content.substring(headEnd + 1, end).trim();
+            try {
+                if ("options".equals(key) || "multi_select".equals(key)) {
+                    var node = JSON.readTree(value);
+                    if (node == null || ("options".equals(key) ? !node.isArray() : !node.isBoolean())) return null;
+                    args.set(key, node);
+                } else args.put(key, value);
+            } catch (java.io.IOException invalid) { return null; }
+            cursor = end + 12;
+        }
+        return null;
     }
 
     private record BareAsk(int end, String argsJson) {}

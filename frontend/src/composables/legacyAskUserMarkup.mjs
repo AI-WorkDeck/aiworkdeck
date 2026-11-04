@@ -9,6 +9,24 @@ const CLOSE = '</ask_user>'
 function readQuestion(raw, terminal = false) {
   const end = raw.endsWith(CLOSE) ? raw.slice(OPEN.length, -CLOSE.length) : terminal ? raw.slice(OPEN.length) : null
   if (end == null) return null
+  // Parameter-style calls require the closing wrapper: incomplete calls are not
+  // actionable. This remains display-only; server validation owns execution.
+  if (/^\s*<parameter=/.test(end) && raw.endsWith(CLOSE)) {
+    let rest = end.trim()
+    const args = {}
+    while (rest) {
+      const field = /^<parameter=(question|options|header|multi_select)>([\s\S]*?)<\/parameter>/.exec(rest)
+      if (!field || Object.hasOwn(args, field[1])) return null
+      const [, key, value] = field
+      try { args[key] = ['options', 'multi_select'].includes(key) ? JSON.parse(value) : value.trim() } catch { return null }
+      rest = rest.slice(field[0].length).trim()
+    }
+    if (!args.question || (Object.hasOwn(args, 'multi_select') && typeof args.multi_select !== 'boolean')) return null
+    const options = Object.hasOwn(args, 'options') ? args.options : []
+    if (!Array.isArray(options) || options.some(o => !o || typeof o.label !== 'string' || !o.label.trim()
+      || (o.description != null && typeof o.description !== 'string'))) return null
+    return { question: args.question, options, header: args.header, multiSelect: args.multi_select ?? false }
+  }
   const match = /^\s*<question>([\s\S]*?)<\/question>\s*(?:<options>([\s\S]*?)<\/options>\s*)?$/.exec(end)
   if (!match || !match[1].trim()) return null
   let options = []

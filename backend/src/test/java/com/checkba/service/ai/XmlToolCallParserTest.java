@@ -399,6 +399,40 @@ class XmlToolCallParserTest {
     }
 
     @Test
+    void parameterAskUserRequiresCompleteStandaloneProtocol() {
+        String tag = "<ask_user><parameter=question>继续？</parameter>"
+                + "<parameter=options>[{\"label\":\"继续\"},{\"label\":\"稍后\"}]</parameter>"
+                + "<parameter=header>方式</parameter><parameter=multi_select>false</parameter></ask_user>";
+        var question = AskUserQuestion.fromArgsJson(single(tag).argsJson(), "test");
+        assertEquals("继续？", question.question());
+        assertEquals("方式", question.header());
+        assertEquals(2, question.options().size());
+        String singleOption = tag.replace(",{\"label\":\"稍后\"}", "");
+        assertThrows(IllegalArgumentException.class,
+                () -> AskUserQuestion.fromArgsJson(single(singleOption).argsJson(), "test"));
+        assertTrue(parser.containsToolCall("<thinking>确认方案</thinking>" + tag));
+        for (String text : List.of("说明：" + tag, "示例：\n" + tag, "```xml\n" + tag + "\n```",
+                "<thinking>" + tag + "</thinking>", "<final>" + tag + "</final>",
+                "<example>" + tag + "</example>", "<!--" + tag + "-->",
+                tag.replace("</ask_user>", ""), tag.replace("false", "invalid"),
+                tag.replace("<parameter=header>", "<parameter=unknown>"),
+                tag.replace("<parameter=header>方式</parameter>", "<parameter=question>重复</parameter>"))) {
+            assertFalse(parser.containsToolCall(text), text);
+            assertTrue(parser.parse(text).isEmpty(), text);
+        }
+    }
+
+    @Test
+    void parameterAskUserRejectsExplicitNullFields() {
+        for (String key : List.of("options", "multi_select")) {
+            String text = "<ask_user><parameter=question>继续？</parameter><parameter="
+                    + key + ">null</parameter></ask_user>";
+            assertFalse(parser.containsToolCall(text));
+            assertTrue(parser.parse(text).isEmpty());
+        }
+    }
+
+    @Test
     void bareAskUserAcceptsBothObservedOptionsQuoteStyles() {
         String options = "[{\"label\":\"删除审查意见\",\"description\":\"正文不动\"},{\"label\":\"统一格式排版\"}]";
         for (String quote : List.of("'", "\"")) {
