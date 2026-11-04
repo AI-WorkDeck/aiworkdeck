@@ -14,7 +14,11 @@ import { spawn, execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import puppeteer from 'puppeteer-core'
 import JSZip from 'jszip'
-import { checkWelcomeModel, checkDocumentChrome, checkWriterReplacement, checkClosedDocument, checkExitList } from './installed-release-checks.mjs'
+import { checkWelcomeModel, checkDocumentChrome, checkNamedProjectEvidence, checkClosedDocument, checkExitList } from './installed-release-checks.mjs'
+
+function diagnosticUrl(value) {
+  try { const u = new URL(value); return `${u.protocol}//${u.host}${u.pathname}` } catch { return '' }
+}
 
 function businessErrorFields(value) {
   if (!value || typeof value !== 'object'
@@ -327,19 +331,24 @@ try {
       evidence.pageErrors ||= []; evidence.pageErrors.push(error.message)
       evidence.pageErrorDetails ||= []; evidence.pageErrorDetails.push({ message: error.message, stack: error.stack })
     })
-    const safeUrl = value => {
-      try { const u = new URL(value); return `${u.protocol}//${u.host}${u.pathname}` } catch (_) { return '' }
-    }
+    const safeUrl = diagnosticUrl
     const recordRenderer = record => {
       evidence.rendererDiagnostics ||= []
       if (evidence.rendererDiagnostics.length >= 50) return
       evidence.rendererDiagnostics.push(record)
       write('renderer-diagnostics.json', evidence.rendererDiagnostics)
     }
+    const safeText = value => String(value || '').replace(/(?:https?|file):\/\/[^\s"'<>]+/g, safeUrl).slice(0, 4096)
     page.on('console', async message => {
+      // Production editor failures/logs are console.log, not warn/error. Preserve them before cleanup destroys the guest.
+      if (message.type() === 'log' && message.text().startsWith('[libre-editor]') && !message.text().includes('QRect(')) {
+        evidence.editorDiagnostics ||= []
+        evidence.editorDiagnostics.push({ capturedAt: new Date().toISOString(), text: safeText(message.text()) })
+        if (evidence.editorDiagnostics.length > 200) evidence.editorDiagnostics.shift()
+        write('editor-diagnostics.json', evidence.editorDiagnostics)
+      }
       if (!['warn', 'error'].includes(message.type())) return
       const location = message.location()
-      const safeText = value => String(value || '').replace(/(?:https?|file):\/\/[^\s"'<>]+/g, safeUrl).slice(0, 4096)
       const record = { kind: 'console', type: message.type(), capturedAt: new Date().toISOString(),
         text: safeText(message.text()),
         errors: message.args().map(arg => arg.remoteObject()).filter(arg => arg.subtype === 'error').map(arg => safeText(arg.description)),
@@ -471,17 +480,6 @@ try {
     await close(ext)
     if (installedMode) evidence.releaseDocuments[ext].closedScreenshot = await checkClosedDocument({ page, run, ext })
   }
-  if (installedMode) {
-    const originalDocx = files.docx
-    files.docx = path.join(home, 'Second Writer.docx')
-    fs.copyFileSync(originalDocx, files.docx)
-    try {
-      await open('docx')
-      await sleep(2000)
-      evidence.releaseSecondWriter = await checkWriterReplacement({ page, run, previousId: evidence.releaseDocuments.docx.fileId })
-      await close('docx')
-    } finally { files.docx = originalDocx }
-  }
   await open('pdf')
   await sleep(2000)
   await assertLocalWorkspaceUnobstructed()
@@ -499,6 +497,7 @@ try {
   if (installedMode) {
     await page.evaluate(() => localStorage.setItem('electron-cloud-restart', 'retained'))
     await close('pdf')
+    evidence.namedProjectEvidence = await checkNamedProjectEvidence({ page, run, base, files })
     await assertLocalWorkspaceUnobstructed()
     const { checkDesktopInteractions } = await import('./installed-desktop-interactions.mjs')
     evidence.desktop = await checkDesktopInteractions({ page, browser, mainRpc: installed.mainRpc, run })
@@ -524,6 +523,29 @@ try {
 } catch (error) {
   evidence.error = error.stack
   write('result.json', evidence) // Preserve the original failure before screenshot/cleanup work.
+  if (page && browser) {
+    try {
+      write('failure-editor-state.json', await page.evaluate(() => {
+        const v = window.__checkbaActiveOverviewVm
+        const safeUrl = value => { try { const u = new URL(value); return `${u.protocol}//${u.host}${u.pathname}` } catch { return '' } }
+        const safeText = value => String(value || '').replace(/(?:https?|file):\/\/[^\s"'<>]+/g, safeUrl).slice(0, 4096)
+        return { capturedAt: new Date().toISOString(), url: safeUrl(location.href), projectId: v?.projectId,
+          activeFile: v?.activeFileLeft && { id: v.activeFileLeft.id, name: v.activeFileLeft.name },
+          editors: Object.values(v?._libreRefs || {}).filter(Boolean).map(e => ({
+            file: e.file && { id: e.file.id, name: e.file.name, fileSize: e.file.fileSize, fileType: e.file.fileType },
+            ready: e.ready, statusKey: e.statusKey, docKind: e.docKind, docLoadFailed: e.docLoadFailed,
+            openFailCode: safeText(e.openFailCode), bootFailReason: safeText(e.bootFailReason), chromeInitialized: e.chromeInitialized,
+            docLoadSeq: e._docLoadSeq, loadGeneration: e._loadGen, loadGenAtFailure: e._loadGenAtFailure,
+            loadInFlight: e._loadInFlight ? { seq: e._loadInFlight.seq } : null, loadStartedAt: e._loadStartedAt, loadSelfHealed: e._loadSelfHealed,
+            adoptedSpare: !!e._adoptedSpare, initialDocument: typeof e._initialDocument === 'boolean' ? e._initialDocument : { type: typeof e._initialDocument },
+            downloadLoaded: e.dlLoaded, downloadTotal: e.dlTotal, log: String(e.log || '').split('\n').slice(-200).map(safeText),
+            guestURL: safeUrl(e.webviewEl?.getAttribute('src')),
+            guestId: (() => { try { return e.webviewEl?.getWebContentsId?.() } catch { return null } })(),
+          })) }
+      }))
+      write('failure-live-targets.json', browser.targets().map(t => ({ type: t.type(), url: diagnosticUrl(t.url()), targetId: t._targetId })))
+    } catch (diagnosticError) { write('failure-editor-diagnostic-error.json', { message: diagnosticError.message }) }
+  }
   if (page && browser) await page.screenshot({ path: path.join(run, 'failure.png') }).catch(() => {})
   throw error
 } finally {

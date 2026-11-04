@@ -19,6 +19,7 @@ if (-not $IsWindows -or $env:GITHUB_ACTIONS -ne 'true' -or -not $env:RUNNER_TEMP
 }
 if ($Mechanism -eq 'LegacyHelper' -and $ExitMode -eq 'Reopen') { throw 'The released old shell has no install lock; Reopen requires AppUpdater baseline.' }
 if ([version]$CandidateVersion -le [version]$OldVersion) { throw 'Candidate must be newer than baseline.' }
+if ($Mechanism -eq 'AppUpdater' -and ([version]$CandidateVersion).Major -eq ([version]$OldVersion).Major -and ([version]$CandidateVersion).Minor -eq ([version]$OldVersion).Minor) { throw 'Native AppUpdater QA requires different update channels; same-channel releases use patches.' }
 $OldInstaller = (Resolve-Path -LiteralPath $OldInstaller).Path
 $CandidateInstaller = (Resolve-Path -LiteralPath $CandidateInstaller).Path
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
@@ -129,7 +130,16 @@ function Close-App($Process) {
 try {
     Signature $OldInstaller
     Signature $CandidateInstaller
-    $p = Start-Process -FilePath $OldInstaller -ArgumentList "/S /D=`"$installDir`"" -PassThru
+    # Parser changed between builder 24 and 26; bind the syntax to the verified baseline lockfile.
+    $baselineBuild = Get-Content (Join-Path $OutDir 'baseline-build.json') -Raw | ConvertFrom-Json
+    $baselineBuilder = Get-Content (Join-Path $OutDir 'baseline-installer-builder.json') -Raw | ConvertFrom-Json
+    Assert-That ($baselineBuilder.sourceSha -ceq $baselineBuild.head_sha) 'Baseline installer parser bound to verified source'
+    $oldArguments = switch ($baselineBuilder.directoryStyle) {
+        'quoted' { "/S /D=`"$installDir`"" }
+        'unquoted' { "/S /D=$installDir" }
+        default { throw 'Unknown baseline NSIS directory syntax' }
+    }
+    $p = Start-Process -FilePath $OldInstaller -ArgumentList $oldArguments -PassThru
     Assert-That ($p.WaitForExit(300000)) 'Old NSIS completed within five minutes'
     $p.Refresh()
     Assert-That ($p.ExitCode -eq 0) 'Old NSIS exit code zero'
