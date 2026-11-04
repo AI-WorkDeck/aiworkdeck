@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cloudAccessRefresh: "Quyền truy cập đám mây đã thay đổi. Hãy tải lại trang hoặc mở lại ứng dụng trước khi tiếp tục. Tệp trên máy sẽ không bị xóa.",
   workspaceSessionUnavailable: "Không thể khôi phục phiên làm việc",
   "confirm": "Xác nhận",
   "cancel": "Hủy",

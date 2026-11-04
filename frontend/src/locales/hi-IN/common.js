@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cloudAccessRefresh: "क्लाउड की पहुँच बदल गई है। आगे बढ़ने से पहले पेज रीफ़्रेश करें या ऐप फिर से खोलें। स्थानीय फ़ाइलें नहीं हटाई जाएँगी।",
   workspaceSessionUnavailable: "कार्यस्थान का सत्र बहाल नहीं किया जा सका",
   "confirm": "ठीक है",
   "cancel": "रद्द करें",

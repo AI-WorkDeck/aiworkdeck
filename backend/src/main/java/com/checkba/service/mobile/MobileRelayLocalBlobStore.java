@@ -60,6 +60,20 @@ public final class MobileRelayLocalBlobStore implements MobileRelayBlobStore {
     }
 
     @Override
+    public boolean ownedLocator(Long userId,String locator) {
+        if(userId==null || locator==null) return false;
+        try {
+            Path path=Path.of(locator).toAbsolutePath();
+            if(!path.equals(path.normalize())) return false;
+            Path relay=relayRoot.resolve(userId.toString()), backup=relayRoot.resolveSibling("mobile-backup").resolve(userId.toString());
+            if(!relay.equals(path.getParent()) && !backup.equals(path.getParent())) return false;
+            for(Path current=path;current!=null && current.startsWith(relayRoot.getParent());current=current.getParent())
+                if(Files.isSymbolicLink(current)) return false;
+            return true;
+        } catch(RuntimeException invalid) { return false; }
+    }
+
+    @Override
     public InputStream open(String locator) throws IOException {
         return Files.newInputStream(safeLocatorPath(locator));
     }

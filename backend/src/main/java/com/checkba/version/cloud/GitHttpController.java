@@ -48,6 +48,11 @@ public class GitHttpController {
     static final String UPLOAD_PACK = "git-upload-pack";
     static final String RECEIVE_PACK = "git-receive-pack";
 
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.service.mobile.CloudProtocolDownloadService downloads;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private CloudGitWriteGuard cloudWrites;
+
     private final ProjectRepoService repoService;
     private final GitAccessService access;
     private final WorkSessionService sessionService;
@@ -80,6 +85,30 @@ public class GitHttpController {
         }
         MemoryRealm realm = MemoryRealm.parse(name);
         return realm == null ? null : new RepoTarget(null, realm);
+    }
+
+    /** Repo-scoped capability avoids exposing the payer's balance to collaborators. */
+    @GetMapping("/{repo}.git/awd-cloud-state")
+    public java.util.Map<String,Object> cloudState(@PathVariable String repo, HttpServletRequest request,
+            HttpServletResponse response) throws IOException {
+        RepoTarget target=parseRepoName(repo);
+        if(target==null){response.sendError(404);return null;}
+        if(authorizeOrDeny(response,()->authorizeTarget(request,target,false))==null)return null;
+        if(cloudWrites==null)return java.util.Map.of("cloudAccess",java.util.Map.of("epoch",0,"canWrite",true));
+        try {return cloudWrites.state(projectOwnerTarget(target),personalOwnerTarget(target));}
+        catch(GitAccessDeniedException denied){response.sendError(denied.statusCode());return null;}
+    }
+
+    private Long projectOwnerTarget(RepoTarget target) {
+        if(target.projectId()!=null)return target.projectId();
+        return target.memoryRealm().kind()==MemoryRealm.Kind.PROJECT?target.memoryRealm().ownerId():null;
+    }
+    private Long personalOwnerTarget(RepoTarget target) {
+        return target.memoryRealm()!=null&&target.memoryRealm().kind()==MemoryRealm.Kind.USER?target.memoryRealm().ownerId():null;
+    }
+    private void cloudWrite(RepoTarget target,Runnable operation) {
+        if(cloudWrites==null)operation.run();
+        else cloudWrites.write(projectOwnerTarget(target),personalOwnerTarget(target),operation);
     }
 
     @GetMapping("/{repo}.git/info/refs")
@@ -155,7 +184,13 @@ public class GitHttpController {
             try (Repository repository = openTarget(target)) {
                 UploadPack up = new UploadPack(repository);
                 up.setBiDirectionalPipe(false);
-                up.upload(body(request), response.getOutputStream(), null);
+                if(downloads!=null && downloads.enabled()) {
+                    java.nio.file.Path snapshot=java.nio.file.Files.createTempFile("cloud-git-export-", ".pack");
+                    try {
+                        try(var output=java.nio.file.Files.newOutputStream(snapshot)) {up.upload(body(request),output,null);}
+                        downloads.deliver(who.userId(),"git:"+repo,java.nio.file.Files.newInputStream(snapshot),java.nio.file.Files.size(snapshot),request,response);
+                    } finally {java.nio.file.Files.deleteIfExists(snapshot);}
+                } else up.upload(body(request), response.getOutputStream(), null);
             }
         } catch (ZipException e) {
             // 请求体不是合法的 gzip 流，是客户端的问题，不是服务端错误
@@ -190,13 +225,13 @@ public class GitHttpController {
                 ReceivePack rp = new ReceivePack(repository);
                 rp.setBiDirectionalPipe(false);
                 configureReceivePack(rp, target, who);
-                runReceiveLocked(target, () -> {
+                runReceiveLocked(target, () -> cloudWrite(target, () -> {
                     try {
                         rp.receive(body(request), response.getOutputStream(), null);
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
-                });
+                }));
             }
         } catch (ZipException e) {
             // 请求体不是合法的 gzip 流，是客户端的问题，不是服务端错误
@@ -229,7 +264,7 @@ public class GitHttpController {
         }
         String repoKey = target.memoryRealm().repoKey();
         if (!memoryRepoService.isInitialized(repoKey)) {
-            memoryRepoService.init(repoKey);
+            runReceiveLocked(target, () -> cloudWrite(target, () -> memoryRepoService.init(repoKey)));
         }
         return true;
     }

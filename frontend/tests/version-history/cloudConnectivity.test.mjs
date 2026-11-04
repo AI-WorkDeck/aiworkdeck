@@ -155,7 +155,7 @@ test('real API observation factory scopes by current backend and session', async
   assert.equal((await observe(5, 'status', () => Promise.resolve(cached))).data.offline, undefined)
 })
 
-function accountApiFixture(request) {
+function accountApiFixture(request, cloudEpochGate) {
   const source = fs.readFileSync(new URL('../../src/services/api.js', import.meta.url), 'utf8')
   const names = ['getAccountStatus', 'connectAccount', 'loginAccount', 'disconnectAccount', 'activateLicense', 'deactivateLicense', 'selectSite']
   const functions = names.map(name => {
@@ -164,24 +164,26 @@ function accountApiFixture(request) {
   }).join('\n')
   const start = source.indexOf('let cloudAccountGeneration =')
   const lifecycle = source.slice(start, source.indexOf('\n\n/**', start)).replace('export function', 'function')
-  return new Function('createCloudConnectivity', 'getApiBaseUrl', 'getSessionId', 'request', 'unwrapEnvelope',
+  return new Function('createCloudConnectivity', 'getApiBaseUrl', 'getSessionId', 'request', 'unwrapEnvelope', 'cloudEpochGate',
     `${lifecycle}\n${functions}\nreturn { ${names.join(',')}, observe: observeCloudConnectivity, generation: getCloudAccountGeneration }`)(
     createCloudConnectivity, () => 'http://synthetic.invalid', () => 'unchanged-local-session', request,
-    result => result?.data || result)
+    result => result?.data || result, cloudEpochGate)
 }
 
 test('real desktop account mutation exits invalidate cloud observations even when local session is unchanged', async () => {
   const names = ['connectAccount', 'loginAccount', 'disconnectAccount', 'activateLicense', 'deactivateLicense', 'selectSite']
   for (const name of names) {
     let reject = false
+    let cleared = 0
     const fixture = accountApiFixture(async () => {
       if (reject) throw new Error('synthetic account mutation failed')
       return { code: 0, data: { connected: true } }
-    })
+    }, { clear() { cleared++ } })
     await fixture.observe(5, 'update', () => response({ status: 'OFFLINE' }))
     const old = deferred(), pending = fixture.observe(5, 'check', () => old.promise)
     await fixture[name]('synthetic-only')
     assert.equal(fixture.generation(), 1, name)
+    assert.equal(cleared, 1, 'successful identity mutation must invalidate write authorization')
     assert.equal((await fixture.observe(5, 'status', () => Promise.resolve(cached))).data.offline, undefined, name)
     old.resolve(cached)
     await assert.rejects(pending, error => error.aborted, name)
@@ -191,6 +193,7 @@ test('real desktop account mutation exits invalidate cloud observations even whe
     reject = true
     await assert.rejects(fixture[name]('synthetic-only'))
     assert.equal(fixture.generation(), 1, 'failed account mutation must preserve prior identity')
+    assert.equal(cleared, 1, 'failed identity mutation must not adopt a new write authorization')
     assert.equal((await fixture.observe(5, 'status', () => Promise.resolve(cached))).data.offline, true)
   }
 })

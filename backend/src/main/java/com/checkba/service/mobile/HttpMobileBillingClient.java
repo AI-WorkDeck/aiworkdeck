@@ -85,6 +85,16 @@ public class HttpMobileBillingClient implements MobileBillingClient {
     }
 
     @Override
+    public Map<String, Object> cloudOperation(String accountId, String action, Map<String, Object> parameters) {
+        if (!java.util.Set.of("cloud-state", "postpaid-accept", "storage-usage", "notification-ack",
+                "cleanup-claim", "cleanup-complete", "cleanup-finish", "cleanup-reconciled", "resume-cloud", "storage-baseline", "egress-quote", "egress-reserve", "egress-settle").contains(action)) throw new IllegalArgumentException("Invalid cloud billing action");
+        Map<String, Object> body = new LinkedHashMap<>(parameters);
+        body.put("action", action);
+        body.put("accountId", accountId);
+        return om.convertValue(call(body), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+    }
+
+    @Override
     public BalanceResult balance(String accountId) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("action", "balance");

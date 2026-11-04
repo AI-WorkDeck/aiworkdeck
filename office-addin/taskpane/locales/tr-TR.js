@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  apiCloudAccessRefresh: "Bulut erişimi değişti. Devam etmeden önce sayfayı yenileyin veya uygulamayı yeniden açın. Yerel dosyalar silinmeyecektir.",
   defaultProjectName: "Geçici proje",
   cmdPptAddImage: "Slayda resim ekle",
   cmdPptAddChart: "Slayda grafik ekle",

@@ -29,6 +29,7 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.nio.file.Files;
@@ -288,6 +289,7 @@ public class MemoryRepoService {
         try (Repository repo = open(repoKey); Git git = new Git(repo)) {
             git.fetch()
                     .setRemote(url)
+                    .setTransportConfigCallback(com.checkba.version.CloudGitEpochClient.transport(url,username,secret))
                     .setCredentialsProvider(new UsernamePasswordCredentialsProvider(
                             username == null ? "" : username, secret == null ? "" : secret))
                     .setRefSpecs(new RefSpec("+refs/heads/" + MAIN_BRANCH + ":" + ORIGIN_MASTER))
@@ -313,6 +315,17 @@ public class MemoryRepoService {
         return false;
     }
 
+    public void bindCloudEpoch(String repoKey,String url,String username,String secret) {
+        try(Repository repo=open(repoKey)){com.checkba.version.CloudGitEpochClient.bind(repo.getConfig(),url,username,secret);}
+        catch(VersionException e){throw e;}
+        catch(IOException e){throw new VersionException("Bind memory cloud permission failed",e);}
+    }
+    public void requireCloudBinding(String repoKey,String url,String username,String secret) {
+        try(Repository repo=open(repoKey)){com.checkba.version.CloudGitEpochClient.frozenHeaders(repo.getConfig(),url,username,secret);}
+        catch(VersionException e){throw e;}
+        catch(IOException e){throw new VersionException("Verify memory cloud permission failed",e);}
+    }
+
     public record PushOutcome(boolean pushed, boolean rejected, String message) {}
 
     /** 推 master（非强制）。被拒走返回值不走异常——被拒即「远端被别的机器推进」，是正常路径。 */
@@ -320,6 +333,7 @@ public class MemoryRepoService {
         try (Repository repo = open(repoKey); Git git = new Git(repo)) {
             Iterable<PushResult> results = git.push()
                     .setRemote(url)
+                    .setTransportConfigCallback(com.checkba.version.CloudGitEpochClient.transport(repo.getConfig(),url,username,secret))
                     .setCredentialsProvider(new UsernamePasswordCredentialsProvider(
                             username == null ? "" : username, secret == null ? "" : secret))
                     .setRefSpecs(new RefSpec("refs/heads/" + MAIN_BRANCH + ":refs/heads/" + MAIN_BRANCH))
@@ -339,6 +353,7 @@ public class MemoryRepoService {
                 }
             }
             return new PushOutcome(!rejected, rejected, msg.toString().trim());
+        } catch (VersionException e) {throw e;
         } catch (Exception e) {
             throw new VersionException("推送记忆仓库失败: " + repoKey, e);
         }

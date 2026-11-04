@@ -25,6 +25,10 @@ public class MobileCalendarPushService {
         this.devices=devices;this.deliveries=deliveries;this.calendar=calendar;this.users=users;this.gateway=gateway;
         this.tx=new TransactionTemplate(transactions);
     }
+    private static boolean cloudReadable(Map<String,Object> settings) {
+        return settings.get("cloudAccess") instanceof Map<?,?> access
+                ? Boolean.TRUE.equals(access.get("canRead")) : Boolean.TRUE.equals(settings.get("subscriptionActive"));
+    }
     public Map<String,Object> status() { return Map.of("available",gateway.available()); }
     public Map<String,Object> register(Long user,String installation,String token,String environment) {
         try {
@@ -36,7 +40,7 @@ public class MobileCalendarPushService {
         return tx.execute(s -> {
             users.lockStorageOwner(user).orElseThrow(() -> new IllegalArgumentException(LangText.of("用户不存在","User not found")));
             var settings=calendar.settings(user);
-            if(!Boolean.TRUE.equals(settings.get("enabled")) || !Boolean.TRUE.equals(settings.get("subscriptionActive")))
+            if(!Boolean.TRUE.equals(settings.get("enabled")) || !cloudReadable(settings))
                 throw new IllegalArgumentException(LangText.of("请先开启手机日程同步","Enable mobile calendar sync first"));
             String normalized=token.toLowerCase(Locale.ROOT);
             // A token belongs to only one current account. Account switches revoke its prior delivery history.

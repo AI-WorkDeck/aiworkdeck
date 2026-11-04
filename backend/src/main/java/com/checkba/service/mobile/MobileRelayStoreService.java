@@ -53,6 +53,24 @@ import java.util.regex.Pattern;
 @Service
 @Slf4j
 public class MobileRelayStoreService {
+    @org.springframework.beans.factory.annotation.Autowired private CloudStorageQuotaService postpaidQuota;
+    @org.springframework.beans.factory.annotation.Autowired private com.checkba.repository.UserRepository cloudUsers;
+    private void deleteMeteredBlob(String locator) {
+        blobStore.deleteQuietly(locator);
+        if(postpaidQuota!=null && postpaidQuota.postpaidEnabled() && blobStore.exists(locator))
+            throw new IllegalStateException(CloudBillingText.get("readUnavailable"));
+    }
+    private void meterStorageChange(Long userId) {
+        if(postpaidQuota!=null && postpaidQuota.postpaidEnabled()) {
+            cloudUsers.lockStorageOwner(userId).orElseThrow();postpaidQuota.storageChanging(userId);
+        }
+    }
+    private void requireCloudPublication(Long userId) {
+        if(postpaidQuota!=null && postpaidQuota.postpaidEnabled()) {
+            cloudUsers.lockStorageOwner(userId).orElseThrow(); postpaidQuota.requireCloudWrite(userId); postpaidQuota.storageChanging(userId);
+        }
+    }
+
 
     /** clientMediaId 只收 UUID 形态——它会拼进物理路径，这里是路径穿越的唯一围栏。 */
     private static final Pattern MEDIA_ID = Pattern.compile("^[A-Fa-f0-9-]{8,64}$");
@@ -135,6 +153,7 @@ public class MobileRelayStoreService {
      */
     @Transactional
     public DirectoryReplaceResult replaceDirectory(Long userId, String deviceId, String deviceName, List<DirEntry> projects) {
+        requireCloudPublication(userId);
         requireDeviceId(deviceId);
         if (projects == null) projects = List.of();
 
@@ -387,6 +406,7 @@ public class MobileRelayStoreService {
     public MobileMediaInbox storeMediaTx(Long userId, String deviceId, String projectKey,
                                        String clientMediaId, String fileName, String mediaType,
                                        LocalDateTime capturedAt, long declaredSize, InputStream content) {
+        requireCloudPublication(userId);
         requireDeviceId(deviceId);
         if (projectKey == null || projectKey.isBlank()) {
             throw new IllegalArgumentException(LangText.of("缺少项目标识", "Missing project key"));
@@ -477,10 +497,11 @@ public class MobileRelayStoreService {
 
     @Transactional
     public void ack(Long userId, Long itemId) {
+        meterStorageChange(userId);
         MobileMediaInbox item = owned(userId, itemId);
         if (item.getStoragePath() != null) {
             // blob 删不掉不该挡住投递确认（deleteQuietly 只 warn）：行先标记，残留由 TTL/桶生命周期兜底
-            blobStore.deleteQuietly(item.getStoragePath());
+            deleteMeteredBlob(item.getStoragePath());
             item.setStoragePath(null);
         }
         if (item.getDeliveredAt() == null) {
@@ -529,12 +550,14 @@ public class MobileRelayStoreService {
     @Scheduled(initialDelay = 15 * 60 * 1000, fixedDelay = 24 * 60 * 60 * 1000)
     @Transactional
     public void cleanupExpired() {
-        List<MobileMediaInbox> expired = inboxRepository.findByCreatedAtBefore(LocalDateTime.now().minus(TTL));
+        List<MobileMediaInbox> expired = new java.util.ArrayList<>(inboxRepository.findByCreatedAtBefore(LocalDateTime.now().minus(TTL)));
+        expired.sort(java.util.Comparator.comparing(MobileMediaInbox::getUserId));
         for (MobileMediaInbox item : expired) {
+            meterStorageChange(item.getUserId());
             // Migrate existing delivered captures before TTL drops their last server-side identity.
             if (mediaMoves != null && item.getDeliveredAt() != null) mediaMoves.rememberRelay(item);
             if (item.getStoragePath() != null) {
-                blobStore.deleteQuietly(item.getStoragePath());
+                deleteMeteredBlob(item.getStoragePath());
             }
             inboxRepository.delete(item);
         }

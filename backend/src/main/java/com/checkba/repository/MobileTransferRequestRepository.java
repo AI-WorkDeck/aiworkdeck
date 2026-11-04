@@ -37,5 +37,6 @@ public interface MobileTransferRequestRepository extends JpaRepository<MobileTra
             + " where t.userId = :userId and t.storagePath is not null")
     long sumPendingBytes(@Param("userId") Long userId);
 
+    List<MobileTransferRequest> findByUserId(Long userId);
     long deleteByUserId(Long userId);
 }

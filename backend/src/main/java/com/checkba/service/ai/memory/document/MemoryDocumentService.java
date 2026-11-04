@@ -46,6 +46,11 @@ public class MemoryDocumentService {
     private final ProjectMemberService projectMembers;
     private final MemoryOrganizationGateway organizations;
     private final TransactionTemplate transactions;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.service.mobile.CloudStorageQuotaService cloudQuota;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.repository.UserRepository cloudUsers;
+
     private final long organizationTimeoutMillis;
     private final ExecutorService organizationExecutor = Executors.newFixedThreadPool(2, task -> {
         Thread thread = new Thread(task, "memory-organization-context");
@@ -152,6 +157,7 @@ public class MemoryDocumentService {
         }
         transactions.executeWithoutResult(status -> {
             LocalAccess access = requireLocalAccess(userId, spaceId, true);
+            beginReduction(access.space());
             MemoryDocument document = documents.findLockedBySpaceIdAndPath(spaceId, path)
                     .filter(d -> !d.isDeleted()).orElseThrow(() -> bad(LangText.of("记忆文件不存在", "Memory file not found")));
             checkRevision(document, expectedRevision);
@@ -163,7 +169,7 @@ public class MemoryDocumentService {
             if (document.getSourceMemoryUid() != null) {
                 legacyEntries.findFirstByUid(document.getSourceMemoryUid()).ifPresent(legacyEntries::delete);
             }
-            refreshIndex(access.space(), userId);
+            refreshIndex(access.space(), userId, true);
         });
     }
 
@@ -202,6 +208,7 @@ public class MemoryDocumentService {
                 || MemoryEntry.MemoryScope.GLOBAL.equals(scope);
         Long owner = userScope ? entry.getUserId() : entry.getProjectId();
         if (owner == null) return null;
+        beginMutation(userScope ? "user" : "project", String.valueOf(owner));
         if (entry.getUid() == null || entry.getUid().isBlank()) {
             entry.setUid(UUID.randomUUID().toString());
             legacyEntries.save(entry);
@@ -227,6 +234,7 @@ public class MemoryDocumentService {
                     refreshIndex(space, entry.getUserId());
                 }
             }
+            finishMutation(space);
             return toView(current, true, true);
         }
         if (path.startsWith("legacy/") && entry.getMemoryKey() != null && !entry.getMemoryKey().isBlank()) {
@@ -249,12 +257,19 @@ public class MemoryDocumentService {
     @Transactional
     public void tombstoneSourceAndDeleteLegacy(String sourceMemoryUid) {
         if (sourceMemoryUid == null) return;
+        legacyEntries.findFirstByUid(sourceMemoryUid).ifPresent(entry -> {
+            boolean personal=MemoryEntry.MemoryScope.USER.equals(entry.getScope()) || MemoryEntry.MemoryScope.GLOBAL.equals(entry.getScope());
+            Long key=personal?entry.getUserId():entry.getProjectId();
+            if(key!=null)beginReduction(personal?"user":"project",String.valueOf(key));
+        });
         documents.findBySourceMemoryUid(sourceMemoryUid).filter(d -> !d.isDeleted()).ifPresent(d -> {
+            MemoryDocumentSpace space=spaces.findById(d.getSpaceId()).orElseThrow();
+            beginReduction(space);
             d.setDeleted(true);
             d.setRevision(d.getRevision() + 1);
             d.setUpdatedAt(LocalDateTime.now());
             documents.save(d);
-            spaces.findById(d.getSpaceId()).ifPresent(s -> refreshIndex(s, null));
+            refreshIndex(space, null, true);
         });
         legacyEntries.findFirstByUid(sourceMemoryUid).ifPresent(legacyEntries::delete);
     }
@@ -289,6 +304,7 @@ public class MemoryDocumentService {
 
     private MemoryFileView writeLocal(MemoryDocumentSpace space, Long userId, String path,
                                       String content, long expectedRevision, String sourceMemoryUid) {
+        beginMutation(space.getScope(), space.getOwnerKey());
         MemoryDocument document = documents.findLockedBySpaceIdAndPath(space.getId(), path).orElse(null);
         if (document == null) {
             if (expectedRevision != 0) throw conflict(LangText.of("记忆文件已发生变化，请刷新后重试", "Memory file has changed; please refresh and try again"));
@@ -319,6 +335,7 @@ public class MemoryDocumentService {
         documents.saveAndFlush(document);
         syncLegacyIndex(document, space, sourceMemoryUid != null);
         if (!INDEX_PATH.equals(path)) refreshIndex(space, userId);
+        finishMutation(space);
         return toView(document, true, true);
     }
 
@@ -352,7 +369,10 @@ public class MemoryDocumentService {
     }
 
     private MemoryDocument ensureIndex(MemoryDocumentSpace space) {
-        MemoryDocument current = documents.findLockedBySpaceIdAndPath(space.getId(), INDEX_PATH).orElse(null);
+        MemoryDocument current = documents.findBySpaceIdAndPath(space.getId(), INDEX_PATH).orElse(null);
+        if (current != null && !current.isDeleted()) return current;
+        beginMutation(space.getScope(), space.getOwnerKey());
+        current = documents.findLockedBySpaceIdAndPath(space.getId(), INDEX_PATH).orElse(null);
         if (current != null && !current.isDeleted()) return current;
         MemoryDocument index = current == null ? new MemoryDocument() : current;
         index.setSpaceId(space.getId());
@@ -368,21 +388,27 @@ public class MemoryDocumentService {
             saved = documents.saveAndFlush(saved);
         }
         syncLegacyIndex(saved, space);
+        finishMutation(space);
         return saved;
     }
 
-    private void refreshIndex(MemoryDocumentSpace space, Long userId) {
-        MemoryDocument index = ensureIndex(space);
+    private void refreshIndex(MemoryDocumentSpace space, Long userId) { refreshIndex(space,userId,false); }
+    private void refreshIndex(MemoryDocumentSpace space, Long userId, boolean reducing) {
+        MemoryDocument index = reducing ? documents.findLockedBySpaceIdAndPath(space.getId(),INDEX_PATH).filter(d->!d.isDeleted()).orElse(null) : ensureIndex(space);
+        if(index==null)return; // Deletion never recreates content that cleanup already removed.
         List<MemoryDocument> topics = documents.findBySpaceIdAndDeletedFalseOrderByPathAsc(space.getId()).stream()
                 .filter(d -> !INDEX_PATH.equals(d.getPath())).toList();
         String content = replaceManagedLinks(index.getContent(), managedLinks(topics));
+        if (reducing && content.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > index.getContent().getBytes(java.nio.charset.StandardCharsets.UTF_8).length) return;
         if (!content.equals(index.getContent())) {
+            if(!reducing)beginMutation(space.getScope(),space.getOwnerKey());
             index.setContent(content);
             index.setRevision(index.getRevision() + 1);
             index.setModifiedBy(userId);
             index.setUpdatedAt(LocalDateTime.now());
             documents.save(index);
             syncLegacyIndex(index, space);
+            if(!reducing)finishMutation(space);
         }
     }
 
@@ -406,11 +432,14 @@ public class MemoryDocumentService {
         if (!readable || (write && !writable)) throw denied(write
                 ? LangText.of("无权修改这个记忆空间", "No permission to modify this memory space")
                 : LangText.of("无权读取这个记忆空间", "No permission to read this memory space"));
+        if(cloudEnabled() && !write && !cloudQuota.canRead(billingOwner(space.getScope(),space.getOwnerKey())))
+            throw denied(com.checkba.service.mobile.CloudBillingText.get("readUnavailable"));
         return new LocalAccess(space, writable);
     }
 
     private MemoryDocumentSpace ensureSpace(String scope, String ownerKey, String label) {
         return spaces.findByScopeAndOwnerKey(scope, ownerKey).orElseGet(() -> {
+            beginMutation(scope,ownerKey);
             MemoryDocumentSpace space = new MemoryDocumentSpace();
             space.setId(UUID.randomUUID().toString());
             space.setScope(scope);
@@ -422,6 +451,48 @@ public class MemoryDocumentService {
                 return spaces.findByScopeAndOwnerKey(scope, ownerKey).orElseThrow(() -> e);
             }
         });
+    }
+
+    private boolean cloudEnabled() { return cloudQuota!=null && cloudQuota.isEnabled() && cloudQuota.postpaidEnabled(); }
+    private Long billingOwner(String scope,String key) {
+        Long id=parseLong(key);
+        if(id==null)throw denied(com.checkba.service.mobile.CloudBillingText.get("writesPaused"));
+        if("user".equals(scope))return id;
+        if(!"project".equals(scope))throw denied(com.checkba.service.mobile.CloudBillingText.get("writesPaused"));
+        Project project=projects.findById(id).orElseThrow();
+        if(!"PERSONAL".equals(project.getCloudOwnership()) || project.getCloudBillingOwnerId()==null
+                || !Objects.equals(project.getUserId(),project.getCloudBillingOwnerId())
+                || (project.getLocalRoot()!=null && !project.getLocalRoot().isBlank()))
+            throw denied(com.checkba.service.mobile.CloudBillingText.get("writesPaused"));
+        return project.getCloudBillingOwnerId();
+    }
+    private void beginMutation(String scope,String key) {
+        if(!cloudEnabled())return;
+        if("project".equals(scope))cloudQuota.requireProjectCapacity(parseLong(key),0);
+        else cloudQuota.requirePersistentCapacity(billingOwner(scope,key),0);
+    }
+    private void finishMutation(MemoryDocumentSpace space) {
+        if(!cloudEnabled())return;
+        documents.flush();legacyEntries.flush();
+        if("project".equals(space.getScope()))cloudQuota.requireCurrentProjectUsage(parseLong(space.getOwnerKey()));
+        else cloudQuota.requireCurrentPersistentUsage(billingOwner(space.getScope(),space.getOwnerKey()));
+    }
+    private void beginReduction(MemoryDocumentSpace space) {beginReduction(space.getScope(),space.getOwnerKey());}
+    private void beginReduction(String scope,String key) {
+        if(!cloudEnabled())return;
+        Long owner=billingOwner(scope,key);
+        cloudUsers.lockStorageOwner(owner).orElseThrow();
+        if(!Objects.equals(owner,billingOwner(scope,key)))throw denied(com.checkba.service.mobile.CloudBillingText.get("writesPaused"));
+        var access=cloudQuota.cloudAccess(owner);
+        if(Boolean.TRUE.equals(access.get("frozen")))throw denied(com.checkba.service.mobile.CloudBillingText.get("writesPaused"));
+        if("project".equals(scope))cloudQuota.requireProjectEpoch(parseLong(key));
+        else {
+            var context=org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+            if(context instanceof org.springframework.web.context.request.ServletRequestAttributes request
+                    && !String.valueOf(access.get("epoch")).equals(request.getRequest().getHeader("X-Cloud-Epoch")))
+                throw denied(com.checkba.service.mobile.CloudBillingText.get("epochChanged"));
+        }
+        cloudQuota.storageChanging(owner);
     }
 
     private static MemorySpaceView view(MemoryDocumentSpace space, boolean readable,

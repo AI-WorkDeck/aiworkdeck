@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { createCloudEpochGate, needsCloudEpoch } from '../../../shared/cloud-epoch.mjs'
 import { normalizeBaseUrl } from './settings.js'
 import { t, getLangTag } from './i18n.js'
 
@@ -27,6 +28,29 @@ function headers(token) {
   return { 'Content-Type': 'application/json', 'X-Session-Id': token || '', ...langHeader() }
 }
 
+const cloudEpochGate = createCloudEpochGate(async (origin, auth) => {
+  const response = await fetch(origin + '/api/mobile/billing/cloud-state', { headers: auth })
+  if (response.status === 404) return null
+  if (!response.ok) throw new Error(t('apiBackendUnreachable'))
+  const state = await response.json()
+  if (state?.code != null && state.code !== 0) throw new Error(t('apiBackendUnreachable'))
+  return state?.data || state
+})
+
+async function cloudFetch(url, options = {}) {
+  const auth = options.headers || {}
+  if (!needsCloudEpoch(url, options.method, auth)) return fetch(url, options)
+  const storedToken = globalThis.localStorage?.getItem('awd_addin_token')
+  const storedServer = globalThis.localStorage?.getItem('awd_addin_server_url')
+  if (storedToken && storedToken !== auth['X-Session-Id']) throw Object.assign(new Error(t('apiCloudAccessRefresh')), { cloudAccessChanged: true })
+  let epoch
+  try { epoch = await cloudEpochGate.headers(url, options.method, auth) }
+  catch { throw Object.assign(new Error(t('apiCloudAccessRefresh')), { cloudAccessChanged: true }) }
+  if (storedToken !== globalThis.localStorage?.getItem('awd_addin_token') || storedServer !== globalThis.localStorage?.getItem('awd_addin_server_url')) throw Object.assign(new Error(t('apiCloudAccessRefresh')), { cloudAccessChanged: true })
+  // Never replay a rejected write with a newer epoch. Reloading the pane starts a new snapshot.
+  return fetch(url, { ...options, headers: { ...auth, ...epoch } })
+}
+
 /**
  * 拉取我的项目列表；同时用作「连接测试」——通了说明地址可达且令牌有效。
  */
@@ -35,8 +59,9 @@ export async function fetchMyProjects({ serverUrl, token }) {
   if (!base) throw new Error(t('apiServerUrlEmpty'))
   let resp
   try {
-    resp = await fetch(`${base}/api/projects/my`, { headers: headers(token) })
+    resp = await cloudFetch(`${base}/api/projects/my`, { headers: headers(token) })
   } catch (e) {
+    if (e?.cloudAccessChanged) throw e
     throw new Error(t('apiBackendUnreachable'))
   }
   if (!resp.ok) {
@@ -57,7 +82,7 @@ export async function ensureAddinDefaultProject({ serverUrl, token }) {
   const base = normalizeBaseUrl(serverUrl)
   if (!base) return null
   try {
-    const resp = await fetch(`${base}/api/projects/ensure-addin-default`, {
+    const resp = await cloudFetch(`${base}/api/projects/ensure-addin-default`, {
       method: 'POST',
       headers: headers(token)
     })
@@ -82,12 +107,13 @@ export async function createProject({ serverUrl, token }, name) {
   if (!base) throw new Error(t('apiServerUrlEmpty'))
   let resp
   try {
-    resp = await fetch(`${base}/api/projects`, {
+    resp = await cloudFetch(`${base}/api/projects`, {
       method: 'POST',
       headers: headers(token),
       body: JSON.stringify({ projectType: 'BLANK', name: (name || '').trim() })
     })
   } catch (e) {
+    if (e?.cloudAccessChanged) throw e
     throw new Error(t('apiBackendUnreachable'))
   }
   if (!resp.ok) throw new Error(t('apiConnectFailedHttp', { status: resp.status }))
@@ -105,7 +131,7 @@ export async function fetchConversations({ serverUrl, token }, projectId) {
   const base = normalizeBaseUrl(serverUrl)
   if (!base || !projectId) return []
   try {
-    const resp = await fetch(
+    const resp = await cloudFetch(
       `${base}/api/ai/conversations?projectId=${encodeURIComponent(projectId)}`,
       { headers: headers(token) })
     if (!resp.ok) return []
@@ -138,12 +164,13 @@ export async function ensureAddinLink({ serverUrl, token }, { deviceId, projectK
   if (!base) throw new Error(t('apiServerUrlEmpty'))
   let resp
   try {
-    resp = await fetch(`${base}/api/projects/ensure-addin-link`, {
+    resp = await cloudFetch(`${base}/api/projects/ensure-addin-link`, {
       method: 'POST',
       headers: headers(token),
       body: JSON.stringify({ deviceId, projectKey, name })
     })
   } catch (e) {
+    if (e?.cloudAccessChanged) throw e
     throw new Error(t('apiBackendUnreachable'))
   }
   if (!resp.ok) throw new Error(t('archiveLinkUnsupported'))
@@ -157,7 +184,7 @@ export async function fetchAddinLinks({ serverUrl, token }) {
   const base = normalizeBaseUrl(serverUrl)
   if (!base) return []
   try {
-    const resp = await fetch(`${base}/api/projects/addin-links`, { headers: headers(token) })
+    const resp = await cloudFetch(`${base}/api/projects/addin-links`, { headers: headers(token) })
     if (!resp.ok) return []
     const data = await resp.json()
     return Array.isArray(data) ? data : []
@@ -180,7 +207,7 @@ export async function uploadRelayDocument({ serverUrl, token }, { bytes, fileNam
   form.append('clientMediaId', clientMediaId)
   form.append('fileName', fileName)
   form.append('mediaType', 'document')
-  const resp = await fetch(`${base}/api/mobile/media`, {
+  const resp = await cloudFetch(`${base}/api/mobile/media`, {
     method: 'POST',
     // multipart 边界由浏览器生成，不能手写 Content-Type
     headers: { 'X-Session-Id': token || '', ...langHeader() },
@@ -196,7 +223,7 @@ export async function fetchModels({ serverUrl, token }) {
   const base = normalizeBaseUrl(serverUrl)
   if (!base) return null
   try {
-    const resp = await fetch(`${base}/api/ai/models`, { headers: headers(token) })
+    const resp = await cloudFetch(`${base}/api/ai/models`, { headers: headers(token) })
     if (!resp.ok) return null
     const data = await resp.json()
     if (data && Array.isArray(data.models)) {
@@ -216,7 +243,7 @@ export async function fetchSkills({ serverUrl, token }) {
   const base = normalizeBaseUrl(serverUrl)
   if (!base) return []
   try {
-    const resp = await fetch(`${base}/api/skills/list`, { headers: headers(token) })
+    const resp = await cloudFetch(`${base}/api/skills/list`, { headers: headers(token) })
     if (!resp.ok) return []
     const data = await resp.json()
     return Array.isArray(data) ? data : []
@@ -231,7 +258,7 @@ export async function fetchSkills({ serverUrl, token }) {
  */
 export async function deleteConversation({ serverUrl, token }, conversationId) {
   const base = normalizeBaseUrl(serverUrl)
-  const resp = await fetch(`${base}/api/ai/conversation/${encodeURIComponent(conversationId)}`, {
+  const resp = await cloudFetch(`${base}/api/ai/conversation/${encodeURIComponent(conversationId)}`, {
     method: 'DELETE',
     headers: headers(token)
   })
@@ -248,7 +275,7 @@ export async function deleteConversation({ serverUrl, token }, conversationId) {
  */
 export async function renameConversation({ serverUrl, token }, conversationId, title) {
   const base = normalizeBaseUrl(serverUrl)
-  const resp = await fetch(`${base}/api/ai/conversation/${encodeURIComponent(conversationId)}/title`, {
+  const resp = await cloudFetch(`${base}/api/ai/conversation/${encodeURIComponent(conversationId)}/title`, {
     method: 'POST',
     headers: headers(token),
     body: JSON.stringify({ title })
@@ -268,7 +295,7 @@ export async function fetchProjectFiles({ serverUrl, token }, projectId) {
   const base = normalizeBaseUrl(serverUrl)
   if (!base || !projectId) return []
   try {
-    const resp = await fetch(`${base}/api/projects/${encodeURIComponent(projectId)}/files?tree=true`, {
+    const resp = await cloudFetch(`${base}/api/projects/${encodeURIComponent(projectId)}/files?tree=true`, {
       headers: headers(token)
     })
     if (!resp.ok) return []
@@ -301,12 +328,13 @@ export async function createProjectFile({ serverUrl, token }, projectId, { name,
   if (!base) throw new Error(t('apiServerUrlEmpty'))
   let resp
   try {
-    resp = await fetch(`${base}/api/projects/${encodeURIComponent(projectId)}/files/file`, {
+    resp = await cloudFetch(`${base}/api/projects/${encodeURIComponent(projectId)}/files/file`, {
       method: 'POST',
       headers: headers(token),
       body: JSON.stringify({ parentId: null, name, fileType, fileSize: size })
     })
   } catch (e) {
+    if (e?.cloudAccessChanged) throw e
     throw new Error(t('apiBackendUnreachable'))
   }
   if (!resp.ok) throw new Error(t('apiCreateFileFailedHttp', { status: resp.status }))
@@ -328,7 +356,7 @@ export async function uploadFileBytes({ serverUrl, token }, fileId, blob, totalS
   if (!base) throw new Error(t('apiServerUrlEmpty'))
   let resp
   try {
-    resp = await fetch(`${base}/api/files/${encodeURIComponent(fileId)}/upload`, {
+    resp = await cloudFetch(`${base}/api/files/${encodeURIComponent(fileId)}/upload`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/octet-stream',
@@ -340,6 +368,7 @@ export async function uploadFileBytes({ serverUrl, token }, fileId, blob, totalS
       body: blob
     })
   } catch (e) {
+    if (e?.cloudAccessChanged) throw e
     throw new Error(t('apiBackendUnreachable'))
   }
   if (!resp.ok) {
@@ -361,7 +390,7 @@ export async function fetchMobileDevices({ serverUrl, token }) {
   const base = normalizeBaseUrl(serverUrl)
   if (!base || !token) return null
   try {
-    const resp = await fetch(`${base}/api/mobile/devices`, { headers: headers(token) })
+    const resp = await cloudFetch(`${base}/api/mobile/devices`, { headers: headers(token) })
     if (!resp.ok) return null
     const data = await resp.json()
     return Array.isArray(data) ? data : null
@@ -376,7 +405,7 @@ export async function fetchMobileDevices({ serverUrl, token }) {
 export async function postDictate({ serverUrl, token }, { audioBase64, format, durationMs }) {
   const base = normalizeBaseUrl(serverUrl)
   if (!base) throw new Error(t('apiServerUrlEmpty'))
-  const resp = await fetch(`${base}/api/voice/dictate`, {
+  const resp = await cloudFetch(`${base}/api/voice/dictate`, {
     method: 'POST',
     headers: headers(token),
     body: JSON.stringify({ audioBase64, format, durationMs })
@@ -404,7 +433,7 @@ export async function fetchMe({ serverUrl, token }) {
   const base = normalizeBaseUrl(serverUrl)
   if (!base || !token) return null
   try {
-    const resp = await fetch(`${base}/api/auth/me`, { headers: headers(token) })
+    const resp = await cloudFetch(`${base}/api/auth/me`, { headers: headers(token) })
     if (!resp.ok) return null
     const data = await resp.json()
     if (data && data.code === 0 && data.data) return data.data
@@ -422,7 +451,7 @@ export async function postLogout({ serverUrl, token }) {
   const base = normalizeBaseUrl(serverUrl)
   if (!base || !token) return
   try {
-    await fetch(`${base}/api/auth/logout`, { method: 'POST', headers: headers(token) })
+    await cloudFetch(`${base}/api/auth/logout`, { method: 'POST', headers: headers(token) })
   } catch (e) {
     // 尽力而为
   }
@@ -437,7 +466,7 @@ export async function fetchConversationHistory({ serverUrl, token }, conversatio
   const base = normalizeBaseUrl(serverUrl)
   if (!base || !conversationId) return []
   try {
-    const resp = await fetch(
+    const resp = await cloudFetch(
       `${base}/api/ai/history?conversationId=${encodeURIComponent(conversationId)}`,
       { headers: headers(token) })
     if (!resp.ok) return []
@@ -463,7 +492,7 @@ export async function getAccountLoginCaptchaConfig({ serverUrl }) {
   const base = normalizeBaseUrl(serverUrl)
   if (!base) return { provider: null }
   try {
-    const resp = await fetch(base + '/api/auth/account-login/captcha-config', {
+    const resp = await cloudFetch(base + '/api/auth/account-login/captcha-config', {
       headers: { Accept: 'application/json' },
     })
     if (!resp.ok) return { provider: null }
@@ -545,12 +574,13 @@ async function postAnonymous(serverUrl, path, body) {
   if (!base) throw new Error(t('apiServerUrlEmpty'))
   let resp
   try {
-    resp = await fetch(`${base}${path}`, {
+    resp = await cloudFetch(`${base}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...langHeader() },
       body: JSON.stringify(body)
     })
   } catch (e) {
+    if (e?.cloudAccessChanged) throw e
     throw new Error(t('apiBackendUnreachable'))
   }
   if (resp.status === 404) {
@@ -584,12 +614,13 @@ export async function postAwdkLogin({ serverUrl }, key) {
   if (!base) throw new Error(t('apiServerUrlEmpty'))
   let resp
   try {
-    resp = await fetch(`${base}/api/auth/awdk-login`, {
+    resp = await cloudFetch(`${base}/api/auth/awdk-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...langHeader() },
       body: JSON.stringify({ key: (key || '').trim() })
     })
   } catch (e) {
+    if (e?.cloudAccessChanged) throw e
     throw new Error(t('apiBackendUnreachable'))
   }
   if (resp.status === 404) {
@@ -622,7 +653,7 @@ export async function fetchPlatformAiStatus({ serverUrl, token }) {
   const base = normalizeBaseUrl(serverUrl)
   if (!base || !token) return null
   try {
-    const resp = await fetch(`${base}/api/platform-ai/key/status`, { headers: headers(token) })
+    const resp = await cloudFetch(`${base}/api/platform-ai/key/status`, { headers: headers(token) })
     if (!resp.ok) return null
     const data = await resp.json()
     if (data && data.code === 0 && data.data) return data.data
@@ -642,12 +673,13 @@ export async function refreshPlatformAiKey({ serverUrl, token }, key) {
   if (!base) throw new Error(t('apiServerUrlEmpty'))
   let resp
   try {
-    resp = await fetch(`${base}/api/platform-ai/key/refresh`, {
+    resp = await cloudFetch(`${base}/api/platform-ai/key/refresh`, {
       method: 'POST',
       headers: headers(token),
       body: JSON.stringify({ key: (key || '').trim() })
     })
   } catch (e) {
+    if (e?.cloudAccessChanged) throw e
     throw new Error(t('apiBackendUnreachable'))
   }
   if (resp.status === 404) {
@@ -673,12 +705,13 @@ export async function createConversation({ serverUrl, token }, projectId) {
   const base = normalizeBaseUrl(serverUrl)
   let resp
   try {
-    resp = await fetch(`${base}/api/agent/conversations`, {
+    resp = await cloudFetch(`${base}/api/agent/conversations`, {
       method: 'POST',
       headers: headers(token),
       body: JSON.stringify({ projectId })
     })
   } catch (e) {
+    if (e?.cloudAccessChanged) throw e
     throw new Error(t('apiBackendUnreachable'))
   }
   // 只有 404（旧后端没有签发端点）允许回退客户端自造 ID——那种后端也不校验签发。
@@ -709,7 +742,7 @@ export async function postChat({ serverUrl, token }, payload) {
   const base = normalizeBaseUrl(serverUrl)
   let resp
   try {
-    resp = await fetch(`${base}/api/agent/chat`, {
+    resp = await cloudFetch(`${base}/api/agent/chat`, {
       method: 'POST',
       headers: headers(token),
       body: JSON.stringify(payload)
@@ -738,7 +771,7 @@ export async function postChat({ serverUrl, token }, payload) {
 export async function postOfficeResult({ serverUrl, token }, payload) {
   const base = normalizeBaseUrl(serverUrl)
   try {
-    const resp = await fetch(`${base}/api/agent/office/result`, {
+    const resp = await cloudFetch(`${base}/api/agent/office/result`, {
       method: 'POST',
       headers: headers(token),
       body: JSON.stringify(payload)
@@ -756,7 +789,7 @@ export async function postOfficeResult({ serverUrl, token }, payload) {
  */
 export async function postPaneHeartbeat({ serverUrl, token }, body) {
   const base = normalizeBaseUrl(serverUrl)
-  const resp = await fetch(`${base}/api/addin/panes/heartbeat`, {
+  const resp = await cloudFetch(`${base}/api/addin/panes/heartbeat`, {
     method: 'POST',
     headers: headers(token),
     body: JSON.stringify(body)
@@ -783,7 +816,7 @@ export function sendPaneBye({ serverUrl, token }, paneId) {
         navigator.sendBeacon(url, new Blob([payload], { type: 'text/plain' }))) return
   } catch (e) { /* 落到 fetch keepalive */ }
   try {
-    fetch(url, { method: 'POST', headers: headers(token), body: payload, keepalive: true }).catch(() => {})
+    cloudFetch(url, { method: 'POST', headers: headers(token), body: payload, keepalive: true }).catch(() => {})
   } catch (e) { /* 尽力而为 */ }
 }
 
@@ -814,8 +847,9 @@ async function gitLinkEnvelope(resp) {
 async function gitLinkFetch(base, path, options) {
   let resp
   try {
-    resp = await fetch(`${base}${path}`, options)
+    resp = await cloudFetch(`${base}${path}`, options)
   } catch (e) {
+    if (e?.cloudAccessChanged) throw e
     throw new Error(t('apiBackendUnreachable'))
   }
   return gitLinkEnvelope(resp)
@@ -867,7 +901,7 @@ export async function deleteGitLink({ serverUrl, token }, id) {
 export async function postCancel({ serverUrl, token }, conversationId) {
   const base = normalizeBaseUrl(serverUrl)
   try {
-    await fetch(`${base}/api/agent/cancel/${conversationId}`, {
+    await cloudFetch(`${base}/api/agent/cancel/${conversationId}`, {
       method: 'POST',
       headers: headers(token)
     })
@@ -879,7 +913,7 @@ export async function postCancel({ serverUrl, token }, conversationId) {
 /** The catalogue is authoritative when available; only an old server (404) falls back. */
 export async function fetchProjectCatalog({ serverUrl, token }) {
   const base = normalizeBaseUrl(serverUrl)
-  const response = await fetch(`${base}/api/mobile/catalog`, { headers: headers(token) })
+  const response = await cloudFetch(`${base}/api/mobile/catalog`, { headers: headers(token) })
   if (response.status === 404) return null
   if (!response.ok) throw new Error(t('apiConnectFailedHttp', { status: response.status }))
   const rows = await response.json()

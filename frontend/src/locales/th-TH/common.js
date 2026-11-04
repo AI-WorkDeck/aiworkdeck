@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  cloudAccessRefresh: "สิทธิ์เข้าถึงคลาวด์เปลี่ยนแปลงแล้ว โปรดรีเฟรชหน้าหรือเปิดแอปใหม่ก่อนดำเนินการต่อ ไฟล์ในเครื่องจะไม่ถูกลบ",
   workspaceSessionUnavailable: "ไม่สามารถกู้คืนเซสชันพื้นที่ทำงานได้",
   "confirm": "ตกลง",
   "cancel": "ยกเลิก",

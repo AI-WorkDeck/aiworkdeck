@@ -39,12 +39,96 @@ class MemoryDocumentServiceTest {
     @Autowired private MemoryDocumentRepository documents;
     @MockBean private ProjectMemberService projectMembers;
     @MockBean private MemoryOrganizationGateway organizations;
+    @MockBean private com.checkba.service.mobile.CloudStorageQuotaService cloudQuota;
+    @MockBean private com.checkba.repository.UserRepository cloudUsers;
 
     @BeforeEach
     void defaultOrganizationSpacesAreUnavailable() {
         when(organizations.listSpaces(anyLong())).thenReturn(List.of(
                 MemorySpaceView.unavailable("team", "团队记忆", "尚未加入团队"),
                 MemorySpaceView.unavailable("firm", "律所记忆", "尚未加入律所")));
+    }
+
+    private void enableCloud() {
+        when(cloudQuota.isEnabled()).thenReturn(true);
+        when(cloudQuota.postpaidEnabled()).thenReturn(true);
+        when(cloudQuota.canRead(anyLong())).thenReturn(true);
+    }
+
+    @Test
+    void frozenOrUnfundedReadsCannotRecreateAnIndex() {
+        String id=space(service.listSpaces(71L,null),"user").id();
+        enableCloud();
+        when(cloudQuota.canRead(71L)).thenReturn(false);
+        assertThrows(MemoryDocumentException.class,()->service.read(71L,id,"remember.md"));
+        assertTrue(documents.findBySpaceIdAndPath(id,"remember.md").isEmpty());
+        when(cloudQuota.canRead(71L)).thenReturn(true);
+        org.mockito.Mockito.doThrow(new IllegalArgumentException("epoch denied")).when(cloudQuota).requirePersistentCapacity(71L,0);
+        assertThrows(IllegalArgumentException.class,()->service.listFiles(71L,id));
+        assertTrue(documents.findBySpaceIdAndPath(id,"remember.md").isEmpty());
+    }
+
+    @Test
+    void cloudPublicationMetersAndChecksActualUsageForTheSpaceOwner() {
+        String id=space(service.listSpaces(72L,null),"user").id();
+        enableCloud();
+        service.write(72L,id,"facts.md","# Facts\nAccount-owned content",0);
+        org.mockito.Mockito.verify(cloudQuota,org.mockito.Mockito.atLeastOnce()).requirePersistentCapacity(72L,0);
+        org.mockito.Mockito.verify(cloudQuota,org.mockito.Mockito.atLeastOnce()).requireCurrentPersistentUsage(72L);
+        assertEquals("# Facts\nAccount-owned content",service.read(72L,id,"facts.md").content());
+    }
+
+    @Test
+    void sharedProjectUsesProjectEpochAndCapacityRatherThanTheMembersPersonalEpoch() {
+        Project project=project(75L,"Shared cloud memory");
+        project.setCloudOwnership("PERSONAL");project.setCloudBillingOwnerId(75L);projects.saveAndFlush(project);
+        when(projectMembers.hasReadPermission(project.getId(),76L)).thenReturn(true);
+        when(projectMembers.hasWritePermission(project.getId(),76L)).thenReturn(true);
+        String id=space(service.listSpaces(76L,project.getId()),"project").id();
+        enableCloud();
+        var file=service.write(76L,id,"facts.md","# Shared facts",0);
+        org.mockito.Mockito.verify(cloudQuota,org.mockito.Mockito.atLeastOnce()).requireProjectCapacity(project.getId(),0);
+        org.mockito.Mockito.verify(cloudQuota,org.mockito.Mockito.atLeastOnce()).requireCurrentProjectUsage(project.getId());
+        org.mockito.Mockito.verify(cloudQuota,org.mockito.Mockito.never()).requireCurrentPersistentUsage(75L);
+        when(cloudUsers.lockStorageOwner(75L)).thenReturn(java.util.Optional.of(new com.checkba.model.entity.User()));
+        when(cloudQuota.cloudAccess(75L)).thenReturn(java.util.Map.of("epoch",9,"frozen",false));
+        var request=new org.springframework.mock.web.MockHttpServletRequest();request.addHeader("X-Cloud-Epoch","2");
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(request));
+        try {
+            service.delete(76L,id,file.path(),file.revision());
+            org.mockito.Mockito.verify(cloudQuota).requireProjectEpoch(project.getId());
+            org.mockito.Mockito.verify(cloudQuota).storageChanging(75L);
+            assertTrue(documents.findBySpaceIdAndPath(id,file.path()).orElseThrow().isDeleted());
+        } finally {org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();}
+    }
+
+    @Test
+    void legacyImportsCannotBypassCloudPublicationGuard() {
+        MemoryEntry entry=new MemoryEntry();entry.setScope(MemoryEntry.MemoryScope.USER);entry.setUserId(73L);
+        entry.setMemoryKey("legacy");entry.setMemoryValue("old content");
+        enableCloud();
+        org.mockito.Mockito.doThrow(new IllegalArgumentException("frozen")).when(cloudQuota).requirePersistentCapacity(73L,0);
+        assertThrows(IllegalArgumentException.class,()->service.migrateLegacyEntry(entry));
+        assertNull(entry.getUid(),"no legacy mutation before authorization");
+    }
+
+    @Test
+    void overLimitDeletionCanReduceExistingContentButStaleEpochCannot() {
+        String id=space(service.listSpaces(74L,null),"user").id();
+        var file=service.write(74L,id,"facts.md","# Remove me",0);
+        enableCloud();
+        when(cloudUsers.lockStorageOwner(74L)).thenReturn(java.util.Optional.of(new com.checkba.model.entity.User()));
+        when(cloudQuota.cloudAccess(74L)).thenReturn(java.util.Map.of("epoch",2,"frozen",false,"canWrite",false));
+        var request=new org.springframework.mock.web.MockHttpServletRequest();request.addHeader("X-Cloud-Epoch","1");
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(request));
+        try {
+            assertThrows(MemoryDocumentException.class,()->service.delete(74L,id,file.path(),file.revision()));
+            request.removeHeader("X-Cloud-Epoch");request.addHeader("X-Cloud-Epoch","2");
+            service.delete(74L,id,file.path(),file.revision());
+            assertTrue(documents.findBySpaceIdAndPath(id,file.path()).orElseThrow().isDeleted());
+            org.mockito.Mockito.verify(cloudQuota).storageChanging(74L);
+            org.mockito.Mockito.verify(cloudQuota,org.mockito.Mockito.never()).requirePersistentCapacity(anyLong(),anyLong());
+        } finally {org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();}
     }
 
     @Test

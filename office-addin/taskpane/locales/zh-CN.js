@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export const ZH = {
+  apiCloudAccessRefresh: "云端权限已变化，请刷新页面或重新打开应用后再操作。本机文件不会删除。",
   defaultProjectName: "临时项目",
   cmdPptAddImage: "插入幻灯片图片",
   cmdPptAddChart: "插入幻灯片图表",

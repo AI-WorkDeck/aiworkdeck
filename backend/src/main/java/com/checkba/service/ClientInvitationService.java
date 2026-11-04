@@ -81,6 +81,7 @@ public class ClientInvitationService {
 
     @Transactional
     public Issued issueClientCode(Long projectId, Long requesterId, String clientName) {
+        projectMemberService.lockCloudMembership(projectId);
         // 1. Check permissions (Allow Admin and Participant)
         if (!projectMemberService.hasWritePermission(projectId, requesterId)) {
              throw new IllegalArgumentException(LangText.of("权限不足：只有管理员或参与者可以邀请客户", "Insufficient permissions: only administrators or participants can invite clients"));
@@ -246,6 +247,7 @@ public class ClientInvitationService {
     @Transactional
     public User createClientUser(ProjectInvitation invitation, String displayName) {
         Long projectId = invitation.getProjectId();
+        projectMemberService.lockCloudMembership(projectId);
         String name = displayName.trim();
         String prefix = "client_inv" + invitation.getId() + "_";
         String username = prefix + nameDigest(name);

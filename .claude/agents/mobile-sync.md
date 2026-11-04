@@ -600,3 +600,9 @@ Apple 订阅桥接：GET `/api/mobile/billing/subscription/appstore/capability`�
 ## 个人助理复制标识（dev-board#1690）
 
 `MobileAssistantTranscript.from` 是云端项目复制与电脑转存的共用文本出口：每条已完成assistant回答前增加LangText可见AI说明，用户问题不标，保留来源段与时间且不改原始turn。旧快照不回填；文本前缀不是文件标准隐式元数据。测试 `MobileAssistantTranscriptTest` 与 `MobileAssistantServiceTest`；其他客户端复制/导出另验。
+
+### #1703 云按量能力与清理后的备份暂停
+
+原subscriptionActive继续表示真实订阅；客户端功能准入读cloudAccess而非订阅。mobile-v1.yaml含cloud-state/postpaid-accept/resume-cloud、quote报价hash及content expectedHash。所有新增云写带当前epoch；桌面relay会话捕获同一次epoch，旧会话不能跨generation重新发布。
+
+`BackupConsent.enabled` 在cloudBackupPaused时为false，`backupPaused`明确是清理暂停；User真实备份同意仍保留，不能复用主动撤销同意让手机删除本机缓存。冻结期间不可读；用户resume后剩余非pendingDeletion字节可读，仍须明确开启备份才恢复新增上传。账户resume与开启备份是两步，未决清理claim不能被开启备份绕过。

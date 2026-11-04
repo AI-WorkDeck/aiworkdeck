@@ -1108,7 +1108,8 @@ public class VersionController {
     }
 
     @GetMapping("/versions/{ref}/file-bytes")
-    public ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody> fileBytesAtRef(
+    @com.checkba.service.mobile.CloudMeteredDownload
+    public ResponseEntity<org.springframework.core.io.Resource> fileBytesAtRef(
             @PathVariable Long projectId, @PathVariable String ref,
             @RequestParam("path") String path,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
@@ -1119,19 +1120,13 @@ public class VersionController {
         if (size < 0) {
             throw VersionException.userFacing(LangText.of("这一版里没有这份文件", "This file isn't in this version"));
         }
-        // Preflight only this file; unrelated recordings must not be downloaded for a text export.
-        try (java.io.InputStream input = repoService.openBlobAtCommit(projectId, commit, rel)) {
-            if (input == null) throw new java.io.IOException("Version file is unavailable");
-        } catch (java.io.IOException e) { throw new VersionException("读取版本内容失败", e); }
-        return ResponseEntity.ok()
-                .header("Content-Type", "application/octet-stream")
-                .contentLength(size)
-                .body(output -> {
-                    try (java.io.InputStream input = repoService.openBlobAtCommit(projectId, commit, rel)) {
-                        if (input == null) throw new java.io.IOException("Version file is unavailable");
-                        input.transferTo(output);
-                    }
-                });
+        try {
+            java.io.InputStream input=repoService.openBlobAtCommit(projectId,commit,rel);
+            if(input==null)throw new java.io.IOException(com.checkba.service.mobile.CloudBillingText.get("readUnavailable"));
+            com.checkba.service.mobile.CloudDownloadContext.mark(requireMember(projectId,sessionId),"version:"+projectId+":"+commit+":"+rel);
+            return ResponseEntity.ok().contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
+                    .contentLength(size).body(new org.springframework.core.io.InputStreamResource(input));
+        } catch(java.io.IOException failure) { throw new VersionException(com.checkba.service.mobile.CloudBillingText.get("readUnavailable"),failure); }
     }
 
     @GetMapping("/versions/{ref}/file-text")

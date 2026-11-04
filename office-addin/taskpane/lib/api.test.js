@@ -23,6 +23,7 @@ import {
   postAccountLoginSendCode,
   postAccountLoginSendEmailCode,
   fetchMobileDevices,
+  ensureAddinDefaultProject,
   postPaneHeartbeat,
   sendPaneBye,
 } from './api.js'
@@ -385,5 +386,29 @@ test('password lifecycle has distinct paths and does not trim the password', asy
     assert.equal(JSON.parse(f.calls[0].options.body).password, ' password ')
     assert.ok(f.calls[1].url.endsWith('/password/reset/send-code'))
     await assert.rejects(postAccountPasswordOperation(connection, '../exchange-key', {}))
+  } finally { f.restore() }
+})
+
+
+test('official cloud writes handshake once and never refresh epoch after rejection', async () => {
+  let epoch = 7
+  const f = stubFetch(url => url.endsWith('/cloud-state') ? jsonReply({ cloudAccess: { epoch } }) : jsonReply({ code: 1 }, false, 409))
+  try {
+    const config = { serverUrl: 'https://addin.aiworkdeck.com', token: 'synthetic-epoch-test' }
+    await ensureAddinDefaultProject(config)
+    epoch = 8
+    await ensureAddinDefaultProject(config)
+    assert.equal(f.calls.filter(call => call.url.endsWith('/cloud-state')).length, 1)
+    const writes = f.calls.filter(call => call.options.method === 'POST')
+    assert.equal(writes.length, 2)
+    assert.ok(writes.every(call => call.options.headers['X-Cloud-Epoch'] === '7'))
+  } finally { f.restore() }
+})
+test('unavailable official cloud state cannot issue a mutation', async () => {
+  const f = stubFetch(() => jsonReply({ cloudAccess: { canWrite: false, reason: 'billing_unavailable' } }))
+  try {
+    await ensureAddinDefaultProject({ serverUrl: 'https://addin.workdeck.ai', token: 'synthetic-unavailable-test' })
+    assert.equal(f.calls.length, 1)
+    assert.ok(f.calls[0].url.endsWith('/cloud-state'))
   } finally { f.restore() }
 })
