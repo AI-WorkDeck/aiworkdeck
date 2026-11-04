@@ -21,3 +21,42 @@ test('polling serializes requests and ignores a replaced QR session result', asy
  resolve({ status: 'confirmed' }); await pending
  assert.equal(state.bqtPolling, false)
 })
+
+test('login mode cannot change while a credential or verification-code request is pending', () => {
+ const start = source.indexOf('switchMode(next) {')
+ const code = source.slice(start, source.indexOf('\n    stopBqtPoll()', start))
+ const switchMode = new Function(`return ({${code}}).switchMode`)()
+ for (const busy of ['submitBusy', 'sendingCode']) {
+  const state = { mode: 'login', [busy]: true, bqtScanEnabled: true, isPhoneSite: true,
+   consentGatePassed: () => true, startBqtScan: () => assert.fail('parallel login started') }
+  switchMode.call(state, 'bqt')
+  assert.equal(state.mode, 'login')
+ }
+})
+
+test('top login mode buttons use native disabled controls during authentication', async () => {
+ const { JSDOM } = await import('jsdom')
+ const dom = new JSDOM('<body><div id="root"></div></body>')
+ for (const key of ['window', 'document', 'Element', 'HTMLElement', 'SVGElement', 'Node']) globalThis[key] = dom.window[key]
+ const Vue = await import('vue')
+ const { compile } = await import('@vue/compiler-dom')
+ const start = source.indexOf('<!-- 大陆站：')
+ const template = source.slice(start, source.indexOf('<!-- 登录与注册', start))
+ const clicked = []
+ const app = Vue.createApp({
+  data: () => ({ isPhoneSite: true, bqtScanEnabled: true, mode: 'login', submitBusy: true, sendingCode: false }),
+  methods: { switchMode: mode => clicked.push(mode) },
+  render: new Function('Vue', compile(template, { mode: 'function' }).code)(Vue),
+ })
+ app.config.globalProperties.$t = key => key
+ const vm = app.mount(document.getElementById('root'))
+ const buttons = [...document.querySelectorAll('button')]
+ assert.equal(buttons.length, 2)
+ assert.ok(buttons.every(button => button.disabled))
+ buttons[1].click(); assert.deepEqual(clicked, [])
+ vm.submitBusy = false; vm.sendingCode = true; await Vue.nextTick()
+ assert.ok(buttons.every(button => button.disabled))
+ vm.sendingCode = false; await Vue.nextTick()
+ buttons[1].click(); assert.deepEqual(clicked, ['bqt'])
+ app.unmount(); dom.window.close()
+})

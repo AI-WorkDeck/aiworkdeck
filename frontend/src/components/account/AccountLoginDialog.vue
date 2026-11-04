@@ -52,6 +52,31 @@
         >{{ siteSegLabel(s) }}</span>
       </div>
 
+      <!-- 大陆站：手机号/口令登录 与 包晴天律师扫码登录 顶部分段切换（dev-board#1665） -->
+      <div
+        v-if="isPhoneSite && bqtScanEnabled && (mode === 'login' || mode === 'bqt')"
+        class="unlock-site-seg"
+        :class="{ 'is-busy': submitBusy || sendingCode }"
+        style="margin-top: 8px; margin-bottom: 16px;"
+      >
+        <component
+          :is="'button'"
+          type="button"
+          :disabled="submitBusy || sendingCode"
+          class="unlock-site-seg-item"
+          :class="{ 'is-active': mode === 'login' }"
+          @click="switchMode('login')"
+        >{{ $t('account.bqtScanBack') }}</component>
+        <component
+          :is="'button'"
+          type="button"
+          :disabled="submitBusy || sendingCode"
+          class="unlock-site-seg-item"
+          :class="{ 'is-active': mode === 'bqt' }"
+          @click="switchMode('bqt')"
+        >{{ $t('account.bqtScanSwitch') }}</component>
+      </div>
+
       <!-- 登录与注册是同一条链路（官网验证码端点「不存在即注册」）。用 v-show：
            人机验证控件挂在这块里，切到 Key 模式再切回来时 DOM 不能被销毁重建 -->
       <div v-show="mode === 'login'" class="unlock-main">
@@ -593,7 +618,7 @@ export default {
       this.errorMsg = ''
     },
     switchMode(next) {
-      if (this.mode === next) return
+      if (this.submitBusy || this.sendingCode || this.mode === next) return
       if (next === 'bqt') {
         if (!this.bqtScanEnabled || !this.isPhoneSite) return
         if (!this.consentGatePassed()) return
@@ -1173,6 +1198,9 @@ export default {
 
 .unlock-site-seg-item {
   flex: 1;
+  padding: 0;
+  font-family: inherit;
+  background: transparent;
   text-align: center;
   white-space: nowrap;
   font-size: var(--awd-font-size-body);
