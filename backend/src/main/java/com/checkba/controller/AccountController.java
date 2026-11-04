@@ -620,18 +620,31 @@ public class AccountController {
         return ok(joined);
     }
 
-    /** 改成员角色：{@code {role}}。 */
+    /**
+     * 改成员角色和/或职务：{@code {role?, title?}}，只转给了的字段。
+     * title 为空串表示清除；职务权限（OWNER/ADMIN 可设）由官网裁决。
+     */
     @PutMapping("/team/members/{accountId}")
     public Map<String, Object> updateTeamMember(
             @org.springframework.web.bind.annotation.PathVariable("accountId") String accountId,
-            @RequestBody(required = false) Map<String, String> body,
+            @RequestBody(required = false) Map<String, Object> body,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         requireUser(sessionId);
-        String role = body == null ? null : body.get("role");
-        if (role == null || role.trim().isEmpty()) {
+        Map<String, Object> patch = new LinkedHashMap<>();
+        if (body != null && body.get("role") instanceof String role && !role.trim().isEmpty()) {
+            patch.put("role", role.trim());
+        }
+        if (body != null && body.containsKey("title")) {
+            Object title = body.get("title");
+            if (title != null && !(title instanceof String)) {
+                throw new IllegalArgumentException(LangText.of("职务必须是文字", "The job title must be text"));
+            }
+            patch.put("title", title == null ? "" : ((String) title).trim());
+        }
+        if (patch.isEmpty()) {
             throw new IllegalArgumentException(LangText.of("角色不能为空", "Role cannot be empty"));
         }
-        return ok(accountService.updateTeamMember(accountId, role));
+        return ok(accountService.updateTeamMember(accountId, patch));
     }
 
     /** 移除成员，或本人退出团队。退出后本机缓存清回默认值。 */

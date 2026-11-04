@@ -95,6 +95,15 @@ description: 插件市场领域。任务涉及插件广场页、在线 Skill 广
 - 三方 pack 提交/审核/签名在官网仓（`lib/packs-store.ts`、admin PackReview、`GET /api/registry/packs/revoked`），发布件出到 outbox 后由服务器侧脚本上架静态目录，新加坡镜像 SG 侧拉取。
 - pack 发布链：`.github/workflows/pack-release.yml`（tag `pack-<id>-v<ver>`）出未签名产物，`deploy/publish-pack.sh` 负责服务器侧签名（私钥不离开官网机）、双机上架与指针切换。
 
+## 一句话写 Skill 与发布到 Marketplace（2026-11）
+
+- **创建**：AI 工具 `create_skill`（`service/ai/tools/SkillAuthoringTools`）→ `service/ai/skill/SkillAuthoringService.create`，写 `{ai.skills.dir}/{id}/skill.yml + prompt.md`（与在线安装同目录、同一套扫描/启停），skill.yml 带 `authored_locally: true`、`created_at`（**带引号写入**，裸 ISO 会被 SnakeYAML 解析成 Date）、`languages: [当前应用语言]`。字段上限与官网 `validateSkillInput` 逐条一致（name≤60、description≤200、triggers 1–20 每个≤40、output≤2000、正文≤20000），本机能建的就能发布。同 id 已存在且**不是**本机创建的 → 拒绝（不覆盖别人的 skill）；是本机创建的 → 覆盖更新、版本补丁位 +1、保留 created_at。
+- 成功后工具发 SSE `client_action {action:"skill_created", skill:{id,name,description,version,input,rules,output}}`：`useAgentStream` 挂到当轮气泡 `createdSkills`，`RootBubble` 渲染 `AgentMessage/SkillCreatedCard.vue`（只在本次会话视图，不入库）；`ChatInterface` 刷新可选 Skill 并发 `awd:market-changed` + `awd:market-changed-from-sidebar`。卡片「查看与发布」发 `awd:open-market-detail`，工作台据此 `openMarketDetail`。
+- **展示**：`SkillView` 新增 `authoredLocally` / `createdAt` / `publishedVersion`；`utils/authoredSkills.mjs`（`isNewlyAuthored` 24h、`publishState`）。左栏「已安装 · Skill」24h 内的本机 skill 标「新建」并排最前；`MentionPicker` 新增 `skills` 列表，输入框 `@` 可点名 skill（选中 = 进 `selectedSkillIds`，不插文件标签）。
+- **发布**：`POST /api/skills/{id}/publish`（管理员）→ `SkillAuthoringService.publish` → `AccountService.submitSkill`（官网 `POST /api/skills`，Bearer awdk_）；`id_taken` 时改走 `updatePublishedSkill`（`PUT /api/skills/{id}`）。只许发布 `authored_locally` 的 skill。结果写同目录 `publish.json`（不改 skill.yml）。失败信封带 `reason`（官网机器码或 `not_connected`），详情页对 `not_connected` 就地 `requireAccount` 后重试一次。
+- **地雷**：① `AccountService.handle` 对非团队路径的 403 `forbidden` 会判 Key 失效并 `markUnauthorized`；`/api/skills/` 已与团队端点同列为业务拒绝（`AccountSkillPublishTest` 钉住），别删。② 本机创建且已发布的 skill，详情页**不显示「重新安装/更新」**——那会用广场副本覆盖本机原稿并丢掉 `authored_locally`。③ 发布动作不记匿名 telemetry：自建 skill 的 id 可能含客户/案件信息。
+- 验证：`SkillAuthoringServiceTest`、`SkillAuthoringToolsTest`、`AccountSkillPublishTest`；`node --test frontend/tests/market/authored-skills.test.mjs frontend/tests/plugins/market-migration.test.mjs`；官网 `npm run test:skill-submit`。真实链路（AI 调 create_skill → 卡片 → 左栏新建 → @ 调用 → 发布到真官网 → 再发布升版本）2026-11-04 在隔离后端 + 本地真官网 + 脚本模型上走通。
+
 ## 官网 registry 契约
 
 - **列表**：`GET {registryUrl}` → skill 元数据 JSON 数组，字段对应 MarketSkillView：id/name/description/icon/version/author/authorDisplayName/triggers[]/allowedTools[]/downloads/updatedAt/homepage/**priceCents/pricingModel**（`installed`、`purchased` 由本地判定）。

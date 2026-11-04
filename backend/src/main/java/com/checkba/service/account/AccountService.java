@@ -843,6 +843,27 @@ public class AccountService {
                 Map.of("role", role == null ? "" : role.trim()));
     }
 
+    /**
+     * PATCH /api/account/team/members/{accountId} —— 只改给了的字段：{@code role} 和/或 {@code title}
+     * （职务，展示标签；空串 = 清除）。
+     */
+    public Map<String, Object> updateTeamMember(String accountId, Map<String, Object> patch) {
+        return sendJson("PATCH", "/api/account/team/members/" + segment(accountId),
+                patch == null ? Map.of() : patch);
+    }
+
+    // ---- Skill 发布（桌面端「发布到 Marketplace」） ----
+
+    /** POST /api/skills —— 以当前账户为作者投稿一个 Skill。同 id 已存在时官网回 400 {@code id_taken}。 */
+    public Map<String, Object> submitSkill(Map<String, Object> body) {
+        return sendJson("POST", "/api/skills", body);
+    }
+
+    /** PUT /api/skills/{id} —— 更新自己发布过的 Skill；不是作者时官网回 403 {@code forbidden}。 */
+    public Map<String, Object> updatePublishedSkill(String id, Map<String, Object> body) {
+        return sendJson("PUT", "/api/skills/" + segment(id), body);
+    }
+
     /** DELETE /api/account/team/members/{accountId} —— 移除成员，或本人退出（OWNER 不可退出）。 */
     public Map<String, Object> removeTeamMember(String accountId) {
         return sendJson("DELETE", "/api/account/team/members/" + segment(accountId), null);
@@ -1251,6 +1272,16 @@ public class AccountService {
             case "head_cannot_leave" -> LangText.of("总部团队不能退出律所", "The head team cannot leave the firm");
             case "bad_phone" -> LangText.of("手机号格式不对", "That phone number is not valid");
             case "bad_role" -> LangText.of("角色不合法", "That role is not allowed");
+            case "bad_title" -> LangText.of("职务最多 30 个字", "A job title can be at most 30 characters");
+            // Skill 投稿（官网 lib/skills-store.ts validateSkillInput 的机器码）
+            case "id_taken" -> LangText.of("Marketplace 上已有同标识的 Skill", "A skill with this id already exists in the Marketplace");
+            case "invalid_id" -> LangText.of("Skill 标识不合规", "The skill id is not valid");
+            case "invalid_name" -> LangText.of("Skill 名称为空或超过 60 字", "The skill name is empty or longer than 60 characters");
+            case "invalid_description" -> LangText.of("Skill 简介为空或超过 200 字", "The skill description is empty or longer than 200 characters");
+            case "invalid_triggers" -> LangText.of("触发词需要 1–20 个，每个不超过 40 字", "Provide 1-20 trigger phrases, each at most 40 characters");
+            case "invalid_tools" -> LangText.of("Skill 声明的工具名不合规", "The skill declares an invalid tool name");
+            case "invalid_prompt" -> LangText.of("Skill 正文为空或超过 20000 字", "The skill instructions are empty or longer than 20000 characters");
+            case "invalid_output" -> LangText.of("Skill 输出说明超过 2000 字", "The skill output description is longer than 2000 characters");
             case "bad_name" -> LangText.of("名称不能为空", "The name cannot be empty");
             case "rate_limited" -> LangText.of("操作太频繁，稍后再试", "Too many requests, try again shortly");
             // 个人档案与头像（spec 2026-09-10 §5，官网 /api/account/profile 与 /api/account/avatar）
@@ -1276,6 +1307,14 @@ public class AccountService {
 
     private Map<String, Object> handle(AccountTransport.Reply reply, String path) {
         int status = reply.status();
+        if (status == 401 && path.startsWith("/api/skills")) {
+            // 投稿端点：官网尚未部署「Bearer 投稿」时一律 401。这不能说明 Key 失效——
+            // 判成 UNAUTHORIZED 会把一把好 Key 标成过期、整个账户掉线。账户真失效由其它端点发现。
+            throw new AccountException(AccountException.Kind.REJECTED, LangText.of(
+                    "官网暂不接受从客户端发布 Skill，请稍后再试或在官网投稿页提交",
+                    "The website does not accept skill publishing from the app yet; try again later or submit on the website"),
+                    "publish_unauthorized");
+        }
         if (status == 401) {
             throw new AccountException(AccountException.Kind.UNAUTHORIZED, unauthorizedMessage());
         }
@@ -1283,8 +1322,10 @@ public class AccountService {
             String code = businessErrorCode(reply.body());
             // 官网 team.ts 的 forbidden 是成员角色不足；鉴权失败另回 unauthorized。
             // 只按团队端点解释该码，保留其他账户接口原有的凭据失效判定。
+            // Skill 更新端点同理：403 forbidden = 这个 id 不是我发布的，不是 Key 失效。
             boolean teamForbidden = status == 403 && "forbidden".equals(code)
-                    && ("/api/account/team".equals(path) || path.startsWith("/api/account/team/"));
+                    && ("/api/account/team".equals(path) || path.startsWith("/api/account/team/")
+                        || path.startsWith("/api/skills/"));
             if (code != null && (teamForbidden || !AUTH_ERROR_CODES.contains(code))) {
                 // 团队等业务端点：凭据没问题，是规则不许（dev-board#496 裁决 4 的 phone_required 等）。
                 // 折叠成「Key 无效」会让用户去官网重生成一把好 Key，还把真正的原因吞掉。

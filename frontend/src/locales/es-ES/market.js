@@ -221,5 +221,15 @@ export default {
   "permSpeech": "Voz y grabación",
   "permTasks": "Calendario y tareas",
   "permClipboard": "Portapapeles",
-  "permLawfirm": "Información del equipo"
+  "permLawfirm": "Información del equipo",
+  "newlyCreatedTag": "Nuevo",
+  "publishBtn": "Publicar en el mercado de extensiones",
+  "publishUpdateBtn": "Actualizar en el mercado de extensiones",
+  "publishingEllipsis": "Publicando…",
+  "publishHint": "Una vez publicada, otros abogados podrán instalar esta habilidad desde el mercado de extensiones",
+  "publishedHint": "Publicada en el mercado de extensiones",
+  "publishedVersionHint": "Publicada en el mercado de extensiones (v{version})",
+  "publishedToast": "Publicada en el mercado de extensiones",
+  "publishUpdatedToast": "La versión en el mercado de extensiones se ha actualizado",
+  "publishFailed": "Error al publicar; inténtelo de nuevo más tarde"
 }

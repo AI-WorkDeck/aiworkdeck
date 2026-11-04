@@ -221,5 +221,15 @@ export default {
   "permSpeech": "เสียงพูดและการบันทึกเสียง",
   "permTasks": "ปฏิทินและงาน",
   "permClipboard": "คลิปบอร์ด",
-  "permLawfirm": "ข้อมูลทีม"
+  "permLawfirm": "ข้อมูลทีม",
+  "newlyCreatedTag": "ใหม่",
+  "publishBtn": "เผยแพร่ไปยังตลาดส่วนขยาย",
+  "publishUpdateBtn": "อัปเดตบนตลาดส่วนขยาย",
+  "publishingEllipsis": "กำลังเผยแพร่…",
+  "publishHint": "เมื่อเผยแพร่แล้ว ทนายความท่านอื่นจะติดตั้งทักษะนี้จากตลาดส่วนขยายได้",
+  "publishedHint": "เผยแพร่ไปยังตลาดส่วนขยายแล้ว",
+  "publishedVersionHint": "เผยแพร่ไปยังตลาดส่วนขยายแล้ว (v{version})",
+  "publishedToast": "เผยแพร่ไปยังตลาดส่วนขยายแล้ว",
+  "publishUpdatedToast": "อัปเดตเวอร์ชันบนตลาดส่วนขยายแล้ว",
+  "publishFailed": "เผยแพร่ไม่สำเร็จ โปรดลองอีกครั้งในภายหลัง"
 }

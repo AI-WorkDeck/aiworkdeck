@@ -312,7 +312,10 @@ export function useAgentStream() {
         // verification_report、harness_evolution 三条 SSE 事件填充，供过程卡与根气泡卡片展示。
         harnessAdaptations: [],
         verificationReport: null,
-        harnessEvolution: null
+        harnessEvolution: null,
+        // 一句话写 Skill：create_skill 成功后后端发 client_action skill_created，卡片挂在当轮气泡上。
+        // 只活在本次会话视图里（不入库）；Skill 本身已落盘并出现在插件广场「已安装 · Skill」。
+        createdSkills: []
     })
 
     const clearDocStreamingPlaceholder = (bubble) => {
@@ -805,6 +808,7 @@ export function useAgentStream() {
             || (Array.isArray(bubble.processes) && bubble.processes.length)
             || (Array.isArray(bubble.artifacts) && bubble.artifacts.length)
             || bubble.verificationReport
+            || (Array.isArray(bubble.createdSkills) && bubble.createdSkills.length)
         )
     )
 
@@ -1711,6 +1715,12 @@ export function useAgentStream() {
                 // 与 PPT 生成等 Agent 后台任务同一张表、同一个浮窗；仍继续下发给页面级 handler。
                 if (d && d.action === 'plugin_job_progress') {
                     upsertPluginJob(d)
+                }
+                if (d && d.action === 'skill_created' && d.skill && d.skill.id && currentAssistantBubble.value) {
+                    const list = currentAssistantBubble.value.createdSkills || (currentAssistantBubble.value.createdSkills = [])
+                    const at = list.findIndex(s => s.id === d.skill.id)
+                    if (at >= 0) list.splice(at, 1, d.skill)
+                    else list.push(d.skill)
                 }
                 // Trigger registered callbacks
                 if (clientActionHandler.value) {

@@ -37,7 +37,7 @@ export default {
   "railLabel": "बातचीत नेविगेशन",
   "railTurnIndex": "चरण {n}",
   "railUntitled": "(कोई प्रश्न पाठ नहीं)",
-  "mentionTitle": "प्रोजेक्ट फ़ाइल का संदर्भ दें",
+  "mentionTitle": "प्रोजेक्ट फ़ाइल या स्किल का संदर्भ दें",
   "mentionHint": "चुनने के लिए ऊपर/नीचे, पुष्टि के लिए Enter, बंद करने के लिए Esc",
   "mentionNoMatch": "कोई मेल खाती प्रोजेक्ट फ़ाइल नहीं",
   "uploadTabLocal": "इस कंप्यूटर से जोड़ें",
@@ -467,5 +467,13 @@ export default {
   "evolutionContrastBefore": "पहले",
   "evolutionContrastAfter": "बाद",
   "evolutionActionFailed": "कार्रवाई पूरी नहीं हुई; कृपया पुनः प्रयास करें",
-  "evolutionPromoteAdminOnly": "प्रवर्धित स्किल्स इस इंस्टेंस पर सभी के लिए लागू होते हैं; व्यवस्थापक अनुमति आवश्यक है"
+  "evolutionPromoteAdminOnly": "प्रवर्धित स्किल्स इस इंस्टेंस पर सभी के लिए लागू होते हैं; व्यवस्थापक अनुमति आवश्यक है",
+  "mentionSkillTag": "स्किल",
+  "skillCreatedLabel": "AI सहायक · स्किल बनाई गई",
+  "skillCardInput": "इनपुट",
+  "skillCardRules": "नियम",
+  "skillCardOutput": "आउटपुट",
+  "skillCardAdded": "\"इंस्टॉल हो गया · स्किल\" में जोड़ी गई",
+  "skillCardOpen": "देखें और प्रकाशित करें",
+  "skillCardTryHint": "अगली बार इसे चलाने के लिए बस {'@'}{name} लिखें"
 }

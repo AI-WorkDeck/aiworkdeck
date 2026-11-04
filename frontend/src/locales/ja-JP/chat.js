@@ -37,7 +37,7 @@ export default {
   "railLabel": "会話ナビゲーション",
   "railTurnIndex": "ターン {n}",
   "railUntitled": "(質問文なし)",
-  "mentionTitle": "プロジェクトファイルを参照",
+  "mentionTitle": "プロジェクトファイルまたはスキルを参照",
   "mentionHint": "上/下で選択、Enter で確定、Esc で閉じる",
   "mentionNoMatch": "一致するプロジェクトファイルがありません",
   "uploadTabLocal": "このコンピューターから追加",
@@ -467,5 +467,13 @@ export default {
   "evolutionContrastBefore": "変更前",
   "evolutionContrastAfter": "変更後",
   "evolutionActionFailed": "操作が完了しませんでした。もう一度お試しください",
-  "evolutionPromoteAdminOnly": "昇格されたスキルはこのインスタンスの全ユーザーに適用されます。管理者権限が必要です"
+  "evolutionPromoteAdminOnly": "昇格されたスキルはこのインスタンスの全ユーザーに適用されます。管理者権限が必要です",
+  "mentionSkillTag": "スキル",
+  "skillCreatedLabel": "AIアシスタント · スキルを作成しました",
+  "skillCardInput": "入力",
+  "skillCardRules": "ルール",
+  "skillCardOutput": "出力",
+  "skillCardAdded": "「インストール済み · スキル」に追加しました",
+  "skillCardOpen": "表示して公開",
+  "skillCardTryHint": "次回は {'@'}{name} と入力すれば呼び出せます"
 }

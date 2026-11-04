@@ -37,7 +37,7 @@ export default {
   "railLabel": "Navigasi percakapan",
   "railTurnIndex": "Giliran {n}",
   "railUntitled": "(tidak ada teks pertanyaan)",
-  "mentionTitle": "Rujuk berkas proyek",
+  "mentionTitle": "Rujuk berkas proyek atau Skill",
   "mentionHint": "Naik/Turun untuk memilih, Enter untuk mengonfirmasi, Esc untuk menutup",
   "mentionNoMatch": "Tidak ada berkas proyek yang cocok",
   "uploadTabLocal": "Tambah dari komputer ini",
@@ -467,5 +467,13 @@ export default {
   "evolutionContrastBefore": "Sebelum",
   "evolutionContrastAfter": "Sesudah",
   "evolutionActionFailed": "Tindakan tidak berhasil; silakan coba lagi",
-  "evolutionPromoteAdminOnly": "Skill yang dipromosikan berlaku untuk semua orang di instance ini; diperlukan izin administrator"
+  "evolutionPromoteAdminOnly": "Skill yang dipromosikan berlaku untuk semua orang di instance ini; diperlukan izin administrator",
+  "mentionSkillTag": "Skill",
+  "skillCreatedLabel": "Asisten AI · Skill Dibuat",
+  "skillCardInput": "Input",
+  "skillCardRules": "Aturan",
+  "skillCardOutput": "Output",
+  "skillCardAdded": "Ditambahkan ke \"Terpasang · Skill\"",
+  "skillCardOpen": "Lihat dan Terbitkan",
+  "skillCardTryHint": "Lain kali, cukup ketik {'@'}{name} untuk menjalankannya"
 }

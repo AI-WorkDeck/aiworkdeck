@@ -6,6 +6,7 @@ package com.checkba.service.team;
 import com.checkba.model.entity.TelemetryEvent;
 import com.checkba.model.entity.TokenUsage;
 import com.checkba.repository.ProjectRepository;
+import com.checkba.repository.ProjectTaskRepository;
 import com.checkba.repository.TelemetryEventRepository;
 import com.checkba.repository.TokenUsageRepository;
 import com.checkba.service.telemetry.InstallIdentityService;
@@ -52,6 +53,7 @@ public class TeamUsageRollupService {
     private final TelemetryEventRepository eventRepository;
     private final TokenUsageRepository tokenUsageRepository;
     private final ProjectRepository projectRepository;
+    private final ProjectTaskRepository taskRepository;
     private final InstallIdentityService identity;
     private final TeamSettingsCache teamSettingsCache;
     private final ObjectMapper mapper = new ObjectMapper();
@@ -60,14 +62,36 @@ public class TeamUsageRollupService {
                                   TelemetryEventRepository eventRepository,
                                   TokenUsageRepository tokenUsageRepository,
                                   ProjectRepository projectRepository,
+                                  ProjectTaskRepository taskRepository,
                                   InstallIdentityService identity,
                                   TeamSettingsCache teamSettingsCache) {
         this.workSessionRepository = workSessionRepository;
         this.eventRepository = eventRepository;
         this.tokenUsageRepository = tokenUsageRepository;
         this.projectRepository = projectRepository;
+        this.taskRepository = taskRepository;
         this.identity = identity;
         this.teamSettingsCache = teamSettingsCache;
+    }
+
+    /**
+     * 本人名下项目里「未完成且未分派」的事项数（团队看板「待分派事项」）。
+     *
+     * <p><b>是上报时刻的快照，不是 {@code date} 当天的历史值</b>——事项表不留状态历史。
+     * 官网只取每人最近一天那份上报里的这个数，所以补传的旧日子带上当前值也不会被重复相加。
+     * 只计数、不带事项标题：标题可能含当事人信息，团队通道的承诺只有计数与（经同意的）项目名。
+     * 它不算「当天有活动」：{@code TeamUsageUploadService.isEmptyDay} 不看这个字段。
+     */
+    long unassignedTasks(Long userId) {
+        if (taskRepository == null || userId == null) return 0L;
+        List<Long> projectIds = new ArrayList<>();
+        for (var p : projectRepository.findByUserIdOrderByCreatedAtDesc(userId)) {
+            if (p.getId() != null && !p.isLooseFileWorkspace() && !p.isScratchWorkspace()) projectIds.add(p.getId());
+        }
+        if (projectIds.isEmpty()) return 0L;
+        return taskRepository.findByProjectIdInAndStatus(projectIds, "OPEN").stream()
+                .filter(t -> t.getAssigneeId() == null)
+                .count();
     }
 
     /**
@@ -92,6 +116,7 @@ public class TeamUsageRollupService {
         payload.put("agentEditActions", counters.agentEditActions);
         payload.put("manualEditActions", counters.manualEditActions);
         payload.put("projectsCreated", counters.projectsCreated);
+        payload.put("unassignedTasks", unassignedTasks(userId));
 
         Map<Long, Long> llmCallsByProject = new LinkedHashMap<>();
         payload.put("tokens", tokens(date, userId, llmCallsByProject));

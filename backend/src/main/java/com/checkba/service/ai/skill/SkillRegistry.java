@@ -513,6 +513,11 @@ public class SkillRegistry {
         if (enabledByDefault != null) {
             skill.setEnabledByDefault(enabledByDefault);
         }
+        Boolean authoredLocally = asBoolean(raw.get("authored_locally"));
+        if (authoredLocally != null) {
+            skill.setAuthoredLocally(authoredLocally);
+        }
+        skill.setCreatedAt(asString(raw.get("created_at")));
         Boolean builtinWorkflow = asBoolean(raw.get("builtin_workflow"));
         if (builtinWorkflow != null) {
             skill.setBuiltinWorkflow(builtinWorkflow);

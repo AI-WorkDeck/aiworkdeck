@@ -125,6 +125,8 @@ const NAMES = {
   list_tools: { zh: '查看工具目录', en: 'Browse tool catalog' },
   // 调用技能（dev-board#1065）：模型自己决定按某个 skill 的流程干活时走它
   use_skill: { zh: '调用技能', en: 'Use a skill' },
+  // 一句话写 Skill：把用户描述的流程落成本机 skill
+  create_skill: { zh: '创建 Skill', en: 'Create a skill' },
   run_python: { zh: '执行Python代码', en: 'Run Python' },
   // 文档编辑（LibreOffice 拟人式原语）
   doc_list_project_files: { zh: '列出项目文件', en: 'List project files' },

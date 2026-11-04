@@ -221,5 +221,15 @@ export default {
   "permSpeech": "Voix et enregistrement",
   "permTasks": "Calendrier et tâches",
   "permClipboard": "Presse-papiers",
-  "permLawfirm": "Informations sur l'équipe"
+  "permLawfirm": "Informations sur l'équipe",
+  "newlyCreatedTag": "Nouveau",
+  "publishBtn": "Publier sur la boutique d’extensions",
+  "publishUpdateBtn": "Mettre à jour sur la boutique d’extensions",
+  "publishingEllipsis": "Publication en cours…",
+  "publishHint": "Une fois publiée, les autres avocats pourront installer cette compétence depuis la boutique d’extensions",
+  "publishedHint": "Publiée sur la boutique d’extensions",
+  "publishedVersionHint": "Publiée sur la boutique d’extensions (v{version})",
+  "publishedToast": "Publiée sur la boutique d’extensions",
+  "publishUpdatedToast": "La version sur la boutique d’extensions a été mise à jour",
+  "publishFailed": "Échec de la publication ; veuillez réessayer plus tard"
 }

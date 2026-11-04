@@ -505,7 +505,7 @@
                 :data-placeholder="$t('chat.inputPlaceholderEmpty')"
               ></div>
               <!-- `@` 引用选择器（dev-board#794 K15）：浮在输入卡上沿 -->
-              <MentionPicker v-if="mentionOpen" ref="mentionPicker" :files="mentionCandidates"
+              <MentionPicker v-if="mentionOpen" ref="mentionPicker" :files="mentionCandidates" :skills="mentionSkills"
                              :query="mentionQuery" :loading="mentionLoading" @select="chooseMentionFile" />
               <!-- Note: Context files are now shown as inline tags inside the rich input -->
               <!-- 本轮生效的 Skill：手动选的带 × 可移除，自动命中的新出现时闪一下 -->
@@ -837,7 +837,7 @@
             :data-placeholder="$t('chat.inputPlaceholder')"
           ></div>
           <!-- `@` 引用选择器（dev-board#794 K15）：浮在输入卡上沿 -->
-          <MentionPicker v-if="mentionOpen" ref="mentionPicker" :files="mentionCandidates"
+          <MentionPicker v-if="mentionOpen" ref="mentionPicker" :files="mentionCandidates" :skills="mentionSkills"
                          :query="mentionQuery" :loading="mentionLoading" @select="chooseMentionFile" />
           <!-- Note: Context files are now shown as inline tags inside the rich input -->
           <!-- 本轮生效的 Skill：手动选的带 × 可移除，自动命中的新出现时闪一下 -->
@@ -1395,6 +1395,13 @@ export default {
            pptConfigData.value = action
            pptExportEditable.value = false // Default to safe option
            showPptConfigDialog.value = true
+        } else if (action.action === 'skill_created') {
+           // 一句话写 Skill 落盘后：刷新本输入框的可选 Skill（好让 @ 立刻点得到），
+           // 并通知插件广场左栏 / 详情页与工作台入口刷新（与广场自己安装后发的两个事件一致）。
+           // 卡片本身由 useAgentStream 挂到当轮气泡上。
+           loadAvailableSkills()
+           uni.$emit('awd:market-changed')
+           uni.$emit('awd:market-changed-from-sidebar')
         } else if (action.action === 'ocr_route_required') {
            ocrRouteHandler.onAction(action)
         } else if (action.action === 'component_required') {
@@ -3599,10 +3606,47 @@ export default {
       return addFile(file)
     }
 
+    // `@` 也能点名 Skill（一句话写 Skill：`@股东会签字页 生成本次股东会的全部签字页`）。
+    // ASK 模式下 skill 不生效，就不列；选中 = 把它勾进本轮（与技能选择器同一个 selectedSkillIds）。
+    const mentionSkills = computed(() => (skillDisabledByMode.value ? [] : availableSkills.value.map(s => ({
+      id: s.id,
+      name: skillDisplayName(s),
+      description: (isEnglish() && s.descriptionEn) || s.description || '',
+    }))))
+
+    const chooseMentionSkill = (skill, anchor) => {
+      if (!selectedSkillIds.value.includes(skill.id)) {
+        selectedSkillIds.value = [...selectedSkillIds.value, skill.id]
+      }
+      // `@查询` 换成 `@名称 `，让输入里看得见点了谁；真正生效靠上面的 selectedSkillIds（chip 行可移除）。
+      if (anchor && anchor.node && anchor.node.isConnected && richInput.value && richInput.value.contains(anchor.node)) {
+        try {
+          const len = String(anchor.node.textContent || '').length
+          const range = document.createRange()
+          range.setStart(anchor.node, Math.min(anchor.start, len))
+          range.setEnd(anchor.node, Math.min(anchor.end, len))
+          range.deleteContents()
+          const text = document.createTextNode('@' + skill.name + '\u00a0')
+          range.insertNode(text)
+          richInput.value.focus()
+          const sel = window.getSelection()
+          const after = document.createRange()
+          after.setStartAfter(text)
+          after.collapse(true)
+          sel.removeAllRanges()
+          sel.addRange(after)
+        } catch (err) {
+          console.warn('[ChatInterface] mention skill insert failed', err)
+        }
+      }
+      if (richInput.value) inputPrompt.value = richInput.value.innerText
+    }
+
     const chooseMentionFile = (file) => {
       const anchor = mentionAnchor
       closeMention()
       if (!file) return
+      if (file.kind === 'skill') return chooseMentionSkill(file, anchor)
       // 先把 `@查询` 那段删掉并把光标留在原处——addFile → insertContextTagToInput
       // 正是往当前 Range 插标签，位置天然对得上。
       if (anchor && anchor.node && anchor.node.isConnected && richInput.value && richInput.value.contains(anchor.node)) {
@@ -4718,6 +4762,7 @@ export default {
        mentionQuery,
        mentionLoading,
        mentionCandidates,
+       mentionSkills,
        mentionPicker,
        chooseMentionFile,
        handleInputKeydown,

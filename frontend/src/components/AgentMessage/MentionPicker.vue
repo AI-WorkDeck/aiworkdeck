@@ -23,7 +23,12 @@
         @mousedown.prevent="$emit('select', item)"
         @mousemove="activeIndex = idx"
       >
-        <template v-if="item.kind === 'member'">
+        <template v-if="item.kind === 'skill'">
+          <text class="mp-skill-tag">{{ $t('chat.mentionSkillTag') }}</text>
+          <text class="mp-name">{{ item.name }}</text>
+          <text v-if="item.description" class="mp-path">{{ item.description }}</text>
+        </template>
+        <template v-else-if="item.kind === 'member'">
           <text class="mp-avatar">{{ memberInitial(item) }}</text>
           <text class="mp-name">{{ memberName(item) }}</text>
           <text v-if="item.roleLabel || item.role" class="mp-path">{{ item.roleLabel || item.role }}</text>
@@ -71,6 +76,11 @@ export default {
     title: { type: String, default: '' },
     hint: { type: String, default: '' },
     emptyText: { type: String, default: '' },
+    /**
+     * 可选：可调用的 Skill [{id, name, description}]（一句话写 Skill：`@股东会签字页`）。
+     * 匹配到的排在最前，条目带 kind:'skill'；宿主据此把 skill 选进本轮而不是插文件标签。
+     */
+    skills: { type: Array, default: () => [] },
     /** 'top'（默认，浮在输入框上方，chat 用法）| 'bottom'（浮在下方） */
     placement: { type: String, default: 'top' },
   },
@@ -81,10 +91,11 @@ export default {
   computed: {
     matches() {
       const files = matchProjectFiles(this.files, this.query)
-      if (!this.members.length) return files
+      const skills = this.matchSkills()
+      if (!this.members.length) return skills.concat(files)
       const members = matchMembers(this.members, this.query)
         .map((m) => ({ ...m, kind: 'member', id: m.userId }))
-      return members.concat(files)
+      return skills.concat(members, files)
     },
   },
   watch: {
@@ -103,6 +114,16 @@ export default {
     },
     memberInitial(item) {
       return memberName(item).slice(0, 1).toUpperCase()
+    },
+    matchSkills() {
+      if (!this.skills.length) return []
+      const q = String(this.query || '').trim().toLowerCase()
+      return this.skills
+        .filter((s) => s && s.id && (!q
+          || String(s.name || '').toLowerCase().includes(q)
+          || String(s.id).toLowerCase().includes(q)))
+        .slice(0, 8)
+        .map((s) => ({ id: s.id, name: s.name || s.id, description: s.description || '', kind: 'skill' }))
     },
     activeItem() {
       return this.matches[this.activeIndex] || null
@@ -182,6 +203,21 @@ export default {
   &.is-active {
     background: var(--awd-accent-soft);
   }
+}
+
+.mp-skill-tag + .mp-name {
+  flex-shrink: 0;
+  max-width: 60%;
+}
+
+.mp-skill-tag {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border-radius: var(--awd-radius-sm);
+  background: var(--awd-accent-soft);
+  color: var(--awd-accent-text);
+  font-size: var(--awd-panel-fs-meta);
+  line-height: 16px;
 }
 
 .mp-icon {

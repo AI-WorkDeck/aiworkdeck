@@ -37,7 +37,7 @@ export default {
   "railLabel": "การนำทางบทสนทนา",
   "railTurnIndex": "รอบที่ {n}",
   "railUntitled": "(ไม่มีข้อความคำถาม)",
-  "mentionTitle": "อ้างอิงไฟล์ของโปรเจกต์",
+  "mentionTitle": "อ้างอิงไฟล์ของโปรเจกต์หรือทักษะ",
   "mentionHint": "กดขึ้น/ลงเพื่อเลือก, Enter เพื่อยืนยัน, Esc เพื่อปิด",
   "mentionNoMatch": "ไม่พบไฟล์โปรเจกต์ที่ตรงกัน",
   "uploadTabLocal": "เพิ่มจากคอมพิวเตอร์นี้",
@@ -467,5 +467,13 @@ export default {
   "evolutionContrastBefore": "ก่อน",
   "evolutionContrastAfter": "หลัง",
   "evolutionActionFailed": "การดำเนินการไม่สำเร็จ โปรดลองอีกครั้ง",
-  "evolutionPromoteAdminOnly": "สกิลที่เลื่อนระดับแล้วจะมีผลกับทุกคนบนอินสแตนซ์นี้ ต้องใช้สิทธิ์ผู้ดูแลระบบ"
+  "evolutionPromoteAdminOnly": "สกิลที่เลื่อนระดับแล้วจะมีผลกับทุกคนบนอินสแตนซ์นี้ ต้องใช้สิทธิ์ผู้ดูแลระบบ",
+  "mentionSkillTag": "ทักษะ",
+  "skillCreatedLabel": "ผู้ช่วย AI · สร้างทักษะแล้ว",
+  "skillCardInput": "อินพุต",
+  "skillCardRules": "กฎ",
+  "skillCardOutput": "เอาต์พุต",
+  "skillCardAdded": "เพิ่มใน \"ติดตั้งแล้ว · ทักษะ\" แล้ว",
+  "skillCardOpen": "ดูและเผยแพร่",
+  "skillCardTryHint": "ครั้งหน้าพิมพ์ {'@'}{name} เพื่อเรียกใช้ได้เลย"
 }

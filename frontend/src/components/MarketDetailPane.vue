@@ -60,14 +60,24 @@
               >
                 <text>{{ busy ? $t('market.installingEllipsis') : $t('market.install') }}</text>
               </view>
+              <!-- 本机创建的 Skill 不给「重新安装」：那会用广场里的副本覆盖本机原稿 -->
               <view
-                v-else-if="marketInfo && installedInfo && !isBuiltinRedaction"
+                v-else-if="marketInfo && installedInfo && !isBuiltinRedaction && !installedInfo.authoredLocally"
                 class="mdp-btn"
                 :class="{ busy }"
                 @tap="doInstallSkill"
               >
                 <text>{{ busy ? $t('market.processingEllipsis') : $t('market.reinstallOrUpdate') }}</text>
               </view>
+              <!-- 一句话写 Skill：本机创建的可一键发布到官网 Marketplace，供其他律师安装 -->
+              <template v-if="installedInfo && installedInfo.authoredLocally">
+                <view class="mdp-btn primary" :class="{ busy }" @tap="doPublishSkill">
+                  <text>{{ busy ? $t('market.publishingEllipsis') : (skillPublishState === 'published' ? $t('market.publishUpdateBtn') : $t('market.publishBtn')) }}</text>
+                </view>
+                <text class="mdp-action-hint">{{ skillPublishState === 'published'
+                  ? (installedInfo.publishedVersion ? $t('market.publishedVersionHint', { version: installedInfo.publishedVersion }) : $t('market.publishedHint'))
+                  : $t('market.publishHint') }}</text>
+              </template>
               <!-- 面板型 skill（背后挂着左栏面板）按插件呈现：只有启用/停用。
                    「生效方式三档」是对话型 skill 的概念，对面板讲不通——设成 manual
                    会让面板里的 kick-off 按钮点了没反应。判据见 leftSidebarPlugins.js。
@@ -114,7 +124,7 @@
               </AwdSelect>
               <text v-if="installedInfo && installedInfo.sourcePluginId" class="mdp-action-hint">{{ $t('market.activationHintSourcePlugin') }}</text>
               <view
-                v-if="installedInfo && marketInfo && !installedInfo.sourcePluginId"
+                v-if="installedInfo && (marketInfo || installedInfo.authoredLocally) && !installedInfo.sourcePluginId"
                 class="mdp-btn danger"
                 :class="{ busy }"
                 @tap="doUninstallSkill"
@@ -320,7 +330,7 @@
 // 插件广场详情 tab（VS Code 扩展详情页形态）。spec = { kind: 'skill'|'plugin', id, name }
 // 由左栏 MarketSidebarPanel 点行打开。自行拉取市场与已安装两份数据合成视图，
 // 装/卸/启停后通过 uni.$emit('awd:market-changed') 通知左栏刷新。
-import { getBundledPlugins, installBundledPlugin, getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, uninstallMarketSkill, installMarketPlugin, uninstallMarketPlugin, setPluginEnabled, setSkillActivation, packStatus, packInfo, packInstall, packUpgrade, packUninstall, getPluginSettings, savePluginSettings, getContributedStyleProfiles, selectContributedStyleProfile, getContributedThemes, selectContributedTheme, resolvePluginEntryUrl } from '@/services/api.js'
+import { getBundledPlugins, installBundledPlugin, getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, uninstallMarketSkill, publishSkill, installMarketPlugin, uninstallMarketPlugin, setPluginEnabled, setSkillActivation, packStatus, packInfo, packInstall, packUpgrade, packUninstall, getPluginSettings, savePluginSettings, getContributedStyleProfiles, selectContributedStyleProfile, getContributedThemes, selectContributedTheme, resolvePluginEntryUrl } from '@/services/api.js'
 import { APP_LANGUAGE_EVENT, getAppLanguage } from '@/utils/appLanguage.js'
 import { setActiveSkin, getResolvedTheme, collectThemeTokens, APP_THEME_EVENT } from '@/utils/appTheme.js'
 import { ICONS } from '@/config/icons.js'
@@ -333,6 +343,7 @@ import PluginConnectionSettings from '@/components/PluginConnectionSettings.vue'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { refreshEntitlements } from '@/composables/useEntitlement.js'
 import { requireAccount, isAccountLoginRetry } from '@/utils/requireAccount.js'
+import { publishState } from '@/utils/authoredSkills.mjs'
 import { t } from '@/i18n'
 import AwdSelect from '@/components/AwdSelect.vue'
 import AwdSwitch from '@/components/AwdSwitch.vue'
@@ -443,6 +454,10 @@ export default {
     }
   },
   computed: {
+    /** 本机创建的 Skill 的发布状态：'none'（非本机创建）/'unpublished'/'published'。 */
+    skillPublishState() {
+      return this.spec && this.spec.kind === 'skill' ? publishState(this.installedInfo) : 'none'
+    },
     ACTIVATION_LABELS() {
       return [
         this.$t('market.activationAuto'),
@@ -1028,6 +1043,31 @@ export default {
         // 后端 4011 已由 api.js 就地弹过登录层：登录成功就重拉详情，按钮按新账户的已购状态显示
         if (isAccountLoginRetry(e)) await this.reload()
         uni.showToast({ title: e?.message || this.$t('market.installFailedNeedAdmin'), icon: 'none' })
+      } finally {
+        this.busy = false
+      }
+    },
+    async doPublishSkill(retried = false) {
+      if (this.busy) return
+      this.busy = true
+      try {
+        const res = await publishSkill(this.spec.id)
+        const data = (res && res.data) || {}
+        uni.showToast({
+          title: data.updated ? this.$t('market.publishUpdatedToast') : this.$t('market.publishedToast'),
+          icon: 'none',
+        })
+        await this.reload()
+        this.notifyChanged()
+      } catch (e) {
+        console.error('发布 Skill 失败:', e)
+        if (e && e.reason === 'not_connected' && !retried) {
+          this.busy = false
+          // 去连账户；连上了就接着发，省得用户再点一次
+          if (await requireAccount({ reason: 'market' })) await this.doPublishSkill(true)
+          return
+        }
+        uni.showToast({ title: e?.message || this.$t('market.publishFailed'), icon: 'none' })
       } finally {
         this.busy = false
       }

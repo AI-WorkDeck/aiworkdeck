@@ -37,7 +37,7 @@ export default {
   "railLabel": "대화 탐색",
   "railTurnIndex": "{n}번째 턴",
   "railUntitled": "(질문 내용 없음)",
-  "mentionTitle": "프로젝트 파일 참조",
+  "mentionTitle": "프로젝트 파일 또는 스킬 참조",
   "mentionHint": "위/아래로 선택, Enter로 확인, Esc로 닫기",
   "mentionNoMatch": "일치하는 프로젝트 파일이 없습니다",
   "uploadTabLocal": "이 컴퓨터에서 추가",
@@ -467,5 +467,13 @@ export default {
   "evolutionContrastBefore": "이전",
   "evolutionContrastAfter": "이후",
   "evolutionActionFailed": "작업이 완료되지 않았습니다. 다시 시도해 주세요",
-  "evolutionPromoteAdminOnly": "승격된 스킬은 이 인스턴스의 모든 사용자에게 적용됩니다. 관리자 권한이 필요합니다"
+  "evolutionPromoteAdminOnly": "승격된 스킬은 이 인스턴스의 모든 사용자에게 적용됩니다. 관리자 권한이 필요합니다",
+  "mentionSkillTag": "스킬",
+  "skillCreatedLabel": "AI 어시스턴트 · 스킬 생성됨",
+  "skillCardInput": "입력",
+  "skillCardRules": "규칙",
+  "skillCardOutput": "출력",
+  "skillCardAdded": "\"설치됨 · 스킬\"에 추가되었습니다",
+  "skillCardOpen": "보기 및 게시",
+  "skillCardTryHint": "다음에는 {'@'}{name}을(를) 입력하면 바로 실행됩니다"
 }

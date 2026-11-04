@@ -37,7 +37,7 @@ export default {
   "railLabel": "對話導航",
   "railTurnIndex": "第 {n} 輪",
   "railUntitled": "（無提問文字）",
-  "mentionTitle": "引用項目文件",
+  "mentionTitle": "引用項目文件或 Skill",
   "mentionHint": "上下鍵選擇 · 回車確認 · Esc 關閉",
   "mentionNoMatch": "沒有匹配的項目文件",
   "uploadTabLocal": "添加本機文件",
@@ -467,5 +467,13 @@ export default {
   "evolutionContrastBefore": "糾偏前",
   "evolutionContrastAfter": "糾偏後",
   "evolutionActionFailed": "操作未成功，請稍後重試",
-  "evolutionPromoteAdminOnly": "升格技能會對本實例所有成員生效，僅管理員可操作"
+  "evolutionPromoteAdminOnly": "升格技能會對本實例所有成員生效，僅管理員可操作",
+  "mentionSkillTag": "Skill",
+  "skillCreatedLabel": "AI 助手 · 已建立 Skill",
+  "skillCardInput": "輸入",
+  "skillCardRules": "規則",
+  "skillCardOutput": "輸出",
+  "skillCardAdded": "已加入「已安裝 · Skill」",
+  "skillCardOpen": "查看與發布",
+  "skillCardTryHint": "下回輸入 {'@'}{name} 叫它一聲就行"
 }
