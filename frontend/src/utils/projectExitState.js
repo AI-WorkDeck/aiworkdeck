@@ -25,7 +25,7 @@ export async function inspectExitProject(row, readStatus) {
     row.count = status.changedCount
     row.receiptEpoch = status.receiptEpoch
     row.state = !status.enabled ? 'empty' : status.conflict ? 'conflict'
-      : !status.canCommit || (!status.working && !row.count) ? 'empty' : 'ready'
+      : !status.canCommit || !row.count ? 'empty' : 'ready'
   } catch { row.state = 'failed' }
 }
 
@@ -54,7 +54,7 @@ export async function settleExitCommit(row, commit, readStatus) {
   }
   try {
     const status = validateStatus(await readStatus(row.id))
-    if (status.conflict || status.changedCount > 0 || (status.working && !status.onDraft)) {
+    if (status.conflict || status.changedCount > 0) {
       row.count = status.changedCount
       row.receiptEpoch = status.receiptEpoch
       row.state = status.conflict ? 'conflict' : 'ready'
