@@ -8841,12 +8841,13 @@ export default {
       const prompt = (payload && payload.prompt ? String(payload.prompt) : '').trim()
       const switched = await this.switchViewMode('chat', { openCanvas: false })
       if (!switched) return
+      await this.$nextTick()
+      for (let i = 0; i < 30 && !this.$refs.chatInterface?.sendQuickPrompt; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+      if (payload.model) this.$refs.chatInterface?.selectModel?.(payload.model)
       if (prompt) {
         this.pendingQuickChatPrompt = prompt
-        await this.$nextTick()
-        for (let i = 0; i < 30 && !this.$refs.chatInterface?.sendQuickPrompt; i++) {
-          await new Promise((resolve) => setTimeout(resolve, 100))
-        }
         this.$refs.chatInterface?.sendQuickPrompt?.(prompt)
         this.pendingQuickChatPrompt = ''
       }
