@@ -424,3 +424,12 @@ test('Mac upgrade fixture uses explicit 0.71 to 0.72 inputs and rejects absent/e
     assert(win.run.includes(`download-upgrade-build.mjs ${kind} win32`))
   }
 })
+
+test('Native Windows baseline directory syntax is bound to known builder lockfile versions', async () => {
+  const { nsisDirectoryStyle } = await import('../scripts/download-upgrade-build.mjs')
+  const lock = version => ({ packages: { 'node_modules/electron-builder': { version } } })
+  assert.deepEqual(nsisDirectoryStyle(lock('24.13.3')), { version: '24.13.3', directoryStyle: 'quoted' })
+  assert.deepEqual(nsisDirectoryStyle(lock('26.5.4')), { version: '26.5.4', directoryStyle: 'unquoted' })
+  for (const version of ['25.0.0', '27.0.0', undefined]) assert.throws(() => nsisDirectoryStyle(lock(version)))
+  assert.throws(() => nsisDirectoryStyle({}))
+})
