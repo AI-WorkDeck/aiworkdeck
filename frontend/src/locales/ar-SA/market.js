@@ -221,5 +221,15 @@ export default {
   "permSpeech": "الخطاب والتسجيل",
   "permTasks": "التقويم والمهام",
   "permClipboard": "الحافظة",
-  "permLawfirm": "معلومات الفريق"
+  "permLawfirm": "معلومات الفريق",
+  "newlyCreatedTag": "جديد",
+  "publishBtn": "النشر في السوق",
+  "publishUpdateBtn": "التحديث في السوق",
+  "publishingEllipsis": "جارٍ النشر…",
+  "publishHint": "بعد النشر، يمكن للمحامين الآخرين تثبيت هذه المهارة من السوق",
+  "publishedHint": "تم النشر في السوق",
+  "publishedVersionHint": "تم النشر في السوق (v{version})",
+  "publishedToast": "تم النشر في السوق",
+  "publishUpdatedToast": "تم تحديث الإصدار في السوق",
+  "publishFailed": "فشل النشر؛ يرجى المحاولة لاحقًا"
 }

@@ -221,5 +221,15 @@ export default {
   "permSpeech": "Percakapan dan perekaman",
   "permTasks": "Kalender dan tugas",
   "permClipboard": "Papan Klip",
-  "permLawfirm": "Informasi tim"
+  "permLawfirm": "Informasi tim",
+  "newlyCreatedTag": "Baru",
+  "publishBtn": "Terbitkan ke Pasar Ekstensi",
+  "publishUpdateBtn": "Perbarui di Pasar Ekstensi",
+  "publishingEllipsis": "Menerbitkan…",
+  "publishHint": "Setelah diterbitkan, pengacara lain dapat memasang Skill ini dari Pasar Ekstensi",
+  "publishedHint": "Diterbitkan ke Pasar Ekstensi",
+  "publishedVersionHint": "Diterbitkan ke Pasar Ekstensi (v{version})",
+  "publishedToast": "Diterbitkan ke Pasar Ekstensi",
+  "publishUpdatedToast": "Versi di Pasar Ekstensi telah diperbarui",
+  "publishFailed": "Penerbitan gagal; silakan coba lagi nanti"
 }

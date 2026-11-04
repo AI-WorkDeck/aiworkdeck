@@ -139,6 +139,9 @@
                  自进化规则由后端自动判定作用域与技能晋升并静默写入记忆，不在对话流中弹卡打扰用户。 -->
             <VerificationReportCard v-if="bubble.verificationReport" :report="bubble.verificationReport" />
 
+            <!-- 一句话写 Skill：create_skill 成功后的结果卡（client_action skill_created） -->
+            <SkillCreatedCard v-for="sk in (bubble.createdSkills || [])" :key="'skill-' + sk.id" :skill="sk" />
+
             <div v-if="fileChanges.length" class="turn-files">
               <button v-for="file in fileChanges" :key="String(file.fileId || file.fileName)"
                 type="button" class="turn-file" @click="$emit('open-file', file)">
@@ -181,6 +184,7 @@ import ProcessCard from './ProcessCard.vue'
 import ArtifactCard from '../ArtifactCard.vue'
 import QuestionCard from './QuestionCard.vue'
 import VerificationReportCard from './VerificationReportCard.vue'
+import SkillCreatedCard from './SkillCreatedCard.vue'
 import LegalReferenceCard from '../legal/LegalReferenceCard.vue'
 import LegalReferencePane from '../legal/LegalReferencePane.vue'
 import { legalMessageParts, referencesFromTools, legalReadableText } from '@/utils/legalReferences.js'

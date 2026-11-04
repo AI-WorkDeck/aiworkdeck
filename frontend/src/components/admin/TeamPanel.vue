@@ -273,6 +273,13 @@
         </view>
         <view class="section-body">
           <template v-if="hasSummary">
+            <TeamWeekBoard
+              v-if="scope === 'team' && range === 7"
+              :summary="summary"
+              :my-role="myRole"
+              :can-edit-title="canManage"
+              @edit-title="onEditTitle"
+            />
             <view class="stats-tiles">
               <view class="stat-tile">
                 <text class="stat-value">{{ kpi.activeMembers || 0 }}</text>
@@ -478,7 +485,7 @@
             </view>
             <view v-for="m in members" :key="m.accountId" class="team-table-row">
               <text class="col col-name">{{ m.displayName || m.accountId }}</text>
-              <text class="col">{{ roleLabel(m.role) }}</text>
+              <text class="col">{{ roleLabel(m.role) }}<text v-if="m.title"> · {{ m.title }}</text></text>
               <text class="col">{{ m.activeDays || 0 }}</text>
               <text class="col">{{ hoursLabel(m.activeMinutes) }}</text>
               <text class="col">{{ m.aiTurns || 0 }}</text>
@@ -623,11 +630,12 @@ import AwdSwitch from '@/components/AwdSwitch.vue'
 import AwdSelect from '@/components/AwdSelect.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
+import TeamWeekBoard from './TeamWeekBoard.vue'
 import {
   getAccountStatus,
   getTeam, createTeam, updateTeam,
   createTeamInvite, revokeTeamInvite, acceptTeamInvite,
-  updateTeamMemberRole, removeTeamMember,
+  updateTeamMemberRole, updateTeamMemberTitle, removeTeamMember,
   getTeamSummary, setTeamProjectAlias,
   getTeamUsageSharing, setTeamUsageSharing, uploadTeamUsageNow,
   getTeamProjectNameNotice, setTeamProjectNameConsent,
@@ -644,7 +652,7 @@ const ROLE_KEYS = ['ADMIN', 'MEMBER']
 
 export default {
   name: 'TeamPanel',
-  components: { AwdSwitch, AwdSelect, SettingsSection, SettingsRow },
+  components: { AwdSwitch, AwdSelect, SettingsSection, SettingsRow, TeamWeekBoard },
   emits: ['go-account'],
   data() {
     return {
@@ -1193,6 +1201,22 @@ export default {
           if (!res.confirm) return
           this.run(async () => {
             await updateTeamMemberRole(member.accountId, next)
+            await this.reload()
+          })
+        },
+      })
+    },
+    onEditTitle(accountId, currentTitle) {
+      uni.showModal({
+        title: this.$t('team.weekSetTitle'),
+        editable: true,
+        placeholderText: this.$t('team.weekTitlePlaceholder', { n: 30 }),
+        content: currentTitle || '',
+        success: (res) => {
+          // 平台不支持 editable 时 content 为 undefined，按取消处理，免得误清空职务
+          if (!res.confirm || typeof res.content !== 'string') return
+          this.run(async () => {
+            await updateTeamMemberTitle(accountId, res.content.trim())
             await this.reload()
           })
         },

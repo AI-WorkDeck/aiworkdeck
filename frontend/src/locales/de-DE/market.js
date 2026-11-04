@@ -221,5 +221,15 @@ export default {
   "permSpeech": "Sprache und Aufnahme",
   "permTasks": "Kalender und Aufgaben",
   "permClipboard": "Zwischenablage",
-  "permLawfirm": "Team-Informationen"
+  "permLawfirm": "Team-Informationen",
+  "newlyCreatedTag": "Neu",
+  "publishBtn": "Im Erweiterungsmarkt veröffentlichen",
+  "publishUpdateBtn": "Im Erweiterungsmarkt aktualisieren",
+  "publishingEllipsis": "Wird veröffentlicht…",
+  "publishHint": "Nach der Veröffentlichung können andere Anwälte diese Fähigkeit aus dem Erweiterungsmarkt installieren",
+  "publishedHint": "Im Erweiterungsmarkt veröffentlicht",
+  "publishedVersionHint": "Im Erweiterungsmarkt veröffentlicht (v{version})",
+  "publishedToast": "Im Erweiterungsmarkt veröffentlicht",
+  "publishUpdatedToast": "Die Version im Erweiterungsmarkt wurde aktualisiert",
+  "publishFailed": "Veröffentlichung fehlgeschlagen; bitte später erneut versuchen"
 }

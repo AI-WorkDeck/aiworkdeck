@@ -221,5 +221,15 @@ export default {
   "permSpeech": "Ghi âm và ghi hình",
   "permTasks": "Lịch và công việc",
   "permClipboard": "Bộ nhớ tạm (Clipboard)",
-  "permLawfirm": "Thông tin nhóm"
+  "permLawfirm": "Thông tin nhóm",
+  "newlyCreatedTag": "Mới",
+  "publishBtn": "Xuất bản lên Chợ tiện ích",
+  "publishUpdateBtn": "Cập nhật trên Chợ tiện ích",
+  "publishingEllipsis": "Đang xuất bản…",
+  "publishHint": "Sau khi xuất bản, các luật sư khác có thể cài đặt kỹ năng này từ Chợ tiện ích",
+  "publishedHint": "Đã xuất bản lên Chợ tiện ích",
+  "publishedVersionHint": "Đã xuất bản lên Chợ tiện ích (v{version})",
+  "publishedToast": "Đã xuất bản lên Chợ tiện ích",
+  "publishUpdatedToast": "Phiên bản trên Chợ tiện ích đã được cập nhật",
+  "publishFailed": "Xuất bản không thành công; vui lòng thử lại sau"
 }

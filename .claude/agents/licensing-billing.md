@@ -1355,6 +1355,13 @@ cost 为 null 原样保留 —— 对账未完成时显示「待结算」，绝�
 只写了 `{team, myRole, members[], pendingInvites[]}`。前端读 `data.myAccountId`，
 **取不到就不显示这个动作**——绝不自己编一个 `me` 之类的 id 去打 DELETE，猜错会把别人踢出团队。
 
+### 「本周」看板、职务与待分派（2026-11）
+
+- 官网 summary 新增 `members[].daily[]/title/agentEditActions/currentProject` 与 `kpi.agentEditActions/activeProjects/unassignedTasks`（契约见官网仓 `doc/desktop-contract.md`）。职务 `title` 是展示标签不涉权限：OWNER/ADMIN 可设任何人，`PUT /api/account/team/members/{id}` 透传 `{role?, title?}`（title 空串 = 清除）。
+- `TeamUsageRollupService.unassignedTasks`：本人名下（非散件/草稿工作区）项目里 OPEN 且 `assigneeId` 为空的事项**计数**，上报时刻的快照；只计数不带标题。它不计入 `isEmptyDay`。
+- 前端 `components/admin/TeamWeekBoard.vue`（TeamPanel 在 scope=team、range=7 时渲染）+ 纯函数 `utils/teamWeek.js`。**负荷口径按「已结束的工作日」**：上报只覆盖昨天及更早，今天的工时永远不在数据里，算进分母会让每周一全员「有余力」；周一不显示档位（`weekBandNoData`），看板注明「数据截至昨天」。「AI 修订次数」是最近 7 天保留在文档里的 AI 编辑动作数，不是文档篇数，文案必须这么写。
+- 验证：`node --test frontend/tests/team/team-week.test.mjs`；`TeamUsageRollupServiceTest`；官网 `npm run test:team`。
+
 ### 三层结构与加入流程（设计 §10）
 
 ```

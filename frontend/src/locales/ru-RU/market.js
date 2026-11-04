@@ -221,5 +221,15 @@ export default {
   "permSpeech": "Речь и запись",
   "permTasks": "Календарь и задачи",
   "permClipboard": "Буфер обмена",
-  "permLawfirm": "Информация о команде"
+  "permLawfirm": "Информация о команде",
+  "newlyCreatedTag": "Новый",
+  "publishBtn": "Опубликовать в каталоге расширений",
+  "publishUpdateBtn": "Обновить в каталоге расширений",
+  "publishingEllipsis": "Публикация…",
+  "publishHint": "После публикации другие юристы смогут установить этот навык из каталога расширений",
+  "publishedHint": "Опубликовано в каталоге расширений",
+  "publishedVersionHint": "Опубликовано в каталоге расширений (v{version})",
+  "publishedToast": "Опубликовано в каталоге расширений",
+  "publishUpdatedToast": "Версия в каталоге расширений обновлена",
+  "publishFailed": "Не удалось опубликовать; повторите попытку позже"
 }

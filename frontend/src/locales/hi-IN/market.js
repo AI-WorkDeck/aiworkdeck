@@ -221,5 +221,15 @@ export default {
   "permSpeech": "वाणी और रिकॉर्डिंग",
   "permTasks": "कैलेंडर और कार्य",
   "permClipboard": "क्लिपबोर्ड",
-  "permLawfirm": "टीम जानकारी"
+  "permLawfirm": "टीम जानकारी",
+  "newlyCreatedTag": "नया",
+  "publishBtn": "मार्केटप्लेस पर प्रकाशित करें",
+  "publishUpdateBtn": "मार्केटप्लेस पर अपडेट करें",
+  "publishingEllipsis": "प्रकाशित हो रहा है…",
+  "publishHint": "प्रकाशित होने के बाद अन्य वकील इस स्किल को मार्केटप्लेस से इंस्टॉल कर सकते हैं",
+  "publishedHint": "मार्केटप्लेस पर प्रकाशित",
+  "publishedVersionHint": "मार्केटप्लेस पर प्रकाशित (v{version})",
+  "publishedToast": "मार्केटप्लेस पर प्रकाशित किया गया",
+  "publishUpdatedToast": "मार्केटप्लेस पर संस्करण अपडेट हो गया है",
+  "publishFailed": "प्रकाशन विफल रहा; कृपया बाद में पुनः प्रयास करें"
 }

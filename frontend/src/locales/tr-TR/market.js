@@ -221,5 +221,15 @@ export default {
   "permSpeech": "Konuşma ve kayıt",
   "permTasks": "Takvim ve görevler",
   "permClipboard": "Pano",
-  "permLawfirm": "Ekip bilgileri"
+  "permLawfirm": "Ekip bilgileri",
+  "newlyCreatedTag": "Yeni",
+  "publishBtn": "Eklenti Mağazası'nda yayınla",
+  "publishUpdateBtn": "Eklenti Mağazası'nda güncelle",
+  "publishingEllipsis": "Yayınlanıyor…",
+  "publishHint": "Yayınlandıktan sonra diğer avukatlar bu beceriyi Eklenti Mağazası'ndan yükleyebilir",
+  "publishedHint": "Eklenti Mağazası'nda yayınlandı",
+  "publishedVersionHint": "Eklenti Mağazası'nda yayınlandı (v{version})",
+  "publishedToast": "Eklenti Mağazası'nda yayınlandı",
+  "publishUpdatedToast": "Eklenti Mağazası'ndaki sürüm güncellendi",
+  "publishFailed": "Yayınlama başarısız oldu; lütfen daha sonra tekrar deneyin"
 }
