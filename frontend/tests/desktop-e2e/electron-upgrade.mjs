@@ -14,6 +14,7 @@ import { spawn, execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import puppeteer from 'puppeteer-core'
 import JSZip from 'jszip'
+import { checkWelcomeModel, checkDocumentChrome, checkWriterReplacement, checkClosedDocument, checkExitList } from './installed-release-checks.mjs'
 
 function businessErrorFields(value) {
   if (!value || typeof value !== 'object'
@@ -376,6 +377,7 @@ try {
     await connectInstalled()
     evidence.runtime = installed.identity.versions
     evidence.installed = installed.provenance
+    evidence.releaseWelcome = await checkWelcomeModel({ page, run })
   } else evidence.runtime = (await start(executable, 'candidate')).versions
   if (process.env.AWD_BASELINE_ELECTRON) assert.equal(await page.evaluate(() => localStorage.getItem('electron-upgrade-persistence')), 'baseline-profile-retained')
   for (const ext of ['docx', 'xlsx', 'pptx']) {
@@ -405,6 +407,10 @@ try {
     await sleep(2000) // Ready precedes the first composited canvas frame.
     await assertLocalWorkspaceUnobstructed()
     await page.screenshot({ path: path.join(run, `${ext}-opened.png`) })
+    if (installedMode) {
+      evidence.releaseDocuments ||= {}
+      evidence.releaseDocuments[ext] = await checkDocumentChrome({ page, run, ext })
+    }
     await page.evaluate(name => Object.values(window.__checkbaActiveOverviewVm._libreRefs).find(e => e.file?.name === name).webviewEl.focus(), path.basename(files[ext]))
     await frame.focus('[data-lo-ime]')
     assert.equal(await frame.$eval('[data-lo-ime]', el => document.activeElement === el), true)
@@ -463,10 +469,23 @@ try {
     await sleep(2000) // Model reload can finish before the compositor paints.
     await page.screenshot({ path: path.join(run, `${ext}-reopened.png`) })
     await close(ext)
+    if (installedMode) evidence.releaseDocuments[ext].closedScreenshot = await checkClosedDocument({ page, run, ext })
+  }
+  if (installedMode) {
+    const originalDocx = files.docx
+    files.docx = path.join(home, 'Second Writer.docx')
+    fs.copyFileSync(originalDocx, files.docx)
+    try {
+      await open('docx')
+      await sleep(2000)
+      evidence.releaseSecondWriter = await checkWriterReplacement({ page, run, previousId: evidence.releaseDocuments.docx.fileId })
+      await close('docx')
+    } finally { files.docx = originalDocx }
   }
   await open('pdf')
   await sleep(2000)
   await assertLocalWorkspaceUnobstructed()
+  if (installedMode) evidence.releaseDocuments.pdf = await checkDocumentChrome({ page, run, ext: 'pdf' })
   await page.screenshot({ path: path.join(run, 'pdf-opened.png') })
   const bounds = await page.$eval('.preview-pdf iframe', el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height } })
   await page.mouse.click(bounds.x + bounds.width * 0.7, bounds.y + bounds.height * 0.5)
@@ -483,6 +502,7 @@ try {
     await assertLocalWorkspaceUnobstructed()
     const { checkDesktopInteractions } = await import('./installed-desktop-interactions.mjs')
     evidence.desktop = await checkDesktopInteractions({ page, browser, mainRpc: installed.mainRpc, run })
+    evidence.releaseExit = await checkExitList({ page, installed, run, base })
     await quit()
     await installed.start(); child = installed.child
     await connectInstalled()
