@@ -419,10 +419,12 @@ export const agentClientActionMethods = {
      * 跑完（含各自的 sendEditorResult ack）才轮到下一个。
      */
     async handleEditorOpenFileSync(action) {
+        if (!this.acceptAgentEditorRun(action)) return this.rejectAgentEditorTarget(action)
+        const entry = action.editorRunId ? this.registerAgentOpenTarget({ ...action, fileId: action.params?.fileId }) : null
         if (!this._docOpenSyncQueue) this._docOpenSyncQueue = createSerialQueue()
-        return this._docOpenSyncQueue(() => this._handleEditorOpenFileSyncImpl(action))
+        return this._docOpenSyncQueue(() => this._handleEditorOpenFileSyncImpl(action, entry))
     },
-    async _handleEditorOpenFileSyncImpl(action) {
+    async _handleEditorOpenFileSyncImpl(action, entry = null) {
         console.log('[ProjectOverview] Open File Sync:', action)
         const { params, requestId, conversationId } = action
 
@@ -446,14 +448,28 @@ export const agentClientActionMethods = {
                 return
             }
 
+            if (entry && (entry.status !== 'opening' || Date.now() >= entry.openDeadline || this._latestAgentOpen !== entry ||
+                !this.agentEditorRunCurrent(action) || this.agentOpenSelection() !== entry.selection)) {
+                entry.status = 'failed'
+                await this.rejectAgentEditorTarget(action)
+                return
+            }
             console.log('[ProjectOverview] Opening file for streaming:', file.name)
 
             // 3. 打开文件（挂载/激活内置 LibreOffice 编辑器）
             await this.openFile(file)
+            if (entry) {
+                entry.selection = this.agentOpenSelection()
+                entry.status = 'opened'
+            }
 
             // 4. 等待编辑器就绪（onLibreReady 置位，最多等待 90 秒——LOWA 首次 boot 较慢）
             let editorReady = false
-            for (let i = 0; i < 180; i++) {
+            if (entry) {
+                if (!await this.waitAgentOpenTarget(action)) return
+                editorReady = true
+            }
+            for (let i = 0; !editorReady && i < 180; i++) {
                 await new Promise(resolve => setTimeout(resolve, 500))
                 if (this.libreOfficeActive && this.libreOfficeExecutor) {
                     editorReady = true
@@ -469,6 +485,14 @@ export const agentClientActionMethods = {
             }
             // 就绪了但文档没打开（空白占位 + 保存闸落下）：不许接着往里流式落字（dev-board#1018）
             if (await this.replyIfEditorLoadFailed(conversationId, requestId)) return
+            if (entry && (!this.agentEditorRunCurrent(action) || this._latestAgentOpen !== entry ||
+                entry.status !== 'opened' || this.agentOpenSelection() !== entry.selection ||
+                String(this.resolveLibreExecutorFileId?.(this.libreOfficeExecutor)) !== String(file.id))) {
+                entry.status = 'failed'
+                await this.rejectAgentEditorTarget(action)
+                return
+            }
+            const streamExecutor = this.libreOfficeExecutor
 
             // 5. 重置流式缓冲，准备接收新的流式数据
             this._docStreamBuffer = ''
@@ -484,12 +508,18 @@ export const agentClientActionMethods = {
             this._docStreamTargetFileId = file.id
             this._projectVersionStreamInterrupted = false
             // worker 端 markdown 状态机也要硬清（上一条流若异常中断会留下半张表/半行）
-            try { await this.libreOfficeExecutor.executeCommand('stream_flush', { discard: true }) } catch (e) {}
+            try { await streamExecutor.executeCommand('stream_flush', { discard: true }) } catch (e) {}
             // 项目模板画像（后端只在非 house-default 时附带）：流式落字前先换画像，stream_insert
             // 才按项目模板排版；失败只记日志（退回 house-default 落字，不让整条流断掉）
             if (params.styleProfile) {
-                try { await this.libreOfficeExecutor.executeCommand('set_style_profile', { profile: params.styleProfile }) }
+                try { await streamExecutor.executeCommand('set_style_profile', { profile: params.styleProfile }) }
                 catch (e) { console.error('[ProjectOverview] set_style_profile before streaming failed:', e) }
+            }
+            if (entry && (!this.agentEditorRunCurrent(action) || this._latestAgentOpen !== entry ||
+                this.agentOpenSelection() !== entry.selection || this.libreOfficeExecutor !== streamExecutor)) {
+                entry.status = 'failed'
+                await this.rejectAgentEditorTarget(action)
+                return
             }
             console.log('[ProjectOverview] Stream state reset, ready for streaming')
 
@@ -506,6 +536,8 @@ export const agentClientActionMethods = {
         } catch (e) {
             console.error('[ProjectOverview] handleEditorOpenFileSync error:', e)
             await sendEditorResult(conversationId, requestId, false, null, e.message)
+        } finally {
+            if (entry?.status === 'opening') entry.status = 'failed'
         }
     },
 
@@ -534,7 +566,51 @@ export const agentClientActionMethods = {
     /**
      * 处理 AI Agent 的打开文件请求
      */
+    agentOpenSelection() {
+        return JSON.stringify([this.projectId, this.focusedPane, this.activeFileIdLeft, this.activeFileIdRight])
+    },
+    acceptAgentEditorRun(action) {
+        if (!action.editorRunId || !action.conversationId) return true
+        const runs = this._agentEditorRuns || (this._agentEditorRuns = new Map())
+        let state = runs.get(action.conversationId)
+        if (!state) {
+            state = { current: action.editorRunId, retired: new Set() }
+            runs.set(action.conversationId, state)
+        }
+        if (state.retired.has(action.editorRunId)) return false
+        if (state.current !== action.editorRunId) {
+            state.retired.add(state.current)
+            state.current = action.editorRunId
+            const previous = this._agentOpenTargets?.get(action.conversationId)
+            if (previous) previous.status = 'failed'
+            this._agentOpenTargets?.delete(action.conversationId)
+        }
+        return true
+    },
+    agentEditorRunCurrent(action) {
+        return !action.editorRunId || !action.conversationId ||
+            this._agentEditorRuns?.get(action.conversationId)?.current === action.editorRunId
+    },
+    async rejectAgentEditorTarget(action) {
+        const msg = this._docStreamText('editorNotReadyOpenDocError', '编辑器未就绪，请先打开一个文档')
+        await sendEditorResult(action.conversationId, action.requestId, false, null, msg)
+    },
+    registerAgentOpenTarget(action) {
+        const targets = this._agentOpenTargets || (this._agentOpenTargets = new Map())
+        const entry = { fileId: action.fileId, selection: this.agentOpenSelection(), status: 'opening',
+            openDeadline: Date.now() + EDITOR_BOOT_WAIT_CAP_MS }
+        // Publish before the first await: the following SSE command must see this barrier.
+        if (action.conversationId && action.editorRunId) targets.set(action.conversationId, entry)
+        this._latestAgentOpen = entry
+        return entry
+    },
     async handleEditorOpenFile(action) {
+        if (!this.acceptAgentEditorRun(action)) return
+        const entry = this.registerAgentOpenTarget(action)
+        entry.promise = this.performAgentOpenFile(action, entry)
+        return entry.promise
+    },
+    async performAgentOpenFile(action, entry) {
         console.log('[ProjectOverview] WPS Open File:', action)
         try {
             const fileId = action.fileId
@@ -551,8 +627,13 @@ export const agentClientActionMethods = {
                 return
             }
 
-            // 打开文件（action.locator：EvidenceLink 定位符，后端 sendOpenFileAction 已允许该字段）
+            if (entry.status !== 'opening' || Date.now() >= entry.openDeadline || this._latestAgentOpen !== entry ||
+                this.agentOpenSelection() !== entry.selection) return
+            // Opening is asynchronous at the component layer; commands also verify executor ownership.
             this.openFile(file, { locator: action.locator || null })
+            entry.selection = this.agentOpenSelection()
+            entry.status = 'opened'
+            entry.isPdf = /\.pdf$/i.test(file.name || '') || file.fileType === 'pdf'
 
             // 提示用户
             uni.showToast({ title: this.$t('workbenchOps.openedNamed', { name: file.name }), icon: 'none' })
@@ -564,7 +645,37 @@ export const agentClientActionMethods = {
         } catch (e) {
             console.error('[ProjectOverview] handleEditorOpenFile error:', e)
             uni.showToast({ title: this.$t('workbenchOps.openFileFailed'), icon: 'none' })
+        } finally {
+            if (entry.status === 'opening') entry.status = 'failed'
         }
+    },
+    async waitAgentOpenTarget(action) {
+        const entry = action.editorRunId ? this._agentOpenTargets?.get(action.conversationId) : null
+        if (!entry) return true // Commands without a preceding open retain their existing behavior.
+        const deadline = Date.now() + this.editorBootWaitCapMs(action.action)
+        while (true) {
+            const current = this.agentEditorRunCurrent(action) && this._agentOpenTargets.get(action.conversationId) === entry &&
+                this._latestAgentOpen === entry && this.agentOpenSelection() === entry.selection
+            if (!current || entry.status === 'failed' || entry.isPdf) break
+            const actual = this.resolveLibreExecutorFileId?.(this.libreOfficeExecutor)
+            if (entry.status === 'opened' && this.libreOfficeActive && actual != null &&
+                String(actual) === String(entry.fileId)) return true
+            if (Date.now() >= deadline) {
+                if (entry.status === 'opened') {
+                    const msg = this._docStreamText('editorStillBootingError', '编辑器仍在启动，请稍后重试同一步')
+                    await sendEditorResult(action.conversationId, action.requestId, false,
+                        { error: msg, code: 'EDITOR_BOOTING', retryable: true }, msg)
+                    return false
+                }
+                break
+            }
+            await new Promise(resolve => setTimeout(resolve, 100))
+        }
+        // A timed-out detail request must not later steal focus or enable a stale command.
+        entry.status = 'failed'
+        const msg = this._docStreamText('editorNotReadyOpenDocError', '编辑器未就绪，请先打开一个文档')
+        await sendEditorResult(action.conversationId, action.requestId, false, null, msg)
+        return false
     },
 
     /**
@@ -846,6 +957,12 @@ export const agentClientActionMethods = {
             return
         }
         if (action.action === 'doc_checkpoint_restore') return this.handleCheckpointRestore(action)
+        if (!this.acceptAgentEditorRun(action)) {
+            await this.rejectAgentEditorTarget(action)
+            return
+        }
+        const openTarget = action.editorRunId ? this._agentOpenTargets?.get(action.conversationId) : null
+        if (!await this.waitAgentOpenTarget(action)) return
         const currentFileId = typeof this.resolveLibreExecutorFileId === 'function'
             ? this.resolveLibreExecutorFileId(this.libreOfficeExecutor) : null
         if (this._checkpointRestores?.has(String(currentFileId))) {
@@ -884,6 +1001,22 @@ export const agentClientActionMethods = {
         }
 
         if (await this.replyIfEditorLoadFailed(conversationId, requestId)) return
+        // The load-failure check awaits a reply; recheck ownership before dispatching any write.
+        // A successful open in this run is newer than the tool context's source-document hint.
+        const expectedTarget = openTarget ? openTarget.fileId : action.targetFileId
+        if (!this.agentEditorRunCurrent(action) || (expectedTarget != null &&
+            String(this.resolveLibreExecutorFileId?.(this.libreOfficeExecutor)) !== String(expectedTarget))) {
+            await this.rejectAgentEditorTarget(action)
+            return
+        }
+        if (openTarget && (this._agentOpenTargets?.get(conversationId) !== openTarget ||
+            this._latestAgentOpen !== openTarget || openTarget.status !== 'opened' ||
+            this.agentOpenSelection() !== openTarget.selection ||
+            String(this.resolveLibreExecutorFileId?.(this.libreOfficeExecutor)) !== String(openTarget.fileId))) {
+            await sendEditorResult(conversationId, requestId, false, null,
+                this._docStreamText('editorNotReadyOpenDocError', '编辑器未就绪，请先打开一个文档'))
+            return
+        }
 
         // doc_export_pdf（dev-board#1065 T-25）：worker 回的是 PDF 字节，不能按通用路径原样回传
         // （Uint8Array 会被 JSON 展开成巨大的对象）。编成 base64 连同源文件 id 交给后端，由后端存进项目。

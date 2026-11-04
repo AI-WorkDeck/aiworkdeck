@@ -102,3 +102,69 @@ test('disconnect recovery uses the same nested-question decoder without duplicat
   assert.equal(s.bubbles.value[0].content, '材料已读。\n')
   assert.deepEqual(s.bubbles.value[0].question.options, OPTIONS.map(o => o.label))
 })
+
+for (const size of [1, 7, 99999]) {
+  test(`parameter wrapper/${size}: complete question renders in stream and history`, () => {
+    const text = `<ask_user><parameter=question>${QUESTION}</parameter><parameter=options>${JSON.stringify(OPTIONS)}</parameter><parameter=header>继续方式</parameter><parameter=multi_select>false</parameter></ask_user>`
+    const s = stream()
+    feed(s, text, size)
+    s.handleEvent('bubble_end', JSON.stringify({ status: 'awaiting_input' }))
+    for (const b of [s.bubbles.value[0], s.parseAssistantHistory(text)]) {
+      assert.equal(b.content, '')
+      assert.equal(b.question.text, QUESTION)
+      assert.deepEqual(b.question.options, OPTIONS.map(o => o.label))
+    }
+  })
+}
+
+test('parameter calls preserve malformed, truncated and quoted text without creating cards', () => {
+  const tag = `<ask_user><parameter=question>${QUESTION}</parameter><parameter=options>${JSON.stringify(OPTIONS)}</parameter></ask_user>`
+  for (const text of ['```xml\n' + tag + '\n```', '说明：' + tag, tag.replace('</ask_user>', ''), tag.replace(JSON.stringify(OPTIONS), '{invalid}'), tag.replace('parameter=options', 'parameter=unknown')]) {
+    const s = stream()
+    feed(s, text, 1)
+    s.handleEvent('bubble_end', JSON.stringify({ status: 'finished' }))
+    assert.equal(s.bubbles.value[0].question, null)
+    assert.equal(s.parseAssistantHistory(text).question, null)
+    assert.ok(s.bubbles.value[0].content.includes('<ask_user>'))
+  }
+})
+
+test('parameter calls inside thinking stay in thinking, not a question card', () => {
+  const tag = `<ask_user><parameter=question>${QUESTION}</parameter></ask_user>`
+  const text = '<thinking>\n' + tag + '</thinking>'
+  const s = stream()
+  feed(s, text, 1)
+  s.handleEvent('bubble_end', JSON.stringify({ status: 'finished' }))
+  for (const b of [s.bubbles.value[0], s.parseAssistantHistory(text)]) {
+    assert.equal(b.question, null)
+    assert.ok(b.thinking.content.includes(tag))
+  }
+})
+
+test('parameter display compatibility preserves finished state and produces a normal follow-up answer', () => {
+  const text = `说明如下：\n<ask_user><parameter=question>${QUESTION}</parameter><parameter=options>${JSON.stringify(OPTIONS)}</parameter><parameter=header>继续方式</parameter></ask_user>`
+  const s = stream()
+  feed(s, text, 1)
+  s.handleEvent('bubble_end', JSON.stringify({ status: 'finished' }))
+  assert.equal(s.agentAwaitingInput.value, false)
+  for (const b of [s.bubbles.value[0], s.parseAssistantHistory(text)]) {
+    assert.equal(b.question.header, '继续方式')
+    const answer = formatAskUserAnswer({ id: b.question.id, question: b.question.text, selected: [b.question.options[0]], other: '' })
+    assert.deepEqual(parseAskUserAnswer(answer.prompt).selected, [OPTIONS[0].label])
+    assert.ok(!b.content.includes('<parameter='))
+  }
+})
+
+
+test('explicit null parameters are invalid, not omitted defaults', () => {
+  for (const key of ['options', 'multi_select']) {
+    const text = `<ask_user><parameter=question>${QUESTION}</parameter><parameter=${key}>null</parameter></ask_user>`
+    const s = stream()
+    feed(s, text, 1)
+    s.handleEvent('bubble_end', JSON.stringify({ status: 'finished' }))
+    for (const b of [s.bubbles.value[0], s.parseAssistantHistory(text)]) {
+      assert.equal(b.question, null)
+      assert.equal(b.content, text)
+    }
+  }
+})
