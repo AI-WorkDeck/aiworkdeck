@@ -7,6 +7,10 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 职责边界：AI 对话功能本身（编排循环、工具注册分发、记忆、SSE、前端聊天 UI、评测）。AI→编辑器指令链路属 ai-doc-bridge 领域；skill 机制属 plugin-system 领域（但 SkillRouter 在编排循环里有两处旁路接入点）。
 
+## 参数式提问兼容（2026-11-04，dev-board#1708）
+
+`XmlToolCallParser` 支持完整的 `<ask_user><parameter=question>…</parameter>…</ask_user>`，字段仅 question/options/header/multi_select，沿原严格协议块边界及 AskUserQuestion 校验；代码、引用、thinking/final 或普通正文混合输出不据此执行。前端 `legacyAskUserMarkup.mjs` 可将合法独立行包装显示为兼容提问卡，流式与历史共用；非法/截断保留字面文本，不猜执行、不伪造服务端等待状态。混合正文的停机问题与模型把内部分析写入 content 的来源仍需原始回执，不能将显示兼容称为两者均已修复。回归 XmlToolCallParserTest 与 legacy-ask-user-stream.test.mjs。
+
 ## 国内百炼与国际 OpenRouter（2026-10-29，dev-board#1625）
 
 平台目录改由 PlatformModelCatalog 从实际供应商读取，并按站点与用户runtime凭据缓存。国内通过官网AI网关到百炼；国际保留OpenRouter。ChatModelFactory 的平台默认/辅助/选模与视觉能力遵循目录，旧合法OpenRouter设置迁移到国内默认。智能选模在目录支持时使用 qwen3.8-flash / qwen3.8-max；不再按JVM国家、时区或IP过滤目录。BYOK/本地保留旧路径；Jev在百炼平台不外发。设置页移除网络区域控制，定价单位按供应商/本站币种下发。国内听写通过同站网关调用 qwen3.8-omni-flash；国际保留原语音模型，两者均不得混用凭据或地址。
