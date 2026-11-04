@@ -19,6 +19,7 @@ if (-not $IsWindows -or $env:GITHUB_ACTIONS -ne 'true' -or -not $env:RUNNER_TEMP
 }
 if ($Mechanism -eq 'LegacyHelper' -and $ExitMode -eq 'Reopen') { throw 'The released old shell has no install lock; Reopen requires AppUpdater baseline.' }
 if ([version]$CandidateVersion -le [version]$OldVersion) { throw 'Candidate must be newer than baseline.' }
+if ($Mechanism -eq 'AppUpdater' -and ([version]$CandidateVersion).Major -eq ([version]$OldVersion).Major -and ([version]$CandidateVersion).Minor -eq ([version]$OldVersion).Minor) { throw 'Native AppUpdater QA requires different update channels; same-channel releases use patches.' }
 $OldInstaller = (Resolve-Path -LiteralPath $OldInstaller).Path
 $CandidateInstaller = (Resolve-Path -LiteralPath $CandidateInstaller).Path
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null

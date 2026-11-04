@@ -16,6 +16,7 @@ export function validateVersions(baseline, candidate) {
   const old = baseline.split('.').map(Number), next = candidate.split('.').map(Number)
   const difference = next.map((n, i) => n - old[i]).find(n => n !== 0)
   assert(difference > 0, 'Candidate must be newer than baseline')
+  assert(next[0] !== old[0] || next[1] !== old[1], 'Native full-upgrade QA requires different update channels; same-channel releases use patches')
 }
 export function signedManifest(installer, baseline) {
   validateVersions(baseline, installer.version)

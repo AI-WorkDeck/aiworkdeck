@@ -404,7 +404,7 @@ test('upgrade release gate verifies manifest signature, exact version, official 
 test('Mac upgrade fixture uses explicit 0.71 to 0.72 inputs and rejects absent/equal/older versions', async () => {
   const { validateVersions, signedManifest } = await import('../scripts/test-full-upgrade-mac-feed.mjs')
   const crypto = require('crypto')
-  for (const [baseline, candidate] of [[undefined, '0.72.0'], ['0.71.0', undefined], ['0.71.0', '0.71.0'], ['0.71.0', '0.70.9'], ['0.71.0', 'latest']]) {
+  for (const [baseline, candidate] of [[undefined, '0.72.0'], ['0.71.0', undefined], ['0.71.0', '0.71.0'], ['0.71.0', '0.70.9'], ['0.71.0', 'latest'], ['0.76.1', '0.76.2']]) {
     assert.throws(() => validateVersions(baseline, candidate))
   }
   const installer = { version: '0.72.0', size: 1, sha256: 'a'.repeat(64), urls: ['http://127.0.0.1/candidate.dmg'] }
