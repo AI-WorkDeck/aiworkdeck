@@ -114,6 +114,24 @@ public class VersionController {
         return statusForUser(projectId, requireMember(projectId, sessionId));
     }
 
+    @GetMapping("/exit-status")
+    public ResponseEntity<Map<String, Object>> exitStatus(
+            @PathVariable Long projectId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = requireMember(projectId, sessionId);
+        var status = sessionService.exitStatus(projectId);
+        Map<String, Object> data = new HashMap<>();
+        data.put("enabled", status.enabled());
+        data.put("working", status.working());
+        data.put("changedCount", status.changedCount());
+        data.put("onDraft", status.onDraft() == null ? null : draftRef(status.onDraft()));
+        data.put("conflict", status.conflict());
+        data.put("canCommit", status.enabled() && !status.conflict()
+                && (status.working() || status.changedCount() > 0)
+                && projectMemberService.hasWritePermission(projectId, userId));
+        return ok(data);
+    }
+
     /** Trusted AI context uses the same membership boundary as HTTP callers. */
     public ResponseEntity<Map<String, Object>> statusForUser(Long projectId, Long viewerId) {
         requireMemberUser(projectId, viewerId);
