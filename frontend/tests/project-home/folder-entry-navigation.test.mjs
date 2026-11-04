@@ -26,13 +26,13 @@ test('legacy all-project entry activates welcome catalog visibly from chat mode'
   state.openProjectsPane()
   assert.deepEqual(calls,['ide','welcome']); assert.equal(state.welcomeCatalogRequest,1); assert.equal(state.projectSwitcherOpen,false)
 })
-test('current-folder deletion saves and confirms first; cancellation never deletes',async()=>{
+test('current-folder deletion saves first without asking for a version commit',async()=>{
   const calls=[]
   const state={projectId:7,isClientView:false,saveFailed:true,$t:key=>key,flushBeforeLeaving:async()=>{calls.push('save');return false},confirmVersionBeforeLeaving:async()=>{calls.push('confirm');return true},...methods('    async leaveWorkbench(url, options)', '    // 「全部项目…」', {flushDirtyEditors:async()=>{calls.push('save');return {failed:state.saveFailed?1:0}},uni:{showToast(){},reLaunch:({success})=>{calls.push('leave');success()}}}),...methods('    async deleteWorkspaceProject(id)', '    // ---------- 欢迎标签与旧项目入口兼容', {deleteProject:async id=>calls.push(`delete:${id}`),uni:{reLaunch:({success})=>{calls.push('leave');success()}}})}
   assert.equal(await state.deleteWorkspaceProject(7),false); assert.deepEqual(calls,['save'])
   calls.length=0; state.saveFailed=false;state.confirmVersionBeforeLeaving=async()=>{calls.push('confirm');return false}
-  assert.equal(await state.deleteWorkspaceProject(7),false); assert.deepEqual(calls,['save','confirm'])
+  assert.equal(await state.deleteWorkspaceProject(7),true); assert.deepEqual(calls,['save','delete:7','leave'])
   calls.length=0; state.confirmVersionBeforeLeaving=async()=>{calls.push('confirm');return true}
-  assert.equal(await state.deleteWorkspaceProject(7),true);assert.deepEqual(calls,['save','confirm','delete:7','leave'])
+  assert.equal(await state.deleteWorkspaceProject(7),true);assert.deepEqual(calls,['save','delete:7','leave'])
   calls.length=0; state.isClientView=true;assert.equal(await state.deleteWorkspaceProject(9),false);assert.deepEqual(calls,[])
 })

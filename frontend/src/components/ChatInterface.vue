@@ -3352,19 +3352,24 @@ export default {
     const cleanTitle = (title) => {
        if (!title) return t('chat.newConversation')
        // Remove common XML tags
-       let cleaned = title
-         .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-         .replace(/<process[^>]*>[\s\S]*?<\/process>/gi, '')
-         .replace(/<step>[\s\S]*?<\/step>/gi, '')
-         .replace(/<tool_code>[\s\S]*?<\/tool_code>/gi, '')
-         .replace(/<tool_output>[\s\S]*?<\/tool_output>/gi, '')
-         .replace(/<artifact[^>]*>[\s\S]*?<\/artifact>/gi, '')
-         .replace(/<final>[\s\S]*?<\/final>/gi, '')
-         // 反问块整体剥掉：不剥的话「以纯反问收尾」的那一轮会把问题正文
-         // 当成会话标题（下面的兜底只摘标记、留内容）
-         .replace(/<question[^>]*>[\s\S]*?<\/question>/gi, '')
-         .replace(/<[^>]+>/g, '') // Remove any remaining tags
-         .trim()
+       let cleaned = String(title)
+       let prev
+       do {
+         prev = cleaned
+         cleaned = cleaned
+           .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+           .replace(/<process[^>]*>[\s\S]*?<\/process>/gi, '')
+           .replace(/<step>[\s\S]*?<\/step>/gi, '')
+           .replace(/<tool_code>[\s\S]*?<\/tool_code>/gi, '')
+           .replace(/<tool_output>[\s\S]*?<\/tool_output>/gi, '')
+           .replace(/<artifact[^>]*>[\s\S]*?<\/artifact>/gi, '')
+           .replace(/<final>[\s\S]*?<\/final>/gi, '')
+           // 反问块整体剥掉：不剥的话「以纯反问收尾」的那一轮会把问题正文
+           // 当成会话标题（下面的兜底只摘标记、留内容）
+           .replace(/<question[^>]*>[\s\S]*?<\/question>/gi, '')
+           .replace(/<[^>]+>/g, '') // Remove any remaining tags
+       } while (cleaned !== prev)
+       cleaned = cleaned.replace(/[<>]/g, '').trim()
        return cleaned || t('chat.newConversation')
     }
 

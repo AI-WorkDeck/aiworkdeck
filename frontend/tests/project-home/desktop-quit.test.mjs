@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { createDesktopQuitGuard, registerQuitSave, unregisterQuitSave, flushQuitWorkbenches, confirmQuitWorkbenches } from '../../src/utils/desktopQuitGuard.js'
+import { createDesktopQuitGuard, registerQuitSave, unregisterQuitSave, flushQuitWorkbenches } from '../../src/utils/desktopQuitGuard.js'
 
 function setup(overrides = {}) {
   const calls = []
@@ -111,14 +111,13 @@ test('a rejected native stage cannot open the choice or acknowledge exit', async
   assert.equal(asked, false)
 })
 
-test('registered workbench confirmation runs after saving and unregister removes both callbacks', async t => {
+test('registered workbench saves are removed on unregister', async t => {
   const owner = {}, calls = []
   t.after(() => unregisterQuitSave(owner))
-  registerQuitSave(owner, async () => { calls.push('save'); return { failed: 0 } }, async () => { calls.push('confirm'); return false })
+  registerQuitSave(owner, async () => { calls.push('save'); return { failed: 0 } })
   assert.deepEqual(await flushQuitWorkbenches(), { failed: 0 })
-  assert.equal(await confirmQuitWorkbenches(), false)
-  assert.deepEqual(calls, ['save', 'confirm'])
+  assert.deepEqual(calls, ['save'])
   unregisterQuitSave(owner)
-  assert.equal(await confirmQuitWorkbenches(), true)
-  assert.deepEqual(calls, ['save', 'confirm'])
+  assert.deepEqual(await flushQuitWorkbenches(), { failed: 0 })
+  assert.deepEqual(calls, ['save'])
 })

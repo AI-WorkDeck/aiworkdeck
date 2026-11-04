@@ -42,7 +42,13 @@ function turnLabel(bubble) {
   const source = bubble.displayContent || bubble.content || ''
   const cached = labelCache.get(bubble)
   if (cached && cached.source === source) return cached.label
-  const label = source.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, 120)
+  let stripped = String(source)
+  let prev
+  do {
+    prev = stripped
+    stripped = stripped.replace(/<[^>]*>/g, '')
+  } while (stripped !== prev)
+  const label = stripped.replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120)
   labelCache.set(bubble, { source, label })
   return label
 }
