@@ -50,7 +50,7 @@ function workbench(extra = {}) {
     GLYPHS: ICONS, $t: t, toggleSidebar() { this.sidebarCollapsed = !this.sidebarCollapsed },
     openPluginTab() { assert.fail('sidebar search must not open a document tab') }, ...extra }
   for (const [name, method] of Object.entries(switching)) vm[name] = method.bind(vm)
-  for (const name of ['isExplorerPane', 'explorerSearchPlugin', 'activeDynamicPlugin', 'leftPaneTitle']) {
+  for (const name of ['documentAvailablePlugins', 'isExplorerPane', 'explorerSearchPlugin', 'activeDynamicPlugin', 'leftPaneTitle']) {
     Object.defineProperty(vm, name, { get: computedMethod(name).bind(vm) })
   }
   return vm

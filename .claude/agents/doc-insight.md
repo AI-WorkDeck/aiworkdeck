@@ -540,3 +540,7 @@ cd backend && mvn clean test                      # 全量（跨类常量内联�
 现有快捷查询入口只有 Writer：`LibreOfficeEditor.initWritingAssistance` 明确限制 `docKind==='writer'`。Calc/Impress 同宿主但无该菜单，PDF 独立预览路径，不因此新增这些格式的编辑能力。四格式的共享标签方法保留左侧文档并排打开资料，资料标签不进入活跃文档/AI文档上下文。
 
 验证：`npm run test:completion`、`npm run test:insight`（含资料解析/标签回归）、`tests/legal-references/chat.mjs`（真实 ChatInterface/SSE 与标签方法，合成 HTTP/资料）、`tests/legal-reference-ui/run.mjs`（三类双主题、窄屏RTL/键盘/来源URL）。真实LOWA操作、四格式保存重开、正式Electron与真实供应商/模型另验。
+
+## 依据入口随可见文档显示（dev-board#1686）
+
+工作台 `documentAvailablePlugins` 仅在 `insightDocFileId` 存在时提供依据的 rail/dock 入口与面板实例；绑定仍按聚焦侧 Writer 优先，再取另一可见分屏 Writer。关闭最后一份可用文档、隐藏右分屏或收起对话画布后，依据回到 AI 助手（左停靠回文件树），聊天和编辑器保活不变。重新显示文档恢复入口而不自动抢焦点。PPT、Excel、PDF 沿原 `isInsightDoc` 能力限制，不新增解析支持。回归 `tests/project-home/document-evidence.test.mjs`。
