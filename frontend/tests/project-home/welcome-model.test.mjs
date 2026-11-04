@@ -54,6 +54,7 @@ test('mounted welcome picker opens, selects actual dropdown option, and emits se
   root.querySelector('[data-quick="send"]').dispatchEvent(new window.Event('tap'))
   assert.equal(emitted.model.id, 'model-b')
   assert.equal(emitted.prompt, 'test prompt')
+  assert.equal(vm.explicitModel, null)
   app.unmount(); root.remove()
 })
 test('default is not overridden; retired stored model displays server fallback', async () => {
