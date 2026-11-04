@@ -9,7 +9,7 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
 
 ## Electron 45 运行时（dev-board#1624）
 
-桌面壳固定 Electron **45.1.0**（Chromium 156 / Node 24），应用版本号与运行时版本独立。开发安装要求 Node >=22.12.0；桌面 CI/打包使用 Node 24。Electron 42 起不再通过包自身 postinstall 自动下载二进制，项目 postinstall 必须先执行 `install-electron`，再执行既有 DMG/NSIS 补丁；不得用跳过安装脚本掩盖缺少运行时。保留 electron-builder 24.13.3 及其已验证补丁。
+桌面壳固定 Electron **45.1.0**（Chromium 156 / Node 24），应用版本号与运行时版本独立。开发安装要求 Node >=22.12.0；桌面 CI/打包使用 Node 24。Electron 42 起不再通过包自身 postinstall 自动下载二进制，项目 postinstall 必须先执行 `install-electron`，再执行既有 DMG/NSIS 补丁；不得用跳过安装脚本掩盖缺少运行时。打包工具链已升级至 `electron-builder ^26.18.0`（dev-board#1661）：Windows 签名配置位于 `build.win.signtoolOptions.sign`，NSIS `/D=` 参数由 `GetDParameter` 按标准无引号尾参数规则解析。
 
 Electron 44 起最低 macOS **13 Ventura**，`build.mac.minimumSystemVersion` 与此一致；本项目仍仅构建 Mac ARM64。BrowserView 和旧导航方法在 45 中仍可用但已弃用，本轮保留现有生命周期。浏览器面板 UA 从当前运行时取得并去掉 Electron 标记，不再伪装成固定 Chrome 120/macOS。
 
