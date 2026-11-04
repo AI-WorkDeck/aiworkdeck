@@ -5,6 +5,7 @@ package com.checkba.service.optimizer;
 
 import com.checkba.model.entity.FeedbackAttachment;
 import com.checkba.model.entity.UserFeedback;
+import com.checkba.service.LangText;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -142,7 +143,15 @@ public class OptimizerAgentService {
 
         FeedbackTriageService.TriageResult triage;
         try {
-            triage = triageService.triage(fb, attachments, props.getModel());
+            triage = isAiContentReport(fb) ? new FeedbackTriageService.TriageResult(
+                    FeedbackTriageService.VERDICT_UNCLEAR, 0.0,
+                    LangText.of("AI 内容举报：待人工核查", "AI content report: human review required"),
+                    LangText.of("用户提交的 AI 内容举报，尚未作出处理结论。",
+                            "User-submitted AI content report; no resolution has been reached."),
+                    "unknown",
+                    LangText.of("须由人工核验举报内容与会话归属、采取适当措施并反馈；通知送达不代表结案。",
+                            "A human must verify the report and conversation ownership, take appropriate action and respond. Notification delivery is not resolution."),
+                    "{}") : triageService.triage(fb, attachments, props.getModel());
         } catch (Exception e) {
             return fail(fb, "分诊失败: " + e.getMessage(), null);
         }
@@ -186,6 +195,16 @@ public class OptimizerAgentService {
         }
 
         return notifyOrFail(fb, triage, attachments, lowConfidenceNote(triage));
+    }
+
+    private boolean isAiContentReport(UserFeedback fb) {
+        if (fb.getContextJson() == null) return false;
+        try {
+            return "ai-content-report".equals(mapper.readTree(fb.getContextJson())
+                    .path("client").path("type").asText());
+        } catch (java.io.IOException e) {
+            return false;
+        }
     }
 
     private String lowConfidenceNote(FeedbackTriageService.TriageResult triage) {
