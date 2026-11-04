@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitProjectsTitle: "ตรวจสอบการเปลี่ยนแปลงโครงการก่อนออก",
+  exitProjectsHint: "เลือกโครงการที่จะบันทึกเป็นเวอร์ชัน การเปลี่ยนแปลงที่ไม่ได้เลือกจะยังคงบันทึกไว้ในคอมพิวเตอร์นี้",
+  exitProjectsChecking: "กำลังตรวจสอบการเปลี่ยนแปลง…",
+  exitProjectsCommit: "บันทึกที่เลือกเป็นเวอร์ชันแล้วออก",
+  exitProjectsCommitted: "บันทึกเป็นเวอร์ชันแล้ว",
+
   "aiSaving": "กำลังบันทึกไฟล์ที่เปิดอยู่…",
   "aiExecuting": "กำลังอัปเดตเวอร์ชันโปรเจกต์…",
   "aiMerging": "กำลังรวมการเปลี่ยนแปลงที่ไม่มีข้อขัดแย้ง…",

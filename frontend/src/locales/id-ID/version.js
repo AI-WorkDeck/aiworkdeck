@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitProjectsTitle: "Tinjau perubahan proyek sebelum keluar",
+  exitProjectsHint: "Pilih proyek untuk dikomit. Perubahan yang tidak dipilih tetap tersimpan di komputer ini.",
+  exitProjectsChecking: "Memeriksa perubahan…",
+  exitProjectsCommit: "Komit pilihan dan keluar",
+  exitProjectsCommitted: "Dikomit",
+
   "aiSaving": "Menyimpan berkas yang terbuka…",
   "aiExecuting": "Memperbarui versi proyek…",
   "aiMerging": "Menggabungkan perubahan tanpa konflik…",

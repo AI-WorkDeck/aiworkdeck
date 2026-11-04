@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitProjectsTitle: "Revisar alterações antes de sair",
+  exitProjectsHint: "Selecione os projetos para confirmar. As alterações não selecionadas permanecem salvas neste computador.",
+  exitProjectsChecking: "Verificando alterações…",
+  exitProjectsCommit: "Confirmar seleção e sair",
+  exitProjectsCommitted: "Confirmado",
+
   "aiSaving": "Salvando arquivos abertos…",
   "aiExecuting": "Atualizando a versão do projeto…",
   "aiMerging": "Mesclando alterações sem conflito…",

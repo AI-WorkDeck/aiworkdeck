@@ -3,6 +3,12 @@ name: version-control
 description: 项目级版本记录领域。任务涉及版本记录/工作段（work session）、时间线、退回版本、丢弃工作、另起一稿/多稿并行/采纳-放弃-冲突三选一、项目 Git 仓库（com.checkba.version 包）、文件树清单 .awd/tree.json 时，先读本文档再动代码。
 ---
 
+## 软件退出的统一项目提交选择（dev-board#1685 / #1687）
+
+`App.vue` 的 desktop quit guard 先暂停 AI 并 `flushQuitWorkbenches` 确认文件落盘，再调用全局 `projectExitDialog.js`；不依赖当前项目或页面实例。`ProjectExitDialog.vue` 立即显示，最多三路读取全部本地项目的 `/version/exit-status`（8 秒请求预算，失败保持可见且可重试），只展示有待提交内容、冲突或统计失败的项目，默认不勾选。全部干净时自动退出；直接退出保留未提交改动，最终仍经 quit guard 再次保存校验。选中项目逐个调用既有 `/session/end` 并核查轻量状态；成功回执先取消勾选，部分失败留在弹窗，重试不重复提交已成功项目。提交中禁止退出按钮；切项目仅保存文件，不再询问提交。退出登录沿用原有确认行为。
+
+独立弹窗沿既有 DOM createApp 宿主方式挂载（uni 会覆盖 App 模板），持有全局浮层隐藏原生 BrowserView；取消代次丢弃迟到结果。`projectExitState.js` 严格核对状态及提交回执，不能把读取失败当成零改动。四格式原有保存屏障未变：Word/PPT/Excel 共用 LibreOfficeEditor；PDF 的预览不新增伪保存路径，其他既有编辑实例仍由原注册表校验。回归 `project-exit.test.mjs`、`desktop-quit-app.test.mjs`、`flush-dirty-editors.test.mjs`。浏览器夹具 `tests/project-exit-ui/build.mjs` 生成真实组件+合成API页面，验证窄窗和部分失败；不等于正式客户端/真实文件退出实测。
+
 ## 本地项目保存与版本锁范围（dev-board#1529）
 
 `WorkSessionService.repoLock` 的本地项目使用 `PathScopedRepoLock`：每次外层获取按当前物理根目录（解析符号链接，包括尚不存在路径的最近已存在祖先）与活动范围比较，仅相同或祖先/后代目录互斥；独立目录与兄弟目录可并行。不能退回所有本地目录一把锁，也不能仅按首次打开时的父子分组：后来打开的父目录仍必须等待已活动子目录。根解析在注册表锁外，解析失败不作无冲突降级；同项目重入沿用外层范围。现有业务只在同项目嵌套；跨项目扩大范围遇到其他线程持锁直接失败，不能形成两方升级死锁。只读轮询不得插队到已等待的重叠保存之前。

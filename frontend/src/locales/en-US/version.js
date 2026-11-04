@@ -4,6 +4,12 @@
 // InviteMemberDialog.vue, CloudAcceptDialog.vue): work sessions, drafts, timeline,
 // three-context adopt conflict dialog, Team Case Library collaboration.
 export default {
+  exitProjectsTitle: "Review project changes before exiting",
+  exitProjectsHint: "Select projects to commit. Unselected changes remain saved on this computer.",
+  exitProjectsChecking: "Checking changes…",
+  exitProjectsCommit: "Commit selected and exit",
+  exitProjectsCommitted: "Committed",
+
   aiSaving: 'Saving open files…',
   aiExecuting: 'Updating project version…',
   aiMerging: 'Merging changes without conflicts…',

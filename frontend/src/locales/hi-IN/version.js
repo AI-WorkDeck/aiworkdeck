@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitProjectsTitle: "बाहर निकलने से पहले परियोजना के बदलाव जाँचें",
+  exitProjectsHint: "कमिट करने के लिए परियोजनाएँ चुनें। नहीं चुने गए बदलाव इस कंप्यूटर पर सहेजे रहेंगे।",
+  exitProjectsChecking: "बदलाव जाँचे जा रहे हैं…",
+  exitProjectsCommit: "चयनित कमिट करें और बाहर निकलें",
+  exitProjectsCommitted: "कमिट किया गया",
+
   "aiSaving": "खुली फ़ाइलें सहेजी जा रही हैं…",
   "aiExecuting": "प्रोजेक्ट संस्करण अपडेट हो रहा है…",
   "aiMerging": "बिना टकराव के बदलाव मर्ज किए जा रहे हैं…",

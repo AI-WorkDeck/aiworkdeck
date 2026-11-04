@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitProjectsTitle: "Έλεγχος αλλαγών πριν την έξοδο",
+  exitProjectsHint: "Επιλέξτε έργα για καταχώριση. Οι μη επιλεγμένες αλλαγές παραμένουν αποθηκευμένες σε αυτόν τον υπολογιστή.",
+  exitProjectsChecking: "Έλεγχος αλλαγών…",
+  exitProjectsCommit: "Καταχώριση επιλογής και έξοδος",
+  exitProjectsCommitted: "Καταχωρίστηκε",
+
   "aiSaving": "Αποθήκευση ανοιχτών αρχείων…",
   "aiExecuting": "Ενημέρωση έκδοσης έργου…",
   "aiMerging": "Συγχώνευση αλλαγών χωρίς συγκρούσεις…",

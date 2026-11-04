@@ -16,7 +16,8 @@ import { applyI18nLocale } from '@/i18n/index.js'
 import { initAppTheme } from '@/utils/appTheme.js'
 import { installModalFocusGuard } from '@/utils/modalFocusGuard.js'
 import { getAppLanguageRemote, saveAppLanguageRemote, prepareAgentRestart, abortAgentRestart } from '@/services/api.js'
-import { createDesktopQuitGuard, flushQuitWorkbenches, confirmQuitWorkbenches } from '@/utils/desktopQuitGuard.js'
+import { confirmProjectExit } from '@/utils/projectExitDialog.js'
+import { createDesktopQuitGuard, flushQuitWorkbenches } from '@/utils/desktopQuitGuard.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 
 export default {
@@ -106,7 +107,7 @@ export default {
         prepare: prepareAgentRestart,
         abort: abortAgentRestart,
         flush: flushQuitWorkbenches,
-        confirm: confirmQuitWorkbenches,
+        confirm: confirmProjectExit,
         progress: stage => {
           awaitingChoice = stage === 'confirming'
           if (awaitingChoice) uni.hideLoading()

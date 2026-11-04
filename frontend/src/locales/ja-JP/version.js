@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitProjectsTitle: "終了前にプロジェクトの変更を確認",
+  exitProjectsHint: "コミットするプロジェクトを選択してください。未選択の変更はこの端末に保存されたまま残ります。",
+  exitProjectsChecking: "変更を確認中…",
+  exitProjectsCommit: "選択項目をコミットして終了",
+  exitProjectsCommitted: "コミット済み",
+
   "aiSaving": "開いているファイルを保存中…",
   "aiExecuting": "プロジェクトのバージョンを更新中…",
   "aiMerging": "競合のない変更をマージ中…",
