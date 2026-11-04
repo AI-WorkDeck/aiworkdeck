@@ -7,6 +7,7 @@ import com.checkba.model.entity.Project;
 import com.checkba.model.entity.TelemetryEvent;
 import com.checkba.model.entity.TokenUsage;
 import com.checkba.repository.ProjectRepository;
+import com.checkba.repository.ProjectTaskRepository;
 import com.checkba.repository.TelemetryEventRepository;
 import com.checkba.repository.TokenUsageRepository;
 import com.checkba.service.telemetry.InstallIdentityService;
@@ -51,6 +52,7 @@ class TeamUsageRollupServiceTest {
     TelemetryEventRepository events;
     TokenUsageRepository tokenUsages;
     ProjectRepository projects;
+    ProjectTaskRepository tasks;
     TeamSettingsCache teamSettings;
     InstallIdentityService identity;
     TeamUsageRollupService service;
@@ -72,7 +74,8 @@ class TeamUsageRollupServiceTest {
         when(tokenUsages.findByCreatedAtAfter(any())).thenReturn(List.of());
         when(teamSettings.shareProjectNames()).thenReturn(false);
 
-        service = new TeamUsageRollupService(workSessions, events, tokenUsages, projects,
+        tasks = mock(ProjectTaskRepository.class);
+        service = new TeamUsageRollupService(workSessions, events, tokenUsages, projects, tasks,
                 identity, teamSettings);
     }
 
@@ -288,5 +291,35 @@ class TeamUsageRollupServiceTest {
         u.setCostSource(source);
         u.setCreatedAt(DAY.atTime(11, 0));
         return u;
+    }
+
+    // ==================== 待分派事项（团队看板） ====================
+
+    @Test
+    @DisplayName("unassignedTasks：只数本人项目里未完成且未分派的事项，跳过散件/草稿工作区")
+    void unassignedTasksCountsOpenUnassignedInOwnProjects() {
+        com.checkba.model.entity.Project real = new com.checkba.model.entity.Project();
+        real.setId(10L);
+        com.checkba.model.entity.Project scratch = new com.checkba.model.entity.Project();
+        scratch.setId(11L);
+        scratch.setProjectType(com.checkba.model.entity.Project.SCRATCH);
+        when(projects.findByUserIdOrderByCreatedAtDesc(USER)).thenReturn(List.of(real, scratch));
+        com.checkba.model.entity.ProjectTask open = new com.checkba.model.entity.ProjectTask();
+        com.checkba.model.entity.ProjectTask assigned = new com.checkba.model.entity.ProjectTask();
+        assigned.setAssigneeId(7L);
+        when(tasks.findByProjectIdInAndStatus(List.of(10L), "OPEN")).thenReturn(List.of(open, assigned));
+
+        Map<String, Object> payload = service.rollupFor(DAY, USER);
+
+        assertEquals(1L, payload.get("unassignedTasks"), "已分派的不算，散件/草稿工作区不查");
+    }
+
+    @Test
+    @DisplayName("unassignedTasks：没有项目时为 0，且不查事项表")
+    void unassignedTasksZeroWithoutProjects() {
+        when(projects.findByUserIdOrderByCreatedAtDesc(USER)).thenReturn(List.of());
+
+        assertEquals(0L, service.rollupFor(DAY, USER).get("unassignedTasks"));
+        org.mockito.Mockito.verifyNoInteractions(tasks);
     }
 }

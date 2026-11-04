@@ -37,7 +37,7 @@ export default {
   "railLabel": "Konversationsnavigation",
   "railTurnIndex": "Runde {n}",
   "railUntitled": "(kein Fragetext)",
-  "mentionTitle": "Auf eine Projektdatei verweisen",
+  "mentionTitle": "Auf eine Projektdatei oder Fähigkeit verweisen",
   "mentionHint": "Auf/Ab zum Auswählen, Eingabe zum Bestätigen, Esc zum Schließen",
   "mentionNoMatch": "Keine übereinstimmenden Projektdateien",
   "uploadTabLocal": "Von diesem Computer hinzufügen",
@@ -467,5 +467,13 @@ export default {
   "evolutionContrastBefore": "Vorher",
   "evolutionContrastAfter": "Nachher",
   "evolutionActionFailed": "Die Aktion wurde nicht ausgeführt; bitte erneut versuchen",
-  "evolutionPromoteAdminOnly": "Hochgestufte Fähigkeiten gelten für alle Benutzer dieser Instanz; Administratorberechtigung erforderlich"
+  "evolutionPromoteAdminOnly": "Hochgestufte Fähigkeiten gelten für alle Benutzer dieser Instanz; Administratorberechtigung erforderlich",
+  "mentionSkillTag": "Fähigkeit",
+  "skillCreatedLabel": "KI-Assistent · Fähigkeit erstellt",
+  "skillCardInput": "Eingabe",
+  "skillCardRules": "Regeln",
+  "skillCardOutput": "Ausgabe",
+  "skillCardAdded": "Zu Installiert · Fähigkeiten hinzugefügt",
+  "skillCardOpen": "Ansehen und veröffentlichen",
+  "skillCardTryHint": "Beim nächsten Mal einfach {'@'}{name} eingeben, um sie auszuführen"
 }

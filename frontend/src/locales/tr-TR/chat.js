@@ -37,7 +37,7 @@ export default {
   "railLabel": "Sohbet gezinmesi",
   "railTurnIndex": "Tur {n}",
   "railUntitled": "(soru metni yok)",
-  "mentionTitle": "Proje dosyasına referans ver",
+  "mentionTitle": "Proje dosyasına veya beceriye referans ver",
   "mentionHint": "Seçmek için Yukarı/Aşağı, onaylamak için Enter, kapatmak için Esc",
   "mentionNoMatch": "Eşleşen proje dosyası yok",
   "uploadTabLocal": "Bu bilgisayardan ekle",
@@ -467,5 +467,13 @@ export default {
   "evolutionContrastBefore": "Önce",
   "evolutionContrastAfter": "Sonra",
   "evolutionActionFailed": "İşlem gerçekleştirilemedi; lütfen tekrar deneyin",
-  "evolutionPromoteAdminOnly": "Yükseltilmiş beceriler bu kurulumdaki herkes için geçerlidir; yönetici izni gereklidir"
+  "evolutionPromoteAdminOnly": "Yükseltilmiş beceriler bu kurulumdaki herkes için geçerlidir; yönetici izni gereklidir",
+  "mentionSkillTag": "Beceri",
+  "skillCreatedLabel": "Yapay Zeka Asistanı · Beceri Oluşturuldu",
+  "skillCardInput": "Girdi",
+  "skillCardRules": "Kurallar",
+  "skillCardOutput": "Çıktı",
+  "skillCardAdded": "\"Yüklendi · Beceriler\" bölümüne eklendi",
+  "skillCardOpen": "Görüntüle ve Yayınla",
+  "skillCardTryHint": "Bir dahaki sefere çalıştırmak için {'@'}{name} yazmanız yeterli"
 }

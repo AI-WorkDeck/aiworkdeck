@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -199,6 +200,32 @@ class AccountControllerTeamTest {
         assertThrows(IllegalArgumentException.class,
                 () -> controller.updateTeamMember("acc-1", Map.of("role", ""), null));
         verifyNoInteractions(accountService);
+    }
+
+    @Test
+    @DisplayName("PUT /team/members/{id}：title / role+title 组装补丁；title=null 清除；非文字或空体拒绝")
+    void updateTeamMemberTitlePatch() {
+        when(accountService.updateTeamMember(any(), any(Map.class))).thenReturn(Map.of());
+
+        controller.updateTeamMember("acc-1", Map.of("title", "  合伙人 "), null);
+        verify(accountService).updateTeamMember("acc-1", Map.of("title", "合伙人"));
+
+        Map<String, Object> nullTitle = new LinkedHashMap<>();
+        nullTitle.put("title", null);
+        controller.updateTeamMember("acc-1", nullTitle, null);
+        verify(accountService).updateTeamMember("acc-1", Map.of("title", ""));
+
+        Map<String, Object> both = new LinkedHashMap<>();
+        both.put("role", " ADMIN ");
+        both.put("title", "主任");
+        controller.updateTeamMember("acc-2", both, null);
+        verify(accountService).updateTeamMember("acc-2", Map.of("role", "ADMIN", "title", "主任"));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> controller.updateTeamMember("acc-1", Map.of("title", 5), null));
+        assertThrows(IllegalArgumentException.class,
+                () -> controller.updateTeamMember("acc-1", Map.of(), null));
+        verify(accountService, times(3)).updateTeamMember(any(), any(Map.class));
     }
 
     @Test

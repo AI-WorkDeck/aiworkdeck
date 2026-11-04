@@ -26,6 +26,7 @@ import com.checkba.service.ai.tools.PluginDevTools;
 import com.checkba.service.ai.tools.PptxTools;
 import com.checkba.service.ai.tools.PythonTools;
 import com.checkba.service.ai.tools.ReferenceTools;
+import com.checkba.service.ai.tools.SkillAuthoringTools;
 import com.checkba.service.ai.tools.SkillTools;
 import com.checkba.service.ai.tools.SlideEditTools;
 import com.checkba.service.ai.tools.SubAgentTools;
@@ -131,6 +132,7 @@ final class RealToolBeans {
                 // use_skill（dev-board#1065）：这里构造出来的 SkillRouter 是 null，只登记工具名与参数名；
                 // 要真跑它的用例由 EvalHarness 换成接了真 skill 登记簿的实例
                 SkillTools.class,
+                SkillAuthoringTools.class,
                 SlideEditTools.class,
                 com.checkba.service.ai.tools.SlideMediaTools.class,
                 com.checkba.service.ai.tools.ImageAssetTools.class,

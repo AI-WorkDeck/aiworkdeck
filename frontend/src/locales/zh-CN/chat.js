@@ -42,7 +42,7 @@ export default {
   railUntitled: '（无提问文字）',
 
   // ---- @ 引用选择器与输入框键位（dev-board#794 K15 / #795 K16）----
-  mentionTitle: '引用项目文件',
+  mentionTitle: '引用项目文件或 Skill',
   mentionHint: '上下键选择 · 回车确认 · Esc 关闭',
   mentionNoMatch: '没有匹配的项目文件',
   uploadTabLocal: '添加本机文件',
@@ -518,4 +518,12 @@ export default {
   evolutionContrastAfter: '纠偏后',
   evolutionActionFailed: '操作未成功，请稍后重试',
   evolutionPromoteAdminOnly: '升格技能会对本实例所有成员生效，仅管理员可操作',
+  mentionSkillTag: 'Skill',
+  skillCreatedLabel: 'AI 助手 · 已创建 Skill',
+  skillCardInput: '输入',
+  skillCardRules: '规则',
+  skillCardOutput: '输出',
+  skillCardAdded: '已加入「已安装 · Skill」',
+  skillCardOpen: '查看与发布',
+  skillCardTryHint: '下回输入 {\'@\'}{name} 叫它一声就行',
 }

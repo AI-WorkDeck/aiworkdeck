@@ -37,7 +37,7 @@ export default {
   "railLabel": "Gespreksnavigatie",
   "railTurnIndex": "Beurt {n}",
   "railUntitled": "(geen vraagtekst)",
-  "mentionTitle": "Verwijzen naar een projectbestand",
+  "mentionTitle": "Verwijzen naar een projectbestand of vaardigheid",
   "mentionHint": "Omhoog/Omlaag om te kiezen, Enter om te bevestigen, Esc om te sluiten",
   "mentionNoMatch": "Geen overeenkomende projectbestanden",
   "uploadTabLocal": "Toevoegen vanaf deze computer",
@@ -467,5 +467,13 @@ export default {
   "evolutionContrastBefore": "Voor",
   "evolutionContrastAfter": "Na",
   "evolutionActionFailed": "De actie is niet uitgevoerd; probeer het opnieuw",
-  "evolutionPromoteAdminOnly": "Gepromoveerde vaardigheden gelden voor alle gebruikers op deze instantie; beheerdersmachtiging vereist"
+  "evolutionPromoteAdminOnly": "Gepromoveerde vaardigheden gelden voor alle gebruikers op deze instantie; beheerdersmachtiging vereist",
+  "mentionSkillTag": "Vaardigheid",
+  "skillCreatedLabel": "AI-assistent · Vaardigheid aangemaakt",
+  "skillCardInput": "Invoer",
+  "skillCardRules": "Regels",
+  "skillCardOutput": "Uitvoer",
+  "skillCardAdded": "Toegevoegd aan \"Geïnstalleerd · Vaardigheden\"",
+  "skillCardOpen": "Bekijken en publiceren",
+  "skillCardTryHint": "Typ de volgende keer {'@'}{name} om haar uit te voeren"
 }

@@ -3822,6 +3822,7 @@ export default {
     this.disposeRestartRecovery()
     unregisterQuitSave(this)
     if (this._onPluginOpenSettings) uni.$off('awd:plugin-open-settings', this._onPluginOpenSettings)
+    if (this._onOpenMarketDetail) uni.$off('awd:open-market-detail', this._onOpenMarketDetail)
     // 标签快照（dev-board#1049）：卸载前把节流中的那次写掉
     this.flushTabSnapshot()
     if (typeof window !== 'undefined' && this._onTabSnapshotPageHide) {
@@ -4154,6 +4155,9 @@ export default {
     this._onMarketChanged = () => Promise.all([this.loadEnabledSkills(), this.loadDynamicPlugins()])
     this._onPluginOpenSettings = ({ pluginId }) => this.openMarketDetail({ kind: 'plugin', id: pluginId, projectId: this.projectId })
     uni.$on('awd:plugin-open-settings', this._onPluginOpenSettings)
+    // 对话里「已创建 Skill」卡片的「查看与发布」：打开该 Skill 的广场详情标签
+    this._onOpenMarketDetail = (spec) => { if (spec && spec.kind && spec.id) this.openMarketDetail(spec) }
+    uni.$on('awd:open-market-detail', this._onOpenMarketDetail)
     uni.$on('awd:market-changed', this._onMarketChanged)
     uni.$on('awd:market-changed-from-sidebar', this._onMarketChanged)
     // Web 插件 evidence.locate（PluginPane）要打开底稿：整个 payload（{fileId, locator, linkKey}）

@@ -37,7 +37,7 @@ export default {
   "railLabel": "Πλοήγηση συνομιλίας",
   "railTurnIndex": "Γύρος {n}",
   "railUntitled": "(χωρίς κείμενο ερώτησης)",
-  "mentionTitle": "Αναφορά σε αρχείο έργου",
+  "mentionTitle": "Αναφορά σε αρχείο έργου ή δεξιότητα",
   "mentionHint": "Πάνω/Κάτω για επιλογή, Enter για επιβεβαίωση, Esc για κλείσιμο",
   "mentionNoMatch": "Κανένα αρχείο έργου δεν ταιριάζει",
   "uploadTabLocal": "Προσθήκη από αυτόν τον υπολογιστή",
@@ -467,5 +467,13 @@ export default {
   "evolutionContrastBefore": "Πριν",
   "evolutionContrastAfter": "Μετά",
   "evolutionActionFailed": "Η ενέργεια δεν ολοκληρώθηκε· δοκιμάστε ξανά",
-  "evolutionPromoteAdminOnly": "Οι προαγμένες δεξιότητες ισχύουν για όλους σε αυτή την εγκατάσταση· απαιτείται άδεια διαχειριστή"
+  "evolutionPromoteAdminOnly": "Οι προαγμένες δεξιότητες ισχύουν για όλους σε αυτή την εγκατάσταση· απαιτείται άδεια διαχειριστή",
+  "mentionSkillTag": "Δεξιότητα",
+  "skillCreatedLabel": "Βοηθός AI · Δημιουργήθηκε δεξιότητα",
+  "skillCardInput": "Είσοδος",
+  "skillCardRules": "Κανόνες",
+  "skillCardOutput": "Έξοδος",
+  "skillCardAdded": "Προστέθηκε στο «Εγκατεστημένο · Δεξιότητες»",
+  "skillCardOpen": "Προβολή και δημοσίευση",
+  "skillCardTryHint": "Την επόμενη φορά, πληκτρολογήστε {'@'}{name} για να την εκτελέσετε"
 }

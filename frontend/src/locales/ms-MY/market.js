@@ -221,5 +221,15 @@ export default {
   "permSpeech": "Pertuturan dan rakaman",
   "permTasks": "Kalendar dan tugasan",
   "permClipboard": "Papan keratan",
-  "permLawfirm": "Maklumat pasukan"
+  "permLawfirm": "Maklumat pasukan",
+  "newlyCreatedTag": "Baharu",
+  "publishBtn": "Terbitkan ke Pasaran",
+  "publishUpdateBtn": "Kemas kini di Pasaran",
+  "publishingEllipsis": "Menerbitkan…",
+  "publishHint": "Setelah diterbitkan, peguam lain boleh memasang kemahiran ini dari Pasaran",
+  "publishedHint": "Diterbitkan ke Pasaran",
+  "publishedVersionHint": "Diterbitkan ke Pasaran (v{version})",
+  "publishedToast": "Diterbitkan ke Pasaran",
+  "publishUpdatedToast": "Versi di Pasaran telah dikemas kini",
+  "publishFailed": "Penerbitan gagal; sila cuba lagi kemudian"
 }

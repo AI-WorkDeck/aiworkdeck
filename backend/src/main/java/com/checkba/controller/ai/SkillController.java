@@ -58,6 +58,14 @@ public class SkillController {
         this.builtinWorkflowVersionService = builtinWorkflowVersionService;
     }
 
+    /** 本机创建 Skill 的发布与台账（一句话写 Skill）。缺席时「发布」不可用、列表照常。 */
+    @Autowired(required = false)
+    private com.checkba.service.ai.skill.SkillAuthoringService skillAuthoringService;
+
+    public void setSkillAuthoringService(com.checkba.service.ai.skill.SkillAuthoringService skillAuthoringService) {
+        this.skillAuthoringService = skillAuthoringService;
+    }
+
     @lombok.Data
     public static class SkillView {
         private String id;
@@ -97,6 +105,12 @@ public class SkillController {
          * 随列表一起给，省得前端为每行再打一次 /api/packs/{id}/status。
          */
         private boolean packReady = true;
+        /** 用户在本机经 AI 创建（skill.yml: authored_locally）；只有这类可以「发布到 Marketplace」。 */
+        private boolean authoredLocally;
+        /** 本机创建时间（ISO-8601），前端据此显示「新建」角标；非本机创建为 null。 */
+        private String createdAt;
+        /** 本机记录的已发布版本；未发布为 null（发布成功但官网没回版本号时为空串）。 */
+        private String publishedVersion;
     }
 
     @GetMapping("/list")
@@ -301,6 +315,40 @@ public class SkillController {
         }
     }
 
+    /**
+     * 把本机创建的 Skill 发布到官网 Marketplace（以已连接账户为作者）。
+     * 失败时 {@code reason} 带官网机器码（如 {@code id_taken}）或 {@code not_connected}，前端据此给出去向。
+     */
+    @PostMapping("/{id}/publish")
+    public ResponseEntity<Map<String, Object>> publishSkill(
+            @PathVariable("id") String id,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        if (!isAdmin(sessionId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error(LangText.of("仅管理员可操作", "Administrator permission required")));
+        }
+        if (skillAuthoringService == null) {
+            return ResponseEntity.ok(error(LangText.of("当前环境不支持发布 Skill", "Publishing skills is not available here")));
+        }
+        try {
+            var result = skillAuthoringService.publish(id);
+            Map<String, Object> body = ok();
+            Map<String, Object> data = new HashMap<>();
+            data.put("id", result.id());
+            data.put("version", result.version());
+            data.put("updated", result.updated());
+            body.put("data", data);
+            return ResponseEntity.ok(body);
+        } catch (com.checkba.service.account.AccountException e) {
+            Map<String, Object> body = error(e.getMessage());
+            String reason = e.getKind() == com.checkba.service.account.AccountException.Kind.NOT_CONNECTED
+                    ? "not_connected" : e.getReason();
+            if (reason != null) body.put("reason", reason);
+            return ResponseEntity.ok(body);
+        } catch (Exception e) {
+            return ResponseEntity.ok(error(e.getMessage()));
+        }
+    }
+
     @PostMapping("/market/uninstall")
     public ResponseEntity<Map<String, Object>> uninstallMarketSkill(
             @RequestBody Map<String, String> body,
@@ -363,6 +411,13 @@ public class SkillController {
         view.setCredits(skill.getCredits());
         view.setAvailable(skillRegistry.isAvailable(skill));
         view.setBuiltinWorkflow(skill.isBuiltinWorkflow());
+        if (skill.isAuthoredLocally()) {
+            view.setAuthoredLocally(true);
+            view.setCreatedAt(skill.getCreatedAt());
+            if (skillAuthoringService != null) {
+                view.setPublishedVersion(skillAuthoringService.publishedVersion(skill.getId()));
+            }
+        }
         String packId = skill.getRequiresPack();
         if (packId != null && !packId.isBlank()) {
             view.setPackId(packId);

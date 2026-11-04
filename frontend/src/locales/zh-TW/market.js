@@ -221,5 +221,15 @@ export default {
   "permSpeech": "語音合成與錄音",
   "permTasks": "日程與事項",
   "permClipboard": "剪貼板",
-  "permLawfirm": "團隊信息"
+  "permLawfirm": "團隊信息",
+  "newlyCreatedTag": "新建",
+  "publishBtn": "發布到外掛市集",
+  "publishUpdateBtn": "更新到外掛市集",
+  "publishingEllipsis": "發布中…",
+  "publishHint": "發布後，其他律師可以在外掛市集安裝這個 Skill",
+  "publishedHint": "已發布到外掛市集",
+  "publishedVersionHint": "已發布到外掛市集（v{version}）",
+  "publishedToast": "已發布到外掛市集",
+  "publishUpdatedToast": "外掛市集上的版本已更新",
+  "publishFailed": "發布失敗，請稍後重試"
 }

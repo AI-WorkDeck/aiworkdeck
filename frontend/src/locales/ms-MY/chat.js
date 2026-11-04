@@ -37,7 +37,7 @@ export default {
   "railLabel": "Navigasi perbualan",
   "railTurnIndex": "Giliran {n}",
   "railUntitled": "(tiada teks soalan)",
-  "mentionTitle": "Rujuk fail projek",
+  "mentionTitle": "Rujuk fail projek atau kemahiran",
   "mentionHint": "Atas/Bawah untuk pilih, Enter untuk sahkan, Esc untuk tutup",
   "mentionNoMatch": "Tiada fail projek yang sepadan",
   "uploadTabLocal": "Tambah dari komputer ini",
@@ -467,5 +467,13 @@ export default {
   "evolutionContrastBefore": "Sebelum",
   "evolutionContrastAfter": "Selepas",
   "evolutionActionFailed": "Tindakan tidak berjaya; sila cuba lagi",
-  "evolutionPromoteAdminOnly": "Skill yang dinaik taraf terpakai kepada semua pengguna pada instance ini; kebenaran pentadbir diperlukan"
+  "evolutionPromoteAdminOnly": "Skill yang dinaik taraf terpakai kepada semua pengguna pada instance ini; kebenaran pentadbir diperlukan",
+  "mentionSkillTag": "Kemahiran",
+  "skillCreatedLabel": "Pembantu AI · Kemahiran Dicipta",
+  "skillCardInput": "Input",
+  "skillCardRules": "Peraturan",
+  "skillCardOutput": "Output",
+  "skillCardAdded": "Ditambah ke \"Dipasang · Kemahiran\"",
+  "skillCardOpen": "Lihat dan Terbitkan",
+  "skillCardTryHint": "Lain kali, taip {'@'}{name} untuk menjalankannya"
 }

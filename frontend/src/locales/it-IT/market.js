@@ -221,5 +221,15 @@ export default {
   "permSpeech": "Voce e registrazione",
   "permTasks": "Calendario e attività",
   "permClipboard": "Appunti",
-  "permLawfirm": "Informazioni sul team"
+  "permLawfirm": "Informazioni sul team",
+  "newlyCreatedTag": "Nuovo",
+  "publishBtn": "Pubblica nel catalogo estensioni",
+  "publishUpdateBtn": "Aggiorna nel catalogo estensioni",
+  "publishingEllipsis": "Pubblicazione in corso…",
+  "publishHint": "Una volta pubblicata, altri avvocati potranno installare questa competenza dal catalogo estensioni",
+  "publishedHint": "Pubblicata nel catalogo estensioni",
+  "publishedVersionHint": "Pubblicata nel catalogo estensioni (v{version})",
+  "publishedToast": "Pubblicata nel catalogo estensioni",
+  "publishUpdatedToast": "La versione nel catalogo estensioni è stata aggiornata",
+  "publishFailed": "Pubblicazione non riuscita; riprova più tardi"
 }

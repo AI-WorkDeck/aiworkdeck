@@ -37,7 +37,7 @@ export default {
   "railLabel": "Navegación de la conversación",
   "railTurnIndex": "Turno {n}",
   "railUntitled": "(sin texto de pregunta)",
-  "mentionTitle": "Referenciar un archivo del proyecto",
+  "mentionTitle": "Referenciar un archivo del proyecto o una habilidad",
   "mentionHint": "Arriba/Abajo para elegir, Intro para confirmar, Esc para cerrar",
   "mentionNoMatch": "No hay archivos del proyecto coincidentes",
   "uploadTabLocal": "Añadir desde este equipo",
@@ -467,5 +467,13 @@ export default {
   "evolutionContrastBefore": "Antes",
   "evolutionContrastAfter": "Después",
   "evolutionActionFailed": "La acción no se realizó; inténtelo de nuevo",
-  "evolutionPromoteAdminOnly": "Las habilidades promovidas se aplican a todos los usuarios de esta instancia; se requiere permiso de administrador"
+  "evolutionPromoteAdminOnly": "Las habilidades promovidas se aplican a todos los usuarios de esta instancia; se requiere permiso de administrador",
+  "mentionSkillTag": "Habilidad",
+  "skillCreatedLabel": "Asistente de IA · Habilidad creada",
+  "skillCardInput": "Entrada",
+  "skillCardRules": "Reglas",
+  "skillCardOutput": "Salida",
+  "skillCardAdded": "Añadida a «Instalado · Habilidades»",
+  "skillCardOpen": "Ver y publicar",
+  "skillCardTryHint": "La próxima vez, escriba {'@'}{name} para ejecutarla"
 }
