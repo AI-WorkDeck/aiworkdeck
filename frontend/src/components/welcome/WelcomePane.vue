@@ -26,7 +26,7 @@
         <text class="welcome-lead">{{ $t('onboarding.unlock.brand.lead') }}</text>
       </view>
 
-      <view class="welcome-quick-chat">
+      <view class="welcome-quick-chat" @keydown.esc="showModelDropdown = false">
         <textarea
           v-model="quickPrompt"
           class="welcome-quick-chat-input"
@@ -37,6 +37,12 @@
         />
         <view class="welcome-quick-chat-actions">
           <view class="welcome-quick-chat-tools">
+            <view class="welcome-quick-tool" role="button" tabindex="0" data-quick="model"
+              :aria-expanded="showModelDropdown ? 'true' : 'false'"
+              @tap="toggleModels" @keydown.enter.stop.prevent="toggleModels" @keydown.space.stop.prevent="toggleModels">
+              <text>{{ selectedModel ? selectedModel.name : $t('chat.selectModel') }}</text>
+              <text aria-hidden="true">▾</text>
+            </view>
             <view class="welcome-quick-tool" data-quick="new-docx" @tap="$emit('quick-create-doc', 'docx')">
               <svg class="welcome-quick-tool-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path v-for="(d, gi) in ICONS.filePlus" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
@@ -61,6 +67,11 @@
           </view>
         </view>
       </view>
+
+      <ModelSelectorDropdown v-if="showModelDropdown" class="welcome-model-dropdown" placement="down"
+        :groups="modelGroups" :current-model-id="selectedModel?.id || ''"
+        :price-display="modelCatalog.priceDisplay" :network-region-basis="modelCatalog.networkRegionBasis || ''"
+        @select="selectWelcomeModel" />
 
       <view class="welcome-columns">
         <view class="welcome-col welcome-col-main">
@@ -173,7 +184,7 @@
 </template>
 
 <script>
-import { getMyProjects, getTelemetrySettings } from '@/services/api.js'
+import { getMyProjects, getTelemetrySettings, fetchAiModels } from '@/services/api.js'
 import { getRecentProjectIds } from '@/utils/recentProjects.js'
 import { getCurrentUser } from '@/utils/auth.js'
 import { isDesktopHost, host } from '@/services/host.js'
@@ -184,13 +195,14 @@ import { buildRecentProjects } from './welcomeRecent.js'
 import { loadTelemetryNoticeDismissed, saveTelemetryNoticeDismissed } from '@/pages/project-overview/welcomeTab.js'
 import FolderCatalog from './FolderCatalog.vue'
 import AccountProjectCatalog from '@/components/project-list/AccountProjectCatalog.vue'
+import ModelSelectorDropdown from '@/components/ModelSelectorDropdown.vue'
 import CloudAcceptDialog from '@/components/CloudAcceptDialog.vue'
 
 let overlaySeq = 0
 
 export default {
   name: 'WelcomePane',
-  components: { CloudAcceptDialog, FolderCatalog, AccountProjectCatalog },
+  components: { ModelSelectorDropdown, CloudAcceptDialog, FolderCatalog, AccountProjectCatalog },
   inject: {
     leaveWorkbench: { default: null },
     deleteWorkspaceProject: { default: null },
@@ -208,6 +220,10 @@ export default {
   data() {
     return {
       quickPrompt: '',
+      showModelDropdown: false,
+      selectedModel: null,
+      explicitModel: null,
+      modelCatalog: { models: [] },
       allProjects: [],
       showAllFolders: this.catalogRequest > 0,
       recentProjects: [],
@@ -218,6 +234,19 @@ export default {
     }
   },
   computed: {
+    modelGroups() {
+      const groups = []
+      for (const model of this.modelCatalog.models || []) {
+        const key = `${model.region}|${model.vendor}`
+        let group = groups.find(item => item.key === key)
+        if (!group) {
+          group = { key, vendor: model.vendor || this.$t('chat.vendorOther'), region: model.region, models: [] }
+          groups.push(group)
+        }
+        group.models.push(model)
+      }
+      return groups.sort((a, b) => (a.region === 'INTERNATIONAL' ? 1 : 0) - (b.region === 'INTERNATIONAL' ? 1 : 0))
+    },
     isDesktop() { return isDesktopHost() },
     ICONS() {
       return ICONS
@@ -260,14 +289,48 @@ export default {
   mounted() {
     this.loadRecent()
     this.loadTelemetryState()
+    this.loadModels(false)
   },
   beforeUnmount() {
+    this._modelLoadGeneration = (this._modelLoadGeneration || 0) + 1
     setGlobalOverlay(false, this._overlayHolder)
   },
   methods: {
+    async loadModels(accountPrompt) {
+      const generation = this._modelLoadGeneration = (this._modelLoadGeneration || 0) + 1
+      try {
+        const catalog = await fetchAiModels({ accountPrompt })
+        if (generation !== this._modelLoadGeneration) return
+        this.modelCatalog = catalog || { models: [] }
+        const models = this.modelCatalog.models || []
+        const saved = this.explicitModel?.id || uni.getStorageSync('ai_selected_model')
+        const selected = models.find(model => model.id === saved || model.aliases?.includes(saved))
+        const automatic = { id: 'auto', name: this.$t('chat.autoModelName'), vision: true }
+        const fallback = models.find(model => model.id === this.modelCatalog.defaultModel) || models[0]
+        this.selectedModel = selected || (models.length ? (!saved || saved === 'auto' ? automatic : fallback) : null)
+        if (this.explicitModel) this.explicitModel = this.selectedModel
+      } catch (error) {
+        if (generation !== this._modelLoadGeneration) return
+        this.modelCatalog = { models: [] }
+        this.explicitModel = null
+        this.selectedModel = null
+        console.warn('[WelcomePane] Model catalog unavailable', error)
+      }
+    },
+    toggleModels() {
+      this.showModelDropdown = !this.showModelDropdown
+      if (this.showModelDropdown) this.loadModels(true)
+    },
+    selectWelcomeModel(model) {
+      this.selectedModel = model
+      this.explicitModel = model
+      this.showModelDropdown = false
+    },
     submitQuickChat() {
       const prompt = (this.quickPrompt || '').trim()
-      this.$emit('start-chat', { prompt })
+      this.showModelDropdown = false
+      this.$emit('start-chat', { prompt, model: this.explicitModel })
+      this.explicitModel = null
       this.quickPrompt = ''
     },
     async loadRecent() {
@@ -384,6 +447,13 @@ export default {
   color: var(--awd-text-2);
   line-height: 1.6;
   max-width: 560px;
+}
+
+.welcome-model-dropdown {
+  position: relative;
+  top: auto !important;
+  margin-top: -28px;
+  margin-bottom: 28px;
 }
 
 .welcome-quick-chat {
