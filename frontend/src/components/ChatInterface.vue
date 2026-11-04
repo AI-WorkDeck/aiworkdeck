@@ -4653,7 +4653,7 @@ export default {
     // Expose methods for parent ref access
     expose({
       addFile, loadMessages, loadConversationMetadata, sendExternalPrompt, resumeAfterRestart,
-      attachCrossProjectFile, sendQuickPrompt,
+      attachCrossProjectFile, sendQuickPrompt, selectModel,
       startNewChat, menuSetMode, menuStop, menuState,
       uploadLocalFilesAndAddContext,
       handleReviewSubmit, handleReviewState,
