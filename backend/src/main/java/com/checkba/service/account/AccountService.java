@@ -339,6 +339,11 @@ public class AccountService {
         if (reply.status() == 409) {
             String code = str(parse(reply.body()).get("error"));
             // 文案红线：不得含「登录」「未授权」「请先」——api.js 用这三个子串判掉线并清会话
+            if ("client_upgrade_required".equals(code)) {
+                throw new AccountException(AccountException.Kind.CONFLICT,
+                        LangText.of("请更新客户端后重试", "Please update your client and try again"),
+                        "client_upgrade_required");
+            }
             if ("no_credits".equals(code)) {
                 throw new AccountException(AccountException.Kind.CONFLICT,
                         LangText.of("账户 Credits 余额为空，到官网充值后即可使用平台 AI",
