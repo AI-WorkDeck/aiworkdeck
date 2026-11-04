@@ -105,7 +105,13 @@ with zipfile.ZipFile(sys.argv[1],'w') as z:
   const outputPath = path.join(out, 'new-activity.docx')
   fs.writeFileSync(outputPath, Buffer.from(await download.arrayBuffer()))
   const xml = execFileSync('python3', ['-c', 'import zipfile,sys;print(zipfile.ZipFile(sys.argv[1]).read("word/document.xml").decode())', outputPath], { encoding: 'utf8' })
-  const plain = xml.replace(/<[^>]+>/g, '')
+  let plain = xml
+  let prevPlain
+  do {
+    prevPlain = plain
+    plain = plain.replace(/<[^>]+>/g, '')
+  } while (plain !== prevPlain)
+  plain = plain.replace(/[<>]/g, '')
   for (const fact of ['11月3日', '李甲', '王乙']) assert.ok(plain.includes(fact), fact)
   assert.match(plain, /23[人名]/)
   assert.ok(!xml.includes('OLD_EVENT_918') && !xml.includes('16人'))

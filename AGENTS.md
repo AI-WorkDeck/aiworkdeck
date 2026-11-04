@@ -17,3 +17,5 @@ Codex 子代理共享文件系统；并行写入须明确隔离 worktree 或互�
 合并与发版分开：完成审阅和必要检查后可按用户授权合并；发版、部署或升级客户端需要本次明确指示。
 
 多语种令牌化必检（dev-board#1477）：所有新增或改动的用户可见文案（前端、桌面端、Office/WPS 加载项、官方插件、后端接口与 AI 工具/Skill）一律采用多语种令牌，严禁硬编码写死。每次提交或合并 PR 前必须运行 `cd frontend && npm run check:locales` 并检查 diff，若发现未令牌化文案或漏译词条，先补齐令牌与多语言词条后再提交/合并。
+
+漏洞与安全扫描合并前必检（dev-board#1661）：每次提交或合并 PR 前，必须自主执行安全与漏洞检查：① 涉及依赖或锁文件改动时，对受影响工作区跑 `npm audit`（确保 0 漏洞），核对 Maven `pom.xml`（含 `backend/` 与 `official-plugins/*/backend/pom.xml`）及 Python `requirements*.txt` / `uv.lock` 无已知高危/中危 CVE；② 合并 PR 前必须等待 `CodeQL` 检查完成，并通过 `gh api "repos/AI-WorkDeck/aiworkdeck/dependabot/alerts?state=open"` 与 `gh api "repos/AI-WorkDeck/aiworkdeck/code-scanning/alerts?state=open"` 核对是否存在未处理告警——凡能修复的漏洞与静态扫描问题必须先修完、验证通过后再合并 PR。
