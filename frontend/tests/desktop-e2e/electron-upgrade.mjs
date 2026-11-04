@@ -394,6 +394,14 @@ try {
     frame.on('pageerror', error => { evidence.guestErrors ||= []; evidence.guestErrors.push({ ext, message: error.message }) })
     frame.on('console', message => { if (message.type() === 'error') { evidence.guestErrors ||= []; evidence.guestErrors.push({ ext, message: message.text() }) } })
     const marker = `兼容验证_ELECTRON_COMPAT_${ext.toUpperCase()}`
+    await sleep(2000) // Ready precedes the first composited canvas frame.
+    await assertLocalWorkspaceUnobstructed()
+    await page.screenshot({ path: path.join(run, `${ext}-opened.png`) })
+    if (installedMode) {
+      evidence.releaseDocuments ||= {}
+      evidence.releaseDocuments[ext] = await checkDocumentChrome({ page, run, ext })
+    }
+    // Chrome checks click outside the guest and resize its canvas. Establish engine selection AFTER those checks.
     if (ext === 'docx') await exec(ext, 'goto', { type: 'end' })
     if (ext === 'xlsx') {
       // Enter the native Calc canvas as a user does before typing. DOM focus on
@@ -411,15 +419,11 @@ try {
       const info = await exec(ext, 'slide_get_page', { slideNumber: 1 })
       const shape = info.shapes.find(s => (s.text || '').includes('普通文本框内容'))
       assert.ok(shape, 'fixture text shape')
-      await exec(ext, 'slide_goto', { slideNumber: 1, shapeName: shape.name })
+      const selection = await exec(ext, 'slide_goto', { slideNumber: 1, shapeName: shape.name })
+      assert.equal(selection.selected, shape.name)
+      write('pptx-input-target.json', selection)
     }
-    await sleep(2000) // Ready precedes the first composited canvas frame.
-    await assertLocalWorkspaceUnobstructed()
-    await page.screenshot({ path: path.join(run, `${ext}-opened.png`) })
-    if (installedMode) {
-      evidence.releaseDocuments ||= {}
-      evidence.releaseDocuments[ext] = await checkDocumentChrome({ page, run, ext })
-    }
+    write(`${ext}-ui-state-before-input.json`, await exec(ext, 'get_ui_state'))
     await page.evaluate(name => Object.values(window.__checkbaActiveOverviewVm._libreRefs).find(e => e.file?.name === name).webviewEl.focus(), path.basename(files[ext]))
     await frame.focus('[data-lo-ime]')
     assert.equal(await frame.$eval('[data-lo-ime]', el => document.activeElement === el), true)
