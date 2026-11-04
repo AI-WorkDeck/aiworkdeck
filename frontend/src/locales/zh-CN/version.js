@@ -3,6 +3,12 @@
 // 版本记录 / 协作（version/*.vue、collab/CollabDialog.vue、InviteMemberDialog.vue、
 // CloudAcceptDialog.vue）：工作段、稿、时间线、三语境采纳冲突弹窗、团队案件库协作。
 export default {
+  exitProjectsTitle: "退出前整理项目改动",
+  exitProjectsHint: "勾选要提交的项目。未勾选项目的文件和未提交改动仍保留在本机。",
+  exitProjectsChecking: "正在检查改动…",
+  exitProjectsCommit: "提交所选并退出",
+  exitProjectsCommitted: "已提交",
+
   aiSaving: '正在保存打开的文件…',
   aiExecuting: '正在处理项目版本…',
   aiMerging: '正在合并不冲突的改动…',

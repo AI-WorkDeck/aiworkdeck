@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitProjectsTitle: "Vérifier les modifications avant de quitter",
+  exitProjectsHint: "Sélectionnez les projets à valider. Les modifications non sélectionnées restent enregistrées sur cet ordinateur.",
+  exitProjectsChecking: "Vérification des modifications…",
+  exitProjectsCommit: "Valider la sélection et quitter",
+  exitProjectsCommitted: "Validé",
+
   "aiSaving": "Enregistrement des fichiers ouverts…",
   "aiExecuting": "Mise à jour de la version du projet…",
   "aiMerging": "Fusion des modifications sans conflit…",

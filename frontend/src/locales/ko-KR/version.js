@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitProjectsTitle: "종료 전 프로젝트 변경 확인",
+  exitProjectsHint: "커밋할 프로젝트를 선택하세요. 선택하지 않은 변경 사항도 이 컴퓨터에 저장된 상태로 유지됩니다.",
+  exitProjectsChecking: "변경 확인 중…",
+  exitProjectsCommit: "선택 항목 커밋 후 종료",
+  exitProjectsCommitted: "커밋 완료",
+
   "aiSaving": "열려 있는 파일 저장 중…",
   "aiExecuting": "프로젝트 버전 업데이트 중…",
   "aiMerging": "충돌 없는 변경 사항 병합 중…",
