@@ -221,5 +221,15 @@ export default {
   "permSpeech": "Spraak en opname",
   "permTasks": "Agenda en taken",
   "permClipboard": "Klembord",
-  "permLawfirm": "Teaminformatie"
+  "permLawfirm": "Teaminformatie",
+  "newlyCreatedTag": "Nieuw",
+  "publishBtn": "Publiceren op Marktplaats",
+  "publishUpdateBtn": "Bijwerken op Marktplaats",
+  "publishingEllipsis": "Publiceren…",
+  "publishHint": "Na publicatie kunnen andere advocaten deze vaardigheid installeren via de Marktplaats",
+  "publishedHint": "Gepubliceerd op Marktplaats",
+  "publishedVersionHint": "Gepubliceerd op Marktplaats (v{version})",
+  "publishedToast": "Gepubliceerd op Marktplaats",
+  "publishUpdatedToast": "De versie op Marktplaats is bijgewerkt",
+  "publishFailed": "Publiceren mislukt; probeer het later opnieuw"
 }

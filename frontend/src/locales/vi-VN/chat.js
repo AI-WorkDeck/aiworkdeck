@@ -37,7 +37,7 @@ export default {
   "railLabel": "Điều hướng hội thoại",
   "railTurnIndex": "Lượt {n}",
   "railUntitled": "(không có nội dung câu hỏi)",
-  "mentionTitle": "Tham chiếu tệp dự án",
+  "mentionTitle": "Tham chiếu tệp dự án hoặc kỹ năng",
   "mentionHint": "Lên/Xuống để chọn, Enter để xác nhận, Esc để đóng",
   "mentionNoMatch": "Không có tệp dự án khớp",
   "uploadTabLocal": "Thêm từ máy tính này",
@@ -467,5 +467,13 @@ export default {
   "evolutionContrastBefore": "Trước",
   "evolutionContrastAfter": "Sau",
   "evolutionActionFailed": "Thao tác không thành công; vui lòng thử lại",
-  "evolutionPromoteAdminOnly": "Kỹ năng đã nâng cấp áp dụng cho mọi người trên instance này; cần quyền quản trị viên"
+  "evolutionPromoteAdminOnly": "Kỹ năng đã nâng cấp áp dụng cho mọi người trên instance này; cần quyền quản trị viên",
+  "mentionSkillTag": "Kỹ năng",
+  "skillCreatedLabel": "Trợ lý AI · Đã tạo kỹ năng",
+  "skillCardInput": "Đầu vào",
+  "skillCardRules": "Quy tắc",
+  "skillCardOutput": "Đầu ra",
+  "skillCardAdded": "Đã thêm vào \"Đã cài đặt · Kỹ năng\"",
+  "skillCardOpen": "Xem và xuất bản",
+  "skillCardTryHint": "Lần sau chỉ cần nhập {'@'}{name} để chạy"
 }

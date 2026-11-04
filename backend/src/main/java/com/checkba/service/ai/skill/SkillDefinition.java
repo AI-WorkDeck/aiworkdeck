@@ -235,6 +235,18 @@ public class SkillDefinition {
     public void setLicense(String license) { this.license = license; }
     public List<String> getCredits() { return credits; }
     public void setCredits(List<String> credits) { this.credits = credits; }
+    /**
+     * 是否由用户在本机经 AI「一句话创建」（skill.yml: authored_locally）。
+     * 只有这类 skill 可以从客户端「发布到 Marketplace」——装来的别人的 skill 不许转投。
+     */
+    private boolean authoredLocally = false;
+    /** 本机创建时间（skill.yml: created_at，ISO-8601），前端据此显示「新建」角标。 */
+    private String createdAt;
+
+    public boolean isAuthoredLocally() { return authoredLocally; }
+    public void setAuthoredLocally(boolean authoredLocally) { this.authoredLocally = authoredLocally; }
+    public String getCreatedAt() { return createdAt; }
+    public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
     public List<String> getLanguages() { return languages; }
     public void setLanguages(List<String> languages) { this.languages = languages; }
     public String getNameEn() { return nameEn; }

@@ -37,7 +37,7 @@ export default {
   "railLabel": "Navigazione della conversazione",
   "railTurnIndex": "Turno {n}",
   "railUntitled": "(nessun testo della domanda)",
-  "mentionTitle": "Fare riferimento a un file del progetto",
+  "mentionTitle": "Fare riferimento a un file del progetto o a una competenza",
   "mentionHint": "Su/Giù per scegliere, Invio per confermare, Esc per chiudere",
   "mentionNoMatch": "Nessun file del progetto corrispondente",
   "uploadTabLocal": "Aggiungi da questo computer",
@@ -467,5 +467,13 @@ export default {
   "evolutionContrastBefore": "Prima",
   "evolutionContrastAfter": "Dopo",
   "evolutionActionFailed": "L'azione non è andata a buon fine; riprova",
-  "evolutionPromoteAdminOnly": "Le competenze promosse si applicano a tutti gli utenti di questa istanza; è richiesta l'autorizzazione dell'amministratore"
+  "evolutionPromoteAdminOnly": "Le competenze promosse si applicano a tutti gli utenti di questa istanza; è richiesta l'autorizzazione dell'amministratore",
+  "mentionSkillTag": "Competenza",
+  "skillCreatedLabel": "Assistente IA · Competenza creata",
+  "skillCardInput": "Input",
+  "skillCardRules": "Regole",
+  "skillCardOutput": "Output",
+  "skillCardAdded": "Aggiunta a \"Installato · Competenze\"",
+  "skillCardOpen": "Visualizza e pubblica",
+  "skillCardTryHint": "La prossima volta, digita {'@'}{name} per eseguirla"
 }

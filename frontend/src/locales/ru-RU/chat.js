@@ -37,7 +37,7 @@ export default {
   "railLabel": "Навигация по беседе",
   "railTurnIndex": "Ход {n}",
   "railUntitled": "(нет текста вопроса)",
-  "mentionTitle": "Ссылка на файл проекта",
+  "mentionTitle": "Ссылка на файл проекта или навык",
   "mentionHint": "Вверх/Вниз — выбор, Enter — подтвердить, Esc — закрыть",
   "mentionNoMatch": "Нет подходящих файлов проекта",
   "uploadTabLocal": "Добавить с этого компьютера",
@@ -467,5 +467,13 @@ export default {
   "evolutionContrastBefore": "До",
   "evolutionContrastAfter": "После",
   "evolutionActionFailed": "Действие не выполнено; попробуйте ещё раз",
-  "evolutionPromoteAdminOnly": "Преобразованные навыки применяются ко всем пользователям этого экземпляра; требуется разрешение администратора"
+  "evolutionPromoteAdminOnly": "Преобразованные навыки применяются ко всем пользователям этого экземпляра; требуется разрешение администратора",
+  "mentionSkillTag": "Навык",
+  "skillCreatedLabel": "ИИ-ассистент · Навык создан",
+  "skillCardInput": "Вход",
+  "skillCardRules": "Правила",
+  "skillCardOutput": "Выход",
+  "skillCardAdded": "Добавлено в «Установлено · Навыки»",
+  "skillCardOpen": "Просмотреть и опубликовать",
+  "skillCardTryHint": "В следующий раз введите {'@'}{name}, чтобы запустить его"
 }

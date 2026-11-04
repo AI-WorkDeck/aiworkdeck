@@ -221,5 +221,15 @@ export default {
   "permSpeech": "音声と録音",
   "permTasks": "カレンダーとタスク",
   "permClipboard": "クリップボード",
-  "permLawfirm": "チーム情報"
+  "permLawfirm": "チーム情報",
+  "newlyCreatedTag": "新規",
+  "publishBtn": "マーケットプレイスに公開",
+  "publishUpdateBtn": "マーケットプレイスを更新",
+  "publishingEllipsis": "公開中…",
+  "publishHint": "公開すると、他の弁護士がマーケットプレイスからこのスキルをインストールできます",
+  "publishedHint": "マーケットプレイスに公開済み",
+  "publishedVersionHint": "マーケットプレイスに公開済み（v{version}）",
+  "publishedToast": "マーケットプレイスに公開しました",
+  "publishUpdatedToast": "マーケットプレイス上のバージョンを更新しました",
+  "publishFailed": "公開に失敗しました。しばらくしてからもう一度お試しください"
 }

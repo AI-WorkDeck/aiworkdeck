@@ -202,6 +202,7 @@ public class ToolRegistry {
             Map.entry("dispatch_subtask", "Delegate subtask"),
             Map.entry("list_tools", "Browse tool catalog"),
             Map.entry("use_skill", "Use a skill"),
+            Map.entry("create_skill", "Create a skill"),
             Map.entry("run_python", "Run Python"),
             Map.entry("doc_list_project_files", "List project files"),
             Map.entry("doc_open_file", "Open document"),

@@ -42,7 +42,7 @@ export default {
   railUntitled: '(no question text)',
 
   // ---- @ mention picker and composer key bindings (dev-board#794 K15 / #795 K16) ----
-  mentionTitle: 'Reference a project file',
+  mentionTitle: 'Reference a project file or skill',
   mentionHint: 'Up/Down to choose, Enter to confirm, Esc to close',
   mentionNoMatch: 'No matching project files',
   uploadTabLocal: 'Add from this computer',
@@ -511,4 +511,12 @@ export default {
   evolutionContrastAfter: 'After',
   evolutionActionFailed: 'The action did not go through; please try again',
   evolutionPromoteAdminOnly: 'Promoted skills apply to everyone on this instance; administrator permission required',
+  mentionSkillTag: 'Skill',
+  skillCreatedLabel: 'AI Assistant · Skill Created',
+  skillCardInput: 'Input',
+  skillCardRules: 'Rules',
+  skillCardOutput: 'Output',
+  skillCardAdded: 'Added to Installed · Skills',
+  skillCardOpen: 'View and Publish',
+  skillCardTryHint: 'Next time, just type {\'@\'}{name} to run it',
 }

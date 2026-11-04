@@ -221,5 +221,15 @@ export default {
   "permSpeech": "음성 및 녹음",
   "permTasks": "캘린더 및 작업",
   "permClipboard": "클립보드",
-  "permLawfirm": "팀 정보"
+  "permLawfirm": "팀 정보",
+  "newlyCreatedTag": "신규",
+  "publishBtn": "마켓플레이스에 게시",
+  "publishUpdateBtn": "마켓플레이스 업데이트",
+  "publishingEllipsis": "게시 중…",
+  "publishHint": "게시하면 다른 변호사가 마켓플레이스에서 이 스킬을 설치할 수 있습니다",
+  "publishedHint": "마켓플레이스에 게시됨",
+  "publishedVersionHint": "마켓플레이스에 게시됨(v{version})",
+  "publishedToast": "마켓플레이스에 게시되었습니다",
+  "publishUpdatedToast": "마켓플레이스의 버전이 업데이트되었습니다",
+  "publishFailed": "게시하지 못했습니다. 잠시 후 다시 시도해 주세요"
 }

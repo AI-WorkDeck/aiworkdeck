@@ -223,6 +223,7 @@ import { ICONS } from '@/config/icons.js'
 import { getPluginAvatarUrl, getPluginGlyphPaths } from '@/config/pluginIcons.js'
 import { getCurrentUser } from '@/utils/auth.js'
 import { isAiWorkflowSkill } from '@/utils/chatSelectableSkills.mjs'
+import { isNewlyAuthored } from '@/utils/authoredSkills.mjs'
 import { canInstall, paidState, priceLabel, purchaseUrl } from '@/utils/marketPricing.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { requireAccount, isAccountLoginRetry } from '@/utils/requireAccount.js'
@@ -325,6 +326,8 @@ export default {
         if (s.author) metaParts.push(s.author)
         if (s.sourcePluginId) metaParts.push(this.$t('market.fromPluginTag'))
         const packPending = s.packId && s.enabled && s.packReady === false
+        // 一句话写 Skill：本机刚创建的（24 小时内）标「新建」并排到最前
+        const isNew = !packPending && mode !== 'disabled' && isNewlyAuthored(s)
         rows.push({
           kind: 'skill',
           id: s.id,
@@ -334,8 +337,10 @@ export default {
           meta: metaParts.join(' · '),
           stateLabel: packPending
             ? this.$t('market.packDownloadingShort')
+            : isNew ? this.$t('market.newlyCreatedTag')
             : this.$t(ACTIVATION_STATE[mode] || 'market.activationStateAuto'),
-          stateClass: packPending ? 'downloading' : (mode === 'disabled' ? 'off' : 'ok'),
+          stateClass: packPending ? 'downloading' : isNew ? 'new' : (mode === 'disabled' ? 'off' : 'ok'),
+          isNew,
           raw: s,
         })
       }
@@ -363,7 +368,8 @@ export default {
       return this.installedRows.filter(r => r.kind === 'plugin')
     },
     installedSkillRows() {
-      return this.installedRows.filter(r => r.kind === 'skill')
+      const rows = this.installedRows.filter(r => r.kind === 'skill')
+      return rows.filter(r => r.isNew).concat(rows.filter(r => !r.isNew))
     },
     /** 标签顺序：插件在前、Skill 在后，与 MarketPane.vue 已安装 tab 一致。 */
     installedMcpRows() {
@@ -823,6 +829,12 @@ export default {
   line-height: 18px;
   &::after { border: 0; }
   &:focus-visible { outline: 2px solid var(--awd-accent-text); outline-offset: 2px; }
+}
+
+.msb-row-state.new {
+  color: var(--awd-accent-text);
+  background: var(--awd-accent-wash);
+  font-weight: 600;
 }
 
 .msb-row-state.update {

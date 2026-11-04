@@ -37,7 +37,7 @@ export default {
   "railLabel": "التنقل في المحادثة",
   "railTurnIndex": "الدورة {n}",
   "railUntitled": "(لا يوجد نص للسؤال)",
-  "mentionTitle": "الإشارة إلى ملف مشروع",
+  "mentionTitle": "الإشارة إلى ملف مشروع أو مهارة",
   "mentionHint": "أعلى/أسفل للاختيار، Enter للتأكيد، Esc للإغلاق",
   "mentionNoMatch": "لا توجد ملفات مشروع مطابقة",
   "uploadTabLocal": "إضافة من هذا الكمبيوتر",
@@ -467,5 +467,13 @@ export default {
   "evolutionContrastBefore": "قبل",
   "evolutionContrastAfter": "بعد",
   "evolutionActionFailed": "لم يكتمل الإجراء؛ يرجى المحاولة مرة أخرى",
-  "evolutionPromoteAdminOnly": "تسري المهارات المرقّاة على جميع المستخدمين في هذه النسخة؛ مطلوب إذن المسؤول"
+  "evolutionPromoteAdminOnly": "تسري المهارات المرقّاة على جميع المستخدمين في هذه النسخة؛ مطلوب إذن المسؤول",
+  "mentionSkillTag": "مهارة",
+  "skillCreatedLabel": "مساعد الذكاء الاصطناعي · تم إنشاء مهارة",
+  "skillCardInput": "المدخلات",
+  "skillCardRules": "القواعد",
+  "skillCardOutput": "المخرجات",
+  "skillCardAdded": "تمت الإضافة إلى \"مثبت · المهارات\"",
+  "skillCardOpen": "عرض ونشر",
+  "skillCardTryHint": "في المرة القادمة، اكتب {'@'}{name} لتشغيلها"
 }

@@ -221,5 +221,15 @@ export default {
   "permSpeech": "Fala e gravação",
   "permTasks": "Calendário e tarefas",
   "permClipboard": "Área de transferência",
-  "permLawfirm": "Informações da equipe"
+  "permLawfirm": "Informações da equipe",
+  "newlyCreatedTag": "Novo",
+  "publishBtn": "Publicar na loja de extensões",
+  "publishUpdateBtn": "Atualizar na loja de extensões",
+  "publishingEllipsis": "Publicando…",
+  "publishHint": "Depois de publicada, outros advogados poderão instalar esta habilidade pela loja de extensões",
+  "publishedHint": "Publicada na loja de extensões",
+  "publishedVersionHint": "Publicada na loja de extensões (v{version})",
+  "publishedToast": "Publicada na loja de extensões",
+  "publishUpdatedToast": "A versão na loja de extensões foi atualizada",
+  "publishFailed": "Falha ao publicar; tente novamente mais tarde"
 }

@@ -1141,6 +1141,19 @@ export function installMarketSkill(skillId) {
   });
 }
 
+// 把本机创建（一句话写 Skill）的 Skill 发布到官网 Marketplace（仅管理员；需已连接账户）。
+// 返回原始信封：失败时 code=1 + message，reason 为官网机器码（id_taken…）或 not_connected。
+export function publishSkill(skillId) {
+  return request({
+    url: `/api/skills/${encodeURIComponent(skillId)}/publish`,
+    method: 'POST',
+    data: {},
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
 // 卸载在线安装的 Skill（仅管理员）
 export function uninstallMarketSkill(skillId) {
   return request({
@@ -3130,6 +3143,16 @@ export function updateTeamMemberRole(accountId, role) {
     url: `/api/account/team/members/${encodeURIComponent(accountId)}`,
     method: 'PUT',
     data: { role },
+    header: { 'Content-Type': 'application/json' },
+  }).then(unwrapEnvelope);
+}
+
+// 设置成员职务（合伙人 / 律师助理……，展示标签不涉权限）；空串 = 清除。OWNER/ADMIN 可设，官网裁决。
+export function updateTeamMemberTitle(accountId, title) {
+  return request({
+    url: `/api/account/team/members/${encodeURIComponent(accountId)}`,
+    method: 'PUT',
+    data: { title: title == null ? '' : String(title) },
     header: { 'Content-Type': 'application/json' },
   }).then(unwrapEnvelope);
 }
