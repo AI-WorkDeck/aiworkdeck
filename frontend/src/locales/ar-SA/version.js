@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitUnconfirmedProject: "مشروع غير مؤكد",
+  exitCommitUnconfirmed: "لم يتم تأكيد اكتمال التثبيت بعد. تحقق مجدداً قبل الخروج، أو ألغِ للعودة إلى التطبيق.",
+  exitProjectsTitle: "مراجعة تغييرات المشاريع قبل الخروج",
+  exitProjectsHint: "حدد المشاريع لتثبيت تغييراتها. تبقى التغييرات غير المحددة محفوظة على هذا الكمبيوتر.",
+  exitProjectsChecking: "جارٍ فحص التغييرات…",
+  exitProjectsCommit: "تثبيت المحدد والخروج",
+  exitProjectsCommitted: "تم التثبيت",
+
   "aiSaving": "جارٍ حفظ الملفات المفتوحة…",
   "aiExecuting": "جارٍ تحديث إصدار المشروع…",
   "aiMerging": "جارٍ دمج التغييرات دون تعارضات…",

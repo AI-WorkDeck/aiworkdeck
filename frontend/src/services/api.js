@@ -3981,6 +3981,10 @@ export function getCalendarSummary() {
 // ==================== 版本记录 ====================
 // 术语对齐 spec 第四节：对外只说「版本 / 本次工作」，不说 commit / branch。
 
+export function getVersionExitStatus(projectId) {
+  return request({ url: `/api/projects/${projectId}/version/exit-status`, method: 'GET', timeout: 8000 });
+}
+
 export function getVersionStatus(projectId) {
   return request({
     url: `/api/projects/${projectId}/version/status`,
@@ -4062,11 +4066,11 @@ export function getVersionCompare(projectId, from, to) {
   });
 }
 
-export function endWorkSession(projectId, title) {
+export function endWorkSession(projectId, title, requestId) {
   return request({
     url: `/api/projects/${projectId}/version/session/end`,
     method: 'POST',
-    data: { title: title || '' }
+    data: { title: title || '', ...(requestId ? { requestId } : {}) }
   });
 }
 

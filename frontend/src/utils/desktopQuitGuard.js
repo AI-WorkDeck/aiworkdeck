@@ -79,7 +79,7 @@ export function createDesktopQuitGuard({ prepare, abort, flush, confirm, progres
 }
 
 const workbenches = new Map()
-export function registerQuitSave(owner, save, confirm) { workbenches.set(owner, { save, confirm }) }
+export function registerQuitSave(owner, save) { workbenches.set(owner, { save }) }
 export function unregisterQuitSave(owner) { workbenches.delete(owner) }
 export async function flushQuitWorkbenches() {
   let failed = 0
@@ -87,12 +87,4 @@ export async function flushQuitWorkbenches() {
     try { failed += (await save()).failed || 0 } catch (_) { failed++ }
   }
   return { failed }
-}
-
-export async function confirmQuitWorkbenches(context = {}) {
-  for (const { confirm } of workbenches.values()) {
-    if (context.isCurrent?.() === false) return false
-    if (confirm && await confirm(context) === false) return false
-  }
-  return true
 }

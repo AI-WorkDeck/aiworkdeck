@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  exitUnconfirmedProject: "Doğrulanmamış proje",
+  exitCommitUnconfirmed: "Kayda geçirme sonucu henüz doğrulanmadı. Çıkmadan önce yeniden denetleyin veya uygulamaya dönmek için iptal edin.",
+  exitProjectsTitle: "Çıkmadan önce proje değişikliklerini inceleyin",
+  exitProjectsHint: "Kayda geçirilecek projeleri seçin. Seçilmeyen değişiklikler bu bilgisayarda kayıtlı kalır.",
+  exitProjectsChecking: "Değişiklikler denetleniyor…",
+  exitProjectsCommit: "Seçilenleri kayda geçir ve çık",
+  exitProjectsCommitted: "Kayda geçirildi",
+
   "aiSaving": "Açık dosyalar kaydediliyor…",
   "aiExecuting": "Proje sürümü güncelleniyor…",
   "aiMerging": "Değişiklikler çatışmasız birleştiriliyor…",

@@ -104,6 +104,70 @@ class WorkSessionServiceTest {
     }
 
     @Test
+    void exitStatusCountsAutosavedAndPendingFilesOnceWithoutHistorySizeScan() throws Exception {
+        ProjectRepoService observedRepo = spy(repoSvc);
+        WorkSessionService observed = new WorkSessionService(observedRepo, manifestSvc, sessionRepo,
+                scheduler, fileRepo, event -> {});
+        observed.setDebounceMillis(60_000);
+        assertEquals(0, observed.exitStatus(7L).changedCount());
+        observed.onChangeSignal(7L, 1L, "Tester");
+        Files.writeString(root.resolve("projects/7/合同.txt"), "second");
+        observed.commitNow(7L, 1L, "Tester", "autosave");
+        assertTrue(observedRepo.pendingChanges(7L).isEmpty());
+        clearInvocations(observedRepo);
+        var saved = observed.exitStatus(7L);
+        assertTrue(saved.working());
+        assertEquals(1, saved.changedCount());
+        verify(observedRepo, times(1)).pendingChanges(7L);
+        verify(observedRepo, never()).repoSizeBytes(anyLong());
+        Files.writeString(root.resolve("projects/7/合同.txt"), "third");
+        Files.writeString(root.resolve("projects/7/new.txt"), "new");
+        assertEquals(2, observed.exitStatus(7L).changedCount());
+        observed.endSession(7L, 1L, "Tester", "done");
+        var clean = observed.exitStatus(7L);
+        assertFalse(clean.working());
+        assertEquals(0, clean.changedCount());
+    }
+
+    @Test
+    void exitStatusSyntheticHistoryTraversalComparison() throws Exception {
+        // Synthetic directory entries model a large history index, not real customer data.
+        Path history = repoSvc.gitDir(7L).resolve("exit-benchmark-history");
+        Files.createDirectories(history);
+        for (int i = 0; i < 4000; i++) Files.writeString(history.resolve("entry-" + i), "history");
+        var members = mock(com.checkba.service.ProjectMemberService.class);
+        when(members.hasReadPermission(7L, 1L)).thenReturn(true);
+        when(members.hasWritePermission(7L, 1L)).thenReturn(true);
+        var controller = new VersionController(repoSvc, svc, members, null, null, null, null);
+        try (var auth = mockStatic(com.checkba.controller.AuthController.class)) {
+            auth.when(() -> com.checkba.controller.AuthController.getUserIdFromSession("session")).thenReturn(1L);
+            for (int round = 0; round < 6; round++) {
+                long start = System.nanoTime();
+                Map<?, ?> full = (Map<?, ?>) controller.status(7L, "session").getBody().get("data");
+                long fullNanos = System.nanoTime() - start;
+                start = System.nanoTime();
+                Map<?, ?> summary = (Map<?, ?>) controller.exitStatus(7L, "session").getBody().get("data");
+                long summaryNanos = System.nanoTime() - start;
+                assertEquals(full.get("changedCount"), summary.get("changedCount"));
+                assertEquals(full.get("working"), summary.get("working"));
+                System.out.printf("EXIT_STATUS_BENCH round=%d historyEntries=4000 statusMs=%.3f exitStatusMs=%.3f%n",
+                        round, fullNanos / 1_000_000.0, summaryNanos / 1_000_000.0);
+            }
+        }
+    }
+
+    @Test
+    void exitStatusUnsignalledChangesDoNotStartOrScheduleAWorkSession() throws Exception {
+        Files.writeString(root.resolve("projects/7/合同.txt"), "external edit");
+        String head = repoSvc.resolveRef(7L, "HEAD");
+        var status = svc.exitStatus(7L);
+        assertEquals(1, status.changedCount());
+        assertFalse(status.working());
+        assertTrue(svc.activeSession(7L).isEmpty());
+        assertEquals(head, repoSvc.resolveRef(7L, "HEAD"));
+    }
+
+    @Test
     void firstChangeSignalStartsSessionImplicitly() {
         assertTrue(svc.activeSession(7L).isEmpty());
 
