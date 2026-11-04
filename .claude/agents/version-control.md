@@ -1074,6 +1074,6 @@ cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='Inte
 
 回归：`VersionExitStatusTest`（权限、冲突、草稿、禁用、忙锁、无容量/后台调度）、`WorkSessionServiceTest`（真实 JGit 自动存档/未存档计数与结束后归零、4000 条合成历史目录六轮新旧端点比较）；合成性能数据不能代表用户现场保存失败已独立复现。
 
-退出提交的未知回执不能用一次状态快照推断已结束（旧 POST 可能尚未完成鉴权/入锁）。`exit-status` 附本进程 `receiptEpoch`；退出专用 `session/end` 可带 `requestId=epoch:UUID`。控制器按用户/项目/请求标识原子登记，重复请求只读 `RUNNING/SUCCEEDED/FAILED` 回执；成功保留原 `sha/notice/conflict`，失败保留本地化错误消息，均不再次提交。不同标题复用同一标识拒绝；不带标识的既有客户端保持原行为。旧进程标识返回 `UNKNOWN` 且不执行，不能自动换新 ID 重提。
+退出提交的未知回执不能用一次状态快照推断已结束（旧 POST 可能尚未完成鉴权/入锁）。`exit-status` 附本进程 `receiptEpoch`；退出专用 `session/end` 可带 `requestId=epoch:UUID`。作用域前缀由本进程及用户/项目各自的安全随机 UUID 组成（不暴露身份数字），在登记前先核对；请求标识全局绑定首次用户/项目，异作用域即使先到也只回 `UNKNOWN`，不执行且不泄露回执。控制器原子登记后，重复请求只读 `RUNNING/SUCCEEDED/FAILED` 回执；成功保留原 `sha/notice/conflict`，失败保留本地化错误消息，均不再次提交。不同标题复用同一标识拒绝；不带标识的既有客户端保持原行为。旧进程标识返回 `UNKNOWN` 且不执行，不能自动换新 ID 重提。
 
 回执只在进程内保留，不落盘、不创建线程或任务队列、不淘汰终态（避免旧 ID 被再次执行）。因此重启后未知结果仍需人工核对，不能宣称跨重启 exactly-once。`VersionEndReceiptTest` 覆盖运行中并发重复、迟到重放、失败缓存、冲突回执、权限与身份/项目隔离、重启旧标识拒绝及旧客户端兼容。

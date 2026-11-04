@@ -40,14 +40,26 @@ public class VersionController {
 
     // Exit-only receipts live for this process. Never evict and accidentally replay a timed-out write.
     private final String receiptEpoch = java.util.UUID.randomUUID().toString();
-    private record EndReceiptKey(Long userId, Long projectId, String requestId) {}
     private static final class EndReceipt {
+        final Long userId;
+        final Long projectId;
         final String title;
         volatile Map<String, Object> result;
-        EndReceipt(String title) { this.title = title; }
+        EndReceipt(Long userId, Long projectId, String title) {
+            this.userId = userId; this.projectId = projectId; this.title = title;
+        }
     }
-    private final java.util.concurrent.ConcurrentMap<EndReceiptKey, EndReceipt> endReceipts =
+    private final java.util.concurrent.ConcurrentMap<String, EndReceipt> endReceipts =
             new java.util.concurrent.ConcurrentHashMap<>();
+
+    private record ReceiptScope(Long userId, Long projectId) {}
+    private final java.util.concurrent.ConcurrentMap<ReceiptScope, String> receiptScopes =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private String receiptScope(Long userId, Long projectId) {
+        return receiptEpoch + ":" + receiptScopes.computeIfAbsent(new ReceiptScope(userId, projectId),
+                ignored -> java.util.UUID.randomUUID().toString());
+    }
 
     /**
      * 提交署名解析（spec 2026-09-14 §2.1）。字段注入：本类的构造器被
@@ -132,7 +144,7 @@ public class VersionController {
         Long userId = requireMember(projectId, sessionId);
         var status = sessionService.exitStatus(projectId);
         Map<String, Object> data = new HashMap<>();
-        data.put("receiptEpoch", receiptEpoch);
+        data.put("receiptEpoch", receiptScope(userId, projectId));
         data.put("enabled", status.enabled());
         data.put("working", status.working());
         data.put("changedCount", status.changedCount());
@@ -766,16 +778,18 @@ public class VersionController {
         String requestId = body == null ? null : body.get("requestId");
         if (requestId == null || requestId.isBlank()) return ok(endSessionData(projectId, userId, title));
         // A retry from an earlier backend process is unknown, never a fresh request.
-        if (!requestId.startsWith(receiptEpoch + ":")) return ok(Map.of("receiptState", "UNKNOWN"));
-        try { java.util.UUID.fromString(requestId.substring(receiptEpoch.length() + 1)); }
+        String scope = receiptScope(userId, projectId);
+        if (!requestId.startsWith(scope + ":")) return ok(Map.of("receiptState", "UNKNOWN"));
+        try { java.util.UUID.fromString(requestId.substring(scope.length() + 1)); }
         catch (IllegalArgumentException error) {
             throw VersionException.userFacing(LangText.of("提交标识无效，请重新检查项目", "Invalid submission identifier; please check the project again"));
         }
         String normalizedTitle = title == null ? "" : title.trim();
-        var key = new EndReceiptKey(userId, projectId, requestId);
-        var receipt = new EndReceipt(normalizedTitle);
-        var previous = endReceipts.putIfAbsent(key, receipt);
+        var receipt = new EndReceipt(userId, projectId, normalizedTitle);
+        var previous = endReceipts.putIfAbsent(requestId, receipt);
         if (previous != null) {
+            if (!previous.userId.equals(userId) || !previous.projectId.equals(projectId))
+                return ok(Map.of("receiptState", "UNKNOWN"));
             if (!previous.title.equals(normalizedTitle)) throw VersionException.userFacing(LangText.of(
                     "同一次提交不能更改标题，请重新检查项目", "The title of an existing submission cannot change; please check the project again"));
             Map<String, Object> result = previous.result;

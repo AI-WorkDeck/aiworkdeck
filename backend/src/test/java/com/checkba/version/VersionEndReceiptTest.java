@@ -32,7 +32,11 @@ class VersionEndReceiptTest {
         try (var auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession("session")).thenReturn(1L);
             Map<?, ?> data = (Map<?, ?>) controller.exitStatus(7L, "session").getBody().get("data");
-            return data.get("receiptEpoch") + ":" + UUID.randomUUID();
+            String epoch = (String) data.get("receiptEpoch");
+            String[] opaqueParts = epoch.split(":");
+            assertEquals(2, opaqueParts.length);
+            for (String part : opaqueParts) assertDoesNotThrow(() -> UUID.fromString(part));
+            return epoch + ":" + UUID.randomUUID();
         }
     }
     private Map<?, ?> submit(VersionController target, long user, long project, Map<String, String> body) {
@@ -94,14 +98,18 @@ class VersionEndReceiptTest {
         var body = Map.of("requestId", id, "title", "");
         assertEquals("UNKNOWN", submit(controller(), 1, 7, body).get("receiptState"));
         verify(sessions, never()).endSession(anyLong(), anyLong(), anyString(), any());
+        // Cross-scope retries must not claim an ID even before its original POST arrives.
+        permit(2, 7); permit(1, 8);
+        assertEquals("UNKNOWN", submit(controller, 2, 7, body).get("receiptState"));
+        assertEquals("UNKNOWN", submit(controller, 1, 8, body).get("receiptState"));
+        verify(sessions, never()).endSession(anyLong(), anyLong(), anyString(), any());
         when(sessions.endSession(anyLong(), anyLong(), anyString(), eq("")))
                 .thenReturn(new WorkSessionService.SessionEndResult("sha", null, null));
         submit(controller, 1, 7, body);
-        assertThrows(IllegalArgumentException.class, () -> submit(controller, 2, 7, body));
-        permit(2, 7); permit(1, 8);
-        assertEquals("SUCCEEDED", submit(controller, 2, 7, body).get("receiptState"));
-        assertEquals("SUCCEEDED", submit(controller, 1, 8, body).get("receiptState"));
-        verify(sessions, times(3)).endSession(anyLong(), anyLong(), anyString(), eq(""));
+        assertThrows(IllegalArgumentException.class, () -> submit(controller, 3, 7, body));
+        assertEquals(Map.of("receiptState", "UNKNOWN"), submit(controller, 2, 7, body));
+        assertEquals(Map.of("receiptState", "UNKNOWN"), submit(controller, 1, 8, body));
+        verify(sessions, times(1)).endSession(anyLong(), anyLong(), anyString(), eq(""));
     }
     @Test
     void legacyCallerStillReceivesOriginalShape() {
