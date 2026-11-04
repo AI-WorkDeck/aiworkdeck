@@ -14,6 +14,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'read-upgrade-test-lock.ps1')
 if (-not $IsWindows -or $env:GITHUB_ACTIONS -ne 'true' -or -not $env:RUNNER_TEMP) {
     throw 'Requires a disposable Windows GitHub Actions runner; never run against a user profile.'
 }
@@ -232,9 +233,12 @@ http.createServer((req,res)=>{
         Assert-ExeVersion $OldVersion 'Helper waits for live parent before replacing app'
         Close-App $app
     }
-    Wait-Until { Test-Path -LiteralPath $lock } 'installer lock observed' 120
-    $lockState = Get-Content -LiteralPath $lock -Raw | ConvertFrom-Json
-    $evidence.helperProcessId = $lockState.helperPid
+    Wait-Until {
+        $record = Read-UpgradeTestLock -Path $lock -AllowLegacyJob:($Mechanism -eq 'LegacyHelper')
+        if ($null -eq $record) { return $false }
+        $script:evidence.helperProcessId = $record.helperPid
+        return $true
+    } 'complete live installer lock observed' 120
     Assert-That ($app.WaitForExit(120000)) 'Old real application exits before installation'
     if ($ExitMode -eq 'Reopen') {
         $fast = Launch
