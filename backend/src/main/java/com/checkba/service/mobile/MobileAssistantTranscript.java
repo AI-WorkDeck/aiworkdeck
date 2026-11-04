@@ -17,7 +17,8 @@ public final class MobileAssistantTranscript {
         for (var turn : turns) {
             messages.add(new Message("USER", turn.getQuestion(), turn.getCreatedAt().toString()));
             if (!"completed".equals(turn.getStatus())) continue;
-            String answer = turn.getAnswer();
+            String answer = LangText.of("AI 生成内容，请核实后使用。",
+                    "AI-generated content. Verify before use.") + "\n\n" + turn.getAnswer();
             if (turn.getSourcesJson() != null && !turn.getSourcesJson().isBlank()) {
                 try {
                     var sources = new ObjectMapper().readTree(turn.getSourcesJson());
