@@ -129,7 +129,8 @@ function Close-App($Process) {
 try {
     Signature $OldInstaller
     Signature $CandidateInstaller
-    $p = Start-Process -FilePath $OldInstaller -ArgumentList "/S /D=`"$installDir`"" -PassThru
+    # NSIS GetDParameter consumes the unquoted remainder of the command line, including spaces.
+    $p = Start-Process -FilePath $OldInstaller -ArgumentList "/S /D=$installDir" -PassThru
     Assert-That ($p.WaitForExit(300000)) 'Old NSIS completed within five minutes'
     $p.Refresh()
     Assert-That ($p.ExitCode -eq 0) 'Old NSIS exit code zero'
