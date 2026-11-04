@@ -676,3 +676,7 @@ Qt/WASM 放映陷阱：UNO `activate/gotoNextSlide` 只改变状态，渲染循�
 原生放映启动前，PaneHider 会同步等侧栏资源配置（最长60秒），但WASM线程阻塞时配置无法完成。宿主动作先保存本次文档的 pane configuration、异步停用非 CenterPane 资源，唤醒Qt并等待请求完成后才调用原生 startWithArguments。end、启动失败和文档切换恢复原配置；异步边界核对模型身份与docSeq，旧请求不能结束新文档放映。真实引擎回归 `impress-playback.mjs` 验证中间帧、内容不变及退出后编辑；本次307ms启动仅为本机专项样本，不作为普遍性能承诺。状态轮询不占用编辑器保存空闲计时。
 
 图片cover裁剪不得把缺失Size100thMM的像素图固定按96DPI换算。Retina的原生输出设备为192DPI，固定换算会让裁剪百分比翻倍；使用Toolkit兼容设备的convertSizeToLogic(SizePixel, MM_100TH)，再按物理尺寸计算GraphicCrop。真实纹理图在DPR1/2均核对srcRect百分比及保存重开的像素画面；纯色块夹具可能掩盖错误裁剪。
+
+## 新文档窗口的原生黑边（dev-board#1688）
+
+空白预热后装载真实文档会创建替换Qt窗口；Fullscreen和UNO窗口几何正确仍可能保留顶部26px、左4px的旧装饰空隙。真实LOWA隔离浏览器已复现，同尺寸resize可清除，viewData和光标几何不变；改宿主底色或反复Fullscreen开关不能作为修复。`set_chrome`实际变更后发一次`ui_layout`，Boot仅在ready且画布非零时同步当前几何；只读可见性查询不发，不恢复周期resize心跳。回归boot-resize与nativeMenuPrune，实测范围见doc/verification/2026-11-04-editor-black-edge.md。
