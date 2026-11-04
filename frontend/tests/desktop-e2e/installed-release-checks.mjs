@@ -97,7 +97,7 @@ export async function checkClosedDocument({ page, run, ext, prefix = 'release' }
     const v = window.__checkbaActiveOverviewVm
     return !v.insightDocFileId && v.rightPaneKey !== 'plugin-insight' && v.leftPaneKey !== 'plugin-insight'
   })
-  return captureDesktop(run, `${prefix}-${ext}-closed-evidence-hidden`)
+  return capture(page, run, `${prefix}-${ext}-closed-evidence-hidden`)
 }
 
 export function assertEvidenceEntryScope(state, entry) {
