@@ -305,6 +305,9 @@ export default {
   reconnectCloud: "Reconnect to Cloud",
   reconnectDidNotHelp: "Reconnected to the cloud, but the cloud still refused this step. You can disconnect the library below and add the case file again; a case file already in the library can also be rebound with “Rebind this case file”.",
   reconnectedCloud: "Reconnected to the cloud. Please try again.",
+  rebindCaseFile: "Rebind this case file",
+  rebindCaseFileTitle: "Rebind this case file?",
+  rebindCaseFileConfirm: "This computer will first unlink this case file from its existing copy in the Team Case Library, then add it to the library again as a new case file. Your local files and version history are not touched. The existing copy in the library is not deleted, but it will no longer sync with this computer, and its participants will need to be added again.",
   // Invite text: the full message sent to a colleague, extracted as one key.
   // Two keys (with/without an inviter name) so English can put a space after {inviter}.
   // Since dev-board#440 this is the only variant: the colleague never types a server address

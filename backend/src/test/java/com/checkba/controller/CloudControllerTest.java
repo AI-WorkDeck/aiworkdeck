@@ -617,6 +617,23 @@ class CloudControllerTest {
         }
     }
 
+    /** 拆本机绑定是项目级写动作：只读成员拒，有写权限才转发。 */
+    @Test
+    void unbindNeedsWritePermission() {
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(USER_ID);
+            when(projectMemberService.hasReadPermission(PROJECT_ID, USER_ID)).thenReturn(true);
+            when(projectMemberService.isClient(PROJECT_ID, USER_ID)).thenReturn(false);
+            when(projectMemberService.hasWritePermission(PROJECT_ID, USER_ID)).thenReturn(false);
+            assertThrows(IllegalArgumentException.class, () -> controller.unbind(PROJECT_ID, "s"));
+            verify(cloudSyncService, never()).unbindProject(anyLong());
+
+            when(projectMemberService.hasWritePermission(PROJECT_ID, USER_ID)).thenReturn(true);
+            controller.unbind(PROJECT_ID, "s");
+            verify(cloudSyncService).unbindProject(PROJECT_ID);
+        }
+    }
+
     /** 律师输入的是手机号，控制层只透传，不做任何形态判断（解析在服务端）。 */
     @Test
     void addMemberForwardsAPhoneNumberUntouched() {
