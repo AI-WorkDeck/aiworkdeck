@@ -5,8 +5,8 @@ package com.checkba.service.tmeet;
 
 import com.checkba.model.entity.TencentMeetingSyncConfig;
 import com.checkba.repository.TencentMeetingSyncConfigRepository;
-import lombok.RequiredArgsConstructor;
 import com.checkba.service.LangText;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
