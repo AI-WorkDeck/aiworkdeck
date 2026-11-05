@@ -21,6 +21,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -59,7 +60,7 @@ class ProjectFileServiceRestoreConflictTest {
         when(repo.existsByProjectIdAndParentIdAndNameAndIdNot(7L, null, "A", 1L)).thenReturn(true);
         assertThrows(IllegalArgumentException.class, () -> service.restore(1L, 9L));
         verify(repo, never()).save(any());
-        assertFalse(!Boolean.TRUE.equals(deleted.getIsDeleted()));
+        assertTrue(Boolean.TRUE.equals(deleted.getIsDeleted()));
     }
 
     @Test
