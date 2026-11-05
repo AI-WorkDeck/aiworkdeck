@@ -1732,6 +1732,8 @@ ipcMain.handle('checkba:update-check', async () => {
 })
 ipcMain.handle('checkba:update-restart', async () => {
   // 补丁已在下载完成时原子激活（overlay.activate），重启后三个 seam 自然读到新版本
+  // 问题 7：重启入口逐个记原因，事后能从 desktop.log 分清是谁触发的重启
+  logDesktopEvent('restart-requested', { reason: 'update-restart', phase: updateService?.getState?.().phase || null, fullUpdateReady: !!fullUpdate?.isReady?.() })
   updateRestartRequested = true
   app.quit()
   return { ok: true }
@@ -1820,7 +1822,10 @@ const openPaths = require('./open-paths').installOpenPaths({
   app, ipcMain,
   queueFile: path.join(app.getPath('home'), '.aiworkdeck', 'restart-open-paths.json'),
   isQuitting: () => quitInProgress,
-  requestRelaunch: () => { updateRestartRequested = true },
+  requestRelaunch: () => {
+    logDesktopEvent('restart-requested', { reason: 'open-paths', detail: 'file open arrived during quit' })
+    updateRestartRequested = true
+  },
   getWindow: () => mainWindow,
   focusWindow: () => {
     if ((!mainWindow || mainWindow.isDestroyed()) && mainWindowStartupReady) createMainWindow()
@@ -2037,7 +2042,11 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-  if (quitInProgress) { updateRestartRequested = true; return }
+  if (quitInProgress) {
+    logDesktopEvent('restart-requested', { reason: 'activate-during-quit', detail: 'Dock/app activated while quitting' })
+    updateRestartRequested = true
+    return
+  }
   if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.show(); mainWindow.focus() }
   else if (mainWindowStartupReady && BrowserWindow.getAllWindows().length === 0) createMainWindow()
 })
