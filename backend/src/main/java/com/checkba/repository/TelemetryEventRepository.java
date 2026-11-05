@@ -20,6 +20,8 @@ public interface TelemetryEventRepository extends JpaRepository<TelemetryEvent, 
 
     List<TelemetryEvent> findByTsAfter(Instant from);
 
+    List<TelemetryEvent> findByTsAfterOrderByTsAsc(Instant from);
+
     @Modifying
     @Query("DELETE FROM TelemetryEvent e WHERE e.ts < :before")
     int deleteByTsBefore(@Param("before") Instant before);
