@@ -7,7 +7,7 @@
 # 跑什么：
 #   1) tests/lowa-e2e  —— 真实 LOWA 引擎 + 覆盖层键盘链路（自包含，必跑）
 #   2) tests/app-e2e   —— 全应用真人模拟（需桌面后端 9696 在跑；不在则跳过并注明）
-# 产出：~/aiworkdeck-qa/reports/YYYY-MM-DD.md；有失败时用 gh 开 issue（标签 qa-nightly）。
+# 产出：~/aiworkdeck-qa/reports/YYYY-MM-DD.md；结果同步到一条滚动 issue（标签 bug，见文末）。
 #
 # 引擎来源：打包版 /Applications/AI WorkDeck.app 内置的 lowa/ + cjk 字体（离线、稳定，
 # 免 CDN；build:zetaoffice 会清空 dist，故引擎复制必须在 build 之后）。
@@ -84,10 +84,29 @@ fi
 # ---- 汇报 ----
 if [[ $FAILED -ne 0 ]]; then
   echo "\n**结论：有失败 ❌**" >> "$REPORT"
-  gh issue create -R AI-WorkDeck/aiworkdeck \
-    --title "每日 QA 失败 $DAY / nightly QA failures" \
-    --body-file "$REPORT" --label bug 2>> "$REPORT" || true
 else
   echo "\n**结论：全部通过 ✅**" >> "$REPORT"
+fi
+
+# 只维护一条滚动 issue，不再每天新开：失败时在它下面追加当天报告（已关闭则重开），
+# 恢复全绿时留言并关闭。按固定标题精确匹配，取最近一条。
+GH_REPO=AI-WorkDeck/aiworkdeck
+ROLLING_TITLE="每日 QA 滚动报告 / nightly QA (rolling)"
+ROLLING=$(gh issue list -R $GH_REPO --state all --limit 5 \
+  --search "\"$ROLLING_TITLE\" in:title sort:created-desc" --json number,title,state \
+  -q ".[] | select(.title == \"$ROLLING_TITLE\") | \"\\(.number) \\(.state)\"" 2>/dev/null | head -1)
+ROLLING_NUM=${ROLLING%% *}
+ROLLING_STATE=${ROLLING##* }
+if [[ $FAILED -ne 0 ]]; then
+  if [[ -z "$ROLLING_NUM" ]]; then
+    gh issue create -R $GH_REPO --title "$ROLLING_TITLE" --label bug \
+      --body-file "$REPORT" 2>> "$REPORT" || true
+  else
+    [[ "$ROLLING_STATE" == "CLOSED" ]] && gh issue reopen "$ROLLING_NUM" -R $GH_REPO 2>> "$REPORT"
+    gh issue comment "$ROLLING_NUM" -R $GH_REPO --body-file "$REPORT" 2>> "$REPORT" || true
+  fi
+elif [[ -n "$ROLLING_NUM" && "$ROLLING_STATE" == "OPEN" ]]; then
+  gh issue comment "$ROLLING_NUM" -R $GH_REPO --body "$DAY 每日 QA 全部通过，自动关闭；再次失败时会重开本 issue。" 2>> "$REPORT" \
+    && gh issue close "$ROLLING_NUM" -R $GH_REPO 2>> "$REPORT"
 fi
 exit $FAILED
