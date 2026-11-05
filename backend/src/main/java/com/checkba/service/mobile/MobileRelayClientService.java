@@ -662,6 +662,9 @@ public class MobileRelayClientService {
 
     // 本次运行的收件记录：只保留最近 100 件，不持久化第二套文件台账。
     private final AtomicBoolean inboxRunning = new AtomicBoolean(false);
+    /** 收件箱/传输命令下载响应体的读取期限：ofInputStream 拿到响应头后 HttpRequest.timeout 不再约束读取，卡住的下载会让 inboxRunning 永远不释放。
+     *  这是整次下载的总期限而非空闲期限：按 200MB 上限留到 30 分钟（约 110KB/s），免得慢网络上的正常大文件每轮都被掐断。 */
+    Duration inboxBodyDeadline = Duration.ofMinutes(30);
     private final Map<Long, Map<String, Object>> receiptItems = new LinkedHashMap<>();
     private String receiptAccount;
     private volatile String inboxAccount;
@@ -1141,7 +1144,7 @@ public class MobileRelayClientService {
             String contentType = content.headers().firstValue("Content-Type").orElse("");
             if (content.statusCode() < 200 || content.statusCode() >= 300
                     || !contentType.startsWith("application/octet-stream")) {
-                try (InputStream in = content.body()) { in.transferTo(OutputStream.nullOutputStream()); }
+                try (InputStream in = new com.checkba.util.DeadlineInputStream(content.body(), inboxBodyDeadline)) { in.transferTo(OutputStream.nullOutputStream()); }
                 log.warn("手机同步：影像 {} 内容下载失败 status={} contentType={}",
                         itemId, content.statusCode(), contentType);
                 receipt(item, "failed", "download");
@@ -1160,7 +1163,7 @@ public class MobileRelayClientService {
             // 不需要额外的补偿删除。
             String storagePath = String.format("projects/%d/%s/%s/%s",
                     projectId, rootFolderName, dateStr, landedName);
-            try (InputStream in = content.body()) {
+            try (InputStream in = new com.checkba.util.DeadlineInputStream(content.body(), inboxBodyDeadline)) {
                 storageServiceFactory.getStorageService().save(storagePath, in);
             }
             // fileType 落**扩展名**，不是 mediaType（dev-board#417）。project_file.file_type
@@ -1224,7 +1227,7 @@ public class MobileRelayClientService {
         String contentType = content.headers().firstValue("Content-Type").orElse("");
         if (content.statusCode() < 200 || content.statusCode() >= 300
                 || !contentType.startsWith("application/octet-stream")) {
-            try (InputStream in = content.body()) { in.transferTo(OutputStream.nullOutputStream()); }
+            try (InputStream in = new com.checkba.util.DeadlineInputStream(content.body(), inboxBodyDeadline)) { in.transferTo(OutputStream.nullOutputStream()); }
             log.warn("手机同步：插件文档 {} 内容下载失败 status={} contentType={}",
                     itemId, content.statusCode(), contentType);
             receipt(item, "failed", "download");
@@ -1236,7 +1239,7 @@ public class MobileRelayClientService {
         String tmpPath = String.format("projects/%d/%s/.tmp-%s-%s", projectId, ADDIN_DOC_ROOT_FOLDER,
                 marker.length() >= 8 ? marker.substring(0, 8) : "part", landedName);
         try {
-            try (InputStream in = content.body()) {
+            try (InputStream in = new com.checkba.util.DeadlineInputStream(content.body(), inboxBodyDeadline)) {
                 storageServiceFactory.getStorageService().save(tmpPath, in);
             }
             storageServiceFactory.getStorageService().move(tmpPath, finalPath);
@@ -1691,7 +1694,7 @@ public class MobileRelayClientService {
         String contentType = content.headers().firstValue("Content-Type").orElse("");
         if (content.statusCode() < 200 || content.statusCode() >= 300
                 || !contentType.startsWith("application/octet-stream")) {
-            try (InputStream in = content.body()) { in.transferTo(OutputStream.nullOutputStream()); }
+            try (InputStream in = new com.checkba.util.DeadlineInputStream(content.body(), inboxBodyDeadline)) { in.transferTo(OutputStream.nullOutputStream()); }
             log.warn("手机同步：传输命令 {} 内容下载失败 status={} contentType={}",
                     id, content.statusCode(), contentType);
             return;
@@ -1710,7 +1713,7 @@ public class MobileRelayClientService {
             // 落盘失败必须在建库之前发生，下一轮才能按幂等判据正确判定"未落地"重新下载。
             String storagePath = String.format("projects/%d/%s/%s/%s",
                     projectId, TRANSFER_ROOT_FOLDER, dateStr, fileName);
-            try (InputStream in = content.body()) {
+            try (InputStream in = new com.checkba.util.DeadlineInputStream(content.body(), inboxBodyDeadline)) {
                 storageServiceFactory.getStorageService().save(storagePath, in);
             } catch (Exception e) {
                 log.warn("手机同步：传输命令 {} 落盘失败，留待下轮重试", id, e);
@@ -1724,7 +1727,7 @@ public class MobileRelayClientService {
             log.info("手机同步：投送命令 {} 已落盘 项目={} 文件={}/{}/{}",
                     id, projectId, TRANSFER_ROOT_FOLDER, dateStr, fileName);
         } else {
-            try (InputStream in = content.body()) { in.transferTo(OutputStream.nullOutputStream()); }
+            try (InputStream in = new com.checkba.util.DeadlineInputStream(content.body(), inboxBodyDeadline)) { in.transferTo(OutputStream.nullOutputStream()); }
         }
 
         HttpResponse<String> ack = authed("POST", "/api/mobile/transfer/" + id + "/ack", "{}");

@@ -69,8 +69,24 @@ public class MobileRelayController {
         long bytes=request.getContentLengthLong();
         if(bytes<0 || bytes>com.checkba.service.mobile.MobileVersionObjectService.PART_BYTES)
             throw new IllegalArgumentException("Invalid version object part length");
-        try(InputStream input=request.getInputStream()) {
-            return versionObjects.put(user,deviceId,projectKey,sha,size,index,partSha,input,bytes);
+        // 先把网络请求体落到临时文件再调 put：put 是事务且持有存储属主行锁，不能在锁内读 socket
+        java.nio.file.Path spool=java.nio.file.Files.createTempFile("mobile-version-part-",".tmp");
+        try {
+            long copied=0;
+            try(InputStream input=request.getInputStream();java.io.OutputStream out=java.nio.file.Files.newOutputStream(spool)) {
+                byte[] buffer=new byte[64*1024];
+                int read;
+                while(copied<=bytes && (read=input.read(buffer,0,(int)Math.min(buffer.length,bytes+1-copied)))>0) {
+                    out.write(buffer,0,read);
+                    copied+=read;
+                }
+            }
+            if(copied>bytes) throw new IllegalArgumentException("Invalid version object part length");
+            try(InputStream input=java.nio.file.Files.newInputStream(spool)) {
+                return versionObjects.put(user,deviceId,projectKey,sha,size,index,partSha,input,bytes);
+            }
+        } finally {
+            java.nio.file.Files.deleteIfExists(spool);
         }
     }
 

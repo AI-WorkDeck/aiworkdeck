@@ -221,17 +221,28 @@ public class GitHttpController {
             }
             response.setContentType("application/x-git-receive-pack-result");
             noCache(response);
-            try (Repository repository = openTarget(target)) {
-                ReceivePack rp = new ReceivePack(repository);
-                rp.setBiDirectionalPipe(false);
-                configureReceivePack(rp, target, who);
-                runReceiveLocked(target, () -> cloudWrite(target, () -> {
-                    try {
-                        rp.receive(body(request), response.getOutputStream(), null);
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                }));
+            // 先把请求体落到临时文件再持锁：rp.receive 在 repoLock 内读 pack，慢客户端涓流上传会把锁
+            // 占到连接超时之外（Tomcat 超时是单次读），期间网页端保存会因 withFileContentWriteLock 失败。
+            // 同 uploadPack 的临时文件做法；锁内只剩本地磁盘的 pack 索引/钩子/更新引用。
+            java.nio.file.Path spool = java.nio.file.Files.createTempFile("cloud-git-receive-", ".pack");
+            try {
+                try (InputStream in = body(request)) {
+                    java.nio.file.Files.copy(in, spool, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+                try (Repository repository = openTarget(target)) {
+                    ReceivePack rp = new ReceivePack(repository);
+                    rp.setBiDirectionalPipe(false);
+                    configureReceivePack(rp, target, who);
+                    runReceiveLocked(target, () -> cloudWrite(target, () -> {
+                        try (InputStream in = java.nio.file.Files.newInputStream(spool)) {
+                            rp.receive(in, response.getOutputStream(), null);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }));
+                }
+            } finally {
+                java.nio.file.Files.deleteIfExists(spool);
             }
         } catch (ZipException e) {
             // 请求体不是合法的 gzip 流，是客户端的问题，不是服务端错误

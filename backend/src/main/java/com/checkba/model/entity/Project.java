@@ -22,7 +22,7 @@ import java.util.Objects;
  * - 目前只包含项目级元数据和公司基础信息 JSON，后续可以在本实体上继续扩展。
  */
 @Entity
-@Table(name = "project")
+@Table(name = "project", uniqueConstraints = @jakarta.persistence.UniqueConstraint(name = "uk_project_create_request", columnNames = {"user_id", "create_request_id"}))
 public class Project {
 
     public static final String LOOSE_FILES = "LOOSE_FILES";
@@ -119,6 +119,15 @@ public class Project {
     /** Account catalogue identity, independent of the database's device-local numeric id. */
     @Column(length = 36)
     private String uid;
+
+    /** 客户端建项目幂等键（桌面端 shareToCloud 超时重试去重用）；可空，不对外序列化。 */
+    @Column(name = "create_request_id", length = 100)
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String createRequestId;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public String getCreateRequestId() { return createRequestId; }
+    public void setCreateRequestId(String createRequestId) { this.createRequestId = createRequestId; }
 
     public String getUid() { return uid; }
     public void setUid(String uid) { this.uid = uid; }

@@ -299,6 +299,73 @@ class FileContentCoordinationTest {
         } finally { versionRelease.countDown(); pool.shutdownNow(); }
     }
 
+    // 编辑器保存序号围栏（B7）：结果不明的旧上传迟到时，不能覆盖同一编辑会话里更新的已落盘保存。
+    @Test void staleSaveFenceAcceptsNewerAndRejectsOlderFromTheSameEditorSession() throws Exception {
+        writeStorageToDocument();
+        assertEquals(200, saveResponse("B", "editor-a", "2").getStatusCode().value());
+        var stale = saveResponse("A", "editor-a", "1");
+        assertEquals(409, stale.getStatusCode().value());
+        assertEquals("STALE_SAVE", stale.getBody().get("reason"));
+        assertEquals("B", Files.readString(document), "the late older save must write nothing");
+        assertEquals(200, saveResponse("C", "editor-a", "3").getStatusCode().value());
+        assertEquals(200, saveResponse("D", "editor-b", "1").getStatusCode().value(), "another editor session is not fenced by editor-a");
+        assertEquals("D", Files.readString(document));
+    }
+
+    @Test void uploadsWithoutSaveSequenceKeepTheExistingBehavior() throws Exception {
+        writeStorageToDocument();
+        assertEquals(200, saveResponse("B", "editor-a", "9").getStatusCode().value());
+        assertEquals(200, saveResponse("plain", null, null).getStatusCode().value());
+        assertEquals("plain", Files.readString(document));
+        assertEquals(200, saveResponse("bad-seq", "editor-a", "not-a-number").getStatusCode().value());
+        assertEquals("bad-seq", Files.readString(document));
+    }
+
+    @Test void staleSaveFenceOrdersConcurrentUploadsUnderTheContentLock() throws Exception {
+        CountDownLatch publishing = new CountDownLatch(1), release = new CountDownLatch(1);
+        when(storage.save(anyString(), any())).thenAnswer(i -> {
+            byte[] bytes;
+            try (java.io.InputStream input = i.getArgument(1)) { bytes = input.readAllBytes(); }
+            if ("newer".equals(new String(bytes, java.nio.charset.StandardCharsets.UTF_8))) {
+                publishing.countDown();
+                assertTrue(release.await(5, TimeUnit.SECONDS));
+            }
+            Files.write(document, bytes);
+            return i.getArgument(0);
+        });
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            var newer = pool.submit(() -> saveResponse("newer", "editor-a", "2"));
+            assertTrue(publishing.await(3, TimeUnit.SECONDS));
+            var older = pool.submit(() -> saveResponse("older", "editor-a", "1"));
+            Thread.sleep(100); // the late older upload is now waiting for the content lock
+            release.countDown();
+            assertEquals(200, newer.get(5, TimeUnit.SECONDS).getStatusCode().value());
+            var rejected = older.get(5, TimeUnit.SECONDS);
+            assertEquals(409, rejected.getStatusCode().value());
+            assertEquals("STALE_SAVE", rejected.getBody().get("reason"));
+            assertEquals("newer", Files.readString(document));
+        } finally { release.countDown(); pool.shutdownNow(); }
+    }
+
+    private void writeStorageToDocument() {
+        when(storage.save(anyString(), any())).thenAnswer(i -> {
+            try (java.io.InputStream input = i.getArgument(1)) { Files.write(document, input.readAllBytes()); }
+            return i.getArgument(0);
+        });
+    }
+
+    private org.springframework.http.ResponseEntity<java.util.Map<String, Object>> saveResponse(String body, String session, String seq) {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setContentType("application/octet-stream"); request.setContent(body.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        if (session != null) request.setParameter("saveSession", session);
+        if (seq != null) request.setParameter("saveSeq", seq);
+        try (var auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("session")).thenReturn(3L);
+            return controller.uploadFile("11", null, null, "session", null, request);
+        }
+    }
+
     private int upload() {
         return uploadResponse().getStatusCode().value();
     }

@@ -195,6 +195,18 @@ class AgentRunRecoveryServiceTest {
     }
 
     @Test
+    void recovery_assistantBeforeLatestUser_isNotTouched() {
+        // 崩在新一轮第一个 token 之前：上一轮已完成的回答不能被补上中断说明
+        stateService.mark(CONV, AgentRunStateService.RunStatus.RUNNING, 42L, 7L);
+        ProjectAiMessage oldAnswer = msg("ASSISTANT", "上一轮完整回答");
+        messages.put(CONV, List.of(msg("USER", "q1"), oldAnswer, msg("USER", "q2")));
+
+        assertEquals(1, recoveryService.recoverInterruptedRuns());
+        assertEquals("上一轮完整回答", oldAnswer.getContent());
+        Mockito.verify(messageRepository, Mockito.never()).save(any(ProjectAiMessage.class));
+    }
+
+    @Test
     void resume_flipsInterruptedBackToRunning() {
         stateService.mark(CONV, AgentRunStateService.RunStatus.RUNNING, 42L, 7L);
         messages.put(CONV, List.of(msg("ASSISTANT", "半截内容")));

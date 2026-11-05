@@ -98,6 +98,12 @@ public class ProjectService {
     /** 删除事务已提交，本地监听不得再为这个 ID 注册或响应迟到的打开事件。 */
     public record ProjectDeletedEvent(long projectId) {}
 
+    /** 带幂等键的重复建项目：返回此前已建出的项目（没有则空）。 */
+    public java.util.Optional<Project> findCreatedByRequestId(ProjectCreateRequest request, Long userId) {
+        if (request == null || userId == null || !StringUtils.hasText(request.getClientRequestId())) return java.util.Optional.empty();
+        return projectRepository.findFirstByUserIdAndCreateRequestId(userId, request.getClientRequestId().strip());
+    }
+
     @Transactional
     public Project createProject(ProjectCreateRequest request, Long userId) {
         if (Project.LOOSE_FILES.equals(request.getProjectType()) || Project.SCRATCH.equals(request.getProjectType())) {
@@ -144,6 +150,9 @@ public class ProjectService {
         project.setListedCompanyName(request.getListedCompanyName() != null ? request.getListedCompanyName() : "");
         project.setTargetCompanyName(request.getTargetCompanyName() != null ? request.getTargetCompanyName() : "");
         project.setUserId(userId);
+        if (StringUtils.hasText(request.getClientRequestId())) {
+            project.setCreateRequestId(request.getClientRequestId().strip());
+        }
         assignCloudBillingOwner(project, userId);
 
         if (request.getListedCompanyInfo() != null) {

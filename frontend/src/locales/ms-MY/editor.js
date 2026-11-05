@@ -110,6 +110,7 @@ export default {
     "movedSaveFailed": "Fail telah dialihkan atau dinamakan semula; perubahan belum disimpan",
     "versionSaveBusy": "Sejarah versi sedang sibuk; perubahan belum disimpan. Sila cuba sebentar lagi.",
     "localVersionSaveBusy": "Sejarah versi sedang sibuk; hasil simpanan belum disahkan. Sila cuba sebentar lagi.",
+    "saveRetryScheduled": "Gagal menyimpan; akan dicuba semula secara automatik dalam {seconds} saat",
     "contentSaveReloadRequired": "Simpanan terdahulu telah dihentikan. Simpan salinan suntingan anda, kemudian muatkan semula fail.",
     "contentSaveConflict": "Fail telah berubah di tempat lain. Simpan salinan suntingan anda, kemudian buka semula fail.",
     "desktopOnly": "Aplikasi desktop sahaja"

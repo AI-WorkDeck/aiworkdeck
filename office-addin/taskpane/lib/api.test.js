@@ -26,6 +26,7 @@ import {
   ensureAddinDefaultProject,
   postPaneHeartbeat,
   sendPaneBye,
+  postOfficeResult,
 } from './api.js'
 
 /** 替换 globalThis.fetch，返回 {calls, restore} */
@@ -411,4 +412,27 @@ test('unavailable official cloud state cannot issue a mutation', async () => {
     assert.equal(f.calls.length, 1)
     assert.ok(f.calls[0].url.endsWith('/cloud-state'))
   } finally { f.restore() }
+})
+
+test('postOfficeResult surfaces a rejected result POST instead of swallowing it', async () => {
+  const f = stubFetch(() => ({ ok: false, status: 500, json: async () => ({}) }))
+  try {
+    await assert.rejects(postOfficeResult({ serverUrl: 'http://x', token: 't' }, { requestId: 'r', ok: true }))
+  } finally { f.restore() }
+})
+test('postOfficeResult aborts a stalled POST after the timeout', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const original = globalThis.fetch
+  globalThis.fetch = (url, options = {}) => new Promise((_, reject) => {
+    options.signal?.addEventListener('abort', () => reject(new Error('aborted')))
+  })
+  try {
+    const p = postOfficeResult({ serverUrl: 'http://x', token: 't' }, { requestId: 'r', ok: true })
+    const settled = assert.rejects(p, /aborted/)
+    t.mock.timers.tick(20000)
+    await settled
+  } finally {
+    if (original === undefined) delete globalThis.fetch
+    else globalThis.fetch = original
+  }
 })

@@ -110,6 +110,7 @@ export default {
     "movedSaveFailed": "Berkas dipindahkan atau diganti nama; perubahan belum disimpan",
     "versionSaveBusy": "Riwayat versi sedang sibuk; perubahan belum disimpan. Silakan coba lagi sesaat.",
     "localVersionSaveBusy": "Riwayat versi sedang sibuk; hasil penyimpanan belum terkonfirmasi. Silakan coba lagi sesaat.",
+    "saveRetryScheduled": "Gagal menyimpan; akan dicoba lagi otomatis dalam {seconds} dtk",
     "contentSaveReloadRequired": "Penyimpanan sebelumnya dihentikan. Simpan salinan editan Anda, lalu muat ulang berkas.",
     "contentSaveConflict": "Berkas telah berubah di tempat lain. Simpan salinan editan Anda, lalu buka kembali berkas.",
     "desktopOnly": "Hanya aplikasi desktop"
