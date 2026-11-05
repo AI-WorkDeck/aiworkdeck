@@ -351,8 +351,12 @@ class OfficialCloudServiceTest {
         assertEquals(2, httpCalls, "展示名变了要重桥一次，案件库那边才会刷新");
         assertEquals(1, rows.size(), "就地重桥，不留第二条连接");
         assertEquals("韩律师", conn.getDisplayName());
-        assertEquals("awdt_second", conn.getDeviceToken());
-        verify(cloudSyncService).revokeRemoteToken(OFFICIAL, 31L, "awdt_second");
+        // 问题 126：改名不换令牌——令牌参与已入库案卷的 awdCloudScope 指纹，换了就全卡在「请明确重新连接」。
+        // 案件库那边的展示名靠这次桥接刷新，新换出的那枚令牌用不上，当场撤掉。
+        assertEquals("awdt_first", conn.getDeviceToken());
+        assertEquals(31L, conn.getTokenId());
+        verify(cloudSyncService).revokeRemoteToken(OFFICIAL, 32L, "awdt_second");
+        verify(cloudSyncService, never()).revokeRemoteToken(OFFICIAL, 31L, "awdt_second");
     }
 
     @Test
@@ -418,5 +422,41 @@ class OfficialCloudServiceTest {
                 new com.checkba.service.account.AccountIdentitySync.DisplayNameSynced(ME, "韩律师"));
 
         assertEquals(2, httpCalls);
+    }
+
+    /**
+     * 问题 126 的起因（dev-board#1713）：改昵称 → refreshDisplayName 重桥 → 连接换了令牌，
+     * 而已放进案件库的案卷 .git/config 里的 awdCloudScope 指纹含令牌，后台交稿/取回过写门禁时
+     * 一律「请明确重新连接」，且已入库的案卷没有任何重新绑定的入口。
+     */
+    @Test
+    void renamingKeepsAlreadySharedProjectsPassingTheCloudWriteFence(@org.junit.jupiter.api.io.TempDir java.nio.file.Path temp) throws Exception {
+        connectedAccount("awdk_abc", "fp-1");
+        OfficialCloudService svc = mainland();
+        CloudConnection conn = svc.connectOfficial(ME);
+        String repo = OFFICIAL + "/git/12.git";
+        var fence = new CloudGitEpochClient((uri, user, token) ->
+                new CloudGitEpochClient.Reply(200, "{\"cloudAccess\":{\"epoch\":4}}"));
+        var config = new org.eclipse.jgit.storage.file.FileBasedConfig(temp.resolve("config").toFile(), org.eclipse.jgit.util.FS.DETECTED);
+        fence.bindConfig(config, repo, conn.getUsername(), conn.getDeviceToken());
+
+        renamedOnCase("韩律师");
+        when(accountService.currentDisplayNameOrNull()).thenReturn("韩律师");
+        svc.refreshDisplayName(ME, "韩律师");
+
+        CloudConnection after = rows.get(conn.getId());
+        assertEquals("韩律师", after.getDisplayName());
+        assertEquals("4", fence.verifyConfig(config, repo, after.getUsername(), after.getDeviceToken()).get("X-Cloud-Epoch"),
+                "同一账户改个名，已入库案卷的后台同步不能被写门禁拦下");
+
+        // 门禁本身不放松：真的换了账户（指纹变了）照旧重桥换令牌，旧绑定被拦住。
+        connectedAccount("awdk_other", "fp-2");
+        canned = "{\"code\":0,\"data\":{\"token\":\"awdt_other\",\"userId\":10,"
+                + "\"username\":\"awd_other\",\"displayName\":\"别人\",\"tokenId\":40}}";
+        CloudConnection switched = svc.connectOfficial(ME);
+        assertEquals("awdt_other", switched.getDeviceToken());
+        var blocked = assertThrows(VersionException.class,
+                () -> fence.verifyConfig(config, repo, switched.getUsername(), switched.getDeviceToken()));
+        assertEquals(VersionException.CLOUD_RECONNECT_REQUIRED, blocked.getKind());
     }
 }

@@ -158,7 +158,10 @@ public class OfficialCloudService {
      * 而 {@link #connectOfficial} 在指纹不变时一直复用旧连接、从不重桥，于是改完昵称
      * 案件库参与人列表里自己还是旧名字，本机合并署名 {@code conn.displayName} 也是旧值。
      *
-     * <p>重桥会换一枚新令牌，旧的那枚随即撤掉（不然每改一次名远端就多一枚长期凭据）。
+     * <p>重桥会签出一枚新令牌，但连接<b>继续用旧令牌</b>、新的那枚当场撤掉：令牌参与已入库
+     * 案卷的写门禁指纹（{@link CloudGitEpochClient} 的 awdCloudScope），换了令牌，已放进案件库的
+     * 案卷后台同步会全部卡在「请明确重新连接」，且没有重新绑定的入口（问题 126，dev-board#1713）。
+     * 账户真的换了走 {@link #connectOfficial} 的指纹判断照旧换令牌，门禁照旧拦。
      * 桥接回来的名字若仍是旧的（旧版案件库不刷新展示名），本机连接照样记官网那份：
      * 合并署名以官网为准，也不会因为两边一直对不上而每次 status 都重桥一次。
      *
@@ -178,20 +181,17 @@ public class OfficialCloudService {
         if (existing == null || name.equals(existing.getDisplayName())) return;
         String key = snapshot.key();
         if (key == null) return;
-        Long oldTokenId = existing.getTokenId();
         try {
-            CloudConnection conn = bridge(existing.getServerUrl(), userId, key,
-                    snapshot.fingerprint(), existing, snapshot);
-            String revokeCredential = null;
-            synchronized (accountService) {
-                if (!accountService.isCurrentConnection(snapshot)) return;
-                if (!name.equals(conn.getDisplayName())) {
-                    conn.setDisplayName(name);
-                    conn = connectionRepository.save(conn);
+            JSONObject data = requestBridge(existing.getServerUrl(), key);
+            try {
+                synchronized (accountService) {
+                    if (!accountService.isCurrentConnection(snapshot)) return;
+                    existing.setDisplayName(name);
+                    connectionRepository.save(existing);
                 }
-                if (oldTokenId != null && !oldTokenId.equals(conn.getTokenId())) revokeCredential = conn.getDeviceToken();
+            } finally {
+                cloudSyncService.revokeRemoteToken(base, data.getLong("tokenId", null), data.getStr("token"));
             }
-            if (revokeCredential != null) cloudSyncService.revokeRemoteToken(base, oldTokenId, revokeCredential);
         } catch (RuntimeException e) {
             log.warn("官方案件库展示名刷新跳过（下次同步再试）: user={} {}", userId, e.getMessage());
         }
@@ -207,23 +207,10 @@ public class OfficialCloudService {
 
     private CloudConnection bridge(String base, Long userId, String key,
                                    String fingerprint, CloudConnection existing, AccountService.ConnectionSnapshot snapshot) {
-        Map<String, String> bridgeBody = new java.util.LinkedHashMap<>();
-        bridgeBody.put("key", key);
-        // 设备名让协作事件行分得清「你在另一台电脑」是哪一台。取不到主机名就不传
-        // （案件库侧回落成「账户桥接」），绝不让一个可有可无的标签挡住桥接本身。
-        String deviceName = localHostName();
-        if (deviceName != null) bridgeBody.put("deviceName", deviceName);
-        JSONObject resp = JSONUtil.parseObj(
-                httpPost(base + "/api/auth/awdk-login", JSONUtil.toJsonStr(bridgeBody)));
-        if (resp.getInt("code", 1) != 0) {
-            throw VersionException.userFacing(LangText.of(
-                    "没能连上官方团队案件库：" + resp.getStr("message", "稍后再试一次"),
-                    "Couldn't reach the official Team Case Library: " + resp.getStr("message", "please try again later")));
-        }
+        JSONObject data = requestBridge(base, key);
         synchronized (accountService) {
             if (!accountService.isCurrentConnection(snapshot)) throw VersionException.userFacing(LangText.of(
                     "账户已变化，请重试", "Account changed; please try again"));
-            JSONObject data = resp.getJSONObject("data");
             CloudConnection conn = existing != null ? existing : new CloudConnection();
             conn.setUserId(userId);
             conn.setServerUrl(base);
@@ -240,6 +227,24 @@ public class OfficialCloudService {
             log.info("已连上官方团队案件库: {} user={} as {}", base, userId, conn.getUsername());
             return connectionRepository.save(conn);
         }
+    }
+
+    /** 调 awdk-login 桥接，回 data（token/tokenId/username/displayName/userId）；不落库。 */
+    private JSONObject requestBridge(String base, String key) {
+        Map<String, String> bridgeBody = new java.util.LinkedHashMap<>();
+        bridgeBody.put("key", key);
+        // 设备名让协作事件行分得清「你在另一台电脑」是哪一台。取不到主机名就不传
+        // （案件库侧回落成「账户桥接」），绝不让一个可有可无的标签挡住桥接本身。
+        String deviceName = localHostName();
+        if (deviceName != null) bridgeBody.put("deviceName", deviceName);
+        JSONObject resp = JSONUtil.parseObj(
+                httpPost(base + "/api/auth/awdk-login", JSONUtil.toJsonStr(bridgeBody)));
+        if (resp.getInt("code", 1) != 0) {
+            throw VersionException.userFacing(LangText.of(
+                    "没能连上官方团队案件库：" + resp.getStr("message", "稍后再试一次"),
+                    "Couldn't reach the official Team Case Library: " + resp.getStr("message", "please try again later")));
+        }
+        return resp.getJSONObject("data");
     }
 
     /** 本机主机名，取不到回 null（无网/无 DNS 的机器上 getLocalHost 会抛）。 */
