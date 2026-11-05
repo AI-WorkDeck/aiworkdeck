@@ -127,7 +127,15 @@ public class PendingMergeStore {
         Path f = file(projectId);
         try {
             Files.createDirectories(f.getParent());
-            Files.write(f, MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(rows));
+            // 先写同目录临时文件再原子替换：写到一半崩溃不会让此前所有文件的记录一起丢
+            Path tmp = f.resolveSibling(FILE_NAME + ".tmp");
+            Files.write(tmp, MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(rows));
+            try {
+                Files.move(tmp, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(tmp, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (Exception e) {
             // 这条必须抛：写不进去就等于「合好的文件没人记得」，收尾时会被当成没合过，
             // 律师会拿到一个说不通的状态。宁可当场报错让他重试。

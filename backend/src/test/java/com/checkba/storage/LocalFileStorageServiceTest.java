@@ -21,9 +21,11 @@ import static org.junit.jupiter.api.Assertions.*;
 class LocalFileStorageServiceTest {
 
     private LocalFileStorageService storage;
+    private Path root;
 
     @BeforeEach
     void setUp(@TempDir Path tempDir) {
+        root = tempDir;
         StorageProperties props = new StorageProperties();
         props.getLocal().setRootPath(tempDir.toAbsolutePath().toString());
         props.getLocal().setTemplatePath(tempDir.resolve("no-template.docx").toAbsolutePath().toString());
@@ -79,5 +81,34 @@ class LocalFileStorageServiceTest {
                 }
             }
         }
+    }
+
+    @Test
+    void failedManagedSaveKeepsOriginalAndLeavesNoTempFile() throws Exception {
+        storage.save("projects/1/c.txt", bytes("original"));
+        java.io.InputStream failing = new java.io.InputStream() {
+            int n = 0;
+            @Override
+            public int read() throws java.io.IOException {
+                if (n++ < 3) return 'x';
+                throw new java.io.IOException("boom");
+            }
+        };
+        assertThrows(StorageException.class, () -> storage.save("projects/1/c.txt", failing));
+        Path dir = root.resolve("projects/1");
+        assertEquals("original", Files.readString(dir.resolve("c.txt")));
+        try (var list = Files.list(dir)) {
+            assertEquals(1, list.count());
+        }
+    }
+
+    @Test
+    void managedSaveKeepsDefaultFilePermissions() throws Exception {
+        Path dir = Files.createDirectories(root.resolve("projects/1"));
+        var probe = Files.createFile(dir.resolve("probe.txt"));
+        var view = Files.getFileAttributeView(probe, java.nio.file.attribute.PosixFileAttributeView.class);
+        org.junit.jupiter.api.Assumptions.assumeTrue(view != null);
+        storage.save("projects/1/d.txt", bytes("x"));
+        assertEquals(Files.getPosixFilePermissions(probe), Files.getPosixFilePermissions(dir.resolve("d.txt")));
     }
 }

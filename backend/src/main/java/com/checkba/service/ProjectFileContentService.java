@@ -225,7 +225,16 @@ public class ProjectFileContentService {
     private UploadResult publishUpload(ProjectFile file, String path, Path staged, Long offset, String totalSize) {
         String saved;
         try (InputStream input = Files.newInputStream(staged)) {
-            saved = offset != null && offset > 0 ? storage().append(path, input) : storage().save(path, input);
+            if (offset != null && offset > 0) {
+                long current = storage().getSize(path);
+                long len = Files.size(staged);
+                if (current == offset) saved = storage().append(path, input);
+                else if (current == offset + len) saved = path; // 重试的分块已落盘，幂等跳过
+                else throw new ContentWriteException(409, "UPLOAD_OFFSET_MISMATCH", LangText.of(
+                        "上传分块位置不一致，请重新上传", "Upload chunk offset mismatch; please upload again"));
+            } else {
+                saved = storage().save(path, input);
+            }
         } catch (IOException e) { throw new StorageException("读取上传临时文件失败", e); }
         boolean complete = true;
         boolean postProcess = offset == null || offset == 0;
