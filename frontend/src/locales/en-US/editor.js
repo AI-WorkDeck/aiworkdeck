@@ -933,6 +933,7 @@ export default {
     local: 'Local suggestions · Tab accept · Esc dismiss',
     empty: 'No local suggestions yet. Vocabulary grows as you write.',
     enabled: 'Automatic semantic suggestions',
+    localAuto: 'Show local suggestions while typing',
     disable: 'Turn autocomplete off',
     preferenceFailed: 'Could not save the setting. The previous state is unchanged; please retry.',
     semantic: 'Suggested continuation',

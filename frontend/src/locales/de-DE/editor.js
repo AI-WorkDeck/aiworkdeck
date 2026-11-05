@@ -943,6 +943,7 @@ export default {
     "local": "Lokale Vorschläge · Tab übernehmen · Esc verwerfen",
     "empty": "Noch keine lokalen Vorschläge. Das Vokabular wächst, während Sie schreiben.",
     "enabled": "Automatische semantische Vorschläge",
+    "localAuto": "Lokale Vorschläge beim Tippen anzeigen",
     "disable": "Autovervollständigung ausschalten",
     "preferenceFailed": "Die Einstellung konnte nicht gespeichert werden. Der vorherige Zustand bleibt erhalten; bitte erneut versuchen.",
     "semantic": "Fortsetzungsvorschlag",

@@ -943,6 +943,7 @@ export default {
     "local": "로컬 제안만 · Tab 수락 · Esc 닫기",
     "empty": "아직 로컬 제안이 없습니다. 작성하면서 어휘가 쌓입니다.",
     "enabled": "자동 의미 기반 제안",
+    "localAuto": "입력 중 로컬 후보 자동 표시",
     "disable": "자동 완성 끄기",
     "preferenceFailed": "설정을 저장하지 못했습니다. 이전 상태가 유지됩니다. 다시 시도하세요.",
     "semantic": "이어쓰기 제안",

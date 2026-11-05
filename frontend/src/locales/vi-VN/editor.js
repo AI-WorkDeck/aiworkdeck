@@ -943,6 +943,7 @@ export default {
     "local": "Gợi ý cục bộ · Tab chấp nhận · Esc bỏ qua",
     "empty": "Chưa có gợi ý cục bộ. Từ vựng sẽ tăng dần khi bạn soạn thảo.",
     "enabled": "Gợi ý ngữ nghĩa tự động",
+    "localAuto": "Hiển thị gợi ý cục bộ khi gõ",
     "disable": "Tắt tự động hoàn thành",
     "preferenceFailed": "Không thể lưu cài đặt. Trạng thái trước đó được giữ nguyên; vui lòng thử lại.",
     "semantic": "Gợi ý viết tiếp",

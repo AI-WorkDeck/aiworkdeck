@@ -58,7 +58,7 @@ test('destruction suppresses late snapshot and lookup responses', async () => {
 test('preference storage is keyed by user and only accepts known boolean values', async () => {
   const f = fixture()
   await f.request('preferences', { enabled: false, learning: 'yes', arbitrary: true })
-  assert.deepEqual(f.calls.find((c) => c.name === 'store').args, ['awd_writing_preferences_33', { enabled: false, learning: true, hints: true }])
+  assert.deepEqual(f.calls.find((c) => c.name === 'store').args, ['awd_writing_preferences_33', { enabled: false, localAuto: false, learning: true, hints: true }])
 })
 
 test('document candidates retain saved details for acceptance, completed-name hints and right-click', async () => {

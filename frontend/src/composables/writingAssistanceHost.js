@@ -9,7 +9,7 @@ import { retrievalSourceLabel } from '../utils/insightDetail.js'
 // 客体页（写作辅助卡片）的全部文案键。客体不 import 语言包：宿主用 translate 生成
 // 标签表随 writing-config 下发，客体收到后整表替换自带的英文兜底（教程反馈 48）。
 export const WRITING_ASSISTANCE_LABEL_KEYS = ['suggestions', 'manual', 'noMatch', 'acceptKey', 'chooseKey', 'dismissKey', 'title', 'close',
-  'local', 'empty', 'enabled', 'disable', 'preferenceFailed', 'semantic', 'policy', 'learning', 'hints', 'manage', 'project', 'user', 'remove',
+  'local', 'empty', 'enabled', 'localAuto', 'disable', 'preferenceFailed', 'semantic', 'policy', 'learning', 'hints', 'manage', 'project', 'user', 'remove',
   'clear', 'confirm', 'loading', 'stale', 'detail', 'insert', 'lookup', 'query', 'otherQueries', 'company', 'law', 'case', 'revise',
   'revisePlaceholder', 'reviseSubmit', 'noDetail', 'source', 'sourceLine', 'dateLine', 'error', 'login', 'recharge', 'saved', 'replaced',
   'current', 'refresh', 'contextHint', 'COMPANY', 'PERSON', 'LAW', 'ARTICLE', 'CASE', 'WORD', 'PHRASE']
@@ -59,7 +59,8 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
   }
   const labels = writingAssistanceLabels(translate)
   let seedComplete = false, seedTimer = null
-  let preferences = { enabled: true, learning: true, hints: true }
+  // localAuto：输入时自动显示本地候选（问题 81），默认关
+  let preferences = { enabled: true, localAuto: false, learning: true, hints: true }
   try { const stored = storage.get(key); for (const name of Object.keys(preferences)) if (typeof stored?.[name] === 'boolean') preferences[name] = stored[name] } catch { /* defaults */ }
   const reportState = (error = '') => {
     try { onState?.({ session, available: !disposed && !!writable, ...preferences, error }) } catch { /* UI state is optional. */ }
