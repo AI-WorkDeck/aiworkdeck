@@ -2360,7 +2360,9 @@ export default {
       // 超过上限才强制保存（崩溃丢失上限）：用户输入时 10s，AI 命令在飞时 60s。
       const dirtyAge = this._dirtySince ? Date.now() - this._dirtySince : 0
       const sinceCmd = Date.now() - Math.max(this._lastCmdAt || 0, this._lastInteractionAt || 0)
-      const forceAfter = this._cmdBusy > 0 ? FORCE_SAVE_DIRTY_AGE_BUSY_MS : FORCE_SAVE_DIRTY_AGE_MS
+      // 大文档整篇导出本身就要十几秒（150 页基准 12–17s），期间输入冻住；上限至少取
+      // 上次导出耗时的 4 倍，冻住的时间不超过编辑时间的约五分之一。
+      const forceAfter = Math.max(this._cmdBusy > 0 ? FORCE_SAVE_DIRTY_AGE_BUSY_MS : FORCE_SAVE_DIRTY_AGE_MS, 4 * (this._lastExportMs || 0))
       if ((this._cmdBusy > 0 || sinceCmd < 1500) && dirtyAge < forceAfter) {
         clearTimeout(this._saveTimer)
         this._saveTimer = setTimeout(() => this.autoSave(), 2000)
@@ -2623,7 +2625,8 @@ export default {
             context: saveContext, generation, acknowledged: false }
         }
         const res = await this.executor.executeCommand('export_document', params)
-        this.appendLog('  ← export ' + (Date.now() - tExp) + 'ms')
+        this._lastExportMs = Date.now() - tExp
+        this.appendLog('  ← export ' + this._lastExportMs + 'ms')
         if (!res || !res.success) throw Object.assign(new Error((res && res.message) || 'export_document returned no success'), { code: res?.code })
         // Structured clone across the relay hops may surface bytes as
         // Uint8Array / ArrayBuffer / plain array — normalize (mirror of the
