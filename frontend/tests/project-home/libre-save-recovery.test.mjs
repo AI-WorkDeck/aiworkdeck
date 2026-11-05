@@ -606,3 +606,45 @@ for (const outcome of ['saved', 'failed', 'discarded', 'reloading', 'project-cha
     assert.deepEqual(events, outcome === 'saved' ? [['awd:file-saved', { projectId: 1487, fileId: 7 }]] : [])
   })
 }
+
+// B7 保存序号围栏：每次上传带本编辑器会话 id 与单调递增序号，后端据此拒绝迟到的旧上传。
+test('上传带编辑器会话与单调序号；版本忙碌的同一份导出复用同一序号', async () => {
+  const urls = []
+  let busy = 1
+  const vm = makeVm({ projectId: 'save-seq', file: { id: 7, name: 'a.docx', fileSize: 10 },
+    uploadBytes: async (url) => {
+      urls.push(url)
+      if (busy-- > 0) throw Object.assign(new Error('HTTP 423'), { saveNotPublished: true })
+    },
+  }, [], (fn, ms) => ms === 1000 ? setTimeout(fn, 0) : setTimeout(fn, ms))
+  assert.equal(await vm.saveDocument(), true)
+  vm.dirty = true
+  assert.equal(await vm.saveDocument(), true)
+  const params = urls.map(url => new URL(url, 'http://x').searchParams)
+  assert.equal(params[0].get('mustExist'), '1')
+  const session = params[0].get('saveSession')
+  assert.ok(session && session.length >= 8)
+  assert.ok(params.every(p => p.get('saveSession') === session), '同一编辑器实例使用同一会话 id')
+  const seqs = params.map(p => Number(p.get('saveSeq')))
+  assert.equal(seqs[0], seqs[1], '版本忙碌重试同一份字节，序号不变')
+  assert.ok(seqs[2] > seqs[1], '新导出的保存序号必须更大')
+  const other = makeVm()
+  let otherUrl
+  other.uploadBytes = async url => { otherUrl = url }
+  await other.saveDocument()
+  assert.notEqual(new URL(otherUrl, 'http://x').searchParams.get('saveSession'), session)
+})
+
+test('后端 409 STALE_SAVE 表示更新的保存已落盘，不按「文件被移动」失败处理', async () => {
+  let xhr
+  class Xhr { constructor() { xhr = this } open() {} setRequestHeader() {} send() {} }
+  const opts = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'getCloudWriteHeaders', 'XMLHttpRequest', body)(...Object.values(barriers), null, null, null, async () => ({}), Xhr)
+  const pending = opts.methods.uploadBytes.call({ $t: k => k }, '/upload/7', new Uint8Array([1]), 'a.docx')
+  await Promise.resolve()
+  xhr.status = 409; xhr.response = JSON.stringify({ code: -1, reason: 'STALE_SAVE' }); xhr.onload()
+  await assert.rejects(pending, e => e.staleSave === true)
+  const vm = makeVm({ uploadBytes: async () => { throw Object.assign(new Error('HTTP 409'), { status: 409, staleSave: true }) } })
+  assert.equal(await vm.saveDocument(), true)
+  assert.notEqual(vm.statusKey, 'movedSaveFailed')
+  assert.equal(vm.statusKey, 'ready')
+})

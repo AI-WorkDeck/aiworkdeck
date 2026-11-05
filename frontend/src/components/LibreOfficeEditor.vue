@@ -2593,7 +2593,13 @@ export default {
           lease.setOperationId(pending.operationId)
           await this.uploadPendingLocalContent(pending)
         } else {
-          const url = getFileWriteUrl(fileId) + (mustExist ? '?mustExist=1' : '')
+          // 保存序号围栏（B7）：同一编辑器实例的会话 id + 单调序号。结果不明的旧上传若迟到，
+          // 后端在内容锁内发现本会话已落过更大的序号，回 409 STALE_SAVE 且一个字节都不写——
+          // 失败后才能安全地自动重存当前（更新的）内容。走查询参数（同 mustExist），旧后端直接忽略。
+          if (!this._saveSessionId) this._saveSessionId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12)
+          this._saveSeq = (this._saveSeq || 0) + 1
+          const url = getFileWriteUrl(fileId) + '?' + (mustExist ? 'mustExist=1&' : '') +
+            'saveSession=' + encodeURIComponent(this._saveSessionId) + '&saveSeq=' + this._saveSeq
           // Only a confirmed pre-publication rejection is safe to retry. Keep the same export
           // and save lease; re-exporting would freeze editing and could mix newer input into it.
           for (let attempt = 0; ; attempt++) {
@@ -2602,6 +2608,8 @@ export default {
               await this.uploadBytes(url, u8, name)
               break
             } catch (e) {
+              // 本会话更新的一笔已经落盘（只可能比这份字节新），这笔不算失败。
+              if (e?.staleSave === true) { this.appendLog('  ← newer save already landed (STALE_SAVE)'); break }
               if (e?.saveNotPublished !== true || attempt >= 3) throw e
               safeToOverwrite = true
               this.appendLog('save waiting for version work; retry ' + (attempt + 1))
@@ -2758,6 +2766,7 @@ export default {
             response.reason === 'VERSION_BUSY' && response.writeState === 'not_started'
           reject(Object.assign(new Error('HTTP ' + xhr.status), {
             status: xhr.status, backendUnavailable: xhr.status >= 500, saveNotPublished,
+            staleSave: xhr.status === 409 && response?.reason === 'STALE_SAVE',
           }))
         }
         xhr.onerror = () => reject(Object.assign(new Error('网络错误 / network error'), { backendUnavailable: true }))
