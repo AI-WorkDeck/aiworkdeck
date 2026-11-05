@@ -162,7 +162,12 @@ class SensitiveChineseNameRecognitionTest {
         "所有权、合同法、常规、说明、时间、文件、通知、以及。",
         "费用支付完毕。金额已确认。时间安排合理。项目负责人签字。",
         "费用：100元。金额：200元。管理费用、工作计划、成果、活动、风险。",
-        "金钱的使用应当合理。与金钱有关。高额的费用已支付。余款将于周五结清。"
+        "金钱的使用应当合理。与金钱有关。高额的费用已支付。余款将于周五结清。",
+        // dev-board#1713 #94：动作动词开头的片段不是姓名（「支」「申」「向」也是姓）
+        "被告：\n支付自 2026 年 1 月 1 日起至实际清偿之日止的利息。",
+        "原告：某某公司\n被告应于十日内，支付自 2026 年 3 月起的租金。",
+        "联系人：\n申请自 2026 年起延期。\n收取自 2026 年 5 月起的费用。",
+        "支付自\n提交至\n申请人"
     })
     void preservesOrdinaryProseAndNonPersonFields(String text) {
         SensitiveTextEngine engine = new SensitiveTextEngine(List.of("CHINESE_NAME"), true, List.of(), List.of());

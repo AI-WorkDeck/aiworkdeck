@@ -54,6 +54,11 @@ final class ChineseNameRecognizer {
             "(?:省|市|区|县|镇|村|路|街|公司|集团|有限|股份|科技|实业|银行|医院|法院|事务所)");
     private static final Pattern PERSON_BEFORE_COMPANY = Pattern.compile("^(?:原告|被告|申请人|被申请人)([\\p{IsHan}]{2,4})(?:诉|与|向)");
 
+    // 「支付自」「申请自」：支/申/向也是姓，但以动作动词开头的片段不是姓名（dev-board#1713 #94）。
+    private static boolean startsWithAction(String value) {
+        return PERSON_ACTION.matcher(value).lookingAt();
+    }
+
     static int organizationStart(String value) {
         var party = PERSON_BEFORE_COMPANY.matcher(value);
         return party.find() && SensitiveType.CHINESE_NAME.isPlausible(party.group(1)) ? party.end() : 0;
@@ -98,7 +103,7 @@ final class ChineseNameRecognizer {
                 spacedNames.set(spaced.start(), spaced.end());
                 String compact = spaced.group().replace(" ", "").replace("　", "");
                 if (SensitiveType.CHINESE_NAME.isPlausible(compact) && !NON_NAME.matcher(compact).find()
-                        && allowsOccurrence(text, spaced.start(), spaced.end(), protectedText)) {
+                        && !startsWithAction(compact) && allowsOccurrence(text, spaced.start(), spaced.end(), protectedText)) {
                     result.add(new Span(spaced.start(), spaced.end()));
                 }
             }
@@ -112,7 +117,8 @@ final class ChineseNameRecognizer {
                     && Character.UnicodeScript.of(text.charAt(limit)) == Character.UnicodeScript.HAN) limit++;
             for (int end = start + 2; end <= limit; end++) {
                 String value = text.substring(start, end);
-                if (!SensitiveType.CHINESE_NAME.isPlausible(value) || NON_NAME.matcher(value).find()) continue;
+                if (!SensitiveType.CHINESE_NAME.isPlausible(value) || NON_NAME.matcher(value).find()
+                        || startsWithAction(value)) continue;
                 boolean boundary = end == text.length() || !Character.isLetterOrDigit(text.charAt(end));
                 boolean contextAfter = AFTER_NAME.matcher(text).region(end, text.length()).lookingAt();
                 if (!boundary && !contextAfter) continue;
