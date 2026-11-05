@@ -82,6 +82,24 @@ public class LocalProjectService {
             new java.util.concurrent.ConcurrentHashMap<>();
     private final Object resolveProjectLock = new Object();
 
+    /**
+     * 导入后同步建基线（教程问题 16）。字段 + ObjectProvider 惰性取用（同 CloudSyncService 取本类的写法）：
+     * 不改构造器，免得与版本服务链形成循环依赖；单测手工 new 时为空即跳过。
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<com.checkba.version.VersionLifecycleService>
+            versionLifecycleProvider;
+    private com.checkba.version.VersionLifecycleService versionLifecycleOverride;
+
+    void setVersionLifecycleForTest(com.checkba.version.VersionLifecycleService service) {
+        this.versionLifecycleOverride = service;
+    }
+
+    private com.checkba.version.VersionLifecycleService versionLifecycle() {
+        if (versionLifecycleOverride != null) return versionLifecycleOverride;
+        return versionLifecycleProvider == null ? null : versionLifecycleProvider.getIfAvailable();
+    }
+
     private java.util.concurrent.locks.ReentrantLock lockForProject(Long projectId) {
         return projectLocks.computeIfAbsent(projectId, k -> new java.util.concurrent.locks.ReentrantLock());
     }
@@ -246,6 +264,12 @@ public class LocalProjectService {
             }
         } finally {
             projectLock.unlock();
+        }
+        // 导入完成后同步建基线（初始版本 = 导入后的全量），否则首次退出时全部文件都算待提交。
+        // 放在导入锁外：自动开启自己在仓库锁内完成判定与初始化，避免两把锁反向嵌套。
+        var lifecycle = versionLifecycle();
+        if (lifecycle != null) {
+            lifecycle.autoEnableAfterLocalImport(project.getId(), userId);
         }
         log.info("打开本地文件夹项目: project={}, root={}, reused={}, imported={}, truncated={}, truncatedCount={}",
                 project.getId(), canonical, reused, stats.imported, stats.truncated, stats.truncatedCount);

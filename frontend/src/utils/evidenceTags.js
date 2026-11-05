@@ -38,11 +38,22 @@ function storageKey() {
   return 'awd_evidence_tags_v1:' + (getCurrentUser()?.id || 'local')
 }
 
-export function loadEvidenceTags() {
+// 没有偏好时的默认组跟着当前项目类型走（教程反馈 77，dev-board#1713）：资本市场与并购
+// 尽调类项目用「材料核查」组，其余（空白项目、打开文件夹、草稿区、取不到类型）用「证据整理」组。
+// 工作台在项目信息到位时写入；标签选择器与拖放建链都经 loadEvidenceTags 读同一份。
+const DUE_DILIGENCE_PROJECT_TYPES = new Set(['MAJOR_ASSET_RESTRUCTURING', 'PRIVATE_PLACEMENT', 'PUBLIC_PLACEMENT', 'ACQUISITION'])
+let currentProjectType = null
+export function setEvidenceProjectType(projectType) {
+  currentProjectType = projectType ? String(projectType) : null
+}
+
+/** t 缺省时（纯函数调用方拿不到语言包）只能给内置「材料核查」组。 */
+export function loadEvidenceTags(t) {
   try {
     const raw = uni.getStorageSync(storageKey())
     if (raw) return normalizeEvidenceTags(JSON.parse(raw))
   } catch (_) { /* Absent/invalid local preferences fall back to the built-ins. */ }
+  if (typeof t === 'function' && !DUE_DILIGENCE_PROJECT_TYPES.has(currentProjectType)) return evidenceTagPreset('evidence', t)
   return [...EVIDENCE_METHODS]
 }
 

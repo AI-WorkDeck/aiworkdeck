@@ -37,7 +37,7 @@ export default {
   "ocr": {
     "refresh": "보기 새로 고침",
     "recognize": "텍스트 인식",
-    "download": "다운로드",
+    "download": "프로젝트에 저장",
     "copy": "복사",
     "insertDoc": "문서에 삽입",
     "webLink": "웹 검증 링크",

@@ -346,9 +346,18 @@ export function rawFallback(detail, limit = 4000) {
   }
 }
 
-// 检索来源的展示键（dev-board#541）：后端 retrievalSource 是技术串（project-file / qichacha+mcp），
-// 浮窗与详情标签页要显示成人话。认不出来的来源返回 null，调用方原样显示。
-const SOURCE_I18N = { 'project-file': 'insight.source.projectFile', 'qichacha+mcp': 'insight.source.qichacha' }
+// 检索来源的展示键（dev-board#541）：后端 retrievalSource 是技术串（project-file / qichacha /
+// qichacha+mcp / pkulaw-semantic 等法宝 MCP 服务名），浮窗、详情标签页、右键资料卡与插入正文的
+// 来源行都要显示成人话（教程反馈 44）。认不出来的来源返回 null，调用方原样显示。
+const SOURCE_I18N = { 'project-file': 'insight.source.projectFile', qichacha: 'insight.source.qichacha', 'qichacha+mcp': 'insight.source.qichacha' }
 export function retrievalSourceKey(src) {
-  return (src && SOURCE_I18N[String(src)]) || null
+  const s = src == null ? '' : String(src).trim()
+  if (!s) return null
+  if (SOURCE_I18N[s]) return SOURCE_I18N[s]
+  return s === 'pkulaw' || s.startsWith('pkulaw-') ? 'insight.source.pkulaw' : null
+}
+/** 来源的用户名称：有映射走语言包，没有就原样。translate 缺省时原样返回。 */
+export function retrievalSourceLabel(src, translate) {
+  const key = retrievalSourceKey(src)
+  return key && typeof translate === 'function' ? translate(key) : (src == null ? '' : String(src))
 }

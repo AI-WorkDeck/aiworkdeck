@@ -7,6 +7,7 @@ import { componentDownloads } from '@/services/componentDownloads.js'
 import { showDialog } from '@/utils/dialog.js'
 import { requireAccount } from '@/utils/requireAccount.js'
 import { confirmPaidTranscription } from '@/utils/paidTranscribeGate.js'
+import { confirmAsrNotice } from '@/utils/asrNoticeDialog.js'
 import { readPcmWav } from '@/utils/ttsWav.js'
 import { getAuthHeaders } from '@/utils/auth.js'
 
@@ -122,9 +123,11 @@ export function createPluginVoiceServices({ projectId, permissions, isCurrent, a
       if (operation === 'notice') return api.getMeetingAsrNotice()
       if (operation === 'acknowledgeNotice') {
         allowed('network')
-        const notice = await api.getMeetingAsrNotice(); check(signal)
-        await confirm(String(notice?.body || notice?.content || (isEn() ? 'Confirm that you have read the recording transcription notice and allow using the cloud transcription service?' : '确认已阅读录音转写告知，并允许使用云端转写服务？')), signal)
-        return api.acknowledgeMeetingAsrNotice(true)
+        // 告知全文与勾选只在这一处可信弹窗里（dev-board#1713 #117）；面板不再重复一份
+        const notice = await confirmAsrNotice({ isCurrent: () => !signal.aborted && isCurrent() })
+        check(signal)
+        if (!notice) error('cancelled', 'Cancelled')
+        return notice
       }
       allowed('file_read')
       if (!projectId()) error('no_project', 'A project is required')

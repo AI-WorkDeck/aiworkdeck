@@ -573,7 +573,16 @@ public class WorkSessionService {
         boolean draft = onDraftBranch(projectId);
         Long sessionId = null;
         if (!draft) {
-            sessionId = ensureSession(projectId, actor.userId(), actor.userName()).getId();
+            WorkSession session = ensureSession(projectId, actor.userId(), actor.userName());
+            sessionId = session.getId();
+            // 最后一次活动时间只用于工时汇总（问题 61）；精确到分钟即可，节流写库，
+            // 不让每个改动信号都多一次 save（ChangeSignalNonBlockingTest 守着写库次数）
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime last = session.getLastActivityAt();
+            if (last == null || java.time.Duration.between(last, now).getSeconds() >= 60) {
+                session.setLastActivityAt(now);
+                sessionRepository.save(session);
+            }
         }
         actors.put(projectId, actor);
         scheduleDebounceCommit(projectId);
@@ -656,13 +665,24 @@ public class WorkSessionService {
             PendingActor a = actors.get(projectId);
             Long userId = a != null ? a.userId() : null;
             String userName = a != null ? a.userName() : null;
+            Long endingId = current.get().getId();
             endSession(projectId, userId, userName, null);
+            markIdleEnded(endingId);
             log.info("空闲超时自动结束一段工作: project={}", projectId);
         } catch (Exception e) {
             log.warn("空闲自动结束工作失败: project={}", projectId, e);
         } finally {
             lock.unlock();
         }
+    }
+
+    /** 给刚被空闲定时器结束的段打标记（只在合并成功、段已不再 ACTIVE 时打）。 */
+    private void markIdleEnded(Long sessionId) {
+        sessionRepository.findById(sessionId).ifPresent(s -> {
+            if (s.getStatus() == WorkSession.Status.ACTIVE) return;
+            s.setIdleEnded(true);
+            sessionRepository.save(s);
+        });
     }
 
     /**
@@ -712,6 +732,7 @@ public class WorkSessionService {
         s.setProjectId(projectId);
         s.setBranchName(branch);
         s.setStartedAt(LocalDateTime.now());
+        s.setLastActivityAt(s.getStartedAt());
         s.setStatus(WorkSession.Status.ACTIVE);
         s.setUserId(userId);
         WorkSession saved = sessionRepository.save(s);

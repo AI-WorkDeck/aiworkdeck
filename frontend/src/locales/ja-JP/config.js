@@ -37,7 +37,7 @@ export default {
   "ocr": {
     "refresh": "表示の更新",
     "recognize": "テキスト認識",
-    "download": "ダウンロード",
+    "download": "プロジェクトに保存",
     "copy": "コピー",
     "insertDoc": "ドキュメントに挿入",
     "webLink": "ウェブ検証へのリンク",

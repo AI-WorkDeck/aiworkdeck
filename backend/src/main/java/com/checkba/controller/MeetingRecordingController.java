@@ -203,15 +203,19 @@ public class MeetingRecordingController {
         boolean transcribable = MeetingRecording.STATUS_RECORDED.equals(meeting.getStatus())
                 || MeetingRecording.STATUS_FAILED.equals(meeting.getStatus())
                 || MeetingRecording.STATUS_EMPTY.equals(meeting.getStatus());
-        if (transcribable && transcriptionService.isConfigured()
-                && !transcriptionService.recordingNoticePending()) {
+        boolean configured = transcriptionService.isConfigured();
+        boolean noticePending = transcriptionService.recordingNoticePending();
+        if (transcribable && configured && !noticePending) {
             meeting = transcriptionService.startTranscription(meeting.getId());
             submitted = true;
         }
         Map<String, Object> result = new HashMap<>();
         result.put("meeting", meeting);
-        result.put("configured", transcriptionService.isConfigured());
+        result.put("configured", configured);
         result.put("submitted", submitted);
+        // 没提交的原因之一：平台档还欠一次转写告知。前端据此提示去确认告知，
+        // 而不是误说成「配置转写服务后可开始转写」（dev-board#1713 #117/#118）。
+        result.put("noticePending", noticePending);
         return result;
     }
 
@@ -260,6 +264,7 @@ public class MeetingRecordingController {
     @PostMapping("/{meetingId}/minutes-prompt")
     public Map<String, Object> minutesPrompt(
             @PathVariable Long meetingId,
+            @RequestParam(value = "format", required = false) String format,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         requireMemberByMeeting(sessionId, meetingId);
         MeetingRecording meeting = meetingService.get(meetingId);
@@ -267,7 +272,10 @@ public class MeetingRecordingController {
             throw new IllegalArgumentException(LangText.of("转写完成后才能生成纪要", "Minutes can only be generated after the transcription is finished"));
         }
         Map<String, Object> result = new HashMap<>();
-        result.put("prompt", meetingService.buildMinutesKickoffPrompt(meeting));
+        // format=interview：同一链路改出访谈笔录（问题 31）；缺省仍是会议纪要
+        result.put("prompt", "interview".equals(format)
+                ? meetingService.buildInterviewKickoffPrompt(meeting)
+                : meetingService.buildMinutesKickoffPrompt(meeting));
         return result;
     }
 

@@ -71,7 +71,7 @@ public final class CloudGitEpochClient {
         return frozen;
     }
     private static VersionException reconnect() {
-        return VersionException.userFacing(com.checkba.service.mobile.CloudBillingText.get("cloudReconnectRequired"));
+        return VersionException.cloudReconnectRequired(com.checkba.service.mobile.CloudBillingText.get("cloudReconnectRequired"));
     }
     private static String scopeFingerprint(String repository,String username,String token) throws IOException {
         if(token==null||token.isBlank())throw reconnect();

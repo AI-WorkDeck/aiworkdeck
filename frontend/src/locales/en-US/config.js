@@ -38,7 +38,7 @@ export default {
   ocr: {
     refresh: 'Refresh View',
     recognize: 'Recognize Text',
-    download: 'Download',
+    download: 'Save to Project',
     copy: 'Copy',
     insertDoc: 'Insert into Document',
     webLink: 'Link to Web Verification',

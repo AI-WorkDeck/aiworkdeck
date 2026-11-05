@@ -103,6 +103,25 @@ test('自愈回滚：连续两次后端启动失败回到上一版本，再失�
   assert.strictEqual(overlay.readCurrent(ctx), null)
 })
 
+// 问题 21（dev-board#1713）：共享数据目录上的多个实例（同一 ~/.aiworkdeck、不同 userData）
+// 的启动失败不能互相累加——别的实例被强杀/并发启动失败，不该把这个实例的补丁静默回滚。
+test('启动失败计数按实例区分：只有同一实例连续两次失败才回滚', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ovl-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const base = makeCtx(root)
+  overlay.activate(base, '0.11.1', { 'backend-app': stageComponent(base, 'backend-app', { 'app.jar': 'v1' }) })
+  const a = { ...base, instanceId: '/Users/u/Library/Application Support/aiworkdeck-desktop' }
+  const b = { ...base, instanceId: '/tmp/demo/userdata' }
+
+  assert.deepStrictEqual(overlay.noteBackendBootFailure(a), { reverted: false })
+  assert.deepStrictEqual(overlay.noteBackendBootFailure(b), { reverted: false })
+  assert.strictEqual(overlay.effectiveVersion(base), '0.11.1', '两个不同实例各失败一次不回滚')
+  assert.deepStrictEqual(overlay.noteBackendBootFailure(a), { reverted: false })
+  assert.strictEqual(overlay.effectiveVersion(base), '0.11.1', 'A→B→A 不算 A 连续失败')
+  assert.deepStrictEqual(overlay.noteBackendBootFailure(a), { reverted: true })
+  assert.strictEqual(overlay.readCurrent(base), null, '同一实例连续两次失败照常回滚')
+})
+
 test('markBootOk 清零计数并修剪无引用版本目录', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ovl-'))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))

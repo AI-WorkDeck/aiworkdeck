@@ -16,7 +16,7 @@
           <div v-for="(item, index) in metadata" :key="index"><dt>{{ $t(item.labelKey) }}</dt><dd>{{ item.value }}</dd></div>
         </dl>
         <aside class="reference-provenance">
-          <div class="reference-provenance-heading"><strong>{{ reference.source || $t('legalReference.unknownSource') }}</strong><span :class="'status-' + status">{{ $t('legalReference.status.' + status) }}</span></div>
+          <div class="reference-provenance-heading"><strong>{{ sourceLabel || $t('legalReference.unknownSource') }}</strong><span :class="'status-' + status">{{ $t('legalReference.status.' + status) }}</span></div>
           <p>{{ $t(status === 'unverified' ? 'legalReference.unverifiedNote' : 'legalReference.evidenceNote') }}</p>
           <p v-if="reference.retrievedAt">{{ $t('legalReference.retrievedAt') }} <time>{{ reference.retrievedAt }}</time></p>
           <p v-if="reference.note">{{ reference.note }}</p>
@@ -36,11 +36,15 @@
 </template>
 
 <script>
+import { retrievalSourceLabel } from '@/utils/insightDetail.js'
+
 export default {
   name: 'LegalReferencePane',
   props: { reference: { type: Object, required: true } },
   emits: ['open-url'],
   computed: {
+    // 来源内部名（pkulaw）显示成用户名称（教程反馈 47）
+    sourceLabel() { return retrievalSourceLabel(this.reference.source, (key) => this.$t(key)) },
     kind() { return ['LAW', 'CASE', 'PENALTY'].includes(this.reference.kind) ? this.reference.kind : 'LAW' },
     status() { return ['retrieved', 'metadata', 'unavailable'].includes(this.reference.status) ? this.reference.status : 'unverified' },
     metadata() { return (this.reference.metadata || []).filter((item) => item.value) },

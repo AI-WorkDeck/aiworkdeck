@@ -74,3 +74,18 @@ export function flattenProjectFileTree(nodes, parentPath = '') {
   nodes.forEach((node) => walk(node, parentPath))
   return result
 }
+
+/** 后端给临时项目起的默认名（ProjectService：LangText.of("临时项目", "Temporary project")，繁中经转换）。 */
+const SCRATCH_DEFAULT_NAMES = ['临时项目', '臨時項目', '臨時專案', 'Temporary project']
+
+/**
+ * 「转为正式项目」弹窗预填的名字（问题 19）：当前对话的标题优先；取不到回落项目名；
+ * 项目名只是临时项目的默认名时留空，让占位提示说话，不再预填「临时项目」。
+ */
+export function promoteScratchDefaultName({ conversationTitle, projectName, extraDefaultNames = [] } = {}) {
+  const title = String(conversationTitle || '').trim()
+  if (title) return title
+  const name = String(projectName || '').trim()
+  if (!name || SCRATCH_DEFAULT_NAMES.includes(name) || extraDefaultNames.includes(name)) return ''
+  return name
+}

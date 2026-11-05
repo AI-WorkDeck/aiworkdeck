@@ -52,3 +52,14 @@ test('share 自己抛的错原样往外抛，由调用方就地显示', async ()
     /没能放进案件库/,
   )
 })
+
+test('needsCloudReconnect 只认后端 kind=CLOUD_RECONNECT_REQUIRED，不靠匹配文案', async () => {
+  const { needsCloudReconnect, CLOUD_RECONNECT_REQUIRED } = await import('../../src/utils/cloudShare.js')
+  assert.equal(CLOUD_RECONNECT_REQUIRED, 'CLOUD_RECONNECT_REQUIRED')
+  const e = new Error('云端同步权限已变化。请明确重新连接云端后再同步；本机文件不会删除。')
+  assert.equal(needsCloudReconnect(e), false, '只有文案、没有 kind 不算')
+  e.kind = 'CLOUD_RECONNECT_REQUIRED'
+  assert.equal(needsCloudReconnect(e), true)
+  assert.equal(needsCloudReconnect({ kind: 'VERSION_BUSY' }), false)
+  assert.equal(needsCloudReconnect(null), false)
+})

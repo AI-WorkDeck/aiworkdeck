@@ -8,6 +8,7 @@ export default {
   "cancel": "İptal",
   "save": "Kaydet",
   "close": "Kapat",
+  "done": "Bitti",
   "delete": "Sil",
   "rename": "Yeniden adlandır",
   "retry": "Tekrar dene",

@@ -4,6 +4,26 @@ import { extractCompletionEntries } from '../utils/completionLexicon.js'
 import { isCreditsRequired } from '../utils/requireAccountCore.js'
 import { completionDetails } from '../utils/completionDetails.js'
 import { referencesFromEntity } from '../utils/legalReferences.js'
+import { retrievalSourceLabel } from '../utils/insightDetail.js'
+
+// 客体页（写作辅助卡片）的全部文案键。客体不 import 语言包：宿主用 translate 生成
+// 标签表随 writing-config 下发，客体收到后整表替换自带的英文兜底（教程反馈 48）。
+export const WRITING_ASSISTANCE_LABEL_KEYS = ['suggestions', 'manual', 'noMatch', 'acceptKey', 'chooseKey', 'dismissKey', 'title', 'close',
+  'local', 'empty', 'enabled', 'localAuto', 'disable', 'preferenceFailed', 'semantic', 'policy', 'learning', 'hints', 'manage', 'project', 'user', 'remove',
+  'clear', 'confirm', 'loading', 'stale', 'detail', 'insert', 'lookup', 'query', 'otherQueries', 'company', 'law', 'case', 'revise',
+  'revisePlaceholder', 'reviseSubmit', 'noDetail', 'source', 'sourceLine', 'dateLine', 'error', 'login', 'recharge', 'saved', 'replaced',
+  'current', 'refresh', 'contextHint', 'COMPANY', 'PERSON', 'LAW', 'ARTICLE', 'CASE', 'WORD', 'PHRASE']
+export function writingAssistanceLabels(translate) {
+  if (typeof translate !== 'function') return null
+  const labels = {}
+  for (const key of WRITING_ASSISTANCE_LABEL_KEYS) {
+    const id = `editor.writingAssist.${key}`
+    const value = translate(id)
+    // vue-i18n 缺词时回传键名本身：不下发，客体保留兜底。
+    if (typeof value === 'string' && value && value !== id) labels[key] = value
+  }
+  return labels
+}
 
 const preferenceListeners = new Map()
 
@@ -22,7 +42,7 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
     clearReferences()
     const sequence = referenceSequence
     const entity = await load()
-    const detail = completionDetails(entity)
+    const detail = completionDetails(entity, { translate, locale: language })
     if (disposed || !active || sequence !== referenceSequence || !openLegalReference || !translate) return detail
     references = referencesFromEntity(entity)
     if (!references.length) return detail
@@ -31,14 +51,16 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
       items: references.map((reference) => ({
         title: reference.title, kind: translate(`legalReference.kind.${reference.kind}`),
         status: translate(`legalReference.status.${reference.status}`),
-        source: reference.source, sourceLabel: translate('legalReference.source'),
+        source: retrievalSourceLabel(reference.source, translate), sourceLabel: translate('legalReference.source'),
         retrievedAt: reference.retrievedAt, retrievedAtLabel: translate('legalReference.retrievedAt'),
         metadata: reference.metadata.map((row) => ({ label: translate(row.labelKey), value: row.value })),
       })),
     } }
   }
+  const labels = writingAssistanceLabels(translate)
   let seedComplete = false, seedTimer = null
-  let preferences = { enabled: true, learning: true, hints: true }
+  // localAuto：输入时自动显示本地候选（问题 81），默认关
+  let preferences = { enabled: true, localAuto: false, learning: true, hints: true }
   try { const stored = storage.get(key); for (const name of Object.keys(preferences)) if (typeof stored?.[name] === 'boolean') preferences[name] = stored[name] } catch { /* defaults */ }
   const reportState = (error = '') => {
     try { onState?.({ session, available: !disposed && !!writable, ...preferences, error }) } catch { /* UI state is optional. */ }
@@ -85,7 +107,7 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
       return { ...known, ...item, kind, uses: Math.max(item.uses || 0, usesByText.get(item.text) || 0) }
     })
     if (!disposed) {
-      send({ __lo: 'lo-relay', type: 'writing-config', config: { ...preferences, session, writable, language, items: [...enriched, ...items] } })
+      send({ __lo: 'lo-relay', type: 'writing-config', config: { ...preferences, session, writable, language, ...(labels ? { labels } : {}), items: [...enriched, ...items] } })
       reportState()
     }
   }

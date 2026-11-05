@@ -202,6 +202,8 @@ export default {
   deRestoreGenerate: '生成复敏文件',
   deMatchCount: '本次匹配 / 还原 {count} 处',
   deSuspectCount: '另有 {count} 处疑似证件/卡号未通过校验，未处理；确认要遮蔽的请填入上方「补充敏感词」。',
+  deMaskAnyway: '仍然遮蔽',
+  deMaskAnywayLabel: '仍然遮蔽 {value}',
   deKitFileTag: '复敏',
   deKitFallbackName: '脱敏文件',
   deBrowseUnavailable: '无法打开项目文件选择器，请改用「导入当前」，或重新进入工作台后再试。',
@@ -464,6 +466,13 @@ export default {
   cpLoadFailed: '加载剪贴板失败',
   cpCopied: '已复制',
   cpDeleteFailed: '删除失败',
+  cpClearAll: '全部清空',
+  cpClearAllConfirm: '清空全部剪贴板记录？清空后无法恢复',
+  cpClearAllOk: '清空',
+  cpClearAllFailed: '清空失败',
+  cpPauseCapture: '暂停记录',
+  cpCaptureNote: '开启时会记录你在所有软件里复制的内容',
+  cpCapturePausedNote: '已暂停：复制的内容不会被记录',
 
   // variable-library.vue
   vlUnnamedProject: '未命名项目',

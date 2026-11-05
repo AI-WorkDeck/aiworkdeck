@@ -5,7 +5,7 @@
 // 重启 / 切项目回来之后，中栏的标签条（左右两窗格）、各自的激活标签与分屏状态照原样回来，
 // 形同 VS Code 的「恢复上次打开的编辑器」。
 //
-// 零依赖（不 import Vue / uni / '@/' 别名），node --test 直接导入（tests/project-home/tab-snapshot.test.mjs）。
+// 零依赖（不 import Vue / '@/' 别名，只相对引用零依赖的 utils/uniStorage.js），node --test 直接导入（tests/project-home/tab-snapshot.test.mjs）。
 // 方法组里的 this 是 project-overview 页面实例；存储走 this.$tabStorage（测试注入）或全局 uni。
 //
 // 契约：
@@ -25,6 +25,7 @@
 //      恢复完成之前不写（否则恢复窗口里的空标签条会先把快照覆盖掉）。
 
 import { workbenchStorageKey } from './noProjectShell.js'
+import { uniStorage } from '../../utils/uniStorage.js'
 
 export const TAB_SNAPSHOT_VERSION = 1
 export const TAB_SNAPSHOT_SUFFIX = 'tabs'
@@ -295,7 +296,7 @@ export function mergeRestored(restored, current) {
 
 function storageOf(vm) {
   if (vm && vm.$tabStorage) return vm.$tabStorage
-  return typeof uni !== 'undefined' ? uni : null // eslint-disable-line no-undef
+  return uniStorage
 }
 
 // 名字随语言走的单例标签：恢复时按当前语言重取，不用快照里存的旧语言文案

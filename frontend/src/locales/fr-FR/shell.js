@@ -3,6 +3,9 @@
 
 export default {
   "updatePreparing": "Vérification et préparation de la mise à jour…",
+  "updatePreparingMount": "Préparation de la mise à jour : montage du programme d’installation (prend généralement quelques minutes)…",
+  "updatePreparingPackage": "Préparation de la mise à jour : empaquetage des fichiers (prend généralement quelques minutes)…",
+  "updatePreparingVerify": "Préparation de la mise à jour : vérification de la signature (prend généralement quelques minutes)…",
   "updateRestart": "Redémarrer pour mettre à jour",
   "updateRestarting": "Enregistrement et préparation du redémarrage…",
   "updateDownloading": "Téléchargement de la mise à jour",

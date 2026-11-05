@@ -7,8 +7,9 @@
   两态：
     - 未登录（未连接账户）：「登录」按钮。点击 emit('login')，宿主就地
       `await requireAccount({ reason: 'account' })` 弹登录层（dev-board#1046），不离开工作台。
-    - 已登录：头像 .avatar-btn，点击展开头像下拉——账户抬头（余额 + 等级）、宽限 / 试用 / 余额不足提示、
-      「消息中心」「我的日程」「设置」「退出登录」。动作只 emit，路由与落盘由宿主做
+    - 已登录：头像 .avatar-btn，点击展开头像下拉——「消息中心」「账户与用量」、宽限 / 试用提示、
+      「我的日程」「设置」「退出登录」。下拉里不摆余额数字与试用剩余天数（问题 113：录屏、
+      投屏时会把账户余额露给旁人），要看就点「账户与用量」；余额不足只在头像上留一个小点。动作只 emit，路由与落盘由宿主做
       （宿主那三个处理器是 check:nav 盯着的 onAvatarMenuSchedule / onAvatarMenuSettings / onAvatarMenuSignOut）。
 
   设置入口只在这份下拉里（外加应用菜单 ⌘,），rail 上没有齿轮。
@@ -78,18 +79,9 @@
         <text>{{ $t('messageCenter.title') }}</text>
         <text v-if="showMessageBadge" class="menu-message-badge" :class="{ 'is-partial': messagePartial }" :title="messageHint" :aria-label="messageHint">{{ messageBadgeText }}</text>
       </view>
-      <!-- 账户抬头：余额 + 等级。整块可点，去「账户与用量」 -->
-      <view v-if="walletVisible" class="avatar-menu-wallet" @tap.stop="emitAndClose('account')">
-        <view class="avatar-menu-wallet-row">
-          <text class="avatar-menu-balance" :class="{ low: walletLow }">{{ walletText }}</text>
-          <text v-if="walletTier" class="avatar-menu-tier">{{ walletTier }}</text>
-        </view>
-        <text class="avatar-menu-wallet-label">{{ $t('workbench.walletMenuLabel') }}</text>
-      </view>
-      <!-- 试用余额（试用计量 v0.1.1）：剩余天数与次数，权威在账户站 -->
-      <view v-if="trialText" class="avatar-menu-trial">
-        <text class="avatar-menu-trial-text">{{ trialText }}</text>
-        <text class="avatar-menu-wallet-label">{{ $t('account.trialTerms') }}</text>
+      <!-- 「账户与用量」入口：只给入口，不摆余额数字、等级与试用剩余天数（问题 113） -->
+      <view v-if="walletVisible" class="avatar-menu-item avatar-menu-account" @tap.stop="emitAndClose('account')">
+        <text>{{ $t('workbench.walletMenuLabel') }}</text>
       </view>
       <!-- 宽限 / 试用提示（原顶栏 chip）：「需联网验证 · 剩 N 天」一类，点开说明弹窗 -->
       <view v-if="noticeText" class="avatar-menu-notice" @tap.stop="emitAndClose('grace-info')">
@@ -123,10 +115,7 @@ export default {
     displayName: { type: String, default: '' },
     avatarUrl: { type: String, default: '' },
     walletVisible: { type: Boolean, default: false },
-    walletText: { type: String, default: '' },
     walletLow: { type: Boolean, default: false },
-    walletTier: { type: String, default: '' },
-    trialText: { type: String, default: '' },
     /** 宽限 / 试用提示文案（「需联网验证 · 剩 N 天」「试用版」）；空串不显示 */
     noticeText: { type: String, default: '' },
     /** 宿主的客户视角（isClientView）：客户看不到事项，下拉里不出「我的日程」 */
@@ -406,63 +395,6 @@ export default {
   font-size: 13px;
   font-weight: 600;
   color: var(--awd-text);
-}
-
-.avatar-menu-wallet {
-  padding: 8px 10px 9px;
-  border-bottom: 1px solid var(--awd-border-subtle);
-  margin-bottom: 4px;
-  border-radius: 6px 6px 0 0;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--awd-surface-2);
-  }
-}
-
-.avatar-menu-wallet-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.avatar-menu-balance {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--awd-text);
-  font-variant-numeric: tabular-nums;
-
-  &.low {
-    color: var(--awd-warning-text);
-  }
-}
-
-.avatar-menu-tier {
-  font-size: 10px;
-  font-weight: 500;
-  line-height: 14px;
-  color: var(--awd-text-on-accent);
-  background: var(--awd-accent);
-  border-radius: 3px;
-  padding: 0 5px;
-}
-
-.avatar-menu-trial {
-  margin: 0 0 4px;
-  padding: 6px 10px;
-}
-
-.avatar-menu-trial-text {
-  display: block;
-  font-size: 12px;
-  color: var(--awd-text-2);
-}
-
-.avatar-menu-wallet-label {
-  display: block;
-  margin-top: 2px;
-  font-size: 11px;
-  color: var(--awd-text-3);
 }
 
 .avatar-menu-notice {

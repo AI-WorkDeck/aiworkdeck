@@ -75,6 +75,18 @@ class MeetingRecordingFileAccessTest {
         mvc.perform(get("/api/meetings/projects/10").header("X-Session-Id", "s"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.meetings[0].id").value(20));
     }
+    @Test void interviewFormatUsesInterviewPrompt() throws Exception {
+        audio.setUserId(7L);
+        when(meetings.buildInterviewKickoffPrompt(meeting)).thenReturn("访谈笔录生成任务。");
+        when(meetings.buildMinutesKickoffPrompt(meeting)).thenReturn("会议纪要生成任务。");
+        try (var auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            mvc.perform(post("/api/meetings/20/minutes-prompt").param("format", "interview").header("X-Session-Id", "s"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.prompt").value("访谈笔录生成任务。"));
+            mvc.perform(post("/api/meetings/20/minutes-prompt").header("X-Session-Id", "s"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.prompt").value("会议纪要生成任务。"));
+        }
+    }
     @Test void legacyRecordWithoutSourceIsOnlyReadableInternally() throws Exception {
         meeting.setAudioFileId(null);
         try (var auth = mockStatic(AuthController.class)) {
@@ -112,5 +124,27 @@ class MeetingRecordingFileAccessTest {
         mvc.perform(patch("/api/meetings/20").header("X-Session-Id", "s")
                 .contentType("application/json").content("{\"title\":\"changed\"}")).andExpect(status().isForbidden());
         mvc.perform(delete("/api/meetings/20").header("X-Session-Id", "s")).andExpect(status().isForbidden());
+    }
+    @Test void registerFileReportsPendingNoticeInsteadOfMisleadingNotConfigured() throws Exception {
+        // dev-board#1713 #117/#118：告知没确认时右键转写不提交，要告诉前端是「欠告知」而不是「没配置」
+        role("USER"); when(members.hasWritePermission(10L, 7L)).thenReturn(true);
+        meeting.setStatus(MeetingRecording.STATUS_RECORDED);
+        when(meetings.registerExisting(10L, 1L, 7L)).thenReturn(meeting);
+        when(transcription.isConfigured()).thenReturn(true);
+        when(transcription.recordingNoticePending()).thenReturn(true);
+        try (var auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            mvc.perform(post("/api/meetings/projects/10/register-file").header("X-Session-Id", "s")
+                    .contentType("application/json").content("{\"fileId\":1}"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.submitted").value(false))
+                    .andExpect(jsonPath("$.configured").value(true)).andExpect(jsonPath("$.noticePending").value(true));
+            verify(transcription, never()).startTranscription(any());
+            when(transcription.recordingNoticePending()).thenReturn(false);
+            when(transcription.startTranscription(20L)).thenReturn(meeting);
+            mvc.perform(post("/api/meetings/projects/10/register-file").header("X-Session-Id", "s")
+                    .contentType("application/json").content("{\"fileId\":1}"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.submitted").value(true))
+                    .andExpect(jsonPath("$.noticePending").value(false));
+        }
     }
 }

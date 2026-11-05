@@ -202,6 +202,8 @@ export default {
   deRestoreGenerate: 'Generate restored file',
   deMatchCount: 'Matched / restored {count} occurrences',
   deSuspectCount: '{count} more ID/card-like numbers failed their check digit and were left untouched. Add the ones you want redacted to "Additional Sensitive Terms" above.',
+  deMaskAnyway: 'Redact anyway',
+  deMaskAnywayLabel: 'Redact {value} anyway',
   deKitFileTag: 'recovery',
   deKitFallbackName: 'redacted-file',
   deBrowseUnavailable: 'The project file picker could not be opened. Use "Import Current" instead, or reopen the workbench and try again.',
@@ -462,6 +464,13 @@ export default {
   cpLoadFailed: 'Failed to load clipboard',
   cpCopied: 'Copied',
   cpDeleteFailed: 'Delete failed',
+  cpClearAll: 'Clear All',
+  cpClearAllConfirm: 'Clear all clipboard history? This cannot be undone.',
+  cpClearAllOk: 'Clear',
+  cpClearAllFailed: 'Failed to clear',
+  cpPauseCapture: 'Pause Recording',
+  cpCaptureNote: 'While on, anything you copy in any app is recorded',
+  cpCapturePausedNote: 'Paused: copied content is not recorded',
 
   // variable-library.vue
   vlUnnamedProject: 'Untitled Project',

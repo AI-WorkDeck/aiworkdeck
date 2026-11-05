@@ -30,6 +30,11 @@
         </div>
       </section>
       <section class="account-section">
+        <label class="toggle" for="auto-sync"><input id="auto-sync" type="checkbox"><span data-i18n="autoSync">会议结束后自动同步到本项目</span></label>
+        <p class="hint" data-i18n="autoSyncHint"></p>
+        <p id="auto-status" class="hint" role="status" hidden></p>
+      </section>
+      <section class="account-section">
         <details id="settings"><summary data-i18n="settings">同步范围与排除词</summary>
           <label for="lookback" data-i18n="lookback">最近多少天</label><input id="lookback" type="number" min="1" max="90" value="30">
           <label for="exclude" data-i18n="exclude">排除会议标题包含的词（每行一个）</label><textarea id="exclude" rows="3" maxlength="4000"></textarea>

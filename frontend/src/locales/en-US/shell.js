@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   updatePreparing: 'Verifying and preparing update…',
+  updatePreparingMount: "Preparing update: mounting installer (usually takes a few minutes)…",
+  updatePreparingPackage: "Preparing update: packaging files (usually takes a few minutes)…",
+  updatePreparingVerify: "Preparing update: verifying signature (usually takes a few minutes)…",
   updateRestart: 'Restart to update',
   updateRestarting: 'Saving and preparing to restart…',
   updateDownloading: 'Downloading update',

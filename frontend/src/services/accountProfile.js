@@ -10,7 +10,7 @@
 import { getLocalIdentityStatus, getAccountStatus, getAccountProfile } from '@/services/api.js'
 import {
   PROFILE_SOURCE, resolveProfileSource,
-  NAME_NUDGE_STORAGE_KEY, withNudgeDismissed,
+  NAME_NUDGE_STORAGE_KEY, withNudgeShown, normalizeNudgeRecords,
 } from '@/utils/identityProfile.js'
 
 export { PROFILE_SOURCE }
@@ -62,20 +62,19 @@ export async function loadIdentityProfile() {
   }
 }
 
-/** 已经打发过「填写你的姓名」弹窗的 accountId 列表。读不到就当空。 */
-export function readNudgeDismissed() {
+/** 「填写你的姓名」弹窗的提醒记录（按 accountId）。读不到就当空。 */
+export function readNudgeRecords() {
   try {
-    const raw = uni.getStorageSync(NAME_NUDGE_STORAGE_KEY)
-    return Array.isArray(raw) ? raw : []
+    return normalizeNudgeRecords(uni.getStorageSync(NAME_NUDGE_STORAGE_KEY))
   } catch (e) {
-    return []
+    return {}
   }
 }
 
-/** 记下这个账户已打发过。写不进去不报错——最坏是下次再弹一次，不该为此打断用户。 */
-export function markNudgeDismissed(accountId) {
+/** 记下这个账户刚弹过一次；done=true 是点了「去填写」。写不进去不报错——最坏是多弹一次。 */
+export function markNudgeShown(accountId, done = false) {
   try {
-    uni.setStorageSync(NAME_NUDGE_STORAGE_KEY, withNudgeDismissed(readNudgeDismissed(), accountId))
+    uni.setStorageSync(NAME_NUDGE_STORAGE_KEY, withNudgeShown(readNudgeRecords(), accountId, Date.now(), done))
   } catch (e) {
     /* 存不下就算了 */
   }

@@ -173,4 +173,28 @@ class SensitiveRecoveryTest {
         var restored = service.restoreFile(result.path(), result.recoveryKit(), password);
         assertTrue(String.join("", new com.checkba.service.sensitive.SensitiveDocx(Path.of(restored.path())).texts()).contains("电话13800001111"));
     }
+
+    @Test
+    void outputNamesReuseTheEngineAndRestoreWithTheSameMapping() throws Exception {
+        // dev-board#1713 #98：副本名 = 原文件名经同一引擎处理 +「（已脱敏）」，复敏同理还原
+        Path source = dir.resolve("disk-123.txt");
+        Files.writeString(source, "甲方：北京星河科技有限公司。联系人：张三。");
+        var result = service.processFile(source.toString(), options(), "北京星河科技有限公司-张三 起诉状.txt");
+        assertTrue(result.name().endsWith("（已脱敏）.txt"), result.name());
+        assertTrue(result.name().contains(" 起诉状"), result.name());
+        assertFalse(result.name().contains("星河"), result.name());
+        assertFalse(result.name().contains("张三"), result.name());
+        // 统计只算正文，不把文件名里的命中算进去
+        var bare = service.processFile(source.toString(), options(), "plain.txt");
+        assertEquals(bare.counts(), result.counts());
+        // 登记时加的重名序号在复敏时一并去掉
+        String copyName = result.name().replace("（已脱敏）.txt", "（已脱敏） (2).txt");
+        var restored = service.restoreFile(result.path(), result.recoveryKit(), password, copyName);
+        assertEquals("北京星河科技有限公司-张三 起诉状（已复敏）.txt", restored.name());
+        // 没有显示名时退回磁盘文件名；MASK 模式的星号换成全角，避开文件名非法字符
+        var masked = service.processFile(source.toString(), new SensitiveService.Options(
+                List.of(), "MASK", List.of("张三"), List.of(), null), "张三/合同.txt");
+        assertEquals("＊＊_合同（已脱敏）.txt", masked.name());
+        assertEquals("disk-123（已脱敏）.txt", service.processFile(source.toString(), options()).name());
+    }
 }

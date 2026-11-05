@@ -4,6 +4,7 @@
   <div class="recording-actions" :aria-busy="!!busy" @keydown.stop>
     <div class="recording-actions-buttons">
       <button type="button" :disabled="!!busy" @click="run('minutes')">{{ $t('meeting.generateMinutes') }}</button>
+      <button type="button" :disabled="!!busy" @click="run('interview')">{{ $t('meeting.generateInterview') }}</button>
       <button type="button" :disabled="!!busy" @click="run('todos')">{{ $t('meeting.fileTodos') }}</button>
       <button type="button" :disabled="!!busy" @click="run('export')">{{ $t('meeting.fileExportWord') }}</button>
     </div>
@@ -32,7 +33,8 @@ export default {
           this.$emit('files-changed', res.file)
           this.message = this.$t('meeting.exported', { name: res.file.name, folder: res.folderName })
         } else {
-          const res = await (action === 'todos' ? getMeetingTodosPrompt : getMeetingMinutesPrompt)(meetingId)
+          const res = action === 'todos' ? await getMeetingTodosPrompt(meetingId)
+            : await getMeetingMinutesPrompt(meetingId, action === 'interview' ? 'interview' : undefined)
           // A late result must not dispatch work for a different recording.
           if (this._disposed || this.meeting.id !== meetingId) return
           this.message = ''

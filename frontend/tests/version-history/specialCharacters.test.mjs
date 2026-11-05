@@ -39,14 +39,21 @@ function harness(stored = '', { failStorage = false, failEngine = false } = {}) 
   return { make, calls, notices, emitted, saved: () => saved }
 }
 
-test('旧开关迁移保留，损坏存储使用默认值', () => {
-  for (const stored of ['', '{broken', JSON.stringify({ formattingMarks: false, ruler: false }), { formattingMarks: false, ruler: false }]) {
+test('旧开关迁移保留，损坏存储使用默认值（默认隐藏格式标记、显示标尺）', () => {
+  for (const stored of ['', '{broken', JSON.stringify({ formattingMarks: true, ruler: false }), { formattingMarks: true, ruler: false }]) {
     const h = harness(stored), host = h.make()
     const old = typeof stored === 'object' || String(stored).includes('formattingMarks')
-    assert.equal(host.viewPrefs.formattingMarks, !old)
+    assert.equal(host.viewPrefs.formattingMarks, old)
+    assert.equal(host.formattingMarks, old)
     assert.equal(host.viewPrefs.ruler, !old)
     for (const key of keys) assert.equal(host.viewPrefs[key], true)
   }
+})
+test('默认隐藏时单独勾选一类，只打开这一类', async () => {
+  const h = harness(), a = h.make()
+  assert.equal(a.markVisible('paragraphMarks'), false)
+  await a.setMark('paragraphMarks', true)
+  assert.deepEqual(a.viewPrefs, { ruler: true, formattingMarks: true, paragraphMarks: true, lineBreaks: false, spaces: false, tabs: false })
 })
 test('全部隐藏后只勾选换行；其它活动文档与重建实例均同步，重载不标脏', async () => {
   const h = harness(), a = h.make(), b = h.make()

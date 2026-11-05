@@ -78,7 +78,8 @@ const SOURCE_LABELS = {
 
 function hfRepoSpec(ctx, service, repo, source) {
   const dir = path.join(ctx.dataDir, 'models', service.replace(/-service$/, ''))
-  const base = { ...process.env, PYTHONPATH: libDirFor(ctx, service), HF_HOME: dir }
+  // 包内 Python 不写 .pyc：往已签名 .app 里落 __pycache__ 会破坏签名封印（问题 91）
+  const base = { ...process.env, PYTHONDONTWRITEBYTECODE: '1', PYTHONPATH: libDirFor(ctx, service), HF_HOME: dir }
   if (source === 'modelscope') {
     return {
       cmd: pyBin(ctx.resourcesPath),
@@ -157,6 +158,7 @@ const COMPONENTS = [
         ],
         env: {
           ...process.env,
+          PYTHONDONTWRITEBYTECODE: '1',
           PYTHONPATH: libDirFor(ctx, 'mineru-service'),
           MINERU_MODEL_SOURCE: 'modelscope',
           MODELSCOPE_CACHE: dir,
@@ -204,6 +206,7 @@ class ModelManager {
   constructor(opts) {
     this.ctx = {
       dataDir: opts.dataDir,
+      awdHome: opts.awdHome || null,
       resourcesPath: opts.resourcesPath,
       projectRoot: opts.projectRoot || null,
       packaged: !!opts.packaged
@@ -329,7 +332,7 @@ class ModelManager {
       let child
       try {
         const spec = this.spawnSpecOverride ? this.spawnSpecOverride(c, this.ctx, sources[idx]) : c.spawnSpec(this.ctx, sources[idx])
-        child = spawn(spec.cmd, spec.args, { cwd: spec.cwd, env: spec.env, stdio: ['ignore', 'pipe', 'pipe'] })
+        child = spawn(spec.cmd, spec.args, { cwd: spec.cwd, env: require('../awd-home').childEnv(spec.env, this.ctx.awdHome), stdio: ['ignore', 'pipe', 'pipe'] })
       } catch (e) { settleFailure(idx, String(e.message || e)); return }
       job.child = child
       let error = ''

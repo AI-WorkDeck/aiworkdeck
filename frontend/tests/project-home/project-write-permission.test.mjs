@@ -123,7 +123,7 @@ for (const identityFirst of [true,false]) test(`initial onLoad/onShow restores m
  const loadIdentity=method('loadRealUserInfo',{getCurrentUserApi:()=>identity.promise})
  vm.loadRealUserInfo=()=>vm.identityPending=loadIdentity.call(vm)
  vm.loadProjectInfo=method('loadProjectInfo',{getProject:()=>project.promise,recordProjectVisit(){},syncRecentToMenuFetching(){},loadProjectTasks:async()=>[]}).bind(vm)
- const deps={uni:{$on(){},getStorageSync(){}},loadSiteLinks(){},loadShowWelcomeOnStartup:()=>false,getCurrentUser:()=>null,
+ const deps={uni:{$on(){},getStorageSync(){}},uniStorage:{},loadSiteLinks(){},loadShowWelcomeOnStartup:()=>false,getCurrentUser:()=>null,
    loadSidebarCollapsed:()=>false,workbenchStorageKey:()=>'',isPaneAllowedWithoutProject:()=>true,NO_PROJECT_DEFAULT_PANE:'projects',
    activityTracker:{getRecordingState:()=>false}}
  lifecycle('onLoad','onShow',deps).call(vm,{id:'12'})

@@ -922,7 +922,7 @@ try {
     // Site status arrives asynchronously after the dialog shell mounts.
     if (siteInfo && siteInfo.multiSite) {
       await pg.waitForFunction(() => document.querySelectorAll(
-        '.awd-login-mask .unlock-site-seg .unlock-site-seg-item').length === 2,
+        '.awd-login-mask .unlock-card-foot .unlock-site-select option').length === 2,
       { timeout: 15000 })
     }
     const st = await pg.evaluate(() => {
@@ -930,7 +930,7 @@ try {
       const q = (s) => mask && mask.querySelector(s)
       return {
         reason: ((q('.awd-login-reason') || {}).textContent || '').trim(),
-        segs: mask ? [...mask.querySelectorAll('.unlock-site-seg .unlock-site-seg-item')].map((e) => e.textContent.trim()) : [],
+        segs: mask ? [...mask.querySelectorAll('.unlock-card-foot .unlock-site-select option')].map((e) => e.textContent.trim()) : [],
         cancel: ((q('.awd-login-cancel') || {}).textContent || '').trim(),
         consent: mask ? mask.querySelectorAll('.consent-mark').length : 0,
         text: mask ? mask.innerText : '',

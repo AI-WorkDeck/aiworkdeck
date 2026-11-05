@@ -243,6 +243,7 @@ test('late onCollabChanged and loadProjectInfo continuations cannot restart poll
       collabRefreshToken: 0, get collabLinked() { return !!this.collabCloud?.linked },
       checkAdoptConflict() {}, loadProjectMembers() { members++ },
       ensureStagingFolder: async () => {}, loadStagingFiles() {}, isActiveOverviewInstance: () => true,
+      startActivityTracking() {},
     }
     owner.stopCollabPolling = parentMethod('stopCollabPolling', { clearInterval() {} }).bind(owner)
     owner.startCollabPolling = parentMethod('startCollabPolling', { setInterval() { timers++; return 1 } }).bind(owner)
@@ -307,7 +308,7 @@ test('hiding an overview does not permanently dispose collaboration; active retu
   }
   parentMethod('startCollabPolling', { setInterval(callback) { tick = callback; return 1 } }).call(owner)
   const start = parent.indexOf('  onHide() {'), end = parent.indexOf('\n  onUnload()', start)
-  const hook = new Function(`return ({${parent.slice(start, end)}}).onHide`)()
+  const hook = new Function('activityTracker', `return ({${parent.slice(start, end)}}).onHide`)({ flushActiveSession() {} })
   hook.call(owner)
   active = false; tick(); assert.equal(checks, 0)
   active = true; tick(); assert.equal(checks, 1)
@@ -320,7 +321,7 @@ test('account change during initial local project load does not cancel local ini
     const owner = { projectId: 5, projectInfoLoaded: false, hasNamedProject: true, collabCloud: null,
       get collabLinked() { return !!this.collabCloud?.linked },
       checkAdoptConflict() {}, loadProjectMembers() { members++ },
-      ensureStagingFolder: async () => {}, loadStagingFiles() {},
+      ensureStagingFolder: async () => {}, loadStagingFiles() {}, startActivityTracking() {},
     }
     owner.stopCollabPolling = parentMethod('stopCollabPolling', { clearInterval() {} }).bind(owner)
     owner.startCollabPolling = parentMethod('startCollabPolling', { setInterval() { timers++; return 1 } }).bind(owner)

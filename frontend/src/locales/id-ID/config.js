@@ -37,7 +37,7 @@ export default {
   "ocr": {
     "refresh": "Muat Ulang Tampilan",
     "recognize": "Kenali Teks",
-    "download": "Unduh",
+    "download": "Simpan ke Proyek",
     "copy": "Salin",
     "insertDoc": "Sisipkan ke Dokumen",
     "webLink": "Tautkan ke Verifikasi Web",

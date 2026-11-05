@@ -156,7 +156,7 @@ export const librePoolMethods = {
         if (file && this.useLibreEditor(file)) {
             if (pane === 'left') this.maybeAdoptLibreSpare(file)
             // 右窗格不能过继左侧备胎；首份文档直接右开时也不能多留一套空白引擎。
-            if (useConservativeLibrePool()) this.libreSpares = this.libreSpares.filter(sp => sp.file || sp.hidden)
+            if (useConservativeLibrePool()) this.libreSpares = this.libreSpares.filter(sp => sp.file || sp.hidden || sp.borrowed)
             this.touchLibreLru(pane, file.id, file.fileSize)
         }
         this.syncLibreExecutor()
@@ -229,7 +229,7 @@ export const librePoolMethods = {
         if (this.libreLruKeys.includes('left:' + file.id)) return // 常规池里已有活实例
         // hidden = 三方合并借走的隐藏实例（acquireLibreHiddenInstance），它正端着
         // 别人的文档字节，绝不能被过继成律师正在打开的那一份。
-        const spare = this.libreSpares.find(sp => !sp.file && !sp.hidden)
+        const spare = this.libreSpares.find(sp => !sp.file && !sp.hidden && !sp.borrowed)
         if (!spare) return
         spare.file = file
         console.log('[ProjectOverview] LibreOffice spare adopted → left:' + id)
@@ -262,8 +262,23 @@ export const librePoolMethods = {
     //      别人的文档，被过继成律师正在打开的那份就是数据事故；
     //   2. 用完必须 release（条目删掉、组件卸载），否则每撞一次车就多一个常驻引擎。
     // 非桌面端没有引擎，直接回 null，调用方据此把那份文件退回整份三选一。
-    async acquireLibreHiddenInstance({ timeoutMs = 180000 } = {}) {
+    //   3. 已经 ready 的空闲预热备胎直接借用（教程问题 88，dev-board#1713）：冷启动实测 90 秒级，
+    //      两页小文件的比对因此卡在「正在启动」。借用只打 borrowed 标记、不翻 hidden——
+    //      可见/隐藏两桶是不同的 v-for 与 key，翻 hidden 会卸掉这台热引擎再冷启一台新的。
+    //      borrowed 同样不许过继、不许被低内存策略清掉；用完即弃，归还后重新排一次备胎预热。
+    // isCancelled：调用方会话作废（取消比对）时立即放弃仍在冷启动的实例，不让它在后台
+    // 跑满启动预算，也不让下一次比对再叠一套引擎抢 CPU。
+    async acquireLibreHiddenInstance({ timeoutMs = 180000, isCancelled = null } = {}) {
         if (!isDesktopHost()) return null
+        const warm = this.libreSpares.find(x => x && !x.file && !x.hidden && !x.borrowed && x.executor)
+        if (warm) {
+            warm.borrowed = true
+            const raw = warm.__v_raw || warm // 句柄持有原始对象，executor 不经响应式代理
+            return {
+                run: (action, payload, callOpts) => raw.executor.executeCommand(action, payload, callOpts),
+                _spare: raw,
+            }
+        }
         this._libreSpareSeq = (this._libreSpareSeq || 0) + 1
         const sp = { key: this._libreSpareSeq, file: null, hidden: true, executor: null }
         this.libreSpares.push(sp)
@@ -277,6 +292,10 @@ export const librePoolMethods = {
         // 引擎冷启动实测 90 秒级（WASM 编译 + 排版），180 秒是留了余量的上限；
         // 轮询而不是等事件，是因为 onLibreSpareReady 是模板上的回调，拿不到 Promise。
         while (!sp.executor) {
+            if (typeof isCancelled === 'function' && isCancelled()) {
+                this.releaseLibreHiddenInstance(sp)
+                return null
+            }
             if (Date.now() > deadline) {
                 this.releaseLibreHiddenInstance(sp)
                 console.warn('[ProjectOverview] LibreOffice hidden instance 启动超时')
@@ -296,7 +315,10 @@ export const librePoolMethods = {
         // #1122: array entries are Vue proxies; acquired handles retain the raw object.
         const key = sp && sp.key
         if (!Number.isSafeInteger(key) || key < 1) return
+        const reused = this.libreSpares.some((x) => x.key === key && x.borrowed)
         this.libreSpares = this.libreSpares.filter((x) => x.key !== key)
+        // 借走的是预热备胎：还掉后补一个，下一次打开文档/比对仍有热引擎可用
+        if (reused && typeof this.scheduleLibreSpare === 'function') this.scheduleLibreSpare()
     },
 
     // 过继实例渲染自 libreSpares，出池必须同步删条目组件才会卸载。

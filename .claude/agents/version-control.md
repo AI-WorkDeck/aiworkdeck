@@ -113,7 +113,7 @@ AI 版本入口（dev-board#1498）复用本领域控制器与服务，工具/�
   - `safeRepoPath()`/`repoRelativePath()`：所有外部传入路径（`file-bytes`/`file-text` 的 `path` 查询参数、`timeline?fileId` 解出的 `ProjectFile.filePath`、采纳裁决的冲突路径）唯一的合法性校验入口——拒绝 `..`/绝对路径/`.awd/` 前缀；`repoRelativePath` 额外校验 `filePath` 前缀真的属于本项目（`projects/{id}/`），归属不符直接抛技术档异常。新增任何吃路径的接口都要过这一关，不要自己重新拼校验逻辑。
 - `VersionController.java` —— REST 层，`/api/projects/{projectId}/version/*`。权限统一走 `requireMember()`，CLIENT 与非成员一律拒绝；改写仓库状态的端点（enable/结束·丢弃·恢复工作/退回/里程碑/稿全系列/结束撞车裁决/prepare-remote）再追加 `requireWriteMember()`（:559，`hasWritePermission`，拒 READ_ONLY——v2 终审 I4，护栏 `VersionControllerAuthTest` 的 READ_ONLY 参数化矩阵；`CloudController` 项目级写端点同口径）。异常处理器 `onVersionError`（:138）按 `VersionException.isUserFacing()` 决定是否回显 message，HTTP 恒 200，用 `code` 区分成败。第 2 期四个端点：`GET /versions/{ref}/file-bytes?path=`（原始字节，给桌面 docx 对比用）、`GET /versions/{ref}/file-text?path=`（Tika 抽取纯文本，给 `DocDiffViewer` 文本对比降级用）、`POST /versions/{sha}/milestone`（标重要版本，`{name}` 限 64 字）、`GET /timeline?fileId=`（单文件历史）。第 3 期新增七个端点：`POST /draft`（另起一稿，`{ref, name}`）、`GET /drafts`（列出本项目全部 ACTIVE 稿）、`POST /draft/{id}/switch`（切到这一稿）、`POST /switch-mainline`（回到主线工作）、`POST /draft/{id}/adopt`（采纳）、`POST /draft/{id}/resolve`（冲突裁决，`{resolutions: {path: MAIN|DRAFT|BOTH}}`）、`POST /draft/{id}/abort-adopt`（中止采纳）、`POST /draft/{id}/abandon`（放弃）。`/status`（:44）新增 `onDraft`（当前是否站在某一稿上，`{id, name}` 或 null）与 `adoptConflict`（`adoptConflictStatus()`，:93，见下方核心契约）两个字段。**v2 新增**：`POST /prepare-remote`（:202，云端准备接收，见下方「prepare-remote 空仓语义」）、`POST /session/resolve-end`/`POST /session/abort-end`（结束工作撞车的三选一裁决/中止，`WorkSessionService.resolveSessionEnd`/`abortSessionEnd`）；`/status` 再加 `sessionEndConflict`/`cloudConflict` 两个字段，与 `adoptConflict` 三者互斥（见下方「三语境冲突判定链」）。**dev-board#438 新增**：`POST /disable`（关闭版本记录并删除历史，权限是 `requireAdminMember` = 写权限之上再要求项目负责人/管理员 `checkAdminPermission`——这是本控制器最严的一档，只有它用得到）；`/status` 加 `repoSizeBytes`（未开启时恒 0）；`/enable` 现在会先 `lifecycleService.clearOptOut(projectId)`。**`GET /drafts/{draftId}/timeline?limit=`**（:457）：单独一稿自己的历史（沿这一稿的分支 walk，不是主线 HEAD），响应体结构与 `/timeline` 完全一致（含 parents，供前端画分叉/双亲关系）；draftId 不存在或已不是 ACTIVE（已采纳/已放弃）走软降级——不抛异常不用 404，直接给空列表，前端（`VersionTimeline.vue` 的 `getDraftTimeline`）不需要为「稿突然消失」单独写错误处理。
 - `ProjectTreeManifestService.java` —— 数据库文件树 ↔ `.awd/tree.json` 双向同步。`capture()`（:57）连软删除节点一起收集，v2 起同时回填 `uid`（存量行缺失就地生成 UUID）；`applyToDatabase()`（:124，同步语义）差异同步（不删表重建）；第 3 期新增 `unionApply()`（:144，采纳专用，见下方「清单并集 vs 同步」）；v2 新增 `normalizeV2()`（:279，见下方「清单 v2 归一化策略」）；`topoSort()` 保证父节点先于子节点处理。
-- `VersionLifecycleService.java` —— **默认开启与关闭的唯一裁决点（dev-board#438）**。两个自动触发点都是 `@TransactionalEventListener(fallbackExecution = true)`：`ProjectService.ProjectCreatedEvent`（新建项目之后）与 `WorkSessionService.AutoEnableRequest`（存量项目的第一个变更信号）。`request()` 在**发布线程上**只做两次内存集合判断（`refusedTooLarge` / `inFlight`）后把真活儿丢给 `taskExecutor`——一次文件夹对账会连发几千个信号，而 `taskExecutor` 是有界队列 200 + AbortPolicy，每个信号都提交一个任务会把它打爆。`autoEnableNow()` 三道闸：总开关 `version.auto-enable`（默认 true）、`Project.versionOptOut`、体积护栏 `withinGuardrail`；**整段（连「有没有初始化过」这个判断一起）跑在 `sessionService.runLocked(projectId, …)` 里**——与团队服务器侧的 `prepare-remote` 共用同一把可重入 `repoLock`，见下方「自动开启与 prepare-remote 同锁」契约与地雷 #48。另有 `disableVersionRecording()`（远端绑定检查 → 落 opt-out → 委托 `WorkSessionService` 真删 → 失败回滚 opt-out）与 `clearOptOut()`（手动 `/enable` 调）。`estimate()` 是静态早停遍历（`Files.walkFileTree` + `TERMINATE`，跳过 `.awd/`），包内可见供直接测。
+- `VersionLifecycleService.java` —— **默认开启与关闭的唯一裁决点（dev-board#438）**。两个自动触发点都是 `@TransactionalEventListener(fallbackExecution = true)`：`ProjectService.ProjectCreatedEvent`（新建项目之后）与 `WorkSessionService.AutoEnableRequest`（存量项目的第一个变更信号）。`request()` 在**发布线程上**只做两次内存集合判断（`refusedTooLarge` / `inFlight`）后把真活儿丢给 `taskExecutor`——一次文件夹对账会连发几千个信号，而 `taskExecutor` 是有界队列 200 + AbortPolicy，每个信号都提交一个任务会把它打爆。`autoEnableNow()` 三道闸：总开关 `version.auto-enable`（默认 true）、`Project.versionOptOut`、体积护栏 `withinGuardrail`；**整段（连「有没有初始化过」这个判断一起）跑在 `sessionService.runLocked(projectId, …)` 里**——与团队服务器侧的 `prepare-remote` 共用同一把可重入 `repoLock`，见下方「自动开启与 prepare-remote 同锁」契约与地雷 #48。另有 `disableVersionRecording()`（远端绑定检查 → 落 opt-out → 委托 `WorkSessionService` 真删 → 失败回滚 opt-out）与 `clearOptOut()`（手动 `/enable` 调）。`estimate()` 是静态早停遍历（`Files.walkFileTree` + `TERMINATE`，跳过 `.awd/`），包内可见供直接测。**第三个触发点（教程问题 16，dev-board#1713）**：`LocalProjectService.openLocalFolder` 导入完成、释放导入锁之后**同步**调 `autoEnableAfterLocalImport(projectId, userId)`（同受总开关 / `refusedTooLarge` / opt-out / 护栏管，内部走 `autoEnableNow` 的仓库锁），返回给前端时「初始版本」= 导入后的全量，首次退出不再把全部文件列为待提交；超过护栏不开，版本面板沿用 `version.notEnabledDesc`。`LocalProjectService` 经字段 `ObjectProvider` 惰性取用，不改构造器。回归 `LocalFolderImportBaselineTest`。
 - `RepoMaintenanceJob.java` —— 每日 03:30 对所有已开启版本记录的项目跑 `gc()`，只做 GC，不做任何历史清理（spec 5.5）。**dev-board#443 起 GC 之前先 `WorkSessionService.reclaimMergedWorkBranches`（回收存量已合并的工作分支，删的是引用不是历史）**：三条判据同时成立才删——`work/` 前缀（`draft/` 与 master 绝不碰）、tip 已是 master 祖先、库里按分支名反查的工作段状态为 MERGED（查不到一律不删；只认 MERGED 不认 DISCARDED，因为丢弃/放弃/空段收尾三条路都是当场删分支，DISCARDED 不会残留）。整段在 `repoLock` 内，裁决窗口整个跳过，单条失败只 WARN 不阻断 GC。护栏 `RepoMaintenanceTest.dailyMaintenanceReclaimsOnlyMergedWorkBranches`（A 删 / B ACTIVE 不删 / C 无行不删 / D draft 不删，三条判据逐条去掉各自转红）。
 - 数据模型：`Project.versionOptOut`（可空布尔，`ddl-auto=update` 自动加列；为空 = 从没关过。两个自动触发点都要认它，手动 `/enable` 清掉它）、`WorkSession.java`（JPA 实体：`Status{ACTIVE,MERGED,DISCARDED}` + 第 3 期新增 `SessionType{WORK,DRAFT}`，状态机见下）、`WorkSessionRepository.java`、`VersionEntry.java`（时间线一条记录）、`FileChange.java`（ADD/MODIFY/DELETE/RENAME）、`MergeOutcome.java`、`TreeManifest.java`（`.awd/tree.json` 的 Java 表示，v2 起带 `version`/`CURRENT_VERSION=2`）、`VersionException.java`（`userFacing` 双档异常）。
 
@@ -166,6 +166,21 @@ AI 版本入口（dev-board#1498）复用本领域控制器与服务，工具/�
   **取库规则本体已抽到 `frontend/src/utils/cloudShare.js`**（`pickShareConnectionId` / `shareProjectToLibrary`，
   share 函数由调用方注入以便 node --test），`CollabDialog.onShare` 与 `InviteMemberDialog` 的「放进团队案件库」
   按钮共用，别再各写一份。
+  **多于一条连接被拒时不再是死胡同**（问题 126 真机复测，dev-board#1713）：两个弹窗就地渲染
+  `frontend/src/components/collab/LibraryConnectionList.vue`，逐条列出服务器（主机名）、是否官方
+  （与 `GET /api/cloud/official` 的 `serverUrl` 相等）、我的身份、`connectedAt`（`CloudController.connectionListItem`
+  新带的 `createdAt`；没有「最近使用」字段），每条一个「断开」：`uni.showModal` 确认后调现有的
+  `disconnectCloudConnection`（行逻辑与「没确认一次都不调」在 `cloudShare.describeLibraryConnections` /
+  `disconnectLibraryConnection`）。断开 = 撤远端令牌 + 删本地连接与它的全部 `ProjectRemote`：本机文件不动，
+  经它入库的案卷在本机回到 `linked:false`，案件库里的内容不动。不自动选、不自动断开、断开后不自动重放 share。
+  **放进案件库被云端写权限门禁拒绝**（`CloudSyncService.accountCloudEpoch` / `CloudGitEpochClient` 抛
+  `VersionException.cloudReconnectRequired`，`CloudController`/`VersionController` 的处理器回 `kind=CLOUD_RECONNECT_REQUIRED`）：
+  两个弹窗用 `cloudShare.needsCloudReconnect(e)`（只认 kind，不匹配文案）就地显示后端原话 +「重新连接云端」按钮，
+  点了才调 `connectOfficialCloud` 再重放一次 share，**不自动重连**（问题 126/127，dev-board#1713）。
+  注意 `OfficialCloudService.connectOfficial` 在账户指纹不变时直接复用旧连接、不换令牌，所以这一按钮对「旧令牌失效」
+  无效；而强制重桥会换令牌，`awdCloudScope` 指纹含令牌，已入库案卷的后台同步会因此全部卡在「请明确重新连接」
+  且没有重绑入口，故未改。`refreshDisplayName` 改名重桥曾触发同一问题，已改为**不换令牌**（见下方「展示名跟官网走」）。
+  两个弹窗在登录层开着时加 `.yield-to-login` 让路，见 licensing-billing.md `accountLoginOpen`。
 - `InviteMemberDialog.vue`（`frontend/src/components/`，成员堆栈「+」与项目列表卡片「+」打开的「把人加进这份案卷」）
   ——**dev-board#527（2026-09-09）起「所里同事」tab 按 `localMode x linked` 三轨**（判定在
   `utils/memberLookup.js` 的 `resolveTrack`）：`localMode=false`（自建多用户服务器）走本机轨
@@ -323,11 +338,16 @@ PR#797 当时只改了 `VersionController`，自动存档（`ProjectFileService.
 最后的操作者，30 分钟空闲自动结束时整段署成「用户」且不认作「你」。现在 userId 与署名一起换成项目负责人，
 两者都查不到才回「用户」。护栏 `service/ProjectFileServiceSignalActorTest`。
 
+`work_session` 的 `lastActivityAt`（每次变更信号落库）与 `idleEnded`（空闲定时器结束时打标）两列可空，由 `ddl-auto=update` 加列（H2/PostgreSQL 均可）。仅供团队日聚合 `TeamUsageRollupService.activeMinutes` 对空闲结束的段按 `lastActivityAt` 计工时（扣掉 30 分钟挂机尾巴）；`endedAt` 语义不变，老数据照旧按 `endedAt`（dev-board#1713）。
+
 **官方案件库上的自己的展示名也要跟官网走**：案件库只在桥接（`awdk-login` → `resolveUser`）时刷新展示名，
 而 `OfficialCloudService.connectOfficial` 指纹不变就一直复用旧连接。现在 `AccountIdentitySync` 每次按官网同步到
 展示名都发 `DisplayNameSynced` 事件，`OfficialCloudService.onDisplayNameSynced`（`@Async`）比对连接上的
-`displayName`，不一致就**就地重桥**（案件库侧没有新端点，旧案件库也兼容）并撤掉旧令牌
-（`CloudSyncService.revokeRemoteToken`，与断开连接共用）。重桥回来的名字若仍是旧的（旧版案件库），
+`displayName`，不一致就**重桥一次让案件库刷新展示名**（案件库侧没有新端点，旧案件库也兼容），但连接**继续用旧令牌**、
+新签出的那枚当场撤掉（`CloudSyncService.revokeRemoteToken`，与断开连接共用）——令牌参与已入库案卷的
+`awdCloudScope` 写门禁指纹，改名换令牌会让已入库案卷的后台同步全部卡在「请明确重新连接」且无重绑入口
+（问题 126，dev-board#1713，护栏 `OfficialCloudServiceTest.renamingKeepsAlreadySharedProjectsPassingTheCloudWriteFence`）。
+账户真的换了仍走 `connectOfficial` 的指纹判断换令牌，门禁照拦。重桥回来的名字若仍是旧的（旧版案件库），
 本机连接照样记官网那份——否则两边永远对不上，每次 `/api/account/status` 都会换一枚令牌。
 
 **已写入的历史 `authorName` 不回填**（Git 提交对象不重写，同上一条纪律）。

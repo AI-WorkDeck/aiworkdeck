@@ -31,7 +31,7 @@ for (const linked of [true, false]) {
         if (options?.online) return
         this.collabCloud = await status
       },
-      checkAdoptConflict() {}, startCollabPolling() {},
+      checkAdoptConflict() {}, startCollabPolling() {}, startActivityTracking() {},
       async ensureStagingFolder() {}, loadStagingFiles() {},
     }
     vm.loadProjectMembers = method('loadProjectMembers', {

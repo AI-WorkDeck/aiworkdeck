@@ -200,6 +200,15 @@ export const clipboardBridgeMethods = {
       window.addEventListener('keydown', this._clipboardKeydownHandler, true)
       // #endif
     },
+    // 剪贴板插件「暂停记录」（dev-board#1713）：paused 为布尔时设置，否则只读。
+    // 只有桌面端有系统级采集可停；网页端返回 supported:false，面板不显示开关。
+    async clipboardCapture(paused) {
+      const api = host.clipboard
+      if (!api || typeof api.getPaused !== 'function' || typeof api.setPaused !== 'function') return { supported: false, paused: false }
+      const res = typeof paused === 'boolean' ? await api.setPaused(paused) : await api.getPaused()
+      return { supported: true, paused: !!(res && res.paused) }
+    },
+
     onClipboardSaved(item) {
       // 1) 面板打开时：立即新增一张卡片（不等刷新）
       if (this.$refs.clipboardPanel && typeof this.$refs.clipboardPanel.prependItem === 'function') {

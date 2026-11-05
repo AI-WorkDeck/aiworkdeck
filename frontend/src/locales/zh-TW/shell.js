@@ -3,6 +3,9 @@
 
 export default {
   "updatePreparing": "正在驗證並準備更新…",
+  "updatePreparingMount": "正在準備更新：掛載安裝包（通常需要幾分鐘）…",
+  "updatePreparingPackage": "正在準備更新：打包更新檔案（通常需要幾分鐘）…",
+  "updatePreparingVerify": "正在準備更新：驗證簽章（通常需要幾分鐘）…",
   "updateRestart": "重啓更新",
   "updateRestarting": "正在保存並準備重啓…",
   "updateDownloading": "正在下載更新",

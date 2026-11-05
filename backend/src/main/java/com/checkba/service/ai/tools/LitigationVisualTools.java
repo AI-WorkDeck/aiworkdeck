@@ -288,7 +288,8 @@ public class LitigationVisualTools implements AgentToolComponent {
                     + "股权/控制结构), comparison_table (A vs B).") String semanticMapJson,
             @P("Diagram name, used for the output folder and file names (e.g. '担保纠纷事实经过时间轴')") String diagramName,
             @P("Project ID") Long projectId,
-            @P(value = "Target folder ID (optional; omit for project root)", required = false) Long parentFolderId,
+            @P(value = "Target folder ID (optional; omit to use the shared litigation-visual folder at project root)",
+                    required = false) Long parentFolderId,
             @P(value = "Visual mode: 奇川风 (default, colour) / 歸藏风 (online, lecture) / 白描 (pure B&W print)",
                     required = false) String mode,
             @P(value = "Comma-separated formats (optional; default svg,png,drawio)",
@@ -350,7 +351,7 @@ public class LitigationVisualTools implements AgentToolComponent {
             boolean draft = r.raw().getBool("draft", false);
             // 一图一文件夹：一次出四种格式，摊平在项目根下会把文件树冲垮。
             String folderName = sanitize(r.raw().getStr("basename", safeName), safeName);
-            ProjectFile folder = createFolderTolerant(projectId, parentFolderId, folderName);
+            ProjectFile folder = createFolderTolerant(projectId, outputParentId(projectId, parentFolderId), folderName);
 
             List<String> registered = new ArrayList<>();
             List<ProjectFile> deliveredFiles = new ArrayList<>();
@@ -455,6 +456,36 @@ public class LitigationVisualTools implements AgentToolComponent {
                     + "不需要你另外用 write_file 保存一份。现在把上面的交付说明讲给用户即可。\n");
         }
         return sb.toString();
+    }
+
+    /**
+     * 产物父文件夹的名字（dev-board#1713）。与前端语言包 config.litigationVisual 同一组译名；
+     * 按当前语言建，但任一语言的同名文件夹都复用——切过界面语言不该再建第二个。
+     */
+    static final Map<String, String> OUTPUT_ROOT_NAMES = Map.ofEntries(
+            Map.entry("zh-CN", "诉讼可视化"), Map.entry("zh-TW", "訴訟視覺化"),
+            Map.entry("en-US", "Litigation Visualization"), Map.entry("ja-JP", "訴訟の可視化"),
+            Map.entry("ko-KR", "소송 시각화"), Map.entry("th-TH", "การแสดงภาพคดีความ"),
+            Map.entry("ms-MY", "Visualisasi Perbicaraan"), Map.entry("id-ID", "Visualisasi Litigasi"),
+            Map.entry("vi-VN", "Trực quan hóa tranh chấp"), Map.entry("fr-FR", "Visualisation des litiges"),
+            Map.entry("de-DE", "Prozessvisualisierung"), Map.entry("es-ES", "Visualización de litigios"),
+            Map.entry("pt-BR", "Visualização de Litígio"), Map.entry("it-IT", "Visualizzazione contenziosi"),
+            Map.entry("ru-RU", "Визуализация судебных процессов"), Map.entry("el-GR", "Οπτικοποίηση δικαστικής υπόθεσης"),
+            Map.entry("tr-TR", "Dava Görselleştirme"), Map.entry("nl-NL", "Procesvisualisatie"),
+            Map.entry("hi-IN", "मुकदमा विज़ुअलाइज़ेशन"), Map.entry("ar-SA", "التصور التقاضي"));
+
+    /**
+     * 一图一文件夹的上一层。没指定目标（或指定的是根目录）时统一收进项目根下的「诉讼可视化」
+     * 文件夹，没有就建、有就复用——历次产出摊在根目录，会排在材料最上面挤占选材料的视线
+     * （dev-board#1713）。模型/用户明确指定了某个子文件夹时照旧尊重。
+     */
+    Long outputParentId(Long projectId, Long parentFolderId) {
+        Long parent = projectFileService.resolveParentId(projectId, parentFolderId);
+        if (parent != null) return parent;
+        for (ProjectFile f : projectFileRepository.findByProjectIdAndParentIdOrderBySortOrderAsc(projectId, null)) {
+            if (Boolean.TRUE.equals(f.getIsFolder()) && OUTPUT_ROOT_NAMES.containsValue(f.getName())) return f.getId();
+        }
+        return createFolderTolerant(projectId, null, com.checkba.service.LangText.of(OUTPUT_ROOT_NAMES)).getId();
     }
 
     /** 同名文件夹已存在时复用而不是报错——同一张图重出一版是常态。 */

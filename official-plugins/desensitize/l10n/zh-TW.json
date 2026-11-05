@@ -1,5 +1,5 @@
 {
-  "plugin.name": "去識別化",
+  "plugin.name": "文件去識別化",
   "plugin.description": "核查敏感信息並生成脫敏副本，可用恢復包復敏。",
-  "view.main.name": "去識別化"
+  "view.main.name": "文件去識別化"
 }

@@ -69,6 +69,10 @@
               <view class="switcher-item switcher-all" @tap="goAllProjects">
                 <text>{{ $t('workbench.allProjects') }}</text>
               </view>
+              <!-- 问题 14：切换器里也能关项目，执行与菜单「文件 > 关闭项目」同一条 app:closeProject -->
+              <view v-if="hasNamedProject" class="switcher-item switcher-close" @tap="closeProjectFromSwitcher">
+                <text>{{ $t('workbench.closeProject') }}</text>
+              </view>
             </view>
             <view v-if="isScratchWorkspace" class="scratch-promote-btn" @click="handlePromoteScratchWorkspace">{{ $t('workbench.chatMode.promoteAction') }}</view>
             <view v-if="isScratchWorkspace" class="scratch-promote-btn" @click="openScratchTransfer">{{ $t('workbench.scratchCopyTitle') }}</view>
@@ -294,10 +298,7 @@
           :display-name="userDisplayName || (currentUser && currentUser.displayName) || ''"
           :avatar-url="(currentUser && currentUser.avatarUrl) || ''"
           :wallet-visible="walletChipVisible"
-          :wallet-text="walletChipText"
           :wallet-low="walletLow"
-          :wallet-tier="walletTierName"
-          :trial-text="trialMenuText"
           :notice-text="accountNoticeText"
           :client-view="isClientView"
           :message-unread="messageCenterUnread"
@@ -862,6 +863,8 @@
             @open="openPluginTab(activeDynamicPlugin.pluginId)"
             @quick-action="onPluginQuickAction"
           />
+          <!-- files：FileTree 在链外用 v-show 常驻，这里只占住分支，免得落进下面的「加载中…」兜底 -->
+          <template v-else-if="leftPaneKey === 'files'"></template>
           <view v-else class="sidebar-plugin-placeholder">
             <text class="placeholder-title">{{ leftPaneTitle }}</text>
             <text class="placeholder-desc">{{ $t('workbench.loadingText') }}</text>
@@ -1079,6 +1082,7 @@
                     :status="evidenceMethodBar.status"
                     :error-text="evidenceMethodBar.errorText"
                     :saving="evidenceMethodBar.saving"
+                    :placement="evidenceMethodBar.placement"
                     @change="onEvidenceMethodChange"
                     @close="closeEvidenceMethodBar"
                   />
@@ -1115,7 +1119,6 @@
                       @locator-consumed="onLocatorConsumed"
                       :insight-subscribed="insightSubscribedFor(file)"
                       :active="!!(activeFileLeft && activeFileLeft.id === file.id)"
-                      @open-insight="onOpenInsight($event, 'left')"
                       @cursor-context="onEditorCursorContext"
                       @open-history="openCommitHistoryTab({ focusSha: $event && $event.sha })"
                     />
@@ -1145,7 +1148,6 @@
                       @locator-consumed="onLocatorConsumed"
                       :insight-subscribed="insightSubscribedFor(sp.file)"
                       :active="!!(sp.file && activeFileLeft && activeFileLeft.id === sp.file.id)"
-                      @open-insight="onOpenInsight($event, 'left')"
                       @cursor-context="onEditorCursorContext"
                       @open-history="openCommitHistoryTab({ focusSha: $event && $event.sha })"
                     />
@@ -1413,6 +1415,7 @@
                     :status="evidenceMethodBar.status"
                     :error-text="evidenceMethodBar.errorText"
                     :saving="evidenceMethodBar.saving"
+                    :placement="evidenceMethodBar.placement"
                     @change="onEvidenceMethodChange"
                     @close="closeEvidenceMethodBar"
                   />
@@ -1439,7 +1442,6 @@
                       @locator-consumed="onLocatorConsumed"
                       :insight-subscribed="insightSubscribedFor(file)"
                       :active="!!(activeFileRight && activeFileRight.id === file.id)"
-                      @open-insight="onOpenInsight($event, 'right')"
                       @cursor-context="onEditorCursorContext"
                       @open-history="openCommitHistoryTab({ focusSha: $event && $event.sha })"
                     />
@@ -1779,8 +1781,11 @@
             @drop="handleAiDrop"
           >
             <!-- 右侧 dock 的 tab 条（dev-board#180）：只有真有面板被停到右侧时才渲染，
-                 平时右侧仍然只有 AI 对话本体，零视觉回归。 -->
-            <view v-if="rightDockPanels.length" class="right-dock-tabs">
+                 平时右侧仍然只有 AI 对话本体，零视觉回归。
+                 问题 12：「依据」只认 Word 文稿，原来没打开文稿时整条 tab 条消失、AI 头部随开关文档
+                 上下跳；现在按全部面板排（rightDockTabs），不可用的「依据」显示禁用态，Word/PPT/Excel/PDF
+                 打开时 tab 条一致。 -->
+            <view v-if="rightDockTabs.length" class="right-dock-tabs">
               <view
                 v-if="hasProject"
                 class="right-dock-tab"
@@ -1790,15 +1795,17 @@
                 <text>{{ $t('workbench.aiAssistant') }}</text>
               </view>
               <view
-                v-for="p in rightDockPanels"
+                v-for="p in rightDockTabs"
                 :key="p.key"
-                class="right-dock-tab is-movable"
-                :class="{ active: rightPaneKey === p.key }"
-                :draggable="true"
-                @tap="switchRightPane(p.key)"
+                class="right-dock-tab"
+                :class="{ active: rightPaneKey === p.key, 'is-disabled': p.disabled, 'is-movable': !p.disabled }"
+                :title="p.disabled ? $t('workbench.insightNeedsDoc') : null"
+                :aria-disabled="p.disabled ? 'true' : null"
+                :draggable="!p.disabled"
+                @tap="!p.disabled && switchRightPane(p.key)"
                 @dragstart="onPanelDragStart(p.key, $event)"
                 @dragend="onPanelDragEnd"
-                @contextmenu.prevent.stop="openDockMenu(p.key, $event)"
+                @contextmenu.prevent.stop="!p.disabled && openDockMenu(p.key, $event)"
               >
                 <text>{{ p.label }}</text>
               </view>
@@ -2385,7 +2392,6 @@ import ScratchTransferDialog from '@/components/project-home/ScratchTransferDial
 import { defineAsyncComponent } from 'vue'
 import { registerOpenWorkbench, unregisterOpenWorkbench } from '@/utils/ideOpen.js'
 import { resolveLooseWorkspace } from './looseFiles.js'
-import { trialBalanceText } from '@/utils/trialBalanceText.js'
 import { flushDirtyEditors } from './flushDirtyEditors.js'
 import { registerQuitSave, unregisterQuitSave } from '@/utils/desktopQuitGuard.js'
 import { claimRestartStartup, createRestartRecovery } from './restartRecovery.js'
@@ -2495,7 +2501,6 @@ import {
   bindShareholderMeetingConversation, // 股东大会核查：会话绑定
   getAccountStatus,
   getLicenseStatus, // 试用版/正式版标识（含 accountConnected 组合口径）
-  getTrialBalance, // 试用余额（试用计量 v0.1.1，权威在账户站）
   getAccountBalance, // Credits 余额 chip（dev-board#187，后端带 TTL 缓存的轻端点）
   getCloudAccountGeneration,
   getCloudStatus, // 协作 chip：这份案卷有没有放进团队案件库、状态如何
@@ -2515,7 +2520,7 @@ import {
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { signOut } from '@/utils/signOut.js'
 import { requireAccount, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
-import { loadSiteLinks, siteBaseUrl, siteLinks } from '@/utils/siteLinks.js'
+import { loadSiteLinks, siteBaseUrl } from '@/utils/siteLinks.js'
 import { confirmPaidTranscription } from '@/utils/paidTranscribeGate.js'
 import { getCurrentUser, getSessionId } from '@/utils/auth.js'
 import { mergeMembers } from '@/utils/mergeMembers.js'
@@ -2577,6 +2582,7 @@ import {
   hasNonWelcomeOpenTabs,
   isScratchProject,
   normalizeViewMode,
+  promoteScratchDefaultName,
   resolveInitialViewMode,
   shouldShowChatCanvas,
 } from './chatMode.js'
@@ -2588,12 +2594,14 @@ import { librePoolMethods } from './librePool.js'
 import { fileTreePdfRecoveryMethods } from './fileTreePdfRecovery.js'
 import { stagingAreaMethods } from './stagingArea.js'
 import { evidenceLinkData, evidenceLinkMethods } from './evidenceLinkActions.js'
+import { setEvidenceProjectType } from '@/utils/evidenceTags.js'
 import { tabDragSplitMethods } from './tabDragSplit.js'
 import { fitPanelWidths } from './panelWidthLimits.js'
 import { panelDockingData, panelDockingMethods } from './panelDocking.js'
 import { railSortData, railSortMethods } from './railSort.js'
 import { loadSidebarCollapsed, saveSidebarCollapsed } from './sidebarCollapse.js'
 import { loadLastConversation } from '@/utils/lastConversation.js'
+import { uniStorage } from '@/utils/uniStorage.js'
 import { themeSwitchData, themeSwitchMethods, themeSwitchComputed } from './themeSwitch.js'
 import { fileOpenTabsMethods } from './fileOpenTabs.js'
 import { useDocumentMerge } from '@/composables/useDocumentMerge.js'
@@ -2623,6 +2631,7 @@ import {
   PROMPTED_PREF_KEY,
   PROMPTED_PACKS_PREF_KEY,
 } from '@/composables/useOptionalComponents.js'
+import { whenPermissionOnboardingStartupSettled } from '@/utils/permissionOnboarding.js'
 import { documentLinkPreviewMethods } from './documentLinkPreview.js'
 import DocumentLinkPreview from '@/components/DocumentLinkPreview.vue'
 import { useLitigationGeneration } from '@/composables/useLitigationGeneration.js'
@@ -2770,7 +2779,6 @@ export default {
       // Credits 余额 chip（dev-board#187）。loaded=false 或 connected=false 时不渲染，
       // 绝不显示 0 冒充余额；available=false（官网不可达）时余额位显示「—」。
       wallet: { loaded: false, connected: false, available: true, balanceCents: null, membership: null },
-      trialBalance: null,
 
       // 布局状态
       viewMode: 'ide',
@@ -2901,6 +2909,7 @@ export default {
       ocrImageDataUrl: '',
       ocrText: '',
       ocrSourceUrl: '',
+      ocrSourceTitle: '',
       // 全屏截图浮层
       showOcrOverlay: false,
       ocrStream: null,
@@ -2913,7 +2922,7 @@ export default {
       ocrOverlaySelecting: false,
       ocrSel: { x1: 0, y1: 0, x2: 0, y2: 0 },
       ocrActionBar: { visible: false, x: 0, y: 0 },
-      ocrDebug: true,
+      ocrDebug: false,
       ocrLastPointer: { x: 0, y: 0 },
 
       // Invite Modal (Refactored)
@@ -3156,35 +3165,12 @@ export default {
     railScheduleCount() {
       return this.railScheduleSummary.overdue + this.railScheduleSummary.today
     },
-    trialMenuText() {
-      return trialBalanceText(this.trialBalance, (k, v) => this.$t(k, v))
-    },
-    walletChipText() {
-      // 官网不可达：余额未知，显示「—」而不是 0
-      if (this.wallet.available === false) return '—'
-      const cents = Number(this.wallet.balanceCents)
-      const symbol = siteLinks().current === 'cn' ? '¥' : '$'
-      return symbol + ((Number.isFinite(cents) ? cents : 0) / 100).toFixed(2)
-    },
     // 余额不足：低于 20 元（2000 分）视为要提醒。官网不可达（余额未知）不算——
     // 那是连接问题不是钱的问题，用「—」表达就够了，不该冒充告急。
     walletLow() {
       if (this.wallet.available === false) return false
       const cents = Number(this.wallet.balanceCents)
       return Number.isFinite(cents) && cents < 2000
-    },
-    // 等级名小徽章：level>=2 才显示（律师助理档只显示余额），优先取多语言词条，否则按语言取 nameZh/nameEn
-    walletTierName() {
-      const m = this.wallet.membership
-      if (!m || !(Number(m.level) >= 2)) return ''
-      if (m.key && typeof this.$t === 'function') {
-        const k = `admin.membershipTiers.${m.key}`
-        const t = this.$t(k)
-        if (t && t !== k) return t
-      }
-      const loc = String((this.$i18n && this.$i18n.locale) || '')
-      const zh = loc === 'zh-CN' || loc === 'zh-TW'
-      return (zh ? m.nameZh : m.nameEn) || m.nameEn || m.nameZh || ''
     },
     meetingRecorderEnabled() { return this.dynamicPlugins.some(plugin => plugin.pluginId === 'voice') },
     /**
@@ -3446,6 +3432,8 @@ export default {
         insertContent: payload => this.insertPlainTextToWps(payload),
         previewImage: url => this.openImagePreview(url),
         copyText: text => this.insertClipboardAndCopy(text),
+        copyImage: dataUrl => this.copyImageDataUrl(dataUrl),
+        clipboardCapture: paused => this.clipboardCapture(paused),
         calendarWorkspace: params => this.calendarWorkspace(params),
         openProject: payload => this.onCalendarOpenProject(payload),
         openTaskFile: payload => this.onCalendarOpenFile(payload),
@@ -3738,11 +3726,17 @@ export default {
     ,
     // ——— 面板停靠（dev-board#180）———
     // 三个 dock 的分配，唯一出处是 config/panelRegistry.js 的纯函数 resolveDocks
-    dockPanels() {
+    // 全部带侧栏视图的插件面板，不看「依据」此刻有没有可解析的文档（右栏 tab 条按它排，问题 12）
+    allDockPanels() {
       if (this.isClientView) return []
-      return this.documentAvailablePlugins.filter(plugin => plugin.sidebarView).map(plugin => ({
+      return this.dynamicPlugins.filter(plugin => plugin.sidebarView).map(plugin => ({
         ...plugin, defaultDock: plugin.sidebarView.defaultDock, allowedDocks: plugin.sidebarView.allowedDocks,
       }))
+    },
+    // 此刻可用的面板（「依据」没有 Word 文稿时不在内）：左栏、菜单、拖放都按它判定
+    dockPanels() {
+      const available = new Set(this.documentAvailablePlugins.map(p => p.key))
+      return this.allDockPanels.filter(p => available.has(p.key))
     },
     panelDocks() {
       const docks = resolveDocks(this.panelDockOverrides, this.dockPanels)
@@ -3756,9 +3750,23 @@ export default {
     bottomToolsList() {
       return this.panelDocks.bottom.map(p => ({ key: p.key, label: (p.labelKey && this.$t(p.labelKey)) || p.label }))
     },
-    // 停靠到右侧面板的面板（非空时右栏才长出 tab 条；平时右侧只有 AI 对话，零视觉回归）
+    // 停靠到右侧、此刻可用的面板（右栏 tab 条用的是下面的 rightDockTabs）
     rightDockPanels() {
       return this.panelDocks.right.map(p => ({ key: p.key, label: (p.labelKey && this.$t(p.labelKey)) || p.label }))
+    },
+    // 右栏 tab 条：按全部面板排，此刻不可用的（没打开 Word 文稿时的「依据」）标 disabled 而不是拿掉，
+    // tab 条不随开关文档出现 / 消失，AI 头部不再跳动（问题 12）。无项目态的过滤与 panelDocks 同口径。
+    rightDockTabs() {
+      const docks = resolveDocks(this.panelDockOverrides, this.allDockPanels)
+      const right = this.hasNamedProject
+        ? docks.right
+        : docks.right.filter(p => (NO_PROJECT_PANE_KEYS.includes(p.key) || isGlobalPlugin(p)))
+      const available = new Set(this.rightDockPanels.map(p => p.key))
+      return right.map(p => ({
+        key: p.key,
+        label: (p.labelKey && this.$t(p.labelKey)) || p.label,
+        disabled: !available.has(p.key),
+      }))
     },
     // 右键「移到…」菜单的选项：只列这个面板允许的 dock，当前所在的那一档置灰
     dockMenuOptions() {
@@ -4045,7 +4053,7 @@ export default {
       // 首次启动的「可选组件」面板：原挂在项目列表页 onLoad，启动落点换了它跟着搬
       this.maybePromptOptionalComponents()
     }
-    this.showWelcomeOnStartup = loadShowWelcomeOnStartup(uni)
+    this.showWelcomeOnStartup = loadShowWelcomeOnStartup(uniStorage)
 
     const user = getCurrentUser()
     if (user) {
@@ -4067,7 +4075,7 @@ export default {
     // rail 图标顺序（dev-board#204）：同为本机习惯，跟停靠位一起在首帧前恢复
     this.loadRailOrder()
     // 左栏收起状态（dev-board#727）：同为本机习惯，不带 projectId
-    this.sidebarCollapsed = loadSidebarCollapsed(uni, !this.hasNamedProject)
+    this.sidebarCollapsed = loadSidebarCollapsed(uniStorage, !this.hasNamedProject)
     this.initThemeSwitch()
 
     // 存储键：有项目按项目分，无项目落 global_*（此前无项目态写的是 project_null_*）
@@ -4186,7 +4194,7 @@ export default {
     this.loadWalletBalance()
 
     // Sync UI state
-    this.isRecording = activityTracker.getRecordingState()
+    this.isRecording = this.hasNamedProject && activityTracker.getRecordingState()
 
     // Reload members to ensure up-to-date list
     if (this.projectId) {
@@ -4214,7 +4222,8 @@ export default {
     // onShow 会重新接管——但期间菜单不能继续亮着工作台那一堆条目。
     // 窗口最小化/被遮挡/锁屏也会触发 onHide，那时本页仍是当前页，不交（见 menuCommands.js）。
     this.releaseMenuOnHide()
-    this.stopActivityTracking()
+    // 最小化 / 锁屏 / 去设置页：只结束当前计时段，不关录制（onShow 接着记当前标签）
+    activityTracker.flushActiveSession()
 
     // Desktop：离开工作区页面（如去个人中心）必须隐藏 BrowserView
     try {
@@ -4632,6 +4641,8 @@ export default {
     this.maybeRegisterOpenWorkbench()
   },
   watch: {
+    // 证据标签默认组跟着项目类型走（教程反馈 77）。
+    'project.projectType': { immediate: true, handler(type) { setEvidenceProjectType(type) } },
     projectId() { this.cancelFileTreePdfExport(); this.resetPdfPreviewPool() },
     'currentUser.id'() { this.resetPdfPreviewPool() },
     // 成员轮询会替换数组；只在实际权限信息变化时销毁 PDF 查看器。
@@ -4791,7 +4802,6 @@ export default {
     // 绝不摆一个「¥0.00」冒充余额。
     async loadWalletBalance() {
       if (!isDesktopHost()) return
-      this.loadTrialBalance()
       try {
         const data = await getAccountBalance()
         if (data && data.connected) {
@@ -4808,14 +4818,6 @@ export default {
       } catch (e) {
         // 旧后端没有该端点 / 请求失败：chip 不渲染
         this.wallet = { loaded: false, connected: false, available: true, balanceCents: null, membership: null }
-      }
-    },
-    // 试用余额行：失败 / 未连接一律不渲染，绝不本地编造剩余次数
-    async loadTrialBalance() {
-      try {
-        this.trialBalance = await getTrialBalance()
-      } catch (e) {
-        this.trialBalance = null
       }
     },
     /** 宽限弹窗的主按钮：联网复验那条去账户设置，其余去官网。 */
@@ -4919,22 +4921,30 @@ export default {
     // 右键「转写」：注册成会议记录（凭证已配则后端顺手提交转写），跳会议录音面板定位到它
     // （dev-board#227）。菜单项本身已按 meetingRecorderEnabled 门控，这里不再重复判。
     // register-file 会当场提交并在平台档预扣 Credits，所以先确认；取消则什么都不做（dev-board#968）。
+    // 面板先开出来并显示「正在准备…」，再确认与注册（dev-board#1713 #116）：原先两次请求都回来才开面板，
+    // 首次可能很久没有任何反馈。register-file 回 noticePending 时提示去确认告知，而不是「配置转写服务」。
     async onTranscribeAudio(file) {
-      if (!(await confirmPaidTranscription({ projectId: this.projectId, audioFileId: file.id }))) return
+      const focus = (meetingId, preparing) => uni.$emit('awd:plugin-sidebar-command', { pluginId: 'voice', command: 'recording-focus', meetingId, preparing })
+      this.openPanelInItsDock('voice')
+      await this.$nextTick()
+      focus(null, true)
+      let meetingId = null
       try {
+        if (!(await confirmPaidTranscription({ projectId: this.projectId, audioFileId: file.id }))) return
         const res = await registerMeetingFromFile(this.projectId, file.id)
-        this.meetingFocusId = res && res.meeting ? res.meeting.id : null
-        this.openPanelInItsDock('voice')
-        this.$nextTick(() => uni.$emit('awd:plugin-sidebar-command', { pluginId: 'voice', command: 'recording-focus', meetingId: this.meetingFocusId }))
+        meetingId = res && res.meeting ? res.meeting.id : null
+        this.meetingFocusId = meetingId
         uni.showToast({
           title: res && res.submitted
             ? this.$t('fileTree.transcribeSubmitted')
-            : this.$t('fileTree.transcribeRegistered'),
+            : this.$t(res && res.noticePending ? 'fileTree.transcribeNoticePending' : 'fileTree.transcribeRegistered'),
           icon: 'none'
         })
       } catch (error) {
         console.error('转写发起失败:', error)
         uni.showToast({ title: (error && error.message) || this.$t('fileTree.transcribeFailed'), icon: 'none' })
+      } finally {
+        focus(meetingId, false)
       }
     },
     // DOM 挂载与标签恢复都完成后，才允许系统打开请求写入标签。
@@ -5058,6 +5068,11 @@ export default {
     goAllProjects() {
       this.projectSwitcherOpen = false
       this.openProjectsPane()
+    },
+    // 切换器底部「关闭项目」：先落盘，再走菜单同一条命令 file.closeProject（app:closeProject）
+    async closeProjectFromSwitcher() {
+      this.projectSwitcherOpen = false
+      await this.runWelcomeCommand('file.closeProject')
     },
     // 日程（命令「日程」、账户下拉「我的日程」）：中栏日程标签（dev-board#1048），不再离开工作台
     goCalendar() {
@@ -6141,6 +6156,7 @@ export default {
     },
     switchToolTab(key) {
       this.activeToolKey = migrateLeftPaneKey(key)
+      this.rememberToolTab(this.activeToolKey)
       // 如果用户切到剪贴板，且之前有 pending，则立刻刷新
       this.$nextTick(() => {
         if (this.activeToolKey === 'plugin-clipboard') {
@@ -6316,18 +6332,32 @@ export default {
     // OCR 采集与浮层生命周期方法组已外置（Phase 3c） → ./ocrCapture.js
 
     // OCR 帧处理与动作方法组已外置（Phase 3b） → ./ocrActions.js
+    // 录制开关是全局持久化的（activityTracker 自己存），这里只管本页恢复 / 挂起计时
     startActivityTracking() {
         if (!this.hasNamedProject) return
-        if (activityTracker.getRecordingState()) {
-             activityTracker.start()
-             this.isRecording = true
-        }
+        activityTracker.start()
+        this.isRecording = activityTracker.getRecordingState()
+        if (this.isRecording) this.trackCurrentTab()
     },
 
     stopActivityTracking() {
         activityTracker.stop()
-        activityTracker.setRecording(false) // Force stop recording state
         this.isRecording = false
+    },
+
+    trackCurrentTab() {
+        const pane = this.focusedPane
+        const file = pane === 'left' ? this.activeFileLeft : this.activeFileRight
+        if (!file) return
+        const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
+        if (this.isBrowserTab(file)) {
+            const url = file.url || ''
+            const title = file.name || ''
+            const fullMeta = meta + (title ? `. Title: ${title}` : '')
+            activityTracker.trackActivePage('OPEN_URL', 0, url, this.project && this.project.id, fullMeta)
+        } else {
+            activityTracker.trackActivePage('OPEN_FILE', file.id, file.name, this.project && this.project.id, meta)
+        }
     },
 
     toggleRecording() {
@@ -6344,23 +6374,9 @@ export default {
         }, 2000)
 
         if (newState) {
-             // uni.showToast({ title: '开始录制工作', icon: 'none' }) // Replaced
              // If we have an active file/tab, start tracking it immediately
-             const pane = this.focusedPane
-             const file = pane === 'left' ? this.activeFileLeft : this.activeFileRight
-             if (file) {
-                 const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
-                 if (this.isBrowserTab(file)) {
-                     const url = file.url || ''
-                     const title = file.name || ''
-                     const fullMeta = meta + (title ? `. Title: ${title}` : '')
-                     activityTracker.trackActivePage('OPEN_URL', 0, url, this.project && this.project.id, fullMeta)
-                 } else {
-                     activityTracker.trackActivePage('OPEN_FILE', file.id, file.name, this.project && this.project.id, meta)
-                 }
-             }
-        } else {
-             // uni.showToast({ title: '已停止录制', icon: 'none' }) // Replaced
+             activityTracker.start()
+             this.trackCurrentTab()
         }
     },
 
@@ -6373,10 +6389,9 @@ export default {
       // 记录到剪贴板历史（best-effort）
       if (options.saveToHistory) {
         try {
-          await saveClipboardText(t)
-          if (this.$refs.clipboardPanel && typeof this.$refs.clipboardPanel.refresh === 'function') {
-            this.$refs.clipboardPanel.refresh()
-          }
+          const res = await saveClipboardText(t)
+          // 与采集桥同一个出口：本实例面板加卡片 + 广播 awd:clipboard-saved（插件面板 / 别的坞位靠它刷新）
+          this.onClipboardSaved((res && res.data) ? res.data : res)
         } catch (e) {
           // ignore
         }
@@ -6603,6 +6618,7 @@ export default {
         }
         recordProjectVisit(this.projectId)
         syncRecentToMenuFetching()
+        this.startActivityTracking()
         this.checkAdoptConflict()
         loadProjectTasks(this.projectId).catch((e) => console.warn('[project-overview] 读取事项失败', e))
         const lifecycle = this._collabStateLifecycle || 0
@@ -6814,7 +6830,7 @@ export default {
     },
     setShowWelcomeOnStartup(on) {
       this.showWelcomeOnStartup = !!on
-      saveShowWelcomeOnStartup(uni, this.showWelcomeOnStartup)
+      saveShowWelcomeOnStartup(uniStorage, this.showWelcomeOnStartup)
     },
     // 左栏「项目」面板里改了当前项目的名字：顶栏与窗口标题跟上
     onProjectRenamedFromPane(payload) {
@@ -6838,12 +6854,15 @@ export default {
         const items = (res && res.components) || []
         const promptedPackIds = unwrap(promptedPacks)
         this.optionalComponentsAppVersion = (status && status.appVersion) || ''
-        this.showOptionalComponents = shouldPromptOptionalComponents({
+        const shouldShow = shouldPromptOptionalComponents({
           items,
           promptedVersion: unwrap(prompted),
           promptedPackIds,
           isDesktop: true,
         })
+        // 首启弹窗排队（问题 4/40）：等权限引导窗关掉（或判定不弹）再弹，两个窗不叠在一起
+        if (shouldShow) await whenPermissionOnboardingStartupSettled()
+        this.showOptionalComponents = shouldShow
         // 0.46 及以前只记了版本号。不弹的时候把「提示过哪些组件」补齐，将来真多出一个新组件
         // 时才认得出来。清单为空（后端没起来 / ai.packs 关着）时不写。
         if (!this.showOptionalComponents && !Array.isArray(promptedPackIds) && items.length) {
@@ -6925,7 +6944,7 @@ export default {
 
     toggleSidebar() {
       this.sidebarCollapsed = !this.sidebarCollapsed
-      saveSidebarCollapsed(uni, this.sidebarCollapsed)
+      saveSidebarCollapsed(uniStorage, this.sidebarCollapsed)
       this.$nextTick(() => this.triggerWorkbenchResize())
     },
 
@@ -6964,7 +6983,7 @@ export default {
     async restoreLastConversation() {
       if (this.restoredLastConversation) return
       this.restoredLastConversation = true
-      const conversationId = loadLastConversation(uni, this.projectId)
+      const conversationId = loadLastConversation(uniStorage, this.projectId)
       if (!conversationId) return
       if (!this.chatHistoryList.length) await this.fetchChatHistory(true)
       if (!this.chatHistoryList.some((c) => c.conversationId === conversationId)) return
@@ -6984,6 +7003,8 @@ export default {
       // 三个工具面板都被搬到左/右之后底部抽屉里没东西可显示，开关也就不该有反应
       // （顶栏那个按钮同样按 bottomToolsList 收起，见模板）
       if (!this.showToolsPanel && !this.bottomToolsList.length) return
+      // 插件是异步加载的，onLoad 那次校正时底栏可能还是空的：打开前再选一次 tab（上次的 / 剪贴板）
+      if (!this.showToolsPanel && !this.bottomToolsList.some(t => t.key === this.activeToolKey)) this.normalizeDockSelections()
       this.showToolsPanel = !this.showToolsPanel
       this.$nextTick(() => this.triggerWorkbenchResize())
     },
@@ -7549,14 +7570,6 @@ export default {
       const chat = this.$refs.chatInterface
       if (!chat || typeof chat.handleReviewState !== 'function' || !this._planReviewStates) return
       for (const st of Object.values(this._planReviewStates)) chat.handleReviewState(st)
-    },
-    /** 写作辅助打开既有资料；全文在线核验由面板中的显式按钮单独触发。 */
-    onOpenInsight(payload, pane) {
-      const fileId = payload && payload.fileId
-      if (pane && this.focusedPane !== pane) this.focusedPane = pane
-      const target = this.insightDocFileId
-      if (!target || (fileId && Number(fileId) !== Number(target))) return
-      this.openPanelInItsDock('insight')
     },
     /** 窗格把实体清单同步上来（宿主据此在正文点击时做匹配）。 */
     onInsightEntities(payload) {
@@ -8858,11 +8871,18 @@ export default {
 
     async handleWelcomeStartChat(payload = {}) {
       const prompt = (payload && payload.prompt ? String(payload.prompt) : '').trim()
+      // 问题 13：项目已打开时，欢迎页提问 =「在本项目新建对话」，不能续到项目里正在进行的那段对话
+      const newChatInProject = this.hasNamedProject
       const switched = await this.switchViewMode('chat', { openCanvas: false })
       if (!switched) return
       await this.$nextTick()
       for (let i = 0; i < 30 && !this.$refs.chatInterface?.sendQuickPrompt; i++) {
         await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+      if (newChatInProject) {
+        // 「恢复上次那段对话」也别在这之后再把旧会话拉回来
+        this.restoredLastConversation = true
+        this.handleChatSidebarNewChat()
       }
       if (payload.model) this.$refs.chatInterface?.selectModel?.(payload.model)
       if (prompt) {
@@ -8932,7 +8952,14 @@ export default {
     async handlePromoteScratchWorkspace() {
       if (!this.isScratchWorkspace) return
       this.showPromoteScratchModal = true
-      this.promoteScratchName = this.project?.name || ''
+      // 预填当前对话的标题，取不到再回落项目名；不再预填「临时项目」（问题 19）
+      const activeConversationId = this.$refs.chatInterface?.currentConversationId || this.currentConversationId
+      const activeChat = activeConversationId ? this.chatHistoryList.find((c) => c.conversationId === activeConversationId) : null
+      this.promoteScratchName = promoteScratchDefaultName({
+        conversationTitle: activeChat && activeChat.title,
+        projectName: this.project?.name,
+        extraDefaultNames: [this.$t('workbench.chatMode.scratchTitle')],
+      })
       const modal = await new Promise((resolve) => {
         uni.showModal({
           title: this.$t('workbench.chatMode.promoteTitle'),

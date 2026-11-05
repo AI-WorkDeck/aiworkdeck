@@ -22,7 +22,8 @@ const fs = require('fs')
  *   { schema: 1, version: "0.11.2",
  *     components: { "backend-app": { version: "0.11.2" }, ... },
  *     previous: { version, components } | null,   // 仅保留一层，供回滚
- *     bootFailures: 0 }
+ *     bootFailures: 0,
+ *     bootFailureInstance?: string|null }          // 最近一次失败来自哪个实例（userData 路径）
  *
  * 不变式：
  *   - current.version 必须严格大于壳版本（ctx.appVersion），否则视为无效
@@ -165,18 +166,24 @@ function revert(ctx) {
 }
 
 /**
- * 后端启动失败记账（设计 §6 自愈回滚）：连续 2 次失败自动回滚。
+ * 后端启动失败记账（设计 §6 自愈回滚）：同一实例连续 2 次失败自动回滚。
+ * 计数按实例区分（问题 21，dev-board#1713）：ctx.instanceId（主进程传 userData 路径）记进
+ * current.json 的 bootFailureInstance；上一次失败若来自别的实例（共享数据目录的演示/测试实例、
+ * 并发启动），从 1 重新数，免得别人的失败把这个实例的补丁静默回滚。没有 instanceId 的调用方
+ * 视为同一个实例，行为同以前。
  * @returns {{reverted: boolean}}
  */
 function noteBackendBootFailure(ctx) {
   const cur = readCurrent(ctx)
   if (!cur) return { reverted: false }
-  const failures = (cur.bootFailures || 0) + 1
+  const instance = ctx.instanceId || null
+  const sameInstance = (cur.bootFailureInstance || null) === instance
+  const failures = (sameInstance ? (cur.bootFailures || 0) : 0) + 1
   if (failures >= 2) {
     revert(ctx)
     return { reverted: true }
   }
-  writeCurrent(ctx, { ...cur, bootFailures: failures })
+  writeCurrent(ctx, { ...cur, bootFailures: failures, bootFailureInstance: instance })
   return { reverted: false }
 }
 

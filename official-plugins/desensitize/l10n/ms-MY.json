@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Nyahpeka",
+  "plugin.name": "Penyuraian Fail",
   "plugin.description": "Periksa maklumat sensitif, jana salinan yang telah dinyahpekakan, dan pulihkan dengan pakej pemulihan.",
-  "view.main.name": "Nyahpeka"
+  "view.main.name": "Penyuraian Fail"
 }

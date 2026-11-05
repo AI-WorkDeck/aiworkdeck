@@ -75,7 +75,7 @@ test('real workbench onLoad binds its compiled uni storage before snapshot reads
   const compiledOnLoad = page.slice(start, end)
     .replace(/\buni\.getStorageSync\b/g, 'compiledStorage.getStorageSync')
     .replace(/\buni\.setStorageSync\b/g, 'compiledStorage.setStorageSync')
-  const dependencies = { uni: { $on() {} }, compiledStorage: storage, loadSiteLinks() {}, syncRecentToMenuFetching() {}, loadShowWelcomeOnStartup: () => false,
+  const dependencies = { uni: { $on() {} }, compiledStorage: storage, loadSiteLinks() {}, syncRecentToMenuFetching() {}, loadShowWelcomeOnStartup: () => false, uniStorage: storage,
     getCurrentUser: () => null, loadSidebarCollapsed: () => false, workbenchStorageKey,
     isPaneAllowedWithoutProject: () => true, NO_PROJECT_DEFAULT_PANE: 'projects', migrateLeftPaneKey: value => value,
     window: { addEventListener() {} },

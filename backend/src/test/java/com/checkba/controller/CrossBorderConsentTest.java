@@ -49,15 +49,20 @@ class CrossBorderConsentTest {
     /** 构造器有 6 个依赖，本测试只关心 systemSettingService，其余传 mock 即可 */
     private AdminConfigController controllerWith(Map<String, String> stored) {
         SystemSettingService settings = mock(SystemSettingService.class);
-        when(settings.get(anyString(), anyString()))
+        when(settings.get(anyString(), org.mockito.ArgumentMatchers.any()))
                 .thenAnswer(inv -> stored.getOrDefault(inv.getArgument(0), inv.getArgument(1)));
+        com.checkba.service.account.AccountService account = mock(com.checkba.service.account.AccountService.class);
+        when(account.currentAccountIdOrNull()).thenReturn("acct-1");
+        com.checkba.service.site.SiteProfileService site = mock(com.checkba.service.site.SiteProfileService.class);
+        when(site.currentSite()).thenReturn("cn");
         return new AdminConfigController(
                 settings,
                 mock(com.checkba.repository.UserRepository.class),
                 mock(AiModelProperties.class),
                 mock(com.checkba.service.AdminAccessService.class),
                 new com.fasterxml.jackson.databind.ObjectMapper(),
-                mock(com.checkba.service.ai.ChatModelFactory.class));
+                mock(com.checkba.service.ai.ChatModelFactory.class),
+                new com.checkba.service.ai.CrossBorderConsentService(settings, account, site));
     }
 
     @Test
@@ -127,5 +132,16 @@ class CrossBorderConsentTest {
         }
         // 告知必须点名境外接收方与用途，否则不构成个保法第三十九条要求的「充分告知」
         assertTrue(message.contains("境外"));
+    }
+
+    @Test
+    @DisplayName("同版本同意但属于另一个账户：不算（问题 130，同意按账户 + 站点记录）")
+    void storedConsentOfAnotherAccountDoesNotCount() throws Exception {
+        Map<String, String> stored = new HashMap<>();
+        stored.put(KEY_AT, "2026-11-01T10:00:00Z");
+        stored.put(KEY_VERSION, CURRENT_VERSION);
+        stored.put("ai.crossBorder.consentAccount", "acct-other");
+        stored.put("ai.crossBorder.consentSite", "cn");
+        assertFalse(hasConsent(controllerWith(stored), new AdminConfigController.AiConfig()));
     }
 }

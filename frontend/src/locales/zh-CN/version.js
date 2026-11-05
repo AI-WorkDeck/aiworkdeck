@@ -282,6 +282,14 @@ export default {
   sharedToLibrary: '已放进团队案件库',
   shareToLibraryFailed: '没能放进案件库',
   tooManyLibraries: '这台电脑连着不止一个案件库，请先断开多余的再放进去',
+  libraryOfficialTag: '官方',
+  librarySignedInAs: '我的身份：{name}',
+  libraryConnectedAt: '连接于 {time}',
+  disconnectLibrary: '断开',
+  disconnectLibraryTitle: '断开这个案件库？',
+  disconnectLibraryConfirm: '断开后，这台电脑不再连着 {server}。本机文件不会删除。通过它放进案件库的案卷，在这台电脑上会变回「未放进案件库」，不再交稿和取回；案件库里已有的内容和同事那边不受影响。',
+  disconnectedLibrary: '已断开',
+  disconnectLibraryFailed: '没能断开，请重试',
   submitted: '已交稿',
   submitFailedNotice: '暂时没能交稿',
   submitFailed: '交稿失败',
@@ -294,6 +302,7 @@ export default {
   addMemberFailed: '没能加进来',
   copiedPasteToColleague: '已复制，粘贴给同事即可',
   connectFailed: '连接失败',
+  reconnectCloud: "重新连接云端",
   // 邀请话术：整段发给同事的邀请文本（含具体操作步骤），一个键完整抽出。
   // 有/无邀请人两个键：英文的人名后面要有空格（"{name} invites you"），单键靠拼
   // {inviter} 没法在两种语言里同时成立。

@@ -13,6 +13,7 @@ import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import com.checkba.service.sensitive.SensitiveTextEngine;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -118,5 +119,35 @@ class SensitiveCustomWordsTest {
         String text = "甲方张三。";
         String out = service.maskCustomWords(text, java.util.Arrays.asList("  ", null, "张三", "张三"));
         assertEquals("甲方**。", out);
+    }
+
+    @Test
+    @DisplayName("补充敏感词完全落在公司全称里：整条公司名优先，不切碎（dev-board#1713 #95）")
+    void customWordInsideLongerEntityYieldsToEntity() {
+        String text = "原告：深圳华晟科技有限公司\n被告：上海远航物流有限公司\n代理人：启衡律师事务所\n华晟与远航另有约定。";
+        var engine = new SensitiveTextEngine(List.of("COMPANY"), true, List.of("华晟", "远航"), List.of());
+        engine.learn(text);
+        String output = engine.apply(text);
+        assertTrue(engine.recovery().containsValue("深圳华晟科技有限公司"), output);
+        assertTrue(engine.recovery().containsValue("上海远航物流有限公司"), output);
+        assertFalse(output.contains("科技有限公司"), output);
+        assertFalse(output.contains("物流有限公司"), output);
+        // 公司名之外单独出现的补充词照样遮
+        assertFalse(output.contains("华晟"), output);
+        assertFalse(output.contains("远航"), output);
+        // 律所维持现状：照旧遮（Q19）
+        assertFalse(output.contains("启衡律师事务所"), output);
+        assertEquals(text, SensitiveTextEngine.apply(output, SensitiveTextEngine.restoreEdits(output, engine.recovery())));
+    }
+
+    @Test
+    @DisplayName("补充敏感词与自动实体只部分重叠：补充词仍优先（dev-board#1713 #95）")
+    void partiallyOverlappingCustomWordStillWins() {
+        String text = "原告：深圳华晟科技有限公司深圳分部";
+        var engine = new SensitiveTextEngine(List.of("COMPANY"), true, List.of("有限公司深圳分部"), List.of());
+        String output = engine.apply(text);
+        assertTrue(engine.recovery().containsValue("有限公司深圳分部"), output + engine.recovery());
+        assertFalse(output.contains("深圳分部"), output);
+        assertEquals(text, SensitiveTextEngine.apply(output, SensitiveTextEngine.restoreEdits(output, engine.recovery())));
     }
 }

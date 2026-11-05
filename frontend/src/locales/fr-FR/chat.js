@@ -271,6 +271,7 @@ export default {
   "memoryRevision": "Révision {revision}",
   "memoryUnknownTime": "Heure de mise à jour inconnue",
   "memoryReadOnly": "Vous pouvez consulter ce périmètre, mais vous n'avez pas l'autorisation de le modifier.",
+  "memoryRememberHint": "La liste des sujets est gérée automatiquement par le système. Pour supprimer un sujet, sélectionnez-le puis supprimez-le.",
   "memoryConflict": "Une version plus récente du serveur existe. Consultez-la avant de choisir la version à conserver.",
   "memoryUseServer": "Utiliser la version du serveur",
   "memorySaveMine": "Enregistrer ma version",

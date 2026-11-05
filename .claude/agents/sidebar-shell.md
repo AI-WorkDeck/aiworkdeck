@@ -532,7 +532,7 @@ launch（**启动页**）/ unlock / identity / login / newproject / **project-li
 ② **所有「去我的项目」的落点统一到项目列表页**（`launch.vue` 启动、`login.vue` 四处、`newproject/index.vue` 返回、工作台 `goAllProjects`）；
 ③ **列表点卡片 `reLaunch` 直达工作台**，中间不再插概览页。
 
-导航流：launch reLaunch→login（非桌面）|identity（本机工作区待选定）|**project-overview 无项目态外壳**（其余一律；2026-09-29 前这里还有 unlock / wizard / project-list 三个落点）；**project-list 薄壳**：进来即 `redirectTo('/pages/project-overview/project-overview?pane=projects')`（栈里还压着别的页时改 `reLaunch`，防两个工作台实例并存），工作台 `onLoad` 读 `?pane=projects` 调 `openProjectsPane()` 打开 IDE 欢迎页全部目录（#1582）；**工作台「全部项目…」`.switcher-all` 不再离开工作台**，调 `openProjectsPane()`；下面这段里「project-overview reLaunch→project-list」是 2026-09-29 之前的形态；unlock/identity 完成后一律 reLaunch 回 launch 重跑分流，不自己跳工作区；**project-list reLaunch→project-overview**（`goToProject`，`onCloudAccepted` 复用同一方法）；**概览在工作台内是左栏面板**（2026-08-19 从中栏标签改过来；rail 第一个按钮 → `toggleLeftPane('home')`，内容组件 `components/project-home/ProjectHomePane.vue` 传 `compact`；顶栏切换器的 `.switcher-home`「项目概览」调的是同一个 `goProjectHome`）；**project-home 薄壳页只留给直链/深链**（`goWorkbench` 仍 reLaunch 进工作台并透传 `openFileId`；点 AI 对话历史带 `conversationId`，工作台 `onLoad` 消费后调 `loadHistoryChat`——它要 `$refs.chatInterface`，只能在 AI 面板已渲染之后调；**在工作台标签里点历史对话不跳页**，走 `openConversationInPanel` 就地切会话）；**project-home →project-list 条件分流**——上一页 route 是 `pages/project-list/project-list` 就 `navigateBack({delta:1})`，否则 `redirectTo`（**不能无脑 navigateTo**：双向 navigateTo 堆实例）；**project-overview reLaunch→project-list**（顶栏切换器里的「全部项目…」`.switcher-all`，工作台参与的跳转一律 reLaunch）；**overview 既不跳 admin 也不跳 userprofile**：设置是中栏标签，个人中心 2026-08-20 并进了它（见下一节）；`pages/userprofile` 与 `pages/admin` 两个薄壳页都还在，只留给直链、浏览器端与仓里既有的 navigateTo（前者现在挂的也是 `AdminPane`，落在个人组的「工作记录」）；admin 内「插件广场」是页内切换（plugin-market 独立页仅直链保留）；newproject reLaunch→overview；**newproject →project-list 同一条件分流**（上一页是列表 `navigateBack`，否则 `redirectTo`；菜单「文件 > 新建项目…」是 reLaunch 进来的单页栈，navigateTo 会压成两层让全局返回键残留，v0.49.0 BUG-07，`check:nav` 守着）；退出 reLaunch login。
+导航流：launch reLaunch→login（非桌面）|identity（本机工作区待选定）|**project-overview 无项目态外壳**（其余一律；2026-09-29 前这里还有 unlock / wizard / project-list 三个落点）；**project-list 薄壳**：进来即 `redirectTo('/pages/project-overview/project-overview?pane=projects')`（栈里还压着别的页时改 `reLaunch`，防两个工作台实例并存），工作台 `onLoad` 读 `?pane=projects` 调 `openProjectsPane()` 打开 IDE 欢迎页全部目录（#1582）；**工作台「全部项目…」`.switcher-all` 不再离开工作台**，调 `openProjectsPane()`；切换器最底部（有命名项目时）是「关闭项目」`.switcher-close`，`closeProjectFromSwitcher` 先落盘再走菜单同一条命令 `file.closeProject`（`app:closeProject`，问题 14，dev-board#1713）；下面这段里「project-overview reLaunch→project-list」是 2026-09-29 之前的形态；unlock/identity 完成后一律 reLaunch 回 launch 重跑分流，不自己跳工作区；**project-list reLaunch→project-overview**（`goToProject`，`onCloudAccepted` 复用同一方法）；**概览在工作台内是左栏面板**（2026-08-19 从中栏标签改过来；rail 第一个按钮 → `toggleLeftPane('home')`，内容组件 `components/project-home/ProjectHomePane.vue` 传 `compact`；顶栏切换器的 `.switcher-home`「项目概览」调的是同一个 `goProjectHome`）；**project-home 薄壳页只留给直链/深链**（`goWorkbench` 仍 reLaunch 进工作台并透传 `openFileId`；点 AI 对话历史带 `conversationId`，工作台 `onLoad` 消费后调 `loadHistoryChat`——它要 `$refs.chatInterface`，只能在 AI 面板已渲染之后调；**在工作台标签里点历史对话不跳页**，走 `openConversationInPanel` 就地切会话）；**project-home →project-list 条件分流**——上一页 route 是 `pages/project-list/project-list` 就 `navigateBack({delta:1})`，否则 `redirectTo`（**不能无脑 navigateTo**：双向 navigateTo 堆实例）；**project-overview reLaunch→project-list**（顶栏切换器里的「全部项目…」`.switcher-all`，工作台参与的跳转一律 reLaunch）；**overview 既不跳 admin 也不跳 userprofile**：设置是中栏标签，个人中心 2026-08-20 并进了它（见下一节）；`pages/userprofile` 与 `pages/admin` 两个薄壳页都还在，只留给直链、浏览器端与仓里既有的 navigateTo（前者现在挂的也是 `AdminPane`，落在个人组的「工作记录」）；admin 内「插件广场」是页内切换（plugin-market 独立页仅直链保留）；newproject reLaunch→overview；**newproject →project-list 同一条件分流**（上一页是列表 `navigateBack`，否则 `redirectTo`；菜单「文件 > 新建项目…」是 reLaunch 进来的单页栈，navigateTo 会压成两层让全局返回键残留，v0.49.0 BUG-07，`check:nav` 守着）；退出 reLaunch login。
 
 **客户门户构建（dev-board#1050）另有一条独立的导航流**：`pages/client-portal/client-portal` 只在 `npm run build:client-portal`（条件编译 `CLIENT_PORTAL`）里注册且是入口页，普通 H5/桌面构建里没有它；门户 reLaunch→project-list（CLIENT 视图）→ project-overview。门户包里只有这三页，`utils/clientPortal.js` 在 `main.js` 用 `uni.addInterceptor` 把其余目标（login/launch/calendar/admin……）改写回门户。pages.json 的条件编译块之间的逗号摆法保证两种构建展开后、以及 `check:nav` 剥注释整份读时都是合法 JSON，改 pages.json 时别打乱。契约全文见 version-control.md「客户门户与尽调清单上云」。
 **全局返回键**：`utils/globalBack.js`，body 级单例（同拖拽条/反馈浮窗），落在各页顶部那条 38px 拖拽条里；可见判据只有「页面栈深度 > 1」，工作台与 project-home 走豁免名单（自带左上角导航）。新页不需要各自补返回按钮。
@@ -690,6 +690,10 @@ left|right，**不给 bottom**——底栏放不下它内部那两个 tab）。
 `.claude/agents/doc-insight.md` 的「前端」一节。
 **它带来一处视觉变化**：`rightDockPanels` 从此默认非空，AI 面板顶部恒有一条
 dock tab 条（「AI 助手 | 依据」）——在它之前那条 tab 条只有用户主动搬过面板才出现。
+**问题 12（dev-board#1713）**：「依据」只认 Word 文稿（`documentAvailablePlugins` 按 `insightDocFileId` 过滤），原来没打开 Word 时
+整条 tab 条消失、AI 头部随开关文档上下跳 36px。现在 tab 条按 `rightDockTabs`（`resolveDocks(overrides, allDockPanels)`）渲染，
+此刻不可用的「依据」标 `is-disabled`（不可点、不可拖、title 提示 `workbench.insightNeedsDoc`）；`dockPanels` / `rightDockPanels`
+仍只含可用面板，左栏、右键菜单、拖放判定不变。Word / PPT / Excel / PDF 打开时 tab 条一致（只差「依据」可不可点）。
 **这个文件不许 import Vue / uni / `@/i18n`**（照 `config/commands/index.js` 的先例，
 它要能被 `node --test` 直接导入），所以只给 `labelKey`，文案由宿主 `$t` 渲染；
 图标从同目录 `icons.js` 取（变量库是新加的 `ICONS.braces`）。单测
@@ -703,6 +707,11 @@ dock tab 条（「AI 助手 | 依据」）——在它之前那条 tab 条只有
 `onLoad` 里 **`loadPanelDocks()` 必须排在恢复 `leftPaneKey` 之前**，紧跟着
 `normalizeDockSelections()`：存量 `leftPaneKey` 可能指向一个已经被搬去右/底的面板，
 不校正就是「左栏『加载中…』占位符 + rail 上一个高亮都没有」那个老地雷。
+底部抽屉选中的 tab 记在全局键 **`awd_tools_drawer_tab`**（`switchToolTab` → `rememberToolTab`），
+`normalizeDockSelections` 校正 `activeToolKey` 时依次取：记住的 → 剪贴板 → 底栏第一个；插件异步加载，
+`toggleToolsPanel` 打开前若当前 key 不在底栏会再校正一次（dev-board#1713）。
+左栏 `sidebar-content` 的 v-if 链里 `files` 有一个空 `<template v-else-if>` 分支：FileTree 在链外 `v-show` 常驻，
+少了这条 files 会落进兜底「加载中…」占位（教程问题 115）。
 
 **rail 拖动排序（dev-board#204，2026-08-27）**：与停靠平行的另一层状态，模块
 `pages/project-overview/railSort.js`（`railSortData()` + `railSortMethods`，同 panelDocking
@@ -845,6 +854,11 @@ DdFilesPanel / ShareholderMeetingPanel。新面板照抄这套，不要再自定
   setBounds`，这是「窗口超出屏幕」唯一的代码成因。护栏 `desktop/tests/main-window-bounds.test.js`
   （源码级断言，已挂进 `desktop/package.json` 的 test 脚本；main.js 一 require 就建窗拉服务，
   只能照 `native-theme-light.test.js` 的口径测）。
+  **窗口大小 / 位置 / 最大化记忆（dev-board#1713，问题 18）**：`desktop/main/window-state.js` 存取 prefs 键
+  `mainWindowStateV1`（最大化 / 全屏时记 `getNormalBounds()`）；建窗时 `restoreWindowOptions` 校验标题栏那条
+  至少 100px 宽落在某块显示器工作区里（外接屏拔掉 → 退回默认尺寸、不给坐标），尺寸再夹进该屏工作区，
+  经构造参数传入；最大化靠建窗后一次 `mainWindow.maximize()`——护栏里唯一放行的主窗口几何 setter。
+  写入点：窗口 `close` 与 `before-quit`（⌘Q 走 `app.exit`，不发 close）。单测 `desktop/tests/window-state.test.js`。
 - **Windows 右上角原生窗控跟随主题（dev-board#865）**：`titleBarOverlay` 是系统画的覆盖层，不吃 CSS。`main.js` 的 `titleBarOverlayFor(dark)` 出取值（浅色 `#ffffff/#3c4043` 保持改造前原值；深色 = 色源 `roles.dark.surface` / `roles.dark.text-2`，即顶栏 `.project-header` 的 `--awd-surface` 与图标色），`syncTitleBarOverlay()` 按 `nativeTheme.shouldUseDarkColors` 调 `setTitleBarOverlay`，**只在 win32**。两个触发点：`applyNativeTheme`（渲染层 `checkba:set-theme` 每次推主题都经过它）与 `nativeTheme.on('updated')`（「跟随系统」时用户在系统设置里切深浅）。改配色色源时主进程这两个字面量要跟着改，`desktop/tests/titlebar-overlay-theme.test.js` 对拍色源。**不要为此把 `themeSource` 改成按平台分流**：nativeTheme 本来就是应用主题的镜像，mac 交通灯那条不变式照旧。
 - **编辑器标签（`.tab-item`）在 project-overview.scss 里只有一份定义了**。此前有两份：
   靠前那份是 VS Code 式贴合标签，被靠后那份整个覆盖成死代码，实际生效的是一排
@@ -942,6 +956,8 @@ DdFilesPanel / ShareholderMeetingPanel。新面板照抄这套，不要再自定
   **不许退回「只置 splitMode=false」**：右窗格是 v-if，留着的标签看不见却仍被
   `pickActiveContextTab` 当成 AI「当前文档」，资源管理器点它还会让 `openFile` 把分屏自己打开。
   单测 `frontend/tests/project-home/split-close-merge.test.mjs`。
+  `closeFile` 关掉右侧最后一个标签后自动走 `toggleSplitMode` 退出分屏（教程问题 76，dev-board#1713）；
+  左侧关空不退出。单测 `split-auto-exit-on-right-empty.test.mjs`。
 - **工具栏下拉在布局变化时收起（v0.49.0 C9-01）**：`EditorToolbar` 的下拉是打开瞬间的
   `position:fixed` 快照；除 #999 的 mousedown/Esc/blur/横滚四路收口外，另挂 `window resize`
   → `closeMenus`。工作台布局变化（分屏开关、标签跨窗格、面板开合）经 `triggerWorkbenchResize`
@@ -1093,7 +1109,7 @@ DdFilesPanel / ShareholderMeetingPanel。新面板照抄这套，不要再自定
 **登录 / 退出后即时刷新**：入口组件自己订 `awd:account-changed`（带 `connected` 的负载先按它翻转「登录 ⇄ 头像」，宿主 `loggedIn`
 跟上后以 prop 为准），工作台也订同一事件（`refreshAccountState` 重拉授权状态、余额、用户信息；mounted 挂、beforeUnmount 按引用摘，
 不加活跃实例守卫）。退出走 `utils/signOut.js`（单动作，停在当前页）。护栏 `tests/account/account-entry-account-changed.test.mjs`（含「在顶栏、rail 里没有账户入口与齿轮」的宿主摆放断言）+ `check:nav`。
-已登录显示头像，下拉 = 账户抬头（余额 + 等级）+ 提醒行（原顶栏宽限 / 试用 chip 文案，`accountNoticeText`）+ 我的日程 / 设置 / 退出登录三个动作；
+已登录显示头像，下拉 = 消息中心 +「账户与用量」入口（只给入口，**不摆余额数字、等级与试用剩余天数**——录屏投屏会把余额露给旁人，问题 113 / dev-board#1713；`check:nav` 断言 AccountEntry 里没有 walletText / walletTier / trialText，下拉恰好五项）+ 提醒行（原顶栏宽限 / 试用 chip 文案，`accountNoticeText`）+ 我的日程 / 设置 / 退出登录；
 余额不足或有提醒时头像右上角挂一个点。下拉从头像下方右对齐展开。顶栏整条是 drag 区：`.header-account` /
 `.account-entry-btn` / `.avatar-menu` 在 App.vue 的顶栏 no-drag 名单里，全屏 mask `.account-entry-mask` 在「全屏浮层」名单里。
 rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goToSystemSettings`）与应用菜单「设置…」（⌘,，`app.settings`）；
@@ -1592,7 +1608,8 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 
 - **微信拖入根因与双通道兜底**：macOS 微信（`WeChat.app`）聊天中的文件位于 App Sandbox 容器 `~/Library/Containers/com.tencent.xinWeChat/Data/...`（及 `Group Containers`），受 macOS TCC `kTCCServiceSystemPolicyAllFiles`（完全磁盘访问权限）保护，未授权时直接返回 `EPERM` 且系统不自动弹窗。`frontend/src/utils/fileTreeExternalDrop.js` 对命中 `/Library/(Group )?Containers/` 的路径在同步 `drop` 事件内预读 `File.arrayBuffer()` 字节流；当后端 `import-local` 因 TCC 失败时自动回退到 `stageDroppedFile` 上传字节；若字节流与直接路径均被 TCC 拒绝，抛出 `dropCode = 'importDropPermissionDenied'` 并触发全局事件 `awd:open-permission-onboarding`（`focus: 'fullDiskAccess', reason: 'wechat-drop'`）。后端 `ProjectFileService.throwIfSourceAccessDenied` 将 `AccessDeniedException` / `Operation not permitted` 转为明确提示开启「完全磁盘访问权限」的异常，同时对真实缺失文件保留原错误。
 - **Codex 式首启权限排查与拖拽授权浮窗**：桌面主进程 `desktop/main/permissions-service.js` 提供 `fullDiskAccess`（探测 `/Library/Preferences/com.apple.TimeMachine.plist` 与微信容器可读性）、`screenRecording`、`microphone`、`accessibility` 四项状态检测，打开对应 `x-apple.systempreferences:com.apple.preference.security?Privacy_*` 页，并通过 JXA `CGWindowListCopyWindowInfo` 追踪系统设置窗口位置，在旁侧贴靠置顶无边框拖拽引导浮窗（`showHelperWindow` + `desktop/preload/permission-helper-preload.js`），支持通过 `webContents.startDrag({ file: appBundlePath, icon })` 将 `AI WorkDeck.app` 直接拖入系统设置列表，后台 800ms 轮询授权成功后自动收起浮窗并广播 `checkba:permissions-updated`。
-- **前端全局引导与设置页入口**：`App.vue` 挂载独立根实例 `mountPermissionOnboarding()`（`PermissionOnboardingModal.vue` + `utils/permissionOnboarding.js`），macOS 桌面端首次启动存在未授权推荐项时自动弹出，并在 `AdminPane.vue`「系统 → 系统权限」提供常驻体检与一键开启入口。所有调起原生 `.app` 拖拽的 `dragstart` 必须先同步 `e.preventDefault()` 再调 `startAppDrag`。
+- **前端全局引导与设置页入口**：`App.vue` 挂载独立根实例 `mountPermissionOnboarding()`（`PermissionOnboardingModal.vue` + `utils/permissionOnboarding.js`），macOS 桌面端首次启动存在未授权推荐项时自动弹出（推荐项＝完全磁盘访问、麦克风；屏幕录制只是截图兜底，非推荐，问题 34/62；「稍后设置」标记经 `host.prefs.get(key)`/`set(key, value)` 按位置传参落盘），并在 `AdminPane.vue`「系统 → 系统权限」提供常驻体检与一键开启入口。所有调起原生 `.app` 拖拽的 `dragstart` 必须先同步 `e.preventDefault()` 再调 `startAppDrag`。
+- **首启弹窗排队（dev-board#1713，问题 4/40）**：`utils/permissionOnboarding.js` 的 `whenPermissionOnboardingStartupSettled()` 在权限窗启动检查结束（判定不弹 / 弹了且关闭 / 不支持或挂载失败）时放行；`project-overview.vue` 的 `maybePromptOptionalComponents` 要弹「可选组件」前先 await 它，两个首启弹窗不叠。新增首启弹窗同样排在它后面。
 - **验证**：`desktop/tests/permissions-service.test.js`、`frontend/tests/project-home/drop-byte-import.test.mjs`、`frontend/tests/project-home/permission-onboarding.test.mjs`。
 
 ## 项目标签恢复的加载范围（dev-board#1473）
@@ -1604,8 +1621,8 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 ## 对话 / 工作台双模式与随手工作区（dev-board#1479，2026-10-26）
 
 - **单壳正交双模（`对话 | 工作台`）**：`project-overview.vue` 顶栏 `.header-center` 提供 `.mode-switch-capsule`（`viewMode: 'chat' | 'ide'`，在 `App.vue` 登记 `no-drag`），纯逻辑在 `pages/project-overview/chatMode.js`（`STARTUP_ENTRY_MODE_KEY = 'awd_startup_entry_mode'` 默认 `'welcome'`，`VIEW_MODE_STORAGE_KEY = 'awd_last_view_mode'`）。切换模式只在 `project-overview.vue` 内改布局状态，不调 `uni.reLaunch`，不卸载 `ChatInterface`（SSE 流不断）与 `LibreOfficeEditor`（LOWA `<webview>` 保活）。
-- **欢迎页快速入口（`WelcomePane.vue`）**：保留欢迎页为默认首屏，顶部新增 `.welcome-quick-chat` 输入框与快捷胶囊（`进入随手对话` / `新建空白文稿` / `新建 Markdown`），emit `start-chat` / `quick-create-doc` 交宿主切入 `chat` 模式。
-- **随手工作区（`Project.SCRATCH = "SCRATCH"`）**：无项目态切入 `chat` 模式时，宿主调 `ensureScratchProject()`（`POST /api/projects/scratch` → `ProjectService.getOrCreateScratchProject`）幂等获取每用户唯一的隐形托管项目（`versionOptOut = true`，在 `getUserProjects` / 律所目录 / 冲突检索中过滤隐藏），原地绑定 `projectId` 并拉取会话与文件。顶栏与侧栏提供「转为正式项目」（`POST /api/projects/{id}/promote` → `ProjectService.promoteScratchProject`），原地将 `SCRATCH` 转为 `BLANK` 并解除 `versionOptOut`，文件与对话历史零迁移保留。
+- **欢迎页快速入口（`WelcomePane.vue`）**：保留欢迎页为默认首屏，顶部新增 `.welcome-quick-chat` 输入框与快捷胶囊（`进入随手对话` / `新建空白文稿` / `新建 Markdown`），emit `start-chat` / `quick-create-doc` 交宿主切入 `chat` 模式。**项目已打开时**（`currentProjectId != null`，即 `hasNamedProject`）按钮与占位改说「在本项目新建对话」，宿主 `handleWelcomeStartChat` 先 `handleChatSidebarNewChat()` 再发送，不续到项目里正在进行的对话（问题 13，dev-board#1713）。
+- **随手工作区（`Project.SCRATCH = "SCRATCH"`）**：无项目态切入 `chat` 模式时，宿主调 `ensureScratchProject()`（`POST /api/projects/scratch` → `ProjectService.getOrCreateScratchProject`）幂等获取每用户唯一的隐形托管项目（`versionOptOut = true`，在 `getUserProjects` / 律所目录 / 冲突检索中过滤隐藏），原地绑定 `projectId` 并拉取会话与文件。顶栏与侧栏提供「转为正式项目」（`POST /api/projects/{id}/promote` → `ProjectService.promoteScratchProject`），原地将 `SCRATCH` 转为 `BLANK` 并解除 `versionOptOut`，文件与对话历史零迁移保留。弹窗预填当前对话标题，取不到回落项目名，项目名只是临时项目默认名时留空（`chatMode.js` 的 `promoteScratchDefaultName`，问题 19）。
 - **轻量侧栏与按需画布（`ChatModeSidebar.vue`）**：`chat` 模式下隐藏 `.left-rail` 与 `.sidebar-left`，左侧挂载可折叠 `ChatModeSidebar.vue`（近期对话、当前工作区文稿 `+ Word` / `+ MD`、跨项目调取树 `getMyProjects` + 按需展开 `getProjectFiles(id, null, true)`）。`.workbench-main` 通过 CSS flex `order` 将 `.side-panel-ai` 置左、`.content-area` 置右：无打开文档时 `.side-panel-ai` 居中流式（`max-width: 840px`），`.content-area` 零宽隐藏保活；打开/新建文稿或 AI 产物时 `chatCanvasOpen = true` 自动展开右侧画布（标签栏附「收起画布」按钮）。
 - **验证**：`frontend/tests/project-home/chat-mode.test.mjs`、`npm --prefix frontend run check:nav`、`npm --prefix frontend run check:emits`、`Backend ScratchProjectAndCrossProjectReadTest`。
 

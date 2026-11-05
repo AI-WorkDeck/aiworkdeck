@@ -86,6 +86,8 @@ class LocalAsrClientTest {
         assertFalse(r.ready());
         assertTrue(r.nextStep().contains("下载"), "下一步要指向下载运行时组件：" + r.nextStep());
         assertFalse(r.nextStep().contains("重启"), "组件没装时让用户重启应用是错的指路：" + r.nextStep());
+        // 问题 35：体积以组件面板按 manifest 显示为准，这里不写死数字
+        assertFalse(r.nextStep().matches("(?s).*\\d\\s*(MB|GB).*"), "不写死组件体积：" + r.nextStep());
         assertNotMistakenForLogout(r);
     }
 

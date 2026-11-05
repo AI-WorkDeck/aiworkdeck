@@ -46,7 +46,8 @@ export default {
   "docMissing": "Quel file non è più presente in questo progetto",
   "source": {
     "projectFile": "File del progetto",
-    "qichacha": "Qichacha"
+    "qichacha": "Qichacha",
+    "pkulaw": "PKULaw"
   },
   "mentions": "{count} occorrenza/e",
   "mentionsTitle": "Occorrenze nel documento",

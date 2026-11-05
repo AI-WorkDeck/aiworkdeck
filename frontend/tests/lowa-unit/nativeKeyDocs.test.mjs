@@ -80,6 +80,7 @@ function build(kind, opts = {}) {
     MD_MARKER_RE: /\*\*|^#/m,
     insertTextAtCursor: (_, t) => seen.writerInserts.push(t), insertInlineStyled: (_, t) => seen.writerInserts.push(t),
     verifySnapshot: () => ({}), viewCursorCellName: () => null,
+    atHyperlinkEnd: () => false, detachTypedFromHyperlink: () => {},
     dispatchUno: (url) => seen.dispatched.push(url),
     UI_COMMANDS: { line_start: '.uno:GoToStartOfLine', page_down: '.uno:PageDown', bold: '.uno:Bold' },
     deselect: () => ({ success: true, name: 'escape', writer: true }),

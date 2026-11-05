@@ -50,7 +50,7 @@ export default {
   "captureNoResult": "截圖完成，但未收到結果",
   "screenShareUnsupported": "當前瀏覽器不支持屏幕共享",
   "captureFailedAllowShare": "截圖失敗（請允許共享標籤頁/窗口）",
-  "captureH5Only": "僅 H5 支持截圖摘錄",
+  "captureH5Only": "僅 H5 支持截圖取詞",
   "loadStagingFailed": "加載暫存區文件失敗",
   "addedToStaging": "已加入暫存區",
   "stagingFullTitle": "文件緩存區已滿",

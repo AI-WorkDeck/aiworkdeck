@@ -56,7 +56,7 @@ export default {
   captureNoResult: 'Screenshot finished but no result received',
   screenShareUnsupported: 'Screen sharing is not supported in this browser',
   captureFailedAllowShare: 'Screenshot failed (allow sharing the tab or window)',
-  captureH5Only: 'Screenshot capture is only supported on web',
+  captureH5Only: 'Screen Capture OCR is only supported on web',
 
   // stagingArea.js
   loadStagingFailed: 'Failed to load staging area files',

@@ -37,7 +37,7 @@ export default {
   "ocr": {
     "refresh": "รีเฟรชมุมมอง",
     "recognize": "จดจำข้อความ",
-    "download": "ดาวน์โหลด",
+    "download": "บันทึกลงโปรเจกต์",
     "copy": "คัดลอก",
     "insertDoc": "แทรกลงในเอกสาร",
     "webLink": "ลิงก์ไปยังการตรวจสอบบนเว็บ",

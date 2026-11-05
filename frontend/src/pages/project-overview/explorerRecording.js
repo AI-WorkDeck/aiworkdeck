@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { getMeetingRecordings, getMeetingAsrNotice } from '@/services/api.js'
 import { recorderState, isRecordingActive, startRecording } from '@/utils/meetingRecorder.js'
+import { confirmAsrNotice } from '@/utils/asrNoticeDialog.js'
 
 // Explorer and welcome clicks are host-owned recording actions. Plugin-initiated starts
 // still go through their existing permission checks and confirmation dialog.
@@ -73,10 +74,10 @@ export default {
         if (data.tier !== 'local') {
           const notice = await getMeetingAsrNotice()
           if (!isCurrent()) return
-          if (data.tier === 'platform' && notice && !notice.acknowledged) {
-            uni.showToast({ title: this.$t('fileTree.recordingNoticeRequired'), icon: 'none' })
-            return
-          }
+          // 欠告知就当场拉起宿主告知框，确认后接着开录（dev-board#1713 #118）
+          if (data.tier === 'platform' && notice && !notice.acknowledged
+              && !(await confirmAsrNotice({ notice, isCurrent }))) return
+          if (!isCurrent()) return
         }
         if (isRecordingActive()) return this.focusExplorerRecording()
         if (!this.canWriteProject || !this.meetingRecorderEnabled) return

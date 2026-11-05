@@ -50,7 +50,7 @@ export default {
   "captureNoResult": "Tangkapan layar selesai tetapi tidak ada hasil yang diterima",
   "screenShareUnsupported": "Berbagi layar tidak didukung di peramban ini",
   "captureFailedAllowShare": "Tangkapan layar gagal (izinkan berbagi tab atau jendela)",
-  "captureH5Only": "Tangkapan layar hanya didukung di H5",
+  "captureH5Only": "OCR Tangkap Layar hanya didukung di web",
   "loadStagingFailed": "Gagal memuat berkas area transit",
   "addedToStaging": "Ditambahkan ke area transit",
   "stagingFullTitle": "Area Transit Penuh",

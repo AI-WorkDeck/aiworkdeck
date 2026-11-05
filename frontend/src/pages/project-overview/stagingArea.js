@@ -114,10 +114,17 @@ export const stagingAreaMethods = {
 
       const fileIds = files.map(f => f.id)
 
-      // 记录每个文件进入暂存区前的原始 parentId
+      // 记录每个文件进入暂存区前的原始 parentId；载荷没带时按 id 从文件树数据反查
+      const treeFiles = (this.$refs.fileTree && this.$refs.fileTree.allFiles) || []
       for (const file of files) {
-        if (file.id && file.parentId !== undefined) {
-          this.stagingOriginalParents[file.id] = file.parentId
+        if (!file.id) continue
+        let parentId = file.parentId
+        if (parentId === undefined) {
+          const hit = treeFiles.find(f => f && String(f.id) === String(file.id))
+          if (hit) parentId = hit.parentId ?? null
+        }
+        if (parentId !== undefined) {
+          this.stagingOriginalParents[file.id] = parentId
         }
       }
 

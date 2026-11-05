@@ -13,5 +13,16 @@
   "panel.exporting": "Toplantı materyalleri kaydediliyor…",
   "panel.preparingAi": "Toplantı materyalleri yapay zekâ için hazırlanıyor…",
   "view.account.name": "Tencent Meeting",
-  "view.meetings.name": "Tencent Meeting"
+  "view.meetings.name": "Tencent Meeting",
+  "panel.autoSync": "Toplantılar bitince bu projeye otomatik eşitle",
+  "panel.autoSyncHint": "Açtığınızda eklentiye, bu panel açıkken her 5 dakikada bir yerel tmeet CLI'yi çalıştırıp son 24 saatte biten toplantıları kontrol etme izni verirsiniz. Kaydı veya tutanağı olan yeni toplantılar projenin \"Tencent Meeting\" klasörüne arşivlenir ve yapay zekâ tutanak ile yapılacakları hazırlar (yapay zekâ kredisi kullanır). Hiçbir şey yüklenmez; tmeet yoksa veya yetkilendirilmemişse kontrol atlanır.",
+  "panel.autoWaiting": "Otomatik eşitleme açık. Kısa süre içinde kontrol edilecek.",
+  "panel.autoRunning": "Otomatik eşitleme sürüyor…",
+  "panel.autoOk": "Otomatik eşitleme: {time} itibarıyla kontrol edildi, {count} yeni toplantı arşivlendi.",
+  "panel.autoPartial": "Otomatik eşitleme: {time} itibarıyla {count} yeni toplantı arşivlendi; bazı materyaller henüz hazır değil, yeniden denenecek.",
+  "panel.autoCliMissing": "Otomatik eşitleme atlandı: tmeet CLI bulunamadı.",
+  "panel.autoNotLoggedIn": "Otomatik eşitleme atlandı: Tencent Meeting yetkilendirilmemiş.",
+  "panel.autoAiFailed": "Bunlardan {count} tanesi için yapay zekâ tutanağı veya yapılacaklar hazırlanamadı; elle oluşturmak için toplantıyı açın.",
+  "panel.autoOn": "Otomatik eşitleme açıldı.",
+  "panel.autoOff": "Otomatik eşitleme kapatıldı."
 }

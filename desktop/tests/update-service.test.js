@@ -403,7 +403,7 @@ async function fullFixture(t, { hash, prepareError, onEvent, beforePrepare } = {
   const prepared = []
   const svc = createUpdateService({ packaged: true, dataDir: root, appVersion: '0.11.0', platform: 'darwin', arch: 'arm64' }, {
     onEvent,
-    prepareInstaller: async (file, version) => { if (beforePrepare) await beforePrepare(); prepared.push({ bytes: fs.readFileSync(file), version }); if (prepareError) throw new Error(prepareError) }
+    prepareInstaller: async (file, version, onStage) => { if (beforePrepare) await beforePrepare(onStage); prepared.push({ bytes: fs.readFileSync(file), version }); if (prepareError) throw new Error(prepareError) }
   })
   return { svc, prepared, asset, ctx: { packaged: true, dataDir: root, appVersion: '0.11.0', platform: 'darwin', arch: 'arm64' } }
 }
@@ -506,4 +506,51 @@ test('完整更新：下载完成后持续广播 preparing，原生准备结束�
   } finally { release() }
   assert.equal((await checking).phase, 'ready')
   assert.equal(events.at(-1).state.phase, 'ready')
+})
+
+// 问题 90：隔离实例（AWD_DISABLE_UPDATES=1 或非默认 --user-data-dir）点「重启更新」后，ShipIt 不带原进程的
+// env 与启动参数重启，变成用真实数据目录起来的默认实例。隔离实例一律不检查、不下载、不出「重启更新」。
+test('隔离实例不做应用内更新：不联网检查，状态带 disabled', async (t) => {
+  const { updatesDisabledReason } = require('../main/services/update-service')
+  assert.equal(updatesDisabledReason({ AWD_DISABLE_UPDATES: '1' }, []), 'AWD_DISABLE_UPDATES')
+  assert.equal(updatesDisabledReason({}, ['/Applications/AI WorkDeck.app/Contents/MacOS/AI WorkDeck', '--user-data-dir=/tmp/x']), 'user-data-dir')
+  assert.equal(updatesDisabledReason({}, ['electron', '--user-data-dir', '/tmp/x']), 'user-data-dir')
+  assert.equal(updatesDisabledReason({ AWD_DISABLE_UPDATES: '0' }, ['electron', '.']), null)
+
+  let hits = 0
+  const srv = http.createServer((_req, res) => { hits++; res.writeHead(404).end() })
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r))
+  t.after(() => srv.close())
+  testEnv(t, `http://127.0.0.1:${srv.address().port}`, pubPem)
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'upd-disabled-'))
+  t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }))
+  const svc = createUpdateService({ packaged: true, dataDir, appVersion: '0.12.0', env: { AWD_DISABLE_UPDATES: '1' }, argv: [] })
+  svc.start()
+  t.after(() => svc.stop())
+  const state = await svc.check()
+  assert.equal(state.disabled, true)
+  assert.equal(state.phase, 'idle')
+  assert.equal(hits, 0)
+})
+
+// 问题 92：准备阶段（挂载 / 打包 / 校验）随 preparing 事件广播，界面据此分阶段提示。
+test('完整更新：准备阶段随 preparing 广播 stage，ready 后清空', async (t) => {
+  const events = []
+  let seen = null
+  const { svc } = await fullFixture(t, {
+    onEvent: (event) => events.push(event),
+    beforePrepare: async (onStage) => {
+      onStage('mount')
+      onStage('package')
+      seen = svc.getState()
+    },
+  })
+  const state = await svc.check()
+  assert.equal(seen.phase, 'preparing')
+  assert.equal(seen.progress.stage, 'package')
+  assert.deepEqual(events.filter((e) => e.type === 'preparing').map((e) => e.state.progress ? e.state.progress.stage : null), [null, 'mount', 'package'])
+  assert.equal(state.phase, 'ready')
+  assert.equal(state.progress, null)
+  const main = fs.readFileSync(path.join(__dirname, '../main/main.js'), 'utf8')
+  assert.match(main, /prepareInstaller: \(file, version, onStage\) => fullUpdate\.prepare\(file, version, onStage\)/)
 })

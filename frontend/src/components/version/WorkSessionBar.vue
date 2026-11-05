@@ -43,6 +43,8 @@
             class="awd-input"
             :disabled="busy"
             :placeholder="$t('version.sessionNamePlaceholder')"
+            :focus="true"
+            @keydown.enter="onTitleEnter"
           />
         </view>
         <view class="awd-footer">
@@ -78,6 +80,12 @@ export default {
     openNaming() {
       this.title = ''
       this.naming = true
+    },
+    // 回车提交；输入法选词时的回车（isComposing / keyCode 229）不算
+    onTitleEnter(e) {
+      if (e && (e.isComposing || e.keyCode === 229)) return
+      if (e && typeof e.preventDefault === 'function') e.preventDefault()
+      this.end()
     },
     async returnToMainline() {
       if (this.busy) return

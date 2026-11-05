@@ -186,7 +186,8 @@ test('shipping main wiring recreates a closed window and brings open requests to
     mainWindow: null, mainWindowStartupReady: true,
     createMainWindow() { context.mainWindow = { isDestroyed: () => false, isMinimized: () => true,
       restore: () => actions.push('restore'), show: () => actions.push('show'), focus: () => actions.push('focus') }; actions.push('create') },
-    require(name) { assert.equal(name, './open-paths'); return { installOpenPaths(options) {
+    require(name) { if (name === './awd-home') return { dataDir: () => os.tmpdir() }
+      assert.equal(name, './open-paths'); return { installOpenPaths(options) {
       installOpenPaths({ ...options, queueFile: null, platform: 'win32', argv: [], stat: () => ({ isFile: () => true, isDirectory: () => false }) })
     } } },
   })

@@ -46,7 +46,8 @@ export default {
   "docMissing": "File tersebut sudah tidak ada di proyek ini",
   "source": {
     "projectFile": "File proyek",
-    "qichacha": "Qichacha"
+    "qichacha": "Qichacha",
+    "pkulaw": "PKULaw"
   },
   "mentions": "{count} penyebutan",
   "mentionsTitle": "Penyebutan dalam dokumen ini",

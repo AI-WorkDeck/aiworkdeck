@@ -322,4 +322,24 @@ class SensitiveControllerTest {
         }
     }
 
+
+    @Test void redactedCopyIsNamedAfterTheRedactedSourceAndNumberedOnConflict() throws Exception {
+        // dev-board#1713 #98
+        file(); when(members.hasReadPermission(2L, 9L)).thenReturn(true); when(members.hasWritePermission(2L, 9L)).thenReturn(true);
+        files.getFile(1L).setName("北京星河科技有限公司起诉状.txt");
+        when(files.createFile(eq(2L), nullable(Long.class), anyString(), anyString(), anyLong(), anyString(), anyString(), eq(9L)))
+                .thenAnswer(call -> { var f = new ProjectFile(); f.setId(3L); f.setProjectId(2L); f.setName(call.getArgument(2)); f.setFilePath(call.getArgument(5)); return f; });
+        when(files.isNameTaken(eq(2L), nullable(Long.class), anyString())).thenAnswer(call -> !((String) call.getArgument(2)).contains(" (2)"));
+        try (var auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(9L);
+            String body = json.writeValueAsString(Map.of("fileId", 1, "strategies", List.of("COMPANY"), "mode", "MASK"));
+            String output = mvc().perform(post("/api/sensitive/desensitize").header("X-Session-Id", "s").contentType("application/json").content(body))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+            String name = json.readTree(output).get("file").get("name").asText();
+            assertTrue(name.endsWith("起诉状（已脱敏） (2).txt"), name);
+            assertFalse(name.contains("星河"), name);
+            assertTrue(Files.exists(dir.resolve(name)));
+            try (var list = Files.list(dir)) { assertEquals(2, list.count()); }
+        }
+    }
 }

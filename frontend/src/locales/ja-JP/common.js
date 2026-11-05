@@ -8,6 +8,7 @@ export default {
   "cancel": "キャンセル",
   "save": "保存",
   "close": "閉じる",
+  "done": "完了",
   "delete": "削除",
   "rename": "名前を変更",
   "retry": "再試行",

@@ -13,5 +13,16 @@
   "panel.exporting": "Đang lưu tài liệu cuộc họp…",
   "panel.preparingAi": "Đang chuẩn bị tài liệu cuộc họp cho AI…",
   "view.account.name": "Tencent Meeting",
-  "view.meetings.name": "Tencent Meeting"
+  "view.meetings.name": "Tencent Meeting",
+  "panel.autoSync": "Tự động đồng bộ vào dự án này khi cuộc họp kết thúc",
+  "panel.autoSyncHint": "Khi bật, bạn cho phép plugin, trong lúc bảng này đang mở, chạy tmeet CLI cục bộ mỗi 5 phút để kiểm tra các cuộc họp đã kết thúc trong 24 giờ qua. Cuộc họp mới có bản ghi hoặc biên bản sẽ được lưu vào thư mục \"Tencent Meeting\" của dự án, và AI soạn biên bản cùng việc cần làm (tiêu tốn tín dụng AI). Không cài đặt bất kỳ chương trình nào; nếu chưa có tmeet hoặc chưa ủy quyền thì bỏ qua lần kiểm tra.",
+  "panel.autoWaiting": "Đã bật tự động đồng bộ. Sẽ kiểm tra ngay.",
+  "panel.autoRunning": "Đang tự động đồng bộ…",
+  "panel.autoOk": "Tự động đồng bộ: đã kiểm tra lúc {time}, lưu {count} cuộc họp mới.",
+  "panel.autoPartial": "Tự động đồng bộ: lưu {count} cuộc họp mới lúc {time}; một số tài liệu chưa sẵn sàng, sẽ thử lại sau.",
+  "panel.autoCliMissing": "Đã bỏ qua tự động đồng bộ: không tìm thấy tmeet CLI.",
+  "panel.autoNotLoggedIn": "Đã bỏ qua tự động đồng bộ: Tencent Meeting chưa được ủy quyền.",
+  "panel.autoAiFailed": "Không thể soạn biên bản hoặc việc cần làm bằng AI cho {count} cuộc họp; mở cuộc họp để tạo thủ công.",
+  "panel.autoOn": "Đã bật tự động đồng bộ.",
+  "panel.autoOff": "Đã tắt tự động đồng bộ."
 }

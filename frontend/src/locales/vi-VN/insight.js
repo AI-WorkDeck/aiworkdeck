@@ -46,7 +46,8 @@ export default {
   "docMissing": "Tệp đó không còn trong dự án này",
   "source": {
     "projectFile": "Tệp dự án",
-    "qichacha": "Qichacha"
+    "qichacha": "Qichacha",
+    "pkulaw": "PKULaw"
   },
   "mentions": "{count} vị trí",
   "mentionsTitle": "Vị trí xuất hiện trong văn bản",

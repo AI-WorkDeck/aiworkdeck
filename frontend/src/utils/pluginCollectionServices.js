@@ -4,7 +4,7 @@
 import {
   getTaskProjectOptions, getProjectTasks, getCalendarTasks, getCalendarSummary,
   getProjectFiles, getProjectMembers, getProjectFavorites, deleteFavorite,
-  listClipboard, deleteClipboardItem, getApiBaseUrl, purchaseFeatureSku,
+  listClipboard, deleteClipboardItem, clearClipboard, getApiBaseUrl, purchaseFeatureSku,
 } from '@/services/api.js'
 import { createTask, updateTask, deleteTask } from '@/utils/taskStore.js'
 import { getSessionId } from '@/utils/auth.js'
@@ -186,6 +186,19 @@ export function createPluginCollectionServices({ projectId, permissions, isCurre
         return isFavorite ? safe : { items: safe, limited: !!result?.limited, hiddenCount: Number(result?.hiddenCount) || 0 }
       }
       if (!isFavorite && operation === 'account') return await action('openAccount')
+      if (!isFavorite && operation === 'clear') {
+        await wait(clearClipboard())
+        cache.clear()
+        uni.$emit('awd:clipboard-saved', { cleared: true })
+        return { ok: true }
+      }
+      // 「暂停记录」：只有桌面端能停系统剪贴板轮询；params.paused 为布尔时设置，否则只读
+      if (!isFavorite && operation === 'capture') {
+        check()
+        if (typeof actions.clipboardCapture !== 'function') return { supported: false, paused: false }
+        const state = await wait(actions.clipboardCapture(typeof params.paused === 'boolean' ? params.paused : undefined))
+        return { supported: !!state?.supported, paused: !!state?.paused }
+      }
       if (!isFavorite && operation === 'purchase') {
         if (purchasing) fail('busy')
         purchasing = true
@@ -225,7 +238,11 @@ export function createPluginCollectionServices({ projectId, permissions, isCurre
       }
       if (operation === 'copy') {
         need('clipboard')
-        const text = isFavorite ? item.sourceUrl || item.content || item.title : item.type === 'TEXT' ? item.text : ''
+        // 收藏：只有图片（截图收藏）就复制图片本身；否则正文 → 来源网址 → 标题（与设置页「全部收藏」一致）
+        if (isFavorite && item.imagePath && !String(item.content || '').trim()) {
+          return await action('copyImage', (await image(service, item.id)).dataUrl)
+        }
+        const text = isFavorite ? item.content || item.sourceUrl || item.title : item.type === 'TEXT' ? item.text : ''
         if (!text) return { ok: false }
         return await action('copyText', String(text).trim())
       }

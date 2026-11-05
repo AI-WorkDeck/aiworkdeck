@@ -27,6 +27,8 @@ const { createClipboardPoller, startChangeCounter } = require('./clipboard-watch
 // "陌生进程占用"，进而降级到端口链下一档另起一套全新后端。requestSingleInstanceLock
 // 直接把第二个进程在此拦停、退出，让它永远走不到 whenReady()，上面两种竞态都无从
 // 发生——不修 allocateBackendPort/isOurBackend 本身（那是复用逻辑，另一类问题）。
+// 隔离实例（AWD_HOME，问题 20）：userData 必须在拿锁之前定好——锁按 userData 判重。
+require('./awd-home').applyUserData(app)
 const singleInstanceLock = app.requestSingleInstanceLock()
 if (!singleInstanceLock) {
   app.quit()
@@ -34,7 +36,7 @@ if (!singleInstanceLock) {
 }
 
 // NSIS may still be replacing files after a very fast manual reopen.
-if (app.isPackaged && process.platform === 'win32' && require('./services/full-update').deferWindowsLaunch(path.join(app.getPath('home'), '.aiworkdeck'), undefined, () => {
+if (app.isPackaged && process.platform === 'win32' && require('./services/full-update').deferWindowsLaunch(require('./awd-home').dataDir(), undefined, () => {
   const { t: langT } = require('./app-language')
   require('electron').dialog.showErrorBox(
     langT({ zh: 'AI WorkDeck 更新仍在进行', en: 'AI WorkDeck Update Still in Progress' }),
@@ -71,7 +73,7 @@ const IS_DEV = process.env.AIWORKDECK_DESKTOP_DEV === '1'
 function logDesktopEvent(type, data) {
   const evt = { ts: new Date().toISOString(), type, ...data }
   try {
-    const dir = path.join(app.getPath('home'), '.aiworkdeck', 'logs')
+    const dir = path.join(require('./awd-home').dataDir(), 'logs')
     require('fs').mkdirSync(dir, { recursive: true })
     require('fs').appendFileSync(path.join(dir, 'desktop.log'), JSON.stringify(evt) + '\n')
   } catch (e) { /* 日志失败不阻断任何流程 */ }
@@ -151,6 +153,8 @@ function getBackendHealth() {
 // update may already have activated a different overlay while Spring was starting.
 function recordBackendBoot(ok, launch, reason = '') {
   if (!launch?.bootOverlay || launch.bootRecorded) return { reverted: false }
+  // 启动中途被退出/强杀（SIGTERM → before-quit → stopAll）：后端是我们自己停的，不是补丁坏了（问题 21）
+  if (!ok && services?.closing) return { reverted: false }
   launch.bootRecorded = true
   try {
     const overlay = require('./services/overlay')
@@ -172,7 +176,7 @@ function recordBackendBoot(ok, launch, reason = '') {
 function overlayCtx() {
   return {
     packaged: app.isPackaged,
-    dataDir: path.join(app.getPath('home'), '.aiworkdeck'),
+    dataDir: require('./awd-home').dataDir(),
     appVersion: app.getVersion()
   }
 }
@@ -212,6 +216,7 @@ let ocrEscShortcutBound = false
 
 function emitClipboard(text, source) {
   try {
+    if (clipboardCapturePaused === true) return
     const t = String(text || '').trim()
     if (!t) return
     // 同步轮询指纹：copy/cut 键监听推送过的文本，轮询 watcher 不再重复推送
@@ -273,6 +278,10 @@ let lastClipboardFingerprint = ''
 let clipboardPrimed = false
 // macOS 剪贴板变更序号读取器（dev-board#869，见 clipboard-watch.js）
 let clipboardChangeCounter = null
+// 用户在剪贴板面板里「暂停记录」（dev-board#1713）：持久化在 prefs，启动时不起轮询
+const CLIPBOARD_PAUSED_PREF = 'clipboardCapturePaused'
+// null = 还没读过 prefs（首次 startClipboardWatcher 时读）
+let clipboardCapturePaused = null
 
 function sendClipboardCopied(payload) {
   if (mainWindow) {
@@ -300,7 +309,10 @@ const clipboardPoller = createClipboardPoller({
 })
 
 function startClipboardWatcher() {
-  if (clipboardWatchTimer) return
+  if (clipboardCapturePaused === null) {
+    try { clipboardCapturePaused = getPrefs().get(CLIPBOARD_PAUSED_PREF, false) === true } catch (e) { clipboardCapturePaused = false }
+  }
+  if (clipboardWatchTimer || clipboardCapturePaused) return
   clipboardPrimed = false
   if (!clipboardChangeCounter) clipboardChangeCounter = startChangeCounter()
 
@@ -440,6 +452,18 @@ function applyNativeTheme(mode) {
   try { return { systemDark: !!nativeTheme.shouldUseDarkColors } } catch (e) { return { systemDark: false } }
 }
 
+function readMainWindowState() {
+  try { return getPrefs().get(require('./window-state').PREF_KEY, null) } catch (e) { return null }
+}
+
+function saveMainWindowState() {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    const ws = require('./window-state')
+    getPrefs().set(ws.PREF_KEY, ws.captureWindowState(mainWindow))
+  } catch (e) { /* 记不住不影响退出 */ }
+}
+
 function createMainWindow() {
   // 启动链、Dock 激活共用此入口，不能覆盖仍在使用的主窗引用（#455）。
   if (mainWindow && !mainWindow.isDestroyed()) return mainWindow
@@ -452,9 +476,12 @@ function createMainWindow() {
   // 裸常量会让窗口一出生就比屏幕大，只能靠「窗口 → 缩放」救回来。
   // workAreaSize 已经扣掉菜单栏/Dock，不要再自行减。
   const workArea = screen.getPrimaryDisplay().workAreaSize
+  // 记住上次的大小 / 位置 / 最大化（问题 18）；记录不在任何显示器上时退回默认尺寸
+  const restored = require('./window-state').restoreWindowOptions(
+    readMainWindowState(), screen.getAllDisplays(),
+    { width: Math.min(1400, workArea.width), height: Math.min(900, workArea.height) })
   mainWindow = new BrowserWindow({
-    width: Math.min(1400, workArea.width),
-    height: Math.min(900, workArea.height),
+    ...restored.bounds,
     icon: path.join(__dirname, '../../frontend/src/static/icon.png'),
     // 首屏白闪修复（dev-board#731）：Electron 默认白底，页面加载完成前会露出。
     // 取值与 design/tokens/awd-palette.json 的 roles.light.bg / roles.dark.bg 一致。
@@ -600,9 +627,13 @@ function createMainWindow() {
     // ignore
   }
 
+  // 启动时恢复用户上次手动最大化的状态（问题 18）——唯一一处打在主窗口上的几何 setter
+  if (restored.maximized) mainWindow.maximize()
+
   const createdWindow = mainWindow
   let closePreparationPending = false
   createdWindow.on('close', (event) => {
+    saveMainWindowState()
     if (quitInProgress && !services) return
     event.preventDefault()
     if (quitInProgress || closePreparationPending) return
@@ -706,6 +737,7 @@ ipcMain.handle('checkba:ocr-start-selection', async (_evt, payload) => {
   const reqId = `ocrsel_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
   const resultChannel = `checkba:ocr-selection-done:${reqId}`
 
+  // 提示条贴底居中，不压 macOS 左上角红绿灯；window 模式没有网页标签，文案不提「网页」（问题 67）
   const html = `<!doctype html>
 <html>
 <head>
@@ -714,7 +746,7 @@ ipcMain.handle('checkba:ocr-start-selection', async (_evt, payload) => {
   <style>
     html, body { margin:0; padding:0; width:100%; height:100%; background: transparent; cursor: crosshair; user-select:none; }
     .layer { position: fixed; inset: 0; }
-    .hint { position: fixed; left: 14px; top: 14px; padding: 6px 10px; background: rgba(252,251,247,0.88); border: 1px solid rgba(221,216,202,0.7); border-radius: 10px; font-size: 12px; color:#2E5A50; }
+    .hint { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); white-space: nowrap; padding: 6px 10px; background: rgba(252,251,247,0.88); border: 1px solid rgba(221,216,202,0.7); border-radius: 10px; font-size: 12px; color:#2E5A50; }
     .shade { position: fixed; inset: 0; background: rgba(0,0,0,0.12); }
     .rect { position: fixed; border: 2px solid rgba(46,90,80,0.85); background: rgba(46,90,80,0.12); border-radius: 6px; pointer-events:none; display:none; }
   </style>
@@ -722,7 +754,9 @@ ipcMain.handle('checkba:ocr-start-selection', async (_evt, payload) => {
 <body>
   <div class="layer">
     <div class="shade"></div>
-    <div class="hint">${escapeHtml(require('./app-language').t({ zh: '拖动框选网页区域 · 点击其它区域或 ESC 退出', en: 'Drag to select an area · Click outside or press ESC to cancel' }))}</div>
+    <div class="hint">${escapeHtml(require('./app-language').t(useWindow
+      ? { zh: '拖动框选区域 · 单击或按 ESC 退出', en: 'Drag to select an area · Click or press ESC to cancel' }
+      : { zh: '拖动框选网页区域 · 点击其它区域或 ESC 退出', en: 'Drag to select a web page area · Click outside or press ESC to cancel' }))}</div>
     <div id="rect" class="rect"></div>
   </div>
   <script>
@@ -1050,12 +1084,12 @@ function makeBrowserView(id) {
   view.webContents.on('context-menu', async (_event, params) => {
     try {
       const selectionText = (params && params.selectionText ? String(params.selectionText) : '').trim()
-      if (!selectionText) return
 
-      const menu = Menu.buildFromTemplate([
-        {
-          label: require('./app-language').t({ zh: '加入网核收藏', en: 'Save as Web Evidence' }),
-          click: async () => {
+      // 基础项（复制 / 全选，可编辑区加剪切 / 粘贴）+ 有选中文字时的「加入网核收藏」（问题 68）
+      const menu = Menu.buildFromTemplate(require('./browser-context-menu').browserContextMenuTemplate(params, {
+        t: require('./app-language').t,
+        wc: view.webContents,
+        onWebmark: async () => {
             try {
               const url = params.pageURL ? String(params.pageURL) : ''
               const title = view.webContents.getTitle ? (view.webContents.getTitle() || '') : ''
@@ -1080,9 +1114,8 @@ function makeBrowserView(id) {
             } catch (e) {
               // ignore
             }
-          }
         }
-      ])
+      }))
       // BrowserView 的 x/y 是相对 view 的；popup 需要相对 BrowserWindow 内容区坐标
       try {
         const b = views.getBounds(id) || { x: 0, y: 0 }
@@ -1448,6 +1481,13 @@ ipcMain.handle('checkba:shell-open-external', async (_evt, payload) => {
   }
 })
 
+// 工作记录的空闲判定（dev-board#1713）：主窗口是否在前台 + 系统空闲秒数。渲染层的 window blur
+// 在编辑器 webview / BrowserView 获得焦点时也会触发，不能拿来判断「人离开了」。
+ipcMain.handle('checkba:app-presence', () => ({
+  focused: !!(mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused()),
+  idleSeconds: powerMonitor.getSystemIdleTime()
+}))
+
 // 桌面端：统一的“应用内确认弹窗”（不依赖 uni.showModal，且不会被 BrowserView/iframe 遮挡）
 ipcMain.handle('checkba:ui-confirm', async (_evt, payload) => {
   if (!mainWindow) return { ok: false, confirmed: false, message: 'window not ready' }
@@ -1589,11 +1629,12 @@ function retireFirstLaunchSplash() {
 function createServices() {
   // 打包模式下 jar/JRE/python 从 resourcesPath 解析（Epic #18 T2），数据落 ~/.aiworkdeck；
   // 四个 Python 服务的 lib/app 落 ~/.aiworkdeck/packs/<service>-runtime/<version>/（设计 §3.2）
-  const dataDir = path.join(app.getPath('home'), '.aiworkdeck')
+  const dataDir = require('./awd-home').dataDir()
   const projectRoot = path.join(__dirname, '..', '..')
   if (!modelManager) {
     modelManager = createModelManager({
       dataDir,
+      awdHome: require('./awd-home').awdHome(),
       resourcesPath: process.resourcesPath,
       projectRoot,
       packaged: app.isPackaged,
@@ -1615,6 +1656,10 @@ function createServices() {
     appVersion: app.getVersion(),
     resourcesPath: process.resourcesPath,
     dataDir,
+    // 隔离实例（问题 20）：后端 -Duser.home、子进程 HOME、后端复用按 home 区分
+    awdHome: require('./awd-home').awdHome(),
+    // overlay 启动失败计数按实例区分（问题 21）：userData 就是实例身份（单实例锁也按它判重）
+    instanceId: app.getPath('userData'),
     // ARM 版 Windows（Mac 虚拟机）上 x64 转译运行，服务启动看门狗要放宽（dev-board#340）
     winEmulated: require('./services/win-arch').isWinArmEmulated()
   })
@@ -1685,7 +1730,7 @@ ipcMain.handle('checkba:service-ensure', async (_evt, payload) => {
 let prefs = null
 function getPrefs() {
   if (!prefs) {
-    prefs = require('./services/prefs').createPrefs({ dataDir: path.join(app.getPath('home'), '.aiworkdeck') })
+    prefs = require('./services/prefs').createPrefs({ dataDir: require('./awd-home').dataDir() })
   }
   return prefs
 }
@@ -1705,6 +1750,16 @@ ipcMain.handle('checkba:prefs-set', async (_evt, payload) => {
   }
 })
 
+// 剪贴板「暂停记录」（dev-board#1713）：停掉系统轮询 + 应用内 copy 推送，并落 prefs
+ipcMain.handle('checkba:clipboard-get-paused', () => ({ ok: true, paused: clipboardCapturePaused === true }))
+ipcMain.handle('checkba:clipboard-set-paused', (_evt, payload) => {
+  clipboardCapturePaused = !!(payload && payload.paused)
+  try { getPrefs().set(CLIPBOARD_PAUSED_PREF, clipboardCapturePaused) } catch (e) { /* ignore */ }
+  if (clipboardCapturePaused) stopClipboardWatcher()
+  else startClipboardWatcher()
+  return { ok: true, paused: clipboardCapturePaused }
+})
+
 // 应用内更新 IPC 面（增量更新 P1）：状态查询 / 手动检查 / 重启生效。
 // 版本口径：appVersion = 壳（安装包）版本，effectiveVersion = 补丁生效版本。
 // 帮助菜单「查看日志」：在访达/资源管理器里高亮日志目录。
@@ -1712,7 +1767,7 @@ ipcMain.handle('checkba:prefs-set', async (_evt, payload) => {
 // 不接受渲染层传路径——那等于把任意目录揭示给渲染层。
 ipcMain.handle('checkba:reveal-logs', async () => {
   try {
-    const dir = path.join(app.getPath('home'), '.aiworkdeck', 'logs')
+    const dir = path.join(require('./awd-home').dataDir(), 'logs')
     if (!require('fs').existsSync(dir)) return { ok: false, message: require('./app-language').t({ zh: '日志目录尚未生成', en: 'Log directory has not been created yet' }) }
     shell.showItemInFolder(path.join(dir, '.'))
     return { ok: true, path: dir }
@@ -1732,6 +1787,8 @@ ipcMain.handle('checkba:update-check', async () => {
 })
 ipcMain.handle('checkba:update-restart', async () => {
   // 补丁已在下载完成时原子激活（overlay.activate），重启后三个 seam 自然读到新版本
+  // 问题 7：重启入口逐个记原因，事后能从 desktop.log 分清是谁触发的重启
+  logDesktopEvent('restart-requested', { reason: 'update-restart', phase: updateService?.getState?.().phase || null, fullUpdateReady: !!fullUpdate?.isReady?.() })
   updateRestartRequested = true
   app.quit()
   return { ok: true }
@@ -1818,9 +1875,12 @@ ipcMain.handle('checkba:set-theme', (_evt, mode) => applyNativeTheme(String(mode
 // Windows 启动 argv / second-instance 与 macOS open-file 共用同一条交付链。
 const openPaths = require('./open-paths').installOpenPaths({
   app, ipcMain,
-  queueFile: path.join(app.getPath('home'), '.aiworkdeck', 'restart-open-paths.json'),
+  queueFile: path.join(require('./awd-home').dataDir(), 'restart-open-paths.json'),
   isQuitting: () => quitInProgress,
-  requestRelaunch: () => { updateRestartRequested = true },
+  requestRelaunch: () => {
+    logDesktopEvent('restart-requested', { reason: 'open-paths', detail: 'file open arrived during quit' })
+    updateRestartRequested = true
+  },
   getWindow: () => mainWindow,
   focusWindow: () => {
     if ((!mainWindow || mainWindow.isDestroyed()) && mainWindowStartupReady) createMainWindow()
@@ -1918,7 +1978,7 @@ app.whenReady().then(() => {
         fullUpdate = require('./services/full-update').createFullUpdate({ app, autoUpdater: require('electron').autoUpdater, dataDir: overlayCtx().dataDir })
         updateService = createUpdateService(overlayCtx(), {
           initialError: fullUpdate.lastError(),
-          prepareInstaller: (file, version) => fullUpdate.prepare(file, version),
+          prepareInstaller: (file, version, onStage) => fullUpdate.prepare(file, version, onStage),
           extractTar,
           onEvent: (evt) => {
             try { if (mainWindow) mainWindow.webContents.send('checkba:update-event', evt) } catch (e) { /* ignore */ }
@@ -2037,7 +2097,11 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-  if (quitInProgress) { updateRestartRequested = true; return }
+  if (quitInProgress) {
+    logDesktopEvent('restart-requested', { reason: 'activate-during-quit', detail: 'Dock/app activated while quitting' })
+    updateRestartRequested = true
+    return
+  }
   if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.show(); mainWindow.focus() }
   else if (mainWindowStartupReady && BrowserWindow.getAllWindows().length === 0) createMainWindow()
 })
@@ -2073,6 +2137,7 @@ app.on('before-quit', async (e) => {
       // ① 先记账：下次再出现「应用自己消失了」，能直接从 desktop.log 读出退出起点与耗时，
       //    不用再去反推 macOS 统一日志（dev-board#602 那次就是这么查的）。
       logDesktopEvent('quit-begin', { pid: process.pid })
+      saveMainWindowState()
       backendSupervisor?.stop()
       // ② 立刻把窗口藏掉。preventDefault 之后停服务要好几秒，原来这段时间里窗口
       //    完全可用、还能建 SSE 发新请求，然后整个应用在同一瞬间消失——用户看到的

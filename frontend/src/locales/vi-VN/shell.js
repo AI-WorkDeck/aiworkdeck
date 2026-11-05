@@ -3,6 +3,9 @@
 
 export default {
   "updatePreparing": "Đang xác minh và chuẩn bị cập nhật…",
+  "updatePreparingMount": "Đang chuẩn bị cập nhật: gắn bộ cài đặt (thường mất vài phút)…",
+  "updatePreparingPackage": "Đang chuẩn bị cập nhật: đóng gói tệp (thường mất vài phút)…",
+  "updatePreparingVerify": "Đang chuẩn bị cập nhật: xác minh chữ ký (thường mất vài phút)…",
   "updateRestart": "Khởi động lại để cập nhật",
   "updateRestarting": "Đang lưu và chuẩn bị khởi động lại…",
   "updateDownloading": "Đang tải bản cập nhật",

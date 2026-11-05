@@ -2473,7 +2473,11 @@ export function useAgentStream() {
                         // 运行状态条的秒表起点（dev-board#792）。这一刻就是模型发出调用的时刻，
                         // 工具跑完才会有 tool_output，中间这段静默正是用户最需要知道「在等什么、等了多久」的时候。
                         // 历史回灌的条目没有这个字段（那时早就跑完了），RootBubble 按缺省 0 处理。
-                        startTime: nowMs()
+                        startTime: nowMs(),
+                        // 本轮实时流（含断线重连的 state_recovery 重放）里收到的工具事件；历史回灌
+                        // （processTextStream(..., true)，stripFences=false）的条目为 false。AI 回答的
+                        // 法规卡据此区分「检索返回内容」与「来源待核验」（教程反馈 47）。
+                        live: stripFences
                     })
                 }
                 activeTag = 'tool_code'

@@ -62,18 +62,15 @@
        （客户、对方当事人）的声音——被录的人不是我们的用户，没同意过任何条款。
        这块必须在按下录音键之前出现，不能做成录完两小时点转写时才弹的模态框：
        那时用户只剩「放弃这份录音」或「照传不误」两条路。
-       正文由后端给（文本与版本号同源，改文案就得推版本，旧确认随即失效）。 -->
+       正文由后端给（文本与版本号同源，改文案就得推版本，旧确认随即失效）。
+       **全文与勾选只在宿主可信弹窗里**（utils/asrNoticeDialog.js，dev-board#1713 #117）：
+       这里只提示并给入口；点「开始录音 / 开始转写」时没确认也会直接拉起同一个弹窗。 -->
   <view class="mr-notice" v-if="needsAsrNotice">
     <text class="mr-notice-title">{{ noticeCopy.title }}</text>
-    <text class="mr-notice-body">{{ asrNotice.body }}</text>
-    <!-- 绝不预勾选：预先勾选的同意在个保法下无效 -->
-    <view class="mr-notice-check" @tap="noticeChecked = !noticeChecked">
-      <view class="mr-notice-mark" :class="{ checked: noticeChecked }"></view>
-      <text class="mr-notice-check-label">{{ noticeCopy.checkLabel }}</text>
-    </view>
+    <text class="mr-notice-body">{{ noticeCopy.pendingHint }}</text>
     <view class="mr-notice-actions">
-      <view class="mr-btn primary" :class="{ disabled: !noticeChecked || noticeBusy }" @tap="onAcknowledgeNotice">
-        {{ noticeCopy.confirm }}
+      <view class="mr-btn primary" :class="{ disabled: noticeBusy }" @tap="ensureAsrNotice">
+        {{ noticeCopy.review }}
       </view>
       <!-- 出路是真的：本机转写已经可用，不是一句安慰 -->
       <view class="mr-btn secondary" :class="{ disabled: tierBusy }" @tap="onToggleLocalAsr(true)">
@@ -86,6 +83,11 @@
        平台代采档缺的是账户，自备 Key 档缺的才是那五个阿里云凭证。 -->
   <view class="mr-config-hint" v-if="configured === false">
     <text>{{ notConfiguredHint }}</text>
+  </view>
+
+  <!-- 右键「语音转文字」先把面板开出来再去注册（dev-board#1713 #116），这期间给一句状态 -->
+  <view class="mr-config-hint" v-if="preparing" role="status">
+    <text>{{ $t('meeting.preparing') }}</text>
   </view>
 
   <!-- 录音区：开会点一下就开录，录前零表单 -->
@@ -238,6 +240,9 @@
               <view class="mr-btn primary" :class="{ disabled: generatingId === m.id }" @tap="onGenerateMinutes(m)">
                 {{ generatingId === m.id ? $t('meeting.sendingToAi') : $t('meeting.generateMinutes') }}
               </view>
+              <view class="mr-btn secondary" :class="{ disabled: generatingId === m.id }" @tap="onGenerateMinutes(m, 'interview')">
+                {{ $t('meeting.generateInterview') }}
+              </view>
               <view class="mr-btn secondary" @tap="onExport(m)">{{ $t('meeting.exportTranscript') }}</view>
             </view>
           </view>
@@ -347,6 +352,11 @@ export default {
     focusMeetingId: {
       type: [String, Number],
       default: null
+    },
+    // 宿主还在为右键转写做准备（计费确认、注册音频）
+    preparing: {
+      type: Boolean,
+      default: false
     }
   },
   emits: ['generate-minutes'],
@@ -386,7 +396,6 @@ export default {
       // **读不到时不拦录音**：为一次设置端点抖动把录音键焊死，比漏一次告知更坏——
       // 而 platform 档在 server 模式下本来就不可用，那里也没有要告知的事。
       asrNotice: null,
-      noticeChecked: false,
       noticeBusy: false,
       // 本机转写模型的下载状态（组件管理里那套 absent/downloading/installed 的同一条链路，
       // 只是搬到用户真正需要它的位置——他刚点开「录音不出本机」的这一刻）
@@ -440,12 +449,10 @@ export default {
     noticeCopy() {
       return {
         title: this.$t('meeting.noticeTitle'),
-        checkLabel: this.$t('meeting.noticeCheckLabel'),
-        confirm: this.$t('meeting.noticeConfirm'),
+        pendingHint: this.$t('meeting.noticePendingHint'),
+        review: this.$t('meeting.noticeReview'),
         switchLocal: this.$t('meeting.noticeSwitchLocal'),
         saveFailed: this.$t('meeting.noticeSaveFailed'),
-        blockBeforeRecording: this.$t('meeting.noticeBlockBeforeRecording'),
-        blockBeforeUpload: this.$t('meeting.noticeBlockBeforeUpload'),
       }
     },
     // 本地档能不能真正用起来。**读的是 platformServices 那个唯一出口**，
@@ -593,24 +600,26 @@ export default {
     async loadAsrNotice() {
       try {
         this.asrNotice = (await getMeetingAsrNotice()) || null
-        this.noticeChecked = false
       } catch (e) {
         console.warn('读取录音转写告知失败', e)
       }
     },
     /**
-     * 确认告知（每台机器一次）。
-     *
-     * 勾选框绝不预勾选，所以这里必然是用户主动点过之后才可用。
-     * 确认失败不改本地状态：让告知块留在原地，比让用户以为确认过了要好。
+     * 确认告知（每台机器一次）：拉起宿主可信弹窗（全文 + 不预勾选的勾选项）。
+     * 返回 true = 现在不欠告知，调用方可以接着做原来那件事（开录 / 转写）。
+     * 用户取消不提示；确认失败不改本地状态：让告知块留在原地，比让用户以为确认过了要好。
      */
-    async onAcknowledgeNotice() {
-      if (!this.noticeChecked || this.noticeBusy) return
+    async ensureAsrNotice() {
+      if (!this.needsAsrNotice) return true
+      if (this.noticeBusy) return false
       this.noticeBusy = true
       try {
-        this.asrNotice = (await acknowledgeMeetingAsrNotice(true)) || this.asrNotice
+        const notice = await acknowledgeMeetingAsrNotice(true)
+        if (notice) this.asrNotice = notice
+        return !!(notice && notice.acknowledged)
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.noticeCopy.saveFailed, icon: 'none' })
+        if (!e || e.code !== 'cancelled') uni.showToast({ title: (e && e.message) || this.noticeCopy.saveFailed, icon: 'none' })
+        return false
       } finally {
         this.noticeBusy = false
       }
@@ -799,13 +808,10 @@ export default {
 
     // ==================== 录音 ====================
     async onStartRecording() {
-      // 告知没确认就不开录。**拦在这一刻是刻意的**：此时什么都还没发生，
-      // 用户看完上面那段点一下就继续；换成录完两小时再拦，他只剩「放弃录音」
-      // 或「照传不误」两条路，后者正好绕过了这段告知存在的理由。
-      if (this.needsAsrNotice) {
-        uni.showToast({ title: this.noticeCopy.blockBeforeRecording, icon: 'none' })
-        return
-      }
+      // 告知没确认就不开录。**拦在这一刻是刻意的**：此时什么都还没发生；
+      // 换成录完两小时再拦，他只剩「放弃录音」或「照传不误」两条路。
+      // 不静默拦：直接拉起告知弹窗，确认后接着开录（dev-board#1713 #118）。
+      if (!(await this.ensureAsrNotice())) return
       try {
         const device = this.audioDevices[this.selectedDeviceIndex]
         await startRecording(this.projectId, device && device.deviceId)
@@ -907,12 +913,8 @@ export default {
     // ==================== 转写与纪要 ====================
     async onTranscribe(m) {
       // 覆盖「本地档录的，之后切到平台档再手动转写」这条路——它绕过了开始录音那道口。
-      // 这里给的是一句提示 + 上方已经摆着的那块告知，不是模态框：告知块本来就在屏幕上，
-      // 确认只要一下。
-      if (this.needsAsrNotice) {
-        uni.showToast({ title: this.noticeCopy.blockBeforeUpload, icon: 'none' })
-        return
-      }
+      // 没确认告知时点了不能没反应（dev-board#1713 #118）：直接拉起告知弹窗，确认后接着转写。
+      if (!(await this.ensureAsrNotice())) return
       // 平台档还没登录账户：先就地登录（登录后置，dev-board#1046），再走扣费确认
       if (!(await this.ensurePlatformAccount())) return
       // 平台档一提交就预扣 Credits：每次都先确认（dev-board#968）
@@ -927,11 +929,11 @@ export default {
         uni.showToast({ title: this.$t('meeting.submitTranscribeFailed', { message: (e && e.message) || e }), icon: 'none' })
       }
     },
-    async onGenerateMinutes(m) {
+    async onGenerateMinutes(m, format) {
       if (this.generatingId) return
       this.generatingId = m.id
       try {
-        const res = await getMeetingMinutesPrompt(m.id)
+        const res = await getMeetingMinutesPrompt(m.id, format)
         this.$emit('generate-minutes', { meeting: m, prompt: res.prompt })
       } catch (e) {
         uni.showToast({ title: this.$t('meeting.generateMinutesFailed', { message: (e && e.message) || e }), icon: 'none' })
@@ -1263,33 +1265,6 @@ export default {
   line-height: 1.7;
 }
 
-.mr-notice-check {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  cursor: pointer;
-}
-
-/* 空心方框 = 未勾选。默认必须是空的：预先勾选的同意无效 */
-.mr-notice-mark {
-  width: 13px;
-  height: 13px;
-  flex: none;
-  border: 1px solid var(--awd-border-strong);
-  border-radius: calc(var(--awd-space-1) / 2);
-  background: var(--awd-surface);
-
-  &.checked {
-    border-color: var(--awd-accent);
-    background: var(--awd-accent);
-  }
-}
-
-.mr-notice-check-label {
-  font-size: var(--awd-panel-fs-meta);
-  color: var(--awd-text);
-}
-
 .mr-notice-actions {
   display: flex;
   gap: 8px;
@@ -1586,12 +1561,16 @@ export default {
   gap: 6px;
 }
 
+/* uni-input 宿主被写死 height:1.4em + overflow:hidden，插件页又是全局 border-box：
+   必须显式定高、上下零内边距，否则改名框里的字被裁掉（dev-board#890 同一陷阱） */
 .mr-input {
   flex: 1;
   min-width: 0;
+  height: 28px;
+  min-height: 28px;
   border: 1px solid var(--awd-border-strong);
   border-radius: var(--awd-radius-md);
-  padding: 4px 8px;
+  padding: 0 8px;
   font-size: var(--awd-panel-fs);
   background: var(--awd-surface);
 }

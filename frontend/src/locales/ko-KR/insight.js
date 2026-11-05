@@ -46,7 +46,8 @@ export default {
   "docMissing": "해당 파일이 더 이상 프로젝트에 없습니다",
   "source": {
     "projectFile": "프로젝트 파일",
-    "qichacha": "치차차(Qichacha)"
+    "qichacha": "치차차(Qichacha)",
+    "pkulaw": "PKULaw"
   },
   "mentions": "{count}곳",
   "mentionsTitle": "문서 내 출처",

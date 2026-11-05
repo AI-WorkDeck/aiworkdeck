@@ -46,7 +46,8 @@ export default {
   "docMissing": "Ese archivo ya no está en este proyecto",
   "source": {
     "projectFile": "Archivo del proyecto",
-    "qichacha": "Qichacha"
+    "qichacha": "Qichacha",
+    "pkulaw": "PKULaw"
   },
   "mentions": "{count} mención(es)",
   "mentionsTitle": "Menciones en este documento",

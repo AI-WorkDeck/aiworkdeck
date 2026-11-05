@@ -58,7 +58,7 @@ test('destruction suppresses late snapshot and lookup responses', async () => {
 test('preference storage is keyed by user and only accepts known boolean values', async () => {
   const f = fixture()
   await f.request('preferences', { enabled: false, learning: 'yes', arbitrary: true })
-  assert.deepEqual(f.calls.find((c) => c.name === 'store').args, ['awd_writing_preferences_33', { enabled: false, learning: true, hints: true }])
+  assert.deepEqual(f.calls.find((c) => c.name === 'store').args, ['awd_writing_preferences_33', { enabled: false, localAuto: false, learning: true, hints: true }])
 })
 
 test('document candidates retain saved details for acceptance, completed-name hints and right-click', async () => {
@@ -456,4 +456,27 @@ test('late legal lookup cannot replace a newer query or become usable after leav
   host.setActive(false); host.setActive(true)
   resolve[2](entity('third')); await third
   assert.equal(sent.at(-1).result.legalReferences, undefined)
+})
+
+test('外查结果的来源映射成用户名称、日期本地化，标签表随配置下发（教程反馈 44/45/48/107）', async t => {
+  const sent = []
+  const messages = { 'insight.source.pkulaw': '北大法宝', 'editor.writingAssist.sourceLine': '来源：{source}', 'editor.writingAssist.dateLine': '查询日期：{date}',
+    'editor.writingAssist.title': '自动补全', 'legalReference.source': '来源' }
+  const translate = (key, params = {}) => (messages[key] ?? key).replace(/\{(\w+)\}/g, (_, n) => params[n])
+  const entity = { kind: 'LAW', name: '《示例法》第十条', retrievalStatus: 'OK', retrievalSource: 'pkulaw-semantic', fetchedAt: '2026-11-04T13:53:02.50303',
+    detail: { result: { title: '示例法', article: '第十条', content: '条文。' } } }
+  const host = createWritingAssistanceHost({ projectId: 11, fileId: 22, userId: 33, writable: true, language: 'zh-CN',
+    send: m => sent.push(m), api: { lookup: async () => entity, list: async () => ({ items: [] }) }, storage: { get() {} }, execute: async () => ({}),
+    openLegalReference: () => {}, translate })
+  t.after(() => host.destroy())
+  await host.handle({ type: 'writing-request', session: host.session, id: 1, action: 'lookup', data: { kind: 'LAW', text: '示例法' } })
+  const result = sent.at(-1).result
+  assert.equal(result.source, '北大法宝')
+  assert.equal(result.date, '2026年11月4日')
+  assert.match(result.variants[0].text, /来源：北大法宝\n查询日期：2026年11月4日$/)
+  assert.equal(result.legalReferences.items[0].source, '北大法宝')
+  await host.handle({ type: 'writing-request', session: host.session, id: 2, action: 'refresh', data: {} })
+  const config = sent.filter(m => m.type === 'writing-config').at(-1).config
+  assert.equal(config.labels.title, '自动补全')
+  assert.equal('suggestions' in config.labels, false, '缺词不下发，客体保留兜底')
 })
