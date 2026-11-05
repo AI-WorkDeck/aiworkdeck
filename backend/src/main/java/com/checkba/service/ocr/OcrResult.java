@@ -31,8 +31,16 @@ public class OcrResult {
      * text one line per block, so prefer it (sub-images separated by a blank line) and fall back to
      * {@code content} when raw has no blocks. Both tiers serialize raw with camelCase field names.
      */
+    /** Aliyun writes thousands separators as full-width commas ("4，200，000"); restore "4,200,000". */
+    private static final java.util.regex.Pattern DIGIT_GROUP_COMMA =
+            java.util.regex.Pattern.compile("(?<=\\d)，(?=\\d{3}(?!\\d))");
+
+    public static String digitGroups(String text) {
+        return text == null ? null : DIGIT_GROUP_COMMA.matcher(text).replaceAll(",");
+    }
+
     public static String lines(String raw, String content) {
-        String fallback = content == null ? "" : content;
+        String fallback = content == null ? "" : digitGroups(content);
         if (raw == null || raw.isBlank()) return fallback;
         com.fasterxml.jackson.databind.JsonNode root;
         try {
@@ -44,7 +52,7 @@ public class OcrResult {
         for (var image : root.path("subImages")) {
             java.util.List<String> lines = new java.util.ArrayList<>();
             for (var block : image.path("blockInfo").path("blockDetails")) {
-                String line = block.path("blockContent").asText("").strip();
+                String line = digitGroups(block.path("blockContent").asText("").strip());
                 if (!line.isEmpty()) lines.add(line);
             }
             if (!lines.isEmpty()) images.add(String.join("\n", lines));
