@@ -166,13 +166,20 @@ AI 版本入口（dev-board#1498）复用本领域控制器与服务，工具/�
   **取库规则本体已抽到 `frontend/src/utils/cloudShare.js`**（`pickShareConnectionId` / `shareProjectToLibrary`，
   share 函数由调用方注入以便 node --test），`CollabDialog.onShare` 与 `InviteMemberDialog` 的「放进团队案件库」
   按钮共用，别再各写一份。
+  **多于一条连接被拒时不再是死胡同**（问题 126 真机复测，dev-board#1713）：两个弹窗就地渲染
+  `frontend/src/components/collab/LibraryConnectionList.vue`，逐条列出服务器（主机名）、是否官方
+  （与 `GET /api/cloud/official` 的 `serverUrl` 相等）、我的身份、`connectedAt`（`CloudController.connectionListItem`
+  新带的 `createdAt`；没有「最近使用」字段），每条一个「断开」：`uni.showModal` 确认后调现有的
+  `disconnectCloudConnection`（行逻辑与「没确认一次都不调」在 `cloudShare.describeLibraryConnections` /
+  `disconnectLibraryConnection`）。断开 = 撤远端令牌 + 删本地连接与它的全部 `ProjectRemote`：本机文件不动，
+  经它入库的案卷在本机回到 `linked:false`，案件库里的内容不动。不自动选、不自动断开、断开后不自动重放 share。
   **放进案件库被云端写权限门禁拒绝**（`CloudSyncService.accountCloudEpoch` / `CloudGitEpochClient` 抛
   `VersionException.cloudReconnectRequired`，`CloudController`/`VersionController` 的处理器回 `kind=CLOUD_RECONNECT_REQUIRED`）：
   两个弹窗用 `cloudShare.needsCloudReconnect(e)`（只认 kind，不匹配文案）就地显示后端原话 +「重新连接云端」按钮，
   点了才调 `connectOfficialCloud` 再重放一次 share，**不自动重连**（问题 126/127，dev-board#1713）。
   注意 `OfficialCloudService.connectOfficial` 在账户指纹不变时直接复用旧连接、不换令牌，所以这一按钮对「旧令牌失效」
   无效；而强制重桥会换令牌，`awdCloudScope` 指纹含令牌，已入库案卷的后台同步会因此全部卡在「请明确重新连接」
-  且没有重绑入口（`refreshDisplayName` 改名重桥今天就会触发同一问题），故未改。
+  且没有重绑入口，故未改。`refreshDisplayName` 改名重桥曾触发同一问题，已改为**不换令牌**（见下方「展示名跟官网走」）。
   两个弹窗在登录层开着时加 `.yield-to-login` 让路，见 licensing-billing.md `accountLoginOpen`。
 - `InviteMemberDialog.vue`（`frontend/src/components/`，成员堆栈「+」与项目列表卡片「+」打开的「把人加进这份案卷」）
   ——**dev-board#527（2026-09-09）起「所里同事」tab 按 `localMode x linked` 三轨**（判定在
@@ -334,8 +341,11 @@ PR#797 当时只改了 `VersionController`，自动存档（`ProjectFileService.
 **官方案件库上的自己的展示名也要跟官网走**：案件库只在桥接（`awdk-login` → `resolveUser`）时刷新展示名，
 而 `OfficialCloudService.connectOfficial` 指纹不变就一直复用旧连接。现在 `AccountIdentitySync` 每次按官网同步到
 展示名都发 `DisplayNameSynced` 事件，`OfficialCloudService.onDisplayNameSynced`（`@Async`）比对连接上的
-`displayName`，不一致就**就地重桥**（案件库侧没有新端点，旧案件库也兼容）并撤掉旧令牌
-（`CloudSyncService.revokeRemoteToken`，与断开连接共用）。重桥回来的名字若仍是旧的（旧版案件库），
+`displayName`，不一致就**重桥一次让案件库刷新展示名**（案件库侧没有新端点，旧案件库也兼容），但连接**继续用旧令牌**、
+新签出的那枚当场撤掉（`CloudSyncService.revokeRemoteToken`，与断开连接共用）——令牌参与已入库案卷的
+`awdCloudScope` 写门禁指纹，改名换令牌会让已入库案卷的后台同步全部卡在「请明确重新连接」且无重绑入口
+（问题 126，dev-board#1713，护栏 `OfficialCloudServiceTest.renamingKeepsAlreadySharedProjectsPassingTheCloudWriteFence`）。
+账户真的换了仍走 `connectOfficial` 的指纹判断换令牌，门禁照拦。重桥回来的名字若仍是旧的（旧版案件库），
 本机连接照样记官网那份——否则两边永远对不上，每次 `/api/account/status` 都会换一枚令牌。
 
 **已写入的历史 `authorName` 不回填**（Git 提交对象不重写，同上一条纪律）。

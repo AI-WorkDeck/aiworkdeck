@@ -58,6 +58,13 @@
             <text v-else class="role-hint">{{ $t('version.noLibraryAvailableNote') }}</text>
             <text class="role-hint">{{ $t('version.clientNeedsLibraryHint') }}</text>
             <text v-if="errorMessage" class="form-error">{{ errorMessage }}</text>
+            <!-- 连着多于一条云端连接被拒：就地列出这几条供断开，不自动选、不自动断开（问题 126，dev-board#1713） -->
+            <LibraryConnectionList
+              v-if="tooManyLibraries"
+              :connections="connections"
+              :official-server-url="officialServerUrl"
+              @disconnected="onLibraryDisconnected"
+            />
             <!-- 云端写权限门禁拒绝（kind=CLOUD_RECONNECT_REQUIRED）：律师自己点重新连接，不自动重连（问题 126/127） -->
             <view
               v-if="reconnectNeeded && errorMessage"
@@ -258,6 +265,7 @@ import { siteBaseUrl } from '@/utils/siteLinks.js'
 import { shareProjectToLibrary, needsCloudReconnect } from '@/utils/cloudShare.js'
 import { requireAccount, accountLoginOpen } from '@/utils/requireAccount.js'
 import { readLocalMode } from '@/services/accountProfile.js'
+import LibraryConnectionList from '@/components/collab/LibraryConnectionList.vue'
 import {
   TRACK, resolveTrack, isWorthLooking, lookupIdentifier, inviteLinkFor, notFoundPresentation,
   clientPortalLink, expiryDate,
@@ -267,6 +275,7 @@ const LOOKUP_DEBOUNCE_MS = 500
 
 export default {
   name: 'InviteMemberDialog',
+  components: { LibraryConnectionList },
   props: {
     visible: {
       type: Boolean,
@@ -313,6 +322,10 @@ export default {
       linked: false,
       connections: [],
       officialAvailable: false,
+      // 只用来在「连着多个案件库」的列表里标出哪条是官方的
+      officialServerUrl: '',
+      // 连着多于一条连接、「放进团队案件库」被拒：就地列出连接供断开
+      tooManyLibraries: false,
       sharing: false,
       // ---- 边输入边查 ----
       // 递增序号：快速改输入时，早发出的请求可能后回来，旧回包不能覆盖新结果
@@ -400,6 +413,7 @@ export default {
         this.loading = false
         this.sharing = false
         this.errorMessage = ''
+        this.tooManyLibraries = false
         this.addedName = ''
         this.clearLookupResult()
         this.resolveTrackState()
@@ -485,8 +499,10 @@ export default {
       try {
         const res = await getOfficialCloud()
         this.officialAvailable = !!(res && res.data && res.data.available)
+        this.officialServerUrl = (res && res.data && res.data.serverUrl) || ''
       } catch (e) {
         this.officialAvailable = false
+        this.officialServerUrl = ''
       }
     },
     async onShareToLibrary() {
@@ -506,8 +522,10 @@ export default {
         })
         if (!res.ok) {
           this.errorMessage = this.$t('version.tooManyLibraries')
+          this.tooManyLibraries = true
           return
         }
+        this.tooManyLibraries = false
         uni.showToast({ title: this.$t('version.sharedToLibrary'), icon: 'none' })
         this.$emit('success')
         await this.resolveTrackState({ forceFetch: true })
@@ -532,6 +550,14 @@ export default {
       }
       await this.loadLibraryOptions()
       await this.onShareToLibrary()
+    },
+    // 断开了一条：重读连接；剩不到两条就收起列表，律师自己再点「放进团队案件库」（不自动放）
+    async onLibraryDisconnected() {
+      await this.loadLibraryOptions()
+      if (this.connections.length <= 1) {
+        this.tooManyLibraries = false
+        this.errorMessage = ''
+      }
     },
     async runLookup(rawValue) {
       const seq = ++this.lookupSeq
