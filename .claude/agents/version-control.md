@@ -166,6 +166,14 @@ AI 版本入口（dev-board#1498）复用本领域控制器与服务，工具/�
   **取库规则本体已抽到 `frontend/src/utils/cloudShare.js`**（`pickShareConnectionId` / `shareProjectToLibrary`，
   share 函数由调用方注入以便 node --test），`CollabDialog.onShare` 与 `InviteMemberDialog` 的「放进团队案件库」
   按钮共用，别再各写一份。
+  **放进案件库被云端写权限门禁拒绝**（`CloudSyncService.accountCloudEpoch` / `CloudGitEpochClient` 抛
+  `VersionException.cloudReconnectRequired`，`CloudController`/`VersionController` 的处理器回 `kind=CLOUD_RECONNECT_REQUIRED`）：
+  两个弹窗用 `cloudShare.needsCloudReconnect(e)`（只认 kind，不匹配文案）就地显示后端原话 +「重新连接云端」按钮，
+  点了才调 `connectOfficialCloud` 再重放一次 share，**不自动重连**（问题 126/127，dev-board#1713）。
+  注意 `OfficialCloudService.connectOfficial` 在账户指纹不变时直接复用旧连接、不换令牌，所以这一按钮对「旧令牌失效」
+  无效；而强制重桥会换令牌，`awdCloudScope` 指纹含令牌，已入库案卷的后台同步会因此全部卡在「请明确重新连接」
+  且没有重绑入口（`refreshDisplayName` 改名重桥今天就会触发同一问题），故未改。
+  两个弹窗在登录层开着时加 `.yield-to-login` 让路，见 licensing-billing.md `accountLoginOpen`。
 - `InviteMemberDialog.vue`（`frontend/src/components/`，成员堆栈「+」与项目列表卡片「+」打开的「把人加进这份案卷」）
   ——**dev-board#527（2026-09-09）起「所里同事」tab 按 `localMode x linked` 三轨**（判定在
   `utils/memberLookup.js` 的 `resolveTrack`）：`localMode=false`（自建多用户服务器）走本机轨

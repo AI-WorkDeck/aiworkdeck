@@ -264,6 +264,7 @@ export default {
   "addMemberFailed": "Tidak dapat menambahkan",
   "copiedPasteToColleague": "Tersalin — tempelkan ke rekan kerja Anda",
   "connectFailed": "Koneksi gagal",
+  "reconnectCloud": "Hubungkan Ulang ke Cloud",
   "inviteTextOfficial": "{inviter} mengundang Anda untuk mengerjakan {project} bersama di AI WorkDeck.\n\nCara bergabung:\n1. Masuk ke aplikasi desktop dengan akun AI WorkDeck Anda sendiri;\n2. Buka daftar proyek dan klik \"Tarik Berkas Kasus dari Pustaka Kasus Tim\";\n3. Pilih {project} dan klik \"Tarik ke Perangkat Ini\".\n\nSetelah itu, kita masing-masing mengerjakan salinan sendiri dan klik \"Kirim Draf\" untuk menggabungkan perubahan bersama.",
   "inviteTextOfficialNoInviter": "Anda diundang untuk bekerja bersama pada {project} di AI WorkDeck.\n\nCara bergabung:\n1. Masuk ke aplikasi desktop dengan akun AI WorkDeck Anda sendiri;\n2. Buka daftar proyek dan klik “Tarik Berkas Kasus dari Perpustakaan Berkas Kasus Tim”;\n3. Pilih {project} dan klik “Tarik ke Perangkat Ini”.\n\nSetelah itu, kita masing-masing bekerja pada salinan sendiri dan klik “Kirim Draf” untuk menggabungkan perubahan.",
   "addPeopleTitle": "Tambahkan Orang ke Berkas Kasus Ini",

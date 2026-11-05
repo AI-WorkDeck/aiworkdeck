@@ -294,6 +294,7 @@ export default {
   addMemberFailed: 'Couldn’t add',
   copiedPasteToColleague: 'Copied — paste it to your colleague',
   connectFailed: 'Connection failed',
+  reconnectCloud: "Reconnect to Cloud",
   // Invite text: the full message sent to a colleague, extracted as one key.
   // Two keys (with/without an inviter name) so English can put a space after {inviter}.
   // Since dev-board#440 this is the only variant: the colleague never types a server address

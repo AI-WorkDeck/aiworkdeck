@@ -54,6 +54,7 @@ class CloudGitEpochClientTest {
   epoch.set(6);
   var stale=assertThrows(VersionException.class,()->restarted.verifyConfig(reopened,REPO+"/awd-objects/hash/parts/0","alice","synthetic-secret"));
   assertTrue(stale.isUserFacing());
+  assertEquals(VersionException.CLOUD_RECONNECT_REQUIRED,stale.getKind(),"front end keys the reconnect button on this kind");
   reopened.load();assertEquals("4",reopened.getString("remote","origin","awdCloudEpoch"));
   assertThrows(VersionException.class,()->restarted.verifyConfig(reopened,REPO,"alice","different-secret"));
   restarted.bindConfig(reopened,REPO,"alice","synthetic-secret");
