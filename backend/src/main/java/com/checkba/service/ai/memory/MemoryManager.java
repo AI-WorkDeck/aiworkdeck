@@ -78,6 +78,26 @@ public class MemoryManager {
     
     private final EmbeddingModel embeddingModel;
 
+    /** 手工 new 的既有单测没有事务管理器；生产由 Spring 注入。 */
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setTransactionManager(org.springframework.transaction.PlatformTransactionManager transactionManager) {
+        this.transactionManager = transactionManager;
+    }
+
+    /**
+     * 在独立事务里执行并在返回前提交。调用方必须已持有对应的进程内锁：
+     * 锁若在 @Transactional 代理提交之前释放，后到的线程读不到未提交的行，仍会重复 INSERT。
+     */
+    private <T> T inNewTx(java.util.function.Supplier<T> body) {
+        if (transactionManager == null) return body.get();
+        org.springframework.transaction.support.TransactionTemplate tx =
+                new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        tx.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return tx.execute(status -> body.get());
+    }
+
     // ==================== 记忆条目操作 ====================
 
     /**
@@ -234,6 +254,15 @@ public class MemoryManager {
 
     private void consolidateIntoProjectMemory(Long projectId, String memoryType, String key, String value) {
         synchronized (projectMemorySaveLock) {
+            inNewTx(() -> {
+                consolidateIntoProjectMemoryTx(projectId, memoryType, key, value);
+                return null;
+            });
+        }
+    }
+
+    private void consolidateIntoProjectMemoryTx(Long projectId, String memoryType, String key, String value) {
+        {
             ProjectMemory pm = projectMemoryRepository.findByProjectId(projectId)
                     .orElseGet(() -> ProjectMemory.builder().projectId(projectId).build());
             String normalizedKey = key.toLowerCase(Locale.ROOT).replaceAll("[\\s_\\-：:]", "");
@@ -989,9 +1018,14 @@ public class MemoryManager {
      * 多实例横向扩容时锁不跨进程，但这已经把审计条目里描述的竞态窗口从"一次完整的 DB 往返"
      * 收窄到可忽略的量级。
      */
-    @Transactional
     public ProjectMemory saveProjectMemory(ProjectMemory projectMemory) {
         synchronized (projectMemorySaveLock) {
+            return inNewTx(() -> saveProjectMemoryTx(projectMemory));
+        }
+    }
+
+    private ProjectMemory saveProjectMemoryTx(ProjectMemory projectMemory) {
+        {
             log.info("Saving project memory for projectId={}", projectMemory.getProjectId());
 
             ProjectMemory existing = projectMemoryRepository
@@ -1011,8 +1045,16 @@ public class MemoryManager {
     /**
      * 更新项目记忆的特定字段
      */
-    @Transactional
     public void updateProjectField(Long projectId, String field, String value) {
+        synchronized (projectMemorySaveLock) {
+            inNewTx(() -> {
+                updateProjectFieldTx(projectId, field, value);
+                return null;
+            });
+        }
+    }
+
+    private void updateProjectFieldTx(Long projectId, String field, String value) {
         log.info("Updating project field: projectId={}, field={}", projectId, field);
         
         ProjectMemory pm = projectMemoryRepository.findByProjectId(projectId)
@@ -1053,9 +1095,14 @@ public class MemoryManager {
      * 保存用户记忆。同 {@link #saveProjectMemory}，{@code user_id} 上也是 unique 约束 +
      * find-then-insert，一样会被并发撞出丢更新，一样用进程内锁收窄竞态窗口。
      */
-    @Transactional
     public UserMemory saveUserMemory(UserMemory userMemory) {
         synchronized (userMemorySaveLock) {
+            return inNewTx(() -> saveUserMemoryTx(userMemory));
+        }
+    }
+
+    private UserMemory saveUserMemoryTx(UserMemory userMemory) {
+        {
             UserMemory existing = userMemoryRepository.findByUserId(userMemory.getUserId()).orElse(null);
             if (existing != null) {
                 userMemory.setId(existing.getId());

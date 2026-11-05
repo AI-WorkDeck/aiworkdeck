@@ -125,9 +125,13 @@ public class AgentRunRecoveryService {
     private void appendInterruptNotice(String conversationId) {
         List<ProjectAiMessage> messages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
         ProjectAiMessage last = null;
-        for (ProjectAiMessage m : messages) {
+        // 从尾部往前找：先碰到 USER 说明本轮还没有 ASSISTANT 行，不能写进上一轮已完成的回答
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            ProjectAiMessage m = messages.get(i);
+            if ("USER".equalsIgnoreCase(m.getRole())) return;
             if ("ASSISTANT".equalsIgnoreCase(m.getRole())) {
                 last = m;
+                break;
             }
         }
         if (last == null) return;
