@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # 腾讯会议 Marketplace 插件
 
-独立安装的 Web 面板和 Java 后端插件，通过腾讯会议官方 `tmeet` CLI 读取会议、录制逐字稿和智能纪要。默认不自动同步，不创建、修改或取消会议，也不申请录制权限。
+独立安装的 Web 面板和 Java 后端插件，通过腾讯会议官方 `tmeet` CLI 读取会议、录制逐字稿和智能纪要。默认不自动同步（可按项目开启，见下文「自动同步」），不创建、修改或取消会议，也不申请录制权限。
 
 ## 使用
 
@@ -13,6 +13,12 @@
 5. 可归档到当前项目，或选择生成纪要、提取待办；这两项会先归档，再以文件引用交给 AI。读取不完整时明确提示，并阻止将其作为完整材料归档。
 
 Mac 与 Windows 的「检查连接」每次都会重新查找 CLI，安装完成后可直接再次检查。Windows 的 npm `.cmd` 入口通过同包 `package.json` 的 `bin` 定位脚本，再由 Node.js 运行，不启动命令解释器；支持 PATH 自定义 npm 前缀和默认 AppData npm 目录。Mac 支持 PATH、常见 Homebrew 与 `~/.local/bin` 的 npm 链接。自定义位置可用 `TMEET_PATH` 和 `TMEET_NODE_PATH`，修改应用进程环境后需重新启动应用。缺少 Node.js、包入口损坏和请求超时会分别提示；不会自动安装或登录。
+
+## 自动同步（1.1.0，默认关闭）
+
+左栏「会议结束后自动同步到本项目」按用户和项目记住。打开开关即授权插件定时调用本机 `tmeet`：插件面板（左栏或会议工作区标签）开着时，每分钟问一次插件后端，后端按项目节流为每 5 分钟最多一轮。每轮作为插件后台任务运行，与手动同步、归档共用同一段代码、同一把项目锁，CLI 调用仍经进程级命令锁串行；只查最近 24 小时已结束的会议和录制，合并进已同步列表（不删除旧列表）。有权限且已完成转码的录制会归档为「<标题>-逐字稿.md」（含腾讯会议智能纪要与待办），再经宿主 LLM 通道生成「<标题>-会议纪要.md」「<标题>-待办.md」（消耗用户 AI 额度；失败时保留归档并在状态行提示，可在会议详情里手动生成）。已归档的会议（含手动「导出到项目」过的）不会重复归档；材料尚未就绪的下轮重试。`tmeet` 未安装、未授权或正在等待浏览器授权时不启动同步命令，只在开关下方显示一行状态，不弹窗；插件不会安装任何程序。
+
+插件 SDK 没有宿主侧定时调度，插件自建线程也无法访问宿主文件，所以自动同步只在 AI WorkDeck 运行且插件面板开着时进行：关闭面板或退出应用期间结束的会议，会在下次打开面板（或切换回该项目）时补同步（仍限最近 24 小时）。
 
 准备面板里的宿主 CLI 检测不代替本插件的「检查连接」：本插件通过公开 SPI 独立运行，插件实际状态以自身检查为准。此改动是源码修复，需后续重建、签名和发布插件包才会到达已安装客户端；本轮未发布。验证包含 Mac 合成进程与 Windows 路径/文件系统模拟，尚未在 Windows 实机运行或连接真实会议账号。
 
@@ -41,10 +47,10 @@ NODE_PATH="$PWD/frontend/node_modules" node --test official-plugins/tencent-meet
 node official-plugins/tencent-meeting/tests/auth-copy-browser.mjs
 ```
 
-输出 `dist/tencent-meeting-1.0.1.zip`，包含真实 JAR、Web 资源和独立技能。JAR 仅使用公开 PluginHost API，宿主依赖不打包进插件。发布使用官网现有 `publish-plugin.mts` 的受理、扫描、审核、签名流程；本构建脚本不会发布。
+输出 `dist/tencent-meeting-<manifest 版本>.zip`，包含真实 JAR、Web 资源和独立技能。JAR 仅使用公开 PluginHost API，宿主依赖不打包进插件。发布使用官网现有 `publish-plugin.mts` 的受理、扫描、审核、签名流程；本构建脚本不会发布。
 
 ## English
 
 Install **Tencent Meeting** from **Marketplace → Plugins**, enable it, select a project, and check the connection. The official `tmeet` CLI must already be installed locally. Open the supplied authorization link in your browser, then manually sync the meeting list. Transcripts and smart minutes load on demand. Archive a meeting to the project, or generate minutes/action items from the archived file using your selected AI model.
 
-There is no automatic background sync, recording permission bypass, meeting mutation, or automatic CLI installation. The CLI login is shared by programs under the same OS user; signing out affects them too. Plugin caches are scoped to the WorkDeck user and project. Marketplace servers distribute the plugin and do not receive meeting content. Real-account authorization and recording availability require user verification.
+Optional per-project auto-sync (off by default) runs the local `tmeet` every 5 minutes while the plugin panel is open, archives meetings that ended in the last 24 hours, and drafts minutes and action items through the host AI channel; a missing or unauthorized CLI is skipped silently. There is no host-side background schedule, recording permission bypass, meeting mutation, or automatic CLI installation. The CLI login is shared by programs under the same OS user; signing out affects them too. Plugin caches are scoped to the WorkDeck user and project. Marketplace servers distribute the plugin and do not receive meeting content. Real-account authorization and recording availability require user verification.

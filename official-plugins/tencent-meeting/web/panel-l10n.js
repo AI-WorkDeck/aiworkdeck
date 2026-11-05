@@ -12,7 +12,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "جارٍ تحميل محتوى الاجتماع…",
     "panel.syncing": "جارٍ مزامنة الاجتماعات…",
     "panel.exporting": "جارٍ حفظ مواد الاجتماع…",
-    "panel.preparingAi": "جارٍ تجهيز مواد الاجتماع للذكاء الاصطناعي…"
+    "panel.preparingAi": "جارٍ تجهيز مواد الاجتماع للذكاء الاصطناعي…",
+    "panel.autoSync": "المزامنة التلقائية مع هذا المشروع بعد انتهاء الاجتماعات",
+    "panel.autoSyncHint": "بتفعيل هذا الخيار تأذن للإضافة، أثناء فتح هذه اللوحة، بتشغيل أداة tmeet المحلية كل 5 دقائق وفحص الاجتماعات التي انتهت خلال آخر 24 ساعة. تُؤرشف الاجتماعات الجديدة التي تتضمن تسجيلاً أو محضراً في مجلد \"Tencent Meeting\" بالمشروع، ويصوغ الذكاء الاصطناعي المحضر والمهام (يستهلك رصيد الذكاء الاصطناعي). لا يُثبَّت أي برنامج؛ وإذا لم تكن tmeet مثبتة أو مُصرّحاً لها يُتخطّى الفحص.",
+    "panel.autoWaiting": "المزامنة التلقائية مفعّلة. سيتم الفحص قريباً.",
+    "panel.autoRunning": "المزامنة التلقائية جارية…",
+    "panel.autoOk": "المزامنة التلقائية: تم الفحص في {time}، وأُرشف {count} من الاجتماعات الجديدة.",
+    "panel.autoPartial": "المزامنة التلقائية: أُرشف {count} من الاجتماعات الجديدة في {time}؛ بعض المواد غير جاهزة بعد وستُعاد المحاولة لاحقاً.",
+    "panel.autoCliMissing": "تم تخطي المزامنة التلقائية: لم يُعثر على tmeet CLI.",
+    "panel.autoNotLoggedIn": "تم تخطي المزامنة التلقائية: Tencent Meeting غير مُصرّح له.",
+    "panel.autoAiFailed": "تعذّر إنشاء محضر أو مهام بالذكاء الاصطناعي لـ {count} منها؛ افتح الاجتماع لإنشائها يدوياً.",
+    "panel.autoOn": "تم تفعيل المزامنة التلقائية.",
+    "panel.autoOff": "تم إيقاف المزامنة التلقائية."
   },
   "de-DE": {
     "panel.refreshList": "Aktualisieren",
@@ -24,7 +35,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "Besprechungsinhalte werden geladen…",
     "panel.syncing": "Besprechungen werden synchronisiert…",
     "panel.exporting": "Besprechungsmaterial wird gespeichert…",
-    "panel.preparingAi": "Besprechungsmaterial für KI wird vorbereitet…"
+    "panel.preparingAi": "Besprechungsmaterial für KI wird vorbereitet…",
+    "panel.autoSync": "Nach Besprechungsende automatisch mit diesem Projekt synchronisieren",
+    "panel.autoSyncHint": "Damit erlauben Sie dem Plugin, bei geöffnetem Panel alle 5 Minuten die lokale tmeet-CLI auszuführen und in den letzten 24 Stunden beendete Besprechungen zu prüfen. Neue Besprechungen mit Aufzeichnung oder Protokoll werden im Ordner „Tencent Meeting“ dieses Projekts archiviert, und die KI erstellt Protokoll und Aufgaben (verbraucht KI-Guthaben). Es wird nichts installiert; fehlt tmeet oder ist es nicht autorisiert, wird die Prüfung übersprungen.",
+    "panel.autoWaiting": "Automatische Synchronisierung ist an. Prüfung folgt in Kürze.",
+    "panel.autoRunning": "Automatische Synchronisierung läuft…",
+    "panel.autoOk": "Automatische Synchronisierung: um {time} geprüft, {count} neue Besprechungen archiviert.",
+    "panel.autoPartial": "Automatische Synchronisierung: {count} neue Besprechungen um {time} archiviert; einige Unterlagen sind noch nicht bereit und werden erneut versucht.",
+    "panel.autoCliMissing": "Automatische Synchronisierung übersprungen: tmeet-CLI nicht gefunden.",
+    "panel.autoNotLoggedIn": "Automatische Synchronisierung übersprungen: Tencent Meeting ist nicht autorisiert.",
+    "panel.autoAiFailed": "Für {count} davon konnten KI-Protokoll oder Aufgaben nicht erstellt werden; öffnen Sie die Besprechung, um sie manuell zu erstellen.",
+    "panel.autoOn": "Automatische Synchronisierung eingeschaltet.",
+    "panel.autoOff": "Automatische Synchronisierung ausgeschaltet."
   },
   "el-GR": {
     "panel.refreshList": "Ανανέωση",
@@ -36,7 +58,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "Φόρτωση περιεχομένου συνάντησης…",
     "panel.syncing": "Συγχρονισμός συναντήσεων…",
     "panel.exporting": "Αποθήκευση υλικού συνάντησης…",
-    "panel.preparingAi": "Προετοιμασία υλικού συνάντησης για την AI…"
+    "panel.preparingAi": "Προετοιμασία υλικού συνάντησης για την AI…",
+    "panel.autoSync": "Αυτόματος συγχρονισμός σε αυτό το έργο μετά το τέλος των συσκέψεων",
+    "panel.autoSyncHint": "Ενεργοποιώντας το, επιτρέπετε στο πρόσθετο, όσο αυτός ο πίνακας είναι ανοιχτός, να εκτελεί κάθε 5 λεπτά το τοπικό tmeet CLI και να ελέγχει συσκέψεις που έληξαν τις τελευταίες 24 ώρες. Νέες συσκέψεις με εγγραφή ή πρακτικά αρχειοθετούνται στον φάκελο «Tencent Meeting» του έργου και η ΤΝ συντάσσει πρακτικά και εκκρεμότητες (καταναλώνει μονάδες ΤΝ). Δεν εγκαθίσταται τίποτα· αν το tmeet λείπει ή δεν είναι εξουσιοδοτημένο, ο έλεγχος παραλείπεται.",
+    "panel.autoWaiting": "Ο αυτόματος συγχρονισμός είναι ενεργός. Έλεγχος σε λίγο.",
+    "panel.autoRunning": "Αυτόματος συγχρονισμός σε εξέλιξη…",
+    "panel.autoOk": "Αυτόματος συγχρονισμός: έλεγχος στις {time}, αρχειοθετήθηκαν {count} νέες συσκέψεις.",
+    "panel.autoPartial": "Αυτόματος συγχρονισμός: αρχειοθετήθηκαν {count} νέες συσκέψεις στις {time}· ορισμένο υλικό δεν είναι ακόμη έτοιμο και θα δοκιμαστεί ξανά.",
+    "panel.autoCliMissing": "Ο αυτόματος συγχρονισμός παραλείφθηκε: δεν βρέθηκε το tmeet CLI.",
+    "panel.autoNotLoggedIn": "Ο αυτόματος συγχρονισμός παραλείφθηκε: το Tencent Meeting δεν είναι εξουσιοδοτημένο.",
+    "panel.autoAiFailed": "Για {count} από αυτές δεν ήταν δυνατή η σύνταξη πρακτικών ή εκκρεμοτήτων με ΤΝ· ανοίξτε τη σύσκεψη για χειροκίνητη δημιουργία.",
+    "panel.autoOn": "Ο αυτόματος συγχρονισμός ενεργοποιήθηκε.",
+    "panel.autoOff": "Ο αυτόματος συγχρονισμός απενεργοποιήθηκε."
   },
   "en-US": {
     "panel.refreshList": "Refresh",
@@ -48,7 +81,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "Loading meeting content…",
     "panel.syncing": "Syncing meetings…",
     "panel.exporting": "Saving meeting material…",
-    "panel.preparingAi": "Preparing meeting material for AI…"
+    "panel.preparingAi": "Preparing meeting material for AI…",
+    "panel.autoSync": "Auto-sync to this project after meetings end",
+    "panel.autoSyncHint": "Turning this on authorizes the plugin, while this panel is open, to run the local tmeet CLI every 5 minutes and check meetings that ended in the last 24 hours. New meetings with recordings or minutes are archived to this project's Tencent Meeting folder, and AI drafts minutes and action items (uses AI credits). Nothing is installed; if tmeet is missing or not authorized, the check is skipped.",
+    "panel.autoWaiting": "Auto-sync is on. Checking shortly.",
+    "panel.autoRunning": "Auto-sync in progress…",
+    "panel.autoOk": "Auto-sync: checked at {time}, {count} new meetings archived.",
+    "panel.autoPartial": "Auto-sync: {count} new meetings archived at {time}; some material is not ready yet and will be retried.",
+    "panel.autoCliMissing": "Auto-sync skipped: tmeet CLI not found.",
+    "panel.autoNotLoggedIn": "Auto-sync skipped: Tencent Meeting is not authorized.",
+    "panel.autoAiFailed": "AI minutes or action items could not be drafted for {count} of them; open the meeting to draft manually.",
+    "panel.autoOn": "Auto-sync turned on.",
+    "panel.autoOff": "Auto-sync turned off."
   },
   "es-ES": {
     "panel.refreshList": "Actualizar",
@@ -60,7 +104,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "Cargando contenido de la reunión…",
     "panel.syncing": "Sincronizando reuniones…",
     "panel.exporting": "Guardando material de la reunión…",
-    "panel.preparingAi": "Preparando material de la reunión para la IA…"
+    "panel.preparingAi": "Preparando material de la reunión para la IA…",
+    "panel.autoSync": "Sincronizar automáticamente con este proyecto al terminar las reuniones",
+    "panel.autoSyncHint": "Al activarlo, autoriza al complemento, mientras este panel esté abierto, a ejecutar el CLI tmeet local cada 5 minutos y revisar las reuniones terminadas en las últimas 24 horas. Las reuniones nuevas con grabación o acta se archivan en la carpeta «Tencent Meeting» del proyecto y la IA redacta el acta y las tareas (consume créditos de IA). No se instala nada; si tmeet no está instalado o autorizado, se omite la revisión.",
+    "panel.autoWaiting": "Sincronización automática activada. Se revisará en breve.",
+    "panel.autoRunning": "Sincronización automática en curso…",
+    "panel.autoOk": "Sincronización automática: revisado a las {time}, {count} reuniones nuevas archivadas.",
+    "panel.autoPartial": "Sincronización automática: {count} reuniones nuevas archivadas a las {time}; parte del material aún no está listo y se reintentará.",
+    "panel.autoCliMissing": "Sincronización automática omitida: no se encontró el CLI tmeet.",
+    "panel.autoNotLoggedIn": "Sincronización automática omitida: Tencent Meeting no está autorizado.",
+    "panel.autoAiFailed": "No se pudo redactar el acta o las tareas con IA para {count} de ellas; abra la reunión para generarlas manualmente.",
+    "panel.autoOn": "Sincronización automática activada.",
+    "panel.autoOff": "Sincronización automática desactivada."
   },
   "fr-FR": {
     "panel.refreshList": "Actualiser",
@@ -72,7 +127,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "Chargement du contenu de la réunion…",
     "panel.syncing": "Synchronisation des réunions…",
     "panel.exporting": "Enregistrement des documents de réunion…",
-    "panel.preparingAi": "Préparation des documents de réunion pour l’IA…"
+    "panel.preparingAi": "Préparation des documents de réunion pour l’IA…",
+    "panel.autoSync": "Synchroniser automatiquement vers ce projet à la fin des réunions",
+    "panel.autoSyncHint": "En l'activant, vous autorisez le plugin, tant que ce panneau est ouvert, à exécuter le CLI tmeet local toutes les 5 minutes pour vérifier les réunions terminées au cours des dernières 24 heures. Les nouvelles réunions avec enregistrement ou compte rendu sont archivées dans le dossier « Tencent Meeting » du projet, et l'IA rédige le compte rendu et les actions (consomme des crédits IA). Rien n'est installé ; si tmeet est absent ou non autorisé, la vérification est ignorée.",
+    "panel.autoWaiting": "Synchronisation automatique activée. Vérification imminente.",
+    "panel.autoRunning": "Synchronisation automatique en cours…",
+    "panel.autoOk": "Synchronisation automatique : vérifiée à {time}, {count} nouvelles réunions archivées.",
+    "panel.autoPartial": "Synchronisation automatique : {count} nouvelles réunions archivées à {time} ; certains éléments ne sont pas encore prêts et seront réessayés.",
+    "panel.autoCliMissing": "Synchronisation automatique ignorée : CLI tmeet introuvable.",
+    "panel.autoNotLoggedIn": "Synchronisation automatique ignorée : Tencent Meeting n'est pas autorisé.",
+    "panel.autoAiFailed": "Le compte rendu ou les actions IA n'ont pas pu être rédigés pour {count} d'entre elles ; ouvrez la réunion pour les générer manuellement.",
+    "panel.autoOn": "Synchronisation automatique activée.",
+    "panel.autoOff": "Synchronisation automatique désactivée."
   },
   "hi-IN": {
     "panel.refreshList": "रीफ़्रेश करें",
@@ -84,7 +150,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "बैठक की सामग्री लोड हो रही है…",
     "panel.syncing": "बैठकें सिंक हो रही हैं…",
     "panel.exporting": "बैठक की सामग्री सहेजी जा रही है…",
-    "panel.preparingAi": "AI के लिए बैठक की सामग्री तैयार हो रही है…"
+    "panel.preparingAi": "AI के लिए बैठक की सामग्री तैयार हो रही है…",
+    "panel.autoSync": "मीटिंग समाप्त होने पर इस प्रोजेक्ट में स्वतः सिंक करें",
+    "panel.autoSyncHint": "इसे चालू करके आप प्लगइन को अनुमति देते हैं कि यह पैनल खुला रहने तक हर 5 मिनट में स्थानीय tmeet CLI चलाए और पिछले 24 घंटों में समाप्त हुई मीटिंग जाँचे। रिकॉर्डिंग या कार्यवृत्त वाली नई मीटिंग इस प्रोजेक्ट के \"Tencent Meeting\" फ़ोल्डर में संग्रहित होती हैं और AI कार्यवृत्त व कार्य-सूची तैयार करता है (AI क्रेडिट खर्च होते हैं)। कुछ भी इंस्टॉल नहीं किया जाता; tmeet न होने या अधिकृत न होने पर जाँच छोड़ दी जाती है।",
+    "panel.autoWaiting": "स्वतः सिंक चालू है। शीघ्र जाँच होगी।",
+    "panel.autoRunning": "स्वतः सिंक जारी है…",
+    "panel.autoOk": "स्वतः सिंक: {time} पर जाँचा गया, {count} नई मीटिंग संग्रहित।",
+    "panel.autoPartial": "स्वतः सिंक: {time} पर {count} नई मीटिंग संग्रहित; कुछ सामग्री अभी तैयार नहीं है, बाद में फिर प्रयास होगा।",
+    "panel.autoCliMissing": "स्वतः सिंक छोड़ा गया: tmeet CLI नहीं मिला।",
+    "panel.autoNotLoggedIn": "स्वतः सिंक छोड़ा गया: Tencent Meeting अधिकृत नहीं है।",
+    "panel.autoAiFailed": "इनमें से {count} के लिए AI कार्यवृत्त या कार्य-सूची नहीं बन सकी; मैन्युअल रूप से बनाने के लिए मीटिंग खोलें।",
+    "panel.autoOn": "स्वतः सिंक चालू किया गया।",
+    "panel.autoOff": "स्वतः सिंक बंद किया गया।"
   },
   "id-ID": {
     "panel.refreshList": "Segarkan",
@@ -96,7 +173,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "Memuat isi rapat…",
     "panel.syncing": "Menyinkronkan rapat…",
     "panel.exporting": "Menyimpan materi rapat…",
-    "panel.preparingAi": "Menyiapkan materi rapat untuk AI…"
+    "panel.preparingAi": "Menyiapkan materi rapat untuk AI…",
+    "panel.autoSync": "Sinkronkan otomatis ke proyek ini setelah rapat selesai",
+    "panel.autoSyncHint": "Dengan mengaktifkannya, Anda mengizinkan plugin, selama panel ini terbuka, menjalankan CLI tmeet lokal setiap 5 menit dan memeriksa rapat yang selesai dalam 24 jam terakhir. Rapat baru yang memiliki rekaman atau notula diarsipkan ke folder \"Tencent Meeting\" proyek ini, dan AI menyusun notula serta tugas (memakai kredit AI). Tidak ada yang diinstal; jika tmeet tidak ada atau belum diotorisasi, pemeriksaan dilewati.",
+    "panel.autoWaiting": "Sinkronisasi otomatis aktif. Segera diperiksa.",
+    "panel.autoRunning": "Sinkronisasi otomatis berjalan…",
+    "panel.autoOk": "Sinkronisasi otomatis: diperiksa pukul {time}, {count} rapat baru diarsipkan.",
+    "panel.autoPartial": "Sinkronisasi otomatis: {count} rapat baru diarsipkan pukul {time}; sebagian materi belum siap dan akan dicoba lagi.",
+    "panel.autoCliMissing": "Sinkronisasi otomatis dilewati: CLI tmeet tidak ditemukan.",
+    "panel.autoNotLoggedIn": "Sinkronisasi otomatis dilewati: Tencent Meeting belum diotorisasi.",
+    "panel.autoAiFailed": "Notula atau tugas AI tidak dapat disusun untuk {count} di antaranya; buka rapat untuk membuatnya secara manual.",
+    "panel.autoOn": "Sinkronisasi otomatis diaktifkan.",
+    "panel.autoOff": "Sinkronisasi otomatis dinonaktifkan."
   },
   "it-IT": {
     "panel.refreshList": "Aggiorna",
@@ -108,7 +196,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "Caricamento del contenuto della riunione…",
     "panel.syncing": "Sincronizzazione delle riunioni…",
     "panel.exporting": "Salvataggio del materiale della riunione…",
-    "panel.preparingAi": "Preparazione del materiale della riunione per l’IA…"
+    "panel.preparingAi": "Preparazione del materiale della riunione per l’IA…",
+    "panel.autoSync": "Sincronizza automaticamente con questo progetto al termine delle riunioni",
+    "panel.autoSyncHint": "Attivandolo autorizzi il plugin, finché questo pannello è aperto, a eseguire la CLI tmeet locale ogni 5 minuti e controllare le riunioni terminate nelle ultime 24 ore. Le nuove riunioni con registrazione o verbale vengono archiviate nella cartella \"Tencent Meeting\" del progetto e l'IA redige verbale e attività (consuma crediti IA). Non viene installato nulla; se tmeet manca o non è autorizzato, il controllo viene saltato.",
+    "panel.autoWaiting": "Sincronizzazione automatica attiva. Controllo a breve.",
+    "panel.autoRunning": "Sincronizzazione automatica in corso…",
+    "panel.autoOk": "Sincronizzazione automatica: controllato alle {time}, {count} nuove riunioni archiviate.",
+    "panel.autoPartial": "Sincronizzazione automatica: {count} nuove riunioni archiviate alle {time}; alcuni materiali non sono ancora pronti e verranno ritentati.",
+    "panel.autoCliMissing": "Sincronizzazione automatica saltata: CLI tmeet non trovata.",
+    "panel.autoNotLoggedIn": "Sincronizzazione automatica saltata: Tencent Meeting non è autorizzato.",
+    "panel.autoAiFailed": "Per {count} di esse non è stato possibile redigere verbale o attività con l'IA; apri la riunione per generarli manualmente.",
+    "panel.autoOn": "Sincronizzazione automatica attivata.",
+    "panel.autoOff": "Sincronizzazione automatica disattivata."
   },
   "ja-JP": {
     "panel.refreshList": "更新",
@@ -120,7 +219,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "会議内容を読み込み中…",
     "panel.syncing": "会議を同期中…",
     "panel.exporting": "会議資料を保存中…",
-    "panel.preparingAi": "AI に渡す会議資料を準備中…"
+    "panel.preparingAi": "AI に渡す会議資料を準備中…",
+    "panel.autoSync": "会議終了後にこのプロジェクトへ自動同期",
+    "panel.autoSyncHint": "オンにすると、このパネルを開いている間、プラグインが 5 分ごとにローカルの tmeet を実行し、直近 24 時間に終了した会議を確認することを許可します。録画または議事録のある新しい会議はこのプロジェクトの「Tencent Meeting」フォルダーに保存され、AI が議事録と ToDo を作成します（AI クレジットを消費）。プログラムはインストールしません。tmeet が未インストールまたは未認可の場合はスキップします。",
+    "panel.autoWaiting": "自動同期はオンです。まもなく確認します。",
+    "panel.autoRunning": "自動同期中…",
+    "panel.autoOk": "自動同期：{time} に確認、新たに {count} 件の会議を保存しました。",
+    "panel.autoPartial": "自動同期：{time} に {count} 件を保存。一部の資料はまだ準備中のため、後で再試行します。",
+    "panel.autoCliMissing": "自動同期をスキップ：tmeet CLI が見つかりません。",
+    "panel.autoNotLoggedIn": "自動同期をスキップ：Tencent Meeting が未認可です。",
+    "panel.autoAiFailed": "うち {count} 件は AI 議事録または ToDo を作成できませんでした。会議を開いて手動で作成できます。",
+    "panel.autoOn": "自動同期をオンにしました。",
+    "panel.autoOff": "自動同期をオフにしました。"
   },
   "ko-KR": {
     "panel.refreshList": "새로고침",
@@ -132,7 +242,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "회의 내용 불러오는 중…",
     "panel.syncing": "회의 동기화 중…",
     "panel.exporting": "회의 자료 저장 중…",
-    "panel.preparingAi": "AI에 전달할 회의 자료 준비 중…"
+    "panel.preparingAi": "AI에 전달할 회의 자료 준비 중…",
+    "panel.autoSync": "회의 종료 후 이 프로젝트로 자동 동기화",
+    "panel.autoSyncHint": "켜면 이 패널이 열려 있는 동안 플러그인이 5분마다 로컬 tmeet을 실행해 최근 24시간 내 종료된 회의를 확인하도록 허용합니다. 녹화나 회의록이 있는 새 회의는 이 프로젝트의 'Tencent Meeting' 폴더에 보관되고 AI가 회의록과 할 일을 작성합니다(AI 크레딧 사용). 프로그램을 설치하지 않으며, tmeet이 없거나 인증되지 않았으면 건너뜁니다.",
+    "panel.autoWaiting": "자동 동기화가 켜져 있습니다. 곧 확인합니다.",
+    "panel.autoRunning": "자동 동기화 중…",
+    "panel.autoOk": "자동 동기화: {time}에 확인, 새 회의 {count}건 보관.",
+    "panel.autoPartial": "자동 동기화: {time}에 {count}건 보관. 일부 자료가 아직 준비되지 않아 나중에 다시 시도합니다.",
+    "panel.autoCliMissing": "자동 동기화 건너뜀: tmeet CLI를 찾을 수 없습니다.",
+    "panel.autoNotLoggedIn": "자동 동기화 건너뜀: Tencent Meeting이 인증되지 않았습니다.",
+    "panel.autoAiFailed": "그중 {count}건은 AI 회의록 또는 할 일을 만들지 못했습니다. 회의를 열어 직접 생성할 수 있습니다.",
+    "panel.autoOn": "자동 동기화를 켰습니다.",
+    "panel.autoOff": "자동 동기화를 껐습니다."
   },
   "ms-MY": {
     "panel.refreshList": "Muat semula",
@@ -144,7 +265,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "Memuatkan kandungan mesyuarat…",
     "panel.syncing": "Menyegerakkan mesyuarat…",
     "panel.exporting": "Menyimpan bahan mesyuarat…",
-    "panel.preparingAi": "Menyediakan bahan mesyuarat untuk AI…"
+    "panel.preparingAi": "Menyediakan bahan mesyuarat untuk AI…",
+    "panel.autoSync": "Segerakkan secara automatik ke projek ini selepas mesyuarat tamat",
+    "panel.autoSyncHint": "Dengan menghidupkannya, anda membenarkan pemalam, selagi panel ini dibuka, menjalankan CLI tmeet setempat setiap 5 minit dan menyemak mesyuarat yang tamat dalam 24 jam lalu. Mesyuarat baharu yang ada rakaman atau minit diarkibkan ke folder \"Tencent Meeting\" projek ini, dan AI menyediakan minit serta tugasan (menggunakan kredit AI). Tiada apa-apa dipasang; jika tmeet tiada atau belum dibenarkan, semakan dilangkau.",
+    "panel.autoWaiting": "Penyegerakan automatik dihidupkan. Semakan akan dibuat sebentar lagi.",
+    "panel.autoRunning": "Penyegerakan automatik sedang berjalan…",
+    "panel.autoOk": "Penyegerakan automatik: disemak pada {time}, {count} mesyuarat baharu diarkibkan.",
+    "panel.autoPartial": "Penyegerakan automatik: {count} mesyuarat baharu diarkibkan pada {time}; sebahagian bahan belum sedia dan akan dicuba semula.",
+    "panel.autoCliMissing": "Penyegerakan automatik dilangkau: CLI tmeet tidak ditemui.",
+    "panel.autoNotLoggedIn": "Penyegerakan automatik dilangkau: Tencent Meeting belum dibenarkan.",
+    "panel.autoAiFailed": "Minit atau tugasan AI tidak dapat disediakan untuk {count} daripadanya; buka mesyuarat untuk menjananya secara manual.",
+    "panel.autoOn": "Penyegerakan automatik dihidupkan.",
+    "panel.autoOff": "Penyegerakan automatik dimatikan."
   },
   "nl-NL": {
     "panel.refreshList": "Vernieuwen",
@@ -156,7 +288,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "Vergaderinhoud laden…",
     "panel.syncing": "Vergaderingen synchroniseren…",
     "panel.exporting": "Vergadermateriaal opslaan…",
-    "panel.preparingAi": "Vergadermateriaal voorbereiden voor AI…"
+    "panel.preparingAi": "Vergadermateriaal voorbereiden voor AI…",
+    "panel.autoSync": "Na afloop van vergaderingen automatisch synchroniseren met dit project",
+    "panel.autoSyncHint": "Hiermee geeft u de plug-in toestemming om, zolang dit paneel open is, elke 5 minuten de lokale tmeet-CLI uit te voeren en vergaderingen te controleren die in de afgelopen 24 uur zijn geëindigd. Nieuwe vergaderingen met opname of notulen worden gearchiveerd in de map 'Tencent Meeting' van dit project en AI stelt notulen en actiepunten op (verbruikt AI-tegoed). Er wordt niets geïnstalleerd; als tmeet ontbreekt of niet is geautoriseerd, wordt de controle overgeslagen.",
+    "panel.autoWaiting": "Automatische synchronisatie staat aan. Controle volgt zo.",
+    "panel.autoRunning": "Automatische synchronisatie bezig…",
+    "panel.autoOk": "Automatische synchronisatie: gecontroleerd om {time}, {count} nieuwe vergaderingen gearchiveerd.",
+    "panel.autoPartial": "Automatische synchronisatie: {count} nieuwe vergaderingen gearchiveerd om {time}; sommige materialen zijn nog niet klaar en worden opnieuw geprobeerd.",
+    "panel.autoCliMissing": "Automatische synchronisatie overgeslagen: tmeet-CLI niet gevonden.",
+    "panel.autoNotLoggedIn": "Automatische synchronisatie overgeslagen: Tencent Meeting is niet geautoriseerd.",
+    "panel.autoAiFailed": "Voor {count} daarvan konden geen AI-notulen of actiepunten worden opgesteld; open de vergadering om ze handmatig te maken.",
+    "panel.autoOn": "Automatische synchronisatie ingeschakeld.",
+    "panel.autoOff": "Automatische synchronisatie uitgeschakeld."
   },
   "pt-BR": {
     "panel.refreshList": "Atualizar",
@@ -168,7 +311,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "Carregando conteúdo da reunião…",
     "panel.syncing": "Sincronizando reuniões…",
     "panel.exporting": "Salvando material da reunião…",
-    "panel.preparingAi": "Preparando material da reunião para a IA…"
+    "panel.preparingAi": "Preparando material da reunião para a IA…",
+    "panel.autoSync": "Sincronizar automaticamente com este projeto após o fim das reuniões",
+    "panel.autoSyncHint": "Ao ativar, você autoriza o plugin, enquanto este painel estiver aberto, a executar o CLI tmeet local a cada 5 minutos e verificar reuniões encerradas nas últimas 24 horas. Reuniões novas com gravação ou ata são arquivadas na pasta \"Tencent Meeting\" do projeto, e a IA redige a ata e as tarefas (consome créditos de IA). Nada é instalado; se o tmeet não estiver instalado ou autorizado, a verificação é ignorada.",
+    "panel.autoWaiting": "Sincronização automática ativada. Verificando em breve.",
+    "panel.autoRunning": "Sincronização automática em andamento…",
+    "panel.autoOk": "Sincronização automática: verificado às {time}, {count} novas reuniões arquivadas.",
+    "panel.autoPartial": "Sincronização automática: {count} novas reuniões arquivadas às {time}; parte do material ainda não está pronta e será tentada novamente.",
+    "panel.autoCliMissing": "Sincronização automática ignorada: CLI tmeet não encontrado.",
+    "panel.autoNotLoggedIn": "Sincronização automática ignorada: Tencent Meeting não está autorizado.",
+    "panel.autoAiFailed": "Não foi possível redigir ata ou tarefas com IA para {count} delas; abra a reunião para gerar manualmente.",
+    "panel.autoOn": "Sincronização automática ativada.",
+    "panel.autoOff": "Sincronização automática desativada."
   },
   "ru-RU": {
     "panel.refreshList": "Обновить",
@@ -180,7 +334,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "Загрузка материалов встречи…",
     "panel.syncing": "Синхронизация встреч…",
     "panel.exporting": "Сохранение материалов встречи…",
-    "panel.preparingAi": "Подготовка материалов встречи для ИИ…"
+    "panel.preparingAi": "Подготовка материалов встречи для ИИ…",
+    "panel.autoSync": "Автоматически синхронизировать с этим проектом после окончания встреч",
+    "panel.autoSyncHint": "Включая, вы разрешаете плагину, пока эта панель открыта, каждые 5 минут запускать локальный tmeet CLI и проверять встречи, завершившиеся за последние 24 часа. Новые встречи с записью или протоколом архивируются в папку «Tencent Meeting» проекта, а ИИ составляет протокол и задачи (расходуются кредиты ИИ). Ничего не устанавливается; если tmeet не установлен или не авторизован, проверка пропускается.",
+    "panel.autoWaiting": "Автосинхронизация включена. Скоро будет проверка.",
+    "panel.autoRunning": "Идёт автосинхронизация…",
+    "panel.autoOk": "Автосинхронизация: проверено в {time}, заархивировано новых встреч: {count}.",
+    "panel.autoPartial": "Автосинхронизация: в {time} заархивировано новых встреч: {count}; часть материалов ещё не готова и будет обработана позже.",
+    "panel.autoCliMissing": "Автосинхронизация пропущена: tmeet CLI не найден.",
+    "panel.autoNotLoggedIn": "Автосинхронизация пропущена: Tencent Meeting не авторизован.",
+    "panel.autoAiFailed": "Для {count} из них не удалось составить протокол или задачи с помощью ИИ; откройте встречу, чтобы создать вручную.",
+    "panel.autoOn": "Автосинхронизация включена.",
+    "panel.autoOff": "Автосинхронизация выключена."
   },
   "th-TH": {
     "panel.refreshList": "รีเฟรช",
@@ -192,7 +357,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "กำลังโหลดเนื้อหาการประชุม…",
     "panel.syncing": "กำลังซิงค์การประชุม…",
     "panel.exporting": "กำลังบันทึกเอกสารการประชุม…",
-    "panel.preparingAi": "กำลังเตรียมเอกสารการประชุมสำหรับ AI…"
+    "panel.preparingAi": "กำลังเตรียมเอกสารการประชุมสำหรับ AI…",
+    "panel.autoSync": "ซิงก์อัตโนมัติเข้าโปรเจกต์นี้เมื่อการประชุมสิ้นสุด",
+    "panel.autoSyncHint": "เมื่อเปิดใช้ คุณอนุญาตให้ปลั๊กอินเรียกใช้ tmeet CLI ในเครื่องทุก 5 นาทีขณะที่แผงนี้เปิดอยู่ เพื่อตรวจสอบการประชุมที่สิ้นสุดใน 24 ชั่วโมงที่ผ่านมา การประชุมใหม่ที่มีการบันทึกหรือรายงานการประชุมจะถูกเก็บในโฟลเดอร์ \"Tencent Meeting\" ของโปรเจกต์ และ AI จะร่างรายงานการประชุมและรายการงาน (ใช้เครดิต AI) ไม่มีการติดตั้งโปรแกรมใด ๆ หากไม่มี tmeet หรือยังไม่ได้อนุญาต จะข้ามการตรวจสอบ",
+    "panel.autoWaiting": "เปิดซิงก์อัตโนมัติแล้ว จะตรวจสอบในไม่ช้า",
+    "panel.autoRunning": "กำลังซิงก์อัตโนมัติ…",
+    "panel.autoOk": "ซิงก์อัตโนมัติ: ตรวจสอบเมื่อ {time} เก็บการประชุมใหม่ {count} รายการ",
+    "panel.autoPartial": "ซิงก์อัตโนมัติ: เก็บการประชุมใหม่ {count} รายการเมื่อ {time} เอกสารบางส่วนยังไม่พร้อม จะลองใหม่ภายหลัง",
+    "panel.autoCliMissing": "ข้ามการซิงก์อัตโนมัติ: ไม่พบ tmeet CLI",
+    "panel.autoNotLoggedIn": "ข้ามการซิงก์อัตโนมัติ: Tencent Meeting ยังไม่ได้รับอนุญาต",
+    "panel.autoAiFailed": "ไม่สามารถร่างรายงานการประชุมหรือรายการงานด้วย AI ได้ {count} รายการ เปิดการประชุมเพื่อสร้างด้วยตนเอง",
+    "panel.autoOn": "เปิดซิงก์อัตโนมัติแล้ว",
+    "panel.autoOff": "ปิดซิงก์อัตโนมัติแล้ว"
   },
   "tr-TR": {
     "panel.refreshList": "Yenile",
@@ -204,7 +380,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "Toplantı içeriği yükleniyor…",
     "panel.syncing": "Toplantılar eşitleniyor…",
     "panel.exporting": "Toplantı materyalleri kaydediliyor…",
-    "panel.preparingAi": "Toplantı materyalleri yapay zekâ için hazırlanıyor…"
+    "panel.preparingAi": "Toplantı materyalleri yapay zekâ için hazırlanıyor…",
+    "panel.autoSync": "Toplantılar bitince bu projeye otomatik eşitle",
+    "panel.autoSyncHint": "Açtığınızda eklentiye, bu panel açıkken her 5 dakikada bir yerel tmeet CLI'yi çalıştırıp son 24 saatte biten toplantıları kontrol etme izni verirsiniz. Kaydı veya tutanağı olan yeni toplantılar projenin \"Tencent Meeting\" klasörüne arşivlenir ve yapay zekâ tutanak ile yapılacakları hazırlar (yapay zekâ kredisi kullanır). Hiçbir şey yüklenmez; tmeet yoksa veya yetkilendirilmemişse kontrol atlanır.",
+    "panel.autoWaiting": "Otomatik eşitleme açık. Kısa süre içinde kontrol edilecek.",
+    "panel.autoRunning": "Otomatik eşitleme sürüyor…",
+    "panel.autoOk": "Otomatik eşitleme: {time} itibarıyla kontrol edildi, {count} yeni toplantı arşivlendi.",
+    "panel.autoPartial": "Otomatik eşitleme: {time} itibarıyla {count} yeni toplantı arşivlendi; bazı materyaller henüz hazır değil, yeniden denenecek.",
+    "panel.autoCliMissing": "Otomatik eşitleme atlandı: tmeet CLI bulunamadı.",
+    "panel.autoNotLoggedIn": "Otomatik eşitleme atlandı: Tencent Meeting yetkilendirilmemiş.",
+    "panel.autoAiFailed": "Bunlardan {count} tanesi için yapay zekâ tutanağı veya yapılacaklar hazırlanamadı; elle oluşturmak için toplantıyı açın.",
+    "panel.autoOn": "Otomatik eşitleme açıldı.",
+    "panel.autoOff": "Otomatik eşitleme kapatıldı."
   },
   "vi-VN": {
     "panel.refreshList": "Làm mới",
@@ -216,7 +403,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "Đang tải nội dung cuộc họp…",
     "panel.syncing": "Đang đồng bộ cuộc họp…",
     "panel.exporting": "Đang lưu tài liệu cuộc họp…",
-    "panel.preparingAi": "Đang chuẩn bị tài liệu cuộc họp cho AI…"
+    "panel.preparingAi": "Đang chuẩn bị tài liệu cuộc họp cho AI…",
+    "panel.autoSync": "Tự động đồng bộ vào dự án này khi cuộc họp kết thúc",
+    "panel.autoSyncHint": "Khi bật, bạn cho phép plugin, trong lúc bảng này đang mở, chạy tmeet CLI cục bộ mỗi 5 phút để kiểm tra các cuộc họp đã kết thúc trong 24 giờ qua. Cuộc họp mới có bản ghi hoặc biên bản sẽ được lưu vào thư mục \"Tencent Meeting\" của dự án, và AI soạn biên bản cùng việc cần làm (tiêu tốn tín dụng AI). Không cài đặt bất kỳ chương trình nào; nếu chưa có tmeet hoặc chưa ủy quyền thì bỏ qua lần kiểm tra.",
+    "panel.autoWaiting": "Đã bật tự động đồng bộ. Sẽ kiểm tra ngay.",
+    "panel.autoRunning": "Đang tự động đồng bộ…",
+    "panel.autoOk": "Tự động đồng bộ: đã kiểm tra lúc {time}, lưu {count} cuộc họp mới.",
+    "panel.autoPartial": "Tự động đồng bộ: lưu {count} cuộc họp mới lúc {time}; một số tài liệu chưa sẵn sàng, sẽ thử lại sau.",
+    "panel.autoCliMissing": "Đã bỏ qua tự động đồng bộ: không tìm thấy tmeet CLI.",
+    "panel.autoNotLoggedIn": "Đã bỏ qua tự động đồng bộ: Tencent Meeting chưa được ủy quyền.",
+    "panel.autoAiFailed": "Không thể soạn biên bản hoặc việc cần làm bằng AI cho {count} cuộc họp; mở cuộc họp để tạo thủ công.",
+    "panel.autoOn": "Đã bật tự động đồng bộ.",
+    "panel.autoOff": "Đã tắt tự động đồng bộ."
   },
   "zh-CN": {
     "panel.refreshList": "刷新",
@@ -228,7 +426,18 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "正在读取会议内容…",
     "panel.syncing": "正在同步会议…",
     "panel.exporting": "正在保存会议材料…",
-    "panel.preparingAi": "正在准备会议材料并交给 AI…"
+    "panel.preparingAi": "正在准备会议材料并交给 AI…",
+    "panel.autoSync": "会议结束后自动同步到本项目",
+    "panel.autoSyncHint": "开启即授权本插件在面板打开期间每 5 分钟调用本机 tmeet，查看最近 24 小时已结束的会议；有录制或纪要的新会议会归档到本项目「腾讯会议」文件夹，并用 AI 生成纪要和待办（消耗 AI 额度）。不会安装任何程序；tmeet 未安装或未授权时自动跳过。",
+    "panel.autoWaiting": "自动同步已开启，稍后检查。",
+    "panel.autoRunning": "自动同步进行中…",
+    "panel.autoOk": "自动同步：{time} 已检查，新归档 {count} 场会议。",
+    "panel.autoPartial": "自动同步：{time} 新归档 {count} 场；部分会议材料尚未就绪，稍后自动重试。",
+    "panel.autoCliMissing": "自动同步已跳过：未找到 tmeet CLI。",
+    "panel.autoNotLoggedIn": "自动同步已跳过：腾讯会议尚未授权。",
+    "panel.autoAiFailed": "其中 {count} 场未能生成 AI 纪要或待办，可打开会议手动生成。",
+    "panel.autoOn": "已开启自动同步。",
+    "panel.autoOff": "已关闭自动同步。"
   },
   "zh-TW": {
     "panel.refreshList": "重新整理",
@@ -240,6 +449,17 @@ window.AWD_TMEET_L10N = {
     "panel.loadingDetail": "正在讀取會議內容…",
     "panel.syncing": "正在同步會議…",
     "panel.exporting": "正在儲存會議資料…",
-    "panel.preparingAi": "正在準備會議資料並交給 AI…"
+    "panel.preparingAi": "正在準備會議資料並交給 AI…",
+    "panel.autoSync": "會議結束後自動同步到本專案",
+    "panel.autoSyncHint": "開啟即授權本外掛在面板開啟期間每 5 分鐘呼叫本機 tmeet，查看最近 24 小時已結束的會議；有錄製或紀要的新會議會歸檔到本專案「騰訊會議」資料夾，並用 AI 產生紀要和待辦（消耗 AI 額度）。不會安裝任何程式；tmeet 未安裝或未授權時自動略過。",
+    "panel.autoWaiting": "自動同步已開啟，稍後檢查。",
+    "panel.autoRunning": "自動同步進行中…",
+    "panel.autoOk": "自動同步：{time} 已檢查，新歸檔 {count} 場會議。",
+    "panel.autoPartial": "自動同步：{time} 新歸檔 {count} 場；部分會議資料尚未就緒，稍後自動重試。",
+    "panel.autoCliMissing": "自動同步已略過：找不到 tmeet CLI。",
+    "panel.autoNotLoggedIn": "自動同步已略過：騰訊會議尚未授權。",
+    "panel.autoAiFailed": "其中 {count} 場未能產生 AI 紀要或待辦，可開啟會議手動產生。",
+    "panel.autoOn": "已開啟自動同步。",
+    "panel.autoOff": "已關閉自動同步。"
   }
 };
