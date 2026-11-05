@@ -167,7 +167,9 @@ class SensitiveChineseNameRecognitionTest {
         "被告：\n支付自 2026 年 1 月 1 日起至实际清偿之日止的利息。",
         "原告：某某公司\n被告应于十日内，支付自 2026 年 3 月起的租金。",
         "联系人：\n申请自 2026 年起延期。\n收取自 2026 年 5 月起的费用。",
-        "支付自\n提交至\n申请人"
+        "支付自\n提交至\n申请人",
+        // tutorial-series #153：起诉状原句（「付」是姓）
+        "二、判令被告以 800,000 元为基数，按每日万分之五向原告支付自 2026 年 3 月 16 日起至实际清偿之日止的逾期付款违约金。"
     })
     void preservesOrdinaryProseAndNonPersonFields(String text) {
         SensitiveTextEngine engine = new SensitiveTextEngine(List.of("CHINESE_NAME"), true, List.of(), List.of());
