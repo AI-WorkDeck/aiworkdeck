@@ -6,7 +6,10 @@ package com.checkba.service.tmeet;
 import com.checkba.model.entity.TencentMeetingSyncConfig;
 import com.checkba.repository.TencentMeetingSyncConfigRepository;
 import lombok.RequiredArgsConstructor;
+import com.checkba.service.LangText;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +27,18 @@ public class TencentMeetingScheduler {
 
     private final TencentMeetingSyncConfigRepository configRepository;
     private final TencentMeetingService tencentMeetingService;
+
+    /** 启动时把上次被强杀/退出遗留的 RUNNING 复位：重启后不可能还有同步在跑，否则调度器会永久跳过该用户。 */
+    @EventListener(ApplicationReadyEvent.class)
+    public void resetInterrupted() {
+        for (TencentMeetingSyncConfig cfg : configRepository.findAll()) {
+            if ("RUNNING".equals(cfg.getLastSyncStatus())) {
+                cfg.setLastSyncStatus("FAILED");
+                cfg.setLastSyncMessage(LangText.of("上次同步被中断", "Last sync was interrupted"));
+                configRepository.save(cfg);
+            }
+        }
+    }
 
     // 每 60 秒检查一次是否到达同步周期
     @Scheduled(fixedDelay = 60_000, initialDelay = 30_000)
