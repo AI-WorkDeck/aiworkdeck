@@ -606,6 +606,18 @@ public class CloudSyncService {
      * 之前就拦住（#848），这一档是它漏拦之后唯一的兜底。
      */
     public UploadResult uploadToCloud(long projectId, boolean background) {
+        // 版本对象（大文件）上传走广域网、可能很久：先在锁外预传一遍（内容寻址、已完成的会跳过），
+        // 否则 repoLock 被占住期间桌面保存会因 withFileContentWriteLock 2 秒超时而失败。
+        // 失败只记日志——下面持锁段仍会再调一次 uploadObjects 补漏并按原样报错。
+        if (objectSync != null) {
+            remoteRepository.findByProjectId(projectId).ifPresent(pre -> {
+                try {
+                    uploadObjects(projectId, connectionOf(pre), pre.getRemoteProjectId());
+                } catch (RuntimeException e) {
+                    log.warn("版本对象锁外预上传失败，留待持锁段重试: project={}, err={}", projectId, e.toString());
+                }
+            });
+        }
         ReentrantLock lock = sessionService.repoLock(projectId);
         lock.lock();
         try {
