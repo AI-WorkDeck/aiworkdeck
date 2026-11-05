@@ -140,6 +140,7 @@ export default {
   "collapseSidebar": "Thu gọn thanh bên",
   "toolsPanel": "Bảng công cụ",
   "aiAssistant": "Trợ lý AI",
+  "insightNeedsDoc": "Dùng được khi mở một tài liệu Word",
   "dockToLeft": "Chuyển sang thanh bên trái",
   "dockToRight": "Chuyển sang bảng bên phải",
   "dockToBottom": "Chuyển sang bảng dưới cùng",

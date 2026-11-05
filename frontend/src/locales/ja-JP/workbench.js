@@ -140,6 +140,7 @@ export default {
   "collapseSidebar": "サイドバーを折りたたむ",
   "toolsPanel": "ツールパネル",
   "aiAssistant": "AIアシスタント",
+  "insightNeedsDoc": "Word 文書を開くと使用できます",
   "dockToLeft": "左サイドバーへ移動",
   "dockToRight": "右パネルへ移動",
   "dockToBottom": "下部パネルへ移動",

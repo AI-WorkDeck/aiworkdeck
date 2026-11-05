@@ -140,6 +140,7 @@ export default {
   "collapseSidebar": "Kenar Çubuğunu Daralt",
   "toolsPanel": "Araçlar Paneli",
   "aiAssistant": "AI Asistan",
+  "insightNeedsDoc": "Bir Word belgesi açıkken kullanılabilir",
   "dockToLeft": "Sol kenar çubuğuna taşı",
   "dockToRight": "Sağ panele taşı",
   "dockToBottom": "Alt panele taşı",

@@ -145,6 +145,7 @@ export default {
   collapseSidebar: '收起左侧栏',
   toolsPanel: '常用工具',
   aiAssistant: 'AI 助手',
+  insightNeedsDoc: "打开一份 Word 文稿后可用",
   // 面板停靠（dev-board#180）：右键菜单与拖拽投放层共用这三条
   dockToLeft: '移到左侧栏',
   dockToRight: '移到右侧面板',

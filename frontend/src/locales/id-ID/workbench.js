@@ -140,6 +140,7 @@ export default {
   "collapseSidebar": "Ciutkan bilah samping",
   "toolsPanel": "Panel Alat",
   "aiAssistant": "Asisten AI",
+  "insightNeedsDoc": "Tersedia setelah dokumen Word dibuka",
   "dockToLeft": "Pindah ke bilah samping kiri",
   "dockToRight": "Pindah ke panel kanan",
   "dockToBottom": "Pindah ke panel bawah",

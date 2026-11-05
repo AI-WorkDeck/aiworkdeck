@@ -140,6 +140,7 @@ export default {
   "collapseSidebar": "ย่อแถบข้าง",
   "toolsPanel": "แผงเครื่องมือ",
   "aiAssistant": "ผู้ช่วย AI",
+  "insightNeedsDoc": "ใช้ได้เมื่อเปิดเอกสาร Word",
   "dockToLeft": "ย้ายไปแถบข้างซ้าย",
   "dockToRight": "ย้ายไปแผงด้านขวา",
   "dockToBottom": "ย้ายไปแผงด้านล่าง",

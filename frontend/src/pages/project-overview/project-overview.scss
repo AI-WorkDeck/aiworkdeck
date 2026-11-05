@@ -4723,6 +4723,14 @@ $color-accent: var(--awd-mint); // Mint Green
     font-weight: 600;
     border-bottom-color: var(--awd-panel-accent, var(--awd-accent));
   }
+
+  /* 「依据」没有可解析的 Word 文稿时：占位但不可点（问题 12） */
+  &.is-disabled {
+    color: var(--awd-text-3);
+    cursor: default;
+
+    &:hover { color: var(--awd-text-3); }
+  }
 }
 
 .right-dock-body {

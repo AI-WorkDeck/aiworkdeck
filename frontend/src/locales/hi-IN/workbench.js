@@ -140,6 +140,7 @@ export default {
   "collapseSidebar": "साइडबार संकुचित करें",
   "toolsPanel": "टूल्स पैनल",
   "aiAssistant": "AI सहायक",
+  "insightNeedsDoc": "Word दस्तावेज़ खुलने पर उपलब्ध",
   "dockToLeft": "बाएँ साइडबार में ले जाएँ",
   "dockToRight": "दाएँ पैनल में ले जाएँ",
   "dockToBottom": "निचले पैनल में ले जाएँ",

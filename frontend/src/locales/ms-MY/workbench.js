@@ -140,6 +140,7 @@ export default {
   "collapseSidebar": "Runtuhkan bar sisi",
   "toolsPanel": "Panel Alat",
   "aiAssistant": "Pembantu AI",
+  "insightNeedsDoc": "Tersedia apabila dokumen Word dibuka",
   "dockToLeft": "Alih ke bar sisi kiri",
   "dockToRight": "Alih ke panel kanan",
   "dockToBottom": "Alih ke panel bawah",
