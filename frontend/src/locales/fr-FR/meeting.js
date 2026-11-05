@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "Locuteur {n}",
   "speakerNamePlaceholder": "Nom du locuteur {n}",
   "generateMinutes": "Générer le compte rendu",
+  "generateInterview": "Générer le procès-verbal d'entretien",
   "sendingToAi": "Transfert à l'IA...",
   "generateMinutesFailed": "Impossible de générer le compte rendu : {message}",
   "exportTranscript": "Exporter la transcription",

@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "Pembicara {n}",
   "speakerNamePlaceholder": "Nama untuk Pembicara {n}",
   "generateMinutes": "Buat Notula Rapat",
+  "generateInterview": "Buat Berita Acara Wawancara",
   "sendingToAi": "Menyerahkan ke AI...",
   "generateMinutesFailed": "Tidak dapat membuat notula: {message}",
   "exportTranscript": "Ekspor Transkrip",

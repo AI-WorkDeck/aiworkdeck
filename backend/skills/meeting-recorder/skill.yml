@@ -47,6 +47,8 @@ triggers:
   - 整理会议记录
   - 会议转写
   - 谈判纪要
+  # 「生成访谈笔录」kick-off 以它开头（MeetingRecordingService.buildInterviewKickoffPrompt，问题 31）
+  - 访谈笔录
 
 # 英文触发词（仅 en-US 应用语言下参与匹配；zh-CN 匹配行为不受影响）。
 # **第一条必须与 MeetingRecordingService.buildMinutesKickoffPrompt 的英文开头一致**
@@ -58,6 +60,8 @@ triggers_en:
   - write up the meeting
   - meeting transcript
   - negotiation minutes
+  # "Interview record generation task." - the interview kick-off prompt starts with it
+  - interview record
 
 # prompt 模板文件名（相对本目录）
 prompt: prompt.md
@@ -114,11 +118,14 @@ output: |
   一份 Word 交付物，用 write_docx 写入项目文件：
   「会议纪要_<会议标题>.docx」——结构化会议纪要（基本信息、议题与讨论要点、
   决议事项、待办事项、风险提示与待核实事项）。
+  kick-off 为「访谈笔录生成任务」时改为「访谈笔录-<录音标题>.docx」——问答体访谈笔录（格式见 prompt「访谈笔录」一节）。
   <final> 中简述：几项决议、几项待办、有无需要核实的事项。不要复述纪要全文。
 
 output_en: |
   One Word deliverable, written into the project files with write_docx:
   "Minutes_<meeting title>.docx" - structured meeting minutes (basic information, topics and
   discussion points, resolutions, action items, risks and items to verify).
+  When the kick-off is an "Interview record generation task", produce "Interview Record-<recording title>.docx"
+  instead - a question-and-answer interview record (see the "Interview record" section of the prompt).
   In <final>, state briefly: how many resolutions, how many action items, and whether anything
   needs verifying. Do not restate the minutes.

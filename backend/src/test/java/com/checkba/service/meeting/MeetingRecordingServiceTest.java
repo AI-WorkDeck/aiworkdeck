@@ -118,6 +118,21 @@ class MeetingRecordingServiceTest {
     }
 
     @Test
+    @DisplayName("访谈笔录：走笔录提示词（问答体、核对签字栏），产物命名「访谈笔录-<原标题>.docx」")
+    void interviewPromptUsesTranscriptFormatAndFileName() {
+        String prompt = service.buildInterviewKickoffPrompt(transcribedMeeting());
+        assertTrue(prompt.startsWith("访谈笔录"), "开头必须是 skill 触发词「访谈笔录」：" + prompt);
+        assertTrue(prompt.contains("访谈笔录-尽调访谈.docx"), prompt);
+        assertTrue(prompt.contains("问：") && prompt.contains("答："), prompt);
+        assertTrue(prompt.contains("以上笔录经被访谈人核对无误"), prompt);
+        assertTrue(prompt.contains("被访谈人") && prompt.contains("访谈人"), prompt);
+        assertTrue(prompt.contains("说话人1、说话人2"));
+        assertTrue(prompt.contains("meetingId=9"));
+        assertTrue(prompt.contains("meeting_get_transcript"));
+        assertFalse(prompt.contains("会议纪要"), "笔录任务不能再落进纪要的提示词与文件名：" + prompt);
+    }
+
+    @Test
     @DisplayName("finish 幂等：durationMs 为空（崩溃恢复补刀）也能收口状态")
     void finishTolerantOfNullDuration() {
         MeetingRecording m = new MeetingRecording();
@@ -188,6 +203,18 @@ class MeetingRecordingServiceTest {
                 "英文触发词必须在 prompt 开头，否则 SkillRouter 命不中：" + prompt);
         assertTrue(prompt.contains("meetingId=9"));
         assertTrue(prompt.contains("meeting_get_transcript"));
+        assertTrue(prompt.contains("Speaker 1, Speaker 2"));
+        assertFalse(prompt.contains("请先"), "英文 prompt 不该混中文句子");
+    }
+
+    @Test
+    @DisplayName("英文下访谈笔录 kick-off 以 interview record 开头，文件名用英文前缀")
+    void interviewPromptInEnglish() {
+        switchToEnglish();
+        String prompt = service.buildInterviewKickoffPrompt(transcribedMeeting());
+        assertTrue(prompt.toLowerCase().startsWith("interview record"), prompt);
+        assertTrue(prompt.contains("Interview Record-尽调访谈.docx"), prompt);
+        assertTrue(prompt.contains("Q:") && prompt.contains("A:"), prompt);
         assertTrue(prompt.contains("Speaker 1, Speaker 2"));
         assertFalse(prompt.contains("请先"), "英文 prompt 不该混中文句子");
     }

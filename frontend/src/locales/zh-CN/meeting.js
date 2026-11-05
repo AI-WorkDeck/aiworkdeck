@@ -145,6 +145,7 @@ export default {
 
   // ---- 纪要与导出 ----
   generateMinutes: '生成会议纪要',
+  generateInterview: '生成访谈笔录',
   sendingToAi: '正在交给 AI...',
   generateMinutesFailed: '生成纪要失败：{message}',
   exportTranscript: '导出转写稿',

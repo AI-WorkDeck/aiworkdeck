@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "Spreker {n}",
   "speakerNamePlaceholder": "Naam voor Spreker {n}",
   "generateMinutes": "Notulen genereren",
+  "generateInterview": "Interviewverslag genereren",
   "sendingToAi": "Overdragen aan AI...",
   "generateMinutesFailed": "Kan notulen niet genereren: {message}",
   "exportTranscript": "Transcriptie exporteren",

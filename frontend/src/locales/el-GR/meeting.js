@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "Ομιλητής {n}",
   "speakerNamePlaceholder": "Όνομα για τον Ομιλητή {n}",
   "generateMinutes": "Δημιουργία πρακτικών",
+  "generateInterview": "Δημιουργία πρακτικού συνέντευξης",
   "sendingToAi": "Παράδοση στην AI...",
   "generateMinutesFailed": "Δεν ήταν δυνατή η δημιουργία πρακτικών: {message}",
   "exportTranscript": "Εξαγωγή απομαγνητοφώνησης",

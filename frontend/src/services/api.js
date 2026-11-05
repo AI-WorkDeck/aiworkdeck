@@ -3628,9 +3628,10 @@ export function getMeetingTodosPrompt(meetingId) {
   })
 }
 
-export function getMeetingMinutesPrompt(meetingId) {
+export function getMeetingMinutesPrompt(meetingId, format) {
+  // format='interview'：同一链路改出问答体访谈笔录（问题 31）；缺省为会议纪要
   return request({
-    url: `/api/meetings/${meetingId}/minutes-prompt`,
+    url: `/api/meetings/${meetingId}/minutes-prompt${format === 'interview' ? '?format=interview' : ''}`,
     method: 'POST'
   })
 }

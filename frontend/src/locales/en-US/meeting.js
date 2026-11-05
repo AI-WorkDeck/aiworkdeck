@@ -140,6 +140,7 @@ export default {
 
   // ---- Minutes and export ----
   generateMinutes: 'Generate Minutes',
+  generateInterview: 'Generate Interview Record',
   sendingToAi: 'Handing off to AI...',
   generateMinutesFailed: 'Could not generate minutes: {message}',
   exportTranscript: 'Export Transcript',

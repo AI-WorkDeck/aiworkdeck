@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "المتحدث {n}",
   "speakerNamePlaceholder": "اسم المتحدث {n}",
   "generateMinutes": "توليد محضر الاجتماع",
+  "generateInterview": "توليد محضر مقابلة",
   "sendingToAi": "جارٍ التسليم إلى الذكاء الاصطناعي...",
   "generateMinutesFailed": "تعذّر توليد المحضر: {message}",
   "exportTranscript": "تصدير النص المفرَّغ",

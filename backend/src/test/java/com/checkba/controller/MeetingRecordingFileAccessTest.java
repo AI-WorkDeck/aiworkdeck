@@ -75,6 +75,18 @@ class MeetingRecordingFileAccessTest {
         mvc.perform(get("/api/meetings/projects/10").header("X-Session-Id", "s"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.meetings[0].id").value(20));
     }
+    @Test void interviewFormatUsesInterviewPrompt() throws Exception {
+        audio.setUserId(7L);
+        when(meetings.buildInterviewKickoffPrompt(meeting)).thenReturn("访谈笔录生成任务。");
+        when(meetings.buildMinutesKickoffPrompt(meeting)).thenReturn("会议纪要生成任务。");
+        try (var auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            mvc.perform(post("/api/meetings/20/minutes-prompt").param("format", "interview").header("X-Session-Id", "s"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.prompt").value("访谈笔录生成任务。"));
+            mvc.perform(post("/api/meetings/20/minutes-prompt").header("X-Session-Id", "s"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.prompt").value("会议纪要生成任务。"));
+        }
+    }
     @Test void legacyRecordWithoutSourceIsOnlyReadableInternally() throws Exception {
         meeting.setAudioFileId(null);
         try (var auth = mockStatic(AuthController.class)) {

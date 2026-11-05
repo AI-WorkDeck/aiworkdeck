@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "Hablante {n}",
   "speakerNamePlaceholder": "Nombre del hablante {n}",
   "generateMinutes": "Generar acta",
+  "generateInterview": "Generar acta de entrevista",
   "sendingToAi": "Pasando a la IA...",
   "generateMinutesFailed": "No se pudo generar el acta: {message}",
   "exportTranscript": "Exportar transcripción",

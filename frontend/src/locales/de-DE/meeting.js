@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "Sprecher {n}",
   "speakerNamePlaceholder": "Name für Sprecher {n}",
   "generateMinutes": "Protokoll generieren",
+  "generateInterview": "Befragungsprotokoll erstellen",
   "sendingToAi": "Übergabe an die KI...",
   "generateMinutesFailed": "Protokoll konnte nicht generiert werden: {message}",
   "exportTranscript": "Transkript exportieren",
