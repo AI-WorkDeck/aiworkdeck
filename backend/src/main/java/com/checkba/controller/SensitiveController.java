@@ -89,10 +89,17 @@ public class SensitiveController {
             File file = storageServiceFactory.getStorageService().load(source.getFilePath()).getFile();
             if (action.equals("preview")) return response(200, sensitiveService.previewFile(file.getAbsolutePath(), request.options()));
             SensitiveService.Result result = action.equals("restore")
-                    ? sensitiveService.restoreFile(file.getAbsolutePath(), recoveryForRestore(source, request, userId), request.password())
-                    : sensitiveService.processFile(file.getAbsolutePath(), request.options());
+                    ? sensitiveService.restoreFile(file.getAbsolutePath(), recoveryForRestore(source, request, userId), request.password(), source.getName())
+                    : sensitiveService.processFile(file.getAbsolutePath(), request.options(), source.getName());
             ProjectFile saved = null;
-            Path output = Path.of(result.path());
+            Path neutral = Path.of(result.path()), renamed;
+            try {
+                renamed = rename(source, neutral, result.name());
+            } catch (Exception e) {
+                cleanup(e, () -> Files.deleteIfExists(neutral));
+                throw e;
+            }
+            Path output = renamed;
             Path kitPath = output.resolveSibling(output.getFileName() + ".awd-recovery");
             ProjectFile recoveryFile = null;
             boolean kitCreated = false;
@@ -128,11 +135,41 @@ public class SensitiveController {
         }
     }
 
-    private ProjectFile register(ProjectFile source, Path output, Long userId) throws Exception {
-        String name = output.getFileName().toString();
+    /**
+     * 中性临时文件改成建议名（dev-board#1713 #98）。同一文件夹已有同名项（含回收站、磁盘残留）
+     * 或其恢复材料名被占用时加「 (n)」序号，与项目文件的重名规则一致。
+     */
+    private Path rename(ProjectFile source, Path output, String desired) throws Exception {
+        if (desired == null || desired.isBlank()) return output;
+        int dot = desired.lastIndexOf('.');
+        String stem = dot > 0 ? desired.substring(0, dot) : desired, ext = dot > 0 ? desired.substring(dot) : "";
+        var storage = storageServiceFactory.getStorageService();
+        for (int i = 0; i <= 1000; i++) {
+            String candidate = i == 0 ? desired : stem + " (" + i + ")" + ext;
+            String kit = candidate + ".awd-recovery";
+            Path target = output.resolveSibling(candidate);
+            if (Files.exists(target) || Files.exists(output.resolveSibling(kit))
+                    || storage.exists(relativePath(source, candidate)) || storage.exists(relativePath(source, kit))
+                    || projectFileService.isNameTaken(source.getProjectId(), source.getParentId(), candidate)
+                    || projectFileService.isNameTaken(source.getProjectId(), source.getParentId(), kit)) continue;
+            try {
+                return Files.move(output, target);
+            } catch (FileAlreadyExistsException ignored) {
+                // Another request took this name between the check and the move.
+            }
+        }
+        throw new IllegalArgumentException(LangText.of("该文件夹下同名文件过多，请手动改名", "Too many files with this name in this folder; please rename manually"));
+    }
+
+    private static String relativePath(ProjectFile source, String name) {
         Path parent = source.getExternalPath() == null || source.getExternalPath().isBlank()
                 ? Path.of(source.getFilePath()).getParent() : Path.of("projects", source.getProjectId().toString());
-        String relative = (parent == null ? Path.of(name) : parent.resolve(name)).toString().replace('\\', '/');
+        return (parent == null ? Path.of(name) : parent.resolve(name)).toString().replace('\\', '/');
+    }
+
+    private ProjectFile register(ProjectFile source, Path output, Long userId) throws Exception {
+        String name = output.getFileName().toString();
+        String relative = relativePath(source, name);
         var storage = storageServiceFactory.getStorageService();
         // Processing may use an external/local temporary file. Registration alone only creates a template.
         boolean alreadyStored = storage.exists(relative);
