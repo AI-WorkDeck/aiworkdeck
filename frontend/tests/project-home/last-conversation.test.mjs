@@ -99,7 +99,7 @@ test('ChatInterface 在 currentConversationId 变化时落盘，且刻意不加 
   const src = read('components/ChatInterface.vue')
   assert.match(src, /import\s*\{\s*saveLastConversation\s*\}\s*from\s*'@\/utils\/lastConversation\.js'/,
     '必须复用同一个模块，不许再写一份键名字面量')
-  const line = src.split('\n').find((l) => l.includes('saveLastConversation(uni, props.projectId'))
+  const line = src.split('\n').find((l) => l.includes('saveLastConversation(uniStorage, props.projectId'))
   assert.ok(line, '找不到落盘的 watch')
   assert.match(line, /watch\(currentConversationId/, '落盘必须挂在 currentConversationId 上')
   assert.doesNotMatch(line, /immediate/,
@@ -116,7 +116,7 @@ test('工作台按项目恢复，并且三条闸都在', () => {
 
   assert.match(body, /if \(this\.restoredLastConversation\) return/, '每个页面实例只试一次')
   assert.match(body, /this\.restoredLastConversation = true/)
-  assert.match(body, /loadLastConversation\(uni, this\.projectId\)/, '必须按项目读，不能读全局键')
+  assert.match(body, /loadLastConversation\(uniStorage, this\.projectId\)/, '必须按项目读，不能读全局键')
   assert.match(body, /this\.chatHistoryList\.some\(/, '会话必须还在这个项目的列表里才恢复')
   assert.match(body, /if \(this\.currentConversationId\) return/, '用户已经自己开了一段就让开，绝不覆盖')
   assert.match(body, /loadHistoryChat\(\{ conversationId \}\)/)
