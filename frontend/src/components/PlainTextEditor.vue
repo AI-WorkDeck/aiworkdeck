@@ -230,13 +230,19 @@ export default {
     // closeFile 的显式 flushSave 分支是主路径，这里兜住"切到别的标签"这种不经
     // closeFile 的卸载——v-if 单实例意味着切标签就是销毁。
     // 放弃修改在途时不兜底上传：服务端正在把文件写回基线，此时上传会把放弃静默撤销
-    if (this.dirty && !this.saving && this._loadOk && this._view && !this._discarding) {
+    if (this.dirty && this._loadOk && this._view && !this._discarding) {
       const content = this._view.state.doc.toString()
-      const saveLease = beginDocumentSave(this.projectId, this.fileRef())
-      if (saveLease) this.uploadContent(content).then(() => saveLease.finish(true), (e) => {
-        saveLease.finish(false)
-        console.warn('[PlainTextEditor] unmount flush-save failed:', e)
-      })
+      const flush = () => {
+        const saveLease = beginDocumentSave(this.projectId, this.fileRef())
+        if (saveLease) this.uploadContent(content).then(() => saveLease.finish(true), (e) => {
+          saveLease.finish(false)
+          console.warn('[PlainTextEditor] unmount flush-save failed:', e)
+        })
+      }
+      // 在途保存还没回来：回来后 save() 会重挂防抖，但定时器随实例作废（_view 已销毁），
+      // 在途期间敲的字没人再传——等它结束后补传这份已取走的内容
+      if (this.saving && this._inflight) this._inflight.catch(() => {}).then(flush)
+      else if (!this.saving) flush()
     }
     if (this._view) { this._view.destroy(); this._view = null }
   },
