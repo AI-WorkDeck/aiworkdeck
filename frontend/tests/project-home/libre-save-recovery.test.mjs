@@ -789,3 +789,28 @@ test('保存状态区分「x 秒后自动重试」与只能手动重试', () => 
   vm.statusKey = 'movedSaveFailed'; vm.saveRetryDelaySec = 15
   assert.equal(state(), 'editor.status.movedSaveFailed')
 })
+
+test('Cmd/Ctrl+S（save-request）在退避等待或只能手动的暂停中都立即保存当前内容', async () => {
+  const clock = retryClock()
+  let failing = true, uploads = 0
+  const vm = makeVm({ projectId: 'save-shortcut', scheduleProvenanceReload() {}, uploadBytes: async () => { uploads++; if (failing) throw offline() } }, [], clock.wait)
+  let event
+  vm.subscribeHostEvents({ subscribe(fn) { event = fn; return () => {} } })
+  await vm.autoSave()
+  assert.equal(clock.timers.length, 1)
+  failing = false
+  event({ __lo: 'lo-relay', type: 'save-request' })
+  for (let i = 0; i < 5; i++) await tick()
+  assert.equal(uploads, 2, '快捷键不等退避到点')
+  assert.equal(vm.statusKey, 'ready')
+  assert.equal(vm.dirty, false)
+  const manual = makeVm({ projectId: 'save-shortcut-manual', uploadBytes: async () => { uploads++; throw Object.assign(new Error('HTTP 403'), { status: 403 }) } }, [], clock.wait)
+  manual.subscribeHostEvents({ subscribe(fn) { event = fn; return () => {} } })
+  await manual.autoSave()
+  assert.equal(manual._savePaused, true)
+  manual.uploadBytes = async () => { uploads++ }
+  event({ __lo: 'lo-relay', type: 'save-request' })
+  for (let i = 0; i < 5; i++) await tick()
+  assert.equal(uploads, 4)
+  assert.equal(manual.dirty, false)
+})

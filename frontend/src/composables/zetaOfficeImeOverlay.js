@@ -124,10 +124,12 @@ export function nativeCursorRectToPixels(raw, surface) {
  *        宿主用它刷新工具栏激活态——引擎的选区监听盖不住纯光标移动。
  * @param {()=>void} [options.onCommentRequested] Opens the host's comment form
  *        for Ctrl/Cmd+Alt+C without creating an empty native annotation.
+ * @param {()=>void} [options.onSaveRequested] Ctrl/Cmd+S: ask the host to save now
+ *        (the engine's own .uno:Save would only write into the WASM MEMFS).
  * @param {(msg:string)=>void} [options.onLog] optional progress/diagnostic log.
  * @returns {{element, focus, reposition, computeRect, destroy}}
  */
-export function attachImeOverlay({ canvas, commit, getCursorRaw, onEnter, sendCommand, onCursorMoved, onCommitted, onAssistanceKey, onCommentRequested, onError, onLog } = {}) {
+export function attachImeOverlay({ canvas, commit, getCursorRaw, onEnter, sendCommand, onCursorMoved, onCommitted, onAssistanceKey, onCommentRequested, onSaveRequested, onError, onLog } = {}) {
   if (!canvas) throw new Error('attachImeOverlay: canvas is required')
   if (typeof commit !== 'function') throw new Error('attachImeOverlay: commit(text) is required')
   const log = (m) => { if (onLog) onLog(m) }
@@ -454,6 +456,14 @@ export function attachImeOverlay({ canvas, commit, getCursorRaw, onEnter, sendCo
       if (!e.repeat) onCommentRequested()
       return
     }
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey
+      && (e.code === 'KeyS' || String(e.key).toLowerCase() === 's')
+      && typeof onSaveRequested === 'function') {
+      e.preventDefault()
+      e.stopPropagation()
+      if (!e.repeat) onSaveRequested()
+      return
+    }
     if (typeof onAssistanceKey === 'function' && onAssistanceKey(e)) return
     if (e.key === 'Enter') {
       e.preventDefault()
@@ -470,7 +480,7 @@ export function attachImeOverlay({ canvas, commit, getCursorRaw, onEnter, sendCo
     }
     if (typeof sendCommand !== 'function') return
     // Desktop shortcuts (Cmd on mac / Ctrl on win). Unmatched mod-combos fall
-    // through UNPREVENTED so host-level accelerators (e.g. save) keep working.
+    // through UNPREVENTED so host-level accelerators keep working (Cmd/Ctrl+S is handled above).
     if (e.metaKey || e.ctrlKey) {
       const k = String(e.key).toLowerCase()
       if (k === 'z') {
