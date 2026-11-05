@@ -625,12 +625,17 @@ export default {
     onBackendHealth(snapshot) {
       if (this._backendHealthDisposed || !snapshot || typeof snapshot.state !== 'string') return
       if (this.backendHealthState?.updatedAt && snapshot.updatedAt < this.backendHealthState.updatedAt) return
+      let recovered = false
       if (snapshot.state === 'healthy' && snapshot.ok === true && ['degraded', 'restarting', 'failed'].includes(this.backendHealthState?.state)) {
         this.backendHealthRecoverySeq = (this.backendHealthRecoverySeq || 0) + 1
+        recovered = true
       }
       observeLocalContentBackend(snapshot)
       this.backendHealthState = snapshot
-      // 只更新提示。上传结果不明时即使服务恢复，也不能擅自把旧稿再次写回。
+      // 服务恢复即补存（B7）：重存的是当前文档、带更大的保存序号；那笔结果不明的旧上传
+      // 即使迟到，也会被后端 STALE_SAVE 围栏拒绝，不会盖掉这次补存。其余闸门照旧由
+      // autoRetrySave 把关（放弃、检查点失效、重载、只能手动的失败类别都不补存）。
+      if (recovered && this.backendSaveRetryReady()) this.autoRetrySave()
     },
     invalidateBackendSaveHint() {
       this.backendFailedUpload = null
