@@ -91,7 +91,7 @@ export default {
     "crossBorderNoticeBody": "Il sito cinese si collega ad Alibaba Cloud Bailian tramite i server AI WorkDeck; il sito internazionale usa OpenRouter. I testi e gli estratti di file inviati all’IA sono usati per inferenza e fatturazione. In base al modello, possono essere elaborati fuori dalla Cina continentale. La revoca del consenso nelle impostazioni disattiva il canale IA della piattaforma.",
     "agreementRequired": "Seleziona la casella per accettare i Termini di servizio e l'Informativa sulla privacy e continuare",
     "crossBorderRequired": "Seleziona il consenso separato per il trasferimento transfrontaliero per continuare",
-    "consentBothRequired": "Seleziona entrambe le caselle qui sopra per continuare",
+    "consentBothRequired": "Seleziona prima entrambi i consensi",
     "crossBorderLabelDomestic": "Consenso specifico: i contenuti inviati all’IA possono essere trattati al di fuori della Cina continentale",
     "crossBorderNoticeTitleDomestic": "Consenso a un possibile trattamento al di fuori della Cina continentale",
     "crossBorderNoticeBodyDomestic": "Il sito Cina si collega ad Alibaba Cloud Bailian tramite i server di AI WorkDeck. Il testo e gli estratti di file inviati all’IA sono usati per l’inferenza e la fatturazione; a seconda del modello scelto, possono essere trattati al di fuori della Cina continentale. Puoi revocare il consenso nelle Impostazioni, disattivando così il canale IA della piattaforma.",

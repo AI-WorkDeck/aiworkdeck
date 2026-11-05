@@ -68,3 +68,28 @@ test('问题 36：分段控件选中项叫「账号登录」，表单下方不�
   const loginBlock = source.slice(source.indexOf('<div v-show="mode === \'login\'"'), source.indexOf('<div v-if="mode === \'bqt\'"'))
   assert.doesNotMatch(loginBlock, /bqtScanSwitch/)
 })
+
+test('问题 g13：弹层形态勾选框在登录按钮之前，未勾选提示夹在两者之间；站点切换在底部', () => {
+  const tpl = source.slice(0, source.indexOf('<script>'))
+  const consentAt = tpl.indexOf('<div class="unlock-consent">')
+  const dialogError = tpl.indexOf('<div v-if="errorMsg && variant === \'dialog\'" class="unlock-error">')
+  const dialogBtn = tpl.indexOf('v-if="mode !== \'bqt\' && variant === \'dialog\'"')
+  assert.ok(consentAt > 0 && dialogError > consentAt && dialogBtn > dialogError, '弹层：勾选框 → 提示 → 登录按钮')
+  // 页面形态保持原顺序：提示 → 按钮 → 勾选框
+  const pageBtn = tpl.indexOf('v-if="mode !== \'bqt\' && variant !== \'dialog\'"')
+  assert.ok(pageBtn > 0 && pageBtn < consentAt, '页面形态的按钮仍在勾选框之前')
+
+  // 站点：顶部药丸只给页面形态，弹层形态的下拉在底部那一行里、语言选择器旁边
+  assert.match(tpl, /v-if="siteStatus\.multiSite && variant !== 'dialog'"\s+class="unlock-site-seg"/)
+  const foot = tpl.indexOf('<div class="unlock-card-foot">')
+  const siteSelect = tpl.indexOf('class="unlock-site-select"')
+  assert.ok(foot > 0 && siteSelect > foot, '站点下拉位于底部')
+  assert.ok(siteSelect > tpl.indexOf('<LanguagePicker'), '站点下拉在语言选择器之后')
+  assert.ok(siteSelect < tpl.indexOf('<div class="unlock-foot-right">'), '站点下拉与语言选择器同在左侧')
+  assert.match(tpl.slice(siteSelect, tpl.indexOf('</component>', siteSelect)), /onSiteSegTap\(/, '沿用原切站入口')
+
+  // 登录方式：弹层形态用下划线标签
+  assert.match(tpl, /variant === 'dialog' \? 'unlock-mode-tabs' : 'unlock-site-seg'/)
+  assert.equal(zhOnboarding.unlock.consentBothRequired, '请先勾选两项同意')
+  assert.doesNotMatch(enOnboarding.unlock.consentBothRequired, /above/i, '不带方向，page 与 dialog 形态共用')
+})

@@ -92,7 +92,7 @@ export default {
     "crossBorderNoticeBody": "Trang Trung Quốc kết nối Alibaba Cloud Bailian qua máy chủ AI WorkDeck; trang quốc tế dùng OpenRouter. Văn bản và trích đoạn tệp gửi cho AI được dùng để suy luận và tính phí. Tùy mô hình, dữ liệu có thể được xử lý ngoài Trung Quốc đại lục. Việc rút lại sự đồng ý trong Cài đặt sẽ tắt kênh AI của nền tảng.",
     "agreementRequired": "Tick vào ô để chấp nhận Điều khoản Dịch vụ và Chính sách Quyền riêng tư để tiếp tục",
     "crossBorderRequired": "Tick vào ô đồng ý chuyển dữ liệu xuyên biên giới để tiếp tục",
-    "consentBothRequired": "Đánh dấu cả hai ô ở trên để tiếp tục",
+    "consentBothRequired": "Vui lòng đánh dấu trước cả hai mục đồng ý",
     "crossBorderLabelDomestic": "Đồng ý riêng: nội dung gửi cho AI có thể được xử lý bên ngoài Trung Quốc đại lục",
     "crossBorderNoticeTitleDomestic": "Đồng ý với việc có thể xử lý bên ngoài Trung Quốc đại lục",
     "crossBorderNoticeBodyDomestic": "Trang Trung Quốc kết nối với Alibaba Cloud Bailian qua máy chủ AI WorkDeck. Văn bản và đoạn trích tệp gửi cho AI được dùng để suy luận và tính phí; tùy mô hình đã chọn, chúng có thể được xử lý bên ngoài Trung Quốc đại lục. Bạn có thể rút lại sự đồng ý trong Cài đặt, khi đó kênh AI của nền tảng sẽ bị tắt.",
