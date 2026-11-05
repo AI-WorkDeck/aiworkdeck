@@ -54,9 +54,22 @@ public class LocalFileStorageService implements StorageService {
             // 确保父目录存在
             Files.createDirectories(filePath.getParent());
             
-            // 保存文件
-            Files.copy(inputStream, filePath, 
-                    StandardCopyOption.REPLACE_EXISTING);
+            // 先写同目录临时文件再原子替换：写入中途失败/崩溃时原文件保持不变
+            Path pending = Files.createTempFile(filePath.getParent(), "~$awd-save-", ".tmp");
+            try {
+                try (java.nio.channels.FileChannel ch = java.nio.channels.FileChannel.open(pending, StandardOpenOption.WRITE);
+                     OutputStream out = java.nio.channels.Channels.newOutputStream(ch)) {
+                    inputStream.transferTo(out);
+                    ch.force(true);
+                }
+                try {
+                    Files.move(pending, filePath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                    Files.move(pending, filePath, StandardCopyOption.REPLACE_EXISTING);
+                }
+            } finally {
+                Files.deleteIfExists(pending);
+            }
             
             log.info("文件保存成功: fileId={}, path={}", fileId, filePath);
 
