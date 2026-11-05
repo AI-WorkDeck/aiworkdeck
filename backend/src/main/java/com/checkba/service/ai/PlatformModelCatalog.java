@@ -6,6 +6,7 @@ import com.checkba.service.LangText;
 import com.checkba.service.account.AccountException;
 import com.checkba.service.account.AccountTransport;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -14,12 +15,15 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /** Provider catalogue scoped to the actual platform credential and trusted endpoint. */
 @Service
+@Slf4j
 public class PlatformModelCatalog {
     private final PlatformAiChannel channel;
     private final AccountTransport transport;
     private final String openRouterBase;
     private final ObjectMapper mapper = new ObjectMapper();
     private final Map<String, Snapshot> cache = new ConcurrentHashMap<>();
+    long retryDelayMs = 500;
+    java.util.function.LongSupplier clock = System::currentTimeMillis;
     private record Snapshot(long expiresAt, Catalog catalog) {}
     public record Model(String id, String name, String vendor, int contextLength, int maxOutputTokens,
                         boolean supportsTools, boolean supportsVision, double inputPricePerMillion,
@@ -39,21 +43,49 @@ public class PlatformModelCatalog {
         String base = connection.bailian() ? connection.baseUrl() : openRouterBase;
         String key = base + ":" + connection.fingerprint();
         Snapshot previous = cache.get(key);
-        if (previous != null && previous.expiresAt() > System.currentTimeMillis()) return previous.catalog();
-        AccountTransport.Reply reply = transport.send("GET", base + "/models", connection.apiKey(), null);
+        if (previous != null && previous.expiresAt() > clock.getAsLong()) return previous.catalog();
+        AccountTransport.Reply reply = fetch(base, connection);
+        if (reply.status() == 401 || reply.status() == 403) {
+            // key 已被吊销/重发：走现有的作废通知，再取一次 key 重拉
+            channel.onKeyRejected(PlatformAiUserScope.current(), connection.fingerprint());
+            connection = channel.connection();
+            base = connection.bailian() ? connection.baseUrl() : openRouterBase;
+            key = base + ":" + connection.fingerprint();
+            reply = fetch(base, connection);
+        }
         if (reply.networkFailure() || reply.status() != 200) {
+            if (previous != null) {
+                log.warn("Model catalogue refresh failed (status={}), serving stale snapshot", reply.status());
+                return previous.catalog();
+            }
             throw new AccountException(AccountException.Kind.NETWORK,
                     LangText.of("模型目录暂时不可用，请稍后重试", "The model catalogue is temporarily unavailable. Retry shortly"));
         }
         Catalog catalog;
         try { catalog = parse(reply.body(), connection.bailian(), connection.defaultModel()); }
         catch (Exception e) {
+            if (previous != null) {
+                log.warn("Model catalogue response unparseable, serving stale snapshot");
+                return previous.catalog();
+            }
             throw new AccountException(AccountException.Kind.MALFORMED,
                     LangText.of("模型目录数据不完整，请稍后重试", "The model catalogue is incomplete. Retry shortly"));
         }
         if (cache.size() >= 256) cache.clear();
-        cache.put(key, new Snapshot(System.currentTimeMillis() + 60_000, catalog));
+        cache.put(key, new Snapshot(clock.getAsLong() + 60_000, catalog));
         return catalog;
+    }
+
+    /** 拉一次目录；网络失败或非 200（401/403 除外，交给调用方换 key）时退避后重试一次。 */
+    private AccountTransport.Reply fetch(String base, PlatformAiKeyService.Resolved connection) {
+        AccountTransport.Reply reply = transport.send("GET", base + "/models", connection.apiKey(), null);
+        if (reply.status() == 200 || reply.status() == 401 || reply.status() == 403) return reply;
+        log.warn("Model catalogue fetch failed (status={}), retrying once", reply.status());
+        try { Thread.sleep(retryDelayMs); }
+        catch (InterruptedException e) { Thread.currentThread().interrupt(); return reply; }
+        reply = transport.send("GET", base + "/models", connection.apiKey(), null);
+        if (reply.status() != 200) log.warn("Model catalogue retry failed (status={})", reply.status());
+        return reply;
     }
 
     Catalog parse(String json, boolean bailian, String preferredDefault) throws Exception {
