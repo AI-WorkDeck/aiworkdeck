@@ -1202,6 +1202,28 @@ public class PptxServiceClient {
         return JSONUtil.parseObj(resp.body()).getJSONObject("data").getStr("markdown");
     }
 
+    /**
+     * Same local-only endpoint as {@link #ocrPdfToMarkdown}; with {@code layout} it also asks for
+     * per-page lines with boxes and the images the markdown references (pptx-runtime ≥ 1.0.6). Older
+     * packs ignore the flag and return only {@code markdown}; callers detect that by the missing
+     * {@code pages} key. Never falls back to the legacy endpoint.
+     *
+     * @return the response {@code data} object
+     */
+    public JSONObject ocrPdfLocal(String pdfFilePath, boolean layout) {
+        JSONObject body = new JSONObject();
+        body.set("pdf_path", pdfFilePath);
+        if (layout) body.set("layout", true);
+        HttpResponse resp = HttpRequest.post(baseUrl + "/api/pdf/ocr-markdown-local")
+                .header("Content-Type", "application/json")
+                .body(body.toString())
+                .timeout(600 * 1000)
+                .execute();
+        if (resp.getStatus() == 404) throw new LocalOcrUnsupportedException();
+        if (resp.getStatus() != 200) throw new RuntimeException("Failed to OCR PDF: " + resp.body());
+        return JSONUtil.parseObj(resp.body()).getJSONObject("data");
+    }
+
     public static final class LocalOcrUnsupportedException extends RuntimeException {
         public LocalOcrUnsupportedException() {
             super(LangText.of(

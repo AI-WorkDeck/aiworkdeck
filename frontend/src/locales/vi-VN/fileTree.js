@@ -158,5 +158,9 @@ export default {
   "ocrCopy": "Sao chép văn bản",
   "ocrExportTxt": "Xuất TXT",
   "ocrExportDocx": "Xuất Word",
-  "ocrOutputSuffix": "-văn bản OCR"
+  "ocrOutputSuffix": "-văn bản OCR",
+  "ocrExportLayoutDocx": "Xuất Word (giữ bố cục)",
+  "ocrSearchablePdf": "Tạo PDF có thể tìm kiếm",
+  "ocrLayoutSuffix": "-bố cục OCR",
+  "ocrSearchableSuffix": "-có thể tìm kiếm"
 }

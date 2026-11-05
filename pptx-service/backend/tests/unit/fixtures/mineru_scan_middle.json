@@ -1,0 +1,317 @@
+{
+ "pdf_info": [
+  {
+   "page_idx": 0,
+   "page_size": [
+    594,
+    841
+   ],
+   "para_blocks": [
+    {
+     "bbox": [
+      219,
+      72,
+      372,
+      95
+     ],
+     "index": 1,
+     "type": "title",
+     "lines": [
+      {
+       "bbox": [
+        218,
+        71,
+        372,
+        95
+       ],
+       "spans": [
+        {
+         "bbox": [
+          218,
+          71,
+          372,
+          95
+         ],
+         "type": "text",
+         "content": "股权转让协议"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "bbox": [
+      177,
+      113,
+      421,
+      127
+     ],
+     "index": 2,
+     "type": "text",
+     "lines": [
+      {
+       "bbox": [
+        177,
+        113,
+        421,
+        127
+       ],
+       "spans": [
+        {
+         "bbox": [
+          177,
+          113,
+          421,
+          127
+         ],
+         "type": "text",
+         "content": "协议编号:XQ-2026-0815签署地:江州市临川区"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "table",
+     "bbox": [
+      62,
+      351,
+      533,
+      478
+     ],
+     "blocks": [
+      {
+       "bbox": [
+        62,
+        351,
+        533,
+        478
+       ],
+       "index": 8,
+       "type": "table_body",
+       "lines": [
+        {
+         "bbox": [
+          62,
+          351,
+          533,
+          478
+         ],
+         "spans": [
+          {
+           "bbox": [
+            62,
+            351,
+            533,
+            478
+           ],
+           "type": "table",
+           "html": "<table><tr><td rowspan=1 colspan=1>期次</td><td rowspan=1 colspan=1>付款条件</td><td rowspan=1 colspan=1>付款金额（元)</td><td rowspan=1 colspan=1>最迟付款日</td></tr><tr><td rowspan=1 colspan=1>第一期</td><td rowspan=1 colspan=1>本协议签署后5个工作日内</td><td rowspan=1 colspan=1>1,260,000</td><td rowspan=1 colspan=1>2026年8月22日</td></tr><tr><td rowspan=1 colspan=1>第二期</td><td rowspan=1 colspan=1>完成工商变更登记之日起10日内</td><td rowspan=1 colspan=1>2,100,000</td><td rowspan=1 colspan=1>2026年9月30日</td></tr><tr><td rowspan=1 colspan=1>第三期</td><td rowspan=1 colspan=1>过渡期审计报告出具且无重大差异</td><td rowspan=1 colspan=1>840,000</td><td rowspan=1 colspan=1>2026年12月31日</td></tr><tr><td rowspan=1 colspan=2>合计</td><td rowspan=1 colspan=1>4,200,000</td><td rowspan=1 colspan=1></td></tr></table>",
+           "image_path": "2c4c2e6a72d6a623bc8e04cb9d5c30db03d4720680f45de3774e50b513378c79.jpg"
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "index": 8
+    },
+    {
+     "type": "image",
+     "bbox": [
+      326,
+      568,
+      503,
+      702
+     ],
+     "blocks": [
+      {
+       "bbox": [
+        326,
+        568,
+        503,
+        702
+       ],
+       "index": 11,
+       "type": "image_body",
+       "lines": [
+        {
+         "bbox": [
+          326,
+          568,
+          503,
+          702
+         ],
+         "spans": [
+          {
+           "bbox": [
+            326,
+            568,
+            503,
+            702
+           ],
+           "type": "image",
+           "image_path": "59bd7a7db9090b1b5591e1037e897d65b057563944bc742f1a53dbf53957240b.jpg"
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "index": 11,
+     "sub_type": "seal"
+    }
+   ],
+   "discarded_blocks": [
+    {
+     "bbox": [
+      267,
+      686,
+      325,
+      697
+     ],
+     "index": 12,
+     "type": "page_number",
+     "lines": [
+      {
+       "bbox": [
+        266,
+        685,
+        325,
+        698
+       ],
+       "spans": [
+        {
+         "bbox": [
+          266,
+          685,
+          325,
+          698
+         ],
+         "type": "text",
+         "content": "第1页共2页"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "page_idx": 1,
+   "page_size": [
+    594,
+    841
+   ],
+   "para_blocks": [
+    {
+     "bbox": [
+      64,
+      80,
+      185,
+      96
+     ],
+     "index": 1,
+     "type": "title",
+     "lines": [
+      {
+       "bbox": [
+        63,
+        79,
+        185,
+        97
+       ],
+       "spans": [
+        {
+         "bbox": [
+          63,
+          79,
+          185,
+          97
+         ],
+         "type": "text",
+         "content": "第三条 陈述与保证"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "bbox": [
+      62,
+      106,
+      290,
+      157
+     ],
+     "index": 2,
+     "type": "text",
+     "lines": [
+      {
+       "bbox": [
+        84,
+        104,
+        289,
+        120
+       ],
+       "spans": [
+        {
+         "bbox": [
+          84,
+          104,
+          289,
+          120
+         ],
+         "type": "text",
+         "content": "3.1甲方保证其合法持有标的股权，该股"
+        }
+       ]
+      },
+      {
+       "bbox": [
+        64,
+        123,
+        288,
+        138
+       ],
+       "spans": [
+        {
+         "bbox": [
+          64,
+          123,
+          288,
+          138
+         ],
+         "type": "text",
+         "content": "权之上不存在质押、查封、冻结或其他权利限"
+        }
+       ]
+      },
+      {
+       "bbox": [
+        64,
+        141,
+        201,
+        155
+       ],
+       "spans": [
+        {
+         "bbox": [
+          64,
+          141,
+          201,
+          155
+         ],
+         "type": "text",
+         "content": "制，亦不存在任何权属争议。"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "discarded_blocks": []
+  }
+ ],
+ "_backend": "pipeline",
+ "_version_name": "3.4.3"
+}

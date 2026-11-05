@@ -158,5 +158,9 @@ export default {
   "ocrCopy": "Copia testo",
   "ocrExportTxt": "Esporta TXT",
   "ocrExportDocx": "Esporta Word",
-  "ocrOutputSuffix": "-testo OCR"
+  "ocrOutputSuffix": "-testo OCR",
+  "ocrExportLayoutDocx": "Esporta Word (mantieni impaginazione)",
+  "ocrSearchablePdf": "Crea PDF ricercabile",
+  "ocrLayoutSuffix": "-layout OCR",
+  "ocrSearchableSuffix": "-ricercabile"
 }

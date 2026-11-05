@@ -9,7 +9,14 @@ import {
   runOcrBatch, summarizeOcrBatch, joinCopiedTexts, sideBySidePlan, openOcrSideBySide, ocrOutputName,
 } from '@/utils/explorerOcr.js'
 
-const OUTPUTS = { copy: { output: 'text' }, txt: { output: 'txt', ext: '.txt' }, docx: { output: 'docx', ext: '.docx' } }
+const OUTPUTS = {
+  copy: { output: 'text' },
+  txt: { output: 'txt', ext: '.txt' },
+  docx: { output: 'docx', ext: '.docx', sideBySide: true },
+  // phase 2: suffixes differ so a layout Word never collides with the text-first one
+  layoutDocx: { output: 'layout_docx', ext: '.docx', suffix: 'fileTree.ocrLayoutSuffix', sideBySide: true },
+  searchablePdf: { output: 'searchable_pdf', ext: '.pdf', suffix: 'fileTree.ocrSearchableSuffix', sideBySide: true },
+}
 
 export default {
   data() {
@@ -26,15 +33,28 @@ export default {
       const projectId = this.projectId
       const jobId = `ocr-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
       Object.assign(this.explorerOcr, { running: true, index: 0, total: items.length, name: '', cancelling: false, jobId })
-      const suffix = this.$t('fileTree.ocrOutputSuffix')
+      const suffix = this.$t(spec.suffix || 'fileTree.ocrOutputSuffix')
       let batch
       try {
         batch = await runOcrBatch({
           items,
           nameFor: item => spec.ext ? ocrOutputName(item.name, spec.ext, suffix) : undefined,
-          recognize: async (item, { consentVersion, name }) => {
-            const res = await recognizeProjectFileText(projectId, item.id, { jobId, output: spec.output, name, consentVersion })
+          recognize: async (item, { consentVersion, name, route }) => {
+            const body = { jobId, output: spec.output, name, consentVersion }
+            if (route) body.route = route
+            const res = await recognizeProjectFileText(projectId, item.id, body)
             return res && res.data
+          },
+          // Local engine failed: say why, and let the user opt into the cloud for this batch with the
+          // same tick-to-confirm notice as any upload. Never retried in the cloud without this.
+          requestCloudFallback: async ({ reason, notice }) => {
+            const result = await showDialog({
+              title: this.$t('workbenchOps.ocrLocalFailedTitle'),
+              content: `${this.$t('workbenchOps.ocrLocalFailedReason', { reason: reason || '' })}\n\n${notice || ''}\n\n${this.$t('workbenchOps.ocrLocalFailedHint')}`,
+              checkLabel: this.$t('workbenchOps.ocrConsentCheck'),
+              confirmText: this.$t('workbenchOps.ocrLocalFailedConfirm'),
+            })
+            return !!result.confirm
           },
           requestConsent: async ({ notice }) => {
             const result = await showDialog({
@@ -80,7 +100,7 @@ export default {
         if (tree && tree.loadFiles) await tree.loadFiles()
         lines.push(this.$t('workbenchOps.ocrSaved', { names: summary.done.map(r => r.file && r.file.name).filter(Boolean).join('、') }))
       }
-      if (action === 'docx') {
+      if (OUTPUTS[action] && OUTPUTS[action].sideBySide) {
         const plan = sideBySidePlan(batch)
         if (plan.first) {
           await openOcrSideBySide(this, plan.first.source, plan.first.output)
@@ -91,7 +111,9 @@ export default {
         const why = f.reason === 'localOnly' ? this.$t('workbenchOps.ocrLocalOnly') : (f.error || this.$t('workbenchOps.recognizeFailed'))
         lines.push(this.$t('workbenchOps.ocrFailedItem', { name: f.name, reason: why }))
       }
+      for (const r of summary.alreadySearchable || []) lines.push(this.$t('workbenchOps.ocrAlreadySearchable', { name: r.item.name }))
       if (summary.skipped.length) lines.push(this.$t('workbenchOps.ocrSkipped', { count: summary.skipped.length }))
+      if (batch.stopped != null && summary.notRun.length) lines.push(this.$t('workbenchOps.ocrStopped', { count: summary.notRun.length }))
       if (batch.cancelled) lines.push(this.$t('workbenchOps.ocrCancelled', { count: summary.notRun.length }))
       if (!summary.failed.length && !summary.skipped.length && !batch.cancelled && batch.results.length === 1) {
         if (lines.length) uni.showToast({ title: lines[0], icon: 'none' })

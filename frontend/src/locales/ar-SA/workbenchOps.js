@@ -81,5 +81,11 @@ export default {
   "ocrFailedItem": "«{name}» لم يكتمل: {reason}",
   "ocrSkipped": "تم تخطي {count} ملف يحتاج إلى OCR سحابي (دون تأكيد)",
   "ocrCancelled": "تم الإلغاء؛ لم تتم معالجة {count} ملف",
-  "ocrSummaryTitle": "اكتمل التعرّف {done}/{total}"
+  "ocrSummaryTitle": "اكتمل التعرّف {done}/{total}",
+  "ocrLocalFailedTitle": "لم يكتمل التعرّف المحلي",
+  "ocrLocalFailedReason": "السبب: {reason}",
+  "ocrLocalFailedHint": "يمكنك استخدام التعرّف السحابي للملفات التي لم يكتمل التعرّف عليها محليًا في هذه الدفعة. إذا لم تفعل، فلن يتم رفع هذه الملفات.",
+  "ocrLocalFailedConfirm": "استخدام التعرّف السحابي",
+  "ocrAlreadySearchable": "«{name}» يحتوي بالفعل على طبقة نصية وهو قابل للبحث؛ لم يتم إنشاء ملف جديد",
+  "ocrStopped": "تم الإيقاف؛ لم تتم معالجة {count} ملف"
 }

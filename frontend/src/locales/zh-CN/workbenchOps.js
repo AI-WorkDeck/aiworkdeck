@@ -96,4 +96,10 @@ export default {
   ocrSkipped: '{count} 份需要云端识别的文件未处理（未确认）',
   ocrCancelled: '已取消，{count} 份未处理',
   ocrSummaryTitle: '识别完成 {done}/{total}',
+  ocrLocalFailedTitle: '本地识别未完成',
+  ocrLocalFailedReason: '原因：{reason}',
+  ocrLocalFailedHint: '可以改用云端识别本批中本地未完成的文件。不改用的话，这些文件不会上传。',
+  ocrLocalFailedConfirm: '改用云端识别',
+  ocrAlreadySearchable: '「{name}」本身带文字层，已经可以搜索，未生成新文件',
+  ocrStopped: '已停止，{count} 份未处理',
 }

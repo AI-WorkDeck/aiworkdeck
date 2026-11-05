@@ -37,11 +37,31 @@ public class AliyunOcrClient {
      * 直接上传图片流（避免对公网 URL 的依赖）
      * 使用 RecognizeAllText + Type="Advanced" 替代原 RecognizeGeneral
      */
-    public OcrResult recognizeGeneral(InputStream imageStream) throws Exception {
-        // 使用 OCR 统一识别接口
+    /**
+     * layout=true 打开坐标（四点）、印章、表格、段落四项，与官网网关 {@code buildOcrRequest} 同一白名单；
+     * 同一动作同一 Type，仍按一次计费。false 时请求与之前完全一致。
+     */
+    static RecognizeAllTextRequest buildRequest(InputStream imageStream, boolean layout) {
         RecognizeAllTextRequest req = new RecognizeAllTextRequest()
                 .setBody(imageStream)
                 .setType("Advanced"); // 通用文字识别高精版
+        if (layout) {
+            req.setOutputCoordinate("points")
+                    .setOutputStamp(true)
+                    .setAdvancedConfig(new RecognizeAllTextRequest.RecognizeAllTextRequestAdvancedConfig()
+                            .setOutputTable(true)
+                            .setOutputParagraph(true));
+        }
+        return req;
+    }
+
+    public OcrResult recognizeGeneral(InputStream imageStream) throws Exception {
+        return recognizeGeneral(imageStream, false);
+    }
+
+    public OcrResult recognizeGeneral(InputStream imageStream, boolean layout) throws Exception {
+        // 使用 OCR 统一识别接口
+        RecognizeAllTextRequest req = buildRequest(imageStream, layout);
 
         RuntimeOptions runtime = new RuntimeOptions();
         // 显式超时：此前无超时，网络卡死会无限期挂起并占用请求线程

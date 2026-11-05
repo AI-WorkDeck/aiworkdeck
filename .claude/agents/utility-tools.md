@@ -505,6 +505,29 @@ uni 依赖换桩；SSR 合并 class 的顺序不固定，按「含有这个类�
   两档的 `OcrResult.text` 一律由 `OcrResult.lines(raw, content)` 从 `raw.subImages[].blockInfo.blockDetails[]`
   逐行拼出（子图之间空一行），raw 无分块才退回 `content`；`raw` 原样保留。截图摘录、AI 读扫描件、
   右键导出同时受益。不改请求参数、不增调用次数。回归 `OcrLineBreaksTest`。
+  **保留版式的 Word / 可搜索 PDF（tutorial-series#155 第二期）**：右键子菜单后两项，
+  `FileOcrService.Output.LAYOUT_DOCX / SEARCHABLE_PDF` → `OcrExportService`。云端走同一扣费点
+  `recognizeGeneral(base64, layout=true)`：两档同一白名单（`AliyunOcrClient.buildRequest` 与官网
+  `buildOcrRequest`）只开 `OutputCoordinate=points`、`OutputStamp`、`AdvancedConfig.OutputTable/OutputParagraph`，
+  仍是一页一次；不传 layout 时请求与旧版逐字节一致。**默认 RecognizeAllText 不返回任何坐标**，
+  旧网关会忽略 layout，于是第 1 页识别后立即检查坐标、缺失即 `layout_unsupported` 停整批（只扣这一页）。
+  版面重建 `AliyunLayoutReader`：阿里云自带的 paragraphInfo 在双栏页会把左右两栏同一行拼成一段，
+  块顺序也是左右交错——阅读顺序只能按坐标自己做（找栏间空隙需≥3 对并排行；跨栏行/表格/单侧孤立行切带，
+  带内先左栏后右栏）。印章：剔除落在章内且与章识别文字吻合的块；章图只留红色像素（否则章下印刷字重影），
+  锚定到它压着的段落（positionV relativeFrom=paragraph），重排后跟着签名走。`LayoutDocxWriter`
+  **刻意不跑 `DocxStyleHelper.applyProfile`**（会重置纸张、给标题自动编号、重排表格）。本地档
+  `MineruLayoutReader` 把 MinerU markdown（含 HTML 表格的 rowspan/colspan）映射到同一 `OcrLayout`。
+  可搜索 PDF `SearchablePdfWriter`：渲染模式 3 隐形字、按行宽水平缩放、支持 0/90/180/270 旋转页。
+  **字体雷**：PDFBox 写 ToUnicode 时取字形的第一个码位，STHeiti 等字体里「方人日月…」与康熙部首共用字形，
+  抽出来变成 U+2F45 之类，搜「甲方」零命中；`SearchablePdfWriter.aliasedCharacters` 检出即拒绝生成。
+  打包版自带 `cjk-kai.ttf` 无此问题。带文字层的 PDF：可搜索→`already_searchable` 不上传；版式 Word→本机
+  pdf2docx（无组件退回文字版 Word）。**选路**：本机 MinerU 就绪且偏好非「云端」即走本地（不弹上传告知、不计费），
+  本地失败返回 `local_failed`，前端以同一勾选式告知询问是否本批改用云端（请求带 `route:"cloud"`，仍需同意版本）。
+  识别结果按文件内容 SHA-256 缓存在 `storage.local.root-path/.ocr-cache`（`OcrResultCache`，300 条），
+  两种导出只识别、只计费一次；无坐标的结果不入缓存。回归：`AliyunLayoutReaderTest`（真实返回夹具
+  `src/test/resources/ocr/`）、`LayoutDocxWriterTest`、`SearchablePdfWriterTest`、`MineruLayoutReaderTest`、
+  `OcrExportServiceTest`、`FileOcrServiceExportTest`、`OcrLayoutRequestTest`、`OcrResultCacheTest`；
+  前端 `npm run test:explorer-ocr`；pptx-service `backend/tests/unit/test_ocr_layout.py`。
   **改 OcrService 的失败语义要同时看 AI 这一侧**：
   那边把 `[System: ...]` 形态的失败翻译成 `Error:` 并把原因原样透给模型
   （Credits 不足 / OCR 未开通要如实报给用户，不能让模型自己推断）。契约与病灶见
@@ -688,7 +711,7 @@ FileTree 的节点/根/空白落点先认包内载荷，先同步快照与 claim
 
 取消选择调用 `/api/ocr/routing/cancel` 撤回本任务 decision，保留到期前的取消记录，迟到 choice 不得重新授权；取消不修改用户此前记住的偏好。原 run 和已续跑 run 被取消后不能借保存的 cloud 偏好继续，新任务须重新选择。前端成功交接只清 UI，不误撤权；取消失败显示重试，并保留原账户/服务端请求范围。逐页渲染前、上传前和结果导出前重检取消及权限，最后一页请求期间取消也不生成迟到 Word；已发出的 HTTP 无法撤回，已识别页面可能已计费。纯白页不上传、不计费，但仍执行取消检查。
 
-验证：`PdfOcrDependenciesTest`、`OcrRoutingServiceTest`、`PdfCloudOcrServiceTest`、`AgentOrchestratorEditorBootingAndComponentStopTest`；前端 `tests/optional-components/ocr-routing.test.mjs` 与真实ChatInterface/SSE浏览器 `tests/chat-presentation-ui/ocr-routing.mjs`。合成输入/传输替身不等于真实付费调用、模型推理或安装包更新。线上pptx-runtime1.0.1无专用local端点，后续需另行构建签名发布；当前版本本地路径会明确不可用，但用户可选择已披露的云端OCR继续，无需等待本地新包。
+验证：`PdfOcrDependenciesTest`、`OcrRoutingServiceTest`、`PdfCloudOcrServiceTest`、`AgentOrchestratorEditorBootingAndComponentStopTest`；前端 `tests/optional-components/ocr-routing.test.mjs` 与真实ChatInterface/SSE浏览器 `tests/chat-presentation-ui/ocr-routing.mjs`。合成输入/传输替身不等于真实付费调用、模型推理或安装包更新。专用local端点自 pptx-runtime 1.0.2 起已发布（2026-11-05 核对镜像为 1.0.5）；`layout:true`（逐行 bbox 与图片，供可搜索 PDF 与印章图）需 1.0.6 起，旧包忽略该参数、只回 markdown。
 
 
 ### 顶栏账户菜单与原生网页（dev-board#1417）

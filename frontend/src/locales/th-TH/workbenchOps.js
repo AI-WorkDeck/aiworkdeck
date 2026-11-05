@@ -81,5 +81,11 @@ export default {
   "ocrFailedItem": "\"{name}\" ไม่สำเร็จ: {reason}",
   "ocrSkipped": "ข้ามไฟล์ที่ต้องใช้ OCR บนคลาวด์ {count} ไฟล์ (ยังไม่ยืนยัน)",
   "ocrCancelled": "ยกเลิกแล้ว ไม่ได้ประมวลผล {count} ไฟล์",
-  "ocrSummaryTitle": "รู้จำเสร็จ {done}/{total}"
+  "ocrSummaryTitle": "รู้จำเสร็จ {done}/{total}",
+  "ocrLocalFailedTitle": "การรู้จำในเครื่องไม่สำเร็จ",
+  "ocrLocalFailedReason": "สาเหตุ: {reason}",
+  "ocrLocalFailedHint": "คุณสามารถใช้การรู้จำบนคลาวด์กับไฟล์ในชุดนี้ที่รู้จำในเครื่องไม่สำเร็จได้ หากไม่ใช้ ไฟล์เหล่านั้นจะไม่ถูกอัปโหลด",
+  "ocrLocalFailedConfirm": "ใช้การรู้จำบนคลาวด์",
+  "ocrAlreadySearchable": "\"{name}\" มีชั้นข้อความอยู่แล้วและค้นหาได้ จึงไม่ได้สร้างไฟล์ใหม่",
+  "ocrStopped": "หยุดแล้ว ไม่ได้ประมวลผล {count} ไฟล์"
 }
