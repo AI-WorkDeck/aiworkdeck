@@ -26,6 +26,8 @@ dev-board#181（后端部分）+ #182 + #541（DOC 第四类实体）。
 
 测试：`CompletionServiceTest`、`CompletionPersistenceTest`、`CompletionControllerTest` 与 `DocInsightServiceTest`（授权、并发、限额、失败缓存与显式检索边界）。
 
+右键资料卡与插入正文（教程反馈 43–48/107–109，dev-board#1713）：`completionDetails(entity, {translate, locale})` 由宿主注入语言包——来源内部名经 `insightDetail.retrievalSourceLabel` 映射（`pkulaw` / `pkulaw-*` → `insight.source.pkulaw`，`qichacha` / `qichacha+mcp` → `insight.source.qichacha`；依据窗格浮窗、AI 回答法规卡同用这一张表），查询日期 `formatQueryDate` 只取年月日并按界面语言本地化（中文「2026年11月4日」）；来源/日期行、工商表题（`editor.writingAssist.companyTable`，作为 COMPANY variant 的 `text` 放在 `rows` 前）都是语言包词条。后端 `retrievalSource` 契约不变。模糊匹配的「仅替换为正确全称」variant 带 `mode:'replace-selection'`，客体只在选区令牌下展示，引擎同一撤销组先删选区再写入。客体页文案表由宿主 `writingAssistanceLabels(translate)` 生成、随 `writing-config.labels` 下发，客体只留英文兜底；结果卡沿用右键菜单坐标，插入按钮在 sticky 底栏 `.awd-wa-actions`。AI 回答里的法规卡：只有本轮实时流的工具事件（`useAgentStream` 给 tool 条目打的 `live:true`）保留「检索返回内容」，历史回灌的一律「来源待核验」。
+
 **服务层 `backend/src/main/java/com/checkba/service/insight/`**
 - `DocInsightService.java` — 管线主体。`startParse` / `latest` / `entityDetail` / `refreshEntity` 四个公有入口，其余全是私有管线。
 - `DocInsightExtraction.java` — 纯函数：切块、提示词、宽容 JSON 解析、确定性正则预抽取、按 normKey 合并去重。
@@ -345,13 +347,13 @@ DOC 实体的 `detail`（命中项目文件时；`GET /entities/{id}` 才下发�
 - `frontend/src/config/panelRegistry.js` —— `insight` 一条（`defaultDock:'right'`、`allowedDocks:['left','right']`，**不给 bottom**：底栏放不下判决书全文）。
 - `frontend/src/services/api.js` —— `parseDocInsight` / `getDocInsight` / `getDocInsightEntity` / `refreshDocInsightEntity`。
 - 宿主接线在 `frontend/src/pages/project-overview/project-overview.vue`（右栏 `rightPaneKey==='insight'` / 左栏 `leftPaneKey==='insight'` 两条显式分支 + `isInsightDoc` / `getInsightExecutor` / `onOpenInsight` / `onInsightEntities` / `setInsightIndex` / `insightSubscribedFor` / `prefetchInsightIndex` / `onEditorCursorContext` / `openInsightHoverCard` / `closeInsightHoverCard`；浮窗在**根节点**渲染，实体详情标签在左右两条 `v-else-if` 链里各一份）。
-- 编辑器侧：`EditorToolbar.vue` 的「解析」按钮（`toggle-insight`）→ `LibreOfficeEditor.vue` `onToggleInsight` → `open-insight` → 宿主。
+- 入口（教程反馈 49，dev-board#1713 核实）：**工作台右栏 dock 的「依据」标签**（`panelRegistry` 的 `insight`，宿主 `openPanelInItsDock('insight')`），面板内「全文在线核验（可能产生费用）」按钮显式 POST `/parse`。编辑器工具栏早已没有「解析」按钮；残留的 `open-insight` 事件链（`inlineReviewHost` 的 `open-insight` 动作、`LibreOfficeEditor.onToggleInsight`、工作台三处 `@open-insight` 与 `onOpenInsight`）与孤儿词条 `editor.toolbar.insightPanel/insightShort` 已删除。
 
 ### 事件流
 
 ```
-工具栏「解析」 → open-insight{fileId} → 宿主 openPanelInItsDock('insight')（被拖去左栏就开左栏）
-                                     → insightParseRequest={fileId,token} → 面板 consumeParseRequest → POST /parse
+右栏「依据」标签 → 宿主 openPanelInItsDock('insight')（被拖去左栏就开左栏）→ 面板「全文在线核验」
+                                     → POST /parse（只由面板按钮触发）
 面板 GET / 轮询 2s（只在 RUNNING 时排下一发，beforeUnmount 必清）
 面板 → @entities{docFileId,entities[]} → 宿主 _insightIndex（非响应式，同 _libreRefs 口径）
 
@@ -415,7 +417,7 @@ DOC 实体的 `detail`（命中项目文件时；`GET /entities/{id}` 才下发�
 ### 其它口径
 
 - 窗格绑「当前活跃的 **writer** 文档」（`isInsightDoc`：`useLibreEditor` 且扩展名在 Writer 子集里；表格/演示/PDF 不进）。分屏时跟 `focusedPane`，点哪一侧的工具栏就把焦点挪到哪一侧。
-- **工具栏「解析」对已经解析过的文档不重跑**（一次解析 = 一次 LLM + 一串外部库调用），只把面板开出来；`status==='FAILED'` 那次不算结论，照样重跑。面板里的「重新解析」是用户明示的，force 重跑。
+- **（历史口径，入口已改为「依据」标签）已经解析过的文档不重跑**（一次解析 = 一次 LLM + 一串外部库调用），只把面板开出来；`status==='FAILED'` 那次不算结论，照样重跑。面板里的「重新解析」是用户明示的，force 重跑。
 - `parseRequest` **必须带 fileId**：面板是 v-if 挂载的，点完解析才挂出来（watch 看不到变化，所以 mounted 也认一次）；不带 fileId 会让「在 A 文档点过解析、随后切到 B 开面板」把 B 也解析掉。
 - 列表瘦身的另一半在前端：`detail` 展开时才 `GET /entities/{id}` 并缓存在组件里；`hasDetail:false` 的一次都不打。
 - NOT_FOUND / UNAVAILABLE / ERROR 的 `retrievalNote` **必须显示**（`.ip-note`）。旁边那个动作分两支（dev-board#458）：

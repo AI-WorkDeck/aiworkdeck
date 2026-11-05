@@ -1079,6 +1079,7 @@
                     :status="evidenceMethodBar.status"
                     :error-text="evidenceMethodBar.errorText"
                     :saving="evidenceMethodBar.saving"
+                    :placement="evidenceMethodBar.placement"
                     @change="onEvidenceMethodChange"
                     @close="closeEvidenceMethodBar"
                   />
@@ -1115,7 +1116,6 @@
                       @locator-consumed="onLocatorConsumed"
                       :insight-subscribed="insightSubscribedFor(file)"
                       :active="!!(activeFileLeft && activeFileLeft.id === file.id)"
-                      @open-insight="onOpenInsight($event, 'left')"
                       @cursor-context="onEditorCursorContext"
                       @open-history="openCommitHistoryTab({ focusSha: $event && $event.sha })"
                     />
@@ -1145,7 +1145,6 @@
                       @locator-consumed="onLocatorConsumed"
                       :insight-subscribed="insightSubscribedFor(sp.file)"
                       :active="!!(sp.file && activeFileLeft && activeFileLeft.id === sp.file.id)"
-                      @open-insight="onOpenInsight($event, 'left')"
                       @cursor-context="onEditorCursorContext"
                       @open-history="openCommitHistoryTab({ focusSha: $event && $event.sha })"
                     />
@@ -1413,6 +1412,7 @@
                     :status="evidenceMethodBar.status"
                     :error-text="evidenceMethodBar.errorText"
                     :saving="evidenceMethodBar.saving"
+                    :placement="evidenceMethodBar.placement"
                     @change="onEvidenceMethodChange"
                     @close="closeEvidenceMethodBar"
                   />
@@ -1439,7 +1439,6 @@
                       @locator-consumed="onLocatorConsumed"
                       :insight-subscribed="insightSubscribedFor(file)"
                       :active="!!(activeFileRight && activeFileRight.id === file.id)"
-                      @open-insight="onOpenInsight($event, 'right')"
                       @cursor-context="onEditorCursorContext"
                       @open-history="openCommitHistoryTab({ focusSha: $event && $event.sha })"
                     />
@@ -2588,6 +2587,7 @@ import { librePoolMethods } from './librePool.js'
 import { fileTreePdfRecoveryMethods } from './fileTreePdfRecovery.js'
 import { stagingAreaMethods } from './stagingArea.js'
 import { evidenceLinkData, evidenceLinkMethods } from './evidenceLinkActions.js'
+import { setEvidenceProjectType } from '@/utils/evidenceTags.js'
 import { tabDragSplitMethods } from './tabDragSplit.js'
 import { fitPanelWidths } from './panelWidthLimits.js'
 import { panelDockingData, panelDockingMethods } from './panelDocking.js'
@@ -4633,6 +4633,8 @@ export default {
     this.maybeRegisterOpenWorkbench()
   },
   watch: {
+    // 证据标签默认组跟着项目类型走（教程反馈 77）。
+    'project.projectType': { immediate: true, handler(type) { setEvidenceProjectType(type) } },
     projectId() { this.cancelFileTreePdfExport(); this.resetPdfPreviewPool() },
     'currentUser.id'() { this.resetPdfPreviewPool() },
     // 成员轮询会替换数组；只在实际权限信息变化时销毁 PDF 查看器。
@@ -7553,14 +7555,6 @@ export default {
       const chat = this.$refs.chatInterface
       if (!chat || typeof chat.handleReviewState !== 'function' || !this._planReviewStates) return
       for (const st of Object.values(this._planReviewStates)) chat.handleReviewState(st)
-    },
-    /** 写作辅助打开既有资料；全文在线核验由面板中的显式按钮单独触发。 */
-    onOpenInsight(payload, pane) {
-      const fileId = payload && payload.fileId
-      if (pane && this.focusedPane !== pane) this.focusedPane = pane
-      const target = this.insightDocFileId
-      if (!target || (fileId && Number(fileId) !== Number(target))) return
-      this.openPanelInItsDock('insight')
     },
     /** 窗格把实体清单同步上来（宿主据此在正文点击时做匹配）。 */
     onInsightEntities(payload) {

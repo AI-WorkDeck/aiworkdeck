@@ -14,18 +14,22 @@
     </dl>
     <p v-if="excerpt" class="reference-excerpt">{{ excerpt }}</p>
     <footer class="reference-card-footer">
-      <span class="reference-source">{{ reference.source || $t('legalReference.unknownSource') }}</span>
+      <span class="reference-source">{{ sourceLabel || $t('legalReference.unknownSource') }}</span>
       <span class="reference-status" :class="'status-' + status">{{ $t('legalReference.status.' + status) }}</span>
     </footer>
   </article>
 </template>
 
 <script>
+import { retrievalSourceLabel } from '@/utils/insightDetail.js'
+
 export default {
   name: 'LegalReferenceCard',
   props: { reference: { type: Object, required: true } },
   emits: ['open'],
   computed: {
+    // 来源内部名（pkulaw）显示成用户名称（教程反馈 47）
+    sourceLabel() { return retrievalSourceLabel(this.reference.source, (key) => this.$t(key)) },
     kind() { return ['LAW', 'CASE', 'PENALTY'].includes(this.reference.kind) ? this.reference.kind : 'LAW' },
     status() { return ['retrieved', 'metadata', 'unavailable'].includes(this.reference.status) ? this.reference.status : 'unverified' },
     metadata() { return (this.reference.metadata || []).filter((item) => item.value).slice(0, 3) },

@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict'
 import { preflight, loadPuppeteer, startServer, launchBrowser, openEditor } from './_boot.mjs'
+import { writingAssistanceLabels } from '../../src/composables/writingAssistanceHost.js'
+import zhEditor from '../../src/locales/zh-CN/editor.js'
+// 宿主随 writing-config 下发的中文标签表（客体自身只带英文兜底，教程反馈 48）。
+const zhLabels = writingAssistanceLabels(key => key.startsWith('editor.') ? key.slice(7).split('.').reduce((o, k) => o?.[k], zhEditor) ?? key : key)
 preflight()
 const server = await startServer()
 const browser = await launchBrowser(await loadPuppeteer())
@@ -11,7 +15,7 @@ try {
   const exec = (a, p = {}) => page.evaluate((a, p) => window.__loExecutor.executeCommand(a, p), a, p)
   const text = async () => (await exec('get_document_text')).paragraphs.map(p => p.text).join('\n')
   await exec('ui_command', { name: 'select_all' }); await exec('replace_selection', { text: '' })
-  await page.evaluate(() => {
+  await page.evaluate((labels) => {
     window.__writingRequests = []
     window.__writingNativeEscapes = 0
     document.getElementById('qtcanvas').addEventListener('keydown', e => {
@@ -24,13 +28,13 @@ try {
       const result = m.action === 'lookup' ? { title: '北京当红晴天律师事务所', source: '测试资料 / Test fixture', date: '2026-09-09', variants: [{ rows: [['企业名称', '北京当红晴天律师事务所'], ['住所', '北京市（测试）']] }] } : {}
       window.postMessage({ __lo: 'lo-relay', type: 'writing-response', id: m.id, session: m.session, result }, location.origin)
     })
-    window.postMessage({ __lo: 'lo-relay', type: 'writing-config', config: { session: 'test-document', writable: true, enabled: true, learning: true, hints: true, items: [
+    window.postMessage({ __lo: 'lo-relay', type: 'writing-config', config: { session: 'test-document', writable: true, enabled: true, learning: true, hints: true, labels, items: [
       { id: 'one', text: '北京当红晴天律师事务所', kind: 'COMPANY', scope: 'project', source: 'variable', uses: 3 },
       { id: 'two', text: '北京当红齐天集团', kind: 'COMPANY', scope: 'project', source: 'variable', uses: 2 },
       { text: '《中华人民共和国民法典》第一百条', kind: 'ARTICLE', scope: 'project', source: 'variable', uses: 3 },
       { text: '张三丰', kind: 'PERSON', scope: 'user', source: 'variable', uses: 2 },
     ] } }, location.origin)
-  })
+  }, zhLabels)
   const input = 'input[data-lo-ime]'
   await page.focus(input)
   const ime = async value => page.evaluate(value => {
@@ -106,7 +110,11 @@ try {
   await page.evaluate(() => [...document.querySelectorAll('.awd-wa-panel button')].find(b => b.textContent === '查询机构工商信息').click())
   await page.waitForSelector('.awd-wa-panel table')
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  // 结果卡沿用右键坐标（教程反馈 108），正好盖在取样区上：取样时先把卡片藏一下，只看它下面有没有 Qt 弹窗。
+  await page.evaluate(() => { document.querySelector('.awd-wa-panel').style.visibility = 'hidden' })
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   assert.deepEqual(await page.screenshot({ clip: popupClip }), unobstructed, 'the worker suppressed Qt popup never opens behind the writing preview')
+  await page.evaluate(() => { document.querySelector('.awd-wa-panel').style.visibility = '' })
   assert.equal(await page.evaluate(() => window.__writingNativeEscapes), 0, 'the host menu no longer synthesises Escape into the canvas (#601)')
   assert.deepEqual(await exec('get_selection'), { success: true, text: '北京当红晴天律师事务所', hasSelection: true }, 'opening the host menu preserves the original selection')
   assert.equal(await text(), '北京当红晴天律师事务所', 'querying and previewing do not insert content')

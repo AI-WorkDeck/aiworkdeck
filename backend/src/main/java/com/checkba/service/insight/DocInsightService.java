@@ -926,7 +926,8 @@ public class DocInsightService {
                 unavailableGateway(row, ge, "");
                 return;
             }
-            first = ge.getMessage();
+            // 上游原话（「企业数据服务返回：【有效请求】查询无结果」）只进日志，note 只留人话（教程反馈 110）
+            log.info("企查查查无结果 name={}: {}", name, ge.getMessage());
         } catch (Exception e) {
             first = readable(e);
         }
@@ -948,7 +949,9 @@ public class DocInsightService {
                     + LangText.of("」仍未查询到工商信息", "\" still returned no registry record"));
         } catch (GatewayException ge) {
             if (emptyUpstream(ge.getMessage())) {
-                notFound(row, "qichacha+mcp", ge.getMessage());
+                log.info("企查查按全称查无结果 name={}: {}", fullName, ge.getMessage());
+                notFound(row, "qichacha+mcp", LangText.of("按全称「", "Full name \"") + fullName
+                        + LangText.of("」仍未查询到工商信息", "\" still returned no registry record"));
             } else {
                 unavailableGateway(row, ge, "");
             }

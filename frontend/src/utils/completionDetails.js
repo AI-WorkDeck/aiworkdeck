@@ -7,6 +7,7 @@ import {
   companyRows,
   lawArticle,
   resultRecords,
+  retrievalSourceLabel,
   unwrapResult,
 } from './insightDetail.js'
 
@@ -47,26 +48,55 @@ function isEnLang() {
   return false
 }
 
-function insertionText(content, source, date) {
-  if (!content) return undefined
+/**
+ * 查询日期写进文书用本地化日期（中文「2026年11月4日」），不写 ISO 时间戳（教程反馈 107）。
+ * 只取后端时间串的年月日部分，不经时区换算：fetchedAt 是服务端本地时间。
+ */
+export function formatQueryDate(value, locale = '') {
+  if (value == null || value === '') return ''
+  const s = String(value)
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s)
+  if (!m) return s
+  const day = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  try {
+    return new Intl.DateTimeFormat(locale || (isEnLang() ? 'en-US' : 'zh-CN'), { year: 'numeric', month: 'long', day: 'numeric' }).format(day)
+  } catch {
+    return `${m[1]}-${m[2]}-${m[3]}`
+  }
+}
+
+// 来源 / 日期行与工商表题走宿主语言包（editor.writingAssist.*）；没有 translate 时
+// （纯函数单测）按界面语言给中文或英文，中文界面不再写「来源 / Source」（教程反馈 45）。
+function textFor(translate) {
+  if (typeof translate === 'function') {
+    return (key, params) => translate(`editor.writingAssist.${key}`, params)
+  }
   const en = isEnLang()
+  const fallback = en
+    ? { sourceLine: 'Source: {source}', dateLine: 'Queried on: {date}', companyTable: 'Business registration information (Source: {source}; queried on {date})', companyTableNoDate: 'Business registration information (Source: {source})', replaceFullName: 'Replace with full legal name only: {name}' }
+    : { sourceLine: '来源：{source}', dateLine: '查询日期：{date}', companyTable: '工商登记信息（来源：{source}，查询日期：{date}）', companyTableNoDate: '工商登记信息（来源：{source}）', replaceFullName: '仅替换为正确全称：{name}' }
+  return (key, params = {}) => fallback[key].replace(/\{(\w+)\}/g, (_, name) => params[name] ?? '')
+}
+
+function insertionText(content, meta) {
+  if (!content) return undefined
   const footer = [
-    source ? (en ? `Source: ${source}` : `来源 / Source：${source}`) : '',
-    date ? (en ? `Queried on: ${date}` : `查询日期：${date}`) : '',
+    meta.source ? meta.text('sourceLine', { source: meta.source }) : '',
+    meta.date ? meta.text('dateLine', { date: meta.date }) : '',
   ].filter(Boolean)
   return footer.length ? `${content}\n\n${footer.join('\n')}` : content
 }
 
-function citationText(lines, content, source, date) {
+function citationText(lines, content, meta) {
   if (!content) return undefined
-  return insertionText(`${lines.filter(Boolean).join('\n')}\n\n${content}`, source, date)
+  return insertionText(`${lines.filter(Boolean).join('\n')}\n\n${content}`, meta)
 }
 
 function recordDetails(detail) {
   return resultRecords(unwrapResult(detail)).records
 }
 
-function lawVariants(detail, source, date, fallbackTitle) {
+function lawVariants(detail, meta, fallbackTitle) {
   const en = isEnLang()
   const rawRecords = recordDetails(detail)
   if (!rawRecords.length) {
@@ -75,7 +105,7 @@ function lawVariants(detail, source, date, fallbackTitle) {
     const title = [law.title, law.article].filter(Boolean).join(' ') || fallbackTitle
     return [{
       title,
-      text: citationText([law.title || fallbackTitle, law.article], law.content, source, date),
+      text: citationText([law.title || fallbackTitle, law.article], law.content, meta),
     }]
   }
   const activeIdx = rawRecords.findIndex((r) => lawArticle({ result: r }).timeliness.includes('现行有效'))
@@ -93,12 +123,12 @@ function lawVariants(detail, source, date, fallbackTitle) {
         law.article,
         law.timeliness ? (en ? `Validity: ${law.timeliness}` : `时效性：${law.timeliness}`) : '',
         url ? (en ? `URL: ${url}` : `URL：${url}`) : '',
-      ], law.content, source, date) } : {}),
+      ], law.content, meta) } : {}),
     }
   }).filter((variant) => variant.text)
 }
 
-function caseVariants(detail, source, date, fallbackTitle) {
+function caseVariants(detail, meta, fallbackTitle) {
   const en = isEnLang()
   const records = recordDetails(detail)
   if (!records.length) {
@@ -113,7 +143,7 @@ function caseVariants(detail, source, date, fallbackTitle) {
         item.caseNumber ? (en ? `Case No.: ${item.caseNumber}` : `案号：${item.caseNumber}`) : '',
         item.court ? (en ? `Court: ${item.court}` : `法院：${item.court}`) : '',
         item.date ? (en ? `Decision Date: ${item.date}` : `裁判日期：${item.date}`) : '',
-      ], content, source, date),
+      ], content, meta),
     }]
   }
   return records.map((record) => {
@@ -128,12 +158,12 @@ function caseVariants(detail, source, date, fallbackTitle) {
         item.court ? (en ? `Court: ${item.court}` : `法院：${item.court}`) : '',
         item.date ? (en ? `Decision Date: ${item.date}` : `裁判日期：${item.date}`) : '',
         url ? (en ? `URL: ${url}` : `URL：${url}`) : '',
-      ], content, source, date) } : {}),
+      ], content, meta) } : {}),
     }
   }).filter((variant) => variant.text)
 }
 
-function authoritativeVariant(detail, source, date) {
+function authoritativeVariant(detail, meta) {
   const en = isEnLang()
   const item = authoritative(detail)
   if (!item) return null
@@ -143,7 +173,7 @@ function authoritativeVariant(detail, source, date) {
       item.title,
       item.date ? (en ? `Effective Date: ${item.date}` : `实施日期：${item.date}`) : '',
       item.url ? (en ? `URL: ${item.url}` : `URL：${item.url}`) : '',
-    ], item.text, source, date) } : {}),
+    ], item.text, meta) } : {}),
   }
 }
 
@@ -153,11 +183,18 @@ function recognitionNote(detail) {
   return [item.title, item.caseNumber, item.court, item.url].filter(Boolean).join(' / ')
 }
 
-export function completionDetails(entityView) {
+/**
+ * translate / locale 由宿主注入（LibreOfficeEditor → writingAssistanceHost）：来源内部名
+ * （pkulaw-semantic / qichacha+mcp）映射成用户名称，日期按界面语言本地化。
+ */
+export function completionDetails(entityView, { translate = null, locale = '' } = {}) {
   const entity = entityView && typeof entityView === 'object' ? entityView : {}
   const detail = parseDetail(entity.detail)
-  const source = entity.retrievalSource || (detail && typeof detail.source === 'string' ? detail.source : '')
-  const date = entity.fetchedAt == null ? '' : String(entity.fetchedAt)
+  const rawSource = entity.retrievalSource || (detail && typeof detail.source === 'string' ? detail.source : '')
+  const source = retrievalSourceLabel(rawSource, translate)
+  const date = formatQueryDate(entity.fetchedAt, locale)
+  const text = textFor(translate)
+  const meta = { source, date, text }
   const note = entity.retrievalNote == null ? '' : String(entity.retrievalNote)
   // Configuration-class failures carry a structured reason code (dev-board#458). The card
   // decides its next step from this code only: the note is bilingual, so matching Chinese
@@ -174,7 +211,7 @@ export function completionDetails(entityView) {
       const queriedName = String(detail.queriedName || base.title || '').trim()
       const fuzzy = Boolean(
         detail.fuzzyMatched ||
-        (source === 'qichacha+mcp' && matchedName && queriedName && matchedName !== queriedName)
+        (rawSource === 'qichacha+mcp' && matchedName && queriedName && matchedName !== queriedName)
       )
       const en = isEnLang()
       if (fuzzy && matchedName && !base.note) {
@@ -183,27 +220,32 @@ export function completionDetails(entityView) {
           : `模糊匹配提示：未精准命中「${queriedName}」，已为您匹配「${matchedName}」，正文中的企业名称可能书写有误，请核对。`
       }
       if (rows.length) {
+        // 工商表写进文书要带出处：表前一行表题（教程反馈 46）。
+        const caption = source ? text(date ? 'companyTable' : 'companyTableNoDate', { source, date }) : ''
         base.variants.push({
           title: fuzzy && matchedName ? (en ? `${matchedName} (Registration Profile)` : `${matchedName}（工商信息表）`) : base.title,
+          ...(caption ? { text: caption } : {}),
           rows: rows.map(({ label, value }) => [label, value]),
         })
       }
       if (fuzzy && matchedName) {
+        // 真替换选区（教程反馈 43）：客体按 mode 让引擎先删选区再写入，同一撤销步骤。
         base.variants.push({
-          title: en ? `Replace with full legal name only: ${matchedName}` : `仅替换为正确全称：${matchedName}`,
+          title: text('replaceFullName', { name: matchedName }),
           text: matchedName,
+          mode: 'replace-selection',
         })
       }
     }
   } else if (entity.kind === 'LAW' || entity.kind === 'ARTICLE') {
     if (!failed) {
-      base.variants.push(...lawVariants(detail, source, date, base.title))
+      base.variants.push(...lawVariants(detail, meta, base.title))
     }
-    const authority = authoritativeVariant(detail, source, date)
+    const authority = authoritativeVariant(detail, meta)
     if (authority?.text) base.variants.push(authority)
   } else if (entity.kind === 'CASE') {
     if (!failed) {
-      base.variants.push(...caseVariants(detail, source, date, base.title))
+      base.variants.push(...caseVariants(detail, meta, base.title))
     }
     const recognition = recognitionNote(detail)
     if (recognition) base.note = [base.note, recognition].filter(Boolean).join('\n')

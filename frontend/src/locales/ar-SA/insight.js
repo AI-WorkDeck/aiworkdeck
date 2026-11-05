@@ -46,7 +46,8 @@ export default {
   "docMissing": "لم يعد هذا الملف موجودًا في هذا المشروع",
   "source": {
     "projectFile": "ملف المشروع",
-    "qichacha": "Qichacha (تشيتشاتشا)"
+    "qichacha": "Qichacha (تشيتشاتشا)",
+    "pkulaw": "PKULaw"
   },
   "mentions": "{count} إشارة",
   "mentionsTitle": "المواضع الواردة في المستند",

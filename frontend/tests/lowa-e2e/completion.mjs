@@ -74,13 +74,13 @@ try {
   ctx = await ok('get_completion_context')
   await ok('export_document', { name: 'autosave-before-detail.docx' })
   await ok('insert_completion_content', { token: ctx.token, text: '【资料】' })
-  assert.equal(await doc(), prefix + '【资料】', '只读自动保存不应让已有光标令牌失效')
+  assert.equal(await doc(), prefix + '\n【资料】', '只读自动保存不应让已有光标令牌失效；资料另起一段')
   await reset()
   ctx = await ok('get_completion_context')
   const completedBeforeSave = await ok('accept_completion', { token: ctx.token, prefix, text })
   await ok('export_document', { name: 'autosave-after-completion.docx' })
   await ok('insert_completion_content', { token: completedBeforeSave.token, text: '【资料】' })
-  assert.equal(await doc(), text + '【资料】', '补全结果令牌跨自动保存仍能追加资料')
+  assert.equal(await doc(), text + '\n【资料】', '补全结果令牌跨自动保存仍能追加资料')
   ctx = await ok('get_completion_context')
   await ok('export_document', { name: 'autosave-before-real-edit.docx' })
   await ok('insert_at_cursor', { text: '继续输入' })
@@ -93,7 +93,7 @@ try {
   const beforeCleanSave = await doc()
   await ok('export_document', { name: 'clean-tracked-autosave.docx' })
   await ok('insert_completion_content', { token: ctx.token, text: '【资料】' })
-  assert.equal(await doc(), beforeCleanSave + '【资料】', '干净态含删除修订的导出也应保留令牌')
+  assert.equal(await doc(), beforeCleanSave + '\n【资料】', '干净态含删除修订的导出也应保留令牌')
   console.log('PASS read-only export preserves context/completion tokens; real edits still invalidate')
 
   await reset(prefix + '\n' + prefix)
@@ -120,12 +120,12 @@ try {
   ctx = await ok('get_completion_context')
   const literal = '\n**第一条**\n# 原文保持'
   await ok('insert_completion_content', { token: ctx.token, text: literal })
-  assert.equal(await doc(), prefix + literal, '资料文字不解析 Markdown')
+  assert.equal(await doc(), prefix + '\n' + literal, '资料文字不解析 Markdown')
   await ok('undo')
   assert.equal(await doc(), prefix, '多段文本一次撤销')
   ctx = await ok('get_completion_context')
   const rows = [['项目', '信息'], ['名称', text], ['备注', '**原样**']]
-  const inserted = await ok('insert_completion_content', { token: ctx.token, text: '\n工商基本信息\n', rows })
+  const inserted = await ok('insert_completion_content', { token: ctx.token, text: '工商基本信息', rows })
   assert.ok(inserted.table && inserted.token)
   assert.deepEqual((await ok('table_read', { tableIndex: 0 })).cells, rows)
   assert.equal((await exec('insert_completion_content', { token: ctx.token, rows })).reason, 'stale')
@@ -147,7 +147,7 @@ try {
   assert.equal(ctx.selectedText, prefix)
   assert.equal((await accept(ctx.token)).reason, 'selection', '选区只允许显式资料插入')
   await ok('insert_completion_content', { token: ctx.token, text: '【外查资料】' })
-  assert.equal(await doc(), '前文' + prefix + '【外查资料】后文', '原选区和前后正文均保留')
+  assert.equal(await doc(), '前文' + prefix + '后文\n【外查资料】', '原句不被拆断：资料另起一段落在当前段之后')
   await ok('undo')
   assert.equal(await doc(), '前文' + prefix + '后文')
   await ok('find_navigate', { keyword: prefix, direction: 'next' })
@@ -155,6 +155,27 @@ try {
   await ok('collapse_selection')
   assert.equal((await exec('insert_completion_content', { token: ctx.token, text: '过期' })).reason, 'stale', '仅改变选区末端也拒绝')
   console.log('PASS selection token appends without replacing and rejects changed selection')
+
+  // 「仅替换为正确全称」：真替换选区、一次撤销（教程反馈 43）
+  const wrong = '北京当红晴天所', right = '北京当红晴天律师事务所'
+  for (const tracked of [false, true]) {
+    await reset('前文' + wrong + '后文')
+    await ok('set_track_changes', { on: tracked })
+    await ok('find_navigate', { keyword: wrong, direction: 'next' })
+    ctx = await ok('get_completion_context')
+    assert.equal(ctx.selectedText, wrong)
+    const replaced = await ok('insert_completion_content', { token: ctx.token, text: right, mode: 'replace-selection' })
+    assert.equal(replaced.operation, 'replace-selection')
+    assert.equal(await doc(), '前文' + right + '后文', '选区被正确全称替换' + (tracked ? '（修订开）' : ''))
+    if (tracked) assert.ok((await ok('list_revisions', { limit: 50, locate: false })).count > 0, '修订开着时记成修订')
+    await ok('undo')
+    assert.equal(await doc(), '前文' + wrong + '后文', '一次撤销恢复原名')
+    await ok('set_track_changes', { on: false })
+  }
+  await reset()
+  ctx = await ok('get_completion_context')
+  assert.equal((await exec('insert_completion_content', { token: ctx.token, text: right, mode: 'replace-selection' })).reason, 'invalid-content', '没有选区不能走替换')
+  console.log('PASS replace-selection replaces the exact selection in one undo step')
 
   await ok('debug_completion_calc')
   for (const action of ['get_completion_context', 'accept_completion', 'insert_completion_content']) {

@@ -47,7 +47,7 @@ export default {
     disabled: { type: Boolean, default: false },
   },
   data() {
-    return { tags: loadEvidenceTags(), editing: false, draft: [], error: '', presets: EVIDENCE_TAG_PRESETS, maxTags: MAX_EVIDENCE_TAGS, maxLength: MAX_EVIDENCE_TAG_LENGTH }
+    return { tags: loadEvidenceTags((key) => this.$t(key)), editing: false, draft: [], error: '', presets: EVIDENCE_TAG_PRESETS, maxTags: MAX_EVIDENCE_TAGS, maxLength: MAX_EVIDENCE_TAG_LENGTH }
   },
   computed: {
     options() {
@@ -61,7 +61,7 @@ export default {
       this.draft[index] = event.detail ? event.detail.value : event.target.value
     },
     label(tag) { return evidenceTagLabel(tag, (key, params) => this.$t(key, params)) },
-    reload() { this.tags = loadEvidenceTags() },
+    reload() { this.tags = loadEvidenceTags((key) => this.$t(key)) },
     toggleEditor() {
       if (!this.editing) {
         this.reload()

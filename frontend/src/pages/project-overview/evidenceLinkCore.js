@@ -89,3 +89,13 @@ export function pickEvidenceTarget(view, targetId) {
   if (targets.length === 1) return targets[0]
   return null
 }
+
+// 回执小条默认贴编辑器底部；刚建链的文字（建链后光标收在链接末尾）落在画布下部时，
+// 小条会压住它的下一行（教程反馈 77）——这时改贴顶部。get_cursor_rect 的 nativeCaret
+// 是引擎窗口物理像素，与 frameHeight 同一单位；读不到就维持底部。
+export function evidenceBarPlacement(rect) {
+  const caret = rect && rect.success !== false ? rect.nativeCaret : null
+  if (!caret || !(caret.frameHeight > 0) || !Number.isFinite(caret.y)) return 'bottom'
+  const bottom = caret.y + (Number(caret.height) || 0)
+  return bottom / caret.frameHeight > 0.6 ? 'top' : 'bottom'
+}
