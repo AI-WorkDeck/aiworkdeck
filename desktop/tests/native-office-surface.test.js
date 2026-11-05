@@ -66,7 +66,9 @@ async function surfaceHarness(options = {}) {
 }
 const tick = () => new Promise(resolve => setTimeout(resolve, 0))
 const writingConfig = session => ({ __lo: 'lo-relay', type: 'writing-config', config: { session, writable: true, enabled: false, learning: false, hints: false,
-  items: [{ id: 'local-company', text: '北京测试有限公司', kind: 'COMPANY', source: 'project' }] } })
+  items: [{ id: 'local-company', text: '北京测试有限公司', kind: 'COMPANY', source: 'project' }],
+  // 宿主按界面语言下发标签表（教程问题 48），客体自身只剩英文兜底
+  labels: { detail: '查看已有资料', insert: '插入以上内容', saved: '已插入，可用撤销恢复。' } } })
 const key = (h, name, options = {}) => h.surface.element.querySelector('input').dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true, ...options }))
 test('surface enables the real ruler asynchronously and retires its handles on a new document', async () => {
   let token = 0
