@@ -1662,3 +1662,9 @@ SCRATCH 展示统一为「临时项目」，复用既有对话模式身份。项
 ## 欢迎页模型选择（dev-board#1684）
 
 `WelcomePane` 快速输入区复用 `ModelSelectorDropdown` 与 `fetchAiModels`，初次目录请求传 `accountPrompt:false`，用户主动展开才允许账户提示。欢迎页无项目时聊天实例尚未挂载，因此显式选择随 `start-chat` 的 `model` 交宿主；宿主等待 `ChatInterface` 后先调既有 `selectModel`（持久化及视觉提示），再发首条消息。未显式选择不覆盖聊天默认选择。下拉在欢迎页滚动内容内展开，避免浮层被裁切。回归 `frontend/tests/project-home/welcome-model.test.mjs` 覆盖真实 Vue/JSDOM 组件点击与首条消息选模顺序；不替代正式 Electron 发布验收。
+
+## 存储写入与还原契约（隐藏缺陷 B1）
+
+- `LocalFileStorageService.save()` 托管文件改为同目录 `~$awd-save-*.tmp` + 原子替换，写入失败原文件不变。
+- 分块上传 `ProjectFileContentService.publishUpload`：offset>0 时 `当前大小==offset` 才追加；`==offset+len` 视为重试已落盘、幂等成功；否则 409 `UPLOAD_OFFSET_MISMATCH`。
+- `ProjectFileService.restore` 原位置有同名活行时抛 `IllegalArgumentException`（前端沿用通用还原失败提示），不做自动改名。
