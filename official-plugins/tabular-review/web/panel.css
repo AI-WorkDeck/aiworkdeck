@@ -1,0 +1,78 @@
+/* SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* 颜色一律取宿主注入的 --awd-* 令牌（PLUGIN_SPEC §19），横向定位用逻辑属性以适配 RTL。 */
+body { margin: 0; }
+.tr-stage { max-width: none; padding: var(--awd-space-4, 16px); box-sizing: border-box; }
+h1, h2 { margin: 0; }
+h2 { font-size: 13px; font-weight: 600; color: var(--awd-text, #2B2A26); }
+.hint { color: var(--awd-text-2, #6B6658); font-size: 12px; margin: 4px 0; }
+
+#notice { margin: var(--awd-space-2, 8px) 0; padding: 8px 12px; border-radius: var(--awd-radius-md, 6px); font-size: 12.5px;
+  background: var(--awd-info-soft, #EEF2F4); color: var(--awd-info-text, #2F4E5E); }
+#notice[data-kind="warn"] { background: var(--awd-warning-soft, #F7EFDD); color: var(--awd-warning-text, #7A5A16); }
+#notice[data-kind="error"] { background: var(--awd-danger-soft, #F6E5E2); color: var(--awd-danger-text, #8A2E22); }
+
+.confirm-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: var(--awd-space-2, 8px) 0; padding: 10px 12px;
+  border: 1px solid var(--awd-border, #DDD8CA); border-inline-start: 3px solid var(--awd-accent, #2E5A50);
+  border-radius: var(--awd-radius-md, 6px); background: var(--awd-surface, #FCFBF7); font-size: 12.5px; }
+.confirm-bar span { flex: 1 1 260px; }
+
+.setup { margin: var(--awd-space-3, 12px) 0; }
+.setup summary { cursor: pointer; }
+.setup-grid { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(320px, 1.4fr); gap: var(--awd-space-4, 16px); margin-top: var(--awd-space-3, 12px); }
+@container (max-width: 720px) { .setup-grid { grid-template-columns: 1fr; } }
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.toolbar .awd-input { flex: 1 1 160px; }
+
+.file-list { max-height: 260px; overflow: auto; border: 1px solid var(--awd-border-subtle, #E8E3D6); border-radius: var(--awd-radius-md, 6px); padding: 4px; }
+.file-item { display: flex; align-items: center; gap: 6px; padding: 3px 4px; font-size: 12.5px; cursor: pointer; }
+.file-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.column-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow: auto; }
+.column-item { display: grid; grid-template-columns: 20px minmax(100px, 1fr) 110px auto; grid-template-areas: "idx title type rm" ". prompt prompt prompt"; gap: 4px 6px; align-items: center; }
+.column-index { grid-area: idx; color: var(--awd-text-2, #6B6658); font-size: 12px; font-variant-numeric: tabular-nums; }
+.column-title { grid-area: title; }
+.column-item select { grid-area: type; }
+.column-item button { grid-area: rm; }
+.column-prompt { grid-area: prompt; resize: vertical; min-height: 40px; }
+
+.review-area { display: flex; gap: var(--awd-space-3, 12px); align-items: flex-start; }
+.table-wrap { flex: 1 1 auto; overflow: auto; max-height: 70vh; border: 1px solid var(--awd-border, #DDD8CA); border-radius: var(--awd-radius-md, 6px); }
+.review-table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }
+.review-table th, .review-table td { border-bottom: 1px solid var(--awd-border-subtle, #E8E3D6); border-inline-end: 1px solid var(--awd-border-subtle, #E8E3D6); padding: 0; text-align: start; vertical-align: top; }
+.review-table thead th { position: sticky; top: 0; z-index: 2; background: var(--awd-surface-2, #F4F1E8); padding: 8px; min-width: 160px; max-width: 260px; font-weight: 600; }
+.review-table thead th:first-child { inset-inline-start: 0; z-index: 3; }
+.row-file { position: sticky; inset-inline-start: 0; z-index: 1; background: var(--awd-surface, #FCFBF7); padding: 8px; min-width: 160px; max-width: 220px; font-weight: 500; }
+.row-file span { display: block; overflow-wrap: anywhere; }
+.row-note { color: var(--awd-warning-text, #7A5A16); font-size: 11.5px; font-weight: 400; }
+.review-table td.hint { padding: 16px; }
+
+.cell-btn { display: flex; gap: 6px; width: 100%; min-height: 44px; padding: 8px; border: 0; background: transparent; color: var(--awd-text, #2B2A26);
+  font: inherit; text-align: start; cursor: pointer; }
+.cell-btn:hover, .cell-btn.is-active { background: var(--awd-accent-soft, #E6EFEC); }
+.cell-btn:focus-visible { outline: 2px solid var(--awd-accent, #2E5A50); outline-offset: -2px; }
+.cell-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; max-width: 260px; }
+.cell-dot { flex: 0 0 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--awd-border, #DDD8CA); }
+.status-ai_draft .cell-dot { background: var(--awd-info-text, #2F4E5E); }
+.status-confirmed .cell-dot { background: var(--awd-accent, #2E5A50); }
+.status-edited .cell-dot { background: var(--awd-gold-text, #8A6A1E); }
+.status-unverified .cell-dot, .status-error .cell-dot { background: var(--awd-danger, #A63A2B); }
+.status-not_found .cell-text, .status-unverified .cell-text, .status-error .cell-text { color: var(--awd-text-2, #6B6658); }
+
+.detail { flex: 0 0 320px; position: sticky; top: 0; max-height: 70vh; overflow: auto; }
+.detail-head { display: flex; align-items: center; gap: 8px; }
+.detail-head strong { flex: 1; }
+.detail-question { font-size: 12.5px; color: var(--awd-text-2, #6B6658); }
+.detail-answer { font-size: 13.5px; white-space: pre-wrap; }
+.detail-quote { margin: 8px 0; padding: 8px 10px; border-inline-start: 3px solid var(--awd-accent, #2E5A50); background: var(--awd-surface-2, #F4F1E8); font-size: 12.5px; white-space: pre-wrap; }
+.detail-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.detail textarea { width: 100%; box-sizing: border-box; }
+.status-badge.status-confirmed { background: var(--awd-accent-soft, #E6EFEC); color: var(--awd-accent-text, #2E5A50); }
+.status-badge.status-edited { background: var(--awd-gold-soft, #F5EDD9); color: var(--awd-gold-text, #8A6A1E); }
+.status-badge.status-unverified, .status-badge.status-error { background: var(--awd-danger-soft, #F6E5E2); color: var(--awd-danger-text, #8A2E22); }
+
+@container (max-width: 860px) {
+  .review-area { flex-direction: column; }
+  .detail { position: static; flex-basis: auto; width: 100%; max-height: none; box-sizing: border-box; }
+}
