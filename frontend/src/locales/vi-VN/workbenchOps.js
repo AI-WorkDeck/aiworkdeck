@@ -81,5 +81,11 @@ export default {
   "ocrFailedItem": "\"{name}\" chưa hoàn tất: {reason}",
   "ocrSkipped": "Bỏ qua {count} tệp cần OCR đám mây (chưa xác nhận)",
   "ocrCancelled": "Đã hủy; {count} tệp chưa xử lý",
-  "ocrSummaryTitle": "Đã nhận dạng {done}/{total}"
+  "ocrSummaryTitle": "Đã nhận dạng {done}/{total}",
+  "ocrLocalFailedTitle": "Nhận dạng cục bộ chưa hoàn tất",
+  "ocrLocalFailedReason": "Lý do: {reason}",
+  "ocrLocalFailedHint": "Bạn có thể dùng nhận dạng trên đám mây cho các tệp trong lô này chưa hoàn tất khi nhận dạng cục bộ. Nếu không, các tệp này sẽ không được tải lên.",
+  "ocrLocalFailedConfirm": "Dùng nhận dạng trên đám mây",
+  "ocrAlreadySearchable": "\"{name}\" đã có lớp văn bản và có thể tìm kiếm; không tạo tệp mới",
+  "ocrStopped": "Đã dừng; {count} tệp chưa xử lý"
 }

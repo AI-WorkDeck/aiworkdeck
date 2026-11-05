@@ -81,5 +81,11 @@ export default {
   "ocrFailedItem": "\"{name}\" पूरा नहीं हुआ: {reason}",
   "ocrSkipped": "क्लाउड OCR वाली {count} फ़ाइल(लें) छोड़ी गईं (पुष्टि नहीं)",
   "ocrCancelled": "रद्द किया गया; {count} फ़ाइल(लें) संसाधित नहीं हुईं",
-  "ocrSummaryTitle": "पहचान पूर्ण {done}/{total}"
+  "ocrSummaryTitle": "पहचान पूर्ण {done}/{total}",
+  "ocrLocalFailedTitle": "स्थानीय पहचान पूरी नहीं हुई",
+  "ocrLocalFailedReason": "कारण: {reason}",
+  "ocrLocalFailedHint": "इस बैच की जिन फ़ाइलों की स्थानीय पहचान विफल रही, उनके लिए आप क्लाउड पहचान का उपयोग कर सकते हैं। ऐसा न करने पर ये फ़ाइलें अपलोड नहीं की जाएँगी।",
+  "ocrLocalFailedConfirm": "क्लाउड पहचान का उपयोग करें",
+  "ocrAlreadySearchable": "\"{name}\" में पहले से टेक्स्ट लेयर है और वह खोजने योग्य है; कोई नई फ़ाइल नहीं बनाई गई",
+  "ocrStopped": "रोका गया; {count} फ़ाइल(लें) संसाधित नहीं हुईं"
 }

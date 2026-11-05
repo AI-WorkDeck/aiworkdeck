@@ -81,5 +81,11 @@ export default {
   "ocrFailedItem": "«{name}» не завершён: {reason}",
   "ocrSkipped": "Пропущено файлов, требующих облачного OCR: {count} (нет подтверждения)",
   "ocrCancelled": "Отменено; не обработано файлов: {count}",
-  "ocrSummaryTitle": "Распознано {done}/{total}"
+  "ocrSummaryTitle": "Распознано {done}/{total}",
+  "ocrLocalFailedTitle": "Локальное распознавание не завершено",
+  "ocrLocalFailedReason": "Причина: {reason}",
+  "ocrLocalFailedHint": "Для файлов этой партии, которые не удалось распознать локально, можно использовать облачное распознавание. Если не использовать, эти файлы не будут загружены.",
+  "ocrLocalFailedConfirm": "Использовать облачное распознавание",
+  "ocrAlreadySearchable": "«{name}» уже содержит текстовый слой и доступен для поиска; новый файл не создан",
+  "ocrStopped": "Остановлено; не обработано файлов: {count}"
 }

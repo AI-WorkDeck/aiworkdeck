@@ -81,5 +81,11 @@ export default {
   "ocrFailedItem": "「{name}」未完成：{reason}",
   "ocrSkipped": "{count} 份需要雲端識別的檔案未處理（未確認）",
   "ocrCancelled": "已取消，{count} 份未處理",
-  "ocrSummaryTitle": "識別完成 {done}/{total}"
+  "ocrSummaryTitle": "識別完成 {done}/{total}",
+  "ocrLocalFailedTitle": "本機識別未完成",
+  "ocrLocalFailedReason": "原因：{reason}",
+  "ocrLocalFailedHint": "可以改用雲端識別本批中本機未完成的檔案。不改用的話，這些檔案不會上傳。",
+  "ocrLocalFailedConfirm": "改用雲端識別",
+  "ocrAlreadySearchable": "「{name}」本身帶文字層，已經可以搜尋，未產生新檔案",
+  "ocrStopped": "已停止，{count} 份未處理"
 }

@@ -81,5 +81,11 @@ export default {
   "ocrFailedItem": "«{name}» non completato: {reason}",
   "ocrSkipped": "{count} file che richiedono OCR cloud saltati (non confermato)",
   "ocrCancelled": "Annullato; {count} file non elaborati",
-  "ocrSummaryTitle": "Riconosciuti {done}/{total}"
+  "ocrSummaryTitle": "Riconosciuti {done}/{total}",
+  "ocrLocalFailedTitle": "Riconoscimento locale non completato",
+  "ocrLocalFailedReason": "Motivo: {reason}",
+  "ocrLocalFailedHint": "Puoi usare il riconoscimento nel cloud per i file di questo gruppo non completati in locale. In caso contrario, questi file non verranno caricati.",
+  "ocrLocalFailedConfirm": "Usa il riconoscimento nel cloud",
+  "ocrAlreadySearchable": "«{name}» ha già un livello di testo ed è ricercabile; non è stato creato alcun nuovo file",
+  "ocrStopped": "Interrotto; {count} file non elaborati"
 }

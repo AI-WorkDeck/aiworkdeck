@@ -158,5 +158,9 @@ export default {
   "ocrCopy": "複製文字",
   "ocrExportTxt": "匯出 TXT",
   "ocrExportDocx": "匯出 Word",
-  "ocrOutputSuffix": "-識別文字"
+  "ocrOutputSuffix": "-識別文字",
+  "ocrExportLayoutDocx": "匯出 Word（保留版式）",
+  "ocrSearchablePdf": "產生可搜尋 PDF",
+  "ocrLayoutSuffix": "-識別版式",
+  "ocrSearchableSuffix": "-可搜尋"
 }

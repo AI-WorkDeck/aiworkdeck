@@ -158,5 +158,9 @@ export default {
   "ocrCopy": "टेक्स्ट कॉपी करें",
   "ocrExportTxt": "TXT में निर्यात करें",
   "ocrExportDocx": "Word में निर्यात करें",
-  "ocrOutputSuffix": "-OCR पाठ"
+  "ocrOutputSuffix": "-OCR पाठ",
+  "ocrExportLayoutDocx": "Word में निर्यात करें (लेआउट बनाए रखें)",
+  "ocrSearchablePdf": "खोजने योग्य PDF बनाएँ",
+  "ocrLayoutSuffix": "-OCR लेआउट",
+  "ocrSearchableSuffix": "-खोजने योग्य"
 }

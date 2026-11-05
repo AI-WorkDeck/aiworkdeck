@@ -97,4 +97,10 @@ export default {
   ocrSkipped: '{count} file(s) needing cloud OCR were skipped (not confirmed)',
   ocrCancelled: 'Cancelled; {count} file(s) not processed',
   ocrSummaryTitle: 'Recognized {done}/{total}',
+  ocrLocalFailedTitle: 'Local recognition did not finish',
+  ocrLocalFailedReason: 'Reason: {reason}',
+  ocrLocalFailedHint: 'You can use cloud recognition for the files in this batch that failed locally. If you don\'t, those files are not uploaded.',
+  ocrLocalFailedConfirm: 'Use cloud recognition',
+  ocrAlreadySearchable: '"{name}" already has a text layer and is searchable; no new file was created',
+  ocrStopped: 'Stopped; {count} file(s) not processed',
 }
