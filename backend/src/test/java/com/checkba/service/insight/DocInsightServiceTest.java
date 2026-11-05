@@ -1682,6 +1682,31 @@ class DocInsightServiceTest {
     }
 
     @Test
+    @DisplayName("选中整句话查法条：句中的《法规》第X条要拆出来走 get_article，不能整句当法规名打 get_law_list 只回标题（dev-board#1713）")
+    void lookupSentenceWithEmbeddedCitationQueriesArticleText() throws Exception {
+        assertArrayEquals(new String[]{"民法典", "第五百七十七条"},
+                DocInsightService.splitLawName("根据《民法典》第五百七十七条，当事人一方不履行合同义务的，应当承担违约责任。"));
+        assertArrayEquals(new String[]{"民法典", "第五百七十七条"},
+                DocInsightService.splitLawName("依据《民法典》第五百七十七条的规定"));
+        assertArrayEquals(new String[]{"民法典", "第五百七十七条"},
+                DocInsightService.splitLawName("《民法典》第五百七十七条规定，当事人一方不履行合同义务的，应当承担违约责任。"));
+
+        when(mcp.callTool(eq(DocInsightService.PKULAW_SEMANTIC), eq("get_article"), anyMap()))
+                .thenReturn("{\"title\":\"中华人民共和国民法典\",\"timeliness\":\"现行有效\","
+                        + "\"article\":\"第五百七十七条　当事人一方不履行合同义务或者履行合同义务不符合约定的，"
+                        + "应当承担继续履行、采取补救措施或者赔偿损失等违约责任。\"}");
+
+        EntityView result = svc.lookupSelection(UID, PID, "LAW",
+                "根据《民法典》第五百七十七条，当事人一方不履行合同义务的，应当承担违约责任。");
+
+        assertEquals("OK", result.retrievalStatus());
+        assertTrue(result.detail().toString().contains("应当承担继续履行"), result.detail().toString());
+        verify(mcp).callTool(eq(DocInsightService.PKULAW_SEMANTIC), eq("get_article"),
+                eq(Map.of("title", "民法典", "number", "第五百七十七条")));
+        verify(mcp, never()).callTool(eq(DocInsightService.PKULAW_KEYWORD), eq("get_law_list"), anyMap());
+    }
+
+    @Test
     @DisplayName("北大法宝 get_article 返回空壳对象时不误判为成功，自动回退 search_article（dev-board#1289）")
     void lookupLawFallsBackToSearchArticleWhenGetArticleReturnsEmptyShell() throws Exception {
         when(mcp.callTool(eq(DocInsightService.PKULAW_SEMANTIC), eq("get_article"), anyMap()))

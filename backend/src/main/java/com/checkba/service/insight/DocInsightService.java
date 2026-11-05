@@ -1449,15 +1449,23 @@ public class DocInsightService {
             "^(第" + CN_NUM + "条(?:之" + CN_NUM + ")?)(?:\\s*第" + CN_NUM + "款)?(?:\\s*第" + CN_NUM + "项)?(?:的?规定)?$");
     private static final Pattern UNBRACKETED_LAW_ARTICLE = Pattern.compile(
             "^(.*?)\\s*(第" + CN_NUM + "条(?:之" + CN_NUM + ")?)(?:\\s*第" + CN_NUM + "款)?(?:\\s*第" + CN_NUM + "项)?(?:的?规定)?$");
+    /** 句中任意位置的「《法规》第X条」：选中整句话查询时取第一处引用。 */
+    private static final Pattern EMBEDDED_CITATION = Pattern.compile(
+            "《([^《》]+)》\\s*(第" + CN_NUM + "条(?:之" + CN_NUM + ")?)");
 
     /**
      * 「《公司法》第二十条」→ {公司法, 第二十条}；
      * 「《民法典》第五百零九条第一款」→ {民法典, 第五百零九条}（法宝 get_article 只认到「第X条」）；
+     * 「根据《民法典》第五百七十七条，当事人……」→ {民法典, 第五百七十七条}（选中整句话，dev-board#1713）；
      * 「劳动合同法第五十条」→ {劳动合同法, 第五十条}；
      * 裸条号「第五十条」→ {"", 第五十条}。
      */
     static String[] splitLawName(String name) {
         String s = name == null ? "" : name.trim();
+        Matcher c = EMBEDDED_CITATION.matcher(s);
+        if (c.find()) {
+            return new String[]{c.group(1).trim(), c.group(2)};
+        }
         Matcher m = LAW_NAME.matcher(s);
         if (m.matches()) {
             String title = m.group(1).trim();
