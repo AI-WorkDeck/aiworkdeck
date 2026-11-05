@@ -2832,8 +2832,11 @@ export default {
 
       // 设置选中状态（单选模式）
       this.selectedFileId = targetFile.id
-      // 清空多选状态，避免旧文件保留多选样式
-      this.multiSelectedIds = [targetFile.id]
+      // 清空多选状态，避免旧文件保留多选样式；但用户 Cmd 多选了 ≥2 项时不覆盖
+      // （关标签后同步激活文件会走到这里，不能把多选清掉）
+      if (!(Array.isArray(this.multiSelectedIds) && this.multiSelectedIds.length >= 2)) {
+        this.multiSelectedIds = [targetFile.id]
+      }
 
       // 延迟滚动到目标元素
       this.$nextTick(() => {
@@ -3078,7 +3081,9 @@ export default {
               fileId: item.id,
               name: item.name,
               fileType: item.isFolder ? 'folder' : item.fileType,
-              wpsFileId: item.wpsFileId
+              wpsFileId: item.wpsFileId,
+              // 暂存区移出时据此回原文件夹（根目录为 null）
+              parentId: item.parentId ?? null
             }
           }
         } catch (err) {}
@@ -3115,7 +3120,8 @@ export default {
               fileId: item.id,
               name: item.name,
               fileType: item.isFolder ? 'folder' : item.fileType,
-              wpsFileId: item.wpsFileId
+              wpsFileId: item.wpsFileId,
+              parentId: item.parentId ?? null
             })
             // 标准自定义类型
             dt.setData('application/x-checkba-file', fileData)
