@@ -3,6 +3,9 @@
 
 export default {
   "updatePreparing": "Güncelleme doğrulanıyor ve hazırlanıyor…",
+  "updatePreparingMount": "Güncelleme hazırlanıyor: yükleyici bağlanıyor (genellikle birkaç dakika sürer)…",
+  "updatePreparingPackage": "Güncelleme hazırlanıyor: dosyalar paketleniyor (genellikle birkaç dakika sürer)…",
+  "updatePreparingVerify": "Güncelleme hazırlanıyor: imza doğrulanıyor (genellikle birkaç dakika sürer)…",
   "updateRestart": "Güncellemek için yeniden başlat",
   "updateRestarting": "Kaydediliyor ve yeniden başlatmaya hazırlanıyor…",
   "updateDownloading": "Güncelleme indiriliyor",

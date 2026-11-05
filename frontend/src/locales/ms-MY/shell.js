@@ -3,6 +3,9 @@
 
 export default {
   "updatePreparing": "Menyemak dan menyediakan kemas kini…",
+  "updatePreparingMount": "Menyediakan kemas kini: melekapkan pemasang (biasanya mengambil beberapa minit)…",
+  "updatePreparingPackage": "Menyediakan kemas kini: membungkus fail (biasanya mengambil beberapa minit)…",
+  "updatePreparingVerify": "Menyediakan kemas kini: mengesahkan tandatangan (biasanya mengambil beberapa minit)…",
   "updateRestart": "Mulakan semula untuk kemas kini",
   "updateRestarting": "Menyimpan dan menyediakan untuk memulakan semula…",
   "updateDownloading": "Memuat turun kemas kini",

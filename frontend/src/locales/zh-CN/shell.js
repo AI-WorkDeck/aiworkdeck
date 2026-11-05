@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   updatePreparing: '正在验证并准备更新…',
+  updatePreparingMount: "正在准备更新：挂载安装包（通常需要几分钟）…",
+  updatePreparingPackage: "正在准备更新：打包更新文件（通常需要几分钟）…",
+  updatePreparingVerify: "正在准备更新：校验签名（通常需要几分钟）…",
   updateRestart: '重启更新',
   updateRestarting: '正在保存并准备重启…',
   updateDownloading: '正在下载更新',

@@ -3,6 +3,9 @@
 
 export default {
   "updatePreparing": "Update wird überprüft und vorbereitet…",
+  "updatePreparingMount": "Update wird vorbereitet: Installationspaket wird eingebunden (dauert meist einige Minuten)…",
+  "updatePreparingPackage": "Update wird vorbereitet: Dateien werden gepackt (dauert meist einige Minuten)…",
+  "updatePreparingVerify": "Update wird vorbereitet: Signatur wird geprüft (dauert meist einige Minuten)…",
   "updateRestart": "Zum Aktualisieren neu starten",
   "updateRestarting": "Wird gespeichert und Neustart vorbereitet…",
   "updateDownloading": "Update wird heruntergeladen",

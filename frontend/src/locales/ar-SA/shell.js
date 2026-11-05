@@ -3,6 +3,9 @@
 
 export default {
   "updatePreparing": "جارٍ التحقق والتحضير للتحديث…",
+  "updatePreparingMount": "جارٍ تحضير التحديث: تركيب حزمة التثبيت (يستغرق عادةً بضع دقائق)…",
+  "updatePreparingPackage": "جارٍ تحضير التحديث: حزم الملفات (يستغرق عادةً بضع دقائق)…",
+  "updatePreparingVerify": "جارٍ تحضير التحديث: التحقق من التوقيع (يستغرق عادةً بضع دقائق)…",
   "updateRestart": "أعد التشغيل للتحديث",
   "updateRestarting": "جارٍ الحفظ والتحضير لإعادة التشغيل…",
   "updateDownloading": "جارٍ تنزيل التحديث",

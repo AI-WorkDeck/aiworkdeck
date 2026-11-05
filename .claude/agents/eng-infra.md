@@ -37,7 +37,7 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
 
 `app-menu.js` 的关于入口使用 `about-window.js` 独立本地窗口，原生 About 的固定 copyright 区无法容纳完整双语许可文案。新窗口正文可换行/滚动、版本仅显示一次；保留版权、AGPL、源码/许可证/商标链接与说明。无脚本、sandbox/contextIsolation 开启，只允许三个固定法律链接交给系统浏览器，重复打开复用窗口。浅色/深色从 `design/tokens/awd-palette.json` 生成 --awd-* 角色令牌快照，测试逐项对拍；更新色源须同步该快照。验证：`desktop/tests/about-window.test.js`，真实窗口用 Electron 运行 `desktop/tests/about-window.electron.js`（独立 profile，不启动产品后端）。
 
-完整更新字节与哈希校验后、`prepareInstaller` 返回前，`update-service.js` 必须广播 `preparing`，只有原生准备成功才 `ready`。前端顶部/设置均覆盖该阶段；主页面就绪不自动弹重启确认，用户点击沿用已有保存/退出守卫。缺平台安装包退回手动下载时也必须广播最终 idle/major-available 快照，不能停在 checking。
+完整更新字节与哈希校验后、`prepareInstaller` 返回前，`update-service.js` 必须广播 `preparing`，只有原生准备成功才 `ready`。准备过程分阶段（dev-board#1713，问题 92）：`full-update.js` 的 `prepare(file, version, onStage)` 依次报 `mount`（hdiutil 挂载）/ `package`（ditto 转 ZIP）/ `verify`（Squirrel 验签准备；Windows 只有这一段），`update-service` 写进 `progress.stage` 并再广播 `preparing`，前端 `shell.updatePreparing{Mount,Package,Verify}` 提示当前阶段与「通常需要几分钟」。前端顶部/设置均覆盖该阶段；主页面就绪不自动弹重启确认，用户点击沿用已有保存/退出守卫。缺平台安装包退回手动下载时也必须广播最终 idle/major-available 快照，不能停在 checking。
 
 ## 发版链路
 

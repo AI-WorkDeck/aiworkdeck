@@ -632,7 +632,7 @@
                   <text v-else-if="update.phase === 'downloading'" class="comp-sub">
                     {{ update.progress?.component === 'installer' ? $t('admin.downloadingInstaller') : (update.progress && update.progress.component ? $t('admin.downloadingPatchComp', { name: update.progress.component }) : $t('admin.downloadingPatch')) }}
                   </text>
-                  <text v-else-if="update.phase === 'preparing'" class="comp-sub">{{ $t('shell.updatePreparing') }}</text>
+                  <text v-else-if="update.phase === 'preparing'" class="comp-sub">{{ $t(updatePreparingKey) }}</text>
                   <text v-else-if="update.phase === 'ready'" class="comp-sub">
                     {{ $t('admin.updateReady', { version: update.available && update.available.version }) }}
                   </text>
@@ -1361,6 +1361,11 @@ export default {
     }
   },
   computed: {
+    // 整包「验证并准备」分阶段提示（问题 92），与顶栏 DesktopUpdateIndicator 同一组词条
+    updatePreparingKey() {
+      const keys = { mount: 'shell.updatePreparingMount', package: 'shell.updatePreparingPackage', verify: 'shell.updatePreparingVerify' }
+      return keys[this.update && this.update.progress && this.update.progress.stage] || 'shell.updatePreparing'
+    },
     /**
      * 「关于」首行：产品名 + 版本 + 版权。品牌名与版本号不进 i18n（专名 + 数字）。
      * 版本取自 loadUpdateStatus() 拉回的桌面端状态；浏览器端拿不到，就只显示产品名。

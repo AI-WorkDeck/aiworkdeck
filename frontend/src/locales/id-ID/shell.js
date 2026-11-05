@@ -3,6 +3,9 @@
 
 export default {
   "updatePreparing": "Memverifikasi dan menyiapkan pembaruan…",
+  "updatePreparingMount": "Menyiapkan pembaruan: memasang penginstal (biasanya butuh beberapa menit)…",
+  "updatePreparingPackage": "Menyiapkan pembaruan: mengemas file (biasanya butuh beberapa menit)…",
+  "updatePreparingVerify": "Menyiapkan pembaruan: memverifikasi tanda tangan (biasanya butuh beberapa menit)…",
   "updateRestart": "Mulai ulang untuk memperbarui",
   "updateRestarting": "Menyimpan dan menyiapkan mulai ulang…",
   "updateDownloading": "Mengunduh pembaruan",

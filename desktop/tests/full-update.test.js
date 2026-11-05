@@ -311,3 +311,18 @@ test('Windows真实helper QA lock probe waits for complete live matching records
   const output = require('child_process').execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', path.join(__dirname, 'upgrade-test-lock.test.ps1')], { encoding: 'utf8', env: windowsPowerShellEnv(), timeout: 15000 })
   assert.match(output, /accepted matching live records/)
 })
+
+// 问题 92：「验证并准备更新」一挂几分钟没有任何进展。准备过程按阶段（挂载 / 打包 / 校验）报出来。
+test('Mac：准备过程依次报告 mount → package → verify 三个阶段', async (t) => {
+  const dir = root(t), calls = [], native = new EventEmitter(), stages = []
+  native.setFeedURL = () => {}
+  native.checkForUpdates = () => { setImmediate(() => native.emit('update-downloaded')) }
+  fs.writeFileSync(path.join(dir, 'update.dmg'), 'verified synthetic dmg')
+  const updater = createFullUpdate({ platform: 'darwin', dataDir: dir, autoUpdater: native }, commands(calls))
+  await updater.prepare(path.join(dir, 'update.dmg'), '0.12.0', (stage) => stages.push([stage, calls.length]))
+  assert.deepEqual(stages.map(([s]) => s), ['mount', 'package', 'verify'])
+  // 每个阶段在对应命令之前报出
+  const idx = (pred) => calls.findIndex(pred)
+  assert.equal(stages[0][1], idx(([cmd, args]) => cmd.endsWith('hdiutil') && args[0] === 'attach'))
+  assert.equal(stages[1][1], idx(([cmd]) => cmd.endsWith('ditto')))
+})
