@@ -575,8 +575,14 @@ public class WorkSessionService {
         if (!draft) {
             WorkSession session = ensureSession(projectId, actor.userId(), actor.userName());
             sessionId = session.getId();
-            session.setLastActivityAt(LocalDateTime.now());
-            sessionRepository.save(session);
+            // 最后一次活动时间只用于工时汇总（问题 61）；精确到分钟即可，节流写库，
+            // 不让每个改动信号都多一次 save（ChangeSignalNonBlockingTest 守着写库次数）
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime last = session.getLastActivityAt();
+            if (last == null || java.time.Duration.between(last, now).getSeconds() >= 60) {
+                session.setLastActivityAt(now);
+                sessionRepository.save(session);
+            }
         }
         actors.put(projectId, actor);
         scheduleDebounceCommit(projectId);
@@ -726,6 +732,7 @@ public class WorkSessionService {
         s.setProjectId(projectId);
         s.setBranchName(branch);
         s.setStartedAt(LocalDateTime.now());
+        s.setLastActivityAt(s.getStartedAt());
         s.setStatus(WorkSession.Status.ACTIVE);
         s.setUserId(userId);
         WorkSession saved = sessionRepository.save(s);
