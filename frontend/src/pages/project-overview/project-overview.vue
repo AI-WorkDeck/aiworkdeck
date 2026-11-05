@@ -1832,6 +1832,7 @@
                 :active-selection="activeSelection"
                 :drag-active="dragOverAiPanel"
                 :flush-active-document="flushActiveDocumentForChat"
+                :read-active-pointer="readActivePointerForChat"
                 :external-read-only="pluginReadOnlyLabel"
                 @fork-conversation="forkPluginConversation"
                 @fork-from-message="branchConversationFromMessage"
@@ -2406,7 +2407,7 @@ import { claimRestartStartup, createRestartRecovery } from './restartRecovery.js
 import { flushActiveDocument } from './flushActiveDocument.js'
 import { isTabVisibleInPane } from './tabVisibility.js'
 import { pickActiveContextTab, isContextEligibleTab, messageContextFileIds } from './activeTabContext.js'
-import { readActiveSelection } from './activeSelectionContext.js'
+import { readActiveSelection, readActivePointer } from './activeSelectionContext.js'
 import { nativeDataTransfer, captureDroppedFiles, isExternalFileDrag, compatibleDropEffect } from '@/utils/fileTreeExternalDrop.js'
 import { consumePluginImDrag } from '@/utils/pluginImDrag.js'
 import { addPluginImFileToAi } from '@/utils/pluginImAi.js'
@@ -3823,6 +3824,7 @@ export default {
     }
   },
   beforeUnmount() {
+    clearTimeout(this._selectionRefreshTimer)
     this.resetPdfPreviewPool()
     this._pdfPreviewRefs = {}
     this._openWorkbenchMounted = false
@@ -5833,7 +5835,13 @@ export default {
     // 插件启动面板（PluginGuidePane）的一键动作：把 manifest.guide.quickActions 里那句
     // prompt 以 AGENT 模式发进 AI 对话——与股东大会/诉讼可视化同一条 resolveChatInterface 路。
     // prompt 里含 skill 触发词才会命中注入（由插件作者在 manifest 里写对），这里只负责发出去。
-    async refreshActiveSelection(payload = null) {
+    // worker 每次选区事件都会触发（拖选时一秒几十次），每次都是一轮 get_selection 往返：
+    // 尾部防抖 200ms，只在停手后读一次。
+    refreshActiveSelection(payload = null) {
+      clearTimeout(this._selectionRefreshTimer)
+      this._selectionRefreshTimer = setTimeout(() => this.refreshActiveSelectionNow(payload), 200)
+    },
+    async refreshActiveSelectionNow(payload = null) {
       const tab = this.currentActiveTab
       if (!tab || tab.id == null) {
         this._selectionReadSeq = (this._selectionReadSeq || 0) + 1
@@ -5845,10 +5853,12 @@ export default {
       }
       const seq = this._selectionReadSeq = (this._selectionReadSeq || 0) + 1
       const targetId = tab.id
-      const text = await readActiveSelection(this._libreRefs, this._plainTextRefs, {
+      // readActiveSelection 返回 { fileId, text }，这里要的是里面的字符串
+      const read = await readActiveSelection(this._libreRefs, this._plainTextRefs, {
         side: this.focusedPane,
         fileId: targetId,
       })
+      const text = read && read.text
       if (seq !== this._selectionReadSeq) return
       const curTab = this.currentActiveTab
       if (!curTab || String(curTab.id) !== String(targetId)) {
@@ -7524,6 +7534,9 @@ export default {
      *
      * 返回 false 时 ChatInterface 把 activeContext 降级成「只带壳」，消息照发。
      */
+    readActivePointerForChat(fileId) {
+      return readActivePointer(this._libreRefs || {}, { side: this.focusedPane, fileId })
+    },
     flushActiveDocumentForChat(fileId, options) {
       return flushActiveDocument(this._libreRefs || {}, {
         side: this.focusedPane,

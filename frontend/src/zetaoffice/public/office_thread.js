@@ -5113,6 +5113,16 @@ const EXEC = {
   // text becomes a paragraph break (insertTextAtCursor).
   replace_selection(p) {
     const rawText = String((p && p.text) || '');
+    // 调用方带了 expectedText = 它以为选中的原文：与实时选区不符就拒绝，不在错位置落修订。
+    // 与下面的写入同一条命令内完成，核对到改写之间没有别的命令能挪动选区。
+    if (p && typeof p.expectedText === 'string' && p.expectedText) {
+      const norm = function (t) { return String(t || '').replace(/\r\n?/g, '\n').trim(); };
+      const cur = EXEC.get_selection({});
+      if (norm(cur && cur.text) !== norm(p.expectedText)) {
+        const msg = '当前选区与 expectedText 不符（用户可能已挪动选区），未执行替换；请改用 doc_replace_at_anchor，或重新 doc_get_cursor_context 核对后再试';
+        return { success: false, error: msg, message: msg, currentSelection: String((cur && cur.text) || '').slice(0, 200) };
+      }
+    }
     if (typeof isCalcDoc === 'function' && isCalcDoc() && typeof activeCalcSelection === 'function') {
       const selection = calcClipboardSelection();
       const lines = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
@@ -6863,6 +6873,35 @@ const EXEC = {
       if (start + paragraphs.length < total) { r.truncated = true; r.nextStartParagraph = start + paragraphs.length; }
       return r;
     });
+  },
+  // [感知] 发送时的「指针」：有选区 → 选区原文 + 锚点 + 段号；无选区 → 光标所在段 + 锚点 + 段号。
+  // 供 AI 对话发送时一并带上，让「改这里 / 这段」一步 doc_replace_at_anchor 命中，不必先查找。
+  // 仅 Writer；锚点沿用 find_text_locations 的书签机制（anchorBookmark）。
+  get_ai_pointer() {
+    if (!isWriterDoc()) return { success: true, kind: 'none' };
+    const MAX_ANCHOR_CHARS = 2000;   // 选区超过这个长度不挂锚点（整块替换风险大，也不该是「这一句」）
+    const MAX_PARA_CHARS = 600;      // 光标段落回传上限；超长段不挂锚点，让模型自己 doc_get_paragraph
+    const selRange = selectionRange();
+    const selText = selRange ? (selRange.getString() || '') : '';
+    if (selText.length > 0) {
+      let anchorId = null;
+      if (selText.length <= MAX_ANCHOR_CHARS) { try { anchorId = anchorBookmark(selRange); } catch (e) {} }
+      return { success: true, kind: 'selection', selectionText: selText.slice(0, MAX_ANCHOR_CHARS),
+        anchorId: anchorId, paragraphIndex: headingChainOf(selRange).paragraphIndex };
+    }
+    const vc = ctrl.getViewCursor();
+    let para = null;
+    try {
+      para = vc.getText().createTextCursorByRange(vc.getStart());
+      para.gotoStartOfParagraph(false);
+      para.gotoEndOfParagraph(true);
+    } catch (e) { return { success: true, kind: 'none' }; }
+    const text = para.getString() || '';
+    if (!text.trim()) return { success: true, kind: 'none' };
+    let anchorId = null;
+    if (text.length <= MAX_PARA_CHARS) { try { anchorId = anchorBookmark(para); } catch (e) {} }
+    return { success: true, kind: 'cursor', paragraphText: text.slice(0, MAX_PARA_CHARS),
+      anchorId: anchorId, paragraphIndex: headingChainOf(vc).paragraphIndex };
   },
   // [感知] what's around the cursor right now — selection, chars before/after,
   // and the enclosing paragraph ("看一眼手边").
@@ -12161,7 +12200,7 @@ const FINAL_TEXT_ACTIONS = new Set(['get_completion_context', 'accept_completion
 // Only known readers may skip the view guard on a clean document. A write can
 // create its first deletion and then read paragraphAfterEdit in the same command.
 const FINAL_TEXT_READ_ACTIONS = new Set([
-  'get_selection', 'get_paragraph', 'get_outline', 'get_document_text', 'get_cursor_context',
+  'get_selection', 'get_paragraph', 'get_outline', 'get_document_text', 'get_cursor_context', 'get_ai_pointer',
   'get_clauses', 'get_cursor_rect', 'get_ui_state', 'get_ui_lang', 'get_doc_kind',
   'get_selection_hyperlink', 'get_hyperlink_at_cursor', 'get_bookmark_context',
   'get_review_context', 'get_review_layout', 'get_completion_context', 'capture_writing_context',
