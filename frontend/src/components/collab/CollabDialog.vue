@@ -69,6 +69,13 @@
                 :class="{ 'awd-btn-disabled': busy }"
                 @tap="onReconnectCloud"
               >{{ $t('version.reconnectCloud') }}</view>
+              <!-- 只剩一条连接也列出来：重新连接还不管用时，律师能断开它再放进去（教程第 11 集） -->
+              <LibraryConnectionList
+                v-if="reconnectMessage && !tooManyLibraries && connections.length"
+                :connections="connections"
+                :official-server-url="official.serverUrl"
+                @disconnected="onLibraryDisconnected"
+              />
             </view>
           </template>
 
@@ -104,6 +111,30 @@
             </view>
             <view class="collab-note">
               {{ $t('version.collabActionsNote') }}
+            </view>
+            <!-- 交稿/取回被云端写权限门禁拒绝：先让律师明确重新连接（换新令牌、已入库案卷跟着换门禁）；
+                 重新连接过还被拒（云端那份已不在或没权限）才给「重新绑定这份案卷」（教程第 11 集） -->
+            <view v-if="reconnectMessage" class="collab-empty-action collab-reconnect">
+              <text class="collab-error">{{ reconnectMessage }}</text>
+              <view class="collab-actions">
+                <view
+                  class="awd-btn awd-btn-secondary"
+                  :class="{ 'awd-btn-disabled': busy }"
+                  @tap="onReconnectCloud"
+                >{{ $t('version.reconnectCloud') }}</view>
+                <view
+                  v-if="reconnectAttempted"
+                  class="awd-btn awd-btn-secondary"
+                  :class="{ 'awd-btn-disabled': busy }"
+                  @tap="onRebindCaseFile"
+                >{{ $t('version.rebindCaseFile') }}</view>
+              </view>
+              <LibraryConnectionList
+                v-if="reconnectMessage && connections.length"
+                :connections="connections"
+                :official-server-url="official.serverUrl"
+                @disconnected="onLibraryDisconnected"
+              />
             </view>
           </template>
           <!-- 常驻的说明入口：这三个按钮各自干什么、为什么有时点了交稿反而被拦下来，
@@ -277,10 +308,12 @@ import {
   listCloudConnections,
   shareProjectToCloud, uploadToCloud, updateFromCloud, checkCloud, getVersionStatus,
   getCloudMembers, addCloudMember, lookupCloudMember, getOfficialCloud, removeCloudMember,
-  connectOfficialCloud,
+  reconnectOfficialCloud, unbindCloudProject,
 } from '@/services/api.js'
 import { roleLabel, ASSIGNABLE_ROLES } from '@/config/memberRoles.js'
-import { shareProjectToLibrary, needsCloudReconnect } from '@/utils/cloudShare.js'
+import {
+  shareProjectToLibrary, needsCloudReconnect, reconnectRequiredMessage, rebindProjectToLibrary,
+} from '@/utils/cloudShare.js'
 import { requireAccount, accountLoginOpen } from '@/utils/requireAccount.js'
 import { getInitial } from '@/utils/textInitial.js'
 import { getAppLanguage } from '@/utils/appLanguage.js'
@@ -344,6 +377,8 @@ export default {
       official: { available: false, serverUrl: '' },
       // 放进案件库被云端写权限门禁拒绝时的原因（后端原话）；有值就显示「重新连接云端」
       reconnectMessage: '',
+      // 这次打开弹窗后律师已经明确重新连接过：再被拒就换一句话，并给「重新绑定这份案卷」
+      reconnectAttempted: false,
       // 连着多于一条连接、「放进团队案件库」被拒：就地列出连接供断开
       tooManyLibraries: false,
       ASSIGNABLE_ROLES,
@@ -409,6 +444,7 @@ export default {
       // 上次查的那个人不能跟着弹窗一起回来——律师会以为这是这次要加的人
       this.addContact = ''
       this.reconnectMessage = ''
+      this.reconnectAttempted = false
       this.tooManyLibraries = false
       this.clearCandidate()
       this.loadConnections()
@@ -467,32 +503,79 @@ export default {
         uni.showToast({ title: this.$t('version.sharedToLibrary'), icon: 'none' })
         this.$emit('changed')
       } catch (e) {
-        if (needsCloudReconnect(e)) this.reconnectMessage = e.message || this.$t('version.shareToLibraryFailed')
+        if (needsCloudReconnect(e)) this.reconnectMessage = reconnectRequiredMessage(e, this.reconnectAttempted, (k) => this.$t(k))
         else uni.showToast({ title: (e && e.message) || this.$t('version.shareToLibraryFailed'), icon: 'none' })
       } finally {
         this.busy = false
       }
     },
-    // 「重新连接云端」：走现有的官方案件库连接入口，连好后重放一次「放进团队案件库」。
+    // 「重新连接云端」：走明确重连接口（指纹没变也换新令牌，已入库案卷跟着换写门禁），
+    // 没入库的连好后重放一次「放进团队案件库」；已入库的让律师再交稿/取回一次。
     // 律师明确点了才连，不做自动重连（门禁不放松）。
     async onReconnectCloud() {
       if (this.busy) return
       this.busy = true
       try {
-        await connectOfficialCloud()
+        await reconnectOfficialCloud()
       } catch (e) {
         uni.showToast({ title: (e && e.message) || this.$t('version.connectFailed'), icon: 'none' })
         return
       } finally {
         this.busy = false
       }
+      this.reconnectAttempted = true
       await this.loadConnections()
+      if (this.linked) {
+        this.reconnectMessage = ''
+        uni.showToast({ title: this.$t('version.reconnectedCloud'), icon: 'none' })
+        this.$emit('changed')
+        return
+      }
       await this.onShare()
     },
-    // 断开了一条：重读连接；剩不到两条就收起列表，律师自己再点「放进团队案件库」（不自动放）
+    // 「重新绑定这份案卷」：确认后拆掉本机与云端那份的绑定（本机文件不动），再放进去一次
+    async onRebindCaseFile() {
+      if (this.busy) return
+      this.busy = true
+      try {
+        const res = await rebindProjectToLibrary({
+          projectId: this.projectId,
+          connections: this.connections,
+          confirm: () => new Promise((resolve) => {
+            uni.showModal({
+              title: this.$t('version.rebindCaseFileTitle'),
+              content: this.$t('version.rebindCaseFileConfirm'),
+              confirmText: this.$t('version.rebindCaseFile'),
+              success: (r) => resolve(!!(r && r.confirm)),
+              fail: () => resolve(false),
+            })
+          }),
+          unbind: unbindCloudProject,
+          share: shareProjectToCloud,
+        })
+        if (res.ok) {
+          this.reconnectMessage = ''
+          uni.showToast({ title: this.$t('version.sharedToLibrary'), icon: 'none' })
+          this.$emit('changed')
+        } else if (res.reason) {
+          this.reconnectMessage = this.$t('version.tooManyLibraries')
+        }
+      } catch (e) {
+        // 拆完绑定、放进去失败：案卷已回到「未放进案件库」，让页面重拉状态，律师可以再点「放进团队案件库」
+        this.$emit('changed')
+        if (needsCloudReconnect(e)) this.reconnectMessage = reconnectRequiredMessage(e, this.reconnectAttempted, (k) => this.$t(k))
+        else uni.showToast({ title: (e && e.message) || this.$t('version.shareToLibraryFailed'), icon: 'none' })
+      } finally {
+        this.busy = false
+      }
+    },
+    // 断开了一条：重读连接；剩不到两条就收起列表，律师自己再点「放进团队案件库」（不自动放）。
+    // 断开会删掉经它入库的绑定，所以也让页面重拉状态，门禁那句旧话一并收起。
     async onLibraryDisconnected() {
       await this.loadConnections()
       if (this.connections.length <= 1) this.tooManyLibraries = false
+      this.reconnectMessage = ''
+      this.$emit('changed')
     },
     openHelp() {
       this.close()
@@ -539,7 +622,8 @@ export default {
         }
         this.$emit('changed')
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.submitFailed'), icon: 'none' })
+        if (needsCloudReconnect(e)) this.reconnectMessage = reconnectRequiredMessage(e, this.reconnectAttempted, (k) => this.$t(k))
+        else uni.showToast({ title: (e && e.message) || this.$t('version.submitFailed'), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -565,7 +649,8 @@ export default {
         }
         this.$emit('changed')
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.pullFailed'), icon: 'none' })
+        if (needsCloudReconnect(e)) this.reconnectMessage = reconnectRequiredMessage(e, this.reconnectAttempted, (k) => this.$t(k))
+        else uni.showToast({ title: (e && e.message) || this.$t('version.pullFailed'), icon: 'none' })
       } finally {
         this.busy = false
       }

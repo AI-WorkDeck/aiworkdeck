@@ -92,6 +92,7 @@ class OfficialCloudServiceTest {
                         .filter(c -> i.getArgument(0).equals(c.getUserId())
                                 && i.getArgument(1).equals(c.getServerUrl()))
                         .findFirst());
+        when(connectionRepository.findById(any())).thenAnswer(i -> java.util.Optional.ofNullable(rows.get((Long) i.getArgument(0))));
         lastUrl = null;
         lastBody = null;
         httpCalls = 0;
@@ -192,6 +193,83 @@ class OfficialCloudServiceTest {
         assertEquals(1, rows.size());
         assertEquals("awdt_second", second.getDeviceToken());
         assertEquals("fp-2", second.getAccountFingerprint());
+    }
+
+    /**
+     * 教程第 11 集（0.78.0 走查）：0.78 之前改名会换令牌，云端已撤掉旧的那枚；指纹没变，
+     * 默认的 connectOfficial 只会把那枚死令牌原样还回来，「重新连接云端」点了等于没点。
+     * 律师明确点的那一下必须真的重桥：同一行（已入库案卷还挂在它上面）、新令牌、旧令牌尽力撤掉，
+     * 并把这条连接下已入库案卷的写门禁换到新令牌上。
+     */
+    @Test
+    void explicitReconnectWithTheSameFingerprintIssuesANewTokenAndKeepsTheRowId() {
+        connectedAccount("awdk_abc", "fp-1");
+        OfficialCloudService svc = mainland();
+        CloudConnection first = svc.connectOfficial(ME);
+        canned = "{\"code\":0,\"data\":{\"token\":\"awdt_second\",\"userId\":9,"
+                + "\"username\":\"awd_hanzewei\",\"displayName\":\"韩泽伟\",\"tokenId\":32}}";
+
+        CloudConnection again = svc.reconnectOfficial(ME);
+
+        assertEquals(first.getId(), again.getId(), "就地重桥：已入库案卷绑在这一行上");
+        assertEquals(1, rows.size());
+        assertEquals(2, httpCalls, "明确重新连接必须真的再桥一次");
+        assertEquals(OFFICIAL + "/api/auth/awdk-login", lastUrl);
+        assertEquals("awdt_second", again.getDeviceToken());
+        assertEquals(32L, again.getTokenId());
+        assertEquals("fp-1", again.getAccountFingerprint());
+        verify(cloudSyncService).revokeRemoteToken(OFFICIAL, 31L, "awdt_first");
+        verify(cloudSyncService).refenceConnectionProjects(first.getId(), ME);
+
+        // 默认入口照旧幂等：不再桥、不换令牌（IM/工作流等调用方每次都会走它）
+        CloudConnection idle = svc.connectOfficial(ME);
+        assertEquals(2, httpCalls);
+        assertEquals("awdt_second", idle.getDeviceToken());
+    }
+
+    /**
+     * 本机账户换了人（指纹变了）再点「重新连接云端」：连接照旧就地换成新账户的令牌，
+     * 但上一个人放进案件库的案卷写门禁绝不能被换到新账户名下——门禁照拦（地雷 #58）。
+     */
+    @Test
+    void explicitReconnectAfterTheAccountChangedNeverRefencesThePreviousPersonsCases() {
+        connectedAccount("awdk_abc", "fp-1");
+        OfficialCloudService svc = mainland();
+        svc.connectOfficial(ME);
+        canned = "{\"code\":0,\"data\":{\"token\":\"awdt_second\",\"userId\":10,"
+                + "\"username\":\"awd_other\",\"displayName\":\"别人\",\"tokenId\":32}}";
+        connectedAccount("awdk_xyz", "fp-2");
+
+        CloudConnection conn = svc.reconnectOfficial(ME);
+
+        assertEquals("awdt_second", conn.getDeviceToken());
+        assertEquals("fp-2", conn.getAccountFingerprint());
+        verify(cloudSyncService, never()).refenceConnectionProjects(anyLong(), any());
+        verify(cloudSyncService, never()).revokeRemoteToken(any(), any(), any());
+    }
+
+    @Test
+    void explicitReconnectWithoutAnyConnectionJustConnects() {
+        connectedAccount("awdk_abc", "fp-1");
+
+        CloudConnection conn = mainland().reconnectOfficial(ME);
+
+        assertEquals("awdt_first", conn.getDeviceToken());
+        assertEquals(1, rows.size());
+        verify(cloudSyncService, never()).revokeRemoteToken(any(), any(), any());
+        verify(cloudSyncService, never()).refenceConnectionProjects(anyLong(), any());
+    }
+
+    @Test
+    void aRejectedExplicitReconnectLeavesTheConnectionUntouched() {
+        connectedAccount("awdk_abc", "fp-1");
+        OfficialCloudService svc = mainland();
+        CloudConnection conn = svc.connectOfficial(ME);
+        canned = "{\"code\":1,\"message\":\"限速\"}";
+
+        assertThrows(VersionException.class, () -> svc.reconnectOfficial(ME));
+        assertEquals("awdt_first", conn.getDeviceToken());
+        verify(cloudSyncService, never()).revokeRemoteToken(any(), any(), any());
     }
 
     /**
@@ -357,6 +435,45 @@ class OfficialCloudServiceTest {
         assertEquals(31L, conn.getTokenId());
         verify(cloudSyncService).revokeRemoteToken(OFFICIAL, 32L, "awdt_second");
         verify(cloudSyncService, never()).revokeRemoteToken(OFFICIAL, 31L, "awdt_second");
+    }
+
+    /**
+     * 改名刷新与「重新连接云端」并发：refreshDisplayName 桥接期间，明确重连已把新令牌落库。
+     * 真实 JPA 下查出来的是脱管副本，改名后整行 save 不能把已作废的旧令牌写回去。
+     */
+    @Test
+    void aConcurrentReconnectTokenIsNotOverwrittenByTheRenameRefresh() {
+        connectedAccount("awdk_abc", "fp-1");
+        CloudConnection conn = mainland().connectOfficial(ME);
+        java.util.function.Function<CloudConnection, CloudConnection> copy = c -> {
+            CloudConnection d = new CloudConnection();
+            org.springframework.beans.BeanUtils.copyProperties(c, d);
+            return d;
+        };
+        doAnswer(i -> rows.values().stream().filter(c -> i.getArgument(0).equals(c.getUserId())).findFirst().map(copy))
+                .when(connectionRepository).findFirstByUserIdAndServerUrl(any(), any());
+        doAnswer(i -> java.util.Optional.ofNullable(rows.get((Long) i.getArgument(0))).map(copy))
+                .when(connectionRepository).findById(any());
+        OfficialCloudService svc = new OfficialCloudService("", "https://www.aiworkdeck.com", accountService,
+                connectionRepository, cloudSyncService) {
+            @Override
+            protected String httpPost(String url, String jsonBody) {
+                // 桥接在途时，另一个线程的明确重连已落库新令牌
+                CloudConnection reconnected = copy.apply(rows.get(conn.getId()));
+                reconnected.setDeviceToken("awdt_reconnected");
+                reconnected.setTokenId(77L);
+                rows.put(conn.getId(), reconnected);
+                return "{\"code\":0,\"data\":{\"token\":\"awdt_second\",\"userId\":9,"
+                        + "\"username\":\"awd_hanzewei\",\"displayName\":\"韩律师\",\"tokenId\":32}}";
+            }
+        };
+        when(accountService.currentDisplayNameOrNull()).thenReturn("韩律师");
+        svc.refreshDisplayName(ME, "韩律师");
+
+        CloudConnection after = rows.get(conn.getId());
+        assertEquals("韩律师", after.getDisplayName());
+        assertEquals("awdt_reconnected", after.getDeviceToken(), "改名刷新不能把重连换出的新令牌改回旧令牌");
+        assertEquals(77L, after.getTokenId());
     }
 
     @Test

@@ -23,6 +23,15 @@ export function needsCloudReconnect(e) {
   return !!e && e.kind === CLOUD_RECONNECT_REQUIRED
 }
 
+/**
+ * 门禁拒绝时显示哪句话。律师已经在这个弹窗里明确重新连接过（新令牌）还被拒，就不能再原样
+ * 说一遍「请重新连接」——那会让人以为按钮没反应（教程第 11 集）。t 由调用方注入（this.$t）。
+ */
+export function reconnectRequiredMessage(e, reconnected, t) {
+  if (reconnected) return t('version.reconnectDidNotHelp')
+  return (e && e.message) || t('version.shareToLibraryFailed')
+}
+
 /** 多于一条连接时的拒绝理由（调用方据此选文案：version.tooManyLibraries）。 */
 export const TOO_MANY_LIBRARIES = 'TOO_MANY_LIBRARIES'
 
@@ -85,4 +94,20 @@ export async function disconnectLibraryConnection({ connectionId, confirm, disco
   if (!(await confirm())) return { ok: false }
   await disconnect(connectionId)
   return { ok: true }
+}
+
+/**
+ * 「重新绑定这份案卷」：已入库的案卷重新连接后仍被门禁拒（云端那份已不在/没权限）时，
+ * 先选连接、再 confirm，再拆掉本机绑定（unbind = api.js 的 unbindCloudProject，本机文件不动），
+ * 再按 shareProjectToLibrary 同一套连接规则放进去一次（share = shareProjectToCloud，后端带幂等键）。
+ * 连接选不出来（多于一条）时**先拒、不弹确认、一个字不拆**——拆完放不进去，案卷就白白掉出了案件库。
+ * unbind/share 抛的错原样往外抛。
+ */
+export async function rebindProjectToLibrary({ projectId, connections, confirm, unbind, share }) {
+  const picked = pickShareConnectionId(connections)
+  if (!picked.ok) return picked
+  if (!(await confirm())) return { ok: false }
+  await unbind(projectId)
+  await share(projectId, picked.connectionId)
+  return { ok: true, connectionId: picked.connectionId }
 }

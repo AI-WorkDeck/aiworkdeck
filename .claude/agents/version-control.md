@@ -176,10 +176,17 @@ AI 版本入口（dev-board#1498）复用本领域控制器与服务，工具/�
   **放进案件库被云端写权限门禁拒绝**（`CloudSyncService.accountCloudEpoch` / `CloudGitEpochClient` 抛
   `VersionException.cloudReconnectRequired`，`CloudController`/`VersionController` 的处理器回 `kind=CLOUD_RECONNECT_REQUIRED`）：
   两个弹窗用 `cloudShare.needsCloudReconnect(e)`（只认 kind，不匹配文案）就地显示后端原话 +「重新连接云端」按钮，
-  点了才调 `connectOfficialCloud` 再重放一次 share，**不自动重连**（问题 126/127，dev-board#1713）。
-  注意 `OfficialCloudService.connectOfficial` 在账户指纹不变时直接复用旧连接、不换令牌，所以这一按钮对「旧令牌失效」
-  无效；而强制重桥会换令牌，`awdCloudScope` 指纹含令牌，已入库案卷的后台同步会因此全部卡在「请明确重新连接」
-  且没有重绑入口，故未改。`refreshDisplayName` 改名重桥曾触发同一问题，已改为**不换令牌**（见下方「展示名跟官网走」）。
+  点了才调 `reconnectOfficialCloud`（`POST /api/cloud/reconnect-official` → `OfficialCloudService.reconnectOfficial`）
+  再重放一次 share，**不自动重连**（问题 126/127，dev-board#1713；教程第 11 集）。明确重连指纹不变也就地重桥：同一行
+  连接、新令牌、旧令牌尽力撤（`revokeRemoteToken`），再 `CloudSyncService.refenceConnectionProjects` 把这条连接下
+  每份已入库案卷的 `awdCloudScope` 写门禁换到新令牌（与 share/clone 同一条显式 `bindCloudEpoch` 路径，逐份尽力）。
+  撤旧令牌与换门禁**只在账户指纹没变时**做：本机换了人再点，连接照旧换成新账户的令牌，上一个人的案卷门禁照拦。
+  默认的 `connectOfficial`（IM/工作流/消息中心/缺 connectionId 的 share）照旧幂等不换令牌。重连过还被拒时换一句
+  `version.reconnectDidNotHelp`，门禁那一块即使只剩一条连接也带 `LibraryConnectionList`（能断开）。已入库案卷的
+  交稿/取回被拒同样就地显示；重连过还被拒（云端那份已不在/没权限）才给「重新绑定这份案卷」：确认后
+  `POST /projects/{id}/unbind`（`CloudSyncService.unbindProject`，只删 `ProjectRemote`，本机文件与云端那份都不动；只许拆挂在自己连接上的绑定）
+  再 share 一次（`cloudShare.rebindProjectToLibrary`，选不出连接时先拒、不拆绑定）。见地雷 #58。
+  `refreshDisplayName` 改名重桥**不换令牌**（见下方「展示名跟官网走」）。
   两个弹窗在登录层开着时加 `.yield-to-login` 让路，见 licensing-billing.md `accountLoginOpen`。
 - `InviteMemberDialog.vue`（`frontend/src/components/`，成员堆栈「+」与项目列表卡片「+」打开的「把人加进这份案卷」）
   ——**dev-board#527（2026-09-09）起「所里同事」tab 按 `localMode x linked` 三轨**（判定在
@@ -923,6 +930,8 @@ spec §5.5 已改，初版口径在那里划掉留痕）**。它原本是「溯�
 56. **版本操作后的「重载打开中的编辑器」必须同时清两个注册表，只摘 `libreLruKeys` 等于没刷新**（v0.44.1 真机反馈 A1）——链路本身是通的（`resolveAdopt` 报 `affectedFileIds`，护栏 `DraftAdoptTest.resolveAdoptReportsTheResolvedFileForEditorReload`；`AdoptConflictDialog` → `VersionPanel.onReload` → `reload-files` → `onVersionReloadFiles`），断在最后一步：非活动实例靠「摘出 `libreLruKeys` 让它卸载」刷新，而**过继备胎**渲染自 `libreSpares`，`leftLibreFiles` 还会把「有备胎顶着」的文件整个排除掉——只摘 LRU 键那个实例压根不卸载，端着的还是合并前的字节。而左窗格首开的那份文档**一定**是过继来的备胎（`maybeAdoptLibreSpare`），也就是最常见的那一种实例。表现：采纳一稿逐处裁决完，磁盘已是合并结果、文档标签里仍是旧正文，关掉标签重开才对（`closeFile` → `pruneClosedLibreSpares` 顺手清掉了备胎槽）。现已收拢进 `librePool.unloadInactiveLibreInstances(fileId)`（两个注册表一起清，活动实例照旧跳过、交给 `reloadActiveLibreInstances` 就地换文档），LRU 淘汰那条路本来就两边都清（`evictLibreInstance` 末尾的 `pruneLibreSpare`）。**今后任何「让某个文件的实例重新装载」的新入口都调这一个方法**，别再自己 filter 一遍 LRU。护栏 `frontend/tests/version-history/versionReloadPool.test.mjs`。
 
 57. **`shareToCloud` 的建项目 POST 带 `clientRequestId` 幂等键**——读超时只有 15s，服务端建成但应答慢时客户端会报「云端不可达」，重试若不带同一个键就会再建一个云端项目。键由 `CloudSyncService.shareRequestIds`（进程内，按 项目:连接）保持到收到应答为止；云端 `POST /api/projects` 按 `(user_id, create_request_id)`（`Project.createRequestId`，唯一约束，不对外序列化）去重，命中直接返回旧项目、不再记「放进案件库」事件。字段可选：旧服务端忽略它，旧客户端不带它。键不落盘，重启后丢失。护栏 `CloudShareIdempotencyTest`。
+
+58. **「重新连接云端」必须走 `reconnectOfficial`，换令牌必须连带换已入库案卷的写门禁**（教程第 11 集，0.78.0 走查）——默认的 `connectOfficial` 指纹不变就原样还回旧连接，旧令牌已被云端撤掉时（0.78 之前改名会换令牌）按钮点了等于没点、重放的 share 原样失败。而只换令牌不换门禁同样是死路：`awdCloudScope` = SHA-256(仓库, 用户名, **令牌**)，换了令牌已入库案卷的后台交稿/取回全部 `CLOUD_RECONNECT_REQUIRED`。所以 `reconnectOfficial` 重桥成功、且账户指纹没变（换了人绝不把上一个人的案卷门禁换到新账户名下）才 `refenceConnectionProjects`（显式 `bindCloudEpoch`，会采纳云端的新权限代次——只许律师明确点的这一下调，后台/IM/工作流一律不许）。逐份尽力：云端那份已删或没权限的换不过来，留给「重新绑定这份案卷」——那条路会在案件库里**新建**一份案卷，原来那份连同参与人留在云端、不再和本机同步（确认框写明）。旧令牌撤销用的是旧令牌本身作会话，令牌已死时撤销请求必然 401、只记日志；对真实案件库的撤销语义没有端到端验证过。护栏 `OfficialCloudServiceTest.explicitReconnectWithTheSameFingerprintIssuesANewTokenAndKeepsTheRowId`、`CloudSyncRebindTest`、`tests/member-invite/cloud-reconnect-rebind.test.mjs`。
 
 ## 客户门户与尽调清单上云（2026-09-29，dev-board#1050）
 

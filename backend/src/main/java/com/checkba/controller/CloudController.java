@@ -93,13 +93,27 @@ public class CloudController {
     public ResponseEntity<Map<String, Object>> connectOfficial(
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = requireLogin(sessionId);
-        CloudConnection conn = officialCloudService.connectOfficial(userId);
+        return ok(officialConnectionReply(officialCloudService.connectOfficial(userId)));
+    }
+
+    /**
+     * 律师明确点了「重新连接云端」：指纹没变也换新令牌（见 OfficialCloudService.reconnectOfficial）。
+     * 与上面的一键连接分开，免得 IM/工作流等默认调用方误触换令牌。
+     */
+    @PostMapping("/reconnect-official")
+    public ResponseEntity<Map<String, Object>> reconnectOfficial(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = requireLogin(sessionId);
+        return ok(officialConnectionReply(officialCloudService.reconnectOfficial(userId)));
+    }
+
+    private static Map<String, Object> officialConnectionReply(CloudConnection conn) {
         Map<String, Object> data = new HashMap<>();
         data.put("connectionId", conn.getId());
         data.put("username", conn.getUsername());
         data.put("displayName", conn.getDisplayName());
         data.put("serverUrl", conn.getServerUrl());
-        return ok(data);
+        return data;
     }
 
     @GetMapping("/connections")
@@ -173,6 +187,16 @@ public class CloudController {
         // connectionId 可缺省：没指定就自动连官方案件库再共享（零配置直连，dev-board#439）。
         // 共享本身的守卫（未共享过 / 已开版本记录 / 不在合并窗口）仍在 CloudSyncService 里。
         return ok(officialCloudService.shareProject(projectId, userId, optionalLong(body, "connectionId")));
+    }
+
+    /** 「重新绑定这份案卷」的前半步：拆本机绑定（本机文件、云端案卷都不动），随后前端再调 share。 */
+    @PostMapping("/projects/{projectId}/unbind")
+    public ResponseEntity<Map<String, Object>> unbind(
+            @PathVariable Long projectId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = requireWriteMember(projectId, sessionId);
+        cloudSyncService.unbindProject(projectId, userId);
+        return ok(Map.of());
     }
 
     @GetMapping("/projects/{projectId}/status")
