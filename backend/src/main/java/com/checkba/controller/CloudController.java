@@ -189,6 +189,16 @@ public class CloudController {
         return ok(officialCloudService.shareProject(projectId, userId, optionalLong(body, "connectionId")));
     }
 
+    /** 「重新绑定这份案卷」的前半步：拆本机绑定（本机文件、云端案卷都不动），随后前端再调 share。 */
+    @PostMapping("/projects/{projectId}/unbind")
+    public ResponseEntity<Map<String, Object>> unbind(
+            @PathVariable Long projectId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        requireWriteMember(projectId, sessionId);
+        cloudSyncService.unbindProject(projectId);
+        return ok(Map.of());
+    }
+
     @GetMapping("/projects/{projectId}/status")
     public ResponseEntity<Map<String, Object>> status(
             @PathVariable Long projectId,

@@ -60,4 +60,24 @@ class CloudSyncRebindTest {
         assertThrows(VersionException.class, () -> cloud.refenceConnectionProjects(1L, 99L));
         verify(repo, never()).bindCloudEpoch(anyLong(), any(), any(), any());
     }
+
+    @Test void unbindOnlyDropsTheLocalBindingAndTouchesNothingInTheCloud() {
+        ProjectRemote bound = remote(7L, "70");
+        when(remotes.findByProjectId(7L)).thenReturn(Optional.of(bound));
+
+        cloud.unbindProject(7L);
+
+        verify(remotes).delete(bound);
+        assertTrue(httpCalls.isEmpty(), "云端那份案卷一个字不动: " + httpCalls);
+        verify(repo, never()).bindCloudEpoch(anyLong(), any(), any(), any());
+    }
+
+    @Test void unbindIsRefusedWhileChoicesArePending() {
+        when(remotes.findByProjectId(7L)).thenReturn(Optional.of(remote(7L, "70")));
+        when(repo.repositoryMerging(7L)).thenReturn(true);
+
+        VersionException e = assertThrows(VersionException.class, () -> cloud.unbindProject(7L));
+        assertTrue(e.isUserFacing());
+        verify(remotes, never()).delete(any());
+    }
 }

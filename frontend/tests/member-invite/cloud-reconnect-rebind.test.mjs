@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import {
-  reconnectRequiredMessage,
+  rebindProjectToLibrary, reconnectRequiredMessage, TOO_MANY_LIBRARIES,
 } from '../../src/utils/cloudShare.js'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
@@ -24,10 +24,50 @@ test('重连过还被门禁拒：换一句话，不再原样重显「请重新�
   assert.equal(reconnectRequiredMessage({ kind: 'CLOUD_RECONNECT_REQUIRED' }, false, t), 't:version.shareToLibraryFailed')
 })
 
-test('api.js：明确重连走自己的端点，默认的一键连接不变', () => {
+test('重新绑定：没确认一次都不调', async () => {
+  const calls = []
+  const res = await rebindProjectToLibrary({
+    projectId: 7, connections: [{ id: 3 }], confirm: async () => false,
+    unbind: async (p) => calls.push(['unbind', p]), share: async (p, c) => calls.push(['share', p, c]),
+  })
+  assert.deepEqual(res, { ok: false })
+  assert.deepEqual(calls, [])
+})
+
+test('重新绑定：确认后先拆本机绑定，再按同一套连接规则放进去', async () => {
+  const calls = []
+  const res = await rebindProjectToLibrary({
+    projectId: 7, connections: [{ id: 3 }], confirm: async () => true,
+    unbind: async (p) => calls.push(['unbind', p]), share: async (p, c) => calls.push(['share', p, c]),
+  })
+  assert.deepEqual(res, { ok: true, connectionId: 3 })
+  assert.deepEqual(calls, [['unbind', 7], ['share', 7, 3]])
+})
+
+test('重新绑定：连着多个案件库时先拒，绑定一个字不拆', async () => {
+  const calls = []
+  const res = await rebindProjectToLibrary({
+    projectId: 7, connections: [{ id: 3 }, { id: 4 }], confirm: async () => true,
+    unbind: async (p) => calls.push(['unbind', p]), share: async (p, c) => calls.push(['share', p, c]),
+  })
+  assert.deepEqual(res, { ok: false, reason: TOO_MANY_LIBRARIES })
+  assert.deepEqual(calls, [])
+})
+
+test('重新绑定：拆绑定失败就不放进去，错误原样往外抛', async () => {
+  const calls = []
+  await assert.rejects(() => rebindProjectToLibrary({
+    projectId: 7, connections: [], confirm: async () => true,
+    unbind: async () => { throw new Error('busy') }, share: async (p, c) => calls.push(['share', p, c]),
+  }), /busy/)
+  assert.deepEqual(calls, [])
+})
+
+test('api.js：明确重连与拆绑定各走自己的端点，默认的一键连接不变', () => {
   const api = read('src/services/api.js')
   assert.match(api, /export function reconnectOfficialCloud\(\) \{\s*return request\(\{ url: '\/api\/cloud\/reconnect-official', method: 'POST' \}\)/)
   assert.match(api, /export function connectOfficialCloud\(\) \{\s*return request\(\{ url: '\/api\/cloud\/connect-official', method: 'POST' \}\)/)
+  assert.match(api, /export function unbindCloudProject\(projectId\) \{\s*return request\(\{ url: `\/api\/cloud\/projects\/\$\{projectId\}\/unbind`, method: 'POST' \}\)/)
 })
 
 for (const file of ['src/components/collab/CollabDialog.vue', 'src/components/InviteMemberDialog.vue']) {
@@ -43,3 +83,14 @@ for (const file of ['src/components/collab/CollabDialog.vue', 'src/components/In
     assert.match(src, /<LibraryConnectionList\s+v-if="[^"]*(reconnectMessage|reconnectNeeded)[^"]*"/)
   })
 }
+
+test('CollabDialog：已入库仍卡住时给「重新绑定这份案卷」，确认框说明后果，确认后拆绑定再放进去', () => {
+  const src = read('src/components/collab/CollabDialog.vue')
+  assert.match(src, /@tap="onRebindCaseFile"/)
+  assert.match(src, /\$t\('version\.rebindCaseFile'\)/)
+  const body = src.slice(src.indexOf('async onRebindCaseFile()'))
+  assert.match(body.slice(0, 1500), /rebindProjectToLibrary\(\{/)
+  assert.match(body.slice(0, 1500), /unbind: unbindCloudProject/)
+  assert.match(body.slice(0, 1500), /share: shareProjectToCloud/)
+  assert.match(src, /\$t\('version\.rebindCaseFileConfirm'\)/)
+})

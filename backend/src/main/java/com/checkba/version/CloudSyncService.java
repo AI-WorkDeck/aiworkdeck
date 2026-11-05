@@ -277,6 +277,25 @@ public class CloudSyncService {
         });
     }
 
+    /**
+     * 「重新绑定这份案卷」的前半步：只拆掉本机这份案卷与云端案卷的绑定（{@code ProjectRemote}）。
+     * 本机文件与版本历史不动，云端那份案卷也不动；随后由界面明确地再放进案件库一次
+     * （{@link #shareToCloud}，带幂等键）。origin 与写门禁留着，下一次共享会整份覆盖。
+     */
+    public void unbindProject(long projectId) {
+        ReentrantLock lock = sessionService.repoLock(projectId);
+        lock.lock();
+        try {
+            if (repoService.repositoryMerging(projectId)) {
+                throw VersionException.userFacing(LangText.of("请先把等你做选择的文件处理完", "Please finish choosing your files first"));
+            }
+            remoteRepository.findByProjectId(projectId).ifPresent(remoteRepository::delete);
+            remoteNameCache.remove(projectId);
+        } finally {
+            lock.unlock();
+        }
+    }
+
     public java.util.List<CloudConnection> listConnections(Long userId) {
         return connectionRepository.findByUserId(userId);
     }
