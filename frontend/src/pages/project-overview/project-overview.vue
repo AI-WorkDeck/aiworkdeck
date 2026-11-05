@@ -1780,8 +1780,11 @@
             @drop="handleAiDrop"
           >
             <!-- 右侧 dock 的 tab 条（dev-board#180）：只有真有面板被停到右侧时才渲染，
-                 平时右侧仍然只有 AI 对话本体，零视觉回归。 -->
-            <view v-if="rightDockPanels.length" class="right-dock-tabs">
+                 平时右侧仍然只有 AI 对话本体，零视觉回归。
+                 问题 12：「依据」只认 Word 文稿，原来没打开文稿时整条 tab 条消失、AI 头部随开关文档
+                 上下跳；现在按全部面板排（rightDockTabs），不可用的「依据」显示禁用态，Word/PPT/Excel/PDF
+                 打开时 tab 条一致。 -->
+            <view v-if="rightDockTabs.length" class="right-dock-tabs">
               <view
                 v-if="hasProject"
                 class="right-dock-tab"
@@ -1791,15 +1794,17 @@
                 <text>{{ $t('workbench.aiAssistant') }}</text>
               </view>
               <view
-                v-for="p in rightDockPanels"
+                v-for="p in rightDockTabs"
                 :key="p.key"
-                class="right-dock-tab is-movable"
-                :class="{ active: rightPaneKey === p.key }"
-                :draggable="true"
-                @tap="switchRightPane(p.key)"
+                class="right-dock-tab"
+                :class="{ active: rightPaneKey === p.key, 'is-disabled': p.disabled, 'is-movable': !p.disabled }"
+                :title="p.disabled ? $t('workbench.insightNeedsDoc') : null"
+                :aria-disabled="p.disabled ? 'true' : null"
+                :draggable="!p.disabled"
+                @tap="!p.disabled && switchRightPane(p.key)"
                 @dragstart="onPanelDragStart(p.key, $event)"
                 @dragend="onPanelDragEnd"
-                @contextmenu.prevent.stop="openDockMenu(p.key, $event)"
+                @contextmenu.prevent.stop="!p.disabled && openDockMenu(p.key, $event)"
               >
                 <text>{{ p.label }}</text>
               </view>
@@ -3714,11 +3719,17 @@ export default {
     ,
     // ——— 面板停靠（dev-board#180）———
     // 三个 dock 的分配，唯一出处是 config/panelRegistry.js 的纯函数 resolveDocks
-    dockPanels() {
+    // 全部带侧栏视图的插件面板，不看「依据」此刻有没有可解析的文档（右栏 tab 条按它排，问题 12）
+    allDockPanels() {
       if (this.isClientView) return []
-      return this.documentAvailablePlugins.filter(plugin => plugin.sidebarView).map(plugin => ({
+      return this.dynamicPlugins.filter(plugin => plugin.sidebarView).map(plugin => ({
         ...plugin, defaultDock: plugin.sidebarView.defaultDock, allowedDocks: plugin.sidebarView.allowedDocks,
       }))
+    },
+    // 此刻可用的面板（「依据」没有 Word 文稿时不在内）：左栏、菜单、拖放都按它判定
+    dockPanels() {
+      const available = new Set(this.documentAvailablePlugins.map(p => p.key))
+      return this.allDockPanels.filter(p => available.has(p.key))
     },
     panelDocks() {
       const docks = resolveDocks(this.panelDockOverrides, this.dockPanels)
@@ -3732,9 +3743,23 @@ export default {
     bottomToolsList() {
       return this.panelDocks.bottom.map(p => ({ key: p.key, label: (p.labelKey && this.$t(p.labelKey)) || p.label }))
     },
-    // 停靠到右侧面板的面板（非空时右栏才长出 tab 条；平时右侧只有 AI 对话，零视觉回归）
+    // 停靠到右侧、此刻可用的面板（右栏 tab 条用的是下面的 rightDockTabs）
     rightDockPanels() {
       return this.panelDocks.right.map(p => ({ key: p.key, label: (p.labelKey && this.$t(p.labelKey)) || p.label }))
+    },
+    // 右栏 tab 条：按全部面板排，此刻不可用的（没打开 Word 文稿时的「依据」）标 disabled 而不是拿掉，
+    // tab 条不随开关文档出现 / 消失，AI 头部不再跳动（问题 12）。无项目态的过滤与 panelDocks 同口径。
+    rightDockTabs() {
+      const docks = resolveDocks(this.panelDockOverrides, this.allDockPanels)
+      const right = this.hasNamedProject
+        ? docks.right
+        : docks.right.filter(p => (NO_PROJECT_PANE_KEYS.includes(p.key) || isGlobalPlugin(p)))
+      const available = new Set(this.rightDockPanels.map(p => p.key))
+      return right.map(p => ({
+        key: p.key,
+        label: (p.labelKey && this.$t(p.labelKey)) || p.label,
+        disabled: !available.has(p.key),
+      }))
     },
     // 右键「移到…」菜单的选项：只列这个面板允许的 dock，当前所在的那一档置灰
     dockMenuOptions() {

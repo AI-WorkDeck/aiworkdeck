@@ -58,3 +58,15 @@ test('问题 19：转为正式项目的预填名', () => {
   assert.match(body, /promoteScratchDefaultName\(\{/)
   assert.doesNotMatch(body, /this\.promoteScratchName = this\.project\?\.name \|\| ''/)
 })
+
+test('问题 12：有项目时右栏「AI 助手 | 依据」tab 条常驻，没打开可解析文档时「依据」禁用而不是消失', () => {
+  assert.match(page, /<view v-if="rightDockTabs\.length" class="right-dock-tabs">/)
+  assert.match(page, /v-for="p in rightDockTabs"/)
+  assert.match(page, /:class="\{ active: rightPaneKey === p\.key, 'is-disabled': p\.disabled, 'is-movable': !p\.disabled \}"/)
+  assert.match(page, /@tap="!p\.disabled && switchRightPane\(p\.key\)"/)
+  const body = methodBody(page, '    rightDockTabs() {')
+  assert.match(body, /resolveDocks\(this\.panelDockOverrides, this\.allDockPanels\)/, 'tab 条要按全部面板排，不跟着「依据」可不可用增减')
+  assert.match(body, /disabled: !available\.has\(p\.key\)/)
+  // dockPanels 仍只含此刻可用的面板（左栏 / 菜单 / 拖放都按它判定，行为不变）
+  assert.match(methodBody(page, '    dockPanels() {'), /this\.allDockPanels\.filter\(p => available\.has\(p\.key\)\)/)
+})

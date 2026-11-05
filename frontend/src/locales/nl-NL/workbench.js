@@ -140,6 +140,7 @@ export default {
   "collapseSidebar": "Zijbalk inklappen",
   "toolsPanel": "Hulpmiddelenpaneel",
   "aiAssistant": "AI-assistent",
+  "insightNeedsDoc": "Beschikbaar zodra een Word-document is geopend",
   "dockToLeft": "Naar de linkerzijbalk verplaatsen",
   "dockToRight": "Naar het rechterpaneel verplaatsen",
   "dockToBottom": "Naar het onderste paneel verplaatsen",

@@ -690,6 +690,10 @@ left|right，**不给 bottom**——底栏放不下它内部那两个 tab）。
 `.claude/agents/doc-insight.md` 的「前端」一节。
 **它带来一处视觉变化**：`rightDockPanels` 从此默认非空，AI 面板顶部恒有一条
 dock tab 条（「AI 助手 | 依据」）——在它之前那条 tab 条只有用户主动搬过面板才出现。
+**问题 12（dev-board#1713）**：「依据」只认 Word 文稿（`documentAvailablePlugins` 按 `insightDocFileId` 过滤），原来没打开 Word 时
+整条 tab 条消失、AI 头部随开关文档上下跳 36px。现在 tab 条按 `rightDockTabs`（`resolveDocks(overrides, allDockPanels)`）渲染，
+此刻不可用的「依据」标 `is-disabled`（不可点、不可拖、title 提示 `workbench.insightNeedsDoc`）；`dockPanels` / `rightDockPanels`
+仍只含可用面板，左栏、右键菜单、拖放判定不变。Word / PPT / Excel / PDF 打开时 tab 条一致（只差「依据」可不可点）。
 **这个文件不许 import Vue / uni / `@/i18n`**（照 `config/commands/index.js` 的先例，
 它要能被 `node --test` 直接导入），所以只给 `labelKey`，文案由宿主 `$t` 渲染；
 图标从同目录 `icons.js` 取（变量库是新加的 `ICONS.braces`）。单测

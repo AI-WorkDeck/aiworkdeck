@@ -140,6 +140,7 @@ export default {
   "collapseSidebar": "사이드바 접기",
   "toolsPanel": "도구 패널",
   "aiAssistant": "AI 어시스턴트",
+  "insightNeedsDoc": "Word 문서를 열면 사용할 수 있습니다",
   "dockToLeft": "왼쪽 사이드바로 이동",
   "dockToRight": "오른쪽 패널로 이동",
   "dockToBottom": "하단 패널로 이동",

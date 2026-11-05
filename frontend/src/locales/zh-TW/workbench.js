@@ -140,6 +140,7 @@ export default {
   "collapseSidebar": "收起左側欄",
   "toolsPanel": "常用工具",
   "aiAssistant": "AI 助手",
+  "insightNeedsDoc": "開啟一份 Word 文稿後可用",
   "dockToLeft": "移到左側欄",
   "dockToRight": "移到右側面板",
   "dockToBottom": "移到底部面板",

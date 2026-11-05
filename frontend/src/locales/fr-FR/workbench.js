@@ -140,6 +140,7 @@ export default {
   "collapseSidebar": "Réduire la barre latérale",
   "toolsPanel": "Panneau d'outils",
   "aiAssistant": "Assistant IA",
+  "insightNeedsDoc": "Disponible dès qu’un document Word est ouvert",
   "dockToLeft": "Déplacer vers la barre latérale gauche",
   "dockToRight": "Déplacer vers le panneau droit",
   "dockToBottom": "Déplacer vers le panneau inférieur",

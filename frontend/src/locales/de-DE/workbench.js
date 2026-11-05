@@ -140,6 +140,7 @@ export default {
   "collapseSidebar": "Seitenleiste einklappen",
   "toolsPanel": "Werkzeuge-Panel",
   "aiAssistant": "KI-Assistent",
+  "insightNeedsDoc": "Verfügbar, sobald ein Word-Dokument geöffnet ist",
   "dockToLeft": "In die linke Seitenleiste verschieben",
   "dockToRight": "In das rechte Panel verschieben",
   "dockToBottom": "In das untere Panel verschieben",

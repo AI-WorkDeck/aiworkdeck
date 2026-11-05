@@ -145,6 +145,7 @@ export default {
   collapseSidebar: 'Collapse Sidebar',
   toolsPanel: 'Tools Panel',
   aiAssistant: 'AI Assistant',
+  insightNeedsDoc: "Available once a Word document is open",
   // Panel docking (dev-board#180): shared by the context menu and the drop hints
   dockToLeft: 'Move to left sidebar',
   dockToRight: 'Move to right panel',

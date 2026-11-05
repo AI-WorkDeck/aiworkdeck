@@ -140,6 +140,7 @@ export default {
   "collapseSidebar": "تصغير الشريط الجانبي",
   "toolsPanel": "لوحة الأدوات",
   "aiAssistant": "المساعد الذكي",
+  "insightNeedsDoc": "متاح عند فتح مستند Word",
   "dockToLeft": "نقل إلى الشريط الجانبي الأيسر",
   "dockToRight": "نقل إلى اللوحة اليمنى",
   "dockToBottom": "نقل إلى اللوحة السفلية",

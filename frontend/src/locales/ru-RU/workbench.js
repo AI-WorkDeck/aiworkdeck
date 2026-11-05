@@ -140,6 +140,7 @@ export default {
   "collapseSidebar": "Свернуть боковую панель",
   "toolsPanel": "Панель инструментов",
   "aiAssistant": "ИИ-ассистент",
+  "insightNeedsDoc": "Доступно, когда открыт документ Word",
   "dockToLeft": "Переместить в левую боковую панель",
   "dockToRight": "Переместить в правую панель",
   "dockToBottom": "Переместить в нижнюю панель",

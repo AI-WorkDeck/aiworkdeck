@@ -140,6 +140,7 @@ export default {
   "collapseSidebar": "Σύμπτυξη πλευρικής γραμμής",
   "toolsPanel": "Πίνακας εργαλείων",
   "aiAssistant": "Βοηθός AI",
+  "insightNeedsDoc": "Διαθέσιμο όταν είναι ανοιχτό ένα έγγραφο Word",
   "dockToLeft": "Μετακίνηση στην αριστερή πλευρική γραμμή",
   "dockToRight": "Μετακίνηση στη δεξιά πλευρική γραμμή",
   "dockToBottom": "Μετακίνηση στο κάτω πάνελ",
