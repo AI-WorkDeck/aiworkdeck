@@ -54,8 +54,10 @@ public class LocalFileStorageService implements StorageService {
             // 确保父目录存在
             Files.createDirectories(filePath.getParent());
             
-            // 先写同目录临时文件再原子替换：写入中途失败/崩溃时原文件保持不变
-            Path pending = Files.createTempFile(filePath.getParent(), "~$awd-save-", ".tmp");
+            // 先写同目录临时文件再原子替换：写入中途失败/崩溃时原文件保持不变。
+            // 用 createFile 而非 createTempFile：后者在 POSIX 上建成 0600，替换后会改掉文件权限
+            Path pending = Files.createFile(filePath.getParent().resolve(
+                    "~$awd-save-" + java.util.UUID.randomUUID() + ".tmp"));
             try {
                 try (java.nio.channels.FileChannel ch = java.nio.channels.FileChannel.open(pending, StandardOpenOption.WRITE);
                      OutputStream out = java.nio.channels.Channels.newOutputStream(ch)) {
