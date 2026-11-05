@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: 功能建议 / Feature request
+description: 建议新的工作流、插件、集成或文档改进 / Suggest a workflow, plugin, integration, or docs improvement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        还在构思阶段的想法，欢迎先到 [Discussions Ideas](https://github.com/AI-WorkDeck/aiworkdeck/discussions/categories/ideas) 讨论。涉及架构或公开契约的大改动请走 [RFC](https://github.com/AI-WorkDeck/aiworkdeck/tree/master/rfcs)。
+        Early-stage ideas are welcome in [Discussions Ideas](https://github.com/AI-WorkDeck/aiworkdeck/discussions/categories/ideas). Large changes to architecture or public contracts go through an [RFC](https://github.com/AI-WorkDeck/aiworkdeck/tree/master/rfcs).
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决的问题 / Problem
+      description: 哪个工作流现在很难、很慢或缺失？/ What workflow is currently hard, slow, or missing?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: 期望的方案 / Proposed solution
+      description: 理想的做法是什么样？/ What would a good solution look like?
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: 你是 / Who needs this?
+      multiple: true
+      options:
+        - 律师或法务 / Lawyer or in-house counsel
+        - 律所或企业法务团队 / Law firm or legal team
+        - 法律科技开发者 / Legal-tech developer
+        - 插件开发者 / Plugin developer
+        - 自部署用户 / Self-hosting user
+        - 其他 / Other
+  - type: textarea
+    id: notes
+    attributes:
+      label: 补充 / Additional context
+      description: 链接、截图、参考产品等（勿含保密信息）/ Links, screenshots, related tools (no confidential material).

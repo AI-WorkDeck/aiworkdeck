@@ -1,8 +1,15 @@
-blank_issues_enabled: true
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# 仓库已开启私密漏洞报告且有 .github/SECURITY.md，GitHub 会在模板选择页自动加
+# 「Report a security vulnerability」入口，这里不再重复。
+blank_issues_enabled: false
 contact_links:
-  - name: Commercial licensing
+  - name: 提问与求助 / Questions & help
+    url: https://github.com/AI-WorkDeck/aiworkdeck/discussions/categories/q-a
+    about: 使用问题、配置求助请到 Discussions / Ask usage and setup questions in Discussions.
+  - name: 商业授权 / Commercial licensing
     url: mailto:hi@aiworkdeck.com
-    about: Contact us for proprietary SaaS, enterprise deployment, or support.
-  - name: AI WorkDeck website
+    about: 私有化 SaaS、企业部署或支持 / Proprietary SaaS, enterprise deployment, or support.
+  - name: 产品官网 / Website
     url: https://www.aiworkdeck.com
-    about: Watch the product walkthrough and feature showcase.
+    about: 产品演示与功能介绍 / Product walkthrough and feature showcase.
