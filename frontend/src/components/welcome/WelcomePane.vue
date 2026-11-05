@@ -194,6 +194,7 @@ import { setGlobalOverlay } from '@/utils/overlayState.js'
 import { ICONS } from '@/config/icons.js'
 import { buildRecentProjects } from './welcomeRecent.js'
 import { loadTelemetryNoticeDismissed, saveTelemetryNoticeDismissed } from '@/pages/project-overview/welcomeTab.js'
+import { uniStorage } from '@/utils/uniStorage.js'
 import FolderCatalog from './FolderCatalog.vue'
 import AccountProjectCatalog from '@/components/project-list/AccountProjectCatalog.vue'
 import ModelSelectorDropdown from '@/components/ModelSelectorDropdown.vue'
@@ -285,7 +286,7 @@ export default {
   created() {
     overlaySeq += 1
     this._overlayHolder = 'welcome-pane-' + overlaySeq
-    this.telemetryDismissed = loadTelemetryNoticeDismissed(uni)
+    this.telemetryDismissed = loadTelemetryNoticeDismissed(uniStorage)
   },
   mounted() {
     this.loadRecent()
@@ -402,7 +403,7 @@ export default {
     },
     dismissTelemetryNotice() {
       this.telemetryDismissed = true
-      saveTelemetryNoticeDismissed(uni)
+      saveTelemetryNoticeDismissed(uniStorage)
     },
   },
 }

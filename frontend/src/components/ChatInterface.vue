@@ -1119,6 +1119,7 @@ import { componentDownloads } from '@/services/componentDownloads.js'
 import { createComponentRequiredHandler, shouldAutoResend } from '@/composables/useComponentRequired.js'
 import { pendingInboxItems } from '@/composables/agentInboxState.mjs'
 import { saveLastConversation } from '@/utils/lastConversation.js'
+import { uniStorage } from '@/utils/uniStorage.js'
 import { isContextEligibleTab } from '@/pages/project-overview/activeTabContext.js'
 import { buildActiveSelectionChip } from '@/pages/project-overview/activeSelectionContext.js'
 import { isCurrentDocSentinel } from '@/utils/chatFileChange.js'
@@ -1428,7 +1429,7 @@ export default {
     let decisionAssistResolvedUser = null
     const decisionAssistIdentity = () => decisionAssistPreferenceKey(decisionAssistUser(getCurrentUser(), decisionAssistResolvedUser), getApiBaseUrl())
     const decisionAssistState = createDecisionAssistState({
-      storage: uni,
+      storage: uniStorage,
       identity: decisionAssistIdentity,
       onChange: (value) => { decisionAssistEnabled.value = value },
     })
@@ -1586,7 +1587,7 @@ export default {
     // 所以写在这里、读在工作台。清空（点了「新对话」）即抹掉记录。
     // 刻意不加 immediate：挂载那一刻 currentConversationId 还是 null，立刻回写会把
     // 工作台正要读的那条记录当场抹掉——恢复永远不会发生，而且一点报错都没有。
-    watch(currentConversationId, (id) => saveLastConversation(uni, props.projectId, id))
+    watch(currentConversationId, (id) => saveLastConversation(uniStorage, props.projectId, id))
 
     // Context Files (for drag-drop file context)
     const contextFiles = ref([])

@@ -79,7 +79,7 @@ test('project-overview.vue 的 toggleSidebar 同时调用 saveSidebarCollapsed �
   const body = src.slice(start, end)
 
   assert.match(body, /this\.sidebarCollapsed\s*=\s*!this\.sidebarCollapsed/, 'toggleSidebar 必须翻转 sidebarCollapsed')
-  assert.match(body, /saveSidebarCollapsed\(uni,\s*this\.sidebarCollapsed\)/, 'toggleSidebar 必须落盘')
+  assert.match(body, /saveSidebarCollapsed\(uniStorage,\s*this\.sidebarCollapsed\)/, 'toggleSidebar 必须落盘')
   assert.match(body, /triggerWorkbenchResize/, 'toggleSidebar 必须触发工作台 resize，否则编辑器/iframe 不跟着重排')
 })
 
@@ -89,7 +89,7 @@ test('onLoad 用 loadSidebarCollapsed 恢复本机收起习惯', () => {
   assert.ok(onLoadStart > 0, '找不到 onLoad')
   const onLoadEnd = src.indexOf('\n  onShow(', onLoadStart)
   const body = src.slice(onLoadStart, onLoadEnd > 0 ? onLoadEnd : onLoadStart + 6000)
-  assert.match(body, /this\.sidebarCollapsed\s*=\s*loadSidebarCollapsed\(uni,\s*!this\.hasNamedProject\)/,
+  assert.match(body, /this\.sidebarCollapsed\s*=\s*loadSidebarCollapsed\(uniStorage,\s*!this\.hasNamedProject\)/,
     'onLoad 必须用 loadSidebarCollapsed 恢复状态，否则每次进项目左栏收起都会弹回来')
 })
 
