@@ -942,6 +942,8 @@ DdFilesPanel / ShareholderMeetingPanel。新面板照抄这套，不要再自定
   **不许退回「只置 splitMode=false」**：右窗格是 v-if，留着的标签看不见却仍被
   `pickActiveContextTab` 当成 AI「当前文档」，资源管理器点它还会让 `openFile` 把分屏自己打开。
   单测 `frontend/tests/project-home/split-close-merge.test.mjs`。
+  `closeFile` 关掉右侧最后一个标签后自动走 `toggleSplitMode` 退出分屏（教程问题 76，dev-board#1713）；
+  左侧关空不退出。单测 `split-auto-exit-on-right-empty.test.mjs`。
 - **工具栏下拉在布局变化时收起（v0.49.0 C9-01）**：`EditorToolbar` 的下拉是打开瞬间的
   `position:fixed` 快照；除 #999 的 mousedown/Esc/blur/横滚四路收口外，另挂 `window resize`
   → `closeMenus`。工作台布局变化（分屏开关、标签跨窗格、面板开合）经 `triggerWorkbenchResize`

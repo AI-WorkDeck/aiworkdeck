@@ -515,6 +515,11 @@ export const fileOpenTabsMethods = {
         this.lastActiveIdsByMode[pane][mode] = newActiveId
         this.saveActiveIdsByMode()
       }
+      // 右侧最后一个标签关掉后自动退出分屏（toggleSplitMode 会复位焦点并同步资源管理器选中）
+      if (pane === 'right' && this.splitMode && list.length === 0 && typeof this.toggleSplitMode === 'function') {
+        await this.toggleSplitMode()
+        return
+      }
       this.syncFileTreeSelectionWithActiveTab?.()
     },
 
