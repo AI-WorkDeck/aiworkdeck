@@ -119,6 +119,15 @@ async function fetchFirst(urls, opts) {
   throw lastErr || new Error('no urls')
 }
 
+// 隔离实例（e2e / 演示 / 复测用独立数据目录）不做应用内更新（问题 90）：Squirrel/ShipIt 替换后
+// 重启不带原进程的 env 与启动参数（--user-data-dir、CFFIXED_USER_HOME…），会以默认实例、
+// 真实数据目录起来。补丁与整包都不检查、不下载，界面也就不会出现「重启更新」。
+function updatesDisabledReason(env = process.env, argv = process.argv) {
+  if (env && env.AWD_DISABLE_UPDATES === '1') return 'AWD_DISABLE_UPDATES'
+  if ((argv || []).some((a) => /^--user-data-dir(=|$)/.test(String(a)))) return 'user-data-dir'
+  return null
+}
+
 function createUpdateService(ctx, hooks = {}) {
   // ctx: { packaged, dataDir, appVersion }
   // hooks: { onEvent(evt), extractTar(archive, destDir) => Promise, onLog }
@@ -132,6 +141,8 @@ function createUpdateService(ctx, hooks = {}) {
     progress: null,        // { component, received, total }
     error: hooks.initialError || null
   }
+  const disabledReason = updatesDisabledReason(ctx.env || process.env, ctx.argv || process.argv)
+  if (disabledReason) state.disabled = true
   let timer = null
   let firstTimer = null
   let checking = null
@@ -272,6 +283,7 @@ function createUpdateService(ctx, hooks = {}) {
   }
 
   async function check() {
+    if (disabledReason) return snapshot()
     if (state.available) return snapshot() // 已准备的版本保持 ready，避免重复下载/原生准备
     if (checking) return checking
     checking = (async () => {
@@ -336,6 +348,7 @@ function createUpdateService(ctx, hooks = {}) {
   }
 
   function start() {
+    if (disabledReason) { logEvent('disabled', { reason: disabledReason }); return }
     if (!ctx.packaged && !process.env.CHECKBA_UPDATE_MANIFEST_URL) return // dev 态默认不查
     firstTimer = setTimeout(() => { check().catch(() => {}) }, CHECK_DELAY_MS)
     if (firstTimer.unref) firstTimer.unref()
@@ -353,4 +366,4 @@ function createUpdateService(ctx, hooks = {}) {
   return { start, stop, check, getState: snapshot, logEvent }
 }
 
-module.exports = { createUpdateService, fetchUrl, UPDATE_PUBKEY_PEM }
+module.exports = { createUpdateService, updatesDisabledReason, fetchUrl, UPDATE_PUBKEY_PEM }
