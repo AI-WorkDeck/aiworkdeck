@@ -107,7 +107,8 @@ const DEBUG_ACTIONS = `
         'com.sun.star.configuration.ConfigurationAccess',
         [mkProp('nodepath', '/org.openoffice.Office.UI/ColorScheme/ColorSchemes')]);
       const c = schemes.getByName(name).getByName('AppBackground').getByName('Color');
-      return { success: true, scheme: name, color: Number(c) };
+      const d = schemes.getByName(name).getByName('DocColor').getByName('Color');
+      return { success: true, scheme: name, color: Number(c), docColor: Number(d) };
     } catch (e) { return { success: false, message: errStr(e) }; }
   },
   // 组 31 探针：绕开 set_revision_view 自己直读两个引擎开关（不让断言变成
@@ -2113,12 +2114,14 @@ try {
     check('set_app_theme dark 成功', dark.success === true && dark.mode === 'dark', JSON.stringify(dark))
     const bgDark = await exec('debug_app_bg')
     check('AppBackground 配置写入 0x141210', bgDark.success === true && bgDark.color === 0x141210, JSON.stringify(bgDark))
+    check('DocColor 配置写入 0x221F1A（深色纸面）', bgDark.docColor === 0x221F1A, JSON.stringify(bgDark))
     await new Promise((r) => setTimeout(r, 900))
     const shotDark = await shotOf()
     const light = await exec('set_app_theme', { mode: 'light' })
     check('set_app_theme light 成功', light.success === true && light.mode === 'light', JSON.stringify(light))
     const bgLight = await exec('debug_app_bg')
     check('AppBackground 配置回到 0xE4E0D4', bgLight.success === true && bgLight.color === 0xE4E0D4, JSON.stringify(bgLight))
+    check('DocColor 配置回到 0xFFFFFF（纸白）', bgLight.docColor === 0xFFFFFF, JSON.stringify(bgLight))
     await new Promise((r) => setTimeout(r, 900))
     const shotLight = await shotOf()
     const ratio = darkenedRatio(shotDark, shotLight)

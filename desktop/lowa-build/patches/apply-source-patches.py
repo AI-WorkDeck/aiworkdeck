@@ -14,6 +14,7 @@
 #     pruning (--slim-dictionaries).
 #  9. Calc row/column header UI font and local palette (#1509).
 # 10. Preserve real tooltip input transparency on WASM (#1515).
+# 11. Dark page: explicit dark text is drawn light on screen (Writer/Calc).
 import argparse
 import glob
 import os
@@ -1372,6 +1373,91 @@ def patch_calc_header_chrome(core):
     )
 
 
+# ---- Dark page: explicit dark text stays readable on screen -----------------
+def patch_dark_page_text(core):
+    # Original targets: LibreOffice core dced3bc711d18407a2cc2400eb46e8261b663d95,
+    # sw/source/core/txtnode/fntcache.cxx and sc/source/core/data/patattr.cxx
+    # (MPL-2.0; original license headers retained). Keep this standalone: the
+    # build VM receives this script without the repo.
+    # 深色纸面（DocColor 变暗）时，LO 只把「自动」颜色的字改成白色；Word/Excel 文件里
+    # 大量显式黑色（w:color 000000、主题色 dk1）会变成黑底黑字。这里只在屏幕绘制、且字和
+    # 它实际所在的底色都偏暗时改画白色；红、蓝等亮色不动，浅色纸面、打印、PDF 导出
+    # 和文档内容都不受影响。
+    writer = f'{core}/sw/source/core/txtnode/fntcache.cxx'
+    patch(
+        writer,
+        '        bChgFntColor = COL_AUTO == rFnt.GetColor() || bChgLineColor;\n'
+        '\n'
+        '        if ( bChgFntColor )\n'
+        '        {\n',
+        '        bChgFntColor = COL_AUTO == rFnt.GetColor() || bChgLineColor;\n'
+        '\n'
+        '        // AI WorkDeck: dark page. Explicit dark text over a dark background is\n'
+        '        // drawn white on screen only; light pages, print and export are unchanged.\n'
+        '        const bool bDarkExplicit = !bChgFntColor && pVSh && bOutputToWindow\n'
+        '            && aGlobalRetoucheColor.IsDark() && rFnt.GetColor().IsDark();\n'
+        '\n'
+        '        if ( bChgFntColor || bDarkExplicit )\n'
+        '        {\n',
+        'Writer dark page explicit text (scope)',
+    )
+    patch(
+        writer,
+        '            if (pVSh && bOutputToWindow)\n'
+        '            {\n'
+        '                // here we determine the preferred window text color for painting\n',
+        '            if (bDarkExplicit)\n'
+        '            {\n'
+        '                if (pCol->IsDark())\n'
+        '                {\n'
+        '                    nNewColor = COL_WHITE;\n'
+        '                    bChgFntColor = true;\n'
+        '                }\n'
+        '            }\n'
+        '            else if (pVSh && bOutputToWindow)\n'
+        '            {\n'
+        '                // here we determine the preferred window text color for painting\n',
+        'Writer dark page explicit text (color)',
+    )
+    patch(
+        writer,
+        '            Color aTmpColor( nNewColor );\n'
+        '            if ( pCol->IsDark() && aTmpColor.IsDark() )\n',
+        '            Color aTmpColor( nNewColor );\n'
+        '            if ( bDarkExplicit )\n'
+        '            {\n'
+        '                // decided above\n'
+        '            }\n'
+        '            else if ( pCol->IsDark() && aTmpColor.IsDark() )\n',
+        'Writer dark page explicit text (contrast)',
+    )
+    calc = f'{core}/sc/source/core/data/patattr.cxx'
+    patch(
+        calc,
+        '            aColor = aSysTextColor;\n'
+        '        }\n'
+        '    }\n'
+        '    aComplexColor.setFinalColor(aColor);\n',
+        '            aColor = aSysTextColor;\n'
+        '        }\n'
+        '    }\n'
+        '    // AI WorkDeck: dark page. On screen only (Display), explicit dark text over\n'
+        '    // a dark cell or page background is drawn white; Print/PDF keep the file color.\n'
+        '    else if (eAutoMode == ScAutoFontColorMode::Display && aColor.IsDark())\n'
+        '    {\n'
+        '        const SvxBrushItem* pBack = pCondSet ? pCondSet->GetItemIfSet(ATTR_BACKGROUND) : nullptr;\n'
+        '        Color aBackColor = (pBack ? pBack : &rItemSet.Get(ATTR_BACKGROUND))->GetColor();\n'
+        '        if (aBackColor == COL_TRANSPARENT)\n'
+        '            aBackColor = pBackConfigColor ? *pBackConfigColor\n'
+        '                : SC_MOD()->GetColorConfig().GetColorValue(svtools::DOCCOLOR).nColor;\n'
+        '        if (aBackColor.IsDark())\n'
+        '            aColor = COL_WHITE;\n'
+        '    }\n'
+        '    aComplexColor.setFinalColor(aColor);\n',
+        'Calc dark page explicit text',
+    )
+
+
 # ---- WASM tooltip input transparency (#1515) --------------------------------
 def patch_wasm_tooltip_input(core):
     # HelpTextWindow is already mouse-transparent in VCL. Preserve that intent
@@ -1490,6 +1576,7 @@ def main(argv=None):
     patch_word_count_and_outline_values(CORE)
     patch_calc_header_chrome(CORE)
     patch_wasm_tooltip_input(CORE)
+    patch_dark_page_text(CORE)
 
     if args.slim_dictionaries or os.path.isdir(f'{CORE}/instdir/share/extensions'):
         slim_dictionaries(CORE, keep_langs=keep_langs)

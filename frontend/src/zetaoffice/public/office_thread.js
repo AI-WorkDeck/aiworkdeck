@@ -5839,7 +5839,10 @@ const EXEC = {
   },
   // ---- [主题] 纸外工作区配色（dev-board#273）------------------------------
   // 宿主深浅主题切换时把 LO 的 AppBackground（纸张周围的工作区底色）跟着切；
-  // DocColor（纸张本身）刻意不动——文档以打印观感为准，深色下纸仍是纸白。
+  // DocColor（Word 纸面 / Excel 无底色单元格）深色下也变暗，同 Word 的深色模式：
+  // 「自动」颜色的字引擎自己改画白色，显式深色字靠引擎补丁（lowa-build
+  // patch_dark_page_text）只在屏幕上改画白色；PPT 幻灯片有自己的背景，不受影响。
+  // 只改屏幕绘制，文档内容、打印与 PDF 导出仍是原色。纸面色 = roles.dark.surface。
   // 配置项运行时可写（与 setRedlineAuthor 同一机制）；色值与 --awd-canvas 令牌同源
   // （light #E4E0D4 / dark #141210，见 design/tokens/awd-palette.json 的
   // roles.light.canvas / roles.dark.canvas，editor.html 头部那份令牌表同值），
@@ -5848,6 +5851,7 @@ const EXEC = {
   set_app_theme(p) {
     const mode = p && p.mode === 'dark' ? 'dark' : 'light';
     const color = mode === 'dark' ? 0x141210 : 0xE4E0D4;
+    const docColor = mode === 'dark' ? 0x221F1A : 0xFFFFFF;
     try {
       const provider = context.getServiceManager().createInstanceWithContext(
         'com.sun.star.configuration.ConfigurationProvider', context);
@@ -5864,6 +5868,7 @@ const EXEC = {
         [mkProp('nodepath', '/org.openoffice.Office.UI/ColorScheme/ColorSchemes')]);
       const scheme = root.getByName(schemeName);
       scheme.getByName('AppBackground').replaceByName('Color', color);
+      scheme.getByName('DocColor').replaceByName('Color', docColor);
       root.commitChanges();
       return { success: true, mode, scheme: schemeName };
     } catch (e) { return { success: false, message: 'set_app_theme 失败: ' + errStr(e) }; }
