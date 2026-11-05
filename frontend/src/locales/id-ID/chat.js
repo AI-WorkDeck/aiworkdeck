@@ -271,6 +271,7 @@ export default {
   "memoryRevision": "Revisi {revision}",
   "memoryUnknownTime": "Waktu pembaruan tidak diketahui",
   "memoryReadOnly": "Anda dapat melihat cakupan ini, tetapi tidak memiliki izin untuk mengeditnya.",
+  "memoryRememberHint": "Daftar topik dikelola otomatis oleh sistem. Untuk menghapus topik, pilih topik tersebut lalu hapus.",
   "memoryConflict": "Tersedia versi server yang lebih baru. Tinjau sebelum memilih versi mana yang akan disimpan.",
   "memoryUseServer": "Gunakan versi server",
   "memorySaveMine": "Simpan versi saya",

@@ -271,6 +271,7 @@ export default {
   "memoryRevision": "Semakan {revision}",
   "memoryUnknownTime": "Masa kemas kini tidak diketahui",
   "memoryReadOnly": "Anda boleh melihat skop ini, tetapi anda tidak mempunyai kebenaran untuk mengeditnya.",
+  "memoryRememberHint": "Senarai topik diselenggara secara automatik oleh sistem. Untuk memadam topik, pilih topik tersebut dan padamkannya.",
   "memoryConflict": "Terdapat versi pelayan yang lebih baharu. Semak sebelum memilih versi mana yang hendak disimpan.",
   "memoryUseServer": "Guna versi pelayan",
   "memorySaveMine": "Simpan versi saya",

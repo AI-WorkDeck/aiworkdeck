@@ -271,6 +271,7 @@ export default {
   "memoryRevision": "Revisión {revision}",
   "memoryUnknownTime": "Hora de actualización desconocida",
   "memoryReadOnly": "Puede ver este ámbito, pero no tiene permiso para editarlo.",
+  "memoryRememberHint": "El sistema mantiene la lista de temas automáticamente. Para eliminar un tema, selecciónelo y elimínelo.",
   "memoryConflict": "Existe una versión más reciente del servidor. Revísela antes de elegir qué versión conservar.",
   "memoryUseServer": "Usar la versión del servidor",
   "memorySaveMine": "Guardar mi versión",

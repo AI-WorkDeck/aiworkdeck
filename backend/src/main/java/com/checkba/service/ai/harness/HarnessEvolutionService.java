@@ -260,6 +260,10 @@ public class HarnessEvolutionService {
         }
         String safeUser = rolledBackUserPrompt == null ? "" : rolledBackUserPrompt.trim();
         String safeAssistant = rolledBackAssistantSummary == null ? "" : rolledBackAssistantSummary.trim();
+        // 被回退的是出错轮：重发只是重试，按「没有可用回答」记（截断前判，标记在末尾）
+        if (safeAssistant.endsWith("[生成出错，已中断]") || safeAssistant.endsWith("[Generation error, interrupted]")) {
+            safeAssistant = "";
+        }
         if (safeUser.isEmpty() && safeAssistant.isEmpty()) {
             return;
         }
@@ -331,7 +335,7 @@ public class HarnessEvolutionService {
         }
 
         // 优先级 1：回退重发对比信号（用户最明确的显式纠偏）
-        if (rollbackSignal != null && initialUserInstruction != null && !initialUserInstruction.isBlank()) {
+        if (isRollbackCorrection(rollbackSignal, initialUserInstruction)) {
             return Optional.of(createFromRollback(
                     conversationId, userId, projectId, rollbackSignal, initialUserInstruction.trim()));
         }
@@ -361,6 +365,21 @@ public class HarnessEvolutionService {
         }
 
         return Optional.empty();
+    }
+
+    /**
+     * 回退重发是否构成纠偏（问题记录 10）：被回退那一轮没有可用回答（出错/空回答）、
+     * 没有原问题可比、或新指令规范化后与原问题相同（即「重新生成」）时都不是纠偏。
+     */
+    static boolean isRollbackCorrection(@Nullable PendingRollbackSignal rollback, @Nullable String instruction) {
+        if (rollback == null || instruction == null || instruction.isBlank()
+                || rollback.rolledBackUserPrompt() == null || rollback.rolledBackUserPrompt().isBlank()
+                || rollback.rolledBackAssistantSummary() == null || rollback.rolledBackAssistantSummary().isBlank()) {
+            return false;
+        }
+        String before = rollback.rolledBackUserPrompt().replaceAll("\\s+", "");
+        String after = truncate(instruction, 400).replaceAll("\\s+", "");
+        return !before.equals(after);
     }
 
     /**
@@ -952,13 +971,14 @@ public class HarnessEvolutionService {
                 ? LangText.of("【领域演进规则】", "[Domain Rule] ")
                 : LangText.of("【执行不变式规则】", "[Execution Invariant] ");
 
-        if (SIGNAL_ROLLBACK_CORRECTION.equals(signalType) && !cleanBefore.isEmpty() && !cleanBefore.equals(cleanAfter)) {
+        if (SIGNAL_ROLLBACK_CORRECTION.equals(signalType)) {
             return prefix + LangText.of(
                     "处理同类请求时，优先遵循用户重发修正后的约束：「" + truncate(cleanAfter, 95)
                             + "」（避免原尝试中未被采纳的做法：「" + truncate(cleanBefore, 45) + "」）。",
                     "Follow the user's corrective constraint: \"" + truncate(cleanAfter, 95)
                             + "\" instead of the rolled-back approach (\"" + truncate(cleanBefore, 45) + "\").");
         }
+        // 插话纠偏（STEER）专用；回退信号已由 isRollbackCorrection 把关，不再落到这里
         return prefix + LangText.of(
                 "执行同类任务时必须严格遵守用户追加约束：「" + truncate(cleanAfter, 110) + "」。",
                 "Strictly enforce the user's steering constraint on similar tasks: \"" + truncate(cleanAfter, 110) + "\".");

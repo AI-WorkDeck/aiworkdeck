@@ -271,6 +271,7 @@ export default {
   "memoryRevision": "リビジョン {revision}",
   "memoryUnknownTime": "更新時刻不明",
   "memoryReadOnly": "このスコープは表示できますが、編集する権限がありません。",
+  "memoryRememberHint": "トピック一覧はシステムが自動で管理します。トピックを削除するには、該当するトピックを選択してから削除してください。",
   "memoryConflict": "サーバーに新しいバージョンがあります。どちらのバージョンを保持するか決める前に確認してください。",
   "memoryUseServer": "サーバーのバージョンを使用",
   "memorySaveMine": "自分のバージョンを保存",

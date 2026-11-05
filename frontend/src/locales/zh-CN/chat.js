@@ -290,6 +290,7 @@ export default {
   memoryRevision: '版本 {revision}',
   memoryUnknownTime: '更新时间未知',
   memoryReadOnly: '你可以查看此范围，但没有编辑权限',
+  memoryRememberHint: '主题列表由系统自动维护；要删除主题，请选中对应主题后删除',
   memoryConflict: '服务器上已有更新。请查看后选择保留哪一版。',
   memoryUseServer: '使用服务器版本',
   memorySaveMine: '保存我的版本',

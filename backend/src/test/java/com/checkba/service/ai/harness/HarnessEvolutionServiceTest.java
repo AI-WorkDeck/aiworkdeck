@@ -105,6 +105,68 @@ class HarnessEvolutionServiceTest {
                 eq(0L));
     }
 
+    /** 问题记录 10：点「重新生成」= 原问题原样重发，不是纠偏，不得写进记忆。 */
+    @Test
+    void regenerateWithSamePromptDoesNotSynthesizeRollbackRule() {
+        evolutionService.recordRollbackSignal(
+                "conv-regen", 7L, 10L, "审查这份股权转让协议", "以下是初步审查结论：无重大风险。");
+        HarnessEvolutionService.PendingRollbackSignal pending =
+                evolutionService.consumePendingRollback("conv-regen").orElseThrow();
+
+        Optional<HarnessEvolutionService.HarnessEvolutionRecord> recordOpt =
+                evolutionService.evaluateTurnEvolution(
+                        "conv-regen", 7L, 10L, "  审查这份  股权转让协议\n", pending, List.of(), List.of());
+
+        assertTrue(recordOpt.isEmpty());
+        verify(memoryDocumentService, never()).write(anyLong(), anyString(), anyString(), anyString(), anyLong());
+    }
+
+    /** 问题记录 10：被回退的那一轮是出错轮，重发只是重试，不是纠偏。 */
+    @Test
+    void rollbackOfErrorTurnDoesNotSynthesizeRule() {
+        evolutionService.recordRollbackSignal(
+                "conv-err", 7L, 10L, "审查这份股权转让协议", "已读取文件。\n\n[生成出错，已中断]");
+
+        Optional<HarnessEvolutionService.HarnessEvolutionRecord> recordOpt =
+                evolutionService.evaluateTurnEvolution(
+                        "conv-err", 7L, 10L, "审查这份股权转让协议，重点看违约金",
+                        evolutionService.consumePendingRollback("conv-err").orElse(null),
+                        List.of(), List.of());
+
+        assertTrue(recordOpt.isEmpty());
+        verify(memoryDocumentService, never()).write(anyLong(), anyString(), anyString(), anyString(), anyLong());
+    }
+
+    /** 问题记录 10：被回退的那一轮没有任何回答（空回答），同样跳过。 */
+    @Test
+    void rollbackOfEmptyAnswerDoesNotSynthesizeRule() {
+        evolutionService.recordRollbackSignal("conv-empty", 7L, 10L, "审查这份股权转让协议", "  ");
+
+        Optional<HarnessEvolutionService.HarnessEvolutionRecord> recordOpt =
+                evolutionService.evaluateTurnEvolution(
+                        "conv-empty", 7L, 10L, "审查这份股权转让协议，重点看违约金",
+                        evolutionService.consumePendingRollback("conv-empty").orElse(null),
+                        List.of(), List.of());
+
+        assertTrue(recordOpt.isEmpty());
+        verify(memoryDocumentService, never()).write(anyLong(), anyString(), anyString(), anyString(), anyLong());
+    }
+
+    /** 问题记录 10：从助手气泡回退时没有原问题可比，不再兜底合成「必须严格遵守」规则。 */
+    @Test
+    void rollbackWithoutOriginalPromptDoesNotSynthesizeRule() {
+        evolutionService.recordRollbackSignal("conv-noprompt", 7L, 10L, "", "以下是初步审查结论：无重大风险。");
+
+        Optional<HarnessEvolutionService.HarnessEvolutionRecord> recordOpt =
+                evolutionService.evaluateTurnEvolution(
+                        "conv-noprompt", 7L, 10L, "审查这份股权转让协议",
+                        evolutionService.consumePendingRollback("conv-noprompt").orElse(null),
+                        List.of(), List.of());
+
+        assertTrue(recordOpt.isEmpty());
+        verify(memoryDocumentService, never()).write(anyLong(), anyString(), anyString(), anyString(), anyLong());
+    }
+
     @Test
     void switchScopeAndPromoteToSkillUpdatesRegistryAndDeletesOnRevert() {
         Optional<HarnessEvolutionService.HarnessEvolutionRecord> recordOpt =

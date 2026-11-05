@@ -271,6 +271,7 @@ export default {
   "memoryRevision": "Version {revision}",
   "memoryUnknownTime": "Unbekannte Aktualisierungszeit",
   "memoryReadOnly": "Sie können diesen Bereich anzeigen, haben jedoch keine Berechtigung zur Bearbeitung.",
+  "memoryRememberHint": "Die Themenliste wird automatisch vom System gepflegt. Um ein Thema zu löschen, wählen Sie das Thema aus und löschen Sie es dort.",
   "memoryConflict": "Es existiert eine neuere Serverversion. Prüfen Sie sie, bevor Sie entscheiden, welche Version Sie behalten möchten.",
   "memoryUseServer": "Serverversion verwenden",
   "memorySaveMine": "Meine Version speichern",
