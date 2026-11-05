@@ -518,7 +518,7 @@ check('工作台「全部项目」开左栏「项目」面板，不离开工作�
   return null
 })
 
-check('账户入口在顶栏右上角（AccountEntry），rail 没有账户或消息入口；下拉恰好四项：消息中心 + 我的日程 + 设置 + 退出登录（dev-board#1490）', () => {
+check('账户入口在顶栏右上角（AccountEntry），rail 没有账户或消息入口；下拉恰好五项：消息中心 + 账户与用量 + 我的日程 + 设置 + 退出登录（dev-board#1490，#1713）', () => {
   // 沿革：2026-08-20 个人中心并进设置后下拉只剩一项，2026-08-21（dev-board#96）撤下拉、
   // 点头像直开设置；2026-08-27（dev-board#205）「退出登录」要有一级入口，下拉恢复成
   // 两项；2026-09-25（dev-board#899）加「我的日程」成三项。2026-09-29（dev-board#1047）
@@ -564,10 +564,12 @@ check('账户入口在顶栏右上角（AccountEntry），rail 没有账户或�
   if (menuIdx < 0) return 'AccountEntry 里找不到下拉 .avatar-menu'
   const menu = entry.slice(menuIdx, entry.indexOf('</template>', menuIdx))
   const actions = menu.match(/class="avatar-menu-item/g) || []
-  if (actions.length !== 4) return `下拉动作项应恰好四项，实际 ${actions.length} 项`
-  for (const ev of ['messages', 'schedule', 'settings', 'sign-out']) {
+  // 「账户与用量」只是入口、不摆余额数字（问题 113，dev-board#1713），算第五项
+  if (actions.length !== 5) return `下拉动作项应恰好五项，实际 ${actions.length} 项`
+  for (const ev of ['messages', 'account', 'schedule', 'settings', 'sign-out']) {
     if (!menu.includes(`emitAndClose('${ev}')`)) return `下拉里没有 ${ev} 项`
   }
+  if (/walletText|walletTier|trialText/.test(entry)) return '头像下拉不许摆余额数字、等级或试用剩余天数（问题 113），只留「账户与用量」入口'
   const firstAction = menu.slice(menu.indexOf('class="avatar-menu-item'), menu.indexOf('</view>', menu.indexOf('class="avatar-menu-item')))
   if (!firstAction.includes("emitAndClose('messages')")) return '消息中心必须是头像下拉的第一个动作'
   if (!tag.includes(':message-unread="messageCenterUnread"') || !tag.includes(':message-partial="messageCenterBadgePartial"')) return '头像没有接收消息未读数与来源不完整状态'

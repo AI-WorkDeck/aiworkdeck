@@ -294,10 +294,7 @@
           :display-name="userDisplayName || (currentUser && currentUser.displayName) || ''"
           :avatar-url="(currentUser && currentUser.avatarUrl) || ''"
           :wallet-visible="walletChipVisible"
-          :wallet-text="walletChipText"
           :wallet-low="walletLow"
-          :wallet-tier="walletTierName"
-          :trial-text="trialMenuText"
           :notice-text="accountNoticeText"
           :client-view="isClientView"
           :message-unread="messageCenterUnread"
@@ -2385,7 +2382,6 @@ import ScratchTransferDialog from '@/components/project-home/ScratchTransferDial
 import { defineAsyncComponent } from 'vue'
 import { registerOpenWorkbench, unregisterOpenWorkbench } from '@/utils/ideOpen.js'
 import { resolveLooseWorkspace } from './looseFiles.js'
-import { trialBalanceText } from '@/utils/trialBalanceText.js'
 import { flushDirtyEditors } from './flushDirtyEditors.js'
 import { registerQuitSave, unregisterQuitSave } from '@/utils/desktopQuitGuard.js'
 import { claimRestartStartup, createRestartRecovery } from './restartRecovery.js'
@@ -2495,7 +2491,6 @@ import {
   bindShareholderMeetingConversation, // 股东大会核查：会话绑定
   getAccountStatus,
   getLicenseStatus, // 试用版/正式版标识（含 accountConnected 组合口径）
-  getTrialBalance, // 试用余额（试用计量 v0.1.1，权威在账户站）
   getAccountBalance, // Credits 余额 chip（dev-board#187，后端带 TTL 缓存的轻端点）
   getCloudAccountGeneration,
   getCloudStatus, // 协作 chip：这份案卷有没有放进团队案件库、状态如何
@@ -2515,7 +2510,7 @@ import {
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { signOut } from '@/utils/signOut.js'
 import { requireAccount, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
-import { loadSiteLinks, siteBaseUrl, siteLinks } from '@/utils/siteLinks.js'
+import { loadSiteLinks, siteBaseUrl } from '@/utils/siteLinks.js'
 import { confirmPaidTranscription } from '@/utils/paidTranscribeGate.js'
 import { getCurrentUser, getSessionId } from '@/utils/auth.js'
 import { mergeMembers } from '@/utils/mergeMembers.js'
@@ -2770,7 +2765,6 @@ export default {
       // Credits 余额 chip（dev-board#187）。loaded=false 或 connected=false 时不渲染，
       // 绝不显示 0 冒充余额；available=false（官网不可达）时余额位显示「—」。
       wallet: { loaded: false, connected: false, available: true, balanceCents: null, membership: null },
-      trialBalance: null,
 
       // 布局状态
       viewMode: 'ide',
@@ -3156,35 +3150,12 @@ export default {
     railScheduleCount() {
       return this.railScheduleSummary.overdue + this.railScheduleSummary.today
     },
-    trialMenuText() {
-      return trialBalanceText(this.trialBalance, (k, v) => this.$t(k, v))
-    },
-    walletChipText() {
-      // 官网不可达：余额未知，显示「—」而不是 0
-      if (this.wallet.available === false) return '—'
-      const cents = Number(this.wallet.balanceCents)
-      const symbol = siteLinks().current === 'cn' ? '¥' : '$'
-      return symbol + ((Number.isFinite(cents) ? cents : 0) / 100).toFixed(2)
-    },
     // 余额不足：低于 20 元（2000 分）视为要提醒。官网不可达（余额未知）不算——
     // 那是连接问题不是钱的问题，用「—」表达就够了，不该冒充告急。
     walletLow() {
       if (this.wallet.available === false) return false
       const cents = Number(this.wallet.balanceCents)
       return Number.isFinite(cents) && cents < 2000
-    },
-    // 等级名小徽章：level>=2 才显示（律师助理档只显示余额），优先取多语言词条，否则按语言取 nameZh/nameEn
-    walletTierName() {
-      const m = this.wallet.membership
-      if (!m || !(Number(m.level) >= 2)) return ''
-      if (m.key && typeof this.$t === 'function') {
-        const k = `admin.membershipTiers.${m.key}`
-        const t = this.$t(k)
-        if (t && t !== k) return t
-      }
-      const loc = String((this.$i18n && this.$i18n.locale) || '')
-      const zh = loc === 'zh-CN' || loc === 'zh-TW'
-      return (zh ? m.nameZh : m.nameEn) || m.nameEn || m.nameZh || ''
     },
     meetingRecorderEnabled() { return this.dynamicPlugins.some(plugin => plugin.pluginId === 'voice') },
     /**
@@ -4791,7 +4762,6 @@ export default {
     // 绝不摆一个「¥0.00」冒充余额。
     async loadWalletBalance() {
       if (!isDesktopHost()) return
-      this.loadTrialBalance()
       try {
         const data = await getAccountBalance()
         if (data && data.connected) {
@@ -4808,14 +4778,6 @@ export default {
       } catch (e) {
         // 旧后端没有该端点 / 请求失败：chip 不渲染
         this.wallet = { loaded: false, connected: false, available: true, balanceCents: null, membership: null }
-      }
-    },
-    // 试用余额行：失败 / 未连接一律不渲染，绝不本地编造剩余次数
-    async loadTrialBalance() {
-      try {
-        this.trialBalance = await getTrialBalance()
-      } catch (e) {
-        this.trialBalance = null
       }
     },
     /** 宽限弹窗的主按钮：联网复验那条去账户设置，其余去官网。 */

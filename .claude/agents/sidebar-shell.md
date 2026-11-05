@@ -1093,7 +1093,7 @@ DdFilesPanel / ShareholderMeetingPanel。新面板照抄这套，不要再自定
 **登录 / 退出后即时刷新**：入口组件自己订 `awd:account-changed`（带 `connected` 的负载先按它翻转「登录 ⇄ 头像」，宿主 `loggedIn`
 跟上后以 prop 为准），工作台也订同一事件（`refreshAccountState` 重拉授权状态、余额、用户信息；mounted 挂、beforeUnmount 按引用摘，
 不加活跃实例守卫）。退出走 `utils/signOut.js`（单动作，停在当前页）。护栏 `tests/account/account-entry-account-changed.test.mjs`（含「在顶栏、rail 里没有账户入口与齿轮」的宿主摆放断言）+ `check:nav`。
-已登录显示头像，下拉 = 账户抬头（余额 + 等级）+ 提醒行（原顶栏宽限 / 试用 chip 文案，`accountNoticeText`）+ 我的日程 / 设置 / 退出登录三个动作；
+已登录显示头像，下拉 = 消息中心 +「账户与用量」入口（只给入口，**不摆余额数字、等级与试用剩余天数**——录屏投屏会把余额露给旁人，问题 113 / dev-board#1713；`check:nav` 断言 AccountEntry 里没有 walletText / walletTier / trialText，下拉恰好五项）+ 提醒行（原顶栏宽限 / 试用 chip 文案，`accountNoticeText`）+ 我的日程 / 设置 / 退出登录；
 余额不足或有提醒时头像右上角挂一个点。下拉从头像下方右对齐展开。顶栏整条是 drag 区：`.header-account` /
 `.account-entry-btn` / `.avatar-menu` 在 App.vue 的顶栏 no-drag 名单里，全屏 mask `.account-entry-mask` 在「全屏浮层」名单里。
 rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goToSystemSettings`）与应用菜单「设置…」（⌘,，`app.settings`）；
