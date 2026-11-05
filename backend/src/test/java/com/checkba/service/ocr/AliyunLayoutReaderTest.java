@@ -94,9 +94,18 @@ class AliyunLayoutReaderTest {
         assertTrue(p.stream().noneMatch(x -> x.text().equals("合同专用章")));
         assertTrue(p.stream().anyMatch(x -> x.text().startsWith("甲方(盖章)")));
         Picture seal = page.blocks().stream().filter(b -> b instanceof Picture).map(b -> (Picture) b).findFirst().orElseThrow();
-        assertNotNull(seal.xPt(), "seal is placed where it was on the page");
+        assertNotNull(seal.xPt(), "seal floats at its horizontal page position");
         assertEquals(715 * 595.3 / 1240, seal.xPt(), 1.0);
         assertEquals((1474 - 1177) * 841.9 / 1754, seal.heightPt(), 1.0);
+        // anchored to the signature paragraph it covers, so it follows that text when the page reflows
+        int sealAt = page.blocks().indexOf(seal);
+        assertTrue(page.blocks().get(sealAt + 1) instanceof Para next && next.text().startsWith("甲方(盖章)"),
+                "seal sits right before the paragraph it is anchored to");
+        assertEquals((1177 - 1286) * 841.9 / 1754, seal.yPt(), 1.0, "vertical offset from that paragraph's top");
+
+        // body size and line pitch measured from the scan so a page stays one page
+        assertEquals(10.5, page.bodyPt(), 1.0);
+        assertEquals(37 * 841.9 / 1754, page.linePitchPt(), 2.0);
     }
 
     @Test
@@ -124,5 +133,33 @@ class AliyunLayoutReaderTest {
         String noCoords = "{\"width\":100,\"height\":100,\"subImages\":[{\"blockInfo\":{\"blockDetails\":[{\"blockContent\":\"x\"}]}}]}";
         assertThrows(AliyunLayoutReader.MissingLayoutException.class, () -> AliyunLayoutReader.searchLines(noCoords));
         assertThrows(AliyunLayoutReader.MissingLayoutException.class, () -> AliyunLayoutReader.read(noCoords, 595, 842, null));
+    }
+
+    @Test
+    void sealCropKeepsOnlyTheRedInkSoPrintedTextUnderItIsNotDuplicated() throws Exception {
+        BufferedImage page = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        var g = page.createGraphics();
+        g.setColor(new java.awt.Color(246, 244, 238)); g.fillRect(0, 0, 100, 100);   // paper
+        g.setColor(new java.awt.Color(20, 20, 20)); g.fillRect(10, 45, 80, 10);       // printed text under the seal
+        g.setColor(new java.awt.Color(215, 30, 30)); g.drawOval(5, 5, 90, 90);        // seal ring
+        g.dispose();
+        byte[] png = AliyunLayoutReader.crop(page, new AliyunLayoutReader.Box(0, 0, 100, 100), 100, 100);
+        BufferedImage seal = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png));
+        assertTrue(seal.getColorModel().hasAlpha());
+        assertEquals(0, seal.getRGB(50, 50) >>> 24, "printed text is transparent");
+        assertEquals(0, seal.getRGB(30, 30) >>> 24, "paper is transparent");
+        assertEquals(255, seal.getRGB(50, 5) >>> 24, "red ink stays opaque");
+    }
+
+    @Test
+    void nonRedStampIsKeptAsIs() throws Exception {
+        BufferedImage page = new BufferedImage(50, 50, BufferedImage.TYPE_INT_RGB);
+        var g = page.createGraphics();
+        g.setColor(java.awt.Color.WHITE); g.fillRect(0, 0, 50, 50);
+        g.setColor(java.awt.Color.BLUE); g.drawOval(2, 2, 46, 46);
+        g.dispose();
+        BufferedImage seal = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(
+                AliyunLayoutReader.crop(page, new AliyunLayoutReader.Box(0, 0, 50, 50), 50, 50)));
+        assertEquals(255, seal.getRGB(25, 25) >>> 24, "no red ink found: crop is not hollowed out");
     }
 }
