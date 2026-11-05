@@ -36,9 +36,10 @@
       <!-- 弹层形态：顶部一句说明是哪个功能要账户 -->
       <div v-if="variant === 'dialog'" class="awd-login-reason" :role="reason === 'expired' ? 'alert' : undefined">{{ reasonText }}</div>
 
-      <!-- 站点分段控件（2026-09-23 §2.2）。单站形态（multiSite=false）整个不渲染；被配置钉定时渲染但不可点。 -->
+      <!-- 站点分段控件（2026-09-23 §2.2）。单站形态（multiSite=false）整个不渲染；被配置钉定时渲染但不可点。
+           弹层形态不在顶部放分段控件，改成底部语言选择器旁的小下拉（.unlock-site-select，问题 g13，dev-board#1713）。 -->
       <div
-        v-if="siteStatus.multiSite"
+        v-if="siteStatus.multiSite && variant !== 'dialog'"
         class="unlock-site-seg"
         :class="{ 'is-disabled': siteStatus.pinned, 'is-busy': siteBusy || rescueBusy }"
       >
@@ -52,27 +53,25 @@
         >{{ siteSegLabel(s) }}</span>
       </div>
 
-      <!-- 大陆站：手机号/口令登录 与 包晴天律师扫码登录 顶部分段切换（dev-board#1665） -->
+      <!-- 大陆站：手机号/口令登录 与 包晴天律师扫码登录 顶部分段切换（dev-board#1665）。
+           弹层形态用文字下划线标签（.unlock-mode-tabs），页面形态仍是药丸分段控件。 -->
       <div
         v-if="isPhoneSite && bqtScanEnabled && (mode === 'login' || mode === 'bqt')"
-        class="unlock-site-seg"
-        :class="{ 'is-busy': submitBusy || sendingCode }"
-        style="margin-top: 8px; margin-bottom: 16px;"
+        :class="[variant === 'dialog' ? 'unlock-mode-tabs' : 'unlock-site-seg', { 'is-busy': submitBusy || sendingCode }]"
+        :style="variant === 'dialog' ? null : 'margin-top: 8px; margin-bottom: 16px;'"
       >
         <component
           :is="'button'"
           type="button"
           :disabled="submitBusy || sendingCode"
-          class="unlock-site-seg-item"
-          :class="{ 'is-active': mode === 'login' }"
+          :class="[variant === 'dialog' ? 'unlock-mode-tab' : 'unlock-site-seg-item', { 'is-active': mode === 'login' }]"
           @click="switchMode('login')"
         >{{ $t('account.accountLoginTab') }}</component>
         <component
           :is="'button'"
           type="button"
           :disabled="submitBusy || sendingCode"
-          class="unlock-site-seg-item"
-          :class="{ 'is-active': mode === 'bqt' }"
+          :class="[variant === 'dialog' ? 'unlock-mode-tab' : 'unlock-site-seg-item', { 'is-active': mode === 'bqt' }]"
           @click="switchMode('bqt')"
         >{{ $t('account.bqtScanSwitch') }}</component>
       </div>
@@ -235,10 +234,11 @@
       </div>
 
       <!-- 共用提交区。两项同意分两枚勾选框且都不预勾选：《服务条款》《隐私政策》是合同同意；
-           跨境传输是个保法第三十九条的「单独同意」，绝不能并进协议一揽子打包。 -->
-      <div v-if="errorMsg" class="unlock-error">{{ errorMsg }}</div>
+           跨境传输是个保法第三十九条的「单独同意」，绝不能并进协议一揽子打包。
+           弹层形态把勾选框挪到按钮上方，提示夹在勾选框与按钮之间（问题 g13）；页面形态仍是 提示 → 按钮 → 勾选框。 -->
+      <div v-if="errorMsg && variant !== 'dialog'" class="unlock-error">{{ errorMsg }}</div>
       <component
-        v-if="mode !== 'bqt'"
+        v-if="mode !== 'bqt' && variant !== 'dialog'"
         :is="'button'"
         type="button"
         class="unlock-btn"
@@ -264,6 +264,16 @@
           </span>
         </div>
       </div>
+      <div v-if="errorMsg && variant === 'dialog'" class="unlock-error">{{ errorMsg }}</div>
+      <component
+        v-if="mode !== 'bqt' && variant === 'dialog'"
+        :is="'button'"
+        type="button"
+        class="unlock-btn"
+        :class="{ 'is-busy': submitBusy }"
+        :disabled="submitBusy"
+        @click="handlePrimary"
+      >{{ footerLabel }}</component>
 
       <!-- 底部一行：左边语言切换（语言名用各自的语言写，不翻译），右边 Key 入口 / 返回 / 暂不登录 -->
       <div class="unlock-card-foot">
@@ -273,6 +283,28 @@
             placement="top"
             @change="({ resolved }) => pickLanguage(resolved)"
           />
+          <!-- 弹层形态的站点切换：样式照语言选择器的小触发器；选中后走与分段控件同一个 onSiteSegTap，
+               没切成（取消确认、切站失败、忙）就把原生 select 的显示值拨回当前站点 -->
+          <div
+            v-if="siteStatus.multiSite && variant === 'dialog'"
+            class="unlock-site-select"
+            :class="{ 'is-disabled': siteStatus.pinned, 'is-busy': siteBusy || rescueBusy }"
+          >
+            <component
+              :is="'select'"
+              class="unlock-site-select-field"
+              :value="siteStatus.current"
+              :disabled="siteStatus.pinned || siteBusy || rescueBusy || submitBusy || sendingCode"
+              :aria-label="$t('onboarding.unlock.switchSiteTitle')"
+              :title="$t('onboarding.unlock.switchSiteTitle')"
+              @change="onSiteSegTap(siteStatus.sites.find((s) => s.id === $event.target.value)); $event.target.value = siteStatus.current"
+            >
+              <option v-for="s in siteStatus.sites" :key="s.id" :value="s.id">{{ siteSegLabel(s) }}</option>
+            </component>
+            <svg class="unlock-site-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
         </div>
         <div class="unlock-foot-right">
           <span v-if="mode === 'code'" class="unlock-foot-link" role="button" @click="switchMode('login')">{{ $t('onboarding.unlock.back') }}</span>
@@ -1490,6 +1522,123 @@ export default {
     font-weight: 500;
     cursor: default;
   }
+}
+
+/* ---------- 弹层形态专用（问题 g13）：登录方式下划线标签、底部站点小下拉、勾选框在按钮上方 ---------- */
+
+.unlock-mode-tabs {
+  display: flex;
+  gap: 20px;
+  margin: 20px 0 22px;
+  border-bottom: 1px solid var(--awd-border-subtle);
+
+  &.is-busy {
+    opacity: 0.7;
+  }
+}
+
+.unlock-mode-tab {
+  appearance: none;
+  margin: 0 0 -1px;
+  padding: 0 0 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-size: var(--awd-font-size-body);
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+  color: var(--awd-text-3);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+
+  &:hover:not([disabled]) {
+    color: var(--awd-text-2);
+  }
+
+  &.is-active {
+    color: var(--awd-accent-text);
+    border-bottom-color: var(--awd-accent);
+  }
+
+  &[disabled] {
+    cursor: default;
+  }
+}
+
+.unlock-card.is-dialog {
+  .unlock-error {
+    margin-top: 10px;
+  }
+
+  .unlock-btn {
+    margin-top: 14px;
+  }
+
+  .unlock-card-foot {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+
+  .unlock-lang {
+    gap: 8px;
+  }
+}
+
+/* 外观照 LanguagePicker 的 compact 触发器（透明底、细边框、12px、右侧小箭头） */
+.unlock-site-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  color: var(--awd-text-2);
+
+  &:hover:not(.is-disabled) {
+    color: var(--awd-text);
+  }
+
+  &.is-busy {
+    opacity: 0.7;
+  }
+}
+
+.unlock-site-select-field {
+  appearance: none;
+  min-height: 28px;
+  margin: 0;
+  padding-block: 3px;
+  padding-inline: 8px 24px;
+  border: 1px solid var(--awd-border-subtle);
+  border-radius: var(--awd-radius-md);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: var(--awd-panel-fs);
+  line-height: 1.3;
+  cursor: pointer;
+  transition: border-color 0.15s;
+
+  &:hover:not([disabled]),
+  &:focus-visible {
+    border-color: var(--awd-accent);
+    outline: none;
+  }
+
+  &[disabled] {
+    cursor: default;
+  }
+
+  option {
+    color: var(--awd-text);
+    background: var(--awd-surface);
+  }
+}
+
+.unlock-site-caret {
+  position: absolute;
+  inset-inline-end: 8px;
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .unlock-foot-right {

@@ -92,7 +92,7 @@ export default {
     "crossBorderNoticeBody": "中国サイトは AI WorkDeck のサーバー経由で Alibaba Cloud Bailian に接続し、国際サイトは OpenRouter を使用します。AI に送信するテキストやファイルの抜粋は推論と課金に使用され、選択したモデルによっては中国本土外で処理されます。設定で同意を撤回すると、プラットフォームの AI が無効になります。",
     "agreementRequired": "続行するには利用規約とプライバシーポリシーへの同意にチェックを入れてください",
     "crossBorderRequired": "続行するには越境転送に関する個別同意にチェックを入れてください",
-    "consentBothRequired": "続行するには上の2項目にチェックを入れてください",
+    "consentBothRequired": "先に2項目の同意にチェックを入れてください",
     "crossBorderLabelDomestic": "個別同意：AI に送信する内容は中国本土外で処理される場合があります",
     "crossBorderNoticeTitleDomestic": "中国本土外での処理の可能性に関する個別同意",
     "crossBorderNoticeBodyDomestic": "中国サイトは AI WorkDeck のサーバー経由で Alibaba Cloud Bailian に接続します。AI に送信するテキストやファイルの抜粋は推論と課金に使用され、選択したモデルによっては中国本土外で処理される場合があります。設定で同意を撤回すると、プラットフォームの AI が無効になります。",
