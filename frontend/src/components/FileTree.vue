@@ -4389,8 +4389,8 @@ export default {
 .context-menu-submenu-arrow {
   margin-inline-start: auto;
   padding-inline-start: 12px;
-  color: var(--awd-text-secondary, var(--awd-text));
-  font-size: 11px;
+  color: var(--awd-text-2);
+  font-size: var(--awd-panel-fs-meta);
 }
 .context-menu-subitem {
   padding-inline-start: 46px;
