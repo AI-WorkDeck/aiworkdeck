@@ -94,7 +94,6 @@ test('保存期间又有 change 事件，保存完成后仍保持 dirty', async 
   let finishSave
   vm.exportSvg = async () => ''
   vm.decodeSvg = () => ''
-  vm.saveDrawioDiagram = undefined
   const source = readFileSync(new URL('../../src/components/DrawioEditor.vue', import.meta.url), 'utf8')
   const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
     .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
