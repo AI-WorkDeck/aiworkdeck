@@ -81,3 +81,14 @@ test('接线：will-download 用 exportDefaultPath 算默认路径并挂 done �
   assert.match(PRELOAD, /setNextExportSource: \(filePath\) => ipcRenderer\.invoke\('fs:setNextExportSource', \{ filePath \}\)/)
   assert.match(PRELOAD, /ipcRenderer\.on\('checkba:download-done', listener\)/)
 })
+
+test('非 PDF 下载不沿用导出源目录（残留的源路径不能漏到别的下载）', () => {
+  assert.strictEqual(
+    exportDefaultPath({ filename: 'report.zip', sourceFilePath: '/Users/a/案件/合同.docx' }),
+    'report.zip',
+  )
+  assert.strictEqual(
+    exportDefaultPath({ filename: '合同.PDF', sourceFilePath: '/Users/a/案件/合同.docx' }),
+    path.join('/Users/a/案件', '合同.PDF'),
+  )
+})

@@ -72,6 +72,8 @@ public class ProjectController {
         if (userId == null) {
             throw new IllegalArgumentException("请先登录");
         }
+        var replay = projectService.findCreatedByRequestId(request, userId);
+        if (replay.isPresent()) return replay.get();
         Project project = projectService.createProject(request, userId);
         recordSharedIfFromDesktop(project, sessionId, userId);
         return project;

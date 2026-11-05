@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.io.ByteArrayInputStream;
@@ -70,6 +71,10 @@ class MobileTransferServiceTest {
 
     @MockBean
     private TransferBillingClient billing;
+    @SpyBean
+    private MobileRelayBlobStore blobStoreSpy;
+    @SpyBean
+    private ProjectFileService projectFileServiceSpy;
     // 拉起完整上下文时 WebTools 会尝试联网初始化搜索工具，与 MobileRelayEndpointIntegrationTest
     // 一样 mock 掉，避免测试环境里的无关网络依赖
     @MockBean
@@ -84,6 +89,7 @@ class MobileTransferServiceTest {
     @BeforeEach
     void setUp() {
         reset(billing, desktopStream);
+        reset(blobStoreSpy, projectFileServiceSpy);
         bindAccount(USER_A, "acct-a");
         bindAccount(USER_B, "acct-b");
     }
@@ -360,6 +366,42 @@ class MobileTransferServiceTest {
         verify(billing, times(1)).refund(eq("acct-a"), eq("ledger-4"), eq("xferrf-" + requestId));
         assertTrue(transferRepository.findByUserIdAndRequestId(USER_A, requestId).isEmpty(),
                 "配额检查失败不该留下一行 PUSH 记录");
+    }
+
+    @Test
+    @DisplayName("PUSH：读取项目文件失败时扣的费要立即退回")
+    void pushRefundsTheChargeWhenReadingFileFails() throws Exception {
+        Project project = newProject(USER_A, "我的项目");
+        ProjectFile file = projectFileService.createFile(project.getId(), null, "a.txt",
+                "txt", 5L, null, null, USER_A);
+        when(billing.charge(eq("acct-a"), anyLong(), anyString(), anyString()))
+                .thenReturn(new TransferBillingClient.ChargeResult(1, "ledger-r1"));
+        doThrow(new java.io.IOException("boom")).when(projectFileServiceSpy).getFileBytes(file.getId());
+
+        String requestId = newRequestId();
+        assertThrows(IllegalStateException.class,
+                () -> service.push(USER_A, "dev-b", "1", file.getId(), requestId));
+
+        verify(billing, times(1)).refund(eq("acct-a"), eq("ledger-r1"), eq("xferrf-" + requestId));
+        assertTrue(transferRepository.findByUserIdAndRequestId(USER_A, requestId).isEmpty());
+    }
+
+    @Test
+    @DisplayName("PUSH：暂存 blob 失败时扣的费要立即退回")
+    void pushRefundsTheChargeWhenStagingFails() throws Exception {
+        Project project = newProject(USER_A, "我的项目");
+        ProjectFile file = projectFileService.createFile(project.getId(), null, "a.txt",
+                "txt", 5L, null, null, USER_A);
+        when(billing.charge(eq("acct-a"), anyLong(), anyString(), anyString()))
+                .thenReturn(new TransferBillingClient.ChargeResult(1, "ledger-r2"));
+        doThrow(new IllegalStateException("disk full")).when(blobStoreSpy).put(any(), anyString(), any(), anyLong());
+
+        String requestId = newRequestId();
+        assertThrows(IllegalStateException.class,
+                () -> service.push(USER_A, "dev-b", "1", file.getId(), requestId));
+
+        verify(billing, times(1)).refund(eq("acct-a"), eq("ledger-r2"), eq("xferrf-" + requestId));
+        assertTrue(transferRepository.findByUserIdAndRequestId(USER_A, requestId).isEmpty());
     }
 
     @Test

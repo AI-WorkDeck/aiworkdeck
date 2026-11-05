@@ -25,6 +25,8 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
      */
     List<Project> findByUserIdOrderByCreatedAtDesc(Long userId);
 
+    java.util.Optional<Project> findFirstByUserIdAndCreateRequestId(Long userId, String createRequestId);
+
     java.util.Optional<Project> findFirstByUserIdAndProjectTypeOrderByIdAsc(Long userId, String projectType);
 
     /**

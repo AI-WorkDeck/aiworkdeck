@@ -21,6 +21,17 @@ public class ProjectCreateRequest {
      */
     private String name;
 
+    /** 幂等键（可选）：同一用户带同一个键重复建项目，只会得到第一次建出的那个项目。 */
+    private String clientRequestId;
+
+    public String getClientRequestId() {
+        return clientRequestId;
+    }
+
+    public void setClientRequestId(String clientRequestId) {
+        this.clientRequestId = clientRequestId;
+    }
+
     /**
      * 上市公司通过外部服务查询到的基础信息
      */
