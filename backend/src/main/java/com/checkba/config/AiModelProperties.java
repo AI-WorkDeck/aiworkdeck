@@ -33,7 +33,9 @@ public class AiModelProperties {
     public enum Provider {
         OLLAMA,
         OPENROUTER,
-        AWD_CLOUD
+        AWD_CLOUD,
+        /** 本地开发模拟模型，只由 ai.mock.enabled 打开（见 MockAiGuard），不能在设置页或 yml 里选中 */
+        MOCK
     }
 
     /**

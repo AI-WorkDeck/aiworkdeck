@@ -75,3 +75,6 @@ office-addin/installer/win/generated/
 desktop/node_modules
 frontend/node_modules
 office-addin/node_modules
+
+# scripts/quickstart.sh 的本地数据（日志、存储、隔离 user.home）
+.quickstart/

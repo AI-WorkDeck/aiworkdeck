@@ -46,3 +46,7 @@ Those run on the host via `restart-all.sh` (which also brings the sidecars up).
 跟踪，暂缓到有实际律所需求时再做。
 The default lawyer evaluation path (topology A) is in `firm-eval-topology-a.md`. A fully self-hosted
 main stack (topology B) is tracked in #3 and deferred until a real firm needs it.
+
+不含旁路服务的最小主栈（Postgres + 后端 + 前端 + nginx）怎么部署见 [self-hosting.md](self-hosting.md)；
+本机开发一条命令起最小栈见 [getting-started.md](getting-started.md)。
+For a minimal main stack without sidecars see self-hosting.md; for a one-command local dev stack see getting-started.md.
