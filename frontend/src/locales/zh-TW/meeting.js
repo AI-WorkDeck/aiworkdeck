@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "說話者{n}",
   "speakerNamePlaceholder": "說話者{n} 的名字",
   "generateMinutes": "產生會議紀要",
+  "generateInterview": "產生訪談筆錄",
   "sendingToAi": "正在交給 AI...",
   "generateMinutesFailed": "產生紀要失敗：{message}",
   "exportTranscript": "匯出轉寫稿",

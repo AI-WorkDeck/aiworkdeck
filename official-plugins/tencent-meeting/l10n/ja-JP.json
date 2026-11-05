@@ -13,5 +13,16 @@
   "panel.exporting": "会議資料を保存中…",
   "panel.preparingAi": "AI に渡す会議資料を準備中…",
   "view.account.name": "Tencent Meeting",
-  "view.meetings.name": "Tencent Meeting"
+  "view.meetings.name": "Tencent Meeting",
+  "panel.autoSync": "会議終了後にこのプロジェクトへ自動同期",
+  "panel.autoSyncHint": "オンにすると、このパネルを開いている間、プラグインが 5 分ごとにローカルの tmeet を実行し、直近 24 時間に終了した会議を確認することを許可します。録画または議事録のある新しい会議はこのプロジェクトの「Tencent Meeting」フォルダーに保存され、AI が議事録と ToDo を作成します（AI クレジットを消費）。プログラムはインストールしません。tmeet が未インストールまたは未認可の場合はスキップします。",
+  "panel.autoWaiting": "自動同期はオンです。まもなく確認します。",
+  "panel.autoRunning": "自動同期中…",
+  "panel.autoOk": "自動同期：{time} に確認、新たに {count} 件の会議を保存しました。",
+  "panel.autoPartial": "自動同期：{time} に {count} 件を保存。一部の資料はまだ準備中のため、後で再試行します。",
+  "panel.autoCliMissing": "自動同期をスキップ：tmeet CLI が見つかりません。",
+  "panel.autoNotLoggedIn": "自動同期をスキップ：Tencent Meeting が未認可です。",
+  "panel.autoAiFailed": "うち {count} 件は AI 議事録または ToDo を作成できませんでした。会議を開いて手動で作成できます。",
+  "panel.autoOn": "自動同期をオンにしました。",
+  "panel.autoOff": "自動同期をオフにしました。"
 }

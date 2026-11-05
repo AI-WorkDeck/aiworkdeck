@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "Người nói {n}",
   "speakerNamePlaceholder": "Tên của Người nói {n}",
   "generateMinutes": "Tạo biên bản họp",
+  "generateInterview": "Tạo biên bản phỏng vấn",
   "sendingToAi": "Đang chuyển cho AI...",
   "generateMinutesFailed": "Không thể tạo biên bản họp: {message}",
   "exportTranscript": "Xuất bản chép lời",

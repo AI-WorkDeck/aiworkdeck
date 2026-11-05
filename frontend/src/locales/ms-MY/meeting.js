@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "Penutur {n}",
   "speakerNamePlaceholder": "Nama untuk Penutur {n}",
   "generateMinutes": "Jana Minit Mesyuarat",
+  "generateInterview": "Jana Rekod Temu Bual",
   "sendingToAi": "Menyerahkan kepada AI...",
   "generateMinutesFailed": "Tidak dapat menjana minit mesyuarat: {message}",
   "exportTranscript": "Eksport Transkrip",

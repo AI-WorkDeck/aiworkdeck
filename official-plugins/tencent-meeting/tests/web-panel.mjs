@@ -340,3 +340,70 @@ test('new workspace labels and view names have all 20 locales and use the packag
     } finally { p.dom.window.close(); }
   }
 });
+
+// ---------- auto sync (issues 28/30) ----------
+test('auto sync stays off by default: no autosync call, no timer, no status line', async (t) => {
+  const p = await panel({ context: { surface: 'sidebar' } }); t.after(() => p.dom.window.close());
+  assert.equal(p.$('auto-sync').checked, false);
+  assert.equal(p.calls.some(call => call.action === 'autosync'), false);
+  assert.equal(p.timers.length, 0);
+  assert.equal(p.$('auto-status').hidden, true);
+  assert.ok(p.$('auto-sync').closest('label').textContent.trim());
+  assert.match(p.dom.window.document.body.textContent, /每 5 分钟调用本机 tmeet/);
+});
+test('enabled auto sync checks once on open, then on a timer, and a missing CLI is only a status line', async (t) => {
+  let last = { result: 'cliMissing', checkedAt: '2026-11-04T01:00:00Z', archived: 0 };
+  const p = await panel({ context: { surface: 'sidebar' }, invoke: ({ action }) => action === 'config' ? { ...fixture.config, autoSync: true }
+    : action === 'autosync' ? { enabled: true, last } : undefined });
+  t.after(() => p.dom.window.close());
+  assert.equal(p.$('auto-sync').checked, true);
+  const auto = p.calls.filter(call => call.action === 'autosync');
+  assert.equal(auto.length, 1); assert.equal(auto[0].params.language, 'zh');
+  assert.equal(p.$('auto-status').hidden, false); assert.match(p.$('auto-status').textContent, /未找到 tmeet/);
+  assert.equal(p.$('feedback').dataset.error, 'false', 'Skipping is silent, never an error');
+  assert.equal(p.timers.find(timer => !timer.cancelled).duration, 60000);
+  last = { result: 'ok', checkedAt: '2026-11-04T01:05:00Z', archived: 2, aiFailed: 1 };
+  assert.ok(await p.timer());
+  assert.equal(p.calls.filter(call => call.action === 'autosync').length, 2);
+  assert.match(p.$('auto-status').textContent, /新归档 2 场/); assert.match(p.$('auto-status').textContent, /1 场未能生成/);
+});
+test('workspace refreshes the meeting list after auto sync archives new meetings', async (t) => {
+  let last = { result: 'ok', checkedAt: 'a', archived: 0 };
+  const p = await panel({ context: { surface: 'workspace' }, invoke: ({ action }) => action === 'config' ? { ...fixture.config, autoSync: true }
+    : action === 'autosync' ? { enabled: true, last } : undefined });
+  t.after(() => p.dom.window.close());
+  const lists = () => p.calls.filter(call => call.action === 'list').length;
+  const before = lists();
+  last = { result: 'ok', checkedAt: 'b', archived: 1 }; await p.timer();
+  assert.equal(lists(), before + 1);
+});
+test('toggling auto sync saves per project and starts or stops the checks; project switch stops them', async (t) => {
+  let enabled = false;
+  const p = await panel({ context: { surface: 'sidebar' }, invoke: ({ action, params }) => {
+    if (action === 'config') { if ('autoSync' in params) enabled = params.autoSync; return { ...fixture.config, autoSync: enabled }; }
+    if (action === 'autosync') return { enabled, running: true };
+  } });
+  t.after(() => p.dom.window.close());
+  p.$('auto-sync').checked = true; p.$('auto-sync').dispatchEvent(new p.dom.window.Event('change')); await tick(); await tick();
+  assert.deepEqual(p.calls.filter(call => call.action === 'config').at(-1).params, { autoSync: true });
+  assert.equal(p.calls.at(-1).action, 'autosync'); assert.match(p.$('auto-status').textContent, /进行中/);
+  assert.match(p.$('feedback').textContent, /已开启自动同步/);
+  p.$('auto-sync').checked = false; p.$('auto-sync').dispatchEvent(new p.dom.window.Event('change')); await tick(); await tick();
+  assert.deepEqual(p.calls.filter(call => call.action === 'config').at(-1).params, { autoSync: false });
+  assert.equal(p.timers.filter(timer => !timer.cancelled && !timer.ran).length, 0);
+  assert.equal(p.$('auto-status').hidden, true);
+  enabled = true; p.$('auto-sync').checked = true; p.$('auto-sync').dispatchEvent(new p.dom.window.Event('change')); await tick(); await tick();
+  enabled = false; // the other project has its own (off) setting
+  await p.switch({ projectId: 2, surface: 'sidebar', language: 'zh-CN' });
+  assert.equal(p.$('auto-sync').checked, false);
+  assert.equal(p.timers.filter(timer => !timer.cancelled && !timer.ran && timer.duration === 60000).length, 0, 'old project timer must stop');
+});
+test('auto sync copy has all 20 locales', async () => {
+  const locales = ['ar-SA','de-DE','el-GR','en-US','es-ES','fr-FR','hi-IN','id-ID','it-IT','ja-JP','ko-KR','ms-MY','nl-NL','pt-BR','ru-RU','th-TH','tr-TR','vi-VN','zh-CN','zh-TW'];
+  const keys = ['autoSync','autoSyncHint','autoWaiting','autoRunning','autoOk','autoPartial','autoCliMissing','autoNotLoggedIn','autoAiFailed','autoOn','autoOff'];
+  for (const locale of locales) {
+    const dictionary = JSON.parse(readFileSync(new URL('../l10n/' + locale + '.json', import.meta.url), 'utf8'));
+    for (const key of keys) assert.ok(dictionary['panel.' + key]?.trim(), locale + ':' + key);
+    assert.match(dictionary['panel.autoSyncHint'], /tmeet/);
+  }
+});

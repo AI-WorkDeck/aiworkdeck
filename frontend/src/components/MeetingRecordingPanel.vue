@@ -240,6 +240,9 @@
               <view class="mr-btn primary" :class="{ disabled: generatingId === m.id }" @tap="onGenerateMinutes(m)">
                 {{ generatingId === m.id ? $t('meeting.sendingToAi') : $t('meeting.generateMinutes') }}
               </view>
+              <view class="mr-btn secondary" :class="{ disabled: generatingId === m.id }" @tap="onGenerateMinutes(m, 'interview')">
+                {{ $t('meeting.generateInterview') }}
+              </view>
               <view class="mr-btn secondary" @tap="onExport(m)">{{ $t('meeting.exportTranscript') }}</view>
             </view>
           </view>
@@ -926,11 +929,11 @@ export default {
         uni.showToast({ title: this.$t('meeting.submitTranscribeFailed', { message: (e && e.message) || e }), icon: 'none' })
       }
     },
-    async onGenerateMinutes(m) {
+    async onGenerateMinutes(m, format) {
       if (this.generatingId) return
       this.generatingId = m.id
       try {
-        const res = await getMeetingMinutesPrompt(m.id)
+        const res = await getMeetingMinutesPrompt(m.id, format)
         this.$emit('generate-minutes', { meeting: m, prompt: res.prompt })
       } catch (e) {
         uni.showToast({ title: this.$t('meeting.generateMinutesFailed', { message: (e && e.message) || e }), icon: 'none' })

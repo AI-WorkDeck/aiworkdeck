@@ -19,6 +19,15 @@ test('minutes and todos dispatch the prompt for the selected recording', async (
     assert.equal(ctx.busy, '')
   }
 })
+test('interview record reuses the minutes prompt chain with format=interview (issue 31)', async () => {
+  const ctx = context()
+  const calls = []
+  globalThis.__recordingApi = { minutes: async (id, format) => { calls.push([id, format]); return { prompt: format || 'minutes' } } }
+  await Actions.methods.run.call(ctx, 'interview')
+  await Actions.methods.run.call(ctx, 'minutes')
+  assert.deepEqual(calls, [[14, 'interview'], [14, undefined]])
+  assert.deepEqual(ctx.events.map((e) => e[1].prompt), ['interview', 'minutes'])
+})
 test('Word export refreshes files only after successful save', async () => {
   const ctx = context()
   globalThis.__recordingApi = { export: async id => { assert.equal(id, 14); return { file: { id: 9, name: 'Transcript.docx' }, folderName: 'Recordings' } } }

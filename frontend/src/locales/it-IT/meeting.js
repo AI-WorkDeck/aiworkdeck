@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "Relatore {n}",
   "speakerNamePlaceholder": "Nome per il Relatore {n}",
   "generateMinutes": "Genera verbale",
+  "generateInterview": "Genera verbale di intervista",
   "sendingToAi": "Passaggio all'AI...",
   "generateMinutesFailed": "Impossibile generare il verbale: {message}",
   "exportTranscript": "Esporta trascrizione",
