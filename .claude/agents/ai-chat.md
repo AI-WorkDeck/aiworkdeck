@@ -7,6 +7,10 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 职责边界：AI 对话功能本身（编排循环、工具注册分发、记忆、SSE、前端聊天 UI、评测）。AI→编辑器指令链路属 ai-doc-bridge 领域；skill 机制属 plugin-system 领域（但 SkillRouter 在编排循环里有两处旁路接入点）。
 
+## 模拟模型（本地开发，Stella 对齐 dev-onboarding）
+
+`ai.mock.enabled=true` 时 `ChatModelFactory.resolveProvider()` 恒为 `MOCK`（先于 local-mode 的 AWD_CLOUD 短路），同步/流式/辅助/限时四个入口都返回 `MockChatModel.INSTANCE`；`ensurePaidAccess` 与平台目录不参与，`/api/ai/config` 回 `activeProvider=MOCK`，前端 `requiresAiAccount('MOCK')` 为假（免账户、不收成 ASK）。模型行为确定：本轮提供了 `doc_list_project_files` 且本轮没发过工具请求 → 原生调用它一次；本轮已有工具请求 → `<final>` 摘录工具结果收尾；无工具 → `<final>` 回显。「本轮」从末尾往前数到第一条不带工具请求的 AiMessage，编排器在工具结果后追加提醒也不会再调工具。只认开关：库里或 yml 写 MOCK 不生效（设置页保存直接拒绝，`ai.model.provider=mock` 启动即失败）；`MockAiGuard` 要求激活 `dev` 且不含 prod/cloud/case/desktop，否则拒绝启动。测试：`MockChatModelTest`、`ChatModelFactoryTest.mockFlag*`。它只证明链路通，不能当作任何模型质量或真实 AI 验收的证据。
+
 ## 参数式提问兼容（2026-11-04，dev-board#1708）
 
 `XmlToolCallParser` 支持完整的 `<ask_user><parameter=question>…</parameter>…</ask_user>`，字段仅 question/options/header/multi_select，沿原严格协议块边界及 AskUserQuestion 校验；代码、引用、thinking/final 或普通正文混合输出不据此执行。前端 `legacyAskUserMarkup.mjs` 可将合法独立行包装显示为兼容提问卡，流式与历史共用；非法/截断保留字面文本，不猜执行、不伪造服务端等待状态。混合正文的停机问题与模型把内部分析写入 content 的来源仍需原始回执，不能将显示兼容称为两者均已修复。回归 XmlToolCallParserTest 与 legacy-ask-user-stream.test.mjs。
