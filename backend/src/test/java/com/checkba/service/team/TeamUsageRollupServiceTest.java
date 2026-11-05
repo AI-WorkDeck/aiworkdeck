@@ -95,6 +95,21 @@ class TeamUsageRollupServiceTest {
     }
 
     @Test
+    @DisplayName("空闲自动结束的段按最后一次活动时间算，不含 30 分钟挂机尾巴（dev-board#1713）")
+    void idleEndedSessionUsesLastActivityAsEnd() {
+        WorkSession idle = session(1L, WorkSession.SessionType.WORK, WorkSession.Status.MERGED, 90);
+        idle.setIdleEnded(true);
+        idle.setLastActivityAt(DAY.atTime(9, 0).plusMinutes(60));
+        WorkSession manual = session(2L, WorkSession.SessionType.WORK, WorkSession.Status.MERGED, 30);
+        manual.setLastActivityAt(DAY.atTime(9, 0).plusMinutes(10));
+        givenSessions(idle, manual);
+
+        Map<String, Object> payload = service.rollupFor(DAY, USER);
+
+        assertEquals(90L, payload.get("activeMinutes"), "空闲段 60 + 手动结束段 30（手动结束仍用 endedAt）");
+    }
+
+    @Test
     @DisplayName("ACTIVE 段不算工时：还没结束的段算一次就变大一次，同一天反复聚合会越滚越大")
     void activeSessionsAreExcluded() {
         WorkSession running = session(3L, WorkSession.SessionType.WORK, WorkSession.Status.ACTIVE, 0);

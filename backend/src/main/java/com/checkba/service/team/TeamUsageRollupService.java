@@ -145,8 +145,9 @@ public class TeamUsageRollupService {
      *       同一天反复聚合会得到不断变大的值。</li>
      * </ul>
      *
-     * <p>另有一个已知的口径误差：WORK 段空闲 30 分钟才自动结束，所以每段最多含 30 分钟
-     * 挂机尾巴。这是版本记录模块的既有行为，此处不做修正（改它会动到版本记录的语义）。
+     * <p>WORK 段空闲 30 分钟才自动结束，endedAt 比人停手晚一个阈值；空闲结束的段
+     * （idleEnded）改用 lastActivityAt 作为结束时间，版本记录侧的 endedAt 语义不变。
+     * 老数据没有 lastActivityAt，仍按 endedAt 算。
      */
     private long activeMinutes(LocalDate date, Long userId, Map<Long, Long> minutesByProject) {
         if (userId == null) return 0;
@@ -157,7 +158,13 @@ public class TeamUsageRollupService {
             if (s.getSessionType() != WorkSession.SessionType.WORK) continue;
             if (s.getStatus() == WorkSession.Status.ACTIVE) continue;
             if (s.getStartedAt() == null || s.getEndedAt() == null) continue;
-            long minutes = Duration.between(s.getStartedAt(), s.getEndedAt()).toMinutes();
+            LocalDateTime end = s.getEndedAt();
+            // 空闲自动结束的段，endedAt 是定时器触发那刻，比人停手晚一个空闲阈值；改按最后活动时间算。
+            LocalDateTime last = s.getLastActivityAt();
+            if (s.isIdleEnded() && last != null && last.isBefore(end) && !last.isBefore(s.getStartedAt())) {
+                end = last;
+            }
+            long minutes = Duration.between(s.getStartedAt(), end).toMinutes();
             if (minutes <= 0) continue;
             total += minutes;
             if (s.getProjectId() != null) {

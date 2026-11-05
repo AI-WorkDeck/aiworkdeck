@@ -50,6 +50,12 @@ public class WorkSession {
     @Column(nullable = false, length = 8, columnDefinition = "varchar(8) default 'WORK'")
     private SessionType sessionType = SessionType.WORK;
 
+    /** 最近一次变更信号的时间；空闲自动结束的段据此还原「人实际停手」的时刻。可空（老数据）。 */
+    private LocalDateTime lastActivityAt;
+
+    /** 是否由 30 分钟空闲定时器自动结束。可空（老数据按 false）。团队工时汇总据此扣掉挂机尾巴。 */
+    private Boolean idleEnded;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getProjectId() { return projectId; }
@@ -68,4 +74,8 @@ public class WorkSession {
     public void setUserId(Long userId) { this.userId = userId; }
     public SessionType getSessionType() { return sessionType; }
     public void setSessionType(SessionType sessionType) { this.sessionType = sessionType; }
+    public LocalDateTime getLastActivityAt() { return lastActivityAt; }
+    public void setLastActivityAt(LocalDateTime lastActivityAt) { this.lastActivityAt = lastActivityAt; }
+    public boolean isIdleEnded() { return Boolean.TRUE.equals(idleEnded); }
+    public void setIdleEnded(boolean idleEnded) { this.idleEnded = idleEnded; }
 }
