@@ -93,13 +93,27 @@ public class CloudController {
     public ResponseEntity<Map<String, Object>> connectOfficial(
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = requireLogin(sessionId);
-        CloudConnection conn = officialCloudService.connectOfficial(userId);
+        return ok(officialConnectionReply(officialCloudService.connectOfficial(userId)));
+    }
+
+    /**
+     * 律师明确点了「重新连接云端」：指纹没变也换新令牌（见 OfficialCloudService.reconnectOfficial）。
+     * 与上面的一键连接分开，免得 IM/工作流等默认调用方误触换令牌。
+     */
+    @PostMapping("/reconnect-official")
+    public ResponseEntity<Map<String, Object>> reconnectOfficial(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = requireLogin(sessionId);
+        return ok(officialConnectionReply(officialCloudService.reconnectOfficial(userId)));
+    }
+
+    private static Map<String, Object> officialConnectionReply(CloudConnection conn) {
         Map<String, Object> data = new HashMap<>();
         data.put("connectionId", conn.getId());
         data.put("username", conn.getUsername());
         data.put("displayName", conn.getDisplayName());
         data.put("serverUrl", conn.getServerUrl());
-        return ok(data);
+        return data;
     }
 
     @GetMapping("/connections")

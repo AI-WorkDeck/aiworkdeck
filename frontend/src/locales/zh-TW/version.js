@@ -273,6 +273,8 @@ export default {
   "copiedPasteToColleague": "已複製，粘貼給同事即可",
   "connectFailed": "連接失敗",
   "reconnectCloud": "重新連接雲端",
+  "reconnectDidNotHelp": "已經重新連接過雲端，雲端仍然拒絕這一步。可以在下面中斷這條連接後再放進團隊案件庫；已在案件庫裡的案卷，也可以「重新綁定這份案卷」。",
+  "reconnectedCloud": "已重新連接雲端，請再試一次",
   "inviteTextOfficial": "{inviter}邀你一起辦《{project}》。\n\n在 AI WorkDeck 里這樣加入：\n1. 用你自己的 AI WorkDeck 賬號登錄桌面端；\n2. 打開項目列表，點「從團隊案件庫取一份案卷」；\n3. 選《{project}》，點「取到本機」。\n\n之後你改你的、我改我的，各自點「交稿」就能合到一起。",
   "inviteTextOfficialNoInviter": "邀你一起辦《{project}》。\n\n在 AI WorkDeck 里這樣加入：\n1. 用你自己的 AI WorkDeck 賬號登錄桌面端；\n2. 打開項目列表，點「從團隊案件庫取一份案卷」；\n3. 選《{project}》，點「取到本機」。\n\n之後你改你的、我改我的，各自點「交稿」就能合到一起。",
   "addPeopleTitle": "把人加進這份案卷",

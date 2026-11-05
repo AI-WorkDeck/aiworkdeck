@@ -273,6 +273,8 @@ export default {
   "copiedPasteToColleague": "Kopyalandı — çalışma arkadaşınıza yapıştırın",
   "connectFailed": "Bağlantı başarısız oldu",
   "reconnectCloud": "Buluta Yeniden Bağlan",
+  "reconnectDidNotHelp": "Buluta yeniden bağlanıldı ancak bulut bu adımı hâlâ reddediyor. Aşağıdan kütüphane bağlantısını kesip dava dosyasını yeniden ekleyebilirsiniz; kütüphanede zaten olan bir dava dosyası «Bu dava dosyasını yeniden bağla» ile de yeniden bağlanabilir.",
+  "reconnectedCloud": "Buluta yeniden bağlanıldı. Lütfen tekrar deneyin.",
   "inviteTextOfficial": "{inviter}, AI WorkDeck üzerinde {project} projesinde birlikte çalışmanı davet ediyor.\n\nKatılmak için:\n1. Masaüstü uygulamasına kendi AI WorkDeck hesabınla giriş yap;\n2. Proje listesini aç ve “Ekip Dava Dosyası Kitaplığından Dava Dosyası Çek” seçeneğine tıkla;\n3. {project} projesini seç ve “Bu Cihaza Çek” seçeneğine tıkla.\n\nBundan sonra her biri kendi kopyamız üzerinde çalışır ve değişiklikleri birleştirmek için “Taslağı Gönder” seçeneğine tıklarız.",
   "inviteTextOfficialNoInviter": "AI WorkDeck üzerinde {project} projesinde birlikte çalışmaya davet edildin.\n\nKatılmak için:\n1. Masaüstü uygulamasına kendi AI WorkDeck hesabınla giriş yap;\n2. Proje listesini aç ve “Ekip Dava Dosyası Kitaplığından Dava Dosyası Çek” seçeneğine tıkla;\n3. {project} projesini seç ve “Bu Cihaza Çek” seçeneğine tıkla.\n\nBundan sonra her biri kendi kopyamız üzerinde çalışır ve değişiklikleri birleştirmek için “Taslağı Gönder” seçeneğine tıklarız.",
   "addPeopleTitle": "Bu Dava Dosyasına Kişi Ekle",

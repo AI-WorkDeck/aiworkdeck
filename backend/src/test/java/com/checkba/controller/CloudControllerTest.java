@@ -589,6 +589,34 @@ class CloudControllerTest {
         }
     }
 
+    /** 「重新连接云端」走单独的端点，只在律师明确点了才换令牌；默认的一键连接照旧幂等。 */
+    @Test
+    void reconnectOfficialGoesThroughTheExplicitPathAndNeverLeaksTheToken() {
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(USER_ID);
+            CloudConnection conn = new CloudConnection();
+            conn.setId(3L);
+            conn.setServerUrl("https://case.aiworkdeck.com");
+            conn.setDeviceToken("awdt_fresh");
+            when(officialCloudService.reconnectOfficial(USER_ID)).thenReturn(conn);
+
+            var resp = controller.reconnectOfficial("s");
+
+            verify(officialCloudService, never()).connectOfficial(any());
+            assertFalse(String.valueOf(resp.getBody()).contains("awdt_fresh"));
+            assertTrue(String.valueOf(resp.getBody()).contains("connectionId=3"));
+        }
+    }
+
+    @Test
+    void anonymousCannotReconnectOfficial() {
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession(null)).thenReturn(null);
+            assertThrows(IllegalArgumentException.class, () -> controller.reconnectOfficial(null));
+            verify(officialCloudService, never()).reconnectOfficial(any());
+        }
+    }
+
     /** 律师输入的是手机号，控制层只透传，不做任何形态判断（解析在服务端）。 */
     @Test
     void addMemberForwardsAPhoneNumberUntouched() {

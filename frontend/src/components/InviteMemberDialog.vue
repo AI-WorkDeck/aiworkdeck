@@ -72,6 +72,13 @@
               :class="{ disabled: sharing }"
               @tap="onReconnectCloud"
             >{{ $t('version.reconnectCloud') }}</view>
+            <!-- 只剩一条连接也列出来：重新连接还不管用时，律师能断开它再放进去（教程第 11 集） -->
+            <LibraryConnectionList
+              v-if="reconnectNeeded && errorMessage && !tooManyLibraries && connections.length"
+              :connections="connections"
+              :official-server-url="officialServerUrl"
+              @disconnected="onLibraryDisconnected"
+            />
           </template>
 
           <template v-else>
@@ -256,13 +263,13 @@ import {
   addProjectMember, lookupProjectMember, inviteClient,
   getCloudStatus, getOfficialCloud, listCloudConnections,
   shareProjectToCloud, addCloudMember, lookupCloudMember,
-  inviteCloudClient, removeCloudMember, connectOfficialCloud,
+  inviteCloudClient, removeCloudMember, reconnectOfficialCloud,
 } from '@/services/api.js'
 import { ASSIGNABLE_ROLES, roleLabel } from '@/config/memberRoles.js'
 import { getInitial } from '@/utils/textInitial.js'
 import { getAppLanguage } from '@/utils/appLanguage.js'
 import { siteBaseUrl } from '@/utils/siteLinks.js'
-import { shareProjectToLibrary, needsCloudReconnect } from '@/utils/cloudShare.js'
+import { shareProjectToLibrary, needsCloudReconnect, reconnectRequiredMessage } from '@/utils/cloudShare.js'
 import { requireAccount, accountLoginOpen } from '@/utils/requireAccount.js'
 import { readLocalMode } from '@/services/accountProfile.js'
 import LibraryConnectionList from '@/components/collab/LibraryConnectionList.vue'
@@ -341,6 +348,8 @@ export default {
       errorMessage: '',
       // 放进案件库被云端写权限门禁拒绝：errorMessage 里是后端原话，这里决定要不要给「重新连接云端」
       reconnectNeeded: false,
+      // 律师已经明确重新连接过：重放还被拒就换一句话，不原样重显
+      reconnectAttempted: false,
       addedName: '',
       inviteOpen: false,
       linkCopied: false,
@@ -414,6 +423,7 @@ export default {
         this.sharing = false
         this.errorMessage = ''
         this.tooManyLibraries = false
+        this.reconnectAttempted = false
         this.addedName = ''
         this.clearLookupResult()
         this.resolveTrackState()
@@ -530,24 +540,27 @@ export default {
         this.$emit('success')
         await this.resolveTrackState({ forceFetch: true })
       } catch (e) {
-        this.errorMessage = (e && e.message) || this.$t('version.shareToLibraryFailed')
         this.reconnectNeeded = needsCloudReconnect(e)
+        this.errorMessage = this.reconnectNeeded
+          ? reconnectRequiredMessage(e, this.reconnectAttempted, (k) => this.$t(k))
+          : (e && e.message) || this.$t('version.shareToLibraryFailed')
       } finally {
         this.sharing = false
       }
     },
-    // 「重新连接云端」：走现有的官方案件库连接入口，连好后重放一次「放进团队案件库」
+    // 「重新连接云端」：走明确重连接口（指纹没变也换新令牌），连好后重放一次「放进团队案件库」
     async onReconnectCloud() {
       if (this.sharing) return
       this.sharing = true
       try {
-        await connectOfficialCloud()
+        await reconnectOfficialCloud()
       } catch (e) {
         this.errorMessage = (e && e.message) || this.$t('version.connectFailed')
         return
       } finally {
         this.sharing = false
       }
+      this.reconnectAttempted = true
       await this.loadLibraryOptions()
       await this.onShareToLibrary()
     },

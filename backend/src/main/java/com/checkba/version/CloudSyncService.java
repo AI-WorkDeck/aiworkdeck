@@ -251,6 +251,32 @@ public class CloudSyncService {
         }
     }
 
+    /**
+     * 明确「重新连接云端」换了令牌之后，把这条连接下每份已入库案卷的写门禁（awdCloudScope）
+     * 换到新令牌上——与 share/clone 同一条显式绑定路径（{@link ProjectRepoService#bindCloudEpoch}），
+     * 后台同步绝不调。逐份尽力：云端那份已经没了或没权限的，换不过来就留着，界面给
+     * 「重新绑定这份案卷」（教程第 11 集）。
+     */
+    public void refenceConnectionProjects(long connectionId, Long userId) {
+        CloudConnection conn = ownedConnection(connectionId, userId);
+        explicitCloudOperation(conn, () -> {
+            for (ProjectRemote remote : remoteRepository.findByConnectionId(connectionId)) {
+                ReentrantLock lock = sessionService.repoLock(remote.getProjectId());
+                lock.lock();
+                try {
+                    repoService.bindCloudEpoch(remote.getProjectId(),
+                            conn.getServerUrl() + "/git/" + remote.getRemoteProjectId() + ".git",
+                            conn.getUsername(), conn.getDeviceToken());
+                } catch (RuntimeException e) {
+                    log.warn("重新连接后案卷写门禁未换过来: project={} {}", remote.getProjectId(), e.getMessage());
+                } finally {
+                    lock.unlock();
+                }
+            }
+            return null;
+        });
+    }
+
     public java.util.List<CloudConnection> listConnections(Long userId) {
         return connectionRepository.findByUserId(userId);
     }

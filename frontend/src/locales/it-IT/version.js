@@ -273,6 +273,8 @@ export default {
   "copiedPasteToColleague": "Copiato — incollalo al tuo collega",
   "connectFailed": "Connessione non riuscita",
   "reconnectCloud": "Ricollegati al cloud",
+  "reconnectDidNotHelp": "La connessione al cloud è stata ripristinata, ma il cloud rifiuta ancora questo passaggio. Puoi scollegare la libreria qui sotto e aggiungere di nuovo il fascicolo; un fascicolo già nella libreria si può anche ricollegare con «Ricollega questo fascicolo».",
+  "reconnectedCloud": "Ricollegato al cloud. Riprova.",
   "inviteTextOfficial": "{inviter} ti invita a collaborare a {project} su AI WorkDeck.\n\nEcco come partecipare:\n1. Accedi all'app desktop con il tuo account AI WorkDeck;\n2. Apri l'elenco dei progetti e fai clic su “Scarica un fascicolo dalla Raccolta fascicoli del team”;\n3. Seleziona {project} e fai clic su “Scarica su questo dispositivo”.\n\nDopo di ciò, ciascuno lavora sulla propria copia e fa clic su “Invia bozza” per unire le modifiche.",
   "inviteTextOfficialNoInviter": "Sei invitato a collaborare a {project} su AI WorkDeck.\n\nEcco come partecipare:\n1. Accedi all'app desktop con il tuo account AI WorkDeck;\n2. Apri l'elenco dei progetti e fai clic su “Scarica un fascicolo dalla Raccolta fascicoli del team”;\n3. Seleziona {project} e fai clic su “Scarica su questo dispositivo”.\n\nDopo di ciò, ciascuno lavora sulla propria copia e fa clic su “Invia bozza” per unire le modifiche.",
   "addPeopleTitle": "Aggiungi persone a questo fascicolo",
