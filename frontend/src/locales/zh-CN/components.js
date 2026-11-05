@@ -15,8 +15,8 @@ export default {
   nameSeparator: '、',
   manageTitle: '组件管理',
 
-  promptWithModel: '需要下载{name}（约 {runtime} MB；含模型约 {total} MB）。落盘于 ~/.aiworkdeck，可在「设置→组件管理」卸载释放。',
-  promptNoModel: '需要下载{name}（约 {runtime} MB）。落盘于 ~/.aiworkdeck，可在「设置→组件管理」卸载释放。',
+  promptWithModel: '需要下载「{name}」（约 {runtime} MB；含模型约 {total} MB）。落盘于 ~/.aiworkdeck，可在「设置 → 组件管理」卸载释放。',
+  promptNoModel: '需要下载「{name}」（约 {runtime} MB）。落盘于 ~/.aiworkdeck，可在「设置 → 组件管理」卸载释放。',
   promptUsage: '它用于：{unlocks}。不下载则：{impact}；其余功能不受影响。',
 
   sizeUnknown: '体积获取中…',
