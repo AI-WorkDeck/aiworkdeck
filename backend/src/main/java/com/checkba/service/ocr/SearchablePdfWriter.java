@@ -105,6 +105,30 @@ public final class SearchablePdfWriter {
         return dropped;
     }
 
+    /**
+     * Characters whose glyph the font shares with a lower code point (e.g. 方 with the Kangxi
+     * radical ⽅ U+2F45 in STHeiti). PDFBox writes the first code point of a glyph into ToUnicode, so
+     * such characters would extract as the look-alike and a search for "甲方" would find nothing.
+     * A font that returns any here must not be used for the text layer.
+     */
+    public static String aliasedCharacters(PDFont font, List<PageText> pages) throws IOException {
+        if (!(font instanceof org.apache.pdfbox.pdmodel.font.PDType0Font type0)
+                || !(type0.getDescendantFont() instanceof org.apache.pdfbox.pdmodel.font.PDCIDFontType2 cid)) return "";
+        var cmap = cid.getTrueTypeFont().getUnicodeCmapLookup();
+        java.util.Set<Integer> seen = new java.util.HashSet<>();
+        StringBuilder aliased = new StringBuilder();
+        for (PageText page : pages) for (Line line : page.lines()) {
+            String text = line.text() == null ? "" : line.text();
+            text.codePoints().filter(seen::add).forEach(cp -> {
+                int gid = cmap.getGlyphId(cp);
+                if (gid == 0) return;
+                List<Integer> codes = cmap.getCharCodes(gid);
+                if (codes != null && !codes.isEmpty() && codes.get(0) != cp) aliased.appendCodePoint(cp);
+            });
+        }
+        return aliased.toString();
+    }
+
     /** Displayed-page point (top-left origin) → unrotated PDF user space. */
     static double[] toUserSpace(double u, double v, PDRectangle box, int rotation) {
         double x0 = box.getLowerLeftX(), y0 = box.getLowerLeftY(), w = box.getWidth(), h = box.getHeight();
