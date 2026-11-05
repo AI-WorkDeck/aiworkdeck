@@ -303,7 +303,10 @@ export const fileOpenTabsMethods = {
           }
         } else {
           tree.selectedFileId = null
-          tree.multiSelectedIds = []
+          // 关掉最后一个文件标签时同样保留用户 ≥2 项的 Cmd 多选
+          if (!(Array.isArray(tree.multiSelectedIds) && tree.multiSelectedIds.length >= 2)) {
+            tree.multiSelectedIds = []
+          }
         }
       }
       applySync()
