@@ -153,6 +153,8 @@ function getBackendHealth() {
 // update may already have activated a different overlay while Spring was starting.
 function recordBackendBoot(ok, launch, reason = '') {
   if (!launch?.bootOverlay || launch.bootRecorded) return { reverted: false }
+  // 启动中途被退出/强杀（SIGTERM → before-quit → stopAll）：后端是我们自己停的，不是补丁坏了（问题 21）
+  if (!ok && services?.closing) return { reverted: false }
   launch.bootRecorded = true
   try {
     const overlay = require('./services/overlay')
@@ -1656,6 +1658,8 @@ function createServices() {
     dataDir,
     // 隔离实例（问题 20）：后端 -Duser.home、子进程 HOME、后端复用按 home 区分
     awdHome: require('./awd-home').awdHome(),
+    // overlay 启动失败计数按实例区分（问题 21）：userData 就是实例身份（单实例锁也按它判重）
+    instanceId: app.getPath('userData'),
     // ARM 版 Windows（Mac 虚拟机）上 x64 转译运行，服务启动看门狗要放宽（dev-board#340）
     winEmulated: require('./services/win-arch').isWinArmEmulated()
   })
