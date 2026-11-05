@@ -240,8 +240,9 @@ export default {
         })
       }
       // 在途保存还没回来：回来后 save() 会重挂防抖，但定时器随实例作废（_view 已销毁），
-      // 在途期间敲的字没人再传——等它结束后补传这份已取走的内容
-      if (this.saving && this._inflight) this._inflight.catch(() => {}).then(flush)
+      // 在途期间敲的字没人再传——等它结束后补传这份已取走的内容。save() 收尾时没有新输入
+      // 会清 dirty（失败则保持脏），只在仍脏时补传，避免把同一份内容再写一遍
+      if (this.saving && this._inflight) this._inflight.catch(() => {}).then(() => { if (this.dirty) flush() })
       else if (!this.saving) flush()
     }
     if (this._view) { this._view.destroy(); this._view = null }
