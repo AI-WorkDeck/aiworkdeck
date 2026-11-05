@@ -94,7 +94,9 @@ export default {
       dirty: false,
       restylePending: false,
       savedTip: '',
-      pendingExport: null,    // 保存链路里等 SVG 的那个 resolve
+      pendingExport: null,    // 保存链路里等 SVG 的那个 {id, resolve}
+      exportSeq: 0,           // 导出请求序号：回包按 requestId 对号，超时后迟到的旧回包不串给下一次
+      changeSeq: 0,           // change 事件计数：保存期间又有改动就不清 dirty
       // 桌面态资源包引导安装：packId 只在 getEditor() 明确回答"资源不在场"时才有值，
       // 见 boot() 里的判定。与 LitigationVisualPanel.vue 的 native pack 状态条同一套
       // 契约（packStatus/packInstall + 轮询），docs/NATIVE_PACK_DISTRIBUTION.md §5/§7.1。
@@ -291,6 +293,7 @@ export default {
       }
       if (msg.event === 'change') {
         this.dirty = true
+        this.changeSeq++
         this.savedTip = ''
         return
       }
@@ -299,8 +302,10 @@ export default {
         return
       }
       if (msg.event === 'export') {
-        if (this.pendingExport) {
-          this.pendingExport(msg.data || '')
+        const reqId = msg.message && msg.message.requestId
+        // 带 requestId 的回包只认当前这次请求；没带的（旧构建不回显）沿用老行为
+        if (this.pendingExport && (reqId == null || reqId === this.pendingExport.id)) {
+          this.pendingExport.resolve(msg.data || '')
           this.pendingExport = null
         }
         return
@@ -311,17 +316,21 @@ export default {
     // 后端收到空 svg 会只写 .drawio、不动 .svg/.png。
     exportSvg(xml) {
       return new Promise((resolve) => {
+        const id = ++this.exportSeq
         const timer = setTimeout(() => {
-          if (this.pendingExport) {
+          if (this.pendingExport && this.pendingExport.id === id) {
             this.pendingExport = null
             resolve('')
           }
         }, 8000)
-        this.pendingExport = (data) => {
-          clearTimeout(timer)
-          resolve(data)
+        this.pendingExport = {
+          id,
+          resolve: (data) => {
+            clearTimeout(timer)
+            resolve(data)
+          }
         }
-        this.post({ action: 'export', format: 'svg', xml })
+        this.post({ action: 'export', format: 'svg', xml, requestId: id })
       })
     },
 
@@ -339,12 +348,13 @@ export default {
     async persistNow(xml) {
       if (!xml) return
       this.savedTip = this.$t('editor.drawio.saving')
+      const changeSeq = this.changeSeq
       try {
         const dataUri = await this.exportSvg(xml)
         const svg = this.decodeSvg(dataUri)
         const res = await saveDrawioDiagram(this.projectId, this.file.id, { xml, svg })
         this.xml = xml
-        this.dirty = false
+        if (this.changeSeq === changeSeq) this.dirty = false
         this.savedTip = this.$t('editor.drawio.saved')
         // 同一张图的 .svg / .png 被一起改了，已打开的标签要重拉。
         // 图廊刷新缩略图；当前画布已经是保存的内容，不重新加载。
