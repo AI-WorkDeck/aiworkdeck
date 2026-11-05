@@ -65,5 +65,21 @@ export default {
   "clipboardRecordFailed": "클립보드 기록 실패",
   "fileCaptureFailed": "파일 기록 실패",
   "fileMoveOccupied": "이 파일이 사용 중일 수 있어 이동할 수 없습니다",
-  "filesMoveOccupiedCount": "{count}개의 파일이 사용 중일 수 있어 이동할 수 없습니다"
+  "filesMoveOccupiedCount": "{count}개의 파일이 사용 중일 수 있어 이동할 수 없습니다",
+  "ocrProgress": "인식 중 {index}/{total}",
+  "ocrCancel": "취소",
+  "ocrCancelling": "취소 중…",
+  "ocrBatchBusy": "이미 인식 작업이 진행 중입니다. 완료를 기다리거나 취소하세요",
+  "ocrConsentTitle": "클라우드 텍스트 인식을 사용할까요?",
+  "ocrConsentHint": "텍스트 레이어가 있는 PDF는 업로드나 과금 없이 바로 추출합니다. 클라우드 OCR은 스캔본과 이미지에만 필요합니다. 이 확인은 이번 일괄 작업에만 적용되며, 설정 → 계정 및 사용량 → 스캔 문서 인식에서 항상 클라우드 또는 로컬 전용으로 바꿀 수 있습니다.",
+  "ocrConsentCheck": "데이터 전송처와 과금 방식을 확인했습니다",
+  "ocrConsentConfirm": "시작",
+  "ocrCopied": "파일 {count}개의 텍스트를 복사하고 클립보드 기록에 저장했습니다",
+  "ocrSaved": "생성됨: {names}",
+  "ocrOthersNotOpened": "나란히 열지 않은 파일: {names}",
+  "ocrLocalOnly": "로컬 전용 인식으로 설정되어 이미지와 스캔본을 업로드하지 않았습니다(설정에서 변경 가능)",
+  "ocrFailedItem": "\"{name}\" 미완료: {reason}",
+  "ocrSkipped": "클라우드 OCR이 필요한 파일 {count}개를 건너뜀(미확인)",
+  "ocrCancelled": "취소됨, 미처리 {count}개",
+  "ocrSummaryTitle": "인식 완료 {done}/{total}"
 }

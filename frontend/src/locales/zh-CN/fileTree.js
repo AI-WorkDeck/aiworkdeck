@@ -171,4 +171,9 @@ export default {
   importDropTooLarge: '无本机路径的文件一次最多接收 100 MB，请先保存到本机再拖入',
   importDesktopOnly: '拖入导入仅桌面端支持',
   unknownFolder: '未知文件夹',
+  ocrMenu: '识别文字（OCR）',
+  ocrCopy: '复制文字',
+  ocrExportTxt: '导出 TXT',
+  ocrExportDocx: '导出 Word',
+  ocrOutputSuffix: '-识别文字',
 }

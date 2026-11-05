@@ -5138,3 +5138,47 @@ $color-accent: var(--awd-mint); // Mint Green
 .page-project-overview.chat-mode .side-resize-handle {
   display: none;
 }
+
+/* 资源管理器「识别文字」批量进度卡（tutorial-series#155） */
+.explorer-ocr-progress {
+  position: fixed;
+  inset-inline-start: 12px;
+  bottom: 36px;
+  z-index: 2500;
+  width: 260px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--awd-border);
+  border-radius: 8px;
+  background: var(--awd-surface);
+  color: var(--awd-text);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  font-size: 13px;
+}
+.explorer-ocr-progress-title { font-weight: 600; }
+.explorer-ocr-progress-name {
+  color: var(--awd-text-secondary, var(--awd-text));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: start;
+}
+.explorer-ocr-progress-bar { height: 4px; border-radius: 2px; background: var(--awd-surface-3, var(--awd-border)); overflow: hidden; }
+.explorer-ocr-progress-fill { height: 100%; background: var(--awd-accent); transition: width .2s; }
+.explorer-ocr-progress-cancel {
+  align-self: flex-end;
+  margin: 0;
+  padding: 4px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  border: 1px solid var(--awd-border-strong, var(--awd-border));
+  border-radius: 5px;
+  background: var(--awd-surface);
+  color: var(--awd-text);
+  cursor: pointer;
+}
+.explorer-ocr-progress-cancel:disabled { opacity: .6; cursor: default; }

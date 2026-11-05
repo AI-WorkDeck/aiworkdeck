@@ -153,5 +153,10 @@ export default {
   "importDropPrepareFailed": "تعذر تجهيز الملف المسحوب. احفظه على جهاز الكمبيوتر وحاول مرة أخرى.",
   "importDropTooLarge": "الملفات التي لا تحتوي على مسار محلي محدودة بـ 100 ميجابايت لكل عملية سحب. احفظها على جهاز الكمبيوتر أولًا.",
   "importDesktopOnly": "الاستيراد بالسحب متاح على سطح المكتب فقط",
-  "unknownFolder": "مجلد غير معروف"
+  "unknownFolder": "مجلد غير معروف",
+  "ocrMenu": "التعرّف على النص (OCR)",
+  "ocrCopy": "نسخ النص",
+  "ocrExportTxt": "تصدير TXT",
+  "ocrExportDocx": "تصدير Word",
+  "ocrOutputSuffix": "-نص OCR"
 }

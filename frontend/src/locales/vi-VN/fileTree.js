@@ -153,5 +153,10 @@ export default {
   "importDropPrepareFailed": "Không thể chuẩn bị tệp được kéo vào. Hãy lưu tệp vào máy tính của bạn và thử lại.",
   "importDropTooLarge": "Các tệp không có đường dẫn cục bộ bị giới hạn 100 MB mỗi lần kéo vào. Hãy lưu chúng vào máy tính của bạn trước.",
   "importDesktopOnly": "Chỉ nhập được bằng cách kéo thả trên ứng dụng desktop",
-  "unknownFolder": "Thư mục không xác định"
+  "unknownFolder": "Thư mục không xác định",
+  "ocrMenu": "Nhận dạng văn bản (OCR)",
+  "ocrCopy": "Sao chép văn bản",
+  "ocrExportTxt": "Xuất TXT",
+  "ocrExportDocx": "Xuất Word",
+  "ocrOutputSuffix": "-văn bản OCR"
 }

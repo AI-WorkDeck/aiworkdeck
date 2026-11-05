@@ -65,5 +65,21 @@ export default {
   "clipboardRecordFailed": "Échec de l'enregistrement du presse-papiers",
   "fileCaptureFailed": "Échec de l'enregistrement du fichier",
   "fileMoveOccupied": "Ce fichier est peut-être en cours d'utilisation et n'a pas pu être déplacé",
-  "filesMoveOccupiedCount": "{count} fichier(s) sont peut-être en cours d'utilisation et n'ont pas pu être déplacés"
+  "filesMoveOccupiedCount": "{count} fichier(s) sont peut-être en cours d'utilisation et n'ont pas pu être déplacés",
+  "ocrProgress": "Reconnaissance {index}/{total}",
+  "ocrCancel": "Annuler",
+  "ocrCancelling": "Annulation…",
+  "ocrBatchBusy": "Une reconnaissance est déjà en cours ; attendez-la ou annulez-la",
+  "ocrConsentTitle": "Utiliser la reconnaissance dans le cloud ?",
+  "ocrConsentHint": "Les PDF avec couche texte sont extraits directement, sans envoi ni facturation ; seuls les scans et images nécessitent l’OCR cloud. Cette confirmation ne vaut que pour ce lot ; passez à « toujours cloud » ou « local uniquement » dans Paramètres → Compte et utilisation → Reconnaissance des scans.",
+  "ocrConsentCheck": "J’ai pris connaissance de la destination des données et de la facturation",
+  "ocrConsentConfirm": "Démarrer",
+  "ocrCopied": "Texte de {count} fichier(s) copié et ajouté à l’historique du presse-papiers",
+  "ocrSaved": "Créé : {names}",
+  "ocrOthersNotOpened": "Non ouverts côte à côte : {names}",
+  "ocrLocalOnly": "La reconnaissance est réglée sur « local uniquement » ; images et scans non envoyés (modifiable dans les Paramètres)",
+  "ocrFailedItem": "« {name} » non terminé : {reason}",
+  "ocrSkipped": "{count} fichier(s) nécessitant l’OCR cloud ignoré(s) (non confirmé)",
+  "ocrCancelled": "Annulé ; {count} fichier(s) non traité(s)",
+  "ocrSummaryTitle": "Reconnus {done}/{total}"
 }

@@ -153,5 +153,10 @@ export default {
   "importDropPrepareFailed": "No se pudo preparar el archivo arrastrado. Guárdelo en su ordenador e inténtelo de nuevo.",
   "importDropTooLarge": "Los archivos sin ruta local están limitados a 100 MB por arrastre. Guárdelos primero en su ordenador.",
   "importDesktopOnly": "La importación por arrastre solo está disponible en la versión de escritorio",
-  "unknownFolder": "Carpeta desconocida"
+  "unknownFolder": "Carpeta desconocida",
+  "ocrMenu": "Reconocer texto (OCR)",
+  "ocrCopy": "Copiar texto",
+  "ocrExportTxt": "Exportar TXT",
+  "ocrExportDocx": "Exportar Word",
+  "ocrOutputSuffix": "-texto OCR"
 }

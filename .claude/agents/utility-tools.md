@@ -506,6 +506,34 @@ uni 依赖换桩；SSR 合并 class 的顺序不固定，按「含有这个类�
   （Credits 不足 / OCR 未开通要如实报给用户，不能让模型自己推断）。契约与病灶见
   `.claude/agents/ai-chat.md` 的「读取类工具的 OCR 路由」。
 
+**资源管理器右键「识别文字（OCR）」（tutorial-series#155，0.79）**：FileTree 对 PDF 与图片
+（`utils/explorerOcr.js` 的 `OCR_EXTENSIONS`，**须与后端 `ai.context.ocr-extensions` 同表**：pdf/jpg/jpeg/png/gif/bmp/webp；
+heic/tif 不在现有识别链路内）单选或多选右键，就地展开三项子菜单：复制文字 / 导出 TXT / 导出 Word。
+混选里有一份不支持就整项不显示；回收站视图不显示。FileTree 只 `$emit('ocr-files', {action, items})`（整组一次），
+其余全在宿主 mixin `pages/project-overview/explorerOcr.js`：
+- **一份文件一个请求**：`POST /api/projects/{pid}/files/{fid}/ocr {jobId, output: text|txt|docx, name, consentVersion}`
+  （`FileOcrController` → `service/ocr/FileOcrService`）；批量队列、进度卡（页面左下 `.explorer-ocr-progress`，可取消）、
+  单份失败不影响其余、最后汇总都在前端（纯逻辑 `runOcrBatch`/`summarizeOcrBatch`）。
+- **不新增出站请求或服务商**：图片直接走 `OcrService.recognizeGeneral`（仍是全仓唯一计费点）；扫描 PDF 走
+  `PdfCloudOcrService.recognizePages`（逐页 150DPI 渲染 → 同一入口，**不设页数上限**、任一页失败整份失败不产残缺文件，纯白页不上传不计费）；
+  带可用文字层的 PDF（`PdfTextLayer.isUsable`）直接返回，不上传、不计费、不问。
+- **告知/计费确认沿用扫描件识别那一套**：`OcrRoutingService.preference` 为 cloud 直接走；ask 时接口回
+  `status=consent_required` + 告知全文与 `VERSION`，前端用 `showDialog({checkLabel})`（勾选才能确认、不预勾选，与 ASR 告知同形）
+  问**一次**，确认后本批后续文件带同一 `consentVersion`；拒绝则本批需上传的文件记为「未处理」，文字层 PDF 照常完成；
+  local 一律不上传（回 `local_only`，本期资源管理器识别不接本地 MinerU）。偏好不在这里改，仍在「设置 → 账户与用量 → 扫描件识别」。
+- **取消**：一批共用一个 `jobId`；`POST /files/ocr/cancel {jobId}` 按「用户+jobId」登记，`FileOcrService` 在每页上传前与落盘前复查，
+  取消后不产迟到文件；已发出的那一页请求撤不回、可能已计费。未开始的文件前端直接跳过。
+- **产物**：TXT 为 UTF-8，同目录 `<原名去扩展名>{fileTree.ocrOutputSuffix}.txt`（zh-CN「-识别文字」），重名由服务端 `ConflictPolicy.RENAME`
+  加「 (n)」，汇总展示服务端实际名字；前端拟的名字不安全或扩展名不符时服务端回落默认名。Word 复用 `AiDocxExportService.exportMarkdownToDocx`
+  （write_docx 同一渲染器与样式画像），正文经 `FileOcrService.toMarkdown`：全部 Markdown 字符转义、单换行转硬换行（`<w:br/>`）、空行分段——
+  **文字为主，不还原版式**。只读成员可「复制文字」，导出要写权限；客户角色一律拒绝。
+- **复制**走 `insertClipboardAndCopy(text, {saveToHistory:true})`（进剪贴板历史）；多份时按「【文件名】」分段。
+- **并排校对**：导出 Word 后 `openOcrSideBySide` 开分屏，左原文件（PDF/图片预览）右 docx；原文件已在右侧时先 `moveTabTo` 到左侧，
+  避免 `openFile` 去重把它在右侧重新激活。批量只并排第一份，其余在汇总里列出。
+- 识别结果**不写** `project_file_text_cache`（缓存里可能躺着 AI 路径带「[System: …]」与 20 页截断的旧结果，也不读它）。
+回归：后端 `FileOcrServiceTest`、`FileOcrControllerTest`、`PdfCloudOcrServiceTest`；前端 `npm run test:explorer-ocr`
+（`explorerOcr.test.mjs` 纯逻辑 + `explorerOcrHost.test.mjs` 宿主 mixin 与 FileTree 接线）。未做真机：真实阿里云返回的换行粒度、长扫描件耗时与分屏观感。
+
 ## preload IPC 通道（desktop/preload/preload.js，window.checkbaDesktop）
 
 - app：`checkba:app-open-internal`（订阅）、`checkba:ui-confirm`（应用内确认弹窗，不被 BrowserView 遮挡）
