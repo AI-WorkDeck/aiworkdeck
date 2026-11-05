@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Slf4j
@@ -40,6 +41,8 @@ public class TencentMeetingService {
     private final ProjectFileService projectFileService;
     private final StorageServiceFactory storageServiceFactory;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    /** 正在同步的用户：手动点击与定时任务重叠会各插一份记录，进程内互斥即可。 */
+    private final Set<Long> runningUsers = ConcurrentHashMap.newKeySet();
 
     public TmeetAuthStatus getAuthStatus() {
         return tmeetCliService.getAuthStatus();
@@ -93,6 +96,17 @@ public class TencentMeetingService {
             throw new IllegalStateException(LangText.of("腾讯会议未登录，请先在插件界面扫码登录", "Tencent Meeting is not signed in; please scan the QR code in the plugin panel first"));
         }
 
+        if (!runningUsers.add(userId)) {
+            throw new IllegalStateException(LangText.of("同步正在进行中", "Sync already in progress"));
+        }
+        try {
+            return doSyncMeetings(userId, projectId, force);
+        } finally {
+            runningUsers.remove(userId);
+        }
+    }
+
+    private SyncSummary doSyncMeetings(Long userId, Long projectId, boolean force) {
         TencentMeetingSyncConfig cfg = getOrCreateConfig(userId);
         cfg.setLastSyncStatus("RUNNING");
         cfg.setLastSyncMessage(LangText.of("正在拉取会议列表中...", "Fetching meeting list..."));
@@ -154,7 +168,7 @@ public class TencentMeetingService {
                 }
 
                 // 查重：已同步且无需强制覆盖则跳过
-                Optional<TencentMeetingRecord> existingOpt = recordRepository.findByRecordFileId(recordFileId);
+                Optional<TencentMeetingRecord> existingOpt = recordRepository.findFirstByRecordFileIdOrderByIdAsc(recordFileId);
                 if (existingOpt.isPresent() && !force) {
                     TencentMeetingRecord existing = existingOpt.get();
                     // 如果传入了 projectId 且原有记录尚未绑定，顺便绑定
@@ -225,25 +239,29 @@ public class TencentMeetingService {
                 added++;
             }
 
-            cfg.setLastSyncAt(LocalDateTime.now());
-            cfg.setLastSyncStatus("SUCCESS");
-            cfg.setLastSyncMessage(LangText.of(
+            String message = LangText.of(
                     String.format("同步完成：扫描 %d 场，新增 %d 场，跳过 %d 场", totalFound, added, skipped),
-                    String.format("Sync completed: scanned %d, added %d, skipped %d", totalFound, added, skipped)));
-            configRepository.save(cfg);
+                    String.format("Sync completed: scanned %d, added %d, skipped %d", totalFound, added, skipped));
+            // 重新读取再回写状态字段：同步期间用户可能改了配置，不能用开头读到的旧实例整行覆盖
+            TencentMeetingSyncConfig fresh = getOrCreateConfig(userId);
+            fresh.setLastSyncAt(LocalDateTime.now());
+            fresh.setLastSyncStatus("SUCCESS");
+            fresh.setLastSyncMessage(message);
+            configRepository.save(fresh);
 
             return SyncSummary.builder()
                     .addedCount(added)
                     .skippedCount(skipped)
                     .totalFound(totalFound)
-                    .message(cfg.getLastSyncMessage())
+                    .message(message)
                     .build();
 
         } catch (Exception e) {
             log.error("腾讯会议同步发生异常", e);
-            cfg.setLastSyncStatus("FAILED");
-            cfg.setLastSyncMessage(LangText.of("同步失败: ", "Sync failed: ") + e.getMessage());
-            configRepository.save(cfg);
+            TencentMeetingSyncConfig fresh = getOrCreateConfig(userId);
+            fresh.setLastSyncStatus("FAILED");
+            fresh.setLastSyncMessage(LangText.of("同步失败: ", "Sync failed: ") + e.getMessage());
+            configRepository.save(fresh);
             throw new RuntimeException(LangText.of("腾讯会议同步失败: ", "Tencent Meeting sync failed: ") + e.getMessage(), e);
         }
     }

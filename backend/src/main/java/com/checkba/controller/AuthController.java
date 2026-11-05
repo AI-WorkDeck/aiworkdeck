@@ -258,6 +258,13 @@ public class AuthController {
     public Map<String, Object> login(@RequestBody LoginRequest request,
                                      jakarta.servlet.http.HttpServletRequest http) {
         String ip = http.getRemoteAddr();
+        // 同 ip+用户名串行化「检查锁定 → 校验凭据 → 记失败」，否则并发请求都在记账前通过检查，绕过 5 次上限
+        synchronized (authAbuseGuard.loginLock(ip, request.getUsername())) {
+            return loginLocked(request, ip);
+        }
+    }
+
+    private Map<String, Object> loginLocked(LoginRequest request, String ip) {
         // 锁定检查独立于凭据校验的 try：锁定拒绝不再计入失败（否则轮询会把锁无限续期）
         try {
             authAbuseGuard.checkLoginAttempt(ip, request.getUsername());

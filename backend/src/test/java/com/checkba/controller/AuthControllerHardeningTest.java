@@ -129,6 +129,38 @@ class AuthControllerHardeningTest {
     }
 
     @Test
+    @DisplayName("并发登录同一 ip+用户名：进入凭据校验的次数不超过 5 次上限")
+    void concurrentLoginsCannotBypassLockoutCap() throws Exception {
+        UserService userService = mock(UserService.class);
+        when(userService.login(anyString(), anyString())).thenAnswer(inv -> {
+            Thread.sleep(50);
+            throw new IllegalArgumentException("用户名或密码错误");
+        });
+        AuthController controller = new AuthController(
+                userService, null, null, null, serverGuard("open"), null, null, null, null, sessions(), false, null,
+                mock(com.checkba.service.account.AccountDeletionService.class), null);
+        AuthController.LoginRequest request = new AuthController.LoginRequest();
+        request.setUsername("alice");
+        request.setPassword("wrong");
+
+        int n = 20;
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(n);
+        java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+        java.util.List<java.util.concurrent.Future<?>> futures = new java.util.ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            futures.add(pool.submit(() -> {
+                start.await();
+                return controller.login(request, http());
+            }));
+        }
+        start.countDown();
+        for (java.util.concurrent.Future<?> f : futures) f.get();
+        pool.shutdown();
+
+        verify(userService, atMost(5)).login(anyString(), anyString());
+    }
+
+    @Test
     @DisplayName("awdk-login 成功：返回 token/userId/username/displayName/tokenId 信封")
     void awdkLoginSuccessEnvelope() {
         AwdkLoginService awdkLoginService = mock(AwdkLoginService.class);

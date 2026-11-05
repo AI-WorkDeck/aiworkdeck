@@ -266,4 +266,25 @@ class OptimizerAgentServiceTest {
 
         verify(source).pending(3, 3);
     }
+
+    @Test
+    void ackFailureAfterNotifyDoesNotNotifyAgainNextRun() {
+        triageReturns(FeedbackTriageService.VERDICT_UNCLEAR, 0.3);
+        when(notifier.notify(any(), any(), any(), any(), any())).thenReturn("https://github.com/a/b/issues/1");
+        UserFeedback again = new UserFeedback();
+        again.setId(5L);
+        again.setKind(UserFeedback.KIND_BUG);
+        again.setStatus(UserFeedback.STATUS_NEW);
+        when(source.pending(anyInt(), anyInt())).thenReturn(List.of(row)).thenReturn(List.of(again));
+        doThrow(new IllegalStateException("ack down")).doNothing().when(source).save(any());
+
+        svc.runOnce();
+        var report = svc.runOnce();
+
+        verify(notifier, times(1)).notify(any(), any(), any(), any(), any());
+        assertEquals(1, report.emailed());
+        assertEquals(UserFeedback.STATUS_EMAILED, again.getStatus());
+        assertEquals("https://github.com/a/b/issues/1", again.getPrUrl());
+        verify(source, times(2)).save(any());
+    }
 }

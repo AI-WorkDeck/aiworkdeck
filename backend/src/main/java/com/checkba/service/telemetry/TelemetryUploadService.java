@@ -193,8 +193,11 @@ public class TelemetryUploadService {
     /** Tier 2：上报最近一天的脱敏事件流（本地已过白名单；不重传历史，粗粒度即可） */
     private void uploadRecentEvents() {
         try {
+            // 游标：只传上次成功之后的新事件，否则每次启动/每天都会把最近 24h 重复入库
+            Instant dayAgo = Instant.now().minus(1, ChronoUnit.DAYS);
+            Instant cursor = settings.eventsCursor();
             List<TelemetryEvent> events =
-                    eventRepository.findByTsAfter(Instant.now().minus(1, ChronoUnit.DAYS));
+                    eventRepository.findByTsAfterOrderByTsAsc(cursor.isAfter(dayAgo) ? cursor : dayAgo);
             if (events.isEmpty()) return;
             if (events.size() > EVENT_BATCH_LIMIT) {
                 events = events.subList(0, EVENT_BATCH_LIMIT);
@@ -212,7 +215,10 @@ public class TelemetryUploadService {
             }
             Map<String, Object> body = Map.of("installId", identity.installId(), "events", items);
             if (!uploadSiteUnchanged()) return;
-            transport.post(ingestBaseUrl + "/events", mapper.writeValueAsString(body));
+            int status = transport.post(ingestBaseUrl + "/events", mapper.writeValueAsString(body));
+            if (status >= 200 && status < 300) {
+                settings.setEventsCursor(events.get(events.size() - 1).getTs());
+            }
         } catch (Exception e) {
             log.debug("事件流上报失败（静默）: {}", e.toString());
         }

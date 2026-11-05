@@ -14,7 +14,11 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -97,5 +101,62 @@ class TencentMeetingServiceTest {
                 "syncMeetings", Long.class, Long.class, boolean.class);
         assertFalse(m.isAnnotationPresent(org.springframework.transaction.annotation.Transactional.class),
                 "syncMeetings 包含外部 CLI 子进程循环，不得挂方法级 @Transactional 占住连接池");
+    }
+
+    private void loggedIn() {
+        com.checkba.service.tmeet.dto.TmeetAuthStatus auth = new com.checkba.service.tmeet.dto.TmeetAuthStatus();
+        auth.setLoggedIn(true);
+        when(tmeetCliService.getAuthStatus()).thenReturn(auth);
+    }
+
+    private static TencentMeetingSyncConfig cfg(boolean autoSync) {
+        TencentMeetingSyncConfig c = new TencentMeetingSyncConfig();
+        c.setUserId(7L);
+        c.setAutoSync(autoSync);
+        c.setSyncDays(7);
+        return c;
+    }
+
+    @Test
+    void syncDoesNotClobberConfigChangedDuringRun() {
+        loggedIn();
+        when(configRepository.findByUserId(7L)).thenReturn(Optional.of(cfg(true)), Optional.of(cfg(false)));
+        List<TencentMeetingSyncConfig> saved = new ArrayList<>();
+        when(configRepository.save(any(TencentMeetingSyncConfig.class))).thenAnswer(inv -> {
+            TencentMeetingSyncConfig c = inv.getArgument(0);
+            saved.add(c);
+            return c;
+        });
+
+        service.syncMeetings(7L, null, false);
+
+        TencentMeetingSyncConfig last = saved.get(saved.size() - 1);
+        assertEquals("SUCCESS", last.getLastSyncStatus());
+        assertFalse(last.getAutoSync());
+    }
+
+    @Test
+    void secondConcurrentSyncRejected() throws Exception {
+        loggedIn();
+        when(configRepository.findByUserId(7L)).thenAnswer(inv -> Optional.of(cfg(true)));
+        when(configRepository.save(any(TencentMeetingSyncConfig.class))).thenAnswer(inv -> inv.getArgument(0));
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        when(tmeetCliService.listEndedMeetings(any(), any(), Mockito.anyInt(), any())).thenAnswer(inv -> {
+            entered.countDown();
+            release.await(10, TimeUnit.SECONDS);
+            return List.of();
+        });
+        Thread first = new Thread(() -> service.syncMeetings(7L, null, false));
+        first.start();
+        try {
+            assertTrue(entered.await(10, TimeUnit.SECONDS));
+            assertThrows(IllegalStateException.class, () -> service.syncMeetings(7L, null, false));
+        } finally {
+            release.countDown();
+            first.join();
+        }
+        // 结束后可再次同步
+        assertDoesNotThrow(() -> service.syncMeetings(7L, null, false));
     }
 }
