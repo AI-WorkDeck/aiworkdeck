@@ -110,6 +110,7 @@ export default {
   "recentProjectsLoadFailed": "Échec du chargement — touchez pour réessayer",
   "projectHome": "Aperçu du projet",
   "allProjects": "Tous les projets…",
+  "closeProject": "Fermer le projet",
   "statusInProgress": "En cours",
   "collab": "Travail collaboratif",
   "managerLabel": "Responsable : {name}",
@@ -139,6 +140,7 @@ export default {
   "collapseSidebar": "Réduire la barre latérale",
   "toolsPanel": "Panneau d'outils",
   "aiAssistant": "Assistant IA",
+  "insightNeedsDoc": "Disponible dès qu’un document Word est ouvert",
   "dockToLeft": "Déplacer vers la barre latérale gauche",
   "dockToRight": "Déplacer vers le panneau droit",
   "dockToBottom": "Déplacer vers le panneau inférieur",
@@ -374,7 +376,9 @@ export default {
   },
   "welcome": {
     "quickChatPlaceholder": "Posez une question et appuyez sur Entrée pour démarrer un chat temporaire…",
+    "quickChatPlaceholderInProject": "Posez une question et appuyez sur Entrée pour démarrer une nouvelle conversation dans ce projet…",
     "enterChatMode": "Démarrer un chat temporaire",
+    "newChatInProject": "Nouvelle conversation dans ce projet",
     "quickNewDocx": "Nouveau document vierge",
     "quickNewMd": "Nouveau Markdown",
     "quickChatSend": "Envoyer"

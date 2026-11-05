@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 团队「本周」看板的纯函数：周一至周五的日期、成员周汇总、负荷档位、热力格等级。
+// 周一本周还没有过完的工作日，看板改看上周（boardWeek）。
 
 /** 每个工作日的预期工时（分钟）：8 小时 */
 export const EXPECTED_DAY_MINUTES = 8 * 60
@@ -51,17 +52,25 @@ export function completedWorkdays(today) {
   return dow - 1
 }
 
-/** 负荷比 = 本周已上报工时 / (8h × 已结束工作日)。周一还没有可比的数据，返回 null。 */
-export function loadRatio(weekMinutes, today) {
-  const days = completedWorkdays(today)
-  if (days <= 0) return null
-  return weekMinutes / (EXPECTED_DAY_MINUTES * days)
+/**
+ * 看板该看哪一周。平日看本周（周一至昨天）；周一本周还没有过完的工作日，
+ * 改看上周一至周五（整周 5 天），界面据 lastWeek 标明「上周」。
+ */
+export function boardWeek(today) {
+  const done = completedWorkdays(today)
+  if (done > 0) return { days: weekDays(today), workdays: done, lastWeek: false }
+  const lastMonday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7)
+  return { days: weekDays(lastMonday), workdays: 5, lastWeek: true }
 }
 
-/** 'light' | 'balanced' | 'busy'；没有可比数据（周一）时为 null。 */
+/** 负荷比 = 看板那一周已上报工时 / (8h × 那一周已结束的工作日)，口径见 boardWeek。 */
+export function loadRatio(weekMinutes, today) {
+  return weekMinutes / (EXPECTED_DAY_MINUTES * boardWeek(today).workdays)
+}
+
+/** 'light' | 'balanced' | 'busy' */
 export function loadBand(weekMinutes, today) {
   const ratio = loadRatio(weekMinutes, today)
-  if (ratio === null) return null
   if (ratio < LIGHT_MAX_RATIO) return 'light'
   if (ratio <= BALANCED_MAX_RATIO) return 'balanced'
   return 'busy'

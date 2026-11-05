@@ -264,6 +264,7 @@ export default {
   "addMemberFailed": "Không thể thêm",
   "copiedPasteToColleague": "Đã sao chép — hãy dán gửi cho đồng nghiệp của bạn",
   "connectFailed": "Kết nối thất bại",
+  "reconnectCloud": "Kết nối lại đám mây",
   "inviteTextOfficial": "{inviter} mời bạn cùng làm việc trên {project} tại AI WorkDeck.\n\nCách tham gia:\n1. Đăng nhập ứng dụng máy tính bằng tài khoản AI WorkDeck của riêng bạn;\n2. Mở danh sách dự án và nhấp vào \"Tải tệp vụ án từ Thư viện vụ án nhóm\";\n3. Chọn {project} và nhấp vào \"Tải về thiết bị này\".\n\nSau đó, mỗi người làm việc trên bản sao của riêng mình và nhấp vào \"Gửi bản thảo\" để gộp các thay đổi lại với nhau.",
   "inviteTextOfficialNoInviter": "Bạn được mời làm việc cùng nhau trên {project} trong AI WorkDeck.\n\nCách tham gia:\n1. Đăng nhập vào ứng dụng desktop bằng tài khoản AI WorkDeck của riêng bạn;\n2. Mở danh sách dự án và nhấp vào “Tải hồ sơ vụ việc từ Thư viện hồ sơ vụ việc của nhóm”;\n3. Chọn {project} và nhấp vào “Tải về thiết bị này”.\n\nSau đó, mỗi người làm việc trên bản sao của mình và nhấp vào “Gửi bản nháp” để hợp nhất các thay đổi.",
   "addPeopleTitle": "Thêm người vào hồ sơ vụ việc này",

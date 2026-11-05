@@ -110,6 +110,7 @@ export default {
   "recentProjectsLoadFailed": "Laden mislukt — tik om opnieuw te proberen",
   "projectHome": "Projectoverzicht",
   "allProjects": "Alle projecten…",
+  "closeProject": "Project sluiten",
   "statusInProgress": "Bezig",
   "collab": "Samenwerking",
   "managerLabel": "Verantwoordelijke: {name}",
@@ -139,6 +140,7 @@ export default {
   "collapseSidebar": "Zijbalk inklappen",
   "toolsPanel": "Hulpmiddelenpaneel",
   "aiAssistant": "AI-assistent",
+  "insightNeedsDoc": "Beschikbaar zodra een Word-document is geopend",
   "dockToLeft": "Naar de linkerzijbalk verplaatsen",
   "dockToRight": "Naar het rechterpaneel verplaatsen",
   "dockToBottom": "Naar het onderste paneel verplaatsen",
@@ -374,7 +376,9 @@ export default {
   },
   "welcome": {
     "quickChatPlaceholder": "Stel een vraag en druk op Enter om een vrije chat te starten…",
+    "quickChatPlaceholderInProject": "Stel een vraag en druk op Enter om in dit project een nieuwe chat te starten…",
     "enterChatMode": "Vrije chat starten",
+    "newChatInProject": "Nieuwe chat in dit project",
     "quickNewDocx": "Nieuw leeg document",
     "quickNewMd": "Nieuwe Markdown",
     "quickChatSend": "Verzenden"

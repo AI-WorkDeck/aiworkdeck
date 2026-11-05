@@ -110,6 +110,7 @@ export default {
   "recentProjectsLoadFailed": "載入失敗，點此重試",
   "projectHome": "專案概覽",
   "allProjects": "全部專案…",
+  "closeProject": "關閉專案",
   "statusInProgress": "進行中",
   "collab": "協作",
   "managerLabel": "負責人：{name}",
@@ -139,6 +140,7 @@ export default {
   "collapseSidebar": "收起左側欄",
   "toolsPanel": "常用工具",
   "aiAssistant": "AI 助手",
+  "insightNeedsDoc": "開啟一份 Word 文稿後可用",
   "dockToLeft": "移到左側欄",
   "dockToRight": "移到右側面板",
   "dockToBottom": "移到底部面板",
@@ -374,7 +376,9 @@ export default {
   },
   "welcome": {
     "quickChatPlaceholder": "輸入一個問題，按 Enter 開始隨手對話…",
+    "quickChatPlaceholderInProject": "輸入一個問題，按 Enter 在本專案新建對話…",
     "enterChatMode": "進入隨手對話",
+    "newChatInProject": "在本專案新建對話",
     "quickNewDocx": "新建空白文稿",
     "quickNewMd": "新建 Markdown",
     "quickChatSend": "發送"

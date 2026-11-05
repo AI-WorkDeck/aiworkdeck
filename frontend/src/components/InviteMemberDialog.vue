@@ -1,7 +1,7 @@
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
-  <view v-if="visible" class="workdeck-dialog-mask" @tap="close">
+  <view v-if="visible" class="workdeck-dialog-mask" :class="{ 'yield-to-login': loginLayerOpen }" @tap="close">
     <view class="workdeck-dialog" @tap.stop>
       <view class="workdeck-dialog-header">
         <text class="workdeck-dialog-title">{{ $t('version.addPeopleTitle') }}</text>
@@ -58,6 +58,13 @@
             <text v-else class="role-hint">{{ $t('version.noLibraryAvailableNote') }}</text>
             <text class="role-hint">{{ $t('version.clientNeedsLibraryHint') }}</text>
             <text v-if="errorMessage" class="form-error">{{ errorMessage }}</text>
+            <!-- 云端写权限门禁拒绝（kind=CLOUD_RECONNECT_REQUIRED）：律师自己点重新连接，不自动重连（问题 126/127） -->
+            <view
+              v-if="reconnectNeeded && errorMessage"
+              class="workdeck-btn workdeck-btn-secondary needs-library-btn"
+              :class="{ disabled: sharing }"
+              @tap="onReconnectCloud"
+            >{{ $t('version.reconnectCloud') }}</view>
           </template>
 
           <template v-else>
@@ -230,7 +237,7 @@
             <view v-if="!clientInviteCode" class="workdeck-btn workdeck-btn-primary" @tap="generateClientCode" :class="{ disabled: loading }">
                 {{ loading ? $t('version.generatingEllipsis') : $t('version.generateAccessCode') }}
             </view>
-            <view v-else class="workdeck-btn workdeck-btn-primary" @tap="close">{{ $t('version.finish') }}</view>
+            <view v-else class="workdeck-btn workdeck-btn-primary" @tap="close">{{ $t('common.done') }}</view>
         </block>
       </view>
     </view>
@@ -242,14 +249,14 @@ import {
   addProjectMember, lookupProjectMember, inviteClient,
   getCloudStatus, getOfficialCloud, listCloudConnections,
   shareProjectToCloud, addCloudMember, lookupCloudMember,
-  inviteCloudClient, removeCloudMember,
+  inviteCloudClient, removeCloudMember, connectOfficialCloud,
 } from '@/services/api.js'
 import { ASSIGNABLE_ROLES, roleLabel } from '@/config/memberRoles.js'
 import { getInitial } from '@/utils/textInitial.js'
 import { getAppLanguage } from '@/utils/appLanguage.js'
 import { siteBaseUrl } from '@/utils/siteLinks.js'
-import { shareProjectToLibrary } from '@/utils/cloudShare.js'
-import { requireAccount } from '@/utils/requireAccount.js'
+import { shareProjectToLibrary, needsCloudReconnect } from '@/utils/cloudShare.js'
+import { requireAccount, accountLoginOpen } from '@/utils/requireAccount.js'
 import { readLocalMode } from '@/services/accountProfile.js'
 import {
   TRACK, resolveTrack, isWorthLooking, lookupIdentifier, inviteLinkFor, notFoundPresentation,
@@ -319,6 +326,8 @@ export default {
       notFoundReason: '',
       // ---- 就地反馈 ----
       errorMessage: '',
+      // 放进案件库被云端写权限门禁拒绝：errorMessage 里是后端原话，这里决定要不要给「重新连接云端」
+      reconnectNeeded: false,
       addedName: '',
       inviteOpen: false,
       linkCopied: false,
@@ -327,6 +336,10 @@ export default {
     }
   },
   computed: {
+    // 登录层（z-index 9990）开着时本弹窗（9999）整块收起让路，登录完自己回来
+    loginLayerOpen() {
+      return accountLoginOpen.value
+    },
     isCloudTrack() {
       return this.track === TRACK.CLOUD
     },
@@ -484,6 +497,7 @@ export default {
           && !(await requireAccount({ reason: 'team' }))) return
       this.sharing = true
       this.errorMessage = ''
+      this.reconnectNeeded = false
       try {
         const res = await shareProjectToLibrary({
           projectId: this.projectId,
@@ -499,9 +513,25 @@ export default {
         await this.resolveTrackState({ forceFetch: true })
       } catch (e) {
         this.errorMessage = (e && e.message) || this.$t('version.shareToLibraryFailed')
+        this.reconnectNeeded = needsCloudReconnect(e)
       } finally {
         this.sharing = false
       }
+    },
+    // 「重新连接云端」：走现有的官方案件库连接入口，连好后重放一次「放进团队案件库」
+    async onReconnectCloud() {
+      if (this.sharing) return
+      this.sharing = true
+      try {
+        await connectOfficialCloud()
+      } catch (e) {
+        this.errorMessage = (e && e.message) || this.$t('version.connectFailed')
+        return
+      } finally {
+        this.sharing = false
+      }
+      await this.loadLibraryOptions()
+      await this.onShareToLibrary()
     },
     async runLookup(rawValue) {
       const seq = ++this.lookupSeq
@@ -660,6 +690,9 @@ export default {
   justify-content: center;
   z-index: 9999;
   backdrop-filter: blur(2px);
+}
+.yield-to-login {
+  visibility: hidden;
 }
 
 .workdeck-dialog {

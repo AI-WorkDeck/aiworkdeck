@@ -264,6 +264,7 @@ export default {
   "addMemberFailed": "追加できませんでした",
   "copiedPasteToColleague": "コピーしました — 同僚に貼り付けて送ってください",
   "connectFailed": "接続に失敗しました",
+  "reconnectCloud": "クラウドに再接続",
   "inviteTextOfficial": "{inviter} が、AI WorkDeck で {project} を一緒に作業するようあなたを招待しました。\n\n参加方法:\n1. 自分の AI WorkDeck アカウントでデスクトップアプリにサインインします。\n2. プロジェクト一覧を開き、「チーム案件ライブラリから案件ファイルを取得」をクリックします。\n3. {project} を選択し、「このデバイスに取得」をクリックします。\n\nその後は各自が自分のコピーで作業し、「草案を送信」をクリックして変更を統合します。",
   "inviteTextOfficialNoInviter": "{project} で AI WorkDeck を使って共同作業しませんか。\n\n参加方法:\n1. デスクトップアプリにご自身の AI WorkDeck アカウントでサインインします。\n2. プロジェクト一覧を開き、「チーム案件ライブラリから案件ファイルをプル」をクリックします。\n3. {project} を選択し、「このデバイスにプル」をクリックします。\n\nその後は、それぞれ自分のコピーで作業し、「ドラフトを送信」をクリックして変更を統合します。",
   "addPeopleTitle": "この案件ファイルにメンバーを追加",

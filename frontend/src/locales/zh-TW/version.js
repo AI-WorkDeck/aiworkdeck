@@ -264,6 +264,7 @@ export default {
   "addMemberFailed": "沒能加進來",
   "copiedPasteToColleague": "已複製，粘貼給同事即可",
   "connectFailed": "連接失敗",
+  "reconnectCloud": "重新連接雲端",
   "inviteTextOfficial": "{inviter}邀你一起辦《{project}》。\n\n在 AI WorkDeck 里這樣加入：\n1. 用你自己的 AI WorkDeck 賬號登錄桌面端；\n2. 打開項目列表，點「從團隊案件庫取一份案卷」；\n3. 選《{project}》，點「取到本機」。\n\n之後你改你的、我改我的，各自點「交稿」就能合到一起。",
   "inviteTextOfficialNoInviter": "邀你一起辦《{project}》。\n\n在 AI WorkDeck 里這樣加入：\n1. 用你自己的 AI WorkDeck 賬號登錄桌面端；\n2. 打開項目列表，點「從團隊案件庫取一份案卷」；\n3. 選《{project}》，點「取到本機」。\n\n之後你改你的、我改我的，各自點「交稿」就能合到一起。",
   "addPeopleTitle": "把人加進這份案卷",

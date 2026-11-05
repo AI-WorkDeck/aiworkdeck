@@ -69,6 +69,10 @@
               <view class="switcher-item switcher-all" @tap="goAllProjects">
                 <text>{{ $t('workbench.allProjects') }}</text>
               </view>
+              <!-- 问题 14：切换器里也能关项目，执行与菜单「文件 > 关闭项目」同一条 app:closeProject -->
+              <view v-if="hasNamedProject" class="switcher-item switcher-close" @tap="closeProjectFromSwitcher">
+                <text>{{ $t('workbench.closeProject') }}</text>
+              </view>
             </view>
             <view v-if="isScratchWorkspace" class="scratch-promote-btn" @click="handlePromoteScratchWorkspace">{{ $t('workbench.chatMode.promoteAction') }}</view>
             <view v-if="isScratchWorkspace" class="scratch-promote-btn" @click="openScratchTransfer">{{ $t('workbench.scratchCopyTitle') }}</view>
@@ -294,10 +298,7 @@
           :display-name="userDisplayName || (currentUser && currentUser.displayName) || ''"
           :avatar-url="(currentUser && currentUser.avatarUrl) || ''"
           :wallet-visible="walletChipVisible"
-          :wallet-text="walletChipText"
           :wallet-low="walletLow"
-          :wallet-tier="walletTierName"
-          :trial-text="trialMenuText"
           :notice-text="accountNoticeText"
           :client-view="isClientView"
           :message-unread="messageCenterUnread"
@@ -1780,8 +1781,11 @@
             @drop="handleAiDrop"
           >
             <!-- 右侧 dock 的 tab 条（dev-board#180）：只有真有面板被停到右侧时才渲染，
-                 平时右侧仍然只有 AI 对话本体，零视觉回归。 -->
-            <view v-if="rightDockPanels.length" class="right-dock-tabs">
+                 平时右侧仍然只有 AI 对话本体，零视觉回归。
+                 问题 12：「依据」只认 Word 文稿，原来没打开文稿时整条 tab 条消失、AI 头部随开关文档
+                 上下跳；现在按全部面板排（rightDockTabs），不可用的「依据」显示禁用态，Word/PPT/Excel/PDF
+                 打开时 tab 条一致。 -->
+            <view v-if="rightDockTabs.length" class="right-dock-tabs">
               <view
                 v-if="hasProject"
                 class="right-dock-tab"
@@ -1791,15 +1795,17 @@
                 <text>{{ $t('workbench.aiAssistant') }}</text>
               </view>
               <view
-                v-for="p in rightDockPanels"
+                v-for="p in rightDockTabs"
                 :key="p.key"
-                class="right-dock-tab is-movable"
-                :class="{ active: rightPaneKey === p.key }"
-                :draggable="true"
-                @tap="switchRightPane(p.key)"
+                class="right-dock-tab"
+                :class="{ active: rightPaneKey === p.key, 'is-disabled': p.disabled, 'is-movable': !p.disabled }"
+                :title="p.disabled ? $t('workbench.insightNeedsDoc') : null"
+                :aria-disabled="p.disabled ? 'true' : null"
+                :draggable="!p.disabled"
+                @tap="!p.disabled && switchRightPane(p.key)"
                 @dragstart="onPanelDragStart(p.key, $event)"
                 @dragend="onPanelDragEnd"
-                @contextmenu.prevent.stop="openDockMenu(p.key, $event)"
+                @contextmenu.prevent.stop="!p.disabled && openDockMenu(p.key, $event)"
               >
                 <text>{{ p.label }}</text>
               </view>
@@ -2386,7 +2392,6 @@ import ScratchTransferDialog from '@/components/project-home/ScratchTransferDial
 import { defineAsyncComponent } from 'vue'
 import { registerOpenWorkbench, unregisterOpenWorkbench } from '@/utils/ideOpen.js'
 import { resolveLooseWorkspace } from './looseFiles.js'
-import { trialBalanceText } from '@/utils/trialBalanceText.js'
 import { flushDirtyEditors } from './flushDirtyEditors.js'
 import { registerQuitSave, unregisterQuitSave } from '@/utils/desktopQuitGuard.js'
 import { claimRestartStartup, createRestartRecovery } from './restartRecovery.js'
@@ -2496,7 +2501,6 @@ import {
   bindShareholderMeetingConversation, // 股东大会核查：会话绑定
   getAccountStatus,
   getLicenseStatus, // 试用版/正式版标识（含 accountConnected 组合口径）
-  getTrialBalance, // 试用余额（试用计量 v0.1.1，权威在账户站）
   getAccountBalance, // Credits 余额 chip（dev-board#187，后端带 TTL 缓存的轻端点）
   getCloudAccountGeneration,
   getCloudStatus, // 协作 chip：这份案卷有没有放进团队案件库、状态如何
@@ -2516,7 +2520,7 @@ import {
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { signOut } from '@/utils/signOut.js'
 import { requireAccount, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
-import { loadSiteLinks, siteBaseUrl, siteLinks } from '@/utils/siteLinks.js'
+import { loadSiteLinks, siteBaseUrl } from '@/utils/siteLinks.js'
 import { confirmPaidTranscription } from '@/utils/paidTranscribeGate.js'
 import { getCurrentUser, getSessionId } from '@/utils/auth.js'
 import { mergeMembers } from '@/utils/mergeMembers.js'
@@ -2578,6 +2582,7 @@ import {
   hasNonWelcomeOpenTabs,
   isScratchProject,
   normalizeViewMode,
+  promoteScratchDefaultName,
   resolveInitialViewMode,
   shouldShowChatCanvas,
 } from './chatMode.js'
@@ -2773,7 +2778,6 @@ export default {
       // Credits 余额 chip（dev-board#187）。loaded=false 或 connected=false 时不渲染，
       // 绝不显示 0 冒充余额；available=false（官网不可达）时余额位显示「—」。
       wallet: { loaded: false, connected: false, available: true, balanceCents: null, membership: null },
-      trialBalance: null,
 
       // 布局状态
       viewMode: 'ide',
@@ -3160,35 +3164,12 @@ export default {
     railScheduleCount() {
       return this.railScheduleSummary.overdue + this.railScheduleSummary.today
     },
-    trialMenuText() {
-      return trialBalanceText(this.trialBalance, (k, v) => this.$t(k, v))
-    },
-    walletChipText() {
-      // 官网不可达：余额未知，显示「—」而不是 0
-      if (this.wallet.available === false) return '—'
-      const cents = Number(this.wallet.balanceCents)
-      const symbol = siteLinks().current === 'cn' ? '¥' : '$'
-      return symbol + ((Number.isFinite(cents) ? cents : 0) / 100).toFixed(2)
-    },
     // 余额不足：低于 20 元（2000 分）视为要提醒。官网不可达（余额未知）不算——
     // 那是连接问题不是钱的问题，用「—」表达就够了，不该冒充告急。
     walletLow() {
       if (this.wallet.available === false) return false
       const cents = Number(this.wallet.balanceCents)
       return Number.isFinite(cents) && cents < 2000
-    },
-    // 等级名小徽章：level>=2 才显示（律师助理档只显示余额），优先取多语言词条，否则按语言取 nameZh/nameEn
-    walletTierName() {
-      const m = this.wallet.membership
-      if (!m || !(Number(m.level) >= 2)) return ''
-      if (m.key && typeof this.$t === 'function') {
-        const k = `admin.membershipTiers.${m.key}`
-        const t = this.$t(k)
-        if (t && t !== k) return t
-      }
-      const loc = String((this.$i18n && this.$i18n.locale) || '')
-      const zh = loc === 'zh-CN' || loc === 'zh-TW'
-      return (zh ? m.nameZh : m.nameEn) || m.nameEn || m.nameZh || ''
     },
     meetingRecorderEnabled() { return this.dynamicPlugins.some(plugin => plugin.pluginId === 'voice') },
     /**
@@ -3744,11 +3725,17 @@ export default {
     ,
     // ——— 面板停靠（dev-board#180）———
     // 三个 dock 的分配，唯一出处是 config/panelRegistry.js 的纯函数 resolveDocks
-    dockPanels() {
+    // 全部带侧栏视图的插件面板，不看「依据」此刻有没有可解析的文档（右栏 tab 条按它排，问题 12）
+    allDockPanels() {
       if (this.isClientView) return []
-      return this.documentAvailablePlugins.filter(plugin => plugin.sidebarView).map(plugin => ({
+      return this.dynamicPlugins.filter(plugin => plugin.sidebarView).map(plugin => ({
         ...plugin, defaultDock: plugin.sidebarView.defaultDock, allowedDocks: plugin.sidebarView.allowedDocks,
       }))
+    },
+    // 此刻可用的面板（「依据」没有 Word 文稿时不在内）：左栏、菜单、拖放都按它判定
+    dockPanels() {
+      const available = new Set(this.documentAvailablePlugins.map(p => p.key))
+      return this.allDockPanels.filter(p => available.has(p.key))
     },
     panelDocks() {
       const docks = resolveDocks(this.panelDockOverrides, this.dockPanels)
@@ -3762,9 +3749,23 @@ export default {
     bottomToolsList() {
       return this.panelDocks.bottom.map(p => ({ key: p.key, label: (p.labelKey && this.$t(p.labelKey)) || p.label }))
     },
-    // 停靠到右侧面板的面板（非空时右栏才长出 tab 条；平时右侧只有 AI 对话，零视觉回归）
+    // 停靠到右侧、此刻可用的面板（右栏 tab 条用的是下面的 rightDockTabs）
     rightDockPanels() {
       return this.panelDocks.right.map(p => ({ key: p.key, label: (p.labelKey && this.$t(p.labelKey)) || p.label }))
+    },
+    // 右栏 tab 条：按全部面板排，此刻不可用的（没打开 Word 文稿时的「依据」）标 disabled 而不是拿掉，
+    // tab 条不随开关文档出现 / 消失，AI 头部不再跳动（问题 12）。无项目态的过滤与 panelDocks 同口径。
+    rightDockTabs() {
+      const docks = resolveDocks(this.panelDockOverrides, this.allDockPanels)
+      const right = this.hasNamedProject
+        ? docks.right
+        : docks.right.filter(p => (NO_PROJECT_PANE_KEYS.includes(p.key) || isGlobalPlugin(p)))
+      const available = new Set(this.rightDockPanels.map(p => p.key))
+      return right.map(p => ({
+        key: p.key,
+        label: (p.labelKey && this.$t(p.labelKey)) || p.label,
+        disabled: !available.has(p.key),
+      }))
     },
     // 右键「移到…」菜单的选项：只列这个面板允许的 dock，当前所在的那一档置灰
     dockMenuOptions() {
@@ -4800,7 +4801,6 @@ export default {
     // 绝不摆一个「¥0.00」冒充余额。
     async loadWalletBalance() {
       if (!isDesktopHost()) return
-      this.loadTrialBalance()
       try {
         const data = await getAccountBalance()
         if (data && data.connected) {
@@ -4817,14 +4817,6 @@ export default {
       } catch (e) {
         // 旧后端没有该端点 / 请求失败：chip 不渲染
         this.wallet = { loaded: false, connected: false, available: true, balanceCents: null, membership: null }
-      }
-    },
-    // 试用余额行：失败 / 未连接一律不渲染，绝不本地编造剩余次数
-    async loadTrialBalance() {
-      try {
-        this.trialBalance = await getTrialBalance()
-      } catch (e) {
-        this.trialBalance = null
       }
     },
     /** 宽限弹窗的主按钮：联网复验那条去账户设置，其余去官网。 */
@@ -5075,6 +5067,11 @@ export default {
     goAllProjects() {
       this.projectSwitcherOpen = false
       this.openProjectsPane()
+    },
+    // 切换器底部「关闭项目」：先落盘，再走菜单同一条命令 file.closeProject（app:closeProject）
+    async closeProjectFromSwitcher() {
+      this.projectSwitcherOpen = false
+      await this.runWelcomeCommand('file.closeProject')
     },
     // 日程（命令「日程」、账户下拉「我的日程」）：中栏日程标签（dev-board#1048），不再离开工作台
     goCalendar() {
@@ -8873,11 +8870,18 @@ export default {
 
     async handleWelcomeStartChat(payload = {}) {
       const prompt = (payload && payload.prompt ? String(payload.prompt) : '').trim()
+      // 问题 13：项目已打开时，欢迎页提问 =「在本项目新建对话」，不能续到项目里正在进行的那段对话
+      const newChatInProject = this.hasNamedProject
       const switched = await this.switchViewMode('chat', { openCanvas: false })
       if (!switched) return
       await this.$nextTick()
       for (let i = 0; i < 30 && !this.$refs.chatInterface?.sendQuickPrompt; i++) {
         await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+      if (newChatInProject) {
+        // 「恢复上次那段对话」也别在这之后再把旧会话拉回来
+        this.restoredLastConversation = true
+        this.handleChatSidebarNewChat()
       }
       if (payload.model) this.$refs.chatInterface?.selectModel?.(payload.model)
       if (prompt) {
@@ -8947,7 +8951,14 @@ export default {
     async handlePromoteScratchWorkspace() {
       if (!this.isScratchWorkspace) return
       this.showPromoteScratchModal = true
-      this.promoteScratchName = this.project?.name || ''
+      // 预填当前对话的标题，取不到再回落项目名；不再预填「临时项目」（问题 19）
+      const activeConversationId = this.$refs.chatInterface?.currentConversationId || this.currentConversationId
+      const activeChat = activeConversationId ? this.chatHistoryList.find((c) => c.conversationId === activeConversationId) : null
+      this.promoteScratchName = promoteScratchDefaultName({
+        conversationTitle: activeChat && activeChat.title,
+        projectName: this.project?.name,
+        extraDefaultNames: [this.$t('workbench.chatMode.scratchTitle')],
+      })
       const modal = await new Promise((resolve) => {
         uni.showModal({
           title: this.$t('workbench.chatMode.promoteTitle'),

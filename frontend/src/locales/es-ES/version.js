@@ -264,6 +264,7 @@ export default {
   "addMemberFailed": "No se pudo añadir",
   "copiedPasteToColleague": "Copiado; pégueselo a su colega",
   "connectFailed": "Error de conexión",
+  "reconnectCloud": "Volver a conectar con la nube",
   "inviteTextOfficial": "{inviter} le invita a trabajar juntos en «{project}» en AI WorkDeck.\n\nAsí puede unirse:\n1. Inicie sesión en la aplicación de escritorio con su propia cuenta de AI WorkDeck;\n2. Abra la lista de proyectos y haga clic en «Descargar un expediente de la Biblioteca de expedientes del equipo»;\n3. Seleccione «{project}» y haga clic en «Descargar en este dispositivo».\n\nDespués, cada uno trabaja en su propia copia y hace clic en «Enviar borrador» para fusionar los cambios.",
   "inviteTextOfficialNoInviter": "Se le invita a trabajar juntos en «{project}» en AI WorkDeck.\n\nAsí puede unirse:\n1. Inicie sesión en la aplicación de escritorio con su propia cuenta de AI WorkDeck;\n2. Abra la lista de proyectos y haga clic en «Descargar un expediente de la Biblioteca de expedientes del equipo»;\n3. Seleccione «{project}» y haga clic en «Descargar en este dispositivo».\n\nDespués, cada uno trabaja en su propia copia y hace clic en «Enviar borrador» para fusionar los cambios.",
   "addPeopleTitle": "Añadir personas a este expediente",

@@ -110,6 +110,7 @@ export default {
   "recentProjectsLoadFailed": "Yükleme başarısız — yeniden denemek için dokunun",
   "projectHome": "Projeye Genel Bakış",
   "allProjects": "Tüm Projeler…",
+  "closeProject": "Projeyi Kapat",
   "statusInProgress": "Devam Ediyor",
   "collab": "İş Birliği",
   "managerLabel": "Lider: {name}",
@@ -139,6 +140,7 @@ export default {
   "collapseSidebar": "Kenar Çubuğunu Daralt",
   "toolsPanel": "Araçlar Paneli",
   "aiAssistant": "AI Asistan",
+  "insightNeedsDoc": "Bir Word belgesi açıkken kullanılabilir",
   "dockToLeft": "Sol kenar çubuğuna taşı",
   "dockToRight": "Sağ panele taşı",
   "dockToBottom": "Alt panele taşı",
@@ -374,7 +376,9 @@ export default {
   },
   "welcome": {
     "quickChatPlaceholder": "Hızlı sohbet başlatmak için bir soru yazıp Enter'a basın…",
+    "quickChatPlaceholderInProject": "Bir soru yazın ve bu projede yeni sohbet başlatmak için Enter'a basın…",
     "enterChatMode": "Hızlı sohbet başlat",
+    "newChatInProject": "Bu Projede Yeni Sohbet",
     "quickNewDocx": "Yeni boş belge",
     "quickNewMd": "Yeni Markdown",
     "quickChatSend": "Gönder"

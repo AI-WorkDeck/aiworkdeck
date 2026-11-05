@@ -264,6 +264,7 @@ export default {
   "addMemberFailed": "Hinzufügen fehlgeschlagen",
   "copiedPasteToColleague": "Kopiert — fügen Sie es bei Ihrem Kollegen ein",
   "connectFailed": "Verbindung fehlgeschlagen",
+  "reconnectCloud": "Erneut mit der Cloud verbinden",
   "inviteTextOfficial": "{inviter} lädt Sie ein, in AI WorkDeck gemeinsam an „{project}“ zu arbeiten.\n\nSo treten Sie bei:\n1. Melden Sie sich mit Ihrem eigenen AI WorkDeck-Konto in der Desktop-App an;\n2. Öffnen Sie die Projektliste und klicken Sie auf „Eine Akte aus der Team-Aktenbibliothek abrufen“;\n3. Wählen Sie „{project}“ aus und klicken Sie auf „Auf dieses Gerät abrufen“.\n\nDanach arbeitet jeder an seiner eigenen Kopie und klickt auf „Entwurf einreichen“, um die Änderungen zusammenzuführen.",
   "inviteTextOfficialNoInviter": "Sie sind eingeladen, in AI WorkDeck gemeinsam an „{project}“ zu arbeiten.\n\nSo treten Sie bei:\n1. Melden Sie sich mit Ihrem eigenen AI WorkDeck-Konto in der Desktop-App an;\n2. Öffnen Sie die Projektliste und klicken Sie auf „Eine Akte aus der Team-Aktenbibliothek abrufen“;\n3. Wählen Sie „{project}“ aus und klicken Sie auf „Auf dieses Gerät abrufen“.\n\nDanach arbeitet jeder an seiner eigenen Kopie und klickt auf „Entwurf einreichen“, um die Änderungen zusammenzuführen.",
   "addPeopleTitle": "Personen zu dieser Akte hinzufügen",
