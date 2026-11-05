@@ -121,6 +121,7 @@ import {
   normalizePermissionItems,
   shouldAutoPromptPermissionOnboarding,
   nextMissingPermissionId,
+  markPermissionOnboardingStartupSettled,
 } from '@/utils/permissionOnboarding.js'
 
 const OVERLAY_KEY = 'permission-onboarding'
@@ -176,6 +177,8 @@ export default {
   watch: {
     visible(v) {
       setGlobalOverlay(!!v, OVERLAY_KEY)
+      // 首启弹窗排队（问题 4/40）：权限窗关掉后，排在后面的「可选组件」窗才弹
+      if (!v) markPermissionOnboardingStartupSettled()
     },
   },
   mounted() {
@@ -237,11 +240,14 @@ export default {
     },
     async checkStartupOnboarding() {
       const state = await this.refreshStatus()
-      if (!state || !state.supported) return
+      if (!state || !state.supported) {
+        markPermissionOnboardingStartupSettled()
+        return
+      }
       let done = false
       try {
         if (host.prefs && typeof host.prefs.get === 'function') {
-          const r = await host.prefs.get({ key: PERMISSION_ONBOARDING_PREF_KEY })
+          const r = await host.prefs.get(PERMISSION_ONBOARDING_PREF_KEY)
           done = !!(r && r.value)
         }
       } catch (_) { /* ignore */ }
@@ -249,6 +255,8 @@ export default {
         this.focusedId = nextMissingPermissionId(state.items, 'fullDiskAccess') || 'fullDiskAccess'
         this.triggerReason = 'startup'
         this.visible = true
+      } else if (!this.visible) {
+        markPermissionOnboardingStartupSettled()
       }
     },
     async openModal(payload = {}) {
@@ -265,7 +273,7 @@ export default {
     async markOnboardingSeen() {
       try {
         if (host.prefs && typeof host.prefs.set === 'function') {
-          await host.prefs.set({ key: PERMISSION_ONBOARDING_PREF_KEY, value: true })
+          await host.prefs.set(PERMISSION_ONBOARDING_PREF_KEY, true)
         }
       } catch (_) { /* ignore */ }
     },
