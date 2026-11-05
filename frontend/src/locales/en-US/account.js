@@ -441,6 +441,7 @@ export default {
   "bqtScanExpired": "QR code expired",
   "bqtScanRefresh": "Refresh QR Code",
   "bqtScanBack": "Back to Account Sign-in",
+  "accountLoginTab": "Account Sign-in",
   "errInvalidInviteCode": "Invalid or inactive invitation code",
   "errInviteAlreadyBound": "This account has already bound a Circle firm invite code",
   "errBqtNotLawyer": "Only verified Baoqingtian lawyer accounts can sign in via QR code",

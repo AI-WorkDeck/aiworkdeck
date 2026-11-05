@@ -172,6 +172,7 @@ function quitHarness({ stopAll, prepare = async () => {}, fullUpdate = null, res
     setTimeout: (fn) => { Promise.resolve().then(fn); return 0 },
     logDesktopEvent: (type, data) => events.push('log:' + type),
     stopClipboardWatcher: () => events.push('stopClipboardWatcher'),
+    saveMainWindowState: () => events.push('saveMainWindowState'),
   })
   vm.runInContext(`
     let quitInProgress = false

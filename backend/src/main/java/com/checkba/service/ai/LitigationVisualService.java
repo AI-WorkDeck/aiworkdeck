@@ -269,9 +269,11 @@ public class LitigationVisualService {
 
     private String probeVersion(String python) {
         try {
-            Process p = new ProcessBuilder(python, "-c",
+            ProcessBuilder pb = new ProcessBuilder(python, "-c",
                     "import sys;print('%d.%d.%d'%sys.version_info[:3])")
-                    .redirectErrorStream(true).start();
+                    .redirectErrorStream(true);
+            pb.environment().put("PYTHONDONTWRITEBYTECODE", "1");
+            Process p = pb.start();
             String out;
             try (BufferedReader r = new BufferedReader(
                     new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
@@ -373,6 +375,16 @@ public class LitigationVisualService {
         return invoke(args);
     }
 
+    /**
+     * 子进程的中文输出必须按 UTF-8 编码，否则 Windows 上会按 GBK 出来，图名/事件文本一路乱码进 JSON。
+     * 不写 .pyc（问题 91）：包内 Python 在已签名的 .app 里落 __pycache__ 会破坏签名封印。
+     */
+    static void configurePythonEnv(java.util.Map<String, String> env) {
+        env.put("PYTHONIOENCODING", "utf-8");
+        env.put("PYTHONUTF8", "1");
+        env.put("PYTHONDONTWRITEBYTECODE", "1");
+    }
+
     private Result invoke(List<String> cliArgs) {
         Runtime rt = runtime();
         String why = unavailableReason();
@@ -389,10 +401,7 @@ public class LitigationVisualService {
         try {
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.directory(rt.litvizDir().toFile());
-            // 子进程的中文输出必须按 UTF-8 编码，否则 Windows 上会按 GBK 出来，
-            // 图名/事件文本一路乱码进 JSON。
-            pb.environment().put("PYTHONIOENCODING", "utf-8");
-            pb.environment().put("PYTHONUTF8", "1");
+            configurePythonEnv(pb.environment());
             if (rt.graphvizDir() != null) {
                 pb.environment().put("LITVIZ_GRAPHVIZ_DIR", rt.graphvizDir());
             }

@@ -54,10 +54,26 @@ export function nextMissingPermissionId(items = [], preferredId = '') {
 
 let mounted = false
 
+// 首启弹窗排队（问题 4/40）：权限引导的启动检查结束（判定不弹，或弹了且已关闭）之前，
+// 其它首启弹窗（「可选组件」）先等着，免得两个弹窗叠在一起。只结算一次，之后立即放行。
+let resolveStartupSettled = null
+const startupSettled = new Promise((resolve) => { resolveStartupSettled = resolve })
+
+export function markPermissionOnboardingStartupSettled() {
+  resolveStartupSettled()
+}
+
+export function whenPermissionOnboardingStartupSettled() {
+  return startupSettled
+}
+
 export async function mountPermissionOnboarding() {
   // #ifdef H5
   if (mounted || typeof document === 'undefined') return
-  if (!host.permissions || typeof host.permissions.getStatus !== 'function') return
+  if (!host.permissions || typeof host.permissions.getStatus !== 'function') {
+    markPermissionOnboardingStartupSettled()
+    return
+  }
   if (document.getElementById(CONTAINER_ID)) return
   try {
     const [{ createApp }, { default: PermissionOnboardingModal }, { i18n }] = await Promise.all([
@@ -73,6 +89,7 @@ export async function mountPermissionOnboarding() {
     mounted = true
   } catch (e) {
     console.warn('[permissions] 权限引导浮层挂载失败:', e)
+    markPermissionOnboardingStartupSettled()
   }
   // #endif
 }

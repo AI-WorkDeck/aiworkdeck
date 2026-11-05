@@ -440,6 +440,18 @@ function applyNativeTheme(mode) {
   try { return { systemDark: !!nativeTheme.shouldUseDarkColors } } catch (e) { return { systemDark: false } }
 }
 
+function readMainWindowState() {
+  try { return getPrefs().get(require('./window-state').PREF_KEY, null) } catch (e) { return null }
+}
+
+function saveMainWindowState() {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    const ws = require('./window-state')
+    getPrefs().set(ws.PREF_KEY, ws.captureWindowState(mainWindow))
+  } catch (e) { /* 记不住不影响退出 */ }
+}
+
 function createMainWindow() {
   // 启动链、Dock 激活共用此入口，不能覆盖仍在使用的主窗引用（#455）。
   if (mainWindow && !mainWindow.isDestroyed()) return mainWindow
@@ -452,9 +464,12 @@ function createMainWindow() {
   // 裸常量会让窗口一出生就比屏幕大，只能靠「窗口 → 缩放」救回来。
   // workAreaSize 已经扣掉菜单栏/Dock，不要再自行减。
   const workArea = screen.getPrimaryDisplay().workAreaSize
+  // 记住上次的大小 / 位置 / 最大化（问题 18）；记录不在任何显示器上时退回默认尺寸
+  const restored = require('./window-state').restoreWindowOptions(
+    readMainWindowState(), screen.getAllDisplays(),
+    { width: Math.min(1400, workArea.width), height: Math.min(900, workArea.height) })
   mainWindow = new BrowserWindow({
-    width: Math.min(1400, workArea.width),
-    height: Math.min(900, workArea.height),
+    ...restored.bounds,
     icon: path.join(__dirname, '../../frontend/src/static/icon.png'),
     // 首屏白闪修复（dev-board#731）：Electron 默认白底，页面加载完成前会露出。
     // 取值与 design/tokens/awd-palette.json 的 roles.light.bg / roles.dark.bg 一致。
@@ -600,9 +615,13 @@ function createMainWindow() {
     // ignore
   }
 
+  // 启动时恢复用户上次手动最大化的状态（问题 18）——唯一一处打在主窗口上的几何 setter
+  if (restored.maximized) mainWindow.maximize()
+
   const createdWindow = mainWindow
   let closePreparationPending = false
   createdWindow.on('close', (event) => {
+    saveMainWindowState()
     if (quitInProgress && !services) return
     event.preventDefault()
     if (quitInProgress || closePreparationPending) return
@@ -706,6 +725,7 @@ ipcMain.handle('checkba:ocr-start-selection', async (_evt, payload) => {
   const reqId = `ocrsel_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
   const resultChannel = `checkba:ocr-selection-done:${reqId}`
 
+  // 提示条贴底居中，不压 macOS 左上角红绿灯；window 模式没有网页标签，文案不提「网页」（问题 67）
   const html = `<!doctype html>
 <html>
 <head>
@@ -714,7 +734,7 @@ ipcMain.handle('checkba:ocr-start-selection', async (_evt, payload) => {
   <style>
     html, body { margin:0; padding:0; width:100%; height:100%; background: transparent; cursor: crosshair; user-select:none; }
     .layer { position: fixed; inset: 0; }
-    .hint { position: fixed; left: 14px; top: 14px; padding: 6px 10px; background: rgba(252,251,247,0.88); border: 1px solid rgba(221,216,202,0.7); border-radius: 10px; font-size: 12px; color:#2E5A50; }
+    .hint { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); white-space: nowrap; padding: 6px 10px; background: rgba(252,251,247,0.88); border: 1px solid rgba(221,216,202,0.7); border-radius: 10px; font-size: 12px; color:#2E5A50; }
     .shade { position: fixed; inset: 0; background: rgba(0,0,0,0.12); }
     .rect { position: fixed; border: 2px solid rgba(46,90,80,0.85); background: rgba(46,90,80,0.12); border-radius: 6px; pointer-events:none; display:none; }
   </style>
@@ -722,7 +742,9 @@ ipcMain.handle('checkba:ocr-start-selection', async (_evt, payload) => {
 <body>
   <div class="layer">
     <div class="shade"></div>
-    <div class="hint">${escapeHtml(require('./app-language').t({ zh: '拖动框选网页区域 · 点击其它区域或 ESC 退出', en: 'Drag to select an area · Click outside or press ESC to cancel' }))}</div>
+    <div class="hint">${escapeHtml(require('./app-language').t(useWindow
+      ? { zh: '拖动框选区域 · 单击或按 ESC 退出', en: 'Drag to select an area · Click or press ESC to cancel' }
+      : { zh: '拖动框选网页区域 · 点击其它区域或 ESC 退出', en: 'Drag to select a web page area · Click outside or press ESC to cancel' }))}</div>
     <div id="rect" class="rect"></div>
   </div>
   <script>
@@ -1050,12 +1072,12 @@ function makeBrowserView(id) {
   view.webContents.on('context-menu', async (_event, params) => {
     try {
       const selectionText = (params && params.selectionText ? String(params.selectionText) : '').trim()
-      if (!selectionText) return
 
-      const menu = Menu.buildFromTemplate([
-        {
-          label: require('./app-language').t({ zh: '加入网核收藏', en: 'Save as Web Evidence' }),
-          click: async () => {
+      // 基础项（复制 / 全选，可编辑区加剪切 / 粘贴）+ 有选中文字时的「加入网核收藏」（问题 68）
+      const menu = Menu.buildFromTemplate(require('./browser-context-menu').browserContextMenuTemplate(params, {
+        t: require('./app-language').t,
+        wc: view.webContents,
+        onWebmark: async () => {
             try {
               const url = params.pageURL ? String(params.pageURL) : ''
               const title = view.webContents.getTitle ? (view.webContents.getTitle() || '') : ''
@@ -1080,9 +1102,8 @@ function makeBrowserView(id) {
             } catch (e) {
               // ignore
             }
-          }
         }
-      ])
+      }))
       // BrowserView 的 x/y 是相对 view 的；popup 需要相对 BrowserWindow 内容区坐标
       try {
         const b = views.getBounds(id) || { x: 0, y: 0 }
@@ -1732,6 +1753,8 @@ ipcMain.handle('checkba:update-check', async () => {
 })
 ipcMain.handle('checkba:update-restart', async () => {
   // 补丁已在下载完成时原子激活（overlay.activate），重启后三个 seam 自然读到新版本
+  // 问题 7：重启入口逐个记原因，事后能从 desktop.log 分清是谁触发的重启
+  logDesktopEvent('restart-requested', { reason: 'update-restart', phase: updateService?.getState?.().phase || null, fullUpdateReady: !!fullUpdate?.isReady?.() })
   updateRestartRequested = true
   app.quit()
   return { ok: true }
@@ -1820,7 +1843,10 @@ const openPaths = require('./open-paths').installOpenPaths({
   app, ipcMain,
   queueFile: path.join(app.getPath('home'), '.aiworkdeck', 'restart-open-paths.json'),
   isQuitting: () => quitInProgress,
-  requestRelaunch: () => { updateRestartRequested = true },
+  requestRelaunch: () => {
+    logDesktopEvent('restart-requested', { reason: 'open-paths', detail: 'file open arrived during quit' })
+    updateRestartRequested = true
+  },
   getWindow: () => mainWindow,
   focusWindow: () => {
     if ((!mainWindow || mainWindow.isDestroyed()) && mainWindowStartupReady) createMainWindow()
@@ -1918,7 +1944,7 @@ app.whenReady().then(() => {
         fullUpdate = require('./services/full-update').createFullUpdate({ app, autoUpdater: require('electron').autoUpdater, dataDir: overlayCtx().dataDir })
         updateService = createUpdateService(overlayCtx(), {
           initialError: fullUpdate.lastError(),
-          prepareInstaller: (file, version) => fullUpdate.prepare(file, version),
+          prepareInstaller: (file, version, onStage) => fullUpdate.prepare(file, version, onStage),
           extractTar,
           onEvent: (evt) => {
             try { if (mainWindow) mainWindow.webContents.send('checkba:update-event', evt) } catch (e) { /* ignore */ }
@@ -2037,7 +2063,11 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-  if (quitInProgress) { updateRestartRequested = true; return }
+  if (quitInProgress) {
+    logDesktopEvent('restart-requested', { reason: 'activate-during-quit', detail: 'Dock/app activated while quitting' })
+    updateRestartRequested = true
+    return
+  }
   if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.show(); mainWindow.focus() }
   else if (mainWindowStartupReady && BrowserWindow.getAllWindows().length === 0) createMainWindow()
 })
@@ -2073,6 +2103,7 @@ app.on('before-quit', async (e) => {
       // ① 先记账：下次再出现「应用自己消失了」，能直接从 desktop.log 读出退出起点与耗时，
       //    不用再去反推 macOS 统一日志（dev-board#602 那次就是这么查的）。
       logDesktopEvent('quit-begin', { pid: process.pid })
+      saveMainWindowState()
       backendSupervisor?.stop()
       // ② 立刻把窗口藏掉。preventDefault 之后停服务要好几秒，原来这段时间里窗口
       //    完全可用、还能建 SSE 发新请求，然后整个应用在同一瞬间消失——用户看到的

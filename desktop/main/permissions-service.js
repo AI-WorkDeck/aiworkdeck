@@ -46,7 +46,9 @@ const PERMISSION_ITEMS = [
     id: 'screenRecording',
     settingsUrl: 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
     supportsDragToSettings: true,
-    recommended: true,
+    // 截图走窗口抓取（webContents.capturePage），不需要这项；只有窗口抓取失败时的全屏兜底才用到，
+    // 所以不算推荐项，也不因它触发首启权限窗（问题 34/62）。
+    recommended: false,
     requiredForWeChatDrop: false,
   },
   {
@@ -370,7 +372,7 @@ function permissionDisplayMeta(permissionId) {
       }),
     },
     accessibility: {
-      title: t({ zh: '辅助功能权限', en: 'Accessibility' }),
+      title: t({ zh: '辅助功能', en: 'Accessibility' }),
       paneName: t({ zh: '隐私与安全性 → 辅助功能', en: 'Privacy & Security → Accessibility' }),
       hint: t({
         zh: '按住下方 AI WorkDeck 图标，直接拖入右侧「系统设置」列表中即可开启系统快捷辅助',
@@ -378,7 +380,7 @@ function permissionDisplayMeta(permissionId) {
       }),
     },
     microphone: {
-      title: t({ zh: '麦克风权限', en: 'Microphone' }),
+      title: t({ zh: '麦克风', en: 'Microphone' }),
       paneName: t({ zh: '隐私与安全性 → 麦克风', en: 'Privacy & Security → Microphone' }),
       hint: t({
         zh: '请在「系统设置 → 隐私与安全性 → 麦克风」中打开 AI WorkDeck 开关',

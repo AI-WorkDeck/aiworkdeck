@@ -3,6 +3,9 @@
 
 export default {
   "updatePreparing": "アップデートを確認・準備しています…",
+  "updatePreparingMount": "アップデートを準備中：インストーラをマウントしています（通常は数分かかります）…",
+  "updatePreparingPackage": "アップデートを準備中：ファイルをパッケージ化しています（通常は数分かかります）…",
+  "updatePreparingVerify": "アップデートを準備中：署名を検証しています（通常は数分かかります）…",
   "updateRestart": "再起動してアップデート",
   "updateRestarting": "保存して再起動の準備をしています…",
   "updateDownloading": "アップデートをダウンロード中",

@@ -845,6 +845,11 @@ DdFilesPanel / ShareholderMeetingPanel。新面板照抄这套，不要再自定
   setBounds`，这是「窗口超出屏幕」唯一的代码成因。护栏 `desktop/tests/main-window-bounds.test.js`
   （源码级断言，已挂进 `desktop/package.json` 的 test 脚本；main.js 一 require 就建窗拉服务，
   只能照 `native-theme-light.test.js` 的口径测）。
+  **窗口大小 / 位置 / 最大化记忆（dev-board#1713，问题 18）**：`desktop/main/window-state.js` 存取 prefs 键
+  `mainWindowStateV1`（最大化 / 全屏时记 `getNormalBounds()`）；建窗时 `restoreWindowOptions` 校验标题栏那条
+  至少 100px 宽落在某块显示器工作区里（外接屏拔掉 → 退回默认尺寸、不给坐标），尺寸再夹进该屏工作区，
+  经构造参数传入；最大化靠建窗后一次 `mainWindow.maximize()`——护栏里唯一放行的主窗口几何 setter。
+  写入点：窗口 `close` 与 `before-quit`（⌘Q 走 `app.exit`，不发 close）。单测 `desktop/tests/window-state.test.js`。
 - **Windows 右上角原生窗控跟随主题（dev-board#865）**：`titleBarOverlay` 是系统画的覆盖层，不吃 CSS。`main.js` 的 `titleBarOverlayFor(dark)` 出取值（浅色 `#ffffff/#3c4043` 保持改造前原值；深色 = 色源 `roles.dark.surface` / `roles.dark.text-2`，即顶栏 `.project-header` 的 `--awd-surface` 与图标色），`syncTitleBarOverlay()` 按 `nativeTheme.shouldUseDarkColors` 调 `setTitleBarOverlay`，**只在 win32**。两个触发点：`applyNativeTheme`（渲染层 `checkba:set-theme` 每次推主题都经过它）与 `nativeTheme.on('updated')`（「跟随系统」时用户在系统设置里切深浅）。改配色色源时主进程这两个字面量要跟着改，`desktop/tests/titlebar-overlay-theme.test.js` 对拍色源。**不要为此把 `themeSource` 改成按平台分流**：nativeTheme 本来就是应用主题的镜像，mac 交通灯那条不变式照旧。
 - **编辑器标签（`.tab-item`）在 project-overview.scss 里只有一份定义了**。此前有两份：
   靠前那份是 VS Code 式贴合标签，被靠后那份整个覆盖成死代码，实际生效的是一排
@@ -1592,7 +1597,8 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 
 - **微信拖入根因与双通道兜底**：macOS 微信（`WeChat.app`）聊天中的文件位于 App Sandbox 容器 `~/Library/Containers/com.tencent.xinWeChat/Data/...`（及 `Group Containers`），受 macOS TCC `kTCCServiceSystemPolicyAllFiles`（完全磁盘访问权限）保护，未授权时直接返回 `EPERM` 且系统不自动弹窗。`frontend/src/utils/fileTreeExternalDrop.js` 对命中 `/Library/(Group )?Containers/` 的路径在同步 `drop` 事件内预读 `File.arrayBuffer()` 字节流；当后端 `import-local` 因 TCC 失败时自动回退到 `stageDroppedFile` 上传字节；若字节流与直接路径均被 TCC 拒绝，抛出 `dropCode = 'importDropPermissionDenied'` 并触发全局事件 `awd:open-permission-onboarding`（`focus: 'fullDiskAccess', reason: 'wechat-drop'`）。后端 `ProjectFileService.throwIfSourceAccessDenied` 将 `AccessDeniedException` / `Operation not permitted` 转为明确提示开启「完全磁盘访问权限」的异常，同时对真实缺失文件保留原错误。
 - **Codex 式首启权限排查与拖拽授权浮窗**：桌面主进程 `desktop/main/permissions-service.js` 提供 `fullDiskAccess`（探测 `/Library/Preferences/com.apple.TimeMachine.plist` 与微信容器可读性）、`screenRecording`、`microphone`、`accessibility` 四项状态检测，打开对应 `x-apple.systempreferences:com.apple.preference.security?Privacy_*` 页，并通过 JXA `CGWindowListCopyWindowInfo` 追踪系统设置窗口位置，在旁侧贴靠置顶无边框拖拽引导浮窗（`showHelperWindow` + `desktop/preload/permission-helper-preload.js`），支持通过 `webContents.startDrag({ file: appBundlePath, icon })` 将 `AI WorkDeck.app` 直接拖入系统设置列表，后台 800ms 轮询授权成功后自动收起浮窗并广播 `checkba:permissions-updated`。
-- **前端全局引导与设置页入口**：`App.vue` 挂载独立根实例 `mountPermissionOnboarding()`（`PermissionOnboardingModal.vue` + `utils/permissionOnboarding.js`），macOS 桌面端首次启动存在未授权推荐项时自动弹出，并在 `AdminPane.vue`「系统 → 系统权限」提供常驻体检与一键开启入口。所有调起原生 `.app` 拖拽的 `dragstart` 必须先同步 `e.preventDefault()` 再调 `startAppDrag`。
+- **前端全局引导与设置页入口**：`App.vue` 挂载独立根实例 `mountPermissionOnboarding()`（`PermissionOnboardingModal.vue` + `utils/permissionOnboarding.js`），macOS 桌面端首次启动存在未授权推荐项时自动弹出（推荐项＝完全磁盘访问、麦克风；屏幕录制只是截图兜底，非推荐，问题 34/62；「稍后设置」标记经 `host.prefs.get(key)`/`set(key, value)` 按位置传参落盘），并在 `AdminPane.vue`「系统 → 系统权限」提供常驻体检与一键开启入口。所有调起原生 `.app` 拖拽的 `dragstart` 必须先同步 `e.preventDefault()` 再调 `startAppDrag`。
+- **首启弹窗排队（dev-board#1713，问题 4/40）**：`utils/permissionOnboarding.js` 的 `whenPermissionOnboardingStartupSettled()` 在权限窗启动检查结束（判定不弹 / 弹了且关闭 / 不支持或挂载失败）时放行；`project-overview.vue` 的 `maybePromptOptionalComponents` 要弹「可选组件」前先 await 它，两个首启弹窗不叠。新增首启弹窗同样排在它后面。
 - **验证**：`desktop/tests/permissions-service.test.js`、`frontend/tests/project-home/drop-byte-import.test.mjs`、`frontend/tests/project-home/permission-onboarding.test.mjs`。
 
 ## 项目标签恢复的加载范围（dev-board#1473）

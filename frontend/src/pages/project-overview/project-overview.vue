@@ -2623,6 +2623,7 @@ import {
   PROMPTED_PREF_KEY,
   PROMPTED_PACKS_PREF_KEY,
 } from '@/composables/useOptionalComponents.js'
+import { whenPermissionOnboardingStartupSettled } from '@/utils/permissionOnboarding.js'
 import { documentLinkPreviewMethods } from './documentLinkPreview.js'
 import DocumentLinkPreview from '@/components/DocumentLinkPreview.vue'
 import { useLitigationGeneration } from '@/composables/useLitigationGeneration.js'
@@ -6838,12 +6839,15 @@ export default {
         const items = (res && res.components) || []
         const promptedPackIds = unwrap(promptedPacks)
         this.optionalComponentsAppVersion = (status && status.appVersion) || ''
-        this.showOptionalComponents = shouldPromptOptionalComponents({
+        const shouldShow = shouldPromptOptionalComponents({
           items,
           promptedVersion: unwrap(prompted),
           promptedPackIds,
           isDesktop: true,
         })
+        // 首启弹窗排队（问题 4/40）：等权限引导窗关掉（或判定不弹）再弹，两个窗不叠在一起
+        if (shouldShow) await whenPermissionOnboardingStartupSettled()
+        this.showOptionalComponents = shouldShow
         // 0.46 及以前只记了版本号。不弹的时候把「提示过哪些组件」补齐，将来真多出一个新组件
         // 时才认得出来。清单为空（后端没起来 / ai.packs 关着）时不写。
         if (!this.showOptionalComponents && !Array.isArray(promptedPackIds) && items.length) {

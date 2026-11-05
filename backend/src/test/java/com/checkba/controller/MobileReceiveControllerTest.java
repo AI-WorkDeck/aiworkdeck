@@ -29,8 +29,8 @@ class MobileReceiveControllerTest {
         try (var auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession(null)).thenReturn(null);
             var controller = new MobileReceiveController(client);
-            assertThrows(IllegalStateException.class, () -> controller.status(null, "42"));
-            assertThrows(IllegalStateException.class, () -> controller.check(null));
+            assertThrows(com.checkba.exception.UnauthorizedException.class, () -> controller.status(null, "42"));
+            assertThrows(com.checkba.exception.UnauthorizedException.class, () -> controller.check(null));
             verifyNoInteractions(client);
             auth.when(() -> AuthController.getUserIdFromSession("session")).thenReturn(7L);
             when(client.receiveStatus("42")).thenReturn(Map.of("active", true, "deviceId", "desktop-42"));
@@ -40,6 +40,24 @@ class MobileReceiveControllerTest {
             mvc.perform(post("/api/mobile-receive/check").header("X-Session-Id", "session"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(0));
             verify(client).receiveNow();
+        }
+    }
+
+    /** 问题 6：欢迎页「账户中的项目」报「服务器内部错误」——未登录要回 4010，云端失败要透出可读文案。 */
+    @Test
+    void catalogErrorsAreReadableAndSignedOutIs4010() throws Exception {
+        var client = mock(MobileRelayClientService.class);
+        try (var auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession(null)).thenReturn(null);
+            auth.when(() -> AuthController.getUserIdFromSession("session")).thenReturn(7L);
+            var mvc = MockMvcBuilders.standaloneSetup(new MobileReceiveController(client))
+                    .setControllerAdvice(new com.checkba.config.GlobalExceptionHandler()).build();
+            mvc.perform(get("/api/mobile-receive/catalog"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(4010));
+            when(client.catalog()).thenThrow(new IllegalStateException("云端项目目录暂不可用", new java.io.IOException("boom")));
+            mvc.perform(get("/api/mobile-receive/catalog").header("X-Session-Id", "session"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(1))
+                    .andExpect(jsonPath("$.message").value("云端项目目录暂不可用"));
         }
     }
 }

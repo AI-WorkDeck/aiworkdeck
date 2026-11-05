@@ -73,13 +73,19 @@ function harness({ platform = 'win32', systemDark = false } = {}) {
   const context = vm.createContext({
     app, BrowserWindow: Window, path, console, nativeTheme,
     process: { platform, env: {} }, __dirname: path.join(__dirname, '../main'),
-    screen: { getPrimaryDisplay: () => ({ workAreaSize: { width: 1400, height: 900 } }) },
+    screen: {
+      getPrimaryDisplay: () => ({ workAreaSize: { width: 1400, height: 900 } }),
+      getAllDisplays: () => [{ workArea: { x: 0, y: 0, width: 1400, height: 900 } }],
+    },
+    // 窗口大小记忆（问题 18）：读写 prefs 的两个 helper 在建窗段之外，这里桩掉
+    readMainWindowState: () => null, saveMainWindowState() {},
     require: (name) => {
       const stubs = {
         'node:os': { totalmem: () => 8 * 1024 ** 3 },
         './services/win-arch': { isWinArmEmulated: () => false },
         './reload-guard': { attachReloadGuard: () => true },
         './services/backend-request-gate': require('../main/services/backend-request-gate'),
+        './window-state': require('../main/window-state'),
       }
       assert.ok(name in stubs, '多了一个没桩的 require: ' + name)
       return stubs[name]

@@ -605,6 +605,11 @@ mobile | meeting | dictation`（缺省不带这个键，前端用通用说明）
 失败不拦路）。**新增连接账户的入口必须接这一步**——后端的跨境闸只在「切到官方通道」那一刻把关，
 默认值不经过那一刻。前端 `getWizardStatus`/`submitWizard` 两个 api 封装随之删除。
 
+**登录弹层跨境同意的措辞按站点分（dev-board#1713，问题 2+38）**：`AccountLoginDialog.crossBorderKey(name)`
+在国内站（`isPhoneSite`）取 `onboarding.unlock.*Domestic`（勾选框 / 告知标题 / 告知正文 / 未勾提示统一
+「可能涉及境外处理」口径，国内站接百炼），国际站沿用原 `crossBorderLabel` 等。只分措辞，两站都仍要勾、
+后端闸门逻辑不变。设置页（AdminPane 的同意框与粘 Key 路径）不感知站点，仍用通用措辞。
+
 ### 换账户提示与断开回退（2026-09-29，dev-board#1046，设计 §5.5）
 
 - **`previousAccountDiffers:true`**：`/api/account/connect`、`/api/account/login`、`/api/license/activate`（粘

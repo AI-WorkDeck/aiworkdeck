@@ -454,6 +454,7 @@ export default {
   "bqtScanExpired": "二维码已过期",
   "bqtScanRefresh": "刷新二维码",
   "bqtScanBack": "返回账号登录",
+  "accountLoginTab": "账号登录",
   "errInvalidInviteCode": "邀请码无效或已停用，请核对后重试",
   "errInviteAlreadyBound": "当前账号已绑定过联盟所邀请码",
   "errBqtNotLawyer": "仅支持包晴天认证律师账号扫码登录",

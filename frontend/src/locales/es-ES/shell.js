@@ -3,6 +3,9 @@
 
 export default {
   "updatePreparing": "Verificando y preparando la actualización…",
+  "updatePreparingMount": "Preparando la actualización: montando el instalador (suele tardar unos minutos)…",
+  "updatePreparingPackage": "Preparando la actualización: empaquetando archivos (suele tardar unos minutos)…",
+  "updatePreparingVerify": "Preparando la actualización: verificando la firma (suele tardar unos minutos)…",
   "updateRestart": "Reiniciar para actualizar",
   "updateRestarting": "Guardando y preparando el reinicio…",
   "updateDownloading": "Descargando actualización",

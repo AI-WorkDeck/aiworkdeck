@@ -399,6 +399,7 @@ export default {
   "bqtScanExpired": "Codice QR scaduto",
   "bqtScanRefresh": "Aggiorna codice QR",
   "bqtScanBack": "Torna all’accesso con account",
+  "accountLoginTab": "Accesso con account",
   "errInvalidInviteCode": "Codice invito non valido o disattivato",
   "errInviteAlreadyBound": "Questo account ha già associato un codice invito Circle",
   "errBqtNotLawyer": "Solo gli account avvocato Baoqingtian verificati possono accedere tramite QR",

@@ -65,6 +65,18 @@ class LitigationVisualServiceTest {
                 "跳过：" + svc.unavailableReason());
     }
 
+    // ==== 子进程环境 ====
+
+    @Test
+    @DisplayName("问题 91：子进程不写 .pyc（包内 Python 在已签名 .app 里写 __pycache__ 会破坏签名封印）")
+    void pythonSubprocessDoesNotWriteBytecode() {
+        java.util.Map<String, String> env = new java.util.HashMap<>();
+        LitigationVisualService.configurePythonEnv(env);
+        assertEquals("1", env.get("PYTHONDONTWRITEBYTECODE"));
+        assertEquals("utf-8", env.get("PYTHONIOENCODING"));
+        assertEquals("1", env.get("PYTHONUTF8"));
+    }
+
     // ==== 运行时定位 ====
 
     @Test
