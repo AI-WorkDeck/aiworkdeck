@@ -56,9 +56,13 @@ public class SensitiveService {
             return terms.stream().map(String::trim).filter(t -> !t.isEmpty()).distinct().toList();
         }
     }
-    /** suspects：形似但校验失败的号码候选（按类型计数），面板据此提示「未处理」（dev-board C2）。 */
+    /**
+     * suspects：形似但校验失败的号码候选（按类型计数），面板据此提示「未处理」（dev-board C2）。
+     * name：建议的副本文件名——原文件名经同一引擎处理后加「（已脱敏）/（已复敏）」；
+     * path 仍是中性临时文件，重名序号由登记方按项目目录决定（dev-board#1713 #98）。
+     */
     public record Result(String path, String recoveryKit, Map<String, Integer> counts,
-                         Map<String, Integer> suspects, List<String> warnings) {}
+                         Map<String, Integer> suspects, List<String> warnings, String name) {}
     public record Preview(String text, Map<String, Integer> counts,
                           Map<String, Integer> suspects, List<String> warnings) {}
     private static final Set<String> TEXT_EXTENSIONS = Set.of("txt", "md", "csv", "log");
@@ -142,6 +146,11 @@ public class SensitiveService {
     }
 
     public Result processFile(String filePath, Options options) throws Exception {
+        return processFile(filePath, options, null);
+    }
+
+    /** @param sourceName 原文件在项目里的显示名（为空时取磁盘文件名），用于生成副本名。 */
+    public Result processFile(String filePath, Options options, String sourceName) throws Exception {
         Path source = Path.of(filePath);
         boolean reversible = options.mode().equals("TOKEN");
         String ext = validateSource(source, reversible);
@@ -154,14 +163,21 @@ public class SensitiveService {
             if (doc != null) { doc.transform(engine::edits); writeDocx(doc, dest); }
             else if (ext.equals("pdf")) processPdf(source.toFile(), dest.toFile(), engine);
             else Files.writeString(dest, engine.apply(text), StandardCharsets.UTF_8);
+            Map<String, Integer> counts = engine.counts();
+            // 文件名与正文同一引擎、同一编号表，复敏时按同一份映射还原；统计只算正文。
+            String name = outputName(engine.apply(stem(sourceName, source)), LangText.of("（已脱敏）", " (Redacted)"), ext);
             String kit = reversible && !engine.recovery().isEmpty() ? SensitiveRecoveryKit.encrypt(engine.recovery(), options.password()) : "";
             var messages = new ArrayList<>(warnings(ext));
-            if (engine.counts().isEmpty()) messages.add(LangText.of("未识别到敏感信息，本次没有替换任何内容。", "No sensitive items were detected; no content was replaced."));
-            return new Result(dest.toString(), kit, engine.counts(), engine.suspects(), messages);
+            if (counts.isEmpty()) messages.add(LangText.of("未识别到敏感信息，本次没有替换任何内容。", "No sensitive items were detected; no content was replaced."));
+            return new Result(dest.toString(), kit, counts, engine.suspects(), messages, name);
         } catch (Exception e) { Files.deleteIfExists(dest); throw e; }
     }
 
     public Result restoreFile(String filePath, String recoveryKit, String password) throws Exception {
+        return restoreFile(filePath, recoveryKit, password, null);
+    }
+
+    public Result restoreFile(String filePath, String recoveryKit, String password, String sourceName) throws Exception {
         Path source = Path.of(filePath);
         String ext = validateSource(source, true);
         Map<String, String> recovery = SensitiveRecoveryKit.decrypt(recoveryKit, password);
@@ -185,13 +201,36 @@ public class SensitiveService {
             var messages = new ArrayList<String>();
             messages.add(LangText.of("仅恢复原样保留的编号；已删除或被改写的编号无法还原。复敏后的文件含原始敏感信息。", "Only intact tokens are restored; deleted or modified tokens cannot be recovered. The restored file contains original sensitive data."));
             if (unknown[0] > 0) messages.add(LangText.of("另有" + unknown[0] + "个编号不属于此复敏文件，已保留原样。", unknown[0] + " token(s) did not belong to this recovery kit and were left unchanged."));
-            return new Result(dest.toString(), "", Map.of("RESTORED", restored[0]), Map.of(), messages);
+            String stem = REDACTED_SUFFIX.matcher(stem(sourceName, source)).replaceFirst("");
+            String name = outputName(SensitiveTextEngine.apply(stem, SensitiveTextEngine.restoreEdits(stem, recovery)),
+                    LangText.of("（已复敏）", " (Restored)"), ext);
+            return new Result(dest.toString(), "", Map.of("RESTORED", restored[0]), Map.of(), messages, name);
         } catch (Exception e) { Files.deleteIfExists(dest); throw e; }
     }
 
     private Path outputPath(Path source, String ext, String prefix) throws IOException {
-        // A neutral filename avoids leaking a company/person name from the source filename.
+        // The temporary file stays neutral; the display name comes from outputName (redacted source name).
         return Files.createTempFile(source.toAbsolutePath().getParent(), "[" + prefix + "]-", "." + ext);
+    }
+
+    /** 上次处理加的后缀（含登记时的重名序号），复敏时去掉再加「（已复敏）」。 */
+    private static final java.util.regex.Pattern REDACTED_SUFFIX =
+            java.util.regex.Pattern.compile("(?:（已脱敏）| \\(Redacted\\))(?: \\(\\d+\\))?$");
+
+    private static String stem(String sourceName, Path source) {
+        String name = sourceName == null || sourceName.isBlank() ? source.getFileName().toString() : sourceName.strip();
+        int dot = name.lastIndexOf('.');
+        return dot > 0 ? name.substring(0, dot) : name;
+    }
+
+    /** 留出「 (n)」序号与「.awd-recovery」的余量，整名不超过常见文件系统的 255 字节。 */
+    static String outputName(String stem, String suffix, String ext) {
+        String clean = stem.replace('*', '＊').replaceAll("[\\\\/:?\"<>|\\p{Cntrl}]", "_");
+        int budget = 255 - (suffix + "." + ext + " (999).awd-recovery").getBytes(StandardCharsets.UTF_8).length;
+        while (clean.getBytes(StandardCharsets.UTF_8).length > budget) {
+            clean = clean.substring(0, clean.offsetByCodePoints(clean.length(), -1));
+        }
+        return clean + suffix + "." + ext;
     }
 
     private String pdfText(PDDocument document) throws IOException {
