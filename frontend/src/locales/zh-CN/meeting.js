@@ -72,9 +72,10 @@ export default {
   noticeCheckLabel: '我已知悉上述处理方式',
   noticeConfirm: '确认，继续用云端转写',
   noticeSwitchLocal: '改用本机转写',
+  noticePendingHint: '使用云端转写前，需要先阅读并确认一次转写告知（每台电脑一次）。',
+  noticeReview: '查看并确认告知',
+  preparing: '正在准备…',
   noticeSaveFailed: '保存失败，稍后重试',
-  noticeBlockBeforeRecording: '开始录音前，看一下上方的转写告知',
-  noticeBlockBeforeUpload: '上传前，看一下上方的转写告知',
 
   // ---- 录音引擎 utils/meetingRecorder.js ----
   alreadyRecording: '已有一场录音在进行中',
@@ -131,7 +132,7 @@ export default {
   paidConfirmDuration: '音频时长：{duration}',
   paidConfirmEstimate: '预计费用：约 {credits} Credits（按分钟向上取整估算，以实际结算为准）',
   paidConfirmPerMinute: '单价：每分钟约 {credits} Credits（以实际结算为准）',
-  paidConfirmBalance: '当前余额：{credits} Credits',
+  paidConfirmInsufficient: '余额不足：预计消耗超过当前账户余额，提交后可能无法完成转写。',
   paidConfirmLocalHint: '不想让音频离开本机、也不扣 Credits：取消后在「语音 > 会议录音」打开「录音不出本机」，改用本机转写。',
   paidConfirmOk: '确定转写',
   emptyTranscriptBillingHint: '平台转写可能仍按处理时长扣除 Credits；重试会再次提交并可能再次计费。',

@@ -30,7 +30,7 @@ function deps({ ctx, balance = null, price = null, confirm = false, localPossibl
 
 // ---------- 确认逻辑 ----------
 
-test('平台档：弹确认框，取消即不提交；框里有计费说明、时长、预计费用、余额、本机转写出路', async () => {
+test('平台档：弹确认框，取消即不提交；框里有计费说明、时长、预计费用、本机转写出路，不显示余额（#119）', async () => {
   const d = deps({ ctx: PLATFORM, balance: 1230, price: { unit: 'minute', creditsPerUnit: 12 }, confirm: false })
   const ok = await confirmPaidTranscription({ durationMs: 125000 }, d)
   assert.equal(ok, false)
@@ -43,8 +43,27 @@ test('平台档：弹确认框，取消即不提交；框里有计费说明、�
   assert.match(o.content, /meeting\.paidConfirmDuration\{"duration":"02:05"\}/)
   // 与网关同算法：ceil(125/60 分钟 × 12 分) = ceil(25) = 25 分 = 0.25 Credits
   assert.match(o.content, /meeting\.paidConfirmEstimate\{"credits":"0.25"\}/)
-  assert.match(o.content, /meeting\.paidConfirmBalance\{"credits":"12.30"\}/)
+  // 录屏/投屏会外泄余额（dev-board#1713 #119）：余额够时一个字都不提
+  assert.doesNotMatch(o.content, /paidConfirmBalance|paidConfirmInsufficient|12\.30/)
   assert.match(o.content, /meeting\.paidConfirmLocalHint/)
+})
+
+test('余额不足才提示「余额不足」，仍不显示余额数字（#119）', async () => {
+  const price = { unit: 'minute', creditsPerUnit: 12 }
+  // 预计 25 分，余额 24 分 → 不足；时长未知按单价比；余额 0 无单价也算不足
+  for (const [opts, balance, insufficient] of [
+    [{ durationMs: 125000 }, 24, true], [{ durationMs: 125000 }, 25, false],
+    [{}, 11, true], [{}, 12, false], [{ durationMs: 125000 }, null, false],
+  ]) {
+    const d = deps({ ctx: PLATFORM, balance, price })
+    await confirmPaidTranscription(opts, d)
+    const c = d.dialogs[0].content
+    assert.equal(/meeting\.paidConfirmInsufficient/.test(c), insufficient, JSON.stringify({ opts, balance }))
+    assert.doesNotMatch(c, /paidConfirmBalance|0\.24|0\.11/)
+  }
+  const none = deps({ ctx: PLATFORM, balance: 0, price: null })
+  await confirmPaidTranscription({}, none)
+  assert.match(none.dialogs[0].content, /meeting\.paidConfirmInsufficient/)
 })
 
 test('平台档：确认后才放行；时长未知给每分钟单价，余额未知不硬凑', async () => {
@@ -167,7 +186,7 @@ test('接线：右键同一份已转写的音频按 audioFileId 找到记录，�
   assert.equal(globalThis.__gateDialogs.length, 0)
 })
 
-test('接线：列表没带 tier（旧后端）退回 /api/platform-services 的 asr 行；余额按「分/100」格式化、单价取 /remote 的 asrPrice', async () => {
+test('接线：列表没带 tier（旧后端）退回 /api/platform-services 的 asr 行；余额只用于判断够不够、单价取 /remote 的 asrPrice', async () => {
   const gate = await loadGate({
     getMeetingRecordings: async () => ({ meetings: [] }),
     getPlatformServices: async () => ({ platformAvailable: true, services: [{ service: 'asr', provider: 'platform' }] }),
@@ -177,7 +196,7 @@ test('接线：列表没带 tier（旧后端）退回 /api/platform-services 的
   assert.equal(await gate.confirmPaidTranscription({ projectId: 1, durationMs: 30000 }), false)
   assert.equal(globalThis.__gateDialogs.length, 1)
   const c = globalThis.__gateDialogs[0].content
-  assert.match(c, /paidConfirmBalance\{"credits":"987.65"\}/)
+  assert.doesNotMatch(c, /paidConfirmBalance|paidConfirmInsufficient|987\.65/)
   // ceil(0.5 分钟 × 15 分) = 8 分
   assert.match(c, /paidConfirmEstimate\{"credits":"0.08"\}/)
   assert.match(c, /paidConfirmLocalHint/)
@@ -205,7 +224,7 @@ test('接线：未连账户 / 官网不可达时不显示余额（不拿 0 冒�
       getAccountBalance: async () => bal,
     }, 'nobal' + (bal.connected ? 1 : 0))
     await gate.confirmPaidTranscription({ projectId: 1 })
-    assert.doesNotMatch(globalThis.__gateDialogs[0].content, /paidConfirmBalance/, JSON.stringify(bal))
+    assert.doesNotMatch(globalThis.__gateDialogs[0].content, /paidConfirmBalance|paidConfirmInsufficient/, JSON.stringify(bal))
   }
 })
 
@@ -223,20 +242,46 @@ function extractMethod(src, name) {
   throw new Error('方法体不闭合')
 }
 
-function overviewTranscribe(confirmResult) {
+function overviewTranscribe(confirmResult, registerResult = { meeting: { id: 5 }, submitted: true }) {
   const src = readFileSync(new URL('../../src/pages/project-overview/project-overview.vue', import.meta.url), 'utf8')
   const method = extractMethod(src, 'onTranscribeAudio')
-  const calls = { register: [], confirm: 0, confirmArgs: [] }
+  const calls = { register: [], confirm: 0, confirmArgs: [], order: [], toasts: [], commands: [] }
   const fn = new Function('registerMeetingFromFile', 'confirmPaidTranscription', 'uni', 'console',
     `return async function ${method}`)(
-    async (...a) => { calls.register.push(a); return { meeting: { id: 5 }, submitted: true } },
-    async (o) => { calls.confirm++; calls.confirmArgs.push(o); return confirmResult },
-    { showToast() {} },
+    async (...a) => { calls.order.push('register'); calls.register.push(a); return registerResult },
+    async (o) => { calls.order.push('confirm'); calls.confirm++; calls.confirmArgs.push(o); return confirmResult },
+    {
+      showToast(o) { calls.toasts.push(o.title) },
+      $emit(event, payload) { calls.order.push('command'); calls.commands.push(payload) },
+    },
     { error() {} },
   )
-  const vm = { projectId: 9, leftPaneKey: 'files', toggleLeftPane() {}, $t: (k) => k }
+  const vm = {
+    projectId: 9, leftPaneKey: 'files', toggleLeftPane() {}, $t: (k) => k,
+    openPanelInItsDock(key) { calls.order.push('panel:' + key) }, $nextTick: async () => {},
+  }
   return { run: (file) => fn.call(vm, file), calls, vm }
 }
+
+test('右键转写：先开面板并显示「正在准备」，再确认与注册；结束（含取消）都撤掉准备态（#116）', async () => {
+  for (const confirmed of [true, false]) {
+    const { run, calls } = overviewTranscribe(confirmed)
+    await run({ id: 77, name: 'a.mp3' })
+    assert.deepEqual(calls.order.slice(0, 3), ['panel:voice', 'command', 'confirm'])
+    assert.deepEqual(calls.commands[0], { pluginId: 'voice', command: 'recording-focus', meetingId: null, preparing: true })
+    assert.deepEqual(calls.commands.at(-1), { pluginId: 'voice', command: 'recording-focus', meetingId: confirmed ? 5 : null, preparing: false })
+    assert.equal(calls.order.at(-1), 'command')
+  }
+})
+
+test('右键转写：告知未确认（noticePending）时提示去确认告知，不再误说「配置转写服务」（#117/#118）', async () => {
+  const { run, calls } = overviewTranscribe(true, { meeting: { id: 5 }, submitted: false, configured: true, noticePending: true })
+  await run({ id: 77, name: 'a.mp3' })
+  assert.deepEqual(calls.toasts, ['fileTree.transcribeNoticePending'])
+  const plain = overviewTranscribe(true, { meeting: { id: 5 }, submitted: false, configured: false, noticePending: false })
+  await plain.run({ id: 77, name: 'a.mp3' })
+  assert.deepEqual(plain.calls.toasts, ['fileTree.transcribeRegistered'])
+})
 
 test('右键转写：用户取消 → 不调 register-file（该接口会当场提交并预扣）', async () => {
   const { run, calls, vm } = overviewTranscribe(false)
