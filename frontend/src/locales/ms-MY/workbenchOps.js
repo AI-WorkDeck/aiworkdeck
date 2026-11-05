@@ -81,5 +81,11 @@ export default {
   "ocrFailedItem": "\"{name}\" tidak selesai: {reason}",
   "ocrSkipped": "{count} fail yang memerlukan OCR awan dilangkau (tidak disahkan)",
   "ocrCancelled": "Dibatalkan; {count} fail tidak diproses",
-  "ocrSummaryTitle": "Dikenal pasti {done}/{total}"
+  "ocrSummaryTitle": "Dikenal pasti {done}/{total}",
+  "ocrLocalFailedTitle": "Pengecaman tempatan tidak selesai",
+  "ocrLocalFailedReason": "Sebab: {reason}",
+  "ocrLocalFailedHint": "Anda boleh menggunakan pengecaman awan untuk fail dalam kumpulan ini yang gagal secara tempatan. Jika tidak, fail tersebut tidak akan dimuat naik.",
+  "ocrLocalFailedConfirm": "Guna pengecaman awan",
+  "ocrAlreadySearchable": "\"{name}\" sudah mempunyai lapisan teks dan boleh dicari; tiada fail baharu dibuat",
+  "ocrStopped": "Dihentikan; {count} fail tidak diproses"
 }

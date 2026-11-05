@@ -81,5 +81,11 @@ export default {
   "ocrFailedItem": "«{name}» não concluído: {reason}",
   "ocrSkipped": "{count} arquivo(s) que exigem OCR na nuvem ignorados (não confirmado)",
   "ocrCancelled": "Cancelado; {count} arquivo(s) não processados",
-  "ocrSummaryTitle": "Reconhecidos {done}/{total}"
+  "ocrSummaryTitle": "Reconhecidos {done}/{total}",
+  "ocrLocalFailedTitle": "O reconhecimento local não foi concluído",
+  "ocrLocalFailedReason": "Motivo: {reason}",
+  "ocrLocalFailedHint": "Você pode usar o reconhecimento na nuvem para os arquivos deste lote que falharam localmente. Se não usar, esses arquivos não serão enviados.",
+  "ocrLocalFailedConfirm": "Usar reconhecimento na nuvem",
+  "ocrAlreadySearchable": "«{name}» já tem camada de texto e permite pesquisa; nenhum arquivo novo foi criado",
+  "ocrStopped": "Interrompido; {count} arquivo(s) não processados"
 }

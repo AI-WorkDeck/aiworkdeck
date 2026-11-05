@@ -81,5 +81,11 @@ export default {
   "ocrFailedItem": "\"{name}\" tidak selesai: {reason}",
   "ocrSkipped": "{count} file yang perlu OCR cloud dilewati (belum dikonfirmasi)",
   "ocrCancelled": "Dibatalkan; {count} file tidak diproses",
-  "ocrSummaryTitle": "Dikenali {done}/{total}"
+  "ocrSummaryTitle": "Dikenali {done}/{total}",
+  "ocrLocalFailedTitle": "Pengenalan lokal tidak selesai",
+  "ocrLocalFailedReason": "Alasan: {reason}",
+  "ocrLocalFailedHint": "Anda dapat memakai pengenalan di cloud untuk file dalam batch ini yang gagal diproses secara lokal. Jika tidak, file tersebut tidak akan diunggah.",
+  "ocrLocalFailedConfirm": "Gunakan pengenalan cloud",
+  "ocrAlreadySearchable": "\"{name}\" sudah memiliki lapisan teks dan dapat dicari; tidak ada file baru yang dibuat",
+  "ocrStopped": "Dihentikan; {count} file tidak diproses"
 }

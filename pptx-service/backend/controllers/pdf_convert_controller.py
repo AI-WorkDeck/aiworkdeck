@@ -6,6 +6,7 @@
 供主仓 backend PdfTools 调用（本地桌面同机部署，传本地文件路径）：
 - POST /api/pdf/to-docx      {pdf_path, output_path}  -> 版式级转 Word（pdf2docx，限文本型）
 - POST /api/pdf/ocr-markdown-local {pdf_path}         -> 扫描件 MinerU OCR（仅本地，新客户端要求此端点）
+  可选 "layout": true 另回 pages（逐行文字+bbox）/ images（markdown 引用图片 base64）/ warnings
 - POST /api/pdf/ocr-markdown {pdf_path}               -> 同一实现，保留旧客户端入口
 """
 from flask import Blueprint, request
@@ -33,7 +34,7 @@ def pdf_to_docx():
 def pdf_ocr_markdown():
     data = request.get_json(silent=True) or {}
     try:
-        result = pdf_convert_service.ocr_markdown(data.get('pdf_path'))
+        result = pdf_convert_service.ocr_markdown(data.get('pdf_path'), data.get('layout', False))
         return success_response(result)
     except pdf_convert_service.PdfConvertError as e:
         return error_response('INVALID_REQUEST', str(e), 400)

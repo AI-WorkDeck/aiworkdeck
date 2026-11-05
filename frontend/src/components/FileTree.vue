@@ -173,7 +173,7 @@
           </view>
           <text class="context-menu-text">{{ $t('fileTree.transcribe') }}</text>
         </view>
-        <!-- 识别文字（OCR，tutorial-series#155）：PDF 与图片，单选/多选均可；点开三项子菜单，
+        <!-- 识别文字（OCR，tutorial-series#155）：PDF 与图片，单选/多选均可；点开五项子菜单（后两项为保留版式 Word / 可搜索 PDF），
              执行交给宿主 onExplorerOcr（批量队列、进度与取消、云端告知、并排校对都在宿主） -->
         <view v-if="canOcrContext()" class="context-menu-item" :aria-expanded="ocrMenuOpen ? 'true' : 'false'" @tap="ocrMenuOpen = !ocrMenuOpen">
           <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
@@ -194,6 +194,12 @@
           </view>
           <view class="context-menu-item context-menu-subitem" @tap="handleContextOcr('docx')">
             <text class="context-menu-text">{{ $t('fileTree.ocrExportDocx') }}</text>
+          </view>
+          <view class="context-menu-item context-menu-subitem" @tap="handleContextOcr('layoutDocx')">
+            <text class="context-menu-text">{{ $t('fileTree.ocrExportLayoutDocx') }}</text>
+          </view>
+          <view class="context-menu-item context-menu-subitem" @tap="handleContextOcr('searchablePdf')">
+            <text class="context-menu-text">{{ $t('fileTree.ocrSearchablePdf') }}</text>
           </view>
         </template>
         <!-- 加入 AI 对话（dev-board#794 K15 ②）：与拖到 AI 面板同一条路，

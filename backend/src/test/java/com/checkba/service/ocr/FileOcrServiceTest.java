@@ -52,7 +52,7 @@ class FileOcrServiceTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        service = new FileOcrService(ocr, pdfOcr, routing, extractor, files, access, members, repository, storageFactory, docx);
+        service = new FileOcrService(ocr, pdfOcr, routing, extractor, files, access, members, repository, storageFactory, docx, mock(OcrExportService.class));
         when(storageFactory.getStorageService()).thenReturn(storage);
         when(members.hasWritePermission(7L, 1L)).thenReturn(true);
         prefer("ask");

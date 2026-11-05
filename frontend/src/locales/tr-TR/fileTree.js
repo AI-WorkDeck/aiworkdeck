@@ -158,5 +158,9 @@ export default {
   "ocrCopy": "Metni kopyala",
   "ocrExportTxt": "TXT olarak dışa aktar",
   "ocrExportDocx": "Word olarak dışa aktar",
-  "ocrOutputSuffix": "-OCR metni"
+  "ocrOutputSuffix": "-OCR metni",
+  "ocrExportLayoutDocx": "Word olarak dışa aktar (düzeni koru)",
+  "ocrSearchablePdf": "Aranabilir PDF oluştur",
+  "ocrLayoutSuffix": "-OCR düzeni",
+  "ocrSearchableSuffix": "-aranabilir"
 }

@@ -158,5 +158,9 @@ export default {
   "ocrCopy": "Salin teks",
   "ocrExportTxt": "Eksport TXT",
   "ocrExportDocx": "Eksport Word",
-  "ocrOutputSuffix": "-teks OCR"
+  "ocrOutputSuffix": "-teks OCR",
+  "ocrExportLayoutDocx": "Eksport Word (kekalkan susun atur)",
+  "ocrSearchablePdf": "Jana PDF boleh cari",
+  "ocrLayoutSuffix": "-susun atur OCR",
+  "ocrSearchableSuffix": "-boleh cari"
 }

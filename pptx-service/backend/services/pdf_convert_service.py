@@ -6,11 +6,14 @@
 - to_docx: 文本型 PDF 的版式级转 Word（pdf2docx：段落/表格/图片/分栏尽量保留原排版）
 - ocr_markdown: 扫描件经本地 mineru-service 解析出 markdown；失败不转云端，
   不生成云端图片描述。即使配置 MINERU_FORCE_CLOUD 或云端凭据，也保持本地处理。
+  可选 layout=True 另回逐行 bbox（pages）与 markdown 引用的图片（images，有上限）。
 
 供主仓 backend PdfTools.pdf_to_word 调用（本地同机部署，传本地文件路径）。
 """
 import logging
 import os
+import re
+from html.parser import HTMLParser
 
 import fitz  # pymupdf（pdf2docx 依赖自带）
 from pdf2docx import Converter
@@ -84,13 +87,20 @@ def to_docx(pdf_path: str, output_path: str) -> dict:
     return {'output_path': resolved_out, 'pages': pages}
 
 
-def ocr_markdown(pdf_path: str) -> dict:
-    """扫描件 OCR：只使用本地 MinerU，不隐式上传或生成云端图片描述。"""
+def ocr_markdown(pdf_path: str, layout=False) -> dict:
+    """扫描件 OCR：只使用本地 MinerU，不隐式上传或生成云端图片描述。
+
+    layout=True 时另回 pages（逐页尺寸 + 逐行文字与 bbox，供可检索 PDF 的隐形文字层）
+    与 images（markdown 引用的图片 base64，供保留印章/插图的 Word），以及 warnings。
+    """
+    if not isinstance(layout, bool):
+        raise PdfConvertError("layout 必须是布尔值")
     resolved_pdf = _validate(pdf_path)
 
     parser = FileParserService(
         mineru_token="",
         local_only=True,
+        return_layout=layout,
     )
 
     _batch_id, markdown, _extract_id, error, _failed = parser.parse_file(
@@ -99,4 +109,96 @@ def ocr_markdown(pdf_path: str) -> dict:
     if error or not markdown or not markdown.strip():
         raise PdfConvertError(
             error or "本地 OCR 未返回解析内容，请检查本机扫描件 OCR 组件与模型后重试；未转用云端 OCR。")
-    return {'markdown': markdown}
+    if not layout:
+        return {'markdown': markdown}
+
+    raw = parser.last_local_layout or {}
+    warnings = []
+    middle_json = raw.get('middle_json')
+    if not isinstance(middle_json, dict):
+        warnings.append("本地 OCR 未返回版面数据（middle_json），pages 为空")
+        middle_json = {}
+    images = _collect_images(markdown, raw.get('images') or {}, warnings)
+    return {'markdown': markdown, 'pages': _layout_pages(middle_json),
+            'images': images, 'warnings': warnings}
+
+
+# [checkba] layout=true 的图片回传上限：单张与合计，超限跳过并写 warnings
+MAX_IMAGE_BYTES = 8 * 1024 * 1024
+MAX_TOTAL_IMAGE_BYTES = 64 * 1024 * 1024
+
+_MD_IMAGE_RE = re.compile(r'!\[[^\]]*\]\(([^)\s]+)')
+
+
+class _HtmlText(HTMLParser):
+    """收集 HTML 里的文字节点（表格 span 的文字只在 html 里）。"""
+
+    def __init__(self):
+        super().__init__()
+        self.parts = []
+
+    def handle_data(self, data):
+        if data.strip():
+            self.parts.append(data.strip())
+
+
+def _html_text(html: str) -> str:
+    p = _HtmlText()
+    p.feed(html)
+    p.close()
+    return ' '.join(p.parts)
+
+
+def _span_text(span: dict) -> str:
+    content = span.get('content')
+    if isinstance(content, str) and content:
+        return content
+    html = span.get('html')
+    if isinstance(html, str) and html:
+        return _html_text(html)
+    return ''
+
+
+def _block_lines(block: dict, out: list):
+    for line in block.get('lines') or []:
+        text = ''.join(_span_text(s) for s in line.get('spans') or [])
+        if text.strip() and line.get('bbox'):
+            out.append({'text': text, 'bbox': list(line['bbox'])})
+    for child in block.get('blocks') or []:
+        _block_lines(child, out)
+
+
+def _layout_pages(middle_json: dict) -> list:
+    """MinerU middle.json → [{width, height, lines:[{text, bbox}]}]，坐标为 PDF 点、左上原点。"""
+    infos = sorted(middle_json.get('pdf_info') or [], key=lambda p: p.get('page_idx', 0))
+    pages = []
+    for info in infos:
+        width, height = (info.get('page_size') or [0, 0])[:2]
+        lines = []
+        for block in info.get('para_blocks') or []:
+            _block_lines(block, lines)
+        pages.append({'width': width, 'height': height, 'lines': lines})
+    return pages
+
+
+def _collect_images(markdown: str, raw_images: dict, warnings: list) -> dict:
+    """只回 markdown 引用到的图片（键 = markdown 里的相对路径，值 = 纯 base64），按上限跳过。"""
+    images = {}
+    total = 0
+    for ref in dict.fromkeys(_MD_IMAGE_RE.findall(markdown)):
+        name = os.path.basename(ref)
+        uri = raw_images.get(name)
+        if not isinstance(uri, str) or not uri:
+            warnings.append(f"图片未随 OCR 结果返回，已跳过: {ref}")
+            continue
+        b64 = uri.split(',', 1)[1] if uri.startswith('data:') else uri
+        size = len(b64) * 3 // 4 - b64[-2:].count('=')
+        if size > MAX_IMAGE_BYTES:
+            warnings.append(f"图片超过单张上限 {MAX_IMAGE_BYTES // (1024 * 1024)}MB，已跳过: {ref}")
+            continue
+        if total + size > MAX_TOTAL_IMAGE_BYTES:
+            warnings.append(f"图片合计超过上限 {MAX_TOTAL_IMAGE_BYTES // (1024 * 1024)}MB，已跳过: {ref}")
+            continue
+        total += size
+        images[ref] = b64
+    return images

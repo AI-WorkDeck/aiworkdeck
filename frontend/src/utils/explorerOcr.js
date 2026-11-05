@@ -25,20 +25,28 @@ export function ocrOutputName(sourceName, ext, suffix) {
 }
 
 /**
- * Runs files one by one. recognize(item, {consentVersion, name}) resolves to the endpoint's data
+ * Runs files one by one. recognize(item, {consentVersion, name, route}) resolves to the endpoint's data
  * ({status, text, file, notice, version}) or throws; a throw only fails that file unless isFatal(err).
+ *
+ * Phase 2 statuses: `already_searchable` (text-layer PDF, nothing generated); `local_failed` asks
+ * requestCloudFallback({reason, notice, version, item}) once per batch — agreeing doubles as the
+ * upload consent and retries that and later local failures with route 'cloud'; `layout_unsupported`
+ * stops the batch (every further cloud file would be billed a page for nothing); `component_outdated`
+ * fails the file with the server's hint.
  */
 export async function runOcrBatch({ items, recognize, requestConsent = async () => false, onProgress = () => {},
-  isCancelled = () => false, isFatal = () => false, nameFor = () => undefined }) {
+  isCancelled = () => false, isFatal = () => false, nameFor = () => undefined, requestCloudFallback = null }) {
   const results = []
   let consentVersion = null
   let consentDeclined = false
+  let cloudFallback = null // null = not asked yet, true/false = the user's answer for this batch
   let cancelled = false
   let fatal = null
+  let stopped = null
   for (let index = 0; index < items.length; index++) {
     const item = items[index]
-    if (cancelled || fatal || isCancelled()) {
-      if (!fatal) cancelled = true
+    if (cancelled || fatal || stopped || isCancelled()) {
+      if (!fatal && !stopped) cancelled = true
       results.push({ item, status: 'notRun' })
       continue
     }
@@ -54,18 +62,31 @@ export async function runOcrBatch({ items, recognize, requestConsent = async () 
           consentDeclined = true
         }
       }
+      if (data && data.status === 'local_failed' && requestCloudFallback && !isCancelled()) {
+        const localReason = data.notice || ''
+        if (cloudFallback === null) {
+          cloudFallback = !!(await requestCloudFallback({ reason: localReason, notice: data.notice, version: data.version, item }))
+          if (cloudFallback) consentVersion = data.version
+        }
+        if (cloudFallback) data = await recognize(item, { consentVersion, name, route: 'cloud' })
+        else data = { status: 'failed', notice: localReason }
+      }
       const status = data && data.status
       if (status === 'done') results.push({ item, status: 'done', text: data.text || '', file: data.file || null })
       else if (status === 'consent_required') results.push({ item, status: 'skipped' })
       else if (status === 'local_only') results.push({ item, status: 'failed', reason: 'localOnly' })
       else if (status === 'cancelled') { cancelled = true; results.push({ item, status: 'notRun' }) }
-      else results.push({ item, status: 'failed', error: '' })
+      else if (status === 'already_searchable') results.push({ item, status: 'alreadySearchable' })
+      else if (status === 'layout_unsupported') {
+        stopped = data.notice || ''
+        results.push({ item, status: 'failed', error: stopped })
+      } else results.push({ item, status: 'failed', error: (data && data.notice) || '' })
     } catch (error) {
       if (isFatal(error)) fatal = error
       results.push({ item, status: 'failed', error: (error && error.message) || '' })
     }
   }
-  return { results, cancelled: cancelled && !fatal, fatal }
+  return { results, cancelled: cancelled && !fatal && !stopped, fatal, stopped }
 }
 
 export function summarizeOcrBatch(batch) {
@@ -75,6 +96,7 @@ export function summarizeOcrBatch(batch) {
     failed: pick('failed').map(r => ({ ...r, name: r.item.name })),
     skipped: pick('skipped'),
     notRun: pick('notRun'),
+    alreadySearchable: pick('alreadySearchable'),
   }
 }
 

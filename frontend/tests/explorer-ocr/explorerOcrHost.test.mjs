@@ -109,3 +109,58 @@ test('file tree offers the entry only for OCR targets and hands the whole select
   const page = readFileSync(new URL('../../src/pages/project-overview/project-overview.vue', import.meta.url), 'utf8')
   assert.match(page, /<FileTree[\s\S]*?@ocr-files="onExplorerOcr"/)
 })
+
+// ---- phase 2: layout Word / searchable PDF / local-first (tutorial-series#155)
+
+test('layout Word and searchable PDF send their outputs and names, then open beside the original', async () => {
+  for (const [action, output, ext, suffix] of [
+    ['layoutDocx', 'layout_docx', '.docx', 'fileTree.ocrLayoutSuffix'],
+    ['searchablePdf', 'searchable_pdf', '.pdf', 'fileTree.ocrSearchableSuffix'],
+  ]) {
+    const { vm, calls } = fixture({ server: id => ({ status: 'done', file: { id: 100 + id, name: `s${id}${ext}` } }) })
+    await vm.onExplorerOcr({ action, items: [pdf(1)] })
+    const api = calls.find(c => c[0] === 'api')
+    assert.equal(api[3].output, output)
+    assert.equal(api[3].name, `s1${suffix}${ext}`)
+    assert.deepEqual(calls.filter(c => c[0] === 'open').map(c => c.slice(1)), [['left', 1], ['right', 101]], action)
+    assert.equal(vm.splitMode, true)
+  }
+})
+
+test('local failure shows the reason with the cloud notice and retries in the cloud only when confirmed', async () => {
+  const server = (id, data) => data.route === 'cloud'
+    ? { status: 'done', file: { id: 100 + id, name: `s${id}.docx` } }
+    : { status: 'local_failed', notice: 'LOCAL-REASON', version: 'v9' }
+  const { vm, calls } = fixture({ server })
+  await vm.onExplorerOcr({ action: 'layoutDocx', items: [pdf(1)] })
+  const dialog = calls.find(c => c[0] === 'dialog')[1]
+  assert.equal(dialog.title, 'workbenchOps.ocrLocalFailedTitle')
+  assert.ok(dialog.content.includes('LOCAL-REASON'))
+  assert.equal(dialog.checkLabel, 'workbenchOps.ocrConsentCheck', 'same tick-to-confirm consent as any upload')
+  const retry = calls.filter(c => c[0] === 'api')[1][3]
+  assert.equal(retry.route, 'cloud')
+  assert.equal(retry.consentVersion, 'v9')
+
+  const declined = fixture({ server, dialog: async () => ({ confirm: false }) })
+  await declined.vm.onExplorerOcr({ action: 'layoutDocx', items: [pdf(1)] })
+  assert.equal(declined.calls.filter(c => c[0] === 'api').length, 1, 'nothing uploaded after declining')
+})
+
+test('summary explains text-layer PDFs and a stopped batch', async () => {
+  const { vm, calls } = fixture({ server: id => id === 1 ? { status: 'already_searchable' }
+    : { status: 'layout_unsupported', notice: 'GATEWAY-OLD' } })
+  await vm.onExplorerOcr({ action: 'searchablePdf', items: [pdf(1), pdf(2), pdf(3)] })
+  const summary = calls.filter(c => c[0] === 'dialog').pop()[1].content
+  assert.ok(summary.includes('workbenchOps.ocrAlreadySearchable{"name":"s1.pdf"}'))
+  assert.ok(summary.includes('GATEWAY-OLD'))
+  assert.ok(summary.includes('workbenchOps.ocrStopped{"count":1}'))
+  assert.equal(calls.filter(c => c[0] === 'api').length, 2, 'the third file is not sent after the stop')
+})
+
+test('file tree offers the two phase-2 entries and hands them to the host', () => {
+  const tree = readFileSync(new URL('../../src/components/FileTree.vue', import.meta.url), 'utf8')
+  assert.match(tree, /handleContextOcr\('layoutDocx'\)/)
+  assert.match(tree, /handleContextOcr\('searchablePdf'\)/)
+  assert.match(tree, /\$t\('fileTree\.ocrExportLayoutDocx'\)/)
+  assert.match(tree, /\$t\('fileTree\.ocrSearchablePdf'\)/)
+})

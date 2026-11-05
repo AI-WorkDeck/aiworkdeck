@@ -152,6 +152,7 @@ class FileParserService:
                  mineru_model_version: str = "vlm",
                  mineru_local_url: str = None,
                  local_only: bool = False,
+                 return_layout: bool = False,
                  ):
         """
         Initialize the file parser service
@@ -170,11 +171,15 @@ class FileParserService:
             mineru_local_url: [checkba] Local MinerU service URL (e.g., http://mineru-service:8000).
                 If None, reads from Flask config / MINERU_LOCAL_URL env.
             local_only: Never use cloud OCR or image captions, even with cloud credentials/configuration.
+            return_layout: [checkba] Also ask local MinerU for images; keep middle_json + images of the
+                last local parse in `self.last_local_layout` (used by /api/pdf/ocr-markdown-local layout=true).
         """
         self.mineru_token = mineru_token
         self.mineru_api_base = mineru_api_base
         self.mineru_model_version = mineru_model_version
         self.local_only = local_only
+        self.return_layout = return_layout
+        self.last_local_layout = None
         self.get_upload_url_api = f"{mineru_api_base}/api/v4/file-urls/batch"
         self.get_result_api_template = f"{mineru_api_base}/api/v4/extract-results/batch/{{}}"
 
@@ -314,6 +319,9 @@ class FileParserService:
                     # 再好，导出也只拿到空元素表、静默退回纯图片版。
                     'return_middle_json': 'true',
                 }
+                if self.return_layout:
+                    # [checkba] 图片以 {文件名: data URI} 随响应下发（mineru-api 的临时目录在它自己进程里，读不到）
+                    data['return_images'] = 'true'
 
                 # Official mineru-api is synchronous and may take a long time
                 response = requests.post(
@@ -342,6 +350,7 @@ class FileParserService:
             markdown_content = None
             content_list = []
             middle_json = None
+            images = {}
 
             if 'results' in result and isinstance(result['results'], dict):
                 # New format: {"results": {filename: {"md_content": "...", "content_list": "..."}}}
@@ -352,6 +361,7 @@ class FileParserService:
                     markdown_content = first_file.get('md_content', '')
                     content_list = _coerce_json_payload(first_file.get('content_list')) or []
                     middle_json = _coerce_json_payload(first_file.get('middle_json'))
+                    images = first_file.get('images') or {}
 
                     logger.info(f"Parsed MinerU response: backend={result.get('backend')}, version={result.get('version')}")
             elif isinstance(result, list) and len(result) > 0:
@@ -365,6 +375,9 @@ class FileParserService:
                 error_msg = "No markdown content in local MinerU response"
                 logger.error(error_msg)
                 return None, None, None, error_msg, 0
+
+            if self.return_layout:
+                self.last_local_layout = {'middle_json': middle_json, 'images': images}
 
             # Generate a unique extract_id for this result
             import uuid

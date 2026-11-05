@@ -81,5 +81,11 @@ export default {
   "ocrFailedItem": "「{name}」は完了しませんでした：{reason}",
   "ocrSkipped": "クラウド OCR が必要な {count} 件をスキップしました（未確認）",
   "ocrCancelled": "キャンセルしました。未処理 {count} 件",
-  "ocrSummaryTitle": "認識完了 {done}/{total}"
+  "ocrSummaryTitle": "認識完了 {done}/{total}",
+  "ocrLocalFailedTitle": "ローカル認識が完了しませんでした",
+  "ocrLocalFailedReason": "理由：{reason}",
+  "ocrLocalFailedHint": "このバッチでローカル認識が完了しなかったファイルは、クラウド認識に切り替えられます。切り替えない場合、それらのファイルはアップロードされません。",
+  "ocrLocalFailedConfirm": "クラウド認識に切り替える",
+  "ocrAlreadySearchable": "「{name}」にはすでにテキストレイヤーがあり検索できるため、新しいファイルは作成しませんでした",
+  "ocrStopped": "停止しました。未処理 {count} 件"
 }
