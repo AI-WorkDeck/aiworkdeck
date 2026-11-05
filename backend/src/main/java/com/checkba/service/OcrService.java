@@ -119,7 +119,8 @@ public class OcrService {
         JsonNode data = result.data();
         // 与 byok 档同一形状（text + raw）：消费方（截图摘录、文件文本抽取）
         // 不该按档位分两套解析
-        return new OcrResult(data.path("content").asText(""), data.path("raw").asText(""));
+        String raw = data.path("raw").asText("");
+        return new OcrResult(OcrResult.lines(raw, data.path("content").asText("")), raw);
     }
 }
 

@@ -500,6 +500,10 @@ uni 依赖换桩；SSR 合并 class 的顺序不固定，按「含有这个类�
   页数上限 `ai.context.ocr-max-pdf-pages`（默认 20）**只约束 OCR 路径**，文字层整篇抽取不设限；
   触发时正文末尾会明写「仅识别前 N 页」。抽取结果按 fileId + 物理文件 mtime/size
   落库缓存（`project_file_text_cache`），同一份扫描件跨重启只识别一次。
+  **识别文字按行给出（tutorial-series#155）**：阿里云 `content` 把整页拼成一行（空格分隔，0 个换行），
+  两档的 `OcrResult.text` 一律由 `OcrResult.lines(raw, content)` 从 `raw.subImages[].blockInfo.blockDetails[]`
+  逐行拼出（子图之间空一行），raw 无分块才退回 `content`；`raw` 原样保留。截图摘录、AI 读扫描件、
+  右键导出同时受益。不改请求参数、不增调用次数。回归 `OcrLineBreaksTest`。
   **改 OcrService 的失败语义要同时看 AI 这一侧**：
   那边把 `[System: ...]` 形态的失败翻译成 `Error:` 并把原因原样透给模型
   （Credits 不足 / OCR 未开通要如实报给用户，不能让模型自己推断）。契约与病灶见
