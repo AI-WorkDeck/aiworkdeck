@@ -492,6 +492,9 @@ function createMainWindow() {
     // mac：精确摆位，13 + 14/2 = 20 = 42px 顶栏的垂直中心。
     // 不用 hiddenInset——那个按系统默认标题栏高度摆，压不准我们的 42px。
     ...(process.platform === 'darwin' ? { trafficLightPosition: { x: 18, y: 13 } } : {}),
+    // mac：窗口不是 key 时第一下真实点击也进网页。默认 false 会把这一下吞成「激活窗口」，
+    // 顶栏截图按钮、框选后的「识别」都要点两下（tutorial-series#154）。其它平台忽略此项。
+    acceptFirstMouse: true,
     // win：原生最小化/最大化/关闭覆盖在右上角，高度对齐顶栏
     // 配色随主题，运行中切换由 syncTitleBarOverlay 接手（dev-board#865）
     ...(process.platform === 'win32'
@@ -894,6 +897,9 @@ ipcMain.handle('checkba:ocr-start-selection', async (_evt, payload) => {
       try { ipcMain.removeAllListeners(resultChannel) } catch (e) { }
       resolve(data || { ok: false, cancelled: true })
       closeOcrSelectWin()
+      // 框选窗 focus() 抢走了 key，关掉后 mac 不一定还给主窗口；不还的话
+      // 渲染层操作条第一下点击与 ESC 都收不到（tutorial-series#154）
+      try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus() } catch (e) { }
       // 兜底：框选窗关闭后，恢复 BrowserView 可见性（避免全屏下 onShow 未触发导致黑屏）
       try { restoreViewsVisibility() } catch (e) { }
     }
