@@ -20,7 +20,8 @@ const path = require('path')
 function exportDefaultPath({ filename, recoveryPath, sourceFilePath } = {}, p = path) {
   if (recoveryPath) return recoveryPath
   const name = String(filename || '')
-  if (typeof sourceFilePath === 'string' && sourceFilePath && p.isAbsolute(sourceFilePath)) {
+  // 源目录只属于导出 PDF 的那次下载；失败残留的槽位不能让别的下载（zip/图片）跟着落到这里
+  if (typeof sourceFilePath === 'string' && sourceFilePath && /\.pdf$/i.test(name) && p.isAbsolute(sourceFilePath)) {
     const dir = p.dirname(sourceFilePath)
     if (dir && dir !== sourceFilePath) return p.join(dir, p.basename(name))
   }
