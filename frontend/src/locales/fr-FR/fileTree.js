@@ -153,5 +153,10 @@ export default {
   "importDropPrepareFailed": "Impossible de préparer le fichier déposé. Enregistrez-le sur votre ordinateur et réessayez.",
   "importDropTooLarge": "Les fichiers sans chemin local sont limités à 100 Mo par dépôt. Enregistrez-les d'abord sur votre ordinateur.",
   "importDesktopOnly": "L'import par glisser-déposer est réservé au bureau",
-  "unknownFolder": "Dossier inconnu"
+  "unknownFolder": "Dossier inconnu",
+  "ocrMenu": "Reconnaître le texte (OCR)",
+  "ocrCopy": "Copier le texte",
+  "ocrExportTxt": "Exporter en TXT",
+  "ocrExportDocx": "Exporter en Word",
+  "ocrOutputSuffix": "-texte OCR"
 }

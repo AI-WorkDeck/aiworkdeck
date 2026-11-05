@@ -153,5 +153,10 @@ export default {
   "importDropPrepareFailed": "ड्रॉप की गई फ़ाइल तैयार नहीं की जा सकी। इसे अपने कंप्यूटर पर सहेजें और पुनः प्रयास करें।",
   "importDropTooLarge": "बिना लोकल पाथ वाली फ़ाइलें प्रति ड्रॉप 100 MB तक सीमित हैं। पहले उन्हें अपने कंप्यूटर पर सहेजें।",
   "importDesktopOnly": "ड्रैग-इन इंपोर्ट केवल डेस्कटॉप पर उपलब्ध है",
-  "unknownFolder": "अज्ञात फ़ोल्डर"
+  "unknownFolder": "अज्ञात फ़ोल्डर",
+  "ocrMenu": "टेक्स्ट पहचानें (OCR)",
+  "ocrCopy": "टेक्स्ट कॉपी करें",
+  "ocrExportTxt": "TXT में निर्यात करें",
+  "ocrExportDocx": "Word में निर्यात करें",
+  "ocrOutputSuffix": "-OCR पाठ"
 }

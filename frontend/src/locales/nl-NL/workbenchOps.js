@@ -65,5 +65,21 @@ export default {
   "clipboardRecordFailed": "Vastleggen van klembord mislukt",
   "fileCaptureFailed": "Vastleggen van bestand mislukt",
   "fileMoveOccupied": "Dit bestand is mogelijk in gebruik en kon niet worden verplaatst",
-  "filesMoveOccupiedCount": "{count} bestand(en) mogelijk in gebruik en kon(den) niet worden verplaatst"
+  "filesMoveOccupiedCount": "{count} bestand(en) mogelijk in gebruik en kon(den) niet worden verplaatst",
+  "ocrProgress": "Herkennen {index}/{total}",
+  "ocrCancel": "Annuleren",
+  "ocrCancelling": "Annuleren…",
+  "ocrBatchBusy": "Er loopt al een herkenning; wacht of annuleer",
+  "ocrConsentTitle": "Cloud-tekstherkenning gebruiken?",
+  "ocrConsentHint": "Pdf’s met een tekstlaag worden direct uitgelezen, zonder upload of kosten; alleen scans en afbeeldingen hebben cloud-OCR nodig. Deze bevestiging geldt alleen voor deze reeks; kies «altijd cloud» of «alleen lokaal» via Instellingen → Account en gebruik → Scanherkenning.",
+  "ocrConsentCheck": "Ik begrijp waar de gegevens heen gaan en hoe er wordt gefactureerd",
+  "ocrConsentConfirm": "Starten",
+  "ocrCopied": "Tekst van {count} bestand(en) gekopieerd en in de klembordgeschiedenis opgeslagen",
+  "ocrSaved": "Aangemaakt: {names}",
+  "ocrOthersNotOpened": "Niet naast elkaar geopend: {names}",
+  "ocrLocalOnly": "Herkenning staat op «alleen lokaal»; afbeeldingen en scans zijn niet geüpload (wijzig dit in Instellingen)",
+  "ocrFailedItem": "“{name}” niet voltooid: {reason}",
+  "ocrSkipped": "{count} bestand(en) die cloud-OCR nodig hebben overgeslagen (niet bevestigd)",
+  "ocrCancelled": "Geannuleerd; {count} bestand(en) niet verwerkt",
+  "ocrSummaryTitle": "Herkend {done}/{total}"
 }

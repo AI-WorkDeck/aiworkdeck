@@ -153,5 +153,10 @@ export default {
   "importDropPrepareFailed": "Die abgelegte Datei konnte nicht vorbereitet werden. Speichern Sie sie auf Ihrem Computer und versuchen Sie es erneut.",
   "importDropTooLarge": "Dateien ohne lokalen Pfad sind auf 100 MB pro Ablage begrenzt. Speichern Sie sie zuerst auf Ihrem Computer.",
   "importDesktopOnly": "Import per Drag-and-drop nur auf dem Desktop",
-  "unknownFolder": "Unbekannter Ordner"
+  "unknownFolder": "Unbekannter Ordner",
+  "ocrMenu": "Text erkennen (OCR)",
+  "ocrCopy": "Text kopieren",
+  "ocrExportTxt": "Als TXT exportieren",
+  "ocrExportDocx": "Als Word exportieren",
+  "ocrOutputSuffix": "-OCR-Text"
 }

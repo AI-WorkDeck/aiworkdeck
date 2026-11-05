@@ -153,5 +153,10 @@ export default {
   "importDropPrepareFailed": "Bırakılan dosya hazırlanamadı. Bilgisayarınıza kaydedin ve tekrar deneyin.",
   "importDropTooLarge": "Yerel yolu olmayan dosyalar her bırakışta 100 MB ile sınırlıdır. Önce bunları bilgisayarınıza kaydedin.",
   "importDesktopOnly": "Sürükle-bırak içe aktarma yalnızca masaüstünde kullanılabilir",
-  "unknownFolder": "Bilinmeyen klasör"
+  "unknownFolder": "Bilinmeyen klasör",
+  "ocrMenu": "Metni tanı (OCR)",
+  "ocrCopy": "Metni kopyala",
+  "ocrExportTxt": "TXT olarak dışa aktar",
+  "ocrExportDocx": "Word olarak dışa aktar",
+  "ocrOutputSuffix": "-OCR metni"
 }

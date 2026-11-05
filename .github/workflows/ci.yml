@@ -219,6 +219,9 @@ jobs:
       - name: Test media player pure logic (cues / CC 状态 / 快捷键 / 取源)
         working-directory: frontend
         run: npm run test:media
+      - name: Test explorer OCR (批量队列 / 云端告知 / 命名 / 失败汇总 / 并排校对)
+        working-directory: frontend
+        run: npm run test:explorer-ocr
       - name: Test LibreOffice relay (迟到结果墓碑 + 三张预算表键集合对齐)
         working-directory: frontend
         run: npm run test:zeta-relay

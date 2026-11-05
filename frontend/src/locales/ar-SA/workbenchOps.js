@@ -65,5 +65,21 @@ export default {
   "clipboardRecordFailed": "فشل تسجيل الحافظة",
   "fileCaptureFailed": "فشل تسجيل الملف",
   "fileMoveOccupied": "قد يكون هذا الملف قيد الاستخدام ولم يمكن نقله",
-  "filesMoveOccupiedCount": "قد يكون {count} ملف/ملفات قيد الاستخدام ولم يمكن نقلها"
+  "filesMoveOccupiedCount": "قد يكون {count} ملف/ملفات قيد الاستخدام ولم يمكن نقلها",
+  "ocrProgress": "جارٍ التعرّف {index}/{total}",
+  "ocrCancel": "إلغاء",
+  "ocrCancelling": "جارٍ الإلغاء…",
+  "ocrBatchBusy": "توجد عملية تعرّف قيد التشغيل؛ انتظر انتهاءها أو ألغِها",
+  "ocrConsentTitle": "هل تريد استخدام التعرّف السحابي على النص؟",
+  "ocrConsentHint": "ملفات PDF التي تحتوي على طبقة نصية تُستخرج مباشرة دون رفع أو رسوم؛ فقط المسوحات والصور تحتاج إلى OCR سحابي. ينطبق هذا التأكيد على هذه الدفعة فقط؛ ويمكنك اختيار «السحابة دائمًا» أو «محليًا فقط» من الإعدادات ← الحساب والاستخدام ← التعرّف على المستندات الممسوحة.",
+  "ocrConsentCheck": "أدركت وجهة البيانات وطريقة الاحتساب",
+  "ocrConsentConfirm": "بدء",
+  "ocrCopied": "تم نسخ نص {count} ملف وحفظه في سجل الحافظة",
+  "ocrSaved": "تم الإنشاء: {names}",
+  "ocrOthersNotOpened": "لم تُفتح جنبًا إلى جنب: {names}",
+  "ocrLocalOnly": "التعرّف مضبوط على «محليًا فقط»؛ لم تُرفع الصور والمسوحات (يمكن تغيير ذلك من الإعدادات)",
+  "ocrFailedItem": "«{name}» لم يكتمل: {reason}",
+  "ocrSkipped": "تم تخطي {count} ملف يحتاج إلى OCR سحابي (دون تأكيد)",
+  "ocrCancelled": "تم الإلغاء؛ لم تتم معالجة {count} ملف",
+  "ocrSummaryTitle": "اكتمل التعرّف {done}/{total}"
 }

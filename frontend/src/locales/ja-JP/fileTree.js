@@ -153,5 +153,10 @@ export default {
   "importDropPrepareFailed": "ドロップされたファイルを準備できませんでした。コンピュータに保存してからもう一度お試しください。",
   "importDropTooLarge": "ローカルパスのないファイルは、1回のドロップにつき100 MBまでです。先にコンピュータに保存してください。",
   "importDesktopOnly": "ドラッグによるインポートはデスクトップ版のみ対応しています",
-  "unknownFolder": "不明なフォルダ"
+  "unknownFolder": "不明なフォルダ",
+  "ocrMenu": "文字を認識（OCR）",
+  "ocrCopy": "テキストをコピー",
+  "ocrExportTxt": "TXT で書き出し",
+  "ocrExportDocx": "Word で書き出し",
+  "ocrOutputSuffix": "-OCRテキスト"
 }

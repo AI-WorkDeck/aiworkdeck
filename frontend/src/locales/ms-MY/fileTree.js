@@ -153,5 +153,10 @@ export default {
   "importDropPrepareFailed": "Tidak dapat menyediakan fail yang diseret. Simpan ke komputer anda dan cuba lagi.",
   "importDropTooLarge": "Fail tanpa laluan setempat dihadkan kepada 100 MB bagi setiap seretan. Simpan fail tersebut ke komputer anda terlebih dahulu.",
   "importDesktopOnly": "Import melalui seretan hanya untuk desktop",
-  "unknownFolder": "Folder tidak diketahui"
+  "unknownFolder": "Folder tidak diketahui",
+  "ocrMenu": "Kenal pasti teks (OCR)",
+  "ocrCopy": "Salin teks",
+  "ocrExportTxt": "Eksport TXT",
+  "ocrExportDocx": "Eksport Word",
+  "ocrOutputSuffix": "-teks OCR"
 }

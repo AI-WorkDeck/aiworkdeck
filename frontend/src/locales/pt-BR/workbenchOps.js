@@ -65,5 +65,21 @@ export default {
   "clipboardRecordFailed": "Falha ao registrar a área de transferência",
   "fileCaptureFailed": "Falha ao registrar o arquivo",
   "fileMoveOccupied": "Este arquivo pode estar em uso e não pôde ser movido",
-  "filesMoveOccupiedCount": "{count} arquivo(s) pode(m) estar em uso e não pôde(puderam) ser movido(s)"
+  "filesMoveOccupiedCount": "{count} arquivo(s) pode(m) estar em uso e não pôde(puderam) ser movido(s)",
+  "ocrProgress": "Reconhecendo {index}/{total}",
+  "ocrCancel": "Cancelar",
+  "ocrCancelling": "Cancelando…",
+  "ocrBatchBusy": "Já há um lote em andamento; aguarde ou cancele",
+  "ocrConsentTitle": "Usar reconhecimento na nuvem?",
+  "ocrConsentHint": "PDFs com camada de texto são extraídos diretamente, sem envio nem cobrança; só digitalizações e imagens precisam de OCR na nuvem. Esta confirmação vale só para este lote; altere para «sempre nuvem» ou «somente local» em Configurações → Conta e uso → Reconhecimento de digitalizações.",
+  "ocrConsentCheck": "Estou ciente do destino dos dados e da cobrança",
+  "ocrConsentConfirm": "Iniciar",
+  "ocrCopied": "Texto de {count} arquivo(s) copiado e salvo no histórico da área de transferência",
+  "ocrSaved": "Criado: {names}",
+  "ocrOthersNotOpened": "Não abertos lado a lado: {names}",
+  "ocrLocalOnly": "O reconhecimento está em «somente local»; imagens e digitalizações não foram enviadas (altere nas Configurações)",
+  "ocrFailedItem": "«{name}» não concluído: {reason}",
+  "ocrSkipped": "{count} arquivo(s) que exigem OCR na nuvem ignorados (não confirmado)",
+  "ocrCancelled": "Cancelado; {count} arquivo(s) não processados",
+  "ocrSummaryTitle": "Reconhecidos {done}/{total}"
 }

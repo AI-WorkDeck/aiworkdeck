@@ -21,23 +21,37 @@ public class PdfCloudOcrService {
     public interface UploadGuard { void check() throws Exception; }
 
     public String recognize(Path path, UploadGuard guard) throws Exception {
+        var pages = recognizePages(path, guard);
+        var text = new StringBuilder();
+        for (int page = 0; page < pages.size(); page++) {
+            text.append("## 第 ").append(page + 1).append(" 页\n\n");
+            if (!pages.get(page).isEmpty()) text.append(escapeMarkdown(pages.get(page))).append("\n\n");
+        }
+        return text.toString();
+    }
+
+    /**
+     * Plain OCR text per page ("" for a truly white page, which is neither uploaded nor billed).
+     * Same all-or-nothing contract as {@link #recognize}: any page failure throws, never partial text.
+     * Explorer OCR (tutorial-series#155) uses this for TXT/clipboard output without Markdown escaping.
+     */
+    public java.util.List<String> recognizePages(Path path, UploadGuard guard) throws Exception {
         try (var pdf = Loader.loadPDF(path.toFile())) {
             if (pdf.getNumberOfPages() == 0) throw new IllegalStateException(LangText.of("PDF 没有页面", "PDF has no pages"));
             var renderer = new PDFRenderer(pdf);
-            var text = new StringBuilder();
+            var pages = new java.util.ArrayList<String>();
             for (int page = 0; page < pdf.getNumberOfPages(); page++) {
                 try {
                     guard.check(); // Cancellation also applies to blank pages and expensive rendering.
                     var image = renderer.renderImageWithDPI(page, 150);
                     try (var bytes = new ByteArrayOutputStream()) {
-                        text.append("## 第 ").append(page + 1).append(" 页\n\n");
-                        if (isWhite(image)) continue;
+                        if (isWhite(image)) { pages.add(""); continue; }
                         ImageIO.write(image, "png", bytes);
                         guard.check(); // Immediately before each billable upload, not merely before the document.
                         OcrResult result = ocr.recognizeGeneral(Base64.getEncoder().encodeToString(bytes.toByteArray()));
                         if (result == null || result.getText() == null || result.getText().isBlank())
                             throw new IllegalStateException(LangText.of("未返回可识别文字", "No recognizable text returned"));
-                        text.append(escapeMarkdown(result.getText())).append("\n\n");
+                        pages.add(result.getText());
                     } finally { image.flush(); }
                 } catch (Exception error) {
                     throw new IllegalStateException(LangText.of(
@@ -46,7 +60,7 @@ public class PdfCloudOcrService {
                 }
             }
             guard.check(); // A cancellation during the final HTTP request must not produce a late document.
-            return text.toString();
+            return pages;
         }
     }
 

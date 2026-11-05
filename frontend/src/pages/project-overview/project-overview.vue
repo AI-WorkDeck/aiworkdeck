@@ -737,6 +737,7 @@
             @view-tasks="onFileTreeViewTasks"
             :transcribe-enabled="meetingRecorderEnabled"
             @transcribe-audio="onTranscribeAudio"
+            @ocr-files="onExplorerOcr"
             @create-recording="onCreateRecording"
           />
           <view v-if="leftPaneKey === 'dd-client'" class="dd-client-entry">
@@ -2384,6 +2385,13 @@
       </view>
     </view>
     <ScratchTransferDialog v-if="showScratchTransfer && isScratchWorkspace" :key="projectId" :source-project-id="projectId" :before-copy="prepareScratchCopy" :files="chatWorkspaceFiles.filter(f => !f.isDirectory)" :conversations="chatHistoryList" @close="showScratchTransfer = false" @copied="handleScratchCopied" />
+    <!-- 资源管理器「识别文字」批量进度（tutorial-series#155）：非模态，可取消；贴左下，不压编辑区里的原生网页 -->
+    <view v-if="explorerOcr.running" class="explorer-ocr-progress" role="status" aria-live="polite">
+      <text class="explorer-ocr-progress-title">{{ $t('workbenchOps.ocrProgress', { index: explorerOcr.index + 1, total: explorerOcr.total }) }}</text>
+      <text class="explorer-ocr-progress-name">{{ explorerOcr.name }}</text>
+      <view class="explorer-ocr-progress-bar"><view class="explorer-ocr-progress-fill" :style="{ width: (explorerOcr.total ? Math.round(explorerOcr.index / explorerOcr.total * 100) : 0) + '%' }"></view></view>
+      <component :is="'button'" type="button" class="explorer-ocr-progress-cancel" :disabled="explorerOcr.cancelling" @click="cancelExplorerOcr">{{ explorerOcr.cancelling ? $t('workbenchOps.ocrCancelling') : $t('workbenchOps.ocrCancel') }}</component>
+    </view>
   </view>
 </template>
 
@@ -2588,6 +2596,7 @@ import {
 } from './chatMode.js'
 import { panelSwitchingMethods } from './panelSwitching.js'
 import explorerRecordingMixin from './explorerRecording.js'
+import explorerOcrMixin from './explorerOcr.js'
 import { menuCommandsMethods } from './menuCommands.js'
 import { agentClientActionMethods } from './agentClientActions.js'
 import { librePoolMethods } from './librePool.js'
@@ -2644,7 +2653,7 @@ import { useLitigationGeneration } from '@/composables/useLitigationGeneration.j
 const WEB_KEEPALIVE_MAX = 5
 
 export default {
-  mixins: [explorerRecordingMixin],
+  mixins: [explorerRecordingMixin, explorerOcrMixin],
   setup() {
     return { requestLitigationGeneration: useLitigationGeneration() }
   },
