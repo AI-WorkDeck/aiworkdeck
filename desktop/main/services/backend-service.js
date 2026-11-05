@@ -213,6 +213,8 @@ function buildJar(ctx) {
 
 function spawnEnv(ctx) {
   const env = { ...process.env }
+  // 后端再起的包内 Python 子进程（诉讼可视化等）继承它：不写 .pyc，免得破坏 .app 签名封印（问题 91）
+  env.PYTHONDONTWRITEBYTECODE = '1'
   // 开发态默认 prod profile，打包态默认 desktop（H2 单机库），仍可用 env 覆盖
   if (!env.SPRING_PROFILES_ACTIVE) env.SPRING_PROFILES_ACTIVE = ctx.packaged ? 'desktop' : 'prod'
   // 端口必须以 ctx.ports.backend 为准，不能像上面 SPRING_PROFILES_ACTIVE 那样
