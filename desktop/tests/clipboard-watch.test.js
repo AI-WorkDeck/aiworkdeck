@@ -266,7 +266,7 @@ test('主进程停止会取消读取；忙碌或失败不会耗掉重启后的�
   const callbacks = [], pending = deferred(), priming = []
   let cancels = 0, calls = 0
   const context = {
-    clipboardWatchTimer: null, clipboardPrimed: false, clipboardChangeCounter: null,
+    clipboardWatchTimer: null, clipboardPrimed: false, clipboardChangeCounter: null, clipboardCapturePaused: false,
     startChangeCounter: () => null,
     setInterval: fn => { callbacks.push(fn); return callbacks.length }, clearInterval: () => {},
     clipboardPoller: {
@@ -363,4 +363,31 @@ test('真实快捷键入口再次复制相同文本，也取消尚未完成的�
   clipboard.read = async () => [{ types: ['text/plain'], getType: async () => new Blob(['B']) }]
   assert.strictEqual(await poller.tick(false), true, '后续轮询自身发送文本不能自取消')
   assert.deepStrictEqual(pushed, [{ type: 'TEXT', t: 'A' }, { type: 'TEXT', t: 'B' }])
+})
+
+// 教程问题 84（dev-board#1713）：剪贴板「暂停记录」持久化在 prefs；暂停时不起轮询，
+// 应用内 copy/cut 也不推送。
+test('paused clipboard capture (from prefs) starts no poller and emits nothing', () => {
+  const fs = require('node:fs')
+  const vm = require('node:vm')
+  const source = fs.readFileSync(require.resolve('../main/main.js'), 'utf8')
+  const watcher = source.slice(source.indexOf('function startClipboardWatcher('), source.indexOf('function attachCopyListener('))
+  const emitter = source.slice(source.indexOf('function emitClipboard('), source.indexOf('function closeOcrSelectWin('))
+  const sent = []
+  let intervals = 0
+  const context = {
+    clipboardWatchTimer: null, clipboardPrimed: false, clipboardChangeCounter: null, clipboardCapturePaused: null,
+    CLIPBOARD_PAUSED_PREF: 'clipboardCapturePaused', lastClipboardFingerprint: '',
+    getPrefs: () => ({ get: (k) => k === 'clipboardCapturePaused' }),
+    startChangeCounter: () => null,
+    setInterval: () => { intervals++; return 1 }, clearInterval: () => {},
+    clipboardPoller: { cancel() {}, tick: async () => true },
+    mainWindow: { webContents: { send: (...a) => sent.push(a) } },
+  }
+  vm.runInNewContext(watcher + emitter + '; this.start = startClipboardWatcher; this.emit = emitClipboard', context)
+  context.start()
+  assert.strictEqual(intervals, 0)
+  assert.strictEqual(context.clipboardCapturePaused, true)
+  context.emit('secret', 'renderer')
+  assert.deepStrictEqual(sent, [])
 })

@@ -63,7 +63,7 @@
               <view v-if="fav.sourceUrl" class="pf-icon-btn" :title="$t('account.openSourceAction')" @tap.stop="openSource(fav)">
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path v-for="(d, gi) in ICONS.link" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
               </view>
-              <view v-if="fav.content || fav.sourceUrl" class="pf-icon-btn" :title="$t('account.copyContentAction')" @tap.stop="copyFavorite(fav)">
+              <view v-if="fav.content || fav.sourceUrl || fav.title || fav.imagePath" class="pf-icon-btn" :title="$t('account.copyContentAction')" @tap.stop="copyFavorite(fav)">
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path v-for="(d, gi) in ICONS.copyDoc" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
               </view>
               <view class="pf-del-wrap">
@@ -161,14 +161,31 @@ export default {
     openSource(fav) {
       if (fav && fav.sourceUrl) openExternalUrl(fav.sourceUrl)
     },
-    copyFavorite(fav) {
-      const data = (fav && (fav.content || fav.sourceUrl)) || ''
+    // 与插件收藏面板同一顺序（dev-board#1713）：只有图片 → 复制图片本身；否则 正文 → 来源网址 → 标题
+    async copyFavorite(fav) {
+      if (!fav) return
+      if (fav.imagePath && !String(fav.content || '').trim()) {
+        try {
+          await this.writeImageToClipboard(getFavoriteImageUrl(fav.id))
+          uni.showToast({ title: this.$t('account.copiedToast'), icon: 'none' })
+        } catch (e) {
+          uni.showToast({ title: this.$t('workbenchOps.copyFailed'), icon: 'none' })
+        }
+        return
+      }
+      const data = fav.content || fav.sourceUrl || fav.title || ''
       if (!data) return
       uni.setClipboardData({
         data,
         showToast: false,
         success: () => uni.showToast({ title: this.$t('account.copiedToast'), icon: 'none' }),
       })
+    },
+    async writeImageToClipboard(url) {
+      const blob = await (await fetch(url)).blob()
+      if (!navigator.clipboard || !navigator.clipboard.write) throw new Error('Clipboard API unavailable')
+      // 浏览器剪贴板只收 image/png；后端存的可能是 jpeg，统一不了就如实失败
+      await navigator.clipboard.write([new ClipboardItem({ [blob.type || 'image/png']: blob })])
     },
     openProject(projectId) {
       if (projectId == null) return

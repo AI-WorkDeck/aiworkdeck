@@ -16,6 +16,9 @@ public interface ClipboardItemRepository extends JpaRepository<ClipboardItem, Lo
 
     List<ClipboardItem> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
 
+    // 「全部清空」用（dev-board#1713）：用户主动清空，连免费额度下看不见的那部分一起删
+    List<ClipboardItem> findByUserId(Long userId);
+
     @Query("select c from ClipboardItem c where c.userId = :userId and (c.text like concat('%', :q, '%') or c.meta like concat('%', :q, '%')) order by c.createdAt desc")
     List<ClipboardItem> search(@Param("userId") Long userId, @Param("q") String q, Pageable pageable);
 

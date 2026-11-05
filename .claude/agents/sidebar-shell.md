@@ -703,6 +703,11 @@ dock tab 条（「AI 助手 | 依据」）——在它之前那条 tab 条只有
 `onLoad` 里 **`loadPanelDocks()` 必须排在恢复 `leftPaneKey` 之前**，紧跟着
 `normalizeDockSelections()`：存量 `leftPaneKey` 可能指向一个已经被搬去右/底的面板，
 不校正就是「左栏『加载中…』占位符 + rail 上一个高亮都没有」那个老地雷。
+底部抽屉选中的 tab 记在全局键 **`awd_tools_drawer_tab`**（`switchToolTab` → `rememberToolTab`），
+`normalizeDockSelections` 校正 `activeToolKey` 时依次取：记住的 → 剪贴板 → 底栏第一个；插件异步加载，
+`toggleToolsPanel` 打开前若当前 key 不在底栏会再校正一次（dev-board#1713）。
+左栏 `sidebar-content` 的 v-if 链里 `files` 有一个空 `<template v-else-if>` 分支：FileTree 在链外 `v-show` 常驻，
+少了这条 files 会落进兜底「加载中…」占位（教程问题 115）。
 
 **rail 拖动排序（dev-board#204，2026-08-27）**：与停靠平行的另一层状态，模块
 `pages/project-overview/railSort.js`（`railSortData()` + `railSortMethods`，同 panelDocking

@@ -2888,6 +2888,14 @@ export function deleteClipboardItem(id) {
   })
 }
 
+// 「全部清空」：删除当前用户全部剪贴板记录（dev-board#1713）
+export function clearClipboard() {
+  return request({
+    url: '/api/clipboard',
+    method: 'DELETE',
+  })
+}
+
 /**
  * 提交一条用户反馈（正文 + 图片 + 语音，一次 multipart 请求）。
  * 分步上传会在网络抖动时留下一堆没有正文的空反馈——而反馈恰恰是「出问题时」提交的。
@@ -3801,6 +3809,7 @@ export default {
   listClipboard,
   saveClipboardText,
   deleteClipboardItem,
+  clearClipboard,
   getProjectVariables,
   saveProjectVariable,
   deleteProjectVariable,

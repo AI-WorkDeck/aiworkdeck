@@ -22,6 +22,7 @@ function setup(overrides = {}, config = {}) {
     deleteFavorite: record('deleteFavorite'),
     listClipboard: async () => ({ items: [{ id: 21, type: 'TEXT', text: 'Clipboard', url: 'http://localhost/file?token=SECRET' }, { id: 22, type: 'IMAGE', path: '/private/image' }], limited: true, hiddenCount: 5 }),
     deleteClipboardItem: record('deleteClipboardItem'),
+    clearClipboard: record('clearClipboard'),
     getApiBaseUrl: () => 'https://host.test', getSessionId: () => 'SECRET',
     purchaseFeatureSku: record('purchaseFeatureSku'), refreshEntitlements: record('refreshEntitlements'),
     createTask: record('createTask'), updateTask: record('updateTask'), deleteTask: record('deleteTask'),
@@ -33,7 +34,7 @@ function setup(overrides = {}, config = {}) {
   const make = new Function(...Object.keys(deps), body)(...Object.values(deps))
   const service = make({ projectId: () => project, permissions: () => permissions, isCurrent: () => current,
     listFiles: async () => [{ id: 70, name: 'Contract' }, { id: 71, name: 'Folder', isFolder: true }],
-    openFile: record('openFile'), actions: Object.fromEntries(['insertContent', 'previewImage', 'openBrowser', 'copyText', 'openProject', 'openTaskFile', 'openAccount', 'calendarWorkspace'].map(name => [name, record(name)])) })
+    openFile: record('openFile'), actions: Object.fromEntries(['insertContent', 'previewImage', 'openBrowser', 'copyText', 'copyImage', 'openProject', 'openTaskFile', 'openAccount', 'calendarWorkspace'].map(name => [name, record(name)])) })
   return { ...service, calls, emitted, project: value => { project = value }, current: value => { current = value }, permissions: value => { permissions = value } }
 }
 const rejects = (promise, code) => assert.rejects(promise, error => error.code === code)
@@ -91,7 +92,7 @@ test('collection operations resolve host-verified item content instead of iframe
   await s.request('favorites', 'open', { id: 11, url: 'javascript:bad' })
   await s.request('clipboard', 'copy', { id: 21 })
   await s.request('clipboard', 'insert', { id: 21 })
-  assert.deepEqual(s.calls, [['copyText', 'https://example.test/page'], ['insertContent', { type: 'TEXT', content: 'Body' }], ['openBrowser', 'https://example.test/page'], ['copyText', 'Clipboard'], ['insertContent', { type: 'TEXT', content: 'Clipboard' }]])
+  assert.deepEqual(s.calls, [['copyText', 'Body'], ['insertContent', { type: 'TEXT', content: 'Body' }], ['openBrowser', 'https://example.test/page'], ['copyText', 'Clipboard'], ['insertContent', { type: 'TEXT', content: 'Clipboard' }]])
   await rejects(s.request('favorites', 'delete', { id: 999 }), 'not_found')
   await s.request('favorites', 'delete', { id: 11 }); await s.request('clipboard', 'delete', { id: 21 })
   assert.deepEqual(s.emitted.map(event => event[0]), ['awd:favorites-changed', 'awd:clipboard-saved'])
@@ -230,3 +231,45 @@ test('calendar workspace operation retains the tasks permission gate and sends o
   await rejects(service.request('calendar', 'workspace', { open: true }), 'permission_denied')
   assert.equal(service.calls.length, 1)
 })
+
+// 教程问题 63/71/84（dev-board#1713）
+test('favorite copy order is content → sourceUrl → title; image-only favorites copy the image itself', async () => {
+  const s = setup({ getProjectFavorites: async () => [
+    { id: 11, content: '', sourceUrl: 'https://example.test/page', title: 'Page' },
+    { id: 13, content: '', title: 'Only title' },
+    { id: 12, content: '', imagePath: '/private/image', sourceUrl: 'https://example.test/shot' },
+  ] })
+  await s.request('favorites', 'list')
+  await s.request('favorites', 'copy', { id: 11 })
+  await s.request('favorites', 'copy', { id: 13 })
+  await s.request('favorites', 'copy', { id: 12 })
+  assert.deepEqual(s.calls.filter(c => c[0] !== 'fetch'), [['copyText', 'https://example.test/page'], ['copyText', 'Only title'], ['copyImage', 'data:image/png;base64,iVBORw0KGgo=']])
+})
+test('clipboard clear deletes everything once and broadcasts; capture state goes through the host action', async () => {
+  const s = setup()
+  await s.request('clipboard', 'list')
+  assert.deepEqual(await s.request('clipboard', 'clear'), { ok: true })
+  assert.deepEqual(s.calls, [['clearClipboard']])
+  assert.deepEqual(s.emitted.at(-1)[0], 'awd:clipboard-saved')
+  await rejects(s.request('clipboard', 'copy', { id: 21 }), 'not_found')
+  // 网页端没有宿主动作：报不支持，不抛错
+  assert.deepEqual(await s.request('clipboard', 'capture'), { supported: false, paused: false })
+  s.permissions(['file_read'])
+  await rejects(s.request('clipboard', 'clear'), 'permission_denied')
+})
+test('clipboard capture state is read and set via clipboardCapture action', async () => {
+  const seen = []
+  const service = setupWithCapture(seen)
+  assert.deepEqual(await service.request('clipboard', 'capture'), { supported: true, paused: false })
+  assert.deepEqual(await service.request('clipboard', 'capture', { paused: true }), { supported: true, paused: true })
+  assert.deepEqual(seen, [undefined, true])
+})
+function setupWithCapture(seen) {
+  let paused = false
+  const deps = { getApiBaseUrl: () => '', getSessionId: () => '', t: k => k, uni: { $emit() {} } }
+  const names = ['getTaskProjectOptions', 'getProjectTasks', 'getCalendarTasks', 'getCalendarSummary', 'getProjectFiles', 'getProjectMembers', 'getProjectFavorites', 'deleteFavorite', 'listClipboard', 'deleteClipboardItem', 'clearClipboard', 'purchaseFeatureSku', 'refreshEntitlements', 'createTask', 'updateTask', 'deleteTask', 'fetch']
+  for (const n of names) deps[n] = async () => []
+  const make = new Function(...Object.keys(deps), body)(...Object.values(deps))
+  return make({ projectId: () => 7, permissions: () => ['clipboard'], isCurrent: () => true, listFiles: async () => [], openFile: async () => {},
+    actions: { clipboardCapture: async (value) => { seen.push(value); if (typeof value === 'boolean') paused = value; return { supported: true, paused } } } })
+}

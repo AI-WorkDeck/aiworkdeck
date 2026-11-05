@@ -790,7 +790,7 @@ export default {
       if (this.isCurrentFavorited) {
         // 取「提示已收藏」而不是「再点取消收藏」：星形态来自按 URL 去重的列表，
         // 同一页可能有多条文字摘录收藏，一键反删会连用户手工摘的内容一起删掉
-        uni.showToast({ title: this.$t('panels.bpAlreadyFavorited'), icon: 'none' })
+        this.notifyAboveView(this.$t('panels.bpAlreadyFavorited'))
         return
       }
       this._favSaving = true
@@ -825,6 +825,14 @@ export default {
         this._favSaving = false
       }
     },
+    // 提示必须看得见：toast 在 DOM 层，会被原生 BrowserView 盖住（dev-board#1713），桌面端走原生弹窗
+    notifyAboveView(title) {
+      if (host.app && host.app.confirm) {
+        host.app.confirm({ title }).catch(() => {})
+      } else {
+        uni.showToast({ title, icon: 'none' })
+      }
+    },
     loadShortcuts() {
       try {
         const raw = uni.getStorageSync(SHORTCUTS_STORAGE_KEY)
@@ -847,7 +855,7 @@ export default {
       const key = this.favUrlKey(url)
       if (!key) return
       if (this.shortcuts.some(s => this.favUrlKey(s.url) === key)) {
-        uni.showToast({ title: this.$t('panels.bpAlreadyPinned'), icon: 'none' })
+        this.notifyAboveView(this.$t('panels.bpAlreadyPinned'))
         return
       }
       const title = (this.pageTitle || '').trim() || this.hostOf(url) || url

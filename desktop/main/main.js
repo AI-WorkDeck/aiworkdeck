@@ -212,6 +212,7 @@ let ocrEscShortcutBound = false
 
 function emitClipboard(text, source) {
   try {
+    if (clipboardCapturePaused === true) return
     const t = String(text || '').trim()
     if (!t) return
     // 同步轮询指纹：copy/cut 键监听推送过的文本，轮询 watcher 不再重复推送
@@ -273,6 +274,10 @@ let lastClipboardFingerprint = ''
 let clipboardPrimed = false
 // macOS 剪贴板变更序号读取器（dev-board#869，见 clipboard-watch.js）
 let clipboardChangeCounter = null
+// 用户在剪贴板面板里「暂停记录」（dev-board#1713）：持久化在 prefs，启动时不起轮询
+const CLIPBOARD_PAUSED_PREF = 'clipboardCapturePaused'
+// null = 还没读过 prefs（首次 startClipboardWatcher 时读）
+let clipboardCapturePaused = null
 
 function sendClipboardCopied(payload) {
   if (mainWindow) {
@@ -300,7 +305,10 @@ const clipboardPoller = createClipboardPoller({
 })
 
 function startClipboardWatcher() {
-  if (clipboardWatchTimer) return
+  if (clipboardCapturePaused === null) {
+    try { clipboardCapturePaused = getPrefs().get(CLIPBOARD_PAUSED_PREF, false) === true } catch (e) { clipboardCapturePaused = false }
+  }
+  if (clipboardWatchTimer || clipboardCapturePaused) return
   clipboardPrimed = false
   if (!clipboardChangeCounter) clipboardChangeCounter = startChangeCounter()
 
@@ -1710,6 +1718,16 @@ ipcMain.handle('checkba:prefs-set', async (_evt, payload) => {
   } catch (e) {
     return { ok: false, message: String(e && e.message ? e.message : e) }
   }
+})
+
+// 剪贴板「暂停记录」（dev-board#1713）：停掉系统轮询 + 应用内 copy 推送，并落 prefs
+ipcMain.handle('checkba:clipboard-get-paused', () => ({ ok: true, paused: clipboardCapturePaused === true }))
+ipcMain.handle('checkba:clipboard-set-paused', (_evt, payload) => {
+  clipboardCapturePaused = !!(payload && payload.paused)
+  try { getPrefs().set(CLIPBOARD_PAUSED_PREF, clipboardCapturePaused) } catch (e) { /* ignore */ }
+  if (clipboardCapturePaused) stopClipboardWatcher()
+  else startClipboardWatcher()
+  return { ok: true, paused: clipboardCapturePaused }
 })
 
 // 应用内更新 IPC 面（增量更新 P1）：状态查询 / 手动检查 / 重启生效。
