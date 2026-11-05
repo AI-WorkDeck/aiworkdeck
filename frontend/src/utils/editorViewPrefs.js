@@ -9,7 +9,8 @@ export const MARK_OPTIONS = [
 ]
 const MARK_DEFAULTS = Object.fromEntries(MARK_OPTIONS.map(o => [o.key, true]))
 const VIEW_PREFS_KEY = 'awd_editor_view_prefs'
-const VIEW_PREFS_DEFAULT = { formattingMarks: true, ruler: true, ...MARK_DEFAULTS }
+// 格式标记（¶ 等）默认隐藏：律师打开文档看到的应是成稿样子，需要时从工具栏「¶⌄」打开。
+const VIEW_PREFS_DEFAULT = { formattingMarks: false, ruler: true, ...MARK_DEFAULTS }
 
 export function readViewPrefs() {
   try {
