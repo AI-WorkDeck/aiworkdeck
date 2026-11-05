@@ -10,7 +10,7 @@ description: Microsoft Office 与 WPS 插件领域。任务涉及 Word/Excel/PPT
 
 Mac Excel 16.114.1 的隔离 QA 任务窗格已跑实际 `hostBridge.executeCommand` → Office.js。原生首轮暴露 pivot 回执读取未加载 `Worksheet.name`，第二轮暴露日期序列值直接作为 validation bound 导致 `InvalidArgument`；分别补 `sheet.load('name')` 后 sync、将日期/时间纯数值转为常量公式（保留日期字符串/已有公式，不做 epoch/locale 换算），两条专项回归通过。
 
-08:11:22Z 基础套件完成并 `file_save`；主任务目视四图表后通过 Excel UI 关闭重开，08:13:03Z native readback 再次通过。独立审计读取回执及 `/tmp/excel-1576-product-evidence/office-native-reopened.xlsx`，确认四个图表部件、一个透视表、七类验证规则、D2:D5 公式与 8/16/22/15 缓存值持久化；关闭重开和图表目视本身是主任务观察，非审计者独立 UI 复现。详见 `doc/verification/2026-10-28-excel-addin-matrix.md`。
+08:11:22Z 基础套件完成并 `file_save`；主任务目视四图表后通过 Excel UI 关闭重开，08:13:03Z native readback 再次通过。独立审计读取回执及 `/tmp/excel-1576-product-evidence/office-native-reopened.xlsx`，确认四个图表部件、一个透视表、七类验证规则、D2:D5 公式与 8/16/22/15 缓存值持久化；关闭重开和图表目视本身是主任务观察，非审计者独立 UI 复现。详见 `docs/dev-notes/verification/2026-10-28-excel-addin-matrix.md`。
 
 该证据只覆盖真实任务窗格基础命令与既有路径保存，不等于完整模型 AI 对话、项目文件新建/打开/PDF 上传或 WPS/Word/PPT 通过。高级套件 08:18:13Z 在 merge readback 断言失败，尚不计全套通过。
 
@@ -60,7 +60,7 @@ PDF、表格及演示高级链路均未验收；测试页 btoa 编码失败发�
 后端 `OfficeEditToolsTest`、`ClientCapabilityServiceTest`、`OfficeBridgeServiceTest` /
 `OfficeBridgeCrossPaneTest` / `OfficeBridgeTimeoutCoverageTest`。当前自动化测试不证明真机通过；
 Office/WPS原生加载、真实取消、保存重开及PDF项目字节仍须单独验收。
-完整差异和审计状态见 `doc/verification/2026-10-28-file-parity-audit.md`。
+完整差异和审计状态见 `docs/dev-notes/verification/2026-10-28-file-parity-audit.md`。
 
 ## 插件后端隐私与正文可靠性（dev-board#1316–1324，2026-10-16）
 
@@ -434,7 +434,7 @@ password/setup不展示控件。AppSource注册、条款、隐私入口及高级
 
 ## WPS 加载项（2026-08-28，dev-board#244）
 
-同一套任务窗格 Vue 源码构建出的第二个宿主家族：WPS 文字/表格/演示（Windows/Linux 版 WPS；Mac 6.13+据WPS官方技术支持支持JS加载项，需本地配置注册，在线部署与具体API兼容性须按版本实测；本轮Mac尚未完成验收，见 `doc/verification/2026-10-28-ppt-addin-parity.md`）。后端零改动——officeHost 仍是 word/excel/powerpoint 三值、clientCapability 仍是 'office'、office_command 契约与回传路径完全一致。
+同一套任务窗格 Vue 源码构建出的第二个宿主家族：WPS 文字/表格/演示（Windows/Linux 版 WPS；Mac 6.13+据WPS官方技术支持支持JS加载项，需本地配置注册，在线部署与具体API兼容性须按版本实测；本轮Mac尚未完成验收，见 `docs/dev-notes/verification/2026-10-28-ppt-addin-parity.md`）。后端零改动——officeHost 仍是 word/excel/powerpoint 三值、clientCapability 仍是 'office'、office_command 契约与回传路径完全一致。
 
 ### 关键文件
 

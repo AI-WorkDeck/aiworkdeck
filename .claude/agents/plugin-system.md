@@ -389,7 +389,7 @@ JAR 插件拿宿主能力的唯一契约：`com.checkba:plugin-api:1.1.0`（1.0.
 
 ## HR 用工模板包下架（2026-09-15，dev-board#649）
 
-`hr-template-pack` 已从三站注册表下架；`PluginService.isRetired` 在离线扫描与启用判定中拒绝该 ID，`PluginMarketService` 隐藏旧列表并拒绝直接安装。保留插件磁盘文件及用户已创建文书。其他通用插件机制不受影响。上线验证与回退备份位置见 `doc/hr-template-retirement.md`。
+`hr-template-pack` 已从三站注册表下架；`PluginService.isRetired` 在离线扫描与启用判定中拒绝该 ID，`PluginMarketService` 隐藏旧列表并拒绝直接安装。保留插件磁盘文件及用户已创建文书。其他通用插件机制不受影响。上线验证与回退备份位置见 `docs/dev-notes/hr-template-retirement.md`。
 
 ## 脱敏面板 v0.44.1 真机三修（引擎 2.2.0）
 
@@ -478,7 +478,7 @@ Web协议仍为awd:1。新增contributes.views/connections/mcpServers和settings
 
 ## 八项业务插件迁移行为契约（2026-10-23，dev-board#1448）
 
-八项为搜索、语音、脱敏、诉讼可视化、日程、收藏夹、剪贴板、解析依据。迁移前后对照和实际验证边界见 `doc/verification/2026-10-23-plugin-parity-1448.md`。宿主活动标签ID通过 `pluginBusinessActions.activeFileId` 供脱敏使用，不等同只允许LOWA的 `getPluginActiveEditor`；归属继续由业务服务查当前项目。依据打开文件走 `insightOpenDoc → openInsightDocFile` 保留右窗行为，项目审查标准不依赖活动文档，坐标只接受编辑器已换算的宿主坐标。
+八项为搜索、语音、脱敏、诉讼可视化、日程、收藏夹、剪贴板、解析依据。迁移前后对照和实际验证边界见 `docs/dev-notes/verification/2026-10-23-plugin-parity-1448.md`。宿主活动标签ID通过 `pluginBusinessActions.activeFileId` 供脱敏使用，不等同只允许LOWA的 `getPluginActiveEditor`；归属继续由业务服务查当前项目。依据打开文件走 `insightOpenDoc → openInsightDocFile` 保留右窗行为，项目审查标准不依赖活动文档，坐标只接受编辑器已换算的宿主坐标。
 
 `awd:litviz-restyled` 成功信号按项目转 `files.changed`；顶部 `awd:meeting-recording-stopped` 转权限为speech的空 `speech.stopped`，iframe再唤醒原面板列表监听。绘图换风格等待保存也要纳入try/catch，取消时向原项目发结束信号释放保存屏障。脱敏原API为300000ms，适配器和SDK上限一致，SDK默认仍60000ms。录音停止可等待用户确认付费转写，超出单次RPC时继续查询真实状态；宿主按项目和meetingId保存原停止结果（包括失败时null），不能再次stop或把旧结果当新结果。
 

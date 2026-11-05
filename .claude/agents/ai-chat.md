@@ -48,7 +48,7 @@ GET 返回非密 `scopeToken`，所有 mutation 必须发送加载表单时的 `
 
 真实 Word→PPT 与 PPT→PPT 各生成三页，已逐页视觉检查及正常保存重开。Word 场景曾因可选润色反复检查而用自然语言引导收尾；PPT 场景在补强新建入口的参考像素学习要求后，模型自行修复换行/重叠/低对比并结束，一次视觉超时重试成功。两类原稿 hash 未变；失败轮与最终快照范围详见验收记录，不将首稿或纯工具通过称为成品通过。
 
-真实 AI 验收须使用产品 Agent/工具/编辑器完整链，隔离数据与专用 QA 账户；后端 BYOK 可执行条件不等于前端模型选择免登录。模型接口请求成功、技能存在或模拟模型单测通过，都不能替代参考 Word/PPT 的成品逐页视觉验收。当前实测及待验记录见 `doc/verification/2026-10-28-ppt-quality.md`。
+真实 AI 验收须使用产品 Agent/工具/编辑器完整链，隔离数据与专用 QA 账户；后端 BYOK 可执行条件不等于前端模型选择免登录。模型接口请求成功、技能存在或模拟模型单测通过，都不能替代参考 Word/PPT 的成品逐页视觉验收。当前实测及待验记录见 `docs/dev-notes/verification/2026-10-28-ppt-quality.md`。
 
 ## 手动展开与阅读位置（dev-board#1568）
 
@@ -130,7 +130,7 @@ MemoryPipelineService对OFFICE跳过自动摘要及后台同步，避免将Syste
 
 `useAgentStream` 在 `doc_stream_end` 先冲正文尾部缓冲、再解除正文抑制并删除临时占位；同轮提前来的 final 也删除占位，异步编辑器失败仍追加可见通知。`chatTimeline` 在占位删除后回退文本索引，防短总结落在旧位置。历史裸文档正文去重未在本次扩展；旧会话无 final 不会被自动补写。
 
-验证：`AgentOrchestratorDocumentSummaryTest`、`AgentStreamHandlerDocumentFinalTest`、`frontend/tests/project-home/doc-stream-summary.test.mjs` 与 `frontend/tests/chat-presentation-ui/doc-stream-summary.mjs`（真实 ChatInterface + 合成 SSE）。现场与验收边界见 `doc/verification/2026-10-21-doc-stream-summary-1392.md`；未发正式包，不代表用户客户端实模复测。
+验证：`AgentOrchestratorDocumentSummaryTest`、`AgentStreamHandlerDocumentFinalTest`、`frontend/tests/project-home/doc-stream-summary.test.mjs` 与 `frontend/tests/chat-presentation-ui/doc-stream-summary.mjs`（真实 ChatInterface + 合成 SSE）。现场与验收边界见 `docs/dev-notes/verification/2026-10-21-doc-stream-summary-1392.md`；未发正式包，不代表用户客户端实模复测。
 
 ## 试用回合归属（dev-board#1166，2026-10-10）
 
@@ -1119,8 +1119,8 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
 - `service/ai/memory/document/*`、`MemoryDocumentController`、`MemoryDocument`/`MemoryDocumentSpace` 是 Markdown 记忆真源。`/api/ai/memory/{spaces,files,file,download}`；个人/项目使用权限校验后的 opaque spaceId，团队/律所由官网共享服务校验成员/管理员。每空间 remember.md 自动维护 topic 链接；UTF-8 128 KiB、路径校验、expectedRevision 冲突及删除墓碑由后端负责。legacy 读写/同步向同一文档服务收敛，不保留可独立写入的副本。
 - **项目记忆按内部材料保护**（dev-board#1256）：其中可能含未开放文件的摘录，不能因为客户是项目成员就公开。客户的项目空间只返回无 ID、固定名称的不可用占位，已知 spaceId 的列表/正文/搜索/下载/写入/删除同样拒绝；上下文索引不注入该空间。统一 `isClient` 优先于项目 ADMIN 等角色；客户自己的个人记忆仍可用，内部 READ_ONLY 成员仍可读项目记忆。
 - `MemoryTools` 暴露 memory_list/read/search/write/edit/delete；Agent/Plan 的 skill 白名单不能隐藏这些基础工具，ASK 只允许前三个。没被 skill 收窄的 Agent/Plan 回合里只读三个每轮必下发（每轮注入的索引点名要 memory_read），写入三个归渐进披露的 memory 类目（dev-board#1073，详见「工具规格瘦身与渐进披露」那张核心集表下的注）。ContextAssembler 每轮注入有权限的限量索引，正文按需由模型读取。`MemoryBrowser.vue` 从对话与设置进入，支持索引跳转、编辑、下载及冲突提示。
-- 桌面共享记忆使用已连接账户 Bearer；服务器使用专用 `memory.shared.base-url`/`memory.shared.secret` 与绑定账户 ID，不能复用只读协作目录密钥。官网配套契约与 PR 见 `doc/ai-alignment/memory-report.md`；无账户/服务未配置的共享空间显示不可用，不能伪装成本地共享。
-- 测试与实际结果：`doc/ai-alignment/validation-report.md`；隔离运行配方：`doc/ai-alignment/test-environment.md`。不可将模拟 provider E2E 称为真实模型测试。
+- 桌面共享记忆使用已连接账户 Bearer；服务器使用专用 `memory.shared.base-url`/`memory.shared.secret` 与绑定账户 ID，不能复用只读协作目录密钥。官网配套契约与 PR 见 `docs/dev-notes/ai-alignment/memory-report.md`；无账户/服务未配置的共享空间显示不可用，不能伪装成本地共享。
+- 测试与实际结果：`docs/dev-notes/ai-alignment/validation-report.md`；隔离运行配方：`docs/dev-notes/ai-alignment/test-environment.md`。不可将模拟 provider E2E 称为真实模型测试。
 
 ## 一条消息的完整链路
 
@@ -1726,7 +1726,7 @@ template :1-539；script :541-1879（模式/模型选择 :648-766、文件变更
 
 ## 超时与失败收尾补充（2026-09-15，dev-board#650）
 
-SSE 建连只等待响应头15秒，已有长流不套这个上限；发送中初次连接失败也必须reject。停止先结束本地等待，再独立用10秒请求确认后台取消，失败不能写“已停止”。模型generate同步抛错走handler.onError同一终态闸，工具准备/本地压缩完成才启动首字看门狗。验证见 `agent-stream-connect/abort` 和 `AgentOrchestratorFailoverFlowTest`；完整矩阵与成本流程见 `doc/ai-timeout-cost-audit.md`。
+SSE 建连只等待响应头15秒，已有长流不套这个上限；发送中初次连接失败也必须reject。停止先结束本地等待，再独立用10秒请求确认后台取消，失败不能写“已停止”。模型generate同步抛错走handler.onError同一终态闸，工具准备/本地压缩完成才启动首字看门狗。验证见 `agent-stream-connect/abort` 和 `AgentOrchestratorFailoverFlowTest`；完整矩阵与成本流程见 `docs/dev-notes/ai-timeout-cost-audit.md`。
 
 ## 参考来源工具 ref_*（2026-09-18，dev-board#717-720）
 
