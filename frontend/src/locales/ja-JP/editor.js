@@ -110,6 +110,7 @@ export default {
     "movedSaveFailed": "ファイルが移動または名前変更されたため、変更はまだ保存されていません",
     "versionSaveBusy": "バージョン履歴を整理中のため、変更はまだ保存されていません。少し待ってから再試行してください。",
     "localVersionSaveBusy": "バージョン履歴を整理中のため、保存結果を確認できません。少し待ってから再試行してください。",
+    "saveRetryScheduled": "保存に失敗しました。{seconds} 秒後に自動で再試行します",
     "contentSaveReloadRequired": "以前の保存が中断されました。現在の編集内容を別名で保存してから、ファイルを再読み込みしてください。",
     "contentSaveConflict": "他の場所でファイルが更新されました。現在の編集内容を別名で保存してから、開き直してください。",
     "desktopOnly": "デスクトップアプリ専用"
