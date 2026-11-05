@@ -53,7 +53,7 @@ Errors use HTTP 401/403/409/400 with readable message (front end handles both HT
 - [x] Implement a minimal persisted Markdown document/revision model and unified service, using existing authentication and project membership checks. Reuse AccountService team lookup for desktop role facts; inspect actual existing team/firm payload and never infer role. Shared backend authentication must verify the requesting account. Determine compatible shared storage using current case/team architecture, and report any required paired server code rather than replacing shared storage with local-only folders.
 - [x] Migrate legacy records idempotently with stable paths and source metadata. Adapt legacy save/read paths so UI edits and AI reads converge, fixing scope-filter bypasses. Retain legacy evidence retrieval compatibility. Do not maintain independently writable copies.
 - [x] Inject concise user/project indexes each turn and authorized org indexes; use token-aware bounded context. Add list/read/search/write/edit/delete memory tools, preserving skill visibility and ASK read-only needs. Model writes immediate durable preferences; avoid unconditional duplicate regex/LLM write pipelines. Keep conversation summarization for context compression.
-- [x] Run targeted memory, context assembly, sync and permission tests; report commands/counts. Commit owned files. Write `doc/ai-alignment/memory-report.md` with final API and integration details for UI worker.
+- [x] Run targeted memory, context assembly, sync and permission tests; report commands/counts. Commit owned files. Write `docs/dev-notes/ai-alignment/memory-report.md` with final API and integration details for UI worker.
 
 **Example behavior to test:**
 
@@ -87,7 +87,7 @@ If an alternate endpoint shape is necessary, notify controller before UI impleme
 - [x] Persist inbox before acknowledging, per-conversation serialize start/finish/drain. Applied steering preserves original objective, inserts user input before next model call, and skips not-yet-started superseded tool requests with paired cancellation results. Cover native and XML tool calls. Keep history chronological using assistant segments around inserted input; emit typed events with IDs/order without breaking old renderers.
 - [x] Queue normal follow-ups until successful completion. Editing/reordering/deleting pending messages is revision checked. Cancellation/error/waiting approval or answer pauses queue; retry duplicates are no-ops. Restart restores pending input and shows interrupted state; never automatically replay uncertain external writes.
 - [x] Remove ordinary/pass/subagent fixed count stops. Replace endless guard-feedback loops with actual no-progress pause after proven repeated failure; legitimate polling with changing result is allowed. Keep cancellation, retry timeout, resource concurrency. Bound resident run output through existing persistence; preserve compaction and protected current task input.
-- [x] Run targeted orchestrator/inbox/subagent/recovery tests, including >100 productive rounds. Existing max-depth tests need behavioral replacement. Commit and write `doc/ai-alignment/inbox-report.md` with final protocol and test evidence.
+- [x] Run targeted orchestrator/inbox/subagent/recovery tests, including >100 productive rounds. Existing max-depth tests need behavioral replacement. Commit and write `docs/dev-notes/ai-alignment/inbox-report.md` with final protocol and test evidence.
 
 **Essential concurrency check:**
 
@@ -108,7 +108,7 @@ Stop new run R2; a late completion from R cannot finish R2 or clear its inbox.
 - [x] Keep rich input usable during run. Separate send/stop; default steer with alternate queue action. Preserve IME, attachments, skill selections, selected model and active document. Show queue above composer with edit/delete/move/send-now controls; allow choosing default follow-up behavior persistently.
 - [x] Consume server inbox and input-applied events, preserve chronological bubbles, restore snapshots on reconnect/history switch. Do not let isStreaming reject legitimate steering; do not create duplicate optimistic messages on replay. New conversation only detaches UI and keeps old run visible in history.
 - [x] Add four-space Markdown browser accessible from chat/project and settings. List remember.md/topic files, follow relative links safely, edit/save with revision conflicts, delete topics, download Markdown, show source/version details. Disable unauthorized organization edits honestly.
-- [x] Run all frontend pure tests relevant to modified state, locale/nav/emit checks and build. Run new AI E2E against integrated backend once controller provides port. Commit owned files and write `doc/ai-alignment/ui-report.md`.
+- [x] Run all frontend pure tests relevant to modified state, locale/nav/emit checks and build. Run new AI E2E against integrated backend once controller provides port. Commit owned files and write `docs/dev-notes/ai-alignment/ui-report.md`.
 
 **Example UI assertions:**
 
@@ -121,7 +121,7 @@ Stop new run R2; a late completion from R cannot finish R2 or clear its inbox.
 
 ### Task 4: Integration, review, full E2E and real examples
 
-**Files:** doc/ai-alignment test evidence; integration fixes assigned back to owning worker; workflow only if missing coverage needs adding.
+**Files:** docs/dev-notes/ai-alignment test evidence; integration fixes assigned back to owning worker; workflow only if missing coverage needs adding.
 
 - [x] Review Task 1–3 diffs independently for spec compliance and quality, then integrate commits into codex/ai-codex-alignment-559. Address findings with scoped tests and re-review.
 - [x] Run complete backend Maven suite, all frontend node test files, emit/locale/nav/SPDX checks and production frontend build. Run all configured E2E scripts enumerated by environment report, not only the new flow.
