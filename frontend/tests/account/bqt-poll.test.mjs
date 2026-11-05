@@ -44,7 +44,7 @@ test('top login mode buttons use native disabled controls during authentication'
  const template = source.slice(start, source.indexOf('<!-- 登录与注册', start))
  const clicked = []
  const app = Vue.createApp({
-  data: () => ({ isPhoneSite: true, bqtScanEnabled: true, mode: 'login', submitBusy: true, sendingCode: false }),
+  data: () => ({ variant: 'dialog', isPhoneSite: true, bqtScanEnabled: true, mode: 'login', submitBusy: true, sendingCode: false }),
   methods: { switchMode: mode => clicked.push(mode) },
   render: new Function('Vue', compile(template, { mode: 'function' }).code)(Vue),
  })
@@ -52,6 +52,8 @@ test('top login mode buttons use native disabled controls during authentication'
  const vm = app.mount(document.getElementById('root'))
  const buttons = [...document.querySelectorAll('button')]
  assert.equal(buttons.length, 2)
+ assert.ok(buttons.every(button => button.classList.contains('unlock-mode-tab')), '弹层形态是下划线标签')
+ assert.ok(buttons[0].classList.contains('is-active'))
  assert.ok(buttons.every(button => button.disabled))
  buttons[1].click(); assert.deepEqual(clicked, [])
  vm.submitBusy = false; vm.sendingCode = true; await Vue.nextTick()
