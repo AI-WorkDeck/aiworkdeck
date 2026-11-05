@@ -2,7 +2,7 @@
 
 - 日期：2026-08-07
 - 领域：licensing-billing（编排侧落点见 ai-chat）
-- 前置：`2026-08-06-office-addin-and-memory-sync.md` §「后续」第 4 条，本仓 `doc/desktop-contract.md` 待办 2
+- 前置：`2026-08-06-office-addin-and-memory-sync.md` §「后续」第 4 条，本仓 `docs/dev-notes/desktop-contract.md` 待办 2
 - 状态：设计待确认 → 确认后实施
 
 ## 1. 问题
@@ -34,7 +34,7 @@
 | 官网 `POST /api/account/ai-key` 幂等、已进契约与 contract-check | 官网仓 `app/api/account/ai-key/route.ts`、`scripts/contract-check.mts:221-241` |
 | 官网侧 key 明文是 AES-256-GCM 加密入库（`v1:iv:tag:cipher`） | 官网仓 `lib/openrouter-keys.ts` |
 
-顺带发现（本设计的副产物）：本仓 `doc/desktop-contract.md` 的待办条目 1
+顺带发现（本设计的副产物）：本仓 `docs/dev-notes/desktop-contract.md` 的待办条目 1
 （「`/api/account/me` 需增加 accountId」）**官网侧已实施并进了权威契约**，按该文件自己的规则应当删除。
 
 ## 3. 三个候选方案
@@ -251,7 +251,7 @@ per-user 之后指纹天然按用户分叉，**不存在串用风险**。但 `mo
 
 方案 a 下**官网仓零代码改动**。契约侧要做的：
 
-- 本仓 `doc/desktop-contract.md`：删除待办条目 1（accountId 官网已实施并已进权威契约与
+- 本仓 `docs/dev-notes/desktop-contract.md`：删除待办条目 1（accountId 官网已实施并已进权威契约与
   contract-check，按该文件自己的规则应当移除）；把条目 2 改写为「已实施，方案 a，官网无新增端点」
   并说明 (b) 的触发条件（出现第二方托管 server 实例时）。
 - 官网仓 `doc/desktop-contract.md` 的 `POST /api/account/ai-key` 一节补一段**使用方说明**：
@@ -309,7 +309,7 @@ per-user 化正是把它从 O(模型数) 变成 O(用户数×模型数) 的那�
 （上限 / 已用 / 剩余 / 最近验证时间 / 刷新入口）。已用与剩余取自 OpenRouter
 `GET /api/v1/key`（server 侧代查，key 明文不出后端）。
 
-**D4：本仓 `doc/desktop-contract.md` 待办条目 1 本 PR 顺手删除**（accountId 官网已实施
+**D4：本仓 `docs/dev-notes/desktop-contract.md` 待办条目 1 本 PR 顺手删除**（accountId 官网已实施
 并已进权威契约与 contract-check）。
 
 ## 8. 实施记录（2026-08-07）

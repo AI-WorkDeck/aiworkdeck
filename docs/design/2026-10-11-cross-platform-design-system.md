@@ -5,7 +5,7 @@
 
 日期：2026-10-11。状态：**主任务已审，分批实施中，尚非全产品已完成状态**。
 范围：桌面工作台、Web 应用、官网账户区、Office/WPS 面板、插件、iOS/Android/小程序/Harmony。
-依据：用户本次七项反馈；现有 `doc/sidebar-ui-standard.md`、色源与主题契约；下列一手设计资料。此规范扩展既有体系，不替换品牌、不更换 UI 框架，也不修改公开令牌名。
+依据：用户本次七项反馈；现有 `docs/dev-notes/sidebar-ui-standard.md`、色源与主题契约；下列一手设计资料。此规范扩展既有体系，不替换品牌、不更换 UI 框架，也不修改公开令牌名。
 
 ## 1. 调查结论与证据边界
 
@@ -17,7 +17,7 @@
 | `scripts/generate-tokens.mjs`、`scripts/check-palette.mjs` | 生成 App、Office、LOWA 外框、SCSS；检查哈希、生成区漂移与声明配色对比度 | 本次 `node scripts/check-palette.mjs` 通过；它不证明每个组件已经用令牌，也不验证任意色对 |
 | `frontend/src/App.vue` | 已有字体、色彩及 `--awd-panel-*` 密度令牌 | 尺寸增量在这里统一定义；不往每个面板再复制数值 |
 | `frontend/src/utils/appTheme.js`、`PluginPane.vue` | iframe 通过 `init/theme` 消息接收白名单令牌，现名单主要是颜色/阴影 | 新增公共尺寸令牌必须接入名单；现有 `--awd-mint` 等名称保留 |
-| `doc/sidebar-ui-standard.md` | 已约定平铺行、10px 内边距、6px 圆角、窄栏与就地状态 | 本次延伸至全产品；旧文档保留领域细节，指向本规范，避免出现两套冲突数值 |
+| `docs/dev-notes/sidebar-ui-standard.md` | 已约定平铺行、10px 内边距、6px 圆角、窄栏与就地状态 | 本次延伸至全产品；旧文档保留领域细节，指向本规范，避免出现两套冲突数值 |
 | `TencentMeetingPanel.vue` | 使用 `--color-bg-card` 加白色回退及硬编码冷灰、绿，未用主体系 | 面板底色异常有源码证据；“服务器内部错误”需独立追踪请求，不能用视觉修复掩盖 |
 | 项目列表/概览 SCSS | 列表仍有 320px 最小卡片、大间距/12px 圆角；概览已有 compact 平铺规则但宽屏独立布局不同 | 按真实容器宽度适配；禁止仅缩小全部字号来营造密度 |
 | 移动 `contract/tokens.json` → Swift/Kotlin/ETS/WXSS | 已生成字体、间距、色彩、动效，`touchMin=44` 同步至 Android 包装层 | 原生端沿用生成链；Android 至少48dp的触摸目标需单独核验/覆盖，不改 iOS 单位假装等价 |

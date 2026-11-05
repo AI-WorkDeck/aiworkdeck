@@ -508,7 +508,7 @@ cd backend && mvn clean test                      # 全量（跨类常量内联�
 
 ## 长文有界降级（2026-09-15，dev-board#650）
 
-显式深入审校的模型阶段总预算105秒（前端120秒），按剩余时间创建不缓存的辅助模型客户端；可重试类整轮自动重试一次（首次尝试为此预留35秒），限流/额度/地域/超窗不重试；传输/账户错误即停止后续块，保留已完成发现并`deepComplete=false`＋`deepReason`原因码。失败日志带`chunk=n/总数`、`chars`、`budgetMs`、`setupMs`（余额探测＋provision key＋DNS/TLS）、`callMs`、`status`、`model`，用于证实或排除首轮冷启动。正文异步解析累计失败块并在结果摘要说明遗漏风险。自动补全扫描最多10000段/200000字，仍有有限候选。边界、回归和实测分层见 `doc/document-resilience-audit.md`。
+显式深入审校的模型阶段总预算105秒（前端120秒），按剩余时间创建不缓存的辅助模型客户端；可重试类整轮自动重试一次（首次尝试为此预留35秒），限流/额度/地域/超窗不重试；传输/账户错误即停止后续块，保留已完成发现并`deepComplete=false`＋`deepReason`原因码。失败日志带`chunk=n/总数`、`chars`、`budgetMs`、`setupMs`（余额探测＋provision key＋DNS/TLS）、`callMs`、`status`、`model`，用于证实或排除首轮冷启动。正文异步解析累计失败块并在结果摘要说明遗漏风险。自动补全扫描最多10000段/200000字，仍有有限候选。边界、回归和实测分层见 `docs/dev-notes/document-resilience-audit.md`。
 
 解析排队使用2工作线程+32等待容量；超载请求返回可见繁忙提示并清理RUNNING/inFlight，拒绝路径不启动AI。真实饱和恢复测试见`DocInsightServiceTest.saturatedParseQueueRejectsCleanlyAndRecovers`。
 
