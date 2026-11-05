@@ -6,8 +6,10 @@ package com.checkba.controller;
 import com.checkba.service.UserActivityLogService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -47,20 +49,24 @@ public class ActivityLogController {
         return result;
     }
 
+    // from/to：yyyy-MM-dd，可选（dev-board#1713）。都不传时与旧版一致：最近 500 条。
     @GetMapping("/history")
     public Map<String, Object> getActivityHistory(
-            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
+            @RequestParam(value = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(value = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (userId == null) {
             throw new IllegalArgumentException("未登录");
         }
 
-        var logs = userActivityLogService.getUserLogs(userId);
+        var page = userActivityLogService.getUserLogs(userId, from, to);
 
         Map<String, Object> result = new HashMap<>();
         result.put("code", 0);
-        result.put("data", logs);
+        result.put("data", page.logs());
+        result.put("truncated", page.truncated());
         return result;
     }
 

@@ -136,6 +136,20 @@ public class ClipboardController {
         }
     }
 
+    // 「全部清空」（dev-board#1713）：删除当前用户全部剪贴板记录
+    @DeleteMapping
+    public ResponseEntity<?> deleteAll(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId
+    ) {
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error(com.checkba.service.LangText.of("请先登录", "Please sign in first")));
+        }
+        Map<String, Object> data = new HashMap<>();
+        data.put("deleted", clipboardService.deleteAll(userId));
+        return ResponseEntity.ok(success(data));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId,

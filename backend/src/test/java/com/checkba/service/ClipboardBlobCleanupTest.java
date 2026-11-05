@@ -76,4 +76,18 @@ class ClipboardBlobCleanupTest {
         service.delete(9L, USER);
         verify(storage, never()).delete(anyString());
     }
+
+    @Test
+    @DisplayName("全部清空（教程问题 84，dev-board#1713）：只删本人的记录，文件型记录的对象一并删掉")
+    void clearAllRemovesOwnItemsAndBlobs() {
+        ClipboardItem text = item("TEXT", "{}");
+        ClipboardItem image = item("IMAGE", "{\"path\":\"clipboard/7/img\"}");
+        when(repository.findByUserId(USER)).thenReturn(java.util.List.of(text, image));
+
+        int removed = service.deleteAll(USER);
+
+        org.junit.jupiter.api.Assertions.assertEquals(2, removed);
+        verify(repository).deleteAll(java.util.List.of(text, image));
+        verify(storage).delete("clipboard/7/img");
+    }
 }

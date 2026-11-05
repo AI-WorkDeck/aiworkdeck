@@ -50,7 +50,7 @@ export default {
   "captureNoResult": "Ekran görüntüsü tamamlandı ancak sonuç alınamadı",
   "screenShareUnsupported": "Bu tarayıcıda ekran paylaşımı desteklenmiyor",
   "captureFailedAllowShare": "Ekran görüntüsü alınamadı (sekme veya pencere paylaşımına izin verin)",
-  "captureH5Only": "Ekran görüntüsü yakalama yalnızca web üzerinde (H5) desteklenir",
+  "captureH5Only": "Ekran Görüntüsünden OCR yalnızca web üzerinde desteklenir",
   "loadStagingFailed": "Hazırlama alanı dosyaları yüklenemedi",
   "addedToStaging": "Hazırlama alanına eklendi",
   "stagingFullTitle": "Staging Alanı Dolu",

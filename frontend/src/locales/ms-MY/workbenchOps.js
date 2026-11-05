@@ -50,7 +50,7 @@ export default {
   "captureNoResult": "Tangkapan skrin selesai tetapi tiada hasil diterima",
   "screenShareUnsupported": "Perkongsian skrin tidak disokong dalam pelayar ini",
   "captureFailedAllowShare": "Tangkapan skrin gagal (sila benarkan perkongsian tab atau tetingkap)",
-  "captureH5Only": "Tangkapan skrin hanya disokong pada H5",
+  "captureH5Only": "OCR Tangkap Skrin hanya disokong pada web",
   "loadStagingFailed": "Gagal memuatkan fail kawasan transit",
   "addedToStaging": "Ditambah ke kawasan transit",
   "stagingFullTitle": "Kawasan Transit Penuh",

@@ -50,7 +50,7 @@ export default {
   "captureNoResult": "انتهى التقاط لقطة الشاشة ولكن لم يتم استلام أي نتيجة",
   "screenShareUnsupported": "مشاركة الشاشة غير مدعومة في هذا المتصفح",
   "captureFailedAllowShare": "فشل التقاط لقطة الشاشة (اسمح بمشاركة علامة التبويب أو النافذة)",
-  "captureH5Only": "التقاط لقطة الشاشة مدعوم على الويب فقط",
+  "captureH5Only": "التقاط نص من لقطة الشاشة (OCR) مدعوم على الويب فقط",
   "loadStagingFailed": "فشل تحميل ملفات منطقة التجهيز",
   "addedToStaging": "تمت الإضافة إلى منطقة التجهيز",
   "stagingFullTitle": "منطقة التجهيز ممتلئة",

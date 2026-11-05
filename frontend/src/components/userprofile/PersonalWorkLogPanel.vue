@@ -13,7 +13,13 @@
   <SettingsSection class="panel-work-log" :title="$t('account.tabWorkLog')" :description="$t('account.workLogSubtitle')">
       <template #actions>
         <view class="log-filter-bar header-actions">
-          <input class="filter-input" v-model="activityFilter.date" :placeholder="$t('account.filterDatePlaceholder')" />
+          <picker class="filter-input filter-date" mode="date" :value="activityFilter.from" :end="activityFilter.to" @change="onRangeChange('from', $event)">
+            <text class="filter-date-text">{{ activityFilter.from }}</text>
+          </picker>
+          <text class="filter-range-sep">–</text>
+          <picker class="filter-input filter-date" mode="date" :value="activityFilter.to" :start="activityFilter.from" @change="onRangeChange('to', $event)">
+            <text class="filter-date-text">{{ activityFilter.to }}</text>
+          </picker>
           <AwdSelect
             class="filter-project-select"
             :range="projectFilterLabels"
@@ -25,6 +31,7 @@
         </view>
       </template>
 
+      <view v-if="activityTruncated" class="log-truncated-hint">{{ $t('account.workLogTruncatedHint') }}</view>
       <view class="log-table-container">
         <view class="log-table-header">
           <text class="th th-project">{{ $t('account.thProject') }}</text>
@@ -60,6 +67,11 @@ import SettingsSection from '@/components/settings/SettingsSection.vue'
 // dev-board BUG-45：actionType → i18n key。取值范围见 backend
 // UserActivityLog.actionType 的文档注释（LOGIN/OPEN_FILE/CLOSE_FILE/PAGE_VIEW/
 // OPEN_URL/CLOSE_URL）+ activityTracker.js 目前实际会发的 WORK。
+// 本地时区的 YYYY-MM-DD（toISOString 是 UTC，凌晨会差一天）
+function localDateString(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 const ACTION_TYPE_I18N_KEYS = {
   LOGIN: 'account.actionLogin',
   OPEN_FILE: 'account.actionOpenFile',
@@ -77,8 +89,11 @@ export default {
     return {
       activityLogs: [],
       activityLoading: false,
+      activityTruncated: false,
+      // 默认查本月（dev-board#1713）；日期按本地时区
       activityFilter: {
-        date: '',
+        from: localDateString(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
+        to: localDateString(new Date()),
         content: '',
       },
       // 'all' | 'unassociated' | 项目 id 的字符串形式
@@ -122,11 +137,18 @@ export default {
       const option = this.projectFilterOptions[index]
       this.projectFilterKey = option ? option.key : 'all'
     },
+    onRangeChange(which, e) {
+      const value = e && e.detail ? e.detail.value : ''
+      if (!value || value === this.activityFilter[which]) return
+      this.activityFilter[which] = value
+      this.loadActivityLogs()
+    },
     async loadActivityLogs() {
       this.activityLoading = true
       try {
-        const res = await getUserActivityHistory()
+        const res = await getUserActivityHistory({ from: this.activityFilter.from, to: this.activityFilter.to })
         this.activityLogs = res.data || []
+        this.activityTruncated = !!res.truncated
       } catch (e) {
         console.error('Failed to load activity logs', e)
       } finally {
@@ -134,16 +156,18 @@ export default {
       }
     },
     getFilteredLogs() {
+      // 关键词同时匹配对象列（文件名 / 网址）、项目名和备注，忽略大小写
+      const keyword = (this.activityFilter.content || '').trim().toLowerCase()
       return this.activityLogs.filter(log => {
-        const dateMatch = !this.activityFilter.date || this.formatTime(log.timestamp).includes(this.activityFilter.date)
-        const contentMatch = !this.activityFilter.content || (log.metaInfo && log.metaInfo.includes(this.activityFilter.content))
+        const contentMatch = !keyword || [this.getLogObject(log), this.getLogProject(log), log.metaInfo]
+          .some(v => v && String(v).toLowerCase().includes(keyword))
         let projectMatch = true
         if (this.projectFilterKey === 'unassociated') {
           projectMatch = !log.projectId
         } else if (this.projectFilterKey !== 'all') {
           projectMatch = String(log.projectId) === this.projectFilterKey
         }
-        return dateMatch && projectMatch && contentMatch
+        return projectMatch && contentMatch
       })
     },
     getLogProject(log) {
@@ -175,7 +199,9 @@ export default {
     getLogStartTime(log) {
       if (log.duration && log.duration > 0) {
         const end = new Date(log.timestamp).getTime()
-        const dur = Number(log.duration) || 0
+        // duration 已扣掉空闲段，开始时间要把空闲加回来
+        const idle = this.parseIdleSegments(log).reduce((sum, seg) => sum + (seg.end - seg.start), 0)
+        const dur = (Number(log.duration) || 0) + idle
         return this.formatDateTime(new Date(end - dur))
       }
       return this.formatDateTime(log.timestamp)
@@ -185,21 +211,45 @@ export default {
     },
     getLogDuration(log) {
       if (log.duration && log.duration > 0) {
-        // Round up to nearest 0.25 minutes (15 seconds)；duration is in ms
-        const seconds = log.duration / 1000
-        const roundedSeconds = Math.ceil(seconds / 15) * 15
-        const minutes = roundedSeconds / 60
-        return this.$t('account.minutesSuffix', { count: minutes.toFixed(2) })
+        return this.formatDuration(log.duration)
       }
       // Fallback for old logs or if duration is 0 (instant actions)
       if (log.metaInfo && log.metaInfo.includes('总时长:')) {
         const match = log.metaInfo.match(/总时长:\s*([\d.]+)分/)
-        if (match) return this.$t('account.minutesSuffix', { count: match[1] })
+        if (match) return this.formatDuration(Number(match[1]) * 60000)
       }
       return '-'
     },
+    // 「x 小时 y 分」/「y 分」/「不足 1 分钟」；不再按 15 秒向上取整成小数分钟（dev-board#1713）
+    formatDuration(ms) {
+      const minutes = Math.floor((Number(ms) || 0) / 60000)
+      if (minutes < 1) return this.$t('account.durationUnderMinute')
+      const hours = Math.floor(minutes / 60)
+      if (hours > 0) return this.$t('account.durationHoursMinutes', { hours, minutes: minutes % 60 })
+      return this.$t('account.durationMinutes', { minutes })
+    },
+    // activityTracker 写的格式：IdleSegments: <开始毫秒>-<结束毫秒>;...
+    parseIdleSegments(log) {
+      const meta = log && log.metaInfo
+      if (!meta || !meta.includes('IdleSegments:')) return []
+      const raw = meta.split('IdleSegments:')[1].trim()
+      const segs = []
+      for (const part of raw.split(';')) {
+        const m = /^(\d{10,})-(\d{10,})$/.exec(part.trim())
+        if (m) segs.push({ start: Number(m[1]), end: Number(m[2]) })
+      }
+      return segs
+    },
+    formatClock(ms) {
+      const d = new Date(ms)
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    },
     getLogIdleTime(log) {
       if (!log.metaInfo) return '-'
+      const segs = this.parseIdleSegments(log)
+      if (segs.length) {
+        return segs.map(seg => `${this.formatClock(seg.start)}-${this.formatClock(seg.end)} (${this.formatDuration(seg.end - seg.start)})`).join(', ')
+      }
       if (log.metaInfo.includes('IdleSegments:')) {
         return log.metaInfo.split('IdleSegments:')[1].trim()
       }
@@ -210,30 +260,32 @@ export default {
       return '-'
     },
     exportLogsToExcel() {
-      // Simple CSV export for now
-      const logs = this.getFilteredLogs()
-      let csvContent = 'data:text/csv;charset=utf-8,\uFEFF' // Add BOM
-      csvContent += `${this.$t('account.thProject')},${this.$t('account.thAction')},${this.$t('account.thObject')},${this.$t('account.thStart')},${this.$t('account.thEnd')},${this.$t('account.thDuration')},${this.$t('account.thIdle')}\n`
-
-      logs.forEach(log => {
-        const project = (this.getLogProject(log) || '').replace(/,/g, ' ')
-        const action = this.getLogActionLabel(log)
-        const object = (this.getLogObject(log) || '').replace(/,/g, ' ')
-        const start = this.getLogStartTime(log)
-        const end = this.getLogEndTime(log)
-        const duration = (this.getLogDuration(log) || '').replace(/,/g, ' ')
-        const idle = (this.getLogIdleTime(log) || '').replace(/,/g, ' ').replace(/\n/g, ' ')
-
-        csvContent += `${project},${action},${object},${start},${end},${duration},${idle}\n`
-      })
-
-      const encodedUri = encodeURI(csvContent)
+      // 原来拼 data: URI，内容里的 # 会被当成片段标识把文件截断；改用 Blob
+      const blob = new Blob([this.buildLogsCsv(this.getFilteredLogs())], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
-      link.setAttribute('href', encodedUri)
-      link.setAttribute('download', `work_log_${new Date().toISOString().slice(0, 10)}.csv`)
+      link.setAttribute('href', url)
+      link.setAttribute('download', `work_log_${localDateString(new Date())}.csv`)
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
+      setTimeout(() => URL.revokeObjectURL(url), 0)
+    },
+    // 标准 CSV：每格双引号包裹、内部 " 写成 ""，行尾 CRLF；BOM 让 Excel 按 UTF-8 打开
+    buildLogsCsv(logs) {
+      const cell = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`
+      const header = ['thProject', 'thAction', 'thObject', 'thStart', 'thEnd', 'thDuration', 'thIdle']
+        .map(k => cell(this.$t(`account.${k}`))).join(',')
+      const rows = logs.map(log => [
+        this.getLogProject(log),
+        this.getLogActionLabel(log),
+        this.getLogObject(log),
+        this.getLogStartTime(log),
+        this.getLogEndTime(log),
+        this.getLogDuration(log),
+        this.getLogIdleTime(log),
+      ].map(cell).join(','))
+      return '\uFEFF' + [header, ...rows].join('\r\n') + '\r\n'
     },
     formatTime(timeStr) {
       if (!timeStr) return ''
@@ -312,6 +364,30 @@ export default {
   background: var(--awd-surface);
   color: var(--awd-text);
   box-sizing: border-box;
+}
+
+.filter-date {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.filter-date-text {
+  line-height: calc(var(--awd-control-height) - 2px);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.filter-range-sep {
+  color: var(--awd-text-3);
+}
+
+.log-truncated-hint {
+  margin-bottom: var(--awd-space-2);
+  font-size: var(--awd-panel-fs-sec);
+  color: var(--awd-text-2);
 }
 
 .filter-project-select {

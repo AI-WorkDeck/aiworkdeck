@@ -862,6 +862,8 @@
             @open="openPluginTab(activeDynamicPlugin.pluginId)"
             @quick-action="onPluginQuickAction"
           />
+          <!-- files：FileTree 在链外用 v-show 常驻，这里只占住分支，免得落进下面的「加载中…」兜底 -->
+          <template v-else-if="leftPaneKey === 'files'"></template>
           <view v-else class="sidebar-plugin-placeholder">
             <text class="placeholder-title">{{ leftPaneTitle }}</text>
             <text class="placeholder-desc">{{ $t('workbench.loadingText') }}</text>
@@ -2902,6 +2904,7 @@ export default {
       ocrImageDataUrl: '',
       ocrText: '',
       ocrSourceUrl: '',
+      ocrSourceTitle: '',
       // 全屏截图浮层
       showOcrOverlay: false,
       ocrStream: null,
@@ -2914,7 +2917,7 @@ export default {
       ocrOverlaySelecting: false,
       ocrSel: { x1: 0, y1: 0, x2: 0, y2: 0 },
       ocrActionBar: { visible: false, x: 0, y: 0 },
-      ocrDebug: true,
+      ocrDebug: false,
       ocrLastPointer: { x: 0, y: 0 },
 
       // Invite Modal (Refactored)
@@ -3447,6 +3450,8 @@ export default {
         insertContent: payload => this.insertPlainTextToWps(payload),
         previewImage: url => this.openImagePreview(url),
         copyText: text => this.insertClipboardAndCopy(text),
+        copyImage: dataUrl => this.copyImageDataUrl(dataUrl),
+        clipboardCapture: paused => this.clipboardCapture(paused),
         calendarWorkspace: params => this.calendarWorkspace(params),
         openProject: payload => this.onCalendarOpenProject(payload),
         openTaskFile: payload => this.onCalendarOpenFile(payload),
@@ -4187,7 +4192,7 @@ export default {
     this.loadWalletBalance()
 
     // Sync UI state
-    this.isRecording = activityTracker.getRecordingState()
+    this.isRecording = this.hasNamedProject && activityTracker.getRecordingState()
 
     // Reload members to ensure up-to-date list
     if (this.projectId) {
@@ -4215,7 +4220,8 @@ export default {
     // onShow 会重新接管——但期间菜单不能继续亮着工作台那一堆条目。
     // 窗口最小化/被遮挡/锁屏也会触发 onHide，那时本页仍是当前页，不交（见 menuCommands.js）。
     this.releaseMenuOnHide()
-    this.stopActivityTracking()
+    // 最小化 / 锁屏 / 去设置页：只结束当前计时段，不关录制（onShow 接着记当前标签）
+    activityTracker.flushActiveSession()
 
     // Desktop：离开工作区页面（如去个人中心）必须隐藏 BrowserView
     try {
@@ -6152,6 +6158,7 @@ export default {
     },
     switchToolTab(key) {
       this.activeToolKey = migrateLeftPaneKey(key)
+      this.rememberToolTab(this.activeToolKey)
       // 如果用户切到剪贴板，且之前有 pending，则立刻刷新
       this.$nextTick(() => {
         if (this.activeToolKey === 'plugin-clipboard') {
@@ -6327,18 +6334,32 @@ export default {
     // OCR 采集与浮层生命周期方法组已外置（Phase 3c） → ./ocrCapture.js
 
     // OCR 帧处理与动作方法组已外置（Phase 3b） → ./ocrActions.js
+    // 录制开关是全局持久化的（activityTracker 自己存），这里只管本页恢复 / 挂起计时
     startActivityTracking() {
         if (!this.hasNamedProject) return
-        if (activityTracker.getRecordingState()) {
-             activityTracker.start()
-             this.isRecording = true
-        }
+        activityTracker.start()
+        this.isRecording = activityTracker.getRecordingState()
+        if (this.isRecording) this.trackCurrentTab()
     },
 
     stopActivityTracking() {
         activityTracker.stop()
-        activityTracker.setRecording(false) // Force stop recording state
         this.isRecording = false
+    },
+
+    trackCurrentTab() {
+        const pane = this.focusedPane
+        const file = pane === 'left' ? this.activeFileLeft : this.activeFileRight
+        if (!file) return
+        const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
+        if (this.isBrowserTab(file)) {
+            const url = file.url || ''
+            const title = file.name || ''
+            const fullMeta = meta + (title ? `. Title: ${title}` : '')
+            activityTracker.trackActivePage('OPEN_URL', 0, url, this.project && this.project.id, fullMeta)
+        } else {
+            activityTracker.trackActivePage('OPEN_FILE', file.id, file.name, this.project && this.project.id, meta)
+        }
     },
 
     toggleRecording() {
@@ -6355,23 +6376,9 @@ export default {
         }, 2000)
 
         if (newState) {
-             // uni.showToast({ title: '开始录制工作', icon: 'none' }) // Replaced
              // If we have an active file/tab, start tracking it immediately
-             const pane = this.focusedPane
-             const file = pane === 'left' ? this.activeFileLeft : this.activeFileRight
-             if (file) {
-                 const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
-                 if (this.isBrowserTab(file)) {
-                     const url = file.url || ''
-                     const title = file.name || ''
-                     const fullMeta = meta + (title ? `. Title: ${title}` : '')
-                     activityTracker.trackActivePage('OPEN_URL', 0, url, this.project && this.project.id, fullMeta)
-                 } else {
-                     activityTracker.trackActivePage('OPEN_FILE', file.id, file.name, this.project && this.project.id, meta)
-                 }
-             }
-        } else {
-             // uni.showToast({ title: '已停止录制', icon: 'none' }) // Replaced
+             activityTracker.start()
+             this.trackCurrentTab()
         }
     },
 
@@ -6384,10 +6391,9 @@ export default {
       // 记录到剪贴板历史（best-effort）
       if (options.saveToHistory) {
         try {
-          await saveClipboardText(t)
-          if (this.$refs.clipboardPanel && typeof this.$refs.clipboardPanel.refresh === 'function') {
-            this.$refs.clipboardPanel.refresh()
-          }
+          const res = await saveClipboardText(t)
+          // 与采集桥同一个出口：本实例面板加卡片 + 广播 awd:clipboard-saved（插件面板 / 别的坞位靠它刷新）
+          this.onClipboardSaved((res && res.data) ? res.data : res)
         } catch (e) {
           // ignore
         }
@@ -6614,6 +6620,7 @@ export default {
         }
         recordProjectVisit(this.projectId)
         syncRecentToMenuFetching()
+        this.startActivityTracking()
         this.checkAdoptConflict()
         loadProjectTasks(this.projectId).catch((e) => console.warn('[project-overview] 读取事项失败', e))
         const lifecycle = this._collabStateLifecycle || 0
@@ -6998,6 +7005,8 @@ export default {
       // 三个工具面板都被搬到左/右之后底部抽屉里没东西可显示，开关也就不该有反应
       // （顶栏那个按钮同样按 bottomToolsList 收起，见模板）
       if (!this.showToolsPanel && !this.bottomToolsList.length) return
+      // 插件是异步加载的，onLoad 那次校正时底栏可能还是空的：打开前再选一次 tab（上次的 / 剪贴板）
+      if (!this.showToolsPanel && !this.bottomToolsList.some(t => t.key === this.activeToolKey)) this.normalizeDockSelections()
       this.showToolsPanel = !this.showToolsPanel
       this.$nextTick(() => this.triggerWorkbenchResize())
     },

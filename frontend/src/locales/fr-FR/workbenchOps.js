@@ -50,7 +50,7 @@ export default {
   "captureNoResult": "Capture d'écran terminée, mais aucun résultat reçu",
   "screenShareUnsupported": "Le partage d'écran n'est pas pris en charge par ce navigateur",
   "captureFailedAllowShare": "Échec de la capture d'écran (autorisez le partage de l'onglet ou de la fenêtre)",
-  "captureH5Only": "La capture d'extrait n'est prise en charge que sur H5",
+  "captureH5Only": "La capture d’écran OCR n’est prise en charge que sur le web",
   "loadStagingFailed": "Échec du chargement des fichiers de la zone de transit",
   "addedToStaging": "Ajouté à la zone de transit",
   "stagingFullTitle": "Zone de transit pleine",
