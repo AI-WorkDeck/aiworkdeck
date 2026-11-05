@@ -634,6 +634,8 @@ IME 光标定位优先用 `XController.getViewData()` 的实时分号数据与 V
 - #1120 历史压力结果：2000 页稀疏修改样本通过比较、末页显示、编辑保存重开；同规模每页修改样本在原生字符/词/自动三模式均达到 180 秒超时，不能宣称全面支持密集修改。后者峰值浏览器进程树 RSS 约 2.58 GiB，独立页面有响应，但没有完成可用产物。
 - 验证：`tests/lowa-e2e/comparison-document.mjs`、`comparison-large.mjs`，`tests/lowa-unit/comparison-document.test.mjs`，project-home `docx-compare-{flow,transport}` 与保存屏障，后端 `DocxComparisonFinalizerTest`、`ProjectFileComparisonTest`、`ProjectFileComparisonControllerTest`。2000 页测试是隔离压力测试，不属于每次 PR 的普通小回归。
 
+- 隐藏实例借用与导出兜底（教程问题 88，dev-board#1713）：`acquireLibreHiddenInstance` 先借已 ready 的空闲预热备胎（只打 `borrowed`，**不翻 `hidden`**——可见/隐藏两桶是不同 v-for 与 key，翻了会卸掉热引擎再冷启一台）；`borrowed` 不许过继、不被低内存策略清掉，归还后 `scheduleLibreSpare`。`isCancelled` 选项让取消比对时立即释放仍在冷启动的实例。`runDocxComparison` 的导出阶段加 5 分钟上限（`EXPORT_STAGE_TIMEOUT_MS`，超时 `editor.compare.failTimeout`）；build 阶段仍按 #1123 不设截止，靠对话框 5 分钟无进展提示 + 取消。回归 `compare-engine-reuse-timeout.test.mjs`。
+
 ### 连续载入的模型释放（dev-board#1121）
 
 `load_document` 成功绑定新模型、安装监听器并恢复视图后，清除旧模型修改标志并关闭旧组件；空输入、两种导入都失败或返回同一模型时不关闭当前模型。`_default` 会保留已修改组件，32 次载入曾累积 33 个模型，导出触及固定 1 GiB WASM heap 而超时；操作系统 RSS 不是 WASM 剩余内存。比较完整序列必须在原所有断言通过后验证 components=1。原生压力测试保留完整 console/pageerror，以免把 OOM 误判为计算慢。

@@ -303,7 +303,10 @@ export const fileOpenTabsMethods = {
           }
         } else {
           tree.selectedFileId = null
-          tree.multiSelectedIds = []
+          // 关掉最后一个文件标签时同样保留用户 ≥2 项的 Cmd 多选
+          if (!(Array.isArray(tree.multiSelectedIds) && tree.multiSelectedIds.length >= 2)) {
+            tree.multiSelectedIds = []
+          }
         }
       }
       applySync()
@@ -511,6 +514,11 @@ export const fileOpenTabsMethods = {
         const mode = this.leftPaneKey || 'files'
         this.lastActiveIdsByMode[pane][mode] = newActiveId
         this.saveActiveIdsByMode()
+      }
+      // 右侧最后一个标签关掉后自动退出分屏（toggleSplitMode 会复位焦点并同步资源管理器选中）
+      if (pane === 'right' && this.splitMode && list.length === 0 && typeof this.toggleSplitMode === 'function') {
+        await this.toggleSplitMode()
+        return
       }
       this.syncFileTreeSelectionWithActiveTab?.()
     },
@@ -1001,7 +1009,7 @@ export const fileOpenTabsMethods = {
             if (names.length) throw new Error(this.$t('editor.compare.failChanged', { name: names[0] }))
           },
           acquireEngine: async () => {
-            engineHandle = await this.acquireLibreHiddenInstance()
+            engineHandle = await this.acquireLibreHiddenInstance({ isCancelled: () => !isCurrent() })
             if (!isCurrent()) releaseOnce()
             return engineHandle
           },
