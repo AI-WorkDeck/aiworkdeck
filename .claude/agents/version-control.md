@@ -338,6 +338,8 @@ PR#797 当时只改了 `VersionController`，自动存档（`ProjectFileService.
 最后的操作者，30 分钟空闲自动结束时整段署成「用户」且不认作「你」。现在 userId 与署名一起换成项目负责人，
 两者都查不到才回「用户」。护栏 `service/ProjectFileServiceSignalActorTest`。
 
+`work_session` 的 `lastActivityAt`（每次变更信号落库）与 `idleEnded`（空闲定时器结束时打标）两列可空，由 `ddl-auto=update` 加列（H2/PostgreSQL 均可）。仅供团队日聚合 `TeamUsageRollupService.activeMinutes` 对空闲结束的段按 `lastActivityAt` 计工时（扣掉 30 分钟挂机尾巴）；`endedAt` 语义不变，老数据照旧按 `endedAt`（dev-board#1713）。
+
 **官方案件库上的自己的展示名也要跟官网走**：案件库只在桥接（`awdk-login` → `resolveUser`）时刷新展示名，
 而 `OfficialCloudService.connectOfficial` 指纹不变就一直复用旧连接。现在 `AccountIdentitySync` 每次按官网同步到
 展示名都发 `DisplayNameSynced` 事件，`OfficialCloudService.onDisplayNameSynced`（`@Async`）比对连接上的
