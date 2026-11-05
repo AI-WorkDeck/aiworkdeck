@@ -238,7 +238,7 @@ def stage_pick(paths_or_sel=None):
                 _save(st)
                 print(f"{_why}，不必再选时间段。")
                 print()
-                print("然后跑：python pipeline.py style 2")
+                print("然后跑：python pipeline.py style 1")  # [AWD-PATCH 9] 上游写 2（歸藏风），与「不回 = 1 奇川风」相悖
                 return
             print(f"第二轮 · 时间段　{note}")
             print()
@@ -287,7 +287,7 @@ def stage_pick(paths_or_sel=None):
         _save(st)
         print(f"{_why}，不必再选时间段。")
         print()
-        print("然后跑：python pipeline.py style 2")
+        print("然后跑：python pipeline.py style 1")  # [AWD-PATCH 9] 同上
         return
     print(f"第二轮 · 时间段　{note}")
     print()
@@ -1234,7 +1234,8 @@ STEPS = [
     ("read <材料...>", "代码", "读材料、切句、认叙述块", ""),
     ("pick",           "用户", "第一轮：勾材料来源（含「全部」）", ""),
     ("span <编号|全部>", "用户", "第二轮：勾时间段（粒度按跨度自适应）", ""),
-    ("style <1-4>",    "用户", "第三轮：呈报给谁 → 白描 / 奇川风 / 歸藏风 / 让 AI 定", ""),
+    # [AWD-PATCH 9] 顺序照 pick.STYLES 的真实编号：1 奇川风 / 2 歸藏风 / 3 白描 / 4 让 AI 定
+    ("style <1-4>",    "用户", "第三轮：选风格 → 奇川风 / 歸藏风 / 白描 / 让 AI 定", ""),
     ("offer",          "模型", "划分并给勾选清单", "verdicts.json + parts.json"),
     ("budget <编号|all>", "用户", "勾哪几个部分", ""),
     ("capacity",       "代码", "按真实骨架算形态与容量", "skeleton.json"),
@@ -1278,7 +1279,8 @@ def stage_next():
     for key, name, cmd, note in (
             ("pick_r1", "pick 第一轮·勾材料来源", "pick", "只有一份材料时自动跳过"),
             ("pick_r2", "span 第二轮·勾时间段", "span 全部", ""),
-            ("style", "style 第三轮·选风格", "style 1", "1 法官白描 / 2 当事人奇川风 / 3 同行歸藏风 / 4 让我定"),
+            # [AWD-PATCH 9] 上游这里的编号与 pick.STYLES 对不上（1 写成白描），模型照它转述就会选错风格
+            ("style", "style 第三轮·选风格", "style 1", "1 奇川风 / 2 歸藏风 / 3 白描 / 4 让我定"),
             ("parts", "offer 划分并给清单", "offer", "先写 verdicts.json + parts.json"),
             # 键名一律照代码里实际写的那个 —— 第一版这里猜成 picked_parts，
             # 而 stage_budget 写的是 picked_ids，于是勾完部分之后 next 还在说

@@ -331,6 +331,27 @@ mqc-litigation-visual-redraw/scripts/render.py` 也直接调它），没有理�
 
 ---
 
+## PATCH 9 · 风格提示的编号与真实编号对不上（`mqc-timeline-master/scripts/pipeline.py` · `stage_pick()` 两处跑法提示 + `STEPS` + `stage_next()`，2026-11-04，dev-board#1713）
+
+**症状**：用户选奇川风，出成歸藏风（教程录制问题 105）。
+
+**根因**：`stage_style` 按 `pick.STYLES` 取号——1 奇川风 / 2 歸藏风 / 3 白描；但 `next` 给模型的
+提示写成「1 法官白描 / 2 当事人奇川风 / 3 同行歸藏风」（v2 早先按受众分三档的旧写法，
+作者已改回 v1 的那一问，这里没跟着改），`STEPS` 表也按旧顺序列；只有一份材料、时间段又
+不值得问时，`stage_pick` 还会提示 `然后跑：python pipeline.py style 2`。模型照这些提示把
+「奇川风」转成 2，管线就画成了歸藏风。
+
+**改法**：只改提示文字，不碰取号逻辑：两处 `style 2` 改成 `style 1`（与「不回 = 1」一致），
+`next` 提示与 `STEPS` 改成真实编号顺序。另在 Java 侧（`LitigationTimelineTools.normalizeAnswer`）
+把风格名映射成编号，风格名优先于标签里的数字，认不出的答复不再落进 `int()` 抛 ValueError。
+
+**验证**：`python3 -I litviz/tests/test_timeline_style_numbering.py`（补丁前 2 项红，补丁后绿）；
+`LitigationTimelineFlowTest#styleNameAndChineseDatesThroughRealPipeline`。
+
+**上游该不该回馈**：该。纯提示文字的 bug，与上游自己的 `STYLES` 注释相矛盾。
+
+---
+
 ## 回归怎么跑
 
 ```bash
