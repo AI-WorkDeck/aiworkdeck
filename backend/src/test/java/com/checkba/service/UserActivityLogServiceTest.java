@@ -14,15 +14,22 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.data.domain.Pageable;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -127,5 +134,51 @@ class UserActivityLogServiceTest {
         long daysBeforeNow = java.time.Duration.between(captor.getValue(), java.time.LocalDateTime.now()).toDays();
         assertTrue(Math.abs(daysBeforeNow - UserActivityLogService.RETENTION_DAYS) <= 1,
                 "清理截止时间应约为「现在减保留天数」，实际相差 " + daysBeforeNow + " 天");
+    }
+
+    // ==== dev-board#1713（问题 58）：工作记录按日期范围查，有范围时不再卡 500 条；
+    // 截断时把 truncated 告诉前端。不传范围保持原行为（最近 500 条）。
+
+    @Test
+    void rangeQueryUsesDayBoundsAndHigherCap() {
+        when(repository.findByUserIdAndTimestampGreaterThanEqualAndTimestampLessThanOrderByTimestampDesc(
+                eq(USER), any(), any(), any())).thenReturn(Arrays.asList(log(null)));
+
+        UserActivityLogService.LogPage page = service.getUserLogs(USER, LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 30));
+
+        ArgumentCaptor<LocalDateTime> from = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> to = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        verify(repository).findByUserIdAndTimestampGreaterThanEqualAndTimestampLessThanOrderByTimestampDesc(
+                eq(USER), from.capture(), to.capture(), pageable.capture());
+        assertEquals(LocalDateTime.of(2026, 11, 1, 0, 0), from.getValue());
+        assertEquals(LocalDateTime.of(2026, 12, 1, 0, 0), to.getValue(), "结束日期当天整天都要包含");
+        assertTrue(pageable.getValue().getPageSize() > 500, "有日期范围时上限要比 500 宽");
+        assertEquals(1, page.logs().size());
+        assertFalse(page.truncated());
+    }
+
+    @Test
+    void rangeQueryReportsTruncationAndTrimsExtraRow() {
+        List<UserActivityLog> many = new ArrayList<>();
+        for (int i = 0; i <= UserActivityLogService.RANGE_MAX_ROWS; i++) many.add(log(null));
+        when(repository.findByUserIdAndTimestampGreaterThanEqualAndTimestampLessThanOrderByTimestampDesc(
+                eq(USER), any(), any(), any())).thenReturn(many);
+
+        UserActivityLogService.LogPage page = service.getUserLogs(USER, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 11, 30));
+
+        assertTrue(page.truncated());
+        assertEquals(UserActivityLogService.RANGE_MAX_ROWS, page.logs().size());
+    }
+
+    @Test
+    void noRangeKeepsLegacyTop500Query() {
+        when(repository.findTop500ByUserIdOrderByTimestampDesc(USER)).thenReturn(Arrays.asList(log(null)));
+
+        UserActivityLogService.LogPage page = service.getUserLogs(USER, null, null);
+
+        verify(repository).findTop500ByUserIdOrderByTimestampDesc(USER);
+        assertEquals(1, page.logs().size());
+        assertFalse(page.truncated());
     }
 }

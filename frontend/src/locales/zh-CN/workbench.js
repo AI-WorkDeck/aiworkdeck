@@ -151,10 +151,10 @@ export default {
   dockCurrent: '当前',
   openSplit: '开启分屏',
   closeSplit: '关闭分屏',
-  ocrCapture: '截图摘录（OCR）',
+  ocrCapture: '截图取词',
   browser: '浏览器',
   browserNewTabHint: '新建浏览器标签',
-  recordActivity: '录制活动',
+  recordActivity: '工作记录',
   logout: '退出登录',
   // 左侧常驻栏
   stagingArea: '文件暂存区',
@@ -277,7 +277,7 @@ export default {
   gotIt: '知道了',
   learnFullVersion: '了解正式版',
   // 底部状态条
-  recordingActive: '活动录制中',
+  recordingActive: '正在记录',
   splitBadge: '分屏',
   // 顶栏工作状态点 / 协作状态
   workingOnDraft: '正在稿《{name}》上修改',
@@ -321,8 +321,8 @@ export default {
   shareClipboardHint: '文件已复制，切到微信选好对话后按 Ctrl+V 即可发送',
   copyFailedNoNewFile: '复制失败：未返回新文件',
   copyFailed: '复制失败',
-  recordingStarted: '开始录制工作',
-  recordingStopped: '已停止录制工作',
+  recordingStarted: '已开始记录',
+  recordingStopped: '已停止记录',
   insertedToDoc: '已插入文档',
   insertFailed: '插入失败',
   imageDownloadFailed: '图片下载失败',

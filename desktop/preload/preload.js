@@ -37,7 +37,9 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
       ipcRenderer.on('checkba:app-open-internal', listener)
       return () => ipcRenderer.removeListener('checkba:app-open-internal', listener)
     },
-    confirm: (payload) => ipcRenderer.invoke('checkba:ui-confirm', payload)
+    confirm: (payload) => ipcRenderer.invoke('checkba:ui-confirm', payload),
+    // 工作记录空闲判定：{ focused, idleSeconds }
+    getPresence: () => ipcRenderer.invoke('checkba:app-presence')
   },
   browser: {
     create: (payload) => ipcRenderer.invoke('checkba:browser-create', payload),

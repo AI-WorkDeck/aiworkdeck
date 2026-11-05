@@ -9,9 +9,11 @@ import com.checkba.repository.ProjectRepository;
 import com.checkba.repository.UserActivityLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +31,18 @@ public class UserActivityLogService {
      */
     static final long RETENTION_DAYS = 180;
 
+    /** 不带日期范围时的老上限（与 findTop500 一致）。 */
+    static final int LEGACY_MAX_ROWS = 500;
+
+    /**
+     * 带日期范围时的单次上限（dev-board#1713）：工作记录默认查本月，一个月几千条是常态，
+     * 500 条会把月初的记录静默截掉。仍然封顶，防止一次拉回半年全量；超出时 truncated=true，前端提示。
+     */
+    static final int RANGE_MAX_ROWS = 5000;
+
+    /** 工作记录查询结果：logs 已按时间倒序；truncated 表示还有更早的记录没返回。 */
+    public record LogPage(List<UserActivityLog> logs, boolean truncated) {}
+
     private final UserActivityLogRepository repository;
     private final ProjectRepository projectRepository;
 
@@ -44,11 +58,31 @@ public class UserActivityLogService {
         repository.save(log);
     }
 
+    public List<UserActivityLog> getUserLogs(Long userId) {
+        return fillProjectNames(repository.findTop500ByUserIdOrderByTimestampDesc(userId));
+    }
+
+    /**
+     * from/to 是闭区间的日期（按服务器本地时区，to 当天整天都算）；两个都不传时退回最近 500 条。
+     * 只传一头时另一头不设限。
+     */
+    public LogPage getUserLogs(Long userId, LocalDate from, LocalDate to) {
+        if (from == null && to == null) {
+            List<UserActivityLog> logs = getUserLogs(userId);
+            return new LogPage(logs, logs.size() >= LEGACY_MAX_ROWS);
+        }
+        LocalDateTime start = from != null ? from.atStartOfDay() : LocalDateTime.of(1970, 1, 1, 0, 0);
+        LocalDateTime end = to != null ? to.plusDays(1).atStartOfDay() : LocalDateTime.now().plusYears(100);
+        List<UserActivityLog> rows = repository.findByUserIdAndTimestampGreaterThanEqualAndTimestampLessThanOrderByTimestampDesc(
+                userId, start, end, PageRequest.of(0, RANGE_MAX_ROWS + 1));
+        boolean truncated = rows.size() > RANGE_MAX_ROWS;
+        List<UserActivityLog> logs = truncated ? rows.subList(0, RANGE_MAX_ROWS) : rows;
+        return new LogPage(fillProjectNames(logs), truncated);
+    }
+
     // 按 projectId 批量补 projectName（一次 IN 查询，不逐条查）；查不到的（项目已删除）
     // 与老数据没有 projectId 的，projectName 都留空，前端归到「未关联项目」。
-    public List<UserActivityLog> getUserLogs(Long userId) {
-        List<UserActivityLog> logs = repository.findTop500ByUserIdOrderByTimestampDesc(userId);
-
+    private List<UserActivityLog> fillProjectNames(List<UserActivityLog> logs) {
         List<Long> projectIds = logs.stream()
                 .map(UserActivityLog::getProjectId)
                 .filter(id -> id != null)

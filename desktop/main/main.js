@@ -1448,6 +1448,13 @@ ipcMain.handle('checkba:shell-open-external', async (_evt, payload) => {
   }
 })
 
+// 工作记录的空闲判定（dev-board#1713）：主窗口是否在前台 + 系统空闲秒数。渲染层的 window blur
+// 在编辑器 webview / BrowserView 获得焦点时也会触发，不能拿来判断「人离开了」。
+ipcMain.handle('checkba:app-presence', () => ({
+  focused: !!(mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused()),
+  idleSeconds: powerMonitor.getSystemIdleTime()
+}))
+
 // 桌面端：统一的“应用内确认弹窗”（不依赖 uni.showModal，且不会被 BrowserView/iframe 遮挡）
 ipcMain.handle('checkba:ui-confirm', async (_evt, payload) => {
   if (!mainWindow) return { ok: false, confirmed: false, message: 'window not ready' }
