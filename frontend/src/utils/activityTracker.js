@@ -11,9 +11,13 @@ export const IDLE_THRESHOLD_MS = 5 * 60 * 1000
 const PRESENCE_POLL_MS = 30 * 1000
 const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart']
 
-function storage() {
-    // 必须出现 uni.xxx 成员访问：uni-h5 构建只在见到成员访问时才注入 uni，单写 typeof uni 打包后恒为 undefined（真机复测发现录制状态存不上）
-    return typeof uni !== 'undefined' && typeof uni.setStorageSync === 'function' ? uni : null
+// 直接写 uni.getStorageSync / uni.setStorageSync：uni-h5 构建会把这两个成员访问替换成导入，
+// 但 typeof uni 不会被替换、打包后恒为 undefined（真机复测发现录制状态存不上）
+function readRecording() {
+    try { return !!uni.getStorageSync(RECORDING_STORAGE_KEY) } catch (e) { return false }
+}
+function writeRecording(value) {
+    try { uni.setStorageSync(RECORDING_STORAGE_KEY, value) } catch (e) { /* ignore */ }
 }
 
 /**
@@ -40,22 +44,12 @@ export class ActivityTracker {
         this.noteActivity = this.noteActivity.bind(this)
         this._onVisibility = this._onVisibility.bind(this)
         this._onDomActivity = this._onDomActivity.bind(this)
-        try {
-            const s = storage()
-            this.isRecording = !!(s && s.getStorageSync(RECORDING_STORAGE_KEY))
-        } catch (e) {
-            this.isRecording = false
-        }
+        this.isRecording = readRecording()
     }
 
     setRecording(isRecording) {
         this.isRecording = !!isRecording
-        try {
-            const s = storage()
-            if (s) s.setStorageSync(RECORDING_STORAGE_KEY, this.isRecording)
-        } catch (e) {
-            // ignore
-        }
+        writeRecording(this.isRecording)
         if (this.isRecording) {
             this.lastActiveAt = Date.now()
             if (!this.suspended) this._watch()
