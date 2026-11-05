@@ -145,7 +145,7 @@ export default {
   "emptyData": "Noch keine Statistiken vorhanden. Sie erscheinen am Tag, nachdem Mitglieder die Freigabe aktiviert haben.",
   "lawfirmDashboardTitle": "Dashboard für Kanzleiführung & Verwaltungsausschuss",
   "lawfirmDashboardDesc": "Prüfen Sie Umsatz und Risiken nach Rechtsgebiet, federführendem Anwalt und einzelnem Anwalt. Öffnen Sie die Kanzlei-Workbench für Details.",
-  "lawfirmSeedDemoBtn": "Wufangzhai-Demodaten laden",
+  "lawfirmSeedDemoBtn": "Qinghe-Foods-Demodaten laden",
   "lawfirmOpenPluginBtn": "Kanzlei-Workbench öffnen",
   "lawfirmKpiActiveMatters": "Aktive Mandate",
   "lawfirmKpiPendingClearances": "Ausstehende Kollisionsprüfungen / Freigaben",

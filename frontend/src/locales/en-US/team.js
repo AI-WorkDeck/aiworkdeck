@@ -165,7 +165,7 @@ export default {
   // ---- Law Firm Decision-Maker Dashboard (TeamPanel.vue) ----
   lawfirmDashboardTitle: 'Law Firm Executive & Management Committee Dashboard',
   lawfirmDashboardDesc: 'Review revenue and risk by practice category, lead lawyer and individual lawyer. Open the law firm workbench for details.',
-  lawfirmSeedDemoBtn: 'Seed Wufangzhai Demo',
+  lawfirmSeedDemoBtn: 'Seed Qinghe Foods Demo',
   lawfirmOpenPluginBtn: 'Open Law Firm Workbench',
   lawfirmKpiActiveMatters: 'Active Matters',
   lawfirmKpiPendingClearances: 'Pending Conflicts / Reviews',

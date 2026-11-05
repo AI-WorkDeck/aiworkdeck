@@ -145,7 +145,7 @@ export default {
   "emptyData": "Pas encore de statistiques. Elles apparaissent le jour suivant l'activation du partage par les membres.",
   "lawfirmDashboardTitle": "Tableau de bord de direction et de comité de gestion du cabinet d'avocats",
   "lawfirmDashboardDesc": "Analysez les revenus et les risques par catégorie de pratique, avocat responsable et avocat individuel. Ouvrez l'atelier du cabinet pour plus de détails.",
-  "lawfirmSeedDemoBtn": "Charger la démo Wufangzhai",
+  "lawfirmSeedDemoBtn": "Charger la démo Qinghe Foods",
   "lawfirmOpenPluginBtn": "Ouvrir l'atelier du cabinet",
   "lawfirmKpiActiveMatters": "Dossiers actifs",
   "lawfirmKpiPendingClearances": "Conflits / Examens en attente",

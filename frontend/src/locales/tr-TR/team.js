@@ -145,7 +145,7 @@ export default {
   "emptyData": "Henüz istatistik yok. Üyeler paylaşımı açtıktan bir gün sonra görünür.",
   "lawfirmDashboardTitle": "Hukuk Bürosu Yönetim ve İcra Kurulu Panosu",
   "lawfirmDashboardDesc": "Gelir ve riski uzmanlık kategorisi, sorumlu avukat ve bireysel avukat bazında inceleyin. Ayrıntılar için hukuk bürosu çalışma alanını açın.",
-  "lawfirmSeedDemoBtn": "Wufangzhai Demo Verilerini Yükle",
+  "lawfirmSeedDemoBtn": "Qinghe Foods Demo Verilerini Yükle",
   "lawfirmOpenPluginBtn": "Hukuk Bürosu Çalışma Alanını Aç",
   "lawfirmKpiActiveMatters": "Aktif Dosyalar",
   "lawfirmKpiPendingClearances": "Bekleyen Çıkar Çatışmaları / İncelemeler",

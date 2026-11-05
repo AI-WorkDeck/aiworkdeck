@@ -146,7 +146,7 @@ export default {
   "emptyData": "ยังไม่มีสถิติ สถิติจะปรากฏหลังจากที่สมาชิกเปิดการแบ่งปันวันถัดไป",
   "lawfirmDashboardTitle": "แดชบอร์ดคณะกรรมการบริหารและบริหารจัดการสำนักงานกฎหมาย",
   "lawfirmDashboardDesc": "ตรวจสอบรายได้และความเสี่ยงตามหมวดงาน ทนายผู้นำ และทนายรายบุคคล เปิดเวิร์กเบนช์ของสำนักงานกฎหมายเพื่อดูรายละเอียด",
-  "lawfirmSeedDemoBtn": "สร้างข้อมูลตัวอย่าง Wufangzhai",
+  "lawfirmSeedDemoBtn": "สร้างข้อมูลตัวอย่าง Qinghe Foods",
   "lawfirmOpenPluginBtn": "เปิดเวิร์กเบนช์สำนักงานกฎหมาย",
   "lawfirmKpiActiveMatters": "คดีที่กำลังดำเนินการ",
   "lawfirmKpiPendingClearances": "ผลปะทะผลประโยชน์ / การตรวจสอบที่รอดำเนินการ",

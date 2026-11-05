@@ -145,7 +145,7 @@ export default {
   "emptyData": "Nog geen statistieken. Ze verschijnen de dag nadat leden het delen hebben ingeschakeld.",
   "lawfirmDashboardTitle": "Dashboard voor Kantoorbestuur & Managementcomité",
   "lawfirmDashboardDesc": "Bekijk omzet en risico's per rechtsgebied, verantwoordelijk advocaat en individuele advocaat. Open de kantoorwerkruimte voor details.",
-  "lawfirmSeedDemoBtn": "Wufangzhai-demogegevens laden",
+  "lawfirmSeedDemoBtn": "Qinghe Foods-demogegevens laden",
   "lawfirmOpenPluginBtn": "Kantoorwerkruimte openen",
   "lawfirmKpiActiveMatters": "Lopende zaken",
   "lawfirmKpiPendingClearances": "Openstaande belangenconflicten / beoordelingen",

@@ -146,7 +146,7 @@ export default {
   "emptyData": "還沒有統計數據。成員打開數據共享開關後，次日可以看到。",
   "lawfirmDashboardTitle": "律所決策者與管委會看板",
   "lawfirmDashboardDesc": "按業務分類、主辦律師與律師個人匯總創收和風控情況，可進入律所管理工作台查看明細。",
-  "lawfirmSeedDemoBtn": "填充五芳齋演示數據",
+  "lawfirmSeedDemoBtn": "填充青禾食品演示數據",
   "lawfirmOpenPluginBtn": "打開律所管理工作台",
   "lawfirmKpiActiveMatters": "在辦案件數",
   "lawfirmKpiPendingClearances": "待處理利衝/審批",

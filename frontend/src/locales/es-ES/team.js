@@ -145,7 +145,7 @@ export default {
   "emptyData": "Aún no hay estadísticas. Aparecerán al día siguiente de que los miembros activen el uso compartido.",
   "lawfirmDashboardTitle": "Panel de Dirección y Comité de Gestión del Despacho",
   "lawfirmDashboardDesc": "Revise los ingresos y riesgos por área de práctica, abogado responsable y abogado individual. Abra el área de trabajo del despacho para ver los detalles.",
-  "lawfirmSeedDemoBtn": "Cargar demostración de Wufangzhai",
+  "lawfirmSeedDemoBtn": "Cargar demostración de Qinghe Foods",
   "lawfirmOpenPluginBtn": "Abrir área de trabajo del despacho",
   "lawfirmKpiActiveMatters": "Asuntos activos",
   "lawfirmKpiPendingClearances": "Conflictos / Revisiones pendientes",

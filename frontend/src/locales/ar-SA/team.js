@@ -145,7 +145,7 @@ export default {
   "emptyData": "لا توجد إحصاءات بعد. تظهر في اليوم التالي لتفعيل المشاركة من قِبل الأعضاء.",
   "lawfirmDashboardTitle": "لوحة معلومات الإدارة التنفيذية ولجنة الإدارة لمكتب المحاماة",
   "lawfirmDashboardDesc": "راجع الإيرادات والمخاطر حسب فئة الممارسة والمحامي المسؤول وكل محامٍ على حدة. افتح منضدة عمل مكتب المحاماة للتفاصيل.",
-  "lawfirmSeedDemoBtn": "تعبئة البيانات التجريبية لـ Wufangzhai",
+  "lawfirmSeedDemoBtn": "تعبئة البيانات التجريبية لـ Qinghe Foods",
   "lawfirmOpenPluginBtn": "فتح منضدة عمل مكتب المحاماة",
   "lawfirmKpiActiveMatters": "القضايا النشطة",
   "lawfirmKpiPendingClearances": "تعارضات المصالح / المراجعات المعلقة",

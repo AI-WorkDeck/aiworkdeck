@@ -145,7 +145,7 @@ export default {
   "emptyData": "Статистики пока нет. Она появится на следующий день после включения обмена участниками.",
   "lawfirmDashboardTitle": "Панель руководителя и управляющего комитета юрфирмы",
   "lawfirmDashboardDesc": "Анализируйте выручку и риски по практикам, ведущим юристам и отдельным юристам. Откройте рабочее место юрфирмы для просмотра деталей.",
-  "lawfirmSeedDemoBtn": "Заполнить демоданные Wufangzhai",
+  "lawfirmSeedDemoBtn": "Заполнить демоданные Qinghe Foods",
   "lawfirmOpenPluginBtn": "Открыть рабочее место юрфирмы",
   "lawfirmKpiActiveMatters": "Активные дела",
   "lawfirmKpiPendingClearances": "Ожидают проверки конфликта интересов / согласования",

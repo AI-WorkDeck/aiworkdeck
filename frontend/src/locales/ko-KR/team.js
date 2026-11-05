@@ -146,7 +146,7 @@ export default {
   "emptyData": "아직 통계 데이터가 없습니다. 멤버가 공유를 켜면 다음 날부터 표시됩니다.",
   "lawfirmDashboardTitle": "로펌 경영진 및 운영위원회 대시보드",
   "lawfirmDashboardDesc": "업무 분야, 담당 변호사, 개별 변호사별로 수익과 리스크 현황을 요약합니다. 자세한 내역은 로펌 관리 워크벤치에서 확인하세요.",
-  "lawfirmSeedDemoBtn": "우팡자이 데모 데이터 채우기",
+  "lawfirmSeedDemoBtn": "칭허식품 데모 데이터 채우기",
   "lawfirmOpenPluginBtn": "로펌 관리 워크벤치 열기",
   "lawfirmKpiActiveMatters": "진행 중인 사건 수",
   "lawfirmKpiPendingClearances": "대기 중인 이해충돌/승인",
