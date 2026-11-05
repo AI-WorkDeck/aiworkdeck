@@ -50,6 +50,16 @@
                 >{{ $t('version.addToTeamLibrary') }}</view>
               </view>
             </template>
+            <!-- 连着多于一条云端连接被拒：就地列出这几条，律师自己断开不用的，剩一条再点「放进团队案件库」。
+                 不自动选、不自动断开（问题 126，dev-board#1713） -->
+            <view v-if="tooManyLibraries" class="collab-empty-action collab-reconnect">
+              <text class="collab-error">{{ $t('version.tooManyLibraries') }}</text>
+              <LibraryConnectionList
+                :connections="connections"
+                :official-server-url="official.serverUrl"
+                @disconnected="onLibraryDisconnected"
+              />
+            </view>
             <!-- 云端写权限门禁拒绝（kind=CLOUD_RECONNECT_REQUIRED）：原因写在这里，不只闪一下 toast；
                  重新连接要律师自己点，不自动重连（问题 126/127） -->
             <view v-if="reconnectMessage" class="collab-empty-action collab-reconnect">
@@ -278,9 +288,11 @@ import { siteBaseUrl } from '@/utils/siteLinks.js'
 import { inviteLinkFor, notFoundPresentation } from '@/utils/memberLookup.js'
 import { remoteAheadText } from '@/utils/collabWording.js'
 import { submitNeedsGuide } from '@/utils/submitGuide.js'
+import LibraryConnectionList from './LibraryConnectionList.vue'
 
 export default {
   name: 'CollabDialog',
+  components: { LibraryConnectionList },
   props: {
     visible: { type: Boolean, default: false },
     projectId: { type: [String, Number], required: true },
@@ -328,9 +340,12 @@ export default {
       avatarBroken: false,
       // 官方团队案件库（GET /api/cloud/official）。只用 available 这一位：为假（国际站）
       // 且本机也没有连接时，这份案卷放不进任何案件库，界面如实说明。地址不给律师看。
-      official: { available: false },
+      // serverUrl 只用来在「连着多个案件库」的列表里标出哪条是官方的。
+      official: { available: false, serverUrl: '' },
       // 放进案件库被云端写权限门禁拒绝时的原因（后端原话）；有值就显示「重新连接云端」
       reconnectMessage: '',
+      // 连着多于一条连接、「放进团队案件库」被拒：就地列出连接供断开
+      tooManyLibraries: false,
       ASSIGNABLE_ROLES,
     }
   },
@@ -394,6 +409,7 @@ export default {
       // 上次查的那个人不能跟着弹窗一起回来——律师会以为这是这次要加的人
       this.addContact = ''
       this.reconnectMessage = ''
+      this.tooManyLibraries = false
       this.clearCandidate()
       this.loadConnections()
       if (this.linked && this.activeTab === 'people') this.loadMembers()
@@ -419,9 +435,12 @@ export default {
       // 不拖累连接列表——本机已经连过库的人不该因为这一次读取失败就点不了「放进去」。
       try {
         const res = await getOfficialCloud()
-        this.official = { available: !!(res && res.data && res.data.available) }
+        this.official = {
+          available: !!(res && res.data && res.data.available),
+          serverUrl: (res && res.data && res.data.serverUrl) || '',
+        }
       } catch (e) {
-        this.official = { available: false }
+        this.official = { available: false, serverUrl: '' }
       }
     },
     async onShare() {
@@ -441,9 +460,10 @@ export default {
           share: shareProjectToCloud,
         })
         if (!res.ok) {
-          uni.showToast({ title: this.$t('version.tooManyLibraries'), icon: 'none' })
+          this.tooManyLibraries = true
           return
         }
+        this.tooManyLibraries = false
         uni.showToast({ title: this.$t('version.sharedToLibrary'), icon: 'none' })
         this.$emit('changed')
       } catch (e) {
@@ -468,6 +488,11 @@ export default {
       }
       await this.loadConnections()
       await this.onShare()
+    },
+    // 断开了一条：重读连接；剩不到两条就收起列表，律师自己再点「放进团队案件库」（不自动放）
+    async onLibraryDisconnected() {
+      await this.loadConnections()
+      if (this.connections.length <= 1) this.tooManyLibraries = false
     },
     openHelp() {
       this.close()

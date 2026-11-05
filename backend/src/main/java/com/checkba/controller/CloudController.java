@@ -157,6 +157,8 @@ public class CloudController {
         m.put("serverUrl", conn.getServerUrl());
         m.put("username", conn.getUsername());
         m.put("displayName", conn.getDisplayName());
+        // 连着多个案件库时界面列出每条连接供断开（问题 126），连上的时间帮律师分清是哪条
+        m.put("connectedAt", conn.getCreatedAt() == null ? null : String.valueOf(conn.getCreatedAt()));
         return m;
     }
 
