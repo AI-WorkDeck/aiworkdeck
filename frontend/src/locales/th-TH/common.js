@@ -8,6 +8,7 @@ export default {
   "cancel": "ยกเลิก",
   "save": "บันทึก",
   "close": "ปิด",
+  "done": "เสร็จสิ้น",
   "delete": "ลบ",
   "rename": "เปลี่ยนชื่อ",
   "retry": "ลองอีกครั้ง",

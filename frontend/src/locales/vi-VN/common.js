@@ -8,6 +8,7 @@ export default {
   "cancel": "Hủy",
   "save": "Lưu",
   "close": "Đóng",
+  "done": "Xong",
   "delete": "Xóa",
   "rename": "Đổi tên",
   "retry": "Thử lại",

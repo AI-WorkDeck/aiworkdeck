@@ -230,7 +230,7 @@
             <view v-if="!clientInviteCode" class="workdeck-btn workdeck-btn-primary" @tap="generateClientCode" :class="{ disabled: loading }">
                 {{ loading ? $t('version.generatingEllipsis') : $t('version.generateAccessCode') }}
             </view>
-            <view v-else class="workdeck-btn workdeck-btn-primary" @tap="close">{{ $t('version.finish') }}</view>
+            <view v-else class="workdeck-btn workdeck-btn-primary" @tap="close">{{ $t('common.done') }}</view>
         </block>
       </view>
     </view>

@@ -8,6 +8,7 @@ export default {
   "cancel": "취소",
   "save": "저장",
   "close": "닫기",
+  "done": "완료",
   "delete": "삭제",
   "rename": "이름 바꾸기",
   "retry": "재시도",
