@@ -551,9 +551,10 @@ public class MobileTransferService {
         }
         // 写 blob 期间可能被 cancel 抢先提交（已退款置 FAILED）：条件更新只在仍是 PENDING 时落 STAGED
         if (repository.stageIfPending(row.getId(), stored.locator(), stored.size(), LocalDateTime.now()) == 0) {
-            blobStore.deleteQuietly(stored.locator());
             MobileTransferRequest current = repository.findById(row.getId()).orElse(null);
-            if (current != null && STATUS_STAGED.equals(current.getStatus())) return; // 并发重传已落好，幂等
+            // 并发重传已落好，幂等；locator 由 requestId 决定、与赢家同一个，不能删
+            if (current != null && STATUS_STAGED.equals(current.getStatus())) return;
+            blobStore.deleteQuietly(stored.locator());
             throw new IllegalArgumentException(LangText.of("该请求当前状态不接受上传", "This request does not accept an upload now"));
         }
     }

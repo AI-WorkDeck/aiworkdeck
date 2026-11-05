@@ -662,8 +662,9 @@ public class MobileRelayClientService {
 
     // 本次运行的收件记录：只保留最近 100 件，不持久化第二套文件台账。
     private final AtomicBoolean inboxRunning = new AtomicBoolean(false);
-    /** 收件箱/传输命令下载响应体的读取期限：ofInputStream 拿到响应头后 HttpRequest.timeout 不再约束读取，卡住的下载会让 inboxRunning 永远不释放。 */
-    Duration inboxBodyDeadline = Duration.ofMinutes(10);
+    /** 收件箱/传输命令下载响应体的读取期限：ofInputStream 拿到响应头后 HttpRequest.timeout 不再约束读取，卡住的下载会让 inboxRunning 永远不释放。
+     *  这是整次下载的总期限而非空闲期限：按 200MB 上限留到 30 分钟（约 110KB/s），免得慢网络上的正常大文件每轮都被掐断。 */
+    Duration inboxBodyDeadline = Duration.ofMinutes(30);
     private final Map<Long, Map<String, Object>> receiptItems = new LinkedHashMap<>();
     private String receiptAccount;
     private volatile String inboxAccount;
