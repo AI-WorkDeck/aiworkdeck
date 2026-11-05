@@ -79,8 +79,10 @@ class AuthControllerPhoneGateTest {
                                              PhoneLoginGuard phoneLoginGuard,
                                              DeviceTokenService deviceTokenService,
                                              MailAuthService mailAuthService) {
+        AuthAbuseGuard abuseGuard = mock(AuthAbuseGuard.class);
+        when(abuseGuard.loginLock(any(), any())).thenReturn(new Object());
         return new AuthController(userService, null, null, deviceTokenService,
-                mock(AuthAbuseGuard.class), null, null, mailAuthService, null, sessions,
+                abuseGuard, null, null, mailAuthService, null, sessions,
                 false, phoneLoginGuard,
                 mock(com.checkba.service.account.AccountDeletionService.class), null);
     }
