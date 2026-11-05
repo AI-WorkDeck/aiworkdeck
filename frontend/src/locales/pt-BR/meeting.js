@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "Falante {n}",
   "speakerNamePlaceholder": "Nome do Falante {n}",
   "generateMinutes": "Gerar Ata",
+  "generateInterview": "Gerar Termo de Entrevista",
   "sendingToAi": "Enviando para a IA...",
   "generateMinutesFailed": "Não foi possível gerar a ata: {message}",
   "exportTranscript": "Exportar Transcrição",

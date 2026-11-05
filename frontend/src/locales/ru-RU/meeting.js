@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "Спикер {n}",
   "speakerNamePlaceholder": "Имя для Спикера {n}",
   "generateMinutes": "Создать протокол встречи",
+  "generateInterview": "Создать протокол опроса",
   "sendingToAi": "Передача ИИ...",
   "generateMinutesFailed": "Не удалось создать протокол: {message}",
   "exportTranscript": "Экспортировать расшифровку",

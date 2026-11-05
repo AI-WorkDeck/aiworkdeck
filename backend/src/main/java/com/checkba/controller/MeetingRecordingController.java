@@ -264,6 +264,7 @@ public class MeetingRecordingController {
     @PostMapping("/{meetingId}/minutes-prompt")
     public Map<String, Object> minutesPrompt(
             @PathVariable Long meetingId,
+            @RequestParam(value = "format", required = false) String format,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         requireMemberByMeeting(sessionId, meetingId);
         MeetingRecording meeting = meetingService.get(meetingId);
@@ -271,7 +272,10 @@ public class MeetingRecordingController {
             throw new IllegalArgumentException(LangText.of("转写完成后才能生成纪要", "Minutes can only be generated after the transcription is finished"));
         }
         Map<String, Object> result = new HashMap<>();
-        result.put("prompt", meetingService.buildMinutesKickoffPrompt(meeting));
+        // format=interview：同一链路改出访谈笔录（问题 31）；缺省仍是会议纪要
+        result.put("prompt", "interview".equals(format)
+                ? meetingService.buildInterviewKickoffPrompt(meeting)
+                : meetingService.buildMinutesKickoffPrompt(meeting));
         return result;
     }
 

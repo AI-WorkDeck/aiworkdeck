@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "ผู้พูด {n}",
   "speakerNamePlaceholder": "ชื่อของผู้พูด {n}",
   "generateMinutes": "สร้างรายงานการประชุม",
+  "generateInterview": "สร้างบันทึกการสัมภาษณ์",
   "sendingToAi": "กำลังส่งต่อให้ AI...",
   "generateMinutesFailed": "ไม่สามารถสร้างรายงานการประชุมได้: {message}",
   "exportTranscript": "ส่งออกบทถอดความ",

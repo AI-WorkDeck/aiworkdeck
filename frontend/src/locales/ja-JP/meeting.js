@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "話者{n}",
   "speakerNamePlaceholder": "話者{n}の名前",
   "generateMinutes": "議事録を生成",
+  "generateInterview": "聴取記録を生成",
   "sendingToAi": "AIに処理を引き継いでいます...",
   "generateMinutesFailed": "議事録を生成できませんでした：{message}",
   "exportTranscript": "文字起こしをエクスポート",

@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "Konuşmacı {n}",
   "speakerNamePlaceholder": "Konuşmacı {n} için ad",
   "generateMinutes": "Tutanak Oluştur",
+  "generateInterview": "Görüşme Tutanağı Oluştur",
   "sendingToAi": "Yapay zekâya aktarılıyor...",
   "generateMinutesFailed": "Tutanak oluşturulamadı: {message}",
   "exportTranscript": "Transkripti Dışa Aktar",

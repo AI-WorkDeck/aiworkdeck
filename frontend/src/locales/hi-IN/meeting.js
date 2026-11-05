@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "वक्ता {n}",
   "speakerNamePlaceholder": "वक्ता {n} का नाम",
   "generateMinutes": "मीटिंग कार्यवृत्त बनाएँ",
+  "generateInterview": "साक्षात्कार अभिलेख बनाएँ",
   "sendingToAi": "AI को सौंपा जा रहा है...",
   "generateMinutesFailed": "कार्यवृत्त नहीं बनाया जा सका: {message}",
   "exportTranscript": "ट्रांसक्रिप्ट एक्सपोर्ट करें",
