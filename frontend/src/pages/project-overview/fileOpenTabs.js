@@ -1009,7 +1009,7 @@ export const fileOpenTabsMethods = {
             if (names.length) throw new Error(this.$t('editor.compare.failChanged', { name: names[0] }))
           },
           acquireEngine: async () => {
-            engineHandle = await this.acquireLibreHiddenInstance()
+            engineHandle = await this.acquireLibreHiddenInstance({ isCancelled: () => !isCurrent() })
             if (!isCurrent()) releaseOnce()
             return engineHandle
           },

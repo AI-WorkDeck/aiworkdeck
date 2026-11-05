@@ -26,8 +26,13 @@ export async function sha256Hex(bytes) {
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+// 导出阶段的兜底上限（教程问题 88，dev-board#1713）。#1123 的 2000 页样本导出约 15 秒，
+// 5 分钟只拦「引擎没死也不回话」的永久等待；原生比较（build）阶段仍按 #1123 不设截止，
+// 由对话框 5 分钟无进展提示 + 取消兜底——密集大文档的原生比较本身可能超过 5 分钟。
+export const EXPORT_STAGE_TIMEOUT_MS = 5 * 60 * 1000
+
 // deps: { source, target, name, authorName, t, onStage, isCancelled, fetchBytes,
-//         recheckClean, acquireEngine, releaseEngine, saveFile }
+//         recheckClean, acquireEngine, releaseEngine, saveFile, exportTimeoutMs? }
 // 返回 saveFile 落成的 ProjectFile；任何失败 throw（err.cancelled=true 表示用户作废）。
 export async function runDocxComparison(deps) {
   const t = deps.t || ((k) => k)
@@ -89,7 +94,17 @@ export async function runDocxComparison(deps) {
     if (!built || built.success !== true) throw new Error(t('editor.compare.failBuild'))
     guard()
     if (deps.onStage) deps.onStage('exporting')
-    const exported = await run('export_document', { name: deps.name })
+    let exportTimer = null
+    const exportTimeout = new Promise((_, reject) => {
+      exportTimer = setTimeout(() => reject(new Error(t('editor.compare.failTimeout'))),
+        deps.exportTimeoutMs ?? EXPORT_STAGE_TIMEOUT_MS)
+    })
+    let exported
+    try {
+      exported = await Promise.race([run('export_document', { name: deps.name }), exportTimeout])
+    } finally {
+      clearTimeout(exportTimer)
+    }
     const bytes = exported && (exported.bytes || exported.data)
     if (!exported || exported.success === false || !bytes || !(bytes.byteLength || bytes.length)) {
       throw new Error(t('editor.compare.failExport'))
