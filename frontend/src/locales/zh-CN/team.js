@@ -216,15 +216,17 @@ export default {
 
   // ---- 团队 · 本周 ----
   weekTitle: "团队 · 本周",
+  weekTitleLastWeek: "团队 · 上周",
   weekSubtitle: "数据来自每位成员的工作记录，无需填报",
   weekBandLight: "有余力",
   weekBandBalanced: "适中",
   weekBandBusy: "忙碌",
-  weekBandNoData: "周一暂无可比数据",
   weekDataThrough: "数据截至昨天：成员的工作记录每天自动上报一次",
+  weekLastWeekNote: "本周还没有过完的工作日，先看上周（周一至周五）",
   weekKpiProjects: "进行中项目",
   weekKpiProjectsCaption: "最近 7 天有投入时间的项目",
   weekKpiHours: "本周自动记录工时",
+  weekKpiHoursLastWeek: "上周自动记录工时",
   weekKpiHoursCaption: "由客户端自动记录的活跃时长",
   weekKpiAiEdits: "AI 修订次数",
   weekKpiAiEditsCaption: "最近 7 天保留在文档中的 AI 修改次数，不是文档篇数",

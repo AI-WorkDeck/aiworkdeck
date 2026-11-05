@@ -276,6 +276,7 @@
             <TeamWeekBoard
               v-if="scope === 'team' && range === 7"
               :summary="summary"
+              :last-week-members="lastWeekMembers"
               :my-role="myRole"
               :can-edit-title="canManage"
               @edit-title="onEditTitle"
@@ -631,6 +632,7 @@ import AwdSelect from '@/components/AwdSelect.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
 import TeamWeekBoard from './TeamWeekBoard.vue'
+import { boardWeek } from '@/utils/teamWeek.js'
 import {
   getAccountStatus,
   getTeam, createTeam, updateTeam,
@@ -678,6 +680,8 @@ export default {
       firm: null,
       summary: null,
       range: 7,
+      // 周一看板改看上周一至周五（utils/teamWeek.js boardWeek），7 天档够不着上周一，另取 30 天档的成员日数据
+      lastWeekMembers: null,
       // 看板视角。入所之后才有「全所」这回事；能不能看由官网按角色判
       scope: 'team',
       // available 初值刻意是 undefined 而不是 true/false：还没问过后端时既不该
@@ -987,6 +991,17 @@ export default {
         }
       } catch (e) {
         this.summary = null
+      }
+      this.lastWeekMembers = null
+      if (this.scope === 'team' && this.range === 7 && boardWeek(new Date()).lastWeek) this.loadLastWeekMembers()
+    },
+    async loadLastWeekMembers() {
+      try {
+        const data = await getTeamSummary(30, 'team')
+        this.lastWeekMembers = data && Array.isArray(data.members) ? data.members : null
+      } catch (e) {
+        // 取不到就退回 7 天档那份：上周一那格会是空的，但看板照常可用
+        this.lastWeekMembers = null
       }
     },
     setRange(days) {
