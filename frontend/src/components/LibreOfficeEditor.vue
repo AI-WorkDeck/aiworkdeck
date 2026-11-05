@@ -2649,7 +2649,7 @@ export default {
           // 保存序号围栏（B7）：同一编辑器实例的会话 id + 单调序号。结果不明的旧上传若迟到，
           // 后端在内容锁内发现本会话已落过更大的序号，回 409 STALE_SAVE 且一个字节都不写——
           // 失败后才能安全地自动重存当前（更新的）内容。走查询参数（同 mustExist），旧后端直接忽略。
-          if (!this._saveSessionId) this._saveSessionId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12)
+          if (!this._saveSessionId) this._saveSessionId = globalThis.crypto.randomUUID()
           this._saveSeq = (this._saveSeq || 0) + 1
           const url = getFileWriteUrl(fileId) + '?' + (mustExist ? 'mustExist=1&' : '') +
             'saveSession=' + encodeURIComponent(this._saveSessionId) + '&saveSeq=' + this._saveSeq
