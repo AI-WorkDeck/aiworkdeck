@@ -72,7 +72,7 @@ public class AliyunOcrClient {
             raw = resp.getBody().getData().toString();
         }
 
-        return new OcrResult(text, raw);
+        return new OcrResult(OcrResult.lines(raw, text), raw);
     }
 }
 
