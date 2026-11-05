@@ -113,6 +113,7 @@ export default {
   recentProjectsLoadFailed: 'Failed to load — tap to retry',
   projectHome: 'Project Overview',
   allProjects: 'All Projects…',
+  closeProject: "Close Project",
   statusInProgress: 'In Progress',
   collab: 'Collaboration',
   managerLabel: 'Lead: {name}',
@@ -405,7 +406,9 @@ export default {
   },
   welcome: {
     quickChatPlaceholder: 'Ask a question and press Enter to start a scratch chat…',
+    quickChatPlaceholderInProject: "Ask a question and press Enter to start a new chat in this project…",
     enterChatMode: 'Start scratch chat',
+    newChatInProject: "New Chat in This Project",
     quickNewDocx: 'New blank document',
     quickNewMd: 'New Markdown',
     quickChatSend: 'Send',

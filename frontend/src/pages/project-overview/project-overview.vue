@@ -69,6 +69,10 @@
               <view class="switcher-item switcher-all" @tap="goAllProjects">
                 <text>{{ $t('workbench.allProjects') }}</text>
               </view>
+              <!-- 问题 14：切换器里也能关项目，执行与菜单「文件 > 关闭项目」同一条 app:closeProject -->
+              <view v-if="hasNamedProject" class="switcher-item switcher-close" @tap="closeProjectFromSwitcher">
+                <text>{{ $t('workbench.closeProject') }}</text>
+              </view>
             </view>
             <view v-if="isScratchWorkspace" class="scratch-promote-btn" @click="handlePromoteScratchWorkspace">{{ $t('workbench.chatMode.promoteAction') }}</view>
             <view v-if="isScratchWorkspace" class="scratch-promote-btn" @click="openScratchTransfer">{{ $t('workbench.scratchCopyTitle') }}</view>
@@ -2572,6 +2576,7 @@ import {
   hasNonWelcomeOpenTabs,
   isScratchProject,
   normalizeViewMode,
+  promoteScratchDefaultName,
   resolveInitialViewMode,
   shouldShowChatCanvas,
 } from './chatMode.js'
@@ -5020,6 +5025,11 @@ export default {
     goAllProjects() {
       this.projectSwitcherOpen = false
       this.openProjectsPane()
+    },
+    // 切换器底部「关闭项目」：先落盘，再走菜单同一条命令 file.closeProject（app:closeProject）
+    async closeProjectFromSwitcher() {
+      this.projectSwitcherOpen = false
+      await this.runWelcomeCommand('file.closeProject')
     },
     // 日程（命令「日程」、账户下拉「我的日程」）：中栏日程标签（dev-board#1048），不再离开工作台
     goCalendar() {
@@ -8820,11 +8830,18 @@ export default {
 
     async handleWelcomeStartChat(payload = {}) {
       const prompt = (payload && payload.prompt ? String(payload.prompt) : '').trim()
+      // 问题 13：项目已打开时，欢迎页提问 =「在本项目新建对话」，不能续到项目里正在进行的那段对话
+      const newChatInProject = this.hasNamedProject
       const switched = await this.switchViewMode('chat', { openCanvas: false })
       if (!switched) return
       await this.$nextTick()
       for (let i = 0; i < 30 && !this.$refs.chatInterface?.sendQuickPrompt; i++) {
         await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+      if (newChatInProject) {
+        // 「恢复上次那段对话」也别在这之后再把旧会话拉回来
+        this.restoredLastConversation = true
+        this.handleChatSidebarNewChat()
       }
       if (payload.model) this.$refs.chatInterface?.selectModel?.(payload.model)
       if (prompt) {
@@ -8894,7 +8911,14 @@ export default {
     async handlePromoteScratchWorkspace() {
       if (!this.isScratchWorkspace) return
       this.showPromoteScratchModal = true
-      this.promoteScratchName = this.project?.name || ''
+      // 预填当前对话的标题，取不到再回落项目名；不再预填「临时项目」（问题 19）
+      const activeConversationId = this.$refs.chatInterface?.currentConversationId || this.currentConversationId
+      const activeChat = activeConversationId ? this.chatHistoryList.find((c) => c.conversationId === activeConversationId) : null
+      this.promoteScratchName = promoteScratchDefaultName({
+        conversationTitle: activeChat && activeChat.title,
+        projectName: this.project?.name,
+        extraDefaultNames: [this.$t('workbench.chatMode.scratchTitle')],
+      })
       const modal = await new Promise((resolve) => {
         uni.showModal({
           title: this.$t('workbench.chatMode.promoteTitle'),

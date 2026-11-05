@@ -110,6 +110,7 @@ export default {
   "recentProjectsLoadFailed": "Не удалось загрузить — нажмите, чтобы повторить",
   "projectHome": "Обзор проекта",
   "allProjects": "Все проекты…",
+  "closeProject": "Закрыть проект",
   "statusInProgress": "В процессе",
   "collab": "Совместная работа",
   "managerLabel": "Руководитель: {name}",
@@ -374,7 +375,9 @@ export default {
   },
   "welcome": {
     "quickChatPlaceholder": "Введите вопрос и нажмите Enter, чтобы начать быстрый чат…",
+    "quickChatPlaceholderInProject": "Задайте вопрос и нажмите Enter, чтобы начать новый чат в этом проекте…",
     "enterChatMode": "Начать быстрый чат",
+    "newChatInProject": "Новый чат в этом проекте",
     "quickNewDocx": "Новый пустой документ",
     "quickNewMd": "Новый документ Markdown",
     "quickChatSend": "Отправить"
