@@ -938,6 +938,7 @@ export default {
     local: '仅本地补全 · Tab 接受 · Esc 关闭',
     empty: '暂无本地候选，常用内容会随写作积累。',
     enabled: '自动语义补全',
+    localAuto: '输入时自动显示本地候选',
     disable: '关闭自动补全',
     preferenceFailed: '设置未能保存，仍保持原状态，请重试。',
     semantic: '建议续写',
