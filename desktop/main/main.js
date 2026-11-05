@@ -440,6 +440,18 @@ function applyNativeTheme(mode) {
   try { return { systemDark: !!nativeTheme.shouldUseDarkColors } } catch (e) { return { systemDark: false } }
 }
 
+function readMainWindowState() {
+  try { return getPrefs().get(require('./window-state').PREF_KEY, null) } catch (e) { return null }
+}
+
+function saveMainWindowState() {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    const ws = require('./window-state')
+    getPrefs().set(ws.PREF_KEY, ws.captureWindowState(mainWindow))
+  } catch (e) { /* 记不住不影响退出 */ }
+}
+
 function createMainWindow() {
   // 启动链、Dock 激活共用此入口，不能覆盖仍在使用的主窗引用（#455）。
   if (mainWindow && !mainWindow.isDestroyed()) return mainWindow
@@ -452,9 +464,12 @@ function createMainWindow() {
   // 裸常量会让窗口一出生就比屏幕大，只能靠「窗口 → 缩放」救回来。
   // workAreaSize 已经扣掉菜单栏/Dock，不要再自行减。
   const workArea = screen.getPrimaryDisplay().workAreaSize
+  // 记住上次的大小 / 位置 / 最大化（问题 18）；记录不在任何显示器上时退回默认尺寸
+  const restored = require('./window-state').restoreWindowOptions(
+    readMainWindowState(), screen.getAllDisplays(),
+    { width: Math.min(1400, workArea.width), height: Math.min(900, workArea.height) })
   mainWindow = new BrowserWindow({
-    width: Math.min(1400, workArea.width),
-    height: Math.min(900, workArea.height),
+    ...restored.bounds,
     icon: path.join(__dirname, '../../frontend/src/static/icon.png'),
     // 首屏白闪修复（dev-board#731）：Electron 默认白底，页面加载完成前会露出。
     // 取值与 design/tokens/awd-palette.json 的 roles.light.bg / roles.dark.bg 一致。
@@ -600,9 +615,13 @@ function createMainWindow() {
     // ignore
   }
 
+  // 启动时恢复用户上次手动最大化的状态（问题 18）——唯一一处打在主窗口上的几何 setter
+  if (restored.maximized) mainWindow.maximize()
+
   const createdWindow = mainWindow
   let closePreparationPending = false
   createdWindow.on('close', (event) => {
+    saveMainWindowState()
     if (quitInProgress && !services) return
     event.preventDefault()
     if (quitInProgress || closePreparationPending) return
@@ -2082,6 +2101,7 @@ app.on('before-quit', async (e) => {
       // ① 先记账：下次再出现「应用自己消失了」，能直接从 desktop.log 读出退出起点与耗时，
       //    不用再去反推 macOS 统一日志（dev-board#602 那次就是这么查的）。
       logDesktopEvent('quit-begin', { pid: process.pid })
+      saveMainWindowState()
       backendSupervisor?.stop()
       // ② 立刻把窗口藏掉。preventDefault 之后停服务要好几秒，原来这段时间里窗口
       //    完全可用、还能建 SSE 发新请求，然后整个应用在同一瞬间消失——用户看到的

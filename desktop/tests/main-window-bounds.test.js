@@ -66,6 +66,9 @@ test('工作区尺寸在 new BrowserWindow 之前就取好', () => {
 // 主窗口的别名（mainWindow / win / …）一律不在名单里——加了新别名就会红，
 // 这是刻意的：请先想清楚是谁触发这次回写。
 const GEOMETRY_RECEIVERS_OK = new Set(['view', 'views', 'ocrSelectWin', 'confirmWin', 'verifyWin', 'helperWindow'])
+// 唯一一处有答案的主窗口回写：启动时恢复用户上次手动最大化的状态（问题 18，触发者 = 上次的用户操作；
+// 大小 / 位置走 new BrowserWindow 的构造参数，不经 setter）。
+const MAIN_WINDOW_SETTERS_OK = new Set(['main.js: mainWindow.maximize()'])
 const GEOMETRY_SETTERS = 'setBounds|setSize|setContentBounds|setContentSize'
   + '|setMinimumSize|setMaximumSize|maximize|unmaximize|setFullScreen'
 
@@ -93,7 +96,9 @@ test('主进程里没有任何打在主窗口上的几何 setter', () => {
     let m
     while ((m = re.exec(code))) {
       if (GEOMETRY_RECEIVERS_OK.has(m[1])) continue
-      offenders.push(path.basename(file) + ': ' + m[1] + '.' + m[2] + '()')
+      const hit = path.basename(file) + ': ' + m[1] + '.' + m[2] + '()'
+      if (MAIN_WINDOW_SETTERS_OK.has(hit)) continue
+      offenders.push(hit)
     }
   }
   assert.deepStrictEqual(offenders, [],
