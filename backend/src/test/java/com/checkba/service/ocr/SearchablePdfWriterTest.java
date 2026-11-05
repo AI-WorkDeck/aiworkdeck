@@ -166,4 +166,22 @@ class SearchablePdfWriterTest {
             }
         }
     }
+
+    @Test
+    void fontsThatShareGlyphsWithRadicalsAreDetected() throws Exception {
+        var pages = List.of(new SearchablePdfWriter.PageText(595, 842,
+                List.of(new SearchablePdfWriter.Line("甲方乙方 Party", 0, 0, 100, 20))));
+        try (PDDocument doc = new PDDocument()) {
+            assertEquals("", SearchablePdfWriter.aliasedCharacters(font(doc), pages), "Latin font has no aliases");
+        }
+        org.junit.jupiter.api.Assumptions.assumeTrue(CJK.isFile(), "needs the macOS STHeiti collection");
+        try (PDDocument doc = new PDDocument();
+             var collection = new org.apache.fontbox.ttf.TrueTypeCollection(CJK)) {
+            org.apache.fontbox.ttf.TrueTypeFont[] first = new org.apache.fontbox.ttf.TrueTypeFont[1];
+            collection.processAllFonts(f -> { if (first[0] == null) first[0] = f; });
+            String aliased = SearchablePdfWriter.aliasedCharacters(PDType0Font.load(doc, first[0], true), pages);
+            assertTrue(aliased.contains("方"), "方 shares its glyph with the radical U+2F45: " + aliased);
+            assertFalse(aliased.contains("甲"));
+        }
+    }
 }

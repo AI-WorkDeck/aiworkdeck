@@ -64,7 +64,7 @@ public class PdfCloudOcrService {
         }
     }
 
-    private static boolean isWhite(java.awt.image.BufferedImage image) {
+    static boolean isWhite(java.awt.image.BufferedImage image) {
         for (int y = 0; y < image.getHeight(); y++)
             for (int x = 0; x < image.getWidth(); x++)
                 if ((image.getRGB(x, y) & 0xffffff) != 0xffffff) return false;
