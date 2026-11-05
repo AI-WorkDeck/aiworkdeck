@@ -4067,6 +4067,8 @@ function installContextMenuInterceptor(controller) {
 // seed scaffolding text here — earlier dev-prototype seed text would otherwise
 // show through whenever a real load was skipped/failed, looking like the editor
 // loaded the wrong content.
+// 备胎引擎开机时的空白文档；warm_engine 只在它还挂着时运行，换上真文档后一律跳过。
+let bootBlankModel = null;
 function bootDoc(initialDocument = false) {
   context = zetajs.getUnoComponentContext();
   desktop = css.frame.Desktop.create(context);
@@ -4074,6 +4076,7 @@ function bootDoc(initialDocument = false) {
   // normal load_document path; ui_ready belongs to that successful first model.
   if (initialDocument) { log('等待首个真实文档 / waiting for first document'); return; }
   xModel = desktop.loadComponentFromURL('private:factory/swriter', '_default', 0, []);
+  bootBlankModel = xModel;
   ctrl = xModel.getCurrentController();
   installReviewCommentInterceptor(ctrl);
   installContextMenuInterceptor(ctrl);
@@ -6719,6 +6722,21 @@ const EXEC = {
   // The filter names in IMPORT_FILTERS are the registry FilterNames, valid for
   // BOTH directions for these formats (e.g. 'MS Word 2007 XML' imports AND
   // exports .docx).
+  // [预热] 备胎空闲时把空白文档导出成 docx 再装回来一次（0.81「秒开」）。
+  // 真机实测：一个引擎装第一份文档要多花约 1.3s 一次性初始化（与格式无关：先装 pptx，
+  // 再装 docx 也快），之后每份只要 0.4s 左右；而每份文档都开在新的备胎上，于是每次
+  // 打开都付这 1.3s。备胎空闲时先付掉，用户点开时就是「第二份文档」的速度。
+  // 只在空白开机文档上做；导出→装回不经宿主保存链路，也不留 modified。
+  warm_engine() {
+    if (!xModel || xModel !== bootBlankModel || !isWriterDoc()) return { success: true, skipped: true };
+    const t0 = performance.now();
+    const ex = EXEC.export_document({ name: 'warm.docx' });
+    if (!ex || !ex.success) return { success: false, message: (ex && ex.message) || 'warm export failed' };
+    const r = EXEC.load_document({ name: 'warm.docx', bytes: ex.bytes });
+    try { if (xModel && xModel.isModified()) xModel.setModified(false); } catch (e) { /* ignore */ }
+    log('warm_engine: 预热完成 / warmed in ' + Math.round(performance.now() - t0) + 'ms');
+    return { success: !!(r && r.success), ms: Math.round(performance.now() - t0) };
+  },
   export_document(p) {
     const name = String(p && p.name || 'document.docx');
     const m = name.match(/\.([A-Za-z0-9]+)$/);
