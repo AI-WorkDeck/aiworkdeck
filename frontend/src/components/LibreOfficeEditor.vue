@@ -481,6 +481,7 @@ export default {
       if (newFile?.id !== oldFile?.id) this.invalidateBackendSaveHint()
       if (!newFile || oldFile) return
       this._adoptedSpare = true
+      this._perfOpenAt = Date.now()
       this.prefetchBytes()
       if (!this._endpointUp) return
       this.ready = false
@@ -520,6 +521,9 @@ export default {
     },
   },
   async mounted() {
+    // 性能埋点（0.81「秒开秒存」）：从挂载 / 备胎过继起算到 ready，一行 [perf] 日志，
+    // 真机基准脚本按这一行取数；不上报、不进遥测。
+    this._perfOpenAt = Date.now()
     this.watchBackendHealth()
     this._onEvidenceDragStart = () => {
       this.evidenceDropArmed = true
@@ -1654,6 +1658,11 @@ export default {
       clearInterval(this._bootTimer)
       this.ready = true
       if (!this.statusKey.endsWith('Failed')) this.statusKey = 'ready'
+      if (this._perfOpenAt && this._perfLoad) {
+        this.appendLog('[perf] open kind=' + (this.docKind || '?') + ' bytes=' + this._perfLoad.bytes +
+          ' path=' + (this._adoptedSpare ? 'spare' : 'cold') + ' load=' + this._perfLoad.ms + 'ms ready=' + (Date.now() - this._perfOpenAt) + 'ms')
+        this._perfOpenAt = 0
+      }
       this.$emit('ready', this.executor)
       // EvidenceLink 首轮：拉缓存 → 旧式链接收编书签（仅 writer）→ 核对锚点。
       // 不 await：核对是后台事，不能拖住 ready 之后的任何链路。
@@ -1921,6 +1930,7 @@ export default {
       } finally {
         if (this._loadInFlight === inflight) this._loadInFlight = null
       }
+      this._perfLoad = { ms: Date.now() - t0, bytes: bytes.length }
       this.appendLog('  ← ' + (Date.now() - t0) + 'ms ' + JSON.stringify(res))
       if (!res || !res.success) throw Object.assign(new Error((res && res.message) || 'load_document returned no success'), { code: res?.code })
       assertCurrentGeneration()
@@ -2629,6 +2639,7 @@ export default {
         if (this._reloading || this._saveDiscarded || checkpointSaveBarrier(this.projectId, fileId) ||
             documentCheckpointGeneration(this.projectId, fileId) !== generation) return false
         this.appendLog('  ← exported ' + u8.length + ' bytes, uploading…')
+        const tUpload = Date.now()
         // mustExist=1（BUG-14 / v0.49.0 C4-03）：这份文件磁盘上本来就有（元数据非空，或本会话
         // 已经存过一次），目标路径不在了只能是被外部改名 / 移走——后端据此回 409，
         // 而不是在旧路径把旧文件名重新建出来。新建空白文档的第一笔不带：那时它还不在磁盘上。
@@ -2684,6 +2695,7 @@ export default {
           try { uni.$emit('awd:file-saved', { projectId: saveProjectId, fileId }) } catch (e) { /* ignore */ }
         }
         this.appendLog('  ← saved to backend (fileId=' + fileId + ')')
+        this.appendLog('[perf] save bytes=' + (u8 ? u8.length : 0) + ' export=' + (tUpload - tExp) + 'ms upload=' + (Date.now() - tUpload) + 'ms total=' + (Date.now() - tExp) + 'ms')
         this._savePaused = false
         this._saveRetryAttempt = 0
         this._exportUnsettled = false
