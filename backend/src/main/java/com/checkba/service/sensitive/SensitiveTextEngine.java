@@ -138,7 +138,21 @@ public final class SensitiveTextEngine {
             }
         });
         // Custom overrides first, then longer entities (company before fragments / overlapping numeric rules).
-        hits.sort(Comparator.<Hit>comparingInt(h -> h.code.equals("CUSTOM") ? 0 : 1)
+        // Exception (dev-board#1713 #95): an entity that fully contains a custom word and only
+        // touches custom words it contains goes before them, so 「华晟」 does not cut
+        // 「深圳华晟科技有限公司」 apart. A partial overlap still lets the custom word win.
+        Set<Hit> wrapping = new HashSet<>();
+        for (Hit hit : hits) {
+            if (hit.code.equals("CUSTOM")) continue;
+            boolean contains = false, crosses = false;
+            for (Hit custom : hits) {
+                if (!custom.code.equals("CUSTOM") || custom.end <= hit.start || custom.start >= hit.end) continue;
+                if (hit.start <= custom.start && custom.end <= hit.end && hit.end - hit.start > custom.end - custom.start) contains = true;
+                else crosses = true;
+            }
+            if (contains && !crosses) wrapping.add(hit);
+        }
+        hits.sort(Comparator.<Hit>comparingInt(h -> wrapping.contains(h) ? 0 : h.code.equals("CUSTOM") ? 1 : 2)
                 .thenComparing(Comparator.comparingInt((Hit h) -> h.end - h.start).reversed())
                 .thenComparingInt(Hit::start).thenComparing(Hit::code));
         BitSet occupied = new BitSet(text.length());
