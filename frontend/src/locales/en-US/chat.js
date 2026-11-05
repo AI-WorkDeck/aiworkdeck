@@ -288,6 +288,7 @@ export default {
   memoryRevision: 'Revision {revision}',
   memoryUnknownTime: 'Unknown update time',
   memoryReadOnly: 'You can view this scope, but you do not have permission to edit it.',
+  memoryRememberHint: 'The topic list is maintained automatically. To delete a topic, select that topic and delete it.',
   memoryConflict: 'A newer server version exists. Review it before choosing which version to keep.',
   memoryUseServer: 'Use server version',
   memorySaveMine: 'Save my version',
