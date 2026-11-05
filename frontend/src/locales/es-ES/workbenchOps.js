@@ -65,5 +65,21 @@ export default {
   "clipboardRecordFailed": "Error al registrar el portapapeles",
   "fileCaptureFailed": "Error al registrar el archivo",
   "fileMoveOccupied": "Puede que este archivo esté en uso y no se pudo mover",
-  "filesMoveOccupiedCount": "Puede que {count} archivo(s) estén en uso y no se pudieron mover"
+  "filesMoveOccupiedCount": "Puede que {count} archivo(s) estén en uso y no se pudieron mover",
+  "ocrProgress": "Reconociendo {index}/{total}",
+  "ocrCancel": "Cancelar",
+  "ocrCancelling": "Cancelando…",
+  "ocrBatchBusy": "Ya hay un lote en curso; espere o cancélelo",
+  "ocrConsentTitle": "¿Usar el reconocimiento en la nube?",
+  "ocrConsentHint": "Los PDF con capa de texto se extraen directamente, sin subirlos ni cobrar; solo los escaneos e imágenes necesitan OCR en la nube. Esta confirmación solo vale para este lote; cámbielo a «siempre en la nube» o «solo local» en Ajustes → Cuenta y uso → Reconocimiento de escaneos.",
+  "ocrConsentCheck": "Entiendo adónde van los datos y cómo se cobra",
+  "ocrConsentConfirm": "Iniciar",
+  "ocrCopied": "Texto de {count} archivo(s) copiado y guardado en el historial del portapapeles",
+  "ocrSaved": "Creado: {names}",
+  "ocrOthersNotOpened": "No abiertos en paralelo: {names}",
+  "ocrLocalOnly": "El reconocimiento está en «solo local»; imágenes y escaneos no se subieron (cámbielo en Ajustes)",
+  "ocrFailedItem": "«{name}» no completado: {reason}",
+  "ocrSkipped": "{count} archivo(s) que requieren OCR en la nube omitidos (sin confirmar)",
+  "ocrCancelled": "Cancelado; {count} archivo(s) sin procesar",
+  "ocrSummaryTitle": "Reconocidos {done}/{total}"
 }

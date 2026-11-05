@@ -153,5 +153,10 @@ export default {
   "importDropPrepareFailed": "드롭된 파일을 준비할 수 없습니다. 컴퓨터에 저장한 후 다시 시도해 주세요.",
   "importDropTooLarge": "로컬 경로가 없는 파일은 한 번에 최대 100MB까지 드롭할 수 있습니다. 먼저 컴퓨터에 저장해 주세요.",
   "importDesktopOnly": "드래그하여 가져오기는 데스크톱에서만 지원됩니다",
-  "unknownFolder": "알 수 없는 폴더"
+  "unknownFolder": "알 수 없는 폴더",
+  "ocrMenu": "텍스트 인식(OCR)",
+  "ocrCopy": "텍스트 복사",
+  "ocrExportTxt": "TXT로 내보내기",
+  "ocrExportDocx": "Word로 내보내기",
+  "ocrOutputSuffix": "-OCR 텍스트"
 }

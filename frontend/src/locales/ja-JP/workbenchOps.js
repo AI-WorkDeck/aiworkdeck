@@ -65,5 +65,21 @@ export default {
   "clipboardRecordFailed": "クリップボードの記録に失敗しました",
   "fileCaptureFailed": "ファイルの記録に失敗しました",
   "fileMoveOccupied": "このファイルは使用中の可能性があるため、移動できませんでした",
-  "filesMoveOccupiedCount": "{count} 件のファイルが使用中の可能性があるため、移動できませんでした"
+  "filesMoveOccupiedCount": "{count} 件のファイルが使用中の可能性があるため、移動できませんでした",
+  "ocrProgress": "認識中 {index}/{total}",
+  "ocrCancel": "キャンセル",
+  "ocrCancelling": "キャンセル中…",
+  "ocrBatchBusy": "別の認識処理が実行中です。完了を待つかキャンセルしてください",
+  "ocrConsentTitle": "クラウドで文字認識しますか？",
+  "ocrConsentHint": "テキストレイヤーのある PDF はそのまま抽出し、アップロードも課金もしません。クラウド OCR が必要なのはスキャンと画像だけです。この確認は今回の一括処理にのみ有効です。「設定 → アカウントと利用状況 → スキャン文書の認識」で常にクラウド／ローカルのみに変更できます。",
+  "ocrConsentCheck": "データの送信先と課金方法を確認しました",
+  "ocrConsentConfirm": "開始",
+  "ocrCopied": "{count} 件のファイルのテキストをコピーし、クリップボード履歴に保存しました",
+  "ocrSaved": "作成しました：{names}",
+  "ocrOthersNotOpened": "並べて開いていないもの：{names}",
+  "ocrLocalOnly": "ローカルのみの認識に設定されているため、画像とスキャンはアップロードしていません（設定で変更できます）",
+  "ocrFailedItem": "「{name}」は完了しませんでした：{reason}",
+  "ocrSkipped": "クラウド OCR が必要な {count} 件をスキップしました（未確認）",
+  "ocrCancelled": "キャンセルしました。未処理 {count} 件",
+  "ocrSummaryTitle": "認識完了 {done}/{total}"
 }

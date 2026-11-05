@@ -153,5 +153,10 @@ export default {
   "importDropPrepareFailed": "Tidak dapat menyiapkan file yang diseret. Simpan ke komputer Anda dan coba lagi.",
   "importDropTooLarge": "File tanpa jalur lokal dibatasi 100 MB per penyeretan. Simpan terlebih dahulu ke komputer Anda.",
   "importDesktopOnly": "Impor dengan seret-masuk hanya untuk desktop",
-  "unknownFolder": "Folder tidak dikenal"
+  "unknownFolder": "Folder tidak dikenal",
+  "ocrMenu": "Kenali teks (OCR)",
+  "ocrCopy": "Salin teks",
+  "ocrExportTxt": "Ekspor TXT",
+  "ocrExportDocx": "Ekspor Word",
+  "ocrOutputSuffix": "-teks OCR"
 }

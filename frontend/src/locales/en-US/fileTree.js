@@ -171,4 +171,9 @@ export default {
   importDropTooLarge: 'Files without a local path are limited to 100 MB per drop. Save them to your computer first.',
   importDesktopOnly: 'Drag-in import is desktop only',
   unknownFolder: 'Unknown folder',
+  ocrMenu: 'Recognize text (OCR)',
+  ocrCopy: 'Copy text',
+  ocrExportTxt: 'Export TXT',
+  ocrExportDocx: 'Export Word',
+  ocrOutputSuffix: '-OCR text',
 }

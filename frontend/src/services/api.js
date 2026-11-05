@@ -2598,6 +2598,28 @@ export function ocrRecognize(imageBase64) {
   });
 }
 
+// 资源管理器右键「识别文字」：单个 PDF/图片识别（output: text|txt|docx），批量由前端逐个调用（tutorial-series#155）
+export function recognizeProjectFileText(projectId, fileId, data) {
+  return request({
+    url: `/api/projects/${projectId}/files/${fileId}/ocr`,
+    method: 'POST',
+    // 扫描件逐页识别，几十页要几分钟
+    timeout: 1800000,
+    data,
+    header: { 'Content-Type': 'application/json' },
+  })
+}
+
+// 取消本批识别：服务端在下一页上传前停下，取消后不再落盘
+export function cancelProjectFileOcr(projectId, jobId) {
+  return request({
+    url: `/api/projects/${projectId}/files/ocr/cancel`,
+    method: 'POST',
+    data: { jobId },
+    header: { 'Content-Type': 'application/json' },
+  })
+}
+
 // 收藏：我的收藏
 export function getMyFavorites() {
   return request({

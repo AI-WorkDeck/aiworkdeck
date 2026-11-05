@@ -65,5 +65,21 @@ export default {
   "clipboardRecordFailed": "剪貼板記錄失敗",
   "fileCaptureFailed": "文件記錄失敗",
   "fileMoveOccupied": "該文件可能正被佔用，未能移動",
-  "filesMoveOccupiedCount": "有 {count} 個文件可能正被佔用，未能移動"
+  "filesMoveOccupiedCount": "有 {count} 個文件可能正被佔用，未能移動",
+  "ocrProgress": "正在識別 {index}/{total}",
+  "ocrCancel": "取消",
+  "ocrCancelling": "正在取消…",
+  "ocrBatchBusy": "已有一批識別在進行，請等它完成或取消",
+  "ocrConsentTitle": "使用雲端識別文字？",
+  "ocrConsentHint": "帶文字層的 PDF 直接擷取，不上傳、不計費；只有掃描件和圖片需要雲端識別。本次確認只對這一批生效，可在「設定 → 帳戶與用量 → 掃描件識別」改為一律雲端或僅本機。",
+  "ocrConsentCheck": "我已知悉上述資料去向與計費方式",
+  "ocrConsentConfirm": "開始識別",
+  "ocrCopied": "已複製 {count} 份檔案的文字，並記入剪貼簿歷史",
+  "ocrSaved": "已產生：{names}",
+  "ocrOthersNotOpened": "其餘未並排開啟的：{names}",
+  "ocrLocalOnly": "已設定為僅本機識別，圖片與掃描件未上傳（可在設定中更改）",
+  "ocrFailedItem": "「{name}」未完成：{reason}",
+  "ocrSkipped": "{count} 份需要雲端識別的檔案未處理（未確認）",
+  "ocrCancelled": "已取消，{count} 份未處理",
+  "ocrSummaryTitle": "識別完成 {done}/{total}"
 }

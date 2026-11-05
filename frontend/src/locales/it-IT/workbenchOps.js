@@ -65,5 +65,21 @@ export default {
   "clipboardRecordFailed": "Impossibile registrare gli appunti",
   "fileCaptureFailed": "Impossibile registrare il file",
   "fileMoveOccupied": "Questo file potrebbe essere in uso e non è stato possibile spostarlo",
-  "filesMoveOccupiedCount": "{count} file potrebbero essere in uso e non è stato possibile spostarli"
+  "filesMoveOccupiedCount": "{count} file potrebbero essere in uso e non è stato possibile spostarli",
+  "ocrProgress": "Riconoscimento {index}/{total}",
+  "ocrCancel": "Annulla",
+  "ocrCancelling": "Annullamento…",
+  "ocrBatchBusy": "È già in corso un riconoscimento; attendi o annullalo",
+  "ocrConsentTitle": "Usare il riconoscimento nel cloud?",
+  "ocrConsentHint": "I PDF con livello di testo vengono estratti direttamente, senza caricamento né addebiti; solo scansioni e immagini richiedono l’OCR cloud. Questa conferma vale solo per questo lotto; puoi impostare «sempre cloud» o «solo locale» in Impostazioni → Account e utilizzo → Riconoscimento scansioni.",
+  "ocrConsentCheck": "Ho preso atto della destinazione dei dati e dell’addebito",
+  "ocrConsentConfirm": "Avvia",
+  "ocrCopied": "Testo di {count} file copiato e salvato nella cronologia appunti",
+  "ocrSaved": "Creato: {names}",
+  "ocrOthersNotOpened": "Non aperti affiancati: {names}",
+  "ocrLocalOnly": "Il riconoscimento è impostato su «solo locale»; immagini e scansioni non caricate (modificabile nelle Impostazioni)",
+  "ocrFailedItem": "«{name}» non completato: {reason}",
+  "ocrSkipped": "{count} file che richiedono OCR cloud saltati (non confermato)",
+  "ocrCancelled": "Annullato; {count} file non elaborati",
+  "ocrSummaryTitle": "Riconosciuti {done}/{total}"
 }

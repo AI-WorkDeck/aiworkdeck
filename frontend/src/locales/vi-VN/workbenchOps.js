@@ -65,5 +65,21 @@ export default {
   "clipboardRecordFailed": "Không thể ghi lại nội dung clipboard",
   "fileCaptureFailed": "Không thể ghi lại tệp",
   "fileMoveOccupied": "Tệp này có thể đang được sử dụng và không thể di chuyển",
-  "filesMoveOccupiedCount": "{count} tệp có thể đang được sử dụng và không thể di chuyển"
+  "filesMoveOccupiedCount": "{count} tệp có thể đang được sử dụng và không thể di chuyển",
+  "ocrProgress": "Đang nhận dạng {index}/{total}",
+  "ocrCancel": "Hủy",
+  "ocrCancelling": "Đang hủy…",
+  "ocrBatchBusy": "Đang có một lượt nhận dạng chạy; hãy chờ hoặc hủy",
+  "ocrConsentTitle": "Dùng nhận dạng văn bản trên đám mây?",
+  "ocrConsentHint": "PDF có lớp văn bản được trích xuất trực tiếp, không tải lên và không tính phí; chỉ bản quét và hình ảnh mới cần OCR đám mây. Xác nhận này chỉ áp dụng cho lượt này; đổi sang «luôn dùng đám mây» hoặc «chỉ cục bộ» tại Cài đặt → Tài khoản & sử dụng → Nhận dạng tài liệu quét.",
+  "ocrConsentCheck": "Tôi đã hiểu dữ liệu được gửi đi đâu và cách tính phí",
+  "ocrConsentConfirm": "Bắt đầu",
+  "ocrCopied": "Đã sao chép văn bản của {count} tệp và lưu vào lịch sử bảng nhớ tạm",
+  "ocrSaved": "Đã tạo: {names}",
+  "ocrOthersNotOpened": "Không mở song song: {names}",
+  "ocrLocalOnly": "Nhận dạng đang đặt «chỉ cục bộ»; hình ảnh và bản quét không được tải lên (đổi trong Cài đặt)",
+  "ocrFailedItem": "\"{name}\" chưa hoàn tất: {reason}",
+  "ocrSkipped": "Bỏ qua {count} tệp cần OCR đám mây (chưa xác nhận)",
+  "ocrCancelled": "Đã hủy; {count} tệp chưa xử lý",
+  "ocrSummaryTitle": "Đã nhận dạng {done}/{total}"
 }
