@@ -163,6 +163,7 @@ export default {
   "lawfirmColContracted": "계약액",
   "lawfirmColCollected": "수금액",
   "lawfirmColRate": "수금률",
+  "lawfirmEmpty": "아직 법인 장부 데이터가 없습니다. 법인 관리 워크벤치에서 사건 수임을 등록하면 여기에 업무 분야, 주임 변호사, 변호사별로 집계됩니다. 데모 데이터를 먼저 채워 미리 볼 수도 있습니다.",
   "lawfirmWanSuffix": "¥{amount}만",
   "lawfirmActionFailedToast": "작업 실패",
   "lawfirmOpenWorkbenchFailedToast": "워크벤치를 열지 못했습니다",

@@ -163,6 +163,7 @@ export default {
   "lawfirmColContracted": "Giá trị ký kết",
   "lawfirmColCollected": "Đã thu",
   "lawfirmColRate": "Tỷ lệ thu hồi",
+  "lawfirmEmpty": "Chưa có dữ liệu công ty luật. Sau khi bạn ghi nhận tiếp nhận vụ việc trong không gian quản lý công ty, dữ liệu sẽ được tổng hợp tại đây theo lĩnh vực, luật sư chủ trì và luật sư. Bạn cũng có thể nạp dữ liệu mẫu để xem trước.",
   "lawfirmWanSuffix": "¥{amount} vạn",
   "lawfirmActionFailedToast": "Thao tác thất bại",
   "lawfirmOpenWorkbenchFailedToast": "Mở bàn làm việc thất bại",

@@ -195,6 +195,7 @@ export default {
   lawfirmColContracted: '签约额',
   lawfirmColCollected: '已到账',
   lawfirmColRate: '回款率',
+  lawfirmEmpty: "还没有律所台账数据。在律所管理工作台录入收案后，这里会按业务分类、主办律师和律师汇总；也可以先填充演示数据看看效果。",
   lawfirmWanSuffix: '{amount} 万',
   lawfirmActionFailedToast: '操作失败',
   lawfirmOpenWorkbenchFailedToast: '打开工作台失败',

@@ -162,6 +162,7 @@ export default {
   "lawfirmColContracted": "Sözleşme Bedeli",
   "lawfirmColCollected": "Tahsil Edilen",
   "lawfirmColRate": "Tahsilat Oranı",
+  "lawfirmEmpty": "Henüz büro verisi yok. Büro yönetimi çalışma alanında dosya kabulü kaydettiğinizde burada uygulama alanı, sorumlu avukat ve avukata göre özetlenir. Önizleme için demo verilerini de yükleyebilirsiniz.",
   "lawfirmWanSuffix": "{amount}0 bin ¥",
   "lawfirmActionFailedToast": "İşlem başarısız",
   "lawfirmOpenWorkbenchFailedToast": "Çalışma alanı açılamadı",

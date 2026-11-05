@@ -162,6 +162,7 @@ export default {
   "lawfirmColContracted": "Contracté",
   "lawfirmColCollected": "Encaissé",
   "lawfirmColRate": "Taux de recouvrement",
+  "lawfirmEmpty": "Aucune donnée de cabinet pour l’instant. Une fois les dossiers enregistrés dans l’espace de gestion du cabinet, ils sont résumés ici par domaine, avocat responsable et avocat. Vous pouvez aussi charger les données de démonstration pour un aperçu.",
   "lawfirmWanSuffix": "{amount}0 k¥",
   "lawfirmActionFailedToast": "L'opération a échoué",
   "lawfirmOpenWorkbenchFailedToast": "Impossible d'ouvrir l'espace de travail",

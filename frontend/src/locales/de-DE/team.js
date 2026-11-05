@@ -162,6 +162,7 @@ export default {
   "lawfirmColContracted": "Vertragsvolumen",
   "lawfirmColCollected": "Vereinnahmt",
   "lawfirmColRate": "Realisierungsquote",
+  "lawfirmEmpty": "Noch keine Kanzleidaten. Sobald Sie Mandatsannahmen in der Kanzleiverwaltung erfassen, werden sie hier nach Rechtsgebiet, federführendem Anwalt und Anwalt zusammengefasst. Sie können auch zuerst die Demodaten laden.",
   "lawfirmWanSuffix": "{amount}0 Tsd. ¥",
   "lawfirmActionFailedToast": "Vorgang fehlgeschlagen",
   "lawfirmOpenWorkbenchFailedToast": "Workbench konnte nicht geöffnet werden",

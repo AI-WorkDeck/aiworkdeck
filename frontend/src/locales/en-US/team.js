@@ -182,6 +182,7 @@ export default {
   lawfirmColContracted: 'Contracted',
   lawfirmColCollected: 'Collected',
   lawfirmColRate: 'Collection Rate',
+  lawfirmEmpty: "No firm ledger data yet. Once you log case intakes in the Law Firm Management workbench, they are summarized here by practice area, lead lawyer and lawyer. You can also load the demo data to preview it.",
   lawfirmWanSuffix: '¥{amount}0k',
   lawfirmActionFailedToast: 'Operation failed',
   lawfirmOpenWorkbenchFailedToast: 'Failed to open workbench',

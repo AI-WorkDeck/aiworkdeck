@@ -162,6 +162,7 @@ export default {
   "lawfirmColContracted": "Contratado",
   "lawfirmColCollected": "Cobrado",
   "lawfirmColRate": "Tasa de cobro",
+  "lawfirmEmpty": "Aún no hay datos del despacho. Cuando registres admisiones de casos en el espacio de gestión del despacho, aquí se resumirán por área, abogado responsable y abogado. También puedes cargar los datos de demostración para verlo.",
   "lawfirmWanSuffix": "{amount}0 mil ¥",
   "lawfirmActionFailedToast": "Error en la operación",
   "lawfirmOpenWorkbenchFailedToast": "No se pudo abrir el área de trabajo",

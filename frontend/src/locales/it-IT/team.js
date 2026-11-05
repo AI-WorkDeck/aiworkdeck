@@ -162,6 +162,7 @@ export default {
   "lawfirmColContracted": "Contrattualizzato",
   "lawfirmColCollected": "Incassato",
   "lawfirmColRate": "Tasso di incasso",
+  "lawfirmEmpty": "Nessun dato dello studio per ora. Quando registri le pratiche nello spazio di gestione dello studio, qui vengono riepilogate per area, avvocato responsabile e avvocato. Puoi anche caricare i dati demo per un’anteprima.",
   "lawfirmWanSuffix": "{amount}0 mila ¥",
   "lawfirmActionFailedToast": "Operazione non riuscita",
   "lawfirmOpenWorkbenchFailedToast": "Impossibile aprire la postazione di lavoro",

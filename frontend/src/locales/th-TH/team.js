@@ -163,6 +163,7 @@ export default {
   "lawfirmColContracted": "ตามสัญญา",
   "lawfirmColCollected": "เก็บได้",
   "lawfirmColRate": "อัตราการเก็บเงิน",
+  "lawfirmEmpty": "ยังไม่มีข้อมูลสำนักงาน เมื่อบันทึกการรับคดีในพื้นที่จัดการสำนักงานแล้ว ข้อมูลจะสรุปไว้ที่นี่ตามสาขางาน ทนายผู้รับผิดชอบ และทนายความ หรือจะเติมข้อมูลตัวอย่างเพื่อดูก่อนก็ได้",
   "lawfirmWanSuffix": "¥{amount} หมื่น",
   "lawfirmActionFailedToast": "การดำเนินการล้มเหลว",
   "lawfirmOpenWorkbenchFailedToast": "เปิดเวิร์กเบนช์ไม่สำเร็จ",
