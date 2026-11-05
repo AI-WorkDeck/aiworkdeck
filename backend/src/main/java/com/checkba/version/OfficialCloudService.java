@@ -105,6 +105,23 @@ public class OfficialCloudService {
      * 不留下第二条连接（否则 CollabDialog 的案件库选择器会冒出一串同地址的死连接）。
      */
     public CloudConnection connectOfficial(Long userId) {
+        return connect(userId, false);
+    }
+
+    /**
+     * 律师在协作弹窗里明确点了「重新连接云端」：指纹没变也重桥一次换新令牌（教程第 11 集）。
+     *
+     * <p>默认的 {@link #connectOfficial} 指纹不变就复用旧连接——旧令牌已被云端撤掉时
+     * （0.78 之前改名会换令牌），按钮点了等于没点。这里就地重桥：同一行（已入库案卷的
+     * {@code ProjectRemote} 都挂在它上面）、新令牌，旧的那枚尽力撤掉，再把这条连接下已入库
+     * 案卷的写门禁换到新令牌上（awdCloudScope 指纹含令牌，不换就全卡在「请明确重新连接」）。
+     * <b>只许律师的明确动作调用</b>——IM/工作流/后台一律走 {@link #connectOfficial}。
+     */
+    public CloudConnection reconnectOfficial(Long userId) {
+        return connect(userId, true);
+    }
+
+    private CloudConnection connect(Long userId, boolean reconnect) {
         AccountService.ConnectionSnapshot snapshot = accountService.connectionSnapshot();
         String base = OfficialCloudEndpoint.resolve(configuredBaseUrl, snapshot.baseUrl());
         if (userId == null) {
@@ -112,8 +129,9 @@ public class OfficialCloudService {
         }
         String fingerprint = snapshot.fingerprint();
         CloudConnection existing = connectionRepository.findFirstByUserIdAndServerUrl(userId, base).orElse(null);
-        if (existing != null && fingerprint != null
-                && fingerprint.equals(existing.getAccountFingerprint())) {
+        boolean sameAccount = existing != null && fingerprint != null
+                && fingerprint.equals(existing.getAccountFingerprint());
+        if (!reconnect && sameAccount) {
             return existing;
         }
         String key = snapshot.key();
@@ -126,7 +144,20 @@ public class OfficialCloudService {
                     "这台电脑还没连上 AI WorkDeck 账户，连好账户就能用官方团队案件库了",
                     "This computer is not linked to an AI WorkDeck account yet — link one to use the official Team Case Library"));
         }
-        return bridge(base, userId, key, fingerprint, existing, snapshot);
+        String oldToken = existing == null ? null : existing.getDeviceToken();
+        Long oldTokenId = existing == null ? null : existing.getTokenId();
+        CloudConnection conn = bridge(base, userId, key, fingerprint, existing, snapshot);
+        // 只在同一个账户上换令牌时才跟着换门禁：本机换了人，上一个人的案卷门禁照拦（地雷 #58）
+        if (reconnect && sameAccount && oldToken != null && !oldToken.equals(conn.getDeviceToken())) {
+            cloudSyncService.revokeRemoteToken(base, oldTokenId, oldToken);
+            try {
+                cloudSyncService.refenceConnectionProjects(conn.getId(), userId);
+            } catch (RuntimeException e) {
+                // 新令牌已落库；还换不过来的案卷由律师在弹窗里「重新绑定这份案卷」
+                log.warn("重新连接后换写门禁未完成: user={} {}", userId, e.getMessage());
+            }
+        }
+        return conn;
     }
 
     /**
@@ -186,8 +217,11 @@ public class OfficialCloudService {
             try {
                 synchronized (accountService) {
                     if (!accountService.isCurrentConnection(snapshot)) return;
-                    existing.setDisplayName(name);
-                    connectionRepository.save(existing);
+                    // 桥接在途时「重新连接云端」可能已把新令牌落库：重读再改名，不拿旧副本整行写回旧令牌
+                    CloudConnection current = connectionRepository.findById(existing.getId()).orElse(null);
+                    if (current == null) return;
+                    current.setDisplayName(name);
+                    connectionRepository.save(current);
                 }
             } finally {
                 cloudSyncService.revokeRemoteToken(base, data.getLong("tokenId", null), data.getStr("token"));

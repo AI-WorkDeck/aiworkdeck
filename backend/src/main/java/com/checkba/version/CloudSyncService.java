@@ -251,6 +251,55 @@ public class CloudSyncService {
         }
     }
 
+    /**
+     * 明确「重新连接云端」换了令牌之后，把这条连接下每份已入库案卷的写门禁（awdCloudScope）
+     * 换到新令牌上——与 share/clone 同一条显式绑定路径（{@link ProjectRepoService#bindCloudEpoch}），
+     * 后台同步绝不调。逐份尽力：云端那份已经没了或没权限的，换不过来就留着，界面给
+     * 「重新绑定这份案卷」（教程第 11 集）。
+     */
+    public void refenceConnectionProjects(long connectionId, Long userId) {
+        CloudConnection conn = ownedConnection(connectionId, userId);
+        explicitCloudOperation(conn, () -> {
+            for (ProjectRemote remote : remoteRepository.findByConnectionId(connectionId)) {
+                ReentrantLock lock = sessionService.repoLock(remote.getProjectId());
+                lock.lock();
+                try {
+                    repoService.bindCloudEpoch(remote.getProjectId(),
+                            conn.getServerUrl() + "/git/" + remote.getRemoteProjectId() + ".git",
+                            conn.getUsername(), conn.getDeviceToken());
+                } catch (RuntimeException e) {
+                    log.warn("重新连接后案卷写门禁未换过来: project={} {}", remote.getProjectId(), e.getMessage());
+                } finally {
+                    lock.unlock();
+                }
+            }
+            return null;
+        });
+    }
+
+    /**
+     * 「重新绑定这份案卷」的前半步：只拆掉本机这份案卷与云端案卷的绑定（{@code ProjectRemote}）。
+     * 本机文件与版本历史不动，云端那份案卷也不动；随后由界面明确地再放进案件库一次
+     * （{@link #shareToCloud}，带幂等键）。origin 与写门禁留着，下一次共享会整份覆盖。
+     * 只许拆挂在自己连接上的绑定：多人共用一个后端时，别人的连接与绑定不归我拆。
+     */
+    public void unbindProject(long projectId, Long userId) {
+        ReentrantLock lock = sessionService.repoLock(projectId);
+        lock.lock();
+        try {
+            if (repoService.repositoryMerging(projectId)) {
+                throw VersionException.userFacing(LangText.of("请先把等你做选择的文件处理完", "Please finish choosing your files first"));
+            }
+            remoteRepository.findByProjectId(projectId).ifPresent(remote -> {
+                ownedConnection(remote.getConnectionId(), userId);
+                remoteRepository.delete(remote);
+            });
+            remoteNameCache.remove(projectId);
+        } finally {
+            lock.unlock();
+        }
+    }
+
     public java.util.List<CloudConnection> listConnections(Long userId) {
         return connectionRepository.findByUserId(userId);
     }

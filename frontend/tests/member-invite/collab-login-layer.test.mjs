@@ -6,7 +6,7 @@
 //    requireAccount 弹出的登录层被盖在下面，点不到，promise 永远不回。修法是登录层开着时
 //    这两个弹窗先收起（visibility: hidden），登录完自己回来，而不是动全局 z-index。
 // 2. 后端以 kind=CLOUD_RECONNECT_REQUIRED 拒绝时，弹窗里要就地写明原因并给「重新连接云端」
-//    按钮，调现有的 connectOfficialCloud；不做自动重连。
+//    按钮，调明确重连的 reconnectOfficialCloud（真的换新令牌）；不做自动重连。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -44,11 +44,11 @@ for (const [file, rootClass] of [
     assert.match(src, /loginLayerOpen\(\) \{\s*return accountLoginOpen\.value\s*\}/)
     assert.match(src, /\.yield-to-login \{\s*visibility: hidden;/)
   })
-  test(`${file}：权限门禁拒绝时显示原因与「重新连接云端」按钮，调 connectOfficialCloud`, () => {
+  test(`${file}：权限门禁拒绝时显示原因与「重新连接云端」按钮，调 reconnectOfficialCloud（明确换新令牌）`, () => {
     assert.match(src, /needsCloudReconnect\(e\)/)
     assert.match(src, /\$t\('version\.reconnectCloud'\)/)
     assert.match(src, /@tap="onReconnectCloud"/)
     const body = src.slice(src.indexOf('async onReconnectCloud()'))
-    assert.match(body.slice(0, 800), /await connectOfficialCloud\(\)/)
+    assert.match(body.slice(0, 800), /await reconnectOfficialCloud\(\)/)
   })
 }
