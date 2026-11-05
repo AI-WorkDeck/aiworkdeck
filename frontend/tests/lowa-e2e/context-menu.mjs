@@ -9,6 +9,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { PNG } from 'pngjs'
 import { preflight, loadPuppeteer, startServer, launchBrowser, openEditor } from './_boot.mjs'
+import { writingAssistanceLabels } from '../../src/composables/writingAssistanceHost.js'
+import zhEditor from '../../src/locales/zh-CN/editor.js'
+// 宿主随 writing-config 下发的中文标签表（客体自身只带英文兜底，教程反馈 48）。
+const zhLabels = writingAssistanceLabels(key => key.startsWith('editor.') ? key.slice(7).split('.').reduce((o, k) => o?.[k], zhEditor) ?? key : key)
 
 preflight()
 const extraFiles = {}
@@ -35,7 +39,7 @@ try {
   await ok('replace_selection', { text: selected })
   await ok('resolve_all_revisions', { action: 'accept' })
   await ok('ui_command', { name: 'select_all' })
-  await page.evaluate(() => {
+  await page.evaluate((labels) => {
     window.__menuRequests = []
     window.addEventListener('message', e => {
       const m = e.data
@@ -45,9 +49,9 @@ try {
         result: m.action === 'lookup' ? { title: '测试查询结果', variants: [{ text: '可用的测试资料' }] } : {} }, location.origin)
     })
     window.postMessage({ __lo: 'lo-relay', type: 'writing-config', config: {
-      session: 'context-menu-test', writable: true, enabled: false, learning: false, hints: true, items: [],
+      session: 'context-menu-test', writable: true, enabled: false, learning: false, hints: true, items: [], labels,
     } }, location.origin)
-  })
+  }, zhLabels)
   await pause(300)
 
   // A point inside the text line, left of the current caret.

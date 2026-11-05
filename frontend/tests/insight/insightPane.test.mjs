@@ -73,15 +73,18 @@ for (const status of [null, 'DONE', 'FAILED']) {
   })
 }
 
-test('写作辅助打开依据只切焦点与停靠窗格，不创建解析请求', () => {
-  const src = readFileSync(new URL('../../src/pages/project-overview/project-overview.vue', import.meta.url), 'utf8')
-  const body = src.match(/onOpenInsight\(payload, pane\) \{([\s\S]*?)\n    \},/)[1]
-  const opened = []
-  const vm = { focusedPane: 'left', insightDocFileId: 9, insightParseRequest: null, openPanelInItsDock: (key) => opened.push(key) }
-  new Function('payload', 'pane', body).call(vm, { fileId: 9 }, 'right')
-  assert.equal(vm.focusedPane, 'right')
-  assert.deepEqual(opened, ['insight'])
-  assert.equal(vm.insightParseRequest, null)
+test('依据入口只剩右栏「依据」标签：open-insight 死链与孤儿词条已删（教程反馈 49）', async () => {
+  const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8')
+  assert.ok(!read('../../src/pages/project-overview/project-overview.vue').includes('open-insight'))
+  assert.ok(!read('../../src/pages/project-overview/project-overview.vue').includes('onOpenInsight'))
+  assert.ok(!read('../../src/components/LibreOfficeEditor.vue').includes('open-insight'))
+  assert.ok(!read('../../src/composables/inlineReviewHost.js').includes('open-insight'))
+  const { LOCALE_REGISTRY } = await import('../../src/locales/registry.js')
+  for (const { code } of LOCALE_REGISTRY) {
+    const { default: editor } = await import(`../../src/locales/${code}/editor.js`)
+    assert.equal(editor.toolbar.insightPanel, undefined, code)
+    assert.equal(editor.toolbar.insightShort, undefined, code)
+  }
 })
 
 test('工具栏不再显示旧解析按钮；在线按钮明确标注费用', () => {

@@ -821,6 +821,38 @@ function typeOverSelection(vc, replace, title, insert) {
   }
 }
 
+// 用户在超链接末尾接着打字：新字不能沿用链接的字符样式（教程反馈 82）。
+// UNO insertString 不扩张 INetFmt（URL 不会跟过来），但 docx 往返后链接文字带着
+// 「Internet link」字符样式这条普通属性，接着打的字会继承它——看上去蓝色下划线，
+// 像链接的一部分。只在「光标前一字是链接、后一字不是同一链接」时成立，返回 true。
+function atHyperlinkEnd(vc) {
+  try {
+    const story = vc.getText();
+    const before = story.createTextCursorByRange(vc.getStart());
+    if (!before.goLeft(1, true)) return false;
+    const url = String(before.getPropertyValue('HyperLinkURL') || '');
+    if (!url) return false;
+    const after = story.createTextCursorByRange(vc.getStart());
+    if (!after.goRight(1, true)) return true;
+    return String(after.getPropertyValue('HyperLinkURL') || '') !== url;
+  } catch (e) { return false; }
+}
+// 刚落在链接末尾的 text（无换行）恢复成段落自身的字符样式。
+function detachTypedFromHyperlink(vc, text) {
+  const n = Array.from(text).length;
+  if (!n) return;
+  try {
+    const range = vc.getText().createTextCursorByRange(vc.getEnd());
+    if (!range.goLeft(n, true)) return;
+    // 只在确实继承到字符样式时才写：多写一次 HyperLinkURL='' 会在 docx 里留下空链接，
+    // 重开后反而把这几个字也染成链接样式（真引擎实证）。
+    let style = '';
+    try { style = String(range.getPropertyValue('CharStyleName') || ''); } catch (e) {}
+    if (!style) return;
+    withRecordChangesOff(function () { range.setPropertyToDefault('CharStyleName'); });
+  } catch (e) {}
+}
+
 // ---- 最小修订颗粒度 (minimal redline granularity) ---------------------------
 // range.setString(newText) under RecordChanges marks the WHOLE range deleted
 // and the WHOLE new text inserted — so a one-char edit in a clause reads as
@@ -4995,19 +5027,38 @@ const EXEC = {
       try { if (paraKeyOf(xModel.getText(), checked.cursor.getStart()) < 0) return completionUnavailable('table-requires-body'); }
       catch (e) { return completionUnavailable('table-requires-body'); }
     }
+    // 「仅替换为正确全称」：真替换选区（教程反馈 43）。删选区与写入在同一个撤销组里，
+    // 修订开着时与写作建议同口径走最小差异修订。
+    if (p.mode === 'replace-selection') {
+      if (rows || !text || /[\r\n]/.test(text) || !checked.snapshot.selectedText) return completionUnavailable('invalid-content');
+      return completionEdit('替换为查询结果', function () {
+        const vc = checked.cursor;
+        let replaced = false, tracked = false;
+        try { tracked = !!xModel.getPropertyValue('RecordChanges'); } catch (e) {}
+        if (tracked) replaced = applyMinimalRedline(vc, text);
+        if (!replaced) { vc.setString(''); vc.collapseToEnd(); insertTextAtCursor(vc, text); }
+        vc.collapseToEnd();
+        return { inserted: text, replaced: checked.snapshot.selectedText, operation: 'replace-selection' };
+      });
+    }
     return completionEdit('插入补全资料', function () {
       const vc = checked.cursor;
-      vc.collapseToEnd(); // 右键外查的选区保留原文，资料追加在其后。
+      // 外查资料另起一段，落在选区/光标所在段落之后，不拆断原句（教程反馈 107）。
+      // 选区原文保留；表格单独占一个空段插入（Writer 把该空段留在表后）。
       const story = vc.getText();
-      const lines = text.replace(/\r\n?/g, '\n').split('\n');
+      const paragraphEnd = story.createTextCursorByRange(vc.getEnd());
+      paragraphEnd.gotoEndOfParagraph(false);
+      vc.gotoRange(paragraphEnd, false);
+      const lines = text ? text.replace(/\r\n?/g, '\n').split('\n') : [];
+      if (rows) lines.push('');
       for (let i = 0; i < lines.length; i++) {
-        if (i) story.insertControlCharacter(vc, css.text.ControlCharacter.PARAGRAPH_BREAK, false);
+        story.insertControlCharacter(vc, css.text.ControlCharacter.PARAGRAPH_BREAK, false);
         if (lines[i]) story.insertString(vc, lines[i], false);
       }
       vc.collapseToEnd();
       let name = null;
       if (rows) { const table = insertStyledTable(rows, 1, true); name = table.getName(); }
-      return { inserted: text, table: name };
+      return { inserted: text, table: name, operation: 'insert-paragraph-after' };
     });
   },
   // [取消] 宿主对一条在飞的批量命令喊停（reqId 来自 progress 消息）。只置位，
@@ -5045,8 +5096,15 @@ const EXEC = {
     const text = String(p.text || '');
     return typeOverSelection(vc, !!p.replaceSelection, '输入', function () {
       vc.collapseToEnd();
-      if (MD_MARKER_RE.test(text)) insertInlineStyled(vc, text);
-      else insertTextAtCursor(vc, text);
+      // 只管用户手打（replaceSelection）的单段纯文本；AI / 插件管线照旧。
+      const typedAfterLink = !!p.replaceSelection && text && !/\n/.test(text) && !MD_MARKER_RE.test(text) && atHyperlinkEnd(vc);
+      let um = null;
+      if (typedAfterLink) { try { um = xModel.getUndoManager(); um.enterUndoContext('输入'); } catch (e) { um = null; } }
+      try {
+        if (MD_MARKER_RE.test(text)) insertInlineStyled(vc, text);
+        else insertTextAtCursor(vc, text);
+        if (typedAfterLink) detachTypedFromHyperlink(vc, text);
+      } finally { if (um) { try { um.leaveUndoContext(); } catch (e) {} } }
       vc.collapseToEnd();
       return Object.assign({ success: true, inserted: text }, verifySnapshot());
     });
@@ -6591,6 +6649,13 @@ const EXEC = {
         try { xModel.setPropertyValue('RecordChanges', true); } catch (e) {}
         resetRevisionView();
       }
+      // 装载期的规范化（修订开关、显示模式、锚点清场；Calc/Impress 装载同样会置位）
+      // 把刚打开的模型留在 modified 态。此后任何一条纯视图命令（set_chrome /
+      // set_view_options）引起的 modify 广播都会过 isModified() 那道筛子、在 ready
+      // 之后到达宿主——只打开就显示「更改待保存」，自动保存再把重新序列化的 docx
+      // 传回去成了「待提交」（教程反馈 15，lowa-e2e open-not-dirty 实证）。
+      // 装载结果就是磁盘上的文件：清掉这个标志，真编辑照常置位。
+      try { if (xModel.isModified()) xModel.setModified(false); } catch (e) {}
       // _default keeps modified components alive. Close only after successful
       // replacement: 33 retained models exhausted LOWA's 1 GiB heap (#1121).
       if (!previous) post('ui_ready');
@@ -7984,7 +8049,10 @@ const EXEC = {
     if (!range || !text.length) return { success: false, message: 'no selection to hyperlink' };
     const xText = range.getText();
     const cur = xText.createTextCursorByRange(range);
-    cur.setPropertyValue('HyperLinkURL', url);
+    // 建链是给原文挂关联，不是改稿：修订开着时也不记成「属性修订」（教程反馈 75）。
+    withRecordChangesOff(function () { cur.setPropertyValue('HyperLinkURL', url); });
+    // 建完链把光标收到链接末尾（教程反馈 82）：选区留着的话，接着打字会把刚建链的文字整段覆盖掉。
+    try { ctrl.getViewCursor().gotoRange(cur.getEnd(), false); } catch (e) {}
     return { success: true, text: text, url: url };
   },
   // [Word 二期] AI 工具面的超链接原语——与 set_selection_hyperlink（host-initiated，

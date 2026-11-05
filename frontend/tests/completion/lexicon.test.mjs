@@ -251,3 +251,18 @@ test('机构名后缀被截断的尾巴不触发同字开头的词条，正常�
   assert.equal(matchCompletionItems('本次修订公司章', items)[0]?.text, '公司章程')
   assert.equal(matchCompletionItems('公司', items)[0]?.text, '公司章程')
 })
+
+// 教程反馈 80：「远航」是公司名「上海远航物流有限公司」的一段，不是人名；
+// 「股东」「公司」这类称谓也不是人名。不做中间匹配（Q12）。
+test('人名候选走 NON_PERSON 过滤，并与已抽到的公司名子串去重', () => {
+  const kinds = text => Object.fromEntries(extractCompletionEntries(text, { segmenter: null }).filter(e => e.kind !== 'PHRASE').map(e => [e.text, e.kind]))
+  const a = kinds('上海远航物流有限公司为本案原告。原告：远航，被告：张三')
+  assert.equal(a['上海远航物流有限公司'], 'COMPANY')
+  assert.equal(a['远航'], undefined, '公司名的一段不判成人名')
+  assert.equal(a['张三'], 'PERSON', '真人名照旧')
+  assert.equal(kinds('股东名册记载远航持股51%，上海远航物流有限公司')['远航'], undefined, '公司名写在后面也去重')
+  const b = kinds('联系人：股东。法定代表人：公司')
+  assert.equal(b['股东'], undefined)
+  assert.equal(b['公司'], undefined)
+  assert.equal(kinds('法定代表人：李四')['李四'], 'PERSON')
+})

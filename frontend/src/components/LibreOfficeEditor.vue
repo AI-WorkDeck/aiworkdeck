@@ -211,7 +211,7 @@ import { EVIDENCE_CHANGED_EVENT } from '@/utils/evidenceEvents.js'
 import { DOC_MUTATED_EVENT } from '@/utils/docEvents.js'
 import { buildAiFormatPrompt, buildAiSelectionRevisePrompt, AI_PROMPT_EVENT } from '@/utils/paragraphFormat.js'
 import { getResolvedTheme, APP_THEME_EVENT } from '@/utils/appTheme.js'
-import { isEnglish } from '@/utils/appLanguage.js'
+import { isEnglish, getAppLanguage } from '@/utils/appLanguage.js'
 import { stampApplication } from '@/utils/docxAppProps.js'
 import { documentStampApplication } from '@/utils/documentGeneratorSetting.js'
 import { createInlineReviewHost } from '@/composables/inlineReviewHost.js'
@@ -252,10 +252,9 @@ export default {
   components: { OfficeNavigation, ReviewPanel, EditorToolbar, EvidenceStaleBar },
   // command-progress：批量命令（find_replace >50 命中 / apply_house_style）的
   // 「第 x/y 处」进度，{reqId, done, total}；reqId 可用 executeCommand('cancel', {reqId}) 喊停。
-  // open-insight：行内写作提示 → 宿主打开「依据」窗格；不自动调用 AI 或外部库。
   // cursor-context：画布点击/光标移动时客体页回传的光标邻域（仅在 insightSubscribed
   //   为真时才产生——不订阅时客体页一条都不发，常态零开销）。
-  emits: ['close', 'ready', 'engine-failed', 'open-url', 'menu-state', 'evidence-drop', 'locator-consumed', 'open-evidence-target', 'command-progress', 'open-insight', 'cursor-context', 'open-history'],
+  emits: ['close', 'ready', 'engine-failed', 'open-url', 'menu-state', 'evidence-drop', 'locator-consumed', 'open-evidence-target', 'command-progress', 'cursor-context', 'open-history'],
   // 写作辅助卡片遇到配置类检索失败时要指一条真路（dev-board#688 D3）。设置在工作台里是
   // 一个标签（dev-board#582），组件拿不到页面实例，只能靠宿主注入——与 MarketDetailPane 同口径。
   inject: { openSettingsTab: { default: null }, openLegalReferenceTab: { default: null } },
@@ -825,14 +824,6 @@ export default {
       else if (payload.action === 'deep') host.runDeep()
       else if (payload.action === 'ai') { host.setAiEnabled(payload.value); this.$emit('menu-state') }
       else if (payload.action === 'hidden') host.setBallHidden(payload.value)
-    },
-    /**
-     * 工具栏「解析」（dev-board#182）。窗格在工作台一级（可停右栏也可停左栏），
-     * 编辑器只把意图连同自己是哪份文档一起上抛，开哪个 dock、要不要 POST /parse
-     * 由宿主决定。
-     */
-    onToggleInsight() {
-      this.$emit('open-insight', { fileId: this.file && this.file.id })
     },
     /**
      * 把「依据」窗格的订阅开关下发给客体页。不订阅时客体页一条 cursor-context 都不发，
@@ -1691,7 +1682,8 @@ export default {
           clear: clearWritingCompletions, lookup: lookupWritingSelection, detail: getDocInsightEntity, learnedDetail: getWritingCompletionDetail },
         openSettings: (opts) => { if (this.openSettingsTab) this.openSettingsTab(opts || {}) },
         openLegalReference: this.openLegalReferenceTab ? (reference) => this.openLegalReferenceTab(reference) : null,
-        translate: (key) => this.$t(key),
+        translate: (key, params) => this.$t(key, params),
+        language: getAppLanguage(),
         openAccount: () => requireAccount({ reason: 'gateway', force: true }),
         openRecharge: () => requireRecharge(),
         onRevise: (payload) => this.onWritingRevise(payload),
@@ -1702,7 +1694,6 @@ export default {
         execute: (action, params) => this.executor.executeCommand(action, params), send: this._transportSend,
         writable: this.canWrite, review: reviewDocInsight, active: this.active !== false,
         storage: { get: (key) => uni.getStorageSync(key), set: (key, value) => uni.setStorageSync(key, value) },
-        openInsight: () => this.onToggleInsight(),
         // 正文浮球只是入口：清单在右栏审阅面板的「AI 审校」标签里。
         openPanel: () => this.openInlineReviewPanel(),
         onState: (state) => { this.inlineReviewState = state },

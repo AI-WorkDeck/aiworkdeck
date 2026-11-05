@@ -142,8 +142,10 @@ export function referencesFromTools(processes = []) {
     const result = parse(item.output)
     if (!tool || !result || result.error || result.isError) continue
     for (const reference of referencesFromEntity({ kind: tool === 'case_search' ? 'CASE' : 'LAW', retrievalStatus: 'OK', detail: { source: 'pkulaw', result } })) {
-      // Legacy chat XML can also be emitted by a model. Do not promote its provenance.
-      reference.status = 'unverified'
+      // Only tool events received in this turn's live stream keep the retrieval status
+      // (retrieved / metadata). Records rebuilt from history text could also have been
+      // authored by a model, so their provenance is not promoted (教程反馈 47).
+      if (item.live !== true) reference.status = 'unverified'
       reference.id = legalReferenceId(reference)
       found.set(reference.id, reference)
     }

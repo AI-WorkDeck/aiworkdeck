@@ -1,7 +1,7 @@
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
-  <view v-if="visible" class="evidence-bar" :class="{ 'is-error': isError }" @mousedown.stop @tap.stop>
+  <view v-if="visible" class="evidence-bar" :class="{ 'is-error': isError, 'at-top': placement === 'top' }" @mousedown.stop @tap.stop>
     <svg class="evidence-bar-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path v-for="(d, i) in linkIcon" :key="i" :d="d" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
@@ -42,6 +42,8 @@ export default {
     status: { type: String, default: 'success' },
     errorText: { type: String, default: '' },
     saving: { type: Boolean, default: false },
+    // 'top'：刚建链的文字在画布下部，小条改贴顶部，不压住它的下一行（教程反馈 77）
+    placement: { type: String, default: 'bottom' },
   },
   computed: {
     isError() { return this.status === 'error' },
@@ -69,6 +71,7 @@ export default {
   box-shadow: 0 6px 20px rgba(46, 90, 80, 0.22);
   font-size: 12px; color: var(--awd-text);
 }
+.evidence-bar.at-top { top: 16px; bottom: auto; }
 .evidence-bar.is-error { border-color: var(--awd-danger); box-shadow: 0 6px 20px rgba(180, 35, 24, 0.18); }
 .evidence-bar.is-error .evidence-bar-icon,
 .evidence-bar.is-error .evidence-bar-linked { color: var(--awd-danger-text); }

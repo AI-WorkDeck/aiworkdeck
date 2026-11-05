@@ -12,7 +12,7 @@ import {
 } from '@/services/api.js'
 import { evidenceTagLabel, loadEvidenceTags } from '@/utils/evidenceTags.js'
 import { parseFileLinkUrl, locatorSummary } from '@/utils/evidenceLocator.js'
-import { createEvidenceLinkForDrop, pickEvidenceTarget } from './evidenceLinkCore.js'
+import { createEvidenceLinkForDrop, pickEvidenceTarget, evidenceBarPlacement } from './evidenceLinkCore.js'
 
 export { createEvidenceLinkForDrop, pickEvidenceTarget }
 
@@ -29,7 +29,7 @@ export const evidenceLinkData = () => ({
   // dev-board#133/#139：失败只弹 toast = 用户毫无感知的静默失败）。
   evidenceMethodBar: {
     visible: false, side: 'left', fileName: '', method: 'written_review',
-    targetId: null, linkKey: '', docFileId: null, status: 'success', errorText: '', saving: false,
+    targetId: null, linkKey: '', docFileId: null, status: 'success', errorText: '', saving: false, placement: 'bottom',
   },
 })
 
@@ -60,7 +60,7 @@ export const evidenceLinkMethods = {
     try {
       res = await createEvidenceLinkForDrop({
         exec, api: { createEvidenceLink: (p, b) => createEvidenceLink(p, b).then(unwrap), addEvidenceTargets: (p, k, t) => addEvidenceTargets(p, k, t).then(unwrap) },
-        method: loadEvidenceTags()[0] || null,
+        method: loadEvidenceTags((key) => this.$t(key))[0] || null,
         projectId: pid, docFileId: Number(doc.id), file, internalBase: this.WPS_INTERNAL_HTTP_LINK_BASE || '',
       })
     } catch (e) {
@@ -81,8 +81,10 @@ export const evidenceLinkMethods = {
       })
       return
     }
+    let placement = 'bottom'
+    try { placement = evidenceBarPlacement(await exec('get_cursor_rect', {})) } catch (e) { /* 读不到光标就贴底部 */ }
     this.showEvidenceMethodBar({
-      side, fileName: file.name || '', targetId: res.targetId, linkKey: res.linkKey, docFileId: Number(doc.id), method: res.method || '',
+      side, fileName: file.name || '', targetId: res.targetId, linkKey: res.linkKey, docFileId: Number(doc.id), method: res.method || '', placement,
     })
     uni.$emit('awd:evidence-changed', { docFileId: Number(doc.id), linkKey: res.linkKey })
   },
@@ -95,9 +97,9 @@ export const evidenceLinkMethods = {
    * 收起只由用户动作驱动：点 ×、选了方法、又建了新的一条（整体替换）、
    * 或者换到别的文档（模板里按 docFileId 收，见 project-overview.vue）。
    */
-  showEvidenceMethodBar({ side, fileName, targetId, linkKey, docFileId, method = 'written_review' }) {
+  showEvidenceMethodBar({ side, fileName, targetId, linkKey, docFileId, method = 'written_review', placement = 'bottom' }) {
     this.evidenceMethodBar = {
-      visible: true, side, fileName, method, targetId, linkKey,
+      visible: true, side, fileName, method, targetId, linkKey, placement,
       docFileId: docFileId == null ? null : Number(docFileId),
       status: 'success', errorText: '', saving: false,
     }

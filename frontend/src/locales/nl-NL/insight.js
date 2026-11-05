@@ -46,7 +46,8 @@ export default {
   "docMissing": "Dat bestand zit niet meer in dit project",
   "source": {
     "projectFile": "Projectbestand",
-    "qichacha": "Qichacha"
+    "qichacha": "Qichacha",
+    "pkulaw": "PKULaw"
   },
   "mentions": "{count} vermelding(en)",
   "mentionsTitle": "Vermeldingen in dit document",
