@@ -91,7 +91,7 @@ export default {
     "crossBorderNoticeBody": "De Chinese site maakt via AI WorkDeck-servers verbinding met Alibaba Cloud Bailian; de internationale site gebruikt OpenRouter. Tekst en bestandsfragmenten die naar AI worden gestuurd, worden gebruikt voor inferentie en facturering. Afhankelijk van het model kan verwerking buiten het Chinese vasteland plaatsvinden. Als u uw toestemming in Instellingen intrekt, wordt het AI-kanaal van het platform uitgeschakeld.",
     "agreementRequired": "Vink het vakje aan om akkoord te gaan met de Servicevoorwaarden en het Privacybeleid om door te gaan",
     "crossBorderRequired": "Vink de afzonderlijke toestemming voor grensoverschrijdende doorgifte aan om door te gaan",
-    "consentBothRequired": "Vink eerst de twee toestemmingen hierboven aan",
+    "consentBothRequired": "Vink eerst beide toestemmingen aan",
     "crossBorderLabelDomestic": "Afzonderlijke toestemming: inhoud die naar de AI wordt gestuurd, kan buiten het Chinese vasteland worden verwerkt",
     "crossBorderNoticeTitleDomestic": "Toestemming voor mogelijke verwerking buiten het Chinese vasteland",
     "crossBorderNoticeBodyDomestic": "De China-site maakt via AI WorkDeck-servers verbinding met Alibaba Cloud Bailian. Tekst en bestandsfragmenten die naar de AI worden gestuurd, worden gebruikt voor inferentie en facturering; afhankelijk van het gekozen model kan verwerking buiten het Chinese vasteland plaatsvinden. Je kunt je toestemming intrekken in Instellingen, waardoor het AI-kanaal van het platform wordt uitgeschakeld.",

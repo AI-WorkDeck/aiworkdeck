@@ -91,7 +91,7 @@ export default {
     "crossBorderNoticeBody": "Situs Tiongkok terhubung ke Alibaba Cloud Bailian melalui server AI WorkDeck; situs internasional menggunakan OpenRouter. Teks dan kutipan berkas yang dikirim ke AI digunakan untuk inferensi dan penagihan. Bergantung pada model, pemrosesan dapat berlangsung di luar Tiongkok daratan. Pencabutan persetujuan di Pengaturan menonaktifkan kanal AI platform.",
     "agreementRequired": "Centang kotak untuk menyetujui Ketentuan Layanan dan Kebijakan Privasi guna melanjutkan",
     "crossBorderRequired": "Centang persetujuan transfer lintas batas yang terpisah untuk melanjutkan",
-    "consentBothRequired": "Centang dulu kedua persetujuan di atas",
+    "consentBothRequired": "Centang dulu kedua persetujuan",
     "crossBorderLabelDomestic": "Persetujuan terpisah: konten yang dikirim ke AI dapat diproses di luar Tiongkok daratan",
     "crossBorderNoticeTitleDomestic": "Persetujuan atas kemungkinan pemrosesan di luar Tiongkok daratan",
     "crossBorderNoticeBodyDomestic": "Situs Tiongkok terhubung ke Alibaba Cloud Bailian melalui server AI WorkDeck. Teks dan cuplikan file yang dikirim ke AI digunakan untuk inferensi dan penagihan; tergantung model yang dipilih, konten tersebut dapat diproses di luar Tiongkok daratan. Anda dapat menarik persetujuan di Pengaturan, yang akan menonaktifkan saluran AI platform.",
