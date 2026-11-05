@@ -327,7 +327,8 @@ function selectDefaultIds(entries, opts = {}) {
  */
 function createSystemFonts(ctx = {}) {
   const homeDir = ctx.homeDir || os.homedir()
-  const dataDir = ctx.dataDir || path.join(homeDir, '.aiworkdeck')
+  // 用户字体目录看真实主目录；数据目录走 awd-home（AWD_HOME 隔离实例，问题 20）
+  const dataDir = ctx.dataDir || require('./awd-home').dataDir()
   const platform = ctx.platform || process.platform
   const dirs = ctx.dirs || fontDirs(platform, ctx.env || process.env, homeDir)
   const configFile = path.join(dataDir, CONFIG_FILE)

@@ -180,7 +180,9 @@ class ServiceManager {
       if (this.closing) throw new Error('services are stopping')
       const spec = candidates[i]
       const stdio = logStream ? ['ignore', 'pipe', 'pipe'] : 'inherit'
-      const proc = spawn(spec.cmd, spec.args, { cwd: spec.cwd, env: spec.env, stdio })
+      // 隔离实例（AWD_HOME，问题 20）：子进程的 HOME / USERPROFILE 指到 AWD_HOME
+      const env = require('../awd-home').childEnv(spec.env, this.ctx.awdHome)
+      const proc = spawn(spec.cmd, spec.args, { cwd: spec.cwd, env, stdio })
       const launch = { process: proc, deadline: Date.now() + timeoutMs,
         fullReady: false, splitReadiness: !!d.startupHealth, bootOverlay: spec.bootOverlay }
       this.launches.set(name, launch)
