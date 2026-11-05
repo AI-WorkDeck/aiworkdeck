@@ -262,4 +262,37 @@ class SseEmitterServiceTest {
                 "身份缺省时行为必须与改造前完全一致：不判移交");
     }
 
+
+    @Test
+    void liveEventWaitsForReplayToFinishSoIdsStayIncreasing() throws Exception {
+        java.util.List<Long> wireIds = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+        java.util.concurrent.CountDownLatch replayStarted = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        SseEmitterService svc = new SseEmitterService() {
+            @Override
+            void emitTo(String connectionId, SseEmitter emitter, String eventName, String payload, long id) {
+                if (id > 0) wireIds.add(id);
+                if (id == 1) {
+                    replayStarted.countDown();
+                    try { release.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                }
+            }
+        };
+        for (int i = 0; i < 3; i++) svc.send("conv-race", "text_delta", "d" + i);
+
+        Thread reconnect = new Thread(() -> svc.createConnection("conv-race", null, "0"));
+        reconnect.start();
+        replayStarted.await();
+        Thread live = new Thread(() -> svc.send("conv-race", "text_delta", "live"));
+        live.start();
+        // 修复后 live 会阻塞在发送锁上；未修复时它直接跑完。两种状态都可以放行补发线程
+        while (live.getState() != Thread.State.BLOCKED && live.getState() != Thread.State.TERMINATED) {
+            Thread.onSpinWait();
+        }
+        release.countDown();
+        reconnect.join();
+        live.join();
+
+        assertEquals(java.util.List.of(1L, 2L, 3L, 4L), wireIds, "补发 1..3 必须先于实时事件 4 上线");
+    }
 }
