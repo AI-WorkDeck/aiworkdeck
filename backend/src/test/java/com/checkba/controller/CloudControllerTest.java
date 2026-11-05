@@ -464,6 +464,18 @@ class CloudControllerTest {
 
         assertEquals(1, response.getBody().get("code"));
         assertEquals("请先把这份案卷放进团队案件库", response.getBody().get("message"));
+        assertFalse(response.getBody().containsKey("kind"));
+    }
+
+    @Test
+    void reconnectRequiredExceptionCarriesKindForTheReconnectButton() {
+        var e = VersionException.cloudReconnectRequired("云端同步权限已变化");
+
+        var response = controller.onVersionError(e);
+
+        assertEquals(1, response.getBody().get("code"));
+        assertEquals("云端同步权限已变化", response.getBody().get("message"));
+        assertEquals(VersionException.CLOUD_RECONNECT_REQUIRED, response.getBody().get("kind"));
     }
 
     // ---- 请求体缺字段：要报「参数不对」，不是 NPE / ClassCastException ----

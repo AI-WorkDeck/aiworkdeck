@@ -264,6 +264,7 @@ export default {
   "addMemberFailed": "Impossible d'ajouter",
   "copiedPasteToColleague": "Copié — collez-le à votre collègue",
   "connectFailed": "Échec de la connexion",
+  "reconnectCloud": "Se reconnecter au cloud",
   "inviteTextOfficial": "{inviter} vous invite à travailler ensemble sur « {project} » dans AI WorkDeck.\n\nVoici comment rejoindre le dossier :\n1. Connectez-vous à l'application de bureau avec votre propre compte AI WorkDeck ;\n2. Ouvrez la liste des projets et cliquez sur « Récupérer un dossier depuis la bibliothèque de dossiers d'équipe » ;\n3. Sélectionnez « {project} » et cliquez sur « Récupérer sur cet appareil ».\n\nEnsuite, chacun travaille sur sa propre copie et clique sur « Envoyer le brouillon » pour fusionner les modifications.",
   "inviteTextOfficialNoInviter": "Vous êtes invité(e) à travailler ensemble sur « {project} » dans AI WorkDeck.\n\nVoici comment rejoindre le dossier :\n1. Connectez-vous à l'application de bureau avec votre propre compte AI WorkDeck ;\n2. Ouvrez la liste des projets et cliquez sur « Récupérer un dossier depuis la bibliothèque de dossiers d'équipe » ;\n3. Sélectionnez « {project} » et cliquez sur « Récupérer sur cet appareil ».\n\nEnsuite, chacun travaille sur sa propre copie et clique sur « Envoyer le brouillon » pour fusionner les modifications.",
   "addPeopleTitle": "Ajouter des personnes à ce dossier",

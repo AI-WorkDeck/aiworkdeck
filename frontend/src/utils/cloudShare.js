@@ -12,6 +12,17 @@
  * 「多于一条时一次都不许调 share」。
  */
 
+/**
+ * 后端云端写权限门禁（权限代次）对不上时回的 kind（VersionException.CLOUD_RECONNECT_REQUIRED）。
+ * 弹窗据此就地写明原因并给「重新连接云端」按钮；不做自动重连。
+ */
+export const CLOUD_RECONNECT_REQUIRED = 'CLOUD_RECONNECT_REQUIRED'
+
+/** 这个错误是不是要律师明确重新连接云端（只认 kind，不匹配文案）。 */
+export function needsCloudReconnect(e) {
+  return !!e && e.kind === CLOUD_RECONNECT_REQUIRED
+}
+
 /** 多于一条连接时的拒绝理由（调用方据此选文案：version.tooManyLibraries）。 */
 export const TOO_MANY_LIBRARIES = 'TOO_MANY_LIBRARIES'
 

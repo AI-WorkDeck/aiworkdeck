@@ -548,6 +548,10 @@ identitySync、平台Key申请或令牌签发。完成 setup 后再单独 exchan
   否则在 `<body>` 下单独 `createApp` 挂登录弹层 `components/account/AccountLoginDialog.vue`（`variant="dialog"`），
   打开期间持有全局浮层（`overlayState.js`，让 BrowserView 让开）；成功 true 并广播，取消 false。
   并发调用共用一个弹层。纯逻辑在 `requireAccountCore.js`（零依赖，护栏 `npm run test:account`）。
+  **登录层 z-index 9990，压不过 9999 的业务弹窗遮罩**：`requireAccount.js` 导出 `accountLoginOpen`（ref，挂载置真、收尾置假），
+  会在自己打开期间调 `requireAccount` 的 9999 弹窗（`CollabDialog`、`InviteMemberDialog`）据此加 `.yield-to-login`（`visibility:hidden`）
+  让路、登录完自己回来；不改全局 z-index（AwdDialog 10000 要盖在登录卡上）。新增这类调用方照抄，护栏
+  `tests/member-invite/collab-login-layer.test.mjs`（问题 126/127，dev-board#1713）。
   浏览器端（团队服务器）恒 true——那里账户在服务端按人桥接，不是「本机连官网账户」。
 - `services/api.js` 的 **4011 分支**：就地弹层（`auto:true`——用户取消后 60 秒内同类自动触发不再追着弹），
   关掉之后**一律 reject**，`err.accountRequired=true`，登录成功时 `err.loggedIn=true`

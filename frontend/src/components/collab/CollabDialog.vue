@@ -1,7 +1,7 @@
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
-  <view v-if="visible" class="awd-mask collab-mask" @tap.self="close">
+  <view v-if="visible" class="awd-mask collab-mask" :class="{ 'yield-to-login': loginLayerOpen }" @tap.self="close">
     <view class="awd-dialog collab-dialog" @tap.stop>
       <view class="awd-header collab-header">
         <text class="awd-title">{{ $t('version.collabTitle') }}</text>
@@ -50,6 +50,16 @@
                 >{{ $t('version.addToTeamLibrary') }}</view>
               </view>
             </template>
+            <!-- 云端写权限门禁拒绝（kind=CLOUD_RECONNECT_REQUIRED）：原因写在这里，不只闪一下 toast；
+                 重新连接要律师自己点，不自动重连（问题 126/127） -->
+            <view v-if="reconnectMessage" class="collab-empty-action collab-reconnect">
+              <text class="collab-error">{{ reconnectMessage }}</text>
+              <view
+                class="awd-btn awd-btn-secondary"
+                :class="{ 'awd-btn-disabled': busy }"
+                @tap="onReconnectCloud"
+              >{{ $t('version.reconnectCloud') }}</view>
+            </view>
           </template>
 
           <template v-else>
@@ -257,10 +267,11 @@ import {
   listCloudConnections,
   shareProjectToCloud, uploadToCloud, updateFromCloud, checkCloud, getVersionStatus,
   getCloudMembers, addCloudMember, lookupCloudMember, getOfficialCloud, removeCloudMember,
+  connectOfficialCloud,
 } from '@/services/api.js'
 import { roleLabel, ASSIGNABLE_ROLES } from '@/config/memberRoles.js'
-import { shareProjectToLibrary } from '@/utils/cloudShare.js'
-import { requireAccount } from '@/utils/requireAccount.js'
+import { shareProjectToLibrary, needsCloudReconnect } from '@/utils/cloudShare.js'
+import { requireAccount, accountLoginOpen } from '@/utils/requireAccount.js'
 import { getInitial } from '@/utils/textInitial.js'
 import { getAppLanguage } from '@/utils/appLanguage.js'
 import { siteBaseUrl } from '@/utils/siteLinks.js'
@@ -318,10 +329,16 @@ export default {
       // 官方团队案件库（GET /api/cloud/official）。只用 available 这一位：为假（国际站）
       // 且本机也没有连接时，这份案卷放不进任何案件库，界面如实说明。地址不给律师看。
       official: { available: false },
+      // 放进案件库被云端写权限门禁拒绝时的原因（后端原话）；有值就显示「重新连接云端」
+      reconnectMessage: '',
       ASSIGNABLE_ROLES,
     }
   },
   computed: {
+    // 登录层（z-index 9990）开着时本弹窗（9999）整块收起让路，登录完自己回来
+    loginLayerOpen() {
+      return accountLoginOpen.value
+    },
     tabs() {
       return [
         { key: 'casefile', label: this.$t('version.tabCaseFile') },
@@ -376,6 +393,7 @@ export default {
       this.activeTab = this.initialTab || 'casefile'
       // 上次查的那个人不能跟着弹窗一起回来——律师会以为这是这次要加的人
       this.addContact = ''
+      this.reconnectMessage = ''
       this.clearCandidate()
       this.loadConnections()
       if (this.linked && this.activeTab === 'people') this.loadMembers()
@@ -415,6 +433,7 @@ export default {
       // 选哪条连接的规则搬到了 utils/cloudShare.js——InviteMemberDialog 的
       // 「放进团队案件库」按钮用的是同一段判定，复制一份必然慢慢分叉。
       this.busy = true
+      this.reconnectMessage = ''
       try {
         const res = await shareProjectToLibrary({
           projectId: this.projectId,
@@ -428,10 +447,27 @@ export default {
         uni.showToast({ title: this.$t('version.sharedToLibrary'), icon: 'none' })
         this.$emit('changed')
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.shareToLibraryFailed'), icon: 'none' })
+        if (needsCloudReconnect(e)) this.reconnectMessage = e.message || this.$t('version.shareToLibraryFailed')
+        else uni.showToast({ title: (e && e.message) || this.$t('version.shareToLibraryFailed'), icon: 'none' })
       } finally {
         this.busy = false
       }
+    },
+    // 「重新连接云端」：走现有的官方案件库连接入口，连好后重放一次「放进团队案件库」。
+    // 律师明确点了才连，不做自动重连（门禁不放松）。
+    async onReconnectCloud() {
+      if (this.busy) return
+      this.busy = true
+      try {
+        await connectOfficialCloud()
+      } catch (e) {
+        uni.showToast({ title: (e && e.message) || this.$t('version.connectFailed'), icon: 'none' })
+        return
+      } finally {
+        this.busy = false
+      }
+      await this.loadConnections()
+      await this.onShare()
     },
     openHelp() {
       this.close()
@@ -635,6 +671,9 @@ export default {
   position: fixed; inset: 0; background: var(--awd-overlay);
   display: flex; align-items: center; justify-content: center; z-index: 9999;
 }
+.yield-to-login {
+  visibility: hidden;
+}
 .collab-dialog {
   width: 640px; max-width: 92vw; max-height: 80vh;
   display: flex; flex-direction: column; background: var(--awd-surface);
@@ -671,6 +710,8 @@ export default {
 
 .collab-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
 .collab-empty-action { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.collab-reconnect { margin-top: 14px; }
+.collab-error { font-size: var(--awd-panel-fs); color: var(--awd-danger-text); line-height: 1.7; }
 
 .collab-field { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
 .collab-label { font-size: var(--awd-font-size-body); font-weight: 500; color: var(--awd-text); }
