@@ -156,4 +156,46 @@ class LitigationVisualFlowTest {
             Files.deleteIfExists(tmp);
         }
     }
+
+    @Test
+    @DisplayName("产出统一收进根目录下的「诉讼可视化」父文件夹：没有就建、任一语言的同名都复用、明确指定子文件夹照旧（dev-board#1713）")
+    void outputsGoIntoSharedLitigationFolder() {
+        com.checkba.service.ProjectFileService files = org.mockito.Mockito.mock(com.checkba.service.ProjectFileService.class);
+        com.checkba.repository.ProjectFileRepository repo =
+                org.mockito.Mockito.mock(com.checkba.repository.ProjectFileRepository.class);
+        LitigationVisualTools t = new LitigationVisualTools(svc, null, files, repo, null, null);
+        org.mockito.Mockito.when(files.resolveParentId(7L, null)).thenReturn(null);
+        org.mockito.Mockito.when(files.resolveParentId(7L, 0L)).thenReturn(null);
+        org.mockito.Mockito.when(files.resolveParentId(7L, 55L)).thenReturn(55L);
+
+        // 没有：按当前语言建一个（测试环境未注册语言服务 → 中文）
+        com.checkba.model.entity.ProjectFile created = new com.checkba.model.entity.ProjectFile();
+        created.setId(300L);
+        org.mockito.Mockito.when(files.createFolder(org.mockito.ArgumentMatchers.eq(7L),
+                org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.eq("诉讼可视化"),
+                org.mockito.ArgumentMatchers.anyLong())).thenReturn(created);
+        org.mockito.Mockito.when(repo.findByProjectIdAndParentIdOrderBySortOrderAsc(7L, null)).thenReturn(java.util.List.of());
+        org.junit.jupiter.api.Assertions.assertEquals(300L, t.outputParentId(7L, null));
+        org.junit.jupiter.api.Assertions.assertEquals(300L, t.outputParentId(7L, 0L), "根目录写成 0 也算根");
+
+        // 已有（哪怕是切换语言前建的英文名）：复用，不再建第二个
+        com.checkba.model.entity.ProjectFile material = new com.checkba.model.entity.ProjectFile();
+        material.setId(1L);
+        material.setName("合同.docx");
+        material.setIsFolder(false);
+        com.checkba.model.entity.ProjectFile existing = new com.checkba.model.entity.ProjectFile();
+        existing.setId(400L);
+        existing.setName("Litigation Visualization");
+        existing.setIsFolder(true);
+        org.mockito.Mockito.when(repo.findByProjectIdAndParentIdOrderBySortOrderAsc(7L, null))
+                .thenReturn(java.util.List.of(material, existing));
+        org.junit.jupiter.api.Assertions.assertEquals(400L, t.outputParentId(7L, null));
+        org.mockito.Mockito.verify(files, org.mockito.Mockito.times(2)).createFolder(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyLong());
+
+        // 明确指定的子文件夹照旧尊重
+        org.junit.jupiter.api.Assertions.assertEquals(55L, t.outputParentId(7L, 55L));
+        org.junit.jupiter.api.Assertions.assertEquals(20, LitigationVisualTools.OUTPUT_ROOT_NAMES.size(), "20 个语种齐全");
+    }
 }

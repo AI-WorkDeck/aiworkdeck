@@ -35,6 +35,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 时间轴大师（mqc-timeline-master，vendor 见 litviz/UPSTREAM.md）的工具面。
@@ -185,7 +187,7 @@ public class LitigationTimelineTools implements AgentToolComponent {
                 // 前缀序号防同名，统一 .txt 后缀表明这是转出的文字版。
                 String safe = LitigationVisualTools.sanitize(pf.getName(), "材料" + idx);
                 Path dst = materialsDir.resolve(String.format("%02d-%s.txt", idx, safe));
-                Files.writeString(dst, text, StandardCharsets.UTF_8);
+                Files.writeString(dst, normalizeChineseDates(text), StandardCharsets.UTF_8);
                 relPaths.add("materials/" + dst.getFileName());
             }
             if (relPaths.isEmpty()) {
@@ -263,14 +265,10 @@ public class LitigationTimelineTools implements AgentToolComponent {
             if (fileErr != null) return fileErr;
 
             List<String> args = new ArrayList<>();
-            String a = answer == null ? "" : answer.trim();
-            if ("style".equals(st) && a.isEmpty()) {
-                // 上游 CLI 裸跑 style 的默认值是 2（歸藏风），与它自己文档承诺的
-                // 「不回 = 奇川风」相悖（契约盘点第 9 节）。这里把默认钉回 1。
-                a = "1";
-            }
-            if ("mark".equals(st) && a.isEmpty()) {
-                a = "0";
+            String a = normalizeAnswer(st, answer);
+            if (a == null) {
+                return "风格『" + answer + "』认不出来。stage=style 的 answer 只认编号："
+                        + "1 奇川风 / 2 歸藏风 / 3 白描（用户没选就传 1）。按用户的原选择换成编号后重试。";
             }
             if (!a.isEmpty()) args.add(a);
 
@@ -289,6 +287,95 @@ public class LitigationTimelineTools implements AgentToolComponent {
         }
     }
 
+    private static final Pattern ALL_ANSWER = Pattern.compile(
+            "all|everything|全选|都要|全都要|整份|(?:全部|所有)(?:材料|时间|时间段|部分|段落|内容)?(?:都要)?");
+    private static final Pattern NUMBER_LIST = Pattern.compile("\\d+(?:[\\s,，、;；]+\\d+)*");
+    private static final Pattern LEADING_STYLE_NO = Pattern.compile("^[\\[【(（]?\\s*([1-4])(?!\\d)");
+
+    /**
+     * 把模型转述的用户答复规范成上游 CLI 认的形状（dev-board#1713）。上游各阶段只认很窄的写法：
+     * budget 只认 {@code all}，「全部」会落进 {@code int("全部")} 抛错，用户就被反复带回第四轮；
+     * style 只认编号，风格名会 ValueError，且上游提示里的编号曾与真实编号对不上。
+     * 返回 null 表示 style 的答复认不出来。
+     */
+    static String normalizeAnswer(String stage, String answer) {
+        String a = answer == null ? "" : answer.trim();
+        switch (stage) {
+            case "pick", "span", "budget" -> {
+                String bare = a.replaceAll("[\\s\\[\\]【】「」『』\"'“”‘’。.!！]", "").toLowerCase(java.util.Locale.ROOT);
+                if (ALL_ANSWER.matcher(bare).matches()) return "all";
+                if (NUMBER_LIST.matcher(a).matches()) return String.join(",", a.split("[\\s,，、;；]+"));
+                return a;
+            }
+            case "style" -> {
+                // 上游 CLI 裸跑 style 的默认值是 2（歸藏风），与它自己文档承诺的
+                // 「不回 = 奇川风」相悖（契约盘点第 9 节）。这里把默认钉回 1。
+                if (a.isEmpty()) return "1";
+                // 风格名优先于编号：用户点的是名字，旧提示「1 法官白描」那类错号标签里的数字不可信。
+                if (a.contains("奇川")) return "1";
+                if (a.contains("歸藏") || a.contains("归藏")) return "2";
+                if (a.contains("白描")) return "3";
+                Matcher m = LEADING_STYLE_NO.matcher(a);
+                if (m.find()) return m.group(1);
+                if (a.contains("你定") || a.contains("AI 定") || a.contains("AI定") || a.contains("默认")) return "4";
+                return null;
+            }
+            case "mark" -> {
+                return a.isEmpty() ? "0" : a;
+            }
+            default -> {
+                return a;
+            }
+        }
+    }
+
+    private static final String CN_DIGITS = "〇零○一二三四五六七八九";
+    private static final Pattern CN_DATE = Pattern.compile(
+            "([〇零○一二三四五六七八九]{4}|(?<!\\d)\\d{4})\\s*年\\s*"
+            + "(十[一二]?|[一二三四五六七八九]|\\d{1,2})\\s*月"
+            + "(?:\\s*([一二三]?十[一二三四五六七八九]?|[一二三四五六七八九]|\\d{1,2})\\s*([日号]))?");
+
+    /**
+     * 把材料里的中文数字日期（二〇二六年二月二十日）改写成阿拉伯数字（2026年2月20日）再交给管线
+     * （dev-board#1713）。上游 pick.py 的 {@code _DATE} 只认阿拉伯数字，合同、判决书落款这种写法
+     * 会被整份判成「0 句带日期」。只改日期本身，纯阿拉伯数字的日期原样不动。
+     * 忠实性：管线的子序列校验与溯源索引都以这份改写后的文字版为准（它不回头比对原件），
+     * 所以图上与索引里出现的是阿拉伯数字写法，其余文字逐字不变。
+     */
+    static String normalizeChineseDates(String text) {
+        if (text == null || text.isEmpty()) return text;
+        Matcher m = CN_DATE.matcher(text);
+        StringBuilder out = new StringBuilder();
+        while (m.find()) {
+            String y = m.group(1), mo = m.group(2), d = m.group(3);
+            boolean chinese = !y.chars().allMatch(Character::isDigit) || !mo.chars().allMatch(Character::isDigit)
+                    || (d != null && !d.chars().allMatch(Character::isDigit));
+            if (!chinese) {
+                m.appendReplacement(out, Matcher.quoteReplacement(m.group()));
+                continue;
+            }
+            StringBuilder year = new StringBuilder();
+            for (char c : y.toCharArray()) {
+                int i = CN_DIGITS.indexOf(c);
+                year.append(i < 0 ? c : (char) ('0' + Math.max(0, i - 2)));
+            }
+            String rep = year + "年" + cnNumber(mo) + "月" + (d == null ? "" : cnNumber(d) + m.group(4));
+            m.appendReplacement(out, Matcher.quoteReplacement(rep));
+        }
+        m.appendTail(out);
+        return out.toString();
+    }
+
+    /** 1–31 的中文小写数字（含「十」「二十三」）转阿拉伯数字；已是数字的原样返回。 */
+    private static int cnNumber(String s) {
+        if (s.chars().allMatch(Character::isDigit)) return Integer.parseInt(s);
+        int ten = s.indexOf('十');
+        if (ten < 0) return CN_DIGITS.indexOf(s.charAt(0)) - 2;
+        int tens = ten == 0 ? 1 : CN_DIGITS.indexOf(s.charAt(0)) - 2;
+        int ones = ten == s.length() - 1 ? 0 : CN_DIGITS.indexOf(s.charAt(ten + 1)) - 2;
+        return tens * 10 + ones;
+    }
+
     // ==================== 出图 ====================
 
     // 与 litigation_render 同一条收尾（sendRefreshFilesAction + sendOpenFileAction），
@@ -304,7 +391,8 @@ public class LitigationTimelineTools implements AgentToolComponent {
     public String litigation_timeline_render(
             @P("Project ID") Long projectId,
             @P("Figure name, used for the folder and file names (e.g. '催告与还款经过时间轴')") String diagramName,
-            @P(value = "Target folder ID (optional; omit for project root)", required = false) Long parentFolderId,
+            @P(value = "Target folder ID (optional; omit to use the shared litigation-visual folder at project root)",
+                    required = false) Long parentFolderId,
             @P(value = "JSON object with items.json (and other pipeline files) to submit before "
                     + "rendering", required = false) String modelFilesJson
     ) {
@@ -367,7 +455,8 @@ public class LitigationTimelineTools implements AgentToolComponent {
                 if (docx != null) paths.add(docx);
             }
 
-            ProjectFile folder = visualTools.createFolderTolerant(projectId, parentFolderId, safeName);
+            ProjectFile folder = visualTools.createFolderTolerant(
+                    projectId, visualTools.outputParentId(projectId, parentFolderId), safeName);
             List<String> registered = new ArrayList<>();
             List<ProjectFile> deliveredFiles = new ArrayList<>();
             ProjectFile svg = null;
