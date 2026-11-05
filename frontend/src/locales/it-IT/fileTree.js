@@ -153,5 +153,10 @@ export default {
   "importDropPrepareFailed": "Impossibile preparare il file rilasciato. Salvalo sul computer e riprova.",
   "importDropTooLarge": "I file senza percorso locale sono limitati a 100 MB per ogni rilascio. Salvali prima sul computer.",
   "importDesktopOnly": "L'importazione mediante trascinamento è disponibile solo su desktop",
-  "unknownFolder": "Cartella sconosciuta"
+  "unknownFolder": "Cartella sconosciuta",
+  "ocrMenu": "Riconosci testo (OCR)",
+  "ocrCopy": "Copia testo",
+  "ocrExportTxt": "Esporta TXT",
+  "ocrExportDocx": "Esporta Word",
+  "ocrOutputSuffix": "-testo OCR"
 }

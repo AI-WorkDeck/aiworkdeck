@@ -173,6 +173,29 @@
           </view>
           <text class="context-menu-text">{{ $t('fileTree.transcribe') }}</text>
         </view>
+        <!-- 识别文字（OCR，tutorial-series#155）：PDF 与图片，单选/多选均可；点开三项子菜单，
+             执行交给宿主 onExplorerOcr（批量队列、进度与取消、云端告知、并排校对都在宿主） -->
+        <view v-if="canOcrContext()" class="context-menu-item" :aria-expanded="ocrMenuOpen ? 'true' : 'false'" @tap="ocrMenuOpen = !ocrMenuOpen">
+          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M8 9h8M12 9v7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </view>
+          <text class="context-menu-text">{{ $t('fileTree.ocrMenu') }}</text>
+          <text class="context-menu-submenu-arrow" aria-hidden="true">{{ ocrMenuOpen ? '▾' : '▸' }}</text>
+        </view>
+        <template v-if="canOcrContext() && ocrMenuOpen">
+          <view class="context-menu-item context-menu-subitem" @tap="handleContextOcr('copy')">
+            <text class="context-menu-text">{{ $t('fileTree.ocrCopy') }}</text>
+          </view>
+          <view class="context-menu-item context-menu-subitem" @tap="handleContextOcr('txt')">
+            <text class="context-menu-text">{{ $t('fileTree.ocrExportTxt') }}</text>
+          </view>
+          <view class="context-menu-item context-menu-subitem" @tap="handleContextOcr('docx')">
+            <text class="context-menu-text">{{ $t('fileTree.ocrExportDocx') }}</text>
+          </view>
+        </template>
         <!-- 加入 AI 对话（dev-board#794 K15 ②）：与拖到 AI 面板同一条路，
              文件夹同样受 10 个文件的上限约束（宿主 addDraggedFileToAiContext 判） -->
         <view v-if="contextMenu.targetItem" class="context-menu-item" @tap="handleContextAddToAi">
@@ -756,6 +779,7 @@ import { nativeEvent, nativeDataTransfer, isExternalFileDrag, compatibleDropEffe
 import { prefetchLocalFilePath, startExternalFileDrag, clearLocalPathCache } from '@/utils/fileLocalDrag.js'
 import { isTranscribableMedia as isTranscribableMediaItem } from '@/utils/audioAttachment.js'
 import { canConvertItemToPdf, canMergeItemsToPdf, pdfConversionRecoveryOptions } from '@/utils/fileTreePdfActions.js'
+import { canOcrItems } from '@/utils/explorerOcr.js'
 import FileTypeIcon from '@/components/FileTypeIcon.vue'
 import ExplorerCreateMenu from '@/components/ExplorerCreateMenu.vue'
 import TagChip from '@/components/TagChip.vue'
@@ -935,6 +959,7 @@ export default {
       multiSelectedIds: [], // 多选的文件 ID 数组
 
       // 右键菜单状态
+      ocrMenuOpen: false,
       contextMenu: {
         visible: false,
         x: 0,
@@ -2580,6 +2605,7 @@ export default {
           this.selectedFileId = item.id
         }
 
+        this.ocrMenuOpen = false
         this.contextMenu = {
           visible: true,
           x: event.clientX || event.pageX || 0,
@@ -2596,6 +2622,7 @@ export default {
     closeContextMenu() {
       this.contextMenu.visible = false
       this.contextMenu.targetItem = null
+      this.ocrMenuOpen = false
     },
 
     /** 当前多选：批量选择态读勾选（checkedMap），否则读 ⌘ 加选（multiSelectedIds） */
@@ -2633,6 +2660,18 @@ export default {
       const items = this.contextTargetItems()
       this.closeContextMenu()
       await this.handleDuplicate(items)
+    },
+
+    canOcrContext() {
+      if (!this.contextMenu || !this.contextMenu.targetItem) return false
+      return canOcrItems(this.contextTargetItems(), this.viewMode)
+    },
+
+    // 整组一次交给宿主：逐个 emit 会各开一批、互相抢进度与云端告知
+    handleContextOcr(action) {
+      const items = this.contextTargetItems()
+      this.closeContextMenu()
+      if (canOcrItems(items, this.viewMode)) this.$emit('ocr-files', { action, items })
     },
 
     canConvertContextToPdf() {
@@ -4344,6 +4383,17 @@ export default {
 .context-menu-text {
   font-size: var(--awd-font-size-body);
   color: var(--awd-text);
+}
+
+/* 识别文字子菜单（tutorial-series#155）：就地展开，子项与图标列对齐缩进 */
+.context-menu-submenu-arrow {
+  margin-inline-start: auto;
+  padding-inline-start: 12px;
+  color: var(--awd-text-secondary, var(--awd-text));
+  font-size: 11px;
+}
+.context-menu-subitem {
+  padding-inline-start: 46px;
 }
 
 /* 文档对比按钮栏 */

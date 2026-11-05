@@ -65,5 +65,21 @@ export default {
   "clipboardRecordFailed": "Gagal merekodkan papan keratan",
   "fileCaptureFailed": "Gagal merekodkan fail",
   "fileMoveOccupied": "Fail ini mungkin sedang digunakan dan tidak dapat dialihkan",
-  "filesMoveOccupiedCount": "{count} fail mungkin sedang digunakan dan tidak dapat dialihkan"
+  "filesMoveOccupiedCount": "{count} fail mungkin sedang digunakan dan tidak dapat dialihkan",
+  "ocrProgress": "Mengenal pasti {index}/{total}",
+  "ocrCancel": "Batal",
+  "ocrCancelling": "Membatalkan…",
+  "ocrBatchBusy": "Satu kelompok pengecaman sedang berjalan; tunggu atau batalkannya",
+  "ocrConsentTitle": "Guna pengecaman teks awan?",
+  "ocrConsentHint": "PDF yang mempunyai lapisan teks diekstrak terus tanpa muat naik dan tanpa caj; hanya imbasan dan imej memerlukan OCR awan. Pengesahan ini hanya untuk kelompok ini; tukar kepada «sentiasa awan» atau «setempat sahaja» di Tetapan → Akaun & penggunaan → Pengecaman dokumen imbasan.",
+  "ocrConsentCheck": "Saya faham ke mana data dihantar dan cara caj dikenakan",
+  "ocrConsentConfirm": "Mula",
+  "ocrCopied": "Teks daripada {count} fail disalin dan disimpan ke sejarah papan klip",
+  "ocrSaved": "Dicipta: {names}",
+  "ocrOthersNotOpened": "Tidak dibuka bersebelahan: {names}",
+  "ocrLocalOnly": "Pengecaman ditetapkan kepada «setempat sahaja»; imej dan imbasan tidak dimuat naik (tukar dalam Tetapan)",
+  "ocrFailedItem": "\"{name}\" tidak selesai: {reason}",
+  "ocrSkipped": "{count} fail yang memerlukan OCR awan dilangkau (tidak disahkan)",
+  "ocrCancelled": "Dibatalkan; {count} fail tidak diproses",
+  "ocrSummaryTitle": "Dikenal pasti {done}/{total}"
 }

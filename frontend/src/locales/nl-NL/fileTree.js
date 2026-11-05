@@ -153,5 +153,10 @@ export default {
   "importDropPrepareFailed": "Kan het gesleepte bestand niet voorbereiden. Sla het op uw computer op en probeer het opnieuw.",
   "importDropTooLarge": "Bestanden zonder lokaal pad zijn beperkt tot 100 MB per keer. Sla ze eerst op uw computer op.",
   "importDesktopOnly": "Importeren door slepen is alleen beschikbaar op desktop",
-  "unknownFolder": "Onbekende map"
+  "unknownFolder": "Onbekende map",
+  "ocrMenu": "Tekst herkennen (OCR)",
+  "ocrCopy": "Tekst kopiëren",
+  "ocrExportTxt": "Exporteren als TXT",
+  "ocrExportDocx": "Exporteren als Word",
+  "ocrOutputSuffix": "-OCR-tekst"
 }

@@ -65,5 +65,21 @@ export default {
   "clipboardRecordFailed": "Zwischenablage konnte nicht aufgezeichnet werden",
   "fileCaptureFailed": "Datei konnte nicht aufgezeichnet werden",
   "fileMoveOccupied": "Diese Datei wird möglicherweise verwendet und konnte nicht verschoben werden",
-  "filesMoveOccupiedCount": "{count} Datei(en) werden möglicherweise verwendet und konnten nicht verschoben werden"
+  "filesMoveOccupiedCount": "{count} Datei(en) werden möglicherweise verwendet und konnten nicht verschoben werden",
+  "ocrProgress": "Erkenne {index}/{total}",
+  "ocrCancel": "Abbrechen",
+  "ocrCancelling": "Wird abgebrochen…",
+  "ocrBatchBusy": "Eine Erkennung läuft bereits; warten Sie oder brechen Sie sie ab",
+  "ocrConsentTitle": "Cloud-Texterkennung verwenden?",
+  "ocrConsentHint": "PDFs mit Textebene werden direkt ausgelesen – ohne Upload und ohne Kosten; nur Scans und Bilder brauchen Cloud-OCR. Diese Bestätigung gilt nur für diesen Durchlauf; dauerhaft Cloud oder nur lokal stellen Sie unter Einstellungen → Konto & Nutzung → Scan-Erkennung ein.",
+  "ocrConsentCheck": "Ich habe Datenweg und Abrechnung zur Kenntnis genommen",
+  "ocrConsentConfirm": "Starten",
+  "ocrCopied": "Text aus {count} Datei(en) kopiert und im Zwischenablageverlauf gespeichert",
+  "ocrSaved": "Erstellt: {names}",
+  "ocrOthersNotOpened": "Nicht nebeneinander geöffnet: {names}",
+  "ocrLocalOnly": "Erkennung ist auf „nur lokal“ gestellt; Bilder und Scans wurden nicht hochgeladen (in den Einstellungen änderbar)",
+  "ocrFailedItem": "„{name}“ nicht abgeschlossen: {reason}",
+  "ocrSkipped": "{count} Datei(en) mit Cloud-OCR-Bedarf übersprungen (nicht bestätigt)",
+  "ocrCancelled": "Abgebrochen; {count} Datei(en) nicht verarbeitet",
+  "ocrSummaryTitle": "Erkannt {done}/{total}"
 }

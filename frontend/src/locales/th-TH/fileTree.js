@@ -153,5 +153,10 @@ export default {
   "importDropPrepareFailed": "ไม่สามารถเตรียมไฟล์ที่วางได้ โปรดบันทึกลงเครื่องของคุณแล้วลองอีกครั้ง",
   "importDropTooLarge": "ไฟล์ที่ไม่มีเส้นทางภายในเครื่องจำกัดที่ 100 MB ต่อการวางหนึ่งครั้ง โปรดบันทึกลงเครื่องของคุณก่อน",
   "importDesktopOnly": "การนำเข้าแบบลากวางใช้ได้เฉพาะบนเดสก์ท็อป",
-  "unknownFolder": "โฟลเดอร์ที่ไม่รู้จัก"
+  "unknownFolder": "โฟลเดอร์ที่ไม่รู้จัก",
+  "ocrMenu": "รู้จำข้อความ (OCR)",
+  "ocrCopy": "คัดลอกข้อความ",
+  "ocrExportTxt": "ส่งออก TXT",
+  "ocrExportDocx": "ส่งออก Word",
+  "ocrOutputSuffix": "-ข้อความ OCR"
 }

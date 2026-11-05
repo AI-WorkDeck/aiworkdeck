@@ -153,5 +153,10 @@ export default {
   "importDropPrepareFailed": "無法接收拖入的文件，請先保存到本機後重試",
   "importDropTooLarge": "無本機路徑的文件一次最多接收 100 MB，請先保存到本機再拖入",
   "importDesktopOnly": "拖入導入僅桌面端支持",
-  "unknownFolder": "未知文件夾"
+  "unknownFolder": "未知文件夾",
+  "ocrMenu": "識別文字（OCR）",
+  "ocrCopy": "複製文字",
+  "ocrExportTxt": "匯出 TXT",
+  "ocrExportDocx": "匯出 Word",
+  "ocrOutputSuffix": "-識別文字"
 }

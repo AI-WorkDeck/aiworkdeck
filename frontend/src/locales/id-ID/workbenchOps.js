@@ -65,5 +65,21 @@ export default {
   "clipboardRecordFailed": "Gagal mencatat papan klip",
   "fileCaptureFailed": "Gagal mencatat berkas",
   "fileMoveOccupied": "Berkas ini mungkin sedang digunakan dan tidak dapat dipindahkan",
-  "filesMoveOccupiedCount": "{count} berkas mungkin sedang digunakan dan tidak dapat dipindahkan"
+  "filesMoveOccupiedCount": "{count} berkas mungkin sedang digunakan dan tidak dapat dipindahkan",
+  "ocrProgress": "Mengenali {index}/{total}",
+  "ocrCancel": "Batal",
+  "ocrCancelling": "Membatalkan…",
+  "ocrBatchBusy": "Satu proses pengenalan sedang berjalan; tunggu atau batalkan",
+  "ocrConsentTitle": "Gunakan pengenalan teks di cloud?",
+  "ocrConsentHint": "PDF yang memiliki lapisan teks diekstrak langsung tanpa unggah dan tanpa biaya; hanya hasil pindai dan gambar yang perlu OCR cloud. Konfirmasi ini hanya berlaku untuk batch ini; ubah ke «selalu cloud» atau «hanya lokal» di Pengaturan → Akun & penggunaan → Pengenalan dokumen pindaian.",
+  "ocrConsentCheck": "Saya memahami tujuan data dan cara penagihannya",
+  "ocrConsentConfirm": "Mulai",
+  "ocrCopied": "Teks dari {count} file disalin dan disimpan ke riwayat papan klip",
+  "ocrSaved": "Dibuat: {names}",
+  "ocrOthersNotOpened": "Tidak dibuka berdampingan: {names}",
+  "ocrLocalOnly": "Pengenalan diatur ke «hanya lokal»; gambar dan pindaian tidak diunggah (ubah di Pengaturan)",
+  "ocrFailedItem": "\"{name}\" tidak selesai: {reason}",
+  "ocrSkipped": "{count} file yang perlu OCR cloud dilewati (belum dikonfirmasi)",
+  "ocrCancelled": "Dibatalkan; {count} file tidak diproses",
+  "ocrSummaryTitle": "Dikenali {done}/{total}"
 }

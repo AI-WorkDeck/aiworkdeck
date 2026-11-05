@@ -100,6 +100,7 @@
     "test:workbench-scroll": "node tests/workbench-scroll/run.mjs",
     "test:editor-open": "node --test tests/toolbar/open-critical-path.test.mjs tests/toolbar/office-navigation.test.mjs tests/toolbar/calc-impress-ely-toolbar.test.mjs",
     "test:media": "node --test tests/media/*.test.mjs",
+    "test:explorer-ocr": "node --test tests/explorer-ocr/*.test.mjs",
     "test:calendar": "node --test tests/calendar/*.test.mjs",
     "test:auth-redirect": "node --test tests/auth-redirect/*.test.mjs",
     "test:commands": "node --test tests/commands/*.test.mjs",

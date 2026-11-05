@@ -65,5 +65,21 @@ export default {
   "clipboardRecordFailed": "Pano kaydedilemedi",
   "fileCaptureFailed": "Dosya kaydedilemedi",
   "fileMoveOccupied": "Bu dosya kullanımda olabilir ve taşınamadı",
-  "filesMoveOccupiedCount": "{count} dosya kullanımda olabilir ve taşınamadı"
+  "filesMoveOccupiedCount": "{count} dosya kullanımda olabilir ve taşınamadı",
+  "ocrProgress": "Tanınıyor {index}/{total}",
+  "ocrCancel": "İptal",
+  "ocrCancelling": "İptal ediliyor…",
+  "ocrBatchBusy": "Zaten bir tanıma işlemi sürüyor; bitmesini bekleyin veya iptal edin",
+  "ocrConsentTitle": "Bulut metin tanıma kullanılsın mı?",
+  "ocrConsentHint": "Metin katmanı olan PDF’ler yükleme ve ücret olmadan doğrudan çıkarılır; yalnızca taramalar ve görseller bulut OCR gerektirir. Bu onay yalnızca bu toplu işlem için geçerlidir; Ayarlar → Hesap ve kullanım → Taranmış belge tanıma bölümünden «her zaman bulut» veya «yalnızca yerel» seçebilirsiniz.",
+  "ocrConsentCheck": "Verinin nereye gittiğini ve nasıl ücretlendirildiğini anladım",
+  "ocrConsentConfirm": "Başlat",
+  "ocrCopied": "{count} dosyanın metni kopyalandı ve pano geçmişine kaydedildi",
+  "ocrSaved": "Oluşturuldu: {names}",
+  "ocrOthersNotOpened": "Yan yana açılmayanlar: {names}",
+  "ocrLocalOnly": "Tanıma «yalnızca yerel» olarak ayarlı; görseller ve taramalar yüklenmedi (Ayarlar’dan değiştirin)",
+  "ocrFailedItem": "\"{name}\" tamamlanmadı: {reason}",
+  "ocrSkipped": "Bulut OCR gerektiren {count} dosya atlandı (onaylanmadı)",
+  "ocrCancelled": "İptal edildi; {count} dosya işlenmedi",
+  "ocrSummaryTitle": "Tanındı {done}/{total}"
 }
