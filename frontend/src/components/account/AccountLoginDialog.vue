@@ -66,7 +66,7 @@
           class="unlock-site-seg-item"
           :class="{ 'is-active': mode === 'login' }"
           @click="switchMode('login')"
-        >{{ $t('account.bqtScanBack') }}</component>
+        >{{ $t('account.accountLoginTab') }}</component>
         <component
           :is="'button'"
           type="button"
@@ -169,7 +169,6 @@
           <div class="unlock-code-links">
             <component :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="switchAuthFlow(authFlow === 'password' ? 'register' : 'password')">{{ $t(authFlow === 'password' ? 'accountPassword.register' : 'accountPassword.back') }}</component>
             <component v-if="authFlow === 'password'" :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="switchAuthFlow('reset')">{{ $t('accountPassword.reset') }}</component>
-            <component v-if="isPhoneSite && bqtScanEnabled" :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="switchMode('bqt')">{{ $t('account.bqtScanSwitch') }}</component>
           </div>
           <div v-if="authFlow === 'register' || authFlow === 'reset'" class="unlock-compat-verification">
             <component :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="loadCompatChallenge">{{ $t(compatLoading ? 'onboarding.unlock.compatLoading' : compatVerification ? 'onboarding.unlock.compatRefresh' : 'onboarding.unlock.compatUse') }}</component>
@@ -260,7 +259,7 @@
         <div class="consent-row" role="checkbox" :aria-checked="crossBorderChecked ? 'true' : 'false'" @click="crossBorderChecked = !crossBorderChecked">
           <span class="consent-mark" :class="{ checked: crossBorderChecked }"></span>
           <span class="consent-text">
-            {{ $t('onboarding.unlock.crossBorderLabel') }}
+            {{ $t(crossBorderKey('crossBorderLabel')) }}
             <span class="unlock-link" @click.stop="showCrossBorderNotice">{{ $t('onboarding.unlock.crossBorderView') }}</span>
           </span>
         </div>
@@ -755,14 +754,25 @@ export default {
       if (this.mode === 'code') this.handleUnlock()
       else this.handleLogin()
     },
-    /** 两项同意是提交前置：不满足时把提示给在勾选框旁边，而不是提交失败之后。 */
+    /**
+     * 跨境同意的措辞按站点取（问题 2+38）：国内站接阿里云百炼，只是「可能涉及境外处理」，
+     * 勾选框、告知、提示统一这个口径；国际站沿用原措辞。同意项本身两站都保留。
+     */
+    crossBorderKey(name) {
+      return `onboarding.unlock.${name}${this.isPhoneSite ? 'Domestic' : ''}`
+    },
+    /** 两项同意是提交前置：不满足时把提示给在勾选框旁边，而不是提交失败之后。两项都缺时一次说清（问题 1）。 */
     consentGatePassed() {
+      if (!this.agreementChecked && !this.crossBorderChecked) {
+        this.errorMsg = this.$t('onboarding.unlock.consentBothRequired')
+        return false
+      }
       if (!this.agreementChecked) {
         this.errorMsg = this.$t('onboarding.unlock.agreementRequired')
         return false
       }
       if (!this.crossBorderChecked) {
-        this.errorMsg = this.$t('onboarding.unlock.crossBorderRequired')
+        this.errorMsg = this.$t(this.crossBorderKey('crossBorderRequired'))
         return false
       }
       return true
@@ -774,8 +784,8 @@ export default {
     },
     showCrossBorderNotice() {
       uni.showModal({
-        title: this.$t('onboarding.unlock.crossBorderNoticeTitle'),
-        content: this.$t('onboarding.unlock.crossBorderNoticeBody'),
+        title: this.$t(this.crossBorderKey('crossBorderNoticeTitle')),
+        content: this.$t(this.crossBorderKey('crossBorderNoticeBody')),
         showCancel: false,
         confirmText: this.$t('onboarding.unlock.gotIt'),
       })

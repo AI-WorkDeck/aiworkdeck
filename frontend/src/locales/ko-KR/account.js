@@ -399,6 +399,7 @@ export default {
   "bqtScanExpired": "QR 코드 만료",
   "bqtScanRefresh": "QR 코드 새로고침",
   "bqtScanBack": "계정 로그인으로 돌아가기",
+  "accountLoginTab": "계정 로그인",
   "errInvalidInviteCode": "초대 코드가 유효하지 않거나 비활성화되었습니다",
   "errInviteAlreadyBound": "이 계정은 이미 Circle 로펌 초대 코드에 연결되어 있습니다",
   "errBqtNotLawyer": "인증된 바오칭톈 변호사 계정만 QR 코드로 로그인할 수 있습니다",

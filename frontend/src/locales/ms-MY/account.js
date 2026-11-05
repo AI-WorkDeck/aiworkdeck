@@ -399,6 +399,7 @@ export default {
   "bqtScanExpired": "Kod QR tamat tempoh",
   "bqtScanRefresh": "Muat semula kod QR",
   "bqtScanBack": "Kembali ke log masuk akaun",
+  "accountLoginTab": "Log Masuk Akaun",
   "errInvalidInviteCode": "Kod jemputan tidak sah atau tidak aktif",
   "errInviteAlreadyBound": "Akaun ini telah mengikat kod jemputan firma Circle",
   "errBqtNotLawyer": "Hanya akaun peguam Baoqingtian disahkan boleh log masuk melalui kod QR",

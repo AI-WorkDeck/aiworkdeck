@@ -399,6 +399,7 @@ export default {
   "bqtScanExpired": "Mã QR đã hết hạn",
   "bqtScanRefresh": "Làm mới mã QR",
   "bqtScanBack": "Quay lại đăng nhập bằng tài khoản",
+  "accountLoginTab": "Đăng nhập bằng tài khoản",
   "errInvalidInviteCode": "Mã mời không hợp lệ hoặc đã ngừng hoạt động",
   "errInviteAlreadyBound": "Tài khoản này đã liên kết mã mời của hãng luật Circle",
   "errBqtNotLawyer": "Chỉ tài khoản luật sư Baoqingtian đã xác minh mới có thể đăng nhập bằng mã QR",
