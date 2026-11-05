@@ -110,6 +110,7 @@ export default {
     "movedSaveFailed": "文件已被移動或改名，改動尚未保存",
     "versionSaveBusy": "正在整理版本，改動尚未保存，請稍後重試",
     "localVersionSaveBusy": "正在整理版本，保存結果待確認，請稍後重試",
+    "saveRetryScheduled": "儲存失敗，{seconds} 秒後自動重試",
     "contentSaveReloadRequired": "舊保存已停止，請先另存當前改動，再重新加載文件",
     "contentSaveConflict": "文件已在別處更新，請先另存當前改動，再重新打開",
     "desktopOnly": "僅桌面版可用"

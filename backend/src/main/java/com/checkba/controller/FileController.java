@@ -443,6 +443,18 @@ public class FileController {
         }
     }
 
+    /**
+     * Editor save order (B7): {@code ?saveSession=<editor instance>&saveSeq=<n>}. Query parameters like
+     * mustExist, so an older server simply ignores them and no CORS preflight list changes. Missing or
+     * malformed values mean an unfenced legacy upload (office-addin, mobile, recordings).
+     */
+    private static com.checkba.service.ProjectFileContentService.SaveOrder saveOrder(HttpServletRequest request) {
+        String session = request.getParameter("saveSession"), seq = request.getParameter("saveSeq");
+        if (!StringUtils.hasText(session) || session.length() > 128 || !StringUtils.hasText(seq)) return null;
+        try { return new com.checkba.service.ProjectFileContentService.SaveOrder(session, Long.parseLong(seq)); }
+        catch (NumberFormatException ignored) { return null; }
+    }
+
     /** Upload reception stays outside transactions and the version lock; publication uses the content service. */
     @PostMapping("/{fileId}/upload")
     public ResponseEntity<Map<String, Object>> uploadFile(
@@ -537,7 +549,7 @@ public class FileController {
             long incoming = multipartFile != null ? multipartFile.getSize() : request.getContentLengthLong();
             var published = contentService.upload(projectFileOpt.get().getId(), projectFileOpt.get().getProjectId(),
                     actor, inputStream, incoming, offset, "1".equals(request.getParameter("mustExist")),
-                    request.getHeader("X-File-Total-Size"));
+                    request.getHeader("X-File-Total-Size"), saveOrder(request));
 
             // The executor may use CallerRunsPolicy. All indexing, notifications and version signals
             // are intentionally submitted only after publication has released the canonical lock.

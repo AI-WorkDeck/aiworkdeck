@@ -110,6 +110,7 @@ export default {
     "movedSaveFailed": "Dosya taşındı veya yeniden adlandırıldı; değişiklikler henüz kaydedilmedi",
     "versionSaveBusy": "Sürüm geçmişi meşgul; değişiklikler henüz kaydedilmedi. Lütfen birazdan tekrar deneyin.",
     "localVersionSaveBusy": "Sürüm geçmişi meşgul; kaydetme sonucu doğrulanmadı. Lütfen birazdan tekrar deneyin.",
+    "saveRetryScheduled": "Kaydedilemedi; {seconds} sn içinde otomatik olarak yeniden denenecek",
     "contentSaveReloadRequired": "Önceki kaydetme işlemi durduruldu. Düzenlemelerinizin bir kopyasını kaydedin, ardından dosyayı yeniden yükleyin.",
     "contentSaveConflict": "Dosya başka bir yerde değiştirildi. Düzenlemelerinizin bir kopyasını kaydedin, ardından dosyayı yeniden açın.",
     "desktopOnly": "Yalnızca masaüstü uygulaması"

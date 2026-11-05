@@ -499,6 +499,7 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
       onCommitted: (text) => { writingAssistance?.committed(text); semanticWriting?.committed(text); inlineReview?.committed(text) },
       onAssistanceKey: (event) => writingAssistance?.keydown(event) || false,
       onCommentRequested: () => relayCommentRequest(),
+      onSaveRequested: () => hostTransport.send({ __lo: 'lo-relay', type: 'save-request' }),
       onError: message => hostTransport.send({ __lo: 'lo-relay', type: 'input-error', message }),
       onLog: (m) => { console.log('[zeta-editor]', m); if (VERIFY) vlog(m) },
     })

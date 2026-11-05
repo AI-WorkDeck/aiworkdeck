@@ -246,6 +246,8 @@ function authorNames() {
   return authorResolver
 }
 function currentAuthorName() { return authorNames().current() }
+// 保存失败后的有界退避（B7）：第 n 次连续失败等 SAVE_RETRY_DELAYS_MS[n]，封顶 60 秒。
+const SAVE_RETRY_DELAYS_MS = [5000, 15000, 30000, 60000]
 
 export default {
   name: 'LibreOfficeEditor',
@@ -331,6 +333,8 @@ export default {
       backendHealthRecoverySeq: 0,
       backendFailedUpload: null,
       versionSaveBusy: false,
+      // >0：保存失败且已排上自动重试（秒数只用于状态文案）；0：只能手动重试。
+      saveRetryDelaySec: 0,
       localSaveReason: null,
       // Autosave: set by the worker's modify signal, cleared when a save starts;
       // read by the host (closeFile / evict) to know if a flush is needed.
@@ -411,6 +415,7 @@ export default {
       if (!this.ready || !this.file || this.loadingOverlayVisible || this.docLoadFailed) return ''
       if (this.saving) return this.$t('editor.status.saving')
       if (this.localContentSaveText) return this.localContentSaveText
+      if (this.statusKey === 'saveFailed' && this.saveRetryDelaySec > 0) return this.$t('editor.status.saveRetryScheduled', { seconds: this.saveRetryDelaySec })
       if (this.statusKey === 'saveFailed' && this.versionSaveBusy) return this.$t('editor.status.versionSaveBusy')
       if (this.statusKey === 'saveFailed' && this.backendSaveRetryReady()) return this.$t('workbench.backendHealth.saveRetryReady')
       if (this.statusKey === 'saveFailed' || this.statusKey === 'movedSaveFailed') return this.$t('editor.status.' + this.statusKey)
@@ -580,6 +585,7 @@ export default {
     // by the closer (closeFile / evictLibreInstance await flushSave first) —
     // export needs the live webview, so saving from here is already too late.
     clearTimeout(this._saveTimer)
+    clearTimeout(this._saveRetryTimer)
     clearTimeout(this._slowSaveTimer)
     clearTimeout(this._reviewRefreshTimer)
     clearInterval(this._bootTimer)
@@ -619,12 +625,17 @@ export default {
     onBackendHealth(snapshot) {
       if (this._backendHealthDisposed || !snapshot || typeof snapshot.state !== 'string') return
       if (this.backendHealthState?.updatedAt && snapshot.updatedAt < this.backendHealthState.updatedAt) return
+      let recovered = false
       if (snapshot.state === 'healthy' && snapshot.ok === true && ['degraded', 'restarting', 'failed'].includes(this.backendHealthState?.state)) {
         this.backendHealthRecoverySeq = (this.backendHealthRecoverySeq || 0) + 1
+        recovered = true
       }
       observeLocalContentBackend(snapshot)
       this.backendHealthState = snapshot
-      // 只更新提示。上传结果不明时即使服务恢复，也不能擅自把旧稿再次写回。
+      // 服务恢复即补存（B7）：重存的是当前文档、带更大的保存序号；那笔结果不明的旧上传
+      // 即使迟到，也会被后端 STALE_SAVE 围栏拒绝，不会盖掉这次补存。其余闸门照旧由
+      // autoRetrySave 把关（放弃、检查点失效、重载、只能手动的失败类别都不补存）。
+      if (recovered && this.backendSaveRetryReady()) this.autoRetrySave()
     },
     invalidateBackendSaveHint() {
       this.backendFailedUpload = null
@@ -1342,7 +1353,8 @@ export default {
           this.$emit('open-url', { url: String(msg.url), target: msg.target || null,
             fileId: this.file && this.file.id, meta: this.withHostPoint(msg.meta) })
         } else if (msg.type === 'save-request') {
-          this.saveDocument()
+          // Cmd/Ctrl+S（WASM 覆盖层与原生输入同一条）：与「重试保存」同一路径，退避等待或暂停中也立即保存。
+          this.retrySave()
         } else if (msg.type === 'review-changed' && this._nativeSurface) {
           const owner = this._nativeSurface
           clearTimeout(this._reviewRefreshTimer)
@@ -2341,17 +2353,51 @@ export default {
       this._dirtySince = 0
       const ok = await this.saveDocument({ trackSnapshot: true })
       if (!ok && !this._saveDiscarded) {
-        // 引擎超时只代表宿主停止等待，后台可能仍在导出。暂停自动重试，
-        // 否则每 15 秒再排一笔，文档永远在「保存中 / 保存失败」间循环。
+        // 失败后停掉打字防抖的排程，改由 armSaveRetry 按退避重试（只对安全的失败类别）；
+        // 引擎超时要先等在途导出结清，不能每 15 秒再堆一笔导出。
         this.dirty = true
         this._savePaused = true
+        this.armSaveRetry()
       }
       if (this.dirty) this.scheduleAutoSave()
     },
     async retrySave() {
       if (this.saving || this._saveDiscarded) return false
+      clearTimeout(this._saveRetryTimer)
+      this._saveRetryTimer = null
       this._savePaused = false
       return this.flushSave()
+    },
+    // B7：保存失败后的有界退避自动重试。只对两类失败开放——服务端明确未开始写入
+    // （版本忙），或结果不明但有保存序号围栏兜底的上传（网络/超时/5xx：迟到的旧上传会被
+    // 后端以 STALE_SAVE 拒绝）；以及引擎导出超时（先等在途导出结清）。被移动/404、权限、
+    // 放弃、检查点失效/待重载、装载失败一律不排，只留手动「重试保存」。
+    armSaveRetry() {
+      clearTimeout(this._saveRetryTimer)
+      this._saveRetryTimer = null
+      this.saveRetryDelaySec = 0
+      if (!this._saveRetryKind || !this.saveRetryAllowed()) return
+      const attempt = this._saveRetryAttempt || 0
+      const delay = SAVE_RETRY_DELAYS_MS[Math.min(attempt, SAVE_RETRY_DELAYS_MS.length - 1)]
+      this._saveRetryAttempt = attempt + 1
+      this.saveRetryDelaySec = delay / 1000
+      this._saveRetryTimer = setTimeout(() => { this._saveRetryTimer = null; this.autoRetrySave() }, delay)
+    },
+    saveRetryAllowed() {
+      return this.statusKey === 'saveFailed' && this._savePaused && !this._saveDiscarded && !this._checkpointInvalidated &&
+        !this._pendingReload && !this._reloading && !this.docLoadFailed && !this._backendHealthDisposed
+    },
+    async autoRetrySave() {
+      if (!this._saveRetryKind || !this.saveRetryAllowed() || this.saving || this._flushPromise) return false
+      if (this._exportUnsettled) {
+        // office 线程串行执行命令：探针有回应 = 超时的那笔导出已经结束，再导出不会叠加。
+        let probe = null
+        try { probe = await this.executor?.executeCommand('get_doc_kind', {}, { background: true }) } catch (e) { /* 仍未结清 */ }
+        if (!probe?.success) { this.armSaveRetry(); return false }
+        this._exportUnsettled = false
+        if (!this.saveRetryAllowed() || this.saving || this._flushPromise) return false
+      }
+      return this.retrySave()
     },
     // 用户明确放弃后关闭上传闸；迟到的导出不能把已关闭的旧副本写回磁盘。
     discardPendingSave() {
@@ -2359,6 +2405,8 @@ export default {
       this._saveDiscarded = true
       this._savePaused = true
       clearTimeout(this._saveTimer)
+      clearTimeout(this._saveRetryTimer)
+      this.saveRetryDelaySec = 0
       if (this._saveXhr) this._saveXhr.abort()
     },
     // Flush before unmount. 关闭方可给等待预算；超时返回 false，不自动丢文档。
@@ -2375,7 +2423,7 @@ export default {
             this.dirty = false
             this._dirtySince = 0
             const ok = await this.saveDocument({ trackSnapshot: true })
-            if (!ok && !this._saveDiscarded) { this.dirty = true; this._savePaused = true }
+            if (!ok && !this._saveDiscarded) { this.dirty = true; this._savePaused = true; this.armSaveRetry() }
             return ok && !this.dirty
           }
           return !this._saveDiscarded
@@ -2498,6 +2546,11 @@ export default {
     async saveDocument({ trackSnapshot = false } = {}) {
       const f = this.file
       if (!f || !this.executor || this.saving || this._saveDiscarded || this._pendingReload) return false
+      // 一笔保存开始，之前排的退避重试与「N 秒后重试」文案都作废；只有 catch 里认定的安全失败类别才再排。
+      this._saveRetryKind = null
+      clearTimeout(this._saveRetryTimer)
+      this._saveRetryTimer = null
+      this.saveRetryDelaySec = 0
       const generation = documentCheckpointGeneration(this.projectId, f.id)
       const barrier = checkpointSaveBarrier(this.projectId, f.id)
       if ((barrier && !barrier.instances?.includes(this)) ||
@@ -2554,7 +2607,7 @@ export default {
         }
         const res = await this.executor.executeCommand('export_document', params)
         this.appendLog('  ← export ' + (Date.now() - tExp) + 'ms')
-        if (!res || !res.success) throw new Error((res && res.message) || 'export_document returned no success')
+        if (!res || !res.success) throw Object.assign(new Error((res && res.message) || 'export_document returned no success'), { code: res?.code })
         // Structured clone across the relay hops may surface bytes as
         // Uint8Array / ArrayBuffer / plain array — normalize (mirror of the
         // worker's load_document normalization).
@@ -2593,7 +2646,13 @@ export default {
           lease.setOperationId(pending.operationId)
           await this.uploadPendingLocalContent(pending)
         } else {
-          const url = getFileWriteUrl(fileId) + (mustExist ? '?mustExist=1' : '')
+          // 保存序号围栏（B7）：同一编辑器实例的会话 id + 单调序号。结果不明的旧上传若迟到，
+          // 后端在内容锁内发现本会话已落过更大的序号，回 409 STALE_SAVE 且一个字节都不写——
+          // 失败后才能安全地自动重存当前（更新的）内容。走查询参数（同 mustExist），旧后端直接忽略。
+          if (!this._saveSessionId) this._saveSessionId = globalThis.crypto.randomUUID()
+          this._saveSeq = (this._saveSeq || 0) + 1
+          const url = getFileWriteUrl(fileId) + '?' + (mustExist ? 'mustExist=1&' : '') +
+            'saveSession=' + encodeURIComponent(this._saveSessionId) + '&saveSeq=' + this._saveSeq
           // Only a confirmed pre-publication rejection is safe to retry. Keep the same export
           // and save lease; re-exporting would freeze editing and could mix newer input into it.
           for (let attempt = 0; ; attempt++) {
@@ -2602,6 +2661,8 @@ export default {
               await this.uploadBytes(url, u8, name)
               break
             } catch (e) {
+              // 本会话更新的一笔已经落盘（只可能比这份字节新），这笔不算失败。
+              if (e?.staleSave === true) { this.appendLog('  ← newer save already landed (STALE_SAVE)'); break }
               if (e?.saveNotPublished !== true || attempt >= 3) throw e
               safeToOverwrite = true
               this.appendLog('save waiting for version work; retry ' + (attempt + 1))
@@ -2624,6 +2685,8 @@ export default {
         }
         this.appendLog('  ← saved to backend (fileId=' + fileId + ')')
         this._savePaused = false
+        this._saveRetryAttempt = 0
+        this._exportUnsettled = false
         this.statusKey = prevStatusKey
         // 这一笔落到后端之后才会被防抖的 commitNow 收成一版——溯源等它一会儿再重拉。
         this.scheduleProvenanceReload()
@@ -2645,6 +2708,13 @@ export default {
         // 404 = 对账认不出新位置、这一行已出索引（外部删除不进回收站，dev-board#903）——
         // 对已装载的文档同样是「被移走了」，落到同一状态才有「另存为…」出口。
         this.statusKey = e && (e.status === 409 || e.status === 404) ? 'movedSaveFailed' : 'saveFailed'
+        // 自动重试资格（B7）：引擎导出超时（导出可能仍在跑，重试前先等它结清）、服务端明确
+        // 未开始写入、或上传阶段的网络/超时/5xx（结果不明，靠 saveSeq 围栏挡住迟到旧稿）。
+        if (uploadRecoverySeq === null && e?.code === 'EDITOR_RESULT_TIMEOUT') {
+          this._exportUnsettled = true
+          this._saveRetryKind = 'export'
+        } else if (notPublished || this.versionSaveBusy) this._saveRetryKind = 'busy'
+        else if (uploadRecoverySeq !== null && e?.backendUnavailable === true) this._saveRetryKind = 'upload'
         this.appendLog('save failed: ' + (e && e.message ? e.message : e))
         return false
       } finally {
@@ -2758,6 +2828,7 @@ export default {
             response.reason === 'VERSION_BUSY' && response.writeState === 'not_started'
           reject(Object.assign(new Error('HTTP ' + xhr.status), {
             status: xhr.status, backendUnavailable: xhr.status >= 500, saveNotPublished,
+            staleSave: xhr.status === 409 && response?.reason === 'STALE_SAVE',
           }))
         }
         xhr.onerror = () => reject(Object.assign(new Error('网络错误 / network error'), { backendUnavailable: true }))

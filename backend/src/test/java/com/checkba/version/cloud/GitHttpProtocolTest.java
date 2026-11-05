@@ -66,6 +66,12 @@ class GitHttpProtocolTest {
     ProjectRepoService repoService;
 
     @Autowired
+    GitHttpController gitController;
+
+    @Autowired
+    com.checkba.version.WorkSessionService sessionService;
+
+    @Autowired
     UserRepository userRepository;
 
     @Autowired
@@ -108,6 +114,47 @@ class GitHttpProtocolTest {
 
         tokenByProject.put(projectId,
                 deviceTokenService.issue(user.getId(), "git-http-test").plaintext());
+    }
+
+    /** 请求体必须先读完再持 repoLock：首次读取时让另一线程抢同一把锁，抢不到就说明读取方正握着它。 */
+    @Test
+    void receivePackReadsBodyBeforeTakingTheProjectLock() throws Exception {
+        seedProject(19L);
+        java.util.concurrent.atomic.AtomicBoolean lockHeldDuringRead = new java.util.concurrent.atomic.AtomicBoolean();
+        java.util.concurrent.atomic.AtomicBoolean probed = new java.util.concurrent.atomic.AtomicBoolean();
+        byte[] flush = "0000".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        var in = new java.io.ByteArrayInputStream(flush);
+        var request = new org.springframework.mock.web.MockHttpServletRequest() {
+            @Override
+            public jakarta.servlet.ServletInputStream getInputStream() {
+                return new jakarta.servlet.ServletInputStream() {
+                    @Override public boolean isFinished() { return in.available() == 0; }
+                    @Override public boolean isReady() { return true; }
+                    @Override public void setReadListener(jakarta.servlet.ReadListener listener) { }
+                    @Override public int read() {
+                        if (probed.compareAndSet(false, true)) {
+                            var acquired = new java.util.concurrent.CountDownLatch(1);
+                            Thread probe = new Thread(() -> sessionService.runLocked(19L, acquired::countDown));
+                            probe.setDaemon(true);
+                            probe.start();
+                            try {
+                                lockHeldDuringRead.set(!acquired.await(1, java.util.concurrent.TimeUnit.SECONDS));
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                        }
+                        return in.read();
+                    }
+                };
+            }
+        };
+        request.setMethod("POST");
+        request.addHeader("Authorization", "Basic " + java.util.Base64.getEncoder().encodeToString(
+                ("git_user:" + tokenByProject.get(19L)).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        gitController.receivePack("19", request, new org.springframework.mock.web.MockHttpServletResponse());
+
+        assertTrue(probed.get(), "请求体应当被读取过");
+        assertFalse(lockHeldDuringRead.get(), "读取网络请求体时不该持有项目 repoLock");
     }
 
     @Test

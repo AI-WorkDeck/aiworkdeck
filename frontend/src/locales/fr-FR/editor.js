@@ -110,6 +110,7 @@ export default {
     "movedSaveFailed": "Le fichier a été déplacé ou renommé ; les modifications ne sont pas encore enregistrées",
     "versionSaveBusy": "L’historique des versions est occupé ; les modifications ne sont pas encore enregistrées. Veuillez réessayer dans un instant.",
     "localVersionSaveBusy": "L’historique des versions est occupé ; le résultat de l’enregistrement n’est pas confirmé. Veuillez réessayer dans un instant.",
+    "saveRetryScheduled": "Échec de l’enregistrement ; nouvel essai automatique dans {seconds} s",
     "contentSaveReloadRequired": "L’enregistrement précédent a été interrompu. Enregistrez une copie de vos modifications, puis rechargez le fichier.",
     "contentSaveConflict": "Le fichier a été modifié ailleurs. Enregistrez une copie de vos modifications, puis rouvrez le fichier.",
     "desktopOnly": "Application de bureau uniquement"

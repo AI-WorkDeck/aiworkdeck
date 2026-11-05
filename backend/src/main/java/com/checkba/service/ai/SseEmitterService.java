@@ -60,6 +60,8 @@ public class SseEmitterService {
     private final Map<String, java.util.ArrayDeque<BufferedEvent>> replayBuffers = new ConcurrentHashMap<>();
     private final Map<String, Integer> replayBytes = new ConcurrentHashMap<>();
     private final Map<String, java.util.concurrent.atomic.AtomicLong> eventSeq = new ConcurrentHashMap<>();
+    /** 每会话一把发送锁：序号分配 + 缓冲 + 写出，与建连的「挂 emitter + 补发」互斥，保证线上的 id 严格递增 */
+    private final Map<String, Object> sendLocks = new ConcurrentHashMap<>();
     /** 上一次建连补发了多少条（日志与回归用例的观察口，别拿它做业务判断）。 */
     private final Map<String, Integer> lastReplayCount = new ConcurrentHashMap<>();
     /**
@@ -176,6 +178,14 @@ public class SseEmitterService {
      * 断线空档里的事件——正文、client_action、终态一并补，见 replaySince。
      */
     public SseEmitter createConnection(String connectionId, String clientId, String lastEventId) {
+        // 挂 emitter 与补发必须在发送锁内一气呵成：否则 agent 线程在补发完成前经新 emitter 发出更大的 id，
+        // 前端按 seq <= lastSseEventSeq 判重，会把随后补发的较小 id 全部丢掉
+        synchronized (sendLocks.computeIfAbsent(connectionId, k -> new Object())) {
+            return createConnectionLocked(connectionId, clientId, lastEventId);
+        }
+    }
+
+    private SseEmitter createConnectionLocked(String connectionId, String clientId, String lastEventId) {
         // 代次自增：本次建连之后，任何持有旧代次的 close() 调用都不再匹配当前连接
         epochs.merge(connectionId, 1L, Long::sum);
         purgeEpochsIfOversized();
@@ -238,6 +248,12 @@ public class SseEmitterService {
      * @param data 数据对象 (会被转为 JSON)
      */
     public void send(String connectionId, String eventName, Object data) {
+        synchronized (sendLocks.computeIfAbsent(connectionId, k -> new Object())) {
+            sendLocked(connectionId, eventName, data);
+        }
+    }
+
+    private void sendLocked(String connectionId, String eventName, Object data) {
         String payload = data == null ? "" : String.valueOf(data);
         long id = 0L;
         if (bufferable(eventName)) {
@@ -256,7 +272,7 @@ public class SseEmitterService {
     }
 
     /** 真正往某个 emitter 上写一条事件；失败即丢弃该 emitter（不抛给调用线程）。 */
-    private void emitTo(String connectionId, SseEmitter emitter, String eventName, String payload, long id) {
+    void emitTo(String connectionId, SseEmitter emitter, String eventName, String payload, long id) {
         try {
             SseEmitter.SseEventBuilder ev = SseEmitter.event().name(eventName).data(payload);
             // id 是 SSE 规范里的断点续传游标，客户端原样经 Last-Event-ID 送回
@@ -361,6 +377,7 @@ public class SseEmitterService {
         replayBuffers.keySet().removeIf(id -> !emitters.containsKey(id));
         replayBytes.keySet().removeIf(id -> !replayBuffers.containsKey(id));
         eventSeq.keySet().removeIf(id -> !replayBuffers.containsKey(id));
+        sendLocks.keySet().removeIf(id -> !replayBuffers.containsKey(id) && !emitters.containsKey(id));
         lastReplayCount.keySet().removeIf(id -> !replayBuffers.containsKey(id));
         // 水位必须与缓冲同生共死：缓冲还在、水位被单独清掉的话，
         // 空游标会把「其实都送达过」的那一段当成漏发内容再倒一遍
