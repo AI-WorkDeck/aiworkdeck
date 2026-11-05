@@ -2587,6 +2587,7 @@ import { librePoolMethods } from './librePool.js'
 import { fileTreePdfRecoveryMethods } from './fileTreePdfRecovery.js'
 import { stagingAreaMethods } from './stagingArea.js'
 import { evidenceLinkData, evidenceLinkMethods } from './evidenceLinkActions.js'
+import { setEvidenceProjectType } from '@/utils/evidenceTags.js'
 import { tabDragSplitMethods } from './tabDragSplit.js'
 import { fitPanelWidths } from './panelWidthLimits.js'
 import { panelDockingData, panelDockingMethods } from './panelDocking.js'
@@ -4631,6 +4632,8 @@ export default {
     this.maybeRegisterOpenWorkbench()
   },
   watch: {
+    // 证据标签默认组跟着项目类型走（教程反馈 77）。
+    'project.projectType': { immediate: true, handler(type) { setEvidenceProjectType(type) } },
     projectId() { this.cancelFileTreePdfExport(); this.resetPdfPreviewPool() },
     'currentUser.id'() { this.resetPdfPreviewPool() },
     // 成员轮询会替换数组；只在实际权限信息变化时销毁 PDF 查看器。

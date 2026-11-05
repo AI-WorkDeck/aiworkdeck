@@ -65,3 +65,26 @@ test('pending target save cannot rewrite a newer receipt or notify the wrong doc
   assert.deepEqual(emitted, [['awd:evidence-changed', {docFileId:10,linkKey:'EVID_A'}]])
   assert.equal(vm.evidenceMethodLabel('原件核对'), '原件核对')
 })
+
+// 教程反馈 77：没有偏好时，资本市场与并购尽调类项目默认「材料核查」组，其余（含取不到类型）默认「证据整理」组。
+test('默认标签组按项目类型取；用户已有偏好时不变', () => {
+  const data = new Map()
+  globalThis.uni = { getStorageSync: key => key === 'checkba_user' ? { id: 9 } : data.get(key), setStorageSync: (k, v) => data.set(k, v), $emit() {} }
+  const evidence = tags.evidenceTagPreset('evidence', t)
+  assert.deepEqual(evidence, ['原件核对', '真实性核实', '关联性分析', '证明目的', '待补充'])
+  for (const type of ['MAJOR_ASSET_RESTRUCTURING', 'PRIVATE_PLACEMENT', 'PUBLIC_PLACEMENT', 'ACQUISITION']) {
+    tags.setEvidenceProjectType(type)
+    assert.deepEqual(tags.loadEvidenceTags(t), EVIDENCE_METHODS, type)
+  }
+  for (const type of ['BLANK', 'LOOSE_FILES', 'SCRATCH', '', null, undefined]) {
+    tags.setEvidenceProjectType(type)
+    assert.deepEqual(tags.loadEvidenceTags(t), evidence, String(type))
+  }
+  tags.saveEvidenceTags(['自定义核对'])
+  for (const type of ['ACQUISITION', 'BLANK']) {
+    tags.setEvidenceProjectType(type)
+    assert.deepEqual(tags.loadEvidenceTags(t), ['自定义核对'], '已有偏好不随项目类型变')
+  }
+  tags.setEvidenceProjectType(undefined)
+  delete globalThis.uni
+})
