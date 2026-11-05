@@ -37,7 +37,7 @@ export default {
   "ocr": {
     "refresh": "Görünümü Yenile",
     "recognize": "Metni Tanı",
-    "download": "İndir",
+    "download": "Projeye Kaydet",
     "copy": "Kopyala",
     "insertDoc": "Belgeye Ekle",
     "webLink": "Web Doğrulamasına Bağla",

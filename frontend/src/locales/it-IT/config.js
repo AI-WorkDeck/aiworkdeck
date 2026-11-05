@@ -37,7 +37,7 @@ export default {
   "ocr": {
     "refresh": "Aggiorna visualizzazione",
     "recognize": "Riconosci il testo",
-    "download": "Scarica",
+    "download": "Salva nel progetto",
     "copy": "Copia",
     "insertDoc": "Inserisci nel documento",
     "webLink": "Collega alla verifica web",

@@ -37,7 +37,9 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
       ipcRenderer.on('checkba:app-open-internal', listener)
       return () => ipcRenderer.removeListener('checkba:app-open-internal', listener)
     },
-    confirm: (payload) => ipcRenderer.invoke('checkba:ui-confirm', payload)
+    confirm: (payload) => ipcRenderer.invoke('checkba:ui-confirm', payload),
+    // 工作记录空闲判定：{ focused, idleSeconds }
+    getPresence: () => ipcRenderer.invoke('checkba:app-presence')
   },
   browser: {
     create: (payload) => ipcRenderer.invoke('checkba:browser-create', payload),
@@ -136,7 +138,10 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
       const listener = (_evt, data) => handler && handler(data)
       ipcRenderer.on('checkba:clipboard-copied', listener)
       return () => ipcRenderer.removeListener('checkba:clipboard-copied', listener)
-    }
+    },
+    // 「暂停记录」：{ ok, paused }
+    getPaused: () => ipcRenderer.invoke('checkba:clipboard-get-paused'),
+    setPaused: (paused) => ipcRenderer.invoke('checkba:clipboard-set-paused', { paused: !!paused })
   },
   backend: {
     getHealth: () => ipcRenderer.invoke('checkba:backend-health'),

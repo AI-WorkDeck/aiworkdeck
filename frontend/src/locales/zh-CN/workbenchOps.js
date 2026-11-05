@@ -56,7 +56,7 @@ export default {
   captureNoResult: '截图完成，但未收到结果',
   screenShareUnsupported: '当前浏览器不支持屏幕共享',
   captureFailedAllowShare: '截图失败（请允许共享标签页/窗口）',
-  captureH5Only: '仅 H5 支持截图摘录',
+  captureH5Only: '仅 H5 支持截图取词',
 
   // stagingArea.js
   loadStagingFailed: '加载暂存区文件失败',

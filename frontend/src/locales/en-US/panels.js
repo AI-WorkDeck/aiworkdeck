@@ -464,6 +464,13 @@ export default {
   cpLoadFailed: 'Failed to load clipboard',
   cpCopied: 'Copied',
   cpDeleteFailed: 'Delete failed',
+  cpClearAll: 'Clear All',
+  cpClearAllConfirm: 'Clear all clipboard history? This cannot be undone.',
+  cpClearAllOk: 'Clear',
+  cpClearAllFailed: 'Failed to clear',
+  cpPauseCapture: 'Pause Recording',
+  cpCaptureNote: 'While on, anything you copy in any app is recorded',
+  cpCapturePausedNote: 'Paused: copied content is not recorded',
 
   // variable-library.vue
   vlUnnamedProject: 'Untitled Project',

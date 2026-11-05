@@ -1910,7 +1910,8 @@ export default {
           this.isAdminUser = res.data.isAdmin === true || this.userInfo.username === 'admin'
           // 缓存说不是管理员、服务端说是：把先前跳过的那三条初始加载补上
           if (!wasAdmin && this.isAdminUser) this.loadAdminSections()
-          // 反过来：停在一个自己看不见的面板上等于空白页，落回个人组第一栏
+          // 当前栏目对这个账号不可见（如缓存说是管理员、服务端说不是）等于空白页，
+          // 落回个人组的「工作记录」栏（不是组内第一栏，第一栏是「语言」）
           if (!this.visibleNavItems.some((n) => n.key === this.activeNav)) {
             this.onNavTap({ key: 'work_log' })
           }

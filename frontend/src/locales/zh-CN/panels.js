@@ -466,6 +466,13 @@ export default {
   cpLoadFailed: '加载剪贴板失败',
   cpCopied: '已复制',
   cpDeleteFailed: '删除失败',
+  cpClearAll: '全部清空',
+  cpClearAllConfirm: '清空全部剪贴板记录？清空后无法恢复',
+  cpClearAllOk: '清空',
+  cpClearAllFailed: '清空失败',
+  cpPauseCapture: '暂停记录',
+  cpCaptureNote: '开启时会记录你在所有软件里复制的内容',
+  cpCapturePausedNote: '已暂停：复制的内容不会被记录',
 
   // variable-library.vue
   vlUnnamedProject: '未命名项目',

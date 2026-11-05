@@ -23,6 +23,8 @@ import { migrateLeftPaneKey } from '@/config/leftSidebarPlugins.js'
 import { NO_PROJECT_DEFAULT_PANE } from './noProjectShell.js'
 
 const DOCK_STORAGE_KEY = 'awd_panel_docks'
+// 底部抽屉上次选中的 tab（全局，dev-board#1713）
+const TOOL_TAB_STORAGE_KEY = 'awd_tools_drawer_tab'
 
 /** 并进 data() 的停靠状态。 */
 export const panelDockingData = () => ({
@@ -77,6 +79,11 @@ export const panelDockingMethods = {
     return [...kept, ...extras].filter(p => p.key !== 'plugin-search')
   },
 
+  // 用户切底部抽屉 tab 时记下来（switchToolTab 调）
+  rememberToolTab(key) {
+    try { if (key) uni.setStorageSync(TOOL_TAB_STORAGE_KEY, key) } catch (e) { /* ignore */ }
+  },
+
   /**
    * 当前选中项落在一个已经搬走的面板上时的兜底：
    * 底栏空了要收起抽屉，右栏回落 AI 对话，左栏回落资源管理器——落在没有分支命中的
@@ -85,7 +92,13 @@ export const panelDockingMethods = {
   normalizeDockSelections() {
     const docks = this.panelDocks
     const bottomKeys = docks.bottom.map((p) => p.key)
-    if (!bottomKeys.includes(this.activeToolKey)) this.activeToolKey = bottomKeys[0] || ''
+    if (!bottomKeys.includes(this.activeToolKey)) {
+      // 记住上次选中的 tab；第一次打开（或记住的那个已搬走）默认剪贴板，再退回第一个
+      let saved = ''
+      try { saved = uni.getStorageSync(TOOL_TAB_STORAGE_KEY) || '' } catch (e) { /* ignore */ }
+      const prefer = [saved, migrateLeftPaneKey('clipboard'), 'clipboard'].find((k) => k && bottomKeys.includes(k))
+      this.activeToolKey = prefer || bottomKeys[0] || ''
+    }
     if (!bottomKeys.length && this.showToolsPanel) this.showToolsPanel = false
 
     const rightKeys = docks.right.map((p) => p.key)

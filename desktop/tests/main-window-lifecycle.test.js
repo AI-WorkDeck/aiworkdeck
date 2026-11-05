@@ -94,7 +94,7 @@ function harness(platform = 'darwin', engine = '', prepare = async () => {}) {
   vm.runInContext(`let mainWindow = null; let mainWindowStartupReady = false;
     let quitInProgress = false; let updateRestartRequested = false;
     let services = { ports: { backend: 9799 } }; const IS_DEV = false;
-    let clipboardWatchTimer = null; let clipboardPrimed = false; let lastClipboardFingerprint = '';
+    let clipboardWatchTimer = null; let clipboardPrimed = false; let lastClipboardFingerprint = ''; let clipboardCapturePaused = false;
     let clipboardChangeCounter = null;
     ${section('function emitClipboard(', 'function closeOcrSelectWin(')}
     ${section('function sendClipboardCopied(', 'function startClipboardWatcher()')}
