@@ -838,21 +838,30 @@ test('Cmd/Ctrl+S（save-request）在退避等待或只能手动的暂停中都�
   assert.equal(manual.dirty, false)
 })
 
-test('命令繁忙时：脏龄 <10s 让路延后，>=10s 强制导出保存', async () => {
+test('用户输入停顿：脏龄 <10s 让路，>=10s 强制保存；AI 命令在飞时上限仍是 60s', async () => {
   let exports = 0
-  const mk = age => makeVm({
-    _cmdBusy: 1, _dirtySince: Date.now() - age,
+  const mk = (age, extra) => makeVm({
+    _dirtySince: Date.now() - age, ...extra,
     executor: { executeCommand: async () => { exports++; return { success: true, bytes: [1] } } },
   })
-  const young = mk(5000)
+  const typing = { _lastInteractionAt: Date.now() }
+  const young = mk(5000, typing)
   await young.autoSave()
   assert.equal(exports, 0)
   assert.equal(young.dirty, true)
   clearTimeout(young._saveTimer)
-  const old = mk(11000)
+  const old = mk(11000, typing)
   await old.autoSave()
   assert.equal(exports, 1)
   assert.equal(old.dirty, false)
+  const storm = mk(30000, { _cmdBusy: 1 })
+  await storm.autoSave()
+  assert.equal(exports, 1, 'AI 修订风暴中 30s 仍让路，不把全文导出塞进风暴')
+  assert.equal(storm.dirty, true)
+  clearTimeout(storm._saveTimer)
+  const stale = mk(61000, { _cmdBusy: 1 })
+  await stale.autoSave()
+  assert.equal(exports, 2)
 })
 
 test('状态诚实：导出到服务端确认前 saving 恒为 true（saveStateText 先判 saving），确认后才落到已保存', async () => {
@@ -873,5 +882,6 @@ test('pagehide / visibilitychange(hidden) 注册并在卸载时移除，脏时 f
   assert.match(source, /addEventListener\('visibilitychange', this\._onVisibilityChange\)/)
   assert.match(source, /removeEventListener\('pagehide', this\._onPageHide\)/)
   assert.match(source, /removeEventListener\('visibilitychange', this\._onVisibilityChange\)/)
-  assert.match(source, /_onPageHide = \(\) => \{ if \(this\.dirty && !this\._saveDiscarded\) this\.flushSave\(\)/)
+  // 只对正常可存的实例补存：手动重试态、未就绪、装载失败、重载中都不碰
+  assert.match(source, /if \(this\.dirty && !this\._saveDiscarded && !this\._savePaused && this\.ready && !this\.docLoadFailed && !this\._reloading\) this\.flushSave\(\)/)
 })
