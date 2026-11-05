@@ -390,15 +390,21 @@ test('plain follow-up stays in the dedicated conversation and does not reopen an
   assert.deepEqual(f.opened, [71])
 })
 
-test('a new diagram uses the same dedicated history but cannot count the previous result as new', async t => {
+test('each new diagram starts a fresh dedicated conversation and cannot count the previous result as new', async t => {
   const f = fixture(t)
   await f.start()
+  f.event('text_delta', '<final>第一张图的过程说明</final>')
   f.event('client_action', { action: 'doc_open_file', fileId: 71 })
   f.set({ diagrams: [{ folderId: 70, name: 'Synthetic', drawioFileId: 71 }] })
   f.event('bubble_end', { status: 'finished' })
   await f.generation.observe()
   await f.start()
-  assert.equal(f.posts[1].conversationId, f.posts[0].conversationId)
+  const second = await f.generation.observe()
+  // dev-board#1713 (103): reusing the old conversation let the previous run's
+  // reasoning surface in the second confirmation box.
+  assert.notEqual(f.posts[1].conversationId, f.posts[0].conversationId)
+  assert.equal(f.posts[1].conversationScope, 'litigation-visual')
+  assert.ok(second.messages.every(message => !message.content.includes('第一张图的过程说明')))
   f.event('bubble_end', { status: 'finished' })
   assert.equal((await f.generation.observe()).phase, 'failed')
   assert.deepEqual(f.opened, [71])
@@ -436,4 +442,51 @@ test('restored later round excludes prior artifact metadata even if it is still 
     diagrams: [{ folderId: 70, name: 'Synthetic', drawioFileId: 71 }] })
   assert.equal((await restored.generation.observe()).phase, 'failed')
   assert.deepEqual(restored.opened, [])
+})
+
+test('awaiting input without a structured question re-reads history before deciding', async t => {
+  const f = fixture(t)
+  await f.start()
+  // The live stream lost the <question> markup; the persisted history still has it.
+  f.event('text_delta', '<final>正在整理材料。</final>')
+  f.set({ inbox: { status: 'AWAITING_INPUT', items: [{ clientRequestId: 'first-request', state: 'applied' }] },
+    history: [{ role: 'USER', clientRequestId: 'first-request', content: 'synthetic input' },
+      { role: 'ASSISTANT', content: '<question>选哪种风格？<option>奇川风</option><option>白描</option></question>' }] })
+  f.event('bubble_end', { status: 'awaiting_input' })
+  const view = await f.generation.observe()
+  assert.equal(view.phase, 'waiting')
+  assert.equal(view.question.text, '选哪种风格？')
+  assert.deepEqual(view.question.options, ['奇川风', '白描'])
+})
+
+test('awaiting input with only prose falls back to the reply text as a free-form question', async t => {
+  const f = fixture(t)
+  await f.start()
+  const prose = '请问这张图呈报给谁？奇川风、歸藏风还是白描？'
+  f.event('text_delta', `<final>${prose}</final>`)
+  f.set({ inbox: { status: 'AWAITING_INPUT', items: [{ clientRequestId: 'first-request', state: 'applied' }] },
+    history: [{ role: 'USER', clientRequestId: 'first-request', content: 'synthetic input' },
+      { role: 'ASSISTANT', content: `<final>${prose}\n调用 litigation_timeline_step(stage=style) 推进\n──给你（AI）──上面若含要问用户的清单</final>` }] })
+  f.event('bubble_end', { status: 'awaiting_input' })
+  const view = await f.generation.observe()
+  assert.equal(view.phase, 'waiting', 'a missing structured question must not fail the run')
+  assert.equal(view.question.text, prose)
+  assert.deepEqual(view.question.options, [])
+  await f.generation.request('answer', { taskId: view.taskId, questionKey: view.question.key, answer: { other: '奇川风' } })
+  await flush()
+  assert.equal(f.posts.length, 2)
+  assert.match(f.posts[1].message, /奇川风/)
+})
+
+test('awaiting input whose reply is only internal tool chatter still fails visibly', async t => {
+  const f = fixture(t)
+  await f.start()
+  f.set({ inbox: { status: 'AWAITING_INPUT', items: [{ clientRequestId: 'first-request', state: 'applied' }] },
+    history: [{ role: 'USER', clientRequestId: 'first-request', content: 'synthetic input' },
+      { role: 'ASSISTANT', content: '<final>下一步调用 litigation_timeline_step 提交 modelFilesJson</final>' }] })
+  f.event('text_delta', '<final>下一步调用 litigation_timeline_step 提交 modelFilesJson</final>')
+  f.event('bubble_end', { status: 'awaiting_input' })
+  const view = await f.generation.observe()
+  assert.equal(view.phase, 'failed')
+  assert.equal(view.message, 'missingQuestion')
 })
