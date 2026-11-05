@@ -88,7 +88,7 @@ function enqueue(kind, opts, fallback) {
 
 /**
  * 确认框。opts：{ title, content, showCancel, confirmText, cancelText, danger,
- * editable, placeholderText }（也接受 uni 的 confirmColor，红色映射成 danger）。
+ * editable, placeholderText, checkLabel }（checkLabel 非空时多一个勾选项，勾上才能确认）（也接受 uni 的 confirmColor，红色映射成 danger）。
  * 返回 Promise<{ confirm, cancel, content? }>，content 只在 editable 且确认时有。
  */
 export function showDialog(opts = {}) {

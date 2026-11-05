@@ -17,7 +17,7 @@ function fixture(overrides = {}) {
   const calls = []
   const state = { status: 'idle', projectId: null, meetingId: null, ...overrides.state }
   const active = () => !['idle', 'error'].includes(state.status)
-  const mixin = new Function('getMeetingRecordings', 'getMeetingAsrNotice', 'recorderState', 'isRecordingActive', 'startRecording', 'uni', source)(
+  const mixin = new Function('getMeetingRecordings', 'getMeetingAsrNotice', 'recorderState', 'isRecordingActive', 'startRecording', 'confirmAsrNotice', 'uni', source)(
     async id => { calls.push(['tier', id]); return overrides.tier ? overrides.tier() : { tier: 'local' } },
     async () => { calls.push(['notice']); return overrides.notice || { acknowledged: true } },
     state, active,
@@ -26,6 +26,7 @@ function fixture(overrides = {}) {
       if (overrides.start) return overrides.start(...args)
       Object.assign(state, { status: 'recording', projectId: args[0], meetingId: 91 })
     },
+    async ({ notice }) => { calls.push(['noticeDialog', notice]); return overrides.noticeDialog === undefined ? { acknowledged: true } : overrides.noticeDialog },
     { $emit: (event, payload) => calls.push(['event', event, payload]), showToast: payload => calls.push(['toast', payload.title]) },
   )
   const vm = {
@@ -61,11 +62,20 @@ test('plugin discovery completes before starting; unavailable voice opens its ex
   assert.equal(calls[2][1], 'fileTree.recordingPluginRequired')
 })
 
-test('unacknowledged cloud notice keeps the recording panel open without starting', async () => {
-  const { vm, calls } = fixture({ tier: async () => ({ tier: 'platform' }), notice: { acknowledged: false } })
+test('unacknowledged cloud notice opens the host notice dialog; cancel keeps the panel open without starting', async () => {
+  const { vm, calls } = fixture({ tier: async () => ({ tier: 'platform' }), notice: { acknowledged: false }, noticeDialog: null })
   await vm.onCreateRecording()
   assert.equal(calls.some(c => c[0] === 'start'), false)
-  assert.deepEqual(calls.at(-1), ['toast', 'fileTree.recordingNoticeRequired'])
+  assert.deepEqual(calls.at(-1), ['noticeDialog', { acknowledged: false }])
+  assert.equal(calls.some(c => c[0] === 'toast'), false, '取消告知不是错误，不弹提示')
+})
+
+test('confirming the notice continues straight into recording (dev-board#1713 #118)', async () => {
+  const { vm, calls } = fixture({ tier: async () => ({ tier: 'platform' }), notice: { acknowledged: false } })
+  await vm.onCreateRecording()
+  const dialog = calls.findIndex(c => c[0] === 'noticeDialog')
+  const start = calls.findIndex(c => c[0] === 'start')
+  assert.ok(dialog > -1 && start > dialog)
 })
 
 test('all active recording states only focus the current recording without restarting', async () => {

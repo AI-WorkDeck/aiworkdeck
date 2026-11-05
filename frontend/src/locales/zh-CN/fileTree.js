@@ -10,7 +10,6 @@ export default {
   defaultPresentationName: "新建演示文稿",
   defaultSpreadsheetName: "新建工作簿",
   recordingPluginRequired: "请先在插件详情中安装或启用“语音”，再开始录音。",
-  recordingNoticeRequired: "开始录音前，请先确认录音面板中的转写告知。",
 
   externalDragFailed: '所选内容无法拖出，请确认选中的是本机现有文件后再试。',
   clientAccessTitle: "客户访问权限",
@@ -64,6 +63,7 @@ export default {
   transcribe: '语音转文字',
   transcribeSubmitted: '已提交转写，请在会议录音面板查看进度',
   transcribeRegistered: '已加入会议录音面板，配置转写服务后可开始转写',
+  transcribeNoticePending: '已加入会议录音面板。在面板里点「开始转写」并确认转写告知即可转写。',
   transcribeFailed: '转写发起失败',
   rename: '重命名',
   fileHistory: '这份文件的历史',
