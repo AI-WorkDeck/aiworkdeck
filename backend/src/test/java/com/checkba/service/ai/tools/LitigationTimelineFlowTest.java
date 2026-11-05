@@ -203,6 +203,7 @@ class LitigationTimelineFlowTest {
         folder.setName("催告经过时间轴");
         folder.setIsFolder(true);
         when(visual.createFolderTolerant(anyLong(), any(), anyString())).thenReturn(folder);
+        when(visual.outputParentId(7L, null)).thenReturn(500L);
         when(visual.registerArtifact(anyLong(), anyLong(), any(Path.class), anyString()))
                 .thenAnswer(inv -> {
                     ProjectFile r = new ProjectFile();
@@ -249,7 +250,10 @@ class LitigationTimelineFlowTest {
         String offered = tools.litigation_timeline_step("offer", null, offerFiles, null);
         assertTrue(offered.contains("催告经过"), offered);
 
-        tools.litigation_timeline_step("budget", "all", null, null);
+        // 用户点「全部」：上游 budget 只认 all，int("全部") 抛错会把用户反复带回第四轮（dev-board#1713）
+        String budgeted = tools.litigation_timeline_step("budget", "全部", null, null);
+        assertFalse(budgeted.startsWith("阶段 budget 未通过"), budgeted);
+        assertTrue(budgeted.contains("勾选了部分"), budgeted);
 
         // ---- skeleton 随 capacity 提交 ----
         List<Map<String, Object>> skeleton = new ArrayList<>();
@@ -290,6 +294,8 @@ class LitigationTimelineFlowTest {
         assertTrue(note.contains("[本图已交付]"), note);
         assertTrue(note.contains(".svg") || note.contains("svg"), note);
         assertTrue(note.contains("溯源索引"), "溯源索引（POI 三线表）应随交付生成：" + note);
+        // 产出文件夹统一收进根目录下的「诉讼可视化」父文件夹（dev-board#1713）
+        Mockito.verify(visual).createFolderTolerant(Mockito.eq(7L), Mockito.eq(500L), anyString());
 
         // ---- 幂等：同一份 items 再渲染一次要被短路 ----
         String again = tools.litigation_timeline_render(7L, "催告经过时间轴", null, null);
@@ -319,6 +325,71 @@ class LitigationTimelineFlowTest {
             assertEquals(3, doc.getTables().get(0).getRows().size(), "表头 + 两行数据");
             assertEquals(5, doc.getTables().get(0).getRow(0).getTableCells().size());
         }
+    }
+
+    @Test
+    @DisplayName("勾选答复规范化：全部/全选/all 统一成 all，风格名映射成真实编号（dev-board#1713）")
+    void answersNormalizedToUpstreamShapes() {
+        for (String all : List.of("全部", "全选", "all", "ALL", "「全部」", "[全部]", "全部部分", "所有", "全部材料", "全都要")) {
+            assertEquals("all", LitigationTimelineTools.normalizeAnswer("budget", all), all);
+            assertEquals("all", LitigationTimelineTools.normalizeAnswer("pick", all), all);
+            assertEquals("all", LitigationTimelineTools.normalizeAnswer("span", all), all);
+        }
+        assertEquals("1,2", LitigationTimelineTools.normalizeAnswer("budget", "1、2"));
+        assertEquals("1,3", LitigationTimelineTools.normalizeAnswer("pick", "1，3"));
+        // 真实编号以 pick.py STYLES 为准：1 奇川风 / 2 歸藏风 / 3 白描
+        assertEquals("1", LitigationTimelineTools.normalizeAnswer("style", "奇川风"));
+        assertEquals("1", LitigationTimelineTools.normalizeAnswer("style", ""));
+        assertEquals("2", LitigationTimelineTools.normalizeAnswer("style", "歸藏风"));
+        assertEquals("2", LitigationTimelineTools.normalizeAnswer("style", "归藏风"));
+        assertEquals("3", LitigationTimelineTools.normalizeAnswer("style", "白描"));
+        assertEquals("3", LitigationTimelineTools.normalizeAnswer("style", "1 法官白描"),
+                "旧提示的错号标签：用户点的是名字，数字不可信");
+        assertEquals("1", LitigationTimelineTools.normalizeAnswer("style", "2 当事人奇川风"));
+        assertEquals("2", LitigationTimelineTools.normalizeAnswer("style", "2"));
+        assertEquals("4", LitigationTimelineTools.normalizeAnswer("style", "你定"));
+        assertEquals(null, LitigationTimelineTools.normalizeAnswer("style", "彩色的那种"));
+        assertEquals("0", LitigationTimelineTools.normalizeAnswer("mark", ""));
+    }
+
+    @Test
+    @DisplayName("中文数字日期归一成阿拉伯数字，否则上游 _DATE 认不出、合同被判成 0 句带日期（dev-board#1713）")
+    void chineseNumeralDatesNormalized() {
+        assertEquals("本合同于2026年2月20日签订。",
+                LitigationTimelineTools.normalizeChineseDates("本合同于二〇二六年二月二十日签订。"));
+        assertEquals("2025年12月31日 与 2024年10月1号 与 2023年11月",
+                LitigationTimelineTools.normalizeChineseDates("二零二五年十二月三十一日 与 二〇二四年十月一号 与 二〇二三年十一月"));
+        assertEquals("2026年3月15日", LitigationTimelineTools.normalizeChineseDates("2026年三月十五日"));
+        String untouched = "2024-03-05 我方催告；2024年3月8日对方回复；质保期为十二个月；三年二月";
+        assertEquals(untouched, LitigationTimelineTools.normalizeChineseDates(untouched));
+    }
+
+    @Test
+    @DisplayName("真管线：风格名直接交给 stage_style 不再 ValueError；中文数字日期进管线后可认（dev-board#1713）")
+    void styleNameAndChineseDatesThroughRealPipeline() throws Exception {
+        requireRuntime();
+        ProjectContextHolder.setConversationId("tl-style-" + System.nanoTime());
+        ProjectContextHolder.setProjectId("7");
+        ProjectFile pf = new ProjectFile();
+        pf.setId(301L);
+        pf.setProjectId(7L);
+        pf.setName("合同.txt");
+        pf.setIsFolder(false);
+        pf.setFileType("txt");
+        ProjectFileRepository repo = mock(ProjectFileRepository.class);
+        when(repo.findById(301L)).thenReturn(Optional.of(pf));
+        ProjectFileTextExtractor docText = mock(ProjectFileTextExtractor.class);
+        when(docText.extractText(pf)).thenReturn(
+                "甲乙双方于二〇二六年二月二十日签订本合同。\n乙方应于二〇二六年三月十五日前交货。\n甲方于二〇二六年四月一日付款。\n");
+        LitigationTimelineTools tools = new LitigationTimelineTools(svc, null, docText, repo, null, null, null);
+
+        String started = tools.litigation_timeline_start(7L, "301");
+        assertTrue(started.contains("2026年2月20日"), started);
+        tools.litigation_timeline_step("pick", "全部", null, null);
+        tools.litigation_timeline_step("span", "全部", null, null);
+        String styled = tools.litigation_timeline_step("style", "歸藏风", null, null);
+        assertFalse(styled.startsWith("阶段 style 未通过"), styled);
+        assertTrue(styled.contains("已选：歸藏风"), styled);
     }
 
     /** 从 start 返回文本里解析「i: 句子」清单（清单结束于空行或指引分隔线）。 */
