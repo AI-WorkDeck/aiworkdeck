@@ -38,6 +38,7 @@ export class ActivityTracker {
         this._pollTimer = null
         this.noteActivity = this.noteActivity.bind(this)
         this._onVisibility = this._onVisibility.bind(this)
+        this._onDomActivity = this._onDomActivity.bind(this)
         try {
             const s = storage()
             this.isRecording = !!(s && s.getStorageSync(RECORDING_STORAGE_KEY))
@@ -168,6 +169,12 @@ export class ActivityTracker {
         session.idleSegments.push({ start: s, end })
     }
 
+    // 页面里的鼠标键盘事件：窗口不在前台时不算（macOS 上鼠标划过后台窗口也会收到 mousemove）
+    _onDomActivity() {
+        if (typeof document !== 'undefined' && typeof document.hasFocus === 'function' && !document.hasFocus()) return
+        this.noteActivity()
+    }
+
     _isVisible() {
         return typeof document === 'undefined' || document.visibilityState !== 'hidden'
     }
@@ -180,7 +187,7 @@ export class ActivityTracker {
         if (this._watching) return
         this._watching = true
         if (typeof window !== 'undefined' && window.addEventListener) {
-            ACTIVITY_EVENTS.forEach(ev => window.addEventListener(ev, this.noteActivity, { capture: true, passive: true }))
+            ACTIVITY_EVENTS.forEach(ev => window.addEventListener(ev, this._onDomActivity, { capture: true, passive: true }))
         }
         if (typeof document !== 'undefined' && document.addEventListener) {
             document.addEventListener('visibilitychange', this._onVisibility)
@@ -194,7 +201,7 @@ export class ActivityTracker {
         if (!this._watching) return
         this._watching = false
         if (typeof window !== 'undefined' && window.removeEventListener) {
-            ACTIVITY_EVENTS.forEach(ev => window.removeEventListener(ev, this.noteActivity, { capture: true }))
+            ACTIVITY_EVENTS.forEach(ev => window.removeEventListener(ev, this._onDomActivity, { capture: true }))
         }
         if (typeof document !== 'undefined' && document.removeEventListener) {
             document.removeEventListener('visibilitychange', this._onVisibility)

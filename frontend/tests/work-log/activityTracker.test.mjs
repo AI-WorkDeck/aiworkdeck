@@ -128,3 +128,22 @@ test('页面挂起只结束当前会话，不改录制开关；恢复后继续�
 })
 
 process.on('exit', () => { Date.now = realNow })
+
+test('窗口不在前台时，鼠标从窗口上划过不算动作（真机复测发现：后台窗口照样收到 mousemove，空闲段被冲掉）', async () => {
+  const t = makeTracker()
+  t.setRecording(true)
+  t.trackActivePage('OPEN_FILE', 1, 'a.docx', 9, 'Project: X')
+  const prevDoc = globalThis.document
+  globalThis.document = { hasFocus: () => false, visibilityState: 'visible' }
+  try {
+    now += 3 * MIN; t._onDomActivity({ type: 'mousemove' })
+    now += 4 * MIN
+    globalThis.document = { hasFocus: () => true, visibilityState: 'visible' }
+    t._onDomActivity({ type: 'mousedown' })
+    now += 1 * MIN
+    t.flushActiveSession(); await flushMicrotasks()
+  } finally { globalThis.document = prevDoc }
+  assert.equal(calls.length, 1)
+  assert.match(calls[0][4], /IdleSegments: /)
+  assert.equal(calls[0][3], MIN, `后台 7 分钟应整段扣掉，只剩回到前台后的 1 分钟，实际 ${calls[0][3]}ms`)
+})
