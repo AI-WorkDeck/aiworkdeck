@@ -725,6 +725,7 @@ ipcMain.handle('checkba:ocr-start-selection', async (_evt, payload) => {
   const reqId = `ocrsel_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
   const resultChannel = `checkba:ocr-selection-done:${reqId}`
 
+  // 提示条贴底居中，不压 macOS 左上角红绿灯；window 模式没有网页标签，文案不提「网页」（问题 67）
   const html = `<!doctype html>
 <html>
 <head>
@@ -733,7 +734,7 @@ ipcMain.handle('checkba:ocr-start-selection', async (_evt, payload) => {
   <style>
     html, body { margin:0; padding:0; width:100%; height:100%; background: transparent; cursor: crosshair; user-select:none; }
     .layer { position: fixed; inset: 0; }
-    .hint { position: fixed; left: 14px; top: 14px; padding: 6px 10px; background: rgba(252,251,247,0.88); border: 1px solid rgba(221,216,202,0.7); border-radius: 10px; font-size: 12px; color:#2E5A50; }
+    .hint { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); white-space: nowrap; padding: 6px 10px; background: rgba(252,251,247,0.88); border: 1px solid rgba(221,216,202,0.7); border-radius: 10px; font-size: 12px; color:#2E5A50; }
     .shade { position: fixed; inset: 0; background: rgba(0,0,0,0.12); }
     .rect { position: fixed; border: 2px solid rgba(46,90,80,0.85); background: rgba(46,90,80,0.12); border-radius: 6px; pointer-events:none; display:none; }
   </style>
@@ -741,7 +742,9 @@ ipcMain.handle('checkba:ocr-start-selection', async (_evt, payload) => {
 <body>
   <div class="layer">
     <div class="shade"></div>
-    <div class="hint">${escapeHtml(require('./app-language').t({ zh: '拖动框选网页区域 · 点击其它区域或 ESC 退出', en: 'Drag to select an area · Click outside or press ESC to cancel' }))}</div>
+    <div class="hint">${escapeHtml(require('./app-language').t(useWindow
+      ? { zh: '拖动框选区域 · 单击或按 ESC 退出', en: 'Drag to select an area · Click or press ESC to cancel' }
+      : { zh: '拖动框选网页区域 · 点击其它区域或 ESC 退出', en: 'Drag to select a web page area · Click outside or press ESC to cancel' }))}</div>
     <div id="rect" class="rect"></div>
   </div>
   <script>
@@ -1069,12 +1072,12 @@ function makeBrowserView(id) {
   view.webContents.on('context-menu', async (_event, params) => {
     try {
       const selectionText = (params && params.selectionText ? String(params.selectionText) : '').trim()
-      if (!selectionText) return
 
-      const menu = Menu.buildFromTemplate([
-        {
-          label: require('./app-language').t({ zh: '加入网核收藏', en: 'Save as Web Evidence' }),
-          click: async () => {
+      // 基础项（复制 / 全选，可编辑区加剪切 / 粘贴）+ 有选中文字时的「加入网核收藏」（问题 68）
+      const menu = Menu.buildFromTemplate(require('./browser-context-menu').browserContextMenuTemplate(params, {
+        t: require('./app-language').t,
+        wc: view.webContents,
+        onWebmark: async () => {
             try {
               const url = params.pageURL ? String(params.pageURL) : ''
               const title = view.webContents.getTitle ? (view.webContents.getTitle() || '') : ''
@@ -1099,9 +1102,8 @@ function makeBrowserView(id) {
             } catch (e) {
               // ignore
             }
-          }
         }
-      ])
+      }))
       // BrowserView 的 x/y 是相对 view 的；popup 需要相对 BrowserWindow 内容区坐标
       try {
         const b = views.getBounds(id) || { x: 0, y: 0 }

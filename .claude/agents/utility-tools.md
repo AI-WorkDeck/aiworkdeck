@@ -146,7 +146,7 @@ local-mode 下本机后端把每个请求都当本机用户，等于把本机管
   回归用例 `frontend/tests/clipboard/`（`npm run test:clipboard`）、`ClipboardDedupTest`。
   **免费额度（PR-C）**：未拥有 `clipboard.unlimited` 时 GET / 只返回「最近 20 条 且 3 天内」，两条同时生效取更严者。**实现是查询侧过滤，绝不删除记录**——超出的行留在库里，解锁后原样可见。GET / 返回体从裸数组改为 `{items, limited, hiddenCount, maxItems, retentionDays}`（`ClipboardListResult`），hiddenCount 只算「因额度看不见」的（= 总数 − min(3天内条数, 20)），不含被分页 limit 挡住的。常量在 `ClipboardService.FREE_MAX_ITEMS/FREE_RETENTION_DAYS`。**额度只在 local-mode（桌面单机版）执行**：`EntitlementService` 是按本机的（无 userId 维度），团队案件库服务器上权益恒为空集，照执行会把每个接入成员截到 20 条且永远无法解锁。
 
-**收藏夹**：`ProjectFavoritesPanel.vue`；网页选中收藏经 `checkba:webmark`（preload ~:26）→ project-overview 订阅入库（~:2003）；后端 `controller/WebFavoriteController.java`（/api/favorites/my、/api/projects/{id}/favorites、DELETE、image）。
+**收藏夹**：`ProjectFavoritesPanel.vue`；网页选中收藏经 `checkba:webmark`（preload ~:26）→ project-overview 订阅入库（~:2003）；网页右键菜单模板在 `desktop/main/browser-context-menu.js`（自定义菜单会整个替换系统菜单：基础项复制 / 全选、可编辑区剪切 / 粘贴自己补齐，没选中文字也弹；有选中时再加「加入网核收藏」，dev-board#1713 问题 68，测试 `desktop/tests/browser-context-menu.test.js`，该文件也守主进程框选窗 `checkba:ocr-start-selection` 的提示条贴底居中）；后端 `controller/WebFavoriteController.java`（/api/favorites/my、/api/projects/{id}/favorites、DELETE、image）。
   **收藏成功的反馈必须是「打开收藏面板 + focusFavorite 高亮新卡片」，不能只弹 toast**：
   用户此刻正在浏览器标签里，toast 在 DOM 层、被原生 BrowserView 整个盖住（实测 toast
   中心恒落在 view 区域内），只弹 toast 的现象就是「点了没反应」。右键收藏与 OCR 摘录收藏
