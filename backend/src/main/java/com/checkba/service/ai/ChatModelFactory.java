@@ -38,6 +38,9 @@ public class ChatModelFactory {
     private final PlatformAiChannel platformAiChannel;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private PlatformModelCatalog platformModelCatalog;
+    /** 平台通道的跨境同意运行时闸（问题 130）。字段注入：本类构造器由 Lombok 生成，测试里有手工 new 的实例。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private CrossBorderConsentService crossBorderConsent;
 
     public boolean isDomesticPlatform() {
         return resolveProvider() == AiModelProperties.Provider.AWD_CLOUD && platformAiChannel.isBailian();
@@ -637,6 +640,11 @@ public class ChatModelFactory {
      */
     private PlatformAiKeyService.Resolved platformConnection() {
         Long userId = PlatformAiUserScope.current();
+        // 跨境同意闸（问题 130）：撤回后平台通道当场停用，首启默认成平台通道也绕不过去。
+        // 只管机器级账户路径——同意记录按「本机连接的账户 + 站点」落库；按用户桥接的团队服务器租户不在此列。
+        if (crossBorderConsent != null && platformAiChannel.usesMachineKey(userId)) {
+            crossBorderConsent.requireForPlatformCall();
+        }
         // 余额闸排在取 key 之前：本地已经缓存过 key 时 apiKey() 根本不联网，
         // 「没充值就不能用」不能只靠取 key 那一刻的 409（见 PlatformCreditsGate）
         platformCreditsGate.ensureCredits(userId);
