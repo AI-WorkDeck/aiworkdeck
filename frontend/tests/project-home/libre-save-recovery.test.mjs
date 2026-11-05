@@ -864,6 +864,20 @@ test('用户输入停顿：脏龄 <10s 让路，>=10s 强制保存；AI 命令�
   assert.equal(exports, 2)
 })
 
+test('大文档：强制保存上限至少是上次导出耗时的 4 倍（导出冻住输入，不能每 10s 冻一次）', async () => {
+  let exports = 0
+  const mk = (age) => makeVm({
+    _dirtySince: Date.now() - age, _lastInteractionAt: Date.now(), _lastExportMs: 15000,
+    executor: { executeCommand: async () => { exports++; return { success: true, bytes: [1] } } },
+  })
+  const vm = mk(30000)
+  await vm.autoSave()
+  assert.equal(exports, 0, '上次导出 15s 时，30s 脏龄仍让路')
+  clearTimeout(vm._saveTimer)
+  await mk(61000).autoSave()
+  assert.equal(exports, 1)
+})
+
 test('状态诚实：导出到服务端确认前 saving 恒为 true（saveStateText 先判 saving），确认后才落到已保存', async () => {
   const gate = deferred()
   const vm = makeVm({ uploadBytes: () => gate.promise })
