@@ -3078,7 +3078,9 @@ export default {
               fileId: item.id,
               name: item.name,
               fileType: item.isFolder ? 'folder' : item.fileType,
-              wpsFileId: item.wpsFileId
+              wpsFileId: item.wpsFileId,
+              // 暂存区移出时据此回原文件夹（根目录为 null）
+              parentId: item.parentId ?? null
             }
           }
         } catch (err) {}
@@ -3115,7 +3117,8 @@ export default {
               fileId: item.id,
               name: item.name,
               fileType: item.isFolder ? 'folder' : item.fileType,
-              wpsFileId: item.wpsFileId
+              wpsFileId: item.wpsFileId,
+              parentId: item.parentId ?? null
             })
             // 标准自定义类型
             dt.setData('application/x-checkba-file', fileData)
