@@ -259,6 +259,23 @@ class ProjectFileContentJpaTest {
         assertTrue(members.hasWritePermission(project.getId(), userId));
         assertEquals(file.getFilePath(), files.findById(file.getId()).orElseThrow().getFilePath());
     }
+    private void chunk(String text, long offset) throws Exception {
+        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        content.upload(file.getId(), project.getId(), actor.getId(), new ByteArrayInputStream(bytes),
+                bytes.length, offset, true, "100");
+    }
+    @Test void retriedChunkAtSameOffsetIsNotAppendedTwice() throws Exception {
+        chunk("AAAA", 0);
+        chunk("BBB", 4);
+        chunk("BBB", 4);
+        assertEquals("AAAABBB", java.nio.file.Files.readString(original));
+    }
+    @Test void chunkBeyondCurrentSizeIsRejectedWith409() throws Exception {
+        chunk("AAAA", 0);
+        var failure = assertThrows(ProjectFileContentService.ContentWriteException.class, () -> chunk("BBB", 9));
+        assertEquals(409, failure.status());
+        assertEquals("AAAA", java.nio.file.Files.readString(original));
+    }
     private ProjectFileContentService.UploadResult upload(Long userId, Runnable change) throws Exception {
         byte[] bytes = "new content".getBytes(StandardCharsets.UTF_8);
         var input = new java.io.InputStream() {
