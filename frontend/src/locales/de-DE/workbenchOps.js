@@ -50,7 +50,7 @@ export default {
   "captureNoResult": "Screenshot abgeschlossen, aber kein Ergebnis erhalten",
   "screenShareUnsupported": "Bildschirmfreigabe wird in diesem Browser nicht unterstützt",
   "captureFailedAllowShare": "Screenshot fehlgeschlagen (bitte Freigabe des Tabs oder Fensters erlauben)",
-  "captureH5Only": "Screenshot-Auszüge werden nur in H5 unterstützt",
+  "captureH5Only": "Texterfassung per Screenshot (OCR) wird nur im Web unterstützt",
   "loadStagingFailed": "Dateien im Zwischenspeicher konnten nicht geladen werden",
   "addedToStaging": "Zum Zwischenspeicher hinzugefügt",
   "stagingFullTitle": "Zwischenspeicher voll",

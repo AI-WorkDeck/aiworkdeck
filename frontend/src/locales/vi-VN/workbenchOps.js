@@ -50,7 +50,7 @@ export default {
   "captureNoResult": "Đã chụp màn hình xong nhưng không nhận được kết quả",
   "screenShareUnsupported": "Trình duyệt hiện tại không hỗ trợ chia sẻ màn hình",
   "captureFailedAllowShare": "Chụp màn hình thất bại (vui lòng cho phép chia sẻ thẻ hoặc cửa sổ)",
-  "captureH5Only": "Chỉ hỗ trợ chụp màn hình trích lục trên H5",
+  "captureH5Only": "OCR chụp màn hình chỉ được hỗ trợ trên web",
   "loadStagingFailed": "Không thể tải tệp vùng tạm lưu",
   "addedToStaging": "Đã thêm vào vùng tạm lưu",
   "stagingFullTitle": "Vùng tạm lưu đã đầy",

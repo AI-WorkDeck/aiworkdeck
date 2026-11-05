@@ -50,7 +50,7 @@ export default {
   "captureNoResult": "Schermafbeelding voltooid, maar geen resultaat ontvangen",
   "screenShareUnsupported": "Scherm delen wordt niet ondersteund in deze browser",
   "captureFailedAllowShare": "Schermafbeelding mislukt (sta het delen van het tabblad of venster toe)",
-  "captureH5Only": "Schermafbeelding maken wordt alleen op web (H5) ondersteund",
+  "captureH5Only": "OCR via schermafbeelding wordt alleen op web ondersteund",
   "loadStagingFailed": "Laden van bestanden in verzamelgebied mislukt",
   "addedToStaging": "Toegevoegd aan verzamelgebied",
   "stagingFullTitle": "Verzamelgebied vol",

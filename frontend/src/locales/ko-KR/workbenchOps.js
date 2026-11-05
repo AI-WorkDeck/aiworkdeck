@@ -50,7 +50,7 @@ export default {
   "captureNoResult": "스크린샷이 완료되었지만 결과를 받지 못했습니다",
   "screenShareUnsupported": "이 브라우저에서는 화면 공유가 지원되지 않습니다",
   "captureFailedAllowShare": "스크린샷 실패 (탭 또는 창 공유를 허용해 주세요)",
-  "captureH5Only": "스크린샷 캡처는 웹에서만 지원됩니다",
+  "captureH5Only": "화면 캡처 OCR은 웹에서만 지원됩니다",
   "loadStagingFailed": "스테이징 영역 파일 로드 실패",
   "addedToStaging": "스테이징 영역에 추가됨",
   "stagingFullTitle": "스테이징 영역이 가득 참",

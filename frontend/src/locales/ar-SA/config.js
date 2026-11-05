@@ -37,7 +37,7 @@ export default {
   "ocr": {
     "refresh": "تحديث العرض",
     "recognize": "التعرّف على النص",
-    "download": "التنزيل",
+    "download": "حفظ في المشروع",
     "copy": "نسخ",
     "insertDoc": "إدراج في المستند",
     "webLink": "رابط للتحقق عبر الويب",
