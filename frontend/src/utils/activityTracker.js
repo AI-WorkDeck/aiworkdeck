@@ -12,7 +12,8 @@ const PRESENCE_POLL_MS = 30 * 1000
 const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart']
 
 function storage() {
-    return typeof uni !== 'undefined' ? uni : null
+    // 必须出现 uni.xxx 成员访问：uni-h5 构建只在见到成员访问时才注入 uni，单写 typeof uni 打包后恒为 undefined（真机复测发现录制状态存不上）
+    return typeof uni !== 'undefined' && typeof uni.setStorageSync === 'function' ? uni : null
 }
 
 /**
