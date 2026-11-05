@@ -70,6 +70,7 @@ public class AuthAbuseGuard {
     private final LongSupplier nowMillis;
 
     private final Map<String, FailureState> loginFailures = new ConcurrentHashMap<>();
+    private final Map<String, Object> loginLocks = new ConcurrentHashMap<>();
     private final Map<String, WindowCounter> registrations = new ConcurrentHashMap<>();
     private final Map<String, WindowCounter> captchaChallenges = new ConcurrentHashMap<>();
     private final Map<String, WindowCounter> codeSends = new ConcurrentHashMap<>();
@@ -111,6 +112,11 @@ public class AuthAbuseGuard {
                     "Too many attempts. This account is temporarily locked and will unlock automatically in "
                             + LOCKOUT.toMinutes() + " minutes"));
         }
+    }
+
+    /** 同 ip+用户名的登录串行化用的监视器：让每次尝试都能看到上一次的失败记录。local-mode 不限流，不需要串行。 */
+    public Object loginLock(String ip, String username) {
+        return localMode ? new Object() : loginLocks.computeIfAbsent(loginKey(ip, username), k -> new Object());
     }
 
     public void recordLoginFailure(String ip, String username) {
@@ -259,6 +265,9 @@ public class AuthAbuseGuard {
 
     private void purgeIfOversized() {
         long now = nowMillis.getAsLong();
+        if (loginLocks.size() > PURGE_THRESHOLD) {
+            loginLocks.clear();
+        }
         if (loginFailures.size() > PURGE_THRESHOLD) {
             loginFailures.entrySet().removeIf(e ->
                     e.getValue().lockedUntil < now
