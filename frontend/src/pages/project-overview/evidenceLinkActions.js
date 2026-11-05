@@ -60,7 +60,7 @@ export const evidenceLinkMethods = {
     try {
       res = await createEvidenceLinkForDrop({
         exec, api: { createEvidenceLink: (p, b) => createEvidenceLink(p, b).then(unwrap), addEvidenceTargets: (p, k, t) => addEvidenceTargets(p, k, t).then(unwrap) },
-        method: loadEvidenceTags()[0] || null,
+        method: loadEvidenceTags((key) => this.$t(key))[0] || null,
         projectId: pid, docFileId: Number(doc.id), file, internalBase: this.WPS_INTERNAL_HTTP_LINK_BASE || '',
       })
     } catch (e) {
