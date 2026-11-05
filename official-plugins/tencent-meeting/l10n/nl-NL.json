@@ -13,5 +13,16 @@
   "panel.exporting": "Vergadermateriaal opslaan…",
   "panel.preparingAi": "Vergadermateriaal voorbereiden voor AI…",
   "view.account.name": "Tencent Meeting",
-  "view.meetings.name": "Tencent Meeting"
+  "view.meetings.name": "Tencent Meeting",
+  "panel.autoSync": "Na afloop van vergaderingen automatisch synchroniseren met dit project",
+  "panel.autoSyncHint": "Hiermee geeft u de plug-in toestemming om, zolang dit paneel open is, elke 5 minuten de lokale tmeet-CLI uit te voeren en vergaderingen te controleren die in de afgelopen 24 uur zijn geëindigd. Nieuwe vergaderingen met opname of notulen worden gearchiveerd in de map 'Tencent Meeting' van dit project en AI stelt notulen en actiepunten op (verbruikt AI-tegoed). Er wordt niets geïnstalleerd; als tmeet ontbreekt of niet is geautoriseerd, wordt de controle overgeslagen.",
+  "panel.autoWaiting": "Automatische synchronisatie staat aan. Controle volgt zo.",
+  "panel.autoRunning": "Automatische synchronisatie bezig…",
+  "panel.autoOk": "Automatische synchronisatie: gecontroleerd om {time}, {count} nieuwe vergaderingen gearchiveerd.",
+  "panel.autoPartial": "Automatische synchronisatie: {count} nieuwe vergaderingen gearchiveerd om {time}; sommige materialen zijn nog niet klaar en worden opnieuw geprobeerd.",
+  "panel.autoCliMissing": "Automatische synchronisatie overgeslagen: tmeet-CLI niet gevonden.",
+  "panel.autoNotLoggedIn": "Automatische synchronisatie overgeslagen: Tencent Meeting is niet geautoriseerd.",
+  "panel.autoAiFailed": "Voor {count} daarvan konden geen AI-notulen of actiepunten worden opgesteld; open de vergadering om ze handmatig te maken.",
+  "panel.autoOn": "Automatische synchronisatie ingeschakeld.",
+  "panel.autoOff": "Automatische synchronisatie uitgeschakeld."
 }

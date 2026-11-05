@@ -13,5 +13,16 @@
   "panel.exporting": "Menyimpan bahan mesyuarat…",
   "panel.preparingAi": "Menyediakan bahan mesyuarat untuk AI…",
   "view.account.name": "Tencent Meeting",
-  "view.meetings.name": "Tencent Meeting"
+  "view.meetings.name": "Tencent Meeting",
+  "panel.autoSync": "Segerakkan secara automatik ke projek ini selepas mesyuarat tamat",
+  "panel.autoSyncHint": "Dengan menghidupkannya, anda membenarkan pemalam, selagi panel ini dibuka, menjalankan CLI tmeet setempat setiap 5 minit dan menyemak mesyuarat yang tamat dalam 24 jam lalu. Mesyuarat baharu yang ada rakaman atau minit diarkibkan ke folder \"Tencent Meeting\" projek ini, dan AI menyediakan minit serta tugasan (menggunakan kredit AI). Tiada apa-apa dipasang; jika tmeet tiada atau belum dibenarkan, semakan dilangkau.",
+  "panel.autoWaiting": "Penyegerakan automatik dihidupkan. Semakan akan dibuat sebentar lagi.",
+  "panel.autoRunning": "Penyegerakan automatik sedang berjalan…",
+  "panel.autoOk": "Penyegerakan automatik: disemak pada {time}, {count} mesyuarat baharu diarkibkan.",
+  "panel.autoPartial": "Penyegerakan automatik: {count} mesyuarat baharu diarkibkan pada {time}; sebahagian bahan belum sedia dan akan dicuba semula.",
+  "panel.autoCliMissing": "Penyegerakan automatik dilangkau: CLI tmeet tidak ditemui.",
+  "panel.autoNotLoggedIn": "Penyegerakan automatik dilangkau: Tencent Meeting belum dibenarkan.",
+  "panel.autoAiFailed": "Minit atau tugasan AI tidak dapat disediakan untuk {count} daripadanya; buka mesyuarat untuk menjananya secara manual.",
+  "panel.autoOn": "Penyegerakan automatik dihidupkan.",
+  "panel.autoOff": "Penyegerakan automatik dimatikan."
 }

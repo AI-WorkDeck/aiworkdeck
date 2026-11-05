@@ -13,5 +13,16 @@
   "panel.exporting": "Enregistrement des documents de réunion…",
   "panel.preparingAi": "Préparation des documents de réunion pour l’IA…",
   "view.account.name": "Tencent Meeting",
-  "view.meetings.name": "Tencent Meeting"
+  "view.meetings.name": "Tencent Meeting",
+  "panel.autoSync": "Synchroniser automatiquement vers ce projet à la fin des réunions",
+  "panel.autoSyncHint": "En l'activant, vous autorisez le plugin, tant que ce panneau est ouvert, à exécuter le CLI tmeet local toutes les 5 minutes pour vérifier les réunions terminées au cours des dernières 24 heures. Les nouvelles réunions avec enregistrement ou compte rendu sont archivées dans le dossier « Tencent Meeting » du projet, et l'IA rédige le compte rendu et les actions (consomme des crédits IA). Rien n'est installé ; si tmeet est absent ou non autorisé, la vérification est ignorée.",
+  "panel.autoWaiting": "Synchronisation automatique activée. Vérification imminente.",
+  "panel.autoRunning": "Synchronisation automatique en cours…",
+  "panel.autoOk": "Synchronisation automatique : vérifiée à {time}, {count} nouvelles réunions archivées.",
+  "panel.autoPartial": "Synchronisation automatique : {count} nouvelles réunions archivées à {time} ; certains éléments ne sont pas encore prêts et seront réessayés.",
+  "panel.autoCliMissing": "Synchronisation automatique ignorée : CLI tmeet introuvable.",
+  "panel.autoNotLoggedIn": "Synchronisation automatique ignorée : Tencent Meeting n'est pas autorisé.",
+  "panel.autoAiFailed": "Le compte rendu ou les actions IA n'ont pas pu être rédigés pour {count} d'entre elles ; ouvrez la réunion pour les générer manuellement.",
+  "panel.autoOn": "Synchronisation automatique activée.",
+  "panel.autoOff": "Synchronisation automatique désactivée."
 }

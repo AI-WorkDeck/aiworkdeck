@@ -13,5 +13,16 @@
   "panel.exporting": "Saving meeting material…",
   "panel.preparingAi": "Preparing meeting material for AI…",
   "view.account.name": "Tencent Meeting",
-  "view.meetings.name": "Tencent Meeting"
+  "view.meetings.name": "Tencent Meeting",
+  "panel.autoSync": "Auto-sync to this project after meetings end",
+  "panel.autoSyncHint": "Turning this on authorizes the plugin, while this panel is open, to run the local tmeet CLI every 5 minutes and check meetings that ended in the last 24 hours. New meetings with recordings or minutes are archived to this project's Tencent Meeting folder, and AI drafts minutes and action items (uses AI credits). Nothing is installed; if tmeet is missing or not authorized, the check is skipped.",
+  "panel.autoWaiting": "Auto-sync is on. Checking shortly.",
+  "panel.autoRunning": "Auto-sync in progress…",
+  "panel.autoOk": "Auto-sync: checked at {time}, {count} new meetings archived.",
+  "panel.autoPartial": "Auto-sync: {count} new meetings archived at {time}; some material is not ready yet and will be retried.",
+  "panel.autoCliMissing": "Auto-sync skipped: tmeet CLI not found.",
+  "panel.autoNotLoggedIn": "Auto-sync skipped: Tencent Meeting is not authorized.",
+  "panel.autoAiFailed": "AI minutes or action items could not be drafted for {count} of them; open the meeting to draft manually.",
+  "panel.autoOn": "Auto-sync turned on.",
+  "panel.autoOff": "Auto-sync turned off."
 }

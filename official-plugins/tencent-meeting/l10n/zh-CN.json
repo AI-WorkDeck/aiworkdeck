@@ -13,5 +13,16 @@
   "panel.exporting": "正在保存会议材料…",
   "panel.preparingAi": "正在准备会议材料并交给 AI…",
   "view.account.name": "腾讯会议",
-  "view.meetings.name": "腾讯会议"
+  "view.meetings.name": "腾讯会议",
+  "panel.autoSync": "会议结束后自动同步到本项目",
+  "panel.autoSyncHint": "开启即授权本插件在面板打开期间每 5 分钟调用本机 tmeet，查看最近 24 小时已结束的会议；有录制或纪要的新会议会归档到本项目「腾讯会议」文件夹，并用 AI 生成纪要和待办（消耗 AI 额度）。不会安装任何程序；tmeet 未安装或未授权时自动跳过。",
+  "panel.autoWaiting": "自动同步已开启，稍后检查。",
+  "panel.autoRunning": "自动同步进行中…",
+  "panel.autoOk": "自动同步：{time} 已检查，新归档 {count} 场会议。",
+  "panel.autoPartial": "自动同步：{time} 新归档 {count} 场；部分会议材料尚未就绪，稍后自动重试。",
+  "panel.autoCliMissing": "自动同步已跳过：未找到 tmeet CLI。",
+  "panel.autoNotLoggedIn": "自动同步已跳过：腾讯会议尚未授权。",
+  "panel.autoAiFailed": "其中 {count} 场未能生成 AI 纪要或待办，可打开会议手动生成。",
+  "panel.autoOn": "已开启自动同步。",
+  "panel.autoOff": "已关闭自动同步。"
 }
