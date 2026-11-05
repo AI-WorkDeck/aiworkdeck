@@ -217,8 +217,11 @@ public class OfficialCloudService {
             try {
                 synchronized (accountService) {
                     if (!accountService.isCurrentConnection(snapshot)) return;
-                    existing.setDisplayName(name);
-                    connectionRepository.save(existing);
+                    // 桥接在途时「重新连接云端」可能已把新令牌落库：重读再改名，不拿旧副本整行写回旧令牌
+                    CloudConnection current = connectionRepository.findById(existing.getId()).orElse(null);
+                    if (current == null) return;
+                    current.setDisplayName(name);
+                    connectionRepository.save(current);
                 }
             } finally {
                 cloudSyncService.revokeRemoteToken(base, data.getLong("tokenId", null), data.getStr("token"));
