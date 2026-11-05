@@ -336,6 +336,11 @@ public class MobileTransferService {
             throw new IllegalArgumentException(LangText.of(
                     "该请求当前状态不可取消", "This request cannot be cancelled in its current state"));
         }
+        // 条件更新抢占 PENDING→FAILED：与 upload 的 stageIfPending 互斥，输家不会覆盖赢家
+        if (repository.failIfPending(row.getId(), LocalDateTime.now()) == 0) {
+            throw new IllegalArgumentException(LangText.of(
+                    "该请求当前状态不可取消", "This request cannot be cancelled in its current state"));
+        }
         row.setErrorMessage(LangText.of("用户取消", "Cancelled by user"));
         row.setStatus(STATUS_FAILED);
         row.setUpdatedAt(LocalDateTime.now());
@@ -544,11 +549,13 @@ public class MobileTransferService {
         } catch (Exception e) {
             throw new IllegalStateException(LangText.of("文件暂存失败", "Failed to stage the file"), e);
         }
-        row.setStoragePath(stored.locator());
-        row.setFileSize(stored.size());
-        row.setStatus(STATUS_STAGED);
-        row.setUpdatedAt(LocalDateTime.now());
-        repository.save(row);
+        // 写 blob 期间可能被 cancel 抢先提交（已退款置 FAILED）：条件更新只在仍是 PENDING 时落 STAGED
+        if (repository.stageIfPending(row.getId(), stored.locator(), stored.size(), LocalDateTime.now()) == 0) {
+            blobStore.deleteQuietly(stored.locator());
+            MobileTransferRequest current = repository.findById(row.getId()).orElse(null);
+            if (current != null && STATUS_STAGED.equals(current.getStatus())) return; // 并发重传已落好，幂等
+            throw new IllegalArgumentException(LangText.of("该请求当前状态不接受上传", "This request does not accept an upload now"));
+        }
     }
 
     public record ContentBlob(InputStream stream, long length) {}

@@ -5,6 +5,7 @@ package com.checkba.repository;
 
 import com.checkba.model.entity.MobileTransferRequest;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -36,6 +37,19 @@ public interface MobileTransferRequestRepository extends JpaRepository<MobileTra
     @Query("select coalesce(sum(t.fileSize), 0) from MobileTransferRequest t"
             + " where t.userId = :userId and t.storagePath is not null")
     long sumPendingBytes(@Param("userId") Long userId);
+
+    /** upload 落 STAGED 的条件更新：仅当行仍是 PENDING 才生效，避免陈旧实体把已取消/退款的行复活。 */
+    @Modifying(clearAutomatically = true)
+    @Query("update MobileTransferRequest t set t.status = 'STAGED', t.storagePath = :path, t.fileSize = :size,"
+            + " t.updatedAt = :now where t.id = :id and t.status = 'PENDING'")
+    int stageIfPending(@Param("id") Long id, @Param("path") String path, @Param("size") long size,
+                       @Param("now") LocalDateTime now);
+
+    /** cancel 的条件更新：仅当行仍是 PENDING 才抢到 FAILED 转换，和 stageIfPending 互斥。 */
+    @Modifying
+    @Query("update MobileTransferRequest t set t.status = 'FAILED', t.updatedAt = :now"
+            + " where t.id = :id and t.status = 'PENDING'")
+    int failIfPending(@Param("id") Long id, @Param("now") LocalDateTime now);
 
     List<MobileTransferRequest> findByUserId(Long userId);
     long deleteByUserId(Long userId);
