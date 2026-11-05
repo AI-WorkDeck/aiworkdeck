@@ -219,6 +219,80 @@ class TencentMeetingToolsTest {
             else { assertFalse(detail.path("success").asBoolean()); assertEquals(2, cli.calls.size()); }
         }
     }
+    // ---------- auto sync (issues 28/30) ----------
+    void loggedInFixture() {
+        dataFixture(); Function<List<String>, TmeetCli.Result> data = cli.answer;
+        cli.answer = args -> args.contains("--version") ? new TmeetCli.Result(0, "1.0")
+            : args.contains("auth") ? new TmeetCli.Result(0, "Logged in\nUserName: 测试用户") : data.apply(args);
+        host.llm = (system, user, options) -> { host.prompts.add(system); return system.contains("待办") ? "- 待办草稿" : "# 纪要草稿"; };
+    }
+    JsonNode autosync() throws Exception { JsonNode out = call("autosync", "{\"language\":\"zh\"}"); assertTrue(out.path("success").asBoolean(), out.toString()); return out.path("data"); }
+    void later() { plugin.clock = java.time.Clock.offset(plugin.clock, TencentMeetingTools.AUTO_INTERVAL.plusSeconds(1)); }
+    @Test void autoSyncIsOffByDefaultAndNeverRunsTheCli() throws Exception {
+        loggedInFixture();
+        assertFalse(call("config", "{}").path("data").path("autoSync").asBoolean());
+        assertFalse(autosync().path("enabled").asBoolean());
+        assertTrue(cli.calls.isEmpty()); assertTrue(host.names.isEmpty());
+        assertFalse(call("config", "{\"autoSync\":\"yes\"}").path("success").asBoolean());
+    }
+    @Test void autoSyncSkipsSilentlyWithoutCliOrAuthorization() throws Exception {
+        call("config", "{\"autoSync\":true}");
+        cli.answer = args -> { throw new TmeetCli.Failure(TmeetCli.MISSING); };
+        assertEquals("cliMissing", autosync().path("last").path("result").asText());
+        assertEquals(List.of(List.of("--version")), cli.calls);
+        later(); cli.calls.clear();
+        cli.answer = args -> new TmeetCli.Result(0, args.contains("--version") ? "1.0" : "Logged out");
+        assertEquals("notLoggedIn", autosync().path("last").path("result").asText());
+        assertEquals(2, cli.calls.size(), "No list/record command without authorization");
+        later(); cli.calls.clear(); cli.pending = true;
+        assertEquals("notLoggedIn", autosync().path("last").path("result").asText());
+        assertTrue(cli.calls.isEmpty(), "Never start a CLI process while browser authorization holds the token lock");
+        assertTrue(host.names.isEmpty());
+    }
+    @Test void autoSyncArchivesNewMeetingsOnceWithMinutesAndTodosWithinTheLastDay() throws Exception {
+        loggedInFixture(); call("config", "{\"autoSync\":true}");
+        JsonNode first = autosync();
+        assertTrue(first.path("enabled").asBoolean());
+        assertEquals("ok", first.path("last").path("result").asText()); assertEquals(1, first.path("last").path("archived").asInt());
+        assertEquals(List.of("测试会议-逐字稿.md", "测试会议-会议纪要.md", "测试会议-待办.md"), host.names);
+        assertEquals(2, host.prompts.size()); assertTrue(host.prompts.get(0).contains("会议纪要"));
+        List<String> list = cli.calls.stream().filter(c -> c.contains("list-ended")).findFirst().orElseThrow();
+        java.time.Duration window = java.time.Duration.between(java.time.OffsetDateTime.parse(list.get(list.indexOf("--start") + 1)),
+            java.time.OffsetDateTime.parse(list.get(list.indexOf("--end") + 1)));
+        assertEquals(java.time.Duration.ofDays(1), window, "Auto sync only looks at the last 24 hours");
+        // Throttled within five minutes: no CLI call at all.
+        cli.calls.clear(); autosync(); assertTrue(cli.calls.isEmpty());
+        // Next round lists again but never re-archives the same meeting.
+        later(); autosync();
+        assertFalse(cli.calls.isEmpty()); assertEquals(3, host.names.size());
+        assertEquals(0, call("autosync", "{}").path("data").path("last").path("archived").asInt());
+    }
+    @Test void manualExportAndResyncCountAsAlreadySynced() throws Exception {
+        loggedInFixture(); finished("sync", "{}"); finished("export", "{\"key\":\"" + key() + "\"}");
+        finished("sync", "{}");
+        call("config", "{\"autoSync\":true}"); autosync();
+        assertEquals(List.of("测试会议-逐字稿.md"), host.names, "Manual export is the same dedupe basis");
+    }
+    @Test void autoSyncKeepsOlderMeetingsAndRetriesUnfinishedMaterial() throws Exception {
+        loggedInFixture(); finished("sync", "{}");
+        Function<List<String>, TmeetCli.Result> ready = cli.answer;
+        cli.answer = args -> args.contains("list-ended") ? result("{\"meeting_info_list\":[" + meeting("can_view").replace("internal-id-secret", "new-id").replace("测试会议", "新会议") + "]}")
+            : args.contains("smart-minutes") ? new TmeetCli.Result(1, "not ready") : ready.apply(args);
+        call("config", "{\"autoSync\":true}");
+        JsonNode data = autosync();
+        assertEquals("partial", data.path("last").path("result").asText()); assertTrue(host.names.isEmpty());
+        assertEquals(2, call("list", "{}").path("data").path("meetings").size(), "Merge must not drop the 30-day list");
+        cli.answer = args -> args.contains("list-ended") ? result("{\"meeting_info_list\":[" + meeting("can_view").replace("internal-id-secret", "new-id").replace("测试会议", "新会议") + "]}") : ready.apply(args);
+        later(); autosync();
+        assertEquals(List.of("新会议-逐字稿.md", "新会议-会议纪要.md", "新会议-待办.md"), host.names);
+    }
+    @Test void aiFailureStillArchivesAndIsReported() throws Exception {
+        loggedInFixture(); host.llm = (system, user, options) -> { throw new IllegalStateException("no credits"); };
+        call("config", "{\"autoSync\":true}");
+        JsonNode last = autosync().path("last");
+        assertEquals(1, last.path("archived").asInt()); assertEquals(1, last.path("aiFailed").asInt());
+        assertEquals(List.of("测试会议-逐字稿.md"), host.names);
+    }
     static class FakeCli implements TmeetCli.Runner {
         List<List<String>> calls = new ArrayList<>(); boolean cancelled, pending; String url = "https://meeting.tencent.com/authorize?code=fixture";
         Function<List<String>, TmeetCli.Result> answer = args -> new TmeetCli.Result(0, "ok");
@@ -229,6 +303,7 @@ class TencentMeetingToolsTest {
     }
     static class FakeHost implements PluginHost {
         ToolCall context = new ToolCall(9L, null, 1L, null); boolean allowProject = true; String written; long writeProject;
+        List<String> names = new ArrayList<>(); List<String> prompts = new ArrayList<>(); Llm llm = null;
         Map<String, JobStatus> statuses = new HashMap<>();
         public String pluginId() { return "tencent-meeting"; }
         public ToolCall call() { return context; }
@@ -238,7 +313,7 @@ class TencentMeetingToolsTest {
                 return switch (method.getName()) {
                     case "list" -> List.of();
                     case "createFolderPath" -> new FileInfo(98, "腾讯会议", null, true, "", 0, "腾讯会议", null, null, null);
-                    case "write" -> { writeProject = (Long) args[0]; written = new String(((InputStream) args[3]).readAllBytes(), StandardCharsets.UTF_8); yield new FileInfo(99, (String) args[2], 98L, false, "md", 1, "腾讯会议/" + args[2], null, null, null); }
+                    case "write" -> { writeProject = (Long) args[0]; names.add((String) args[2]); written = new String(((InputStream) args[3]).readAllBytes(), StandardCharsets.UTF_8); yield new FileInfo(99, (String) args[2], 98L, false, "md", 1, "腾讯会议/" + args[2], null, null, null); }
                     default -> throw new AssertionError(method);
                 };
             });
@@ -259,6 +334,6 @@ class TencentMeetingToolsTest {
             public void cancel(String id) {}
         }; }
         public Text text() { return null; } public com.checkba.plugin.api.Tags tags() { return null; } public Evidence evidence() { return null; }
-        public Docs docs() { return null; } public Settings settings() { return null; } public Llm llm() { return null; }
+        public Docs docs() { return null; } public Settings settings() { return null; } public Llm llm() { return llm; }
     }
 }

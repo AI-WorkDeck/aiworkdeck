@@ -108,6 +108,7 @@ export default {
   "speakerDefaultName": "화자 {n}",
   "speakerNamePlaceholder": "화자 {n}의 이름",
   "generateMinutes": "회의록 생성",
+  "generateInterview": "면담 조서 생성",
   "sendingToAi": "AI에게 전달하는 중...",
   "generateMinutesFailed": "회의록을 생성하지 못했습니다: {message}",
   "exportTranscript": "전사본 내보내기",

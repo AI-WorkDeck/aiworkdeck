@@ -13,5 +13,16 @@
   "panel.exporting": "Menyimpan materi rapat…",
   "panel.preparingAi": "Menyiapkan materi rapat untuk AI…",
   "view.account.name": "Tencent Meeting",
-  "view.meetings.name": "Tencent Meeting"
+  "view.meetings.name": "Tencent Meeting",
+  "panel.autoSync": "Sinkronkan otomatis ke proyek ini setelah rapat selesai",
+  "panel.autoSyncHint": "Dengan mengaktifkannya, Anda mengizinkan plugin, selama panel ini terbuka, menjalankan CLI tmeet lokal setiap 5 menit dan memeriksa rapat yang selesai dalam 24 jam terakhir. Rapat baru yang memiliki rekaman atau notula diarsipkan ke folder \"Tencent Meeting\" proyek ini, dan AI menyusun notula serta tugas (memakai kredit AI). Tidak ada yang diinstal; jika tmeet tidak ada atau belum diotorisasi, pemeriksaan dilewati.",
+  "panel.autoWaiting": "Sinkronisasi otomatis aktif. Segera diperiksa.",
+  "panel.autoRunning": "Sinkronisasi otomatis berjalan…",
+  "panel.autoOk": "Sinkronisasi otomatis: diperiksa pukul {time}, {count} rapat baru diarsipkan.",
+  "panel.autoPartial": "Sinkronisasi otomatis: {count} rapat baru diarsipkan pukul {time}; sebagian materi belum siap dan akan dicoba lagi.",
+  "panel.autoCliMissing": "Sinkronisasi otomatis dilewati: CLI tmeet tidak ditemukan.",
+  "panel.autoNotLoggedIn": "Sinkronisasi otomatis dilewati: Tencent Meeting belum diotorisasi.",
+  "panel.autoAiFailed": "Notula atau tugas AI tidak dapat disusun untuk {count} di antaranya; buka rapat untuk membuatnya secara manual.",
+  "panel.autoOn": "Sinkronisasi otomatis diaktifkan.",
+  "panel.autoOff": "Sinkronisasi otomatis dinonaktifkan."
 }

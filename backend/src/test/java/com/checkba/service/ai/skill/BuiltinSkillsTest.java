@@ -306,6 +306,12 @@ class BuiltinSkillsTest {
                 "prompt.en.md 应被加载且同样交代先读转写稿");
         assertFalse(s.getOutputEn() == null || s.getOutputEn().isBlank(),
                 "output_en 缺失会让英文模式注入中文产出约定");
+
+        // 访谈笔录（问题 31）：kick-off 以「访谈笔录」/ "Interview record" 开头，两侧提示词各有笔录格式
+        assertTrue(s.getTriggers().contains("访谈笔录"), "buildInterviewKickoffPrompt 以它开头：" + s.getTriggers());
+        assertTrue(s.getTriggersEn().contains("interview record"), "英文笔录 kick-off 以它开头：" + s.getTriggersEn());
+        assertTrue(s.getPromptTemplate().contains("以上笔录经被访谈人核对无误"), "prompt.md 缺访谈笔录格式");
+        assertTrue(s.getPromptTemplateEn().contains("Interview record"), "prompt.en.md 缺访谈笔录格式");
     }
 
     /**
@@ -450,6 +456,9 @@ class BuiltinSkillsTest {
         assertEquals("meeting-recorder",
                 enRouter.match("Meeting minutes generation task.").orElseThrow().getId(),
                 "面板拼出的英文 kick-off prompt 必须命中会议录音 skill");
+        assertEquals("meeting-recorder",
+                enRouter.match("Interview record generation task.").orElseThrow().getId(),
+                "英文「生成访谈笔录」kick-off 也必须命中会议录音 skill");
     }
 
     @Test
