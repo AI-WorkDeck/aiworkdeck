@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class MobileVersionObjectControllerTest {
@@ -37,5 +38,35 @@ class MobileVersionObjectControllerTest {
             assertThrows(IllegalArgumentException.class,()->controller.versionObjectPart("session","a".repeat(64),0,"device","42",2,"b".repeat(64),request));
             verifyNoInteractions(objects);verify(request,never()).getInputStream();
         } catch(java.io.IOException e){throw new AssertionError(e);}
+    }
+    @Test void partBodyIsFullyReadBeforeThePersistentPutStarts() throws Exception {
+        try(var auth=mockStatic(AuthController.class)) {
+            auth.when(()->AuthController.getUserIdFromSession("session")).thenReturn(7L);
+            byte[] payload="hello".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            var wire=new java.io.ByteArrayInputStream(payload);
+            var reachedEof=new java.util.concurrent.atomic.AtomicBoolean();
+            var stream=new jakarta.servlet.ServletInputStream() {
+                @Override public boolean isFinished(){return wire.available()==0;}
+                @Override public boolean isReady(){return true;}
+                @Override public void setReadListener(jakarta.servlet.ReadListener listener){}
+                @Override public int read(){int v=wire.read();if(v<0)reachedEof.set(true);return v;}
+            };
+            var request=mock(jakarta.servlet.http.HttpServletRequest.class);
+            when(request.getContentLengthLong()).thenReturn((long)payload.length);
+            when(request.getInputStream()).thenReturn(stream);
+            var seen=new java.util.concurrent.atomic.AtomicReference<byte[]>();
+            var eofBeforePut=new java.util.concurrent.atomic.AtomicBoolean();
+            when(objects.put(eq(7L),eq("device"),eq("42"),anyString(),eq(5L),eq(0),anyString(),any(java.io.InputStream.class),eq(5L)))
+                    .thenAnswer(inv->{
+                        eofBeforePut.set(reachedEof.get());
+                        java.io.InputStream passed=inv.getArgument(7);
+                        assertNotSame(stream,passed);
+                        seen.set(passed.readAllBytes());
+                        return java.util.Map.of("ok",true);
+                    });
+            controller.versionObjectPart("session","a".repeat(64),0,"device","42",5,"b".repeat(64),request);
+            assertTrue(eofBeforePut.get(),"请求体应在 put（事务+属主锁）开始前读完");
+            assertArrayEquals(payload,seen.get());
+        }
     }
 }

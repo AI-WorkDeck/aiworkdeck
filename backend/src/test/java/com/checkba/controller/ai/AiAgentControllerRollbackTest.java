@@ -46,14 +46,16 @@ import static org.mockito.Mockito.when;
 class AiAgentControllerRollbackTest {
 
     private ProjectAiMessageService messageService;
+    private AgentOrchestrator agentOrchestrator;
     private AiAgentController controller;
 
     @BeforeEach
     void setUp() {
         messageService = mock(ProjectAiMessageService.class);
+        agentOrchestrator = mock(AgentOrchestrator.class);
         controller = new AiAgentController(
                 mock(SseEmitterService.class),
-                mock(AgentOrchestrator.class),
+                agentOrchestrator,
                 messageService,
                 mock(BackgroundTaskService.class),
                 mock(PptxTools.class),
@@ -153,6 +155,19 @@ class AiAgentControllerRollbackTest {
             when(messageService.isConversationOwnedBy("conv-1", 7L)).thenReturn(false);
 
             assertEquals(403, controller.rollbackHistory(req("conv-1", "42", null), "s").getStatusCode().value());
+            verify(messageService, never()).rollbackWithArchive(anyString(), any(), any(), anyLong());
+        }
+    }
+
+    @Test
+    @DisplayName("会话仍有活跃 run：409 且不截断，避免编排器把已删的 assistant 行写回来")
+    void activeRunIsRejectedWith409() {
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            when(messageService.isConversationOwnedBy("conv-1", 7L)).thenReturn(true);
+            when(agentOrchestrator.hasActiveRun("conv-1")).thenReturn(true);
+
+            assertEquals(409, controller.rollbackHistory(req("conv-1", "42", null), "s").getStatusCode().value());
             verify(messageService, never()).rollbackWithArchive(anyString(), any(), any(), anyLong());
         }
     }

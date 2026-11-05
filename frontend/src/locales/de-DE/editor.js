@@ -110,6 +110,7 @@ export default {
     "movedSaveFailed": "Datei wurde verschoben oder umbenannt; Änderungen sind noch nicht gespeichert",
     "versionSaveBusy": "Versionsverlauf ist beschäftigt; Änderungen sind noch nicht gespeichert. Bitte versuchen Sie es gleich erneut.",
     "localVersionSaveBusy": "Versionsverlauf ist beschäftigt; das Speicherergebnis ist noch unbestätigt. Bitte versuchen Sie es gleich erneut.",
+    "saveRetryScheduled": "Speichern fehlgeschlagen; neuer Versuch automatisch in {seconds} s",
     "contentSaveReloadRequired": "Der vorherige Speichervorgang wurde gestoppt. Speichern Sie eine Kopie Ihrer Änderungen und laden Sie die Datei anschließend neu.",
     "contentSaveConflict": "Die Datei wurde an anderer Stelle geändert. Speichern Sie eine Kopie Ihrer Änderungen und öffnen Sie die Datei anschließend erneut.",
     "desktopOnly": "Nur in der Desktop-App verfügbar"

@@ -110,6 +110,7 @@ export default {
     "movedSaveFailed": "Tệp đã được di chuyển hoặc đổi tên; thay đổi chưa được lưu",
     "versionSaveBusy": "Đang xử lý lịch sử phiên bản, thay đổi chưa được lưu. Vui lòng thử lại sau giây lát.",
     "localVersionSaveBusy": "Đang xử lý lịch sử phiên bản, kết quả lưu chưa được xác nhận. Vui lòng thử lại sau giây lát.",
+    "saveRetryScheduled": "Lưu không thành công; sẽ tự động thử lại sau {seconds} giây",
     "contentSaveReloadRequired": "Lần lưu trước đã dừng. Hãy lưu bản sao các chỉnh sửa hiện tại rồi tải lại tệp.",
     "contentSaveConflict": "Tệp đã được cập nhật ở nơi khác. Hãy lưu bản sao các chỉnh sửa hiện tại rồi mở lại tệp.",
     "desktopOnly": "Chỉ khả dụng trên bản máy tính"

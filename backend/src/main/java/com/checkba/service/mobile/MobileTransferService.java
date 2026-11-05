@@ -336,6 +336,11 @@ public class MobileTransferService {
             throw new IllegalArgumentException(LangText.of(
                     "该请求当前状态不可取消", "This request cannot be cancelled in its current state"));
         }
+        // 条件更新抢占 PENDING→FAILED：与 upload 的 stageIfPending 互斥，输家不会覆盖赢家
+        if (repository.failIfPending(row.getId(), LocalDateTime.now()) == 0) {
+            throw new IllegalArgumentException(LangText.of(
+                    "该请求当前状态不可取消", "This request cannot be cancelled in its current state"));
+        }
         row.setErrorMessage(LangText.of("用户取消", "Cancelled by user"));
         row.setStatus(STATUS_FAILED);
         row.setUpdatedAt(LocalDateTime.now());
@@ -382,19 +387,25 @@ public class MobileTransferService {
             throw quotaFailure;
         }
 
-        byte[] bytes;
-        try {
-            bytes = projectFileService.getFileBytes(fileId);
-        } catch (IOException e) {
-            throw new IllegalStateException(LangText.of("读取文件失败", "Failed to read the file"), e);
-        }
         MobileRelayBlobStore.StoredBlob stored;
         try {
-            stored = blobStore.put(userId, requestId,
-                    new java.io.ByteArrayInputStream(bytes == null ? new byte[0] : bytes),
-                    bytes == null ? 0 : bytes.length);
-        } catch (Exception e) {
-            throw new IllegalStateException(LangText.of("文件暂存失败", "Failed to stage the file"), e);
+            byte[] bytes;
+            try {
+                bytes = projectFileService.getFileBytes(fileId);
+            } catch (IOException e) {
+                throw new IllegalStateException(LangText.of("读取文件失败", "Failed to read the file"), e);
+            }
+            try {
+                stored = blobStore.put(userId, requestId,
+                        new java.io.ByteArrayInputStream(bytes == null ? new byte[0] : bytes),
+                        bytes == null ? 0 : bytes.length);
+            } catch (Exception e) {
+                throw new IllegalStateException(LangText.of("文件暂存失败", "Failed to stage the file"), e);
+            }
+        } catch (RuntimeException stageFailure) {
+            // 同配额失败：此时尚未建行，TTL 清扫兜不到这笔扣费，读取/暂存失败要立刻退掉
+            refundChargeQuietly(userId, charge.ledgerId(), requestId);
+            throw stageFailure;
         }
 
         MobileTransferRequest row = new MobileTransferRequest();
@@ -538,11 +549,14 @@ public class MobileTransferService {
         } catch (Exception e) {
             throw new IllegalStateException(LangText.of("文件暂存失败", "Failed to stage the file"), e);
         }
-        row.setStoragePath(stored.locator());
-        row.setFileSize(stored.size());
-        row.setStatus(STATUS_STAGED);
-        row.setUpdatedAt(LocalDateTime.now());
-        repository.save(row);
+        // 写 blob 期间可能被 cancel 抢先提交（已退款置 FAILED）：条件更新只在仍是 PENDING 时落 STAGED
+        if (repository.stageIfPending(row.getId(), stored.locator(), stored.size(), LocalDateTime.now()) == 0) {
+            MobileTransferRequest current = repository.findById(row.getId()).orElse(null);
+            // 并发重传已落好，幂等；locator 由 requestId 决定、与赢家同一个，不能删
+            if (current != null && STATUS_STAGED.equals(current.getStatus())) return;
+            blobStore.deleteQuietly(stored.locator());
+            throw new IllegalArgumentException(LangText.of("该请求当前状态不接受上传", "This request does not accept an upload now"));
+        }
     }
 
     public record ContentBlob(InputStream stream, long length) {}
