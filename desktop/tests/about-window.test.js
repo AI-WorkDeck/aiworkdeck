@@ -95,3 +95,22 @@ test('About does not create a window while the main window is unavailable or des
   showAboutWindow({ isDestroyed: () => true })
   assert.equal(windows.length, count)
 })
+
+// 问题 79 前半：About 显示的是壳版本，看不出补丁已生效。生效版本与壳不同时写成「0.68.2（安装包 0.68.0）」。
+test('About shows the effective patch version and the installer version when they differ', () => {
+  setAppLanguage('zh-CN')
+  const electron = require('electron')
+  const dir = path.join(userData, '.aiworkdeck', 'overlay', '0.68')
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(path.join(dir, 'current.json'), JSON.stringify({ schema: 1, version: '0.68.2', components: {} }))
+  electron.app.isPackaged = true
+  try {
+    const win = showAboutWindow(parent)
+    const html = decodeURIComponent(win.url.split(',').slice(1).join(','))
+    assert.match(html, /版本 0\.68\.2（安装包 0\.68\.0）/)
+    win.close()
+  } finally {
+    electron.app.isPackaged = undefined
+    fs.rmSync(path.join(userData, '.aiworkdeck'), { recursive: true, force: true })
+  }
+})
