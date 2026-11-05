@@ -70,6 +70,7 @@
                 <text class="memory-link" @tap="saveCurrent">{{ $t('chat.memorySaveMine') }}</text>
               </view>
             </view>
+            <view v-if="current.path === 'remember.md'" class="memory-hint">{{ $t('chat.memoryRememberHint') }}</view>
             <!-- maxlength=-1：uni-h5 的 textarea 缺省只许 140 字；上限按契约 128 KiB 在保存时校验 -->
             <textarea ref="editor" v-model="draft" class="memory-textarea" :maxlength="-1" :disabled="!canWrite"></textarea>
             <view v-if="relativeLinks.length" class="memory-related">
@@ -446,6 +447,7 @@ export default {
 .memory-meta { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; color: var(--awd-text-3); font-size: 11px; }
 .memory-unsaved { color: var(--awd-accent-text); }
 .memory-readonly,.memory-conflict { margin-bottom: 8px; padding: 7px 9px; border-radius: 6px; background: var(--awd-warning-soft, #fff6df); color: var(--awd-text-2); font-size: 11px; }
+.memory-hint { margin-bottom: 8px; color: var(--awd-text-3); font-size: 11px; }
 .memory-conflict { display: flex; justify-content: space-between; gap: 10px; }
 .memory-conflict-actions { display: flex; gap: 10px; }
 .memory-textarea { width: 100%; min-height: 0; flex: 1; box-sizing: border-box; padding: 12px; border: 1px solid var(--awd-border); border-radius: 8px; background: var(--awd-bg); color: var(--awd-text); font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }

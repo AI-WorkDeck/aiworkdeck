@@ -271,6 +271,7 @@ export default {
   "memoryRevision": "Revizyon {revision}",
   "memoryUnknownTime": "Bilinmeyen güncelleme zamanı",
   "memoryReadOnly": "Bu kapsamı görüntüleyebilirsiniz, ancak düzenleme izniniz yok.",
+  "memoryRememberHint": "Konu listesi sistem tarafından otomatik olarak güncellenir. Bir konuyu silmek için o konuyu seçip silin.",
   "memoryConflict": "Sunucuda daha yeni bir sürüm var. Hangi sürümü tutacağınıza karar vermeden önce inceleyin.",
   "memoryUseServer": "Sunucu sürümünü kullan",
   "memorySaveMine": "Sürümümü kaydet",

@@ -271,6 +271,7 @@ export default {
   "memoryRevision": "리비전 {revision}",
   "memoryUnknownTime": "업데이트 시간 알 수 없음",
   "memoryReadOnly": "이 범위는 볼 수 있지만 편집할 권한이 없습니다.",
+  "memoryRememberHint": "주제 목록은 시스템이 자동으로 관리합니다. 주제를 삭제하려면 해당 주제를 선택한 후 삭제하세요.",
   "memoryConflict": "더 최신 서버 버전이 있습니다. 어떤 버전을 유지할지 선택하기 전에 확인해 보세요.",
   "memoryUseServer": "서버 버전 사용",
   "memorySaveMine": "내 버전 저장",
