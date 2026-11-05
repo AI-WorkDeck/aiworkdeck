@@ -520,7 +520,7 @@ cd backend && mvn clean test                      # 全量（跨类常量内联�
 
 ## 法条选区查询与企查查模糊匹配提示（dev-board#1289/#1290，2026-10-15）
 
-- **北大法宝返回形状与选区拆分（#1289）**：`get_article`/`search_article` 将条号与条文正文合并在 `article` 字段（无独立 `content` 字段），`get_law_list` 返回挂在大写 `Data` 键下；前端 `insightDetail.js` 与 `completionDetails.js` 兼容 `article`/`Data`/`Title`/`TimelinessDic` 字段解析。后端 `DocInsightService` 拒绝把 `{"title":null,"article":""}` 空壳对象判为 `OK`，在 `get_article` 返回空壳时继续回退 `search_article`；支持无书名号法条、条号附带款/项后缀归一化及结合上下文自动关联最近法规名。
+- **北大法宝返回形状与选区拆分（#1289）**：`get_article`/`search_article` 将条号与条文正文合并在 `article` 字段（无独立 `content` 字段），`get_law_list` 返回挂在大写 `Data` 键下；前端 `insightDetail.js` 与 `completionDetails.js` 兼容 `article`/`Data`/`Title`/`TimelinessDic` 字段解析。后端 `DocInsightService` 拒绝把 `{"title":null,"article":""}` 空壳对象判为 `OK`，在 `get_article` 返回空壳时继续回退 `search_article`；支持无书名号法条、条号附带款/项后缀归一化及结合上下文自动关联最近法规名。选中整句话查询时，`splitLawName` 先取句中第一处「《法规》第X条」走 `get_article`（此前整句被当法规名打 `get_law_list`，关键词库只回法规标题清单，卡片只有法规名，dev-board#1713）。
 - **企查查模糊匹配与名称纠错提示（#1290）**：精确查询未命中时走企查查模糊检索（兼容自备 Key 与平台网关），择优匹配候选企业；当登记全称与原查询词不一致时，保留并透传模糊匹配提示（指明未精确命中原词、已模糊匹配至工商登记全称、提醒核对正文企业名称是否缺漏字），在选区查询资料卡与依据窗格顶部显著展示。
 
 

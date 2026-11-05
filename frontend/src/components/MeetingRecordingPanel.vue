@@ -1558,12 +1558,16 @@ export default {
   gap: 6px;
 }
 
+/* uni-input 宿主被写死 height:1.4em + overflow:hidden，插件页又是全局 border-box：
+   必须显式定高、上下零内边距，否则改名框里的字被裁掉（dev-board#890 同一陷阱） */
 .mr-input {
   flex: 1;
   min-width: 0;
+  height: 28px;
+  min-height: 28px;
   border: 1px solid var(--awd-border-strong);
   border-radius: var(--awd-radius-md);
-  padding: 4px 8px;
+  padding: 0 8px;
   font-size: var(--awd-panel-fs);
   background: var(--awd-surface);
 }
