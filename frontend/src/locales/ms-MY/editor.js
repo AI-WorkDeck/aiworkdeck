@@ -943,6 +943,7 @@ export default {
     "local": "Cadangan tempatan · Tab terima · Esc tolak",
     "empty": "Belum ada cadangan tempatan. Perbendaharaan kata bertambah semasa anda menulis.",
     "enabled": "Cadangan semantik automatik",
+    "localAuto": "Tunjukkan cadangan setempat semasa menaip",
     "disable": "Matikan autolengkap",
     "preferenceFailed": "Tidak dapat menyimpan tetapan. Keadaan sebelumnya tidak berubah; sila cuba lagi.",
     "semantic": "Cadangan sambungan",

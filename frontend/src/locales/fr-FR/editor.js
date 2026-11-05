@@ -943,6 +943,7 @@ export default {
     "local": "Suggestions locales · Tab accepter · Esc ignorer",
     "empty": "Aucune suggestion locale pour l’instant. Le vocabulaire s’enrichit au fil de votre rédaction.",
     "enabled": "Suggestions sémantiques automatiques",
+    "localAuto": "Afficher les suggestions locales pendant la saisie",
     "disable": "Désactiver la saisie semi-automatique",
     "preferenceFailed": "Impossible d’enregistrer le réglage. L’état précédent est conservé ; veuillez réessayer.",
     "semantic": "Suggestion de suite",

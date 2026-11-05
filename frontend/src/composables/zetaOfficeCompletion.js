@@ -6,7 +6,7 @@ import { WRITING_ASSISTANCE_CSS, renderCompletionOption } from './writingAssista
 
 // 英文兜底。实际文案由宿主用 t() 生成、随 writing-config 的 labels 下发（教程反馈 48），
 // 客体页不 import 语言包；收到之前（或宿主缺词）才用这一份。
-const FALLBACK_LABELS = { suggestions: 'Suggestions', manual: 'Show suggestions · Alt+/', noMatch: 'No matching local entries. Keep typing or review learned vocabulary.', acceptKey: 'Accept', chooseKey: 'Select', dismissKey: 'Dismiss', title: 'Autocomplete', close: 'Close', local: 'Local suggestions · Tab accept · Esc dismiss', empty: 'No local suggestions yet. Vocabulary grows as you write.', enabled: 'Automatic semantic suggestions', disable: 'Turn autocomplete off', preferenceFailed: 'Could not save the setting. The previous state is unchanged; please retry.', semantic: 'Suggested continuation', policy: 'After a pause, AI suggests a useful, grounded continuation. Uses your default model to generate, then shares relevant context with Kimi K3 and Qwen3.8 Max for review. Each call uses AI credits. Re-enable in review settings; Alt+/ opens vocabulary manually.', learning: 'Learn from my typing', hints: 'Related information', manage: 'Learned vocabulary', project: 'This project', user: 'My vocabulary', remove: 'Delete', clear: 'Clear learned entries in this scope', confirm: 'Click again to confirm', loading: 'Loading…', stale: 'The cursor or document changed. Select the text again.', detail: 'View saved information', insert: 'Insert the content above', lookup: 'Online lookup (charges may apply)', query: 'Look up information…', otherQueries: 'Other lookups…', company: 'Look up company information', law: 'Look up a law or article', case: 'Look up a case', revise: 'Revise selection with AI…', revisePlaceholder: 'Enter revision instructions, press Enter…', reviseSubmit: 'Send', noDetail: 'No insertable information. Select text and right-click to look it up.', source: 'Source', sourceLine: 'Source: {source}', dateLine: 'Queried on: {date}', error: 'The operation failed. Please try again.', login: 'Sign in', recharge: 'Add credits', saved: 'Inserted. Use Undo to revert.', replaced: 'Replaced. Use Undo to revert.', current: 'Current document', refresh: 'Refresh local vocabulary', contextHint: 'Select text and right-click to look up a company, law or case. Nothing goes online — and nothing can be charged — until you click.', COMPANY: 'Company', PERSON: 'Person', LAW: 'Law', ARTICLE: 'Article', CASE: 'Case', WORD: 'Word', PHRASE: 'Phrase' }
+const FALLBACK_LABELS = { suggestions: 'Suggestions', manual: 'Show suggestions · Alt+/', noMatch: 'No matching local entries. Keep typing or review learned vocabulary.', acceptKey: 'Accept', chooseKey: 'Select', dismissKey: 'Dismiss', title: 'Autocomplete', close: 'Close', local: 'Local suggestions · Tab accept · Esc dismiss', empty: 'No local suggestions yet. Vocabulary grows as you write.', enabled: 'Automatic semantic suggestions', localAuto: 'Show local suggestions while typing', disable: 'Turn autocomplete off', preferenceFailed: 'Could not save the setting. The previous state is unchanged; please retry.', semantic: 'Suggested continuation', policy: 'After a pause, AI suggests a useful, grounded continuation. Uses your default model to generate, then shares relevant context with Kimi K3 and Qwen3.8 Max for review. Each call uses AI credits. Re-enable in review settings; Alt+/ opens vocabulary manually.', learning: 'Learn from my typing', hints: 'Related information', manage: 'Learned vocabulary', project: 'This project', user: 'My vocabulary', remove: 'Delete', clear: 'Clear learned entries in this scope', confirm: 'Click again to confirm', loading: 'Loading…', stale: 'The cursor or document changed. Select the text again.', detail: 'View saved information', insert: 'Insert the content above', lookup: 'Online lookup (charges may apply)', query: 'Look up information…', otherQueries: 'Other lookups…', company: 'Look up company information', law: 'Look up a law or article', case: 'Look up a case', revise: 'Revise selection with AI…', revisePlaceholder: 'Enter revision instructions, press Enter…', reviseSubmit: 'Send', noDetail: 'No insertable information. Select text and right-click to look it up.', source: 'Source', sourceLine: 'Source: {source}', dateLine: 'Queried on: {date}', error: 'The operation failed. Please try again.', login: 'Sign in', recharge: 'Add credits', saved: 'Inserted. Use Undo to revert.', replaced: 'Replaced. Use Undo to revert.', current: 'Current document', refresh: 'Refresh local vocabulary', contextHint: 'Select text and right-click to look up a company, law or case. Nothing goes online — and nothing can be charged — until you click.', COMPANY: 'Company', PERSON: 'Person', LAW: 'Law', ARTICLE: 'Article', CASE: 'Case', WORD: 'Word', PHRASE: 'Phrase' }
 let instanceSeq = 0
 // Longest selection the right-click lookup menu accepts.
 const CONTEXT_MENU_MAX = 160
@@ -14,6 +14,10 @@ const SUGGEST_DELAY = 1800
 const AUTO_INTERVAL = 45000
 const MIN_TYPED = 20
 const DISMISS_PAUSE = 120000
+// 本地词库随打随弹（问题 81，默认关）：停顿这么久就查本机词库，不发任何请求。
+const LOCAL_SUGGEST_DELAY = 400
+// 这些字符把「光标前的连续文字」断成新的一段：Esc 关掉的那一段之后恢复自动弹出。
+const RUN_BREAK = /[\s，。！？；：、,.!?;:（）()《》“”"'\n]/
 
 /** Guest-side UI. No network access: all requests travel through the document host. */
 export function attachWritingAssistance({ canvas, input, execute, transport, focus, overlayContainer, bounds }) {
@@ -27,6 +31,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   let items = [], current = null, choices = [], active = 0, generation = 0, timer = 0, learningTimer = 0
   let preferredText = '', panelPoint
   let lastAutomaticAt = -Infinity, quietUntil = 0, typedSinceAttempt = 0, automaticActive = false, pollTimer = 0
+  let localTimer = 0, localShown = false, localSuppressed = false
   const dismissed = new Set()
   let ownText = '', mode = '', disposed = false, composing = false, accepting = false, scope = 'project', clearArmed = false
   const pending = new Map()
@@ -102,16 +107,18 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     position(point)
   }
   function hide() {
-    mode = ''; choices = []; panel.hidden = true; root.hidden = true; panel.replaceChildren(); input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); input.removeAttribute('aria-controls'); status.textContent = ''
+    mode = ''; choices = []; localShown = false; panel.hidden = true; root.hidden = true; panel.replaceChildren(); input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); input.removeAttribute('aria-controls'); status.textContent = ''
     setPanelOpen(false)
   }
   function invalidate({ flush = true } = {}) {
-    generation++; clearTimeout(timer); clearTimeout(pollTimer); timer = 0; pollTimer = 0; current = null; accepting = false; preferredText = ''
+    generation++; clearTimeout(timer); clearTimeout(pollTimer); clearTimeout(localTimer); timer = 0; pollTimer = 0; localTimer = 0; current = null; accepting = false; preferredText = ''
     if (automaticActive) { automaticActive = false; rpc('semantic-auto-cancel').catch(() => {}) }
     hide()
     if (flush) flushLearning()
   }
   function dismiss() {
+    // Esc 关掉自动弹出的本地候选：这一段不再弹，直到断句或移动光标
+    if (mode === 'suggest' && localShown) localSuppressed = true
     if (mode === 'suggest' && choices.some(item => item.semantic)) {
       quietUntil = Date.now() + DISMISS_PAUSE
       for (const item of choices) dismissed.add(item.text)
@@ -141,7 +148,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     if (msg.type === 'writing-config') {
       if (!msg.config || typeof msg.config !== 'object') return
       const changed = typeof msg.config.session === 'string' && msg.config.session !== config.session
-      if (changed) { invalidate(); for (const p of pending.values()) { clearTimeout(p.timeout); p.reject(new Error(t.stale)) }; pending.clear(); items = []; ownText = ''; dismissed.clear(); typedSinceAttempt = 0; quietUntil = 0; lastAutomaticAt = -Infinity }
+      if (changed) { invalidate(); for (const p of pending.values()) { clearTimeout(p.timeout); p.reject(new Error(t.stale)) }; pending.clear(); items = []; ownText = ''; dismissed.clear(); typedSinceAttempt = 0; quietUntil = 0; lastAutomaticAt = -Infinity; localSuppressed = false }
       if (msg.config.labels && typeof msg.config.labels === 'object') {
         const next = { ...FALLBACK_LABELS }
         for (const key of Object.keys(FALLBACK_LABELS)) if (typeof msg.config.labels[key] === 'string' && msg.config.labels[key]) next[key] = msg.config.labels[key]
@@ -389,6 +396,20 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     try { await render(await rpc('semantic-auto-generate', { composing })) }
     catch { if (currentRequest()) { quietUntil = Date.now() + DISMISS_PAUSE; invalidate({ flush: false }) } }
   }
+  /** 「输入时自动显示本地候选」：只匹配本机词库，不调 AI、不经宿主联网。 */
+  async function localAutoSuggestion() {
+    localTimer = 0
+    const live = () => !disposed && !composing && config.localAuto && config.writable && !accepting && !mode && !localSuppressed && doc.activeElement === input
+    if (!live()) return
+    const gen = generation
+    let ctx
+    try { ctx = await execute('get_completion_context', { radius: 160 }) } catch { return }
+    if (gen !== generation || !live() || !ctx?.success || !ctx.available || !ctx.token) return
+    const matches = matchCompletionItems(ctx.before, eligibleItems()).filter(item => [...item.prefix].length >= 2)
+    if (!matches.length) return
+    current = ctx; choices = matches; active = 0
+    renderChoices(); localShown = true
+  }
   function committed(text) {
     if (disposed) return
     invalidate({ flush: false })
@@ -396,6 +417,8 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     if (config.learning && config.writable) { ownText = (ownText + text).slice(-4000); clearTimeout(learningTimer); learningTimer = setTimeout(flushLearning, 8000) }
     if (/[。！？；\n]/.test(text)) flushLearning()
     timer = config.enabled && config.writable ? setTimeout(automaticSuggestion, SUGGEST_DELAY) : 0
+    if (RUN_BREAK.test(String(text || ''))) localSuppressed = false
+    if (config.localAuto && config.writable && !composing && !localSuppressed) localTimer = setTimeout(localAutoSuggestion, LOCAL_SUGGEST_DELAY)
   }
   function keydown(e) {
     if (disposed) return false
@@ -414,7 +437,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   }
   async function settings() {
     invalidate(); show('settings')
-    for (const name of ['enabled', 'learning', 'hints']) {
+    for (const name of ['enabled', 'localAuto', 'learning', 'hints']) {
       const label = doc.createElement('label'); const check = doc.createElement('input'); check.type = 'checkbox'; check.checked = config[name]
       check.onchange = async () => {
         config[name] = check.checked
@@ -423,6 +446,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
           if (automaticActive) { automaticActive = false; rpc('semantic-auto-cancel').catch(() => {}) }
         }
         if (name === 'learning' && !check.checked) { ownText = ''; clearTimeout(learningTimer); learningTimer = 0 }
+        if (name === 'localAuto' && !check.checked) { clearTimeout(localTimer); localTimer = 0 }
         try { await rpc('preferences', { [name]: check.checked }) }
         catch (error) { if (!disposed && mode === 'settings') { check.checked = config[name]; note(error.message === 'PREFERENCES_SAVE_FAILED' ? t.preferenceFailed : error.message || t.error) } }
       }
@@ -547,10 +571,11 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   }
   const startComposition = () => { composing = true; invalidate({ flush: false }) }
   const endComposition = () => { composing = false }
-  const moved = () => invalidate()
+  const moved = () => { localSuppressed = false; invalidate() }
   const cursorMoved = (event) => {
     // committed() invalidates and schedules after the text has reached the engine.
     if (event?.reason === 'commit') return
+    localSuppressed = false
     invalidate({ flush: false })
     // Reading and moving the caret never request automatic suggestions.
   }
@@ -586,7 +611,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   return { committed, keydown, invalidate, cursorMoved, reposition: resized,
     destroy() {
       if (disposed) return
-      invalidate(); disposed = true; clearTimeout(timer); clearTimeout(learningTimer); unsub()
+      invalidate(); disposed = true; clearTimeout(timer); clearTimeout(localTimer); clearTimeout(learningTimer); unsub()
       for (const p of pending.values()) { clearTimeout(p.timeout); p.reject(new Error(t.stale)) }; pending.clear()
       input.removeEventListener('compositionstart', startComposition); input.removeEventListener('compositionend', endComposition); input.removeEventListener('blur', blur)
       input.removeEventListener('focus', refreshOnFocus)

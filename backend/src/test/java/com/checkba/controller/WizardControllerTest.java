@@ -54,7 +54,8 @@ class WizardControllerTest {
         // 换成 mock 反而会把这条安全前置条件测空。
         return new WizardController(systemSettingService,
                 new com.checkba.service.WizardStateService(systemSettingService, systemSettingRepository),
-                userRepository, adminAccessService, new ObjectMapper(), chatModelFactory);
+                userRepository, adminAccessService, new ObjectMapper(), chatModelFactory,
+                mock(com.checkba.service.ai.CrossBorderConsentService.class));
     }
 
     @Test

@@ -943,6 +943,7 @@ export default {
     "local": "Lokale suggesties · Tab accepteren · Esc negeren",
     "empty": "Nog geen lokale suggesties. De woordenschat groeit terwijl u schrijft.",
     "enabled": "Automatische semantische suggesties",
+    "localAuto": "Lokale suggesties tonen tijdens het typen",
     "disable": "Autoaanvullen uitschakelen",
     "preferenceFailed": "De instelling kon niet worden opgeslagen. De vorige status is ongewijzigd; probeer het opnieuw.",
     "semantic": "Voorgestelde voortzetting",

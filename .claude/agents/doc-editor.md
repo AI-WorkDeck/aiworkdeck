@@ -156,7 +156,7 @@ Writer 切换修订显示会发出大量 `Modify` 通知，不能一律算真实
 
 ## 自动补全（#1225 语义判断；#1226 共享审校开关）
 
-- 对外叫**「自动补全」**（en: Autocomplete；#755 之前叫「写作辅助」，代码里的 `attachWritingAssistance` / `.awd-writing-assistance` / `writingAssistance*` 等内部名一律不动）。面板内开关为「自动语义补全」。词库匹配仅保留 `Alt+/` 或 `Ctrl+Space` 手动调用，不再随输入或光标移动自动弹出。
+- 对外叫**「自动补全」**（en: Autocomplete；#755 之前叫「写作辅助」，代码里的 `attachWritingAssistance` / `.awd-writing-assistance` / `writingAssistance*` 等内部名一律不动）。面板内开关为「自动语义补全」与「输入时自动显示本地候选」（偏好键 `localAuto`，**默认关**，dev-board#1713 问题 81）。词库匹配默认只由 `Alt+/` 或 `Ctrl+Space` 手动调用；开启 `localAuto` 后，`committed()` 停顿 400ms（`LOCAL_SUGGEST_DELAY`）查本机词库，光标前连续文字 ≥2 字且是某条的前缀才弹，不发任何 rpc/AI 请求；IME 组字期间不弹；Esc 关掉后这一段不再弹，直到 `RUN_BREAK` 标点/空白或移动光标。与「自动语义补全」的计时器、45 秒间隔、两分钟静默互不影响；光标移动本身不触发自动弹出。
 - **词库与详细设置入口在 Writer 自建工具栏**（#755）：画布右下角那颗常驻按钮 `.awd-wa-toggle` 已撤掉（连同它的 CSS），`EditorToolbar.vue` 右侧常驻区里「自动补全」与「有据续写」由一条 `etb-sep` 起头并排成写作一组（两颗都不可用时那条分隔线也不画）。消息对与 #748 同款、宿主不本地乐观翻按下态：客体 → 宿主 `writing-assistance-state {available, open}`（`available = session && writable`；`open` 只算设置面板这一族 `mode ∈ {settings, manage}`——打字候选、右键查询卡片、资料卡都不点亮那颗按钮），宿主 → 客体 `writing-assistance-panel {open}`。`LibreOfficeEditor.initWritingAssistance()` 换文档时先把 `writingAssistanceAvailable/Open` 复位，等客体重新上报。面板关着时客体根节点整块 `hidden`（画布上不留一个像素、也截不到点击），根节点另挂 `data-available="true|false"` 作为「这份客体的写作会话已就绪」的 DOM 标记——`tests/desktop-e2e/writing.mjs` 认 webview 靠它（原先靠那颗按钮的 `hidden`）。
 - 右键查询（机构/法规/案例）**不受自动语义补全开关影响**，默认开、点了才联网；设置面板底部用一行灰字说明这件事（`LABELS.contextHint`），不在那里再给一个开关。
 - `zetaOfficeCompletion.js` 是客体 DOM 菜单，`writingAssistanceHost.js` 是项目/用户词库与 API 宿主；`editor-main.js` / IME overlay 只提供接线。Writer 就绪且可写时启用，换文档、重载、卸载销毁 session；中文组合输入优先，方向键/Tab 只在候选展开时接管，Enter 保留换段。

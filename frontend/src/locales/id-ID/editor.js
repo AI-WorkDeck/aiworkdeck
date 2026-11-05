@@ -943,6 +943,7 @@ export default {
     "local": "Saran lokal · Tab terima · Esc tutup",
     "empty": "Belum ada saran lokal. Kosakata bertambah seiring Anda menulis.",
     "enabled": "Saran semantik otomatis",
+    "localAuto": "Tampilkan saran lokal saat mengetik",
     "disable": "Matikan lengkapi otomatis",
     "preferenceFailed": "Pengaturan tidak dapat disimpan. Status sebelumnya tidak berubah; silakan coba lagi.",
     "semantic": "Saran kelanjutan",
