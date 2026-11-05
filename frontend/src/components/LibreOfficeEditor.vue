@@ -2546,7 +2546,11 @@ export default {
     async saveDocument({ trackSnapshot = false } = {}) {
       const f = this.file
       if (!f || !this.executor || this.saving || this._saveDiscarded || this._pendingReload) return false
-      this._saveRetryKind = null // 只有 catch 里认定的安全失败类别才允许自动重试
+      // 一笔保存开始，之前排的退避重试与「N 秒后重试」文案都作废；只有 catch 里认定的安全失败类别才再排。
+      this._saveRetryKind = null
+      clearTimeout(this._saveRetryTimer)
+      this._saveRetryTimer = null
+      this.saveRetryDelaySec = 0
       const generation = documentCheckpointGeneration(this.projectId, f.id)
       const barrier = checkpointSaveBarrier(this.projectId, f.id)
       if ((barrier && !barrier.instances?.includes(this)) ||
@@ -2683,9 +2687,6 @@ export default {
         this._savePaused = false
         this._saveRetryAttempt = 0
         this._exportUnsettled = false
-        clearTimeout(this._saveRetryTimer)
-        this._saveRetryTimer = null
-        this.saveRetryDelaySec = 0
         this.statusKey = prevStatusKey
         // 这一笔落到后端之后才会被防抖的 commitNow 收成一版——溯源等它一会儿再重拉。
         this.scheduleProvenanceReload()
