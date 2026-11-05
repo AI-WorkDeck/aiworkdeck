@@ -43,17 +43,17 @@ test('装载过真文件的编辑器保存时要求目标仍存在（mustExist=1
   const vm = makeVm({ uploadBytes: async (url) => { urls.push(url) } })
   assert.equal(await vm.saveDocument(), true)
   assert.equal(urls.length, 1)
-  assert.match(urls[0], /^\/upload\/7\?mustExist=1$/)
+  assert.match(urls[0], /^\/upload\/7\?mustExist=1&/) // 其后是 B7 保存序号参数
 })
 
 test('新建空白文档的第一笔保存不带 mustExist（磁盘上本来就还没有它），存过一次之后才带', async () => {
   const urls = []
   const vm = makeVm({ file: { id: 9, name: '新建.docx', fileSize: 0 }, uploadBytes: async (url) => { urls.push(url) } })
   assert.equal(await vm.saveDocument(), true)
-  assert.equal(urls[0], '/upload/9')
+  assert.equal(new URL(urls[0], 'http://x').searchParams.get('mustExist'), null)
   vm.dirty = true
   assert.equal(await vm.saveDocument(), true)
-  assert.equal(urls[1], '/upload/9?mustExist=1')
+  assert.equal(new URL(urls[1], 'http://x').searchParams.get('mustExist'), '1')
 })
 
 test('后端 409（文件已被移动/改名）落成专门的状态、留脏、仍可重试', async () => {
