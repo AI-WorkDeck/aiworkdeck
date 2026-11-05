@@ -96,6 +96,26 @@ public @interface ToolMeta {
     boolean offerToModel() default true;
 
     /**
+     * 能力目录里的访问级别（docs/capability-catalog.md，Stella 对齐 mcp-server 主题）。
+     *
+     * <p>默认 {@link Access#INFERRED}：由 {@code CapabilityCatalog.inferAccess} 按工具名动词推断，
+     * 拿不准的一律算写入。只有推断结果不对时才在这里显式声明，覆盖推断。
+     */
+    Access access() default Access.INFERRED;
+
+    /** {@link #access()} 的取值。 */
+    enum Access {
+        /** 未声明，按工具名推断。 */
+        INFERRED,
+        /** 只读：不改项目、文档、记忆或外部状态。 */
+        READ,
+        /** 写入：产生新内容或修改现有内容，可在编辑器/版本里撤回。 */
+        WRITE,
+        /** 破坏性：删除、覆盖或不可逆地改变已有内容，应经用户确认。 */
+        DESTRUCTIVE
+    }
+
+    /**
      * {@link #requiresHost()} 的取值。与
      * {@code ClientCapabilityService.Capability} 三档一一对应（NONE 表示"不挑宿主"，
      * 不是"只给 none 会话"）。

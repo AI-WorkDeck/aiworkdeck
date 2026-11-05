@@ -132,7 +132,7 @@ public class TagTools implements AgentToolComponent {
     }
 
     @Tool("移除文件上的某个标签（只解除文件与标签的关联，不删除标签本身）。")
-    @ToolMeta(displayName = "移除文件标签", category = "file")
+    @ToolMeta(displayName = "移除文件标签", category = "file", access = ToolMeta.Access.WRITE)
     public String tag_remove_from_file(
             @P("文件ID，须来自 doc_list_project_files 等工具返回的 fileId") Long fileId,
             @P("要移除的标签名称") String tagName,
