@@ -187,7 +187,7 @@ class TelemetryRollupUploadTest {
     @Test
     void tier2UploadsEventsBatchWhenEnabled() {
         when(rollupRepo.findByUploadedFalseAndDateAfter(any())).thenReturn(List.of());
-        when(eventRepo.findByTsAfter(any())).thenReturn(List.of(
+        when(eventRepo.findByTsAfterOrderByTsAsc(any())).thenReturn(List.of(
                 ev("ui.nav", "{\"page\":\"admin\"}", 0)));
         List<String> bodies = new ArrayList<>();
         TelemetryUploadService svc = uploader("true", "true", (url, body) -> {
@@ -198,5 +198,55 @@ class TelemetryRollupUploadTest {
         assertEquals(1, bodies.size());
         assertTrue(bodies.get(0).contains("ui.nav"));
         assertTrue(bodies.get(0).contains(identity.installId()));
+    }
+
+    private java.util.Map<String, String> backCursorStore() {
+        java.util.Map<String, String> store = new java.util.HashMap<>();
+        when(settingStore.get(eq(TelemetrySettings.KEY_EVENTS_CURSOR), anyString())).thenAnswer(inv ->
+                store.getOrDefault(TelemetrySettings.KEY_EVENTS_CURSOR, inv.getArgument(1)));
+        doAnswer(inv -> store.put(inv.getArgument(0), inv.getArgument(1)))
+                .when(settingStore).set(eq(TelemetrySettings.KEY_EVENTS_CURSOR), anyString());
+        return store;
+    }
+
+    private void repoReturnsRecentEventsAfterCursor() {
+        TelemetryEvent recent = new TelemetryEvent();
+        recent.setTs(Instant.now().minusSeconds(600));
+        recent.setEventName("ui.nav");
+        when(eventRepo.findByTsAfterOrderByTsAsc(any())).thenAnswer(inv -> {
+            Instant from = inv.getArgument(0);
+            return recent.getTs().isAfter(from) ? List.of(recent) : List.of();
+        });
+    }
+
+    @Test
+    void tier2EventsAreNotResentOnNextSyncAfterSuccess() {
+        when(rollupRepo.findByUploadedFalseAndDateAfter(any())).thenReturn(List.of());
+        backCursorStore();
+        repoReturnsRecentEventsAfterCursor();
+        List<String> bodies = new ArrayList<>();
+        TelemetryUploadService svc = uploader("true", "true", (url, body) -> {
+            if (url.endsWith("/events")) bodies.add(body);
+            return 200;
+        });
+        svc.sync();
+        svc.sync();
+        assertEquals(1, bodies.size());
+    }
+
+    @Test
+    void tier2CursorDoesNotAdvanceWhenServerRejects() {
+        when(rollupRepo.findByUploadedFalseAndDateAfter(any())).thenReturn(List.of());
+        java.util.Map<String, String> store = backCursorStore();
+        repoReturnsRecentEventsAfterCursor();
+        List<String> bodies = new ArrayList<>();
+        TelemetryUploadService svc = uploader("true", "true", (url, body) -> {
+            if (url.endsWith("/events")) bodies.add(body);
+            return 500;
+        });
+        svc.sync();
+        svc.sync();
+        assertEquals(2, bodies.size());
+        assertTrue(store.isEmpty());
     }
 }
