@@ -36,6 +36,7 @@ class AccountSwitchCleanupTest {
     com.checkba.service.SystemSettingService systemSettingService;
     AccountIdentitySync identitySync;
     ChatModelFactory chatModelFactory;
+    com.checkba.service.ai.CrossBorderConsentService crossBorderConsent;
 
     @BeforeEach
     void setUp() {
@@ -50,10 +51,18 @@ class AccountSwitchCleanupTest {
         teamProjectNameNotice = mock(com.checkba.service.team.TeamProjectNameNotice.class);
         systemSettingService = mock(com.checkba.service.SystemSettingService.class);
         identitySync = mock(AccountIdentitySync.class);
+        crossBorderConsent = mock(com.checkba.service.ai.CrossBorderConsentService.class);
         cleanup = new AccountSwitchCleanup(accountService, entitlementService, platformAiChannel,
                 platformCreditsGate, platformUsageAccountant, chatModelFactory,
                 teamUsageSettings, teamSettingsCache, teamProjectNameNotice,
-                systemSettingService, identitySync);
+                systemSettingService, identitySync, crossBorderConsent);
+    }
+
+    @Test
+    @DisplayName("afterConnect：把连接前（登录弹层/粘 Key）记下的跨境同意绑到刚连上的账户（问题 130）")
+    void afterConnectBindsPendingCrossBorderConsent() {
+        cleanup.afterConnect();
+        verify(crossBorderConsent).bindPendingToCurrentAccount();
     }
 
     @Test
