@@ -160,7 +160,13 @@ test('source change during the save await also prevents the pending tab move', a
 test('卡片文案走语言包，不再按 zh / 非 zh 写死中英两套（J7，dev-board#1713）', async () => {
   const { readFileSync } = await import('node:fs')
   const src = readFileSync(new URL('../../src/components/DocumentLinkPreview.vue', import.meta.url), 'utf8')
-  const code = src.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\/.*$/gm, '')
+  // 逐段剥掉 HTML 注释（不用一次性正则替换，避免 CodeQL「多字符过滤不完整」误报）
+  let code = '', rest = src
+  for (let i = rest.indexOf('<!--'); i >= 0; i = rest.indexOf('<!--')) {
+    const end = rest.indexOf('-->', i + 4)
+    code += rest.slice(0, i); rest = end < 0 ? '' : rest.slice(end + 3)
+  }
+  code = (code + rest).replace(/\/\/.*$/gm, '')
   assert.doesNotMatch(code, /[一-鿿]/, '组件里不许再有写死的中文')
   assert.doesNotMatch(code, /Open alongside|Link preview/, '组件里不许再有写死的英文')
   for (const key of ['linkPreviewTitle', 'linkPreviewUnavailable', 'linkPreviewTruncated', 'linkPreviewDocument', 'linkPreviewNoExcerpt', 'linkPreviewOpenAside', 'linkPreviewNoWeb']) {

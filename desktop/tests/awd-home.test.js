@@ -109,11 +109,14 @@ test('后端复用：不同 home 的实例互不复用对方的后端（两个�
 test('service-manager：设了 AWD_HOME 时子进程拿到的 HOME 是 AWD_HOME', async (t) => {
   const { createServiceManager, findFreePort } = require('../main/services/service-manager')
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'awd-home-'))
-  t.after(() => fs.rmSync(home, { recursive: true, force: true }))
   const out = path.join(home, 'seen-home')
   const mgr = createServiceManager({ packaged: false, resourcesPath: null, dataDir: home,
     projectRoot: path.join(__dirname, '..'), awdHome: home })
-  t.after(() => mgr.stopAll())
+  // 先停子进程再删目录：Windows 上子进程占着 cwd 时删除会 EPERM，未停的子进程还会让测试挂死
+  t.after(async () => {
+    await mgr.stopAll()
+    fs.rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  })
   const script = `require('fs').writeFileSync(${JSON.stringify(out)}, process.env.HOME || '');
     require('http').createServer((q, r) => r.end('ok')).listen(Number(process.env.PORT), '127.0.0.1')`
   mgr.register({ name: 'probe', logName: 'probe', port: async () => findFreePort(), startTimeoutMs: () => 10000,
