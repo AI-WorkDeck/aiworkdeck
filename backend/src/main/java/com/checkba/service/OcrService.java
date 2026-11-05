@@ -43,6 +43,11 @@ public class OcrService {
      * 通用 OCR 识别（图片 base64，支持 dataURL）
      */
     public OcrResult recognizeGeneral(String imageBase64) {
+        return recognizeGeneral(imageBase64, false);
+    }
+
+    /** @param layout 要坐标、印章、表格、段落（版式 Word / 可搜索 PDF 用）；计费不变，仍是这一个扣费点 */
+    public OcrResult recognizeGeneral(String imageBase64, boolean layout) {
         if (!StringUtils.hasText(imageBase64)) {
             throw new IllegalArgumentException("imageBase64 不能为空");
         }
@@ -63,7 +68,7 @@ public class OcrService {
 
         if (externalProviderResolver.resolve(ExternalServiceProvider.OCR)
                 == ExternalServiceProvider.PLATFORM) {
-            return recognizeViaPlatform(payload);
+            return recognizeViaPlatform(payload, layout);
         }
 
         String ak = systemSettingService.get("external.aliyunOcr.accessKeyId", "");
@@ -98,7 +103,7 @@ public class OcrService {
         try {
             byte[] bytes = Base64.getDecoder().decode(payload);
             var client = AliyunOcrClientFactory.create(ak, sk, endpoint, regionId);
-            return client.recognizeGeneral(new ByteArrayInputStream(bytes));
+            return client.recognizeGeneral(new ByteArrayInputStream(bytes), layout);
         } catch (Exception e) {
             log.error("OCR 识别失败", e);
             throw new RuntimeException("OCR 识别失败: " + e.getMessage(), e);
@@ -113,9 +118,13 @@ public class OcrService {
      * RuntimeException 会让「未开放 / 上游挂 / 我们挂 / 余额不足」全变成
      * 一句「服务器内部错误」，用户不知道下一步该做什么。
      */
-    private OcrResult recognizeViaPlatform(String payload) {
+    private OcrResult recognizeViaPlatform(String payload, boolean layout) {
+        // layout 只在需要时才带：不带时请求与旧版完全一致
+        Map<String, Object> params = layout
+                ? Map.of("imageBase64", payload, "layout", true)
+                : Map.of("imageBase64", payload);
         PlatformGatewayClient.Result result = platformGatewayClient.call(
-                "ocr", "recognize", Map.of("imageBase64", payload), GATEWAY_TIMEOUT_SECONDS);
+                "ocr", "recognize", params, GATEWAY_TIMEOUT_SECONDS);
         JsonNode data = result.data();
         // 与 byok 档同一形状（text + raw）：消费方（截图摘录、文件文本抽取）
         // 不该按档位分两套解析
