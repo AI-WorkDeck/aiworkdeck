@@ -193,3 +193,28 @@ test('字体令牌与 uni.scss 的三条字栈逐字一致', () => {
     assert.ok(app.includes('--awd-font-' + name + ': ' + m[1].trim() + ';'), '--awd-font-' + name + ' 与 uni.scss 不一致')
   }
 })
+
+test('checkLabel：归一化后透传；组件里勾上才能确认、不预勾选（dev-board#1713 #117）', () => {
+  assert.equal(normalizeModalOptions({ title: 't' }, zh).checkLabel, '')
+  assert.equal(normalizeModalOptions({ title: 't', checkLabel: '我已知悉' }, zh).checkLabel, '我已知悉')
+  const host = fs.readFileSync(path.join(SRC, 'components/AwdDialogHost.vue'), 'utf8')
+  assert.match(host, /:check-label="current\.opts\.checkLabel \|\| ''"/)
+  const view = fs.readFileSync(path.join(SRC, 'components/AwdDialog.vue'), 'utf8')
+  assert.match(view, /checked: false,/, '勾选项初值必须是未勾选')
+  assert.match(view, /:disabled="needsCheck && !checked"/)
+  // 回车走的是 confirm()，同样要拦
+  const script = view.slice(view.indexOf('<script>') + 8, view.indexOf('</script>'))
+    .replace(/^import .*$/m, '').replace('export default', 'return')
+  const comp = new Function('resolveDialogKey', script)(() => null)
+  const results = []
+  const vm = { kind: 'modal', editable: false, checkLabel: '我已知悉', checked: false, closed: false, draft: '',
+    $emit: (_e, r) => results.push(r) }
+  vm.needsCheck = comp.computed.needsCheck.call(vm)
+  vm.finish = comp.methods.finish.bind(vm)
+  comp.methods.confirm.call(vm)
+  assert.equal(results.length, 0, '没勾选不能确认')
+  vm.checked = true
+  comp.methods.confirm.call(vm)
+  assert.equal(results.length, 1)
+  assert.equal(results[0].confirm, true)
+})

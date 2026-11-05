@@ -37,7 +37,7 @@ export default {
   "ocr": {
     "refresh": "重新整理畫面",
     "recognize": "辨識",
-    "download": "下載",
+    "download": "保存到專案",
     "copy": "複製",
     "insertDoc": "插入文件",
     "webLink": "網核關聯",

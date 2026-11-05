@@ -165,3 +165,79 @@ test('BUG-45: zh-CN 与 en-US 两份文案同步补齐，不是只改了一边',
     assert.match(en, new RegExp(`\\b${k}\\s*:`), `en-US/account.js 缺 ${k}`)
   }
 })
+
+// ---------- dev-board#1713：时长显示、关键词、CSV、空闲段（问题 111/55/56/57/51） ----------
+
+function makeVmWithParams() {
+  const vm = makeVm()
+  vm.$t = (k, p) => (p ? `${k}:${JSON.stringify(p)}` : k)
+  return vm
+}
+
+test('111: 时长按 15 秒（0.25 分）向上取整，显示「0.25 分」「1.75 分」「2 分」，满 60 分写「x 小时 y 分」', () => {
+  const vm = makeVmWithParams()
+  assert.equal(vm.getLogDuration({ duration: 2 * 1000 }), 'account.durationMinutes:{"minutes":"0.25"}')
+  assert.equal(vm.getLogDuration({ duration: 15 * 1000 }), 'account.durationMinutes:{"minutes":"0.25"}')
+  assert.equal(vm.getLogDuration({ duration: 16 * 1000 }), 'account.durationMinutes:{"minutes":"0.5"}')
+  assert.equal(vm.getLogDuration({ duration: 116 * 1000 }), 'account.durationMinutes:{"minutes":"2"}')
+  assert.equal(vm.getLogDuration({ duration: 7 * 60 * 1000 + 40 * 1000 }), 'account.durationMinutes:{"minutes":"7.75"}')
+  assert.equal(vm.getLogDuration({ duration: (2 * 60 + 5) * 60 * 1000 + 1000 }), 'account.durationHoursMinutes:{"hours":2,"minutes":"5.25"}')
+})
+
+test('55: 关键词同时匹配对象列与项目名，忽略大小写', () => {
+  const vm = makeVm()
+  vm.activityLogs = [
+    { id: 1, actionType: 'OPEN_FILE', targetName: '股权转让协议.DOCX', projectId: 1, projectName: '甲项目', metaInfo: 'Project: 甲项目' },
+    { id: 2, actionType: 'OPEN_URL', targetName: 'https://Example.com/a', projectId: 2, projectName: 'Alpha 并购', metaInfo: '' },
+  ]
+  vm.projectFilterKey = 'all'
+  vm.activityFilter.content = '.docx'
+  assert.deepEqual(vm.getFilteredLogs().map(l => l.id), [1])
+  vm.activityFilter.content = 'alpha'
+  assert.deepEqual(vm.getFilteredLogs().map(l => l.id), [2])
+  vm.activityFilter.content = 'example.COM'
+  assert.deepEqual(vm.getFilteredLogs().map(l => l.id), [2])
+})
+
+test('56: CSV 标准转义（双引号包裹、内部 " 加倍），# 与逗号原样保留，带 BOM', () => {
+  const vm = makeVm()
+  const csv = vm.buildLogsCsv([
+    { id: 1, actionType: 'OPEN_FILE', targetName: '方案#2, "终稿".docx', projectId: 1, projectName: 'A', duration: 0, timestamp: '2026-11-01T10:00:00' },
+  ])
+  assert.ok(csv.startsWith('﻿'))
+  assert.match(csv, /"方案#2, ""终稿""\.docx"/)
+  assert.equal(csv.trim().split('\r\n').length, 2)
+})
+
+test('56/57: 导出走 Blob + createObjectURL，文件名用本地日期，不再用 data: URI / toISOString', () => {
+  const start = SRC.indexOf('exportLogsToExcel()')
+  const body = SRC.slice(start, SRC.indexOf('formatTime(timeStr)', start))
+  assert.match(body, /new Blob\(/)
+  assert.match(body, /URL\.createObjectURL/)
+  assert.doesNotMatch(body, /data:text\/csv/)
+  assert.doesNotMatch(body, /toISOString/)
+})
+
+test('51: 空闲段按 activityTracker 写的毫秒格式解析，开始时间把空闲加回去', () => {
+  const vm = makeVmWithParams()
+  const start = new Date(2026, 10, 3, 9, 0, 0).getTime()
+  const idleStart = start + 10 * 60000
+  const idleEnd = start + 25 * 60000
+  const end = start + 40 * 60000
+  const log = {
+    actionType: 'OPEN_FILE', duration: 25 * 60000, timestamp: new Date(end).toISOString(),
+    metaInfo: `Project: A. IdleSegments: ${idleStart}-${idleEnd}`,
+  }
+  assert.equal(vm.getLogIdleTime(log), '09:10-09:25 (account.durationMinutes:{"minutes":"15"})')
+  assert.equal(vm.getLogStartTime(log), vm.formatDateTime(new Date(start)))
+})
+
+test('57/111: 中英文案补齐（导出 CSV、时长格式、截断提示）', () => {
+  const zh = read('../../src/locales/zh-CN/account.js')
+  const en = read('../../src/locales/en-US/account.js')
+  assert.match(zh, /exportExcelBtn:\s*'导出 CSV'/)
+  for (const k of ['durationMinutes', 'durationHoursMinutes', 'workLogTruncatedHint']) {
+    assert.match(zh, new RegExp(`\\b${k}\\s*:`), `zh-CN 缺 ${k}`)
+    assert.match(en, new RegExp(`\\b${k}\\s*:`), `en-US 缺 ${k}`)
+  }
+})

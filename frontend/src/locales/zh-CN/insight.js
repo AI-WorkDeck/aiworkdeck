@@ -60,6 +60,7 @@ export default {
   source: {
     projectFile: '项目文件',
     qichacha: '企查查',
+    pkulaw: '北大法宝',
   },
 
   mentions: '{count} 处',

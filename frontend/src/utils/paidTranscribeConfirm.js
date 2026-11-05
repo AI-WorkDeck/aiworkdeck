@@ -98,8 +98,12 @@ export async function confirmPaidTranscription(opts, deps) {
     lines.push(t(est.kind === 'total' ? 'meeting.paidConfirmEstimate' : 'meeting.paidConfirmPerMinute',
       { credits: est.credits }))
   }
-  const balance = balanceCents == null ? null : centsToCreditsText(balanceCents)
-  if (balance) lines.push(t('meeting.paidConfirmBalance', { credits: balance }))
+  // 余额本身不上屏（录屏 / 投屏会外泄，dev-board#1713 #119），只在不够这次（时长未知时按一分钟）时提示。
+  const balance = balanceCents == null ? NaN : Number(balanceCents)
+  const needCents = est ? Math.round(Number(est.credits) * 100) : 0
+  if (Number.isFinite(balance) && (est ? balance < needCents : balance <= 0)) {
+    lines.push(t('meeting.paidConfirmInsufficient'))
+  }
   let localPossible = false
   try { localPossible = !!(deps.localPossible && deps.localPossible()) } catch (e) { /* ignore */ }
   if (localPossible) lines.push(t('meeting.paidConfirmLocalHint'))

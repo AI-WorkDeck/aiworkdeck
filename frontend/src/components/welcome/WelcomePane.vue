@@ -30,7 +30,7 @@
         <textarea
           v-model="quickPrompt"
           class="welcome-quick-chat-input"
-          :placeholder="$t('workbench.welcome.quickChatPlaceholder')"
+          :placeholder="$t(currentProjectId != null ? 'workbench.welcome.quickChatPlaceholderInProject' : 'workbench.welcome.quickChatPlaceholder')"
           :maxlength="-1"
           :auto-height="true"
           @keydown.enter.exact.prevent="submitQuickChat"
@@ -63,7 +63,8 @@
             </view>
           </view>
           <view class="welcome-quick-send" data-quick="send" @tap="submitQuickChat">
-            <text>{{ quickPrompt.trim() ? $t('workbench.welcome.quickChatSend') : $t('workbench.welcome.enterChatMode') }}</text>
+            <!-- 项目已打开时宿主会在本项目新建一段对话再发送（问题 13），按钮如实说 -->
+            <text>{{ quickPrompt.trim() ? $t('workbench.welcome.quickChatSend') : $t(currentProjectId != null ? 'workbench.welcome.newChatInProject' : 'workbench.welcome.enterChatMode') }}</text>
           </view>
         </view>
       </view>
@@ -193,6 +194,7 @@ import { setGlobalOverlay } from '@/utils/overlayState.js'
 import { ICONS } from '@/config/icons.js'
 import { buildRecentProjects } from './welcomeRecent.js'
 import { loadTelemetryNoticeDismissed, saveTelemetryNoticeDismissed } from '@/pages/project-overview/welcomeTab.js'
+import { uniStorage } from '@/utils/uniStorage.js'
 import FolderCatalog from './FolderCatalog.vue'
 import AccountProjectCatalog from '@/components/project-list/AccountProjectCatalog.vue'
 import ModelSelectorDropdown from '@/components/ModelSelectorDropdown.vue'
@@ -284,7 +286,7 @@ export default {
   created() {
     overlaySeq += 1
     this._overlayHolder = 'welcome-pane-' + overlaySeq
-    this.telemetryDismissed = loadTelemetryNoticeDismissed(uni)
+    this.telemetryDismissed = loadTelemetryNoticeDismissed(uniStorage)
   },
   mounted() {
     this.loadRecent()
@@ -401,7 +403,7 @@ export default {
     },
     dismissTelemetryNotice() {
       this.telemetryDismissed = true
-      saveTelemetryNoticeDismissed(uni)
+      saveTelemetryNoticeDismissed(uniStorage)
     },
   },
 }

@@ -34,6 +34,8 @@ import { host, isDesktopHost } from '@/services/host.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 
 let indicatorSequence = 0
+// 整包「验证并准备」分阶段提示（问题 92）：壳在 progress.stage 报 mount / package / verify
+const PREPARE_STAGE_KEYS = { mount: 'shell.updatePreparingMount', package: 'shell.updatePreparingPackage', verify: 'shell.updatePreparingVerify' }
 
 export default {
   data() {
@@ -54,7 +56,7 @@ export default {
       if (this.restarting) return this.$t('shell.updateRestarting')
       if (this.failed) return this.$t('shell.updateFailed')
       if (this.ready) return this.$t('shell.updateRestart')
-      if (this.update.phase === 'preparing') return this.$t('shell.updatePreparing')
+      if (this.update.phase === 'preparing') return this.$t(PREPARE_STAGE_KEYS[this.update.progress?.stage] || 'shell.updatePreparing')
       if (this.update.phase === 'checking') return this.$t('shell.menuCheckingUpdate')
       if (this.update.phase === 'downloading') return this.$t(this.percent === null ? 'shell.updateDownloading' : 'shell.updateProgress', { percent: this.percent })
       return this.$t('shell.updateManual')

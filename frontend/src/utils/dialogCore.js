@@ -55,6 +55,8 @@ export function normalizeModalOptions(opts, translate) {
     danger: o.danger === true || isDangerColor(o.confirmColor),
     editable: o.editable === true,
     placeholderText: text(o.placeholderText),
+    // 勾上才能确认的告知项（不预勾选）；空串 = 没有
+    checkLabel: text(o.checkLabel),
   }
 }
 

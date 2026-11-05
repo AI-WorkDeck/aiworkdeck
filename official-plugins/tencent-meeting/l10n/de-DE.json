@@ -13,5 +13,16 @@
   "panel.exporting": "Besprechungsmaterial wird gespeichert…",
   "panel.preparingAi": "Besprechungsmaterial für KI wird vorbereitet…",
   "view.account.name": "Tencent Meeting",
-  "view.meetings.name": "Tencent Meeting"
+  "view.meetings.name": "Tencent Meeting",
+  "panel.autoSync": "Nach Besprechungsende automatisch mit diesem Projekt synchronisieren",
+  "panel.autoSyncHint": "Damit erlauben Sie dem Plugin, bei geöffnetem Panel alle 5 Minuten die lokale tmeet-CLI auszuführen und in den letzten 24 Stunden beendete Besprechungen zu prüfen. Neue Besprechungen mit Aufzeichnung oder Protokoll werden im Ordner „Tencent Meeting“ dieses Projekts archiviert, und die KI erstellt Protokoll und Aufgaben (verbraucht KI-Guthaben). Es wird nichts installiert; fehlt tmeet oder ist es nicht autorisiert, wird die Prüfung übersprungen.",
+  "panel.autoWaiting": "Automatische Synchronisierung ist an. Prüfung folgt in Kürze.",
+  "panel.autoRunning": "Automatische Synchronisierung läuft…",
+  "panel.autoOk": "Automatische Synchronisierung: um {time} geprüft, {count} neue Besprechungen archiviert.",
+  "panel.autoPartial": "Automatische Synchronisierung: {count} neue Besprechungen um {time} archiviert; einige Unterlagen sind noch nicht bereit und werden erneut versucht.",
+  "panel.autoCliMissing": "Automatische Synchronisierung übersprungen: tmeet-CLI nicht gefunden.",
+  "panel.autoNotLoggedIn": "Automatische Synchronisierung übersprungen: Tencent Meeting ist nicht autorisiert.",
+  "panel.autoAiFailed": "Für {count} davon konnten KI-Protokoll oder Aufgaben nicht erstellt werden; öffnen Sie die Besprechung, um sie manuell zu erstellen.",
+  "panel.autoOn": "Automatische Synchronisierung eingeschaltet.",
+  "panel.autoOff": "Automatische Synchronisierung ausgeschaltet."
 }

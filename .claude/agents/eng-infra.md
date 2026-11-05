@@ -37,7 +37,7 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
 
 `app-menu.js` 的关于入口使用 `about-window.js` 独立本地窗口，原生 About 的固定 copyright 区无法容纳完整双语许可文案。新窗口正文可换行/滚动、版本仅显示一次；保留版权、AGPL、源码/许可证/商标链接与说明。无脚本、sandbox/contextIsolation 开启，只允许三个固定法律链接交给系统浏览器，重复打开复用窗口。浅色/深色从 `design/tokens/awd-palette.json` 生成 --awd-* 角色令牌快照，测试逐项对拍；更新色源须同步该快照。验证：`desktop/tests/about-window.test.js`，真实窗口用 Electron 运行 `desktop/tests/about-window.electron.js`（独立 profile，不启动产品后端）。
 
-完整更新字节与哈希校验后、`prepareInstaller` 返回前，`update-service.js` 必须广播 `preparing`，只有原生准备成功才 `ready`。前端顶部/设置均覆盖该阶段；主页面就绪不自动弹重启确认，用户点击沿用已有保存/退出守卫。缺平台安装包退回手动下载时也必须广播最终 idle/major-available 快照，不能停在 checking。
+完整更新字节与哈希校验后、`prepareInstaller` 返回前，`update-service.js` 必须广播 `preparing`，只有原生准备成功才 `ready`。准备过程分阶段（dev-board#1713，问题 92）：`full-update.js` 的 `prepare(file, version, onStage)` 依次报 `mount`（hdiutil 挂载）/ `package`（ditto 转 ZIP）/ `verify`（Squirrel 验签准备；Windows 只有这一段），`update-service` 写进 `progress.stage` 并再广播 `preparing`，前端 `shell.updatePreparing{Mount,Package,Verify}` 提示当前阶段与「通常需要几分钟」。前端顶部/设置均覆盖该阶段；主页面就绪不自动弹重启确认，用户点击沿用已有保存/退出守卫。缺平台安装包退回手动下载时也必须广播最终 idle/major-available 快照，不能停在 checking。
 
 ## 发版链路
 
@@ -51,6 +51,7 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
 0.3. **完整版本退出安装（dev-board#1356）**：`update-service.js` 继续先验证 Ed25519 清单；`channels[major].installers` 的 `darwin-arm64` / `win32` 含 `{version,size,sha256,urls}`，只接受更新版本并流式校验完整字节。沿用现有 DMG/NSIS 和 `/update/desktop/installers/` 镜像；`installers/latest.json` 没有签名，仍仅供官网，不作为客户端安装信任依据。`finalize-update-manifest.js` 在 release job 收齐两个平台后验证原清单签名、绑定实际产物哈希并重新签名，任一平台缺失不发布。旧壳不具备完整安装能力，首次仍需安装包含本改动的完整版本；不得声称补丁能升级旧壳。
    - Mac：`full-update.js` 挂载已校验 DMG、核对 plist 版本、用系统 ditto 转本地 ZIP，由 Electron 内置 Squirrel.Mac 经随机路径的回环 HTTP 校验签名并准备安装；只在 `update-downloaded` 后 ready。正常退出不调用 `quitAndInstall`（ShipIt 随下次启动应用更新），主动重启才调用；签名身份变更可能拒绝自动升级，不能删除签名校验。签名拒绝、替换/回退由原生更新器负责，单测替身不证明正式签名安装成功。
    - Windows：`install-update.ps1` 复制到数据目录后运行（PowerShell 不认识 app.asar 路径），握手完成才退出；helper 等父进程退出，再次校验 SHA256 与 Authenticode，运行原 NSIS `/S --updated`。只在成功且用户主动重启/安装期间手动重开时启动。helper 存活期间启动锁阻止第二后端；超过20分钟提示检查安装器，不强杀。失败保留已验证下载件和 `.error`，下次状态读出；沿用 NSIS 的失败行为，不保证产品级回退，不能声称 Windows 安装失败自动恢复旧版。
+   - 隔离实例不更新（dev-board#1713，问题 90）：`AWD_DISABLE_UPDATES=1`、设了 `AWD_HOME` 或带 `--user-data-dir` 启动时，`update-service.js` 的 `updatesDisabledReason` 生效——补丁与整包都不检查、不下载，状态带 `disabled:true`（顶栏更新指示与「重启更新」不出现），update.log 记 `disabled`。原因：ShipIt 替换后重启不带原进程 env/启动参数，会变成用真实数据目录的默认实例。e2e / 演示 / 复测实例请设 `AWD_DISABLE_UPDATES=1`。
    - 退出：`host.lifecycle.onPrepareQuit/onQuitCancelled/cancelQuit` 与主renderer的 `checkba:prepare-quit` / `quit-prepared` ACK 共用普通退出/更新重启。renderer暂停任务、保存dirty编辑器、等待项目级提交选择、再次确认保存后ACK；主进程只接受当前主窗口同requestId，60s保存超时/取消不隐藏或停服务。dev-board#1489 新增确认阶段通知，等待选择与提交期间暂停退出计时，取消恢复任务。完成ACK后才停后端再安装。Windows点X同样走此路径；Mac红叉先确认再隐藏并恢复暂停的任务，Dock激活恢复，Cmd+Q与关窗复用在途确认。
    - 验证：`update-service.test.js` 的本地签名HTTP、`full-update.test.js` 的真实回环feed/平台替身、`quit-lifecycle.test.js` 的实际主进程片段和ACK，以及 Windows CI 才运行的 helper 合成测试。正式签名Mac/Windows升级、Squirrel回退、Windows NSIS安装/安装期间快开须另外隔离实测，不可用源码测试替代；未获本次发版授权不打tag或部署。
    - 完整 Windows 验收入口：手动 `full-upgrade-smoke.yml` 指定成功的签名 Desktop Build run；`test-full-upgrade.ps1` 仅允许一次性 Actions runner，实际安装、启动、退出、升级并核对签名、后端 JAR、项目/文件 ID、正文及偏好持久化。`LegacyHelper` 只证明新 helper 兼容旧安装目录；`AppUpdater` 必须提供含新更新器的较低版本签名基线，分别验 Restart/Quit/Reopen。本地临时签名清单仅用于测试，不能替代生产清单验签；脚本存在不等于实测已通过，结果以对应 run 的 evidence.json 与截图为准。
@@ -345,6 +346,7 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
 - **打包态桌面后端：5269 → 5369 → 5169 → 随机**（`desktop/main/services/backend-service.js` allocateBackendPort：真实 bind 探测；被占时先探 `/api/admin/wizard` 验明是否自家后端，**并对比 build 指纹**（spawn 时注入 `AWD_BACKEND_BUILD`=app.jar 的 size-mtime，wizard 响应 `build` 字段回显，PR#589/dev-board#139：更新后残留的陈旧后端曾被静默复用导致新前端打旧后端 404）——同指纹复用；指纹不一致警告并复用，不能杀非本壳创建的进程（旧进程可能握着 H2 文件锁）；陌生进程降级下一个端口。dev 态不校验指纹（restart-backend.sh 拉起的后端无指纹）。service-manager 的 verifyReuse/reallocatePort 契约即为此加）。实际端口经 BrowserWindow additionalArguments → preload → `window.checkbaDesktop.apiBaseUrl` 注入渲染层，`frontend/src/services/api.js` 最优先读它。
 - **dev 态后端仍 9696**：restart-backend.sh / e2e / CI 全部不变；`CHECKBA_BACKEND_PORT` 可显式覆盖两种模式。注入优先级高于 `VITE_API_BASE_URL`，所以**凡是走 Electron 壳的测试/脚本，要换后端必须改 `CHECKBA_BACKEND_PORT`**，只指 dev server 的环境变量不管用（desktop-e2e 曾因此整条链失败）。
 - pptx/mineru/kokoro/asr 打包态是动态回环端口（由后端内部转发，前端不可见）；编辑器静态服务器 47613 因 COOP/COEP 跨源隔离必须独立源，勿并入。
+- 编辑器静态服务 zetaoffice 47613 / draw.io 47614 是**首选**端口：被占（另一个实例、dev 与打包版并存）就 `listen(0)` 换空闲端口，渲染层、`<webview>`、`?lowa=` 同源代理地址全部取 IPC（`checkba:zetaoffice-editor` / `checkba:drawio-editor`）回的实际 origin；壳与前端源码不许写死这两个端口（`desktop/tests/editor-port-fallback.test.js` 守着，问题 23）。多实例同时跑真正要隔离的是后端与数据目录，用 `AWD_HOME`。
 
 ## 本地开发启动
 
@@ -404,11 +406,36 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
 - **kokoro/asr 模型下载源顺序（dev-board#583）**：先 ModelScope，失败再回落 hf-mirror，经 `model-fetch.py --source hf` 读取固定 revision 与逐文件 metadata，大小及 LFS SHA256 / Git blob SHA1 验证后才发布 refs/main（`CHECKBA_MODEL_SOURCE=modelscope|hf` 强制单源）。原因：hf-mirror 只代理元数据，大文件 302 到 HF 官方 CDN（cas-bridge.xethub.hf.co），国内无代理必挂 `LocalEntryNotFoundError`。ModelScope 路径是 `desktop/main/services/model-fetch.py`（纯标准库，按 HF 缓存布局落 `HF_HOME/hub/models--*/{blobs/<sha256>, snapshots/<ModelScope commit>, refs/main}`，续传临时文件 `blobs/<sha256>.incomplete`，refs/main 最后写——所以旧的半截缓存里 refs/main 指向不存在的 snapshot 也能直接续下），运行侧 pack 的 app.py 不用改。**地雷**：脚本随 `main/**` 进 app.asar，Python 读不了，model-manager 每次下载前把它拷到 `~/.aiworkdeck/models/.model-fetch.py` 再跑。mineru 仍走 MinerU 官方 CLI（`-s modelscope`），不动。
 - 模型不进包：mineru/kokoro/asr 模型首启在"组件管理"下载（下载进度按字节级整体，PR#142）。asr 的 faster-whisper medium 约 1.5GB，依赖闭包 182MB（压缩后约 57MB 进安装包，大头是 onnxruntime 70MB + PyAV 44MB，两者都是 faster-whisper 的硬依赖）。
 
+## 隔离实例：AWD_HOME（dev-board#1713，问题 20）
+
+同一台机器上跑演示 / 测试 / 复测实例的正式办法：`AWD_HOME=<目录>`。它就是这个实例的「家」：
+
+- 数据目录（原 `~/.aiworkdeck`：prefs.json、overlay、logs、packs、models、H2 库、license/account…）→ `<AWD_HOME>/.aiworkdeck`；
+- Electron userData → `<AWD_HOME>/userdata`（命令行显式给了 `--user-data-dir` 时以命令行为准）；在 `requestSingleInstanceLock` 之前设，所以和默认实例互不顶替；
+- 后端 JVM 加 `-Duser.home=<AWD_HOME>`（后端所有 `${user.home}/.aiworkdeck` 跟过来，包括 H2 URL 与 `security.license.dir` 默认值）；四个 Python 服务、模型下载、pptx alembic 子进程的 `HOME`/`USERPROFILE` 指到 `<AWD_HOME>`；
+- 后端复用按 home 区分：设了 AWD_HOME 时 build 指纹带 `@home-<sha256 前 12 位>` 后缀，`decideReuse` 见到不同 home 的后端一律 `skip`（两个方向都是），不会连到别的实例的后端读到别人的数据；
+- 应用内更新关闭（`updatesDisabledReason` 返回 `AWD_HOME`，同问题 90）。
+
+overlay 自愈回滚计数也按实例区分（问题 21）：`overlay/<major>/current.json` 的 `bootFailures` 旁边记 `bootFailureInstance`
+（= 记账实例的 userData 路径，经 service ctx `instanceId` → `bootOverlay.context` 传入），上一次失败来自别的实例就从 1 重新数，
+只有同一实例连续两次启动失败才回滚；实例自己在退出中（`services.closing`，SIGTERM/⌘Q 打断启动）造成的启动失败不记账。
+
+不设时行为完全不变。用法（macOS）：`AWD_HOME=/tmp/awd-demo "/Applications/AI WorkDeck.app/Contents/MacOS/AI WorkDeck"`，
+或 `open -n --env AWD_HOME=/tmp/awd-demo -a "AI WorkDeck"`（`-n` 才会再开一个实例；`open` 不传当前 shell 的 env，必须用 `--env`）。
+Windows：`set AWD_HOME=D:\awd-demo && "%LOCALAPPDATA%\Programs\AI WorkDeck\AI WorkDeck.exe"`。
+
+**地雷**：主进程所有数据路径都必须走 `desktop/main/awd-home.js` 的 `dataDir()`；`tests/awd-home.test.js` 有扫描契约，
+`main/` 里出现 `getPath('home')` 或 `'.aiworkdeck'` 字面量就红。主进程自己的 `os.homedir()` 刻意不改——废纸篓保护（file-service）、
+完全磁盘访问探测（permissions-service）、用户字体目录（system-fonts）说的都是真实主目录。
+未覆盖：dev 态后端固定 9696 且不验指纹（restart-backend.sh 那套），AWD_HOME 只对打包态后端隔离；macOS 的 ShipIt 缓存
+`~/Library/Caches/com.aiworkdeck.desktop.ShipIt` 不随 AWD_HOME（更新已关，不会写）。
+
 ## 已知地雷
 
 **真机走查/门禁的三条环境地雷（2026-09-13，0.42.0 发版前实测）**：
 ① Electron 的 `app.getPath('home')` 在 macOS 上走 passwd 条目、**不认 `HOME` 环境变量**——隔离 HOME 起 dev 壳时，
 `~/.aiworkdeck/logs/desktop.log` 这类按 home 派生的路径仍落在维护者真实目录；隔离只对后端（`-Duser.home`）有效。
+现在一律用 `AWD_HOME`（见下节「隔离实例：AWD_HOME」），不要再拼 `CFFIXED_USER_HOME` / `JAVA_TOOL_OPTIONS` 那套。
 ② 模拟断网别只给 JVM `-Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=1`：`SystemProxyRefresher` 每 60 秒把代理属性改回
 机器真实系统代理（日志「检测到系统代理已变更 … 已就地更新」），之后请求真的出网、拿回 401 被分类成非网络错误，
 看起来像「断网提示没生效」。要加 `--network.proxy.auto-refresh=false`。

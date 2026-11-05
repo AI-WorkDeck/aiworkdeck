@@ -157,6 +157,8 @@ public class CloudController {
         m.put("serverUrl", conn.getServerUrl());
         m.put("username", conn.getUsername());
         m.put("displayName", conn.getDisplayName());
+        // 连着多个案件库时界面列出每条连接供断开（问题 126），连上的时间帮律师分清是哪条
+        m.put("connectedAt", conn.getCreatedAt() == null ? null : String.valueOf(conn.getCreatedAt()));
         return m;
     }
 
@@ -349,7 +351,10 @@ public class CloudController {
     public ResponseEntity<Map<String, Object>> onVersionError(VersionException e) {
         log.warn("云端协作操作失败", e);
         String message = e.isUserFacing() ? e.getMessage() : LangText.of("这次协作操作没能完成，请稍后重试", "This collaboration action didn't finish — please try again later");
-        return ResponseEntity.ok(Map.of("code", 1, "message", message));
+        Map<String, Object> body = new java.util.LinkedHashMap<>(Map.of("code", 1, "message", message));
+        // kind（如 CLOUD_RECONNECT_REQUIRED）让前端给出对应的动作按钮，同 VersionController
+        if (e.getKind() != null) body.put("kind", e.getKind());
+        return ResponseEntity.ok(body);
     }
 
     /** 只校验登录，不校验项目成员/角色——连接级端点用。 */

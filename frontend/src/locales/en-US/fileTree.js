@@ -10,7 +10,6 @@ export default {
   defaultPresentationName: "New presentation",
   defaultSpreadsheetName: "New workbook",
   recordingPluginRequired: "Install or enable Voice in plugin details before starting a recording.",
-  recordingNoticeRequired: "Please acknowledge the transcription notice in the recording panel before starting.",
 
   externalDragFailed: 'Could not drag the selection out. Make sure all selected items are existing local files and try again.',
   clientAccessTitle: "Client file access",
@@ -64,6 +63,7 @@ export default {
   transcribe: 'Transcribe speech',
   transcribeSubmitted: 'Transcription submitted. Check progress in the meeting recordings panel.',
   transcribeRegistered: 'Added to the meeting recordings panel. Configure a transcription service to start.',
+  transcribeNoticePending: 'Added to the meeting recordings panel. Click "Start transcription" there and confirm the transcription notice to transcribe.',
   transcribeFailed: 'Failed to start transcription',
   rename: 'Rename',
   fileHistory: 'File History',

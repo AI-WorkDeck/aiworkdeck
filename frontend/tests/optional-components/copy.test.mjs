@@ -72,3 +72,16 @@ test('CI 真的跑这套单测（不跑等于没写）', () => {
   const wf = readFileSync(new URL('../../../.github/workflows/ci.yml', import.meta.url), 'utf8')
   assert.ok(wf.includes('test:optional-components'), 'ci.yml 没有调用 npm run test:optional-components')
 })
+
+// 问题 42：「需要下载{name}」渲染成「需要下载PPT 生成…」；「设置→组件管理」与别处「设置 → 组件管理」写法不一。
+test('中文提示：组件名加书名号，菜单路径箭头两侧留空格', async () => {
+  const { default: tw } = await import('../../src/locales/zh-TW/components.js')
+  for (const [loc, dict] of [['zh-CN', zh], ['zh-TW', tw]]) {
+    for (const k of ['promptWithModel', 'promptNoModel']) {
+      assert.match(dict[k], /「\{name\}」/, `${loc} ${k}`)
+    }
+    for (const [k, v] of Object.entries(dict)) {
+      if (typeof v === 'string') assert.doesNotMatch(v, /\S→|→\S/, `${loc} ${k}`)
+    }
+  }
+})

@@ -221,6 +221,19 @@ public class ClipboardService {
         deleteBlobQuietly(item);
     }
 
+    /**
+     * 「全部清空」（dev-board#1713）：用户主动删除本人全部剪贴板记录，包括免费额度下暂时看不见的。
+     * 这是用户的明确操作，不违反「额度只隐藏、绝不自动删除」的红线。返回删除条数。
+     */
+    @Transactional
+    public int deleteAll(Long userId) {
+        List<ClipboardItem> items = repository.findByUserId(userId);
+        if (items.isEmpty()) return 0;
+        repository.deleteAll(items);
+        items.forEach(this::deleteBlobQuietly);
+        return items.size();
+    }
+
     /** 取出文件型记录的存储 key 并删除；不是文件型、meta 坏了、删不掉，一律只记日志。 */
     private void deleteBlobQuietly(ClipboardItem item) {
         if ("TEXT".equals(item.getType())) return;

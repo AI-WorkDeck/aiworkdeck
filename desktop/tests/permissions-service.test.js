@@ -139,3 +139,18 @@ test('requestPermissionAccess：打开对应系统设置隐私页并拉起拖拽
   assert.deepEqual(openedUrls, ['x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles']);
   assert.deepEqual(helperShown, ['fullDiskAccess']);
 });
+
+// 问题 34/62：屏幕录制当前没有功能依赖（截图走窗口抓取），不该标「推荐」、不该触发首启弹窗。
+test('屏幕录制权限是非推荐项', () => {
+  const svc = require('../main/permissions-service');
+  assert.equal(svc.PERMISSION_BY_ID.screenRecording.recommended, false);
+  assert.equal(svc.PERMISSION_BY_ID.fullDiskAccess.recommended, true);
+});
+
+// 问题 41：悬浮窗标题与主弹窗统一（「辅助功能」「麦克风」，不带「权限」二字）；paneName 跟 macOS 系统叫法。
+test('拖拽悬浮窗标题与主弹窗叫法一致', () => {
+  const src = fs.readFileSync(path.join(__dirname, '../main/permissions-service.js'), 'utf8');
+  assert.match(src, /title: t\(\{ zh: '辅助功能', en: 'Accessibility' \}\)/);
+  assert.match(src, /title: t\(\{ zh: '麦克风', en: 'Microphone' \}\)/);
+  assert.doesNotMatch(src, /title: t\(\{ zh: '(辅助功能|麦克风)权限'/);
+});

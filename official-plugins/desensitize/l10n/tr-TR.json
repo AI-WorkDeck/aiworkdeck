@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Veri Maskeleme",
+  "plugin.name": "Dosya Karartma",
   "plugin.description": "Hassas bilgileri inceleyin, maskelenmiş kopyalar oluşturun ve kurtarma paketleriyle geri yükleyin.",
-  "view.main.name": "Veri Maskeleme"
+  "view.main.name": "Dosya Karartma"
 }

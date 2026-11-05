@@ -13,5 +13,16 @@
   "panel.exporting": "正在儲存會議資料…",
   "panel.preparingAi": "正在準備會議資料並交給 AI…",
   "view.account.name": "騰訊會議",
-  "view.meetings.name": "騰訊會議"
+  "view.meetings.name": "騰訊會議",
+  "panel.autoSync": "會議結束後自動同步到本專案",
+  "panel.autoSyncHint": "開啟即授權本外掛在面板開啟期間每 5 分鐘呼叫本機 tmeet，查看最近 24 小時已結束的會議；有錄製或紀要的新會議會歸檔到本專案「騰訊會議」資料夾，並用 AI 產生紀要和待辦（消耗 AI 額度）。不會安裝任何程式；tmeet 未安裝或未授權時自動略過。",
+  "panel.autoWaiting": "自動同步已開啟，稍後檢查。",
+  "panel.autoRunning": "自動同步進行中…",
+  "panel.autoOk": "自動同步：{time} 已檢查，新歸檔 {count} 場會議。",
+  "panel.autoPartial": "自動同步：{time} 新歸檔 {count} 場；部分會議資料尚未就緒，稍後自動重試。",
+  "panel.autoCliMissing": "自動同步已略過：找不到 tmeet CLI。",
+  "panel.autoNotLoggedIn": "自動同步已略過：騰訊會議尚未授權。",
+  "panel.autoAiFailed": "其中 {count} 場未能產生 AI 紀要或待辦，可開啟會議手動產生。",
+  "panel.autoOn": "已開啟自動同步。",
+  "panel.autoOff": "已關閉自動同步。"
 }

@@ -26,6 +26,8 @@ function workDir(ctx) {
 function spawnEnv(ctx) {
   return {
     ...process.env,
+    // 包内 Python 不写 .pyc：往已签名 .app 里落 __pycache__ 会破坏签名封印（问题 91）
+    PYTHONDONTWRITEBYTECODE: '1',
     PYTHONPATH: libDir(ctx),
     MINERU_DEVICE_MODE: 'cpu',
     MINERU_MODEL_SOURCE: 'modelscope',

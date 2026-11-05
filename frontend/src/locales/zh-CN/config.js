@@ -38,7 +38,7 @@ export default {
   ocr: {
     refresh: '刷新画面',
     recognize: '识别',
-    download: '下载',
+    download: '保存到项目',
     copy: '复制',
     insertDoc: '插入文档',
     webLink: '网核关联',

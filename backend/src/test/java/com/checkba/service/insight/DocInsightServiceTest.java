@@ -472,6 +472,44 @@ class DocInsightServiceTest {
     }
 
     @Test
+    @DisplayName("查无此企业时 note 只留人话，不拼上游原话「企业数据服务返回：【有效请求】…」（教程问题 110）")
+    void 查无此企业不拼上游原话() throws Exception {
+        String upstream = "企业数据服务返回：【有效请求】查询无结果";
+        when(qichacha.queryEciInfoJson(anyString()))
+                .thenThrow(new GatewayException(GatewayException.Kind.UPSTREAM_FAILED, upstream));
+        when(mcp.callTool(eq(DocInsightService.QICHACHA_MCP_SERVER), anyString(), anyMap()))
+                .thenReturn("Error: Unknown MCP server: qichacha-company");
+        stubPkulawUnavailable();
+
+        awaitStatus(svc.startParse(UID, PID, DOC).runId(), DocInsightRun.STATUS_DONE);
+        DocInsightEntity company = entityOf(DocInsightEntity.KIND_COMPANY);
+        assertEquals(DocInsightEntity.RETRIEVAL_NOT_FOUND, company.getRetrievalStatus());
+        assertTrue(company.getRetrievalNote().contains("未查询到该企业"), company.getRetrievalNote());
+        assertFalse(company.getRetrievalNote().contains("企业数据服务返回"), company.getRetrievalNote());
+        assertFalse(company.getRetrievalNote().contains("【有效请求】"), company.getRetrievalNote());
+    }
+
+    @Test
+    @DisplayName("全称重打仍查无结果：note 说「按全称仍未查询到」，不带上游原话（教程问题 110）")
+    void 全称重打查无结果不拼上游原话() throws Exception {
+        String upstream = "企业数据服务返回：【有效请求】查询无结果";
+        when(qichacha.queryEciInfoJson("京微资易科技"))
+                .thenThrow(new GatewayException(GatewayException.Kind.UPSTREAM_FAILED, upstream));
+        when(mcp.callTool(eq(DocInsightService.QICHACHA_MCP_SERVER), eq(DocInsightService.QICHACHA_MCP_TOOL), anyMap()))
+                .thenReturn("{\"data\":[{\"企业名称\":\"京微资易科技有限公司\",\"统一社会信用代码\":\"91330100799655058B\"}]}");
+        when(qichacha.queryEciInfoJson("京微资易科技有限公司"))
+                .thenThrow(new GatewayException(GatewayException.Kind.UPSTREAM_FAILED, upstream));
+        stubPkulawUnavailable();
+
+        awaitStatus(svc.startParse(UID, PID, DOC).runId(), DocInsightRun.STATUS_DONE);
+        DocInsightEntity company = entityOf(DocInsightEntity.KIND_COMPANY);
+        assertEquals(DocInsightEntity.RETRIEVAL_NOT_FOUND, company.getRetrievalStatus());
+        assertTrue(company.getRetrievalNote().contains("京微资易科技有限公司"), company.getRetrievalNote());
+        assertFalse(company.getRetrievalNote().contains("企业数据服务返回"), company.getRetrievalNote());
+        assertFalse(company.getRetrievalNote().contains("【有效请求】"), company.getRetrievalNote());
+    }
+
+    @Test
     @DisplayName("网关失败是 UNAVAILABLE（不是查无此企业），并带结构化原因码 hint=NO_CREDITS")
     void 网关失败落不可用() throws Exception {
         when(qichacha.queryEciInfoJson(anyString()))
@@ -1641,6 +1679,31 @@ class DocInsightServiceTest {
                 DocInsightService.splitLawName("劳动合同法第五十条"));
         assertArrayEquals(new String[]{"", "第五十条"},
                 DocInsightService.splitLawName("第五十条"));
+    }
+
+    @Test
+    @DisplayName("选中整句话查法条：句中的《法规》第X条要拆出来走 get_article，不能整句当法规名打 get_law_list 只回标题（dev-board#1713）")
+    void lookupSentenceWithEmbeddedCitationQueriesArticleText() throws Exception {
+        assertArrayEquals(new String[]{"民法典", "第五百七十七条"},
+                DocInsightService.splitLawName("根据《民法典》第五百七十七条，当事人一方不履行合同义务的，应当承担违约责任。"));
+        assertArrayEquals(new String[]{"民法典", "第五百七十七条"},
+                DocInsightService.splitLawName("依据《民法典》第五百七十七条的规定"));
+        assertArrayEquals(new String[]{"民法典", "第五百七十七条"},
+                DocInsightService.splitLawName("《民法典》第五百七十七条规定，当事人一方不履行合同义务的，应当承担违约责任。"));
+
+        when(mcp.callTool(eq(DocInsightService.PKULAW_SEMANTIC), eq("get_article"), anyMap()))
+                .thenReturn("{\"title\":\"中华人民共和国民法典\",\"timeliness\":\"现行有效\","
+                        + "\"article\":\"第五百七十七条　当事人一方不履行合同义务或者履行合同义务不符合约定的，"
+                        + "应当承担继续履行、采取补救措施或者赔偿损失等违约责任。\"}");
+
+        EntityView result = svc.lookupSelection(UID, PID, "LAW",
+                "根据《民法典》第五百七十七条，当事人一方不履行合同义务的，应当承担违约责任。");
+
+        assertEquals("OK", result.retrievalStatus());
+        assertTrue(result.detail().toString().contains("应当承担继续履行"), result.detail().toString());
+        verify(mcp).callTool(eq(DocInsightService.PKULAW_SEMANTIC), eq("get_article"),
+                eq(Map.of("title", "民法典", "number", "第五百七十七条")));
+        verify(mcp, never()).callTool(eq(DocInsightService.PKULAW_KEYWORD), eq("get_law_list"), anyMap());
     }
 
     @Test

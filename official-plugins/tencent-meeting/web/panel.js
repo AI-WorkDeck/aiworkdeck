@@ -45,6 +45,9 @@
   };
   let context = {}, language = 'zh', locale = 'zh-CN', epoch = 0, busy = false, status = null, meetings = [], selected = null;
   let loginTimer = null, loginAttempts = 0, loginEpoch = 0, statusRequest = null;
+  // Opt-in auto sync: the plugin SDK has no host scheduler, so an open panel drives it; the backend throttles to 5 minutes.
+  let autoTimer = null, autoEnabled = false, autoChecked = null;
+  const AUTO_TICK_MS = 60000;
   const t = (key) => window.AWD_TMEET_L10N[locale]?.['panel.' + key] ?? window.AWD_TMEET_L10N['en-US']?.['panel.' + key] ?? copy[language][key];
   const value = (input) => typeof input === 'string' || typeof input === 'number' ? String(input) : '';
   const stale = () => Object.assign(new Error('stale'), { stale: true });
@@ -61,7 +64,7 @@
     $('reload-detail').disabled ||= !selected;
     ['export', 'draft-minutes', 'draft-todos'].forEach((id) => { $(id).disabled ||= !selected || selected.complete === false || !!selected.errors?.length; });
     $('copy-url').disabled = !$('authorize-url').value;
-    $('lookback').disabled = $('exclude').disabled = busy || !context.projectId;
+    $('lookback').disabled = $('exclude').disabled = $('auto-sync').disabled = busy || !context.projectId;
     $('project-notice').hidden = !!context.projectId;
     $('project-notice').textContent = t('noProject');
   }
@@ -172,10 +175,39 @@
     $('minutes').textContent = value(selected.smartMinutes) || t('noMinutes');
     showTab('transcript'); controls();
   }
+  function stopAuto() { clearTimeout(autoTimer); autoTimer = null; }
+  function paintAuto(data, current) {
+    const line = $('auto-status'), last = data?.last;
+    if (!data?.enabled) { line.hidden = true; line.textContent = ''; return; }
+    line.hidden = false;
+    const count = (input) => String(Number.isFinite(Number(input)) ? Number(input) : 0);
+    if (data.running) line.textContent = t('autoRunning');
+    else if (!last || !value(last.result) || last.result === 'disabled') line.textContent = t('autoWaiting');
+    else if (last.result === 'cliMissing' || last.result === 'notLoggedIn') line.textContent = t(last.result === 'cliMissing' ? 'autoCliMissing' : 'autoNotLoggedIn');
+    else {
+      line.textContent = t(last.result === 'partial' ? 'autoPartial' : 'autoOk').replace('{time}', dateLabel(last.checkedAt)).replace('{count}', count(last.archived))
+        + (Number(last.aiFailed) > 0 ? ' ' + t('autoAiFailed').replace('{count}', count(last.aiFailed)) : '');
+    }
+    if (!last || last.checkedAt === autoChecked) return;
+    const fresh = autoChecked !== null && Number(last.archived) > 0;
+    autoChecked = last.checkedAt;
+    if (fresh && context.surface !== 'sidebar' && !busy) {
+      invoke('list', {}, current).then((list) => { if (current === epoch && !busy) { meetings = Array.isArray(list?.meetings) ? list.meetings : []; paintList(); } }).catch(() => {});
+    }
+  }
+  function autoTick(current) {
+    stopAuto();
+    if (current !== epoch || !autoEnabled || !context.projectId) return;
+    // Silent by design: a missing CLI or authorization only shows in the status line, never as a dialog or error.
+    invoke('autosync', { language }, current).then((data) => { if (current === epoch) paintAuto(data, current); }).catch(() => {});
+    autoTimer = setTimeout(() => autoTick(current), AUTO_TICK_MS);
+  }
   async function loadLocal(current) {
     const config = await invoke('config', {}, current);
     $('lookback').value = config?.lookbackDays ?? 30;
     $('exclude').value = Array.isArray(config?.excludeKeywords) ? config.excludeKeywords.join('\n') : '';
+    $('auto-sync').checked = autoEnabled = config?.autoSync === true;
+    if (autoEnabled) { if (!autoTimer) autoTick(current); } else { stopAuto(); paintAuto(null, current); }
     if (context.surface === 'sidebar') return;
     const list = await invoke('list', {}, current);
     meetings = Array.isArray(list?.meetings) ? list.meetings : []; paintList();
@@ -255,6 +287,15 @@
     const excludeKeywords = [...new Set($('exclude').value.split(/\n/).map((word) => word.trim()).filter(Boolean))];
     await invoke('config', { lookbackDays, excludeKeywords }, current); feedback(t('saved'));
   }));
+  $('auto-sync').addEventListener('change', () => {
+    const wanted = $('auto-sync').checked;
+    return run(async (current) => {
+      try { await invoke('config', { autoSync: wanted }, current); }
+      catch (error) { if (current === epoch) $('auto-sync').checked = autoEnabled; throw error; }
+      autoEnabled = wanted; feedback(t(wanted ? 'autoOn' : 'autoOff'));
+      if (wanted) autoTick(current); else { stopAuto(); paintAuto(null, current); }
+    });
+  });
   $('sync').addEventListener('click', () => run(async (current) => {
     const result = await invoke('sync', {}, current);
     const list = await invoke('list', {}, current); meetings = Array.isArray(list?.meetings) ? list.meetings : [];
@@ -305,6 +346,7 @@
     $('connection-status').textContent = t('unchecked'); $('authorization').hidden = true; $('authorize-url').value = '';
     $('logout-confirmation').hidden = true;
     status = null; meetings = []; selected = null; $('search').value = ''; $('exclude').value = ''; $('lookback').value = '30';
+    stopAuto(); autoEnabled = false; autoChecked = null; $('auto-sync').checked = false; paintAuto(null);
     paintList(); paintDetail(); controls(); feedback('');
   }
   controls();
@@ -335,5 +377,5 @@
   }
   window.addEventListener('focus', refreshAuthorization);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshAuthorization(); });
-  window.addEventListener('pagehide', () => { ++epoch; stopLogin(); });
+  window.addEventListener('pagehide', () => { ++epoch; stopLogin(); stopAuto(); });
 })();

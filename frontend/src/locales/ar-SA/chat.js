@@ -271,6 +271,7 @@ export default {
   "memoryRevision": "المراجعة {revision}",
   "memoryUnknownTime": "وقت تحديث غير معروف",
   "memoryReadOnly": "يمكنك عرض هذا النطاق، ولكن ليس لديك صلاحية تعديله.",
+  "memoryRememberHint": "يحدّث النظام قائمة الموضوعات تلقائيًا؛ لحذف موضوع، حدّده ثم احذفه.",
   "memoryConflict": "توجد نسخة أحدث على الخادم. راجعها قبل اختيار النسخة التي تريد الاحتفاظ بها.",
   "memoryUseServer": "استخدام نسخة الخادم",
   "memorySaveMine": "حفظ نسختي",

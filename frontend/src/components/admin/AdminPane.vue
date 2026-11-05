@@ -632,7 +632,7 @@
                   <text v-else-if="update.phase === 'downloading'" class="comp-sub">
                     {{ update.progress?.component === 'installer' ? $t('admin.downloadingInstaller') : (update.progress && update.progress.component ? $t('admin.downloadingPatchComp', { name: update.progress.component }) : $t('admin.downloadingPatch')) }}
                   </text>
-                  <text v-else-if="update.phase === 'preparing'" class="comp-sub">{{ $t('shell.updatePreparing') }}</text>
+                  <text v-else-if="update.phase === 'preparing'" class="comp-sub">{{ $t(updatePreparingKey) }}</text>
                   <text v-else-if="update.phase === 'ready'" class="comp-sub">
                     {{ $t('admin.updateReady', { version: update.available && update.available.version }) }}
                   </text>
@@ -1070,7 +1070,7 @@ import { signOut } from '@/utils/signOut.js'
 import { requireAccount, broadcastAccountChanged, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { recordAccountConsents } from '@/utils/accountConsent.js'
 import { refreshEntitlements, isEnabled, FEATURES } from '@/composables/useEntitlement.js'
-import { loadIdentityProfile, readNudgeDismissed, markNudgeDismissed, PROFILE_SOURCE } from '@/services/accountProfile.js'
+import { loadIdentityProfile, readNudgeRecords, markNudgeShown, PROFILE_SOURCE } from '@/services/accountProfile.js'
 import { shouldPromptNameNudge } from '@/utils/identityProfile.js'
 import { shouldAcceptResponse } from '@/utils/requestGeneration.js'
 import UnlockHint from '@/components/UnlockHint.vue'
@@ -1361,6 +1361,11 @@ export default {
     }
   },
   computed: {
+    // 整包「验证并准备」分阶段提示（问题 92），与顶栏 DesktopUpdateIndicator 同一组词条
+    updatePreparingKey() {
+      const keys = { mount: 'shell.updatePreparingMount', package: 'shell.updatePreparingPackage', verify: 'shell.updatePreparingVerify' }
+      return keys[this.update && this.update.progress && this.update.progress.stage] || 'shell.updatePreparing'
+    },
     /**
      * 「关于」首行：产品名 + 版本 + 版权。品牌名与版本号不进 i18n（专名 + 数字）。
      * 版本取自 loadUpdateStatus() 拉回的桌面端状态；浏览器端拿不到，就只显示产品名。
@@ -1905,7 +1910,8 @@ export default {
           this.isAdminUser = res.data.isAdmin === true || this.userInfo.username === 'admin'
           // 缓存说不是管理员、服务端说是：把先前跳过的那三条初始加载补上
           if (!wasAdmin && this.isAdminUser) this.loadAdminSections()
-          // 反过来：停在一个自己看不见的面板上等于空白页，落回个人组第一栏
+          // 当前栏目对这个账号不可见（如缓存说是管理员、服务端说不是）等于空白页，
+          // 落回个人组的「工作记录」栏（不是组内第一栏，第一栏是「语言」）
           if (!this.visibleNavItems.some((n) => n.key === this.activeNav)) {
             this.onNavTap({ key: 'work_log' })
           }
@@ -1975,23 +1981,23 @@ export default {
       return this.accountProfile
     },
     /**
-     * 「填写你的姓名」弹窗：每个 accountId 只弹一次（已读落 storage）。
-     * 弹出来就记已读——两个按钮都算打发过，不然点「稍后」的人下次进来还要再看一遍。
+     * 「填写你的姓名」弹窗：点「稍后」后隔 3 天（仍是默认昵称）再提醒，最多再提醒 2 次；
+     * 点「去填写」后不再提醒。弹出来就记一次（含时间），落 storage。
      */
     maybePromptNameNudge() {
       const p = this.accountProfile
       if (!shouldPromptNameNudge({
         displayNameIsDefault: p.displayNameIsDefault,
         accountId: p.accountId,
-        dismissedIds: readNudgeDismissed(),
+        records: readNudgeRecords(),
       })) return
-      markNudgeDismissed(p.accountId)
+      markNudgeShown(p.accountId)
       uni.showModal({
         title: this.$t('account.nameNudgeTitle'),
         content: this.$t('account.nameNudgeText'),
         confirmText: this.$t('account.nameNudgeConfirm'),
         cancelText: this.$t('common.later'),
-        success: (r) => { if (r.confirm) this.goFillName() },
+        success: (r) => { if (r.confirm) { markNudgeShown(p.accountId, true); this.goFillName() } },
       })
     },
     /**

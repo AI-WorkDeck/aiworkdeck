@@ -30,6 +30,8 @@ function workDir(ctx) {
 function spawnEnv(ctx) {
   return {
     ...process.env,
+    // 包内 Python 不写 .pyc：往已签名 .app 里落 __pycache__ 会破坏签名封印（问题 91）
+    PYTHONDONTWRITEBYTECODE: '1',
     PYTHONPATH: libDir(ctx),
     PORT: String(ctx.ports['asr-service']),
     // 模型缓存与 ModelManager 下载侧一致；运行时强制离线——本地档的全部意义就是零出网，

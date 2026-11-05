@@ -2,12 +2,24 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 const { app, BrowserWindow, shell } = require('electron')
 const { t, getAppLanguage } = require('./app-language')
+const overlay = require('./services/overlay')
 
 const SOURCE_URL = 'https://github.com/AI-WorkDeck/aiworkdeck'
 const LEGAL_URLS = [SOURCE_URL, `${SOURCE_URL}/blob/master/LICENSE`, `${SOURCE_URL}/blob/master/legal/TRADEMARKS.md`]
 let aboutWindow = null
 
 const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+
+// 显示补丁生效版本（与 main.js overlayCtx 同一口径）；与壳（安装包）版本不同时一并写出（问题 79）
+function versionText() {
+  const appVersion = app.getVersion()
+  let effective = appVersion
+  try {
+    effective = overlay.effectiveVersion({ packaged: app.isPackaged, dataDir: require('./awd-home').dataDir(), appVersion })
+  } catch (_) { /* 读不到 overlay 时按壳版本显示 */ }
+  if (effective === appVersion) return appVersion
+  return t({ zh: `${effective}（安装包 ${appVersion}）`, en: `${effective} (installer ${appVersion})` })
+}
 
 // macOS 原生 About 的 copyright 高度固定，不能承载完整双语许可告示。
 // 使用无脚本的本地页面；正文自然换行、滚动，不依赖主工作台是否加载成功。
@@ -29,7 +41,7 @@ nav { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 18px 0; margin: 4p
 a { color: var(--awd-accent-text); text-underline-offset: 3px; }
 a:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
 @media (prefers-color-scheme: dark) { :root { --awd-text: #EDE9DF; --awd-text-2: #B0AA9C; --awd-surface: #221F1A; --awd-border: #3D372E; --awd-accent-text: #89A8A0; } }
-</style></head><body><header><h1>AI WorkDeck</h1><p class="version">${t({ zh: '版本', en: 'Version' })} ${escapeHtml(app.getVersion())}</p></header>
+</style></head><body><header><h1>AI WorkDeck</h1><p class="version">${t({ zh: '版本', en: 'Version' })} ${escapeHtml(versionText())}</p></header>
 <main>
 <p>版权所有 2026 北京京微资易科技有限公司及 AI WorkDeck 贡献者<span class="english" lang="en">Copyright 2026 Beijing Jingwei Ziyi Technology Co., Ltd. and AI WorkDeck contributors</span></p>
 <p>本软件依 GNU Affero General Public License v3.0 或更高版本发布，不提供任何担保。<span class="english" lang="en">Released under the GNU AGPL v3.0 or later, with ABSOLUTELY NO WARRANTY.</span></p>

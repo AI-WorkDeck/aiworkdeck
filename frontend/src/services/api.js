@@ -2888,6 +2888,14 @@ export function deleteClipboardItem(id) {
   })
 }
 
+// 「全部清空」：删除当前用户全部剪贴板记录（dev-board#1713）
+export function clearClipboard() {
+  return request({
+    url: '/api/clipboard',
+    method: 'DELETE',
+  })
+}
+
 /**
  * 提交一条用户反馈（正文 + 图片 + 语音，一次 multipart 请求）。
  * 分步上传会在网络抖动时留下一堆没有正文的空反馈——而反馈恰恰是「出问题时」提交的。
@@ -3070,10 +3078,15 @@ export function logActivity(actionType, targetId, targetName, duration, metaInfo
   })
 }
 
-export function getUserActivityHistory() {
+// range: { from, to }（YYYY-MM-DD，闭区间，可选）；不传时后端返回最近 500 条。返回体多一个 truncated。
+export function getUserActivityHistory(range = {}) {
+  const data = {}
+  if (range.from) data.from = range.from
+  if (range.to) data.to = range.to
   return request({
     url: '/api/activity/history',
-    method: 'GET'
+    method: 'GET',
+    data
   })
 }
 
@@ -3615,9 +3628,10 @@ export function getMeetingTodosPrompt(meetingId) {
   })
 }
 
-export function getMeetingMinutesPrompt(meetingId) {
+export function getMeetingMinutesPrompt(meetingId, format) {
+  // format='interview'：同一链路改出问答体访谈笔录（问题 31）；缺省为会议纪要
   return request({
-    url: `/api/meetings/${meetingId}/minutes-prompt`,
+    url: `/api/meetings/${meetingId}/minutes-prompt${format === 'interview' ? '?format=interview' : ''}`,
     method: 'POST'
   })
 }
@@ -3796,6 +3810,7 @@ export default {
   listClipboard,
   saveClipboardText,
   deleteClipboardItem,
+  clearClipboard,
   getProjectVariables,
   saveProjectVariable,
   deleteProjectVariable,
@@ -4372,8 +4387,8 @@ export function listCloudConnections() {
   return request({ url: '/api/cloud/connections', method: 'GET' })
 }
 
-// 同 cloudConnect：dev-board#440 撤掉「退出这个案件库」按钮后界面上没有调用方，
-// 端点保留给自建用户与 e2e 清场（run.mjs 的 finally）。
+// dev-board#440 撤掉「退出这个案件库」按钮后，界面上唯一的调用方是 LibraryConnectionList
+// （连着多于一条连接、「放进团队案件库」被拒时就地断开，问题 126）；e2e 清场也用它。
 export function disconnectCloudConnection(connectionId) {
   return request({ url: `/api/cloud/connections/${connectionId}/disconnect`, method: 'POST' })
 }

@@ -1,7 +1,7 @@
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
-  <view v-if="visible" class="workdeck-dialog-mask" @tap="close">
+  <view v-if="visible" class="workdeck-dialog-mask" :class="{ 'yield-to-login': loginLayerOpen }" @tap="close">
     <view class="workdeck-dialog" @tap.stop>
       <view class="workdeck-dialog-header">
         <text class="workdeck-dialog-title">{{ $t('version.addPeopleTitle') }}</text>
@@ -58,6 +58,20 @@
             <text v-else class="role-hint">{{ $t('version.noLibraryAvailableNote') }}</text>
             <text class="role-hint">{{ $t('version.clientNeedsLibraryHint') }}</text>
             <text v-if="errorMessage" class="form-error">{{ errorMessage }}</text>
+            <!-- 连着多于一条云端连接被拒：就地列出这几条供断开，不自动选、不自动断开（问题 126，dev-board#1713） -->
+            <LibraryConnectionList
+              v-if="tooManyLibraries"
+              :connections="connections"
+              :official-server-url="officialServerUrl"
+              @disconnected="onLibraryDisconnected"
+            />
+            <!-- 云端写权限门禁拒绝（kind=CLOUD_RECONNECT_REQUIRED）：律师自己点重新连接，不自动重连（问题 126/127） -->
+            <view
+              v-if="reconnectNeeded && errorMessage"
+              class="workdeck-btn workdeck-btn-secondary needs-library-btn"
+              :class="{ disabled: sharing }"
+              @tap="onReconnectCloud"
+            >{{ $t('version.reconnectCloud') }}</view>
           </template>
 
           <template v-else>
@@ -230,7 +244,7 @@
             <view v-if="!clientInviteCode" class="workdeck-btn workdeck-btn-primary" @tap="generateClientCode" :class="{ disabled: loading }">
                 {{ loading ? $t('version.generatingEllipsis') : $t('version.generateAccessCode') }}
             </view>
-            <view v-else class="workdeck-btn workdeck-btn-primary" @tap="close">{{ $t('version.finish') }}</view>
+            <view v-else class="workdeck-btn workdeck-btn-primary" @tap="close">{{ $t('common.done') }}</view>
         </block>
       </view>
     </view>
@@ -242,15 +256,16 @@ import {
   addProjectMember, lookupProjectMember, inviteClient,
   getCloudStatus, getOfficialCloud, listCloudConnections,
   shareProjectToCloud, addCloudMember, lookupCloudMember,
-  inviteCloudClient, removeCloudMember,
+  inviteCloudClient, removeCloudMember, connectOfficialCloud,
 } from '@/services/api.js'
 import { ASSIGNABLE_ROLES, roleLabel } from '@/config/memberRoles.js'
 import { getInitial } from '@/utils/textInitial.js'
 import { getAppLanguage } from '@/utils/appLanguage.js'
 import { siteBaseUrl } from '@/utils/siteLinks.js'
-import { shareProjectToLibrary } from '@/utils/cloudShare.js'
-import { requireAccount } from '@/utils/requireAccount.js'
+import { shareProjectToLibrary, needsCloudReconnect } from '@/utils/cloudShare.js'
+import { requireAccount, accountLoginOpen } from '@/utils/requireAccount.js'
 import { readLocalMode } from '@/services/accountProfile.js'
+import LibraryConnectionList from '@/components/collab/LibraryConnectionList.vue'
 import {
   TRACK, resolveTrack, isWorthLooking, lookupIdentifier, inviteLinkFor, notFoundPresentation,
   clientPortalLink, expiryDate,
@@ -260,6 +275,7 @@ const LOOKUP_DEBOUNCE_MS = 500
 
 export default {
   name: 'InviteMemberDialog',
+  components: { LibraryConnectionList },
   props: {
     visible: {
       type: Boolean,
@@ -306,6 +322,10 @@ export default {
       linked: false,
       connections: [],
       officialAvailable: false,
+      // 只用来在「连着多个案件库」的列表里标出哪条是官方的
+      officialServerUrl: '',
+      // 连着多于一条连接、「放进团队案件库」被拒：就地列出连接供断开
+      tooManyLibraries: false,
       sharing: false,
       // ---- 边输入边查 ----
       // 递增序号：快速改输入时，早发出的请求可能后回来，旧回包不能覆盖新结果
@@ -319,6 +339,8 @@ export default {
       notFoundReason: '',
       // ---- 就地反馈 ----
       errorMessage: '',
+      // 放进案件库被云端写权限门禁拒绝：errorMessage 里是后端原话，这里决定要不要给「重新连接云端」
+      reconnectNeeded: false,
       addedName: '',
       inviteOpen: false,
       linkCopied: false,
@@ -327,6 +349,10 @@ export default {
     }
   },
   computed: {
+    // 登录层（z-index 9990）开着时本弹窗（9999）整块收起让路，登录完自己回来
+    loginLayerOpen() {
+      return accountLoginOpen.value
+    },
     isCloudTrack() {
       return this.track === TRACK.CLOUD
     },
@@ -387,6 +413,7 @@ export default {
         this.loading = false
         this.sharing = false
         this.errorMessage = ''
+        this.tooManyLibraries = false
         this.addedName = ''
         this.clearLookupResult()
         this.resolveTrackState()
@@ -472,8 +499,10 @@ export default {
       try {
         const res = await getOfficialCloud()
         this.officialAvailable = !!(res && res.data && res.data.available)
+        this.officialServerUrl = (res && res.data && res.data.serverUrl) || ''
       } catch (e) {
         this.officialAvailable = false
+        this.officialServerUrl = ''
       }
     },
     async onShareToLibrary() {
@@ -484,6 +513,7 @@ export default {
           && !(await requireAccount({ reason: 'team' }))) return
       this.sharing = true
       this.errorMessage = ''
+      this.reconnectNeeded = false
       try {
         const res = await shareProjectToLibrary({
           projectId: this.projectId,
@@ -492,15 +522,41 @@ export default {
         })
         if (!res.ok) {
           this.errorMessage = this.$t('version.tooManyLibraries')
+          this.tooManyLibraries = true
           return
         }
+        this.tooManyLibraries = false
         uni.showToast({ title: this.$t('version.sharedToLibrary'), icon: 'none' })
         this.$emit('success')
         await this.resolveTrackState({ forceFetch: true })
       } catch (e) {
         this.errorMessage = (e && e.message) || this.$t('version.shareToLibraryFailed')
+        this.reconnectNeeded = needsCloudReconnect(e)
       } finally {
         this.sharing = false
+      }
+    },
+    // 「重新连接云端」：走现有的官方案件库连接入口，连好后重放一次「放进团队案件库」
+    async onReconnectCloud() {
+      if (this.sharing) return
+      this.sharing = true
+      try {
+        await connectOfficialCloud()
+      } catch (e) {
+        this.errorMessage = (e && e.message) || this.$t('version.connectFailed')
+        return
+      } finally {
+        this.sharing = false
+      }
+      await this.loadLibraryOptions()
+      await this.onShareToLibrary()
+    },
+    // 断开了一条：重读连接；剩不到两条就收起列表，律师自己再点「放进团队案件库」（不自动放）
+    async onLibraryDisconnected() {
+      await this.loadLibraryOptions()
+      if (this.connections.length <= 1) {
+        this.tooManyLibraries = false
+        this.errorMessage = ''
       }
     },
     async runLookup(rawValue) {
@@ -660,6 +716,9 @@ export default {
   justify-content: center;
   z-index: 9999;
   backdrop-filter: blur(2px);
+}
+.yield-to-login {
+  visibility: hidden;
 }
 
 .workdeck-dialog {

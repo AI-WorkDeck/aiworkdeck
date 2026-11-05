@@ -37,7 +37,7 @@ export default {
   "ocr": {
     "refresh": "Weergave vernieuwen",
     "recognize": "Tekst herkennen",
-    "download": "Downloaden",
+    "download": "Opslaan in project",
     "copy": "Kopiëren",
     "insertDoc": "In document invoegen",
     "webLink": "Link naar online verificatie",

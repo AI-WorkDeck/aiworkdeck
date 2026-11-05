@@ -17,9 +17,10 @@ test('公司详情只展示 basic 中真实存在的字段，并接受字符串�
 
   assert.equal(view.title, '北京示例有限公司')
   assert.equal(view.source, '企业信息服务')
-  assert.equal(view.date, '2026-09-09T08:30:00Z')
+  assert.equal(view.date, '2026年9月9日')
   assert.deepEqual(view.variants, [{
     title: '北京示例有限公司',
+    text: '工商登记信息（来源：企业信息服务，查询日期：2026年9月9日）',
     rows: [
       ['企业名称', '北京示例有限公司'],
       ['统一社会信用代码', '91110000TEST'],
@@ -45,8 +46,9 @@ test('每条法规检索记录形成独立候选，保留条号、时效性、UR
   assert.equal(view.variants.length, 2)
   assert.equal(view.variants[0].rows, undefined)
   assert.match(view.variants[0].text, /^示例法（2025修订）\n第十条\n时效性：现行有效\nURL：https:\/\/law\.example\/2025\/10\n\n当事人应当诚信履行。/)
-  assert.match(view.variants[0].text, /来源 \/ Source：法规检索服务/)
-  assert.match(view.variants[0].text, /查询日期：2026-09-09/)
+  assert.match(view.variants[0].text, /\n来源：法规检索服务\n/)
+  assert.doesNotMatch(view.variants[0].text, /Source/)
+  assert.match(view.variants[0].text, /查询日期：2026年9月9日$/)
   assert.match(view.variants[1].text, /\n\n旧版条文。\n\n/)
 })
 
@@ -130,7 +132,7 @@ test('LAW 与 CASE 保留普通字符串及 MCP 文本信封中的真实原文',
   })
   assert.deepEqual(law.variants, [{
     title: '《示例法》',
-    text: '《示例法》\n\n这是法规原文。\n\n来源 / Source：法规服务\n查询日期：2026-09-09',
+    text: '《示例法》\n\n这是法规原文。\n\n来源：法规服务\n查询日期：2026年9月9日',
   }])
 
   const caseView = completionDetails({
@@ -214,5 +216,47 @@ test('企业工商模糊匹配时展示名称纠错提示并提供仅替换正�
   assert.equal(view.variants[0].rows[0][1], '成都包晴天智能科技有限公司')
   assert.equal(view.variants[1].title, '仅替换为正确全称：成都包晴天智能科技有限公司')
   assert.equal(view.variants[1].text, '成都包晴天智能科技有限公司')
+  assert.equal(view.variants[1].mode, 'replace-selection', '真替换选区，不是追加（教程反馈 43）')
+})
+
+// 教程反馈 44/45/46/107：来源走语言包映射，查询日期本地化，工商表带表题。
+const zhMessages = {
+  'insight.source.pkulaw': '北大法宝', 'insight.source.qichacha': '企查查',
+  'editor.writingAssist.sourceLine': '来源：{source}', 'editor.writingAssist.dateLine': '查询日期：{date}',
+  'editor.writingAssist.companyTable': '工商登记信息（来源：{source}，查询日期：{date}）',
+  'editor.writingAssist.companyTableNoDate': '工商登记信息（来源：{source}）',
+  'editor.writingAssist.replaceFullName': '仅替换为正确全称：{name}',
+}
+const translate = (key, params = {}) => (zhMessages[key] || key).replace(/\{(\w+)\}/g, (_, n) => params[n])
+
+test('法宝内部服务名映射成「北大法宝」，ISO 带毫秒的时间写成本地化日期', () => {
+  for (const retrievalSource of ['pkulaw-semantic', 'pkulaw-keyword', 'pkulaw-semantic/search_article']) {
+    const view = completionDetails({
+      name: '《示例法》第十条', kind: 'LAW', retrievalStatus: 'OK', retrievalSource,
+      fetchedAt: '2026-11-04T13:53:02.50303',
+      detail: { result: { title: '示例法', article: '第十条', content: '条文。' } },
+    }, { translate, locale: 'zh-CN' })
+    assert.equal(view.source, '北大法宝')
+    assert.equal(view.date, '2026年11月4日')
+    assert.equal(view.variants[0].text, '示例法\n第十条\n\n条文。\n\n来源：北大法宝\n查询日期：2026年11月4日')
+    assert.doesNotMatch(view.variants[0].text, /pkulaw|Source|T13:53/)
+  }
+})
+
+test('企查查两种内部来源都显示「企查查」，工商表题带来源与查询日期', () => {
+  for (const retrievalSource of ['qichacha', 'qichacha+mcp']) {
+    const view = completionDetails({
+      name: '北京示例有限公司', kind: 'COMPANY', retrievalStatus: 'OK', retrievalSource, fetchedAt: '2026-11-04T09:00:00',
+      detail: { basic: { 企业名称: '北京示例有限公司' } },
+    }, { translate, locale: 'zh-CN' })
+    assert.equal(view.source, '企查查')
+    assert.equal(view.variants[0].text, '工商登记信息（来源：企查查，查询日期：2026年11月4日）')
+    assert.deepEqual(view.variants[0].rows, [['企业名称', '北京示例有限公司']])
+  }
+})
+
+test('英文界面日期按 en-US 本地化', () => {
+  const view = completionDetails({ name: 'X', kind: 'LAW', fetchedAt: '2026-11-04T13:53:02.503' }, { locale: 'en-US' })
+  assert.equal(view.date, 'November 4, 2026')
 })
 

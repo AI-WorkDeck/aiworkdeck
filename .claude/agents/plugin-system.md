@@ -438,6 +438,10 @@ CSS 在弹窗期间把 `.pane-content` 里的 `iframe`/`webview` 置 `visibility
 
 当前市场插件位于 `official-plugins/tencent-meeting`。opaque iframe 内复制链接先在点击事件中同步执行，并核对复制结果；不可因浏览器提供 Clipboard API 就假设写入成功，也不把短期授权 URL 存入剪贴板历史。授权进程存活时不启动 `--version`、`auth status` 或其他 CLI 命令，以免争用 CLI 凭据锁。宿主内跨插件重扫只共享进程 PID/启动时间；授权 URL 仅保存在原实例内存，新实例不能取消旧授权。前端遇到 pending 恢复轮询并允许继续授权；跨重扫取不回链接时提示回原浏览器完成。验证为插件 Java/前端套件与 `tests/auth-copy-browser.mjs`（真实 Chrome、合成服务和隔离剪贴板）。本契约不保证外部应用同时运行 CLI 的互斥；真实 OAuth 与 Windows 实机需另行验收。
 
+### 腾讯会议插件自动同步（1.1.0，问题 28/30，dev-board#1713）
+
+开关 `config.autoSync`（state.json，按用户/项目，默认 false）。插件 SDK 与 `plugin-api` 没有定时调度、插件自建线程访问宿主会抛 `IllegalStateException`，所以由面板驱动：面板（sidebar/workspace 任一开着）读到开关为真时立即调用一次 `tencent_meeting_action("autosync")`，之后每 60s 再调；后端按 user/project 节流 5 分钟（`AUTO_INTERVAL`，可注入 `clock`）、同一时刻只跑一个 `tencent-meeting-autosync` 任务。任务与手动 sync/export 共用 `startJob` + `lock(scope)`，CLI 仍经 `NativeRunner` 的进程级 `COMMAND_MONITOR` 串行；先查 `loginPending` / `--version` / `auth status`，不满足即记 `state.auto.result=cliMissing|notLoggedIn` 后返回（面板只显示一行状态，不弹窗）。同步窗口 1 天、合并模式（不删旧列表）；对本轮出现、`recordFiles` 非空且无 `archived` 标记的会议走与「导出到项目」同一个 `archive()`（写「<标题>-逐字稿.md」并标 `archived`，手动导出也标；手动 sync 重建条目时保留该标记 = 去重依据），再用 `host.llm()`（辅助模型，与面板手动纪要/待办同一套指令）写「-会议纪要.md」「-待办.md」，LLM 失败只计 `aiFailed`。材料未就绪的会议不标记、下轮重试。只在面板开着时运行；关面板/退应用期间结束的会议在下次打开面板时补（仍限 24 小时）。测试：`TencentMeetingToolsTest.autoSync*`、`manualExportAndResyncCountAsAlreadySynced`、`aiFailureStillArchivesAndIsReported`，`tests/web-panel.mjs` 末尾 auto sync 五条。
+
 ## 内置腾讯会议面板契约（dev-board#1197，2026-10-11）
 
 用户截图对应旧内置TencentMeetingPanel，并非动态market插件。认证POST `/api/tmeet/auth/login-start`，状态字段为loggedIn/userName/cliAvailable；不存在`/auth/login`，错误请求会落到NoResourceFoundException。退出data=false不表示断开。同步POST `/sync` 的projectId/force在query（Controller @RequestParam）；两个AI材料端点minutes-prompt/todos-prompt为POST，取data.prompt字符串。失败不能伪造提示词或成功状态。
@@ -487,5 +491,11 @@ Web协议仍为awd:1。新增contributes.views/connections/mcpServers和settings
 ## 会议与侧栏面板体验（2026-10-27，#1534/#1535/#1537）
 
 腾讯会议声明 sidebar/account 与 workspace/meetings 两个视图，复用同一可信入口；PluginPane 握手 `context.surface` 区分 `sidebar`/`workspace`，未提供时插件保留 combined 兼容。左栏只处理账号授权及同步范围，工作区为可搜索会议列表与正文双列，620px以下在列表/正文间返回；正文、列表独立滚动，纪要/待办/导出操作常驻。重新聚焦只后台检查授权，不锁按钮或重建列表；同步与刷新列表仍是明确操作，不能在登录锁持有期间并发 CLI 调用。测试 `official-plugins/tencent-meeting/tests/workspace-browser.mjs` 使用真实sandbox iframe/SDK与合成接口。
+
+**文件脱敏 2.4.0 / 插件 1.0.7（dev-board#1713）**：插件名统一「文件脱敏」（manifest、l10n 与 `config.sidebar.desensitize` 对齐）。
+姓名候选以 `PERSON_ACTION` 动作动词开头（支付、申请…）时拒绝；自定义词**完全**落在更长的自动实体内且该实体不与其它自定义词部分重叠时，长实体优先（部分重叠仍是自定义词优先）。
+预览多回 `suspectItems`（疑似号码原值+类型，去重、最多 100 条，只在本机），面板逐条给「仍然遮蔽」= 写进补充敏感词后重新预览，校验位闸门不放开。
+副本名 = 原显示名经同一引擎处理 +「（已脱敏）」（复敏用同一映射还原 +「（已复敏）」），`SensitiveService.Result.name` 给建议名，`SensitiveController.rename` 按同目录（含回收站、磁盘、`.awd-recovery`）加「 (n)」；统计只算正文。
+DesensitizePane 与诉讼可视化「安装 / 重试」控件补 role/tabindex/aria-disabled 与 Enter/Space。回归 `Sensitive*Test`、`frontend/tests/desensitize/*`、`tests/litigation-visual/packUpdate.test.mjs`。
 
 语音/脱敏根背景用侧栏 `--awd-bg`，表单保留 surface；脱敏按钮清除 Uni 默认伪元素描边、引用公共控件令牌，窄栏模式按钮纵排。长编号说明在预览阶段显示，不移除不可逆/PDF/恢复密码等必要操作提示。语音/脱敏编译资源与manifest版本应随源码一并准备，源码验证不等于用户已安装新版。

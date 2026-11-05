@@ -271,6 +271,7 @@ export default {
   "memoryRevision": "Revisão {revision}",
   "memoryUnknownTime": "Horário de atualização desconhecido",
   "memoryReadOnly": "Você pode visualizar este escopo, mas não tem permissão para editá-lo.",
+  "memoryRememberHint": "A lista de tópicos é mantida automaticamente pelo sistema. Para excluir um tópico, selecione-o e exclua-o.",
   "memoryConflict": "Existe uma versão mais recente do servidor. Revise-a antes de escolher qual versão manter.",
   "memoryUseServer": "Usar versão do servidor",
   "memorySaveMine": "Salvar minha versão",

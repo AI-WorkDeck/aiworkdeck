@@ -821,6 +821,11 @@ public class ProjectFileService {
         throw new IllegalArgumentException(LangText.of("该文件夹下同名文件过多，请手动改名: ", "Too many files with this name in this folder; please rename manually: ") + name);
     }
 
+    /** 同一文件夹下该名字是否已被占用（含回收站与磁盘上的同名文件）；脱敏副本据此加序号。 */
+    public boolean isNameTaken(Long projectId, Long parentId, String candidate) {
+        return conflictingNameTaken(projectId, parentId == null || parentId == 0L ? null : parentId, candidate);
+    }
+
     private boolean conflictingNameTaken(Long projectId, Long parentId, String candidate) {
         if (projectFileRepository.existsByProjectIdAndParentIdAndNameIncludingDeleted(projectId, parentId, candidate)) {
             return true;

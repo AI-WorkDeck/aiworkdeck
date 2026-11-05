@@ -266,6 +266,11 @@ export const ocrActionMethods = {
       this.closeOcrOverlay()
 
       // 1. Copy Image to Clipboard
+      await this.copyImageDataUrl(dataUrl)
+    },
+
+    // 把图片（data URL）写进系统剪贴板；截图「复制」与收藏面板复制图片收藏共用
+    async copyImageDataUrl(dataUrl) {
       try {
           const blob = await (await fetch(dataUrl)).blob()
 
@@ -436,16 +441,24 @@ export const ocrActionMethods = {
 
       const imgData = this.ocrImageDataUrl
       const srcUrl = this.ocrSourceUrl
+      // 标题：页面标题 → 主机名 + 时间 → 「网页摘录」（不再拿整条 URL 当标题，dev-board#1713）
+      const sourceHost = (() => { try { return srcUrl ? new URL(srcUrl).host : '' } catch (e) { return '' } })()
+      const now = new Date()
+      const pad = n => String(n).padStart(2, '0')
+      const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
+      const title = String(this.ocrSourceTitle || '').trim() || (sourceHost ? `${sourceHost} ${stamp}` : this.$t('workbenchOps.webExcerpt'))
       // Close overlay immediately
       this.closeOcrOverlay()
 
       try {
         uni.showToast({ title: this.$t('workbenchOps.addingFavorite'), icon: 'loading', duration: 1200 })
         const created = await createProjectFavorite(this.projectId, {
-          title: srcUrl ? srcUrl : this.$t('workbenchOps.webExcerpt'),
+          title,
           sourceUrl: srcUrl,
           content: '',
-          imageBase64: imgData
+          imageBase64: imgData,
+          // 卡片右下角的来源域名读 meta.sourceHost（与 BrowserPane 收藏本页同口径）
+          meta: JSON.stringify({ kind: 'screenshot', capturedAt: now.toISOString(), sourceUrl: srcUrl, title, sourceHost })
         })
         const favId = created && created.id ? created.id : null
         // 立即给用户可见反馈：打开收藏夹并高亮新卡片
@@ -453,7 +466,12 @@ export const ocrActionMethods = {
         uni.showToast({ title: this.$t('workbenchOps.favoriteSuccess'), icon: 'success' })
       } catch (e) {
         console.error('收藏失败:', e)
-        uni.showToast({ title: e.message || this.$t('workbenchOps.favoriteFailed'), icon: 'none' })
+        // 用户此刻多半停在浏览器标签上，toast 会被原生 BrowserView 盖住：桌面端走原生弹窗
+        if (host.app && host.app.confirm) {
+          host.app.confirm({ title: this.$t('workbenchOps.favoriteFailed'), content: (e && e.message) || '' }).catch(() => {})
+        } else {
+          uni.showToast({ title: e.message || this.$t('workbenchOps.favoriteFailed'), icon: 'none' })
+        }
       }
     },
 

@@ -1574,14 +1574,14 @@ public class CloudSyncService {
         try(HttpResponse response=HttpRequest.get(endpoint).header("X-Session-Id",token)
                 .setFollowRedirects(false).setConnectionTimeout(5000).setReadTimeout(15000).execute()) {
             if(response.getStatus()==404)return Map.of();
-            if(response.getStatus()!=200)throw VersionException.userFacing(com.checkba.service.mobile.CloudBillingText.get("cloudReconnectRequired"));
+            if(response.getStatus()!=200)throw VersionException.cloudReconnectRequired(com.checkba.service.mobile.CloudBillingText.get("cloudReconnectRequired"));
             com.fasterxml.jackson.databind.JsonNode state=new com.fasterxml.jackson.databind.ObjectMapper().readTree(response.body());
             var epoch=state.path("cloudAccess").path("epoch");
             if(!epoch.isIntegralNumber() || !epoch.canConvertToLong() || epoch.longValue()<0)
-                throw VersionException.userFacing(com.checkba.service.mobile.CloudBillingText.get("cloudReconnectRequired"));
+                throw VersionException.cloudReconnectRequired(com.checkba.service.mobile.CloudBillingText.get("cloudReconnectRequired"));
             return Map.of("X-Cloud-Epoch",epoch.asText());
         } catch(java.io.IOException e) {
-            throw VersionException.userFacing(com.checkba.service.mobile.CloudBillingText.get("cloudReconnectRequired"));
+            throw VersionException.cloudReconnectRequired(com.checkba.service.mobile.CloudBillingText.get("cloudReconnectRequired"));
         }
     }
 

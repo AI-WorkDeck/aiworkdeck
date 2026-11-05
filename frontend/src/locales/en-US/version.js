@@ -282,6 +282,14 @@ export default {
   sharedToLibrary: 'Added to the Team Case Library',
   shareToLibraryFailed: 'Couldn’t add to the case library',
   tooManyLibraries: 'This computer is linked to more than one case library — disconnect the extra ones first',
+  libraryOfficialTag: 'Official',
+  librarySignedInAs: 'Signed in as {name}',
+  libraryConnectedAt: 'Connected {time}',
+  disconnectLibrary: 'Disconnect',
+  disconnectLibraryTitle: 'Disconnect this case library?',
+  disconnectLibraryConfirm: 'This computer will no longer be connected to {server}. Local files will not be deleted. Case files added to the library through it will show as not in the library on this computer and will stop submitting and pulling drafts; what is already in the library, and your colleagues\' copies, are not affected.',
+  disconnectedLibrary: 'Disconnected',
+  disconnectLibraryFailed: 'Couldn\'t disconnect — please try again',
   submitted: 'Draft submitted',
   submitFailedNotice: 'Couldn’t submit the draft right now',
   submitFailed: 'Failed to submit draft',
@@ -294,6 +302,7 @@ export default {
   addMemberFailed: 'Couldn’t add',
   copiedPasteToColleague: 'Copied — paste it to your colleague',
   connectFailed: 'Connection failed',
+  reconnectCloud: "Reconnect to Cloud",
   // Invite text: the full message sent to a colleague, extracted as one key.
   // Two keys (with/without an inviter name) so English can put a space after {inviter}.
   // Since dev-board#440 this is the only variant: the colleague never types a server address

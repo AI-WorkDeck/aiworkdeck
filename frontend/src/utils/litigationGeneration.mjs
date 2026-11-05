@@ -19,6 +19,18 @@ function checkpointQuestion(bubble) {
   return text ? { text, options: [], descriptions: [], answered: false } : null
 }
 
+// Last resort while the run is AWAITING_INPUT but the reply has no structured
+// question: ask with the reply's own prose and accept a free-form answer instead
+// of failing the run (dev-board#1713). Drop the internal guidance block and any
+// line naming tools or protocol so the confirmation never shows AI-internal text.
+const INTERNAL_LINE = /litigation_\w+|modelFilesJson|questionProtocol|给你（AI）|不要发给用户|<\/?[a-z_]+[\s>]/i
+function proseQuestion(bubble) {
+  if (!bubble || bubble.role === 'USER') return null
+  const body = String(bubble.content || '').split(/─{2,}[^\n]*给你（AI）/)[0]
+  const text = body.split('\n').filter(line => !INTERNAL_LINE.test(line)).join('\n').trim()
+  return text ? { text, options: [], descriptions: [], answered: false } : null
+}
+
 // Owns a dedicated native Agent stream, never a ChatInterface or its preferences.
 // Persist the submission ID before sending: a lost HTTP receipt is retried through
 // the existing inbox idempotency boundary, not by starting another conversation.
@@ -198,7 +210,17 @@ export function createLitigationGeneration({ stream, api, storage, isCurrent, op
       } else setPhase('paused', text('paused'))
     } else if (['PAUSED', 'INTERRUPTED'].includes(status)) setPhase('paused', text('paused'))
     else if ((status === 'AWAITING_INPUT' || stream.agentAwaitingInput.value || question) && !stream.isStreaming.value) {
-      const q = question
+      let q = question
+      if ((!q || q.answered) && status === 'AWAITING_INPUT') {
+        // The live bubble may have lost the markup; re-read the persisted history once per round.
+        const round = task.pending?.clientRequestId || task.conversationId
+        if (task.questionRecovered !== round) {
+          task.questionRecovered = round
+          try { await recover(); requireCurrent() } catch { if (!current()) return view() }
+          q = last()?.question
+        }
+        if (!q || q.answered) q = proseQuestion(last())
+      }
       if (!q || q.answered) setPhase('failed', text('missingQuestion'))
       else {
         task.question = { ...copy(q), text: q.text,
@@ -258,9 +280,10 @@ export function createLitigationGeneration({ stream, api, storage, isCurrent, op
       return view()
     }
     const previous = task
+    // Every "start" is a fresh conversation (dev-board#1713): reusing the previous
+    // one let its reasoning leak into the next confirmation. Follow-ups use `message`.
     task = { id: uuid(), projectId: api.projectId, phase: 'starting', input, startedAt: now(),
-      conversationId: previous?.conversationId, scoped: previous?.scoped, round: (previous?.round || 0) + 1,
-      intent: 'generate', outputIds: [], pending: null, accepted: false }
+      round: 1, intent: 'generate', outputIds: [], pending: null, accepted: false }
     const captured = task
     // Return the acknowledgement immediately; the work is owned by the workbench,
     // so hiding/recreating the plugin iframe does not lose progress or errors.
@@ -274,7 +297,7 @@ export function createLitigationGeneration({ stream, api, storage, isCurrent, op
         const kickoff = await api.kickoff(input)
         requireCurrent()
         if (!kickoff?.prompt) throw new Error(text('failed'))
-        const issued = task.conversationId ? { conversationId: task.conversationId } : await api.issue()
+        const issued = await api.issue()
         requireCurrent()
         if (!issued?.conversationId) throw new Error(text('failed'))
         task.conversationId = issued.conversationId
@@ -283,7 +306,7 @@ export function createLitigationGeneration({ stream, api, storage, isCurrent, op
         requireCurrent()
         task.pending = pending(kickoff.prompt, params.clientRequestId || uuid(), {
           displayText: [text('startPrompt'), input.diagramHint, input.scope].filter(Boolean).join(' · ') })
-        if (!previous?.conversationId) stream.clearBubbles()
+        stream.clearBubbles()
         stream.fileChanges.value = []
         stream.setConversationId(task.conversationId)
         stream.agentRunStatus.value = null

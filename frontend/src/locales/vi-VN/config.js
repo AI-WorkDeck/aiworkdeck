@@ -37,7 +37,7 @@ export default {
   "ocr": {
     "refresh": "Làm mới chế độ xem",
     "recognize": "Nhận dạng văn bản",
-    "download": "Tải xuống",
+    "download": "Lưu vào dự án",
     "copy": "Sao chép",
     "insertDoc": "Chèn vào tài liệu",
     "webLink": "Liên kết xác minh web",

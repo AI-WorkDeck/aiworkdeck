@@ -47,3 +47,24 @@ sent to the client, or circulated to the team as it stands.
 
 
 When the user requests only recording action items, follow that request without generating a minutes document. Check task_list for duplicates, then persist with task_create(type=TODO). Ask about unclear dates or member identities. todo_write does not save calendar items.
+
+## Interview record (when the kick-off is an "Interview record generation task")
+
+Do not write meeting minutes. Produce the question-and-answer interview record lawyers use, and save it with
+`write_docx` as "Interview Record-<recording title>.docx":
+
+1. **Header**: title ("Interview record"), time (recording time), place (only if the transcript states it;
+   otherwise leave a blank to fill in), interviewee and interviewer (use the transcript's speaker names; the
+   person asking is the interviewer, the person answering is the interviewee; carry "Speaker N" over as is and
+   never invent an identity).
+2. **Body**: in chronological order, as alternating "Q: ..." and "A: ..." paragraphs, one paragraph per
+   question or answer; merge consecutive turns by the same person. Stay faithful to the original words: remove
+   only filler words and meaningless repetition, keep the speaker's wording, tone and order; do not
+   summarize, condense, restate as conclusions, or add any analysis. Mark inaudible or clearly mis-transcribed
+   passages as "[inaudible mm:ss]" instead of completing them for the interviewee.
+3. **Ending**: a separate paragraph "The interviewee has checked the above record and confirms it is
+   accurate.", followed by signature lines: "Interviewee (signature): ________  Date: ________" and
+   "Interviewer (signature): ________  Date: ________".
+
+In <final>, state only the saved file name, the number of Q/A paragraphs and the number of inaudible marks.
+Do not restate the record.

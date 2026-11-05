@@ -46,19 +46,22 @@ public class WizardController {
     private final com.checkba.service.AdminAccessService adminAccessService;
     private final ObjectMapper objectMapper;
     private final com.checkba.service.ai.ChatModelFactory chatModelFactory;
+    private final com.checkba.service.ai.CrossBorderConsentService crossBorderConsent;
 
     public WizardController(SystemSettingService systemSettingService,
                             com.checkba.service.WizardStateService wizardStateService,
                             UserRepository userRepository,
                             com.checkba.service.AdminAccessService adminAccessService,
                             ObjectMapper objectMapper,
-                            com.checkba.service.ai.ChatModelFactory chatModelFactory) {
+                            com.checkba.service.ai.ChatModelFactory chatModelFactory,
+                            com.checkba.service.ai.CrossBorderConsentService crossBorderConsent) {
         this.systemSettingService = systemSettingService;
         this.wizardStateService = wizardStateService;
         this.userRepository = userRepository;
         this.adminAccessService = adminAccessService;
         this.objectMapper = objectMapper;
         this.chatModelFactory = chatModelFactory;
+        this.crossBorderConsent = crossBorderConsent;
     }
 
     @GetMapping
@@ -106,7 +109,7 @@ public class WizardController {
         // 跨境同意闸门：与管理后台共用 AdminConfigController.crossBorderBlockReason 的同一处判定。
         // 向导是用户选平台通道的主入口（AWD_CLOUD 在向导里恒可选），漏了这道闸等于同意形同装饰。
         String crossBorderBlock = AdminConfigController.crossBorderBlockReason(
-                request.getAi(), systemSettingService);
+                request.getAi(), crossBorderConsent);
         if (crossBorderBlock != null) {
             return ResponseEntity.badRequest().body(error(crossBorderBlock));
         }
@@ -118,6 +121,7 @@ public class WizardController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(error(e.getMessage()));
         }
+        crossBorderConsent.stampIdentity(updates);
         updates.put(KEY_WIZARD_COMPLETED, "true");
         systemSettingService.setMany(updates);
         // 向导保存的 key/供应商立即生效（与管理后台保存行为一致）

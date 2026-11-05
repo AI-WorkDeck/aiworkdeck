@@ -548,6 +548,10 @@ identitySync、平台Key申请或令牌签发。完成 setup 后再单独 exchan
   否则在 `<body>` 下单独 `createApp` 挂登录弹层 `components/account/AccountLoginDialog.vue`（`variant="dialog"`），
   打开期间持有全局浮层（`overlayState.js`，让 BrowserView 让开）；成功 true 并广播，取消 false。
   并发调用共用一个弹层。纯逻辑在 `requireAccountCore.js`（零依赖，护栏 `npm run test:account`）。
+  **登录层 z-index 9990，压不过 9999 的业务弹窗遮罩**：`requireAccount.js` 导出 `accountLoginOpen`（ref，挂载置真、收尾置假），
+  会在自己打开期间调 `requireAccount` 的 9999 弹窗（`CollabDialog`、`InviteMemberDialog`）据此加 `.yield-to-login`（`visibility:hidden`）
+  让路、登录完自己回来；不改全局 z-index（AwdDialog 10000 要盖在登录卡上）。新增这类调用方照抄，护栏
+  `tests/member-invite/collab-login-layer.test.mjs`（问题 126/127，dev-board#1713）。
   浏览器端（团队服务器）恒 true——那里账户在服务端按人桥接，不是「本机连官网账户」。
 - `services/api.js` 的 **4011 分支**：就地弹层（`auto:true`——用户取消后 60 秒内同类自动触发不再追着弹），
   关掉之后**一律 reject**，`err.accountRequired=true`，登录成功时 `err.loggedIn=true`
@@ -602,8 +606,24 @@ mobile | meeting | dictation`（缺省不带这个键，前端用通用说明）
 **跨境同意不在后端默认值里记**：默认成官方通道本身不让内容出境，出境要先有账户，而连账户的入口
 （登录弹层、设置页粘 Key）都在提交前取得两项同意并记录（`frontend/src/utils/accountConsent.js` 的
 `recordAccountConsents()`：协议版本 `POST /api/license/agreement` + `POST /api/admin/config {ai:{crossBorderConsent:true}}`，
-失败不拦路）。**新增连接账户的入口必须接这一步**——后端的跨境闸只在「切到官方通道」那一刻把关，
-默认值不经过那一刻。前端 `getWizardStatus`/`submitWizard` 两个 api 封装随之删除。
+失败不拦路）。**新增连接账户的入口必须接这一步**，并在连上后调 `AccountSwitchCleanup.afterConnect()`
+（它把这份 pending 同意绑到新账户）。前端 `getWizardStatus`/`submitWizard` 两个 api 封装随之删除。
+
+**跨境同意按「账户 + 站点」记录，且有运行时闸（dev-board#1713，问题 130）**：判定与记录只在
+`service/ai/CrossBorderConsentService`。键：`ai.crossBorder.consentAt/consentVersion`（原有）+
+`consentAccount`（官网 accountId，缺时 `fp:`+Key 指纹）+ `consentSite` + `consentPendingAt`。
+版本、账户、站点三者都对上才算同意；切站、换账户后设置页显示未同意、平台调用被拒。
+同意先于连接：保存同意时写 pending 时间戳，`afterConnect` 在 30 分钟内把它绑给刚连上的账户；
+没有站点字段的旧记录 = 升级前的机器级同意，首次在已连接状态下判定时迁移成当前账户 + 当前站点。
+运行时闸在 `ChatModelFactory.platformConnection()`（所有平台模型消费方的共同入口）：机器级账户路径
+（`usesMachineKey`）、已连接却无有效同意 → `AccountException(CONFLICT, reason=cross_border_consent_required)`；
+未连接放行给下游 4011 登录弹层。本机模型 / 自备 Key 不经过这里。语音听写（`VoiceDictationService`）
+直接取平台密钥、不经工厂，目前不在闸内。
+
+**登录弹层跨境同意的措辞按站点分（dev-board#1713，问题 2+38）**：`AccountLoginDialog.crossBorderKey(name)`
+在国内站（`isPhoneSite`）取 `onboarding.unlock.*Domestic`（勾选框 / 告知标题 / 告知正文 / 未勾提示统一
+「可能涉及境外处理」口径，国内站接百炼），国际站沿用原 `crossBorderLabel` 等。只分措辞，两站都仍要勾、
+后端闸门逻辑不变。设置页（AdminPane 的同意框与粘 Key 路径）不感知站点，仍用通用措辞。
 
 ### 换账户提示与断开回退（2026-09-29，dev-board#1046，设计 §5.5）
 
@@ -897,7 +917,7 @@ cost 为 null 原样保留 —— 对账未完成时显示「待结算」，绝�
     （`PlatformAiKeyCipher` 构造器）——明文降级是典型的潜伏逃生门，这里刻意不留。
 
 18. **切到平台通道有两个入口，跨境同意闸必须两个都设**。同意（个保法第三十九条）的判定与
-    拒绝文案在 `AdminConfigController.crossBorderBlockReason(ai, settings)`（静态，与
+    拒绝文案在 `AdminConfigController.crossBorderBlockReason(ai, crossBorderConsentService)`（静态，与
     `toSettingsUpdates` 同款），**管理后台 `updateAdminConfig` 与首启向导 `WizardController.initialize`
     都要调它**。这条是踩出来的：闸门最初只在管理后台，而向导走的是 `toSettingsUpdates` 静态映射、
     完全绕过闸门——偏偏向导才是用户选平台通道的主入口（AWD_CLOUD 恒可选，见地雷 15），
@@ -906,7 +926,9 @@ cost 为 null 原样保留 —— 对账未完成时显示「待结算」，绝�
     **两处初值都必须是未勾选**——预先勾选的同意在个保法下无效。
     `crossBorderConsent` 只在选平台通道时才进 payload：其余档位带 `false` 会把已有同意误撤回。
     护栏：`CrossBorderConsentTest`（判定本身：版本作废、文案红线）
-    + `CrossBorderConsentGateSharedTest`（这道闸没有第二份实现、没有入口漏掉它）。
+    + `CrossBorderConsentGateSharedTest`（这道闸没有第二份实现、没有入口漏掉它；含换账户/切站/旧数据迁移）
+    + `CrossBorderConsentServiceTest`（登录路径绑定新账户）+ `CrossBorderConsentRuntimeGateTest`（撤回即停用）。
+    两个保存入口在 `toSettingsUpdates` 之后都要调 `crossBorderConsent.stampIdentity(updates)` 补账户与站点。
 
 19. **切站不是「换个域名」，是换了一个商业实体，清理表必须背下来**（双主站设计 §2.4）。
     删：`account.json`、`entitlements.json`、`platform-ai-key.json`、`license.json` 中 **mode=account** 的票据。
@@ -1359,7 +1381,7 @@ cost 为 null 原样保留 —— 对账未完成时显示「待结算」，绝�
 
 - 官网 summary 新增 `members[].daily[]/title/agentEditActions/currentProject` 与 `kpi.agentEditActions/activeProjects/unassignedTasks`（契约见官网仓 `doc/desktop-contract.md`）。职务 `title` 是展示标签不涉权限：OWNER/ADMIN 可设任何人，`PUT /api/account/team/members/{id}` 透传 `{role?, title?}`（title 空串 = 清除）。
 - `TeamUsageRollupService.unassignedTasks`：本人名下（非散件/草稿工作区）项目里 OPEN 且 `assigneeId` 为空的事项**计数**，上报时刻的快照；只计数不带标题。它不计入 `isEmptyDay`。
-- 前端 `components/admin/TeamWeekBoard.vue`（TeamPanel 在 scope=team、range=7 时渲染）+ 纯函数 `utils/teamWeek.js`。**负荷口径按「已结束的工作日」**：上报只覆盖昨天及更早，今天的工时永远不在数据里，算进分母会让每周一全员「有余力」；周一不显示档位（`weekBandNoData`），看板注明「数据截至昨天」。「AI 修订次数」是最近 7 天保留在文档里的 AI 编辑动作数，不是文档篇数，文案必须这么写。
+- 前端 `components/admin/TeamWeekBoard.vue`（TeamPanel 在 scope=team、range=7 时渲染）+ 纯函数 `utils/teamWeek.js`。**负荷口径按「已结束的工作日」**：上报只覆盖昨天及更早，今天的工时永远不在数据里，算进分母会让每周一全员「有余力」；周一本周还没有过完的工作日，改看上周一至周五（`boardWeek`，标题与工时 KPI 换成「上周」并加一行说明；7 天档的窗口够不着上周一，`TeamPanel` 周一另取一次 30 天档的成员日数据传给看板，dev-board#1713），看板注明「数据截至昨天」。「AI 修订次数」是最近 7 天保留在文档里的 AI 编辑动作数，不是文档篇数，文案必须这么写。
 - 验证：`node --test frontend/tests/team/team-week.test.mjs`；`TeamUsageRollupServiceTest`；官网 `npm run test:team`。
 
 ### 三层结构与加入流程（设计 §10）

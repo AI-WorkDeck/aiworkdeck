@@ -3,7 +3,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  weekDays, memberWeek, loadBand, loadRatio, cellLevel, completedWorkdays,
+  weekDays, memberWeek, loadBand, loadRatio, cellLevel, completedWorkdays, boardWeek,
   LIGHT_MAX_RATIO, BALANCED_MAX_RATIO,
 } from '../../src/utils/teamWeek.js'
 
@@ -68,9 +68,29 @@ test('loadBand: boundaries on Wednesday (expected 2 x 480 = 960)', () => {
   assert.equal(loadBand(961, wed), 'busy')
 })
 
-test('loadBand: Monday has no comparable data; Sunday uses 5 days', () => {
-  assert.equal(loadBand(0, new Date(2026, 10, 2)), null)
-  assert.equal(loadRatio(600, new Date(2026, 10, 2)), null)
+test('boardWeek: Monday falls back to last Mon..Fri (5 full days), other days stay on this week', () => {
+  const mon = boardWeek(new Date(2026, 10, 2, 9))
+  assert.equal(mon.lastWeek, true)
+  assert.equal(mon.workdays, 5)
+  assert.deepEqual(mon.days, ['2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30'])
+  const tue = boardWeek(new Date(2026, 10, 3))
+  assert.equal(tue.lastWeek, false)
+  assert.equal(tue.workdays, 1)
+  assert.deepEqual(tue.days, MON)
+  const sun = boardWeek(new Date(2026, 10, 8))
+  assert.equal(sun.lastWeek, false)
+  assert.equal(sun.workdays, 5)
+  assert.deepEqual(sun.days, MON)
+  // 跨月：12 月第一个周一回看 11 月最后一周
+  assert.deepEqual(boardWeek(new Date(2026, 11, 7)).days[0], '2026-11-30')
+})
+
+test('loadBand: Monday rates last week over 5 days; Sunday uses 5 days', () => {
+  const mon = new Date(2026, 10, 2)
+  assert.equal(loadRatio(2400, mon), 1)
+  assert.equal(loadBand(1439, mon), 'light')
+  assert.equal(loadBand(2400, mon), 'balanced')
+  assert.equal(loadBand(2401, mon), 'busy')
   assert.equal(loadBand(2400, new Date(2026, 10, 8)), 'balanced') // 5 days
   assert.equal(loadBand(2401, new Date(2026, 10, 8)), 'busy')
 })

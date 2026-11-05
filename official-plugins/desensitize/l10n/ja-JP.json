@@ -1,5 +1,5 @@
 {
-  "plugin.name": "匿名化",
+  "plugin.name": "ファイル墨消し",
   "plugin.description": "機密情報を検査し、匿名化したコピーを生成し、リカバリーパッケージで復元します。",
-  "view.main.name": "匿名化"
+  "view.main.name": "ファイル墨消し"
 }

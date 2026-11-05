@@ -186,6 +186,18 @@ public class VersionLifecycleService {
         }
     }
 
+    /**
+     * 「打开文件夹」导入完成后同步建基线（教程问题 16，dev-board#1713）：律师刚导入的全量
+     * 就是「初始版本」，不能让它们在第一次退出时全部显示成待提交。与异步触发点同受
+     * 总开关、已关闭、护栏三道闸；被护栏拒绝时不开，版本面板沿用「文件夹太大没有自动开启」的提示。
+     * 调用方不得持有会与仓库锁反向嵌套的锁。
+     */
+    public void autoEnableAfterLocalImport(long projectId, Long userId) {
+        if (!autoEnable) return;
+        if (refusedTooLarge.contains(projectId)) return;
+        autoEnableNow(projectId, userId, null);
+    }
+
     record CoreBaselinePolicy(String skipReason, String authorName, String authorEmail) {}
 
     /** Synchronous policy check under the caller's repository lock. Handoff must see failures. */

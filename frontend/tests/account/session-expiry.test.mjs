@@ -141,6 +141,7 @@ test('actual account coordinator deduplicates expiry, preserves the warning afte
     .replace(/^import .*$/gm, '').replace(/^export \{.*$/gm, '').replace(/export (async function|function|const)/g, '$1')
   const deps = {
     createApp: (_component, props) => { dialogs.push(props); return { use() {}, mount() {}, unmount() {} } },
+    ref: (value) => ({ value }),
     AccountLoginDialog: {}, RechargeDialog: {}, i18n: { global: { t: key => key } },
     showDialog: () => { recoveryDialogs++; return new Promise(resolve => { resolveRecovery = resolve }) }, createAccountGate, reasonFromBackend: value => value,
     getAccountStatus: async () => ({ connected: true }), getCloudAccountGeneration: () => 0, isDesktopHost: () => true,

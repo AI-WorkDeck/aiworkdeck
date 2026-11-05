@@ -79,7 +79,7 @@ function editorRoots() {
     try {
       const overlay = require('./services/overlay')
       const dir = overlay.componentDir(
-        { packaged: true, dataDir: path.join(app.getPath('home'), '.aiworkdeck'), appVersion: app.getVersion() },
+        { packaged: true, dataDir: require('./awd-home').dataDir(), appVersion: app.getVersion() },
         'zetaoffice-wrapper'
       )
       if (dir) roots.push(dir)

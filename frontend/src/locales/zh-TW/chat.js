@@ -271,6 +271,7 @@ export default {
   "memoryRevision": "版本 {revision}",
   "memoryUnknownTime": "更新時間未知",
   "memoryReadOnly": "你可以查看此範圍，但沒有編輯權限",
+  "memoryRememberHint": "主題列表由系統自動維護；要刪除主題，請選取對應主題後刪除",
   "memoryConflict": "服務器上已有更新。請查看後選擇保留哪一版。",
   "memoryUseServer": "使用服務器版本",
   "memorySaveMine": "保存我的版本",

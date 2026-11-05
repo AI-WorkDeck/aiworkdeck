@@ -29,7 +29,7 @@ const Welcome = component('../../src/components/welcome/WelcomePane.vue', {
   fetchAiModels: async options => { requests.push(options); return catalog },
   getMyProjects: async () => [], getTelemetrySettings: async () => ({ enabled: false }), getRecentProjectIds: () => [],
   getCurrentUser: () => null, isDesktopHost: () => false, host: {}, siteBaseUrl: () => '', setGlobalOverlay: noop,
-  ICONS: {}, buildRecentProjects: () => [], loadTelemetryNoticeDismissed: () => true, saveTelemetryNoticeDismissed: noop,
+  ICONS: {}, buildRecentProjects: () => [], loadTelemetryNoticeDismissed: () => true, uniStorage: {}, saveTelemetryNoticeDismissed: noop,
 })
 const settle = async () => { await new Promise(resolve => setTimeout(resolve, 0)); await Vue.nextTick() }
 test('mounted welcome picker opens, selects actual dropdown option, and emits selection with prompt', async () => {

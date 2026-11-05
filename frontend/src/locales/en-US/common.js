@@ -8,6 +8,7 @@ export default {
   cancel: 'Cancel',
   save: 'Save',
   close: 'Close',
+  done: "Done",
   delete: 'Delete',
   rename: 'Rename',
   retry: 'Retry',

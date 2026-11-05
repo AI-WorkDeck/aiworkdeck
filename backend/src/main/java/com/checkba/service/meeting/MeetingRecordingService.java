@@ -381,6 +381,50 @@ public class MeetingRecordingService {
         return sb.toString();
     }
 
+    /**
+     * 「生成访谈笔录」kick-off prompt（问题 31）。与纪要同一条链路、同一个 skill，
+     * 开头是 skill.yml 的触发词「访谈笔录」/ triggers_en 的 "interview record"；
+     * 笔录格式细则在 prompt.md / prompt.en.md 的「访谈笔录」一节，这里再把要点与文件名钉死。
+     */
+    public String buildInterviewKickoffPrompt(MeetingRecording meeting) {
+        Map<String, String> names = speakerDisplayNames(meeting);
+        boolean en = LangText.isEnglish();
+        java.util.Set<String> speakerIds = new java.util.TreeSet<>();
+        readSegments(meeting).forEach(s -> speakerIds.add(s.speaker()));
+        String speakers = String.join(en ? ", " : "、",
+                speakerIds.stream().map(id -> displaySpeaker(names, id)).toList());
+        String time = meeting.getCreatedAt() == null ? ""
+                : meeting.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        String fileName = LangText.of("访谈笔录-", "Interview Record-") + sanitize(meeting.getTitle()) + ".docx";
+        StringBuilder sb = new StringBuilder();
+        if (en) {
+            sb.append("Interview record generation task.\n\nRecording: ").append(meeting.getTitle())
+                    .append(" (meetingId=").append(meeting.getId()).append(")\n");
+            if (!time.isEmpty()) sb.append("Recorded at: ").append(time).append('\n');
+            if (!speakers.isEmpty()) sb.append("Speakers (from speaker separation): ").append(speakers).append('\n');
+            sb.append("\nFirst call the meeting_get_transcript tool (meetingId=").append(meeting.getId())
+                    .append(") to read the full transcript, then follow the skill's interview record format: "
+                            + "title, time, place (only if stated), interviewee / interviewer (use the speaker names above), "
+                            + "then the body as alternating \"Q: ... A: ...\" paragraphs, faithful to the original words - "
+                            + "remove only filler words and repetition, do not summarize or add conclusions. "
+                            + "End with \"The interviewee has checked the above record and confirms it is accurate.\" "
+                            + "and signature lines. Save it with write_docx as \"")
+                    .append(fileName).append("\".");
+            return sb.toString();
+        }
+        sb.append("访谈笔录生成任务。\n\n录音：").append(meeting.getTitle())
+                .append("（meetingId=").append(meeting.getId()).append("）\n");
+        if (!time.isEmpty()) sb.append("录音时间：").append(time).append('\n');
+        if (!speakers.isEmpty()) sb.append("说话人（说话人分离结果）：").append(speakers).append('\n');
+        sb.append("\n请先调用 meeting_get_transcript 工具（meetingId=").append(meeting.getId())
+                .append("）读取完整转写稿，再按 skill 约定的访谈笔录格式整理：标题、时间、地点（转写稿提到才写）、"
+                        + "被访谈人 / 访谈人（取上面的说话人名），正文按「问：…… 答：……」逐段整理，忠于原话，"
+                        + "只去掉口头语和重复，不概括、不加结论；末尾写「以上笔录经被访谈人核对无误」并留签字栏。"
+                        + "用 write_docx 保存为「")
+                .append(fileName).append("」。");
+        return sb.toString();
+    }
+
     public String buildTodosKickoffPrompt(MeetingRecording meeting, Map<Long, String> members) {
         String instructions = LangText.of(
                 "会议录音待办任务。先用 meeting_get_transcript 读取完整转写，meetingId=",

@@ -39,6 +39,16 @@ public class VersionException extends RuntimeException {
         return new VersionException(message, true, null);
     }
 
+    /**
+     * 云端写权限门禁（权限代次）对不上、要律师明确重新连接云端。kind 回给前端，
+     * 协作弹窗据此显示「重新连接云端」按钮，不靠匹配文案去猜。
+     */
+    public static final String CLOUD_RECONNECT_REQUIRED = "CLOUD_RECONNECT_REQUIRED";
+
+    public static VersionException cloudReconnectRequired(String message) {
+        return new VersionException(message, true, CLOUD_RECONNECT_REQUIRED);
+    }
+
     public static VersionException busy(String message) {
         return new VersionException(message, true, "VERSION_BUSY");
     }

@@ -79,6 +79,14 @@ title-updated，把同一条消息里的 url 扔了）。
   `onBrowserUrlChange/onBrowserTitleChange` 收 `(pane, tabId, value)`，按 id 找标签；
   按「当前激活的那个」收会把后台标签的地址写到用户正看着的标签上。activityTracker
   只记激活标签。
+
+**工作记录（`utils/activityTracker.js`，dev-board#1713）**：录制开关全局持久化（uni storage `awd_work_log_recording`）；
+只上报 OPEN_FILE / OPEN_URL 会话（旧的 WORK 整段计时已删）。空闲：连续 5 分钟无动作算空闲，整段从 duration 扣掉，
+metaInfo 追加 `IdleSegments: <开始毫秒>-<结束毫秒>;...`，`PersonalWorkLogPanel` 解析展示并把空闲加回开始时间。
+动作信号 = 宿主 DOM 键鼠事件 + 桌面端每 30 秒 `host.app.getPresence()`（IPC `checkba:app-presence`：主窗口
+`isFocused()` + `powerMonitor.getSystemIdleTime()`）。**不许再用宿主 window blur**：编辑器 webview / BrowserView
+获得焦点就会触发。页面 onHide 只 `flushActiveSession()`，不关录制；`/api/activity/history?from&to` 默认本月，
+有范围时上限 5000 并回 `truncated`。回归 `npm run test:work-log`、`UserActivityLogServiceTest`。
 - 跨窗格双开在 Web 下是**两个独立 iframe**（`tabDragSplit.moveTabTo` 跨窗格复制了 tab 对象，
   左右各有自己的 `tab.url`），与桌面端「一个 BrowserView、`wanted` 计数」不是一回事。
 
@@ -146,7 +154,9 @@ local-mode 下本机后端把每个请求都当本机用户，等于把本机管
   回归用例 `frontend/tests/clipboard/`（`npm run test:clipboard`）、`ClipboardDedupTest`。
   **免费额度（PR-C）**：未拥有 `clipboard.unlimited` 时 GET / 只返回「最近 20 条 且 3 天内」，两条同时生效取更严者。**实现是查询侧过滤，绝不删除记录**——超出的行留在库里，解锁后原样可见。GET / 返回体从裸数组改为 `{items, limited, hiddenCount, maxItems, retentionDays}`（`ClipboardListResult`），hiddenCount 只算「因额度看不见」的（= 总数 − min(3天内条数, 20)），不含被分页 limit 挡住的。常量在 `ClipboardService.FREE_MAX_ITEMS/FREE_RETENTION_DAYS`。**额度只在 local-mode（桌面单机版）执行**：`EntitlementService` 是按本机的（无 userId 维度），团队案件库服务器上权益恒为空集，照执行会把每个接入成员截到 20 条且永远无法解锁。
 
-**收藏夹**：`ProjectFavoritesPanel.vue`；网页选中收藏经 `checkba:webmark`（preload ~:26）→ project-overview 订阅入库（~:2003）；后端 `controller/WebFavoriteController.java`（/api/favorites/my、/api/projects/{id}/favorites、DELETE、image）。
+  **全部清空 / 暂停记录（dev-board#1713）**：剪贴板插件面板（`frontend/plugin-app/clipboard/Panel.vue`，改完 `node scripts/build-business-plugins.mjs clipboard` 并升 `official-plugins/clipboard/manifest.json` 版本）经宿主服务 `clipboard.clear` → `DELETE /api/clipboard`（`ClipboardService.deleteAll`，用户主动清空，连额度下看不见的一起删、文件对象一并删）、`clipboard.capture {paused?}` → 宿主动作 `clipboardCapture`（`clipboardBridge.js`）→ preload `clipboard.getPaused/setPaused` → IPC `checkba:clipboard-get-paused/set-paused`。暂停状态落 `~/.aiworkdeck/prefs.json` 的 `clipboardCapturePaused`，`startClipboardWatcher` 首次启动时读；暂停时不起轮询、`emitClipboard`（应用内 copy/cut）也不推送。网页端没有系统级采集，`capture` 返回 `supported:false`，面板不显示开关与「会记录你在所有软件里复制的内容」说明。回归 `desktop/tests/clipboard-watch.test.js`、`frontend/tests/plugins/collections-services.test.mjs`、`ClipboardBlobCleanupTest`。
+
+**收藏夹**：`ProjectFavoritesPanel.vue`；网页选中收藏经 `checkba:webmark`（preload ~:26）→ project-overview 订阅入库（~:2003）；网页右键菜单模板在 `desktop/main/browser-context-menu.js`（自定义菜单会整个替换系统菜单：基础项复制 / 全选、可编辑区剪切 / 粘贴自己补齐，没选中文字也弹；有选中时再加「加入网核收藏」，dev-board#1713 问题 68，测试 `desktop/tests/browser-context-menu.test.js`，该文件也守主进程框选窗 `checkba:ocr-start-selection` 的提示条贴底居中）；后端 `controller/WebFavoriteController.java`（/api/favorites/my、/api/projects/{id}/favorites、DELETE、image）。
   **收藏成功的反馈必须是「打开收藏面板 + focusFavorite 高亮新卡片」，不能只弹 toast**：
   用户此刻正在浏览器标签里，toast 在 DOM 层、被原生 BrowserView 整个盖住（实测 toast
   中心恒落在 view 区域内），只弹 toast 的现象就是「点了没反应」。右键收藏与 OCR 摘录收藏
@@ -157,6 +167,11 @@ local-mode 下本机后端把每个请求都当本机用户，等于把本机管
   `localFavUrls` 只是「刚收藏、列表未回」的占位，每次列表拉回即以服务端为准（BUG-60，
   `tests/browser/favorite-star-sync.test.mjs`）。面板 `refresh(force)`：新增收藏后的刷新
   要传 `force=true` 绕过 1.2s 节流，否则新卡片可能刷不出来、高亮落空。
+  **复制顺序（dev-board#1713）**：插件收藏面板（`pluginCollectionServices` 的 `favorites.copy`）与设置页「全部收藏」统一为
+  正文 → 来源网址 → 标题；只有图片、没有正文的收藏（截图收藏）复制图片本身（宿主动作 `copyImage` →
+  `ocrActions.copyImageDataUrl`，即 `navigator.clipboard.write` + `ClipboardItem`，没有专门的宿主剪贴板写图 API；
+  浏览器只保证 image/png）。截图「加入收藏」的标题：页面标题 → 「主机名 + 时间」→「网页摘录」，meta 带 `sourceHost`。
+  「已在收藏夹中 / 已在快捷方式中」走 BrowserPane `notifyAboveView`（桌面端 `host.app.confirm`）。
 
 **搜索**：`SearchPanel.vue`；后端 `controller/SearchController.java`（POST /api/projects/{id}/search）。
 `ContentSearchService` 的全文抽取已改为复用 `DocumentTextService`（PDF 走 PDFBox3 原生
@@ -335,12 +350,25 @@ finish 是否带 `transcribe:false`，跳过时面板/胶囊 toast 说明，会�
 档位读不到按可能扣费处理照样问。**档位优先读 `GET /api/meetings/projects/{id}` 的 `tier`**（项目成员可读；
 团队服务器的非管理员读不到机器级 `/api/platform-services`），没有才退回后者。框里是计费方式 + 时长（已知时）
 + 预计费用（`/api/platform-services/remote` 的 `asrPrice {unit, creditsPerUnit}`，creditsPerUnit 与
-balanceCents 同为「分」，只认 `unit=minute`，精确 op=transcribe 优先于通配 `*`；估算 = ceil(带小数分钟 × 单价)，与网关结算同算法；文案必带「约」）+ 余额（顶栏 chip 同端点，
-cents/100 显示为 Credits）。余额与单价各有 1.5 秒竞速上限，超时就不显示那一行。
+balanceCents 同为「分」，只认 `unit=minute`，精确 op=transcribe 优先于通配 `*`；估算 = ceil(带小数分钟 × 单价)，与网关结算同算法；文案必带「约」）。
+**余额数字不上框**（录屏/投屏外泄，dev-board#1713 #119）：余额（顶栏 chip 同端点）只用来判断够不够这次
+（时长未知按一分钟单价、无单价按 ≤0），不够才加一句 `meeting.paidConfirmInsufficient`。余额与单价各有 1.5 秒竞速上限，超时就不判断。
 AwdDialog 队列非空时持有 `overlayState` 的 `'awd-dialog'`（`utils/dialog.js`），让工作台把 BrowserView 藏起来——
 否则网页开着时框被原生层盖住、Esc 进不来，录音收尾会永远卡在等确认。
 后端没有取消进行中转写的接口（只有 DELETE 会议），转写中条目因此没有「取消」。
 回归 `frontend/tests/meeting-recorder/paid-transcribe-confirm.test.mjs`。
+
+**平台档转写告知只有一处（dev-board#1713 #117/#118）**：告知全文与「我已知悉」勾选只在宿主可信弹窗
+`utils/asrNoticeDialog.js`（`AwdDialog` 的 `checkLabel`：不预勾选、勾上才能确认）。插件面板
+`MeetingRecordingPanel` 只放提示 +「查看并确认告知」入口，不再自画勾选块；面板「开始录音 / 开始转写」、
+资源管理器新建录音在欠告知时**直接拉起这个弹窗、确认后接着做**，不许只闪 toast。插件侧经
+`pluginVoiceServices` 的 `acknowledgeNotice` 调同一个函数（取消回 `cancelled`，面板不提示）。
+`register-file` 回 `noticePending`，右键转写据此提示 `fileTree.transcribeNoticePending`。
+右键转写（`project-overview.onTranscribeAudio`）先 `openPanelInItsDock('voice')` 并发
+`recording-focus` 带 `preparing:true`（面板显示「正在准备…」），确认与注册结束后再发一次 `preparing:false`。
+`MeetingTranscriptionService.isConfigured` 的本机探测按地址缓存 5 秒（`LOCAL_READY_CACHE_MS`），
+面板「重新检测」走 `/api/asr/local/probe` 直探不受影响。回归 `tests/meeting-recorder/asr-notice.test.mjs`、
+`MeetingTranscriptionLocalPathTest`、`MeetingRecordingFileAccessTest`。
 
 **转写卡死判定与进度提示（dev-board#532，2026-09-09 维护者拍板）**：会议进入 `TRANSCRIBING`
 之后只有上游给终态才会离开，上游永不给终态（听悟任务被清理、网关任务被回收）就永远卡着，
@@ -654,3 +682,5 @@ H5 的项目 PDF 先用鉴权 HEAD 校验，再让内置查看器直连 `/api/fi
 版本恢复按 affectedFileIds 处理 PDF，包括受保护的项目版本流程；AI 后端更新有新版本号时等待 watcher 的既有加载，无新版本号则显式重载，两者都须等待查看器接收结果，失败不得报更新成功；文件树同步同时更新 PDF 版本及大小。覆盖测试：`tests/project-home/pdf-version-restore.test.mjs`；后端 `FileControllerRangeTest`、`LocalCoreHttpReadsTest`。PDF 按真实阅读/AI修改/版本能力验收，不把 Word 的输入和保存结论外推。
 
 **录音文件页后处理（dev-board#1670）**：`media/MediaPlayer.vue` 仅在工作台两栏显式开启 recordingActionsEnabled 且音频转写 ready 时挂 `RecordingActions.vue`，通过 `FilePreview` 的 `ai-prompt` 事件接工作台两栏的 `handleMeetingMinutesStart`。纪要复用 minutes-prompt，待办使用 todos-prompt（writer + 源录音可读 + TRANSCRIBED 校验；真实 task_list/task_create，不是 todo_write；负责人沿用日历 @ 成员关联语义，不新增对外通知），导出复用会议 export 接口保存 DOCX 并发 files-changed→extracted 刷新资源树。请求期间互斥，切文件/卸载使迟到结果失效。音频播放与转写的计费流程未改变；视频、Word/PPT/Excel/PDF预览不挂此入口。回归：`node --test frontend/tests/media/*.test.mjs`。
+
+**访谈笔录（问题 31，dev-board#1713）**：会议录音面板「生成会议纪要」旁与 `RecordingActions` 各有「生成访谈笔录」，走同一个 `POST /api/meetings/{id}/minutes-prompt`，加 query `format=interview` 时改调 `MeetingRecordingService.buildInterviewKickoffPrompt`（缺省仍是纪要）。kick-off 以「访谈笔录生成任务」/ "Interview record generation task." 开头，对应 `backend/skills/meeting-recorder/skill.yml` 的 `访谈笔录` / `interview record` 触发词；问答体格式在 `prompt.md` / `prompt.en.md` 末节，产物由 AI 用 write_docx 存为「访谈笔录-<原标题>.docx」（英文 "Interview Record-<title>.docx"）。改开头要同步触发词，`MeetingRecordingServiceTest`、`BuiltinSkillsTest`、`MeetingRecordingFileAccessTest.interviewFormatUsesInterviewPrompt` 两端锁着。

@@ -113,6 +113,7 @@ export default {
   recentProjectsLoadFailed: 'Failed to load — tap to retry',
   projectHome: 'Project Overview',
   allProjects: 'All Projects…',
+  closeProject: "Close Project",
   statusInProgress: 'In Progress',
   collab: 'Collaboration',
   managerLabel: 'Lead: {name}',
@@ -144,6 +145,7 @@ export default {
   collapseSidebar: 'Collapse Sidebar',
   toolsPanel: 'Tools Panel',
   aiAssistant: 'AI Assistant',
+  insightNeedsDoc: "Available once a Word document is open",
   // Panel docking (dev-board#180): shared by the context menu and the drop hints
   dockToLeft: 'Move to left sidebar',
   dockToRight: 'Move to right panel',
@@ -151,10 +153,10 @@ export default {
   dockCurrent: 'current',
   openSplit: 'Open Split View',
   closeSplit: 'Close Split View',
-  ocrCapture: 'Screenshot Capture (OCR)',
+  ocrCapture: 'Screen Capture OCR',
   browser: 'Browser',
   browserNewTabHint: 'New browser tab',
-  recordActivity: 'Record Activity',
+  recordActivity: 'Activity Log',
   logout: 'Log Out',
   // Left rail
   stagingArea: 'Staging Area',
@@ -277,7 +279,7 @@ export default {
   gotIt: 'Got It',
   learnFullVersion: 'Learn About the Full Version',
   // Bottom status bar
-  recordingActive: 'Recording activity',
+  recordingActive: 'Logging activity',
   splitBadge: 'Split View',
   // Work status chip / collaboration states
   workingOnDraft: 'Working on draft "{name}"',
@@ -323,8 +325,8 @@ export default {
   shareClipboardHint: 'File copied. Switch to WeChat, pick a chat and press Ctrl+V to send',
   copyFailedNoNewFile: 'Copy failed: no new file returned',
   copyFailed: 'Copy failed',
-  recordingStarted: 'Recording started',
-  recordingStopped: 'Recording stopped',
+  recordingStarted: 'Logging started',
+  recordingStopped: 'Logging stopped',
   insertedToDoc: 'Inserted into document',
   insertFailed: 'Insert failed',
   imageDownloadFailed: 'Image download failed',
@@ -405,7 +407,9 @@ export default {
   },
   welcome: {
     quickChatPlaceholder: 'Ask a question and press Enter to start a scratch chat…',
+    quickChatPlaceholderInProject: "Ask a question and press Enter to start a new chat in this project…",
     enterChatMode: 'Start scratch chat',
+    newChatInProject: "New Chat in This Project",
     quickNewDocx: 'New blank document',
     quickNewMd: 'New Markdown',
     quickChatSend: 'Send',

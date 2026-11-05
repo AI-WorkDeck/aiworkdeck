@@ -54,6 +54,8 @@ textarea { padding: var(--awd-space-2, 8px); resize: vertical; }
 label { display: block; font-size: var(--awd-panel-fs, 12px); margin: var(--awd-space-3, 12px) 0 var(--awd-space-1, 4px); }
 .copy-row { display: flex; flex-wrap: wrap; gap: var(--awd-space-2, 8px); }
 .copy-row input { flex: 1 1 160px; }
+label.toggle { display: flex; align-items: center; gap: var(--awd-space-2, 8px); margin-top: 0; min-height: 48px; font-size: var(--awd-font-size-sm, 13px); cursor: pointer; }
+label.toggle input { display: inline-block; width: auto; min-height: 0; flex: 0 0 auto; }
 .copy-row button { flex-shrink: 0; }
 summary { cursor: pointer; }
 #save-config { margin-top: var(--awd-space-3, 12px); }

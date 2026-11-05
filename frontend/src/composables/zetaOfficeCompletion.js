@@ -4,10 +4,9 @@ import { classifySelectionLookup, resolveSelectionLookupText } from '../utils/se
 import { extractCompletionEntries, matchCompletionItems } from '../utils/completionLexicon.js'
 import { WRITING_ASSISTANCE_CSS, renderCompletionOption } from './writingAssistancePresentation.js'
 
-const LABELS = {
-  zh: { suggestions: '补全建议', manual: '显示补全建议 · Alt+/', noMatch: '没有匹配的本地词条，请继续输入或查看已学词库。', acceptKey: '补全', chooseKey: '选择', dismissKey: '关闭', title: '自动补全', close: '关闭', local: '仅本地补全 · Tab 接受 · Esc 关闭', empty: '暂无本地候选，常用内容会随写作积累。', enabled: '自动语义补全', disable: '关闭自动补全', preferenceFailed: '设置未能保存，仍保持原状态，请重试。', semantic: '建议续写', policy: '停笔后结合前后文判断，有把握且有帮助才提示。自动补全由当前默认模型生成，并将相关上下文交给 Kimi K3 和 Qwen3.8 Max 核对，会消耗 AI 额度，可随时从审校设置重新开启；Alt+/ 仅手动查看词库。', learning: '学习我输入的常用内容', hints: '相关资料提示', manage: '已学词库', project: '本项目', user: '我的词库', remove: '删除', clear: '清空此范围的已学记录', confirm: '再次点击确认清空', loading: '正在读取…', stale: '光标或正文已变化，请重新选择后操作。', detail: '查看已有资料', insert: '插入以上内容', lookup: '在线查询（可能产生费用）', query: '查询资料…', otherQueries: '其他查询…', company: '查询机构工商信息', law: '查询法规与条款', case: '查询案例与案号', revise: 'AI 修订选中内容…', revisePlaceholder: '输入修订意见，回车交 AI 修改…', reviseSubmit: '发送', noDetail: '暂无可插入的资料。可选中文字后右键查询。', source: '来源', date: '查询时间', error: '操作未完成，请稍后重试。', login: '登录', recharge: '去充值', saved: '已插入，可用撤销恢复。', current: '当前文档', refresh: '刷新本地词库', contextHint: '选中文字后右键可查询机构 / 法规 / 案例，点了才联网、才可能扣费。', COMPANY: '机构', PERSON: '人名', LAW: '法规', ARTICLE: '条款', CASE: '案例', WORD: '词语', PHRASE: '表述' },
-  en: { suggestions: 'Suggestions', manual: 'Show suggestions · Alt+/', noMatch: 'No matching local entries. Keep typing or review learned vocabulary.', acceptKey: 'Accept', chooseKey: 'Select', dismissKey: 'Dismiss', title: 'Autocomplete', close: 'Close', local: 'Local suggestions · Tab accept · Esc dismiss', empty: 'No local suggestions yet. Vocabulary grows as you write.', enabled: 'Automatic semantic suggestions', disable: 'Turn autocomplete off', preferenceFailed: 'Could not save the setting. The previous state is unchanged; please retry.', semantic: 'Suggested continuation', policy: 'After a pause, AI suggests a useful, grounded continuation. Uses your default model to generate, then shares relevant context with Kimi K3 and Qwen3.8 Max for review. Each call uses AI credits. Re-enable in review settings; Alt+/ opens vocabulary manually.', learning: 'Learn from my typing', hints: 'Related information', manage: 'Learned vocabulary', project: 'This project', user: 'My vocabulary', remove: 'Delete', clear: 'Clear learned entries in this scope', confirm: 'Click again to confirm', loading: 'Loading…', stale: 'The cursor or document changed. Select the text again.', detail: 'View saved information', insert: 'Insert the content above', lookup: 'Online lookup (charges may apply)', query: 'Look up information…', otherQueries: 'Other lookups…', company: 'Look up company information', law: 'Look up a law or article', case: 'Look up a case', revise: 'Revise selection with AI…', revisePlaceholder: 'Enter revision instructions, press Enter…', reviseSubmit: 'Send', noDetail: 'No insertable information. Select text and right-click to look it up.', source: 'Source', date: 'Retrieved', error: 'The operation failed. Please try again.', login: 'Sign in', recharge: 'Add credits', saved: 'Inserted. Use Undo to revert.', current: 'Current document', refresh: 'Refresh local vocabulary', contextHint: 'Select text and right-click to look up a company, law or case. Nothing goes online — and nothing can be charged — until you click.', COMPANY: 'Company', PERSON: 'Person', LAW: 'Law', ARTICLE: 'Article', CASE: 'Case', WORD: 'Word', PHRASE: 'Phrase' },
-}
+// 英文兜底。实际文案由宿主用 t() 生成、随 writing-config 的 labels 下发（教程反馈 48），
+// 客体页不 import 语言包；收到之前（或宿主缺词）才用这一份。
+const FALLBACK_LABELS = { suggestions: 'Suggestions', manual: 'Show suggestions · Alt+/', noMatch: 'No matching local entries. Keep typing or review learned vocabulary.', acceptKey: 'Accept', chooseKey: 'Select', dismissKey: 'Dismiss', title: 'Autocomplete', close: 'Close', local: 'Local suggestions · Tab accept · Esc dismiss', empty: 'No local suggestions yet. Vocabulary grows as you write.', enabled: 'Automatic semantic suggestions', localAuto: 'Show local suggestions while typing', disable: 'Turn autocomplete off', preferenceFailed: 'Could not save the setting. The previous state is unchanged; please retry.', semantic: 'Suggested continuation', policy: 'After a pause, AI suggests a useful, grounded continuation. Uses your default model to generate, then shares relevant context with Kimi K3 and Qwen3.8 Max for review. Each call uses AI credits. Re-enable in review settings; Alt+/ opens vocabulary manually.', learning: 'Learn from my typing', hints: 'Related information', manage: 'Learned vocabulary', project: 'This project', user: 'My vocabulary', remove: 'Delete', clear: 'Clear learned entries in this scope', confirm: 'Click again to confirm', loading: 'Loading…', stale: 'The cursor or document changed. Select the text again.', detail: 'View saved information', insert: 'Insert the content above', lookup: 'Online lookup (charges may apply)', query: 'Look up information…', otherQueries: 'Other lookups…', company: 'Look up company information', law: 'Look up a law or article', case: 'Look up a case', revise: 'Revise selection with AI…', revisePlaceholder: 'Enter revision instructions, press Enter…', reviseSubmit: 'Send', noDetail: 'No insertable information. Select text and right-click to look it up.', source: 'Source', sourceLine: 'Source: {source}', dateLine: 'Queried on: {date}', error: 'The operation failed. Please try again.', login: 'Sign in', recharge: 'Add credits', saved: 'Inserted. Use Undo to revert.', replaced: 'Replaced. Use Undo to revert.', current: 'Current document', refresh: 'Refresh local vocabulary', contextHint: 'Select text and right-click to look up a company, law or case. Nothing goes online — and nothing can be charged — until you click.', COMPANY: 'Company', PERSON: 'Person', LAW: 'Law', ARTICLE: 'Article', CASE: 'Case', WORD: 'Word', PHRASE: 'Phrase' }
 let instanceSeq = 0
 // Longest selection the right-click lookup menu accepts.
 const CONTEXT_MENU_MAX = 160
@@ -15,18 +14,24 @@ const SUGGEST_DELAY = 1800
 const AUTO_INTERVAL = 45000
 const MIN_TYPED = 20
 const DISMISS_PAUSE = 120000
+// 本地词库随打随弹（问题 81，默认关）：停顿这么久就查本机词库，不发任何请求。
+const LOCAL_SUGGEST_DELAY = 400
+// 这些字符把「光标前的连续文字」断成新的一段：Esc 关掉的那一段之后恢复自动弹出。
+const RUN_BREAK = /[\s，。！？；：、,.!?;:（）()《》“”"'\n]/
 
 /** Guest-side UI. No network access: all requests travel through the document host. */
-export function attachWritingAssistance({ canvas, input, execute, transport, focus, language = 'zh-CN', overlayContainer, bounds }) {
+export function attachWritingAssistance({ canvas, input, execute, transport, focus, overlayContainer, bounds }) {
   const doc = canvas.ownerDocument
   const view = doc.defaultView
   const viewport = () => bounds?.() || { left: 0, top: 0, right: view.innerWidth, bottom: view.innerHeight, width: view.innerWidth, height: view.innerHeight }
   const queryRoot = overlayContainer || doc
-  const t = LABELS[language && !String(language).startsWith('zh') ? 'en' : 'zh']
+  let t = { ...FALLBACK_LABELS }
+  const fill = (template, params) => String(template).replace(/\{(\w+)\}/g, (_, name) => params[name] ?? '')
   let config = { enabled: false, learning: false, hints: true, writable: false, session: '', items: [] }
   let items = [], current = null, choices = [], active = 0, generation = 0, timer = 0, learningTimer = 0
   let preferredText = '', panelPoint
   let lastAutomaticAt = -Infinity, quietUntil = 0, typedSinceAttempt = 0, automaticActive = false, pollTimer = 0
+  let localTimer = 0, localShown = false, localSuppressed = false
   const dismissed = new Set()
   let ownText = '', mode = '', disposed = false, composing = false, accepting = false, scope = 'project', clearArmed = false
   const pending = new Map()
@@ -45,7 +50,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     b.addEventListener('click', (e) => {
       const gen = generation
       const failed = (error) => {
-        if (!disposed && gen === generation) { show('notice'); note(error.message || t.error) }
+        if (!disposed && gen === generation) { show('notice', t.title, panelPoint); note(error.message || t.error) }
       }
       try { Promise.resolve(fn(e)).catch(failed) } catch (error) { failed(error) }
     }); parent.appendChild(b); return b
@@ -102,16 +107,18 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     position(point)
   }
   function hide() {
-    mode = ''; choices = []; panel.hidden = true; root.hidden = true; panel.replaceChildren(); input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); input.removeAttribute('aria-controls'); status.textContent = ''
+    mode = ''; choices = []; localShown = false; panel.hidden = true; root.hidden = true; panel.replaceChildren(); input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); input.removeAttribute('aria-controls'); status.textContent = ''
     setPanelOpen(false)
   }
   function invalidate({ flush = true } = {}) {
-    generation++; clearTimeout(timer); clearTimeout(pollTimer); timer = 0; pollTimer = 0; current = null; accepting = false; preferredText = ''
+    generation++; clearTimeout(timer); clearTimeout(pollTimer); clearTimeout(localTimer); timer = 0; pollTimer = 0; localTimer = 0; current = null; accepting = false; preferredText = ''
     if (automaticActive) { automaticActive = false; rpc('semantic-auto-cancel').catch(() => {}) }
     hide()
     if (flush) flushLearning()
   }
   function dismiss() {
+    // Esc 关掉自动弹出的本地候选：这一段不再弹，直到断句或移动光标
+    if (mode === 'suggest' && localShown) localSuppressed = true
     if (mode === 'suggest' && choices.some(item => item.semantic)) {
       quietUntil = Date.now() + DISMISS_PAUSE
       for (const item of choices) dismissed.add(item.text)
@@ -141,7 +148,13 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     if (msg.type === 'writing-config') {
       if (!msg.config || typeof msg.config !== 'object') return
       const changed = typeof msg.config.session === 'string' && msg.config.session !== config.session
-      if (changed) { invalidate(); for (const p of pending.values()) { clearTimeout(p.timeout); p.reject(new Error(t.stale)) }; pending.clear(); items = []; ownText = ''; dismissed.clear(); typedSinceAttempt = 0; quietUntil = 0; lastAutomaticAt = -Infinity }
+      if (changed) { invalidate(); for (const p of pending.values()) { clearTimeout(p.timeout); p.reject(new Error(t.stale)) }; pending.clear(); items = []; ownText = ''; dismissed.clear(); typedSinceAttempt = 0; quietUntil = 0; lastAutomaticAt = -Infinity; localSuppressed = false }
+      if (msg.config.labels && typeof msg.config.labels === 'object') {
+        const next = { ...FALLBACK_LABELS }
+        for (const key of Object.keys(FALLBACK_LABELS)) if (typeof msg.config.labels[key] === 'string' && msg.config.labels[key]) next[key] = msg.config.labels[key]
+        t = next
+        input.setAttribute('aria-label', t.title)
+      }
       const disabled = (config.enabled && msg.config.enabled === false) || (config.writable && msg.config.writable === false)
       config = { ...config, ...msg.config }
       if (Array.isArray(msg.config.items)) items = msg.config.items.map(item => ({ ...item }))
@@ -252,7 +265,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   }
   function showRelated(item, token) {
     show('related', item.text)
-    if (item.entityId || item.hasDetail) button(t.detail, () => detailRequest('detail', { entityId: item.entityId, id: item.id }, token))
+    if (item.entityId || item.hasDetail) button(t.detail, () => detailRequest('detail', { entityId: item.entityId, id: item.id }, { token }))
     else note(t.noDetail)
     position()
   }
@@ -266,15 +279,17 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     if (hint === 'NOT_CONNECTED' || hint === 'UNAUTHORIZED') button(t.login, () => rpc('login').catch(() => {}))
     else if (hint === 'NO_CREDITS') button(t.recharge, () => rpc('recharge').catch(() => {}))
   }
-  async function detailRequest(action, data, token) {
+  // point：右键菜单那一点。结果卡沿用同一坐标，不从选区旁跳到画布右侧（教程反馈 108）。
+  // selection：令牌是否覆盖一段选区——只有这时才给「仅替换为正确全称」。
+  async function detailRequest(action, data, { token, point, selection = false } = {}) {
     clearTimeout(timer); const gen = ++generation
-    show('detail'); note(t.loading)
+    show('detail', t.title, point); note(t.loading)
     try {
       const result = await rpc(action, data)
       if (gen !== generation || disposed) return
       if (!result || typeof result !== 'object') throw new Error(t.error)
       if (action === 'lookup' && result.success !== false) rpc('refresh').catch(() => {})
-      show('detail', result.title || data.text || t.title)
+      show('detail', result.title || data.text || t.title, point)
       if (result.note) note(result.note)
       hintAction(result.hint)
       const legal = result.legalReferences
@@ -302,35 +317,39 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
           if (reference.retrievedAt) { const date = doc.createElement('small'); date.textContent = `${reference.retrievedAtLabel}: ${reference.retrievedAt}`; card.appendChild(date) }
         }
       }
-      const variants = result.variants || []
-      if (!variants.length) { if (!legal?.items?.length) note(t.noDetail); position(); return }
+      const variants = (result.variants || []).filter(v => selection || v.mode !== 'replace-selection')
+      if (!variants.length) { if (!legal?.items?.length) note(t.noDetail); position(point); return }
       const body = doc.createElement('div'); panel.appendChild(body)
+      // 操作按钮钉在卡片底部，不用滚到底才看得到（教程反馈 109）。
+      const actions = doc.createElement('div'); actions.className = 'awd-wa-actions'; panel.appendChild(actions)
       let chosen = 0
       const render = () => {
-        body.replaceChildren(); const v = variants[chosen]
+        body.replaceChildren(); actions.replaceChildren(); const v = variants[chosen]
+        // 表题（工商登记信息…）在表前，与插入正文的顺序一致。
+        if (v.text) note(v.text, body)
         if (v.rows?.length) {
           const table = doc.createElement('table'); body.appendChild(table)
           for (const row of v.rows) { const tr = doc.createElement('tr'); table.appendChild(tr); for (const cell of row) { const td = doc.createElement('td'); td.textContent = cell; tr.appendChild(td) } }
         }
-        if (v.text) note(v.text, body)
-        note([result.source && `${t.source}: ${result.source}`, result.date && `${t.date}: ${result.date}`].filter(Boolean).join('\n'), body)
+        note([result.source && fill(t.sourceLine, { source: result.source }), result.date && fill(t.dateLine, { date: result.date })].filter(Boolean).join('\n'), body)
+        const replace = v.mode === 'replace-selection'
         if (v.text || v.rows?.length) button(t.insert, async () => {
           if (accepting || gen !== generation || !config.writable) return
           accepting = gen
           try {
-            const r = await execute('insert_completion_content', { token, ...(v.rows?.length ? { rows: v.rows } : {}), ...(v.text ? { text: v.text } : {}) }).catch(() => null)
+            const r = await execute('insert_completion_content', { token, ...(v.rows?.length ? { rows: v.rows } : {}), ...(v.text ? { text: v.text } : {}), ...(replace ? { mode: 'replace-selection' } : {}) }).catch(() => null)
             if (disposed || gen !== generation) return
-            show('notice'); note(r?.success ? t.saved : t.stale); focus()
+            show('notice', t.title, point); note(r?.success ? (replace ? t.replaced : t.saved) : t.stale); focus()
           } finally { if (accepting === gen) accepting = false }
-        }, body)
+        }, actions)
       }
       if (variants.length > 1) {
         const select = doc.createElement('select'); select.setAttribute('aria-label', result.title || t.title)
         variants.forEach((v, i) => { const opt = doc.createElement('option'); opt.value = i; opt.textContent = v.title || String(i + 1); select.appendChild(opt) })
         select.onchange = () => { chosen = Number(select.value); render() }; panel.insertBefore(select, body)
       }
-      render(); position()
-    } catch (e) { if (!disposed && gen === generation) { show('notice'); note(e.message || t.error); hintAction(e.hint) } }
+      render(); position(point)
+    } catch (e) { if (!disposed && gen === generation) { show('notice', t.title, point); note(e.message || t.error); hintAction(e.hint) } }
   }
   function learn(entries, targetScope) {
     if (!config.learning || !config.writable || !entries.length) return
@@ -377,6 +396,20 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     try { await render(await rpc('semantic-auto-generate', { composing })) }
     catch { if (currentRequest()) { quietUntil = Date.now() + DISMISS_PAUSE; invalidate({ flush: false }) } }
   }
+  /** 「输入时自动显示本地候选」：只匹配本机词库，不调 AI、不经宿主联网。 */
+  async function localAutoSuggestion() {
+    localTimer = 0
+    const live = () => !disposed && !composing && config.localAuto && config.writable && !accepting && !mode && !localSuppressed && doc.activeElement === input
+    if (!live()) return
+    const gen = generation
+    let ctx
+    try { ctx = await execute('get_completion_context', { radius: 160 }) } catch { return }
+    if (gen !== generation || !live() || !ctx?.success || !ctx.available || !ctx.token) return
+    const matches = matchCompletionItems(ctx.before, eligibleItems()).filter(item => [...item.prefix].length >= 2)
+    if (!matches.length) return
+    current = ctx; choices = matches; active = 0
+    renderChoices(); localShown = true
+  }
   function committed(text) {
     if (disposed) return
     invalidate({ flush: false })
@@ -384,6 +417,8 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     if (config.learning && config.writable) { ownText = (ownText + text).slice(-4000); clearTimeout(learningTimer); learningTimer = setTimeout(flushLearning, 8000) }
     if (/[。！？；\n]/.test(text)) flushLearning()
     timer = config.enabled && config.writable ? setTimeout(automaticSuggestion, SUGGEST_DELAY) : 0
+    if (RUN_BREAK.test(String(text || ''))) localSuppressed = false
+    if (config.localAuto && config.writable && !composing && !localSuppressed) localTimer = setTimeout(localAutoSuggestion, LOCAL_SUGGEST_DELAY)
   }
   function keydown(e) {
     if (disposed) return false
@@ -402,7 +437,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   }
   async function settings() {
     invalidate(); show('settings')
-    for (const name of ['enabled', 'learning', 'hints']) {
+    for (const name of ['enabled', 'localAuto', 'learning', 'hints']) {
       const label = doc.createElement('label'); const check = doc.createElement('input'); check.type = 'checkbox'; check.checked = config[name]
       check.onchange = async () => {
         config[name] = check.checked
@@ -411,6 +446,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
           if (automaticActive) { automaticActive = false; rpc('semantic-auto-cancel').catch(() => {}) }
         }
         if (name === 'learning' && !check.checked) { ownText = ''; clearTimeout(learningTimer); learningTimer = 0 }
+        if (name === 'localAuto' && !check.checked) { clearTimeout(localTimer); localTimer = 0 }
         try { await rpc('preferences', { [name]: check.checked }) }
         catch (error) { if (!disposed && mode === 'settings') { check.checked = config[name]; note(error.message === 'PREFERENCES_SAVE_FAILED' ? t.preferenceFailed : error.message || t.error) } }
       }
@@ -464,13 +500,14 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     const recommended = classifySelectionLookup(ctx.selectedText)
     const resolvedLawText = resolveSelectionLookupText(ctx.selectedText, ctx.before, 'LAW')
     const known = items.find((x) => x.text === ctx.selectedText || (recommended === 'LAW' && x.text === resolvedLawText))
-    if (known?.entityId || known?.hasDetail) button(t.detail, () => detailRequest('detail', { entityId: known.entityId, id: known.id }, ctx.token))
+    const lookupContext = { token: ctx.token, point, selection: !!ctx.selectedText }
+    if (known?.entityId || known?.hasDetail) button(t.detail, () => detailRequest('detail', { entityId: known.entityId, id: known.id }, lookupContext))
     // Only a complete selection is classified. Unknown or mixed text keeps a
     // compact manual route; opening it never issues a lookup request.
     const queries = [['COMPANY', 'company'], ['LAW', 'law'], ['CASE', 'case']]
     const addQuery = ([kind, label], parent = panel) => {
       const lookupText = kind === 'LAW' ? resolvedLawText : ctx.selectedText
-      const action = button(t[label], () => detailRequest('lookup', { kind, text: lookupText }, ctx.token), parent)
+      const action = button(t[label], () => detailRequest('lookup', { kind, text: lookupText }, lookupContext), parent)
       action.className = 'awd-wa-query'
       if (kind === recommended) action.classList.add('awd-wa-query-primary')
     }
@@ -534,10 +571,11 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   }
   const startComposition = () => { composing = true; invalidate({ flush: false }) }
   const endComposition = () => { composing = false }
-  const moved = () => invalidate()
+  const moved = () => { localSuppressed = false; invalidate() }
   const cursorMoved = (event) => {
     // committed() invalidates and schedules after the text has reached the engine.
     if (event?.reason === 'commit') return
+    localSuppressed = false
     invalidate({ flush: false })
     // Reading and moving the caret never request automatic suggestions.
   }
@@ -573,7 +611,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   return { committed, keydown, invalidate, cursorMoved, reposition: resized,
     destroy() {
       if (disposed) return
-      invalidate(); disposed = true; clearTimeout(timer); clearTimeout(learningTimer); unsub()
+      invalidate(); disposed = true; clearTimeout(timer); clearTimeout(localTimer); clearTimeout(learningTimer); unsub()
       for (const p of pending.values()) { clearTimeout(p.timeout); p.reject(new Error(t.stale)) }; pending.clear()
       input.removeEventListener('compositionstart', startComposition); input.removeEventListener('compositionend', endComposition); input.removeEventListener('blur', blur)
       input.removeEventListener('focus', refreshOnFocus)

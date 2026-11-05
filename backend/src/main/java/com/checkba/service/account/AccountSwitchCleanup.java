@@ -48,6 +48,7 @@ public class AccountSwitchCleanup {
     private final com.checkba.service.team.TeamProjectNameNotice teamProjectNameNotice;
     private final com.checkba.service.SystemSettingService systemSettingService;
     private final AccountIdentitySync identitySync;
+    private final com.checkba.service.ai.CrossBorderConsentService crossBorderConsent;
 
     /** 单机桌面版判别位。非 final：不进 {@code @RequiredArgsConstructor}，单测用 ReflectionTestUtils 设。 */
     @org.springframework.beans.factory.annotation.Value("${security.local-mode:false}")
@@ -76,6 +77,8 @@ public class AccountSwitchCleanup {
     public boolean afterConnect() {
         invalidateAll();
         entitlementService.refreshAsync();
+        // 连接前（登录弹层/粘 Key/解锁页）记下的跨境同意归这个账户；没经过同意的换号不继承上一个账户的同意
+        crossBorderConsent.bindPendingToCurrentAccount();
         return recordAccount();
     }
 

@@ -3,6 +3,23 @@
 <template>
   <view class="clip-panel">
     <input class="collection-search" v-model="localQuery" :placeholder="$t('common.search')" :aria-label="$t('common.search')" />
+    <!-- 全部清空 / 暂停记录（dev-board#1713）。暂停只在桌面端出现：网页端没有系统级采集可停 -->
+    <view class="clip-toolbar">
+      <view v-if="capture.supported" class="clip-tool-btn" :class="{ active: capture.paused }" role="switch" :aria-checked="capture.paused ? 'true' : 'false'" @tap="togglePause">
+        <text>{{ $t('panels.cpPauseCapture') }}</text>
+      </view>
+      <view v-if="items.length && !clearConfirm" class="clip-tool-btn danger" @tap="clearConfirm = true">
+        <text>{{ $t('panels.cpClearAll') }}</text>
+      </view>
+    </view>
+    <text v-if="capture.supported" class="clip-capture-note">{{ capture.paused ? $t('panels.cpCapturePausedNote') : $t('panels.cpCaptureNote') }}</text>
+    <view v-if="clearConfirm" class="clip-clear-confirm">
+      <text class="pop-text">{{ $t('panels.cpClearAllConfirm') }}</text>
+      <view class="pop-row">
+        <view class="pop-btn" @tap="clearConfirm = false">{{ $t('panels.cpCancel') }}</view>
+        <view class="pop-btn danger" @tap="confirmClearAll">{{ $t('panels.cpClearAllOk') }}</view>
+      </view>
+    </view>
     <!-- 免费额度提示：只在确实有记录被挡住时出现。没超额时一个字都不显示，不打扰。 -->
     <UnlockHint
       v-if="hiddenCount > 0"
@@ -121,11 +138,14 @@ export default {
       confirmDeleteId: null,
       // 已点「确定」、DELETE 与重拉还没回来的那一条：期间卡片不再响应复制（BUG-63）
       deletingId: null,
+      clearConfirm: false,
+      capture: { supported: false, paused: false },
       _refreshSeq: 0
     }
   },
   mounted() {
     this.refresh()
+    this.loadCapture()
     this._unsubscribe = subscribe(() => this.refreshSilently())
   },
   beforeUnmount() { this._unsubscribe?.(); ++this._refreshSeq },
@@ -245,7 +265,24 @@ export default {
         if (this.deletingId === id) this.deletingId = null
       }
     },
-    previewImage(it) { return this.run('preview', it.id) }
+    previewImage(it) { return this.run('preview', it.id) },
+    async loadCapture() {
+      try { this.capture = await perform('capture') || { supported: false, paused: false } }
+      catch (e) { this.capture = { supported: false, paused: false } }
+    },
+    async togglePause() {
+      try { this.capture = await perform('capture', { paused: !this.capture.paused }) }
+      catch (error) { uni.showToast({ title: error.message, icon: 'none' }) }
+    },
+    async confirmClearAll() {
+      this.clearConfirm = false
+      try {
+        await perform('clear')
+        await this.refresh()
+      } catch (e) {
+        uni.showToast({ title: (e && e.message) || this.$t('panels.cpClearAllFailed'), icon: 'none' })
+      }
+    }
   }
 }
 </script>
@@ -262,6 +299,14 @@ export default {
   background: var(--awd-surface);
 }
 
+.clip-toolbar { display: flex; gap: 8px; margin: 0 12px 4px; flex-shrink: 0; }
+.clip-toolbar:empty { display: none; }
+.clip-tool-btn { padding: 2px 10px; min-height: 26px; line-height: 22px; border: 1px solid var(--awd-border); border-radius: 4px; font-size: 12px; color: var(--awd-text-2); cursor: pointer; box-sizing: border-box; }
+.clip-tool-btn.active { border-color: var(--awd-accent); color: var(--awd-accent); }
+.clip-tool-btn.danger { color: var(--awd-danger-text); }
+.clip-capture-note { margin: 0 12px 4px; font-size: 12px; color: var(--awd-text-3); flex-shrink: 0; }
+.clip-clear-confirm { margin: 0 12px 8px; padding: 8px; border: 1px solid var(--awd-border); border-radius: 4px; flex-shrink: 0; }
+.clip-clear-confirm .pop-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
 /* 额度提示贴在列表上方，不占据滚动区，避免翻到底才看到 */
 .clip-unlock-hint {
   margin: 12px 16px 0;
