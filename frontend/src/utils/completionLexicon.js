@@ -60,10 +60,16 @@ export function extractCompletionEntries(text, { segmenter, limit = MAX_ENTRIES 
     if (value.length > law?.length) add(value, 'ARTICLE')
   }
   for (const match of text.matchAll(CASE_NUMBER_RE)) add(match[0], 'CASE')
-  for (const match of text.matchAll(PERSON_RE)) add(match[1], 'PERSON')
-  for (const match of text.matchAll(NARRATIVE_PERSON_RE)) {
-    if (!NON_PERSON.test(match[1])) add(match[1], 'PERSON')
+  // 人名两条腿都过 NON_PERSON；是已抽到的公司名的一段（「远航」⊂「上海远航物流有限公司」）
+  // 的不当人名（教程反馈 80）。公司在上面已经全部抽完，与出现先后无关。
+  const companies = entries.filter((entry) => entry.kind === 'COMPANY').map((entry) => entry.text)
+  const addPerson = (value) => {
+    const name = String(value || '').trim()
+    if (!name || NON_PERSON.test(name) || companies.some((company) => company.includes(name))) return
+    add(name, 'PERSON')
   }
+  for (const match of text.matchAll(PERSON_RE)) addPerson(match[1])
+  for (const match of text.matchAll(NARRATIVE_PERSON_RE)) addPerson(match[1])
 
   const wordSegmenter = resolveSegmenter(segmenter)
   if (wordSegmenter) {
