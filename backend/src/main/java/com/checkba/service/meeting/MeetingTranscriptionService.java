@@ -321,10 +321,31 @@ public class MeetingTranscriptionService {
      */
     public boolean isConfigured() {
         return switch (tier()) {
-            case LOCAL -> localAsrClient.probe().ready();
+            case LOCAL -> localReady();
             case PLATFORM -> platformGatewayClient.connected();
             case BYOK -> loadSettings().configured();
         };
+    }
+
+    /**
+     * 本机探测结果的短时缓存（dev-board#1713 #116）：一次右键转写会经会议列表、register-file
+     * 连问好几遍，每遍都是一次可能卡到超时的 HTTP 探测。按地址缓存几秒；面板「重新检测」
+     * 走的是 /api/asr/local/probe 直探，不受这里影响。
+     */
+    static final long LOCAL_READY_CACHE_MS = 5_000;
+    private record LocalReady(String base, boolean ready, long at) {}
+    private volatile LocalReady localReady;
+
+    private boolean localReady() {
+        String base = localAsrClient.baseUrl();
+        LocalReady cached = localReady;
+        long now = System.currentTimeMillis();
+        if (cached != null && java.util.Objects.equals(cached.base(), base) && now - cached.at() < LOCAL_READY_CACHE_MS) {
+            return cached.ready();
+        }
+        boolean ready = localAsrClient.probe().ready();
+        localReady = new LocalReady(base, ready, now);
+        return ready;
     }
 
     /**

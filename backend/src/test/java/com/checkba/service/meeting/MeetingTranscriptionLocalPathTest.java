@@ -238,6 +238,22 @@ class MeetingTranscriptionLocalPathTest {
     }
 
     @Test
+    @DisplayName("isConfigured 的本机探测短时缓存：一次右键转写里连问几遍只探一次，换地址重探（dev-board#1713 #116）")
+    void configuredCachesTheLocalProbeBriefly() {
+        when(localAsr.baseUrl()).thenReturn("http://127.0.0.1:8890");
+        MeetingTranscriptionService svc = service();
+        assertTrue(svc.isConfigured());
+        assertTrue(svc.isConfigured());
+        assertTrue(svc.isConfigured());
+        verify(localAsr, times(1)).probe();
+
+        when(localAsr.baseUrl()).thenReturn("http://127.0.0.1:9999");
+        stubProbe(LocalAsrClient.Status.SERVICE_DOWN, "服务没起。", "重启应用。");
+        assertFalse(svc.isConfigured(), "Electron 换了端口必须重新探，不能沿用旧地址的结论");
+        verify(localAsr, times(2)).probe();
+    }
+
+    @Test
     @DisplayName("被关机打断的转写要能自愈：两个 taskId 都为空且本 JVM 没在跑 → 落 FAILED 让用户能重试")
     void interruptedTranscriptionRecoversInsteadOfHangingForever() {
         // 模拟「上次运行留下的」：库里停在转写中，但本进程里没有对应的后台任务
