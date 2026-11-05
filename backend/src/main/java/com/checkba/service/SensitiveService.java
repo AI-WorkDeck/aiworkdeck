@@ -32,7 +32,7 @@ import java.nio.file.Path;
 @Service
 @Slf4j
 public class SensitiveService {
-    public static final String VERSION = "2.3.0";
+    public static final String VERSION = "2.4.0";
     public static final String DESCRIPTION = "本地规则脱敏：公司、中文姓名、注册地址及正文地址、统一社会信用代码、律师执业证号等自动识别，地址仅保留行政层级，支持补充词语、预览与编号替换；校验失败的证件号单独提示不处理；编辑副本后凭加密映射和密码复敏。引擎随桌面端更新，不调用大模型。";
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.checkba.service.document.DocumentGeneratorSettings documentGeneratorSettings;
@@ -63,8 +63,9 @@ public class SensitiveService {
      */
     public record Result(String path, String recoveryKit, Map<String, Integer> counts,
                          Map<String, Integer> suspects, List<String> warnings, String name) {}
+    /** suspectItems：疑似号码的原值与类型（去重、最多 100 条），只在本机预览里给，面板据此提供「仍然遮蔽」。 */
     public record Preview(String text, Map<String, Integer> counts,
-                          Map<String, Integer> suspects, List<String> warnings) {}
+                          Map<String, Integer> suspects, List<String> warnings, List<Map<String, String>> suspectItems) {}
     private static final Set<String> TEXT_EXTENSIONS = Set.of("txt", "md", "csv", "log");
 
     public String processFile(String filePath, List<String> strategies) throws Exception {
@@ -142,7 +143,7 @@ public class SensitiveService {
         if (engine.counts().isEmpty()) messages.add(LangText.of("未识别到敏感信息，不代表原文没有敏感信息。", "No sensitive items were detected; this does not guarantee the document contains none."));
         if (preview.length() > 12000) messages.add(LangText.of("预览仅显示前12000字符，统计和实际处理覆盖全文。", "Preview shows only the first 12,000 characters; statistics and actual processing cover the full document."));
         return new Preview(preview.substring(0, Math.min(12000, preview.length())),
-                engine.counts(), engine.suspects(), messages);
+                engine.counts(), engine.suspects(), messages, engine.suspectItems().stream().limit(100).toList());
     }
 
     public Result processFile(String filePath, Options options) throws Exception {

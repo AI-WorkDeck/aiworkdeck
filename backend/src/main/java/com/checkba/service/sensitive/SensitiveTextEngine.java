@@ -21,6 +21,8 @@ public final class SensitiveTextEngine {
     private final Map<String, Integer> counts = new LinkedHashMap<>();
     /** 形似但校验失败的号码候选（按类型计数）：不处理，但要让用户看见（dev-board C2）。 */
     private final Map<String, Integer> suspects = new LinkedHashMap<>();
+    /** 同一批疑似号码的原值（去重，原值 → 类型），只回给本机预览，供「仍然遮蔽」（dev-board#1713 #96）。 */
+    private final Map<String, String> suspectValues = new LinkedHashMap<>();
     private final boolean reversible;
     private String scope = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
 
@@ -173,6 +175,7 @@ public final class SensitiveTextEngine {
             if (next >= 0 && next < suspect.end) continue;
             if (!reported.add(suspect.start + ":" + suspect.end)) continue;
             suspects.merge(suspect.code, 1, Integer::sum);
+            suspectValues.putIfAbsent(suspect.value, suspect.code);
         }
         accepted.sort(Comparator.comparingInt(Hit::start));
         List<Edit> edits = new ArrayList<>();
@@ -201,6 +204,9 @@ public final class SensitiveTextEngine {
     public Map<String, String> recovery() { return Map.copyOf(recovery); }
     public Map<String, Integer> counts() { return Map.copyOf(counts); }
     public Map<String, Integer> suspects() { return Map.copyOf(suspects); }
+    public List<Map<String, String>> suspectItems() {
+        return suspectValues.entrySet().stream().map(e -> Map.of("type", e.getValue(), "value", e.getKey())).toList();
+    }
 
     public static String apply(String text, List<Edit> edits) {
         StringBuilder result = new StringBuilder(text);

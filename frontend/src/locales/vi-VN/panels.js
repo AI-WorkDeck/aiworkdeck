@@ -197,6 +197,8 @@ export default {
   "deRestoreGenerate": "Tạo tệp đã khôi phục",
   "deMatchCount": "Đã khớp / khôi phục {count} lần xuất hiện",
   "deSuspectCount": "{count} số dạng ID/thẻ khác không vượt qua kiểm tra chữ số kiểm tra và được giữ nguyên. Hãy thêm những số bạn muốn che vào \"Thuật ngữ nhạy cảm bổ sung\" ở trên.",
+  "deMaskAnyway": "Vẫn che",
+  "deMaskAnywayLabel": "Vẫn che {value}",
   "deKitFileTag": "khoi-phuc",
   "deKitFallbackName": "tep-da-che",
   "deBrowseUnavailable": "Không thể mở trình chọn tệp dự án. Hãy dùng \"Import Current\" thay thế, hoặc mở lại workbench và thử lần nữa.",

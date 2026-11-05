@@ -197,6 +197,8 @@ export default {
   "deRestoreGenerate": "Geri yüklenmiş dosyayı oluştur",
   "deMatchCount": "Eşleşen / geri yüklenen {count} geçiş",
   "deSuspectCount": "{count} adet daha kimlik/kart benzeri numara kontrol basamağını geçemediği için olduğu gibi bırakıldı. Sansürlenmesini istediklerinizi yukarıdaki \"Ek Hassas Terimler\" bölümüne ekleyin.",
+  "deMaskAnyway": "Yine de sansürle",
+  "deMaskAnywayLabel": "{value} yine de sansürle",
   "deKitFileTag": "geri-yukleme",
   "deKitFallbackName": "sansurlu-dosya",
   "deBrowseUnavailable": "Proje dosya seçici açılamadı. Bunun yerine \"Mevcut Dosyayı İçe Aktar\" seçeneğini kullanın veya çalışma tezgahını yeniden açıp tekrar deneyin.",

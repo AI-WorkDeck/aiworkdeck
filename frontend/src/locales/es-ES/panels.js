@@ -194,6 +194,8 @@ export default {
   "deRestoreGenerate": "Generar archivo restaurado",
   "deMatchCount": "{count} coincidencias / restauraciones en esta ejecución",
   "deSuspectCount": " otros {count} números similares a documentos/tarjetas no superaron el dígito de control y no se procesaron. Añada los que desee ocultar en «Términos sensibles adicionales» más arriba.",
+  "deMaskAnyway": "Ocultar de todos modos",
+  "deMaskAnywayLabel": "Ocultar {value} de todos modos",
   "deKitFileTag": "restauracion",
   "deKitFallbackName": "archivo-anonimizado",
   "deBrowseUnavailable": "No se pudo abrir el selector de archivos del proyecto. Utilice «Importar actual» en su lugar, o vuelva a abrir el área de trabajo e inténtelo de nuevo.",

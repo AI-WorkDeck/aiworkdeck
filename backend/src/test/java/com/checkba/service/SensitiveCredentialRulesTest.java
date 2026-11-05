@@ -153,4 +153,22 @@ class SensitiveCredentialRulesTest {
         SensitiveService.Result result = service.processFile(source.toString(), options);
         assertEquals(1, total(result.suspects()));
     }
+
+    @Test
+    @DisplayName("预览带上疑似号码原值；补进敏感词后不再报疑似（dev-board#1713 #96）")
+    void previewListsSuspectValuesAndMaskingThemAsCustomTermsClearsThem() throws Exception {
+        java.nio.file.Path source = dir.resolve("suspect.txt");
+        java.nio.file.Files.writeString(source, "被告代码：" + FABRICATED_USCC + "。再次出现：" + FABRICATED_USCC + "。");
+        var preview = service.previewFile(source.toString(), new SensitiveService.Options(
+                List.of("UNIFIED_SOCIAL_CREDIT"), "TOKEN", List.of(), List.of(), null));
+        assertEquals(2, total(preview.suspects()));
+        assertEquals(List.of(java.util.Map.of("type", "UNIFIED_SOCIAL_CREDIT", "value", FABRICATED_USCC)), preview.suspectItems());
+        // 「仍然遮蔽」= 写进补充敏感词再预览；校验位闸门本身不放开
+        var masked = service.previewFile(source.toString(), new SensitiveService.Options(
+                List.of("UNIFIED_SOCIAL_CREDIT"), "TOKEN", List.of(FABRICATED_USCC), List.of(), null));
+        assertFalse(masked.text().contains(FABRICATED_USCC));
+        assertEquals(0, total(masked.suspects()));
+        assertTrue(masked.suspectItems().isEmpty());
+        assertEquals(0, masked.counts().getOrDefault("UNIFIED_SOCIAL_CREDIT", 0));
+    }
 }

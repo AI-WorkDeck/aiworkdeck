@@ -197,6 +197,8 @@ export default {
   "deRestoreGenerate": "復元ファイルを生成",
   "deMatchCount": "{count} 件を照合 / 復元しました",
   "deSuspectCount": "チェックディジット検証に失敗した ID/カード形式の番号があと {count} 件あり、元のまま残されました。マスキングしたい番号は上の「追加の機微用語」に入力してください。",
+  "deMaskAnyway": "それでもマスキング",
+  "deMaskAnywayLabel": "{value} をそれでもマスキング",
   "deKitFileTag": "復元",
   "deKitFallbackName": "マスキング済みファイル",
   "deBrowseUnavailable": "プロジェクトのファイルピッカーを開けませんでした。代わりに「現在のファイルをインポート」を使用するか、ワークベンチを開き直してもう一度お試しください。",
