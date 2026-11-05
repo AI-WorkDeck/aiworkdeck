@@ -342,7 +342,8 @@ export default {
                               id: data.fileId,
                               name: data.name,
                               fileType: data.fileType,
-                              wpsFileId: data.wpsFileId
+                              wpsFileId: data.wpsFileId,
+                              ...(data.parentId !== undefined ? { parentId: data.parentId } : {})
                           })
                       }
                   }
@@ -361,7 +362,8 @@ export default {
                 id: data.fileId,
                 name: data.name,
                 fileType: data.fileType,
-                wpsFileId: data.wpsFileId
+                wpsFileId: data.wpsFileId,
+                ...(data.parentId !== undefined ? { parentId: data.parentId } : {})
              })
           }
           // Clear it
