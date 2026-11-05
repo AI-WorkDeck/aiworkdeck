@@ -112,7 +112,10 @@ public class DdAiService {
         if (jobs.countByKindAndSubmissionId("VERIFY", submissionId) >= 3)
             throw new DdProcessingException(LangText.of("本版材料已核验三次，请补传更清晰的材料或提交律师复核", "This material version has been verified three times; please upload clearer materials or submit for lawyer review"));
         Long reviewer = request.getPublishedBy() != null ? request.getPublishedBy() : request.getCreatedBy();
-        DdAiJob job = enqueue(request.getProjectId(), reviewer, "VERIFY", submission.getItemId(), submissionId, Map.of());
+        // synchronized 在事务代理提交前就释放了，并发的第二个调用仍可能读到同一个计数；
+        // 带确定性的「第 n 次核验」键，让 uk_dd_job_attempt 在库里拒绝重复入队。
+        String attemptKey = "verify:" + submissionId + ":" + jobs.countByKindAndSubmissionId("VERIFY", submissionId);
+        DdAiJob job = enqueue(request.getProjectId(), reviewer, "VERIFY", submission.getItemId(), submissionId, Map.of(), attemptKey);
         submissions.updateAssessment(submissionId, "QUEUED", null);
         return job;
     }
@@ -137,8 +140,16 @@ public class DdAiService {
         } while (!interrupted.isEmpty());
     }
 
+    /** 正常任务的各步骤都有超时（网关 60s 等），30 分钟仍是 RUNNING 只能是工作线程挂死。 */
+    private static final long STALE_RUNNING_MINUTES = 30;
+
     @Scheduled(fixedDelay = 1500)
     public void dispatch() {
+        // 回收挂死的 RUNNING：否则它一直占着 64 的活跃上限并挡住同一材料的重新核验，直到重启。
+        // fail() 的 finish 只作用于 RUNNING，僵尸线程之后再 finish 是空操作。
+        for (DdAiJob stuck : jobs.findTop8ByStatusAndStartedAtBefore("RUNNING", java.time.LocalDateTime.now().minusMinutes(STALE_RUNNING_MINUTES)))
+            fail(stuck, LangText.of("本次处理长时间没有结果，已中止。材料已保留，请重试。",
+                    "Processing produced no result for too long and was stopped. Materials have been preserved; please try again."));
         if (running.get() >= 2) return;
         for (DdAiJob candidate : jobs.findTop8ByStatusOrderByCreatedAtAsc("QUEUED")) {
             if (running.incrementAndGet() > 2) { running.decrementAndGet(); break; }
