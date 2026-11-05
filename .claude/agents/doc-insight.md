@@ -36,6 +36,10 @@ dev-board#181（后端部分）+ #182 + #541（DOC 第四类实体）。
 - `DocInsightViews.java` — REST 视图 record。
 - `InsightProperties.java` — `insight.*` 配置。
 
+**离线法律引用解析（对齐 Stella，`service/legal/cn/`，尚未接入管线）**
+- `LawCitation`（条文引用 → 法名/版本/条/款/项/目，含列举）、`CaseNumber`（新式案号 → 年度/法院代字/层级/类型）、`LawAliases`（法律简称全称表）、`ChineseNumerals`（中文数字互转）。纯函数、零网络。
+  要做法条/案号的识别与归一先用它们，别再写第三份正则；接入方案与外部数据源合规见 `docs/plans/stella-alignment/cn-legal-data.md`。
+
 **实体与仓储**
 - `model/entity/DocInsightRun|DocInsightEntity|DocInsightFinding.java`（表 `doc_insight_run` / `doc_insight_entity` / `doc_insight_finding`，索引写在 `@Table` 上，ddl-auto 自动建表）。
 - `repository/DocInsight{Run,Entity,Finding}Repository.java`。
