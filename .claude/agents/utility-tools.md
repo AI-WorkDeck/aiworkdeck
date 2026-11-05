@@ -523,6 +523,11 @@ uni 依赖换桩；SSR 合并 class 的顺序不固定，按「含有这个类�
   打包版自带 `cjk-kai.ttf` 无此问题。带文字层的 PDF：可搜索→`already_searchable` 不上传；版式 Word→本机
   pdf2docx（无组件退回文字版 Word）。**选路**：本机 MinerU 就绪且偏好非「云端」即走本地（不弹上传告知、不计费），
   本地失败返回 `local_failed`，前端以同一勾选式告知询问是否本批改用云端（请求带 `route:"cloud"`，仍需同意版本）。
+  **右键路径要自己拉起本地服务（0.79.0 真机复测）**：后端只判组件已装就选本地，但工作台里只有
+  AI 工具/组件面板会 `host.services.ensure`；宿主 mixin 在批处理开始前尽力 ensure `pptx-service` 与
+  `mineru-service`（未装立即 disabled、不下载），否则每份都 `local_failed` 并劝用户改云端。
+  发布版 MinerU 会输出跨空行的 `<details><summary>seal</summary>…</details>`（章面 OCR 乱码），
+  `MineruLayoutReader` 整块丢弃、保留章图；以标签开头的其它块只取文本（夹具 `mineru-packaged.md`）。
   识别结果按文件内容 SHA-256 缓存在 `storage.local.root-path/.ocr-cache`（`OcrResultCache`，300 条），
   两种导出只识别、只计费一次；无坐标的结果不入缓存。回归：`AliyunLayoutReaderTest`（真实返回夹具
   `src/test/resources/ocr/`）、`LayoutDocxWriterTest`、`SearchablePdfWriterTest`、`MineruLayoutReaderTest`、
