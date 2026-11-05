@@ -209,6 +209,24 @@ class CloudControllerTest {
         }
     }
 
+    /** 连着多个案件库时界面要列出每条连接让律师断开（问题 126），连上的时间帮他分清是哪条。 */
+    @Test
+    void connectionsListCarriesConnectedAt() {
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(USER_ID);
+            CloudConnection conn = new CloudConnection();
+            conn.setId(5L);
+            conn.setServerUrl("https://cloud.example.com");
+            conn.setCreatedAt(LocalDateTime.of(2026, 10, 1, 9, 30, 12));
+            when(cloudSyncService.listConnections(USER_ID)).thenReturn(List.of(conn));
+
+            @SuppressWarnings("unchecked")
+            var data = (Map<String, Object>) controller.connections("sess").getBody().get("data");
+            var item = ((List<Map<String, Object>>) data.get("connections")).get(0);
+            assertEquals("2026-10-01T09:30:12", item.get("connectedAt"));
+        }
+    }
+
     // ---- upload/update 转发参数正确 --------------------------------------------
 
     @Test

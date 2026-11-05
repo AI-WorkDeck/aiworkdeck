@@ -166,6 +166,13 @@ AI 版本入口（dev-board#1498）复用本领域控制器与服务，工具/�
   **取库规则本体已抽到 `frontend/src/utils/cloudShare.js`**（`pickShareConnectionId` / `shareProjectToLibrary`，
   share 函数由调用方注入以便 node --test），`CollabDialog.onShare` 与 `InviteMemberDialog` 的「放进团队案件库」
   按钮共用，别再各写一份。
+  **多于一条连接被拒时不再是死胡同**（问题 126 真机复测，dev-board#1713）：两个弹窗就地渲染
+  `frontend/src/components/collab/LibraryConnectionList.vue`，逐条列出服务器（主机名）、是否官方
+  （与 `GET /api/cloud/official` 的 `serverUrl` 相等）、我的身份、`connectedAt`（`CloudController.connectionListItem`
+  新带的 `createdAt`；没有「最近使用」字段），每条一个「断开」：`uni.showModal` 确认后调现有的
+  `disconnectCloudConnection`（行逻辑与「没确认一次都不调」在 `cloudShare.describeLibraryConnections` /
+  `disconnectLibraryConnection`）。断开 = 撤远端令牌 + 删本地连接与它的全部 `ProjectRemote`：本机文件不动，
+  经它入库的案卷在本机回到 `linked:false`，案件库里的内容不动。不自动选、不自动断开、断开后不自动重放 share。
   **放进案件库被云端写权限门禁拒绝**（`CloudSyncService.accountCloudEpoch` / `CloudGitEpochClient` 抛
   `VersionException.cloudReconnectRequired`，`CloudController`/`VersionController` 的处理器回 `kind=CLOUD_RECONNECT_REQUIRED`）：
   两个弹窗用 `cloudShare.needsCloudReconnect(e)`（只认 kind，不匹配文案）就地显示后端原话 +「重新连接云端」按钮，

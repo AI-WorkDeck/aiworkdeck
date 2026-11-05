@@ -4386,8 +4386,8 @@ export function listCloudConnections() {
   return request({ url: '/api/cloud/connections', method: 'GET' })
 }
 
-// 同 cloudConnect：dev-board#440 撤掉「退出这个案件库」按钮后界面上没有调用方，
-// 端点保留给自建用户与 e2e 清场（run.mjs 的 finally）。
+// dev-board#440 撤掉「退出这个案件库」按钮后，界面上唯一的调用方是 LibraryConnectionList
+// （连着多于一条连接、「放进团队案件库」被拒时就地断开，问题 126）；e2e 清场也用它。
 export function disconnectCloudConnection(connectionId) {
   return request({ url: `/api/cloud/connections/${connectionId}/disconnect`, method: 'POST' })
 }
