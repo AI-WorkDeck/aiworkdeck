@@ -5,6 +5,7 @@
 // cancel, asks the existing cloud-OCR notice once per batch, then copies / refreshes / opens side by side.
 import { recognizeProjectFileText, cancelProjectFileOcr, promptFeatureNotConfigured } from '@/services/api.js'
 import { showDialog } from '@/utils/dialog.js'
+import { host } from '@/services/host.js'
 import {
   runOcrBatch, summarizeOcrBatch, joinCopiedTexts, sideBySidePlan, openOcrSideBySide, ocrOutputName,
 } from '@/utils/explorerOcr.js'
@@ -34,6 +35,14 @@ export default {
       const jobId = `ocr-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
       Object.assign(this.explorerOcr, { running: true, index: 0, total: items.length, name: '', cancelling: false, jobId })
       const suffix = this.$t(spec.suffix || 'fileTree.ocrOutputSuffix')
+      // An installed local engine is preferred by the backend, but nothing else on this path starts its
+      // services (0.79.0 device test: every local job came back local_failed). Best effort: a missing
+      // component reports disabled at once and never downloads; failures leave the cloud/consent path as is.
+      if (host && host.services && host.services.ensure) {
+        for (const name of ['pptx-service', 'mineru-service']) {
+          try { await host.services.ensure(name) } catch (e) { /* not installed or failed to start */ }
+        }
+      }
       let batch
       try {
         batch = await runOcrBatch({
