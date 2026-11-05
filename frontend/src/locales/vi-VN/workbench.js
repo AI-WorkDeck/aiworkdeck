@@ -110,6 +110,7 @@ export default {
   "recentProjectsLoadFailed": "Tải thất bại — chạm để thử lại",
   "projectHome": "Tổng quan dự án",
   "allProjects": "Tất cả dự án…",
+  "closeProject": "Đóng dự án",
   "statusInProgress": "Đang tiến hành",
   "collab": "Hợp tác",
   "managerLabel": "Trưởng nhóm: {name}",
@@ -139,6 +140,7 @@ export default {
   "collapseSidebar": "Thu gọn thanh bên",
   "toolsPanel": "Bảng công cụ",
   "aiAssistant": "Trợ lý AI",
+  "insightNeedsDoc": "Dùng được khi mở một tài liệu Word",
   "dockToLeft": "Chuyển sang thanh bên trái",
   "dockToRight": "Chuyển sang bảng bên phải",
   "dockToBottom": "Chuyển sang bảng dưới cùng",
@@ -374,7 +376,9 @@ export default {
   },
   "welcome": {
     "quickChatPlaceholder": "Đặt câu hỏi và nhấn Enter để bắt đầu trò chuyện scratch…",
+    "quickChatPlaceholderInProject": "Nhập câu hỏi và nhấn Enter để bắt đầu cuộc trò chuyện mới trong dự án này…",
     "enterChatMode": "Bắt đầu trò chuyện scratch",
+    "newChatInProject": "Trò chuyện mới trong dự án này",
     "quickNewDocx": "Tài liệu trống mới",
     "quickNewMd": "Markdown mới",
     "quickChatSend": "Gửi"

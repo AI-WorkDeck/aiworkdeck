@@ -8,6 +8,7 @@ export default {
   "cancel": "Batal",
   "save": "Simpan",
   "close": "Tutup",
+  "done": "Selesai",
   "delete": "Hapus",
   "rename": "Ubah nama",
   "retry": "Coba lagi",

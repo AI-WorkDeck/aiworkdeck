@@ -110,6 +110,7 @@ export default {
   "recentProjectsLoadFailed": "लोड होने में विफल — पुनः प्रयास के लिए टैप करें",
   "projectHome": "प्रोजेक्ट अवलोकन",
   "allProjects": "सभी प्रोजेक्ट…",
+  "closeProject": "प्रोजेक्ट बंद करें",
   "statusInProgress": "प्रगति पर",
   "collab": "सहयोग",
   "managerLabel": "लीड: {name}",
@@ -139,6 +140,7 @@ export default {
   "collapseSidebar": "साइडबार संकुचित करें",
   "toolsPanel": "टूल्स पैनल",
   "aiAssistant": "AI सहायक",
+  "insightNeedsDoc": "Word दस्तावेज़ खुलने पर उपलब्ध",
   "dockToLeft": "बाएँ साइडबार में ले जाएँ",
   "dockToRight": "दाएँ पैनल में ले जाएँ",
   "dockToBottom": "निचले पैनल में ले जाएँ",
@@ -374,7 +376,9 @@ export default {
   },
   "welcome": {
     "quickChatPlaceholder": "प्रश्न पूछें और स्क्रैच चैट शुरू करने के लिए Enter दबाएँ…",
+    "quickChatPlaceholderInProject": "प्रश्न लिखें और इस प्रोजेक्ट में नई चैट शुरू करने के लिए Enter दबाएँ…",
     "enterChatMode": "स्क्रैच चैट शुरू करें",
+    "newChatInProject": "इस प्रोजेक्ट में नई चैट",
     "quickNewDocx": "नया खाली दस्तावेज़",
     "quickNewMd": "नया Markdown",
     "quickChatSend": "भेजें"

@@ -349,7 +349,10 @@ public class CloudController {
     public ResponseEntity<Map<String, Object>> onVersionError(VersionException e) {
         log.warn("云端协作操作失败", e);
         String message = e.isUserFacing() ? e.getMessage() : LangText.of("这次协作操作没能完成，请稍后重试", "This collaboration action didn't finish — please try again later");
-        return ResponseEntity.ok(Map.of("code", 1, "message", message));
+        Map<String, Object> body = new java.util.LinkedHashMap<>(Map.of("code", 1, "message", message));
+        // kind（如 CLOUD_RECONNECT_REQUIRED）让前端给出对应的动作按钮，同 VersionController
+        if (e.getKind() != null) body.put("kind", e.getKind());
+        return ResponseEntity.ok(body);
     }
 
     /** 只校验登录，不校验项目成员/角色——连接级端点用。 */

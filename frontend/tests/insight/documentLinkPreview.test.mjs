@@ -156,3 +156,14 @@ test('source change during the save await also prevents the pending tab move', a
   save.resolve(true); await opening
   assert.equal(h.activeFileIdLeft, 2); assert.equal(h.rightFiles.length, 0); assert.equal(h.splitMode, false)
 })
+
+test('卡片文案走语言包，不再按 zh / 非 zh 写死中英两套（J7，dev-board#1713）', async () => {
+  const { readFileSync } = await import('node:fs')
+  const src = readFileSync(new URL('../../src/components/DocumentLinkPreview.vue', import.meta.url), 'utf8')
+  const code = src.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\/.*$/gm, '')
+  assert.doesNotMatch(code, /[一-鿿]/, '组件里不许再有写死的中文')
+  assert.doesNotMatch(code, /Open alongside|Link preview/, '组件里不许再有写死的英文')
+  for (const key of ['linkPreviewTitle', 'linkPreviewUnavailable', 'linkPreviewTruncated', 'linkPreviewDocument', 'linkPreviewNoExcerpt', 'linkPreviewOpenAside', 'linkPreviewNoWeb']) {
+    assert.ok(code.includes(`'${key}'`), `缺 editor.${key}`)
+  }
+})

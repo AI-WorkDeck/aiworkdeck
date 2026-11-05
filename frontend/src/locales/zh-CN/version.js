@@ -294,6 +294,7 @@ export default {
   addMemberFailed: '没能加进来',
   copiedPasteToColleague: '已复制，粘贴给同事即可',
   connectFailed: '连接失败',
+  reconnectCloud: "重新连接云端",
   // 邀请话术：整段发给同事的邀请文本（含具体操作步骤），一个键完整抽出。
   // 有/无邀请人两个键：英文的人名后面要有空格（"{name} invites you"），单键靠拼
   // {inviter} 没法在两种语言里同时成立。

@@ -17,7 +17,7 @@
 // 打开期间持有全局浮层（overlayState.js）：桌面端 BrowserView 是原生层、永远盖在 DOM 上，
 // 不让开的话登录框被网页视图挡住、点不到，等它结果的调用方就永远挂着（同 dev-board#968）。
 
-import { createApp } from 'vue'
+import { createApp, ref } from 'vue'
 import AccountLoginDialog from '@/components/account/AccountLoginDialog.vue'
 import RechargeDialog from '@/components/RechargeDialog.vue'
 import { i18n } from '@/i18n/index.js'
@@ -36,6 +36,12 @@ export const ACCOUNT_CHANGED_EVENT = 'awd:account-changed'
 const CONTAINER_ID = 'awd-account-login-host'
 const OVERLAY_HOLDER = 'awd-account-login'
 let sessionExpired = false
+
+/**
+ * 登录弹层此刻开着没有。登录层 z-index 9990，压不过 9999 的业务弹窗遮罩（协作弹窗、加人弹窗）；
+ * 那些弹窗据此先把自己收起、登录完再回来，否则登录层被盖住点不到、调用方一直挂着（问题 126/127）。
+ */
+export const accountLoginOpen = ref(false)
 export function isAccountSessionExpired() { return sessionExpired }
 
 function openDialog({ reason }) {
@@ -56,6 +62,7 @@ function openDialog({ reason }) {
       if (settled) return
       settled = true
       try { app && app.unmount() } catch (e) { /* ignore */ }
+      accountLoginOpen.value = false
       setGlobalOverlay(false, OVERLAY_HOLDER)
       resolve(result)
     }
@@ -70,6 +77,7 @@ function openDialog({ reason }) {
       })
       app.use(i18n)
       setGlobalOverlay(true, OVERLAY_HOLDER)
+      accountLoginOpen.value = true
       app.mount(el)
     } catch (e) {
       console.warn('[requireAccount] 登录弹层挂载失败:', e)

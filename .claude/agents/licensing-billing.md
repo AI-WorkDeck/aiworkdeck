@@ -548,6 +548,10 @@ identitySync、平台Key申请或令牌签发。完成 setup 后再单独 exchan
   否则在 `<body>` 下单独 `createApp` 挂登录弹层 `components/account/AccountLoginDialog.vue`（`variant="dialog"`），
   打开期间持有全局浮层（`overlayState.js`，让 BrowserView 让开）；成功 true 并广播，取消 false。
   并发调用共用一个弹层。纯逻辑在 `requireAccountCore.js`（零依赖，护栏 `npm run test:account`）。
+  **登录层 z-index 9990，压不过 9999 的业务弹窗遮罩**：`requireAccount.js` 导出 `accountLoginOpen`（ref，挂载置真、收尾置假），
+  会在自己打开期间调 `requireAccount` 的 9999 弹窗（`CollabDialog`、`InviteMemberDialog`）据此加 `.yield-to-login`（`visibility:hidden`）
+  让路、登录完自己回来；不改全局 z-index（AwdDialog 10000 要盖在登录卡上）。新增这类调用方照抄，护栏
+  `tests/member-invite/collab-login-layer.test.mjs`（问题 126/127，dev-board#1713）。
   浏览器端（团队服务器）恒 true——那里账户在服务端按人桥接，不是「本机连官网账户」。
 - `services/api.js` 的 **4011 分支**：就地弹层（`auto:true`——用户取消后 60 秒内同类自动触发不再追着弹），
   关掉之后**一律 reject**，`err.accountRequired=true`，登录成功时 `err.loggedIn=true`
@@ -1364,7 +1368,7 @@ cost 为 null 原样保留 —— 对账未完成时显示「待结算」，绝�
 
 - 官网 summary 新增 `members[].daily[]/title/agentEditActions/currentProject` 与 `kpi.agentEditActions/activeProjects/unassignedTasks`（契约见官网仓 `doc/desktop-contract.md`）。职务 `title` 是展示标签不涉权限：OWNER/ADMIN 可设任何人，`PUT /api/account/team/members/{id}` 透传 `{role?, title?}`（title 空串 = 清除）。
 - `TeamUsageRollupService.unassignedTasks`：本人名下（非散件/草稿工作区）项目里 OPEN 且 `assigneeId` 为空的事项**计数**，上报时刻的快照；只计数不带标题。它不计入 `isEmptyDay`。
-- 前端 `components/admin/TeamWeekBoard.vue`（TeamPanel 在 scope=team、range=7 时渲染）+ 纯函数 `utils/teamWeek.js`。**负荷口径按「已结束的工作日」**：上报只覆盖昨天及更早，今天的工时永远不在数据里，算进分母会让每周一全员「有余力」；周一不显示档位（`weekBandNoData`），看板注明「数据截至昨天」。「AI 修订次数」是最近 7 天保留在文档里的 AI 编辑动作数，不是文档篇数，文案必须这么写。
+- 前端 `components/admin/TeamWeekBoard.vue`（TeamPanel 在 scope=team、range=7 时渲染）+ 纯函数 `utils/teamWeek.js`。**负荷口径按「已结束的工作日」**：上报只覆盖昨天及更早，今天的工时永远不在数据里，算进分母会让每周一全员「有余力」；周一本周还没有过完的工作日，改看上周一至周五（`boardWeek`，标题与工时 KPI 换成「上周」并加一行说明；7 天档的窗口够不着上周一，`TeamPanel` 周一另取一次 30 天档的成员日数据传给看板，dev-board#1713），看板注明「数据截至昨天」。「AI 修订次数」是最近 7 天保留在文档里的 AI 编辑动作数，不是文档篇数，文案必须这么写。
 - 验证：`node --test frontend/tests/team/team-week.test.mjs`；`TeamUsageRollupServiceTest`；官网 `npm run test:team`。
 
 ### 三层结构与加入流程（设计 §10）

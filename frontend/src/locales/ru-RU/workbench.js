@@ -110,6 +110,7 @@ export default {
   "recentProjectsLoadFailed": "Не удалось загрузить — нажмите, чтобы повторить",
   "projectHome": "Обзор проекта",
   "allProjects": "Все проекты…",
+  "closeProject": "Закрыть проект",
   "statusInProgress": "В процессе",
   "collab": "Совместная работа",
   "managerLabel": "Руководитель: {name}",
@@ -139,6 +140,7 @@ export default {
   "collapseSidebar": "Свернуть боковую панель",
   "toolsPanel": "Панель инструментов",
   "aiAssistant": "ИИ-ассистент",
+  "insightNeedsDoc": "Доступно, когда открыт документ Word",
   "dockToLeft": "Переместить в левую боковую панель",
   "dockToRight": "Переместить в правую панель",
   "dockToBottom": "Переместить в нижнюю панель",
@@ -374,7 +376,9 @@ export default {
   },
   "welcome": {
     "quickChatPlaceholder": "Введите вопрос и нажмите Enter, чтобы начать быстрый чат…",
+    "quickChatPlaceholderInProject": "Задайте вопрос и нажмите Enter, чтобы начать новый чат в этом проекте…",
     "enterChatMode": "Начать быстрый чат",
+    "newChatInProject": "Новый чат в этом проекте",
     "quickNewDocx": "Новый пустой документ",
     "quickNewMd": "Новый документ Markdown",
     "quickChatSend": "Отправить"

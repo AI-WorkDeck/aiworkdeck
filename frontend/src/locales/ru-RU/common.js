@@ -8,6 +8,7 @@ export default {
   "cancel": "Отмена",
   "save": "Сохранить",
   "close": "Закрыть",
+  "done": "Готово",
   "delete": "Удалить",
   "rename": "Переименовать",
   "retry": "Повторить",

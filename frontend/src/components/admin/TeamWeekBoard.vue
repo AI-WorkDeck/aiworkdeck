@@ -3,7 +3,8 @@
 <!--
   团队「本周」看板（纯展示）。数据全部来自 summary（成员各自的工作记录，无需填报）：
     - 工时格取 members[].daily，缺的天按 0；
-    - 负荷档位按「8 小时 × 本周已结束的工作日」估算（上报滞后一天，周一不显示档位），口径在 utils/teamWeek.js；
+    - 负荷档位按「8 小时 × 本周已结束的工作日」估算（上报滞后一天），周一本周还没有过完的工作日，
+      改看上周一至周五并标明「上周」，口径在 utils/teamWeek.js 的 boardWeek；
     - 「AI 修订次数」数的是留在文档里的 AI 修改动作，不是文档篇数；
     - 项目名没共享时只说「项目名未共享」，不拿别处的名字补。
 -->
@@ -11,9 +12,10 @@
   <view class="week-board">
     <view class="week-head">
       <view class="week-head-main">
-        <text class="week-title">{{ $t('team.weekTitle') }}</text>
+        <text class="week-title">{{ $t(week.lastWeek ? 'team.weekTitleLastWeek' : 'team.weekTitle') }}</text>
         <text class="week-range">{{ rangeText }}</text>
         <text class="week-sub">{{ $t('team.weekSubtitle') }}</text>
+        <text v-if="week.lastWeek" class="week-sub">{{ $t('team.weekLastWeekNote') }}</text>
         <text class="week-sub">{{ $t('team.weekDataThrough') }}</text>
       </view>
       <view class="week-legend">
@@ -32,7 +34,7 @@
       </view>
       <view class="week-kpi">
         <text class="week-kpi-value">{{ $t('team.weekHoursShort', { hours: totalHours }) }}</text>
-        <text class="week-kpi-label">{{ $t('team.weekKpiHours') }}</text>
+        <text class="week-kpi-label">{{ $t(week.lastWeek ? 'team.weekKpiHoursLastWeek' : 'team.weekKpiHours') }}</text>
         <text class="week-kpi-sub">{{ $t('team.weekKpiHoursCaption') }}</text>
       </view>
       <view class="week-kpi">
@@ -80,7 +82,7 @@
         <text class="wcol wcol-current">{{ r.current }}</text>
         <text class="wcol wcol-hours">{{ r.hours }}</text>
         <view class="wcol wcol-load week-load">
-          <view class="week-bar"><view class="week-bar-fill" :class="'band-' + (r.band || 'none')" :style="{ width: r.barPct + '%' }"></view></view>
+          <view class="week-bar"><view class="week-bar-fill" :class="'band-' + r.band" :style="{ width: r.barPct + '%' }"></view></view>
           <text class="week-load-text">{{ bandLabel(r.band) }}</text>
         </view>
       </view>
@@ -89,7 +91,7 @@
 </template>
 
 <script>
-import { weekDays, memberWeek, loadBand, loadRatio, cellLevel } from '@/utils/teamWeek.js'
+import { boardWeek, memberWeek, loadBand, loadRatio, cellLevel } from '@/utils/teamWeek.js'
 
 const BANDS = ['light', 'balanced', 'busy']
 
@@ -97,6 +99,8 @@ export default {
   name: 'TeamWeekBoard',
   props: {
     summary: { type: Object, default: null },
+    // 周一看板改看上周：7 天档的窗口够不着上周一，宿主另取一份 30 天档的成员日数据递进来
+    lastWeekMembers: { type: Array, default: null },
     myRole: { type: String, default: '' },
     canEditTitle: { type: Boolean, default: false },
   },
@@ -108,8 +112,11 @@ export default {
     today() {
       return new Date()
     },
+    week() {
+      return boardWeek(this.today)
+    },
     days() {
-      return weekDays(this.today)
+      return this.week.days
     },
     kpi() {
       return (this.summary && this.summary.kpi) || {}
@@ -130,7 +137,8 @@ export default {
       }
     },
     rows() {
-      const members = (this.summary && Array.isArray(this.summary.members)) ? this.summary.members : []
+      const members = (this.week.lastWeek && this.lastWeekMembers)
+        || ((this.summary && Array.isArray(this.summary.members)) ? this.summary.members : [])
       // 忙的排前面：看板要回答的是「谁忙不过来，谁还有余力」
       return members.map((m) => {
         const week = memberWeek(m, this.days)
@@ -158,7 +166,7 @@ export default {
           current,
           hours: this.$t('team.weekHoursShort', { hours: (week.weekMinutes / 60).toFixed(1) }),
           band,
-          barPct: ratio === null ? 0 : Math.round((Math.min(ratio, 1.2) / 1.2) * 100),
+          barPct: Math.round((Math.min(ratio, 1.2) / 1.2) * 100),
         }
       }).sort((a, b) => b.week.weekMinutes - a.week.weekMinutes)
     },
@@ -174,7 +182,6 @@ export default {
       return this.$t('team.roleMember')
     },
     bandLabel(b) {
-      if (!b) return this.$t('team.weekBandNoData')
       return this.$t(b === 'light' ? 'team.weekBandLight' : b === 'busy' ? 'team.weekBandBusy' : 'team.weekBandBalanced')
     },
   },

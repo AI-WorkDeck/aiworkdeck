@@ -41,7 +41,7 @@ ${overlay}
 const ICONS = ${JSON.stringify(ICONS)}; const TRANSLATIONS = ${JSON.stringify(translations)}; const ACCOUNT_CHANGED_EVENT = 'awd:account-changed';
 window.uni = {$on(){},$off(){}};
 const entry = (()=>{${options}})(); entry.render = (()=>{${render}})();
-const accountApp = Vue.createApp(entry, {loggedIn:true, displayName:'QA 合成账号',walletVisible:true,walletText:'¥100.00',walletTier:'测试'});
+const accountApp = Vue.createApp(entry, {loggedIn:true, displayName:'QA 合成账号',walletVisible:true});
 accountApp.config.globalProperties.$t = k => TRANSLATIONS[k] || k;
 const account = accountApp.mount('#account');
 const saveSidebarCollapsed = () => {};

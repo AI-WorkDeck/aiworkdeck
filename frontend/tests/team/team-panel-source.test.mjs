@@ -395,3 +395,10 @@ test('切换团队与切换律所：确认前置、半途失败弹模态框、�
   assert.match(teamPanel, /team\.switchFirmHeadBlocked/)
   assert.match(teamPanel, /notifyOrgChanged\(/)
 })
+
+// ==================== 律所看板空态（问题 123，dev-board#1713） ====================
+
+test('律所看板没有台账数据时显示空态引导，不靠后端塞假部门撑表格', () => {
+  assert.match(teamPanel, /<view v-if="lawfirmActiveRows\.length" class="team-table lf-dim-table">/)
+  assert.match(teamPanel, /<text v-else class="empty-line lf-empty">\{\{ \$t\('team\.lawfirmEmpty'\) \}\}<\/text>/)
+})

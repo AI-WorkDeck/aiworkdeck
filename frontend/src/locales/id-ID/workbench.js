@@ -110,6 +110,7 @@ export default {
   "recentProjectsLoadFailed": "Gagal dimuat — ketuk untuk mencoba lagi",
   "projectHome": "Ringkasan Proyek",
   "allProjects": "Semua Proyek…",
+  "closeProject": "Tutup Proyek",
   "statusInProgress": "Sedang Berlangsung",
   "collab": "Kolaborasi",
   "managerLabel": "Penanggung Jawab: {name}",
@@ -139,6 +140,7 @@ export default {
   "collapseSidebar": "Ciutkan bilah samping",
   "toolsPanel": "Panel Alat",
   "aiAssistant": "Asisten AI",
+  "insightNeedsDoc": "Tersedia setelah dokumen Word dibuka",
   "dockToLeft": "Pindah ke bilah samping kiri",
   "dockToRight": "Pindah ke panel kanan",
   "dockToBottom": "Pindah ke panel bawah",
@@ -374,7 +376,9 @@ export default {
   },
   "welcome": {
     "quickChatPlaceholder": "Ajukan pertanyaan dan tekan Enter untuk memulai obrolan scratch…",
+    "quickChatPlaceholderInProject": "Ketik pertanyaan lalu tekan Enter untuk memulai obrolan baru di proyek ini…",
     "enterChatMode": "Mulai obrolan scratch",
+    "newChatInProject": "Obrolan Baru di Proyek Ini",
     "quickNewDocx": "Dokumen kosong baru",
     "quickNewMd": "Markdown baru",
     "quickChatSend": "Kirim"

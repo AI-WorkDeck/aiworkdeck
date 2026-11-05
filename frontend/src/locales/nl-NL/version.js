@@ -264,6 +264,7 @@ export default {
   "addMemberFailed": "Kon niet toevoegen",
   "copiedPasteToColleague": "Gekopieerd — plak het in een bericht aan uw collega",
   "connectFailed": "Verbinding mislukt",
+  "reconnectCloud": "Opnieuw verbinden met de cloud",
   "inviteTextOfficial": "{inviter} nodigt u uit om samen aan {project} te werken in AI WorkDeck.\n\nZo doet u mee:\n1. Log in op de desktop-app met uw eigen AI WorkDeck-account;\n2. Open de projectenlijst en klik op “Een dossier ophalen uit de Teamdossierbibliotheek”;\n3. Selecteer {project} en klik op “Ophalen naar dit apparaat”.\n\nDaarna werkt ieder aan een eigen exemplaar en klikt u op “Concept indienen” om wijzigingen samen te voegen.",
   "inviteTextOfficialNoInviter": "U bent uitgenodigd om samen aan {project} te werken in AI WorkDeck.\n\nZo doet u mee:\n1. Log in op de desktop-app met uw eigen AI WorkDeck-account;\n2. Open de projectenlijst en klik op “Een dossier ophalen uit de Teamdossierbibliotheek”;\n3. Selecteer {project} en klik op “Ophalen naar dit apparaat”.\n\nDaarna werkt ieder aan een eigen exemplaar en klikt u op “Concept indienen” om wijzigingen samen te voegen.",
   "addPeopleTitle": "Personen toevoegen aan dit dossier",
