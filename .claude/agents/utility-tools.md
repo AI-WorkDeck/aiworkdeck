@@ -505,6 +505,8 @@ uni 依赖换桩；SSR 合并 class 的顺序不固定，按「含有这个类�
   两档的 `OcrResult.text` 一律由 `OcrResult.lines(raw, content)` 从 `raw.subImages[].blockInfo.blockDetails[]`
   逐行拼出（子图之间空一行），raw 无分块才退回 `content`；`raw` 原样保留。截图摘录、AI 读扫描件、
   右键导出同时受益。不改请求参数、不增调用次数。回归 `OcrLineBreaksTest`。
+  阿里云把千分位写成全角「4，200，000」：凡读阿里云文字处（`lines`、`AliyunLayoutReader` 的段落与单元格、
+  可搜索 PDF 文字层）一律过 `OcrResult.digitGroups`，只改「数字，三位数字」里的逗号。回归 `OcrDigitGroupingTest`。
   **保留版式的 Word / 可搜索 PDF（tutorial-series#155 第二期）**：右键子菜单后两项，
   `FileOcrService.Output.LAYOUT_DOCX / SEARCHABLE_PDF` → `OcrExportService`。云端走同一扣费点
   `recognizeGeneral(base64, layout=true)`：两档同一白名单（`AliyunOcrClient.buildRequest` 与官网
