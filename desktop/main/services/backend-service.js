@@ -302,7 +302,7 @@ function spec(ctx, javaCmd) {
   // 打包模式：工作目录必须可写（resources 目录只读）
   const cwd = ctx.packaged ? ctx.dataDir : path.join(ctx.projectRoot, 'backend')
   if (ctx.packaged) fs.mkdirSync(cwd, { recursive: true })
-  const bootOverlay = { context: { packaged: ctx.packaged, dataDir: ctx.dataDir, appVersion: ctx.appVersion },
+  const bootOverlay = { context: { packaged: ctx.packaged, dataDir: ctx.dataDir, appVersion: ctx.appVersion, instanceId: ctx.instanceId },
     current: require('./overlay').readCurrent(ctx) }
   return { cmd: javaCmd, args: javaLaunchArgs(ctx), env: spawnEnv(ctx), cwd, bootOverlay }
 }

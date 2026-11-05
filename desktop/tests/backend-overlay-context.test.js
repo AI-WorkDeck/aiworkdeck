@@ -111,6 +111,28 @@ test('full startup failures keep the two-launch rollback rule and one verdict pe
   assert.equal(overlay.readCurrent(h.correctCtx), null)
 })
 
+// 问题 21：实例在启动中途被退出/强杀（SIGTERM → before-quit → stopAll）时，后端启动
+// 失败是我们自己停的，不是补丁坏了，不能给 bootFailures 记账。
+test('startup failure caused by our own shutdown is not counted against the overlay', t => {
+  const h = harness(t), record = bootRecorder(h.manager)
+  activateFixture(h, '0.38.5')
+  const launch = captureLaunch(h)
+  h.manager.closing = true
+  assert.equal(record(false, launch, 'services are stopping').reverted, false)
+  assert.equal(overlay.readCurrent(h.correctCtx).bootFailures || 0, 0)
+})
+
+test('boot verdict carries this instance identity into the overlay counter', t => {
+  const h = harness(t), record = bootRecorder(h.manager)
+  activateFixture(h, '0.38.5')
+  overlay.noteBackendBootFailure({ ...h.correctCtx, instanceId: '/other/instance/userdata' })
+  const launch = captureLaunch(h)
+  assert.equal(launch.bootOverlay.context.instanceId, h.manager.ctx.instanceId)
+  assert.ok(h.manager.ctx.instanceId, 'createServices 应把 userData 作为实例标识放进 ctx')
+  assert.equal(record(false, launch, 'full startup timeout').reverted, false, '别的实例的失败不累加')
+  assert.equal(overlay.readCurrent(h.correctCtx).bootFailures, 1)
+})
+
 test('full health clears failures for the exact overlay used by this launch', t => {
   const h = harness(t), record = bootRecorder(h.manager)
   activateFixture(h, '0.38.5')

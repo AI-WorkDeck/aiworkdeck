@@ -415,6 +415,10 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
 - 后端复用按 home 区分：设了 AWD_HOME 时 build 指纹带 `@home-<sha256 前 12 位>` 后缀，`decideReuse` 见到不同 home 的后端一律 `skip`（两个方向都是），不会连到别的实例的后端读到别人的数据；
 - 应用内更新关闭（`updatesDisabledReason` 返回 `AWD_HOME`，同问题 90）。
 
+overlay 自愈回滚计数也按实例区分（问题 21）：`overlay/<major>/current.json` 的 `bootFailures` 旁边记 `bootFailureInstance`
+（= 记账实例的 userData 路径，经 service ctx `instanceId` → `bootOverlay.context` 传入），上一次失败来自别的实例就从 1 重新数，
+只有同一实例连续两次启动失败才回滚；实例自己在退出中（`services.closing`，SIGTERM/⌘Q 打断启动）造成的启动失败不记账。
+
 不设时行为完全不变。用法（macOS）：`AWD_HOME=/tmp/awd-demo "/Applications/AI WorkDeck.app/Contents/MacOS/AI WorkDeck"`，
 或 `open -n --env AWD_HOME=/tmp/awd-demo -a "AI WorkDeck"`（`-n` 才会再开一个实例；`open` 不传当前 shell 的 env，必须用 `--env`）。
 Windows：`set AWD_HOME=D:\awd-demo && "%LOCALAPPDATA%\Programs\AI WorkDeck\AI WorkDeck.exe"`。
