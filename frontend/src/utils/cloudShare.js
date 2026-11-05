@@ -98,15 +98,15 @@ export async function disconnectLibraryConnection({ connectionId, confirm, disco
 
 /**
  * 「重新绑定这份案卷」：已入库的案卷重新连接后仍被门禁拒（云端那份已不在/没权限）时，
- * 先 confirm，再拆掉本机绑定（unbind = api.js 的 unbindCloudProject，本机文件不动），
+ * 先选连接、再 confirm，再拆掉本机绑定（unbind = api.js 的 unbindCloudProject，本机文件不动），
  * 再按 shareProjectToLibrary 同一套连接规则放进去一次（share = shareProjectToCloud，后端带幂等键）。
- * 连接选不出来（多于一条）时**先拒、一个字不拆**——拆完放不进去，案卷就白白掉出了案件库。
+ * 连接选不出来（多于一条）时**先拒、不弹确认、一个字不拆**——拆完放不进去，案卷就白白掉出了案件库。
  * unbind/share 抛的错原样往外抛。
  */
 export async function rebindProjectToLibrary({ projectId, connections, confirm, unbind, share }) {
-  if (!(await confirm())) return { ok: false }
   const picked = pickShareConnectionId(connections)
   if (!picked.ok) return picked
+  if (!(await confirm())) return { ok: false }
   await unbind(projectId)
   await share(projectId, picked.connectionId)
   return { ok: true, connectionId: picked.connectionId }
