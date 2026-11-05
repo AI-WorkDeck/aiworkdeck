@@ -610,5 +610,5 @@ Apple 订阅桥接：GET `/api/mobile/billing/subscription/appstore/capability`�
 ### 隐藏缺陷修复（B3）带来的约束
 
 - **网络读不进事务/锁**：`MobileRelayController.versionObjectPart` 先把请求体落临时文件再调 `MobileVersionObjectService.put`（事务 + 属主行锁）；`GitHttpController.receivePack` 先落临时文件再进 `repoLock`；`CloudSyncService.uploadToCloud` 在锁外先预传一遍版本对象（持锁段保留原调用补漏）。新增同类入口别在锁内读 socket / 走 WAN。
-- **收件箱下载必须有读取期限**：`MobileRelayClientService` 里 `content.body()` 一律包 `DeadlineInputStream(…, inboxBodyDeadline)`（默认 10 分钟）。`ofInputStream` 拿到响应头后 `HttpRequest.timeout` 不再约束读取，不包的话卡住的下载永远占着 `inboxRunning`，整条手机同步冻结。
+- **收件箱下载必须有读取期限**：`MobileRelayClientService` 里 `content.body()` 一律包 `DeadlineInputStream(…, inboxBodyDeadline)`（默认 30 分钟，整次下载总期限）。`ofInputStream` 拿到响应头后 `HttpRequest.timeout` 不再约束读取，不包的话卡住的下载永远占着 `inboxRunning`，整条手机同步冻结。
 - **传输请求状态转换用条件更新**：`MobileTransferService.upload`（`stageIfPending`）与 `cancel`（`failIfPending`）靠 `where status='PENDING'` 互斥，输家不得再整行 save 覆盖；`push()` 扣费后读文件/暂存失败要 `refundChargeQuietly`（此时没有行，TTL 清扫兜不到）。
