@@ -91,7 +91,7 @@ export default {
     "crossBorderNoticeBody": "Çin sitesi, AI WorkDeck sunucuları üzerinden Alibaba Cloud Bailian’a bağlanır; uluslararası site OpenRouter kullanır. Yapay zekâya gönderilen metinler ve dosya alıntıları çıkarım ve faturalandırma için kullanılır. Seçilen modele göre işlem Çin ana karası dışında yapılabilir. Ayarlardan onayınızı geri çekmeniz platformun yapay zekâ kanalını devre dışı bırakır.",
     "agreementRequired": "Devam etmek için Hizmet Şartları ve Gizlilik Politikası onay kutusunu işaretleyin",
     "crossBorderRequired": "Devam etmek için ayrı yurt dışı veri aktarımı onay kutusunu işaretleyin",
-    "consentBothRequired": "Devam etmek için yukarıdaki iki kutuyu da işaretleyin",
+    "consentBothRequired": "Lütfen önce yukarıdaki iki onay kutusunu işaretleyin",
     "crossBorderLabelDomestic": "Ayrı onay: Yapay zekâya gönderilen içerik Çin anakarası dışında işlenebilir",
     "crossBorderNoticeTitleDomestic": "Çin anakarası dışında olası işlemeye onay",
     "crossBorderNoticeBodyDomestic": "Çin sitesi, AI WorkDeck sunucuları üzerinden Alibaba Cloud Bailian’a bağlanır. Yapay zekâya gönderilen metin ve dosya parçaları çıkarım ve faturalandırma için kullanılır; seçilen modele bağlı olarak Çin anakarası dışında işlenebilir. Onayınızı Ayarlar’dan geri çekebilirsiniz; bu durumda platformun yapay zekâ kanalı devre dışı kalır.",
