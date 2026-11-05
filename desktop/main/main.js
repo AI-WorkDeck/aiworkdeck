@@ -27,6 +27,8 @@ const { createClipboardPoller, startChangeCounter } = require('./clipboard-watch
 // "陌生进程占用"，进而降级到端口链下一档另起一套全新后端。requestSingleInstanceLock
 // 直接把第二个进程在此拦停、退出，让它永远走不到 whenReady()，上面两种竞态都无从
 // 发生——不修 allocateBackendPort/isOurBackend 本身（那是复用逻辑，另一类问题）。
+// 隔离实例（AWD_HOME，问题 20）：userData 必须在拿锁之前定好——锁按 userData 判重。
+require('./awd-home').applyUserData(app)
 const singleInstanceLock = app.requestSingleInstanceLock()
 if (!singleInstanceLock) {
   app.quit()
@@ -34,7 +36,7 @@ if (!singleInstanceLock) {
 }
 
 // NSIS may still be replacing files after a very fast manual reopen.
-if (app.isPackaged && process.platform === 'win32' && require('./services/full-update').deferWindowsLaunch(path.join(app.getPath('home'), '.aiworkdeck'), undefined, () => {
+if (app.isPackaged && process.platform === 'win32' && require('./services/full-update').deferWindowsLaunch(require('./awd-home').dataDir(), undefined, () => {
   const { t: langT } = require('./app-language')
   require('electron').dialog.showErrorBox(
     langT({ zh: 'AI WorkDeck 更新仍在进行', en: 'AI WorkDeck Update Still in Progress' }),
@@ -71,7 +73,7 @@ const IS_DEV = process.env.AIWORKDECK_DESKTOP_DEV === '1'
 function logDesktopEvent(type, data) {
   const evt = { ts: new Date().toISOString(), type, ...data }
   try {
-    const dir = path.join(app.getPath('home'), '.aiworkdeck', 'logs')
+    const dir = path.join(require('./awd-home').dataDir(), 'logs')
     require('fs').mkdirSync(dir, { recursive: true })
     require('fs').appendFileSync(path.join(dir, 'desktop.log'), JSON.stringify(evt) + '\n')
   } catch (e) { /* 日志失败不阻断任何流程 */ }
@@ -172,7 +174,7 @@ function recordBackendBoot(ok, launch, reason = '') {
 function overlayCtx() {
   return {
     packaged: app.isPackaged,
-    dataDir: path.join(app.getPath('home'), '.aiworkdeck'),
+    dataDir: require('./awd-home').dataDir(),
     appVersion: app.getVersion()
   }
 }
@@ -1625,11 +1627,12 @@ function retireFirstLaunchSplash() {
 function createServices() {
   // 打包模式下 jar/JRE/python 从 resourcesPath 解析（Epic #18 T2），数据落 ~/.aiworkdeck；
   // 四个 Python 服务的 lib/app 落 ~/.aiworkdeck/packs/<service>-runtime/<version>/（设计 §3.2）
-  const dataDir = path.join(app.getPath('home'), '.aiworkdeck')
+  const dataDir = require('./awd-home').dataDir()
   const projectRoot = path.join(__dirname, '..', '..')
   if (!modelManager) {
     modelManager = createModelManager({
       dataDir,
+      awdHome: require('./awd-home').awdHome(),
       resourcesPath: process.resourcesPath,
       projectRoot,
       packaged: app.isPackaged,
@@ -1651,6 +1654,8 @@ function createServices() {
     appVersion: app.getVersion(),
     resourcesPath: process.resourcesPath,
     dataDir,
+    // 隔离实例（问题 20）：后端 -Duser.home、子进程 HOME、后端复用按 home 区分
+    awdHome: require('./awd-home').awdHome(),
     // ARM 版 Windows（Mac 虚拟机）上 x64 转译运行，服务启动看门狗要放宽（dev-board#340）
     winEmulated: require('./services/win-arch').isWinArmEmulated()
   })
@@ -1721,7 +1726,7 @@ ipcMain.handle('checkba:service-ensure', async (_evt, payload) => {
 let prefs = null
 function getPrefs() {
   if (!prefs) {
-    prefs = require('./services/prefs').createPrefs({ dataDir: path.join(app.getPath('home'), '.aiworkdeck') })
+    prefs = require('./services/prefs').createPrefs({ dataDir: require('./awd-home').dataDir() })
   }
   return prefs
 }
@@ -1758,7 +1763,7 @@ ipcMain.handle('checkba:clipboard-set-paused', (_evt, payload) => {
 // 不接受渲染层传路径——那等于把任意目录揭示给渲染层。
 ipcMain.handle('checkba:reveal-logs', async () => {
   try {
-    const dir = path.join(app.getPath('home'), '.aiworkdeck', 'logs')
+    const dir = path.join(require('./awd-home').dataDir(), 'logs')
     if (!require('fs').existsSync(dir)) return { ok: false, message: require('./app-language').t({ zh: '日志目录尚未生成', en: 'Log directory has not been created yet' }) }
     shell.showItemInFolder(path.join(dir, '.'))
     return { ok: true, path: dir }
@@ -1866,7 +1871,7 @@ ipcMain.handle('checkba:set-theme', (_evt, mode) => applyNativeTheme(String(mode
 // Windows 启动 argv / second-instance 与 macOS open-file 共用同一条交付链。
 const openPaths = require('./open-paths').installOpenPaths({
   app, ipcMain,
-  queueFile: path.join(app.getPath('home'), '.aiworkdeck', 'restart-open-paths.json'),
+  queueFile: path.join(require('./awd-home').dataDir(), 'restart-open-paths.json'),
   isQuitting: () => quitInProgress,
   requestRelaunch: () => {
     logDesktopEvent('restart-requested', { reason: 'open-paths', detail: 'file open arrived during quit' })

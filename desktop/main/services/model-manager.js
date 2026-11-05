@@ -206,6 +206,7 @@ class ModelManager {
   constructor(opts) {
     this.ctx = {
       dataDir: opts.dataDir,
+      awdHome: opts.awdHome || null,
       resourcesPath: opts.resourcesPath,
       projectRoot: opts.projectRoot || null,
       packaged: !!opts.packaged
@@ -331,7 +332,7 @@ class ModelManager {
       let child
       try {
         const spec = this.spawnSpecOverride ? this.spawnSpecOverride(c, this.ctx, sources[idx]) : c.spawnSpec(this.ctx, sources[idx])
-        child = spawn(spec.cmd, spec.args, { cwd: spec.cwd, env: spec.env, stdio: ['ignore', 'pipe', 'pipe'] })
+        child = spawn(spec.cmd, spec.args, { cwd: spec.cwd, env: require('../awd-home').childEnv(spec.env, this.ctx.awdHome), stdio: ['ignore', 'pipe', 'pipe'] })
       } catch (e) { settleFailure(idx, String(e.message || e)); return }
       job.child = child
       let error = ''
