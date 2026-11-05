@@ -389,25 +389,48 @@ test('保存状态固定展示待保存、保存中、已保存及失败；不�
 })
 
 for (const recoveryFirst of [false, true]) {
-  test(`本地服务恢复${recoveryFirst ? '先于' : '晚于'}上传失败：只提示手动重试，绝不自动补写`, async () => {
+  test(`本地服务恢复${recoveryFirst ? '先于' : '晚于'}上传失败：有保存序号围栏兜底，恢复后自动补存当前内容`, async () => {
     const gate = deferred(); let uploads = 0
-    const vm = makeVm({ backendHealthRecoverySeq: 0, backendHealthState: null, backendFailedUpload: null,
-      uploadBytes: () => { uploads++; return gate.promise } })
+    const timers = []
+    const vm = makeVm({ backendHealthRecoverySeq: 0, backendHealthState: null, backendFailedUpload: null, scheduleProvenanceReload() {},
+      uploadBytes: () => { uploads++; return uploads === 1 ? gate.promise : Promise.resolve() } }, [],
+      (fn, ms) => ms >= 5000 ? (timers.push({ fn, ms }), 'retry') : setTimeout(fn, ms))
     vm.onBackendHealth( { state: 'degraded', ok: false, updatedAt: 1 })
     const pending = vm.autoSave()
     await tick()
     if (recoveryFirst) vm.onBackendHealth({ state: 'healthy', ok: true, updatedAt: 2 })
     gate.reject(Object.assign(new Error('network'), { backendUnavailable: true }))
     await pending
-    if (!recoveryFirst) vm.onBackendHealth({ state: 'healthy', ok: true, updatedAt: 2 })
-    assert.equal(vm.backendSaveRetryReady(), true)
     assert.equal(vm.dirty, true)
     assert.equal(vm._savePaused, true)
-    assert.equal(uploads, 1, '健康恢复只给恢复保存入口，不写入文稿')
-    vm.discardPendingSave()
+    if (recoveryFirst) {
+      // 失败晚于恢复事件：没有新的健康事件可等，按退避第一档补存。
+      assert.equal(vm.backendSaveRetryReady(), true)
+      assert.equal(uploads, 1)
+      assert.deepEqual(timers.map(t => t.ms), [5000])
+      timers.shift().fn()
+    } else {
+      vm.onBackendHealth({ state: 'healthy', ok: true, updatedAt: 2 })
+    }
+    for (let i = 0; i < 5; i++) await tick()
+    assert.equal(uploads, 2, '服务恢复后自动补存，不再等用户点重试')
+    assert.equal(vm.dirty, false)
+    assert.equal(vm.statusKey, 'ready')
     assert.equal(vm.backendSaveRetryReady(), false)
   })
 }
+
+test('服务恢复不会替只能手动的失败或已放弃的文稿自动补写', async () => {
+  let uploads = 0
+  const vm = makeVm({ backendHealthRecoverySeq: 0, backendHealthState: null, backendFailedUpload: null,
+    uploadBytes: async () => { uploads++; throw Object.assign(new Error('network'), { backendUnavailable: true }) } })
+  vm.onBackendHealth({ state: 'failed', ok: false, updatedAt: 1 })
+  await vm.autoSave()
+  vm.discardPendingSave()
+  vm.onBackendHealth({ state: 'healthy', ok: true, updatedAt: 2 })
+  await tick()
+  assert.equal(uploads, 1)
+})
 
 test('服务恢复不替引擎错误或404/409/权限错误声称可恢复；旧文件/重载/销毁不留恢复提示', async () => {
   for (const error of [new Error('export timeout'), Object.assign(new Error('HTTP 404'), { status: 404 }), Object.assign(new Error('HTTP 409'), { status: 409 }), Object.assign(new Error('HTTP 403'), { status: 403 })]) {
