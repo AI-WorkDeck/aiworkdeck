@@ -95,6 +95,7 @@ optimizer.*」——普通用户永远 enabled=false，只看得到下面的「�
 
 ## 已知地雷
 
+- **外部动作后的回执要先记账**：`OptimizerAgentService` 在 PR/通知成功后经 `unacked`（进程内）记账再 `source.save`；save 失败时下一轮只补回执、不再通知/开 PR。新增出口时走 `saveAfterExternalAction`，别直接 `save`。
 - **uni H5 编译器会替换标签**：`button`/`input`/`textarea`/`audio` 会变成 uni 组件，
   `<audio>` 直接编译失败（uni-h5 未导出 `Audio`），uni 的 `Input` 不支持 `type="file"`。
   浮窗因此用 `div[role=button]` / `<component :is="'textarea'">` / JS 现建 file input /
