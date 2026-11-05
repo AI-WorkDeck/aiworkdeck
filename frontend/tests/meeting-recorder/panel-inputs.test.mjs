@@ -85,3 +85,15 @@ test('存量解析失败记录不再回显原始 JSON，同时保留可操作的
   assert.equal(vm.transcriptionError({ error: '转写结果处理失败: JSON {"TaskId":"private-task"}' }), 'meeting.resultUnreadable')
   assert.equal(vm.transcriptionError({ error: '请检查网络后重试' }), '请检查网络后重试')
 })
+
+// 插件页全局 `* { box-sizing: border-box }`，uni-input 宿主又被 uni 写死 `height:1.4em; overflow:hidden`：
+// 12px 字号下宿主只有 16.8px，再减上下 4px 内边距和 1px 边框，内容区不到 7px，改名/改标题框的字被裁掉。
+test('改名/改标题输入框显式定高，border-box 下内容区装得下一行字', () => {
+  const rule = source.match(/\n\.mr-input \{([^}]*)\}/)?.[1] || ''
+  const px = name => Number(rule.match(new RegExp(`(?:^|\\s)${name}:\\s*(\\d+)px`))?.[1])
+  const height = px('height')
+  assert.ok(height >= 26, `.mr-input 需要显式 height（当前 ${height}）`)
+  assert.ok(px('min-height') >= 26, '.mr-input 需要覆盖 uni-input 的 min-height:1.4em')
+  const vertical = Number(rule.match(/padding:\s*(\d+)px/)?.[1] ?? 0)
+  assert.ok(height - 2 * vertical - 2 >= 20, `内容区高度不足：height ${height}，上下内边距 ${vertical}`)
+})
