@@ -26,6 +26,11 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 - 五个法宝工具的 UI/历史显示上限采用现有结果型 16,000 字符，模型上下文仍保留原始结果。不解析截断 JSON 来伪造资料卡，不把检索成功或来源字段当作真实性、现行效力或适用性认证。前端原始工具输出继续展示截断提示。
 - 回归：`LegalToolsValidationTest`、`ExternalServiceDualTierRoutingTest`、`ToolDisclosurePolicyTest`、`ContextAssemblerServiceTest`、`SystemPromptToolVisibilityContractTest`、`AgentOrchestratorQuestionStopTest`、`ToolDisplayNameCoverageTest`、`ToolChoiceSurfaceTest`。合成通道测试不代表供应商实查、模型遵循率或正式客户端验收。
 
+## 能力目录与本机 MCP 服务器（Stella 对齐，docs/plans/stella-alignment/mcp-server.md）
+
+- `@ToolMeta.access()` 默认 INFERRED，由 `service/ai/capability/CapabilityCatalog` 按工具名动词推断 read/write/destructive（认不出算 write），并推出 scope `awd:<领域>.<read|write>`。`docs/capability-catalog.md` 由 `CapabilityCatalogDocTest` 生成并做漂移比对：**增删改工具后要重新生成**（`AWD_WRITE_CAPABILITY_CATALOG=1 mvn test -Dtest=CapabilityCatalogDocTest`），推断不对就在 `@ToolMeta` 显式写 access。
+- AWD 自身作为 MCP 服务器：`LocalMcpServerController` 的 `POST /mcp`（只在 local-mode，默认关闭=404，`Authorization: Bearer awdm_...`，带 Origin 拒绝）与 `/api/mcp-server/{status,enable,disable}`；工具在 `service/mcpserver/LocalMcpServerTools`，全部只读、不经 ToolRegistry、读文件不走 OCR。新增 MCP 工具必须登记 `DEFINITIONS`，只能是 read（测试钉着）。
+
 ## 独立 MCP 连接（dev-board#1599）
 
 `UserMcpConnectionService` 与 `/api/mcp/{presets,connections}` 独立于 Plugin 启停，按本地 userId + 当前平台账户指纹隔离配置。`PluginCredentialStore` 加密保存 Bearer、请求头、env 及 OAuth 凭据；API 不回显秘密。GET 离线列预置/状态，显式 test 才 initialize/tools-list，显式 enable 才向 AI 提供工具。公网 HTTPS Streamable HTTP 复用 `PluginMcpEndpointPolicy`/`PluginMcpHttpClient`；桌面 stdio 经版本绑定确认后由 `UserMcpStdioClient` 启动；OAuth 由 `UserMcpOAuthService` 标准发现、PKCE、加密刷新，测试和业务调用都使用同一解析入口。新增配置导入/授权契约见 plugin-marketplace.md 的 MCP 高级连接节（#1601–1603）。
