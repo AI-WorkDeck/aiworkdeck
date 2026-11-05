@@ -8,6 +8,7 @@ export default {
   "cancel": "Cancelar",
   "save": "Guardar",
   "close": "Cerrar",
+  "done": "Listo",
   "delete": "Eliminar",
   "rename": "Renombrar",
   "retry": "Reintentar",

@@ -8,6 +8,7 @@ export default {
   cancel: '取消',
   save: '保存',
   close: '关闭',
+  done: "完成",
   delete: '删除',
   rename: '重命名',
   retry: '重试',

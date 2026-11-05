@@ -8,6 +8,7 @@ export default {
   "cancel": "रद्द करें",
   "save": "सहेजें",
   "close": "बंद करें",
+  "done": "पूर्ण",
   "delete": "हटाएँ",
   "rename": "नाम बदलें",
   "retry": "पुनः प्रयास करें",
