@@ -285,6 +285,8 @@ public class CloudSyncService {
         return explicitCloudOperation(connection,()->shareToCloudBound(projectId,connectionId,userId));
     }
 
+    private final Map<String, String> shareRequestIds = new java.util.concurrent.ConcurrentHashMap<>();
+
     private Map<String,Object> shareToCloudBound(long projectId,long connectionId,Long userId) {
         ReentrantLock lock = sessionService.repoLock(projectId);
         lock.lock();
@@ -302,9 +304,15 @@ public class CloudSyncService {
             String localName = projectRepository.findById(projectId)
                     .map(Project::getName).orElse(LangText.of("未命名项目", "Untitled Project"));
 
-            String createBody = JSONUtil.toJsonStr(Map.of("projectType", "BLANK", "name", localName));
+            // 建项目 POST 非幂等且读超时只有 15s：服务端建成但应答慢时客户端看到「不可达」，重试会造第二个。
+            // 带 clientRequestId 让服务端按键去重；键在本进程内跟随（项目, 连接），收到应答后才丢弃。
+            // 旧服务端不认这个字段会忽略它，行为退回原样。
+            String shareKey = projectId + ":" + connectionId;
+            String requestId = shareRequestIds.computeIfAbsent(shareKey, k -> java.util.UUID.randomUUID().toString());
+            String createBody = JSONUtil.toJsonStr(Map.of("projectType", "BLANK", "name", localName, "clientRequestId", requestId));
             JSONObject created = JSONUtil.parseObj(
                     httpPost(conn.getServerUrl() + "/api/projects", createBody, conn.getDeviceToken()));
+            shareRequestIds.remove(shareKey);
             long remoteProjectId = created.getLong("id");
 
             // 服务端项目已经建好：往后任何一步失败都会留下云端孤儿项目，整段包
