@@ -44,31 +44,31 @@ public final class LayoutDocxWriter {
         int pictureId = 1;
         for (int i = 0; i < pages.size(); i++) {
             Page page = pages.get(i);
-            P anchorHost = null;
-            List<Picture> floating = page.blocks().stream()
-                    .filter(b -> b instanceof Picture pic && pic.xPt() != null).map(b -> (Picture) b).toList();
+            // Floating pictures are anchored to the paragraph that follows them in the block list.
+            List<Picture> pending = new java.util.ArrayList<>();
             for (Block block : page.blocks()) {
+                P host = null;
                 if (block instanceof Para para) {
-                    P p = paragraph(para);
-                    main.getContent().add(p);
-                    if (anchorHost == null) anchorHost = p;
+                    host = paragraph(para, page);
+                    main.getContent().add(host);
                 } else if (block instanceof Table table) {
-                    main.getContent().add(table(table));
-                } else if (block instanceof Picture pic && pic.xPt() == null) {
-                    P p = W.createP();
-                    p.getContent().add(drawingRun(inline(pkg, pic, pictureId++)));
-                    main.getContent().add(p);
-                    if (anchorHost == null) anchorHost = p;
+                    main.getContent().add(table(table, page));
+                } else if (block instanceof Picture pic && pic.xPt() != null) {
+                    pending.add(pic);
+                } else if (block instanceof Picture pic) {
+                    host = W.createP();
+                    host.getContent().add(drawingRun(inline(pkg, pic, pictureId++)));
+                    main.getContent().add(host);
+                }
+                if (host != null) {
+                    for (Picture pic : pending) host.getContent().add(0, drawingRun(anchor(pkg, pic, pictureId++)));
+                    pending.clear();
                 }
             }
-            if (!floating.isEmpty()) {
-                if (anchorHost == null) {
-                    anchorHost = W.createP();
-                    main.getContent().add(anchorHost);
-                }
-                for (Picture pic : floating) {
-                    anchorHost.getContent().add(drawingRun(anchor(pkg, pic, pictureId++)));
-                }
+            if (!pending.isEmpty()) {
+                P host = W.createP();
+                for (Picture pic : pending) host.getContent().add(drawingRun(anchor(pkg, pic, pictureId++)));
+                main.getContent().add(host);
             }
             if (i < pages.size() - 1) main.getContent().add(pageBreak());
         }
@@ -80,14 +80,28 @@ public final class LayoutDocxWriter {
 
     // ------------------------------------------------------------------ text
 
-    static P paragraph(Para para) {
+    static P paragraph(Para para, Page page) {
         P p = W.createP();
         PPr ppr = W.createPPr();
         if (para.kind() != Kind.BODY) {
             PPrBase.PStyle style = W.createPPrBasePStyle();
-            style.setVal(para.kind() == Kind.TITLE ? "Title" : "Heading2");
+            style.setVal(para.kind() == Kind.TITLE ? "Heading1" : "Heading2");
             ppr.setPStyle(style);
         }
+        PPrBase.Spacing spacing = W.createPPrBaseSpacing();
+        if (para.kind() == Kind.BODY && page != null) {
+            spacing.setLine(twips(page.linePitchPt()));
+            spacing.setLineRule(STLineSpacingRule.EXACT);
+            spacing.setBefore(BigInteger.ZERO);
+            spacing.setAfter(twips(page.bodyPt() * 0.5));
+        } else if (para.kind() != Kind.BODY) {
+            spacing.setBefore(twips(page == null ? 6 : page.bodyPt()));
+            spacing.setAfter(twips(page == null ? 6 : page.bodyPt() * 0.5));
+        } else {
+            spacing.setBefore(BigInteger.ZERO);
+            spacing.setAfter(BigInteger.ZERO);
+        }
+        ppr.setSpacing(spacing);
         Jc jc = W.createJc();
         jc.setVal(switch (para.align()) {
             case CENTER -> JcEnumeration.CENTER;
@@ -103,15 +117,25 @@ public final class LayoutDocxWriter {
         }
         p.setPPr(ppr);
         R r = W.createR();
+        RPr rpr = W.createRPr();
+        double body = page == null ? 12 : page.bodyPt();
+        double pt = switch (para.kind()) {
+            case TITLE -> Math.max(body * 1.6, 16);
+            case HEADING -> body * 1.15;
+            default -> body;
+        };
+        HpsMeasure size = W.createHpsMeasure();
+        size.setVal(BigInteger.valueOf(Math.round(pt * 2)));
+        rpr.setSz(size);
+        rpr.setSzCs(size);
         if (para.kind() != Kind.BODY) {
-            RPr rpr = W.createRPr();
             rpr.setB(W.createBooleanDefaultTrue());
-            HpsMeasure size = W.createHpsMeasure();
-            size.setVal(BigInteger.valueOf(para.kind() == Kind.TITLE ? 36 : 28));
-            rpr.setSz(size);
             rpr.setRFonts(fonts("黑体"));
-            r.setRPr(rpr);
+            Color black = W.createColor();
+            black.setVal("000000");
+            rpr.setColor(black);
         }
+        r.setRPr(rpr);
         Text t = W.createText();
         t.setValue(AiDocxExportService.stripXmlInvalidChars(para.text()));
         t.setSpace("preserve");
@@ -182,7 +206,7 @@ public final class LayoutDocxWriter {
 
     // ------------------------------------------------------------------ tables
 
-    static Tbl table(Table table) {
+    static Tbl table(Table table, Page page) {
         Tbl tbl = W.createTbl();
         TblPr pr = W.createTblPr();
         TblBorders borders = W.createTblBorders();
@@ -226,7 +250,14 @@ public final class LayoutDocxWriter {
                 }
                 if (cell != null && cell.r0() == r) text = cell.text();
                 tc.setTcPr(tcPr);
-                tc.getContent().add(paragraph(new Para(text, Kind.BODY, Align.LEFT, false)));
+                tc.getContent().add(paragraph(new Para(text, Kind.BODY, Align.LEFT, false), null));
+                if (page != null) {
+                    var run = (R) ((P) tc.getContent().get(0)).getContent().get(0);
+                    HpsMeasure cellSize = W.createHpsMeasure();
+                    cellSize.setVal(BigInteger.valueOf(Math.round(page.bodyPt() * 2)));
+                    run.getRPr().setSz(cellSize);
+                    run.getRPr().setSzCs(cellSize);
+                }
                 tr.getContent().add(tc);
                 c += span;
             }
@@ -270,7 +301,7 @@ public final class LayoutDocxWriter {
                 + " behindDoc=\"1\" locked=\"0\" layoutInCell=\"1\" allowOverlap=\"1\">"
                 + "<wp:simplePos x=\"0\" y=\"0\"/>"
                 + "<wp:positionH relativeFrom=\"page\"><wp:posOffset>" + Math.round(pic.xPt() * EMU_PER_PT) + "</wp:posOffset></wp:positionH>"
-                + "<wp:positionV relativeFrom=\"page\"><wp:posOffset>" + Math.round(pic.yPt() * EMU_PER_PT) + "</wp:posOffset></wp:positionV>"
+                + "<wp:positionV relativeFrom=\"paragraph\"><wp:posOffset>" + Math.round(pic.yPt() * EMU_PER_PT) + "</wp:posOffset></wp:positionV>"
                 + "<wp:extent cx=\"" + cx + "\" cy=\"" + cy + "\"/>"
                 + "<wp:effectExtent l=\"0\" t=\"0\" r=\"0\" b=\"0\"/>"
                 + "<wp:wrapNone/>"

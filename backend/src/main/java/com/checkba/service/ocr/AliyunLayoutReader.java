@@ -206,20 +206,32 @@ public final class AliyunLayoutReader {
         double pageRight = rows.stream().mapToDouble(r -> r.box.x1).max().orElse(p.width());
         List<Row> ordered = order(rows, gutter, lh, pageLeft, pageRight);
 
-        List<Block> blocks = paragraphs(ordered, lh, sx, sy, pageLeft, pageRight);
+        Map<Block, Box> paraBoxes = new IdentityHashMap<>();
+        List<Double> pitches = new ArrayList<>();
+        List<Block> blocks = paragraphs(ordered, lh, sx, pageLeft, pageRight, paraBoxes, pitches);
         if (pageImage != null) {
             for (Stamp s : p.stamps()) {
                 byte[] png = crop(pageImage, s.box(), p.width(), p.height());
-                if (png != null) {
-                    blocks.add(new OcrLayout.Picture(png, s.box().w() * sx, s.box().h() * sy, s.box().x0 * sx, s.box().y0 * sy));
+                if (png == null) continue;
+                Block host = null;
+                double best = 0;
+                for (Map.Entry<Block, Box> e : paraBoxes.entrySet()) {
+                    double overlap = e.getValue().overlapArea(s.box());
+                    if (overlap > best) { best = overlap; host = e.getKey(); }
                 }
+                int at = host == null ? blocks.size() : blocks.indexOf(host);
+                double dy = host == null ? 0 : (s.box().y0 - paraBoxes.get(host).y0) * sy;
+                blocks.add(at, new OcrLayout.Picture(png, s.box().w() * sx, s.box().h() * sy, s.box().x0 * sx, dy));
             }
         }
+        double bodyPt = Math.max(8, Math.min(16, Math.round(lh * sy / 1.25 * 2) / 2.0));
+        double pitch = pitches.isEmpty() ? lh * 1.4 : pitches.stream().sorted().toList().get(pitches.size() / 2);
+        double linePitchPt = Math.max(bodyPt * 1.1, Math.min(bodyPt * 2.5, pitch * sy));
         double top = rows.stream().mapToDouble(r -> r.box.y0).min().orElse(0);
         double bottom = rows.stream().mapToDouble(r -> r.box.y1).max().orElse(p.height());
         return new OcrLayout.Page(pageWidthPt, pageHeightPt,
                 clampMargin(pageLeft * sx), clampMargin((p.width() - pageRight) * sx),
-                clampMargin(top * sy), clampMargin((p.height() - bottom) * sy), blocks);
+                clampMargin(top * sy), clampMargin((p.height() - bottom) * sy), bodyPt, linePitchPt, blocks);
     }
 
     static double clampMargin(double pt) { return Math.max(18, Math.min(144, pt)); }
@@ -353,8 +365,10 @@ public final class AliyunLayoutReader {
         return Align.LEFT;
     }
 
-    static List<Block> paragraphs(List<Row> ordered, double lh, double sx, double sy, double pageLeft, double pageRight) {
+    static List<Block> paragraphs(List<Row> ordered, double lh, double sx, double pageLeft, double pageRight,
+                                  Map<Block, Box> paraBoxes, List<Double> pitches) {
         List<Block> out = new ArrayList<>();
+        List<Box> rowsOfPara = new ArrayList<>();
         StringBuilder text = null;
         Row first = null, prev = null;
         Align align = Align.LEFT;
@@ -365,6 +379,7 @@ public final class AliyunLayoutReader {
         for (Row r : ordered) {
             if (r.table != null) {
                 closePara(out, text, first, prev, align, lines, gapAbove, true, lh);
+                record(out, paraBoxes, rowsOfPara);
                 text = null; prev = null;
                 out.add(table(r.table, sx));
                 gapAbove = true;
@@ -383,17 +398,30 @@ public final class AliyunLayoutReader {
             if (newPara) {
                 boolean gapBelowPrev = prev == null || !sameColumn || gap > 0.8 * lh || indent;
                 closePara(out, text, first, prev, align, lines, gapAbove, gapBelowPrev, lh);
+                record(out, paraBoxes, rowsOfPara);
                 gapAbove = prev == null || !sameColumn || gap > 0.8 * lh;
                 text = new StringBuilder(rowText);
                 first = r; align = a; lines = 1;
             } else {
                 appendLine(text, rowText);
                 lines++;
+                if (sameColumn) pitches.add(r.box.y0 - prev.box.y0);
             }
+            rowsOfPara.add(r.box);
             prev = r;
         }
         closePara(out, text, first, prev, align, lines, gapAbove, true, lh);
+        record(out, paraBoxes, rowsOfPara);
         return out;
+    }
+
+    /** Remembers where the paragraph just closed sat on the page (for anchoring seals). */
+    static void record(List<Block> out, Map<Block, Box> paraBoxes, List<Box> rowsOfPara) {
+        if (!rowsOfPara.isEmpty() && !out.isEmpty() && out.get(out.size() - 1) instanceof Para para
+                && !paraBoxes.containsKey(para)) {
+            paraBoxes.put(para, union(rowsOfPara));
+        }
+        rowsOfPara.clear();
     }
 
     static void appendLine(StringBuilder sb, String next) {
@@ -438,14 +466,38 @@ public final class AliyunLayoutReader {
         return new OcrLayout.Table(t.rows(), t.cols(), cells, widths);
     }
 
+    /**
+     * Keeps only the seal's red ink (everything else transparent): the printed lines under the seal
+     * are already rebuilt as text, and leaving their pixels in the picture would print them twice.
+     * Returns null when the region has almost no red (e.g. a blue or black stamp), so the caller
+     * keeps the plain crop instead of an empty picture.
+     */
+    static BufferedImage redInk(BufferedImage region) {
+        int w = region.getWidth(), h = region.getHeight(), red = 0;
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        for (int yy = 0; yy < h; yy++) {
+            for (int xx = 0; xx < w; xx++) {
+                int rgb = region.getRGB(xx, yy);
+                int r = (rgb >> 16) & 0xff, g = (rgb >> 8) & 0xff, b = rgb & 0xff;
+                if (r > 120 && r - Math.max(g, b) > 50) {
+                    out.setRGB(xx, yy, 0xff000000 | (rgb & 0xffffff));
+                    red++;
+                }
+            }
+        }
+        return red >= Math.max(1, w * h / 200) ? out : null;
+    }
+
     static byte[] crop(BufferedImage image, Box b, double frameW, double frameH) {
         double kx = image.getWidth() / frameW, ky = image.getHeight() / frameH;
         int x = (int) Math.max(0, Math.floor(b.x0 * kx)), y = (int) Math.max(0, Math.floor(b.y0 * ky));
         int w = (int) Math.min(image.getWidth() - x, Math.ceil(b.w() * kx));
         int h = (int) Math.min(image.getHeight() - y, Math.ceil(b.h() * ky));
         if (w <= 0 || h <= 0) return null;
+        BufferedImage region = image.getSubimage(x, y, w, h);
+        BufferedImage ink = redInk(region);
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            ImageIO.write(image.getSubimage(x, y, w, h), "png", out);
+            ImageIO.write(ink != null ? ink : region, "png", out);
             return out.toByteArray();
         } catch (Exception e) {
             return null;

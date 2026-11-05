@@ -25,7 +25,7 @@ class LayoutDocxWriterTest {
     }
 
     static Page page(List<Block> blocks) {
-        return new Page(595.3, 841.9, 60, 50, 70, 80, blocks);
+        return new Page(595.3, 841.9, 60, 50, 70, 80, 10.5, 17.5, blocks);
     }
 
     static String xml(byte[] docx) throws Exception {
@@ -48,7 +48,11 @@ class LayoutDocxWriterTest {
         assertTrue(x.contains("w:val=\"right\""), "date right aligned");
         assertTrue(x.contains("w:firstLineChars=\"200\""), "body first-line indent of two characters");
         assertTrue(x.contains("w:val=\"Heading2\""), "section heading uses a heading style (navigation pane)");
-        assertTrue(x.contains("w:val=\"Title\""));
+        assertTrue(x.contains("w:val=\"Heading1\""), "title");
+        assertFalse(x.contains("w:val=\"Title\""), "the built-in Title style draws a coloured rule");
+        assertTrue(x.contains("<w:color w:val=\"000000\"/>"), "headings are black, not the theme blue");
+        assertTrue(x.contains("<w:sz w:val=\"21\"/>"), "10.5pt body measured from the scan");
+        assertTrue(x.contains("w:line=\"350\"") && x.contains("w:lineRule=\"exact\""), "17.5pt line pitch");
     }
 
     @Test
@@ -70,11 +74,17 @@ class LayoutDocxWriterTest {
     @Test
     void floatingPictureIsAnchoredToThePageBehindText() throws Exception {
         String x = xml(LayoutDocxWriter.write(List.of(page(List.of(
-                new Para("甲方（盖章）", Kind.BODY, Align.RIGHT, false),
-                new Picture(png(), 140, 140, 340.0, 560.0))))));
+                new Picture(png(), 140, 140, 340.0, -50.0),
+                new Para("甲方（盖章）", Kind.BODY, Align.RIGHT, false))))));
+        assertTrue(x.contains("<wp:posOffset>" + (-50L * 12700) + "</wp:posOffset>"), "negative offset: seal starts above the line");
+        int anchorAt = x.indexOf("<wp:anchor"), textAt = x.indexOf("甲方（盖章）");
+        assertTrue(anchorAt < textAt && x.lastIndexOf("<w:p>", anchorAt) == x.lastIndexOf("<w:p>", textAt)
+                || anchorAt < textAt && x.lastIndexOf("<w:p ", anchorAt) == x.lastIndexOf("<w:p ", textAt),
+                "anchor lives in the same paragraph as the text it covers");
         assertTrue(x.contains("<wp:anchor"), "seal floats");
         assertTrue(x.matches("(?s).*behindDoc=\"(1|true)\".*"), "behind the signature text");
-        assertTrue(x.contains("relativeFrom=\"page\""));
+        assertTrue(x.contains("<wp:positionH relativeFrom=\"page\">"));
+        assertTrue(x.contains("<wp:positionV relativeFrom=\"paragraph\">"), "follows its paragraph when text reflows");
         assertTrue(x.contains("<wp:posOffset>" + (340L * 12700) + "</wp:posOffset>"), "x offset in EMU");
         assertTrue(x.contains("cx=\"" + (140L * 12700) + "\""));
     }

@@ -29,11 +29,14 @@ public final class OcrLayout {
     public record Table(int rows, int cols, List<Cell> cells, double[] colWidths) implements Block {}
 
     /**
-     * @param xPt/yPt position from the page's top-left corner; null means inline in the text flow
+     * @param xPt from the page's left edge; null means an inline picture in the text flow
+     * @param yPt from the top of the paragraph that follows this block (the picture is anchored to
+     *            it, so it moves with that text when the page reflows); may be negative
      */
     public record Picture(byte[] png, double widthPt, double heightPt, Double xPt, Double yPt) implements Block {}
 
-    /** Margins are measured from the text actually found on the page. */
+    /** Margins, body size and line pitch are measured from the text actually found on the page. */
     public record Page(double widthPt, double heightPt, double marginLeft, double marginRight,
-                       double marginTop, double marginBottom, List<Block> blocks) {}
+                       double marginTop, double marginBottom, double bodyPt, double linePitchPt,
+                       List<Block> blocks) {}
 }
