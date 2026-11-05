@@ -606,8 +606,19 @@ mobile | meeting | dictation`（缺省不带这个键，前端用通用说明）
 **跨境同意不在后端默认值里记**：默认成官方通道本身不让内容出境，出境要先有账户，而连账户的入口
 （登录弹层、设置页粘 Key）都在提交前取得两项同意并记录（`frontend/src/utils/accountConsent.js` 的
 `recordAccountConsents()`：协议版本 `POST /api/license/agreement` + `POST /api/admin/config {ai:{crossBorderConsent:true}}`，
-失败不拦路）。**新增连接账户的入口必须接这一步**——后端的跨境闸只在「切到官方通道」那一刻把关，
-默认值不经过那一刻。前端 `getWizardStatus`/`submitWizard` 两个 api 封装随之删除。
+失败不拦路）。**新增连接账户的入口必须接这一步**，并在连上后调 `AccountSwitchCleanup.afterConnect()`
+（它把这份 pending 同意绑到新账户）。前端 `getWizardStatus`/`submitWizard` 两个 api 封装随之删除。
+
+**跨境同意按「账户 + 站点」记录，且有运行时闸（dev-board#1713，问题 130）**：判定与记录只在
+`service/ai/CrossBorderConsentService`。键：`ai.crossBorder.consentAt/consentVersion`（原有）+
+`consentAccount`（官网 accountId，缺时 `fp:`+Key 指纹）+ `consentSite` + `consentPendingAt`。
+版本、账户、站点三者都对上才算同意；切站、换账户后设置页显示未同意、平台调用被拒。
+同意先于连接：保存同意时写 pending 时间戳，`afterConnect` 在 30 分钟内把它绑给刚连上的账户；
+没有站点字段的旧记录 = 升级前的机器级同意，首次在已连接状态下判定时迁移成当前账户 + 当前站点。
+运行时闸在 `ChatModelFactory.platformConnection()`（所有平台模型消费方的共同入口）：机器级账户路径
+（`usesMachineKey`）、已连接却无有效同意 → `AccountException(CONFLICT, reason=cross_border_consent_required)`；
+未连接放行给下游 4011 登录弹层。本机模型 / 自备 Key 不经过这里。语音听写（`VoiceDictationService`）
+直接取平台密钥、不经工厂，目前不在闸内。
 
 **登录弹层跨境同意的措辞按站点分（dev-board#1713，问题 2+38）**：`AccountLoginDialog.crossBorderKey(name)`
 在国内站（`isPhoneSite`）取 `onboarding.unlock.*Domestic`（勾选框 / 告知标题 / 告知正文 / 未勾提示统一
@@ -906,7 +917,7 @@ cost 为 null 原样保留 —— 对账未完成时显示「待结算」，绝�
     （`PlatformAiKeyCipher` 构造器）——明文降级是典型的潜伏逃生门，这里刻意不留。
 
 18. **切到平台通道有两个入口，跨境同意闸必须两个都设**。同意（个保法第三十九条）的判定与
-    拒绝文案在 `AdminConfigController.crossBorderBlockReason(ai, settings)`（静态，与
+    拒绝文案在 `AdminConfigController.crossBorderBlockReason(ai, crossBorderConsentService)`（静态，与
     `toSettingsUpdates` 同款），**管理后台 `updateAdminConfig` 与首启向导 `WizardController.initialize`
     都要调它**。这条是踩出来的：闸门最初只在管理后台，而向导走的是 `toSettingsUpdates` 静态映射、
     完全绕过闸门——偏偏向导才是用户选平台通道的主入口（AWD_CLOUD 恒可选，见地雷 15），
@@ -915,7 +926,9 @@ cost 为 null 原样保留 —— 对账未完成时显示「待结算」，绝�
     **两处初值都必须是未勾选**——预先勾选的同意在个保法下无效。
     `crossBorderConsent` 只在选平台通道时才进 payload：其余档位带 `false` 会把已有同意误撤回。
     护栏：`CrossBorderConsentTest`（判定本身：版本作废、文案红线）
-    + `CrossBorderConsentGateSharedTest`（这道闸没有第二份实现、没有入口漏掉它）。
+    + `CrossBorderConsentGateSharedTest`（这道闸没有第二份实现、没有入口漏掉它；含换账户/切站/旧数据迁移）
+    + `CrossBorderConsentServiceTest`（登录路径绑定新账户）+ `CrossBorderConsentRuntimeGateTest`（撤回即停用）。
+    两个保存入口在 `toSettingsUpdates` 之后都要调 `crossBorderConsent.stampIdentity(updates)` 补账户与站点。
 
 19. **切站不是「换个域名」，是换了一个商业实体，清理表必须背下来**（双主站设计 §2.4）。
     删：`account.json`、`entitlements.json`、`platform-ai-key.json`、`license.json` 中 **mode=account** 的票据。

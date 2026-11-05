@@ -943,6 +943,7 @@ export default {
     "local": "Suggerimenti locali · Tab accetta · Esc ignora",
     "empty": "Ancora nessun suggerimento locale. Il vocabolario cresce mentre scrivi.",
     "enabled": "Suggerimenti semantici automatici",
+    "localAuto": "Mostra suggerimenti locali durante la digitazione",
     "disable": "Disattiva completamento automatico",
     "preferenceFailed": "Impossibile salvare l’impostazione. Lo stato precedente non è cambiato; riprova.",
     "semantic": "Continuazione suggerita",

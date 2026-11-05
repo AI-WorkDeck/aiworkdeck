@@ -943,6 +943,7 @@ export default {
     "local": "Yerel öneriler · Tab kabul · Esc yoksay",
     "empty": "Henüz yerel öneri yok. Kelime dağarcığı yazdıkça büyür.",
     "enabled": "Otomatik anlamsal öneriler",
+    "localAuto": "Yazarken yerel önerileri göster",
     "disable": "Otomatik tamamlamayı kapat",
     "preferenceFailed": "Ayar kaydedilemedi. Önceki durum değişmedi; lütfen tekrar deneyin.",
     "semantic": "Önerilen devam",

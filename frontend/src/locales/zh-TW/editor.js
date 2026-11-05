@@ -943,6 +943,7 @@ export default {
     "local": "僅本地補全 · Tab 接受 · Esc 關閉",
     "empty": "暫無本地候選，常用內容會隨寫作累積。",
     "enabled": "自動語義補全",
+    "localAuto": "輸入時自動顯示本機候選",
     "disable": "關閉自動補全",
     "preferenceFailed": "設定未能儲存，仍保持原狀態，請重試。",
     "semantic": "建議續寫",

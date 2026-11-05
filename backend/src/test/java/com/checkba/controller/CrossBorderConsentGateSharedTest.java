@@ -4,6 +4,9 @@
 package com.checkba.controller;
 
 import com.checkba.service.SystemSettingService;
+import com.checkba.service.account.AccountService;
+import com.checkba.service.ai.CrossBorderConsentService;
+import com.checkba.service.site.SiteProfileService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -13,7 +16,11 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -34,11 +41,17 @@ class CrossBorderConsentGateSharedTest {
     private static final String KEY_VERSION = "ai.crossBorder.consentVersion";
     private static final String CURRENT_VERSION = "2026-10-29";
 
-    private SystemSettingService settingsWith(Map<String, String> stored) {
+    /** 本机连着账户 acct-1、当前站点 cn；同意判定走真实的 CrossBorderConsentService。 */
+    private CrossBorderConsentService settingsWith(Map<String, String> stored) {
         SystemSettingService settings = mock(SystemSettingService.class);
-        when(settings.get(anyString(), anyString()))
+        when(settings.get(anyString(), any()))
                 .thenAnswer(inv -> stored.getOrDefault(inv.getArgument(0), inv.getArgument(1)));
-        return settings;
+        doAnswer(inv -> { stored.putAll(inv.getArgument(0)); return null; }).when(settings).setMany(anyMap());
+        AccountService account = mock(AccountService.class);
+        when(account.currentAccountIdOrNull()).thenReturn("acct-1");
+        SiteProfileService site = mock(SiteProfileService.class);
+        when(site.currentSite()).thenReturn("cn");
+        return new CrossBorderConsentService(settings, account, site);
     }
 
     private AdminConfigController.AiConfig ai(String provider, Boolean consent) {
@@ -107,5 +120,41 @@ class CrossBorderConsentGateSharedTest {
         assertNotNull(AdminConfigController.crossBorderBlockReason(
                 ai("AWD_CLOUD", Boolean.FALSE), settingsWith(stored)),
                 "同一请求里撤回同意又要切平台通道，必须以撤回为准");
+    }
+
+    @Test
+    @DisplayName("库里的同意属于另一个账户：拦住（换账户要重新征求，问题 130）")
+    void blocksWhenStoredConsentBelongsToAnotherAccount() {
+        Map<String, String> stored = new HashMap<>();
+        stored.put(KEY_AT, "2026-11-01T10:00:00Z");
+        stored.put(KEY_VERSION, CURRENT_VERSION);
+        stored.put("ai.crossBorder.consentAccount", "acct-other");
+        stored.put("ai.crossBorder.consentSite", "cn");
+        assertNotNull(AdminConfigController.crossBorderBlockReason(
+                ai("AWD_CLOUD", null), settingsWith(stored)));
+    }
+
+    @Test
+    @DisplayName("库里的同意是在另一个站点给的：拦住（切站要重新征求，问题 130）")
+    void blocksWhenStoredConsentBelongsToAnotherSite() {
+        Map<String, String> stored = new HashMap<>();
+        stored.put(KEY_AT, "2026-11-01T10:00:00Z");
+        stored.put(KEY_VERSION, CURRENT_VERSION);
+        stored.put("ai.crossBorder.consentAccount", "acct-1");
+        stored.put("ai.crossBorder.consentSite", "intl");
+        assertNotNull(AdminConfigController.crossBorderBlockReason(
+                ai("AWD_CLOUD", null), settingsWith(stored)));
+    }
+
+    @Test
+    @DisplayName("升级前的机器级同意：视为当前账户、当前站点的同意并补写，老用户不被突然拦住")
+    void legacyMachineConsentMigratesToCurrentAccountAndSite() {
+        Map<String, String> stored = new HashMap<>();
+        stored.put(KEY_AT, "2026-08-08T10:00:00Z");
+        stored.put(KEY_VERSION, CURRENT_VERSION);
+        assertNull(AdminConfigController.crossBorderBlockReason(
+                ai("AWD_CLOUD", null), settingsWith(stored)));
+        assertEquals("acct-1", stored.get("ai.crossBorder.consentAccount"));
+        assertEquals("cn", stored.get("ai.crossBorder.consentSite"));
     }
 }
