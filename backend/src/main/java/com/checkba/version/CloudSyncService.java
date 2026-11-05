@@ -1643,15 +1643,34 @@ public class CloudSyncService {
         try(HttpResponse response=HttpRequest.get(endpoint).header("X-Session-Id",token)
                 .setFollowRedirects(false).setConnectionTimeout(5000).setReadTimeout(15000).execute()) {
             if(response.getStatus()==404)return Map.of();
-            if(response.getStatus()!=200)throw VersionException.cloudReconnectRequired(com.checkba.service.mobile.CloudBillingText.get("cloudReconnectRequired"));
-            com.fasterxml.jackson.databind.JsonNode state=new com.fasterxml.jackson.databind.ObjectMapper().readTree(response.body());
-            var epoch=state.path("cloudAccess").path("epoch");
-            if(!epoch.isIntegralNumber() || !epoch.canConvertToLong() || epoch.longValue()<0)
-                throw VersionException.cloudReconnectRequired(com.checkba.service.mobile.CloudBillingText.get("cloudReconnectRequired"));
-            return Map.of("X-Cloud-Epoch",epoch.asText());
+            return epochFromCloudState(response.getStatus(),response.body());
         } catch(java.io.IOException e) {
-            throw VersionException.cloudReconnectRequired(com.checkba.service.mobile.CloudBillingText.get("cloudReconnectRequired"));
+            throw VersionException.userFacing(com.checkba.service.mobile.CloudBillingText.get("stateUnavailable"));
         }
+    }
+
+    /**
+     * 只有会话失效（HTTP 401/403 或业务码 4010）才算「要重新连接」。案件库出错时回 HTTP 200 +
+     * {code,message}（GlobalExceptionHandler），以前一律报「重新连接」，律师重连多少次都没用；
+     * 现在原样带出服务端的话，读不出时退回「云端计费状态暂不可用」。
+     */
+    static Map<String,String> epochFromCloudState(int status,String body) throws java.io.IOException {
+        String reconnect=com.checkba.service.mobile.CloudBillingText.get("cloudReconnectRequired");
+        if(status==401||status==403)throw VersionException.cloudReconnectRequired(reconnect);
+        String unavailable=com.checkba.service.mobile.CloudBillingText.get("stateUnavailable");
+        if(status!=200)throw VersionException.userFacing(unavailable);
+        com.fasterxml.jackson.databind.JsonNode state=new com.fasterxml.jackson.databind.ObjectMapper().readTree(body==null?"":body);
+        if(state==null)throw VersionException.userFacing(unavailable);
+        var code=state.path("code");
+        if(code.isIntegralNumber() && code.intValue()!=0) {
+            if(code.intValue()==com.checkba.config.GlobalExceptionHandler.CODE_UNAUTHENTICATED)throw VersionException.cloudReconnectRequired(reconnect);
+            String message=state.path("message").asText("").strip();
+            throw VersionException.userFacing(message.isEmpty()?unavailable:message);
+        }
+        var epoch=state.path("cloudAccess").path("epoch");
+        if(!epoch.isIntegralNumber() || !epoch.canConvertToLong() || epoch.longValue()<0)
+            throw VersionException.userFacing(unavailable);
+        return Map.of("X-Cloud-Epoch",epoch.asText());
     }
 
     /** 无需认证头的调用，委托三参版本。 */
