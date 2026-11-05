@@ -29,6 +29,7 @@ public final class MineruLayoutReader {
     private static final double MARGIN = 72;
     private static final Pattern IMAGE = Pattern.compile("^!\\[[^\\]]*]\\(([^)\\s]+)\\)\\s*$");
     private static final Pattern HEADING = Pattern.compile("^(#{1,6})\\s+(.*)$");
+    private static final Pattern BLOCK_TAG = Pattern.compile("</?[a-zA-Z][a-zA-Z0-9]*(\\s[^>]*)?>");
     private static final Pattern ESCAPE = Pattern.compile("\\\\([\\\\`*_{}\\[\\]()#+\\-.!|<>~])");
 
     private MineruLayoutReader() {}
@@ -44,6 +45,7 @@ public final class MineruLayoutReader {
         for (String chunk : chunks(markdown == null ? "" : markdown)) {
             String t = chunk.strip();
             if (t.isEmpty()) continue;
+            if (t.regionMatches(true, 0, "<details", 0, 8)) continue; // seal OCR block: the seal picture is kept
             if (t.regionMatches(true, 0, "<table", 0, 6)) {
                 Table table = table(t, textWidth);
                 if (table != null) blocks.add(table);
@@ -64,16 +66,32 @@ public final class MineruLayoutReader {
                 continue;
             }
             String text = unescape(String.join("", t.lines().map(String::strip).toList()));
+            // A block that is HTML (starts with a tag) keeps only its text; a lone '<' in prose stays.
+            if (BLOCK_TAG.matcher(text).lookingAt()) text = Jsoup.parseBodyFragment(text).text().strip();
+            if (text.isEmpty()) continue;
             blocks.add(new Para(text, Kind.BODY, Align.LEFT, true));
         }
         return List.of(new Page(pageWidthPt, pageHeightPt, MARGIN, MARGIN, MARGIN, MARGIN, 12, 20, blocks));
     }
 
-    /** Blank-line separated chunks; an HTML table is always its own chunk even without blank lines. */
+    /**
+     * Blank-line separated chunks; an HTML table is always its own chunk even without blank lines,
+     * and a {@code <details>…</details>} block (MinerU's seal OCR) stays one chunk across blank lines.
+     */
     static List<String> chunks(String markdown) {
         List<String> out = new ArrayList<>();
         StringBuilder cur = new StringBuilder();
+        StringBuilder details = null;
         for (String line : markdown.replace("\r\n", "\n").split("\n", -1)) {
+            if (details == null && line.strip().regionMatches(true, 0, "<details", 0, 8)) {
+                if (cur.length() > 0) { out.add(cur.toString()); cur.setLength(0); }
+                details = new StringBuilder();
+            }
+            if (details != null) {
+                details.append(line).append('\n');
+                if (line.toLowerCase(java.util.Locale.ROOT).contains("</details>")) { out.add(details.toString()); details = null; }
+                continue;
+            }
             boolean tableLine = line.strip().regionMatches(true, 0, "<table", 0, 6);
             if (line.isBlank() || tableLine) {
                 if (cur.length() > 0) { out.add(cur.toString()); cur.setLength(0); }
@@ -84,6 +102,7 @@ public final class MineruLayoutReader {
             cur.append(line);
         }
         if (cur.length() > 0) out.add(cur.toString());
+        if (details != null) out.add(details.toString()); // unterminated: still dropped as a whole
         return out;
     }
 
