@@ -179,13 +179,15 @@
     dashboard: 'dashboard',
     analytics: 'dashboard',
     kpi: 'dashboard',
-    team: 'dashboard'
+    team: 'dashboard',
+    expense: 'expense',
+    expenses: 'expense'
   };
 
   function switchTab(tabId) {
     const raw = String(tabId || '').replace(/^tab-/, '').replace(/^panel-/, '').trim().toLowerCase();
     const normalized = TAB_ALIASES[raw] || raw;
-    const valid = ['intake', 'conflict', 'finance', 'dashboard'];
+    const valid = ['intake', 'conflict', 'finance', 'dashboard', 'expense'];
     const target = valid.includes(normalized) ? normalized : 'intake';
     state.activeTab = target;
     for (const key of valid) {
@@ -1243,7 +1245,7 @@
   }
 
   // Bind navigation tabs
-  for (const tabKey of ['intake', 'conflict', 'finance', 'dashboard']) {
+  for (const tabKey of ['intake', 'conflict', 'finance', 'dashboard', 'expense']) {
     const btn = $(`tab-${tabKey}`);
     if (btn) {
       btn.addEventListener('click', () => switchTab(tabKey));
