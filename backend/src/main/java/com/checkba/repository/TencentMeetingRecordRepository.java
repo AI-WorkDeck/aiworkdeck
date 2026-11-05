@@ -19,6 +19,9 @@ public interface TencentMeetingRecordRepository extends JpaRepository<TencentMee
 
     Optional<TencentMeetingRecord> findByRecordFileId(String recordFileId);
 
+    /** 历史上并发同步可能留下同 recordFileId 的重复行，取最早一条，避免 IncorrectResultSizeDataAccessException。 */
+    Optional<TencentMeetingRecord> findFirstByRecordFileIdOrderByIdAsc(String recordFileId);
+
     Optional<TencentMeetingRecord> findByMeetingIdAndRecordFileId(String meetingId, String recordFileId);
 
     List<TencentMeetingRecord> findByUserIdAndSubjectContainingIgnoreCaseOrderByStartTimeDesc(Long userId, String keyword);

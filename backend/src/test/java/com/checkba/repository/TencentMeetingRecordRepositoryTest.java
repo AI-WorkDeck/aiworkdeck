@@ -90,4 +90,26 @@ class TencentMeetingRecordRepositoryTest {
         assertEquals(14, found.get().getSyncDays());
         assertEquals("面试,背调", found.get().getExcludeKeywords());
     }
+
+    @Test
+    void findFirstByRecordFileIdToleratesDuplicateRows() {
+        TencentMeetingRecord a = new TencentMeetingRecord();
+        a.setUserId(100L);
+        a.setMeetingId("m-dup");
+        a.setRecordFileId("rf-dup");
+        a.setSubject("first");
+        a.setStatus(TencentMeetingRecord.STATUS_SYNCED);
+        TencentMeetingRecord b = new TencentMeetingRecord();
+        b.setUserId(100L);
+        b.setMeetingId("m-dup");
+        b.setRecordFileId("rf-dup");
+        b.setSubject("second");
+        b.setStatus(TencentMeetingRecord.STATUS_SYNCED);
+        TencentMeetingRecord savedA = recordRepository.saveAndFlush(a);
+        recordRepository.saveAndFlush(b);
+
+        Optional<TencentMeetingRecord> found = recordRepository.findFirstByRecordFileIdOrderByIdAsc("rf-dup");
+        assertTrue(found.isPresent());
+        assertEquals(savedA.getId(), found.get().getId());
+    }
 }
