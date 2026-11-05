@@ -116,6 +116,8 @@
           <text class="col">{{ formatLawFirmRate(row.collectionRate ?? row.collectionRatePercent ?? row.billedCollectionRatePercent) }}</text>
         </view>
       </view>
+      <!-- 没建律所 / 台账为空：后端不再塞写死的部门，这里给一句引导（问题 123） -->
+      <text v-else class="empty-line lf-empty">{{ $t('team.lawfirmEmpty') }}</text>
     </SettingsSection>
 
     <!-- 态 1：未连接账户 -->

@@ -162,6 +162,7 @@ export default {
   "lawfirmColContracted": "Terkontrak",
   "lawfirmColCollected": "Terkumpul",
   "lawfirmColRate": "Tingkat Penagihan",
+  "lawfirmEmpty": "Belum ada data kantor hukum. Setelah Anda mencatat intake kasus di ruang kerja manajemen kantor, data akan diringkas di sini menurut bidang praktik, advokat penanggung jawab, dan advokat. Anda juga bisa mengisi data demo untuk melihat contohnya.",
   "lawfirmWanSuffix": "¥{amount}0rb",
   "lawfirmActionFailedToast": "Operasi gagal",
   "lawfirmOpenWorkbenchFailedToast": "Gagal membuka meja kerja",

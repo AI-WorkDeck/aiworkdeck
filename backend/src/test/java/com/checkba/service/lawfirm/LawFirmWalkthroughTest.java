@@ -109,6 +109,41 @@ class LawFirmWalkthroughTest {
     }
 
     @Test
+    @DisplayName("没建律所 / 台账为空：看板不塞写死的业务部门，也不按 userId 给律师分配假部门")
+    @SuppressWarnings("unchecked")
+    void emptyLedgerDashboardHasNoFabricatedDepartments() {
+        Map<String, Object> overview = lawFirmService.execute(userA.getId(), null, "overview", Map.of("scope", "all"));
+        Map<String, Object> dashboard = (Map<String, Object>) overview.get("dashboard");
+        List<Map<String, Object>> departments = (List<Map<String, Object>>) dashboard.get("departments");
+        List<Map<String, Object>> units = (List<Map<String, Object>>) dashboard.get("units");
+
+        assertTrue(departments.isEmpty(), "台账为空时不该出现任何部门: " + departments);
+        for (Map<String, Object> unit : units) {
+            assertNull(unit.get("departmentName"), "没有收案记录的律师不该被分配部门: " + unit);
+        }
+        Map<String, Object> self = (Map<String, Object>) overview.get("self");
+        assertNull(self.get("departmentName"));
+    }
+
+    @Test
+    @DisplayName("本机填充演示数据后，看板照常按演示台账里的业务部门汇总")
+    @SuppressWarnings("unchecked")
+    void localDemoSeedStillShowsDemoDepartments() {
+        // lawFirmService 是事务代理，localMode 要设在被代理的实例上
+        LawFirmManagementService target = org.springframework.test.util.AopTestUtils.getUltimateTargetObject(lawFirmService);
+        target.localMode = true;
+        try {
+            Map<String, Object> overview = lawFirmService.execute(userA.getId(), null, "seedDemo", Map.of());
+            Map<String, Object> dashboard = (Map<String, Object>) overview.get("dashboard");
+            List<Map<String, Object>> departments = (List<Map<String, Object>>) dashboard.get("departments");
+            Set<Object> names = departments.stream().map(d -> d.get("departmentName")).collect(java.util.stream.Collectors.toSet());
+            assertEquals(Set.of("资本市场与证券部", "公司并购与投融资部", "民商事争议解决部", "知识产权与合规部"), names);
+        } finally {
+            target.localMode = false;
+        }
+    }
+
+    @Test
     @DisplayName("Walkthrough 1: 绿色无冲突收案 -> 利冲委员终审 -> 正式立案与工作台自动建项")
     @SuppressWarnings("unchecked")
     void walkthrough1_greenIntakeToCommitteeApprovalAndWorkbenchProjectCreation() {

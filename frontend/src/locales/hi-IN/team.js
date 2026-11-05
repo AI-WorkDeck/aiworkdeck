@@ -162,6 +162,7 @@ export default {
   "lawfirmColContracted": "अनुबंधित",
   "lawfirmColCollected": "प्राप्त",
   "lawfirmColRate": "वसूली दर",
+  "lawfirmEmpty": "अभी फ़र्म का कोई डेटा नहीं है। फ़र्म प्रबंधन कार्यक्षेत्र में केस इनटेक दर्ज करने के बाद यहाँ अभ्यास क्षेत्र, प्रमुख वकील और वकील के अनुसार सारांश दिखेगा। झलक के लिए आप डेमो डेटा भी भर सकते हैं।",
   "lawfirmWanSuffix": "¥{amount}0 हज़ार",
   "lawfirmActionFailedToast": "कार्य विफल रहा",
   "lawfirmOpenWorkbenchFailedToast": "कार्यपटल खोलने में विफल",

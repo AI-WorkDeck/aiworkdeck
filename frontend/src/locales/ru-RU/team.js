@@ -162,6 +162,7 @@ export default {
   "lawfirmColContracted": "По договорам",
   "lawfirmColCollected": "Оплачено",
   "lawfirmColRate": "Доля оплаты",
+  "lawfirmEmpty": "Данных фирмы пока нет. Когда вы зарегистрируете дела в рабочем пространстве управления фирмой, они будут сведены здесь по практикам, ведущим юристам и юристам. Можно также загрузить демоданные для предварительного просмотра.",
   "lawfirmWanSuffix": "{amount}0 тыс. ¥",
   "lawfirmActionFailedToast": "Операция не выполнена",
   "lawfirmOpenWorkbenchFailedToast": "Не удалось открыть рабочее место",

@@ -162,6 +162,7 @@ export default {
   "lawfirmColContracted": "Dikontrakkan",
   "lawfirmColCollected": "Dikutip",
   "lawfirmColRate": "Kadar Kutipan",
+  "lawfirmEmpty": "Belum ada data firma. Selepas anda merekod pendaftaran kes di ruang kerja pengurusan firma, ia akan diringkaskan di sini mengikut bidang amalan, peguam utama dan peguam. Anda juga boleh mengisi data demo untuk melihat contohnya.",
   "lawfirmWanSuffix": "¥{amount}0 ribu",
   "lawfirmActionFailedToast": "Operasi gagal",
   "lawfirmOpenWorkbenchFailedToast": "Gagal membuka meja kerja",

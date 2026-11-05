@@ -162,6 +162,7 @@ export default {
   "lawfirmColContracted": "التعاقدات",
   "lawfirmColCollected": "المحصّل",
   "lawfirmColRate": "معدل التحصيل",
+  "lawfirmEmpty": "لا توجد بيانات للمكتب بعد. بعد تسجيل القضايا في مساحة إدارة المكتب، ستُلخَّص هنا حسب مجال الممارسة والمحامي المسؤول والمحامي. يمكنك أيضًا تحميل البيانات التجريبية للمعاينة.",
   "lawfirmWanSuffix": "¥{amount}0 ألف",
   "lawfirmActionFailedToast": "فشلت العملية",
   "lawfirmOpenWorkbenchFailedToast": "فشل فتح منضدة العمل",

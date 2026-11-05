@@ -162,6 +162,7 @@ export default {
   "lawfirmColContracted": "Gecontracteerd",
   "lawfirmColCollected": "Geïnd",
   "lawfirmColRate": "Incassograad",
+  "lawfirmEmpty": "Nog geen kantoorgegevens. Zodra u zaakintakes vastlegt in de kantoorbeheerwerkplek, worden ze hier samengevat per rechtsgebied, behandelend advocaat en advocaat. U kunt ook eerst de demogegevens laden.",
   "lawfirmWanSuffix": "{amount}0k ¥",
   "lawfirmActionFailedToast": "Bewerking mislukt",
   "lawfirmOpenWorkbenchFailedToast": "Kan werkruimte niet openen",

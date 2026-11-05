@@ -163,6 +163,7 @@ export default {
   "lawfirmColContracted": "簽約額",
   "lawfirmColCollected": "已到賬",
   "lawfirmColRate": "回款率",
+  "lawfirmEmpty": "還沒有律所台帳資料。在律所管理工作台錄入收案後，這裡會按業務分類、主辦律師和律師彙總；也可以先填充演示資料看看效果。",
   "lawfirmWanSuffix": "{amount} 萬",
   "lawfirmActionFailedToast": "操作失敗",
   "lawfirmOpenWorkbenchFailedToast": "打開工作台失敗",

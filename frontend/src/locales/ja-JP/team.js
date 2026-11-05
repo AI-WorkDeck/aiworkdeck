@@ -163,6 +163,7 @@ export default {
   "lawfirmColContracted": "契約額",
   "lawfirmColCollected": "入金済",
   "lawfirmColRate": "回収率",
+  "lawfirmEmpty": "事務所の台帳データはまだありません。事務所管理ワークベンチで受任を登録すると、ここに業務分野・主任弁護士・弁護士ごとに集計されます。デモデータを投入して確認することもできます。",
   "lawfirmWanSuffix": "¥{amount}万",
   "lawfirmActionFailedToast": "操作に失敗しました",
   "lawfirmOpenWorkbenchFailedToast": "ワークベンチを開けませんでした",

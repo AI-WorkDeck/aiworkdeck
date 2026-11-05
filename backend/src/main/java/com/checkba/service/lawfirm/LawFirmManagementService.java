@@ -230,7 +230,12 @@ public class LawFirmManagementService {
         Map<String, Object> selfInfo = new LinkedHashMap<>();
         selfInfo.put("id", userId);
         selfInfo.put("displayName", currentUserName);
-        selfInfo.put("departmentName", defaultDeptForUser(userId));
+        // 只取台账里真实记过的业务部门；没建律所 / 台账为空时留空，不按 userId 套一个写死的部门
+        selfInfo.put("departmentName", allIntakes.stream()
+                .filter(i -> Objects.equals(i.getLeadLawyerUserId(), userId) || Objects.equals(i.getApplicantUserId(), userId))
+                .map(LawFirmMatterIntake::getDepartmentName)
+                .filter(d -> d != null && !d.isBlank())
+                .findFirst().orElse(null));
         selfInfo.put("role", "主办律师 / 利冲委员");
 
         Map<String, Object> out = new LinkedHashMap<>();
@@ -1174,7 +1179,8 @@ public class LawFirmManagementService {
         for (Map.Entry<Long, String> unitEntry : unitNameMap.entrySet()) {
             Long uid = unitEntry.getKey();
             String uname = unitEntry.getValue();
-            String dept = unitDeptMap.getOrDefault(uid, defaultDeptForUser(uid));
+            // 台账里没有这位律师的部门就留空（没建律所时看板不该冒出写死的部门）
+            String dept = unitDeptMap.get(uid);
 
             long leadCases = intakes.stream()
                     .filter(i -> !"REJECTED_CONFLICT".equalsIgnoreCase(i.getStatus())
@@ -1386,12 +1392,7 @@ public class LawFirmManagementService {
         intakes.stream().map(LawFirmMatterIntake::getDepartmentName).filter(s -> s != null && !s.isBlank()).forEach(deptNames::add);
         invoices.stream().map(LawFirmInvoice::getDepartmentName).filter(s -> s != null && !s.isBlank()).forEach(deptNames::add);
         unitList.stream().map(u -> (String) u.get("departmentName")).filter(s -> s != null && !s.isBlank()).forEach(deptNames::add);
-        if (deptNames.isEmpty()) {
-            deptNames.add("资本市场与证券部");
-            deptNames.add("公司并购与投融资部");
-            deptNames.add("民商事争议解决部");
-            deptNames.add("知识产权与合规部");
-        }
+        // 台账为空时部门列表就是空的，前端显示空态引导；不塞演示用的部门名
 
         List<Map<String, Object>> departmentList = new ArrayList<>();
         for (String dept : deptNames) {
@@ -2590,17 +2591,6 @@ public class LawFirmManagementService {
             case "OVERLOADED" -> "超负荷";
             default -> "适中";
         };
-    }
-
-    private static String defaultDeptForUser(Long userId) {
-        if (userId == null) return "公司并购与投融资部";
-        String[] depts = {
-                "资本市场与证券部",
-                "公司并购与投融资部",
-                "民商事争议解决部",
-                "知识产权与合规部"
-        };
-        return depts[(int) (Math.abs(userId) % depts.length)];
     }
 
     private static String practiceAreaLabel(String area) {
