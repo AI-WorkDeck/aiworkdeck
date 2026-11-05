@@ -138,7 +138,10 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
       const listener = (_evt, data) => handler && handler(data)
       ipcRenderer.on('checkba:clipboard-copied', listener)
       return () => ipcRenderer.removeListener('checkba:clipboard-copied', listener)
-    }
+    },
+    // 「暂停记录」：{ ok, paused }
+    getPaused: () => ipcRenderer.invoke('checkba:clipboard-get-paused'),
+    setPaused: (paused) => ipcRenderer.invoke('checkba:clipboard-set-paused', { paused: !!paused })
   },
   backend: {
     getHealth: () => ipcRenderer.invoke('checkba:backend-health'),

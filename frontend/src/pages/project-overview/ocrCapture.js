@@ -189,6 +189,7 @@ export const ocrCaptureMethods = {
         // 尽量绑定当前浏览器 tab 的 URL（用于收藏）
         const active = this.focusedPane === 'right' ? this.activeFileRight : this.activeFileLeft
         this.ocrSourceUrl = active && active.tabType === 'web' ? (active.url || '') : ''
+        this.ocrSourceTitle = active && active.tabType === 'web' ? (active.name || '') : ''
 
         // Desktop：直接抓屏做底图，不需要浏览器授权
         if (this.isDesktopApp && host.ocr) {

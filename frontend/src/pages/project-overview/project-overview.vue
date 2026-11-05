@@ -862,6 +862,8 @@
             @open="openPluginTab(activeDynamicPlugin.pluginId)"
             @quick-action="onPluginQuickAction"
           />
+          <!-- files：FileTree 在链外用 v-show 常驻，这里只占住分支，免得落进下面的「加载中…」兜底 -->
+          <template v-else-if="leftPaneKey === 'files'"></template>
           <view v-else class="sidebar-plugin-placeholder">
             <text class="placeholder-title">{{ leftPaneTitle }}</text>
             <text class="placeholder-desc">{{ $t('workbench.loadingText') }}</text>
@@ -2901,6 +2903,7 @@ export default {
       ocrImageDataUrl: '',
       ocrText: '',
       ocrSourceUrl: '',
+      ocrSourceTitle: '',
       // 全屏截图浮层
       showOcrOverlay: false,
       ocrStream: null,
@@ -2913,7 +2916,7 @@ export default {
       ocrOverlaySelecting: false,
       ocrSel: { x1: 0, y1: 0, x2: 0, y2: 0 },
       ocrActionBar: { visible: false, x: 0, y: 0 },
-      ocrDebug: true,
+      ocrDebug: false,
       ocrLastPointer: { x: 0, y: 0 },
 
       // Invite Modal (Refactored)
@@ -3446,6 +3449,8 @@ export default {
         insertContent: payload => this.insertPlainTextToWps(payload),
         previewImage: url => this.openImagePreview(url),
         copyText: text => this.insertClipboardAndCopy(text),
+        copyImage: dataUrl => this.copyImageDataUrl(dataUrl),
+        clipboardCapture: paused => this.clipboardCapture(paused),
         calendarWorkspace: params => this.calendarWorkspace(params),
         openProject: payload => this.onCalendarOpenProject(payload),
         openTaskFile: payload => this.onCalendarOpenFile(payload),
@@ -6142,6 +6147,7 @@ export default {
     },
     switchToolTab(key) {
       this.activeToolKey = migrateLeftPaneKey(key)
+      this.rememberToolTab(this.activeToolKey)
       // 如果用户切到剪贴板，且之前有 pending，则立刻刷新
       this.$nextTick(() => {
         if (this.activeToolKey === 'plugin-clipboard') {
@@ -6374,10 +6380,9 @@ export default {
       // 记录到剪贴板历史（best-effort）
       if (options.saveToHistory) {
         try {
-          await saveClipboardText(t)
-          if (this.$refs.clipboardPanel && typeof this.$refs.clipboardPanel.refresh === 'function') {
-            this.$refs.clipboardPanel.refresh()
-          }
+          const res = await saveClipboardText(t)
+          // 与采集桥同一个出口：本实例面板加卡片 + 广播 awd:clipboard-saved（插件面板 / 别的坞位靠它刷新）
+          this.onClipboardSaved((res && res.data) ? res.data : res)
         } catch (e) {
           // ignore
         }
@@ -6986,6 +6991,8 @@ export default {
       // 三个工具面板都被搬到左/右之后底部抽屉里没东西可显示，开关也就不该有反应
       // （顶栏那个按钮同样按 bottomToolsList 收起，见模板）
       if (!this.showToolsPanel && !this.bottomToolsList.length) return
+      // 插件是异步加载的，onLoad 那次校正时底栏可能还是空的：打开前再选一次 tab（上次的 / 剪贴板）
+      if (!this.showToolsPanel && !this.bottomToolsList.some(t => t.key === this.activeToolKey)) this.normalizeDockSelections()
       this.showToolsPanel = !this.showToolsPanel
       this.$nextTick(() => this.triggerWorkbenchResize())
     },
