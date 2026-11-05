@@ -1197,6 +1197,12 @@ public class ProjectFileService {
          
          // 权限检查已移至 Controller 层，这里不再检查创建者身份
 
+         if (projectFileRepository.existsByProjectIdAndParentIdAndNameAndIdNot(
+                 file.getProjectId(), file.getParentId(), file.getName(), fileId)) {
+             throw new IllegalArgumentException(LangText.of(
+                     "原位置已存在同名文件/文件夹，请先重命名后再还原: ",
+                     "A file or folder with this name already exists at the original location; rename it before restoring: ") + file.getName());
+         }
          restoreRecursive(file);
          signalChange(file.getProjectId(), userId);
     }
