@@ -42,7 +42,6 @@ export default {
   thIdle: 'Idle Time',
   loadingEllipsis: 'Loading…',
   noRecords: 'No records',
-  durationUnderMinute: 'Under 1 min',
   durationMinutes: '{minutes} min',
   durationHoursMinutes: '{hours} h {minutes} min',
   workLogTruncatedHint: 'Too many records: only the most recent 5,000 are shown. Narrow the date range to see earlier ones.',

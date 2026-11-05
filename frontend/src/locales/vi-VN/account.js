@@ -30,7 +30,6 @@ export default {
   "thIdle": "Thời gian nhàn rỗi",
   "loadingEllipsis": "Đang tải…",
   "noRecords": "Không có bản ghi",
-  "durationUnderMinute": "Dưới 1 phút",
   "durationMinutes": "{minutes} phút",
   "durationHoursMinutes": "{hours} giờ {minutes} phút",
   "workLogTruncatedHint": "Có quá nhiều bản ghi: chỉ hiển thị 5.000 bản ghi gần nhất. Hãy thu hẹp khoảng ngày để xem các bản ghi cũ hơn.",

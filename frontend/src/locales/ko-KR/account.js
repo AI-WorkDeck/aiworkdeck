@@ -30,7 +30,6 @@ export default {
   "thIdle": "유휴 시간",
   "loadingEllipsis": "불러오는 중…",
   "noRecords": "기록 없음",
-  "durationUnderMinute": "1분 미만",
   "durationMinutes": "{minutes}분",
   "durationHoursMinutes": "{hours}시간 {minutes}분",
   "workLogTruncatedHint": "기록이 너무 많아 최근 5000건만 표시됩니다. 날짜 범위를 좁히면 이전 기록을 볼 수 있습니다.",

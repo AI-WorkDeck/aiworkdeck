@@ -30,7 +30,6 @@ export default {
   "thIdle": "アイドル時間",
   "loadingEllipsis": "読み込み中…",
   "noRecords": "記録なし",
-  "durationUnderMinute": "1分未満",
   "durationMinutes": "{minutes}分",
   "durationHoursMinutes": "{hours}時間{minutes}分",
   "workLogTruncatedHint": "記録が多すぎるため、最新の5000件のみ表示しています。日付範囲を絞ると、それ以前の記録を確認できます。",

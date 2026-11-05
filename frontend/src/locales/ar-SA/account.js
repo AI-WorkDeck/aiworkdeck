@@ -30,7 +30,6 @@ export default {
   "thIdle": "وقت الخمول",
   "loadingEllipsis": "جارٍ التحميل…",
   "noRecords": "لا توجد سجلات",
-  "durationUnderMinute": "أقل من دقيقة",
   "durationMinutes": "{minutes} د",
   "durationHoursMinutes": "{hours} س {minutes} د",
   "workLogTruncatedHint": "عدد السجلات كبير جدًا: يتم عرض أحدث 5000 سجل فقط. قلّص نطاق التاريخ لرؤية السجلات الأقدم.",

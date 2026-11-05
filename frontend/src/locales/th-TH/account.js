@@ -30,7 +30,6 @@ export default {
   "thIdle": "เวลาที่ไม่มีการใช้งาน",
   "loadingEllipsis": "กำลังโหลด…",
   "noRecords": "ไม่มีรายการ",
-  "durationUnderMinute": "น้อยกว่า 1 นาที",
   "durationMinutes": "{minutes} นาที",
   "durationHoursMinutes": "{hours} ชม. {minutes} นาที",
   "workLogTruncatedHint": "มีรายการมากเกินไป: แสดงเฉพาะ 5000 รายการล่าสุด ลดช่วงวันที่เพื่อดูรายการก่อนหน้า",

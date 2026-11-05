@@ -30,7 +30,6 @@ export default {
   "thIdle": "Waktu Menganggur",
   "loadingEllipsis": "Memuat…",
   "noRecords": "Tidak ada catatan",
-  "durationUnderMinute": "Kurang dari 1 mnt",
   "durationMinutes": "{minutes} mnt",
   "durationHoursMinutes": "{hours} jam {minutes} mnt",
   "workLogTruncatedHint": "Terlalu banyak catatan: hanya 5.000 terbaru yang ditampilkan. Persempit rentang tanggal untuk melihat yang lebih lama.",

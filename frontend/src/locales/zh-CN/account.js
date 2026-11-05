@@ -42,7 +42,6 @@ export default {
   thIdle: '连续无动作时间',
   loadingEllipsis: '加载中...',
   noRecords: '无记录',
-  durationUnderMinute: '不足 1 分钟',
   durationMinutes: '{minutes} 分',
   durationHoursMinutes: '{hours} 小时 {minutes} 分',
   workLogTruncatedHint: '记录太多，只显示了最近的 5000 条；缩小日期范围可以看到更早的记录',

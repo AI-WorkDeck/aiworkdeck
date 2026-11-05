@@ -30,7 +30,6 @@ export default {
   "thIdle": "निष्क्रिय समय",
   "loadingEllipsis": "लोड हो रहा है…",
   "noRecords": "कोई रिकॉर्ड नहीं",
-  "durationUnderMinute": "1 मिनट से कम",
   "durationMinutes": "{minutes} मिनट",
   "durationHoursMinutes": "{hours} घंटे {minutes} मिनट",
   "workLogTruncatedHint": "रिकॉर्ड बहुत अधिक हैं: केवल सबसे हाल के 5000 दिखाए गए हैं। पुराने रिकॉर्ड देखने के लिए तारीख की सीमा घटाएँ।",

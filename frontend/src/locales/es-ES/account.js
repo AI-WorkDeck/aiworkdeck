@@ -30,7 +30,6 @@ export default {
   "thIdle": "Tiempo de inactividad",
   "loadingEllipsis": "Cargando…",
   "noRecords": "Sin registros",
-  "durationUnderMinute": "Menos de 1 min",
   "durationMinutes": "{minutes} min",
   "durationHoursMinutes": "{hours} h {minutes} min",
   "workLogTruncatedHint": "Hay demasiados registros: solo se muestran los 5000 más recientes. Acota el rango de fechas para ver los anteriores.",
