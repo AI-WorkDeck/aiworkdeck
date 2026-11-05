@@ -335,12 +335,25 @@ finish 是否带 `transcribe:false`，跳过时面板/胶囊 toast 说明，会�
 档位读不到按可能扣费处理照样问。**档位优先读 `GET /api/meetings/projects/{id}` 的 `tier`**（项目成员可读；
 团队服务器的非管理员读不到机器级 `/api/platform-services`），没有才退回后者。框里是计费方式 + 时长（已知时）
 + 预计费用（`/api/platform-services/remote` 的 `asrPrice {unit, creditsPerUnit}`，creditsPerUnit 与
-balanceCents 同为「分」，只认 `unit=minute`，精确 op=transcribe 优先于通配 `*`；估算 = ceil(带小数分钟 × 单价)，与网关结算同算法；文案必带「约」）+ 余额（顶栏 chip 同端点，
-cents/100 显示为 Credits）。余额与单价各有 1.5 秒竞速上限，超时就不显示那一行。
+balanceCents 同为「分」，只认 `unit=minute`，精确 op=transcribe 优先于通配 `*`；估算 = ceil(带小数分钟 × 单价)，与网关结算同算法；文案必带「约」）。
+**余额数字不上框**（录屏/投屏外泄，dev-board#1713 #119）：余额（顶栏 chip 同端点）只用来判断够不够这次
+（时长未知按一分钟单价、无单价按 ≤0），不够才加一句 `meeting.paidConfirmInsufficient`。余额与单价各有 1.5 秒竞速上限，超时就不判断。
 AwdDialog 队列非空时持有 `overlayState` 的 `'awd-dialog'`（`utils/dialog.js`），让工作台把 BrowserView 藏起来——
 否则网页开着时框被原生层盖住、Esc 进不来，录音收尾会永远卡在等确认。
 后端没有取消进行中转写的接口（只有 DELETE 会议），转写中条目因此没有「取消」。
 回归 `frontend/tests/meeting-recorder/paid-transcribe-confirm.test.mjs`。
+
+**平台档转写告知只有一处（dev-board#1713 #117/#118）**：告知全文与「我已知悉」勾选只在宿主可信弹窗
+`utils/asrNoticeDialog.js`（`AwdDialog` 的 `checkLabel`：不预勾选、勾上才能确认）。插件面板
+`MeetingRecordingPanel` 只放提示 +「查看并确认告知」入口，不再自画勾选块；面板「开始录音 / 开始转写」、
+资源管理器新建录音在欠告知时**直接拉起这个弹窗、确认后接着做**，不许只闪 toast。插件侧经
+`pluginVoiceServices` 的 `acknowledgeNotice` 调同一个函数（取消回 `cancelled`，面板不提示）。
+`register-file` 回 `noticePending`，右键转写据此提示 `fileTree.transcribeNoticePending`。
+右键转写（`project-overview.onTranscribeAudio`）先 `openPanelInItsDock('voice')` 并发
+`recording-focus` 带 `preparing:true`（面板显示「正在准备…」），确认与注册结束后再发一次 `preparing:false`。
+`MeetingTranscriptionService.isConfigured` 的本机探测按地址缓存 5 秒（`LOCAL_READY_CACHE_MS`），
+面板「重新检测」走 `/api/asr/local/probe` 直探不受影响。回归 `tests/meeting-recorder/asr-notice.test.mjs`、
+`MeetingTranscriptionLocalPathTest`、`MeetingRecordingFileAccessTest`。
 
 **转写卡死判定与进度提示（dev-board#532，2026-09-09 维护者拍板）**：会议进入 `TRANSCRIBING`
 之后只有上游给终态才会离开，上游永不给终态（听悟任务被清理、网关任务被回收）就永远卡着，
