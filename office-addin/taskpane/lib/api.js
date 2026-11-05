@@ -766,19 +766,27 @@ export async function postChat({ serverUrl, token }, payload) {
 /**
  * 回传一条 office_command 的执行结果（Phase C 工具桥）。
  * payload: {requestId, ok, data|error}；后端按挂起表校验会话归属。
- * 回传失败时后端工具会在超时后拿到明确错误，这里只记录不重试。
+ * 回传失败（被拒绝/网络错/20s 超时）会抛错，由调用方把芯片标 failed 并提示；不重试——
+ * 后端工具超时消息已告诉模型该命令可能已执行。
  */
 export async function postOfficeResult({ serverUrl, token }, payload) {
   const base = normalizeBaseUrl(serverUrl)
+  // 不用 AbortSignal.timeout：旧版 Office WebView 可能没有
+  const ac = typeof AbortController === 'function' ? new AbortController() : null
+  const timer = ac && setTimeout(() => ac.abort(), 20000)
   try {
     const resp = await cloudFetch(`${base}/api/agent/office/result`, {
       method: 'POST',
       headers: headers(token),
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: ac?.signal
     })
-    if (!resp.ok) console.warn('[Addin] office 结果回传被拒绝', resp.status)
-  } catch (e) {
-    console.warn('[Addin] office 结果回传失败', e)
+    if (!resp.ok) {
+      console.warn('[Addin] office 结果回传被拒绝', resp.status)
+      throw new Error(t('apiChatFailedHttp', { status: resp.status }))
+    }
+  } finally {
+    if (timer) clearTimeout(timer)
   }
 }
 

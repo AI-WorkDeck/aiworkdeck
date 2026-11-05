@@ -167,3 +167,47 @@ test('IME Ctrl/Cmd+Alt+C requests the form, suppresses repeat and Copy, and resp
   assert.deepEqual(commands, ['get_selection'])
   assert.deepEqual(writes, ['正文选区'])
 })
+
+// B7：Cmd/Ctrl+S 在编辑器里就是「现在保存」——覆盖层或画布上的按键都转成宿主 save-request。
+test('IME Cmd/Ctrl+S requests a save, suppresses repeat, and leaves other combos alone', async t => {
+  const dom = new JSDOM('<div><canvas></canvas></div>', { pretendToBeVisual: true })
+  const saved = Object.fromEntries(['document', 'navigator', 'getComputedStyle'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
+  for (const [key, value] of Object.entries({ document: dom.window.document, navigator: dom.window.navigator, getComputedStyle: dom.window.getComputedStyle })) {
+    Object.defineProperty(globalThis, key, { configurable: true, value })
+  }
+  const commands = [], saves = []
+  const overlay = attachImeOverlay({ canvas: document.querySelector('canvas'), commit() {},
+    sendCommand: async action => { commands.push(action); return {} }, onSaveRequested: () => saves.push(true) })
+  t.after(() => {
+    overlay.destroy(); dom.window.close()
+    for (const [key, descriptor] of Object.entries(saved)) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor)
+      else delete globalThis[key]
+    }
+  })
+  const key = (target, props) => {
+    const e = new dom.window.KeyboardEvent('keydown', { key: 's', code: 'KeyS', bubbles: true, cancelable: true, ...props })
+    target.dispatchEvent(e)
+    return e
+  }
+  assert.equal(key(overlay.element, { metaKey: true }).defaultPrevented, true)
+  assert.equal(key(document.querySelector('canvas'), { ctrlKey: true }).defaultPrevented, true, '焦点在画布上也要拦下')
+  assert.equal(key(overlay.element, { ctrlKey: true, repeat: true }).defaultPrevented, true)
+  assert.equal(saves.length, 2)
+  assert.equal(key(overlay.element, { metaKey: true, isComposing: true }).defaultPrevented, false)
+  assert.equal(saves.length, 2)
+  assert.deepEqual(commands, [])
+})
+
+test('editor page relays Cmd/Ctrl+S as save-request and the host saves through retrySave even while paused', async () => {
+  const main = read('../../src/zetaoffice/editor-main.js')
+  assert.match(main, /onSaveRequested: \(\) => hostTransport\.send\(\{ __lo: 'lo-relay', type: 'save-request' \}\)/)
+  const editor = component('../../src/components/LibreOfficeEditor.vue', { ReviewPanel: null, EditorToolbar: null, EvidenceStaleBar: null })
+  let event, retried = 0
+  const vm = { file: { id: 7 }, retrySave: async () => { retried++; return true }, saveDocument: async () => { throw new Error('must use retrySave') } }
+  vm.subscribeHostEvents = editor.methods.subscribeHostEvents.bind(vm)
+  vm.subscribeHostEvents({ subscribe(fn) { event = fn; return () => {} } })
+  event({ __lo: 'lo-relay', type: 'save-request' })
+  await tick()
+  assert.equal(retried, 1)
+})

@@ -222,3 +222,38 @@ test('重载在途切到另一文件，旧下载不能覆盖新实例内容', as
   assert.equal(writes, 0)
   endCheckpointSaveBarrier(inst.projectId, fileId, barrier.restoreId)
 })
+
+test('卸载时有保存在途：在途期间敲的字在它结束后补传', async () => {
+  const { inst, uploads, edit, unmount } = makeEditor()
+  edit('v2')
+  const saved = inst.save()
+  assert.equal(uploads.length, 1)
+  edit('v3')
+  unmount()
+  uploads[0].resolve()
+  await saved
+  await tick()
+  assert.equal(uploads.length, 2)
+  assert.equal(uploads[1].content, 'v3')
+})
+
+test('卸载时有保存在途但期间没再输入：不重复上传；在途失败则补传', async () => {
+  const ok = makeEditor()
+  ok.edit('v2')
+  const saved = ok.inst.save()
+  ok.unmount()
+  ok.uploads[0].resolve()
+  await saved
+  await tick()
+  assert.equal(ok.uploads.length, 1)
+
+  const bad = makeEditor()
+  bad.edit('v2')
+  const failed = bad.inst.save()
+  bad.unmount()
+  bad.uploads[0].reject(new Error('offline'))
+  await failed
+  await tick()
+  assert.equal(bad.uploads.length, 2)
+  assert.equal(bad.uploads[1].content, 'v2')
+})

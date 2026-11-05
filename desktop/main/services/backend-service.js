@@ -295,6 +295,8 @@ function spawnEnv(ctx) {
   // 后端 build 指纹：wizard 端点回显，复用前对比识破陈旧残留后端（见 backendBuildId）
   env.AWD_BACKEND_BUILD = backendBuildId(ctx)
   env.AWD_BACKEND_CONTROL_TOKEN = randomBytes(32).toString('hex')
+  // 后端盯住壳进程：壳崩溃后残留的 JVM 自行退出（backend ParentProcessWatchdog）
+  env.AWD_PARENT_PID = String(process.pid)
   return env
 }
 

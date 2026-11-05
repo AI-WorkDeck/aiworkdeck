@@ -30,6 +30,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
@@ -244,6 +246,24 @@ class CloudSyncUploadTest {
         CloudConnection conn = cloud.connect("http://server:9696", "hanzewei", "pw", "MacBook", 1L);
         assertEquals("awdt_abc", conn.getDeviceToken());
         assertTrue(lastHttpUrl.endsWith("/api/auth/device-token"));
+    }
+
+    @Test
+    void objectUploadRunsBeforeTakingTheRepoLock() throws Exception {
+        linkToBareRemote(7L);
+        var objectSync = mock(com.checkba.version.cloud.ProjectObjectSyncService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(cloud, "objectSync", objectSync);
+        List<Boolean> heldAtCall = new ArrayList<>();
+        doAnswer(i -> {
+            heldAtCall.add(svc.repoLock(7L).isHeldByCurrentThread());
+            return null;
+        }).when(objectSync).upload(anyLong(), anyString(), anyString(), anyString());
+
+        cloud.uploadToCloud(7L, true);
+
+        assertFalse(heldAtCall.isEmpty(), "应当调用过版本对象上传");
+        assertFalse(heldAtCall.get(0), "第一次版本对象上传（WAN）不该持有 repoLock");
+        assertTrue(heldAtCall.contains(true), "持锁段仍要再补传一次");
     }
 
     @Test
