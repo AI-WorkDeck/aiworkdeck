@@ -309,7 +309,7 @@ default_api = _ToolAPI()
             // Env Vars（平台代采档下一个都不注入，见 injectableCredentials）
             credentials.forEach((name, value) -> {
                 command.add("-e");
-                command.add(name + "=" + value);
+                command.add(name); // 只给名字；值走子进程环境变量，不进 argv/日志/ps
             });
 
             // Image & Command
@@ -320,6 +320,7 @@ default_api = _ToolAPI()
 
             ProcessBuilder pb = new ProcessBuilder(command);
             pb.redirectErrorStream(false);
+            credentials.forEach((name, value) -> pb.environment().put(name, value));
             log.info("Executing Docker command: {}", String.join(" ", command));
             
             process = startSandbox(pb);

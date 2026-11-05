@@ -429,6 +429,12 @@ public class AiAgentController {
             return ResponseEntity.status(403).body("{\"status\":\"error\", \"message\":\"" +
                     LangText.of("无权操作该会话", "You do not have permission for this conversation") + "\"}");
         }
+        // 运行中截断会让编排器把已删除的 assistant 行重新插到截断点之后，且工具仍在改文档
+        if (agentOrchestrator.hasActiveRun(request.getConversationId())) {
+            return ResponseEntity.status(409).body("{\"status\":\"error\", \"message\":\"" + LangText.of(
+                    "当前对话仍在运行，请先停止",
+                    "This conversation is still running; stop it first") + "\"}");
+        }
         Long messageId;
         try {
             messageId = parseMessageId(request.getMessageId());
