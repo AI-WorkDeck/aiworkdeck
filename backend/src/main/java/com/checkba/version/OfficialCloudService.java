@@ -129,8 +129,9 @@ public class OfficialCloudService {
         }
         String fingerprint = snapshot.fingerprint();
         CloudConnection existing = connectionRepository.findFirstByUserIdAndServerUrl(userId, base).orElse(null);
-        if (!reconnect && existing != null && fingerprint != null
-                && fingerprint.equals(existing.getAccountFingerprint())) {
+        boolean sameAccount = existing != null && fingerprint != null
+                && fingerprint.equals(existing.getAccountFingerprint());
+        if (!reconnect && sameAccount) {
             return existing;
         }
         String key = snapshot.key();
@@ -146,7 +147,8 @@ public class OfficialCloudService {
         String oldToken = existing == null ? null : existing.getDeviceToken();
         Long oldTokenId = existing == null ? null : existing.getTokenId();
         CloudConnection conn = bridge(base, userId, key, fingerprint, existing, snapshot);
-        if (reconnect && oldToken != null && !oldToken.equals(conn.getDeviceToken())) {
+        // 只在同一个账户上换令牌时才跟着换门禁：本机换了人，上一个人的案卷门禁照拦（地雷 #58）
+        if (reconnect && sameAccount && oldToken != null && !oldToken.equals(conn.getDeviceToken())) {
             cloudSyncService.revokeRemoteToken(base, oldTokenId, oldToken);
             try {
                 cloudSyncService.refenceConnectionProjects(conn.getId(), userId);

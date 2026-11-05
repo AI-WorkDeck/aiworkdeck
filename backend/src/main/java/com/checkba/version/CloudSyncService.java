@@ -281,15 +281,19 @@ public class CloudSyncService {
      * 「重新绑定这份案卷」的前半步：只拆掉本机这份案卷与云端案卷的绑定（{@code ProjectRemote}）。
      * 本机文件与版本历史不动，云端那份案卷也不动；随后由界面明确地再放进案件库一次
      * （{@link #shareToCloud}，带幂等键）。origin 与写门禁留着，下一次共享会整份覆盖。
+     * 只许拆挂在自己连接上的绑定：多人共用一个后端时，别人的连接与绑定不归我拆。
      */
-    public void unbindProject(long projectId) {
+    public void unbindProject(long projectId, Long userId) {
         ReentrantLock lock = sessionService.repoLock(projectId);
         lock.lock();
         try {
             if (repoService.repositoryMerging(projectId)) {
                 throw VersionException.userFacing(LangText.of("请先把等你做选择的文件处理完", "Please finish choosing your files first"));
             }
-            remoteRepository.findByProjectId(projectId).ifPresent(remoteRepository::delete);
+            remoteRepository.findByProjectId(projectId).ifPresent(remote -> {
+                ownedConnection(remote.getConnectionId(), userId);
+                remoteRepository.delete(remote);
+            });
             remoteNameCache.remove(projectId);
         } finally {
             lock.unlock();

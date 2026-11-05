@@ -626,11 +626,11 @@ class CloudControllerTest {
             when(projectMemberService.isClient(PROJECT_ID, USER_ID)).thenReturn(false);
             when(projectMemberService.hasWritePermission(PROJECT_ID, USER_ID)).thenReturn(false);
             assertThrows(IllegalArgumentException.class, () -> controller.unbind(PROJECT_ID, "s"));
-            verify(cloudSyncService, never()).unbindProject(anyLong());
+            verify(cloudSyncService, never()).unbindProject(anyLong(), any());
 
             when(projectMemberService.hasWritePermission(PROJECT_ID, USER_ID)).thenReturn(true);
             controller.unbind(PROJECT_ID, "s");
-            verify(cloudSyncService).unbindProject(PROJECT_ID);
+            verify(cloudSyncService).unbindProject(PROJECT_ID, USER_ID);
         }
     }
 

@@ -44,10 +44,10 @@ test('重新绑定：确认后先拆本机绑定，再按同一套连接规则�
   assert.deepEqual(calls, [['unbind', 7], ['share', 7, 3]])
 })
 
-test('重新绑定：连着多个案件库时先拒，绑定一个字不拆', async () => {
+test('重新绑定：连着多个案件库时先拒，不弹确认、绑定一个字不拆', async () => {
   const calls = []
   const res = await rebindProjectToLibrary({
-    projectId: 7, connections: [{ id: 3 }, { id: 4 }], confirm: async () => true,
+    projectId: 7, connections: [{ id: 3 }, { id: 4 }], confirm: async () => { calls.push(['confirm']); return true },
     unbind: async (p) => calls.push(['unbind', p]), share: async (p, c) => calls.push(['share', p, c]),
   })
   assert.deepEqual(res, { ok: false, reason: TOO_MANY_LIBRARIES })

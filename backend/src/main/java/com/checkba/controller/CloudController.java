@@ -194,8 +194,8 @@ public class CloudController {
     public ResponseEntity<Map<String, Object>> unbind(
             @PathVariable Long projectId,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireWriteMember(projectId, sessionId);
-        cloudSyncService.unbindProject(projectId);
+        Long userId = requireWriteMember(projectId, sessionId);
+        cloudSyncService.unbindProject(projectId, userId);
         return ok(Map.of());
     }
 

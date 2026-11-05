@@ -226,6 +226,27 @@ class OfficialCloudServiceTest {
         assertEquals("awdt_second", idle.getDeviceToken());
     }
 
+    /**
+     * 本机账户换了人（指纹变了）再点「重新连接云端」：连接照旧就地换成新账户的令牌，
+     * 但上一个人放进案件库的案卷写门禁绝不能被换到新账户名下——门禁照拦（地雷 #58）。
+     */
+    @Test
+    void explicitReconnectAfterTheAccountChangedNeverRefencesThePreviousPersonsCases() {
+        connectedAccount("awdk_abc", "fp-1");
+        OfficialCloudService svc = mainland();
+        svc.connectOfficial(ME);
+        canned = "{\"code\":0,\"data\":{\"token\":\"awdt_second\",\"userId\":10,"
+                + "\"username\":\"awd_other\",\"displayName\":\"别人\",\"tokenId\":32}}";
+        connectedAccount("awdk_xyz", "fp-2");
+
+        CloudConnection conn = svc.reconnectOfficial(ME);
+
+        assertEquals("awdt_second", conn.getDeviceToken());
+        assertEquals("fp-2", conn.getAccountFingerprint());
+        verify(cloudSyncService, never()).refenceConnectionProjects(anyLong(), any());
+        verify(cloudSyncService, never()).revokeRemoteToken(any(), any(), any());
+    }
+
     @Test
     void explicitReconnectWithoutAnyConnectionJustConnects() {
         connectedAccount("awdk_abc", "fp-1");

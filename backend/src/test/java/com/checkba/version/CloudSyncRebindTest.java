@@ -65,7 +65,7 @@ class CloudSyncRebindTest {
         ProjectRemote bound = remote(7L, "70");
         when(remotes.findByProjectId(7L)).thenReturn(Optional.of(bound));
 
-        cloud.unbindProject(7L);
+        cloud.unbindProject(7L, 42L);
 
         verify(remotes).delete(bound);
         assertTrue(httpCalls.isEmpty(), "云端那份案卷一个字不动: " + httpCalls);
@@ -76,8 +76,16 @@ class CloudSyncRebindTest {
         when(remotes.findByProjectId(7L)).thenReturn(Optional.of(remote(7L, "70")));
         when(repo.repositoryMerging(7L)).thenReturn(true);
 
-        VersionException e = assertThrows(VersionException.class, () -> cloud.unbindProject(7L));
+        VersionException e = assertThrows(VersionException.class, () -> cloud.unbindProject(7L, 42L));
         assertTrue(e.isUserFacing());
+        verify(remotes, never()).delete(any());
+    }
+
+    /** 同一个后端上的另一位律师：哪怕对这份案卷有写权限，也拆不了挂在别人连接上的绑定。 */
+    @Test void unbindRefusesABindingThatHangsOnSomeoneElsesConnection() {
+        when(remotes.findByProjectId(7L)).thenReturn(Optional.of(remote(7L, "70")));
+
+        assertThrows(VersionException.class, () -> cloud.unbindProject(7L, 99L));
         verify(remotes, never()).delete(any());
     }
 }
