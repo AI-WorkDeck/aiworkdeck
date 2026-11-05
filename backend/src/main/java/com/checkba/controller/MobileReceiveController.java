@@ -2,8 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package com.checkba.controller;
 
+import com.checkba.exception.UnauthorizedException;
 import com.checkba.service.mobile.MobileRelayClientService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
@@ -12,14 +16,28 @@ import java.util.Map;
 @RequestMapping("/api/mobile-receive")
 @ConditionalOnProperty(name = "security.local-mode", havingValue = "true")
 public class MobileReceiveController {
+    private static final Logger log = LoggerFactory.getLogger(MobileReceiveController.class);
     private final MobileRelayClientService client;
 
     public MobileReceiveController(MobileRelayClientService client) {
         this.client = client;
     }
 
+    // 未登录走全局 4010（UnauthorizedException；中文字面量在出口按语言翻译），前端据此处理会话失效（问题 6）
     private void requireUser(String session) {
-        if (AuthController.getUserIdFromSession(session) == null) throw new IllegalStateException(com.checkba.service.LangText.of("请先登录", "Please sign in first"));
+        if (AuthController.getUserIdFromSession(session) == null) throw new UnauthorizedException("请先登录");
+    }
+
+    /**
+     * 云端目录 / 收件链路的失败（MobileRelayClientService 抛的 IllegalStateException，message 都是
+     * LangText 用户文案）在本控制器内透出，别被全局兜底成「服务器内部错误」（问题 6）。只管这个控制器。
+     */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, Object>> handleRelayFailure(IllegalStateException e) {
+        log.warn("mobile-receive 请求失败: {}", e.getMessage(), e.getCause());
+        String message = e.getMessage() != null && !e.getMessage().isBlank() ? e.getMessage()
+                : com.checkba.service.LangText.of("云端请求失败", "Cloud request failed");
+        return ResponseEntity.ok(Map.of("code", 1, "message", message));
     }
 
     @GetMapping("/catalog")
