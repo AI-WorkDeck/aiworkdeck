@@ -90,6 +90,8 @@ class FileControllerChunkedUploadTest {
         when(projectFileRepository.sumSizeByProjectId(4L)).thenReturn(0L);
         when(storageServiceFactory.getStorageService()).thenReturn(storageService);
         when(storageService.append(any(), any())).thenReturn(FILE_PATH);
+        // 追加前落盘大小须等于本块 offset（分块幂等校验）
+        when(storageService.getSize(FILE_PATH)).thenReturn(5242880L);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setContentType("application/octet-stream");
@@ -150,8 +152,8 @@ class FileControllerChunkedUploadTest {
         when(projectFileRepository.sumSizeByProjectId(4L)).thenReturn(0L);
         when(storageServiceFactory.getStorageService()).thenReturn(storageService);
         when(storageService.append(any(), any())).thenReturn(FILE_PATH);
-        // 落盘大小已达到声明的总大小 —— 整个文件传完
-        when(storageService.getSize(FILE_PATH)).thenReturn(10485760L);
+        // 追加前落盘大小等于本块 offset；追加后达到声明的总大小 —— 整个文件传完
+        when(storageService.getSize(FILE_PATH)).thenReturn(5242880L, 10485760L);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setContentType("application/octet-stream");
