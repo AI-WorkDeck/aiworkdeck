@@ -116,6 +116,8 @@ export const MAX_POINTER_PARAGRAPH_CHARS = 600
  *
  * @returns {Promise<{ kind: 'selection'|'cursor'|'none', ... } | null>}
  */
+export const POINTER_READ_TIMEOUT_MS = 800
+
 export async function readActivePointer(libreRefs, { side, fileId } = {}) {
   const id = Number(fileId)
   if (!id) return null
@@ -130,7 +132,9 @@ export async function readActivePointer(libreRefs, { side, fileId } = {}) {
       && inst.executor && typeof inst.executor.executeCommand === 'function'
     if (!usable) continue
     try {
-      const res = await inst.executor.executeCommand('get_ai_pointer', {}, { background: true })
+      // 发送路径等不起：office 线程正忙（AI 修订风暴、整篇导出）时 800ms 内拿不到就放弃，
+      // 退回只带选区文字的旧行为，不拖住发送。
+      const res = await inst.executor.executeCommand('get_ai_pointer', {}, { background: true, timeoutMs: POINTER_READ_TIMEOUT_MS })
       return res && res.success !== false ? res : null
     } catch (e) {
       return null

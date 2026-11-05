@@ -5838,6 +5838,10 @@ export default {
     // worker 每次选区事件都会触发（拖选时一秒几十次），每次都是一轮 get_selection 往返：
     // 尾部防抖 200ms，只在停手后读一次。
     refreshActiveSelection(payload = null) {
+      // 别的窗格（例如 AI 正在改另一份文档）的选区事件先在这里丢掉，不能重置定时器，
+      // 否则 200ms 内一条无关事件会把用户自己这一次刷新顶掉，选区标签停在旧内容。
+      const tab = this.currentActiveTab
+      if (payload && payload.fileId != null && tab && tab.id != null && String(payload.fileId) !== String(tab.id)) return
       clearTimeout(this._selectionRefreshTimer)
       this._selectionRefreshTimer = setTimeout(() => this.refreshActiveSelectionNow(payload), 200)
     },

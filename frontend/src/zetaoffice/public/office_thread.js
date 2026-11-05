@@ -113,6 +113,7 @@ function anchorBookmark(range) {
 // story 的书签（单元格锚点用正文 XText 照样摘得掉，table-retype 的锚点组守着）。
 function dropAiAnchors() {
   anchorTexts.clear();
+  pointerAnchorName = null;
   const bms = xModel.getBookmarks();
   const names = (bms.getElementNames && bms.getElementNames()) || [];
   const xText = xModel.getText();
@@ -128,6 +129,29 @@ function anchorRange(name) {
   const bms = xModel.getBookmarks();
   if (!bms.hasByName(name)) return null;
   return bms.getByName(name).getAnchor(); // XTextRange
+}
+// 发送时给「指哪儿」挂的锚点（get_ai_pointer）。每条消息都会走一次，不能留下副作用：
+// 不标脏（否则每发一条消息都触发一次整篇导出+上传）、不进撤销栈（否则用户 Ctrl+Z
+// 先撤掉一个看不见的书签）；同时只保留最近一个，旧的先摘掉，不在文档里越积越多。
+let pointerAnchorName = null;
+function silentPointerAnchor(range) {
+  const undo = xModel.getUndoManager(), ownsUndoLock = !undo.isLocked();
+  if (ownsUndoLock) undo.lock();
+  try {
+    return withViewOnlyChange(function () {
+      if (pointerAnchorName) {
+        try {
+          const bms = xModel.getBookmarks();
+          if (bms.hasByName(pointerAnchorName)) xModel.getText().removeTextContent(bms.getByName(pointerAnchorName));
+        } catch (e) { /* 已随编辑消失 */ }
+        anchorTexts.delete(pointerAnchorName);
+        pointerAnchorName = null;
+      }
+      return (pointerAnchorName = anchorBookmark(range));
+    });
+  } finally {
+    if (ownsUndoLock) undo.unlock();
+  }
 }
 // Compare in the final-text view immediately before selecting/writing. Unrelated
 // edits may move a bookmark without invalidating its unchanged target text.
@@ -5118,7 +5142,9 @@ const EXEC = {
     if (p && typeof p.expectedText === 'string' && p.expectedText) {
       const norm = function (t) { return String(t || '').replace(/\r\n?/g, '\n').trim(); };
       const cur = EXEC.get_selection({});
-      if (norm(cur && cur.text) !== norm(p.expectedText)) {
+      // 模型手里的选区原文最多 2000 字（后端截断）；长选区按前缀核对，否则永远对不上。
+      const live = norm(cur && cur.text), want = norm(p.expectedText);
+      if (live !== want && !(want.length >= 1900 && live.startsWith(want.slice(0, 1900)))) {
         const msg = '当前选区与 expectedText 不符（用户可能已挪动选区），未执行替换；请改用 doc_replace_at_anchor，或重新 doc_get_cursor_context 核对后再试';
         return { success: false, error: msg, message: msg, currentSelection: String((cur && cur.text) || '').slice(0, 200) };
       }
@@ -6885,7 +6911,7 @@ const EXEC = {
     const selText = selRange ? (selRange.getString() || '') : '';
     if (selText.length > 0) {
       let anchorId = null;
-      if (selText.length <= MAX_ANCHOR_CHARS) { try { anchorId = anchorBookmark(selRange); } catch (e) {} }
+      if (selText.length <= MAX_ANCHOR_CHARS) { try { anchorId = silentPointerAnchor(selRange); } catch (e) {} }
       return { success: true, kind: 'selection', selectionText: selText.slice(0, MAX_ANCHOR_CHARS),
         anchorId: anchorId, paragraphIndex: headingChainOf(selRange).paragraphIndex };
     }
@@ -6899,7 +6925,7 @@ const EXEC = {
     const text = para.getString() || '';
     if (!text.trim()) return { success: true, kind: 'none' };
     let anchorId = null;
-    if (text.length <= MAX_PARA_CHARS) { try { anchorId = anchorBookmark(para); } catch (e) {} }
+    if (text.length <= MAX_PARA_CHARS) { try { anchorId = silentPointerAnchor(para); } catch (e) {} }
     return { success: true, kind: 'cursor', paragraphText: text.slice(0, MAX_PARA_CHARS),
       anchorId: anchorId, paragraphIndex: headingChainOf(vc).paragraphIndex };
   },
@@ -12196,7 +12222,7 @@ const EXEC = {
 // 原语可能是 async（分批的 find_replace / apply_house_style），恢复必须等它 settle；
 // 批间仍让出事件循环，但后续最终文本命令及用户显示切换等待当前批次完成，
 // 避免中途改变段落成员，或收尾恢复覆盖用户的新选择。
-const FINAL_TEXT_ACTIONS = new Set(['get_completion_context', 'accept_completion', 'insert_completion_content', 'capture_writing_context', 'accept_writing_suggestion', 'get_review_context', 'goto_review_range', 'apply_review_edit']);
+const FINAL_TEXT_ACTIONS = new Set(['get_ai_pointer', 'get_completion_context', 'accept_completion', 'insert_completion_content', 'capture_writing_context', 'accept_writing_suggestion', 'get_review_context', 'goto_review_range', 'apply_review_edit']);
 // Only known readers may skip the view guard on a clean document. A write can
 // create its first deletion and then read paragraphAfterEdit in the same command.
 const FINAL_TEXT_READ_ACTIONS = new Set([

@@ -11,7 +11,21 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok }); console.log
 
 preflight()
 const puppeteer = await loadPuppeteer()
-const server = await startServer()
+const probe = `
+  debug_pointer_state() {
+    const bms = xModel.getBookmarks(), names = (bms.getElementNames && bms.getElementNames()) || [];
+    let anchors = 0; for (let i = 0; i < names.length; i++) if (String(names[i]).indexOf('__ai_anchor_') === 0) anchors++;
+    return { success: true, modified: !!xModel.isModified(), anchors: anchors };
+  },
+  debug_set_modified(p) { xModel.setModified(!!p.value); return { success: true }; },
+  debug_record_changes(p) { xModel.setPropertyValue('RecordChanges', !!p.value); return { success: true }; },
+`
+function patchServed(url, body) {
+  if (url === '/office_thread.js') return Buffer.from(body.toString('utf8').replace('const EXEC = {', 'const EXEC = {\n' + probe))
+  if (/^\/assets\/editor-.*\.js$/.test(url)) return Buffer.from(body.toString('utf8').replace('"get_hyperlink_at_cursor"', '"get_hyperlink_at_cursor","debug_pointer_state","debug_set_modified","debug_record_changes"'))
+  return body
+}
+const server = await startServer({ patchServed })
 const browser = await launchBrowser(puppeteer)
 try {
   const page = await openEditor(browser)
@@ -27,6 +41,18 @@ try {
   }
   const textOf = async () => ((await exec('get_document_text', {})).paragraphs || []).map((p) => p.text).join('\n')
   const before = await textOf()
+
+  // 副作用：干净文档上连取三次指针 → 不标脏、不进撤销栈、只留一个锚点
+  await exec('debug_set_modified', { value: false })
+  await exec('select_paragraph', { index: 0 }); await exec('collapse_selection', { to: 'start' })
+  for (let i = 0; i < 3; i++) await exec('get_ai_pointer')
+  const st = await exec('debug_pointer_state')
+  check('取指针不把干净文档标脏（不触发自动保存）', st.modified === false, st)
+  check('反复取指针只保留一个锚点', st.anchors === 1, st)
+  await exec('undo', { steps: 1 })
+  check('取指针后立即撤销，撤回的是最后一笔真编辑而非书签', !/第三条 甲方违约应赔偿/.test(await textOf()) || (await textOf()) !== before, { text: await textOf() })
+  await exec('redo', { steps: 1 })
+  check('重做恢复原文', (await textOf()) === before, { text: await textOf() })
 
   // 光标落在第二条段内（无选区）
   await exec('select_paragraph', { index: 1 }); await exec('collapse_selection', { to: 'start' })
@@ -57,9 +83,20 @@ try {
   const ok = await exec('replace_selection', { text: '第三条 委托方违约应赔偿。', expectedText: sel.selectionText })
   check('选区一致时 replace_selection 写入', ok.success === true && /第三条 委托方违约/.test(await textOf()), ok)
 
+  // 修订模式下：先留一条删除修订，再在含删除修订的段落取指针，锚点按最终文本校验
+  await exec('debug_record_changes', { value: true })
+  const loc = await exec('find_text_locations', { keyword: '按期付款' })
+  await exec('replace_at_position', { anchor: loc.matches[0].anchorId, newText: '按约付款' })
+  await exec('select_paragraph', { index: 0 }); await exec('collapse_selection', { to: 'start' })
+  const tracked = await exec('get_ai_pointer')
+  check('修订段落的指针文本是最终文本（不含删除痕迹）', tracked.kind === 'cursor' && /按约付款/.test(tracked.paragraphText) && !/按期付款/.test(tracked.paragraphText), tracked)
+  const trackedRep = await exec('replace_at_position', { anchor: tracked.anchorId, newText: '第一条 委托方应按约付款。' })
+  check('修订段落按指针锚点一步改中', trackedRep.success === true, trackedRep)
+  await exec('debug_record_changes', { value: false })
+
   // 副作用：撤销一步应撤回上一笔真编辑，而不是一个看不见的书签插入
   const u = await exec('undo', { steps: 1 })
-  check('撤销一步撤回最近一笔真编辑', /第三条 甲方违约/.test(await textOf()), { u: u.success, text: await textOf() })
+  check('撤销一步撤回最近一笔真编辑（修订段落那次锚点替换）', /第一条 甲方应按约付款/.test(await textOf()) && /第三条 委托方违约/.test(await textOf()), { u: u.success, text: await textOf() })
 } finally {
   await browser.close(); server.close()
 }
