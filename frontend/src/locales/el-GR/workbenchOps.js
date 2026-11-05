@@ -81,5 +81,11 @@ export default {
   "ocrFailedItem": "«{name}» δεν ολοκληρώθηκε: {reason}",
   "ocrSkipped": "Παραλείφθηκαν {count} αρχεία που χρειάζονται OCR στο cloud (χωρίς επιβεβαίωση)",
   "ocrCancelled": "Ακυρώθηκε· {count} αρχεία δεν επεξεργάστηκαν",
-  "ocrSummaryTitle": "Αναγνωρίστηκαν {done}/{total}"
+  "ocrSummaryTitle": "Αναγνωρίστηκαν {done}/{total}",
+  "ocrLocalFailedTitle": "Η τοπική αναγνώριση δεν ολοκληρώθηκε",
+  "ocrLocalFailedReason": "Αιτία: {reason}",
+  "ocrLocalFailedHint": "Μπορείτε να χρησιμοποιήσετε αναγνώριση στο cloud για τα αρχεία αυτής της παρτίδας που απέτυχαν τοπικά. Αν όχι, αυτά τα αρχεία δεν θα ανεβούν.",
+  "ocrLocalFailedConfirm": "Χρήση αναγνώρισης στο cloud",
+  "ocrAlreadySearchable": "«{name}» έχει ήδη επίπεδο κειμένου και είναι αναζητήσιμο· δεν δημιουργήθηκε νέο αρχείο",
+  "ocrStopped": "Διακόπηκε· {count} αρχεία δεν επεξεργάστηκαν"
 }

@@ -81,5 +81,11 @@ export default {
   "ocrFailedItem": "«{name}» no completado: {reason}",
   "ocrSkipped": "{count} archivo(s) que requieren OCR en la nube omitidos (sin confirmar)",
   "ocrCancelled": "Cancelado; {count} archivo(s) sin procesar",
-  "ocrSummaryTitle": "Reconocidos {done}/{total}"
+  "ocrSummaryTitle": "Reconocidos {done}/{total}",
+  "ocrLocalFailedTitle": "El reconocimiento local no se completó",
+  "ocrLocalFailedReason": "Motivo: {reason}",
+  "ocrLocalFailedHint": "Puedes usar el reconocimiento en la nube para los archivos de este lote que fallaron en local. Si no lo haces, esos archivos no se subirán.",
+  "ocrLocalFailedConfirm": "Usar reconocimiento en la nube",
+  "ocrAlreadySearchable": "«{name}» ya tiene capa de texto y permite búsquedas; no se creó ningún archivo nuevo",
+  "ocrStopped": "Detenido; {count} archivo(s) sin procesar"
 }

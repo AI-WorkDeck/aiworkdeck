@@ -158,5 +158,9 @@ export default {
   "ocrCopy": "คัดลอกข้อความ",
   "ocrExportTxt": "ส่งออก TXT",
   "ocrExportDocx": "ส่งออก Word",
-  "ocrOutputSuffix": "-ข้อความ OCR"
+  "ocrOutputSuffix": "-ข้อความ OCR",
+  "ocrExportLayoutDocx": "ส่งออก Word (คงเค้าโครง)",
+  "ocrSearchablePdf": "สร้าง PDF ที่ค้นหาได้",
+  "ocrLayoutSuffix": "-เค้าโครง OCR",
+  "ocrSearchableSuffix": "-ค้นหาได้"
 }

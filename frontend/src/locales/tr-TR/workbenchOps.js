@@ -81,5 +81,11 @@ export default {
   "ocrFailedItem": "\"{name}\" tamamlanmadı: {reason}",
   "ocrSkipped": "Bulut OCR gerektiren {count} dosya atlandı (onaylanmadı)",
   "ocrCancelled": "İptal edildi; {count} dosya işlenmedi",
-  "ocrSummaryTitle": "Tanındı {done}/{total}"
+  "ocrSummaryTitle": "Tanındı {done}/{total}",
+  "ocrLocalFailedTitle": "Yerel tanıma tamamlanamadı",
+  "ocrLocalFailedReason": "Neden: {reason}",
+  "ocrLocalFailedHint": "Bu gruptaki yerel olarak tamamlanamayan dosyalar için bulut tanıma kullanabilirsiniz. Kullanmazsanız bu dosyalar yüklenmez.",
+  "ocrLocalFailedConfirm": "Bulut tanımayı kullan",
+  "ocrAlreadySearchable": "\"{name}\" zaten metin katmanına sahip ve aranabilir; yeni dosya oluşturulmadı",
+  "ocrStopped": "Durduruldu; {count} dosya işlenmedi"
 }

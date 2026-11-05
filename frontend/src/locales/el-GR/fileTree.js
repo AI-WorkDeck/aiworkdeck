@@ -158,5 +158,9 @@ export default {
   "ocrCopy": "Αντιγραφή κειμένου",
   "ocrExportTxt": "Εξαγωγή TXT",
   "ocrExportDocx": "Εξαγωγή Word",
-  "ocrOutputSuffix": "-κείμενο OCR"
+  "ocrOutputSuffix": "-κείμενο OCR",
+  "ocrExportLayoutDocx": "Εξαγωγή Word (διατήρηση διάταξης)",
+  "ocrSearchablePdf": "Δημιουργία PDF με δυνατότητα αναζήτησης",
+  "ocrLayoutSuffix": "-διάταξη OCR",
+  "ocrSearchableSuffix": "-με αναζήτηση"
 }

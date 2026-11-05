@@ -176,4 +176,8 @@ export default {
   ocrExportTxt: 'Export TXT',
   ocrExportDocx: 'Export Word',
   ocrOutputSuffix: '-OCR text',
+  ocrExportLayoutDocx: 'Export Word (keep layout)',
+  ocrSearchablePdf: 'Make searchable PDF',
+  ocrLayoutSuffix: '-OCR layout',
+  ocrSearchableSuffix: '-searchable',
 }

@@ -158,5 +158,9 @@ export default {
   "ocrCopy": "نسخ النص",
   "ocrExportTxt": "تصدير TXT",
   "ocrExportDocx": "تصدير Word",
-  "ocrOutputSuffix": "-نص OCR"
+  "ocrOutputSuffix": "-نص OCR",
+  "ocrExportLayoutDocx": "تصدير Word (مع الحفاظ على التخطيط)",
+  "ocrSearchablePdf": "إنشاء PDF قابل للبحث",
+  "ocrLayoutSuffix": "-تخطيط OCR",
+  "ocrSearchableSuffix": "-قابل للبحث"
 }

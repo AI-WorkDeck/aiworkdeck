@@ -176,4 +176,8 @@ export default {
   ocrExportTxt: '导出 TXT',
   ocrExportDocx: '导出 Word',
   ocrOutputSuffix: '-识别文字',
+  ocrExportLayoutDocx: '导出 Word（保留版式）',
+  ocrSearchablePdf: '生成可搜索 PDF',
+  ocrLayoutSuffix: '-识别版式',
+  ocrSearchableSuffix: '-可搜索',
 }

@@ -81,5 +81,11 @@ export default {
   "ocrFailedItem": "„{name}“ nicht abgeschlossen: {reason}",
   "ocrSkipped": "{count} Datei(en) mit Cloud-OCR-Bedarf übersprungen (nicht bestätigt)",
   "ocrCancelled": "Abgebrochen; {count} Datei(en) nicht verarbeitet",
-  "ocrSummaryTitle": "Erkannt {done}/{total}"
+  "ocrSummaryTitle": "Erkannt {done}/{total}",
+  "ocrLocalFailedTitle": "Lokale Erkennung nicht abgeschlossen",
+  "ocrLocalFailedReason": "Grund: {reason}",
+  "ocrLocalFailedHint": "Sie können für die Dateien dieses Stapels, bei denen die lokale Erkennung fehlgeschlagen ist, die Cloud-Erkennung verwenden. Andernfalls werden diese Dateien nicht hochgeladen.",
+  "ocrLocalFailedConfirm": "Cloud-Erkennung verwenden",
+  "ocrAlreadySearchable": "„{name}“ hat bereits eine Textebene und ist durchsuchbar; es wurde keine neue Datei erstellt",
+  "ocrStopped": "Angehalten; {count} Datei(en) nicht verarbeitet"
 }

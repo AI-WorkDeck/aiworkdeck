@@ -158,5 +158,9 @@ export default {
   "ocrCopy": "テキストをコピー",
   "ocrExportTxt": "TXT で書き出し",
   "ocrExportDocx": "Word で書き出し",
-  "ocrOutputSuffix": "-OCRテキスト"
+  "ocrOutputSuffix": "-OCRテキスト",
+  "ocrExportLayoutDocx": "Word で書き出し（レイアウト保持）",
+  "ocrSearchablePdf": "検索可能な PDF を作成",
+  "ocrLayoutSuffix": "-OCRレイアウト",
+  "ocrSearchableSuffix": "-検索可能"
 }
