@@ -399,6 +399,7 @@ export default {
   "bqtScanExpired": "انتهت صلاحية رمز QR",
   "bqtScanRefresh": "تحديث رمز QR",
   "bqtScanBack": "العودة إلى تسجيل الدخول بالحساب",
+  "accountLoginTab": "تسجيل الدخول بالحساب",
   "errInvalidInviteCode": "رمز الدعوة غير صالح أو موقوف، تحقق وأعد المحاولة",
   "errInviteAlreadyBound": "ربط هذا الحساب رمز دعوة Circle مسبقًا",
   "errBqtNotLawyer": "تسجيل الدخول عبر رمز QR متاح فقط لحسابات محامي باوتشينغتيان المعتمدة",

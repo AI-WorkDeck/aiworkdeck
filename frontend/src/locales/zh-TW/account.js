@@ -399,6 +399,7 @@ export default {
   "bqtScanExpired": "二維碼已過期",
   "bqtScanRefresh": "重新整理二維碼",
   "bqtScanBack": "返回帳號登入",
+  "accountLoginTab": "帳號登入",
   "errInvalidInviteCode": "邀請碼無效或已停用，請核對後重試",
   "errInviteAlreadyBound": "目前帳號已綁定過聯盟所邀請碼",
   "errBqtNotLawyer": "僅支援包晴天認證律師帳號掃碼登入",

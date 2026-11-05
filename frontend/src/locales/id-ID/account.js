@@ -399,6 +399,7 @@ export default {
   "bqtScanExpired": "Kode QR kedaluwarsa",
   "bqtScanRefresh": "Muat ulang kode QR",
   "bqtScanBack": "Kembali ke masuk akun",
+  "accountLoginTab": "Masuk dengan Akun",
   "errInvalidInviteCode": "Kode undangan tidak valid atau tidak aktif",
   "errInviteAlreadyBound": "Akun ini sudah mengikat kode undangan firma Circle",
   "errBqtNotLawyer": "Hanya akun pengacara Baoqingtian terverifikasi yang dapat masuk via kode QR",

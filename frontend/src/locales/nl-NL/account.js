@@ -399,6 +399,7 @@ export default {
   "bqtScanExpired": "QR-code verlopen",
   "bqtScanRefresh": "QR-code vernieuwen",
   "bqtScanBack": "Terug naar accountlogin",
+  "accountLoginTab": "Inloggen met account",
   "errInvalidInviteCode": "Ongeldige of gedeactiveerde uitnodigingscode",
   "errInviteAlreadyBound": "Dit account heeft al een Circle-kantooruitnodigingscode gekoppeld",
   "errBqtNotLawyer": "Alleen geverifieerde Baoqingtian-advocaataccounts kunnen inloggen via QR-code",
