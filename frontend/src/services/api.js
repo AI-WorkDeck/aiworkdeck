@@ -4438,6 +4438,11 @@ export function connectOfficialCloud() {
   return request({ url: '/api/cloud/connect-official', method: 'POST' })
 }
 
+// 律师明确点了「重新连接云端」：指纹没变也换新令牌（默认的一键连接会复用已被撤掉的旧令牌）
+export function reconnectOfficialCloud() {
+  return request({ url: '/api/cloud/reconnect-official', method: 'POST' })
+}
+
 // localRoot（可选，dev-board#1040）：取回到本机自选文件夹（绝对路径，桌面端 local-mode 才放行）；
 // 不传 = 软件托管目录，与原来一样
 export function acceptCloudProject(connectionId, remoteProjectId, localRoot) {

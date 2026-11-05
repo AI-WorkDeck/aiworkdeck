@@ -273,6 +273,8 @@ export default {
   "copiedPasteToColleague": "Copiado — cole para o seu colega",
   "connectFailed": "Falha na conexão",
   "reconnectCloud": "Reconectar à nuvem",
+  "reconnectDidNotHelp": "A conexão com a nuvem foi refeita, mas a nuvem ainda recusa esta etapa. Você pode desconectar a biblioteca abaixo e adicionar o processo novamente; um processo que já está na biblioteca também pode ser revinculado com “Revincular este processo”.",
+  "reconnectedCloud": "Reconectado à nuvem. Tente novamente.",
   "inviteTextOfficial": "{inviter} convida você para trabalhar em {project} juntos no AI WorkDeck.\n\nVeja como participar:\n1. Entre no aplicativo desktop com sua própria conta do AI WorkDeck;\n2. Abra a lista de projetos e clique em “Buscar um Arquivo de Caso da Biblioteca de Casos da Equipe”;\n3. Selecione {project} e clique em “Buscar neste Dispositivo”.\n\nDepois disso, cada um trabalha em sua própria cópia e clica em “Enviar Rascunho” para combinar as alterações.",
   "inviteTextOfficialNoInviter": "Você foi convidado para trabalhar em {project} juntos no AI WorkDeck.\n\nVeja como participar:\n1. Entre no aplicativo desktop com sua própria conta do AI WorkDeck;\n2. Abra a lista de projetos e clique em “Buscar um Arquivo de Caso da Biblioteca de Casos da Equipe”;\n3. Selecione {project} e clique em “Buscar neste Dispositivo”.\n\nDepois disso, cada um trabalha em sua própria cópia e clica em “Enviar Rascunho” para combinar as alterações.",
   "addPeopleTitle": "Adicionar Pessoas a Este Arquivo de Caso",

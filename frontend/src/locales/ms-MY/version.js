@@ -273,6 +273,8 @@ export default {
   "copiedPasteToColleague": "Disalin — tampalkan kepada rakan sekerja anda",
   "connectFailed": "Sambungan gagal",
   "reconnectCloud": "Sambung Semula ke Awan",
+  "reconnectDidNotHelp": "Sambungan ke awan telah disambung semula, tetapi awan masih menolak langkah ini. Anda boleh memutuskan sambungan perpustakaan di bawah dan menambah fail kes sekali lagi; fail kes yang sudah ada dalam perpustakaan juga boleh diikat semula dengan «Ikat semula fail kes ini».",
+  "reconnectedCloud": "Telah disambung semula ke awan. Sila cuba lagi.",
   "inviteTextOfficial": "{inviter} menjemput anda untuk bekerja pada {project} bersama-sama di AI WorkDeck.\n\nCara untuk sertai:\n1. Log masuk ke aplikasi desktop dengan akaun AI WorkDeck anda sendiri;\n2. Buka senarai projek dan klik \"Tarik Fail Kes dari Pustaka Kes Pasukan\";\n3. Pilih {project} dan klik \"Tarik ke Peranti Ini\".\n\nSelepas itu, kita setiap satu bekerja pada salinan sendiri dan klik \"Hantar Draf\" untuk menggabungkan perubahan bersama.",
   "inviteTextOfficialNoInviter": "Anda dijemput untuk bekerja bersama pada {project} di AI WorkDeck.\n\nCara untuk sertai:\n1. Log masuk ke aplikasi desktop dengan akaun AI WorkDeck anda sendiri;\n2. Buka senarai projek dan klik “Tarik Fail Kes daripada Perpustakaan Fail Kes Pasukan”;\n3. Pilih {project} dan klik “Tarik ke Peranti Ini”.\n\nSelepas itu, setiap daripada kita bekerja pada salinan sendiri dan klik “Hantar Draf” untuk menggabungkan perubahan.",
   "addPeopleTitle": "Tambah Orang ke Fail Kes Ini",

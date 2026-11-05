@@ -273,6 +273,8 @@ export default {
   "copiedPasteToColleague": "복사되었습니다 — 동료에게 붙여넣어 주세요",
   "connectFailed": "연결 실패",
   "reconnectCloud": "클라우드에 다시 연결",
+  "reconnectDidNotHelp": "클라우드에 다시 연결했지만 클라우드가 여전히 이 작업을 거부합니다. 아래에서 이 연결을 끊은 뒤 팀 케이스 라이브러리에 다시 추가할 수 있습니다. 이미 라이브러리에 있는 케이스 파일은 「이 케이스 파일 다시 연결」도 사용할 수 있습니다.",
+  "reconnectedCloud": "클라우드에 다시 연결했습니다. 다시 시도해 주세요",
   "inviteTextOfficial": "{inviter}님이 AI WorkDeck에서 {project} 프로젝트를 함께 작업하라고 초대했습니다.\n\n참여 방법:\n1. 자신의 AI WorkDeck 계정으로 데스크톱 앱에 로그인합니다.\n2. 프로젝트 목록을 열고 \"팀 케이스 라이브러리에서 케이스 파일 가져오기\"를 클릭합니다.\n3. {project}를 선택하고 \"이 기기로 가져오기\"를 클릭합니다.\n\n이후에는 각자 자신의 사본에서 작업하고 \"초안 제출\"을 클릭하여 변경 사항을 함께 병합합니다.",
   "inviteTextOfficialNoInviter": "AI WorkDeck에서 {project} 프로젝트를 함께 작업하도록 초대받았습니다.\n\n참여 방법:\n1. 데스크톱 앱에 본인의 AI WorkDeck 계정으로 로그인합니다.\n2. 프로젝트 목록을 열고 “팀 케이스 라이브러리에서 케이스 파일 가져오기”를 클릭합니다.\n3. {project}를 선택하고 “이 기기로 가져오기”를 클릭합니다.\n\n이후에는 각자 자신의 사본에서 작업하고 “초안 제출”을 클릭하여 변경 사항을 병합합니다.",
   "addPeopleTitle": "이 케이스 파일에 사람 추가",

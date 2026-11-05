@@ -23,6 +23,15 @@ export function needsCloudReconnect(e) {
   return !!e && e.kind === CLOUD_RECONNECT_REQUIRED
 }
 
+/**
+ * 门禁拒绝时显示哪句话。律师已经在这个弹窗里明确重新连接过（新令牌）还被拒，就不能再原样
+ * 说一遍「请重新连接」——那会让人以为按钮没反应（教程第 11 集）。t 由调用方注入（this.$t）。
+ */
+export function reconnectRequiredMessage(e, reconnected, t) {
+  if (reconnected) return t('version.reconnectDidNotHelp')
+  return (e && e.message) || t('version.shareToLibraryFailed')
+}
+
 /** 多于一条连接时的拒绝理由（调用方据此选文案：version.tooManyLibraries）。 */
 export const TOO_MANY_LIBRARIES = 'TOO_MANY_LIBRARIES'
 

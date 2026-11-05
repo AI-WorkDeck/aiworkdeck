@@ -303,6 +303,8 @@ export default {
   copiedPasteToColleague: '已复制，粘贴给同事即可',
   connectFailed: '连接失败',
   reconnectCloud: "重新连接云端",
+  reconnectDidNotHelp: "已经重新连接过云端，云端仍然拒绝这一步。可以在下面断开这条连接后再放进团队案件库；已在案件库里的案卷，也可以「重新绑定这份案卷」。",
+  reconnectedCloud: "已重新连接云端，请再试一次",
   // 邀请话术：整段发给同事的邀请文本（含具体操作步骤），一个键完整抽出。
   // 有/无邀请人两个键：英文的人名后面要有空格（"{name} invites you"），单键靠拼
   // {inviter} 没法在两种语言里同时成立。
