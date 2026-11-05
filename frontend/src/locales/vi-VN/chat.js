@@ -271,6 +271,7 @@ export default {
   "memoryRevision": "Bản sửa đổi {revision}",
   "memoryUnknownTime": "Không rõ thời gian cập nhật",
   "memoryReadOnly": "Bạn có thể xem phạm vi này nhưng không có quyền chỉnh sửa.",
+  "memoryRememberHint": "Danh sách chủ đề do hệ thống tự động duy trì. Để xóa một chủ đề, hãy chọn chủ đề đó rồi xóa.",
   "memoryConflict": "Có phiên bản máy chủ mới hơn. Hãy xem lại trước khi chọn phiên bản nào cần giữ.",
   "memoryUseServer": "Dùng phiên bản máy chủ",
   "memorySaveMine": "Lưu phiên bản của tôi",

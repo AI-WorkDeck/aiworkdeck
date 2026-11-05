@@ -271,6 +271,7 @@ export default {
   "memoryRevision": "Revisie {revision}",
   "memoryUnknownTime": "Onbekende updatetijd",
   "memoryReadOnly": "U kunt dit bereik bekijken, maar u heeft geen toestemming om het te bewerken.",
+  "memoryRememberHint": "De onderwerpenlijst wordt automatisch door het systeem bijgehouden. Selecteer een onderwerp en verwijder het om het te verwijderen.",
   "memoryConflict": "Er bestaat een nieuwere serverversie. Bekijk deze voordat u kiest welke versie u wilt behouden.",
   "memoryUseServer": "Serverversie gebruiken",
   "memorySaveMine": "Mijn versie opslaan",
