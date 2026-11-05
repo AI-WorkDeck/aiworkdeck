@@ -837,3 +837,41 @@ test('Cmd/Ctrl+S（save-request）在退避等待或只能手动的暂停中都�
   assert.equal(uploads, 4)
   assert.equal(manual.dirty, false)
 })
+
+test('命令繁忙时：脏龄 <10s 让路延后，>=10s 强制导出保存', async () => {
+  let exports = 0
+  const mk = age => makeVm({
+    _cmdBusy: 1, _dirtySince: Date.now() - age,
+    executor: { executeCommand: async () => { exports++; return { success: true, bytes: [1] } } },
+  })
+  const young = mk(5000)
+  await young.autoSave()
+  assert.equal(exports, 0)
+  assert.equal(young.dirty, true)
+  clearTimeout(young._saveTimer)
+  const old = mk(11000)
+  await old.autoSave()
+  assert.equal(exports, 1)
+  assert.equal(old.dirty, false)
+})
+
+test('状态诚实：导出到服务端确认前 saving 恒为 true（saveStateText 先判 saving），确认后才落到已保存', async () => {
+  const gate = deferred()
+  const vm = makeVm({ uploadBytes: () => gate.promise })
+  const saving = vm.autoSave(); await tick(); await tick()
+  assert.equal(vm.saving, true, '上传未确认前必须处于 saving')
+  gate.resolve()
+  await saving
+  assert.equal(vm.saving, false)
+  assert.equal(vm.dirty, false)
+  const st = source.slice(source.indexOf('saveStateText() {'))
+  assert.ok(st.indexOf("if (this.saving)") < st.indexOf("if (this.dirty)"))
+})
+
+test('pagehide / visibilitychange(hidden) 注册并在卸载时移除，脏时 flushSave', () => {
+  assert.match(source, /addEventListener\('pagehide', this\._onPageHide\)/)
+  assert.match(source, /addEventListener\('visibilitychange', this\._onVisibilityChange\)/)
+  assert.match(source, /removeEventListener\('pagehide', this\._onPageHide\)/)
+  assert.match(source, /removeEventListener\('visibilitychange', this\._onVisibilityChange\)/)
+  assert.match(source, /_onPageHide = \(\) => \{ if \(this\.dirty && !this\._saveDiscarded\) this\.flushSave\(\)/)
+})
