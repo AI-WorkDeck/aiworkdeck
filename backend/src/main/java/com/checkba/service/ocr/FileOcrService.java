@@ -46,8 +46,16 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Service
 public class FileOcrService {
-    public enum Output { TEXT, TXT, DOCX }
-    public record Request(String jobId, Output output, String name, String consentVersion) {}
+    public enum Output { TEXT, TXT, DOCX, LAYOUT_DOCX, SEARCHABLE_PDF }
+    /**
+     * @param route {@code "cloud"} = the user explicitly chose cloud for this job after local
+     *              recognition failed (still needs the consent version unless cloud is remembered)
+     */
+    public record Request(String jobId, Output output, String name, String consentVersion, String route) {
+        public Request(String jobId, Output output, String name, String consentVersion) {
+            this(jobId, output, name, consentVersion, null);
+        }
+    }
     public record Outcome(String status, String text, ProjectFile file, String source, int pages,
                           String notice, String version) {
         static Outcome of(String status) { return new Outcome(status, null, null, null, 0, null, null); }
@@ -65,6 +73,7 @@ public class FileOcrService {
     private final ProjectFileRepository repository;
     private final StorageServiceFactory storageFactory;
     private final AiDocxExportService docxExport;
+    private final OcrExportService exports;
     /** key = userId + ":" + jobId, so one user's cancel never stops another user's batch. */
     private final Map<String, Instant> cancelled = new ConcurrentHashMap<>();
 
@@ -72,10 +81,10 @@ public class FileOcrService {
                           FileContentExtractorService extractor, ProjectFileService files,
                           ProjectFileAccessService access, ProjectMemberService members,
                           ProjectFileRepository repository, StorageServiceFactory storageFactory,
-                          AiDocxExportService docxExport) {
+                          AiDocxExportService docxExport, OcrExportService exports) {
         this.ocr = ocr; this.pdfOcr = pdfOcr; this.routing = routing; this.extractor = extractor;
         this.files = files; this.access = access; this.members = members; this.repository = repository;
-        this.storageFactory = storageFactory; this.docxExport = docxExport;
+        this.storageFactory = storageFactory; this.docxExport = docxExport; this.exports = exports;
     }
 
     public void cancel(Long userId, String jobId) {
@@ -123,13 +132,48 @@ public class FileOcrService {
                     layer = new PDFTextStripper().getText(doc);
                 }
             }
+            boolean layoutOutput = output == Output.LAYOUT_DOCX || output == Output.SEARCHABLE_PDF;
             if (layer != null && PdfTextLayer.isUsable(layer)) {
+                if (output == Output.SEARCHABLE_PDF) return Outcome.of("already_searchable");
+                if (output == Output.LAYOUT_DOCX) {
+                    // Local pdf2docx keeps the real layout of a digital PDF; free, no upload.
+                    byte[] converted = exports == null ? null : exports.layoutDocxFromTextPdf(bytes);
+                    if (converted != null) {
+                        ProjectFile saved = saveBytes(file, userId,
+                                outputName(file.getName(), request.name(), ".docx", layoutSuffix()), "docx", converted);
+                        return new Outcome("done", null, saved, "text", 1, null, null);
+                    }
+                }
                 pages = List.of(layer);
                 source = "text";
             } else {
                 Map<String, Object> preference = routing.preference(userId);
                 String choice = String.valueOf(preference.get("choice"));
-                if ("local".equals(choice)) return Outcome.of("local_only");
+                boolean forceCloud = "cloud".equals(request.route());
+                // An installed local engine is preferred unless the user chose cloud (decided 2026-11-05):
+                // free and nothing leaves the machine. Its failure is reported, never silently sent to cloud.
+                if (!forceCloud && !"cloud".equals(choice) && exports != null && exports.localReady()) {
+                    byte[] pdfBytes;
+                    OcrExportService.LocalResult local;
+                    try {
+                        pdfBytes = OcrExportService.asPdf(bytes, pdf);
+                        local = exports.local(bytes, pdfBytes, layoutOutput);
+                    } catch (CancellationException e) {
+                        return Outcome.of("cancelled");
+                    } catch (Exception e) {
+                        if (isCancelled(userId, jobId)) return Outcome.of("cancelled");
+                        return new Outcome("local_failed", null, null, "local", 0, e.getMessage(), OcrRoutingService.VERSION);
+                    }
+                    if (isCancelled(userId, jobId)) return Outcome.of("cancelled");
+                    if (layoutOutput) {
+                        return layoutFile(file, userId, request, output, "local", 0, () -> output == Output.LAYOUT_DOCX
+                                ? exports.layoutDocxFromLocal(pdfBytes, local) : exports.searchablePdfFromLocal(pdfBytes, local));
+                    }
+                    pages = List.of(OcrExportService.plainText(local.markdown()));
+                    source = "local";
+                    return finish(projectId, file, userId, request, output, pages, source);
+                }
+                if ("local".equals(choice) && !forceCloud) return Outcome.of("local_only");
                 if (!"cloud".equals(choice) && !OcrRoutingService.VERSION.equals(request.consentVersion()))
                     return new Outcome("consent_required", null, null, null, 0,
                             String.valueOf(preference.get("notice")), OcrRoutingService.VERSION);
@@ -137,6 +181,23 @@ public class FileOcrService {
                     if (Thread.currentThread().isInterrupted() || isCancelled(userId, jobId))
                         throw new CancellationException(LangText.of("任务已取消，后续页面未上传", "Cancelled; remaining pages were not uploaded"));
                 };
+                if (layoutOutput) {
+                    byte[] pdfBytes = OcrExportService.asPdf(bytes, pdf);
+                    List<String> raws;
+                    try {
+                        raws = exports.cloudPages(bytes, pdfBytes, guard);
+                    } catch (CancellationException e) {
+                        return Outcome.of("cancelled");
+                    } catch (OcrExportService.LayoutUnsupportedException e) {
+                        return new Outcome("layout_unsupported", null, null, "ocr", 0, e.getMessage(), null);
+                    } catch (IllegalStateException e) {
+                        if (isCancelled(userId, jobId)) return Outcome.of("cancelled");
+                        throw new IllegalArgumentException(e.getMessage(), e);
+                    }
+                    if (isCancelled(userId, jobId)) return Outcome.of("cancelled");
+                    return layoutFile(file, userId, request, output, "ocr", raws.size(), () -> output == Output.LAYOUT_DOCX
+                            ? exports.layoutDocxFromCloud(pdfBytes, raws) : exports.searchablePdfFromCloud(pdfBytes, raws));
+                }
                 try {
                     if (pdf) {
                         pages = pdfOcr.recognizePages(temp, guard);
@@ -158,7 +219,15 @@ public class FileOcrService {
         }
         // A cancel that arrived while the last request was in flight must not produce a late file.
         if (isCancelled(userId, jobId)) return Outcome.of("cancelled");
+        return finish(projectId, file, userId, request, output, pages, source);
+    }
 
+    /** Text outputs (copy / TXT / text-first Word) from recognized page texts. */
+    private Outcome finish(Long projectId, ProjectFile file, Long userId, Request request, Output output,
+                           List<String> pages, String source) {
+        if (output == Output.LAYOUT_DOCX) output = Output.DOCX; // digital PDF without local pdf2docx
+        String suffixedName = request.output() == Output.LAYOUT_DOCX
+                ? outputName(file.getName(), request.name(), ".docx", layoutSuffix()) : null;
         List<String> nonEmpty = new ArrayList<>();
         for (String page : pages) if (page != null && !page.isBlank()) nonEmpty.add(page.strip());
         String text = String.join("\n\n", nonEmpty);
@@ -167,22 +236,49 @@ public class FileOcrService {
             created = saveTxt(file, userId, outputName(file.getName(), request.name(), ".txt"), text);
         } else if (output == Output.DOCX) {
             created = docxExport.exportMarkdownToDocx(projectId, file.getParentId(), userId,
-                    outputName(file.getName(), request.name(), ".docx"), toMarkdown(text));
+                    suffixedName != null ? suffixedName : outputName(file.getName(), request.name(), ".docx"), toMarkdown(text));
         }
         return new Outcome("done", output == Output.TEXT ? text : null, created, source, pages.size(), null, null);
     }
 
+    interface FileBuilder { byte[] build() throws Exception; }
+
+    /** Layout Word / searchable PDF: build the bytes, then save them beside the source file. */
+    private Outcome layoutFile(ProjectFile file, Long userId, Request request, Output output, String source, int pages,
+                               FileBuilder builder) throws Exception {
+        byte[] data;
+        try {
+            data = builder.build();
+        } catch (OcrExportService.ComponentOutdatedException e) {
+            return new Outcome("component_outdated", null, null, source, pages, e.getMessage(), null);
+        } catch (IllegalStateException e) {
+            throw new IllegalArgumentException(e.getMessage(), e);
+        }
+        if (isCancelled(userId, request.jobId())) return Outcome.of("cancelled");
+        boolean docx = output == Output.LAYOUT_DOCX;
+        String ext = docx ? ".docx" : ".pdf";
+        String name = outputName(file.getName(), request.name(), ext, docx ? layoutSuffix() : searchableSuffix());
+        return new Outcome("done", null, saveBytes(file, userId, name, docx ? "docx" : "pdf", data), source, pages, null, null);
+    }
+
+    static String layoutSuffix() { return LangText.of("-识别版式", "-OCR layout"); }
+
+    static String searchableSuffix() { return LangText.of("-可搜索", "-searchable"); }
+
     private ProjectFile saveTxt(ProjectFile source, Long userId, String name, String text) {
-        byte[] data = text.getBytes(StandardCharsets.UTF_8);
+        return saveBytes(source, userId, name, "txt", text.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private ProjectFile saveBytes(ProjectFile source, Long userId, String name, String type, byte[] data) {
         Long projectId = source.getProjectId();
-        ProjectFile created = files.createFile(projectId, source.getParentId(), name, "txt", (long) data.length,
+        ProjectFile created = files.createFile(projectId, source.getParentId(), name, type, (long) data.length,
                 null, files.generateWpsFileId(projectId), userId, ProjectFileService.ConflictPolicy.RENAME);
         var storage = storageFactory.getStorageService();
         try {
             storage.save(created.getFilePath(), new ByteArrayInputStream(data));
         } catch (Exception e) {
             try { storage.delete(created.getFilePath()); } catch (Exception ignored) { /* best effort */ }
-            throw new IllegalArgumentException(LangText.of("保存 TXT 失败: " + e.getMessage(), "Failed to save TXT: " + e.getMessage()), e);
+            throw new IllegalArgumentException(LangText.of("保存文件失败: " + e.getMessage(), "Failed to save the file: " + e.getMessage()), e);
         }
         created.setFileSize((long) data.length);
         created.setUpdatedAt(LocalDateTime.now());
@@ -191,6 +287,10 @@ public class FileOcrService {
 
     /** Frontend proposes the localized name; anything unsafe or with the wrong extension falls back. */
     static String outputName(String sourceName, String proposed, String ext) {
+        return outputName(sourceName, proposed, ext, LangText.of("-识别文字", "-OCR text"));
+    }
+
+    static String outputName(String sourceName, String proposed, String ext, String fallbackSuffix) {
         String p = proposed == null ? "" : proposed.trim();
         boolean safe = !p.isEmpty() && p.length() <= 200 && !p.contains("/") && !p.contains("\\")
                 && !p.contains("..") && p.chars().noneMatch(c -> c < 0x20)
@@ -199,7 +299,7 @@ public class FileOcrService {
         String name = sourceName == null ? "file" : sourceName;
         int dot = name.lastIndexOf('.');
         String stem = dot > 0 ? name.substring(0, dot) : name;
-        return stem + LangText.of("-识别文字", "-OCR text") + ext;
+        return stem + fallbackSuffix + ext;
     }
 
     /**
