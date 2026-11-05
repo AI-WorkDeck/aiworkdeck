@@ -511,6 +511,11 @@ public class AgentOrchestrator {
         return guard;
     }
 
+    /** 该会话当前是否有登记在册的 run（回退等破坏性操作据此拒绝并发）。 */
+    public boolean hasActiveRun(String conversationId) {
+        return conversationId != null && activeRuns.get(conversationId) != null;
+    }
+
     /** Current durable-run identity exposed to the receipt/controller layer. */
     public String activeRunId(String conversationId) {
         RunGuard guard = activeRuns.get(conversationId);
