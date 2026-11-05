@@ -146,7 +146,7 @@ export default {
   "emptyData": "統計データはまだありません。メンバーが共有をオンにすると翌日から表示されます。",
   "lawfirmDashboardTitle": "法律事務所 経営層・管理委員会ダッシュボード",
   "lawfirmDashboardDesc": "業務分野・主任弁護士・各弁護士ごとに売上とリスク状況を集計します。詳細は法律事務所管理ワークベンチで確認できます。",
-  "lawfirmSeedDemoBtn": "五芳斎デモデータを投入",
+  "lawfirmSeedDemoBtn": "青禾食品デモデータを投入",
   "lawfirmOpenPluginBtn": "法律事務所ワークベンチを開く",
   "lawfirmKpiActiveMatters": "進行中案件数",
   "lawfirmKpiPendingClearances": "未処理の利益相反／承認",

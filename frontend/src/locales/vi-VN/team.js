@@ -146,7 +146,7 @@ export default {
   "emptyData": "Chưa có dữ liệu thống kê. Dữ liệu sẽ xuất hiện vào ngày hôm sau khi các thành viên bật chia sẻ.",
   "lawfirmDashboardTitle": "Bảng điều khiển Ban điều hành & Ủy ban quản lý công ty luật",
   "lawfirmDashboardDesc": "Tổng hợp doanh thu và kiểm soát rủi ro theo lĩnh vực nghiệp vụ, luật sư phụ trách chính và từng luật sư. Mở bàn làm việc quản lý công ty luật để xem chi tiết.",
-  "lawfirmSeedDemoBtn": "Nạp dữ liệu mẫu Ngũ Phương Trai",
+  "lawfirmSeedDemoBtn": "Nạp dữ liệu mẫu Qinghe Foods",
   "lawfirmOpenPluginBtn": "Mở Bàn làm việc Công ty luật",
   "lawfirmKpiActiveMatters": "Vụ việc đang thụ lý",
   "lawfirmKpiPendingClearances": "Xung đột lợi ích / Phê duyệt chờ xử lý",

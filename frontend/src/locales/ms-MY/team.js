@@ -145,7 +145,7 @@ export default {
   "emptyData": "Belum ada statistik. Ia akan dipaparkan sehari selepas ahli menghidupkan perkongsian.",
   "lawfirmDashboardTitle": "Papan Pemuka Eksekutif & Jawatankuasa Pengurusan Firma Guaman",
   "lawfirmDashboardDesc": "Semak hasil dan risiko mengikut kategori amalan, peguam utama dan peguam individu. Buka meja kerja firma guaman untuk butiran.",
-  "lawfirmSeedDemoBtn": "Isi Data Demo Wufangzhai",
+  "lawfirmSeedDemoBtn": "Isi Data Demo Qinghe Foods",
   "lawfirmOpenPluginBtn": "Buka Meja Kerja Firma Guaman",
   "lawfirmKpiActiveMatters": "Perkara Aktif",
   "lawfirmKpiPendingClearances": "Konflik / Semakan Menunggu",

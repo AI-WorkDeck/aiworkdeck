@@ -145,7 +145,7 @@ export default {
   "emptyData": "Belum ada statistik. Statistik akan muncul sehari setelah anggota mengaktifkan berbagi.",
   "lawfirmDashboardTitle": "Dasbor Eksekutif & Komite Manajemen Kantor Hukum",
   "lawfirmDashboardDesc": "Tinjau pendapatan dan risiko berdasarkan kategori praktik, pengacara penanggung jawab, dan masing-masing pengacara. Buka meja kerja kantor hukum untuk detailnya.",
-  "lawfirmSeedDemoBtn": "Isi Data Demo Wufangzhai",
+  "lawfirmSeedDemoBtn": "Isi Data Demo Qinghe Foods",
   "lawfirmOpenPluginBtn": "Buka Meja Kerja Kantor Hukum",
   "lawfirmKpiActiveMatters": "Perkara Aktif",
   "lawfirmKpiPendingClearances": "Pemeriksaan Konflik / Tinjauan Tertunda",

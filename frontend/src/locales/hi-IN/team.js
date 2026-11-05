@@ -145,7 +145,7 @@ export default {
   "emptyData": "अभी कोई आंकड़े नहीं हैं। सदस्यों द्वारा शेयरिंग चालू करने के अगले दिन से वे दिखाई देते हैं।",
   "lawfirmDashboardTitle": "लॉ फ़र्म कार्यकारी एवं प्रबंधन समिति डैशबोर्ड",
   "lawfirmDashboardDesc": "प्रैक्टिस श्रेणी, प्रमुख वकील और व्यक्तिगत वकील के अनुसार राजस्व और जोखिम की समीक्षा करें। विवरण के लिए लॉ फ़र्म कार्यपटल खोलें।",
-  "lawfirmSeedDemoBtn": "वुफांगझाई डेमो डेटा भरें",
+  "lawfirmSeedDemoBtn": "Qinghe Foods डेमो डेटा भरें",
   "lawfirmOpenPluginBtn": "लॉ फ़र्म कार्यपटल खोलें",
   "lawfirmKpiActiveMatters": "सक्रिय मामले",
   "lawfirmKpiPendingClearances": "लंबित हित-टकराव / समीक्षाएं",

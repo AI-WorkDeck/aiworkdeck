@@ -145,7 +145,7 @@ export default {
   "emptyData": "Ainda não há estatísticas. Elas aparecem no dia seguinte após os membros ativarem o compartilhamento.",
   "lawfirmDashboardTitle": "Painel da Diretoria e Comitê Gestor do Escritório",
   "lawfirmDashboardDesc": "Analise receitas e riscos por área de atuação, advogado líder e advogado individual. Abra a bancada de gestão do escritório para ver detalhes.",
-  "lawfirmSeedDemoBtn": "Carregar demonstração Wufangzhai",
+  "lawfirmSeedDemoBtn": "Carregar demonstração Qinghe Foods",
   "lawfirmOpenPluginBtn": "Abrir Bancada do Escritório",
   "lawfirmKpiActiveMatters": "Casos ativos",
   "lawfirmKpiPendingClearances": "Conflitos / Aprovações pendentes",

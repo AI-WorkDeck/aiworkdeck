@@ -178,7 +178,7 @@ export default {
   // ---- 律所决策者看板（TeamPanel.vue） ----
   lawfirmDashboardTitle: '律所决策者与管委会看板',
   lawfirmDashboardDesc: '按业务分类、主办律师与律师个人汇总创收和风控情况，可进入律所管理工作台查看明细。',
-  lawfirmSeedDemoBtn: '填充五芳斋演示数据',
+  lawfirmSeedDemoBtn: '填充青禾食品演示数据',
   lawfirmOpenPluginBtn: '打开律所管理工作台',
   lawfirmKpiActiveMatters: '在办案件数',
   lawfirmKpiPendingClearances: '待处理利冲/审批',

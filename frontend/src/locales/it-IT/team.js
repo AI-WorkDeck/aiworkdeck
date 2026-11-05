@@ -145,7 +145,7 @@ export default {
   "emptyData": "Ancora nessuna statistica. Appariranno il giorno successivo all'attivazione della condivisione da parte dei membri.",
   "lawfirmDashboardTitle": "Cruscotto Direzionale e Comitato di Gestione dello Studio Legale",
   "lawfirmDashboardDesc": "Esamina ricavi e rischi per area di attività, avvocato responsabile e singolo avvocato. Apri la postazione di gestione dello studio per i dettagli.",
-  "lawfirmSeedDemoBtn": "Carica dati demo Wufangzhai",
+  "lawfirmSeedDemoBtn": "Carica dati demo Qinghe Foods",
   "lawfirmOpenPluginBtn": "Apri Postazione Studio Legale",
   "lawfirmKpiActiveMatters": "Pratiche attive",
   "lawfirmKpiPendingClearances": "Conflitti / Verifiche in sospeso",
