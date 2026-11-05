@@ -30,7 +30,6 @@ export default {
   "thIdle": "Inaktivitätszeit",
   "loadingEllipsis": "Wird geladen…",
   "noRecords": "Keine Einträge",
-  "durationUnderMinute": "Unter 1 Min.",
   "durationMinutes": "{minutes} Min.",
   "durationHoursMinutes": "{hours} Std. {minutes} Min.",
   "workLogTruncatedHint": "Zu viele Einträge: Es werden nur die neuesten 5.000 angezeigt. Schränken Sie den Datumsbereich ein, um frühere Einträge zu sehen.",

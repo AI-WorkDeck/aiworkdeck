@@ -220,12 +220,12 @@ export default {
       }
       return '-'
     },
-    // 「x 小时 y 分」/「y 分」/「不足 1 分钟」；不再按 15 秒向上取整成小数分钟（dev-board#1713）
+    // 按 15 秒（0.25 分）向上取整：「0.25 分」「1.75 分」「2 分」，满 60 分写「x 小时 y 分」（dev-board#1713）
     formatDuration(ms) {
-      const minutes = Math.floor((Number(ms) || 0) / 60000)
-      if (minutes < 1) return this.$t('account.durationUnderMinute')
-      const hours = Math.floor(minutes / 60)
-      if (hours > 0) return this.$t('account.durationHoursMinutes', { hours, minutes: minutes % 60 })
+      const quarters = Math.max(1, Math.ceil((Number(ms) || 0) / 15000))
+      const hours = Math.floor(quarters / 240)
+      const minutes = String((quarters % 240) / 4)
+      if (hours > 0) return this.$t('account.durationHoursMinutes', { hours, minutes })
       return this.$t('account.durationMinutes', { minutes })
     },
     // activityTracker 写的格式：IdleSegments: <开始毫秒>-<结束毫秒>;...

@@ -30,7 +30,6 @@ export default {
   "thIdle": "Время простоя",
   "loadingEllipsis": "Загрузка…",
   "noRecords": "Нет записей",
-  "durationUnderMinute": "Менее 1 мин",
   "durationMinutes": "{minutes} мин",
   "durationHoursMinutes": "{hours} ч {minutes} мин",
   "workLogTruncatedHint": "Слишком много записей: показаны только последние 5 000. Сузьте диапазон дат, чтобы увидеть более ранние.",

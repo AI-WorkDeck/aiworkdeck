@@ -174,12 +174,14 @@ function makeVmWithParams() {
   return vm
 }
 
-test('111: 时长显示成「x 小时 y 分」/「y 分」/「不足 1 分钟」，不再是 15 秒取整的小数分钟', () => {
+test('111: 时长按 15 秒（0.25 分）向上取整，显示「0.25 分」「1.75 分」「2 分」，满 60 分写「x 小时 y 分」', () => {
   const vm = makeVmWithParams()
-  assert.equal(vm.getLogDuration({ duration: 15 * 1000 }), 'account.durationUnderMinute')
-  assert.equal(vm.getLogDuration({ duration: 7 * 60 * 1000 + 40 * 1000 }), 'account.durationMinutes:{"minutes":7}')
-  assert.equal(vm.getLogDuration({ duration: (2 * 60 + 5) * 60 * 1000 }), 'account.durationHoursMinutes:{"hours":2,"minutes":5}')
-  assert.doesNotMatch(SRC, /Math\.ceil\(seconds \/ 15\)/)
+  assert.equal(vm.getLogDuration({ duration: 2 * 1000 }), 'account.durationMinutes:{"minutes":"0.25"}')
+  assert.equal(vm.getLogDuration({ duration: 15 * 1000 }), 'account.durationMinutes:{"minutes":"0.25"}')
+  assert.equal(vm.getLogDuration({ duration: 16 * 1000 }), 'account.durationMinutes:{"minutes":"0.5"}')
+  assert.equal(vm.getLogDuration({ duration: 116 * 1000 }), 'account.durationMinutes:{"minutes":"2"}')
+  assert.equal(vm.getLogDuration({ duration: 7 * 60 * 1000 + 40 * 1000 }), 'account.durationMinutes:{"minutes":"7.75"}')
+  assert.equal(vm.getLogDuration({ duration: (2 * 60 + 5) * 60 * 1000 + 1000 }), 'account.durationHoursMinutes:{"hours":2,"minutes":"5.25"}')
 })
 
 test('55: 关键词同时匹配对象列与项目名，忽略大小写', () => {
@@ -226,7 +228,7 @@ test('51: 空闲段按 activityTracker 写的毫秒格式解析，开始时间�
     actionType: 'OPEN_FILE', duration: 25 * 60000, timestamp: new Date(end).toISOString(),
     metaInfo: `Project: A. IdleSegments: ${idleStart}-${idleEnd}`,
   }
-  assert.equal(vm.getLogIdleTime(log), '09:10-09:25 (account.durationMinutes:{"minutes":15})')
+  assert.equal(vm.getLogIdleTime(log), '09:10-09:25 (account.durationMinutes:{"minutes":"15"})')
   assert.equal(vm.getLogStartTime(log), vm.formatDateTime(new Date(start)))
 })
 
@@ -234,7 +236,7 @@ test('57/111: 中英文案补齐（导出 CSV、时长格式、截断提示）',
   const zh = read('../../src/locales/zh-CN/account.js')
   const en = read('../../src/locales/en-US/account.js')
   assert.match(zh, /exportExcelBtn:\s*'导出 CSV'/)
-  for (const k of ['durationUnderMinute', 'durationMinutes', 'durationHoursMinutes', 'workLogTruncatedHint']) {
+  for (const k of ['durationMinutes', 'durationHoursMinutes', 'workLogTruncatedHint']) {
     assert.match(zh, new RegExp(`\\b${k}\\s*:`), `zh-CN 缺 ${k}`)
     assert.match(en, new RegExp(`\\b${k}\\s*:`), `en-US 缺 ${k}`)
   }

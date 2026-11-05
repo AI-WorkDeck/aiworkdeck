@@ -30,7 +30,6 @@ export default {
   "thIdle": "連續無動作時間",
   "loadingEllipsis": "載入中...",
   "noRecords": "無記錄",
-  "durationUnderMinute": "不足 1 分鐘",
   "durationMinutes": "{minutes} 分",
   "durationHoursMinutes": "{hours} 小時 {minutes} 分",
   "workLogTruncatedHint": "記錄太多，只顯示了最近的 5000 筆；縮小日期範圍可以看到更早的記錄",

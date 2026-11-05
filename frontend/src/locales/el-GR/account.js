@@ -30,7 +30,6 @@ export default {
   "thIdle": "Χρόνος αδράνειας",
   "loadingEllipsis": "Φόρτωση…",
   "noRecords": "Δεν υπάρχουν εγγραφές",
-  "durationUnderMinute": "Λιγότερο από 1 λεπ",
   "durationMinutes": "{minutes} λεπ",
   "durationHoursMinutes": "{hours} ώ {minutes} λεπ",
   "workLogTruncatedHint": "Πάρα πολλές εγγραφές: εμφανίζονται μόνο οι 5000 πιο πρόσφατες. Περιορίστε το εύρος ημερομηνιών για να δείτε παλαιότερες.",

@@ -30,7 +30,6 @@ export default {
   "thIdle": "Boşta Süre",
   "loadingEllipsis": "Yükleniyor…",
   "noRecords": "Kayıt yok",
-  "durationUnderMinute": "1 dakikadan az",
   "durationMinutes": "{minutes} dk",
   "durationHoursMinutes": "{hours} sa {minutes} dk",
   "workLogTruncatedHint": "Çok fazla kayıt var: yalnızca en son 5.000 kayıt gösteriliyor. Daha eski kayıtları görmek için tarih aralığını daraltın.",

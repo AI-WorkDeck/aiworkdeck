@@ -30,7 +30,6 @@ export default {
   "thIdle": "Inactieve tijd",
   "loadingEllipsis": "Laden…",
   "noRecords": "Geen gegevens",
-  "durationUnderMinute": "Minder dan 1 min.",
   "durationMinutes": "{minutes} min.",
   "durationHoursMinutes": "{hours} u {minutes} min.",
   "workLogTruncatedHint": "Te veel gegevens: alleen de meest recente 5.000 worden getoond. Beperk het datumbereik om oudere te zien.",

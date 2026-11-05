@@ -30,7 +30,6 @@ export default {
   "thIdle": "Masa Terbiar",
   "loadingEllipsis": "Memuatkan…",
   "noRecords": "Tiada rekod",
-  "durationUnderMinute": "Kurang daripada 1 min",
   "durationMinutes": "{minutes} min",
   "durationHoursMinutes": "{hours} j {minutes} min",
   "workLogTruncatedHint": "Terlalu banyak rekod: hanya 5,000 terkini dipaparkan. Persempitkan julat tarikh untuk melihat yang lebih awal.",
