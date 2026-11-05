@@ -57,7 +57,7 @@ function runAlembicUpgrade(ctx) {
   return new Promise((resolve, reject) => {
     const proc = spawn(pyBin(ctx), ['-m', 'alembic', '-c', path.join(appDir(ctx), 'alembic.ini'), 'upgrade', 'head'], {
       cwd: appDir(ctx),
-      env: spawnEnv(ctx),
+      env: require('../awd-home').childEnv(spawnEnv(ctx), ctx.awdHome),
       stdio: ['ignore', 'ignore', 'pipe']
     })
     let stderr = ''

@@ -127,7 +127,7 @@ Writer 切换修订显示会发出大量 `Modify` 通知，不能一律算真实
 - `desktop/scripts/lowa-selfhost.md` — 自托管流程文档。
 
 **桌面壳服务**
-- `desktop/main/zetaoffice-server.js` — 同源本地 HTTP 服务（editor.html + /lowa/* 本地优先、CDN 兜底）；memoized `startEditorServer()`。**固定端口 47613**（占用回退随机）+ /lowa/* ETag/304 复验（PR#220）：origin 稳定才能让 Chromium 跨启动复用 HTTP 缓存与 V8 WASM 代码缓存（150MB soffice.wasm 免重编译）；引擎 URL 跨版本不变所以是 no-cache 复验而非 immutable，别改成长缓存。
+- `desktop/main/zetaoffice-server.js` — 同源本地 HTTP 服务（editor.html + /lowa/* 本地优先、CDN 兜底）；memoized `startEditorServer()`。**固定端口 47613**（占用回退随机；渲染层/webview/LOWA 代理一律用 IPC 回的实际 origin，别处不许写死 47613，`desktop/tests/editor-port-fallback.test.js`，问题 23）+ /lowa/* ETag/304 复验（PR#220）：origin 稳定才能让 Chromium 跨启动复用 HTTP 缓存与 V8 WASM 代码缓存（150MB soffice.wasm 免重编译）；引擎 URL 跨版本不变所以是 no-cache 复验而非 immutable，别改成长缓存。
 - `desktop/main/zetaoffice-session.js` — persist:zetaoffice 分区注入 COOP/COEP/CORP（webview 跨源隔离，SharedArrayBuffer 可用，不污染主窗口）。
 - `desktop/main/zetaoffice-verify.js` — ⌘⇧L 验证窗口（?verify=1，零副作用验证引擎/中文/AI 命令）。
 - `desktop/main/lok-sidecar.js` — 原生 LibreOfficeKit 侧车管理器与协议桥（dev-board#1371）：`encodeFrame`/`FrameDecoder`（8 字节长度前缀帧：`[u32BE totalPayloadLen][u8 type][u24BE requestId][payload]`）、`coalesceInvalidatedTiles`（16ms 窗口按 part 合并失效矩形并重算 256×256 CSS px 瓦片网格）、`resolveEditorEngineMode`（`AWD_EDITOR_ENGINE=lok|lowa` 与自动探测回退 LOWA）、`createLokSidecarManager`（子进程生命周期与 IPC 桥）。架构规范见 `docs/superpowers/specs/2026-10-20-native-lok-sidecar-architecture.md`（含 `desktop/lowa-build/patches/0001..0003` 原生 C++ 可复用性与 `office_thread.js` UNO AI 桥 100% 保留路径）。单测：`desktop/tests/lok-sidecar.test.js`。

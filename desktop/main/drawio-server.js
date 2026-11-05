@@ -18,7 +18,6 @@
 // 实例 / dev 与打包版并存）就退回随机端口，功能不受影响，只是少了跨启动的缓存复用。
 
 const path = require('path')
-const os = require('node:os')
 const http = require('node:http')
 const fs = require('node:fs')
 const { stat } = require('node:fs/promises')
@@ -46,9 +45,7 @@ const PACK_COMPONENT = 'drawio'
 // <home>/.aiworkdeck/packs（与 overlay.js 的 dataDir 同一个 home 惯例）。
 function packsBaseDir() {
   if (process.env.AIWORKDECK_PACKS_DIR) return process.env.AIWORKDECK_PACKS_DIR
-  const app = electronApp()
-  const home = (app && app.getPath('home')) || os.homedir()
-  return path.join(home, '.aiworkdeck', 'packs')
+  return path.join(require('./awd-home').dataDir(), 'packs')
 }
 
 // pack 根惰性解析：每次调用都现读 current.json，装完即生效、Electron 不需要重启

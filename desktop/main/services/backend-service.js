@@ -4,7 +4,7 @@ const path = require('path')
 const fs = require('fs')
 const net = require('net')
 const http = require('http')
-const { randomBytes } = require('crypto')
+const { randomBytes, createHash } = require('crypto')
 const { spawn, execFileSync } = require('child_process')
 const { isPortOpen } = require('./service-manager')
 
@@ -93,10 +93,20 @@ async function probeExternalBackendHealth(port) {
 function backendBuildId(ctx) {
   try {
     const st = fs.statSync(jarPath(ctx))
-    return `${st.size}-${Math.round(st.mtimeMs)}`
+    return `${st.size}-${Math.round(st.mtimeMs)}${homeTag(ctx)}`
   } catch (e) {
     return ''
   }
+}
+
+// 隔离实例（AWD_HOME，问题 20）的指纹后缀「@home-<摘要>」。默认实例没有后缀，格式不变。
+// 不同 home 的后端读写的是不同数据目录，端口链上撞见对方的后端绝不能复用（decideReuse）。
+function homeTag(ctx) {
+  return ctx && ctx.awdHome ? '@home-' + createHash('sha256').update(String(ctx.awdHome)).digest('hex').slice(0, 12) : ''
+}
+function homeTagOfBuild(build) {
+  const i = String(build || '').indexOf('@')
+  return i < 0 ? '' : String(build).slice(i)
 }
 
 /**
@@ -110,6 +120,8 @@ function backendBuildId(ctx) {
  */
 function decideReuse(probe, { packaged, expectedBuild }) {
   if (!probe.ours) return 'skip'
+  // 别的 home（隔离实例 ↔ 默认实例）的后端：数据目录不同，当陌生进程跳过
+  if (homeTagOfBuild(probe.build) !== homeTagOfBuild(expectedBuild)) return 'skip'
   if (!packaged) return 'reuse'
   if (!expectedBuild || probe.build === expectedBuild) return 'reuse'
   return 'replace'
@@ -187,11 +199,14 @@ function jarPath(ctx) {
 }
 
 function javaLaunchArgs(ctx) {
+  // 隔离实例（AWD_HOME，问题 20）：后端所有 ${user.home}/.aiworkdeck 跟着落到 AWD_HOME 下。
+  // macOS 上 JVM 的 user.home 取自账户记录、不认 $HOME，只能显式传。
+  const home = ctx.awdHome ? ['-Duser.home=' + ctx.awdHome] : []
   const layout = backendLayout(ctx)
-  if (layout.kind === 'fat') return ['-jar', layout.jar]
+  if (layout.kind === 'fat') return [...home, '-jar', layout.jar]
   // -cp 通配符由 JVM 展开（spawn 无 shell，不会被 glob）；分隔符按平台
   const sep = process.platform === 'win32' ? ';' : ':'
-  return ['-cp', layout.appJar + sep + path.join(layout.libDir, '*'), BACKEND_MAIN_CLASS]
+  return [...home, '-cp', layout.appJar + sep + path.join(layout.libDir, '*'), BACKEND_MAIN_CLASS]
 }
 
 function bundledJava(ctx) {
@@ -287,7 +302,7 @@ function spec(ctx, javaCmd) {
   // 打包模式：工作目录必须可写（resources 目录只读）
   const cwd = ctx.packaged ? ctx.dataDir : path.join(ctx.projectRoot, 'backend')
   if (ctx.packaged) fs.mkdirSync(cwd, { recursive: true })
-  const bootOverlay = { context: { packaged: ctx.packaged, dataDir: ctx.dataDir, appVersion: ctx.appVersion },
+  const bootOverlay = { context: { packaged: ctx.packaged, dataDir: ctx.dataDir, appVersion: ctx.appVersion, instanceId: ctx.instanceId },
     current: require('./overlay').readCurrent(ctx) }
   return { cmd: javaCmd, args: javaLaunchArgs(ctx), env: spawnEnv(ctx), cwd, bootOverlay }
 }
