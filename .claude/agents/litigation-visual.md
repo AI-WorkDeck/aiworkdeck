@@ -194,7 +194,10 @@ render 成功后清掉 pending checkpoint（下一张图重新走三问）。
 **红色授权制**：深红 `#991B1B` 只标一处，且必须 `checkpoint.emphasis_source` 交代
 来源。地图说不清红从哪来，引擎一点都不画。脚本强制，不靠模型自觉。
 
-**产物落点**：一图一文件夹，内含 svg + png + drawio 三种格式 + `<名>.map.json`
+**产物落点**：一图一文件夹，没指定目标（或指定根目录）时统一收进项目根下的「诉讼可视化」
+父文件夹（`LitigationVisualTools.outputParentId`，名称按当前语言取 `OUTPUT_ROOT_NAMES`、与前端
+`config.litigationVisual` 同译名；任一语言的同名文件夹都复用；明确指定子文件夹时照旧，dev-board#1713）。
+每个图文件夹内含 svg + png + drawio 三种格式 + `<名>.map.json`
 （语义地图，留着才能「换风格」不重新问模型）。曾经默认还出 pptx/vsdx，PR 用户
 反馈「版本太多、留一个可编辑的就行」后收窄（`LitigationVisualTools.DEFAULT_FORMATS`）；
 引擎本身仍支持这两种格式，只是产品不再默认交付。身份靠 `wpsFileId` 前缀
@@ -217,6 +220,13 @@ skill.yml 的 `output`/`output_en`、两份 prompt。
 - **不要把管线产物再过 `validate_map.py`/jsonschema**：三处泳道上限互相矛盾
   （schema 3 / validate_map 2 / 渲染器 6），且管线会写 schema 外字段 `lane.side`，
   多泳道图必红。管线主路径本来就不调 validate_map。
+- 勾选答复只认窄写法：`budget` 只认 `all`（「全部」会 `int()` 抛错，用户被反复带回第四轮），
+  `style` 只认编号。`LitigationTimelineTools.normalizeAnswer` 把「全部/全选/所有/all…」统一成 `all`、
+  「1、2」规范成「1,2」、风格名（奇川/歸藏/归藏/白描）映射成 1/2/3（名字优先于标签里的数字），
+  认不出的风格直接回错误提示（dev-board#1713）。上游提示里的错号已由 PATCH 9 改正。
+- 材料文字版先过 `normalizeChineseDates`：上游 `pick._DATE` 不认「二〇二六年二月二十日」，合同会被判成
+  「0 句带日期」。改写后的阿拉伯数字日期就是管线的原文——子序列忠实性校验与溯源索引都只比对
+  `materials/*.txt`，不回头比对原件。
 - 另：管线是 **cwd 固定文件名**状态机，一个案件一个 workdir 是硬约束；
   `render` 不自建输出目录（cli 已代建）。
 
