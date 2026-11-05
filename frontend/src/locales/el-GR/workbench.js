@@ -110,6 +110,7 @@ export default {
   "recentProjectsLoadFailed": "Αποτυχία φόρτωσης — πατήστε για επανάληψη",
   "projectHome": "Επισκόπηση έργου",
   "allProjects": "Όλα τα έργα…",
+  "closeProject": "Κλείσιμο έργου",
   "statusInProgress": "Σε εξέλιξη",
   "collab": "Συνεργασία",
   "managerLabel": "Υπεύθυνος: {name}",
@@ -374,7 +375,9 @@ export default {
   },
   "welcome": {
     "quickChatPlaceholder": "Κάντε μια ερώτηση και πατήστε Enter για να ξεκινήσετε μια γρήγορη συνομιλία…",
+    "quickChatPlaceholderInProject": "Κάντε μια ερώτηση και πατήστε Enter για να ξεκινήσετε νέα συνομιλία σε αυτό το έργο…",
     "enterChatMode": "Έναρξη γρήγορης συνομιλίας",
+    "newChatInProject": "Νέα συνομιλία σε αυτό το έργο",
     "quickNewDocx": "Νέο κενό έγγραφο",
     "quickNewMd": "Νέο αρχείο Markdown",
     "quickChatSend": "Αποστολή"

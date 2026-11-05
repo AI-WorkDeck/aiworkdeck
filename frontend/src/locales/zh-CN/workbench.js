@@ -113,6 +113,7 @@ export default {
   recentProjectsLoadFailed: '加载失败，点此重试',
   projectHome: '项目概览',
   allProjects: '全部项目…',
+  closeProject: "关闭项目",
   statusInProgress: '进行中',
   collab: '协作',
   managerLabel: '负责人：{name}',
@@ -404,7 +405,9 @@ export default {
   },
   welcome: {
     quickChatPlaceholder: '输入一个问题，按 Enter 开始随手对话…',
+    quickChatPlaceholderInProject: "输入一个问题，按 Enter 在本项目新建对话…",
     enterChatMode: '进入随手对话',
+    newChatInProject: "在本项目新建对话",
     quickNewDocx: '新建空白文稿',
     quickNewMd: '新建 Markdown',
     quickChatSend: '发送',

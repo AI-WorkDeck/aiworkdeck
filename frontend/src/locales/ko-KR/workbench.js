@@ -110,6 +110,7 @@ export default {
   "recentProjectsLoadFailed": "불러오기 실패 — 탭하여 다시 시도",
   "projectHome": "프로젝트 개요",
   "allProjects": "모든 프로젝트…",
+  "closeProject": "프로젝트 닫기",
   "statusInProgress": "진행 중",
   "collab": "협업",
   "managerLabel": "담당자: {name}",
@@ -374,7 +375,9 @@ export default {
   },
   "welcome": {
     "quickChatPlaceholder": "질문을 입력하고 Enter 키를 눌러 스크래치 채팅을 시작하세요…",
+    "quickChatPlaceholderInProject": "질문을 입력하고 Enter를 누르면 이 프로젝트에서 새 대화를 시작합니다…",
     "enterChatMode": "스크래치 채팅 시작",
+    "newChatInProject": "이 프로젝트에서 새 대화",
     "quickNewDocx": "새 빈 문서",
     "quickNewMd": "새 Markdown",
     "quickChatSend": "보내기"

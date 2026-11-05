@@ -110,6 +110,7 @@ export default {
   "recentProjectsLoadFailed": "Gagal dimuatkan — ketik untuk cuba semula",
   "projectHome": "Ringkasan Projek",
   "allProjects": "Semua Projek…",
+  "closeProject": "Tutup Projek",
   "statusInProgress": "Sedang Berjalan",
   "collab": "Kerjasama",
   "managerLabel": "Ketua: {name}",
@@ -374,7 +375,9 @@ export default {
   },
   "welcome": {
     "quickChatPlaceholder": "Ajukan soalan dan tekan Enter untuk memulakan sembang kasual…",
+    "quickChatPlaceholderInProject": "Taip soalan dan tekan Enter untuk memulakan sembang baharu dalam projek ini…",
     "enterChatMode": "Mulakan sembang kasual",
+    "newChatInProject": "Sembang Baharu dalam Projek Ini",
     "quickNewDocx": "Dokumen kosong baharu",
     "quickNewMd": "Markdown baharu",
     "quickChatSend": "Hantar"

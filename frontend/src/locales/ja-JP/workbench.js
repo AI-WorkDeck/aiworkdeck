@@ -110,6 +110,7 @@ export default {
   "recentProjectsLoadFailed": "読み込みに失敗しました — タップして再試行",
   "projectHome": "プロジェクト概要",
   "allProjects": "すべてのプロジェクト…",
+  "closeProject": "プロジェクトを閉じる",
   "statusInProgress": "進行中",
   "collab": "コラボレーション",
   "managerLabel": "リーダー: {name}",
@@ -374,7 +375,9 @@ export default {
   },
   "welcome": {
     "quickChatPlaceholder": "質問を入力して Enter を押すとスクラッチチャットが始まります…",
+    "quickChatPlaceholderInProject": "質問を入力して Enter を押すと、このプロジェクトで新しいチャットを始めます…",
     "enterChatMode": "スクラッチチャットを開始",
+    "newChatInProject": "このプロジェクトで新しいチャット",
     "quickNewDocx": "新規空白ドキュメント",
     "quickNewMd": "新規 Markdown",
     "quickChatSend": "送信"

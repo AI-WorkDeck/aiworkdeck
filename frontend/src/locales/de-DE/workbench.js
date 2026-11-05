@@ -110,6 +110,7 @@ export default {
   "recentProjectsLoadFailed": "Laden fehlgeschlagen – zum Wiederholen tippen",
   "projectHome": "Projektübersicht",
   "allProjects": "Alle Projekte…",
+  "closeProject": "Projekt schließen",
   "statusInProgress": "In Bearbeitung",
   "collab": "Zusammenarbeit",
   "managerLabel": "Verantwortlich: {name}",
@@ -374,7 +375,9 @@ export default {
   },
   "welcome": {
     "quickChatPlaceholder": "Stellen Sie eine Frage und drücken Sie die Eingabetaste, um einen freien Chat zu starten…",
+    "quickChatPlaceholderInProject": "Stellen Sie eine Frage und drücken Sie die Eingabetaste, um in diesem Projekt einen neuen Chat zu beginnen…",
     "enterChatMode": "Freien Chat starten",
+    "newChatInProject": "Neuer Chat in diesem Projekt",
     "quickNewDocx": "Neues leeres Dokument",
     "quickNewMd": "Neues Markdown",
     "quickChatSend": "Senden"

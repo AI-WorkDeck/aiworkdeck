@@ -348,6 +348,12 @@ $color-accent: var(--awd-mint); // Mint Green
   }
 }
 
+/* 「关闭项目」紧跟在「全部项目…」之后，同属底部动作区，不再加分隔线 */
+.switcher-close text {
+  color: var(--awd-text-2);
+  font-size: 13px;
+}
+
 .rename-container { min-width: 0; max-width: 320px; -webkit-app-region: no-drag; }
 .rename-input {
   box-sizing: border-box;

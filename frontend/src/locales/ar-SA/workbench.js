@@ -110,6 +110,7 @@ export default {
   "recentProjectsLoadFailed": "فشل التحميل — انقر لإعادة المحاولة",
   "projectHome": "نظرة عامة على المشروع",
   "allProjects": "جميع المشاريع…",
+  "closeProject": "إغلاق المشروع",
   "statusInProgress": "قيد التنفيذ",
   "collab": "التعاون",
   "managerLabel": "قائد الفريق: {name}",
@@ -374,7 +375,9 @@ export default {
   },
   "welcome": {
     "quickChatPlaceholder": "اطرح سؤالاً واضغط Enter لبدء محادثة سريعة…",
+    "quickChatPlaceholderInProject": "اكتب سؤالًا واضغط Enter لبدء محادثة جديدة في هذا المشروع…",
     "enterChatMode": "بدء محادثة سريعة",
+    "newChatInProject": "محادثة جديدة في هذا المشروع",
     "quickNewDocx": "مستند فارغ جديد",
     "quickNewMd": "ملف Markdown جديد",
     "quickChatSend": "إرسال"
