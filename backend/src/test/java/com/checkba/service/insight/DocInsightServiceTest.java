@@ -472,6 +472,44 @@ class DocInsightServiceTest {
     }
 
     @Test
+    @DisplayName("查无此企业时 note 只留人话，不拼上游原话「企业数据服务返回：【有效请求】…」（教程问题 110）")
+    void 查无此企业不拼上游原话() throws Exception {
+        String upstream = "企业数据服务返回：【有效请求】查询无结果";
+        when(qichacha.queryEciInfoJson(anyString()))
+                .thenThrow(new GatewayException(GatewayException.Kind.UPSTREAM_FAILED, upstream));
+        when(mcp.callTool(eq(DocInsightService.QICHACHA_MCP_SERVER), anyString(), anyMap()))
+                .thenReturn("Error: Unknown MCP server: qichacha-company");
+        stubPkulawUnavailable();
+
+        awaitStatus(svc.startParse(UID, PID, DOC).runId(), DocInsightRun.STATUS_DONE);
+        DocInsightEntity company = entityOf(DocInsightEntity.KIND_COMPANY);
+        assertEquals(DocInsightEntity.RETRIEVAL_NOT_FOUND, company.getRetrievalStatus());
+        assertTrue(company.getRetrievalNote().contains("未查询到该企业"), company.getRetrievalNote());
+        assertFalse(company.getRetrievalNote().contains("企业数据服务返回"), company.getRetrievalNote());
+        assertFalse(company.getRetrievalNote().contains("【有效请求】"), company.getRetrievalNote());
+    }
+
+    @Test
+    @DisplayName("全称重打仍查无结果：note 说「按全称仍未查询到」，不带上游原话（教程问题 110）")
+    void 全称重打查无结果不拼上游原话() throws Exception {
+        String upstream = "企业数据服务返回：【有效请求】查询无结果";
+        when(qichacha.queryEciInfoJson("京微资易科技"))
+                .thenThrow(new GatewayException(GatewayException.Kind.UPSTREAM_FAILED, upstream));
+        when(mcp.callTool(eq(DocInsightService.QICHACHA_MCP_SERVER), eq(DocInsightService.QICHACHA_MCP_TOOL), anyMap()))
+                .thenReturn("{\"data\":[{\"企业名称\":\"京微资易科技有限公司\",\"统一社会信用代码\":\"91330100799655058B\"}]}");
+        when(qichacha.queryEciInfoJson("京微资易科技有限公司"))
+                .thenThrow(new GatewayException(GatewayException.Kind.UPSTREAM_FAILED, upstream));
+        stubPkulawUnavailable();
+
+        awaitStatus(svc.startParse(UID, PID, DOC).runId(), DocInsightRun.STATUS_DONE);
+        DocInsightEntity company = entityOf(DocInsightEntity.KIND_COMPANY);
+        assertEquals(DocInsightEntity.RETRIEVAL_NOT_FOUND, company.getRetrievalStatus());
+        assertTrue(company.getRetrievalNote().contains("京微资易科技有限公司"), company.getRetrievalNote());
+        assertFalse(company.getRetrievalNote().contains("企业数据服务返回"), company.getRetrievalNote());
+        assertFalse(company.getRetrievalNote().contains("【有效请求】"), company.getRetrievalNote());
+    }
+
+    @Test
     @DisplayName("网关失败是 UNAVAILABLE（不是查无此企业），并带结构化原因码 hint=NO_CREDITS")
     void 网关失败落不可用() throws Exception {
         when(qichacha.queryEciInfoJson(anyString()))
