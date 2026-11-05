@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Anonimización",
+  "plugin.name": "Redacción de archivos",
   "plugin.description": "Inspeccione información sensible, genere copias anonimizadas y restáurelas con paquetes de recuperación.",
-  "view.main.name": "Anonimización"
+  "view.main.name": "Redacción de archivos"
 }
