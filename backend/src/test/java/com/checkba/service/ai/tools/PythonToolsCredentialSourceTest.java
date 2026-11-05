@@ -12,6 +12,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -88,5 +91,37 @@ class PythonToolsCredentialSourceTest {
         assertEquals("", env.get("TUSHARE_TOKEN"));
         assertEquals("", env.get("QICHACHA_KEY"));
         assertEquals("", env.get("QICHACHA_SECRET"));
+    }
+
+    @Test
+    @DisplayName("凭证值不得出现在 docker argv（会进日志与 ps），只经子进程环境变量透传")
+    void secretsTravelThroughEnvironmentNotArgv() throws Exception {
+        java.util.concurrent.atomic.AtomicReference<ProcessBuilder> captured =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        PythonTools tools = new PythonTools(null, null, null, null) {
+            @Override boolean dockerReady() { return true; }
+            @Override public Map<String, String> injectableCredentials() {
+                return Map.of("TUSHARE_TOKEN", "secret-123");
+            }
+            @Override Process startSandbox(ProcessBuilder builder) {
+                captured.set(builder);
+                Process process = mock(Process.class);
+                when(process.isAlive()).thenReturn(false);
+                when(process.exitValue()).thenReturn(0);
+                when(process.getInputStream()).thenReturn(java.io.InputStream.nullInputStream());
+                when(process.getErrorStream()).thenReturn(java.io.InputStream.nullInputStream());
+                return process;
+            }
+        };
+
+        tools.run_python("print(1)");
+
+        ProcessBuilder pb = captured.get();
+        assertNotNull(pb, "应已启动沙箱");
+        for (String arg : pb.command()) {
+            assertFalse(arg.contains("secret-123"), "argv 泄露凭证: " + arg);
+        }
+        assertTrue(pb.command().contains("TUSHARE_TOKEN"));
+        assertEquals("secret-123", pb.environment().get("TUSHARE_TOKEN"));
     }
 }
