@@ -399,6 +399,7 @@ export default {
   "bqtScanExpired": "QR-Code abgelaufen",
   "bqtScanRefresh": "QR-Code neu laden",
   "bqtScanBack": "Zurück zur Kontoanmeldung",
+  "accountLoginTab": "Konto-Anmeldung",
   "errInvalidInviteCode": "Ungültiger oder deaktivierter Einladungscode",
   "errInviteAlreadyBound": "Dieses Konto hat bereits einen Circle-Kanzlei-Einladungscode gebunden",
   "errBqtNotLawyer": "Nur verifizierte Baoqingtian-Anwaltskonten können sich per QR-Code anmelden",

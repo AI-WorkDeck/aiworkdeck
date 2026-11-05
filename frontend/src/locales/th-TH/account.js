@@ -399,6 +399,7 @@ export default {
   "bqtScanExpired": "รหัส QR หมดอายุ",
   "bqtScanRefresh": "รีเฟรชรหัส QR",
   "bqtScanBack": "กลับไปที่การเข้าสู่ระบบด้วยบัญชี",
+  "accountLoginTab": "เข้าสู่ระบบด้วยบัญชี",
   "errInvalidInviteCode": "รหัสเชิญไม่ถูกต้องหรือถูกปิดใช้งาน",
   "errInviteAlreadyBound": "บัญชีนี้ได้ผูกรหัสเชิญของสำนักงาน Circle ไปแล้ว",
   "errBqtNotLawyer": "เฉพาะบัญชีทนาย Baoqingtian ที่ผ่านการตรวจสอบเท่านั้นที่เข้าสู่ระบบด้วย QR ได้",

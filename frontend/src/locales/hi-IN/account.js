@@ -399,6 +399,7 @@ export default {
   "bqtScanExpired": "QR कोड समाप्त",
   "bqtScanRefresh": "QR कोड रीफ़्रेश करें",
   "bqtScanBack": "अकाउंट साइन-इन पर वापस जाएँ",
+  "accountLoginTab": "खाता साइन-इन",
   "errInvalidInviteCode": "आमंत्रण कोड अमान्य या निष्क्रिय है",
   "errInviteAlreadyBound": "इस अकाउंट ने पहले ही Circle फ़र्म आमंत्रण कोड जोड़ लिया है",
   "errBqtNotLawyer": "केवल सत्यापित Baoqingtian वकील अकाउंट ही QR कोड से साइन इन कर सकते हैं",

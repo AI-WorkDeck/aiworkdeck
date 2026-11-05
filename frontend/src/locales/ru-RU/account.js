@@ -399,6 +399,7 @@ export default {
   "bqtScanExpired": "QR-код истёк",
   "bqtScanRefresh": "Обновить QR-код",
   "bqtScanBack": "Вернуться ко входу по аккаунту",
+  "accountLoginTab": "Вход в аккаунт",
   "errInvalidInviteCode": "Пригласительный код недействителен или отключён",
   "errInviteAlreadyBound": "Этот аккаунт уже привязал пригласительный код фирмы Circle",
   "errBqtNotLawyer": "Только верифицированные аккаунты юристов Baoqingtian могут входить по QR-коду",

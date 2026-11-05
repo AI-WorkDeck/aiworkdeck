@@ -399,6 +399,7 @@ export default {
   "bqtScanExpired": "Ο κωδικός QR έληξε",
   "bqtScanRefresh": "Ανανέωση κωδικού QR",
   "bqtScanBack": "Επιστροφή στη σύνδεση λογαριασμού",
+  "accountLoginTab": "Σύνδεση λογαριασμού",
   "errInvalidInviteCode": "Μη έγκυρος ή ανενεργός κωδικός πρόσκλησης",
   "errInviteAlreadyBound": "Αυτός ο λογαριασμός έχει ήδη συνδέσει κωδικό πρόσκλησης Circle",
   "errBqtNotLawyer": "Μόνο πιστοποιημένοι λογαριασμοί δικηγόρων Baoqingtian μπορούν να συνδεθούν μέσω QR",

@@ -135,3 +135,16 @@ test('keyboard activation prevents defaults and ignores auto-repeat', async () =
   assert.equal(f.counts().restarts, 1)
   assert.equal(prevented, 2)
 })
+
+// 问题 92：准备阶段分阶段提示（挂载 / 打包 / 校验），并说明通常需要几分钟。
+test('preparing shows the current stage when the shell reports one', () => {
+  const f = fixture()
+  f.emit({ phase: 'preparing', progress: { component: 'installer', stage: 'mount' } })
+  assert.equal(f.vm.statusLabel, 'shell.updatePreparingMount')
+  f.emit({ phase: 'preparing', progress: { component: 'installer', stage: 'package' } })
+  assert.equal(f.vm.statusLabel, 'shell.updatePreparingPackage')
+  f.emit({ phase: 'preparing', progress: { component: 'installer', stage: 'verify' } })
+  assert.equal(f.vm.statusLabel, 'shell.updatePreparingVerify')
+  f.emit({ phase: 'preparing', progress: { component: 'installer', stage: 'unknown' } })
+  assert.equal(f.vm.statusLabel, 'shell.updatePreparing')
+})

@@ -399,6 +399,7 @@ export default {
   "bqtScanExpired": "QRコードの有効期限が切れました",
   "bqtScanRefresh": "QRコードを更新",
   "bqtScanBack": "アカウントログインに戻る",
+  "accountLoginTab": "アカウントログイン",
   "errInvalidInviteCode": "招待コードが無効または停止されています",
   "errInviteAlreadyBound": "このアカウントはすでに Circle 律所招待コードをバインド済みです",
   "errBqtNotLawyer": "認証済みの包晴天弁護士アカウントのみQRログインできます",

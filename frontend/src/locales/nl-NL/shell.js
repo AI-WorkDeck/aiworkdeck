@@ -3,6 +3,9 @@
 
 export default {
   "updatePreparing": "Update wordt gecontroleerd en voorbereid…",
+  "updatePreparingMount": "Update voorbereiden: installatiepakket koppelen (duurt meestal enkele minuten)…",
+  "updatePreparingPackage": "Update voorbereiden: bestanden verpakken (duurt meestal enkele minuten)…",
+  "updatePreparingVerify": "Update voorbereiden: handtekening controleren (duurt meestal enkele minuten)…",
   "updateRestart": "Herstart om bij te werken",
   "updateRestarting": "Opslaan en voorbereiden op herstart…",
   "updateDownloading": "Update wordt gedownload",

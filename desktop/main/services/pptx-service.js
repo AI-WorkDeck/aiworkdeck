@@ -31,6 +31,8 @@ function dataDir(ctx) {
 function spawnEnv(ctx) {
   const env = {
     ...process.env,
+    // 包内 Python 不写 .pyc：往已签名 .app 里落 __pycache__ 会破坏签名封印（问题 91）
+    PYTHONDONTWRITEBYTECODE: '1',
     PYTHONPATH: libDir(ctx),
     PPTX_DATA_DIR: dataDir(ctx),
     // banana-slides 0.4.0 起监听端口读 BACKEND_PORT（0.1 读 PORT）——两个都传，升降级均可用

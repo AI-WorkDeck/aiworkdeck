@@ -399,6 +399,7 @@ export default {
   "bqtScanExpired": "QR kodunun süresi doldu",
   "bqtScanRefresh": "QR kodunu yenile",
   "bqtScanBack": "Hesap girişine dön",
+  "accountLoginTab": "Hesapla Giriş",
   "errInvalidInviteCode": "Geçersiz veya devre dışı davet kodu",
   "errInviteAlreadyBound": "Bu hesap zaten bir Circle büro davet koduna bağlı",
   "errBqtNotLawyer": "Yalnızca doğrulanmış Baoqingtian avukat hesapları QR kod ile giriş yapabilir",
