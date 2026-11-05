@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -51,6 +52,11 @@ public class OptimizerAgentService {
     private final AtomicBoolean running = new AtomicBoolean(false);
     private volatile RunReport lastReport;
     private volatile LocalDateTime lastRunAt;
+    /** 外部动作（PR/通知）已成功、但回执（source.save）还没落地的反馈：下一轮只补回执，不重复动作。仅进程内，重启后丢失可接受。 */
+    private final Map<Long, UnackedAction> unacked = new ConcurrentHashMap<>();
+
+    private record UnackedAction(String status, String prUrl, LocalDateTime handledAt, ItemResult result) {
+    }
 
     public record ItemResult(Long feedbackId, String verdict, double confidence, String outcome, String detail) {
     }
@@ -134,6 +140,16 @@ public class OptimizerAgentService {
     }
 
     private ItemResult processOne(UserFeedback fb) {
+        UnackedAction pendingAck = unacked.get(fb.getId());
+        if (pendingAck != null) {
+            fb.setStatus(pendingAck.status());
+            fb.setPrUrl(pendingAck.prUrl());
+            fb.setLastError(null);
+            fb.setHandledAt(pendingAck.handledAt());
+            source.save(fb);
+            unacked.remove(fb.getId());
+            return pendingAck.result();
+        }
         List<FeedbackAttachment> attachments = source.attachmentsOf(fb);
         // 尝试次数在最前面加：分诊本身挂掉也要计数，否则一条永远分诊失败的反馈
         // 每轮都会被重新捞出来，永远到不了 maxAttempts（白烧 token）
@@ -180,9 +196,9 @@ public class OptimizerAgentService {
                     fb.setPrUrl(outcome.prUrl());
                     fb.setLastError(null);
                     fb.setHandledAt(LocalDateTime.now());
-                    source.save(fb);
-                    return new ItemResult(fb.getId(), triage.verdict(), triage.confidence(),
+                    ItemResult opened = new ItemResult(fb.getId(), triage.verdict(), triage.confidence(),
                             UserFeedback.STATUS_PR_OPENED, outcome.prUrl());
+                    return saveAfterExternalAction(fb, opened);
                 }
                 case NO_CHANGES, BLOCKED -> {
                     // 判成 bug 但改不出来（或改到了受保护路径）：这恰恰是最该问人的情况
@@ -231,9 +247,16 @@ public class OptimizerAgentService {
         if (url != null && !url.isBlank()) fb.setPrUrl(url);
         fb.setLastError(null);
         fb.setHandledAt(LocalDateTime.now());
+        return saveAfterExternalAction(fb, new ItemResult(fb.getId(), triage.verdict(), triage.confidence(),
+                UserFeedback.STATUS_EMAILED, url == null || url.isBlank() ? note : url));
+    }
+
+    /** 外部动作已发生后回写状态：先记账再 save，save 抛了账还在，下一轮只补回执。 */
+    private ItemResult saveAfterExternalAction(UserFeedback fb, ItemResult result) {
+        unacked.put(fb.getId(), new UnackedAction(fb.getStatus(), fb.getPrUrl(), fb.getHandledAt(), result));
         source.save(fb);
-        return new ItemResult(fb.getId(), triage.verdict(), triage.confidence(),
-                UserFeedback.STATUS_EMAILED, url == null || url.isBlank() ? note : url);
+        unacked.remove(fb.getId());
+        return result;
     }
 
     /** 本轮没成：没到重试上限就退回 NEW 等下一轮，到了上限停在 FAILED 等人看。 */
