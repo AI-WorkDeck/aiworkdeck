@@ -11,6 +11,7 @@ import java.util.Optional;
 
 public interface DdAiJobRepository extends JpaRepository<DdAiJob, String> {
     List<DdAiJob> findTop8ByStatusOrderByCreatedAtAsc(String status);
+    List<DdAiJob> findTop8ByStatusAndStartedAtBefore(String status, java.time.LocalDateTime before);
     long countByStatusIn(List<String> statuses);
     long countByKindAndSubmissionId(String kind, Long submissionId);
     Optional<DdAiJob> findByProjectIdAndUserIdAndKindAndIdempotencyKey(Long projectId, Long userId, String kind, String idempotencyKey);

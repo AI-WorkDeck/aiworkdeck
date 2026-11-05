@@ -110,6 +110,7 @@ export default {
     "movedSaveFailed": "El archivo se movió o cambió de nombre; los cambios aún no se han guardado",
     "versionSaveBusy": "El historial de versiones está ocupado; los cambios aún no se han guardado. Inténtalo de nuevo en breve.",
     "localVersionSaveBusy": "El historial de versiones está ocupado; el resultado del guardado no está confirmado. Inténtalo de nuevo en breve.",
+    "saveRetryScheduled": "No se pudo guardar; se reintentará automáticamente en {seconds} s",
     "contentSaveReloadRequired": "El guardado anterior se detuvo. Guarda una copia de tus cambios y vuelve a cargar el archivo.",
     "contentSaveConflict": "El archivo cambió en otro lugar. Guarda una copia de tus cambios y vuelve a abrir el archivo.",
     "desktopOnly": "Solo en la aplicación de escritorio"

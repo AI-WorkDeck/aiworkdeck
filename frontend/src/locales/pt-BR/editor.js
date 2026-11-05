@@ -110,6 +110,7 @@ export default {
     "movedSaveFailed": "O arquivo foi movido ou renomeado; as alterações ainda não foram salvas",
     "versionSaveBusy": "O histórico de versões está ocupado; as alterações ainda não foram salvas. Tente novamente em instantes.",
     "localVersionSaveBusy": "O histórico de versões está ocupado; o resultado do salvamento não foi confirmado. Tente novamente em instantes.",
+    "saveRetryScheduled": "Falha ao salvar; nova tentativa automática em {seconds} s",
     "contentSaveReloadRequired": "O salvamento anterior foi interrompido. Salve uma cópia das suas edições e recarregue o arquivo.",
     "contentSaveConflict": "O arquivo foi alterado em outro local. Salve uma cópia das suas edições e reabra o arquivo.",
     "desktopOnly": "Apenas no aplicativo para computador"

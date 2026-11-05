@@ -60,3 +60,52 @@ test('init 后的 load 消息带 fit（只缩不放），打开即按编辑区�
   assert.equal(message.maxFitScale, 1)
   assert.equal(message.xml, '<mxfile/>')
 })
+
+function wireFrame(vm) {
+  const source = {}
+  const posted = []
+  vm.$refs = { frame: { contentWindow: source } }
+  vm.post = msg => { posted.push(msg) }
+  const send = message => vm.onMessage({ source, data: JSON.stringify(message) })
+  return { posted, send }
+}
+
+test('exportSvg 超时后迟到的旧回包不能喂给下一次保存', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const vm = loadEditor()
+  const { posted, send } = wireFrame(vm)
+  const a = vm.exportSvg('<a/>')
+  t.mock.timers.tick(8000)
+  assert.equal(await a, '')
+  let settledB = null
+  const b = vm.exportSvg('<b/>').then(v => { settledB = v })
+  assert.equal(posted.length, 2)
+  send({ event: 'export', data: 'svgA', message: posted[0] })
+  await Promise.resolve()
+  assert.equal(settledB, null)
+  send({ event: 'export', data: 'svgB', message: posted[1] })
+  await b
+  assert.equal(settledB, 'svgB')
+})
+
+test('保存期间又有 change 事件，保存完成后仍保持 dirty', async () => {
+  const vm = loadEditor()
+  const { send } = wireFrame(vm)
+  let finishSave
+  vm.exportSvg = async () => ''
+  vm.decodeSvg = () => ''
+  const source = readFileSync(new URL('../../src/components/DrawioEditor.vue', import.meta.url), 'utf8')
+  const script = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
+    .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
+  const saveDrawioDiagram = () => new Promise(resolve => { finishSave = resolve })
+  const component = new Function('uni', 'createSerialQueue', 'saveDrawioDiagram', script.replace('export default', 'return'))(
+    { $emit() {}, showToast() {} }, createSerialQueue, saveDrawioDiagram)
+  vm.persistNow = component.methods.persistNow.bind(vm)
+  vm.$emit = () => {}
+  const saving = vm.persistNow('<x/>')
+  await Promise.resolve()
+  send({ event: 'change' })
+  finishSave({})
+  await saving
+  assert.equal(vm.dirty, true)
+})

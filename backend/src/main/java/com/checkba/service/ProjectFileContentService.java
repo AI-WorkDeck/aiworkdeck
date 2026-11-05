@@ -29,7 +29,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
@@ -50,9 +53,18 @@ public class ProjectFileContentService {
     private final PlatformTransactionManager transactionManager;
     private final CloudStorageQuotaService quota;
     @PersistenceContext private EntityManager entityManager;
+    /**
+     * fileId -> (editor session -> highest applied save seq). Only read and written under the project's
+     * content lock, so check-then-publish-then-record is atomic per file. In-memory on purpose: an upload
+     * still in flight dies with the process, so a restart cannot let an older request land later.
+     */
+    private final Map<Long, Map<String, Long>> appliedSaves = new ConcurrentHashMap<>();
+    private static final int MAX_SAVE_SESSIONS_PER_FILE = 32;
     @Value("${storage.subscription-quota.enabled:false}") private boolean subscriptionQuotaEnabled;
 
     public record UploadResult(ProjectFile file, String path, boolean complete, boolean postProcess) {}
+    /** One editor instance's monotonic save order (query saveSession/saveSeq). Null = unfenced legacy caller. */
+    public record SaveOrder(String session, long seq) {}
     public record TextResult(ProjectFile file, String before, String after, boolean changed) {}
 
     public static class ContentWriteException extends RuntimeException {
@@ -68,12 +80,19 @@ public class ProjectFileContentService {
     /** Receive each complete HTTP request outside the repository lock and outside a DB transaction. */
     public UploadResult upload(long fileId, long projectId, Long actor, InputStream input, long incoming,
                                Long offset, boolean mustExist, String totalSize) throws IOException {
+        return upload(fileId, projectId, actor, input, incoming, offset, mustExist, totalSize, null);
+    }
+
+    /** saveOrder fences a late, older upload from the same editor session (409 STALE_SAVE, nothing written). */
+    public UploadResult upload(long fileId, long projectId, Long actor, InputStream input, long incoming,
+                               Long offset, boolean mustExist, String totalSize, SaveOrder saveOrder) throws IOException {
         requireNoTransaction();
         if (subscriptionQuotaEnabled && incoming < 0) throw new IllegalArgumentException("Cloud uploads require Content-Length");
         Path staged = Files.createTempFile("awd-content-upload-", ".tmp");
         try {
             Files.copy(input, staged, StandardCopyOption.REPLACE_EXISTING);
             return withContentLock(projectId, () -> {
+                requireFreshSave(fileId, saveOrder);
                 UploadResult result;
                 if (subscriptionQuotaEnabled) {
                     // Same order as project deletion: repo -> transaction -> quota owner. The owner
@@ -113,6 +132,7 @@ public class ProjectFileContentService {
                     });
                     result = publishUpload(file, file.getFilePath(), staged, offset, totalSize);
                 }
+                recordAppliedSave(fileId, saveOrder);
                 if (result.complete()) {
                     Long size = null;
                     try { long measured = storage().getSize(result.path()); if (measured > 0) size = measured; }
@@ -155,6 +175,25 @@ public class ProjectFileContentService {
             touch(file, file.getFilePath(), (long) bytes.length);
             return new TextResult(file, before, after, true);
         });
+    }
+
+    private void requireFreshSave(long fileId, SaveOrder order) {
+        if (order == null) return;
+        Long applied = appliedSaves.getOrDefault(fileId, Map.of()).get(order.session());
+        if (applied != null && order.seq() < applied) {
+            throw new ContentWriteException(409, "STALE_SAVE", LangText.of(
+                    "该编辑器已保存过更新的内容，本次较早的保存已忽略",
+                    "A newer save from this editor already landed; this older save was ignored"));
+        }
+    }
+
+    private void recordAppliedSave(long fileId, SaveOrder order) {
+        if (order == null) return;
+        appliedSaves.computeIfAbsent(fileId, id -> new LinkedHashMap<>(16, 0.75f, true) {
+            @Override protected boolean removeEldestEntry(Map.Entry<String, Long> eldest) {
+                return size() > MAX_SAVE_SESSIONS_PER_FILE;
+            }
+        }).merge(order.session(), order.seq(), Math::max);
     }
 
     private ProjectFile uploadTarget(long id, long projectId, Long actor, Long offset, boolean mustExist) {

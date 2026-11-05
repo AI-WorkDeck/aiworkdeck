@@ -922,6 +922,8 @@ spec §5.5 已改，初版口径在那里划掉留痕）**。它原本是「溯�
 
 56. **版本操作后的「重载打开中的编辑器」必须同时清两个注册表，只摘 `libreLruKeys` 等于没刷新**（v0.44.1 真机反馈 A1）——链路本身是通的（`resolveAdopt` 报 `affectedFileIds`，护栏 `DraftAdoptTest.resolveAdoptReportsTheResolvedFileForEditorReload`；`AdoptConflictDialog` → `VersionPanel.onReload` → `reload-files` → `onVersionReloadFiles`），断在最后一步：非活动实例靠「摘出 `libreLruKeys` 让它卸载」刷新，而**过继备胎**渲染自 `libreSpares`，`leftLibreFiles` 还会把「有备胎顶着」的文件整个排除掉——只摘 LRU 键那个实例压根不卸载，端着的还是合并前的字节。而左窗格首开的那份文档**一定**是过继来的备胎（`maybeAdoptLibreSpare`），也就是最常见的那一种实例。表现：采纳一稿逐处裁决完，磁盘已是合并结果、文档标签里仍是旧正文，关掉标签重开才对（`closeFile` → `pruneClosedLibreSpares` 顺手清掉了备胎槽）。现已收拢进 `librePool.unloadInactiveLibreInstances(fileId)`（两个注册表一起清，活动实例照旧跳过、交给 `reloadActiveLibreInstances` 就地换文档），LRU 淘汰那条路本来就两边都清（`evictLibreInstance` 末尾的 `pruneLibreSpare`）。**今后任何「让某个文件的实例重新装载」的新入口都调这一个方法**，别再自己 filter 一遍 LRU。护栏 `frontend/tests/version-history/versionReloadPool.test.mjs`。
 
+57. **`shareToCloud` 的建项目 POST 带 `clientRequestId` 幂等键**——读超时只有 15s，服务端建成但应答慢时客户端会报「云端不可达」，重试若不带同一个键就会再建一个云端项目。键由 `CloudSyncService.shareRequestIds`（进程内，按 项目:连接）保持到收到应答为止；云端 `POST /api/projects` 按 `(user_id, create_request_id)`（`Project.createRequestId`，唯一约束，不对外序列化）去重，命中直接返回旧项目、不再记「放进案件库」事件。字段可选：旧服务端忽略它，旧客户端不带它。键不落盘，重启后丢失。护栏 `CloudShareIdempotencyTest`。
+
 ## 客户门户与尽调清单上云（2026-09-29，dev-board#1050）
 
 律师把案卷放进案件库之后，客户凭访问码在**案件库托管的网页**（`{server}/client/`）里看尽调清单、传材料。

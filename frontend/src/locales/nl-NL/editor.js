@@ -110,6 +110,7 @@ export default {
     "movedSaveFailed": "Bestand is verplaatst of hernoemd; wijzigingen zijn nog niet opgeslagen",
     "versionSaveBusy": "Versiegeschiedenis is bezet; wijzigingen zijn nog niet opgeslagen. Probeer het zo opnieuw.",
     "localVersionSaveBusy": "Versiegeschiedenis is bezet; het opslagresultaat is nog niet bevestigd. Probeer het zo opnieuw.",
+    "saveRetryScheduled": "Opslaan mislukt; automatisch opnieuw over {seconds} s",
     "contentSaveReloadRequired": "Het eerdere opslaan is gestopt. Sla eerst een kopie van uw bewerkingen op en laad het bestand daarna opnieuw.",
     "contentSaveConflict": "Het bestand is elders gewijzigd. Sla eerst een kopie van uw bewerkingen op en open het bestand daarna opnieuw.",
     "desktopOnly": "Alleen in de desktop-app"
