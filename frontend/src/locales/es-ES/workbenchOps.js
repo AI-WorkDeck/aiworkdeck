@@ -50,7 +50,7 @@ export default {
   "captureNoResult": "La captura de pantalla finalizó pero no se recibió ningún resultado",
   "screenShareUnsupported": "Este navegador no admite compartir pantalla",
   "captureFailedAllowShare": "Error en la captura de pantalla (permita compartir la pestaña o ventana)",
-  "captureH5Only": "La captura de extractos solo se admite en H5",
+  "captureH5Only": "La captura de pantalla con OCR solo se admite en la web",
   "loadStagingFailed": "Error al cargar los archivos del área temporal",
   "addedToStaging": "Añadido al área temporal",
   "stagingFullTitle": "Área temporal llena",

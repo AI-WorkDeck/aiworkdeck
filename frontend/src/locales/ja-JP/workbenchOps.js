@@ -50,7 +50,7 @@ export default {
   "captureNoResult": "スクリーンショットは完了しましたが、結果を受信できませんでした",
   "screenShareUnsupported": "現在のブラウザは画面共有に対応していません",
   "captureFailedAllowShare": "スクリーンショットに失敗しました（タブまたはウィンドウの共有を許可してください）",
-  "captureH5Only": "スクリーンショット抜粋は H5 のみ対応しています",
+  "captureH5Only": "スクリーンショットOCRはWebのみ対応しています",
   "loadStagingFailed": "ステージングエリアのファイル読み込みに失敗しました",
   "addedToStaging": "ステージングエリアに追加しました",
   "stagingFullTitle": "ファイルステージングエリアが満杯です",

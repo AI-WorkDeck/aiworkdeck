@@ -50,7 +50,7 @@ export default {
   "captureNoResult": "Screenshot completato ma nessun risultato ricevuto",
   "screenShareUnsupported": "La condivisione dello schermo non è supportata in questo browser",
   "captureFailedAllowShare": "Screenshot non riuscito (consenti la condivisione della scheda o della finestra)",
-  "captureH5Only": "L'acquisizione dello schermo è supportata solo su web (H5)",
+  "captureH5Only": "L'OCR da acquisizione schermo è supportato solo sul web",
   "loadStagingFailed": "Impossibile caricare i file dell'area di transito",
   "addedToStaging": "Aggiunto all'area di transito",
   "stagingFullTitle": "Area di transito piena",
