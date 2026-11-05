@@ -70,6 +70,8 @@
 | `awd.chat.send(prompt)` | 字符串，上限 4000 字 | `{}` | **v2.5 新增**：把 `prompt` 作为可见用户消息发进 AI 对话（起草类动作走这条，不要直调工具） |
 | `awd.ui.openWorkspace()` | 无 | `{}` | **SDK 1.8**：打开本插件已声明的 workspace；未声明或不可用返回 `unavailable`，旧宿主返回 `unknown_method` |
 | `awd.ui.openFile(path)` | 文件 path | `{}` | **v2.5 新增**：把项目文件打开到工作台中栏；需 `file_read` |
+| `awd.call('ui.openFile', { path, locator })` | path + 可选定位符 `{type:'docx',quote}` / `{type:'pdf',quote?,page?}` | `{}` | **宿主 0.81.0 起**：打开并定位到引文/页码；老宿主忽略 locator；需 `file_read` |
+| `awd.call('files.download', { name, data })` | `.xlsx`/`.docx`/`.csv` 文件名 + `ArrayBuffer`/`Uint8Array`（≤20 MiB） | `{ started, name }` | **宿主 0.81.0 起**：sandbox 不能直接下载，导出办公文件走这条；需 `file_write` |
 | `awd.evidence.link(params)` | `{ anchor: {selection:true}\|{quote}, docPath?, targets:[{path, locator?, relation?, note?}] }` | `{ linkKey, targetIds }` | 在当前 Word 文档的选区/引文上建底稿关联；需 `editor` |
 | `awd.evidence.list(params)` | `{ docPath?, path?, status? }` | `{ links: [...] }` | 列底稿关联；需 `file_read` |
 | `awd.evidence.locate(params)` | `{ linkKey, targetId? }` | `{}` | 有 targetId 打开底稿定位，否则跳到文档锚点；需 `editor` |
