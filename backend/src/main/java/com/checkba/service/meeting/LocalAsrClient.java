@@ -135,8 +135,8 @@ public class LocalAsrClient {
                 return new ProbeResult(Status.RUNTIME_MISSING, base, "", false,
                         LangText.of("本机语音识别组件还没安装。",
                                 "The on-device speech recognition component is not installed."),
-                        LangText.of("下载「本机语音识别」组件（运行时约 40MB，模型 1.5GB）后，录音可以完全不出本机。",
-                                "Download the on-device speech recognition component (about 40 MB runtime plus a 1.5 GB model) "
+                        LangText.of("到「设置 → 组件管理」下载「本机语音识别」组件（体积见组件面板）后，录音可以完全不出本机。",
+                                "Download the on-device speech recognition component in Settings → Components (size shown there) "
                                         + "to keep recordings entirely on this computer."));
             }
             return new ProbeResult(Status.SERVICE_DOWN, base, "", false,
