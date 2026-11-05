@@ -197,6 +197,8 @@ export default {
   "deRestoreGenerate": "生成復敏文件",
   "deMatchCount": "本次匹配 / 還原 {count} 處",
   "deSuspectCount": "另有 {count} 處疑似證件/卡號未通過校驗，未處理；確認要遮蔽的請填入上方「補充敏感詞」。",
+  "deMaskAnyway": "仍然遮蔽",
+  "deMaskAnywayLabel": "仍然遮蔽 {value}",
   "deKitFileTag": "復敏",
   "deKitFallbackName": "脫敏文件",
   "deBrowseUnavailable": "無法打開項目文件選擇器，請改用「導入當前」，或重新進入工作台後再試。",

@@ -14,7 +14,11 @@
       v-if="canInstallPack"
       class="lv-pack-retry"
       :class="{ disabled: litPackRetrying }"
+      role="button"
+      :tabindex="litPackRetrying ? -1 : 0"
+      :aria-disabled="litPackRetrying || null"
       @tap="retryPackInstall"
+      @keydown="onPackRetryKey"
     >
       <text>{{ litPackRetrying ? $t('panels.litPackRetrying') : $t(litPackStatus.state === 'not_installed' ? 'market.install' : 'common.retry') }}</text>
     </view>
@@ -386,6 +390,12 @@ export default {
     stopPackPoll() {
       if (this.litPackTimer) { clearInterval(this.litPackTimer); this.litPackTimer = null }
     },
+    // 「安装 / 重试」是 view，没有按钮语义：Enter/Space 显式接通（dev-board#1713 #97）
+    onPackRetryKey(event) {
+      if (!['Enter', ' '].includes(event.key)) return
+      event.preventDefault()
+      if (!event.repeat) return this.retryPackInstall()
+    },
     async retryPackInstall() {
       if (this.litPackRetrying || this.litPackStatus?.state === 'revoked') return
       this.litPackRetrying = true
@@ -655,6 +665,7 @@ export default {
 }
 .lv-pack-retry text { font-size: var(--awd-panel-fs-meta); color: var(--awd-text-on-accent); font-weight: 600; }
 .lv-pack-retry.disabled { opacity: .5; pointer-events: none; }
+.lv-pack-retry:focus-visible { outline: var(--awd-focus-width) solid var(--awd-accent); outline-offset: var(--awd-focus-offset); }
 
 /* 分组头：与插件广场同形（26px / 11px-700 / 计数徽章 / 右侧动作） */
 .lv-sec-head {

@@ -197,6 +197,8 @@ export default {
   "deRestoreGenerate": "Hersteld bestand genereren",
   "deMatchCount": "{count} overeenkomsten gevonden / hersteld",
   "deSuspectCount": "{count} extra ID-/kaartachtige nummers slaagden niet voor de controlecijfercontrole en zijn ongewijzigd gelaten. Voeg de gewenste termen toe aan \"Aanvullende gevoelige termen\" hierboven.",
+  "deMaskAnyway": "Toch onleesbaar maken",
+  "deMaskAnywayLabel": "{value} toch onleesbaar maken",
   "deKitFileTag": "herstel",
   "deKitFallbackName": "geanonimiseerd-bestand",
   "deBrowseUnavailable": "De projectbestandskiezer kon niet worden geopend. Gebruik in plaats daarvan \"Huidige importeren\", of heropen de workbench en probeer het opnieuw.",
