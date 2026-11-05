@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# gitleaks 配置：沿用默认规则，只放行测试里的合成假值（逐个列出，不按目录放行，
+# 免得真密钥混进测试文件也被放过）。新增放行项请写明出处。
+title = "AI WorkDeck gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "测试夹具中的合成值，非真实凭证"
+regexes = [
+  '''^fixture12345$''',                       # MobileWorkspaceApiContractTest 测试口令
+  '''^sk-verySecret1234$''',                  # PluginContributionServiceTest
+  '''^sk-or-v1-0123456789abcdef$''',          # PlatformAiKeyCipherTest
+  '''^SYNTHETIC_PRIVATE_MATERIAL_042$''',     # WritingModelTransportTest
+  '''^9f2c1d4e5a6b7c8d$''',                   # TeamUsageUploadServiceTest 项目匿名键
+  '''^awdk_harness_e2e_fixture_key$''',       # harness-self-evolving-e2e
+]
