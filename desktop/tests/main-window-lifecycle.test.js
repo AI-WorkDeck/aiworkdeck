@@ -275,3 +275,14 @@ test('shipping preload forwards the native request identity through confirmation
     ['checkba:quit-prepared', { requestId: 'quit-test-1489', ok: true }],
   ])
 })
+
+// 问题 7：中途「自动重启升级」查不清是谁触发的。三个置 updateRestartRequested 的入口各记一条带原因的日志。
+test('每个重启入口都在 desktop.log 记一条 restart-requested 和原因', () => {
+  const setters = source.split('updateRestartRequested = true').length - 1
+  assert.equal(setters, 3, '新增重启入口时同步补日志')
+  for (const reason of ['update-restart', 'activate-during-quit', 'open-paths']) {
+    assert.match(source, new RegExp(`logDesktopEvent\\('restart-requested', \\{ reason: '${reason}'`), reason)
+  }
+  const restartHandler = source.slice(source.indexOf("ipcMain.handle('checkba:update-restart'"))
+  assert.ok(restartHandler.indexOf("logDesktopEvent('restart-requested'") < restartHandler.indexOf('app.quit()'))
+})
