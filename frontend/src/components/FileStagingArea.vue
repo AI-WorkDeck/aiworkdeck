@@ -79,10 +79,10 @@
                @mousedown="onItemPrimeDrag(file)"
                @dragstart.stop="onDragStart(file, $event)"
                @dragend="onDragEnd"
-               @tap.stop="onItemClick(file, $event)"
+               @click.stop="onItemClick(file, $event)"
                @dblclick.stop="handleDoubleClick(file)"
             >
-               <view class="checkbox-wrapper" @tap.stop="toggleCheck(file.id)">
+               <view class="checkbox-wrapper" @mousedown.stop @tap.stop="toggleCheck(file.id)">
                  <view class="custom-checkbox" :class="{ checked: selectedIds.includes(file.id) }">
                    <text v-if="selectedIds.includes(file.id)" class="check-mark">√</text>
                  </view>
@@ -209,7 +209,12 @@ export default {
     onItemClick(file, event) {
       const id = file.id
       // Multi-select with Cmd/Ctrl/Shift
-      const isMulti = event.metaKey || event.ctrlKey || event.shiftKey
+      // uni-h5 重建的 click 对象不带修饰键，回退读正在派发的原生 click（同 FileTree.handleItemClick）
+      let native = (event && typeof event.metaKey === 'boolean') ? event : null
+      if (!native && typeof window !== 'undefined' && window.event && window.event.type === 'click') {
+        native = window.event
+      }
+      const isMulti = !!(native && (native.metaKey || native.ctrlKey || native.shiftKey))
       
       if (isMulti) {
         this.toggleCheck(id)
@@ -397,6 +402,9 @@ export default {
     // Marquee Selection
     // Marquee Selection Removed
     onMouseDown(e) {
+        // 只在点到列表空白处时清空；点在文件行（含复选框、移除按钮）上交给行自己的点击处理
+        const target = e && e.target
+        if (target && typeof target.closest === 'function' && target.closest('.staging-item')) return
         // Clear selection if not modified key
         if (!e.metaKey && !e.ctrlKey && !e.shiftKey) {
             this.selectedIds = [];
