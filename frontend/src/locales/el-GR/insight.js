@@ -46,7 +46,8 @@ export default {
   "docMissing": "Αυτό το αρχείο δεν βρίσκεται πλέον στο έργο",
   "source": {
     "projectFile": "Αρχείο έργου",
-    "qichacha": "Qichacha (Αναζήτηση)"
+    "qichacha": "Qichacha (Αναζήτηση)",
+    "pkulaw": "PKULaw"
   },
   "mentions": "{count} αναφορά(-ές)",
   "mentionsTitle": "Αναφορές στο έγγραφο",

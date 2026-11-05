@@ -101,14 +101,15 @@ test('画布上那颗常驻按钮连同它的样式一起撤掉', () => {
 
 test('对外文案两语言都不再有「写作辅助」', () => {
   // 只看文案表，不看注释：注释里的旧称不影响用户看到什么。
-  const labels = GUEST.match(/^const LABELS = \{[\s\S]*?^\}$/m)
-  assert.ok(labels, 'LABELS 文案表还在')
-  assert.equal(labels[0].includes('写作辅助'), false)
-  assert.equal(labels[0].includes('Writing assistance'), false)
-  assert.match(labels[0], /title: '自动补全'/)
-  assert.match(labels[0], /title: 'Autocomplete'/)
-  assert.match(labels[0], /enabled: '自动语义补全'/, '面板内的开关要与面板标题区分开')
-  assert.match(labels[0], /enabled: 'Automatic semantic suggestions'/)
+  // 客体文案表搬进语言包（editor.writingAssist，教程反馈 48），客体只留英文兜底。
+  const fallback = GUEST.match(/^const FALLBACK_LABELS = \{.*\}$/m)
+  assert.ok(fallback, '英文兜底表还在')
+  assert.equal(/\p{Script=Han}/u.test(fallback[0]), false, '客体页不再写死中文')
+  assert.equal(fallback[0].includes('Writing assistance'), false)
+  assert.equal(zh.writingAssist.title, '自动补全')
+  assert.equal(en.writingAssist.title, 'Autocomplete')
+  assert.equal(zh.writingAssist.enabled, '自动语义补全', '面板内的开关要与面板标题区分开')
+  assert.equal(en.writingAssist.enabled, 'Automatic semantic suggestions')
   assert.equal(zh.toolbar.autocompleteShort, '自动补全')
   assert.equal(en.toolbar.autocompleteShort, 'Autocomplete')
   assert.equal(JSON.stringify(zh).includes('写作辅助'), false)

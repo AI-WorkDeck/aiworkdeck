@@ -31,7 +31,7 @@ const AUTO_AI_BLOCKING = new Set(['DEEP_QUOTA', 'DEEP_RATE_LIMITED', 'DEEP_MODEL
  *   - 规则检查（结构、编号、交叉引用、算式、证件号码）始终静默跑，不调模型、不查外库；
  *   - AI 审校在停笔 20 秒后自动跑一次，扣 Credits，用户可以关。
  */
-export function createInlineReviewHost({ projectId, fileId, userId, execute, send, review, storage, openInsight, openPanel, onState,
+export function createInlineReviewHost({ projectId, fileId, userId, execute, send, review, storage, openPanel, onState,
   writable = true, active = true, delay = 2500, now = () => Date.now(),
   timers = { set: (fn, ms) => setTimeout(fn, ms), clear: id => clearTimeout(id) } }) {
   const session = `review:${projectId}:${fileId}:${Date.now()}:${Math.random().toString(36).slice(2)}`
@@ -235,7 +235,6 @@ export function createInlineReviewHost({ projectId, fileId, userId, execute, sen
     runDeep() { return run(true) },
     async handle(msg) {
       if (disposed || msg?.type !== 'inline-review-request' || msg.session !== session) return false
-      if (msg.action === 'open-insight') { openInsight?.(); return true }
       // 正文里的浮球只是一个入口：清单在宿主右栏，客体页不再自己画面板。
       if (msg.action === 'open-panel') { openPanel?.(); return true }
       if (msg.action === 'preferences' && msg.data && typeof msg.data === 'object') {

@@ -46,7 +46,8 @@ export default {
   "docMissing": "檔案已不在專案中",
   "source": {
     "projectFile": "專案檔案",
-    "qichacha": "企查查"
+    "qichacha": "企查查",
+    "pkulaw": "北大法寶"
   },
   "mentions": "{count} 處",
   "mentionsTitle": "文中出處",

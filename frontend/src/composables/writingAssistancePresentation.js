@@ -43,6 +43,10 @@ export const WRITING_ASSISTANCE_CSS = `
   color:var(--wa-muted); font-size:18px; line-height:24px;
 }
 .awd-writing-assistance .awd-wa-panel[data-mode="context"] { width:300px; }
+.awd-writing-assistance .awd-wa-actions:not(:empty) {
+  position:sticky; bottom:-7px; z-index:1; margin:6px -7px -7px; padding:6px 7px 7px;
+  display:flex; flex-wrap:wrap; gap:6px; background:var(--wa-surface); border-top:1px solid var(--wa-divider);
+}
 .awd-writing-assistance .awd-wa-panel[data-mode="context"] .awd-wa-heading strong {
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }

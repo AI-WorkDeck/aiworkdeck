@@ -46,7 +46,8 @@ export default {
   "docMissing": "Этого файла больше нет в проекте",
   "source": {
     "projectFile": "Файл проекта",
-    "qichacha": "Qichacha (Цичача)"
+    "qichacha": "Qichacha (Цичача)",
+    "pkulaw": "PKULaw"
   },
   "mentions": "Упоминаний: {count}",
   "mentionsTitle": "Упоминания в документе",

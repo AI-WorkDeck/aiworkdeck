@@ -46,7 +46,8 @@ export default {
   "docMissing": "Diese Datei befindet sich nicht mehr im Projekt",
   "source": {
     "projectFile": "Projektdatei",
-    "qichacha": "Qichacha"
+    "qichacha": "Qichacha",
+    "pkulaw": "PKULaw"
   },
   "mentions": "{count} Fundstelle(n)",
   "mentionsTitle": "Fundstellen im Dokument",
