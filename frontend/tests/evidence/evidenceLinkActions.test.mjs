@@ -126,6 +126,8 @@ test('现有 WASM 两条真实方法兼容额外 expectedText 参数，保留实
   }) }
   const actions = vm.runInNewContext(`({${methods.join('\n')}})`, {
     isWriterDoc: () => true, selectionRange: () => range,
+    // 建链在修订关闭下写（教程反馈 75）：包装器被调用即记一笔。
+    withRecordChangesOff: fn => { mutations.push(['recordChangesOff']); return fn() },
     bmFail: message => ({ success: false, message }), errStr: String,
     xModel: { getBookmarks: () => ({ hasByName: () => false }), createInstance: () => ({ setName(name) { this.name = name } }) },
     ctrl: { getSelection: () => ({ getCount: () => 1, getByIndex: () => range }) },
@@ -136,7 +138,7 @@ test('现有 WASM 两条真实方法兼容额外 expectedText 参数，保留实
   assert.equal(link.success, true)
   assert.equal(bookmark.text, text)
   assert.equal(link.text, text)
-  assert.deepEqual(mutations, [['bookmark', range, 'EVID_TEST', true], ['HyperLinkURL', BASE]])
+  assert.deepEqual(mutations, [['bookmark', range, 'EVID_TEST', true], ['recordChangesOff'], ['HyperLinkURL', BASE]])
 })
 
 test('选区已带 filelink?k= → 复用 linkKey，只 addEvidenceTargets，取该文件下最新 target', async () => {
@@ -241,4 +243,16 @@ test('drop uses the configured first tag, allows no default, and preserves a ded
   h.api.addEvidenceTargets = async () => ({targets: [{id: 12, fileId: 77, method: '已有标签'}]})
   const result = await createEvidenceLinkForDrop({ ...h, projectId: 1, docFileId: 10, file, method: '新默认' })
   assert.equal(result.method, '已有标签')
+})
+
+// 教程反馈 77：回执小条避让刚建链的文字。
+test('回执小条：链接末尾在画布下部时贴顶部，读不到光标就贴底部', async () => {
+  const { evidenceBarPlacement } = await import('../../src/pages/project-overview/evidenceLinkCore.js')
+  const at = (y, height = 20, frameHeight = 1000) => ({ success: true, nativeCaret: { x: 10, y, height, frameHeight } })
+  assert.equal(evidenceBarPlacement(at(100)), 'bottom')
+  assert.equal(evidenceBarPlacement(at(700)), 'top')
+  assert.equal(evidenceBarPlacement(at(950)), 'top')
+  assert.equal(evidenceBarPlacement({ success: true }), 'bottom')
+  assert.equal(evidenceBarPlacement({ success: false, reason: 'not-writer' }), 'bottom')
+  assert.equal(evidenceBarPlacement(null), 'bottom')
 })
