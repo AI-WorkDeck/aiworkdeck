@@ -68,6 +68,18 @@
           @input="draft = $event.target.value"
         />
         <div v-else-if="content" :id="bodyId" class="awd-dlg__body">{{ content }}</div>
+        <!-- 需要用户主动勾选才能确认的告知（如录音转写告知）：绝不预勾选 -->
+        <component :is="'label'" v-if="checkLabel && !editable" class="awd-dlg__check">
+          <component
+            :is="'input'"
+            ref="check"
+            type="checkbox"
+            class="awd-dlg__check-box"
+            :checked="checked"
+            @change="checked = $event.target.checked"
+          />
+          <span class="awd-dlg__check-label">{{ checkLabel }}</span>
+        </component>
         <div class="awd-dlg__actions">
           <component
             :is="'button'"
@@ -83,6 +95,7 @@
             type="button"
             class="awd-dlg__btn awd-dlg__confirm"
             :class="danger ? 'awd-dlg__btn--danger' : 'awd-dlg__btn--primary'"
+            :disabled="needsCheck && !checked"
             @click="confirm"
           >{{ confirmText }}</component>
         </div>
@@ -108,6 +121,8 @@ export default {
     danger: { type: Boolean, default: false },
     editable: { type: Boolean, default: false },
     placeholderText: { type: String, default: '' },
+    // 非空时多一个勾选项，勾上才能确认（不预勾选）
+    checkLabel: { type: String, default: '' },
     itemList: { type: Array, default: () => [] },
     itemColor: { type: String, default: '' },
   },
@@ -121,9 +136,13 @@ export default {
       bodyId: 'awd-dlg-body-' + uid,
       closed: false,
       restoreFocusTo: null,
+      checked: false,
     }
   },
   computed: {
+    needsCheck() {
+      return this.kind === 'modal' && !this.editable && !!this.checkLabel
+    },
     labelId() {
       if (this.title) return this.titleId
       if (this.kind === 'modal' && this.content && !this.editable) return this.bodyId
@@ -161,6 +180,8 @@ export default {
         target = this.$refs.panel && this.$refs.panel.querySelector('.awd-dlg__item')
       } else if (this.editable) {
         target = this.el('input')
+      } else if (this.needsCheck) {
+        target = this.el('check')
       } else if (this.danger && this.showCancel) {
         // 危险动作默认落在「取消」上：回车按的是焦点所在的按钮，不会误触确认
         target = this.el('cancelBtn')
@@ -225,6 +246,7 @@ export default {
       this.$emit('close', result)
     },
     confirm() {
+      if (this.needsCheck && !this.checked) return
       this.finish({ confirm: true, cancel: false, content: this.draft })
     },
     cancel() {
@@ -312,6 +334,29 @@ html[data-theme='dark'] .awd-dlg {
   color: var(--awd-text-2);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.awd-dlg__check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--awd-space-2);
+  margin: var(--awd-space-3) 0 0;
+  font: 500 var(--awd-font-size-body)/1.5 var(--awd-font-sans);
+  color: var(--awd-text);
+  cursor: pointer;
+}
+.awd-dlg__check-box {
+  flex: none;
+  margin: 3px 0 0;
+  accent-color: var(--awd-accent);
+}
+.awd-dlg__check-box:focus-visible {
+  outline: var(--awd-focus-width) solid var(--awd-accent);
+  outline-offset: var(--awd-focus-offset);
+}
+.awd-dlg__confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .awd-dlg__input {

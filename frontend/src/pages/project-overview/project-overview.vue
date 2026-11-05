@@ -4922,22 +4922,30 @@ export default {
     // 右键「转写」：注册成会议记录（凭证已配则后端顺手提交转写），跳会议录音面板定位到它
     // （dev-board#227）。菜单项本身已按 meetingRecorderEnabled 门控，这里不再重复判。
     // register-file 会当场提交并在平台档预扣 Credits，所以先确认；取消则什么都不做（dev-board#968）。
+    // 面板先开出来并显示「正在准备…」，再确认与注册（dev-board#1713 #116）：原先两次请求都回来才开面板，
+    // 首次可能很久没有任何反馈。register-file 回 noticePending 时提示去确认告知，而不是「配置转写服务」。
     async onTranscribeAudio(file) {
-      if (!(await confirmPaidTranscription({ projectId: this.projectId, audioFileId: file.id }))) return
+      const focus = (meetingId, preparing) => uni.$emit('awd:plugin-sidebar-command', { pluginId: 'voice', command: 'recording-focus', meetingId, preparing })
+      this.openPanelInItsDock('voice')
+      await this.$nextTick()
+      focus(null, true)
+      let meetingId = null
       try {
+        if (!(await confirmPaidTranscription({ projectId: this.projectId, audioFileId: file.id }))) return
         const res = await registerMeetingFromFile(this.projectId, file.id)
-        this.meetingFocusId = res && res.meeting ? res.meeting.id : null
-        this.openPanelInItsDock('voice')
-        this.$nextTick(() => uni.$emit('awd:plugin-sidebar-command', { pluginId: 'voice', command: 'recording-focus', meetingId: this.meetingFocusId }))
+        meetingId = res && res.meeting ? res.meeting.id : null
+        this.meetingFocusId = meetingId
         uni.showToast({
           title: res && res.submitted
             ? this.$t('fileTree.transcribeSubmitted')
-            : this.$t('fileTree.transcribeRegistered'),
+            : this.$t(res && res.noticePending ? 'fileTree.transcribeNoticePending' : 'fileTree.transcribeRegistered'),
           icon: 'none'
         })
       } catch (error) {
         console.error('转写发起失败:', error)
         uni.showToast({ title: (error && error.message) || this.$t('fileTree.transcribeFailed'), icon: 'none' })
+      } finally {
+        focus(meetingId, false)
       }
     },
     // DOM 挂载与标签恢复都完成后，才允许系统打开请求写入标签。

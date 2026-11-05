@@ -197,6 +197,8 @@ export default {
   "deRestoreGenerate": "Jana fail yang dipulihkan",
   "deMatchCount": "Padan / dipulihkan {count} kejadian",
   "deSuspectCount": "{count} nombor seakan ID/kad gagal semakan check digit dan dibiarkan tidak diubah. Tambahkan yang ingin disunting ke \"Istilah Sensitif Tambahan\" di atas.",
+  "deMaskAnyway": "Sunting juga",
+  "deMaskAnywayLabel": "Sunting juga {value}",
   "deKitFileTag": "pemulihan",
   "deKitFallbackName": "fail-dikaburkan",
   "deBrowseUnavailable": "Pemilih fail projek tidak dapat dibuka. Gunakan \"Import Semasa\" sebagai gantinya, atau buka semasa workbench dan cuba lagi.",

@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Desensibilização",
+  "plugin.name": "Ocultação de Conteúdo em Arquivos",
   "plugin.description": "Inspecione informações sensíveis, gere cópias desensibilizadas e restaure com pacotes de recuperação.",
-  "view.main.name": "Desensibilização"
+  "view.main.name": "Ocultação de Conteúdo em Arquivos"
 }

@@ -194,6 +194,8 @@ export default {
   "deRestoreGenerate": "Genera file ripristinato",
   "deMatchCount": "{count} occorrenze trovate / ripristinate",
   "deSuspectCount": "Altri {count} numeri simili a documenti/carte non hanno superato il controllo della cifra di verifica e non sono stati toccati. Aggiungi quelli che desideri oscurare in \"Termini sensibili aggiuntivi\" qui sopra.",
+  "deMaskAnyway": "Oscura comunque",
+  "deMaskAnywayLabel": "Oscura comunque {value}",
   "deKitFileTag": "ripristino",
   "deKitFallbackName": "file-oscurato",
   "deBrowseUnavailable": "Impossibile aprire il selettore dei file di progetto. Usa \"Importa attuale\" oppure riapri l'area di lavoro e riprova.",

@@ -21,6 +21,8 @@ public final class SensitiveTextEngine {
     private final Map<String, Integer> counts = new LinkedHashMap<>();
     /** 形似但校验失败的号码候选（按类型计数）：不处理，但要让用户看见（dev-board C2）。 */
     private final Map<String, Integer> suspects = new LinkedHashMap<>();
+    /** 同一批疑似号码的原值（去重，原值 → 类型），只回给本机预览，供「仍然遮蔽」（dev-board#1713 #96）。 */
+    private final Map<String, String> suspectValues = new LinkedHashMap<>();
     private final boolean reversible;
     private String scope = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
 
@@ -138,7 +140,21 @@ public final class SensitiveTextEngine {
             }
         });
         // Custom overrides first, then longer entities (company before fragments / overlapping numeric rules).
-        hits.sort(Comparator.<Hit>comparingInt(h -> h.code.equals("CUSTOM") ? 0 : 1)
+        // Exception (dev-board#1713 #95): an entity that fully contains a custom word and only
+        // touches custom words it contains goes before them, so 「华晟」 does not cut
+        // 「深圳华晟科技有限公司」 apart. A partial overlap still lets the custom word win.
+        Set<Hit> wrapping = new HashSet<>();
+        for (Hit hit : hits) {
+            if (hit.code.equals("CUSTOM")) continue;
+            boolean contains = false, crosses = false;
+            for (Hit custom : hits) {
+                if (!custom.code.equals("CUSTOM") || custom.end <= hit.start || custom.start >= hit.end) continue;
+                if (hit.start <= custom.start && custom.end <= hit.end && hit.end - hit.start > custom.end - custom.start) contains = true;
+                else crosses = true;
+            }
+            if (contains && !crosses) wrapping.add(hit);
+        }
+        hits.sort(Comparator.<Hit>comparingInt(h -> wrapping.contains(h) ? 0 : h.code.equals("CUSTOM") ? 1 : 2)
                 .thenComparing(Comparator.comparingInt((Hit h) -> h.end - h.start).reversed())
                 .thenComparingInt(Hit::start).thenComparing(Hit::code));
         BitSet occupied = new BitSet(text.length());
@@ -159,6 +175,7 @@ public final class SensitiveTextEngine {
             if (next >= 0 && next < suspect.end) continue;
             if (!reported.add(suspect.start + ":" + suspect.end)) continue;
             suspects.merge(suspect.code, 1, Integer::sum);
+            suspectValues.putIfAbsent(suspect.value, suspect.code);
         }
         accepted.sort(Comparator.comparingInt(Hit::start));
         List<Edit> edits = new ArrayList<>();
@@ -187,6 +204,9 @@ public final class SensitiveTextEngine {
     public Map<String, String> recovery() { return Map.copyOf(recovery); }
     public Map<String, Integer> counts() { return Map.copyOf(counts); }
     public Map<String, Integer> suspects() { return Map.copyOf(suspects); }
+    public List<Map<String, String>> suspectItems() {
+        return suspectValues.entrySet().stream().map(e -> Map.of("type", e.getValue(), "value", e.getKey())).toList();
+    }
 
     public static String apply(String text, List<Edit> edits) {
         StringBuilder result = new StringBuilder(text);

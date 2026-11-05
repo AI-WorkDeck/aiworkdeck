@@ -194,6 +194,8 @@ export default {
   "deRestoreGenerate": "Gerar arquivo restaurado",
   "deMatchCount": "{count} ocorrências correspondidas / restauradas",
   "deSuspectCount": "{count} números semelhantes a IDs/cartões falharam na verificação do dígito verificador e foram mantidos intactos. Adicione os que deseja anonimizar em \"Termos Sensíveis Adicionais\" acima.",
+  "deMaskAnyway": "Ocultar mesmo assim",
+  "deMaskAnywayLabel": "Ocultar {value} mesmo assim",
   "deKitFileTag": "recuperacao",
   "deKitFallbackName": "arquivo-anonimizado",
   "deBrowseUnavailable": "Não foi possível abrir o seletor de arquivos do projeto. Use \"Importar Atual\", ou reabra o workbench e tente novamente.",

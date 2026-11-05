@@ -197,6 +197,8 @@ export default {
   "deRestoreGenerate": "복원된 파일 생성",
   "deMatchCount": "{count}개 항목 일치 / 복원됨",
   "deSuspectCount": "체크 디지트 검사를 통과하지 못한 ID/카드 형식의 번호 {count}개는 그대로 유지되었습니다. 마스킹하려는 번호를 위의 \"추가 민감 용어\"에 추가하세요.",
+  "deMaskAnyway": "그래도 마스킹",
+  "deMaskAnywayLabel": "{value} 그래도 마스킹",
   "deKitFileTag": "복원",
   "deKitFallbackName": "비식별화-파일",
   "deBrowseUnavailable": "프로젝트 파일 선택기를 열 수 없습니다. 대신 \"현재 파일 가져오기\"를 사용하거나 워크벤치를 다시 열고 시도해 주세요.",

@@ -91,3 +91,20 @@ test('未安装与封禁状态不伪装下载中，也不持续轮询', async ()
     }
   }
 })
+
+test('「安装 / 重试」有按钮语义，Enter/Space 能触发（dev-board#1713 #97）', async () => {
+  const tag = source.slice(source.indexOf('class="lv-pack-retry"') - 200, source.indexOf('@keydown="onPackRetryKey"') + 30)
+  assert.match(tag, /role="button"/)
+  assert.match(tag, /:tabindex="litPackRetrying \? -1 : 0"/)
+  assert.match(tag, /@keydown="onPackRetryKey"/)
+  const p = panel(['ready'])
+  p.vm.litPackStatus = { state: 'not_installed' }
+  let prevented = 0
+  const key = k => ({ key: k, repeat: false, preventDefault: () => { prevented++ } })
+  p.vm.onPackRetryKey(key('a'))
+  assert.equal(p.installs(), 0)
+  await p.vm.onPackRetryKey(key('Enter'))
+  await p.vm.onPackRetryKey(key(' '))
+  assert.equal(p.installs(), 2)
+  assert.equal(prevented, 2)
+})

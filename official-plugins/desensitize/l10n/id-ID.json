@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Desensitisasi",
+  "plugin.name": "Penyuntingan Berkas",
   "plugin.description": "Periksa informasi sensitif, buat salinan yang telah didesensitisasi, dan pulihkan dengan paket pemulihan.",
-  "view.main.name": "Desensitisasi"
+  "view.main.name": "Penyuntingan Berkas"
 }
