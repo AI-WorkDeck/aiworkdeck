@@ -75,6 +75,9 @@ class MobileRelayClientHttpTest {
     private final List<String> acked = new CopyOnWriteArrayList<>();
     private volatile String inboxJson = "[]";
     private volatile String ackResponse = "{\"code\":0}";
+    // 为 true 时 /content 只发 10 字节就卡住（Content-Length 声称 1000），直到 stallRelease 放行
+    private volatile boolean stallContent;
+    private final CountDownLatch stallRelease = new CountDownLatch(1);
     // 目录推送响应体：默认与旧行为一致（普通成功，无截断），尽调 P3#5 的截断告警用例改它。
     private volatile String projectsResponseBody = "{\"code\":0}";
 
@@ -116,7 +119,15 @@ class MobileRelayClientHttpTest {
         });
         server.createContext("/api/mobile/inbox", ex -> {
             String path = ex.getRequestURI().getPath();
-            if (path.endsWith("/content")) {
+            if (path.endsWith("/content") && stallContent) {
+                ex.getResponseHeaders().add("Content-Type", "application/octet-stream");
+                ex.sendResponseHeaders(200, 1000);
+                OutputStream os = ex.getResponseBody();
+                os.write(new byte[10]);
+                os.flush();
+                try { stallRelease.await(10, TimeUnit.SECONDS); } catch (InterruptedException ignored) { }
+                ex.close();
+            } else if (path.endsWith("/content")) {
                 ex.getResponseHeaders().add("Content-Type", "application/octet-stream");
                 respond(ex, 200, "JPEG-BYTES");
             } else if (path.endsWith("/ack")) {
@@ -168,6 +179,11 @@ class MobileRelayClientHttpTest {
                 }
             }
         });
+        server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool(r -> {
+            Thread t = new Thread(r);
+            t.setDaemon(true);
+            return t;
+        }));
         server.start();
         baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
 
@@ -499,6 +515,26 @@ class MobileRelayClientHttpTest {
     @SuppressWarnings("unchecked")
     private Map<String, Object> firstReceipt(MobileRelayClientService svc) {
         return ((List<Map<String, Object>>) svc.receiveStatus("42").get("items")).get(0);
+    }
+
+    @Test
+    void stalledInboxBodyDownloadTimesOutAndReleasesThePollGuard() throws Exception {
+        statusFixture("42");
+        stallContent = true;
+        var svc = service();
+        svc.inboxBodyDeadline = java.time.Duration.ofMillis(500);
+        when(storageService.save(anyString(), any(InputStream.class))).thenAnswer(inv -> {
+            inv.getArgument(1, InputStream.class).readAllBytes();
+            return inv.getArgument(0);
+        });
+        try {
+            var run = CompletableFuture.runAsync(svc::pollInbox);
+            assertDoesNotThrow(() -> run.get(8, TimeUnit.SECONDS), "卡住的下载必须在期限内放弃，不能永远占着 pollInbox");
+        } finally { stallRelease.countDown(); }
+        assertEquals(false, svc.receiveStatus("42").get("checking"));
+        assertTrue(acked.isEmpty(), "字节没收全不能确认");
+        verify(projectFileService, never()).createFile(anyLong(), any(), anyString(), anyString(), anyLong(),
+                any(), any(), any());
     }
 
     @Test
