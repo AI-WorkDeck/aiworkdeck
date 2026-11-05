@@ -1079,6 +1079,7 @@
                     :status="evidenceMethodBar.status"
                     :error-text="evidenceMethodBar.errorText"
                     :saving="evidenceMethodBar.saving"
+                    :placement="evidenceMethodBar.placement"
                     @change="onEvidenceMethodChange"
                     @close="closeEvidenceMethodBar"
                   />
@@ -1411,6 +1412,7 @@
                     :status="evidenceMethodBar.status"
                     :error-text="evidenceMethodBar.errorText"
                     :saving="evidenceMethodBar.saving"
+                    :placement="evidenceMethodBar.placement"
                     @change="onEvidenceMethodChange"
                     @close="closeEvidenceMethodBar"
                   />
