@@ -1942,7 +1942,7 @@ app.whenReady().then(() => {
         fullUpdate = require('./services/full-update').createFullUpdate({ app, autoUpdater: require('electron').autoUpdater, dataDir: overlayCtx().dataDir })
         updateService = createUpdateService(overlayCtx(), {
           initialError: fullUpdate.lastError(),
-          prepareInstaller: (file, version) => fullUpdate.prepare(file, version),
+          prepareInstaller: (file, version, onStage) => fullUpdate.prepare(file, version, onStage),
           extractTar,
           onEvent: (evt) => {
             try { if (mainWindow) mainWindow.webContents.send('checkba:update-event', evt) } catch (e) { /* ignore */ }

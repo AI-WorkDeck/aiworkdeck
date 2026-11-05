@@ -269,7 +269,11 @@ function createUpdateService(ctx, hooks = {}) {
       state.phase = 'preparing'
       state.progress = null
       emit('preparing', { version: installer.version })
-      await hooks.prepareInstaller(file, installer.version)
+      // 分阶段进度（问题 92）：挂载 / 打包 / 校验，界面据 progress.stage 提示当前在哪一步
+      await hooks.prepareInstaller(file, installer.version, (stage) => {
+        state.progress = { component: 'installer', version: installer.version, stage }
+        emit('preparing', { version: installer.version, stage })
+      })
       state.available = { version: installer.version, kind: 'installer' }
       state.majorAvailable = null
       state.progress = null

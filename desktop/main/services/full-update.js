@@ -10,12 +10,14 @@ const run = promisify(execFile)
 
 // Squirrel.Mac owns signature verification, replacement and rollback. We feed it
 // only an already SHA256-verified installer through an unguessable loopback URL.
-async function prepareMac(file, version, updater, command = run) {
+// onStage(stage)：准备过程分阶段报进度（问题 92）——mount 挂载 DMG / package 转 ZIP / verify 原生验签准备。
+async function prepareMac(file, version, updater, command = run, onStage = () => {}) {
   const dir = path.dirname(file)
   const mount = fs.mkdtempSync(path.join(dir, 'mount-'))
   const zip = path.join(dir, 'update.zip')
   let mounted = false
   try {
+    onStage('mount')
     await command('/usr/bin/hdiutil', ['attach', file, '-readonly', '-nobrowse', '-mountpoint', mount])
     mounted = true
     const apps = fs.readdirSync(mount).filter((n) => n.endsWith('.app'))
@@ -23,6 +25,7 @@ async function prepareMac(file, version, updater, command = run) {
     const source = path.join(mount, apps[0])
     const { stdout } = await command('/usr/bin/plutil', ['-extract', 'CFBundleShortVersionString', 'raw', '-o', '-', path.join(source, 'Contents/Info.plist')])
     if (stdout.trim() !== version) throw new Error('安装包版本与签名清单不一致')
+    onStage('package')
     await command('/usr/bin/ditto', ['-c', '-k', '--sequesterRsrc', '--keepParent', source, zip])
   } finally {
     if (mounted) await command('/usr/bin/hdiutil', ['detach', mount])
@@ -43,6 +46,7 @@ async function prepareMac(file, version, updater, command = run) {
     } else res.writeHead(404).end()
   })
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
+  onStage('verify')
   try {
     await new Promise((resolve, reject) => {
       const cleanup = () => { clearTimeout(timer); updater.removeListener('error', failed); updater.removeListener('update-downloaded', done); updater.removeListener('update-not-available', unavailable) }
@@ -93,10 +97,11 @@ function windowsPowerShellEnv(env = process.env) {
 function createFullUpdate({ app, autoUpdater, dataDir, platform = process.platform }, command = run) {
   let prepared = null
   return {
-    async prepare(file, version) {
+    async prepare(file, version, onStage = () => {}) {
       if (platform === 'darwin') {
-        await prepareMac(file, version, autoUpdater, command)
+        await prepareMac(file, version, autoUpdater, command, onStage)
       } else if (platform === 'win32') {
+        onStage('verify')
         // The signed manifest pins exact bytes; Authenticode adds Windows trust.
         await command('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
           `$s=Get-AuthenticodeSignature -LiteralPath '${file.replace(/'/g, "''")}'; if ($s.Status -ne 'Valid') { throw 'Invalid installer signature' }` ], { env: windowsPowerShellEnv() })

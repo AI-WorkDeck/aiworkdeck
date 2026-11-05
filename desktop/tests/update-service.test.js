@@ -403,7 +403,7 @@ async function fullFixture(t, { hash, prepareError, onEvent, beforePrepare } = {
   const prepared = []
   const svc = createUpdateService({ packaged: true, dataDir: root, appVersion: '0.11.0', platform: 'darwin', arch: 'arm64' }, {
     onEvent,
-    prepareInstaller: async (file, version) => { if (beforePrepare) await beforePrepare(); prepared.push({ bytes: fs.readFileSync(file), version }); if (prepareError) throw new Error(prepareError) }
+    prepareInstaller: async (file, version, onStage) => { if (beforePrepare) await beforePrepare(onStage); prepared.push({ bytes: fs.readFileSync(file), version }); if (prepareError) throw new Error(prepareError) }
   })
   return { svc, prepared, asset, ctx: { packaged: true, dataDir: root, appVersion: '0.11.0', platform: 'darwin', arch: 'arm64' } }
 }
@@ -531,4 +531,26 @@ test('隔离实例不做应用内更新：不联网检查，状态带 disabled',
   assert.equal(state.disabled, true)
   assert.equal(state.phase, 'idle')
   assert.equal(hits, 0)
+})
+
+// 问题 92：准备阶段（挂载 / 打包 / 校验）随 preparing 事件广播，界面据此分阶段提示。
+test('完整更新：准备阶段随 preparing 广播 stage，ready 后清空', async (t) => {
+  const events = []
+  let seen = null
+  const { svc } = await fullFixture(t, {
+    onEvent: (event) => events.push(event),
+    beforePrepare: async (onStage) => {
+      onStage('mount')
+      onStage('package')
+      seen = svc.getState()
+    },
+  })
+  const state = await svc.check()
+  assert.equal(seen.phase, 'preparing')
+  assert.equal(seen.progress.stage, 'package')
+  assert.deepEqual(events.filter((e) => e.type === 'preparing').map((e) => e.state.progress ? e.state.progress.stage : null), [null, 'mount', 'package'])
+  assert.equal(state.phase, 'ready')
+  assert.equal(state.progress, null)
+  const main = fs.readFileSync(path.join(__dirname, '../main/main.js'), 'utf8')
+  assert.match(main, /prepareInstaller: \(file, version, onStage\) => fullUpdate\.prepare\(file, version, onStage\)/)
 })
