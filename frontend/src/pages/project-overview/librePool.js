@@ -21,6 +21,9 @@ const LIBRE_SIZE_UNIT_BYTES = 2 * 1024 * 1024
 const LIBRE_WEIGHT_BUDGET = 6
 const LOW_MEMORY_BYTES = 8 * 1024 ** 3
 const LOW_MEMORY_INSTANCE_BUDGET = 2
+// 备胎延迟建：避开项目打开期（文件树/面板初始化）的资源竞争，同时尽早预热，
+// 让首开文档免整链冷启动。原 4s 偏长，用户常在 4s 内就点开第一份文档。
+const LIBRE_SPARE_DELAY_MS = 2000
 
 // 引擎固定基座远大于小文档本身；低内存设备不能只按压缩后的文件体积记账。
 // 用宿主真实物理内存，旧壳/网页缺失时保守处理，不依赖浏览器截断的 deviceMemory。
@@ -175,7 +178,7 @@ export const librePoolMethods = {
         clearTimeout(this._libreSpareTimer)
         if (this.hasActiveNativeDocument()) return
         if (useConservativeLibrePool() && this.hasLibreDocumentInstance()) return
-        this._libreSpareTimer = setTimeout(() => this.initLibreSpare(), 4000)
+        this._libreSpareTimer = setTimeout(() => this.initLibreSpare(), LIBRE_SPARE_DELAY_MS)
     },
     initLibreSpare() {
         // 页面栈多实例守卫：只有活跃 overview 实例建备胎（PR#148/#151 模式）。
