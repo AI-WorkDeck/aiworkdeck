@@ -101,4 +101,14 @@ class LocalFileStorageServiceTest {
             assertEquals(1, list.count());
         }
     }
+
+    @Test
+    void managedSaveKeepsDefaultFilePermissions() throws Exception {
+        Path dir = Files.createDirectories(root.resolve("projects/1"));
+        var probe = Files.createFile(dir.resolve("probe.txt"));
+        var view = Files.getFileAttributeView(probe, java.nio.file.attribute.PosixFileAttributeView.class);
+        org.junit.jupiter.api.Assumptions.assumeTrue(view != null);
+        storage.save("projects/1/d.txt", bytes("x"));
+        assertEquals(Files.getPosixFilePermissions(probe), Files.getPosixFilePermissions(dir.resolve("d.txt")));
+    }
 }
