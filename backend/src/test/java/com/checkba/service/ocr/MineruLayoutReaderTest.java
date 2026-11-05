@@ -80,4 +80,36 @@ class MineruLayoutReaderTest {
         assertEquals(594, lines.get(0).frameWidth());
         assertEquals("股权转让协议", lines.get(0).lines().get(0).text());
     }
+
+    /**
+     * The MinerU bundled in the released mineru-runtime adds a seal block
+     * {@code <details><summary>seal</summary> …OCR of the seal… </details>} spanning blank lines;
+     * it reached the Word body as raw tags plus garbage (found in the 0.79.0 device test).
+     */
+    @Test
+    void releasedMineruSealDetailsBlockIsDroppedAndNoHtmlReachesTheText() throws Exception {
+        String md;
+        try (var in = MineruLayoutReaderTest.class.getResourceAsStream("/ocr/mineru-packaged.md")) {
+            md = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        assertTrue(md.contains("<details>"), "fixture is the real packaged output");
+        String ref = "images/59bd7a7db9090b1b5591e1037e897d65b057563944bc742f1a53dbf53957240b.jpg";
+        Page page = MineruLayoutReader.read(md, Map.of(ref, pngB64()), 594, 841).get(0);
+        for (Block b : page.blocks()) {
+            if (b instanceof Para p) {
+                assertFalse(p.text().contains("<") || p.text().contains("summary") || p.text().contains("LZ"),
+                        "no HTML or seal OCR garbage in body text: " + p.text());
+            }
+        }
+        assertEquals(1, page.blocks().stream().filter(b -> b instanceof Picture).count(), "the seal picture itself is kept");
+        assertTrue(page.blocks().stream().anyMatch(b -> b instanceof Para p && p.text().equals("第三条 陈述与保证")));
+        assertFalse(OcrExportService.plainText(md).contains("<"), "copy text / TXT use the same reader");
+    }
+
+    @Test
+    void otherBlockLevelHtmlKeepsItsTextOnly() {
+        Page page = MineruLayoutReader.read("<p>甲方：<b>某公司</b></p>\n\n正文 a<b 不是标签\n", Map.of(), 594, 841).get(0);
+        assertEquals("甲方：某公司", ((Para) page.blocks().get(0)).text());
+        assertEquals("正文 a<b 不是标签", ((Para) page.blocks().get(1)).text(), "a lone '<' in ordinary text is kept");
+    }
 }

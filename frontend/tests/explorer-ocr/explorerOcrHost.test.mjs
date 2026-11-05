@@ -10,16 +10,17 @@ import * as utils from '../../src/utils/explorerOcr.js'
 const source = readFileSync(new URL('../../src/pages/project-overview/explorerOcr.js', import.meta.url), 'utf8')
   .replace(/^import[\s\S]*?from '[^']+'\n/gm, '').replace('export default', 'return')
 
-function fixture({ server, dialog = async () => ({ confirm: true }) } = {}) {
+function fixture({ server, dialog = async () => ({ confirm: true }), host = { services: null } } = {}) {
   const calls = []
   const mixin = new Function('recognizeProjectFileText', 'cancelProjectFileOcr', 'promptFeatureNotConfigured', 'showDialog',
-    'runOcrBatch', 'summarizeOcrBatch', 'joinCopiedTexts', 'sideBySidePlan', 'openOcrSideBySide', 'ocrOutputName', 'uni', source)(
+    'runOcrBatch', 'summarizeOcrBatch', 'joinCopiedTexts', 'sideBySidePlan', 'openOcrSideBySide', 'ocrOutputName', 'uni', 'host', source)(
     async (projectId, fileId, data) => { calls.push(['api', projectId, fileId, { ...data }]); return { code: 0, data: await server(fileId, data, calls) } },
     async (projectId, jobId) => calls.push(['cancelApi', projectId, jobId]),
     e => calls.push(['notConfigured', e.message]),
     async opts => { calls.push(['dialog', opts]); return dialog(opts) },
     utils.runOcrBatch, utils.summarizeOcrBatch, utils.joinCopiedTexts, utils.sideBySidePlan, utils.openOcrSideBySide, utils.ocrOutputName,
     { showToast: p => calls.push(['toast', p.title]) },
+    host,
   )
   const vm = {
     projectId: 12, leftFiles: [], rightFiles: [], splitMode: false, focusedPane: 'left',
@@ -163,4 +164,23 @@ test('file tree offers the two phase-2 entries and hands them to the host', () =
   assert.match(tree, /handleContextOcr\('searchablePdf'\)/)
   assert.match(tree, /\$t\('fileTree\.ocrExportLayoutDocx'\)/)
   assert.match(tree, /\$t\('fileTree\.ocrSearchablePdf'\)/)
+})
+
+// 0.79.0 device test: the local engine was installed but its services were never started by the
+// right-click path, so every local job came back local_failed and the user was offered the cloud.
+test('desktop: local OCR services are started before the first file; failures and the web are harmless', async () => {
+  const ensured = []
+  const host = { services: { ensure: async name => { ensured.push(name); return name === 'mineru-service' ? { ok: false, disabled: true } : { ok: true } } } }
+  const { vm, calls } = fixture({ host, server: id => { calls.push(['serverSaw', [...ensured]]); return { status: 'done', text: `T${id}` } } })
+  await vm.onExplorerOcr({ action: 'copy', items: [pdf(1)] })
+  assert.deepEqual(ensured, ['pptx-service', 'mineru-service'])
+  assert.deepEqual(calls.find(c => c[0] === 'serverSaw')[1], ['pptx-service', 'mineru-service'], 'started before recognizing')
+
+  const throwing = fixture({ host: { services: { ensure: async () => { throw new Error('boom') } } }, server: () => ({ status: 'done', text: 'x' }) })
+  await throwing.vm.onExplorerOcr({ action: 'copy', items: [pdf(1)] })
+  assert.ok(throwing.calls.some(c => c[0] === 'clipboard'), 'a failed ensure does not stop the batch')
+
+  const web = fixture({ server: () => ({ status: 'done', text: 'x' }) })
+  await web.vm.onExplorerOcr({ action: 'copy', items: [pdf(1)] })
+  assert.ok(web.calls.some(c => c[0] === 'clipboard'), 'no desktop host: nothing to start')
 })
