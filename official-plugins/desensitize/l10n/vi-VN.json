@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Che giấu thông tin",
+  "plugin.name": "Che giấu thông tin tệp",
   "plugin.description": "Kiểm tra thông tin nhạy cảm, tạo bản sao đã được che giấu, và khôi phục bằng gói khôi phục.",
-  "view.main.name": "Che giấu thông tin"
+  "view.main.name": "Che giấu thông tin tệp"
 }

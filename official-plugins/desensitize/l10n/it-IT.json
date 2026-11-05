@@ -1,5 +1,5 @@
 {
-  "plugin.name": "Desensibilizzazione",
+  "plugin.name": "Oscuramento dei file",
   "plugin.description": "Ispeziona le informazioni sensibili, genera copie desensibilizzate e ripristina con pacchetti di recupero.",
-  "view.main.name": "Desensibilizzazione"
+  "view.main.name": "Oscuramento dei file"
 }
