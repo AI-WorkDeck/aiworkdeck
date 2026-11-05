@@ -65,7 +65,12 @@ function harness(platform = 'darwin', engine = '', prepare = async () => {}) {
     // 默认给浅色：桌面壳启动时 applyNativeTheme('light') 就是出厂值，与真实运行一致。
     nativeTheme: { shouldUseDarkColors: false },
     process: { platform, env: { AWD_EDITOR_ENGINE: engine } }, __dirname: path.join(__dirname, '../main'),
-    screen: { getPrimaryDisplay: () => ({ workAreaSize: { width: 1400, height: 900 } }) },
+    screen: {
+      getPrimaryDisplay: () => ({ workAreaSize: { width: 1400, height: 900 } }),
+      getAllDisplays: () => [{ workArea: { x: 0, y: 0, width: 1400, height: 900 } }],
+    },
+    // 窗口大小记忆（问题 18）：读写 prefs 的两个 helper 在建窗段之外，这里桩掉
+    readMainWindowState: () => null, saveMainWindowState() {},
     require: name => {
       // 建窗那段里现场 require 的模块在这里明确列出；来了别的就当场报死，
       // 免得新依赖悄悄混进建窗路径还没人知道。
@@ -74,6 +79,7 @@ function harness(platform = 'darwin', engine = '', prepare = async () => {}) {
         './services/win-arch': { isWinArmEmulated: () => false },
         './reload-guard': { attachReloadGuard: () => true },
         './services/backend-request-gate': require('../main/services/backend-request-gate'),
+        './window-state': require('../main/window-state'),
       }
       assert.ok(name in stubs, 'createMainWindow 里多了一个没桩的 require: ' + name)
       return stubs[name]
