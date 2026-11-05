@@ -31,9 +31,8 @@ export default {
 
   // ---- userprofile.vue: activity log ----
   defaultUserName: 'User',
-  filterDatePlaceholder: 'Date (YYYY-MM-DD)',
   filterContentPlaceholder: 'Activity keyword',
-  exportExcelBtn: 'Export to Excel',
+  exportExcelBtn: 'Export CSV',
   thProject: 'Project',
   thAction: 'Action',
   thObject: 'Object',
@@ -43,7 +42,10 @@ export default {
   thIdle: 'Idle Time',
   loadingEllipsis: 'Loading…',
   noRecords: 'No records',
-  minutesSuffix: '{count} min',
+  durationUnderMinute: 'Under 1 min',
+  durationMinutes: '{minutes} min',
+  durationHoursMinutes: '{hours} h {minutes} min',
+  workLogTruncatedHint: 'Too many records: only the most recent 5,000 are shown. Narrow the date range to see earlier ones.',
   allProjectsOption: 'All Projects',
   unassociatedProjectOption: 'No Project',
   // dev-board BUG-45: the Action column / CSV export used to show the raw
@@ -57,10 +59,10 @@ export default {
   actionWork: 'Work',
 
   // ---- Settings page: All Favorites (dev-board#872: cross-project roll-up, grouped by project) ----
-  favoritesSubtitle: 'A roll-up of everything you have favorited across all projects. The favorites drawer in the workbench sidebar only shows the current project, and lets you insert directly into a document.',
+  favoritesSubtitle: 'A roll-up of everything you have favorited across all projects. The Favorites panel in the workbench only shows the current project, and lets you insert directly into a document.',
   favoritesSearchPlaceholder: 'Search title, content, or project',
   emptyFavoritesDesc: 'No favorites yet',
-  emptyFavoritesHow: 'Favorite a page or selected text from the browser panel, or check Favorite when saving a screenshot, and it will show up here.',
+  emptyFavoritesHow: 'Favorite a page or selected text from the browser panel, or click "Add to Favorites" after taking a screenshot, and it will show up here.',
   favoritesNoMatch: 'No matching favorites',
   favoritesNoProject: 'Deleted project',
   untitledExcerpt: 'Untitled excerpt',

@@ -103,6 +103,7 @@
     "test:calendar": "node --test tests/calendar/*.test.mjs",
     "test:auth-redirect": "node --test tests/auth-redirect/*.test.mjs",
     "test:commands": "node --test tests/commands/*.test.mjs",
+    "test:work-log": "node --test tests/work-log/*.test.mjs",
     "test:zeta-relay": "node --test tests/zeta-relay/*.test.mjs",
     "test:evidence": "node --test tests/evidence/*.test.mjs",
     "test:plugin-sdk": "node --test tests/plugin-sdk/*.test.mjs",

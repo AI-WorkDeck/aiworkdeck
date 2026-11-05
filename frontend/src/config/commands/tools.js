@@ -23,7 +23,7 @@ export const TOOLS_COMMANDS = [
   },
   {
     id: 'tools.activityRecord',
-    label: { zh: '活动记录', en: 'Activity Recording' },
+    label: { zh: '工作记录', en: 'Activity Log' },
     menu: 'tools', group: 1,
     type: 'checkbox', checked: 'recording',
     when: ['workbench', 'notClient'],

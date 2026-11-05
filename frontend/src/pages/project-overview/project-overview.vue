@@ -4186,7 +4186,7 @@ export default {
     this.loadWalletBalance()
 
     // Sync UI state
-    this.isRecording = activityTracker.getRecordingState()
+    this.isRecording = this.hasNamedProject && activityTracker.getRecordingState()
 
     // Reload members to ensure up-to-date list
     if (this.projectId) {
@@ -4214,7 +4214,8 @@ export default {
     // onShow 会重新接管——但期间菜单不能继续亮着工作台那一堆条目。
     // 窗口最小化/被遮挡/锁屏也会触发 onHide，那时本页仍是当前页，不交（见 menuCommands.js）。
     this.releaseMenuOnHide()
-    this.stopActivityTracking()
+    // 最小化 / 锁屏 / 去设置页：只结束当前计时段，不关录制（onShow 接着记当前标签）
+    activityTracker.flushActiveSession()
 
     // Desktop：离开工作区页面（如去个人中心）必须隐藏 BrowserView
     try {
@@ -6316,18 +6317,32 @@ export default {
     // OCR 采集与浮层生命周期方法组已外置（Phase 3c） → ./ocrCapture.js
 
     // OCR 帧处理与动作方法组已外置（Phase 3b） → ./ocrActions.js
+    // 录制开关是全局持久化的（activityTracker 自己存），这里只管本页恢复 / 挂起计时
     startActivityTracking() {
         if (!this.hasNamedProject) return
-        if (activityTracker.getRecordingState()) {
-             activityTracker.start()
-             this.isRecording = true
-        }
+        activityTracker.start()
+        this.isRecording = activityTracker.getRecordingState()
+        if (this.isRecording) this.trackCurrentTab()
     },
 
     stopActivityTracking() {
         activityTracker.stop()
-        activityTracker.setRecording(false) // Force stop recording state
         this.isRecording = false
+    },
+
+    trackCurrentTab() {
+        const pane = this.focusedPane
+        const file = pane === 'left' ? this.activeFileLeft : this.activeFileRight
+        if (!file) return
+        const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
+        if (this.isBrowserTab(file)) {
+            const url = file.url || ''
+            const title = file.name || ''
+            const fullMeta = meta + (title ? `. Title: ${title}` : '')
+            activityTracker.trackActivePage('OPEN_URL', 0, url, this.project && this.project.id, fullMeta)
+        } else {
+            activityTracker.trackActivePage('OPEN_FILE', file.id, file.name, this.project && this.project.id, meta)
+        }
     },
 
     toggleRecording() {
@@ -6344,23 +6359,9 @@ export default {
         }, 2000)
 
         if (newState) {
-             // uni.showToast({ title: '开始录制工作', icon: 'none' }) // Replaced
              // If we have an active file/tab, start tracking it immediately
-             const pane = this.focusedPane
-             const file = pane === 'left' ? this.activeFileLeft : this.activeFileRight
-             if (file) {
-                 const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
-                 if (this.isBrowserTab(file)) {
-                     const url = file.url || ''
-                     const title = file.name || ''
-                     const fullMeta = meta + (title ? `. Title: ${title}` : '')
-                     activityTracker.trackActivePage('OPEN_URL', 0, url, this.project && this.project.id, fullMeta)
-                 } else {
-                     activityTracker.trackActivePage('OPEN_FILE', file.id, file.name, this.project && this.project.id, meta)
-                 }
-             }
-        } else {
-             // uni.showToast({ title: '已停止录制', icon: 'none' }) // Replaced
+             activityTracker.start()
+             this.trackCurrentTab()
         }
     },
 
@@ -6603,6 +6604,7 @@ export default {
         }
         recordProjectVisit(this.projectId)
         syncRecentToMenuFetching()
+        this.startActivityTracking()
         this.checkAdoptConflict()
         loadProjectTasks(this.projectId).catch((e) => console.warn('[project-overview] 读取事项失败', e))
         const lifecycle = this._collabStateLifecycle || 0

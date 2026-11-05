@@ -31,9 +31,8 @@ export default {
 
   // ---- userprofile.vue：工作记录 ----
   defaultUserName: '用户',
-  filterDatePlaceholder: '日期 (YYYY-MM-DD)',
   filterContentPlaceholder: '工作内容关键词',
-  exportExcelBtn: '导出 Excel',
+  exportExcelBtn: '导出 CSV',
   thProject: '项目',
   thAction: '操作',
   thObject: '对象',
@@ -43,7 +42,10 @@ export default {
   thIdle: '连续无动作时间',
   loadingEllipsis: '加载中...',
   noRecords: '无记录',
-  minutesSuffix: '{count}分',
+  durationUnderMinute: '不足 1 分钟',
+  durationMinutes: '{minutes} 分',
+  durationHoursMinutes: '{hours} 小时 {minutes} 分',
+  workLogTruncatedHint: '记录太多，只显示了最近的 5000 条；缩小日期范围可以看到更早的记录',
   allProjectsOption: '全部项目',
   unassociatedProjectOption: '未关联项目',
   // dev-board BUG-45：「操作」列/CSV 导出原来直接显示后端枚举值，改成中文文案
@@ -56,10 +58,10 @@ export default {
   actionWork: '工作',
 
   // ---- 设置页「全部收藏」（dev-board#872：跨项目汇总，按项目分组）----
-  favoritesSubtitle: '汇总你在所有项目里收藏的内容；工作台左栏的收藏夹只看当前项目，并可直接插入文档',
+  favoritesSubtitle: '汇总你在所有项目里收藏的内容；工作台里的收藏夹只看当前项目，并可直接插入文档',
   favoritesSearchPlaceholder: '搜索标题、内容或项目',
   emptyFavoritesDesc: '暂无收藏内容',
-  emptyFavoritesHow: '在浏览器面板里收藏网页或选中文字，或截图时勾选收藏，都会汇总到这里',
+  emptyFavoritesHow: '在浏览器面板里收藏网页或选中文字，或截图后点「加入收藏」，都会汇总到这里',
   favoritesNoMatch: '没有匹配的收藏',
   favoritesNoProject: '已删除的项目',
   untitledExcerpt: '未命名摘录',
