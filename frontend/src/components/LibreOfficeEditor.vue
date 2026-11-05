@@ -1348,7 +1348,8 @@ export default {
           this.$emit('open-url', { url: String(msg.url), target: msg.target || null,
             fileId: this.file && this.file.id, meta: this.withHostPoint(msg.meta) })
         } else if (msg.type === 'save-request') {
-          this.saveDocument()
+          // Cmd/Ctrl+S（WASM 覆盖层与原生输入同一条）：与「重试保存」同一路径，退避等待或暂停中也立即保存。
+          this.retrySave()
         } else if (msg.type === 'review-changed' && this._nativeSurface) {
           const owner = this._nativeSurface
           clearTimeout(this._reviewRefreshTimer)
