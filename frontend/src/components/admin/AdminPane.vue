@@ -1070,7 +1070,7 @@ import { signOut } from '@/utils/signOut.js'
 import { requireAccount, broadcastAccountChanged, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { recordAccountConsents } from '@/utils/accountConsent.js'
 import { refreshEntitlements, isEnabled, FEATURES } from '@/composables/useEntitlement.js'
-import { loadIdentityProfile, readNudgeDismissed, markNudgeDismissed, PROFILE_SOURCE } from '@/services/accountProfile.js'
+import { loadIdentityProfile, readNudgeRecords, markNudgeShown, PROFILE_SOURCE } from '@/services/accountProfile.js'
 import { shouldPromptNameNudge } from '@/utils/identityProfile.js'
 import { shouldAcceptResponse } from '@/utils/requestGeneration.js'
 import UnlockHint from '@/components/UnlockHint.vue'
@@ -1981,23 +1981,23 @@ export default {
       return this.accountProfile
     },
     /**
-     * 「填写你的姓名」弹窗：每个 accountId 只弹一次（已读落 storage）。
-     * 弹出来就记已读——两个按钮都算打发过，不然点「稍后」的人下次进来还要再看一遍。
+     * 「填写你的姓名」弹窗：点「稍后」后隔 3 天（仍是默认昵称）再提醒，最多再提醒 2 次；
+     * 点「去填写」后不再提醒。弹出来就记一次（含时间），落 storage。
      */
     maybePromptNameNudge() {
       const p = this.accountProfile
       if (!shouldPromptNameNudge({
         displayNameIsDefault: p.displayNameIsDefault,
         accountId: p.accountId,
-        dismissedIds: readNudgeDismissed(),
+        records: readNudgeRecords(),
       })) return
-      markNudgeDismissed(p.accountId)
+      markNudgeShown(p.accountId)
       uni.showModal({
         title: this.$t('account.nameNudgeTitle'),
         content: this.$t('account.nameNudgeText'),
         confirmText: this.$t('account.nameNudgeConfirm'),
         cancelText: this.$t('common.later'),
-        success: (r) => { if (r.confirm) this.goFillName() },
+        success: (r) => { if (r.confirm) { markNudgeShown(p.accountId, true); this.goFillName() } },
       })
     },
     /**

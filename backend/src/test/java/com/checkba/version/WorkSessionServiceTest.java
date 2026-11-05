@@ -71,6 +71,8 @@ class WorkSessionServiceTest {
             sessions.put(s.getId(), s);
             return s;
         });
+        when(sessionRepo.findById(any())).thenAnswer(i ->
+                Optional.ofNullable(sessions.get((Long) i.getArgument(0))));
         when(sessionRepo.findFirstByProjectIdAndStatus(any(), any())).thenAnswer(i ->
                 sessions.values().stream()
                         .filter(s -> s.getProjectId().equals(i.getArgument(0))
@@ -507,6 +509,24 @@ class WorkSessionServiceTest {
         assertEquals(WorkSession.Status.MERGED, s.getStatus());
         assertNotNull(s.getTitle());
         assertFalse(s.getTitle().isBlank(), "空闲自动结束也要走默认命名");
+    }
+
+    @Test
+    void idleAutoEndMarksSessionAndKeepsLastActivityTime() throws Exception {
+        svc.setIdleEndMillis(200);
+        svc.onChangeSignal(7L, 1L, "韩泽伟");
+        Files.writeString(root.resolve("projects/7/合同.txt"), "二稿");
+        svc.commitNow(7L, 1L, "韩泽伟", "改了");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline
+                && !sessions.values().iterator().next().isIdleEnded()) {
+            Thread.sleep(20);
+        }
+        WorkSession s = sessions.values().iterator().next();
+        assertTrue(s.isIdleEnded(), "空闲自动结束的段要打标记");
+        assertNotNull(s.getLastActivityAt(), "要记下最后一次活动时间");
+        assertFalse(s.getLastActivityAt().isAfter(s.getEndedAt().minusNanos(150_000_000L)),
+                "最后活动时间应早于结束时间约一个空闲阈值");
     }
 
     /** 回归测试：手动 endSession 必须像 cancelPending 的其他调用点一样取消空闲定时器。 */
