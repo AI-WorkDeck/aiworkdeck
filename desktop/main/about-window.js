@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 const { app, BrowserWindow, shell } = require('electron')
-const path = require('path')
 const { t, getAppLanguage } = require('./app-language')
 const overlay = require('./services/overlay')
 
@@ -16,7 +15,7 @@ function versionText() {
   const appVersion = app.getVersion()
   let effective = appVersion
   try {
-    effective = overlay.effectiveVersion({ packaged: app.isPackaged, dataDir: path.join(app.getPath('home'), '.aiworkdeck'), appVersion })
+    effective = overlay.effectiveVersion({ packaged: app.isPackaged, dataDir: require('./awd-home').dataDir(), appVersion })
   } catch (_) { /* 读不到 overlay 时按壳版本显示 */ }
   if (effective === appVersion) return appVersion
   return t({ zh: `${effective}（安装包 ${appVersion}）`, en: `${effective} (installer ${appVersion})` })

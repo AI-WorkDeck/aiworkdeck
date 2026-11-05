@@ -124,6 +124,7 @@ async function fetchFirst(urls, opts) {
 // 真实数据目录起来。补丁与整包都不检查、不下载，界面也就不会出现「重启更新」。
 function updatesDisabledReason(env = process.env, argv = process.argv) {
   if (env && env.AWD_DISABLE_UPDATES === '1') return 'AWD_DISABLE_UPDATES'
+  if (require('../awd-home').awdHome(env)) return 'AWD_HOME'
   if ((argv || []).some((a) => /^--user-data-dir(=|$)/.test(String(a)))) return 'user-data-dir'
   return null
 }

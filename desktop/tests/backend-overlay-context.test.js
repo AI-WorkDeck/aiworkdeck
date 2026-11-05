@@ -29,7 +29,10 @@ function harness(t) {
     createMineruDescriptor: () => ({ name: 'mineru-service' }),
     createKokoroDescriptor: () => ({ name: 'kokoro-service' }),
     createAsrDescriptor: () => ({ name: 'asr-service' }),
-    require: name => { assert.equal(name, './services/win-arch'); return { isWinArmEmulated: () => false } },
+    require: name => {
+      if (name === './awd-home') return { dataDir: () => path.join(home, '.aiworkdeck'), awdHome: () => null }
+      assert.equal(name, './services/win-arch'); return { isWinArmEmulated: () => false }
+    },
   })
   vm.runInContext(`let modelManager = null; ${source.slice(start, end)}; globalThis.manager = createServices()`, context)
   const correctCtx = { packaged: true, appVersion: '0.38.4', dataDir: path.join(home, '.aiworkdeck') }
