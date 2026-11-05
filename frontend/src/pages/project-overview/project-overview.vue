@@ -2601,6 +2601,7 @@ import { panelDockingData, panelDockingMethods } from './panelDocking.js'
 import { railSortData, railSortMethods } from './railSort.js'
 import { loadSidebarCollapsed, saveSidebarCollapsed } from './sidebarCollapse.js'
 import { loadLastConversation } from '@/utils/lastConversation.js'
+import { uniStorage } from '@/utils/uniStorage.js'
 import { themeSwitchData, themeSwitchMethods, themeSwitchComputed } from './themeSwitch.js'
 import { fileOpenTabsMethods } from './fileOpenTabs.js'
 import { useDocumentMerge } from '@/composables/useDocumentMerge.js'
@@ -4052,7 +4053,7 @@ export default {
       // 首次启动的「可选组件」面板：原挂在项目列表页 onLoad，启动落点换了它跟着搬
       this.maybePromptOptionalComponents()
     }
-    this.showWelcomeOnStartup = loadShowWelcomeOnStartup(uni)
+    this.showWelcomeOnStartup = loadShowWelcomeOnStartup(uniStorage)
 
     const user = getCurrentUser()
     if (user) {
@@ -4074,7 +4075,7 @@ export default {
     // rail 图标顺序（dev-board#204）：同为本机习惯，跟停靠位一起在首帧前恢复
     this.loadRailOrder()
     // 左栏收起状态（dev-board#727）：同为本机习惯，不带 projectId
-    this.sidebarCollapsed = loadSidebarCollapsed(uni, !this.hasNamedProject)
+    this.sidebarCollapsed = loadSidebarCollapsed(uniStorage, !this.hasNamedProject)
     this.initThemeSwitch()
 
     // 存储键：有项目按项目分，无项目落 global_*（此前无项目态写的是 project_null_*）
@@ -6829,7 +6830,7 @@ export default {
     },
     setShowWelcomeOnStartup(on) {
       this.showWelcomeOnStartup = !!on
-      saveShowWelcomeOnStartup(uni, this.showWelcomeOnStartup)
+      saveShowWelcomeOnStartup(uniStorage, this.showWelcomeOnStartup)
     },
     // 左栏「项目」面板里改了当前项目的名字：顶栏与窗口标题跟上
     onProjectRenamedFromPane(payload) {
@@ -6943,7 +6944,7 @@ export default {
 
     toggleSidebar() {
       this.sidebarCollapsed = !this.sidebarCollapsed
-      saveSidebarCollapsed(uni, this.sidebarCollapsed)
+      saveSidebarCollapsed(uniStorage, this.sidebarCollapsed)
       this.$nextTick(() => this.triggerWorkbenchResize())
     },
 
@@ -6982,7 +6983,7 @@ export default {
     async restoreLastConversation() {
       if (this.restoredLastConversation) return
       this.restoredLastConversation = true
-      const conversationId = loadLastConversation(uni, this.projectId)
+      const conversationId = loadLastConversation(uniStorage, this.projectId)
       if (!conversationId) return
       if (!this.chatHistoryList.length) await this.fetchChatHistory(true)
       if (!this.chatHistoryList.some((c) => c.conversationId === conversationId)) return
