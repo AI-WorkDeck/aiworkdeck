@@ -46,7 +46,8 @@ export default {
   "docMissing": "वह फ़ाइल अब इस प्रोजेक्ट में नहीं है",
   "source": {
     "projectFile": "प्रोजेक्ट फ़ाइल",
-    "qichacha": "Qichacha (चीचाचा)"
+    "qichacha": "Qichacha (चीचाचा)",
+    "pkulaw": "PKULaw"
   },
   "mentions": "{count} उल्लेख",
   "mentionsTitle": "इस दस्तावेज़ में उल्लेख",

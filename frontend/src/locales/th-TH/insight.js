@@ -46,7 +46,8 @@ export default {
   "docMissing": "ไฟล์นั้นไม่อยู่ในโปรเจกต์นี้แล้ว",
   "source": {
     "projectFile": "ไฟล์โปรเจกต์",
-    "qichacha": "Qichacha (ฉีฉาฉา)"
+    "qichacha": "Qichacha (ฉีฉาฉา)",
+    "pkulaw": "PKULaw"
   },
   "mentions": "{count} จุด",
   "mentionsTitle": "ตำแหน่งที่ปรากฏในเอกสาร",

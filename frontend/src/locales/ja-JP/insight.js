@@ -46,7 +46,8 @@ export default {
   "docMissing": "ファイルはすでにプロジェクト内にありません",
   "source": {
     "projectFile": "プロジェクトファイル",
-    "qichacha": "Qichacha（企査査）"
+    "qichacha": "Qichacha（企査査）",
+    "pkulaw": "北大法宝（PKULaw）"
   },
   "mentions": "{count} 箇所",
   "mentionsTitle": "本文中の出現箇所",

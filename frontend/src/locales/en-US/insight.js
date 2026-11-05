@@ -54,6 +54,7 @@ export default {
   source: {
     projectFile: 'Project file',
     qichacha: 'Qichacha',
+    pkulaw: 'PKULaw',
   },
 
   mentions: '{count} mention(s)',

@@ -122,3 +122,16 @@ test('ChatInterface 回灌历史时把 msg.reasoning 交给解析器', async () 
   const ui = readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
   assert.match(ui, /parseAssistantHistory\(msg\.content \|\| '', msg\.reasoning\)/)
 })
+
+test('工具条目标记来源：本轮实时流 live=true，历史回灌 live=false（教程反馈 47）', () => {
+  const s = stream()
+  s.handleEvent('state_recovery', JSON.stringify({ content: '', startedAt: 1, serverNow: 1, events: [] }))
+  s.handleEvent('text_delta', JSON.stringify({ content: TOOL }))
+  const liveBubble = s.bubbles.value[s.bubbles.value.length - 1]
+  const liveTool = liveBubble.processes[0].items.find(item => item.type === 'tool')
+  assert.equal(liveTool.status, 'success')
+  assert.equal(liveTool.live, true)
+  s.resetSSE()
+  const history = s.parseAssistantHistory(TOOL + '<final>结论</final>')
+  assert.equal(history.processes[0].items.find(item => item.type === 'tool').live, false)
+})

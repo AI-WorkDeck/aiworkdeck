@@ -46,7 +46,8 @@ export default {
   "docMissing": "Bu dosya artık projede değil",
   "source": {
     "projectFile": "Proje dosyası",
-    "qichacha": "Qichacha"
+    "qichacha": "Qichacha",
+    "pkulaw": "PKULaw"
   },
   "mentions": "{count} geçiş",
   "mentionsTitle": "Belgedeki geçişler",

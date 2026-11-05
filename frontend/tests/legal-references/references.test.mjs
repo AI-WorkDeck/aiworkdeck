@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { retrievalSourceLabel } from '../../src/utils/insightDetail.js'
 import { referencesFromEntity, referenceFromModel, legalMessageParts, referencesFromTools, safeLegalUrl, legalReadableText } from '../../src/utils/legalReferences.js'
 import { legalReferenceTabMethods } from '../../src/pages/project-overview/legalReferenceTab.js'
 import { serializeTab } from '../../src/pages/project-overview/tabSnapshot.js'
@@ -54,6 +55,21 @@ test('completed legal tools render from historical process records without trust
   const refs = referencesFromTools([{ items: [item, item, { ...item, output: output.slice(0, -4) }, { ...item, status: 'loading' }, { ...item, code: 'search_web({})' }] }])
   assert.equal(refs.length, 1)
   assert.equal(refs[0].status, 'unverified')
+})
+test('本轮实时工具事件返回的法规标「检索返回内容」，历史回灌的保留待核验（教程反馈 47）', () => {
+  const output = JSON.stringify({ data: [{ title: 'Act', article: '第一条　Original' }] })
+  const item = { type: 'tool', status: 'success', code: 'legal_tools.law_search({"query":"x"})', output }
+  assert.equal(referencesFromTools([{ items: [{ ...item, live: true }] }])[0].status, 'retrieved')
+  assert.equal(referencesFromTools([{ items: [{ ...item, live: false }] }])[0].status, 'unverified')
+  assert.equal(referencesFromTools([{ items: [item] }])[0].status, 'unverified')
+})
+test('来源内部名映射成用户名称（教程反馈 44/47）', () => {
+  const t = key => ({ 'insight.source.pkulaw': '北大法宝', 'insight.source.qichacha': '企查查' }[key] || key)
+  assert.equal(retrievalSourceLabel('pkulaw', t), '北大法宝')
+  assert.equal(retrievalSourceLabel('pkulaw-semantic/search_article', t), '北大法宝')
+  assert.equal(retrievalSourceLabel('qichacha', t), '企查查')
+  assert.equal(retrievalSourceLabel('某检索服务', t), '某检索服务')
+  assert.equal(retrievalSourceLabel('pkulawish', t), 'pkulawish')
 })
 test('reader opens beside every document format, retains editor, deduplicates and survives snapshots', () => {
   for (const fileType of ['docx', 'pptx', 'xlsx', 'pdf']) {

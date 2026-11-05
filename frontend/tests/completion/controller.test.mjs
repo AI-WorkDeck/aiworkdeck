@@ -5,7 +5,12 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { JSDOM } from 'jsdom'
 import { attachWritingAssistance } from '../../src/composables/zetaOfficeCompletion.js'
-import { createWritingAssistanceHost } from '../../src/composables/writingAssistanceHost.js'
+import { createWritingAssistanceHost, writingAssistanceLabels } from '../../src/composables/writingAssistanceHost.js'
+import zhEditor from '../../src/locales/zh-CN/editor.js'
+
+// 宿主下发的中文标签表（教程反馈 48）：客体自己只带英文兜底。
+const zhTranslate = key => key.startsWith('editor.') ? key.slice(7).split('.').reduce((o, k) => o?.[k], zhEditor) ?? key : key
+const zhLabels = writingAssistanceLabels(zhTranslate)
 
 const tick = () => new Promise(resolve => setTimeout(resolve, 0))
 const debounce = () => new Promise(resolve => setTimeout(resolve, 10))
@@ -37,7 +42,7 @@ function harness(t, overrides = {}) {
   }
   input.focus()
   const api = attachWritingAssistance({ canvas, input, execute, transport, focus: () => input.focus() })
-  const config = value => deliver({ type: 'writing-config', config: { session: 'doc-1', enabled: true, learning: false, hints: true, writable: true, items: entries, ...value } })
+  const config = value => deliver({ type: 'writing-config', config: { session: 'doc-1', enabled: true, learning: false, hints: true, writable: true, items: entries, labels: zhLabels, ...value } })
   config()
   const key = (key, props = {}) => { const event = new dom.window.KeyboardEvent('keydown', { key, cancelable: true, ...props }); return { handled: api.keydown(event), event } }
   const button = text => [...doc.querySelectorAll('.awd-writing-assistance button')].find(b => b.textContent === text)
@@ -880,4 +885,50 @@ test('metadata-only lookup remains readable even when no insertable body was ret
   assert.equal(h.doc.querySelectorAll('.awd-wa-legal-card button').length, 1)
   assert.equal(h.panel().textContent.includes('暂无可插入的资料'), false)
   assert.equal(h.button('插入以上内容'), undefined)
+})
+
+// 教程反馈 108/109/43：结果卡沿用右键坐标；插入按钮钉在底栏；「仅替换为正确全称」真替换。
+test('右键查询的结果卡沿用菜单坐标，插入按钮在 sticky 底栏，替换候选带 replace-selection', async t => {
+  const h = harness(t)
+  h.setContext({ available: false, hasSelection: true, selectedText: '成都包晴天科技有限公司', token: 'selected-company' })
+  h.canvas.dispatchEvent(new h.dom.window.MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 200, clientY: 150 })); await tick()
+  const at = () => [h.panel().style.left, h.panel().style.top]
+  assert.deepEqual(at(), ['200px', '150px'])
+  h.button('查询机构工商信息').click(); await tick()
+  assert.deepEqual(at(), ['200px', '150px'], '等待中的卡片不跳位置')
+  h.respond('lookup', { title: '成都包晴天科技有限公司', source: '企查查', date: '2026年11月4日', variants: [
+    { title: '工商信息表', text: '工商登记信息（来源：企查查，查询日期：2026年11月4日）', rows: [['企业名称', '成都包晴天智能科技有限公司']] },
+    { title: '仅替换为正确全称：成都包晴天智能科技有限公司', text: '成都包晴天智能科技有限公司', mode: 'replace-selection' },
+  ] }); await tick()
+  assert.deepEqual(at(), ['200px', '150px'], '结果卡不跳到画布右侧')
+  assert.match(h.panel().textContent, /来源：企查查\n查询日期：2026年11月4日/)
+  const insert = h.button('插入以上内容')
+  assert.ok(insert.closest('.awd-wa-actions'), '插入按钮在卡片底栏')
+  assert.equal(insert.closest('.awd-wa-actions').parentElement, h.panel(), '底栏是卡片的直接子节点，随卡片滚动时钉在底部')
+  const select = h.panel().querySelector('select')
+  select.value = '1'; select.onchange(); await tick()
+  h.button('插入以上内容').click(); await tick()
+  assert.deepEqual(h.calls.findLast(c => c.action === 'insert_completion_content').params,
+    { token: 'selected-company', text: '成都包晴天智能科技有限公司', mode: 'replace-selection' })
+  assert.match(h.panel().textContent, /已替换，可用撤销恢复。/)
+  assert.deepEqual(at(), ['200px', '150px'])
+})
+
+test('没有选区的资料卡不给替换候选', async t => {
+  const h = harness(t)
+  await suggestions(h)
+  h.key('Tab'); await tick()
+  h.button('查看已有资料').click(); await tick()
+  h.respond('detail', { title: 'x', variants: [{ title: '仅替换', text: '全称', mode: 'replace-selection' }] }); await tick()
+  assert.equal(h.button('插入以上内容'), undefined)
+  assert.match(h.panel().textContent, /暂无可插入的资料/)
+})
+
+test('客体文案以宿主下发的标签表为准，缺词保留英文兜底（教程反馈 48）', async t => {
+  const h = harness(t)
+  h.config({ labels: { title: 'Autovervollständigung', suggestions: 'Vorschläge' } })
+  assert.equal(h.input.getAttribute('aria-label'), 'Autovervollständigung')
+  await suggestions(h)
+  assert.equal(h.doc.querySelector('.awd-wa-heading strong').textContent, 'Vorschläge')
+  assert.match(h.panel().textContent, /Accept/, '缺的键回落英文')
 })

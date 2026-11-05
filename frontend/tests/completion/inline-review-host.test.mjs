@@ -22,7 +22,6 @@ function fixture(t, opts = {}) {
     execute: (...args) => { execCalls.push(args[0]); return dependencies.execute(...args) },
     review: (...args) => dependencies.review(...args),
     send: (m) => messages.push(m), storage: { get: (k) => stored.get(k), set: (k, v) => stored.set(k, v) },
-    openInsight: () => calls.push({ open: true }),
     openPanel: () => calls.push({ panel: true }),
     onState: (s) => states.push(s),
     now: () => clock.at,
@@ -103,11 +102,11 @@ test('read-only members can use local checks but cannot call a model', async (t)
   assert.equal(f.calls.length, 1); assert.equal(f.calls[0].body.deep, false)
 })
 
-test('opening evidence is read-only and stale guest sessions have no effects', async (t) => {
+test('stale guest sessions have no effects; the removed open-insight action is not handled', async (t) => {
   const f = fixture(t)
   assert.equal(await f.request('deep', {}, 'old-document'), false)
-  await f.request('open-insight')
-  assert.deepEqual(f.calls, [{ open: true }])
+  assert.equal(await f.request('open-insight'), false)
+  assert.deepEqual(f.calls, [])
 })
 
 test('关掉 AI 只停模型那一层，不花钱的规则检查照常跑', async (t) => {

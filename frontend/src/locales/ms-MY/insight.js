@@ -46,7 +46,8 @@ export default {
   "docMissing": "Fail tersebut tidak lagi berada dalam projek ini",
   "source": {
     "projectFile": "Fail projek",
-    "qichacha": "Qichacha"
+    "qichacha": "Qichacha",
+    "pkulaw": "PKULaw"
   },
   "mentions": "{count} sebutan",
   "mentionsTitle": "Sebutan dalam dokumen ini",
