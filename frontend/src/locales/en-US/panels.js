@@ -202,6 +202,8 @@ export default {
   deRestoreGenerate: 'Generate restored file',
   deMatchCount: 'Matched / restored {count} occurrences',
   deSuspectCount: '{count} more ID/card-like numbers failed their check digit and were left untouched. Add the ones you want redacted to "Additional Sensitive Terms" above.',
+  deMaskAnyway: 'Redact anyway',
+  deMaskAnywayLabel: 'Redact {value} anyway',
   deKitFileTag: 'recovery',
   deKitFallbackName: 'redacted-file',
   deBrowseUnavailable: 'The project file picker could not be opened. Use "Import Current" instead, or reopen the workbench and try again.',

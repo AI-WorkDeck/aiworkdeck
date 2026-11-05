@@ -62,6 +62,7 @@ async function render(state = {}) {
     }),
     computed: component.computed,
     methods: {
+      ...component.methods,
       $t: (k, p) => (p ? k + JSON.stringify(p) : k),
     },
   })
@@ -131,9 +132,8 @@ test('自定义词通过预览和生成共用的 payload 传给后端', () => {
 })
 
 test('仅填词语时可以先预览；没有输入或未选文件时不能预览', () => {
-  const m = SRC.match(/<button[^>]*:disabled="([^"]+)"[^>]*@tap="handlePreview"/)
-  assert.ok(m)
-  const disabled = new Function('s', `with (s) { return (${m[1]}) }`)
+  assert.match(SRC, /<button[^>]*:disabled="previewDisabled"[^>]*@tap="handlePreview"/)
+  const disabled = s => component.computed.previewDisabled.call(s)
   assert.equal(disabled({ processing: false, fileId: 1, selectedStrategies: [], customTerms: '张三' }), false)
   assert.equal(disabled({ processing: false, fileId: 1, selectedStrategies: [], customTerms: '' }), true)
   assert.equal(disabled({ processing: false, fileId: null, selectedStrategies: [], customTerms: '张三' }), true)
@@ -200,5 +200,84 @@ test('两种替换方式均说明地址只保留层级，编号须完整保留�
     const panels = await loadPanels(lang)
     assert.match(panels.deTokenNotice, expected)
     assert.match(panels.deMaskNotice, expected)
+  }
+})
+
+// ==================== 键盘语义（dev-board#1713 #97） ====================
+
+test('每个可点控件都有按钮/勾选语义、可聚焦并接 Enter/Space', () => {
+  const template = SRC.slice(SRC.indexOf('<template>'), SRC.lastIndexOf('</template>'))
+  // 属性里有 `() =>`，不能按 `>` 截标签；模板属性里没有 `<`，按 `<` 切段即可。
+  const tags = template.split('<').filter(part => /^(button|view|label)\b/.test(part) && part.includes('@tap='))
+  assert.ok(tags.length >= 16, `可点控件数量不对：${tags.length}`)
+  for (const tag of tags) {
+    assert.match(tag, /role="(button|checkbox)"/, '缺 role：' + tag)
+    assert.match(tag, /:tabindex="/, '缺 tabindex：' + tag)
+    assert.match(tag, /@keydown="onActionKey\(/, '缺键盘处理：' + tag)
+  }
+})
+
+test('onActionKey 只响应 Enter/Space，禁用与长按连发不触发', () => {
+  const calls = []
+  const key = (k, extra = {}) => ({ key: k, repeat: false, preventDefault() { this.prevented = true }, ...extra })
+  const run = (event, disabled) => component.methods.onActionKey.call({}, event, () => calls.push(event.key), disabled)
+  const enter = key('Enter'); run(enter, false)
+  const space = key(' '); run(space, false)
+  run(key('a'), false)
+  const blocked = key('Enter'); run(blocked, true)
+  run(key(' ', { repeat: true }), false)
+  assert.deepEqual(calls, ['Enter', ' '])
+  assert.ok(enter.prevented && space.prevented && blocked.prevented, 'Space 不拦会滚动面板')
+})
+
+test('禁用的按钮移出 Tab 顺序并标 aria-disabled', async () => {
+  const html = stripComments(await render({ fileId: null }))
+  assert.match(html, /<button(?=[^>]*aria-disabled="true")(?=[^>]*tabindex="-1")[^>]*>panels\.dePreview<\/button>/)
+  const ready = stripComments(await render({ fileId: 1 }))
+  assert.match(ready, /<button(?![^>]*aria-disabled)(?=[^>]*tabindex="0")[^>]*>panels\.dePreview<\/button>/)
+})
+
+// ==================== 疑似号码「仍然遮蔽」（dev-board#1713 #96） ====================
+
+const SUSPECT = '91310115MA1K4YH666'
+
+test('预览逐条列出疑似号码原值与类型，并给「仍然遮蔽」', async () => {
+  const html = stripComments(await render({
+    fileId: 1,
+    availableStrategies: [{ value: 'UNIFIED_SOCIAL_CREDIT', label: '统一社会信用代码 (9111...)' }],
+    preview: { text: 'x', counts: {}, suspects: { UNIFIED_SOCIAL_CREDIT: 1 }, suspectItems: [{ type: 'UNIFIED_SOCIAL_CREDIT', value: SUSPECT }] },
+  }))
+  assert.match(html, /panels\.deSuspectCount/)
+  assert.match(html, new RegExp('class="suspect-value"[^>]*>' + SUSPECT))
+  assert.match(html, /class="suspect-type"[^>]*>统一社会信用代码</)
+  assert.match(html, /<button[^>]*aria-label="panels\.deMaskAnywayLabel\{"value":"91310115MA1K4YH666"\}"[^>]*>panels\.deMaskAnyway<\/button>/)
+  // 生成之后不再给按钮（那时改词表也改不了已生成的副本）
+  const after = stripComments(await render({ fileId: 1, result: { suspects: { UNIFIED_SOCIAL_CREDIT: 1 } }, preview: null }))
+  assert.doesNotMatch(after, /panels\.deMaskAnyway/)
+})
+
+test('「仍然遮蔽」写进补充敏感词（不重复）并重新预览', async () => {
+  let previews = 0
+  const state = {
+    processing: false, customTerms: '张三', customWordsOpen: false,
+    $nextTick: async () => {}, handlePreview: async () => { previews++ },
+  }
+  await component.methods.maskSuspect.call(state, SUSPECT)
+  assert.equal(state.customTerms, '张三\n' + SUSPECT)
+  assert.equal(state.customWordsOpen, true)
+  assert.equal(previews, 1)
+  await component.methods.maskSuspect.call(state, SUSPECT)
+  assert.equal(state.customTerms, '张三\n' + SUSPECT, '同一个号不应重复写入')
+  state.processing = true
+  await component.methods.maskSuspect.call(state, 'X')
+  assert.equal(previews, 2, '处理中不响应')
+})
+
+test('「仍然遮蔽」文案 20 语种齐全', async () => {
+  const { SUPPORTED_LOCALE_CODES } = await import(new URL('../../src/locales/registry.js', import.meta.url))
+  for (const lang of SUPPORTED_LOCALE_CODES) {
+    const panels = await loadPanels(lang)
+    assert.ok(panels.deMaskAnyway, `${lang} 缺 panels.deMaskAnyway`)
+    assert.match(panels.deMaskAnywayLabel || '', /\{value\}/, `${lang} panels.deMaskAnywayLabel 缺 {value}`)
   }
 })

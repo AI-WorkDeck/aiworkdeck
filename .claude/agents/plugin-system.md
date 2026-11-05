@@ -488,4 +488,10 @@ Web协议仍为awd:1。新增contributes.views/connections/mcpServers和settings
 
 腾讯会议声明 sidebar/account 与 workspace/meetings 两个视图，复用同一可信入口；PluginPane 握手 `context.surface` 区分 `sidebar`/`workspace`，未提供时插件保留 combined 兼容。左栏只处理账号授权及同步范围，工作区为可搜索会议列表与正文双列，620px以下在列表/正文间返回；正文、列表独立滚动，纪要/待办/导出操作常驻。重新聚焦只后台检查授权，不锁按钮或重建列表；同步与刷新列表仍是明确操作，不能在登录锁持有期间并发 CLI 调用。测试 `official-plugins/tencent-meeting/tests/workspace-browser.mjs` 使用真实sandbox iframe/SDK与合成接口。
 
+**文件脱敏 2.4.0 / 插件 1.0.7（dev-board#1713）**：插件名统一「文件脱敏」（manifest、l10n 与 `config.sidebar.desensitize` 对齐）。
+姓名候选以 `PERSON_ACTION` 动作动词开头（支付、申请…）时拒绝；自定义词**完全**落在更长的自动实体内且该实体不与其它自定义词部分重叠时，长实体优先（部分重叠仍是自定义词优先）。
+预览多回 `suspectItems`（疑似号码原值+类型，去重、最多 100 条，只在本机），面板逐条给「仍然遮蔽」= 写进补充敏感词后重新预览，校验位闸门不放开。
+副本名 = 原显示名经同一引擎处理 +「（已脱敏）」（复敏用同一映射还原 +「（已复敏）」），`SensitiveService.Result.name` 给建议名，`SensitiveController.rename` 按同目录（含回收站、磁盘、`.awd-recovery`）加「 (n)」；统计只算正文。
+DesensitizePane 与诉讼可视化「安装 / 重试」控件补 role/tabindex/aria-disabled 与 Enter/Space。回归 `Sensitive*Test`、`frontend/tests/desensitize/*`、`tests/litigation-visual/packUpdate.test.mjs`。
+
 语音/脱敏根背景用侧栏 `--awd-bg`，表单保留 surface；脱敏按钮清除 Uni 默认伪元素描边、引用公共控件令牌，窄栏模式按钮纵排。长编号说明在预览阶段显示，不移除不可逆/PDF/恢复密码等必要操作提示。语音/脱敏编译资源与manifest版本应随源码一并准备，源码验证不等于用户已安装新版。

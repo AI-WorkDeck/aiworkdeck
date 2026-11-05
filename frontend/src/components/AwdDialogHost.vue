@@ -18,6 +18,7 @@
     :danger="!!current.opts.danger"
     :editable="!!current.opts.editable"
     :placeholder-text="current.opts.placeholderText || ''"
+    :check-label="current.opts.checkLabel || ''"
     :item-list="current.opts.itemList || []"
     :item-color="current.opts.itemColor || ''"
     @close="onClose"

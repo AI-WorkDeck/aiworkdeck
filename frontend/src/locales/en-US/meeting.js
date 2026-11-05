@@ -68,9 +68,10 @@ export default {
   noticeCheckLabel: 'I understand how the recording will be processed',
   noticeConfirm: 'Confirm and continue with cloud transcription',
   noticeSwitchLocal: 'Switch to on-device transcription',
+  noticePendingHint: 'Before using cloud transcription, read and confirm the transcription notice (once per computer).',
+  noticeReview: 'Review and confirm notice',
+  preparing: 'Preparing…',
   noticeSaveFailed: 'Could not save. Try again later.',
-  noticeBlockBeforeRecording: 'Review the transcription notice above before starting a recording',
-  noticeBlockBeforeUpload: 'Review the transcription notice above before uploading',
 
   // ---- Recording engine, utils/meetingRecorder.js ----
   alreadyRecording: 'A recording is already in progress',
@@ -126,7 +127,7 @@ export default {
   paidConfirmDuration: 'Audio length: {duration}',
   paidConfirmEstimate: 'Estimated cost: about {credits} Credits (rounded up to whole minutes; the final charge may differ)',
   paidConfirmPerMinute: 'Rate: about {credits} Credits per minute (the final charge may differ)',
-  paidConfirmBalance: 'Current balance: {credits} Credits',
+  paidConfirmInsufficient: 'Insufficient balance: the estimated cost exceeds your account balance, so transcription may not complete.',
   paidConfirmLocalHint: 'To keep the audio on this device and spend no Credits, cancel, then turn on "Keep recordings on this device" under Voice > Meeting Recording to transcribe locally.',
   paidConfirmOk: 'Transcribe',
   emptyTranscriptBillingHint: 'Platform transcription may still charge Credits for processing time. Retrying submits a new task and may incur another charge.',

@@ -194,6 +194,8 @@ export default {
   "deRestoreGenerate": "Générer le fichier restauré",
   "deMatchCount": "{count} occurrence(s) correspondante(s) / restaurée(s)",
   "deSuspectCount": "{count} autre(s) numéro(s) de type pièce d'identité ou carte n'ont pas passé le contrôle de clé et ont été laissés intacts. Ajoutez ceux que vous souhaitez occulter dans « Termes sensibles supplémentaires » ci-dessus.",
+  "deMaskAnyway": "Occulter quand même",
+  "deMaskAnywayLabel": "Occulter {value} quand même",
   "deKitFileTag": "restauration",
   "deKitFallbackName": "fichier-anonymise",
   "deBrowseUnavailable": "Impossible d'ouvrir le sélecteur de fichiers du projet. Utilisez plutôt « Importer le fichier actuel », ou rouvrez l'espace de travail et réessayez.",

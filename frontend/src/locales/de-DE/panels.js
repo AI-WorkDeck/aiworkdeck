@@ -194,6 +194,8 @@ export default {
   "deRestoreGenerate": "Wiederhergestellte Datei erstellen",
   "deMatchCount": "{count} Vorkommen abgeglichen / wiederhergestellt",
   "deSuspectCount": "{count} weitere ausweis-/kartenähnliche Nummern haben die Prüfziffernprüfung nicht bestanden und wurden unverändert gelassen. Fügen Sie diejenigen, die geschwärzt werden sollen, oben unter „Zusätzliche sensible Begriffe“ hinzu.",
+  "deMaskAnyway": "Trotzdem schwärzen",
+  "deMaskAnywayLabel": "{value} trotzdem schwärzen",
   "deKitFileTag": "wiederherstellung",
   "deKitFallbackName": "geschwaerzte-datei",
   "deBrowseUnavailable": "Die Projektdateiauswahl konnte nicht geöffnet werden. Verwenden Sie stattdessen „Aktuelle importieren“ oder öffnen Sie die Workbench erneut und versuchen Sie es noch einmal.",

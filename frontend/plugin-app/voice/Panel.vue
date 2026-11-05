@@ -7,7 +7,7 @@
       <button class="voice-tab" role="tab" :aria-selected="tab === 'recording'" @click="tab = 'recording'">{{ $t('workbench.voiceRecorder') }}</button>
     </view>
     <EasyVoicePane v-if="tab === 'speech'" :download-artifact="downloadAudio" @request-doc-text="importText" @highlight-sentence="highlight" @clear-highlight="clearHighlight" />
-    <MeetingRecordingPanel v-else :project-id="projectId" :load-audio="loadAudio" :focus-meeting-id="focusMeetingId" @generate-minutes="generateMinutes" />
+    <MeetingRecordingPanel v-else :project-id="projectId" :load-audio="loadAudio" :focus-meeting-id="focusMeetingId" :preparing="preparing" @generate-minutes="generateMinutes" />
   </view>
 </template>
 <script>
@@ -19,12 +19,12 @@ import { refreshRecorder } from './meetingRecorder.js'
 export default {
   components: { EasyVoicePane, MeetingRecordingPanel },
   props: { projectId: [String, Number] },
-  data: () => ({ ready: false, tab: 'speech', focusMeetingId: null }),
+  data: () => ({ ready: false, tab: 'speech', focusMeetingId: null, preparing: false }),
   async mounted() {
     await initializeHost()
     if (this._gone) return
     this.ready = true
-    this._off = window.awd.events.on('sidebar.command', event => { if (event.command === 'recording-focus') { this.focusMeetingId = event.meetingId; this.tab = 'recording' } })
+    this._off = window.awd.events.on('sidebar.command', event => { if (event.command === 'recording-focus') { this.focusMeetingId = event.meetingId; this.preparing = !!event.preparing; this.tab = 'recording' } })
     this._offStopped = window.awd.events.on('speech.stopped', () => uni.$emit('awd:meeting-recording-stopped'))
     const poll = () => refreshRecorder().catch(() => {})
     poll(); this._timer = setInterval(poll, 500)

@@ -197,6 +197,8 @@ export default {
   "deRestoreGenerate": "Buat file yang dipulihkan",
   "deMatchCount": "Menemukan / memulihkan {count} kemunculan",
   "deSuspectCount": "{count} nomor lain yang menyerupai ID/kartu gagal melewati pemeriksaan digit dan dibiarkan apa adanya. Tambahkan nomor yang ingin disensor ke \"Istilah Sensitif Tambahan\" di atas.",
+  "deMaskAnyway": "Tetap sensor",
+  "deMaskAnywayLabel": "Tetap sensor {value}",
   "deKitFileTag": "pemulihan",
   "deKitFallbackName": "file-tersensor",
   "deBrowseUnavailable": "Pemilih file proyek tidak dapat dibuka. Gunakan \"Impor Saat Ini\", atau buka kembali workbench dan coba lagi.",
