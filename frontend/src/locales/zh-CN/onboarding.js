@@ -99,7 +99,7 @@ export default {
     crossBorderNoticeBody: "国内站通过 AI WorkDeck 服务器接入阿里云百炼，国际站使用 OpenRouter。提交给 AI 的文本与相关文件片段用于模型推理和计费；所选模型可能在境外处理这些内容。你可以在设置中撤回同意，撤回后平台 AI 通道停用。",
     agreementRequired: '需勾选同意《服务条款》与《隐私政策》后继续',
     crossBorderRequired: '需勾选跨境传输的单独同意后继续',
-    consentBothRequired: "请先勾选上方两项同意",
+    consentBothRequired: "请先勾选两项同意",
     crossBorderLabelDomestic: "单独同意：送入 AI 的内容可能涉及境外处理",
     crossBorderNoticeTitleDomestic: "可能涉及境外处理的单独同意",
     crossBorderNoticeBodyDomestic: "国内站通过 AI WorkDeck 服务器接入阿里云百炼。提交给 AI 的文本与相关文件片段用于模型推理和计费；视所选模型，可能涉及境外处理。你可以在设置中撤回同意，撤回后平台 AI 通道停用。",

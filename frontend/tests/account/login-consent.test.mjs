@@ -90,5 +90,6 @@ test('问题 g13：弹层形态勾选框在登录按钮之前，未勾选提示�
 
   // 登录方式：弹层形态用下划线标签
   assert.match(tpl, /variant === 'dialog' \? 'unlock-mode-tabs' : 'unlock-site-seg'/)
-  assert.equal(zhOnboarding.unlock.consentBothRequired, '请先勾选上方两项同意')
+  assert.equal(zhOnboarding.unlock.consentBothRequired, '请先勾选两项同意')
+  assert.doesNotMatch(enOnboarding.unlock.consentBothRequired, /above/i, '不带方向，page 与 dialog 形态共用')
 })
