@@ -4159,6 +4159,14 @@ export function endWorkSession(projectId, title, requestId) {
   });
 }
 
+// 提交弹窗的「AI 写说明」：只回一句建议标题，不改仓库
+export function suggestSessionTitle(projectId) {
+  return request({
+    url: `/api/projects/${projectId}/version/session/suggest-title`,
+    method: 'POST'
+  });
+}
+
 export function discardWorkSession(projectId) {
   return request({
     url: `/api/projects/${projectId}/version/session/discard`,

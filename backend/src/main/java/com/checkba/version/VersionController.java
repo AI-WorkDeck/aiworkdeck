@@ -109,6 +109,10 @@ public class VersionController {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.checkba.version.merge.ProvenanceService provenanceService;
 
+    /** 提交弹窗的「AI 写说明」。字段注入且允许缺席，理由同 provenanceService。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SessionTitleSuggester titleSuggester;
+
     /** 埋点：版本记录关键动作计数（op 是端点枚举名，不带任何项目/版本信息） */
     private void trackOp(String op) {
         telemetryService.record("version.op", Map.of("op", op, "ok", true));
@@ -821,6 +825,17 @@ public class VersionController {
         if (r.conflict() != null) data.put("conflict", sessionEndConflictData(r.conflict()));
         trackOp("session_end");
         return data;
+    }
+
+    /** 给这次要提交的改动起一句标题（辅助模型）；只给建议，不写仓库。 */
+    @PostMapping("/session/suggest-title")
+    public ResponseEntity<Map<String, Object>> suggestSessionTitle(
+            @PathVariable Long projectId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = requireWriteMember(projectId, sessionId);
+        if (titleSuggester == null) throw VersionException.userFacing(LangText.of(
+                "暂时没能生成说明，请手动填写", "Couldn't draft a title right now; please type one"));
+        return ok(Map.of("title", titleSuggester.suggest(projectId, userId)));
     }
 
     @PostMapping("/session/resolve-end")
