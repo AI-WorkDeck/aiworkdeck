@@ -57,6 +57,18 @@
           <text v-if="displayNameSaving" class="bind-link">{{ $t('account.nicknameSaving') }}</text>
         </SettingsRow>
         <text v-if="displayNameError" class="form-error">{{ displayNameError }}</text>
+        <!-- 修订与批注署名：只存本机，设了就优先于昵称（editorAuthor.js REDLINE_AUTHOR_KEY） -->
+        <SettingsRow :label="$t('account.redlineAuthorLabel')">
+          <input
+            class="bind-input"
+            v-model="redlineAuthorInput"
+            maxlength="48"
+            :placeholder="$t('account.redlineAuthorPlaceholder')"
+            @blur="saveRedlineAuthor"
+            @confirm="saveRedlineAuthor"
+          />
+        </SettingsRow>
+        <text :class="redlineAuthorError ? 'form-error' : 'form-hint'">{{ redlineAuthorError || $t('account.redlineAuthorHint') }}</text>
       </SettingsSection>
 
       <!-- 账号安全（server 模式；认证器恒可用，短信取决于通道配置） -->
@@ -208,6 +220,11 @@ import {
 } from '@/services/api.js'
 import { loadIdentityProfile, PROFILE_SOURCE } from '@/services/accountProfile.js'
 import { submittedInputValue } from '@/utils/identityProfile.js'
+import { REDLINE_AUTHOR_KEY, MAX_REDLINE_AUTHOR_CHARS } from '@/utils/editorAuthor.js'
+
+function readRedlineAuthor() {
+  try { return String(uni.getStorageSync(REDLINE_AUTHOR_KEY) || '') } catch (e) { return '' }
+}
 import { getDocumentGeneratorSettings, updateDocumentGeneratorSettings } from '@/services/api.js'
 import { resetDocumentStampCache } from '@/utils/documentGeneratorSetting.js'
 import AwdSwitch from '@/components/AwdSwitch.vue'
@@ -250,6 +267,8 @@ export default {
       // 也就是今天这套只读形态——绝不先画出一个必然失败的输入框。
       accountProfile: { source: PROFILE_SOURCE.LOCAL, accountId: '', displayNameIsDefault: false },
       displayNameInput: '',
+      redlineAuthorInput: readRedlineAuthor(),
+      redlineAuthorError: '',
       displayNameSaving: false,
       displayNameError: '',
       displayNameFocus: false,
@@ -415,6 +434,21 @@ export default {
      * 存昵称。@blur 与 @confirm 都会调到这里（回车之后紧接着失焦），
      * 所以「没变就什么都不做」这条不是优化，是防止一次编辑发两次写请求。
      */
+    saveRedlineAuthor(e) {
+      const next = String(submittedInputValue(e, this.redlineAuthorInput) || '').trim()
+      if (next.length > MAX_REDLINE_AUTHOR_CHARS) {
+        this.redlineAuthorError = this.$t('account.nicknameTooLong')
+        return
+      }
+      this.redlineAuthorError = ''
+      this.redlineAuthorInput = next
+      if (next === readRedlineAuthor()) return
+      try {
+        if (next) uni.setStorageSync(REDLINE_AUTHOR_KEY, next)
+        else uni.removeStorageSync(REDLINE_AUTHOR_KEY)
+      } catch (err) { /* storage 不可用时只是不生效 */ }
+      uni.$emit('awd:identity-updated')
+    },
     async saveDisplayName(e) {
       if (!this.canEditProfile || this.displayNameSaving) return
       const current = String(this.userInfo.displayName || '')
@@ -841,6 +875,13 @@ export default {
   width: 48px;
   height: 48px;
   border-radius: 50%;
+}
+
+.form-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-3);
 }
 
 .form-error {
