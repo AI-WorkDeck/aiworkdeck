@@ -251,6 +251,7 @@ export default {
   "clientNeedsLibraryHint": "Depois que este arquivo de caso estiver na Biblioteca de Casos da Equipe, você poderá convidar clientes para visualizá-lo com um código de acesso.",
   "sharedToLibrary": "Adicionado à Biblioteca de Casos da Equipe",
   "shareToLibraryFailed": "Não foi possível adicionar à biblioteca de casos",
+  "cloudServiceIssueHint": "O serviço da biblioteca de casos não conseguiu concluir esta etapa agora. Não foi um erro seu e seus arquivos locais não foram afetados. Tente novamente mais tarde; se continuar, envie a mensagem acima pelo Feedback.",
   "tooManyLibraries": "Este computador está vinculado a mais de uma biblioteca de casos — desconecte as extras primeiro",
   "libraryOfficialTag": "Oficial",
   "librarySignedInAs": "Conectado como {name}",

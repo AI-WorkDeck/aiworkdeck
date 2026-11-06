@@ -251,6 +251,7 @@ export default {
   "clientNeedsLibraryHint": "放進團隊案件庫後，可邀請客戶憑訪問碼查看。",
   "sharedToLibrary": "已放進團隊案件庫",
   "shareToLibraryFailed": "沒能放進案件庫",
+  "cloudServiceIssueHint": "這是案件庫服務暫時沒能完成這一步，不是你的操作有誤，本機檔案也不受影響。請稍後再試；一直出現的話，請透過「回饋」把上面這句話發給我們。",
   "tooManyLibraries": "這台電腦連著不止一個案件庫，請先斷開多餘的再放進去",
   "libraryOfficialTag": "官方",
   "librarySignedInAs": "我的身分：{name}",

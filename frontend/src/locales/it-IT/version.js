@@ -251,6 +251,7 @@ export default {
   "clientNeedsLibraryHint": "Una volta che questo fascicolo è nella Raccolta fascicoli del team, puoi invitare i clienti a visualizzarlo tramite un codice di accesso.",
   "sharedToLibrary": "Aggiunto alla Raccolta fascicoli del team",
   "shareToLibraryFailed": "Impossibile aggiungere alla raccolta fascicoli",
+  "cloudServiceIssueHint": "Il servizio della libreria dei casi non è riuscito a completare questo passaggio. Non è un tuo errore e i file locali non sono interessati. Riprova più tardi; se continua, inviaci il messaggio qui sopra tramite Feedback.",
   "tooManyLibraries": "Questo computer è collegato a più di una raccolta fascicoli — scollega prima quelle in eccesso",
   "libraryOfficialTag": "Ufficiale",
   "librarySignedInAs": "Accesso come {name}",

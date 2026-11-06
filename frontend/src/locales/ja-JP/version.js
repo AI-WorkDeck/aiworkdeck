@@ -251,6 +251,7 @@ export default {
   "clientNeedsLibraryHint": "この案件ファイルがチーム案件ライブラリに入ると、アクセスコードを使ってクライアントを閲覧に招待できます。",
   "sharedToLibrary": "チーム案件ライブラリに追加しました",
   "shareToLibraryFailed": "案件ライブラリに追加できませんでした",
+  "cloudServiceIssueHint": "案件ライブラリのサービスが一時的にこの操作を完了できませんでした。操作ミスではなく、ローカルのファイルにも影響はありません。しばらくしてからもう一度お試しください。繰り返し表示される場合は、「フィードバック」から上のメッセージをお送りください。",
   "tooManyLibraries": "このコンピューターは複数の案件ライブラリに接続されています — 余分な接続を先に切断してください",
   "libraryOfficialTag": "公式",
   "librarySignedInAs": "自分のアカウント：{name}",

@@ -251,6 +251,7 @@ export default {
   "clientNeedsLibraryHint": "Zodra dit dossier in de Teamdossierbibliotheek staat, kunt u cliënten uitnodigen om het te bekijken met een toegangscode.",
   "sharedToLibrary": "Toegevoegd aan de Teamdossierbibliotheek",
   "shareToLibraryFailed": "Kon niet toevoegen aan de dossierbibliotheek",
+  "cloudServiceIssueHint": "De dossierbibliotheekdienst kon deze stap nu niet voltooien. Dit ligt niet aan jou en je lokale bestanden zijn niet geraakt. Probeer het later opnieuw; blijft het gebeuren, stuur ons dan het bericht hierboven via Feedback.",
   "tooManyLibraries": "Deze computer is gekoppeld aan meer dan één dossierbibliotheek — ontkoppel eerst de extra bibliotheken",
   "libraryOfficialTag": "Officieel",
   "librarySignedInAs": "Aangemeld als {name}",

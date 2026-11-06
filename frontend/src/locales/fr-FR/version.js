@@ -251,6 +251,7 @@ export default {
   "clientNeedsLibraryHint": "Une fois ce dossier dans la bibliothèque de dossiers d'équipe, vous pourrez inviter des clients à le consulter avec un code d'accès.",
   "sharedToLibrary": "Ajouté à la bibliothèque de dossiers d'équipe",
   "shareToLibraryFailed": "Impossible d'ajouter à la bibliothèque de dossiers",
+  "cloudServiceIssueHint": "Le service de bibliothèque de dossiers n’a pas pu terminer cette étape pour le moment. Ce n’est pas une erreur de votre part et vos fichiers locaux ne sont pas touchés. Réessayez plus tard ; si cela persiste, envoyez-nous le message ci-dessus via Commentaires.",
   "tooManyLibraries": "Cet ordinateur est lié à plusieurs bibliothèques de dossiers — déconnectez d'abord les bibliothèques supplémentaires",
   "libraryOfficialTag": "Officielle",
   "librarySignedInAs": "Connecté en tant que {name}",

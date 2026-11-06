@@ -251,6 +251,7 @@ export default {
   "clientNeedsLibraryHint": "이 케이스 파일이 팀 케이스 라이브러리에 들어가면 액세스 코드로 고객을 초대하여 볼 수 있습니다.",
   "sharedToLibrary": "팀 케이스 라이브러리에 추가되었습니다",
   "shareToLibraryFailed": "케이스 라이브러리에 추가할 수 없습니다",
+  "cloudServiceIssueHint": "사건 라이브러리 서비스가 지금 이 단계를 완료하지 못했습니다. 사용자의 잘못이 아니며 로컬 파일에도 영향이 없습니다. 잠시 후 다시 시도하고, 계속 나타나면 「피드백」으로 위 메시지를 보내 주세요.",
   "tooManyLibraries": "이 컴퓨터는 둘 이상의 케이스 라이브러리에 연결되어 있습니다 — 먼저 불필요한 연결을 해제하세요",
   "libraryOfficialTag": "공식",
   "librarySignedInAs": "내 계정: {name}",

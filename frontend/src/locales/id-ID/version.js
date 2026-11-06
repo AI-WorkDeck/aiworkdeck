@@ -251,6 +251,7 @@ export default {
   "clientNeedsLibraryHint": "Setelah berkas kasus ini berada di Pustaka Kasus Tim, Anda dapat mengundang klien untuk melihatnya dengan kode akses.",
   "sharedToLibrary": "Berhasil ditambahkan ke Pustaka Kasus Tim",
   "shareToLibraryFailed": "Tidak dapat menambahkan ke pustaka kasus",
+  "cloudServiceIssueHint": "Layanan pustaka kasus belum dapat menyelesaikan langkah ini sekarang. Ini bukan kesalahan Anda dan file lokal Anda tidak terpengaruh. Coba lagi nanti; jika terus terjadi, kirim pesan di atas kepada kami melalui Masukan.",
   "tooManyLibraries": "Komputer ini terhubung ke lebih dari satu pustaka kasus — putuskan sambungan yang berlebihan terlebih dahulu",
   "libraryOfficialTag": "Resmi",
   "librarySignedInAs": "Masuk sebagai {name}",

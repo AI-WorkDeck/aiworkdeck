@@ -251,6 +251,7 @@ export default {
   "clientNeedsLibraryHint": "Khi tệp vụ án này đã có trong Thư viện vụ án nhóm, bạn có thể mời khách hàng xem bằng mã truy cập.",
   "sharedToLibrary": "Đã thêm vào Thư viện vụ án nhóm",
   "shareToLibraryFailed": "Không thể thêm vào thư viện vụ án",
+  "cloudServiceIssueHint": "Dịch vụ thư viện hồ sơ hiện chưa hoàn tất được bước này. Đây không phải lỗi của bạn và tệp trên máy không bị ảnh hưởng. Hãy thử lại sau; nếu vẫn xảy ra, hãy gửi thông báo ở trên cho chúng tôi qua mục Phản hồi.",
   "tooManyLibraries": "Máy tính này đang kết nối với nhiều hơn một thư viện vụ án — hãy ngắt kết nối các thư viện thừa trước",
   "libraryOfficialTag": "Chính thức",
   "librarySignedInAs": "Đăng nhập với tên {name}",

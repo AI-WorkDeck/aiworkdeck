@@ -251,6 +251,7 @@ export default {
   "clientNeedsLibraryHint": "Sobald diese Akte in der Team-Aktenbibliothek liegt, können Sie Mandanten einladen, sie mit einem Zugangscode einzusehen.",
   "sharedToLibrary": "Zur Team-Aktenbibliothek hinzugefügt",
   "shareToLibraryFailed": "Konnte nicht zur Aktenbibliothek hinzugefügt werden",
+  "cloudServiceIssueHint": "Der Fallbibliotheksdienst konnte diesen Schritt gerade nicht abschließen. Das ist kein Fehler Ihrerseits, und Ihre lokalen Dateien sind nicht betroffen. Versuchen Sie es später erneut; wenn es weiter auftritt, senden Sie uns die Meldung oben über „Feedback“.",
   "tooManyLibraries": "Dieser Computer ist mit mehr als einer Aktenbibliothek verknüpft — trennen Sie zuerst die überzähligen Verbindungen",
   "libraryOfficialTag": "Offiziell",
   "librarySignedInAs": "Angemeldet als {name}",

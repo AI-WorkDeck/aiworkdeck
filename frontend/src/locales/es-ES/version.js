@@ -251,6 +251,7 @@ export default {
   "clientNeedsLibraryHint": "Una vez que este expediente esté en la Biblioteca de expedientes del equipo, podrá invitar a clientes a consultarlo mediante un código de acceso.",
   "sharedToLibrary": "Añadido a la Biblioteca de expedientes del equipo",
   "shareToLibraryFailed": "No se pudo añadir a la biblioteca de expedientes",
+  "cloudServiceIssueHint": "El servicio de la biblioteca de casos no pudo completar este paso ahora mismo. No es un error tuyo y tus archivos locales no se ven afectados. Inténtalo más tarde; si sigue ocurriendo, envíanos el mensaje de arriba desde Comentarios.",
   "tooManyLibraries": "Este ordenador está vinculado a más de una biblioteca de expedientes; desconecte primero las adicionales",
   "libraryOfficialTag": "Oficial",
   "librarySignedInAs": "Sesión como {name}",
