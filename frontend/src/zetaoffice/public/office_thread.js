@@ -1202,6 +1202,9 @@ function deselect() {
 // 缩放上下限。LO 自身允许 20%..600%，越界写进去引擎会自己夹，但夹之前会先按
 // 非法值重排一次版；在 JS 侧先夹住，捏合手势连发时不至于抖。
 const ZOOM_MIN = 20, ZOOM_MAX = 600;
+// 用户自己定的缩放（工具栏 / 捏合 / Cmd+加减号），set_zoom{fit} 只在它之下收。
+// 绑定 xModel：换文档后作废，新文档以打开时的缩放为准。
+let zoomPref = { model: null, value: 100 };
 
 // LO 自己的 chrome（自建工具栏要关掉的那些）。singlemode-* 是选中表格/图片时
 // 自动冒出来的上下文工具栏——逐项关的时候必须连它们一起关，否则一选中表格就
@@ -5857,12 +5860,32 @@ const EXEC = {
   // ZoomType 必须先切 BY_VALUE——停在「适合页宽」这类自动模式时，引擎会按窗口
   // 重算 ZoomValue，写进去的数当场被覆盖。两个属性都是 sal_Int16，裸 number 会
   // 编组成 long 被严格 setter 拒绝（且常被 try 吞掉），必须走 shortAny。
+  // {fit:'width'}：分屏开合后窗格宽度变了（宿主发起），按页宽重算一次，但不超过
+  // 用户自己定的缩放（只缩不放）；之后仍是 BY_VALUE，不跟着窗口持续变。仅 Writer：
+  // Impress 默认整页适配本就随窗口重算，Calc 没有「页宽」可言。
   set_zoom(p) {
     let vs = null;
     try { vs = ctrl.getViewSettings(); } catch (e) { vs = ctrl; }
     if (!vs || typeof vs.getPropertyValue !== 'function') return { success: false, message: 'no view settings' };
     let cur = 100;
     try { cur = Number(vs.getPropertyValue('ZoomValue')) || 100; } catch (e) {}
+    if (p && p.fit === 'width') {
+      if (!isWriterDoc()) return { success: true, zoom: cur, fitted: false };
+      const pref = zoomPref.model === xModel ? zoomPref.value : cur;
+      let fit = pref;
+      try {
+        vs.setPropertyValue('ZoomType', shortAny(css.view.DocumentZoomType.PAGE_WIDTH));
+        fit = Number(vs.getPropertyValue('ZoomValue')) || pref;
+      } catch (e) {}
+      const next = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.min(pref, Math.round(fit))));
+      try { vs.setPropertyValue('ZoomType', shortAny(css.view.DocumentZoomType.BY_VALUE)); } catch (e) {}
+      try { vs.setPropertyValue('ZoomValue', shortAny(next)); }
+      catch (e) { return { success: false, message: 'set_zoom 失败: ' + errStr(e) }; }
+      zoomPref = { model: xModel, value: pref };
+      let applied = next;
+      try { applied = Number(vs.getPropertyValue('ZoomValue')) || next; } catch (e) {}
+      return { success: true, zoom: applied, fitted: true };
+    }
     const hasValue = p && p.value != null;
     const hasDelta = p && p.delta != null;
     if (!hasValue && !hasDelta) return { success: true, zoom: cur };
@@ -5874,6 +5897,7 @@ const EXEC = {
     catch (e) { return { success: false, message: 'set_zoom 失败: ' + errStr(e) }; }
     let applied = next;
     try { applied = Number(vs.getPropertyValue('ZoomValue')) || next; } catch (e) {}
+    zoomPref = { model: xModel, value: applied };
     return { success: true, zoom: applied };
   },
   // ---- [主题] 纸外工作区配色（dev-board#273）------------------------------

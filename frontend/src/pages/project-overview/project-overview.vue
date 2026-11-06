@@ -4701,7 +4701,11 @@ export default {
     // （幂等，见 tabDragSplit.rebindTabsWheel）。
     splitMode() {
       this.pushMenuState()
-      this.$nextTick(() => this.rebindTabsWheel())
+      // 窗格宽度减半 / 恢复：文档按新宽度重新适配缩放，免得只看得到半页。
+      this.$nextTick(() => {
+        this.rebindTabsWheel()
+        Object.values(this._libreRefs || {}).forEach(ed => ed?.fitPaneWidth?.())
+      })
       // 重开分屏会重建右侧引擎，活动文件 ID 没变也必须重新核算驻留预算。
       if (this.splitMode) this.onActiveOfficeFileChanged('right', this.activeFileRight)
       else {
@@ -4915,6 +4919,8 @@ export default {
     onLibreReady(executor, pane, fileId) {
       librePoolMethods.onLibreReady.call(this, executor, pane, fileId)
       this.notifyRestartRecovery()
+      // 分屏中打开的文档落在半宽窗格里，同样按窗格宽度适配一次。
+      if (this.splitMode) this._libreRefs?.[pane + ':' + fileId]?.fitPaneWidth?.(0)
     },
     openFile(file, options = {}) {
       if (!options.restartRecovery) this.cancelRestartRecovery()
