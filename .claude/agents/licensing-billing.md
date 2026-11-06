@@ -1536,7 +1536,7 @@ return 404 兜底，云后端从 127.0.0.1 直连 Next。云侧唯一出口
 | `POST /api/internal/account` | `AWD_MOBILE_BILLING_SECRET` | `service/mobile/MobileBillingClient` | `mobile.billing.*` | 手机端账户解析/余额/充值/注销 |
 | `POST /api/internal/collab-directory` | `AWD_COLLAB_DIRECTORY_SECRET` | `service/collab/AccountDirectoryClient` | `collab.directory.*` | 加同事时的账户是否存在 + 展示名/手机号 + 双方团队律所归属 |
 
-第三条**同样不违反**「per-user 平台 AI key」那条裁决（doc/desktop-contract.md）：它回的是名录事实，
+第三条**同样不违反**「per-user 平台 AI key」那条裁决（docs/dev-notes/desktop-contract.md）：它回的是名录事实，
 **不发任何凭据**——拿到它的答复也换不出任何用户的 key、令牌或会话，泄露的上界是「某个手机号在官网注册过、
 展示名是什么、和谁同团队」，而这几样正是发起查询的律师本来就要看到的东西。用途单一、密钥单一，
 撤销就是把官网那一个 env 拿掉。案件库侧的消费者是 `CollaboratorAdmission`（见 version-control.md「加同事」）。

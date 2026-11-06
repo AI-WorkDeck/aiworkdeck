@@ -23,7 +23,7 @@
 ## 3. 安全边界（沿用已有先例，不开新口子）
 
 官网早已否决「服务端凭 accountId 换任意用户 key」这类宽权限服务间凭据
-（本仓 `doc/desktop-contract.md`「per-user 平台 AI key」）。本次**不违反**那条裁决：新口只回
+（本仓 `docs/dev-notes/desktop-contract.md`「per-user 平台 AI key」）。本次**不违反**那条裁决：新口只回
 名录信息（账户是否存在、展示名、手机号、团队/律所归属），**不发任何凭据**，形状照
 `POST /api/internal/transfer`（dev-board#251）与 `/api/internal/account`（#425）：
 同机直连 `127.0.0.1:<next 端口>`、头 `X-Internal-Secret`、专用密钥、未配置或不匹配一律裸 404、
