@@ -406,6 +406,18 @@ opaque origin 使然，不能靠 `event.origin` 判断。
 对应新错误码：`action_not_allowed`（doc.exec 原语不对插件开放）、`ai_failed`（模型调用失败）、
 `experimental_not_allowed`（x- 实验方法仅对 dev 安装开放，§12.4）。
 
+**表格化审阅补齐（宿主 0.81.0 起，待发版；老宿主按 `unknown_method` / 忽略 `locator` 降级）**：
+
+| 方法 | 参数 | 返回 | 权限 |
+|---|---|---|---|
+| `ui.openFile` | `{ path, locator? }`：`locator` 只认 `{ type: 'docx', quote }` 与 `{ type: 'pdf', quote?, page? }`，`quote` 压空白后截 500 字符，其余字段丢弃 | `{}` | `file_read` |
+| `files.download` | `{ name, data }`：`data` 为 `ArrayBuffer` 或字节数组，≤ 20 MiB；`name` 只允许 `.xlsx` / `.docx` / `.csv`，宿主清洗文件名并按扩展名定 MIME | `{ started: true, name }`，只表示已发起下载，不表示用户已保存 | `file_write` |
+
+`locator` 与 EvidenceLink 定位符同形（`docs/EVIDENCE_CONTRACT.md`、§8.4 `evidence.*`），打开后由编辑器/预览的
+`pendingLocator` 链路定位：Writer/Calc/Impress 按引文查找选中，PDF 有页码时翻页、只有引文时显示引文卡片。
+sandbox 不含 `allow-downloads`，插件要导出办公文件只能走 `files.download`，与 `sensitive/download`、
+`voice/download` 同一条宿主 Blob 下载路径。首个使用方：`official-plugins/tabular-review/`。
+
 ### 8.5 SDK 表面
 
 源头在 [sdk/plugin-sdk/awd-plugin-sdk.js](../sdk/plugin-sdk/awd-plugin-sdk.js)；
@@ -537,6 +549,8 @@ insertText(text)/addComment(anchorText, text)`、`awd.events.on(name, cb)`（返
   三个方法（§8.4、§8.5），SDK 版本号 `1.0.0` → `1.1.0`。manifest 无新增字段。
 - **v2.6**：主题通道（§8.3/§8.5）——`init.context.themeTokens`、宿主推送 `type:"theme"`、
   SDK 自动注入 CSS 变量与 `awd.theme.*`。SDK `1.1.0` → `1.2.0`。manifest 无新增字段。
+- **表格化审阅补齐（宿主 0.81.0 起，待发版）**：`ui.openFile` 增加可选 `locator`，新增 `files.download`（§8.4）；
+  SDK 未加糖衣，插件用 `awd.call` 直调。
 - **v2.9（当前，宿主 0.28 起）**：生态路线 P4（dev-board#284）——声明式长尾四贡献点（§14）：
   `contributes.templates`（新建入口 + AI 工具 `list_contributed_templates`/`create_file_from_template`）、
   `contributes.styleProfiles`（可选为全局默认，插在解析链「项目画像」与「系统默认」之间）、

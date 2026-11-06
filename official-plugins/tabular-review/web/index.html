@@ -1,0 +1,74 @@
+<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title></title>
+  <link rel="stylesheet" href="panel.css">
+  <script src="awd-plugin-sdk.js"></script>
+  <script src="panel-l10n.js"></script>
+  <script src="review-core.js"></script>
+  <script src="xlsx.js"></script>
+  <script src="panel.js" defer></script>
+</head>
+<body>
+  <main class="awd-plugin-stage tr-stage">
+    <header class="awd-plugin-header">
+      <div>
+        <h1 class="awd-title" data-i18n="panel.title"></h1>
+        <p class="awd-subtitle" data-i18n="panel.subtitle"></p>
+      </div>
+      <div class="awd-header-actions">
+        <button type="button" id="run" class="awd-btn awd-btn-primary" data-i18n="panel.run.start"></button>
+        <button type="button" id="export" class="awd-btn" data-i18n="panel.export.button"></button>
+      </div>
+    </header>
+
+    <div id="notice" role="status" aria-live="polite" hidden></div>
+    <div id="confirm" class="confirm-bar" role="alertdialog" hidden></div>
+    <div id="progress" hidden></div>
+
+    <details class="awd-card setup" open>
+      <summary class="awd-card-title" data-i18n="panel.setup"></summary>
+      <div class="setup-grid">
+        <section aria-labelledby="files-heading">
+          <div class="section-head">
+            <h2 id="files-heading" data-i18n="panel.files.heading"></h2>
+            <span id="file-count" class="awd-badge"></span>
+          </div>
+          <div class="toolbar">
+            <input id="file-filter" class="awd-input" type="search" data-i18n-placeholder="panel.files.filter">
+            <button type="button" id="select-all" class="awd-btn awd-btn-sm" data-i18n="panel.files.selectAll"></button>
+            <button type="button" id="clear-files" class="awd-btn awd-btn-sm" data-i18n="panel.files.clear"></button>
+          </div>
+          <div id="file-list" class="file-list"></div>
+        </section>
+        <section aria-labelledby="columns-heading">
+          <div class="section-head">
+            <h2 id="columns-heading" data-i18n="panel.columns.heading"></h2>
+            <span id="column-count" class="awd-badge"></span>
+          </div>
+          <div class="toolbar">
+            <select id="template-select" class="awd-select"></select>
+            <button type="button" id="template-apply" class="awd-btn awd-btn-sm" data-i18n="panel.columns.applyTemplate"></button>
+            <button type="button" id="add-column" class="awd-btn awd-btn-sm" data-i18n="panel.columns.add"></button>
+          </div>
+          <div id="column-list" class="column-list"></div>
+        </section>
+      </div>
+    </details>
+
+    <div class="review-area">
+      <div class="table-wrap">
+        <table class="review-table">
+          <thead id="table-head"></thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+      <aside id="detail" class="awd-card detail" aria-live="polite" hidden></aside>
+    </div>
+  </main>
+</body>
+</html>

@@ -37,6 +37,7 @@ export const PLUGIN_GLYPH_MAP = Object.freeze({
     'M17 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z',
   ],
   'plugin-dev': ['M9 8l-5 4 5 4', 'M15 8l5 4-5 4', 'M13 5l-2 14'],
+  'tabular-review': ['M4 5h16v14H4z', 'M4 10h16', 'M4 15h16', 'M10 5v14'],
   'theme-inkwash-zen': [
     'M12 3a9 9 0 1 0 8.5 6.1',
     'M18 3c-2.5 1.5-4.5 4.2-5 7.5 2.8-.4 5.3-2.2 6.8-4.7',

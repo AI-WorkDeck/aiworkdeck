@@ -176,6 +176,8 @@ jobs:
         run: node --test official-plugins/tencent-meeting/tests/web-*.mjs
       - name: Test Baoqingtian plugin workspace
         run: NODE_PATH=frontend/node_modules node --test official-plugins/baoqingtian/tests/web-*.mjs
+      - name: Test tabular review plugin
+        run: NODE_PATH=frontend/node_modules node --test official-plugins/tabular-review/tests/*.mjs
       - name: Test law firm management plugin
         run: node --test official-plugins/lawfirm-management/tests/*.mjs
       - name: Test built-in Tencent Meeting request and UI contracts

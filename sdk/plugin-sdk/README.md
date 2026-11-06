@@ -171,3 +171,10 @@ await awd.ui.openWorkspace();
 该方法无参数，只能打开当前插件自己已声明的工作区；成功返回 `{}`，无可用工作区返回 `unavailable`。宿主仍核对当前安装、启用、权限和作用域，不接受调用方指定其他插件、任意 URL 或未声明视图。旧宿主返回 `unknown_method`，应提示升级，不能声称已经打开。桥协议新增方法不代表用户客户端已升级。
 
 验收按实际入口进行：轻量插件检查主题等贡献点可用、无多余侧栏和标签；panel 插件检查主要操作与窄栏；工作区插件检查打开、单例聚焦、切换保活和关闭；所有形态检查禁用/卸载后对应入口和实例消失。
+
+## 打开到出处与导出办公文件（宿主 0.81.0 起，待发版）
+
+- `awd.call('ui.openFile', { path, locator })`：`locator` 可选，形如 `{ type: 'docx', quote }` 或 `{ type: 'pdf', quote, page }`，打开后定位到引文或页码；老宿主忽略 `locator`，只打开文件。
+- `awd.call('files.download', { name, data })`：需 `file_write`；`data` 为 `ArrayBuffer`/`Uint8Array`（≤ 20 MiB），`name` 只允许 `.xlsx`、`.docx`、`.csv`。老宿主返回 `unknown_method`，应提示升级。
+
+两者暂无糖衣方法，详见 [PLUGIN_SPEC §8.4](../../docs/PLUGIN_SPEC.md)。
