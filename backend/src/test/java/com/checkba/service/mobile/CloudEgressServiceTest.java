@@ -26,7 +26,7 @@ class CloudEgressServiceTest {
    protected void doCommit(DefaultTransactionStatus s){}
    protected void doRollback(DefaultTransactionStatus s){}
   };
-  when(quota.postpaidEnabled()).thenReturn(true);
+  when(quota.postpaidEnabled()).thenReturn(true);when(quota.postpaidFor(anyLong())).thenReturn(true);
   when(quota.canRead(anyLong())).thenReturn(true);
   when(users.lockStorageOwner(7L)).thenReturn(Optional.of(new User()));
   when(catalog.fileList(7L,"p")).thenReturn(Map.of("files",List.of(Map.of("uid","f","source","cloud","size",999999))));
@@ -69,7 +69,7 @@ class CloudEgressServiceTest {
   assertEquals("settled",receipt.getState());verify(catalog,times(1)).content(7L,"p","f");
  }
  @Test void legacyQuoteHasRealVersionAndZeroPrice() throws Exception {
-  var svc=service();when(quota.postpaidEnabled()).thenReturn(false);
+  var svc=service();when(quota.postpaidEnabled()).thenReturn(false);when(quota.postpaidFor(anyLong())).thenReturn(false);
   when(billing.balance(7L)).thenReturn(new MobileBillingClient.BalanceResult(0,"USD","free"));
   var quote=svc.quote(7L,"p","f");assertEquals(0,quote.get("quoteCents"));assertEquals("USD",quote.get("cashCurrency"));
   assertTrue(quote.get("resourceHash").toString().matches("[a-f0-9]{64}"));
@@ -86,5 +86,15 @@ class CloudEgressServiceTest {
   var svc=service();
   assertThrows(IllegalArgumentException.class,()->svc.prepare(7L,"p","f","abcdefghijklmnop","0".repeat(64)));
   verify(billing,never()).cloudOperation(eq(7L),eq("egress-reserve"),anyMap());
+ }
+
+ @Test void unacceptedAccountDownloadsUnbilledWithSwitchOnAndOnlyShadowSeesIt() throws Exception {
+  var svc=service();when(quota.postpaidFor(7L)).thenReturn(false);when(quota.canRead(7L)).thenReturn(false);
+  var shadow=mock(CloudPostpaidShadowService.class);org.springframework.test.util.ReflectionTestUtils.setField(svc,"shadow",shadow);
+  var download=svc.prepare(7L,"p","f",null);var out=new ByteArrayOutputStream();svc.write(download,out);
+  assertArrayEquals(bytes,out.toByteArray());
+  verify(billing,never()).cloudOperation(anyLong(),anyString(),anyMap());
+  verify(shadow).egress(eq(7L),anyString(),eq((long)bytes.length),eq(true));
+  assertTrue(rows.isEmpty(),"no billing receipt");
  }
 }

@@ -605,6 +605,8 @@ Apple 订阅桥接：GET `/api/mobile/billing/subscription/appstore/capability`�
 
 原subscriptionActive继续表示真实订阅；客户端功能准入读cloudAccess而非订阅。mobile-v1.yaml含cloud-state/postpaid-accept/resume-cloud、quote报价hash及content expectedHash。所有新增云写带当前epoch；桌面relay会话捕获同一次epoch，旧会话不能跨generation重新发布。
 
+**按账户生效（2026-11-05）**：后付费准入、PERSONAL归属、epoch与下载计费只对已接受政策账户（`CloudStorageQuotaService.postpaidFor`，读cloud-state的`billing.accepted`）生效；未接受账户即使全局开关打开也走订阅配额，与关闭时一致。新增准入点别直接用全局`postpaidEnabled()`判断单个账户。影子计量`CloudPostpaidShadowService`（`storage.postpaid.shadow`）只上报`shadow-*`，实时开关打开时失效，回归`CloudPostpaidShadowServiceTest`。
+
 `BackupConsent.enabled` 在cloudBackupPaused时为false，`backupPaused`明确是清理暂停；User真实备份同意仍保留，不能复用主动撤销同意让手机删除本机缓存。冻结期间不可读；用户resume后剩余非pendingDeletion字节可读，仍须明确开启备份才恢复新增上传。账户resume与开启备份是两步，未决清理claim不能被开启备份绕过。
 
 ### 隐藏缺陷修复（B3）带来的约束

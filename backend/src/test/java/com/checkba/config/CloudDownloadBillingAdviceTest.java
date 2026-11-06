@@ -31,7 +31,7 @@ class CloudDownloadBillingAdviceTest {
   @GetMapping("/denied") @CloudMeteredDownload ResponseEntity<Map<String,String>> denied(){return ResponseEntity.status(403).body(Map.of("error","denied"));}
  }
  @BeforeEach void setup()throws Exception {
-  when(quota.isEnabled()).thenReturn(true);when(quota.postpaidEnabled()).thenReturn(true);
+  when(quota.isEnabled()).thenReturn(true);when(quota.postpaidEnabled()).thenReturn(true);when(quota.postpaidFor(anyLong())).thenReturn(true);
   when(billing.cloudState(7L)).thenReturn(Map.of("cloudAccess",Map.of("epoch",1)));
   when(egress.prepareSource(eq(7L),anyString(),any(),anyLong(),anyString(),isNull())).thenAnswer(c->{
    try(InputStream input=c.getArgument(2)){var path=Files.createTempFile("advice-test", ".bin");Files.write(path,input.readAllBytes());return new CloudEgressService.Download(new CloudEgressService.Snapshot(path,Files.size(path),"hash"),null,7L,false);}
@@ -58,5 +58,21 @@ class CloudDownloadBillingAdviceTest {
  @Test void localModeLeavesConverterInControl()throws Exception {
   when(quota.isEnabled()).thenReturn(false);
   mvc.perform(get("/file")).andExpect(content().bytes("abcdef".getBytes()));verifyNoInteractions(egress);
+ }
+
+ @Test void unacceptedAccountGetsUnmodifiedResponseWithSwitchOn()throws Exception {
+  when(quota.postpaidFor(7L)).thenReturn(false);
+  mvc.perform(get("/file")).andExpect(status().isOk()).andExpect(content().bytes("abcdef".getBytes()));
+  verify(egress,never()).prepareSource(anyLong(),anyString(),any(),anyLong(),anyString(),any());verifyNoInteractions(billing);
+ }
+ @Test void shadowRecordsSizeWithoutTouchingResponseOrBilling()throws Exception {
+  when(quota.postpaidEnabled()).thenReturn(false);
+  var shadow=mock(CloudPostpaidShadowService.class);when(shadow.active()).thenReturn(true);
+  var advice=new CloudDownloadBillingAdvice(quota,egress,billing);org.springframework.test.util.ReflectionTestUtils.setField(advice,"shadow",shadow);
+  var shadowMvc=MockMvcBuilders.standaloneSetup(endpoint).setControllerAdvice(advice).build();
+  shadowMvc.perform(get("/file")).andExpect(status().isOk()).andExpect(content().bytes("abcdef".getBytes()));
+  shadowMvc.perform(get("/denied")).andExpect(status().isForbidden());
+  verify(shadow,times(1)).egress(7L,"file:stable",6L,false);
+  verify(egress,never()).prepareSource(anyLong(),anyString(),any(),anyLong(),anyString(),any());verifyNoInteractions(billing);
  }
 }

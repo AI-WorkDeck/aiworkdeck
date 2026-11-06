@@ -29,6 +29,12 @@ public interface MobileBillingClient {
                 CloudBillingText.get("unavailable"), "cloud_billing_disabled");
     }
 
+    /** Shadow report about cloud users without an account mapping; carries cloud user ids only. */
+    default Map<String, Object> shadowUnmapped(Map<String, Object> report) {
+        throw new MobileBillingException(MobileBillingKind.DISABLED,
+                CloudBillingText.get("unavailable"), "cloud_billing_disabled");
+    }
+
     /**
      * 余额。
      *
