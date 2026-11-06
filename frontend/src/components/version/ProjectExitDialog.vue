@@ -13,7 +13,9 @@
           <component :is="'input'" type="checkbox" :checked="row.selected" :disabled="busy || row.state !== 'ready'"
             @change="row.selected = $event.target.checked" />
           <span class="project-exit-name">{{ row.name || $t('version.exitUnconfirmedProject') }}</span>
-          <span class="project-exit-count">{{ rowText(row) }}</span>
+          <component :is="'button'" v-if="['failed', 'uncertain'].includes(row.state)" type="button" class="project-exit-count project-exit-retry"
+            :disabled="busy || loading" @click.prevent="retry">{{ rowText(row) }}</component>
+          <span v-else class="project-exit-count">{{ rowText(row) }}</span>
         </component>
       </div>
       <p v-if="!loading && !listFailed && !visibleRows.length">{{ $t('version.noActiveSession') }}</p>
@@ -83,6 +85,11 @@ export default {
         await Promise.all(Array.from({ length: 3 }, async () => {
           while (!this._disposed && index < this.rows.length) await inspectExitProject(this.rows[index++], this.readStatus)
         }))
+        // Nested folders share one backend lock; recheck parallel-scan failures one at a time.
+        for (const row of this.rows.filter(row => row.state === 'failed')) {
+          if (this._disposed) break
+          await inspectExitProject(row, this.readStatus)
+        }
       } catch { this.listFailed = true }
       finally {
         this.loading = false
@@ -122,6 +129,8 @@ p { font-size: 13px; line-height: 1.6; }
 .project-exit-row { display: flex; align-items: center; gap: 10px; padding-block: 10px; border-bottom: 1px solid var(--awd-border); }
 .project-exit-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .project-exit-count { max-width: 40%; font-size: 12px; }
+.project-exit-retry { padding: 0; border: 0; background: none; color: inherit; font: inherit; font-size: 12px; text-align: end; text-decoration: underline; cursor: pointer; }
+.project-exit-retry:disabled { opacity: .5; cursor: default; }
 footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
 .project-exit-button { padding: 8px 12px; border: 1px solid var(--awd-border); border-radius: 6px; background: var(--awd-surface); color: var(--awd-text); cursor: pointer; }
 .project-exit-button:disabled { opacity: .5; cursor: default; }
