@@ -458,11 +458,17 @@ export default {
     submitBusy() {
       return this.loggingIn || this.unlocking || this.compatLoading
     },
+    consentsReady() {
+      return this.agreementChecked && this.crossBorderChecked
+    },
   },
   watch: {
     codeIdentifier() { this.clearCompatChallenge() },
     authFlow() { this.clearCompatChallenge() },
     'siteStatus.current'() { this.clearCompatChallenge() },
+    consentsReady(ok) {
+      if (ok && this.mode === 'bqt' && !this.bqtSession && !this.bqtLoading) this.startBqtScan()
+    },
   },
   mounted() {
     loadSiteLinks()
@@ -652,10 +658,10 @@ export default {
       if (this.submitBusy || this.sendingCode || this.mode === next) return
       if (next === 'bqt') {
         if (!this.bqtScanEnabled || !this.isPhoneSite) return
-        if (!this.consentGatePassed()) return
+        // 先切过去；两项同意没勾就停在扫码页提示，勾齐后由 watch 自动出码
         this.mode = 'bqt'
         this.errorMsg = ''
-        this.startBqtScan()
+        if (this.consentGatePassed()) this.startBqtScan()
         return
       }
       this.stopBqtPoll()
