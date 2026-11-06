@@ -495,7 +495,10 @@ public class AdminConfigController {
                 // 而 resolveProvider() 对认不出的值只 warn 一句就静默回落 yml。
                 String provider = ai.getActiveProvider().trim().toUpperCase(java.util.Locale.ROOT);
                 try {
-                    AiModelProperties.Provider.valueOf(provider);
+                    // MOCK 只由 ai.mock.enabled 打开，不能从设置页写进库
+                    if (AiModelProperties.Provider.valueOf(provider) == AiModelProperties.Provider.MOCK) {
+                        throw new IllegalArgumentException(provider);
+                    }
                 } catch (IllegalArgumentException e) {
                     throw new IllegalArgumentException(LangText.of(
                             "AI 提供商取值非法：" + ai.getActiveProvider()

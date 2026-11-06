@@ -396,6 +396,26 @@ class ChatModelFactoryTest {
         verifyNoInteractions(creditsGate, platformAiChannel, usageAccountant);
     }
 
+    @Test
+    void mockFlagRoutesEveryChatModelToTheMockEvenInLocalMode() {
+        org.springframework.test.util.ReflectionTestUtils.setField(factory, "localMode", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(factory, "mockAi", true);
+        setDbProvider("OPENROUTER");
+        assertEquals(AiModelProperties.Provider.MOCK, factory.resolveProvider());
+        assertSame(MockChatModel.INSTANCE, factory.getStreamingChatModel("anthropic/claude-sonnet-4.5"));
+        assertSame(MockChatModel.INSTANCE, factory.getChatModel(null));
+        assertSame(MockChatModel.INSTANCE, factory.getAuxChatModel());
+        assertSame(MockChatModel.INSTANCE, factory.getChatModel(null, java.time.Duration.ofSeconds(5)));
+        assertFalse(factory.usesProviderCatalog());
+        assertDoesNotThrow(() -> factory.ensurePaidAccess(1L));
+    }
+
+    @Test
+    void storedMockProviderIsIgnoredWithoutTheFlag() {
+        setDbProvider("MOCK");
+        assertNotEquals(AiModelProperties.Provider.MOCK, factory.resolveProvider());
+    }
+
     private void setDbProvider(String provider) {
         when(systemSettingService.get(eq("ai.activeProvider"), any())).thenReturn(provider);
     }

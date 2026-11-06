@@ -33,6 +33,10 @@ public class ChatModelFactory {
     @org.springframework.beans.factory.annotation.Value("${security.local-mode:false}")
     private boolean localMode;
 
+    /** 本地开发模拟模型开关；只允许 dev profile 打开，由 MockAiGuard 在启动期把关。 */
+    @org.springframework.beans.factory.annotation.Value("${ai.mock.enabled:false}")
+    private boolean mockAi;
+
     private final AiModelProperties aiModelProperties;
     private final com.checkba.service.SystemSettingService systemSettingService;
     private final PlatformAiChannel platformAiChannel;
@@ -143,12 +147,16 @@ public class ChatModelFactory {
      * 未配置或值非法时回退 application.yml 的静态配置。
      */
     public AiModelProperties.Provider resolveProvider() {
+        if (mockAi) return AiModelProperties.Provider.MOCK;
         // Official desktop cloud calls must use the signed-in account, never an old DB/env key.
         if (localMode && !isExplicitLocalProvider()) return AiModelProperties.Provider.AWD_CLOUD;
         String configured = systemSettingService.get("ai.activeProvider", null);
         if (configured != null && !configured.isBlank()) {
             try {
-                return AiModelProperties.Provider.valueOf(configured.trim().toUpperCase());
+                AiModelProperties.Provider stored = AiModelProperties.Provider.valueOf(configured.trim().toUpperCase());
+                // 模拟档只认 ai.mock.enabled，库里存的值不算数
+                if (stored != AiModelProperties.Provider.MOCK) return stored;
+                log.warn("Ignoring ai.activeProvider=MOCK; the mock model is enabled only by ai.mock.enabled");
             } catch (IllegalArgumentException e) {
                 log.warn("Unknown ai.activeProvider value '{}', falling back to static config", configured);
             }
@@ -312,6 +320,7 @@ public class ChatModelFactory {
         long started = System.nanoTime();
         ResolvedTarget target = resolveTarget(modelId, true);
         recordModelUse(target.channel().name(), target.modelId(), false);
+        if (target.channel() == AiModelProperties.Provider.MOCK) return MockChatModel.INSTANCE;
         if (target.channel() == AiModelProperties.Provider.OLLAMA) {
             return OllamaChatModel.builder().baseUrl(resolveOllamaBaseUrl()).modelName(target.modelId())
                     .temperature(aiModelProperties.getOllama().getTemperature()).numPredict(maxOutputTokens)
@@ -474,6 +483,10 @@ public class ChatModelFactory {
                 ? "default"
                 : (isAuto ? resolveDefaultModel() : AllowedModels.canonicalModelId(modelId));
 
+        if (provider == AiModelProperties.Provider.MOCK) {
+            return new ResolvedTarget(AiModelProperties.Provider.MOCK, MockChatModel.MODEL_ID);
+        }
+
         // 平台通道必须先于白名单短路判定：白名单模型走的是 BYOK 的 OpenRouter key，
         // 而平台通道用的是官网 provision 的 key，两者不能混
         if (provider == AiModelProperties.Provider.AWD_CLOUD) {
@@ -574,6 +587,7 @@ public class ChatModelFactory {
         return switch (target.channel()) {
             case AWD_CLOUD -> getOrCreatePlatformModel(target.modelId());
             case OLLAMA -> getOrCreateOllamaModel(target.modelId());
+            case MOCK -> MockChatModel.INSTANCE;
             default -> getOrCreateOpenRouterModel(target.modelId());
         };
     }
@@ -863,6 +877,7 @@ public class ChatModelFactory {
         return switch (target.channel()) {
             case AWD_CLOUD -> getOrCreatePlatformStreamingModel(target.modelId(), reasoningEffortOverride);
             case OLLAMA -> getOrCreateOllamaStreamingModel(target.modelId());
+            case MOCK -> MockChatModel.INSTANCE;
             default -> getOrCreateOpenRouterStreamingModel(target.modelId(), reasoningEffortOverride);
         };
     }
