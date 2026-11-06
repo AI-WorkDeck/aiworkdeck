@@ -38,6 +38,15 @@ function createMockLibreOfficeTree(rootDir, { use242Layout = false } = {}) {
   ].join('\n'))
 
   // Exact dark-page anchors from core dced3bc711d18407a2cc2400eb46e8261b663d95.
+  writeFileEnsured(path.join(rootDir, 'vcl/qt5/QtGraphics_Controls.cxx'), [
+    '#include <vcl/decoview.hxx>',
+    '                m_image->fill(QApplication::palette().color(QPalette::Window).rgb());',
+    '                break;',
+    '            }',
+    '            [[fallthrough]]; // Qt::transparent',
+    '            draw(QStyle::CC_ScrollBar, option, m_image.get(), rBackgroundColor,',
+    '',
+  ].join('\n'))
   writeFileEnsured(path.join(rootDir, 'svtools/source/control/ruler.cxx'), [
     '    const StyleSettings& rStyleSettings = rRenderContext.GetSettings().GetStyleSettings();',
     '    tools::Long    nP1;            // pixel position of Page1',
@@ -496,6 +505,10 @@ test('apply-source-patches.py applies all C++ kernel & dictionary patches cleanl
       assert.ok(m, setter)
       assert.equal('#' + m[1], rulerRoles[role])
     }
+
+    const qtControls = fs.readFileSync(path.join(tmpDir, 'vcl/qt5/QtGraphics_Controls.cxx'), 'utf8')
+    assert.match(qtControls, /#include <vcl\/settings\.hxx>/)
+    assert.equal(qtControls.match(/MiscSettings::GetAppColorMode\(\) == 2/g).length, 2)
 
     // Verify instdir dictionary slimming & Lightproof removal
     assert.ok(fs.existsSync(path.join(tmpDir, 'instdir/share/extensions/dict-en/en_US.aff')))

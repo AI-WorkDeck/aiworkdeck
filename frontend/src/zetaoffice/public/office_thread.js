@@ -5870,6 +5870,16 @@ const EXEC = {
       scheme.getByName('AppBackground').replaceByName('Color', color);
       scheme.getByName('DocColor').replaceByName('Color', docColor);
       root.commitChanges();
+      // 引擎补丁 patch_dark_scrollbars 读 vcl 自己的 ApplicationAppearance（1 浅 / 2 深）给
+      // Qt 滚动条换深色；旧引擎不认这层补丁，写了也无副作用（无头实测运行时改它不影响其余界面）。
+      try {
+        const misc = provider.createInstanceWithArguments('com.sun.star.configuration.ConfigurationUpdateAccess',
+          [mkProp('nodepath', '/org.openoffice.Office.Common/Misc')]);
+        misc.replaceByName('ApplicationAppearance', shortAny(mode === 'dark' ? 2 : 1));
+        misc.commitChanges();
+      } catch (e) { /* 配置项缺失时只是滚动条不跟着变 */ }
+      // 滚动条、标尺是子窗口，配色改完不会自己重画；整窗连同子窗口失效一次。
+      try { ctrl.getFrame().getContainerWindow().invalidate(1 | 8); } catch (e) { /* CHILDREN | UPDATE */ }
       return { success: true, mode, scheme: schemeName };
     } catch (e) { return { success: false, message: 'set_app_theme 失败: ' + errStr(e) }; }
   },

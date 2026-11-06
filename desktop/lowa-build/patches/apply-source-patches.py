@@ -16,6 +16,7 @@
 # 10. Preserve real tooltip input transparency on WASM (#1515).
 # 11. Dark page: explicit dark text is drawn light on screen (Writer/Calc).
 # 12. Dark ruler follows the dark page (local StyleSettings on the ruler's VirtualDevice).
+# 13. Dark Qt scrollbars when ApplicationAppearance is dark (per-draw QStyleOption palette).
 import argparse
 import glob
 import os
@@ -1498,6 +1499,56 @@ def patch_dark_ruler(core):
         'Dark ruler palette',
     )
 
+# ---- Dark scrollbars: follow the dark page (tutorial ep 18) -----------------
+def patch_dark_scrollbars(core):
+    # Original target: LibreOffice core dced3bc711d18407a2cc2400eb46e8261b663d95,
+    # vcl/qt5/QtGraphics_Controls.cxx (MPL-2.0; original license header retained).
+    # Qt WASM 的调色板固定浅色，深色纸面两侧仍是浅色滚动条。vcl 不能依赖 svtools 的
+    # ColorConfig，这里读 vcl 自己的 MiscSettings::GetAppColorMode()（officecfg
+    # Common/Misc/ApplicationAppearance，2 = 深色；宿主 set_app_theme 同步写这个键），
+    # 只改这一次绘制的 QStyleOption 调色板，不改 QApplication 全局调色板。
+    target = f'{core}/vcl/qt5/QtGraphics_Controls.cxx'
+    patch(
+        target,
+        '#include <vcl/decoview.hxx>\n',
+        '#include <vcl/decoview.hxx>\n#include <vcl/settings.hxx>\n',
+        'Dark scrollbars include',
+    )
+    patch(
+        target,
+        '            draw(QStyle::CC_ScrollBar, option, m_image.get(), rBackgroundColor,\n',
+        '            // AI WorkDeck: dark scrollbars (design/tokens/awd-palette.json roles.dark).\n'
+        '            if (MiscSettings::GetAppColorMode() == 2)\n'
+        '            {\n'
+        '                option.palette.setColor(QPalette::Window, QColor(0x19, 0x17, 0x13)); // bg\n'
+        '                option.palette.setColor(QPalette::Base, QColor(0x19, 0x17, 0x13));\n'
+        '                option.palette.setColor(QPalette::Button, QColor(0x36, 0x31, 0x29)); // surface-3: handle\n'
+        '                option.palette.setColor(QPalette::Light, QColor(0x4A, 0x44, 0x3A));\n'
+        '                option.palette.setColor(QPalette::Midlight, QColor(0x3D, 0x37, 0x2E));\n'
+        '                option.palette.setColor(QPalette::Mid, QColor(0x3D, 0x37, 0x2E));    // border\n'
+        '                option.palette.setColor(QPalette::Dark, QColor(0x2B, 0x27, 0x21));\n'
+        '                option.palette.setColor(QPalette::Shadow, QColor(0x0A, 0x09, 0x08));\n'
+        '                option.palette.setColor(QPalette::ButtonText, QColor(0xB0, 0xAA, 0x9C)); // text-2: arrows\n'
+        '                option.palette.setColor(QPalette::WindowText, QColor(0xB0, 0xAA, 0x9C));\n'
+        '            }\n'
+        '            draw(QStyle::CC_ScrollBar, option, m_image.get(), rBackgroundColor,\n',
+        'Dark scrollbars palette',
+    )
+    patch(
+        target,
+        '                m_image->fill(QApplication::palette().color(QPalette::Window).rgb());\n'
+        '                break;\n'
+        '            }\n'
+        '            [[fallthrough]]; // Qt::transparent\n',
+        '                m_image->fill(MiscSettings::GetAppColorMode() == 2\n'
+        '                    ? QColor(0x19, 0x17, 0x13).rgb() // AI WorkDeck: dark scrollbar track (bg)\n'
+        '                    : QApplication::palette().color(QPalette::Window).rgb());\n'
+        '                break;\n'
+        '            }\n'
+        '            [[fallthrough]]; // Qt::transparent\n',
+        'Dark scrollbars track',
+    )
+
 # ---- WASM tooltip input transparency (#1515) --------------------------------
 def patch_wasm_tooltip_input(core):
     # HelpTextWindow is already mouse-transparent in VCL. Preserve that intent
@@ -1618,6 +1669,7 @@ def main(argv=None):
     patch_wasm_tooltip_input(CORE)
     patch_dark_page_text(CORE)
     patch_dark_ruler(CORE)
+    patch_dark_scrollbars(CORE)
 
     if args.slim_dictionaries or os.path.isdir(f'{CORE}/instdir/share/extensions'):
         slim_dictionaries(CORE, keep_langs=keep_langs)

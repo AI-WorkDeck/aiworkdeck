@@ -68,9 +68,9 @@ function stats(png) {
 }
 
 // 竖排标尺：画布最左那一条（藏掉原生工具栏后产品里同样露出来），取一段纵向带的平均亮度。
-function rulerMean(png) {
+function rulerMean(png, x0 = 3, x1 = 17) {
   let sum = 0, n = 0
-  for (let y = Math.floor(png.height * 0.1); y < Math.floor(png.height * 0.6); y++) for (let x = 3; x < 17; x++) {
+  for (let y = Math.floor(png.height * 0.1); y < Math.floor(png.height * 0.6); y++) for (let x = x0; x < x1; x++) {
     const o = (y * png.width + x) * 4; sum += (png.data[o] + png.data[o + 1] + png.data[o + 2]) / 3; n++
   }
   return n ? Math.round(sum / n) : null
@@ -106,7 +106,11 @@ try {
     await exec('set_app_theme', { mode: 'dark' })
     res[name] = await shot(name + '-dark')
     console.log(name, JSON.stringify(res[name]))
-    if (name === 'word-auto') res.rulerMean = rulerMean(PNG.sync.read(fs.readFileSync(path.join(out, name + '-dark.png'))))
+    if (name === 'word-auto') {
+      const png = PNG.sync.read(fs.readFileSync(path.join(out, name + '-dark.png')))
+      res.rulerMean = rulerMean(png)
+      res.scrollbarMean = rulerMean(png, png.width - 12, png.width - 3) // 右缘竖向滚动条
+    }
     if (name === 'word-black') {
       const pdf = await exec('export_pdf', {})
       const bytes = pdf && (pdf.bytes || pdf.data)
@@ -120,6 +124,7 @@ try {
   check('Word 纸面变暗', res['word-auto'].mean < 90, res['word-auto'])
   // 标尺（产品里唯一露出来的原生 chrome 之一）跟着暗：引擎补丁 patch_dark_ruler，r7 及以前必红
   check('标尺跟着变暗（引擎补丁）', res.rulerMean != null && res.rulerMean < 110, { rulerMean: res.rulerMean })
+  check('滚动条跟着变暗（引擎补丁）', res.scrollbarMean != null && res.scrollbarMean < 110, { scrollbarMean: res.scrollbarMean })
   check('Word 自动颜色字在深色纸面上变亮', res['word-auto'].bright > 0.01 && res['word-auto'].dark > 0.5, res['word-auto'])
   // 显式黑字改画白色后，亮像素应与「自动」颜色那份同一量级；旧引擎下几乎为零。
   check('Word 显式黑字在深色纸面上变亮（引擎补丁）', res['word-black'].bright > res['word-auto'].bright * 0.5, { black: res['word-black'], auto: res['word-auto'] })
