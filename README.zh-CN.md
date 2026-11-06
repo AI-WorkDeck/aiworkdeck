@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/AI-WorkDeck/aiworkdeck/releases/latest"><img src="https://img.shields.io/github/v/release/AI-WorkDeck/aiworkdeck?filter=v*&cacheSeconds=3600" alt="最新版本"></a>
+  <a href="https://github.com/AI-WorkDeck/aiworkdeck/releases/latest"><img src="https://img.shields.io/github/v/release/AI-WorkDeck/aiworkdeck?cacheSeconds=3600" alt="最新版本"></a>
   <a href="https://github.com/AI-WorkDeck/aiworkdeck/stargazers"><img src="https://img.shields.io/github/stars/AI-WorkDeck/aiworkdeck" alt="GitHub Stars"></a>
   <a href="https://github.com/AI-WorkDeck/aiworkdeck/actions/workflows/ci.yml"><img src="https://github.com/AI-WorkDeck/aiworkdeck/actions/workflows/ci.yml/badge.svg" alt="持续集成状态"></a>
   <a href="legal/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="AGPL-3.0-or-later"></a>
