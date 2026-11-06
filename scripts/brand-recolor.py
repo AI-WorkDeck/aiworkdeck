@@ -123,7 +123,7 @@ ASSETS: dict[str, list[tuple[str, str]]] = {
 #   frontend/static/logo.png            金色抽象图形，全仓无引用，疑似废弃
 #   legal/AI Workdeck Trademark.png     商标注册申请图样，注册主体的法律文件
 #   pptx-service/**                     第三方受限许可（CC BY-NC-SA），另算
-#   */screenshots/**, doc/verification/ 产品界面截图，要重跑截图流水线而不是重上色
+#   */screenshots/**, docs/dev-notes/verification/ 产品界面截图，要重跑截图流水线而不是重上色
 #   aiworkdeck_mobile/docs/design/**    历史评审存档图
 #   *_monochrome.png / monochrome.png   纯黑白，没有品牌色
 #   desktop/build/、office-addin/installer/ 下的安装器美术（DMG 背景、NSIS 位图）

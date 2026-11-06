@@ -125,6 +125,34 @@ function extOf(name) {
   return dot < 0 ? '' : String(name).slice(dot + 1).toLowerCase()
 }
 
+/** ui.openFile 的可选定位符：只放行编辑器/预览已会消费的 docx/pdf 引文与 pdf 页码，其余字段丢弃 */
+function sanitizePluginLocator(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const type = raw.type === 'pdf' || raw.type === 'docx' ? raw.type : ''
+  if (!type) return null
+  const quote = typeof raw.quote === 'string' ? raw.quote.replace(/\s+/g, ' ').trim().slice(0, 500) : ''
+  const page = type === 'pdf' && Number.isInteger(raw.page) && raw.page >= 1 ? raw.page : null
+  if (!quote && !page) return null
+  const out = { type }
+  if (quote) out.quote = quote
+  if (page) out.page = page
+  return out
+}
+
+/** files.download：只允许导出办公文件，MIME 由宿主按扩展名决定，不信插件自报 */
+const DOWNLOAD_TYPES = {
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  csv: 'text/csv'
+}
+const DOWNLOAD_LIMIT = 20 * 1024 * 1024
+
+function pluginDownloadTarget(raw) {
+  const name = String(raw == null ? '' : raw).replace(/[\\/:*?"<>|\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, '_').replace(/^[. ]+|[. ]+$/g, '').trim().slice(0, 120)
+  const type = DOWNLOAD_TYPES[extOf(name)]
+  return type && name.length > extOf(name).length + 1 ? { name, type } : null
+}
+
 export default {
   name: 'PluginPane',
   // chat.send 与 PluginGuidePane 的快捷按钮走同一条 kickoff 路：
@@ -413,12 +441,7 @@ export default {
     businessServices() {
       if (!this._businessServices) {
         const generation = this.sessionGeneration
-        const actions = { activeFileId: () => this.activeEditor()?.fileId, ...this.businessActions, emit: (name, data) => uni.$emit(name, data), download: ({ content, name, type }) => {
-          const url = URL.createObjectURL(new Blob([content], { type }))
-          const link = document.createElement('a')
-          try { link.href = url; link.download = name; document.body.appendChild(link); link.click() }
-          finally { link.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000) }
-        } }
+        const actions = { activeFileId: () => this.activeEditor()?.fileId, ...this.businessActions, emit: (name, data) => uni.$emit(name, data), download: args => this.triggerDownload(args) }
         const voice = createPluginVoiceServices({ projectId: () => this.projectId, permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration, actions })
         const collections = createPluginCollectionServices({ projectId: () => this.projectId, permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration, actions, openFile: file => uni.$emit('awd:open-evidence-target', { fileId: file.id }) })
         const insight = createPluginInsightServices({ projectId: () => this.projectId, permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration, actions, listFiles: () => this.listProjectFiles() })
@@ -435,6 +458,12 @@ export default {
         })
       }
       return this._businessServices
+    },
+    triggerDownload({ content, name, type }) {
+      const url = URL.createObjectURL(new Blob([content], { type }))
+      const link = document.createElement('a')
+      try { link.href = url; link.download = name; document.body.appendChild(link); link.click() }
+      finally { link.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000) }
     },
     platformServices() {
       if (!this._platformServices) {
@@ -796,9 +825,23 @@ export default {
           const hit = (await this.listProjectFiles()).find(f => f.path === path)
           if (generation !== this.sessionGeneration) return this.staleContext()
           if (!hit) return { ok: false, error: { code: 'not_found', message: L('文件不存在：', 'File not found: ') + path } }
-          // 与 evidence.locate 打开底稿同一条路：工作台监听后走 openFileLinkTarget
-          uni.$emit('awd:open-evidence-target', { fileId: hit.id, locator: null, linkKey: null })
+          // 与 evidence.locate 打开底稿同一条路：工作台监听后走 openFileLinkTarget；
+          // 可选 locator（docx/pdf 引文）由编辑器/预览按既有 pendingLocator 链路定位
+          uni.$emit('awd:open-evidence-target', { fileId: hit.id, locator: sanitizePluginLocator(params.locator), linkKey: null })
           return { ok: true, result: {} }
+        }
+
+        case 'files.download': {
+          if (!this.hasPermission('file_write')) return this.denied('file_write')
+          const target = pluginDownloadTarget(params.name)
+          if (!target) return { ok: false, error: { code: 'invalid_params', message: L('仅支持下载 .xlsx、.docx 或 .csv 文件', 'Only .xlsx, .docx or .csv files can be downloaded') } }
+          const data = params.data
+          if (!(data instanceof ArrayBuffer) && !ArrayBuffer.isView(data)) {
+            return { ok: false, error: { code: 'invalid_params', message: L('data 必须是 ArrayBuffer 或字节数组', 'data must be an ArrayBuffer or byte array') } }
+          }
+          if (data.byteLength > DOWNLOAD_LIMIT) return { ok: false, error: { code: 'quota_exceeded', message: L('文件超过 20 MiB 上限', 'File exceeds the 20 MiB limit') } }
+          this.triggerDownload({ content: data, name: target.name, type: target.type })
+          return { ok: true, result: { started: true, name: target.name } }
         }
 
         // ==== 规范 v2.7 新增：doc.* / events.* / ai.request ====

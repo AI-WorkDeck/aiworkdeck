@@ -7,6 +7,10 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 职责边界：AI 对话功能本身（编排循环、工具注册分发、记忆、SSE、前端聊天 UI、评测）。AI→编辑器指令链路属 ai-doc-bridge 领域；skill 机制属 plugin-system 领域（但 SkillRouter 在编排循环里有两处旁路接入点）。
 
+## 模拟模型（本地开发，Stella 对齐 dev-onboarding）
+
+`ai.mock.enabled=true` 时 `ChatModelFactory.resolveProvider()` 恒为 `MOCK`（先于 local-mode 的 AWD_CLOUD 短路），同步/流式/辅助/限时四个入口都返回 `MockChatModel.INSTANCE`；`ensurePaidAccess` 与平台目录不参与，`/api/ai/config` 回 `activeProvider=MOCK`，前端 `requiresAiAccount('MOCK')` 为假（免账户、不收成 ASK）。模型行为确定：本轮提供了 `doc_list_project_files` 且本轮没发过工具请求 → 原生调用它一次；本轮已有工具请求 → `<final>` 摘录工具结果收尾；无工具 → `<final>` 回显。「本轮」从末尾往前数到第一条不带工具请求的 AiMessage，编排器在工具结果后追加提醒也不会再调工具。只认开关：库里或 yml 写 MOCK 不生效（设置页保存直接拒绝，`ai.model.provider=mock` 启动即失败）；`MockAiGuard` 要求激活 `dev` 且不含 prod/cloud/case/desktop，否则拒绝启动。测试：`MockChatModelTest`、`ChatModelFactoryTest.mockFlag*`。它只证明链路通，不能当作任何模型质量或真实 AI 验收的证据。
+
 ## 参数式提问兼容（2026-11-04，dev-board#1708）
 
 `XmlToolCallParser` 支持完整的 `<ask_user><parameter=question>…</parameter>…</ask_user>`，字段仅 question/options/header/multi_select，沿原严格协议块边界及 AskUserQuestion 校验；代码、引用、thinking/final 或普通正文混合输出不据此执行。前端 `legacyAskUserMarkup.mjs` 可将合法独立行包装显示为兼容提问卡，流式与历史共用；非法/截断保留字面文本，不猜执行、不伪造服务端等待状态。混合正文的停机问题与模型把内部分析写入 content 的来源仍需原始回执，不能将显示兼容称为两者均已修复。回归 XmlToolCallParserTest 与 legacy-ask-user-stream.test.mjs。
@@ -25,6 +29,11 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 - 中英基底提示约定聊天正文的 `legal-reference` JSON 围栏（单个对象或数组）：`kind: LAW|CASE|PENALTY`、`title`，可选 `documentNumber/authority/date/effectiveDate/validity/source/url/summary/excerpt`。`summary` 是 AI 整理、`excerpt` 是读取到的原文节选；模型卡固定待核对，忽略自报 verified，不因卡片展示额外要求付费查询，也不能把协议写进文档。`ContextAssemblerService.spliceToolGuidance` 按 OFFICE 能力删除卡片提示段（插件暂未支持此渲染），保留正常检索与案例工具说明。处罚与其他法域沿 `search_web/browse_url` 查公开来源。
 - 五个法宝工具的 UI/历史显示上限采用现有结果型 16,000 字符，模型上下文仍保留原始结果。不解析截断 JSON 来伪造资料卡，不把检索成功或来源字段当作真实性、现行效力或适用性认证。前端原始工具输出继续展示截断提示。
 - 回归：`LegalToolsValidationTest`、`ExternalServiceDualTierRoutingTest`、`ToolDisclosurePolicyTest`、`ContextAssemblerServiceTest`、`SystemPromptToolVisibilityContractTest`、`AgentOrchestratorQuestionStopTest`、`ToolDisplayNameCoverageTest`、`ToolChoiceSurfaceTest`。合成通道测试不代表供应商实查、模型遵循率或正式客户端验收。
+
+## 能力目录与本机 MCP 服务器（Stella 对齐，docs/plans/stella-alignment/mcp-server.md）
+
+- `@ToolMeta.access()` 默认 INFERRED，由 `service/ai/capability/CapabilityCatalog` 按工具名动词推断 read/write/destructive（认不出算 write），并推出 scope `awd:<领域>.<read|write>`。`docs/capability-catalog.md` 由 `CapabilityCatalogDocTest` 生成并做漂移比对：**增删改工具后要重新生成**（`AWD_WRITE_CAPABILITY_CATALOG=1 mvn test -Dtest=CapabilityCatalogDocTest`），推断不对就在 `@ToolMeta` 显式写 access。
+- AWD 自身作为 MCP 服务器：`LocalMcpServerController` 的 `POST /mcp`（只在 local-mode，默认关闭=404，`Authorization: Bearer awdm_...`，带 Origin 拒绝）与 `/api/mcp-server/{status,enable,disable}`；工具在 `service/mcpserver/LocalMcpServerTools`，全部只读、不经 ToolRegistry、读文件不走 OCR。新增 MCP 工具必须登记 `DEFINITIONS`，只能是 read（测试钉着）。
 
 ## 独立 MCP 连接（dev-board#1599）
 
@@ -48,7 +57,7 @@ GET 返回非密 `scopeToken`，所有 mutation 必须发送加载表单时的 `
 
 真实 Word→PPT 与 PPT→PPT 各生成三页，已逐页视觉检查及正常保存重开。Word 场景曾因可选润色反复检查而用自然语言引导收尾；PPT 场景在补强新建入口的参考像素学习要求后，模型自行修复换行/重叠/低对比并结束，一次视觉超时重试成功。两类原稿 hash 未变；失败轮与最终快照范围详见验收记录，不将首稿或纯工具通过称为成品通过。
 
-真实 AI 验收须使用产品 Agent/工具/编辑器完整链，隔离数据与专用 QA 账户；后端 BYOK 可执行条件不等于前端模型选择免登录。模型接口请求成功、技能存在或模拟模型单测通过，都不能替代参考 Word/PPT 的成品逐页视觉验收。当前实测及待验记录见 `doc/verification/2026-10-28-ppt-quality.md`。
+真实 AI 验收须使用产品 Agent/工具/编辑器完整链，隔离数据与专用 QA 账户；后端 BYOK 可执行条件不等于前端模型选择免登录。模型接口请求成功、技能存在或模拟模型单测通过，都不能替代参考 Word/PPT 的成品逐页视觉验收。当前实测及待验记录见 `docs/dev-notes/verification/2026-10-28-ppt-quality.md`。
 
 ## 手动展开与阅读位置（dev-board#1568）
 
@@ -130,7 +139,7 @@ MemoryPipelineService对OFFICE跳过自动摘要及后台同步，避免将Syste
 
 `useAgentStream` 在 `doc_stream_end` 先冲正文尾部缓冲、再解除正文抑制并删除临时占位；同轮提前来的 final 也删除占位，异步编辑器失败仍追加可见通知。`chatTimeline` 在占位删除后回退文本索引，防短总结落在旧位置。历史裸文档正文去重未在本次扩展；旧会话无 final 不会被自动补写。
 
-验证：`AgentOrchestratorDocumentSummaryTest`、`AgentStreamHandlerDocumentFinalTest`、`frontend/tests/project-home/doc-stream-summary.test.mjs` 与 `frontend/tests/chat-presentation-ui/doc-stream-summary.mjs`（真实 ChatInterface + 合成 SSE）。现场与验收边界见 `doc/verification/2026-10-21-doc-stream-summary-1392.md`；未发正式包，不代表用户客户端实模复测。
+验证：`AgentOrchestratorDocumentSummaryTest`、`AgentStreamHandlerDocumentFinalTest`、`frontend/tests/project-home/doc-stream-summary.test.mjs` 与 `frontend/tests/chat-presentation-ui/doc-stream-summary.mjs`（真实 ChatInterface + 合成 SSE）。现场与验收边界见 `docs/dev-notes/verification/2026-10-21-doc-stream-summary-1392.md`；未发正式包，不代表用户客户端实模复测。
 
 ## 试用回合归属（dev-board#1166，2026-10-10）
 
@@ -1119,8 +1128,8 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
 - `service/ai/memory/document/*`、`MemoryDocumentController`、`MemoryDocument`/`MemoryDocumentSpace` 是 Markdown 记忆真源。`/api/ai/memory/{spaces,files,file,download}`；个人/项目使用权限校验后的 opaque spaceId，团队/律所由官网共享服务校验成员/管理员。每空间 remember.md 自动维护 topic 链接；UTF-8 128 KiB、路径校验、expectedRevision 冲突及删除墓碑由后端负责。legacy 读写/同步向同一文档服务收敛，不保留可独立写入的副本。
 - **项目记忆按内部材料保护**（dev-board#1256）：其中可能含未开放文件的摘录，不能因为客户是项目成员就公开。客户的项目空间只返回无 ID、固定名称的不可用占位，已知 spaceId 的列表/正文/搜索/下载/写入/删除同样拒绝；上下文索引不注入该空间。统一 `isClient` 优先于项目 ADMIN 等角色；客户自己的个人记忆仍可用，内部 READ_ONLY 成员仍可读项目记忆。
 - `MemoryTools` 暴露 memory_list/read/search/write/edit/delete；Agent/Plan 的 skill 白名单不能隐藏这些基础工具，ASK 只允许前三个。没被 skill 收窄的 Agent/Plan 回合里只读三个每轮必下发（每轮注入的索引点名要 memory_read），写入三个归渐进披露的 memory 类目（dev-board#1073，详见「工具规格瘦身与渐进披露」那张核心集表下的注）。ContextAssembler 每轮注入有权限的限量索引，正文按需由模型读取。`MemoryBrowser.vue` 从对话与设置进入，支持索引跳转、编辑、下载及冲突提示。
-- 桌面共享记忆使用已连接账户 Bearer；服务器使用专用 `memory.shared.base-url`/`memory.shared.secret` 与绑定账户 ID，不能复用只读协作目录密钥。官网配套契约与 PR 见 `doc/ai-alignment/memory-report.md`；无账户/服务未配置的共享空间显示不可用，不能伪装成本地共享。
-- 测试与实际结果：`doc/ai-alignment/validation-report.md`；隔离运行配方：`doc/ai-alignment/test-environment.md`。不可将模拟 provider E2E 称为真实模型测试。
+- 桌面共享记忆使用已连接账户 Bearer；服务器使用专用 `memory.shared.base-url`/`memory.shared.secret` 与绑定账户 ID，不能复用只读协作目录密钥。官网配套契约与 PR 见 `docs/dev-notes/ai-alignment/memory-report.md`；无账户/服务未配置的共享空间显示不可用，不能伪装成本地共享。
+- 测试与实际结果：`docs/dev-notes/ai-alignment/validation-report.md`；隔离运行配方：`docs/dev-notes/ai-alignment/test-environment.md`。不可将模拟 provider E2E 称为真实模型测试。
 
 ## 一条消息的完整链路
 
@@ -1726,7 +1735,7 @@ template :1-539；script :541-1879（模式/模型选择 :648-766、文件变更
 
 ## 超时与失败收尾补充（2026-09-15，dev-board#650）
 
-SSE 建连只等待响应头15秒，已有长流不套这个上限；发送中初次连接失败也必须reject。停止先结束本地等待，再独立用10秒请求确认后台取消，失败不能写“已停止”。模型generate同步抛错走handler.onError同一终态闸，工具准备/本地压缩完成才启动首字看门狗。验证见 `agent-stream-connect/abort` 和 `AgentOrchestratorFailoverFlowTest`；完整矩阵与成本流程见 `doc/ai-timeout-cost-audit.md`。
+SSE 建连只等待响应头15秒，已有长流不套这个上限；发送中初次连接失败也必须reject。停止先结束本地等待，再独立用10秒请求确认后台取消，失败不能写“已停止”。模型generate同步抛错走handler.onError同一终态闸，工具准备/本地压缩完成才启动首字看门狗。验证见 `agent-stream-connect/abort` 和 `AgentOrchestratorFailoverFlowTest`；完整矩阵与成本流程见 `docs/dev-notes/ai-timeout-cost-audit.md`。
 
 ## 参考来源工具 ref_*（2026-09-18，dev-board#717-720）
 

@@ -118,7 +118,7 @@ public class EnterpriseDataTools implements AgentToolComponent {
             "icp", "get_internet_service_info",
             "ipr_pledge", "get_ipr_pledge");
 
-    @ToolMeta(displayName = "查询企业知识产权", category = "data")
+    @ToolMeta(displayName = "查询企业知识产权", category = "data", access = ToolMeta.Access.READ)
     @Tool("Look up a Chinese company's intellectual-property records by company name or unified social credit code. "
             + "kind must be one of: trademark (商标), patent (专利), intl_patent (国际专利), "
             + "software_copyright (软件著作权), work_copyright (作品著作权), "

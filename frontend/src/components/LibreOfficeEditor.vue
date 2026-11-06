@@ -248,6 +248,11 @@ function authorNames() {
 function currentAuthorName() { return authorNames().current() }
 // 保存失败后的有界退避（B7）：第 n 次连续失败等 SAVE_RETRY_DELAYS_MS[n]，封顶 60 秒。
 const SAVE_RETRY_DELAYS_MS = [5000, 15000, 30000, 60000]
+// 脏数据存活超过该时长即不再为「命令繁忙 / 刚输入」让路，强制导出保存（崩溃丢失上限）。
+const FORCE_SAVE_DIRTY_AGE_MS = 10000
+// AI 命令在飞（修订风暴）时仍按旧的 60s 上限：每 10s 硬塞一次全文导出会把风暴中的
+// 滚动重新冻住（见 autoSave 注释）；用户自己打字停顿时才用 10s。
+const FORCE_SAVE_DIRTY_AGE_BUSY_MS = 60000
 
 export default {
   name: 'LibreOfficeEditor',
@@ -537,6 +542,15 @@ export default {
     this._onEvidenceDragEnd = () => { this.evidenceDropArmed = false; this.evidenceDropOver = false; this._dragEndedAt = Date.now() }
     uni.$on('file-drag-start', this._onEvidenceDragStart)
     uni.$on('file-drag-end', this._onEvidenceDragEnd)
+    // 页面隐藏 / 关闭时尽力 flush 一次（导出需要存活的 webview，不保证完成）。
+    // 只对正常可存的实例补存：手动重试态（_savePaused）、未就绪、装载失败、重载中都不碰，
+    // 否则每次切走窗口都把已知失败的上传再撞一遍（池里每个脏实例同时撞）。
+    this._onPageHide = () => {
+      if (this.dirty && !this._saveDiscarded && !this._savePaused && this.ready && !this.docLoadFailed && !this._reloading) this.flushSave().catch(() => {})
+    }
+    this._onVisibilityChange = () => { if (typeof document !== 'undefined' && document.visibilityState === 'hidden') this._onPageHide() }
+    if (typeof window !== 'undefined') window.addEventListener('pagehide', this._onPageHide)
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', this._onVisibilityChange)
     this._onThemeChanged = () => this.pushTheme()
     uni.$on(APP_THEME_EVENT, this._onThemeChanged)
     // AI 写完一笔的无损通知（dev-board#460）：引擎的 modified 边沿是有损的
@@ -583,6 +597,8 @@ export default {
     this.inlineReviewState = null
     uni.$off('file-drag-start', this._onEvidenceDragStart)
     uni.$off('file-drag-end', this._onEvidenceDragEnd)
+    if (typeof window !== 'undefined') window.removeEventListener('pagehide', this._onPageHide)
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', this._onVisibilityChange)
     if (this._onThemeChanged) { uni.$off(APP_THEME_EVENT, this._onThemeChanged); this._onThemeChanged = null }
     if (this._onDocMutated) { uni.$off(DOC_MUTATED_EVENT, this._onDocMutated); this._onDocMutated = null }
     // Autosave timers die with the instance. Any still-dirty edits were flushed
@@ -2365,10 +2381,13 @@ export default {
       // Qt 事件循环（滚动/输入/重绘）整段冻住。AI 修订风暴期间 modify 不断，旧的
       // 15s max-wait 会把导出硬塞进风暴中间 → 用户「完全无法滚动的假死」。
       // 改为：命令在飞或刚结束（<1.5s）时让路、等空闲窗口再导出；只有脏数据
-      // 超过 60s 才强制保存（崩溃丢失上限从 15s 放宽到 60s，换取修订期不冻结）。
+      // 超过上限才强制保存（崩溃丢失上限）：用户输入时 10s，AI 命令在飞时 60s。
       const dirtyAge = this._dirtySince ? Date.now() - this._dirtySince : 0
       const sinceCmd = Date.now() - Math.max(this._lastCmdAt || 0, this._lastInteractionAt || 0)
-      if ((this._cmdBusy > 0 || sinceCmd < 1500) && dirtyAge < 60000) {
+      // 大文档整篇导出本身就要十几秒（150 页基准 12–17s），期间输入冻住；上限至少取
+      // 上次导出耗时的 4 倍，冻住的时间不超过编辑时间的约五分之一。
+      const forceAfter = Math.max(this._cmdBusy > 0 ? FORCE_SAVE_DIRTY_AGE_BUSY_MS : FORCE_SAVE_DIRTY_AGE_MS, 4 * (this._lastExportMs || 0))
+      if ((this._cmdBusy > 0 || sinceCmd < 1500) && dirtyAge < forceAfter) {
         clearTimeout(this._saveTimer)
         this._saveTimer = setTimeout(() => this.autoSave(), 2000)
         return
@@ -2630,7 +2649,8 @@ export default {
             context: saveContext, generation, acknowledged: false }
         }
         const res = await this.executor.executeCommand('export_document', params)
-        this.appendLog('  ← export ' + (Date.now() - tExp) + 'ms')
+        this._lastExportMs = Date.now() - tExp
+        this.appendLog('  ← export ' + this._lastExportMs + 'ms')
         if (!res || !res.success) throw Object.assign(new Error((res && res.message) || 'export_document returned no success'), { code: res?.code })
         // Structured clone across the relay hops may surface bytes as
         // Uint8Array / ArrayBuffer / plain array — normalize (mirror of the

@@ -70,7 +70,7 @@ AI 编程工具已经展示了智能体进入实际工作环境的价值。专�
 <summary><strong>查看扩展广场</strong></summary>
 
 <p align="center">
-  <img src=".github/assets/marketplace-live.png" alt="应用内插件与可复用 Skill 广场" width="1000">
+  <img src="docs/images/marketing/e2e/plugin-market.png" alt="应用内插件与可复用 Skill 广场" width="1000">
 </p>
 
 扩展广场截图使用虚构演示材料。实际评估请使用[最新版本](https://github.com/AI-WorkDeck/aiworkdeck/releases/latest)。

@@ -266,7 +266,7 @@ NORMAL `#3B82F6`，`tagTypes.js` 与 TagService 两处同值）。分组展示�
 
 **长文即时朗读（dev-board#1337/#1338）**：`EasyVoicePane.vue` 的按钮是“开始朗读”，通过 `utils/ttsText.js` 按自然标点/长度上限保留原文分段，`utils/ttsReader.js` 串行调用现有 `/api/tts/generate`，首段返回即播、同时准备后段；不要再次等全部段完成才建播放器。字幕来自朗读时的文本快照，由每段真实 `playing` 事件更新，保留 `highlight-sentence/clear-highlight` 对文档宿主的兼容事件；不按字数占比猜时间。播放中语速直接修改 HTMLAudioElement.playbackRate（保音高），合成固定 rate=1，避免倍率叠乘；下载按钮明确为原速 WAV，仅全部合成成功后可用，`utils/ttsWav.js` 合并PCM数据并重写头部，不能拼接多个RIFF文件。编辑/清空/导入新文本、停止和卸载都使旧任务失效并abort客户端请求，禁止迟到播放；已在Python运行的单段仍可能算完，不声称推理即时中止。`generateTtsAudio` 传 signal、logBody:false，避免记录文书正文。回归 `npm run test:tts`，现有 `test:project-home` 和 `test:optional-components`；真实浏览器/本机模型性能另见本次PR和 `docs/tts-instant-reading-research-2026-10-17.md`，源码合并不等于已发版。
 
-**朗读面板与键盘（dev-board#1339）**：音色使用共享 `AwdSelect` 的可选 `searchable/searchLabel/searchPlaceholder/emptyText`，过滤后仍发出原始 `range` 下标；当前朗读使用启动时的音色快照，更换音色在下次朗读生效。播放速度0.5–2x，方向键每次0.05、PageUp/Down每次0.25、Home/End到边界，恢复原速不重合成。Uni H5 的按钮和滑杆不是原生 HTML 控件，Enter/Space、焦点、禁用态和 slider ARIA 须显式接通；正文通过真实 textarea 的原生 input 监听同步（卸载时解除），避免 Uni 的100ms输入节流截尾，也不要在开始时无条件将DOM值反灌模型（导入后的DOM可能尚未更新）。真正聚焦的 textarea/search input 还须设置可访问名称，不能只标 Uni 外壳。错误提示持久显示，面板遵守 `doc/sidebar-ui-standard.md` 和跨平台设计令牌。真实 Uni 编译的隔离浏览器回归见 `frontend/tests/tts-panel-ui/README.md`，其服务与音频为合成夹具，不等同于已安装 Electron、完整工作台或正式发版验收。
+**朗读面板与键盘（dev-board#1339）**：音色使用共享 `AwdSelect` 的可选 `searchable/searchLabel/searchPlaceholder/emptyText`，过滤后仍发出原始 `range` 下标；当前朗读使用启动时的音色快照，更换音色在下次朗读生效。播放速度0.5–2x，方向键每次0.05、PageUp/Down每次0.25、Home/End到边界，恢复原速不重合成。Uni H5 的按钮和滑杆不是原生 HTML 控件，Enter/Space、焦点、禁用态和 slider ARIA 须显式接通；正文通过真实 textarea 的原生 input 监听同步（卸载时解除），避免 Uni 的100ms输入节流截尾，也不要在开始时无条件将DOM值反灌模型（导入后的DOM可能尚未更新）。真正聚焦的 textarea/search input 还须设置可访问名称，不能只标 Uni 外壳。错误提示持久显示，面板遵守 `docs/dev-notes/sidebar-ui-standard.md` 和跨平台设计令牌。真实 Uni 编译的隔离浏览器回归见 `frontend/tests/tts-panel-ui/README.md`，其服务与音频为合成夹具，不等同于已安装 Electron、完整工作台或正式发版验收。
 
 
 账户失效补充（dev-board#1623）：云转写提交或后台轮询的凭据拒绝会持久化账户 `authExpired`。
@@ -505,6 +505,8 @@ uni 依赖换桩；SSR 合并 class 的顺序不固定，按「含有这个类�
   两档的 `OcrResult.text` 一律由 `OcrResult.lines(raw, content)` 从 `raw.subImages[].blockInfo.blockDetails[]`
   逐行拼出（子图之间空一行），raw 无分块才退回 `content`；`raw` 原样保留。截图摘录、AI 读扫描件、
   右键导出同时受益。不改请求参数、不增调用次数。回归 `OcrLineBreaksTest`。
+  阿里云把千分位写成全角「4，200，000」：凡读阿里云文字处（`lines`、`AliyunLayoutReader` 的段落与单元格、
+  可搜索 PDF 文字层）一律过 `OcrResult.digitGroups`，只改「数字，三位数字」里的逗号。回归 `OcrDigitGroupingTest`。
   **保留版式的 Word / 可搜索 PDF（tutorial-series#155 第二期）**：右键子菜单后两项，
   `FileOcrService.Output.LAYOUT_DOCX / SEARCHABLE_PDF` → `OcrExportService`。云端走同一扣费点
   `recognizeGeneral(base64, layout=true)`：两档同一白名单（`AliyunOcrClient.buildRequest` 与官网
@@ -685,7 +687,7 @@ FilePickerDialog :298 / EasyVoicePane :537 / DesensitizePane :543 / SearchPanel 
 
 ## 转写超时与重取结果（2026-09-15，dev-board#650）
 
-云转写等待阈值为max(3小时,音频时长×3)，先查询上游结果再判断本地等待超时。结果下载失败保留原taskId；本地超时后重试查询原任务，不重新提交计费。兼容旧“转写超时”记录，EMPTY终态幂等，锁内用最新快照判断任务与终态。外部真正FAILED仍走原重试流程。本地请求取消不保证上游停止计费，详见 `doc/ai-timeout-cost-audit.md`。
+云转写等待阈值为max(3小时,音频时长×3)，先查询上游结果再判断本地等待超时。结果下载失败保留原taskId；本地超时后重试查询原任务，不重新提交计费。兼容旧“转写超时”记录，EMPTY终态幂等，锁内用最新快照判断任务与终态。外部真正FAILED仍走原重试流程。本地请求取消不保证上游停止计费，详见 `docs/dev-notes/ai-timeout-cost-audit.md`。
 
 
 ## 压缩包内文件预览与拖出（dev-board#1357/#1358，2026-10-19）

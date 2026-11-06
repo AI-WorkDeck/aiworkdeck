@@ -3,13 +3,45 @@
 
 # Getting started
 
-> Originally contributed by @AzazelSensei in #730; refreshed 2026-09-29.
+> Originally contributed by @AzazelSensei in #730; refreshed 2026-09-29; quickstart added 2026-11.
 
 This is the from-source path for contributors and self-hosters. If you only want to try the product, download a [desktop release](https://github.com/AI-WorkDeck/aiworkdeck/releases/latest) instead; it bundles the backend, a JRE, and a local database, so none of the prerequisites below are needed.
 
+## Run it in 5 minutes / 5 分钟跑起来
+
+You need **Docker**, **JDK 21**, **Maven 3**, and **Node.js 20+** (npm). No AI key, no account.
+
+```bash
+git clone https://github.com/AI-WorkDeck/aiworkdeck.git
+cd aiworkdeck
+./scripts/quickstart.sh
+```
+
+One command does the rest:
+
+1. starts PostgreSQL (pgvector) in Docker on `127.0.0.1:55432` ([`docker-compose.dev.yml`](../docker-compose.dev.yml));
+2. builds the backend and starts it on `127.0.0.1:9696` with the `dev` profile: no sign-in, **mock AI on**;
+3. creates a demo project, 「演示案件：买卖合同纠纷」, with four fictional case documents ([`fixtures/evidence-demo-1076`](../fixtures/evidence-demo-1076));
+4. installs frontend dependencies on first run, starts the H5 dev server on `http://localhost:5173`, and opens the demo project's workbench in your browser. (In a plain browser the H5 root page is the sign-in page, which the desktop shell skips. The `dev` profile needs no sign-in, so the script opens the workbench URL directly.)
+
+The first run downloads Maven and npm dependencies, so it takes longer than later runs. `Ctrl-C` stops the backend and frontend. The database keeps running; stop it with `docker compose -f docker-compose.dev.yml down` (add `-v` to delete the data). Logs, uploaded files, and the backend's isolated home directory are kept in `.quickstart/` (git-ignored), not in your desktop app's `~/.aiworkdeck`.
+
+**Mock AI.** With the `dev` profile the chat uses a deterministic fake model (`MockChatModel`). In Agent mode it calls one read-only tool (`doc_list_project_files`), then answers with an excerpt of the result. In Ask mode it echoes your message. Each reply says it is a mock. This lets you work on the chat UI, tool calls, and SSE stream without a key. The mock only starts with the `dev` profile. If `ai.mock.enabled=true` is combined with `prod`, `cloud`, `case`, or `desktop`, the backend refuses to start. The mock cannot be selected in Settings.
+
+| Variable | Effect |
+|---|---|
+| `AI_MOCK_ENABLED=false` | Use a real provider instead (configure it in Settings; cloud models require signing in) |
+| `AWD_SKIP_BUILD=1` | Reuse the existing backend jar |
+| `AWD_NO_OPEN=1` | Do not open the browser |
+| `AWD_DB_PORT=55432` | Host port for PostgreSQL |
+
+The quickstart starts only the minimal stack. OCR (MinerU), PPT generation, speech, and other sidecars are not started, and features that depend on them report that the component is unavailable. To run the full contributor stack, use `restart-all.sh` below. For a server deployment, see [self-hosting](self-hosting.md).
+
+## Full stack (sidecars and desktop shell)
+
 > **Root `docker-compose.yml` is not a full stack / 根目录 compose 不是全栈.** It only starts the MinerU and PPTX sidecars; the backend, frontend, and PostgreSQL run on the host via `restart-all.sh`. See [docker-sidecars.md](docker-sidecars.md). Law-firm evaluators should start with [firm-eval-topology-a.md](firm-eval-topology-a.md) (desktop release, no prerequisites).
 
-## Prerequisites
+### Prerequisites
 
 | Requirement | Version |
 |---|---|
@@ -22,7 +54,7 @@ This is the from-source path for contributors and self-hosters. If you only want
 
 `restart-all.sh` is a bash script that relies on `lsof`; it is written for macOS and Linux.
 
-## Run the stack
+### Run the stack
 
 ```bash
 git clone https://github.com/AI-WorkDeck/aiworkdeck.git

@@ -70,7 +70,7 @@ The engineering focus is the quality of the resulting file: preserving structure
 <summary><strong>See the extension marketplace</strong></summary>
 
 <p align="center">
-  <img src=".github/assets/marketplace-live.png" alt="The in-app marketplace for plugins and reusable Skills" width="1000">
+  <img src="docs/images/marketing/e2e/plugin-market.png" alt="The in-app marketplace for plugins and reusable Skills" width="1000">
 </p>
 
 In-app marketplace capture using fictional demo materials. For an evaluation build, use the [latest release](https://github.com/AI-WorkDeck/aiworkdeck/releases/latest).

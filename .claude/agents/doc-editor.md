@@ -15,7 +15,7 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 
 新增 AI 工具 `PdfVisualTools.pdf_inspect_visual` 与工具栏 `DocumentVisualReviewService` 分属两条入口：AI 工具接收已导出的 PDF 文件，实际渲染目标页与可选参考页交给支持视觉的辅助模型；工具栏仍沿用用户发起、revision 守卫与当前编辑器导出流程。两者均不能用结构数据冒充像素核验，也不自动修改文档。参考 Word/PPT 须先读格式再导出对照，精确字号/缩进以结构为准，视觉判断覆盖布局、密度、颜色与裁切。
 
-专项 `frontend/tests/lowa-e2e/ppt-precision.mjs` 覆盖真实引擎插页、局部替换、陈旧目标拒绝、背景、段距/行距/缩进及导出重开；`frontend/tests/lowa-unit/slide-precision.test.mjs` 覆盖部分失败与无副作用拒绝。全套 LOWA 回归、专项结果与真实 AI 验收边界见 `doc/verification/2026-10-28-ppt-quality.md`，不能用 PPT 结果替代 Word/Excel/PDF 对应路径的验证。
+专项 `frontend/tests/lowa-e2e/ppt-precision.mjs` 覆盖真实引擎插页、局部替换、陈旧目标拒绝、背景、段距/行距/缩进及导出重开；`frontend/tests/lowa-unit/slide-precision.test.mjs` 覆盖部分失败与无副作用拒绝。全套 LOWA 回归、专项结果与真实 AI 验收边界见 `docs/dev-notes/verification/2026-10-28-ppt-quality.md`，不能用 PPT 结果替代 Word/Excel/PDF 对应路径的验证。
 
 ## Calc 排序的原生契约（2026-10-28，dev-board#1576）
 
@@ -25,7 +25,7 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 
 排序仍先拒绝受保护表、无效/越界排序列和超过5000格的范围；单行/单格明确no-op，防止Calc自动扩大单格选区。原生排序负责移动单元格内容、随行样式和行内相对公式引用，不覆盖用户的外部引用策略。本轮默认配置下，范围外 `H1=D2` 保持指向D2坐标，排序后跟随D2当前值；不能承诺外部公式自动跟随原记录。错误回执为 `SHEET_SORT_FAILED`，detail保留宿主异常。
 
-独立 `frontend/tests/lowa-unit/sheet-sort.test.mjs` 5项通过；`frontend/tests/lowa-e2e/sheet-sort.mjs` 真实Calc覆盖非A1范围、表头、升序/无表头降序、公式结果与文本、字体底色随行、保存重开及单格不扩大目标。默认读取当前worker源码并经测试服务内存替换；`SHEET_SORT_WORKER`可指定旧源码负对照。详细命令、日志及临时产物见 `doc/verification/2026-10-28-excel-desktop-quality.md`。该专项不是完整AI编排，也不证明Office/WPS实机通过。
+独立 `frontend/tests/lowa-unit/sheet-sort.test.mjs` 5项通过；`frontend/tests/lowa-e2e/sheet-sort.mjs` 真实Calc覆盖非A1范围、表头、升序/无表头降序、公式结果与文本、字体底色随行、保存重开及单格不扩大目标。默认读取当前worker源码并经测试服务内存替换；`SHEET_SORT_WORKER`可指定旧源码负对照。详细命令、日志及临时产物见 `docs/dev-notes/verification/2026-10-28-excel-desktop-quality.md`。该专项不是完整AI编排，也不证明Office/WPS实机通过。
 
 ## 输入法中间态光标（dev-board#1597）
 
@@ -39,7 +39,7 @@ LOWA 与原生候选在组合期间显示同一个持有焦点的真实 input，
 
 PPT 内容修改立即失效缩略图，但全篇导航清单等宿主允许后台工作时才读；Calc 保留原即时更新，防止同数量工作表重命名在保存失败时停留旧名。页增删、移动和撤销/重做由 worker 完成后发带 documentSeq 的结构事件，覆盖宿主按钮及 guest IME 快捷键，宿主只接受当前已就绪文档。结构刷新不受内容空闲门限制。
 
-回归：`tests/lowa-unit/ppt-interaction-read.test.mjs`、`slide-precision.test.mjs`、`tests/toolbar/ui-state-refresh.test.mjs`。完整桌面性能入口 `tests/desktop-e2e/ppt-interaction-latency.mjs` 使用合成文件、隔离路径/端口、正常自动保存与关闭重开；基线模式只恢复完整状态读取，非完整历史版本。计时用 compositor 帧匹配稳定后的实际画面，排除光标闪烁；首个变化像素可能只是形状边框，不能当作文字已经出现。须审阅匹配帧及新页连续帧、核验实际文字与原生 chrome 隐藏，不能用接口耗时替代画布体验。PPT_LATENCY_SOURCE_ROOT 可指定另一个完整旧源码构建作全链路基线；详见 doc/verification/2026-10-30-ppt-edit-latency.md。Word/Calc 保持原状态路径，PDF 使用 Chromium 预览，不经过本路径；四格式联查继续用 `tests/desktop-e2e/electron-upgrade.mjs`。
+回归：`tests/lowa-unit/ppt-interaction-read.test.mjs`、`slide-precision.test.mjs`、`tests/toolbar/ui-state-refresh.test.mjs`。完整桌面性能入口 `tests/desktop-e2e/ppt-interaction-latency.mjs` 使用合成文件、隔离路径/端口、正常自动保存与关闭重开；基线模式只恢复完整状态读取，非完整历史版本。计时用 compositor 帧匹配稳定后的实际画面，排除光标闪烁；首个变化像素可能只是形状边框，不能当作文字已经出现。须审阅匹配帧及新页连续帧、核验实际文字与原生 chrome 隐藏，不能用接口耗时替代画布体验。PPT_LATENCY_SOURCE_ROOT 可指定另一个完整旧源码构建作全链路基线；详见 docs/dev-notes/verification/2026-10-30-ppt-edit-latency.md。Word/Calc 保持原状态路径，PDF 使用 Chromium 预览，不经过本路径；四格式联查继续用 `tests/desktop-e2e/electron-upgrade.mjs`。
 
 ## Calc 标题与输入时钟候选（dev-board#1509 / #1511）
 
@@ -686,4 +686,4 @@ Qt/WASM 放映陷阱：UNO `activate/gotoNextSlide` 只改变状态，渲染循�
 
 ## 新文档窗口的原生黑边（dev-board#1688）
 
-空白预热后装载真实文档会创建替换Qt窗口；Fullscreen和UNO窗口几何正确仍可能保留顶部26px、左4px的旧装饰空隙。真实LOWA隔离浏览器已复现，同尺寸resize可清除，viewData和光标几何不变；改宿主底色或反复Fullscreen开关不能作为修复。`set_chrome`实际变更后发一次`ui_layout`，Boot仅在ready且画布非零时同步当前几何；只读可见性查询不发，不恢复周期resize心跳。回归boot-resize与nativeMenuPrune，实测范围见doc/verification/2026-11-04-editor-black-edge.md。
+空白预热后装载真实文档会创建替换Qt窗口；Fullscreen和UNO窗口几何正确仍可能保留顶部26px、左4px的旧装饰空隙。真实LOWA隔离浏览器已复现，同尺寸resize可清除，viewData和光标几何不变；改宿主底色或反复Fullscreen开关不能作为修复。`set_chrome`实际变更后发一次`ui_layout`，Boot仅在ready且画布非零时同步当前几何；只读可见性查询不发，不恢复周期resize心跳。回归boot-resize与nativeMenuPrune，实测范围见docs/dev-notes/verification/2026-11-04-editor-black-edge.md。

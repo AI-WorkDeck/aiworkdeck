@@ -1,0 +1,90 @@
+# 供应链卫生：密钥扫描 + SBOM（docs/plans/stella-alignment/compliance.md）。
+# - secret-scan：gitleaks 只扫本次 PR / push 新增的提交。历史里已有的发现见设计文档，
+#   不改写历史，所以这里不做全历史阻断。
+# - sbom：生成 CycloneDX SBOM，作为 CI 产物上传（不入库）。
+# 两个工具都按版本 + sha256 固定下载，不用 gitleaks-action（组织仓库要许可证）。
+name: Supply chain
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GITLEAKS_VERSION: 8.30.1
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+  SYFT_VERSION: 1.55.0
+  SYFT_SHA256: bb65249542db5fedeeb4d3f9b018b75e7264dbfbbb10486f044581a92f90490d
+  CYCLONEDX_MAVEN_VERSION: 2.9.1
+
+jobs:
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks
+        run: |
+          curl -fsSL -o gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum -c -
+          tar -xzf gitleaks.tgz -C "$RUNNER_TEMP" gitleaks
+      - name: Scan new commits
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          # workflow_dispatch 或新分支没有 before：退化为只扫当前工作树。
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            "$RUNNER_TEMP/gitleaks" dir . --redact --no-banner --exit-code 1
+          else
+            "$RUNNER_TEMP/gitleaks" git . --log-opts="$BASE..$HEAD_SHA" --redact --no-banner --exit-code 1
+          fi
+
+  sbom:
+    name: SBOM (CycloneDX)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Install plugin-api (host SPI, local artifact)
+        run: mvn -B -q -f backend/plugin-api/pom.xml install -DskipTests
+      - name: Maven SBOM (backend, resolved transitive dependencies)
+        run: |
+          mkdir -p sbom
+          mvn -B -q -f backend/pom.xml \
+            "org.cyclonedx:cyclonedx-maven-plugin:${CYCLONEDX_MAVEN_VERSION}:makeAggregateBom" \
+            -DoutputFormat=json -DoutputName=bom -DincludeTestScope=false
+          cp backend/target/bom.json sbom/backend-maven.cdx.json
+      - name: Install syft
+        run: |
+          curl -fsSL -o syft.tgz "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz"
+          echo "${SYFT_SHA256}  syft.tgz" | sha256sum -c -
+          tar -xzf syft.tgz -C "$RUNNER_TEMP" syft
+      - name: Repository SBOM (npm lockfiles, Python locks, other manifests)
+        # 扫源码树里的清单与锁文件：npm package-lock.json、Python requirements/uv.lock、
+        # 插件与示例的 pom.xml 等。backend 的传递依赖以上一步 Maven SBOM 为准。
+        run: |
+          "$RUNNER_TEMP/syft" scan dir:. \
+            --exclude './sbom' --exclude './backend/target' \
+            --source-name aiworkdeck --source-version "${GITHUB_SHA}" \
+            -o cyclonedx-json=sbom/repo.cdx.json
+      - name: Summarize
+        run: |
+          for f in sbom/*.cdx.json; do
+            echo "$f: $(jq '.components | length' "$f") components"
+          done | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom/
+          retention-days: 90

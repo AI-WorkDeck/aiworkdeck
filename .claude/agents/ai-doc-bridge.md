@@ -31,7 +31,7 @@ Word/PPT/Excel 共用此路由；PDF 不借用旧 Office executor。无上下文
 
 `slide_add_table` 完成行列创建后再设置目标尺寸，避免第一行占满原定整表高度；返回实际表格尺寸与行高列宽。`slide_table_set_style` 支持单元格范围的字体/字号/粗体、文字色、填充色、对齐及行高；`slide_table_read` 回读行高列宽。表头深底白字等必须使用单元格格式，不能用整形状背景冒充。行高有引擎单位舍入，保存重开按实际 pt 核对。
 
-验证入口与未验范围见 `doc/verification/2026-10-28-ppt-quality.md`。
+验证入口与未验范围见 `docs/dev-notes/verification/2026-10-28-ppt-quality.md`。
 
 ## 项目版本操作的保存与回执（2026-10-26，dev-board#1498）
 
@@ -502,7 +502,7 @@ txt/md/markdown 自 dev-board#37 起不进 LOWA（前端走 PlainTextEditor.vue�
 
 ## 长文结果完整性（2026-09-15，dev-board#650）
 
-`get_clauses`返回最多300项，但额外返回`totalClauseCount/truncated/nextStartParagraph`，不能把数组长度当全文条款数。后端/relay超时返回`EDITOR_RESULT_TIMEOUT`、`outcomeUnknown=true`、`retryable=false`，先读回文档/修订再决定是否写入；message与error同时保留。`build_merge_draft`的三层预算对齐180秒。真实150/300分页夹具及导出核验见 `doc/verification/` 与 `doc/document-resilience-audit.md`。
+`get_clauses`返回最多300项，但额外返回`totalClauseCount/truncated/nextStartParagraph`，不能把数组长度当全文条款数。后端/relay超时返回`EDITOR_RESULT_TIMEOUT`、`outcomeUnknown=true`、`retryable=false`，先读回文档/修订再决定是否写入；message与error同时保留。`build_merge_draft`的三层预算对齐180秒。真实150/300分页夹具及导出核验见 `docs/dev-notes/verification/` 与 `docs/dev-notes/document-resilience-audit.md`。
 
 
 ### 2026-10-11 导出与多产物身份回执（dev-board #1202）

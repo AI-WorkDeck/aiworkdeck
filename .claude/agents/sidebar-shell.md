@@ -1452,7 +1452,7 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 
 ## 左栏统一标准（2026-09-15，dev-board#648/#651）
 
-标准与脱敏路径见 `doc/sidebar-ui-standard.md`。项目概览在窄栏使用扁平字段/统计行；脱敏主路径为选文件→核查预览→生成副本，补充词/识别规则折叠，密码在预览后出现。录音保留异步进度/安装入口，统一主题与错误状态。动态尽调 CSS 在独立仓库 PR#2，详见 `doc/addon-sidebar-alignment.md`，未签名发布不能当作客户端已更新。
+标准与脱敏路径见 `docs/dev-notes/sidebar-ui-standard.md`。项目概览在窄栏使用扁平字段/统计行；脱敏主路径为选文件→核查预览→生成副本，补充词/识别规则折叠，密码在预览后出现。录音保留异步进度/安装入口，统一主题与错误状态。动态尽调 CSS 在独立仓库 PR#2，详见 `docs/dev-notes/addon-sidebar-alignment.md`，未签名发布不能当作客户端已更新。
 
 ## 全屏弹窗 vs 文档画布（2026-09-15，v0.44.1 真机 B6）
 
@@ -1616,7 +1616,7 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 
 `tabSnapshot.snapshotFileIds` 收集左右窗格真实文件和比对两侧的去重 ID；`fetchTabSnapshotFileIndex(ids)` 经 `getProjectFilesByIds` 每批最多 200 个，调用现有 `GET /api/projects/{id}/files?tree=true&ids=…`。该分支仅查询当前项目未删除的指定文件，不读取整棵文件树或 tags；目录仍由宿主过滤。空快照不请求，任一批失败沿用原有保留标签的错误兜底，不能把部分返回当成完整存在性索引误删标签。文件树展示继续使用 tree/parent 路径，鉴权规则不变；切换仍须先 `flushDirtyEditors`。回归：`tab-snapshot.test.mjs`、`tab-file-lookup.test.mjs` 与后端 `ProjectFileControllerIdsTest`。
 
-宿主 `onLoad` 必须在恢复前以具名 `uni.getStorageSync/setStorageSync` 包装注入 `$tabStorage`。H5 构建按方法名改写 API 引用，裸 `uni` 及普通 JS 方法组读到的全局 `uni` 可能只有空壳；不能改成 `$tabStorage = uni`。回归同时覆盖无绑定、裸绑定负对照；实际编译产物和 Electron 项目切换验收见 `doc/verification/2026-10-24-startup-project-word-performance.md`。
+宿主 `onLoad` 必须在恢复前以具名 `uni.getStorageSync/setStorageSync` 包装注入 `$tabStorage`。H5 构建按方法名改写 API 引用，裸 `uni` 及普通 JS 方法组读到的全局 `uni` 可能只有空壳；不能改成 `$tabStorage = uni`。回归同时覆盖无绑定、裸绑定负对照；实际编译产物和 Electron 项目切换验收见 `docs/dev-notes/verification/2026-10-24-startup-project-word-performance.md`。
 
 ## 对话 / 工作台双模式与随手工作区（dev-board#1479，2026-10-26）
 
