@@ -41,7 +41,7 @@ class VersionExitStatusTest {
     }
 
     @Test
-    void busyRepositoryFailsFastInsteadOfClaimingThereAreNoChanges() throws Exception {
+    void busyRepositoryFailsInsteadOfClaimingThereAreNoChanges() throws Exception {
         var repo = mock(ProjectRepoService.class);
         var service = new WorkSessionService(repo, null, mock(WorkSessionRepository.class),
                 mock(org.springframework.scheduling.TaskScheduler.class), null, event -> {});
@@ -57,10 +57,30 @@ class VersionExitStatusTest {
         holder.start();
         try {
             assertTrue(ready.await(2, java.util.concurrent.TimeUnit.SECONDS));
-            assertTimeoutPreemptively(java.time.Duration.ofSeconds(1),
+            assertTimeoutPreemptively(java.time.Duration.ofSeconds(7),
                     () -> assertThrows(VersionException.class, () -> service.exitStatus(7L)));
             verify(repo, never()).pendingChanges(anyLong());
         } finally { release.countDown(); holder.join(2000); }
+    }
+
+    @Test
+    void briefOverlappingHolderIsWaitedForInsteadOfFailing() throws Exception {
+        var repo = mock(ProjectRepoService.class);
+        var service = new WorkSessionService(repo, null, mock(WorkSessionRepository.class),
+                mock(org.springframework.scheduling.TaskScheduler.class), null, event -> {});
+        var ready = new java.util.concurrent.CountDownLatch(1);
+        Thread holder = new Thread(() -> {
+            var lock = service.repoLock(7L);
+            lock.lock();
+            try { ready.countDown(); Thread.sleep(300); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            finally { lock.unlock(); }
+        });
+        holder.start();
+        try {
+            assertTrue(ready.await(2, java.util.concurrent.TimeUnit.SECONDS));
+            assertFalse(service.exitStatus(7L).enabled());
+        } finally { holder.join(2000); }
     }
 
     @Test

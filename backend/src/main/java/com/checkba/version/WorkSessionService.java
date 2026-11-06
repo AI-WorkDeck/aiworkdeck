@@ -749,8 +749,15 @@ public class WorkSessionService {
 
     public ExitStatus exitStatus(long projectId) {
         ReentrantLock lock = repoLock(projectId);
-        if (!lock.tryLock()) throw VersionException.busy(LangText.of(
-                "正在整理版本，请稍后重试", "Version history is busy; please try again shortly"));
+        // Nested local folders share one path-scoped lock, so the quit dialog's parallel scan of a
+        // parent and its child always collides; wait briefly (under the client's 8s timeout).
+        try {
+            if (!lock.tryLock(5, java.util.concurrent.TimeUnit.SECONDS)) throw VersionException.busy(LangText.of(
+                    "正在整理版本，请稍后重试", "Version history is busy; please try again shortly"));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw VersionException.busy(LangText.of("正在整理版本，请稍后重试", "Version history is busy; please try again shortly"));
+        }
         try {
             if (!repoService.isInitialized(projectId)) return new ExitStatus(false, false, 0, null, false);
             WorkSession draft = activeDraftOnBranch(projectId).orElse(null);
