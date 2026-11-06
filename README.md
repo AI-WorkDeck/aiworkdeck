@@ -1,133 +1,131 @@
 <p align="center">
-  <a href="https://www.aiworkdeck.com"><img src=".github/assets/icon.png" width="80" alt="AI WorkDeck logo"></a>
-</p>
-
-<h1 align="center">AI WorkDeck</h1>
-
-<p align="center">
-  <strong>The open-source AI workspace for professional document work.</strong><br>
-  From source material to a reviewed deliverable — starting with legal work.
+  <a href="https://www.aiworkdeck.com/en">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/banner-en-dark.webp">
+      <img src=".github/assets/readme/banner-en-light.webp" alt="AI WorkDeck — The IDE for lawyers. Clear the clutter. Get back to the law." width="100%">
+    </picture>
+  </a>
 </p>
 
 <p align="center">
-  <a href="legal/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="AGPL-3.0-or-later"></a>
-  <a href="https://github.com/AI-WorkDeck/aiworkdeck/releases"><img src="https://img.shields.io/github/v/release/AI-WorkDeck/aiworkdeck?color=2E5A50" alt="Latest release"></a>
+  Programmers have long had their IDE: files, editing, search, versions and AI in one window.<br>
+  <strong>AI WorkDeck brings that infrastructure to lawyers</strong> — organised by matter, every answer sourced, every change on the record.
+</p>
+
+<p align="center">
+  <a href="https://github.com/AI-WorkDeck/aiworkdeck/releases/latest"><picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/btn-download-en-dark.png"><img src=".github/assets/readme/btn-download-en-light.png" alt="Download for desktop" height="44"></picture></a>&nbsp;
+  <a href="https://github.com/AI-WorkDeck/aiworkdeck/stargazers"><picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/btn-star-en-dark.png"><img src=".github/assets/readme/btn-star-en-light.png" alt="Star on GitHub" height="44"></picture></a>&nbsp;
+  <a href="https://www.aiworkdeck.com/web?lang=en"><picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme/btn-try-en-dark.png"><img src=".github/assets/readme/btn-try-en-light.png" alt="Try it in your browser" height="44"></picture></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/AI-WorkDeck/aiworkdeck/releases/latest"><img src="https://img.shields.io/github/v/release/AI-WorkDeck/aiworkdeck?filter=v*" alt="Latest release"></a>
+  <a href="https://github.com/AI-WorkDeck/aiworkdeck/releases"><img src="https://img.shields.io/github/downloads/AI-WorkDeck/aiworkdeck/total" alt="Downloads"></a>
+  <a href="https://github.com/AI-WorkDeck/aiworkdeck/stargazers"><img src="https://img.shields.io/github/stars/AI-WorkDeck/aiworkdeck" alt="GitHub stars"></a>
   <a href="https://github.com/AI-WorkDeck/aiworkdeck/actions/workflows/ci.yml"><img src="https://github.com/AI-WorkDeck/aiworkdeck/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="legal/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="AGPL-3.0-or-later"></a>
+  <br>
+  <sub>Free community edition · Windows / macOS · <strong>English</strong> · <a href="README.zh-CN.md">简体中文</a></sub>
 </p>
 
 <p align="center">
-  <strong>English</strong> · <a href="README.zh-CN.md">简体中文</a><br>
-  <a href="WHY.md">Our thesis</a> · <a href="#build-with-us">Build with us</a> · <a href="docs/architecture.md">Architecture</a> · <a href="https://github.com/AI-WorkDeck/aiworkdeck/releases/latest">Download</a> · <a href="mailto:hi@aiworkdeck.com">Community contact</a>
+  <a href="https://www.aiworkdeck.com/api/video?id=promo-en"><img src=".github/assets/readme/hero-en.webp" alt="The real AI WorkDeck interface: case files on the left, a draft complaint in the middle, the AI assistant on the right. Click to watch the 2-minute film." width="100%"></a>
+  <br><sub>▶ Click the screenshot to watch the 2-minute film. Real interface; the matter is fictional.</sub>
 </p>
 
-A contract is ready when someone can stand behind it. That means checking its sources, negotiating changes, preserving the document's structure, and knowing which version was approved. Producing the first draft is only part of the job.
+## Why an IDE
 
-**AI WorkDeck brings those steps into one extensible workspace.** Agents work alongside the document editor, project files, source references, and version history. A lawyer can inspect an AI-authored change in the document, accept or reject it, and keep the work in the project's history. Developers can build on the same editor, agent tools, and plugin runtime.
+**The AI chat box is the command line of the AI era.** A big matter means hundreds of documents, months of work and several people. Lawyers, like programmers, work in text — piles of files, draft after draft, citations to check everywhere. They deserve their own infrastructure too.
 
-**We are building a shared foundation for professional AI:** start with demanding legal workflows, make the underlying document operations reusable, and enable specialists to build the next applications on top.
+| Chat box | AI WorkDeck |
+|---|---|
+| Start from scratch every time | The context lives with the matter |
+| Paste the materials in, one by one | The AI reads the case file and edits the documents |
+| Copy the answers back out, piece by piece | Every step leaves a record |
 
-AI WorkDeck is an open-source exploration rooted in day-to-day legal work, developed outside working hours with team support and feedback from colleagues. Its initiator, Zewei Han, is a practicing lawyer and a partner at Beijing Redsunny Law. He previously worked at King & Wood Mallesons, where he supported projects of the firm’s legal technology team, and co-authored 《大模型时代的法律科技》 (on legal technology in the era of large models). The project shares tools and methods from practice for fellow practitioners and developers to examine and improve.
+Just a quick question? Switch to chat mode. For the longer argument, read [our thesis →](WHY.md)
 
-<p align="center">
-  <img src="docs/images/marketing/01-workspace.png" alt="Project files, document editor, and AI conversation in one workspace" width="1000">
-  <br><sub>Workspace — project files, the document, and AI side by side. Demo materials are fictional.</sub>
-</p>
+## What it does
 
-<p align="center">
-  <img src="docs/images/marketing/02-revision-toolbar.png" alt="Tracked changes in a contract with accept and reject controls on the revision toolbar" width="1000">
-  <br><sub>Accept / reject revisions — AI writes tracked changes; you review each one.</sub>
-</p>
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src=".github/assets/readme/feature-redline.webp" alt="AI edits shown as tracked changes in a contract, each with accept and reject buttons">
+      <p><strong>AI edits the document itself.</strong> It writes straight into the real Word file as tracked changes, and you accept or reject each one.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src=".github/assets/readme/feature-evidence.webp" alt="Clicking a citation in a report jumps to the highlighted passage in the source document">
+      <p><strong>Every conclusion has a source.</strong> Click a citation to land on the supporting passage; changed or missing anchors are flagged.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src=".github/assets/readme/feature-field.webp" alt="A phone capturing a delivery note on site, and the desktop case file showing the new site photos and recordings filed by date">
+      <p><strong>The field and the office, connected.</strong> Photos and recordings taken on your phone land in the matter on your computer, filed by date.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src=".github/assets/readme/feature-market.webp" alt="The in-app marketplace listing Skills, plugins and MCP servers">
+      <p><strong>Extended by the community.</strong> Install Skills, plugins and MCP servers in one click — or publish your own; authors keep 85% of net receipts on paid listings.</p>
+    </td>
+  </tr>
+</table>
 
-<p align="center">
-  <img src="docs/images/marketing/03-evidence-jump.png" alt="Clicking an evidence citation jumps to the highlighted source passage in another document" width="1000">
-  <br><sub>Evidence jump — open a citation and land on the supporting source passage.</sub>
-</p>
+<sub>Screenshots use fictional demo matters. The interface is shown in Chinese; it ships in 20 interface languages.</sub>
 
-## Why this is worth building
+## Video tutorials
 
-AI coding tools have shown the value of bringing an agent into the environment where work happens. Professional document work needs that same depth of integration: an understanding of the file being edited, the material behind it, the changes being proposed, and the person responsible for the result.
+Two minutes, one task — 19 short episodes on the [website](https://www.aiworkdeck.com/en/videos). Tutorials are in Chinese for now.
 
-We are starting with legal work because these requirements meet in almost every matter. A due-diligence finding needs a source. A negotiated clause needs a review trail. A final document needs to survive handoff to someone using Word. Solving these together creates a foundation that can also serve transaction advisory, compliance, and other document-intensive professions.
-
-**Our bet is that the enduring value lies in connecting context, action, and review.** Better models expand what an agent can do; the workspace makes that capability useful in a real professional process. Read the [product thesis](WHY.md) for the expansion path and the questions we still need to prove.
-
-## What you can inspect today
-
-This repository contains the desktop app, workbench, agent backend, document-editor integration, and plugin runtime. It is a working codebase with [desktop releases](https://github.com/AI-WorkDeck/aiworkdeck/releases), [public development history](https://github.com/AI-WorkDeck/aiworkdeck/commits/master/), and [CI](https://github.com/AI-WorkDeck/aiworkdeck/actions/workflows/ci.yml).
-
-| Foundation | Why it matters | Explore it |
-|---|---|---|
-| **Document-native agent actions** | Apply fine-grained edits through structured tools; inspect tracked changes and comments in the embedded LibreOffice WASM editor, with checkpoint recovery available. | [Editor primitives](docs/AI_EDITOR_PRIMITIVES.md) · [Editor bridge](frontend/src/zetaoffice/) |
-| **Source-linked work** | Connect a passage to its supporting material, navigate back to the source, and detect changed or missing anchors. Extend retrieval through an evidence-provider interface. | [Evidence contract](docs/EVIDENCE_CONTRACT.md) · [Provider example](examples/hello-evidence-plugin/) |
-| **Project history and collaboration** | Compare parallel drafts with three-way document merge workflows and inspect paragraph-level provenance, backed by Git history. | [Version engine](backend/src/main/java/com/checkba/version/) |
-| **An extensible workbench** | Add web panes, Java tools, declarative templates, or reusable Skills without rebuilding the entire application. | [Plugin guide](docs/plugin-guide.md) · [SDK](sdk/plugin-sdk/) · [Examples](examples/) |
-| **Professional workflows** | Due diligence, contract review, source checking, and litigation visualization give the platform concrete places to develop. | [Built-in Skills](backend/skills/) · [Visualization engine](litviz/) |
-| **Multiple ways into the work** | The desktop workbench and Office/WPS task panes connect AI assistance to existing document workflows. | [Desktop](desktop/) · [Office add-in](office-addin/) |
-
-The engineering focus is the quality of the resulting file: preserving structure, making edits reviewable, and keeping sources traceable through revision. The [roadmap](#roadmap) identifies the next problems contributors can help solve.
-
-<details>
-<summary><strong>See the extension marketplace</strong></summary>
-
-<p align="center">
-  <img src="docs/images/marketing/e2e/plugin-market.png" alt="The in-app marketplace for plugins and reusable Skills" width="1000">
-</p>
-
-In-app marketplace capture using fictional demo materials. For an evaluation build, use the [latest release](https://github.com/AI-WorkDeck/aiworkdeck/releases/latest).
-
-</details>
-
-## Build with us
-
-A developer should be able to spend their effort on a valuable workflow and reuse the document infrastructure beneath it. There are several concrete entry points:
-
-| Build | Reuse | First step |
-|---|---|---|
-| A focused review or research pane | Project files, document access, host events, and UI integration | Run the [minimal web plugin](examples/hello-web-plugin/) — plain HTML and JavaScript, no build step. |
-| A connection to a specialist source | The evidence-retrieval interface and its conformance tests | Extend the [evidence-provider example](examples/hello-evidence-plugin/). |
-| A reusable professional workflow | The agent's tools and Skill loading | Read the [Skill specification](docs/SKILL_SPEC.md) and inspect [existing Skills](backend/skills/). |
-| Templates and house styles | Declarative contributions, without executable backend code | Start from the [declarative plugin](examples/hello-declarative-plugin/). |
-| A stronger core | The editor bridge, version engine, and agent runtime | Read [architecture](docs/architecture.md), then [run from source](docs/getting-started.md). |
-
-Web plugins use a sandboxed iframe and a permission-checked bridge. Java plugins run in the backend process and must be trusted. The [plugin guide](docs/plugin-guide.md) explains those boundaries and the publication process.
-
-### Build a plugin with an Agent
-
-Follow the [developer walkthrough](docs/plugin-developer-journey.md): describe a small workflow, build the [checklist example](examples/checklist-helper/), install and debug in an isolated project, then apply through the website developer center and submit with a revocable token. The developer program initially has no application fee. Basic profile review records the maintainer, private contact details, purpose, and requested permissions; each plugin version still undergoes separate review and signing. This is not identity certification. [SDK and service contracts](sdk/plugin-sdk/) cover settings, host AI, external connections, MCP and independent subscriptions. New host / portal features in this branch remain pending release / deployment.
-
-### Contributing
-
-Start by turning a review or research task you know well into an extension. If you prefer improving the core, a small reproducible case is especially valuable: a document that loses formatting, a source link that no longer resolves, an edit that fails to round-trip, or an unclear setup step. Use synthetic or appropriately redacted materials and describe the expected result. Discuss the scope in an [issue](https://github.com/AI-WorkDeck/aiworkdeck/issues) before starting a large change.
-
-Read the [contribution guide](.github/CONTRIBUTING.md). Code contributions require a one-time [CLA](legal/CLA.md); contributors retain copyright and grant the steward dual-licensing rights. Substantial API changes use the [RFC process](GOVERNANCE.md#rfc-process). The [governance model](GOVERNANCE.md) provides a path from contributor to reviewer to maintainer, and the [current maintainers](MAINTAINERS.md) are public.
-
-Plugin and Skill authors can also publish through the marketplace: [China](https://www.aiworkdeck.com/zh/plugins) · [International](https://www.workdeck.ai/en/plugins). Author ownership, paid-listing revenue sharing, review, and settlement are described in the [marketplace terms](legal/MARKETPLACE-TERMS.md). For individual funded tasks, see the [bounty policy](BOUNTIES.md); availability and amounts are set per issue.
-
-## Roadmap
-
-The next stage is about making this foundation easier to trust and easier to build on. These are contribution directions, not dated release commitments:
-
-- **Reliable document work:** reproducible cases for complex layouts, long documents, tracked changes, and undo; evaluate the saved and reopened document as well as the agent's response.
-- **Verifiable sources:** strengthen source-link survival across edits and retrieval-provider conformance; explore cryptographic provenance separately from ordinary history and citations.
-- **A shorter path for builders:** a clean local demo, clearer self-hosting instructions, more plugin examples, and bilingual contributor documentation.
-- **Repeatable professional workflows:** turn narrowly scoped tasks into Skills and extensions with explicit inputs, review steps, and testable outputs.
-
-Bring a concrete use case to [Discussions](https://github.com/AI-WorkDeck/aiworkdeck/discussions) or propose a focused [issue](https://github.com/AI-WorkDeck/aiworkdeck/issues). Developers and practitioners can help define the work together.
+<table>
+  <tr>
+    <td width="25%"><a href="https://www.aiworkdeck.com/en/videos"><img src=".github/assets/readme/tutorial-ep-start-02.webp" alt="Tutorial: With so many AI chat apps, why a workspace?"></a><br><sub>Why a workspace?</sub></td>
+    <td width="25%"><a href="https://www.aiworkdeck.com/en/videos"><img src=".github/assets/readme/tutorial-ep-lit-04.webp" alt="Tutorial: Linking evidence into the complaint"></a><br><sub>Linking evidence into the complaint</sub></td>
+    <td width="25%"><a href="https://www.aiworkdeck.com/en/videos"><img src=".github/assets/readme/tutorial-ep-lit-09.webp" alt="Tutorial: Hiding party details before the AI edits a pleading"></a><br><sub>Hiding party details before the AI edits</sub></td>
+    <td width="25%"><a href="https://www.aiworkdeck.com/en/videos"><img src=".github/assets/readme/tutorial-ep-team-01.webp" alt="Tutorial: Who on the team is busy? See it at a glance"></a><br><sub>Who on the team is busy?</sub></td>
+  </tr>
+</table>
 
 <a id="quick-start"></a>
 
-## Evaluate the project
+## Try it
 
-- **Try the product:** [macOS / Windows releases](https://github.com/AI-WorkDeck/aiworkdeck/releases/latest) · [Product walkthrough](https://www.aiworkdeck.com/zh/showcase).
-- **Explore or run the source:** [Getting started](docs/getting-started.md) · [Architecture](docs/architecture.md). The contributor stack uses JDK 21, Maven, Node/npm, and PostgreSQL; optional sidecars have additional requirements.
-- **Understand the data paths:** [Privacy and service data flows](legal/PRIVACY.md). Desktop editing uses local storage by default; cloud models, platform services, hosted add-ins, and sync have different data paths. Self-hosting requires configuration and deployment-specific verification.
-- **Understand the rights:** [AGPL-3.0-or-later](legal/LICENSE) · [CLA](legal/CLA.md) · [Commercial licensing](legal/COMMERCIAL-LICENSE.md).
+- **Use it:** [macOS / Windows releases](https://github.com/AI-WorkDeck/aiworkdeck/releases/latest) · [try it in the browser](https://www.aiworkdeck.com/web?lang=en) · [website](https://www.aiworkdeck.com/en).
+- **Run from source:** [Getting started](docs/getting-started.md) · [Architecture](docs/architecture.md). The contributor stack uses JDK 21, Maven, Node/npm and PostgreSQL; optional sidecars have additional requirements.
+- **Know the data paths:** desktop editing uses local storage by default; cloud models, platform services, hosted add-ins and sync have different data paths. Self-hosting requires configuration and deployment-specific verification. See [Privacy and service data flows](legal/PRIVACY.md).
 
-Follow [releases](https://github.com/AI-WorkDeck/aiworkdeck/releases), join a [discussion](https://github.com/AI-WorkDeck/aiworkdeck/discussions), or build a small extension. The most useful next step is something we can inspect and improve together.
+<a id="what-you-can-inspect-today"></a>
+
+## Build with us
+
+The repository contains the desktop app, workbench, agent backend, document-editor integration and plugin runtime. The foundations map to code you can read:
+
+| Foundation | Where to look |
+|---|---|
+| Document-native agent edits, tracked changes and checkpoints in the embedded LibreOffice WASM editor | [Editor primitives](docs/AI_EDITOR_PRIMITIVES.md) · [Editor bridge](frontend/src/zetaoffice/) |
+| Source links with anchor-change detection; a pluggable evidence-provider interface | [Evidence contract](docs/EVIDENCE_CONTRACT.md) · [Provider example](examples/hello-evidence-plugin/) |
+| Git-backed history, three-way document merge, paragraph-level provenance | [Version engine](backend/src/main/java/com/checkba/version/) |
+| Web panes, Java tools, declarative templates and reusable Skills | [Plugin guide](docs/plugin-guide.md) · [SDK](sdk/plugin-sdk/) · [Skill spec](docs/SKILL_SPEC.md) · [Examples](examples/) |
+| Built-in workflows and entry points | [Skills](backend/skills/) · [Litigation visualization](litviz/) · [Desktop](desktop/) · [Office/WPS add-in](office-addin/) |
+
+**Build a plugin.** Start with the [minimal web plugin](examples/hello-web-plugin/) (plain HTML and JavaScript, no build step) or the [declarative plugin](examples/hello-declarative-plugin/), or let an agent help you through the [developer walkthrough](docs/plugin-developer-journey.md). Web plugins run in a sandboxed iframe behind a permission-checked bridge; Java plugins run in the backend process and must be trusted. The developer program initially has no application fee; basic profile review is not identity certification, and each plugin version undergoes separate review and signing. The [plugin guide](docs/plugin-guide.md) explains the boundaries and the publication process.
+
+<a id="contributing"></a>
+
+**Contribute.** A small reproducible case is especially valuable: a document that loses formatting, a source link that no longer resolves, an edit that fails to round-trip, or an unclear setup step. Use synthetic or redacted materials, and discuss large changes in an [issue](https://github.com/AI-WorkDeck/aiworkdeck/issues) first. Read the [contribution guide](.github/CONTRIBUTING.md). Code contributions require a one-time [CLA](legal/CLA.md); contributors retain copyright and grant the steward dual-licensing rights. Substantial API changes use the [RFC process](GOVERNANCE.md#rfc-process); the [governance model](GOVERNANCE.md) and [maintainers](MAINTAINERS.md) are public. Plugin and Skill authors can publish through the marketplace ([China](https://www.aiworkdeck.com/zh/plugins) · [International](https://www.workdeck.ai/en/plugins)) under the [marketplace terms](legal/MARKETPLACE-TERMS.md); funded tasks follow the [bounty policy](BOUNTIES.md), with availability and amounts set per issue.
+
+<a id="roadmap"></a>
+
+**Roadmap** — contribution directions, not dated release commitments: reliable document work on complex layouts, long documents, tracked changes and undo; source links that survive edits; a shorter path for builders (clean local demo, self-hosting docs, more examples); and repeatable professional workflows packaged as Skills. Bring a use case to [Discussions](https://github.com/AI-WorkDeck/aiworkdeck/discussions).
+
+## About
+
+AI WorkDeck is an open-source exploration rooted in day-to-day legal work, developed outside working hours with team support and feedback from colleagues. Its initiator, Zewei Han, is a practicing lawyer and a partner at Beijing Redsunny Law. He previously worked at King & Wood Mallesons, where he supported projects of the firm’s legal technology team, and co-authored 《大模型时代的法律科技》 (on legal technology in the era of large models). Contact: [hi@aiworkdeck.com](mailto:hi@aiworkdeck.com).
 
 ## Licensing and stewardship
 
-The steward is **北京京微资易科技有限公司 (Beijing Jingwei Ziyi Technology Co., Ltd.)**; **真善美承泽有限公司 (Zhen Shan Mei Grace Legacy Limited)** operates the international offering. Commercial licensing covers the steward's code; third-party components retain their own terms. See [commercial licensing](legal/COMMERCIAL-LICENSE.md), [third-party components](legal/THIRD-PARTY-COMPONENTS.md), and [trademarks](legal/TRADEMARKS.md).
+The steward is **北京京微资易科技有限公司 (Beijing Jingwei Ziyi Technology Co., Ltd.)**; **真善美承泽有限公司 (Zhen Shan Mei Grace Legacy Limited)** operates the international offering. Commercial licensing covers the steward's code; third-party components retain their own terms. See [AGPL-3.0-or-later](legal/LICENSE), [commercial licensing](legal/COMMERCIAL-LICENSE.md), [third-party components](legal/THIRD-PARTY-COMPONENTS.md), and [trademarks](legal/TRADEMARKS.md).
+
+<a id="community-fund"></a>
 
 The steward's existing policy allocates **20% of net commercial-licensing revenue** to a community fund for bounties, Skill-creation grants, and community events. This is a public policy that may be adjusted prospectively, not an individual contractual entitlement. Governance roles carry technical authority; economic terms are set separately in the [bounty policy](BOUNTIES.md) and [marketplace terms](legal/MARKETPLACE-TERMS.md).
 
