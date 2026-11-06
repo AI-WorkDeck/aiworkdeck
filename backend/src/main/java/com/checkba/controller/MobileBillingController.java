@@ -36,7 +36,7 @@ public class MobileBillingController {
         this.service = service;
     }
 
-    /** GET /balance → {balanceCents, currency, plan}。 */
+    /** GET /balance → {balanceCents, currency, plan, subscription, billingLine, bqtMember}。 */
     @GetMapping("/balance")
     public Map<String, Object> balance(
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
@@ -46,6 +46,7 @@ public class MobileBillingController {
         out.put("currency", r.currency());
         out.put("plan", r.plan());
         out.put("subscription", r.subscription());
+        out.putAll(r.billing()); // billingLine + bqtMember（包晴天律师只看包晴天积分折算额度）
         return out;
     }
 

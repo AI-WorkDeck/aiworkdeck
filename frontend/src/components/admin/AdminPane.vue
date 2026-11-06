@@ -3756,15 +3756,15 @@ $brand-accent: $brand-mint;
 }
 
 .bqt-member-card {
-  margin-top: 12px; padding: 10px 12px; border-radius: 8px;
-  background: rgba(184, 110, 20, 0.08);
+  margin-top: 12px; padding: 10px 12px; border-radius: var(--awd-radius-md);
+  background: var(--awd-gold-soft);
   display: flex; flex-direction: column; gap: 4px;
 }
 .bqt-member-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.bqt-member-title { font-size: 13px; font-weight: 600; color: #B86E14; }
-.bqt-member-status { font-size: 12px; color: #256F46; }
-.bqt-member-status.is-expired { color: var(--awd-danger, #B42318); }
-.bqt-member-warn { font-size: 12px; color: var(--awd-danger, #B42318); }
+.bqt-member-title { font-size: var(--awd-font-size-body); font-weight: 600; color: var(--awd-gold-text); }
+.bqt-member-status { font-size: var(--awd-panel-fs-meta); color: var(--awd-accent-text); }
+.bqt-member-status.is-expired { color: var(--awd-danger-text); }
+.bqt-member-warn { font-size: var(--awd-panel-fs-meta); color: var(--awd-danger-text); }
 .wallet-recharge-btn {
   margin-top: 4px;
   align-self: flex-start;
