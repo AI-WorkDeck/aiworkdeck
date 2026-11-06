@@ -38,6 +38,11 @@ function createMockLibreOfficeTree(rootDir, { use242Layout = false } = {}) {
   ].join('\n'))
 
   // Exact dark-page anchors from core dced3bc711d18407a2cc2400eb46e8261b663d95.
+  writeFileEnsured(path.join(rootDir, 'svtools/source/control/ruler.cxx'), [
+    '    const StyleSettings& rStyleSettings = rRenderContext.GetSettings().GetStyleSettings();',
+    '    tools::Long    nP1;            // pixel position of Page1',
+    '',
+  ].join('\n'))
   writeFileEnsured(path.join(rootDir, 'sw/source/core/txtnode/fntcache.cxx'), [
     "        bChgFntColor = COL_AUTO == rFnt.GetColor() || bChgLineColor;",
     "",
@@ -481,6 +486,16 @@ test('apply-source-patches.py applies all C++ kernel & dictionary patches cleanl
     assert.match(fntcache, /if \(bDarkExplicit\)\n            \{\n                if \(pCol->IsDark\(\)\)/)
     const patattr = fs.readFileSync(path.join(tmpDir, 'sc/source/core/data/patattr.cxx'), 'utf8')
     assert.match(patattr, /else if \(eAutoMode == ScAutoFontColorMode::Display && aColor\.IsDark\(\)\)/)
+
+    const ruler = fs.readFileSync(path.join(tmpDir, 'svtools/source/control/ruler.cxx'), 'utf8')
+    assert.match(ruler, /GetColorValue\(svtools::APPBACKGROUND\)\.nColor\.IsDark\(\)/)
+    assert.match(ruler, /const StyleSettings& rStyleSettings = maVirDev->GetSettings\(\)\.GetStyleSettings\(\);/)
+    const rulerRoles = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'design/tokens/awd-palette.json'), 'utf8')).roles.dark
+    for (const [setter, role] of Object.entries({ WindowColor: 'surface', DialogColor: 'bg', ShadowColor: 'border', DarkShadowColor: 'text-2', WorkspaceColor: 'canvas' })) {
+      const m = ruler.match(new RegExp(`Set${setter}\\(Color\\(0x([A-Fa-f0-9]{6})\\)\\)`))
+      assert.ok(m, setter)
+      assert.equal('#' + m[1], rulerRoles[role])
+    }
 
     // Verify instdir dictionary slimming & Lightproof removal
     assert.ok(fs.existsSync(path.join(tmpDir, 'instdir/share/extensions/dict-en/en_US.aff')))

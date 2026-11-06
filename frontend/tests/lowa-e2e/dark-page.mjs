@@ -67,6 +67,15 @@ function stats(png) {
   return { mean: Math.round(lum / n), dark: +(dark / n).toFixed(4), bright: +(bright / n).toFixed(4), red: +(red / n).toFixed(4) }
 }
 
+// 竖排标尺：画布最左那一条（藏掉原生工具栏后产品里同样露出来），取一段纵向带的平均亮度。
+function rulerMean(png) {
+  let sum = 0, n = 0
+  for (let y = Math.floor(png.height * 0.1); y < Math.floor(png.height * 0.6); y++) for (let x = 3; x < 17; x++) {
+    const o = (y * png.width + x) * 4; sum += (png.data[o] + png.data[o + 1] + png.data[o + 2]) / 3; n++
+  }
+  return n ? Math.round(sum / n) : null
+}
+
 preflight()
 const puppeteer = await loadPuppeteer()
 const server = await startServer()
@@ -92,9 +101,12 @@ try {
   for (const [name, bytes] of cases) {
     const loaded = await load(bytes, name + '.docx')
     if (!loaded.success) throw new Error(name + ': ' + JSON.stringify(loaded))
+    // 同产品：原生菜单/工具栏/状态栏都藏起来，露出来的只剩画布与标尺
+    await exec('set_chrome', { menubar: false, statusbar: false, toolbars: false, rulers: true })
     await exec('set_app_theme', { mode: 'dark' })
     res[name] = await shot(name + '-dark')
     console.log(name, JSON.stringify(res[name]))
+    if (name === 'word-auto') res.rulerMean = rulerMean(PNG.sync.read(fs.readFileSync(path.join(out, name + '-dark.png'))))
     if (name === 'word-black') {
       const pdf = await exec('export_pdf', {})
       const bytes = pdf && (pdf.bytes || pdf.data)
@@ -106,6 +118,8 @@ try {
     await exec('set_app_theme', { mode: 'light' })
   }
   check('Word 纸面变暗', res['word-auto'].mean < 90, res['word-auto'])
+  // 标尺（产品里唯一露出来的原生 chrome 之一）跟着暗：引擎补丁 patch_dark_ruler，r7 及以前必红
+  check('标尺跟着变暗（引擎补丁）', res.rulerMean != null && res.rulerMean < 110, { rulerMean: res.rulerMean })
   check('Word 自动颜色字在深色纸面上变亮', res['word-auto'].bright > 0.01 && res['word-auto'].dark > 0.5, res['word-auto'])
   // 显式黑字改画白色后，亮像素应与「自动」颜色那份同一量级；旧引擎下几乎为零。
   check('Word 显式黑字在深色纸面上变亮（引擎补丁）', res['word-black'].bright > res['word-auto'].bright * 0.5, { black: res['word-black'], auto: res['word-auto'] })
@@ -115,6 +129,8 @@ try {
   for (const [name, font, fill, text] of [['excel-empty', '000000', null, ' '], ['excel-black', '000000', null], ['excel-yellow-fill', '000000', 'FFFF00']]) {
     const loaded = await load(await xlsx(font, fill, text), name + '.xlsx')
     if (!loaded.success) throw new Error(name + ': ' + JSON.stringify(loaded))
+    // 同产品：原生菜单/工具栏/状态栏都藏起来，露出来的只剩画布与标尺
+    await exec('set_chrome', { menubar: false, statusbar: false, toolbars: false, rulers: true })
     await exec('set_app_theme', { mode: 'dark' })
     res[name] = await shot(name + '-dark')
     console.log(name, JSON.stringify(res[name]))

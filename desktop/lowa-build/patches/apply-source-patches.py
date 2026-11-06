@@ -15,6 +15,7 @@
 #  9. Calc row/column header UI font and local palette (#1509).
 # 10. Preserve real tooltip input transparency on WASM (#1515).
 # 11. Dark page: explicit dark text is drawn light on screen (Writer/Calc).
+# 12. Dark ruler follows the dark page (local StyleSettings on the ruler's VirtualDevice).
 import argparse
 import glob
 import os
@@ -1458,6 +1459,45 @@ def patch_dark_page_text(core):
     )
 
 
+# ---- Dark ruler: follow the dark page (tutorial ep 18) ----------------------
+def patch_dark_ruler(core):
+    # Original target: LibreOffice core dced3bc711d18407a2cc2400eb46e8261b663d95,
+    # svtools/source/control/ruler.cxx (MPL-2.0; original license header retained).
+    # 深色纸面时标尺仍是浅色一条（Qt WASM 的调色板固定浅色，运行时改 ApplicationAppearance
+    # 无效，2026-11-05 无头实测）。同 Calc 行列标题补丁的路数：以 AppBackground 判深浅，
+    # 只给标尺的离屏设备换一份局部 StyleSettings，不改全局调色板；浅色、高对比走原路径。
+    target = f'{core}/svtools/source/control/ruler.cxx'
+    patch(
+        target,
+        '    const StyleSettings& rStyleSettings = rRenderContext.GetSettings().GetStyleSettings();\n'
+        '    tools::Long    nP1;            // pixel position of Page1\n',
+        '    // AI WorkDeck: dark ruler. design/tokens/awd-palette.json roles.dark.\n'
+        '    if (!rRenderContext.GetSettings().GetStyleSettings().GetHighContrastMode()\n'
+        '        && svtools::ColorConfig().GetColorValue(svtools::APPBACKGROUND).nColor.IsDark())\n'
+        '    {\n'
+        '        AllSettings aRulerSettings(GetSettings());\n'
+        '        StyleSettings aRulerStyle(aRulerSettings.GetStyleSettings());\n'
+        '        aRulerStyle.SetWindowColor(Color(0x221F1A));     // surface: text area\n'
+        '        aRulerStyle.SetDialogColor(Color(0x191713));     // bg: margins\n'
+        '        aRulerStyle.SetFaceColor(Color(0x2B2721));       // surface-2\n'
+        '        aRulerStyle.SetLightColor(Color(0x363129));      // surface-3\n'
+        '        aRulerStyle.SetShadowColor(Color(0x3D372E));     // border\n'
+        '        aRulerStyle.SetDarkShadowColor(Color(0xB0AA9C)); // text-2: ticks, indents\n'
+        '        aRulerStyle.SetWorkspaceColor(Color(0x141210));  // canvas\n'
+        '        aRulerSettings.SetStyleSettings(aRulerStyle);\n'
+        '        maVirDev->SetSettings(aRulerSettings);\n'
+        '        maVirDev->SetTextColor(Color(0xB0AA9C));         // text-2: numbers\n'
+        '    }\n'
+        '    else\n'
+        '    {\n'
+        '        maVirDev->SetSettings(GetSettings());\n'
+        '        maVirDev->SetTextColor(GetTextColor());\n'
+        '    }\n'
+        '    const StyleSettings& rStyleSettings = maVirDev->GetSettings().GetStyleSettings();\n'
+        '    tools::Long    nP1;            // pixel position of Page1\n',
+        'Dark ruler palette',
+    )
+
 # ---- WASM tooltip input transparency (#1515) --------------------------------
 def patch_wasm_tooltip_input(core):
     # HelpTextWindow is already mouse-transparent in VCL. Preserve that intent
@@ -1577,6 +1617,7 @@ def main(argv=None):
     patch_calc_header_chrome(CORE)
     patch_wasm_tooltip_input(CORE)
     patch_dark_page_text(CORE)
+    patch_dark_ruler(CORE)
 
     if args.slim_dictionaries or os.path.isdir(f'{CORE}/instdir/share/extensions'):
         slim_dictionaries(CORE, keep_langs=keep_langs)
