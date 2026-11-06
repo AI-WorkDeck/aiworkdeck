@@ -71,6 +71,8 @@ export const EDITOR_ACTIONS = [
   // [Track E] export the current document as bytes (host-initiated save):
   // {name} -> storeToURL into MEMFS -> {bytes, size}; the host uploads them.
   'export_document',
+  // [0.81 秒开] 备胎空闲时导出+装回空白文档一次，付掉引擎首份文档的一次性初始化。
+  'warm_engine',
   // [dev-board#886] 导出 PDF 字节（宿主发起：原生「导出为 PDF」入口被 worker 拦下后
   // 经 export-pdf-request 请宿主执行，宿主拿字节走应用自己的下载链路）。
   'export_pdf',

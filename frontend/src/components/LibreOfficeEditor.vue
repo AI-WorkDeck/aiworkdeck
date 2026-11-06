@@ -487,6 +487,7 @@ export default {
       if (newFile?.id !== oldFile?.id) this.invalidateBackendSaveHint()
       if (!newFile || oldFile) return
       this._adoptedSpare = true
+      this._perfOpenAt = Date.now()
       this.prefetchBytes()
       if (!this._endpointUp) return
       this.ready = false
@@ -526,6 +527,9 @@ export default {
     },
   },
   async mounted() {
+    // 性能埋点（0.81「秒开秒存」）：从挂载 / 备胎过继起算到 ready，一行 [perf] 日志，
+    // 真机基准脚本按这一行取数；不上报、不进遥测。
+    this._perfOpenAt = Date.now()
     // 改了昵称或「修订与批注署名」：已打开的文档立刻换署名（只影响之后新增的修订与批注）。
     this._onIdentityUpdated = () => { authorNames().refresh(); this.resolveRedlineAuthor() }
     uni.$on('awd:identity-updated', this._onIdentityUpdated)
@@ -1531,7 +1535,17 @@ export default {
     // guest 被系统回收 / 渲染进程崩掉 / 被冻死都不会有任何信号——_endpointUp
     // 只是一个「历史上握过手」的布尔，不代表现在还活着。拿它直接 finishDocLoad
     // 就是撞 180s 超时的那条路。先花几毫秒探一声活，死了就丢掉备胎走冷启动。
+    warmSpare() {
+      const executor = this.executor
+      if (!executor || this._warmPromise) return
+      const t0 = Date.now()
+      this._warmPromise = executor.executeCommand('warm_engine', {}, { background: true, timeoutMs: 20000 })
+        .then((r) => { this.appendLog('[perf] warm ' + (r && r.skipped ? 'skipped' : (Date.now() - t0) + 'ms')) })
+        .catch((e) => { this.appendLog('warm_engine failed: ' + (e && e.message ? e.message : e)) })
+    },
     async adoptAndLoad() {
+      // 预热还在跑时探活会排在它后面、可能超出 3s 探活预算被误判成死引擎——先等它跑完。
+      if (this._warmPromise) await this._warmPromise
       if (await this.probeGuestAlive()) { this.finishDocLoad(); return }
       this.appendLog('备胎探活失败 → 丢弃并冷启动 / spare probe failed, cold boot instead')
       const retryPreview = this._previewSkippedForWarmEngine
@@ -1675,7 +1689,16 @@ export default {
       clearInterval(this._bootTimer)
       this.ready = true
       if (!this.statusKey.endsWith('Failed')) this.statusKey = 'ready'
+      if (this._perfOpenAt && this._perfLoad) {
+        this.appendLog('[perf] open kind=' + (this.docKind || '?') + ' bytes=' + this._perfLoad.bytes +
+          ' path=' + (this._adoptedSpare ? 'spare' : 'cold') + ' load=' + this._perfLoad.ms + 'ms ready=' + (Date.now() - this._perfOpenAt) + 'ms')
+        this._perfOpenAt = 0
+      }
       this.$emit('ready', this.executor)
+      // 备胎（还没有文件）空闲时预热引擎：付掉首份文档的一次性初始化（约 1.3s），
+      // 用户点开文件时就是「第二份文档」的速度。过继时 adoptAndLoad 先等它结束。
+      // 备胎此刻还没有 docKind（没装过文档）；是不是空白 Writer 由 worker 自己判定。
+      if (!this.file) this.warmSpare()
       // EvidenceLink 首轮：拉缓存 → 旧式链接收编书签（仅 writer）→ 核对锚点。
       // 不 await：核对是后台事，不能拖住 ready 之后的任何链路。
       this.initEvidence()
@@ -1942,6 +1965,7 @@ export default {
       } finally {
         if (this._loadInFlight === inflight) this._loadInFlight = null
       }
+      this._perfLoad = { ms: Date.now() - t0, bytes: bytes.length }
       this.appendLog('  ← ' + (Date.now() - t0) + 'ms ' + JSON.stringify(res))
       if (!res || !res.success) throw Object.assign(new Error((res && res.message) || 'load_document returned no success'), { code: res?.code })
       assertCurrentGeneration()
@@ -2654,6 +2678,7 @@ export default {
         if (this._reloading || this._saveDiscarded || checkpointSaveBarrier(this.projectId, fileId) ||
             documentCheckpointGeneration(this.projectId, fileId) !== generation) return false
         this.appendLog('  ← exported ' + u8.length + ' bytes, uploading…')
+        const tUpload = Date.now()
         // mustExist=1（BUG-14 / v0.49.0 C4-03）：这份文件磁盘上本来就有（元数据非空，或本会话
         // 已经存过一次），目标路径不在了只能是被外部改名 / 移走——后端据此回 409，
         // 而不是在旧路径把旧文件名重新建出来。新建空白文档的第一笔不带：那时它还不在磁盘上。
@@ -2709,6 +2734,7 @@ export default {
           try { uni.$emit('awd:file-saved', { projectId: saveProjectId, fileId }) } catch (e) { /* ignore */ }
         }
         this.appendLog('  ← saved to backend (fileId=' + fileId + ')')
+        this.appendLog('[perf] save bytes=' + (u8 ? u8.length : 0) + ' export=' + (tUpload - tExp) + 'ms upload=' + (Date.now() - tUpload) + 'ms total=' + (Date.now() - tExp) + 'ms')
         this._savePaused = false
         this._saveRetryAttempt = 0
         this._exportUnsettled = false

@@ -54,7 +54,7 @@ function warmupVm() {
   const tick = () => {
     assert.equal(pending.size, 1)
     const { ms, due } = pending.values().next().value
-    assert.equal(ms, 4000)
+    assert.equal(ms, 2000)
     advance(due - now)
   }
   return { vm, pending, tick, advance }
@@ -65,13 +65,13 @@ test('foreground ready restarts the full warmup delay before another engine can 
   add(vm, 'left', 1)
   vm._libreRefs['left:1'].ready = false
   vm.scheduleLibreSpare()
-  advance(3800)
+  advance(1800)
   vm._libreRefs['left:1'].ready = true
   vm.onLibreReady({ executeCommand() {} }, 'left', 1)
   assert.equal(pending.size, 1)
   advance(200)
   assert.equal(vm.libreSpares.length, 0, 'the original empty-workbench deadline must be cancelled')
-  advance(3799)
+  advance(1799)
   assert.equal(vm.libreSpares.length, 0)
   advance(1)
   assert.equal(vm.libreSpares.length, 1)
