@@ -131,7 +131,7 @@ try {
   check('Word 红字仍是红色', res['word-red'].red > 0.005 && res['word-red'].bright < 0.01, res['word-red'])
   check('Word 白色底纹里的字仍是深色（不白底白字）', res['word-white-shading'].bright > 0.3 && res['word-white-shading'].dark > 0.005, res['word-white-shading'])
 
-  for (const [name, font, fill, text] of [['excel-empty', '000000', null, ' '], ['excel-black', '000000', null], ['excel-yellow-fill', '000000', 'FFFF00']]) {
+  for (const [name, font, fill, text] of [['excel-empty', '000000', null, ' '], ['excel-black', '000000', null], ['excel-yellow-fill', '000000', 'FFFF00'], ['excel-red', 'FF0000', null]]) {
     const loaded = await load(await xlsx(font, fill, text), name + '.xlsx')
     if (!loaded.success) throw new Error(name + ': ' + JSON.stringify(loaded))
     // 同产品：原生菜单/工具栏/状态栏都藏起来，露出来的只剩画布与标尺
@@ -143,6 +143,7 @@ try {
   }
   check('Excel 无底色单元格变暗，显式黑字变亮（引擎补丁）', res['excel-black'].mean < 110 && res['excel-black'].bright - res['excel-empty'].bright > 0.02, { black: res['excel-black'], empty: res['excel-empty'] })
   check('Excel 黄色底纹单元格的字仍是深色', res['excel-yellow-fill'].dark > 0.005, res['excel-yellow-fill'])
+  check('Excel 红字仍是红色', res['excel-red'].red > 0.005, res['excel-red'])
 
   const pptx = fs.readFileSync(new URL('./fixtures/impress-smoke.pptx', import.meta.url))
   const loaded = await load(Array.from(pptx), 'smoke.pptx')
