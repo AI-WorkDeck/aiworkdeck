@@ -269,7 +269,7 @@
           <!-- 转写稿 -->
           <view class="mr-section">
             <text class="mr-section-title">{{ $t('meeting.transcript') }}</text>
-            <view class="mr-transcript">
+            <view class="mr-transcript awd-hairline-scroll">
               <view v-for="(seg, i) in segmentsOf(m)" :key="i" class="mr-seg">
                 <view class="mr-seg-head">
                   <text class="mr-seg-speaker" :class="speakerClass(seg.speaker)">{{ speakerName(m, seg.speaker) }}</text>

@@ -10,6 +10,8 @@
   <script src="awd-plugin-sdk.js"></script>
   <script src="panel.js" defer></script>
   <script src="workflow.js" defer></script>
+  <script src="expenses-l10n.js" defer></script>
+  <script src="expenses.js" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -45,6 +47,9 @@
       </button>
       <button type="button" id="tab-dashboard" role="tab" data-tab="dashboard" aria-selected="false" aria-controls="panel-dashboard" class="tab-btn">
         <span>决策与业务看板</span>
+      </button>
+      <button type="button" id="tab-expense" role="tab" data-tab="expense" aria-selected="false" aria-controls="panel-expense" class="tab-btn">
+        <span data-ex="expense.tab"></span>
       </button>
     </nav>
   </header>
@@ -464,6 +469,57 @@
             <tbody id="unit-table"></tbody>
           </table>
         </div>
+      </article>
+    </section>
+
+    <!-- Tab 5: 办案费用（本机台账，plugin storage） -->
+    <section id="panel-expense" role="tabpanel" aria-labelledby="tab-expense" class="tab-panel" hidden>
+      <div class="split-grid">
+        <article class="card">
+          <header class="card-header"><div><h2 data-ex="expense.formTitle"></h2><p class="hint" data-ex="expense.formHint"></p></div></header>
+          <form id="ex-form" class="form-grid" novalidate>
+            <label><span data-ex="expense.date"></span><input id="ex-date" type="date" required></label>
+            <label><span data-ex="expense.amount"></span><input id="ex-amount" type="text" inputmode="decimal" required></label>
+            <label class="field-span-2"><span data-ex="expense.matter"></span><input id="ex-matter" type="text" list="ex-matters" data-ex-placeholder="expense.matterPlaceholder" required></label>
+            <label><span data-ex="expense.category"></span>
+              <select id="ex-category">
+                <option value="COURT_FEE" data-ex="expense.cat.COURT_FEE"></option>
+                <option value="PRESERVATION" data-ex="expense.cat.PRESERVATION"></option>
+                <option value="APPRAISAL" data-ex="expense.cat.APPRAISAL"></option>
+                <option value="NOTARY" data-ex="expense.cat.NOTARY"></option>
+                <option value="TRAVEL" data-ex="expense.cat.TRAVEL"></option>
+                <option value="ARCHIVE" data-ex="expense.cat.ARCHIVE"></option>
+                <option value="POSTAGE" data-ex="expense.cat.POSTAGE"></option>
+                <option value="OTHER" data-ex="expense.cat.OTHER"></option>
+              </select>
+            </label>
+            <label><span data-ex="expense.paidBy"></span>
+              <select id="ex-paid-by">
+                <option value="FIRM" data-ex="expense.paid.FIRM"></option>
+                <option value="CLIENT" data-ex="expense.paid.CLIENT"></option>
+              </select>
+            </label>
+            <label class="field-span-2"><span data-ex="expense.voucher"></span><input id="ex-voucher" type="text" data-ex-placeholder="expense.voucherPlaceholder"></label>
+            <p id="ex-status" class="hint field-span-2" role="status" aria-live="polite"></p>
+            <div class="form-actions field-span-2"><button type="submit" id="ex-add" data-ex="expense.add"></button></div>
+          </form>
+          <datalist id="ex-matters"></datalist>
+        </article>
+        <article class="card">
+          <header class="card-header"><div><h2 data-ex="expense.summaryTitle"></h2></div></header>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th data-ex="expense.col.matter"></th><th data-ex="expense.col.advanced"></th><th data-ex="expense.col.pending"></th><th data-ex="expense.col.noVoucher"></th><th data-ex="expense.col.client"></th>
+              </tr></thead>
+              <tbody id="ex-summary"></tbody>
+            </table>
+          </div>
+        </article>
+      </div>
+      <article class="card">
+        <header class="card-header"><div><h2 data-ex="expense.listTitle"></h2></div></header>
+        <div id="ex-list" class="stack-list"></div>
       </article>
     </section>
   </main>

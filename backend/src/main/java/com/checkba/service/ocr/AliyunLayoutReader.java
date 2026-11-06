@@ -90,7 +90,7 @@ public final class AliyunLayoutReader {
         boolean anyText = false;
         for (JsonNode image : root.path("subImages")) {
             for (JsonNode b : image.path("blockInfo").path("blockDetails")) {
-                String text = b.path("blockContent").asText("").strip();
+                String text = OcrResult.digitGroups(b.path("blockContent").asText("").strip());
                 if (text.isEmpty()) continue;
                 anyText = true;
                 Box box = box(b.path("blockPoints"));
@@ -104,7 +104,7 @@ public final class AliyunLayoutReader {
                 for (JsonNode c : t.path("cellDetails")) {
                     CellSrc cell = new CellSrc(c.path("rowStart").asInt(), c.path("rowEnd").asInt(),
                             c.path("columnStart").asInt(), c.path("columnEnd").asInt(),
-                            c.path("cellContent").asText("").strip(), box(c.path("cellPoints")));
+                            OcrResult.digitGroups(c.path("cellContent").asText("").strip()), box(c.path("cellPoints")));
                     cells.add(cell);
                     rows = Math.max(rows, cell.r1() + 1);
                     cols = Math.max(cols, cell.c1() + 1);
