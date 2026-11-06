@@ -75,4 +75,10 @@ export default {
   // artifact 兜底文件名
   taskListArtifact: '任务清单',
   planArtifact: '计划',
+  "bqtMemberInvalid": "包晴天会员已失效，请在包晴天 App 续费会员后重试。",
+  "bqtAiClosed": "你的包晴天会员有效，但 AI 工作台已在包晴天关闭。请在包晴天 App 中开启后重试。",
+  "bqtInsufficientPoints": "包晴天积分不足，请在包晴天 App 充值积分后重试。",
+  "bqtOutstandingDebt": "此前有一笔扣点未成功。请在包晴天 App 充值积分，然后联系客服处理。",
+  "bqtUnavailable": "包晴天服务暂时不可用，请稍后重试。",
+  "bqtRechargeViaBqt": "包晴天会员请在包晴天 App 充值或续费，AI WorkDeck 内不提供充值。",
 }

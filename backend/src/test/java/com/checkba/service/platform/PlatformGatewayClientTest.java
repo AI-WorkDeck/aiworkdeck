@@ -196,6 +196,26 @@ class PlatformGatewayClientTest {
     }
 
     @Test
+    @DisplayName("包晴天积分通道的拒绝带 reason，403 会员失效不当成凭据失效、402 积分不足不当成 NO_CREDITS")
+    void bqtRefusalsAreBusinessStatesWithReason() {
+        String[][] cases = {
+                {"403", "bqt_member_invalid", "SERVICE_DISABLED"},
+                {"403", "bqt_ai_closed", "SERVICE_DISABLED"},
+                {"402", "bqt_insufficient_points", "SERVICE_DISABLED"},
+                {"402", "bqt_outstanding_debt", "SERVICE_DISABLED"},
+                {"503", "bqt_unavailable", "UPSTREAM_FAILED"},
+        };
+        for (String[] c : cases) {
+            transport.reply(Integer.parseInt(c[0]), "{\"error\":\"" + c[1] + "\",\"message\":\"x\"}");
+            GatewayException e = assertThrows(GatewayException.class, () -> client.call("search", "web", Map.of(), 30));
+            assertEquals(c[2], e.getKind().name(), c[1]);
+            assertEquals(c[1], e.getReason());
+            assertFalse(e.getMessage().contains("登录") || e.getMessage().contains("请先"), e.getMessage());
+        }
+        verify(accountService, never()).markUnauthorized(anyString(), anyLong());
+    }
+
+    @Test
     @DisplayName("撞上用户自设的花费上限是可恢复的确认，不是「预期外的状态 409」")
     void budgetExceededIsItsOwnKind() {
         // 不认这个码的话它会落到按状态码分类的默认分支，变成 MALFORMED——

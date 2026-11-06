@@ -58,5 +58,11 @@ export default {
   "pdfExportTooLargeError": "Tệp PDF đã xuất vượt quá {mb}MB và không thể lưu vào dự án qua AI; vui lòng dùng \"Tệp -> Xuất dưới dạng PDF\"",
   "systemOperation": "Thao tác hệ thống",
   "taskListArtifact": "Danh sách công việc",
-  "planArtifact": "Kế hoạch"
+  "planArtifact": "Kế hoạch",
+  "bqtMemberInvalid": "Tư cách thành viên Baoqingtian của bạn không còn hiệu lực. Hãy gia hạn trong ứng dụng Baoqingtian rồi thử lại.",
+  "bqtAiClosed": "Tư cách thành viên Baoqingtian của bạn còn hiệu lực, nhưng không gian làm việc AI đã bị tắt trong Baoqingtian. Hãy bật trong ứng dụng Baoqingtian rồi thử lại.",
+  "bqtInsufficientPoints": "Không đủ điểm Baoqingtian. Hãy nạp điểm trong ứng dụng Baoqingtian rồi thử lại.",
+  "bqtOutstandingDebt": "Lần trừ điểm trước đó không thành công. Hãy nạp điểm trong ứng dụng Baoqingtian rồi liên hệ bộ phận hỗ trợ.",
+  "bqtUnavailable": "Dịch vụ Baoqingtian tạm thời không khả dụng. Vui lòng thử lại sau.",
+  "bqtRechargeViaBqt": "Thành viên Baoqingtian nạp điểm hoặc gia hạn trong ứng dụng Baoqingtian; AI WorkDeck không nhận thanh toán cho tài khoản này.",
 }

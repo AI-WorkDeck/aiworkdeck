@@ -58,5 +58,11 @@ export default {
   "pdfExportTooLargeError": "PDF yang diekspor melebihi {mb}MB dan tidak dapat disimpan ke proyek melalui AI; silakan gunakan \"File -> Ekspor sebagai PDF\"",
   "systemOperation": "Tindakan Sistem",
   "taskListArtifact": "Daftar Tugas",
-  "planArtifact": "Rencana"
+  "planArtifact": "Rencana",
+  "bqtMemberInvalid": "Keanggotaan Baoqingtian Anda tidak lagi aktif. Perpanjang di aplikasi Baoqingtian lalu coba lagi.",
+  "bqtAiClosed": "Keanggotaan Baoqingtian Anda aktif, tetapi ruang kerja AI dinonaktifkan di Baoqingtian. Aktifkan di aplikasi Baoqingtian lalu coba lagi.",
+  "bqtInsufficientPoints": "Poin Baoqingtian tidak cukup. Isi ulang poin di aplikasi Baoqingtian lalu coba lagi.",
+  "bqtOutstandingDebt": "Pemotongan poin sebelumnya gagal. Isi ulang poin di aplikasi Baoqingtian lalu hubungi dukungan.",
+  "bqtUnavailable": "Layanan Baoqingtian sementara tidak tersedia. Silakan coba lagi nanti.",
+  "bqtRechargeViaBqt": "Anggota Baoqingtian mengisi ulang atau memperpanjang di aplikasi Baoqingtian; AI WorkDeck tidak menerima pembayaran untuk akun ini.",
 }

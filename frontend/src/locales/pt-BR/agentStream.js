@@ -58,5 +58,11 @@ export default {
   "pdfExportTooLargeError": "O PDF exportado excede {mb}MB e não pode ser salvo no projeto via IA; use \"Arquivo -> Exportar como PDF\"",
   "systemOperation": "Ações do Sistema",
   "taskListArtifact": "Lista de Tarefas",
-  "planArtifact": "Plano"
+  "planArtifact": "Plano",
+  "bqtMemberInvalid": "Sua assinatura Baoqingtian não está mais ativa. Renove no app Baoqingtian e tente novamente.",
+  "bqtAiClosed": "Sua assinatura Baoqingtian está ativa, mas o espaço de trabalho de IA está desativado no Baoqingtian. Ative no app Baoqingtian e tente novamente.",
+  "bqtInsufficientPoints": "Pontos Baoqingtian insuficientes. Recarregue pontos no app Baoqingtian e tente novamente.",
+  "bqtOutstandingDebt": "Uma dedução de pontos anterior falhou. Recarregue pontos no app Baoqingtian e depois entre em contato com o suporte.",
+  "bqtUnavailable": "O serviço Baoqingtian está temporariamente indisponível. Tente novamente mais tarde.",
+  "bqtRechargeViaBqt": "Membros Baoqingtian recarregam ou renovam no app Baoqingtian; o AI WorkDeck não aceita pagamentos para esta conta.",
 }

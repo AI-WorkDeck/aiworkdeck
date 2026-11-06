@@ -46,14 +46,25 @@ public class GatewayException extends RuntimeException {
     }
 
     private final Kind kind;
+    /** 官网给的机器码（目前只有包晴天积分通道的 bqt_*），前端据此取多语种文案；其余为 null。 */
+    private final String reason;
 
     public GatewayException(Kind kind, String message) {
+        this(kind, message, null);
+    }
+
+    public GatewayException(Kind kind, String message, String reason) {
         super(message);
         this.kind = kind;
+        this.reason = reason;
     }
 
     public Kind getKind() {
         return kind;
+    }
+
+    public String getReason() {
+        return reason;
     }
 
     /** Official desktop gateways require an account; BYOK is not a supported recovery path. */

@@ -58,5 +58,11 @@ export default {
   "pdfExportTooLargeError": "エクスポートされたPDFが {mb}MB を超えているため、AI経由でプロジェクトに保存できません。「ファイル -> PDFとしてエクスポート」を使用してください",
   "systemOperation": "システム操作",
   "taskListArtifact": "タスクリスト",
-  "planArtifact": "プラン"
+  "planArtifact": "プラン",
+  "bqtMemberInvalid": "包晴天会員資格が無効になりました。包晴天アプリで更新してから、もう一度お試しください。",
+  "bqtAiClosed": "包晴天会員資格は有効ですが、AIワークベンチが包晴天でオフになっています。包晴天アプリでオンにしてから、もう一度お試しください。",
+  "bqtInsufficientPoints": "包晴天ポイントが不足しています。包晴天アプリでポイントをチャージしてから、もう一度お試しください。",
+  "bqtOutstandingDebt": "以前のポイント差引に失敗しています。包晴天アプリでポイントをチャージしてから、サポートまでお問い合わせください。",
+  "bqtUnavailable": "包晴天サービスは一時的にご利用できません。しばらくしてからもう一度お試しください。",
+  "bqtRechargeViaBqt": "包晴天会員は包晴天アプリでチャージまたは更新してください。AI WorkDeck ではこのアカウントの決済は行えません。",
 }

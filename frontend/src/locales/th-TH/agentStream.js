@@ -58,5 +58,11 @@ export default {
   "pdfExportTooLargeError": "ไฟล์ PDF ที่ส่งออกมีขนาดเกิน {mb}MB และไม่สามารถบันทึกลงในโปรเจกต์ผ่าน AI ได้ โปรดใช้เมนู \"ไฟล์ -> ส่งออกเป็น PDF\" แทน",
   "systemOperation": "การดำเนินการของระบบ",
   "taskListArtifact": "รายการงาน",
-  "planArtifact": "แผนงาน"
+  "planArtifact": "แผนงาน",
+  "bqtMemberInvalid": "สมาชิก Baoqingtian ของคุณไม่ได้ใช้งานอยู่แล้ว โปรดต่ออายุในแอป Baoqingtian แล้วลองอีกครั้ง",
+  "bqtAiClosed": "สมาชิก Baoqingtian ของคุณยังใช้งานอยู่ แต่พื้นที่ทำงาน AI ถูกปิดใน Baoqingtian โปรดเปิดในแอป Baoqingtian แล้วลองอีกครั้ง",
+  "bqtInsufficientPoints": "คะแนน Baoqingtian ไม่เพียงพอ โปรดเติมคะแนนในแอป Baoqingtian แล้วลองอีกครั้ง",
+  "bqtOutstandingDebt": "การหักคะแนนครั้งก่อนไม่สำเร็จ โปรดเติมคะแนนในแอป Baoqingtian แล้วติดต่อฝ่ายสนับสนุน",
+  "bqtUnavailable": "บริการ Baoqingtian ไม่พร้อมใช้งานชั่วคราว โปรดลองอีกครั้งในภายหลัง",
+  "bqtRechargeViaBqt": "สมาชิก Baoqingtian เติมคะแนนหรือต่ออายุในแอป Baoqingtian; AI WorkDeck ไม่รับชำระเงินสำหรับบัญชีนี้",
 }

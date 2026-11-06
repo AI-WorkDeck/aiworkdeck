@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { fetchAgentConnection } from './sharedAgentConnection.mjs'
 import { isCreditsRequired, isAccountRequired } from '@/utils/requireAccountCore.js'
+import { bqtErrorCode, bqtErrorMessage } from '@/utils/bqtBilling.js'
 import { ref, reactive, nextTick, onUnmounted, getCurrentInstance } from 'vue'
 import { deleteAgentInboxItem, getAgentInbox, getApiBaseUrl, getConversationMetadata, updateAgentInboxItem } from '@/services/api.js'
 import { getSessionId } from '@/utils/auth.js'
@@ -1885,7 +1886,11 @@ export function useAgentStream() {
                 let attachmentErrorKey = ''
                 try { const payload = JSON.parse(dataStr); attachmentErrorKey = ({ CONTEXT_PREPARATION_TIMEOUT: 'chat.contextPreparationTimeout', ATTACHMENT_READER_BUSY: 'chat.attachmentReaderBusy', ATTACHMENTS_REQUIRE_TOOLS: 'chat.attachmentsRequireTools' })[payload?.code] || '' } catch (_) { /* plain-text error */ }
                 const errMsg = attachmentErrorKey ? t(attachmentErrorKey) : dataStr && accountPayload ? (accountPayload.message || dataStr) : (dataStr || "Unknown Error")
-                if (isAccountRequired(accountPayload)) {
+                const bqtCode = bqtErrorCode(accountPayload) || bqtErrorCode(errMsg)
+                if (bqtCode) {
+                    // 包晴天积分通道的网关拒绝：只能在包晴天 App 处理，不弹本应用的充值层
+                    currentAssistantBubble.value.content += '\n\n' + bqtErrorMessage(bqtCode, t) + '\n'
+                } else if (isAccountRequired(accountPayload)) {
                     // 这台电脑还没登录账户：就地弹登录层（不是会话失效，不清会话）。
                     // 这一轮不自动重发——登录完用户重发即可。平时走不到这里：ChatInterface
                     // 发送前已经用 requireAccount 拦过，这是后端兜底（如退出登录的同一秒里发出的消息）

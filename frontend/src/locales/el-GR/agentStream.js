@@ -58,5 +58,11 @@ export default {
   "pdfExportTooLargeError": "Το εξαγόμενο PDF υπερβαίνει τα {mb}MB και δεν μπορεί να αποθηκευτεί στο έργο μέσω AI· χρησιμοποιήστε «Αρχείο -> Εξαγωγή ως PDF»",
   "systemOperation": "Ενέργειες συστήματος",
   "taskListArtifact": "Λίστα εργασιών",
-  "planArtifact": "Σχέδιο"
+  "planArtifact": "Σχέδιο",
+  "bqtMemberInvalid": "Η συνδρομή σας στο Baoqingtian δεν είναι πλέον ενεργή. Ανανεώστε την στην εφαρμογή Baoqingtian και δοκιμάστε ξανά.",
+  "bqtAiClosed": "Η συνδρομή σας στο Baoqingtian είναι ενεργή, αλλά ο χώρος εργασίας AI είναι απενεργοποιημένος στο Baoqingtian. Ενεργοποιήστε τον στην εφαρμογή Baoqingtian και δοκιμάστε ξανά.",
+  "bqtInsufficientPoints": "Δεν υπάρχουν αρκετοί πόντοι Baoqingtian. Φορτίστε πόντους στην εφαρμογή Baoqingtian και δοκιμάστε ξανά.",
+  "bqtOutstandingDebt": "Μια προηγούμενη αφαίρεση πόντων απέτυχε. Φορτίστε πόντους στην εφαρμογή Baoqingtian και επικοινωνήστε με την υποστήριξη.",
+  "bqtUnavailable": "Η υπηρεσία Baoqingtian δεν είναι προσωρινά διαθέσιμη. Δοκιμάστε ξανά αργότερα.",
+  "bqtRechargeViaBqt": "Τα μέλη του Baoqingtian φορτίζουν ή ανανεώνουν στην εφαρμογή Baoqingtian· το AI WorkDeck δεν δέχεται πληρωμές για αυτόν τον λογαριασμό.",
 }
