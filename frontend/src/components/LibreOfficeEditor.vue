@@ -1676,7 +1676,8 @@ export default {
       this.$emit('ready', this.executor)
       // 备胎（还没有文件）空闲时预热引擎：付掉首份文档的一次性初始化（约 1.3s），
       // 用户点开文件时就是「第二份文档」的速度。过继时 adoptAndLoad 先等它结束。
-      if (!this.file && this.docKind === 'writer') this.warmSpare()
+      // 备胎此刻还没有 docKind（没装过文档）；是不是空白 Writer 由 worker 自己判定。
+      if (!this.file) this.warmSpare()
       // EvidenceLink 首轮：拉缓存 → 旧式链接收编书签（仅 writer）→ 核对锚点。
       // 不 await：核对是后台事，不能拖住 ready 之后的任何链路。
       this.initEvidence()
