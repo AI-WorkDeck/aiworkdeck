@@ -1,0 +1,290 @@
+[
+  {
+    "id": "startup-agreement-drafter",
+    "name": "创业协议起草",
+    "description": "为创业公司快速起草一页纸合作协议（如设计合作伙伴协议），覆盖 IP、保密、数据与商业权利。",
+    "icon": "🚀",
+    "version": "1.0.0",
+    "author": "legal-ops",
+    "authorDisplayName": "法务运营组",
+    "triggers": [
+      "设计合作协议",
+      "起草合作协议",
+      "一页纸协议",
+      "种子客户协议",
+      "创业协议"
+    ],
+    "allowedTools": [
+      "law_search",
+      "write_docx"
+    ],
+    "category": "corporate",
+    "downloads": 7,
+    "updatedAt": "2026-07-24",
+    "homepage": "https://www.aiworkdeck.com/zh/skills/startup-agreement-drafter",
+    "priceCents": 0,
+    "pricingModel": "once"
+  },
+  {
+    "id": "shang-shi-fa-lv-yi-jian-shu-shen-cha",
+    "name": "上市法律意见书审查",
+    "description": "帮助证券律师审查 IPO 法律意见书，检查格式、内容、法规引用及法律分析逻辑。",
+    "icon": "◆",
+    "version": "1.0.0",
+    "author": "legal-ops",
+    "authorDisplayName": "法务运营组",
+    "triggers": [
+      "审上市法律意见书",
+      "审查IPO法律意见书",
+      "核查法律意见书",
+      "法律意见书审查",
+      "上市法律意见书复核"
+    ],
+    "allowedTools": [
+      "read_document",
+      "doc_get_document_text",
+      "doc_get_outline",
+      "doc_get_clauses",
+      "list_files",
+      "search_project_files",
+      "read_file",
+      "law_search",
+      "law_search_keyword",
+      "get_law_article",
+      "law_recognition",
+      "write_docx",
+      "write_file",
+      "doc_open_file",
+      "doc_find_text",
+      "doc_add_comment",
+      "search_web",
+      "browse_url",
+      "deep_search",
+      "query_memory",
+      "save_memory",
+      "retrieve_evidence",
+      "get_user_profile"
+    ],
+    "category": "compliance",
+    "downloads": 4,
+    "updatedAt": "2026-07-24",
+    "homepage": "https://www.aiworkdeck.com/zh/skills/shang-shi-fa-lv-yi-jian-shu-shen-cha",
+    "priceCents": 0,
+    "pricingModel": "once"
+  },
+  {
+    "id": "everyday-legal-advisor",
+    "name": "日常法律顾问",
+    "description": "把日常法律困境讲明白：什么性质、下一步做什么、留什么证据；仅供参考，不构成正式法律意见。",
+    "icon": "🧭",
+    "version": "1.0.0",
+    "author": "legal-ops",
+    "authorDisplayName": "法务运营组",
+    "triggers": [
+      "法律咨询",
+      "遇到纠纷怎么办",
+      "出了事故",
+      "被拖欠",
+      "维权咨询"
+    ],
+    "allowedTools": [
+      "law_search",
+      "web_search"
+    ],
+    "category": "other",
+    "downloads": 4,
+    "updatedAt": "2026-07-24",
+    "homepage": "https://www.aiworkdeck.com/zh/skills/everyday-legal-advisor",
+    "priceCents": 0,
+    "pricingModel": "once"
+  },
+  {
+    "id": "case-law-researcher",
+    "name": "判例检索助手",
+    "description": "围绕法律论点检索真实可核验的支持案例，附案号与裁判要旨，检索不到即如实说明。",
+    "icon": "⚖️",
+    "version": "1.0.0",
+    "author": "research-atelier",
+    "authorDisplayName": "法研社",
+    "triggers": [
+      "找判例",
+      "检索案例",
+      "类案检索",
+      "找支持案例",
+      "指导性案例"
+    ],
+    "allowedTools": [
+      "law_search",
+      "web_search",
+      "write_docx"
+    ],
+    "category": "research",
+    "downloads": 4,
+    "updatedAt": "2026-07-24",
+    "homepage": "https://www.aiworkdeck.com/zh/skills/case-law-researcher",
+    "priceCents": 0,
+    "pricingModel": "once"
+  },
+  {
+    "id": "clause-rewriter",
+    "name": "条款改写器",
+    "description": "按指令精准改写既有合同条款，只动该动的字，输出可直接替换回合同的成品文本。",
+    "icon": "✍️",
+    "version": "1.0.0",
+    "author": "contract-lab",
+    "authorDisplayName": "合同实验室",
+    "triggers": [
+      "改写条款",
+      "条款改写",
+      "调整这条条款",
+      "改成对等条款",
+      "条款换立场"
+    ],
+    "allowedTools": [
+      "read_document",
+      "write_docx",
+      "doc_add_comment"
+    ],
+    "category": "contract",
+    "downloads": 4,
+    "updatedAt": "2026-07-24",
+    "homepage": "https://www.aiworkdeck.com/zh/skills/clause-rewriter",
+    "priceCents": 0,
+    "pricingModel": "once"
+  },
+  {
+    "id": "clause-library-indexer",
+    "name": "条款库标引",
+    "description": "为合同条款自动生成标签、摘要与标题，加工成可检索的条款库资产，支持批量入库。",
+    "icon": "🗂️",
+    "version": "1.0.0",
+    "author": "contract-lab",
+    "authorDisplayName": "合同实验室",
+    "triggers": [
+      "条款入库",
+      "条款打标签",
+      "条款库标引",
+      "归档这条条款",
+      "条款摘要"
+    ],
+    "allowedTools": [
+      "read_document",
+      "write_docx"
+    ],
+    "category": "contract",
+    "downloads": 6,
+    "updatedAt": "2026-07-24",
+    "homepage": "https://www.aiworkdeck.com/zh/skills/clause-library-indexer",
+    "priceCents": 0,
+    "pricingModel": "once"
+  },
+  {
+    "id": "matter-status-synthesis",
+    "name": "事项状态汇总",
+    "description": "从工作文档与往来记录中合成法律事项状态报告，只讲实质进展，供汇报、周报与交接。",
+    "icon": "📋",
+    "version": "1.0.0",
+    "author": "legal-ops",
+    "authorDisplayName": "法务运营组",
+    "triggers": [
+      "事项状态汇总",
+      "写周报",
+      "案件进展汇报",
+      "状态报告",
+      "工作交接"
+    ],
+    "allowedTools": [
+      "list_files",
+      "read_document",
+      "write_docx"
+    ],
+    "category": "office",
+    "downloads": 4,
+    "updatedAt": "2026-07-24",
+    "homepage": "https://www.aiworkdeck.com/zh/skills/matter-status-synthesis",
+    "priceCents": 0,
+    "pricingModel": "once"
+  },
+  {
+    "id": "tabular-contract-review",
+    "name": "批量表格化审查",
+    "description": "把一批合同按统一字段抽取成审查表，每格附原文出处或标注无法核实，用于尽调与盘点。",
+    "icon": "📊",
+    "version": "1.0.0",
+    "author": "compliance-desk",
+    "authorDisplayName": "合规风控台",
+    "triggers": [
+      "批量审查合同",
+      "尽调表格",
+      "合同盘点",
+      "审查这批文件",
+      "做尽调清单"
+    ],
+    "allowedTools": [
+      "list_files",
+      "read_document",
+      "write_docx"
+    ],
+    "category": "compliance",
+    "downloads": 2,
+    "updatedAt": "2026-07-24",
+    "homepage": "https://www.aiworkdeck.com/zh/skills/tabular-contract-review",
+    "priceCents": 0,
+    "pricingModel": "once"
+  },
+  {
+    "id": "contract-version-diff",
+    "name": "合同版本比对",
+    "description": "对多轮谈判的合同版本做条款级差异比对，分清实质修改与文字润色，看清谁改了什么。",
+    "icon": "🔀",
+    "version": "1.0.0",
+    "author": "contract-lab",
+    "authorDisplayName": "合同实验室",
+    "triggers": [
+      "版本比对",
+      "比对合同版本",
+      "看看改了什么",
+      "多版本对比",
+      "变更日志"
+    ],
+    "allowedTools": [
+      "list_files",
+      "read_document",
+      "write_docx"
+    ],
+    "category": "contract",
+    "downloads": 5,
+    "updatedAt": "2026-07-24",
+    "homepage": "https://www.aiworkdeck.com/zh/skills/contract-version-diff",
+    "priceCents": 0,
+    "pricingModel": "once"
+  },
+  {
+    "id": "citation-verifier",
+    "name": "引用核查器",
+    "description": "逐条核查文书中的法条与判例引用，标记内容不符、已失效或无法核实的引用。",
+    "icon": "🔎",
+    "version": "1.0.0",
+    "author": "research-atelier",
+    "authorDisplayName": "法研社",
+    "triggers": [
+      "核查引用",
+      "法条核实",
+      "判例核查",
+      "引用校验",
+      "检查引注"
+    ],
+    "allowedTools": [
+      "read_document",
+      "law_search",
+      "web_search",
+      "doc_add_comment"
+    ],
+    "category": "research",
+    "downloads": 3,
+    "updatedAt": "2026-07-24",
+    "homepage": "https://www.aiworkdeck.com/zh/skills/citation-verifier",
+    "priceCents": 0,
+    "pricingModel": "once"
+  }
+]
