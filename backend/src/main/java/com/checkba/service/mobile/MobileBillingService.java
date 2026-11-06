@@ -162,6 +162,8 @@ public class MobileBillingService {
         String locale=com.checkba.service.AppLanguageScope.current();
         if(locale!=null) userRepository.updateCloudBillingLocale(userId,locale);
     }
+    public Map<String, Object> shadowUnmapped(Map<String, Object> report) { return billing.shadowUnmapped(report); }
+
     public Map<String, Object> cloudState(Long userId) {
         return cloudOperation(userId, "cloud-state", Map.of());
     }

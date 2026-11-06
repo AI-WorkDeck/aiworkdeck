@@ -16,7 +16,7 @@ class CloudPostpaidQuotaTest {
  CloudStorageQuotaService quota=new CloudStorageQuotaService(billing,files,projects,users,mock(StorageServiceFactory.class),true);
  @BeforeEach void init(){ReflectionTestUtils.setField(quota,"postpaidEnabled",true);ReflectionTestUtils.setField(quota,"safetyLimitBytes",100L);}
  @AfterEach void clear(){RequestContextHolder.resetRequestAttributes();}
- void state(long owner,boolean write,long epoch){when(billing.cloudState(owner)).thenReturn(Map.of("cloudAccess",Map.of("canWrite",write,"canUse",write,"canRead",true,"epoch",epoch)));}
+ void state(long owner,boolean write,long epoch){when(billing.cloudState(owner)).thenReturn(Map.of("billing",Map.of("accepted",true),"cloudAccess",Map.of("canWrite",write,"canUse",write,"canRead",true,"epoch",epoch)));}
  void request(String epoch){var request=new MockHttpServletRequest();if(epoch!=null)request.addHeader("X-Cloud-Epoch",epoch);RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));}
  @Test void prepaidOrCreditNonSubscriberCanWriteWithoutFakingSubscription(){state(1,true,1);when(billing.balance(1L)).thenReturn(new MobileBillingClient.BalanceResult(10,"CNY","free"));assertEquals(100,quota.persistentQuota(1L));assertEquals(0,quota.subscriptionQuota(1L));request("1");assertDoesNotThrow(()->quota.requireCloudWrite(1L));}
  @Test void overLimitStopsWritesButKeepsRead(){state(1,false,2);assertFalse(quota.canWrite(1L));assertTrue(quota.canRead(1L));request("2");assertThrows(IllegalArgumentException.class,()->quota.requireCloudWrite(1L));}
@@ -58,4 +58,42 @@ class CloudPostpaidQuotaTest {
   }
  }
 
+
+ // Not accepting the policy keeps exactly the switch-off (subscription) rules; accepting only adds postpaid.
+ void unaccepted(long owner){when(billing.cloudState(owner)).thenReturn(Map.of("billing",Map.of("accepted",false),"cloudAccess",Map.of("canWrite",false,"canUse",false,"canRead",false,"epoch",0)));}
+ void subscribed(long owner){when(billing.balance(owner)).thenReturn(new MobileBillingClient.BalanceResult(0,"CNY","pro",Map.of("active",true,"expiresAt",java.time.Instant.now().plusSeconds(86400).toString(),"cloudStorageBytes",CloudStorageQuotaService.PRO_BYTES)));}
+ List<Object> access(long owner){return List.of(quota.canWrite(owner),quota.canRead(owner),quota.canUse(owner),quota.persistentQuota(owner));}
+ @Test void unacceptedSubscriberKeepsCloudWritesWithSwitchOn(){
+  unaccepted(1);subscribed(1);request(null);
+  assertEquals(List.of(true,true,true,CloudStorageQuotaService.PRO_BYTES),access(1));
+  assertDoesNotThrow(()->quota.requireCloudWrite(1L),"no epoch/postpaid gate for an unaccepted account");
+  assertFalse(quota.postpaidFor(1L));
+  ReflectionTestUtils.setField(quota,"postpaidEnabled",false);
+  assertEquals(List.of(true,true,true,CloudStorageQuotaService.PRO_BYTES),access(1),"identical to the switch off");
+ }
+ @Test void unacceptedFreeOrUnmappedUserGetsExactlySwitchOffAccess(){
+  unaccepted(1);when(billing.balance(1L)).thenReturn(new MobileBillingClient.BalanceResult(500,"CNY","free"));
+  when(billing.cloudState(2L)).thenThrow(new MobileBillingFailureException(MobileBillingKind.NOT_CONNECTED,"unmapped"));
+  when(billing.balance(2L)).thenThrow(new MobileBillingFailureException(MobileBillingKind.NOT_CONNECTED,"unmapped"));
+  var on=List.of(access(1),access(2));
+  ReflectionTestUtils.setField(quota,"postpaidEnabled",false);
+  assertEquals(List.of(access(1),access(2)),on);
+  assertEquals(List.of(false,false,false,0L),on.get(0));
+ }
+ @Test void unacceptedOwnerProjectWritesUseSubscriptionRulesNotPostpaidOwnershipOrEpoch(){
+  var project=new com.checkba.model.entity.Project();project.setId(7L);project.setUserId(1L);
+  when(projects.findById(7L)).thenReturn(Optional.of(project));when(projects.lockForImWrite(7L)).thenReturn(Optional.of(project));when(users.lockStorageOwner(1L)).thenReturn(Optional.of(new com.checkba.model.entity.User()));
+  var file=new com.checkba.model.entity.ProjectFile();file.setProjectId(7L);file.setFileSize(9L);file.setIsDeleted(false);
+  when(files.findCloudFilesByOwner(1L)).thenReturn(List.of(file));
+  unaccepted(1);subscribed(1);request(null);
+  assertDoesNotThrow(()->quota.requireProjectCapacity(7L,100),"legacy project without PERSONAL ownership stays writable");
+  assertEquals(9L,quota.usage(1L).get("persistentUsedBytes"),"subscription scope counts the legacy project");
+  var meters=mock(org.springframework.beans.factory.ObjectProvider.class);ReflectionTestUtils.setField(quota,"meters",meters);
+  quota.storageChanging(1L);verifyNoInteractions(meters);
+  verify(billing,never()).cloudOperation(anyLong(),anyString(),anyMap());
+ }
+ @Test void unavailableAuthorityStillFailsClosedForUnknownAcceptance(){
+  when(billing.cloudState(1L)).thenThrow(new MobileBillingFailureException(MobileBillingKind.UNAVAILABLE,"offline"));subscribed(1);
+  assertThrows(MobileBillingFailureException.class,()->quota.requireCloudWrite(1L));
+ }
 }

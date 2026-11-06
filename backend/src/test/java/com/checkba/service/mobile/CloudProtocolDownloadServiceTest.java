@@ -13,7 +13,7 @@ class CloudProtocolDownloadServiceTest {
  final MobileBillingService billing=mock(MobileBillingService.class);
  final CloudEgressService egress=mock(CloudEgressService.class);
  final CloudProtocolDownloadService service=new CloudProtocolDownloadService(quota,billing,egress);
- @BeforeEach void init(){when(quota.isEnabled()).thenReturn(true);when(quota.postpaidEnabled()).thenReturn(true);}
+ @BeforeEach void init(){when(quota.isEnabled()).thenReturn(true);when(quota.postpaidEnabled()).thenReturn(true);when(quota.postpaidFor(anyLong())).thenReturn(true);}
  @Test void hardshipGitCannotAcquireRepeatedDynamicExports()throws Exception {
   when(billing.cloudState(7L)).thenReturn(Map.of("cloudAccess",Map.of("caseId","case")));
   var response=new MockHttpServletResponse();var closed=new java.util.concurrent.atomic.AtomicBoolean();
