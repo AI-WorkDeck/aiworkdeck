@@ -144,7 +144,7 @@ try {
     const todos = window.chatState.bubbles.at(-1).planTodos
     window.sseController.enqueue(new TextEncoder().encode(`event: plan_update\ndata: ${JSON.stringify({ todos })}\n\n`))
   })
-  await page.click('.question-card .btn-option')
+  await page.click('.question-card .q-choice:not(.q-choice-other)')
   await wait(() => window.chatState.bubbles.at(-1).isStreaming)
   const send = async (event, data) => page.evaluate(({ event, data }) => {
     window.sseController.enqueue(new TextEncoder().encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
@@ -183,14 +183,14 @@ try {
   // 回答问题进入生成中开始，一路用真的 handleSubmit / AgentInbox DOM 驱动。
   await page.evaluate(() => { window.inboxItems = []; window.nextReceiptState = 'applied' })
   await page.evaluate(() => window.loadFixture('question'))
-  await wait(() => document.querySelector('.question-card .btn-option'))
-  await page.click('.question-card .btn-option')
+  await wait(() => document.querySelector('.question-card .q-choice:not(.q-choice-other)'))
+  await page.click('.question-card .q-choice:not(.q-choice-other)')
   await wait(() => window.chatState.isStreaming)
   const interject = (text) => page.evaluate(async (text) => {
     document.querySelector('.chat-input-rich').textContent = text
     await window.chatState.handleSubmit('steer')
   }, text)
-  const lastReceipt = () => page.$$eval('.user-bubble', (els) =>
+  const lastReceipt = () => page.$$eval('.message-row.user', (els) =>
     els[els.length - 1]?.querySelector('.bubble-receipt')?.textContent.trim() || '')
   // 待处理区用的是 uni 的 @tap。这个夹具只跑 @vitejs/plugin-vue，没有 uni 的模板
   // 编译器把 tap 映射成 click，所以这里直接派发 tap——测的是处理函数的接线，
@@ -457,7 +457,7 @@ try {
       `${label}: 长模型名由省略号截断吸收收缩，而不是去挤模式名`)
   }
   // 长模型名是触发挤压的条件之一，夹具默认空目录只显示「选择模型」，压不出病灶
-  await page.evaluate(() => { window.chatState.currentModelName = 'Very-Long-Model-Name-Pro-Max-Ultra-128k-Preview' })
+  await page.evaluate(() => { window.chatState.currentModelId = 'Very-Long-Model-Name-Pro-Max-Ultra-128k-Preview' })
   for (const kind of ['conversation', 'empty']) {
     if (kind === 'empty') {
       await page.evaluate(() => window.chat.loadMessages('fixture-empty-1101', []))
@@ -557,12 +557,12 @@ try {
   assert.ok(copiedAnswer.includes('第一部分：付款安排已核对。'), `复制的是这条回答的正文，实际：${copiedAnswer}`)
   assert.ok(!/<\/?(final|thinking|process|tool_code)/.test(copiedAnswer), '协议 XML 不许被复制走')
 
-  // 工具卡：调用与输出各一颗 12px 图标，点了不该把刚展开的输出折叠回去。
+  // 工具卡：输出的 12px 复制图标，点了不该把刚展开的输出折叠回去。
   await page.click('.message-row.assistant .activity-entry:not(.activity-entry--plan) .activity-summary')
   await wait(() => document.querySelector('.tool-copy-btn'))
-  assert.equal(await page.$$eval('.tool-row', els => els[0].querySelectorAll('.tool-copy-btn').length), 2, '调用与输出各一颗')
-  assert.equal(await copyAndRead('.tool-copy-btn', 0), 'read_document({"fileId":1})', '复制调用拿的是原样调用串')
-  assert.equal(await copyAndRead('.tool-copy-btn', 1), '已核对条款 1，付款期限为30日。', '复制输出拿的是工具原始输出')
+  // 调用串是内部工具说明，不放进用户操作区（854e31b79）；可核查的输出仍可复制
+  assert.equal(await page.$$eval('.tool-row', els => els[0].querySelectorAll('.tool-copy-btn').length), 1, '只有输出有复制键')
+  assert.equal(await copyAndRead('.tool-copy-btn', 0), '已核对条款 1，付款期限为30日。', '复制输出拿的是工具原始输出')
   assert.equal(await page.$('.tool-output'), null, '复制不该顺手把输出折叠状态弄翻')
 
   // 正文里的代码块：流式期每帧重写整段 v-html，手工框选会被当场清掉，这里必须有按钮。
@@ -758,9 +758,9 @@ try {
     document.querySelector('.msg-regen-btn span').textContent.trim(),
     document.querySelector('.md-copy-btn').textContent.trim(),
     document.querySelector('.tool-copy-btn').getAttribute('title')
-  ]), ['Copy', 'Regenerate', 'Copy', 'Copy call'], 'English labels for copy/regenerate')
+  ]), ['Copy', 'Regenerate', 'Copy', 'Copy output'], 'English labels for copy/regenerate')
   // dev-board#1101 英文面：两套模板、窄栏，模式名「Agent」同样单行不溢出
-  await page.evaluate(() => { window.chatState.currentModelName = 'Very-Long-Model-Name-Pro-Max-Ultra-128k-Preview' })
+  await page.evaluate(() => { window.chatState.currentModelId = 'Very-Long-Model-Name-Pro-Max-Ultra-128k-Preview' })
   for (const kind of ['conversation', 'empty']) {
     if (kind === 'empty') {
       await page.evaluate(() => window.chat.loadMessages('fixture-empty-1101-en', []))
