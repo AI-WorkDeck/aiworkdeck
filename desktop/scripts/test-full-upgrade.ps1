@@ -123,9 +123,77 @@ function Wait-Renderer {
 function Launch {
     return Start-Process -FilePath $exe -ArgumentList "--remote-debugging-port=$cdpPort" -PassThru
 }
+# The production installer relaunches without CDP. Use the same native UI action for
+# baseline and candidate; never bypass renderer save/quit preparation through IPC.
+$exitDrivers = @()
+$exitDialogDriver = @'
+param([int]$TargetPid, [string]$EvidencePath)
+$ErrorActionPreference = 'Stop'
+$result = [ordered]@{ targetPid = $TargetPid; status = 'waiting'; invoked = $false }
+try {
+    Add-Type -AssemblyName UIAutomationClient
+    Add-Type -AssemblyName UIAutomationTypes
+    $deadline = [DateTime]::UtcNow.AddSeconds(120)
+    $title = 'Review project changes before exiting'
+    $label = 'Exit Without Committing'
+    $dialogCondition = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty, $title)
+    $buttonCondition = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::Button)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        $target = Get-Process -Id $TargetPid -ErrorAction SilentlyContinue
+        if ($null -eq $target) { $result.status = 'exited-without-dialog'; break }
+        if ($target.MainWindowHandle -ne [IntPtr]::Zero) {
+            $root = [Windows.Automation.AutomationElement]::FromHandle($target.MainWindowHandle)
+            $dialogs = $root.FindAll([Windows.Automation.TreeScope]::Descendants, $dialogCondition)
+            foreach ($dialog in $dialogs) {
+                if ($dialog.Current.ProcessId -ne $TargetPid -or $dialog.Current.IsOffscreen) { continue }
+                $buttons = @($dialog.FindAll([Windows.Automation.TreeScope]::Descendants, $buttonCondition) | Where-Object { -not $_.Current.IsOffscreen })
+                # A matching heading alone is not the modal. Verify its complete footer.
+                $names = @($buttons | ForEach-Object { $_.Current.Name })
+                if (($names -join '|') -notin @('Cancel|Exit Without Committing|Commit selected and exit', 'Cancel|Retry|Exit Without Committing|Commit selected and exit')) { continue }
+                $button = $buttons[$buttons.Count - 2]
+                if ($button.Current.ProcessId -ne $TargetPid -or $button.Current.Name -cne $label -or -not $button.Current.IsEnabled) { continue }
+                $bounds = $button.Current.BoundingRectangle
+                if ($bounds.Width -le 0 -or $bounds.Height -le 0) { continue }
+                $pattern = $null
+                if (-not $button.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) { throw 'Exit button does not support native Invoke' }
+                $result.dialog = $dialog.Current.Name
+                $result.button = $button.Current.Name
+                $result.buttonPid = $button.Current.ProcessId
+                $result.footer = $names
+                $result.enabled = $button.Current.IsEnabled
+                $result.offscreen = $button.Current.IsOffscreen
+                $result.status = 'invoking'
+                $result | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $EvidencePath -Encoding utf8
+                $pattern.Invoke()
+                $result.invoked = $true
+                $result.status = 'invoked'
+                break
+            }
+            if ($result.invoked) { break }
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    if ($result.status -eq 'waiting') { throw 'Visible enabled project-exit dialog was not found before deadline' }
+} catch {
+    $result.status = 'failed'
+    $result.error = $_.Exception.Message
+} finally {
+    $result | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $EvidencePath -Encoding utf8
+}
+if ($result.status -eq 'failed') { exit 1 }
+'@
+function Start-ExitDialogDriver($Process) {
+    $driver = Join-Path $OutDir 'exit-dialog-driver.ps1'
+    $exitDialogDriver | Set-Content -LiteralPath $driver -Encoding utf8
+    $record = Join-Path $OutDir ("exit-dialog-{0}-{1}.json" -f $Process.Id, $script:exitDrivers.Count)
+    # Windows PowerShell supplies the native .NET Framework UI Automation assemblies.
+    $observer = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', "`"$driver`"", '-TargetPid', $Process.Id, '-EvidencePath', "`"$record`"") -PassThru -WindowStyle Hidden
+    $script:exitDrivers += @{ process = $observer; record = $record }
+}
 function Close-App($Process) {
     $Process.Refresh()
     Assert-That ($Process.MainWindowHandle -ne [IntPtr]::Zero) 'Real application window exists before close'
+    Start-ExitDialogDriver $Process
     [UpgradeWindow]::PostMessage($Process.MainWindowHandle, 0x10, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
 }
 try {
@@ -204,6 +272,7 @@ http.createServer((req,res)=>{
         if ($ExitMode -eq 'Restart') {
             # Obtain the CDP acknowledgment before the IPC closes this renderer. The following
             # lock/process/version gates, not this scheduling acknowledgment, prove completion.
+            Start-ExitDialogDriver $app
             Assert-That ((Renderer 'setTimeout(() => window.checkbaDesktop.update.restart(), 250); true') -eq $true) 'Scheduled real update restart'
         } else { Close-App $app }
     } else {
@@ -270,7 +339,6 @@ http.createServer((req,res)=>{
     # Explicit second normal restart verifies Chromium preference persistence in the installed app.
     $current = Get-Process -Name 'AI WorkDeck' | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
     Close-App $current
-    if (-not $current.WaitForExit(10000)) { Close-App $current }
     Assert-That ($current.WaitForExit(120000)) 'Upgraded app closes normally'
     $app = Launch
     Wait-Backend
@@ -278,6 +346,11 @@ http.createServer((req,res)=>{
     Assert-That ((Renderer 'window.checkbaDesktop.update.status()').appVersion -eq $CandidateVersion) 'Reopened renderer belongs to running candidate executable'
     Assert-That ((Renderer "localStorage.getItem('awd-upgrade-fixture')") -eq $marker) 'Renderer preference survives install and subsequent restart'
     Screenshot '04-reopened-workbench'
+    foreach ($driver in $exitDrivers) {
+        Assert-That ($driver.process.WaitForExit(1000)) 'Native exit-dialog driver completed'
+        $record = Get-Content -LiteralPath $driver.record -Raw | ConvertFrom-Json
+        Assert-That ($driver.process.ExitCode -eq 0 -and $record.status -in @('invoked', 'exited-without-dialog')) 'Native exit-dialog driver completed without bypass'
+    }
     $evidence.result = 'PASS'
 } catch {
     $evidence.result = 'FAIL'
