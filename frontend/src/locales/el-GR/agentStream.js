@@ -61,6 +61,7 @@ export default {
   "planArtifact": "Σχέδιο",
   "bqtMemberInvalid": "Η συνδρομή σας στο Baoqingtian δεν είναι πλέον ενεργή. Ανανεώστε την στην εφαρμογή Baoqingtian και δοκιμάστε ξανά.",
   "bqtAiClosed": "Η συνδρομή σας στο Baoqingtian είναι ενεργή, αλλά ο χώρος εργασίας AI είναι απενεργοποιημένος στο Baoqingtian. Ενεργοποιήστε τον στην εφαρμογή Baoqingtian και δοκιμάστε ξανά.",
+  "bqtModelNotAllowed": "Οι λογαριασμοί δικηγόρων Baoqingtian μπορούν να χρησιμοποιούν μόνο μοντέλα DeepSeek. Αλλάξτε σε μοντέλο DeepSeek και δοκιμάστε ξανά.",
   "bqtInsufficientPoints": "Δεν υπάρχουν αρκετοί πόντοι Baoqingtian. Φορτίστε πόντους στην εφαρμογή Baoqingtian και δοκιμάστε ξανά.",
   "bqtOutstandingDebt": "Μια προηγούμενη αφαίρεση πόντων απέτυχε. Φορτίστε πόντους στην εφαρμογή Baoqingtian και επικοινωνήστε με την υποστήριξη.",
   "bqtUnavailable": "Η υπηρεσία Baoqingtian δεν είναι προσωρινά διαθέσιμη. Δοκιμάστε ξανά αργότερα.",

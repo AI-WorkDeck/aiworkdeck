@@ -21,11 +21,11 @@ public final class BqtBilling {
 
     public static final Set<String> ERROR_CODES = Set.of(
             "bqt_member_invalid", "bqt_ai_closed", "bqt_insufficient_points",
-            "bqt_outstanding_debt", "bqt_unavailable", "bqt_recharge_via_bqt");
+            "bqt_outstanding_debt", "bqt_unavailable", "bqt_model_not_allowed", "bqt_recharge_via_bqt");
 
     private static final Set<String> BILLING_LINES = Set.of("bqt", "circle", "standard");
     private static final Pattern CODE_IN_TEXT = Pattern.compile(
-            "\\b(bqt_(?:member_invalid|ai_closed|insufficient_points|outstanding_debt|unavailable|recharge_via_bqt))\\b");
+            "\\b(bqt_(?:member_invalid|ai_closed|insufficient_points|outstanding_debt|unavailable|model_not_allowed|recharge_via_bqt))\\b");
 
     private BqtBilling() {
     }
@@ -75,6 +75,8 @@ public final class BqtBilling {
                     "A previous points deduction failed. Recharge points in the Baoqingtian app, then contact support");
             case "bqt_unavailable" -> LangText.of("包晴天服务暂时不可用，请稍后重试",
                     "The Baoqingtian service is temporarily unavailable. Please try again later");
+            case "bqt_model_not_allowed" -> LangText.of("包晴天律师账户只能使用 DeepSeek 模型，请切换到 DeepSeek 后重试",
+                    "Baoqingtian lawyer accounts can only use DeepSeek models. Switch to a DeepSeek model and try again");
             case "bqt_recharge_via_bqt" -> LangText.of("包晴天会员请在包晴天 App 充值或续费",
                     "Baoqingtian members recharge or renew in the Baoqingtian app");
             default -> LangText.of("包晴天账户状态异常，请在包晴天 App 查看",

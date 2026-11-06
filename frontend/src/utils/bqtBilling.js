@@ -6,13 +6,13 @@
 
 export const BQT_ERROR_CODES = Object.freeze([
   'bqt_member_invalid', 'bqt_ai_closed', 'bqt_insufficient_points',
-  'bqt_outstanding_debt', 'bqt_unavailable', 'bqt_recharge_via_bqt',
+  'bqt_outstanding_debt', 'bqt_unavailable', 'bqt_model_not_allowed', 'bqt_recharge_via_bqt',
 ])
 
 // 词条名 = 错误码转驼峰（bqt_ai_closed → agentStream.bqtAiClosed）；services/api.js 内联了同一规则
 const messageKey = code => 'agentStream.' + code.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
 
-const CODE_IN_TEXT = /\b(bqt_(?:member_invalid|ai_closed|insufficient_points|outstanding_debt|unavailable|recharge_via_bqt))\b/
+const CODE_IN_TEXT = /\b(bqt_(?:member_invalid|ai_closed|insufficient_points|outstanding_debt|unavailable|model_not_allowed|recharge_via_bqt))\b/
 
 /** 从错误对象 / 载荷的 reason，或一段错误文本里认出 bqt 错误码；认不出返回 ''。 */
 export function bqtErrorCode(value) {

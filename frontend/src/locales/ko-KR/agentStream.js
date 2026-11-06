@@ -61,6 +61,7 @@ export default {
   "planArtifact": "계획",
   "bqtMemberInvalid": "바오칭톈 멤버십이 더 이상 유효하지 않습니다. 바오칭톈 앱에서 갱신한 후 다시 시도해 주세요.",
   "bqtAiClosed": "바오칭톈 멤버십은 유효하지만 바오칭톈에서 AI 워크벤치가 꺼져 있습니다. 바오칭톈 앱에서 켠 후 다시 시도해 주세요.",
+  "bqtModelNotAllowed": "바오칭톈 변호사 계정은 DeepSeek 모델만 사용할 수 있습니다. DeepSeek로 전환한 후 다시 시도해 주세요.",
   "bqtInsufficientPoints": "바오칭톈 포인트가 부족합니다. 바오칭톈 앱에서 포인트를 충전한 후 다시 시도해 주세요.",
   "bqtOutstandingDebt": "이전 포인트 차감이 실패했습니다. 바오칭톈 앱에서 포인트를 충전한 후 고객 지원에 문의해 주세요.",
   "bqtUnavailable": "바오칭톈 서비스를 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.",

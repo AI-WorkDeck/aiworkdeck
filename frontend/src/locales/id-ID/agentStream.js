@@ -61,6 +61,7 @@ export default {
   "planArtifact": "Rencana",
   "bqtMemberInvalid": "Keanggotaan Baoqingtian Anda tidak lagi aktif. Perpanjang di aplikasi Baoqingtian lalu coba lagi.",
   "bqtAiClosed": "Keanggotaan Baoqingtian Anda aktif, tetapi ruang kerja AI dinonaktifkan di Baoqingtian. Aktifkan di aplikasi Baoqingtian lalu coba lagi.",
+  "bqtModelNotAllowed": "Akun pengacara Baoqingtian hanya dapat menggunakan model DeepSeek. Beralihlah ke model DeepSeek lalu coba lagi.",
   "bqtInsufficientPoints": "Poin Baoqingtian tidak cukup. Isi ulang poin di aplikasi Baoqingtian lalu coba lagi.",
   "bqtOutstandingDebt": "Pemotongan poin sebelumnya gagal. Isi ulang poin di aplikasi Baoqingtian lalu hubungi dukungan.",
   "bqtUnavailable": "Layanan Baoqingtian sementara tidak tersedia. Silakan coba lagi nanti.",

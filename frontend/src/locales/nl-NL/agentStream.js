@@ -61,6 +61,7 @@ export default {
   "planArtifact": "Werkplan",
   "bqtMemberInvalid": "Je Baoqingtian-lidmaatschap is niet meer actief. Verleng het in de Baoqingtian-app en probeer het opnieuw.",
   "bqtAiClosed": "Je Baoqingtian-lidmaatschap is actief, maar de AI-werkomgeving staat uit in Baoqingtian. Zet deze aan in de Baoqingtian-app en probeer het opnieuw.",
+  "bqtModelNotAllowed": "Baoqingtian-advocaataccounts kunnen alleen DeepSeek-modellen gebruiken. Schakel over naar een DeepSeek-model en probeer het opnieuw.",
   "bqtInsufficientPoints": "Niet genoeg Baoqingtian-punten. Laad punten op in de Baoqingtian-app en probeer het opnieuw.",
   "bqtOutstandingDebt": "Een eerdere puntenafschrijving is mislukt. Laad punten op in de Baoqingtian-app en neem daarna contact op met de support.",
   "bqtUnavailable": "De Baoqingtian-service is tijdelijk niet beschikbaar. Probeer het later opnieuw.",

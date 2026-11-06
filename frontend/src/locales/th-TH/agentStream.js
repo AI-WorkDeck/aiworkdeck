@@ -61,6 +61,7 @@ export default {
   "planArtifact": "แผนงาน",
   "bqtMemberInvalid": "สมาชิก Baoqingtian ของคุณไม่ได้ใช้งานอยู่แล้ว โปรดต่ออายุในแอป Baoqingtian แล้วลองอีกครั้ง",
   "bqtAiClosed": "สมาชิก Baoqingtian ของคุณยังใช้งานอยู่ แต่พื้นที่ทำงาน AI ถูกปิดใน Baoqingtian โปรดเปิดในแอป Baoqingtian แล้วลองอีกครั้ง",
+  "bqtModelNotAllowed": "บัญชีทนายความ Baoqingtian ใช้ได้เฉพาะโมเดล DeepSeek เท่านั้น โปรดเปลี่ยนเป็นโมเดล DeepSeek แล้วลองอีกครั้ง",
   "bqtInsufficientPoints": "คะแนน Baoqingtian ไม่เพียงพอ โปรดเติมคะแนนในแอป Baoqingtian แล้วลองอีกครั้ง",
   "bqtOutstandingDebt": "การหักคะแนนครั้งก่อนไม่สำเร็จ โปรดเติมคะแนนในแอป Baoqingtian แล้วติดต่อฝ่ายสนับสนุน",
   "bqtUnavailable": "บริการ Baoqingtian ไม่พร้อมใช้งานชั่วคราว โปรดลองอีกครั้งในภายหลัง",

@@ -61,6 +61,7 @@ export default {
   "planArtifact": "Arbeitsplan",
   "bqtMemberInvalid": "Ihre Baoqingtian-Mitgliedschaft ist nicht mehr aktiv. Verlängern Sie sie in der Baoqingtian-App und versuchen Sie es erneut.",
   "bqtAiClosed": "Ihre Baoqingtian-Mitgliedschaft ist aktiv, aber die KI-Arbeitsumgebung ist in Baoqingtian deaktiviert. Aktivieren Sie sie in der Baoqingtian-App und versuchen Sie es erneut.",
+  "bqtModelNotAllowed": "Baoqingtian-Anwaltskonten können nur DeepSeek-Modelle verwenden. Wechseln Sie zu einem DeepSeek-Modell und versuchen Sie es erneut.",
   "bqtInsufficientPoints": "Nicht genügend Baoqingtian-Punkte. Laden Sie Punkte in der Baoqingtian-App auf und versuchen Sie es erneut.",
   "bqtOutstandingDebt": "Ein früherer Punkteabzug ist fehlgeschlagen. Laden Sie Punkte in der Baoqingtian-App auf und wenden Sie sich dann an den Support.",
   "bqtUnavailable": "Der Baoqingtian-Dienst ist vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut.",

@@ -61,6 +61,7 @@ export default {
   "planArtifact": "Plan d'action",
   "bqtMemberInvalid": "Votre abonnement Baoqingtian n'est plus actif. Renouvelez-le dans l'app Baoqingtian et réessayez.",
   "bqtAiClosed": "Votre abonnement Baoqingtian est actif, mais l'espace de travail IA est désactivé dans Baoqingtian. Activez-le dans l'app Baoqingtian et réessayez.",
+  "bqtModelNotAllowed": "Les comptes avocats Baoqingtian ne peuvent utiliser que les modèles DeepSeek. Passez à un modèle DeepSeek et réessayez.",
   "bqtInsufficientPoints": "Points Baoqingtian insuffisants. Rechargez des points dans l'app Baoqingtian et réessayez.",
   "bqtOutstandingDebt": "Une déduction de points précédente a échoué. Rechargez des points dans l'app Baoqingtian puis contactez le support.",
   "bqtUnavailable": "Le service Baoqingtian est temporairement indisponible. Veuillez réessayer plus tard.",

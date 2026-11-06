@@ -203,6 +203,7 @@ class PlatformGatewayClientTest {
                 {"403", "bqt_ai_closed", "SERVICE_DISABLED"},
                 {"402", "bqt_insufficient_points", "SERVICE_DISABLED"},
                 {"402", "bqt_outstanding_debt", "SERVICE_DISABLED"},
+                {"403", "bqt_model_not_allowed", "SERVICE_DISABLED"},
                 {"503", "bqt_unavailable", "UPSTREAM_FAILED"},
         };
         for (String[] c : cases) {

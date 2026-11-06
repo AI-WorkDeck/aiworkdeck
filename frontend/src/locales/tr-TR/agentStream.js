@@ -61,6 +61,7 @@ export default {
   "planArtifact": "Çalışma Planı",
   "bqtMemberInvalid": "Baoqingtian üyeliğiniz artık aktif değil. Baoqingtian uygulamasında yenileyin ve tekrar deneyin.",
   "bqtAiClosed": "Baoqingtian üyeliğiniz aktif, ancak AI çalışma alanı Baoqingtian'de kapalı. Baoqingtian uygulamasında açın ve tekrar deneyin.",
+  "bqtModelNotAllowed": "Baoqingtian avukat hesapları yalnızca DeepSeek modellerini kullanabilir. Bir DeepSeek modeline geçip tekrar deneyin.",
   "bqtInsufficientPoints": "Yeterli Baoqingtian puanı yok. Baoqingtian uygulamasından puan yükleyin ve tekrar deneyin.",
   "bqtOutstandingDebt": "Önceki bir puan kesintisi başarısız oldu. Baoqingtian uygulamasından puan yükleyin, ardından destekle iletişime geçin.",
   "bqtUnavailable": "Baoqingtian hizmeti geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.",

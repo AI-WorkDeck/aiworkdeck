@@ -61,6 +61,7 @@ export default {
   "planArtifact": "Kế hoạch",
   "bqtMemberInvalid": "Tư cách thành viên Baoqingtian của bạn không còn hiệu lực. Hãy gia hạn trong ứng dụng Baoqingtian rồi thử lại.",
   "bqtAiClosed": "Tư cách thành viên Baoqingtian của bạn còn hiệu lực, nhưng không gian làm việc AI đã bị tắt trong Baoqingtian. Hãy bật trong ứng dụng Baoqingtian rồi thử lại.",
+  "bqtModelNotAllowed": "Tài khoản luật sư Baoqingtian chỉ có thể dùng mô hình DeepSeek. Hãy chuyển sang mô hình DeepSeek rồi thử lại.",
   "bqtInsufficientPoints": "Không đủ điểm Baoqingtian. Hãy nạp điểm trong ứng dụng Baoqingtian rồi thử lại.",
   "bqtOutstandingDebt": "Lần trừ điểm trước đó không thành công. Hãy nạp điểm trong ứng dụng Baoqingtian rồi liên hệ bộ phận hỗ trợ.",
   "bqtUnavailable": "Dịch vụ Baoqingtian tạm thời không khả dụng. Vui lòng thử lại sau.",

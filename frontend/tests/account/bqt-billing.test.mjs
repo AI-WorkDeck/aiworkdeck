@@ -29,6 +29,8 @@ test('error codes come from reason or raw text, never from look-alikes', () => {
   assert.equal(bqtErrorCode('AI_QUOTA_EXHAUSTED: insufficient credits'), '')
   assert.equal(bqtErrorCode('xbqt_ai_closedy'), '')
   assert.equal(bqtErrorMessage('bqt_ai_closed', k => k), 'agentStream.bqtAiClosed')
+  assert.equal(bqtErrorCode('{"error":{"code":"bqt_model_not_allowed"}}'), 'bqt_model_not_allowed')
+  assert.equal(bqtErrorMessage('bqt_model_not_allowed', k => k), 'agentStream.bqtModelNotAllowed')
   assert.equal(bqtErrorMessage('no_credits', k => k), '')
 })
 
