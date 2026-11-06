@@ -73,3 +73,25 @@ test('后端读不到（未登录 / 老后端 / 网络错）不抛、不重试�
   assert.equal(await r.resolve(), '', '失败后不再打网络——署名拿不到不值得反复重试')
   assert.equal(fetched, 1)
 })
+
+test('「修订与批注署名」设了就优先于昵称；清空回落昵称；refresh 后重新问后端', async () => {
+  let override = ''
+  let remoteName = '韩泽伟'
+  let fetched = 0
+  const r = createAuthorNameResolver({
+    readCached: () => null,
+    fetchRemote: async () => { fetched++; return { displayName: remoteName } },
+    readOverride: () => override,
+  })
+  assert.equal(await r.resolve(), '韩泽伟')
+  override = '  承办律师  '
+  assert.equal(r.current(), '承办律师')
+  assert.equal(await r.resolve(), '承办律师')
+  override = ''
+  assert.equal(r.current(), '韩泽伟')
+  // 改了昵称：refresh 丢掉旧的远端值，下一次 resolve 重新问
+  remoteName = '周律师'
+  r.refresh()
+  assert.equal(await r.resolve(), '周律师')
+  assert.equal(fetched, 2)
+})

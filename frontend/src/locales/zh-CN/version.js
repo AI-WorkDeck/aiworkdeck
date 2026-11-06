@@ -284,6 +284,7 @@ export default {
   clientNeedsLibraryHint: '放进团队案件库后，可邀请客户凭访问码查看。',
   sharedToLibrary: '已放进团队案件库',
   shareToLibraryFailed: '没能放进案件库',
+  cloudServiceIssueHint: "这是案件库服务暂时没能完成这一步，不是你的操作有误，本机文件也不受影响。请稍后再试；一直出现的话，请通过「反馈」把上面这句话发给我们。",
   tooManyLibraries: '这台电脑连着不止一个案件库，请先断开多余的再放进去',
   libraryOfficialTag: '官方',
   librarySignedInAs: '我的身份：{name}',

@@ -254,6 +254,7 @@ export default {
   "clientNeedsLibraryHint": "Bu dava dosyası Takım Dava Kütüphanesine eklendikten sonra, erişim koduyla istemcileri görüntülemeye davet edebilirsiniz.",
   "sharedToLibrary": "Takım Dava Kütüphanesine Eklendi",
   "shareToLibraryFailed": "Dava kütüphanesine eklenemedi",
+  "cloudServiceIssueHint": "Dava kitaplığı hizmeti bu adımı şu anda tamamlayamadı. Bu sizin hatanız değil ve yerel dosyalarınız etkilenmedi. Daha sonra tekrar deneyin; sürerse yukarıdaki mesajı Geri Bildirim üzerinden bize gönderin.",
   "tooManyLibraries": "Bu bilgisayar birden fazla dava kütüphanesine bağlı — önce fazlalıkları bağlantısını kesin",
   "libraryOfficialTag": "Resmi",
   "librarySignedInAs": "{name} olarak oturum açıldı",

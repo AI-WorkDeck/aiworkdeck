@@ -17,6 +17,11 @@
 // 让引擎用它自己的默认作者。
 const NAME_KEYS = ['displayName', 'nickname', 'name']
 
+// 「修订与批注署名」（个人设置里单独设）：设了就优先于账户昵称，只存本机。
+// 律师常用「承办律师」「XX 所」这类对外署名，不想把账户实名带进交给对方的文档。
+export const REDLINE_AUTHOR_KEY = 'awd_redline_author'
+export const MAX_REDLINE_AUTHOR_CHARS = 24
+
 /** 按来源顺序取第一个非空展示名；都没有回空串。 */
 export function pickAuthorName(...sources) {
   for (const s of sources) {
@@ -42,13 +47,16 @@ export function pickAuthorName(...sources) {
 export function createAuthorNameResolver(deps) {
   const readCached = deps.readCached
   const fetchRemote = deps.fetchRemote
+  const readOverride = deps.readOverride || (() => '')
   let remote = null
   let inflight = null
   let tried = false
-  const current = () => pickAuthorName(readCached(), remote)
+  const current = () => String(readOverride() || '').trim() || pickAuthorName(readCached(), remote)
   return {
     /** 同步取：只看已经有的东西，不发请求。 */
     current,
+    /** 改了昵称 / 署名之后：丢掉上次问到的后端值，下一次 resolve 重新问。 */
+    refresh() { remote = null; tried = false; inflight = null },
     /** 异步取：已经有名字就直接兑现；没有就问一次后端（单飞）。永不抛。 */
     resolve() {
       const now = current()

@@ -284,6 +284,7 @@ export default {
   clientNeedsLibraryHint: 'Once this case file is in the Team Case Library, you can invite clients to view it with an access code.',
   sharedToLibrary: 'Added to the Team Case Library',
   shareToLibraryFailed: 'Couldn’t add to the case library',
+  cloudServiceIssueHint: "The case library service couldn’t complete this step right now. It isn’t something you did wrong, and your local files are not affected. Try again later; if it keeps happening, send us the message above via Feedback.",
   tooManyLibraries: 'This computer is linked to more than one case library — disconnect the extra ones first',
   libraryOfficialTag: 'Official',
   librarySignedInAs: 'Signed in as {name}',
