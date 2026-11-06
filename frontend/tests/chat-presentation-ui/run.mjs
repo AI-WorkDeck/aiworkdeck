@@ -30,7 +30,7 @@ try {
   assert.equal(await page.$('.turn-activity'), null, 'no fixed classification bar')
   assert.equal(await page.$$eval('.message-list .process-card', els => els.length), 0, 'historical execution starts collapsed')
   assert.ok(await page.$eval('.message-list', el => el.textContent.includes('第一部分') && el.textContent.includes('第二部分')), 'all historical reply segments survive')
-  const summary = '.message-row.assistant .activity-summary'
+  const summary = '.message-row.assistant .activity-entry:not(.activity-entry--plan) .activity-summary'
   await page.click(summary)
   assert.ok(await visible('.process-card'), 'history can be expanded')
   await page.click('.tool-row')
@@ -558,7 +558,7 @@ try {
   assert.ok(!/<\/?(final|thinking|process|tool_code)/.test(copiedAnswer), '协议 XML 不许被复制走')
 
   // 工具卡：调用与输出各一颗 12px 图标，点了不该把刚展开的输出折叠回去。
-  await page.click('.message-row.assistant .activity-summary')
+  await page.click('.message-row.assistant .activity-entry:not(.activity-entry--plan) .activity-summary')
   await wait(() => document.querySelector('.tool-copy-btn'))
   assert.equal(await page.$$eval('.tool-row', els => els[0].querySelectorAll('.tool-copy-btn').length), 2, '调用与输出各一颗')
   assert.equal(await copyAndRead('.tool-copy-btn', 0), 'read_document({"fileId":1})', '复制调用拿的是原样调用串')
@@ -751,7 +751,7 @@ try {
   // 新加的四处复制 + 重新生成也必须跟着换语言（硬编码中文/英文在另一套界面里会原样露出来）
   await page.evaluate(() => { window.chatState.bubbles.at(-1).content += '\n\n```\nAlpha\n```\n' })
   await wait(() => document.querySelector('.md-copy-btn'))
-  await page.click('.message-row.assistant:last-child .activity-summary')
+  await page.click('.message-row.assistant:last-child .activity-entry:not(.activity-entry--plan) .activity-summary')
   await wait(() => document.querySelector('.tool-copy-btn'))
   assert.deepEqual(await page.evaluate(() => [
     document.querySelector('.msg-copy-btn span').textContent.trim(),

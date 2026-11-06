@@ -89,9 +89,18 @@ export function visibleChatTimeline(bubble) {
     ...(bubble.artifacts || []).map(data => ({ type: 'artifact', data })),
     ...(bubble.content ? [{ type: 'text', start: 0, end: bubble.content.length }] : [])
   ]
+  // The plan heads its turn: plan first, then the work it tracks. Live bubbles record it at the
+  // first plan_update, replayed history after the last todo_write — rendering by recorded position
+  // showed the same turn's plan mid-way live and at the very end after a reload.
+  const order = entries.map((entry, index) => ({ entry, index }))
+  const planAt = order.findIndex(item => item.entry.type === 'plan')
+  if (planAt > 0) {
+    const [plan] = order.splice(planAt, 1)
+    order.splice(order[0].entry.type === 'title' ? 1 : 0, 0, plan)
+  }
   const result = []
   let textEnd = 0
-  entries.forEach((entry, index) => {
+  order.forEach(({ entry, index }) => {
     if (entry.type === 'thinking' && !entry.data.content && !(bubble.isStreaming && entry.data.status === 'thinking')) return
     if (entry.type === 'plan' && !entry.data.length) return
     if (entry.type === 'text') {
