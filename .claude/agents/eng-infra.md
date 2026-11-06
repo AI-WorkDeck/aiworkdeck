@@ -350,6 +350,7 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
 
 ## 本地开发启动
 
+- 最小栈（贡献者首跑，不需要 AI Key）：`./scripts/quickstart.sh`——`docker-compose.dev.yml` 起 Postgres（pgvector，127.0.0.1:55432）→ mvn package → 后端 `dev` profile（`application-dev.yml`：local-mode 免登 + 模拟 AI）→ `scripts/quickstart/seed-demo.mjs` 经 HTTP 灌演示项目（fixtures/evidence-demo-1076，同名跳过；新项目首个上传会回 `VERSION_BUSY`，脚本重试）→ `npx uni --port 5173` → 开浏览器。user.home / 存储 / 已装插件目录都隔离到仓库内 `.quickstart/`（裸 jar 在 backend/ 下起时 `ai.plugins.dir: plugins` 会把内置插件解到 `backend/plugins/`，别提交）。端口 9696/5173 被占直接报错不杀进程。模拟 AI 契约见 `ai-chat.md`「模拟模型」。
 - 一键：`./restart-all.sh`（Docker 服务 + 后端 + 前端 + 桌面）。
 - 后端：`cd backend && ./restart-backend.sh`（mvn package -DskipTests → kill 9696 → nohup java -jar，prod 配置，日志 backend/app.log）。
 - 前端：`cd frontend && npm run dev:h5`（5173；e2e 用 `npx uni --port 5174`）。**npm 不是 pnpm**。

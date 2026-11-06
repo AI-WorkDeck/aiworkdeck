@@ -149,9 +149,10 @@ export function isCreditsRequired(error) {
     || error.reason === 'no_credits' || error.reason === 'insufficient_credits')
 }
 
-/** Legacy cloud provider settings still incur external charges. Only explicit local Ollama is exempt. */
+/** Legacy cloud provider settings still incur external charges. Only explicit local Ollama and the dev-only mock model are exempt. */
 export function requiresAiAccount(provider) {
-  return String(provider || '').toUpperCase() !== 'OLLAMA'
+  const p = String(provider || '').toUpperCase()
+  return p !== 'OLLAMA' && p !== 'MOCK'
 }
 
 /** An expired platform account needs the same in-place sign-in as a disconnected one. */

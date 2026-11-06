@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# 本地开发 / 快速体验 profile：scripts/quickstart.sh 用它起后端。
+# 激活方式：--spring.profiles.active=dev（或环境变量 SPRING_PROFILES_ACTIVE=dev）。
+# 只供本机开发，不要和 prod / cloud / case / desktop 一起激活（模拟 AI 会拒绝启动）。
+
+server:
+  address: 127.0.0.1
+
+spring:
+  datasource:
+    # quickstart 的 Postgres 容器映射在 55432，避开本机已有的 5432
+    url: jdbc:postgresql://localhost:${AWD_DB_PORT:55432}/checkba
+  jpa:
+    show-sql: false
+
+security:
+  # 单机免登（与桌面版相同）：打开就是工作台，不需要注册账号
+  local-mode: true
+  admin:
+    allow-all-users: true
+
+ai:
+  # 模拟 AI：不需要任何 AI Key，回复确定，见 MockChatModel。设 AI_MOCK_ENABLED=false 改用真实模型。
+  mock:
+    enabled: ${AI_MOCK_ENABLED:true}
+  # 自动打标签会在上传时调用辅助模型，模拟模式下没有意义
+  auto-tagging:
+    enabled: false
