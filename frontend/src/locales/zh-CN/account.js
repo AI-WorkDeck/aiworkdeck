@@ -101,6 +101,9 @@ export default {
   nicknameSaving: '保存中...',
   nicknameSaveFailed: '保存失败: {message}',
   nicknameTooLong: '姓名最多 24 个字',
+  redlineAuthorLabel: '修订与批注署名',
+  redlineAuthorPlaceholder: '留空则使用昵称',
+  redlineAuthorHint: '只影响之后新增的修订和批注，已有署名不变',
   // 姓名引导（Spec §6）：手机号注册的默认展示名是打码手机号，同事在案卷里看到的就是它
   nameNudgeText: '填写你的姓名，同事在案卷里看到的就是它',
   nameNudgeTitle: '填写你的姓名',

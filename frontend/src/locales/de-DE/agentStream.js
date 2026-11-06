@@ -58,5 +58,12 @@ export default {
   "pdfExportTooLargeError": "Die exportierte PDF überschreitet {mb}MB und kann nicht per KI im Projekt gespeichert werden; bitte verwenden Sie stattdessen „Datei -> Als PDF exportieren“",
   "systemOperation": "Systemaktionen",
   "taskListArtifact": "Aufgabenliste",
-  "planArtifact": "Arbeitsplan"
+  "planArtifact": "Arbeitsplan",
+  "bqtMemberInvalid": "Ihre Baoqingtian-Mitgliedschaft ist nicht mehr aktiv. Verlängern Sie sie in der Baoqingtian-App und versuchen Sie es erneut.",
+  "bqtAiClosed": "Ihre Baoqingtian-Mitgliedschaft ist aktiv, aber die KI-Arbeitsumgebung ist in Baoqingtian deaktiviert. Aktivieren Sie sie in der Baoqingtian-App und versuchen Sie es erneut.",
+  "bqtModelNotAllowed": "Baoqingtian-Anwaltskonten können nur DeepSeek-Modelle verwenden. Wechseln Sie zu einem DeepSeek-Modell und versuchen Sie es erneut.",
+  "bqtInsufficientPoints": "Nicht genügend Baoqingtian-Punkte. Laden Sie Punkte in der Baoqingtian-App auf und versuchen Sie es erneut.",
+  "bqtOutstandingDebt": "Ein früherer Punkteabzug ist fehlgeschlagen. Laden Sie Punkte in der Baoqingtian-App auf und wenden Sie sich dann an den Support.",
+  "bqtUnavailable": "Der Baoqingtian-Dienst ist vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut.",
+  "bqtRechargeViaBqt": "Baoqingtian-Mitglieder laden in der Baoqingtian-App auf oder verlängern dort; AI WorkDeck nimmt für dieses Konto keine Zahlungen entgegen.",
 }

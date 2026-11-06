@@ -2238,6 +2238,15 @@ $color-accent: var(--awd-mint); // Mint Green
   visibility: hidden;
   pointer-events: none;
 }
+/* 备胎例外：visibility:hidden 照样让 guest 的 rAF 停摆（0.81 真机实测 0 帧/秒，可见实例
+   145 帧/秒），引擎 boot 卡在「等 office 端点」——备胎从来没有在后台真正热起来，用户
+   点开文件时才接着 boot，21KB 的 docx 也要 3s。改成透明垫底：照常出帧、照常 boot 和
+   预热（warm_engine），点开 0.6s。只此一个空白实例，不改保活池里已装好文档的那些。 */
+.pane-content.libre-spare-standby {
+  visibility: visible;
+  opacity: 0;
+  z-index: -1;
+}
 
 .pane-empty {
   width: 100%;

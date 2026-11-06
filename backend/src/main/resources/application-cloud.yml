@@ -72,6 +72,8 @@ storage:
   postpaid:
     enabled: ${AWD_CLOUD_POSTPAID_ENABLED:false}
     cleanup-enabled: ${AWD_CLOUD_CLEANUP_ENABLED:false}
+    # Shadow metering only (no charge/debt/access change). Ignored while `enabled` is true: live wins.
+    shadow: ${AWD_CLOUD_POSTPAID_SHADOW:false}
     safety-limit-bytes: ${AWD_CLOUD_SAFETY_LIMIT_BYTES:107374182400}
   subscription-quota:
     enabled: true

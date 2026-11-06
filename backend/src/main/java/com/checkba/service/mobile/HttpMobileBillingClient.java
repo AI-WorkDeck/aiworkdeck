@@ -87,10 +87,17 @@ public class HttpMobileBillingClient implements MobileBillingClient {
     @Override
     public Map<String, Object> cloudOperation(String accountId, String action, Map<String, Object> parameters) {
         if (!java.util.Set.of("cloud-state", "postpaid-accept", "storage-usage", "notification-ack",
-                "cleanup-claim", "cleanup-complete", "cleanup-finish", "cleanup-reconciled", "resume-cloud", "storage-baseline", "egress-quote", "egress-reserve", "egress-settle").contains(action)) throw new IllegalArgumentException("Invalid cloud billing action");
+                "cleanup-claim", "cleanup-complete", "cleanup-finish", "cleanup-reconciled", "resume-cloud", "storage-baseline", "egress-quote", "egress-reserve", "egress-settle", "shadow-storage", "shadow-egress").contains(action)) throw new IllegalArgumentException("Invalid cloud billing action");
         Map<String, Object> body = new LinkedHashMap<>(parameters);
         body.put("action", action);
         body.put("accountId", accountId);
+        return om.convertValue(call(body), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+    }
+
+    @Override
+    public Map<String, Object> shadowUnmapped(Map<String, Object> report) {
+        Map<String, Object> body = new LinkedHashMap<>(report);
+        body.put("action", "shadow-unmapped");
         return om.convertValue(call(body), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
     }
 
@@ -107,7 +114,9 @@ public class HttpMobileBillingClient implements MobileBillingClient {
                 json.path("subscription").isObject()
                         ? new com.fasterxml.jackson.databind.ObjectMapper().convertValue(json.path("subscription"),
                             new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {})
-                        : Map.of());
+                        : Map.of(),
+                new com.fasterxml.jackson.databind.ObjectMapper().convertValue(json,
+                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}));
     }
 
     @Override

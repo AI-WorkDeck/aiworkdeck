@@ -749,8 +749,15 @@ public class WorkSessionService {
 
     public ExitStatus exitStatus(long projectId) {
         ReentrantLock lock = repoLock(projectId);
-        if (!lock.tryLock()) throw VersionException.busy(LangText.of(
-                "正在整理版本，请稍后重试", "Version history is busy; please try again shortly"));
+        // Nested local folders share one path-scoped lock, so the quit dialog's parallel scan of a
+        // parent and its child always collides; wait briefly (under the client's 8s timeout).
+        try {
+            if (!lock.tryLock(5, java.util.concurrent.TimeUnit.SECONDS)) throw VersionException.busy(LangText.of(
+                    "正在整理版本，请稍后重试", "Version history is busy; please try again shortly"));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw VersionException.busy(LangText.of("正在整理版本，请稍后重试", "Version history is busy; please try again shortly"));
+        }
         try {
             if (!repoService.isInitialized(projectId)) return new ExitStatus(false, false, 0, null, false);
             WorkSession draft = activeDraftOnBranch(projectId).orElse(null);
@@ -770,6 +777,41 @@ public class WorkSessionService {
             }
             long count = paths.stream().filter(path -> !path.startsWith(".awd/")).count();
             return new ExitStatus(true, active.isPresent(), count, draft, false);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /** What the next commit would contain: the version it is compared against and every changed path. */
+    public record CommitPreview(String base, List<FileChange> changes) {}
+
+    /**
+     * Same scope as {@link #exitStatus}: on the mainline a work session commits everything since it
+     * branched off (autosaves included); on a draft the commit only covers the working tree.
+     */
+    public CommitPreview commitPreview(long projectId) {
+        ReentrantLock lock = repoLock(projectId);
+        if (!lock.tryLock()) throw VersionException.busy(LangText.of(
+                "正在整理版本，请稍后重试", "Version history is busy; please try again shortly"));
+        try {
+            if (!repoService.isInitialized(projectId) || repoService.repositoryMerging(projectId)) {
+                return new CommitPreview("HEAD", List.of());
+            }
+            String base = "HEAD";
+            Map<String, FileChange> byPath = new LinkedHashMap<>();
+            Optional<WorkSession> active = activeDraftOnBranch(projectId).isPresent()
+                    ? Optional.empty() : activeSession(projectId);
+            if (active.isPresent()) {
+                String merged = repoService.mergeBase(projectId, repoService.mainBranch(), active.get().getBranchName());
+                if (merged != null) {
+                    base = merged;
+                    repoService.diffNameStatus(projectId, base, "HEAD").forEach(c -> byPath.put(c.path(), c));
+                }
+            }
+            repoService.pendingChanges(projectId).forEach(c -> byPath.put(c.path(), c));
+            List<FileChange> changes = byPath.values().stream()
+                    .filter(c -> !c.path().startsWith(".awd/")).toList();
+            return new CommitPreview(base, changes);
         } finally {
             lock.unlock();
         }

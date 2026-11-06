@@ -20,9 +20,10 @@ function harness(backend, loggedIn = false) {
   return { request, prompts }
 }
 
-test('only explicit local Ollama bypasses the AI account gate', () => {
+test('only explicit local Ollama and the dev mock bypass the AI account gate', () => {
   for (const provider of ['AWD_CLOUD', 'OPENROUTER', '', undefined, 'GEMINI']) assert.equal(requiresAiAccount(provider), true)
   assert.equal(requiresAiAccount('OLLAMA'), false)
+  assert.equal(requiresAiAccount('MOCK'), false)
 })
 
 test('HTTP account failure opens login and remains a rejected operation even after login', async () => {

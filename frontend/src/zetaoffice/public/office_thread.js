@@ -113,6 +113,7 @@ function anchorBookmark(range) {
 // story 的书签（单元格锚点用正文 XText 照样摘得掉，table-retype 的锚点组守着）。
 function dropAiAnchors() {
   anchorTexts.clear();
+  pointerAnchorName = null;
   const bms = xModel.getBookmarks();
   const names = (bms.getElementNames && bms.getElementNames()) || [];
   const xText = xModel.getText();
@@ -128,6 +129,29 @@ function anchorRange(name) {
   const bms = xModel.getBookmarks();
   if (!bms.hasByName(name)) return null;
   return bms.getByName(name).getAnchor(); // XTextRange
+}
+// 发送时给「指哪儿」挂的锚点（get_ai_pointer）。每条消息都会走一次，不能留下副作用：
+// 不标脏（否则每发一条消息都触发一次整篇导出+上传）、不进撤销栈（否则用户 Ctrl+Z
+// 先撤掉一个看不见的书签）；同时只保留最近一个，旧的先摘掉，不在文档里越积越多。
+let pointerAnchorName = null;
+function silentPointerAnchor(range) {
+  const undo = xModel.getUndoManager(), ownsUndoLock = !undo.isLocked();
+  if (ownsUndoLock) undo.lock();
+  try {
+    return withViewOnlyChange(function () {
+      if (pointerAnchorName) {
+        try {
+          const bms = xModel.getBookmarks();
+          if (bms.hasByName(pointerAnchorName)) xModel.getText().removeTextContent(bms.getByName(pointerAnchorName));
+        } catch (e) { /* 已随编辑消失 */ }
+        anchorTexts.delete(pointerAnchorName);
+        pointerAnchorName = null;
+      }
+      return (pointerAnchorName = anchorBookmark(range));
+    });
+  } finally {
+    if (ownsUndoLock) undo.unlock();
+  }
 }
 // Compare in the final-text view immediately before selecting/writing. Unrelated
 // edits may move a bookmark without invalidating its unchanged target text.
@@ -4067,6 +4091,8 @@ function installContextMenuInterceptor(controller) {
 // seed scaffolding text here — earlier dev-prototype seed text would otherwise
 // show through whenever a real load was skipped/failed, looking like the editor
 // loaded the wrong content.
+// 备胎引擎开机时的空白文档；warm_engine 只在它还挂着时运行，换上真文档后一律跳过。
+let bootBlankModel = null;
 function bootDoc(initialDocument = false) {
   context = zetajs.getUnoComponentContext();
   desktop = css.frame.Desktop.create(context);
@@ -4074,6 +4100,7 @@ function bootDoc(initialDocument = false) {
   // normal load_document path; ui_ready belongs to that successful first model.
   if (initialDocument) { log('等待首个真实文档 / waiting for first document'); return; }
   xModel = desktop.loadComponentFromURL('private:factory/swriter', '_default', 0, []);
+  bootBlankModel = xModel;
   ctrl = xModel.getCurrentController();
   installReviewCommentInterceptor(ctrl);
   installContextMenuInterceptor(ctrl);
@@ -5113,6 +5140,18 @@ const EXEC = {
   // text becomes a paragraph break (insertTextAtCursor).
   replace_selection(p) {
     const rawText = String((p && p.text) || '');
+    // 调用方带了 expectedText = 它以为选中的原文：与实时选区不符就拒绝，不在错位置落修订。
+    // 与下面的写入同一条命令内完成，核对到改写之间没有别的命令能挪动选区。
+    if (p && typeof p.expectedText === 'string' && p.expectedText) {
+      const norm = function (t) { return String(t || '').replace(/\r\n?/g, '\n').trim(); };
+      const cur = EXEC.get_selection({});
+      // 模型手里的选区原文最多 2000 字（后端截断）；长选区按前缀核对，否则永远对不上。
+      const live = norm(cur && cur.text), want = norm(p.expectedText);
+      if (live !== want && !(want.length >= 1900 && live.startsWith(want.slice(0, 1900)))) {
+        const msg = '当前选区与 expectedText 不符（用户可能已挪动选区），未执行替换；请改用 doc_replace_at_anchor，或重新 doc_get_cursor_context 核对后再试';
+        return { success: false, error: msg, message: msg, currentSelection: String((cur && cur.text) || '').slice(0, 200) };
+      }
+    }
     if (typeof isCalcDoc === 'function' && isCalcDoc() && typeof activeCalcSelection === 'function') {
       const selection = calcClipboardSelection();
       const lines = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
@@ -6734,6 +6773,21 @@ const EXEC = {
   // The filter names in IMPORT_FILTERS are the registry FilterNames, valid for
   // BOTH directions for these formats (e.g. 'MS Word 2007 XML' imports AND
   // exports .docx).
+  // [预热] 备胎空闲时把空白文档导出成 docx 再装回来一次（0.81「秒开」）。
+  // 真机实测：一个引擎装第一份文档要多花约 1.3s 一次性初始化（与格式无关：先装 pptx，
+  // 再装 docx 也快），之后每份只要 0.4s 左右；而每份文档都开在新的备胎上，于是每次
+  // 打开都付这 1.3s。备胎空闲时先付掉，用户点开时就是「第二份文档」的速度。
+  // 只在空白开机文档上做；导出→装回不经宿主保存链路，也不留 modified。
+  warm_engine() {
+    if (!xModel || xModel !== bootBlankModel || !isWriterDoc()) return { success: true, skipped: true };
+    const t0 = performance.now();
+    const ex = EXEC.export_document({ name: 'warm.docx' });
+    if (!ex || !ex.success) return { success: false, message: (ex && ex.message) || 'warm export failed' };
+    const r = EXEC.load_document({ name: 'warm.docx', bytes: ex.bytes });
+    try { if (xModel && xModel.isModified()) xModel.setModified(false); } catch (e) { /* ignore */ }
+    log('warm_engine: 预热完成 / warmed in ' + Math.round(performance.now() - t0) + 'ms');
+    return { success: !!(r && r.success), ms: Math.round(performance.now() - t0) };
+  },
   export_document(p) {
     const name = String(p && p.name || 'document.docx');
     const m = name.match(/\.([A-Za-z0-9]+)$/);
@@ -6878,6 +6932,35 @@ const EXEC = {
       if (start + paragraphs.length < total) { r.truncated = true; r.nextStartParagraph = start + paragraphs.length; }
       return r;
     });
+  },
+  // [感知] 发送时的「指针」：有选区 → 选区原文 + 锚点 + 段号；无选区 → 光标所在段 + 锚点 + 段号。
+  // 供 AI 对话发送时一并带上，让「改这里 / 这段」一步 doc_replace_at_anchor 命中，不必先查找。
+  // 仅 Writer；锚点沿用 find_text_locations 的书签机制（anchorBookmark）。
+  get_ai_pointer() {
+    if (!isWriterDoc()) return { success: true, kind: 'none' };
+    const MAX_ANCHOR_CHARS = 2000;   // 选区超过这个长度不挂锚点（整块替换风险大，也不该是「这一句」）
+    const MAX_PARA_CHARS = 600;      // 光标段落回传上限；超长段不挂锚点，让模型自己 doc_get_paragraph
+    const selRange = selectionRange();
+    const selText = selRange ? (selRange.getString() || '') : '';
+    if (selText.length > 0) {
+      let anchorId = null;
+      if (selText.length <= MAX_ANCHOR_CHARS) { try { anchorId = silentPointerAnchor(selRange); } catch (e) {} }
+      return { success: true, kind: 'selection', selectionText: selText.slice(0, MAX_ANCHOR_CHARS),
+        anchorId: anchorId, paragraphIndex: headingChainOf(selRange).paragraphIndex };
+    }
+    const vc = ctrl.getViewCursor();
+    let para = null;
+    try {
+      para = vc.getText().createTextCursorByRange(vc.getStart());
+      para.gotoStartOfParagraph(false);
+      para.gotoEndOfParagraph(true);
+    } catch (e) { return { success: true, kind: 'none' }; }
+    const text = para.getString() || '';
+    if (!text.trim()) return { success: true, kind: 'none' };
+    let anchorId = null;
+    if (text.length <= MAX_PARA_CHARS) { try { anchorId = silentPointerAnchor(para); } catch (e) {} }
+    return { success: true, kind: 'cursor', paragraphText: text.slice(0, MAX_PARA_CHARS),
+      anchorId: anchorId, paragraphIndex: headingChainOf(vc).paragraphIndex };
   },
   // [感知] what's around the cursor right now — selection, chars before/after,
   // and the enclosing paragraph ("看一眼手边").
@@ -12172,11 +12255,11 @@ const EXEC = {
 // 原语可能是 async（分批的 find_replace / apply_house_style），恢复必须等它 settle；
 // 批间仍让出事件循环，但后续最终文本命令及用户显示切换等待当前批次完成，
 // 避免中途改变段落成员，或收尾恢复覆盖用户的新选择。
-const FINAL_TEXT_ACTIONS = new Set(['get_completion_context', 'accept_completion', 'insert_completion_content', 'capture_writing_context', 'accept_writing_suggestion', 'get_review_context', 'goto_review_range', 'apply_review_edit']);
+const FINAL_TEXT_ACTIONS = new Set(['get_ai_pointer', 'get_completion_context', 'accept_completion', 'insert_completion_content', 'capture_writing_context', 'accept_writing_suggestion', 'get_review_context', 'goto_review_range', 'apply_review_edit']);
 // Only known readers may skip the view guard on a clean document. A write can
 // create its first deletion and then read paragraphAfterEdit in the same command.
 const FINAL_TEXT_READ_ACTIONS = new Set([
-  'get_selection', 'get_paragraph', 'get_outline', 'get_document_text', 'get_cursor_context',
+  'get_selection', 'get_paragraph', 'get_outline', 'get_document_text', 'get_cursor_context', 'get_ai_pointer',
   'get_clauses', 'get_cursor_rect', 'get_ui_state', 'get_ui_lang', 'get_doc_kind',
   'get_selection_hyperlink', 'get_hyperlink_at_cursor', 'get_bookmark_context',
   'get_review_context', 'get_review_layout', 'get_completion_context', 'capture_writing_context',

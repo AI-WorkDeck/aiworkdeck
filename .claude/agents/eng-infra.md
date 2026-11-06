@@ -339,7 +339,7 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
 
 **app-e2e 文件编号（dev-board#521）**：`createFile` 新建的测试文件允许 `wpsFileId=null`；J9/J10 的字节覆盖助手必须与 J4/真实编辑器一致，**只用数字 `id`** 调上传端点（dev-board#1035 起 `/api/files/{x}/...` 只认数字主键，前端与 e2e 不再传 `wpsFileId`）。强制要求 `wpsFileId` 会让合法落盘文件被判不存在，随后 MODIFY、分稿与协作步骤连锁失败。
 
-每日全量 QA：`scripts/qa-nightly.sh`（crontab，跑在 ~/aiworkdeck-qa/repo 专用克隆，报告 ~/aiworkdeck-qa/reports/，失败 gh 开 issue 标签 qa-nightly，引擎取自已安装 app）。
+每日全量 QA：`scripts/qa-nightly.sh`（crontab，跑在 ~/aiworkdeck-qa/repo 专用克隆，报告 ~/aiworkdeck-qa/reports/，结果写进一条滚动 issue「每日 QA 滚动报告 / nightly QA (rolling)」（失败追加评论、已关则重开，全绿留言并关闭；标签 bug），引擎取自已安装 app）。
 
 ## 端口体系（2026-08 起）
 
@@ -350,6 +350,7 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
 
 ## 本地开发启动
 
+- 最小栈（贡献者首跑，不需要 AI Key）：`./scripts/quickstart.sh`——`docker-compose.dev.yml` 起 Postgres（pgvector，127.0.0.1:55432）→ mvn package → 后端 `dev` profile（`application-dev.yml`：local-mode 免登 + 模拟 AI）→ `scripts/quickstart/seed-demo.mjs` 经 HTTP 灌演示项目（fixtures/evidence-demo-1076，同名跳过；新项目首个上传会回 `VERSION_BUSY`，脚本重试）→ `npx uni --port 5173` → 开浏览器。user.home / 存储 / 已装插件目录都隔离到仓库内 `.quickstart/`（裸 jar 在 backend/ 下起时 `ai.plugins.dir: plugins` 会把内置插件解到 `backend/plugins/`，别提交）。端口 9696/5173 被占直接报错不杀进程。模拟 AI 契约见 `ai-chat.md`「模拟模型」。
 - 一键：`./restart-all.sh`（Docker 服务 + 后端 + 前端 + 桌面）。
 - 后端：`cd backend && ./restart-backend.sh`（mvn package -DskipTests → kill 9696 → nohup java -jar，prod 配置，日志 backend/app.log）。
 - 前端：`cd frontend && npm run dev:h5`（5173；e2e 用 `npx uni --port 5174`）。**npm 不是 pnpm**。

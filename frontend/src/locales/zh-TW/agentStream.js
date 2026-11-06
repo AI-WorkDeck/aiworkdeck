@@ -58,5 +58,12 @@ export default {
   "pdfExportTooLargeError": "導出的 PDF 超過 {mb}MB，無法經 AI 存進項目；請用選單「檔案 → 導出為 PDF」另存",
   "systemOperation": "系統操作",
   "taskListArtifact": "任務清單",
-  "planArtifact": "計劃"
+  "planArtifact": "計劃",
+  "bqtMemberInvalid": "包晴天會員已失效，請在包晴天 App 續費會員後重試。",
+  "bqtAiClosed": "你的包晴天會員有效，但 AI 工作台已在包晴天關閉。請在包晴天 App 中開啟後重試。",
+  "bqtModelNotAllowed": "包晴天律師帳戶只能使用 DeepSeek 模型，請切換到 DeepSeek 後重試。",
+  "bqtInsufficientPoints": "包晴天積分不足，請在包晴天 App 儲值積分後重試。",
+  "bqtOutstandingDebt": "此前有一筆扣點未成功。請在包晴天 App 儲值積分，然後聯繫客服處理。",
+  "bqtUnavailable": "包晴天服務暫時不可用，請稍後重試。",
+  "bqtRechargeViaBqt": "包晴天會員請在包晴天 App 儲值或續費，AI WorkDeck 內不提供儲值。",
 }

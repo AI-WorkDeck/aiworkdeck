@@ -201,7 +201,7 @@ import EditorToolbar from '@/components/EditorToolbar.vue'
 import EvidenceStaleBar from '@/components/EvidenceStaleBar.vue'
 import { getCloudWriteHeaders, getCheckpointRestoreWriteState, getFileBytesUrl, getFileWriteUrl, listEvidenceLinks, reportEvidenceAnchors, keepEvidenceAnchor, getCurrentUser as fetchAuthUser, getFileLocalPath } from '@/services/api.js'
 import { getAuthHeaders, getCurrentUser } from '@/utils/auth.js'
-import { createAuthorNameResolver } from '@/utils/editorAuthor.js'
+import { createAuthorNameResolver, REDLINE_AUTHOR_KEY } from '@/utils/editorAuthor.js'
 import { host } from '@/services/host.js'
 import { watchDownloadDone, displayName } from '@/utils/downloadDone.js'
 import { anchorHash } from '@/utils/anchorHash.js'
@@ -241,6 +241,7 @@ function authorNames() {
     authorResolver = createAuthorNameResolver({
       readCached: () => getCurrentUser() || null,
       fetchRemote: () => fetchAuthUser().then((r) => (r && r.data) || null),
+      readOverride: () => { try { return uni.getStorageSync(REDLINE_AUTHOR_KEY) || '' } catch (e) { return '' } },
     })
   }
   return authorResolver
@@ -248,6 +249,11 @@ function authorNames() {
 function currentAuthorName() { return authorNames().current() }
 // 保存失败后的有界退避（B7）：第 n 次连续失败等 SAVE_RETRY_DELAYS_MS[n]，封顶 60 秒。
 const SAVE_RETRY_DELAYS_MS = [5000, 15000, 30000, 60000]
+// 脏数据存活超过该时长即不再为「命令繁忙 / 刚输入」让路，强制导出保存（崩溃丢失上限）。
+const FORCE_SAVE_DIRTY_AGE_MS = 10000
+// AI 命令在飞（修订风暴）时仍按旧的 60s 上限：每 10s 硬塞一次全文导出会把风暴中的
+// 滚动重新冻住（见 autoSave 注释）；用户自己打字停顿时才用 10s。
+const FORCE_SAVE_DIRTY_AGE_BUSY_MS = 60000
 
 export default {
   name: 'LibreOfficeEditor',
@@ -481,6 +487,7 @@ export default {
       if (newFile?.id !== oldFile?.id) this.invalidateBackendSaveHint()
       if (!newFile || oldFile) return
       this._adoptedSpare = true
+      this._perfOpenAt = Date.now()
       this.prefetchBytes()
       if (!this._endpointUp) return
       this.ready = false
@@ -520,6 +527,12 @@ export default {
     },
   },
   async mounted() {
+    // 性能埋点（0.81「秒开秒存」）：从挂载 / 备胎过继起算到 ready，一行 [perf] 日志，
+    // 真机基准脚本按这一行取数；不上报、不进遥测。
+    this._perfOpenAt = Date.now()
+    // 改了昵称或「修订与批注署名」：已打开的文档立刻换署名（只影响之后新增的修订与批注）。
+    this._onIdentityUpdated = () => { authorNames().refresh(); this.resolveRedlineAuthor() }
+    uni.$on('awd:identity-updated', this._onIdentityUpdated)
     this.watchBackendHealth()
     this._onEvidenceDragStart = () => {
       this.evidenceDropArmed = true
@@ -533,6 +546,15 @@ export default {
     this._onEvidenceDragEnd = () => { this.evidenceDropArmed = false; this.evidenceDropOver = false; this._dragEndedAt = Date.now() }
     uni.$on('file-drag-start', this._onEvidenceDragStart)
     uni.$on('file-drag-end', this._onEvidenceDragEnd)
+    // 页面隐藏 / 关闭时尽力 flush 一次（导出需要存活的 webview，不保证完成）。
+    // 只对正常可存的实例补存：手动重试态（_savePaused）、未就绪、装载失败、重载中都不碰，
+    // 否则每次切走窗口都把已知失败的上传再撞一遍（池里每个脏实例同时撞）。
+    this._onPageHide = () => {
+      if (this.dirty && !this._saveDiscarded && !this._savePaused && this.ready && !this.docLoadFailed && !this._reloading) this.flushSave().catch(() => {})
+    }
+    this._onVisibilityChange = () => { if (typeof document !== 'undefined' && document.visibilityState === 'hidden') this._onPageHide() }
+    if (typeof window !== 'undefined') window.addEventListener('pagehide', this._onPageHide)
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', this._onVisibilityChange)
     this._onThemeChanged = () => this.pushTheme()
     uni.$on(APP_THEME_EVENT, this._onThemeChanged)
     // AI 写完一笔的无损通知（dev-board#460）：引擎的 modified 边沿是有损的
@@ -565,6 +587,7 @@ export default {
     }
   },
   beforeUnmount() {
+    if (this._onIdentityUpdated) uni.$off('awd:identity-updated', this._onIdentityUpdated)
     this._nativeSurface?.dispose()?.catch(error => this.appendLog('native close failed: ' + error.message))
     this._nativeSurface = null
     this._backendHealthDisposed = true
@@ -579,6 +602,8 @@ export default {
     this.inlineReviewState = null
     uni.$off('file-drag-start', this._onEvidenceDragStart)
     uni.$off('file-drag-end', this._onEvidenceDragEnd)
+    if (typeof window !== 'undefined') window.removeEventListener('pagehide', this._onPageHide)
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', this._onVisibilityChange)
     if (this._onThemeChanged) { uni.$off(APP_THEME_EVENT, this._onThemeChanged); this._onThemeChanged = null }
     if (this._onDocMutated) { uni.$off(DOC_MUTATED_EVENT, this._onDocMutated); this._onDocMutated = null }
     // Autosave timers die with the instance. Any still-dirty edits were flushed
@@ -1510,7 +1535,17 @@ export default {
     // guest 被系统回收 / 渲染进程崩掉 / 被冻死都不会有任何信号——_endpointUp
     // 只是一个「历史上握过手」的布尔，不代表现在还活着。拿它直接 finishDocLoad
     // 就是撞 180s 超时的那条路。先花几毫秒探一声活，死了就丢掉备胎走冷启动。
+    warmSpare() {
+      const executor = this.executor
+      if (!executor || this._warmPromise) return
+      const t0 = Date.now()
+      this._warmPromise = executor.executeCommand('warm_engine', {}, { background: true, timeoutMs: 20000 })
+        .then((r) => { this.appendLog('[perf] warm ' + (r && r.skipped ? 'skipped' : (Date.now() - t0) + 'ms')) })
+        .catch((e) => { this.appendLog('warm_engine failed: ' + (e && e.message ? e.message : e)) })
+    },
     async adoptAndLoad() {
+      // 预热还在跑时探活会排在它后面、可能超出 3s 探活预算被误判成死引擎——先等它跑完。
+      if (this._warmPromise) await this._warmPromise
       if (await this.probeGuestAlive()) { this.finishDocLoad(); return }
       this.appendLog('备胎探活失败 → 丢弃并冷启动 / spare probe failed, cold boot instead')
       const retryPreview = this._previewSkippedForWarmEngine
@@ -1654,7 +1689,16 @@ export default {
       clearInterval(this._bootTimer)
       this.ready = true
       if (!this.statusKey.endsWith('Failed')) this.statusKey = 'ready'
+      if (this._perfOpenAt && this._perfLoad) {
+        this.appendLog('[perf] open kind=' + (this.docKind || '?') + ' bytes=' + this._perfLoad.bytes +
+          ' path=' + (this._adoptedSpare ? 'spare' : 'cold') + ' load=' + this._perfLoad.ms + 'ms ready=' + (Date.now() - this._perfOpenAt) + 'ms')
+        this._perfOpenAt = 0
+      }
       this.$emit('ready', this.executor)
+      // 备胎（还没有文件）空闲时预热引擎：付掉首份文档的一次性初始化（约 1.3s），
+      // 用户点开文件时就是「第二份文档」的速度。过继时 adoptAndLoad 先等它结束。
+      // 备胎此刻还没有 docKind（没装过文档）；是不是空白 Writer 由 worker 自己判定。
+      if (!this.file) this.warmSpare()
       // EvidenceLink 首轮：拉缓存 → 旧式链接收编书签（仅 writer）→ 核对锚点。
       // 不 await：核对是后台事，不能拖住 ready 之后的任何链路。
       this.initEvidence()
@@ -1921,6 +1965,7 @@ export default {
       } finally {
         if (this._loadInFlight === inflight) this._loadInFlight = null
       }
+      this._perfLoad = { ms: Date.now() - t0, bytes: bytes.length }
       this.appendLog('  ← ' + (Date.now() - t0) + 'ms ' + JSON.stringify(res))
       if (!res || !res.success) throw Object.assign(new Error((res && res.message) || 'load_document returned no success'), { code: res?.code })
       assertCurrentGeneration()
@@ -2341,10 +2386,13 @@ export default {
       // Qt 事件循环（滚动/输入/重绘）整段冻住。AI 修订风暴期间 modify 不断，旧的
       // 15s max-wait 会把导出硬塞进风暴中间 → 用户「完全无法滚动的假死」。
       // 改为：命令在飞或刚结束（<1.5s）时让路、等空闲窗口再导出；只有脏数据
-      // 超过 60s 才强制保存（崩溃丢失上限从 15s 放宽到 60s，换取修订期不冻结）。
+      // 超过上限才强制保存（崩溃丢失上限）：用户输入时 10s，AI 命令在飞时 60s。
       const dirtyAge = this._dirtySince ? Date.now() - this._dirtySince : 0
       const sinceCmd = Date.now() - Math.max(this._lastCmdAt || 0, this._lastInteractionAt || 0)
-      if ((this._cmdBusy > 0 || sinceCmd < 1500) && dirtyAge < 60000) {
+      // 大文档整篇导出本身就要十几秒（150 页基准 12–17s），期间输入冻住；上限至少取
+      // 上次导出耗时的 4 倍，冻住的时间不超过编辑时间的约五分之一。
+      const forceAfter = Math.max(this._cmdBusy > 0 ? FORCE_SAVE_DIRTY_AGE_BUSY_MS : FORCE_SAVE_DIRTY_AGE_MS, 4 * (this._lastExportMs || 0))
+      if ((this._cmdBusy > 0 || sinceCmd < 1500) && dirtyAge < forceAfter) {
         clearTimeout(this._saveTimer)
         this._saveTimer = setTimeout(() => this.autoSave(), 2000)
         return
@@ -2606,7 +2654,8 @@ export default {
             context: saveContext, generation, acknowledged: false }
         }
         const res = await this.executor.executeCommand('export_document', params)
-        this.appendLog('  ← export ' + (Date.now() - tExp) + 'ms')
+        this._lastExportMs = Date.now() - tExp
+        this.appendLog('  ← export ' + this._lastExportMs + 'ms')
         if (!res || !res.success) throw Object.assign(new Error((res && res.message) || 'export_document returned no success'), { code: res?.code })
         // Structured clone across the relay hops may surface bytes as
         // Uint8Array / ArrayBuffer / plain array — normalize (mirror of the
@@ -2629,6 +2678,7 @@ export default {
         if (this._reloading || this._saveDiscarded || checkpointSaveBarrier(this.projectId, fileId) ||
             documentCheckpointGeneration(this.projectId, fileId) !== generation) return false
         this.appendLog('  ← exported ' + u8.length + ' bytes, uploading…')
+        const tUpload = Date.now()
         // mustExist=1（BUG-14 / v0.49.0 C4-03）：这份文件磁盘上本来就有（元数据非空，或本会话
         // 已经存过一次），目标路径不在了只能是被外部改名 / 移走——后端据此回 409，
         // 而不是在旧路径把旧文件名重新建出来。新建空白文档的第一笔不带：那时它还不在磁盘上。
@@ -2684,6 +2734,7 @@ export default {
           try { uni.$emit('awd:file-saved', { projectId: saveProjectId, fileId }) } catch (e) { /* ignore */ }
         }
         this.appendLog('  ← saved to backend (fileId=' + fileId + ')')
+        this.appendLog('[perf] save bytes=' + (u8 ? u8.length : 0) + ' export=' + (tUpload - tExp) + 'ms upload=' + (Date.now() - tUpload) + 'ms total=' + (Date.now() - tExp) + 'ms')
         this._savePaused = false
         this._saveRetryAttempt = 0
         this._exportUnsettled = false

@@ -29,7 +29,7 @@ export const EDITOR_ACTIONS = [
   // perceive (get_document_text/get_cursor_context), position visibly
   // (select_paragraph/collapse_selection), edit (delete_selection), format
   // (format_selection/set_paragraph_format), recover (undo/redo).
-  'get_document_text', 'get_cursor_context', 'get_clauses', 'select_paragraph', 'collapse_selection',
+  'get_document_text', 'get_cursor_context', 'get_ai_pointer', 'get_clauses', 'select_paragraph', 'collapse_selection',
   // 人工补全：内存快照校验后同步接受，不使用 AI 编辑通道。
   'get_completion_context', 'accept_completion', 'insert_completion_content',
   // Semantic writing keeps a separate revision-checked snapshot; literal suffix/selection only.
@@ -71,6 +71,8 @@ export const EDITOR_ACTIONS = [
   // [Track E] export the current document as bytes (host-initiated save):
   // {name} -> storeToURL into MEMFS -> {bytes, size}; the host uploads them.
   'export_document',
+  // [0.81 秒开] 备胎空闲时导出+装回空白文档一次，付掉引擎首份文档的一次性初始化。
+  'warm_engine',
   // [dev-board#886] 导出 PDF 字节（宿主发起：原生「导出为 PDF」入口被 worker 拦下后
   // 经 export-pdf-request 请宿主执行，宿主拿字节走应用自己的下载链路）。
   'export_pdf',

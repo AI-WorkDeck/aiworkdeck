@@ -637,14 +637,20 @@ public class DocumentEditTools implements AgentToolComponent {
 
     @ToolMeta(displayName = "替换选区", category = "document", fileEffect = "MODIFIED")
     @Tool("替换当前选区（或光标位置）的文本内容。如果选区非空，则替换选区；如果只是光标，则插入文本。" +
+          "已知目标的 anchorId 时改用 doc_replace_at_anchor；必须用本工具时传 expectedText（你以为选中的原文），" +
+          "实际选区与之不符就拒绝执行，避免用户在你思考期间挪动选区后改错位置。" +
           REDLINE_GRANULARITY_NOTE)
     public String doc_replace_selection(
-            @P("用于替换的文本内容") String text
+            @P("用于替换的文本内容") String text,
+            @P(value = "你以为当前选中的原文；传了就先核对，选区已变则拒绝并报错", required = false) String expectedText
     ) {
-        log.info("Tool: doc_replace_selection called text length={}", text.length());
+        log.info("Tool: doc_replace_selection called text length={}, expectedText={}", text.length(), expectedText != null);
         try {
-            return editorBridgeService.executeEditorCommand("replace_selection", 
-                    java.util.Map.of("text", text));
+            java.util.Map<String, Object> params = new java.util.HashMap<>();
+            params.put("text", text);
+            // 核对放在 worker 一侧与替换同一条命令里完成，核对与改写之间没有空隙
+            if (expectedText != null && !expectedText.isEmpty()) params.put("expectedText", expectedText);
+            return editorBridgeService.executeEditorCommand("replace_selection", params);
         } catch (Exception e) {
             log.error("Failed to replace selection", e);
             return "Error: " + e.getMessage();

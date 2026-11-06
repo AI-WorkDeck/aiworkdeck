@@ -58,5 +58,12 @@ export default {
   "pdfExportTooLargeError": "PDF yang dieksport melebihi {mb}MB dan tidak boleh disimpan ke dalam projek melalui AI; sila gunakan \"Fail -> Eksport sebagai PDF\" sebaliknya",
   "systemOperation": "Tindakan Sistem",
   "taskListArtifact": "Senarai Tugasan",
-  "planArtifact": "Pelan"
+  "planArtifact": "Pelan",
+  "bqtMemberInvalid": "Keahlian Baoqingtian anda tidak lagi aktif. Perbaharui dalam aplikasi Baoqingtian dan cuba lagi.",
+  "bqtAiClosed": "Keahlian Baoqingtian anda aktif, tetapi ruang kerja AI dimatikan dalam Baoqingtian. Hidupkan dalam aplikasi Baoqingtian dan cuba lagi.",
+  "bqtModelNotAllowed": "Akaun peguam Baoqingtian hanya boleh menggunakan model DeepSeek. Tukar kepada model DeepSeek dan cuba lagi.",
+  "bqtInsufficientPoints": "Mata Baoqingtian tidak mencukupi. Tambah nilai mata dalam aplikasi Baoqingtian dan cuba lagi.",
+  "bqtOutstandingDebt": "Potongan mata sebelum ini gagal. Tambah nilai mata dalam aplikasi Baoqingtian kemudian hubungi sokongan.",
+  "bqtUnavailable": "Perkhidmatan Baoqingtian tidak tersedia buat sementara waktu. Sila cuba lagi kemudian.",
+  "bqtRechargeViaBqt": "Ahli Baoqingtian menambah nilai atau memperbaharui dalam aplikasi Baoqingtian; AI WorkDeck tidak menerima pembayaran untuk akaun ini.",
 }

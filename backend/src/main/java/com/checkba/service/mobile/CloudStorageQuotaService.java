@@ -59,9 +59,13 @@ public class CloudStorageQuotaService {
 
     public Map<String, Object> usage(Long userId) {
         Map<String, Object> result = new java.util.LinkedHashMap<>();
-        result.put("persistentUsedBytes", usedBytes(userId));
-        try { result.put("persistentQuotaBytes", persistentQuota(userId)); }
+        try {
+            var live = liveAccess(userId);
+            result.put("persistentUsedBytes", usedBytes(userId, live != null));
+            result.put("persistentQuotaBytes", live != null ? (Boolean.TRUE.equals(live.get("canWrite")) ? safetyLimitBytes : 0) : subscriptionQuota(userId));
+        }
         catch (MobileBillingFailureException e) {
+            result.put("persistentUsedBytes", usedBytes(userId, false));
             result.put("persistentQuotaBytes", null);
             result.put("persistentQuotaAvailable", false);
         }
@@ -69,6 +73,29 @@ public class CloudStorageQuotaService {
     }
 
     public boolean postpaidEnabled() { return postpaidEnabled; }
+
+    /**
+     * Live postpaid rules apply only to accounts that accepted the policy. Everyone else keeps exactly the
+     * subscription rules they had with the switch off; accepting only adds the postpaid capability.
+     * Returns null when the legacy rules apply. An unavailable authority still fails closed.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> liveAccess(Long userId) {
+        if (!postpaidEnabled) return null;
+        Map<String, Object> state;
+        try { state = cloudState(userId); }
+        catch (MobileBillingFailureException e) {
+            // No account mapping cannot have accepted the policy: same answer as subscriptionQuota.
+            if (e.getKind() == MobileBillingKind.NOT_CONNECTED || e.getKind() == MobileBillingKind.NOT_FOUND
+                    || e.getKind() == MobileBillingKind.DISABLED) return null;
+            throw e;
+        }
+        if (!(state.get("billing") instanceof Map<?, ?> money) || !Boolean.TRUE.equals(money.get("accepted"))) return null;
+        if (!(state.get("cloudAccess") instanceof Map<?, ?> access)) throw new MobileBillingFailureException(MobileBillingKind.UNAVAILABLE,
+                CloudBillingText.get("stateUnavailable"));
+        return (Map<String, Object>) access;
+    }
+    public boolean postpaidFor(Long userId) { return liveAccess(userId) != null; }
 
     public void resumeCloud(Long userId) { billing.cloudOperation(userId,"resume-cloud",Map.of("policyVersion","2026-11-04")); }
     public Map<String, Object> cloudState(Long userId) { return billing.cloudState(userId); }
@@ -81,8 +108,8 @@ public class CloudStorageQuotaService {
         return (Map<String, Object>) access;
     }
     public void requireCloudWrite(Long userId) {
-        if(!postpaidEnabled) return;
-        var access=cloudAccess(userId);
+        var access=liveAccess(userId);
+        if(access==null) return;
         if(!Boolean.TRUE.equals(access.get("canWrite"))) throw new IllegalArgumentException(CloudBillingText.get("writesPaused"));
         requireEpoch(access);
     }
@@ -94,16 +121,14 @@ public class CloudStorageQuotaService {
         }
     }
     public void storageChanging(Long userId) {
-        if(postpaidEnabled && meters!=null) meters.getObject().changing(userId);
+        if(postpaidEnabled && meters!=null && postpaidFor(userId)) meters.getObject().changing(userId);
     }
-    public boolean canWrite(Long userId) {
-        return postpaidEnabled ? Boolean.TRUE.equals(cloudAccess(userId).get("canWrite")) : subscriptionQuota(userId)>0;
-    }
-    public boolean canRead(Long userId) {
-        return postpaidEnabled ? Boolean.TRUE.equals(cloudAccess(userId).get("canRead")) : subscriptionQuota(userId)>0;
-    }
-    public boolean canUse(Long userId) {
-        return postpaidEnabled ? Boolean.TRUE.equals(cloudAccess(userId).get("canUse")) : subscriptionQuota(userId)>0;
+    public boolean canWrite(Long userId) { return can(userId,"canWrite"); }
+    public boolean canRead(Long userId) { return can(userId,"canRead"); }
+    public boolean canUse(Long userId) { return can(userId,"canUse"); }
+    private boolean can(Long userId,String capability) {
+        var access=liveAccess(userId);
+        return access!=null ? Boolean.TRUE.equals(access.get(capability)) : subscriptionQuota(userId)>0;
     }
     public void appendCloudState(Long userId, Map<String,Object> output) {
         if (postpaidEnabled) try { output.putAll(cloudState(userId)); }
@@ -111,7 +136,8 @@ public class CloudStorageQuotaService {
                 "canUse",false,"canWrite",false,"canRead",false,"reason","billing_unavailable")); }
     }
     public long persistentQuota(Long userId) {
-        return postpaidEnabled ? (canWrite(userId) ? safetyLimitBytes : 0) : subscriptionQuota(userId);
+        var access=liveAccess(userId);
+        return access!=null ? (Boolean.TRUE.equals(access.get("canWrite")) ? safetyLimitBytes : 0) : subscriptionQuota(userId);
     }
 
     public long subscriptionQuota(Long userId) {
@@ -154,11 +180,14 @@ public class CloudStorageQuotaService {
         return Boolean.TRUE.equals(file.getIsDeleted()) ? 0 : Math.max(0, file.getFileSize() == null ? 0 : file.getFileSize());
     }
 
-    public long usedBytes(Long userId) {
+    public long usedBytes(Long userId) { return usedBytes(userId, postpaidEnabled); }
+
+    /** {@code metered}: the full postpaid occupancy scope; otherwise the subscription-quota scope. */
+    public long usedBytes(Long userId, boolean metered) {
         long total = 0;
         java.util.Set<String> seen = new java.util.HashSet<>();
         for (ProjectFile file : files.findCloudFilesByOwner(userId)) {
-            if(postpaidEnabled() && !projects.findById(file.getProjectId()).map(p->isBillableProject(p,userId)).orElse(false))continue;
+            if(metered && !projects.findById(file.getProjectId()).map(p->isBillableProject(p,userId)).orElse(false))continue;
             // A row loaded for authorization before acquiring the lock may still have its old path.
             if (entityManager != null && org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
                     && entityManager.contains(file)) entityManager.refresh(file);
@@ -172,7 +201,7 @@ public class CloudStorageQuotaService {
         if (versionObjects != null) for (var object : versionObjects.findByUserId(userId)) {
             total = Math.addExact(total, object.getSize());
         }
-        if(postpaidEnabled()) {
+        if(metered) {
             if(cloudMedia!=null)for(var item:cloudMedia.findByUserId(userId)) if(item.getStoragePath()!=null && seen.add(item.getStoragePath()))
                 total=Math.addExact(total,Math.max(0,item.getFileSize()==null?0:item.getFileSize()));
             if(cloudTransfers!=null)for(var item:cloudTransfers.findByUserId(userId)) if(item.getStoragePath()!=null && seen.add(item.getStoragePath()))
@@ -180,11 +209,11 @@ public class CloudStorageQuotaService {
         }
         var localObjects = localVersionObjects == null ? null : localVersionObjects.getIfAvailable();
         if (localObjects != null) for (var project : projects.findByUserIdOrderByCreatedAtDesc(userId)) {
-            if(postpaidEnabled() && !isBillableProject(project,userId))continue;
+            if(metered && !isBillableProject(project,userId))continue;
             try { total = Math.addExact(total, localObjects.usageBytes(project.getId())); }
             catch (java.io.IOException e) { throw new IllegalStateException("Version object usage unavailable", e); }
         }
-        if(postpaidEnabled()) {
+        if(metered) {
             var repo=cloudRepos==null?null:cloudRepos.getIfAvailable();var memory=cloudMemory==null?null:cloudMemory.getIfAvailable();
             for(var project:projects.findByUserIdOrderByCreatedAtDesc(userId)) {
                 if(!isBillableProject(project,userId))continue;
@@ -199,7 +228,7 @@ public class CloudStorageQuotaService {
                 total=Math.addExact(total,directoryBytes(memory.gitDir(key)));
             }
         }
-        if(postpaidEnabled())total=Math.addExact(total,memoryContentBytes(userId));
+        if(metered)total=Math.addExact(total,memoryContentBytes(userId));
         return total;
     }
     private long memoryContentBytes(Long user) {
@@ -276,8 +305,9 @@ public class CloudStorageQuotaService {
     }
 
     private void checkCapacity(Long userId, long additionalBytes) {
+        boolean live = postpaidFor(userId);
         long quota = persistentQuota(userId);
-        long used = usedBytes(userId);
+        long used = usedBytes(userId, live);
         if (used > quota || additionalBytes > quota - used) {
             throw new IllegalArgumentException(CloudBillingText.get("storageLimit"));
         }
@@ -288,7 +318,7 @@ public class CloudStorageQuotaService {
                 && java.util.Objects.equals(user,project.getUserId()) && (project.getLocalRoot()==null || project.getLocalRoot().isBlank());
     }
     private Long billingOwnerForWrite(com.checkba.model.entity.Project project) {
-        if(!postpaidEnabled())return project.getUserId();
+        if(!postpaidEnabled() || !postpaidFor(project.getUserId()))return project.getUserId();
         if(!"PERSONAL".equals(project.getCloudOwnership()) || project.getCloudBillingOwnerId()==null
                 || !java.util.Objects.equals(project.getUserId(),project.getCloudBillingOwnerId())
                 || (project.getLocalRoot()!=null && !project.getLocalRoot().isBlank()))
@@ -300,6 +330,7 @@ public class CloudStorageQuotaService {
     public void requireProjectEpoch(Long projectId) {
         if(!postpaidEnabled())return;
         var project=projects.lockForImWrite(projectId).orElseThrow(()->new IllegalArgumentException(CloudBillingText.get("writesPaused")));
+        if(!postpaidFor(project.getUserId()))return;
         Long owner=billingOwnerForWrite(project), actor=null;
         var attributes=org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
         if(attributes instanceof org.springframework.web.context.request.ServletRequestAttributes request) {
@@ -326,7 +357,7 @@ public class CloudStorageQuotaService {
     public void requireProjectCapacity(Long projectId, long additionalBytes) {
         if (!enabled) return;
         var project=lockedWriteProject(projectId);Long owner=billingOwnerForWrite(project);
-        if(postpaidEnabled()) {if(!canWrite(owner))throw new IllegalArgumentException(CloudBillingText.get("writesPaused"));requireProjectEpoch(projectId);}
+        if(postpaidFor(owner)) {if(!canWrite(owner))throw new IllegalArgumentException(CloudBillingText.get("writesPaused"));requireProjectEpoch(projectId);}
         if (additionalBytes <= 0) return;
         checkCapacity(owner, additionalBytes);
     }
@@ -336,7 +367,7 @@ public class CloudStorageQuotaService {
     public void requireCurrentProjectUsage(Long projectId) {
         if (!enabled) return;
         var project=lockedWriteProject(projectId);Long owner=billingOwnerForWrite(project);
-        if(postpaidEnabled()) {if(!canWrite(owner))throw new IllegalArgumentException(CloudBillingText.get("writesPaused"));requireProjectEpoch(projectId);}
+        if(postpaidFor(owner)) {if(!canWrite(owner))throw new IllegalArgumentException(CloudBillingText.get("writesPaused"));requireProjectEpoch(projectId);}
         checkCapacity(owner, 0);
     }
 }

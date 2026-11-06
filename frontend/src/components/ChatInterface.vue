@@ -1121,7 +1121,7 @@ import { pendingInboxItems } from '@/composables/agentInboxState.mjs'
 import { saveLastConversation } from '@/utils/lastConversation.js'
 import { uniStorage } from '@/utils/uniStorage.js'
 import { isContextEligibleTab } from '@/pages/project-overview/activeTabContext.js'
-import { buildActiveSelectionChip } from '@/pages/project-overview/activeSelectionContext.js'
+import { buildActiveSelectionChip, buildPointerFields } from '@/pages/project-overview/activeSelectionContext.js'
 import { isCurrentDocSentinel } from '@/utils/chatFileChange.js'
 import { canDragCreatedFile, startCreatedFileDrag, endCreatedFileDrag } from '@/utils/generatedFileDrag.js'
 import { warmDragImage } from '@/utils/dragImage.js'
@@ -1211,6 +1211,11 @@ export default {
      * （没成就把活跃文档降级成「只带壳」，让模型走编辑器桥读实时正文）。
      * 不传（插件/测试宿主）时整段跳过，行为与改动前一致。
      */
+    // 发送时读 Writer 指针（选区/光标段落 + 锚点 + 段号），签名 (fileId) => Promise<pointer|null>
+    readActivePointer: {
+      type: Function,
+      default: null
+    },
     flushActiveDocument: {
       type: Function,
       default: null
@@ -2859,6 +2864,17 @@ export default {
       // chip 被用户摘掉时 activeDocChip 为 null，本轮就真的不带——
       // 「帮我查一下最新的司法解释」这类与文档无关的提问不该每轮都拖着几万字的合同。
       const selectionChip = activeSelectionChip.value
+      // 发送瞬间再读一次实时指针：胶囊是事件驱动的快照，可能已过期，也不含光标段落/锚点。
+      // 用户摘掉了选区胶囊就不带；读失败（null）退回胶囊原行为。
+      let pointerFields = {}
+      if (chipTab && !activeSelectionDismissed.value && typeof props.readActivePointer === 'function') {
+        try {
+          pointerFields = buildPointerFields(await props.readActivePointer(chipTab.id))
+        } catch (e) {
+          console.warn('[ChatInterface] read active pointer failed', e)
+        }
+      }
+      const pointerKnown = Object.keys(pointerFields).length > 0
       const activeContext = chipTab ? {
         id: chipTab.id,
         name: chipTab.name,
@@ -2867,7 +2883,8 @@ export default {
         pane: props.activeTabPane,
         // 没能落盘：告诉后端别用磁盘上那份旧正文，改走 readHint 分支
         staleBody: !activeDocFlushed,
-        ...(selectionChip ? { selectionText: selectionChip.text } : {})
+        ...(!pointerKnown && selectionChip ? { selectionText: selectionChip.text } : {}),
+        ...pointerFields
       } : null
       const attempt = beginChatSubmission(submissionTracker, {
         prompt,

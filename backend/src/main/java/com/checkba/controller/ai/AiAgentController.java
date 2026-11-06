@@ -783,6 +783,14 @@ public class AiAgentController {
          * 让模型直接针对该选区就地修订或解释，无需先花一轮工具调用去探测选区。
          */
         private String selectionText;
+        /**
+         * 可选：发送时在 Writer 里取到的「指针」。选区存在时 pointerAnchorId/pointerParagraphIndex 指向选区；
+         * 无选区时 cursorParagraphText 是光标所在段落（pointer* 指向该段）。
+         * 有 anchorId 就能一步 doc_replace_at_anchor，省掉先查找定位的一轮。
+         */
+        private String pointerAnchorId;
+        private Integer pointerParagraphIndex;
+        private String cursorParagraphText;
 
         /** 可选（dev-board#1479）：附件来自其他项目时的跨项目只读引用标注。 */
         private Long projectId;
@@ -800,6 +808,12 @@ public class AiAgentController {
         public void setStaleBody(boolean staleBody) { this.staleBody = staleBody; }
         public String getSelectionText() { return selectionText; }
         public void setSelectionText(String selectionText) { this.selectionText = selectionText; }
+        public String getPointerAnchorId() { return pointerAnchorId; }
+        public void setPointerAnchorId(String pointerAnchorId) { this.pointerAnchorId = pointerAnchorId; }
+        public Integer getPointerParagraphIndex() { return pointerParagraphIndex; }
+        public void setPointerParagraphIndex(Integer pointerParagraphIndex) { this.pointerParagraphIndex = pointerParagraphIndex; }
+        public String getCursorParagraphText() { return cursorParagraphText; }
+        public void setCursorParagraphText(String cursorParagraphText) { this.cursorParagraphText = cursorParagraphText; }
 
         public String getId() { return id; }
         public void setId(String id) { this.id = id; }

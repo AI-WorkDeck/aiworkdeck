@@ -682,8 +682,15 @@ class MobileApiContractTest {
         binding.setCreatedAt(LocalDateTime.now());
         accountBindingRepository.save(binding);
 
+        // 包晴天律师（billingLine=bqt）走最满的分支：bqtMember 每个键都必须先写进 YAML 的 BqtMember
+        Map<String, Object> bqtMember = new java.util.LinkedHashMap<>();
+        bqtMember.put("points", "98.92"); bqtMember.put("cents", 3297L); bqtMember.put("outstandingCents", 0L);
+        bqtMember.put("failedCount", 0); bqtMember.put("centsPerPoint", 100.0 / 3); bqtMember.put("levelCode", "GROWTH");
+        bqtMember.put("status", "ACTIVE"); bqtMember.put("aiWorkbench", true); bqtMember.put("expireAt", "2026-11-29T08:33:20.000Z");
+        bqtMember.put("fetchedAt", "2026-11-06T07:03:25.655Z"); bqtMember.put("rechargeAllowed", false);
         when(billing.balance(anyString()))
-                .thenReturn(new MobileBillingClient.BalanceResult(12345L, "CNY", "paid"));
+                .thenReturn(new MobileBillingClient.BalanceResult(12345L, "CNY", "paid", Map.of(),
+                        Map.of("billingLine", "bqt", "bqtMember", bqtMember)));
         when(billing.createRecharge(anyString(), anyLong(), anyString(), isNull(), isNull(), isNull()))
                 .thenReturn(new MobileBillingClient.RechargeOrder(
                         "qrcode", "OT-contract-1", 5000L, "weixin://wxpay/bizpayurl?pr=x", null, null,

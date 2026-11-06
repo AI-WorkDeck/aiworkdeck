@@ -58,5 +58,12 @@ export default {
   "pdfExportTooLargeError": "Экспортированный PDF превышает {mb}MB и не может быть сохранён в проект через ИИ; используйте меню «Файл -> Экспорт в PDF»",
   "systemOperation": "Системные действия",
   "taskListArtifact": "Список задач",
-  "planArtifact": "План"
+  "planArtifact": "План",
+  "bqtMemberInvalid": "Ваше членство в Baoqingtian больше не активно. Продлите его в приложении Baoqingtian и повторите попытку.",
+  "bqtAiClosed": "Ваше членство в Baoqingtian активно, но AI-рабочее пространство отключено в Baoqingtian. Включите его в приложении Baoqingtian и повторите попытку.",
+  "bqtModelNotAllowed": "Аккаунты юристов Baoqingtian могут использовать только модели DeepSeek. Переключитесь на модель DeepSeek и повторите попытку.",
+  "bqtInsufficientPoints": "Недостаточно баллов Baoqingtian. Пополните баллы в приложении Baoqingtian и повторите попытку.",
+  "bqtOutstandingDebt": "Предыдущее списание баллов не удалось. Пополните баллы в приложении Baoqingtian, затем обратитесь в поддержку.",
+  "bqtUnavailable": "Сервис Baoqingtian временно недоступен. Повторите попытку позже.",
+  "bqtRechargeViaBqt": "Участники Baoqingtian пополняют баллы или продлевают членство в приложении Baoqingtian; AI WorkDeck не принимает платежи для этого аккаунта.",
 }

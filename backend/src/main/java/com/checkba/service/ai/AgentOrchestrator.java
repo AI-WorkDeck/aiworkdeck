@@ -3270,6 +3270,12 @@ public class AgentOrchestrator {
             LlmErrorClassifier.Kind kind = LlmErrorClassifier.classify(err);
             com.checkba.service.account.AccountException accountError =
                     err instanceof com.checkba.service.account.AccountException ae ? ae : null;
+            // 包晴天积分通道的网关拒绝（会员失效/AI 关闭/积分不足/欠扣/暂不可用）：同一账户换模型、
+            // 退避重放都无济于事，也不能落到下面的 no_credits（那会打开本应用的充值弹层）
+            String bqtCode = accountError == null ? com.checkba.service.account.BqtBilling.errorCodeIn(err) : null;
+            if (bqtCode != null) {
+                accountError = com.checkba.service.account.BqtBilling.rejected(bqtCode);
+            }
             if (accountError == null && kind == LlmErrorClassifier.Kind.QUOTA_EXHAUSTED
                     && chatModelFactory.resolveProvider() == com.checkba.config.AiModelProperties.Provider.AWD_CLOUD) {
                 accountError = new com.checkba.service.account.AccountException(

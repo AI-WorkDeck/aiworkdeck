@@ -60,6 +60,12 @@
                 @disconnected="onLibraryDisconnected"
               />
             </view>
+            <!-- 放进案件库失败、又不是要重新连接（例如案件库服务器配置不全）：原因留在弹窗里，
+                 不只闪一下 toast（教程第 11 集：「此服务器未开通统一账户充值」一闪就没，像没点上） -->
+            <view v-if="shareError && !reconnectMessage" class="collab-empty-action collab-reconnect">
+              <text class="collab-error">{{ shareError }}</text>
+              <text class="collab-hint">{{ $t('version.cloudServiceIssueHint') }}</text>
+            </view>
             <!-- 云端写权限门禁拒绝（kind=CLOUD_RECONNECT_REQUIRED）：原因写在这里，不只闪一下 toast；
                  重新连接要律师自己点，不自动重连（问题 126/127） -->
             <view v-if="reconnectMessage" class="collab-empty-action collab-reconnect">
@@ -377,6 +383,7 @@ export default {
       official: { available: false, serverUrl: '' },
       // 放进案件库被云端写权限门禁拒绝时的原因（后端原话）；有值就显示「重新连接云端」
       reconnectMessage: '',
+      shareError: '',
       // 这次打开弹窗后律师已经明确重新连接过：再被拒就换一句话，并给「重新绑定这份案卷」
       reconnectAttempted: false,
       // 连着多于一条连接、「放进团队案件库」被拒：就地列出连接供断开
@@ -489,6 +496,7 @@ export default {
       // 「放进团队案件库」按钮用的是同一段判定，复制一份必然慢慢分叉。
       this.busy = true
       this.reconnectMessage = ''
+      this.shareError = ''
       try {
         const res = await shareProjectToLibrary({
           projectId: this.projectId,
@@ -504,7 +512,7 @@ export default {
         this.$emit('changed')
       } catch (e) {
         if (needsCloudReconnect(e)) this.reconnectMessage = reconnectRequiredMessage(e, this.reconnectAttempted, (k) => this.$t(k))
-        else uni.showToast({ title: (e && e.message) || this.$t('version.shareToLibraryFailed'), icon: 'none' })
+        else this.shareError = (e && e.message) || this.$t('version.shareToLibraryFailed')
       } finally {
         this.busy = false
       }
@@ -537,6 +545,7 @@ export default {
     async onRebindCaseFile() {
       if (this.busy) return
       this.busy = true
+      this.shareError = ''
       try {
         const res = await rebindProjectToLibrary({
           projectId: this.projectId,
@@ -564,7 +573,7 @@ export default {
         // 拆完绑定、放进去失败：案卷已回到「未放进案件库」，让页面重拉状态，律师可以再点「放进团队案件库」
         this.$emit('changed')
         if (needsCloudReconnect(e)) this.reconnectMessage = reconnectRequiredMessage(e, this.reconnectAttempted, (k) => this.$t(k))
-        else uni.showToast({ title: (e && e.message) || this.$t('version.shareToLibraryFailed'), icon: 'none' })
+        else this.shareError = (e && e.message) || this.$t('version.shareToLibraryFailed')
       } finally {
         this.busy = false
       }
@@ -822,6 +831,7 @@ export default {
 .collab-empty-action { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 .collab-reconnect { margin-top: 14px; }
 .collab-error { font-size: var(--awd-panel-fs); color: var(--awd-danger-text); line-height: 1.7; }
+.collab-hint { font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); line-height: 1.7; }
 
 .collab-field { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
 .collab-label { font-size: var(--awd-font-size-body); font-weight: 500; color: var(--awd-text); }

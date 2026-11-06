@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# 本地开发最小栈的数据库：只有 PostgreSQL（含 pgvector）。
+# 后端和前端由 scripts/quickstart.sh 在宿主上起，见 docs/getting-started.md。
+# OCR / ASR / PPT 等旁路服务不在这里，需要时用根目录 docker-compose.yml。
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: checkba
+      POSTGRES_USER: checkba
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-checkba123}
+    # 只发布到宿主回环；55432 避开本机已有的 5432
+    ports:
+      - "127.0.0.1:${AWD_DB_PORT:-55432}:5432"
+    volumes:
+      - awd-dev-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U checkba -d checkba"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  awd-dev-postgres:

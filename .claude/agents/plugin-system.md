@@ -18,6 +18,8 @@ description: 插件系统领域（具体插件实现）。任务涉及尽调/脱
 
 ## 现有插件清单
 
+**表格化审阅（Stella 对齐，2026-11）**：`official-plugins/tabular-review/` 0.1.0，纯 Web 插件（`file_read/file_write/ai`，工作区视图），最低宿主 0.81.0；源码交付不代表已上架。逻辑在 `web/review-core.js`（分段、提示词、答案解析、引文核验、限频重试），`web/xlsx.js` 是无依赖 xlsx 写出器，界面 `web/panel.js`，文案 `l10n/*.json` 经 `scripts/sync-panel-l10n.mjs` 生成 `web/panel-l10n.js`。**地雷**：AI 引文必须能在 `files.read` 抽出的原文里逐字找到才生成锚点，找不到的答案丢弃并标「引文未核验」（EVIDENCE_CONTRACT 缺定位符不得编造）；律师已确认/已修改的格子不被重跑覆盖；`ai.request` 每插件 10 次/分钟、单次 16000 字符，插件侧先限频再退避重试；审阅表存插件 KV（64 KB 上限，超限只提示导出）。依赖的宿主补齐：`ui.openFile` 可带 `locator`、新增 `files.download`（PLUGIN_SPEC §8.4），测试 `frontend/tests/plugin-sdk/open-locator-download.test.mjs`。设计见 `docs/plans/stella-alignment/tabular-review.md`。
+
 **项目沟通助手（dev-board#1423/#1424）**：`official-plugins/project-im/` 0.2.0 使用宿主 `im.request` 的 `agentScopes/ensureAgent/agentInfo/agentReply`，最低宿主0.69.0；源码交付不代表已发布。产品层级仅律所→团队→项目；`imDirectory.organization` 是旧桥字段，实际来自 `team`，用户文案必须叫团队。插件和 `PluginWorkspaceSummary` 以会话优先、通讯录折叠，`projectColleagues` 展示当前项目成员。
 
 - 云端 `ImAgentService`：每层级共享群唯一绑定，另按用户绑定 `AGENT_DIRECT` 私聊。项目UUID仅用于群归属，不授予项目或群访问权；项目群非成员须邀请码，团队/律所群按 `MemoryOrganizationGateway` 每次复核。AI 为 `actorType=AGENT` 的系统参与者，不注册User；旧消息无actorType按真人处理。`ImAgentTurn` 持久保存请求状态，以原消息ID幂等，模型在事务外执行，发回前复核成员和附件可见性。
@@ -389,7 +391,7 @@ JAR 插件拿宿主能力的唯一契约：`com.checkba:plugin-api:1.1.0`（1.0.
 
 ## HR 用工模板包下架（2026-09-15，dev-board#649）
 
-`hr-template-pack` 已从三站注册表下架；`PluginService.isRetired` 在离线扫描与启用判定中拒绝该 ID，`PluginMarketService` 隐藏旧列表并拒绝直接安装。保留插件磁盘文件及用户已创建文书。其他通用插件机制不受影响。上线验证与回退备份位置见 `doc/hr-template-retirement.md`。
+`hr-template-pack` 已从三站注册表下架；`PluginService.isRetired` 在离线扫描与启用判定中拒绝该 ID，`PluginMarketService` 隐藏旧列表并拒绝直接安装。保留插件磁盘文件及用户已创建文书。其他通用插件机制不受影响。上线验证与回退备份位置见 `docs/dev-notes/hr-template-retirement.md`。
 
 ## 脱敏面板 v0.44.1 真机三修（引擎 2.2.0）
 
@@ -478,7 +480,7 @@ Web协议仍为awd:1。新增contributes.views/connections/mcpServers和settings
 
 ## 八项业务插件迁移行为契约（2026-10-23，dev-board#1448）
 
-八项为搜索、语音、脱敏、诉讼可视化、日程、收藏夹、剪贴板、解析依据。迁移前后对照和实际验证边界见 `doc/verification/2026-10-23-plugin-parity-1448.md`。宿主活动标签ID通过 `pluginBusinessActions.activeFileId` 供脱敏使用，不等同只允许LOWA的 `getPluginActiveEditor`；归属继续由业务服务查当前项目。依据打开文件走 `insightOpenDoc → openInsightDocFile` 保留右窗行为，项目审查标准不依赖活动文档，坐标只接受编辑器已换算的宿主坐标。
+八项为搜索、语音、脱敏、诉讼可视化、日程、收藏夹、剪贴板、解析依据。迁移前后对照和实际验证边界见 `docs/dev-notes/verification/2026-10-23-plugin-parity-1448.md`。宿主活动标签ID通过 `pluginBusinessActions.activeFileId` 供脱敏使用，不等同只允许LOWA的 `getPluginActiveEditor`；归属继续由业务服务查当前项目。依据打开文件走 `insightOpenDoc → openInsightDocFile` 保留右窗行为，项目审查标准不依赖活动文档，坐标只接受编辑器已换算的宿主坐标。
 
 `awd:litviz-restyled` 成功信号按项目转 `files.changed`；顶部 `awd:meeting-recording-stopped` 转权限为speech的空 `speech.stopped`，iframe再唤醒原面板列表监听。绘图换风格等待保存也要纳入try/catch，取消时向原项目发结束信号释放保存屏障。脱敏原API为300000ms，适配器和SDK上限一致，SDK默认仍60000ms。录音停止可等待用户确认付费转写，超出单次RPC时继续查询真实状态；宿主按项目和meetingId保存原停止结果（包括失败时null），不能再次stop或把旧结果当新结果。
 
