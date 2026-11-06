@@ -24,7 +24,7 @@ export const DOC_MUTATED_DEBOUNCE_MS = 300
 export const DOC_READONLY_ACTIONS = new Set([
   'slide_show_control', 'office_get_navigation', 'office_activate_item', 'slide_get_thumbnail',
   // 读正文 / 读状态
-  'get_selection', 'get_paragraph', 'get_outline', 'get_document_text', 'get_cursor_context',
+  'get_selection', 'get_paragraph', 'get_outline', 'get_document_text', 'get_cursor_context', 'get_ai_pointer',
   'get_clauses', 'get_cursor_rect', 'get_ui_state', 'get_ui_lang', 'get_selection_hyperlink',
   'get_hyperlink_at_cursor', 'get_bookmark_context', 'list_styles', 'list_fonts',
   'list_revisions', 'list_comments', 'check_link_anchors', 'var_list',

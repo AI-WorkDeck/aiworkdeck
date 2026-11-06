@@ -9,6 +9,9 @@ import {
   normalizeSelectionText,
   buildActiveSelectionChip,
   readActiveSelection,
+  readActivePointer,
+  buildPointerFields,
+  MAX_POINTER_PARAGRAPH_CHARS,
 } from '../../src/pages/project-overview/activeSelectionContext.js'
 import { buildAiSelectionRevisePrompt } from '../../src/utils/paragraphFormat.js'
 
@@ -103,5 +106,42 @@ describe('activeSelectionContext (dev-board#1430)', () => {
     assert.match(prompt, /《技术服务合同\.docx》/)
     assert.match(prompt, /乙方应于三日内交付全部成果/)
     assert.match(prompt, /改为五个工作日内交付，并补充验收标准/)
+  })
+})
+
+describe('Writer 指针 (get_ai_pointer)', () => {
+  it('buildPointerFields: 选区取实时文本并带锚点/段号', () => {
+    assert.deepEqual(
+      buildPointerFields({ kind: 'selection', selectionText: '  违约金条款 ', anchorId: '__ai_anchor_3', paragraphIndex: 5 }),
+      { pointerAnchorId: '__ai_anchor_3', pointerParagraphIndex: 5, selectionText: '违约金条款' }
+    )
+  })
+
+  it('buildPointerFields: 无选区带光标段落，超长安全截断，缺锚点/段号则省略', () => {
+    const r = buildPointerFields({ kind: 'cursor', paragraphText: '甲'.repeat(MAX_POINTER_PARAGRAPH_CHARS + 10), paragraphIndex: -1 })
+    assert.equal(r.cursorParagraphText.length, MAX_POINTER_PARAGRAPH_CHARS)
+    assert.equal('pointerAnchorId' in r, false)
+    assert.equal('pointerParagraphIndex' in r, false)
+  })
+
+  it('buildPointerFields: none / 空 / 非法输入返回 {}', () => {
+    assert.deepEqual(buildPointerFields(null), {})
+    assert.deepEqual(buildPointerFields({ kind: 'none' }), {})
+    assert.deepEqual(buildPointerFields({ kind: 'cursor', paragraphText: '  ' }), {})
+    assert.deepEqual(buildPointerFields({ kind: 'selection', selectionText: '', anchorId: 'x' }), {})
+  })
+
+  it('readActivePointer: 调 get_ai_pointer；非 Writer / 失败返回 null', async () => {
+    const calls = []
+    const mk = (extra = {}) => ({
+      ready: true, file: { id: 7 }, docKind: 'writer',
+      executor: { executeCommand: async (a) => { calls.push(a); return { success: true, kind: 'cursor', paragraphText: '段' } } },
+      ...extra,
+    })
+    assert.equal((await readActivePointer({ 'left:7': mk() }, { side: 'left', fileId: 7 })).kind, 'cursor')
+    assert.deepEqual(calls, ['get_ai_pointer'])
+    assert.equal(await readActivePointer({ 'left:7': mk({ docKind: 'sheet' }) }, { side: 'left', fileId: 7 }), null)
+    const bad = mk({ executor: { executeCommand: async () => { throw new Error('x') } } })
+    assert.equal(await readActivePointer({ 'left:7': bad }, { side: 'left', fileId: 7 }), null)
   })
 })
