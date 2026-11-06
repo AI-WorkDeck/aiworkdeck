@@ -1382,9 +1382,10 @@ def patch_dark_page_text(core):
     # (MPL-2.0; original license headers retained). Keep this standalone: the
     # build VM receives this script without the repo.
     # 深色纸面（DocColor 变暗）时，LO 只把「自动」颜色的字改成白色；Word/Excel 文件里
-    # 大量显式黑色（w:color 000000、主题色 dk1）会变成黑底黑字。这里只在屏幕绘制、且字和
-    # 它实际所在的底色都偏暗时改画白色；红、蓝等亮色不动，浅色纸面、打印、PDF 导出
-    # 和文档内容都不受影响。
+    # 大量显式黑色（w:color 000000、主题色 dk1）会变成黑底黑字。这里只在屏幕绘制、且字
+    # 真的很暗（亮度 < 64：黑、深灰、藏青）而它所在的底色也偏暗时改画白色。字色不能用
+    # Color::IsDark()：24.2 的阈值是亮度 <= 156，纯红（76）也算「暗」，红字会被刷成白字
+    # （r8 首版实测，dark-page.mjs「红字仍是红色」抓到）。浅色纸面、打印、PDF 与文档内容不受影响。
     writer = f'{core}/sw/source/core/txtnode/fntcache.cxx'
     patch(
         writer,
@@ -1397,7 +1398,7 @@ def patch_dark_page_text(core):
         '        // AI WorkDeck: dark page. Explicit dark text over a dark background is\n'
         '        // drawn white on screen only; light pages, print and export are unchanged.\n'
         '        const bool bDarkExplicit = !bChgFntColor && pVSh && bOutputToWindow\n'
-        '            && aGlobalRetoucheColor.IsDark() && rFnt.GetColor().IsDark();\n'
+        '            && aGlobalRetoucheColor.IsDark() && rFnt.GetColor().GetLuminance() < 64;\n'
         '\n'
         '        if ( bChgFntColor || bDarkExplicit )\n'
         '        {\n',
@@ -1445,7 +1446,7 @@ def patch_dark_page_text(core):
         '    }\n'
         '    // AI WorkDeck: dark page. On screen only (Display), explicit dark text over\n'
         '    // a dark cell or page background is drawn white; Print/PDF keep the file color.\n'
-        '    else if (eAutoMode == ScAutoFontColorMode::Display && aColor.IsDark())\n'
+        '    else if (eAutoMode == ScAutoFontColorMode::Display && aColor.GetLuminance() < 64)\n'
         '    {\n'
         '        const SvxBrushItem* pBack = pCondSet ? pCondSet->GetItemIfSet(ATTR_BACKGROUND) : nullptr;\n'
         '        Color aBackColor = (pBack ? pBack : &rItemSet.Get(ATTR_BACKGROUND))->GetColor();\n'

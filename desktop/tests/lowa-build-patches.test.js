@@ -490,11 +490,11 @@ test('apply-source-patches.py applies all C++ kernel & dictionary patches cleanl
     assert.equal('#' + selectedText[1], roles.dark['text-on-accent'])
 
     const fntcache = fs.readFileSync(path.join(tmpDir, 'sw/source/core/txtnode/fntcache.cxx'), 'utf8')
-    assert.match(fntcache, /const bool bDarkExplicit = !bChgFntColor && pVSh && bOutputToWindow\n            && aGlobalRetoucheColor\.IsDark\(\) && rFnt\.GetColor\(\)\.IsDark\(\);/)
+    assert.match(fntcache, /const bool bDarkExplicit = !bChgFntColor && pVSh && bOutputToWindow\n            && aGlobalRetoucheColor\.IsDark\(\) && rFnt\.GetColor\(\)\.GetLuminance\(\) < 64;/)
     assert.match(fntcache, /if \( bChgFntColor \|\| bDarkExplicit \)/)
     assert.match(fntcache, /if \(bDarkExplicit\)\n            \{\n                if \(pCol->IsDark\(\)\)/)
     const patattr = fs.readFileSync(path.join(tmpDir, 'sc/source/core/data/patattr.cxx'), 'utf8')
-    assert.match(patattr, /else if \(eAutoMode == ScAutoFontColorMode::Display && aColor\.IsDark\(\)\)/)
+    assert.match(patattr, /else if \(eAutoMode == ScAutoFontColorMode::Display && aColor\.GetLuminance\(\) < 64\)/)
 
     const ruler = fs.readFileSync(path.join(tmpDir, 'svtools/source/control/ruler.cxx'), 'utf8')
     assert.match(ruler, /GetColorValue\(svtools::APPBACKGROUND\)\.nColor\.IsDark\(\)/)
