@@ -166,11 +166,53 @@ class SessionTitleSuggesterTest {
         assertTrue(assertThrows(VersionException.class, () -> s.suggest(pid, 1L)).isUserFacing());
     }
 
+    /** 真实 Word 文件：正文经 Tika 抽取，只送改动的条款，跨 run 拆开的数字也要还原成整句。 */
+    @Test
+    void digestOfAWordContractShowsOnlyTheEditedClauses() throws Exception {
+        long pid = 32L;
+        Files.createDirectories(project(pid));
+        Path original = Path.of("../fixtures/evidence-demo-1076/01-购销合同.docx");
+        Files.copy(original, project(pid).resolve("合同.docx"));
+        svc.enableVersionRecording(pid, "韩泽伟", "hzw@example.com");
+
+        Files.write(project(pid).resolve("合同.docx"), editDocx(Files.readAllBytes(original)));
+        String digest = suggester().digest(pid);
+        assertTrue(digest.startsWith("MODIFIED: 合同.docx"), digest);
+        assertTrue(digest.contains("- 5.1 甲方应于验收合格后 15 日内一次性支付合同总价。"), digest);
+        assertTrue(digest.contains("+ 5.1 甲方应于验收合格后 30 日内一次性支付合同总价。"), digest);
+        assertTrue(digest.contains("+ 8.1 甲方逾期付款的，每逾期一日按未付金额的万分之五支付违约金。"), digest);
+        assertFalse(digest.contains("第一条") || digest.contains("第九条"), "unchanged clauses stay out: " + digest);
+    }
+
+    /** 与编辑器保存同形：只改 document.xml 里的两处文字，其余部件原样。 */
+    private static byte[] editDocx(byte[] docx) throws Exception {
+        var out = new java.io.ByteArrayOutputStream();
+        try (var in = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(docx));
+             var zip = new java.util.zip.ZipOutputStream(out)) {
+            for (var e = in.getNextEntry(); e != null; e = in.getNextEntry()) {
+                byte[] bytes = in.readAllBytes();
+                if (e.getName().equals("word/document.xml")) {
+                    String xml = new String(bytes, java.nio.charset.StandardCharsets.UTF_8)
+                            .replace("验收合格后</w:t></w:r><w:r><w:t xml:space=\"preserve\"> 15 </w:t>",
+                                    "验收合格后</w:t></w:r><w:r><w:t xml:space=\"preserve\"> 30 </w:t>")
+                            .replace("万分之三", "万分之五");
+                    bytes = xml.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                }
+                zip.putNextEntry(new java.util.zip.ZipEntry(e.getName()));
+                zip.write(bytes);
+                zip.closeEntry();
+            }
+        }
+        return out.toByteArray();
+    }
+
     @Test
     void cleanTitleStripsLabelsQuotesAndTrailingPunctuation() {
         assertEquals("Add payment terms", SessionTitleSuggester.cleanTitle("Title: \"Add payment terms.\"\nExplanation"));
         assertEquals("下调违约金比例", SessionTitleSuggester.cleanTitle("标题：「下调违约金比例」。"));
         assertEquals("修改《股权转让协议》", SessionTitleSuggester.cleanTitle("修改《股权转让协议》。"));
+        assertEquals("调整付款期限", SessionTitleSuggester.cleanTitle("<think>\n先看改动……\n</think>\n\n调整付款期限"));
+        assertEquals("调整付款期限", SessionTitleSuggester.cleanTitle("<final>调整付款期限</final>"));
         assertEquals(SessionTitleSuggester.MAX_TITLE_CHARS, SessionTitleSuggester.cleanTitle("长".repeat(200)).length());
     }
 }

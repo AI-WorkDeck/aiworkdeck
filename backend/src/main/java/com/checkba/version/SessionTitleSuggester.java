@@ -110,7 +110,15 @@ public class SessionTitleSuggester {
 
     static String cleanTitle(String raw) {
         if (raw == null) return "";
-        String line = raw.strip().lines().filter(l -> !l.isBlank()).findFirst().orElse("").strip();
+        // 思考型模型会先吐 <think>…</think>，有的还套一层协议标签（<final>…）；只要标签里外的正文
+        String text = raw.replaceAll("(?s)<think>.*?</think>", "");
+        String prev;
+        do {
+            prev = text;
+            text = text.replaceAll("<[^<>]*>", "");
+        } while (!text.equals(prev));
+        String line = text.replace("<", "").replace(">", "").strip().lines()
+                .filter(l -> !l.isBlank()).findFirst().orElse("").strip();
         line = line.replaceAll("^(标题|Title)\\s*[:：]\\s*", "");
         // 《》 不剥：标题常以书名号结尾（「修改《股权转让协议》」）
         line = line.replaceAll("^[\"'“”‘’「」『』*`\\s]+|[\"'“”‘’「」『』*`。．.！!\\s]+$", "");
