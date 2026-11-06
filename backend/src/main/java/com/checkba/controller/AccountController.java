@@ -955,6 +955,7 @@ public class AccountController {
             if (profile.get("bqtQingtian") != null) {
                 platform.put("bqtQingtian", profile.get("bqtQingtian"));
             }
+            com.checkba.service.account.BqtBilling.copyBillingFields(profile, platform);
             platform.put("allocations", accountService.fetchLedger().stream()
                     .filter(entry -> "ai_alloc".equals(entry.get("kind")))
                     .toList());

@@ -44,9 +44,20 @@ public interface MobileBillingClient {
      *                     只返回 {@code paid} / {@code free}，<b>不是套餐名，也基本不会为 null</b>
      *                     （只有上游没给这个字段时才是 null）。各端不要当套餐名直接渲染。
      */
-    record BalanceResult(long balanceCents, String currency, String plan, Map<String, Object> subscription) {
+    record BalanceResult(long balanceCents, String currency, String plan, Map<String, Object> subscription,
+            Map<String, Object> billing) {
         public BalanceResult(long balanceCents, String currency, String plan) {
             this(balanceCents, currency, plan, Map.of());
+        }
+        /** 旧官网没有计费线字段：billingLine=standard、bqtMember=null（见 BqtBilling.copyBillingFields）。 */
+        public BalanceResult(long balanceCents, String currency, String plan, Map<String, Object> subscription) {
+            this(balanceCents, currency, plan, subscription, null);
+        }
+        /** 包晴天积分通道：{billingLine, bqtMember}，恒非空。 */
+        public BalanceResult {
+            Map<String, Object> fields = new java.util.LinkedHashMap<>();
+            com.checkba.service.account.BqtBilling.copyBillingFields(billing, fields);
+            billing = java.util.Collections.unmodifiableMap(fields);
         }
     }
 

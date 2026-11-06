@@ -614,3 +614,7 @@ Apple 订阅桥接：GET `/api/mobile/billing/subscription/appstore/capability`�
 - **网络读不进事务/锁**：`MobileRelayController.versionObjectPart` 先把请求体落临时文件再调 `MobileVersionObjectService.put`（事务 + 属主行锁）；`GitHttpController.receivePack` 先落临时文件再进 `repoLock`；`CloudSyncService.uploadToCloud` 在锁外先预传一遍版本对象（持锁段保留原调用补漏）。新增同类入口别在锁内读 socket / 走 WAN。
 - **收件箱下载必须有读取期限**：`MobileRelayClientService` 里 `content.body()` 一律包 `DeadlineInputStream(…, inboxBodyDeadline)`（默认 30 分钟，整次下载总期限）。`ofInputStream` 拿到响应头后 `HttpRequest.timeout` 不再约束读取，不包的话卡住的下载永远占着 `inboxRunning`，整条手机同步冻结。
 - **传输请求状态转换用条件更新**：`MobileTransferService.upload`（`stageIfPending`）与 `cancel`（`failIfPending`）靠 `where status='PENDING'` 互斥，输家不得再整行 save 覆盖；`push()` 扣费后读文件/暂存失败要 `refundChargeQuietly`（此时没有行，TTL 清扫兜不到）。
+
+## 包晴天律师（2026-11-06，aiworkdeck_website#380 / aiworkdeck#1403）
+
+`GET /api/mobile/billing/balance` 透传官网 `billingLine`（standard|circle|bqt）与 `bqtMember`（schema `BqtMember`，mobile-v1.yaml），经 `MobileBillingClient.BalanceResult.billing` → `BqtBilling.copyBillingFields`，旧官网缺字段按 standard/null。billingLine=bqt 时四端只显示包晴天积分折算额度（balanceCents 已是折算值），隐藏本站充值/Pro/兑换码，提示去包晴天 App 充值续费。网关拒绝码 `bqt_*` 不是登录失效。手机端登录建议：建扫码会话后打开 `bqtlawyer:///pages/scan/result?qrid=&timestamp=&source=`（包晴天 App 现有 scheme 与确认页），回前台继续轮询 status；未装包晴天则显示二维码或手机号登录。回归：`MobileApiContractTest`（bqt 分支覆盖 BqtMember 每个键）。

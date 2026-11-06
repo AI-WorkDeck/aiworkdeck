@@ -114,7 +114,9 @@ public class HttpMobileBillingClient implements MobileBillingClient {
                 json.path("subscription").isObject()
                         ? new com.fasterxml.jackson.databind.ObjectMapper().convertValue(json.path("subscription"),
                             new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {})
-                        : Map.of());
+                        : Map.of(),
+                new com.fasterxml.jackson.databind.ObjectMapper().convertValue(json,
+                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}));
     }
 
     @Override

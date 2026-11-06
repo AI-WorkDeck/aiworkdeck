@@ -415,6 +415,22 @@ components:
         message: { type: string, nullable: true }
         kind: { type: string }
         data: { $ref: '#/components/schemas/LoginData' }
+    BqtMember:
+      type: object
+      description: 包晴天会员与积分（官网 lib/bqt-account.ts bqtMemberView）。
+      required: [points, cents, outstandingCents, failedCount, centsPerPoint, levelCode, status, aiWorkbench, expireAt, fetchedAt, rechargeAllowed]
+      properties:
+        points: { type: string, description: 可用积分，两位小数字符串，如 "98.92" }
+        cents: { type: integer, format: int64, description: 折算后的可用额度（分），已扣除尚未扣成的部分 }
+        outstandingCents: { type: integer, format: int64, description: 已提供服务但尚未从包晴天扣成的分 }
+        failedCount: { type: integer, description: 扣减失败未处理的笔数；> 0 时应提示用户在包晴天充值后联系客服 }
+        centsPerPoint: { type: number, description: 1 积分折合多少分（1 元 = 3 积分时为 33.33…） }
+        levelCode: { type: string, nullable: true, enum: [LIGHT, GROWTH, null], description: LIGHT 轻享会员 / GROWTH 律师成长会员 }
+        status: { type: string, enum: [ACTIVE, EXPIRED] }
+        aiWorkbench: { type: boolean, description: 会员有效但为 false 时是「AI 工作台已在包晴天关闭」，不是未开通 }
+        expireAt: { type: string, nullable: true, description: 会员到期时刻 ISO-8601 }
+        fetchedAt: { type: string, description: 快照时间 ISO-8601 }
+        rechargeAllowed: { type: boolean, enum: [false] }
     BillingBalance:
       type: object
       description: |
@@ -429,6 +445,17 @@ components:
       properties:
         balanceCents: { type: integer, format: int64, description: 余额，整数分（Credits 1 元 = 100 分） }
         currency: { type: string, enum: [CNY, USD], description: 站点币种，由部署站点决定 }
+        billingLine:
+          type: string
+          enum: [standard, circle, bqt]
+          description: |
+            计费线（包晴天积分通道，2026-11-06）。旧服务器缺失时按 standard。
+            bqt = 包晴天律师：只显示包晴天积分折算的额度（balanceCents 已是折算值），
+            不显示本站充值、Pro 购买、兑换码，改为提示在包晴天 App 充值/续费。
+        bqtMember:
+          nullable: true
+          description: billingLine=bqt 时的包晴天会员与积分快照；其他计费线恒为 null。bqt 线下也可能为 null（包晴天暂不可达）。
+          allOf: [{ $ref: '#/components/schemas/BqtMember' }]
         subscription:
           type: object
           description: 订阅服务额度快照，与充值余额分账；旧服务器可能缺失

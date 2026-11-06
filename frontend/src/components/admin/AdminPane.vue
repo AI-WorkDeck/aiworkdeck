@@ -308,7 +308,9 @@
                     <view class="wallet-left">
                       <text class="wallet-balance-label">{{ $t('admin.walletBalanceLabel') }}</text>
                       <text class="wallet-balance-value">{{ walletBalanceText }}</text>
-                      <button class="btn-primary wallet-recharge-btn" @tap="showRecharge = true">
+                      <!-- 包晴天积分通道：不在本应用充值（dev-board BQT 积分通道） -->
+                      <text v-if="isBqtBilling" class="account-note">{{ $t('admin.bqtPayInApp') }}</text>
+                      <button v-else class="btn-primary wallet-recharge-btn" @tap="showRecharge = true">
                         {{ $t('admin.rechargeButton') }}
                       </button>
                     </view>
@@ -342,8 +344,22 @@
                     <text style="font-size: 13px;">{{ $t('admin.walletQingtianBalance', { remaining: walletBqtQingtian.remainingCoins, monthly: walletBqtQingtian.monthlyCoins }) }}</text>
                     <text style="font-size: 12px; opacity: 0.75;">{{ $t('admin.walletQingtianRatio', { creditsPerCoin: walletBqtQingtian.creditsPerCoin }) }}</text>
                   </view>
-                  <!-- 兑换码 / Circle 联盟所邀请码绑定入口 -->
-                  <view style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.06);">
+                  <!-- 包晴天会员（积分通道）：等级、状态、到期、积分与折算 Credits；取代上面的晴天币月度额度 -->
+                  <view v-if="walletBqtMember" class="bqt-member-card">
+                    <view class="bqt-member-head">
+                      <text class="bqt-member-title">{{ $t('admin.bqtMemberTitle') }} · {{ $t(walletBqtMember.levelKey) }}</text>
+                      <text class="bqt-member-status" :class="{ 'is-expired': !walletBqtMember.active }">
+                        {{ walletBqtMember.active ? $t('admin.bqtStatusActive') : $t('admin.bqtStatusExpired') }}
+                      </text>
+                    </view>
+                    <text v-if="walletBqtMember.expireAt" class="account-note">{{ $t('admin.bqtExpireAt', { date: formatUsageTime(walletBqtMember.expireAt) }) }}</text>
+                    <text class="account-note">{{ $t('admin.bqtPointsLine', { points: walletBqtMember.points, credits: walletBqtMember.credits }) }}</text>
+                    <text v-if="walletBqtMember.active && !walletBqtMember.aiWorkbench" class="bqt-member-warn">{{ $t('agentStream.bqtAiClosed') }}</text>
+                    <text v-if="walletBqtMember.hasDebt" class="bqt-member-warn">{{ $t('admin.bqtDebtWarning', { count: walletBqtMember.failedCount, amount: walletBqtMember.outstandingCredits }) }}</text>
+                    <text class="account-note">{{ $t('admin.bqtPayInApp') }}</text>
+                  </view>
+                  <!-- 兑换码 / Circle 联盟所邀请码绑定入口（储值入口，包晴天积分通道不显示） -->
+                  <view v-if="!isBqtBilling" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.06);">
                     <text style="font-size: 12px; opacity: 0.75; display: block; margin-bottom: 6px;">{{ $t('admin.walletRedeemTitle') }}</text>
                     <view style="display: flex; gap: 8px; align-items: center;">
                       <input
@@ -395,11 +411,13 @@
                 <text class="account-note">{{ $t('admin.subscriptionReset', { date: formatUsageTime(subscription.weeklyEnd) }) }}</text>
                 <text class="account-note">{{ $t('admin.subscriptionEnds', { date: formatUsageTime(subscription.periodEnd) }) }}</text>
                 <text class="account-note">{{ $t(subscription.walletFallbackEnabled ? 'admin.subscriptionFallbackOn' : 'admin.subscriptionFallbackOff') }}</text>
-                <button class="comp-btn" @tap="openSubscriptionAccount">{{ $t('admin.subscriptionManage') }}</button>
+                <text v-if="isBqtBilling" class="account-note">{{ $t('admin.bqtPayInApp') }}</text>
+                <button v-else class="comp-btn" @tap="openSubscriptionAccount">{{ $t('admin.subscriptionManage') }}</button>
               </view>
               <view v-else class="provider-card">
                 <text class="account-note">{{ $t('admin.subscriptionInactiveNote') }}</text>
-                <button class="comp-btn" @tap="openSubscriptionAccount">{{ $t('admin.subscriptionSubscribeBtn') }}</button>
+                <text v-if="isBqtBilling" class="account-note">{{ $t('admin.bqtPayInApp') }}</text>
+                <button v-else class="comp-btn" @tap="openSubscriptionAccount">{{ $t('admin.subscriptionSubscribeBtn') }}</button>
               </view>
             </SettingsSection>
 
@@ -1075,6 +1093,7 @@ import { shouldPromptNameNudge } from '@/utils/identityProfile.js'
 import { shouldAcceptResponse } from '@/utils/requestGeneration.js'
 import UnlockHint from '@/components/UnlockHint.vue'
 import RechargeDialog from '@/components/RechargeDialog.vue'
+import { isBqtBillingLine, bqtMemberView } from '@/utils/bqtBilling.js'
 import AwdSelect from '@/components/AwdSelect.vue'
 import AwdSwitch from '@/components/AwdSwitch.vue'
 import PersonalWorkLogPanel from '@/components/userprofile/PersonalWorkLogPanel.vue'
@@ -1590,7 +1609,18 @@ export default {
         || (this.accountPlatform && this.accountPlatform.circleFirm)
         || null
     },
+    // 包晴天积分通道（billingLine=bqt）：余额由积分折算，充值/续费只在包晴天 App。
+    // 旧后端/旧官网没有 billingLine，按普通账户处理。
+    isBqtBilling() {
+      return isBqtBillingLine(this.walletData) || isBqtBillingLine(this.accountPlatform)
+    },
+    walletBqtMember() {
+      return bqtMemberView((this.walletData && this.walletData.bqtMember)
+        || (this.accountPlatform && this.accountPlatform.bqtMember))
+    },
     walletBqtQingtian() {
+      // 新的积分通道快照取代旧的晴天币月度额度，两块不同时显示
+      if (this.walletBqtMember) return null
       return (this.walletData && this.walletData.bqtQingtian)
         || (this.accountPlatform && this.accountPlatform.bqtQingtian)
         || null
@@ -2567,6 +2597,8 @@ export default {
             subscription: b.subscription || null,
             circleFirm: b.circleFirm || null,
             bqtQingtian: b.bqtQingtian || null,
+            billingLine: b.billingLine || 'standard',
+            bqtMember: b.bqtMember || null,
           }
         } else {
           this.walletData = { loaded: false, available: true, balanceCents: null, circleFirm: null, bqtQingtian: null }
@@ -3723,6 +3755,16 @@ $brand-accent: $brand-mint;
   font-variant-numeric: tabular-nums;
 }
 
+.bqt-member-card {
+  margin-top: 12px; padding: 10px 12px; border-radius: var(--awd-radius-md);
+  background: var(--awd-gold-soft);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.bqt-member-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bqt-member-title { font-size: var(--awd-font-size-body); font-weight: 600; color: var(--awd-gold-text); }
+.bqt-member-status { font-size: var(--awd-panel-fs-meta); color: var(--awd-accent-text); }
+.bqt-member-status.is-expired { color: var(--awd-danger-text); }
+.bqt-member-warn { font-size: var(--awd-panel-fs-meta); color: var(--awd-danger-text); }
 .wallet-recharge-btn {
   margin-top: 4px;
   align-self: flex-start;

@@ -8,8 +8,10 @@
         <span class="recharge-subtitle">{{ $t('admin.rechargeSubtitle') }}</span>
       </div>
       <div class="awd-body">
+        <!-- 包晴天积分通道：余额由包晴天积分折算，只能在包晴天 App 充值/续费 -->
+        <span v-if="bqtOnly" class="recharge-hint">{{ $t('admin.bqtRechargeNote') }}</span>
         <!-- 步骤一：选金额 -->
-        <template v-if="step === 'pick'">
+        <template v-else-if="step === 'pick'">
           <span class="recharge-label">{{ $t('admin.rechargeAmountLabel') }}</span>
           <div class="recharge-presets">
             <div
@@ -67,7 +69,7 @@
       <div class="awd-footer">
         <div class="awd-btn awd-btn-secondary" @click="close">{{ $t('common.close') }}</div>
         <div
-          v-if="step === 'pick'"
+          v-if="step === 'pick' && !bqtOnly"
           class="awd-btn awd-btn-primary"
           :class="{ 'awd-btn-disabled': submitting }"
           @click="submit"
@@ -85,7 +87,8 @@
 //
 // 轮询清理红线（本仓踩过：Stripe 回跳轮询被 cleanup 掐死）：定时器句柄存在组件实例上，
 // beforeUnmount 与「关闭弹窗」都只清**自己的**定时器，不写任何全局 [open] 态互斥逻辑。
-import { createAccountRecharge, getRechargeStatus } from '@/services/api.js'
+import { createAccountRecharge, getRechargeStatus, getAccountBalance } from '@/services/api.js'
+import { isBqtBillingLine } from '@/utils/bqtBilling.js'
 import { siteLinks } from '@/utils/siteLinks.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 
@@ -115,6 +118,7 @@ export default {
       outTradeNo: '',
       amountCents: 0,
       pollTimedOut: false,
+      bqtOnly: false,
     }
   },
   computed: {
@@ -150,6 +154,7 @@ export default {
       handler(v) {
         if (v) {
           this.resetState()
+          this.checkBillingLine()
         } else {
           // 弹窗被宿主关掉（v-model）也要停轮询——只清自己的定时器
           this.stopPolling()
@@ -173,6 +178,16 @@ export default {
       this.amountCents = 0
       this.pollTimedOut = false
     },
+    // 包晴天积分通道的账户不在本应用充值：打开时问一次余额端点（后端带缓存），
+    // 失败或旧后端没有 billingLine 就保持原有充值流程
+    async checkBillingLine() {
+      try {
+        const balance = await getAccountBalance()
+        if (this.visible) this.bqtOnly = isBqtBillingLine(balance)
+      } catch (e) {
+        // 查不到不改变原有行为
+      }
+    },
     pickPreset(cents) {
       this.selectedCents = cents
       this.customInput = ''
@@ -188,7 +203,7 @@ export default {
       return Math.round(yuan * 100)
     },
     async submit() {
-      if (this.submitting) return
+      if (this.submitting || this.bqtOnly) return
       let cents = this.selectedCents
       if (this.customInput.trim()) {
         const parsed = this.parseCustomCents(this.customInput)

@@ -837,6 +837,69 @@ class AccountServiceTest {
     }
 
     @Test
+    @DisplayName("balance：包晴天积分通道透传 billingLine 与 bqtMember")
+    void balanceSnapshotPassesBqtMember() {
+        AccountService service = connected();
+        transport.enqueue(200, "{\"balanceCents\":12345,\"plan\":\"pro\",\"billingLine\":\"bqt\","
+                + "\"bqtMember\":{\"points\":\"1234.5\",\"cents\":12345,\"outstandingCents\":0,\"failedCount\":0,"
+                + "\"centsPerPoint\":10,\"levelCode\":\"GROWTH\",\"status\":\"ACTIVE\",\"aiWorkbench\":true,"
+                + "\"expireAt\":\"2027-01-01T00:00:00Z\",\"fetchedAt\":\"2026-11-05T00:00:00Z\",\"rechargeAllowed\":false}}");
+        transport.enqueue(200, "{}");
+
+        Map<String, Object> result = service.balanceSnapshot();
+
+        assertEquals("bqt", result.get("billingLine"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> member = (Map<String, Object>) result.get("bqtMember");
+        assertEquals("GROWTH", member.get("levelCode"));
+        assertEquals("1234.5", member.get("points"));
+        assertEquals(12345, member.get("cents"));
+    }
+
+    @Test
+    @DisplayName("balance：旧官网没有 billingLine 时记 standard、bqtMember 为 null")
+    void balanceSnapshotDefaultsToStandardLine() {
+        AccountService service = connected();
+        transport.enqueue(200, "{\"balanceCents\":500,\"plan\":\"free\",\"bqtMember\":{\"points\":\"1\"}}");
+        transport.enqueue(200, "{}");
+        Map<String, Object> result = service.balanceSnapshot();
+        assertEquals("standard", result.get("billingLine"));
+        assertTrue(result.containsKey("bqtMember"));
+        assertNull(result.get("bqtMember"));
+    }
+
+    @Test
+    @DisplayName("包晴天拒绝码：403 不判凭据失效，充值端点回 bqt_recharge_via_bqt 带 reason")
+    void bqtRefusalsDoNotExpireTheAccount() {
+        AccountService service = connected();
+        transport.enqueue(403, "{\"error\":\"bqt_member_invalid\"}");
+        AccountException e = assertThrows(AccountException.class, service::fetchProfile);
+        assertEquals(AccountException.Kind.REJECTED, e.getKind());
+        assertEquals("bqt_member_invalid", e.getReason());
+        assertTrue(service.isConnected(), "会员失效不是 Key 失效，账户必须保持连接");
+
+        transport.enqueue(403, "{\"error\":\"bqt_recharge_via_bqt\"}");
+        AccountException recharge = assertThrows(AccountException.class,
+                () -> service.createRecharge(5000, "idem"));
+        assertEquals("bqt_recharge_via_bqt", recharge.getReason());
+
+        transport.enqueue(402, "{\"error\":\"bqt_insufficient_points\"}");
+        AccountException key = assertThrows(AccountException.class, service::fetchAiKey);
+        assertEquals("bqt_insufficient_points", key.getReason());
+        assertTrue(service.isConnected());
+    }
+
+    @Test
+    @DisplayName("包晴天拒绝码能从模型网关的异常链里认出来")
+    void bqtCodeFoundInErrorChain() {
+        RuntimeException err = new RuntimeException("stream failed", new RuntimeException(
+                "{\"error\":{\"code\":\"bqt_ai_closed\",\"message\":\"AI closed\"}}"));
+        assertEquals("bqt_ai_closed", BqtBilling.errorCodeIn(err));
+        assertNull(BqtBilling.errorCodeIn(new RuntimeException("status code: 402 insufficient credits")));
+        assertNull(BqtBilling.errorCodeIn("xbqt_ai_closed_y"));
+    }
+
+    @Test
     @DisplayName("balance：TTL 窗口内重复调用不再打官网——profile 60 秒、membership 10 分钟")
     void balanceSnapshotCachesWithinTtl() {
         AccountService service = connected();

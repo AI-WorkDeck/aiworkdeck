@@ -102,6 +102,7 @@ public class GlobalExceptionHandler {
             result.put("reason", com.checkba.service.account.AccountRequired.REASON_GATEWAY);
         }
         result.put("gatewayKind", e.getKind().name());
+        if (e.getReason() != null) result.put("reason", e.getReason());
         result.put("canUseOwnKey", e.suggestsByok());
         result.put("message", e.getMessage());
         return ResponseEntity.ok().body(result);

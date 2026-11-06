@@ -336,6 +336,8 @@ public class AccountService {
         if (reply.networkFailure()) {
             throw networkError();
         }
+        String bqtCode = reply.status() >= 400 ? businessErrorCode(reply.body()) : null;
+        if (bqtCode != null && BqtBilling.ERROR_CODES.contains(bqtCode)) throw BqtBilling.rejected(bqtCode);
         if (reply.status() == 409) {
             String code = str(parse(reply.body()).get("error"));
             // 文案红线：不得含「登录」「未授权」「请先」——api.js 用这三个子串判掉线并清会话
@@ -612,6 +614,10 @@ public class AccountService {
         if (reply.networkFailure()) {
             throw networkError();
         }
+        String bqtCode = reply.status() >= 400 ? businessErrorCode(reply.body()) : null;
+        if (bqtCode != null && BqtBilling.ERROR_CODES.contains(bqtCode)) {
+            throw new SkuPurchaseException(AccountException.Kind.CONFLICT, bqtCode, BqtBilling.message(bqtCode));
+        }
         if (reply.status() == 400 || reply.status() == 409) {
             String code = str(parse(reply.body()).get("error"));
             // 文案红线：不得含「登录」「未授权」「请先」——api.js 曾用这三个子串判掉线
@@ -688,6 +694,7 @@ public class AccountService {
         if (profile.get("bqtQingtian") != null) {
             result.put("bqtQingtian", profile.get("bqtQingtian"));
         }
+        BqtBilling.copyBillingFields(profile, result);
         Map<String, Object> membership = null;
         try {
             membership = cachedMembershipSummary(owner);
@@ -1312,6 +1319,11 @@ public class AccountService {
 
     private Map<String, Object> handle(AccountTransport.Reply reply, String path) {
         int status = reply.status();
+        if (status >= 400) {
+            // 包晴天积分通道的业务拒绝（含 403 会员失效）：凭据有效，不能落到下面 403 的掉线分支
+            String bqtCode = businessErrorCode(reply.body());
+            if (bqtCode != null && BqtBilling.ERROR_CODES.contains(bqtCode)) throw BqtBilling.rejected(bqtCode);
+        }
         if (status == 401 && path.startsWith("/api/skills")) {
             // 投稿端点：官网尚未部署「Bearer 投稿」时一律 401。这不能说明 Key 失效——
             // 判成 UNAUTHORIZED 会把一把好 Key 标成过期、整个账户掉线。账户真失效由其它端点发现。

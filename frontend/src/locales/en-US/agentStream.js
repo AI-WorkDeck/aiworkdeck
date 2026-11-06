@@ -77,4 +77,11 @@ export default {
   // Artifact fallback file names
   taskListArtifact: 'Task List',
   planArtifact: 'Plan',
+  "bqtMemberInvalid": "Your Baoqingtian membership is no longer active. Renew it in the Baoqingtian app and try again.",
+  "bqtAiClosed": "Your Baoqingtian membership is active, but the AI workbench is switched off in Baoqingtian. Turn it on in the Baoqingtian app and try again.",
+  "bqtModelNotAllowed": "Baoqingtian lawyer accounts can only use DeepSeek models. Switch to a DeepSeek model and try again.",
+  "bqtInsufficientPoints": "Not enough Baoqingtian points. Recharge points in the Baoqingtian app and try again.",
+  "bqtOutstandingDebt": "A previous points deduction failed. Recharge points in the Baoqingtian app, then contact support.",
+  "bqtUnavailable": "The Baoqingtian service is temporarily unavailable. Please try again later.",
+  "bqtRechargeViaBqt": "Baoqingtian members recharge or renew in the Baoqingtian app; AI WorkDeck does not take payments for this account.",
 }

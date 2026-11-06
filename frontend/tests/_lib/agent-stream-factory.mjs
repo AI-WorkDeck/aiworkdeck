@@ -17,6 +17,7 @@ import { nextBubbleId } from '../../src/composables/bubbleId.js'
 import { documentEditedFromProcesses } from '../../src/utils/useInDocumentVisibility.js'
 import { isSameFileChange } from '../../src/utils/chatFileChange.js'
 import { isAccountRequired, isCreditsRequired } from '../../src/utils/requireAccountCore.js'
+import { bqtErrorCode, bqtErrorMessage } from '../../src/utils/bqtBilling.js'
 import { createLegacyAskUserMarkup } from '../../src/composables/legacyAskUserMarkup.mjs'
 import { isUserQuestionAwaiting } from '../../src/composables/awaitingInput.mjs'
 
@@ -58,6 +59,8 @@ const DEPS = {
   createLegacyAskUserMarkup,
   isAccountRequired,
   isCreditsRequired,
+  bqtErrorCode,
+  bqtErrorMessage,
 }
 
 /**

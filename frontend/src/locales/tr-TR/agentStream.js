@@ -58,5 +58,12 @@ export default {
   "pdfExportTooLargeError": "Dışa aktarılan PDF {mb}MB sınırını aşıyor ve YZ aracılığıyla projeye kaydedilemiyor; lütfen bunun yerine \"Dosya -> PDF olarak dışa aktar\" seçeneğini kullanın",
   "systemOperation": "Sistem eylemleri",
   "taskListArtifact": "Görev Listesi",
-  "planArtifact": "Çalışma Planı"
+  "planArtifact": "Çalışma Planı",
+  "bqtMemberInvalid": "Baoqingtian üyeliğiniz artık aktif değil. Baoqingtian uygulamasında yenileyin ve tekrar deneyin.",
+  "bqtAiClosed": "Baoqingtian üyeliğiniz aktif, ancak AI çalışma alanı Baoqingtian'de kapalı. Baoqingtian uygulamasında açın ve tekrar deneyin.",
+  "bqtModelNotAllowed": "Baoqingtian avukat hesapları yalnızca DeepSeek modellerini kullanabilir. Bir DeepSeek modeline geçip tekrar deneyin.",
+  "bqtInsufficientPoints": "Yeterli Baoqingtian puanı yok. Baoqingtian uygulamasından puan yükleyin ve tekrar deneyin.",
+  "bqtOutstandingDebt": "Önceki bir puan kesintisi başarısız oldu. Baoqingtian uygulamasından puan yükleyin, ardından destekle iletişime geçin.",
+  "bqtUnavailable": "Baoqingtian hizmeti geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
+  "bqtRechargeViaBqt": "Baoqingtian üyeleri Baoqingtian uygulamasında yükleme yapar veya yeniler; AI WorkDeck bu hesap için ödeme almaz.",
 }

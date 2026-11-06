@@ -1619,6 +1619,12 @@ The mobile capability endpoint passes the authenticated user through the existin
 
 验证：frontend/tests/account/bqt-poll.test.mjs 的缺 proof/串行/迟到结果保护；AccountServiceTest 校验 proof 透传、缺值拒绝。真实上游扫码需原位生产凭据和显式启用后另验。
 
+## 包晴天积分通道（billingLine=bqt）
+
+官网是余额与扣点权威。`/api/account/me` 的 `billingLine`（bqt|circle|standard）与 `bqtMember` 由 `BqtBilling.copyBillingFields` 透传到 `/api/account/balance` 与 `/api/account/usage` 的 platform 段；旧官网缺省记 standard/null，非 bqt 线一律不透 bqtMember。有 bqtMember 时设置页会员卡（`AdminPane` 的 `walletBqtMember`）取代旧 `bqtQingtian` 晴天币块；`isBqtBilling` 隐藏充值按钮、兑换码、Pro 订阅/管理按钮，改显示「请在包晴天 App 充值/续费」；`RechargeDialog` 打开时查一次余额，bqt 线只显示说明、不建单（覆盖 requireRecharge 自动弹层与写作宿主入口）。
+
+错误码 `bqt_member_invalid/ai_closed/insufficient_points/outstanding_debt/unavailable/recharge_via_bqt` 是业务态：`AccountService.handle`/ai-key/purchase 转 REJECTED（或 SkuPurchaseException）+ reason；`PlatformGatewayClient` 在状态码分类前识别（否则 403 会被判 UNAUTHORIZED 并标账户失效），带 `reason` 出信封；`AgentOrchestrator` onError 沿异常链认码后直接终态，不重试、不换模型、不转 no_credits。前端 `utils/bqtBilling.js` 与 `api.js`（内联同一规则，因 request() 被测试按源码注入）按 reason 取 `agentStream.bqt*` 20 语种文案。验证：`AccountServiceTest`、`PlatformGatewayClientTest`、`tests/account/bqt-billing.test.mjs`、`tests/project-home/network-unreachable-notice.test.mjs`。
+
 ## 云按量账务与后付费（dev-board#1701/#1703，默认关闭）
 
 `CloudStorageQuotaService` 将订阅身份和云能力分开：`subscriptionQuota` 只回答真实订阅权益，`canUse/canRead/canWrite` 来自官网 cloud-state。HTTP新增云写入必须带当前 `X-Cloud-Epoch`；`lockProjectForWrite` 本身只加锁和记录容量变动，删除不能被新增写入闸挡住。新增用户可见计费文本统一 `CloudBillingText` 与 `resources/i18n/cloud-billing.json`（20语种）。

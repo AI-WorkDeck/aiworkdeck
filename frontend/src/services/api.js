@@ -410,8 +410,13 @@ async function request(options) {
             err.usage = res.data.usage || null;
             reject(err);
           } else {
-            // 业务失败：code=1 或其他非0值
-            const errorMessage = res.data.message || t('common.serviceErrorRetryLater')
+            // 业务失败：code=1 或其他非0值。包晴天积分通道的拒绝（reason=bqt_*）按界面语言换成
+            // 「去包晴天 App 处理」的提示，后端文案只有中英两种。码表与词条名同 utils/bqtBilling.js；
+            // 这里内联是因为 request() 被多处测试按源码注入依赖求值，不再引新模块
+            const bqtReason = /^bqt_(?:member_invalid|ai_closed|insufficient_points|outstanding_debt|unavailable|model_not_allowed|recharge_via_bqt)$/.test(res.data.reason || '')
+              ? res.data.reason : ''
+            const errorMessage = (bqtReason && t('agentStream.' + bqtReason.replace(/_([a-z])/g, (_, c) => c.toUpperCase())))
+              || res.data.message || t('common.serviceErrorRetryLater')
             console.error('业务错误:', {
               code: res.data.code,
               message: errorMessage,
