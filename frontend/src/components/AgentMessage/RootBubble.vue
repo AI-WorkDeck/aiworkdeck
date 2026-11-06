@@ -20,7 +20,7 @@
               @reading-interaction="emit('reading-interaction')"
             />
             <div v-else-if="entry.type === 'title'" class="stream-title">{{ bubble.title }}</div>
-            <section v-else-if="entry.type === 'execution' || entry.type === 'plan'" class="activity-entry">
+            <section v-else-if="entry.type === 'execution' || entry.type === 'plan'" class="activity-entry" :class="{ 'activity-entry--plan': entry.type === 'plan' }">
               <button type="button" class="activity-summary" :class="{ 'is-working': isActive(entry, index), 'has-error': hasError(entry) }"
                 :aria-expanded="isExpanded(entry, index)" @click="toggleEntry(entry, index)">
                 <span>{{ activityLabel(entry, index) }}</span>
@@ -280,14 +280,19 @@ const runningTool = entry => {
 const timeline = computed(() => visibleChatTimeline(props.bubble))
 const entryToggles = ref({})
 const isActive = (entry, index) => isTimelineEntryActive(entry, index, timeline.value, props.bubble.isStreaming)
+// The plan stays open while its steps are still running and folds to「计划 · n/n」once the turn ends.
+// It does not take the working highlight: that belongs to the step actually executing.
+const opensByDefault = (entry, index) => entry.type === 'plan'
+  ? !!props.bubble.isStreaming && entry.data.some(todo => todo.status === 'pending' || todo.status === 'in_progress')
+  : isActive(entry, index)
 const isExpanded = (entry, index) => {
-  const active = isActive(entry, index)
+  const open = opensByDefault(entry, index)
   const override = entryToggles.value[entry.key]
-  return override && override.active === active ? override.expanded : active
+  return override && override.active === open ? override.expanded : open
 }
 const toggleEntry = (entry, index) => {
   emit('reading-interaction')
-  entryToggles.value = { ...entryToggles.value, [entry.key]: { active: isActive(entry, index), expanded: !isExpanded(entry, index) } }
+  entryToggles.value = { ...entryToggles.value, [entry.key]: { active: opensByDefault(entry, index), expanded: !isExpanded(entry, index) } }
 }
 const hasError = entry => entry.type === 'execution' && entry.procs.some(proc => (proc.items || []).some(item => item.status === 'error'))
 const activityLabel = (entry, index) => {

@@ -125,13 +125,17 @@ const otherInput = ref(null)
 // 同一张卡只发一次：uni 的 input 可能同时派发 confirm 与 keydown，按钮也可能被连点
 const sent = ref(false)
 
-// 换了一个问题（新一轮 ask_user 覆盖了这张卡）就清掉上一问的草稿
-watch(() => [props.questionId, props.text], () => {
+function resetDraft() {
   chosen.value = []
   otherOpen.value = false
   otherText.value = ''
   sent.value = false
-})
+}
+// 换了一个问题（新一轮 ask_user 覆盖了这张卡）就清掉上一问的草稿
+watch(() => [props.questionId, props.text], resetDraft)
+// 同一问重新变得可答（回退了那条回答、或重新载入同一会话）：上次的「已发送」闩不能留着，
+// 否则选项看着能点、点了什么也不发生
+watch(() => props.actionable, now => { if (now) resetDraft() })
 
 function isChosen(i) {
   if (!props.actionable) {
