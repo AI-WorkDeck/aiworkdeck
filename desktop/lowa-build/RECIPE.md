@@ -1,6 +1,33 @@
 # zh-CN LOWA engine rebuild recipe (with tooltip-CJK fix) — issue #66
 
 
+
+## r8 (2026-11-06) — dark page: explicit dark text, ruler, scrollbars (tutorial ep 18)
+
+r7 (= the r7b tooltip-input candidate) plus four source patches in `apply-source-patches.py`:
+`patch_dark_page_text` (Writer `fntcache.cxx`, Calc `patattr.cxx`: on screen only, explicit text with
+luminance < 64 over a dark background draws white; print/PDF/document unchanged), `patch_dark_ruler`
+(`svtools` ruler draws its VirtualDevice with a local dark StyleSettings when AppBackground is dark) and
+`patch_dark_scrollbars` (`vcl/qt5` scrollbar QStyleOption palette when `ApplicationAppearance`=2, which
+`set_app_theme` now writes). Core/Qt/toolchain pins unchanged.
+
+Built 2026-11-06 07:22–07:57 UTC on Singapore `ecs.c9i.16xlarge` (ap-southeast-1d), artifacts relayed
+through the Singapore lightweight server (direct download ran at ~15 KB/s). All temporary resources
+(instance, VPC, vSwitch, security group, key pair) were deleted and the deletion re-checked by tag.
+
+The first r8 candidate (built 06:16–06:50 UTC) used `Color::IsDark()` for the text colour; 24.2's
+threshold is luminance <= 156, so pure red (76) was whitened. `dark-page.mjs` caught it; this build uses
+luminance < 64. That candidate was never published.
+
+| File | Bytes | SHA-256 |
+|---|---:|---|
+| soffice.js | 858359 | `5a8b4cc2218c40dfe1d41b9f26df85496b9e1ad7e862b32d8daa9c9212f8dd06` |
+| soffice.wasm | 161691505 | `59acc694f30993c7909f1d6411f3e64b16690cc736ac058bb1b7f175e6ea9956` |
+| soffice.data | 56494002 | `1d2645c919910e5cadfe383eedb1bdca67b27a232d90916aac71d592d0ced5e4` |
+| soffice.data.js.metadata | 207339 | `871e91a4ef63866b518b559f4e3fdbedb59dcca418c56b5d60fb74d0d2b62945` |
+
+Validation: `frontend/tests/lowa-e2e/dark-page.mjs` 12/12 on r8 (r7: the four engine-patch checks fail as
+expected); full suite results recorded in the PR.
 ## r7b candidate (2026-10-26) — real tooltip input transparency (#1515)
 
 This follow-up retains the r7 header palette/font and input-clock fixes below,

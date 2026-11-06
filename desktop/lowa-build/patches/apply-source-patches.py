@@ -14,6 +14,9 @@
 #     pruning (--slim-dictionaries).
 #  9. Calc row/column header UI font and local palette (#1509).
 # 10. Preserve real tooltip input transparency on WASM (#1515).
+# 11. Dark page: explicit dark text is drawn light on screen (Writer/Calc).
+# 12. Dark ruler follows the dark page (local StyleSettings on the ruler's VirtualDevice).
+# 13. Dark Qt scrollbars when ApplicationAppearance is dark (per-draw QStyleOption palette).
 import argparse
 import glob
 import os
@@ -1372,6 +1375,181 @@ def patch_calc_header_chrome(core):
     )
 
 
+# ---- Dark page: explicit dark text stays readable on screen -----------------
+def patch_dark_page_text(core):
+    # Original targets: LibreOffice core dced3bc711d18407a2cc2400eb46e8261b663d95,
+    # sw/source/core/txtnode/fntcache.cxx and sc/source/core/data/patattr.cxx
+    # (MPL-2.0; original license headers retained). Keep this standalone: the
+    # build VM receives this script without the repo.
+    # 深色纸面（DocColor 变暗）时，LO 只把「自动」颜色的字改成白色；Word/Excel 文件里
+    # 大量显式黑色（w:color 000000、主题色 dk1）会变成黑底黑字。这里只在屏幕绘制、且字
+    # 真的很暗（亮度 < 64：黑、深灰、藏青）而它所在的底色也偏暗时改画白色。字色不能用
+    # Color::IsDark()：24.2 的阈值是亮度 <= 156，纯红（76）也算「暗」，红字会被刷成白字
+    # （r8 首版实测，dark-page.mjs「红字仍是红色」抓到）。浅色纸面、打印、PDF 与文档内容不受影响。
+    writer = f'{core}/sw/source/core/txtnode/fntcache.cxx'
+    patch(
+        writer,
+        '        bChgFntColor = COL_AUTO == rFnt.GetColor() || bChgLineColor;\n'
+        '\n'
+        '        if ( bChgFntColor )\n'
+        '        {\n',
+        '        bChgFntColor = COL_AUTO == rFnt.GetColor() || bChgLineColor;\n'
+        '\n'
+        '        // AI WorkDeck: dark page. Explicit dark text over a dark background is\n'
+        '        // drawn white on screen only; light pages, print and export are unchanged.\n'
+        '        const bool bDarkExplicit = !bChgFntColor && pVSh && bOutputToWindow\n'
+        '            && aGlobalRetoucheColor.IsDark() && rFnt.GetColor().GetLuminance() < 64;\n'
+        '\n'
+        '        if ( bChgFntColor || bDarkExplicit )\n'
+        '        {\n',
+        'Writer dark page explicit text (scope)',
+    )
+    patch(
+        writer,
+        '            if (pVSh && bOutputToWindow)\n'
+        '            {\n'
+        '                // here we determine the preferred window text color for painting\n',
+        '            if (bDarkExplicit)\n'
+        '            {\n'
+        '                if (pCol->IsDark())\n'
+        '                {\n'
+        '                    nNewColor = COL_WHITE;\n'
+        '                    bChgFntColor = true;\n'
+        '                }\n'
+        '            }\n'
+        '            else if (pVSh && bOutputToWindow)\n'
+        '            {\n'
+        '                // here we determine the preferred window text color for painting\n',
+        'Writer dark page explicit text (color)',
+    )
+    patch(
+        writer,
+        '            Color aTmpColor( nNewColor );\n'
+        '            if ( pCol->IsDark() && aTmpColor.IsDark() )\n',
+        '            Color aTmpColor( nNewColor );\n'
+        '            if ( bDarkExplicit )\n'
+        '            {\n'
+        '                // decided above\n'
+        '            }\n'
+        '            else if ( pCol->IsDark() && aTmpColor.IsDark() )\n',
+        'Writer dark page explicit text (contrast)',
+    )
+    calc = f'{core}/sc/source/core/data/patattr.cxx'
+    patch(
+        calc,
+        '            aColor = aSysTextColor;\n'
+        '        }\n'
+        '    }\n'
+        '    aComplexColor.setFinalColor(aColor);\n',
+        '            aColor = aSysTextColor;\n'
+        '        }\n'
+        '    }\n'
+        '    // AI WorkDeck: dark page. On screen only (Display), explicit dark text over\n'
+        '    // a dark cell or page background is drawn white; Print/PDF keep the file color.\n'
+        '    else if (eAutoMode == ScAutoFontColorMode::Display && aColor.GetLuminance() < 64)\n'
+        '    {\n'
+        '        const SvxBrushItem* pBack = pCondSet ? pCondSet->GetItemIfSet(ATTR_BACKGROUND) : nullptr;\n'
+        '        Color aBackColor = (pBack ? pBack : &rItemSet.Get(ATTR_BACKGROUND))->GetColor();\n'
+        '        if (aBackColor == COL_TRANSPARENT)\n'
+        '            aBackColor = pBackConfigColor ? *pBackConfigColor\n'
+        '                : SC_MOD()->GetColorConfig().GetColorValue(svtools::DOCCOLOR).nColor;\n'
+        '        if (aBackColor.IsDark())\n'
+        '            aColor = COL_WHITE;\n'
+        '    }\n'
+        '    aComplexColor.setFinalColor(aColor);\n',
+        'Calc dark page explicit text',
+    )
+
+
+# ---- Dark ruler: follow the dark page (tutorial ep 18) ----------------------
+def patch_dark_ruler(core):
+    # Original target: LibreOffice core dced3bc711d18407a2cc2400eb46e8261b663d95,
+    # svtools/source/control/ruler.cxx (MPL-2.0; original license header retained).
+    # 深色纸面时标尺仍是浅色一条（Qt WASM 的调色板固定浅色，运行时改 ApplicationAppearance
+    # 无效，2026-11-05 无头实测）。同 Calc 行列标题补丁的路数：以 AppBackground 判深浅，
+    # 只给标尺的离屏设备换一份局部 StyleSettings，不改全局调色板；浅色、高对比走原路径。
+    target = f'{core}/svtools/source/control/ruler.cxx'
+    patch(
+        target,
+        '    const StyleSettings& rStyleSettings = rRenderContext.GetSettings().GetStyleSettings();\n'
+        '    tools::Long    nP1;            // pixel position of Page1\n',
+        '    // AI WorkDeck: dark ruler. design/tokens/awd-palette.json roles.dark.\n'
+        '    if (!rRenderContext.GetSettings().GetStyleSettings().GetHighContrastMode()\n'
+        '        && svtools::ColorConfig().GetColorValue(svtools::APPBACKGROUND).nColor.IsDark())\n'
+        '    {\n'
+        '        AllSettings aRulerSettings(GetSettings());\n'
+        '        StyleSettings aRulerStyle(aRulerSettings.GetStyleSettings());\n'
+        '        aRulerStyle.SetWindowColor(Color(0x221F1A));     // surface: text area\n'
+        '        aRulerStyle.SetDialogColor(Color(0x191713));     // bg: margins\n'
+        '        aRulerStyle.SetFaceColor(Color(0x2B2721));       // surface-2\n'
+        '        aRulerStyle.SetLightColor(Color(0x363129));      // surface-3\n'
+        '        aRulerStyle.SetShadowColor(Color(0x3D372E));     // border\n'
+        '        aRulerStyle.SetDarkShadowColor(Color(0xB0AA9C)); // text-2: ticks, indents\n'
+        '        aRulerStyle.SetWorkspaceColor(Color(0x141210));  // canvas\n'
+        '        aRulerSettings.SetStyleSettings(aRulerStyle);\n'
+        '        maVirDev->SetSettings(aRulerSettings);\n'
+        '        maVirDev->SetTextColor(Color(0xB0AA9C));         // text-2: numbers\n'
+        '    }\n'
+        '    else\n'
+        '    {\n'
+        '        maVirDev->SetSettings(GetSettings());\n'
+        '        maVirDev->SetTextColor(GetTextColor());\n'
+        '    }\n'
+        '    const StyleSettings& rStyleSettings = maVirDev->GetSettings().GetStyleSettings();\n'
+        '    tools::Long    nP1;            // pixel position of Page1\n',
+        'Dark ruler palette',
+    )
+
+# ---- Dark scrollbars: follow the dark page (tutorial ep 18) -----------------
+def patch_dark_scrollbars(core):
+    # Original target: LibreOffice core dced3bc711d18407a2cc2400eb46e8261b663d95,
+    # vcl/qt5/QtGraphics_Controls.cxx (MPL-2.0; original license header retained).
+    # Qt WASM 的调色板固定浅色，深色纸面两侧仍是浅色滚动条。vcl 不能依赖 svtools 的
+    # ColorConfig，这里读 vcl 自己的 MiscSettings::GetAppColorMode()（officecfg
+    # Common/Misc/ApplicationAppearance，2 = 深色；宿主 set_app_theme 同步写这个键），
+    # 只改这一次绘制的 QStyleOption 调色板，不改 QApplication 全局调色板。
+    target = f'{core}/vcl/qt5/QtGraphics_Controls.cxx'
+    patch(
+        target,
+        '#include <vcl/decoview.hxx>\n',
+        '#include <vcl/decoview.hxx>\n#include <vcl/settings.hxx>\n',
+        'Dark scrollbars include',
+    )
+    patch(
+        target,
+        '            draw(QStyle::CC_ScrollBar, option, m_image.get(), rBackgroundColor,\n',
+        '            // AI WorkDeck: dark scrollbars (design/tokens/awd-palette.json roles.dark).\n'
+        '            if (MiscSettings::GetAppColorMode() == 2)\n'
+        '            {\n'
+        '                option.palette.setColor(QPalette::Window, QColor(0x19, 0x17, 0x13)); // bg\n'
+        '                option.palette.setColor(QPalette::Base, QColor(0x19, 0x17, 0x13));\n'
+        '                option.palette.setColor(QPalette::Button, QColor(0x36, 0x31, 0x29)); // surface-3: handle\n'
+        '                option.palette.setColor(QPalette::Light, QColor(0x4A, 0x44, 0x3A));\n'
+        '                option.palette.setColor(QPalette::Midlight, QColor(0x3D, 0x37, 0x2E));\n'
+        '                option.palette.setColor(QPalette::Mid, QColor(0x3D, 0x37, 0x2E));    // border\n'
+        '                option.palette.setColor(QPalette::Dark, QColor(0x2B, 0x27, 0x21));\n'
+        '                option.palette.setColor(QPalette::Shadow, QColor(0x0A, 0x09, 0x08));\n'
+        '                option.palette.setColor(QPalette::ButtonText, QColor(0xB0, 0xAA, 0x9C)); // text-2: arrows\n'
+        '                option.palette.setColor(QPalette::WindowText, QColor(0xB0, 0xAA, 0x9C));\n'
+        '            }\n'
+        '            draw(QStyle::CC_ScrollBar, option, m_image.get(), rBackgroundColor,\n',
+        'Dark scrollbars palette',
+    )
+    patch(
+        target,
+        '                m_image->fill(QApplication::palette().color(QPalette::Window).rgb());\n'
+        '                break;\n'
+        '            }\n'
+        '            [[fallthrough]]; // Qt::transparent\n',
+        '                m_image->fill(MiscSettings::GetAppColorMode() == 2\n'
+        '                    ? QColor(0x19, 0x17, 0x13).rgb() // AI WorkDeck: dark scrollbar track (bg)\n'
+        '                    : QApplication::palette().color(QPalette::Window).rgb());\n'
+        '                break;\n'
+        '            }\n'
+        '            [[fallthrough]]; // Qt::transparent\n',
+        'Dark scrollbars track',
+    )
+
 # ---- WASM tooltip input transparency (#1515) --------------------------------
 def patch_wasm_tooltip_input(core):
     # HelpTextWindow is already mouse-transparent in VCL. Preserve that intent
@@ -1490,6 +1668,9 @@ def main(argv=None):
     patch_word_count_and_outline_values(CORE)
     patch_calc_header_chrome(CORE)
     patch_wasm_tooltip_input(CORE)
+    patch_dark_page_text(CORE)
+    patch_dark_ruler(CORE)
+    patch_dark_scrollbars(CORE)
 
     if args.slim_dictionaries or os.path.isdir(f'{CORE}/instdir/share/extensions'):
         slim_dictionaries(CORE, keep_langs=keep_langs)
