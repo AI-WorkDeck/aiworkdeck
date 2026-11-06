@@ -19,8 +19,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/AI-WorkDeck/aiworkdeck/releases/latest"><img src="https://img.shields.io/github/v/release/AI-WorkDeck/aiworkdeck?filter=v*" alt="Latest release"></a>
-  <a href="https://github.com/AI-WorkDeck/aiworkdeck/releases"><img src="https://img.shields.io/github/downloads/AI-WorkDeck/aiworkdeck/total" alt="Downloads"></a>
+  <a href="https://github.com/AI-WorkDeck/aiworkdeck/releases/latest"><img src="https://img.shields.io/github/v/release/AI-WorkDeck/aiworkdeck?filter=v*&cacheSeconds=3600" alt="Latest release"></a>
   <a href="https://github.com/AI-WorkDeck/aiworkdeck/stargazers"><img src="https://img.shields.io/github/stars/AI-WorkDeck/aiworkdeck" alt="GitHub stars"></a>
   <a href="https://github.com/AI-WorkDeck/aiworkdeck/actions/workflows/ci.yml"><img src="https://github.com/AI-WorkDeck/aiworkdeck/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
   <a href="legal/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="AGPL-3.0-or-later"></a>
