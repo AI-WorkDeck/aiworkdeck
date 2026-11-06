@@ -38,14 +38,17 @@
         <view class="awd-header"><text class="awd-title">{{ $t('version.nameSessionTitle') }}</text></view>
         <view class="awd-body">
           <text class="session-help">{{ $t(cloudLinked && !onDraft ? 'version.commitCloudHelp' : 'version.commitLocalHelp') }}</text>
-          <input
-            v-model="title"
-            class="awd-input"
-            :disabled="busy"
-            :placeholder="$t('version.sessionNamePlaceholder')"
-            :focus="true"
-            @keydown.enter="onTitleEnter"
-          />
+          <view class="title-row">
+            <input
+              v-model="title"
+              class="awd-input title-input"
+              :disabled="busy || suggesting"
+              :placeholder="$t('version.sessionNamePlaceholder')"
+              :focus="true"
+              @keydown.enter="onTitleEnter"
+            />
+            <component :is="'button'" type="button" class="session-btn suggest-btn" :disabled="busy || suggesting" @click="suggestTitle">{{ $t(suggesting ? 'version.suggestingTitle' : 'version.suggestTitle') }}</component>
+          </view>
         </view>
         <view class="awd-footer">
           <view class="awd-btn awd-btn-secondary" :aria-disabled="busy" @tap="!busy && (naming = false)">{{ $t('common.cancel') }}</view>
@@ -58,7 +61,7 @@
 
 <script>
 import {
-  endWorkSession, discardWorkSession,
+  endWorkSession, discardWorkSession, suggestSessionTitle,
   switchToMainline, adoptDraft, abandonDraft,
 } from '@/services/api.js'
 
@@ -73,13 +76,28 @@ export default {
   },
   emits: ['ended', 'discarded', 'mainline-resumed', 'draft-adopted', 'draft-abandoned'],
   data() {
-    return { naming: false, title: '', busy: false }
+    return { naming: false, title: '', busy: false, suggesting: false }
   },
   inject: ['projectId'],
   methods: {
     openNaming() {
       this.title = ''
       this.naming = true
+    },
+    // 先保存打开的文件，摘要才包含还没落盘的改动；生成结果只填进输入框，律师可改可删
+    async suggestTitle() {
+      if (this.busy || this.suggesting) return
+      this.suggesting = true
+      try {
+        if (this.beforeCommit && await this.beforeCommit() === false) return
+        const res = await suggestSessionTitle(this.projectId)
+        const title = (res && res.data && res.data.title) || ''
+        if (title && this.naming) this.title = title
+      } catch (e) {
+        uni.showToast({ title: (e && e.message) || this.$t('version.suggestTitleFailed'), icon: 'none' })
+      } finally {
+        this.suggesting = false
+      }
     },
     // 回车提交；输入法选词时的回车（isComposing / keyCode 229）不算
     onTitleEnter(e) {
@@ -140,7 +158,7 @@ export default {
       })
     },
     async end() {
-      if (this.busy) return
+      if (this.busy || this.suggesting) return
       this.busy = true
       try {
         if (this.beforeCommit && await this.beforeCommit() === false) return
@@ -236,6 +254,9 @@ export default {
   width: 100%; height: 38px; padding: 0 12px; border: 1px solid var(--awd-border-strong);
   border-radius: 6px; font-size: 14px; color: var(--awd-text); box-sizing: border-box;
 }
+.title-row { display: flex; align-items: center; gap: var(--awd-space-1); }
+.title-input { flex: 1; min-width: 0; }
+.suggest-btn { flex-shrink: 0; white-space: nowrap; color: var(--awd-accent-text); }
 .awd-footer {
   display: flex; justify-content: flex-end; gap: 12px;
   padding: 14px 24px; border-top: 1px solid var(--awd-border-subtle); background: var(--awd-bg);

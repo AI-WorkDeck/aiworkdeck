@@ -9,6 +9,10 @@ description: 项目级版本记录领域。任务涉及版本记录/工作段（
 
 独立弹窗沿既有 DOM createApp 宿主方式挂载（uni 会覆盖 App 模板），持有全局浮层隐藏原生 BrowserView；取消代次丢弃迟到结果。`projectExitState.js` 严格核对状态及提交回执，不能把读取失败当成零改动。四格式原有保存屏障未变：Word/PPT/Excel 共用 LibreOfficeEditor；PDF 的预览不新增伪保存路径，其他既有编辑实例仍由原注册表校验。回归 `project-exit.test.mjs`、`desktop-quit-app.test.mjs`、`flush-dirty-editors.test.mjs`。浏览器夹具 `tests/project-exit-ui/build.mjs` 生成真实组件+合成API页面，验证窄窗和部分失败；不等于正式客户端/真实文件退出实测。
 
+## 提交弹窗「AI 写说明」
+
+`WorkSessionBar` 命名弹窗的输入框旁有「AI 写说明」：先走 `beforeCommit` 保存打开的文件，再调 `POST /version/session/suggest-title`，回一句标题只填进输入框（可改可删，留空仍走默认标题）；生成中禁止提交。后端 `SessionTitleSuggester` 用辅助模型（`getAuxChatModel`，便宜档，`PlatformAiUserScope` + token 记账），不写仓库。改动范围取 `WorkSessionService.commitPreview`，与 `exitStatus` 同口径：主线工作段 = 分叉点到 HEAD（含自动存档）∪ 工作区未存档改动；稿上只有工作区改动。每个文件掐掉首尾相同段落、只送中间的 -/+ 段落（单文件 1500 字、总 6000 字），正文抽不出的（超 50MB 等）只列文件名。回归 `SessionTitleSuggesterTest`、`tests/version-history/commitTitleSuggest.test.mjs`。
+
 ## 本地项目保存与版本锁范围（dev-board#1529）
 
 `WorkSessionService.repoLock` 的本地项目使用 `PathScopedRepoLock`：每次外层获取按当前物理根目录（解析符号链接，包括尚不存在路径的最近已存在祖先）与活动范围比较，仅相同或祖先/后代目录互斥；独立目录与兄弟目录可并行。不能退回所有本地目录一把锁，也不能仅按首次打开时的父子分组：后来打开的父目录仍必须等待已活动子目录。根解析在注册表锁外，解析失败不作无冲突降级；同项目重入沿用外层范围。现有业务只在同项目嵌套；跨项目扩大范围遇到其他线程持锁直接失败，不能形成两方升级死锁。只读轮询不得插队到已等待的重叠保存之前。
