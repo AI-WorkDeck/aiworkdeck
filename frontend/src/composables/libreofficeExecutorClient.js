@@ -29,7 +29,7 @@ export const EDITOR_ACTIONS = [
   // perceive (get_document_text/get_cursor_context), position visibly
   // (select_paragraph/collapse_selection), edit (delete_selection), format
   // (format_selection/set_paragraph_format), recover (undo/redo).
-  'get_document_text', 'get_cursor_context', 'get_clauses', 'select_paragraph', 'collapse_selection',
+  'get_document_text', 'get_cursor_context', 'get_ai_pointer', 'get_clauses', 'select_paragraph', 'collapse_selection',
   // 人工补全：内存快照校验后同步接受，不使用 AI 编辑通道。
   'get_completion_context', 'accept_completion', 'insert_completion_content',
   // Semantic writing keeps a separate revision-checked snapshot; literal suffix/selection only.

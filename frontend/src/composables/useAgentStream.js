@@ -876,7 +876,11 @@ export function useAgentStream() {
             staleBody: activeContext.staleBody === true,
             ...(typeof activeContext.selectionText === 'string' && activeContext.selectionText.trim()
                 ? { selectionText: activeContext.selectionText.trim() }
-                : {})
+                : {}),
+            // Writer 指针（锚点/段号/光标段落），后端据此让模型一步 doc_replace_at_anchor
+            ...(activeContext.pointerAnchorId ? { pointerAnchorId: activeContext.pointerAnchorId } : {}),
+            ...(Number.isInteger(activeContext.pointerParagraphIndex) ? { pointerParagraphIndex: activeContext.pointerParagraphIndex } : {}),
+            ...(activeContext.cursorParagraphText ? { cursorParagraphText: activeContext.cursorParagraphText } : {})
         } : null
 
         if (!continuingRun) {

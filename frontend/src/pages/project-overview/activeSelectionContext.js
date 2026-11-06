@@ -107,3 +107,65 @@ export async function readActiveSelection(libreRefs, plainTextRefs, { side, file
 
   return { fileId: id, text: '' }
 }
+
+export const MAX_POINTER_PARAGRAPH_CHARS = 600
+
+/**
+ * 发送时读取 Writer 指针（选区 + 锚点 + 段号 / 光标段落 + 锚点 + 段号）。
+ * 只对 LOWA Writer 有效；读不到（非 Writer / 未就绪 / 命令失败）返回 null，调用方退回旧的选区胶囊。
+ *
+ * @returns {Promise<{ kind: 'selection'|'cursor'|'none', ... } | null>}
+ */
+export const POINTER_READ_TIMEOUT_MS = 800
+
+export async function readActivePointer(libreRefs, { side, fileId } = {}) {
+  const id = Number(fileId)
+  if (!id) return null
+  const lRefs = libreRefs || {}
+  const keys = side ? [`${side}:${id}`, `left:${id}`, `right:${id}`] : [`left:${id}`, `right:${id}`]
+  for (const key of keys) {
+    const inst = lRefs[key]
+    if (!inst) continue
+    const usable = inst.ready && !inst.docLoadFailed && !inst._reloading
+      && (!inst.docKind || inst.docKind === 'writer')
+      && Number(inst.file && inst.file.id) === id
+      && inst.executor && typeof inst.executor.executeCommand === 'function'
+    if (!usable) continue
+    try {
+      // 发送路径等不起：office 线程正忙（AI 修订风暴、整篇导出）时 800ms 内拿不到就放弃，
+      // 退回只带选区文字的旧行为，不拖住发送。
+      const res = await inst.executor.executeCommand('get_ai_pointer', {}, { background: true, timeoutMs: POINTER_READ_TIMEOUT_MS })
+      return res && res.success !== false ? res : null
+    } catch (e) {
+      return null
+    }
+  }
+  return null
+}
+
+/**
+ * 把 get_ai_pointer 的结果折成 activeContext 里要多带的字段（纯函数）。
+ * 选区：selectionText 以实时读到的为准（胶囊可能已过期），并带 anchor/段号；
+ * 无选区：cursorParagraphText + anchor/段号。其余情形返回 {}，由调用方保持原行为。
+ */
+export function buildPointerFields(pointer) {
+  if (!pointer || typeof pointer !== 'object') return {}
+  const out = {}
+  if (pointer.anchorId) out.pointerAnchorId = String(pointer.anchorId)
+  if (Number.isInteger(pointer.paragraphIndex) && pointer.paragraphIndex >= 0) {
+    out.pointerParagraphIndex = pointer.paragraphIndex
+  }
+  if (pointer.kind === 'selection') {
+    const text = normalizeSelectionText(pointer.selectionText)
+    if (!text) return {}
+    out.selectionText = text
+    return out
+  }
+  if (pointer.kind === 'cursor') {
+    const text = sliceSafeCodePoints(String(pointer.paragraphText || '').trim(), MAX_POINTER_PARAGRAPH_CHARS)
+    if (!text) return {}
+    out.cursorParagraphText = text
+    return out
+  }
+  return {}
+}

@@ -72,3 +72,30 @@ test('plan updates retain position and render updated statuses, explicit clear r
   bubble.planTodos = []; captureChatTimeline(bubble)
   assert.deepEqual(visibleChatTimeline(bubble).map(e => e.type), ['text'])
 })
+
+test('plan heads the turn whether it was recorded mid-run or replayed after the last todo_write', () => {
+  const live = reactive(base())
+  live.thinking = { status: 'done', content: 'Scope' }; captureChatTimeline(live)
+  live.processes.push(proc('a', 'success')); captureChatTimeline(live)
+  live.planTodos = [{ content: 'Read', status: 'in_progress' }]; captureChatTimeline(live)
+  live.processes.push(proc('b')); captureChatTimeline(live)
+  assert.deepEqual(visibleChatTimeline(live).map(e => e.type), ['plan', 'thinking', 'execution'])
+  // History replay inserts the recovered plan right after the last todo_write, i.e. near the end.
+  const replayed = reactive({ ...base(), isStreaming: false, content: 'Answer', planTodos: [{ content: 'Read', status: 'completed' }] })
+  replayed.timeline = [{ type: 'process', data: proc('a', 'success') }, { type: 'plan', data: replayed.planTodos }, { type: 'text', start: 0, end: 6 }]
+  assert.deepEqual(visibleChatTimeline(replayed).map(e => e.type), ['plan', 'execution', 'text'])
+})
+
+test('running plan is open without stealing the working highlight; it folds when the turn ends', () => {
+  const bubble = reactive(base())
+  bubble.processes.push(proc('a')); captureChatTimeline(bubble)
+  bubble.planTodos = [{ content: 'Read', status: 'in_progress' }, { content: 'Write', status: 'pending' }]; captureChatTimeline(bubble)
+  const view = mount(bubble)
+  const [plan, execution] = view.timeline.value
+  assert.equal(plan.type, 'plan')
+  assert.equal(view.isExpanded(plan, 0), true, 'plan visible while steps run')
+  assert.equal(isTimelineEntryActive(plan, 0, view.timeline.value, true), false, 'executing step keeps the highlight')
+  assert.equal(view.isExpanded(execution, 1), true)
+  bubble.isStreaming = false
+  assert.equal(view.isExpanded(view.timeline.value[0], 0), false, 'finished turn folds to the n/n summary')
+})

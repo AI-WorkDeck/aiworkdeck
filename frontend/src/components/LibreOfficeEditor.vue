@@ -201,7 +201,7 @@ import EditorToolbar from '@/components/EditorToolbar.vue'
 import EvidenceStaleBar from '@/components/EvidenceStaleBar.vue'
 import { getCloudWriteHeaders, getCheckpointRestoreWriteState, getFileBytesUrl, getFileWriteUrl, listEvidenceLinks, reportEvidenceAnchors, keepEvidenceAnchor, getCurrentUser as fetchAuthUser, getFileLocalPath } from '@/services/api.js'
 import { getAuthHeaders, getCurrentUser } from '@/utils/auth.js'
-import { createAuthorNameResolver } from '@/utils/editorAuthor.js'
+import { createAuthorNameResolver, REDLINE_AUTHOR_KEY } from '@/utils/editorAuthor.js'
 import { host } from '@/services/host.js'
 import { watchDownloadDone, displayName } from '@/utils/downloadDone.js'
 import { anchorHash } from '@/utils/anchorHash.js'
@@ -241,6 +241,7 @@ function authorNames() {
     authorResolver = createAuthorNameResolver({
       readCached: () => getCurrentUser() || null,
       fetchRemote: () => fetchAuthUser().then((r) => (r && r.data) || null),
+      readOverride: () => { try { return uni.getStorageSync(REDLINE_AUTHOR_KEY) || '' } catch (e) { return '' } },
     })
   }
   return authorResolver
@@ -529,6 +530,9 @@ export default {
     // 性能埋点（0.81「秒开秒存」）：从挂载 / 备胎过继起算到 ready，一行 [perf] 日志，
     // 真机基准脚本按这一行取数；不上报、不进遥测。
     this._perfOpenAt = Date.now()
+    // 改了昵称或「修订与批注署名」：已打开的文档立刻换署名（只影响之后新增的修订与批注）。
+    this._onIdentityUpdated = () => { authorNames().refresh(); this.resolveRedlineAuthor() }
+    uni.$on('awd:identity-updated', this._onIdentityUpdated)
     this.watchBackendHealth()
     this._onEvidenceDragStart = () => {
       this.evidenceDropArmed = true
@@ -583,6 +587,7 @@ export default {
     }
   },
   beforeUnmount() {
+    if (this._onIdentityUpdated) uni.$off('awd:identity-updated', this._onIdentityUpdated)
     this._nativeSurface?.dispose()?.catch(error => this.appendLog('native close failed: ' + error.message))
     this._nativeSurface = null
     this._backendHealthDisposed = true

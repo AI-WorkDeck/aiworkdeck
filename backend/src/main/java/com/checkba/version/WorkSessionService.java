@@ -775,6 +775,41 @@ public class WorkSessionService {
         }
     }
 
+    /** What the next commit would contain: the version it is compared against and every changed path. */
+    public record CommitPreview(String base, List<FileChange> changes) {}
+
+    /**
+     * Same scope as {@link #exitStatus}: on the mainline a work session commits everything since it
+     * branched off (autosaves included); on a draft the commit only covers the working tree.
+     */
+    public CommitPreview commitPreview(long projectId) {
+        ReentrantLock lock = repoLock(projectId);
+        if (!lock.tryLock()) throw VersionException.busy(LangText.of(
+                "正在整理版本，请稍后重试", "Version history is busy; please try again shortly"));
+        try {
+            if (!repoService.isInitialized(projectId) || repoService.repositoryMerging(projectId)) {
+                return new CommitPreview("HEAD", List.of());
+            }
+            String base = "HEAD";
+            Map<String, FileChange> byPath = new LinkedHashMap<>();
+            Optional<WorkSession> active = activeDraftOnBranch(projectId).isPresent()
+                    ? Optional.empty() : activeSession(projectId);
+            if (active.isPresent()) {
+                String merged = repoService.mergeBase(projectId, repoService.mainBranch(), active.get().getBranchName());
+                if (merged != null) {
+                    base = merged;
+                    repoService.diffNameStatus(projectId, base, "HEAD").forEach(c -> byPath.put(c.path(), c));
+                }
+            }
+            repoService.pendingChanges(projectId).forEach(c -> byPath.put(c.path(), c));
+            List<FileChange> changes = byPath.values().stream()
+                    .filter(c -> !c.path().startsWith(".awd/")).toList();
+            return new CommitPreview(base, changes);
+        } finally {
+            lock.unlock();
+        }
+    }
+
     /** /status 不等待耗时提交，避免查询请求与数据库连接排队耗尽。 */
     public List<FileChange> pendingChangesLocked(long projectId) {
         ReentrantLock lock = repoLock(projectId);

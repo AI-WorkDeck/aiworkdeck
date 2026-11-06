@@ -102,6 +102,9 @@ export default {
   nicknameSaving: 'Saving…',
   nicknameSaveFailed: 'Save failed: {message}',
   nicknameTooLong: 'A name can be at most 24 characters',
+  redlineAuthorLabel: 'Name on tracked changes and comments',
+  redlineAuthorPlaceholder: 'Leave blank to use your nickname',
+  redlineAuthorHint: 'Applies only to new tracked changes and comments; existing ones keep their author',
   // Name nudge (Spec §6): phone sign-ups default to a masked phone number as the display name
   nameNudgeText: 'Add your name — it is what colleagues see on a case file',
   nameNudgeTitle: 'Add Your Name',
