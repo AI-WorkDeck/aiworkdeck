@@ -77,10 +77,10 @@
 
 <table>
   <tr>
-    <td width="25%"><a href="https://www.aiworkdeck.com/zh/videos"><img src=".github/assets/readme/tutorial-ep-start-02.webp" alt="教程：AI 对话框那么多，为什么还要一个工作台？"></a><br><sub>为什么还要一个工作台？</sub></td>
-    <td width="25%"><a href="https://www.aiworkdeck.com/zh/videos"><img src=".github/assets/readme/tutorial-ep-lit-04.webp" alt="教程：证据怎么挂到起诉状上？"></a><br><sub>证据怎么挂到起诉状上？</sub></td>
-    <td width="25%"><a href="https://www.aiworkdeck.com/zh/videos"><img src=".github/assets/readme/tutorial-ep-lit-09.webp" alt="教程：起诉状想给 AI 改，当事人信息怎么先藏起来？"></a><br><sub>当事人信息怎么先藏起来？</sub></td>
-    <td width="25%"><a href="https://www.aiworkdeck.com/zh/videos"><img src=".github/assets/readme/tutorial-ep-team-01.webp" alt="教程：团队里谁忙谁闲，能一眼看出来吗？"></a><br><sub>团队里谁忙谁闲？</sub></td>
+    <td width="25%" valign="top"><a href="https://www.aiworkdeck.com/zh/videos"><img src=".github/assets/readme/tutorial-ep-start-02.webp" alt="教程：AI 对话框那么多，为什么还要一个工作台？"></a><br><sub>为什么还要一个工作台？</sub></td>
+    <td width="25%" valign="top"><a href="https://www.aiworkdeck.com/zh/videos"><img src=".github/assets/readme/tutorial-ep-lit-04.webp" alt="教程：证据怎么挂到起诉状上？"></a><br><sub>证据怎么挂到起诉状上？</sub></td>
+    <td width="25%" valign="top"><a href="https://www.aiworkdeck.com/zh/videos"><img src=".github/assets/readme/tutorial-ep-lit-09.webp" alt="教程：起诉状想给 AI 改，当事人信息怎么先藏起来？"></a><br><sub>当事人信息怎么先藏起来？</sub></td>
+    <td width="25%" valign="top"><a href="https://www.aiworkdeck.com/zh/videos"><img src=".github/assets/readme/tutorial-ep-team-01.webp" alt="教程：团队里谁忙谁闲，能一眼看出来吗？"></a><br><sub>团队里谁忙谁闲？</sub></td>
   </tr>
 </table>
 

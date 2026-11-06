@@ -77,10 +77,10 @@ Two minutes, one task — 19 short episodes on the [website](https://www.aiworkd
 
 <table>
   <tr>
-    <td width="25%"><a href="https://www.aiworkdeck.com/en/videos"><img src=".github/assets/readme/tutorial-ep-start-02.webp" alt="Tutorial: With so many AI chat apps, why a workspace?"></a><br><sub>Why a workspace?</sub></td>
-    <td width="25%"><a href="https://www.aiworkdeck.com/en/videos"><img src=".github/assets/readme/tutorial-ep-lit-04.webp" alt="Tutorial: Linking evidence into the complaint"></a><br><sub>Linking evidence into the complaint</sub></td>
-    <td width="25%"><a href="https://www.aiworkdeck.com/en/videos"><img src=".github/assets/readme/tutorial-ep-lit-09.webp" alt="Tutorial: Hiding party details before the AI edits a pleading"></a><br><sub>Hiding party details before the AI edits</sub></td>
-    <td width="25%"><a href="https://www.aiworkdeck.com/en/videos"><img src=".github/assets/readme/tutorial-ep-team-01.webp" alt="Tutorial: Who on the team is busy? See it at a glance"></a><br><sub>Who on the team is busy?</sub></td>
+    <td width="25%" valign="top"><a href="https://www.aiworkdeck.com/en/videos"><img src=".github/assets/readme/tutorial-ep-start-02.webp" alt="Tutorial: With so many AI chat apps, why a workspace?"></a><br><sub>Why a workspace?</sub></td>
+    <td width="25%" valign="top"><a href="https://www.aiworkdeck.com/en/videos"><img src=".github/assets/readme/tutorial-ep-lit-04.webp" alt="Tutorial: Linking evidence into the complaint"></a><br><sub>Linking evidence into the complaint</sub></td>
+    <td width="25%" valign="top"><a href="https://www.aiworkdeck.com/en/videos"><img src=".github/assets/readme/tutorial-ep-lit-09.webp" alt="Tutorial: Hiding party details before the AI edits a pleading"></a><br><sub>Hiding party details before the AI edits</sub></td>
+    <td width="25%" valign="top"><a href="https://www.aiworkdeck.com/en/videos"><img src=".github/assets/readme/tutorial-ep-team-01.webp" alt="Tutorial: Who on the team is busy? See it at a glance"></a><br><sub>Who on the team is busy?</sub></td>
   </tr>
 </table>
 
