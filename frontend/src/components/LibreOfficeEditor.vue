@@ -613,6 +613,7 @@ export default {
     clearTimeout(this._saveRetryTimer)
     clearTimeout(this._slowSaveTimer)
     clearTimeout(this._reviewRefreshTimer)
+    clearTimeout(this._fitWidthTimer)
     clearInterval(this._bootTimer)
     try { if (this._anchorChecker) this._anchorChecker.dispose() } catch (e) { /* ignore */ }
     this._anchorChecker = null
@@ -895,6 +896,19 @@ export default {
       try {
         this._transportSend({ __lo: 'lo-relay', type: 'set-theme', theme: getResolvedTheme() })
       } catch (e) { /* 通道没起来：ready 时还会补发一次 */ }
+    },
+    // 分屏开合后窗格宽度变了：把页面按新宽度收进来（只缩不放，上限是用户自己定的
+    // 缩放，见 office_thread set_zoom{fit}）。webview 里的 Qt 画布要晚一拍才跟上
+    // 新尺寸，等布局停稳再算；连着开合只算最后一次。宿主在 splitMode 切换时调用。
+    fitPaneWidth(delayMs = 400) {
+      clearTimeout(this._fitWidthTimer)
+      this._fitWidthTimer = setTimeout(async () => {
+        if (!this.ready || !this.executor || this.docKind !== 'writer') return
+        try {
+          const r = await this.executor.executeCommand('set_zoom', { fit: 'width' })
+          if (r && r.success) this.uiRefreshKey++   // 工具栏上的缩放百分比跟着刷新
+        } catch (e) { /* 适配失败就保持原缩放 */ }
+      }, delayMs)
     },
     // 宿主把键盘焦点交回编辑器（BUG-61，侧栏「插入」之后）。聚焦 webview/iframe 容器即可：
     // 客体窗口拿回焦点且页内无焦点时，IME 覆盖层会接住键盘（zetaOfficeImeOverlay onWindowFocus），
