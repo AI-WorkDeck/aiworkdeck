@@ -181,7 +181,7 @@
                   <image v-if="member.avatarUrl" :src="member.avatarUrl" class="avatar-img-new" />
                   <view v-else class="avatar-placeholder-new client-placeholder">{{ member.displayName?.charAt(0) || $t('projects.clientInitial') }}</view>
                 </view>
-                <view v-if="canManageMembers(project)" class="add-member-btn-new" @tap.stop="openInviteModal(project.id)">+</view>
+                <view :title="$t('workbench.addMember')" v-if="canManageMembers(project)" class="add-member-btn-new" @tap.stop="openInviteModal(project.id)">+</view>
               </view>
               <view class="ptable-col col-ops">
                 <!-- 点行打开项目；改名单独给一个动作按钮。 -->

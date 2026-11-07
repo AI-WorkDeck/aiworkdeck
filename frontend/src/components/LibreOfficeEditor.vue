@@ -97,7 +97,7 @@
     </view>
     <view v-if="inputError" class="libre-input-error" role="alert">
       <text>{{ inputError }}</text>
-      <button type="button" :aria-label="$t('common.close')" @click="inputError = ''">×</button>
+      <button :title="$t('common.close')" type="button" :aria-label="$t('common.close')" @click="inputError = ''">×</button>
     </view>
     <!-- review-overview-open：审阅概览现在浮在画布右侧（不挤宽画布），画布上的
          宿主浮层据此让出面板宽度，见样式 .libre-review-overview 之后那一段。 -->

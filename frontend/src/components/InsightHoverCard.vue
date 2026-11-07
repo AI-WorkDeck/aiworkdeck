@@ -11,7 +11,7 @@
       <view class="ihc-head">
         <text class="ihc-badge" :class="'k-' + kind">{{ $t('insight.entityKind.' + kind) }}</text>
         <text class="ihc-name" :title="entity.name || ''">{{ entity.name }}</text>
-        <text class="ihc-x" @tap.stop="close">×</text>
+        <text :title="$t('common.close')" class="ihc-x" @tap.stop="close">×</text>
       </view>
 
       <view class="ihc-status">

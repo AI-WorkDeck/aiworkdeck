@@ -4,7 +4,7 @@
   <view class="dd-panel">
     <view class="dd-panel-head">
       <text>{{ $t('ddWorkflow.lists') }}</text><text class="muted">{{ requests.length }}</text>
-      <button class="icon-button" :disabled="loading || busy" :aria-label="$t('ddWorkflow.refresh')" @tap="fetchRequests">↻</button>
+      <button :title="$t('ddWorkflow.refresh')" class="icon-button" :disabled="loading || busy" :aria-label="$t('ddWorkflow.refresh')" @tap="fetchRequests">↻</button>
     </view>
     <view v-if="notifications.length" class="dd-notifications">
       <text class="hint">{{ $t('ddWorkflow.pendingNotifications') }}</text>
