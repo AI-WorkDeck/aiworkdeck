@@ -293,3 +293,14 @@ test('invalid declarative tool declarations are rejected', async t => {
     await assert.rejects(validatePlugin(dir), pattern, JSON.stringify(tool))
   }
 })
+
+test('install surfaces the local host validation message instead of a generic rejection', async t => {
+  const server = createServer((req, res) => {
+    res.setHeader('Content-Type', 'application/json')
+    res.end(JSON.stringify({ code: 400, message: 'Invalid declarative tool: tools.x: access is required' }))
+  })
+  server.listen(0, '127.0.0.1'); await once(server, 'listening')
+  t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections() }))
+  const endpoint = 'http://127.0.0.1:' + server.address().port
+  await assert.rejects(main(['install', '--endpoint', endpoint, '--project-id', '7', '--folder-id', '9'], {}), /Host rejected request: Invalid declarative tool: tools\.x: access is required/)
+})

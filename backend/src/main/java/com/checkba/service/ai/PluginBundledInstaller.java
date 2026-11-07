@@ -98,8 +98,10 @@ public class PluginBundledInstaller {
                 if (Files.isDirectory(file)) Files.createDirectories(output);
                 else { Files.createDirectories(output.getParent()); Files.copy(file, output); }
             }
-            PluginManifestContractValidator.validateViews(cn.hutool.json.JSONUtil.toBean(
-                    Files.readString(staging.resolve("manifest.json")), PluginService.PluginMetadata.class), staging.toFile());
+            var staged = cn.hutool.json.JSONUtil.toBean(
+                    Files.readString(staging.resolve("manifest.json")), PluginService.PluginMetadata.class);
+            PluginManifestContractValidator.validateViews(staged, staging.toFile());
+            PluginManifestContractValidator.validateTools(staged);
             Files.writeString(staging.resolve(MARKER), String.valueOf(meta.get("version")));
             if (Files.exists(target)) {
                 backup = destination.toAbsolutePath().getParent().resolve(".bundle-backup-" + UUID.randomUUID());

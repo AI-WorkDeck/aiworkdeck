@@ -285,6 +285,10 @@ async function jsonRequest(url, init) {
       manifest_invalid: 'Run validate and check the manifest against the published schema.',
     }
     const code = Object.hasOwn(hints, result?.error || '') ? result.error : null
+    // The local host's own validation message is safe and actionable; remote portals stay code-only.
+    const local = ['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname)
+    const detail = local && typeof (result?.message || result?.error) === 'string' ? String(result.message || result.error).slice(0, 1000) : null
+    if (detail && !code) throw new Error('Host rejected request: ' + detail)
     throw new Error('Server rejected request (HTTP ' + response.status + ')' + (code ? ': ' + code + '. ' + hints[code] : '; inspect the authenticated host or developer portal before retrying.'))
   }
   if (!result || typeof result !== 'object') throw new Error('Unexpected response; verify status in the developer portal before retrying')

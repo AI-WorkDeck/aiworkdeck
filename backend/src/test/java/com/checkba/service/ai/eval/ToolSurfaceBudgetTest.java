@@ -66,7 +66,10 @@ class ToolSurfaceBudgetTest {
         PROMPTS.put("worst", WORST);
     }
 
-    private record Cell(int tools, int tokens) {
+    private record Cell(int tools, int tokens, List<String> names) {
+        Cell(int tools, int tokens) {
+            this(tools, tokens, List.of());
+        }
     }
 
     private static Cell measure(Host host, String prompt) {
@@ -87,7 +90,14 @@ class ToolSurfaceBudgetTest {
         turn.text = "<final>ok</final>";
         c.turns.add(turn);
         EvalHarness.RunResult r = EvalHarness.run(c);
-        return new Cell(r.firstCallOfferedTools(), r.firstCallOfferedSchemaTokens());
+        List<String> names = List.of();
+        for (int i = 0; i < r.toolsOfferedPerLlmCall().size(); i++) {
+            if (r.toolsOfferedPerLlmCall().get(i)) {
+                names = r.toolNamesOfferedPerLlmCall().get(i).stream().sorted().toList();
+                break;
+            }
+        }
+        return new Cell(r.firstCallOfferedTools(), r.firstCallOfferedSchemaTokens(), names);
     }
 
     private static Map<String, Cell> loadBaseline() {
@@ -141,7 +151,7 @@ class ToolSurfaceBudgetTest {
                 boolean tokensOk = Math.abs(now.tokens() - base.tokens()) <= base.tokens() * TOKEN_TOLERANCE;
                 if (!toolsOk || !tokensOk) {
                     failures.add(key + "：实际 " + now.tools() + " 个 / " + now.tokens() + " token，基线 "
-                            + base.tools() + " 个 / " + base.tokens() + " token");
+                            + base.tools() + " 个 / " + base.tokens() + " token\n    下发：" + now.names());
                 }
             }
             table.append('\n');
