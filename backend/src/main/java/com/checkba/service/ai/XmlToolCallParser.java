@@ -140,7 +140,8 @@ public class XmlToolCallParser {
             if (content.startsWith("<ask_user", cursor)
                     && cursor + 9 < content.length()
                     && (Character.isWhitespace(content.charAt(cursor + 9)) || content.charAt(cursor + 9) == '/')) {
-                BareAsk parsed = bareAskArguments(content, cursor + 9);
+                BareAsk parsed = entityQuotedAskArguments(content, cursor + 9);
+                if (parsed == null) parsed = bareAskArguments(content, cursor + 9);
                 if (parsed == null) return List.of();
                 String raw = content.substring(cursor, parsed.end());
                 calls.add(new LocatedCall(cursor, new ParsedCall("ask_user",
@@ -200,6 +201,26 @@ public class XmlToolCallParser {
     }
 
     private record BareAsk(int end, String argsJson) {}
+
+    private static final Pattern ENTITY_QUOTED_HEAD =
+            Pattern.compile("\\s+[a-z_]+\\s*=\\s*&(?:quot|#34|#39|apos);");
+
+    /**
+     * 属性引号被 HTML 转义（{@code question=&quot;…&quot;}）的自闭合形态：先整体反转义再走常规解析。
+     * 结束位置按反转义后的 "/>" 折回原文偏移；不是该形态（或没有结束符）返回 null，交给常规路径。
+     */
+    private BareAsk entityQuotedAskArguments(String content, int cursor) {
+        if (!ENTITY_QUOTED_HEAD.matcher(content).region(cursor, content.length()).lookingAt()) return null;
+        int close = content.indexOf("/>", cursor);
+        if (close < 0) return null;
+        String slice = content.substring(cursor, close + 2);
+        String decoded = slice.replace("&quot;", "\"").replace("&#34;", "\"")
+                .replace("&#39;", "'").replace("&apos;", "'")
+                .replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&");
+        BareAsk parsed = bareAskArguments(decoded, 0);
+        if (parsed == null || parsed.end() != decoded.length()) return null;
+        return new BareAsk(close + 2, parsed.argsJson());
+    }
 
     /** 属性值与外层结束符用同一次扫描定位，值里的 <br/> 不是标签结束。
      * 不明确的参数走现有 question-required 错误反馈；未闭合的语法不猜边界。
