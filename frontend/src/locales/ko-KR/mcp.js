@@ -79,7 +79,7 @@ export default {
   "commandHint": "명령, 인수와 작업 디렉터리는 표시됩니다. 비밀 정보는 전용 자격 증명 또는 환경 변수 필드에 입력하세요.",
   "oauthSaveFirst": "승인하기 전에 이 연결을 설정하고 저장하세요.",
   "localTitle": "로컬 MCP 서비스",
-  "localDesc": "이 컴퓨터의 Claude Code, Codex 등 도구가 AI WorkDeck 프로젝트를 읽기 전용으로 볼 수 있게 합니다.",
+  "localDesc": "이 컴퓨터의 Claude Code, Codex 등 도구가 AI WorkDeck 프로젝트를 읽고 수정안을 제안할 수 있게 합니다. 수정안은 검토 후에만 문서에 반영됩니다.",
   "localOn": "켜짐",
   "localOff": "꺼짐",
   "localEnable": "켜기",

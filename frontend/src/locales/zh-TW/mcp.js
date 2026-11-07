@@ -79,7 +79,7 @@ export default {
   "commandHint": "命令、參數與工作目錄屬於可查看的執行設定。請將密鑰放在專用憑證或環境變數欄位中。",
   "oauthSaveFirst": "請先設定並儲存此連線，再進行授權。",
   "localTitle": "對外 MCP 服務",
-  "localDesc": "允許本機上的 Claude Code、Codex 等工具唯讀存取你的 AI WorkDeck 專案。",
+  "localDesc": "允許本機的 Claude Code、Codex 等工具讀取你的 AI WorkDeck 專案，並提交修改建議；修改須經你審閱才會寫入文件。",
   "localOn": "已開啟",
   "localOff": "已關閉",
   "localEnable": "開啟",

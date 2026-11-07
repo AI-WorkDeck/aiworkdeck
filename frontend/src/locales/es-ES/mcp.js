@@ -79,7 +79,7 @@ export default {
   "commandHint": "Los comandos, argumentos y directorios de trabajo siguen visibles. Coloque los secretos en los campos de credenciales o variables de entorno.",
   "oauthSaveFirst": "Configure y guarde esta conexión antes de autorizarla.",
   "localTitle": "Servicio MCP local",
-  "localDesc": "Permite que Claude Code, Codex y otras herramientas de este equipo lean tus proyectos de AI WorkDeck (solo lectura).",
+  "localDesc": "Permite que Claude Code, Codex y otras herramientas de este equipo lean tus proyectos de AI WorkDeck y propongan cambios. Los cambios solo llegan al documento después de que los revises.",
   "localOn": "Activado",
   "localOff": "Desactivado",
   "localEnable": "Activar",

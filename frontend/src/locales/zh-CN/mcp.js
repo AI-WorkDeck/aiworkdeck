@@ -79,7 +79,7 @@ export default {
   "commandHint": "命令、参数和工作目录属于可查看的运行配置。请将密钥放在专用凭据或环境变量字段中。",
   "oauthSaveFirst": "请先配置并保存此连接，再进行授权。",
   "localTitle": "对外 MCP 服务",
-  "localDesc": "允许本机上的 Claude Code、Codex 等工具只读访问你的 AI WorkDeck 项目。",
+  "localDesc": "允许本机的 Claude Code、Codex 等工具读取你的 AI WorkDeck 项目，并提交修改建议；修改须经你审阅才会写入文档。",
   "localOn": "已开启",
   "localOff": "已关闭",
   "localEnable": "开启",

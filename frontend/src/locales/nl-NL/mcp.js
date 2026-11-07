@@ -79,7 +79,7 @@ export default {
   "commandHint": "Opdrachten, argumenten en werkmappen blijven zichtbaar. Plaats geheimen in de velden voor inloggegevens of omgevingsvariabelen.",
   "oauthSaveFirst": "Configureer en sla deze verbinding op voordat u autoriseert.",
   "localTitle": "Lokale MCP-service",
-  "localDesc": "Sta Claude Code, Codex en andere tools op deze computer toe je AI WorkDeck-projecten alleen-lezen te bekijken.",
+  "localDesc": "Laat Claude Code, Codex en andere tools op deze computer je AI WorkDeck-projecten lezen en wijzigingen voorstellen. Wijzigingen komen pas in het document nadat jij ze hebt beoordeeld.",
   "localOn": "Aan",
   "localOff": "Uit",
   "localEnable": "Inschakelen",

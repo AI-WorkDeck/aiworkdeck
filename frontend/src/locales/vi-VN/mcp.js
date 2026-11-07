@@ -79,7 +79,7 @@ export default {
   "commandHint": "Lệnh, đối số và thư mục làm việc vẫn hiển thị. Đặt thông tin bí mật trong trường thông tin xác thực hoặc biến môi trường.",
   "oauthSaveFirst": "Cấu hình và lưu kết nối này trước khi cấp quyền.",
   "localTitle": "Dịch vụ MCP cục bộ",
-  "localDesc": "Cho phép Claude Code, Codex và các công cụ khác trên máy này đọc các dự án AI WorkDeck của bạn (chỉ đọc).",
+  "localDesc": "Cho phép Claude Code, Codex và các công cụ khác trên máy này đọc dự án AI WorkDeck của bạn và đề xuất chỉnh sửa. Chỉnh sửa chỉ vào tài liệu sau khi bạn xem xét.",
   "localOn": "Đang bật",
   "localOff": "Đang tắt",
   "localEnable": "Bật",

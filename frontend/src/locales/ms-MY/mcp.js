@@ -79,7 +79,7 @@ export default {
   "commandHint": "Arahan, argumen dan direktori kerja kekal kelihatan. Masukkan rahsia dalam medan kelayakan atau pemboleh ubah persekitaran.",
   "oauthSaveFirst": "Konfigurasikan dan simpan sambungan ini sebelum memberi kebenaran.",
   "localTitle": "Perkhidmatan MCP setempat",
-  "localDesc": "Benarkan Claude Code, Codex dan alat lain pada komputer ini membaca projek AI WorkDeck anda (baca sahaja).",
+  "localDesc": "Benarkan Claude Code, Codex dan alat lain pada komputer ini membaca projek AI WorkDeck anda dan mencadangkan suntingan. Suntingan hanya masuk ke dokumen selepas anda menyemaknya.",
   "localOn": "Hidup",
   "localOff": "Mati",
   "localEnable": "Hidupkan",

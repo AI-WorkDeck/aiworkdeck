@@ -79,7 +79,7 @@ export default {
   "commandHint": "Komutlar, bağımsız değişkenler ve çalışma dizinleri görünür kalır. Sırları kimlik bilgisi veya ortam değişkeni alanlarına yazın.",
   "oauthSaveFirst": "Yetkilendirmeden önce bu bağlantıyı yapılandırıp kaydedin.",
   "localTitle": "Yerel MCP hizmeti",
-  "localDesc": "Bu bilgisayardaki Claude Code, Codex ve diğer araçların AI WorkDeck projelerinizi salt okunur olarak görmesine izin verin.",
+  "localDesc": "Bu bilgisayardaki Claude Code, Codex ve diğer araçların AI WorkDeck projelerinizi okumasına ve düzenleme önermesine izin verin. Düzenlemeler ancak siz inceledikten sonra belgeye girer.",
   "localOn": "Açık",
   "localOff": "Kapalı",
   "localEnable": "Aç",

@@ -79,7 +79,7 @@ export default {
   "commandHint": "Perintah, argumen, dan direktori kerja tetap terlihat. Masukkan rahasia di kolom kredensial atau variabel lingkungan.",
   "oauthSaveFirst": "Konfigurasikan dan simpan koneksi ini sebelum memberi otorisasi.",
   "localTitle": "Layanan MCP lokal",
-  "localDesc": "Izinkan Claude Code, Codex, dan alat lain di komputer ini membaca proyek AI WorkDeck Anda (hanya baca).",
+  "localDesc": "Izinkan Claude Code, Codex, dan alat lain di komputer ini membaca proyek AI WorkDeck Anda dan mengusulkan perubahan. Perubahan baru masuk ke dokumen setelah Anda tinjau.",
   "localOn": "Aktif",
   "localOff": "Nonaktif",
   "localEnable": "Aktifkan",

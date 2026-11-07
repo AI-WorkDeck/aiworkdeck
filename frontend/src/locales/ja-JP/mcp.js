@@ -79,7 +79,7 @@ export default {
   "commandHint": "コマンド、引数、作業ディレクトリは表示されます。秘密情報は専用の認証情報欄または環境変数欄に入力してください。",
   "oauthSaveFirst": "認可する前に、この接続を設定して保存してください。",
   "localTitle": "ローカル MCP サービス",
-  "localDesc": "このパソコン上の Claude Code や Codex などから、AI WorkDeck のプロジェクトを読み取り専用で参照できるようにします。",
+  "localDesc": "このコンピューター上の Claude Code、Codex などのツールが AI WorkDeck のプロジェクトを読み取り、修正を提案できるようにします。修正はあなたが確認するまで文書に反映されません。",
   "localOn": "オン",
   "localOff": "オフ",
   "localEnable": "オンにする",
