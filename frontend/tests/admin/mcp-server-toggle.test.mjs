@@ -48,5 +48,5 @@ test('non-local mode (status 404) hides the whole section', async () => {
   assert.match(template, /<section v-if="available"/)
 })
 test('template tokenizes copy and warns about one-time token', () => {
-  assert.ok(template.includes("mcp.localWarn") && !/[一-鿿]/.test(template.replace(/<!--.*?-->/g, '')))
+  assert.ok(template.includes("mcp.localWarn") && !/[一-鿿]/.test(template.split('\n').filter(l => !l.trim().startsWith('<!--')).join('\n')))
 })
