@@ -73,7 +73,7 @@ export default {
     submitted: '已开始生成字幕，完成后自动显示',
     ready: '字幕已生成',
     failed: '字幕生成失败，可点字幕按钮重试',
-    notConfigured: '转写服务未开通：到「系统管理 - 平台服务 - 会议录音转写」配置后即可生成字幕',
+    notConfigured: '转写服务未开通：到「设置 - 平台服务 - 会议录音转写」配置后即可生成字幕',
     noticePending: '已登记。请先在「语音 - 会议录音」面板确认录音告知，再点字幕按钮生成',
     submitFailed: '字幕生成发起失败',
     empty: '未识别到语音',

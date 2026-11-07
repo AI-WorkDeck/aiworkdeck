@@ -20,6 +20,10 @@
       <!-- Sidebar -->
       <view class="admin-sidebar">
         <view class="nav-card">
+            <!-- 整页形态（/pages/admin/admin、/pages/userprofile/userprofile）没有标签栏可退，自带一个回工作台的出口 -->
+            <view v-if="!embedded" class="nav-back" role="button" tabindex="0" @tap="goBackToWorkbench" @keydown.enter.stop.prevent="goBackToWorkbench">
+              <text>{{ $t('admin.backToWorkbench') }}</text>
+            </view>
             <!-- 紧凑用户行取代了原来单独一张大居中头像卡（dev-board#892）：
                  头像可点：local-mode 且已连接账户时写官网（展示名与头像的唯一权威源），
                  自建服务器仍走原来那条 uni.chooseImage + uploadAvatar。 -->
@@ -1207,8 +1211,8 @@ export default {
       // 「系统」组是否可见。原来这条规则长在个人中心的 checkAdminTab（只有管理员
       // 才多出一个「系统设置」tab），两页合并后它就是这一处。
       isAdminUser: cachedIsAdmin(),
-      // 非管理员进来时默认落个人组第一栏——落在一个自己看不见的面板上等于空白页
-      activeNav: cachedIsAdmin() ? 'ai' : 'work_log',
+      // 非管理员进来时默认落「个人资料与登录」——落在一个自己看不见的面板上等于空白页
+      activeNav: cachedIsAdmin() ? 'ai' : 'personal_settings',
       /** 服务端记录的同意时间戳；空 = 未同意或告知文本已改版需重新征求 */
       crossBorderConsentAt: '',
       // 两组导航。group 只决定排版分组，可见性一律在 visibleNavItems 里判。
@@ -1730,6 +1734,9 @@ export default {
     }
   },
   methods: {
+    goBackToWorkbench() {
+      uni.reLaunch({ url: '/pages/project-overview/project-overview' })
+    },
     resolveAdminNavKey(key) {
       return resolveAdminNavKey(key)
     },
@@ -3054,6 +3061,15 @@ $brand-accent: $brand-mint;
 
 /* 紧凑用户行（dev-board#892），取代原来单独一张大居中头像卡——头像 36px +
    展示名 13px/600 + 角色小胶囊，坐在导航卡顶部，对齐插件广场侧栏的密度。 */
+.nav-back {
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--awd-text-2);
+    cursor: pointer;
+
+    &:hover { color: var(--awd-accent-text); background: var(--awd-surface-2); }
+}
+
 .sidebar-user-row {
     display: flex;
     align-items: center;

@@ -502,7 +502,7 @@
                 @paste="handlePaste"
                 @keydown="handleInputKeydown"
                 @click="handleInputClick"
-                :data-placeholder="$t('chat.inputPlaceholderEmpty')"
+                :data-placeholder="$t('chat.inputPlaceholderEmpty') + '\n' + $t('chat.inputKeysHint')"
               ></div>
               <!-- `@` 引用选择器（dev-board#794 K15）：浮在输入卡上沿 -->
               <MentionPicker v-if="mentionOpen" ref="mentionPicker" :files="mentionCandidates" :skills="mentionSkills"
@@ -834,7 +834,7 @@
             @paste="handlePaste"
             @keydown="handleInputKeydown"
             @click="handleInputClick"
-            :data-placeholder="$t('chat.inputPlaceholder')"
+            :data-placeholder="$t('chat.inputPlaceholder') + '\n' + $t('chat.inputKeysHint')"
           ></div>
           <!-- `@` 引用选择器（dev-board#794 K15）：浮在输入卡上沿 -->
           <MentionPicker v-if="mentionOpen" ref="mentionPicker" :files="mentionCandidates" :skills="mentionSkills"
@@ -2131,9 +2131,19 @@ export default {
     }
     watch(() => builtinWorkflowMenu.value.visible, open => setGlobalOverlay(open, workflowMenuHolder), { flush: 'sync' })
     watch([() => props.visible, () => props.projectId], closeBuiltinWorkflowContextMenu)
-    onMounted(() => window.addEventListener('keydown', dismissWorkflowMenu, true))
+    // 模式下拉开着时 Esc 收起（与点遮罩同效）
+    const dismissModeDropdown = (event) => {
+      if (event.key !== 'Escape' || !showModeDropdown.value) return
+      event.stopPropagation()
+      showModeDropdown.value = false
+    }
+    onMounted(() => {
+      window.addEventListener('keydown', dismissWorkflowMenu, true)
+      window.addEventListener('keydown', dismissModeDropdown, true)
+    })
     onBeforeUnmount(() => {
       window.removeEventListener('keydown', dismissWorkflowMenu, true)
+      window.removeEventListener('keydown', dismissModeDropdown, true)
       setGlobalOverlay(false, workflowMenuHolder)
     })
 
@@ -5474,6 +5484,7 @@ export default {
 
 .chat-input-rich:empty:before {
   content: attr(data-placeholder);
+  white-space: pre-line;
   color: var(--awd-text-3);
 }
 

@@ -85,7 +85,7 @@ export default {
   ocrCancelling: '正在取消…',
   ocrBatchBusy: '已有一批识别在进行，请等它完成或取消',
   ocrConsentTitle: '使用云端识别文字？',
-  ocrConsentHint: '带文字层的 PDF 直接提取，不上传、不计费；只有扫描件和图片需要云端识别。本次确认只对这一批生效，可在「设置 → 账户与用量 → 扫描件识别」改为始终云端或仅本地。',
+  ocrConsentHint: '带文字层的 PDF 直接提取，不上传、不计费；只有扫描件和图片需要云端识别。本次确认只对这一批生效，可在「设置 → 账户与余额 → 扫描件识别」改为始终云端或仅本地。',
   ocrConsentCheck: '我已知悉上述数据去向与计费方式',
   ocrConsentConfirm: '开始识别',
   ocrCopied: '已复制 {count} 份文件的文字，并记入剪贴板历史',

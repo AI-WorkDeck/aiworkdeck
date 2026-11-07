@@ -32,7 +32,7 @@ export default {
   "signIn": "Giriş yap",
   "signInTitle": "Oturum aç (AI, ücretli mağaza öğeleri ve ekip dosya kütüphanesi için gereklidir)",
   "noProjectTitle": "Başlamak için bir proje açın",
-  "noProjectHint": "Soldaki Projeler bölümünden bir proje açın veya Karşılama sayfasından yeni bir proje oluşturun.",
+  "noProjectHint": "Bir proje seçmek için sol üstteki “Tüm projeler” seçeneğine tıklayın veya Karşılama sayfasında yeni bir proje oluşturun.",
   "startupDisabledHint": "Karşılama sayfası artık başlangıçta açılmıyor.",
   "openWelcome": "Karşılama sayfasını aç",
   "aiNeedsProject": "AI sohbetini kullanmak için önce bir proje açın"

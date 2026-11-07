@@ -42,7 +42,7 @@ export default {
   downloadStartFailed: 'Could not start the download. Try again later.',
 
   // ---- No transcription credentials yet (recording still works). Next step depends on tier ----
-  notConfiguredPlatform: 'Transcription is unavailable for now: recordings are still saved to project files, but cannot be turned into text. Connect your AI WorkDeck account under System settings - Account & Usage to enable it.',
+  notConfiguredPlatform: 'Transcription is unavailable for now: recordings are still saved to project files, but cannot be turned into text. Connect your AI WorkDeck account under Settings - Account & balance to enable it.',
   notConfiguredByok: 'No transcription service configured: recordings are still saved to project files, but cannot be turned into text. An administrator can enter Alibaba Cloud Tingwu credentials under System settings - Platform Services - Meeting Transcription, or switch to platform-sourced.',
 
   // ---- Recording ----
