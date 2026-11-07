@@ -462,4 +462,31 @@ class ProjectTaskServiceTest {
         t.setSource("user");
         return t;
     }
+
+    private static com.checkba.model.entity.Project proj(long id, String name, boolean scratch) {
+        var p = new com.checkba.model.entity.Project();
+        p.setId(id);
+        p.setName(name);
+        if (scratch) p.setProjectType(com.checkba.model.entity.Project.SCRATCH);
+        return p;
+    }
+
+    @Test
+    void resolveProjectsFollowsUserWordingRules() {
+        when(projectService.getUserProjects(7L)).thenReturn(List.of(
+                proj(1L, "股权转让项目-星河并购", false), proj(2L, "星河租赁合同纠纷", false),
+                proj(3L, "金冠纾困", false), proj(4L, "星河临时", true), proj(5L, "星河并购", false)));
+        when(memberService.hasWritePermission(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(7L))).thenReturn(true);
+        when(memberService.isClient(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(7L))).thenReturn(false);
+
+        // 「星河」→ 多个（含没有事项的项目），scratch 不参与
+        assertEquals(List.of(1L, 2L, 5L), service.resolveProjects(7L, "星河", true).stream().map(com.checkba.model.entity.Project::getId).toList());
+        // 全名唯一相等，但另一项目名包含它（"股权转让项目-星河并购" 含 "星河并购"）→ 仍歧义
+        assertEquals(2, service.resolveProjects(7L, "星河并购", true).size());
+        // 全名唯一相等且无他项目包含 → 直接用
+        assertEquals(List.of(3L), service.resolveProjects(7L, "金冠纾困", true).stream().map(com.checkba.model.entity.Project::getId).toList());
+        // 称呼更长（含项目名）→ 命中
+        assertEquals(List.of(3L), service.resolveProjects(7L, "金冠纾困案的开庭", true).stream().map(com.checkba.model.entity.Project::getId).toList());
+        assertTrue(service.resolveProjects(7L, "不存在", true).isEmpty());
+    }
 }

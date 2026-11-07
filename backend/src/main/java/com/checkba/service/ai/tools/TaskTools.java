@@ -53,30 +53,27 @@ public class TaskTools implements AgentToolComponent {
             @P(value = "关联的项目内文件ID，多个用英文逗号分隔（如 12,15），须来自 doc_list_project_files 等工具返回的 fileId", required = false) String fileIds,
             @P(value = "负责人用户ID（可选），必须是本项目成员", required = false) Long assigneeId,
             @P(value = "提前多少分钟提醒（可选）：0=准时，60=提前1小时，1440=提前1天；不填表示不提醒", required = false) Integer remindBefore,
-            @P("目标项目名称；用户说的就是当前项目时填当前项目名。按名称精确或唯一包含匹配；若用户的项目说法可能匹配多个项目，先调用 ask_user 问清再创建") String projectName,
+            @P("用户原话里对项目的称呼，原样照抄，不要自己改写成全称；用户没提项目时填当前项目名") String project,
             Long projectId,
             Long userId
     ) {
         final Long contextProjectId = projectId;
-        log.info("Tool: task_create title='{}' dueDate={} dueTime={} type={} fileId={} fileIds={} projectName={}",
-                title, dueDate, dueTime, type, fileId, fileIds, projectName);
+        log.info("Tool: task_create title='{}' dueDate={} dueTime={} type={} fileId={} fileIds={} project={}",
+                title, dueDate, dueTime, type, fileId, fileIds, project);
 
         if (userId == null) {
             return "错误：无法获取当前用户身份，任务未创建。";
         }
-        if (projectName == null || projectName.isBlank()) {
-            return "错误：缺少 projectName，任务未创建。请填写目标项目名称（用户说的就是当前项目时填当前项目名）；不确定是哪个项目就先 ask_user。";
+        if (project == null || project.isBlank()) {
+            return "错误：缺少 project，任务未创建。请原样填写用户对项目的称呼（用户没提项目时填当前项目名）；不确定是哪个项目就先 ask_user。";
         }
-        String requestedName = projectName.trim();
-        List<com.checkba.model.entity.Project> matches = projectTaskService.findWritableProjectsByName(userId, requestedName);
+        String requestedName = project.trim();
+        List<com.checkba.model.entity.Project> matches = projectTaskService.resolveProjects(userId, requestedName, true);
         if (matches.isEmpty()) {
-            return "错误：没有找到名为「" + requestedName + "」且你有写权限的项目，任务未创建。请向用户确认项目名称。";
+            return "错误：没有找到与「" + requestedName + "」对应且你有写权限的项目，任务未创建。请向用户确认项目名称。";
         }
         if (matches.size() > 1) {
-            StringBuilder sb = new StringBuilder("错误：「" + requestedName + "」匹配到多个项目，任务未创建。请用 ask_user 向用户确认是哪一个：");
-            matches.stream().limit(5).forEach(p -> sb.append("\n- ").append(p.getName()).append("（id=").append(p.getId()).append("）"));
-            if (matches.size() > 5) sb.append("\n- …等共 ").append(matches.size()).append(" 个");
-            return sb.toString();
+            return ambiguous(requestedName, matches, "任务未创建");
         }
         com.checkba.model.entity.Project target = matches.get(0);
         projectId = target.getId();
@@ -203,23 +200,22 @@ public class TaskTools implements AgentToolComponent {
         }
     }
 
-    @Tool("查询当前项目的事项列表（截止日、开庭、会议、待办等），可选按日期区间过滤；allProjects=true 时改查用户可访问的全部项目（每行带项目名），" +
-          "用于“本周有哪些截止事项”这类不限于当前项目的问题。" +
-          "每行含事项 id、类型、标题、时间、状态、负责人与关联文件。" +
+    @Tool("查询事项列表（截止日、开庭、会议、待办等），可选按日期区间过滤。默认查用户可访问的全部项目（每行带项目名）——" +
+          "律师说“我这周有哪些截止事项”指的是名下所有案件；只有用户点名某个项目时才填 project 收窄到该项目。" +
+          "每行含事项 id、项目、类型、标题、时间（含星期）、状态、负责人与关联文件。" +
           "用于回答“有哪些截止日”“下周有什么安排”“这个项目的任务清单”类问题，也用于给 task_update 找 taskId。")
     @ToolMeta(displayName = "查询日程任务", category = "task")
     public String task_list(
             @P(value = "起始日期（含），ISO 格式 yyyy-MM-dd；不填表示不限起始", required = false) String from,
             @P(value = "结束日期（含），ISO 格式 yyyy-MM-dd；不填表示不限结束", required = false) String to,
-            @P(value = "true=跨用户可访问的全部项目查询（默认 false，只查当前项目）", required = false) Boolean allProjects,
+            @P(value = "用户原话里对项目的称呼，原样照抄，不要自己改写成全称；仅当用户点名某个项目时填写，不填=全部项目", required = false) String project,
             Long projectId,
             Long userId
     ) {
-        log.info("Tool: task_list project={} allProjects={} from={} to={}", projectId, allProjects, from, to);
+        log.info("Tool: task_list project='{}' context={} from={} to={}", project, projectId, from, to);
 
-        boolean crossProject = Boolean.TRUE.equals(allProjects) || projectId == null;
-        if (crossProject && userId == null) {
-            return "错误：无法获取当前项目ID或用户身份，请在项目上下文中使用此工具。";
+        if (userId == null) {
+            return "错误：无法获取当前用户身份，请在登录状态下使用此工具。";
         }
         LocalDate fromDate = null;
         if (from != null && !from.isBlank()) {
@@ -236,24 +232,35 @@ public class TaskTools implements AgentToolComponent {
             }
         }
 
+        boolean crossProject = project == null || project.isBlank();
+        com.checkba.model.entity.Project narrowed = null;
+        if (!crossProject) {
+            List<com.checkba.model.entity.Project> matches = projectTaskService.resolveProjects(userId, project.trim(), false);
+            if (matches.isEmpty()) {
+                return "错误：没有找到与「" + project.trim() + "」对应的项目。去掉 project 可查全部项目。";
+            }
+            if (matches.size() > 1) {
+                return ambiguous(project.trim(), matches, "未查询");
+            }
+            narrowed = matches.get(0);
+        }
         List<Map<String, Object>> tasks = crossProject
                 ? projectTaskService.listForUser(userId, fromDate, toDate)
-                : projectTaskService.listByProject(projectId, fromDate, toDate);
+                : projectTaskService.listByProject(narrowed.getId(), fromDate, toDate);
         if (tasks.isEmpty()) {
-            if (crossProject) {
-                return "你可访问的项目在该区间内暂无日程任务。";
-            }
             // 空列表必须给明确文案，不能返回空字符串——空白工具输出会掀翻整轮对话
             // （ToolExecutionResultMessage.ensureNotBlank，见 .claude/agents/ai-chat.md 已知地雷）。
-            return "当前项目在该区间内暂无日程任务。";
+            return crossProject ? "你可访问的项目在该区间内暂无日程任务。"
+                    : "项目「" + narrowed.getName() + "」在该区间内暂无日程任务。";
         }
+        final String narrowedName = narrowed == null ? null : narrowed.getName();
 
         StringBuilder sb = new StringBuilder("共 ").append(tasks.size()).append(" 项日程任务：\n");
         for (Map<String, Object> t : tasks) {
             StringJoiner line = new StringJoiner(" | ");
             line.add("id=" + t.get("id"));
-            if (crossProject) {
-                line.add("项目：" + t.get("projectName"));
+            if (crossProject || narrowedName != null) {
+                line.add("项目：" + (crossProject ? t.get("projectName") : narrowedName));
             }
             line.add(typeLabel(t.get("type") == null ? null : String.valueOf(t.get("type"))));
             String title = String.valueOf(t.get("title"));
@@ -276,6 +283,13 @@ public class TaskTools implements AgentToolComponent {
     }
 
     /** 类型中文名；null/未知按默认截止日。 */
+    private static String ambiguous(String text, List<com.checkba.model.entity.Project> matches, String effect) {
+        StringBuilder sb = new StringBuilder("错误：「" + text + "」匹配到多个项目，" + effect + "。请用 ask_user 让用户选择：");
+        matches.stream().limit(5).forEach(p -> sb.append("\n- ").append(p.getName()).append("（id=").append(p.getId()).append("）"));
+        if (matches.size() > 5) sb.append("\n- …等共 ").append(matches.size()).append(" 个");
+        return sb.toString();
+    }
+
     /** 日期后带星期（模型曾把星期报错），如 2026-11-06 周五 / 2026-11-06 Fri。 */
     static String weekdayDate(Object date) {
         if (date == null) return "null";

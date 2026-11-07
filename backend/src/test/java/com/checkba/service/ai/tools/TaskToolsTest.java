@@ -45,7 +45,7 @@ class TaskToolsTest {
     @BeforeEach
     void setUp() {
         taskService = mock(ProjectTaskService.class);
-        when(taskService.findWritableProjectsByName(eq(10L), any())).thenReturn(List.of(project(1L, "P")));
+        when(taskService.resolveProjects(eq(10L), any(), eq(true))).thenReturn(List.of(project(1L, "P")));
         tools = new TaskTools(taskService);
     }
 
@@ -103,7 +103,7 @@ class TaskToolsTest {
     @Test
     @DisplayName("task_list：空列表返回明确文案，绝不是空字符串")
     void listEmptyReturnsExplicitText() {
-        when(taskService.listByProject(1L, null, null)).thenReturn(List.of());
+        when(taskService.listForUser(9L, null, null)).thenReturn(List.of());
 
         String out = tools.task_list(null, null, null, 1L, 9L);
 
@@ -120,7 +120,7 @@ class TaskToolsTest {
         row.put("dueTime", LocalTime.of(9, 30));
         row.put("status", "OPEN");
         row.put("fileName", "答辩状.docx");
-        when(taskService.listByProject(1L, null, null)).thenReturn(List.of(row));
+        when(taskService.listForUser(9L, null, null)).thenReturn(List.of(row));
 
         String out = tools.task_list(null, null, null, 1L, 9L);
 
@@ -161,7 +161,7 @@ class TaskToolsTest {
     }
 
     @Test
-    @DisplayName("task_list：allProjects=true 即使会话绑定了项目也跨项目；用户不是成员的项目不出现（由 listForUser 按成员关系给出）")
+    @DisplayName("task_list：默认跨项目，即使会话绑定了项目；用户不是成员的项目不出现（由 listForUser 按成员关系给出）")
     void listAllProjectsFlagOverridesBoundProject() {
         Map<String, Object> mine = new LinkedHashMap<>();
         mine.put("id", 5L);
@@ -172,7 +172,7 @@ class TaskToolsTest {
         // listForUser 只会返回 getUserProjects 里的项目；非成员项目 B 的事项不在其中
         when(taskService.listForUser(9L, null, null)).thenReturn(List.of(mine));
 
-        String out = tools.task_list(null, null, true, 1L, 9L);
+        String out = tools.task_list(null, null, null, 1L, 9L);
 
         assertTrue(out.contains("我的案"), out);
         assertFalse(out.contains("非成员案"), out);
@@ -183,8 +183,37 @@ class TaskToolsTest {
     @DisplayName("task_list：跨项目无结果也给明确文案")
     void listAcrossProjectsEmptyHasText() {
         when(taskService.listForUser(9L, null, null)).thenReturn(List.of());
-        String out = tools.task_list(null, null, true, null, 9L);
+        String out = tools.task_list(null, null, null, null, 9L);
         assertTrue(out.contains("暂无"), out);
+    }
+
+    @Test
+    @DisplayName("task_list：project 收窄到一个项目；歧义时报错列候选，不查询")
+    void listNarrowsToOneProjectAndReportsAmbiguity() {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", 5L);
+        row.put("title", "举证期限");
+        row.put("dueDate", LocalDate.of(2026, 11, 6));
+        row.put("status", "OPEN");
+        when(taskService.resolveProjects(9L, "星河并购", false)).thenReturn(List.of(project(3L, "股权转让项目-星河并购")));
+        when(taskService.listByProject(3L, null, null)).thenReturn(List.of(row));
+        String out = tools.task_list(null, null, "星河并购", 1L, 9L);
+        assertTrue(out.contains("项目：股权转让项目-星河并购") && out.contains("2026-11-06 周五"), out);
+
+        when(taskService.resolveProjects(9L, "星河", false)).thenReturn(List.of(project(3L, "股权转让项目-星河并购"), project(4L, "星河租赁合同纠纷")));
+        String amb = tools.task_list(null, null, "星河", 1L, 9L);
+        assertTrue(amb.startsWith("错误") && amb.contains("ask_user") && amb.contains("星河租赁合同纠纷"), amb);
+        verify(taskService, never()).listByProject(eq(4L), any(), any());
+    }
+
+    @Test
+    @DisplayName("task_create：「星河」匹配两个项目（含没有事项的）→ 歧义，必须 ask_user；全名唯一时直接用")
+    void createXingheAmbiguousThenFullNameUnique() {
+        when(taskService.resolveProjects(eq(10L), eq("星河"), eq(true))).thenReturn(List.of(
+                project(3L, "股权转让项目-星河并购"), project(4L, "星河租赁合同纠纷")));
+        String out = tools.task_create("开庭", "2026-11-11", "10:00", null, null, null, null, null, null, null, "星河", 1L, 10L);
+        assertTrue(out.startsWith("错误") && out.contains("ask_user") && out.contains("星河租赁合同纠纷"), out);
+        verify(taskService, never()).createAiTask(any(), any(ProjectTaskService.TaskDraft.class), any());
     }
 
     // ==================== dev-board#895 ====================
@@ -300,7 +329,7 @@ class TaskToolsTest {
         legacy.put("title", "旧事项");
         legacy.put("dueDate", LocalDate.of(2026, 10, 13));
         legacy.put("status", "DONE");
-        when(taskService.listByProject(1L, null, null)).thenReturn(List.of(row, legacy));
+        when(taskService.listForUser(9L, null, null)).thenReturn(List.of(row, legacy));
 
         String out = tools.task_list(null, null, null, 1L, 9L);
 
@@ -323,7 +352,7 @@ class TaskToolsTest {
     @Test
     @DisplayName("task_create projectName：精确匹配优先于当前项目，写入匹配项目")
     void taskCreateProjectNameExactWinsOverConversationProject() {
-        when(taskService.findWritableProjectsByName(10L, "张三案")).thenReturn(List.of(project(5L, "张三案")));
+        when(taskService.resolveProjects(eq(10L), eq("张三案"), eq(true))).thenReturn(List.of(project(5L, "张三案")));
         ProjectTask created = new ProjectTask();
         created.setId(1L);
         created.setTitle("开庭");
@@ -337,7 +366,7 @@ class TaskToolsTest {
     @Test
     @DisplayName("task_create projectName：包含匹配唯一命中时使用；服务层给出单个候选即可")
     void taskCreateProjectNameContainsUnique() {
-        when(taskService.findWritableProjectsByName(10L, "张三")).thenReturn(List.of(project(6L, "张三劳动争议案")));
+        when(taskService.resolveProjects(eq(10L), eq("张三"), eq(true))).thenReturn(List.of(project(6L, "张三劳动争议案")));
         ProjectTask created = new ProjectTask();
         created.setId(2L);
         created.setTitle("x");
@@ -349,7 +378,7 @@ class TaskToolsTest {
     @Test
     @DisplayName("task_create projectName：有歧义——不创建，列最多 5 个候选并让模型问用户")
     void taskCreateProjectNameAmbiguous() {
-        when(taskService.findWritableProjectsByName(10L, "案")).thenReturn(List.of(
+        when(taskService.resolveProjects(eq(10L), eq("案"), eq(true))).thenReturn(List.of(
                 project(1L, "A案"), project(2L, "B案"), project(3L, "C案"), project(4L, "D案"), project(5L, "E案"), project(6L, "F案")));
         String out = tools.task_create("x", "2026-12-02", null, null, null, null, null, null, null, null, "案", 1L, 10L);
         assertTrue(out.startsWith("错误") && out.contains("A案") && out.contains("E案") && !out.contains("F案"), out);
@@ -359,18 +388,18 @@ class TaskToolsTest {
     @Test
     @DisplayName("task_create projectName：没找到——不创建")
     void taskCreateProjectNameNone() {
-        when(taskService.findWritableProjectsByName(10L, "不存在")).thenReturn(List.of());
+        when(taskService.resolveProjects(eq(10L), eq("不存在"), eq(true))).thenReturn(List.of());
         String out = tools.task_create("x", "2026-12-02", null, null, null, null, null, null, null, null, "不存在", 1L, 10L);
         assertTrue(out.startsWith("错误"), out);
         verify(taskService, never()).createAiTask(any(), any(ProjectTaskService.TaskDraft.class), any());
     }
 
     @Test
-    @DisplayName("task_create：projectName 必填——缺失/空白不创建，不回退到会话项目（含 SCRATCH）")
+    @DisplayName("task_create：project 必填——缺失/空白不创建，不回退到会话项目（含 SCRATCH）")
     void taskCreateRequiresProjectName() {
         for (String name : new String[]{null, "  "}) {
             String out = tools.task_create("x", "2026-12-02", null, null, null, null, null, null, null, null, name, 99L, 10L);
-            assertTrue(out.startsWith("错误") && out.contains("projectName"), out);
+            assertTrue(out.startsWith("错误") && out.contains("project"), out);
         }
         verify(taskService, never()).createAiTask(any(), any(ProjectTaskService.TaskDraft.class), any());
     }
@@ -378,7 +407,7 @@ class TaskToolsTest {
     @Test
     @DisplayName("task_create：结果以解析出的项目开头；包含匹配时附带提示，精确匹配不附带；日期带星期")
     void taskCreateLeadsWithResolvedProjectAndNotesFuzzyMatch() {
-        when(taskService.findWritableProjectsByName(10L, "星河")).thenReturn(List.of(project(8L, "星河科技案")));
+        when(taskService.resolveProjects(eq(10L), eq("星河"), eq(true))).thenReturn(List.of(project(8L, "星河科技案")));
         ProjectTask created = new ProjectTask();
         created.setId(3L);
         created.setTitle("开庭");
@@ -389,7 +418,7 @@ class TaskToolsTest {
         assertTrue(out.contains("按「星河」匹配到「星河科技案」"), out);
         assertTrue(out.contains("2026-11-06 周五"), out);
 
-        when(taskService.findWritableProjectsByName(10L, "星河科技案")).thenReturn(List.of(project(8L, "星河科技案")));
+        when(taskService.resolveProjects(eq(10L), eq("星河科技案"), eq(true))).thenReturn(List.of(project(8L, "星河科技案")));
         String exact = tools.task_create("开庭", "2026-11-06", null, null, null, null, null, null, null, null, "星河科技案", 1L, 10L);
         assertFalse(exact.contains("匹配到"), exact);
     }

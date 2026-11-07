@@ -296,20 +296,30 @@ public class ProjectTaskService {
     }
 
     /**
-     * 按名称在用户可写的非 SCRATCH 项目里找：先精确（忽略大小写）匹配，没有再取「名称包含」匹配。
-     * 返回 0 个 = 没找到，1 个 = 唯一，多个 = 有歧义（调用方列候选并让用户选）。
+     * 把用户原话里的项目称呼解析到用户可访问的非 SCRATCH 项目（含没有任何事项的项目）。
+     * 称呼与某项目全名完全相等（忽略大小写），且没有其他项目名包含该称呼 → 只返回它（无歧义）；
+     * 否则返回所有「项目名包含称呼」或「称呼包含项目名」的项目。0 个 = 没找到，1 个 = 唯一，多个 = 歧义。
+     *
+     * @param write true 时只考虑用户可写且非 CLIENT 的项目（建事项）；false 只需可读（查事项）
      */
-    public List<Project> findWritableProjectsByName(Long userId, String name) {
-        String needle = name == null ? "" : name.trim().toLowerCase();
+    public List<Project> resolveProjects(Long userId, String text, boolean write) {
+        String needle = text == null ? "" : text.trim().toLowerCase();
         if (needle.isEmpty()) return List.of();
-        List<Project> writable = projectService.getUserProjects(userId).stream()
-                .filter(p -> !p.isScratchWorkspace() && p.getName() != null)
-                .filter(p -> projectMemberService.hasWritePermission(p.getId(), userId)
-                        && !projectMemberService.isClient(p.getId(), userId))
+        List<Project> candidates = projectService.getUserProjects(userId).stream()
+                .filter(p -> !p.isScratchWorkspace() && p.getName() != null && !p.getName().isBlank())
+                .filter(p -> !write || (projectMemberService.hasWritePermission(p.getId(), userId)
+                        && !projectMemberService.isClient(p.getId(), userId)))
                 .toList();
-        List<Project> exact = writable.stream().filter(p -> p.getName().trim().toLowerCase().equals(needle)).toList();
-        if (!exact.isEmpty()) return exact;
-        return writable.stream().filter(p -> p.getName().toLowerCase().contains(needle)).toList();
+        List<Project> exact = candidates.stream().filter(p -> p.getName().trim().toLowerCase().equals(needle)).toList();
+        List<Project> related = candidates.stream().filter(p -> {
+            String name = p.getName().trim().toLowerCase();
+            return name.contains(needle) || needle.contains(name);
+        }).toList();
+        if (exact.size() == 1 && related.stream().noneMatch(p -> !p.getId().equals(exact.get(0).getId())
+                && p.getName().trim().toLowerCase().contains(needle))) {
+            return exact;
+        }
+        return related;
     }
 
     /** 单任务响应体（含 fileName）。create/update 端点用，字段集与列表端点完全一致。 */
