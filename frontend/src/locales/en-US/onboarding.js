@@ -124,7 +124,7 @@ export default {
   },
   identity: {
     title: 'Choose a Local Workspace',
-    subtitle: 'Multiple existing accounts were found on this device. Choose the workspace to continue with. You will not be asked again, and you can change it later in Settings → Account & Usage.',
+    subtitle: 'Multiple existing accounts were found on this device. Choose the workspace to continue with. You will not be asked again, and you can change it later in Settings → Account & balance.',
     reading: 'Reading local accounts',
     retry: 'Retry',
     itemMeta: '{projects} projects · {files} files',

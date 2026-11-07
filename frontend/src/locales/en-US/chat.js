@@ -133,6 +133,7 @@ export default {
   welcomeSubtitle: 'Ask questions, draft documents, or analyze data anytime.',
   inputPlaceholderEmpty: 'Ask a question, drag files or folders here, or paste contract text...',
   inputPlaceholder: 'Ask anything or describe a task',
+  inputKeysHint: 'Enter to send, Shift+Enter for a new line, type {\'@\'} to reference project files',
   pluginReadOnlyNotice: 'Add-in conversation ({source}) is read-only. Fork it to continue here.',
   forkToContinue: 'Fork to continue',
   recentChats: 'Recent Conversations',
@@ -473,7 +474,7 @@ export default {
   reviewFileMissing: 'Cannot find the project file for this plan. Revise it in the card instead.',
   reviewConversationSwitchFailed: 'Could not switch back to the conversation of this plan. The revision was not sent.',
   // Smart Mode (dev-board#1434)
-  autoModelName: 'Smart Mode (Auto)',
+  autoModelName: 'Auto-select model (recommended)',
   autoModelBadge: 'Recommended',
   autoModelDesc: 'Automatically routes between fast, balanced, and flagship models based on task complexity and modality',
   autoModelRoutedLabel: 'Auto · {name}',

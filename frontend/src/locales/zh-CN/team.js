@@ -15,8 +15,8 @@ export default {
   subtitle: '律所、团队、项目三级协作，使用统计按团队汇总',
   privacyLine: '团队统计只上传计数与匿名项目编号，不含文档内容、文件名与对话',
   needAccountTitle: '尚未连接账户',
-  needAccountDesc: '团队挂在 AI WorkDeck 账户上。到「账户与用量」连接账户后再回来。',
-  goAccount: '前往账户与用量',
+  needAccountDesc: '团队挂在 AI WorkDeck 账户上。到「账户与余额」连接账户后再回来。',
+  goAccount: '前往账户与余额',
   loadFailed: '团队信息暂时取不到，稍后重试',
   retry: '重试',
 

@@ -115,10 +115,10 @@
       <!-- Center Logo -->
       <view class="header-center">
         <view class="mode-switch-capsule" role="tablist" :aria-label="$t('workbench.chatMode.modeSwitchLabel')">
-          <view class="mode-switch-item" :class="{ active: viewMode === 'chat' }" role="tab" :aria-selected="viewMode === 'chat' ? 'true' : 'false'" @click="switchViewMode('chat')">
+          <view class="mode-switch-item" :class="{ active: viewMode === 'chat' }" :title="$t('workbench.chatMode.modeChatTitle')" role="tab" :aria-selected="viewMode === 'chat' ? 'true' : 'false'" @click="switchViewMode('chat')">
             <text class="mode-switch-label">{{ $t('workbench.chatMode.modeChat') }}</text>
           </view>
-          <view class="mode-switch-item" :class="{ active: viewMode === 'ide' }" role="tab" :aria-selected="viewMode === 'ide' ? 'true' : 'false'" @click="switchViewMode('ide')">
+          <view class="mode-switch-item" :class="{ active: viewMode === 'ide' }" :title="$t('workbench.chatMode.modeIdeTitle')" role="tab" :aria-selected="viewMode === 'ide' ? 'true' : 'false'" @click="switchViewMode('ide')">
             <text class="mode-switch-label">{{ $t('workbench.chatMode.modeIde') }}</text>
           </view>
         </view>
@@ -3916,6 +3916,10 @@ export default {
       window.removeEventListener('keydown', this._ideKeymapHandler, true)
       this._ideKeymapHandler = null
     }
+    if (typeof window !== 'undefined' && this._historyEscHandler) {
+      window.removeEventListener('keydown', this._historyEscHandler, true)
+      this._historyEscHandler = null
+    }
     clearTimeout(this._libreSpareTimer)
     this.teardownResponsiveListener()
     // Epic #43: 解绑 ⌘⇧O 嵌入式编辑器监听
@@ -4654,6 +4658,15 @@ export default {
   watch: {
     // 证据标签默认组跟着项目类型走（教程反馈 77）。
     'project.projectType': { immediate: true, handler(type) { setEvidenceProjectType(type) } },
+    // AI 面板「历史」下拉：开着时 Esc 收起（与点遮罩同效）
+    showHistoryDrawer(open) {
+      if (typeof window === 'undefined') return
+      if (this._historyEscHandler) window.removeEventListener('keydown', this._historyEscHandler, true)
+      this._historyEscHandler = null
+      if (!open) return
+      this._historyEscHandler = (e) => { if (e.key === 'Escape') { e.stopPropagation(); this.showHistoryDrawer = false } }
+      window.addEventListener('keydown', this._historyEscHandler, true)
+    },
     projectId() { this.cancelFileTreePdfExport(); this.resetPdfPreviewPool() },
     'currentUser.id'() { this.resetPdfPreviewPool() },
     // 成员轮询会替换数组；只在实际权限信息变化时销毁 PDF 查看器。

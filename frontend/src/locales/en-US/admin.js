@@ -73,10 +73,11 @@ export default {
   navGroupPersonal: 'Personal',
   navGroupSystem: 'System',
   // Personal group: the other three entries reuse account.tab*
-  navPersonalSettings: 'Account & Security',
+  navPersonalSettings: 'Profile & sign-in',
+  backToWorkbench: '← Back to workbench',
   navAi: 'AI Settings',
   navPlatform: 'Platform Services',
-  navAccount: 'Account & Usage',
+  navAccount: 'Account & balance',
   navComponents: 'Components',
   navUpdates: 'Software Update',
   navTelemetry: 'Usage Statistics',

@@ -23,7 +23,7 @@ export default {
   "audioHint": "沒配轉寫服務時，這段錄音會原樣留給維護者聽，不會被丟掉。",
   "contextToggleExpand": "查看隨反饋一起發送的現場信息（{summary}）",
   "contextToggleCollapse": "收起隨反饋一起發送的現場信息（{summary}）",
-  "submitHint": "提交後會發給 AI WorkDeck 維護者；本機也會留一份，在「系統管理 → 用戶反饋」里能查。",
+  "submitHint": "提交後會發給 AI WorkDeck 維護者；本機也會留一份，在「設定 → 用戶反饋」里能查。",
   "viewProgress": "查看進度",
   "retry": "重試",
   "loading": "載入中…",

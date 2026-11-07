@@ -32,7 +32,7 @@ export default {
   "signIn": "登入",
   "signInTitle": "登錄賬戶（使用 AI、廣場付費內容與團隊案件庫時需要）",
   "noProjectTitle": "打開一個項目開始工作",
-  "noProjectHint": "在左側「項目」里打開一個項目，或從歡迎頁新建。",
+  "noProjectHint": "點左上角「全部項目」選擇一個項目，或在歡迎頁新建",
   "startupDisabledHint": "啓動時不再自動顯示歡迎頁。",
   "openWelcome": "打開歡迎頁",
   "aiNeedsProject": "先打開一個項目，再使用 AI 對話"

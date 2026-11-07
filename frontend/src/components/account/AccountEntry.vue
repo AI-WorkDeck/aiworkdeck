@@ -43,6 +43,17 @@
       <text v-if="showMessageBadge" class="account-message-badge" :class="{ 'is-partial': messagePartial }">{{ messageBadgeText }}</text>
     </view>
     <view
+      v-if="!signedIn"
+      class="account-entry-btn signed-out-settings"
+      role="button"
+      tabindex="0"
+      @tap.stop="emitAndClose('settings')"
+      @keydown.enter.stop.prevent="emitAndClose('settings')"
+      @keydown.space.stop.prevent="emitAndClose('settings')"
+    >
+      <text class="account-entry-label">{{ $t('workbench.settingsTabName') }}</text>
+    </view>
+    <view
       class="account-entry-btn"
       :class="signedIn ? { 'avatar-btn': true, 'is-open': menuOpen } : { 'header-login-btn': true, 'is-signed-out': true, 'is-expired': authExpired }"
       role="button"
@@ -236,6 +247,16 @@ export default {
   width: 26px;
   height: 26px;
   margin-right: 8px;
+  border-radius: var(--awd-radius-sm, 4px);
+  color: var(--awd-text-2);
+
+  &:hover { color: var(--awd-accent-text); background: var(--awd-surface-2); }
+}
+
+.signed-out-settings {
+  height: 22px;
+  margin-right: 8px;
+  padding: 0 6px;
   border-radius: var(--awd-radius-sm, 4px);
   color: var(--awd-text-2);
 

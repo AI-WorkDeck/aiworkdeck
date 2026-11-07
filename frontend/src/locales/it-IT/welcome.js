@@ -32,7 +32,7 @@ export default {
   "signIn": "Accedi",
   "signInTitle": "Accedi (necessario per l'IA, gli articoli a pagamento dell'hub e la libreria dei fascicoli del team)",
   "noProjectTitle": "Apri un progetto per iniziare",
-  "noProjectHint": "Apri un progetto da Progetti sulla sinistra, oppure creane uno dalla pagina di benvenuto.",
+  "noProjectHint": "Fai clic su «Tutti i progetti» in alto a sinistra per scegliere un progetto, oppure creane uno dalla pagina di benvenuto.",
   "startupDisabledHint": "La pagina di benvenuto non si aprirà più all'avvio.",
   "openWelcome": "Apri la pagina di benvenuto",
   "aiNeedsProject": "Apri prima un progetto per usare la chat IA"

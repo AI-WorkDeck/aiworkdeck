@@ -4,7 +4,7 @@
   <view class="mobile-receive">
     <button class="receive-trigger" :class="{ attention: hasFailure }" @click="open = !open" :aria-expanded="open">
       <span class="receive-dot" :class="{ busy: status.checking, failed: hasFailure }"></span>
-      {{ $t('workbench.mobileReceive.title') }} · {{ summary }}
+      {{ inactive ? $t('workbench.mobileReceive.inactiveLabel') : $t('workbench.mobileReceive.title') + ' · ' + summary }}
     </button>
     <view v-if="open" class="receive-panel" role="dialog" :aria-label="$t('workbench.mobileReceive.title')">
       <view class="receive-header">
@@ -52,9 +52,10 @@ export default {
   computed: {
     items() { return [...(this.status.items || [])].reverse() },
     hasFailure() { return this.loadError || !!this.status.error || this.items.some(i => i.phase === 'failed') },
+    // 没有「是否配置过配对」的状态可依据，未启用统一显示「未启用」而不是吓人的「未连接」
+    inactive() { return !this.hasFailure && !this.status.active },
     summary() {
       if (this.hasFailure) return this.$t('workbench.mobileReceive.needsAttention')
-      if (!this.status.active) return this.$t('workbench.mobileReceive.disconnected')
       const receiving = this.items.filter(i => ['pending', 'receiving'].includes(i.phase)).length
       if (receiving) return this.$t('workbench.mobileReceive.receivingCount', { count: receiving })
       if (this.status.checking) return this.$t('workbench.mobileReceive.checking')

@@ -73,10 +73,11 @@ export default {
   navGroupPersonal: '个人',
   navGroupSystem: '系统',
   // 「个人」组：工作记录 / 我的收藏 / 我的代办三项复用 account.tab* 文案
-  navPersonalSettings: '账户与安全',
+  navPersonalSettings: '个人资料与登录',
+  backToWorkbench: '← 返回工作台',
   navAi: 'AI 功能设置',
   navPlatform: '平台服务',
-  navAccount: '账户与用量',
+  navAccount: '账户与余额',
   navComponents: '组件管理',
   navUpdates: '软件更新',
   navTelemetry: '数据统计',
@@ -146,7 +147,7 @@ export default {
   siteSwitchFailedTitle: '切换未完成',
   siteSwitchFailedContent: '切换站点失败，站点维持不变。',
 
-  // 账户与用量
+  // 账户与余额
   accountSectionSubtitle: '连接 AI WorkDeck 账户后，可以使用平台 AI 通道、查看余额与用量，并同步已购插件与功能解锁',
   accountIntro: '桌面端不需要注册登录。在官网账户页生成一枚账户 Key（awdk_ 开头），粘贴到下面即可完成连接；Key 保存在本机，随时可以断开。',
   getKeyButton: '前往官网获取 Key',
