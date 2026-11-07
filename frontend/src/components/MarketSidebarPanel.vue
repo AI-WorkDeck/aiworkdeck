@@ -70,6 +70,7 @@
             <text>{{ row.stateLabel }}</text>
           </view>
         </view>
+        <view class="msb-list-end" />
         </scroll-view>
       </view>
       </view>
@@ -205,6 +206,7 @@
             </view>
           </view>
         </template>
+        <view class="msb-list-end" />
         </scroll-view>
       </view>
       </view>
@@ -748,6 +750,14 @@ export default {
   flex: 1;
   height: 0;
   min-height: 0;
+  /* 底部淡出：两组对半分高时，被截断的行渐隐，看得出「下面还有、可滚动」，
+     而不是像被下一组压住。末尾的 .msb-list-end 垫出同样高度，滚到底时最后一行完整可见。 */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+}
+
+.msb-list-end {
+  height: 24px;
 }
 
 /* 分组头：VS Code 式全大写小字 + 计数 */
