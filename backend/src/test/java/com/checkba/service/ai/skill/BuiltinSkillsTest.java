@@ -121,6 +121,16 @@ class BuiltinSkillsTest {
     }
 
     @Test
+    @DisplayName("触发词同长并列时按命中位置裁决：「腾讯会议…会议纪要」归腾讯会议，单纯「整理会议纪要」仍归 meeting-recorder")
+    void tiedTriggersResolveByMentionOrder() {
+        SkillRouter router = new SkillRouter(registry, new SkillProperties(),
+                org.mockito.Mockito.mock(com.checkba.service.telemetry.TelemetryService.class), null);
+        assertEquals("tencent-meeting",
+                router.match("刚开完腾讯会议，帮我整理成会议纪要").orElseThrow().getId());
+        assertEquals("meeting-recorder", router.match("帮我整理会议纪要").orElseThrow().getId());
+    }
+
+    @Test
     @DisplayName("腾讯会议：内置 skill 与插件自带 skill 的白名单都放行 tencent_meeting_action")
     void tencentMeetingSkillsAllowThePluginTool() throws Exception {
         assertTrue(registry.getSkill("tencent-meeting").orElseThrow().getAllowedTools().contains("tencent_meeting_action"));

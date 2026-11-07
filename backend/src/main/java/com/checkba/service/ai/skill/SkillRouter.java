@@ -173,7 +173,7 @@ public class SkillRouter {
 
     /**
      * 触发匹配（无状态）：在所有可用 skill 中找命中关键词的；
-     * 多命中时取最长命中关键词的 skill（并列时取先注册的）。
+     * 多命中时依次比：最长命中词 → 命中词个数 → 命中词总长 → 命中位置靠前者；全平取先注册的。
      *
      * 生效方式为"仅手动"的 skill 不参与自动匹配——它只能由用户钉选生效。
      */
@@ -184,7 +184,7 @@ public class SkillRouter {
         String normalized = userInput.toLowerCase();
         boolean english = isEnglish();
         SkillDefinition best = null;
-        int bestLen = 0;
+        long[] bestScore = null;
         for (SkillDefinition skill : skillRegistry.getSkills()) {
             if (!skillRegistry.isAvailable(skill) || skillRegistry.isManual(skill.getId())) {
                 continue;
@@ -192,14 +192,31 @@ public class SkillRouter {
             if ("legal-opinion-review".equals(skill.getId()) && !requestsOpinionReview(normalized)) {
                 continue;
             }
+            // 得分（逐项比较，大者胜）：最长命中词长度 → 命中的不同触发词个数 → 命中词总长度
+            // → 命中位置越靠前越优先（先点名的对象，如「腾讯会议」，比后面的动作「会议纪要」更具体）。
+            // 全部相同才按注册顺序（先注册者胜）。
+            java.util.Set<String> hits = new java.util.HashSet<>();
+            int maxLen = 0;
+            int totalLen = 0;
+            int firstPos = Integer.MAX_VALUE;
             for (String trigger : matchTriggers(skill, english)) {
                 if (trigger == null || trigger.isBlank()) {
                     continue;
                 }
-                if (containsTrigger(normalized, trigger.toLowerCase()) && trigger.length() > bestLen) {
-                    best = skill;
-                    bestLen = trigger.length();
+                String t = trigger.toLowerCase();
+                if (containsTrigger(normalized, t) && hits.add(t)) {
+                    maxLen = Math.max(maxLen, t.length());
+                    totalLen += t.length();
+                    firstPos = Math.min(firstPos, Math.max(0, normalized.indexOf(t)));
                 }
+            }
+            if (hits.isEmpty()) {
+                continue;
+            }
+            long[] score = {maxLen, hits.size(), totalLen, -firstPos};
+            if (bestScore == null || java.util.Arrays.compare(score, bestScore) > 0) {
+                best = skill;
+                bestScore = score;
             }
         }
         return Optional.ofNullable(best);
