@@ -95,6 +95,9 @@
         <text v-if="statusKey === 'movedSaveFailed' && !saving" class="libre-save-retry" @tap="saveCopyAs">{{ $t('editor.saveCopyAs') }}</text>
       </view>
     </view>
+    <!-- 外部 Agent（MCP propose_revision）的待审修订：仅激活的已打开文件显示，接受后以修订痕迹落入文档 -->
+    <!-- PendingRevisionBar 在 main.js 全局注册：不进本组件的 script，免得抽取源码构建组件的测试夹具逐个补桩 -->
+    <PendingRevisionBar v-if="file && file.id && active" :project-id="projectId" :file-id="file.id" :executor="pendingRevisionExecutor" />
     <view v-if="inputError" class="libre-input-error" role="alert">
       <text>{{ inputError }}</text>
       <button :title="$t('common.close')" type="button" :aria-label="$t('common.close')" @click="inputError = ''">×</button>
@@ -382,6 +385,10 @@ export default {
     }
   },
   computed: {
+    /** 待审修订接受用：文档就绪且可写时才给执行器，经同一条 executeCommand（EDITOR_ACTIONS 闸）落修订。 */
+    pendingRevisionExecutor() {
+      return this.ready && this.canWrite && this.executor ? (a, p) => this.executor.executeCommand(a, p) : null
+    },
     localContentSaveText() {
       if (!this.statusKey.endsWith('Failed')) return ''
       if (this.localSaveReason === 'OPERATION_CANCELLED') return this.$t('editor.status.contentSaveReloadRequired')

@@ -4938,3 +4938,11 @@ export const previewMcpImport = (json, scopeToken) => request({ header: { 'X-MCP
 export const importMcpConnections = (json, selectedIndices, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: '/api/mcp/import', method: 'POST', data: { json, selectedIndices } })
 export const authorizeMcpConnection = (id, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: `/api/mcp/connections/${encodeURIComponent(id)}/oauth/authorize`, method: 'POST', timeout: 75000 })
 export const disconnectMcpOAuth = (id, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: `/api/mcp/connections/${encodeURIComponent(id)}/oauth`, method: 'DELETE' })
+
+// ==================== 外部 Agent 待审修订（MCP propose_revision，docs/plans/agent-app-control.md C7） ====================
+export const listPendingRevisions = (params) => request({ url: '/api/revisions/pending', method: 'GET', params })
+export const acceptPendingRevision = (id) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/accept`, method: 'POST' })
+export const markPendingRevisionApplied = (id) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/applied`, method: 'POST' })
+export const recordPendingRevisionProgress = (id, appliedCount) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/progress`, method: 'POST', data: { appliedCount } })
+export const rejectPendingRevision = (id) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/reject`, method: 'POST' })
+export const getMcpServerStatus = () => request({ url: '/api/mcp-server/status', method: 'GET' })

@@ -33,7 +33,7 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 ## 能力目录与本机 MCP 服务器（Stella 对齐，docs/plans/stella-alignment/mcp-server.md）
 
 - `@ToolMeta.access()` 默认 INFERRED，由 `service/ai/capability/CapabilityCatalog` 按工具名动词推断 read/write/destructive（认不出算 write），并推出 scope `awd:<领域>.<read|write>`。`docs/capability-catalog.md` 由 `CapabilityCatalogDocTest` 生成并做漂移比对：**增删改工具后要重新生成**（`AWD_WRITE_CAPABILITY_CATALOG=1 mvn test -Dtest=CapabilityCatalogDocTest`），推断不对就在 `@ToolMeta` 显式写 access。
-- AWD 自身作为 MCP 服务器：`LocalMcpServerController` 的 `POST /mcp`（只在 local-mode，默认关闭=404，`Authorization: Bearer awdm_...`，带 Origin 拒绝）与 `/api/mcp-server/{status,enable,disable}`；工具在 `service/mcpserver/LocalMcpServerTools`，全部只读、不经 ToolRegistry、读文件不走 OCR。新增 MCP 工具必须登记 `DEFINITIONS`，只能是 read（测试钉着）。
+- AWD 自身作为 MCP 服务器：`LocalMcpServerController` 的 `POST /mcp`（只在 local-mode，默认关闭=404，`Authorization: Bearer awdm_...`，带 Origin 拒绝）与 `/api/mcp-server/{status,enable,disable}`；工具在 `service/mcpserver/LocalMcpServerTools`，除 `propose_revision` 外全部只读、不经 ToolRegistry、读文件不走 OCR。新增 MCP 工具必须登记 `DEFINITIONS`，只能是 read；唯一的写工具是 `propose_revision`（access=write，scope `awd:project.propose`，`CapabilityCatalogDocTest` 点名放行，不改文件只落 `PendingRevision`，契约见 `ai-doc-bridge.md`「外部 Agent 待审修订」）。`read_file` 返回 `version`（= 更新时间毫秒-字节数），即提案的 `baseVersion`。`tools/call` 来源标注取请求头 User-Agent（无状态，拿不到 initialize 的 clientInfo），净化后写成 `mcp:<client>`。
 
 ## 独立 MCP 连接（dev-board#1599）
 

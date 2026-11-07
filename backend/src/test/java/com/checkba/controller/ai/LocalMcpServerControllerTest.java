@@ -96,22 +96,45 @@ class LocalMcpServerControllerTest {
     }
 
     @Test
-    void toolsListIsReadOnly() throws Exception {
+    void toolsListIsReadOnlyExceptProposeRevision() throws Exception {
         rpc("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}")
                 .andExpect(jsonPath("$.result.tools", hasSize(LocalMcpServerTools.DEFINITIONS.size())))
-                .andExpect(jsonPath("$.result.tools[*].annotations.readOnlyHint", everyItem(org.hamcrest.Matchers.is(true))))
+                .andExpect(jsonPath("$.result.tools[?(@.name=='propose_revision')]", hasSize(1)))
+                .andExpect(jsonPath("$.result.tools[?(@.name=='propose_revision')].annotations.readOnlyHint",
+                        everyItem(org.hamcrest.Matchers.is(false))))
+                .andExpect(jsonPath("$.result.tools[?(@.name!='propose_revision')].annotations.readOnlyHint",
+                        everyItem(org.hamcrest.Matchers.is(true))))
                 .andExpect(jsonPath("$.result.tools[*].annotations.destructiveHint", everyItem(org.hamcrest.Matchers.is(false))));
     }
 
     @Test
+    void proposeRevisionCallPassesClientNameAndReportsInvalidAsToolError() throws Exception {
+        when(tools.call(eq("propose_revision"), anyMap(), eq(7L), eq("claude-code/1.0")))
+                .thenReturn(Map.of("proposalId", 5, "status", "PENDING"));
+        mvc.perform(post("/mcp").header("Authorization", "Bearer " + TOKEN).header("User-Agent", "claude-code/1.0")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/call\",\"params\":{\"name\":\"propose_revision\",\"arguments\":{\"fileId\":1,\"baseVersion\":\"v\",\"edits\":[{\"find\":\"a\",\"replace\":\"b\"}]}}}"))
+                .andExpect(jsonPath("$.result.isError").value(false))
+                .andExpect(jsonPath("$.result.content[0].text", containsString("\"proposalId\":5")));
+
+        when(tools.call(eq("propose_revision"), anyMap(), eq(7L), eq("claude-code/1.0")))
+                .thenThrow(new LocalMcpServerTools.ToolError("find must not be empty"));
+        mvc.perform(post("/mcp").header("Authorization", "Bearer " + TOKEN).header("User-Agent", "claude-code/1.0")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"tools/call\",\"params\":{\"name\":\"propose_revision\",\"arguments\":{\"fileId\":1,\"baseVersion\":\"v\",\"edits\":[{\"find\":\"\",\"replace\":\"b\"}]}}}"))
+                .andExpect(jsonPath("$.result.isError").value(true))
+                .andExpect(jsonPath("$.result.content[0].text").value("find must not be empty"));
+    }
+
+    @Test
     void toolsCallRunsAsLocalUserAndReportsToolErrorsInResult() throws Exception {
-        when(tools.call(eq("list_projects"), anyMap(), eq(7L))).thenReturn(List.of(Map.of("projectId", 1)));
+        when(tools.call(eq("list_projects"), anyMap(), eq(7L), any())).thenReturn(List.of(Map.of("projectId", 1)));
         rpc("{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"list_projects\",\"arguments\":{}}}")
                 .andExpect(jsonPath("$.id").value(3))
                 .andExpect(jsonPath("$.result.isError").value(false))
                 .andExpect(jsonPath("$.result.content[0].text").value("[{\"projectId\":1}]"));
 
-        when(tools.call(eq("read_file"), anyMap(), any())).thenThrow(new LocalMcpServerTools.ToolError("File not found: 9"));
+        when(tools.call(eq("read_file"), anyMap(), any(), any())).thenThrow(new LocalMcpServerTools.ToolError("File not found: 9"));
         rpc("{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"read_file\",\"arguments\":{\"fileId\":9}}}")
                 .andExpect(jsonPath("$.result.isError").value(true))
                 .andExpect(jsonPath("$.result.content[0].text").value("File not found: 9"));
