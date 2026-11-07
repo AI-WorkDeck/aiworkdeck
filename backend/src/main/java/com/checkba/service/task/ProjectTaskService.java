@@ -3,6 +3,7 @@
 
 package com.checkba.service.task;
 
+import com.checkba.model.entity.Project;
 import com.checkba.model.entity.ProjectFile;
 import com.checkba.model.entity.ProjectTask;
 import com.checkba.model.entity.ProjectTaskFile;
@@ -14,6 +15,7 @@ import com.checkba.repository.UserRepository;
 import com.checkba.service.LangText;
 import com.checkba.service.LocalIdentityService;
 import com.checkba.service.ProjectMemberService;
+import com.checkba.service.ProjectService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -66,17 +68,20 @@ public class ProjectTaskService {
     private final ProjectTaskFileRepository taskFileRepository;
     private final UserRepository userRepository;
     private final ProjectMemberService projectMemberService;
+    private final ProjectService projectService;
 
     public ProjectTaskService(ProjectTaskRepository taskRepository,
                               ProjectFileRepository projectFileRepository,
                               ProjectTaskFileRepository taskFileRepository,
                               UserRepository userRepository,
-                              ProjectMemberService projectMemberService) {
+                              ProjectMemberService projectMemberService,
+                              ProjectService projectService) {
         this.taskRepository = taskRepository;
         this.projectFileRepository = projectFileRepository;
         this.taskFileRepository = taskFileRepository;
         this.userRepository = userRepository;
         this.projectMemberService = projectMemberService;
+        this.projectService = projectService;
     }
 
     /**
@@ -250,8 +255,8 @@ public class ProjectTaskService {
      */
     public List<Map<String, Object>> listByProject(Long projectId, LocalDate from, LocalDate to, Long fileId) {
         List<ProjectTask> tasks = fileId == null
-                ? taskRepository.findByProjectIdAndDueDateRange(projectId, from, to)
-                : taskRepository.findByProjectIdAndFileIdAndDueDateRange(projectId, fileId, from, to);
+                ? taskRepository.findByProjectIdAndDueDateRange(projectId, lowerBound(from), upperBound(to))
+                : taskRepository.findByProjectIdAndFileIdAndDueDateRange(projectId, fileId, lowerBound(from), upperBound(to));
         return toMaps(tasks);
     }
 
@@ -260,8 +265,40 @@ public class ProjectTaskService {
         if (projectIds == null || projectIds.isEmpty()) {
             return List.of();
         }
-        List<ProjectTask> tasks = taskRepository.findByProjectIdInAndDueDateRange(projectIds, from, to);
+        List<ProjectTask> tasks = taskRepository.findByProjectIdInAndDueDateRange(projectIds, lowerBound(from), upperBound(to));
         return toMaps(tasks);
+    }
+
+    /*
+     * 日期区间空端换成哨兵值再下发：PostgreSQL 推不出空 LocalDate 参数的类型，
+     * 「:from IS NULL OR …」会炸 could not determine data type of parameter（H2 不炸，单测测不出）。
+     * due_date 列 NOT NULL，哨兵与「不限」语义等价。
+     */
+    static final LocalDate NO_LOWER_BOUND = LocalDate.of(1900, 1, 1);
+    static final LocalDate NO_UPPER_BOUND = LocalDate.of(9999, 12, 31);
+
+    private static LocalDate lowerBound(LocalDate from) {
+        return from == null ? NO_LOWER_BOUND : from;
+    }
+
+    private static LocalDate upperBound(LocalDate to) {
+        return to == null ? NO_UPPER_BOUND : to;
+    }
+
+    /**
+     * 用户可见全部项目（创建的 ∪ 成员项目，同 ProjectService.getUserProjects）在日期区间内的事项，
+     * 每条带 projectName。日历页 GET /api/calendar 与 AI 工具 task_list（跨项目）共用。
+     */
+    public List<Map<String, Object>> listForUser(Long userId, LocalDate from, LocalDate to) {
+        Map<Long, String> projectNames = new HashMap<>();
+        for (Project p : projectService.getUserProjects(userId)) {
+            projectNames.put(p.getId(), p.getName());
+        }
+        List<Map<String, Object>> tasks = listAcrossProjects(List.copyOf(projectNames.keySet()), from, to);
+        for (Map<String, Object> task : tasks) {
+            task.put("projectName", projectNames.get(task.get("projectId")));
+        }
+        return tasks;
     }
 
     /** 单任务响应体（含 fileName）。create/update 端点用，字段集与列表端点完全一致。 */

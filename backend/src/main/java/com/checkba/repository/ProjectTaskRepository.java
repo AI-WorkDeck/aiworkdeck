@@ -22,7 +22,7 @@ public interface ProjectTaskRepository extends JpaRepository<ProjectTask, Long> 
 
     /** 单项目任务列表，供 ProjectOverviewController /tasks 与 TaskSchedule.vue 用。 */
     @Query("SELECT t FROM ProjectTask t WHERE t.projectId = :projectId "
-            + "AND (:from IS NULL OR t.dueDate >= :from) AND (:to IS NULL OR t.dueDate <= :to) "
+            + "AND t.dueDate >= :from AND t.dueDate <= :to "
             + "ORDER BY t.dueDate ASC, t.dueTime ASC NULLS FIRST")
     List<ProjectTask> findByProjectIdAndDueDateRange(
             @Param("projectId") Long projectId,
@@ -31,7 +31,7 @@ public interface ProjectTaskRepository extends JpaRepository<ProjectTask, Long> 
 
     /** 跨项目聚合，供 CalendarController 用（当前用户可见的全部项目）。 */
     @Query("SELECT t FROM ProjectTask t WHERE t.projectId IN :projectIds "
-            + "AND (:from IS NULL OR t.dueDate >= :from) AND (:to IS NULL OR t.dueDate <= :to) "
+            + "AND t.dueDate >= :from AND t.dueDate <= :to "
             + "ORDER BY t.dueDate ASC, t.dueTime ASC NULLS FIRST")
     List<ProjectTask> findByProjectIdInAndDueDateRange(
             @Param("projectIds") List<Long> projectIds,
@@ -45,7 +45,7 @@ public interface ProjectTaskRepository extends JpaRepository<ProjectTask, Long> 
      */
     @Query("SELECT t FROM ProjectTask t WHERE t.projectId = :projectId "
             + "AND (t.fileId = :fileId OR t.id IN (SELECT f.taskId FROM ProjectTaskFile f WHERE f.fileId = :fileId)) "
-            + "AND (:from IS NULL OR t.dueDate >= :from) AND (:to IS NULL OR t.dueDate <= :to) "
+            + "AND t.dueDate >= :from AND t.dueDate <= :to "
             + "ORDER BY t.dueDate ASC, t.dueTime ASC NULLS FIRST")
     List<ProjectTask> findByProjectIdAndFileIdAndDueDateRange(
             @Param("projectId") Long projectId,

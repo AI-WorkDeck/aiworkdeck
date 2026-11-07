@@ -7,6 +7,8 @@
 
 ## 工作流程
 
+> 若工具列表里有 `tencent_meeting_action`（腾讯会议插件已安装并启用），一律改用它：`action=list` 列会议、`action=detail` 取逐字稿与纪要素材（返回 pending 及 jobId 时用同 action 带 {jobId} 继续查询）；下文的 `tmeet_*` 仅在没有该工具时使用。
+
 1. **读取会议内容**：
    - 提取输入中的 `recordId`，调用 `tmeet_get_transcript(recordId=...)` 读取会议主题、时间、发言人、智能纪要素材及完整逐字稿。
    - 若用户未提供明确的 recordId，先调用 `tmeet_list_meetings()` 查询当前项目的腾讯会议列表。
