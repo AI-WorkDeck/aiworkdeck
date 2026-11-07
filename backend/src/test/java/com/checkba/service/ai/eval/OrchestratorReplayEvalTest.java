@@ -135,6 +135,21 @@ class OrchestratorReplayEvalTest {
             }
         }
 
+        // 5.1.2 每轮下发体量（tool-surface-audit S0）：报告里逐轮打印，用例写了上限就卡首轮
+        if (r.offeredToolCountPerCall().stream().anyMatch(n -> n > 0)) {
+            System.out.printf("[eval-offered] %s offeredToolsPerCall=%s offeredSchemaTokensPerCall=%s%n",
+                    c.id, r.offeredToolCountPerCall(), r.offeredSchemaTokensPerCall());
+        }
+        if (c.expect.maxOfferedToolsFirstCall != null) {
+            assertTrue(r.firstCallOfferedTools() <= c.expect.maxOfferedToolsFirstCall,
+                    "首轮下发工具数 " + r.firstCallOfferedTools() + " 超过上限 " + c.expect.maxOfferedToolsFirstCall);
+        }
+        if (c.expect.maxOfferedTokensFirstCall != null) {
+            assertTrue(r.firstCallOfferedSchemaTokens() <= c.expect.maxOfferedTokensFirstCall,
+                    "首轮下发 schema token " + r.firstCallOfferedSchemaTokens()
+                            + " 超过上限 " + c.expect.maxOfferedTokensFirstCall);
+        }
+
         // 5.2 回喂断言：编排器主动追加的系统提醒应出现在某次 LLM 上下文里
         for (String marker : c.expect.promptContains) {
             assertTrue(r.promptTexts().stream().anyMatch(p -> p.contains(marker)),

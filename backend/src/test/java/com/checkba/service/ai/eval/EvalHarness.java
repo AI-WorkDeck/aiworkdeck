@@ -68,7 +68,30 @@ public final class EvalHarness {
             List<List<String>> toolNamesOfferedPerLlmCall,
             List<String> promptTexts,
             List<Long> checkpointFileIds,
-            int remainingScriptTurns) {
+            int remainingScriptTurns,
+            List<Integer> offeredToolCountPerCall,
+            List<Integer> offeredSchemaTokensPerCall) {
+
+        /** 第一次携带工具的 LLM 调用的下发工具数（没有则 0） */
+        public int firstCallOfferedTools() {
+            for (int i = 0; i < toolsOfferedPerLlmCall.size(); i++) {
+                if (toolsOfferedPerLlmCall.get(i)) {
+                    return offeredToolCountPerCall.get(i);
+                }
+            }
+            return 0;
+        }
+
+        /** 第一次携带工具的 LLM 调用的下发 schema token（没有则 0） */
+        public int firstCallOfferedSchemaTokens() {
+            for (int i = 0; i < toolsOfferedPerLlmCall.size(); i++) {
+                if (toolsOfferedPerLlmCall.get(i)) {
+                    return offeredSchemaTokensPerCall.get(i);
+                }
+            }
+            return 0;
+        }
+
 
         /** 最终保存的 ASSISTANT 消息（含 executionLog 前缀） */
         public Optional<String> lastAssistantMessage() {
@@ -305,7 +328,8 @@ public final class EvalHarness {
         return new RunResult(c, registry.dispatches(), List.copyOf(sseEvents), List.copyOf(savedMessages),
                 List.copyOf(artifactSaves), List.copyOf(folderRenames),
                 scripted.toolsOfferedPerCall(), scripted.toolNamesOfferedPerCall(),
-                scripted.promptTextPerCall(), List.copyOf(checkpointFileIds), scripted.remainingTurns());
+                scripted.promptTextPerCall(), List.copyOf(checkpointFileIds), scripted.remainingTurns(),
+                scripted.offeredToolCountPerCall(), scripted.offeredSchemaTokensPerCall());
     }
 
     /** 内置 skills 目录（与 EvalCase.casesDir 同思路：兼容从 backend/ 或仓库根目录跑测试） */
