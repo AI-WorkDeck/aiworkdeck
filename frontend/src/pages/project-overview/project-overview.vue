@@ -958,7 +958,7 @@
                         <path v-for="(d, gi) in getFileIconPaths(file.fileType, file.tabType, file.pluginId || (file.marketSpec && file.marketSpec.id))" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
                       </svg>
                       <text class="tab-name">{{ getTabDisplayName(file) }}</text>
-                      <text class="tab-close" @tap.stop="closeFile(file.id, 'left')">×</text>
+                      <text :title="$t('common.close')" class="tab-close" @tap.stop="closeFile(file.id, 'left')">×</text>
                     </view>
                   </view>
                 </scroll-view>
@@ -1001,7 +1001,7 @@
                         <path v-for="(d, gi) in getFileIconPaths(file.fileType, file.tabType, file.pluginId || (file.marketSpec && file.marketSpec.id))" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
                       </svg>
                       <text class="tab-name">{{ getTabDisplayName(file) }}</text>
-                      <text class="tab-close" @tap.stop="closeFile(file.id, 'right')">×</text>
+                      <text :title="$t('common.close')" class="tab-close" @tap.stop="closeFile(file.id, 'right')">×</text>
                     </view>
                   </view>
                 </scroll-view>
@@ -1725,7 +1725,7 @@
                       :placeholder="toolsSearchPlaceholder"
                       confirm-type="search"
                     />
-                    <view v-if="toolsSearchKeyword" class="tools-search-clear" @tap="toolsSearchKeyword = ''">×</view>
+                    <view :title="$t('common.clear')" v-if="toolsSearchKeyword" class="tools-search-clear" @tap="toolsSearchKeyword = ''">×</view>
                   </view>
                 </view>
 
@@ -1918,7 +1918,7 @@
                         :maxlength="60"
                         :placeholder="$t('workbench.historyFilterPlaceholder')"
                     />
-                    <text v-if="historyFilter" class="history-filter-clear" @tap.stop="historyFilter = ''">×</text>
+                    <text :title="$t('common.clear')" v-if="historyFilter" class="history-filter-clear" @tap.stop="historyFilter = ''">×</text>
                 </view>
                 <scroll-view scroll-y class="drawer-list" style="max-height: 350px;">
                     <view v-if="loadingHistory" class="menu-item" style="color:var(--awd-text-3);">{{ $t('workbench.loadingText') }}</view>
@@ -2048,7 +2048,7 @@
       <!-- 图片预览（剪贴板等）：桌面端 BrowserView 盖 DOM，须走 desktopOverlayActive 守卫 -->
       <view v-if="imagePreviewUrl" class="image-preview-mask" @tap="closeImagePreview">
         <image class="image-preview-img" :src="imagePreviewUrl" mode="aspectFit"></image>
-        <view class="image-preview-close" @tap.stop="closeImagePreview">✕</view>
+        <view :title="$t('common.close')" class="image-preview-close" @tap.stop="closeImagePreview">✕</view>
       </view>
 
       <!-- Screenshot Save Dialog -->

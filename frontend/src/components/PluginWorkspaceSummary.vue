@@ -14,7 +14,7 @@
             class="pws-search-input"
             :placeholder="tr('panels.pwsSearchPlaceholder', '搜索会话或联系人…')"
           />
-          <text v-if="searchKeyword" class="pws-search-clear" @tap="searchKeyword = ''">×</text>
+          <text :title="$t('common.clear')" v-if="searchKeyword" class="pws-search-clear" @tap="searchKeyword = ''">×</text>
         </view>
         <view class="pws-im-quick-row">
           <view class="pws-quick-btn primary" @tap="emitCommand('open-new-chat')">

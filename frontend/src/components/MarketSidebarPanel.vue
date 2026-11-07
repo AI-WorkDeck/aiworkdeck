@@ -8,7 +8,7 @@
         <path v-for="(d, gi) in ICONS.search" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
       <input class="msb-search-input" v-model="searchText" :placeholder="$t('common.search') + ' · ' + $t('market.sectionSkillTitle') + ' / ' + $t('market.sectionPluginTitle') + ' / ' + $t('mcp.label')" />
-      <view v-if="searchText" class="msb-search-clear" @tap="searchText = ''">×</view>
+      <view :title="$t('common.clear')" v-if="searchText" class="msb-search-clear" @tap="searchText = ''">×</view>
     </view>
 
     <view class="msb-body">

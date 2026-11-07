@@ -6,7 +6,7 @@
       <header class="quick-look-header">
         <span class="quick-look-hint">{{ $t('files.quickLookHint') }}</span>
         <button type="button" @click="$emit('open')">{{ $t('files.quickLookOpen') }}</button>
-        <button type="button" :aria-label="$t('common.close')" @click="$emit('close')">×</button>
+        <button :title="$t('common.close')" type="button" :aria-label="$t('common.close')" @click="$emit('close')">×</button>
       </header>
       <FilePreview :key="file.id" :file="file" :project-id="projectId" :show-edit-btn="false" @extracted="$emit('extracted', $event)" />
     </section>

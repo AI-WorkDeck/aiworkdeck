@@ -5,7 +5,7 @@
     <div v-if="suggestion" class="chat-suggestion" aria-live="polite">
       <button class="suggestion-text" type="button" @click="$emit('edit')" :title="$t('chatSuggestions.edit')">{{ suggestion.text }}</button>
       <span class="suggestion-shortcut">{{ $t('chatSuggestions.tab') }}</span>
-      <button class="suggestion-dismiss" type="button" :aria-label="$t('chatSuggestions.dismiss')" @click="$emit('dismiss')">×</button>
+      <button :title="$t('chatSuggestions.dismiss')" class="suggestion-dismiss" type="button" :aria-label="$t('chatSuggestions.dismiss')" @click="$emit('dismiss')">×</button>
     </div>
     <div v-if="showSettings" class="suggestion-settings">
       <button type="button" class="suggestion-toggle" :aria-pressed="enabled" @click="$emit('toggle')">{{ $t(enabled ? 'chatSuggestions.on' : 'chatSuggestions.off') }}</button>

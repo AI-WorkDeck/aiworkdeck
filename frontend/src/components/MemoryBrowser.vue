@@ -8,7 +8,7 @@
           <text class="memory-title">{{ $t('chat.memoryTitle') }}</text>
           <text class="memory-subtitle">{{ $t('chat.memorySubtitle') }}</text>
         </view>
-        <text class="memory-close" @tap="$emit('close')">×</text>
+        <text :title="$t('common.close')" class="memory-close" @tap="$emit('close')">×</text>
       </view>
 
       <view class="memory-spaces">

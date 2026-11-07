@@ -114,9 +114,9 @@
             @click.stop="hideEvidenceRect"
           ></view>
           <view v-if="imageReady" class="image-toolbar" @mousedown.stop>
-            <button class="img-tool-btn" size="mini" @tap="imageZoomOutBtn">−</button>
+            <button :title="$t('common.zoomOut')" class="img-tool-btn" size="mini" @tap="imageZoomOutBtn">−</button>
             <text class="img-zoom-pct">{{ imageZoomPercentText }}</text>
-            <button class="img-tool-btn" size="mini" @tap="imageZoomInBtn">＋</button>
+            <button :title="$t('common.zoomIn')" class="img-tool-btn" size="mini" @tap="imageZoomInBtn">＋</button>
             <view class="img-tool-sep"></view>
             <button class="img-tool-btn img-tool-btn-text" size="mini" @tap="imageZoomActual">1:1</button>
             <button class="img-tool-btn img-tool-btn-text" size="mini" @tap="imageZoomFit">{{ $t('files.fitWindow') }}</button>

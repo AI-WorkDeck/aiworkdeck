@@ -5,7 +5,7 @@
     <view class="workdeck-dialog" @tap.stop>
       <view class="workdeck-dialog-header">
         <text class="workdeck-dialog-title">{{ $t('version.addPeopleTitle') }}</text>
-        <view class="modal-close" @tap="close">×</view>
+        <view :title="$t('common.close')" class="modal-close" @tap="close">×</view>
       </view>
 
       <!-- 只有同事和客户两种邀请方式都可用时才显示切换栏。 -->

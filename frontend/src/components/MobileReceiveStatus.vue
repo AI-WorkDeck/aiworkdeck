@@ -9,7 +9,7 @@
     <view v-if="open" class="receive-panel" role="dialog" :aria-label="$t('workbench.mobileReceive.title')">
       <view class="receive-header">
         <strong>{{ $t('workbench.mobileReceive.title') }}</strong>
-        <button class="receive-close" @click="open = false" :aria-label="$t('workbench.mobileReceive.close')">×</button>
+        <button :title="$t('workbench.mobileReceive.close')" class="receive-close" @click="open = false" :aria-label="$t('workbench.mobileReceive.close')">×</button>
       </view>
       <p v-if="!status.active">{{ $t('workbench.mobileReceive.connect') }}</p>
       <p v-else-if="hasFailure" class="receive-error">{{ $t('workbench.mobileReceive.connectionError') }}</p>

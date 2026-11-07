@@ -7,7 +7,7 @@
             <text class="awd-dialog-title">{{ $t('chat.builtinWorkflowModalTitle', { name: activeModalWorkflow.title }) }}</text>
             <text class="bw-editor-subtitle">{{ $t('chat.builtinWorkflowModalSubtitle') }}</text>
           </view>
-          <text v-if="!embeddedInSettings" class="awd-dialog-close" @tap="closeBuiltinWorkflowModal">×</text>
+          <text :title="$t('common.close')" v-if="!embeddedInSettings" class="awd-dialog-close" @tap="closeBuiltinWorkflowModal">×</text>
         </view>
 
         <!-- 顶部四大工作流切换栏：从「高级设置」进入后可一站式配置任意内置工作流 -->

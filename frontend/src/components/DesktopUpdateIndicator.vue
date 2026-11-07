@@ -19,7 +19,7 @@
     <view v-if="expanded" class="update-popover" role="region" :aria-label="$t('shell.updateDetails')">
       <view class="update-popover-header">
         <text role="status" aria-live="polite">{{ statusLabel }}</text>
-        <button type="button" role="button" tabindex="0" @keydown="onActionKey($event, 'closeDetails')" class="update-close" :aria-label="$t('shell.updateClose')" @click="closeDetails">×</button>
+        <button :title="$t('shell.updateClose')" type="button" role="button" tabindex="0" @keydown="onActionKey($event, 'closeDetails')" class="update-close" :aria-label="$t('shell.updateClose')" @click="closeDetails">×</button>
       </view>
       <text v-if="errorText" class="update-error">{{ errorText }}</text>
       <text v-else class="update-hint">{{ ready ? hint : $t('shell.updateBackground') }}</text>

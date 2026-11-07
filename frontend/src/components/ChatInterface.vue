@@ -291,19 +291,19 @@
        </view>
        <view class="header-actions">
           <view class="memory-header-btn" @tap="$emit('open-settings', { nav: 'memory' })">{{ $t('chat.memoryButton') }}</view>
-          <view class="icon-btn" @tap="$emit('toggle-history')" title="History">
+          <view class="icon-btn" @tap="$emit('toggle-history')" :title="$t('workbench.historyConversations')">
              <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                <circle cx="12" cy="12" r="9" />
                <path d="M12 7v5l3 2" />
              </svg>
              <view v-if="historyBadge" class="conv-dot header-dot" :class="historyBadge"></view>
           </view>
-          <view class="icon-btn" @tap="startNewChat" title="New Chat">
+          <view class="icon-btn" @tap="startNewChat" :title="$t('chat.newConversation')">
              <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                <path d="M12 5v14M5 12h14" />
              </svg>
           </view>
-          <view class="icon-btn" @tap="$emit('close')" title="Close">
+          <view class="icon-btn" @tap="$emit('close')" :title="$t('common.close')">
              <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                <path d="M18 6L6 18M6 6l12 12" />
              </svg>
@@ -474,21 +474,21 @@
                <view v-if="pastedImages.length > 0" class="input-images-preview">
                   <view v-for="(img, index) in pastedImages" :key="index" class="preview-image-item">
                      <image v-if="img.path" :src="img.path" mode="aspectFill" class="preview-thumb" />
-                     <text class="preview-remove" @tap="removePastedImage(index)">×</text>
+                     <text :title="$t('common.remove')" class="preview-remove" @tap="removePastedImage(index)">×</text>
                   </view>
                </view>
                <!-- 当前文档 chip（K14 ①）：看得见、摘得掉。摘掉只对这一轮生效 -->
                <view v-if="activeDocChip" class="active-doc-chip" :title="$t('chat.activeDocChipTitle')">
                   <text class="active-doc-label">{{ $t('chat.activeDocChipLabel') }}</text>
                   <text class="active-doc-name">{{ activeDocChip.name }}</text>
-                  <text class="active-doc-remove" @tap.stop="dismissActiveDoc">×</text>
+                  <text :title="$t('common.remove')" class="active-doc-remove" @tap.stop="dismissActiveDoc">×</text>
                </view>
                <!-- 当前文档选区 chip（dev-board#1430）：选中正文后自动浮出，可直接对选区提修订意见 -->
                <view v-if="activeSelectionChip" class="active-doc-chip active-selection-chip" :title="$t('chat.activeSelectionChipTitle')">
                   <text class="active-doc-label">{{ $t('chat.activeSelectionChipLabel') }}</text>
                   <text class="active-doc-name">{{ $t('chat.activeSelectionChipPreview', { text: activeSelectionChip.preview }) }}</text>
                   <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { count: activeSelectionChip.charCount }) }}</text>
-                  <text class="active-doc-remove" @tap.stop="dismissActiveSelection">×</text>
+                  <text :title="$t('common.remove')" class="active-doc-remove" @tap.stop="dismissActiveSelection">×</text>
                </view>
                <!-- 「模型看不了图」常驻提示（K21 ⑨）：粘的、拖的图片都覆盖；能力未知一律不提示 -->
                <text v-if="visionNotice" class="input-images-note">{{ $t(visionNotice) }}</text>
@@ -514,13 +514,13 @@
                        class="skill-chip"
                        :class="{ auto: chip.source === 'auto', 'is-builtin': chip.builtinWorkflow, flash: chip.justActivated }">
                     <text class="skill-chip-name">{{ chip.builtinWorkflow ? $t('chat.builtinWorkflowChipPrefix', { name: chip.customVersion && chip.versionName ? `${chip.name} · ${chip.versionName}` : chip.name }) : chip.name }}</text>
-                    <text v-if="chip.source === 'manual'" class="skill-chip-remove"
+                    <text :title="$t('common.remove')" v-if="chip.source === 'manual'" class="skill-chip-remove"
                           @tap.stop="removeSelectedSkill(chip.id)">×</text>
                  </view>
               </view>
               <view class="input-footer" :class="{ 'is-streaming': isStreaming }">
                  <view class="action-bar-left">
-                    <view class="icon-btn mini file-add-btn" @tap="triggerFileSelect" title="Add File">
+                    <view class="icon-btn mini file-add-btn" @tap="triggerFileSelect" :title="$t('chat.uploadFileTitle')">
                    <svg class="plus-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                  </view>
                     <!-- Agent Mode Selector -->
@@ -578,7 +578,7 @@
                                       @tap.stop="applyBuiltinWorkflow(bw)"
                                       @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
                                    <text class="skill-builtin-pill-label">{{ bw.activeIsSystemDefault ? bw.title : `${bw.title} · ${bw.activeVersionName}` }}</text>
-                                   <text class="skill-builtin-pill-more" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
+                                   <text :title="$t('chat.builtinWorkflowRightClickHint')" class="skill-builtin-pill-more" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
                                 </view>
                              </view>
                           </view>
@@ -616,8 +616,8 @@
                     <view v-if="isStreaming" class="alternate-send" @tap="handleSubmit(followUpMode === 'steer' ? 'queue' : 'steer')">
                        {{ followUpMode === 'steer' ? $t('chat.queueInstead') : $t('chat.steerInstead') }}
                     </view>
-                    <button v-if="isStreaming" type="button" class="stop-btn" :aria-label="$t('chat.stop')" @click="handleAbort"><text>■</text></button>
-                    <button type="button" class="send-btn" :class="{ disabled: !inputPrompt.trim() || isUploadingPasted }" :aria-label="$t('chat.sendAria')" @click="handleSubmit(followUpMode)">
+                    <button :title="$t('chat.stop')" v-if="isStreaming" type="button" class="stop-btn" :aria-label="$t('chat.stop')" @click="handleAbort"><text>■</text></button>
+                    <button :title="$t('chat.sendAria')" type="button" class="send-btn" :class="{ disabled: !inputPrompt.trim() || isUploadingPasted }" :aria-label="$t('chat.sendAria')" @click="handleSubmit(followUpMode)">
                        <text class="send-icon">↑</text>
                     </button>
                  </view>
@@ -806,21 +806,21 @@
            <view v-if="pastedImages.length > 0" class="input-images-preview">
               <view v-for="(img, index) in pastedImages" :key="index" class="preview-image-item">
                  <image v-if="img.path" :src="img.path" mode="aspectFill" class="preview-thumb" />
-                 <text class="preview-remove" @tap="removePastedImage(index)">×</text>
+                 <text :title="$t('common.remove')" class="preview-remove" @tap="removePastedImage(index)">×</text>
               </view>
            </view>
            <!-- 当前文档 chip（K14 ①）：看得见、摘得掉。摘掉只对这一轮生效 -->
            <view v-if="activeDocChip" class="active-doc-chip" :title="$t('chat.activeDocChipTitle')">
               <text class="active-doc-label">{{ $t('chat.activeDocChipLabel') }}</text>
               <text class="active-doc-name">{{ activeDocChip.name }}</text>
-              <text class="active-doc-remove" @tap.stop="dismissActiveDoc">×</text>
+              <text :title="$t('common.remove')" class="active-doc-remove" @tap.stop="dismissActiveDoc">×</text>
            </view>
            <!-- 当前文档选区 chip（dev-board#1430）：选中正文后自动浮出，可直接对选区提修订意见 -->
            <view v-if="activeSelectionChip" class="active-doc-chip active-selection-chip" :title="$t('chat.activeSelectionChipTitle')">
               <text class="active-doc-label">{{ $t('chat.activeSelectionChipLabel') }}</text>
               <text class="active-doc-name">{{ $t('chat.activeSelectionChipPreview', { text: activeSelectionChip.preview }) }}</text>
               <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { count: activeSelectionChip.charCount }) }}</text>
-              <text class="active-doc-remove" @tap.stop="dismissActiveSelection">×</text>
+              <text :title="$t('common.remove')" class="active-doc-remove" @tap.stop="dismissActiveSelection">×</text>
            </view>
            <!-- 「模型看不了图」常驻提示（K21 ⑨）：粘的、拖的图片都覆盖；能力未知一律不提示 -->
            <text v-if="visionNotice" class="input-images-note">{{ $t(visionNotice) }}</text>
@@ -846,13 +846,13 @@
                    class="skill-chip"
                    :class="{ auto: chip.source === 'auto', 'is-builtin': chip.builtinWorkflow, flash: chip.justActivated }">
                 <text class="skill-chip-name">{{ chip.builtinWorkflow ? $t('chat.builtinWorkflowChipPrefix', { name: chip.customVersion && chip.versionName ? `${chip.name} · ${chip.versionName}` : chip.name }) : chip.name }}</text>
-                <text v-if="chip.source === 'manual'" class="skill-chip-remove"
+                <text :title="$t('common.remove')" v-if="chip.source === 'manual'" class="skill-chip-remove"
                       @tap.stop="removeSelectedSkill(chip.id)">×</text>
              </view>
           </view>
           <view class="input-footer" :class="{ 'is-streaming': isStreaming }">
              <view class="action-bar-left">
-                <view class="icon-btn mini" @tap="triggerFileSelect" title="Add File">
+                <view class="icon-btn mini" @tap="triggerFileSelect" :title="$t('chat.uploadFileTitle')">
                    <svg class="plus-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </view>
                 <!-- Agent Mode Selector -->
@@ -910,7 +910,7 @@
                                   @tap.stop="applyBuiltinWorkflow(bw)"
                                   @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
                                <text class="skill-builtin-pill-label">{{ bw.activeIsSystemDefault ? bw.title : `${bw.title} · ${bw.activeVersionName}` }}</text>
-                               <text class="skill-builtin-pill-more" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
+                               <text :title="$t('chat.builtinWorkflowRightClickHint')" class="skill-builtin-pill-more" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
                             </view>
                          </view>
                       </view>
@@ -948,8 +948,8 @@
                 <view v-if="isStreaming" class="alternate-send" @tap="handleSubmit(followUpMode === 'steer' ? 'queue' : 'steer')">
                    {{ followUpMode === 'steer' ? $t('chat.queueInstead') : $t('chat.steerInstead') }}
                 </view>
-                <button v-if="isStreaming" type="button" class="stop-btn" :aria-label="$t('chat.stop')" @click="handleAbort"><text>■</text></button>
-                <button type="button" class="send-btn" :class="{ disabled: !inputPrompt.trim() || isUploadingPasted }" :aria-label="$t('chat.sendAria')" @click="handleSubmit(followUpMode)">
+                <button :title="$t('chat.stop')" v-if="isStreaming" type="button" class="stop-btn" :aria-label="$t('chat.stop')" @click="handleAbort"><text>■</text></button>
+                <button :title="$t('chat.sendAria')" type="button" class="send-btn" :class="{ disabled: !inputPrompt.trim() || isUploadingPasted }" :aria-label="$t('chat.sendAria')" @click="handleSubmit(followUpMode)">
                    <text class="send-icon">↑</text>
                 </button>
              </view>
