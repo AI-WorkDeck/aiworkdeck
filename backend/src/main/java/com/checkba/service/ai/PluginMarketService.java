@@ -296,6 +296,7 @@ public class PluginMarketService {
             }
             // minHostVersion 闸（规范 v2.7 P0）：staging 落齐后、上位前校验——宁可装不上，不可装成半残
             checkMinHostVersion(staging);
+            checkDeclaredTools(staging);
 
             purchaseGate.assertConnection(connection);
             replaceInstalledPlugin(staging, id, version);
@@ -547,6 +548,22 @@ public class PluginMarketService {
             throw new IllegalStateException(LangText.of(
                     "插件需要宿主版本 ≥ " + min + "（当前 " + appVersion + "），请先升级客户端再安装",
                     "Plugin requires host >= " + min + " (current " + appVersion + "); upgrade the app first"));
+        }
+    }
+
+    /** 声明式 Agent 工具的安装前校验（规范 v2.13 §20）：非法声明拒装，而不是装了不生效。 */
+    void checkDeclaredTools(java.nio.file.Path staging) {
+        java.nio.file.Path manifestPath = staging.resolve("manifest.json");
+        if (!Files.isRegularFile(manifestPath)) {
+            return;
+        }
+        try {
+            PluginManifestContractValidator.validateTools(cn.hutool.json.JSONUtil.toBean(
+                    Files.readString(manifestPath), PluginService.PluginMetadata.class));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException(LangText.of("插件声明的 Agent 工具无效: ", "Invalid Agent tool declaration: ") + e.getMessage());
+        } catch (IOException e) {
+            // 读不出 manifest 属验签与 rescan 链路的职责，同 checkMinHostVersion
         }
     }
 

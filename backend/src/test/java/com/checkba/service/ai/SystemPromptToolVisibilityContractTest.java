@@ -92,7 +92,9 @@ class SystemPromptToolVisibilityContractTest {
      */
     private static final Set<String> NON_TOOL_IDENTIFIERS = new TreeSet<>(List.of(
             // dev-board#1611：法律资料卡字段，不是工具调用。
-            "kind", "title", "authority", "date", "validity", "source", "url", "summary", "excerpt", "verified"));
+            "kind", "title", "authority", "date", "validity", "source", "url", "summary", "excerpt", "verified",
+            // task_create / task_list 的参数名（「用户原话里的项目称呼」），不是工具。
+            "project"));
 
     /**
      * 今天声明了宿主依赖的全部工具（{@code @ToolMeta.requiresHost}）。

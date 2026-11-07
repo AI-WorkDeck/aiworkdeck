@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -572,6 +573,103 @@ public class ToolRegistry {
 
     public void setPluginMcpService(com.checkba.service.ai.mcp.PluginMcpService service) { this.pluginMcpService = service; }
 
+    /** 声明式工具（manifest tools[].handler.type=service）的执行表；required=false 同 pluginHostFactory（手工 new 的测试不装配）。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.plugin.HostServiceRegistry hostServices;
+
+    void setHostServiceRegistry(com.checkba.service.plugin.HostServiceRegistry registry) { this.hostServices = registry; }
+
+    /** 一条可用的声明式工具：所属插件 + manifest 条目 + 给模型的规格（模式同 PluginMcpService.Binding）。 */
+    public record DeclaredToolBinding(String pluginId, PluginService.PluginToolInfo tool, ToolSpecification specification) {}
+
+    /**
+     * 当前可用的声明式工具：插件已启用、未撤销、未被宿主版本挡住，且 handler=service 且服务表认得。
+     * handler=jar 走既有 JAR 路径；connection/view 在 PluginService 加载时已记日志，这里不注册。
+     * 名字与内置工具冲突时内置优先。
+     */
+    public List<DeclaredToolBinding> declaredBindings() {
+        List<DeclaredToolBinding> all = new ArrayList<>();
+        for (PluginService.DeclaredTool declared : pluginService.getDeclaredTools()) {
+            DeclaredToolBinding binding = bind(declared);
+            if (binding != null) all.add(binding);
+        }
+        return all;
+    }
+
+    private DeclaredToolBinding bind(PluginService.DeclaredTool declared) {
+        PluginService.PluginToolInfo tool = declared.tool();
+        String pluginId = declared.pluginId();
+        if (hostServices != null && "service".equals(tool.handlerType()) && isDestructive(tool)) {
+            log.info("Declared tool {} of plugin {} not registered: destructive declarative tools await confirmation gate (P2-1)",
+                    tool.getName(), pluginId);
+            return null;
+        }
+        if (hostServices == null || !"service".equals(tool.handlerType()) || builtinTools.containsKey(tool.getName())
+                || !pluginService.isEnabled(pluginId) || pluginService.revokedReason(pluginId) != null) return null;
+        try {
+            return new DeclaredToolBinding(pluginId, tool, ToolSpecification.builder()
+                    .name(tool.getName())
+                    .description(pluginService.localize(pluginId, tool.getDescription()))
+                    .parameters(declaredParameters(tool)).build());
+        } catch (RuntimeException invalid) {
+            log.warn("Declared tool {} of plugin {} skipped: {}", tool.getName(), pluginId, invalid.getMessage());
+            return null;
+        }
+    }
+
+    /** userId/conversationId 由服务端注入，不向模型暴露；projectId 在 schema 里声明了才是「目标项目」参数。 */
+    @SuppressWarnings("unchecked")
+    private static dev.langchain4j.model.chat.request.json.JsonObjectSchema declaredParameters(PluginService.PluginToolInfo tool) {
+        Map<String, Object> schema = tool.getInputSchema() == null
+                ? Map.of("type", "object") : new java.util.LinkedHashMap<>(tool.getInputSchema());
+        if (schema.get("properties") instanceof Map<?, ?> props) {
+            Map<String, Object> kept = new java.util.LinkedHashMap<>((Map<String, Object>) props);
+            kept.keySet().removeAll(Set.of("userId", "conversationId"));
+            schema.put("properties", kept);
+            if (schema.get("required") instanceof List<?> req) schema.put("required", req.stream().filter(kept::containsKey).toList());
+        }
+        return com.checkba.service.ai.mcp.PluginMcpSchema.object(schema);
+    }
+
+    /** 声明为 destructive，或绑定的服务操作本身是 destructive（如 calendar/delete）。 */
+    private static boolean isDestructive(PluginService.PluginToolInfo tool) {
+        if ("destructive".equals(tool.getAccess())) return true;
+        var h = tool.getHandler();
+        return com.checkba.service.plugin.HostServiceRegistry.spec(h.getService(), h.getOperation())
+                .map(spec -> "destructive".equals(spec.access())).orElse(false);
+    }
+
+    DeclaredToolBinding declaredBinding(String name) {
+        for (PluginService.DeclaredTool declared : pluginService.getDeclaredTools()) {
+            if (Objects.equals(declared.tool().getName(), name)) {
+                DeclaredToolBinding binding = bind(declared);
+                if (binding != null) return binding;
+            }
+        }
+        return null;
+    }
+
+    /** 声明式 read 工具名：ASK 模式放行（与 AgentOrchestrator.ASK_READ_TOOLS 并集）。 */
+    public Set<String> declaredReadToolNames() {
+        Set<String> names = new java.util.HashSet<>();
+        for (DeclaredToolBinding b : declaredBindings()) {
+            if (com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(b.tool().getName(), b.tool().getAccess())
+                    == ToolMeta.Access.READ) names.add(b.specification().name());
+        }
+        return names;
+    }
+
+    /** 启用中插件的声明式工具 keywords（含 handler=jar 条目，如 tencent_meeting_action），喂工具披露的 plugin-tools 预放回。 */
+    public List<String> declaredToolKeywords() {
+        List<String> words = new ArrayList<>();
+        for (PluginService.DeclaredTool declared : pluginService.getDeclaredTools()) {
+            if (declared.tool().getKeywords() != null && pluginService.isEnabled(declared.pluginId())) {
+                words.addAll(declared.tool().getKeywords());
+            }
+        }
+        return words;
+    }
+
     private final List<AgentToolComponent> toolComponents;
     private final PluginService pluginService;
     private final ClientCapabilityService clientCapabilityService;
@@ -621,6 +719,7 @@ public class ToolRegistry {
         }
         if (disclosurePolicy != null) {
             disclosurePolicy.setPluginToolNames(this::pluginToolNames);
+            disclosurePolicy.setPluginToolKeywords(this::declaredToolKeywords);
         }
         log.info("ToolRegistry initialized: {} built-in tools from {} components",
                 builtinTools.size(), toolComponents.size());
@@ -633,6 +732,7 @@ public class ToolRegistry {
     public Set<String> pluginToolNames() {
         Set<String> names = new java.util.HashSet<>(pluginService.getPluginTools().keySet());
         if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> names.add(b.specification().name()));
+        declaredBindings().forEach(b -> names.add(b.specification().name()));
         return java.util.Collections.unmodifiableSet(names);
     }
 
@@ -795,6 +895,7 @@ public class ToolRegistry {
                     || availability.computeIfAbsent(component, this::componentAvailable)) all.add(spec);
         }
         if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> all.add(b.specification()));
+        declaredBindings().forEach(b -> all.add(b.specification()));
         if (userMcpService != null) userMcpService.bindings().forEach(b -> all.add(b.specification()));
         for (ToolSpecification spec : pluginService.getToolSpecifications()) {
             if (pluginToolEnabled(spec.name())) {
@@ -906,6 +1007,7 @@ public class ToolRegistry {
             }
         }
         if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> names.add(b.specification().name()));
+        declaredBindings().forEach(b -> names.add(b.specification().name()));
         if (userMcpService != null) userMcpService.bindings().forEach(b -> names.add(b.specification().name()));
         names.sort(Comparator.comparingInt(String::length).reversed());
         return names;
@@ -938,6 +1040,8 @@ public class ToolRegistry {
             var binding = pluginMcpService.find(name);
             if (binding != null) return Optional.of(new RegisteredTool(pluginMcpService, null, binding.specification(), null, true));
         }
+        var declared = declaredBinding(name);
+        if (declared != null) return Optional.of(new RegisteredTool(hostServices, null, declared.specification(), null, true));
         // 插件工具：先过启停过滤（禁用插件的工具视同不存在，重新启用即恢复）
         if (!pluginToolEnabled(name)) {
             return Optional.empty();
@@ -1004,6 +1108,10 @@ public class ToolRegistry {
             }
         }
 
+        if (tool.bean() instanceof com.checkba.service.plugin.HostServiceRegistry) {
+            return executeDeclared(resolvedName, argsJson, ctx, tool);
+        }
+
         // 插件工具权限校验（规范 v2）：所需权限未在 manifest permissions 中声明即拒绝
         if (tool.fromPlugin()) {
             List<String> missing = pluginService.missingPermissionsForTool(resolvedName);
@@ -1051,6 +1159,42 @@ public class ToolRegistry {
             if (pluginHostFactory != null) {
                 pluginHostFactory.clear();
             }
+        }
+    }
+
+    /**
+     * 声明式工具（handler=service）分发：权限 = 工具声明的 permissions ∪ 服务表要求的 permissions，
+     * 必须都在 manifest.permissions 里，否则拒绝；userId 取服务端上下文，模型传的 userId 不可信。
+     * 项目级成员权限在 HostServiceRegistry 里按目标 projectId 核。
+     */
+    private ToolResult executeDeclared(String name, String argsJson, ToolContext ctx, RegisteredTool tool) {
+        DeclaredToolBinding binding = declaredBinding(name);
+        if (binding == null) return new ToolResult(unknownToolMessage(name), null, false);
+        var handler = binding.tool().getHandler();
+        var plugin = pluginService.getPlugin(binding.pluginId());
+        Set<String> granted = plugin == null || plugin.getPermissions() == null ? Set.of() : new java.util.HashSet<>(plugin.getPermissions());
+        Set<String> required = new java.util.LinkedHashSet<>();
+        if (binding.tool().getPermissions() != null) required.addAll(binding.tool().getPermissions());
+        com.checkba.service.plugin.HostServiceRegistry.spec(handler.getService(), handler.getOperation())
+                .ifPresent(spec -> required.addAll(spec.requiredPermissions()));
+        required.removeAll(granted);
+        if (!required.isEmpty()) {
+            log.warn("Tool '{}' rejected: requires undeclared permission(s) {}", name, required);
+            return new ToolResult("Error: permission denied — tool '" + name + "' requires permission(s) "
+                    + required + " not declared in the plugin manifest \"permissions\".", tool, true);
+        }
+        try {
+            Map<String, Object> args = new java.util.LinkedHashMap<>(parseArgs(argsJson));
+            args.remove("userId");
+            args.remove("conversationId");
+            String out = hostServices.invoke(handler.getService(), handler.getOperation(),
+                    ctx == null ? null : ctx.userId(), ctx == null ? null : ctx.projectId(), args);
+            return new ToolResult(out.isEmpty() ? "OK" : out, tool, true);
+        } catch (IllegalArgumentException e) {
+            return new ToolResult("Error: " + e.getMessage(), tool, true);
+        } catch (RuntimeException e) {
+            log.error("Declared tool '{}' failed", name, e);
+            return new ToolResult("Error executing tool: " + e.getMessage(), tool, true);
         }
     }
 

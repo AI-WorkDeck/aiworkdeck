@@ -462,4 +462,44 @@ class ProjectTaskServiceTest {
         t.setSource("user");
         return t;
     }
+
+    private static com.checkba.model.entity.Project proj(long id, String name, boolean scratch) {
+        var p = new com.checkba.model.entity.Project();
+        p.setId(id);
+        p.setName(name);
+        if (scratch) p.setProjectType(com.checkba.model.entity.Project.SCRATCH);
+        return p;
+    }
+
+    @Test
+    void resolveProjectsFollowsUserWordingRules() {
+        when(projectService.getUserProjects(7L)).thenReturn(List.of(
+                proj(1L, "股权转让项目-星河并购", false), proj(2L, "星河租赁合同纠纷", false),
+                proj(3L, "金冠纾困", false), proj(4L, "星河临时", true), proj(5L, "星河并购", false)));
+        when(memberService.hasWritePermission(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(7L))).thenReturn(true);
+        when(memberService.isClient(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(7L))).thenReturn(false);
+
+        // 「星河」→ 多个（含没有事项的项目），scratch 不参与
+        assertEquals(List.of(1L, 2L, 5L), service.resolveProjects(7L, "星河", true).stream().map(com.checkba.model.entity.Project::getId).toList());
+        // 全名唯一相等，但另一项目名包含它（"股权转让项目-星河并购" 含 "星河并购"）→ 仍歧义
+        assertEquals(2, service.resolveProjects(7L, "星河并购", true).size());
+        // 全名唯一相等且无他项目包含 → 直接用
+        assertEquals(List.of(3L), service.resolveProjects(7L, "金冠纾困", true).stream().map(com.checkba.model.entity.Project::getId).toList());
+        // 称呼更长（含项目名）→ 命中
+        assertEquals(List.of(3L), service.resolveProjects(7L, "金冠纾困案的开庭", true).stream().map(com.checkba.model.entity.Project::getId).toList());
+        assertTrue(service.resolveProjects(7L, "不存在", true).isEmpty());
+    }
+
+    @Test
+    void mentionedProjectsFindsLongestCommonSubstringWithThresholds() {
+        var all = List.of(proj(1L, "股权转让项目-星河并购", false), proj(2L, "星河租赁合同纠纷", false), proj(3L, "张某劳动争议案", false));
+        java.util.function.Function<String, List<Long>> ids = m -> ProjectTaskService.mentionedProjects(all, m)
+                .stream().map(com.checkba.model.entity.Project::getId).toList();
+        assertEquals(List.of(1L, 2L), ids.apply("下周三上午十点给星河加一个开庭提醒"));
+        assertEquals(List.of(1L), ids.apply("给星河并购加一个开庭提醒"));
+        assertEquals(List.of(3L), ids.apply("给劳动争议案加一个开庭提醒"));
+        assertTrue(ids.apply("给这个案子加一个开庭提醒").isEmpty());
+        assertTrue(ProjectTaskService.mentionedProjects(List.of(proj(9L, "Alpha Holdings", false)), "add a hearing for alp").isEmpty(),
+                "纯拉丁字符阈值是 4");
+    }
 }
