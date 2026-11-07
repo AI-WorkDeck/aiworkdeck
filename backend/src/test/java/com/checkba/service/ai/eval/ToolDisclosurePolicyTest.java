@@ -570,4 +570,40 @@ class ToolDisclosurePolicyTest {
         }
         return census.toString();
     }
+
+    @Test
+    @DisplayName("「腾讯会议纪要」首轮就能看到插件工具 tencent_meeting_action；无关提问不放回 plugin-tools")
+    void meetingPromptSurfacesPluginToolOnTurnOne() {
+        ToolDisclosurePolicy policy = new ToolDisclosurePolicy(true);
+        policy.setPluginToolNames(() -> Set.of("tencent_meeting_action"));
+        List<ToolSpecification> candidates = List.of(
+                ToolSpecification.builder().name("tencent_meeting_action").description("x").build());
+
+        Set<String> hinted = policy.categoriesHintedBy("帮我把刚才的腾讯会议纪要整理出来");
+        assertTrue(hinted.contains(ToolDisclosurePolicy.PLUGIN_TOOLS_CATEGORY), hinted.toString());
+        assertEquals(1, policy.narrow(candidates, hinted).size());
+
+        assertTrue(policy.narrow(candidates, policy.categoriesHintedBy("meeting minutes of today")).size() == 1);
+        assertEquals(0, policy.narrow(candidates, policy.categoriesHintedBy("读一下这份合同")).size());
+    }
+
+    @Test
+    @DisplayName("腾讯会议插件已安装且启用 -> 不下发内置 tmeet_*；未安装 -> 保留")
+    void builtinTmeetToolsAreHiddenOnlyWhenThePluginIsActive() {
+        PluginService plugins = org.mockito.Mockito.mock(PluginService.class);
+        org.mockito.Mockito.when(plugins.getPluginTools()).thenReturn(java.util.Map.of());
+        org.mockito.Mockito.when(plugins.getToolSpecifications()).thenReturn(List.of());
+        RecordingToolRegistry registry = new RecordingToolRegistry(RealToolBeans.instantiateAll(), plugins);
+        registry.init();
+
+        assertTrue(registry.getAllSpecifications().stream().anyMatch(s -> s.name().equals("tmeet_get_transcript")));
+
+        org.mockito.Mockito.when(plugins.getPluginIdForTool("tencent_meeting_action")).thenReturn("tencent-meeting");
+        org.mockito.Mockito.when(plugins.isEnabled("tencent-meeting")).thenReturn(false);
+        assertTrue(registry.getAllSpecifications().stream().anyMatch(s -> s.name().equals("tmeet_get_transcript")),
+                "插件已装但被禁用时仍应保留内置工具");
+
+        org.mockito.Mockito.when(plugins.isEnabled("tencent-meeting")).thenReturn(true);
+        assertFalse(registry.getAllSpecifications().stream().anyMatch(s -> s.name().startsWith("tmeet_")));
+    }
 }

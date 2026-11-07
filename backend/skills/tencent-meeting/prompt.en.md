@@ -7,6 +7,8 @@ Your primary objectives cover two key scenarios:
 
 ## Workflow
 
+> If `tencent_meeting_action` is in the tool list (Tencent Meeting plugin installed and enabled), use it instead: `action=list` to list meetings, `action=detail` for the transcript and minutes material (when it returns pending with a jobId, poll with the same action and {jobId}). The `tmeet_*` tools below are only for when that tool is absent.
+
 1. **Retrieve Meeting Content**:
    - Extract `recordId` from prompt and invoke `tmeet_get_transcript(recordId=...)` to retrieve title, time, participants, smart minutes and diarized transcript.
    - If `recordId` is omitted, call `tmeet_list_meetings()` to search synced Tencent meetings.

@@ -104,7 +104,7 @@ class TaskToolsTest {
     void listEmptyReturnsExplicitText() {
         when(taskService.listByProject(1L, null, null)).thenReturn(List.of());
 
-        String out = tools.task_list(null, null, 1L);
+        String out = tools.task_list(null, null, null, 1L, 9L);
 
         assertFalse(out.isBlank(), "空工具输出会掀翻整轮对话（ensureNotBlank），必须给明确文案");
         assertTrue(out.contains("暂无"), out);
@@ -121,7 +121,7 @@ class TaskToolsTest {
         row.put("fileName", "答辩状.docx");
         when(taskService.listByProject(1L, null, null)).thenReturn(List.of(row));
 
-        String out = tools.task_list(null, null, 1L);
+        String out = tools.task_list(null, null, null, 1L, 9L);
 
         assertTrue(out.contains("提交答辩状"), out);
         assertTrue(out.contains("2026-09-01"), out);
@@ -131,12 +131,59 @@ class TaskToolsTest {
     }
 
     @Test
-    @DisplayName("task_list：projectId 缺失时返回可行动错误，不调用 service")
+    @DisplayName("task_list：projectId 与 userId 都缺失时返回可行动错误，不调用 service")
     void listRejectsMissingProjectId() {
-        String out = tools.task_list(null, null, null);
+        String out = tools.task_list(null, null, null, null, null);
 
         assertTrue(out.startsWith("错误"), out);
         verifyNoInteractions(taskService);
+    }
+
+    @Test
+    @DisplayName("task_list：projectId 缺失但有 userId = 跨用户可访问项目查询，行带项目名；不查单项目")
+    void listWithoutProjectIdQueriesAcrossUserProjects() {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", 5L);
+        row.put("title", "举证期限");
+        row.put("dueDate", LocalDate.of(2026, 11, 10));
+        row.put("status", "OPEN");
+        row.put("projectName", "金冠纾困");
+        LocalDate from = LocalDate.of(2026, 11, 9);
+        LocalDate to = LocalDate.of(2026, 11, 15);
+        when(taskService.listForUser(9L, from, to)).thenReturn(List.of(row));
+
+        String out = tools.task_list("2026-11-09", "2026-11-15", null, null, 9L);
+
+        assertTrue(out.contains("举证期限"), out);
+        assertTrue(out.contains("项目：金冠纾困"), out);
+        verify(taskService, never()).listByProject(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("task_list：allProjects=true 即使会话绑定了项目也跨项目；用户不是成员的项目不出现（由 listForUser 按成员关系给出）")
+    void listAllProjectsFlagOverridesBoundProject() {
+        Map<String, Object> mine = new LinkedHashMap<>();
+        mine.put("id", 5L);
+        mine.put("title", "我的事项");
+        mine.put("dueDate", LocalDate.of(2026, 11, 10));
+        mine.put("status", "OPEN");
+        mine.put("projectName", "我的案");
+        // listForUser 只会返回 getUserProjects 里的项目；非成员项目 B 的事项不在其中
+        when(taskService.listForUser(9L, null, null)).thenReturn(List.of(mine));
+
+        String out = tools.task_list(null, null, true, 1L, 9L);
+
+        assertTrue(out.contains("我的案"), out);
+        assertFalse(out.contains("非成员案"), out);
+        verify(taskService, never()).listByProject(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("task_list：跨项目无结果也给明确文案")
+    void listAcrossProjectsEmptyHasText() {
+        when(taskService.listForUser(9L, null, null)).thenReturn(List.of());
+        String out = tools.task_list(null, null, true, null, 9L);
+        assertTrue(out.contains("暂无"), out);
     }
 
     // ==================== dev-board#895 ====================
@@ -254,7 +301,7 @@ class TaskToolsTest {
         legacy.put("status", "DONE");
         when(taskService.listByProject(1L, null, null)).thenReturn(List.of(row, legacy));
 
-        String out = tools.task_list(null, null, 1L);
+        String out = tools.task_list(null, null, null, 1L, 9L);
 
         assertTrue(out.contains("id=8"), out);
         assertTrue(out.contains("开庭"), out);

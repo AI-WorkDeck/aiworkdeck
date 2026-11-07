@@ -20,6 +20,7 @@ triggers_en:
 prompt: prompt.md
 tool_policy: restrict
 allowed_tools:
+  - tencent_meeting_action
   - read_file
   - search_project_files
   - extract_file_text

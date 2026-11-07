@@ -180,19 +180,23 @@ public class TaskTools implements AgentToolComponent {
         }
     }
 
-    @Tool("查询当前项目的事项列表（截止日、开庭、会议、待办等），可选按日期区间过滤。" +
+    @Tool("查询当前项目的事项列表（截止日、开庭、会议、待办等），可选按日期区间过滤；allProjects=true 时改查用户可访问的全部项目（每行带项目名），" +
+          "用于“本周有哪些截止事项”这类不限于当前项目的问题。" +
           "每行含事项 id、类型、标题、时间、状态、负责人与关联文件。" +
           "用于回答“有哪些截止日”“下周有什么安排”“这个项目的任务清单”类问题，也用于给 task_update 找 taskId。")
     @ToolMeta(displayName = "查询日程任务", category = "task")
     public String task_list(
             @P(value = "起始日期（含），ISO 格式 yyyy-MM-dd；不填表示不限起始", required = false) String from,
             @P(value = "结束日期（含），ISO 格式 yyyy-MM-dd；不填表示不限结束", required = false) String to,
-            Long projectId
+            @P(value = "true=跨用户可访问的全部项目查询（默认 false，只查当前项目）", required = false) Boolean allProjects,
+            Long projectId,
+            Long userId
     ) {
-        log.info("Tool: task_list project={} from={} to={}", projectId, from, to);
+        log.info("Tool: task_list project={} allProjects={} from={} to={}", projectId, allProjects, from, to);
 
-        if (projectId == null) {
-            return "错误：无法获取当前项目ID，请在项目上下文中使用此工具。";
+        boolean crossProject = Boolean.TRUE.equals(allProjects) || projectId == null;
+        if (crossProject && userId == null) {
+            return "错误：无法获取当前项目ID或用户身份，请在项目上下文中使用此工具。";
         }
         LocalDate fromDate = null;
         if (from != null && !from.isBlank()) {
@@ -209,8 +213,13 @@ public class TaskTools implements AgentToolComponent {
             }
         }
 
-        List<Map<String, Object>> tasks = projectTaskService.listByProject(projectId, fromDate, toDate);
+        List<Map<String, Object>> tasks = crossProject
+                ? projectTaskService.listForUser(userId, fromDate, toDate)
+                : projectTaskService.listByProject(projectId, fromDate, toDate);
         if (tasks.isEmpty()) {
+            if (crossProject) {
+                return "你可访问的项目在该区间内暂无日程任务。";
+            }
             // 空列表必须给明确文案，不能返回空字符串——空白工具输出会掀翻整轮对话
             // （ToolExecutionResultMessage.ensureNotBlank，见 .claude/agents/ai-chat.md 已知地雷）。
             return "当前项目在该区间内暂无日程任务。";
@@ -220,6 +229,9 @@ public class TaskTools implements AgentToolComponent {
         for (Map<String, Object> t : tasks) {
             StringJoiner line = new StringJoiner(" | ");
             line.add("id=" + t.get("id"));
+            if (crossProject) {
+                line.add("项目：" + t.get("projectName"));
+            }
             line.add(typeLabel(t.get("type") == null ? null : String.valueOf(t.get("type"))));
             String title = String.valueOf(t.get("title"));
             line.add("HIGH".equals(t.get("priority")) ? title + "（重要）" : title);
