@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# host,prompt,offeredTools,offeredSchemaTokens(o200k)
+# 2026-11-07 取自 master 8ee11eadc，与 docs/plans/tool-surface-audit.md §1.1 一致
+lowa-docx,neutral,41,10675
+lowa-docx,typical,64,17584
+lowa-docx,worst,147,33245
+lowa-xlsx,neutral,34,8943
+lowa-xlsx,typical,58,14474
+lowa-xlsx,worst,129,28288
+lowa-pptx,neutral,34,8702
+lowa-pptx,typical,37,9637
+lowa-pptx,worst,129,29268
+lowa-nofile,neutral,50,13449
+lowa-nofile,typical,94,24954
+lowa-nofile,worst,198,46432
+office-word,neutral,32,8126
+office-word,typical,35,9061
+office-word,worst,81,17780
+office-excel,neutral,30,7868
+office-excel,typical,33,8803
+office-excel,worst,79,17522
+office-ppt,neutral,29,7555
+office-ppt,typical,32,8490
+office-ppt,worst,78,17209
+none,neutral,23,6085
+none,typical,26,7020
+none,worst,72,15739
+ask,neutral,8,1306
+ask,typical,8,1306
+ask,worst,8,1306
