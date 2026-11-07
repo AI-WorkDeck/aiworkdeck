@@ -121,6 +121,37 @@ class BuiltinSkillsTest {
     }
 
     @Test
+    @DisplayName("触发词并列：赢家按位置选，但并列 skill 的工具白名单并入；单纯「整理会议纪要」保持 meeting-recorder 原工具集")
+    void tiedTriggersUnionToolsWhateverTheWordOrder() {
+        SkillRouter router = new SkillRouter(registry, new SkillProperties(),
+                org.mockito.Mockito.mock(com.checkba.service.telemetry.TelemetryService.class), null);
+        List<ToolSpecification> all = new ArrayList<>(realToolNames.stream()
+                .map(name -> ToolSpecification.builder().name(name).description(name).build()).toList());
+        all.add(ToolSpecification.builder().name("tencent_meeting_action").description("x").build());
+
+        router.activateForTurn("c", "r1", "刚开完腾讯会议，帮我整理成会议纪要", null);
+        assertEquals("tencent-meeting", router.activeSkill("r1").orElseThrow().getId());
+        Set<String> v1 = names(router.visibleTools("r1", all));
+        assertTrue(v1.contains("tencent_meeting_action") && v1.contains("meeting_list_recordings"), v1.toString());
+
+        router.activateForTurn("c", "r2", "整理会议纪要，就是刚才腾讯会议那个", null);
+        assertEquals("meeting-recorder", router.activeSkill("r2").orElseThrow().getId());
+        Set<String> v2 = names(router.visibleTools("r2", all));
+        assertTrue(v2.contains("tencent_meeting_action") && v2.contains("meeting_list_recordings"), v2.toString());
+
+        router.activateForTurn("c", "r3", "帮我整理会议纪要", null);
+        assertEquals("meeting-recorder", router.activeSkill("r3").orElseThrow().getId());
+        Set<String> v3 = names(router.visibleTools("r3", all));
+        assertTrue(v3.contains("meeting_list_recordings"));
+        assertFalse(v3.contains("tencent_meeting_action"), v3.toString());
+        assertFalse(v3.contains("tmeet_get_transcript"), v3.toString());
+    }
+
+    private static Set<String> names(List<ToolSpecification> specs) {
+        return specs.stream().map(ToolSpecification::name).collect(java.util.stream.Collectors.toSet());
+    }
+
+    @Test
     @DisplayName("腾讯会议：内置 skill 与插件自带 skill 的白名单都放行 tencent_meeting_action")
     void tencentMeetingSkillsAllowThePluginTool() throws Exception {
         assertTrue(registry.getSkill("tencent-meeting").orElseThrow().getAllowedTools().contains("tencent_meeting_action"));

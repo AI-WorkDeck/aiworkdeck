@@ -72,14 +72,16 @@ export default {
   // 两个分组标题（2026-08-20 个人中心并入设置）
   navGroupPersonal: '个人',
   navGroupSystem: '系统',
+  navGroupMyWork: '我的工作',
   // 「个人」组：工作记录 / 我的收藏 / 我的代办三项复用 account.tab* 文案
-  navPersonalSettings: '账户与安全',
+  navPersonalSettings: '个人资料与登录',
+  backToWorkbench: '← 返回工作台',
   navAi: 'AI 功能设置',
   navPlatform: '平台服务',
-  navAccount: '账户与用量',
+  navAccount: '账户与余额',
   navComponents: '组件管理',
   navUpdates: '软件更新',
-  navTelemetry: '数据统计',
+  navTelemetry: '隐私与数据',
   navFeedback: '用户反馈',
 
   saveConfigButton: '保存配置',
@@ -105,7 +107,7 @@ export default {
   effectiveDefaultModel: '当前生效的默认模型：{model}',
   auxModelLabel: '辅助模型',
   auxModelNote: '辅助模型用于子 Agent、会话起标题、上下文摘要、记忆抽取与文件自动打标签。这些调用用户看不见但每轮都在跑，默认用一个便宜模型是刻意的——省钱主要省在这里。',
-  subagentModelLabel: '子 Agent 模型',
+  subagentModelLabel: '后台任务模型',
   subagentModelNote: '留空即继承上面的辅助模型。',
   inheritAux: '继承辅助模型',
   followBuiltIn: '跟随内置默认',
@@ -146,7 +148,7 @@ export default {
   siteSwitchFailedTitle: '切换未完成',
   siteSwitchFailedContent: '切换站点失败，站点维持不变。',
 
-  // 账户与用量
+  // 账户与余额
   accountSectionSubtitle: '连接 AI WorkDeck 账户后，可以使用平台 AI 通道、查看余额与用量，并同步已购插件与功能解锁',
   accountIntro: '桌面端不需要注册登录。在官网账户页生成一枚账户 Key（awdk_ 开头），粘贴到下面即可完成连接；Key 保存在本机，随时可以断开。',
   getKeyButton: '前往官网获取 Key',
@@ -309,6 +311,7 @@ export default {
 
   // 数据统计
   telemetrySubtitle: '产品会在本机记录功能使用情况（仅动作类型与计数，从不记录文档内容、对话文本或文件名），用于下方的使用统计。以下开关控制哪些数据会以匿名形式帮助我们改进产品。',
+  telemetrySectionTitle: '匿名使用统计',
   telemetryRollupTitle: '分享匿名使用统计',
   telemetryRollupDesc: '每日一条聚合计数（功能使用次数、事项类型分布），匿名安装标识，随时可关',
   telemetryEventsTitle: '分享脱敏使用明细',

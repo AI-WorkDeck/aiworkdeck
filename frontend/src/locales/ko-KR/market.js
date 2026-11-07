@@ -145,7 +145,7 @@ export default {
   "reinstallOrUpdate": "재설치 / 업데이트",
   "activationModeLabel": "활성화: {mode} ▾",
   "processingEllipsis": "처리 중…",
-  "needAccountHint": "유료 항목입니다. 먼저 설정의 \"계정 및 사용량\"에서 AI WorkDeck 계정을 연결하세요 — 구매 기록은 그 후에만 확인할 수 있습니다.",
+  "needAccountHint": "유료 항목입니다. 먼저 설정의 \"계정 및 잔액\"에서 AI WorkDeck 계정을 연결하세요 — 구매 기록은 그 후에만 확인할 수 있습니다.",
   "buyHint": "유료 항목입니다. 구매는 공식 웹사이트에서 완료됩니다. 결제 후 이 페이지로 돌아와 \"구매 완료, 새로고침\"을 클릭하여 설치하세요.",
   "whenToUse": "사용 시점",
   "scenarioLead": "대화에서 다음과 같이 말하면 자동으로 인계받습니다:",

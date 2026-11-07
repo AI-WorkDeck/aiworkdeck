@@ -145,7 +145,7 @@ export default {
   "reinstallOrUpdate": "Cài đặt lại / Cập nhật",
   "activationModeLabel": "Kích hoạt: {mode} ▾",
   "processingEllipsis": "Đang xử lý…",
-  "needAccountHint": "Đây là mục trả phí. Hãy kết nối tài khoản AI WorkDeck của bạn trong phần \"Tài khoản & Mức sử dụng\" trong Cài đặt trước — hồ sơ mua hàng chỉ có thể được xác minh sau đó.",
+  "needAccountHint": "Đây là mục trả phí. Hãy kết nối tài khoản AI WorkDeck của bạn trong phần \"Tài khoản và số dư\" trong Cài đặt trước — hồ sơ mua hàng chỉ có thể được xác minh sau đó.",
   "buyHint": "Đây là mục trả phí. Việc mua được hoàn tất trên trang web chính thức; sau khi thanh toán, hãy quay lại trang này và nhấp vào \"Đã mua, làm mới\" để cài đặt.",
   "whenToUse": "Khi nào sử dụng",
   "scenarioLead": "Nói điều gì đó như thế này trong cuộc trò chuyện, và nó sẽ tự động tiếp quản:",

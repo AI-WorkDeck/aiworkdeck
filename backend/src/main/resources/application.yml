@@ -71,20 +71,22 @@ external:
 # token-setting-key：系统设置里的 token 覆盖键，后台管理界面可在线修改
 mcp:
   servers:
+    # 全部 pkulaw-* 统一指向聚合端点 mcp-law-agg/mcp：各分服务端点已不再提供这些工具
+    # （上游回 "Unknown tool: get_article"）。server 名不变，调用方无需改动。
     - name: pkulaw-semantic
-      url: https://apim-gateway.pkulaw.com/mcp-law-search-service
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60
       enabled: true
     - name: pkulaw-keyword
-      url: https://apim-gateway.pkulaw.com/mcp-law
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60
       enabled: true
     - name: pkulaw-recognition
-      url: https://apim-gateway.pkulaw.com/law_recognition
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60
@@ -93,13 +95,13 @@ mcp:
     # 语义检索 search_case（参数 text，可带 case_type/doc_type 筛选）与
     # 关键词检索 get_case_list（title/正文关键词）。insight.case-server 指向语义档。
     - name: pkulaw-case-semantic
-      url: https://apim-gateway.pkulaw.com/mcp-case-search-service
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60
       enabled: true
     - name: pkulaw-case-keyword
-      url: https://apim-gateway.pkulaw.com/mcp-case
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60
@@ -115,25 +117,25 @@ mcp:
     #   pkulaw-case-number       anhao_recognition(text)                    案号识别+标准化（带法院/判决书标题/法宝链接/GID）
     #   pkulaw-agg               聚合 server：以 server.tool 命名空间挂全部 10 个工具（URL 带 /mcp 后缀，别掉）
     - name: pkulaw-fatiao
-      url: https://apim-gateway.pkulaw.com/mcp-fatiao
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60
       enabled: true
     - name: pkulaw-doc-link
-      url: https://apim-gateway.pkulaw.com/add-doc-link
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60
       enabled: true
     - name: pkulaw-citation-validator
-      url: https://apim-gateway.pkulaw.com/pku_citation_validator
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60
       enabled: true
     - name: pkulaw-case-number
-      url: https://apim-gateway.pkulaw.com/case_number_recognition
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60

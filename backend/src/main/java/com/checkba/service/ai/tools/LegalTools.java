@@ -54,6 +54,51 @@ public class LegalTools implements AgentToolComponent {
             java.util.Set.of("law_search", "law_search_keyword", "law_recognition", "get_law_article", "case_search");
 
     /**
+     * 法宝上游（MCP 返回错误 / Unknown tool）失败时，回给模型的消息里带的机器可识别标记。
+     * 与语言无关：{@code HarnessDiagnosticService} 与编排器据此跳过「澄清护栏」与类目自愈，并把其余法宝工具本轮置为不可用。
+     */
+    public static final String VENDOR_UNAVAILABLE_MARKER = "[pkulaw_unavailable]";
+
+    /** 是不是 {@link #vendorUnavailable} 产出的消息。 */
+    public static boolean isVendorUnavailable(String output) {
+        return output != null && output.contains(VENDOR_UNAVAILABLE_MARKER);
+    }
+
+    /** 法宝工具名集合（只读），供编排器在上游整体失败后本轮整体下线。 */
+    public static java.util.Set<String> pkulawToolNames() {
+        return PKULAW_TOOLS;
+    }
+
+    /**
+     * 上游返回的是错误（而非参数校验错误——那种模型改参数还能救）时，换成一句明确的模型向说明。
+     * 以 {@code Error:} 开头 = 判失败；原因原文保留，方便排查。
+     */
+    static String vendorUnavailable(String raw) {
+        String reason = raw.length() > 300 ? raw.substring(0, 300) + "…" : raw;
+        return com.checkba.service.LangText.of(
+                "Error: " + VENDOR_UNAVAILABLE_MARKER + " 北大法宝法源暂时不可用（" + reason + "）。"
+                        + "不要重试其他法宝工具（law_search / law_search_keyword / get_law_article / law_recognition / case_search 同源，本轮已下线）。"
+                        + "如改用 search_web / browse_url，只能作为线索，并须在回答中注明「非权威来源，待核实」；"
+                        + "优先国家法律法规数据库 flk.npc.gov.cn 原文。",
+                "Error: " + VENDOR_UNAVAILABLE_MARKER + " The PKULaw legal source is temporarily unavailable (" + reason + "). "
+                        + "Do not retry other PKULaw tools (law_search / law_search_keyword / get_law_article / law_recognition / case_search share the same source and are disabled for this run). "
+                        + "If you fall back to search_web / browse_url, treat results as leads only and state in your answer "
+                        + "\"non-authoritative source, to be verified\"; prefer the original text on the National Laws and Regulations Database flk.npc.gov.cn.");
+    }
+
+    private static boolean isVendorError(String out) {
+        if (out == null) {
+            return false;
+        }
+        String t = out.stripLeading();
+        if (t.contains("validation error for call[")) {
+            return false;
+        }
+        return t.startsWith("Error from MCP server") || t.contains("Unknown tool")
+                || t.contains("MCP server has no credential");
+    }
+
+    /**
      * 没连账户时不把法宝检索下发给模型（dev-board#750）。{@code read_document} 读的是项目里
      * 已有的文件、全程不出网，绝不能跟着一起藏——那会让模型以为它连文件都读不了。
      */
@@ -231,7 +276,12 @@ public class LegalTools implements AgentToolComponent {
      */
     private String callPkulaw(String server, String tool, Map<String, Object> args) {
         try {
-            return pkulawChannel.callTool(server, tool, args);
+            String out = pkulawChannel.callTool(server, tool, args);
+            if (isVendorError(out)) {
+                log.warn("法宝上游失败 server={} tool={}: {}", server, tool, out);
+                return vendorUnavailable(out);
+            }
+            return out;
         } catch (com.checkba.service.platform.GatewayException e) {
             switch (e.getKind()) {
                 case NOT_CONNECTED, UNAUTHORIZED, NO_CREDITS -> throw e;

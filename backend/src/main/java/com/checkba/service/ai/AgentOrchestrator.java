@@ -3906,6 +3906,23 @@ public class AgentOrchestrator {
         if (diag == null || guard == null) {
             return resultText;
         }
+        // 法宝上游整体不可用：本轮余下的法宝工具不再下发，免得模型逐个试（roundCandidates 每轮按此集合重算）
+        if (com.checkba.service.ai.tools.LegalTools.isVendorUnavailable(resultText)) {
+            java.util.Set<String> merged = new java.util.HashSet<>(guard.unusableTools);
+            merged.addAll(com.checkba.service.ai.tools.LegalTools.pkulawToolNames());
+            guard.unusableTools = merged;
+        }
+        // 配置/凭证/上游不可用：不做类目展开与 ask_user 护栏，只告诉模型这个工具本轮不可用
+        if (com.checkba.service.ai.harness.HarnessDiagnosticService.isToolUnavailable(resultText)) {
+            if (com.checkba.service.ai.tools.LegalTools.isVendorUnavailable(resultText)) {
+                return resultText; // 已带明确说明
+            }
+            return resultText + "\n\n" + com.checkba.service.LangText.of(
+                    "[Harness 工具不可用] " + toolName + " 当前不可用（配置、凭证或上游服务问题），不要重试同一工具。"
+                            + "可改用其他途径，但来自非权威来源的内容须在回答中注明「待核实」。",
+                    "[Harness Tool Unavailable] " + toolName + " is currently unavailable (configuration, credential or upstream issue); "
+                            + "do not retry it. Use another route, and mark content from non-authoritative sources as unverified.");
+        }
         try {
             String initialInstruction = guard.opinionInstructions.isEmpty() ? "" : guard.opinionInstructions.get(0);
             // 点名调了本轮未下发的工具时，noteToolCategoryExpansion 已先把它的类目放回展开集；

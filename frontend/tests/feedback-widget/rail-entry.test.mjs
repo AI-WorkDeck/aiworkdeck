@@ -70,7 +70,7 @@ test('打开浮窗的唯一通道仍是 awd:open-feedback 事件', () => {
 })
 
 test('工作台 rail 固定底部有反馈按钮（与暂存区/版本记录同一簇）', () => {
-  const rail = WORKBENCH.slice(WORKBENCH.indexOf('<view class="left-rail">'))
+  const rail = WORKBENCH.slice(WORKBENCH.indexOf('<view class="left-rail"'))
   const railEnd = rail.indexOf('<!-- File Picker Dialog')
   assert.ok(railEnd > 0, '找不到 rail 段落的结尾')
   const body = rail.slice(0, railEnd)

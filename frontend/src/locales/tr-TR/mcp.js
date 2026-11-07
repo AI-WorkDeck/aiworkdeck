@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   "label": "MCP",
-  "title": "MCP bağlantıları",
+  "title": "Harici araç bağlantıları (MCP)",
   "description": "MCP, harici araçları AI sohbetlerine ve görevlerine bağlar. Skill iş yöntemleri sağlar; Plugin masaüstünü genişletir.",
   "billing": "Etkin kişisel bağlantınız önceliklidir ve veri çağrıları platform kredisi kullanmaz. Sağlayıcı ve AI model ücretleri geçerlidir. Hatalarda ücretli kanala geçilmez.",
   "transport": "HTTPS Streamable HTTP, Bearer ve OAuth’u destekler. Yerel stdio komutları masaüstü yerel modunu ve çalıştırmadan önce onay gerektirir.",
@@ -77,5 +77,16 @@ export default {
   "fileReadFailed": "Dosya okunamadı. Yeniden seçin veya JSON’u yapıştırın.",
   "localConfirm": "Bu komut çalıştırılsın mı? {command} — Yerel hesabınızın izinleriyle çalışır ve dosyalara ve ağa erişebilir. Yalnızca programa güveniyorsanız devam edin.",
   "commandHint": "Komutlar, bağımsız değişkenler ve çalışma dizinleri görünür kalır. Sırları kimlik bilgisi veya ortam değişkeni alanlarına yazın.",
-  "oauthSaveFirst": "Yetkilendirmeden önce bu bağlantıyı yapılandırıp kaydedin."
+  "oauthSaveFirst": "Yetkilendirmeden önce bu bağlantıyı yapılandırıp kaydedin.",
+  "localTitle": "Yerel MCP hizmeti",
+  "localDesc": "Bu bilgisayardaki Claude Code, Codex ve diğer araçların AI WorkDeck projelerinizi okumasına ve düzenleme önermesine izin verin. Düzenlemeler ancak siz inceledikten sonra belgeye girer.",
+  "localOn": "Açık",
+  "localOff": "Kapalı",
+  "localEnable": "Aç",
+  "localDisable": "Kapat",
+  "localRotate": "Yeniden aç (yeni belirteç)",
+  "localWarn": "Belirteç yalnızca bir kez gösterilir, şimdi kopyalayın. Yeniden açmak yeni bir belirteç üretir ve eskisi geçersiz olur.",
+  "localClaude": "Claude Code komutu",
+  "localCodex": "Codex yapılandırması (~/.codex/config.toml)",
+  "localCopy": "Kopyala"
 }

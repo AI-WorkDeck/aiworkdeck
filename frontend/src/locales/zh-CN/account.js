@@ -313,11 +313,11 @@ export default {
     loginButton: '登录',
     loginAccountButton: '登录 AI WorkDeck 账户',
     notSignedIn: '未登录',
-    // 设置页「账户与用量」：粘 Key 退成高级入口
+    // 设置页「账户与余额」：粘 Key 退成高级入口
     pasteKeyAdvanced: '高级：粘贴账户 Key',
     pasteKeyCollapse: '收起',
     pasteKeyConsentRequired: '连接前请先勾选上面两项同意',
-    // 手机端同步（设置页「账户与用量」）
+    // 手机端同步（设置页「账户与余额」）
     mobileSyncTitle: '手机端同步',
     mobileSyncDesc: '手机 App 拍的现场照片、录音会自动回到这台电脑的对应项目里。',
     mobileSyncNeedsLogin: '未登录：手机端同步不会工作。登录同一个 AI WorkDeck 账户后自动开启。',

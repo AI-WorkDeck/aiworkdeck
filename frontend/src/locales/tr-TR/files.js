@@ -66,7 +66,7 @@ export default {
     "submitted": "Altyazılar oluşturuluyor. Hazır olduğunda görünecekler.",
     "ready": "Altyazılar hazır",
     "failed": "Altyazı oluşturma başarısız oldu. Tekrar denemek için altyazı düğmesine tıklayın.",
-    "notConfigured": "Transkripsiyon ayarlanmadı. Altyazı oluşturmak için Sistem ayarları - Platform Hizmetleri - Toplantı Transkripsiyonu bölümünden yapılandırın.",
+    "notConfigured": "Transkripsiyon ayarlanmadı. Altyazı oluşturmak için Ayarlar - Platform Hizmetleri - Toplantı Transkripsiyonu bölümünden yapılandırın.",
     "noticePending": "Kayıt yapıldı. Önce Ses - Toplantı Kaydı bölümündeki kayıt bildirimini onaylayın, ardından altyazı düğmesine tıklayın.",
     "submitFailed": "Altyazı oluşturma başlatılamadı",
     "empty": "Konuşma algılanmadı"

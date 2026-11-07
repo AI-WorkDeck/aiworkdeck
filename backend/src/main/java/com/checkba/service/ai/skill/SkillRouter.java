@@ -168,23 +168,35 @@ public class SkillRouter {
     }
 
     /** {@link #activeByRun} 的 value：本轮生效集合 + 激活时刻，供惰性过期判断。 */
-    private record ActivationRecord(List<ActiveEntry> entries, long activatedAtMillis) {
+    private record ActivationRecord(List<ActiveEntry> entries, long activatedAtMillis, Set<String> tiedTools) {
+        ActivationRecord(List<ActiveEntry> entries, long activatedAtMillis) {
+            this(entries, activatedAtMillis, Set.of());
+        }
     }
 
     /**
      * 触发匹配（无状态）：在所有可用 skill 中找命中关键词的；
-     * 多命中时取最长命中关键词的 skill（并列时取先注册的）。
+     * 多命中时依次比：最长命中词 → 命中词个数 → 命中词总长 → 命中位置靠前者；全平取先注册的。
      *
      * 生效方式为"仅手动"的 skill 不参与自动匹配——它只能由用户钉选生效。
      */
     public Optional<SkillDefinition> match(String userInput) {
+        return matchTied(userInput).stream().findFirst();
+    }
+
+    /**
+     * 同 {@link #match}，但返回赢家以及与它在前三项（最长命中词、命中词个数、命中词总长）上完全并列的其余 skill
+     * （赢家在首位）。位置只用来选赢家；并列者的工具白名单会并入赢家（见 {@link #visibleTools}），
+     * 避免仅凭措辞先后就把另一边的能力藏掉。
+     */
+    List<SkillDefinition> matchTied(String userInput) {
         if (userInput == null || userInput.isBlank()) {
-            return Optional.empty();
+            return List.of();
         }
         String normalized = userInput.toLowerCase();
         boolean english = isEnglish();
-        SkillDefinition best = null;
-        int bestLen = 0;
+        java.util.List<SkillDefinition> matched = new java.util.ArrayList<>();
+        java.util.List<long[]> scores = new java.util.ArrayList<>();
         for (SkillDefinition skill : skillRegistry.getSkills()) {
             if (!skillRegistry.isAvailable(skill) || skillRegistry.isManual(skill.getId())) {
                 continue;
@@ -192,17 +204,48 @@ public class SkillRouter {
             if ("legal-opinion-review".equals(skill.getId()) && !requestsOpinionReview(normalized)) {
                 continue;
             }
+            // 得分（逐项比较，大者胜）：最长命中词长度 → 命中的不同触发词个数 → 命中词总长度
+            // → 命中位置越靠前越优先（先点名的对象，如「腾讯会议」，比后面的动作「会议纪要」更具体）。
+            // 全部相同才按注册顺序（先注册者胜）。
+            java.util.Set<String> hits = new java.util.HashSet<>();
+            int maxLen = 0;
+            int totalLen = 0;
+            int firstPos = Integer.MAX_VALUE;
             for (String trigger : matchTriggers(skill, english)) {
                 if (trigger == null || trigger.isBlank()) {
                     continue;
                 }
-                if (containsTrigger(normalized, trigger.toLowerCase()) && trigger.length() > bestLen) {
-                    best = skill;
-                    bestLen = trigger.length();
+                String t = trigger.toLowerCase();
+                if (containsTrigger(normalized, t) && hits.add(t)) {
+                    maxLen = Math.max(maxLen, t.length());
+                    totalLen += t.length();
+                    firstPos = Math.min(firstPos, Math.max(0, normalized.indexOf(t)));
                 }
             }
+            if (hits.isEmpty()) {
+                continue;
+            }
+            matched.add(skill);
+            scores.add(new long[]{maxLen, hits.size(), totalLen, -firstPos});
         }
-        return Optional.ofNullable(best);
+        if (matched.isEmpty()) {
+            return List.of();
+        }
+        int bestIdx = 0;
+        for (int i = 1; i < matched.size(); i++) {
+            if (java.util.Arrays.compare(scores.get(i), scores.get(bestIdx)) > 0) {
+                bestIdx = i;
+            }
+        }
+        long[] top = scores.get(bestIdx);
+        List<SkillDefinition> result = new java.util.ArrayList<>();
+        result.add(matched.get(bestIdx));
+        for (int i = 0; i < matched.size(); i++) {
+            if (i != bestIdx && java.util.Arrays.compare(scores.get(i), 0, 3, top, 0, 3) == 0) {
+                result.add(matched.get(i));
+            }
+        }
+        return result;
     }
 
     /**
@@ -357,7 +400,13 @@ public class SkillRouter {
 
         // 手动选过的 skill 即便同时命中触发词也仍标 manual：用户看到的应该是"我选的"，
         // 而不是"碰巧也被关键词猜中了"。
-        match(userInput).ifPresent(matched -> active.putIfAbsent(matched.getId(), SOURCE_AUTO));
+        List<SkillDefinition> tied = matchTied(userInput);
+        Set<String> tiedTools = new HashSet<>();
+        if (!tied.isEmpty()) {
+            active.putIfAbsent(tied.get(0).getId(), SOURCE_AUTO);
+            // 并列者只借工具白名单（不注入它的 prompt、不算生效 skill）
+            tied.stream().skip(1).forEach(t -> tiedTools.addAll(t.getAllowedTools()));
+        }
 
         if (active.isEmpty()) {
             activeByRun.remove(runId);
@@ -366,7 +415,7 @@ public class SkillRouter {
         List<ActiveEntry> entries = active.entrySet().stream()
                 .map(e -> new ActiveEntry(e.getKey(), e.getValue()))
                 .toList();
-        activeByRun.put(runId, new ActivationRecord(entries, clockMillis.getAsLong()));
+        activeByRun.put(runId, new ActivationRecord(entries, clockMillis.getAsLong(), tiedTools));
         log.info("Skills activated for conversation {} (run {}): {}", conversationId, runId, active);
         recordActivation(conversationId, activeSkills(runId));
     }
@@ -608,6 +657,10 @@ public class SkillRouter {
         for (ActiveSkill entry : active) {
             whitelist.addAll(entry.definition().getAllowedTools());
             activeIds.add(entry.definition().getId());
+        }
+        ActivationRecord record = activeByRun.get(runId);
+        if (record != null) {
+            whitelist.addAll(record.tiedTools());
         }
         whitelist.addAll(properties.getBaseTools());
         whitelist.addAll(ORCHESTRATION_TOOLS);

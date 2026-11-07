@@ -4927,6 +4927,11 @@ export const revertHarnessEvolution = (id) => request({
 })
 
 
+// 本机「对外 MCP 服务」开关（仅单机模式；其余模式 404）。enable 响应带一次性令牌，不记日志。
+export const getLocalMcpServerStatus = () => request({ logBody: false, url: '/api/mcp-server/status' })
+export const enableLocalMcpServer = () => request({ logBody: false, url: '/api/mcp-server/enable', method: 'POST' })
+export const disableLocalMcpServer = () => request({ logBody: false, url: '/api/mcp-server/disable', method: 'POST' })
+
 // Independent user-scoped MCP connections. Credentials are write-only.
 export const getMcpConnections = () => request({ logBody: false, url: '/api/mcp/connections' })
 export const saveMcpConnection = (id, data, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: '/api/mcp/connections' + (id ? '/' + encodeURIComponent(id) : ''), method: id ? 'PUT' : 'POST', data })
@@ -4938,3 +4943,11 @@ export const previewMcpImport = (json, scopeToken) => request({ header: { 'X-MCP
 export const importMcpConnections = (json, selectedIndices, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: '/api/mcp/import', method: 'POST', data: { json, selectedIndices } })
 export const authorizeMcpConnection = (id, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: `/api/mcp/connections/${encodeURIComponent(id)}/oauth/authorize`, method: 'POST', timeout: 75000 })
 export const disconnectMcpOAuth = (id, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: `/api/mcp/connections/${encodeURIComponent(id)}/oauth`, method: 'DELETE' })
+
+// ==================== 外部 Agent 待审修订（MCP propose_revision，docs/plans/agent-app-control.md C7） ====================
+export const listPendingRevisions = (params) => request({ url: '/api/revisions/pending', method: 'GET', params })
+export const acceptPendingRevision = (id) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/accept`, method: 'POST' })
+export const markPendingRevisionApplied = (id) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/applied`, method: 'POST' })
+export const recordPendingRevisionProgress = (id, appliedCount) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/progress`, method: 'POST', data: { appliedCount } })
+export const rejectPendingRevision = (id) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/reject`, method: 'POST' })
+export const getMcpServerStatus = () => request({ url: '/api/mcp-server/status', method: 'GET' })

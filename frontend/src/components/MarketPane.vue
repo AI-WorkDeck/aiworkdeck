@@ -871,11 +871,10 @@ export default {
       }
     },
     goBack() {
-      uni.navigateBack({
-        fail: () => {
-          uni.redirectTo({ url: '/pages/admin/admin' })
-        }
-      })
+      // 直接打开本页（没有历史栈）时 navigateBack 会静默失败，回工作台
+      const toWorkbench = () => uni.reLaunch({ url: '/pages/project-overview/project-overview' })
+      if (getCurrentPages().length <= 1) return toWorkbench()
+      uni.navigateBack({ fail: toWorkbench })
     },
   }
 }

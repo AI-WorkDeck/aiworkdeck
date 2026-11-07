@@ -520,3 +520,16 @@ txt/md/markdown 自 dev-board#37 起不进 LOWA（前端走 PlainTextEditor.vue�
 `SlideEditTools` 新增 `slide_add_chart`（column/bar/line/area/pie/doughnut/scatter）、`slide_format_chart`（精确shapeName、配色、字号、图例/网格）、`slide_set_transition`（none/fade/push/wipe）。chart2 散点显式配对 X/Y sequence；不把横轴列当数据系列。样式取真实 chart2 series；标记用完整 `css.chart2.Symbol`，不能只修改返回结构的字段。UNO `CharHeight` 必须用 float Any；普通整数看似设置成功，却会导致 PPTX 导出失败。过渡 Type/Subtype 用 short Any，fade CROSSFADE=101。
 
 图片生成与插入独立：`image_generate_asset` 创建带请求键的任务，`image_get_generation` 查询并幂等导入，返回 `db_id` 给 `slide_add_image.fileId`。生成图片不切换当前PPT身份；未完成回执不发虚假新增文件事件。权限/下载/导入测试见 ImageAssetToolsTest、ImageAssetClientTest、SlideMediaToolsTest；真实引擎测试见 `ppt-advanced-design.mjs`、`ppt-image-layout.mjs`。设置回读、保存重开、实际图片和放映四种证据不能互相替代。
+
+
+## 外部 Agent 待审修订（P1-5，docs/plans/agent-app-control.md C7）
+
+外部 Agent（Claude Code/Codex 经本机 MCP）只能 `propose_revision(fileId, baseVersion, edits[{find, replace, reason}])`，**永不直接改文件**。
+
+- 后端：`model/entity/PendingRevision`（ddl-auto 建表，无迁移脚本）、`PendingRevisionRepository`、`service/revision/PendingRevisionService`、`controller/RevisionController`（`/api/revisions/pending`：`GET ?projectId=|fileId=`、`POST /{id}/accept {conversationId}`、`POST /{id}/reject`）。权限一律项目写权限（`hasWritePermission`，已排除 CLIENT）；无权与不存在同一句话。
+- 提案校验：仅 Word（.docx/.doc，其余格式拒绝建档）；edits ≤ 50，find 非空且 ≤ 2000 字符，replace ≤ 20000，reason ≤ 500；每文件待审 ≤ 20 条。
+- `baseVersion` = `PendingRevisionService.fileVersion(file)`（`updatedAt` 毫秒 + `-` + `fileSize`，任何保存都会变）。接受时不一致 → 状态标 STALE、记录保留、REST 回 `code=4090`（`data.status=STALE`），不套用；用户仍可查看/拒绝。
+- 接受路径（不依赖 AI 对话/SSE）：`POST /{id}/accept` 只校验权限与基线并返回 `edits`（不一致 → 标 STALE、`code=4090`）；前端在编辑器里经本地执行器（`LibreOfficeEditor` 的 `executor.executeCommand`，即 EDITOR_ACTIONS 同一条路径）先**预检**（对剩余每条 `find_text_locations`，任一零命中则一条不套用，UI 标出是第几条并可拒绝；事后 `clear_anchors` 清书签），再 `set_track_changes {on:true}`，从 `appliedCount` 起逐条 `find_replace`，每成功一条 `POST /{id}/progress {appliedCount}` 上报（实体 `applied_count`）（`replaceAll=false`、`__agent:true` → 署名 AI WorkDeck），**全部成功**才调 `POST /{id}/applied` 删记录；任一条失败（含 `total===0`）提案保留，再次接受从第一条未套用的继续；`appliedCount>0` 时后端 accept 跳过基线比较（文档已被自己改过），由前端预检兜底。纯函数 `applyPendingRevision`（`utils/pendingRevision.js`）依赖注入，测试钉着调用顺序。审阅条只在已打开且就绪、可写的编辑器里显示接受；文件树角标点击即打开文件。
+- 前端：`utils/pendingRevision.js`（纯函数）、`utils/pendingRevisionStore.js`（缓存 + 接受/拒绝 + `startRevisionRefresh`）、`components/PendingRevisionBar.vue`（编辑器顶栏，`LibreOfficeEditor` 挂载并传入 `executor`）、`FileTree.vue` 角标（复用 `.tree-item-due`）。刷新：挂载时拉一次；之后仅当 `GET /api/mcp-server/status` 的 `enabled=true`（非单机模式 404 → 不轮询）才在窗口聚焦和每 60s 刷新。词条在 `locales/<20 语种>/revision.js`。
+- 测试：`PendingRevisionServiceTest`、`RevisionControllerTest`、`LocalMcpServer{Tools,Controller}Test`、`frontend/tests/revision/pending.test.mjs`。
+- 已知缺口：仅 Word；没有“逐条”接受（整单套用）；预检用 find_text_locations（上限 50 命中，大小写不敏感，与 find_replace 默认一致），`clear_anchors` 会清掉本文档全部 AI 锚点。

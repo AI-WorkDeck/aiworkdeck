@@ -255,8 +255,8 @@ public class ProjectTaskService {
      */
     public List<Map<String, Object>> listByProject(Long projectId, LocalDate from, LocalDate to, Long fileId) {
         List<ProjectTask> tasks = fileId == null
-                ? taskRepository.findByProjectIdAndDueDateRange(projectId, from, to)
-                : taskRepository.findByProjectIdAndFileIdAndDueDateRange(projectId, fileId, from, to);
+                ? taskRepository.findByProjectIdAndDueDateRange(projectId, lowerBound(from), upperBound(to))
+                : taskRepository.findByProjectIdAndFileIdAndDueDateRange(projectId, fileId, lowerBound(from), upperBound(to));
         return toMaps(tasks);
     }
 
@@ -265,8 +265,24 @@ public class ProjectTaskService {
         if (projectIds == null || projectIds.isEmpty()) {
             return List.of();
         }
-        List<ProjectTask> tasks = taskRepository.findByProjectIdInAndDueDateRange(projectIds, from, to);
+        List<ProjectTask> tasks = taskRepository.findByProjectIdInAndDueDateRange(projectIds, lowerBound(from), upperBound(to));
         return toMaps(tasks);
+    }
+
+    /*
+     * 日期区间空端换成哨兵值再下发：PostgreSQL 推不出空 LocalDate 参数的类型，
+     * 「:from IS NULL OR …」会炸 could not determine data type of parameter（H2 不炸，单测测不出）。
+     * due_date 列 NOT NULL，哨兵与「不限」语义等价。
+     */
+    static final LocalDate NO_LOWER_BOUND = LocalDate.of(1900, 1, 1);
+    static final LocalDate NO_UPPER_BOUND = LocalDate.of(9999, 12, 31);
+
+    private static LocalDate lowerBound(LocalDate from) {
+        return from == null ? NO_LOWER_BOUND : from;
+    }
+
+    private static LocalDate upperBound(LocalDate to) {
+        return to == null ? NO_UPPER_BOUND : to;
     }
 
     /**

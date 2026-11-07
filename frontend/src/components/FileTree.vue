@@ -492,6 +492,12 @@
               :class="'is-' + fileDueIndex[item.id].kind"
               :title="fileDueIndex[item.id].title"
             >{{ fileDueIndex[item.id].text }}</text>
+            <!-- 外部 Agent 待审修订角标（MCP propose_revision） -->
+            <text
+              v-if="!item.isFolder && renamingId !== item.id && viewMode !== 'recycle' && pendingRevisionCounts[item.id]"
+              class="tree-item-due is-soon"
+              :title="$t('revision.bannerCount', { count: pendingRevisionCounts[item.id] })"
+            >{{ pendingRevisionCounts[item.id] }}</text>
             <view v-if="viewMode === 'recycle'" class="tree-item-actions" @tap.stop>
                 <view
                   class="action-btn icon-btn"
@@ -625,6 +631,12 @@
               :class="'is-' + fileDueIndex[item.id].kind"
               :title="fileDueIndex[item.id].title"
             >{{ fileDueIndex[item.id].text }}</text>
+            <!-- 外部 Agent 待审修订角标（MCP propose_revision） -->
+            <text
+              v-if="!item.isFolder && renamingId !== item.id && viewMode !== 'recycle' && pendingRevisionCounts[item.id]"
+              class="tree-item-due is-soon"
+              :title="$t('revision.bannerCount', { count: pendingRevisionCounts[item.id] })"
+            >{{ pendingRevisionCounts[item.id] }}</text>
             <view v-if="viewMode === 'recycle'" class="tree-item-actions" @tap.stop>
                               <view
                   class="action-btn icon-btn"
@@ -793,6 +805,8 @@ import TagFilter from '@/components/TagFilter.vue'
 import TagSelector from '@/components/TagSelector.vue'
 import TagManager from '@/components/TagManager.vue'
 import { taskStore, loadProjectTasks } from '@/utils/taskStore.js'
+import { pendingRevisionsOf, startRevisionRefresh } from '@/utils/pendingRevisionStore.js'
+import { countsByFile } from '@/utils/pendingRevision.js'
 import { isDone, dueBadge, compareDue, taskFileIds } from '@/components/calendar/taskUtils.js'
 import { ICONS } from '@/config/icons.js'
 import { revealInFolderKey } from '@/utils/windowChrome.js'
@@ -1003,6 +1017,9 @@ export default {
      * 文件树几百个节点时逐行调 tasksForFile 会变成 O(节点 × 事项)。
      * 数据是 taskStore 的响应式缓存，事项增删改后自动重算。
      */
+    pendingRevisionCounts() {
+      return countsByFile(pendingRevisionsOf(this.projectId))
+    },
     fileDueIndex() {
       const entry = taskStore.byProject[String(this.projectId)]
       const list = (entry && entry.list) || []
@@ -1267,6 +1284,8 @@ export default {
         this.loadFiles()
         // 到期徽标的数据（taskStore 有缓存与在途合并，工作台 onLoad 已预热时不会重发）
         if (this.projectId) loadProjectTasks(this.projectId).catch(() => {})
+        if (this._stopRevisionRefresh) this._stopRevisionRefresh()
+        this._stopRevisionRefresh = this.projectId ? startRevisionRefresh(this.projectId) : null
       }
     },
     parentId: {
@@ -1318,6 +1337,7 @@ export default {
     if (typeof window !== 'undefined') window.addEventListener('keydown', this._onTagDialogKeydown, true)
   },
   beforeUnmount() {
+    if (this._stopRevisionRefresh) this._stopRevisionRefresh()
     this._fileChangesMounted = false
     this.tagsRequest++
     this._fileChangesStop?.()

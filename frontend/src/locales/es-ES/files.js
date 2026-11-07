@@ -66,7 +66,7 @@ export default {
     "submitted": "Generando subtítulos. Aparecerán cuando estén listos.",
     "ready": "Los subtítulos están listos",
     "failed": "Error al generar los subtítulos. Haga clic en el botón de subtítulos para reintentar.",
-    "notConfigured": "La transcripción no está configurada. Configúrela en Configuración del sistema - Servicios de plataforma - Transcripción de reuniones para generar subtítulos.",
+    "notConfigured": "La transcripción no está configurada. Configúrela en Ajustes - Servicios de plataforma - Transcripción de reuniones para generar subtítulos.",
     "noticePending": "Registrado. Confirme primero el aviso de grabación en Voz - Grabación de reuniones y, a continuación, haga clic en el botón de subtítulos.",
     "submitFailed": "No se pudo iniciar la generación de subtítulos",
     "empty": "No se detectó voz"

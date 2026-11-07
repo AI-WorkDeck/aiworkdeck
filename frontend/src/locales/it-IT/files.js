@@ -66,7 +66,7 @@ export default {
     "submitted": "Generazione dei sottotitoli in corso. Verranno visualizzati quando pronti.",
     "ready": "I sottotitoli sono pronti",
     "failed": "Generazione dei sottotitoli non riuscita. Fai clic sul pulsante dei sottotitoli per riprovare.",
-    "notConfigured": "La trascrizione non è configurata. Configurala in Impostazioni di sistema - Servizi della piattaforma - Trascrizione riunioni per generare i sottotitoli.",
+    "notConfigured": "La trascrizione non è configurata. Configurala in Impostazioni - Servizi della piattaforma - Trascrizione riunioni per generare i sottotitoli.",
     "noticePending": "Registrato. Conferma prima l'avviso di registrazione in Voce - Registrazione riunioni, quindi fai clic sul pulsante dei sottotitoli.",
     "submitFailed": "Impossibile avviare la generazione dei sottotitoli",
     "empty": "Nessun discorso rilevato"

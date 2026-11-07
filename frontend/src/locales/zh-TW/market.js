@@ -145,7 +145,7 @@ export default {
   "reinstallOrUpdate": "重新安裝 / 更新",
   "activationModeLabel": "生效方式：{mode} ▾",
   "processingEllipsis": "處理中…",
-  "needAccountHint": "這是付費項目。請先在設置的「賬戶與用量」中連接 AI WorkDeck 賬戶，安裝時才能校驗購買記錄。",
+  "needAccountHint": "這是付費項目。請先在設置的「帳戶與餘額」中連接 AI WorkDeck 賬戶，安裝時才能校驗購買記錄。",
   "buyHint": "這是付費項目。購買在官網完成，付款後回到本頁點「我已購買，刷新」即可安裝。",
   "whenToUse": "什麼時候用",
   "scenarioLead": "在對話里說出類似這些訴求時，它會自動接管：",

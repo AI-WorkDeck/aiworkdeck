@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   "label": "MCP",
-  "title": "Kết nối MCP",
+  "title": "Kết nối công cụ ngoài (MCP)",
   "description": "MCP kết nối công cụ bên ngoài với hội thoại và tác vụ AI. Skill cung cấp quy trình; Plugin mở rộng ứng dụng máy tính.",
   "billing": "Kết nối đã bật của bạn được ưu tiên, không trừ tín dụng nền tảng cho dữ liệu. Phí nhà cung cấp và mô hình AI vẫn áp dụng. Lỗi không tự chuyển sang kênh trả phí.",
   "transport": "HTTPS Streamable HTTP hỗ trợ Bearer và OAuth. Lệnh stdio cục bộ yêu cầu chế độ máy tính cục bộ và xác nhận trước khi chạy.",
@@ -77,5 +77,16 @@ export default {
   "fileReadFailed": "Không thể đọc tệp. Chọn lại hoặc dán JSON.",
   "localConfirm": "Chạy lệnh này? {command} — Lệnh chạy với quyền tài khoản cục bộ của bạn và có thể truy cập tệp cùng mạng. Chỉ tiếp tục nếu bạn tin cậy chương trình này.",
   "commandHint": "Lệnh, đối số và thư mục làm việc vẫn hiển thị. Đặt thông tin bí mật trong trường thông tin xác thực hoặc biến môi trường.",
-  "oauthSaveFirst": "Cấu hình và lưu kết nối này trước khi cấp quyền."
+  "oauthSaveFirst": "Cấu hình và lưu kết nối này trước khi cấp quyền.",
+  "localTitle": "Dịch vụ MCP cục bộ",
+  "localDesc": "Cho phép Claude Code, Codex và các công cụ khác trên máy này đọc dự án AI WorkDeck của bạn và đề xuất chỉnh sửa. Chỉnh sửa chỉ vào tài liệu sau khi bạn xem xét.",
+  "localOn": "Đang bật",
+  "localOff": "Đang tắt",
+  "localEnable": "Bật",
+  "localDisable": "Tắt",
+  "localRotate": "Bật lại (token mới)",
+  "localWarn": "Token chỉ hiển thị một lần, hãy sao chép ngay. Bật lại sẽ cấp token mới và token cũ ngừng hoạt động.",
+  "localClaude": "Lệnh Claude Code",
+  "localCodex": "Cấu hình Codex (~/.codex/config.toml)",
+  "localCopy": "Sao chép"
 }

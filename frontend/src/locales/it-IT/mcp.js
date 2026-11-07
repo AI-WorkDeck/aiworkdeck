@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   "label": "MCP",
-  "title": "Connessioni MCP",
+  "title": "Connessioni a strumenti esterni (MCP)",
   "description": "MCP collega strumenti esterni a conversazioni e attività IA. Le Skill forniscono metodi, i Plugin ampliano il desktop.",
   "billing": "La connessione attivata ha priorità e non usa crediti della piattaforma per i dati. Restano i costi del fornitore e del modello IA. Nessun ripiego a pagamento in caso di errore.",
   "transport": "HTTPS Streamable HTTP supporta Bearer e OAuth. I comandi stdio richiedono la modalità desktop locale e una conferma prima dell’esecuzione.",
@@ -77,5 +77,16 @@ export default {
   "fileReadFailed": "Impossibile leggere il file. Selezionalo di nuovo o incolla il JSON.",
   "localConfirm": "Eseguire questo comando? {command} — Usa i permessi del tuo account locale e può accedere ai file e alla rete. Continua solo se ti fidi del programma.",
   "commandHint": "Comandi, argomenti e directory di lavoro restano visibili. Inserisci i segreti nei campi per credenziali o variabili d’ambiente.",
-  "oauthSaveFirst": "Configura e salva questa connessione prima di autorizzarla."
+  "oauthSaveFirst": "Configura e salva questa connessione prima di autorizzarla.",
+  "localTitle": "Servizio MCP locale",
+  "localDesc": "Consente a Claude Code, Codex e ad altri strumenti di questo computer di leggere i tuoi progetti AI WorkDeck e proporre modifiche. Le modifiche entrano nel documento solo dopo la tua revisione.",
+  "localOn": "Attivo",
+  "localOff": "Disattivato",
+  "localEnable": "Attiva",
+  "localDisable": "Disattiva",
+  "localRotate": "Riattiva (nuovo token)",
+  "localWarn": "Il token viene mostrato una sola volta: copialo subito. Riattivando il servizio viene emesso un nuovo token e il precedente smette di funzionare.",
+  "localClaude": "Comando Claude Code",
+  "localCodex": "Configurazione Codex (~/.codex/config.toml)",
+  "localCopy": "Copia"
 }

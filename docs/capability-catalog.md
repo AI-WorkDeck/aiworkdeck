@@ -21,6 +21,7 @@
 | `list_project_files` | read | awd:project.read | `list_files`, `search_project_files` |
 | `read_file` | read | awd:project.read | `extract_file_text`, `read_file` |
 | `search_project` | read | awd:project.read | `search_project_content` |
+| `propose_revision` | write | awd:project.propose | — |
 
 ## editor
 

@@ -116,7 +116,7 @@ export default {
   },
   "identity": {
     "title": "Pilih Ruang Kerja Tempatan",
-    "subtitle": "Berbilang akaun sedia ada ditemui pada peranti ini. Pilih ruang kerja untuk diteruskan. Anda tidak akan ditanya lagi, dan anda boleh menukarnya kemudian dalam Tetapan → Akaun & Penggunaan.",
+    "subtitle": "Berbilang akaun sedia ada ditemui pada peranti ini. Pilih ruang kerja untuk diteruskan. Anda tidak akan ditanya lagi, dan anda boleh menukarnya kemudian dalam Tetapan → Akaun & baki.",
     "reading": "Sedang membaca akaun tempatan",
     "retry": "Cuba lagi",
     "itemMeta": "{projects} projek · {files} fail",

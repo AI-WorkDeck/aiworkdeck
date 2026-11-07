@@ -556,4 +556,20 @@ class XmlToolCallParserTest {
         assertEquals("甲方", args.getStr("findText"));
         assertEquals("乙方", args.getStr("replaceText"));
     }
+
+    @Test
+    void bareAskUserRecognisedFromRecordedSampleAndEntityEscapedQuotes() {
+        String sample = "<ask_user question=\"没有文件，请问是哪个期限？\" options='[{\"label\":\"提供文件\",\"description\":\"上传文书\"},"
+                + "{\"label\":\"口头说明\",\"description\":\"直接告诉我\"}]' /> <process name=\"Query memory\">"
+                + "<tool_code>query_memory({\"query\": \"期限\"})</tool_code><tool_output status=\"SUCCESS\">无</tool_output></process>";
+        var calls = parser.parse(sample);
+        assertEquals("ask_user", calls.get(0).toolName());
+        assertEquals(2, AskUserQuestion.fromArgsJson(calls.get(0).argsJson(), "test").options().size());
+
+        // HTML 实体转义的引号：属性与 JSON 内部都是 &quot;
+        String escaped = "<ask_user question=&quot;选哪个？&quot; options=&quot;[&quot;甲&quot;,&quot;乙&quot;]&quot; />";
+        var q = AskUserQuestion.fromArgsJson(single(escaped).argsJson(), "test");
+        assertEquals("选哪个？", q.question());
+        assertEquals(2, q.options().size());
+    }
 }

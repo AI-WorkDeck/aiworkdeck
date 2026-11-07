@@ -227,7 +227,7 @@ public class ToolDisclosurePolicy {
         CATEGORIES.put("enterprise-data", List.of("qichacha_", "name:tushare_query"));
         // law_search / law_search_keyword / get_law_article 在核心集，这里收的是剩下的 law_recognition：
         // 归进 legal 比落 misc 好找——模型要的是「法规这一族还有什么」，不是「杂项里翻翻看」。
-        CATEGORIES.put("legal", List.of("law_", "name:case_search"));
+        CATEGORIES.put("legal", List.of("law_", "name:get_law_article", "name:case_search"));
         CATEGORIES.put("meeting", List.of("meeting_", "tmeet_"));
         CATEGORIES.put("task", List.of("task_"));
         // 文件标签不是事项（T-19）：tag_list / tag_file / tag_remove_from_file 原先挂在 task 下
@@ -475,6 +475,14 @@ public class ToolDisclosurePolicy {
         }
         if (CORE.contains(toolName)) {
             return "core";
+        }
+        return ruleCategoryOf(toolName);
+    }
+
+    /** 忽略核心集、只按类目规则归属（core 工具的「本来所属类目」，供 list_tools 展开时列全）。 */
+    public String ruleCategoryOf(String toolName) {
+        if (toolName == null) {
+            return FALLBACK_CATEGORY;
         }
         if (isPluginTool(toolName)) {
             return PLUGIN_TOOLS_CATEGORY;

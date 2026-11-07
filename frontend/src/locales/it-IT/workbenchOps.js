@@ -71,7 +71,7 @@ export default {
   "ocrCancelling": "Annullamento…",
   "ocrBatchBusy": "È già in corso un riconoscimento; attendi o annullalo",
   "ocrConsentTitle": "Usare il riconoscimento nel cloud?",
-  "ocrConsentHint": "I PDF con livello di testo vengono estratti direttamente, senza caricamento né addebiti; solo scansioni e immagini richiedono l’OCR cloud. Questa conferma vale solo per questo lotto; puoi impostare «sempre cloud» o «solo locale» in Impostazioni → Account e utilizzo → Riconoscimento scansioni.",
+  "ocrConsentHint": "I PDF con livello di testo vengono estratti direttamente, senza caricamento né addebiti; solo scansioni e immagini richiedono l’OCR cloud. Questa conferma vale solo per questo lotto; puoi impostare «sempre cloud» o «solo locale» in Impostazioni → Impostazioni IA → Riconoscimento scansioni.",
   "ocrConsentCheck": "Ho preso atto della destinazione dei dati e dell’addebito",
   "ocrConsentConfirm": "Avvia",
   "ocrCopied": "Testo di {count} file copiato e salvato nella cronologia appunti",

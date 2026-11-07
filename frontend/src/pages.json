@@ -96,7 +96,7 @@
 		{
 			"path": "pages/admin/admin",
 			"style": {
-				"navigationBarTitleText": "系统管理",
+				"navigationBarTitleText": "设置",
 				"navigationStyle": "custom"
 			}
 		},

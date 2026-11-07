@@ -73,7 +73,7 @@ export default {
     submitted: 'Generating captions. They will appear when ready.',
     ready: 'Captions are ready',
     failed: 'Caption generation failed. Click the captions button to retry.',
-    notConfigured: 'Transcription is not set up. Configure it in System settings - Platform Services - Meeting Transcription to generate captions.',
+    notConfigured: 'Transcription is not set up. Configure it in Settings - Platform Services - Meeting Transcription to generate captions.',
     noticePending: 'Registered. Confirm the recording notice in Voice - Meeting Recording first, then click the captions button.',
     submitFailed: 'Could not start caption generation',
     empty: 'No speech detected',

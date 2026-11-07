@@ -33,7 +33,7 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 ## 能力目录与本机 MCP 服务器（Stella 对齐，docs/plans/stella-alignment/mcp-server.md）
 
 - `@ToolMeta.access()` 默认 INFERRED，由 `service/ai/capability/CapabilityCatalog` 按工具名动词推断 read/write/destructive（认不出算 write），并推出 scope `awd:<领域>.<read|write>`。`docs/capability-catalog.md` 由 `CapabilityCatalogDocTest` 生成并做漂移比对：**增删改工具后要重新生成**（`AWD_WRITE_CAPABILITY_CATALOG=1 mvn test -Dtest=CapabilityCatalogDocTest`），推断不对就在 `@ToolMeta` 显式写 access。
-- AWD 自身作为 MCP 服务器：`LocalMcpServerController` 的 `POST /mcp`（只在 local-mode，默认关闭=404，`Authorization: Bearer awdm_...`，带 Origin 拒绝）与 `/api/mcp-server/{status,enable,disable}`；工具在 `service/mcpserver/LocalMcpServerTools`，全部只读、不经 ToolRegistry、读文件不走 OCR。新增 MCP 工具必须登记 `DEFINITIONS`，只能是 read（测试钉着）。
+- AWD 自身作为 MCP 服务器：`LocalMcpServerController` 的 `POST /mcp`（只在 local-mode，默认关闭=404，`Authorization: Bearer awdm_...`，带 Origin 拒绝）与 `/api/mcp-server/{status,enable,disable}`；工具在 `service/mcpserver/LocalMcpServerTools`，除 `propose_revision` 外全部只读、不经 ToolRegistry、读文件不走 OCR。新增 MCP 工具必须登记 `DEFINITIONS`，只能是 read；唯一的写工具是 `propose_revision`（access=write，scope `awd:project.propose`，`CapabilityCatalogDocTest` 点名放行，不改文件只落 `PendingRevision`，契约见 `ai-doc-bridge.md`「外部 Agent 待审修订」）。`read_file` 返回 `version`（= 更新时间毫秒-字节数），即提案的 `baseVersion`。`tools/call` 来源标注取请求头 User-Agent（无状态，拿不到 initialize 的 clientInfo），净化后写成 `mcp:<client>`。
 
 ## 独立 MCP 连接（dev-board#1599）
 
@@ -1907,3 +1907,13 @@ SSE query 都显式携带范围；不匹配的普通面板连接在替换 emitte
 - `SseEmitterService.createConnection` 与 `send` 共用每会话发送锁（挂 emitter + 补发、序号分配 + 写出互斥），实时事件 id 不会先于补发 id 上线；`emitTo` 为包内可见仅供测试。
 - `MemoryManager` 的 saveProjectMemory/saveUserMemory/updateProjectField/consolidate 在锁内用 REQUIRES_NEW 事务提交（注入了事务管理器时），不要再给这几个方法加 `@Transactional`，否则锁又会早于提交释放。
 - `PythonTools` 凭证只以 `-e NAME` 传名、值经 `ProcessBuilder.environment()`，不得再拼进 docker argv（会进日志与 ps）。
+
+### 2026-11-07 法宝上游失败的处置（民法典第1082条事故）
+
+- **上游错误不是注册表未知工具**：`HarnessDiagnosticService` 对结果含 `Error from MCP server` 或 `LegalTools.VENDOR_UNAVAILABLE_MARKER`（`[pkulaw_unavailable]`）的失败，类目关键词只看用户指令与参数（不再因输出里的 "MCP" 展开 `[mcp]`）、不按失败工具展开类目、不触发 `CLARIFY_WITH_USER`（那条只治盲猜检索）。
+- **`LegalTools.callPkulaw`**：上游 `Error from MCP server`/`Unknown tool`（参数校验错误 `validation error for call[` 除外，仍原样回给模型）换成以 `Error:` 开头的「北大法宝法源暂时不可用」说明（原因原文 + 不要重试其他法宝工具 + 备用来源须注明「非权威来源，待核实」，优先 flk.npc.gov.cn）。`PkulawChannel` 平台档把裸 `Unknown tool` 补成 `Error from MCP server:` 前缀。
+- **本轮下线其余法宝工具**：`AgentOrchestrator.applyHarnessAdaptationIfDiagnosed` 见到标记即把 `LegalTools.pkulawToolNames()` 并入 `guard.unusableTools`（每轮 `roundCandidates` 按它重算）。
+- **`list_tools(category)`** 也列核心集里同类的工具，标 `(already available)` 不重复签名；`get_law_article` 补进 legal 类目规则（`ToolDisclosurePolicy.ruleCategoryOf`）。
+- 桌面 BYOK/直连：`application.yml` 的 `pkulaw-*` 全部指向聚合端点 `mcp-law-agg/mcp`，server 名不变。
+- 回归：`LegalToolsVendorFailureTest`、`LegalVendorFailureReplayEvalTest`、`HarnessDiagnosticServiceTest`、`ToolDiscoveryToolsSearchTest`。
+- **泛化（同日复测）**：类目展开永不从工具输出推导，只看用户指令/参数与失败工具名自身类目。`HarnessDiagnosticService.isToolUnavailable` 把「无凭证 / Key 未配置 / 未连接 / 上游 4xx5xx / 上游 Unknown tool」统一判为工具不可用：不展开类目、不触发 ask_user 护栏；编排器改追加「[Harness 工具不可用]」说明（法宝已带自己的说明并保留本轮整体下线）。`LegalTools` 把 `MCP server has no credential` 也归入法源不可用。

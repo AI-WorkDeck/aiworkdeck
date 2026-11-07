@@ -4,6 +4,7 @@ import {
 	createSSRApp
 } from "vue";
 import App from "./App.vue";
+import PendingRevisionBar from "./components/PendingRevisionBar.vue";
 import { recordFrontendError } from "./utils/errorBuffer.js";
 import { i18n } from "./i18n/index.js";
 import { isClientPortalBuild, capturePortalCode, portalRoute } from "./utils/clientPortal.js";
@@ -20,6 +21,8 @@ export function createApp() {
 	const app = createSSRApp(App);
 	// i18n（EN 版）：locale 由 utils/appLanguage.js 决定；语言切换走整页 reload
 	app.use(i18n);
+	// 编辑器顶栏的外部修订待审条（LibreOfficeEditor 模板内使用）
+	app.component("PendingRevisionBar", PendingRevisionBar);
 	// #ifdef H5
 	// uni.showModal / uni.showActionSheet 转发到应用内对话框 AwdDialog（dev-board#849）：
 	// uni-h5 自带的弹窗缺省按钮是写死的英文 OK/Cancel、字体掉到衬线字。

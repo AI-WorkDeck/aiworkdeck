@@ -36,6 +36,7 @@ class LocalMcpServerToolsTest {
     private ProjectFileRepository files;
     private ProjectFileTextExtractor extractor;
     private ContentSearchService search;
+    private com.checkba.service.revision.PendingRevisionService revisions;
     private LocalMcpServerTools tools;
 
     @BeforeEach
@@ -45,7 +46,8 @@ class LocalMcpServerToolsTest {
         files = mock(ProjectFileRepository.class);
         extractor = mock(ProjectFileTextExtractor.class);
         search = mock(ContentSearchService.class);
-        tools = new LocalMcpServerTools(projectService, members, files, extractor, search);
+        revisions = mock(com.checkba.service.revision.PendingRevisionService.class);
+        tools = new LocalMcpServerTools(projectService, members, files, extractor, search, revisions);
         when(members.hasReadPermission(1L, USER)).thenReturn(true);
         when(members.hasReadPermission(2L, USER)).thenReturn(false);
     }
@@ -127,5 +129,43 @@ class LocalMcpServerToolsTest {
         assertEquals(10L, hits.get(0).get("fileId"));
         assertEquals(3, hits.get(0).get("line"));
         assertEquals("违约金", out.get("query"));
+    }
+
+    @Test
+    void proposeRevisionQueuesWithSanitizedClientSourceAndNeverTouchesFiles() {
+        com.checkba.model.entity.PendingRevision saved = new com.checkba.model.entity.PendingRevision();
+        saved.setId(5L);
+        saved.setStatus("PENDING");
+        when(revisions.propose(any(), any(), any(), any(), any())).thenReturn(saved);
+        Object out = tools.call("propose_revision", Map.of("fileId", 3, "baseVersion", "1-2",
+                "edits", List.of(Map.of("find", "a", "replace", "b", "reason", "r"))), USER, "claude<code>/1.0");
+        assertEquals(5L, ((Map<?, ?>) out).get("proposalId"));
+        org.mockito.ArgumentCaptor<String> src = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(revisions).propose(org.mockito.ArgumentMatchers.eq(USER), org.mockito.ArgumentMatchers.eq(3L),
+                org.mockito.ArgumentMatchers.eq("1-2"), any(), src.capture());
+        assertEquals("mcp:claudecode1.0", src.getValue());
+    }
+
+    @Test
+    void proposeRevisionRejectsMalformedArguments() {
+        assertThrows(LocalMcpServerTools.ToolError.class, () -> tools.call("propose_revision",
+                Map.of("fileId", 3, "edits", List.of()), USER));
+        assertThrows(LocalMcpServerTools.ToolError.class, () -> tools.call("propose_revision",
+                Map.of("fileId", 3, "baseVersion", "v", "edits", List.of(Map.of("find", "a"))), USER));
+        when(revisions.propose(any(), any(), any(), any(), any()))
+                .thenThrow(new com.checkba.service.revision.PendingRevisionService.RevisionException("bad"));
+        assertThrows(LocalMcpServerTools.ToolError.class, () -> tools.call("propose_revision",
+                Map.of("fileId", 3, "baseVersion", "v", "edits", List.of(Map.of("find", "a", "replace", "b"))), USER));
+    }
+
+    @Test
+    void readFileReturnsVersionForBaseVersion() throws Exception {
+        ProjectFile f = file(9, 1, "a.docx");
+        f.setFileSize(10L);
+        when(files.findById(9L)).thenReturn(Optional.of(f));
+        when(members.hasReadPermission(1L, USER)).thenReturn(true);
+        when(extractor.extract(f)).thenReturn("hello");
+        Map<?, ?> out = (Map<?, ?>) tools.call("read_file", Map.of("fileId", 9), USER);
+        assertEquals(com.checkba.service.revision.PendingRevisionService.fileVersion(f), out.get("version"));
     }
 }

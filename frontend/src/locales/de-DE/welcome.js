@@ -32,7 +32,7 @@ export default {
   "signIn": "Anmelden",
   "signInTitle": "Anmelden (erforderlich für KI, kostenpflichtige Hub-Elemente und die Team-Aktenbibliothek)",
   "noProjectTitle": "Öffnen Sie ein Projekt, um loszulegen",
-  "noProjectHint": "Öffnen Sie ein Projekt über „Projekte“ links oder erstellen Sie eines über die Willkommensseite.",
+  "noProjectHint": "Klicken Sie oben links auf „Alle Projekte“, um ein Projekt auszuwählen, oder legen Sie auf der Willkommensseite eines an.",
   "startupDisabledHint": "Die Willkommensseite wird beim Start nicht mehr geöffnet.",
   "openWelcome": "Willkommensseite öffnen",
   "aiNeedsProject": "Öffnen Sie zuerst ein Projekt, um den KI-Chat zu verwenden"

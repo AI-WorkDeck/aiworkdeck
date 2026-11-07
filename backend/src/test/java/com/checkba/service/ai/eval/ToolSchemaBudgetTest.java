@@ -47,12 +47,7 @@ class ToolSchemaBudgetTest {
      * 真要估 token、估钱，看这一个。
      */
     static int wireBytes(List<ToolSpecification> specs) {
-        if (specs.isEmpty()) {
-            return 0;
-        }
-        String json = dev.ai4j.openai4j.Json.toJson(
-                dev.langchain4j.model.openai.InternalOpenAiHelper.toTools(specs, false));
-        return json.replaceAll("[ \\t\\n\\r]", "").length();
+        return ToolSurfaceMetrics.wireJson(specs).length();
     }
 
     /** 粗估一份工具规格的体量：名字 + 描述 + 每个参数的名字与说明。与真实 JSON schema 同量级。 */

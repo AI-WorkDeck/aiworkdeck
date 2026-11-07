@@ -6,6 +6,7 @@
     <p>{{ $t('mcp.description') }}</p>
     <p class="mcp-note">{{ $t('mcp.billing') }}</p>
     <p class="mcp-note">{{ $t('mcp.transport') }}</p>
+    <LocalMcpServerToggle />
     <div class="mcp-actions">
       <button :disabled="!!busy || !scopeToken" @click="edit(null)">{{ $t('mcp.add') }}</button>
       <button :disabled="!!busy" @click="load()">{{ $t('mcp.refresh') }}</button>
@@ -116,9 +117,11 @@
 <script>
 import { getApiBaseUrl, getCloudAccountGeneration, getMcpConnections, saveMcpConnection, testMcpConnection, setMcpConnectionEnabled, deleteMcpConnection, previewMcpImport, importMcpConnections, authorizeMcpConnection, disconnectMcpOAuth } from '@/services/api.js'
 import { getCurrentUser } from '@/utils/auth.js'
+import LocalMcpServerToggle from '@/components/admin/LocalMcpServerToggle.vue'
 import { openExternalUrl, openExternalUrlChecked } from '@/utils/externalLink.js'
 export default {
   name: 'McpConnectionsPanel',
+  components: { LocalMcpServerToggle },
   data: () => ({ connections: [], presets: [], draft: null, scopeToken: '', stdioAvailable: false, busy: '', error: '', notice: '', importOpen: false, importJson: '', importPreview: null, selectedIndices: [], oauthLinks: {} }),
   mounted() {
     this._alive = true; this._owner = this.identity(); this._loadVersion = 0; this._importVersion = 0; this.load()

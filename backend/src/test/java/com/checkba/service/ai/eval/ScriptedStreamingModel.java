@@ -35,6 +35,8 @@ public class ScriptedStreamingModel implements StreamingChatLanguageModel {
     private final List<Boolean> toolsOfferedPerCall = new ArrayList<>();
     private final List<List<String>> toolNamesOfferedPerCall = new ArrayList<>();
     private final List<String> promptTextPerCall = new ArrayList<>();
+    private final List<Integer> offeredToolCountPerCall = new ArrayList<>();
+    private final List<Integer> offeredSchemaTokensPerCall = new ArrayList<>();
 
     public ScriptedStreamingModel(List<EvalCase.Turn> turns) {
         this.remaining = new ArrayDeque<>(turns);
@@ -55,6 +57,16 @@ public class ScriptedStreamingModel implements StreamingChatLanguageModel {
         return List.copyOf(promptTextPerCall);
     }
 
+    /** 每次 LLM 调用下发的工具个数（未携带工具记 0；S0 测量基建，tool-surface-audit） */
+    public List<Integer> offeredToolCountPerCall() {
+        return List.copyOf(offeredToolCountPerCall);
+    }
+
+    /** 每次 LLM 调用下发的工具 schema token（o200k，口径见 {@link ToolSurfaceMetrics}；未携带工具记 0） */
+    public List<Integer> offeredSchemaTokensPerCall() {
+        return List.copyOf(offeredSchemaTokensPerCall);
+    }
+
     /** 剩余未消费的脚本轮数（用例结束后应为 0） */
     public int remainingTurns() {
         return remaining.size();
@@ -62,14 +74,18 @@ public class ScriptedStreamingModel implements StreamingChatLanguageModel {
 
     @Override
     public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {
+        offeredToolCountPerCall.add(0);
+        offeredSchemaTokensPerCall.add(0);
         serve(messages, false, List.of(), handler);
     }
 
     @Override
     public void generate(List<ChatMessage> messages, List<ToolSpecification> toolSpecifications,
                          StreamingResponseHandler<AiMessage> handler) {
-        serve(messages, true, toolSpecifications == null ? List.of()
-                : toolSpecifications.stream().map(ToolSpecification::name).toList(), handler);
+        List<ToolSpecification> specs = toolSpecifications == null ? List.of() : toolSpecifications;
+        offeredToolCountPerCall.add(specs.size());
+        offeredSchemaTokensPerCall.add(ToolSurfaceMetrics.schemaTokens(specs));
+        serve(messages, true, specs.stream().map(ToolSpecification::name).toList(), handler);
     }
 
     private void serve(List<ChatMessage> messages, boolean toolsOffered, List<String> toolNames,

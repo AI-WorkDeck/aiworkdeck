@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   "label": "MCP",
-  "title": "MCP 连接",
+  "title": "外部工具连接（MCP）",
   "description": "MCP 为 AI 对话和任务接入外部工具；Skill 提供工作方法，Plugin 扩展桌面功能。",
   "billing": "已启用的自配通道优先，不扣平台数据调用积分；供应商费用和 AI 模型用量仍按各自规则计算。自配失败不会自动转为平台付费调用。",
   "transport": "支持 HTTPS Streamable HTTP、Bearer 与 OAuth；本地 stdio 命令仅限桌面本地模式，运行前需确认。",
@@ -77,5 +77,16 @@ export default {
   "fileReadFailed": "文件读取失败，请重新选择或粘贴 JSON。",
   "localConfirm": "确认运行此命令？{command}。程序将以当前本地账户的权限运行，可能访问文件和网络。请仅在信任此程序时继续。",
   "commandHint": "命令、参数和工作目录属于可查看的运行配置。请将密钥放在专用凭据或环境变量字段中。",
-  "oauthSaveFirst": "请先配置并保存此连接，再进行授权。"
+  "oauthSaveFirst": "请先配置并保存此连接，再进行授权。",
+  "localTitle": "对外 MCP 服务",
+  "localDesc": "允许本机的 Claude Code、Codex 等工具读取你的 AI WorkDeck 项目，并提交修改建议；修改须经你审阅才会写入文档。",
+  "localOn": "已开启",
+  "localOff": "已关闭",
+  "localEnable": "开启",
+  "localDisable": "关闭",
+  "localRotate": "重新开启（换新令牌）",
+  "localWarn": "令牌只显示这一次，请立即复制。再次开启会签发新令牌，旧令牌随即失效。",
+  "localClaude": "Claude Code 命令",
+  "localCodex": "Codex 配置（~/.codex/config.toml）",
+  "localCopy": "复制"
 }

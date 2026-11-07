@@ -346,7 +346,7 @@ const PERSONAL_PANELS = [
 check('统一设置页有完整的「个人」组，且没把搬走的 projects 带回来', () => {
   const src = readVue('src/components/admin/AdminPane.vue')
   const missing = ['work_log', 'favorites', 'todos', 'personal_settings']
-    .filter((k) => !new RegExp("key: '" + k + "'[^\\n]*group: 'personal'").test(src))
+    .filter((k) => !new RegExp("key: '" + k + "'[^\\n]*group: '(personal|mywork)'").test(src))
   if (missing.length) return '个人组缺: ' + missing.join(', ')
   if (/key:\s*'projects'/.test(src)) return "navItems 里冒出了 projects——那一栏 2026-08 搬去项目列表页了"
   if (!src.includes("group: 'system'")) return '系统组的 group 标记没了，两组会挤成一堆'
@@ -356,8 +356,8 @@ check('统一设置页有完整的「个人」组，且没把搬走的 projects 
 check('统一设置页的默认落点是可见的面板', () => {
   const src = readVue('src/components/admin/AdminPane.vue')
   // 非管理员看不见「系统」组，默认值还写死 'ai' 的话他进来就是一张空白页
-  if (!src.includes("activeNav: cachedIsAdmin() ? 'ai' : 'work_log'")) {
-    return "activeNav 默认值要按 cachedIsAdmin() 分流（管理员 'ai'，其余 'work_log'）"
+  if (!src.includes("activeNav: cachedIsAdmin() ? 'ai' : 'personal_settings'")) {
+    return "activeNav 默认值要按 cachedIsAdmin() 分流（管理员 'ai'，其余 'personal_settings'）"
   }
   if (!src.includes("if (n.group === 'system' && !this.isAdminUser) return false")) {
     return 'visibleNavItems 没有把系统组按 isAdmin 收起（原个人中心 checkAdminTab 那条规则）'
@@ -531,8 +531,8 @@ check('账户入口在顶栏右上角（AccountEntry），rail 没有账户或�
   for (const gone of ['class="trial-chip', 'avatarMenuOpen', 'AccountRailEntry']) {
     if (src.includes(gone)) return '残留旧账户入口形态: ' + gone
   }
-  const rail = src.slice(src.indexOf('<view class="left-rail">'), src.indexOf('<FilePickerDialog'))
-  if (!rail.startsWith('<view class="left-rail">')) return '找不到 rail 模板段'
+  const rail = src.slice(src.indexOf('<view class="left-rail"'), src.indexOf('<FilePickerDialog'))
+  if (!rail.startsWith('<view class="left-rail"')) return '找不到 rail 模板段'
   if (rail.includes('<AccountEntry')) return 'rail 里不该再有账户入口（dev-board#1062 改回顶栏）'
   if (rail.includes('GLYPHS.settings') || rail.includes('goToSystemSettings')) return 'rail 里不该再有设置齿轮（设置入口在头像下拉里）'
   const header = src.slice(src.indexOf('<view class="header-right">'), src.indexOf('<!-- 主体布局 -->'))
@@ -903,6 +903,7 @@ checkFull('app-e2e：启动落工作台外壳、经欢迎目录进项目，不�
 const WORKBENCH_NAV_ALLOWLIST = {
   // 切身份需要整站重走启动链；保留这处例外，不许再新增。
   'components/admin/AdminPane.vue#onSwitchIdentity': '预存在：切换本机身份后整站回启动链重建',
+  'components/admin/AdminPane.vue#goBackToWorkbench': '「← 返回工作台」只在整页形态（!embedded）渲染，此时没有工作台可落盘',
 }
 
 check('工作台 provide 出 leaveWorkbench，给里面的组件用', () => {

@@ -140,6 +140,10 @@ public class EvalCase {
         public List<String> offeredToolsExcludeFirstCall = new ArrayList<>();
         /** 只对**最后一次**携带工具的调用断言包含；与上一条配对使用。 */
         public List<String> offeredToolsIncludeLastCall = new ArrayList<>();
+        /** 第一次携带工具的 LLM 调用下发的工具个数上限（null = 不断言；tool-surface-audit S0） */
+        public Integer maxOfferedToolsFirstCall;
+        /** 第一次携带工具的 LLM 调用下发的 schema token 上限（o200k，口径见 ToolSurfaceMetrics；null = 不断言） */
+        public Integer maxOfferedTokensFirstCall;
         /** 会话文件夹重命名（<title> 协议）应包含的子串（null = 不断言） */
         public String renamedTitleContains;
         /** 应在某次 LLM 调用的上下文中出现的子串（断言编排器回喂了某条系统提醒；空 = 不断言） */

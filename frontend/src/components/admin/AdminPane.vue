@@ -20,6 +20,10 @@
       <!-- Sidebar -->
       <view class="admin-sidebar">
         <view class="nav-card">
+            <!-- 整页形态（/pages/admin/admin、/pages/userprofile/userprofile）没有标签栏可退，自带一个回工作台的出口 -->
+            <view v-if="!embedded" class="nav-back" role="button" tabindex="0" @tap="goBackToWorkbench" @keydown.enter.stop.prevent="goBackToWorkbench">
+              <text>{{ $t('admin.backToWorkbench') }}</text>
+            </view>
             <!-- 紧凑用户行取代了原来单独一张大居中头像卡（dev-board#892）：
                  头像可点：local-mode 且已连接账户时写官网（展示名与头像的唯一权威源），
                  自建服务器仍走原来那条 uni.chooseImage + uploadAvatar。 -->
@@ -42,7 +46,7 @@
                 </view>
               </view>
             </view>
-            <!-- 两组：「个人」（原个人中心四栏）与「系统」（原系统设置各分区）。
+            <!-- 三组：「个人」、「系统」（原系统设置各分区）与垫底的「我的工作」（原个人中心的工作记录等四栏）。
                  分组只是排版，可见性仍由 visibleNavItems 一处决定
                  （desktopOnly + 系统组要 isAdmin）。 -->
             <view v-for="group in navGroups" :key="group.key" class="nav-group">
@@ -109,19 +113,6 @@
                 <text class="platform-link" @tap="switchToOfficialChannel">{{ $t('admin.switchToOfficialChannel') }}</text>
               </view>
 
-              <!-- 跨境传输的单独同意（个保法第三十九条）。官方通道会把内容送往境外，
-                   所以它恒显示。绝不预勾选——预勾选的同意是无效的。 -->
-              <view class="consent-box">
-                <text class="consent-title">{{ $t('admin.consentTitle') }}</text>
-                <text class="consent-body">{{ $t('onboarding.unlock.crossBorderNoticeBody') }}</text>
-                <view class="consent-check" @tap="toggleCrossBorderConsent">
-                  <view class="consent-box-mark" :class="{ checked: crossBorderConsented }"></view>
-                  <text class="consent-check-label">{{ $t('admin.consentCheckLabel') }}</text>
-                </view>
-                <text v-if="crossBorderConsentAt" class="consent-meta">{{ $t('admin.consentAt', { time: formatConsentAt }) }}</text>
-                <text class="consent-link" @tap="openPrivacyCrossBorder">{{ $t('admin.consentPrivacyLink') }}</text>
-              </view>
-
               <!-- 模型选择。清单唯一来源是后端模型目录（GET /api/ai/models）——
                    历史上前端硬编码过两份互不同步的清单，结果是「后端加模型用户看不到、
                    前端加模型被工厂静默回落默认模型」。
@@ -169,6 +160,9 @@
                 <button type="button" class="comp-btn" @tap="onNavTap({ key: 'workflows' })">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</button>
               </SettingsRow>
           </SettingsSection>
+
+          <!-- 扫描件识别（OCR）：属于 AI 功能，原先误放在「账户与余额」里 -->
+          <OcrRoutingSettings :key="'ocr-routing-' + identityCurrentId" />
 
           <!-- 保存按钮 -->
           <view class="fixed-footer">
@@ -567,8 +561,6 @@
               </view>
           </SettingsSection>
 
-          <OcrRoutingSettings :key="'ocr-routing-' + identityCurrentId" />
-
           <!-- 花费闸门。原属已撤销的「平台服务」分区，官方版全部外部服务统一平台代采后
                那个分区已无实际作用；这张卡是其中仍然真实的功能，随通知一起搬来本分区末尾
                （刻意放在最后，减少与本分区其它改动的冲突面）。
@@ -699,7 +691,22 @@
           scroll-y
           class="config-scroll"
         >
-          <SettingsSection :title="$t('admin.navTelemetry')" :description="$t('admin.telemetrySubtitle')">
+          <!-- 隐私与数据：跨境传输同意 / 匿名使用统计开关 / 文档属性 / 本地使用统计 都收在这一页 -->
+          <SettingsSection :title="$t('admin.consentTitle')">
+              <!-- 跨境传输的单独同意（个保法第三十九条）。官方通道会把内容送往境外，
+                 所以它恒显示。绝不预勾选——预勾选的同意是无效的。 -->
+            <view class="consent-box">
+              <text class="consent-body">{{ $t('onboarding.unlock.crossBorderNoticeBody') }}</text>
+              <view class="consent-check" @tap="toggleCrossBorderConsent">
+                <view class="consent-box-mark" :class="{ checked: crossBorderConsented }"></view>
+                <text class="consent-check-label">{{ $t('admin.consentCheckLabel') }}</text>
+              </view>
+              <text v-if="crossBorderConsentAt" class="consent-meta">{{ $t('admin.consentAt', { time: formatConsentAt }) }}</text>
+              <text class="consent-link" @tap="openPrivacyCrossBorder">{{ $t('admin.consentPrivacyLink') }}</text>
+            </view>
+          </SettingsSection>
+
+          <SettingsSection :title="$t('admin.telemetrySectionTitle')" :description="$t('admin.telemetrySubtitle')">
               <view class="provider-card">
                 <view class="provider-header telemetry-switch-row">
                   <view class="telemetry-switch-info">
@@ -735,6 +742,8 @@
                 <text class="telemetry-privacy-line">{{ $t('admin.telemetryPrivacyLine') }}</text>
               </view>
           </SettingsSection>
+
+          <DocGeneratorSetting />
 
           <SettingsSection :title="$t('admin.localStatsTitle')" :description="$t('admin.localStatsSubtitle')">
               <template #actions>
@@ -1110,6 +1119,7 @@ import MemoryBrowser from '@/components/MemoryBrowser.vue'
 import BuiltinWorkflowEditor from '@/components/BuiltinWorkflowEditor.vue'
 import LanguagePicker from '@/components/LanguagePicker.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
+import DocGeneratorSetting from '@/components/settings/DocGeneratorSetting.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
 import { componentDownloads } from '@/services/componentDownloads.js'
 import { openPermissionOnboarding, normalizePermissionItems } from '@/utils/permissionOnboarding.js'
@@ -1167,6 +1177,7 @@ export function resolveAdminNavKey(key) {
 export default {
   name: 'AdminPane',
   components: {
+    DocGeneratorSetting,
     OcrRoutingSettings,
     UnlockHint, RechargeDialog, AwdSelect, AwdSwitch,
     PersonalWorkLogPanel, PersonalCaseIntakePanel, PersonalFavoritesPanel, PersonalTodosPanel, PersonalSettingsPanel,
@@ -1207,20 +1218,23 @@ export default {
       // 「系统」组是否可见。原来这条规则长在个人中心的 checkAdminTab（只有管理员
       // 才多出一个「系统设置」tab），两页合并后它就是这一处。
       isAdminUser: cachedIsAdmin(),
-      // 非管理员进来时默认落个人组第一栏——落在一个自己看不见的面板上等于空白页
-      activeNav: cachedIsAdmin() ? 'ai' : 'work_log',
+      // 非管理员进来时默认落「个人资料与登录」——落在一个自己看不见的面板上等于空白页
+      activeNav: cachedIsAdmin() ? 'ai' : 'personal_settings',
       /** 服务端记录的同意时间戳；空 = 未同意或告知文本已改版需重新征求 */
       crossBorderConsentAt: '',
-      // 两组导航。group 只决定排版分组，可见性一律在 visibleNavItems 里判。
+      // 三组导航（个人 / 系统 / 我的工作）。group 只决定排版分组，可见性一律在 visibleNavItems 里判。
       navItems: [
-        // 「个人」组：2026-08-20 从个人中心搬来的四栏。key 刻意避开 'account'
-        //（系统组的「账户与用量」已经占了这个 key）。
+        // 2026-08-20 从个人中心搬来的四栏（工作记录 / 立案与利冲 / 全部收藏 / 我的待办）现在单列
+        // 在最后一组「我的工作」。key 刻意避开 'account'（系统组的「账户与余额」已经占了这个 key）。
         { key: 'language', label: this.$t('account.languageGroupTitle'), group: 'personal' },
-        { key: 'work_log', label: this.$t('account.tabWorkLog'), group: 'personal' },
-        { key: 'case_intake', label: this.$t('account.tabCaseIntake'), group: 'personal' },
-        { key: 'favorites', label: this.$t('account.tabFavorites'), group: 'personal' },
-        { key: 'todos', label: this.$t('account.tabTodos'), group: 'personal' },
+        { key: 'work_log', label: this.$t('account.tabWorkLog'), group: 'mywork' },
+        { key: 'case_intake', label: this.$t('account.tabCaseIntake'), group: 'mywork' },
+        { key: 'favorites', label: this.$t('account.tabFavorites'), group: 'mywork' },
+        { key: 'todos', label: this.$t('account.tabTodos'), group: 'mywork' },
         { key: 'personal_settings', label: this.$t('admin.navPersonalSettings'), group: 'personal' },
+        // 隐私与数据（原「数据统计」）：匿名统计开关、跨境传输同意、文档属性都收在这里；
+        // 人人要能看到自己的同意与文档属性开关，所以挂「个人」组而不是仅管理员可见的「系统」组。
+        { key: 'telemetry', label: this.$t('admin.navTelemetry'), group: 'personal' },
         // 团队（dev-board#496）：挂「个人」组而不是「系统」组——团队是每个人自己的归属，
         // 普通成员也要看得到自己的统计与那个数据共享开关，而「系统」组对非管理员整组收起
         { key: 'team', label: this.$t('team.navTeam'), group: 'personal' },
@@ -1238,8 +1252,7 @@ export default {
         // 能力升级（dev-board#497）：能力槽切换 + 从 GitHub 装能力包。桌面端才有意义
         //（落盘到本机 plugins/ 目录、进程型引擎跑在本机）
         { key: 'capabilities', label: this.$t('admin.navCapabilities'), group: 'system', desktopOnly: true },
-        { key: 'telemetry', label: this.$t('admin.navTelemetry'), group: 'system' },
-        { key: 'feedback', label: this.$t('admin.navFeedback'), group: 'system' },
+                { key: 'feedback', label: this.$t('admin.navFeedback'), group: 'system' },
         // 'plugins'（插件广场）2026-08-27 已撤——入口统一收敛到左 rail 的插件中心，
         // 独立页 /pages/plugin-market 仍保留给直链。
       ],
@@ -1458,6 +1471,7 @@ export default {
       const groups = [
         { key: 'personal', label: this.$t('admin.navGroupPersonal') },
         { key: 'system', label: this.$t('admin.navGroupSystem') },
+        { key: 'mywork', label: this.$t('admin.navGroupMyWork') },
       ]
       return groups
         .map((g) => ({ ...g, items: this.visibleNavItems.filter((n) => n.group === g.key) }))
@@ -1730,6 +1744,9 @@ export default {
     }
   },
   methods: {
+    goBackToWorkbench() {
+      uni.reLaunch({ url: '/pages/project-overview/project-overview' })
+    },
     resolveAdminNavKey(key) {
       return resolveAdminNavKey(key)
     },
@@ -3054,6 +3071,15 @@ $brand-accent: $brand-mint;
 
 /* 紧凑用户行（dev-board#892），取代原来单独一张大居中头像卡——头像 36px +
    展示名 13px/600 + 角色小胶囊，坐在导航卡顶部，对齐插件广场侧栏的密度。 */
+.nav-back {
+    padding: 8px 14px;
+    font-size: var(--awd-font-size-body);
+    color: var(--awd-text-2);
+    cursor: pointer;
+
+    &:hover { color: var(--awd-accent-text); background: var(--awd-surface-2); }
+}
+
 .sidebar-user-row {
     display: flex;
     align-items: center;
