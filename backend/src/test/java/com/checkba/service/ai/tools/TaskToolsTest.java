@@ -45,6 +45,7 @@ class TaskToolsTest {
     @BeforeEach
     void setUp() {
         taskService = mock(ProjectTaskService.class);
+        when(taskService.findWritableProjectsByName(eq(10L), any())).thenReturn(List.of(project(1L, "P")));
         tools = new TaskTools(taskService);
     }
 
@@ -67,7 +68,7 @@ class TaskToolsTest {
                 .thenReturn(task(5L, "提交答辩状", LocalDate.of(2026, 9, 1), LocalTime.of(9, 30)));
 
         String out = tools.task_create("提交答辩状", "2026-09-01", "09:30", null,
-                null, null, null, null, null, null, null, 1L, 10L);
+                null, null, null, null, null, null, "P", 1L, 10L);
 
         assertTrue(out.contains("提交答辩状"), out);
         assertTrue(out.contains("id=5"), out);
@@ -80,7 +81,7 @@ class TaskToolsTest {
     @DisplayName("task_create：dueDate 缺失/格式非法——不调用 service，返回可行动错误")
     void createRejectsBadDueDate() {
         String out = tools.task_create("任务", "not-a-date", null, null,
-                null, null, null, null, null, null, null, 1L, 10L);
+                null, null, null, null, null, null, "P", 1L, 10L);
 
         assertTrue(out.startsWith("错误"), out);
         verify(taskService, never()).createAiTask(any(), any(ProjectTaskService.TaskDraft.class), any());
@@ -93,7 +94,7 @@ class TaskToolsTest {
                 .thenThrow(new IllegalArgumentException("文件不属于该项目"));
 
         String out = tools.task_create("任务", "2026-09-01", null, 99L,
-                null, null, null, null, null, null, null, 1L, 10L);
+                null, null, null, null, null, null, "P", 1L, 10L);
 
         assertFalse(out.isBlank());
         assertTrue(out.contains("文件不属于该项目"), out);
@@ -199,7 +200,7 @@ class TaskToolsTest {
         when(taskService.createAiTask(eq(1L), eq(expected), eq(10L))).thenReturn(created);
 
         String out = tools.task_create("开庭", "2026-10-12", "09:30", 7L,
-                "HEARING", "带原件", "HIGH", "12， 15", 2L, 1440, null, 1L, 10L);
+                "HEARING", "带原件", "HIGH", "12， 15", 2L, 1440, "P", 1L, 10L);
 
         assertTrue(out.contains("开庭"), out);
         assertTrue(out.contains("id=6"), out);
@@ -210,7 +211,7 @@ class TaskToolsTest {
     @DisplayName("task_create：fileIds 不是数字——不调用 service，返回以「错误」开头的文案")
     void createRejectsBadFileIds() {
         String out = tools.task_create("x", "2026-10-12", null, null,
-                null, null, null, "12,abc", null, null, null, 1L, 10L);
+                null, null, null, "12,abc", null, null, "P", 1L, 10L);
         assertTrue(out.startsWith("错误"), out);
         verify(taskService, never()).createAiTask(any(), any(ProjectTaskService.TaskDraft.class), any());
     }
@@ -221,7 +222,7 @@ class TaskToolsTest {
         when(taskService.createAiTask(eq(1L), any(ProjectTaskService.TaskDraft.class), eq(10L)))
                 .thenThrow(new IllegalArgumentException("type 只能是 DEADLINE/HEARING/MEETING/TODO/OTHER"));
         String out = tools.task_create("x", "2026-10-12", null, null,
-                "PARTY", null, null, null, null, null, null, 1L, 10L);
+                "PARTY", null, null, null, null, null, "P", 1L, 10L);
         assertTrue(out.startsWith("错误"), out);
         assertTrue(out.contains("DEADLINE"), out);
     }
@@ -306,7 +307,7 @@ class TaskToolsTest {
         assertTrue(out.contains("id=8"), out);
         assertTrue(out.contains("开庭"), out);
         assertTrue(out.contains("重要"), out);
-        assertTrue(out.contains("2026-10-12 09:30"), out);
+        assertTrue(out.contains("2026-10-12 周一 09:30"), out);
         assertTrue(out.contains("负责人：韩泽伟"), out);
         assertTrue(out.contains("起诉状.docx、证据清单.xlsx"), out);
         assertTrue(out.contains("截止日"), "type 缺省按截止日展示：" + out);
@@ -329,7 +330,7 @@ class TaskToolsTest {
         created.setDueDate(LocalDate.of(2026, 12, 2));
         when(taskService.createAiTask(eq(5L), any(ProjectTaskService.TaskDraft.class), eq(10L))).thenReturn(created);
         String out = tools.task_create("开庭", "2026-12-02", "10:00", null, null, null, null, null, null, null, "张三案", 1L, 10L);
-        assertTrue(out.startsWith("已创建"), out);
+        assertTrue(out.startsWith("已在项目"), out);
         verify(taskService, never()).createAiTask(eq(1L), any(ProjectTaskService.TaskDraft.class), any());
     }
 
@@ -342,7 +343,7 @@ class TaskToolsTest {
         created.setTitle("x");
         created.setDueDate(LocalDate.of(2026, 12, 2));
         when(taskService.createAiTask(eq(6L), any(ProjectTaskService.TaskDraft.class), eq(10L))).thenReturn(created);
-        assertTrue(tools.task_create("x", "2026-12-02", null, null, null, null, null, null, null, null, "张三", null, 10L).startsWith("已创建"));
+        assertTrue(tools.task_create("x", "2026-12-02", null, null, null, null, null, null, null, null, "张三", null, 10L).startsWith("已在项目"));
     }
 
     @Test
@@ -365,13 +366,31 @@ class TaskToolsTest {
     }
 
     @Test
-    @DisplayName("task_create：当前是 SCRATCH 或无项目且没给 projectName——不静默写入，要求询问用户")
-    void taskCreateScratchCountsAsNoProject() {
-        when(taskService.isScratchProject(99L)).thenReturn(true);
-        for (Long pid : new Long[]{99L, null}) {
-            String out = tools.task_create("x", "2026-12-02", null, null, null, null, null, null, null, null, null, pid, 10L);
+    @DisplayName("task_create：projectName 必填——缺失/空白不创建，不回退到会话项目（含 SCRATCH）")
+    void taskCreateRequiresProjectName() {
+        for (String name : new String[]{null, "  "}) {
+            String out = tools.task_create("x", "2026-12-02", null, null, null, null, null, null, null, null, name, 99L, 10L);
             assertTrue(out.startsWith("错误") && out.contains("projectName"), out);
         }
         verify(taskService, never()).createAiTask(any(), any(ProjectTaskService.TaskDraft.class), any());
+    }
+
+    @Test
+    @DisplayName("task_create：结果以解析出的项目开头；包含匹配时附带提示，精确匹配不附带；日期带星期")
+    void taskCreateLeadsWithResolvedProjectAndNotesFuzzyMatch() {
+        when(taskService.findWritableProjectsByName(10L, "星河")).thenReturn(List.of(project(8L, "星河科技案")));
+        ProjectTask created = new ProjectTask();
+        created.setId(3L);
+        created.setTitle("开庭");
+        created.setDueDate(LocalDate.of(2026, 11, 6));
+        when(taskService.createAiTask(eq(8L), any(ProjectTaskService.TaskDraft.class), eq(10L))).thenReturn(created);
+        String out = tools.task_create("开庭", "2026-11-06", null, null, null, null, null, null, null, null, "星河", 1L, 10L);
+        assertTrue(out.startsWith("已在项目「星河科技案」创建"), out);
+        assertTrue(out.contains("按「星河」匹配到「星河科技案」"), out);
+        assertTrue(out.contains("2026-11-06 周五"), out);
+
+        when(taskService.findWritableProjectsByName(10L, "星河科技案")).thenReturn(List.of(project(8L, "星河科技案")));
+        String exact = tools.task_create("开庭", "2026-11-06", null, null, null, null, null, null, null, null, "星河科技案", 1L, 10L);
+        assertFalse(exact.contains("匹配到"), exact);
     }
 }

@@ -4,6 +4,7 @@
 package com.checkba.service.ai.tools;
 
 import com.checkba.model.entity.ProjectTask;
+import com.checkba.service.LangText;
 import com.checkba.service.task.ProjectTaskService;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
@@ -52,32 +53,35 @@ public class TaskTools implements AgentToolComponent {
             @P(value = "关联的项目内文件ID，多个用英文逗号分隔（如 12,15），须来自 doc_list_project_files 等工具返回的 fileId", required = false) String fileIds,
             @P(value = "负责人用户ID（可选），必须是本项目成员", required = false) Long assigneeId,
             @P(value = "提前多少分钟提醒（可选）：0=准时，60=提前1小时，1440=提前1天；不填表示不提醒", required = false) Integer remindBefore,
-            @P(value = "目标项目名称（可选）：用户点名了某个案子/项目时必填，按名称精确或包含匹配；优先于当前对话所在项目。当前对话没有绑定正式项目时也必须提供", required = false) String projectName,
+            @P("目标项目名称；用户说的就是当前项目时填当前项目名。按名称精确或唯一包含匹配；若用户的项目说法可能匹配多个项目，先调用 ask_user 问清再创建") String projectName,
             Long projectId,
             Long userId
     ) {
-        log.info("Tool: task_create title='{}' dueDate={} dueTime={} type={} fileId={} fileIds={} project={}",
-                title, dueDate, dueTime, type, fileId, fileIds, projectId);
+        final Long contextProjectId = projectId;
+        log.info("Tool: task_create title='{}' dueDate={} dueTime={} type={} fileId={} fileIds={} projectName={}",
+                title, dueDate, dueTime, type, fileId, fileIds, projectName);
 
         if (userId == null) {
             return "错误：无法获取当前用户身份，任务未创建。";
         }
-        if (projectName != null && !projectName.isBlank()) {
-            List<com.checkba.model.entity.Project> matches = projectTaskService.findWritableProjectsByName(userId, projectName);
-            if (matches.isEmpty()) {
-                return "错误：没有找到名为「" + projectName.trim() + "」且你有写权限的项目，任务未创建。请向用户确认项目名称。";
-            }
-            if (matches.size() > 1) {
-                StringBuilder sb = new StringBuilder("错误：「" + projectName.trim() + "」匹配到多个项目，任务未创建。请向用户确认是哪一个：");
-                matches.stream().limit(5).forEach(p -> sb.append("\n- ").append(p.getName()).append("（id=").append(p.getId()).append("）"));
-                if (matches.size() > 5) sb.append("\n- …等共 ").append(matches.size()).append(" 个");
-                return sb.toString();
-            }
-            projectId = matches.get(0).getId();
-        } else if (projectId == null || projectTaskService.isScratchProject(projectId)) {
-            // 随手工作区（SCRATCH）不是用户指的项目：不静默写进去
-            return "错误：当前对话没有绑定正式项目，任务未创建。请询问用户要加到哪个项目，并用 projectName 指定。";
+        if (projectName == null || projectName.isBlank()) {
+            return "错误：缺少 projectName，任务未创建。请填写目标项目名称（用户说的就是当前项目时填当前项目名）；不确定是哪个项目就先 ask_user。";
         }
+        String requestedName = projectName.trim();
+        List<com.checkba.model.entity.Project> matches = projectTaskService.findWritableProjectsByName(userId, requestedName);
+        if (matches.isEmpty()) {
+            return "错误：没有找到名为「" + requestedName + "」且你有写权限的项目，任务未创建。请向用户确认项目名称。";
+        }
+        if (matches.size() > 1) {
+            StringBuilder sb = new StringBuilder("错误：「" + requestedName + "」匹配到多个项目，任务未创建。请用 ask_user 向用户确认是哪一个：");
+            matches.stream().limit(5).forEach(p -> sb.append("\n- ").append(p.getName()).append("（id=").append(p.getId()).append("）"));
+            if (matches.size() > 5) sb.append("\n- …等共 ").append(matches.size()).append(" 个");
+            return sb.toString();
+        }
+        com.checkba.model.entity.Project target = matches.get(0);
+        projectId = target.getId();
+        log.info("Tool: task_create resolved project={} ({}) from name '{}', context project={}",
+                projectId, target.getName(), requestedName, contextProjectId);
         LocalDate parsedDueDate = parseDate(dueDate);
         if (parsedDueDate == null) {
             return "错误：dueDate 缺失或格式不合法，须为 ISO 日期 yyyy-MM-dd。";
@@ -109,13 +113,18 @@ public class TaskTools implements AgentToolComponent {
                     title, parsedDueDate, parsedDueTime, type, priority, notes, assigneeId, remindBefore,
                     parsedFileIds.isEmpty() ? null : parsedFileIds);
             ProjectTask task = projectTaskService.createAiTask(projectId, draft, userId);
-            StringBuilder sb = new StringBuilder("已创建").append(typeLabel(task.getType())).append("事项：");
+            StringBuilder sb = new StringBuilder(LangText.of("已在项目「" + target.getName() + "」创建", "Created in project \"" + target.getName() + "\": "))
+                    .append(typeLabel(task.getType())).append("事项：");
             sb.append(task.getTitle()).append("（id=").append(task.getId())
-                    .append("，日期 ").append(task.getDueDate());
+                    .append("，日期 ").append(weekdayDate(task.getDueDate()));
             if (task.getDueTime() != null) {
                 sb.append(' ').append(task.getDueTime());
             }
             sb.append("）。");
+            if (!requestedName.equalsIgnoreCase(target.getName() == null ? "" : target.getName().trim())) {
+                sb.append(LangText.of("（按「" + requestedName + "」匹配到「" + target.getName() + "」；如不是这个项目请告诉我）",
+                        " (matched \"" + target.getName() + "\" from \"" + requestedName + "\"; tell me if that is the wrong project)"));
+            }
             return sb.toString();
         } catch (IllegalArgumentException e) {
             return "错误：" + e.getMessage();
@@ -180,7 +189,7 @@ public class TaskTools implements AgentToolComponent {
             StringBuilder sb = new StringBuilder("已更新事项：");
             sb.append(t.getTitle()).append("（id=").append(t.getId())
                     .append("，").append(typeLabel(t.getType()))
-                    .append("，日期 ").append(t.getDueDate());
+                    .append("，日期 ").append(weekdayDate(t.getDueDate()));
             if (t.getDueTime() != null) {
                 sb.append(' ').append(t.getDueTime());
             }
@@ -251,7 +260,7 @@ public class TaskTools implements AgentToolComponent {
             line.add("HIGH".equals(t.get("priority")) ? title + "（重要）" : title);
             Object dueDate = t.get("dueDate");
             Object dueTime = t.get("dueTime");
-            line.add("时间 " + dueDate + (dueTime != null ? " " + dueTime : "（全天）"));
+            line.add("时间 " + weekdayDate(dueDate) + (dueTime != null ? " " + dueTime : "（全天）"));
             line.add(String.valueOf(t.get("status")));
             Object assigneeName = t.get("assigneeName");
             if (assigneeName != null) {
@@ -267,6 +276,18 @@ public class TaskTools implements AgentToolComponent {
     }
 
     /** 类型中文名；null/未知按默认截止日。 */
+    /** 日期后带星期（模型曾把星期报错），如 2026-11-06 周五 / 2026-11-06 Fri。 */
+    static String weekdayDate(Object date) {
+        if (date == null) return "null";
+        try {
+            LocalDate d = date instanceof LocalDate ld ? ld : LocalDate.parse(String.valueOf(date));
+            return d + " " + d.getDayOfWeek().getDisplayName(java.time.format.TextStyle.SHORT,
+                    com.checkba.service.LangText.isEnglish() ? java.util.Locale.ENGLISH : java.util.Locale.CHINA);
+        } catch (RuntimeException e) {
+            return String.valueOf(date);
+        }
+    }
+
     static String typeLabel(String type) {
         if (type == null) {
             return "截止日";
