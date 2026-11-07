@@ -77,5 +77,16 @@ export default {
   "fileReadFailed": "파일을 읽을 수 없습니다. 다시 선택하거나 JSON을 붙여넣으세요.",
   "localConfirm": "이 명령을 실행할까요? {command} — 로컬 계정 권한으로 실행되며 파일과 네트워크에 접근할 수 있습니다. 신뢰하는 프로그램인 경우에만 계속하세요.",
   "commandHint": "명령, 인수와 작업 디렉터리는 표시됩니다. 비밀 정보는 전용 자격 증명 또는 환경 변수 필드에 입력하세요.",
-  "oauthSaveFirst": "승인하기 전에 이 연결을 설정하고 저장하세요."
+  "oauthSaveFirst": "승인하기 전에 이 연결을 설정하고 저장하세요.",
+  "localTitle": "로컬 MCP 서비스",
+  "localDesc": "이 컴퓨터의 Claude Code, Codex 등 도구가 AI WorkDeck 프로젝트를 읽기 전용으로 볼 수 있게 합니다.",
+  "localOn": "켜짐",
+  "localOff": "꺼짐",
+  "localEnable": "켜기",
+  "localDisable": "끄기",
+  "localRotate": "다시 켜기(새 토큰)",
+  "localWarn": "토큰은 한 번만 표시되므로 지금 복사하세요. 다시 켜면 새 토큰이 발급되고 이전 토큰은 사용할 수 없게 됩니다.",
+  "localClaude": "Claude Code 명령",
+  "localCodex": "Codex 설정(~/.codex/config.toml)",
+  "localCopy": "복사"
 }
