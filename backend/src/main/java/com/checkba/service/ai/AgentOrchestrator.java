@@ -366,6 +366,8 @@ public class AgentOrchestrator {
         Long defaultOutputFolderId;
         // 活跃文档名（仅用于给模型的反馈文案）
         String activeFileName;
+        /** 本轮用户消息原文：注入 ToolContext.userMessage（原生与 XML 工具路径共用 dispatchTool）。 */
+        volatile String userMessage;
         /**
          * dev-board#1097 法律意见书收尾补检（机制与边界见 {@link OpinionCompletionCheck}）：
          * opinionCompletionCheckDone — 服务端兜底核验一轮最多一次，派发前置位，成败都不再补第二次；
@@ -1181,14 +1183,15 @@ public class AgentOrchestrator {
                         guard == null ? null : guard.roundOffered,
                         guard == null ? null : guard.runId,
                         disclosedCategories, guard == null ? null : guard::isCancelled,
-                        guard == null ? null : guard.defaultOutputFolderId, guard == null ? null : guard.activeFileId);
+                        guard == null ? null : guard.defaultOutputFolderId, guard == null ? null : guard.activeFileId,
+                        null, guard == null ? null : guard.userMessage);
         final FileChangeTurn effectTurn = guard == null ? null : guard.fileChangeTurn;
         if (effectTurn != null) effectTurn.clientRequestId = guard.clientRequestId;
         if (effectTurn != null && "dispatch_subtask".equals(toolName)) {
             ctx = new com.checkba.service.ai.tools.ToolContext(ctx.projectId(), ctx.conversationId(), ctx.userId(),
                     ctx.modelId(), ctx.sessionTools(), ctx.offeredTools(), ctx.runId(), ctx.disclosedCategories(),
                     ctx.cancellationCheck(), ctx.defaultOutputFolderId(), ctx.activeFileId(),
-                    (id, kind) -> notifyVerifiedFile(conversationId, id, kind, projectId, effectTurn));
+                    (id, kind) -> notifyVerifiedFile(conversationId, id, kind, projectId, effectTurn), ctx.userMessage());
         }
         long toolStartMs = System.currentTimeMillis();
         final com.checkba.service.ai.tools.ToolContext readContext = ctx;
@@ -2391,6 +2394,7 @@ public class AgentOrchestrator {
             }
             // 活跃文档类目裁剪与渐进披露（dev-board#1064）：起跑时一次算定要不要按类目裁，并把本轮
             // 用户输入的关键词与生效 skill 的白名单涉及的类目预先放回（写进同一份展开集，只增不减）。
+            guard.userMessage = request.getMessage();
             prepareToolCategoryPutBack(guard, request.getMessage(), agentMode);
             // 运行期不可用的工具也在同一处算定（dev-board#750）：账户没连时那些工具每次都只会回
             // 一句「尚未连接 AI WorkDeck 账户」，而模型会为此白花一整轮（3~5 秒）

@@ -76,6 +76,8 @@ public class TaskTools implements AgentToolComponent {
             return ambiguous(requestedName, matches, "任务未创建");
         }
         com.checkba.model.entity.Project target = matches.get(0);
+        String conflict = mentionConflict(userId, target, "任务未创建");
+        if (conflict != null) return conflict;
         projectId = target.getId();
         log.info("Tool: task_create resolved project={} ({}) from name '{}', context project={}",
                 projectId, target.getName(), requestedName, contextProjectId);
@@ -200,7 +202,7 @@ public class TaskTools implements AgentToolComponent {
         }
     }
 
-    @Tool("查询事项列表（截止日、开庭、会议、待办等），可选按日期区间过滤。默认查用户可访问的全部项目（每行带项目名）——" +
+    @Tool("查询期限、截止、开庭、提醒等日程事项（默认全部项目）。可选按日期区间过滤（截止日、开庭、会议、待办），每行带项目名——" +
           "律师说“我这周有哪些截止事项”指的是名下所有案件；只有用户点名某个项目时才填 project 收窄到该项目。" +
           "每行含事项 id、项目、类型、标题、时间（含星期）、状态、负责人与关联文件。" +
           "用于回答“有哪些截止日”“下周有什么安排”“这个项目的任务清单”类问题，也用于给 task_update 找 taskId。")
@@ -243,6 +245,8 @@ public class TaskTools implements AgentToolComponent {
                 return ambiguous(project.trim(), matches, "未查询");
             }
             narrowed = matches.get(0);
+            String conflict = mentionConflict(userId, narrowed, "未查询");
+            if (conflict != null) return conflict;
         }
         List<Map<String, Object>> tasks = crossProject
                 ? projectTaskService.listForUser(userId, fromDate, toDate)
@@ -283,6 +287,23 @@ public class TaskTools implements AgentToolComponent {
     }
 
     /** 类型中文名；null/未知按默认截止日。 */
+    /**
+     * 服务端核对：用户本轮消息指向的项目若不止一个，而消息里又没出现模型选中项目的全名，说明模型是从先前工具输出里
+     * 抄了全名替用户挑了一个 → 拒绝并让模型 ask_user。用户没点名项目（候选为空）或拿不到消息时不干预。
+     */
+    private String mentionConflict(Long userId, com.checkba.model.entity.Project resolved, String effect) {
+        var ctx = ToolContextHolder.get();
+        String message = ctx == null ? null : ctx.userMessage();
+        if (message == null || message.isBlank()) return null;
+        List<com.checkba.model.entity.Project> candidates = projectTaskService.projectsMentionedBy(userId, message);
+        if (candidates.size() <= 1) return null;
+        String name = resolved.getName() == null ? "" : resolved.getName().trim().toLowerCase();
+        if (!name.isEmpty() && message.toLowerCase().contains(name)) return null;
+        StringBuilder sb = new StringBuilder("错误：用户的说法可能指向多个项目，" + effect + "。请用 ask_user 让用户选择：");
+        candidates.stream().limit(5).forEach(p -> sb.append("\n- ").append(p.getName()).append("（id=").append(p.getId()).append("）"));
+        return sb.toString();
+    }
+
     private static String ambiguous(String text, List<com.checkba.model.entity.Project> matches, String effect) {
         StringBuilder sb = new StringBuilder("错误：「" + text + "」匹配到多个项目，" + effect + "。请用 ask_user 让用户选择：");
         matches.stream().limit(5).forEach(p -> sb.append("\n- ").append(p.getName()).append("（id=").append(p.getId()).append("）"));

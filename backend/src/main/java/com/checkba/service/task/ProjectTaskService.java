@@ -322,6 +322,63 @@ public class ProjectTaskService {
         return related;
     }
 
+    /** 项目名/用户消息归一化时先剔掉的泛称（长词在前）。 */
+    private static final List<String> GENERIC_WORDS = List.of("有限公司", "一案", "项目", "案件", "纠纷", "合同", "公司", "事项",
+            "matter", "case", "project", "案", "诉", "与", "关于", "的");
+
+    private static String normalizeForMention(String text, char separator) {
+        String t = text == null ? "" : text.toLowerCase();
+        for (String w : GENERIC_WORDS) t = t.replace(w, String.valueOf(separator));
+        StringBuilder sb = new StringBuilder();
+        for (char c : t.toCharArray()) sb.append(Character.isLetterOrDigit(c) ? c : separator);
+        return sb.toString();
+    }
+
+    private static String longestCommonSubstring(String a, String b) {
+        int best = 0, end = 0;
+        int[] prev = new int[b.length() + 1];
+        for (int i = 1; i <= a.length(); i++) {
+            int[] cur = new int[b.length() + 1];
+            for (int j = 1; j <= b.length(); j++) {
+                if (a.charAt(i - 1) == b.charAt(j - 1)) {
+                    cur[j] = prev[j - 1] + 1;
+                    if (cur[j] > best) { best = cur[j]; end = i; }
+                }
+            }
+            prev = cur;
+        }
+        return a.substring(end - best, end);
+    }
+
+    /**
+     * 用户这句话指向哪些项目（服务端确定性判定，不信模型传来的称呼）：名称与消息各自剔掉泛称后取最长公共子串，
+     * 长度须达阈值（含 CJK ≥2，纯拉丁 ≥4）；取全体最大长度 M，达到 M 的项目即候选。空 = 用户没点名项目。
+     */
+    public static List<Project> mentionedProjects(List<Project> projects, String message) {
+        if (message == null || message.isBlank() || projects == null) return List.of();
+        String normalizedMessage = normalizeForMention(message.length() > 2000 ? message.substring(0, 2000) : message, '\u0002');
+        int max = 0;
+        java.util.Map<Project, Integer> lengths = new java.util.LinkedHashMap<>();
+        for (Project p : projects) {
+            if (p.getName() == null) continue;
+            String common = longestCommonSubstring(normalizeForMention(p.getName(), '\u0001'), normalizedMessage);
+            boolean cjk = common.chars().anyMatch(c -> Character.UnicodeScript.of(c) == Character.UnicodeScript.HAN
+                    || (c >= 0x3040 && c <= 0x30ff) || (c >= 0xac00 && c <= 0xd7af));
+            if (common.length() >= (cjk ? 2 : 4)) {
+                lengths.put(p, common.length());
+                max = Math.max(max, common.length());
+            }
+        }
+        final int m = max;
+        return lengths.entrySet().stream().filter(e -> e.getValue() == m).map(java.util.Map.Entry::getKey).toList();
+    }
+
+    /** 同 {@link #mentionedProjects(List, String)}，范围为用户可访问的非 SCRATCH 项目。 */
+    public List<Project> projectsMentionedBy(Long userId, String message) {
+        return mentionedProjects(projectService.getUserProjects(userId).stream()
+                .filter(p -> !p.isScratchWorkspace()).toList(), message);
+    }
+
     /** 单任务响应体（含 fileName）。create/update 端点用，字段集与列表端点完全一致。 */
     public Map<String, Object> toResponseMap(ProjectTask t) {
         return toMaps(List.of(t)).get(0);

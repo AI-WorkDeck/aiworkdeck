@@ -422,4 +422,66 @@ class TaskToolsTest {
         String exact = tools.task_create("开庭", "2026-11-06", null, null, null, null, null, null, null, null, "星河科技案", 1L, 10L);
         assertFalse(exact.contains("匹配到"), exact);
     }
+
+    // ---- 服务端核对用户消息（模型从先前工具输出抄全名替用户挑项目） ----
+
+    private static final List<com.checkba.model.entity.Project> XINGHE = List.of(
+            project(3L, "股权转让项目-星河并购"), project(4L, "星河租赁合同纠纷"), project(5L, "张某劳动争议案"));
+
+    private void userSays(String message) {
+        com.checkba.service.ai.tools.ToolContextHolder.set(new com.checkba.service.ai.tools.ToolContext(
+                1L, "c", 10L, "m", List.of(), null, null, null, null, null, null, null, message));
+        when(taskService.projectsMentionedBy(eq(10L), any())).thenAnswer(
+                i -> ProjectTaskService.mentionedProjects(XINGHE, i.getArgument(1)));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearHolder() {
+        com.checkba.service.ai.tools.ToolContextHolder.clear();
+    }
+
+    private String createFor(String modelProject, long resolvedId, String resolvedName) {
+        when(taskService.resolveProjects(eq(10L), eq(modelProject), eq(true))).thenReturn(List.of(project(resolvedId, resolvedName)));
+        ProjectTask created = new ProjectTask();
+        created.setId(9L);
+        created.setTitle("开庭提醒");
+        created.setDueDate(LocalDate.of(2026, 11, 11));
+        when(taskService.createAiTask(eq(resolvedId), any(ProjectTaskService.TaskDraft.class), eq(10L))).thenReturn(created);
+        return tools.task_create("开庭提醒", "2026-11-11", "10:00", null, null, null, null, null, null, null, modelProject, 1L, 10L);
+    }
+
+    @Test
+    @DisplayName("用户说「星河」、模型传了某一个项目的全名 → 服务端按消息判定歧义并拒绝")
+    void userMessageAmbiguousRefusesModelPickedFullName() {
+        userSays("下周三上午十点给星河加一个开庭提醒");
+        String out = createFor("股权转让项目-星河并购", 3L, "股权转让项目-星河并购");
+        assertTrue(out.startsWith("错误") && out.contains("ask_user") && out.contains("星河租赁合同纠纷")
+                && out.contains("股权转让项目-星河并购"), out);
+        verify(taskService, never()).createAiTask(any(), any(ProjectTaskService.TaskDraft.class), any());
+    }
+
+    @Test
+    @DisplayName("用户说「星河并购」→ 唯一最长匹配，放行；用户说「劳动争议案」放行；说「这个案子」不干预")
+    void userMessageUniqueOrAbsentIsAllowed() {
+        userSays("下周三上午十点给星河并购加一个开庭提醒");
+        assertTrue(createFor("星河并购", 3L, "股权转让项目-星河并购").startsWith("已在项目"));
+        userSays("给劳动争议案加一个开庭提醒");
+        assertTrue(createFor("劳动争议案", 5L, "张某劳动争议案").startsWith("已在项目"));
+        userSays("给这个案子加一个开庭提醒");
+        assertTrue(createFor("张某劳动争议案", 5L, "张某劳动争议案").startsWith("已在项目"));
+    }
+
+    @Test
+    @DisplayName("消息里原样出现所选项目全名 → 放行；task_list 的 project 同样核对")
+    void userMessageContainingFullNameAndTaskList() {
+        userSays("给星河租赁合同纠纷加一个开庭提醒，不是星河并购");
+        assertTrue(createFor("星河租赁合同纠纷", 4L, "星河租赁合同纠纷").startsWith("已在项目"));
+        userSays("星河有哪些期限");
+        when(taskService.resolveProjects(eq(9L), eq("股权转让项目-星河并购"), eq(false))).thenReturn(List.of(project(3L, "股权转让项目-星河并购")));
+        com.checkba.service.ai.tools.ToolContextHolder.set(new com.checkba.service.ai.tools.ToolContext(
+                1L, "c", 9L, "m", List.of(), null, null, null, null, null, null, null, "星河有哪些期限"));
+        when(taskService.projectsMentionedBy(eq(9L), any())).thenAnswer(i -> ProjectTaskService.mentionedProjects(XINGHE, i.getArgument(1)));
+        String out = tools.task_list(null, null, "股权转让项目-星河并购", 1L, 9L);
+        assertTrue(out.startsWith("错误") && out.contains("ask_user"), out);
+    }
 }

@@ -302,7 +302,8 @@ public class ToolDisclosurePolicy {
         // xlsx 会话或「做一张表格」说的是电子表格；分不清就两类都放回，多付的是一轮里两类的规格。
         CATEGORY_KEYWORDS.put("spreadsheet", List.of("表格", "excel", "xlsx", "工作表"));
         CATEGORY_KEYWORDS.put("table", List.of("表格", "table", "单元格", "合并单元格"));
-        CATEGORY_KEYWORDS.put("task", List.of("事项", "日程", "提醒", "待办", "截止", "deadline"));
+        CATEGORY_KEYWORDS.put("task", List.of("事项", "日程", "提醒", "待办", "截止", "deadline",
+                "期限", "到期", "开庭", "庭审", "时效", "截止日"));
         // 以下几类是渐进披露默认打开后补的（dev-board#1064 第二步）：律师最常说的几类请求，
         // 起跑时就把那一类放回，免得先花一轮查目录、再让下一轮的提示缓存整段失效。
         CATEGORY_KEYWORDS.put("revision", List.of("修订", "批注", "接受", "拒绝", "评论",

@@ -489,4 +489,17 @@ class ProjectTaskServiceTest {
         assertEquals(List.of(3L), service.resolveProjects(7L, "金冠纾困案的开庭", true).stream().map(com.checkba.model.entity.Project::getId).toList());
         assertTrue(service.resolveProjects(7L, "不存在", true).isEmpty());
     }
+
+    @Test
+    void mentionedProjectsFindsLongestCommonSubstringWithThresholds() {
+        var all = List.of(proj(1L, "股权转让项目-星河并购", false), proj(2L, "星河租赁合同纠纷", false), proj(3L, "张某劳动争议案", false));
+        java.util.function.Function<String, List<Long>> ids = m -> ProjectTaskService.mentionedProjects(all, m)
+                .stream().map(com.checkba.model.entity.Project::getId).toList();
+        assertEquals(List.of(1L, 2L), ids.apply("下周三上午十点给星河加一个开庭提醒"));
+        assertEquals(List.of(1L), ids.apply("给星河并购加一个开庭提醒"));
+        assertEquals(List.of(3L), ids.apply("给劳动争议案加一个开庭提醒"));
+        assertTrue(ids.apply("给这个案子加一个开庭提醒").isEmpty());
+        assertTrue(ProjectTaskService.mentionedProjects(List.of(proj(9L, "Alpha Holdings", false)), "add a hearing for alp").isEmpty(),
+                "纯拉丁字符阈值是 4");
+    }
 }
