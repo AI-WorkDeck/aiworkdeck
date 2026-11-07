@@ -145,7 +145,7 @@ export default {
   "reinstallOrUpdate": "Neu installieren / Aktualisieren",
   "activationModeLabel": "Aktivierung: {mode} ▾",
   "processingEllipsis": "Verarbeitung…",
-  "needAccountHint": "Dies ist ein kostenpflichtiger Artikel. Verbinden Sie zuerst Ihr AI WorkDeck-Konto unter „Konto & Nutzung“ in den Einstellungen — Kaufnachweise können erst danach verifiziert werden.",
+  "needAccountHint": "Dies ist ein kostenpflichtiger Artikel. Verbinden Sie zuerst Ihr AI WorkDeck-Konto unter „Konto & Guthaben“ in den Einstellungen — Kaufnachweise können erst danach verifiziert werden.",
   "buyHint": "Dies ist ein kostenpflichtiger Artikel. Der Kauf erfolgt auf der offiziellen Website; kehren Sie nach der Zahlung zu dieser Seite zurück und klicken Sie auf „Gekauft, Aktualisieren“, um zu installieren.",
   "whenToUse": "Wann verwenden",
   "scenarioLead": "Sagen Sie etwas wie folgt im Gespräch, und es übernimmt automatisch:",

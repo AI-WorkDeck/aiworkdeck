@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   "label": "MCP",
-  "title": "Kết nối MCP",
+  "title": "Kết nối công cụ ngoài (MCP)",
   "description": "MCP kết nối công cụ bên ngoài với hội thoại và tác vụ AI. Skill cung cấp quy trình; Plugin mở rộng ứng dụng máy tính.",
   "billing": "Kết nối đã bật của bạn được ưu tiên, không trừ tín dụng nền tảng cho dữ liệu. Phí nhà cung cấp và mô hình AI vẫn áp dụng. Lỗi không tự chuyển sang kênh trả phí.",
   "transport": "HTTPS Streamable HTTP hỗ trợ Bearer và OAuth. Lệnh stdio cục bộ yêu cầu chế độ máy tính cục bộ và xác nhận trước khi chạy.",

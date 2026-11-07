@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   "label": "MCP",
-  "title": "MCP 连接",
+  "title": "外部工具连接（MCP）",
   "description": "MCP 为 AI 对话和任务接入外部工具；Skill 提供工作方法，Plugin 扩展桌面功能。",
   "billing": "已启用的自配通道优先，不扣平台数据调用积分；供应商费用和 AI 模型用量仍按各自规则计算。自配失败不会自动转为平台付费调用。",
   "transport": "支持 HTTPS Streamable HTTP、Bearer 与 OAuth；本地 stdio 命令仅限桌面本地模式，运行前需确认。",

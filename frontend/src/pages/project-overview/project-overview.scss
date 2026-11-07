@@ -614,7 +614,7 @@ $color-accent: var(--awd-mint); // Mint Green
 
 /* Left Rail (Activity Bar) - Match Doc Dark BG */
 .left-rail {
-  width: 50px;
+  width: 56px;
   min-height: 0;
   background-color: var(--awd-bg); // AI WorkDeck Gray-Pale (Light Mode)
   display: flex;
@@ -660,10 +660,13 @@ $color-accent: var(--awd-mint); // Mint Green
 }
 
 .rail-btn {
-  width: 40px;
-  height: 40px;
+  width: 52px;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 3px 0 4px;
   @include flex-center;
-  margin-bottom: 8px;
+  flex-direction: column;
+  margin-bottom: 4px;
   border-radius: 8px;
   cursor: pointer;
   color: var(--awd-text-2); // Slate-500 (Gray-Medium equivalent)
@@ -699,6 +702,44 @@ $color-accent: var(--awd-mint); // Mint Green
   width: 40px;
   height: 40px;
   @include flex-center;
+}
+
+/* rail 图标下的一行小字：平时 text-3，悬停 / 选中跟图标同色提亮；放不下的截断 */
+.rail-btn .rail-icon-wrapper {
+  height: 24px;
+}
+
+.rail-label {
+  display: block;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0 1px;
+  margin-top: 1px;
+  font-size: 10px;
+  line-height: 12px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--awd-text-3);
+  transition: color 0.2s;
+}
+
+.rail-btn:hover .rail-label,
+.rail-btn.active .rail-label {
+  color: var(--awd-accent-text);
+}
+
+/* 整理图标中的「完成」：rail 顶部一行文字链接 */
+.rail-edit-done {
+  flex-shrink: 0;
+  padding: 0 0 8px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--awd-accent-text);
+  cursor: pointer;
+
+  &:hover { text-decoration: underline; }
 }
 
 .rail-icon-svg {
@@ -1403,27 +1444,24 @@ $color-accent: var(--awd-mint); // Mint Green
     cursor: pointer;
 }
 .history-filter-clear:hover { color: var(--awd-text); }
-/* 悬停才出的行内操作：常驻会把本来就窄的一行挤没，而这三个都不是高频动作 */
+/* 行内操作收进常驻的「⋯」：平时淡显（text-3），行悬停 / 自身悬停提亮。三个动作都不是高频，
+   且展开后的三项文字会把本来就窄的一行挤没，所以只留一个点。 */
 .conv-row { position: relative; }
-.conv-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+.conv-more {
     flex-shrink: 0;
-    /* 右边留出空档：紧贴着时间戳时「删除 1小时前」会连成一串读不开 */
-    margin: 0 10px 0 10px;
-    opacity: 0;
-    transition: opacity 0.12s ease;
-}
-.conv-row:hover .conv-actions { opacity: 1; }
-.conv-action {
-    font-size: 11px;
+    margin: 0 4px 0 8px;
+    padding: 0 4px;
+    font-size: 14px;
+    line-height: 18px;
     color: var(--awd-text-3);
+    opacity: 0.7;
+    border-radius: 4px;
     cursor: pointer;
-    white-space: nowrap;
+    transition: opacity 0.12s ease, color 0.12s ease;
 }
-.conv-action:hover { color: var(--awd-accent-text); }
-.conv-action.danger:hover { color: var(--awd-danger-text); }
+.conv-row:hover .conv-more { opacity: 1; }
+.conv-more:hover { color: var(--awd-accent-text); background: var(--awd-surface-2); }
+.conv-menu-danger:hover { color: var(--awd-danger-text); }
 .conv-pin-mark {
     flex-shrink: 0;
     font-size: 10px;
@@ -4692,6 +4730,11 @@ $color-accent: var(--awd-mint); // Mint Green
   border-radius: 8px;
 }
 
+/* rail 图标带标签后上下紧挨着，虚线框内收一点免得相邻两框互相咬合 */
+.rail-edit-mode .rail-btn.is-sortable {
+  outline-offset: -1px;
+}
+
 /* 动画敏感用户：只留虚线框，不抖 */
 @media (prefers-reduced-motion: reduce) {
   .rail-edit-mode .rail-btn.is-sortable,
@@ -4855,6 +4898,12 @@ $color-accent: var(--awd-mint); // Mint Green
     cursor: default;
     &:hover { background: transparent; }
   }
+}
+
+.dock-menu-sep {
+  margin-top: 4px;
+  border-top: 1px solid var(--awd-border);
+  height: 32px;
 }
 
 .dock-menu-cur {

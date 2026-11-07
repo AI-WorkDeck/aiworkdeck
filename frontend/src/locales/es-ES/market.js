@@ -145,7 +145,7 @@ export default {
   "reinstallOrUpdate": "Reinstalar / Actualizar",
   "activationModeLabel": "Activación: {mode} ▾",
   "processingEllipsis": "Procesando…",
-  "needAccountHint": "Este es un artículo de pago. Conecte primero su cuenta de AI WorkDeck en «Cuenta y uso» en Configuración; los registros de compra solo pueden verificarse después.",
+  "needAccountHint": "Este es un artículo de pago. Conecte primero su cuenta de AI WorkDeck en «Cuenta y saldo» en Configuración; los registros de compra solo pueden verificarse después.",
   "buyHint": "Este es un artículo de pago. La compra se completa en el sitio web oficial; tras pagar, vuelva a esta página y haga clic en \"Ya compré, Actualizar\" para instalarlo.",
   "whenToUse": "Cuándo usar",
   "scenarioLead": "Diga algo como esto en la conversación, y se activará automáticamente:",

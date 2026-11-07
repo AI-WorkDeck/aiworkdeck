@@ -116,7 +116,7 @@ export default {
   },
   "identity": {
     "title": "Yerel Çalışma Alanı Seçin",
-    "subtitle": "Bu cihazda birden fazla mevcut hesap bulundu. Devam etmek istediğiniz çalışma alanını seçin. Bu soru bir daha sorulmayacak; daha sonra Ayarlar → Hesap ve Kullanım bölümünden değiştirebilirsiniz.",
+    "subtitle": "Bu cihazda birden fazla mevcut hesap bulundu. Devam etmek istediğiniz çalışma alanını seçin. Bu soru bir daha sorulmayacak; daha sonra Ayarlar → Hesap ve bakiye bölümünden değiştirebilirsiniz.",
     "reading": "Yerel hesaplar okunuyor",
     "retry": "Tekrar dene",
     "itemMeta": "{projects} proje · {files} dosya",

@@ -72,6 +72,7 @@ export default {
   // The two sidebar groups (profile merged into settings, 2026-08-20)
   navGroupPersonal: 'Personal',
   navGroupSystem: 'System',
+  navGroupMyWork: 'My work',
   // Personal group: the other three entries reuse account.tab*
   navPersonalSettings: 'Profile & sign-in',
   backToWorkbench: '← Back to workbench',
@@ -80,7 +81,7 @@ export default {
   navAccount: 'Account & balance',
   navComponents: 'Components',
   navUpdates: 'Software Update',
-  navTelemetry: 'Usage Statistics',
+  navTelemetry: 'Privacy & data',
   navFeedback: 'User Feedback',
 
   saveConfigButton: 'Save Settings',
@@ -106,7 +107,7 @@ export default {
   effectiveDefaultModel: 'Default model currently in effect: {model}',
   auxModelLabel: 'Auxiliary Model',
   auxModelNote: 'The auxiliary model handles subagents, conversation titling, context summaries, memory extraction, and automatic file tagging. These calls are invisible to you but run every turn; defaulting to an inexpensive model is deliberate, as this is where most of the savings come from.',
-  subagentModelLabel: 'Subagent Model',
+  subagentModelLabel: 'Background task model',
   subagentModelNote: 'Leave empty to inherit the auxiliary model above.',
   inheritAux: 'Inherit auxiliary model',
   followBuiltIn: 'Follow built-in default',
@@ -311,6 +312,7 @@ export default {
 
   // Usage statistics
   telemetrySubtitle: 'The product records feature usage on this machine (action types and counts only, never document content, conversation text, or file names) for the statistics below. The switches below control which data helps us improve the product in anonymized form.',
+  telemetrySectionTitle: 'Anonymous usage statistics',
   telemetryRollupTitle: 'Share anonymous usage statistics',
   telemetryRollupDesc: 'One aggregated daily count (feature usage counts, matter type distribution) with an anonymous install ID; can be turned off at any time',
   telemetryEventsTitle: 'Share redacted usage details',

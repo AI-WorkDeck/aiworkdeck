@@ -71,7 +71,7 @@ export default {
   "ocrCancelling": "Cancelando…",
   "ocrBatchBusy": "Ya hay un lote en curso; espere o cancélelo",
   "ocrConsentTitle": "¿Usar el reconocimiento en la nube?",
-  "ocrConsentHint": "Los PDF con capa de texto se extraen directamente, sin subirlos ni cobrar; solo los escaneos e imágenes necesitan OCR en la nube. Esta confirmación solo vale para este lote; cámbielo a «siempre en la nube» o «solo local» en Ajustes → Cuenta y uso → Reconocimiento de escaneos.",
+  "ocrConsentHint": "Los PDF con capa de texto se extraen directamente, sin subirlos ni cobrar; solo los escaneos e imágenes necesitan OCR en la nube. Esta confirmación solo vale para este lote; cámbielo a «siempre en la nube» o «solo local» en Ajustes → Ajustes de IA → Reconocimiento de escaneos.",
   "ocrConsentCheck": "Entiendo adónde van los datos y cómo se cobra",
   "ocrConsentConfirm": "Iniciar",
   "ocrCopied": "Texto de {count} archivo(s) copiado y guardado en el historial del portapapeles",

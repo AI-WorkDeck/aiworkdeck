@@ -179,18 +179,6 @@
             </view>
           </view>
           <view v-if="themeMenuOpen" class="theme-menu-mask" @tap="themeMenuOpen = false"></view>
-          <!-- rail 整理模式开关（dev-board#215/#221）：从 rail 挪到顶栏（原「已连接账户」chip 位），
-               开着时 rail 可拖项抖动+虚线框、点击不打开面板，再按一次退出 -->
-          <view
-            class="top-bar-btn"
-            :class="{ active: railEditMode }"
-            :title="railEditMode ? $t('workbench.railEditDone') : $t('workbench.railEditEnter')"
-            @tap="toggleRailEditMode"
-          >
-            <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path v-for="(d, gi) in GLYPHS.sort" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </view>
           <!-- 1. Left Sidebar -->
           <view
             class="top-bar-btn"
@@ -330,7 +318,9 @@
     <!-- 主体布局 -->
     <view class="main-layout" :class="{ 'is-compact': isCompactLayout }">
       <!-- Cursor 风格：最左常驻栏（Activity Bar） -->
-      <view class="left-rail">
+      <view class="left-rail" @contextmenu="openRailMenu($event)">
+        <!-- 整理图标入口：右键 rail 空白处或任一图标 →「整理图标」；整理中这里出「完成」退出 -->
+        <text v-if="railEditMode" class="rail-edit-done" role="button" tabindex="0" @tap="toggleRailEditMode" @keydown.enter.prevent="toggleRailEditMode">{{ $t('workbench.railEditDoneBtn') }}</text>
         <view class="rail-tools awd-hairline-scroll" tabindex="0">
         <!-- rail 的顺序就是 config/leftSidebarPlugins.js 里数组的顺序（项目概览 →
              资源管理器 → 插件中心 → 语音 → 脱敏 → 门控项）。
@@ -347,7 +337,7 @@
           @dragstart="onRailDragStart(p.key, $event)"
           @dragover="onRailDragOver(p.key, $event)"
           @dragend="onRailDragEnd"
-          @contextmenu="openDockMenu(p.key, $event)"
+          @contextmenu="openDockMenu(p.key, $event, true)"
         >
           <view v-if="p.avatarUrl" class="rail-icon-wrapper rail-avatar-wrapper">
             <image :src="p.avatarUrl" class="rail-plugin-avatar" mode="aspectFill" />
@@ -381,6 +371,7 @@
             </svg>
           </view>
           <text v-else class="rail-icon">{{ p.icon }}</text>
+          <text class="rail-label">{{ railLabelOf(p) }}</text>
           <text v-if="p.key === 'market' && pluginUpdateState.count > 0" class="rail-badge" :aria-label="$t('market.updateAvailableCount', { count: pluginUpdateState.count })" :title="$t('market.updateAvailableCount', { count: pluginUpdateState.count })">{{ pluginUpdateState.count > 99 ? '99+' : pluginUpdateState.count }}</text>
           <text v-if="p.key === 'dd-client' && ddClientUnread > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddClientUnread })">{{ ddClientUnread > 99 ? '99+' : ddClientUnread }}</text>
           <text v-if="p.key === 'dd-files' && ddLawyerNotifications.length > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddLawyerNotifications.length })">{{ ddLawyerNotifications.length > 99 ? '99+' : ddLawyerNotifications.length }}</text>
@@ -393,7 +384,7 @@
           >{{ railScheduleCount > 99 ? '99+' : railScheduleCount }}</text>
         </view>
 
-        <!-- 整理模式开关已挪到顶栏 header-tools（dev-board#221，原在 rail 上太显眼） -->
+        <!-- 整理模式入口：rail 右键菜单「整理图标」（原顶栏按钮已撤，见 openRailMenu） -->
 
         </view>
 
@@ -413,6 +404,7 @@
               <path v-for="(d, gi) in GLYPHS.inbox" :key="gi" :d="d" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-icon-path" />
             </svg>
           </view>
+          <text class="rail-label">{{ $t('workbench.railLabelStaging') }}</text>
         </view>
 
         <!-- 插件中心与系统设置都不在 rail 底部了（2026-08-19）：前者升成 rail 数组
@@ -440,6 +432,7 @@
               <path v-for="(path, idx) in VERSION_PLUGIN.svgPaths" :key="idx" :d="path.d" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-icon-path" />
             </svg>
           </view>
+          <text class="rail-label">{{ $t('workbench.railLabelVersion') }}</text>
           <text v-if="versionEntry.badge" class="rail-badge" :class="{ 'is-overdue': versionEntry.attention }" aria-hidden="true">{{ versionEntry.badge }}</text>
         </view>
 
@@ -514,6 +507,7 @@
               <path v-for="(d, gi) in GLYPHS.feedback" :key="gi" :d="d" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-icon-path" />
             </svg>
           </view>
+          <text class="rail-label">{{ $t('workbench.railLabelFeedback') }}</text>
         </view>
         </view>
       </view>
@@ -1951,13 +1945,9 @@
                             </view>
                             <text class="item-preview" style="display:block; font-size:11px; color:var(--awd-text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ chat.lastMessage }}</text>
                         </view>
-                        <!-- 悬停才出的行内操作（dev-board#796）。@tap.stop 是硬要求：
-                             整行点击就是打开会话，不拦住的话点「删除」会先把它打开一遍。 -->
-                        <view v-if="renamingConversationId !== chat.conversationId" class="conv-actions" @tap.stop>
-                            <text class="conv-action" @tap.stop="beginRenameConversation(chat)">{{ $t('workbench.conversationRename') }}</text>
-                            <text class="conv-action" @tap.stop="togglePinConversation(chat)">{{ chat.pinned ? $t('workbench.conversationUnpin') : $t('workbench.conversationPin') }}</text>
-                            <text class="conv-action danger" @tap.stop="confirmDeleteConversation(chat)">{{ $t('workbench.conversationDelete') }}</text>
-                        </view>
+                        <!-- 行内操作收进常驻的「⋯」（平时淡显、行悬停提亮），点开才是重命名 / 置顶 / 删除（dev-board#796）。
+                             @tap.stop 是硬要求：整行点击就是打开会话，不拦住的话点「⋯」会先把它打开一遍。 -->
+                        <text v-if="renamingConversationId !== chat.conversationId" class="conv-more" role="button" :title="$t('workbench.conversationMore')" :aria-label="$t('workbench.conversationMore')" @tap.stop="openConvMenu(chat, $event)">⋯</text>
                         <view style="display:flex; flex-direction:column; align-items:flex-end; margin-left:8px; flex-shrink:0;">
                             <text class="item-time" style="font-size:var(--awd-panel-fs-sec); color:var(--awd-text-3);">{{ formatTime(chat.updatedAt) }}</text>
                             <text v-if="convStatusLabel(chat)" class="conv-status-label" :class="convDotClass(chat)">{{ convStatusLabel(chat) }}</text>
@@ -2295,7 +2285,7 @@
       :style="{ left: dockMenu.x + 'px', top: dockMenu.y + 'px' }"
       @tap.stop
     >
-      <view class="dock-menu-title">{{ dockMenuTitle }}</view>
+      <view v-if="dockMenuTitle" class="dock-menu-title">{{ dockMenuTitle }}</view>
       <view
         v-for="opt in dockMenuOptions"
         :key="opt.dock"
@@ -2306,6 +2296,17 @@
         <text>{{ opt.label }}</text>
         <text v-if="opt.disabled" class="dock-menu-cur">{{ $t('workbench.dockCurrent') }}</text>
       </view>
+      <view v-if="dockMenu.rail" class="dock-menu-item" :class="{ 'dock-menu-sep': dockMenuOptions.length }" @tap="startRailEditFromMenu">
+        <text>{{ $t('workbench.railEditMenuItem') }}</text>
+      </view>
+    </view>
+
+    <!-- 历史对话行的「⋯」菜单：重命名 / 置顶 / 删除（复用右键菜单的样式） -->
+    <view v-if="convMenu.visible" class="dock-menu-mask" @tap="closeConvMenu" @contextmenu.prevent="closeConvMenu"></view>
+    <view v-if="convMenu.visible" class="dock-menu" :style="{ left: convMenu.x + 'px', top: convMenu.y + 'px' }" @tap.stop>
+      <view class="dock-menu-item" @tap="runConvMenu('rename')"><text>{{ $t('workbench.conversationRename') }}</text></view>
+      <view class="dock-menu-item" @tap="runConvMenu('pin')"><text>{{ convMenu.chat && convMenu.chat.pinned ? $t('workbench.conversationUnpin') : $t('workbench.conversationPin') }}</text></view>
+      <view class="dock-menu-item conv-menu-danger" @tap="runConvMenu('delete')"><text>{{ $t('workbench.conversationDelete') }}</text></view>
     </view>
 
     <!-- 面板停靠：拖拽投放高亮层。只在拖拽期间存在，只铺三个 dock 自身的区域
@@ -2884,6 +2885,7 @@ export default {
 
       // AI New Features
       showHistoryDrawer: false,
+      convMenu: { visible: false, chat: null, x: 0, y: 0 },
       loadingHistory: false,
       chatHistoryList: [],
       // 历史下拉的纯前端过滤（dev-board#796）：按标题/预览子串匹配，不发请求
@@ -3240,7 +3242,8 @@ export default {
       // 动态插件与项目面板一律不上 rail——它们都带着 projectId 干活。
       if (user?.role === 'CLIENT') return getPluginsForUser('CLIENT')
       if (!this.hasProject || this.isLooseWorkspace) {
-        const globals = [...LEFT_SIDEBAR_PLUGINS.filter(p => isPaneAllowedWithoutProject(p.key)), ...this.dynamicPlugins.filter(p => hasPluginNavigation(p) && isGlobalPlugin(p))]
+        // 客户协作按钮无项目态不上 rail（面板本身仍可由消息中心等入口打开，见 NO_PROJECT_PANE_KEYS）
+        const globals = [...LEFT_SIDEBAR_PLUGINS.filter(p => p.key !== 'dd-client' && isPaneAllowedWithoutProject(p.key)), ...this.dynamicPlugins.filter(p => hasPluginNavigation(p) && isGlobalPlugin(p))]
         return this.applyRailOrder(this.applyPanelDocks(globals).filter(p => isPaneAllowedWithoutProject(p.key) || isGlobalPlugin(p)))
       }
       const base = (user && user.role === 'CLIENT')
@@ -8494,6 +8497,28 @@ export default {
       }
     },
     // --- AI Header Actions ---
+    openConvMenu(chat, evt) {
+      const native = typeof window !== 'undefined' ? window.event : null
+      const rawX = (evt && Number(evt.clientX)) || (native && Number(native.clientX)) || 0
+      const rawY = (evt && Number(evt.clientY)) || (native && Number(native.clientY)) || 0
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 0
+      const vh = typeof window !== 'undefined' ? window.innerHeight : 0
+      // 菜单 fixed 定位：贴右 / 下边缘时往里收，免得被顶出屏外
+      const x = vw ? Math.min(rawX, Math.max(0, vw - 168)) : rawX
+      const y = vh ? Math.min(rawY, Math.max(0, vh - 120)) : rawY
+      this.convMenu = { visible: true, chat, x, y }
+    },
+    closeConvMenu() {
+      if (this.convMenu.visible) this.convMenu = { visible: false, chat: null, x: 0, y: 0 }
+    },
+    runConvMenu(action) {
+      const chat = this.convMenu.chat
+      this.closeConvMenu()
+      if (!chat) return
+      if (action === 'rename') this.beginRenameConversation(chat)
+      else if (action === 'pin') this.togglePinConversation(chat)
+      else if (action === 'delete') this.confirmDeleteConversation(chat)
+    },
     toggleHistoryDrawer() {
         this.showHistoryDrawer = !this.showHistoryDrawer
         if (this.showHistoryDrawer) {

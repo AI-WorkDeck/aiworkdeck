@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   "label": "MCP",
-  "title": "Sambungan MCP",
+  "title": "Sambungan alat luaran (MCP)",
   "description": "MCP menghubungkan alat luaran dengan perbualan dan tugas AI. Skill menyediakan kaedah kerja; Plugin menambah fungsi desktop.",
   "billing": "Sambungan aktif anda diutamakan tanpa kredit platform untuk panggilan data. Caj penyedia dan model AI masih terpakai. Kegagalan tidak beralih ke saluran berbayar.",
   "transport": "HTTPS Streamable HTTP menyokong Bearer dan OAuth. Arahan stdio setempat memerlukan mod desktop setempat serta pengesahan sebelum dijalankan.",

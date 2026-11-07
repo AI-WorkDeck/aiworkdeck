@@ -116,7 +116,7 @@ export default {
   },
   "identity": {
     "title": "Pilih Ruang Kerja Lokal",
-    "subtitle": "Ditemukan beberapa akun yang sudah ada di perangkat ini. Pilih ruang kerja untuk melanjutkan. Anda tidak akan ditanya lagi, dan Anda dapat mengubahnya nanti di Pengaturan → Akun & Penggunaan.",
+    "subtitle": "Ditemukan beberapa akun yang sudah ada di perangkat ini. Pilih ruang kerja untuk melanjutkan. Anda tidak akan ditanya lagi, dan Anda dapat mengubahnya nanti di Pengaturan → Akun & saldo.",
     "reading": "Membaca akun lokal",
     "retry": "Coba lagi",
     "itemMeta": "{projects} proyek · {files} berkas",

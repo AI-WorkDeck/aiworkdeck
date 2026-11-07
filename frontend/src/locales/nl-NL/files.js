@@ -66,7 +66,7 @@ export default {
     "submitted": "Ondertitels worden gegenereerd. Ze verschijnen zodra ze klaar zijn.",
     "ready": "De ondertitels zijn klaar",
     "failed": "Genereren van ondertitels mislukt. Klik op de ondertitelknop om het opnieuw te proberen.",
-    "notConfigured": "Transcriptie is niet ingesteld. Stel het in via Systeeminstellingen - Platformdiensten - Vergadertranscriptie om ondertitels te genereren.",
+    "notConfigured": "Transcriptie is niet ingesteld. Stel het in via Instellingen - Platformdiensten - Vergadertranscriptie om ondertitels te genereren.",
     "noticePending": "Geregistreerd. Bevestig eerst de opnamemelding onder Stem - Vergaderopname en klik vervolgens op de ondertitelknop.",
     "submitFailed": "Kan generatie van ondertitels niet starten",
     "empty": "Geen spraak gedetecteerd"

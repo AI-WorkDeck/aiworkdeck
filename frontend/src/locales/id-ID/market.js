@@ -145,7 +145,7 @@ export default {
   "reinstallOrUpdate": "Instal Ulang / Perbarui",
   "activationModeLabel": "Aktivasi: {mode} ▾",
   "processingEllipsis": "Sedang diproses…",
-  "needAccountHint": "Ini adalah item berbayar. Hubungkan akun AI WorkDeck Anda di bagian \"Akun & Penggunaan\" di Pengaturan terlebih dahulu — catatan pembelian hanya dapat diverifikasi setelah itu.",
+  "needAccountHint": "Ini adalah item berbayar. Hubungkan akun AI WorkDeck Anda di bagian \"Akun & saldo\" di Pengaturan terlebih dahulu — catatan pembelian hanya dapat diverifikasi setelah itu.",
   "buyHint": "Ini adalah item berbayar. Pembelian diselesaikan di situs web resmi; setelah membayar, kembali ke halaman ini dan klik \"Sudah Dibeli, Segarkan\" untuk menginstal.",
   "whenToUse": "Kapan Digunakan",
   "scenarioLead": "Ucapkan sesuatu seperti ini dalam percakapan, dan itu akan mengambil alih secara otomatis:",

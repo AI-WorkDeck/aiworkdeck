@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   "label": "MCP",
-  "title": "MCP bağlantıları",
+  "title": "Harici araç bağlantıları (MCP)",
   "description": "MCP, harici araçları AI sohbetlerine ve görevlerine bağlar. Skill iş yöntemleri sağlar; Plugin masaüstünü genişletir.",
   "billing": "Etkin kişisel bağlantınız önceliklidir ve veri çağrıları platform kredisi kullanmaz. Sağlayıcı ve AI model ücretleri geçerlidir. Hatalarda ücretli kanala geçilmez.",
   "transport": "HTTPS Streamable HTTP, Bearer ve OAuth’u destekler. Yerel stdio komutları masaüstü yerel modunu ve çalıştırmadan önce onay gerektirir.",

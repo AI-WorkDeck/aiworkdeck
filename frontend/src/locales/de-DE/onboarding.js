@@ -116,7 +116,7 @@ export default {
   },
   "identity": {
     "title": "Lokalen Arbeitsbereich auswählen",
-    "subtitle": "Auf diesem Gerät wurden mehrere bestehende Konten gefunden. Wählen Sie den Arbeitsbereich aus, mit dem Sie fortfahren möchten. Sie werden nicht erneut gefragt und können dies später unter Einstellungen → Konto & Nutzung ändern.",
+    "subtitle": "Auf diesem Gerät wurden mehrere bestehende Konten gefunden. Wählen Sie den Arbeitsbereich aus, mit dem Sie fortfahren möchten. Sie werden nicht erneut gefragt und können dies später unter Einstellungen → Konto & Guthaben ändern.",
     "reading": "Lokale Konten werden gelesen",
     "retry": "Erneut versuchen",
     "itemMeta": "{projects} Projekte · {files} Dateien",

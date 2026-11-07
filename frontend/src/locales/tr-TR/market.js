@@ -145,7 +145,7 @@ export default {
   "reinstallOrUpdate": "Yeniden yükle / Güncelle",
   "activationModeLabel": "Etkinleştirme: {mode} ▾",
   "processingEllipsis": "İşleniyor…",
-  "needAccountHint": "Bu ücretli bir öğedir. Önce Ayarlar'daki \"Hesap ve Kullanım\" bölümünden AI WorkDeck hesabınızı bağlayın — satın alma kayıtları ancak bundan sonra doğrulanabilir.",
+  "needAccountHint": "Bu ücretli bir öğedir. Önce Ayarlar'daki \"Hesap ve bakiye\" bölümünden AI WorkDeck hesabınızı bağlayın — satın alma kayıtları ancak bundan sonra doğrulanabilir.",
   "buyHint": "Bu ücretli bir öğedir. Satın alma resmi web sitesinde tamamlanır; ödeme yaptıktan sonra bu sayfaya geri dönün ve yüklemek için \"Satın aldım, yenile\" düğmesine tıklayın.",
   "whenToUse": "Ne zaman kullanılır",
   "scenarioLead": "Sohbette şuna benzer bir şey söyleyin, otomatik olarak devralır:",

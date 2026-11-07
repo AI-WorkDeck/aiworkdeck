@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   "label": "MCP",
-  "title": "MCP 接続",
+  "title": "外部ツール連携（MCP）",
   "description": "MCP は AI の会話・タスクに外部ツールを接続します。Skill は手順、Plugin はデスクトップ機能を追加します。",
   "billing": "有効な独自接続を優先し、データ呼び出しにプラットフォーム残高を使いません。提供元の料金と AI モデルの利用料は別途発生します。失敗時に有料経路へ切り替えません。",
   "transport": "HTTPS Streamable HTTP、Bearer、OAuth に対応。ローカル stdio コマンドはデスクトップのローカルモードでのみ実行でき、事前の確認が必要です。",

@@ -218,7 +218,7 @@ test('宿主摆放：账户入口在顶栏 header-right、「活动记录」右�
   const at = header.indexOf('<AccountEntry')
   assert.ok(at > 0, '顶栏里有 <AccountEntry>')
   assert.ok(at > header.indexOf('toggleRecording'), '在「活动记录」右侧')
-  const rail = host.slice(host.indexOf('<view class="left-rail">'), host.indexOf('<FilePickerDialog'))
+  const rail = host.slice(host.indexOf('<view class="left-rail"'), host.indexOf('<FilePickerDialog'))
   assert.ok(rail.length > 0)
   assert.doesNotMatch(rail, /<AccountEntry|AccountRailEntry/)
   assert.doesNotMatch(rail, /GLYPHS\.settings|goToSystemSettings/)

@@ -66,7 +66,7 @@ export default {
     "submitted": "Gerando legendas. Elas aparecerão quando estiverem prontas.",
     "ready": "As legendas estão prontas",
     "failed": "Falha na geração de legendas. Clique no botão de legendas para tentar novamente.",
-    "notConfigured": "A transcrição não está configurada. Configure em Configurações do sistema - Serviços da Plataforma - Transcrição de Reuniões para gerar legendas.",
+    "notConfigured": "A transcrição não está configurada. Configure em Configurações - Serviços da Plataforma - Transcrição de Reuniões para gerar legendas.",
     "noticePending": "Registrado. Confirme o aviso de gravação em Voz - Gravação de Reunião primeiro e, em seguida, clique no botão de legendas.",
     "submitFailed": "Não foi possível iniciar a geração de legendas",
     "empty": "Nenhuma fala detectada"

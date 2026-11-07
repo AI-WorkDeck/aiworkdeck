@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   "label": "MCP",
-  "title": "Conexões MCP",
+  "title": "Conexões de ferramentas externas (MCP)",
   "description": "MCP conecta ferramentas externas a conversas e tarefas de IA. Skills fornecem métodos e Plugins ampliam o desktop.",
   "billing": "Sua conexão ativada tem prioridade e não usa créditos da plataforma para dados. As cobranças do provedor e do modelo de IA continuam. Falhas não acionam uma alternativa paga.",
   "transport": "HTTPS Streamable HTTP aceita Bearer e OAuth. Comandos stdio exigem o modo local do desktop e confirmação antes da execução.",

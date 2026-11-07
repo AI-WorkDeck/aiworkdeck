@@ -117,7 +117,7 @@ export default {
   },
   "identity": {
     "title": "Chọn Workspace cục bộ",
-    "subtitle": "Phát hiện nhiều tài khoản hiện có trên thiết bị này. Hãy chọn workspace để tiếp tục. Bạn sẽ không được hỏi lại, và có thể thay đổi sau trong Cài đặt → Tài khoản & Sử dụng.",
+    "subtitle": "Phát hiện nhiều tài khoản hiện có trên thiết bị này. Hãy chọn workspace để tiếp tục. Bạn sẽ không được hỏi lại, và có thể thay đổi sau trong Cài đặt → Tài khoản và số dư.",
     "reading": "Đang đọc các tài khoản cục bộ",
     "retry": "Thử lại",
     "itemMeta": "{projects} dự án · {files} tệp",

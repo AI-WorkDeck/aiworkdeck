@@ -181,24 +181,6 @@
         <text v-if="!deviceTokens.length" class="bind-tip">{{ $t('account.noTokensYet') }}</text>
       </SettingsSection>
 
-      <!-- 文档属性里的产品标识（可溯源性设计规范附录 B4）。默认开：Word / WPS /
-           LibreOffice 保存文档时都会写这个标准字段，我们此前是唯一不写的那个。
-           只写产品名与版本，不写作者/单位/机器名——所以它不是隐私项，是「交付前
-           要不要清元数据」的开关。 -->
-      <SettingsSection :title="$t('account.docGeneratorGroupTitle')">
-        <SettingsRow :label="$t('account.docGeneratorLabel')">
-          <AwdSwitch
-            :checked="docGeneratorEnabled"
-            :disabled="docGeneratorBusy"
-            @change="onToggleDocGenerator"
-          />
-        </SettingsRow>
-        <text class="bind-tip">{{ $t('account.docGeneratorHint') }}</text>
-        <text v-if="docGeneratorEnabled && docGeneratorApplication" class="bind-tip">
-          {{ $t('account.docGeneratorCurrent', { application: docGeneratorApplication }) }}
-        </text>
-      </SettingsSection>
-
       <!-- 退出登录。**桌面端也要有**：此前这一块写着 v-if="!isDesktop"，
            于是桌面端全应用没有一个登出入口，想换账号只能去设置页把
            「断开连接」和「解除授权」各点一遍。两件事已收进 utils/signOut.js。 -->
@@ -225,8 +207,6 @@ import { REDLINE_AUTHOR_KEY, MAX_REDLINE_AUTHOR_CHARS } from '@/utils/editorAuth
 function readRedlineAuthor() {
   try { return String(uni.getStorageSync(REDLINE_AUTHOR_KEY) || '') } catch (e) { return '' }
 }
-import { getDocumentGeneratorSettings, updateDocumentGeneratorSettings } from '@/services/api.js'
-import { resetDocumentStampCache } from '@/utils/documentGeneratorSetting.js'
 import AwdSwitch from '@/components/AwdSwitch.vue'
 import LanguagePicker from '@/components/LanguagePicker.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
@@ -290,12 +270,6 @@ export default {
         label: entry.nativeName,
       })),
 
-      // 文档属性里的产品标识（B4）：默认按「开」渲染，拉到后端值再纠正——
-      // 缺省就是开，先画成关会在加载瞬间闪一下。
-      docGeneratorEnabled: true,
-      docGeneratorApplication: '',
-      docGeneratorBusy: false,
-
       // 认证器（TOTP）绑定
       showTotpPanel: false,
       totpSecret: '',
@@ -328,7 +302,6 @@ export default {
   mounted() {
     this.loadUserInfo()
     this.loadAccountProfile()
-    this.loadDocGeneratorSetting()
     // 设置页别处（账户分区的姓名引导、连接成功后的弹窗）点「去填写」时把光标送到这里。
     // 那两处切栏之后本组件才挂上来，所以只能靠事件，不能靠 prop。
     this._onFocusDisplayName = () => this.focusDisplayName()
@@ -357,36 +330,6 @@ export default {
   methods: {
     // Options API 模板拿不到裸导入函数，包一层 method 才能在模板里当 getInitial(...) 调用
     getInitial,
-    async loadDocGeneratorSetting() {
-      try {
-        const res = await getDocumentGeneratorSettings()
-        if (res && res.code === 0) {
-          this.docGeneratorEnabled = res.enabled !== false
-          this.docGeneratorApplication = res.application || ''
-        }
-      } catch (e) {
-        // 读不到就保持默认显示，不打扰用户：这个开关不影响任何正在进行的工作
-      }
-    },
-    async onToggleDocGenerator(next) {
-      if (this.docGeneratorBusy) return
-      const prev = this.docGeneratorEnabled
-      this.docGeneratorBusy = true
-      this.docGeneratorEnabled = next
-      try {
-        const res = await updateDocumentGeneratorSettings({ enabled: next })
-        if (!res || res.code !== 0) throw new Error('save failed')
-        this.docGeneratorEnabled = res.enabled !== false
-        this.docGeneratorApplication = res.application || this.docGeneratorApplication
-        // 编辑器的保存路径按会话缓存这个开关，改完必须让它重取，否则要等下次启动才生效
-        resetDocumentStampCache()
-      } catch (e) {
-        this.docGeneratorEnabled = prev
-        uni.showToast({ title: this.$t('account.docGeneratorSaveFailed'), icon: 'none' })
-      } finally {
-        this.docGeneratorBusy = false
-      }
-    },
     async loadUserInfo() {
       const user = getCurrentUser()
       if (user) {
