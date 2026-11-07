@@ -77,5 +77,16 @@ export default {
   "fileReadFailed": "檔案讀取失敗，請重新選擇或貼上 JSON。",
   "localConfirm": "確認執行此命令？{command}。程式會以目前本機帳戶權限執行，可能存取檔案及網路。請僅在信任此程式時繼續。",
   "commandHint": "命令、參數與工作目錄屬於可查看的執行設定。請將密鑰放在專用憑證或環境變數欄位中。",
-  "oauthSaveFirst": "請先設定並儲存此連線，再進行授權。"
+  "oauthSaveFirst": "請先設定並儲存此連線，再進行授權。",
+  "localTitle": "對外 MCP 服務",
+  "localDesc": "允許本機的 Claude Code、Codex 等工具讀取你的 AI WorkDeck 專案，並提交修改建議；修改須經你審閱才會寫入文件。",
+  "localOn": "已開啟",
+  "localOff": "已關閉",
+  "localEnable": "開啟",
+  "localDisable": "關閉",
+  "localRotate": "重新開啟（換新權杖）",
+  "localWarn": "權杖只會顯示這一次，請立即複製。再次開啟會簽發新權杖，舊權杖隨即失效。",
+  "localClaude": "Claude Code 指令",
+  "localCodex": "Codex 設定（~/.codex/config.toml）",
+  "localCopy": "複製"
 }

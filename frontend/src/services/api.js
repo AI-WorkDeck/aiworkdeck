@@ -4927,6 +4927,11 @@ export const revertHarnessEvolution = (id) => request({
 })
 
 
+// 本机「对外 MCP 服务」开关（仅单机模式；其余模式 404）。enable 响应带一次性令牌，不记日志。
+export const getLocalMcpServerStatus = () => request({ logBody: false, url: '/api/mcp-server/status' })
+export const enableLocalMcpServer = () => request({ logBody: false, url: '/api/mcp-server/enable', method: 'POST' })
+export const disableLocalMcpServer = () => request({ logBody: false, url: '/api/mcp-server/disable', method: 'POST' })
+
 // Independent user-scoped MCP connections. Credentials are write-only.
 export const getMcpConnections = () => request({ logBody: false, url: '/api/mcp/connections' })
 export const saveMcpConnection = (id, data, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: '/api/mcp/connections' + (id ? '/' + encodeURIComponent(id) : ''), method: id ? 'PUT' : 'POST', data })

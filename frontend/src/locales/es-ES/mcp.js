@@ -77,5 +77,16 @@ export default {
   "fileReadFailed": "No se pudo leer el archivo. Elíjalo de nuevo o pegue el JSON.",
   "localConfirm": "¿Ejecutar este comando? {command} — Usa los permisos de su cuenta local y puede acceder a archivos y a la red. Continúe solo si confía en este programa.",
   "commandHint": "Los comandos, argumentos y directorios de trabajo siguen visibles. Coloque los secretos en los campos de credenciales o variables de entorno.",
-  "oauthSaveFirst": "Configure y guarde esta conexión antes de autorizarla."
+  "oauthSaveFirst": "Configure y guarde esta conexión antes de autorizarla.",
+  "localTitle": "Servicio MCP local",
+  "localDesc": "Permite que Claude Code, Codex y otras herramientas de este equipo lean tus proyectos de AI WorkDeck y propongan cambios. Los cambios solo llegan al documento después de que los revises.",
+  "localOn": "Activado",
+  "localOff": "Desactivado",
+  "localEnable": "Activar",
+  "localDisable": "Desactivar",
+  "localRotate": "Activar de nuevo (token nuevo)",
+  "localWarn": "El token solo se muestra una vez; cópialo ahora. Al activarlo de nuevo se emite un token nuevo y el anterior deja de funcionar.",
+  "localClaude": "Comando de Claude Code",
+  "localCodex": "Configuración de Codex (~/.codex/config.toml)",
+  "localCopy": "Copiar"
 }

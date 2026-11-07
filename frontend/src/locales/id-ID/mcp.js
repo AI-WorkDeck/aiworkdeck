@@ -77,5 +77,16 @@ export default {
   "fileReadFailed": "Berkas tidak dapat dibaca. Pilih kembali atau tempel JSON.",
   "localConfirm": "Jalankan perintah ini? {command} — Perintah berjalan dengan izin akun lokal Anda dan dapat mengakses berkas serta jaringan. Lanjutkan hanya jika Anda mempercayai program ini.",
   "commandHint": "Perintah, argumen, dan direktori kerja tetap terlihat. Masukkan rahasia di kolom kredensial atau variabel lingkungan.",
-  "oauthSaveFirst": "Konfigurasikan dan simpan koneksi ini sebelum memberi otorisasi."
+  "oauthSaveFirst": "Konfigurasikan dan simpan koneksi ini sebelum memberi otorisasi.",
+  "localTitle": "Layanan MCP lokal",
+  "localDesc": "Izinkan Claude Code, Codex, dan alat lain di komputer ini membaca proyek AI WorkDeck Anda dan mengusulkan perubahan. Perubahan baru masuk ke dokumen setelah Anda tinjau.",
+  "localOn": "Aktif",
+  "localOff": "Nonaktif",
+  "localEnable": "Aktifkan",
+  "localDisable": "Nonaktifkan",
+  "localRotate": "Aktifkan lagi (token baru)",
+  "localWarn": "Token hanya ditampilkan sekali, jadi salin sekarang. Mengaktifkan lagi akan menerbitkan token baru dan token lama tidak berlaku.",
+  "localClaude": "Perintah Claude Code",
+  "localCodex": "Konfigurasi Codex (~/.codex/config.toml)",
+  "localCopy": "Salin"
 }

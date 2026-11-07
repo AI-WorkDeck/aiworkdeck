@@ -77,5 +77,16 @@ export default {
   "fileReadFailed": "Không thể đọc tệp. Chọn lại hoặc dán JSON.",
   "localConfirm": "Chạy lệnh này? {command} — Lệnh chạy với quyền tài khoản cục bộ của bạn và có thể truy cập tệp cùng mạng. Chỉ tiếp tục nếu bạn tin cậy chương trình này.",
   "commandHint": "Lệnh, đối số và thư mục làm việc vẫn hiển thị. Đặt thông tin bí mật trong trường thông tin xác thực hoặc biến môi trường.",
-  "oauthSaveFirst": "Cấu hình và lưu kết nối này trước khi cấp quyền."
+  "oauthSaveFirst": "Cấu hình và lưu kết nối này trước khi cấp quyền.",
+  "localTitle": "Dịch vụ MCP cục bộ",
+  "localDesc": "Cho phép Claude Code, Codex và các công cụ khác trên máy này đọc dự án AI WorkDeck của bạn và đề xuất chỉnh sửa. Chỉnh sửa chỉ vào tài liệu sau khi bạn xem xét.",
+  "localOn": "Đang bật",
+  "localOff": "Đang tắt",
+  "localEnable": "Bật",
+  "localDisable": "Tắt",
+  "localRotate": "Bật lại (token mới)",
+  "localWarn": "Token chỉ hiển thị một lần, hãy sao chép ngay. Bật lại sẽ cấp token mới và token cũ ngừng hoạt động.",
+  "localClaude": "Lệnh Claude Code",
+  "localCodex": "Cấu hình Codex (~/.codex/config.toml)",
+  "localCopy": "Sao chép"
 }
