@@ -109,6 +109,23 @@ class PendingRevisionServiceTest {
     }
 
     @Test
+    void proposeRejectsBaseVersionMismatch() {
+        PendingRevisionService.RevisionException e = assertThrows(PendingRevisionService.RevisionException.class,
+                () -> service.propose(USER, 3L, "1-1", List.of(new PendingRevisionService.Edit("a", "b", null)), "mcp:x"));
+        assertTrue(e.getMessage().contains(PendingRevisionService.fileVersion(file)));
+        assertTrue(store.isEmpty());
+    }
+
+    @Test
+    void listMarksStaleWhenFileChanged() {
+        PendingRevision r = propose();
+        file.setFileSize(999L);
+        Map<String, Object> row = service.listByProject(USER, 1L).get(0);
+        assertEquals("STALE", row.get("status"));
+        assertEquals("STALE", r.getStatus());
+    }
+
+    @Test
     void rejectDeletes() {
         PendingRevision r = propose();
         service.reject(USER, 11L);

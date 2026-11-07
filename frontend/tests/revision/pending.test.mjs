@@ -157,3 +157,10 @@ test('refresh only polls when the MCP server is enabled', () => {
   assert.match(store, /res\.enabled === true/)
   assert.doesNotMatch(store, /conversationId/)
 })
+
+test('stale claim arrives as a rejected request (err.code 4090) and is mapped to the STALE state', () => {
+  const store = fs.readFileSync(new URL('../../src/utils/pendingRevisionStore.js', import.meta.url), 'utf8')
+  assert.match(store, /e\.code === STALE_CODE\) \{ rev\.status = 'STALE'/)
+  const editor = fs.readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8')
+  assert.doesNotMatch(editor.slice(editor.indexOf('<script>')), /PendingRevisionBar/)
+})

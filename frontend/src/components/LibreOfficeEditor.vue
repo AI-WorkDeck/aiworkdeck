@@ -96,6 +96,7 @@
       </view>
     </view>
     <!-- 外部 Agent（MCP propose_revision）的待审修订：仅激活的已打开文件显示，接受后以修订痕迹落入文档 -->
+    <!-- PendingRevisionBar 在 main.js 全局注册：不进本组件的 script，免得抽取源码构建组件的测试夹具逐个补桩 -->
     <PendingRevisionBar v-if="file && file.id && active" :project-id="projectId" :file-id="file.id" :executor="pendingRevisionExecutor" />
     <view v-if="inputError" class="libre-input-error" role="alert">
       <text>{{ inputError }}</text>
@@ -201,7 +202,6 @@ import ReviewPanel from '@/components/ReviewPanel.vue'
 import OfficeNavigation from '@/components/OfficeNavigation.vue'
 import EditorToolbar from '@/components/EditorToolbar.vue'
 import EvidenceStaleBar from '@/components/EvidenceStaleBar.vue'
-import PendingRevisionBar from '@/components/PendingRevisionBar.vue'
 import { getCloudWriteHeaders, getCheckpointRestoreWriteState, getFileBytesUrl, getFileWriteUrl, listEvidenceLinks, reportEvidenceAnchors, keepEvidenceAnchor, getCurrentUser as fetchAuthUser, getFileLocalPath } from '@/services/api.js'
 import { getAuthHeaders, getCurrentUser } from '@/utils/auth.js'
 import { createAuthorNameResolver, REDLINE_AUTHOR_KEY } from '@/utils/editorAuthor.js'
@@ -260,7 +260,7 @@ const FORCE_SAVE_DIRTY_AGE_BUSY_MS = 60000
 
 export default {
   name: 'LibreOfficeEditor',
-  components: { OfficeNavigation, ReviewPanel, EditorToolbar, EvidenceStaleBar, PendingRevisionBar },
+  components: { OfficeNavigation, ReviewPanel, EditorToolbar, EvidenceStaleBar },
   // command-progress：批量命令（find_replace >50 命中 / apply_house_style）的
   // 「第 x/y 处」进度，{reqId, done, total}；reqId 可用 executeCommand('cancel', {reqId}) 喊停。
   // cursor-context：画布点击/光标移动时客体页回传的光标邻域（仅在 insightSubscribed

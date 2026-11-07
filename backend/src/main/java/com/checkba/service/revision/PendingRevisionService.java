@@ -93,6 +93,12 @@ public class PendingRevisionService {
         if (baseVersion == null || baseVersion.isBlank() || baseVersion.length() > 64) {
             throw new RevisionException(LangText.of("缺少 baseVersion（先 read_file 取 version）", "Missing baseVersion (call read_file and use its version)"));
         }
+        String current = fileVersion(file);
+        if (!current.equals(baseVersion.trim())) {
+            throw new RevisionException(LangText.of(
+                    "baseVersion 与文件当前版本不一致（当前 " + current + "）：文件已被修改，请重新 read_file 后基于最新内容再提交",
+                    "baseVersion does not match the file's current version (" + current + "): the file changed; call read_file again and propose against the latest content"));
+        }
         validate(edits);
         if (repository.countByFileId(fileId) >= MAX_PENDING_PER_FILE) {
             throw new RevisionException(LangText.of("该文件待审提案已达上限，请先在 AI WorkDeck 中处理",
@@ -227,9 +233,23 @@ public class PendingRevisionService {
         }
     }
 
+    /** 列表时顺带判定过期：未套用过且文件版本已变 → 标 STALE（不用等用户点接受）。 */
+    private void refreshStale(PendingRevision r) {
+        if (!PendingRevision.PENDING.equals(r.getStatus()) || r.getAppliedCount() > 0) return;
+        fileRepository.findById(r.getFileId())
+                .filter(f -> !Boolean.TRUE.equals(f.getIsDeleted()))
+                .ifPresent(f -> {
+                    if (!fileVersion(f).equals(r.getBaseVersion())) {
+                        r.setStatus(PendingRevision.STALE);
+                        repository.save(r);
+                    }
+                });
+    }
+
     private List<Map<String, Object>> view(List<PendingRevision> rows) {
         List<Map<String, Object>> out = new ArrayList<>();
         for (PendingRevision r : rows) {
+            refreshStale(r);
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", r.getId());
             m.put("fileId", r.getFileId());

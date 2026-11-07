@@ -70,7 +70,14 @@ export async function acceptRevision(rev, executor) {
   const result = await applyPendingRevision({
     id: rev.id,
     claim: async (id) => {
-      const res = await acceptPendingRevision(id)
+      // request() 对非 0 的业务码一律 reject（err.code 带业务码），过期不是失败而是一种状态
+      let res
+      try {
+        res = await acceptPendingRevision(id)
+      } catch (e) {
+        if (e && e.code === STALE_CODE) { rev.status = 'STALE'; return { ok: false, stale: true, message: e.message } }
+        return { ok: false, message: (e && e.message) || '' }
+      }
       if (res && res.code === 0) return { ok: true, edits: (res.data && res.data.edits) || [], appliedCount: (res.data && res.data.appliedCount) || 0 }
       if (res && res.code === STALE_CODE) { rev.status = 'STALE'; return { ok: false, stale: true, message: res.message } }
       return { ok: false, message: res && res.message }
