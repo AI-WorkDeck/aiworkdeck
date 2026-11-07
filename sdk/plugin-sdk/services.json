@@ -1,0 +1,27 @@
+{
+  "$comment": "Host service table (spec v2.13, section 20). Keys are the service/operation names used by awd.services.request and by declarative tools (handler.type=service). Published copy of the backend HostServiceRegistry; plugin-dev validate checks declarations against it offline. Additive only.",
+  "version": 1,
+  "services": {
+    "calendar": {
+      "operations": {
+        "list": { "access": "read", "requiredPermissions": ["tasks"] },
+        "listForUser": { "access": "read", "requiredPermissions": ["tasks"] },
+        "create": { "access": "write", "requiredPermissions": ["tasks"] },
+        "update": { "access": "write", "requiredPermissions": ["tasks"] },
+        "delete": { "access": "destructive", "requiredPermissions": ["tasks"] }
+      }
+    },
+    "search": {
+      "operations": {
+        "query": { "access": "read", "requiredPermissions": ["file_read"] },
+        "tags": { "access": "read", "requiredPermissions": ["file_read"] }
+      }
+    },
+    "sensitive": {
+      "operations": {
+        "preview": { "access": "read", "requiredPermissions": ["file_read", "file_write"] },
+        "redact": { "access": "write", "requiredPermissions": ["file_read", "file_write"] }
+      }
+    }
+  }
+}

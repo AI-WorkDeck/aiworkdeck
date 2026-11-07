@@ -131,6 +131,10 @@ node scripts/plugin-dev.mjs submissions --endpoint https://YOUR-PORTAL/api/plugi
 
 宿主固定服务、权限与取消语义详见 [SERVICES.md](SERVICES.md)。
 
+## 声明式 Agent 工具（规范 v2.13，宿主运行时随后续版本）
+
+`manifest.json` 的 `tools[]` 除老形态（JAR 工具：`name`/`description`/`permissions`）外，新增声明式形态：`name`（非 JAR 工具须以 `<插件id 连字符转下划线>_` 开头）、`description`（可用 `%key%`）、`access`（`read|write|destructive`）、`inputSchema`（与 `contributes.mcpServers` 相同的受限子集）、`handler`（`jar` | `service` | `connection` | `view`）、`permissions`（⊆ manifest.permissions）、`mcp`、`confirm`、`keywords`。`handler.type=service` 的服务与操作名取自 [services.json](services.json)（宿主服务表的发布副本，与 `awd.services.request` 同名）；`view` 属第四期，`awd.tools.handle` 目前只有类型占位，`awd.tools.list()` 待宿主桥方法。`init` 生成的模板带一个 read 样例工具，`validate` 离线检查全部规则。详见 docs/PLUGIN_SPEC.md §20。
+
 ## 消息中心通知（SDK 1.7）
 
 声明 `notifications` 后，使用 `awd.notifications.publish({eventKey,title,body?,actionState?,target?})` 向当前账号发布持久通知；业务真正完成后调用 `awd.notifications.resolve(eventKey, 'done')`。已读不代表业务确认。通知目标只能打开本插件，禁止任意 URL、执行代码或指定其他收件人。

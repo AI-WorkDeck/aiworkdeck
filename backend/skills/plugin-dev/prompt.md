@@ -38,14 +38,15 @@
   "author": "",
   "permissions": ["file_read"],      // 只声明用到的；可用值见下
   "frontendEntry": "web/index.html", // 此最小示例的入口；也可用 contributes.views 声明视图
-  "tools": [],                       // 必须为空
+  "tools": [],                       // 纯 Web 插件可留空，或声明 service/connection 型声明式工具（见下）
   "backendJars": []                  // 必须为空
 }
 ```
 
 - `permissions` 可用值：`file_read`（读项目文件）、`file_write`（写入获授权项目文件）、`network`（放开 fetch 到 https）、`editor`（文档读写：doc.*/evidence.*，v2.7 起真实生效）、`ai`（面板内静默调平台模型 ai.request，v2.7 起，烧用户 Credits——真用得上才声明）。未声明 `file_read` 时调 `files.*` 会得到 `permission_denied`；未声明 `network` 时 CSP 是 `connect-src 'none'`，fetch 一律被浏览器拦截。权限最小化：用不到的不要声明。
 - **v2.9 声明式贡献点**：manifest 顶层 `settings`（用户可配置项，广场详情页渲染表单）与 `contributes.templates`/`contributes.styleProfiles`（文书模板/样式画像，纯数据文件）对开发安装开放；`contributes.evidenceSources` 不收（数据源接入要走广场审核）。字段形状见 docs/PLUGIN_SPEC.md §13/§14。
-- **开发安装只收纯 Web 插件**：`backendJars` / `tools` / `skills` / `packs` 任一非空会被拒装。需要后端代码的插件必须走插件广场的人工审核 + 签名流程，不要试图绕开。
+- **开发安装只收纯 Web 插件**：`backendJars` / `skills` / `packs` 任一非空会被拒装；`tools` 里的 JAR 工具（老形态，只有 name/description/permissions）同样不收。需要后端代码的插件必须走插件广场的人工审核 + 签名流程，不要试图绕开。
+- **声明式 Agent 工具（规范 v2.13，docs/PLUGIN_SPEC.md §20）**：纯 Web 插件可以在 `tools[]` 声明 `handler.type` 为 `service`（绑定宿主固定服务，名单见 `sdk/plugin-sdk/services.json`，与 `awd.services.request` 同名）或 `connection`（绑定 `contributes.connections` 里已声明的连接操作）的工具，让 Agent 直接调用。必填 `name`（必须以 `<插件id 把 - 换成 _>_` 开头）、`description`（非空，可用 `%key%` 走 l10n）、`access`（`read|write|destructive`）；`inputSchema` 用与 MCP 相同的受限子集；`permissions` 必须是 manifest.permissions 的子集；可选 `mcp`、`confirm`、`keywords`。`handler.type=view` 属第四期，暂勿使用。写完用 `node scripts/plugin-dev.mjs validate` 校验。JAR 工具仍走广场审核。
 
 ## 运行环境（沙箱边界，写代码前必须知道）
 
@@ -88,7 +89,7 @@
 
 manifest 建议：用到 v2.7 能力（doc.*/events/ai.request）时声明 `"minHostVersion": "0.27.4"`——老宿主不认识新方法，声明后 0.27.4+ 的宿主能在装的时候就给出「请升级客户端」的明确提示，而不是运行期一堆 `unknown_method`。
 
-`awd.tools.invoke` 提醒：**开发安装的插件 manifest `tools` 必须为空**（见上文「开发安装只收纯 Web 插件」），所以这个方法在本地自测环境下永远拿不到工具、只会收 `invoke_failed`；只有走插件广场审核上架、且插件确实声明了 JAR 工具时才会真正生效。给用户写代码前先确认这一点，别承诺一个本机测不出效果的功能。
+`awd.tools.invoke` 提醒：**该方法只调 JAR 工具**；开发安装的插件不能带 JAR 工具（见上文「开发安装只收纯 Web 插件」），所以它在本地自测环境下只会收 `invoke_failed`；只有走插件广场审核上架、且插件确实声明了 JAR 工具时才会真正生效。声明式工具（service/connection）由 Agent 调用，不经 `tools.invoke`。给用户写代码前先确认这一点，别承诺一个本机测不出效果的功能。
 
 最小可用示例（骨架的 index.html 就是这个形状）：
 
