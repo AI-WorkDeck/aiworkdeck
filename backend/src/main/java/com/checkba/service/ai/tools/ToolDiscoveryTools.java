@@ -216,7 +216,9 @@ public class ToolDiscoveryTools implements AgentToolComponent {
         int shown = 0;
         for (String category : requested) {
             List<ToolSpecification> specs = candidates.stream()
-                    .filter(s -> category.equals(policy.categoryOf(s.name())))
+                    .filter(s -> category.equals(policy.categoryOf(s.name()))
+                            || ("core".equals(policy.categoryOf(s.name()))
+                                    && category.equals(policy.ruleCategoryOf(s.name()))))
                     .toList();
             sb.append("== ").append(category).append(" (").append(specs.size()).append(" tools) ==\n");
             if (specs.isEmpty()) {
@@ -224,6 +226,11 @@ public class ToolDiscoveryTools implements AgentToolComponent {
                         + "it needs a different document type or client)\n");
             }
             for (ToolSpecification spec : specs) {
+                if ("core".equals(policy.categoryOf(spec.name()))) {
+                    // 核心集里的同类工具：已在工具列表里，只点名不重复签名（省字符）
+                    sb.append("- ").append(spec.name()).append(" (already available)\n");
+                    continue;
+                }
                 shown++;
                 appendTool(sb, spec);
             }

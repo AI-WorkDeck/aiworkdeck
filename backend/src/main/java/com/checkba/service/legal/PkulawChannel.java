@@ -65,7 +65,12 @@ public class PkulawChannel {
         // 网关的 op 就是法宝的工具名；MCP 端点写死在服务端，客户端点不了别处
         PlatformGatewayClient.Result result =
                 platformGatewayClient.call("pkulaw", tool, Map.of("args", args), TIMEOUT_SECONDS);
-        return McpResponseParser.parse(result.data().path("raw").asText(""));
+        String parsed = McpResponseParser.parse(result.data().path("raw").asText(""));
+        // 上游裸文本 "Unknown tool: x"（无 Error 前缀）补齐前缀，两档对失败的判据一致
+        if (parsed != null && parsed.stripLeading().startsWith("Unknown tool")) {
+            return "Error from MCP server: " + parsed;
+        }
+        return parsed;
     }
 
     /** 这个 server 这次走不走平台网关。 */

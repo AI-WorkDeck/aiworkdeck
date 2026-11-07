@@ -3896,6 +3896,12 @@ public class AgentOrchestrator {
         if (diag == null || guard == null) {
             return resultText;
         }
+        // 法宝上游整体不可用：本轮余下的法宝工具不再下发，免得模型逐个试（roundCandidates 每轮按此集合重算）
+        if (com.checkba.service.ai.tools.LegalTools.isVendorUnavailable(resultText)) {
+            java.util.Set<String> merged = new java.util.HashSet<>(guard.unusableTools);
+            merged.addAll(com.checkba.service.ai.tools.LegalTools.pkulawToolNames());
+            guard.unusableTools = merged;
+        }
         try {
             String initialInstruction = guard.opinionInstructions.isEmpty() ? "" : guard.opinionInstructions.get(0);
             // 点名调了本轮未下发的工具时，noteToolCategoryExpansion 已先把它的类目放回展开集；

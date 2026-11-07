@@ -112,4 +112,35 @@ class HarnessDiagnosticServiceTest {
         }
         return "skills";
     }
+
+    @Test
+    void upstreamMcpUnknownToolTextDoesNotExpandMcpCategoryOrAskUser() {
+        String vendorError = "Error from MCP server: Unknown tool: get_article";
+        // 已成功派发的 get_law_article：上游文本里的 MCP / Unknown tool 不是注册表未知工具
+        Optional<HarnessDiagnosticService.HarnessAdaptation> a1 = diagnosticService.diagnoseAndAdapt(
+                "conv-1", "run-1", "民法典第1082条是什么", "get_law_article",
+                "{\"title\":\"民法典\",\"number\":\"1082\"}", vendorError, 1, new HashSet<>(), List.of());
+        assertTrue(a1.isEmpty(), "上游错误不应触发任何自愈：" + a1);
+
+        // 供应商不可用不触发「澄清护栏」（盲猜关键词那条）
+        Optional<HarnessDiagnosticService.HarnessAdaptation> a2 = diagnosticService.diagnoseAndAdapt(
+                "conv-1", "run-1", "民法典第1082条是什么", "law_search_keyword",
+                "{\"title\":\"民法典\"}", "Error from MCP server: Unknown tool: get_law_list", 2,
+                new HashSet<>(Set.of("legal")), List.of());
+        assertTrue(a2.isEmpty(), "上游错误不应触发 ask_user 护栏：" + a2);
+        Optional<HarnessDiagnosticService.HarnessAdaptation> a3 = diagnosticService.diagnoseAndAdapt(
+                "conv-1", "run-1", "民法典第1082条是什么", "law_search",
+                "{}", com.checkba.service.ai.tools.LegalTools.VENDOR_UNAVAILABLE_MARKER + " ...", 3,
+                new HashSet<>(Set.of("legal")), List.of());
+        assertTrue(a3.isEmpty(), "vendor-unavailable 标记同样不触发：" + a3);
+    }
+
+    @Test
+    void genuineLookupMissStillTriggersClarifyGuardrail() {
+        Optional<HarnessDiagnosticService.HarnessAdaptation> a = diagnosticService.diagnoseAndAdapt(
+                "conv-1", "run-1", "找一下合同", "search_project_files",
+                "{\"query\":\"x\"}", "Error: no files matched", 1, new HashSet<>(Set.of("files")), List.of());
+        assertTrue(a.isPresent());
+        assertEquals(HarnessDiagnosticService.ACTION_CLARIFY_WITH_USER, a.get().actionType());
+    }
 }

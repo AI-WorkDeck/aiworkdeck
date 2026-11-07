@@ -136,6 +136,9 @@ public class HarnessDiagnosticService {
                 + " " + (toolArgsSummary == null ? "" : toolArgsSummary)
                 + " " + safeResult;
 
+        String hintContext = (userInstruction == null ? "" : userInstruction)
+                + " " + (toolArgsSummary == null ? "" : toolArgsSummary);
+
         // 1. INVARIANT 层：文档锚点/原文替换未命中时，优先注入回读探针（Anchor Probe Recovery）
         if (DOC_EDIT_TOOLS.contains(safeTool) && isAnchorOrMatchMiss(safeResult)
                 && !alreadyTriggered(existingAdaptations, ACTION_ANCHOR_PROBE_RECOVERY, safeTool)) {
@@ -172,13 +175,16 @@ public class HarnessDiagnosticService {
 
         // 2. INVARIANT 层：检查是否需要展开尚未披露的工具类目
         Set<String> candidateCategories = new LinkedHashSet<>();
-        if (!safeTool.isEmpty()) {
+        if (!safeTool.isEmpty() && !isUpstreamFailure(safeResult)) {
             String toolCategory = toolDisclosurePolicy.categoryOf(safeTool);
             if (!"core".equals(toolCategory) && !ToolDisclosurePolicy.FALLBACK_CATEGORY.equals(toolCategory)) {
                 candidateCategories.add(toolCategory);
             }
         }
-        candidateCategories.addAll(toolDisclosurePolicy.categoriesHintedBy(combinedContext));
+        // 关键词只从用户指令与参数里找：工具输出里的 "Error from MCP server: Unknown tool"
+        // 是上游供应商的文本，不是我们注册表的未知工具，不能因其含 "MCP" 就展开 [mcp] 类目
+        candidateCategories.addAll(toolDisclosurePolicy.categoriesHintedBy(
+                isUpstreamFailure(safeResult) ? hintContext : combinedContext));
         if (DOC_EDIT_TOOLS.contains(safeTool)) {
             candidateCategories.add("edit");
         }
@@ -258,7 +264,9 @@ public class HarnessDiagnosticService {
         }
 
         // 4. DOMAIN 层：连续检索/查找无结果或累计失败 >= 2 次时，处方立即向用户澄清而非盲猜
+        // 供应商不可用（上游 MCP 报错）不是盲猜关键词，让用户补材料没用，不触发
         if ((SEARCH_LOOKUP_TOOLS.contains(safeTool) || consecutiveFailures >= 2)
+                && !isUpstreamFailure(safeResult)
                 && !alreadyTriggered(existingAdaptations, ACTION_CLARIFY_WITH_USER, safeTool)) {
             String title = LangText.of(
                     "Harness 自愈：阻断盲目重试，切换为证据缺口澄清",
@@ -313,6 +321,13 @@ public class HarnessDiagnosticService {
             }
         }
         return Optional.ofNullable(best);
+    }
+
+    /** 工具已成功派发、但上游供应商（MCP server）回了错误：与注册表自身的未知工具无关。 */
+    private static boolean isUpstreamFailure(String resultText) {
+        return resultText != null
+                && (resultText.contains("Error from MCP server")
+                        || com.checkba.service.ai.tools.LegalTools.isVendorUnavailable(resultText));
     }
 
     private static boolean isAnchorOrMatchMiss(String resultText) {

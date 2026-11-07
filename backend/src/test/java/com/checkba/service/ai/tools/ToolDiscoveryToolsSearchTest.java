@@ -197,4 +197,23 @@ class ToolDiscoveryToolsSearchTest {
         def.setDescription(description);
         return def;
     }
+
+    @Test
+    @DisplayName("category 展开页也列出已在核心集里的同类工具，标 (already available) 且不重复签名")
+    void categoryListingIncludesCoreToolsOfThatCategory() {
+        List<ToolSpecification> session = List.of(
+                spec("law_search", "semantic law search"),
+                spec("get_law_article", "get article"),
+                spec("law_search_keyword", "keyword law search"),
+                spec("case_search", "case search"),
+                spec("list_tools", "catalog"));
+        bindContext(session, "run-1");
+        String out = tools().list_tools("legal", null, null, "conv");
+
+        assertTrue(out.contains("== legal (4 tools) =="), out);
+        assertTrue(out.contains("- law_search (already available)"), out);
+        assertTrue(out.contains("- get_law_article (already available)"), out);
+        assertTrue(out.contains("- law_search_keyword("), "非核心的仍给全签名：" + out);
+        assertTrue(out.contains("- case_search("), out);
+    }
 }
