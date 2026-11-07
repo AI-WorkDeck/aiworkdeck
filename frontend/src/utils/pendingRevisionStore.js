@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 待审修订的模块级响应式缓存：文件树角标与编辑器顶栏共用一份，接受/拒绝后就地更新。
 import { reactive } from 'vue'
-import { listPendingRevisions, acceptPendingRevision, markPendingRevisionApplied, rejectPendingRevision, getMcpServerStatus } from '@/services/api.js'
+import { listPendingRevisions, acceptPendingRevision, markPendingRevisionApplied, recordPendingRevisionProgress, rejectPendingRevision, getMcpServerStatus } from '@/services/api.js'
 import { STALE_CODE, applyPendingRevision } from '@/utils/pendingRevision.js'
 
 export const pendingRevisionStore = reactive({
@@ -71,16 +71,21 @@ export async function acceptRevision(rev, executor) {
     id: rev.id,
     claim: async (id) => {
       const res = await acceptPendingRevision(id)
-      if (res && res.code === 0) return { ok: true, edits: (res.data && res.data.edits) || [] }
+      if (res && res.code === 0) return { ok: true, edits: (res.data && res.data.edits) || [], appliedCount: (res.data && res.data.appliedCount) || 0 }
       if (res && res.code === STALE_CODE) { rev.status = 'STALE'; return { ok: false, stale: true, message: res.message } }
       return { ok: false, message: res && res.message }
     },
     execute: (action, params) => executor(action, params),
+    progress: async (id, n) => {
+      try { await recordPendingRevisionProgress(id, n); rev.appliedCount = n } catch (e) { /* 上报失败不阻断套用 */ }
+    },
     markApplied: async (id) => {
       await markPendingRevisionApplied(id)
       drop(rev.projectId, rev.id)
     },
   })
+  rev.mismatchIndex = result.mismatch ? result.mismatchIndex : null
+  if (result.applied != null) rev.appliedCount = result.applied
   return result
 }
 

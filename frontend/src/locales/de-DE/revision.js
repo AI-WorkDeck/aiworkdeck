@@ -14,4 +14,7 @@ export default {
   applied: "Als nachverfolgte Änderungen angewendet. Nehmen Sie sie im Dokument an oder lehnen Sie sie ab.",
   editorNotReady: "Der Editor ist nicht bereit oder das Dokument ist schreibgeschützt; die Änderung kann noch nicht angewendet werden.",
   failed: "Fehlgeschlagen: {message}",
+  noMatch: "Änderung {index} passt nicht mehr zum Dokument; es wurde nichts angewendet. Sie können diesen Vorschlag ablehnen.",
+  partial: "Nach {done} von {total} Änderungen abgebrochen ({message}). Erneut annehmen setzt bei der ersten nicht angewendeten Änderung fort.",
+  progress: "{done} von {total} angewendet",
 }

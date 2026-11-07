@@ -14,4 +14,7 @@ export default {
   applied: "已套用为修订痕迹，请在文档中逐条接受或拒绝。",
   editorNotReady: "编辑器尚未就绪或文档为只读，暂时无法套用修订。",
   failed: "操作失败：{message}",
+  noMatch: "第 {index} 条修订在当前文档中已找不到原文，未套用任何修订；可拒绝该提案。",
+  partial: "已套用 {done}/{total} 条后中断（{message}）。再次点击接受将从未套用的一条继续。",
+  progress: "已套用 {done}/{total} 条",
 }

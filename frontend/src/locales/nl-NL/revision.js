@@ -14,4 +14,7 @@ export default {
   applied: "Toegepast als bijgehouden wijzigingen. Accepteer of wijs ze af in het document.",
   editorNotReady: "De editor is niet gereed of het document is alleen-lezen; de wijziging kan nog niet worden toegepast.",
   failed: "Mislukt: {message}",
+  noMatch: "Wijziging {index} komt niet meer overeen met het document; er is niets toegepast. U kunt dit voorstel afwijzen.",
+  partial: "Gestopt na {done} van {total} wijzigingen ({message}). Opnieuw accepteren hervat bij de eerste niet-toegepaste wijziging.",
+  progress: "{done} van {total} toegepast",
 }

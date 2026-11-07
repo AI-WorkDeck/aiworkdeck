@@ -14,4 +14,7 @@ export default {
   applied: "Diterapkan sebagai perubahan terlacak. Terima atau tolak di dalam dokumen.",
   editorNotReady: "Editor belum siap atau dokumen bersifat hanya-baca, sehingga revisi belum dapat diterapkan.",
   failed: "Gagal: {message}",
+  noMatch: "Revisi {index} tidak lagi cocok dengan dokumen, sehingga tidak ada yang diterapkan. Anda dapat menolak usulan ini.",
+  partial: "Berhenti setelah menerapkan {done} dari {total} revisi ({message}). Terima lagi untuk melanjutkan dari revisi pertama yang belum diterapkan.",
+  progress: "{done} dari {total} diterapkan",
 }

@@ -14,4 +14,7 @@ export default {
   applied: "Aplicada como control de cambios. Acéptela o recházala en el documento.",
   editorNotReady: "El editor no está listo o el documento es de solo lectura, por lo que aún no se puede aplicar la revisión.",
   failed: "Error: {message}",
+  noMatch: "La edición {index} ya no coincide con el documento, por lo que no se aplicó nada. Puede rechazar esta propuesta.",
+  partial: "Se detuvo tras aplicar {done} de {total} ediciones ({message}). Al aceptar de nuevo se reanuda desde la primera sin aplicar.",
+  progress: "{done} de {total} aplicadas",
 }

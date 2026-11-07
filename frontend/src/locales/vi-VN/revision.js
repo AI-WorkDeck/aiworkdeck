@@ -14,4 +14,7 @@ export default {
   applied: "Đã áp dụng dưới dạng theo dõi thay đổi. Hãy chấp nhận hoặc từ chối trong tài liệu.",
   editorNotReady: "Trình soạn thảo chưa sẵn sàng hoặc tài liệu chỉ đọc nên chưa thể áp dụng chỉnh sửa.",
   failed: "Thất bại: {message}",
+  noMatch: "Chỉnh sửa thứ {index} không còn khớp với tài liệu nên chưa áp dụng gì. Bạn có thể từ chối đề xuất này.",
+  partial: "Dừng sau khi áp dụng {done}/{total} chỉnh sửa ({message}). Chấp nhận lại sẽ tiếp tục từ chỉnh sửa đầu tiên chưa áp dụng.",
+  progress: "Đã áp dụng {done}/{total}",
 }

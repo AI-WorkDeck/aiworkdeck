@@ -14,4 +14,7 @@ export default {
   applied: "Değişiklik izleme olarak uygulandı. Belgede tek tek kabul edin veya reddedin.",
   editorNotReady: "Düzenleyici hazır değil veya belge salt okunur; düzeltme henüz uygulanamıyor.",
   failed: "Başarısız: {message}",
+  noMatch: "{index}. düzeltme artık belgeyle eşleşmiyor, bu yüzden hiçbir şey uygulanmadı. Bu öneriyi reddedebilirsiniz.",
+  partial: "{total} düzeltmeden {done} tanesi uygulandıktan sonra durdu ({message}). Yeniden kabul etmek ilk uygulanmamış olandan devam eder.",
+  progress: "{total} içinden {done} uygulandı",
 }

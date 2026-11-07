@@ -14,4 +14,7 @@ export default {
   applied: "Digunakan sebagai perubahan jejak. Terima atau tolak dalam dokumen.",
   editorNotReady: "Editor belum sedia atau dokumen adalah baca-sahaja, jadi semakan belum boleh digunakan.",
   failed: "Gagal: {message}",
+  noMatch: "Semakan {index} tidak lagi sepadan dengan dokumen, jadi tiada apa-apa yang digunakan. Anda boleh menolak cadangan ini.",
+  partial: "Berhenti selepas menggunakan {done} daripada {total} semakan ({message}). Terima semula untuk menyambung dari yang pertama belum digunakan.",
+  progress: "{done} daripada {total} digunakan",
 }

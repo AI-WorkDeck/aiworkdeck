@@ -95,6 +95,20 @@ class PendingRevisionServiceTest {
     }
 
     @Test
+    void progressIsRecordedAndResumeSkipsBaseVersionCheck() {
+        PendingRevision r = propose();
+        service.recordProgress(USER, 11L, 1);
+        service.recordProgress(USER, 11L, 0); // 只增不减
+        assertEquals(1, r.getAppliedCount());
+        file.setFileSize(555L); // 文档已被自己的第一条修订改过
+        Map<String, Object> out = service.accept(USER, 11L);
+        assertEquals(1, out.get("appliedCount"));
+        assertEquals("PENDING", r.getStatus());
+        assertThrows(PendingRevisionService.RevisionException.class, () -> service.recordProgress(USER, 11L, 3));
+        assertThrows(PendingRevisionService.RevisionException.class, () -> service.recordProgress(99L, 11L, 1));
+    }
+
+    @Test
     void rejectDeletes() {
         PendingRevision r = propose();
         service.reject(USER, 11L);

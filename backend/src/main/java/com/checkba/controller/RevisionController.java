@@ -65,6 +65,18 @@ public class RevisionController {
         }
     }
 
+    /** body: {appliedCount} —— 已落入文档的累计条数，失败后从断点继续。 */
+    @PostMapping("/{id}/progress")
+    public ResponseEntity<Map<String, Object>> progress(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Object n = body == null ? null : body.get("appliedCount");
+        if (!(n instanceof Number num)) throw new IllegalArgumentException(LangText.of("缺少 appliedCount", "appliedCount is required"));
+        service.recordProgress(user(sessionId), id, num.intValue());
+        return ok(Map.of("appliedCount", num.intValue()));
+    }
+
     /** 前端全部 edits 套用成功后调用，删除提案。 */
     @PostMapping("/{id}/applied")
     public ResponseEntity<Map<String, Object>> applied(

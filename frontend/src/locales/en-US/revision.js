@@ -14,4 +14,7 @@ export default {
   applied: "Applied as tracked changes. Accept or reject them in the document.",
   editorNotReady: "The editor is not ready or the document is read-only, so the revision cannot be applied yet.",
   failed: "Failed: {message}",
+  noMatch: "Edit {index} no longer matches the document, so nothing was applied. You can reject this proposal.",
+  partial: "Stopped after applying {done} of {total} edits ({message}). Accept again to resume from the first unapplied edit.",
+  progress: "{done} of {total} applied",
 }

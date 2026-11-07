@@ -53,21 +53,24 @@ test('file tree badge and editor bar are mounted', () => {
   assert.match(editor, /<PendingRevisionBar/)
 })
 
-function accept({ edits, results, claim } = {}) {
+function accept({ edits, results, claim, matches, appliedCount } = {}) {
   const calls = []
   const applied = []
+  const progressLog = []
   const res = results || {}
   return {
-    calls, applied,
+    calls, applied, progressLog,
     run: () => applyPendingRevision({
       id: 5,
-      claim: claim || (async () => ({ ok: true, edits: edits || [{ find: 'a', replace: 'b' }, { find: 'c', replace: '' }] })),
+      claim: claim || (async () => ({ ok: true, appliedCount: appliedCount || 0, edits: edits || [{ find: 'a', replace: 'b' }, { find: 'c', replace: '' }] })),
       execute: async (action, params) => {
         calls.push([action, params])
+        if (action === 'find_text_locations') return { success: true, count: matches ? (matches[params.keyword] ?? 1) : 1 }
         const idx = calls.filter(([a]) => a === 'find_replace').length - 1
         if (action === 'find_replace' && res[idx]) return res[idx]
         return { success: true, total: 1 }
       },
+      progress: async (id, n) => { progressLog.push(n) },
       markApplied: async (id) => { applied.push(id) },
     }),
   }
@@ -78,10 +81,11 @@ test('accept: track changes on, then each edit as agent find_replace, applied ca
   const r = await t.run()
   assert.equal(r.ok, true)
   assert.equal(r.applied, 2)
-  assert.deepEqual(t.calls.map(([a]) => a), ['set_track_changes', 'find_replace', 'find_replace'])
-  assert.equal(t.calls[0][1].on, true)
-  assert.deepEqual(t.calls[1][1], { findText: 'a', replaceText: 'b', replaceAll: false, __agent: true })
-  assert.equal(t.calls[2][1].replaceText, '')
+  assert.deepEqual(t.calls.map(([a]) => a), ['find_text_locations', 'find_text_locations', 'clear_anchors', 'set_track_changes', 'find_replace', 'find_replace'])
+  assert.deepEqual(t.progressLog, [1, 2])
+  assert.equal(t.calls[3][1].on, true)
+  assert.deepEqual(t.calls[4][1], { findText: 'a', replaceText: 'b', replaceAll: false, __agent: true })
+  assert.equal(t.calls[5][1].replaceText, '')
   assert.deepEqual(t.applied, [5])
 })
 
@@ -91,6 +95,7 @@ test('accept: partial failure keeps the proposal (no applied call)', async () =>
   assert.equal(r.ok, false)
   assert.equal(r.applied, 1)
   assert.equal(r.failedIndex, 1)
+  assert.deepEqual(t.progressLog, [1])
   assert.equal(r.message, 'not found')
   assert.deepEqual(t.applied, [])
 })
@@ -111,15 +116,37 @@ test('accept: stale claim touches nothing in the editor', async () => {
   assert.deepEqual(t.applied, [])
 })
 
+test('preflight: a zero-match edit applies nothing and names the edit', async () => {
+  const t = accept({ matches: { c: 0 } })
+  const r = await t.run()
+  assert.equal(r.ok, false)
+  assert.equal(r.mismatch, true)
+  assert.equal(r.mismatchIndex, 1)
+  assert.equal(t.calls.some(([a]) => a === 'find_replace' || a === 'set_track_changes'), false)
+  assert.deepEqual(t.progressLog, [])
+  assert.deepEqual(t.applied, [])
+})
+
+test('resume: starts at appliedCount, preflights and applies only the remainder', async () => {
+  const t = accept({ appliedCount: 1, matches: { a: 0 } }) // 第一条已套用，原文自然已不存在
+  const r = await t.run()
+  assert.equal(r.ok, true)
+  assert.equal(r.applied, 2)
+  const replaced = t.calls.filter(([a]) => a === 'find_replace').map(([, p]) => p.findText)
+  assert.deepEqual(replaced, ['c'])
+  assert.deepEqual(t.progressLog, [2])
+  assert.deepEqual(t.applied, [5])
+})
+
 test('accept: track changes unavailable aborts before any edit', async () => {
   const calls = []
   const r = await applyPendingRevision({
     id: 1, claim: async () => ({ ok: true, edits: [{ find: 'a', replace: 'b' }] }),
-    execute: async (a) => { calls.push(a); return { success: false, message: 'no' } },
+    execute: async (a) => { calls.push(a); return a === 'find_text_locations' ? { success: true, count: 1 } : { success: false, message: 'no' } },
     markApplied: async () => { calls.push('applied') },
   })
   assert.equal(r.ok, false)
-  assert.deepEqual(calls, ['set_track_changes'])
+  assert.deepEqual(calls, ['find_text_locations', 'clear_anchors', 'set_track_changes'])
 })
 
 test('refresh only polls when the MCP server is enabled', () => {

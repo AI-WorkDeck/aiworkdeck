@@ -171,7 +171,9 @@ public class PendingRevisionService {
             repository.delete(r);
             throw new RevisionException(LangText.of("文件已不存在，提案已移除", "The file no longer exists; the proposal was removed"));
         }
-        if (PendingRevision.STALE.equals(r.getStatus()) || !fileVersion(file).equals(r.getBaseVersion())) {
+        // 已部分套用：文档已被这条提案自己改过，基线必然不同；此时由前端对剩余 edits 逐条预检兜底
+        boolean resuming = r.getAppliedCount() > 0 && PendingRevision.PENDING.equals(r.getStatus());
+        if (PendingRevision.STALE.equals(r.getStatus()) || (!resuming && !fileVersion(file).equals(r.getBaseVersion()))) {
             r.setStatus(PendingRevision.STALE);
             repository.save(r);
             throw new StaleRevisionException(LangText.of(
@@ -182,7 +184,21 @@ public class PendingRevisionService {
         out.put("id", r.getId());
         out.put("fileId", file.getId());
         out.put("edits", readEdits(r));
+        out.put("appliedCount", r.getAppliedCount());
         return out;
+    }
+
+    /** 前端每套用成功一条就上报累计条数（只增不减、不超过总数），失败后可从断点继续。 */
+    public void recordProgress(Long userId, Long id, int appliedCount) {
+        PendingRevision r = load(id, userId);
+        int total = readEdits(r).size();
+        if (appliedCount < 0 || appliedCount > total) {
+            throw new RevisionException(LangText.of("进度超出范围", "Progress out of range"));
+        }
+        if (appliedCount > r.getAppliedCount()) {
+            r.setAppliedCount(appliedCount);
+            repository.save(r);
+        }
     }
 
     /** 接受第二步：前端全部 edits 套用成功后调用，删除记录。 */
@@ -222,6 +238,7 @@ public class PendingRevisionService {
             m.put("status", r.getStatus());
             m.put("createdAt", r.getCreatedAt() == null ? null : r.getCreatedAt().toString());
             m.put("edits", readEdits(r));
+            m.put("appliedCount", r.getAppliedCount());
             out.add(m);
         }
         return out;

@@ -47,6 +47,10 @@ class RevisionControllerTest {
             mvc.perform(post("/api/revisions/pending/11/applied").header("X-Session-Id", "s"))
                     .andExpect(jsonPath("$.data.applied").value(true));
             verify(service).markApplied(7L, 11L);
+            mvc.perform(post("/api/revisions/pending/11/progress").header("X-Session-Id", "s")
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"appliedCount\":1}"))
+                    .andExpect(jsonPath("$.data.appliedCount").value(1));
+            verify(service).recordProgress(7L, 11L, 1);
             verify(service).reject(7L, 11L);
         }
     }

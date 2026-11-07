@@ -14,4 +14,7 @@ export default {
   applied: "Appliquée en suivi des modifications. Acceptez ou refusez-les dans le document.",
   editorNotReady: "L'éditeur n'est pas prêt ou le document est en lecture seule ; la révision ne peut pas encore être appliquée.",
   failed: "Échec : {message}",
+  noMatch: "La modification {index} ne correspond plus au document ; rien n'a été appliqué. Vous pouvez refuser cette proposition.",
+  partial: "Interrompu après {done} modification(s) sur {total} ({message}). Accepter de nouveau reprend à la première non appliquée.",
+  progress: "{done} sur {total} appliquée(s)",
 }

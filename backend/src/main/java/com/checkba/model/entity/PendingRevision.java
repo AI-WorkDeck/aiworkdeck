@@ -48,6 +48,10 @@ public class PendingRevision {
     @Column(nullable = false, length = 16)
     private String status = PENDING;
 
+    /** 已落入文档的 edits 条数（前端逐条套用时上报，失败后从第一条未套用的继续）。 */
+    @Column(name = "applied_count")
+    private Integer appliedCount = 0;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -68,6 +72,8 @@ public class PendingRevision {
     public void setSource(String source) { this.source = source; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+    public int getAppliedCount() { return appliedCount == null ? 0 : appliedCount; }
+    public void setAppliedCount(int appliedCount) { this.appliedCount = appliedCount; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public Long getCreatedBy() { return createdBy; }

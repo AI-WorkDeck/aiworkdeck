@@ -4943,5 +4943,6 @@ export const disconnectMcpOAuth = (id, scopeToken) => request({ header: { 'X-MCP
 export const listPendingRevisions = (params) => request({ url: '/api/revisions/pending', method: 'GET', params })
 export const acceptPendingRevision = (id) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/accept`, method: 'POST' })
 export const markPendingRevisionApplied = (id) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/applied`, method: 'POST' })
+export const recordPendingRevisionProgress = (id, appliedCount) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/progress`, method: 'POST', data: { appliedCount } })
 export const rejectPendingRevision = (id) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/reject`, method: 'POST' })
 export const getMcpServerStatus = () => request({ url: '/api/mcp-server/status', method: 'GET' })

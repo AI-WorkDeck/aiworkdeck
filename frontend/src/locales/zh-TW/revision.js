@@ -14,4 +14,7 @@ export default {
   applied: "已套用為修訂痕跡，請在文件中逐條接受或拒絕。",
   editorNotReady: "編輯器尚未就緒或文件為唯讀，暫時無法套用修訂。",
   failed: "操作失敗：{message}",
+  noMatch: "第 {index} 條修訂在目前文件中已找不到原文，未套用任何修訂；可拒絕該提案。",
+  partial: "已套用 {done}/{total} 條後中斷（{message}）。再次點擊接受將從未套用的一條繼續。",
+  progress: "已套用 {done}/{total} 條",
 }

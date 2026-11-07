@@ -14,7 +14,8 @@
           <text v-if="isStale(r)" class="prb-stale">{{ $t('revision.stale') }}</text>
         </view>
         <text v-if="isStale(r)" class="prb-hint">{{ $t('revision.staleHint') }}</text>
-        <view v-for="(e, i) in r.edits" :key="i" class="prb-edit">
+        <text v-if="r.appliedCount > 0" class="prb-hint">{{ $t('revision.progress', { done: r.appliedCount, total: r.edits.length }) }}</text>
+        <view v-for="(e, i) in r.edits" :key="i" class="prb-edit" :class="{ done: i < (r.appliedCount || 0), mismatch: r.mismatchIndex === i }">
           <text class="prb-find">{{ preview(e.find) }}</text>
           <text class="prb-arrow">→</text>
           <text class="prb-replace">{{ preview(e.replace) }}</text>
@@ -68,7 +69,10 @@ export default {
       try {
         const res = await acceptRevision(r, this.executor)
         if (res.ok) this.toast(this.$t('revision.applied'))
-        else this.toast(res.stale ? this.$t('revision.staleHint') : this.$t('revision.failed', { message: res.message || '' }))
+        else if (res.stale) this.toast(this.$t('revision.staleHint'))
+        else if (res.mismatch) { this.expanded = true; this.toast(this.$t('revision.noMatch', { index: res.mismatchIndex + 1 })) }
+        else if (res.applied > 0) this.toast(this.$t('revision.partial', { done: res.applied, total: res.total, message: res.message || '' }))
+        else this.toast(this.$t('revision.failed', { message: res.message || '' }))
       } catch (e) {
         this.toast(this.$t('revision.failed', { message: (e && e.message) || '' }))
       } finally { this.busy = false }
@@ -100,6 +104,8 @@ export default {
 .prb-stale { padding: 0 5px; border-radius: var(--awd-radius-sm); background: var(--awd-danger-soft); color: var(--awd-danger-text); }
 .prb-hint { display: block; color: var(--awd-text-2); margin: 2px 0; }
 .prb-edit { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.prb-edit.done { opacity: 0.55; }
+.prb-edit.mismatch { outline: 1px solid var(--awd-danger-text); border-radius: var(--awd-radius-sm); }
 .prb-find { text-decoration: line-through; color: var(--awd-danger-text); }
 .prb-replace { color: var(--awd-accent-text); }
 .prb-reason { flex-basis: 100%; color: var(--awd-text-2); }

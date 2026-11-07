@@ -14,4 +14,7 @@ export default {
   applied: "Applicata come revisioni. Accettale o rifiutale nel documento.",
   editorNotReady: "L'editor non è pronto o il documento è in sola lettura, quindi la revisione non può ancora essere applicata.",
   failed: "Operazione non riuscita: {message}",
+  noMatch: "La modifica {index} non corrisponde più al documento, quindi non è stato applicato nulla. Puoi rifiutare questa proposta.",
+  partial: "Interrotto dopo {done} modifiche su {total} ({message}). Accettando di nuovo si riprende dalla prima non applicata.",
+  progress: "{done} di {total} applicate",
 }
