@@ -9,7 +9,6 @@ import com.checkba.repository.PendingRevisionRepository;
 import com.checkba.repository.ProjectFileRepository;
 import com.checkba.service.LangText;
 import com.checkba.service.ProjectMemberService;
-import com.checkba.service.ai.EditorBridgeService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,7 +18,6 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,16 +53,14 @@ public class PendingRevisionService {
     private final PendingRevisionRepository repository;
     private final ProjectFileRepository fileRepository;
     private final ProjectMemberService members;
-    private final EditorBridgeService editorBridge;
     private final ObjectMapper objectMapper;
 
     public PendingRevisionService(PendingRevisionRepository repository, ProjectFileRepository fileRepository,
-                                  ProjectMemberService members, EditorBridgeService editorBridge,
+                                  ProjectMemberService members,
                                   ObjectMapper objectMapper) {
         this.repository = repository;
         this.fileRepository = fileRepository;
         this.members = members;
-        this.editorBridge = editorBridge;
         this.objectMapper = objectMapper;
     }
 
@@ -163,17 +159,12 @@ public class PendingRevisionService {
     }
 
     /**
-     * 接受：基线一致 → 经编辑器（修订模式）逐条 find_replace，成功后删除记录；
-     * 基线已变 → 标 STALE 并抛 {@link StaleRevisionException}（记录保留，用户仍可查看/拒绝）。
-     *
-     * @param conversationId 前端编辑器所在的 SSE 会话（EditorBridgeService 的下发通道）
+     * 接受第一步：校验权限与基线。基线一致 → 返回要套用的 edits（由前端经本地编辑器执行器以修订模式落入文档，
+     * 不依赖任何 AI 对话/SSE 会话）；基线已变 → 标 STALE 并抛 {@link StaleRevisionException}
+     * （记录保留，用户仍可查看/拒绝）。记录在 {@link #markApplied} 之前不删除。
      */
-    public Map<String, Object> accept(Long userId, Long id, String conversationId) {
+    public Map<String, Object> accept(Long userId, Long id) {
         PendingRevision r = load(id, userId);
-        if (conversationId == null || conversationId.isBlank()) {
-            throw new RevisionException(LangText.of("需要一个已连接编辑器的对话会话才能套用修订",
-                    "A connected editor conversation is required to apply the revision"));
-        }
         ProjectFile file = fileRepository.findById(r.getFileId())
                 .filter(f -> !Boolean.TRUE.equals(f.getIsDeleted())).orElse(null);
         if (file == null) {
@@ -187,42 +178,16 @@ public class PendingRevisionService {
                     "文档在提案之后已被修改，提案已过期、未套用（仍可查看或拒绝）",
                     "The document changed after this proposal; it is stale and was not applied (you can still view or reject it)"));
         }
-        List<Edit> edits = readEdits(r);
-        String prev = editorBridge.getCurrentConversationId();
-        editorBridge.setCurrentConversationId(conversationId);
-        try {
-            Map<String, Object> open = new HashMap<>();
-            open.put("fileId", file.getId());
-            open.put("fileName", file.getName());
-            open.put("fileType", file.getFileType());
-            open.put("wpsFileId", file.getWpsFileId() != null ? file.getWpsFileId() : "");
-            open.put("trackRevisions", true);
-            open.put("userName", "AI WorkDeck");
-            requireOk(editorBridge.executeEditorCommand("doc_open_file_sync", open));
-            for (Edit e : edits) {
-                Map<String, Object> p = new LinkedHashMap<>();
-                p.put("findText", e.find());
-                p.put("replaceText", e.replace());
-                p.put("replaceAll", false);
-                requireOk(editorBridge.executeEditorCommand("find_replace", p));
-            }
-        } finally {
-            if (prev == null) editorBridge.clearCurrentConversationId();
-            else editorBridge.setCurrentConversationId(prev);
-        }
-        repository.delete(r);
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("applied", edits.size());
+        out.put("id", r.getId());
         out.put("fileId", file.getId());
+        out.put("edits", readEdits(r));
         return out;
     }
 
-    private void requireOk(String resultJson) {
-        if (resultJson != null && resultJson.contains("\"error\"")) {
-            log.warn("pending revision apply failed: {}", resultJson);
-            throw new RevisionException(LangText.of("编辑器套用失败，提案保留：", "The editor failed to apply the edits; the proposal is kept: ")
-                    + resultJson);
-        }
+    /** 接受第二步：前端全部 edits 套用成功后调用，删除记录。 */
+    public void markApplied(Long userId, Long id) {
+        repository.delete(load(id, userId));
     }
 
     private PendingRevision load(Long id, Long userId) {

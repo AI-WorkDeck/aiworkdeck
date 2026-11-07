@@ -4941,5 +4941,7 @@ export const disconnectMcpOAuth = (id, scopeToken) => request({ header: { 'X-MCP
 
 // ==================== 外部 Agent 待审修订（MCP propose_revision，docs/plans/agent-app-control.md C7） ====================
 export const listPendingRevisions = (params) => request({ url: '/api/revisions/pending', method: 'GET', params })
-export const acceptPendingRevision = (id, conversationId) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/accept`, method: 'POST', data: { conversationId }, timeout: 200000 })
+export const acceptPendingRevision = (id) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/accept`, method: 'POST' })
+export const markPendingRevisionApplied = (id) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/applied`, method: 'POST' })
 export const rejectPendingRevision = (id) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/reject`, method: 'POST' })
+export const getMcpServerStatus = () => request({ url: '/api/mcp-server/status', method: 'GET' })

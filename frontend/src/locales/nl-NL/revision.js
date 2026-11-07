@@ -12,6 +12,6 @@ export default {
   stale: "Verouderd",
   staleHint: "Het document is na dit voorstel gewijzigd en kan niet worden toegepast. U kunt het nog wel bekijken of afwijzen.",
   applied: "Toegepast als bijgehouden wijzigingen. Accepteer of wijs ze af in het document.",
-  needConversation: "Open een AI-gesprek (verbonden met de editor) voordat u een wijziging accepteert.",
+  editorNotReady: "De editor is niet gereed of het document is alleen-lezen; de wijziging kan nog niet worden toegepast.",
   failed: "Mislukt: {message}",
 }

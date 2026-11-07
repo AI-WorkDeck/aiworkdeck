@@ -12,6 +12,6 @@ export default {
   stale: "Veraltet",
   staleHint: "Das Dokument wurde nach diesem Vorschlag geändert und kann nicht angewendet werden. Sie können es weiterhin ansehen oder ablehnen.",
   applied: "Als nachverfolgte Änderungen angewendet. Nehmen Sie sie im Dokument an oder lehnen Sie sie ab.",
-  needConversation: "Öffnen Sie eine KI-Unterhaltung (mit dem Editor verbunden), bevor Sie eine Änderung annehmen.",
+  editorNotReady: "Der Editor ist nicht bereit oder das Dokument ist schreibgeschützt; die Änderung kann noch nicht angewendet werden.",
   failed: "Fehlgeschlagen: {message}",
 }

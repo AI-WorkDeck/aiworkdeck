@@ -48,16 +48,14 @@ public class RevisionController {
         return ok(Map.of("revisions", rows));
     }
 
-    /** body: {conversationId} —— 前端编辑器所在的 SSE 会话。 */
+    /** 校验基线并返回要套用的 edits（前端经编辑器执行器落修订）；基线过期回 code=4090。 */
     @PostMapping("/{id}/accept")
     public ResponseEntity<Map<String, Object>> accept(
             @PathVariable Long id,
-            @RequestBody(required = false) Map<String, Object> body,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = user(sessionId);
-        Object conv = body == null ? null : body.get("conversationId");
         try {
-            return ok(service.accept(userId, id, conv instanceof String s ? s : null));
+            return ok(service.accept(userId, id));
         } catch (PendingRevisionService.StaleRevisionException e) {
             Map<String, Object> r = new HashMap<>();
             r.put("code", CODE_STALE);
@@ -65,6 +63,15 @@ public class RevisionController {
             r.put("data", Map.of("status", "STALE"));
             return ResponseEntity.ok(r);
         }
+    }
+
+    /** 前端全部 edits 套用成功后调用，删除提案。 */
+    @PostMapping("/{id}/applied")
+    public ResponseEntity<Map<String, Object>> applied(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        service.markApplied(user(sessionId), id);
+        return ok(Map.of("applied", true));
     }
 
     @PostMapping("/{id}/reject")

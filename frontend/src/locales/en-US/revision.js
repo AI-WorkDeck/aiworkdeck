@@ -12,6 +12,6 @@ export default {
   stale: "Outdated",
   staleHint: "The document changed after this proposal, so it cannot be applied. You can still view or reject it.",
   applied: "Applied as tracked changes. Accept or reject them in the document.",
-  needConversation: "Open an AI conversation (connected to the editor) before accepting a revision.",
+  editorNotReady: "The editor is not ready or the document is read-only, so the revision cannot be applied yet.",
   failed: "Failed: {message}",
 }

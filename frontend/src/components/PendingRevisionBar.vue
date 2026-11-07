@@ -32,19 +32,19 @@
 <script>
 // PendingRevisionBar.vue — 编辑器顶栏的「N 条外部修订待审」提示条与审阅列表。
 // 只展示 + 触发接受/拒绝；接受后修订痕迹由编辑器侧逐条落入文档，用户在文档里照常接受/拒绝。
-import { pendingRevisionStore, pendingRevisionsOf, loadPendingRevisions, acceptRevision, rejectRevision } from '@/utils/pendingRevisionStore.js'
+import { pendingRevisionsOf, startRevisionRefresh, acceptRevision, rejectRevision } from '@/utils/pendingRevisionStore.js'
 import { forFile, previewText, isStale } from '@/utils/pendingRevision.js'
-
-const POLL_MS = 20000
 
 export default {
   name: 'PendingRevisionBar',
   props: {
     projectId: { type: [Number, String], default: null },
     fileId: { type: [Number, String], default: null },
+    // 编辑器的 executeCommand(action, params)；文档未就绪或只读时为 null，接受按钮不可用
+    executor: { type: Function, default: null },
   },
   data() {
-    return { expanded: false, busy: false, timer: null }
+    return { expanded: false, busy: false, stopRefresh: null }
   },
   computed: {
     items() {
@@ -52,23 +52,21 @@ export default {
     },
   },
   mounted() {
-    this.refresh()
-    this.timer = setInterval(() => this.refresh(), POLL_MS)
+    this.stopRefresh = startRevisionRefresh(this.projectId)
   },
   beforeUnmount() {
-    if (this.timer) clearInterval(this.timer)
+    if (this.stopRefresh) this.stopRefresh()
   },
   methods: {
     isStale,
     preview: previewText,
-    refresh() { if (this.projectId) loadPendingRevisions(this.projectId) },
     toast(title) { uni.showToast({ title, icon: 'none', duration: 3500 }) },
     async onAccept(r) {
       if (this.busy) return
-      if (!pendingRevisionStore.conversationId) { this.toast(this.$t('revision.needConversation')); return }
+      if (!this.executor) { this.toast(this.$t('revision.editorNotReady')); return }
       this.busy = true
       try {
-        const res = await acceptRevision(r)
+        const res = await acceptRevision(r, this.executor)
         if (res.ok) this.toast(this.$t('revision.applied'))
         else this.toast(res.stale ? this.$t('revision.staleHint') : this.$t('revision.failed', { message: res.message || '' }))
       } catch (e) {

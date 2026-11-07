@@ -8,7 +8,6 @@ import com.checkba.model.entity.ProjectFile;
 import com.checkba.repository.PendingRevisionRepository;
 import com.checkba.repository.ProjectFileRepository;
 import com.checkba.service.ProjectMemberService;
-import com.checkba.service.ai.EditorBridgeService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,7 +30,6 @@ class PendingRevisionServiceTest {
     private PendingRevisionRepository repo;
     private ProjectFileRepository files;
     private ProjectMemberService members;
-    private EditorBridgeService bridge;
     private PendingRevisionService service;
     private ProjectFile file;
     private final List<PendingRevision> store = new ArrayList<>();
@@ -41,8 +39,7 @@ class PendingRevisionServiceTest {
         repo = mock(PendingRevisionRepository.class);
         files = mock(ProjectFileRepository.class);
         members = mock(ProjectMemberService.class);
-        bridge = mock(EditorBridgeService.class);
-        service = new PendingRevisionService(repo, files, members, bridge, new ObjectMapper());
+        service = new PendingRevisionService(repo, files, members, new ObjectMapper());
         file = new ProjectFile();
         file.setId(3L);
         file.setProjectId(1L);
@@ -61,7 +58,6 @@ class PendingRevisionServiceTest {
         });
         when(repo.findById(11L)).thenAnswer(i -> store.stream().findFirst());
         when(repo.findByProjectIdOrderByCreatedAtAsc(1L)).thenAnswer(i -> List.copyOf(store));
-        when(bridge.executeEditorCommand(any(), any())).thenReturn("{\"success\":true}");
     }
 
     private PendingRevision propose() {
@@ -71,42 +67,31 @@ class PendingRevisionServiceTest {
     }
 
     @Test
-    void proposeListAcceptWithMatchingBaseSendsFindReplaceInTrackedMode() {
+    void acceptWithMatchingBaseReturnsEditsAndKeepsRecordUntilApplied() {
         PendingRevision r = propose();
-        assertEquals("PENDING", r.getStatus());
         assertEquals(1, service.listByProject(USER, 1L).size());
 
-        Map<String, Object> out = service.accept(USER, 11L, "conv-1");
-        assertEquals(2, out.get("applied"));
+        Map<String, Object> out = service.accept(USER, 11L);
+        List<?> edits = (List<?>) out.get("edits");
+        assertEquals(2, edits.size());
+        assertEquals("甲方", ((PendingRevisionService.Edit) edits.get(0)).find());
+        assertEquals("PENDING", r.getStatus());
+        verify(repo, never()).delete(any(PendingRevision.class));
 
-        ArgumentCaptor<Map<String, Object>> params = ArgumentCaptor.forClass(Map.class);
-        ArgumentCaptor<String> actions = ArgumentCaptor.forClass(String.class);
-        verify(bridge, times(3)).executeEditorCommand(actions.capture(), params.capture());
-        assertEquals(List.of("doc_open_file_sync", "find_replace", "find_replace"), actions.getAllValues());
-        assertEquals(true, params.getAllValues().get(0).get("trackRevisions"));
-        assertEquals("甲方", params.getAllValues().get(1).get("findText"));
-        assertEquals("卖方", params.getAllValues().get(2).get("replaceText"));
+        service.markApplied(USER, 11L);
         verify(repo).delete(r);
-        verify(bridge).setCurrentConversationId("conv-1");
-        verify(bridge).clearCurrentConversationId();
     }
 
     @Test
-    void baseVersionMismatchMarksStaleAndDoesNotTouchEditor() {
+    void baseVersionMismatchMarksStaleAndReturnsNoEdits() {
         PendingRevision r = propose();
         file.setFileSize(101L);
-        assertThrows(PendingRevisionService.StaleRevisionException.class, () -> service.accept(USER, 11L, "conv-1"));
+        assertThrows(PendingRevisionService.StaleRevisionException.class, () -> service.accept(USER, 11L));
         assertEquals("STALE", r.getStatus());
-        verify(bridge, never()).executeEditorCommand(any(), any());
         verify(repo, never()).delete(any(PendingRevision.class));
-    }
-
-    @Test
-    void editorFailureKeepsProposal() {
-        propose();
-        when(bridge.executeEditorCommand(eq("find_replace"), any())).thenReturn("{\"error\":\"x\"}");
-        assertThrows(PendingRevisionService.RevisionException.class, () -> service.accept(USER, 11L, "conv-1"));
-        verify(repo, never()).delete(any(PendingRevision.class));
+        // 过期后再次接受仍拒绝，即使文件“恢复”到原版本
+        file.setFileSize(100L);
+        assertThrows(PendingRevisionService.StaleRevisionException.class, () -> service.accept(USER, 11L));
     }
 
     @Test
@@ -123,9 +108,9 @@ class PendingRevisionServiceTest {
         assertThrows(PendingRevisionService.RevisionException.class, () -> service.propose(outsider, 3L, "v",
                 List.of(new PendingRevisionService.Edit("a", "b", null)), "mcp:x"));
         assertThrows(PendingRevisionService.RevisionException.class, () -> service.listByProject(outsider, 1L));
-        assertThrows(PendingRevisionService.RevisionException.class, () -> service.accept(outsider, 11L, "c"));
+        assertThrows(PendingRevisionService.RevisionException.class, () -> service.accept(outsider, 11L));
         assertThrows(PendingRevisionService.RevisionException.class, () -> service.reject(outsider, 11L));
-        verify(bridge, never()).executeEditorCommand(any(), any());
+        assertThrows(PendingRevisionService.RevisionException.class, () -> service.markApplied(outsider, 11L));
         verify(repo, never()).delete(r);
     }
 

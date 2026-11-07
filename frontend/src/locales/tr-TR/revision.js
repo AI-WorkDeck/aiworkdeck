@@ -12,6 +12,6 @@ export default {
   stale: "Güncel değil",
   staleHint: "Belge bu öneriden sonra değiştiği için uygulanamaz. Yine de görüntüleyebilir veya reddedebilirsiniz.",
   applied: "Değişiklik izleme olarak uygulandı. Belgede tek tek kabul edin veya reddedin.",
-  needConversation: "Bir düzeltmeyi kabul etmeden önce düzenleyiciye bağlı bir YZ sohbeti açın.",
+  editorNotReady: "Düzenleyici hazır değil veya belge salt okunur; düzeltme henüz uygulanamıyor.",
   failed: "Başarısız: {message}",
 }

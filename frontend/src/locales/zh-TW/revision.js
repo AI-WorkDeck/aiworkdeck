@@ -12,6 +12,6 @@ export default {
   stale: "已過期",
   staleHint: "文件在提案之後已被修改，無法套用；仍可檢視或拒絕。",
   applied: "已套用為修訂痕跡，請在文件中逐條接受或拒絕。",
-  needConversation: "請先開啟一個 AI 對話（連接編輯器）再接受修訂。",
+  editorNotReady: "編輯器尚未就緒或文件為唯讀，暫時無法套用修訂。",
   failed: "操作失敗：{message}",
 }

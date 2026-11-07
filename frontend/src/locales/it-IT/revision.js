@@ -12,6 +12,6 @@ export default {
   stale: "Obsoleta",
   staleHint: "Il documento è cambiato dopo questa proposta e non può essere applicata. Puoi comunque visualizzarla o rifiutarla.",
   applied: "Applicata come revisioni. Accettale o rifiutale nel documento.",
-  needConversation: "Apri una conversazione IA (collegata all'editor) prima di accettare una revisione.",
+  editorNotReady: "L'editor non è pronto o il documento è in sola lettura, quindi la revisione non può ancora essere applicata.",
   failed: "Operazione non riuscita: {message}",
 }

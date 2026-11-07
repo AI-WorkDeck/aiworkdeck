@@ -12,6 +12,6 @@ export default {
   stale: "Luput",
   staleHint: "Dokumen telah berubah selepas cadangan ini, jadi ia tidak boleh digunakan. Anda masih boleh melihat atau menolaknya.",
   applied: "Digunakan sebagai perubahan jejak. Terima atau tolak dalam dokumen.",
-  needConversation: "Buka perbualan AI (disambungkan ke editor) sebelum menerima semakan.",
+  editorNotReady: "Editor belum sedia atau dokumen adalah baca-sahaja, jadi semakan belum boleh digunakan.",
   failed: "Gagal: {message}",
 }

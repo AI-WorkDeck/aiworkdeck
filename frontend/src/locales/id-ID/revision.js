@@ -12,6 +12,6 @@ export default {
   stale: "Kedaluwarsa",
   staleHint: "Dokumen berubah setelah usulan ini sehingga tidak dapat diterapkan. Anda masih dapat melihat atau menolaknya.",
   applied: "Diterapkan sebagai perubahan terlacak. Terima atau tolak di dalam dokumen.",
-  needConversation: "Buka percakapan AI (terhubung ke editor) sebelum menerima revisi.",
+  editorNotReady: "Editor belum siap atau dokumen bersifat hanya-baca, sehingga revisi belum dapat diterapkan.",
   failed: "Gagal: {message}",
 }

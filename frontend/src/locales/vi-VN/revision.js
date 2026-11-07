@@ -12,6 +12,6 @@ export default {
   stale: "Đã lỗi thời",
   staleHint: "Tài liệu đã thay đổi sau đề xuất này nên không thể áp dụng. Bạn vẫn có thể xem hoặc từ chối.",
   applied: "Đã áp dụng dưới dạng theo dõi thay đổi. Hãy chấp nhận hoặc từ chối trong tài liệu.",
-  needConversation: "Hãy mở một cuộc trò chuyện AI (đã kết nối với trình soạn thảo) trước khi chấp nhận chỉnh sửa.",
+  editorNotReady: "Trình soạn thảo chưa sẵn sàng hoặc tài liệu chỉ đọc nên chưa thể áp dụng chỉnh sửa.",
   failed: "Thất bại: {message}",
 }

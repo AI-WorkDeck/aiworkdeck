@@ -31,3 +31,33 @@ export function isStale(r) {
 export function totalEdits(rev) {
   return Array.isArray(rev && rev.edits) ? rev.edits.length : 0
 }
+
+/**
+ * 接受一条提案：后端校验基线并交出 edits → 本地编辑器执行器开修订模式后逐条 find_replace →
+ * 全部成功才调 markApplied 删除提案；任一条失败提案保留（已落下的修订痕迹留在文档里，用户可撤销）。
+ *
+ * 依赖全部注入，便于测试：
+ *   claim(id)        → { ok:true, edits } | { ok:false, stale?:true, message? }
+ *   execute(a, p)    → { success, total? }（编辑器 executeCommand）
+ *   markApplied(id)  → Promise
+ */
+export async function applyPendingRevision({ id, claim, execute, markApplied }) {
+  const c = await claim(id)
+  if (!c || !c.ok) return { ok: false, stale: !!(c && c.stale), message: c && c.message, applied: 0 }
+  const edits = Array.isArray(c.edits) ? c.edits : []
+  if (!edits.length) return { ok: false, message: 'no edits', applied: 0 }
+  const track = await execute('set_track_changes', { on: true, __agent: true })
+  if (!track || track.success === false) {
+    return { ok: false, message: (track && (track.message || track.error)) || 'track changes unavailable', applied: 0 }
+  }
+  let applied = 0
+  for (const e of edits) {
+    const r = await execute('find_replace', { findText: e.find, replaceText: e.replace, replaceAll: false, __agent: true })
+    if (!r || r.success === false || r.total === 0) {
+      return { ok: false, message: (r && (r.message || r.error)) || 'find_replace failed', applied, failedIndex: applied }
+    }
+    applied++
+  }
+  await markApplied(id)
+  return { ok: true, applied }
+}

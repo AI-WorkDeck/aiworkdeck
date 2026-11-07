@@ -805,7 +805,7 @@ import TagFilter from '@/components/TagFilter.vue'
 import TagSelector from '@/components/TagSelector.vue'
 import TagManager from '@/components/TagManager.vue'
 import { taskStore, loadProjectTasks } from '@/utils/taskStore.js'
-import { pendingRevisionsOf, loadPendingRevisions } from '@/utils/pendingRevisionStore.js'
+import { pendingRevisionsOf, startRevisionRefresh } from '@/utils/pendingRevisionStore.js'
 import { countsByFile } from '@/utils/pendingRevision.js'
 import { isDone, dueBadge, compareDue, taskFileIds } from '@/components/calendar/taskUtils.js'
 import { ICONS } from '@/config/icons.js'
@@ -1284,7 +1284,8 @@ export default {
         this.loadFiles()
         // 到期徽标的数据（taskStore 有缓存与在途合并，工作台 onLoad 已预热时不会重发）
         if (this.projectId) loadProjectTasks(this.projectId).catch(() => {})
-        if (this.projectId) loadPendingRevisions(this.projectId)
+        if (this._stopRevisionRefresh) this._stopRevisionRefresh()
+        this._stopRevisionRefresh = this.projectId ? startRevisionRefresh(this.projectId) : null
       }
     },
     parentId: {
@@ -1327,8 +1328,6 @@ export default {
     this._onDragStart = () => { this.isAnyDragging = true; this.recordDragStartPoint() }
     this._onDragEnd = () => { this.isAnyDragging = false; this.stagingDragOver = false; this.rootDropActive = false; this.externalDragActive = false; this.dragStartPoint = null }
     uni.$on('file-drag-start', this._onDragStart)
-    // 外部 Agent 提案没有推送通道，低频轮询刷新角标
-    this._revisionTimer = setInterval(() => { if (this.projectId) loadPendingRevisions(this.projectId) }, 30000)
     uni.$on('file-drag-end', this._onDragEnd)
     this._onArchiveDragEnd = () => this.resetExternalDrag()
     uni.$on('archive-drag-end', this._onArchiveDragEnd)
@@ -1338,7 +1337,7 @@ export default {
     if (typeof window !== 'undefined') window.addEventListener('keydown', this._onTagDialogKeydown, true)
   },
   beforeUnmount() {
-    if (this._revisionTimer) clearInterval(this._revisionTimer)
+    if (this._stopRevisionRefresh) this._stopRevisionRefresh()
     this._fileChangesMounted = false
     this.tagsRequest++
     this._fileChangesStop?.()

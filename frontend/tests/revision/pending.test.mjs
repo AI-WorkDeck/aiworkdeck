@@ -3,7 +3,7 @@
 import fs from 'node:fs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { countsByFile, forFile, previewText, isStale, totalEdits, STALE_CODE } from '../../src/utils/pendingRevision.js'
+import { countsByFile, forFile, previewText, isStale, totalEdits, STALE_CODE, applyPendingRevision } from '../../src/utils/pendingRevision.js'
 
 const rows = [
   { id: 1, fileId: 3, status: 'PENDING', edits: [{ find: 'a', replace: 'b' }, { find: 'c', replace: 'd' }] },
@@ -51,4 +51,82 @@ test('file tree badge and editor bar are mounted', () => {
   const editor = fs.readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8')
   assert.match(tree, /pendingRevisionCounts\[item\.id\]/)
   assert.match(editor, /<PendingRevisionBar/)
+})
+
+function accept({ edits, results, claim } = {}) {
+  const calls = []
+  const applied = []
+  const res = results || {}
+  return {
+    calls, applied,
+    run: () => applyPendingRevision({
+      id: 5,
+      claim: claim || (async () => ({ ok: true, edits: edits || [{ find: 'a', replace: 'b' }, { find: 'c', replace: '' }] })),
+      execute: async (action, params) => {
+        calls.push([action, params])
+        const idx = calls.filter(([a]) => a === 'find_replace').length - 1
+        if (action === 'find_replace' && res[idx]) return res[idx]
+        return { success: true, total: 1 }
+      },
+      markApplied: async (id) => { applied.push(id) },
+    }),
+  }
+}
+
+test('accept: track changes on, then each edit as agent find_replace, applied call last', async () => {
+  const t = accept()
+  const r = await t.run()
+  assert.equal(r.ok, true)
+  assert.equal(r.applied, 2)
+  assert.deepEqual(t.calls.map(([a]) => a), ['set_track_changes', 'find_replace', 'find_replace'])
+  assert.equal(t.calls[0][1].on, true)
+  assert.deepEqual(t.calls[1][1], { findText: 'a', replaceText: 'b', replaceAll: false, __agent: true })
+  assert.equal(t.calls[2][1].replaceText, '')
+  assert.deepEqual(t.applied, [5])
+})
+
+test('accept: partial failure keeps the proposal (no applied call)', async () => {
+  const t = accept({ results: { 1: { success: false, message: 'not found' } } })
+  const r = await t.run()
+  assert.equal(r.ok, false)
+  assert.equal(r.applied, 1)
+  assert.equal(r.failedIndex, 1)
+  assert.equal(r.message, 'not found')
+  assert.deepEqual(t.applied, [])
+})
+
+test('accept: zero matches counts as failure', async () => {
+  const t = accept({ results: { 0: { success: true, total: 0 } } })
+  const r = await t.run()
+  assert.equal(r.ok, false)
+  assert.deepEqual(t.applied, [])
+})
+
+test('accept: stale claim touches nothing in the editor', async () => {
+  const t = accept({ claim: async () => ({ ok: false, stale: true, message: 'stale' }) })
+  const r = await t.run()
+  assert.equal(r.ok, false)
+  assert.equal(r.stale, true)
+  assert.equal(t.calls.length, 0)
+  assert.deepEqual(t.applied, [])
+})
+
+test('accept: track changes unavailable aborts before any edit', async () => {
+  const calls = []
+  const r = await applyPendingRevision({
+    id: 1, claim: async () => ({ ok: true, edits: [{ find: 'a', replace: 'b' }] }),
+    execute: async (a) => { calls.push(a); return { success: false, message: 'no' } },
+    markApplied: async () => { calls.push('applied') },
+  })
+  assert.equal(r.ok, false)
+  assert.deepEqual(calls, ['set_track_changes'])
+})
+
+test('refresh only polls when the MCP server is enabled', () => {
+  const store = fs.readFileSync(new URL('../../src/utils/pendingRevisionStore.js', import.meta.url), 'utf8')
+  assert.match(store, /POLL_MS = 60000/)
+  assert.match(store, /if \(await isMcpServerEnabled\(\)\) loadPendingRevisions/)
+  assert.match(store, /addEventListener\('focus'/)
+  assert.match(store, /res\.enabled === true/)
+  assert.doesNotMatch(store, /conversationId/)
 })
