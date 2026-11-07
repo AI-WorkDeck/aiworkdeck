@@ -3073,7 +3073,7 @@ $brand-accent: $brand-mint;
    展示名 13px/600 + 角色小胶囊，坐在导航卡顶部，对齐插件广场侧栏的密度。 */
 .nav-back {
     padding: 8px 14px;
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     color: var(--awd-text-2);
     cursor: pointer;
 
