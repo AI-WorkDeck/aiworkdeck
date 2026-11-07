@@ -2,5 +2,7 @@
   "plugin.name": "Calendrier",
   "plugin.description": "Calendrier multi-projets, tâches, rappels et liens de fichiers.",
   "view.sidebar.name": "Calendrier",
-  "view.main.name": "Calendrier"
+  "view.main.name": "Calendrier",
+  "tool.calendar_agenda.description": "Liste les éléments d'agenda (échéances, audiences, réunions, tâches) de tous les projets visibles par l'utilisateur sur une période, avec le nom du projet. Pour des questions comme « qu'est-ce qui arrive à échéance cette semaine ».",
+  "tool.calendar_create.description": "Crée un élément d'agenda (échéance, audience, réunion ou tâche) dans un projet ; il apparaît ensuite dans l'agenda du projet."
 }

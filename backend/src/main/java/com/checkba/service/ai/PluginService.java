@@ -452,6 +452,80 @@ public class PluginService {
         private String description;
         /** 该工具运行所需的能力（规范 v2）：缺省视为不需要任何敏感能力（v1 兼容） */
         private List<String> permissions;
+        /** 声明式 Agent 工具（规范 v2.13 §20）：read | write | destructive；老形态为 null */
+        private String access;
+        /** 声明式工具入参（受限 JSON Schema 子集，同 contributes.mcpServers 的 inputSchema） */
+        private Map<String, Object> inputSchema;
+        /** 执行者；缺省 = jar（老形态，name = @Tool 方法名） */
+        private ToolHandlerDecl handler;
+        /** 是否投影到对外 MCP；缺省 read→true，write/destructive→false（P1-4 消费） */
+        private Boolean mcp;
+        /** auto | always | never（P2-1 消费） */
+        private String confirm;
+        /** 命中即在起跑时放回本插件工具（喂 ToolDisclosurePolicy） */
+        private List<String> keywords;
+
+        /** 带任一声明式字段即视为声明式条目；只有 name/description/permissions 的老条目返回 false。 */
+        @com.fasterxml.jackson.annotation.JsonIgnore
+        public boolean isDeclarative() {
+            return access != null || inputSchema != null || handler != null || mcp != null
+                    || confirm != null || keywords != null;
+        }
+
+        /** handler.type，缺省 jar。 */
+        @com.fasterxml.jackson.annotation.JsonIgnore
+        public String handlerType() {
+            return handler == null || handler.getType() == null ? "jar" : handler.getType();
+        }
+    }
+
+    @lombok.Data
+    public static class ToolHandlerDecl {
+        /** jar | service | connection | view */
+        private String type;
+        private String service;
+        private String operation;
+        private String connectionId;
+        private String viewId;
+    }
+
+    /** 某插件的一条声明式工具（已通过 {@link PluginManifestContractValidator#validateTools}）。 */
+    public record DeclaredTool(String pluginId, PluginToolInfo tool) {}
+
+    /**
+     * 全部已加载插件的声明式工具条目（含 handler=jar 的带元数据条目；调用方按 handlerType 取用）。
+     * 非法声明在 loadPlugins 时已被整段丢弃，这里拿到的都是合法的。不按启停过滤。
+     */
+    public List<DeclaredTool> getDeclaredTools() {
+        List<DeclaredTool> all = new ArrayList<>();
+        for (PluginMetadata plugin : plugins) {
+            if (plugin.getTools() == null) continue;
+            for (PluginToolInfo tool : plugin.getTools()) {
+                if (tool != null && tool.isDeclarative()) all.add(new DeclaredTool(plugin.getId(), tool));
+            }
+        }
+        return all;
+    }
+
+    /**
+     * 非法的声明式工具 → 丢弃该插件全部声明式条目并 WARN，面板与老形态 JAR 条目照常
+     * （与 frontendEntry 失败同口径；老条目保留以免丢掉 JAR 工具的权限校验）。
+     */
+    private void applyDeclaredTools(PluginMetadata meta) {
+        if (meta.getTools() == null || meta.getTools().stream().noneMatch(t -> t != null && t.isDeclarative())) return;
+        try {
+            PluginManifestContractValidator.validateTools(meta);
+        } catch (RuntimeException invalid) {
+            log.warn("Plugin {} declares invalid Agent tools, tools section skipped: {}", meta.getId(), invalid.getMessage());
+            meta.setTools(meta.getTools().stream().filter(t -> t != null && !t.isDeclarative()).toList());
+            return;
+        }
+        for (PluginToolInfo tool : meta.getTools()) {
+            if (tool != null && tool.isDeclarative() && ("connection".equals(tool.handlerType()) || "view".equals(tool.handlerType()))) {
+                log.info("Plugin {} tool {}: handler.type={} is not supported until phase 2/4, not registered",
+                        meta.getId(), tool.getName(), tool.handlerType());
+            }
+        }
     }
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -1124,6 +1198,7 @@ public class PluginService {
                 }
                 validateFrontendEntry(pluginDir, meta);
                 PluginManifestContractValidator.validateViews(meta, pluginDir);
+                applyDeclaredTools(meta);
                 plugins.add(meta);
                 pluginDirById.put(meta.getId(), pluginDir);
 

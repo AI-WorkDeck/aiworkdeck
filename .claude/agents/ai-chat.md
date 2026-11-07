@@ -780,6 +780,17 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
         `@Autowired(required = false)` 拿到 `ToolDisclosurePolicy` 后调 `setPluginToolNames(this::pluginToolNames)` 交进去。
         **方向不能反**：策略类不能注入 ToolRegistry（ToolRegistry → 工具组件 → ToolDiscoveryTools → 策略，成环）。
         手工 new 的 ToolRegistry（EvalHarness、各单测）没有这根线，视为没有插件工具，行为不变。来源抛异常一律按「不是插件工具」处理。
+      - **声明式插件工具（manifest `tools[]` 带 `access`/`handler`…，规范 v2.13 §20，设计 `docs/plans/agent-app-control.md`）**：
+        `ToolRegistry.declaredBindings()` 是第三种运行期来源（照抄 `PluginMcpService.bindings()`）：`PluginService.getDeclaredTools()` →
+        `handler.type=service` 且插件启用/未撤销 → `ToolSpecification`（`inputSchema` 经 `PluginMcpSchema.object`，描述经 `PluginService.localize`，
+        `userId/conversationId` 从 schema 摘掉）；`resolve` 返回 `RegisteredTool(bean=HostServiceRegistry, fromPlugin=true)`，
+        `execute` 在 `executeDeclared` 里分发：**权限 = 工具 `permissions` ∪ 服务表要求的权限，必须都在 manifest.permissions 里，否则拒绝**；
+        `userId` 恒取服务端 `ToolContext`，参数里的 `projectId` 只是目标项目，由 `HostServiceRegistry` 每次重核成员权限（读=成员，写=可写且非 CLIENT；
+        update/delete 以任务所在项目为准）。`handler=jar` 仍走既有 JAR 路径；`connection`/`view` 校验放行但不注册（第 2/4 期）。
+        披露与 ASK：`pluginToolNames()` 并入声明式工具名（落 `plugin-tools`）；声明的 `keywords`（含 `tencent_meeting_action` 这类 jar 条目）经
+        `ToolDisclosurePolicy.setPluginToolKeywords(registry::declaredToolKeywords)` 动态命中 plugin-tools 预放回；ASK 模式放行
+        `ASK_READ_TOOLS ∪ ToolRegistry.declaredReadToolNames()`（`AgentOrchestrator.askAllows`）；`CapabilityCatalog.accessOfDeclared` 以声明为准、不推断。
+        回归 `PluginDeclaredToolsTest`、`HostServiceRegistryTest`。
       - **开关关着时连 `list_tools` 自己都不下发**（`ToolDiscoveryTools.isAvailable()`）：
         模型手上已是全集，再挂个目录只会每轮白付约一千字符。**例外是 ②b 活跃文档类目裁剪**（dev-board#1064，
         默认开）：它开着时目录工具进程级可用，由编排器按「本轮藏没藏东西」决定下不下发（`dropIdleCatalog`）。

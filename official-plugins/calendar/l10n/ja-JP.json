@@ -2,5 +2,7 @@
   "plugin.name": "カレンダー",
   "plugin.description": "プロジェクト横断のカレンダー、タスク、リマインダー、ファイルリンク。",
   "view.sidebar.name": "カレンダー",
-  "view.main.name": "カレンダー"
+  "view.main.name": "カレンダー",
+  "tool.calendar_agenda.description": "指定期間内に、ユーザーが閲覧できるすべてのプロジェクトのカレンダー項目（期限、期日、会議、ToDo）をプロジェクト名付きで一覧します。「今週の期限は？」のような質問に使います。",
+  "tool.calendar_create.description": "プロジェクトにカレンダー項目（期限、期日、会議、ToDo）を作成します。作成後はプロジェクトのカレンダーに表示されます。"
 }

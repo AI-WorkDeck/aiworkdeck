@@ -317,6 +317,7 @@ public class PluginDevService {
                     .readValue(Files.readString(new File(tmp, "manifest.json").toPath()), PluginService.PluginMetadata.class);
             PluginManifestContractValidator.validateViews(metadata, tmp);
             PluginManifestContractValidator.validateServices(metadata);
+            PluginManifestContractValidator.validateTools(metadata);
             marker.set("installedAt", LocalDateTime.now().toString());
             Files.write(new File(tmp, DEV_MARKER).toPath(), marker.toString().getBytes(StandardCharsets.UTF_8));
 
@@ -462,12 +463,32 @@ public class PluginDevService {
             }
         }
         // 开发安装只收纯 Web 插件：以下字段任一非空即拒装（安全模型见类注释）
-        for (String forbidden : List.of("backendJars", "tools", "skills", "packs")) {
+        for (String forbidden : List.of("backendJars", "skills", "packs")) {
             JSONArray arr = manifest.getJSONArray(forbidden);
             if (arr != null && !arr.isEmpty()) {
                 errors.add(LangText.of(
                         "开发安装只支持纯 Web 插件，manifest." + forbidden + " 必须为空（JAR/工具/skill/资源包请走插件广场的审核签名流程）",
                         "Dev install only accepts pure web plugins; manifest." + forbidden + " must be empty"));
+            }
+        }
+        // tools：只收声明式的 service/connection/view 条目（规范 v2.13 §20）；老形态与 handler=jar 需要 JAR，不收
+        JSONArray tools = manifest.getJSONArray("tools");
+        if (tools != null && !tools.isEmpty()) {
+            boolean jarTool = false;
+            for (Object o : tools) {
+                var tool = JSONUtil.toBean(JSONUtil.parseObj(o), PluginService.PluginToolInfo.class);
+                jarTool |= !tool.isDeclarative() || "jar".equals(tool.handlerType());
+            }
+            if (jarTool) {
+                errors.add(LangText.of(
+                        "开发安装只支持纯 Web 插件：manifest.tools 只能是声明式工具（handler.type 为 service/connection），JAR 工具请走插件广场的审核签名流程",
+                        "Dev install only accepts pure web plugins; manifest.tools may only hold declarative tools (handler.type service/connection)"));
+            } else {
+                try {
+                    PluginManifestContractValidator.validateTools(JSONUtil.toBean(manifest, PluginService.PluginMetadata.class));
+                } catch (IllegalArgumentException e) {
+                    errors.add(LangText.of("声明式工具无效: ", "Invalid declarative tool: ") + e.getMessage());
+                }
             }
         }
         // 证据来源不走 dev 免签直装（规范 v2.8 P3 红线）：SPI 要 JAR、MCP 是数据源接入，

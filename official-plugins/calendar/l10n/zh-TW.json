@@ -2,5 +2,7 @@
   "plugin.name": "日程",
   "plugin.description": "跨項目日曆、任務、提醒和文件關聯。",
   "view.sidebar.name": "日程",
-  "view.main.name": "日程"
+  "view.main.name": "日程",
+  "tool.calendar_agenda.description": "查詢使用者可見的所有專案在日期範圍內的日程事項（截止日、開庭、會議、待辦），每筆附專案名稱。用於回答「本週有哪些截止事項」這類問題。",
+  "tool.calendar_create.description": "在指定專案中建立一筆日程事項（截止日、開庭、會議、待辦），建立後會出現在專案日程中。"
 }

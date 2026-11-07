@@ -1140,6 +1140,11 @@ public class AgentOrchestrator {
      * 分发一次工具调用并处理声明式副作用（文件变更通知、文件树刷新）。
      * 修改类工具（fileEffect=MODIFIED）执行前自动为活跃文档创建本轮检查点。
      */
+    /** ASK 只放内置只读集，外加插件声明的 read 工具（manifest tools[].access=read，规范 v2.13 §20）。 */
+    private boolean askAllows(String toolName) {
+        return ASK_READ_TOOLS.contains(toolName) || toolRegistry.declaredReadToolNames().contains(toolName);
+    }
+
     private ToolRegistry.ToolResult dispatchTool(String toolName, String argsJson,
                                                  Long projectId, String conversationId,
                                                  Long userId, String modelId, RunGuard guard) {
@@ -2677,7 +2682,7 @@ public class AgentOrchestrator {
 
                     String result;
                     boolean success;
-                    if (agentMode == AgentMode.ASK && !ASK_READ_TOOLS.contains(req.name())) {
+                    if (agentMode == AgentMode.ASK && !askAllows(req.name())) {
                         result = "Error: ASK mode permits only read-only attachment, memory and version inspection tools.";
                         success = false;
                     } else {
@@ -2848,7 +2853,7 @@ public class AgentOrchestrator {
                     if (call.parseError() != null) {
                         result = call.parseError();
                         xmlToolSuccess = false;
-                    } else if (agentMode == AgentMode.ASK && !ASK_READ_TOOLS.contains(call.toolName())) {
+                    } else if (agentMode == AgentMode.ASK && !askAllows(call.toolName())) {
                         result = "Error: ASK mode permits only read-only attachment, memory and version inspection tools.";
                         xmlToolSuccess = false;
                     } else {
@@ -3428,8 +3433,9 @@ public class AgentOrchestrator {
             guard.roundTrimmed = 0;
         }
         if (agentMode == AgentMode.ASK) {
+            Set<String> declaredRead = toolRegistry.declaredReadToolNames();
             visible = chatModelFactory.usesProviderCatalog() && !chatModelFactory.effectiveModelSupportsTools(modelId)
-                    ? List.of() : registered.stream().filter(s -> ASK_READ_TOOLS.contains(s.name())).toList();
+                    ? List.of() : registered.stream().filter(s -> ASK_READ_TOOLS.contains(s.name()) || declaredRead.contains(s.name())).toList();
             log.info("Ask mode: generating with {} read-only tools", visible.size());
         } else {
             List<ToolSpecification> afterSkill = skillRouter.visibleTools(guard.runId, registered);

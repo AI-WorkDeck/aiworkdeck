@@ -31,6 +31,53 @@ public final class PluginManifestContractValidator {
             }
         }
     }
+    /**
+     * Declarative Agent tools (spec section 20): same rules as {@code scripts/plugin-dev.mjs validate}.
+     * Legacy entries (name/description/permissions only) are not inspected. Throws IllegalArgumentException.
+     */
+    public static void validateTools(PluginService.PluginMetadata meta) {
+        if (meta.getTools() == null) return;
+        String prefix = String.valueOf(meta.getId()).replace('-', '_') + "_";
+        Set<String> declaredPermissions = meta.getPermissions() == null ? Set.of() : new HashSet<>(meta.getPermissions());
+        Set<String> seen = new HashSet<>();
+        java.util.List<com.checkba.service.plugin.PluginConnectionService.Connection> connections = null;
+        for (PluginService.PluginToolInfo tool : meta.getTools()) {
+            if (tool == null || !tool.isDeclarative()) continue;
+            String label = "tools." + tool.getName() + ": ";
+            if (tool.getName() == null || !tool.getName().matches("[A-Za-z][A-Za-z0-9_]{1,63}")) throw new IllegalArgumentException(label + "invalid tool name");
+            if (!seen.add(tool.getName())) throw new IllegalArgumentException(label + "duplicate tool name");
+            if (tool.getDescription() == null || tool.getDescription().isBlank()) throw new IllegalArgumentException(label + "description must not be blank");
+            if (!Set.of("read", "write", "destructive").contains(tool.getAccess())) throw new IllegalArgumentException(label + "access is required: read | write | destructive");
+            if (tool.getConfirm() != null && !Set.of("auto", "always", "never").contains(tool.getConfirm())) throw new IllegalArgumentException(label + "invalid confirm");
+            String type = tool.handlerType();
+            if (!Set.of("jar", "service", "connection", "view").contains(type)) throw new IllegalArgumentException(label + "unknown handler.type: " + type);
+            if (!"jar".equals(type) && !tool.getName().startsWith(prefix)) throw new IllegalArgumentException(label + "non-JAR tool name must start with " + prefix);
+            if (tool.getPermissions() != null) for (String permission : tool.getPermissions()) {
+                if (!declaredPermissions.contains(permission)) throw new IllegalArgumentException(label + "permission not declared in manifest.permissions: " + permission);
+            }
+            if (tool.getInputSchema() != null) {
+                try { com.checkba.service.ai.mcp.PluginMcpSchema.object(tool.getInputSchema()); }
+                catch (RuntimeException e) { throw new IllegalArgumentException(label + "invalid inputSchema"); }
+            }
+            var handler = tool.getHandler();
+            if ("service".equals(type)) {
+                if (com.checkba.service.plugin.HostServiceRegistry.spec(handler.getService(), handler.getOperation()).isEmpty()) {
+                    throw new IllegalArgumentException(label + "unknown host service operation: " + handler.getService() + "." + handler.getOperation());
+                }
+            } else if ("connection".equals(type)) {
+                if (connections == null) connections = com.checkba.service.plugin.PluginConnectionService.parseDeclarations(meta);
+                var connection = connections.stream().filter(c -> c.id().equals(handler.getConnectionId())).findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException(label + "handler.connectionId is not a declared connection: " + handler.getConnectionId()));
+                if (connection.operations() == null || !connection.operations().containsKey(handler.getOperation())) {
+                    throw new IllegalArgumentException(label + "unknown connection operation: " + handler.getConnectionId() + "." + handler.getOperation());
+                }
+            } else if ("view".equals(type)) {
+                boolean declared = meta.getContributes() != null && meta.getContributes().getViews() != null
+                        && meta.getContributes().getViews().stream().anyMatch(v -> v != null && v.getId() != null && v.getId().equals(handler.getViewId()));
+                if (!declared) throw new IllegalArgumentException(label + "handler.viewId is not a declared view: " + handler.getViewId());
+            }
+        }
+    }
     public static void validateViews(PluginService.PluginMetadata meta, File directory) {
         if (meta.getContributes() == null || meta.getContributes().getViews() == null) return;
         Set<String> ids = new HashSet<>();

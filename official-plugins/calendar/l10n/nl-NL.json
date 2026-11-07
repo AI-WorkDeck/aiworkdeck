@@ -2,5 +2,7 @@
   "plugin.name": "Agenda",
   "plugin.description": "Agenda, taken, herinneringen en bestandskoppelingen over projecten heen.",
   "view.sidebar.name": "Agenda",
-  "view.main.name": "Agenda"
+  "view.main.name": "Agenda",
+  "tool.calendar_agenda.description": "Toont agenda-items (deadlines, zittingen, vergaderingen, taken) uit alle projecten die de gebruiker kan zien binnen een datumbereik, elk met projectnaam. Voor vragen zoals \"wat moet er deze week af\".",
+  "tool.calendar_create.description": "Maakt een agenda-item (deadline, zitting, vergadering of taak) aan in een project; het verschijnt daarna in de projectagenda."
 }

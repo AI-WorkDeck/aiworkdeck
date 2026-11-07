@@ -470,6 +470,15 @@ CSS 在弹窗期间把 `.pane-content` 里的 `iframe`/`webview` 置 `visibility
 Web协议仍为awd:1。新增contributes.views/connections/mcpServers和settings.scope，规范见docs/PLUGIN_SPEC.md §17；SDK源、类型/schema及CLI在sdk/plugin-sdk与scripts/plugin-dev.mjs，官网模板须字节同步。PluginMcpService把审核声明接入ToolRegistry实际工具链；HTTP MCP协议/DNS/取消边界位于service/ai/mcp/PluginMcp*。PluginConnectionService管理固定操作、OAuth PKCE、按用户/账户加密凭据及开发者订阅；PluginDevTrustService的显式开发授权绑定manifest摘要，安装端排除所有来源/信任标记。scope存储使用plugin-user/plugin-project前缀，不能与旧installation的plugin.<id>.<key>混用。新增测试：PluginMcp*、PluginConnection*、PluginDevTrust*及scripts/tests/plugin-dev.test.mjs。
 
 
+## 声明式 Agent 工具（规范 v2.13 §20，P1-1/P1-2/P1-3，设计 `docs/plans/agent-app-control.md`）
+
+纯 Web 插件不写 Java 也能被应用内 Agent 调用：manifest `tools[]` 条目带 `access`（必填 read|write|destructive）、`inputSchema`、`handler`、`permissions`、`mcp`、`confirm`、`keywords` 任一字段即为声明式条目；只有 name/description/permissions 的老条目照旧按 JAR 解释，零改动兼容。
+
+- **解析与校验**：`PluginService.PluginToolInfo`（`isDeclarative()`/`handlerType()`）、`getDeclaredTools()`；规则唯一实现 `PluginManifestContractValidator.validateTools`（与 `scripts/plugin-dev.mjs validate` 同规则：非 JAR 名字前缀 `<id 的 - 换 _>_`、access、inputSchema 子集、`calendar/search/sensitive` 里 service/operation 存在、connectionId/viewId 已声明、permissions ⊆ manifest.permissions）。**加载时非法 → 丢该插件全部声明式条目 + WARN，面板与老 JAR 条目照常**（老条目保留是为了不丢 JAR 工具的权限校验）；广场安装（`PluginMarketService.checkDeclaredTools`）、开发安装、内置安装（`PluginBundledInstaller`）则直接拒装。开发安装只收声明式的非 jar 工具，老形态/`handler=jar` 仍因需要 JAR 被拒。
+- **宿主服务表**：`service/plugin/HostServiceRegistry`（静态 `TABLE` + 处理器）= `sdk/plugin-sdk/services.json` 的后端本体，`HostServiceRegistryTest` 钉住两者逐项一致（名字/access/所需权限），改一处必须同批改另一处。当前 calendar（list/listForUser/create/update/delete）、search（query/tags）、sensitive（preview/redact，走 `SensitiveController.executeAs`，**恢复密钥与原词映射不回给模型**）。每次调用核目标项目成员权限。**前端 `services.request` 尚未改走同一张表**（PluginPane 仍是 `pluginCollectionServices.js`/`pluginBusinessServices.js`），后续 PR 接。
+- **注册**：见 `ai-chat.md`「声明式插件工具」；官方样板 `official-plugins/calendar`（`calendar_agenda` read → `calendar/listForUser`、`calendar_create` write → `calendar/create`，描述走 `%tool.*.description%` + 20 语种 l10n）、`official-plugins/tencent-meeting`（`tencent_meeting_action` 补 `access:"write"` + `keywords`，handler 缺省 jar），最小示例 `examples/hello-agent-tools/`（`PluginDeclaredToolsTest` 以它为夹具）。
+- **地雷**：① 改了官方插件 manifest 必须升版本号才会被 `PluginBundledInstaller` 重新落盘；② `tasks` 不在 `PluginService.KNOWN_PERMISSIONS`，会打「unknown permission」WARN（calendar 早就如此，只是日志）；③ 新增 `HostServiceRegistry` 操作要同批改 `services.json`、`PluginManifestContractValidator` 无需改（它读 `TABLE`）、`scripts/plugin-dev.mjs` 无需改（读 `services.json`）。
+
 ## 插件服务完整验收（2026-10-18，dev-board#1344/#1345/#1346）
 
 `PluginConnectionService` 的 OAuth 桌面回调跟随实际监听端口；server 模式需显式可信 HTTPS `ai.plugins.oauth-redirect-uri`。失效/过期凭据返回 needsReconnect，重连/断连取消旧 HTTP；不回滚远端副作用。连接响应阻止原始 token 直接回显，非通用泄漏检测。`PluginConnectionSettings` 的列表与订阅各自按请求序号拒绝迟到结果；`openExternalUrlChecked` 同时处理 IPC reject 和 `{ok:false}`，避免失败仍报 opened。

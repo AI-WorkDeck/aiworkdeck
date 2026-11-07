@@ -13,7 +13,9 @@
   "tools": [{
     "name": "tencent_meeting_action",
     "description": "腾讯会议插件：检查连接、用户授权登录、按需同步、查看会议及逐字稿、归档项目文件。",
-    "permissions": ["file_read", "file_write", "network"]
+    "permissions": ["file_read", "file_write", "network"],
+    "access": "write",
+    "keywords": ["腾讯会议", "会议纪要", "纪要", "逐字稿", "会议录制", "tencent meeting", "meeting minutes", "transcript"]
   }],
   "contributes": {
     "views": [

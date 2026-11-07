@@ -2,5 +2,7 @@
   "plugin.name": "Calendario",
   "plugin.description": "Calendario entre proyectos, tareas, recordatorios y enlaces a archivos.",
   "view.sidebar.name": "Calendario",
-  "view.main.name": "Calendario"
+  "view.main.name": "Calendario",
+  "tool.calendar_agenda.description": "Lista los elementos del calendario (plazos, vistas, reuniones, tareas) de todos los proyectos visibles para el usuario dentro de un rango de fechas, cada uno con el nombre del proyecto. Úsalo para preguntas como «qué vence esta semana».",
+  "tool.calendar_create.description": "Crea un elemento de calendario (plazo, vista, reunión o tarea) en un proyecto; después aparece en el calendario del proyecto."
 }

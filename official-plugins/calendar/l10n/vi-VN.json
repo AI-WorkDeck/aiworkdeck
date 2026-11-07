@@ -2,5 +2,7 @@
   "plugin.name": "Lịch",
   "plugin.description": "Lịch liên dự án, nhiệm vụ, lời nhắc và liên kết tệp.",
   "view.sidebar.name": "Lịch",
-  "view.main.name": "Lịch"
+  "view.main.name": "Lịch",
+  "tool.calendar_agenda.description": "Liệt kê các mục lịch (hạn chót, phiên xử, cuộc họp, việc cần làm) của tất cả dự án người dùng nhìn thấy trong một khoảng ngày, kèm tên dự án. Dùng cho câu hỏi như \"tuần này có gì đến hạn\".",
+  "tool.calendar_create.description": "Tạo một mục lịch (hạn chót, phiên xử, cuộc họp hoặc việc cần làm) trong một dự án; sau đó nó xuất hiện trong lịch của dự án."
 }

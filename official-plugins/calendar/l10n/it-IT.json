@@ -2,5 +2,7 @@
   "plugin.name": "Calendario",
   "plugin.description": "Calendario multiprogetto, attività, promemoria e collegamenti ai file.",
   "view.sidebar.name": "Calendario",
-  "view.main.name": "Calendario"
+  "view.main.name": "Calendario",
+  "tool.calendar_agenda.description": "Elenca gli elementi del calendario (scadenze, udienze, riunioni, attività) di tutti i progetti visibili all'utente in un intervallo di date, ciascuno con il nome del progetto. Per domande come «cosa scade questa settimana».",
+  "tool.calendar_create.description": "Crea un elemento del calendario (scadenza, udienza, riunione o attività) in un progetto; compare poi nel calendario del progetto."
 }

@@ -410,6 +410,19 @@ public class ToolDisclosurePolicy {
                 }
             }
         }
+        if (!hinted.contains(PLUGIN_TOOLS_CATEGORY)) {
+            try {
+                for (String keyword : pluginToolKeywords.get()) {
+                    if (keyword != null && !keyword.isBlank()
+                            && SkillRouter.containsTrigger(normalized, keyword.toLowerCase(Locale.ROOT))) {
+                        hinted.add(PLUGIN_TOOLS_CATEGORY);
+                        break;
+                    }
+                }
+            } catch (RuntimeException ignored) {
+                // 判不准就不提示：披露是优化，不能让它掀翻起跑
+            }
+        }
         return hinted;
     }
 
@@ -439,6 +452,14 @@ public class ToolDisclosurePolicy {
     /** 核心集（只读）。供契约测试核对「名字是不是真的存在」与常用链的覆盖面。 */
     public Set<String> coreToolNames() {
         return CORE;
+    }
+
+    /** 启用插件在 manifest 里声明的 keywords（规范 v2.13 §20）：命中即预放回 plugin-tools 类目。活视图。 */
+    private volatile Supplier<List<String>> pluginToolKeywords = List::of;
+
+    /** 由 {@code ToolRegistry} 在初始化时调一次。 */
+    public void setPluginToolKeywords(Supplier<List<String>> source) {
+        this.pluginToolKeywords = source == null ? List::of : source;
     }
 
     /** 由 {@code ToolRegistry} 在初始化时调一次（见 {@link #pluginToolNames}）。null 视为没有插件工具。 */

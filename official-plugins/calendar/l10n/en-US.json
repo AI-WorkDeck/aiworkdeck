@@ -2,5 +2,7 @@
   "plugin.name": "Calendar",
   "plugin.description": "Cross-project calendar, tasks, reminders, and file links.",
   "view.sidebar.name": "Calendar",
-  "view.main.name": "Calendar"
+  "view.main.name": "Calendar",
+  "tool.calendar_agenda.description": "List calendar items (deadlines, hearings, meetings, to-dos) across all projects the user can see within a date range, each with its project name. Use it for questions like 'what is due this week'.",
+  "tool.calendar_create.description": "Create a calendar item (deadline, hearing, meeting or to-do) in a project; it then appears in the project calendar."
 }
