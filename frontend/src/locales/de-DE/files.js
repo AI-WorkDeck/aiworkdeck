@@ -66,7 +66,7 @@ export default {
     "submitted": "Untertitel werden generiert. Sie erscheinen, sobald sie bereit sind.",
     "ready": "Untertitel sind bereit",
     "failed": "Generierung der Untertitel fehlgeschlagen. Klicken Sie auf die Untertitel-Schaltfläche, um es erneut zu versuchen.",
-    "notConfigured": "Transkription ist nicht eingerichtet. Konfigurieren Sie sie unter Systemeinstellungen - Plattformdienste - Meeting-Transkription, um Untertitel zu generieren.",
+    "notConfigured": "Transkription ist nicht eingerichtet. Konfigurieren Sie sie unter Einstellungen - Plattformdienste - Meeting-Transkription, um Untertitel zu generieren.",
     "noticePending": "Registriert. Bestätigen Sie zuerst den Aufnahmehinweis unter Stimme - Meeting-Aufnahme und klicken Sie dann auf die Untertitel-Schaltfläche.",
     "submitFailed": "Generierung der Untertitel konnte nicht gestartet werden",
     "empty": "Keine Sprache erkannt"

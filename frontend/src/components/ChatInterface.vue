@@ -625,47 +625,31 @@
           </view>
           <ChatSuggestionControl v-if="chatSuggestions.available && visibleSuggestion" :suggestion="visibleSuggestion" :show-settings="false"
             @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
+          <!-- 四个内置工作流直接摆在输入框下（空会话态）：不必先展开「高级设置」才找得到。
+               点击把快捷指令填进输入框；右键或 ⋯ 切换项目版本 / 编辑规则（同原折叠区行为）。 -->
+          <view class="empty-workflows">
+             <view class="empty-workflows-head">
+                <text class="empty-workflows-title">{{ $t('chat.builtinWorkflowsFoldEntry') }}</text>
+                <text class="empty-workflows-link" @tap="openBuiltinWorkflowEditor(builtinQuickWorkflows[0], builtinQuickWorkflows[0]?.activeVersionId)">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</text>
+             </view>
+             <view class="empty-workflows-grid">
+                <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
+                      class="empty-workflow-card" :data-bw-card="bw.id"
+                      :class="{ 'is-custom-version': !bw.activeIsSystemDefault }"
+                      :title="$t('chat.builtinWorkflowRightClickHint')"
+                      @tap="applyBuiltinWorkflow(bw)"
+                      @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                   <view class="empty-workflow-top">
+                      <text class="empty-workflow-name">{{ bw.title }}</text>
+                      <text :title="$t('chat.builtinWorkflowRightClickHint')" class="empty-workflow-more" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
+                   </view>
+                   <text class="empty-workflow-desc">{{ bw.desc }}</text>
+                </view>
+             </view>
+          </view>
           <details class="composer-advanced-settings">
           <summary class="composer-advanced-summary">{{ $t('chat.composerAdvancedSettings') }}</summary>
           <view class="composer-preferences">
-          <details class="builtin-workflows-fold" :class="{ customized: builtinCustomActiveCount > 0 }">
-             <summary class="builtin-workflows-summary">
-                <span class="builtin-workflows-entry">
-                   <span class="builtin-workflows-heading">
-                      <span class="builtin-workflows-title">{{ $t('chat.builtinWorkflowsFoldEntry') }}</span>
-                      <span class="builtin-workflows-summary-state" :class="{ custom: builtinCustomActiveCount > 0 }">
-                         {{ builtinCustomActiveCount > 0 ? $t('chat.builtinWorkflowsCustomCount', { count: builtinCustomActiveCount }) : $t('chat.builtinWorkflowBadge') }}
-                      </span>
-                   </span>
-                   <span class="builtin-workflows-scope">{{ $t('chat.builtinWorkflowsScope') }}</span>
-                </span>
-                <span class="builtin-workflows-summary-right">
-                   <button type="button" class="builtin-workflows-adv-btn"
-                           @click.stop.prevent="openBuiltinWorkflowEditor(builtinQuickWorkflows[0], builtinQuickWorkflows[0]?.activeVersionId)">
-                      {{ $t('chat.builtinWorkflowsAdvancedBtn') }}
-                   </button>
-                </span>
-             </summary>
-             <view class="builtin-workflows-body">
-                <view class="builtin-workflows-grid">
-                   <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
-                         class="builtin-workflow-card" :data-bw-card="bw.id"
-                         :class="{ 'is-custom-version': !bw.activeIsSystemDefault }"
-                         :title="$t('chat.builtinWorkflowRightClickHint')"
-                         @tap="applyBuiltinWorkflow(bw)"
-                         @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
-                      <view class="builtin-workflow-card-top">
-                         <text class="builtin-workflow-name">{{ bw.title }}</text>
-                         <view class="builtin-workflow-card-actions" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">
-                            <text class="builtin-workflow-ver-tag" :class="{ custom: !bw.activeIsSystemDefault }">{{ bw.activeVersionName }}</text>
-                            <text class="builtin-workflow-more-btn">⋯</text>
-                         </view>
-                      </view>
-                      <text class="builtin-workflow-desc">{{ bw.desc }}</text>
-                   </view>
-                </view>
-             </view>
-          </details>
           <ChatSuggestionControl v-if="chatSuggestions.available" :enabled="suggestionEnabled" @toggle="chatSuggestions.toggle" />
           <DecisionAssistControl :enabled="decisionAssistEnabled" :local-only="isLocalOnlyProvider" @toggle="toggleDecisionAssist" />
           </view>
@@ -675,7 +659,10 @@
 
        <!-- Bottom: History (pushed to bottom with flexbox) -->
        <view class="empty-bottom-section">
-          <view class="recent-history-header">{{ $t('chat.recentChats') }}</view>
+          <view class="recent-history-header">
+             <text>{{ $t('chat.recentChats') }}</text>
+             <text v-if="recentHistory && recentHistory.length > 0" class="recent-history-all" role="button" @tap="$emit('toggle-history')">{{ $t('chat.recentChatsAll') }}</text>
+          </view>
           <view class="recent-history" v-if="recentHistory && recentHistory.length > 0">
              <view v-for="h in recentHistory" :key="h.id" class="history-item" @tap="$emit('load-history', h)">
                 <view v-if="recentDotClass(h)" class="conv-dot" :class="recentDotClass(h)"></view>
@@ -5376,7 +5363,17 @@ export default {
   color: var(--awd-text-3);
   margin-bottom: 8px;
   letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
+
+.recent-history-all {
+  font-size: var(--awd-panel-fs-meta);
+  font-weight: 400;
+  cursor: pointer;
+}
+.recent-history-all:hover { color: var(--awd-accent-text); }
 
 .recent-history {
   display: flex;
@@ -6600,6 +6597,77 @@ export default {
 }
 .composer-preferences > :deep(:not(:first-child)) {
   border-top: 1px solid var(--awd-border-subtle);
+}
+/* 空会话态：输入框下的内置工作流卡片（2x2，安静的描边卡片） */
+.empty-workflows { margin-top: 10px; min-width: 0; }
+.empty-workflows-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 6px;
+}
+.empty-workflows-title { font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); }
+.empty-workflows-link {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-3);
+  cursor: pointer;
+}
+.empty-workflows-link:hover { color: var(--awd-accent-text); }
+.empty-workflows-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.empty-workflow-card {
+  display: flex;
+  flex-direction: column;
+  row-gap: 2px;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: var(--awd-radius-md);
+  background: transparent;
+  border: 1px solid var(--awd-border-subtle);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.empty-workflow-card:hover {
+  border-color: var(--awd-accent);
+  background: var(--awd-accent-wash);
+}
+.empty-workflow-card.is-custom-version { border-color: var(--awd-accent); }
+.empty-workflow-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  column-gap: 6px;
+  min-width: 0;
+}
+.empty-workflow-name {
+  font-size: var(--awd-panel-fs);
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--awd-text);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.empty-workflow-more {
+  flex-shrink: 0;
+  font-size: var(--awd-panel-fs);
+  line-height: 1;
+  color: var(--awd-text-3);
+  padding: 0 2px;
+}
+.empty-workflow-more:hover { color: var(--awd-accent-text); }
+.empty-workflow-desc {
+  font-size: var(--awd-panel-fs-meta);
+  line-height: 1.35;
+  color: var(--awd-text-3);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 .builtin-workflows-fold { width: 100%; color: var(--awd-text-2); box-sizing: border-box; }
 .builtin-workflows-summary {

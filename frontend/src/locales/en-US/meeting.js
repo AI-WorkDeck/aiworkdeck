@@ -22,7 +22,7 @@ export default {
   tierNeedsAccount: 'Account needed',
   tierDescLocal: 'Recording and transcription both happen on this device, and the audio never leaves it. Expect roughly 1.5x real time (a two-hour meeting takes about an hour) and no speaker separation.',
   tierDescByok: 'Transcribed with your own Alibaba Cloud Tingwu account; the audio passes through your own OSS bucket.',
-  tierDescNoPlatform: 'This deployment uses your own key. Enter the Tingwu credentials under System settings - Platform Services.',
+  tierDescNoPlatform: 'This deployment uses your own key. Enter the Tingwu credentials under Settings - Platform Services.',
   tierDescNotConnected: 'Connect your AI WorkDeck account and transcription works right away, with no Tingwu account of your own.',
   tierDescPlatform: 'AI WorkDeck transcribes for you and bills Credits from your account balance by duration; processing may still be charged when no speech is detected. The audio passes through our object storage and is deleted as soon as transcription finishes, with a 24-hour sweep as a backstop.',
   localSwitchLabel: 'Keep recordings on this device',
@@ -43,7 +43,7 @@ export default {
 
   // ---- No transcription credentials yet (recording still works). Next step depends on tier ----
   notConfiguredPlatform: 'Transcription is unavailable for now: recordings are still saved to project files, but cannot be turned into text. Connect your AI WorkDeck account under Settings - Account & balance to enable it.',
-  notConfiguredByok: 'No transcription service configured: recordings are still saved to project files, but cannot be turned into text. An administrator can enter Alibaba Cloud Tingwu credentials under System settings - Platform Services - Meeting Transcription, or switch to platform-sourced.',
+  notConfiguredByok: 'No transcription service configured: recordings are still saved to project files, but cannot be turned into text. An administrator can enter Alibaba Cloud Tingwu credentials under Settings - Platform Services - Meeting Transcription, or switch to platform-sourced.',
 
   // ---- Recording ----
   micDeviceLabel: 'Microphone',

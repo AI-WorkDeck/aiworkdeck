@@ -116,7 +116,7 @@ export default {
   },
   "identity": {
     "title": "Scegli uno spazio di lavoro locale",
-    "subtitle": "Su questo dispositivo sono stati trovati più account esistenti. Scegli lo spazio di lavoro con cui continuare. Non ti verrà più chiesto e potrai modificarlo in seguito in Impostazioni → Account e utilizzo.",
+    "subtitle": "Su questo dispositivo sono stati trovati più account esistenti. Scegli lo spazio di lavoro con cui continuare. Non ti verrà più chiesto e potrai modificarlo in seguito in Impostazioni → Account e saldo.",
     "reading": "Lettura degli account locali",
     "retry": "Riprova",
     "itemMeta": "{projects} progetti · {files} file",

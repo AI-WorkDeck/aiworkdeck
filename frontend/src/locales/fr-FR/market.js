@@ -145,7 +145,7 @@ export default {
   "reinstallOrUpdate": "Réinstaller / Mettre à jour",
   "activationModeLabel": "Activation : {mode} ▾",
   "processingEllipsis": "Traitement…",
-  "needAccountHint": "Cet élément est payant. Connectez d'abord votre compte AI WorkDeck dans « Compte et utilisation » dans les Paramètres — les achats ne peuvent être vérifiés qu'après cela.",
+  "needAccountHint": "Cet élément est payant. Connectez d'abord votre compte AI WorkDeck dans « Compte et solde » dans les Paramètres — les achats ne peuvent être vérifiés qu'après cela.",
   "buyHint": "Cet élément est payant. L'achat se fait sur le site officiel ; après le paiement, revenez sur cette page et cliquez sur « J'ai acheté, Actualiser » pour l'installer.",
   "whenToUse": "Quand l'utiliser",
   "scenarioLead": "Dites par exemple ceci dans la conversation, et il prend automatiquement le relais :",

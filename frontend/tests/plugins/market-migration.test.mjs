@@ -43,7 +43,9 @@ test('builtinWorkflow skills are hidden from installedRows in lazy mode', () => 
 
 test('ChatInterface builtin workflows fold like Jev with Advanced settings, more button, right-click menu, and workspace version manager', () => {
   const chatSource = readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
-  assert.ok(chatSource.includes('<details class="builtin-workflows-fold"'))
+  // 空会话态的工作流直接摆成卡片（empty-workflow-card）；会话中的输入区仍是「高级设置」里的折叠区
+  assert.ok(chatSource.includes('empty-workflow-card'))
+  assert.ok(chatSource.includes('<details class="builtin-workflows-fold builtin-workflows-fold-bottom"'))
   assert.ok(chatSource.includes('builtin-workflows-summary'))
   assert.ok(chatSource.includes('builtin-workflows-adv-btn'))
   assert.ok(chatSource.includes('builtin-workflow-more-btn'))

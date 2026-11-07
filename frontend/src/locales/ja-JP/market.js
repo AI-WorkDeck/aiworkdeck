@@ -145,7 +145,7 @@ export default {
   "reinstallOrUpdate": "再インストール / 更新",
   "activationModeLabel": "アクティベーション: {mode} ▾",
   "processingEllipsis": "処理中…",
-  "needAccountHint": "これは有料アイテムです。先に設定の「アカウントと使用状況」で AI WorkDeck アカウントを接続してください — 購入履歴はその後にのみ確認できます。",
+  "needAccountHint": "これは有料アイテムです。先に設定の「アカウントと残高」で AI WorkDeck アカウントを接続してください — 購入履歴はその後にのみ確認できます。",
   "buyHint": "これは有料アイテムです。購入は公式ウェブサイトで完了します。支払い後、このページに戻り「購入済み、更新する」をクリックしてインストールしてください。",
   "whenToUse": "使用するタイミング",
   "scenarioLead": "会話で次のように話しかけると、自動的に引き継ぎます：",

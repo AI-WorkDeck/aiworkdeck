@@ -86,7 +86,7 @@ export default {
   ocrCancelling: 'Cancelling…',
   ocrBatchBusy: 'A recognition batch is already running; wait for it or cancel it',
   ocrConsentTitle: 'Use cloud text recognition?',
-  ocrConsentHint: 'PDFs with a text layer are extracted directly, with no upload and no charge; only scans and images need cloud OCR. This confirmation applies to this batch only; change it to always-cloud or local-only under Settings → Account & usage → Scanned document recognition.',
+  ocrConsentHint: 'PDFs with a text layer are extracted directly, with no upload and no charge; only scans and images need cloud OCR. This confirmation applies to this batch only; change it to always-cloud or local-only under Settings → AI Settings → Scanned document recognition.',
   ocrConsentCheck: 'I understand where the data goes and how it is billed',
   ocrConsentConfirm: 'Start',
   ocrCopied: 'Copied text from {count} file(s) and saved it to clipboard history',

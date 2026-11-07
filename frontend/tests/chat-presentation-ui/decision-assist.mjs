@@ -47,7 +47,7 @@ try {
   assert.equal(await state(), 'false')
   assert.equal(await expanded(), false, 'Jev explanation is collapsed by default')
   assert.equal(await switchVisible(), false, 'the opt-in switch is hidden until expanded')
-  assert.match(await page.$eval(summarySelector, el => el.textContent), /了解并使用 Jev.*已关闭/)
+  assert.match(await page.$eval(summarySelector, el => el.textContent), /了解并使用智能决策辅助（实验）.*已关闭/)
   assert.equal((await submit('默认关闭的合成问题')).decisionAssistEnabled, false)
   await expandControl()
   await page.click(summarySelector)

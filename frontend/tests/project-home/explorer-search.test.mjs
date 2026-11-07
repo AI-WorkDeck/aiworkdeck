@@ -129,7 +129,7 @@ test('batch selection, unavailable search, no project and other panes do not off
 test('the files rail stays active while search is open and clears its active state when collapsed', () => {
   for (const leftPaneKey of ['files', 'plugin-search']) for (const sidebarCollapsed of [false, true]) {
     const vm = workbench({ leftPaneKey, sidebarCollapsed, LEFT_SIDEBAR_PLUGINS: [{ key: 'files', label: 'Files' }],
-      isMovablePanel: () => false, draggingRailKey: null })
+      isMovablePanel: () => false, draggingRailKey: null, railLabelOf: () => 'Files' })
     const [button] = byClass(rendered('rail-btn', vm), 'rail-btn')
     assert.equal(button.props.class.split(' ').includes('active'), !sidebarCollapsed)
   }

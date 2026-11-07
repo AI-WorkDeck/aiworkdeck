@@ -66,7 +66,7 @@ export default {
     "submitted": "Sedang menjana kapsyen. Kapsyen akan dipaparkan apabila siap.",
     "ready": "Kapsyen sudah sedia",
     "failed": "Penjanaan kapsyen gagal. Klik butang kapsyen untuk cuba lagi.",
-    "notConfigured": "Transkripsi belum dikonfigurasi. Tetapkannya dalam Tetapan Sistem - Perkhidmatan Platform - Transkripsi Mesyuarat untuk menjana kapsyen.",
+    "notConfigured": "Transkripsi belum dikonfigurasi. Tetapkannya dalam Tetapan - Perkhidmatan Platform - Transkripsi Mesyuarat untuk menjana kapsyen.",
     "noticePending": "Telah didaftarkan. Sahkan notis rakaman dalam Suara - Rakaman Mesyuarat dahulu, kemudian klik butang kapsyen.",
     "submitFailed": "Penjanaan kapsyen tidak dapat dimulakan",
     "empty": "Tiada pertuturan dikesan"
