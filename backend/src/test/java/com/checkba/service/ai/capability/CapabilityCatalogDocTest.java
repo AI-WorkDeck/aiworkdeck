@@ -67,9 +67,15 @@ class CapabilityCatalogDocTest {
     }
 
     @Test
-    void mcpServerExposesOnlyReadCapabilitiesBackedByRealAgentTools() {
+    void mcpServerExposesOnlyReadCapabilitiesPlusProposeRevisionBackedByRealAgentTools() {
         List<String> ids = catalog().stream().map(CapabilityCatalog.Capability::id).toList();
         for (LocalMcpServerTools.Definition def : LocalMcpServerTools.DEFINITIONS) {
+            // 唯一允许的写工具：propose_revision 只落待审记录，不改文件（agent-app-control.md C7）
+            if ("propose_revision".equals(def.name())) {
+                assertEquals(ToolMeta.Access.WRITE, def.access());
+                assertEquals("awd:project.propose", def.scope());
+                continue;
+            }
             assertEquals(ToolMeta.Access.READ, def.access(), def.name());
             assertTrue(def.scope().endsWith(".read"), def.name());
             for (String covered : def.coversAgentTools()) {

@@ -1,0 +1,17 @@
+// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// 外部 Agent（MCP propose_revision）待审修订：角标、编辑器顶栏与审阅列表
+export default {
+  bannerCount: "İncelemeyi bekleyen {count} harici düzeltme",
+  review: "İncele",
+  collapse: "Daralt",
+  source: "Kaynak: {source}",
+  reason: "Gerekçe: {reason}",
+  accept: "Kabul et ve değişiklik izleme olarak uygula",
+  reject: "Reddet",
+  stale: "Güncel değil",
+  staleHint: "Belge bu öneriden sonra değiştiği için uygulanamaz. Yine de görüntüleyebilir veya reddedebilirsiniz.",
+  applied: "Değişiklik izleme olarak uygulandı. Belgede tek tek kabul edin veya reddedin.",
+  needConversation: "Bir düzeltmeyi kabul etmeden önce düzenleyiciye bağlı bir YZ sohbeti açın.",
+  failed: "Başarısız: {message}",
+}

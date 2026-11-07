@@ -1,0 +1,17 @@
+// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// 外部 Agent（MCP propose_revision）待审修订：角标、编辑器顶栏与审阅列表
+export default {
+  bannerCount: "{count} revisión(es) externa(s) pendiente(s) de revisar",
+  review: "Revisar",
+  collapse: "Contraer",
+  source: "Origen: {source}",
+  reason: "Motivo: {reason}",
+  accept: "Aceptar y aplicar como control de cambios",
+  reject: "Rechazar",
+  stale: "Obsoleta",
+  staleHint: "El documento cambió después de esta propuesta y no se puede aplicar. Aún puede verla o rechazarla.",
+  applied: "Aplicada como control de cambios. Acéptela o recházala en el documento.",
+  needConversation: "Abra una conversación de IA (conectada al editor) antes de aceptar una revisión.",
+  failed: "Error: {message}",
+}

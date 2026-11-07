@@ -112,6 +112,7 @@ public class LocalMcpServerController {
     @PostMapping(value = "/mcp", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Object> mcp(@RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String auth,
                                       @RequestHeader(value = HttpHeaders.ORIGIN, required = false) String origin,
+                                      @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String clientName,
                                       @RequestBody(required = false) String rawBody) {
         if (!localIdentity.isLocalMode() || !settings.isEnabled()) return ResponseEntity.notFound().build();
         if (origin != null && !origin.isEmpty()) {
@@ -144,7 +145,7 @@ public class LocalMcpServerController {
             case "initialize" -> result = initializeResult(message.path("params").path("protocolVersion").asText(""));
             case "ping" -> result = Map.of();
             case "tools/list" -> result = Map.of("tools", toolList());
-            case "tools/call" -> result = callTool(message.path("params"));
+            case "tools/call" -> result = callTool(message.path("params"), clientName);
             default -> {
                 return ResponseEntity.ok(error(id, -32601, "Method not found: " + method));
             }
@@ -164,8 +165,9 @@ public class LocalMcpServerController {
         result.put("capabilities", Map.of("tools", Map.of("listChanged", false)));
         result.put("serverInfo", Map.of("name", "aiworkdeck", "title", ProductIdentity.PRODUCT_NAME,
                 "version", ProductIdentity.version()));
-        result.put("instructions", "Read-only access to the local AI WorkDeck projects. "
-                + "Start with list_projects, then list_project_files or search_project, then read_file.");
+        result.put("instructions", "Local AI WorkDeck projects. Start with list_projects, then list_project_files or search_project, then read_file. "
+                + "Files are never edited directly: propose_revision queues edits (use read_file's version as baseVersion) "
+                + "that the user reviews and accepts as tracked changes.");
         return result;
     }
 
@@ -175,14 +177,15 @@ public class LocalMcpServerController {
             tool.put("name", def.name());
             tool.put("description", def.description());
             tool.put("inputSchema", def.inputSchema());
-            tool.put("annotations", Map.of("readOnlyHint", true, "destructiveHint", false,
-                    "idempotentHint", true, "openWorldHint", false));
+            boolean read = def.access() == com.checkba.service.ai.tools.ToolMeta.Access.READ;
+            tool.put("annotations", Map.of("readOnlyHint", read, "destructiveHint", false,
+                    "idempotentHint", read, "openWorldHint", false));
             return tool;
         }).toList();
     }
 
     /** 工具层错误按 MCP 约定放进 result（isError=true），让调用它的模型看得见、能改参数重试。 */
-    private Map<String, Object> callTool(JsonNode params) {
+    private Map<String, Object> callTool(JsonNode params, String clientName) {
         if (!params.path("name").isTextual()) return null;
         String name = params.get("name").asText();
         JsonNode argsNode = params.path("arguments");
@@ -193,7 +196,7 @@ public class LocalMcpServerController {
         log.info("MCP tools/call name={} projectId={} fileId={}", name, args.get("projectId"), args.get("fileId"));
         Map<String, Object> result = new LinkedHashMap<>();
         try {
-            Object value = tools.call(name, args, userId);
+            Object value = tools.call(name, args, userId, clientName);
             result.put("content", List.of(Map.of("type", "text", "text", objectMapper.writeValueAsString(value))));
             result.put("isError", false);
         } catch (LocalMcpServerTools.ToolError e) {

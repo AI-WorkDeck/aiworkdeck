@@ -1084,6 +1084,7 @@
 </template>
 
 <script>
+import { setRevisionConversation } from '@/utils/pendingRevisionStore.js'
 import { selectableChatSkills } from '@/utils/chatSelectableSkills.mjs'
 import { getPendingAgentRestarts, resumeAgentRestart, getCloudAccountGeneration } from '@/services/api.js'
 import { fileChangesForBubble, summarizeFileChanges } from '@/utils/chatFileChange.js'
@@ -1593,6 +1594,8 @@ export default {
     // 刻意不加 immediate：挂载那一刻 currentConversationId 还是 null，立刻回写会把
     // 工作台正要读的那条记录当场抹掉——恢复永远不会发生，而且一点报错都没有。
     watch(currentConversationId, (id) => saveLastConversation(uniStorage, props.projectId, id))
+    // 待审修订接受时经后端桥把修订命令下发到这条 SSE 会话（PendingRevisionBar）
+    watch(currentConversationId, (id) => setRevisionConversation(id), { immediate: true })
 
     // Context Files (for drag-drop file context)
     const contextFiles = ref([])
