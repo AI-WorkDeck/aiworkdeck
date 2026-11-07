@@ -51,6 +51,8 @@ allowed_tools:
   # 腾讯会议专用工具
   - tmeet_list_meetings
   - tmeet_get_transcript
+  # 腾讯会议插件已安装并启用时以插件工具为准（此时 tmeet_* 不下发给模型）
+  - tencent_meeting_action
   # 日程与任务（落入系统项目日程管理）
   - task_create
   - task_list

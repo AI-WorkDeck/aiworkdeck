@@ -11,6 +11,7 @@ import com.checkba.repository.ProjectTaskFileRepository;
 import com.checkba.repository.ProjectTaskRepository;
 import com.checkba.repository.UserRepository;
 import com.checkba.service.ProjectMemberService;
+import com.checkba.service.ProjectService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,12 +68,14 @@ class ProjectTaskServiceTest {
     private UserRepository userRepository;
 
     private ProjectMemberService memberService;
+    private ProjectService projectService;
     private ProjectTaskService service;
 
     @BeforeEach
     void setUp() {
         memberService = mock(ProjectMemberService.class);
-        service = new ProjectTaskService(taskRepository, fileRepository, taskFileRepository, userRepository, memberService);
+        projectService = mock(ProjectService.class);
+        service = new ProjectTaskService(taskRepository, fileRepository, taskFileRepository, userRepository, memberService, projectService);
     }
 
     private User saveUser(String username, String displayName) {
@@ -426,5 +429,37 @@ class ProjectTaskServiceTest {
         Map<String, Object> empty = service.summarize(List.of(), today);
         assertEquals(0, empty.get("overdue"));
         assertNull(empty.get("nextDue"));
+    }
+
+    @Test
+    @DisplayName("listForUser：只聚合 getUserProjects 返回的项目，结果带 projectName，区间外与无权项目被排除")
+    void listForUserAggregatesOnlyAccessibleProjectsWithNames() {
+        com.checkba.model.entity.Project mine = new com.checkba.model.entity.Project();
+        mine.setId(101L);
+        mine.setName("我的案");
+        when(projectService.getUserProjects(7L)).thenReturn(List.of(mine));
+        taskRepository.save(rawTask(101L, "我的截止", LocalDate.of(2026, 9, 3)));
+        taskRepository.save(rawTask(101L, "区间外", LocalDate.of(2026, 12, 3)));
+        taskRepository.save(rawTask(202L, "别人的案", LocalDate.of(2026, 9, 3)));
+
+        List<Map<String, Object>> out = service.listForUser(7L, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 7));
+
+        assertEquals(1, out.size(), out.toString());
+        assertEquals("我的截止", out.get(0).get("title"));
+        assertEquals("我的案", out.get(0).get("projectName"));
+    }
+
+    private ProjectTask rawTask(Long projectId, String title, LocalDate due) {
+        ProjectTask t = new ProjectTask();
+        t.setUid(java.util.UUID.randomUUID().toString());
+        t.setUserId(7L);
+        t.setProjectId(projectId);
+        t.setTitle(title);
+        t.setDueDate(due);
+        t.setType("DEADLINE");
+        t.setStatus("OPEN");
+        t.setPriority("NORMAL");
+        t.setSource("user");
+        return t;
     }
 }

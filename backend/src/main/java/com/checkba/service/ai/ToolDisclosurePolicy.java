@@ -294,6 +294,9 @@ public class ToolDisclosurePolicy {
                 "公司背景", "tushare", "股票", "上市公司"));
         CATEGORY_KEYWORDS.put("plugin", List.of("插件", "plugin", "能力安装", "capability"));
         CATEGORY_KEYWORDS.put("meeting", List.of("会议", "录音", "纪要", "转写", "meeting", "transcript"));
+        // 插件工具统一落 plugin-tools；腾讯会议插件的 tencent_meeting_action 靠这些词在首轮就可见
+        CATEGORY_KEYWORDS.put("plugin-tools", List.of("会议", "纪要", "腾讯会议", "逐字稿", "转写",
+                "meeting minutes", "tencent meeting", "transcript"));
         CATEGORY_KEYWORDS.put("python", List.of("python", "脚本", "计算一下", "跑一段代码"));
         // 「表格」两边都放：docx 里说的「表格」是文档内的表（table 类目的 doc_table_*），
         // xlsx 会话或「做一张表格」说的是电子表格；分不清就两类都放回，多付的是一轮里两类的规格。

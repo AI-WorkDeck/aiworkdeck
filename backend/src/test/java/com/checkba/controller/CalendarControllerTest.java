@@ -59,7 +59,7 @@ class CalendarControllerTest {
             IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                     () -> controller.list(null, null, null));
             assertEquals("未登录", e.getMessage());
-            verify(taskService, never()).listAcrossProjects(any(), any(), any());
+            verify(taskService, never()).listForUser(any(), any(), any());
         }
     }
 
@@ -67,8 +67,7 @@ class CalendarControllerTest {
     void noVisibleProjectsReturnsEmptyTasks() {
         try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(1L);
-            when(projectService.getUserProjects(1L)).thenReturn(List.of());
-            when(taskService.listAcrossProjects(List.of(), null, null)).thenReturn(List.of());
+            when(taskService.listForUser(1L, null, null)).thenReturn(List.of());
 
             Map<String, Object> resp = controller.list(null, null, "sess").getBody();
             assertNotNull(resp);
@@ -79,39 +78,22 @@ class CalendarControllerTest {
     }
 
     @Test
-    void aggregatesTasksAcrossVisibleProjectsAndFillsProjectName() {
+    void delegatesCrossProjectAggregationToServiceWithDateRange() {
         try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(1L);
-            when(projectService.getUserProjects(1L)).thenReturn(List.of(
-                    project(1L, "金冠纾困"), project(2L, "另一个项目")));
-
             Map<String, Object> t1 = new LinkedHashMap<>();
             t1.put("id", 10L);
-            t1.put("projectId", 1L);
-            t1.put("title", "开庭");
-            t1.put("dueDate", LocalDate.of(2026, 9, 1));
+            t1.put("projectName", "金冠纾困");
+            LocalDate from = LocalDate.of(2026, 9, 1);
+            LocalDate to = LocalDate.of(2026, 9, 7);
+            when(taskService.listForUser(1L, from, to)).thenReturn(List.of(t1));
 
-            Map<String, Object> t2 = new LinkedHashMap<>();
-            t2.put("id", 11L);
-            t2.put("projectId", 2L);
-            t2.put("title", "答辩");
-            t2.put("dueDate", LocalDate.of(2026, 9, 2));
-
-            ArgumentCaptor<List<Long>> idsCaptor = ArgumentCaptor.forClass(List.class);
-            when(taskService.listAcrossProjects(idsCaptor.capture(), any(), any()))
-                    .thenReturn(List.of(t1, t2));
-
-            Map<String, Object> resp = controller.list(null, null, "sess").getBody();
+            Map<String, Object> resp = controller.list(from, to, "sess").getBody();
             assertNotNull(resp);
             assertEquals(0, resp.get("code"));
             @SuppressWarnings("unchecked")
             Map<String, Object> data = (Map<String, Object>) resp.get("data");
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> tasks = (List<Map<String, Object>>) data.get("tasks");
-            assertEquals(2, tasks.size());
-            assertTrue(tasks.stream().anyMatch(t -> "金冠纾困".equals(t.get("projectName")) && t.get("id").equals(10L)));
-            assertTrue(tasks.stream().anyMatch(t -> "另一个项目".equals(t.get("projectName")) && t.get("id").equals(11L)));
-            assertTrue(idsCaptor.getValue().containsAll(List.of(1L, 2L)));
+            assertEquals(List.of(t1), data.get("tasks"));
         }
     }
 

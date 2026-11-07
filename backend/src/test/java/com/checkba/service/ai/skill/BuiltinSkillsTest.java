@@ -121,6 +121,15 @@ class BuiltinSkillsTest {
     }
 
     @Test
+    @DisplayName("腾讯会议：内置 skill 与插件自带 skill 的白名单都放行 tencent_meeting_action")
+    void tencentMeetingSkillsAllowThePluginTool() throws Exception {
+        assertTrue(registry.getSkill("tencent-meeting").orElseThrow().getAllowedTools().contains("tencent_meeting_action"));
+        Path pluginSkill = Path.of("..", "official-plugins", "tencent-meeting", "skill", "skill.yml");
+        assertTrue(Files.readString(pluginSkill).contains("  - tencent_meeting_action"),
+                "插件 skill 是 restrict，白名单漏列插件工具会在触发词命中时把它裁掉");
+    }
+
+    @Test
     void contractReviewChecksDraftFactsWithoutRewritingFutureObligationsAsUnverified() {
         var skill = registry.getSkill("contract-review").orElseThrow();
         assertTrue(skill.getPromptTemplate().contains("草稿自述不能自证"));
@@ -209,7 +218,8 @@ class BuiltinSkillsTest {
         List<String> bogus = new ArrayList<>();
         for (SkillDefinition skill : registry.getSkills()) {
             for (String tool : skill.getAllowedTools()) {
-                if (!realToolNames.contains(tool)) {
+                // 插件工具（腾讯会议插件的 JAR 工具）不在内置扫描范围内
+                if (!realToolNames.contains(tool) && !"tencent_meeting_action".equals(tool)) {
                     bogus.add(skill.getId() + " -> " + tool);
                 }
             }

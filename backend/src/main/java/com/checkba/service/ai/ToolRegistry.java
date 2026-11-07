@@ -787,7 +787,9 @@ public class ToolRegistry {
     public List<ToolSpecification> getAllSpecifications() {
         List<ToolSpecification> all = new ArrayList<>();
         Map<AgentToolComponent, Boolean> availability = new java.util.IdentityHashMap<>();
+        boolean tmeetPluginActive = tencentMeetingPluginActive();
         for (ToolSpecification spec : builtinSpecifications) {
+            if (tmeetPluginActive && spec.name().startsWith("tmeet_")) continue;
             Object owner = builtinTools.get(spec.name()).bean();
             if (!(owner instanceof AgentToolComponent component)
                     || availability.computeIfAbsent(component, this::componentAvailable)) all.add(spec);
@@ -858,6 +860,12 @@ public class ToolRegistry {
      * 插件启停过滤：内置工具（不属于任何插件，pid == null）恒可见；
      * 插件工具仅在所属插件启用时可见。
      */
+    /** 腾讯会议插件已安装且启用：以插件工具 tencent_meeting_action 为准，不再向模型提供内置 tmeet_*（未装则保留）。 */
+    private boolean tencentMeetingPluginActive() {
+        String pid = pluginService.getPluginIdForTool("tencent_meeting_action");
+        return pid != null && pluginService.isEnabled(pid);
+    }
+
     private boolean pluginToolEnabled(String toolName) {
         String pid = pluginService.getPluginIdForTool(toolName);
         return pid == null || pluginService.isEnabled(pid);
