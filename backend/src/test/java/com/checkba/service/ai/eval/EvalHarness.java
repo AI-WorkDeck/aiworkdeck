@@ -168,6 +168,12 @@ public final class EvalHarness {
         toolBeans.stream()
                 .filter(bean -> bean instanceof com.checkba.service.ai.tools.ToolDiscoveryTools)
                 .forEach(bean -> ((com.checkba.service.ai.tools.ToolDiscoveryTools) bean).setSkillRouter(skillRouter));
+        // run_python 只在本机 Docker 可用时下发（PythonTools 探测 `docker version`）。CI 机器有 Docker、多数开发机与
+        // 律师电脑没有，不钉住的话同一提交在两边下发的工具面不同（tool-surface 基线差一个 run_python）。
+        // 评测一律按「无 Docker」——这也是律师桌面端的常态。
+        toolBeans.stream()
+                .filter(bean -> bean instanceof com.checkba.service.ai.tools.PythonTools)
+                .forEach(EvalHarness::pinDockerUnavailable);
         RecordingToolRegistry registry = new RecordingToolRegistry(toolBeans, pluginService);
         registry.init();
         registry.setStubs(c.toolStubs);
@@ -340,5 +346,15 @@ public final class EvalHarness {
             }
         }
         return "skills";
+    }
+
+    private static void pinDockerUnavailable(com.checkba.service.ai.tools.AgentToolComponent python) {
+        try {
+            java.lang.reflect.Field f = com.checkba.service.ai.tools.PythonTools.class.getDeclaredField("dockerAvailable");
+            f.setAccessible(true);
+            f.set(python, Boolean.FALSE);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("PythonTools.dockerAvailable 改名了？评测需要钉住 Docker 可用性", e);
+        }
     }
 }
