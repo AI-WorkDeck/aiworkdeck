@@ -94,7 +94,8 @@ public class LegalTools implements AgentToolComponent {
         if (t.contains("validation error for call[")) {
             return false;
         }
-        return t.startsWith("Error from MCP server") || t.contains("Unknown tool");
+        return t.startsWith("Error from MCP server") || t.contains("Unknown tool")
+                || t.contains("MCP server has no credential");
     }
 
     /**

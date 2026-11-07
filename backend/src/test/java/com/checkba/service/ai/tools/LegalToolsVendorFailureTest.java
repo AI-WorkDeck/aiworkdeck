@@ -50,4 +50,11 @@ class LegalToolsVendorFailureTest {
         assertTrue(LegalTools.pkulawToolNames().containsAll(
                 java.util.Set.of("law_search", "get_law_article", "case_search")));
     }
+
+    @Test
+    void noCredentialBecomesVendorUnavailable() {
+        String out = toolsReturning("Error: MCP server has no credential: pkulaw-semantic").law_search("x");
+        assertTrue(LegalTools.isVendorUnavailable(out), out);
+        assertTrue(out.contains("has no credential"), out);
+    }
 }

@@ -143,4 +143,30 @@ class HarnessDiagnosticServiceTest {
         assertTrue(a.isPresent());
         assertEquals(HarnessDiagnosticService.ACTION_CLARIFY_WITH_USER, a.get().actionType());
     }
+
+    @Test
+    void credentialAndKeyMissingErrorsAreUnavailableNotCategoryHintsOrGuard() {
+        String noCred = "Error: MCP server has no credential: pkulaw-semantic";
+        String noKey = "错误：网络搜索未配置：当前部署未提供博查（Bocha AI）搜索的 API Key。本次已跳过网络搜索";
+        assertTrue(HarnessDiagnosticService.isToolUnavailable(noCred));
+        assertTrue(HarnessDiagnosticService.isToolUnavailable(noKey));
+        assertTrue(HarnessDiagnosticService.isToolUnavailable("Error searching web: Bocha API returned 502 Bad Gateway"));
+        assertTrue(!HarnessDiagnosticService.isToolUnavailable("Error: no files matched"));
+
+        assertTrue(diagnosticService.diagnoseAndAdapt("c", "r", "民法典第1082条是什么", "get_law_article",
+                "{}", noCred, 1, new HashSet<>(), List.of()).isEmpty());
+        // search_web 属 SEARCH_LOOKUP 之外也不得触发 ask_user；连续失败 >=2 同样不触发
+        assertTrue(diagnosticService.diagnoseAndAdapt("c", "r", "查一下", "search_web",
+                "{}", noKey, 2, new HashSet<>(), List.of()).isEmpty());
+    }
+
+    @Test
+    void toolOutputNeverDrivesCategoryExpansion() {
+        // 输出里有 mcp / 表格 等类目关键词，但指令和参数里没有
+        Set<String> expanded = new HashSet<>();
+        Optional<HarnessDiagnosticService.HarnessAdaptation> a = diagnosticService.diagnoseAndAdapt(
+                "c", "r", "你好", "some_tool", "{}", "Error: please use the MCP table tools", 1, expanded, List.of());
+        assertTrue(a.isEmpty() || !HarnessDiagnosticService.ACTION_EXPAND_TOOL_CATEGORY.equals(a.get().actionType()));
+        assertTrue(expanded.isEmpty());
+    }
 }

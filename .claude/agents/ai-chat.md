@@ -1904,3 +1904,4 @@ SSE query 都显式携带范围；不匹配的普通面板连接在替换 emitte
 - **`list_tools(category)`** 也列核心集里同类的工具，标 `(already available)` 不重复签名；`get_law_article` 补进 legal 类目规则（`ToolDisclosurePolicy.ruleCategoryOf`）。
 - 桌面 BYOK/直连：`application.yml` 的 `pkulaw-*` 全部指向聚合端点 `mcp-law-agg/mcp`，server 名不变。
 - 回归：`LegalToolsVendorFailureTest`、`LegalVendorFailureReplayEvalTest`、`HarnessDiagnosticServiceTest`、`ToolDiscoveryToolsSearchTest`。
+- **泛化（同日复测）**：类目展开永不从工具输出推导，只看用户指令/参数与失败工具名自身类目。`HarnessDiagnosticService.isToolUnavailable` 把「无凭证 / Key 未配置 / 未连接 / 上游 4xx5xx / 上游 Unknown tool」统一判为工具不可用：不展开类目、不触发 ask_user 护栏；编排器改追加「[Harness 工具不可用]」说明（法宝已带自己的说明并保留本轮整体下线）。`LegalTools` 把 `MCP server has no credential` 也归入法源不可用。
