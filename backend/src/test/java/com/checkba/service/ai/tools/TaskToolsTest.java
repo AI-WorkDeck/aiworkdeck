@@ -67,7 +67,7 @@ class TaskToolsTest {
                 .thenReturn(task(5L, "提交答辩状", LocalDate.of(2026, 9, 1), LocalTime.of(9, 30)));
 
         String out = tools.task_create("提交答辩状", "2026-09-01", "09:30", null,
-                null, null, null, null, null, null, 1L, 10L);
+                null, null, null, null, null, null, null, 1L, 10L);
 
         assertTrue(out.contains("提交答辩状"), out);
         assertTrue(out.contains("id=5"), out);
@@ -80,10 +80,10 @@ class TaskToolsTest {
     @DisplayName("task_create：dueDate 缺失/格式非法——不调用 service，返回可行动错误")
     void createRejectsBadDueDate() {
         String out = tools.task_create("任务", "not-a-date", null, null,
-                null, null, null, null, null, null, 1L, 10L);
+                null, null, null, null, null, null, null, 1L, 10L);
 
         assertTrue(out.startsWith("错误"), out);
-        verifyNoInteractions(taskService);
+        verify(taskService, never()).createAiTask(any(), any(ProjectTaskService.TaskDraft.class), any());
     }
 
     @Test
@@ -93,7 +93,7 @@ class TaskToolsTest {
                 .thenThrow(new IllegalArgumentException("文件不属于该项目"));
 
         String out = tools.task_create("任务", "2026-09-01", null, 99L,
-                null, null, null, null, null, null, 1L, 10L);
+                null, null, null, null, null, null, null, 1L, 10L);
 
         assertFalse(out.isBlank());
         assertTrue(out.contains("文件不属于该项目"), out);
@@ -199,7 +199,7 @@ class TaskToolsTest {
         when(taskService.createAiTask(eq(1L), eq(expected), eq(10L))).thenReturn(created);
 
         String out = tools.task_create("开庭", "2026-10-12", "09:30", 7L,
-                "HEARING", "带原件", "HIGH", "12， 15", 2L, 1440, 1L, 10L);
+                "HEARING", "带原件", "HIGH", "12， 15", 2L, 1440, null, 1L, 10L);
 
         assertTrue(out.contains("开庭"), out);
         assertTrue(out.contains("id=6"), out);
@@ -210,9 +210,9 @@ class TaskToolsTest {
     @DisplayName("task_create：fileIds 不是数字——不调用 service，返回以「错误」开头的文案")
     void createRejectsBadFileIds() {
         String out = tools.task_create("x", "2026-10-12", null, null,
-                null, null, null, "12,abc", null, null, 1L, 10L);
+                null, null, null, "12,abc", null, null, null, 1L, 10L);
         assertTrue(out.startsWith("错误"), out);
-        verifyNoInteractions(taskService);
+        verify(taskService, never()).createAiTask(any(), any(ProjectTaskService.TaskDraft.class), any());
     }
 
     @Test
@@ -221,7 +221,7 @@ class TaskToolsTest {
         when(taskService.createAiTask(eq(1L), any(ProjectTaskService.TaskDraft.class), eq(10L)))
                 .thenThrow(new IllegalArgumentException("type 只能是 DEADLINE/HEARING/MEETING/TODO/OTHER"));
         String out = tools.task_create("x", "2026-10-12", null, null,
-                "PARTY", null, null, null, null, null, 1L, 10L);
+                "PARTY", null, null, null, null, null, null, 1L, 10L);
         assertTrue(out.startsWith("错误"), out);
         assertTrue(out.contains("DEADLINE"), out);
     }
@@ -310,5 +310,68 @@ class TaskToolsTest {
         assertTrue(out.contains("负责人：韩泽伟"), out);
         assertTrue(out.contains("起诉状.docx、证据清单.xlsx"), out);
         assertTrue(out.contains("截止日"), "type 缺省按截止日展示：" + out);
+    }
+
+    private static com.checkba.model.entity.Project project(long id, String name) {
+        var p = new com.checkba.model.entity.Project();
+        p.setId(id);
+        p.setName(name);
+        return p;
+    }
+
+    @Test
+    @DisplayName("task_create projectName：精确匹配优先于当前项目，写入匹配项目")
+    void taskCreateProjectNameExactWinsOverConversationProject() {
+        when(taskService.findWritableProjectsByName(10L, "张三案")).thenReturn(List.of(project(5L, "张三案")));
+        ProjectTask created = new ProjectTask();
+        created.setId(1L);
+        created.setTitle("开庭");
+        created.setDueDate(LocalDate.of(2026, 12, 2));
+        when(taskService.createAiTask(eq(5L), any(ProjectTaskService.TaskDraft.class), eq(10L))).thenReturn(created);
+        String out = tools.task_create("开庭", "2026-12-02", "10:00", null, null, null, null, null, null, null, "张三案", 1L, 10L);
+        assertTrue(out.startsWith("已创建"), out);
+        verify(taskService, never()).createAiTask(eq(1L), any(ProjectTaskService.TaskDraft.class), any());
+    }
+
+    @Test
+    @DisplayName("task_create projectName：包含匹配唯一命中时使用；服务层给出单个候选即可")
+    void taskCreateProjectNameContainsUnique() {
+        when(taskService.findWritableProjectsByName(10L, "张三")).thenReturn(List.of(project(6L, "张三劳动争议案")));
+        ProjectTask created = new ProjectTask();
+        created.setId(2L);
+        created.setTitle("x");
+        created.setDueDate(LocalDate.of(2026, 12, 2));
+        when(taskService.createAiTask(eq(6L), any(ProjectTaskService.TaskDraft.class), eq(10L))).thenReturn(created);
+        assertTrue(tools.task_create("x", "2026-12-02", null, null, null, null, null, null, null, null, "张三", null, 10L).startsWith("已创建"));
+    }
+
+    @Test
+    @DisplayName("task_create projectName：有歧义——不创建，列最多 5 个候选并让模型问用户")
+    void taskCreateProjectNameAmbiguous() {
+        when(taskService.findWritableProjectsByName(10L, "案")).thenReturn(List.of(
+                project(1L, "A案"), project(2L, "B案"), project(3L, "C案"), project(4L, "D案"), project(5L, "E案"), project(6L, "F案")));
+        String out = tools.task_create("x", "2026-12-02", null, null, null, null, null, null, null, null, "案", 1L, 10L);
+        assertTrue(out.startsWith("错误") && out.contains("A案") && out.contains("E案") && !out.contains("F案"), out);
+        verify(taskService, never()).createAiTask(any(), any(ProjectTaskService.TaskDraft.class), any());
+    }
+
+    @Test
+    @DisplayName("task_create projectName：没找到——不创建")
+    void taskCreateProjectNameNone() {
+        when(taskService.findWritableProjectsByName(10L, "不存在")).thenReturn(List.of());
+        String out = tools.task_create("x", "2026-12-02", null, null, null, null, null, null, null, null, "不存在", 1L, 10L);
+        assertTrue(out.startsWith("错误"), out);
+        verify(taskService, never()).createAiTask(any(), any(ProjectTaskService.TaskDraft.class), any());
+    }
+
+    @Test
+    @DisplayName("task_create：当前是 SCRATCH 或无项目且没给 projectName——不静默写入，要求询问用户")
+    void taskCreateScratchCountsAsNoProject() {
+        when(taskService.isScratchProject(99L)).thenReturn(true);
+        for (Long pid : new Long[]{99L, null}) {
+            String out = tools.task_create("x", "2026-12-02", null, null, null, null, null, null, null, null, null, pid, 10L);
+            assertTrue(out.startsWith("错误") && out.contains("projectName"), out);
+        }
+        verify(taskService, never()).createAiTask(any(), any(ProjectTaskService.TaskDraft.class), any());
     }
 }

@@ -52,17 +52,31 @@ public class TaskTools implements AgentToolComponent {
             @P(value = "关联的项目内文件ID，多个用英文逗号分隔（如 12,15），须来自 doc_list_project_files 等工具返回的 fileId", required = false) String fileIds,
             @P(value = "负责人用户ID（可选），必须是本项目成员", required = false) Long assigneeId,
             @P(value = "提前多少分钟提醒（可选）：0=准时，60=提前1小时，1440=提前1天；不填表示不提醒", required = false) Integer remindBefore,
+            @P(value = "目标项目名称（可选）：用户点名了某个案子/项目时必填，按名称精确或包含匹配；优先于当前对话所在项目。当前对话没有绑定正式项目时也必须提供", required = false) String projectName,
             Long projectId,
             Long userId
     ) {
         log.info("Tool: task_create title='{}' dueDate={} dueTime={} type={} fileId={} fileIds={} project={}",
                 title, dueDate, dueTime, type, fileId, fileIds, projectId);
 
-        if (projectId == null) {
-            return "错误：无法获取当前项目ID，请在项目上下文中使用此工具。";
-        }
         if (userId == null) {
             return "错误：无法获取当前用户身份，任务未创建。";
+        }
+        if (projectName != null && !projectName.isBlank()) {
+            List<com.checkba.model.entity.Project> matches = projectTaskService.findWritableProjectsByName(userId, projectName);
+            if (matches.isEmpty()) {
+                return "错误：没有找到名为「" + projectName.trim() + "」且你有写权限的项目，任务未创建。请向用户确认项目名称。";
+            }
+            if (matches.size() > 1) {
+                StringBuilder sb = new StringBuilder("错误：「" + projectName.trim() + "」匹配到多个项目，任务未创建。请向用户确认是哪一个：");
+                matches.stream().limit(5).forEach(p -> sb.append("\n- ").append(p.getName()).append("（id=").append(p.getId()).append("）"));
+                if (matches.size() > 5) sb.append("\n- …等共 ").append(matches.size()).append(" 个");
+                return sb.toString();
+            }
+            projectId = matches.get(0).getId();
+        } else if (projectId == null || projectTaskService.isScratchProject(projectId)) {
+            // 随手工作区（SCRATCH）不是用户指的项目：不静默写进去
+            return "错误：当前对话没有绑定正式项目，任务未创建。请询问用户要加到哪个项目，并用 projectName 指定。";
         }
         LocalDate parsedDueDate = parseDate(dueDate);
         if (parsedDueDate == null) {

@@ -138,6 +138,11 @@ public class HostServiceRegistry {
         if (projectId == null || projectId <= 0) {
             throw new IllegalArgumentException(LangText.of("缺少目标项目（projectId）", "projectId is required"));
         }
+        if (write && tasks.isScratchProject(projectId)) {
+            // 随手工作区（SCRATCH）不是用户指的项目：写入必须明确目标，不静默落进去
+            throw new IllegalArgumentException(LangText.of("当前没有绑定正式项目，请先询问用户要写入哪个项目并传 projectId",
+                    "No project is selected; ask the user which project to write to and pass projectId"));
+        }
         boolean allowed = write
                 ? members.hasWritePermission(projectId, call.userId()) && !members.isClient(projectId, call.userId())
                 : members.hasReadPermission(projectId, call.userId());

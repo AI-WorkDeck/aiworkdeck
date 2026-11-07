@@ -2,7 +2,5 @@
   "plugin.name": "Takvim",
   "plugin.description": "Projeler arası takvim, görevler, hatırlatıcılar ve dosya bağlantıları.",
   "view.sidebar.name": "Takvim",
-  "view.main.name": "Takvim",
-  "tool.calendar_agenda.description": "Kullanıcının görebildiği tüm projelerdeki takvim öğelerini (süreler, duruşmalar, toplantılar, görevler) bir tarih aralığında proje adıyla birlikte listeler. \"Bu hafta nelerin süresi doluyor\" gibi sorular için kullanılır.",
-  "tool.calendar_create.description": "Bir projede takvim öğesi (süre, duruşma, toplantı veya görev) oluşturur; ardından proje takviminde görünür."
+  "view.main.name": "Takvim"
 }

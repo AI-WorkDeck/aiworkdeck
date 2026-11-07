@@ -285,6 +285,33 @@ public class ProjectTaskService {
         return tasks;
     }
 
+    /** 隐藏的随手工作区（SCRATCH）：写入类工具不得把它当作用户指的项目。查不到视为否。 */
+    public boolean isScratchProject(Long projectId) {
+        if (projectId == null) return false;
+        try {
+            return projectService.getProject(projectId).isScratchWorkspace();
+        } catch (RuntimeException notFound) {
+            return false;
+        }
+    }
+
+    /**
+     * 按名称在用户可写的非 SCRATCH 项目里找：先精确（忽略大小写）匹配，没有再取「名称包含」匹配。
+     * 返回 0 个 = 没找到，1 个 = 唯一，多个 = 有歧义（调用方列候选并让用户选）。
+     */
+    public List<Project> findWritableProjectsByName(Long userId, String name) {
+        String needle = name == null ? "" : name.trim().toLowerCase();
+        if (needle.isEmpty()) return List.of();
+        List<Project> writable = projectService.getUserProjects(userId).stream()
+                .filter(p -> !p.isScratchWorkspace() && p.getName() != null)
+                .filter(p -> projectMemberService.hasWritePermission(p.getId(), userId)
+                        && !projectMemberService.isClient(p.getId(), userId))
+                .toList();
+        List<Project> exact = writable.stream().filter(p -> p.getName().trim().toLowerCase().equals(needle)).toList();
+        if (!exact.isEmpty()) return exact;
+        return writable.stream().filter(p -> p.getName().toLowerCase().contains(needle)).toList();
+    }
+
     /** 单任务响应体（含 fileName）。create/update 端点用，字段集与列表端点完全一致。 */
     public Map<String, Object> toResponseMap(ProjectTask t) {
         return toMaps(List.of(t)).get(0);

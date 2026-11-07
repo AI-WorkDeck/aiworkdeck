@@ -89,6 +89,19 @@ class HostServiceRegistryTest {
     }
 
     @Test
+    void writeToScratchProjectIsRefusedEvenForMembers() {
+        when(tasks.isScratchProject(77L)).thenReturn(true);
+        when(members.hasWritePermission(77L, 7L)).thenReturn(true);
+        var e = assertThrows(IllegalArgumentException.class, () -> registry.invoke("calendar", "create", 7L, 77L,
+                Map.of("title", "x", "dueDate", "2026-12-01")));
+        assertTrue(e.getMessage().contains("projectId"));
+        verify(tasks, never()).createAiTask(any(), any(ProjectTaskService.TaskDraft.class), any());
+        // 读不受影响
+        when(members.hasReadPermission(77L, 7L)).thenReturn(true);
+        registry.invoke("calendar", "list", 7L, 77L, Map.of());
+    }
+
+    @Test
     void updateAndDeleteCheckTheProjectOwningTheTask() {
         ProjectTask task = new ProjectTask();
         task.setId(3L);

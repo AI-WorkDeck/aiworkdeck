@@ -2,7 +2,5 @@
   "plugin.name": "Kalender",
   "plugin.description": "Kalender lintas proyek, tugas, pengingat, dan tautan berkas.",
   "view.sidebar.name": "Kalender",
-  "view.main.name": "Kalender",
-  "tool.calendar_agenda.description": "Menampilkan item kalender (tenggat, sidang, rapat, tugas) dari semua proyek yang terlihat oleh pengguna dalam rentang tanggal, lengkap dengan nama proyek. Gunakan untuk pertanyaan seperti \"apa yang jatuh tempo minggu ini\".",
-  "tool.calendar_create.description": "Membuat item kalender (tenggat, sidang, rapat, atau tugas) di sebuah proyek; item tersebut kemudian muncul di kalender proyek."
+  "view.main.name": "Kalender"
 }

@@ -2,7 +2,5 @@
   "plugin.name": "Kalender",
   "plugin.description": "Projektübergreifender Kalender, Aufgaben, Erinnerungen und Dateilinks.",
   "view.sidebar.name": "Kalender",
-  "view.main.name": "Kalender",
-  "tool.calendar_agenda.description": "Listet Kalendereinträge (Fristen, Verhandlungen, Besprechungen, Aufgaben) aus allen für den Nutzer sichtbaren Projekten in einem Datumsbereich, jeweils mit Projektnamen. Für Fragen wie „Was ist diese Woche fällig?“.",
-  "tool.calendar_create.description": "Legt in einem Projekt einen Kalendereintrag an (Frist, Verhandlung, Besprechung oder Aufgabe); er erscheint anschließend im Projektkalender."
+  "view.main.name": "Kalender"
 }

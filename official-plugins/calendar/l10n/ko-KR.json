@@ -2,7 +2,5 @@
   "plugin.name": "캘린더",
   "plugin.description": "프로젝트 전반의 캘린더, 작업, 알림 및 파일 링크입니다.",
   "view.sidebar.name": "캘린더",
-  "view.main.name": "캘린더",
-  "tool.calendar_agenda.description": "날짜 범위 내에서 사용자가 볼 수 있는 모든 프로젝트의 일정 항목(기한, 기일, 회의, 할 일)을 프로젝트 이름과 함께 나열합니다. \"이번 주 마감이 뭐야\" 같은 질문에 사용합니다.",
-  "tool.calendar_create.description": "프로젝트에 일정 항목(기한, 기일, 회의, 할 일)을 만듭니다. 만든 뒤 프로젝트 일정에 표시됩니다."
+  "view.main.name": "캘린더"
 }
