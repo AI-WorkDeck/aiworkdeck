@@ -28,10 +28,24 @@ export interface McpServerDeclaration {
   id: string; transport: 'streamable-http'; url: string; credentialKey?: string; connectionId?: string;
   tools: { name: string; description: string; inputSchema: McpObjectSchema }[];
 }
+/** Legacy JAR tool: name is the @Tool method name. */
+export interface LegacyToolDeclaration { name: string; description?: string; permissions?: Permission[]; [key: string]: unknown }
+export type ToolHandler =
+  | { type: 'jar' }
+  | { type: 'service'; service: string; operation: string }
+  | { type: 'connection'; connectionId: string; operation: string }
+  /** Phase 4, not yet executable. */
+  | { type: 'view'; viewId: string };
+/** Declarative Agent tool (spec v2.13, section 20). Non-JAR names must start with `<pluginId with - as _>_`. */
+export interface DeclarativeToolDeclaration {
+  name: string; description: string; access: 'read' | 'write' | 'destructive';
+  inputSchema?: McpObjectSchema; handler?: ToolHandler; permissions?: Permission[];
+  mcp?: boolean; confirm?: 'auto' | 'always' | 'never'; keywords?: string[];
+}
 export interface PluginManifest {
   $schema?: string; id: string; name: string; version: string; description?: string; author?: string; homepage?: string; icon?: string;
   minHostVersion?: string; frontendEntry?: string; permissions?: Permission[]; backendJars?: string[]; skills?: string[]; packs?: string[];
-  tools?: { name: string; description?: string; [key: string]: unknown }[];
+  tools?: (LegacyToolDeclaration | DeclarativeToolDeclaration)[];
   settings?: SettingDeclaration[]; guide?: Record<string, unknown>;
   contributes?: {
     mcpServers?: McpServerDeclaration[];

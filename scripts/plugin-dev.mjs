@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const sdkDir = path.join(repo, 'sdk/plugin-sdk')
 const schema = JSON.parse(await fs.readFile(path.join(sdkDir, 'manifest.schema.json'), 'utf8'))
+const hostServices = JSON.parse(await fs.readFile(path.join(sdkDir, 'services.json'), 'utf8')).services
 const MAX_BYTES = 20 * 1024 * 1024
 const MAX_FILES = 200
 const excludedName = /^(?:\.env(?:\..*)?|\.git|\.ssh|\.aws|\.npmrc|node_modules|\.DS_Store|\.awd-(?:dev|bundled|service-trust)(?:-.*)?|credentials(?:\..*)?|secrets?(?:\..*)?|tokens?(?:\..*)?|api[-_]?key(?:\..*)?|service[-_]?account(?:\..*)?|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?|.*\.(?:pem|key|p12|pfx|keystore|zip))$/i
@@ -19,6 +20,8 @@ export function validateSchema(value, rule = schema, location = '$') {
   const fail = message => errors.push(location + ': ' + message)
   if (Object.hasOwn(rule, 'const') && value !== rule.const) fail('expected ' + rule.const)
   if (rule.oneOf && rule.oneOf.filter(choice => validateSchema(value, choice, location).length === 0).length !== 1) fail('must match exactly one declared variant')
+  if (rule.anyOf && !rule.anyOf.some(choice => validateSchema(value, choice, location).length === 0)) fail('must match at least one declared variant')
+  if (rule.not && validateSchema(value, rule.not, location).length === 0) fail('matches a forbidden variant')
   if (rule.enum && !rule.enum.includes(value)) fail('expected one of ' + rule.enum.join(', '))
   const actual = Array.isArray(value) ? 'array' : value === null ? 'null' : typeof value
   if (rule.type && actual !== rule.type) { fail('expected ' + rule.type); return errors }
@@ -87,6 +90,7 @@ export async function validatePlugin(directory) {
   if (!manifestFile) throw new Error('manifest.json is required at package root')
   let manifest
   try { manifest = JSON.parse(manifestFile.data.toString('utf8')) } catch { throw new Error('manifest.json: invalid JSON') }
+  validateDeclaredTools(manifest)
   const errors = validateSchema(manifest)
   if (errors.length) throw new Error(errors.join('\n'))
   const names = new Set(files.map(f => f.name))
@@ -145,6 +149,38 @@ export async function validatePlugin(directory) {
   return { root, manifest, files, excluded, bytes: total }
 }
 
+const DECLARATIVE_KEYS = ['access', 'handler', 'inputSchema', 'mcp', 'confirm', 'keywords']
+// Declarative Agent tools (spec section 20). Runs before schema validation so authors get a specific message.
+export function validateDeclaredTools(manifest) {
+  if (!Array.isArray(manifest.tools)) return
+  const prefix = String(manifest.id).replace(/-/g, '_') + '_'
+  const seen = new Set()
+  for (const tool of manifest.tools) {
+    if (!tool || typeof tool !== 'object' || !DECLARATIVE_KEYS.some(key => Object.hasOwn(tool, key))) continue
+    const label = 'tools.' + tool.name + ': '
+    if (seen.has(tool.name)) throw new Error(label + 'duplicate tool name')
+    seen.add(tool.name)
+    if (typeof tool.description !== 'string' || !tool.description.trim()) throw new Error(label + 'description must not be blank')
+    if (!['read', 'write', 'destructive'].includes(tool.access)) throw new Error(label + 'access is required: read | write | destructive')
+    const handler = tool.handler ?? { type: 'jar' }
+    if (handler.type !== 'jar' && !String(tool.name).startsWith(prefix)) throw new Error(label + 'non-JAR tool name must start with ' + prefix)
+    for (const permission of tool.permissions || []) {
+      if (!(manifest.permissions || []).includes(permission)) throw new Error(label + 'permission not declared in manifest.permissions: ' + permission)
+    }
+    if (tool.inputSchema !== undefined) validateMcpInputSchema(tool.inputSchema)
+    const c = manifest.contributes || {}
+    if (handler.type === 'service') {
+      if (!Object.hasOwn(hostServices[handler.service]?.operations || {}, handler.operation)) throw new Error(label + 'unknown host service operation: ' + handler.service + '.' + handler.operation)
+    } else if (handler.type === 'connection') {
+      const connection = (c.connections || []).find(item => item.id === handler.connectionId)
+      if (!connection) throw new Error(label + 'handler.connectionId is not a declared connection: ' + handler.connectionId)
+      if (!Object.hasOwn(connection.operations || {}, handler.operation)) throw new Error(label + 'unknown connection operation: ' + handler.connectionId + '.' + handler.operation)
+    } else if (handler.type === 'view') {
+      if (!(c.views || []).some(item => item.id === handler.viewId)) throw new Error(label + 'handler.viewId is not a declared view: ' + handler.viewId)
+    }
+  }
+}
+
 // Match PluginMcpSchema's supported subset; unsupported constraints must not be silently dropped.
 export function validateMcpInputSchema(value, depth = 0) {
   if (depth > 8) throw new Error('MCP inputSchema exceeds nesting depth 8')
@@ -191,11 +227,23 @@ export function zipFiles(files) {
   return Buffer.concat([...local, ...central, end])
 }
 
+// One read-only declarative Agent tool bound to a host service (spec section 20).
+function exampleTool(id) {
+  return {
+    name: id.replace(/-/g, '_') + '_list_tasks',
+    description: 'List the user calendar tasks, optionally within a date range.',
+    access: 'read',
+    inputSchema: { type: 'object', properties: { from: { type: 'string', description: 'Start date, YYYY-MM-DD' }, to: { type: 'string', description: 'End date, YYYY-MM-DD' } }, additionalProperties: false },
+    handler: { type: 'service', service: 'calendar', operation: 'listForUser' },
+    permissions: ['tasks']
+  }
+}
+
 export async function initPlugin(directory, id) {
   if (!/^[a-z0-9][a-z0-9-]{1,49}$/.test(id)) throw new Error('Use a lowercase plugin id of 2–50 letters, digits or hyphens')
   await fs.mkdir(directory) // Never overwrite an existing project.
   await fs.mkdir(path.join(directory, 'web'))
-  const manifest = { $schema: './manifest.schema.json', id, name: id, version: '0.1.0', permissions: [], frontendEntry: 'web/index.html', tools: [], backendJars: [] }
+  const manifest = { $schema: './manifest.schema.json', id, name: id, version: '0.1.0', permissions: ['tasks'], frontendEntry: 'web/index.html', tools: [exampleTool(id)], backendJars: [] }
   await fs.writeFile(path.join(directory, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
   await fs.copyFile(path.join(sdkDir, 'manifest.schema.json'), path.join(directory, 'manifest.schema.json'))
   for (const file of ['awd-plugin-sdk.js', 'awd-plugin-sdk.d.ts']) await fs.copyFile(path.join(sdkDir, file), path.join(directory, 'web', file))

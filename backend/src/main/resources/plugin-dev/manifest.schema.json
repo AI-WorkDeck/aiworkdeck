@@ -83,19 +83,14 @@
     "tools": {
       "type": "array",
       "items": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
+        "oneOf": [
+          {
+            "$ref": "#/$defs/legacyTool"
           },
-          "description": {
-            "type": "string"
+          {
+            "$ref": "#/$defs/declarativeTool"
           }
-        },
-        "required": [
-          "name"
-        ],
-        "additionalProperties": true
+        ]
       }
     },
     "guide": {
@@ -703,6 +698,224 @@
           },
           "required": [
             "type"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "legacyTool": {
+      "description": "Legacy JAR tool (name = @Tool method name). Must not carry any declarative field.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "file_read",
+              "file_write",
+              "network",
+              "editor",
+              "ai",
+              "im",
+              "notifications",
+              "lawfirm",
+              "speech",
+              "tasks",
+              "clipboard"
+            ]
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": true,
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "access"
+            ]
+          },
+          {
+            "required": [
+              "handler"
+            ]
+          },
+          {
+            "required": [
+              "inputSchema"
+            ]
+          },
+          {
+            "required": [
+              "mcp"
+            ]
+          },
+          {
+            "required": [
+              "confirm"
+            ]
+          },
+          {
+            "required": [
+              "keywords"
+            ]
+          }
+        ]
+      }
+    },
+    "declarativeTool": {
+      "description": "Declarative Agent tool (spec v2.13, section 20). Non-JAR tool names must start with <pluginId with - replaced by _>_ (checked by plugin-dev validate).",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]{1,63}$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "access": {
+          "enum": [
+            "read",
+            "write",
+            "destructive"
+          ]
+        },
+        "inputSchema": {
+          "$ref": "#/$defs/mcpObjectSchema"
+        },
+        "handler": {
+          "$ref": "#/$defs/toolHandler"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "file_read",
+              "file_write",
+              "network",
+              "editor",
+              "ai",
+              "im",
+              "notifications",
+              "lawfirm",
+              "speech",
+              "tasks",
+              "clipboard"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "mcp": {
+          "type": "boolean"
+        },
+        "confirm": {
+          "enum": [
+            "auto",
+            "always",
+            "never"
+          ]
+        },
+        "keywords": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "access"
+      ],
+      "additionalProperties": false
+    },
+    "toolHandler": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "jar"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "service"
+            },
+            "service": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+            },
+            "operation": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+            }
+          },
+          "required": [
+            "type",
+            "service",
+            "operation"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "connection"
+            },
+            "connectionId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,49}$"
+            },
+            "operation": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+            }
+          },
+          "required": [
+            "type",
+            "connectionId",
+            "operation"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "view"
+            },
+            "viewId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,49}$"
+            }
+          },
+          "required": [
+            "type",
+            "viewId"
           ],
           "additionalProperties": false
         }

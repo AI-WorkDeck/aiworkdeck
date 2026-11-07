@@ -1056,3 +1056,25 @@ UI 的 `dpia_workbench_action` 和 Agent 的 `dpia_workbench_task` 按可信调�
 6. **长耗时任务安全进度反馈（Safe Progress Bar）**
    - 超过 2 秒的文档抽取、批量核查或 AI 推理，必须通过 `awd.ui.progress(target, { title, detail, percent, safetyNote, cancelText, onCancel })` 或 `.awd-safe-progress` 展示当前阶段、进度百分比、可取消按钮及「本地底稿与已保存进度不受影响」的安全感知提示，严禁使用无反馈的全屏死锁遮罩。
 
+## 20. 声明式 Agent 工具（tools[]，v2.13）
+
+> 本节是 `docs/plans/agent-app-control.md` C2/C3/C9 的 SDK 侧落地。P1-1 只交付 schema、`sdk/plugin-sdk/services.json`、`plugin-dev validate` 离线校验与文档；宿主运行时注册（`ToolRegistry` 接入、`HostServiceRegistry`、安装期共用校验）由后续 PR 落地，在此之前宿主仍按老形态处理 `tools`。只加不改（§12.1）：只有 `name`/`description`/`permissions` 的老 manifest 继续按 JAR 工具解释。
+
+`tools[]` 每项二选一：
+
+- **老形态（JAR）**：`name` = `@Tool` 方法名，可带 `description`、`permissions`；不得含下列任何声明式字段。
+- **声明式**：
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `name` | 是 | 非 JAR 工具必须以 `<pluginId 连字符转下划线>_` 开头 |
+| `description` | 是 | 非空；支持 l10n `%key%`（§14.4）；第一行进模型目录 |
+| `access` | 是 | `read` \| `write` \| `destructive`；读写分级是策略唯一轴 |
+| `inputSchema` | 否 | `mcpObjectSchema` 子集（§17.5） |
+| `handler` | 否 | 缺省 `{type:"jar"}`；`{type:"service",service,operation}`、`{type:"connection",connectionId,operation}`、`{type:"view",viewId}`（第四期） |
+| `permissions` | 否 | 运行所需，⊆ `manifest.permissions` |
+| `mcp` | 否 | 是否投影到对外 MCP；缺省 read→true，write/destructive→false |
+| `confirm` | 否 | `auto`（缺省，按 access；destructive 必确认）\| `always` \| `never` |
+| `keywords` | 否 | 命中即在起跑时放回本插件工具 |
+
+`validate` 规则：非 JAR 名字前缀；`access` 必填；`description` 非空；`inputSchema` 过 §17.5 子集；`service/operation` 必须在 `sdk/plugin-sdk/services.json`（宿主服务表发布副本，首批 `calendar`、`search`、`sensitive`）；`connection` 必须是已声明的 `contributes.connections` 且操作存在；`view` 必须是已声明视图；`permissions` ⊆ `manifest.permissions`。SDK：`awd.tools.handle` 仅类型占位（第四期），`awd.tools.list()` 待宿主桥方法。
