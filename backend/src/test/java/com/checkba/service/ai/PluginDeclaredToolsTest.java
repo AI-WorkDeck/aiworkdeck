@@ -121,6 +121,24 @@ class PluginDeclaredToolsTest {
     }
 
     @Test
+    void destructiveDeclarativeToolsAreNotRegistered() throws IOException {
+        // 声明为 destructive，以及绑定 calendar/delete（服务操作本身 destructive）的工具都通过校验但不注册
+        String extra = ",{\"name\":\"hello_agent_tools_wipe\",\"description\":\"x\",\"access\":\"destructive\","
+                + "\"handler\":{\"type\":\"service\",\"service\":\"calendar\",\"operation\":\"update\"},\"permissions\":[\"tasks\"]},"
+                + "{\"name\":\"hello_agent_tools_del\",\"description\":\"x\",\"access\":\"write\","
+                + "\"handler\":{\"type\":\"service\",\"service\":\"calendar\",\"operation\":\"delete\"},\"permissions\":[\"tasks\"]}]";
+        String withDestructive = manifest.replaceFirst("\\]\\s*,\\s*\"backendJars\"", java.util.regex.Matcher.quoteReplacement(extra) + ",\"backendJars\"");
+        assertNotEquals(manifest, withDestructive);
+        install(withDestructive);
+        PluginManifestContractValidator.validateTools(plugins.getPlugin("hello-agent-tools"));
+        assertEquals(4, plugins.getDeclaredTools().size());
+        assertTrue(names().contains("hello_agent_tools_list_tasks"));
+        assertFalse(names().contains("hello_agent_tools_wipe"));
+        assertFalse(names().contains("hello_agent_tools_del"));
+        assertTrue(registry.resolve("hello_agent_tools_del").isEmpty());
+    }
+
+    @Test
     void invalidDeclarationSkipsToolsButPluginStillLoads() throws IOException {
         install(manifest.replace("hello_agent_tools_add_task", "bad_prefix_add_task"));
         assertNotNull(plugins.getPlugin("hello-agent-tools"));

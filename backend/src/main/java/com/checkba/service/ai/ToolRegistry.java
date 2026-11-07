@@ -599,6 +599,11 @@ public class ToolRegistry {
     private DeclaredToolBinding bind(PluginService.DeclaredTool declared) {
         PluginService.PluginToolInfo tool = declared.tool();
         String pluginId = declared.pluginId();
+        if (hostServices != null && "service".equals(tool.handlerType()) && isDestructive(tool)) {
+            log.info("Declared tool {} of plugin {} not registered: destructive declarative tools await confirmation gate (P2-1)",
+                    tool.getName(), pluginId);
+            return null;
+        }
         if (hostServices == null || !"service".equals(tool.handlerType()) || builtinTools.containsKey(tool.getName())
                 || !pluginService.isEnabled(pluginId) || pluginService.revokedReason(pluginId) != null) return null;
         try {
@@ -624,6 +629,14 @@ public class ToolRegistry {
             if (schema.get("required") instanceof List<?> req) schema.put("required", req.stream().filter(kept::containsKey).toList());
         }
         return com.checkba.service.ai.mcp.PluginMcpSchema.object(schema);
+    }
+
+    /** 声明为 destructive，或绑定的服务操作本身是 destructive（如 calendar/delete）。 */
+    private static boolean isDestructive(PluginService.PluginToolInfo tool) {
+        if ("destructive".equals(tool.getAccess())) return true;
+        var h = tool.getHandler();
+        return com.checkba.service.plugin.HostServiceRegistry.spec(h.getService(), h.getOperation())
+                .map(spec -> "destructive".equals(spec.access())).orElse(false);
     }
 
     DeclaredToolBinding declaredBinding(String name) {
