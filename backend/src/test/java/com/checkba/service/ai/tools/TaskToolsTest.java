@@ -484,4 +484,64 @@ class TaskToolsTest {
         String out = tools.task_list(null, null, "股权转让项目-星河并购", 1L, 9L);
         assertTrue(out.startsWith("错误") && out.contains("ask_user"), out);
     }
+
+    // ---- 解析不到名称时退到用户话里的项目指向 ----
+
+    private static final List<com.checkba.model.entity.Project> FALLBACK_PROJECTS = List.of(
+            project(3L, "股权转让项目-星河并购"), project(4L, "星河租赁合同纠纷"),
+            project(5L, "张三劳动争议案"), project(6L, "李四借款案"));
+
+    private void fallbackWorld(String userMessage) {
+        com.checkba.service.ai.tools.ToolContextHolder.set(new com.checkba.service.ai.tools.ToolContext(
+                1L, "c", 10L, "m", List.of(), null, null, null, null, null, null, null, userMessage));
+        when(taskService.resolveProjects(eq(10L), any(), eq(true))).thenReturn(List.of());
+        when(taskService.projectsMentionedBy(eq(10L), any())).thenAnswer(
+                i -> ProjectTaskService.mentionedProjects(FALLBACK_PROJECTS, i.getArgument(1)));
+        when(taskService.canWrite(eq(10L), any())).thenReturn(true);
+        when(taskService.recentProjects(10L, 5)).thenReturn(FALLBACK_PROJECTS);
+    }
+
+    @Test
+    @DisplayName("「星河那个案子」解析不到名称 → 退到用户话里的指向，匹配两个项目 → 歧义 + ask_user，不再说「没有这个项目」")
+    void fallbackAmbiguousForColloquialName() {
+        String message = "下周三上午十点给星河那个案子加开庭提醒";
+        fallbackWorld(message);
+        String out = tools.task_create("开庭提醒", "2026-11-11", "10:00", null, null, null, null, null, null, null, "星河那个案子", 1L, 10L);
+        assertTrue(out.startsWith("错误") && out.contains("ask_user") && out.contains("星河租赁合同纠纷")
+                && out.contains("股权转让项目-星河并购") && !out.contains("没有找到"), out);
+        verify(taskService, never()).createAiTask(any(), any(ProjectTaskService.TaskDraft.class), any());
+    }
+
+    @Test
+    @DisplayName("「张三那个劳动争议的案子」→ 唯一指向张三劳动争议案，带模糊匹配提示地创建")
+    void fallbackUniqueUsesProjectWithFuzzyNote() {
+        fallbackWorld("给张三那个劳动争议的案子加一个开庭提醒");
+        ProjectTask created = new ProjectTask();
+        created.setId(9L);
+        created.setTitle("开庭提醒");
+        created.setDueDate(LocalDate.of(2026, 11, 11));
+        when(taskService.createAiTask(eq(5L), any(ProjectTaskService.TaskDraft.class), eq(10L))).thenReturn(created);
+        String out = tools.task_create("开庭提醒", "2026-11-11", "10:00", null, null, null, null, null, null, null, "张三那个劳动争议的案子", 1L, 10L);
+        assertTrue(out.startsWith("已在项目「张三劳动争议案」创建") && out.contains("按「张三那个劳动争议的案子」匹配到"), out);
+    }
+
+    @Test
+    @DisplayName("确实不存在的名称 → 仍是未找到，但列出最近的项目作提示")
+    void fallbackNothingListsRecentProjects() {
+        fallbackWorld("给王五的事加个提醒");
+        String out = tools.task_create("提醒", "2026-11-11", null, null, null, null, null, null, null, null, "王五的事", 1L, 10L);
+        assertTrue(out.startsWith("错误：没有找到") && out.contains("最近的项目") && out.contains("李四借款案"), out);
+        verify(taskService, never()).createAiTask(any(), any(ProjectTaskService.TaskDraft.class), any());
+    }
+
+    @Test
+    @DisplayName("task_list 的 project 同样退到用户话里的指向")
+    void fallbackAlsoForTaskList() {
+        com.checkba.service.ai.tools.ToolContextHolder.set(new com.checkba.service.ai.tools.ToolContext(
+                1L, "c", 9L, "m", List.of(), null, null, null, null, null, null, null, "星河那个案子有哪些期限"));
+        when(taskService.resolveProjects(eq(9L), any(), eq(false))).thenReturn(List.of());
+        when(taskService.projectsMentionedBy(eq(9L), any())).thenAnswer(i -> ProjectTaskService.mentionedProjects(FALLBACK_PROJECTS, i.getArgument(1)));
+        String out = tools.task_list(null, null, "星河那个案子", 1L, 9L);
+        assertTrue(out.startsWith("错误") && out.contains("ask_user") && out.contains("星河租赁合同纠纷"), out);
+    }
 }

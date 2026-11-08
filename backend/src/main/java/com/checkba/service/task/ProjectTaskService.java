@@ -389,6 +389,17 @@ public class ProjectTaskService {
         return lengths.entrySet().stream().filter(e -> e.getValue() == m).map(java.util.Map.Entry::getKey).toList();
     }
 
+    /** 用户可写且非 CLIENT（建事项的前提）。 */
+    public boolean canWrite(Long userId, Project project) {
+        return projectMemberService.hasWritePermission(project.getId(), userId)
+                && !projectMemberService.isClient(project.getId(), userId);
+    }
+
+    /** 用户可访问的非 SCRATCH 项目里最近的 limit 个（getUserProjects 按创建时间倒序），给「没找到」提示做候选。 */
+    public List<Project> recentProjects(Long userId, int limit) {
+        return projectService.getUserProjects(userId).stream().filter(p -> !p.isScratchWorkspace()).limit(limit).toList();
+    }
+
     /** 同 {@link #mentionedProjects(List, String)}，范围为用户可访问的非 SCRATCH 项目。 */
     public List<Project> projectsMentionedBy(Long userId, String message) {
         return mentionedProjects(projectService.getUserProjects(userId).stream()
