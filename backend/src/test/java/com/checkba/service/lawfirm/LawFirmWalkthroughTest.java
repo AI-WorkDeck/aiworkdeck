@@ -84,6 +84,10 @@ class LawFirmWalkthroughTest {
     @MockBean
     private PluginService pluginService;
 
+    /** 走查测的是业务链路，不是全所查看权限；权限另见 LawFirmFirmWideAccessTest。 */
+    @MockBean
+    private LawFirmAccessPolicy accessPolicy;
+
     private User userA;
     private User userB;
     private User userCommittee;
@@ -91,6 +95,7 @@ class LawFirmWalkthroughTest {
     @BeforeEach
     void setUpUsers() {
         lawFirmService.localMode = false;
+        org.mockito.Mockito.when(accessPolicy.canViewFirmWide(org.mockito.ArgumentMatchers.any())).thenReturn(true);
         userA = createUser("lawyer_a", "苏婉清（合伙人）");
         userB = createUser("lawyer_b", "周铭泽（主办律师）");
         userCommittee = createUser("lawyer_committee", "林正源（利冲主任委员）");

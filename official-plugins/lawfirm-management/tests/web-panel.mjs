@@ -282,7 +282,8 @@ async function mountPanel(options = {}) {
                   committeeQueue: state.intakes,
                   invoices: state.invoices,
                   collections: state.collections,
-                  dashboard: state.dashboard
+                  dashboard: state.dashboard,
+                  restricted: state.restricted === true
                 };
                 break;
               case 'conflictPreview':
@@ -675,4 +676,23 @@ test('5. Rendering the Decision-Maker Dashboard (departments, team leads, units 
   assert.match(unitText, /韩泽伟律师.*饱和 · 高负荷/);
   assert.match(unitText, /陈静知律师.*超负荷 · 预警分流/);
   assert.match(unitText, /周予安律师.*空闲 · 可优先派案/);
+});
+
+test('6. Restricted-view banner stays visible after a refresh overwrites the status line, and clears for admins', async (t) => {
+  const p = await mountPanel({ onCall: (msg, state) => { if (msg.method === 'lawfirm.request') state.restricted = true; } });
+  t.after(() => p.dom.window.close());
+  const banner = p.$('restrictedBanner');
+  assert.equal(banner.hidden, false, 'banner shown for restricted overview');
+  assert.match(banner.textContent, /无权查看全所数据/);
+
+  p.$('refresh-data').click();
+  await tick(8);
+  assert.match(p.$('notice').textContent, /数据已刷新/, 'status line was overwritten by the refresh message');
+  assert.equal(banner.hidden, false, 'banner persists');
+  assert.match(banner.textContent, /无权查看全所数据/);
+
+  // Admin: next overview is not restricted, banner goes away
+  const admin = await mountPanel();
+  t.after(() => admin.dom.window.close());
+  assert.equal(admin.$('restrictedBanner').hidden, true);
 });

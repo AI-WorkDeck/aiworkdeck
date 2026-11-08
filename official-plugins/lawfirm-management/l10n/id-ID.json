@@ -42,5 +42,9 @@
   "expense.saved": "Biaya dicatat.",
   "expense.updated": "Biaya diperbarui.",
   "expense.deleted": "Biaya dihapus.",
-  "expense.quota": "Penyimpanan lokal plugin penuh (64 KB). Hapus dulu catatan lama yang sudah diselesaikan."
+  "expense.quota": "Penyimpanan lokal plugin penuh (64 KB). Hapus dulu catatan lama yang sudah diselesaikan.",
+  "tool.lawfirm_management_matter_overview.desc": "Gunakan saat pengguna menanyakan penerimaan perkara, perkara, kemajuan persetujuan benturan kepentingan, atau ringkasan bisnis bulanan firma. Ringkasan firma hukum (hanya baca): status penerimaan/perkara, KPI, dan persetujuan benturan kepentingan yang tertunda; filter opsional berdasarkan proyek atau kata kunci.",
+  "tool.lawfirm_management_conflict_check.desc": "Gunakan saat pengguna menanyakan apakah klien atau pihak lawan memiliki benturan kepentingan. Pemeriksaan benturan kepentingan (hanya baca, tidak ada yang disimpan): membandingkan klien dan pihak lawan dengan perkara yang ada.",
+  "tool.lawfirm_management_fee_ledger.desc": "Gunakan saat pengguna menanyakan biaya, penagihan, tagihan, faktur, atau piutang seluruh firma (hanya administrator firma). Lihat buku besar biaya (hanya baca): faktur, penagihan, piutang, dan tingkat penagihan; filter berdasarkan proyek atau kata kunci.",
+  "access.restricted": "Anda tidak memiliki izin melihat data seluruh firma. Hanya item yang terkait dengan Anda yang ditampilkan. Buku besar biaya dan dasbor seluruh firma hanya untuk administrator firma."
 }

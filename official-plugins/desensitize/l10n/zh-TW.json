@@ -1,5 +1,7 @@
 {
   "plugin.name": "文件去識別化",
   "plugin.description": "核查敏感信息並生成脫敏副本，可用恢復包復敏。",
-  "view.main.name": "文件去識別化"
+  "view.main.name": "文件去識別化",
+  "tool.desensitize_preview.desc": "使用者詢問「這份檔案有哪些敏感資訊會被去識別化、先預覽」時使用。預覽專案檔案中將被去識別化的敏感資訊（唯讀，不產生檔案）。",
+  "tool.desensitize_redact.desc": "使用者說「把這份檔案去識別化／匿名化／打碼」時使用（遮蓋模式，不可還原）。對專案檔案去識別化並另存為新的去識別化副本；絕不覆蓋原檔案。"
 }
