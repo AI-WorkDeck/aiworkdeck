@@ -361,8 +361,7 @@ class ToolDisclosurePolicyTest {
     void categoryAssignmentsAfterTheSplit() {
         // edit：定位 / 删改 / 按段落取改。核心集里的几个照旧是 core（categoryOf 先判核心集）
         for (String name : List.of("doc_goto", "doc_collapse_cursor", "doc_delete_selection", "doc_redo",
-                "doc_modify_paragraph", "doc_replace_nth_match", "doc_delete_match", "doc_delete_text",
-                "doc_set_selection", "doc_get_selection", "doc_insert_under_heading")) {
+                "doc_modify_paragraph", "doc_insert_under_heading")) {
             assertEquals("edit", POLICY.categoryOf(name), name);
         }
         // #1064 第二步退出核心集后归 edit

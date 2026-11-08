@@ -43,9 +43,6 @@ class DocumentEditToolsToolMetaContractTest {
      * 把 {@code doc_collapse_cursor} 这类纯光标操作也算成写入，拿它做正向断言会造成误报。
      */
     private static final Set<String> MUST_BE_MODIFIED = Set.of(
-            "doc_replace_nth_match",
-            "doc_delete_match",
-            "doc_delete_text",
             "doc_replace_selection",
             "doc_insert_at_cursor",
             "doc_insert_under_heading",

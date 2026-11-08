@@ -14,14 +14,9 @@ doc_audit_structure,builtin,doc,LOWA,read,Y,Y,0,194,32,zh,zh,keep,doc_audit_stru
 doc_list_project_files,builtin,doc,ALL,read,Y,Y,0,167,42,zh,zh,keep,doc_list_project_files,files,Y,Y,Y,Y,Y,Y,Y,Y,Y,V1: description rewritten to the A5 template
 doc_open_file,builtin,doc,LOWA,write,Y,Y,1,109,11,zh,zh,keep,doc_open_file,files,Y,Y,Y,Y,N,N,N,N,N,"single job, zh, short first line"
 doc_start_stream,builtin,doc,LOWA,write,Y,Y,3,305,27,zh,mixed,keep,doc_start_stream,files,Y,Y,Y,Y,N,N,N,N,N,V1: description rewritten to the A5 template
-doc_get_selection,builtin,doc,LOWA,read,N,N,0,58,20,zh,zh,deprecate,,,N,N,N,N,N,N,N,N,N,doc_get_cursor_context covers
 doc_goto,builtin,doc,LOWA,read,N,Y,2,131,13,zh,mixed,merge→doc_select,doc_select,docx-edit,N,N,N,N,N,N,N,N,N,target=start|end; access→read
-doc_set_selection,builtin,doc,LOWA,write,N,N,2,102,21,zh,mixed,deprecate,,,N,N,N,N,N,N,N,N,N,doc_select covers
 doc_find_text,builtin,doc,LOWA,read,Y,Y,2,315,63,zh,mixed,keep,doc_find_text,docx-edit,Y,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 doc_find_replace,builtin,doc,LOWA,write,Y,Y,3,298,28,zh,mixed,keep,doc_find_replace,docx-edit,Y,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
-doc_replace_nth_match,builtin,doc,LOWA,write,N,N,3,152,21,zh,zh,deprecate,,,N,N,N,N,N,N,N,N,N,hidden since T-14; replace_at_anchor covers
-doc_delete_match,builtin,doc,LOWA,destructive,N,N,2,101,18,zh,zh,deprecate,,,N,N,N,N,N,N,N,N,N,hidden since T-14
-doc_delete_text,builtin,doc,LOWA,destructive,N,N,2,104,11,zh,zh,deprecate,,,N,N,N,N,N,N,N,N,N,"hidden; replace_at_anchor("""") deletes"
 doc_replace_selection,builtin,doc,LOWA,write,N,Y,2,176,19,zh,zh,keep,doc_replace_selection,docx-edit,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 doc_insert_at_cursor,builtin,doc,LOWA,write,Y,Y,3,278,40,zh,mixed,keep,doc_insert_at_cursor,docx-edit,Y,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 doc_get_paragraph,builtin,doc,LOWA,read,N,Y,1,106,15,zh,zh,keep,doc_get_paragraph,docx-edit,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
@@ -29,7 +24,6 @@ doc_modify_paragraph,builtin,doc,LOWA,write,N,Y,2,135,42,zh,zh,keep,doc_modify_p
 doc_get_outline,builtin,doc,LOWA,read,N,Y,0,116,21,zh,zh,keep,doc_get_outline,docx-edit,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 doc_insert_under_heading,builtin,doc,LOWA,write,N,Y,2,125,16,zh,zh,keep,doc_insert_under_heading,docx-edit,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 doc_export_pdf,builtin,doc,LOWA,write,Y,Y,1,162,41,zh,zh,keep,doc_export_pdf,files,N,N,N,N,N,N,N,N,N,leaves core; files/pdf keyword puts it back
-doc_search_related_docs,builtin,doc,LOWA,read,N,N,1,79,17,zh,zh,deprecate,,,N,N,N,N,N,N,N,N,N,search_project_content covers
 doc_get_document_text,builtin,doc,LOWA,read,Y,Y,2,220,35,zh,mixed,keep,doc_get_document_text,docx-edit,Y,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 doc_get_clauses,builtin,doc,LOWA,read,Y,Y,0,192,35,zh,mixed,keep,doc_get_clauses,docx-edit,Y,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 doc_get_cursor_context,builtin,doc,LOWA,read,Y,Y,0,71,33,zh,zh,keep,doc_get_cursor_context,docx-edit,Y,N,N,N,N,N,N,N,N,"single job, zh, short first line"
@@ -102,7 +96,6 @@ sheet_define_name,builtin,sheet,LOWA,write,N,Y,4,191,18,zh,mixed,keep+rewrite-de
 sheet_protect_sheet,builtin,sheet,LOWA,write,N,Y,3,118,26,zh,zh,keep,sheet_protect_sheet,spreadsheet,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 sheet_group_rows_cols,builtin,sheet,LOWA,write,N,Y,4,209,26,zh,mixed,keep+rewrite-desc,sheet_group_rows_cols,spreadsheet,N,N,N,N,N,N,N,N,N,body mixed
 sheet_add_pivot_table,builtin,sheet,LOWA,write,N,Y,6,330,48,zh,zh,keep,sheet_add_pivot_table,spreadsheet,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
-doc_debug_revisions,builtin,doc,LOWA,read,N,N,0,70,36,zh,zh,deprecate,,,N,N,N,N,N,N,N,N,N,debug only; keep as test helper outside registry
 qichacha_query,builtin,qichacha,ALL,read,N,Y,1,87,170,en,en,keep+rewrite-desc,qichacha_query,research,N,N,N,N,N,N,N,N,Y,first line 170 chars; first line en
 qichacha_ipr,builtin,qichacha,ALL,read,N,Y,2,186,103,en,mixed,keep+rewrite-desc,qichacha_ipr,research,N,N,N,N,N,N,N,N,Y,first line 103 chars; first line en
 tushare_query,builtin,enterprise-data,ALL,read,N,Y,3,215,57,en,en,keep+rewrite-desc,tushare_query,research,N,N,N,N,N,N,N,N,Y,first line en
@@ -115,9 +108,6 @@ extract_file_text,builtin,files,ALL,read,Y,Y,3,322,65,zh,en,keep,extract_file_te
 search_across_projects,builtin,search,ALL,read,N,Y,1,107,97,en,en,merge→search_project_files,search_project_files,files,N,N,N,N,N,N,N,N,Y,scope=all
 write_file,builtin,files,ALL,write,N,Y,3,243,155,en,en,keep+rewrite-desc,write_file,files,N,N,N,N,N,N,N,N,W,first line 155 chars; first line en
 write_docx,builtin,files,ALL,write,Y,Y,4,232,32,zh,en,keep,write_docx,files,Y,Y,Y,Y,Y,Y,Y,Y,W,V1: description rewritten to the A5 template
-scan_files,builtin,files,ALL,write,N,N,0,48,82,en,en,deprecate,,,N,N,N,N,N,N,N,N,N,hidden maintenance op
-delete_file,builtin,files,ALL,destructive,N,N,1,57,13,en,en,deprecate,,,N,N,N,N,N,N,N,N,N,permanently disabled stub; move_to_trash is the entry
-move_file,builtin,files,ALL,write,N,N,2,152,81,en,en,deprecate,,,N,N,N,N,N,N,N,N,N,hidden twin of move_files
 move_files_batch,builtin,files,ALL,write,Y,Y,1,221,42,zh,en,rename→move_files,move_files,files,N,N,N,N,N,N,N,N,W,only move tool left; drop _batch suffix; shim one release
 move_to_trash,builtin,files,ALL,destructive,Y,Y,1,214,61,zh,en,keep,move_to_trash,files,N,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 create_folder,builtin,files,ALL,write,Y,Y,2,118,25,zh,en,keep,create_folder,files,N,N,N,N,N,N,N,N,W,V1: description rewritten to the A5 template
@@ -126,7 +116,6 @@ move_project_file,builtin,files,ALL,write,N,Y,2,116,86,en,en,merge→move_files,
 copy_files,builtin,files,ALL,write,N,Y,2,243,155,en,en,keep+rewrite-desc,copy_files,files,N,N,N,N,N,N,N,N,N,first line 155 chars; first line en
 image_generate_asset,builtin,image,ALL,write,N,Y,4,222,72,en,en,keep+rewrite-desc,image_generate_asset,slides,N,N,N,N,N,N,N,N,N,first line en
 image_get_generation,builtin,image,ALL,write,N,Y,1,102,79,en,en,keep+rewrite-desc,image_get_generation,slides,N,N,N,N,N,N,N,N,N,first line en; access→write (imports file)
-read_document,builtin,files,ALL,read,N,N,1,165,90,en,en,deprecate,,,N,N,N,N,N,N,N,N,N,hidden; extract_file_text covers
 law_search,builtin,law,ALL,read,Y,Y,1,104,22,zh,en,keep,law_search,legal,Y,Y,Y,Y,Y,Y,Y,Y,Y,V1: description rewritten to the A5 template
 case_search,builtin,law,ALL,read,N,Y,1,113,102,en,en,keep+rewrite-desc,case_search,legal,N,N,N,N,N,N,N,N,Y,first line 102 chars; first line en
 law_search_keyword,builtin,law,ALL,read,N,Y,2,98,48,en,en,merge→law_search,law_search,legal,N,N,N,N,N,N,N,N,Y,mode=keyword
@@ -141,13 +130,8 @@ litigation_render,builtin,litigation,LOWA,write,N,Y,5,423,118,en,en,keep+rewrite
 meeting_list_recordings,builtin,meeting,ALL,read,N,Y,0,62,102,en,en,merge→meeting_list,meeting_list,meeting,N,N,N,N,N,N,N,N,Y,source=recording
 meeting_get_transcript,builtin,meeting,ALL,read,N,Y,1,94,123,en,en,merge→meeting_get_transcript,meeting_get_transcript,meeting,N,N,N,N,N,N,N,N,Y,source=recording
 save_memory,builtin,memory,ALL,write,Y,Y,6,431,65,zh,mixed,keep,save_memory,memory,Y,Y,Y,Y,Y,Y,Y,Y,W,V1: description rewritten to the A5 template
-get_user_profile,builtin,memory,ALL,read,N,N,0,73,32,zh,zh,deprecate,,,N,N,N,N,N,N,N,N,N,hidden; query_memory covers
 query_memory,builtin,memory,ALL,read,Y,Y,6,381,54,zh,mixed,keep,query_memory,memory,Y,Y,Y,Y,Y,Y,Y,Y,Y,V1: description rewritten to the A5 template
-get_project_context,builtin,files,ALL,read,N,N,0,51,34,zh,zh,deprecate,,,N,N,N,N,N,N,N,N,N,hidden; project memory via query_memory
 update_project_info,builtin,memory,ALL,write,N,Y,2,91,27,zh,zh,keep,update_project_info,memory,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
-search_knowledge_base,builtin,search,ALL,read,N,N,4,173,57,mixed,mixed,deprecate,,,N,N,N,N,N,N,N,N,N,hidden compat shim since 0.6
-deep_search,builtin,files,ALL,read,N,N,4,170,55,mixed,mixed,deprecate,,,N,N,N,N,N,N,N,N,N,hidden compat shim since 0.6
-get_conversation_summary,builtin,files,ALL,read,N,N,0,49,25,zh,zh,deprecate,,,N,N,N,N,N,N,N,N,N,hidden; history is in context
 memory_list,builtin,memory,ALL,read,fixed,Y,1,109,22,zh,mixed,keep,memory_list,memory,Y,Y,Y,Y,Y,Y,Y,Y,Y,V1: description rewritten to the A5 template
 memory_read,builtin,memory,ALL,read,fixed,Y,2,112,20,zh,mixed,keep,memory_read,memory,Y,Y,Y,Y,Y,Y,Y,Y,Y,V1: description rewritten to the A5 template
 memory_search,builtin,memory,ALL,read,fixed,Y,2,137,41,zh,mixed,keep,memory_search,memory,N,N,N,N,N,N,N,N,Y,V1: description rewritten to the A5 template
@@ -256,7 +240,6 @@ office_ppt_add_table,builtin,office_ppt,OFFICE-ppt,write,N,Y,8,366,33,mixed,mixe
 office_ppt_table_read,builtin,office_ppt,OFFICE-ppt,read,N,Y,2,159,36,mixed,mixed,keep+rewrite-desc,office_ppt_table_read,table,N,N,N,N,N,N,N,N,N,first line mixed
 office_ppt_table_set_cell,builtin,office_ppt,OFFICE-ppt,write,N,Y,5,237,45,mixed,mixed,keep+rewrite-desc,office_ppt_table_set_cell,table,N,N,N,N,N,N,N,N,N,first line mixed
 office_ppt_set_hyperlink,builtin,office_ppt,OFFICE-ppt,write,N,Y,3,190,34,mixed,mixed,keep+rewrite-desc,office_ppt_set_hyperlink,slides,N,N,N,N,N,N,N,N,N,first line mixed
-pdf_list_files,builtin,pdf,ALL,read,N,N,0,131,66,zh,mixed,deprecate,,,N,N,N,N,N,N,N,N,N,hidden; doc_list_project_files covers
 pdf_inspect,builtin,pdf,ALL,read,N,Y,3,346,44,zh,mixed,keep+rewrite-desc,pdf_inspect,pdf,N,N,N,N,N,N,N,N,Y,body mixed
 pdf_highlight,builtin,pdf,LOWA,write,N,Y,5,249,21,zh,zh,keep,pdf_highlight,pdf,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 pdf_annotate,builtin,pdf,LOWA,write,N,Y,4,190,28,zh,zh,keep,pdf_annotate,pdf,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
@@ -273,15 +256,10 @@ pdf_inspect_visual,builtin,pdf,ALL,read,N,Y,6,286,74,en,en,keep+rewrite-desc,pdf
 plugin_dev_scaffold,builtin,plugin_dev,ALL,write,N,Y,2,177,103,mixed,mixed,keep+rewrite-desc,plugin_dev_scaffold,developer,N,N,N,N,N,N,N,N,N,first line 103 chars; first line mixed
 plugin_dev_install,builtin,plugin_dev,ALL,write,N,Y,1,166,45,zh,zh,keep,plugin_dev_install,developer,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 list_project_folders,builtin,files,ALL,read,N,Y,0,113,154,zh,zh,merge→doc_list_project_files,doc_list_project_files,files,N,N,N,N,N,N,N,N,Y,foldersOnly=true
-pptx_list_files,builtin,pptx,ALL,read,N,N,0,124,70,zh,mixed,deprecate,,,N,N,N,N,N,N,N,N,N,hidden; same
-pptx_search_files,builtin,pptx,ALL,read,N,N,1,76,19,zh,zh,deprecate,,,N,N,N,N,N,N,N,N,N,hidden; search_project_files covers
-pptx_open_file,builtin,pptx,LOWA,write,N,N,1,85,40,zh,zh,deprecate,,,N,N,N,N,N,N,N,N,N,hidden; doc_open_file covers
 pptx_check_service,builtin,pptx,LOWA,read,N,Y,0,54,17,zh,zh,hide-from-model,pptx_check_service,slides,N,N,N,N,N,N,N,N,N,health check is not a model action; orchestrator checks service
 pptx_generate,builtin,pptx,LOWA,write,N,Y,5,402,19,zh,zh,keep,pptx_generate,slides,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 pptx_generate_outline,builtin,pptx,LOWA,write,N,Y,2,107,22,zh,zh,merge→pptx_outline,pptx_outline,slides,N,N,N,N,N,N,N,N,N,action=create
 pptx_inspect_format,builtin,pptx,ALL,read,N,Y,2,253,39,zh,mixed,keep+rewrite-desc,pptx_inspect_format,slides,N,N,N,N,N,N,N,N,Y,body mixed
-pptx_apply_format,builtin,pptx,LOWA,write,N,N,2,562,112,zh,mixed,deprecate,,,N,N,N,N,N,N,N,N,N,hidden; slide_* covers
-pptx_edit_page,builtin,pptx,ALL,write,N,N,3,172,74,mixed,mixed,deprecate,,,N,N,N,N,N,N,N,N,N,hidden; slide_* covers
 pptx_get_project_pages,builtin,pptx,LOWA,read,N,Y,1,76,13,zh,zh,keep,pptx_get_project_pages,slides,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 pptx_refine_outline,builtin,pptx,LOWA,write,N,Y,3,150,18,zh,zh,merge→pptx_outline,pptx_outline,slides,N,N,N,N,N,N,N,N,N,action=refine
 pptx_export_editable,builtin,pptx,LOWA,write,N,Y,3,294,15,zh,zh,keep,pptx_export_editable,slides,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"

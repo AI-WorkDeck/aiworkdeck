@@ -115,7 +115,7 @@ public class ToolDisclosurePolicy {
             // —— 项目材料：找文件（按名 / 按正文）→ 拿 fileId → 读全文 → 落一份新文件 → 整理 ——
             // doc_list_project_files 自 dev-board#1065 T-01 起三档会话都可见（纯后端清单），
             // 所以纯对话与 Office 任务窗格会话也不必为「这是什么文件」先查一次目录（#1064 实测病灶）。
-            // read_document 已只登记不下发（T-05），入口统一是 extract_file_text。
+            // read_document 已删除（V3，Java 方法仅供内部调用），入口统一是 extract_file_text。
             "doc_list_project_files", "search_project_files", "search_project_content", "extract_file_text", "list_attached_files",
             "write_docx", "create_folder", "move_files_batch", "move_to_trash",
             // 跨文件硬规则要求先列后读；reference 没有关键词预放回，不能再让模型先查目录。
@@ -211,8 +211,7 @@ public class ToolDisclosurePolicy {
         CATEGORIES.put("revision", List.of(
                 "name:doc_restore_checkpoint", "name:doc_get_comments", "name:doc_list_revisions", "name:doc_accept_revision", "name:doc_reject_revision",
                 "name:doc_accept_all_revisions", "name:doc_reject_all_revisions",
-                "name:doc_reply_comment", "name:doc_resolve_comment", "name:doc_delete_comment",
-                "name:doc_debug_revisions"));
+                "name:doc_reply_comment", "name:doc_resolve_comment", "name:doc_delete_comment"));
         CATEGORIES.put("evidence", List.of(
                 "name:doc_link_evidence", "name:doc_list_evidence",
                 "name:evidence_verify", "name:retrieve_evidence",
@@ -229,14 +228,13 @@ public class ToolDisclosurePolicy {
         CATEGORIES.put("edit", List.of(
                 "name:doc_goto", "name:doc_collapse_cursor", "name:doc_delete_selection", "name:doc_redo",
                 "name:doc_select_anchor", "name:doc_select_paragraph", "name:doc_modify_paragraph",
-                "name:doc_replace_nth_match", "name:doc_delete_match", "name:doc_delete_text",
-                "name:doc_set_selection", "name:doc_get_selection", "name:doc_get_paragraph",
+                "name:doc_get_paragraph",
                 "name:doc_get_outline", "name:doc_insert_under_heading", "name:doc_replace_selection"));
         // files 排在 format 之前，只为 doc_export_pdf：它带 doc_ 前缀，排在后面就会被 format 通配吃掉。
         CATEGORIES.put("files", List.of(
-                "name:list_files", "name:read_file", "name:write_file", "name:scan_files",
-                "name:move_file", "name:move_project_file", "name:rename_project_file",
-                "name:list_project_folders", "name:delete_file", "text_", "name:doc_export_pdf",
+                "name:list_files", "name:read_file", "name:write_file",
+                "name:move_project_file", "name:rename_project_file",
+                "name:list_project_folders", "text_", "name:doc_export_pdf",
                 "name:copy_files", "name:search_across_projects"));
         // doc_* 里剩下的全是版式与排版：字符格式、段落格式、页面、页眉页脚、目录、脚注、图片、超链接……
         CATEGORIES.put("format", List.of("doc_"));

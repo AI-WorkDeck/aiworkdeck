@@ -57,7 +57,7 @@ public class HarnessDiagnosticService {
 
     private static final Set<String> DOC_EDIT_TOOLS = Set.of(
             "doc_find_replace", "doc_replace_at_anchor", "doc_modify_paragraph",
-            "doc_replace_selection", "doc_replace_nth_match", "doc_delete_match",
+            "doc_replace_selection",
             "office_replace_text", "office_replace_batch", "sheet_find_replace",
             "slide_replace_text", "office_ppt_replace_text");
 

@@ -142,7 +142,7 @@ public class ClientCapabilityService {
      * <p><b>纯后端（不经 {@code EditorBridgeService.executeEditorCommand}）</b>——逐个核对过
      * {@code DocumentEditTools} / {@code CheckpointTools} 的 85 个 @Tool，真正纯后端的只有这几个：
      * <ul>
-     *   <li>{@code doc_list_project_files} / {@code doc_open_file} / {@code doc_search_related_docs}
+     *   <li>{@code doc_list_project_files} / {@code doc_open_file}
      *       —— 读 project_file 表 + 经 SSE 下发打开指令，是「换一份目标文档」的唯一入口，
      *       裁掉它 xlsx 会话里的模型就再也打不开任何 Word 文档了；</li>
      *   <li>{@code doc_restore_checkpoint} —— 按 fileId 还原本轮快照，与文档类型无关。
@@ -167,7 +167,6 @@ public class ClientCapabilityService {
     private static final java.util.Set<String> KIND_AGNOSTIC_LOWA_TOOLS = java.util.Set.of(
             "doc_list_project_files",
             "doc_open_file",
-            "doc_search_related_docs",
             "doc_restore_checkpoint",
             "doc_export_pdf",
             "sheet_create_file",

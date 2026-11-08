@@ -36,6 +36,8 @@ const LOCALIZED_NAMES = {
 }
 
 const NAMES = {
+  // 注：tool-system-v2 V3 已删除 22 个长期隐藏工具（get_user_profile、read_document、pptx_open_file 等），
+  // 它们在下面保留的条目是 history-only：只为老会话的过程卡继续显示友好名，不对应任何现存工具。
   // 计划 / 项目
   todo_write: { zh: '更新任务清单', en: 'Update plan' },
   ask_user: { zh: '向用户提问', en: 'Ask the user' },

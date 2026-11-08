@@ -54,7 +54,7 @@
     "expect": {
       "toolCalls": [{ "name": "query_memory", "argsContain": { "depth": "hybrid" } }],
       "offeredToolsInclude": ["query_memory"],
-      "offeredToolsExclude": ["search_knowledge_base", "deep_search"],
+      "toolsNotRegistered": ["search_knowledge_base", "deep_search"],
       "structureContains": ["<final>"],
       "bubbleEndStatus": "finished"
     }
@@ -82,7 +82,7 @@
     "expect": {
       "toolCalls": [{ "name": "query_memory", "argsContain": { "depth": "deep" } }],
       "offeredToolsInclude": ["query_memory"],
-      "offeredToolsExclude": ["deep_search", "search_knowledge_base"],
+      "toolsNotRegistered": ["deep_search", "search_knowledge_base"],
       "structureContains": ["<final>"],
       "bubbleEndStatus": "finished"
     }
@@ -116,7 +116,7 @@
         { "name": "extract_file_text", "argsContain": { "fileId": "1001" } }
       ],
       "offeredToolsInclude": ["doc_list_project_files", "extract_file_text", "search_project_content"],
-      "offeredToolsExclude": ["read_document"],
+      "toolsNotRegistered": ["read_document"],
       "structureContains": ["<final>"],
       "bubbleEndStatus": "finished"
     }
@@ -169,7 +169,7 @@
     "expect": {
       "toolCalls": [{ "name": "slide_set_shape_text" }],
       "offeredToolsInclude": ["slide_set_shape_text", "slide_get_overview", "slide_add_page"],
-      "offeredToolsExclude": ["pptx_apply_format", "pptx_edit_page", "pptx_open_file"],
+      "toolsNotRegistered": ["pptx_apply_format", "pptx_edit_page", "pptx_open_file"],
       "structureContains": ["<final>"],
       "bubbleEndStatus": "finished"
     }
