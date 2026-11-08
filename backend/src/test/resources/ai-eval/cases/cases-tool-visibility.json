@@ -28,7 +28,6 @@
         "doc_get_document_text",
         "doc_audit_structure",
         "doc_restore_checkpoint",
-        "sheet_create_file",
         "write_docx"
       ],
       "offeredToolsExclude": [
@@ -69,7 +68,6 @@
       "offeredToolsInclude": [
         "sheet_write_cells",
         "sheet_read_range",
-        "sheet_create_file",
         "doc_list_project_files",
         "doc_open_file",
         "doc_restore_checkpoint",
@@ -114,8 +112,7 @@
         "slide_set_shape_text",
         "slide_get_overview",
         "doc_open_file",
-        "doc_restore_checkpoint",
-        "sheet_create_file"
+        "doc_restore_checkpoint"
       ],
       "offeredToolsExclude": [
         "doc_find_replace",
@@ -127,8 +124,8 @@
     }
   },
   {
-    "id": "no-active-document-keeps-every-editing-tool",
-    "title": "没有活跃文档：三套原语全下发（判不准时必须倒向全集）",
+    "id": "no-active-document-offers-entry-points-only",
+    "title": "没有活跃文档：只下发找/开/建入口，文档编辑原语（doc_/sheet_/slide_）暂不下发，打开或新建后再放回（tool-surface-audit S1）",
     "category": "files",
     "protocol": "native",
     "userInput": "项目里都有哪些文件？",
@@ -146,6 +143,12 @@
     "expect": {
       "toolCalls": [{ "name": "doc_list_project_files" }],
       "offeredToolsInclude": [
+        "doc_open_file",
+        "doc_start_stream",
+        "sheet_create_file",
+        "slide_create_file"
+      ],
+      "offeredToolsExclude": [
         "doc_find_replace",
         "sheet_write_cells",
         "slide_add_page"

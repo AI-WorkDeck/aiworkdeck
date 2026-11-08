@@ -367,6 +367,7 @@
     "category": "skill",
     "protocol": "xml",
     "userInput": "先朗读文档的第一段，然后把甲方名称统一改成「京微资易」。",
+    "activeDocument": { "id": "1001", "name": "股权转让协议.docx", "fileType": "docx" },
     "turns": [
       {
         "text": "<process name=\"统一甲方名称\"><tool_code>doc_find_replace(findText=\"甲方\", replaceText=\"京微资易\", replaceAll=true)</tool_code></process>"

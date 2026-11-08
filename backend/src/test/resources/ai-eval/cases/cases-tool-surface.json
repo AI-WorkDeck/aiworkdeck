@@ -1,0 +1,239 @@
+[
+  {
+    "id": "surface-nofile-neutral",
+    "title": "没开文件、中性问句：首轮 ≤30 工具 / ≤7k token（tool-surface-audit S1）",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "这份合同有什么风险？",
+    "turns": [
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "maxOfferedToolsFirstCall": 30,
+      "maxOfferedTokensFirstCall": 7000,
+      "offeredToolsInclude": [
+        "doc_open_file",
+        "doc_start_stream",
+        "list_tools",
+        "ask_user",
+        "use_skill"
+      ],
+      "offeredToolsExclude": [
+        "doc_find_replace",
+        "doc_insert_table",
+        "sheet_write_cells",
+        "slide_add_page"
+      ]
+    }
+  },
+  {
+    "id": "surface-nofile-draft-then-edit-widens",
+    "title": "没开文件、新建协议：doc_start_stream 成功后下一轮 doc_find_replace 可见",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "新建一份股权转让协议",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_start_stream",
+            "arguments": {
+              "fileName": "股权转让协议.docx"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已新建并开始起草。</final>"
+      }
+    ],
+    "projectFiles": [
+      {
+        "id": 2001,
+        "projectId": 1,
+        "name": "股权转让协议.docx",
+        "isDeleted": false,
+        "isFolder": false
+      }
+    ],
+    "toolStubs": {
+      "doc_start_stream": "{\"status\": \"success\", \"db_id\": 2001, \"file_name\": \"股权转让协议.docx\"}"
+    },
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "toolCalls": [
+        {
+          "name": "doc_start_stream"
+        }
+      ],
+      "offeredToolsExcludeFirstCall": [
+        "doc_find_replace"
+      ],
+      "offeredToolsIncludeLastCall": [
+        "doc_find_replace"
+      ]
+    }
+  },
+  {
+    "id": "surface-nofile-typical-sentence",
+    "title": "没开文件、典型一句话（表格+格式+事项）：预放回后首轮 ≤45 工具",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "把这张表格的格式统一一下，再建一个下周三的提醒事项",
+    "turns": [
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "maxOfferedToolsFirstCall": 45,
+      "offeredToolsInclude": [
+        "list_tools",
+        "task_create"
+      ]
+    }
+  },
+  {
+    "id": "surface-heavy-sentence-capped-to-three",
+    "title": "一句话命中 16+ 类：只预放回 3 类，list_tools 仍在列",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "pdf 版本 流程图 ppt mcp 工商 插件 transcript python 表格 事项 修订 模板 依据 格式 移动 法规 记住",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股权转让协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "maxOfferedToolsFirstCall": 60,
+      "offeredToolsInclude": [
+        "list_tools"
+      ],
+      "offeredToolsExclude": [
+        "pdf_merge",
+        "litigation_timeline",
+        "user_mcp_call",
+        "qichacha_search"
+      ]
+    }
+  },
+  {
+    "id": "surface-word-ppt-prediscloses-create-file",
+    "title": "Word 会话里「把这份合同转成PPT」：create_file 靠关键词预放回，首轮可见",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "把这份合同转成PPT",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股权转让协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "offeredToolsInclude": [
+        "slide_create_file"
+      ],
+      "maxOfferedToolsFirstCall": 70
+    }
+  },
+  {
+    "id": "surface-word-table-prediscloses-create-file",
+    "title": "Word 会话里「把付款条款做成表格」：create_file 靠关键词预放回，首轮可见",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "把付款条款做成表格",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股权转让协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "offeredToolsInclude": [
+        "sheet_create_file"
+      ],
+      "maxOfferedToolsFirstCall": 70
+    }
+  },
+  {
+    "id": "surface-word-slides-prediscloses-create-file",
+    "title": "Word 会话里「根据这份合同生成幻灯片」：create_file 靠关键词预放回，首轮可见",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "根据这份合同生成幻灯片",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股权转让协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "offeredToolsInclude": [
+        "slide_create_file"
+      ],
+      "maxOfferedToolsFirstCall": 70
+    }
+  },
+  {
+    "id": "surface-word-excel-prediscloses-create-file",
+    "title": "Word 会话里「把这份合同的付款节点导出为Excel」：create_file 靠关键词预放回，首轮可见",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "把这份合同的付款节点导出为Excel",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股权转让协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "offeredToolsInclude": [
+        "sheet_create_file"
+      ],
+      "maxOfferedToolsFirstCall": 70
+    }
+  },
+  {
+    "id": "surface-nofile-skill-keeps-offer-within-budget",
+    "title": "没开文件 + 命中 skill（证据目录）+ 「表格」关键词：skill 只按名字放行白名单工具、不连带整类，首轮 ≤45 且 sheet_create_file 可见",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "把项目里的证据目录整理成表格",
+    "turns": [{ "text": "<final>好的。</final>" }],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "maxOfferedToolsFirstCall": 45,
+      "offeredToolsInclude": ["sheet_create_file", "list_tools"]
+    }
+  }
+]

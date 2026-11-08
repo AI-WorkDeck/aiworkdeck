@@ -152,11 +152,12 @@ public class ToolDisclosurePolicy {
             "doc_export_pdf",
 
             // ==================== LOWA 表格（xlsx）段：5 个 ====================
-            // sheet_create_file 在 docx 会话里同样可见（新建一份表格，不依赖活跃文档类型）。
-            "sheet_create_file", "sheet_get_overview", "sheet_read_range", "sheet_write_cells", "sheet_find_replace",
+            // sheet_create_file / slide_create_file 不在核心集（tool-surface-audit S1，已拍板 #1）：
+            // 有文档开着时靠「表格 / excel / ppt / 幻灯片」关键词预放回；没开文件时见 NOFILE_ENTRY_EXTRA。
+            "sheet_get_overview", "sheet_read_range", "sheet_write_cells", "sheet_find_replace",
 
             // ==================== LOWA 演示（pptx）段：6 个 ====================
-            "slide_create_file", "slide_get_overview", "slide_get_page", "slide_set_shape_text", "slide_replace_text", "slide_add_page",
+            "slide_get_overview", "slide_get_page", "slide_set_shape_text", "slide_replace_text", "slide_add_page",
 
             // ==================== Office 任务窗格·Word 段：7 个（T-18）====================
             // office_pass_step 是 Word 窗格整篇大改的入口（分段过卷，dev-board#422）；office_add_comment 是审查的交付物。
@@ -172,6 +173,30 @@ public class ToolDisclosurePolicy {
             // ==================== Office 任务窗格·PowerPoint 段：4 个（T-18）====================
             "office_ppt_get_slides", "office_ppt_replace_text", "office_ppt_format_text", "office_ppt_add_slide"
     );
+
+    /**
+     * 没开文件态（LOWA 且起跑时无活跃文档，tool-surface-audit S1）额外放进核心集的入口工具：
+     * 新建一份表格 / 演示文稿。它们不在 {@link #CORE}（有文档开着时靠关键词预放回），
+     * 但没开文件时「新建」就是入口，不该先查目录。
+     */
+    static final Set<String> NOFILE_ENTRY_EXTRA = Set.of("sheet_create_file", "slide_create_file");
+
+    /**
+     * 没开文件态保留的 doc_* / sheet_* / slide_* 核心工具：找 / 打开 / 新建入口。
+     * 其余文档编辑原语在没有文档时一个都用不上，打开或新建文档后由编排器放回（只增不减）。
+     */
+    static final Set<String> NOFILE_KEPT_DOC_TOOLS = Set.of("doc_open_file", "doc_start_stream");
+
+    /**
+     * 没开文件态再让出的两个整理类核心工具（预算：中性首轮 ≤7k token）：批量移动 / 移入回收站不是入口动作，
+     * 「移动 / 归档 / 文件夹 / 回收站」关键词会随 files 类目放回。
+     */
+    static final Set<String> NOFILE_HIDDEN_CORE = Set.of("move_files_batch", "move_to_trash");
+
+    private static boolean isDocEditPrimitive(String name) {
+        return (name.startsWith("doc_") || name.startsWith("sheet_") || name.startsWith("slide_"))
+                && !"doc_list_project_files".equals(name);
+    }
 
     /**
      * 类目 → 这个类目收哪些工具。按<b>声明顺序</b>匹配，第一个命中的类目即归属，
@@ -300,7 +325,7 @@ public class ToolDisclosurePolicy {
         CATEGORY_KEYWORDS.put("python", List.of("python", "脚本", "计算一下", "跑一段代码"));
         // 「表格」两边都放：docx 里说的「表格」是文档内的表（table 类目的 doc_table_*），
         // xlsx 会话或「做一张表格」说的是电子表格；分不清就两类都放回，多付的是一轮里两类的规格。
-        CATEGORY_KEYWORDS.put("spreadsheet", List.of("表格", "excel", "xlsx", "工作表"));
+        CATEGORY_KEYWORDS.put("spreadsheet", List.of("表格", "excel", "xlsx", "工作表", "电子表格", "一张表"));
         CATEGORY_KEYWORDS.put("table", List.of("表格", "table", "单元格", "合并单元格"));
         CATEGORY_KEYWORDS.put("task", List.of("事项", "日程", "提醒", "待办", "截止", "deadline",
                 "期限", "到期", "开庭", "庭审", "时效", "截止日"));
@@ -317,7 +342,7 @@ public class ToolDisclosurePolicy {
                 "插入目录", "生成目录", "更新目录", "font", "format", "heading"));
         // 不收「整理」：「整理一下录音 / 要点」远比「整理文件夹」常见，而建文件夹、批量移动、移入回收站本来就在核心集；
         // 但明确指文件归档的「文件整理」「整理文件」「归档」直接预先放回 files 全集（含单文件移动与重命名）。
-        CATEGORY_KEYWORDS.put("files", List.of("移动", "重命名", "文件夹", "文件整理", "整理文件", "归档",
+        CATEGORY_KEYWORDS.put("files", List.of("移动", "重命名", "文件夹", "回收站", "文件整理", "整理文件", "归档",
                 "rename", "move", "folder", "organize files", "file organization"));
         // 「法》」「条例》」：用户一写书名号引一部法（《公司法》《劳动合同法》《著作权法实施条例》）就是在查法条，
         // 比「法规」「法条」这类泛称命中得准。
@@ -374,6 +399,12 @@ public class ToolDisclosurePolicy {
      */
     public List<ToolSpecification> trimForDocKind(List<ToolSpecification> candidates, String activeDocKind,
                                                   Set<String> expanded) {
+        return trimForDocKind(candidates, activeDocKind, expanded, Set.of());
+    }
+
+    /** @param extraNames 生效 skill 白名单点名的工具：即使所在类目被藏也按名保留。 */
+    public List<ToolSpecification> trimForDocKind(List<ToolSpecification> candidates, String activeDocKind,
+                                                  Set<String> expanded, Set<String> extraNames) {
         Set<String> hidden = hiddenCategoriesFor(activeDocKind);
         if (hidden.isEmpty() || candidates == null) {
             return candidates;
@@ -382,7 +413,8 @@ public class ToolDisclosurePolicy {
         List<ToolSpecification> kept = new ArrayList<>();
         for (ToolSpecification spec : candidates) {
             String category = categoryOf(spec.name());
-            if (!hidden.contains(category) || open.contains(category)) {
+            if (!hidden.contains(category) || open.contains(category)
+                    || (extraNames != null && extraNames.contains(spec.name()))) {
                 kept.add(spec);
             }
         }
@@ -425,6 +457,49 @@ public class ToolDisclosurePolicy {
             }
         }
         return hinted;
+    }
+
+    /** 单轮关键词预放回类目上限（tool-surface-audit S1）。其余留给模型 {@code list_tools(category)}。 */
+    public static final int MAX_KEYWORD_PUTBACK = 3;
+
+    /** 同分时的固定先后：越靠前越先放回（律师日常最高频、规格最小的优先）。 */
+    private static final List<String> PUTBACK_PRIORITY = List.of(
+            "task", "legal", "revision", "memory", "spreadsheet", "slides", "format", "table", "files",
+            "template", "evidence", "pdf", "meeting", "plugin-tools", "version", "enterprise-data",
+            "litigation", "python", "plugin", "mcp");
+
+    /**
+     * {@link #categoriesHintedBy} 的限量版：最多 {@value #MAX_KEYWORD_PUTBACK} 类，
+     * 按命中强度（命中关键词的总长度，越长越具体）从高到低取，同分按 {@link #PUTBACK_PRIORITY}，
+     * 确定性。没进前三的类目模型仍可 {@code list_tools(category)} 展开。
+     */
+    public Set<String> categoriesPutBackFor(String userMessage) {
+        Set<String> hinted = categoriesHintedBy(userMessage);
+        if (hinted.size() <= MAX_KEYWORD_PUTBACK) {
+            return hinted;
+        }
+        String normalized = userMessage.toLowerCase(Locale.ROOT);
+        Map<String, Integer> score = new LinkedHashMap<>();
+        for (String category : hinted) {
+            int total = 0;
+            for (String keyword : CATEGORY_KEYWORDS.getOrDefault(category, List.of())) {
+                if (SkillRouter.containsTrigger(normalized, keyword.toLowerCase(Locale.ROOT))) {
+                    total += keyword.length();
+                }
+            }
+            score.put(category, Math.max(total, 1));
+        }
+        List<String> ranked = new ArrayList<>(hinted);
+        ranked.sort((a, b) -> {
+            int byScore = Integer.compare(score.get(b), score.get(a));
+            if (byScore != 0) {
+                return byScore;
+            }
+            int pa = PUTBACK_PRIORITY.indexOf(a);
+            int pb = PUTBACK_PRIORITY.indexOf(b);
+            return Integer.compare(pa < 0 ? Integer.MAX_VALUE : pa, pb < 0 ? Integer.MAX_VALUE : pb);
+        });
+        return new LinkedHashSet<>(ranked.subList(0, MAX_KEYWORD_PUTBACK));
     }
 
     /** 关键词表覆盖的类目（只读）。契约测试据它核对每个键都是目录认得的类目——认不得就永远不会被提示。 */
@@ -525,11 +600,38 @@ public class ToolDisclosurePolicy {
      * 本方法只在它上面再收窄一次，绝不放宽。
      */
     public List<ToolSpecification> narrow(List<ToolSpecification> candidates, Set<String> expanded) {
+        return narrow(candidates, expanded, false);
+    }
+
+    /**
+     * @param noFile 没开文件态（LOWA 且无活跃文档）：文档编辑原语（doc_/sheet_/slide_，核心集与已展开类目里的，
+     *               除打开 / 流式新建入口外）暂不下发，新建表格 / 演示文稿作为入口补进来；
+     *               其余类目照常按展开集放行。
+     */
+    public List<ToolSpecification> narrow(List<ToolSpecification> candidates, Set<String> expanded, boolean noFile) {
+        return narrow(candidates, expanded, noFile, Set.of());
+    }
+
+    /** @param extraNames 生效 skill 白名单里点名的工具：按名字放行，不连带整个类目。 */
+    public List<ToolSpecification> narrow(List<ToolSpecification> candidates, Set<String> expanded, boolean noFile,
+                                          Set<String> extraNames) {
         Set<String> open = expanded == null ? Set.of() : expanded;
         List<ToolSpecification> kept = new ArrayList<>();
         for (ToolSpecification spec : candidates) {
-            String category = categoryOf(spec.name());
-            if ("core".equals(category) || open.contains(category)) {
+            String name = spec.name();
+            String category = categoryOf(name);
+            if (extraNames != null && extraNames.contains(name)) {
+                kept.add(spec);
+            } else if (noFile && NOFILE_ENTRY_EXTRA.contains(name)) {
+                kept.add(spec);
+            } else if (noFile && isDocEditPrimitive(name) && !NOFILE_KEPT_DOC_TOOLS.contains(name)) {
+                // 没有文档时编辑原语（含被关键词放回的类目里的）一个都用不上；打开 / 新建后 noFile 清零，随展开集回来
+                continue;
+            } else if ("core".equals(category)) {
+                if (!noFile || !NOFILE_HIDDEN_CORE.contains(name)) {
+                    kept.add(spec);
+                }
+            } else if (open.contains(category)) {
                 kept.add(spec);
             }
         }

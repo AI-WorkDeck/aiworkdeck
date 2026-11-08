@@ -114,7 +114,6 @@
         "doc_list_project_files",
         "extract_file_text",
         "search_project_content",
-        "doc_get_document_text",
         "law_search",
         "query_memory",
         "todo_write"
