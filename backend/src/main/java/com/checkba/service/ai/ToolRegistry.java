@@ -1117,9 +1117,13 @@ public class ToolRegistry {
             String src = source != null ? source
                     : ctx.conversationId() != null && ctx.conversationId().startsWith("mcp:") ? "mcp" : "agent";
             RegisteredTool tool = result == null ? null : result.tool();
-            String access = com.checkba.service.ai.capability.CapabilityCatalog
-                    .accessOf(name, tool == null ? null : tool.meta()).name().toLowerCase(java.util.Locale.ROOT);
-            String pluginId = pluginService.getPluginIdForTool(name);
+            DeclaredToolBinding declared = tool != null && tool.bean() instanceof com.checkba.service.plugin.HostServiceRegistry
+                    ? declaredBinding(name) : null;
+            String access = (declared != null
+                    ? com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(name, declared.tool().getAccess())
+                    : com.checkba.service.ai.capability.CapabilityCatalog.accessOf(name, tool == null ? null : tool.meta()))
+                    .name().toLowerCase(java.util.Locale.ROOT);
+            String pluginId = declared != null ? declared.pluginId() : pluginService.getPluginIdForTool(name);
             Map<String, Object> meta = new java.util.LinkedHashMap<>();
             meta.put("source", src);
             meta.put("access", access);
