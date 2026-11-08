@@ -71,6 +71,8 @@ public class EvalCase {
      * 这一类藏了、那一类回来了」，被全局开关改掉模式后断言本身就不成立，跑了也只是噪音红。
      */
     public Boolean docSessionCategoryTrim;
+    /** 可选：本轮用户消息带一个附件（决定条件核心 list_attached_files，tool-system-v2 V2）。 */
+    public boolean withAttachment;
     /** 非 null 时该用例进入真实 LLM 冒烟集（RealLlmSmokeTest） */
     public Smoke smoke;
     /** 预录的模型输出，按轮次回放 */
@@ -142,6 +144,8 @@ public class EvalCase {
         public List<String> offeredToolsIncludeLastCall = new ArrayList<>();
         /** 第一次携带工具的 LLM 调用下发的工具个数上限（null = 不断言；tool-surface-audit S0） */
         public Integer maxOfferedToolsFirstCall;
+        /** 第二次及以后每次 LLM 调用下发的工具个数上限（中途增长封顶，tool-system-v2 V2；null = 不断言） */
+        public Integer maxOfferedToolsLaterCalls;
         /** 第一次携带工具的 LLM 调用下发的 schema token 上限（o200k，口径见 ToolSurfaceMetrics；null = 不断言） */
         public Integer maxOfferedTokensFirstCall;
         /** 会话文件夹重命名（<title> 协议）应包含的子串（null = 不断言） */

@@ -580,7 +580,7 @@ class AgentOrchestratorInboxTest {
         orchestrator.setToolDisclosurePolicy(new ToolDisclosurePolicy(false));
         when(modelFactory.resolveTarget(any(), eq(false))).thenReturn(new ChatModelFactory.ResolvedTarget(
                 com.checkba.config.AiModelProperties.Provider.OPENROUTER, MODEL));
-        var specs = List.of("extract_file_text", "read_file", "doc_set_font", "doc_accept_revision", "memory_search")
+        var specs = List.of("extract_file_text", "read_file", "doc_set_font", "doc_accept_revision", "memory_list", "memory_read")
                 .stream().map(n -> ToolSpecification.builder().name(n).description(n).build()).toList();
         when(tools.getAllSpecifications(any(), any())).thenReturn(specs);
         var catalog = ToolSpecification.builder().name("list_tools").description("catalog").build();
@@ -628,7 +628,7 @@ class AgentOrchestratorInboxTest {
         request.setDecisionAssistEnabled(true);
         orchestrator.handleUserMessage(request, 7L);
         assertEquals(2, modelToolNames.size());
-        assertTrue(modelToolNames.get(0).containsAll(List.of("extract_file_text", "read_file", "memory_search", "list_tools")));
+        assertTrue(modelToolNames.get(0).containsAll(List.of("extract_file_text", "read_file", "memory_list", "memory_read", "list_tools")));
         assertFalse(modelToolNames.get(0).contains("doc_set_font"));
         assertTrue(modelToolNames.get(1).containsAll(modelToolNames.get(0)));
         assertTrue(modelToolNames.get(1).contains("doc_set_font"));

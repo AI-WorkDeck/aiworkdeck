@@ -229,11 +229,379 @@
     "category": "files",
     "protocol": "native",
     "userInput": "把项目里的证据目录整理成表格",
-    "turns": [{ "text": "<final>好的。</final>" }],
+    "turns": [
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
     "expect": {
       "bubbleEndStatus": "finished",
       "maxOfferedToolsFirstCall": 45,
-      "offeredToolsInclude": ["sheet_create_file", "list_tools"]
+      "offeredToolsInclude": [
+        "sheet_create_file",
+        "list_tools"
+      ]
+    }
+  },
+  {
+    "id": "surface-v2-standard-format-keyword",
+    "title": "V2：「把全文统一成律所标准格式」首轮含 doc_apply_standard_format（退出核心集后靠关键词放回）",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "把全文统一成律所标准格式",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股权转让协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "offeredToolsInclude": [
+        "doc_apply_standard_format"
+      ]
+    }
+  },
+  {
+    "id": "surface-v2-export-pdf-keyword",
+    "title": "V2：「导出成PDF」首轮含 doc_export_pdf",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "导出成PDF",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股权转让协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "offeredToolsInclude": [
+        "doc_export_pdf"
+      ]
+    }
+  },
+  {
+    "id": "surface-v2-create-folder-keyword",
+    "title": "V2：「新建一个文件夹叫证据」首轮含 create_folder",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "新建一个文件夹叫证据",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股权转让协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "offeredToolsInclude": [
+        "create_folder"
+      ]
+    }
+  },
+  {
+    "id": "surface-v2-trash-keyword",
+    "title": "V2：「把这个文件删了」首轮含 move_to_trash（destructive 由 ToolDisclosurePolicyTest 钉）",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "把这个文件删了",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股权转让协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "offeredToolsInclude": [
+        "move_to_trash"
+      ],
+      "offeredToolsExclude": [
+        "delete_file"
+      ]
+    }
+  },
+  {
+    "id": "surface-v2-memory-search-keyword",
+    "title": "V2：「你还记得我之前说过的偏好吗」首轮含 memory_search",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "你还记得我之前说过的偏好吗",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股权转让协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "offeredToolsInclude": [
+        "memory_search"
+      ]
+    }
+  },
+  {
+    "id": "surface-v2-neutral-lacks-left-core",
+    "title": "V2：中性问句首轮不含退出核心集的 8 个名字，但仍含固定追加的 memory_list/memory_read",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "这份合同有什么风险？",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股权转让协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "offeredToolsInclude": [
+        "memory_list",
+        "memory_read",
+        "list_tools"
+      ],
+      "offeredToolsExclude": [
+        "create_folder",
+        "move_files_batch",
+        "move_to_trash",
+        "doc_apply_standard_format",
+        "doc_export_pdf",
+        "memory_search",
+        "list_attached_files",
+        "doc_restore_checkpoint"
+      ]
+    }
+  },
+  {
+    "id": "surface-v2-attachment-offers-list-attached",
+    "title": "V2：本轮带附件，首轮含 list_attached_files",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "看一下我发的附件",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股权转让协议.docx",
+      "fileType": "docx"
+    },
+    "withAttachment": true,
+    "turns": [
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "offeredToolsInclude": [
+        "list_attached_files"
+      ]
+    }
+  },
+  {
+    "id": "surface-v2-no-attachment-no-list-attached",
+    "title": "V2：本轮无附件，首轮不含 list_attached_files",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "看一下这份合同",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股权转让协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "offeredToolsInclude": [
+        "extract_file_text"
+      ],
+      "offeredToolsExclude": [
+        "list_attached_files"
+      ]
+    }
+  },
+  {
+    "id": "surface-v2-checkpoint-appears-after-first-edit",
+    "title": "V2：docx 会话没有检查点时不下发 doc_restore_checkpoint，首次修改（建检查点）之后的轮次下发",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "在光标处插入一句话",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股权转让协议.docx",
+      "fileType": "docx"
+    },
+    "projectFiles": [],
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_insert_at_cursor",
+            "arguments": {
+              "text": "测试"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已插入。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "offeredToolsInclude": [
+        "list_tools"
+      ],
+      "offeredToolsExcludeFirstCall": [
+        "doc_restore_checkpoint"
+      ],
+      "offeredToolsIncludeLastCall": [
+        "doc_restore_checkpoint"
+      ]
+    }
+  },
+  {
+    "id": "surface-v2-pptx-restore-checkpoint-always",
+    "title": "V2：pptx 会话 doc_restore_checkpoint 常驻（Impress 的 doc_undo 是空操作）",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "把第一页标题改成年度报告",
+    "activeDocument": {
+      "id": "1001",
+      "name": "汇报.pptx",
+      "fileType": "pptx"
+    },
+    "turns": [
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "offeredToolsInclude": [
+        "doc_restore_checkpoint"
+      ]
+    }
+  },
+  {
+    "id": "surface-v2-midrun-growth-capped",
+    "title": "V2：逐类 list_tools 展开七个类目，第 2 个往返起每轮下发 ≤46（含另补 memory_list/read）；超出的按 LRU 收回",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "帮我看看这份合同还需要补什么",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股权转让协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "list_tools",
+            "arguments": {
+              "category": "revision"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "list_tools",
+            "arguments": {
+              "category": "template"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "list_tools",
+            "arguments": {
+              "category": "evidence"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "list_tools",
+            "arguments": {
+              "category": "legal"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "list_tools",
+            "arguments": {
+              "category": "version"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "list_tools",
+            "arguments": {
+              "category": "memory"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "list_tools",
+            "arguments": {
+              "category": "task"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "maxOfferedToolsLaterCalls": 46,
+      "offeredToolsIncludeLastCall": [
+        "list_tools",
+        "task_create"
+      ]
     }
   }
 ]

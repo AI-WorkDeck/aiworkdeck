@@ -144,6 +144,14 @@ class OrchestratorReplayEvalTest {
             assertTrue(r.firstCallOfferedTools() <= c.expect.maxOfferedToolsFirstCall,
                     "首轮下发工具数 " + r.firstCallOfferedTools() + " 超过上限 " + c.expect.maxOfferedToolsFirstCall);
         }
+        if (c.expect.maxOfferedToolsLaterCalls != null) {
+            List<Integer> counts = r.offeredToolCountPerCall();
+            for (int i = 1; i < counts.size(); i++) {
+                assertTrue(counts.get(i) <= c.expect.maxOfferedToolsLaterCalls,
+                        "第 " + (i + 1) + " 次 LLM 调用下发 " + counts.get(i) + " 个工具，超过中途封顶 "
+                                + c.expect.maxOfferedToolsLaterCalls + "：" + counts);
+            }
+        }
         if (c.expect.maxOfferedTokensFirstCall != null) {
             assertTrue(r.firstCallOfferedSchemaTokens() <= c.expect.maxOfferedTokensFirstCall,
                     "首轮下发 schema token " + r.firstCallOfferedSchemaTokens()

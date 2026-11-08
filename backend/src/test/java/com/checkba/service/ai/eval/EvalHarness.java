@@ -260,6 +260,8 @@ public final class EvalHarness {
             checkpointFileIds.add(inv.getArgument(1));
             return null;
         }).when(checkpointService).ensureCheckpoint(any(), any());
+        // 条件核心 doc_restore_checkpoint（tool-system-v2 V2）：本轮建过检查点之后 hasCheckpoint 才为真
+        when(checkpointService.hasCheckpoint(any())).thenAnswer(inv -> !checkpointFileIds.isEmpty());
         com.checkba.version.WorkSessionService workSessionService = mock(com.checkba.version.WorkSessionService.class);
 
         // 故障转移与自动 compaction 用真实配置默认值：备选链默认为空（不会在回放里切模型），
@@ -327,6 +329,14 @@ public final class EvalHarness {
             active.setName(c.activeDocument.name);
             active.setFileType(c.activeDocument.fileType);
             request.setActiveContext(active);
+        }
+
+        if (c.withAttachment) {
+            AiAgentController.ContextItem attachment = new AiAgentController.ContextItem();
+            attachment.setId("9001");
+            attachment.setName("附件.pdf");
+            attachment.setFileType("pdf");
+            request.setContextItems(List.of(attachment));
         }
 
         orchestrator.handleUserMessage(request, 7L);

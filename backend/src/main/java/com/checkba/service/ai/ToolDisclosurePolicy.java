@@ -116,12 +116,14 @@ public class ToolDisclosurePolicy {
             // doc_list_project_files 自 dev-board#1065 T-01 起三档会话都可见（纯后端清单），
             // 所以纯对话与 Office 任务窗格会话也不必为「这是什么文件」先查一次目录（#1064 实测病灶）。
             // read_document 已只登记不下发（T-05），入口统一是 extract_file_text。
-            "doc_list_project_files", "search_project_files", "search_project_content", "extract_file_text", "list_attached_files",
-            "write_docx", "create_folder", "move_files_batch", "move_to_trash",
+            "doc_list_project_files", "search_project_files", "search_project_content", "extract_file_text",
+            "write_docx",
             // 跨文件硬规则要求先列后读；reference 没有关键词预放回，不能再让模型先查目录。
             "ref_list", "ref_read",
 
-            // —— 记忆：检索与保存各一个（memory_list/read/search 由编排器每轮另补；write/edit/delete 走 memory 类目，skill 收窄时由编排器兜底，dev-board#1073）——
+            // V2：create_folder / move_files_batch / move_to_trash 退到 files 类目（关键词预放回）；
+            // list_attached_files 改为条件核心（本轮有附件时由编排器补）。
+            // —— 记忆：检索与保存各一个（memory_list/read 由编排器每轮另补，memory_search 退到 memory 类目；write/edit/delete 走 memory 类目，skill 收窄时由编排器兜底，dev-board#1073）——
             "query_memory", "save_memory",
 
             // —— 法源与公网：律师最高频的外部检索。law_search_keyword 是 law_search 的精确检索变体，
@@ -141,15 +143,14 @@ public class ToolDisclosurePolicy {
             // doc_replace_selection / doc_select_anchor / doc_select_paragraph 退到 edit 类目：
             // 锚点替换与查找替换已覆盖「改一处」，先选中再替换是两步走的旧路。
             "doc_find_replace", "doc_replace_at_anchor", "doc_insert_at_cursor", "doc_start_stream",
-            "doc_insert_table", "doc_apply_standard_format",
+            "doc_insert_table",
             // —— 批注与后悔药 ——
             // doc_get_comments 退到 revision 类目（与回复 / 解决 / 删除批注同类；「批注」「修订」等关键词会预先放回）。
-            // doc_restore_checkpoint 回到核心集：Impress 上 doc_undo 是空操作（引擎不记撤销栈，
-            // lowa-e2e undo-redo-kinds 实测），pptx 会话里它是唯一的后悔药，约 300 字符。
-            "doc_add_comment", "doc_undo", "doc_restore_checkpoint",
-            // LOWA Word/Calc/Impress visual verification needs export without a files discovery round.
-            // Upstream capability gates still exclude this command from Office add-ins and none sessions.
-            "doc_export_pdf",
+            // Impress 上 doc_undo 是空操作（引擎不记撤销栈，lowa-e2e undo-redo-kinds 实测），
+            // pptx 会话里 doc_restore_checkpoint 是唯一的后悔药，所以 pptx 常驻（条件核心）。
+            "doc_add_comment", "doc_undo",
+            // V2：doc_restore_checkpoint 改为条件核心（本轮已有检查点、或 pptx 会话时由编排器补）；
+            // doc_apply_standard_format 退到 format 类目、doc_export_pdf 退到 pdf 类目（关键词预放回）。
 
             // ==================== LOWA 表格（xlsx）段：5 个 ====================
             // sheet_create_file / slide_create_file 不在核心集（tool-surface-audit S1，已拍板 #1）：
@@ -186,12 +187,6 @@ public class ToolDisclosurePolicy {
      * 其余文档编辑原语在没有文档时一个都用不上，打开或新建文档后由编排器放回（只增不减）。
      */
     static final Set<String> NOFILE_KEPT_DOC_TOOLS = Set.of("doc_open_file", "doc_start_stream");
-
-    /**
-     * 没开文件态再让出的两个整理类核心工具（预算：中性首轮 ≤7k token）：批量移动 / 移入回收站不是入口动作，
-     * 「移动 / 归档 / 文件夹 / 回收站」关键词会随 files 类目放回。
-     */
-    static final Set<String> NOFILE_HIDDEN_CORE = Set.of("move_files_batch", "move_to_trash");
 
     private static boolean isDocEditPrimitive(String name) {
         return (name.startsWith("doc_") || name.startsWith("sheet_") || name.startsWith("slide_"))
@@ -232,18 +227,20 @@ public class ToolDisclosurePolicy {
                 "name:doc_replace_nth_match", "name:doc_delete_match", "name:doc_delete_text",
                 "name:doc_set_selection", "name:doc_get_selection", "name:doc_get_paragraph",
                 "name:doc_get_outline", "name:doc_insert_under_heading", "name:doc_replace_selection"));
-        // files 排在 format 之前，只为 doc_export_pdf：它带 doc_ 前缀，排在后面就会被 format 通配吃掉。
+        // pdf 与 files 排在 format 之前，只为 doc_export_pdf：它带 doc_ 前缀，排在后面就会被 format 通配吃掉。
+        // V2：doc_export_pdf 从核心集退到 pdf 类目（「导出PDF / 转PDF」命中 pdf 关键词）。
+        CATEGORIES.put("pdf", List.of("name:doc_export_pdf", "pdf_"));
         CATEGORIES.put("files", List.of(
+                "name:create_folder", "name:move_files_batch", "name:move_to_trash",
                 "name:list_files", "name:read_file", "name:write_file", "name:scan_files",
                 "name:move_file", "name:move_project_file", "name:rename_project_file",
-                "name:list_project_folders", "name:delete_file", "text_", "name:doc_export_pdf",
+                "name:list_project_folders", "name:delete_file", "text_",
                 "name:copy_files", "name:search_across_projects"));
         // doc_* 里剩下的全是版式与排版：字符格式、段落格式、页面、页眉页脚、目录、脚注、图片、超链接……
         CATEGORIES.put("format", List.of("doc_"));
         CATEGORIES.put("spreadsheet", List.of("sheet_"));
         CATEGORIES.put("slides", List.of("slide_", "pptx_", "image_generate_asset", "image_get_generation"));
         CATEGORIES.put("office", List.of("office_"));
-        CATEGORIES.put("pdf", List.of("pdf_"));
         CATEGORIES.put("litigation", List.of("litigation_"));
         CATEGORIES.put("reference", List.of("ref_"));
         CATEGORIES.put("version", List.of("version_"));
@@ -340,9 +337,10 @@ public class ToolDisclosurePolicy {
         // 四十个规格；只收明确指文档目录的短语。
         CATEGORY_KEYWORDS.put("format", List.of("格式", "字体", "字号", "段落", "页眉", "页脚", "脚注", "排版",
                 "插入目录", "生成目录", "更新目录", "font", "format", "heading"));
-        // 不收「整理」：「整理一下录音 / 要点」远比「整理文件夹」常见，而建文件夹、批量移动、移入回收站本来就在核心集；
+        // 不收「整理」：「整理一下录音 / 要点」远比「整理文件夹」常见，而建文件夹、批量移动、移入回收站在 V2 起也退到 files 类目（靠「文件夹 / 移动 / 回收站 / 删除文件」预放回）；
         // 但明确指文件归档的「文件整理」「整理文件」「归档」直接预先放回 files 全集（含单文件移动与重命名）。
         CATEGORY_KEYWORDS.put("files", List.of("移动", "重命名", "文件夹", "回收站", "文件整理", "整理文件", "归档",
+                "删除文件", "删掉文件", "文件删了", "删了这个文件", "删除这个文件", "删掉这个文件",
                 "rename", "move", "folder", "organize files", "file organization"));
         // 「法》」「条例》」：用户一写书名号引一部法（《公司法》《劳动合同法》《著作权法实施条例》）就是在查法条，
         // 比「法规」「法条」这类泛称命中得准。
@@ -351,7 +349,7 @@ public class ToolDisclosurePolicy {
         // memory 类目里是 memory_write / memory_edit / memory_delete 三个写入工具（只读三个编排器每轮都补，
         // dev-board#1073）；「记下」「忘掉」是要改记忆文件的说法。不收「别忘」「forget」：
         // 「别忘了加页码」是叮嘱不是记忆。
-        CATEGORY_KEYWORDS.put("memory", List.of("记住", "记忆", "偏好", "记下", "忘掉", "remember", "memory"));
+        CATEGORY_KEYWORDS.put("memory", List.of("记住", "记忆", "偏好", "记下", "忘掉", "记得", "之前说过", "上次说过", "之前提过", "remember", "memory"));
         // edit 刻意不收关键词：「删除 / 改成 / 替换 / 插入」几乎每句改文档的话都有，而真正常用的
         // 删改原语（锚点替换、查找替换、光标处插入）本来就在核心集里。
     }
@@ -628,14 +626,69 @@ public class ToolDisclosurePolicy {
                 // 没有文档时编辑原语（含被关键词放回的类目里的）一个都用不上；打开 / 新建后 noFile 清零，随展开集回来
                 continue;
             } else if ("core".equals(category)) {
-                if (!noFile || !NOFILE_HIDDEN_CORE.contains(name)) {
-                    kept.add(spec);
-                }
+                kept.add(spec);
             } else if (open.contains(category)) {
                 kept.add(spec);
             }
         }
         return kept;
+    }
+
+    /** 每轮下发工具总数上限（tool-system-v2 B6 / V2）。超过时按 LRU 逐个收回已展开类目。 */
+    public static final int MAX_OFFERED_PER_ROUND = 45;
+
+    /** 模型经 {@code list_tools} 明确要的类目，在之后多少轮内不被收回。 */
+    public static final int LIST_TOOLS_PROTECT_ROUNDS = 2;
+
+    /**
+     * 中途增长封顶：{@link #narrow} 的结果加上编排器另补的 {@code reserve} 个工具超过
+     * {@link #MAX_OFFERED_PER_ROUND} 时，从已展开类目里按「最近使用轮次最小、同分按类目名」逐个收回，
+     * 直到不超或无类目可收。纯函数、确定性。
+     *
+     * <p>永不收回：核心集（不属于任何类目）、skill 点名的工具（{@code extraNames} 按名放行）、
+     * 受保护类目（{@code protectedCategories}：模型最近两轮用 list_tools 要的、本轮刚放回或刚用过的）。
+     * 只考虑真对候选集有贡献的类目，收回一个零贡献的类目没有意义。
+     *
+     * @param lastUsed 类目 → 最近一次放回或被调用的轮次（缺省按 0）
+     * @return 被收回的类目（调用方据此从展开集移除）；不需要收回时为空集
+     */
+    public Set<String> evictToBudget(List<ToolSpecification> candidates, Set<String> expanded, boolean noFile,
+                                     Set<String> extraNames, Map<String, Integer> lastUsed,
+                                     Set<String> protectedCategories, int reserve) {
+        if (candidates == null || expanded == null || expanded.isEmpty()) {
+            return Set.of();
+        }
+        Set<String> contributing = new LinkedHashSet<>();
+        for (ToolSpecification spec : candidates) {
+            String category = categoryOf(spec.name());
+            if (!"core".equals(category)) {
+                contributing.add(category);
+            }
+        }
+        Set<String> work = new LinkedHashSet<>(expanded);
+        Set<String> evicted = new LinkedHashSet<>();
+        while (narrow(candidates, work, noFile, extraNames).size() + reserve > MAX_OFFERED_PER_ROUND) {
+            String victim = null;
+            for (String category : work) {
+                if (!contributing.contains(category) || protectedCategories.contains(category)) {
+                    continue;
+                }
+                if (victim == null) {
+                    victim = category;
+                    continue;
+                }
+                int byUse = Integer.compare(lastUsed.getOrDefault(category, 0), lastUsed.getOrDefault(victim, 0));
+                if (byUse < 0 || (byUse == 0 && category.compareTo(victim) < 0)) {
+                    victim = category;
+                }
+            }
+            if (victim == null) {
+                break;
+            }
+            work.remove(victim);
+            evicted.add(victim);
+        }
+        return evicted;
     }
 
     /**

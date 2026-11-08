@@ -27,9 +27,10 @@
         "doc_find_text",
         "doc_get_document_text",
         "doc_audit_structure",
-        "doc_restore_checkpoint",
         "write_docx"
       ],
+      "offeredToolsExcludeFirstCall": ["doc_restore_checkpoint"],
+      "offeredToolsIncludeLastCall": ["doc_restore_checkpoint"],
       "offeredToolsExclude": [
         "slide_add_page",
         "slide_get_overview",
@@ -70,9 +71,10 @@
         "sheet_read_range",
         "doc_list_project_files",
         "doc_open_file",
-        "doc_restore_checkpoint",
         "extract_file_text"
       ],
+      "offeredToolsExcludeFirstCall": ["doc_restore_checkpoint"],
+      "offeredToolsIncludeLastCall": ["doc_restore_checkpoint"],
       "offeredToolsExclude": [
         "doc_find_replace",
         "doc_get_document_text",
