@@ -1733,6 +1733,7 @@ template :1-539；script :541-1879（模式/模型选择 :648-766、文件变更
 - 渐进披露（dev-board#810/#1064）：`mvn test -Dtest='ToolDisclosurePolicyTest,ToolSchemaBudgetTest,ContextAssemblerServiceTest,ToolDiscoveryTools*Test,SkillToolsTest,DecisionAssist*,*ToolDecision*,AgentOrchestratorInboxTest'`。
 - 只跑回放：`mvn test -Dtest=OrchestratorReplayEvalTest`；真实 LLM 冒烟：`OPENROUTER_API_KEY=… mvn test -Dtest=RealLlmSmokeTest`（默认模型已换成 deepseek/deepseek-v4-flash，境内可跑）。
 - 工具选择面（dev-board#807/#808）：`mvn test -Dtest=ToolChoiceSurfaceTest,FormatTableColumnWidthTest,MemoryToolsScopeTest,ToolRegistryTest,ToolDeclarationContractTest,OrchestratorReplayEvalTest`。
+- 工具清单与描述门禁（tool-system-v2 V0）：`ToolInventoryContractTest` 把注册表（内置 + 官方插件 manifest/JAR）与 `docs/plans/tool-system-v2-inventory.csv` 对拍——增删工具必须同提交改 CSV（新工具补一行 `verdict=new`）；描述首句 ≤80 字符、单一中文、动词开头，CSV 裁决为 `keep`/`new` 的行强制，其余只打印清单。描述重写后把该行改成 `keep` 即纳入强制。
 - 身份作用域与模型解析：`mvn test -Dtest=PlatformScopeCloudMultiTenantTest,AuxModelResolverTest,SubAgentServiceTest,AgentOrchestratorFailoverTest,AgentOrchestratorFailoverFlowTest`。
 - 工具可见性声明化 / skill tool_policy（dev-board#799）：
   `mvn test -Dtest=ToolDeclarationContractTest,ClientCapabilityServiceTest,ClientCapabilityDocKindTest,SkillRouterTest,BuiltinSkillsTest,ToolSchemaBudgetTest,OrchestratorReplayEvalTest`。
