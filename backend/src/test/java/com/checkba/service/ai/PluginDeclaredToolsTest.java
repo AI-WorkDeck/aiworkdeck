@@ -110,6 +110,20 @@ class PluginDeclaredToolsTest {
     }
 
     @Test
+    void auditCarriesDeclaredAccessAndPluginId() throws IOException {
+        install(manifest);
+        var logs = mock(com.checkba.service.UserActivityLogService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(registry, "activityLogService", logs);
+        registry.auditExecutor = Runnable::run;
+        when(tasks.listForUser(7L, null, null)).thenReturn(List.of());
+        registry.execute("hello_agent_tools_list_tasks", "{}", ctx);
+        var meta = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(logs).logActivity(eq(7L), eq("ai_tool"), any(), eq("hello_agent_tools_list_tasks"), anyLong(), meta.capture(), eq(5L));
+        assertTrue(meta.getValue().contains("\"access\":\"read\""), meta.getValue());
+        assertTrue(meta.getValue().contains("\"pluginId\":\"hello-agent-tools\""), meta.getValue());
+    }
+
+    @Test
     void toolWithoutDeclaredPermissionIsRefused() throws IOException {
         // manifest.permissions 里没有 tasks：工具自身 permissions 为空也能通过校验，运行时被服务表要求的权限拦住
         install(manifest.replace("\"permissions\": [\"tasks\"],\n  \"minHostVersion\"", "\"permissions\": [],\n  \"minHostVersion\"")

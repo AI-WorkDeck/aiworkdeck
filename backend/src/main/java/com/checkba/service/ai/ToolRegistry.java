@@ -1078,6 +1078,81 @@ public class ToolRegistry {
      * @param ctx      服务端上下文（覆盖同名参数）
      */
     public ToolResult execute(String name, String argsJson, ToolContext ctx) {
+        return execute(name, argsJson, ctx, null);
+    }
+
+    /** source 显式指定审计来源（agent|mcp|plugin-ui）；null = 按 ctx 推断（conversationId 以 "mcp:" 开头为 mcp，否则 agent）。 */
+    public ToolResult execute(String name, String argsJson, ToolContext ctx, String source) {
+        long started = System.nanoTime();
+        ToolResult result = null;
+        try {
+            result = doExecute(name, argsJson, ctx);
+            return result;
+        } finally {
+            audit(TOOL_NAME_ALIASES.getOrDefault(name, name), argsJson, ctx, source, result, started);
+        }
+    }
+
+    // 审计（agent-app-control C8）：只记工具名与参数摘要，绝不记参数值/输出（律师保密）。
+    private static final Set<String> AUDIT_SKIPPED = Set.of("list_tools", "use_skill");
+    private static final java.util.concurrent.Executor AUDIT_EXECUTOR =
+            java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "tool-audit");
+                t.setDaemon(true);
+                return t;
+            });
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.UserActivityLogService activityLogService;
+
+    /** 测试可替换为同步执行器。 */
+    java.util.concurrent.Executor auditExecutor = AUDIT_EXECUTOR;
+
+    private void audit(String name, String argsJson, ToolContext ctx, String source, ToolResult result, long started) {
+        try {
+            if (activityLogService == null || ctx == null || ctx.userId() == null || name == null
+                    || AUDIT_SKIPPED.contains(name) || (result != null && !result.found())) return;
+            long durationMs = (System.nanoTime() - started) / 1_000_000;
+            boolean ok = result != null && !(result.output() != null && result.output().startsWith("Error"));
+            String src = source != null ? source
+                    : ctx.conversationId() != null && ctx.conversationId().startsWith("mcp:") ? "mcp" : "agent";
+            RegisteredTool tool = result == null ? null : result.tool();
+            DeclaredToolBinding declared = tool != null && tool.bean() instanceof com.checkba.service.plugin.HostServiceRegistry
+                    ? declaredBinding(name) : null;
+            String access = (declared != null
+                    ? com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(name, declared.tool().getAccess())
+                    : com.checkba.service.ai.capability.CapabilityCatalog.accessOf(name, tool == null ? null : tool.meta()))
+                    .name().toLowerCase(java.util.Locale.ROOT);
+            String pluginId = declared != null ? declared.pluginId() : pluginService.getPluginIdForTool(name);
+            Map<String, Object> meta = new java.util.LinkedHashMap<>();
+            meta.put("source", src);
+            meta.put("access", access);
+            if (pluginId != null) meta.put("pluginId", pluginId);
+            meta.put("argsDigest", sha256(argsJson == null ? "" : argsJson));
+            meta.put("ok", ok);
+            meta.put("durationMs", durationMs);
+            String metaJson = cn.hutool.json.JSONUtil.toJsonStr(meta);
+            Long userId = ctx.userId();
+            Long projectId = ctx.projectId();
+            auditExecutor.execute(() -> {
+                try {
+                    activityLogService.logActivity(userId, "ai_tool", null, name, durationMs, metaJson, projectId);
+                } catch (Exception e) {
+                    log.warn("Tool audit write failed for '{}': {}", name, e.toString());
+                }
+            });
+        } catch (Exception e) {
+            log.warn("Tool audit failed for '{}': {}", name, e.toString());
+        }
+    }
+
+    private static String sha256(String text) throws java.security.NoSuchAlgorithmException {
+        byte[] d = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return java.util.HexFormat.of().formatHex(d);
+    }
+
+    private ToolResult doExecute(String name, String argsJson, ToolContext ctx) {
         String resolvedName = TOOL_NAME_ALIASES.getOrDefault(name, name);
         if (userMcpService != null && resolvedName.startsWith("user_mcp_")) {
             var binding = userMcpService.find(resolvedName, ctx == null ? null : ctx.userId());

@@ -56,6 +56,10 @@ export default {
   actionOpenUrl: 'Opened URL',
   actionCloseUrl: 'Closed URL',
   actionWork: 'Work',
+  actionAiTool: 'AI tool call',
+  aiToolSourceAgent: 'Agent',
+  aiToolSourceMcp: 'External MCP',
+  aiToolSourcePlugin: 'Plugin',
 
   // ---- Settings page: All Favorites (dev-board#872: cross-project roll-up, grouped by project) ----
   favoritesSubtitle: 'A roll-up of everything you have favorited across all projects. The Favorites panel in the workbench only shows the current project, and lets you insert directly into a document.',
