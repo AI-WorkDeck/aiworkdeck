@@ -43,8 +43,8 @@
   "expense.updated": "Το έξοδο ενημερώθηκε.",
   "expense.deleted": "Το έξοδο διαγράφηκε.",
   "expense.quota": "Ο τοπικός χώρος αποθήκευσης του πρόσθετου είναι πλήρης (64 KB). Διαγράψτε πρώτα παλαιότερες διακανονισμένες εγγραφές.",
-  "tool.lawfirm_management_matter_overview.desc": "Επισκόπηση δικηγορικού γραφείου (μόνο ανάγνωση): κατάσταση αναθέσεων και υποθέσεων, δείκτες και εκκρεμείς εγκρίσεις σύγκρουσης συμφερόντων· προαιρετικό φίλτρο έργου ή λέξης-κλειδιού.",
-  "tool.lawfirm_management_conflict_check.desc": "Έλεγχος σύγκρουσης συμφερόντων (μόνο ανάγνωση, δεν αποθηκεύεται τίποτα): συγκρίνει πελάτη και αντίδικο με υπάρχουσες υποθέσεις.",
-  "tool.lawfirm_management_fee_ledger.desc": "Προβολή βιβλίου αμοιβών (μόνο ανάγνωση): τιμολόγια, εισπράξεις, απαιτήσεις και ποσοστό είσπραξης· φίλτρο έργου ή λέξης-κλειδιού.",
+  "tool.lawfirm_management_matter_overview.desc": "Use when the user asks about the firm's intake, matters, conflict-clearance progress or monthly business overview. Επισκόπηση δικηγορικού γραφείου (μόνο ανάγνωση): κατάσταση αναθέσεων και υποθέσεων, δείκτες και εκκρεμείς εγκρίσεις σύγκρουσης συμφερόντων· προαιρετικό φίλτρο έργου ή λέξης-κλειδιού.",
+  "tool.lawfirm_management_conflict_check.desc": "Use when the user asks whether a client or counterparty has a conflict of interest. Έλεγχος σύγκρουσης συμφερόντων (μόνο ανάγνωση, δεν αποθηκεύεται τίποτα): συγκρίνει πελάτη και αντίδικο με υπάρχουσες υποθέσεις.",
+  "tool.lawfirm_management_fee_ledger.desc": "Use when the user asks about firm-wide fees, collections, bills, invoices or receivables (law firm administrators only). Προβολή βιβλίου αμοιβών (μόνο ανάγνωση): τιμολόγια, εισπράξεις, απαιτήσεις και ποσοστό είσπραξης· φίλτρο έργου ή λέξης-κλειδιού.",
   "access.restricted": "Δεν έχετε δικαίωμα προβολής δεδομένων όλου του γραφείου. Εμφανίζονται μόνο στοιχεία που σας αφορούν. Το βιβλίο αμοιβών και οι πίνακες ελέγχου όλου του γραφείου προορίζονται για διαχειριστές."
 }

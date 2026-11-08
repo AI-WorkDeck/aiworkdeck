@@ -1,6 +1,6 @@
 {
   "plugin.name": "프로젝트 메시징",
   "plugin.description": "로펌, 팀, 프로젝트 커뮤니케이션: 공유 어시스턴트, 다이렉트 메시지, 파일 보관, AI 참조. 현재 중국 본토 계정에만 제공됩니다.",
-  "tool.project_im_list_conversations.desc": "사용자의 메시지 대화 목록(읽기 전용).",
-  "tool.project_im_read_messages.desc": "사용자가 참여한 대화의 최근 메시지를 읽습니다(읽기 전용)."
+  "tool.project_im_list_conversations.desc": "Use when the user asks which group chats or conversations exist, including the project group. 사용자의 메시지 대화 목록(읽기 전용).",
+  "tool.project_im_read_messages.desc": "Use when the user asks what a group chat or project group has been discussing, or wants the chat history (get the conversation id from project_im_list_conversations first). 사용자가 참여한 대화의 최근 메시지를 읽습니다(읽기 전용)."
 }

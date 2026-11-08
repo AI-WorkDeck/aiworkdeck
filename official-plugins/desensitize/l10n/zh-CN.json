@@ -2,6 +2,6 @@
   "plugin.name": "文件脱敏",
   "plugin.description": "核查敏感信息并生成脱敏副本，可用恢复包复敏。",
   "view.main.name": "文件脱敏",
-  "tool.desensitize_preview.desc": "预览项目文件中将被脱敏的敏感信息（只读，不生成文件）。",
-  "tool.desensitize_redact.desc": "对项目文件脱敏并另存为新的脱敏副本；绝不覆盖原文件。"
+  "tool.desensitize_preview.desc": "用户问「这份文件有哪些敏感信息会被脱敏、先预览」时用。预览项目文件中将被脱敏的敏感信息（只读，不生成文件）。",
+  "tool.desensitize_redact.desc": "用户说「把这份文件脱敏/匿名化/打码」时用（遮盖模式，不可复敏）。对项目文件脱敏并另存为新的脱敏副本；绝不覆盖原文件。"
 }

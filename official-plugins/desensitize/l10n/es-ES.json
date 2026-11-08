@@ -2,6 +2,6 @@
   "plugin.name": "Redacción de archivos",
   "plugin.description": "Inspeccione información sensible, genere copias anonimizadas y restáurelas con paquetes de recuperación.",
   "view.main.name": "Redacción de archivos",
-  "tool.desensitize_preview.desc": "Vista previa de los datos sensibles que se ocultarían en un archivo del proyecto (solo lectura, no crea archivos).",
-  "tool.desensitize_redact.desc": "Oculta datos sensibles de un archivo del proyecto y guarda una copia NUEVA anonimizada; el original nunca se sobrescribe."
+  "tool.desensitize_preview.desc": "Use when the user wants to preview what sensitive information in a file would be redacted. Vista previa de los datos sensibles que se ocultarían en un archivo del proyecto (solo lectura, no crea archivos).",
+  "tool.desensitize_redact.desc": "Use when the user asks to redact, anonymize or mask a file (mask mode, not restorable). Oculta datos sensibles de un archivo del proyecto y guarda una copia NUEVA anonimizada; el original nunca se sobrescribe."
 }

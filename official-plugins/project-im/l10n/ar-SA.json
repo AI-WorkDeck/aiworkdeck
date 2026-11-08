@@ -1,6 +1,6 @@
 {
   "plugin.name": "مراسلات المشروع",
   "plugin.description": "التواصل على مستوى شركة المحاماة والفريق والمشروع: مساعد مشترك، ورسائل مباشرة، وأرشفة الملفات، ومراجع الذكاء الاصطناعي. متاح حاليًا لحسابات الصين القارية فقط.",
-  "tool.project_im_list_conversations.desc": "عرض محادثات المراسلة الخاصة بالمستخدم (للقراءة فقط).",
-  "tool.project_im_read_messages.desc": "قراءة أحدث رسائل محادثة ينتمي إليها المستخدم (للقراءة فقط)."
+  "tool.project_im_list_conversations.desc": "Use when the user asks which group chats or conversations exist, including the project group. عرض محادثات المراسلة الخاصة بالمستخدم (للقراءة فقط).",
+  "tool.project_im_read_messages.desc": "Use when the user asks what a group chat or project group has been discussing, or wants the chat history (get the conversation id from project_im_list_conversations first). قراءة أحدث رسائل محادثة ينتمي إليها المستخدم (للقراءة فقط)."
 }

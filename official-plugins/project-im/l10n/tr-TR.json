@@ -1,6 +1,6 @@
 {
   "plugin.name": "Proje Mesajlaşması",
   "plugin.description": "Hukuk bürosu, ekip ve proje iletişimi: paylaşılan asistan, doğrudan mesajlar, dosya arşivleme ve AI referansları. Şu anda yalnızca Anakara Çin hesapları için kullanılabilir.",
-  "tool.project_im_list_conversations.desc": "Kullanıcının mesajlaşma konuşmalarını listeler (salt okunur).",
-  "tool.project_im_read_messages.desc": "Kullanıcının üyesi olduğu bir konuşmanın son mesajlarını okur (salt okunur)."
+  "tool.project_im_list_conversations.desc": "Use when the user asks which group chats or conversations exist, including the project group. Kullanıcının mesajlaşma konuşmalarını listeler (salt okunur).",
+  "tool.project_im_read_messages.desc": "Use when the user asks what a group chat or project group has been discussing, or wants the chat history (get the conversation id from project_im_list_conversations first). Kullanıcının üyesi olduğu bir konuşmanın son mesajlarını okur (salt okunur)."
 }

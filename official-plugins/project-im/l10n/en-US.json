@@ -1,6 +1,6 @@
 {
   "plugin.name": "Project Messaging",
   "plugin.description": "Law firm, team, and project communication: shared assistant, direct messages, file archiving, and AI references. Currently available for Mainland China accounts only.",
-  "tool.project_im_list_conversations.desc": "List the user's messaging conversations (read-only).",
-  "tool.project_im_read_messages.desc": "Read recent messages of a conversation the user belongs to (read-only)."
+  "tool.project_im_list_conversations.desc": "Use when the user asks which group chats or conversations exist, including the project group. List the user's messaging conversations (read-only).",
+  "tool.project_im_read_messages.desc": "Use when the user asks what a group chat or project group has been discussing, or wants the chat history (get the conversation id from project_im_list_conversations first). Read recent messages of a conversation the user belongs to (read-only)."
 }

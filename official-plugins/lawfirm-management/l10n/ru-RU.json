@@ -43,8 +43,8 @@
   "expense.updated": "Расход обновлён.",
   "expense.deleted": "Расход удалён.",
   "expense.quota": "Локальное хранилище плагина заполнено (64 KB). Сначала удалите старые рассчитанные записи.",
-  "tool.lawfirm_management_matter_overview.desc": "Обзор юридической фирмы (только чтение): статус приёма и дел, показатели и ожидающие согласования конфликта интересов; фильтр по проекту или ключевому слову.",
-  "tool.lawfirm_management_conflict_check.desc": "Проверка конфликта интересов (только чтение, ничего не сохраняется): сверяет клиента и контрагента с существующими делами.",
-  "tool.lawfirm_management_fee_ledger.desc": "Просмотр книги гонораров (только чтение): счета, поступления, дебиторская задолженность и доля взыскания; фильтр по проекту или ключевому слову.",
+  "tool.lawfirm_management_matter_overview.desc": "Use when the user asks about the firm's intake, matters, conflict-clearance progress or monthly business overview. Обзор юридической фирмы (только чтение): статус приёма и дел, показатели и ожидающие согласования конфликта интересов; фильтр по проекту или ключевому слову.",
+  "tool.lawfirm_management_conflict_check.desc": "Use when the user asks whether a client or counterparty has a conflict of interest. Проверка конфликта интересов (только чтение, ничего не сохраняется): сверяет клиента и контрагента с существующими делами.",
+  "tool.lawfirm_management_fee_ledger.desc": "Use when the user asks about firm-wide fees, collections, bills, invoices or receivables (law firm administrators only). Просмотр книги гонораров (только чтение): счета, поступления, дебиторская задолженность и доля взыскания; фильтр по проекту или ключевому слову.",
   "access.restricted": "Нет прав на просмотр данных всей фирмы. Показаны только материалы, связанные с вами. Книга гонораров и дашборды всей фирмы доступны только администраторам фирмы."
 }

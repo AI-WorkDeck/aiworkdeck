@@ -5,7 +5,12 @@
   "description": "律所收案立项、法规级利益冲突检索与站内信协同放行、发票与财务收费台账（支持手动核销与金蝶/用友对接）、律师工作负荷与管理决策看板。",
   "author": "AI WorkDeck",
   "minHostVersion": "0.71.0",
-  "permissions": ["lawfirm", "im", "file_read", "file_write"],
+  "permissions": [
+    "lawfirm",
+    "im",
+    "file_read",
+    "file_write"
+  ],
   "frontendEntry": "web/index.html",
   "backendJars": [],
   "tools": [
@@ -48,13 +53,25 @@
         "lawfirm"
       ],
       "keywords": [
-        "律所",
+        "收费",
+        "费用",
+        "回款",
+        "账单",
+        "发票",
+        "台账",
+        "利冲",
+        "冲突",
         "收案",
-        "立项",
-        "利冲放行",
+        "案源",
+        "全所",
+        "律所",
+        "收费台账",
+        "利益冲突",
         "law firm",
-        "matter intake",
-        "kpi"
+        "fee ledger",
+        "conflict check",
+        "collections",
+        "receivable"
       ]
     },
     {
@@ -121,11 +138,25 @@
         "lawfirm"
       ],
       "keywords": [
-        "利益冲突",
+        "收费",
+        "费用",
+        "回款",
+        "账单",
+        "发票",
+        "台账",
         "利冲",
-        "冲突检索",
+        "冲突",
+        "收案",
+        "案源",
+        "全所",
+        "律所",
+        "收费台账",
+        "利益冲突",
+        "law firm",
+        "fee ledger",
         "conflict check",
-        "conflict of interest"
+        "collections",
+        "receivable"
       ]
     },
     {
@@ -168,15 +199,25 @@
         "lawfirm"
       ],
       "keywords": [
-        "收费台账",
+        "收费",
+        "费用",
         "回款",
-        "应收",
-        "发票台账",
-        "开票",
+        "账单",
+        "发票",
+        "台账",
+        "利冲",
+        "冲突",
+        "收案",
+        "案源",
+        "全所",
+        "律所",
+        "收费台账",
+        "利益冲突",
+        "law firm",
         "fee ledger",
+        "conflict check",
         "collections",
-        "receivable",
-        "invoice ledger"
+        "receivable"
       ]
     }
   ],

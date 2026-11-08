@@ -2,6 +2,6 @@
   "plugin.name": "การปกปิดข้อมูลในไฟล์",
   "plugin.description": "ตรวจสอบข้อมูลอ่อนไหว สร้างสำเนาที่ปกปิดแล้ว และกู้คืนด้วยแพ็กเกจการกู้คืน",
   "view.main.name": "การปกปิดข้อมูลในไฟล์",
-  "tool.desensitize_preview.desc": "แสดงตัวอย่างข้อมูลอ่อนไหวที่จะถูกปกปิดในไฟล์โปรเจกต์ (อ่านอย่างเดียว ไม่สร้างไฟล์)",
-  "tool.desensitize_redact.desc": "ปกปิดข้อมูลอ่อนไหวในไฟล์โปรเจกต์และบันทึกเป็นสำเนาใหม่ จะไม่เขียนทับไฟล์ต้นฉบับ"
+  "tool.desensitize_preview.desc": "Use when the user wants to preview what sensitive information in a file would be redacted. แสดงตัวอย่างข้อมูลอ่อนไหวที่จะถูกปกปิดในไฟล์โปรเจกต์ (อ่านอย่างเดียว ไม่สร้างไฟล์)",
+  "tool.desensitize_redact.desc": "Use when the user asks to redact, anonymize or mask a file (mask mode, not restorable). ปกปิดข้อมูลอ่อนไหวในไฟล์โปรเจกต์และบันทึกเป็นสำเนาใหม่ จะไม่เขียนทับไฟล์ต้นฉบับ"
 }

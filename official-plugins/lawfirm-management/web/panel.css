@@ -224,6 +224,20 @@ p {
 }
 
 /* Notice Bar */
+#restrictedBanner {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 1px solid #d9b25f;
+  background: #fff7e0;
+  color: #6b4b00;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+#restrictedBanner[hidden] {
+  display: none;
+}
+
 #notice {
   padding: 8px 16px;
   background: var(--awd-accent-wash, var(--fallback-wash));

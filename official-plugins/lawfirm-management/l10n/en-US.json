@@ -43,8 +43,8 @@
   "expense.updated": "Expense updated.",
   "expense.deleted": "Expense deleted.",
   "expense.quota": "Local plugin storage is full (64 KB). Delete older settled entries first.",
-  "tool.lawfirm_management_matter_overview.desc": "Law firm overview (read-only): intake/matter status, KPIs and pending conflict clearances; optional project or keyword filter.",
-  "tool.lawfirm_management_conflict_check.desc": "Conflict-of-interest check (read-only, nothing is saved): compares a client and counterparty against existing matters.",
-  "tool.lawfirm_management_fee_ledger.desc": "Read the fee ledger (read-only): invoices, collections, receivables and collection rate; filter by project or keyword.",
+  "tool.lawfirm_management_matter_overview.desc": "Use when the user asks about the firm's intake, matters, conflict-clearance progress or monthly business overview. Law firm overview (read-only): intake/matter status, KPIs and pending conflict clearances; optional project or keyword filter.",
+  "tool.lawfirm_management_conflict_check.desc": "Use when the user asks whether a client or counterparty has a conflict of interest. Conflict-of-interest check (read-only, nothing is saved): compares a client and counterparty against existing matters.",
+  "tool.lawfirm_management_fee_ledger.desc": "Use when the user asks about firm-wide fees, collections, bills, invoices or receivables. Read the fee ledger (read-only): invoices, collections, receivables and collection rate; filter by project or keyword. Law firm administrators only.",
   "access.restricted": "You don't have permission to view firm-wide data. Only items related to you are shown. The firm-wide fee ledger and dashboards are limited to law firm administrators."
 }

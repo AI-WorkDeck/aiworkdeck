@@ -5,7 +5,11 @@
   "minHostVersion": "0.78.0",
   "description": "核查敏感信息并生成脱敏副本，可用恢复包复敏。",
   "author": "AI WorkDeck",
-  "permissions": ["file_read", "file_write", "editor"],
+  "permissions": [
+    "file_read",
+    "file_write",
+    "editor"
+  ],
   "tools": [
     {
       "name": "desensitize_preview",
@@ -18,21 +22,13 @@
             "type": "integer",
             "description": "Project file id"
           },
-          "mode": {
-            "type": "string",
-            "enum": [
-              "TOKEN",
-              "MASK"
-            ],
-            "description": "Replacement style (default TOKEN)"
-          },
           "strategies": {
             "type": "array",
             "items": {
               "type": "string",
               "description": "Detection strategy id"
             },
-            "description": "Optional detection strategies"
+            "description": "Optional detection strategy codes (COMPANY, CHINESE_NAME, PHONE, ID_CARD, UNIFIED_SOCIAL_CREDIT, LAWYER_LICENSE, EMAIL, BANK_CARD, ADDRESS, ...). Omit to use the panel defaults"
           },
           "customTerms": {
             "type": "array",
@@ -67,9 +63,14 @@
       ],
       "keywords": [
         "脱敏",
+        "匿名化",
+        "隐去",
+        "打码",
+        "遮盖",
         "敏感信息",
         "desensitize",
-        "redact preview",
+        "redact",
+        "anonymize",
         "sensitive info"
       ]
     },
@@ -84,21 +85,13 @@
             "type": "integer",
             "description": "Project file id"
           },
-          "mode": {
-            "type": "string",
-            "enum": [
-              "TOKEN",
-              "MASK"
-            ],
-            "description": "Replacement style (default TOKEN)"
-          },
           "strategies": {
             "type": "array",
             "items": {
               "type": "string",
               "description": "Detection strategy id"
             },
-            "description": "Optional detection strategies"
+            "description": "Optional detection strategy codes (COMPANY, CHINESE_NAME, PHONE, ID_CARD, UNIFIED_SOCIAL_CREDIT, LAWYER_LICENSE, EMAIL, BANK_CARD, ADDRESS, ...). Omit to use the panel defaults"
           },
           "customTerms": {
             "type": "array",
@@ -133,16 +126,32 @@
       ],
       "keywords": [
         "脱敏",
-        "脱敏副本",
-        "遮盖敏感",
-        "redact",
+        "匿名化",
+        "隐去",
+        "打码",
+        "遮盖",
+        "敏感信息",
         "desensitize",
-        "anonymize"
+        "redact",
+        "anonymize",
+        "sensitive info"
       ]
     }
   ],
   "frontendEntry": "web/index.html",
   "contributes": {
-    "views": [{ "id": "main", "name": "文件脱敏", "entry": "web/index.html", "placement": "sidebar", "scope": "project", "defaultDock": "left", "allowedDocks": ["left"] }]
+    "views": [
+      {
+        "id": "main",
+        "name": "文件脱敏",
+        "entry": "web/index.html",
+        "placement": "sidebar",
+        "scope": "project",
+        "defaultDock": "left",
+        "allowedDocks": [
+          "left"
+        ]
+      }
+    ]
   }
 }

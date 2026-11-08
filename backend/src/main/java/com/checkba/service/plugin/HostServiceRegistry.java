@@ -253,6 +253,10 @@ public class HostServiceRegistry {
 
     // ---- sensitive ----
 
+    /** 脱敏面板默认勾选的策略（panel 的 selectedStrategies 初始值）。 */
+    static final List<String> SENSITIVE_DEFAULT_STRATEGIES = List.of("COMPANY", "CHINESE_NAME", "PHONE", "ID_CARD",
+            "UNIFIED_SOCIAL_CREDIT", "LAWYER_LICENSE", "EMAIL", "BANK_CARD", "ADDRESS");
+
     /** 走 SensitiveController 同一条路径（读/写权限闸、落盘、重名处理）；恢复密钥与原词映射不回给模型。 */
     private Object sensitiveRun(Call call, String action) {
         SensitiveController controller = sensitive.getIfAvailable();
@@ -260,14 +264,20 @@ public class HostServiceRegistry {
         Map<String, Object> a = call.args();
         Long fileId = longArg(a, "fileId");
         if (fileId == null) throw new IllegalArgumentException(LangText.of("缺少 fileId", "fileId is required"));
-        var request = new SensitiveController.Request(fileId, strings(a.get("strategies")),
-                "preview".equals(action) ? text(a, "mode") : "MASK".equals(text(a, "mode")) ? "MASK" : "TOKEN",
-                strings(a.get("customTerms")), strings(a.get("excludedTerms")), null, null);
+        // Agent 只用 MASK：TOKEN 需要用户自选的复敏密码，绝不经 Agent（传 null 只会得到「请输入复敏密码」，模型会反复重试）
+        List<String> customTerms = strings(a.get("customTerms"));
+        List<String> strategies = strings(a.get("strategies"));
+        if ((strategies == null || strategies.isEmpty()) && (customTerms == null || customTerms.isEmpty())) {
+            strategies = SENSITIVE_DEFAULT_STRATEGIES; // 与脱敏面板默认勾选一致
+        }
+        var request = new SensitiveController.Request(fileId, strategies, "MASK",
+                customTerms, strings(a.get("excludedTerms")), null, null);
         ResponseEntity<?> response = controller.executeAs(request, call.userId(), action);
         Object body = response.getBody();
         if (!response.getStatusCode().is2xxSuccessful()) {
             Object error = body instanceof Map<?, ?> m ? m.get("error") : null;
-            throw new IllegalArgumentException(String.valueOf(error == null ? "Sensitive operation failed" : error));
+            throw new IllegalArgumentException(String.valueOf(error == null ? "Sensitive operation failed" : error)
+                    + " [Not retryable with the same arguments; do not retry, tell the user what failed.]");
         }
         if ("preview".equals(action) || !(body instanceof Map<?, ?> map)) return body;
         Map<String, Object> safe = new LinkedHashMap<>();

@@ -1,6 +1,6 @@
 {
   "plugin.name": "Μηνύματα Έργου",
   "plugin.description": "Επικοινωνία δικηγορικού γραφείου, ομάδας και έργου: κοινός βοηθός, απευθείας μηνύματα, αρχειοθέτηση αρχείων και αναφορές AI. Προς το παρόν διαθέσιμο μόνο για λογαριασμούς Ηπειρωτικής Κίνας.",
-  "tool.project_im_list_conversations.desc": "Εμφανίζει τις συνομιλίες μηνυμάτων του χρήστη (μόνο ανάγνωση).",
-  "tool.project_im_read_messages.desc": "Διαβάζει τα πρόσφατα μηνύματα συνομιλίας στην οποία συμμετέχει ο χρήστης (μόνο ανάγνωση)."
+  "tool.project_im_list_conversations.desc": "Use when the user asks which group chats or conversations exist, including the project group. Εμφανίζει τις συνομιλίες μηνυμάτων του χρήστη (μόνο ανάγνωση).",
+  "tool.project_im_read_messages.desc": "Use when the user asks what a group chat or project group has been discussing, or wants the chat history (get the conversation id from project_im_list_conversations first). Διαβάζει τα πρόσφατα μηνύματα συνομιλίας στην οποία συμμετέχει ο χρήστης (μόνο ανάγνωση)."
 }

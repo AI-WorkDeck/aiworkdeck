@@ -43,8 +43,8 @@
   "expense.updated": "Gasto actualizado.",
   "expense.deleted": "Gasto eliminado.",
   "expense.quota": "El almacenamiento local del plugin está lleno (64 KB). Elimine primero las entradas liquidadas más antiguas.",
-  "tool.lawfirm_management_matter_overview.desc": "Resumen del despacho (solo lectura): estado de altas y asuntos, indicadores y autorizaciones de conflicto de intereses pendientes; filtro opcional por proyecto o palabra clave.",
-  "tool.lawfirm_management_conflict_check.desc": "Verificación de conflicto de intereses (solo lectura, no se guarda nada): compara cliente y contraparte con los asuntos existentes.",
-  "tool.lawfirm_management_fee_ledger.desc": "Consultar el libro de honorarios (solo lectura): facturas, cobros, cuentas por cobrar y tasa de cobro; filtro por proyecto o palabra clave.",
+  "tool.lawfirm_management_matter_overview.desc": "Use when the user asks about the firm's intake, matters, conflict-clearance progress or monthly business overview. Resumen del despacho (solo lectura): estado de altas y asuntos, indicadores y autorizaciones de conflicto de intereses pendientes; filtro opcional por proyecto o palabra clave.",
+  "tool.lawfirm_management_conflict_check.desc": "Use when the user asks whether a client or counterparty has a conflict of interest. Verificación de conflicto de intereses (solo lectura, no se guarda nada): compara cliente y contraparte con los asuntos existentes.",
+  "tool.lawfirm_management_fee_ledger.desc": "Use when the user asks about firm-wide fees, collections, bills, invoices or receivables (law firm administrators only). Consultar el libro de honorarios (solo lectura): facturas, cobros, cuentas por cobrar y tasa de cobro; filtro por proyecto o palabra clave.",
   "access.restricted": "No tienes permiso para ver los datos de todo el despacho. Solo se muestran los elementos que te conciernen. El libro de honorarios y los paneles de todo el despacho son solo para administradores."
 }

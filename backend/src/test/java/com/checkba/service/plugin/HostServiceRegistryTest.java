@@ -138,6 +138,49 @@ class HostServiceRegistryTest {
         assertThrows(IllegalArgumentException.class, () -> registry.invoke("calendar", "listForUser", null, 5L, Map.of()));
     }
 
+    // ---- sensitive（Agent 只用 MASK + 面板默认策略）----
+
+    @SuppressWarnings("unchecked")
+    private HostServiceRegistry withSensitive(com.checkba.controller.SensitiveController controller) {
+        ObjectProvider<com.checkba.controller.SensitiveController> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(controller);
+        return new HostServiceRegistry(tasks, members, null, null, provider, lawfirmProvider, imProvider);
+    }
+
+    @Test
+    void sensitiveAlwaysMasksAndFallsBackToPanelDefaultStrategies() {
+        var controller = mock(com.checkba.controller.SensitiveController.class);
+        doReturn(org.springframework.http.ResponseEntity.ok(Map.of("counts", Map.of()))).when(controller).executeAs(any(), eq(7L), any());
+        var reg = withSensitive(controller);
+        var captor = org.mockito.ArgumentCaptor.forClass(com.checkba.controller.SensitiveController.Request.class);
+
+        reg.invoke("sensitive", "redact", 7L, null, Map.of("fileId", 3, "mode", "TOKEN"));
+        verify(controller).executeAs(captor.capture(), eq(7L), eq("desensitize"));
+        assertEquals("MASK", captor.getValue().mode(), "TOKEN 需要用户密码，Agent 一律 MASK");
+        assertNull(captor.getValue().password());
+        assertEquals(HostServiceRegistry.SENSITIVE_DEFAULT_STRATEGIES, captor.getValue().strategies());
+
+        reg.invoke("sensitive", "preview", 7L, null, Map.of("fileId", 3));
+        verify(controller).executeAs(captor.capture(), eq(7L), eq("preview"));
+        assertEquals("MASK", captor.getValue().mode());
+        assertFalse(captor.getValue().strategies().isEmpty());
+
+        // 只给自定义词：不再硬塞默认策略
+        reg.invoke("sensitive", "preview", 7L, null, Map.of("fileId", 3, "customTerms", List.of("张三")));
+        verify(controller, times(2)).executeAs(captor.capture(), eq(7L), eq("preview"));
+        assertTrue(captor.getValue().strategies() == null || captor.getValue().strategies().isEmpty());
+    }
+
+    @Test
+    void sensitiveFailureIsMarkedNotRetryable() {
+        var controller = mock(com.checkba.controller.SensitiveController.class);
+        doReturn(org.springframework.http.ResponseEntity.badRequest().body(Map.of("error", "Unknown redaction strategy")))
+                .when(controller).executeAs(any(), any(), any());
+        var e = assertThrows(IllegalArgumentException.class,
+                () -> withSensitive(controller).invoke("sensitive", "redact", 7L, null, Map.of("fileId", 3)));
+        assertTrue(e.getMessage().contains("Unknown redaction strategy") && e.getMessage().contains("Not retryable"), e.getMessage());
+    }
+
     // ---- lawfirm（只读）----
 
     private static Map<String, Object> overviewFixture() {
