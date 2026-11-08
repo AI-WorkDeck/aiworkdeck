@@ -68,9 +68,9 @@ public class TaskTools implements AgentToolComponent {
             return "错误：缺少 project，任务未创建。请原样填写用户对项目的称呼（用户没提项目时填当前项目名）；不确定是哪个项目就先 ask_user。";
         }
         String requestedName = project.trim();
-        List<com.checkba.model.entity.Project> matches = projectTaskService.resolveProjects(userId, requestedName, true);
+        List<com.checkba.model.entity.Project> matches = resolveWithFallback(userId, requestedName, true);
         if (matches.isEmpty()) {
-            return "错误：没有找到与「" + requestedName + "」对应且你有写权限的项目，任务未创建。请向用户确认项目名称。";
+            return notFound(userId, requestedName, "且你有写权限", "任务未创建");
         }
         if (matches.size() > 1) {
             return ambiguous(requestedName, matches, "任务未创建");
@@ -237,9 +237,9 @@ public class TaskTools implements AgentToolComponent {
         boolean crossProject = project == null || project.isBlank();
         com.checkba.model.entity.Project narrowed = null;
         if (!crossProject) {
-            List<com.checkba.model.entity.Project> matches = projectTaskService.resolveProjects(userId, project.trim(), false);
+            List<com.checkba.model.entity.Project> matches = resolveWithFallback(userId, project.trim(), false);
             if (matches.isEmpty()) {
-                return "错误：没有找到与「" + project.trim() + "」对应的项目。去掉 project 可查全部项目。";
+                return notFound(userId, project.trim(), "", "未查询；去掉 project 可查全部项目");
             }
             if (matches.size() > 1) {
                 return ambiguous(project.trim(), matches, "未查询");
@@ -301,6 +301,34 @@ public class TaskTools implements AgentToolComponent {
         if (!name.isEmpty() && message.toLowerCase().contains(name)) return null;
         StringBuilder sb = new StringBuilder("错误：用户的说法可能指向多个项目，" + effect + "。请用 ask_user 让用户选择：");
         candidates.stream().limit(5).forEach(p -> sb.append("\n- ").append(p.getName()).append("（id=").append(p.getId()).append("）"));
+        return sb.toString();
+    }
+
+    /**
+     * 按名称解析不到时（模型传了「星河那个案子」这类口语，不是项目名），退到用户话里的项目指向：
+     * 对模型传的称呼与本轮用户消息各做一次 {@link ProjectTaskService#mentionedProjects}，合并去重。
+     * 建事项时只保留用户可写的项目。
+     */
+    private List<com.checkba.model.entity.Project> resolveWithFallback(Long userId, String text, boolean write) {
+        List<com.checkba.model.entity.Project> matches = projectTaskService.resolveProjects(userId, text, write);
+        if (!matches.isEmpty()) return matches;
+        var ctx = ToolContextHolder.get();
+        String message = ctx == null ? null : ctx.userMessage();
+        java.util.Map<Long, com.checkba.model.entity.Project> merged = new java.util.LinkedHashMap<>();
+        for (String source : new String[]{text, message}) {
+            if (source == null || source.isBlank()) continue;
+            for (var p : projectTaskService.projectsMentionedBy(userId, source)) merged.putIfAbsent(p.getId(), p);
+        }
+        return merged.values().stream().filter(p -> !write || projectTaskService.canWrite(userId, p)).toList();
+    }
+
+    private String notFound(Long userId, String text, String access, String effect) {
+        StringBuilder sb = new StringBuilder("错误：没有找到与「" + text + "」对应" + access + "的项目，" + effect + "。请向用户确认项目名称。");
+        List<com.checkba.model.entity.Project> recent = projectTaskService.recentProjects(userId, 5);
+        if (!recent.isEmpty()) {
+            sb.append("\n用户最近的项目（仅供提示）：");
+            recent.forEach(p -> sb.append("\n- ").append(p.getName()).append("（id=").append(p.getId()).append("）"));
+        }
         return sb.toString();
     }
 
