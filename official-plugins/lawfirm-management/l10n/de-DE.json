@@ -42,5 +42,8 @@
   "expense.saved": "Auslage erfasst.",
   "expense.updated": "Auslage aktualisiert.",
   "expense.deleted": "Auslage gelöscht.",
-  "expense.quota": "Der lokale Plugin-Speicher ist voll (64 KB). Bitte zuerst ältere abgerechnete Einträge löschen."
+  "expense.quota": "Der lokale Plugin-Speicher ist voll (64 KB). Bitte zuerst ältere abgerechnete Einträge löschen.",
+  "tool.lawfirm_management_matter_overview.desc": "Kanzleiübersicht (nur lesen): Mandats-/Aufnahmestatus, Kennzahlen und offene Interessenkollisions-Freigaben; optional nach Projekt oder Stichwort filtern.",
+  "tool.lawfirm_management_conflict_check.desc": "Interessenkollisionsprüfung (nur lesen, es wird nichts gespeichert): gleicht Mandant und Gegenpartei mit bestehenden Mandaten ab.",
+  "tool.lawfirm_management_fee_ledger.desc": "Honorarbuch lesen (nur lesen): Rechnungen, Zahlungseingänge, Forderungen und Einzugsquote; nach Projekt oder Stichwort filterbar."
 }

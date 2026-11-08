@@ -1,5 +1,7 @@
 {
   "plugin.name": "ファイル墨消し",
   "plugin.description": "機密情報を検査し、匿名化したコピーを生成し、リカバリーパッケージで復元します。",
-  "view.main.name": "ファイル墨消し"
+  "view.main.name": "ファイル墨消し",
+  "tool.desensitize_preview.desc": "プロジェクトファイル内でマスキングされる機微情報をプレビューします（読み取り専用、ファイルは作成しません）。",
+  "tool.desensitize_redact.desc": "プロジェクトファイルの機微情報をマスキングし、新しいコピーとして保存します。元のファイルは上書きしません。"
 }

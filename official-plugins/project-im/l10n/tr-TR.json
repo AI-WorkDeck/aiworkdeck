@@ -1,4 +1,6 @@
 {
   "plugin.name": "Proje Mesajlaşması",
-  "plugin.description": "Hukuk bürosu, ekip ve proje iletişimi: paylaşılan asistan, doğrudan mesajlar, dosya arşivleme ve AI referansları. Şu anda yalnızca Anakara Çin hesapları için kullanılabilir."
+  "plugin.description": "Hukuk bürosu, ekip ve proje iletişimi: paylaşılan asistan, doğrudan mesajlar, dosya arşivleme ve AI referansları. Şu anda yalnızca Anakara Çin hesapları için kullanılabilir.",
+  "tool.project_im_list_conversations.desc": "Kullanıcının mesajlaşma konuşmalarını listeler (salt okunur).",
+  "tool.project_im_read_messages.desc": "Kullanıcının üyesi olduğu bir konuşmanın son mesajlarını okur (salt okunur)."
 }

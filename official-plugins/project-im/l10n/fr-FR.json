@@ -1,4 +1,6 @@
 {
   "plugin.name": "Messagerie de projet",
-  "plugin.description": "Communication au sein du cabinet, des équipes et des projets : assistant partagé, messages directs, archivage de fichiers et références IA. Actuellement disponible uniquement pour les comptes de Chine continentale."
+  "plugin.description": "Communication au sein du cabinet, des équipes et des projets : assistant partagé, messages directs, archivage de fichiers et références IA. Actuellement disponible uniquement pour les comptes de Chine continentale.",
+  "tool.project_im_list_conversations.desc": "Liste les conversations de messagerie de l'utilisateur (lecture seule).",
+  "tool.project_im_read_messages.desc": "Lit les derniers messages d'une conversation à laquelle l'utilisateur participe (lecture seule)."
 }

@@ -1,4 +1,6 @@
 {
   "plugin.name": "Project Messaging",
-  "plugin.description": "Law firm, team, and project communication: shared assistant, direct messages, file archiving, and AI references. Currently available for Mainland China accounts only."
+  "plugin.description": "Law firm, team, and project communication: shared assistant, direct messages, file archiving, and AI references. Currently available for Mainland China accounts only.",
+  "tool.project_im_list_conversations.desc": "List the user's messaging conversations (read-only).",
+  "tool.project_im_read_messages.desc": "Read recent messages of a conversation the user belongs to (read-only)."
 }

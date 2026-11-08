@@ -1,4 +1,6 @@
 {
   "plugin.name": "Projektmessaging",
-  "plugin.description": "Kommunikation für Kanzlei, Team und Projekt: geteilter Assistent, Direktnachrichten, Dateiarchivierung und KI-Verweise. Derzeit nur für Konten in Festlandchina verfügbar."
+  "plugin.description": "Kommunikation für Kanzlei, Team und Projekt: geteilter Assistent, Direktnachrichten, Dateiarchivierung und KI-Verweise. Derzeit nur für Konten in Festlandchina verfügbar.",
+  "tool.project_im_list_conversations.desc": "Listet die Nachrichten-Unterhaltungen des Nutzers auf (nur lesen).",
+  "tool.project_im_read_messages.desc": "Liest die letzten Nachrichten einer Unterhaltung, an der der Nutzer beteiligt ist (nur lesen)."
 }

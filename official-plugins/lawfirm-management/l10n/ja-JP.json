@@ -42,5 +42,8 @@
   "expense.saved": "費用を登録しました。",
   "expense.updated": "費用を更新しました。",
   "expense.deleted": "費用を削除しました。",
-  "expense.quota": "プラグインのローカルストレージがいっぱいです（64 KB）。まず精算済みの古い記録を削除してください。"
+  "expense.quota": "プラグインのローカルストレージがいっぱいです（64 KB）。まず精算済みの古い記録を削除してください。",
+  "tool.lawfirm_management_matter_overview.desc": "法律事務所管理の概要（読み取り専用）：受任・案件の状況、KPI、未処理の利益相反クリアランス。プロジェクトやキーワードで絞り込み可能。",
+  "tool.lawfirm_management_conflict_check.desc": "利益相反チェック（読み取り専用、何も保存しません）：依頼者と相手方を既存案件と照合します。",
+  "tool.lawfirm_management_fee_ledger.desc": "報酬台帳の参照（読み取り専用）：請求書、入金、売掛金、回収率。プロジェクトやキーワードで絞り込み可能。"
 }

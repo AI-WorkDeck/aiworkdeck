@@ -1,5 +1,7 @@
 {
   "plugin.name": "Dosya Karartma",
   "plugin.description": "Hassas bilgileri inceleyin, maskelenmiş kopyalar oluşturun ve kurtarma paketleriyle geri yükleyin.",
-  "view.main.name": "Dosya Karartma"
+  "view.main.name": "Dosya Karartma",
+  "tool.desensitize_preview.desc": "Bir proje dosyasında gizlenecek hassas bilgilerin önizlemesi (salt okunur, dosya oluşturmaz).",
+  "tool.desensitize_redact.desc": "Proje dosyasındaki hassas bilgileri gizler ve YENİ bir kopya olarak kaydeder; orijinal dosyanın üzerine asla yazılmaz."
 }

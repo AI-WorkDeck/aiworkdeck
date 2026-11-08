@@ -1077,4 +1077,4 @@ UI 的 `dpia_workbench_action` 和 Agent 的 `dpia_workbench_task` 按可信调�
 | `confirm` | 否 | `auto`（缺省，按 access；destructive 必确认）\| `always` \| `never` |
 | `keywords` | 否 | 命中即在起跑时放回本插件工具 |
 
-`validate` 规则：非 JAR 名字前缀；`access` 必填；`description` 非空；`inputSchema` 过 §17.5 子集；`service/operation` 必须在 `sdk/plugin-sdk/services.json`（宿主服务表发布副本，首批 `calendar`、`search`、`sensitive`）；`connection` 必须是已声明的 `contributes.connections` 且操作存在；`view` 必须是已声明视图；`permissions` ⊆ `manifest.permissions`。SDK：`awd.tools.handle` 仅类型占位（第四期），`awd.tools.list()` 待宿主桥方法。
+`validate` 规则：非 JAR 名字前缀；`access` 必填；`description` 非空；`inputSchema` 过 §17.5 子集；`service/operation` 必须在 `sdk/plugin-sdk/services.json`（宿主服务表发布副本，首批 `calendar`、`search`、`sensitive`，P2-3 增只读 `lawfirm`、`im`）；`connection` 必须是已声明的 `contributes.connections` 且操作存在；`view` 必须是已声明视图；`permissions` ⊆ `manifest.permissions`。SDK：`awd.tools.handle` 仅类型占位（第四期），`awd.tools.list()` 待宿主桥方法。

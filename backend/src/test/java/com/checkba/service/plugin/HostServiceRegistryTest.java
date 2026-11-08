@@ -8,7 +8,10 @@ import com.checkba.service.ProjectMemberService;
 import com.checkba.service.task.ProjectTaskService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.checkba.service.im.ImGatewayService;
+import com.checkba.service.lawfirm.LawFirmManagementService;
 import org.junit.jupiter.api.Assumptions;
+import org.springframework.beans.factory.ObjectProvider;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
@@ -19,6 +22,8 @@ import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 /**
@@ -30,7 +35,19 @@ class HostServiceRegistryTest {
 
     private final ProjectTaskService tasks = mock(ProjectTaskService.class);
     private final ProjectMemberService members = mock(ProjectMemberService.class);
-    private final HostServiceRegistry registry = new HostServiceRegistry(tasks, members, null, null, null);
+    private final LawFirmManagementService lawfirm = mock(LawFirmManagementService.class);
+    private final ImGatewayService im = mock(ImGatewayService.class);
+    @SuppressWarnings("unchecked")
+    private final ObjectProvider<LawFirmManagementService> lawfirmProvider = mock(ObjectProvider.class);
+    @SuppressWarnings("unchecked")
+    private final ObjectProvider<ImGatewayService> imProvider = mock(ObjectProvider.class);
+    private final HostServiceRegistry registry = newRegistry();
+
+    private HostServiceRegistry newRegistry() {
+        when(lawfirmProvider.getIfAvailable()).thenReturn(lawfirm);
+        when(imProvider.getIfAvailable()).thenReturn(im);
+        return new HostServiceRegistry(tasks, members, null, null, null, lawfirmProvider, imProvider);
+    }
 
     @Test
     void servicesJsonMatchesHostServiceRegistry() throws Exception {
@@ -118,6 +135,106 @@ class HostServiceRegistryTest {
     void unknownOperationAndMissingUserAreRefused() {
         assertThrows(IllegalArgumentException.class, () -> registry.invoke("calendar", "nope", 7L, 5L, Map.of()));
         assertThrows(IllegalArgumentException.class, () -> registry.invoke("calendar", "listForUser", null, 5L, Map.of()));
+    }
+
+    // ---- lawfirm（只读）----
+
+    private static Map<String, Object> overviewFixture() {
+        return Map.of(
+                "summary", Map.of("arTotalCents", 1000, "collectionRatePercent", 50.0, "billingRatePercent", 80.0, "pendingInvoiceCount", 2, "secret", "x"),
+                "kpi", Map.of("k", 1),
+                "users", List.of(Map.of("username", "should-not-leak")),
+                "matters", List.of(Map.of("id", 1, "projectId", 5, "title", "甲公司并购"), Map.of("id", 2, "projectId", 6, "title", "乙公司诉讼")),
+                "pendingClearances", List.of(Map.of("id", 9)),
+                "invoices", List.of(Map.of("id", 1, "projectId", 5, "matterTitle", "甲公司并购"), Map.of("id", 2, "projectId", 6, "matterTitle", "乙")),
+                "collections", List.of(Map.of("id", 3, "projectId", 5, "payerName", "甲")));
+    }
+
+    @Test
+    void lawfirmOverviewIsTrimmedAndUsesServerIdentity() {
+        when(lawfirm.execute(eq(7L), isNull(), eq("overview"), any())).thenReturn(overviewFixture());
+        String out = registry.invoke("lawfirm", "overview", 7L, 5L, Map.of("userId", 99));
+        assertTrue(out.contains("甲公司并购") && out.contains("乙公司诉讼"), out);
+        assertFalse(out.contains("should-not-leak"), "未列入的字段（用户目录）不回给模型");
+        verify(lawfirm).execute(eq(7L), isNull(), eq("overview"), eq(Map.of("scope", "all")));
+    }
+
+    @Test
+    void lawfirmOverviewWithProjectChecksMembershipAndFilters() {
+        when(members.hasReadPermission(9L, 7L)).thenReturn(false);
+        assertThrows(IllegalArgumentException.class, () -> registry.invoke("lawfirm", "overview", 7L, 5L, Map.of("projectId", 9)));
+        verify(lawfirm, never()).execute(any(), any(), any(), any());
+
+        when(members.hasReadPermission(5L, 7L)).thenReturn(true);
+        when(lawfirm.execute(eq(7L), eq(5L), eq("overview"), any())).thenReturn(overviewFixture());
+        String out = registry.invoke("lawfirm", "overview", 7L, null, Map.of("projectId", 5, "query", "并购"));
+        assertTrue(out.contains("甲公司并购"));
+        assertFalse(out.contains("乙公司诉讼"));
+    }
+
+    @Test
+    void lawfirmConflictCheckForwardsOnlyWhitelistedParamsAndNeverWrites() {
+        when(lawfirm.execute(eq(7L), isNull(), eq("precheckConflict"), any())).thenReturn(Map.of("riskLevel", "RED"));
+        assertThrows(IllegalArgumentException.class, () -> registry.invoke("lawfirm", "conflictCheck", 7L, null, Map.of("title", "x")));
+        String out = registry.invoke("lawfirm", "conflictCheck", 7L, null,
+                Map.of("clientName", "甲", "counterpartyName", "乙", "applicantName", "冒名", "leadLawyerUserId", 99));
+        assertTrue(out.contains("RED"));
+        verify(lawfirm).execute(eq(7L), isNull(), eq("precheckConflict"), eq(Map.of("clientName", "甲", "counterpartyName", "乙")));
+        verify(lawfirm, never()).execute(any(), any(), eq("submitIntake"), any());
+        assertThrows(IllegalArgumentException.class, () -> registry.invoke("lawfirm", "conflictCheck", null, null, Map.of("clientName", "甲")));
+    }
+
+    @Test
+    void lawfirmFeeLedgerFiltersByKindProjectAndMembership() {
+        when(lawfirm.execute(eq(7L), any(), eq("overview"), any())).thenReturn(overviewFixture());
+        String invoices = registry.invoke("lawfirm", "feeLedger", 7L, null, Map.of("kind", "invoices"));
+        assertTrue(invoices.contains("\"invoices\"") && !invoices.contains("\"collections\""), invoices);
+        assertTrue(invoices.contains("arTotalCents"));
+
+        when(members.hasReadPermission(9L, 7L)).thenReturn(false);
+        assertThrows(IllegalArgumentException.class, () -> registry.invoke("lawfirm", "feeLedger", 7L, null, Map.of("projectId", 9)));
+
+        when(members.hasReadPermission(5L, 7L)).thenReturn(true);
+        String scoped = registry.invoke("lawfirm", "feeLedger", 7L, null, Map.of("projectId", 5));
+        assertTrue(scoped.contains("甲公司并购"));
+        assertFalse(scoped.contains("\"matterTitle\":\"乙\""), scoped);
+    }
+
+    @Test
+    void lawfirmServiceFailureIsSurfacedNotSwallowed() {
+        when(lawfirm.execute(any(), any(), any(), any())).thenThrow(new IllegalArgumentException("请先登录"));
+        var e = assertThrows(IllegalArgumentException.class, () -> registry.invoke("lawfirm", "overview", 7L, null, Map.of()));
+        assertEquals("请先登录", e.getMessage());
+    }
+
+    // ---- im（只读）----
+
+    @Test
+    void imListConversationsUsesServerIdentity() {
+        when(im.execute(eq(7L), eq("list"), any())).thenReturn(Map.of("conversations", List.of(Map.of("id", "c1", "title", "项目群"))));
+        String out = registry.invoke("im", "listConversations", 7L, 5L, Map.of("userId", 99));
+        assertTrue(out.contains("项目群"));
+        verify(im).execute(7L, "list", Map.of());
+        assertThrows(IllegalArgumentException.class, () -> registry.invoke("im", "listConversations", null, 5L, Map.of()));
+    }
+
+    @Test
+    void imReadMessagesForwardsOnlyPagingAndRelaysMembershipDenial() {
+        assertThrows(IllegalArgumentException.class, () -> registry.invoke("im", "readMessages", 7L, null, Map.of()));
+        assertThrows(IllegalArgumentException.class, () -> registry.invoke("im", "readMessages", 7L, null,
+                Map.of("imConversationId", "c1", "beforeId", 5, "afterId", 1)));
+
+        when(im.execute(eq(7L), eq("messages"), any())).thenReturn(Map.of("messages", List.of(Map.of("id", 3, "text", "你好"))));
+        String out = registry.invoke("im", "readMessages", 7L, null,
+                Map.of("imConversationId", "c1", "limit", 500, "beforeId", 10, "action", "send", "text", "x"));
+        assertTrue(out.contains("你好"));
+        verify(im).execute(7L, "messages", Map.of("conversationId", "c1", "limit", 100, "beforeId", 10L));
+
+        // 非会话成员：ImService 抛出的拒绝原样回给模型，不返回任何消息
+        when(im.execute(eq(7L), eq("messages"), eq(Map.of("conversationId", "other", "limit", 30))))
+                .thenThrow(new IllegalArgumentException("无权访问该会话"));
+        var e = assertThrows(IllegalArgumentException.class, () -> registry.invoke("im", "readMessages", 7L, null, Map.of("imConversationId", "other")));
+        assertEquals("无权访问该会话", e.getMessage());
     }
 
     private static Long eq5() { return org.mockito.ArgumentMatchers.eq(5L); }

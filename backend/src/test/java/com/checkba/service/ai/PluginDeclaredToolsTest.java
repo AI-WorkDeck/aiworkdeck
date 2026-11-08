@@ -56,7 +56,7 @@ class PluginDeclaredToolsTest {
         doAnswer(i -> store.put(i.getArgument(0), i.getArgument(1))).when(settings).set(anyString(), anyString());
         plugins = new PluginService(settings, pluginsDir.toString());
         registry = new ToolRegistry(List.of(), plugins, new ClientCapabilityService());
-        registry.setHostServiceRegistry(new HostServiceRegistry(tasks, members, null, null, null));
+        registry.setHostServiceRegistry(new HostServiceRegistry(tasks, members, null, null, null, null, null));
         registry.init();
     }
 

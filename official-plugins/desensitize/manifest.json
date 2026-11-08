@@ -1,11 +1,146 @@
 {
   "id": "desensitize",
   "name": "文件脱敏",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "minHostVersion": "0.78.0",
   "description": "核查敏感信息并生成脱敏副本，可用恢复包复敏。",
   "author": "AI WorkDeck",
   "permissions": ["file_read", "file_write", "editor"],
+  "tools": [
+    {
+      "name": "desensitize_preview",
+      "description": "%tool.desensitize_preview.desc%",
+      "access": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "integer",
+            "description": "Project file id"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "TOKEN",
+              "MASK"
+            ],
+            "description": "Replacement style (default TOKEN)"
+          },
+          "strategies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Detection strategy id"
+            },
+            "description": "Optional detection strategies"
+          },
+          "customTerms": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Term"
+            },
+            "description": "Extra terms to treat as sensitive"
+          },
+          "excludedTerms": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Term"
+            },
+            "description": "Terms to leave untouched"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileId"
+        ]
+      },
+      "handler": {
+        "type": "service",
+        "service": "sensitive",
+        "operation": "preview"
+      },
+      "permissions": [
+        "file_read",
+        "file_write"
+      ],
+      "keywords": [
+        "脱敏",
+        "敏感信息",
+        "desensitize",
+        "redact preview",
+        "sensitive info"
+      ]
+    },
+    {
+      "name": "desensitize_redact",
+      "description": "%tool.desensitize_redact.desc%",
+      "access": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "integer",
+            "description": "Project file id"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "TOKEN",
+              "MASK"
+            ],
+            "description": "Replacement style (default TOKEN)"
+          },
+          "strategies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Detection strategy id"
+            },
+            "description": "Optional detection strategies"
+          },
+          "customTerms": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Term"
+            },
+            "description": "Extra terms to treat as sensitive"
+          },
+          "excludedTerms": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Term"
+            },
+            "description": "Terms to leave untouched"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileId"
+        ]
+      },
+      "handler": {
+        "type": "service",
+        "service": "sensitive",
+        "operation": "redact"
+      },
+      "permissions": [
+        "file_read",
+        "file_write"
+      ],
+      "keywords": [
+        "脱敏",
+        "脱敏副本",
+        "遮盖敏感",
+        "redact",
+        "desensitize",
+        "anonymize"
+      ]
+    }
+  ],
   "frontendEntry": "web/index.html",
   "contributes": {
     "views": [{ "id": "main", "name": "文件脱敏", "entry": "web/index.html", "placement": "sidebar", "scope": "project", "defaultDock": "left", "allowedDocks": ["left"] }]

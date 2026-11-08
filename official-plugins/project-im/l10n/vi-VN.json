@@ -1,4 +1,6 @@
 {
   "plugin.name": "Nhắn tin dự án",
-  "plugin.description": "Giao tiếp của công ty luật, nhóm và dự án: trợ lý dùng chung, tin nhắn trực tiếp, lưu trữ tệp và tham chiếu AI. Hiện chỉ khả dụng cho tài khoản Trung Quốc đại lục."
+  "plugin.description": "Giao tiếp của công ty luật, nhóm và dự án: trợ lý dùng chung, tin nhắn trực tiếp, lưu trữ tệp và tham chiếu AI. Hiện chỉ khả dụng cho tài khoản Trung Quốc đại lục.",
+  "tool.project_im_list_conversations.desc": "Liệt kê các cuộc trò chuyện nhắn tin của người dùng (chỉ đọc).",
+  "tool.project_im_read_messages.desc": "Đọc các tin nhắn gần đây của cuộc trò chuyện mà người dùng tham gia (chỉ đọc)."
 }

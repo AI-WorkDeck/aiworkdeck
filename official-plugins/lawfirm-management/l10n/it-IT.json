@@ -42,5 +42,8 @@
   "expense.saved": "Spesa registrata.",
   "expense.updated": "Spesa aggiornata.",
   "expense.deleted": "Spesa eliminata.",
-  "expense.quota": "L'archivio locale del plugin è pieno (64 KB). Elimina prima le voci regolate più vecchie."
+  "expense.quota": "L'archivio locale del plugin è pieno (64 KB). Elimina prima le voci regolate più vecchie.",
+  "tool.lawfirm_management_matter_overview.desc": "Panoramica dello studio (sola lettura): stato di incarichi e pratiche, indicatori e autorizzazioni per conflitto di interessi in sospeso; filtro facoltativo per progetto o parola chiave.",
+  "tool.lawfirm_management_conflict_check.desc": "Verifica del conflitto di interessi (sola lettura, nulla viene salvato): confronta cliente e controparte con le pratiche esistenti.",
+  "tool.lawfirm_management_fee_ledger.desc": "Consulta il registro degli onorari (sola lettura): fatture, incassi, crediti e tasso di incasso; filtro per progetto o parola chiave."
 }

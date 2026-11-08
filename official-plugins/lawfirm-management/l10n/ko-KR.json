@@ -42,5 +42,8 @@
   "expense.saved": "비용이 등록되었습니다.",
   "expense.updated": "비용이 업데이트되었습니다.",
   "expense.deleted": "비용이 삭제되었습니다.",
-  "expense.quota": "플러그인 로컬 저장 공간이 가득 찼습니다(64 KB). 먼저 정산 완료된 오래된 기록을 삭제하세요."
+  "expense.quota": "플러그인 로컬 저장 공간이 가득 찼습니다(64 KB). 먼저 정산 완료된 오래된 기록을 삭제하세요.",
+  "tool.lawfirm_management_matter_overview.desc": "법률사무소 관리 개요(읽기 전용): 수임/사건 상태, KPI, 처리 대기 중인 이해충돌 승인. 프로젝트나 키워드로 필터링할 수 있습니다.",
+  "tool.lawfirm_management_conflict_check.desc": "이해충돌 검색(읽기 전용, 아무것도 저장하지 않음): 의뢰인과 상대방을 기존 사건과 대조합니다.",
+  "tool.lawfirm_management_fee_ledger.desc": "수임료 장부 조회(읽기 전용): 청구서, 수금, 미수금, 수금률. 프로젝트나 키워드로 필터링할 수 있습니다."
 }

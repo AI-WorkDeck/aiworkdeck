@@ -42,5 +42,8 @@
   "expense.saved": "Frais enregistré.",
   "expense.updated": "Frais mis à jour.",
   "expense.deleted": "Frais supprimé.",
-  "expense.quota": "Le stockage local du plugin est plein (64 KB). Supprimez d'abord les anciennes entrées réglées."
+  "expense.quota": "Le stockage local du plugin est plein (64 KB). Supprimez d'abord les anciennes entrées réglées.",
+  "tool.lawfirm_management_matter_overview.desc": "Aperçu du cabinet (lecture seule) : état des dossiers et prises en charge, indicateurs et autorisations de conflit d'intérêts en attente ; filtre facultatif par projet ou mot-clé.",
+  "tool.lawfirm_management_conflict_check.desc": "Vérification de conflit d'intérêts (lecture seule, rien n'est enregistré) : compare un client et une partie adverse aux dossiers existants.",
+  "tool.lawfirm_management_fee_ledger.desc": "Consulter le registre des honoraires (lecture seule) : factures, encaissements, créances et taux de recouvrement ; filtre par projet ou mot-clé."
 }

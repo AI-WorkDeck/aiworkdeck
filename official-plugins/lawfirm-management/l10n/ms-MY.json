@@ -42,5 +42,8 @@
   "expense.saved": "Perbelanjaan direkodkan.",
   "expense.updated": "Perbelanjaan dikemas kini.",
   "expense.deleted": "Perbelanjaan dipadam.",
-  "expense.quota": "Storan setempat plugin penuh (64 KB). Padam dahulu rekod lama yang telah diselesaikan."
+  "expense.quota": "Storan setempat plugin penuh (64 KB). Padam dahulu rekod lama yang telah diselesaikan.",
+  "tool.lawfirm_management_matter_overview.desc": "Gambaran keseluruhan firma guaman (baca sahaja): status pengambilan/kes, KPI dan kelulusan percanggahan kepentingan yang belum selesai; tapis pilihan mengikut projek atau kata kunci.",
+  "tool.lawfirm_management_conflict_check.desc": "Semakan percanggahan kepentingan (baca sahaja, tiada apa disimpan): membandingkan klien dan pihak lawan dengan kes sedia ada.",
+  "tool.lawfirm_management_fee_ledger.desc": "Lihat lejar yuran (baca sahaja): invois, kutipan, akaun belum terima dan kadar kutipan; tapis mengikut projek atau kata kunci."
 }

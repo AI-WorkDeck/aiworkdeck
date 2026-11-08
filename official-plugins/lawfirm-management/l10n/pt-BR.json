@@ -42,5 +42,8 @@
   "expense.saved": "Despesa registrada.",
   "expense.updated": "Despesa atualizada.",
   "expense.deleted": "Despesa excluída.",
-  "expense.quota": "O armazenamento local do plugin está cheio (64 KB). Exclua primeiro os lançamentos acertados mais antigos."
+  "expense.quota": "O armazenamento local do plugin está cheio (64 KB). Exclua primeiro os lançamentos acertados mais antigos.",
+  "tool.lawfirm_management_matter_overview.desc": "Visão geral do escritório (somente leitura): status de admissões e casos, indicadores e liberações de conflito de interesses pendentes; filtro opcional por projeto ou palavra-chave.",
+  "tool.lawfirm_management_conflict_check.desc": "Verificação de conflito de interesses (somente leitura, nada é salvo): compara cliente e parte contrária com os casos existentes.",
+  "tool.lawfirm_management_fee_ledger.desc": "Consultar o livro de honorários (somente leitura): faturas, recebimentos, valores a receber e taxa de recebimento; filtro por projeto ou palavra-chave."
 }

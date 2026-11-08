@@ -1,4 +1,6 @@
 {
   "plugin.name": "项目沟通",
-  "plugin.description": "律所、团队与项目的沟通：共享助手、私聊、文件归档与 AI 引用。目前仅支持中国大陆站账号，国际站暂未开通。"
+  "plugin.description": "律所、团队与项目的沟通：共享助手、私聊、文件归档与 AI 引用。目前仅支持中国大陆站账号，国际站暂未开通。",
+  "tool.project_im_list_conversations.desc": "列出用户的沟通会话（只读）。",
+  "tool.project_im_read_messages.desc": "读取用户所在会话的最近消息（只读）。"
 }

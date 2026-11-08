@@ -42,5 +42,8 @@
   "expense.saved": "費用已登錄。",
   "expense.updated": "費用已更新。",
   "expense.deleted": "費用已刪除。",
-  "expense.quota": "本機外掛程式儲存空間已滿（64 KB），請先刪除已結算的舊記錄。"
+  "expense.quota": "本機外掛程式儲存空間已滿（64 KB），請先刪除已結算的舊記錄。",
+  "tool.lawfirm_management_matter_overview.desc": "律所管理概覽（唯讀）：收案／事項狀態、KPI、待處理的利衝放行；可依專案或關鍵字篩選。",
+  "tool.lawfirm_management_conflict_check.desc": "利益衝突檢索（唯讀，不儲存任何內容）：依委託人與對方當事人比對既有事項。",
+  "tool.lawfirm_management_fee_ledger.desc": "查詢收費台帳（唯讀）：發票、回款、應收與回款率；可依專案或關鍵字篩選。"
 }
