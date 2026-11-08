@@ -2,6 +2,6 @@
   "plugin.name": "Penyuraian Fail",
   "plugin.description": "Periksa maklumat sensitif, jana salinan yang telah dinyahpekakan, dan pulihkan dengan pakej pemulihan.",
   "view.main.name": "Penyuraian Fail",
-  "tool.desensitize_preview.desc": "Use when the user wants to preview what sensitive information in a file would be redacted. Pratonton maklumat sensitif yang akan disamarkan dalam fail projek (baca sahaja, tidak mencipta fail).",
-  "tool.desensitize_redact.desc": "Use when the user asks to redact, anonymize or mask a file (mask mode, not restorable). Samarkan maklumat sensitif dalam fail projek dan simpan sebagai salinan BARU; fail asal tidak pernah ditimpa."
+  "tool.desensitize_preview.desc": "Guna apabila pengguna mahu pratonton maklumat sensitif dalam fail yang akan disamarkan. Pratonton maklumat sensitif yang akan disamarkan dalam fail projek (baca sahaja, tidak mencipta fail).",
+  "tool.desensitize_redact.desc": "Guna apabila pengguna meminta fail disamarkan, dinyahkenal pasti atau ditutup (mod samar, tidak boleh dipulihkan). Samarkan maklumat sensitif dalam fail projek dan simpan sebagai salinan BARU; fail asal tidak pernah ditimpa."
 }

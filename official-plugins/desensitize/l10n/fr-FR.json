@@ -2,6 +2,6 @@
   "plugin.name": "Anonymisation de fichiers",
   "plugin.description": "Inspectez les informations sensibles, générez des copies désensibilisées et restaurez avec des packages de récupération.",
   "view.main.name": "Anonymisation de fichiers",
-  "tool.desensitize_preview.desc": "Use when the user wants to preview what sensitive information in a file would be redacted. Aperçu des informations sensibles qui seraient masquées dans un fichier de projet (lecture seule, aucun fichier créé).",
-  "tool.desensitize_redact.desc": "Use when the user asks to redact, anonymize or mask a file (mask mode, not restorable). Masque les informations sensibles d'un fichier de projet et enregistre une NOUVELLE copie masquée ; l'original n'est jamais écrasé."
+  "tool.desensitize_preview.desc": "À utiliser quand l'utilisateur veut prévisualiser les informations sensibles qui seraient masquées dans un fichier. Aperçu des informations sensibles qui seraient masquées dans un fichier de projet (lecture seule, aucun fichier créé).",
+  "tool.desensitize_redact.desc": "À utiliser quand l'utilisateur demande de masquer, anonymiser ou caviarder un fichier (mode masque, non réversible). Masque les informations sensibles d'un fichier de projet et enregistre une NOUVELLE copie masquée ; l'original n'est jamais écrasé."
 }

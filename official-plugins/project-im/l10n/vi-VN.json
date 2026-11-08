@@ -1,6 +1,6 @@
 {
   "plugin.name": "Nhắn tin dự án",
   "plugin.description": "Giao tiếp của công ty luật, nhóm và dự án: trợ lý dùng chung, tin nhắn trực tiếp, lưu trữ tệp và tham chiếu AI. Hiện chỉ khả dụng cho tài khoản Trung Quốc đại lục.",
-  "tool.project_im_list_conversations.desc": "Use when the user asks which group chats or conversations exist, including the project group. Liệt kê các cuộc trò chuyện nhắn tin của người dùng (chỉ đọc).",
-  "tool.project_im_read_messages.desc": "Use when the user asks what a group chat or project group has been discussing, or wants the chat history (get the conversation id from project_im_list_conversations first). Đọc các tin nhắn gần đây của cuộc trò chuyện mà người dùng tham gia (chỉ đọc)."
+  "tool.project_im_list_conversations.desc": "Dùng khi người dùng hỏi có những nhóm chat hoặc cuộc trò chuyện nào, kể cả nhóm dự án. Liệt kê các cuộc trò chuyện nhắn tin của người dùng (chỉ đọc).",
+  "tool.project_im_read_messages.desc": "Dùng khi người dùng hỏi nhóm chat hoặc nhóm dự án gần đây thảo luận gì, hoặc muốn xem lịch sử chat (lấy id cuộc trò chuyện từ project_im_list_conversations trước). Đọc các tin nhắn gần đây của cuộc trò chuyện mà người dùng tham gia (chỉ đọc)."
 }

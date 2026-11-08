@@ -1,6 +1,6 @@
 {
   "plugin.name": "Projectberichten",
   "plugin.description": "Communicatie binnen advocatenkantoor, team en project: gedeelde assistent, directe berichten, bestandsarchivering en AI-referenties. Momenteel alleen beschikbaar voor accounts in vasteland China.",
-  "tool.project_im_list_conversations.desc": "Use when the user asks which group chats or conversations exist, including the project group. Toont de berichtgesprekken van de gebruiker (alleen lezen).",
-  "tool.project_im_read_messages.desc": "Use when the user asks what a group chat or project group has been discussing, or wants the chat history (get the conversation id from project_im_list_conversations first). Leest recente berichten van een gesprek waar de gebruiker deel van uitmaakt (alleen lezen)."
+  "tool.project_im_list_conversations.desc": "Gebruiken wanneer de gebruiker vraagt welke groepschats of gesprekken er zijn, inclusief de projectgroep. Toont de berichtgesprekken van de gebruiker (alleen lezen).",
+  "tool.project_im_read_messages.desc": "Gebruiken wanneer de gebruiker vraagt waarover in een groepschat of de projectgroep recent is gesproken, of de chatgeschiedenis wil (haal eerst de gesprek-id op met project_im_list_conversations). Leest recente berichten van een gesprek waar de gebruiker deel van uitmaakt (alleen lezen)."
 }

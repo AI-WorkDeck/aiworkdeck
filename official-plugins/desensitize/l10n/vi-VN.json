@@ -2,6 +2,6 @@
   "plugin.name": "Che giấu thông tin tệp",
   "plugin.description": "Kiểm tra thông tin nhạy cảm, tạo bản sao đã được che giấu, và khôi phục bằng gói khôi phục.",
   "view.main.name": "Che giấu thông tin tệp",
-  "tool.desensitize_preview.desc": "Use when the user wants to preview what sensitive information in a file would be redacted. Xem trước các thông tin nhạy cảm sẽ bị che trong tệp dự án (chỉ đọc, không tạo tệp).",
-  "tool.desensitize_redact.desc": "Use when the user asks to redact, anonymize or mask a file (mask mode, not restorable). Che thông tin nhạy cảm trong tệp dự án và lưu thành bản sao MỚI; không bao giờ ghi đè tệp gốc."
+  "tool.desensitize_preview.desc": "Dùng khi người dùng muốn xem trước những thông tin nhạy cảm nào trong tệp sẽ bị che. Xem trước các thông tin nhạy cảm sẽ bị che trong tệp dự án (chỉ đọc, không tạo tệp).",
+  "tool.desensitize_redact.desc": "Dùng khi người dùng yêu cầu che, ẩn danh hoặc làm mờ thông tin trong tệp (chế độ che, không thể khôi phục). Che thông tin nhạy cảm trong tệp dự án và lưu thành bản sao MỚI; không bao giờ ghi đè tệp gốc."
 }

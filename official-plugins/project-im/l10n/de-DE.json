@@ -1,6 +1,6 @@
 {
   "plugin.name": "Projektmessaging",
   "plugin.description": "Kommunikation für Kanzlei, Team und Projekt: geteilter Assistent, Direktnachrichten, Dateiarchivierung und KI-Verweise. Derzeit nur für Konten in Festlandchina verfügbar.",
-  "tool.project_im_list_conversations.desc": "Use when the user asks which group chats or conversations exist, including the project group. Listet die Nachrichten-Unterhaltungen des Nutzers auf (nur lesen).",
-  "tool.project_im_read_messages.desc": "Use when the user asks what a group chat or project group has been discussing, or wants the chat history (get the conversation id from project_im_list_conversations first). Liest die letzten Nachrichten einer Unterhaltung, an der der Nutzer beteiligt ist (nur lesen)."
+  "tool.project_im_list_conversations.desc": "Verwenden, wenn der Nutzer fragt, welche Gruppenchats oder Unterhaltungen es gibt, einschließlich der Projektgruppe. Listet die Nachrichten-Unterhaltungen des Nutzers auf (nur lesen).",
+  "tool.project_im_read_messages.desc": "Verwenden, wenn der Nutzer wissen will, worüber in einem Gruppenchat oder in der Projektgruppe zuletzt gesprochen wurde, oder den Chatverlauf braucht (Unterhaltungs-ID zuvor mit project_im_list_conversations holen). Liest die letzten Nachrichten einer Unterhaltung, an der der Nutzer beteiligt ist (nur lesen)."
 }

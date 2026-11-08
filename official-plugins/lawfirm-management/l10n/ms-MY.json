@@ -43,8 +43,8 @@
   "expense.updated": "Perbelanjaan dikemas kini.",
   "expense.deleted": "Perbelanjaan dipadam.",
   "expense.quota": "Storan setempat plugin penuh (64 KB). Padam dahulu rekod lama yang telah diselesaikan.",
-  "tool.lawfirm_management_matter_overview.desc": "Use when the user asks about the firm's intake, matters, conflict-clearance progress or monthly business overview. Gambaran keseluruhan firma guaman (baca sahaja): status pengambilan/kes, KPI dan kelulusan percanggahan kepentingan yang belum selesai; tapis pilihan mengikut projek atau kata kunci.",
-  "tool.lawfirm_management_conflict_check.desc": "Use when the user asks whether a client or counterparty has a conflict of interest. Semakan percanggahan kepentingan (baca sahaja, tiada apa disimpan): membandingkan klien dan pihak lawan dengan kes sedia ada.",
-  "tool.lawfirm_management_fee_ledger.desc": "Use when the user asks about firm-wide fees, collections, bills, invoices or receivables (law firm administrators only). Lihat lejar yuran (baca sahaja): invois, kutipan, akaun belum terima dan kadar kutipan; tapis mengikut projek atau kata kunci.",
+  "tool.lawfirm_management_matter_overview.desc": "Guna apabila pengguna bertanya tentang pengambilan kes, kes, kemajuan kelulusan percanggahan kepentingan atau ringkasan perniagaan bulanan firma. Gambaran keseluruhan firma guaman (baca sahaja): status pengambilan/kes, KPI dan kelulusan percanggahan kepentingan yang belum selesai; tapis pilihan mengikut projek atau kata kunci.",
+  "tool.lawfirm_management_conflict_check.desc": "Guna apabila pengguna bertanya sama ada klien atau pihak lawan mempunyai percanggahan kepentingan. Semakan percanggahan kepentingan (baca sahaja, tiada apa disimpan): membandingkan klien dan pihak lawan dengan kes sedia ada.",
+  "tool.lawfirm_management_fee_ledger.desc": "Guna apabila pengguna bertanya tentang yuran, kutipan, bil, invois atau akaun belum terima seluruh firma (pentadbir firma sahaja). Lihat lejar yuran (baca sahaja): invois, kutipan, akaun belum terima dan kadar kutipan; tapis mengikut projek atau kata kunci.",
   "access.restricted": "Anda tiada kebenaran melihat data seluruh firma. Hanya item berkaitan anda dipaparkan. Lejar yuran dan papan pemuka seluruh firma terhad kepada pentadbir firma."
 }

@@ -1,6 +1,6 @@
 {
   "plugin.name": "प्रोजेक्ट संदेश",
   "plugin.description": "लॉ फर्म, टीम और प्रोजेक्ट संचार: साझा असिस्टेंट, सीधे संदेश, फ़ाइल संग्रहण और AI संदर्भ। वर्तमान में केवल मुख्यभूमि चीन खातों के लिए उपलब्ध।",
-  "tool.project_im_list_conversations.desc": "Use when the user asks which group chats or conversations exist, including the project group. उपयोगकर्ता की संदेश बातचीतों की सूची (केवल पढ़ने के लिए)।",
-  "tool.project_im_read_messages.desc": "Use when the user asks what a group chat or project group has been discussing, or wants the chat history (get the conversation id from project_im_list_conversations first). उपयोगकर्ता जिस बातचीत का सदस्य है उसके हाल के संदेश पढ़ें (केवल पढ़ने के लिए)।"
+  "tool.project_im_list_conversations.desc": "तब उपयोग करें जब उपयोगकर्ता पूछे कि कौन-से ग्रुप चैट या बातचीत मौजूद हैं, प्रोजेक्ट ग्रुप सहित। उपयोगकर्ता की संदेश बातचीतों की सूची (केवल पढ़ने के लिए)।",
+  "tool.project_im_read_messages.desc": "तब उपयोग करें जब उपयोगकर्ता पूछे कि किसी ग्रुप चैट या प्रोजेक्ट ग्रुप में हाल में क्या चर्चा हुई, या चैट इतिहास चाहे (पहले project_im_list_conversations से बातचीत की id लें)। उपयोगकर्ता जिस बातचीत का सदस्य है उसके हाल के संदेश पढ़ें (केवल पढ़ने के लिए)।"
 }

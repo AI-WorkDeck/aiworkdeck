@@ -1,6 +1,6 @@
 {
   "plugin.name": "Обмен сообщениями проекта",
   "plugin.description": "Коммуникация юридической фирмы, команды и проекта: общий ассистент, прямые сообщения, архивирование файлов и ссылки на ИИ. В настоящее время доступно только для аккаунтов материкового Китая.",
-  "tool.project_im_list_conversations.desc": "Use when the user asks which group chats or conversations exist, including the project group. Список диалогов пользователя в мессенджере (только чтение).",
-  "tool.project_im_read_messages.desc": "Use when the user asks what a group chat or project group has been discussing, or wants the chat history (get the conversation id from project_im_list_conversations first). Чтение последних сообщений диалога, в котором состоит пользователь (только чтение)."
+  "tool.project_im_list_conversations.desc": "Использовать, когда пользователь спрашивает, какие групповые чаты или диалоги существуют, включая группу проекта. Список диалогов пользователя в мессенджере (только чтение).",
+  "tool.project_im_read_messages.desc": "Использовать, когда пользователь спрашивает, что недавно обсуждали в групповом чате или группе проекта, или хочет историю переписки (сначала получить id диалога через project_im_list_conversations). Чтение последних сообщений диалога, в котором состоит пользователь (только чтение)."
 }
