@@ -194,7 +194,8 @@ public class LegalTools implements AgentToolComponent {
     // --- PKULaw MCP Integration（服务器名对应配置 mcp.servers[].name）---
 
     @ToolMeta(displayName = "语义搜索法规", category = "legal")
-    @Tool("Search for laws and regulations using PKULaw MCP Semantic Search. Use this for general legal questions. Returns a list of relevant articles.")
+    @Tool("用北大法宝语义检索法律法规，返回相关条文列表。\n"
+            + "何时用：一般法律问题。已知法规名和条号用 get_law_article；中国大陆以外的法域用 search_web。")
     public String law_search(@P("要检索的法律问题或关键词，用自然语言描述即可") String query) {
         log.info("Tool: law_search (semantic) called for query='{}'", query);
         // 先校验再解引用：query 缺省时 Map.of("query", query) 会直接抛 NPE（getMessage()==null），
@@ -249,7 +250,8 @@ public class LegalTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "查询法条", category = "legal")
-    @Tool("Get the full content of a specific law article by its title and article number. Use this when you have article info from law_search results.")
+    @Tool("按法规全称和条号取一条法律条文的完整内容。\n"
+            + "何时用：已有 law_search 结果里的法规名和条号，或用户点名某一条；不知道哪条先用 law_search。")
     public String get_law_article(
             @P("法规全称（如「中华人民共和国民法典」），可取自 law_search 的结果") String title,
             @P("条文号（如「第五百七十七条」或「577」）") String number) {

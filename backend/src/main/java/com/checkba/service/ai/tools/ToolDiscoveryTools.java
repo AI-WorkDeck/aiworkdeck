@@ -100,29 +100,16 @@ public class ToolDiscoveryTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "查看工具目录", category = "agent")
-    @Tool("Find tools that exist in this session but are NOT in the tool list you were given, and the "
-            + "specialised workflows (skills) you can switch to with use_skill. "
-            + "Call this BEFORE telling the user something cannot be done — the capability is very often here. "
-            + "Categories: table, revision (incl. checkpoint restore), evidence, template, "
-            + "edit (cursor/selection, delete, rewrite a paragraph, insert under a heading), "
-            + "files (incl. export to PDF), format (fonts/paragraphs/page setup/TOC/footnotes/images), "
-            + "spreadsheet, slides, office, pdf, litigation (diagrams), reference, memory, enterprise-data, legal, "
-            + "version (Git status/history/changed paths, commit, pull latest, restore history), meeting, task, tag (file tags), plugin, python, plugin-tools (tools from installed plugins), mcp (user-configured remote MCP connections), misc. "
-            + "With no argument you get every category with the tool names in it, plus the skills (cheap, do this first). "
-            + "With query you search tool names and descriptions by keywords (every word must match, up to 15 hits); "
-            + "with names you get exactly those tools; with a category (comma-separate several) you get the whole category. "
-            + "If several are given, names wins over query, and query over category. "
-            + "Every tool whose full signature is printed is added to your regular tool list from the NEXT turn on. "
-            + "You may call any tool it printed IMMEDIATELY in this same turn by writing it as "
-            + "<tool_code>name(arg=\"value\")</tool_code>; plain function calling only works from the next turn.")
+    @Tool("查找本会话里存在、但不在当前工具清单中的工具，以及可用 use_skill 切换的专项技能。\n"
+            + "何时用：告诉用户「做不了」之前先调它，能力常常就在这里。无参数时返回全部类目及其工具名，外加技能清单（便宜，先这样调）。\n"
+            + "类目：table、revision（含检查点恢复）、evidence、template、edit（光标选区、删除、改写段落）、files（含导出 PDF）、format（字体段落页面、目录、脚注、图片）、spreadsheet、slides、office、pdf、litigation、reference、memory、enterprise-data、legal、version（Git）、meeting、task、tag、plugin、python、plugin-tools、mcp、misc。\n"
+            + "优先级 names > query > category。返回完整签名的工具从下一轮起进入常规清单；本轮立刻要用，写成 <tool_code>name(arg=\"value\")</tool_code>。")
     public String list_tools(
-            @P(value = "Category to expand, e.g. \"format\" or \"table,revision\". Omit to see all categories.",
+            @P(value = "要展开的类目，如 \"format\" 或 \"table,revision\"；省略则列出全部类目",
                     required = false) String category,
-            @P(value = "Keywords to search tool names and descriptions, e.g. \"pdf merge\" or \"页码\". "
-                    + "Every word must match. Returns up to 15 tools with full signatures.",
+            @P(value = "搜工具名和描述的关键词，如 \"pdf merge\"，每个词都要命中；最多 15 条",
                     required = false) String query,
-            @P(value = "Exact tool names, comma-separated, e.g. \"pdf_merge,pdf_split\". "
-                    + "Returns their full signatures.",
+            @P(value = "精确工具名，逗号分隔，如 \"pdf_merge,pdf_split\"",
                     required = false) String names,
             String conversationId
     ) {

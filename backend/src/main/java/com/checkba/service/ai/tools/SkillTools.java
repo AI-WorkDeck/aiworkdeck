@@ -45,14 +45,11 @@ public class SkillTools implements AgentToolComponent {
     private final SkillRouter skillRouter;
 
     @ToolMeta(displayName = "调用技能", category = "agent")
-    @Tool("Switch this turn onto a specialised workflow (a 'skill') and get its full instructions. "
-            + "Use it when the user's task clearly matches one of the skills listed by list_tools() under "
-            + "'skills', even if the user did not name it. The result IS the skill's instructions - read them "
-            + "and follow them for the rest of this turn. Tools the skill needs join your regular tool list "
-            + "from the NEXT turn on; to use one right now, call it as <tool_code>name(arg=\"value\")</tool_code>. "
-            + "Do not call it again for a skill that is already active.")
+    @Tool("切换到一个专项工作流（skill）并取得它的完整指引，本轮后续按指引执行。\n"
+            + "何时用：用户任务明显匹配 list_tools() 的 skills 清单里的某个技能，即使用户没点名。已激活的技能不要重复调用。\n"
+            + "技能需要的工具从下一轮起进入常规清单；本轮要立刻用，写成 <tool_code>name(arg=\"value\")</tool_code>。")
     public String use_skill(
-            @P("The skill id exactly as listed by list_tools(), e.g. \"litigation-visual\".") String skillId,
+            @P("技能 id，与 list_tools() 列出的完全一致，如 \"litigation-visual\"") String skillId,
             String conversationId
     ) {
         if (skillRouter == null) {

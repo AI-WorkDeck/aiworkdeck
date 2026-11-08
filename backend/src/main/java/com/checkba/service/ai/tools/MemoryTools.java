@@ -77,22 +77,18 @@ public class MemoryTools implements AgentToolComponent {
     /**
      * 保存结构化记忆
      */
-    @Tool("保存重要信息到三级记忆系统中。用于存储关键决策、结论、事实、法律引用、用户偏好等需要长期保留的信息。" +
-          "触发条件（如果……则写）：" +
-          "1) 如果用户表达了跨项目的个人偏好、称谓、行文风格或审校习惯 → 传 type=preference, scope=user 写入 L3 个人长期记忆（preference 未传 scope 时自动归入 user）；" +
-          "2) 如果用户拍板了项目决策、交易结构，或经底稿/法规核实确认了核心案件事实、关键金额/日期、重大核查结论 → 传 scope=project（默认）或 file 写入 L2 项目情景与证据账本，关键法条、金额、日期与拍板结论将 isProtected 设为 true；" +
-          "3) 如果仅是文书草稿中未经核实的单方陈述、一次性闲聊或与既有记忆完全重复的内容 → 不要调用本工具（防噪纪律）。" +
-          "结构化写法（总表 Hook + 细项展开）：value 的第一行应写一句高密度结论摘要（系统会自动提取为 remember.md 总表索引的「— 一句话摘要」触发钩子），换行后补充展开内容（Why/事实依据/底稿出处 + How to apply/适用条件与执行方式）。" +
-          "它与 query_memory 是「记一条 / 找一条」的默认入口；要整理、批量改或按文件编辑记忆文件本身" +
-          "（含团队/律所共享记忆）时，改用 memory_list / memory_read / memory_write 等 memory_* 工具。")
+    @Tool("把需要长期保留的关键决策、结论、事实、法条引用、用户偏好存入记忆；与 query_memory 是「记一条 / 找一条」的默认入口。\n"
+            + "何时用：用户表达了跨项目的个人偏好、称谓、行文风格 → type=preference；用户拍板了项目决策，或经底稿/法规核实了核心事实、关键金额/日期 → scope=project 或 file，法条、金额、日期、拍板结论设 isProtected=true。\n"
+            + "何时不用：未经核实的单方陈述、闲聊、与既有记忆重复的内容。整理或编辑记忆文件本身（含团队/律所共享）用 memory_list / memory_read / memory_write。\n"
+            + "value 首行写一句高密度结论摘要（成为 remember.md 总表钩子），换行写依据与适用条件。")
     @ToolMeta(displayName = "保存记忆", category = "memory")
     public String save_memory(
-            @P("记忆类型: decision(决策)/conclusion(结论)/fact(事实)/reference(法律引用)/preference(偏好)") String type,
-            @P("记忆标题或关键词，用于后续检索与 remember.md 总表标题") String key,
-            @P("记忆内容：首行写一句话高密度结论摘要（自动进入 remember.md 总表索引钩子），换行写展开细节（Why/依据 + How to apply/适用规则）") String value,
-            @P("是否为法律关键信息需要特别保护（如法条引用、金额、日期等），受保护信息在压缩时不会丢失") boolean isProtected,
-            @P("记忆作用域(可选，preference默认user，其余默认project): user(L3用户级，跨项目的个人偏好与习惯)/project(L2项目级)/conversation(L1仅本对话)/file(L2绑定文件)/global(L3通用领域知识)") String scope,
-            @P("来源文件ID(可选)，scope=file 时必填，将记忆绑定到具体文件") Long sourceFileId
+            @P("decision（决策）/ conclusion（结论）/ fact（事实）/ reference（法律引用）/ preference（偏好）") String type,
+            @P("记忆标题或关键词，用于检索和 remember.md 总表标题") String key,
+            @P("首行一句话结论摘要，换行写依据与适用规则") String value,
+            @P("法条引用、金额、日期等关键信息设 true，压缩时不丢") boolean isProtected,
+            @P("可选。user（preference 缺省）/ project（其余缺省）/ conversation / file（需 sourceFileId）/ global") String scope,
+            @P("可选。来源文件 ID，scope=file 时必填") Long sourceFileId
     ) {
         log.info("Tool: save_memory called type={}, key={}, protected={}, scope={}", type, key, isProtected, scope);
 
@@ -204,26 +200,17 @@ public class MemoryTools implements AgentToolComponent {
     /**
      * 查询项目记忆
      */
-    @Tool("在本项目的记忆里找此前的决策、结论、事实与约定。它与 save_memory 是「记一条 / 找一条」的默认入口；"
-            + "只有要按文件整理记忆（先看有哪些记忆文件、读或改某一个文件）时才改用 memory_search / memory_read 等 memory_* 工具。"
-            + "三档检索算法用 depth 选，不要为同一个问题换着工具挨个试：\n"
-            + "- depth=quick（默认）：关键词精确召回。最快最省，什么都不花。"
-            + "用户用的词很可能就是当初存下来的词时（人名、公司名、条款名、金额）选它。\n"
-            + "- depth=hybrid：关键词 + 语义 RRF 融合。quick 没找到、或者用户是用自己的说法转述"
-            + "（「当时怎么定的价」而记忆里写的是「对价」）时选它。仍然不花额外的模型调用。\n"
-            + "- depth=deep：多轮召回，**会额外起一次辅助模型做查询扩展**（真实的时延与费用）。"
-            + "只在 quick/hybrid 都没捞到、且这件事确实值得多花一次调用时选它；"
-            + "不要一上来就用 deep，也不要三档挨个试一遍。\n"
-            + "若要可靠地找回某次 save_memory 明确绑定过的 file/conversation 作用域记忆，"
-            + "请传 scope（与 sourceFileId）——否则三档都只能靠相关性碰运气，可能命中不了。")
+    @Tool("在本项目记忆里找此前的决策、结论、事实与约定，与 save_memory 是「记一条 / 找一条」的默认入口。\n"
+            + "何时不用：要按文件整理记忆（看有哪些文件、读或改某个文件）才改用 memory_list / memory_read 等 memory_* 工具。\n"
+            + "depth 三档，别为同一问题换着档试：quick（默认）关键词精确召回，适合人名、公司名、条款名、金额；hybrid 关键词加语义，quick 没找到或用户换了说法时用；deep 多轮召回并额外调一次辅助模型（有时延与费用），仅前两档都没捞到且值得时用。\n"
+            + "要可靠找回绑定过 file/conversation 作用域的记忆，传 scope（及 sourceFileId），否则只能靠相关性。")
     public String query_memory(
-            @P("查询关键词，用于搜索相关记忆") String query,
-            @P("记忆类型过滤(可选): decision/conclusion/fact/reference/preference/all，默认为all") String type,
-            @P("按作用域精确定位(可选): file(需配 sourceFileId)/conversation(取当前对话)，"
-                    + "不传则和此前一样只按关键词在全项目范围检索") String scope,
-            @P("来源文件ID(可选)，scope=file 时必填") Long sourceFileId,
-            @P("检索档位(可选): quick(默认,关键词)/hybrid(关键词+语义融合)/deep(多轮召回，额外一次模型调用)") String depth,
-            @P("返回条数(可选,1-20)；不传按档位取默认值") Integer limit
+            @P("查询关键词") String query,
+            @P("可选。类型过滤：decision/conclusion/fact/reference/preference/all，默认 all") String type,
+            @P("可选。file（需 sourceFileId）或 conversation；不传则全项目按关键词检索") String scope,
+            @P("可选。来源文件 ID，scope=file 时必填") Long sourceFileId,
+            @P("可选。quick（默认）/ hybrid / deep") String depth,
+            @P("可选。返回条数 1-20，不传按档位取默认值") Integer limit
     ) {
         log.info("Tool: query_memory called query='{}', type='{}', scope='{}', depth='{}'", query, type, scope, depth);
         return retrieveWithDepth(query, type, scope, sourceFileId, depth, limit);
@@ -510,8 +497,8 @@ public class MemoryTools implements AgentToolComponent {
         }
     }
 
-    @Tool("列出 Markdown 长期记忆空间中的文件。scope 只能是 user、project、team 或 firm；空间身份由当前登录用户和项目自动确定。"
-            + "管理记忆文件本身用本组 memory_* 工具；只想记一条或找一条时用 save_memory / query_memory。")
+    @Tool("列出 Markdown 长期记忆空间里的文件。\n"
+            + "何时用：整理、批量改或按文件编辑记忆；只想记一条或找一条用 save_memory / query_memory。scope 取 user、project、team 或 firm，空间由当前用户和项目自动确定。")
     @ToolMeta(displayName = "列出记忆文件", category = "memory")
     public String memory_list(@P("记忆范围: user/project/team/firm") String scope) {
         try {
@@ -529,8 +516,8 @@ public class MemoryTools implements AgentToolComponent {
         }
     }
 
-    @Tool("读取一个 Markdown 长期记忆文件。scope 只能是 user、project、team 或 firm；先用 memory_list 获取路径。"
-            + "管理记忆文件本身用本组 memory_* 工具；只想记一条或找一条时用 save_memory / query_memory。")
+    @Tool("读取一个 Markdown 长期记忆文件。\n"
+            + "路径先用 memory_list 获取；scope 取 user、project、team 或 firm。只想记一条或找一条用 save_memory / query_memory。")
     @ToolMeta(displayName = "读取记忆文件", category = "memory")
     public String memory_read(@P("记忆范围: user/project/team/firm") String scope,
                               @P("相对 Markdown 路径，例如 remember.md 或 topics/style.md") String path) {
@@ -543,10 +530,10 @@ public class MemoryTools implements AgentToolComponent {
         }
     }
 
-    @Tool("在一个 Markdown 长期记忆空间内搜索标题、路径和正文，返回的是文件路径与 revision（供 memory_read / memory_edit 接着用）。"
-            + "scope 只能是 user、project、team 或 firm。只想找回此前记下的某条决策或事实时用 query_memory，它直接返回记忆内容。")
+    @Tool("在一个 Markdown 长期记忆空间内搜索标题、路径和正文，返回文件路径与版本号。\n"
+            + "路径和版本号（revision）供 memory_read / memory_edit 接着用。何时不用：只想找回某条决策或事实用 query_memory，它直接返回记忆内容。scope 取 user、project、team 或 firm。")
     @ToolMeta(displayName = "搜索记忆", category = "memory")
-    public String memory_search(@P("记忆范围: user/project/team/firm") String scope,
+    public String memory_search(@P("记忆范围：user / project / team / firm") String scope,
                                 @P("搜索词") String query) {
         try {
             MemorySpaceView space = resolveDocumentSpace(scope);
